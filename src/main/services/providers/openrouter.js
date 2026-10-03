@@ -432,13 +432,11 @@
   }
 
   // ─── Chi può servire un modello, prima di chiamarlo ───────────────────────
-  // Voce e dettatura ignorano il blocco `provider` (#713): l'esclusione si
-  // applica qui, sugli host che il router dichiara, e senza un host ammesso la
-  // richiesta non parte. Host sconosciuti (rete, 404, elenco vuoto): si chiama,
-  // e resta il riscontro a posteriori.
+  // Sugli endpoint audio il router ignora il blocco `provider` (#713): l'esclusione si applica qui, sugli host
+  // dichiarati. Regole: patterns/voce-dettatura-e-vettori-passano-dal-router-come-le-chat.md.
   const HOSTS_FRESH_MS = 60 * 60 * 1000;
   const HOSTS_RETRY_MS = 5 * 60 * 1000;
-  const HOSTS_TIMEOUT_MS = 10000;
+  const HOSTS_TIMEOUT_MS = 10 * 1000;
   const HOSTS_MAX_MODELS = 500;
   const hostsCache = new Map(); // id → { until, hosts, pending }
 
@@ -515,9 +513,7 @@
       if (!names.some((x) => x.toLowerCase() === n.toLowerCase())) names.push(n);
     }
     const I18n = global.SN_I18N;
-    const err = new Error(I18n
-      ? I18n.t('err_audio_no_allowed_host', model, joinNames(names))
-      : `Il modello «${model}» lo serve solo ${joinNames(names)}, che Filo esclude. Non ho mandato niente: scegli un altro modello.`);
+    const err = new Error(I18n ? I18n.t('err_audio_no_allowed_host', model, joinNames(names)) : `NO_ALLOWED_HOST ${model}`);
     err.code = 'NO_ALLOWED_HOST';
     err.provider = 'openrouter';
     err.model = model;

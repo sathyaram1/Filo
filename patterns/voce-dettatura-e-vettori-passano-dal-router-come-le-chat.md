@@ -19,6 +19,15 @@ delle chat. Regole che ne seguono:
   lo chiede fuori dal cammino della risposta, marchia la voce di cronologia
   (`History.patch`) e, per la lettura, registra anche il costo che il router
   riporta lì. Senza questo riscontro la lista di esclusione è solo una speranza.
+- **Sugli endpoint audio il router ignora il blocco `provider`** (#713:
+  `ignore`, `only` e `order` lì non valgono). Per voce e dettatura la lista di
+  esclusione si applica PRIMA di chiamare: `ensureAllowedHost` (openrouter.js)
+  legge chi serve il modello da `/models/{id}/endpoints` (un'ora di cache; un
+  elenco scaduto si usa mentre si rilegge) e, se nessun host è ammesso
+  (`hostPolicyViolation`, constants.js), non chiama e lancia `NO_ALLOWED_HOST`,
+  un messaggio che lettura, dettatura e «Prova» mostrano così com'è. Se gli host
+  non si sanno si chiama comunque; con host misti il router può ancora scegliere
+  quello escluso. In entrambi i casi resta il riscontro a posteriori.
 - **Il costo dell'audio è quello del router**, non un listino a token:
   `usage.costUsd` ha la precedenza in `estimateCostEur` (costTracker.js).
 - **I vettori portano il nome del modello che li ha fatti** (`embedModel` sulla
@@ -33,7 +42,8 @@ delle chat. Regole che ne seguono:
 - **Le voci del registro dichiarano le modalità** (`inputs`/`outputs`) e chi
   valida (editor delle Opzioni, menu «Detta», pulsanti «Prova») le legge via
   `entryModalities`: un modello dal nome muto non passa per "forse sa tutto".
-- **Test:** `tests/unit/openrouterAudio.test.mjs`, `dictationSegmenter.test.mjs`,
-  `ttsVoices.test.mjs`; `tests/tts-voice-openrouter.spec.mjs`,
+- **Test:** `tests/unit/openrouterAudio.test.mjs`, `vocePoliticaHost.test.mjs`,
+  `dictationSegmenter.test.mjs`, `ttsVoices.test.mjs`;
+  `tests/tts-voice-openrouter.spec.mjs`, `voce-dettatura-host-esclusi.spec.mjs`,
   `dictation-live.spec.mjs`, `dictation-open-weights-reason.spec.mjs`,
   `tab-semantic-search.spec.mjs` (reindicizzazione).
