@@ -1873,6 +1873,24 @@
     } catch (_) {}
   });
 
+  // Aperta dal tasto destro sull'avviso di un sito pericoloso (#813.5): la domanda su quel sito parte da sola, il falso
+  // allarme apre «Invia feedback» già scritto. Durante l'intervista di benvenuto la domanda resta scritta e la manda l'utente.
+  async function richiestaDellAvviso(inAccoglienza) {
+    const r = await send({ type: MSG.CASA_RICHIESTA });
+    const q = r && r.ok && r.richiesta;
+    if (!q || typeof q.testo !== 'string' || !q.testo) return;
+    if (q.tipo === 'segnala') {
+      const fine = Date.now() + 5000;
+      while (!self.SN_FEEDBACK_UI && Date.now() < fine) await new Promise((ok) => setTimeout(ok, 50));
+      self.SN_FEEDBACK_UI?.open({ testo: q.testo });
+    } else if (q.tipo === 'chiedi') {
+      if (!inAccoglienza) { submitMessage(q.testo); return; }
+      inputEl.value = q.testo;
+      autoGrowInput();
+      inputEl.focus();
+    }
+  }
+
   (async function init() {
     renderControls();
     refreshRedteamVisibile();
@@ -1914,6 +1932,7 @@
     // Nessuna intervista aperta: se l'ultima si era chiusa a metà, la home lo
     // dice — finché l'utente non risponde a quella riga.
     else Accoglienza.refreshOnboardingNotice().catch(() => {});
+    richiestaDellAvviso(!!onbState).catch((e) => console.warn('[Filo] richiesta dall\'avviso', e));
     // Popup all'avvio, in sequenza per non sovrapporsi: prima il recap
     // aggiornamento (solo se c'è una versione precedente vista e note nuove),
     // POI il ringraziamento per i feedback risolti (C5). Se il recap non compare,

@@ -120,6 +120,12 @@
       doesNot: 'Non chiude né archivia nessuna scheda: le riordina soltanto (per chiudere quelle non più utili c’è /pulisci).',
     },
     {
+      id: 'tab-preview', title: 'Anteprima di una scheda al passaggio del mouse', category: 'navigation',
+      desc: 'Passando il mouse su una scheda della barra compare una carta con il suo titolo, il sito e un’immagine della pagina com’era l’ultima volta che l’hai vista. Le schede aperte in secondo piano hanno la loro immagine appena finiscono di caricare, anche se non le hai mai aperte. Sulla scheda che hai davanti la carta mostra solo il titolo.',
+      invoke: 'Passa il mouse su una scheda. In Preferenze → «Anteprima delle schede» la spegni o scegli la dimensione (piccola, media, grande); lo stesso chiedendolo a Filo ("spegni l\'anteprima delle schede", "anteprima delle schede più grande").',
+      doesNot: 'L’immagine è quella dell’ultima volta che la pagina si è vista. Una pagina aperta dietro e mai vista si rifà quando cambia (una posta che si riempie tardi), e così una scheda dietro che passa da sola a un’altra pagina, anche senza ricaricare (il video dopo), o una scheda lasciata mentre caricava ancora o appena arrivata; se invece una pagina già vista e ferma cambia mentre è dietro (una chat, un feed che si aggiorna), l’anteprima resta com’era finché non ci torni. Le immagini restano in memoria e non vengono salvate sul computer.',
+    },
+    {
       id: 'open-in-background', title: 'Apri una scheda in secondo piano', category: 'navigation',
       desc: 'Filo può aprire una pagina senza portartici davanti: tu resti dove sei e quello che hai chiesto — un brano, una radio, un podcast — parte lo stesso nella scheda dietro.',
       invoke: 'Chiedilo a parole all’assistente ("mettimi questa canzone", "apri senza cambiare scheda"): quando ciò che apre serve solo da ascoltare, la scheda nasce in secondo piano. Il riferimento che resta nella conversazione ti porta a quella scheda quando vuoi.',
@@ -472,6 +478,12 @@
       id: 'security', title: 'Sicurezza e privacy', category: 'settings',
       desc: 'Protezione dalla fuga del tuo indirizzo IP, blocco dei popup, gestione dei cookie (manuale / predefinita / privacy massima), lista dei siti bloccati e lista dei siti fidati. Un sito bloccato non si apre da nessuna strada (link, risultati di una ricerca, barra della home, redirect, finestrelle, indietro e avanti, azioni di Filo) finché non scegli «Apri comunque» (nella notifica, sulla pagina «Sito bloccato» o sotto la risposta di Filo in chat o nell\'assistente sulla pagina); una scheda già aperta su un sito che metti in lista passa subito alla pagina «Sito bloccato», anche alla riapertura di Filo, e da lì un collegamento porta alla lista.',
       invoke: 'Pagina filo://security/security.html.',
+    },
+    {
+      id: 'dangerous-sites', title: 'Avviso dei siti pericolosi', category: 'settings',
+      desc: 'Un sito pericoloso (in lista per phishing o malware, o che imita un marchio e chiede la password) o sospetto viene coperto da un avviso appena si apre, prima che finisca di caricarsi. L\'avviso sta fuori dalla pagina: il sito non lo copre, non lo toglie e non sente quello che ci scrivi. Su un sito pericoloso si prosegue scrivendo «confermo», su uno sospetto con «Continua»; la scelta vale per quel sito in quella scheda finché resta aperta.',
+      invoke: 'Compare da solo. Tasto destro sull\'avviso: «Chiedi a Filo di questo sito» (apre una chat nuova con la domanda), «Segnala un falso allarme» (apre «Invia feedback» già scritto), «Copia l\'indirizzo», «Torna indietro». Impostazioni → Sicurezza → «Avvisa sui siti pericolosi».',
+      doesNot: 'Non blocca la navigazione e non chiude la scheda: la pagina carica sotto l\'avviso.',
     },
     {
       id: 'cookie-banners', title: 'Banner dei cookie rifiutati da soli', category: 'settings',

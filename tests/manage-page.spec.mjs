@@ -2181,8 +2181,10 @@ test('DD1: la tab Modelli di supporto renderizza tutti gli slot col modelChainEd
   // Attendi che l'editor sia visibile (caricamento IPC completato).
   await expect(page.locator('#mgSmEditor')).toBeVisible({ timeout: 5000 });
 
-  // 7 slot presenti nel DOM (sanitizer + 3 giudici fissi + dinamico + red-team + priorità).
-  await expect(page.locator('.mg-sm-slot')).toHaveCount(7);
+  // 8 slot presenti nel DOM (sanitizer + 3 giudici fissi + dinamico + red-team +
+  // priorità, e la ricerca fra i feedback spostata qui dalle Opzioni, #465).
+  await expect(page.locator('.mg-sm-slot')).toHaveCount(8);
+  await expect(page.locator('[data-slot="manageSearch"] label')).toHaveText('Ricerca fra i feedback');
   await expect(page.locator('[data-slot="sanitizer"]')).toBeVisible();
   await expect(page.locator('[data-slot="judge1"]')).toBeVisible();
   await expect(page.locator('[data-slot="judge2"]')).toBeVisible();
@@ -2202,7 +2204,7 @@ test('DD1: la tab Modelli di supporto renderizza tutti gli slot col modelChainEd
   // Ogni slot ha almeno un input (modelChainEditor crea .sn-chain-input per ogni segmento).
   const chainInputs = page.locator('.mg-sm-chain-host .sn-chain-input');
   const count = await chainInputs.count();
-  expect(count).toBeGreaterThanOrEqual(7);
+  expect(count).toBeGreaterThanOrEqual(8);
 
   // Il bottone "Salva" è visibile.
   await expect(page.locator('#mgSmSaveBtn')).toBeVisible();
@@ -2258,6 +2260,7 @@ test('DD1: il bottone Salva invia support_models_update con i valori corretti', 
   expect(sent).toHaveProperty('judgeDynamic');
   expect(sent).toHaveProperty('judgeRedTeam');
   expect(sent).toHaveProperty('judgePriority');
+  expect(sent).toHaveProperty('manageSearch');
   // Il vecchio slot unico non viene più inviato.
   expect(sent).not.toHaveProperty('judgeL2');
 

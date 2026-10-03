@@ -10,6 +10,7 @@
 
 const { BrowserWindow } = require('electron');
 const Defaults = require('./defaultsStore');
+const { settingsForOwnerAction, fillMovedSlots, ownerSlotFor } = require('./resolveSupportModel');
 const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra } = require('./impostazioniPerOrigine');
 const SegretiLetti = require('./segretiLetti');
 
@@ -354,9 +355,11 @@ function actionLabelForSettings(action) {
 
 function modelConfigError(settings, action, missingRefs) {
   const label = actionLabelForSettings(action);
-  const where = settings && settings.useDefaultModels === false
-    ? I18n.t('err_model_where_own')
-    : I18n.t('err_model_where_default');
+  const where = ownerSlotFor(action)
+    ? I18n.t('err_model_where_owner')
+    : settings && settings.useDefaultModels === false
+      ? I18n.t('err_model_where_own')
+      : I18n.t('err_model_where_default');
   const missing = missingRefs || [];
   const e = new Error(missing.length
     ? I18n.t('err_unknown_model_for_action', label, SN_CONST.formatModelRefsForMessage(missing), where)
@@ -652,7 +655,7 @@ function createAnswerStreamer(onText) {
 // della chat», punto 1): senza numeri per turno ogni scelta sui modelli è a
 // occhio. `timing` finisce nella cronologia AI accanto al costo.
 async function handleAIRequest({ action, payload, origin, onReasoning = null, onText = null, onToolCall = null, tools = null, toolChoice = null, signal = null, noCache = false }) {
-  const settings = await getEffectiveSettings();
+  const settings = await settingsForOwnerAction(await getEffectiveSettings(), action);
   if (action === ACTIONS.TRANSCRIBE_AUDIO) return handleTranscription({ settings, payload, origin, signal });
   // NIENTE `payload.modelOverride`: era la porta di servizio con cui un chiamante
   // poteva imporre un modello scritto nel codice, scavalcando la configurazione
@@ -3695,6 +3698,7 @@ const handlerCtx = {
   broadcastToFiloPages,
   broadcastLiveUpdate,
   getEffectiveSettings,
+  fillMovedSlots,
   withDefaults,
   Defaults,
   isAdmin: () => {
