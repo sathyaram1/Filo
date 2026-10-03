@@ -1156,6 +1156,29 @@
     return L1_MOTIVI[k] || k.replace(/_/g, ' ');
   }
 
+  // Segno di mittente pericoloso (#922): lo tiene il server (ownerSenderFlag) e lo toglie solo il gesto
+  // esplicito dell'owner, mai un'approvazione — o un attaccante si ripulisce con un feedback innocuo.
+  const FRASE_SEGNO_ERRATO = 'il segno era un errore';
+
+  /** Il filtro d'ingresso l'ha fermato perché il mittente era segnato? PURA. */
+  function fermatoDalSegno(fb) {
+    const p = fb && fb.pipeline;
+    if (!p || typeof p !== 'object' || !Array.isArray(p.l1Reasons)) return false;
+    return p.l1Reasons.some((r) => String(r == null ? '' : r).trim() === 'linked_prior_attack');
+  }
+
+  const MOTIVI_SEGNO = {
+    attack: 'un suo feedback è stato giudicato un attacco',
+    attack_confirmed: 'un suo attacco è stato confermato',
+  };
+  /** Il motivo del segno in parole: un codice si traduce, un testo del server passa com'è. PURA. */
+  function motivoSegnoText(reason) {
+    const k = String(reason == null ? '' : reason).trim();
+    if (!k) return '';
+    if (MOTIVI_SEGNO[k]) return MOTIVI_SEGNO[k];
+    return /^[a-z0-9_]+$/i.test(k) ? l1MotivoText(k) : k;
+  }
+
   // Cosa ha FATTO il filtro d'ingresso, non come si chiama il campo.
   const L1_AZIONI = {
     block_attack: 'ha fermato la segnalazione come attacco',
@@ -1591,6 +1614,7 @@
     fusioneInAttesa, fusioniSenzaFeedback, richiestaDiQuesto, numeroOf,
     l1MotivoText, LIVELLO_COLORI, L1_MOTIVI, righeTesto,
     aspettaRisposta, ultimaDomanda,
+    FRASE_SEGNO_ERRATO, fermatoDalSegno, motivoSegnoText,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
