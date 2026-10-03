@@ -362,10 +362,11 @@
   // perché la shell è alta solo 88px e gli elementi DOM non possono apparire
   // sopra le WebContentsView delle tab. Delega globale così funziona anche per i
   // tab ricreati ad ogni render().
+  // Anche la carta di una scheda lo usa: cede al suggerimento di un controllo nell'istante in cui lui compare.
+  const SUGGERIMENTO_RITARDO = 350;
   (() => {
     let showTimer = null;
     let currentTarget = null;
-    const SHOW_DELAY = 350;
 
     function hide() {
       if (showTimer) { clearTimeout(showTimer); showTimer = null; }
