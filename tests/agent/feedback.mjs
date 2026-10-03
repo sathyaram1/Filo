@@ -128,17 +128,24 @@ export async function pushIssue({ model, severity, area, title, detail, foundAt,
   const encTitle = `${severity || 'low'}|${(area || '?').replace(/\|/g, '/')}|${(title || '(senza titolo)').replace(/\|/g, '/')}`.slice(0, 500);
   const doc = {
     fields: {
-      text: toFsValue((detail || '').slice(0, 10000)),
-      url: toFsValue((foundAt || '').slice(0, 2000)),
+      text: toFsValue(await cifra((detail || '').slice(0, 10000))),
+      url: toFsValue(await cifra((foundAt || '').slice(0, 2000))),
       title: toFsValue(encTitle),
       userAgent: toFsValue('filo-agent'),
-      clientId: toFsValue(`agent:${(model || 'unknown')}`.slice(0, 100)),
+      clientId: toFsValue(await cifra(`agent:${(model || 'unknown')}`.slice(0, 100))),
       images: toFsValue(images),
+      statusPublic: toFsValue('open'),
+      senderProof: toFsValue('admin'),
       createdAt: { timestampValue: new Date().toISOString() },
     },
   };
   const endpoint = `${FIRESTORE_BASE}/${COLLECTION}?key=${API_KEY}`;
-  const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(doc) });
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify(doc),
+  });
+  // Un token rifiutato non ripiega sull'anonimo: sarebbe di nuovo un utente che si firma esploratore.
   if (!res.ok) throw new Error(`firestore create ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`);
   const json = await res.json();
   return { id: json.name?.split('/').pop() || '', images };
