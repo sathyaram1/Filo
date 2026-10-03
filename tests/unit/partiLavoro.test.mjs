@@ -119,7 +119,7 @@ test('cosa legge chi lancia finish: la parte che manca e come chiuderla, o la pr
   assert.match(sola, /Pratica #915 chiusa\./, 'un lavoro di una parte sola si chiude come prima');
 });
 
-test('regole: localMerges lo scrive solo l’admin, nella forma { app?, server?, solo? } con interi positivi', () => {
+test('regole: localMerges lo scrive solo l’admin, nella forma { app?, server?, solo?, ramo? } con interi positivi', () => {
   const rules = readFileSync(join(ROOT, 'firestore.rules'), 'utf8').replace(/\/\/[^\n]*/g, '');
   const m = /function localMergesValido\(d\) \{([\s\S]*?)\n\s*\}/.exec(rules);
   assert.ok(m, 'funzione localMergesValido non trovata');
