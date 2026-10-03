@@ -3334,7 +3334,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   if (onboardingClosed) {
     finishOnboarding({ userMessage, filoReply: textReply, stateText });
   } else {
-    lezioniAutomaticheConsentite({ sender, contesto: azioniViste })
+    lezioniAutomaticheConsentite({ sender, contesto: azioniViste, fontiLette })
       .then((ok) => (ok ? maybeRunLessonAgent({ userMessage, filoReply: textReply, stateText }) : null))
       .catch(() => {});
   }
