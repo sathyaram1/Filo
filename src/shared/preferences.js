@@ -82,6 +82,20 @@
     return Number.isFinite(n) ? n : NaN;
   }
 
+  // I toni della suoneria e degli avvisi: gli id sono quelli di SN_SOUNDS (sounds.js).
+  const TONI = {
+    standard: 'default', default: 'default', normale: 'default',
+    delicata: 'gentle', gentle: 'gentle', dolce: 'gentle', morbida: 'gentle',
+    urgente: 'urgent', urgent: 'urgent', forte: 'urgent', acuto: 'urgent',
+    carillon: 'chime', chime: 'chime', campanello: 'chime', campana: 'chime',
+  };
+  const TONI_ETICHETTE = { default: 'Standard', gentle: 'Delicata', urgent: 'Urgente', chime: 'Carillon' };
+  function tonoDa(v) {
+    return TONI[String(v == null ? '' : v).trim().toLowerCase()] || null;
+  }
+  // Lo stesso tetto del campo nelle Preferenze.
+  const NOTIF_SEC_MAX = 120;
+
   // Ogni voce: sinonimi di chiave + build(valore) → { partial, label }.
   // `partial` è il pezzo di settings da fondere (deepMerge preserva i campi
   // annidati vicini); `label` è la conferma leggibile per l'utente.
@@ -302,6 +316,16 @@
         return { partial: { autoArchive: { onIdle: b } }, label: `Archivia quando inattivo → ${b ? 'attivo' : 'disattivato'}` };
       },
     },
+    // #737 — sta nella pagina Sicurezza accanto all'ad-block, ma non apre né chiude niente: si applica subito.
+    {
+      keys: ['salta_pubblicita', 'salta pubblicità', 'salta pubblicita', 'salta le pubblicità', 'salta le pubblicita',
+        'salta annunci', 'salta gli annunci', 'pubblicità dei video', 'pubblicita dei video', 'skip ads', 'salta ads'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { security: { adSkip: { enabled: b } } }, label: `Salta le pubblicità dei video → ${b ? 'attivo' : 'disattivato'}` };
+      },
+    },
 
     // ── Sicurezza / privacy — livello 2 (popup di conferma prima di applicare) ──
     {
@@ -509,17 +533,50 @@
       keys: ['suoneria_timer', 'suoneria timer', 'suoneria', 'ringtone', 'timer ringtone', 'suono timer', 'tono timer'],
       level: 1,
       build(v) {
-        const s = String(v == null ? '' : v).trim().toLowerCase();
-        const map = {
-          standard: 'default', default: 'default', normale: 'default',
-          delicata: 'gentle', gentle: 'gentle', dolce: 'gentle', morbida: 'gentle',
-          urgente: 'urgent', urgent: 'urgent', forte: 'urgent', acuto: 'urgent',
-          carillon: 'chime', chime: 'chime', campanello: 'chime', campana: 'chime',
-        };
-        const tone = map[s];
+        const tone = tonoDa(v);
         if (!tone) return null;
-        const labelMap = { default: 'Standard', gentle: 'Delicata', urgent: 'Urgente', chime: 'Carillon' };
-        return { partial: { timerRingtone: tone }, label: `Suoneria timer → ${labelMap[tone]}` };
+        return { partial: { timerRingtone: tone }, label: `Suoneria timer → ${TONI_ETICHETTE[tone]}` };
+      },
+    },
+
+    // ── Avvisi in basso a destra (barra e pagine) — reversibili, innocui → livello 1 ──
+    {
+      keys: ['durata_notifiche', 'durata notifiche', 'durata delle notifiche', 'durata notifica', 'durata della notifica',
+        'durata avvisi', 'durata degli avvisi', 'durata toast', 'tempo notifiche', 'notifications.durationsec'],
+      build(v) {
+        const s = String(v == null ? '' : v).trim().toLowerCase();
+        // Una cifra decide sempre («resta 8 secondi» è 8); le parole del «per sempre» contano solo senza cifre,
+        // e «non restano» chiede il contrario.
+        let n;
+        if (/\d/.test(s)) {
+          n = parseItalianNumber(s);
+          if (/min/.test(s)) n *= 60;
+        } else if (/\bnon\s+rest/.test(s)) return null;
+        else if (/(sempre|infinit|finch[eé]|resta|non spar|le chiudo|la chiudo)/.test(s)) n = 0;
+        else return null;
+        if (!Number.isFinite(n) || n < 0) return null;
+        n = Math.round(n);
+        if (n > NOTIF_SEC_MAX) {
+          return { rifiuto: `la durata massima è ${NOTIF_SEC_MAX} secondi; con 0 gli avvisi restano finché non li chiudi` };
+        }
+        return {
+          partial: { notifications: { durationSec: n } },
+          label: n === 0 ? 'Avvisi → restano finché non li chiudi' : `Durata degli avvisi → ${n} s`,
+        };
+      },
+    },
+    {
+      keys: ['suono_notifiche', 'suono notifiche', 'suono delle notifiche', 'suono notifica', 'suono della notifica',
+        'suono avvisi', 'suono degli avvisi', 'tono notifiche', 'notifications.sound'],
+      // Un sì/no lo accende o lo spegne; un tono lo accende con quel tono.
+      build(v) {
+        const tone = tonoDa(v);
+        if (tone) {
+          return { partial: { notifications: { soundEnabled: true, sound: tone } }, label: `Suono degli avvisi → ${TONI_ETICHETTE[tone]}` };
+        }
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { notifications: { soundEnabled: b } }, label: `Suono degli avvisi → ${b ? 'acceso' : 'spento'}` };
       },
     },
 

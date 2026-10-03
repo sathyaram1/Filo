@@ -183,6 +183,7 @@
     settings = await fetchSettings();
     applyTheme(settings.theme);
     applyThemeTokens(settings.themeTokens);
+    self.SN_AVVISI?.imposta(settings.notifications);
 
     // Le tre cose qui sotto descrivono la SCHEDA: il colore che la tinge e i
     // segnali su quanto è stata usata. Un riquadro incorporato non ne sa nulla —
@@ -684,6 +685,9 @@
     // lo stesso canale `context-menu` del webContents.
     e.stopPropagation();
 
+    const avviso = self.SN_AVVISI?.avvisoSotto?.(realTarget(e));
+    if (avviso) { openAvvisoMenu(avviso, e); return; }
+
     // Spellcheck: in un editabile supportato, prima cerchiamo un errore "blu"
     // (sincrono); altrimenti partiamo con la richiesta on-demand all'LLM per la
     // parola sotto il cursore (zigzag rosso del browser).
@@ -729,6 +733,21 @@
     }
 
     await openNormalMenuAt(e);
+  }
+
+  // Le azioni dell'avviso e «Chiudi», nello stesso ordine del menu degli avvisi della barra.
+  function openAvvisoMenu({ el, chiudi, azioni }, e) {
+    const items = [];
+    if (azioni) {
+      for (const a of azioni) items.push({ type: 'item', label: a.label, onClick: () => a.fn() });
+    } else {
+      for (const b of el.querySelectorAll('button')) {
+        const label = (b.textContent || '').trim();
+        if (label) items.push({ type: 'item', label, onClick: () => b.click() });
+      }
+    }
+    items.push({ type: 'item', label: I18n.t('popup_close'), onClick: () => chiudi() });
+    Menu.open({ x: e.clientX, y: e.clientY, items });
   }
 
   // Input testuali in cui ha senso aspettarsi una correzione ortografica
@@ -2150,6 +2169,7 @@
       settings = msg.settings;
       applyTheme(settings.theme);
       applyThemeTokens(settings.themeTokens);
+      self.SN_AVVISI?.imposta(settings.notifications);
       // Colore identità delle tab: i parametri di estrazione possono essere
       // cambiati (a voce o nelle Preferenze). Ricalcola il colore del favicon
       // coi nuovi parametri così la tinta della tab si aggiorna live.

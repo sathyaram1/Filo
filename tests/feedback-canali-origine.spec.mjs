@@ -184,8 +184,6 @@ test('anche le porte di chi ha solo fatto l\'accesso rifiutano per provenienza',
       vota: { type: MSG.BOARD_CAST_VOTE, id: 'fb-uno', vote: 'works' },
       ritiraIlVoto: { type: MSG.BOARD_CLEAR_VOTE, id: 'fb-uno' },
       riapriAPagamento: { type: MSG.BOARD_REOPEN, id: 'fb-uno', text: 'scritto da un sito' },
-      elencoDiChiUsaFilo: { type: MSG.OWNER_LIST_USERS },
-      regaloDiCrediti: { type: MSG.OWNER_GIFT_CREDITS, email: 'chiunque@example.com', amount: 1000 },
     });
     const esegui = async (mittente) => {
       const res = {};

@@ -564,9 +564,10 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
   transition: opacity 0.18s ease, transform 0.18s ease;
   pointer-events: none; z-index: 200;
 }
-.ed-toast.show { opacity: 1; transform: translateY(0); }
-/* Toast con azione (es. "Annulla"): testo + bottone in riga. Il bottone deve
-   restare cliccabile anche se il toast di suo ha pointer-events: none. */
+/* Visibile prende il puntatore: sopra, i tempi aspettano; un clic lo chiude. Mentre sfuma torna trasparente. */
+.ed-toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; cursor: pointer; transition: opacity 0.18s ease, transform 0.18s ease, background 0.15s ease; }
+.ed-toast.show:hover { background: var(--sn-hover, var(--sn-bg)); }
+/* Toast con azione (es. "Annulla"): testo + bottone in riga. */
 .ed-toast:has(.ed-toast-action) { display: flex; align-items: center; gap: 12px; }
 .ed-toast-action {
   pointer-events: auto;
