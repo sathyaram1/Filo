@@ -654,7 +654,7 @@
 
     // Categorie (Fase 2)
     GET_CATEGORIES: 'get_categories',
-    RENAME_CATEGORY: 'rename_category',         // { id, name }
+    RENAME_CATEGORY: 'rename_category',         // { id, name, unisci? } — unisci:false non fonde con un'omonima
     DELETE_CATEGORY: 'delete_category',         // { id }
     MERGE_CATEGORIES: 'merge_categories',       // { fromId, toId }
     MOVE_PAGE_CATEGORY: 'move_page_category',   // { pageId, categoryId }

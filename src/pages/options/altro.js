@@ -147,12 +147,30 @@
     if (newName !== cat.name) {
       const vecchio = cat.name;
       cat.name = newName;
-      const r = await chrome.runtime.sendMessage({ type: MSG.RENAME_CATEGORY, id: cat.id, name: newName }).catch(() => null);
-      if (!r || !r.ok) { cat.name = vecchio; return; }
+      // Un nome già preso fonde le due categorie e non si disfa: parte solo confermato (Rinomina, Invio), mai da solo.
+      const r = await chrome.runtime.sendMessage({ type: MSG.RENAME_CATEGORY, id: cat.id, name: newName, unisci: conferma }).catch(() => null);
+      if (!r || !r.ok) {
+        cat.name = vecchio;
+        if (r && r.error === 'name_taken') avvisoOmonima(input, r.category);
+        return;
+      }
+      if (r.category && r.category.id !== cat.id) {
+        await renderCategories();
+        mostraSalvato();
+        return;
+      }
     } else if (!conferma) {
       return;
     }
     mostraSalvato();
+  }
+
+  function avvisoOmonima(input, omonima) {
+    const meta = input.parentElement.querySelector('.sn-cat-meta');
+    if (!meta) return;
+    if (meta.dataset.conta === undefined) meta.dataset.conta = meta.textContent;
+    meta.textContent = omonima ? I18n.t('options_category_name_taken', omonima.name) : meta.dataset.conta;
+    meta.classList.toggle('sn-cat-warn', !!omonima);
   }
 
   function mostraSalvato() {
