@@ -53,6 +53,11 @@ async function modelloFinto(app, { giri = [], aiuto = '{"text":"Ecco.","status":
     const risposta = (attempts, messages, onToolCall) => {
       globalThis.__visti.push(JSON.parse(JSON.stringify(messages)));
       const testo = JSON.stringify(messages);
+      // Le chiamate di sottofondo non sono giri della chat: la home che si rigenera quando arriva la chiave e il
+      // correttore sul campo di scrittura. Chi arriva prima dipende dai tempi, e un giro rubato toglie l'azione.
+      const sottofondo = testo.includes('preparare la dashboard') ? '{"message":"Bentornato.","suggestions":[]}'
+        : (testo.includes('scritto in un campo editabile') ? '{"issues":[]}' : '');
+      if (sottofondo) return { text: sottofondo, model: attempts[0].model, provider: attempts[0].provider, usage: {} };
       if (!testo.includes('toolCalls') && !messages.some((m) => m.role === 'tool') && giri.length === 0) {
         const ultimo = JSON.stringify([...messages].reverse().find((m) => m.role === 'user') || '');
         const scelta = risposte.find(([parola]) => ultimo.includes(parola)) || risposte[risposte.length - 1];

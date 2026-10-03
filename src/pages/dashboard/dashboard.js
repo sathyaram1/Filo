@@ -591,23 +591,23 @@
   }
 
   // ===== Generazione dashboard (messaggio centro + suggerimenti) =====
+  // Un ricalcolo spinto dal main mentre la richiesta è in volo è più nuovo della sua risposta, e uno arrivato
+  // prima vale quanto la cache che la risposta servirebbe: i suggerimenti che ha portato restano («Aggiorna» no).
+  let giroDashboard = 0;
+  let spinteDashboard = 0;
   async function loadDashboard({ force = false } = {}) {
+    const giro = ++giroDashboard;
     renderSuggestions({ pronti: false });
     if (showHomeMessage) {
       homeMessageEl.classList.add('dash-home-msg-loading');
       homeMessageEl.textContent = '…';
     }
     const r = await send({ type: MSG.FILO_GENERATE_DASHBOARD, force });
-    if (!r?.ok) {
-      homeMessageEl.classList.remove('dash-home-msg-loading');
-      homeMessageEl.textContent = 'Filo è in ascolto.';
-      suggestions = [];
-      renderSuggestions();
-      return;
-    }
+    if (giro !== giroDashboard) return;
     homeMessageEl.classList.remove('dash-home-msg-loading');
-    homeMessageEl.textContent = r.message || 'Filo è in ascolto.';
-    suggestions = Array.isArray(r.suggestions) ? r.suggestions : [];
+    homeMessageEl.textContent = (r?.ok && r.message) || 'Filo è in ascolto.';
+    if (!force && spinteDashboard) { renderSuggestions(); return; }
+    suggestions = (r?.ok && Array.isArray(r.suggestions)) ? r.suggestions : [];
     renderSuggestions();
   }
 
@@ -1280,6 +1280,8 @@
       // #155 — il ricalcolo in background della home è pronto: aggiorna
       // messaggio + suggerimenti senza rifare la chiamata all'LLM.
       if (Accoglienza.isActive()) return; // l'intervista è ancora a schermo
+      giroDashboard++;
+      spinteDashboard++;
       if (showHomeMessage) {
         homeMessageEl.classList.remove('dash-home-msg-loading');
         homeMessageEl.textContent = msg.message || 'Filo è in ascolto.';
