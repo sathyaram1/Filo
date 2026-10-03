@@ -144,10 +144,11 @@ export function togliCollegamento(p) {
   return { ok: false, motivo: `non riesco a togliere il collegamento ${p}` };
 }
 
-/** Toglie una cartella di prova: prima il collegamento, poi il resto, solo se il collegamento non c'è più. */
+/** Toglie una cartella di prova: prima il collegamento, poi il lucchetto, poi il resto, solo se il collegamento non c'è più. */
 export function chiudiAlbero(git, dir) {
   const c = togliCollegamento(join(dir, 'node_modules'));
   if (!c.ok) return c;
+  git(['worktree', 'unlock', dir]);
   if (!git(['worktree', 'remove', '--force', dir]).ok) {
     try { rmSync(dir, { recursive: true, force: true }); } catch (_) { /* resta: lo dice il controllo sotto */ }
     git(['worktree', 'prune']);
