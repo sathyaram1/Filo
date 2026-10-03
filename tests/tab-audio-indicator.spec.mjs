@@ -18,6 +18,15 @@ async function patchWebTabs(app, patch) {
   }, patch);
 }
 
+// Il titolo che la carta d'anteprima mostra a schermo, '' se la carta non si vede.
+function titoloInCarta(app) {
+  return app.evaluate(async ({ BrowserWindow }) => {
+    const c = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed() && w.webContents.getURL() === 'filo://shell/anteprima.html');
+    if (!c || !c.isVisible()) return '';
+    return c.webContents.executeJavaScript(`document.getElementById('carta').hidden ? '' : document.getElementById('titolo').textContent`);
+  });
+}
+
 async function openPage(openTab, testServer, title) {
   const page = await openTab(testServer.html(`<title>${title}</title><link rel="icon" href="${FAV}"><h1 id="ok">x</h1>`));
   await page.waitForSelector('#ok');
