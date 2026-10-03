@@ -25,7 +25,7 @@ l'ha rotto e cosa hai cambiato.
    `main`. Per capire la seconda leggi il commit di `main` che ha toccato quel
    punto, non indovinarla.
 2. Non migliorare, non ritoccare, non aggiungere: ogni riga cambiata oltre il
-   conflitto è codice che nessuno ha verificato.
+   conflitto (o oltre i test rossi dell'elenco) è codice che nessuno ha verificato.
 3. Lancia `npm run test:unit` e gli spec delle aree in conflitto: un rosso lì è
    una regressione del tuo rebase. La cartella delle prove dei giri non la
    rilanciare per intero — la corre chi verifica, subito dopo di te, ed è
