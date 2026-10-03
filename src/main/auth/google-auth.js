@@ -306,10 +306,15 @@ function segreti() {
   return [session?.refreshToken, session?.idToken].filter(Boolean);
 }
 
-function signOut() {
+function chiudiSessione() {
   session = null;
   ricordata = false;
   store.clear();
+}
+
+function signOut() {
+  chiudiSessione();
+  segnaOwnerCaduto(false);
 }
 
 async function refreshIfNeeded() {
