@@ -39,7 +39,8 @@ function pushMap(map, key, sel) {
 }
 
 // Legge il testo di una lista e ne tiene le sole regole di occultamento. PURA.
-function parseCosmetic(text, into) {
+// `estese`: anche le regole #?# il cui selettore è CSS vero (`:has()`), che la pubblicità usa e i banner no.
+function parseCosmetic(text, into, { estese = false } = {}) {
   const out = into || emptyList();
   if (!text) return out;
   const seenComplex = new Set(out.complex);
@@ -49,6 +50,8 @@ function parseCosmetic(text, into) {
     let sep = '##';
     let at = line.indexOf('#@#');
     if (at >= 0) sep = '#@#';
+    else if (estese && (at = line.indexOf('#@?#')) >= 0) sep = '#@?#';
+    else if (estese && (at = line.indexOf('#?#')) >= 0) sep = '#?#';
     else {
       if (line.includes('#?#') || line.includes('#$#') || line.includes('#%#') || line.includes('#$?#')) continue;
       at = line.indexOf('##');
@@ -58,7 +61,7 @@ function parseCosmetic(text, into) {
     const sel = line.slice(at + sep.length).trim();
     if (!sel || PROCEDURAL.test(sel)) continue;
     const doms = domains ? domains.split(',').map((d) => d.trim().toLowerCase()).filter(Boolean) : [];
-    if (sep === '#@#') {
+    if (sep === '#@#' || sep === '#@?#') {
       if (!doms.length) out.genericExceptions.add(sel);
       for (const d of doms) if (d[0] !== '~') pushMap(out.exceptions, d, sel);
       continue;
@@ -98,38 +101,42 @@ let enabled = false;
 let refreshing = null;
 let refreshTimer = null;
 
-function exceptionsFor(host) {
-  const set = new Set(list.genericExceptions);
-  for (const k of hostKeys(host)) for (const s of (list.exceptions.get(k) || [])) set.add(s);
+// Le funzioni «In» lavorano su una lista qualsiasi: le usa anche il nascondere della pubblicità (adblock.js).
+function exceptionsIn(l, host) {
+  const set = new Set(l.genericExceptions);
+  for (const k of hostKeys(host)) for (const s of (l.exceptions.get(k) || [])) set.add(s);
   return set;
 }
 
 // Quello che la pagina di `host` riceve subito: le regole complesse generiche e quelle scritte per quel sito.
-function forHost(host) {
-  const exc = exceptionsFor(host);
+function forHostIn(l, host) {
+  const exc = exceptionsIn(l, host);
   const specific = [];
-  for (const k of hostKeys(host)) for (const s of (list.specific.get(k) || [])) if (!exc.has(s)) specific.push(s);
+  for (const k of hostKeys(host)) for (const s of (l.specific.get(k) || [])) if (!exc.has(s)) specific.push(s);
   return {
-    complex: list.complex.filter((s) => !exc.has(s)),
+    complex: exc.size ? l.complex.filter((s) => !exc.has(s)) : l.complex.slice(),
     specific: [...new Set(specific)],
-    count: list.ids.size + list.classes.size + list.complex.length,
+    count: l.ids.size + l.classes.size + l.complex.length,
   };
 }
 
 // Gli id e le classi presenti in pagina che la lista nasconde: la pagina li chiede man mano che li incontra.
-function matchTokens(host, ids, classes) {
-  const exc = exceptionsFor(host);
+function matchTokensIn(l, host, ids, classes) {
+  const exc = exceptionsIn(l, host);
   const out = [];
   for (const id of Array.isArray(ids) ? ids.slice(0, 5000) : []) {
     const sel = '#' + id;
-    if (typeof id === 'string' && list.ids.has(id) && !exc.has(sel)) out.push(sel);
+    if (typeof id === 'string' && l.ids.has(id) && !exc.has(sel)) out.push(sel);
   }
   for (const c of Array.isArray(classes) ? classes.slice(0, 5000) : []) {
     const sel = '.' + c;
-    if (typeof c === 'string' && list.classes.has(c) && !exc.has(sel)) out.push(sel);
+    if (typeof c === 'string' && l.classes.has(c) && !exc.has(sel)) out.push(sel);
   }
   return out;
 }
+
+function forHost(host) { return forHostIn(list, host); }
+function matchTokens(host, ids, classes) { return matchTokensIn(list, host, ids, classes); }
 
 // ─── cache e download ────────────────────────────────────────────────────────
 
@@ -242,10 +249,15 @@ function setListForTest(text) {
 module.exports = {
   PRIMARY,
   FALLBACK,
+  emptyList,
   parseCosmetic,
   hostKeys,
+  toJson,
+  fromJson,
   forHost,
+  forHostIn,
   matchTokens,
+  matchTokensIn,
   refresh,
   init,
   configureFromSettings,

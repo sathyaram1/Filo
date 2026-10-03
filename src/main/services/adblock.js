@@ -1,27 +1,6 @@
-// Motore di ad-blocking per-dominio basato su liste (processo main).
-//
-// COSA FA
-//   A differenza del blocco tracker "curato" in cookies.js (poche decine di
-//   host scritti a mano) e del popup-blocker in tabs.js (disposition new-window),
-//   questo è il motore di ad-blocking vero: scarica una o più LISTE pubbliche e
-//   gratuite (StevenBlack hosts, EasyList), le tiene in cache locale e le
-//   aggiorna da sole una volta a settimana. Ogni richiesta verso un dominio
-//   presente nelle liste viene annullata a monte (onBeforeRequest), così lo
-//   script pubblicitario/tracker non si carica nemmeno.
-//
-// PERCHÉ UNA CACHE SU DISCO
-//   Le liste sono grandi (StevenBlack supera i 100k domini) e cambiano lentamente.
-//   Scaricarle a ogni avvio sprecherebbe rete e rallenterebbe il boot. Le teniamo
-//   in userData/adblock/lists.json e ci basiamo su `updatedAt`: si rinfresca solo
-//   se la cache manca o ha più di una settimana. Il download è sempre in
-//   background e non blocca mai la navigazione; se la rete non c'è, si continua
-//   con la cache esistente (o senza blocco, ma la navigazione non si rompe).
-//
-// SICUREZZA: niente domini legittimi
-//   Una whitelist di base (BASE_WHITELIST) protegge i domini "buoni" anche se per
-//   errore finissero in una lista: il match in whitelist vince sempre sul blocco.
-//
-// Il toggle vive in settings.security.adblock.enabled (pagina Sicurezza).
+// Ad-blocking a liste pubbliche (processo main), scaricate a runtime e tenute in cache una settimana: blocca le
+// richieste ai domini in lista e dà le regole per nascondere i riquadri rimasti (src/preload/nascondi-pubblicita.js).
+// Toggle: settings.security.adblock.enabled. Il listener di rete è di cookies.js, che chiede a shouldBlock.
 
 'use strict';
 
@@ -31,13 +10,18 @@
 const fsp = require('node:fs/promises');
 const path = require('node:path');
 
-// Liste pubbliche e gratuite usate di default. Formati misti gestiti dal parser:
-//   - hosts file:  righe "0.0.0.0 dominio" / "127.0.0.1 dominio"
-//   - EasyList:    righe con ancora di dominio "||dominio^"
+// Formati misti: hosts file ("0.0.0.0 dominio") e liste EasyList ("||dominio^", "dominio##selettore").
+// Le liste regionali portano le regole dei siti italiani e francesi, che EasyList non conosce.
 const DEFAULT_SOURCES = [
   'https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts',
   'https://easylist.to/easylist/easylist.txt',
+  'https://easylist-downloads.adblockplus.org/easylistitaly.txt',
+  'https://easylist-downloads.adblockplus.org/liste_fr.txt',
 ];
+
+// Una cache scritta prima delle regole di occultamento (e del parser che non blocca più siti interi per una
+// regola di percorso) va riscaricata subito, non fra una settimana.
+const CACHE_FORMAT = 2;
 
 // Aggiornamento automatico: settimanale (le liste cambiano lentamente).
 const REFRESH_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -62,6 +46,32 @@ const BASE_WHITELIST = [
 
 // ─── parsing liste (logica pura, esportata e testata) ───────────────────────
 
+// Opzioni con cui «||dominio^$…» vuol dire ancora «blocca il dominio». Un'opzione fuori elenco (csp=,
+// rewrite=, redirect=, removeparam…) cambia la richiesta invece di bloccarla, e un domain= positivo la
+// limita a certi siti: preso come blocco del dominio intero, spegnerebbe un sito o una CDN dappertutto.
+const NET_OPTS = new Set([
+  'third-party', '3p', 'first-party', '1p', 'popup', 'document', 'doc', 'subdocument', 'frame', 'script',
+  'image', 'stylesheet', 'css', 'object', 'xmlhttprequest', 'xhr', 'media', 'font', 'websocket', 'ping',
+  'other', 'all', 'important', 'match-case',
+]);
+
+function bloccaIlDominio(opts) {
+  if (opts === undefined) return true;
+  for (let o of opts.split(',')) {
+    o = o.trim().toLowerCase();
+    if (!o) continue;
+    const eq = o.indexOf('=');
+    if (eq >= 0) {
+      const name = o.slice(0, eq);
+      if (name !== 'domain' && name !== 'from') return false;
+      if (o.slice(eq + 1).split('|').some((d) => d && d[0] !== '~')) return false;
+      continue;
+    }
+    if (!NET_OPTS.has(o[0] === '~' ? o.slice(1) : o)) return false;
+  }
+  return true;
+}
+
 // Estrae l'insieme di domini da bloccare dal testo di una lista. Riconosce sia
 // il formato hosts (0.0.0.0/127.0.0.1 dominio) sia le regole EasyList con ancora
 // di dominio (||dominio^). Ignora commenti, regole cosmetiche (##, #@#), regole
@@ -84,10 +94,11 @@ function parseList(text) {
     // implementiamo le allow-rule, ma non devono finire tra i domini bloccati).
     if (line.startsWith('@@')) continue;
 
-    // EasyList: ancora di dominio "||dominio^..." (eventuali opzioni dopo "^").
+    // EasyList: ancora di dominio "||dominio^" o "||dominio^$opzioni". Con un percorso dopo "^"
+    // ("||sito.it^*/ads/") la regola vale per quel percorso, non per il sito.
     if (line.startsWith('||')) {
-      const m = line.slice(2).match(/^([a-z0-9_-]+(?:\.[a-z0-9_-]+)+)\^/i);
-      if (m) {
+      const m = line.slice(2).match(/^([a-z0-9_-]+(?:\.[a-z0-9_-]+)+)\^(?:\$(.*))?$/i);
+      if (m && bloccaIlDominio(m[2])) {
         const d = normalizeDomain(m[1]);
         if (d) out.add(d);
       }
@@ -115,6 +126,61 @@ function normalizeDomain(raw) {
   return s;
 }
 
+// ─── regole di occultamento (logica pura) ───────────────────────────────────
+
+const CB = require('./cookieBanners');
+
+// Un file hosts ha righe «## …» che sono commenti, non regole: le sue righe valgono solo per la rete.
+function isHostsFile(text) {
+  return /^(?:0\.0\.0\.0|127\.0\.0\.1)\s/m.test(String(text || ''));
+}
+
+// I siti dove la lista spegne l'occultamento: tutto ($elemhide) o solo le regole generiche ($generichide).
+// Sono le eccezioni scritte per i siti che le regole generiche rompono (account Google, negozi, motori di ricerca).
+function emptyOff() { return { all: new Set(), generic: new Set() }; }
+
+function parseHideOff(text, into) {
+  const out = into || emptyOff();
+  for (let line of String(text || '').split(/\r?\n/)) {
+    line = line.trim();
+    if (!line.startsWith('@@')) continue;
+    const dollar = line.lastIndexOf('$');
+    if (dollar < 0) continue;
+    const opts = line.slice(dollar + 1).toLowerCase().split(',').map((o) => o.trim());
+    const all = opts.includes('elemhide') || opts.includes('ehide');
+    if (!all && !opts.includes('generichide') && !opts.includes('ghide')) continue;
+    const target = all ? out.all : out.generic;
+    const dom = opts.find((o) => o.startsWith('domain=') || o.startsWith('from='));
+    if (dom) {
+      for (const d of dom.slice(dom.indexOf('=') + 1).split('|')) if (d && d[0] !== '~') target.add(d);
+      continue;
+    }
+    const m = line.slice(2, dollar).match(/^\|\|([a-z0-9_.*-]+?)(?:\.)?(?:[\^/?:]|$)/i);
+    if (!m) continue;
+    const host = m[1].toLowerCase();
+    target.add(line.slice(2 + 2 + m[1].length)[0] === '.' ? host + '.*' : host);
+  }
+  return out;
+}
+
+function offFor(off, host) {
+  const keys = CB.hostKeys(host);
+  return {
+    all: keys.some((k) => off.all.has(k)),
+    generic: keys.some((k) => off.generic.has(k)),
+  };
+}
+
+// Un selettore con graffe o commenti uscirebbe dalla sua regola e scriverebbe CSS nella pagina.
+function toCss(selectors) {
+  const out = [];
+  for (const sel of selectors) {
+    if (typeof sel !== 'string' || !sel || /[{}]|\/\*|\*\//.test(sel)) continue;
+    out.push(`${sel}{display:none!important}`);
+  }
+  return out.join('\n');
+}
+
 // ─── stato in-memory ────────────────────────────────────────────────────────
 
 let blockedDomains = new Set();   // domini caricati dalle liste
@@ -123,6 +189,8 @@ let enabled = false;              // toggle utente (settings.security.adblock.en
 let lastUpdatedAt = 0;            // ms epoch dell'ultimo refresh riuscito
 let refreshing = null;            // promise del refresh in corso (dedup)
 let refreshTimer = null;          // setInterval del refresh periodico
+let cosmetic = CB.emptyList();    // regole di occultamento delle liste
+let hideOff = emptyOff();
 
 function hostnameOf(url) {
   try { return new URL(url).hostname.toLowerCase(); } catch (_) { return ''; }
@@ -168,6 +236,35 @@ function shouldBlock(url) {
   return enabled && isBlockedUrl(url);
 }
 
+// ─── occultamento: cosa la pagina riceve ────────────────────────────────────
+
+function pageHost(href) {
+  const s = String(href || '');
+  return /^https?:/i.test(s) ? hostnameOf(s) : '';
+}
+
+// Alla nascita della pagina: le regole complesse generiche e quelle scritte per il suo sito. `tokens` dice se
+// vale la pena mandare dopo gli id e le classi che la pagina incontra.
+function cosmeticForPage(href) {
+  const host = pageHost(href);
+  if (!enabled || !host) return { css: '', tokens: false };
+  const off = offFor(hideOff, host);
+  if (off.all) return { css: '', tokens: false };
+  const { complex, specific } = CB.forHostIn(cosmetic, host);
+  const generic = !off.generic && (cosmetic.ids.size + cosmetic.classes.size) > 0;
+  return { css: toCss(off.generic ? specific : complex.concat(specific)), tokens: generic };
+}
+
+// Gli id e le classi della pagina che le regole generiche nascondono, come CSS da aggiungere.
+function cosmeticForTokens(href, ids, classes) {
+  const host = pageHost(href);
+  if (!enabled || !host) return '';
+  const off = offFor(hideOff, host);
+  if (off.all || off.generic) return '';
+  const clean = (arr) => (Array.isArray(arr) ? arr.filter((x) => typeof x === 'string' && x && x.length <= 120) : []);
+  return toCss(CB.matchTokensIn(cosmetic, host, clean(ids), clean(classes)));
+}
+
 // ─── cache su disco ─────────────────────────────────────────────────────────
 
 function cacheDir() {
@@ -183,7 +280,12 @@ async function loadCache() {
     const data = JSON.parse(raw);
     if (data && Array.isArray(data.domains)) {
       blockedDomains = new Set(data.domains);
-      lastUpdatedAt = Number(data.updatedAt) || 0;
+      const current = data.format === CACHE_FORMAT && data.cosmetic;
+      lastUpdatedAt = current ? (Number(data.updatedAt) || 0) : 0;
+      if (current) {
+        cosmetic = CB.fromJson(data.cosmetic);
+        hideOff = { all: new Set(data.hideOff && data.hideOff.all), generic: new Set(data.hideOff && data.hideOff.generic) };
+      }
       return true;
     }
   } catch (_) { /* nessuna cache: si parte vuoti finché non si scarica */ }
@@ -194,9 +296,12 @@ async function saveCache() {
   try {
     await fsp.mkdir(cacheDir(), { recursive: true });
     const payload = JSON.stringify({
+      format: CACHE_FORMAT,
       updatedAt: lastUpdatedAt,
       count: blockedDomains.size,
       domains: Array.from(blockedDomains),
+      cosmetic: CB.toJson(cosmetic),
+      hideOff: { all: [...hideOff.all], generic: [...hideOff.generic] },
     });
     await fsp.writeFile(cacheFile(), payload, 'utf8');
   } catch (_) { /* best-effort: la cache è un'ottimizzazione, non un requisito */ }
@@ -247,17 +352,27 @@ function refresh({ force = false, sources = DEFAULT_SOURCES } = {}) {
       }
       const texts = await Promise.all(sources.map((u) => fetchList(u)));
       const merged = new Set();
+      const nextCosmetic = CB.emptyList();
+      const nextOff = emptyOff();
       let any = false;
       for (const text of texts) {
         if (!text) continue;
         any = true;
         for (const d of parseList(text)) merged.add(d);
+        if (isHostsFile(text)) continue;
+        CB.parseCosmetic(text, nextCosmetic, { estese: true });
+        parseHideOff(text, nextOff);
       }
       if (!any || merged.size === 0) {
         // Tutti i download falliti (rete assente) → tieni la cache esistente.
         return { ok: false, error: 'download_failed', count: blockedDomains.size };
       }
       blockedDomains = merged;
+      // Se solo le liste di occultamento non sono arrivate, si tengono le regole che c'erano.
+      if (nextCosmetic.ids.size + nextCosmetic.classes.size + nextCosmetic.complex.length + nextCosmetic.specific.size) {
+        cosmetic = nextCosmetic;
+        hideOff = nextOff;
+      }
       lastUpdatedAt = Date.now();
       await saveCache();
       return { ok: true, count: blockedDomains.size, updatedAt: lastUpdatedAt };
@@ -330,14 +445,30 @@ function setDomainsForTest(domains) {
   lastUpdatedAt = Date.now();
 }
 
+// Solo per i test: regole di occultamento scritte a mano, senza rete.
+function setCosmeticForTest(text) {
+  cosmetic = CB.parseCosmetic(text, null, { estese: true });
+  hideOff = parseHideOff(text);
+}
+
 function status() {
-  return { enabled, count: blockedDomains.size, updatedAt: lastUpdatedAt };
+  return {
+    enabled,
+    count: blockedDomains.size,
+    hideRules: cosmetic.ids.size + cosmetic.classes.size + cosmetic.complex.length + cosmetic.specific.size,
+    updatedAt: lastUpdatedAt,
+  };
 }
 
 module.exports = {
   DEFAULT_SOURCES,
   fetchList,
   parseList,
+  parseHideOff,
+  isHostsFile,
+  cosmeticForPage,
+  cosmeticForTokens,
+  setCosmeticForTest,
   normalizeDomain,
   isBlockedHost,
   isBlockedUrl,
