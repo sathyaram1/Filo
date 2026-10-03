@@ -259,8 +259,9 @@
   function senderLabel(fb) {
     const kind = authorKindOf(fb);
     const m = AUTHOR_META[kind] || AUTHOR_META.user;
-    if (kind !== 'user' && kind !== 'unproven') return `${m.icon} ${m.label}`;
-    const id = String((fb && fb.clientId) || '').trim();
+    if (kind !== 'user') return `${m.icon} ${m.label}`;
+    // Senza il nome riservato che si era dato: ne mostrerebbe la firma.
+    const id = String((fb && fb.clientId) || '').trim().replace(/^(non-provato:)?(owner|routine|agent|local):/i, '');
     const short = id.slice(0, 8);
     return short ? `${m.icon} ${m.label} · ${short}…` : `${m.icon} ${m.label}`;
   }
