@@ -375,3 +375,121 @@ test('Google Sites: un modulo montato secondi dopo il caricamento del riquadro f
   await openTab('https://sites.google.com/view/posta-lenta');
   expect(await livelloScheda(app, 'sites.google.com', 12000)).toBe('sospetto');
 });
+
+// Una pagina che non finisce di caricarsi (#813.1): il modulo è già a schermo, lo script dopo non arriva mai. Il server
+// tiene aperto lo script finché la prova non lo chiude, e la scheda si apre senza aspettare il DOMContentLoaded.
+async function serviInCaricamento(app, pagine, providers) {
+  await app.evaluate(async ({ session, net }, { pg, gsbListed }) => {
+    globalThis.__sbLenti = [];
+    const risposta = (req) => {
+      const u = new URL(req.url);
+      if (u.pathname === '/lento.js') {
+        const body = new ReadableStream({ start: (c) => { globalThis.__sbLenti.push(c); } });
+        return new Response(body, { headers: { 'content-type': 'text/javascript' } });
+      }
+      const html = pg[u.hostname + u.pathname];
+      if (html && u.searchParams.has('tardi')) {
+        const body = new ReadableStream({ start: (c) => { globalThis.__sbLenti.push(c); setTimeout(() => { try { c.enqueue(new TextEncoder().encode(html)); } catch (_) {} }, 1500); } });
+        return new Response(body, { headers: { 'content-type': 'text/html; charset=utf-8' } });
+      }
+      if (html) return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
+      return net.fetch(req, { bypassCustomProtocolHandlers: true });
+    };
+    for (const s of ['http', 'https']) {
+      try { session.defaultSession.protocol.unhandle(s); } catch (_) {}
+      session.defaultSession.protocol.handle(s, risposta);
+    }
+    globalThis.SN_SAFEBROWSE.setProviders({
+      gsb: gsbListed ? async () => ({ listed: true, category: 'phishing' }) : null,
+      rdap: null, ct: null, sandbox: null,
+      llm: async () => ({ suspicious: false, reason: null }),
+    });
+  }, { pg: pagine, gsbListed: !!(providers && providers.gsbListed) });
+}
+
+async function chiudiLenti(app) {
+  await app.evaluate(() => { for (const c of globalThis.__sbLenti || []) { try { c.close(); } catch (_) {} } }).catch(() => {});
+}
+
+async function apriSenzaAspettare(app, shell, url) {
+  const host = new URL(url).hostname;
+  await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+  const fine = Date.now() + 10_000;
+  while (Date.now() < fine) {
+    const p = app.windows().find((w) => { try { return new URL(w.url()).hostname === host; } catch (_) { return false; } });
+    if (p) return p;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  throw new Error(`nessuna scheda per ${url}`);
+}
+
+const MODULO_LENTO = '<title>Accedi</title><form><input name="email" placeholder="Email">'
+  + '<input type="password" id="pw" name="pw" placeholder="Password"><button>Accedi</button></form>'
+  + '<script src="/lento.js"></script><p>fine pagina</p>';
+
+// Il click sul campo cade sull'avviso: quello che l'utente scrive non arriva alla pagina.
+async function provaAScrivereLaPassword(page) {
+  const box = await page.locator('#pw').boundingBox();
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await page.keyboard.type('segreto');
+  return page.locator('#pw').inputValue();
+}
+
+test('pagina segnalata da Google che resta in caricamento: l\'avviso copre il modulo prima che finisca (#813.1)', async ({ app, shell }) => {
+  await serviInCaricamento(app, { 'conto-verifica-accesso.com/login': MODULO_LENTO }, { gsbListed: true });
+  try {
+    const page = await apriSenzaAspettare(app, shell, 'https://conto-verifica-accesso.com/login');
+    await expect(page.locator('#pw')).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByText('Sito segnalato come pericoloso')).toBeVisible({ timeout: 6_000 });
+    expect(await page.evaluate(() => document.readyState)).toBe('loading');
+    // La tastiera è dell'avviso: chi stava per scrivere la password la scrive lì, non nella pagina.
+    await page.keyboard.type('segreto');
+    await expect(page.getByPlaceholder('confermo')).toHaveValue('segreto');
+    expect(await provaAScrivereLaPassword(page)).toBe('');
+    // Un verdetto ripetuto (a pagina pronta, dal main) non cancella quello che si sta scrivendo nell'avviso.
+    await page.getByPlaceholder('confermo').fill('confer');
+    await chiudiLenti(app);
+    await page.waitForFunction(() => document.readyState !== 'loading', null, { timeout: 8_000 });
+    await page.waitForTimeout(800);
+    await expect(page.getByPlaceholder('confermo')).toHaveValue('confer');
+    // L'avviso resta sopra la pagina costruita, e si chiude solo come sempre.
+    expect(await page.evaluate(() => document.documentElement.lastElementChild.id)).toBe('filo-safebrowse-host');
+    await page.getByPlaceholder('confermo').fill('confermo');
+    await page.getByRole('button', { name: 'Procedi comunque' }).click();
+    await expect(page.getByText('Sito segnalato come pericoloso')).toHaveCount(0, { timeout: 6_000 });
+    await page.locator('#pw').fill('segreto');
+    await expect(page.locator('#pw')).toHaveValue('segreto');
+  } finally {
+    await chiudiLenti(app);
+  }
+});
+
+test('campo password che compare mentre la pagina carica: l\'avviso che ne dipende non aspetta la fine (#813.1)', async ({ app, shell }) => {
+  await serviInCaricamento(app, { 'area-riservata-clienti.it/accesso': MODULO_LENTO });
+  try {
+    const page = await apriSenzaAspettare(app, shell, 'http://area-riservata-clienti.it/accesso');
+    await expect(page.locator('#pw')).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByText('Sito potenzialmente sospetto')).toBeVisible({ timeout: 6_000 });
+    expect(await page.evaluate(() => document.readyState)).toBe('loading');
+    expect(await provaAScrivereLaPassword(page)).toBe('');
+  } finally {
+    await chiudiLenti(app);
+  }
+});
+
+test('verdetto pronto prima che la pagina mandi il primo byte: l\'avviso compare con la pagina e tiene la tastiera (#813.1)', async ({ app, shell }) => {
+  await serviInCaricamento(app, { 'conto-verifica-accesso.com/login': MODULO_LENTO }, { gsbListed: true });
+  try {
+    const page = await apriSenzaAspettare(app, shell, 'https://conto-verifica-accesso.com/login?tardi');
+    await expect(page.locator('#pw')).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByText('Sito segnalato come pericoloso')).toBeVisible({ timeout: 6_000 });
+    expect(await page.evaluate(() => document.readyState)).toBe('loading');
+    // Disegnato prima di <body>, l'avviso è stato spostato in fondo senza perdere il fuoco.
+    expect(await page.evaluate(() => document.documentElement.lastElementChild.id)).toBe('filo-safebrowse-host');
+    await page.keyboard.type('segreto');
+    await expect(page.getByPlaceholder('confermo')).toHaveValue('segreto');
+    await expect(page.locator('#pw')).toHaveValue('');
+  } finally {
+    await chiudiLenti(app);
+  }
+});
