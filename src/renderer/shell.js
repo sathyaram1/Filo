@@ -387,7 +387,7 @@
         const x = Math.round(r.left + r.width / 2 - 60);
         const y = Math.round(r.bottom + 6);
         api.tooltipShow(text, x, y);
-      }, SHOW_DELAY);
+      }, SUGGERIMENTO_RITARDO);
     });
     document.addEventListener('mouseout', (e) => {
       const t = e.target.closest('[data-tip]');
