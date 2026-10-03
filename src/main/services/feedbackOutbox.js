@@ -244,7 +244,11 @@
             else anyFail = true; // nessuno a cui dirlo: si riprova, non si butta
             continue;
           }
-          if (it.dallOwner && e && e.accessoOwner) { attendiAccesso(it, e.message || 'token rifiutato'); anyFail = true; continue; }
+          if (it.dallOwner && e && e.accessoOwner) {
+            it.tokenRifiutato = true;
+            attendiAccesso(it, e.message || 'token rifiutato', 'rifiutato');
+            continue;
+          }
           it.attesaAccesso = false;
           it.attempts = (it.attempts || 0) + 1;
           anyFail = true;
