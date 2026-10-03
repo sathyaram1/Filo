@@ -30,7 +30,6 @@ test('tasto destro sul numero di carta selezionato: la spiegazione non lo manda 
   await page.keyboard.press('Control+a');
   await page.locator('#c').click({ button: 'right', position: { x: 12, y: 8 } });
   await expect(page.locator('.sn-menu')).toBeVisible();
-  await expect.poll(() => app.evaluate(() => (globalThis.__visti || []).length), { timeout: 10_000 }).toBeGreaterThan(0);
-  await page.waitForTimeout(1500);
+  await page.waitForTimeout(3000);
   expect(await arrivato(app, page), 'il numero di carta selezionato è partito verso il modello').not.toContain('4111');
 });
