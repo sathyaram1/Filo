@@ -30,6 +30,7 @@ async function preparaRouter(app, { tts, stt }) {
       modelRegistry: {
         ...T.registry,
         'voce-openai': { label: 'Voce OpenAI', provider: 'openrouter', model: 'openai/gpt-4o-mini-tts', inputs: ['text'], outputs: ['audio'] },
+        'voce-openai-hd': { label: 'Voce OpenAI HD', provider: 'openrouter', model: 'openai/tts-1-hd', inputs: ['text'], outputs: ['audio'] },
         'ascolto-openai': { label: 'Dettatura OpenAI', provider: 'openrouter', model: 'openai/gpt-4o-transcribe', inputs: ['audio'], outputs: ['text'] },
       },
       models: { ...T.models, [A.TTS]: tts, [A.TRANSCRIBE_AUDIO]: stt },
@@ -39,6 +40,7 @@ async function preparaRouter(app, { tts, stt }) {
     const HOSTS = {
       'openai/gpt-4o-mini-tts': [{ provider_name: 'OpenAI', tag: 'openai' }],
       'openai/gpt-4o-transcribe': [{ provider_name: 'OpenAI', tag: 'openai' }],
+      'openai/tts-1-hd': [{ provider_name: 'OpenAI', tag: 'openai' }],
       'hexgrad/kokoro-82m': [{ provider_name: 'DeepInfra', tag: 'deepinfra/fp16' }, { provider_name: 'Together', tag: 'together' }],
     };
     globalThis.__audioCalls = [];
@@ -134,6 +136,28 @@ test('Voce e dettatura: un modello servito solo da un fornitore escluso non part
   expect(ok.audioBase64.length).toBeGreaterThan(0);
   const dopo = await app.evaluate(() => globalThis.__audioCalls);
   expect(dopo.map((c) => c.model)).toEqual(['hexgrad/kokoro-82m']);
+
+  await app.evaluate(() => { if (globalThis.__fetchVero) globalThis.fetch = globalThis.__fetchVero; });
+});
+
+test('Voce: un altro modello escluso, scelto dopo il primo rifiuto, ha il suo avviso; lo stesso motivo no', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentScripts === '1', null, { timeout: 8_000 });
+  const leggi = () => page.evaluate(() => chrome.runtime.sendMessage({ type: 'tts_synth', text: 'Ciao.', lang: 'it-IT' }));
+
+  await preparaRouter(app, { tts: 'voce-openai', stt: 'ascolto-openai' });
+  const primo = await leggi();
+  expect(primo.errorCode).toBe('NO_ALLOWED_HOST');
+  expect(primo.firstFallback).toBe(true);
+  expect((await leggi()).firstFallback, 'stesso motivo: niente avviso ripetuto').toBe(false);
+
+  await preparaRouter(app, { tts: 'voce-openai-hd', stt: 'ascolto-openai' });
+  const altro = await leggi();
+  expect(altro.errorCode).toBe('NO_ALLOWED_HOST');
+  expect(altro.error).toContain('openai/tts-1-hd');
+  expect(altro.firstFallback, 'il motivo del nuovo modello arriva all\'utente').toBe(true);
+  expect(await app.evaluate(() => globalThis.__audioCalls)).toEqual([]);
 
   await app.evaluate(() => { if (globalThis.__fetchVero) globalThis.fetch = globalThis.__fetchVero; });
 });

@@ -91,6 +91,7 @@
     // %s = id del modello, %s = chi lo serve («OpenAI», «OpenAI e Azure»).
     // Voce e dettatura: nessun host ammesso, la richiesta non parte (#713).
     err_audio_no_allowed_host: 'Il modello «%s» lo serve solo %s, che Filo esclude. Non ho mandato niente: scegli un altro modello.',
+    err_audio_no_allowed_host_many: 'Il modello «%s» lo servono solo %s, che Filo esclude. Non ho mandato niente: scegli un altro modello.',
     menu_dictate: 'Detta',
     menu_screenshot: 'Screenshot',
     menu_screenshot_crop: 'Screenshot di una parte',

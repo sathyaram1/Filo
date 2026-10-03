@@ -70,7 +70,7 @@ test('modello servito solo dal produttore escluso: la voce non parte e l\'errore
       (e) => {
         assert.equal(e.code, 'NO_ALLOWED_HOST');
         assert.match(e.message, /openai\/gpt-4o-mini-tts/);
-        assert.match(e.message, /OpenAI/);
+        assert.match(e.message, /lo serve solo OpenAI,/);
         assert.deepEqual(e.hosts, ['OpenAI']);
         return true;
       },
@@ -85,7 +85,7 @@ test('modello servito solo dal produttore escluso: la dettatura non parte', asyn
   await withRouter({ [model]: endpoints(['OpenAI', 'openai'], ['Azure', 'azure']) }, async (calls) => {
     await assert.rejects(
       OR.transcribe({ apiKey: 'k', model, audioBase64: 'QUJD', format: 'wav', providerRouting: { ignore: ['OpenAI', 'Azure'] } }),
-      (e) => e.code === 'NO_ALLOWED_HOST' && /OpenAI e Azure/.test(e.message),
+      (e) => e.code === 'NO_ALLOWED_HOST' && /lo servono solo OpenAI e Azure,/.test(e.message),
     );
     assert.deepEqual(calls.audio, []);
   });
@@ -119,7 +119,7 @@ test('una variante del nome del produttore è esclusa come la forma base', async
   await withRouter({ [model]: endpoints(['Google AI Studio', 'google-ai-studio'], ['Google Vertex', 'google-vertex/global']) }, async (calls) => {
     await assert.rejects(
       OR.synthesizeSpeech({ apiKey: 'k', model, text: 'x', providerRouting: ROUTING }),
-      (e) => e.code === 'NO_ALLOWED_HOST' && /Google AI Studio e Google Vertex/.test(e.message),
+      (e) => e.code === 'NO_ALLOWED_HOST' && /lo servono solo Google AI Studio e Google Vertex,/.test(e.message),
     );
     assert.deepEqual(calls.audio, []);
   });

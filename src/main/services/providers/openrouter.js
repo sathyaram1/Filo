@@ -513,7 +513,8 @@
       if (!names.some((x) => x.toLowerCase() === n.toLowerCase())) names.push(n);
     }
     const I18n = global.SN_I18N;
-    const err = new Error(I18n ? I18n.t('err_audio_no_allowed_host', model, joinNames(names)) : `NO_ALLOWED_HOST ${model}`);
+    const chiave = names.length > 1 ? 'err_audio_no_allowed_host_many' : 'err_audio_no_allowed_host';
+    const err = new Error(I18n ? I18n.t(chiave, model, joinNames(names)) : `NO_ALLOWED_HOST ${model}`);
     err.code = 'NO_ALLOWED_HOST';
     err.provider = 'openrouter';
     err.model = model;
