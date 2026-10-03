@@ -101,9 +101,10 @@ service cloud.firestore {
             && d.localOnly.get('at', 0) > 0);
     }
 
-    // `localMerges` { app?, server?, solo? } (#915): quando ogni parte di un
-    // lavoro locale è arrivata su main, in millisecondi, e `solo` la parte che
-    // ha chiuso dicendo che il lavoro stava tutto lì. Lo scrivono il server e
+    // `localMerges` { app?, server?, solo?, ramo? } (#915): quando ogni parte di un
+    // lavoro locale è arrivata su main, in millisecondi, `solo` la parte che
+    // ha chiuso dicendo che il lavoro stava tutto lì, `ramo` il ramo dell'ultima
+    // parte fusa (una parte tardiva vale solo col suo nome). Lo scrivono il server e
     // server:fondi (admin); la pratica si chiude all'ultima parte.
     function localMergesValido(d) {
       return !('localMerges' in d)
