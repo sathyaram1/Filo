@@ -31,7 +31,7 @@ test('in Gestione un nome riservato senza prova è un utente qualunque', async (
   for (const id of FINTI) await expect(autore(page, id), id).toHaveAttribute('title', 'Scritto da: Utente');
 
   // Nel dettaglio: «Da 👤 Utente», senza la firma che si era dato, e la segnalazione è una bolla dell'utente.
-  for (const [id, pezzo] of [['FINTO_OWNER', 'qualcun'], ['FINTA_ROUTINE', 'verifier'], ['RIFIUTATO', 'qualcun']]) {
+  for (const [id, pezzo] of [['FINTO_OWNER', 'qualcuno'], ['FINTA_ROUTINE', 'verifier'], ['RIFIUTATO', 'qualcuno']]) {
     await page.locator(`.mg-item[data-id="${id}"]`).click();
     await expect(page.locator('.mg-sender-link')).toHaveText(`👤 Utente · ${pezzo}…`);
     await expect(page.locator('.mg-bubble').first()).toHaveClass(/mg-bubble--user/);
