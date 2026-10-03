@@ -568,6 +568,18 @@ test('serverCtx: la ripresa passa dalla busta del server a chi riprende, e un va
   assert.equal(serverCtx({ role: 'fixer' }, { payload: { feedback: { text: 't' } } }).ripresa, null);
 });
 
+test('riallineamento per unit rossi sulla fusione (#929): l\'elenco dei test rotti scritto dal server arriva a chi riallinea', () => {
+  const critica = 'FAIL tecnico: unit ROSSI sul risultato della fusione.\n  - tests/unit/x.test.mjs › rotto sulla fusione';
+  const fx = buildPayload({ role: 'fixer', id: 'A', num: '#1', branch: 'worker/A' }, serverCtx({ role: 'fixer' }, { payload: { feedback: { text: 't' }, critique: critica } }));
+  assert.equal(fx.case, 'riallineamento');
+  assert.equal(fx.critique, critica);
+  const senza = buildPayload({ role: 'fixer', id: 'A', branch: 'worker/A' }, serverCtx({ role: 'fixer' }, { payload: { feedback: { text: 't' } } }));
+  assert.ok(!('critique' in senza), 'un server vecchio non la manda: nessun campo vuoto');
+  assert.equal(serverCtx({ role: 'new-work' }, { payload: { critique: critica } }).critique, undefined, 'solo chi riallinea');
+  const testo = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'routines', 'roles', 'resolver-rebase.md'), 'utf8');
+  assert.match(testo, /Unit rossi sulla fusione/, 'il testo di ruolo dice cosa fare dei test elencati');
+});
+
 test('readRoleInstructions: il caso del correttore sceglie il testo (ripresa ≠ rebase), e un caso ignoto vale il rebase', () => {
   const dir = resolve(TMP, 'routines', 'roles');
   mkdirSync(dir, { recursive: true });
