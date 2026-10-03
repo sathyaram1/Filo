@@ -15,7 +15,14 @@ test('clic al centro di una scheda stretta che suona: si apre la scheda', async 
   const tab = shell.locator(`.tab[data-id="${id}"]`);
   await expect(tab.locator('.audio-ind')).toBeVisible({ timeout: 10_000 });
   await expect(tab.locator('.favicon')).toBeHidden();
-  const box = await tab.boundingBox();
+  await expect(shell.locator('.tab .spinner')).toHaveCount(0, { timeout: 15_000 });
+  await shell.waitForTimeout(500);
+  const box = await shell.evaluate((id) => {
+    const el = document.querySelector(`.tab[data-id="${id}"]`);
+    el.scrollIntoView({ inline: 'nearest' });
+    const r = el.getBoundingClientRect();
+    return { x: r.x, y: r.y, width: r.width, height: r.height };
+  }, id);
   expect(box.width).toBeLessThan(56);
   await shell.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   await expect(tab).toHaveClass(/active/, { timeout: 5000 });
