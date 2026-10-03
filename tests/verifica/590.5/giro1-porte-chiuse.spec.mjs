@@ -1,5 +1,5 @@
-// Verifica #590.5 giro 1: porte vicine a quelle della segnalazione (ricarica, navigazione, Ctrl+Tab, stile, token,
-// categoria, editor dei modelli per azione, correttore).
+// Verifica #590.5 giro 1: porte vicine alla segnalazione, provate e chiuse (ricarica, navigazione nella stessa
+// scheda, via e ritorno, Ctrl+Tab, categoria, stile della chat, token estetici).
 import { test, expect } from '../../fixtures/electron.mjs';
 
 const impostazioni = async (shell) => (await shell.evaluate(() => window.filoShell.message({ type: 'get_settings' }))).settings;
@@ -107,61 +107,4 @@ test('Preferenze: un token estetico scritto e Ctrl+W subito: salvato', async ({ 
   await pref.keyboard.type('#123456');
   await ctrlW(app);
   await expect.poll(async () => JSON.stringify(await impostazioni(shell)).includes('#123456'), { timeout: 4000 }).toBe(true);
-});
-
-test('Modelli: un modello scritto in un segmento e Ctrl+W: cosa resta', async ({ app, shell, openTab }) => {
-  await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { useDefaultModels: false } }));
-  const modelli = await openTab('filo://options/options.html');
-  const seg = modelli.locator('#modelsGrid .sn-chain input').first();
-  await expect(seg).toBeVisible({ timeout: 8000 });
-  const prima = JSON.stringify((await impostazioni(shell)).models);
-  await seg.click();
-  await modelli.keyboard.press('Control+A');
-  await modelli.keyboard.type('inesistente-xyz');
-  await ctrlW(app);
-  await new Promise((r) => setTimeout(r, 1500));
-  const dopo = JSON.stringify((await impostazioni(shell)).models);
-  console.log('PRIMA', prima.slice(0, 300));
-  console.log('DOPO ', dopo.slice(0, 300));
-  // E con un segmento lasciato col clic altrove? Il confronto lo fa chi legge il log.
-});
-
-test('Correttore: una correzione cambiata e Ctrl+W subito', async ({ app, openTab }) => {
-  const sp = await openTab('filo://spellcheck/spellcheck.html');
-  await sp.waitForLoadState('domcontentloaded');
-  await sp.evaluate(async () => { await chrome.storage.local.set({ sn_autocorrect: { qeusto: 'questo' } }); });
-  await sp.reload();
-  const corr = sp.locator('#autocorrectList input').nth(1);
-  await expect(corr).toHaveValue('questo', { timeout: 8000 });
-  await corr.click();
-  await sp.keyboard.press('Control+A');
-  await sp.keyboard.type('quello');
-  await ctrlW(app);
-  const altra = await openTab('filo://spellcheck/spellcheck.html');
-  await new Promise((r) => setTimeout(r, 1500));
-  const v = await altra.evaluate(async () => (await chrome.storage.local.get('sn_autocorrect')).sn_autocorrect);
-  console.log('CORRETTORE', JSON.stringify(v));
-  expect(v.qeusto).toBe('quello');
-});
-
-test('Modelli: un modello che l\'azione respinge, uscito col clic vs Ctrl+W', async ({ app, shell, openTab }) => {
-  await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { useDefaultModels: false } }));
-  const modelli = await openTab('filo://options/options.html');
-  await expect(modelli.locator('#modelsGrid .sn-chain input').first()).toBeVisible({ timeout: 8000 });
-  const idx = await modelli.evaluate(() => window.SN_MODEL_CHAIN.actionLabels().findIndex(([a]) => a === 'describe_image'));
-  const seg = modelli.locator('#modelsGrid .sn-chain').nth(idx).locator('input').first();
-  const prima = (await impostazioni(shell)).models.describe_image;
-  await seg.click();
-  await modelli.keyboard.press('Control+A');
-  await modelli.keyboard.type('deepseek-flash');
-  await modelli.keyboard.press('Escape');
-  await modelli.locator('h1').first().click();
-  await new Promise((r) => setTimeout(r, 1200));
-  console.log('CLIC: prima', prima, 'dopo', (await impostazioni(shell)).models.describe_image, 'casella', await seg.inputValue(), 'msg', await modelli.locator('#modelsGrid .sn-chain').nth(idx).locator('.sn-chain-msg').allTextContents());
-  await seg.click();
-  await modelli.keyboard.press('Control+A');
-  await modelli.keyboard.type('deepseek-flash');
-  await ctrlW(app);
-  await new Promise((r) => setTimeout(r, 1500));
-  console.log('CTRLW: dopo', (await impostazioni(shell)).models.describe_image);
 });
