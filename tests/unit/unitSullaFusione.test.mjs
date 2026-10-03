@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, collegaCartella } from '../helpers/percorsi.mjs';
 import {
   decidiEsito, campoPerIlServer, chiaveTest, testoProva, togliCollegamento, chiudiAlbero, gitIn,
-  provaUnitSullaFusione, chiediConProva, TETTO_ROSSI,
+  provaUnitSullaFusione, chiediConProva, pulisciResti, TETTO_ROSSI,
 } from '../../scripts/lib/unit-sulla-fusione.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -313,5 +313,57 @@ test('prova vera: un rosso instabile si riprova da solo e non ferma la fusione',
     pulita(r);
   } finally {
     rmSync(r.casa, { recursive: true, force: true });
+  }
+});
+
+// ─── Una prova interrotta a metà (Ctrl+C, timeout di chi la lancia) ──────────
+//
+// Il worktree di prova resta registrato col collegamento a node_modules: un `git worktree remove --force` qualunque
+// lo attraverserebbe svuotando il node_modules vero. Il lucchetto lo rifiuta, e i resti li toglie la prova dopo.
+
+test('durante la prova la cartella ha il lucchetto: un remove --force qualunque non attraversa il collegamento', () => {
+  const r = repoFinto();
+  try {
+    const punta = r.ramo('claude/lucchetto', () => r.scrivi('nuovo.txt', 'x\n'));
+    r.suMain(() => r.scrivi('altro.txt', 'y\n'));
+    let rifiutato = null;
+    const p = provaUnitSullaFusione({
+      root: r.lavoro, punta, scrivi: () => {},
+      lancia: (dir) => { rifiutato = !r.g(['worktree', 'remove', '--force', dir]).ok; return { ok: true, rossi: [] }; },
+    });
+    assert.equal(p.esito, 'verde');
+    assert.equal(rifiutato, true, 'col lucchetto il remove --force si rifiuta');
+    pulita(r);
+  } finally {
+    rmSync(r.casa, { recursive: true, force: true });
+  }
+});
+
+test('i resti di una prova interrotta li toglie la prova dopo, senza attraversare il collegamento; quelli di una viva no', () => {
+  const r = repoFinto();
+  const tmp = cartellaTemporanea('filo-929-tmp-');
+  const resto = (nome, pid) => {
+    const base = join(tmp, nome);
+    mkdirSync(base);
+    writeFileSync(join(base, 'pid'), String(pid));
+    const dir = join(base, 'fusione');
+    r.ok(['worktree', 'add', '--detach', '--quiet', dir, 'HEAD']);
+    r.ok(['worktree', 'lock', '--reason', 'prova', dir]);
+    collegaCartella(join(r.lavoro, 'node_modules'), join(dir, 'node_modules'));
+    return base;
+  };
+  try {
+    const morta = resto('filo-fusione-mort01', 4242);
+    const viva = resto('filo-fusione-viva01', 4343);
+    const tolte = pulisciResti({ git: r.g, tmp, vivo: (pid) => pid === 4343 });
+    assert.deepEqual(tolte, [morta]);
+    assert.ok(!existsSync(morta));
+    assert.ok(existsSync(join(viva, 'fusione', 'node_modules')), 'una prova viva non si tocca');
+    assert.equal(readFileSync(join(r.lavoro, 'node_modules', 'sentinella.txt'), 'utf8'), 'resta');
+    assert.deepEqual(pulisciResti({ git: r.g, tmp, vivo: () => false }), [viva]);
+    pulita(r);
+  } finally {
+    rmSync(r.casa, { recursive: true, force: true });
+    rmSync(tmp, { recursive: true, force: true });
   }
 });

@@ -203,8 +203,11 @@ function provaViva(base, { vivo = pidVivo, oraMs = Date.now() } = {}) {
  */
 export function pulisciResti({ git, tmp = tmpdir(), vivo = pidVivo, oraMs = Date.now() } = {}) {
   const basi = new Map();
-  const aggiungi = (base, dir) => {
-    if (!NOME_BASE.test(basename(base))) return;
+  const aggiungi = (grezza, dir) => {
+    if (!NOME_BASE.test(basename(grezza))) return;
+    // git scrive la forma lunga con le barre normali, la temporanea di Windows può essere quella corta: una chiave sola.
+    let base;
+    try { base = realpathSync.native(grezza); } catch (_) { base = resolve(grezza); }
     if (!basi.has(base)) basi.set(base, new Set());
     if (dir) basi.get(base).add(dir);
   };
