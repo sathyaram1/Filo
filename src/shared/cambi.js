@@ -348,7 +348,7 @@
     dashboard: 'dalla home',
     shell: 'dalla barra delle schede',
     'menu-scheda': 'dal menu della scheda',
-    zoom: 'coi tasti o la rotella',
+    zoom: 'con un gesto sulla pagina',
   };
   function provenienza(evento) {
     const e = evento || {};
@@ -490,7 +490,9 @@
   // Le righe dei cambi recenti, dal più vecchio al più nuovo. Il testo dentro viene anche dai nomi
   // dei timer e dai valori scritti da un modello: chi le mette nel prompt le recinta (filoState.js).
   function righePerModello(eventi, { adesso = Date.now(), max = 40 } = {}) {
-    const lista = Array.isArray(eventi) ? eventi : [];
+    // Un'importazione accoda eventi vecchi: per il modello contano in ordine di tempo.
+    const tempo = (e) => new Date(e && e.ts).getTime() || 0;
+    const lista = (Array.isArray(eventi) ? eventi : []).slice().sort((a, b) => tempo(a) - tempo(b));
     const chiusi = annullati(lista);
     const scelti = lista.slice(-max);
     const righe = scelti.map((e) => {

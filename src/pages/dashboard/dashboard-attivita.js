@@ -257,6 +257,7 @@
     ESEGUI_COMANDO: (n) => (n > 1 ? `eseguito ${n} comandi` : 'eseguito un comando'),
     IMPOSTA_PREFERENZA: (n) => (n > 1 ? `cambiato ${n} impostazioni` : 'cambiato un\'impostazione'),
     IMPOSTA_ESTETICA: (n) => (n > 1 ? `cambiato ${n} dettagli dell'aspetto` : 'cambiato l\'aspetto'),
+    ANNULLA_CAMBIO: (n) => (n > 1 ? `rimesso com'era ${n} cambi` : 'rimesso com\'era un cambio'),
     SALVA_APPUNTO: (n) => (n > 1 ? `salvato ${n} appunti` : 'salvato un appunto'),
     SALVA_LEZIONE: (n) => (n > 1 ? `memorizzato ${n} cose` : 'memorizzato una cosa'),
     DIMENTICA: (n) => (n > 1 ? `dimenticato ${n} cose` : 'dimenticato una cosa'),
@@ -325,6 +326,10 @@
   function pulito(v) {
     return String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, '').trim();
   }
+  function frasiCambi(a) {
+    const l = Array.isArray(a && a._cambi) ? a._cambi : [];
+    return l.map((c) => pulito(c && c.frase)).filter(Boolean).join('; ');
+  }
   const ACTIVITY_ROWS = {
     TIMER: (a) => {
       const sec = Number(a.seconds || a.secondi || 0);
@@ -352,10 +357,18 @@
     EVENTO_CALENDARIO: (a) => ({ icon: '📅', text: `Evento creato · ${a.title || a.titolo || ''}` }),
     // Impostazione applicata subito (livello 1, es. il tema): prima non
     // lasciava traccia in chat, come se non fosse successo niente.
+    // La frase è quella dell'evento del filo, col nome della pagina Preferenze (#557, #867); senza
+    // evento il valore era già quello.
     IMPOSTA_PREFERENZA: (a) => {
-      const k = a.chiave || a.key || '';
-      const v = a.valore ?? a.value;
-      return { icon: '⚙', text: `Impostato · ${k}${v !== undefined && v !== '' ? ` = ${v}` : ''}` };
+      const f = frasiCambi(a);
+      if (f) return { icon: '⚙', text: `Impostato · ${f}` };
+      const k = pulito(a.chiave || a.key || '').replace(/_/g, ' ');
+      const v = pulito(a.valore ?? a.value);
+      return { icon: '⚙', text: `Già così · ${k}${v ? `: ${v}` : ''}` };
+    },
+    ANNULLA_CAMBIO: (a) => {
+      const f = pulito(a._output && a._output.frase);
+      return { icon: '↩', text: `Rimesso com’era${f ? ` · prima di: ${f}` : ''}` };
     },
     // Passi intermedi (#368/#376): la ricerca è già partita nel main e i
     // risultati rientrano nel turno successivo, dove compare la risposta.
@@ -402,6 +415,8 @@
       const T = window.SN_THEME_TOKENS;
       const t = T && T.get && T.get(tok);
       const val = a.valore ?? a.value ?? a.val ?? a.colore;
+      const f = frasiCambi(a);
+      if (f) return { icon: '🎨', text: `Aspetto · ${f.replace(/^aspetto, /, '')}` };
       return { icon: '🎨', text: `Aspetto · ${(t && t.label) || tok}${val ? ` = ${val}` : ''}` };
     },
     PROXY_TAB: (a) => ({ icon: '🌍', text: `Scheda aperta da · ${String(a.country || a.paese || '').toUpperCase()}` }),
@@ -443,6 +458,7 @@
     LEGGI_DOCUMENTO: 'Documento non letto', LEGGI_TRASPARENZA: 'Documento non disponibile',
     CAPACITA_DETTAGLIO: 'Verifica non riuscita', NAVIGA: 'Link non aperto',
     IMPOSTA_PREFERENZA: 'Impostazione non applicata', IMPOSTA_ESTETICA: 'Aspetto non cambiato',
+    ANNULLA_CAMBIO: 'Niente annullato',
     STILE_PAGINA: 'Aspetto della pagina non cambiato', RIPRISTINA_STILE_PAGINA: 'Aspetto della pagina non ripristinato',
     PROXY_TAB: 'Scheda non instradata', RIMUOVI_PROXY: 'Proxy non tolto',
     RIMUOVI_PROXY_TUTTE: 'Proxy non tolti', REGOLA_PROXY_DOMINIO: 'Regola non salvata',

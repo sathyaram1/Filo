@@ -2862,6 +2862,15 @@ function toolResultText({ action, res, rendered }) {
   if (type === 'ZOOM_PAGINA' && !res.executed && res.output && res.output.zoom === 'muto') {
     return 'Zoom non cambiato: la pagina davanti non risponde ai comandi di zoom (può essere una pagina di sistema, o non aver finito di caricare). Dillo all\'utente, e non ripetere l\'azione uguale.';
   }
+  if (type === 'ANNULLA_CAMBIO' && res.output) {
+    const o = res.output;
+    if (!res.executed) {
+      return `Niente annullato: ${o.error || 'cambio non trovato'}. Rileggi i CAMBI RECENTI nello STATO e, se non è chiaro quale intende, chiediglielo.`;
+    }
+    const saltati = Array.isArray(o.saltati) && o.saltati.length
+      ? `\nNon rimessi, perché nel frattempo sarebbero già scaduti:\n${nomiSalvati(o.saltati)}` : '';
+    return `Annullato il cambio ${o.annullato}: è tornato com'era prima di questo:\n${nomiSalvati([o.frase || ''])}${saltati}`;
+  }
   if (res.executed) {
     // La descrizione «a cosa fatta» (per un'impostazione: «Impostazione
     // applicata: Tema → Scuro»), non quella del popup di conferma («Filo vuole
@@ -4485,6 +4494,23 @@ function casaPertinente(parole, it) {
 
 // Ogni destinatario riceve il messaggio ritagliato sul PROPRIO indirizzo (frame
 // per frame): a un sito arrivano solo i tipi che il codice di Filo lì ascolta.
+// Quello che serve al registro dei cambi per rimettere le cose com'erano, e per dirlo alle pagine.
+Registro.collega({
+  applicaImpostazioni: (parziale) => applySettingsUpdate(parziale),
+  aggiornaVivo: () => broadcastLiveUpdate(),
+  aggiornaRegoleProxy: () => refreshProxyRulesAllWindows(),
+  zoomSu: async (host, percentuale) => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      const tm = w._filoTabs;
+      if (!tm || typeof tm.zoomSulSito !== 'function') continue;
+      if (await tm.zoomSulSito(host, percentuale)) return true;
+    }
+    return false;
+  },
+  annuncia: (ids) => broadcastToFiloPages({ type: MSG.CAMBI_AGGIORNATI, ids }),
+});
+Registro.avvia();
+
 function broadcastToTabs(message) {
   try {
     for (const win of BrowserWindow.getAllWindows()) {

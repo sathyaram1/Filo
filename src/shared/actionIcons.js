@@ -56,6 +56,7 @@
     ZOOM_PAGINA: 'zoomPagina',
     STILE_PAGINA: 'brush',
     RIPRISTINA_STILE_PAGINA: 'undo',
+    ANNULLA_CAMBIO: 'undo',
   };
 
   const PREVISTE = {

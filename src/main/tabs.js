@@ -131,6 +131,14 @@ function schedaPerPermessi(wc) {
 // pagina filo:// NON singleton è la nuova scheda (`filo://newtab/`): di quella
 // se ne vogliono quante se ne aprono. La chiave d'identità è host+path (query
 // e hash esclusi: un ?highlight non rende la pagina "un'altra pagina").
+// Chromium tiene lo zoom per sito: la chiave del suo evento è l'host, e per le pagine di Filo il loro indirizzo.
+function ospiteDelloZoom(url) {
+  try {
+    const u = new URL(String(url || ''));
+    return u.protocol === 'filo:' ? `filo://${u.hostname}` : u.hostname.replace(/^www\./, '');
+  } catch (_) { return ''; }
+}
+
 function filoSingletonKey(url) {
   const s = String(url || '');
   if (!s.startsWith('filo://')) return null;
@@ -1890,8 +1898,31 @@ class TabManager {
   // delle pagine che zoomano da sé restano di chi già li tiene. Il preload
   // risponde con la percentuale che ha davvero applicato: chi chiede un valore
   // fuori scala deve poterlo dire all'utente invece di tacere il taglio.
-  applicaZoom(spec) {
-    const active = this.tabs.find((t) => t.id === this.activeId);
+  // Il cambio applicato diventa un evento del filo nel contesto di chi l'ha chiesto (#867).
+  async applicaZoom(spec, bersaglio = null) {
+    const tab = bersaglio || this.tabs.find((t) => t.id === this.activeId);
+    const esito = await this._chiediZoom(tab, spec);
+    if (esito && typeof esito.prima === 'number' && typeof esito.percentuale === 'number') {
+      try {
+        require('./services/registroCambi').registraZoom(
+          { host: ospiteDelloZoom(tab.url), prima: esito.prima, dopo: esito.percentuale },
+          { incognito: !!this.incognito },
+        );
+      } catch (_) {}
+    }
+    return esito;
+  }
+
+  // «Rimetti com'era» uno zoom: sulla scheda di quel sito che si vede, o su un'altra dello stesso sito.
+  async zoomSulSito(host, percentuale) {
+    const stessi = this.tabs.filter((t) => t.view && ospiteDelloZoom(t.url) === host);
+    if (!stessi.length) return false;
+    const tab = stessi.find((t) => t.id === this.activeId) || stessi[0];
+    const esito = await this.applicaZoom({ percentuale }, tab);
+    return !!(esito && !esito.muto);
+  }
+
+  _chiediZoom(active, spec) {
     if (!active || !active.view) return Promise.resolve(null);
     const wc = active.view.webContents;
     const rid = `zoom-${randomUUID()}`;
@@ -1937,6 +1968,21 @@ class TabManager {
       wc.ipc.on('filo:zoom-proprio', (_e, perc) => {
         const n = Math.round(Number(perc));
         tab.zoomProprio = Number.isFinite(n) && n > 0 ? n : null;
+      });
+    } catch (_) {}
+    // Una raffica di tasti o di rotella finita: un evento del filo (#867). Solo dal frame principale,
+    // e solo numeri dentro i limiti dello zoom.
+    try {
+      wc.ipc.on('filo:zoom-registra', (e, d) => {
+        if (e.senderFrame && wc.mainFrame && e.senderFrame !== wc.mainFrame) return;
+        const Z = globalThis.SN_ZOOM;
+        const dentro = (x) => Number.isFinite(Number(x)) && (!Z || (Number(x) >= Z.MIN_PERCENTUALE - 1 && Number(x) <= Z.MAX_PERCENTUALE + 1));
+        if (!d || !dentro(d.prima) || !dentro(d.dopo)) return;
+        const R = require('./services/registroCambi');
+        R.con({ via: 'interfaccia', dove: 'zoom' }, () => R.registraZoom(
+          { host: ospiteDelloZoom(tab.url), prima: d.prima, dopo: d.dopo },
+          { incognito: !!this.incognito },
+        ));
       });
     } catch (_) {}
     // In modalità "contenuto a tutto schermo" la pagina copre la barra, quindi

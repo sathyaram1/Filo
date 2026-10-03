@@ -78,6 +78,18 @@ function senderInfo(event) {
   };
 }
 
+// La pagina che ha chiesto, come la nomina il registro dei cambi (src/shared/cambi.js, DOVE).
+function provenienzaDi(info) {
+  if (info && info.isShell) return { via: 'interfaccia', dove: 'shell' };
+  let u = null;
+  try { u = new URL(String((info && info.url) || '')); } catch (_) { u = null; }
+  if (u && u.protocol === 'filo:') {
+    const dove = u.hostname === 'options' && /altro/.test(u.pathname) ? 'altro' : u.hostname;
+    return { via: 'interfaccia', dove };
+  }
+  return { via: 'pagina' };
+}
+
 function registerIpcHandlers() {
   // Alla chiusura di Filo non lasciamo shell orfane: nessuna persistenza dopo
   // l'uscita (alla riapertura si parte da una shell pulita).
@@ -140,7 +152,8 @@ function registerIpcHandlers() {
     // dello storage che ne discende (anche dopo await) finisce nell'overlay in
     // RAM invece che su disco. Copre TUTTE le azioni di memoria senza dover
     // gattare ogni singolo case.
-    const run = () => handleMessage(msg, info);
+    // Ogni stato che la richiesta salva diventa un evento del filo che dice da dove è venuto (#867).
+    const run = () => require('./services/registroCambi').con(provenienzaDi(info), () => handleMessage(msg, info));
     try {
       return info.isIncognito ? await DiskStorage.runIncognito(run) : await run();
     } catch (err) {
@@ -449,7 +462,7 @@ function registerIpcHandlers() {
     const win = finestraDellaBarra(event.sender);
     if (!win) return { ok: false, error: 'forbidden' };
     // In incognito l'elenco dei siti si scrive nella memoria della sessione, non sul disco.
-    const run = () => win._filoTabs.setCookieBanners(id, !!show);
+    const run = () => require('./services/registroCambi').con({ via: 'interfaccia', dove: 'menu-scheda' }, () => win._filoTabs.setCookieBanners(id, !!show));
     return win._filoIncognito ? DiskStorage.runIncognito(run) : run();
   });
   // Stato per il menu della shell: la voce compare solo se un endpoint è

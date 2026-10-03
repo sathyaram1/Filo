@@ -89,10 +89,20 @@
 
   // `creditiFreschi`: la chiede un turno di chat, dove «quanti crediti ho?» va
   // risposto col saldo di adesso; la home si accontenta dell'ultimo letto.
+  // I cambi di stato recenti (#867): li tiene il registro del main, che qui c'è solo nel main.
+  async function readCambi() {
+    try {
+      const R = global.SN_REGISTRO_CAMBI;
+      return R && typeof R.ultimi === 'function' ? await R.ultimi() : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   async function assemble({ creditiFreschi = false } = {}) {
     const Mem = global.SN_FILO_MEMORY;
     const now = new Date();
-    const [tabs, session, timers, notifications, dashboardCache, rawLog, credits] = await Promise.all([
+    const [tabs, session, timers, notifications, dashboardCache, rawLog, credits, cambi] = await Promise.all([
       listTabs(),
       Mem.getSession(),
       Mem.listTimers(),
@@ -100,6 +110,7 @@
       Mem.getDashboardCache(),
       Mem.listRaw({ since: new Date(Date.now() - 24 * 3600 * 1000).toISOString(), limit: 50 }),
       readCredits({ fresco: creditiFreschi }),
+      readCambi(),
     ]);
 
     const sessionInfo = session.sessionStartedAt
@@ -148,6 +159,7 @@
         ageRel: formatRelativeTime(n.ts),
       })),
       recentActions: rawLog,
+      cambi: cambi ? { righe: cambi.righe || [], tolti: cambi.tolti || 0 } : null,
       dashboard: dashboardCache,
       credits,
     };
@@ -297,6 +309,15 @@
         .map((a) => `- [${formatRelativeTime(a.ts)}] ${a.type}: ${a.summary}`)));
     }
     lines.push('');
+    // Le frasi portano nomi di timer e valori che può aver scritto un modello: recinto come sopra.
+    if (state.cambi) {
+      lines.push('CAMBI RECENTI (impostazioni, aspetto, sveglie e timer, regole del proxy, zoom; dal più vecchio al più nuovo)');
+      lines.push('Fatti dalla chat o dalle pagine, sono lo stesso evento: «rimetti come prima» si fa con ANNULLA_CAMBIO e l\'id.');
+      if (!state.cambi.righe.length) lines.push('(nessuno)');
+      else lines.push(salvati(state.cambi.righe));
+      if (state.cambi.tolti > 0) lines.push(`(più ${state.cambi.tolti} cambi più vecchi, non elencati qui)`);
+      lines.push('');
+    }
     lines.push('DASHBOARD ATTUALE');
     if (state.dashboard) {
       const righe = [`Messaggio: "${String(state.dashboard.message || '').slice(0, 200)}"`];
