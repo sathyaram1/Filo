@@ -239,11 +239,12 @@ async function praticaInChiaro(doc) {
     statusPublic: f.statusPublic?.stringValue || 'open',
     localOnly: lo ? { by: lo.by?.stringValue || '', at: Number(lo.at?.integerValue || 0) } : undefined,
     localApproval: la ? { by: la.by?.stringValue || '', at: Number(la.at?.integerValue || 0) } : undefined,
+    userNote: f.userNote?.stringValue || '',
     beatAt: f.beatAt?.stringValue || f.beatAt?.timestampValue || '',
     workingSince: f.workingSince?.stringValue || f.workingSince?.timestampValue || '',
   };
 }
-const CAMPI_PRATICA = ['clientId', 'senderProof', 'status', 'statusPublic', 'localOnly', 'localApproval', 'beatAt', 'workingSince', 'pipeline'];
+const CAMPI_PRATICA = ['clientId', 'senderProof', 'status', 'statusPublic', 'localOnly', 'localApproval', 'userNote', 'beatAt', 'workingSince', 'pipeline'];
 
 /**
  * Il segno «solo in locale» (#908): `valore` true lo mette ({ by, at } in ms), false lo toglie.
@@ -411,7 +412,49 @@ export async function praticaPerLaSessione(id, opts = {}) {
   if (!opts.allaChiusura && !MR.isLocalOnly(fb) && STATI_DEL_LAVORO_LOCALE.includes(fb.status)) {
     return { ok: false, motivo: SENZA_SEGNO, utente: false, senzaSegno: true };
   }
-  return { ok: true, avviso: avvisoDaCampi(doc.fields) };
+  return { ok: true, avviso: [avvisoDaCampi(doc.fields), avvisoFrase(fb, id)].filter(Boolean).join('
+') };
+}
+
+/** Il promemoria della frase per chi ha segnalato (regola: SN_MANAGE_REVIEW.fraseAttesa), '' se non serve. PURA. */
+export function avvisoFrase(fb, rif) {
+  if (!MR.fraseAttesa(fb)) return '';
+  return `Chi l’ha mandato è un utente: a pratica chiusa vede la risoluzione con la sola frase per lui, e questa pratica non ne ha una. Se il lavoro cambia qualcosa che vede, scrivila (una riga in chiaro, niente dettagli di sicurezza): npm run feedback -- ${rif} --frase "…". Vale anche a pratica chiusa.`;
+}
+
+/** Lo stesso promemoria letto in rete, per chi ha la pratica ma non l'ha appena riletta (finish, server:fondi). '' anche se non si legge. */
+export async function fraseDaScrivere(id, rif = id, opts = {}) {
+  try {
+    const bearer = opts.bearer || await acquireBearer();
+    const doc = await getDoc(id, bearer, CAMPI_PRATICA);
+    const fb = doc && await praticaInChiaro(doc);
+    return fb ? avvisoFrase(fb, rif) : '';
+  } catch (_) { return ''; }
+}
+
+/**
+ * Solo la frase per chi ha segnalato, stato invariato: `<n|id> --frase "…"`. Dai Ricevuti no, come ogni passaggio di una
+ * sessione (partenzaVietata): lì decide l'owner. Su una pratica chiusa sì: la bacheca la mostra alla prossima sincronizzazione.
+ */
+export async function scriviFrase(id, frase, opts = {}) {
+  const testo = String(frase || '').trim();
+  if (!testo) return { ok: false, motivo: 'la frase è vuota' };
+  const bearer = opts.bearer || await acquireBearer();
+  const doc = await getDoc(id, bearer, ['status']);
+  if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
+  const { from, leggibile } = await statoAttuale(doc);
+  if (!leggibile) return { ok: false, motivo: 'stato attuale non decifrabile: non so dove sta la pratica' };
+  const vietata = partenzaVietata(from);
+  if (vietata) return { ok: false, motivo: vietata };
+  const fields = { userNote: toFsValue(testo.slice(0, 500)) };
+  if (opts.dryRun) return { ok: true, dryRun: true, tagliata: testo.length > 500 };
+  const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?updateMask.fieldPaths=userNote`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
+    body: JSON.stringify({ fields }),
+  });
+  if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
+  return { ok: true, tagliata: testo.length > 500 };
 }
 
 /**
