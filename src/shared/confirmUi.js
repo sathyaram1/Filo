@@ -424,6 +424,9 @@
         okDisabled: !!(okBtn && (okBtn.disabled || okBtn.getAttribute('aria-disabled') === 'true')),
         textScrollTop: textEl ? textEl.scrollTop : 0,
         hasInput: !!q('.sn-confirm-input'),
+        // Un clic o un tasto veri adesso varrebbero: il primo fotogramma può
+        // arrivare ben dopo che il riquadro sta nel DOM (#592.11).
+        pronto: !!(active.pronto && active.pronto()),
         textScrolls: !!(textEl && textEl.scrollHeight > textEl.clientHeight + 1),
         selectionBg,
       };
