@@ -69,6 +69,7 @@ beforeEach(() => {
   };
   Collector._reset();
   Collector._setAuto(false);   // niente timer veri nei test
+  Collector._setAccesa(true);  // la coda di quando la raccolta riparte (#897)
 });
 
 afterEach(() => { globalThis.fetch = fetchOrig; Collector._reset(); });
@@ -89,6 +90,7 @@ test('il ritardo è sorteggiato dentro una finestra dichiarata, non fisso', asyn
   for (const sorte of [0, 0.25, 0.5, 0.75, 1]) {
     Collector._reset();
     Collector._setAuto(false);
+    Collector._setAccesa(true);
     Collector._setSorteggio(() => sorte);
     const prima = Date.now();
     await raccogli('https://esempio.it/x', 'una cosa');
@@ -185,6 +187,7 @@ test('la coda sopravvive alla chiusura dell’app: quello che c’era sul disco 
     // l'app si chiude e riapre: stessa coda, stesso ritardo già sorteggiato
     Collector._reset();
     Collector._setAuto(false);
+    Collector._setAccesa(true);
     assert.equal(await Collector.flush({ now: Date.now() }), 1, 'non è ancora maturo');
     assert.equal(scritture.length, 0);
     await Collector.flush({ now: Date.now() + RITARDO_MAX_MS + 1000 });
@@ -254,6 +257,7 @@ test('un percorso salvato mentre la coda si sta ancora leggendo dal disco non la
   try {
     Collector._reset();
     Collector._setAuto(false);
+    Collector._setAccesa(true);
     Collector.init();                       // avvio: la lettura è partita
     await raccogli('https://nuovo-esempio.it/x', 'una cosa di adesso');
     await new Promise((r) => setTimeout(r, 60));
