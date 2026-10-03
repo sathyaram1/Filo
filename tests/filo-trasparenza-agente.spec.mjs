@@ -22,18 +22,24 @@ const toolTrasparenza = (app) => app.evaluate(() => {
     def: def ? def.function : null,
     esistenti: globalThis.SN_TRANSPARENCY.ids(),
     previsti: globalThis.SN_TRANSPARENCY.NAV.map((n) => n.id),
+    conNota: globalThis.SN_TRANSPARENCY.conNota().map((n) => n.id),
   };
 });
 
 test('il prompt dichiara al modello solo i documenti che esistono davvero', async ({ app, openTab }) => {
   await openTab(NEWTAB);
-  const { def, esistenti, previsti } = await toolTrasparenza(app);
+  const { def, esistenti, previsti, conNota } = await toolTrasparenza(app);
   expect(def, 'LEGGI_TRASPARENZA non arriva più al modello').toBeTruthy();
   expect(esistenti.length).toBeGreaterThan(0);
-  expect(def.parameters.properties.doc.enum).toEqual(esistenti);
+  // Le sezioni non scritte con la loro nota si leggono come un documento (#888).
+  expect(def.parameters.properties.doc.enum).toEqual(esistenti.concat(conNota));
 
   const promesso = `${def.description} ${def.parameters.properties.doc.description}`;
-  for (const id of previsti.filter((i) => !esistenti.includes(i))) {
+  for (const id of conNota) {
+    expect(promesso, `il prompt non dice che "${id}" ha una nota da leggere`)
+      .toMatch(new RegExp(`(^|[^a-z0-9_-])${id}([^a-z0-9_-]|$)`, 'i'));
+  }
+  for (const id of previsti.filter((i) => !esistenti.includes(i) && !conNota.includes(i))) {
     expect(promesso, `il prompt promette "${id}", che non è stato scritto`)
       .not.toMatch(new RegExp(`(^|[^a-z0-9_-])${id}([^a-z0-9_-]|$)`, 'i'));
   }
@@ -53,6 +59,7 @@ test('un documento non scritto: l\'agente riceve un no esplicito, non un vicolo 
   await openTab(NEWTAB);
   const previsti = await app.evaluate(() => ({
     mancanti: globalThis.SN_TRANSPARENCY.NAV
+      .filter((n) => !n.nota)
       .map((n) => n.id)
       .filter((id) => !globalThis.SN_TRANSPARENCY.ids().includes(id)),
   }));
@@ -163,4 +170,71 @@ test('il documento rientra nel prompt intero, fonti comprese', async ({ app, she
   expect(tool.content, 'il documento arriva tagliato').not.toContain('documento troncato');
   expect(tool.content.length).toBeGreaterThanOrEqual(intero.length);
   expect(tool.content).toContain('Fonti:');
+});
+
+// #888 — «quanto costa Filo?»: prima l'agente chiedeva la sezione su come Filo
+// si sostiene e riceveva «non esiste». Ora riceve la nota dell'owner, intera,
+// e il diario della chat scrive che l'ha riletta.
+test('a «quanto costa Filo?» la chat riceve la nota su come si sostiene', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 10_000 });
+  const page = await (async () => {
+    const deadline = Date.now() + 15_000;
+    while (Date.now() < deadline) {
+      const win = app.windows().find((w) => w.url().startsWith('filo://newtab'));
+      if (win) { await win.waitForLoadState('domcontentloaded'); return win; }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    throw new Error('newtab non trovata');
+  })();
+  await expect(page.locator('#input')).toBeVisible();
+
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+  });
+  await app.evaluate(() => {
+    globalThis.__calls = [];
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, tools, onDelta, onToolCall }) => {
+      const n = globalThis.__calls.push({ messages: JSON.parse(JSON.stringify(messages)), tools: JSON.parse(JSON.stringify(tools || [])) });
+      const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+      if (n === 1) {
+        try { onToolCall && onToolCall({ id: 't1', name: 'LEGGI_TRASPARENZA' }); } catch (_) {}
+        return {
+          ...base, text: '',
+          toolCalls: [{ id: 't1', name: 'LEGGI_TRASPARENZA', arguments: '{"doc":"business"}' }],
+          reasoningDetails: [], finishReason: 'tool_calls',
+        };
+      }
+      try { onDelta && onDelta('Ecco come stanno le cose.'); } catch (_) {}
+      return { ...base, text: 'Ecco come stanno le cose.', toolCalls: [], reasoningDetails: [], finishReason: 'stop' };
+    };
+  });
+
+  await page.locator('#input').fill('quanto costa Filo?');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco come stanno le cose.' })).toBeVisible({ timeout: 20_000 });
+
+  const calls = await app.evaluate(() => globalThis.__calls);
+  const nota = await app.evaluate(() => globalThis.SN_TRANSPARENCY.nota('business'));
+  expect(nota).toContain('Fino ad allora è tutto offerto');
+  // Lo strumento offerto al modello ammette la sezione: senza, il modello non
+  // potrebbe nemmeno chiederla.
+  const def = (calls[0].tools || []).map((t) => t.function || t).find((f) => f && f.name === 'LEGGI_TRASPARENZA');
+  expect(def, 'LEGGI_TRASPARENZA non arriva al modello').toBeTruthy();
+  expect(def.parameters.properties.doc.enum).toContain('business');
+  const tool = calls[1].messages.filter((x) => x.role === 'tool').pop();
+  expect(tool, 'l\'esito di LEGGI_TRASPARENZA non torna al modello').toBeTruthy();
+  expect(tool.content).toContain(nota);
+  expect(tool.content).not.toContain('NON esiste');
+  // Nel diario della chat è una lettura riuscita, non «Documento non disponibile».
+  await expect(page.locator('body')).not.toContainText('Documento non disponibile');
+  const r = await execAction(app, { type: 'LEGGI_TRASPARENZA', doc: 'business' });
+  expect(r.executed).toBe(true);
+  expect(r.output.missing).toBe(false);
 });

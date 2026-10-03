@@ -1654,7 +1654,8 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
         // riuscita: il testo torna lo stesso (dice all'agente che non c'è, così
         // non lo ricostruisce a memoria), ma il diario non deve scrivere
         // «riletto la trasparenza» per una cosa che nessuno ha letto (#515).
-        const trovato = !!(T && (!doc || T.get(doc)));
+        // La nota di una sezione non scritta invece si legge davvero (#888).
+        const trovato = !!(T && (!doc || T.get(doc) || (typeof T.nota === 'function' && T.nota(doc))));
         return { executed: trovato, kept: true, output: { doc: doc || null, text, missing: !trovato } };
       }
       case 'EVENTO_CALENDARIO':

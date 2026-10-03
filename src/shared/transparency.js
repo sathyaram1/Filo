@@ -24,7 +24,8 @@
     },
     {
       "id": "business",
-      "label": "Come si sostiene"
+      "label": "Come si sostiene",
+      "nota": "Questa pagina la scrivo quando Filo comincerà a chiedere pagamenti: dirà quanto costa, dove vanno i soldi e quanto ci guadagno. Fino ad allora è tutto offerto. Se usi una tua chiave OpenRouter, paghi solo quella."
     }
   ];
   const GLOSSARY = {
@@ -231,6 +232,13 @@
   function all() { return DOCS.slice(); }
   function get(id) { return DOCS.find((d) => d.id === String(id || '').toLowerCase()) || null; }
   function ids() { return DOCS.map((d) => d.id); }
+  // La nota di una sezione annunciata e non ancora scritta: '' se non ce l'ha.
+  function nota(id) {
+    const key = String(id == null ? '' : id).trim().toLowerCase();
+    const voce = NAV.find((n) => n.id === key);
+    return (voce && voce.nota) || '';
+  }
+  function conNota() { return NAV.filter((n) => n.nota).map((n) => ({ ...n })); }
 
   // Testo per l'agente. Senza id torna l'indice dei documenti disponibili, così
   // può scegliere quale leggere invece di indovinare. Con un id che NON esiste
@@ -241,7 +249,17 @@
     const key = String(id == null ? '' : id).replace(/\s+/g, ' ').trim().toLowerCase().slice(0, 120);
     const doc = get(key);
     if (doc) return doc.title + (doc.updated ? ' — aggiornato ' + doc.updated : '') + '\n\n' + doc.text;
-    const elenco = DOCS.map((d) => d.id + ' (' + d.title + ')').join(', ');
+    // La nota è la risposta voluta dall'owner: va riferita com'è, perché sui
+    // numeri non vuole impegni prima dei pagamenti (#888).
+    const voce = NAV.find((n) => n.id === key && n.nota);
+    if (voce) {
+      return voce.label + ' — sezione non ancora scritta. Per ora l\'autore di Filo dice solo questo: '
+        + 'riferiscilo all\'utente così com\'è, senza aggiungere cifre, motivazioni o promesse tue.\n\n' + voce.nota;
+    }
+    const note = conNota();
+    const elenco = DOCS.map((d) => d.id + ' (' + d.title + ')').join(', ')
+      + (note.length ? '. Sezioni non ancora scritte, con una nota su com\'è oggi: '
+        + note.map((n) => n.id + ' (' + n.label + ')').join(', ') : '');
     if (!key) return 'Documenti di trasparenza disponibili: ' + elenco + '.';
     const previsto = NAV.some((n) => n.id === key);
     return 'Il documento "' + key + '" NON esiste'
@@ -250,5 +268,5 @@
       + 'Documenti di trasparenza disponibili: ' + elenco + '.';
   }
 
-  global.SN_TRANSPARENCY = { NAV, GLOSSARY, all, get, ids, asText };
+  global.SN_TRANSPARENCY = { NAV, GLOSSARY, all, get, ids, nota, conNota, asText };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

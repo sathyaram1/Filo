@@ -68,18 +68,25 @@
     $('title').textContent = nome;
     // Senza niente nell'indirizzo non c'è nessuna sezione da negare: qui non
     // c'è proprio ancora niente di scritto, e lo dice il corpo della pagina.
-    $('subtitle').textContent = !chiesto ? ''
+    // Una nota dice già da sé che la sezione non è scritta: sta al posto della frase.
+    const nota = voce ? T.nota(voce.id) : '';
+    $('subtitle').textContent = !chiesto || nota ? ''
       : (voce ? 'Questa sezione non è ancora scritta.' : 'Questa sezione non esiste.');
     $('meta').textContent = '';
 
     const body = $('doc-body');
     body.textContent = '';
+    if (nota) {
+      const n = document.createElement('p');
+      n.textContent = nota;
+      body.appendChild(n);
+    }
     const p = document.createElement('p');
     const docs = T.all();
     if (!docs.length) {
       p.textContent = 'Non c’è ancora nessun documento di trasparenza.';
     } else {
-      p.appendChild(document.createTextNode('Quello che c’è scritto: '));
+      p.appendChild(document.createTextNode(nota ? 'Intanto puoi leggere: ' : 'Quello che c’è scritto: '));
       docs.forEach((d, i) => {
         if (i) p.appendChild(document.createTextNode(', '));
         const a = document.createElement('a');

@@ -354,8 +354,8 @@
     },
     {
       id: 'transparency-docs', title: 'Perché Filo fa così (trasparenza)', category: 'assistant',
-      desc: 'Le scelte dichiarate di Filo, scritte per esteso e con le fonti: quali modelli AI usa e quali aziende esclude, e perché. Le stesse pagine le puoi leggere anche senza connessione, e puoi chiederne conto a Filo in chat — le rilegge e risponde con quello che c’è scritto, invece di improvvisare. Le sezioni su privacy, sicurezza e su come Filo si sostiene sono in arrivo.',
-      invoke: 'Pagina filo://transparency/transparency.html; in chat basta chiedere perché Filo usa un certo modello o un’azienda invece di un’altra.',
+      desc: 'Le scelte dichiarate di Filo, scritte per esteso e con le fonti: quali modelli AI usa e quali aziende esclude, e perché. Le stesse pagine le puoi leggere anche senza connessione, e puoi chiederne conto a Filo in chat — le rilegge e risponde con quello che c’è scritto, invece di improvvisare. Le sezioni su privacy, sicurezza e su come Filo si sostiene sono in arrivo. Su come si sostiene, per ora la pagina dice: «Questa pagina la scrivo quando Filo comincerà a chiedere pagamenti: dirà quanto costa, dove vanno i soldi e quanto ci guadagno. Fino ad allora è tutto offerto. Se usi una tua chiave OpenRouter, paghi solo quella.»',
+      invoke: 'Pagina filo://transparency/transparency.html; in chat basta chiedere perché Filo usa un certo modello o un’azienda invece di un’altra, o quanto costa Filo.',
       doesNot: 'Non è un riassunto scritto dall’assistente: è il testo dell’autore di Filo, e quando cambia idea la pagina riporta la data dell’ultima revisione.',
     },
     {

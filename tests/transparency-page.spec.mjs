@@ -146,6 +146,37 @@ test('una sezione non ancora scritta si spiega anche cliccandola nella barra', a
   expect(tab.nome).toMatch(/non ancora scritta/);
 });
 
+// #888 — «Come si sostiene» resta in arrivo, ma aperta dice quando arriverà e
+// com'è oggi, con le parole dell'owner. Dall'indirizzo e dalla barra uguale.
+test('la sezione su come Filo si sostiene dice com\'è oggi, invece del solo «non ancora scritta»', async ({ app, openTab }) => {
+  const nota = await app.evaluate(() => globalThis.SN_TRANSPARENCY.nota('business'));
+  expect(nota).toContain('Fino ad allora è tutto offerto');
+
+  const page = await openTab(URL);
+  await expect(page.locator('#title')).toHaveText('Politica sui modelli');
+  const voce = page.locator('#nav a[href*="doc=business"]');
+  await expect(voce).toHaveClass(/is-soon/);
+  await voce.click();
+
+  await expect(page.locator('#title')).toHaveText('Come si sostiene');
+  await expect(page.locator('#doc-body p').first()).toHaveText(nota);
+  await expect(page.locator('#subtitle')).toHaveText('');
+  await expect(page.locator('#doc-body')).not.toContainText('non è ancora scritta');
+  await expect(page.locator('#doc-body a[href*="doc=models"]')).toHaveCount(1);
+  await expect(page.locator('#nav a[href*="doc=business"]')).toHaveClass(/is-soon/);
+  await expect(page.locator('#nav a[href*="doc=business"]')).toHaveClass(/is-active/);
+  await page.screenshot({ path: 'tests/.shots/888-trasparenza-business.png' });
+
+  // Dall'indirizzo, scritto come capita, la stessa pagina.
+  const diretta = await openTab(`${URL}?doc=%20Business%20`);
+  await expect(diretta.locator('#doc-body p').first()).toHaveText(nota);
+
+  // Privacy resta com'era.
+  const privacy = await openTab(`${URL}?doc=privacy`);
+  await expect(privacy.locator('#subtitle')).toHaveText('Questa sezione non è ancora scritta.');
+  await expect(privacy.locator('#doc-body')).not.toContainText(nota);
+});
+
 test('lo stesso documento chiesto con le maiuscole resta lo stesso documento', async ({ openTab }) => {
   // In chat «MODELS» e «models» sono la stessa cosa. Un indirizzo lo si scrive
   // a mano o lo si ricopia da un messaggio: negare lì un documento che esiste
