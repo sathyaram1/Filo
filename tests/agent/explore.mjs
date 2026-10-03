@@ -311,6 +311,7 @@ async function run() {
           detail: i.detail || '',
           foundAt: o.start,
           screenshotPath: join(o.out, i.shot),
+          idToken,
         });
         console.log(`  ✓ feedback ${r.id} — ${i.title}`);
       } catch (e) {
