@@ -44,9 +44,8 @@ test('la riga incollata intera passa (rilievo di livello zero del quinto giro)',
 });
 
 test('l’utente può leggere il proprio pseudonimo, quello con cui l’owner gli regala crediti', async () => {
-  // Sesto giro: la pagina non lo mostra da nessuna parte. Atteso rosso finché
-  // non viene corretto (poi togliere questa riga).
-  test.fail(true, 'lo pseudonimo non compare nella pagina Crediti dell’utente');
+  // Sesto giro: la pagina non lo mostrava da nessuna parte. Corretto col #895
+  // («Il tuo pseudonimo»); la guardia permanente sta in regalo-per-pseudonimo.spec.mjs.
   const [code] = await server.codiciOwner(1);
   const filo = await avviaFilo({ env: server.env });
   try {

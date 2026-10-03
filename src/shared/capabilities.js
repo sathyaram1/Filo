@@ -471,8 +471,8 @@
     },
     {
       id: 'preferences', title: 'Preferenze', category: 'settings',
-      desc: 'Tema (chiaro/scuro/sistema), dimensione del testo delle pagine interne, archiviazione automatica delle schede, stile dell’assistente, voce/velocità/tono della lettura, notifiche, e la modalità terminale con la sua shell.',
-      invoke: 'Pagina filo://preferences/preferences.html.',
+      desc: 'Tema (chiaro/scuro/sistema), dimensione del testo delle pagine interne, archiviazione automatica delle schede, stile dell’assistente, voce/velocità/tono della lettura, durata e suono degli avvisi in basso a destra (la durata vale anche per le conferme dentro le pagine, che restano più brevi in proporzione; ogni avviso aspetta finché ci tieni sopra il puntatore; quelli della barra si chiudono con la X, quelli nelle pagine con un clic; col tasto destro su un avviso il menu offre le sue azioni e «Chiudi»), e la modalità terminale con la sua shell.',
+      invoke: 'Pagina filo://preferences/preferences.html, oppure chiedendolo a Filo in chat.',
     },
     {
       id: 'security', title: 'Sicurezza e privacy', category: 'settings',
@@ -480,10 +480,22 @@
       invoke: 'Pagina filo://security/security.html.',
     },
     {
+      id: 'dangerous-sites', title: 'Avviso dei siti pericolosi', category: 'settings',
+      desc: 'Un sito pericoloso (in lista per phishing o malware, o che imita un marchio e chiede la password) o sospetto viene coperto da un avviso appena si apre, prima che finisca di caricarsi. L\'avviso sta fuori dalla pagina: il sito non lo copre, non lo toglie e non sente quello che ci scrivi. Su un sito pericoloso si prosegue scrivendo «confermo», su uno sospetto con «Continua»; la scelta vale per quel sito in quella scheda finché resta aperta.',
+      invoke: 'Compare da solo. Tasto destro sull\'avviso: «Chiedi a Filo di questo sito» (apre una chat nuova con la domanda), «Segnala un falso allarme» (apre «Invia feedback» già scritto), «Copia l\'indirizzo», «Torna indietro». Impostazioni → Sicurezza → «Avvisa sui siti pericolosi».',
+      doesNot: 'Non blocca la navigazione e non chiude la scheda: la pagina carica sotto l\'avviso.',
+    },
+    {
       id: 'cookie-banners', title: 'Banner dei cookie rifiutati da soli', category: 'settings',
       desc: 'In modalità Automatico e Privacy Filo rifiuta da solo i banner dei cookie, anche quando stanno in un riquadro dentro la pagina. Quelli che non hanno un «rifiuta» (solo «Accetta», o «accetta o abbonati») li nasconde, senza accettare niente, e se la pagina era rimasta ferma o scurita la sblocca. Dove il sito lo dice, controlla che il rifiuto sia stato registrato davvero.',
       invoke: 'Da solo, a ogni pagina. Il tasto destro sulla scheda dice cosa è successo su quel sito («Cookie non necessari rifiutati» o «Banner dei cookie nascosto»), anche tornandoci dopo in un\'altra scheda o dopo un riavvio, e offre «Mostra il banner dei cookie» per rivederlo; sullo stesso menu «Rifiuta i cookie in automatico qui» torna indietro. In Impostazioni → Sicurezza si vedono tutti e due gli elenchi: i siti coi banner visibili («Rifiuta in automatico») e quelli dove Filo ha rifiutato o nascosto («Mostra il banner»).',
       doesNot: 'In modalità Manuale non tocca nessun banner. Non avvisa da solo quando rifiuta o nasconde qualcosa. Non nasconde i messaggi che non parlano di cookie (avviso sull\'adblocker, limite di articoli gratuiti). Una scelta fatta in una finestra incognito resta lì. In Privacy non tiene sul disco cosa ha fatto sui siti non fidati. «Mostra il banner» toglie solo la risposta che il clic sul banner ha creato, non l\'accesso o le preferenze del sito.',
+    },
+    {
+      id: 'video-ad-skip', title: 'Pubblicità dei video saltate da sole', category: 'settings',
+      desc: 'Quando un video mostra una pubblicità che si può saltare, Filo preme «Salta» appena il pulsante compare, con un clic come il tuo. Vale su YouTube, anche nei suoi video incorporati in altri siti, e sui lettori pubblicitari che usano molti siti (Google IMA, JW Player), anche dentro un riquadro della pagina e nelle schede in secondo piano. Su YouTube, se stai scrivendo in un campo della pagina o tieni premuto il mouse, aspetta che tu abbia finito; se hai scorso più giù e il lettore non si vede, lo preme appena torni a vederlo.',
+      invoke: 'Da solo, acceso di serie. Si spegne in Impostazioni → Sicurezza → «Salta le pubblicità dei video», o chiedendolo a Filo.',
+      doesNot: 'Non accorcia le pubblicità senza «Salta» e non lo preme prima che il lettore lo mostri. Su un video di YouTube incorporato non preme se il sito ci ha messo sopra un suo elemento.',
     },
     {
       id: 'site-permissions', title: 'Permessi dei siti', category: 'navigation',
@@ -518,8 +530,8 @@
     // ────────────────────────────── Crediti ──────────────────────────────────
     {
       id: 'credits', title: 'Crediti e consumi', category: 'credits',
-      desc: 'Mostra il saldo dei crediti, quando si ricaricano e un grafico di come li hai spesi tra le varie azioni. Sotto ci sono i movimenti, cioè da dove arrivano i crediti che hai: l’invito riscattato, la quota di ogni giorno, i regali e i premi per le segnalazioni che mandi e per quelle che Filo risolve. Puoi anche chiedere a Filo in chat quanti crediti ti restano: te lo dice al volo, senza aprire la pagina.',
-      invoke: 'Chiedendolo a Filo in chat ("quanti crediti mi restano?"), oppure dalla pagina filo://credits/credits.html per il dettaglio e il grafico.',
+      desc: 'Mostra il saldo dei crediti, quando si ricaricano e un grafico di come li hai spesi tra le varie azioni. Sotto ci sono i movimenti, cioè da dove arrivano i crediti che hai: l’invito riscattato, la quota di ogni giorno, i regali e i premi per le segnalazioni che mandi e per quelle che Filo risolve. Se hai un portafoglio, sotto il saldo c’è il tuo pseudonimo, il nome con cui compari sul server di Filo. Lo copi con un clic o dal tasto destro, e basta quello per ricevere un regalo di crediti senza dare email o nome. Puoi anche chiedere a Filo in chat quanti crediti ti restano: te lo dice al volo, senza aprire la pagina.',
+      invoke: 'Chiedendolo a Filo in chat ("quanti crediti mi restano?"), oppure dalla pagina filo://credits/credits.html per il dettaglio, il grafico e il tuo pseudonimo («Il tuo pseudonimo», sotto il saldo).',
     },
     {
       id: 'invites', title: 'Inviti e crediti di Filo', category: 'credits',

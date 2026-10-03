@@ -162,17 +162,6 @@
     // non ha creato lui (ramo admin delle regole), quindi quel passo resta al
     // triage. { id, text } → { ok, feedbackId, balance } | { ok:false, error }.
     BOARD_REOPEN: 'board_reopen',
-    // Comandi proprietario (#210). Riservati all'owner (auth.isAdmin()).
-    // OWNER_LIST_USERS: una PAGINA dell'elenco degli utenti registrati (campo
-    //   `email` sui doc credits/<uid>), ordinata per email. `after` è l'ultima
-    //   email già ricevuta; `next` la riporta se c'è un'altra pagina, `total`
-    //   è il conteggio di tutti (null se non è arrivato). `cerca` restringe a
-    //   chi ha un'email che comincia così, e `total` conta solo loro.
-    //   { after?, cerca? } → { ok, users:[{email,name,balance}], total, next, cerca } | { ok:false, error }.
-    OWNER_LIST_USERS: 'owner_list_users',
-    // OWNER_GIFT_CREDITS: regala `amount` crediti all'utente con `email`.
-    //   { amount, email } → { ok, email, amount, balance } | { ok:false, error }.
-    OWNER_GIFT_CREDITS: 'owner_gift_credits',
     // Broadcast main→renderer: l'utente corrente ha ricevuto crediti in regalo
     // (#210.4). { amount } → la home mostra un popup una volta sola.
     GIFT_NOTICE: 'gift_notice',
@@ -589,20 +578,13 @@
     WEB_SEARCH: 'web_search',                      // { query } → { ok, results: [{title,url,snippet}], provider }
 
     // === Rilevamento siti pericolosi (src/main/services/safebrowse/) ===
-    // Il content script chiede il verdetto per la URL corrente (+ indizi di
-    // pagina: presenza campo password/pagamento). Il main risponde col livello
-    // e un messaggio specifico. → { ok, level:'safe'|'sospetto'|'pericoloso',
-    // message:{title,body}|null, registrable }
+    // Il content script manda la URL corrente e gli indizi (campo password/pagamento); il main mostra l'avviso in una
+    // vista sopra la scheda, i cui pulsanti non passano da questo canale, che i siti raggiungono (#813.5).
+    // → { ok, level:'safe'|'sospetto'|'pericoloso', message:{title,body}|null, registrable }
     SAFEBROWSE_GET: 'safebrowse_get',              // { url, hasPassword?, hasPayment? }
-    // L'utente ha scritto "confermo" sull'interstitial "pericoloso": registra un
-    // bypass per (tab, dominio) così la pagina non viene più coperta. → { ok }
-    SAFEBROWSE_PROCEED: 'safebrowse_proceed',      // { url }
-    // L'utente ha chiuso con "ok" il banner "sospetto": non riproporlo per
-    // questo dominio nel tab. → { ok }
-    SAFEBROWSE_DISMISS: 'safebrowse_dismiss',      // { url }
-    // Broadcast main→content: il verdetto per la URL è cambiato (navigazione o
-    // arricchimento asincrono RDAP/GSB/sandbox). Il content (ri)disegna l'avviso.
-    SAFEBROWSE_UPDATE: 'safebrowse_update',         // → { url, level, message }
+    // La home aperta dal tasto destro sull'avviso chiede cosa le ha lasciato il main: la domanda a Filo sul sito o la
+    // segnalazione del falso allarme, una volta sola. Solo pagine filo://. → { ok, richiesta: { tipo, testo } | null }
+    CASA_RICHIESTA: 'casa_richiesta',
 
     // === Geo-block: proposta inline (proxy-per-tab-spec.md §5, feedback #151) ===
     // Broadcast main→content: un contenuto bloccato in Italia è stato rilevato su
@@ -636,6 +618,21 @@
     COOKIES_SITES: 'cookies_sites',                 // {} → { ok, sites: [{ site, rejected, hidden, at }] }
     // Solo pagine filo:// (Sicurezza): «Apri da un altro paese» ha un fornitore? E con quale host.
     PROXY_STATUS: 'proxy_status',                   // {} → { ok, configured, providerHost }
+
+    // === Pubblicità dei video da saltare (#737, src/content/adSkip.js) ===
+    // Aperti alle pagine web di proposito: li chiede il content script di ogni frame, e non portano dati dell'utente.
+    // `clicVero` dice se questo frame può chiedere il clic vero: il frame principale di una scheda su YouTube, o il
+    // lettore di YouTube incorporato (lì il clic parte quando ogni frame sopra di lui ha confermato il punto).
+    AD_SKIP_CONFIG: 'ad_skip_config',               // {} → { ok, enabled, clicVero }
+    // Il «Salta» premuto dal main con un clic vero nel punto dato (px CSS del frame); il main ricontrolla
+    // interruttore, frame e sito, e ne dà uno ogni 800 ms per scheda. Dal lettore incorporato porta anche il suo tag.
+    AD_SKIP_CLICK: 'ad_skip_click',                 // { x, y, tag? } → { ok, code? }
+    // Main→un solo frame sopra il lettore: dove cade nella tua vista il punto (x, y) del riquadro figlio con quel tag
+    // e quell'origine? Il content script risponde con AD_SKIP_HERE.
+    AD_SKIP_WHERE: 'ad_skip_where',                 // { id, tag, origine, x, y }
+    AD_SKIP_HERE: 'ad_skip_here',                   // { id, x, y, tag } | { id, code } → { ok }
+    // Broadcast main→content quando l'interruttore cambia: il content rilegge la config.
+    AD_SKIP_CONFIG_UPDATE: 'ad_skip_config_update',
 
     // === Account "Accedi con Google" (vedi src/main/auth/) ===
     // Login/logout/stato. Tutto vive nel main process: i token non sono mai

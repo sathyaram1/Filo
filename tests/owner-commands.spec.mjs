@@ -1,4 +1,4 @@
-// Comandi proprietario (#210): /users, /gift e l'avviso "crediti regalati".
+// Comandi proprietario (#210, #895): /users, /gift e l'avviso "crediti regalati".
 //
 // Questi comandi sono riservati all'owner (auth.isAdmin nel main + regole
 // Firestore). In ambiente di test NON c'è una sessione Google admin, quindi:
@@ -10,9 +10,8 @@
 //   • verifichiamo che il broadcast GIFT_NOTICE (#210.4) faccia comparire il
 //     popup di avviso una volta sola, e che si chiuda con il bottone.
 //
-// La verifica del REGALO vero (saldo del destinatario che cresce) richiede una
-// sessione admin + Firestore live e va fatta a mano dall'owner dopo il deploy
-// delle regole: vedi le note del feedback.
+// Il REGALO vero (saldo del destinatario che cresce) e l'elenco per pseudonimo
+// stanno in regalo-per-pseudonimo.spec.mjs, con un owner simulato.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { CONFIRM_HOST, confirmText, clickConfirm } from './helpers/confirm.mjs';
@@ -37,7 +36,7 @@ test('"/users" e "/gift" sono riconosciuti come comandi Filo (non sconosciuti)',
   await expect(input).toHaveClass(/is-cmd-filo/);
   await expect(input).not.toHaveClass(/is-cmd-unknown/);
 
-  await input.fill('/gift 2000 mario@esempio.com');
+  await input.fill('/gift 2000 abcdef0123456789');
   await expect(input).toHaveClass(/is-cmd-filo/);
   await expect(input).not.toHaveClass(/is-cmd-unknown/);
 });
@@ -47,7 +46,7 @@ test('"/gift" senza argomenti spiega l\'uso (nessuna chiamata)', async ({ openTa
   await expect(page.locator('#input')).toBeVisible({ timeout: 8_000 });
 
   await submit(page, '/gift');
-  await expect(page.locator('.dash-bubble')).toContainText('/gift NUMERO EMAIL', { timeout: 8_000 });
+  await expect(page.locator('.dash-bubble')).toContainText('/gift NUMERO PSEUDONIMO', { timeout: 8_000 });
 });
 
 test('"/gift abc ..." rifiuta un numero non valido lato client', async ({ openTab }) => {
@@ -70,7 +69,7 @@ test('da NON proprietario, "/gift" valido risponde che è un comando riservato',
   const page = await openTab(NEWTAB);
   await expect(page.locator('#input')).toBeVisible({ timeout: 8_000 });
 
-  await submit(page, '/gift 2000 mario@esempio.com');
+  await submit(page, '/gift 2000 abcdef0123456789');
   await expect(page.locator('.dash-bubble').last()).toContainText(/riservato al proprietario/i, { timeout: 8_000 });
 });
 

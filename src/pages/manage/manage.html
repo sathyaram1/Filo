@@ -9,6 +9,7 @@
   <!-- Stesso foglio della gemella nella prima schermata, così le due superfici non possono divergere. -->
   <link rel="stylesheet" href="filo://style/mergeApprovals.css" />
   <script src="filo://shared/themeTokens.js"></script>
+  <script src="filo://shared/avvisiTempo.js"></script>
   <script src="filo://shared/pageBootstrap.js"></script>
   <script src="filo://shared/constants.js"></script>
   <script src="filo://shared/contenutoEsterno.js"></script>
@@ -979,7 +980,9 @@
       transition: opacity 0.18s ease, transform 0.18s ease;
       pointer-events: none; z-index: 2147483001;
     }
-    .mg-toast.show { opacity: 1; transform: translateY(0); }
+    /* Visibile prende il puntatore (sopra, il tempo aspetta; un clic lo chiude); nascosto torna trasparente. */
+    .mg-toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; cursor: pointer; }
+    .mg-toast.show:hover { background: var(--sn-hover, var(--sn-bg)); }
     .mg-toast[data-kind="err"] { border-left-color: #c0392b; }
     .mg-toast[data-kind="ok"]  { border-left-color: #2e9e5b; }
 

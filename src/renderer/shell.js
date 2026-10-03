@@ -362,10 +362,11 @@
   // perché la shell è alta solo 88px e gli elementi DOM non possono apparire
   // sopra le WebContentsView delle tab. Delega globale così funziona anche per i
   // tab ricreati ad ogni render().
+  // Anche la carta di una scheda lo usa: cede al suggerimento di un controllo nell'istante in cui lui compare.
+  const SUGGERIMENTO_RITARDO = 350;
   (() => {
     let showTimer = null;
     let currentTarget = null;
-    const SHOW_DELAY = 350;
 
     function hide() {
       if (showTimer) { clearTimeout(showTimer); showTimer = null; }
@@ -374,7 +375,9 @@
     }
     document.addEventListener('mouseover', (e) => {
       const t = e.target.closest('[data-tip]');
-      if (!t || t === currentTarget) return;
+      if (t === currentTarget) return;
+      // Un elemento tolto dal ridisegno non riceve mouseout: il suo suggerimento resterebbe sopra la carta.
+      if (!t) { if (currentTarget && !currentTarget.isConnected) hide(); return; }
       hide();
       currentTarget = t;
       const text = t.dataset.tip;
@@ -386,7 +389,7 @@
         const x = Math.round(r.left + r.width / 2 - 60);
         const y = Math.round(r.bottom + 6);
         api.tooltipShow(text, x, y);
-      }, SHOW_DELAY);
+      }, SUGGERIMENTO_RITARDO);
     });
     document.addEventListener('mouseout', (e) => {
       const t = e.target.closest('[data-tip]');
@@ -463,6 +466,16 @@
         if (sottoIlPuntatore(id)) invia(id);
       }, RITARDO);
     }
+    // Croce, avviso audio e paese hanno il loro suggerimento, che cade dove sta la carta (#589.16): la carta gli
+    // cede il posto quando lui compare, non prima, o attraversando la croce verso la scheda accanto lampeggerebbe.
+    function suUnControllo(target, el) {
+      const c = target.closest('[data-tip]');
+      return !!c && c !== el && el.contains(c);
+    }
+    function cede() {
+      if (timer) { clearTimeout(timer); timer = null; attesaDi = null; }
+      if (aperta && !vaVia) vaVia = setTimeout(nascondi, SUGGERIMENTO_RITARDO);
+    }
     // Una scheda appena rifatta non ha ancora :hover col puntatore fermo sopra: conta dove sta il puntatore.
     function sottoIlPuntatore(id) {
       const el = elDi(id);
@@ -482,7 +495,8 @@
     tabsEl.addEventListener('mouseover', (e) => {
       puntatore = { x: e.clientX, y: e.clientY };
       const el = e.target.closest('.tab[data-anteprima]');
-      if (el) sopra(el.dataset.anteprima);
+      if (el && suUnControllo(e.target, el)) cede();
+      else if (el) sopra(el.dataset.anteprima);
       // Il bordo fra due schede non spegne la carta: passando alla vicina cambierebbe con un lampo.
       else if (!vaVia) vaVia = setTimeout(nascondi, 120);
     });
@@ -1176,9 +1190,8 @@
     // Con un tetto teniamo solo le più recenti (le più rilevanti); le eccedenti
     // vengono rimosse subito, senza attendere il timeout.
     const MAX_STACK = 5;
-    // Col puntatore sopra la pila i tempi aspettano; uscito, a chi era agli sgoccioli restano almeno questi ms.
-    const RIPRESA_MS = 2000;
-    let fermi = false;
+    // Col puntatore sopra la pila (lo dice la vista che la disegna) i tempi aspettano: regola in avvisiTempo.js.
+    const tempi = window.SN_AVVISI.orologio();
     let seq = 0;
     function hostEl() {
       if (!host) {
@@ -1213,7 +1226,7 @@
       try { api.avvisi.stato({ carte, tema: { vars } }); } catch (_) {}
     }
     if (api.avvisi) {
-      if (api.avvisi.onSopra) api.avvisi.onSopra((dati) => ferma(!!(dati && dati.sopra)));
+      if (api.avvisi.onSopra) api.avvisi.onSopra((dati) => tempi.ferma(!!(dati && dati.sopra)));
       api.avvisi.onAzione((dati) => {
         if (!host || !dati) return;
         const card = Array.from(host.children).find((c) => c.dataset.nid === String(dati.id));
@@ -1233,39 +1246,22 @@
       const over = live.length - MAX_STACK;
       for (let i = 0; i < over; i++) {
         const c = live[i]; // le più vecchie sono in cima (append in coda)
-        if (c._timer) clearTimeout(c._timer);
+        if (c._tempo) c._tempo.annulla();
         try { c.remove(); } catch (_) {}
       }
     }
     function avviaTempo(card, ms) {
-      card._restano = ms;
-      if (fermi) return;
-      card._scade = Date.now() + ms;
-      card._timer = setTimeout(() => dismiss(card), ms);
-    }
-    function ferma(sopra) {
-      if (sopra === fermi) return;
-      fermi = sopra;
-      for (const c of hostEl().children) {
-        if (c.dataset.closing === '1' || c._restano == null) continue;
-        if (sopra) {
-          if (!c._timer) continue;
-          clearTimeout(c._timer);
-          c._timer = null;
-          c._restano = Math.max(0, c._scade - Date.now());
-        } else if (!c._timer) {
-          avviaTempo(c, Math.max(c._restano, RIPRESA_MS));
-        }
-      }
+      if (card._tempo) card._tempo.annulla();
+      card._tempo = tempi.avvia(ms, () => dismiss(card));
     }
     function dismiss(card) {
       if (!card || card.dataset.closing === '1') return;
       card.dataset.closing = '1';
-      if (card._timer) clearTimeout(card._timer);
-      card._timer = null;
+      if (card._tempo) card._tempo.annulla();
+      card._tempo = null;
       card.classList.remove('show');
       // Pila vuota: nessuno ha più il puntatore sopra, anche se la vista sparendo non l'ha potuto dire.
-      if (!Array.from(hostEl().children).some((c) => c.dataset.closing !== '1')) fermi = false;
+      if (!Array.from(hostEl().children).some((c) => c.dataset.closing !== '1')) tempi.ferma(false);
       // attende la transizione prima di rimuovere dal DOM
       setTimeout(() => { try { card.remove(); } catch (_) {} }, 220);
     }
@@ -1301,10 +1297,9 @@
       if (!text) return null;
       opts = opts || {};
       if (opts.key) dismissKey(opts.key);
-      const durationSec = opts.durationSec != null
-        ? Number(opts.durationSec)
-        : notifConfig.durationSec;
-      const durata = Number.isFinite(durationSec) && durationSec > 0 ? durationSec : 0;
+      // Una durata scelta da chi chiama vale per la durata standard: quella delle Preferenze la riporta in scala.
+      const chiesta = opts.durationSec != null ? Number(opts.durationSec) : window.SN_AVVISI.STANDARD_SEC;
+      const durata = window.SN_AVVISI.durata(Number.isFinite(chiesta) && chiesta >= 0 ? chiesta * 1000 : undefined, notifConfig.durationSec);
 
       const chiave = opts.unica ? String(opts.unica) : '';
       const gemella = chiave && Array.from(hostEl().children)
@@ -1312,10 +1307,7 @@
       if (gemella) {
         gemella.querySelector('.shell-notif-msg').textContent = text;
         azioni(gemella, opts.actions);
-        if (gemella._timer) clearTimeout(gemella._timer);
-        gemella._timer = null;
-        gemella._restano = null;
-        if (durata) avviaTempo(gemella, durata * 1000);
+        avviaTempo(gemella, durata);
         return gemella;
       }
 
@@ -1357,7 +1349,7 @@
         try { window.SN_SOUNDS.play(typeof wantSound === 'string' ? wantSound : notifConfig.sound); } catch (_) {}
       }
 
-      if (durata) avviaTempo(card, durata * 1000);
+      avviaTempo(card, durata);
       return card;
     }
     // Un avviso con chiave dice uno stato: quando lo stato cambia se ne va.

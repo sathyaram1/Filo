@@ -184,8 +184,6 @@ test('anche le porte di chi ha solo fatto l\'accesso rifiutano per provenienza',
       vota: { type: MSG.BOARD_CAST_VOTE, id: 'fb-uno', vote: 'works' },
       ritiraIlVoto: { type: MSG.BOARD_CLEAR_VOTE, id: 'fb-uno' },
       riapriAPagamento: { type: MSG.BOARD_REOPEN, id: 'fb-uno', text: 'scritto da un sito' },
-      elencoDiChiUsaFilo: { type: MSG.OWNER_LIST_USERS },
-      regaloDiCrediti: { type: MSG.OWNER_GIFT_CREDITS, email: 'chiunque@example.com', amount: 1000 },
     });
     const esegui = async (mittente) => {
       const res = {};
@@ -355,4 +353,70 @@ test('l\'archivio delle schede chiuse si legge, si cerca e si cancella solo dall
   expect(out.rimaste, 'un sito ha cancellato schede dall\'archivio').toEqual(['Banca online, estratto conto']);
   expect(out.daFilo.ok).toBe(true);
   expect(out.daFilo.tabs.map((x) => x.title)).toEqual(['Banca online, estratto conto']);
+});
+
+test('il riordino delle schede, e la chiusura di una scheda per id, li chiede solo una pagina di Filo (#589.15)', async ({ app, shell, openTab, testServer }) => {
+  // Dal codice di Filo dentro un sito qualunque: senza il confine una delle due
+  // schede doppie finiva nell'archivio e, con un modello, partiva una chiamata pagata.
+  test.setTimeout(60_000);
+  const doppia = testServer.html('<html><head><title>Doppia</title></head><body><p>doppia</p></body></html>');
+  await openTab(doppia);
+  await openTab(doppia);
+  await testServer.openReady(openTab, '<html><head><title>Sito B</title></head><body><p>B</p></body></html>', { pubblico: true });
+
+  const stato = () => app.evaluate(async ({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    const archivio = (await globalThis.SN_ARCHIVED_TABS.list()).map((x) => x.title);
+    return {
+      doppie: tm.tabs.filter((t) => t.title === 'Doppia').map((t) => t.id),
+      ordine: tm.tabs.map((t) => t.id),
+      archivio,
+      chiamate: globalThis.__chiamateTriage,
+    };
+  });
+  await expect.poll(async () => (await stato()).doppie.length, { timeout: 10_000 }).toBe(2);
+
+  await app.evaluate(() => {
+    globalThis.__chiamateTriage = 0;
+    // Il modello configurato: tiene tutto, ma ogni giro è una chiamata.
+    globalThis.SN_TAB_TRIAGE_DECIDE = async () => { globalThis.__chiamateTriage += 1; return { decisions: [] }; };
+  });
+  const prima = await stato();
+
+  // Dal mondo isolato del sito B, cioè dallo stesso canale che usano i content script di Filo.
+  const dalSito = await app.evaluate(async ({ BrowserWindow }, bersaglio) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    const b = tm.tabs.find((t) => /sito-pubblico\.test/.test(t.url || ''));
+    const manda = (m) => b.view.webContents.executeJavaScriptInIsolatedWorld(999, [{
+      code: `chrome.runtime.sendMessage(${JSON.stringify(m)})`,
+    }]);
+    return {
+      riordino: await manda({ type: 'run_tab_triage' }),
+      riordinoColori: await manda({ type: 'reorder_tabs' }),
+      chiudi: await manda({ type: '_tabs:remove', id: bersaglio }),
+      confermaAFreddo: await manda({ type: 'filo_confirm_action', action: { type: 'PULISCI_TAB' } }),
+    };
+  }, prima.doppie[0]);
+
+  for (const porta of ['riordino', 'riordinoColori', 'chiudi']) {
+    expect(dalSito[porta] && dalSito[porta].ok, `${porta}: un sito visitato non deve ottenere niente`).toBe(false);
+    expect(String(dalSito[porta].code || ''), porta).toBe('forbidden');
+  }
+  expect(dalSito.confermaAFreddo.executed, 'una conferma mai chiesta ha lanciato il riordino').toBe(false);
+  const dopo = await stato();
+  expect(dopo.doppie, 'un sito ha chiuso una scheda dell\'utente').toEqual(prima.doppie);
+  expect(dopo.ordine).toEqual(prima.ordine);
+  expect(dopo.archivio).not.toContain('Doppia');
+  expect(dopo.chiamate, 'un sito ha fatto partire una chiamata al modello').toBe(0);
+
+  // Il bottone della home funziona come prima: la doppia va nell'archivio.
+  const home = app.windows().find((w) => w.url().startsWith('filo://newtab'));
+  const r = await home.evaluate(() => chrome.runtime.sendMessage({ type: 'run_tab_triage' }));
+  expect(r).toMatchObject({ ok: true, archived: 1 });
+  const fine = await stato();
+  expect(fine.doppie.length).toBe(1);
+  expect(fine.archivio).toContain('Doppia');
+  expect(fine.chiamate).toBe(1);
+  expect((await home.evaluate(() => chrome.runtime.sendMessage({ type: 'reorder_tabs' }))).ok).toBe(true);
+  void shell;
 });

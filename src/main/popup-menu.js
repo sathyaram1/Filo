@@ -47,6 +47,11 @@ const ICON_PATHS = {
   close:
     '<path d="M6 6l12 12"/><path d="M18 6L6 18"/>',
 
+  // Freccia indietro: COPIA di `back` in src/shared/icons.js. Voce «Torna indietro» del menu dell'avviso del sito.
+  back:
+    '<path d="M19 12H5"/>' +
+    '<path d="M11 6l-6 6 6 6"/>',
+
   // Biscotto morsicato — righe del banner dei cookie nel menu della scheda (#754).
   cookie:
     '<path d="M12 3a9 9 0 1 0 9 9 3 3 0 0 1-3.6-3.4A3 3 0 0 1 14.4 5 3 3 0 0 1 12 3z"/>' +
