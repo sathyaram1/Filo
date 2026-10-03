@@ -1568,3 +1568,32 @@ test('praticaChiusa e localSignCheck: su un lavoro locale chiuso togliere il seg
   assert.equal(MR.praticaChiusa(aperta), false);
   assert.deepEqual(MR.localSignCheck(aperta, false), { ok: true });
 });
+
+// ── Segno di mittente pericoloso (#922) ───────────────────────────────────
+
+test('segno: fermato dal segno solo col motivo linked_prior_attack del filtro d’ingresso', () => {
+  assert.equal(MR.fermatoDalSegno({ pipeline: { l1Reasons: ['linked_prior_attack'] } }), true);
+  assert.equal(MR.fermatoDalSegno({ pipeline: { l1Reasons: ['obfuscation', ' linked_prior_attack '] } }), true);
+  // Le raffiche non le ha fermate nessun segno: si sbloccano col rigiudizio.
+  for (const r of ['raffica_mittente', 'raffica_globale', 'raffica_non_contata', 'prior_attack']) {
+    assert.equal(MR.fermatoDalSegno({ pipeline: { l1Reasons: [r] } }), false, r);
+  }
+  // Pipeline cifrata, assente o storta: non si sa, quindi no.
+  assert.equal(MR.fermatoDalSegno({ pipeline: 'FENC1:abc' }), false);
+  assert.equal(MR.fermatoDalSegno({}), false);
+  assert.equal(MR.fermatoDalSegno(null), false);
+  assert.equal(MR.fermatoDalSegno({ pipeline: { l1Reasons: 'linked_prior_attack' } }), false);
+});
+
+test('segno: la frase della conferma è quella che il server accetta', () => {
+  assert.equal(MR.FRASE_SEGNO_ERRATO, 'il segno era un errore');
+});
+
+test('segno: il motivo si traduce se è un codice, passa com’è se è un testo', () => {
+  assert.equal(MR.motivoSegnoText('attack'), 'un suo feedback è stato giudicato un attacco');
+  assert.equal(MR.motivoSegnoText('linked_prior_attack'), 'collegato a un attacco precedente');
+  assert.equal(MR.motivoSegnoText('nuovo_codice'), 'nuovo codice');
+  assert.equal(MR.motivoSegnoText('Il feedback #812 è stato giudicato un attacco'), 'Il feedback #812 è stato giudicato un attacco');
+  assert.equal(MR.motivoSegnoText(''), '');
+  assert.equal(MR.motivoSegnoText(null), '');
+});

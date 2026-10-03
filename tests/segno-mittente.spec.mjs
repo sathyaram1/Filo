@@ -240,6 +240,9 @@ test('#922 — lo stesso gesto nel pannello del mittente; su un feedback che il 
   await pannello.getByRole('button', { name: 'Il segno era un errore' }).click();
   await expect(pannello).toContainText('passano dai giudici come quelli di tutti');
   await page.screenshot({ path: 'tests/.shots/segno-mittente-pannello.png' });
+  await page.evaluate(() => document.documentElement.setAttribute('data-sn-theme', 'dark'));
+  await page.screenshot({ path: 'tests/.shots/segno-mittente-pannello-scuro.png' });
+  await page.evaluate(() => document.documentElement.setAttribute('data-sn-theme', 'light'));
   expect(clear()).toHaveLength(0);
   await pannello.getByRole('button', { name: 'Togli il segno' }).click();
 
