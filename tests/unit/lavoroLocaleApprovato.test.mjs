@@ -153,7 +153,8 @@ test('approvato: start/finish --feedback e i passaggi del lavoro lo accettano; s
   await conRete(approvato, async () => {
     const r = await of.praticaPerLaSessione('a1', OPTS);
     assert.equal(r.ok, true, r.motivo);
-    assert.equal(r.avviso, '');
+    assert.doesNotMatch(r.avviso, /L5/, 'il sì vale quanto la prova: niente avviso sulla fusione');
+    assert.match(r.avviso, /frase/, 'chi l’ha mandato è un utente: la frase per lui la scrive la sessione');
   });
   await conRete(approvato, async (patch) => {
     const r = await of.scrivi('a1', 'working', 'presa in carico', { ...OPTS, attore: 'routine', dryRun: true });
