@@ -1,5 +1,5 @@
 // Il lavoro locale sul server con la sua pratica (#908): la controlla, la prende in carico, lancia server:fondi di
-// filo-security e a fusione riuscita la chiude, se la parte dell'app non manca ancora (#915, lib/parti-lavoro.mjs).
+// filo-security e a fusione riuscita la chiude solo se la parte dell'app è già su main o con --solo-server (#915).
 // Regole: tests/unit/serverFondiPratica.test.mjs. Uso: npm run server:fondi -- claude/<ramo> --feedback <N>
 
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -13,7 +13,7 @@ import { FINESTRA_PARTE_TARDIVA_MS, NOME_PARTE, parteTardiva } from './lib/parti
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // Lo legge server:fondi di filo-security: senza, si rifiuta e rimanda qui.
 export const PRATICA_ENV = 'FILO_SERVER_PRATICA';
-const USO = 'Uso, dal repo Filo: npm run server:fondi -- claude/<ramo> --feedback <N> [--dry-run]';
+const USO = 'Uso, dal repo Filo: npm run server:fondi -- claude/<ramo> --feedback <N> [--solo-server] [--dry-run]';
 
 export const SENZA_PRATICA = [
   'Questo lavoro sul server non ha la sua pratica, e ogni lavoro locale ne ha una: in Gestione è il registro di cosa fa ogni sessione.',
@@ -36,18 +36,19 @@ export function cartellaDelServer(radice, esiste = existsSync) {
   return '';
 }
 
-/** Ramo, pratica e prova a vuoto, anche quando npm si è preso le opzioni. PURA. */
+/** Ramo, pratica, «solo server» e prova a vuoto, anche quando npm si è preso le opzioni. PURA. */
 export function leggiArgomenti(argv, env = {}) {
-  const daNpm = argomentiDaNpm(env, { opzioni: ['--feedback', '--dry-run'], conValore: ['--feedback'] });
+  const daNpm = argomentiDaNpm(env, { opzioni: ['--feedback', '--dry-run', '--solo-server'], conValore: ['--feedback'] });
   if (daNpm.errore) return { errore: daNpm.errore };
   const f = estraiOpzioneFeedback([...(Array.isArray(argv) ? argv : []), ...daNpm.args]);
   if (f.errore) return { errore: f.errore };
   const dryRun = f.resto.includes('--dry-run');
-  const altri = f.resto.filter((a) => a !== '--dry-run');
+  const soloServer = f.resto.includes('--solo-server');
+  const altri = f.resto.filter((a) => a !== '--dry-run' && a !== '--solo-server');
   const sconosciute = altri.filter((a) => /^-/.test(a));
   if (sconosciute.length) return { errore: `argomenti non capiti (${sconosciute.join(' ')})` };
   if (altri.length > 1) return { errore: `un ramo solo, non ${altri.length} (${altri.join(' ')})` };
-  return { ramo: altri[0] || '', pratica: f.valore, dryRun, nota: daNpm.nota };
+  return { ramo: altri[0] || '', pratica: f.valore, dryRun, soloServer, nota: daNpm.nota };
 }
 
 export const notaInizio = (ramo) => `Lavoro sul server: porto ${ramo} su main di filo-security (npm run server:fondi).`;
@@ -141,17 +142,29 @@ export async function esegui(argv, deps = {}) {
     }
     const figlio = { ...env, [PRATICA_ENV]: chi };
     const lancia = deps.lancia || lanciaServer;
-    const ramiApp = tardiva || letta.parti.app ? [] : (deps.ramiAperti || ramiApertiDellaPratica)(r.id, { ramoGemello: a.ramo });
+    // La parte dell'app già su main: questa è l'ultima. Altrimenti l'app può ancora arrivare, anche da un ramo che da
+    // qui non si vede, e la pratica si chiude solo a parola (--solo-server), che resta scritta per chi arrivasse dopo.
+    const ultima = !!letta.parti.app;
+    const solo = a.soloServer && !ultima && !tardiva;
+    const chiude = !tardiva && (ultima || solo);
+    const ramiApp = tardiva || ultima ? [] : (deps.ramiAperti || ramiApertiDellaPratica)(r.id, { ramoGemello: a.ramo });
     const quando = tardiva ? new Date(tardiva.at).toISOString() : '';
     const numero = chi.replace(/^#/, '');
+    const chiudeApp = `la chiude la fusione di ${ramiApp.length ? ramiApp.join(', ') : 'quella parte'} (npm run finish -- --feedback ${numero})`;
+    const soloComando = `npm run server:fondi -- ${a.ramo} --feedback ${numero} --solo-server`;
+    if (solo && ramiApp.length) {
+      err(`Attenzione: dici che il lavoro sta solo sul server, ma ${ramiApp.join(', ')} dell'app è legato a questa pratica e non è su main. Chiusa così, la sua fusione non salterà L5: se è di questo lavoro, rilancia senza --solo-server.`);
+    }
     const dopo = tardiva
       ? `resterebbe chiusa, con la nota di quest'ultima parte (l'ha chiusa la fusione della parte ${NOME_PARTE.app}, ${quando})`
-      : ramiApp.length
-        ? `resterebbe aperta: la chiude la fusione di ${ramiApp.join(', ')} dell'app`
-        : `si chiuderebbe con «${notaFine(a.ramo, '')}»`;
+      : chiude
+        ? `si chiuderebbe con «${notaFine(a.ramo, '')}»`
+        : `resterebbe aperta: manca la parte ${NOME_PARTE.app}, ${chiudeApp}. Se il lavoro sta solo sul server: ${soloComando}`;
     if (a.dryRun) {
       const k = lancia(cartella, [a.ramo, '--dry-run'], figlio);
-      log(`PROVA: la pratica ${chi} andrebbe in lavorazione e, a fusione riuscita, ${dopo}.`);
+      log(tardiva
+        ? `PROVA: la pratica ${chi} non si riapre e, a fusione riuscita, ${dopo}.`
+        : `PROVA: la pratica ${chi} andrebbe in lavorazione e, a fusione riuscita, ${dopo}.`);
       return k;
     }
     if (tardiva) {
@@ -169,7 +182,7 @@ export async function esegui(argv, deps = {}) {
       return k;
     }
     const sha = (deps.punta || puntaDelServer)(cartella);
-    const parte = await of.registraParte(r.id, 'server', { bearer });
+    const parte = await of.registraParte(r.id, 'server', { bearer, solo });
     if (!parte.ok) err(`La pratica ${chi} non ha registrato che la parte del server è su main (${parte.motivo}): una parte dell'app che arrivasse a pratica chiusa non la troverebbe.`);
     if (tardiva) {
       const nota = `${notaFine(a.ramo, sha)} Era l'ultima parte: la pratica l'aveva chiusa la fusione della parte ${NOME_PARTE.app} dello stesso lavoro (${quando}), e resta chiusa.`;
@@ -178,16 +191,19 @@ export async function esegui(argv, deps = {}) {
       log(`${a.ramo} è su main del server. La pratica ${chi} resta chiusa, con la nota di quest'ultima parte. Per il deploy: npm run server:pubblica, da filo-security/functions.`);
       return annotata.ok ? 0 : 1;
     }
-    if (ramiApp.length) {
-      const nota = `${notaFine(a.ramo, sha)} La pratica resta aperta: manca la parte ${NOME_PARTE.app}, non ancora su main. La chiude la fusione di ${ramiApp.join(', ')} (npm run finish -- --feedback ${numero}).`;
+    if (!chiude) {
+      const nota = `${notaFine(a.ramo, sha)} La pratica resta aperta: manca la parte ${NOME_PARTE.app}, non ancora su main, e ${chiudeApp}. Se il lavoro stava solo sul server: ${soloComando}.`;
       const annotata = await of.annotaPratica(r.id, nota, { bearer });
       if (!annotata.ok) err(`${a.ramo} è su main del server, ma la pratica ${chi} non l'ha registrato (${annotata.motivo}).`);
-      log(`${a.ramo} è su main del server. La pratica ${chi} resta aperta: manca la parte ${NOME_PARTE.app}, la chiude la fusione di ${ramiApp.join(', ')} (npm run finish -- --feedback ${numero}). Per il deploy: npm run server:pubblica, da filo-security/functions.`);
+      log(`${a.ramo} è su main del server. La pratica ${chi} resta aperta: manca la parte ${NOME_PARTE.app}, ${chiudeApp}.`);
+      log(`Se il lavoro stava solo sul server, chiudila con: ${soloComando}`);
+      log('Per il deploy: npm run server:pubblica, da filo-security/functions.');
       return annotata.ok ? 0 : 1;
     }
-    const chiusa = await of.scrivi(r.id, 'done', notaFine(a.ramo, sha), { bearer, attore: 'routine' });
+    const notaChiusura = solo ? `${notaFine(a.ramo, sha)} Il lavoro stava solo sul server (--solo-server).` : notaFine(a.ramo, sha);
+    const chiusa = await of.scrivi(r.id, 'done', notaChiusura, { bearer, attore: 'routine' });
     if (!chiusa.ok) {
-      err(`${a.ramo} è su main del server, ma la pratica ${chi} non si è chiusa (${chiusa.motivo}). Chiudila a mano:\n  npm run feedback -- ${r.id} done "${notaFine(a.ramo, sha)}" --come-routine`);
+      err(`${a.ramo} è su main del server, ma la pratica ${chi} non si è chiusa (${chiusa.motivo}). Chiudila a mano:\n  npm run feedback -- ${r.id} done "${notaChiusura}" --come-routine`);
       return 1;
     }
     log(`Pratica ${chi} chiusa: ${a.ramo} è su main del server. Per il deploy: npm run server:pubblica, da filo-security/functions.`);
