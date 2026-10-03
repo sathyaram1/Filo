@@ -44,7 +44,11 @@ test('un feedback normale arriva incorniciato, e il testo non chiude la cornice 
 test('chi l’ha mandato, in parole', () => {
   assert.equal(mod.mittenteInParole({ clientId: 'local:claude', senderProof: 'admin' }), 'una sessione locale');
   assert.equal(mod.mittenteInParole({ clientId: 'owner:me', senderProof: 'admin' }), 'l’owner');
-  assert.match(mod.mittenteInParole({ clientId: 'local:claude' }), /senza prova/);
+  // #912: il nome riservato senza prova è un utente, in parole come altrove.
+  for (const clientId of ['local:claude', 'owner:me', 'routine:verifier', 'agent:x', 'non-provato:owner:me']) {
+    assert.equal(mod.mittenteInParole({ clientId }), 'un utente', clientId);
+  }
+  assert.equal(mod.mittenteInParole({ clientId: 'routine:verifier', senderProof: 'server' }), 'un’automazione (verifier)');
   assert.equal(mod.mittenteInParole({ clientId: 'c-utente' }), 'un utente');
 });
 
