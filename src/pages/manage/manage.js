@@ -3119,6 +3119,7 @@
       });
       mgActionsRow.appendChild(b);
     }
+    aggiornaBottoneSegno(fb);
   }
 
   // Una scrittura in volo spegne TUTTA la riga, non solo il bottone premuto:
