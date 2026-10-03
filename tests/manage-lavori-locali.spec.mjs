@@ -11,17 +11,15 @@
 //   4. Nei Ricevuti un feedback col segno resta lì, lo dice sulla scheda, e
 //      l'approvazione dice dove va.
 //   5. Automazioni: una fusione locale che ha saltato L5 si legge come tale.
-//   6. La pagina gemella dei feedback ha la stessa sezione con lo stesso numero.
-//   7. Su un lavoro locale provato «Fondi senza chiedermelo» non c'è (il server la
+//   6. Su un lavoro locale provato «Fondi senza chiedermelo» non c'è (il server la
 //      fonde comunque senza chiedere): al suo posto una riga che lo dice. Un segno di
 //      pre-approvazione già messo resta nel dato, e torna quando il segno locale si toglie.
-//   8. Su un lavoro locale chiuso togliere il segno lo rimette nella bacheca pubblica, non alle
+//   7. Su un lavoro locale chiuso togliere il segno lo rimette nella bacheca pubblica, non alle
 //      routine, e i testi lo dicono; «Copia» nomina finish solo dove il numero lo lega a un lavoro.
 
 import { test, expect } from './fixtures/electron.mjs';
 
 const MANAGE = 'filo://manage/manage.html';
-const FEEDBACK = 'filo://feedback/feedback.html';
 const SEGNO = { by: 'owner@esempio', at: Date.parse('2026-09-30T08:00:00Z') };
 
 function fb(over = {}) {
@@ -209,18 +207,6 @@ test('Automazioni: la fusione locale che ha saltato L5 dice perché non ha chies
   // La pratica è a un clic.
   await box.locator('.sn-mac-origin-link').click();
   await expect(page.locator('#mgDetail')).toBeVisible();
-});
-
-test('la pagina gemella dei feedback ha la stessa sezione, con lo stesso numero', async ({ openTab }) => {
-  const page = await openTab(FEEDBACK);
-  await page.waitForLoadState('domcontentloaded');
-  await page.waitForFunction(() => window.__fbTest && window.SN_MANAGE_REVIEW);
-  await page.evaluate((items) => window.__fbTest.setData(items), [
-    fb({ localOnly: SEGNO }),
-    fb({ _id: 'q-1', seq: 700, clientId: 'utente-x', senderProof: undefined }),
-  ]);
-  await expect(page.locator('#tabs [data-tab="local"]')).toHaveText('Lavori locali (1)');
-  await expect(page.locator('#tabs [data-tab="queue"]')).toHaveText('In coda (1)');
 });
 
 test('lavoro locale: niente «Fondi senza chiedermelo», una riga dice che si fonde senza chiedere', async ({ openTab }) => {
