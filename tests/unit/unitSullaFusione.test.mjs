@@ -1,0 +1,246 @@
+// Gli unit sul risultato della fusione prima di chiederla (#929): l'esito dai due lati, il campo per il server, i
+// tentativi quando main si muove, e la pulizia che non deve MAI attraversare il collegamento a node_modules.
+// La prova vera gira su un repo finto con origin, col lanciatore vero degli unit copiato dentro.
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { cartellaTemporanea, collegaCartella } from '../helpers/percorsi.mjs';
+import {
+  decidiEsito, campoPerIlServer, chiaveTest, testoProva, togliCollegamento, chiudiAlbero, gitIn,
+  provaUnitSullaFusione, chiediConProva, TETTO_ROSSI,
+} from '../../scripts/lib/unit-sulla-fusione.mjs';
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const SHA = 'a'.repeat(40);
+
+test('esito: verde, contenuto, conflitto, e un rosso si giudica solo dopo averlo riprovato su main', () => {
+  assert.deepEqual(decidiEsito({ contenuto: true }), { esito: 'main_contenuto' });
+  assert.equal(decidiEsito({ conflitto: ['a.js'] }).esito, 'conflitto');
+  assert.deepEqual(decidiEsito({ fusione: { ok: true, rossi: [] } }), { esito: 'verde' });
+  assert.deepEqual(decidiEsito({ fusione: { ok: false, rossi: ['x'] } }), { serveMain: true });
+  assert.deepEqual(decidiEsito({ fusione: { ok: false, rossi: ['x'] }, main: { ok: true, rossi: [] } }),
+    { esito: 'rosso_sulla_fusione', rossi: ['x'] });
+});
+
+test('esito: rosso anche su main fonde, ma non se la fusione rompe test che su main passano', () => {
+  assert.equal(decidiEsito({ fusione: { ok: false, rossi: ['x'] }, main: { ok: false, rossi: ['x'] } }).esito, 'rosso_anche_su_main');
+  const nuovi = decidiEsito({ fusione: { ok: false, rossi: ['x', 'y'] }, main: { ok: false, rossi: ['x'] } });
+  assert.deepEqual(nuovi, { esito: 'rosso_sulla_fusione', rossi: ['y'], rossiMain: 1 });
+  // Un lanciatore caduto senza elenco non si confronta: vale la regola dell'owner, main rotto non ferma.
+  assert.equal(decidiEsito({ fusione: { ok: false, rossi: [] }, main: { ok: false, rossi: ['x'] } }).esito, 'rosso_anche_su_main');
+});
+
+test('lo stesso test rosso ha la stessa chiave in due cartelle diverse', () => {
+  const a = chiaveTest({ nome: 'n', file: join('/tmp/x/fusione', 'tests', 'unit', 'a.test.mjs') }, '/tmp/x/fusione');
+  const b = chiaveTest({ nome: 'n', file: join('/tmp/x/main', 'tests', 'unit', 'a.test.mjs') }, '/tmp/x/main');
+  assert.equal(a, 'tests/unit/a.test.mjs › n');
+  assert.equal(a, b);
+  // Fuori dalla cartella (forma corta e lunga di Windows): conta il pezzo da tests/.
+  assert.equal(chiaveTest({ nome: 'n', file: 'C:\\ALTRO~1\\fusione\\tests\\unit\\a.test.mjs' }, 'C:\\altro nome\\fusione'), 'tests/unit/a.test.mjs › n');
+});
+
+test('il campo per il server: niente campo senza origin, «non_provata» col motivo, elenco dei rossi col tetto dichiarato', () => {
+  assert.equal(campoPerIlServer({ saltata: true, motivo: 'nessun origin' }), null);
+  assert.deepEqual(campoPerIlServer({ errore: 'git giù' }), { esito: 'non_provata', motivo: 'git giù' });
+  assert.deepEqual(campoPerIlServer({ esito: 'verde', mainSha: SHA }), { esito: 'verde', mainSha: SHA });
+  const tanti = Array.from({ length: TETTO_ROSSI + 5 }, (_, i) => `t${i}`);
+  const c = campoPerIlServer({ esito: 'rosso_sulla_fusione', mainSha: SHA, rossi: tanti });
+  assert.equal(c.rossi.length, TETTO_ROSSI);
+  assert.equal(c.altriRossi, 5, 'un taglio si dice');
+  assert.match(testoProva({ esito: 'rosso_sulla_fusione', mainSha: SHA, rossi: ['tests/unit/a.test.mjs › n'] }), /✖ tests\/unit\/a\.test\.mjs › n/);
+});
+
+test('main mosso: si rifà la prova fino al tetto, poi ci si ferma senza fondere', async () => {
+  let prove = 0;
+  const chieste = [];
+  const prova = () => { prove++; return { esito: 'verde', mainSha: String(prove).repeat(40).slice(0, 40) }; };
+  const muto = () => {};
+  const r = await chiediConProva({
+    prova, scrivi: muto, tentativi: 3,
+    chiedi: async (campo) => { chieste.push(campo.mainSha); return { result: chieste.length < 2 ? 'main_moved' : 'merged' }; },
+    mainMosso: (x) => x.result === 'main_moved',
+  });
+  assert.equal(r.reply.result, 'merged');
+  assert.equal(prove, 2, 'una prova nuova per ogni main mosso');
+  assert.notEqual(chieste[0], chieste[1], 'la seconda richiesta porta lo sha della seconda prova');
+  const sempre = await chiediConProva({ prova, scrivi: muto, tentativi: 3, chiedi: async () => ({ result: 'main_moved' }), mainMosso: (x) => x.result === 'main_moved' });
+  assert.equal(sempre.esaurito, true);
+  assert.equal(sempre.tentativi, 3);
+  const fermo = await chiediConProva({
+    prova: () => ({ esito: 'rosso_sulla_fusione', mainSha: SHA, rossi: ['x'] }), scrivi: muto,
+    fermaSe: (p) => p.esito === 'rosso_sulla_fusione', chiedi: async () => assert.fail('un rosso sulla fusione non si chiede'), mainMosso: () => false,
+  });
+  assert.equal(fermo.fermo, true);
+});
+
+test('togliere il collegamento a node_modules non tocca la cartella a cui punta', () => {
+  const casa = cartellaTemporanea('filo-929-collegamento-');
+  try {
+    const vero = join(casa, 'principale', 'node_modules');
+    mkdirSync(join(vero, 'pacchetto'), { recursive: true });
+    writeFileSync(join(vero, 'pacchetto', 'sentinella.txt'), 'resta', 'utf8');
+    const albero = join(casa, 'albero');
+    mkdirSync(albero);
+    collegaCartella(vero, join(albero, 'node_modules'));
+    assert.ok(existsSync(join(albero, 'node_modules', 'pacchetto', 'sentinella.txt')), 'il collegamento funziona');
+    assert.deepEqual(togliCollegamento(join(albero, 'node_modules')), { ok: true });
+    assert.ok(!existsSync(join(albero, 'node_modules')), 'il collegamento non c\'è più');
+    assert.equal(readFileSync(join(vero, 'pacchetto', 'sentinella.txt'), 'utf8'), 'resta', 'il node_modules vero è intatto');
+    // Una cartella vera piena al posto del collegamento: non si svuota.
+    const finto = join(casa, 'finto', 'node_modules');
+    mkdirSync(finto, { recursive: true });
+    writeFileSync(join(finto, 'dentro.txt'), 'x', 'utf8');
+    assert.equal(togliCollegamento(finto).ok, false);
+    assert.ok(existsSync(join(finto, 'dentro.txt')));
+    assert.deepEqual(togliCollegamento(join(casa, 'non-c-e')), { ok: true });
+  } finally {
+    rmSync(casa, { recursive: true, force: true });
+  }
+});
+
+// ─── La prova vera, su un repo finto con origin ──────────────────────────────
+
+function repoFinto() {
+  const casa = cartellaTemporanea('filo-929-repo-');
+  const origin = join(casa, 'origin.git');
+  const lavoro = join(casa, 'lavoro');
+  execFileSync('git', ['init', '-q', '--bare', '--initial-branch=main', origin]);
+  mkdirSync(join(lavoro, 'scripts', 'lib'), { recursive: true });
+  mkdirSync(join(lavoro, 'tests', 'unit'), { recursive: true });
+  for (const f of ['scripts/run-unit-tests.mjs', 'scripts/lib/riga-di-comando.mjs', 'scripts/lib/riepilogo-unit.mjs']) {
+    copyFileSync(join(ROOT, f), join(lavoro, f));
+  }
+  writeFileSync(join(lavoro, '.gitignore'), 'node_modules\n', 'utf8');
+  writeFileSync(join(lavoro, 'valore.txt'), 'uno\n', 'utf8');
+  writeFileSync(join(lavoro, 'tests', 'unit', 'base.test.mjs'), "import { test } from 'node:test';\ntest('base', () => {});\n", 'utf8');
+  // Il node_modules vero del repo: la prova lo collega nelle sue cartelle, e alla fine deve essere ancora qui.
+  mkdirSync(join(lavoro, 'node_modules'));
+  writeFileSync(join(lavoro, 'node_modules', 'sentinella.txt'), 'resta', 'utf8');
+  const g = gitIn(lavoro);
+  const ok = (args) => { const r = g(args); assert.ok(r.ok, `git ${args.join(' ')}: ${r.out}`); return r.out; };
+  ok(['init', '-q', '--initial-branch=main']);
+  ok(['config', 'user.email', 't@t']);
+  ok(['config', 'user.name', 't']);
+  ok(['add', '-A']);
+  ok(['commit', '-qm', 'base']);
+  ok(['remote', 'add', 'origin', origin]);
+  ok(['push', '-q', 'origin', 'main']);
+  const scrivi = (file, testo) => { mkdirSync(dirname(join(lavoro, file)), { recursive: true }); writeFileSync(join(lavoro, file), testo, 'utf8'); };
+  const commit = (msg) => { ok(['add', '-A']); ok(['commit', '-qm', msg]); return ok(['rev-parse', 'HEAD']); };
+  const suMain = (fn) => { ok(['checkout', '-q', 'main']); fn(); commit('main avanti'); ok(['push', '-q', 'origin', 'main']); };
+  const ramo = (nome, fn) => { ok(['checkout', '-q', '-b', nome, 'main']); fn(); return commit(nome); };
+  return { casa, lavoro, g, ok, scrivi, suMain, ramo };
+}
+
+const TEST_VALORE = "import { test } from 'node:test';\nimport assert from 'node:assert';\nimport { readFileSync } from 'node:fs';\n"
+  + "test('il valore è uno', () => assert.equal(readFileSync('valore.txt', 'utf8').trim(), 'uno'));\n";
+const TEST_ROTTO = "import { test } from 'node:test';\nimport assert from 'node:assert';\ntest('rotto su main', () => assert.fail('rotto'));\n";
+
+function provaIn(r, punta) {
+  return provaUnitSullaFusione({ root: r.lavoro, punta, scrivi: () => {} });
+}
+
+function pulita(r) {
+  assert.equal(readFileSync(join(r.lavoro, 'node_modules', 'sentinella.txt'), 'utf8'), 'resta', 'il node_modules del repo è intatto');
+  const alberi = r.ok(['worktree', 'list', '--porcelain']).split('\n').filter((l) => l.startsWith('worktree '));
+  assert.equal(alberi.length, 1, `nessuna cartella di prova rimasta: ${alberi.join(', ')}`);
+}
+
+test('prova vera: main dentro il ramo, verde, conflitto', () => {
+  const r = repoFinto();
+  try {
+    const dentro = r.ramo('claude/dentro', () => r.scrivi('nuovo.txt', 'x\n'));
+    const p0 = provaIn(r, dentro);
+    assert.equal(p0.esito, 'main_contenuto');
+    r.suMain(() => r.scrivi('altro.txt', 'y\n'));
+    r.ok(['checkout', '-q', 'claude/dentro']);
+    const p1 = provaIn(r, dentro);
+    assert.equal(p1.esito, 'verde', JSON.stringify(p1));
+    assert.equal(p1.mainSha, r.ok(['rev-parse', 'origin/main']), 'lo sha provato è quello di origin/main');
+    pulita(r);
+    const urta = r.ramo('claude/urta', () => r.scrivi('valore.txt', 'tre\n'));
+    r.suMain(() => r.scrivi('valore.txt', 'quattro\n'));
+    const p2 = provaIn(r, urta);
+    assert.equal(p2.esito, 'conflitto');
+    assert.deepEqual(p2.file, ['valore.txt']);
+    pulita(r);
+  } finally {
+    rmSync(r.casa, { recursive: true, force: true });
+  }
+});
+
+test('prova vera: rosso solo sulla fusione ferma con l\'elenco, rosso anche su main no', () => {
+  const r = repoFinto();
+  try {
+    // Il ramo cambia il valore, main aggiunge il test che lo vuole com'era: verdi da soli, rossi insieme.
+    const punta = r.ramo('claude/valore', () => r.scrivi('valore.txt', 'due\n'));
+    r.suMain(() => r.scrivi('tests/unit/valore.test.mjs', TEST_VALORE));
+    const p = provaIn(r, punta);
+    assert.equal(p.esito, 'rosso_sulla_fusione', JSON.stringify(p));
+    assert.deepEqual(p.rossi, ['tests/unit/valore.test.mjs › il valore è uno']);
+    pulita(r);
+
+    // Main già rotto e un ramo innocuo: si fonde.
+    r.suMain(() => r.scrivi('tests/unit/rotto.test.mjs', TEST_ROTTO));
+    const innocuo = r.ramo('claude/innocuo', () => r.scrivi('innocuo.txt', 'x\n'));
+    r.suMain(() => r.scrivi('ancora.txt', 'z\n'));
+    const q = provaIn(r, innocuo);
+    assert.equal(q.esito, 'rosso_anche_su_main', JSON.stringify(q));
+    pulita(r);
+
+    // Main rotto E la fusione ne rompe un altro: ferma, e l'elenco ha solo quello nuovo.
+    r.ok(['checkout', '-q', 'claude/valore']);
+    const s = provaIn(r, punta);
+    assert.equal(s.esito, 'rosso_sulla_fusione', JSON.stringify(s));
+    assert.deepEqual(s.rossi, ['tests/unit/valore.test.mjs › il valore è uno']);
+    pulita(r);
+  } finally {
+    rmSync(r.casa, { recursive: true, force: true });
+  }
+});
+
+test('senza origin la prova si salta e lo si dice; con origin irraggiungibile è un errore', () => {
+  const casa = cartellaTemporanea('filo-929-senza-');
+  try {
+    const g = gitIn(casa);
+    g(['init', '-q', '--initial-branch=main']);
+    assert.equal(provaUnitSullaFusione({ root: casa, punta: SHA, scrivi: () => {} }).saltata, true);
+    g(['remote', 'add', 'origin', join(casa, 'non-esiste.git')]);
+    assert.match(provaUnitSullaFusione({ root: casa, punta: SHA, scrivi: () => {} }).errore, /non riesco a scaricare main/);
+  } finally {
+    rmSync(casa, { recursive: true, force: true });
+  }
+});
+
+test('una cartella di prova si toglie anche dopo un guasto, e il node_modules collegato resta', () => {
+  const r = repoFinto();
+  try {
+    const punta = r.ramo('claude/guasto', () => r.scrivi('nuovo.txt', 'x\n'));
+    r.suMain(() => r.scrivi('altro.txt', 'y\n'));
+    const p = provaUnitSullaFusione({ root: r.lavoro, punta, scrivi: () => {}, lancia: () => { throw new Error('lanciatore esploso'); } });
+    assert.fail(`doveva lanciare, ha dato ${JSON.stringify(p)}`);
+  } catch (e) {
+    assert.match(String(e.message), /lanciatore esploso/);
+    pulita(r);
+  } finally {
+    rmSync(r.casa, { recursive: true, force: true });
+  }
+});
+
+test('chiudiAlbero toglie prima il collegamento: con un collegamento che non si toglie, il resto non si tocca', () => {
+  const casa = cartellaTemporanea('filo-929-chiudi-');
+  try {
+    const albero = join(casa, 'albero');
+    mkdirSync(join(albero, 'node_modules'), { recursive: true });
+    writeFileSync(join(albero, 'node_modules', 'dentro.txt'), 'x', 'utf8');
+    const r = chiudiAlbero(() => assert.fail('git non va chiamato'), albero);
+    assert.equal(r.ok, false);
+    assert.ok(existsSync(join(albero, 'node_modules', 'dentro.txt')));
+  } finally {
+    rmSync(casa, { recursive: true, force: true });
+  }
+});
