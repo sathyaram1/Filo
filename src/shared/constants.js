@@ -126,6 +126,9 @@
     // Persiste tra le sessioni così, riaprendo Filo, si riparte dalla stessa
     // cartella invece di tornare alla home (#259). La aggiorna ogni `cd`.
     FILO_TERMINAL_CWD: 'filo_terminal_cwd',
+    // true dopo il primo comando che Filo propone o esegue in chat: la frase che
+    // spiega il terminale si dice una volta sola, anche dopo un riavvio (#892).
+    FILO_TERMINALE_SPIEGATO: 'filo_terminale_spiegato',
     // Ultima versione di cui l'utente ha visto il recap aggiornamento (popup
     // all'avvio). All'avvio si confronta con app.getVersion(): se è più vecchia
     // e ci sono note (src/shared/patchNotes.js), mostra il recap. Vedi C4.
