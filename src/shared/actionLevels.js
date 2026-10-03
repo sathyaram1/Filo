@@ -555,6 +555,13 @@
         return labels[cmd] || 'Azionare un comando della finestra di Filo';
       },
     },
+    // #870 — le carte della home, come le dispone l'utente trascinandole. Livello 1: ogni mossa si annulla con
+    // quella opposta, e una carta tolta resta in «altro», da cui si rimette.
+    CARTA_HOME: {
+      level: 1,
+      describe: (a) => descriviCarta(a, false),
+      describeDone: (a) => descriviCarta(a, true),
+    },
     // ── estetica del CONTENUTO della pagina via chat (#185) ───────────────────
     // Filo cambia l'aspetto del testo della pagina che l'utente sta guardando
     // ("scrivi in grassetto tutti i titoli"). Livello 1: si applica subito, vale
