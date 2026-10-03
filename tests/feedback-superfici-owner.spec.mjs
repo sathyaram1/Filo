@@ -57,7 +57,8 @@ test('/feedback da chi non gestisce i feedback: nessuna scheda nuova, e la strad
 test('il vecchio indirizzo della posta porta a Gestione', async ({ app, shell }) => {
   await shell.evaluate((u) => window.filoShell.tabs.open(u), VECCHIO_INDIRIZZO);
   const suGestione = () => app.windows().find((w) => w.url().startsWith('filo://manage/'));
-  await expect.poll(() => Boolean(suGestione()), { timeout: 10_000 }).toBe(true);
+  await expect.poll(() => app.windows().map((w) => w.url()).filter((u) => /^filo:\/\/(manage|feedback)\//.test(u)),
+    { timeout: 20_000 }).toEqual([expect.stringMatching(/^filo:\/\/manage\//)]);
   const page = suGestione();
   await expect(page.locator('#mgListEmpty')).toBeVisible({ timeout: 20_000 });
 });
