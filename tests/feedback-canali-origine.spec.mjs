@@ -248,10 +248,42 @@ test('a un sito visitato l\'identità di chi usa Filo non arriva', async ({ app,
     expect(Object.keys(r).sort()).toEqual(['isAdmin', 'ok', 'signedIn']);
   }
 
-  // Da una pagina di Filo la risposta resta intera: è di lì che le pagine
-  // mostrano chi è entrato.
+  // Da una pagina di Filo la risposta resta intera. Elenco minimo, non esatto: il
+  // confine chiuso è quello dei siti, un campo nuovo per Filo non è un rosso (#816.1).
   expect(out.filo.ok).toBe(true);
-  expect(Object.keys(out.filo).sort()).toEqual(['isAdmin', 'ok', 'profile', 'signedIn', 'uid']);
+  expect(Object.keys(out.filo)).toEqual(expect.arrayContaining(['isAdmin', 'ok', 'profile', 'remembered', 'signedIn', 'uid']));
+});
+
+test('chiedere l\'accesso da un sito non consegna al sito chi è entrato (#810.9)', async ({ app, shell }) => {
+  void shell;
+
+  const out = await app.evaluate(async (_electron, mittenti) => {
+    const M = process.getBuiltinModule('module');
+    const k = Object.keys(M._cache).find((x) => /auth[\\/]google-auth\.js$/.test(x));
+    const ga = M._cache[k].exports;
+    const profilo = { email: 'chi-usa-filo@example.com', name: 'Chi Usa Filo' };
+    ga.signIn = async () => profilo;
+    ga.isSignedIn = () => true;
+    ga.isRemembered = () => true;
+    ga.getProfile = () => profilo;
+    const MSG = globalThis.SN_MSG.MSG;
+    const accedi = (m) => globalThis.SN_HANDLE_MESSAGE({ type: MSG.AUTH_SIGNIN }, m);
+    return {
+      sito: await accedi(mittenti.sito),
+      sitoConScheda: await accedi(mittenti.sitoConScheda),
+      filo: await accedi(mittenti.filo),
+    };
+  }, { sito: SITO, sitoConScheda: SITO_CON_SCHEDA, filo: PAGINA_DI_FILO });
+
+  for (const provenienza of ['sito', 'sitoConScheda']) {
+    const r = out[provenienza];
+    expect(r.ok, `${provenienza}: l'esito dell'accesso arriva anche al sito`).toBe(true);
+    expect(r.signedIn).toBe(true);
+    expect(JSON.stringify(r), `${provenienza}: l'email di chi usa Filo è arrivata al sito`).not.toContain('chi-usa-filo@example.com');
+    expect(Object.keys(r).sort()).toEqual(['isAdmin', 'ok', 'signedIn']);
+  }
+  expect(out.filo.ok).toBe(true);
+  expect(out.filo.profile && out.filo.profile.email).toBe('chi-usa-filo@example.com');
 });
 
 test('l\'avviso «l\'accesso è cambiato» non arriva alle schede sui siti, e porta il profilo solo a Filo', async ({ app, openTab, testServer }) => {
@@ -286,4 +318,41 @@ test('l\'avviso «l\'accesso è cambiato» non arriva alle schede sui siti, e po
   for (const c of web) {
     expect(c.avvisi.length, `${c.url}: l'avviso con dentro il profilo è arrivato a un sito visitato`).toBe(0);
   }
+});
+
+test('l\'archivio delle schede chiuse si legge, si cerca e si cancella solo dalle pagine di Filo', async ({ app, shell }) => {
+  void shell;
+
+  const out = await app.evaluate(async (_electron, mittenti) => {
+    const MSG = globalThis.SN_MSG.MSG;
+    const A = globalThis.SN_ARCHIVED_TABS;
+    const a = await A.archive({ url: 'https://banca.example/estratto', title: 'Banca online, estratto conto' });
+    const porte = () => ({
+      elenco: { type: MSG.GET_ARCHIVED_TABS },
+      ricerca: { type: MSG.SEARCH_ARCHIVED_TABS, query: 'banca' },
+      daCancellare: { type: MSG.ARCHIVIO_DA_CANCELLARE, query: 'banca' },
+      eliminaGruppo: { type: MSG.DELETE_ARCHIVED_TABS, ids: [a.id] },
+      eliminaUna: { type: MSG.REMOVE_ARCHIVED_TAB, id: a.id },
+      svuota: { type: MSG.CLEAR_ARCHIVED_TABS },
+    });
+    const res = {};
+    for (const [prov, mittente] of Object.entries(mittenti)) {
+      res[prov] = {};
+      for (const [nome, msg] of Object.entries(porte())) res[prov][nome] = await globalThis.SN_HANDLE_MESSAGE(msg, mittente);
+    }
+    const rimaste = (await A.list()).map((x) => x.title);
+    const daFilo = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.GET_ARCHIVED_TABS }, { url: 'filo://archive/archive.html' });
+    return { res, rimaste, daFilo };
+  }, { sito: SITO, sitoConScheda: SITO_CON_SCHEDA });
+
+  for (const [prov, porte] of Object.entries(out.res)) {
+    for (const [porta, r] of Object.entries(porte)) {
+      expect(r.ok, `${prov}/${porta}: un sito visitato non deve ottenere niente`).toBe(false);
+      expect(String(r.code || ''), `${prov}/${porta}`).toBe('forbidden');
+      expect(JSON.stringify(r), `${prov}/${porta}: il titolo è uscito verso il sito`).not.toContain('Banca online');
+    }
+  }
+  expect(out.rimaste, 'un sito ha cancellato schede dall\'archivio').toEqual(['Banca online, estratto conto']);
+  expect(out.daFilo.ok).toBe(true);
+  expect(out.daFilo.tabs.map((x) => x.title)).toEqual(['Banca online, estratto conto']);
 });

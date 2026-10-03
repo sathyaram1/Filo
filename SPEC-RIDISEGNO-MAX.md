@@ -264,10 +264,10 @@ Collegato (18/08, revisione del ruolo secaudit con l'owner):
 ## 11. Suite completa: in GitHub, non dentro il giro
 
 **Dal 2026-09-15 la suite intera (`npm test`) non la lancia nessun ruolo**, e
-nemmeno una sessione locale: gira in GitHub, nel lavoro di release, che parte
-ogni sei ore — verde, e la patch si pubblica; un rosso nuovo (fuori dai rossi
-noti del contenitore), e la patch non esce, il rosso diventa un feedback e si
-corregge con calma, saltando un giro. Una regressione è rara: non vale un'ora
+nemmeno una sessione locale: gira in GitHub a ogni fusione su main
+(`suite.yml`), e ogni sei ore si pubblica il commit più nuovo con la suite
+verde; un rosso nuovo (fuori dai rossi noti del contenitore) diventa un
+feedback e si corregge con calma, mentre la pubblicazione resta sull'ultimo verde. Una regressione è rara: non vale un'ora
 d'attesa a ogni consegna.
 
 Dentro il giro: chi scrive codice fa unit test e spec mirati, e le regressioni

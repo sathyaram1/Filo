@@ -40,11 +40,51 @@ async function callSecurityFunction(name, data = {}) {
   });
   if (!res.ok) {
     let detail = '';
-    try { detail = (await res.json())?.error?.message || ''; } catch (_) {}
-    throw new Error(`callable ${name} ${res.status}${detail ? ': ' + detail : ''}`);
+    let code = '';
+    try {
+      const err = (await res.json())?.error || {};
+      detail = err.message || '';
+      code = err.status || '';
+    } catch (_) {}
+    // Codice e spiegazione del server restano attaccati all'errore: chi chiama sceglie la frase per l'owner.
+    throw Object.assign(new Error(`callable ${name} ${res.status}${detail ? ': ' + detail : ''}`),
+      { httpStatus: res.status, code: String(code), detail: String(detail) });
   }
   const body = await res.json();
   return body && body.result;
+}
+
+// Un errore di ownerSenderFlag detto all'owner. Su frase o stato sbagliati la spiegazione è del server.
+const ERRORI_SEGNO = {
+  PERMISSION_DENIED: 'Il server dice che questo account non può toccare il segno: serve quello del proprietario.',
+  NOT_FOUND: 'Il server non trova questo feedback o il suo mittente.',
+  UNAUTHENTICATED: 'Sessione scaduta: rifai l\'accesso.',
+};
+function erroreSegno(e) {
+  const code = String(e?.code || '').toUpperCase();
+  const detail = String(e?.detail || '').trim();
+  if (code === 'INVALID_ARGUMENT' || code === 'FAILED_PRECONDITION') return detail || 'Il server ha rifiutato la richiesta.';
+  if (ERRORI_SEGNO[code]) return detail ? `${ERRORI_SEGNO[code]} (${detail})` : ERRORI_SEGNO[code];
+  if (e?.httpStatus) return `Il server ha risposto con un errore ${e.httpStatus}${detail ? `: ${detail}` : ''}.`;
+  // `fetch` fallisce con un TypeError quando il server non si raggiunge; il resto ha già la sua frase.
+  if (e?.name === 'TypeError') return 'Il server non risponde: controlla la connessione e riprova.';
+  return e?.message || 'Non riuscito.';
+}
+
+// Un istante del server (ISO, millisecondi, secondi o Timestamp serializzato) come ISO; '' se non c'è.
+function aIso(v) {
+  if (v == null || v === '') return '';
+  let ms = NaN;
+  if (typeof v === 'object') {
+    const s = v._seconds ?? v.seconds;
+    if (typeof s === 'number') ms = s * 1000;
+  } else if (typeof v === 'number' || /^\d+$/.test(String(v).trim())) {
+    const n = Number(v);
+    ms = n < 1e11 ? n * 1000 : n;
+  } else {
+    ms = Date.parse(String(v));
+  }
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : '';
 }
 
 // ---- Slot chiave privata feedback (S1.3) ----------------------------------------
@@ -249,6 +289,7 @@ module.exports = function register(on, ctx) {
   // Firebase REALE (request.auth.uid nelle Firestore rules) — diverso
   // dall'email del profilo — usato dalla bacheca (DC2) per riconoscere i
   // propri voti nella mappa `votes` autorevole letta da Firestore.
+  // `remembered` serve solo alla finestra (avviso «accesso non ricordato»): ai siti non va.
   // Da un sito visitato questa porta risponde, ma senza IDENTITÀ: niente
   // indirizzo email, niente nome, niente identificativo dell'account. Un
   // content script gira anche dentro le pagine dei siti, e di sé deve sapere
@@ -264,7 +305,9 @@ module.exports = function register(on, ctx) {
     return { ok: true, signedIn, isAdmin, profile: auth.getProfile(), uid, remembered: auth.isRemembered() };
   });
 
-  on(MSG.AUTH_SIGNIN, async () => {
+  // Un sito può chiedere l'accesso (il pannello del red-team gira nelle sue
+  // pagine), ma come per lo stato gli torna solo l'esito, mai chi è entrato.
+  on(MSG.AUTH_SIGNIN, async (msg, sender, origin) => {
     try {
       const profile = await auth.signIn();
       const remembered = auth.isRemembered();
@@ -281,6 +324,7 @@ module.exports = function register(on, ctx) {
       // Appena l'owner è dentro, la vista pubblica dei feedback si rimette in
       // pari da sola (#583): è il momento in cui il main ha di nuovo il token.
       if (auth.isAdmin()) scheduleViewSync({ delayMs: 4000, force: true });
+      if (!daFilo(origin, sender)) return { ok: true, signedIn: auth.isSignedIn(), isAdmin: auth.isAdmin() };
       return { ok: true, profile, isAdmin: auth.isAdmin(), remembered };
     } catch (e) {
       return { ok: false, ...spiegaErroreAccesso(e) };
@@ -342,11 +386,19 @@ module.exports = function register(on, ctx) {
         if (msg.localOnly) { try { email = String(auth.getTokenClaims()?.email || ''); } catch (_) {} }
         localOnly = msg.localOnly ? { by: email || 'owner', at: Date.now() } : null;
       }
+      // #913: «approvalo come lavoro locale» su un feedback non tuo. Resta anche se il segno si toglie: senza, il
+      // segno non si rimetterebbe più, perché il sì si dà solo dai Ricevuti.
+      let localApproval;
+      if (msg.localApproval === true) {
+        let email = '';
+        try { email = String(auth.getTokenClaims()?.email || ''); } catch (_) {}
+        localApproval = { by: email || 'owner', at: Date.now() };
+      }
       // «È mio» (#908): l'unico valore che l'owner può dare è la sua prova.
       const senderProof = msg.senderProof === 'admin' ? 'admin' : undefined;
       await globalThis.SN_FEEDBACK.updateStatus(
         id,
-        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, mergePreapproved, localOnly, senderProof },
+        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, mergePreapproved, localOnly, localApproval, senderProof },
         { idToken },
       );
       // Il triage cambia quello che la bacheca deve mostrare (un fix chiuso
@@ -1269,6 +1321,36 @@ module.exports = function register(on, ctx) {
     if (r.requestId) out.requestId = String(r.requestId);
     if (r.sha) out.sha = String(r.sha);
     if (r.error) out.error = String(r.error);
+    return out;
+  }));
+
+  // Il segno di mittente pericoloso (#922). La frase di `clear` arriva dalla pagina, che la manda solo dopo
+  // il sì dell'owner: qui non si inventa, e il server rifiuta qualunque altra.
+  on(MSG.FEEDBACK_SENDER_FLAG, ownerOnly(async (msg) => {
+    const feedbackId = String(msg?.feedbackId || '').trim();
+    const action = String(msg?.action || '');
+    if (!feedbackId) return { ok: false, error: 'Manca il feedback di cui leggere il mittente.' };
+    if (action !== 'read' && action !== 'clear') return { ok: false, error: 'Sul segno si può solo leggere o togliere.' };
+    const data = { feedbackId, action };
+    if (action === 'clear') data.conferma = String(msg?.conferma ?? '');
+    let r;
+    try {
+      r = await callSecurityFunction('ownerSenderFlag', data);
+    } catch (e) {
+      return { ok: false, error: erroreSegno(e) };
+    }
+    if (!r || r.ok === false) {
+      return { ok: false, error: (r && (r.detail || r.reason || r.error)) || 'Il server non ha risposto sul segno.' };
+    }
+    const out = {
+      ok: true,
+      flagged: r.flagged === true,
+      reason: typeof r.reason === 'string' ? r.reason : '',
+      flaggedAt: aIso(r.flaggedAt),
+      clearedAt: aIso(r.clearedAt),
+    };
+    // Una risposta di `clear` che non riporta l'ora la conosce comunque chi l'ha chiesta.
+    if (action === 'clear' && !out.flagged && !out.clearedAt) out.clearedAt = new Date().toISOString();
     return out;
   }));
 

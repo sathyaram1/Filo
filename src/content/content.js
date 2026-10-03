@@ -1734,10 +1734,23 @@
     // 4. Feedback (alpha) + Red-team (invia attacco)
     items.push({ type: 'separator' });
     items.push(buildFeedbackItem());
-    items.push(buildRedteamAttackItem());
+    // In pausa (#896) la voce c'è solo per chi vede il Red Team. Si richiede a ogni apertura: vale dalla successiva.
+    refreshRedteamVisibile();
+    if (redteamVisibile) items.push(buildRedteamAttackItem());
 
     return items;
   }
+
+  // Parte nascosta: per difetto la voce manca a chi la vedrebbe fino alla risposta, per eccesso porta tutti in un vicolo cieco.
+  let redteamVisibile = false;
+  function refreshRedteamVisibile() {
+    try {
+      Promise.resolve(chrome.runtime.sendMessage({ type: MSG.REDTEAM_VISIBILITY }))
+        .then((r) => { redteamVisibile = !!(r && r.ok && r.visible); })
+        .catch(() => {});
+    } catch (_) {}
+  }
+  refreshRedteamVisibile();
 
   // Red-team — "Invia attacco" (spec §8.1): apre un pannello dedicato (mirrors
   // il flusso feedback) con due campi separati (testo attacco + descrizione) e
@@ -1814,11 +1827,13 @@
 
   // Azioni sul collegamento (senza la sezione "Spiega", come sopra).
   function buildLinkActionItems(linkEl) {
+    // Un collegamento scritto da un modello di Filo si apre e si scarica solo dal main, dopo la porta delle uscite (#810).
+    const diFilo = !!(linkEl.classList && linkEl.classList.contains('filo-md-link') && Popup && Popup.apriCollegamento);
     const out = [
       {
         type: 'item',
         label: I18n.t('menu_open_in_new_tab'),
-        onClick: () => window.open(linkEl.href, '_blank', 'noopener'),
+        onClick: () => (diFilo ? Popup.apriCollegamento(linkEl) : window.open(linkEl.href, '_blank', 'noopener')),
       },
     ];
     // "Salva file" — gemello di "Salva immagine come" per i link a un file
@@ -1829,7 +1844,7 @@
       out.push({
         type: 'item',
         label: I18n.t('menu_save_file'),
-        onClick: () => Actions.downloadLink(linkEl),
+        onClick: () => (diFilo ? Popup.scaricaCollegamento(linkEl) : Actions.downloadLink(linkEl)),
       });
     }
     out.push(
@@ -2107,7 +2122,7 @@
     if (msg?.type === MSG.TOP_FRAME_COMMAND) {
       try {
         if (msg.surface === 'feedback') self.SN_FEEDBACK_UI?.open();
-        else if (msg.surface === 'redteam') self.SN_REDTEAM_ATTACK_UI?.open();
+        else if (msg.surface === 'redteam') { if (redteamVisibile) self.SN_REDTEAM_ATTACK_UI?.open(); }
         else if (msg.surface === 'help') openHelpSidebar();
         else MenuIcons.runIconAction(msg.iconId);
       } catch (e) { console.error('[SN] azione di pagina dal riquadro', e); }

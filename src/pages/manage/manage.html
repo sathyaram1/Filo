@@ -93,6 +93,15 @@
       min-width: 22px; text-align: left;
     }
     .mg-switch.mg-switch--disabled { cursor: not-allowed; opacity: 0.5; }
+    /* Il Red Team (#896): la levetta risponde al passaggio del puntatore e, mentre salva, pulsa. */
+    #mgRtRoot label.mg-switch:not(.mg-switch--disabled):hover .mg-switch-track {
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--sn-accent) 22%, transparent);
+    }
+    #mgRtRoot .mg-switch-track { transition: background 0.15s, box-shadow 0.15s; }
+    #mgRtRoot label.mg-switch.mg-rt-salva .mg-switch-track { animation: mg-rt-pulsa 0.9s ease-in-out infinite; }
+    @keyframes mg-rt-pulsa { 50% { opacity: 0.55; } }
+    .mg-rt-stato:empty { display: none; }
+    .mg-rt-stato.mg-err { color: #c0392b; }
     /* Variante piccola per gli interruttori figli: le levette incolonnate a destra, perché con quattro voci di
        lunghezza diversa si veda a colpo d'occhio quali sono accese. */
     .sn-page label.mg-switch--sm {
@@ -1092,6 +1101,25 @@
     }
 
     .mg-sender-info { display: flex; flex-direction: column; gap: 10px; }
+    /* Segno di mittente pericoloso: il rosso del tema, perché è il motivo per cui i suoi feedback si fermano. */
+    .mg-segno { margin-top: 4px; }
+    .mg-segno[hidden], .mg-sender-segno[hidden], #mgSideSegno button[hidden] { display: none; }
+    .mg-segno-testo { overflow-wrap: anywhere; }
+    #mgSegnoTestata .mg-segno--segnato {
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .mg-segno--segnato { color: var(--sn-error); font-weight: 600; }
+    .mg-segno--tolto, .mg-segno--errore { color: var(--sn-muted); }
+    .mg-segno-riprova {
+      all: unset; cursor: pointer; margin-left: 8px; color: var(--sn-accent);
+      font-size: 12px; transition: opacity 0.1s;
+    }
+    .mg-segno-riprova:hover, .mg-segno-riprova:focus-visible { text-decoration: underline; }
+    .mg-segno-riprova:disabled { opacity: 0.5; cursor: default; }
+    .mg-sender-segno { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; font-size: 13px; }
+    .mg-segno-conferma { display: flex; flex-direction: column; gap: 8px; }
+    .mg-segno-conferma[hidden] { display: none; }
+    .mg-segno-domanda { font-size: 13px; color: var(--sn-text); line-height: 1.4; }
     .mg-sender-stat { font-size: 13px; color: var(--sn-muted); }
     .mg-sender-stat strong { color: var(--sn-text); }
     .mg-sender-list { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
@@ -1242,7 +1270,7 @@
       <button type="button" class="mg-tab" data-tab="resolved" role="tab">Risolti</button>
       <button type="button" class="mg-tab" data-tab="archived" role="tab">Archiviati</button>
       <button type="button" class="mg-tab" data-tab="fbstats" role="tab">Statistiche feedback</button>
-      <button type="button" class="mg-tab" data-tab="stats" role="tab">Statistiche Red Team</button>
+      <button type="button" class="mg-tab" data-tab="stats" role="tab">Red Team</button>
       <button type="button" class="mg-tab" data-tab="models" role="tab">Modelli di supporto</button>
       <button type="button" class="mg-tab" data-tab="automation" role="tab">Automazioni</button>
       <button type="button" class="mg-tab" data-tab="log" role="tab">Log</button>
@@ -1370,6 +1398,9 @@
                   </div>
                 </div>
               </div>
+
+              <!-- «Il segno era un errore» (#922): la conferma dice cosa cambia, subito sotto il tasto. Testi dal JS. -->
+              <div class="mg-reopen mg-segno-conferma" id="mgSegnoConferma" hidden></div>
 
               <!-- Gli esiti stanno SOTTO la riga: un messaggio lungo (una scrittura rifiutata, una chiave scaduta) si
                  prendeva il posto dei tasti e li mandava a capo finché restava lì. -->
@@ -1511,10 +1542,19 @@
       </div>
     </section>
 
+    <!-- Il Red Team in pausa (#896): l'interruttore lo legge e lo scrive manageRedteam.js. -->
     <section class="mg-panel" id="panel-stats" data-panel="stats">
-      <div class="mg-coming">
-        <div class="mg-coming-icon">📊</div>
-        <div>In arrivo</div>
+      <div class="mg-automation" id="mgRtRoot">
+        <section class="mg-auto-block">
+          <label class="mg-switch mg-switch--disabled" id="mgRtOpenSwitch"
+            title="Spento, il Red Team lo vedi solo tu. Acceso, torna a tutti senza una versione nuova.">
+            <span class="mg-switch-text">Red Team aperto a tutti</span>
+            <input type="checkbox" id="mgRtOpenToggle" disabled />
+            <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+            <span class="mg-switch-state" id="mgRtOpenState">Off</span>
+          </label>
+          <p class="mg-auto-block-desc mg-rt-stato" id="mgRtOpenMsg" role="status"></p>
+        </section>
       </div>
     </section>
 
@@ -1957,5 +1997,6 @@
   <div class="mg-lightbox" id="mgLightbox"><img id="mgLightboxImg" alt=""></div>
 
   <script src="manage.js"></script>
+  <script src="manageRedteam.js"></script>
 </body>
 </html>

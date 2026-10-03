@@ -1173,17 +1173,17 @@ const stati  = (fb, opts) => MR.ownerActions(fb, opts).map((a) => a.to);
 
 test('ownerActions: Ricevuti → in coda, le conferme che servono, archivia', () => {
   // Allineato: nessuna conferma da offrire.
-  assert.deepEqual(chiavi({ status: 'aligned' }), ['accept', 'archive']);
+  assert.deepEqual(chiavi({ status: 'aligned' }), ['accept', 'accept_local', 'archive']);
   // Attacco: una conferma sola, quella giusta.
-  assert.deepEqual(chiavi({ status: 'attack' }), ['accept', 'confirm_attack', 'archive']);
-  assert.deepEqual(chiavi({ status: 'spam' }), ['accept', 'confirm_spam', 'archive']);
+  assert.deepEqual(chiavi({ status: 'attack' }), ['accept', 'accept_local', 'confirm_attack', 'archive']);
+  assert.deepEqual(chiavi({ status: 'spam' }), ['accept', 'accept_local', 'confirm_spam', 'archive']);
   // File sospetto: non è ancora classificato, quindi le conferme sono DUE.
   // Ne offriva una sola sulla dashboard di gestione: una delle due decisioni
   // esisteva su una strada sola.
   assert.deepEqual(chiavi({ status: 'suspicious_file' }),
-    ['accept', 'confirm_attack', 'confirm_spam', 'archive']);
+    ['accept', 'accept_local', 'confirm_attack', 'confirm_spam', 'archive']);
   assert.deepEqual(stati({ status: 'suspicious_file' }),
-    ['todo', 'attack_confirmed', 'spam_confirmed', 'archived']);
+    ['todo', 'todo', 'attack_confirmed', 'spam_confirmed', 'archived']);
 });
 
 test('ownerActions: In coda → chiudi a mano o archivia; un `done` non ancora uscito non si richiude', () => {
@@ -1249,7 +1249,7 @@ test('ownerActions: stato illeggibile → nessuna azione (su tutte le superfici)
 
 test('ownerActions: stati storti (assente, vuoto, nullo, inventato) → trattati come Ricevuti', () => {
   for (const fb of [{}, { status: '' }, { status: null }, { status: 'zzz-inventato' }]) {
-    assert.deepEqual(chiavi(fb), ['accept', 'archive'], JSON.stringify(fb));
+    assert.deepEqual(chiavi(fb), ['accept', 'accept_local', 'archive'], JSON.stringify(fb));
   }
 });
 
@@ -1566,4 +1566,33 @@ test('praticaChiusa e localSignCheck: su un lavoro locale chiuso togliere il seg
   const aperta = locale({ status: 'working', localOnly: SEGNO });
   assert.equal(MR.praticaChiusa(aperta), false);
   assert.deepEqual(MR.localSignCheck(aperta, false), { ok: true });
+});
+
+// ── Segno di mittente pericoloso (#922) ───────────────────────────────────
+
+test('segno: fermato dal segno solo col motivo linked_prior_attack del filtro d’ingresso', () => {
+  assert.equal(MR.fermatoDalSegno({ pipeline: { l1Reasons: ['linked_prior_attack'] } }), true);
+  assert.equal(MR.fermatoDalSegno({ pipeline: { l1Reasons: ['obfuscation', ' linked_prior_attack '] } }), true);
+  // Le raffiche non le ha fermate nessun segno: si sbloccano col rigiudizio.
+  for (const r of ['raffica_mittente', 'raffica_globale', 'raffica_non_contata', 'prior_attack']) {
+    assert.equal(MR.fermatoDalSegno({ pipeline: { l1Reasons: [r] } }), false, r);
+  }
+  // Pipeline cifrata, assente o storta: non si sa, quindi no.
+  assert.equal(MR.fermatoDalSegno({ pipeline: 'FENC1:abc' }), false);
+  assert.equal(MR.fermatoDalSegno({}), false);
+  assert.equal(MR.fermatoDalSegno(null), false);
+  assert.equal(MR.fermatoDalSegno({ pipeline: { l1Reasons: 'linked_prior_attack' } }), false);
+});
+
+test('segno: la frase della conferma è quella che il server accetta', () => {
+  assert.equal(MR.FRASE_SEGNO_ERRATO, 'il segno era un errore');
+});
+
+test('segno: il motivo si traduce se è un codice, passa com’è se è un testo', () => {
+  assert.equal(MR.motivoSegnoText('attack'), 'un suo feedback è stato giudicato un attacco');
+  assert.equal(MR.motivoSegnoText('linked_prior_attack'), 'collegato a un attacco precedente');
+  assert.equal(MR.motivoSegnoText('nuovo_codice'), 'nuovo codice');
+  assert.equal(MR.motivoSegnoText('Il feedback #812 è stato giudicato un attacco'), 'Il feedback #812 è stato giudicato un attacco');
+  assert.equal(MR.motivoSegnoText(''), '');
+  assert.equal(MR.motivoSegnoText(null), '');
 });

@@ -10,6 +10,9 @@ module.exports = function register(on, ctx) {
   const Q = globalThis.SN_SCRYFALL_Q;
   const IE = globalThis.SN_DECK_IMPORT_EXPORT;
   const { ACTIONS, PROMPTS } = globalThis.SN_CONST;
+  // Sei pagine di Scryfall per una ricerca che passa dal giudice: circa 20 lotti, meno di un centesimo col modello
+  // economico. Una rete più larga di così la chat la dichiara col numero e chiede un vincolo in più.
+  const JUDGE_MAX_CARDS = 1050;
 
   // Identity del mazzo per il filtro automatico (§4): dai colori del
   // commander. Senza commander nessun vincolo (si cerca in tutto Scryfall).
@@ -81,6 +84,40 @@ module.exports = function register(on, ctx) {
     return withId ? `  - ${name} [id: ${entry.scryfall_id}]${tags}` : `  - ${name}${tags}`;
   }
 
+  // Il modello che giudicherà le carte: i giudizi salvati valgono solo per lui. '' se non è configurato (il giudice
+  // allora fallisce da sé, e lo dice).
+  async function judgeModelNow() {
+    try {
+      const settings = await ctx.getEffectiveSettings();
+      const chain = ctx.buildAttemptChain(settings, ctx.modelForAction(settings, ACTIONS.DECKS_SEARCH_FILTER), ACTIONS.DECKS_SEARCH_FILTER);
+      return chain[0] ? `${chain[0].provider || ''}/${chain[0].model || ''}` : '';
+    } catch (_) { return ''; }
+  }
+
+  // Quello che la richiesta dà per scontato e il giudice non vede altrove (#382): il commander del mazzo, le carte
+  // del mazzo se il criterio lo richiama, e le richieste di prima quando il modello non ha scritto un criterio.
+  async function judgeContext({ deck, criterion, previousAsks, deckNames }) {
+    const out = [];
+    const meta = deck && deck.commanderMeta;
+    if (deck && deck.commander) {
+      const c = (await Scry.cards([deck.commander]).catch(() => ({})))[deck.commander];
+      const body = c
+        ? [c.name, c.manaCost ? `costo ${c.manaCost}` : '', c.typeLine, c.oracleText ? `— ${c.oracleText.replace(/\n/g, ' ')}` : '']
+          .filter(Boolean).join(' · ')
+        : String((meta && meta.name) || '');
+      if (body) out.push(`Il commander del mazzo è ${body}`);
+    }
+    // Stesso metro dei tag contestuali (§7): la lista entra solo se serve, perché ogni carta aggiunta la cambia.
+    const asks = [criterion, ...previousAsks].join(' ');
+    if (deckNames.length && !globalThis.SN_DECK_OPINIONS.isContextFreeTag(asks)) {
+      out.push(`Carte già nel mazzo: ${deckNames.join(', ')}`);
+    }
+    if (previousAsks.length) {
+      out.push(`Richieste precedenti dell'utente in questa chat, dalla più vecchia:\n${previousAsks.map((t) => `- «${t}»`).join('\n')}`);
+    }
+    return out.join('\n');
+  }
+
   // Errore → frase per l'utente (#331): mai un codice HTTP nudo in chat.
   // La traduzione vive in `shared/chatErrors.js` (#360): è la STESSA per tutte
   // le chat di Filo — prima era solo qui e la chat della home mostrava ancora
@@ -149,6 +186,12 @@ module.exports = function register(on, ctx) {
           try { wc.send('filo:reasoning', { reqId: reasoningReqId, text: t }); } catch (_) {}
         }
       };
+      // Stesso canale, fase della ricerca: la bolla in attesa dice cosa sta facendo Filo e a che punto è (#382).
+      const onProgress = (progress) => {
+        if (reasoningReqId && wc && !wc.isDestroyed?.()) {
+          try { wc.send('filo:reasoning', { reqId: reasoningReqId, progress: { ...progress, reply } }); } catch (_) {}
+        }
+      };
 
       const r = await handleAIRequest({
         action: ACTIONS.DECKS_CHAT,
@@ -170,6 +213,10 @@ module.exports = function register(on, ctx) {
       let cardIds = [];
       let cards = {};
       let query = '';
+      let uncheckedIds = [];
+      // Il turno è andato solo in parte (ricerca non partita, carte non controllate) e la risposta dice di riprovare:
+      // la bolla allora tiene il tasto Riprova, come una risposta in errore.
+      let retryable = false;
       // Budget/reply/deck di uscita dichiarati qui (prima dell'import, sotto)
       // perché sia la ricerca sia l'import possono accodare testo alla reply.
       let reply = parsed.reply;
@@ -208,15 +255,26 @@ module.exports = function register(on, ctx) {
         }
       }
       if (parsed.query) {
+        // Il criterio del giudice segue la query che è partita davvero: quella corretta al secondo tentativo porta il suo.
+        let criterion = parsed.filter;
         // Filtro identity AUTOMATICO (§4): lo aggiunge search/buildSearchQuery;
         // se l'utente/LLM ha già un vincolo id esplicito, quello vince.
         // La query la scrive il MODELLO e può essere sintatticamente invalida
         // (Scryfall risponde 400): non buttare l'intero turno (#331) — si
         // riprova UNA volta facendo correggere la query al modello stesso, e
         // se non ne esce si spiega il problema in chiaro nella reply.
+        // Solo un messaggio tutto in sintassi è già la richiesta esatta, anche se il modello gli aggiunge un criterio;
+        // ogni altra ricerca passa dal giudice (§4.1).
+        const critOf = (c) => (Q.isPureSyntax(text) ? '' : (c || text));
+        // Chi passa dal giudice segue le pagine di Scryfall fino al tetto: la query larga le riempie in fretta, e
+        // fermarsi alla prima vedeva solo le 175 più economiche (#382). Oltre il tetto la chat lo dice.
+        const runSearch = (q, c) => (critOf(c)
+          ? Scry.search(q, { identity: identityColors, maxCards: JUDGE_MAX_CARDS, remember: false,
+            onPage: ({ found, total }) => onProgress({ fase: 'cerco', done: found, total: Math.min(total, JUDGE_MAX_CARDS) }) })
+          : Scry.search(q, { identity: identityColors }));
         let sr = null;
         try {
-          sr = await Scry.search(parsed.query, { identity: identityColors });
+          sr = await runSearch(parsed.query, criterion);
         } catch (e1) {
           const status = Number(e1 && e1.status);
           const detail = String((e1 && e1.details) || '');
@@ -257,7 +315,8 @@ module.exports = function register(on, ctx) {
               if (p2.query) {
                 // Il modello ha riprovato: se anche questa fallisce si passa
                 // alla spiegazione generica qui sotto.
-                sr = await Scry.search(p2.query, { identity: identityColors });
+                criterion = p2.filter || criterion;
+                sr = await runSearch(p2.query, criterion);
               } else if (p2.reply) {
                 // Niente query: il modello ha SPIEGATO il problema — è la
                 // risposta per l'utente, il messaggio generico non serve.
@@ -266,6 +325,7 @@ module.exports = function register(on, ctx) {
             } catch (_) { sr = null; }
           }
           if (!sr && !explained) {
+            retryable = true;
             reply = [reply,
               `Ho provato a cercare su Scryfall ma la ricerca non è andata a buon fine (la query «${parsed.query}» non è stata accettata${Number.isFinite(status) && (status >= 500 || status === 429) ? ' perché il servizio al momento non risponde' : ''}). Prova a riformulare la richiesta con parole diverse, o riprova tra poco.`,
             ].filter(Boolean).join('\n');
@@ -275,22 +335,47 @@ module.exports = function register(on, ctx) {
           cardIds = sr.cards.map((c) => c.id);
           for (const c of sr.cards) cards[c.id] = c;
           query = sr.query;
-          // Filtro semantico (§4.1): la query era LARGA apposta (sinonimi, per
-          // non perdere carte). Se il modello ha dato un "filter", un LLM
-          // economico giudica carta-per-carta se rispetta l'intento, in batch,
-          // con cache (carta, criterio). Best-effort: un errore o un filtro che
-          // svuota TUTTO non deve lasciare l'utente a mani vuote → si ricade
-          // sui risultati larghi.
-          if (parsed.filter && cardIds.length) {
+          // Filtro semantico (§4.1): la query è LARGA apposta, e ogni carta che torna passa dal giudice (#382).
+          // Senza criterio del modello vale la richiesta stessa.
+          const crit = critOf(criterion);
+          const found = cardIds.length;
+          // Una pagina che non ha risposto non è un tetto: la bolla tiene Riprova, e la nota lo dice.
+          if (sr.broken) retryable = true;
+          if (!found) {
+            reply = [reply, globalThis.SN_DECK_OPINIONS.searchEmptyNote({ identity: !!identityColors })].filter(Boolean).join('\n');
+          } else if (crit) {
+            onProgress({ fase: 'controllo', done: 0, total: found });
+            let fr;
             try {
-              const Opinions = globalThis.SN_DECK_OPINIONS_SVC;
-              const fr = await Opinions.filterSearch({
-                criterion: parsed.filter, cardIds, cards, handleAIRequest,
+              const previousAsks = criterion ? [] : history.filter((m) => m.role === 'user').slice(-3)
+                .map((m) => (m.content.length > 300 ? `${m.content.slice(0, 299)}…` : m.content));
+              fr = await globalThis.SN_DECK_OPINIONS_SVC.filterSearch({
+                criterion: crit, cardIds, cards, handleAIRequest,
+                context: await judgeContext({
+                  deck: deckOut || deck, criterion: crit, previousAsks,
+                  deckNames: (deckOut || deck).carte.map((c) => known[c.scryfall_id] && known[c.scryfall_id].name).filter(Boolean),
+                }),
+                judgeModel: await judgeModelNow(),
+                onProgress: ({ done, total }) => onProgress({ fase: 'controllo', done, total }),
               });
-              if (fr && Array.isArray(fr.keepIds) && fr.keepIds.length) {
-                cardIds = fr.keepIds;
-              }
-            } catch (_) { /* filtro fallito: si tengono i risultati larghi */ }
+            } catch (e) {
+              fr = { keepIds: cardIds, unverifiedIds: cardIds, error: e };
+            }
+            cardIds = fr.keepIds;
+            // Segnate in lista solo se sono una parte: se non l'ha controllata nessuna, lo dice già la nota.
+            if (fr.unverifiedIds.length < found) uncheckedIds = fr.unverifiedIds;
+            if (fr.unverifiedIds.length) retryable = true;
+            const note = globalThis.SN_DECK_OPINIONS.searchFilterNote({
+              found, kept: fr.keepIds.length, unverified: fr.unverifiedIds.length, criterion: crit, total: sr.total,
+              broken: !!sr.broken, why: fr.error ? (fr.error.userText || friendlyChatError(fr.error)) : '',
+            });
+            if (note) reply = [reply, note].filter(Boolean).join('\n');
+            // In cache vanno le carte che si mostrano, non le centinaia della rete larga.
+            Scry.remember(cardIds.map((id) => cards[id]).filter(Boolean)).catch(() => {});
+            cards = Object.fromEntries(cardIds.filter((id) => cards[id]).map((id) => [id, cards[id]]));
+          } else {
+            const cap = globalThis.SN_DECK_OPINIONS.searchCapNote({ seen: found, total: sr.total, judged: false, broken: !!sr.broken });
+            if (cap) reply = [reply, cap].filter(Boolean).join('\n');
           }
         }
       } else if (parsed.cards.length) {
@@ -437,8 +522,11 @@ module.exports = function register(on, ctx) {
         }
       }
 
+      const unchecked = uncheckedIds.filter((id) => cardIds.includes(id));
       return {
         ok: true, reply, cardIds, cards, query,
+        ...(unchecked.length ? { uncheckedIds: unchecked } : {}),
+        ...(retryable ? { retryable: true } : {}),
         ...(reasoning ? { reasoning } : {}),
         ...(deckOut ? { deck: deckOut } : {}),
         ...(importPending ? { importPending } : {}),

@@ -2,6 +2,8 @@
 // Non decide niente sul lavoro: la condizione per saltare L5 la rilegge il server dal documento.
 // Test: tests/unit/praticaLocale.test.mjs.
 
+import { FINESTRA_PARTE_TARDIVA_MS, partiDaCampi } from './parti-lavoro.mjs';
+
 const ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
 
 /**
@@ -55,16 +57,26 @@ export function estraiOpzioneFeedback(argv) {
 }
 
 /**
- * Cosa manca alla pratica perché la fusione salti L5, detto prima del lavoro. PURA.
+ * Cosa manca alla pratica perché la fusione dell'app salti L5, detto prima del lavoro. PURA.
  * Guarda i soli campi in chiaro: il mittente (cifrato) e lo stato fine li rilegge il server.
  */
-export function avvisoDaCampi(fields) {
+export function avvisoDaCampi(fields, ora = Date.now()) {
   const f = fields || {};
   const mancano = [];
-  if (f.senderProof?.stringValue !== 'admin') mancano.push('la prova del mittente (senderProof admin)');
+  // Il sì dell'owner come lavoro locale (#913) vale quanto la prova: il server lo legge allo stesso modo.
+  if (f.senderProof?.stringValue !== 'admin' && !f.localApproval?.mapValue) {
+    mancano.push('la prova del mittente (senderProof admin) o l’approvazione dell’owner come lavoro locale');
+  }
   if (!f.localOnly?.mapValue) mancano.push('il segno «solo in locale»');
-  if (f.statusPublic?.stringValue === 'closed') mancano.push('una pratica aperta (è chiusa)');
-  if (!mancano.length) return '';
+  let tardiva = '';
+  if (f.statusPublic?.stringValue === 'closed') {
+    // Chiusa dalla fusione della parte del server dello stesso lavoro: per l'app vale ancora per poco (#915).
+    const parti = partiDaCampi(f);
+    const fino = parti.server && !parti.app && parti.solo !== 'server' && parti.ramo ? parti.server + FINESTRA_PARTE_TARDIVA_MS : 0;
+    if (fino > ora) tardiva = `La pratica l’ha chiusa la fusione di ${parti.ramo}, la parte del server: vale per la parte dell’app solo dal ramo con lo stesso nome, fino a ${new Date(fino).toISOString()}; poi alla fusione L5 non si salta più.`;
+    else mancano.push('una pratica aperta (è chiusa)');
+  }
+  if (!mancano.length) return tardiva;
   return `Attenzione: a questa pratica manca ${mancano.join(', ')}. Alla fusione L5 non si salta e, se i controlli fermano, si aspetta il tuo sì.`;
 }
 

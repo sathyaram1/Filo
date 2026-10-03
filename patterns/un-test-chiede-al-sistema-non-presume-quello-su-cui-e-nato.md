@@ -43,6 +43,24 @@ Tre unit test rossi solo su Windows.
 Riferimenti: `tests/unit/documentRead.test.mjs` (nomi ambigui, maiuscole),
 `tests/unit/terminaleCodifica.test.mjs` (preludio per shell, esito dei comandi).
 
+## Il contenitore senza gestore di finestre (#465.1)
+
+Sotto xvfb (le routine, la suite in GitHub) nessuno esegue `minimize()`: la richiesta
+cade nel vuoto e la finestra resta com'era. La prova chiede `isMinimized()`; se il
+sistema non l'ha ridotta, finge la sua risposta (`isMinimized` vero ed evento
+`minimize`, poi il contrario) e prova lo stesso cammino del codice. Sostituire la
+riduzione con un'altra uscita dalla vista lascerebbe la riduzione provata solo sul
+Windows dell'owner. Riferimento: `tests/manage-ricevuti-vivi.spec.mjs`.
+
+## Il contenitore che disegna adagio (#592.11)
+
+Sotto xvfb un fotogramma può arrivare un secondo dopo che il riquadro sta nel DOM:
+`toBeVisible()` guarda il DOM, l'utente vede i fotogrammi. Il dialogo di conferma conta
+dal primo fotogramma il mezzo secondo in cui un gesto vero non vale, e una prova che
+aspettava 600 ms da `toBeVisible()` prima di premere Invio era rossa tre volte su
+quattro. Prima di un gesto che deve valere si chiede al dialogo se è pronto
+(`aspettaConfermaPronta`, `tests/helpers/confirm.mjs`), non si aspetta un tempo fisso.
+
 ## La macchina dell'owner (#563)
 
 Due proprietà che le altre macchine non hanno, e ogni test che le dava per scontate
@@ -60,3 +78,22 @@ nasceva rosso solo per l'owner, per settimane (undici spec così):
   (`tests/helpers/percorsi.mjs`), che la fa canonica e con uno spazio nel nome per tutti:
   una costruita con `mkdtempSync` prova su un percorso che sulla macchina dell'owner non
   esiste, e una sentinella lo impedisce.
+
+## Il cancello di pubblicazione (#931)
+
+Gli unit test girano su Windows in un posto solo: il cancello prima di una versione,
+su una macchina di GitHub dove il repo sta su `D:` e la cartella temporanea su `C:`.
+Lì si rompono due cose che passano dove repo e temporanea stanno sullo stesso disco, e
+il rosso ferma le versioni per tutti:
+
+- **Due dischi.** Fra `D:\…` e `C:\…` `relative` risponde con un percorso assoluto,
+  senza `..`. «Comincia con `..`» dice «dentro» per un file che sta fuori: si chiede a
+  `fuoriDa(cartella, percorso)` (`tests/helpers/percorsi.mjs`). E un nome relativo
+  rimesso insieme con `join(radice, nome)` incolla i due dischi
+  (`D:\a\Filo\Filo\C:\Users\…`): si usa `resolve`.
+- **Il node che gira.** Il processo che esegue la prova tiene aperto il proprio
+  eseguibile, e su Windows nessun nome di quel file si cancella finché gira: un
+  collegamento fisso a `process.execPath` (per fingere un comando) fa fallire la pulizia
+  con EPERM. Si copia.
+
+Sentinella delle due forme: `tests/unit/cartelleTemporanee.test.mjs`.

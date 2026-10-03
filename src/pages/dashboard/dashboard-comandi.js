@@ -451,7 +451,7 @@
       // L'utente ha deciso: da qui in poi quell'host non viene più messo in
       // dubbio (niente rosso, niente avviso al prossimo invio).
       siteResolveCache.set(host, true);
-      send({ type: MSG.OPEN_URL, url: siteUrlOf(text) });
+      send({ type: MSG.OPEN_URL, url: siteUrlOf(text), parole: [text] });
       if (inputEl.value.trim() === text) { inputEl.value = ''; autoGrowInput(); }
       updateInputClass();
     });
@@ -513,7 +513,7 @@
     //    indirizzi — SN_URL_NAV.normalizeUrl (#398) — così "/localhost:3000" o
     //    "/192.168.1.1" si aprono davvero invece di partire su un https vuoto.
     if (isSiteToken(text)) {
-      send({ type: MSG.OPEN_URL, url: siteUrlOf(text) });
+      send({ type: MSG.OPEN_URL, url: siteUrlOf(text), parole: [text] });
       inputEl.value = '';
       autoGrowInput();
       updateInputClass();

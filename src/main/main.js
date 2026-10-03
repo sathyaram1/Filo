@@ -399,24 +399,23 @@ app.whenReady().then(async () => {
           ), 10_000, 'diagnostica content-script');
           console.log('[smoke] content-script diag:', JSON.stringify(csDiag, null, 2));
 
-          // Simula selezione + right-click per verificare che il menu compaia.
-          await entro(csWin.webContents.executeJavaScript(`(() => {
+          // Seleziona e fa un tasto destro come l'utente: uno fabbricato dallo script il menu lo ignora (#589.8).
+          const punto = await entro(csWin.webContents.executeJavaScript(`(() => {
             const span = document.querySelector('.selectable');
-            if (!span) return false;
+            if (!span) return null;
             const range = document.createRange();
             range.selectNodeContents(span);
             const sel = window.getSelection();
             sel.removeAllRanges();
             sel.addRange(range);
             const rect = span.getBoundingClientRect();
-            const evt = new MouseEvent('contextmenu', {
-              bubbles: true, cancelable: true, view: window,
-              clientX: rect.left + rect.width / 2,
-              clientY: rect.top + rect.height / 2,
-              button: 2,
-            });
-            return span.dispatchEvent(evt);
+            return { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2) };
           })()`), 10_000, 'tasto destro simulato');
+          if (punto) {
+            for (const type of ['mouseDown', 'mouseUp']) {
+              csWin.webContents.sendInputEvent({ type, x: punto.x, y: punto.y, button: 'right', clickCount: 1 });
+            }
+          }
           await new Promise((r) => setTimeout(r, 500));
           const menuDiag = await entro(csWin.webContents.executeJavaScript(
             "({ menu: !!document.querySelector('.sn-menu')," +

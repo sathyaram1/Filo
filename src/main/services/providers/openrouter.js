@@ -110,21 +110,24 @@
   // ammesso OpenRouter risponde con un errore, che risale come un normale errore
   // provider: la richiesta FALLISCE in modo evidente invece di passare da un host
   // escluso. `sort` sceglie l'ordine fra gli ammessi (latency/throughput) invece
-  // del prezzo. Non tocchiamo `allow_fallbacks`: vogliamo che, fra gli host
-  // AMMESSI, il ripiego automatico resti attivo.
-  function providerBlock(routing) {
-    if (!routing || typeof routing !== 'object') return null;
+  // del prezzo. `allow_fallbacks` resta acceso: fra gli host AMMESSI il ripiego
+  // serve. Un modello da comprare solo dal produttore (#904) porta `only` anche senza `routing`.
+  function providerBlock(routing, model) {
     const p = {};
-    const ignore = Array.isArray(routing.ignore) ? routing.ignore.filter(Boolean) : [];
+    const r = routing && typeof routing === 'object' ? routing : {};
+    const ignore = Array.isArray(r.ignore) ? r.ignore.filter(Boolean) : [];
     if (ignore.length) p.ignore = ignore;
-    if (routing.sort === 'latency' || routing.sort === 'throughput' || routing.sort === 'price') {
-      p.sort = routing.sort;
+    if (r.sort === 'latency' || r.sort === 'throughput' || r.sort === 'price') {
+      p.sort = r.sort;
     }
-    if (routing.allowFallbacks === false) p.allow_fallbacks = false;
+    if (r.allowFallbacks === false) p.allow_fallbacks = false;
     // Con gli strumenti (tool calling) in richiesta, solo gli host che li
     // supportano davvero: senza questo il router può passare a un host che
     // ignora `tools` in silenzio, e il modello risponde a parole invece di agire.
-    if (routing.requireParameters === true) p.require_parameters = true;
+    if (r.requireParameters === true) p.require_parameters = true;
+    const C = global.SN_CONST;
+    const rule = C && typeof C.producerOnlyRule === 'function' ? C.producerOnlyRule(model) : null;
+    if (rule) p.only = rule.only.slice();
     return Object.keys(p).length ? p : null;
   }
 
@@ -288,7 +291,7 @@
     const body = { model, messages, stream: false, usage: { include: true }, ...toolsFields(tools, toolChoice) };
     const r = reasoningField(reasoning, false);
     if (r) body.reasoning = r;
-    const pb = providerBlock(providerRouting);
+    const pb = providerBlock(providerRouting, model);
     if (pb) body.provider = pb;
     const payload = JSON.stringify(body);
     const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(ENDPOINT, apiKey, (key) => ({
@@ -330,7 +333,7 @@
     // non ragionano semplicemente non ne emettono — best-effort.
     const r = reasoningField(reasoning, !!onReasoning);
     if (r) reqBody.reasoning = r;
-    const pb = providerBlock(providerRouting);
+    const pb = providerBlock(providerRouting, model);
     if (pb) reqBody.provider = pb;
     const payload = JSON.stringify(reqBody);
     // Il rifiuto della chiave arriva con lo status, prima di qualunque delta:
@@ -438,7 +441,7 @@
     if (voice) body.voice = voice;
     const sp = Number(speed);
     if (Number.isFinite(sp) && sp > 0 && sp !== 1) body.speed = sp;
-    const pb = providerBlock(providerRouting);
+    const pb = providerBlock(providerRouting, model);
     if (pb) body.provider = pb;
     const payload = JSON.stringify(body);
     const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(SPEECH_ENDPOINT, apiKey, (key) => ({
@@ -468,7 +471,7 @@
   async function transcribe({ apiKey, model, audioBase64, format, language, providerRouting, signal }) {
     const body = { model, input_audio: { data: audioBase64, format: format || 'wav' } };
     if (language) body.language = language;
-    const pb = providerBlock(providerRouting);
+    const pb = providerBlock(providerRouting, model);
     if (pb) body.provider = pb;
     const payload = JSON.stringify(body);
     const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(TRANSCRIPTIONS_ENDPOINT, apiKey, (key) => ({
@@ -506,7 +509,7 @@
     const body = { model, input };
     const d = Number(dim);
     if (Number.isInteger(d) && d > 0) body.dimensions = d;
-    const pb = providerBlock(providerRouting);
+    const pb = providerBlock(providerRouting, model);
     if (pb) body.provider = pb;
     const payload = JSON.stringify(body);
     const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(EMBEDDINGS_ENDPOINT, apiKey, (key) => ({

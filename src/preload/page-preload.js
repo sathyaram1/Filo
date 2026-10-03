@@ -90,7 +90,16 @@ let contextMenuHandler = null;
 try {
   globalThis.__snSetContextMenuHandler = (fn) => { contextMenuHandler = fn; };
   window.addEventListener('contextmenu', (e) => {
-    if (typeof contextMenuHandler === 'function') { contextMenuHandler(e); return; }
+    // Solo il tasto destro dell'utente: uno fabbricato dallo script del sito aprirebbe il menu, e con lui
+    // Incolla e la cronologia degli appunti, senza che l'utente l'abbia chiesto (#589.8).
+    if (!e.isTrusted) return;
+    // Il sito non deve vedere il clic che apre il menu di Filo, nemmeno dal suo ascolto in cattura su window: se lo annulla,
+    // il main non sa che l'utente ha aperto il menu e Incolla resta senza cronologia (#589.4). Chromium lo emette lo stesso.
+    if (typeof contextMenuHandler === 'function') {
+      contextMenuHandler(e);
+      if (!e.shiftKey) { try { e.stopImmediatePropagation(); } catch (_) {} }
+      return;
+    }
     // #405 — primo tasto destro dentro un riquadro: i content script non sono
     // ancora montati (li montiamo solo all'uso). Montali ORA e rigioca questo
     // stesso clic appena l'handler è pronto, così il primo tentativo apre il
@@ -99,7 +108,7 @@ try {
     // Shift resta la via di fuga anche qui: con Shift premuto non tocchiamo
     // l'evento e lasciamo che il riquadro faccia quello che farebbe da solo.
     if (e.shiftKey) return;
-    try { e.stopPropagation(); } catch (_) {}
+    try { e.stopImmediatePropagation(); } catch (_) {}
     replayContextMenu(e);
     ensureContentScripts();
   }, { capture: true });
@@ -522,8 +531,17 @@ function waitForContentScripts(fn) {
   tick();
 }
 
+// L'avviso del sito pericoloso non aspetta la pagina costruita: un modulo password già a schermo sopra uno script che
+// non arriva mai resterebbe scrivibile senza avviso (#813.1). loadScripts() ritrova questi moduli già caricati.
+function startSafebrowse() {
+  try { require(path.join(SHARED_DIR, 'filoUi.js')); } catch (e) { console.error('[Filo CS] filoUi', e); }
+  try { require(path.join(SHARED_DIR, 'messages.js')); } catch (e) { console.error('[Filo CS] messages', e); }
+  try { require(path.join(CONTENT_DIR, 'safebrowse.js')); } catch (e) { console.error('[Filo CS] safebrowse', e); }
+}
+
 if (!IS_SUBFRAME) {
   contentScriptsStarted = true;
+  startSafebrowse();
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', start, { once: true });
   } else {

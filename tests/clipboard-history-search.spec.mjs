@@ -5,6 +5,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { argomentiScala } from './fixtures/electron.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { apriCronologia, statoCronologia, testiCronologia } from './helpers/cronologiaAppunti.mjs';
 
 // Feedback: poter scorrere fra tutto ciò che è stato incollato e, in basso, una
 // barra "Cerca…" (grigia) per cercare fra le cose incollate.
@@ -61,35 +62,26 @@ test('paste history submenu is scrollable and has a working search bar', async (
 
     // Apri il menu sull'area editabile (vuota → nessun ramo spellcheck) e poi il
     // sotto-menu della cronologia incolla.
-    await page.locator('#ta').click({ button: 'right' });
-    await expect(page.locator('.sn-menu')).toBeVisible();
-    const arrow = page.locator('.sn-menu-paste-arrow');
-    await expect(arrow).toBeVisible();
-    await arrow.click();
-
-    const sub = page.locator('.sn-menu-history-sub');
-    await expect(sub).toBeVisible();
-    await expect(sub.locator('.sn-menu-history-item')).toHaveCount(20);
+    const stato = await apriCronologia(app, page, '#ta');
+    expect(stato.voci).toHaveLength(20);
 
     // Scrollabilità: con 20 voci il contenuto eccede l'altezza → scrollbar.
-    const scrollable = await sub
-      .locator('.sn-menu-history-list')
-      .evaluate((el) => el.scrollHeight > el.clientHeight + 4);
-    expect(scrollable, 'la lista deve essere scorrevole').toBe(true);
+    expect(stato.lista.scrollHeight > stato.lista.clientHeight + 4, 'la lista deve essere scorrevole').toBe(true);
 
-    // Barra di ricerca in basso con placeholder grigio "Cerca…".
-    const input = page.locator('.sn-menu-history-search-input');
-    await expect(input).toBeVisible();
-    await expect(input).toHaveAttribute('placeholder', /Cerca/);
+    // Barra di ricerca in basso con placeholder grigio "Cerca…", col fuoco già dentro.
+    expect(stato.cerca.centro).toBeTruthy();
+    expect(stato.cerca.segnaposto).toMatch(/Cerca/);
+    await expect.poll(async () => (await statoCronologia(app, page))?.cerca?.fuoco).toBe(true);
 
     // Filtro: digitando "ananas" resta solo la voce 7.
-    await input.fill('ananas');
-    await expect(page.locator('.sn-menu-history-item:visible')).toHaveCount(1);
-    await expect(page.locator('.sn-menu-history-item:visible')).toContainText('ananas');
+    await page.mouse.click(stato.cerca.centro.x, stato.cerca.centro.y);
+    await page.keyboard.type('ananas');
+    await expect.poll(() => testiCronologia(app, page)).toEqual([expect.stringContaining('ananas')]);
 
     // Svuotando la ricerca tornano tutte.
-    await input.fill('');
-    await expect(page.locator('.sn-menu-history-item:visible')).toHaveCount(20);
+    await page.keyboard.press('Control+A');
+    await page.keyboard.press('Backspace');
+    await expect.poll(() => testiCronologia(app, page)).toHaveLength(20);
   } finally {
     try { await app.close(); } catch (_) {}
     rmSync(userData, { recursive: true, force: true });

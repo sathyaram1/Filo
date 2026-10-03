@@ -184,11 +184,19 @@
   }
 
   /**
-   * Fusa senza passare dall’owner perché era il lavoro locale di una pratica provata (#908):
-   * L5 ha girato solo per registrare i blocchi. PURA.
+   * Fusa senza passare dall’owner perché era il lavoro locale di una pratica provata (#908) o di un feedback che
+   * l’owner ha approvato come lavoro locale (#913): L5 ha girato solo per registrare i blocchi. PURA.
    */
   function isSkippedL5(r) {
     return !!(r && r.skippedL5 === true);
+  }
+
+  /** Perché quella fusione non ha chiesto: la prova del mittente, o il sì dell’owner a un feedback non suo. PURA. */
+  function skippedL5Hint(r) {
+    var dopo = ' I controlli hanno solo registrato cosa avrebbero fermato.';
+    if (!(r && r.localApproved === true)) return 'Pratica aperta da te o da una sessione locale, con la prova del mittente.' + dopo;
+    var by = String(r.preapprovedBy || '').trim().slice(0, 120);
+    return 'Feedback di un utente o di una routine, approvato come lavoro locale' + (by ? ' da ' + by : '') + '.' + dopo;
   }
 
   /** Un blocco, in una riga leggibile. PURA. Un blocco senza frase si NOMINA lo stesso. */
@@ -840,7 +848,8 @@
     host.appendChild(el('p', 'sn-mac-recent-title', 'Fuse senza chiedere'));
     var intro = el('p', 'sn-mac-preapproved-intro',
       'Lavori fermati dai controlli e fusi lo stesso. Quelli delle automazioni avevano sulla pratica il tuo «fondi senza chiedermelo»; '
-      + 'quelli locali venivano da una pratica tua, con la prova del mittente. Qui c’è tutto quello che era stato segnalato.');
+      + 'quelli locali venivano da una pratica tua con la prova del mittente, o da un feedback che hai approvato come lavoro locale. '
+      + 'Qui c’è tutto quello che era stato segnalato.');
     host.appendChild(intro);
     var ul = el('ul', 'sn-mac-preapproved');
     for (var i = 0; i < list.length; i++) {
@@ -861,7 +870,7 @@
       sha.title = 'Il commit esaminato: ' + String(r.sha || '') + (r.mergeSha ? '\nIl commit di fusione: ' + String(r.mergeSha) : '');
       head.appendChild(sha);
       var who = el('span', 'sn-mac-recent-who', isSkippedL5(r) ? 'lavoro locale: L5 saltato' : preapprovedBy(r));
-      if (isSkippedL5(r)) who.title = 'Pratica aperta da te o da una sessione locale, con la prova del mittente. I controlli hanno solo registrato cosa avrebbero fermato.';
+      if (isSkippedL5(r)) who.title = skippedL5Hint(r);
       else if (r.preapprovedAt) who.title = preapprovedWhenText(r.preapprovedAt);
       head.appendChild(who);
       head.appendChild(el('span', 'sn-mac-recent-when', mergedWhenText(r.decidedAtMs || r.createdAtMs, now)));
@@ -909,6 +918,7 @@
     originLabel: originLabel,
     originHint: originHint,
     isSkippedL5: isSkippedL5,
+    skippedL5Hint: skippedL5Hint,
     howToRetry: howToRetry,
     blockLabel: blockLabel,
     blockItems: blockItems,

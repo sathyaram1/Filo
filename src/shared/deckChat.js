@@ -58,8 +58,13 @@
     if (reply) out.reply = reply;
     // «Svuota la chat» chiesto a parole: la bolla tiene il suo tasto, così la richiesta sopravvive ad Annulla e ai cambi di mazzo.
     if (m.clearChat === true) out.clearChat = true;
+    // Turno andato solo in parte: il tasto Riprova resta anche riaprendo la chat.
+    if (m.retryable === true) out.retryable = true;
     const cardIds = idList(m.cardIds);
     if (cardIds.length) out.cardIds = cardIds;
+    // Le righe che il giudice non ha potuto guardare restano segnate anche riaprendo la chat (#382).
+    const unchecked = idList(m.uncheckedIds).filter((id) => cardIds.includes(id));
+    if (unchecked.length) out.uncheckedIds = unchecked;
     const query = str(m.query);
     if (query) out.query = query;
     const qty = qtyMap(m.importQty);

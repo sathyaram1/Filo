@@ -109,6 +109,20 @@
     return C.fuoriPerimetro(p, a && a._perimetro);
   }
 
+  // Cosa fa un comando, a parole (#892): la scrive il modello e apre bottone e
+  // popup, sopra il comando vero. È solo testo, il livello non la legge mai.
+  // Via i caratteri invisibili o che rigirano il testo; il tetto si vede (…).
+  const SPIEGAZIONE_MAX = 300;
+  function spiegazioneComando(a) {
+    const v = a && (a.spiegazione ?? a.descrizione);
+    let t = (typeof v === 'string' ? v : '')
+      .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]+/g, ' ')
+      .replace(/\s+/g, ' ').trim();
+    const segni = Array.from(t);
+    if (segni.length > SPIEGAZIONE_MAX) t = `${segni.slice(0, SPIEGAZIONE_MAX - 1).join('').trimEnd()}…`;
+    return t || 'Uso il terminale del computer';
+  }
+
   const REGISTRY = {
     NAVIGA: {
       // Aprire un link è di norma innocuo → livello 1, diretto. ECCEZIONE
@@ -305,15 +319,24 @@
       level: 1,
       describe: (a) => `Creare l'evento "${a.title || a.titolo || ''}"`,
     },
+    // La prima riga di describe è quella che il diario mostra mentre si aspetta il clic.
     PULISCI_TAB: {
       level: 2,
-      describe: () => 'Valutare le schede aperte e archiviare quelle non più utili. '
+      describe: () => 'Riordinare le schede e archiviare quelle non più utili.\n'
         + 'Le schede archiviate restano riapribili da “Tab archiviate”.',
+      describeDone: (a) => {
+        const n = Number(a && a._output && a._output.archived) || 0;
+        return n ? `Schede riordinate: archiviate ${n} non più utili` : 'Schede riordinate: nessuna da archiviare';
+      },
     },
     CANCELLA_ARCHIVIO: {
       level: 3,
-      describe: (a) => `Eliminare DEFINITIVAMENTE dall'archivio le schede pertinenti a `
-        + `“${a.query || a.testo || ''}”.`,
+      describe: (a) => `Eliminare dall'archivio le schede su “${a.query || a.testo || ''}”.\n`
+        + 'Vengono eliminate DEFINITIVAMENTE: non si possono recuperare.',
+      describeDone: (a) => {
+        const n = Number(a && a._output && a._output.eliminate) || 0;
+        return `Eliminate DEFINITIVAMENTE dall'archivio ${n} ${n === 1 ? 'scheda' : 'schede'} su “${a.query || a.testo || ''}”`;
+      },
     },
     CANCELLA_MEMORIA: {
       // Cancella tutti i moduli di memoria di Filo (PROFILO, PREFERENZE, espansioni)
@@ -416,7 +439,7 @@
         const C = global.SN_CMD_CLASSIFY;
         let perche = '';
         try { perche = (cmd && C && C.classifyDetail) ? C.classifyDetail(cmd, a._perimetro).motivo : ''; } catch (_) {}
-        return `Eseguire nel terminale:\n${cmd || '(comando vuoto)'}`
+        return `${spiegazioneComando(a)}\n\nIl comando, nel terminale:\n${cmd || '(comando vuoto)'}`
           + (cwd ? `\nCartella di lavoro: ${cwd}` : '')
           + (perche ? `\nPerché te lo chiedo: ${perche}` : '');
       },
@@ -533,5 +556,5 @@
     try { return (entry.describeDone ? entry.describeDone(action) : entry.describe(action)) || ''; } catch (_) { return ''; }
   }
 
-  global.SN_ACTION_LEVELS = { REGISTRY, levelFor, describe, describeDone };
+  global.SN_ACTION_LEVELS = { REGISTRY, levelFor, describe, describeDone, spiegazioneComando };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

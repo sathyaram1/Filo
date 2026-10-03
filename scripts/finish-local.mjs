@@ -68,7 +68,10 @@ import { fileURLToPath } from 'node:url';
 import { verdictForCurrentBranch, readState } from './verify-local.mjs';
 import { askServerMerge, messageForOwnerMerge, exitCodeForOwnerMerge } from './lib/owner-merge.mjs';
 import { preparaLancioElectron } from './lib/schermo-virtuale.mjs';
+import { lottiPerRigaDiComando } from './lib/riga-di-comando.mjs';
 import { readMarker } from './lib/routine-role.mjs';
+import { partiServerInSospeso } from './lib/parti-lavoro.mjs';
+import { cartellaDelServer } from './server-fondi-pratica.mjs';
 import mergeApprovalSignal from '../src/main/services/mergeApprovalSignal.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -437,23 +440,8 @@ export function specDaRilanciare({ checkOnly, ok, sha, tollerato }) {
   };
 }
 
-/**
- * Spezza l'elenco degli spec in lotti che stanno in UNA riga di comando. PURA.
- * Su Windows la riga ha un tetto di ~8.000 caratteri: con tutto `src` toccato
- * gli spec mirati sono stati 245 e il lancio moriva con «riga troppo lunga»
- * prima ancora di partire. Ogni lotto è un `npx playwright test …` a sé.
- */
-export function lottiPerRigaDiComando(specs, maxChars = 6000) {
-  const lotti = [];
-  let corrente = [], lunghezza = 0;
-  for (const s of specs) {
-    const pezzo = s.length + 1;
-    if (corrente.length && lunghezza + pezzo > maxChars) { lotti.push(corrente); corrente = []; lunghezza = 0; }
-    corrente.push(s); lunghezza += pezzo;
-  }
-  if (corrente.length) lotti.push(corrente);
-  return lotti;
-}
+// Con tutto `src` toccato gli spec mirati sono stati 245: in una riga sola `npx` (cmd.exe) moriva prima di partire.
+export { lottiPerRigaDiComando };
 
 /** Lancia gli spec a lotti (vedi lottiPerRigaDiComando); tutti i lotti girano, l'esito è l'AND. */
 function runSpecsALotti(specs, label) {
@@ -541,7 +529,9 @@ async function main() {
     '                       (con npm: `npm run finish -- --check`, oppure `npm run finish:check`)',
     '  --feedback <N>       la pratica di questo lavoro (numero o id): senza, quella scritta da',
     '                       verify-local start --feedback. Senza nessuna delle due non si chiude.',
-    '                       Un lavoro locale provato non aspetta il sì',
+    '                       Un lavoro locale provato, o approvato da te, non aspetta il sì.',
+    '                       Su un feedback di un utente la frase per lui la scrive la sessione:',
+    '                       npm run feedback -- <N> --frase "…" (vale anche a pratica chiusa)',
     '  --help               questa schermata',
   ].join('\n');
   if (argv.includes('--help') || argv.includes('-h')) { console.log(AIUTO); return; }
@@ -656,9 +646,7 @@ async function main() {
       process.exit(1);
     }
     // 2. Spec mirati alle aree toccate. La suite completa gira SOLO in GitHub
-    //    Actions, nel lavoro di release, ogni sei ore prima di pubblicare
-    //    (dal 2026-09-15: nessun ruolo e nessuna sessione la lancia): qui
-    //    serve il segnale rapido.
+    //    Actions, a ogni fusione su main: qui serve il segnale rapido.
     if (blocking.length) {
       if (!runSpecsALotti(blocking, `Spec delle aree toccate (${blocking.length})`)) {
         console.error('\n✗ Spec rossi: non pubblico. Sistema e rilancia.');
@@ -758,7 +746,10 @@ async function main() {
   process.stdout.write('\n▸ Chiedo al server di fondere\n');
   if (pratica && pratica.id) console.log(`  pratica ${pratica.seq ? `#${pratica.seq}` : pratica.id}`);
   else console.log('  nessuna pratica collegata: se i controlli fermano, la fusione aspetta il tuo sì');
-  const reply = await askServerMerge({ branch, sha: cur, feedbackId: pratica ? pratica.id : '' });
+  // La parte del server dello stesso lavoro (ramo con lo stesso nome) non ancora su main tiene aperta la pratica (#915).
+  const pendingParts = pratica && pratica.id ? partiServerInSospeso(branch, { cartellaServer: cartellaDelServer(ROOT) }) : [];
+  for (const p of pendingParts) console.log(`  parte del server non ancora su main: ${p.branch} (la pratica resta aperta per lei)`);
+  const reply = await askServerMerge({ branch, sha: cur, feedbackId: pratica ? pratica.id : '', pendingParts });
   // Il server ha aperto una richiesta: suona il campanello, così una finestra
   // di Filo GIÀ APERTA se ne accorge da sola. Non è un permesso in più — non
   // crea niente e non approva niente, fa solo rileggere l'elenco vero — ed è
@@ -769,6 +760,11 @@ async function main() {
   const message = messageForOwnerMerge(reply, branch, { feedbackId: pratica ? pratica.id : '', feedbackNum: pratica ? pratica.seq : '' });
   if (code === 0) console.log(`\n${message}`);
   else console.error(`\n${message}`);
+  if (pratica && pratica.id) {
+    const { fraseDaScrivere } = await import('./owner-feedback.mjs');
+    const frase = await fraseDaScrivere(pratica.id, pratica.seq ? `#${pratica.seq}` : pratica.id);
+    if (frase) console.log(`\n${frase}`);
+  }
   process.exit(code);
 }
 

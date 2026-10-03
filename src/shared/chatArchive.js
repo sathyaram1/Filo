@@ -346,11 +346,24 @@
     const text = String(turn.text == null ? '' : turn.text);
     const out = { role, text, ts: turn.ts || new Date().toISOString() };
     if (Array.isArray(turn.actions) && turn.actions.length) {
+      // Un'azione fermata perché portava fuori un segreto resta fermata (#810): riaperta, la chat non la dà per fatta.
       out.actions = turn.actions
-        .map((a) => (a && a.type ? String(a.type) : ''))
+        .map((a) => (a && a.type ? (a._output && a._output.blocked === 'segreto' ? 'FERMATA' : String(a.type)) : ''))
         .filter(Boolean);
     }
     if (turn.images) out.images = Number(turn.images) || 0;
+    // Un messaggio partito da un suggerimento della home l'ha scritto un modello: riaperta, non è voce dell'utente (#810).
+    if (role === 'user' && turn.daModello) out.daModello = true;
+    // Da dove venivano i segreti che una frase di Filo ripete, o il testo stesso se l'ha scritto un comando (#810):
+    // riaperta, la chat li tratta ancora da letti. Regole: src/shared/urlExfil.js (lettiNelTesto).
+    if (role === 'filo') {
+      const letti = (Array.isArray(turn.letti) ? turn.letti : [])
+        .filter((x) => x && typeof x.valore === 'string' && x.valore)
+        .slice(0, 200)
+        .map((x) => ({ valore: x.valore.slice(0, 200), regola: String(x.regola || 'codice'), fonte: String(x.fonte || 'da fuori').slice(0, 120) }));
+      if (letti.length) out.letti = letti;
+      if (typeof turn.esterno === 'string' && turn.esterno.trim()) out.esterno = turn.esterno.trim().slice(0, 120);
+    }
     return out;
   }
 

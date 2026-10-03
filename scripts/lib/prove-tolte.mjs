@@ -84,6 +84,27 @@ export function baseDelConfronto(shaCritica, shaPulizia, root) {
   } catch (_) { return critica; }
 }
 
+// Il sigillo che il rilascio del verificatore lascia sulla punta del ramo.
+export const SIGILLO_VERIFICATORE = 'release:verifier';
+
+/**
+ * Dopo un «pass» la pulizia non si registra: la sigilla il rilascio di chi ha verificato. È il SUO punto fermo più
+ * recente che discende dalla critica e da lei ha solo tolto prove del giro, o ''. Il sigillo di un altro ruolo
+ * (chi riallinea che rilascia dopo aver tolto una prova) non lo diventa mai (#880, #679).
+ */
+export function puliziaDelPass(shaCritica, punti, root) {
+  const critica = String(shaCritica || '');
+  if (!SHA.test(critica)) return '';
+  const shas = (Array.isArray(punti) ? punti : []).filter((p) => p && p.by === SIGILLO_VERIFICATORE)
+    .map((p) => String(p.sha || '')).filter((s) => SHA.test(s) && s !== critica);
+  for (const sha of [...new Set(shas.reverse())]) {
+    try { execFileSync('git', ['merge-base', '--is-ancestor', critica, sha], { cwd: root, stdio: 'ignore' }); } catch (_) { continue; }
+    const tol = soloProveTolte(diffDopoLaVerifica(critica, sha, root));
+    if (tol.ok && tol.files.length) return sha;
+  }
+  return '';
+}
+
 /**
  * Il commit della pulizia, fra la critica e HEAD: solo prove o casi TOLTI, tutti da una cartella del
  * giro (`cartella`, o una sola se non la si sa). Stessa regola di «dopo un verdetto si può solo togliere».

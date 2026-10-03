@@ -18,10 +18,12 @@ const PAGINA = `<!doctype html><html><head><meta charset="utf-8"><title>zoom</ti
 // Esegue un'azione Filo nel main COL MITTENTE, come fa la chat della home:
 // senza, l'azione ripiegherebbe sulla prima finestra e la prova resterebbe
 // verde anche se la strada vera fosse rotta (patterns/lo-stato-che-dura…).
+// Il mittente porta anche l'indirizzo della home, come quello vero di ipc.js:
+// un mittente senza indirizzo vale come un sito e lo zoom gli è negato.
 const execAction = (app, action) =>
   app.evaluate(({ BrowserWindow }, { action }) => {
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
-    return globalThis.SN_EXECUTE_FILO_ACTION(action, { sender: { win, wc: win.webContents } });
+    return globalThis.SN_EXECUTE_FILO_ACTION(action, { sender: { win, wc: win.webContents, url: 'filo://newtab/' } });
   }, { action });
 
 // La percentuale di zoom di UNA pagina precisa: le schede del test stanno tutte

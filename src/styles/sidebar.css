@@ -179,6 +179,11 @@
   white-space: normal;
   overflow-wrap: anywhere;
 }
+/* Un'azione fermata (#810): la riga dice anche da dove veniva il segreto, quindi va a capo. */
+.sn-sidebar-log.sn-sidebar-log-fermata {
+  white-space: normal;
+  opacity: 0.9;
+}
 
 /* Stato collassato: visibile solo la barra di input. Il pannello si rimpicciolisce
    verso l'alto (height:auto), restando ancorato al bottom: l'input resta dov'era. */

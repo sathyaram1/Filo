@@ -199,8 +199,8 @@ test.describe('colorazione comandi', () => {
         }
       }
     });
-    // La modalità terminale è attiva quando il placeholder cita la shell.
-    await expect(input).toHaveAttribute('placeholder', /comando per la shell/, { timeout: 8_000 });
+    // Il segnaposto non cita la shell finché nella chat non gira un comando (#892): si chiede al modulo.
+    await expect.poll(() => page.evaluate(() => window.SN_DASH_TERMINALE.isEnabled()), { timeout: 8_000 }).toBe(true);
 
     // Comando inesistente → rosso (dopo il controllo "esiste?" con debounce).
     await input.fill('/gargargus');
@@ -357,7 +357,7 @@ test.describe('focus dopo invio comando', () => {
     const page = await newtabPage();
     await expect(page.locator('#input')).toBeVisible({ timeout: 8_000 });
     await setTerminal(page, true);
-    await expect(page.locator('#dashDir')).toBeVisible({ timeout: 8_000 });
+    await expect.poll(() => page.evaluate(() => window.SN_DASH_TERMINALE.isEnabled()), { timeout: 8_000 }).toBe(true);
 
     // Invio reale: clicca la barra, scrivi, premi Enter.
     await page.locator('#input').click();
@@ -506,7 +506,7 @@ test.describe('comandi extra (timer/incognito/no-flicker)', () => {
         }
       }
     });
-    await expect(input).toHaveAttribute('placeholder', /comando per la shell/, { timeout: 8_000 });
+    await expect.poll(() => page.evaluate(() => window.SN_DASH_TERMINALE.isEnabled()), { timeout: 8_000 }).toBe(true);
 
     // Digita un comando non ancora verificato e leggi la classe SUBITO dopo il
     // gestore 'input' (sincrono), PRIMA che parta il controllo "esiste?" con

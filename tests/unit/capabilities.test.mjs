@@ -49,17 +49,40 @@ test('gli id sono unici e stabili (kebab-case)', () => {
 });
 
 test('index() è compatto, get()/byCategory()/all() coerenti', () => {
-  const idx = CAP.index();
+  const tutti = { redteam: true };
+  const idx = CAP.index(tutti);
   assert.equal(idx.length, CAP.CAPABILITIES.length);
   for (const e of idx) {
     assert.deepEqual(Object.keys(e).sort(), ['category', 'id', 'title']);
-    assert.ok(CAP.get(e.id), `get(${e.id}) deve risolvere`);
+    assert.ok(CAP.get(e.id, tutti), `get(${e.id}) deve risolvere`);
   }
-  assert.equal(CAP.get('id-inesistente'), undefined);
-  assert.equal(CAP.all().length, CAP.CAPABILITIES.length);
+  assert.equal(CAP.get('id-inesistente', tutti), undefined);
+  assert.equal(CAP.all(tutti).length, CAP.CAPABILITIES.length);
   // all() torna una copia: mutarla non tocca l'originale.
-  CAP.all().pop();
-  assert.equal(CAP.all().length, CAP.CAPABILITIES.length);
+  CAP.all(tutti).pop();
+  assert.equal(CAP.all(tutti).length, CAP.CAPABILITIES.length);
+});
+
+test('#896 — il Red Team in pausa non esiste per l’agente: né voce, né accenno nelle altre', () => {
+  const chiuso = { redteam: false };
+  for (const aperti of [undefined, chiuso]) {
+    assert.equal(CAP.get('red-team', aperti), undefined);
+    assert.ok(!CAP.index(aperti).some((c) => c.id === 'red-team'));
+    assert.ok(!CAP.all(aperti).some((c) => c.id === 'red-team'));
+    assert.ok(!CAP.byCategory('pages', aperti).some((c) => c.id === 'red-team'));
+    const idx = CAP.renderIndexForPrompt(aperti);
+    assert.doesNotMatch(idx, /red.?team/i, 'l’indice per il prompt parla ancora del Red Team');
+    assert.match(CAP.renderDetailForPrompt(['red-team'], aperti), /nessuna capacità con questo id/i);
+    // Le voci che restano non lo nominano: l'agente lo racconterebbe lo stesso.
+    for (const c of CAP.all(aperti)) {
+      assert.doesNotMatch(`${c.title} ${c.desc} ${c.invoke} ${c.doesNot || ''}`, /red.?team|filo:\/\/redteam/i,
+        `la voce "${c.id}" nomina il Red Team anche a chi non lo vede`);
+    }
+  }
+  const aperto = { redteam: true };
+  assert.ok(CAP.get('red-team', aperto));
+  assert.match(CAP.renderIndexForPrompt(aperto), /Red Team \[red-team\]/);
+  assert.match(CAP.renderDetailForPrompt(['red-team'], aperto), /filo:\/\/redteam\/redteam\.html/);
 });
 
 // ── Anti-stale: incrocio col codice reale ────────────────────────────────────
@@ -114,6 +137,8 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     FILO_GENERATE_DASHBOARD: 'generate-dashboard',
     FILO_RUN_ACTION: 'agent-actions',
     FILO_CONFIRM_ACTION: 'agent-actions',
+    // #810 — un indirizzo proposto da un modello si apre col clic solo dopo la porta delle uscite.
+    FILO_APRI_PROPOSTA: 'agent-actions',
     FILO_GET_MEMORY: 'filo-memory',
     // #592 — la memoria riga per riga nelle Preferenze: rileggerla e toglierne una.
     FILO_MEMORY_VIEW: 'filo-memory',

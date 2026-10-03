@@ -213,7 +213,7 @@ test('#509 — Gestione offre su ogni segnalazione le azioni del suo stato', asy
     expect(azioni[item._id].length, `azioni su ${item.name}`).toBeGreaterThan(0);
   }
 
-  expect(azioni.z4).toEqual(['→ In coda', 'Conferma attacco', 'Conferma spam', 'Archivia']);
+  expect(azioni.z4).toEqual(['→ In coda', '💻 Lavoro locale', 'Conferma attacco', 'Conferma spam', 'Archivia']);
   expect(azioni.z6).toEqual(['Archivia', 'Riapri']);
   for (const id of ['z7', 'z8', 'z9', 'zA', 'zB']) {
     expect(azioni[id], `archiviata ${id}: solo il ripristino`).toEqual(['↩ Ripristina']);

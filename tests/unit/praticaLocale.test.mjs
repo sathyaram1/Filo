@@ -66,6 +66,19 @@ test('avvisoDaCampi: dice cosa manca perché L5 si salti, e tace se non manca ni
   assert.match(avvisoDaCampi({ ...pieno, senderProof: undefined }), /prova del mittente/);
   assert.match(avvisoDaCampi({ ...pieno, localOnly: undefined }), /solo in locale/);
   assert.match(avvisoDaCampi({ ...pieno, statusPublic: { stringValue: 'closed' } }), /chiusa/);
+  // Chiusa dalla parte del server dello stesso lavoro da poco: per l'app vale ancora, e si dice fino a quando (#915).
+  const ora = Date.parse('2026-10-03T10:00:00Z');
+  const valore = (v) => (typeof v === 'string' ? { stringValue: v } : { integerValue: String(v) });
+  const parti = (m) => ({ localMerges: { mapValue: { fields: Object.fromEntries(Object.entries(m).map(([k, v]) => [k, valore(v)])) } } });
+  const chiusa = { ...pieno, statusPublic: { stringValue: 'closed' } };
+  const tardiva = avvisoDaCampi({ ...chiusa, ...parti({ server: ora - 3600e3, ramo: 'claude/lavoro' }) }, ora);
+  assert.match(tardiva, /solo dal ramo con lo stesso nome, fino a 2026-10-05T09:00:00\.000Z/);
+  assert.match(tardiva, /claude\/lavoro/);
+  assert.doesNotMatch(tardiva, /manca/);
+  // Senza il ramo che l'ha chiusa non si sa di quale lavoro è: vale come chiusa.
+  assert.match(avvisoDaCampi({ ...chiusa, ...parti({ server: ora - 3600e3 }) }, ora), /una pratica aperta/);
+  assert.match(avvisoDaCampi({ ...chiusa, ...parti({ server: ora - 49 * 3600e3 }) }, ora), /una pratica aperta/);
+  assert.match(avvisoDaCampi({ ...chiusa, ...parti({ server: ora, app: ora }) }, ora), /una pratica aperta/);
 });
 
 test('verify-local start: la pratica resta legata al ramo finché non se ne indica un’altra', () => {

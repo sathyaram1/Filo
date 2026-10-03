@@ -1093,9 +1093,12 @@
     copyToClipboard(href);
   }
 
+  function searchUrlFor(text) {
+    return `https://www.google.com/search?q=${encodeURIComponent((text || '').slice(0, 500))}`;
+  }
+
   function searchTextOnWeb(text) {
-    const q = encodeURIComponent((text || '').slice(0, 500));
-    window.open(`https://www.google.com/search?q=${q}`, '_blank', 'noopener');
+    window.open(searchUrlFor(text), '_blank', 'noopener');
   }
 
   // ------------------------------------------------------------
@@ -1320,12 +1323,15 @@
     return items;
   }
 
+  // Lens-style reverse search (più affidabile di searchbyimage)
+  function imageSearchUrlFor(imgEl) {
+    const src = imgEl && (imgEl.currentSrc || imgEl.src);
+    return src ? `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(src)}` : '';
+  }
+
   function searchImageOnWeb(imgEl) {
-    const src = imgEl.currentSrc || imgEl.src;
-    if (!src) return;
-    const q = encodeURIComponent(src);
-    // Lens-style reverse search (più affidabile di searchbyimage)
-    window.open(`https://lens.google.com/uploadbyurl?url=${q}`, '_blank', 'noopener');
+    const url = imageSearchUrlFor(imgEl);
+    if (url) window.open(url, '_blank', 'noopener');
   }
 
   // ------------------------------------------------------------
@@ -1887,7 +1893,9 @@
     shareCurrentPage,
     shareLink,
     searchTextOnWeb,
+    searchUrlFor,
     searchImageOnWeb,
+    imageSearchUrlFor,
     // video / audio
     buildMediaItems,
     buildMediaSpeedItem,

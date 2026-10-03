@@ -69,6 +69,15 @@ export const PASSI = {
 };
 
 /**
+ * Le chiavi dell'allarme: `piattaforma:mac` o `piattaforma:linux`. Un guasto
+ * della stessa metà con un feedback ancora aperto non ne apre un altro. PURA.
+ */
+export function chiaviAllarme(piattaforma) {
+  const nome = String(piattaforma || '').trim().toLowerCase();
+  return [nome ? `piattaforma:${nome}` : 'piattaforma'];
+}
+
+/**
  * L'id del primo passo fallito, letto da `toJSON(steps)` di Actions (che li
  * elenca nell'ordine in cui sono girati). Stringa vuota se non si capisce
  * quale sia: l'allarme parte lo stesso, dirlo è meglio che tacere. PURA.
@@ -218,7 +227,7 @@ async function main() {
     mancanti: process.env.MANCANTI,
     esiti,
   });
-  await inviaAllarme(titolo, testo);
+  await inviaAllarme(titolo, testo, chiaviAllarme(process.env.PIATTAFORMA));
 }
 
 // Il workflow lancia una COPIA di questo file, fuori dalla copia di lavoro: se

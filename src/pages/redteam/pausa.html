@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <title>Filo — Red Team</title>
+  <link rel="icon" href="filo://asset/icons/icon-32.png" />
+  <link rel="stylesheet" href="filo://style/theme.css" />
+  <link rel="stylesheet" href="filo://style/pages.css" />
+  <script src="filo://shared/themeTokens.js"></script>
+  <script src="filo://shared/pageBootstrap.js"></script>
+  <!-- La frase è quella del server (redteamGate.FRASE_PAUSA): una sentinella le tiene uguali. -->
+  <style>
+    html, body { height: 100%; margin: 0; }
+    body { background: var(--sn-bg); color: var(--sn-fg); }
+    .rt-pausa {
+      min-height: calc(100vh / var(--sn-zoom, 1));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      box-sizing: border-box;
+    }
+    .rt-pausa p {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.5;
+      color: var(--sn-muted);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <main class="rt-pausa" id="rtPausa">
+    <p>Il Red Team è in pausa: tornerà dopo il rilascio</p>
+  </main>
+</body>
+</html>

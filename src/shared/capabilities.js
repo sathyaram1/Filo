@@ -19,6 +19,7 @@
 //     desc:     'Cosa fa, in termini utente. Niente nomi di file/funzioni.',
 //     invoke:   'Come si attiva (shortcut / voce di menu / pagina).',
 //     doesNot:  'Confine: cosa NON fa (opzionale, ma prezioso per F4).',
+//     cancello: 'redteam',              // opzionale: la voce esiste solo per chi ha quel cancello aperto
 //   }
 //
 // `desc`/`invoke`/`doesNot` sono per l'utente finale, non tecnici.
@@ -181,7 +182,7 @@
     },
     {
       id: 'deck-builder', title: 'Deck builder MTG (Commander)', category: 'writing',
-      desc: 'Costruttore di mazzi Commander salvati sul tuo computer: libreria dei mazzi, banco di lavoro a tre colonne regolabili, elenco carte con simboli di mana raggruppato per tipo/tag/costo/colore, commander con avvisi di legalità (doppioni, colori, carte bandite); se il mazzo non ha ancora un nome tuo, impostare il commander gli dà automaticamente il nome del commander (e lo aggiorna se cambi commander); puoi anche rimuovere il commander e tornare a «Nessun commander» (dal menu del mazzo o col tasto destro sulla riga del commander), e la carta che avevi scelto rientra nel mazzo. Nel banco di lavoro c\'è la chat con Filo, una per mazzo e salvata sul tuo computer: ricaricando la pagina o riavviando Filo ritrovi la conversazione com\'era (liste di carte, ragionamento, nomi citati) e puoi continuarla; se una risposta era a metà quando hai chiuso la ritrovi segnata come interrotta, con «Riprova»; per ripartire da zero la svuoti (con conferma) dalla gomma in cima alla chat, col tasto destro sulla sua intestazione, dal menu del mazzo o chiedendolo a Filo in chat (la sua risposta tiene il tasto «Svuota la chat…», che resta lì se annulli o cambi mazzo), e la chat se ne va anche eliminando il mazzo (la copia di un mazzo parte con la chat vuota). Nella chat cerchi carte con una query secca o una frase in linguaggio naturale (risultati già filtrati sui colori del commander, con tasto per aggiungerle al mazzo); se dici a parole che vuoi costruire attorno a un commander (o qual è il commander del mazzo) e il mazzo non ne ha ancora uno, Filo lo imposta da solo e da lì filtra le ricerche sui suoi colori (un commander già impostato non viene toccato) — per le ricerche "a parole" che descrivono un effetto o un tema Filo getta una rete ampia (sinonimi e formulazioni diverse) e poi passa i risultati al setaccio tenendo solo le carte che rispettano davvero la richiesta, riusando i giudizi già dati per le ricerche ripetute; chiedi pareri o peschi carte da un altro tuo mazzo; mentre Filo pensa il suo ragionamento scorre in diretta nella bolla e resta poi consultabile in un blocco "Ragionamento" apribile e richiudibile con un click, e se una ricerca viene rifiutata dall\'archivio carte Filo la corregge e riprova da solo (o spiega il problema in chiaro). Passando il mouse su una carta (nei risultati, nel mazzo o nei nomi citati in chat) il pannello destro mostra l\'anteprima con immagine, prezzo e tag (le carte bifronte hanno un tasto per girarle e vedere il retro, o basta cliccare la carta); cliccandola si apre il carosello per valutare le carte una a una con la tastiera (frecce per scorrere, Invio per aggiungere/rimuovere, Esc per chiudere) — cliccando un nome citato nel testo il carosello sfoglia tutte le carte nominate in quel messaggio, e la carta mostrata è evidenziata nel testo e negli elenchi. Sotto l\'anteprima (e nel carosello) c\'è un riquadro modulare: col tasto destro scegli cosa mostra — dati della carta, mini curva di mana con evidenziato dove cadrebbe la carta, prezzo con ristampe e legalità, oppure il parere di Filo sulla carta rispetto al tuo mazzo (calcolato quando serve e ricordato; se poi modifichi il mazzo il parere resta visibile con un pallino "da aggiornare" e un tasto per rigenerarlo). In chat puoi chiedere "valuta il mazzo" per avere una sintesi e il parere pronto su tutte le carte, e "tagga il mazzo con ramp, draw, removal" per far assegnare i tag a Filo carta per carta (i giudizi già dati vengono ricordati anche per gli altri mazzi); i tag alimentano raggruppamento, calcolatore di probabilità e richieste tipo "il ramp di mazzo X". Puoi anche trascinare una carta dell\'elenco su una categoria per spostarla: raggruppato per tag, rilasciarla su un tag chiede se aggiungerlo a quelli già presenti o sostituirli tutti (nessuna domanda quando non c\'è scelta da fare), e "Senza tag" toglie tutti i tag; nelle viste per tipo/costo/colore il trascinamento sposta la carta nel gruppo scelto. A riposo il pannello destro mostra le statistiche del mazzo: curva di mana con costo medio, mana richiesto e prodotto per colore, composizione per tipo con totale su 100, check di legalità, budget in euro (tetto impostabile dal menu del mazzo o in chat con "budget 40 euro", con totale e residuo sempre visibili) e un calcolatore di probabilità di pescata (per tag e turno, dal pannello o chiedendo in chat "che probabilità ho di avere 2 ramp e 3 terre al turno 10?"); nel pannello la stima si aggiorna da sola appena cambi turno, categorie o mazzo, raffinandosi fino a convergere senza bisogno di ricalcolare a mano. Puoi anche importare/esportare un mazzo come lista di testo (formato "1 Sol Ring" per riga, quello di Moxfield/Archidekt) dal menu del mazzo: l\'import mostra sempre un\'anteprima di conferma con le carte riconosciute (e segnala quelle che non ha capito) prima di scrivere qualunque cosa; l\'export genera lo stesso formato, pronto da copiare. In alternativa puoi incollare la lista direttamente in chat, anche scritta male o con nomi in italiano: Filo la interpreta, propone l\'elenco da confermare carta per carta o tutto insieme, e risolve i nomi su Scryfall prima di aggiungerli.',
+      desc: 'Costruttore di mazzi Commander salvati sul tuo computer: libreria dei mazzi, banco di lavoro a tre colonne regolabili, elenco carte con simboli di mana raggruppato per tipo/tag/costo/colore, commander con avvisi di legalità (doppioni, colori, carte bandite); se il mazzo non ha ancora un nome tuo, impostare il commander gli dà automaticamente il nome del commander (e lo aggiorna se cambi commander); puoi anche rimuovere il commander e tornare a «Nessun commander» (dal menu del mazzo o col tasto destro sulla riga del commander), e la carta che avevi scelto rientra nel mazzo. Nel banco di lavoro c\'è la chat con Filo, una per mazzo e salvata sul tuo computer: ricaricando la pagina o riavviando Filo ritrovi la conversazione com\'era (liste di carte, ragionamento, nomi citati) e puoi continuarla; se una risposta era a metà quando hai chiuso la ritrovi segnata come interrotta, con «Riprova»; per ripartire da zero la svuoti (con conferma) dalla gomma in cima alla chat, col tasto destro sulla sua intestazione, dal menu del mazzo o chiedendolo a Filo in chat (la sua risposta tiene il tasto «Svuota la chat…», che resta lì se annulli o cambi mazzo), e la chat se ne va anche eliminando il mazzo (la copia di un mazzo parte con la chat vuota). Nella chat cerchi carte con una query secca o una frase in linguaggio naturale (risultati già filtrati sui colori del commander, con tasto per aggiungerle al mazzo); se dici a parole che vuoi costruire attorno a un commander (o qual è il commander del mazzo) e il mazzo non ne ha ancora uno, Filo lo imposta da solo e da lì filtra le ricerche sui suoi colori (un commander già impostato non viene toccato) — per le ricerche "a parole" Filo getta una rete ampia (sinonimi e formulazioni diverse) e poi controlla i risultati uno per uno, anche oltre la prima pagina di Scryfall (fino a circa mille carte; se ne trova di più lo dice col numero e suggerisce un vincolo in più), mostrando solo le carte che rispettano davvero la richiesta (una carta che ha haste non passa per una che la dà; il controllo sa qual è il commander del mazzo, vede prezzo, forza e costituzione, e se il modello non riassume la richiesta tiene conto di quelle di prima); mentre controlla la bolla mostra a che punto è; se nessuna va bene lo dice, e lo dice anche quando Scryfall non trova niente; una pagina di risultati che non risponde la riprova da solo, e se ancora non risponde lo scrive, con Riprova per le carte mancanti; se il servizio AI risponde che ha troppe richieste aspetta e manda meno controlli insieme; se il controllo non riesce lo dice e mostra la ricerca senza filtro, e le carte che non ha potuto controllare restano segnate con un punto interrogativo, anche riaprendo la chat; una risposta riuscita solo in parte (carte non controllate, ricerca che l\'archivio non ha accettato) ha il tasto Riprova, che rifà lo stesso turno; riusa i giudizi già dati per le ricerche ripetute, finché non cambi il modello del filtro o non cambiano i dati della carta, come il prezzo (una query scritta tutta in sintassi Scryfall non passa mai dal controllo, nemmeno se il modello ci aggiunge un criterio, perché è già esatta, e se trova più di una pagina di carte lo dice); chiedi pareri o peschi carte da un altro tuo mazzo; mentre Filo pensa il suo ragionamento scorre in diretta nella bolla e resta poi consultabile in un blocco "Ragionamento" apribile e richiudibile con un click, e se una ricerca viene rifiutata dall\'archivio carte Filo la corregge e riprova da solo (o spiega il problema in chiaro). Passando il mouse su una carta (nei risultati, nel mazzo o nei nomi citati in chat) il pannello destro mostra l\'anteprima con immagine, prezzo e tag (le carte bifronte hanno un tasto per girarle e vedere il retro, o basta cliccare la carta); cliccandola si apre il carosello per valutare le carte una a una con la tastiera (frecce per scorrere, Invio per aggiungere/rimuovere, Esc per chiudere) — cliccando un nome citato nel testo il carosello sfoglia tutte le carte nominate in quel messaggio, e la carta mostrata è evidenziata nel testo e negli elenchi. Sotto l\'anteprima (e nel carosello) c\'è un riquadro modulare: col tasto destro scegli cosa mostra — dati della carta, mini curva di mana con evidenziato dove cadrebbe la carta, prezzo con ristampe e legalità, oppure il parere di Filo sulla carta rispetto al tuo mazzo (calcolato quando serve e ricordato; se poi modifichi il mazzo il parere resta visibile con un pallino "da aggiornare" e un tasto per rigenerarlo). In chat puoi chiedere "valuta il mazzo" per avere una sintesi e il parere pronto su tutte le carte, e "tagga il mazzo con ramp, draw, removal" per far assegnare i tag a Filo carta per carta (i giudizi già dati vengono ricordati anche per gli altri mazzi); i tag alimentano raggruppamento, calcolatore di probabilità e richieste tipo "il ramp di mazzo X". Puoi anche trascinare una carta dell\'elenco su una categoria per spostarla: raggruppato per tag, rilasciarla su un tag chiede se aggiungerlo a quelli già presenti o sostituirli tutti (nessuna domanda quando non c\'è scelta da fare), e "Senza tag" toglie tutti i tag; nelle viste per tipo/costo/colore il trascinamento sposta la carta nel gruppo scelto. A riposo il pannello destro mostra le statistiche del mazzo: curva di mana con costo medio, mana richiesto e prodotto per colore, composizione per tipo con totale su 100, check di legalità, budget in euro (tetto impostabile dal menu del mazzo o in chat con "budget 40 euro", con totale e residuo sempre visibili) e un calcolatore di probabilità di pescata (per tag e turno, dal pannello o chiedendo in chat "che probabilità ho di avere 2 ramp e 3 terre al turno 10?"); nel pannello la stima si aggiorna da sola appena cambi turno, categorie o mazzo, raffinandosi fino a convergere senza bisogno di ricalcolare a mano. Puoi anche importare/esportare un mazzo come lista di testo (formato "1 Sol Ring" per riga, quello di Moxfield/Archidekt) dal menu del mazzo: l\'import mostra sempre un\'anteprima di conferma con le carte riconosciute (e segnala quelle che non ha capito) prima di scrivere qualunque cosa; l\'export genera lo stesso formato, pronto da copiare. In alternativa puoi incollare la lista direttamente in chat, anche scritta male o con nomi in italiano: Filo la interpreta, propone l\'elenco da confermare carta per carta o tutto insieme, e risolve i nomi su Scryfall prima di aggiungerli.',
       invoke: 'Menu App → "Deck builder MTG", oppure filo://decks/decks.html. Tasto destro su carte e mazzi per le azioni; click sul nome del mazzo per gestirlo (include "Importa…"/"Esporta…"); la barra in basso a sinistra del banco di lavoro è la chat/ricerca (incolla lì una lista per l\'import via chat; la gomma in cima alla chat la svuota); click su una carta per sfogliarla nel carosello; trascina una carta dell\'elenco su un\'altra categoria per spostarla (o taggarla, in vista per tag); le statistiche sono nel pannello destro a riposo.',
       doesNot: 'Non gioca partite. L\'import non gestisce sideboard/maybeboard (vengono ignorati) né commander in coppia (partner): solo la prima carta della sezione "Commander" diventa il commander del mazzo, le altre entrano come carte normali.',
     },
@@ -338,9 +339,9 @@
     // ──────────────────── Assistente e agente di pagina ──────────────────────
     {
       id: 'help-sidebar', title: 'Assistente di pagina (Aiuto)', category: 'assistant',
-      desc: 'Apre un assistente laterale che vede la pagina e ti aiuta passo passo: può evidenziare elementi, suggerire dove cliccare, aprire menu nascosti e proporre cosa scrivere in un campo (lo invii tu). Alla fine ti chiede se ha funzionato. Se rispondi, Filo condivide i passi di quel percorso con chi userà l’assistente sullo stesso sito, senza i tuoi dati e senza niente che dica chi sei.',
+      desc: 'Apre un assistente laterale che vede la pagina e ti aiuta passo passo: può evidenziare elementi, suggerire dove cliccare, aprire menu nascosti e proporre cosa scrivere in un campo (lo invii tu). I passi che fai con lui, per ora, non escono dal tuo computer.',
       invoke: 'Alt+H (Ctrl+Alt+H su Mac).',
-      doesNot: 'Non invia i moduli al posto tuo: ogni azione che modifica la pagina richiede una tua conferma. Il percorso condiviso non porta il tuo nome, il tuo browser né l’ora in cui l’hai fatto; se chiudi il riquadro senza rispondere, Filo non condivide niente. Da quello che è solo tuo — il router di casa, un disco di rete, l’intranet dell’ufficio, un server di prova, le pagine interne di Filo — non condivide e non te lo chiede nemmeno.',
+      doesNot: 'Non invia i moduli al posto tuo: ogni azione che modifica la pagina richiede una tua conferma. Per ora non ti chiede se ha funzionato e non condivide con nessuno i passi delle tue sessioni.',
     },
     {
       id: 'web-search-assistant', title: 'Ricerca sul web dell’assistente', category: 'assistant',
@@ -371,6 +372,12 @@
       doesNot: 'Legge e basta: non modifica né sposta i tuoi file. Su un PDF che è in realtà una scansione o una foto di un foglio non c’è testo da estrarre, e Filo te lo dice invece di inventarsi cosa c’è scritto. Non legge ancora i documenti Word ed Excel, né i file molto grandi; di un documento lunghissimo legge la prima parte e ti avverte che si è fermato lì. Un file fuori dalla tua cartella personale (un altro disco, una chiavetta, una cartella di sistema) o un file nascosto di configurazione non lo apre senza il tuo OK.',
     },
     {
+      id: 'terminal-mode', title: 'Filo usa il terminale del computer', category: 'assistant',
+      desc: 'Per le richieste che lo vogliono («quanto spazio ho sul disco?», «trova i file più grandi in Download») Filo lancia un comando nel terminale del computer e ti risponde con quello che ha trovato. Non serve sapere cos’è un terminale. Ogni comando dice prima a parole cosa fa, e sotto c’è il comando vero. Quello che legge parte subito; quello che cambia qualcosa ti chiede prima un OK; per cancellare, o per un comando che non riconosce, devi scrivere «conferma». Quale conferma serve lo decide Filo leggendo il comando, mai il modello. Nella home puoi anche scrivere tu un comando che inizia con / e va dritto alla shell.',
+      invoke: 'È accesa di serie: chiedi a parole all’assistente (nuova scheda). Si spegne in Preferenze, alla voce «Modalità terminale», dove scegli anche la shell; oppure chiedi a Filo di spegnerla.',
+      doesNot: 'Da spenta Filo non esegue nessun comando. Non cambia, installa o cancella niente senza chiedertelo prima.',
+    },
+    {
       id: 'generate-dashboard', title: 'Dashboard personale di Filo', category: 'assistant',
       desc: 'Quando apri una nuova scheda, Filo prepara un breve messaggio per te e qualche suggerimento utile, in base a ciò che stavi facendo e a ciò che ricorda di te.',
       invoke: 'Si genera da sola all’apertura di una nuova scheda; il messaggio centrale si può nascondere dalle Preferenze ("Commento nella home").',
@@ -380,7 +387,7 @@
       id: 'agent-actions', title: 'Filo agisce al posto tuo', category: 'assistant',
       desc: 'Su tua richiesta Filo può compiere azioni per te: aprire pagine o file, cercare sul web, mettere timer e sveglie (e poi cancellarle o spostarle), salvare appunti, regolare preferenze e aspetto, archiviare schede, persino inviare un feedback a tuo nome.',
       invoke: 'Chiedile a parole all’assistente (nuova scheda) oppure all’assistente laterale di pagina (Alt+H, Ctrl+Alt+H su Mac).',
-      doesNot: 'Le azioni delicate ti vengono prima descritte e partono solo dopo la tua conferma; le più rischiose (cancellazioni irreversibili) chiedono di digitare "conferma". Non esegue nulla di delicato di nascosto. Se un link che sta per aprire, o una ricerca sul web che sta per fare, contiene dati letti dal tuo computer, prima te lo mostra e aspetta il tuo OK.',
+      doesNot: 'Le azioni delicate ti vengono prima descritte e partono solo dopo la tua conferma; le più rischiose (cancellazioni irreversibili) chiedono di digitare "conferma". Non esegue nulla di delicato di nascosto. Se un link che sta per aprire, o una ricerca sul web che sta per fare, contiene dati letti dal tuo computer, prima te lo mostra e aspetta il tuo OK. Non fa mai uscire un segreto: se un link, una ricerca, un comando, un feedback, un collegamento (anche di posta, anche nelle risposte dell’assistente di pagina) o un suggerimento che apri o scarichi con un clic o dal menu del tasto destro, o il testo che l’assistente di pagina propone per un campo, conterrebbe una chiave che Filo custodisce, oppure un codice monouso o di recupero, una password, una chiave, una carta o un IBAN letti da una pagina, un documento, una ricerca o un comando (e non scritti da te in chat), l’azione non parte a nessun livello, nemmeno col tuo OK, e in chat compare cosa è stato fermato. Se vuoi mandarlo davvero, lo fai tu a mano.',
     },
     {
       id: 'filo-memory', title: 'Memoria di Filo', category: 'assistant',
@@ -416,11 +423,11 @@
     // ─────────────────────────── Pagine interne ──────────────────────────────
     {
       id: 'home-page', title: 'Home di Filo', category: 'pages',
-      desc: 'La pagina della nuova scheda: al centro l’assistente a cui chiedere qualsiasi cosa, azioni e suggerimenti, un messaggio in evidenza e gli aggiornamenti recenti. In alto a destra ci sono le icone per Red Team, Cronologia, Impostazioni, App e Profilo.',
+      desc: 'La pagina della nuova scheda: al centro l’assistente a cui chiedere qualsiasi cosa, azioni e suggerimenti, un messaggio in evidenza e gli aggiornamenti recenti. In alto a destra ci sono le icone per Cronologia, Impostazioni, App e Profilo.',
       invoke: 'Apri una nuova scheda, l\'icona Home in alto a destra nella home, oppure indirizzo filo://newtab/.',
     },
     {
-      id: 'red-team', title: 'Red Team', category: 'pages',
+      id: 'red-team', title: 'Red Team', category: 'pages', cancello: 'redteam',
       desc: 'Il programma per mettere alla prova la sicurezza di Filo: provi a farne aggirare le difese e, per i tentativi riconosciuti come attacchi reali, guadagni crediti e sali in classifica. La pagina raccoglie le tue statistiche e i tuoi record, la classifica dei partecipanti e le regole del gioco. Per partecipare davvero serve un codice di invito, che leghi al tuo account e sblocca le statistiche personali.',
       invoke: 'Icona a scudo rosso in alto a destra nella home (nuova scheda), oppure indirizzo filo://redteam/redteam.html.',
       doesNot: 'Senza un codice di invito puoi leggere regole e classifica ma non accumulare punteggi. La creazione dei codici di invito è riservata a chi gestisce Filo.',
@@ -458,7 +465,7 @@
     },
     {
       id: 'preferences', title: 'Preferenze', category: 'settings',
-      desc: 'Tema (chiaro/scuro/sistema), dimensione del testo delle pagine interne, archiviazione automatica delle schede, stile dell’assistente, voce/velocità/tono della lettura, e notifiche.',
+      desc: 'Tema (chiaro/scuro/sistema), dimensione del testo delle pagine interne, archiviazione automatica delle schede, stile dell’assistente, voce/velocità/tono della lettura, notifiche, e la modalità terminale con la sua shell.',
       invoke: 'Pagina filo://preferences/preferences.html.',
     },
     {
@@ -517,26 +524,32 @@
   ];
 
   // ── API ────────────────────────────────────────────────────────────────────
+  // `aperti` = i cancelli aperti per chi chiede, es. { redteam: true }. Una voce con `cancello` chiuso non esiste:
+  // l'agente non la propone e non la racconta (#896). Senza `aperti` i cancelli sono chiusi.
+
+  function visibili(aperti) {
+    return CAPABILITIES.filter((c) => !c.cancello || (aperti && aperti[c.cancello] === true));
+  }
 
   // Indice COMPATTO (id + titolo + categoria), pensato per stare sempre in
   // contesto all'agente senza pesare: il dettaglio si recupera con get(id).
-  function index() {
-    return CAPABILITIES.map((c) => ({ id: c.id, title: c.title, category: c.category }));
+  function index(aperti) {
+    return visibili(aperti).map((c) => ({ id: c.id, title: c.title, category: c.category }));
   }
 
   // Dettaglio completo di una capacità per id (o undefined).
-  function get(id) {
-    return CAPABILITIES.find((c) => c.id === id);
+  function get(id, aperti) {
+    return visibili(aperti).find((c) => c.id === id);
   }
 
   // Tutte le capacità di una categoria.
-  function byCategory(category) {
-    return CAPABILITIES.filter((c) => c.category === category);
+  function byCategory(category, aperti) {
+    return visibili(aperti).filter((c) => c.category === category);
   }
 
   // Tutte le capacità (copia per non far mutare l'originale).
-  function all() {
-    return CAPABILITIES.slice();
+  function all(aperti) {
+    return visibili(aperti);
   }
 
   // ── Rendering per il prompt dell'agente (F2) ────────────────────────────────
@@ -547,10 +560,11 @@
   // esatto (invoke) e i limiti (doesNot) c'è renderDetailForPrompt(ids), che
   // l'agente recupera on-demand con l'azione CAPACITA_DETTAGLIO. L'id tra []
   // serve all'agente per chiedere il dettaglio della voce giusta.
-  function renderIndexForPrompt() {
+  function renderIndexForPrompt(aperti) {
     const lines = [];
+    const elenco = visibili(aperti);
     for (const [cat, label] of Object.entries(CATEGORIES)) {
-      const items = CAPABILITIES.filter((c) => c.category === cat);
+      const items = elenco.filter((c) => c.category === cat);
       if (!items.length) continue;
       lines.push(`${label}:`);
       for (const c of items) lines.push(`  - ${c.title} [${c.id}]`);
@@ -562,13 +576,13 @@
   // per id, formattato per essere reinserito nel contesto dell'agente come
   // OSSERVAZIONE (dati, non istruzioni). Gli id sconosciuti vengono segnalati
   // esplicitamente così l'agente non finge di averli trovati.
-  function renderDetailForPrompt(ids) {
+  function renderDetailForPrompt(ids, aperti) {
     const list = Array.isArray(ids) ? ids : (ids ? [ids] : []);
     if (!list.length) return '(nessuna capacità richiesta)';
     const blocks = [];
     for (const rawId of list) {
       const id = String(rawId || '').trim();
-      const c = get(id);
+      const c = get(id, aperti);
       if (!c) {
         blocks.push(`• "${id}": nessuna capacità con questo id (Filo non sa fare questa cosa).`);
         continue;

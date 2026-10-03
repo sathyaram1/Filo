@@ -33,6 +33,16 @@ function casaFinta() {
   return casa;
 }
 
+// Su Windows sotto carico la cartella resta occupata anche dopo i tentativi: una
+// cartella temporanea rimasta è innocua, un rosso nel cancello unit della release no.
+function pulisci(casa, maxRetries = 5) {
+  try {
+    rmSync(casa, { recursive: true, force: true, maxRetries, retryDelay: 200 });
+  } catch (e) {
+    if (!['EBUSY', 'EPERM', 'ENOTEMPTY'].includes(e?.code)) throw e;
+  }
+}
+
 function scriviMarcatore(casa, marker) {
   writeFileSync(beatFile(casa), JSON.stringify(marker, null, 2) + '\n', 'utf8');
 }
@@ -76,7 +86,7 @@ test('due invocazioni con lo stesso biglietto accendono UN battito solo', () => 
     assert.equal(secondo.why, 'already_live');
     assert.equal(avvii, 1, 'due processi che battono lo stesso biglietto sono solo rumore');
   } finally {
-    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+    pulisci(casa);
   }
 });
 
@@ -98,7 +108,7 @@ test('biglietto nuovo: il battito si riaccende, e il vecchio non resta orfano', 
     assert.deepEqual(uccisi, [4243], 'il battito del biglietto vecchio va spento prima di perderne le tracce');
   } finally {
     process.kill = killVero;
-    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+    pulisci(casa);
   }
 });
 
@@ -119,7 +129,7 @@ test('un marcatore vecchio di giorni non fa ammazzare un estraneo', () => {
     assert.deepEqual(uccisi, [], 'un numero di processo vecchio di giorni non dice più di chi è');
   } finally {
     process.kill = killVero;
-    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+    pulisci(casa);
   }
 });
 
@@ -142,7 +152,7 @@ test('rilasciare un biglietto NON spegne il battito di un altro lavoro', () => {
     assert.equal(readBeat(casa).ticket, 'b-vivo', 'e il marcatore resta quello di chi lavora');
   } finally {
     process.kill = killVero;
-    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+    pulisci(casa);
   }
 });
 
@@ -159,7 +169,7 @@ test('rilasciare il PROPRIO biglietto spegne il battito', () => {
     assert.equal(readBeat(casa), null);
   } finally {
     process.kill = killVero;
-    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+    pulisci(casa);
   }
 });
 
@@ -171,7 +181,7 @@ test('senza biglietto non si accende niente', () => {
     assert.equal(r.started, false);
     assert.equal(avvii, 0);
   } finally {
-    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+    pulisci(casa);
   }
 });
 
@@ -189,7 +199,7 @@ test('un marcatore rimasto da una sessione morta non blocca il battito nuovo', (
     assert.equal(r.started, true);
     assert.equal(avvii, 1);
   } finally {
-    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+    pulisci(casa);
   }
 });
 
@@ -234,7 +244,7 @@ test('un rilascio RIFIUTATO dal server lascia vivo il battito', async () => {
     assert.ok(readBeat(casa), 'il battito non va toccato quando il rilascio non è andato a buon fine');
   } finally {
     srv.close();
-    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+    pulisci(casa);
   }
 });
 
@@ -261,7 +271,7 @@ test('rilasciare il biglietto di un ALTRO giro non tocca il battito, dal comando
       'il battito di chi sta ancora lavorando deve sopravvivere al rilascio di un altro');
   } finally {
     srv.close();
-    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+    pulisci(casa);
   }
 });
 
@@ -285,7 +295,7 @@ test('un rilascio ACCETTATO spegne il battito', async () => {
     assert.equal(readBeat(casa), null, 'col biglietto muore anche il battito');
   } finally {
     srv.close();
-    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+    pulisci(casa);
   }
 });
 
@@ -346,6 +356,6 @@ test('il giro col biglietto fa arrivare un battito al server, senza che nessuno 
     }
     srv.close();
     await new Promise((r) => setTimeout(r, 200));
-    rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    pulisci(casa, 10);
   }
 });

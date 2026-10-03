@@ -57,6 +57,11 @@
     REOPEN_ARCHIVED_TAB: 'reopen_archived_tab',
     // §3.2 — ricerca semantica nell'archivio (embedding Google). { query }
     SEARCH_ARCHIVED_TABS: 'search_archived_tabs',
+    // §5 — le schede archiviate da proporre per la cancellazione: solo le
+    // pertinenti, tutte. { query, richiesta } → { ok, results } | { ok: false, error }
+    ARCHIVIO_DA_CANCELLARE: 'archivio_da_cancellare',
+    // Main → la pagina che ha chiesto: { richiesta, fatte, totali } schede giudicate.
+    ARCHIVIO_DA_CANCELLARE_AVANZAMENTO: 'archivio_da_cancellare_avanzamento',
     // §5 — cancellazione PERMANENTE di più tab archiviate (dopo conferma). { ids }
     DELETE_ARCHIVED_TABS: 'delete_archived_tabs',
     // Deck builder Commander (DECK-BUILDER-SPEC.md): CRUD dei mazzi, storage
@@ -232,7 +237,8 @@
     //   servito e costo. { pseudonym } → { ok, detail } (detail.found false se
     //   lo pseudonimo non esiste).
     WALLET_OWNER_USER_DETAIL: 'wallet_owner_user_detail',
-    CAPTURE_VISIBLE_TAB: 'capture_visible_tab',
+    // Le due foto (pagina e barra) vanno solo alla pagina in vista, che inquadra sé stessa: services/fotoDellaPagina.js.
+    CAPTURE_VISIBLE_TAB: 'capture_visible_tab', // → { ok, dataUrl? }
     // "Salva immagine come…" dal menu contestuale. Instradato dal main
     // (session download + will-download) perché l'attributo `download` di un
     // <a> lato pagina è onorato da Chromium SOLO per URL same-origin/blob:/
@@ -253,7 +259,8 @@
     // l'intercettazione will-download di #410.1 e ottiene ESATTAMENTE lo stesso
     // trattamento del clic sul link — avanzamento in barra, salvataggio in
     // cartella Download, avviso finale, voce in cronologia (parità dei cammini).
-    // { url } → { ok } | { ok:false, error }
+    // { url, diFilo, parole } → { ok } | { ok:false, error, frase }. `diFilo`: il collegamento l'ha scritto un modello
+    // di Filo, e lo scaricamento passa dalla porta delle uscite (#810).
     DOWNLOAD_LINK: 'download_link',
     // --- Download "nativi" della navigazione (#410.1) --------------------
     // Sono i download che partono cliccando un link a un file (PDF, ZIP,
@@ -445,7 +452,7 @@
     // Triage admin di un feedback (cambio stato/note/priorità). Instradato dal
     // main, che allega il Firebase ID token come Bearer e RIFIUTA se l'utente
     // loggato non è admin. → { ok } | { ok:false, error }
-    FEEDBACK_UPDATE: 'feedback_update',           // { id, status?, notes?, userNote?, priority?, archiveOverride?, mergePreapproved?: bool, localOnly?: bool, senderProof?: 'admin' }
+    FEEDBACK_UPDATE: 'feedback_update',           // { id, status?, notes?, userNote?, priority?, archiveOverride?, mergePreapproved?: bool, localOnly?: bool, localApproval?: true, senderProof?: 'admin' }
     // #583 — LETTURA dei feedback per le superfici dell'owner. La collezione
     // non è più pubblica: leggono solo l'admin e il server. L'ID token vive nel
     // main e non deve arrivare in una pagina, quindi la pagina CHIEDE la
@@ -565,6 +572,10 @@
     // Stessa origine e stesso cancello delle approvazioni di fusione: solo
     // pagine `filo://`, solo il proprietario.
     LIVELLO4_SALTA: 'livello4_salta',  // { feedbackId } → { ok, esito:'fuso'|'bloccato'|'conflitto'|'ramo_assente', requestId? } | { ok:false, error }
+    // Il segno di mittente pericoloso di chi ha mandato quel feedback (#922), dalla callable ownerSenderFlag.
+    // `clear` toglie il segno solo con la frase della conferma, che la pagina manda dopo il sì dell'owner.
+    // Solo pagine `filo://`, solo il proprietario.
+    FEEDBACK_SENDER_FLAG: 'feedback_sender_flag', // { feedbackId, action:'read'|'clear', conferma? } → { ok, flagged, reason, flaggedAt, clearedAt } | { ok:false, error }
     // BROADCAST (main → pagine): l'elenco è cambiato, eccolo. Non è un
     // handler: nessuno lo "chiama", lo manda il main quando `npm run finish`
     // suona il campanello (services/mergeApprovalSignal.js) o quando l'owner
@@ -629,12 +640,13 @@
     // === Account "Accedi con Google" (vedi src/main/auth/) ===
     // Login/logout/stato. Tutto vive nel main process: i token non sono mai
     // esposti alle pagine. La risposta porta solo il profilo pubblico.
-    AUTH_SIGNIN: 'auth_signin',                    // → { ok, profile } | { ok: false, code, error: frase per l'utente }
+    AUTH_SIGNIN: 'auth_signin',                    // → { ok, profile, isAdmin, remembered }; a un sito solo { ok, signedIn, isAdmin } | { ok: false, code, error: frase per l'utente }
     AUTH_SIGNOUT: 'auth_signout',                  // → { ok }
-    AUTH_STATUS: 'auth_status',                    // → { ok, signedIn, profile|null }
-    AUTH_CHANGED: 'auth_changed',                  // broadcast → { signedIn, profile|null }
+    AUTH_STATUS: 'auth_status',                    // → { ok, signedIn, isAdmin, profile|null, uid, remembered }; a un sito solo { ok, signedIn, isAdmin }
+    AUTH_CHANGED: 'auth_changed',                  // broadcast alle sole pagine di Filo → { signedIn, isAdmin, profile|null, remembered }
 
-    // Clipboard history (per il menu "Incolla")
+    // Clipboard history (per il menu "Incolla"). Chi legge e chi scrive da un sito: services/appuntiDaiSiti.js. L'elenco
+    // lo dà solo GET; le scritture rispondono { ok } e basta.
     GET_CLIPBOARD_HISTORY: 'get_clipboard_history',
     PUSH_CLIPBOARD_ENTRY: 'push_clipboard_entry',     // { entry }
     UPDATE_CLIPBOARD_DESCRIPTION: 'update_clipboard_description', // { dataUrl, description }
@@ -643,7 +655,7 @@
 
     // Categorie (Fase 2)
     GET_CATEGORIES: 'get_categories',
-    RENAME_CATEGORY: 'rename_category',         // { id, name }
+    RENAME_CATEGORY: 'rename_category',         // { id, name, unisci? } — unisci:false non fonde con un'omonima
     DELETE_CATEGORY: 'delete_category',         // { id }
     MERGE_CATEGORIES: 'merge_categories',       // { fromId, toId }
     MOVE_PAGE_CATEGORY: 'move_page_category',   // { pageId, categoryId }
@@ -761,6 +773,20 @@
     // conferma e poi rimanda l'azione via FILO_CONFIRM_ACTION. { action }
     FILO_RUN_ACTION: 'filo_run_action',
 
+    // #810 — un indirizzo web proposto da un modello in una pagina di Filo si apre solo dopo la porta delle
+    // uscite. { url, parole } → { aperto, frase }
+    FILO_APRI_PROPOSTA: 'filo_apri_proposta',
+    // #810 — un collegamento scritto da un modello nelle superfici di Filo dentro una pagina web (assistente di pagina,
+    // Spiega, richiesta rapida) lo apre il main dopo la porta delle uscite. Aperto ai content script: non dà più di un
+    // window.open. { url, parole, sfondo } → { aperto, frase, avvisato }
+    APRI_COLLEGAMENTO_FILO: 'apri_collegamento_filo',
+    // #810 — main → pagina di Filo: un indirizzo che la pagina ha chiesto di aprire (menu, link) è stato fermato
+    // dalla porta delle uscite. { frase }
+    USCITA_FERMATA: 'uscita_fermata',
+    // #810 — il testo che l'assistente di pagina vuole scrivere in un campo passa dalla porta delle uscite.
+    // { testo, parole } → { blocca, frase }
+    CONTROLLA_CAMPO: 'controlla_campo',
+
     // #405 — un'azione di PAGINA invocata dal menu aperto dentro un riquadro
     // incorporato (iframe). Il riquadro conosce solo se stesso: tradurre,
     // condividere, salvare o fare uno screenshot devono valere per la pagina
@@ -875,6 +901,16 @@
     // REDTEAM_REVOKE_CODE: revoca un codice ancora libero (SOLO owner). { code } →
     //   { ok } | { ok:false, status:'invalid_code'|'code_used', error? }.
     REDTEAM_REVOKE_CODE: 'redteam_revoke_code',
+    // In pausa (#896) gli handler qui sopra rispondono { status:'paused', paused:true, error } (invio, riscatto)
+    // o { paused:true, error, … } (stato, tentativo, classifica) a chi non vede il Red Team.
+    // REDTEAM_VISIBILITY: { attendi? } → { ok, visible } (a un sito) | { ok, visible, owner, openToAll, letto }.
+    REDTEAM_VISIBILITY: 'redteam_visibility',
+    // Broadcast main → pagine di Filo: { visible } quando cambia.
+    REDTEAM_VISIBILITY_CHANGED: 'redteam_visibility_changed',
+    // L'interruttore «Red Team aperto a tutti» di Gestione (SOLO owner, solo da Filo).
+    //   GET { } → { ok, openToAll, letto } · SET { openToAll } → { ok, openToAll } | { ok:false, error }.
+    REDTEAM_OPEN_GET: 'redteam_open_get',
+    REDTEAM_OPEN_SET: 'redteam_open_set',
   };
 
   // Port-based streaming
