@@ -92,7 +92,7 @@ export function classifyOwnerMerge(status, body) {
 /**
  * Quello che il server dice della pratica locale (#908), solo se lo dice. PURA.
  * Tutto sta in `r.local` (localView in filo-security ownerMerge.js): ammessa →
- * num, skippedL5, blocks ({ gate, label, detail } o il solo nome), record, closed, approvato (il sì dell'owner a un
+ * num, skippedL5, blocks ({ gate, label, detail } o il solo nome), record, closed, approvato e daRoutine (il sì dell'owner a un
  * feedback non suo, #913); non ammessa → reason, detail.
  */
 function campiLocali(r) {
@@ -108,6 +108,7 @@ function campiLocali(r) {
     }
     if (typeof loc.closed === 'boolean') out.closed = loc.closed;
     if (loc.approvato === true) out.approvato = true;
+    if (loc.approvato === true && loc.daRoutine === true) out.daRoutine = true;
     return out;
   }
   out.localReason = String(loc.reason || 'pratica_non_ammessa').slice(0, 80);
@@ -138,7 +139,7 @@ export function messageForOwnerMerge(reply, branch = 'il ramo', ctx = {}) {
       const righe = [`✓ '${branch}' fuso su main dal server${r.sha ? ` (${String(r.sha).slice(0, 8)})` : ''}.`];
       if (r.skippedL5) {
         const blocchi = Array.isArray(r.blocks) ? r.blocks : [];
-        righe.push(`  L5 saltato: lavoro locale di ${pratica}, ${r.approvato ? 'feedback di un utente che hai approvato come lavoro locale' : 'mittente provato'}.`);
+        righe.push(`  L5 saltato: lavoro locale di ${pratica}, ${r.approvato ? `feedback ${r.daRoutine ? 'di una routine' : 'di un utente'} che hai approvato come lavoro locale` : 'mittente provato'}.`);
         righe.push(blocchi.length
           ? `  Blocchi registrati (${blocchi.length}), li rileggi in Gestione → Automazioni, «Fuse senza chiedere»:\n${blocchi.map((t) => `    · ${bloccoInRiga(t)}`).join('\n')}`
           : '  Nessun blocco registrato: i controlli non avrebbero fermato niente.');

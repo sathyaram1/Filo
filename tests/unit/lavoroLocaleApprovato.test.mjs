@@ -214,6 +214,8 @@ test('#913: fuso sopra L5 per il sì dell’owner, la riga del finish e Automazi
   assert.match(riga({ approvato: true }), /L5 saltato: lavoro locale di #950, feedback di un utente che hai approvato/);
   assert.doesNotMatch(riga({ approvato: true }), /mittente provato/);
   assert.match(riga({}), /mittente provato/);
+  assert.match(riga({ approvato: true, daRoutine: true }), /feedback di una routine che hai approvato/);
+  assert.doesNotMatch(riga({ approvato: true, daRoutine: true }), /di un utente/);
   const approvato = MA.skippedL5Hint({ skippedL5: true, localApproved: true, preapprovedBy: 'owner@esempio' });
   assert.match(approvato, /approvato come lavoro locale da owner@esempio/);
   assert.doesNotMatch(approvato, /prova del mittente/);
