@@ -15,6 +15,9 @@ const { showPopupMenu } = require('./popup-menu');
 const { showTooltip, hideTooltip } = require('./popup-tooltip');
 const { createSession, defaultCwd, commandExists } = require('./services/shell');
 const { resolveShell } = require('./services/terminal');
+const SegretiLetti = require('./services/segretiLetti');
+// Quanto dell'output di un comando lanciato a mano passa dal registro dei segreti letti: quanto una pagina.
+const MAX_STAMPATO = 8000000;
 const { hostResolves } = require('./services/hostResolve');
 const DiskStorage = require('./shim/storage');
 
@@ -228,9 +231,19 @@ function registerIpcHandlers() {
         if (s) { try { s.kill(); } catch (_) {} shellSessions.delete(key); }
       });
     }
+    // Quello che stampa un comando lanciato a mano è testo letto da fuori: la chat riaperta lo rilegge come
+    // una frase di Filo, e la porta delle uscite deve saperlo (#810). Si tiene la coda, dove finisce l'esito.
+    const stampato = [];
+    let quanto = 0;
     session.exec(command, {
-      onData: (d) => send('data', d),
-      onExit: (e) => send('exit', e),
+      onData: (d) => {
+        const pezzo = String((d && d.chunk) || '');
+        stampato.push(pezzo);
+        quanto += pezzo.length;
+        while (quanto > MAX_STAMPATO && stampato.length > 1) quanto -= stampato.shift().length;
+        send('data', d);
+      },
+      onExit: (e) => { SegretiLetti.ricorda(stampato.join(''), "dall'output di un comando"); send('exit', e); },
       onError: (e) => send('error', e),
     });
     return { ok: true };

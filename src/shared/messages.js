@@ -57,6 +57,11 @@
     REOPEN_ARCHIVED_TAB: 'reopen_archived_tab',
     // §3.2 — ricerca semantica nell'archivio (embedding Google). { query }
     SEARCH_ARCHIVED_TABS: 'search_archived_tabs',
+    // §5 — le schede archiviate da proporre per la cancellazione: solo le
+    // pertinenti, tutte. { query, richiesta } → { ok, results } | { ok: false, error }
+    ARCHIVIO_DA_CANCELLARE: 'archivio_da_cancellare',
+    // Main → la pagina che ha chiesto: { richiesta, fatte, totali } schede giudicate.
+    ARCHIVIO_DA_CANCELLARE_AVANZAMENTO: 'archivio_da_cancellare_avanzamento',
     // §5 — cancellazione PERMANENTE di più tab archiviate (dopo conferma). { ids }
     DELETE_ARCHIVED_TABS: 'delete_archived_tabs',
     // Deck builder Commander (DECK-BUILDER-SPEC.md): CRUD dei mazzi, storage
@@ -253,7 +258,8 @@
     // l'intercettazione will-download di #410.1 e ottiene ESATTAMENTE lo stesso
     // trattamento del clic sul link — avanzamento in barra, salvataggio in
     // cartella Download, avviso finale, voce in cronologia (parità dei cammini).
-    // { url } → { ok } | { ok:false, error }
+    // { url, diFilo, parole } → { ok } | { ok:false, error, frase }. `diFilo`: il collegamento l'ha scritto un modello
+    // di Filo, e lo scaricamento passa dalla porta delle uscite (#810).
     DOWNLOAD_LINK: 'download_link',
     // --- Download "nativi" della navigazione (#410.1) --------------------
     // Sono i download che partono cliccando un link a un file (PDF, ZIP,
@@ -565,6 +571,10 @@
     // Stessa origine e stesso cancello delle approvazioni di fusione: solo
     // pagine `filo://`, solo il proprietario.
     LIVELLO4_SALTA: 'livello4_salta',  // { feedbackId } → { ok, esito:'fuso'|'bloccato'|'conflitto'|'ramo_assente', requestId? } | { ok:false, error }
+    // Il segno di mittente pericoloso di chi ha mandato quel feedback (#922), dalla callable ownerSenderFlag.
+    // `clear` toglie il segno solo con la frase della conferma, che la pagina manda dopo il sì dell'owner.
+    // Solo pagine `filo://`, solo il proprietario.
+    FEEDBACK_SENDER_FLAG: 'feedback_sender_flag', // { feedbackId, action:'read'|'clear', conferma? } → { ok, flagged, reason, flaggedAt, clearedAt } | { ok:false, error }
     // BROADCAST (main → pagine): l'elenco è cambiato, eccolo. Non è un
     // handler: nessuno lo "chiama", lo manda il main quando `npm run finish`
     // suona il campanello (services/mergeApprovalSignal.js) o quando l'owner
@@ -634,7 +644,8 @@
     AUTH_STATUS: 'auth_status',                    // → { ok, signedIn, profile|null }
     AUTH_CHANGED: 'auth_changed',                  // broadcast → { signedIn, profile|null }
 
-    // Clipboard history (per il menu "Incolla")
+    // Clipboard history (per il menu "Incolla"). Chi legge e chi scrive da un sito: services/appuntiDaiSiti.js. L'elenco
+    // lo dà solo GET; le scritture rispondono { ok } e basta.
     GET_CLIPBOARD_HISTORY: 'get_clipboard_history',
     PUSH_CLIPBOARD_ENTRY: 'push_clipboard_entry',     // { entry }
     UPDATE_CLIPBOARD_DESCRIPTION: 'update_clipboard_description', // { dataUrl, description }
@@ -760,6 +771,20 @@
     // needsConfirm, describe }: se needsConfirm il client mostra il popup di
     // conferma e poi rimanda l'azione via FILO_CONFIRM_ACTION. { action }
     FILO_RUN_ACTION: 'filo_run_action',
+
+    // #810 — un indirizzo web proposto da un modello in una pagina di Filo si apre solo dopo la porta delle
+    // uscite. { url, parole } → { aperto, frase }
+    FILO_APRI_PROPOSTA: 'filo_apri_proposta',
+    // #810 — un collegamento scritto da un modello nelle superfici di Filo dentro una pagina web (assistente di pagina,
+    // Spiega, richiesta rapida) lo apre il main dopo la porta delle uscite. Aperto ai content script: non dà più di un
+    // window.open. { url, parole, sfondo } → { aperto, frase, avvisato }
+    APRI_COLLEGAMENTO_FILO: 'apri_collegamento_filo',
+    // #810 — main → pagina di Filo: un indirizzo che la pagina ha chiesto di aprire (menu, link) è stato fermato
+    // dalla porta delle uscite. { frase }
+    USCITA_FERMATA: 'uscita_fermata',
+    // #810 — il testo che l'assistente di pagina vuole scrivere in un campo passa dalla porta delle uscite.
+    // { testo, parole } → { blocca, frase }
+    CONTROLLA_CAMPO: 'controlla_campo',
 
     // #405 — un'azione di PAGINA invocata dal menu aperto dentro un riquadro
     // incorporato (iframe). Il riquadro conosce solo se stesso: tradurre,

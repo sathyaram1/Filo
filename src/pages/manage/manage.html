@@ -1101,6 +1101,25 @@
     }
 
     .mg-sender-info { display: flex; flex-direction: column; gap: 10px; }
+    /* Segno di mittente pericoloso: il rosso del tema, perché è il motivo per cui i suoi feedback si fermano. */
+    .mg-segno { margin-top: 4px; }
+    .mg-segno[hidden], .mg-sender-segno[hidden], #mgSideSegno button[hidden] { display: none; }
+    .mg-segno-testo { overflow-wrap: anywhere; }
+    #mgSegnoTestata .mg-segno--segnato {
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .mg-segno--segnato { color: var(--sn-error); font-weight: 600; }
+    .mg-segno--tolto, .mg-segno--errore { color: var(--sn-muted); }
+    .mg-segno-riprova {
+      all: unset; cursor: pointer; margin-left: 8px; color: var(--sn-accent);
+      font-size: 12px; transition: opacity 0.1s;
+    }
+    .mg-segno-riprova:hover, .mg-segno-riprova:focus-visible { text-decoration: underline; }
+    .mg-segno-riprova:disabled { opacity: 0.5; cursor: default; }
+    .mg-sender-segno { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; font-size: 13px; }
+    .mg-segno-conferma { display: flex; flex-direction: column; gap: 8px; }
+    .mg-segno-conferma[hidden] { display: none; }
+    .mg-segno-domanda { font-size: 13px; color: var(--sn-text); line-height: 1.4; }
     .mg-sender-stat { font-size: 13px; color: var(--sn-muted); }
     .mg-sender-stat strong { color: var(--sn-text); }
     .mg-sender-list { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
@@ -1379,6 +1398,9 @@
                   </div>
                 </div>
               </div>
+
+              <!-- «Il segno era un errore» (#922): la conferma dice cosa cambia, subito sotto il tasto. Testi dal JS. -->
+              <div class="mg-reopen mg-segno-conferma" id="mgSegnoConferma" hidden></div>
 
               <!-- Gli esiti stanno SOTTO la riga: un messaggio lungo (una scrittura rifiutata, una chiave scaduta) si
                  prendeva il posto dei tasti e li mandava a capo finché restava lì. -->

@@ -137,6 +137,8 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     FILO_GENERATE_DASHBOARD: 'generate-dashboard',
     FILO_RUN_ACTION: 'agent-actions',
     FILO_CONFIRM_ACTION: 'agent-actions',
+    // #810 — un indirizzo proposto da un modello si apre col clic solo dopo la porta delle uscite.
+    FILO_APRI_PROPOSTA: 'agent-actions',
     FILO_GET_MEMORY: 'filo-memory',
     // #592 — la memoria riga per riga nelle Preferenze: rileggerla e toglierne una.
     FILO_MEMORY_VIEW: 'filo-memory',

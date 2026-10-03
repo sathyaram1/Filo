@@ -21,7 +21,7 @@
 
 import { mkdtempSync, realpathSync, symlinkSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
-import { join } from 'node:path';
+import path, { join } from 'node:path';
 
 // Forma canonica di un percorso ESISTENTE. Se il percorso non c'è (o il sistema
 // non sa risolverlo) torna quello che gli è stato dato: un test non deve morire
@@ -69,4 +69,12 @@ export function cartellaInCasa(prefisso) {
 // una junction no, e Node la risolve allo stesso modo. Altrove resta un symlink.
 export function collegaCartella(verso, collegamento) {
   symlinkSync(verso, collegamento, process.platform === 'win32' ? 'junction' : 'dir');
+}
+
+// Il percorso sta fuori dalla cartella. Fra due dischi (sul cancello Windows il repo è su D:, la temporanea su C:)
+// `relative` risponde con un percorso assoluto, senza nessun `..` davanti: chiedere solo il `..` lì dice «dentro».
+// `sistema` è `path.win32` nelle prove che girano altrove.
+export function fuoriDa(cartella, p, sistema = path) {
+  const r = sistema.relative(cartella, p);
+  return r === '..' || r.startsWith(`..${sistema.sep}`) || sistema.isAbsolute(r);
 }

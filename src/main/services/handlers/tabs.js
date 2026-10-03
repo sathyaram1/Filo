@@ -4,7 +4,7 @@
 const { soloFilo } = require('./origine');
 
 module.exports = function register(on, ctx) {
-  const { MSG, winOf, searchArchivedTabs } = ctx;
+  const { MSG, winOf, searchArchivedTabs, archivioDaCancellare } = ctx;
   const ArchivedTabs = globalThis.SN_ARCHIVED_TABS;
 
   on('_tabs:create', async (msg, sender) => {
@@ -110,21 +110,32 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
-  on(MSG.GET_ARCHIVED_TABS, async () => {
+  // L'archivio è la cronologia dell'utente e la cancellazione è definitiva: lo leggono e lo toccano solo le pagine di Filo.
+  on(MSG.GET_ARCHIVED_TABS, soloFilo(async () => {
     // listMeta: senza embedding (non spediamo i vettori al renderer).
     return { ok: true, tabs: await ArchivedTabs.listMeta() };
-  });
+  }));
 
-  on(MSG.SEARCH_ARCHIVED_TABS, async (msg) => searchArchivedTabs(msg.query));
+  on(MSG.SEARCH_ARCHIVED_TABS, soloFilo(async (msg) => searchArchivedTabs(msg.query)));
 
-  on(MSG.DELETE_ARCHIVED_TABS, async (msg) => {
+  // Spende una chiamata al modello per ogni blocco di schede: solo dalle pagine di Filo.
+  // L'avanzamento torna solo alla pagina che ha chiesto, col numero della sua richiesta.
+  on(MSG.ARCHIVIO_DA_CANCELLARE, soloFilo(async (msg, sender) => archivioDaCancellare(msg && msg.query, {
+    avanzamento: (fatte, totali) => {
+      const wc = sender && sender.wc;
+      if (!wc || wc.isDestroyed()) return;
+      wc.send('filo:broadcast', { type: MSG.ARCHIVIO_DA_CANCELLARE_AVANZAMENTO, richiesta: msg && msg.richiesta, fatte, totali });
+    },
+  })));
+
+  on(MSG.DELETE_ARCHIVED_TABS, soloFilo(async (msg) => {
     const r = await ArchivedTabs.removeMany(msg.ids || []);
     return { ok: true, removed: r.removed, remaining: r.remaining };
-  });
+  }));
 
-  on(MSG.REMOVE_ARCHIVED_TAB, async (msg) => ({ ok: true, tabs: await ArchivedTabs.remove(msg.id) }));
+  on(MSG.REMOVE_ARCHIVED_TAB, soloFilo(async (msg) => ({ ok: true, tabs: await ArchivedTabs.remove(msg.id) })));
 
-  on(MSG.CLEAR_ARCHIVED_TABS, async () => ({ ok: true, tabs: await ArchivedTabs.clear() }));
+  on(MSG.CLEAR_ARCHIVED_TABS, soloFilo(async () => ({ ok: true, tabs: await ArchivedTabs.clear() })));
 
   on(MSG.REOPEN_ARCHIVED_TAB, async (msg, sender) => {
     // Riapre la scheda archiviata, ripristinando lo scroll registrato.

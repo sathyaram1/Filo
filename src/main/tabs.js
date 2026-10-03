@@ -2165,6 +2165,8 @@ class TabManager {
       }
     });
 
+    // I riquadri si guardano da quando nascono: uno che non finisce mai di caricarsi mostra già il modulo (#813.1).
+    wc.on('did-frame-navigate', (_e, _url, _code, _text, isMainFrame) => this._sbOnFrameLoad(tab, isMainFrame));
     wc.on('did-frame-finish-load', (_e, isMainFrame) => this._sbOnFrameLoad(tab, isMainFrame));
 
     // §3.1 — ripristino scroll alla riapertura da archivio: a caricamento finito
@@ -2408,6 +2410,13 @@ class TabManager {
     // 'foreground-tab' e 'background-tab' sono link cliccati dall'utente.
     wc.setWindowOpenHandler((details) => {
       const { url, disposition } = details;
+      // Da una pagina di Filo l'indirizzo l'ha scelto quasi sempre un modello: passa dalla porta delle uscite (#810).
+      if (tab.isInternal && typeof globalThis.SN_USCITA_DA_FILO === 'function') {
+        globalThis.SN_USCITA_DA_FILO(url, wc, () => {
+          this.apriDaCollegamento(url, { sfondo: disposition === 'background-tab' });
+        }).catch(() => {});
+        return { action: 'deny' };
+      }
       // SICUREZZA: nega l'apertura (window.open / target=_blank) verso schemi
       // non-web — stessa difesa di will-navigate (file:// → leak NTLM, ecc.).
       // mailto:/tel:/sms: vengono consegnati all'OS invece di essere ignorati.
@@ -2518,6 +2527,7 @@ class TabManager {
     if (!win || !win.webContents) return;
     const pwc = win.webContents;
     installaPermessi(pwc.session);
+    Permessi.seguiGesti(pwc);
     try {
       pwc.setWebRTCIPHandlingPolicy(
         this.security.protectIpLeak ? 'default_public_interface_only' : 'default',
@@ -2674,6 +2684,15 @@ class TabManager {
         opts: { actions: [{ label: 'Riapri', openUrl: url }] },
       });
     } catch (_) {}
+  }
+
+  // Un collegamento che Filo apre per conto di una pagina, dopo la porta delle uscite (#810): la posta al sistema, i
+  // siti in blacklist fermati come un clic, il resto in una scheda nuova.
+  apriDaCollegamento(url, { sfondo = false } = {}) {
+    if (isWebUnsafeNav(url)) return openExternalScheme(url);
+    if (this._maybeBlockNavigation(null, url)) return false;
+    this.openTab(url, { activate: !sfondo, openedByLink: true });
+    return true;
   }
 
   // #590 — L'UNICO punto che applica la lista dei siti bloccati: ci passano

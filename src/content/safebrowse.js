@@ -11,6 +11,8 @@
 // NON blocca mai la navigazione: la pagina carica normalmente, l'avviso la
 // copre. Il verdetto può cambiare in corsa (segnali di rete asincroni): il main
 // fa broadcast SAFEBROWSE_UPDATE e qui ridisegniamo.
+// Parte all'apertura del documento, non a pagina costruita: una pagina che non
+// finisce di caricarsi mostra già il modulo, e l'avviso non può aspettarla.
 //
 // Tutti gli stili sono applicati via proprietà inline (CSSOM), non via <style>
 // o <link>: così l'avviso appare anche sotto le CSP più rigide e non è
@@ -29,6 +31,8 @@
   let host = null;        // elemento host dello shadow root
   let shadow = null;
   let currentLevel = 'safe';
+  let drawn = null;       // l'avviso disegnato: lo stesso verdetto ripetuto non cancella il «confermo» già scritto
+  let pending = null;     // verdetto arrivato quando il documento non ha ancora una radice
 
   const chrome = global.chrome;
   function send(msg, cb) {
@@ -49,23 +53,80 @@
     try { return new URL(a).host === new URL(b).host; } catch (_) { return true; }
   }
 
+  // L'host sta in fondo alla radice: a pari z-index vince chi viene dopo, e il parser aggiunge <body> dopo un avviso
+  // disegnato durante il caricamento. Spostarlo toglie il fuoco, che torna dov'era.
   function ensureHost() {
-    if (host && document.documentElement.contains(host)) return;
-    host = document.getElementById(HOST_ID);
+    const root = document.documentElement;
+    if (!root) return false;
     if (!host) {
       host = document.createElement('div');
       host.id = HOST_ID;
       global.SN_FILO_UI?.mark(host);
       css(host, { all: 'initial' });
       shadow = host.attachShadow({ mode: 'open' });
-      (document.documentElement || document.body).appendChild(host);
-    } else if (!shadow) {
-      shadow = host.shadowRoot || host.attachShadow({ mode: 'open' });
+      // Lo sfondo della modale lo dà l'avviso: senza, la pagina si scurisce un po' di più che prima.
+      try { const st = new CSSStyleSheet(); st.replaceSync('dialog::backdrop{background:transparent}'); shadow.adoptedStyleSheets = [st]; } catch (_) {}
     }
+    if (host.parentNode !== root || host.nextElementSibling) {
+      const focused = shadow.activeElement;
+      root.appendChild(host);
+      keepOnTop();
+      if (focused) { try { focused.focus(); } catch (_) {} }
+    }
+    return true;
+  }
+
+  // L'avviso è una finestra modale: la pagina sotto diventa inerte e non si riprende il fuoco né il clic. Una modale
+  // aperta dopo dalla pagina gli salirebbe sopra rendendolo inerte, e lo spostamento dell'host lo toglie dal livello
+  // più alto: in entrambi i casi si riapre in cima.
+  let dialog = null;
+  function keepOnTop() {
+    if (!dialog || !dialog.isConnected) return;
+    let onTop = dialog.matches(':modal');
+    if (onTop) {
+      try { onTop = document.elementFromPoint(innerWidth / 2, innerHeight / 2) === host; } catch (_) {}
+    }
+    if (onTop) return;
+    const focused = shadow.activeElement;
+    try { if (dialog.open) dialog.close(); dialog.showModal(); } catch (_) {}
+    if (focused) { try { focused.focus(); } catch (_) {} }
+  }
+
+  let guard = null;
+  function watchTopLayer() {
+    if (guard || typeof MutationObserver !== 'function') return;
+    guard = new MutationObserver(() => { if (dialog) keepOnTop(); });
+    try { guard.observe(document, { subtree: true, attributes: true, attributeFilter: ['open'] }); } catch (_) {}
+    document.addEventListener('toggle', () => { if (dialog) keepOnTop(); }, true);
+  }
+
+  function mount(overlay) {
+    dialog = document.createElement('dialog');
+    css(dialog, {
+      position: 'fixed', inset: '0', margin: '0', padding: '0', border: 'none',
+      width: '100vw', height: '100vh', maxWidth: 'none', maxHeight: 'none',
+      background: 'transparent', overflow: 'hidden', outline: 'none',
+    });
+    // Esc chiuderebbe la modale: l'avviso si toglie solo dai suoi pulsanti.
+    dialog.addEventListener('cancel', (e) => e.preventDefault());
+    const self = dialog;
+    dialog.addEventListener('close', () => {
+      if (dialog === self && currentLevel !== 'safe') { try { if (!self.open) self.showModal(); } catch (_) {} }
+    });
+    dialog.appendChild(overlay);
+    shadow.appendChild(dialog);
+    try { dialog.showModal(); } catch (_) {}
+    keepOnTop();
+    watchTopLayer();
   }
 
   function clear() {
     currentLevel = 'safe';
+    drawn = null;
+    pending = null;
+    const d = dialog;
+    dialog = null;
+    if (d) { try { d.close(); } catch (_) {} }
     if (shadow) { try { shadow.replaceChildren(); } catch (_) { shadow.innerHTML = ''; } }
     if (host) { css(host, { pointerEvents: 'none' }); }
   }
@@ -90,6 +151,7 @@
   // ── Interstitial "pericoloso" (blocca l'interazione) ──────────────────────
   function renderDanger(url, message) {
     ensureHost();
+    if (dialog) { const d = dialog; dialog = null; try { d.close(); } catch (_) {} }
     shadow.replaceChildren();
     css(host, { pointerEvents: 'auto' });
 
@@ -173,7 +235,7 @@
     card.appendChild(icon); card.appendChild(title); card.appendChild(body);
     card.appendChild(hint); card.appendChild(input); card.appendChild(row);
     overlay.appendChild(card);
-    shadow.appendChild(overlay);
+    mount(overlay);
     try { input.focus(); } catch (_) {}
   }
 
@@ -186,6 +248,7 @@
   // da digitare), ma comunque una scelta attiva, non un avviso ignorabile.
   function renderSuspect(url, message) {
     ensureHost();
+    if (dialog) { const d = dialog; dialog = null; try { d.close(); } catch (_) {} }
     shadow.replaceChildren();
     css(host, { pointerEvents: 'auto' });
 
@@ -238,22 +301,55 @@
     row.appendChild(back); row.appendChild(proceed);
     card.appendChild(icon); card.appendChild(title); card.appendChild(body); card.appendChild(row);
     overlay.appendChild(card);
-    shadow.appendChild(overlay);
+    mount(overlay);
     try { proceed.focus(); } catch (_) {}
   }
 
   function render(level, message, url) {
     const u = url || location.href;
-    if (level === 'pericoloso') { currentLevel = level; renderDanger(u, message); }
-    else if (level === 'sospetto') { currentLevel = level; renderSuspect(u, message); }
-    else clear();
+    if (level !== 'pericoloso' && level !== 'sospetto') { clear(); return; }
+    currentLevel = level;
+    if (!ensureHost()) { pending = { level, message, url: u }; return; }
+    pending = null;
+    const key = [level, message && message.title, message && message.body].join('\n');
+    if (drawn === key && shadow.firstChild) return;
+    drawn = key;
+    if (level === 'pericoloso') renderDanger(u, message);
+    else renderSuspect(u, message);
   }
 
+  let sentHints = { hasPassword: false, hasPayment: false };
   function requestVerdict() {
     const hints = pageHints();
+    sentHints = hints;
     send({ type: T_GET, url: location.href, hasPassword: hints.hasPassword, hasPayment: hints.hasPayment }, (r) => {
       if (r && r.ok) render(r.level, r.message);
     });
+  }
+
+  // Un campo password o di carta alza la gravità: va chiesto appena compare, non quando la pagina dice di aver finito.
+  function hintsGrew() {
+    if (sentHints.hasPassword && sentHints.hasPayment) return;
+    const h = pageHints();
+    if ((h.hasPassword && !sentHints.hasPassword) || (h.hasPayment && !sentHints.hasPayment)) requestVerdict();
+  }
+
+  // Finché il parser lavora: la radice che nasce riceve l'avviso in attesa, <body> che arriva non lo deve coprire,
+  // i campi sensibili si guardano a ogni pezzo di pagina (al più ogni 200 ms).
+  function watchLoading() {
+    if (typeof MutationObserver !== 'function') return;
+    let timer = null;
+    const mo = new MutationObserver(() => {
+      if (pending) render(pending.level, pending.message, pending.url);
+      else if (currentLevel !== 'safe') ensureHost();
+      if (!timer) timer = setTimeout(() => { timer = null; hintsGrew(); }, 200);
+    });
+    try { mo.observe(document, { childList: true, subtree: true }); } catch (_) { return; }
+    document.addEventListener('DOMContentLoaded', () => {
+      mo.disconnect();
+      clearTimeout(timer);
+      if (currentLevel !== 'safe') ensureHost();
+    }, { once: true });
   }
 
   // Broadcast dal main: il verdetto per la URL è cambiato.
@@ -265,7 +361,7 @@
     });
   } catch (_) {}
 
-  function start() {
+  function onReady() {
     requestVerdict();
     // Ricontrolla dopo un attimo: alcuni siti montano i campi password/pagamento
     // via JS dopo il primo paint, alzando la gravità del verdetto.
@@ -273,9 +369,11 @@
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', start, { once: true });
+    requestVerdict();
+    watchLoading();
+    document.addEventListener('DOMContentLoaded', onReady, { once: true });
   } else {
-    start();
+    onReady();
   }
 
   global.SN_SAFEBROWSE_UI = { render, requestVerdict, clear, _state: () => currentLevel };
