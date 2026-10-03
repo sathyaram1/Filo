@@ -51,6 +51,13 @@
   flex: 1;
 }
 
+/* Le voci della cronologia incolla portano testi di altri siti, password comprese: il testo visibile è
+   contenuto generato da una proprietà posata nello shadow chiuso, mai un nodo di testo, così la ricerca del
+   sito non lo legge (#589.8, patterns/un-pezzo-di-filo-in-un-sito-ubbidisce-solo-all-utente.md). */
+.sn-menu-gentesto::before {
+  content: var(--sn-gentesto, "");
+}
+
 .sn-menu-item-icon {
   flex: 0 0 auto;
   display: inline-flex;
