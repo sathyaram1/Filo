@@ -34,7 +34,7 @@ test('Gestione: icona, etichetta, bolla e gruppo del mittente seguono la prova, 
     await expect(icona, f.clientId).toHaveText('👤');
     await expect(icona, f.clientId).toHaveAttribute('title', /Utente/);
   }
-  const attese = { 'v-owner': '👑', 'v-local': '💻', 'v-routine': '🔍', 'v-agent': '🔍' };
+  const attese = { 'v-owner': '👑', 'v-local': '💻', 'v-routine': '🔍', 'v-agent': '🤖' };
   for (const [id, ic] of Object.entries(attese)) {
     await expect(page.locator(`.mg-item[data-id="${id}"] .mg-item-author`), id).toHaveText(ic);
   }
