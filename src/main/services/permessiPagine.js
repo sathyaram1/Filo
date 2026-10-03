@@ -132,11 +132,20 @@ function lasciapassare(wc, tipo) {
   return true;
 }
 
+// Ogni strada con cui Chromium apre il menu, perché un sito che annulla il `contextmenu` non la spenga (#589.4 giro 3).
 function tastoDelMenu(input) {
   const type = input.type;
-  // Electron non dà il pulsante: il tasto destro premuto sta fra i modificatori.
-  if (type === 'mouseDown') return Array.isArray(input.modifiers) && input.modifiers.includes('rightbuttondown');
-  return (type === 'rawKeyDown' || type === 'keyDown') && input.key === 'ContextMenu';
+  const mod = Array.isArray(input.modifiers) ? input.modifiers : [];
+  // Electron non dà il pulsante: il tasto premuto sta fra i modificatori.
+  if (type === 'mouseDown') {
+    if (mod.includes('rightbuttondown')) return true;
+    if (process.platform === 'darwin') return mod.includes('leftbuttondown') && mod.includes('control');
+    return false;
+  }
+  if (type === 'rawKeyDown' || type === 'keyDown') {
+    return input.key === 'ContextMenu' || (input.key === 'F10' && mod.includes('shift'));
+  }
+  return type === 'gestureLongPress' || type === 'gestureLongTap' || type === 'gestureTwoFingerTap' || type === 'contextMenu';
 }
 
 function segnaMenu(wc, frame) {
