@@ -155,7 +155,7 @@ test('con 50.000 eventi nel filo un messaggio si scrive veloce come a filo vuoto
   for (let i = 0; i < 50000; i++) {
     blocco.push(E.riga(E.crea(i % 2 ? E.TIPI.NAVIGAZIONE : E.TIPI.MESSAGGIO, i % 2
       ? { url: `https://p.example/${i}`, titolo: `Pagina ${i}` }
-      : { chat: `c${i % 500}`, msg: { role: 'user', text: `messaggio numero ${i} `.repeat(8) } }, { dispositivo })));
+      : { chat: `c${(i / 2) % 500}`, msg: { role: 'user', text: `messaggio numero ${i} `.repeat(8) } }, { dispositivo })));
   }
   writeFileSync(pieno.file, blocco.join(''));
   const misura = async ({ f }) => {
