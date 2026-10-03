@@ -126,11 +126,19 @@ test('senza --solo-server e senza un ramo dell’app in vista la pratica resta a
   assert.match(prova.testo, /resterebbe aperta/);
 });
 
-test('--solo-server con un ramo dell’app legato alla pratica: lo dice, e la chiude come richiesto', async () => {
-  const r = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], ramiAperti: ['claude/app'] });
-  assert.equal(r.k, 0, r.testo);
+test('--solo-server con un ramo dell’app legato alla pratica: si ferma prima di fondere, e il rilancio consigliato funziona', async () => {
+  const docs = { p: doc('p') };
+  const r = await giro({ docs, argv: ['claude/x', '--feedback', 'p', '--solo-server'], ramiAperti: ['claude/app'] });
+  assert.equal(r.k, 1, r.testo);
   assert.match(r.testo, /claude\/app dell'app è legato a questa pratica/);
-  assert.ok(r.scritture.at(-1).includes('resolvedInVersion'));
+  assert.match(r.testo, /rilancia senza --solo-server: npm run server:fondi -- claude\/x --feedback 910\n/);
+  assert.match(r.testo, /Non ho toccato niente/);
+  assert.deepEqual(r.lanci, [], 'dopo la fusione il rilancio senza --solo-server sarebbe rifiutato');
+  assert.deepEqual(r.scritture, []);
+  const prova = await giro({ docs, argv: ['claude/x', '--feedback', 'p', '--solo-server', '--dry-run'], ramiAperti: ['claude/app'] });
+  assert.equal(prova.k, 1, 'anche la prova a vuoto dice che si fermerebbe');
+  const rilancio = await giro({ docs, argv: ['claude/x', '--feedback', 'p'], ramiAperti: ['claude/app'] });
+  assert.equal(rilancio.k, 0, rilancio.testo);
 });
 
 test('se il server si ferma la pratica resta in lavorazione, con la nota del motivo', async () => {
