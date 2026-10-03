@@ -815,6 +815,15 @@ test('secaudit: sul fail la ricetta non chiede una consegna di design, che il se
   assert.ok(!/accoda|deliver status/.test(fail[0]), `sul fail niente consegne a mano: «${fail[0]}»`);
 });
 
+test('secaudit: la richiesta di fusione fa girare gli unit sulla fusione per minuti, e la ricetta la manda in sottofondo (#929)', () => {
+  // Una chiamata da due minuti la taglia a metà: nessuna richiesta parte e resta la cartella di prova.
+  const t = readFileSync(fileURLToPath(new URL('../../routines/roles/secaudit.md', import.meta.url)), 'utf8').replace(/\s+/g, ' ');
+  const i = t.indexOf('merge-gate.mjs');
+  assert.ok(i > -1);
+  assert.match(t.slice(i, i + 1200), /sottofondo/);
+  assert.ok(!/Qui non gira nessun git/.test(t), 'qui adesso girano git e gli unit');
+});
+
 // ─── Il biglietto perso non deve più poter succedere (incidente #444) ─────────
 //
 // Il 25 agosto un `--help` battuto a metà lavoro è finito nella porta "giro
