@@ -560,7 +560,13 @@ La regola, uguale per tutti e due:
   fusione se nella directory c'è qualcosa fuori dai commit (il salvataggio
   automatico lo committerebbe e lo spedirebbe, e il server fonderebbe la punta
   NUOVA), e non la chiede se il verdetto del controllo di sicurezza registrato
-  su questa macchina parla di un altro commit. Se la verifica ha dato l'ok su
+  su questa macchina parla di un altro commit. Dal #929 `routineMerge` e
+  `ownerMerge` portano anche `provaUnit`: gli unit girati da chi chiede sul
+  risultato della fusione con origin/main (`scripts/lib/unit-sulla-fusione.mjs`).
+  Il server fonde solo se main è ancora lo sha provato (`main_moved`
+  altrimenti, e chi chiede rifà la prova, al massimo tre volte); rossi solo
+  sulla fusione → riallineamento con l'elenco dei test (`unit_rossi`); senza il
+  campo fonde come prima e lo scrive nel log (`src/routine/provaUnit.js`). Se la verifica ha dato l'ok su
   un altro commit lo **dice** in una nota e chiede lo stesso: quella mossa la
   giudica il server (punto sopra). Se su questa macchina non risulta su quale
   commit sono stati dati i via libera, lo **dice** e prosegue: astenersi in
