@@ -70,11 +70,16 @@ test('«richiede lavoro locale» dice il vero secondo chi ha aperto il feedback'
   const routine = MR.judgesNote(rimandato({ clientId: 'routine:residuo', senderProof: 'server' })).text;
   const utente = MR.judgesNote(rimandato({ clientId: 'utente-1' })).text;
   const senzaProva = MR.judgesNote(rimandato({ clientId: 'owner:me' })).text;
-  for (const t of [owner, sessione]) {
+  const approvato = MR.judgesNote(rimandato({ clientId: 'utente-2', localApproval: { by: 'owner', at: 1 } })).text;
+  for (const t of [owner, sessione, approvato]) {
     assert.match(t, /Solo lavoro locale/);
-    assert.doesNotMatch(t, /feedback degli utenti/);
+    assert.doesNotMatch(t, /💻 Lavoro locale/);
   }
-  assert.match(routine, /routine/);
-  assert.doesNotMatch(routine, /feedback degli utenti/);
-  for (const t of [utente, senzaProva]) assert.match(t, /feedback degli utenti non si lavorano/);
+  // Routine e utenti (#913): la frase porta al sì dell'owner, che è anche il tasto principale nei Ricevuti.
+  for (const t of [routine, utente, senzaProva]) {
+    assert.match(t, /Con «💻 Lavoro locale» lo lavora e lo chiude una sessione/);
+    assert.doesNotMatch(t, /non si lavorano/);
+  }
+  const tasto = MR.ownerActions(rimandato({ clientId: 'routine:residuo', senderProof: 'server' })).find((a) => a.key === 'accept_local');
+  assert.ok(tasto && tasto.primary, 'su una routine rimandata «💻 Lavoro locale» è il tasto principale');
 });
