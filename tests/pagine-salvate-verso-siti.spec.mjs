@@ -33,6 +33,9 @@ test('la pagina salvata di un sito non arriva a un altro sito; la home la mostra
     const r = await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.GET_SAVED_PAGES });
     return String(r?.pages?.[0]?.thumbnail || '').slice(0, 11);
   }), { timeout: 10_000 }).toBe('data:image/');
+  // Il messaggio della home, calcolato qui, elenca la pagina A: lo stato di Filo ne terrebbe una copia (#589.12 giro 1).
+  expect(await home.evaluate(async () => JSON.stringify(
+    await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.FILO_GENERATE_DASHBOARD, force: true })))).toContain(TITOLO_A);
 
   const b = await testServer.openReady(openTab, '<!doctype html><html><body><p>sito B</p></body></html>', { pubblico: true });
   void b;
@@ -41,6 +44,7 @@ test('la pagina salvata di un sito non arriva a un altro sito; la home la mostra
   const risposte = {
     elenco: await daB({ type: M.GET_SAVED_PAGES }),
     categorie: await daB({ type: M.GET_CATEGORIES }),
+    stato: await daB({ type: M.FILO_GET_STATE }),
     togli: await daB({ type: M.REMOVE_SAVED_PAGE, id: 'inesistente' }),
     consuma: await daB({ type: M.CONSUME_SAVED_PAGE, id: 'inesistente' }),
     home: await daB({ type: M.FILO_GENERATE_DASHBOARD, force: true }),
@@ -48,6 +52,7 @@ test('la pagina salvata di un sito non arriva a un altro sito; la home la mostra
   };
   expect(risposte.elenco).toMatchObject({ ok: false, error: 'forbidden' });
   expect(risposte.categorie).toMatchObject({ ok: false, error: 'forbidden' });
+  expect(risposte.stato).toMatchObject({ ok: false, error: 'forbidden' });
   expect(risposte.togli).toMatchObject({ ok: false, error: 'forbidden' });
   expect(risposte.consuma).toMatchObject({ ok: false, error: 'forbidden' });
   expect(risposte.home).toMatchObject({ ok: false, error: 'forbidden' });

@@ -116,3 +116,10 @@ test('il messaggio della home, che mette in fila le pagine salvate, si chiede so
   const corpo = src.slice(src.indexOf('on(MSG.FILO_GENERATE_DASHBOARD'), src.indexOf('handleFiloGenerateDashboard('));
   assert.match(corpo, /if \(!isFilo\(origin\)\) return \{[^}]*forbidden/, 'FILO_GENERATE_DASHBOARD risponde anche a un sito');
 });
+
+test('lo stato di Filo, che contiene il messaggio della home e le schede aperte, si chiede solo da una pagina di Filo', () => {
+  const src = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers', 'filo.js'), 'utf8');
+  const inizio = src.indexOf('on(MSG.FILO_GET_STATE');
+  const corpo = src.slice(inizio, src.indexOf('FiloState.assemble(', inizio));
+  assert.match(corpo, /if \(!isFilo\(origin\)\) return \{[^}]*forbidden/, 'FILO_GET_STATE risponde anche a un sito');
+});
