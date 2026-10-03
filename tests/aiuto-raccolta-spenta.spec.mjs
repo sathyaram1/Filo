@@ -63,7 +63,8 @@ async function preparaMain(app) {
     globalThis.__chiamate = [];
     const finto = async ({ messages }) => {
       const testo = JSON.stringify(messages);
-      const pulizia = /Sei un classificatore|Sei un giudice di sicurezza/.test(testo);
+      // in sottofondo Filo chiama i modelli anche per altro (il controllo dei siti)
+      const pulizia = /informazioni programmatiche su un percorso di navigazione|Sei un giudice di sicurezza/.test(testo);
       globalThis.__chiamate.push({ pulizia, testo });
       const risposta = pulizia
         ? (testo.includes('Sei un giudice') ? '{"ok":true}' : intento)
@@ -80,25 +81,39 @@ async function apriSito(openTab, testServer) {
   u.hostname = SITO;
   const page = await openTab(u.href);
   await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
-  await page.waitForFunction(() => typeof window.SN_SIDEBAR?.open === 'function', null, { timeout: 8000 });
-  return page;
+  return { page, url: u.href };
+}
+
+// Alt+H come lo preme l'utente: sulle pagine web la sidebar vive nel mondo
+// isolato dei content script, e da lì non la raggiunge nessun evaluate.
+function apriAiuto(app) {
+  return app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
+    t.view.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'H', modifiers: ['alt'] });
+    t.view.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'H', modifiers: ['alt'] });
+  });
+}
+
+// Chi chiede alla porta «da qui si raccoglie?» e chi manda un percorso: le due
+// richieste della sidebar, viste dove arrivano.
+async function spiaRaccolta(app) {
+  await app.evaluate(() => {
+    const PC = globalThis.SN_PATHS_COLLECTOR;
+    globalThis.__porta = [];
+    globalThis.__salvati = 0;
+    const porta = PC.raccoglibile;
+    PC.raccoglibile = async (u) => { const r = await porta(u); globalThis.__porta.push(r); return r; };
+    const salva = PC.collectAndSave;
+    PC.collectAndSave = async (a) => { globalThis.__salvati += 1; return salva(a); };
+  });
 }
 
 test('una sessione dell’Aiuto finita con un passo eseguito non chiede «Ha funzionato?» e non paga la pulizia', async ({ app, openTab, testServer }) => {
   await preparaMain(app);
-  const page = await apriSito(openTab, testServer);
-  await page.evaluate(() => {
-    window.__porta = [];
-    window.__salvati = 0;
-    const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
-    chrome.runtime.sendMessage = (msg, ...rest) => {
-      if (msg && msg.type === 'save_path') window.__salvati += 1;
-      const p = orig(msg, ...rest);
-      if (msg && msg.type === 'path_collectable') Promise.resolve(p).then((r) => window.__porta.push(r));
-      return p;
-    };
-    window.SN_SIDEBAR.open();
-  });
+  await spiaRaccolta(app);
+  const { page } = await apriSito(openTab, testServer);
+  await apriAiuto(app);
   await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 8000 });
   await page.fill('.sn-sidebar-input textarea', DOMANDA);
   await page.press('.sn-sidebar-input textarea', 'Enter');
@@ -106,15 +121,17 @@ test('una sessione dell’Aiuto finita con un passo eseguito non chiede «Ha fun
   // il passo c'è stato davvero: la sezione si è aperta e la chat lo dice
   await expect(page.locator('#avanzate')).toHaveAttribute('open', '', { timeout: 15000 });
   await expect(page.locator('.sn-sidebar-log').last()).toContainText('sezione aperta');
-  await expect(page.locator('.sn-sidebar-msg, .sn-sidebar-conv').filter({ hasText: 'Eccole, le ho aperte.' }).first()).toBeVisible();
+  await expect(page.locator('.sn-sidebar-msg-assistant').filter({ hasText: 'Eccole, le ho aperte.' })).toHaveCount(1);
 
   // la sessione è finita e la porta ha risposto: a raccolta spenta, no
-  await page.waitForFunction(() => window.__porta.length > 0, null, { timeout: 10000 });
-  expect(await page.evaluate(() => window.__porta[0].raccoglibile)).toBe(false);
+  await expect.poll(() => app.evaluate(() => globalThis.__porta.length), { timeout: 10000 }).toBeGreaterThan(0);
   await page.waitForTimeout(300);
   await expect(page.locator('.sn-sidebar-feedback')).toHaveCount(0);
   await expect(page.getByText('Ha funzionato?')).toHaveCount(0);
-  expect(await page.evaluate(() => window.__salvati)).toBe(0);
+  const porta = await app.evaluate(() => globalThis.__porta[0]);
+  expect(porta.ok).toBe(false);
+  expect(porta.reason).toMatch(/spenta/);
+  expect(await app.evaluate(() => globalThis.__salvati), 'nessun save_path').toBe(0);
 
   const chiamate = await app.evaluate(() => globalThis.__chiamate);
   expect(chiamate.filter((c) => c.pulizia), 'nessuna chiamata HELP_INTENT_GUESS né HELP_INTENT_JUDGE').toEqual([]);
@@ -128,24 +145,27 @@ test('una sessione dell’Aiuto finita con un passo eseguito non chiede «Ha fun
 
 test('un save_path arrivato comunque non paga nessun modello e non mette niente in coda', async ({ app, openTab, testServer }) => {
   await preparaMain(app);
-  const page = await apriSito(openTab, testServer);
-  const risposta = await page.evaluate((domanda) => chrome.runtime.sendMessage({
-    type: 'save_path',
-    payload: { session: {
-      rawUrl: location.href,
-      rawSteps: [{ selector: '#avanzate', action: 'reveal' }],
-      rawUserMessages: [domanda],
-      success: true,
-    } },
-  }), DOMANDA);
-  expect(risposta && risposta.ok).toBe(true);
-  // la raccolta gira in sottofondo dopo la risposta: le si lascia il tempo
-  await page.waitForTimeout(1000);
-  const esito = await app.evaluate(async () => ({
-    chiamate: globalThis.__chiamate.length,
-    coda: globalThis.SN_PATHS_COLLECTOR.inCoda(),
-    disco: await globalThis.SN_STORAGE.getRaw('pathsOutbox', []),
-  }));
+  const { url } = await apriSito(openTab, testServer);
+  const esito = await app.evaluate(async (_e, { url, domanda }) => {
+    const risposta = await globalThis.__filoHandlers.handleMessage({
+      type: globalThis.SN_MSG.MSG.SAVE_PATH,
+      payload: { session: {
+        rawUrl: url,
+        rawSteps: [{ selector: '#avanzate', action: 'reveal' }],
+        rawUserMessages: [domanda],
+        success: true,
+      } },
+    }, { url });
+    // la raccolta gira in sottofondo dopo la risposta: le si lascia il tempo
+    await new Promise((r) => setTimeout(r, 1000));
+    return {
+      risposta,
+      chiamate: globalThis.__chiamate.filter((c) => c.pulizia).length,
+      coda: globalThis.SN_PATHS_COLLECTOR.inCoda(),
+      disco: await globalThis.SN_STORAGE.getRaw('pathsOutbox', []),
+    };
+  }, { url, domanda: DOMANDA });
+  expect(esito.risposta && esito.risposta.ok).toBe(true);
   expect(esito.chiamate).toBe(0);
   expect(esito.coda).toBe(0);
   expect(esito.disco).toEqual([]);
