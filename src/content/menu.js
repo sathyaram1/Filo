@@ -27,10 +27,21 @@
     return document.fullscreenElement || document.documentElement;
   }
 
-  // Ogni pezzo entra nel documento del sito già chiuso ai gesti finti, nodo per nodo (#589.8).
+  // Ogni pezzo entra nel documento del sito già chiuso ai gesti finti, nodo per nodo (#589.8), e sotto le sonde
+  // che dicono se l'utente lo vede (#589.11).
   function monta(el) {
     global.SN_FILO_UI?.soloGestiVeri(el);
-    return menuHost().appendChild(el);
+    const host = menuHost();
+    return host.insertBefore(el, global.SN_VISTO?.prima(host, el) || null);
+  }
+
+  // Un clic su una voce che il sito copriva non parte: il menu si chiude e l'utente sa perché.
+  function bloccaMenu() {
+    close();
+    try { global.SN_POPUP?.showToast?.(I18n.t('menu_click_covered'), { duration: 4000 }); } catch (_) {}
+  }
+  function sorveglia(pannello, radice) {
+    global.SN_VISTO?.sorveglia(pannello, { radice, bloccato: bloccaMenu });
   }
 
   let activeMenu = null;

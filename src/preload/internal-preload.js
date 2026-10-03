@@ -312,6 +312,7 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'overlayPlacement.js')); // #500 — geometria di menu e riquadro risposta: PRIMA di popup.js e menu.js
   safe(path.join(CONTENT, 'extractContext.js'));
   safe(path.join(CONTENT, 'popup.js'));
+  safe(path.join(CONTENT, 'vistoDavvero.js')); // #589.11 — sulle pagine di Filo resta spento: nessun sito può coprire il menu
   safe(path.join(CONTENT, 'menu.js'));
   safe(path.join(CONTENT, 'highlight.js'));
   safe(path.join(CONTENT, 'sidebar.js'));

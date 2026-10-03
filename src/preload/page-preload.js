@@ -447,6 +447,7 @@ function loadScripts() {
   try { require(path.join(SHARED_DIR, 'overlayPlacement.js')); } catch (e) { console.error('[Filo CS] overlayPlacement', e); } // #500 — geometria di menu e riquadro risposta: PRIMA di popup.js e menu.js
   try { require(path.join(CONTENT_DIR, 'extractContext.js')); } catch (e) { console.error('[Filo CS] extractContext', e); }
   try { require(path.join(CONTENT_DIR, 'popup.js')); } catch (e) { console.error('[Filo CS] popup', e); }
+  try { require(path.join(CONTENT_DIR, 'vistoDavvero.js')); } catch (e) { console.error('[Filo CS] vistoDavvero', e); } // #589.11 — un clic sul menu conta solo se la voce si vedeva: PRIMA di menu.js
   try { require(path.join(CONTENT_DIR, 'menu.js')); } catch (e) { console.error('[Filo CS] menu', e); }
   try { require(path.join(CONTENT_DIR, 'highlight.js')); } catch (e) { console.error('[Filo CS] highlight', e); }
   try { require(path.join(CONTENT_DIR, 'sidebar.js')); } catch (e) { console.error('[Filo CS] sidebar', e); }
