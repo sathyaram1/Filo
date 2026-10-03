@@ -96,7 +96,7 @@ export function testoProva(prova) {
     case 'verde': {
       const ins = Array.isArray(p.instabili) ? p.instabili : [];
       if (!ins.length) return `▸ Unit sulla fusione con main ${m}: verdi.`;
-      return [`▸ Unit sulla fusione con main ${m}: verdi. Rossi al primo giro e verdi riprovati da soli, quindi instabili e non della fusione:`,
+      return [`▸ Unit sulla fusione con main ${m}: verdi. Rossi al primo giro, verdi da soli e rifacendo la suite intera, quindi instabili e non della fusione:`,
         ...ins.map((r) => `    ~ ${r}`)].join('\n');
     }
     case 'conflitto': return `▸ Unit sulla fusione con main ${m}: non provati, la fusione va in conflitto${p.file && p.file.length ? ` su ${p.file.join(', ')}` : ''}.`;
