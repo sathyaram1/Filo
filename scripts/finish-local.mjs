@@ -70,6 +70,8 @@ import { askServerMerge, messageForOwnerMerge, exitCodeForOwnerMerge } from './l
 import { preparaLancioElectron } from './lib/schermo-virtuale.mjs';
 import { lottiPerRigaDiComando } from './lib/riga-di-comando.mjs';
 import { readMarker } from './lib/routine-role.mjs';
+import { partiServerInSospeso } from './lib/parti-lavoro.mjs';
+import { cartellaDelServer } from './server-fondi-pratica.mjs';
 import mergeApprovalSignal from '../src/main/services/mergeApprovalSignal.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -744,7 +746,10 @@ async function main() {
   process.stdout.write('\n▸ Chiedo al server di fondere\n');
   if (pratica && pratica.id) console.log(`  pratica ${pratica.seq ? `#${pratica.seq}` : pratica.id}`);
   else console.log('  nessuna pratica collegata: se i controlli fermano, la fusione aspetta il tuo sì');
-  const reply = await askServerMerge({ branch, sha: cur, feedbackId: pratica ? pratica.id : '' });
+  // La parte del server dello stesso lavoro (ramo con lo stesso nome) non ancora su main tiene aperta la pratica (#915).
+  const pendingParts = pratica && pratica.id ? partiServerInSospeso(branch, { cartellaServer: cartellaDelServer(ROOT) }) : [];
+  for (const p of pendingParts) console.log(`  parte del server non ancora su main: ${p.branch} (la pratica resta aperta per lei)`);
+  const reply = await askServerMerge({ branch, sha: cur, feedbackId: pratica ? pratica.id : '', pendingParts });
   // Il server ha aperto una richiesta: suona il campanello, così una finestra
   // di Filo GIÀ APERTA se ne accorge da sola. Non è un permesso in più — non
   // crea niente e non approva niente, fa solo rileggere l'elenco vero — ed è
