@@ -979,19 +979,46 @@
     'n[uú]mero de (la )?tarjeta', 'tarjeta de (cr[eé]dito|d[eé]bito)', 'num[eé]ro de (la )?carte',
     'carte (bancaire|de cr[eé]dit)', 'kartennummer', 'kreditkarte'].join('|'), 'i');
 
+  // Il browser o il sito mostrano già i puntini al posto del testo.
+  function copertoAschermo(el) {
+    if (el.type === 'password' || String(el.getAttribute?.('type') || '').toLowerCase() === 'password') return true;
+    try {
+      const cs = window.getComputedStyle(el);
+      const puntini = cs.webkitTextSecurity || cs.getPropertyValue('-webkit-text-security');
+      return !!puntini && puntini !== 'none';
+    } catch (_) { return false; }
+  }
+
+  // I campi segreti compilati che a schermo si leggono (un numero di carta, una password resa visibile), con
+  // quanto serve a ridisegnarli coperti nell'immagine della pagina che va al modello.
+  function campiSegretiInVista() {
+    const out = [];
+    for (const el of document.querySelectorAll('input, textarea, select')) {
+      if (!el.value || !campoSegreto(el) || copertoAschermo(el)) continue;
+      const r = el.getBoundingClientRect();
+      if (!r.width || !r.height || r.bottom <= 0 || r.right <= 0 || r.top >= window.innerHeight || r.left >= window.innerWidth) continue;
+      const cs = window.getComputedStyle(el);
+      // Uno sfondo trasparente o velato lascerebbe trasparire le cifre sotto la copertura.
+      const velato = /^transparent$|^rgba\(.*,\s*(0?\.\d+|0)\)$/.test(cs.backgroundColor);
+      const sfondo = velato ? '#ffffff' : cs.backgroundColor;
+      const bordo = (lato) => parseFloat(cs[`border${lato}Width`]) || 0;
+      out.push({
+        left: r.left + bordo('Left'), top: r.top + bordo('Top'),
+        width: Math.max(1, r.width - bordo('Left') - bordo('Right')), height: Math.max(1, r.height - bordo('Top') - bordo('Bottom')),
+        sfondo, testo: cs.color || '#000000', corpo: parseFloat(cs.fontSize) || 14,
+      });
+    }
+    return out;
+  }
+
   // Un campo il cui valore non esce mai dalla pagina verso un modello (#810.7): password, codici, dati della
   // carta. Lo dice il tipo, l'autocompletamento, il testo coperto dai puntini o il nome che il sito gli dà.
   function campoSegreto(el) {
     if (!el || el.nodeType !== 1 || !CAMPO_CON_VALORE.test(el.tagName)) return false;
     const tipo = String(el.getAttribute('type') || '').toLowerCase();
     if (el.tagName === 'INPUT' && INPUT_BOTTONE.test(tipo)) return false;
-    if (tipo === 'password' || el.type === 'password') return true;
+    if (copertoAschermo(el)) return true;
     if (AUTOCOMPLETE_SEGRETO.test(String(el.getAttribute('autocomplete') || ''))) return true;
-    try {
-      const cs = window.getComputedStyle(el);
-      const coperto = cs.webkitTextSecurity || cs.getPropertyValue('-webkit-text-security');
-      if (coperto && coperto !== 'none') return true;
-    } catch (_) {}
     const nomi = ['aria-label', 'placeholder', 'name', 'id', 'title'].map((a) => el.getAttribute(a) || '');
     nomi.push(etichettaCollegata(el));
     return PAROLE_SEGRETE.test(nomi.join(' ').replace(/([a-z])([A-Z])/g, '$1 $2'));
@@ -1166,6 +1193,7 @@
     extractInteractiveOutline,
     nomeElemento,
     campoSegreto,
+    campiSegretiInVista,
     viewportInfo,
     expandAncestors,
     canRevealElement,

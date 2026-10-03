@@ -977,12 +977,39 @@
     };
   }
 
+  // I campi segreti leggibili a schermo arrivano al modello coperti dai puntini (#810.7): misurati prima e dopo lo
+  // scatto, se la pagina scorre nel frattempo. Se coprirli non riesce, l'immagine non parte.
   async function captureScreenshot() {
     try {
+      const prima = Extract.campiSegretiInVista();
       const r = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB });
-      if (r?.ok && r.dataUrl) return r.dataUrl;
+      if (r?.ok && r.dataUrl) return await coperta(r.dataUrl, prima.concat(Extract.campiSegretiInVista()));
     } catch (_) {}
     return null;
+  }
+
+  async function coperta(dataUrl, campi) {
+    if (!campi.length) return dataUrl;
+    // Decodificata qui e non caricata come <img>: la politica dei contenuti del sito può vietare le immagini data:.
+    const byte = Uint8Array.from(atob(dataUrl.slice(dataUrl.indexOf(',') + 1)), (c) => c.charCodeAt(0));
+    const img = await createImageBitmap(new Blob([byte], { type: 'image/png' }));
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    const sx = img.width / window.innerWidth;
+    const sy = img.height / window.innerHeight;
+    for (const c of campi) {
+      const x = c.left * sx, y = c.top * sy, w = c.width * sx, h = c.height * sy;
+      ctx.fillStyle = c.sfondo;
+      ctx.fillRect(Math.floor(x), Math.floor(y), Math.ceil(w + x - Math.floor(x)), Math.ceil(h + y - Math.floor(y)));
+      ctx.fillStyle = c.testo;
+      ctx.font = `${Math.round(Math.min(c.corpo * sy * 1.4, h * 0.9))}px sans-serif`;
+      ctx.textBaseline = 'middle';
+      ctx.fillText('••••••••', x + 3 * sx, y + h / 2, Math.max(1, w - 6 * sx));
+    }
+    return canvas.toDataURL('image/png');
   }
 
   // Aspetta che la pagina si "stabilizzi" dopo un'azione utente: utile per

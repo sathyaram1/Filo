@@ -1,5 +1,5 @@
 // La password e i dati della carta che l'utente scrive in un modulo non partono verso il modello dell'assistente
-// di pagina (#810.7): il campo arriva col suo nome, il valore resta nella pagina. Senza il fix è rossa: con
+// di pagina (#810.7): il campo arriva col suo nome e, nell'immagine, coperto dai puntini. Senza il fix è rossa: con
 // l'etichetta legata al campo e nessun segnaposto, la descrizione degli elementi portava il valore in chiaro.
 
 import { test, expect } from './fixtures/electron.mjs';
@@ -10,7 +10,7 @@ async function preparaModelli(app) {
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
-      models: { [C.ACTIONS.HELP]: 'deepseek-flash' },
+      models: { [C.ACTIONS.HELP]: 'deepseek-flash', [C.ACTIONS.SPELLCHECK_WORD]: 'deepseek-flash' },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
   });
@@ -129,4 +129,74 @@ test('il clic sul campo della password indicato dall’assistente lo racconta co
   await expect(page.locator('.sn-sidebar-log', { hasText: 'click su Password' })).toBeVisible();
   await expect(page.locator('.sn-sidebar')).not.toContainText('Gatto.Rosso.77');
   expect(await arrivato(app, page)).not.toContain('Gatto.Rosso.77');
+});
+
+// Il tasto destro su una parola di un campo di testo chiede al modello la correzione, con tutto il campo intorno:
+// in una password resa visibile dal sito la mandava intera.
+test('il tasto destro sulla password resa visibile non la manda alla correzione', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, modulo('<label for="c">Password</label> <input id="c" type="text"> '
+    + '<label for="n">Note per la consegna</label> <input id="n">'));
+  await superaAvviso(page);
+  await page.fill('#c', 'Gatto.Rosso.77');
+  await page.fill('#n', 'consegnaa domani');
+  await preparaModelli(app);
+  await modelloFinto(app, [['', JSON.stringify({ misspelled: false })]]);
+
+  await page.locator('#c').click({ button: 'right', position: { x: 12, y: 8 } });
+  await expect(page.locator('.sn-menu')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await page.locator('#n').click({ button: 'right', position: { x: 12, y: 8 } });
+  await expect.poll(() => arrivato(app, page), { timeout: 15_000 }).toContain('consegnaa');
+  expect(await arrivato(app, page)).not.toContain('Gatto');
+});
+
+// Il numero della carta a schermo si legge: nell'immagine della pagina che va al modello il campo arriva coperto dai
+// puntini, quindi due numeri diversi danno la stessa immagine.
+test('nell’immagine della pagina che va al modello il numero della carta è coperto', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, modulo('<label for="c">Numero della carta</label> '
+    + '<input id="c" autocomplete="cc-number" style="width:280px;font-size:18px">'));
+  await superaAvviso(page);
+  await preparaModelli(app);
+  await modelloFinto(app, [['', JSON.stringify({ text: 'Premi «Accedi».', status: 'done' })]]);
+  await apriAiuto(shell, page);
+
+  const immagini = [];
+  for (const [i, valore] of ['4111 1111 1111 1111', '5500 0000 0000 0004'].entries()) {
+    await page.fill('#c', valore);
+    await scriviAllAiuto(page, 'aiutami a pagare');
+    await expect.poll(() => app.evaluate(() => globalThis.__visti.length), { timeout: 20_000 }).toBe(i + 1);
+    immagini.push(await app.evaluate(() => {
+      const utente = [...globalThis.__visti.at(-1)].reverse().find((m) => m.role === 'user');
+      const parte = Array.isArray(utente.content) && utente.content.find((p) => p.type === 'image_url');
+      return parte ? parte.image_url.url : null;
+    }));
+  }
+  expect(immagini[0], 'al modello deve arrivare l’immagine della pagina').toMatch(/^data:image\//);
+  expect(immagini[1]).toMatch(/^data:image\//);
+
+  // Dentro il bordo: il bordo e l'anello del fuoco cambiano col campo attivo, e non dicono niente del numero.
+  const diversi = await page.evaluate(async ([a, b]) => {
+    const campo = document.querySelector('#c');
+    const b0 = campo.getBoundingClientRect();
+    const cs = getComputedStyle(campo);
+    const l = parseFloat(cs.borderLeftWidth) + 1, t = parseFloat(cs.borderTopWidth) + 1;
+    const r = { left: b0.left + l, top: b0.top + t, width: b0.width - 2 * l, height: b0.height - 2 * t };
+    const pixel = async (url) => {
+      const byte = Uint8Array.from(atob(url.slice(url.indexOf(',') + 1)), (c) => c.charCodeAt(0));
+      const img = await createImageBitmap(new Blob([byte]));
+      const cv = document.createElement('canvas');
+      cv.width = img.width; cv.height = img.height;
+      const ctx = cv.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const sx = img.width / window.innerWidth, sy = img.height / window.innerHeight;
+      return ctx.getImageData(Math.round(r.left * sx), Math.round(r.top * sy), Math.round(r.width * sx), Math.round(r.height * sy)).data;
+    };
+    const [pa, pb] = [await pixel(a), await pixel(b)];
+    let n = 0;
+    for (let i = 0; i < pa.length; i++) if (pa[i] !== pb[i]) n++;
+    return n;
+  }, immagini);
+  expect(diversi, 'il numero scritto nel campo si vede nell’immagine').toBe(0);
 });

@@ -739,7 +739,7 @@
     if (el.disabled || el.readOnly) return false;
     const t = (el.getAttribute('type') || 'text').toLowerCase();
     if (!['text', 'search', ''].includes(t)) return false;
-    // La correzione manda al modello la parola e tutto il campo: una password mostrata o un numero di carta no (#810.7).
+    // La correzione manda al modello la parola e tutto il campo: in una password resa visibile, no (#810.7).
     if (Extract?.campoSegreto?.(el)) return false;
     // Rispetta la disabilitazione esplicita.
     const sc = el.getAttribute('spellcheck');
