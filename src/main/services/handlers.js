@@ -4332,7 +4332,25 @@ async function pertinentiDaCancellare(query, items) {
   throw ultimo || new Error('giudizio non riuscito');
 }
 
-async function archivioDaCancellare(query) {
+// Giudizi riusciti per blocco, per qualche minuto: «Riprova» dopo un guasto
+// rifà solo i blocchi mancati, non le decine già giudicate.
+const GIUDIZI_RECENTI_MS = 15 * 60_000;
+const giudiziRecenti = new Map();
+
+async function giudicaBlocco(query, items) {
+  const ora = Date.now();
+  for (const [k, v] of giudiziRecenti) if (ora - v.at > GIUDIZI_RECENTI_MS) giudiziRecenti.delete(k);
+  const chiave = `${query}\u0000${items.map((it) => it.id).join(',')}`;
+  const noto = giudiziRecenti.get(chiave);
+  if (noto) return items.filter((it) => noto.ids.has(it.id));
+  const presi = await pertinentiDaCancellare(query, items);
+  giudiziRecenti.set(chiave, { at: ora, ids: new Set(presi.map((it) => it.id)) });
+  return presi;
+}
+
+// `avanzamento(fatte, totali)`: schede giudicate su quelle da giudicare. Il
+// totale cala quando la parte ordinata per somiglianza si ferma prima della fine.
+async function archivioDaCancellare(query, { avanzamento = () => {} } = {}) {
   const q = String(query == null ? '' : query).trim();
   if (!q) return { ok: true, results: [] };
   const settings = await getEffectiveSettings();
@@ -4352,10 +4370,16 @@ async function archivioDaCancellare(query) {
     }
   }
   scored.sort((a, b) => b.score - a.score);
+  let totali = scored.length + senzaVettore.length;
+  let fatte = 0;
+  const segna = (n) => { fatte += n; try { avanzamento(fatte, totali); } catch (_) {} };
   const trovate = [];
   try {
     for (let i = 0; i < scored.length; i += BLOCCO_DA_CANCELLARE) {
-      const presi = await pertinentiDaCancellare(q, scored.slice(i, i + BLOCCO_DA_CANCELLARE).map((x) => x.it));
+      const blocco = scored.slice(i, i + BLOCCO_DA_CANCELLARE).map((x) => x.it);
+      const presi = await giudicaBlocco(q, blocco);
+      if (!presi.length) totali -= scored.length - (i + blocco.length);
+      segna(blocco.length);
       if (!presi.length) break;
       trovate.push(...presi);
     }
@@ -4364,7 +4388,8 @@ async function archivioDaCancellare(query) {
     const blocchi = [];
     for (let i = 0; i < senzaVettore.length; i += BLOCCO_DA_CANCELLARE) blocchi.push(senzaVettore.slice(i, i + BLOCCO_DA_CANCELLARE));
     for (let i = 0; i < blocchi.length; i += 4) {
-      const esiti = await Promise.all(blocchi.slice(i, i + 4).map((b) => pertinentiDaCancellare(q, b)));
+      const esiti = await Promise.all(blocchi.slice(i, i + 4)
+        .map((b) => giudicaBlocco(q, b).then((presi) => { segna(b.length); return presi; })));
       for (const presi of esiti) trovate.push(...presi);
     }
   } catch (e) {

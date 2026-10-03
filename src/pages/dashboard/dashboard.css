@@ -622,15 +622,30 @@ body[data-state="thread"] .dash-right { min-height: 0; }
 @media (prefers-reduced-motion: reduce) {
   .dash-delete-note[data-cerco="1"]::before { animation: none; border-top-color: currentColor; }
 }
-.dash-delete-list {
+/* Selettore lungo quanto quello delle liste nel testo della bolla, che sennò rimette il rientro. */
+.dash-delete-panel ul.dash-delete-list {
   margin: 6px 0 10px;
-  padding-left: 18px;
+  padding: 0;
+  list-style: none;
   max-height: 180px;
   overflow: auto;
   font-size: 12px;
-  opacity: 0.85;
 }
-.dash-delete-list li { margin: 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dash-delete-list li {
+  margin: 1px 0;
+  padding: 2px 4px;
+  border-radius: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background-color 0.15s ease;
+}
+.dash-delete-list li:hover { background: color-mix(in srgb, #c0392b 10%, transparent); }
+.dash-delete-list label { cursor: pointer; }
+.dash-delete-list input { margin: 0 6px 0 0; vertical-align: -2px; accent-color: #c0392b; cursor: pointer; }
+.dash-delete-list span { opacity: 0.85; }
+/* Tolta dall'elenco: resta visibile, ma si legge che non verrà eliminata. */
+.dash-delete-list input:not(:checked) + span { opacity: 0.45; text-decoration: line-through; }
 
 /* Il raffinamento estetico (color picker, slider) è volutamente poco invadente: lo sfondo resta
    visibile perché l'anteprima live sulle superfici dietro si veda mentre si trascina. */

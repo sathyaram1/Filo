@@ -1044,9 +1044,23 @@
         return;
       }
       note.dataset.cerco = '1';
-      note.textContent = `Cerco nell’archivio: “${query}”…`;
-      const r = await send({ type: MSG.ARCHIVIO_DA_CANCELLARE, query });
-      delete note.dataset.cerco;
+      const cercoTesto = `Cerco nell’archivio: “${query}”…`;
+      note.textContent = cercoTesto;
+      // Con un archivio grande il giudizio dura: il main dice quante schede ha già guardato.
+      const richiesta = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+      const suAvanzamento = (m) => {
+        if (!m || m.type !== MSG.ARCHIVIO_DA_CANCELLARE_AVANZAMENTO || m.richiesta !== richiesta) return;
+        if (note.dataset.cerco !== '1') return;
+        note.textContent = `${cercoTesto} ${m.fatte} di ${m.totali} schede guardate`;
+      };
+      try { chrome.runtime.onMessage.addListener(suAvanzamento); } catch (_) {}
+      let r = null;
+      try {
+        r = await send({ type: MSG.ARCHIVIO_DA_CANCELLARE, query, richiesta });
+      } finally {
+        try { chrome.runtime.onMessage.removeListener(suAvanzamento); } catch (_) {}
+        delete note.dataset.cerco;
+      }
       const results = (r && r.ok && Array.isArray(r.results)) ? r.results : null;
       if (!results) {
         if (r && r.ok && r.results === null) {
@@ -1072,42 +1086,64 @@
       note.textContent = results.length === 1
         ? `Trovata 1 scheda pertinente a “${query}”. Verrà eliminata DEFINITIVAMENTE:`
         : `Trovate ${results.length} schede pertinenti a “${query}”. Verranno eliminate DEFINITIVAMENTE:`;
+      // Le sceglie un modello: chi conferma deve poter togliere quella presa per sbaglio.
       const ul = document.createElement('ul');
       ul.className = 'dash-delete-list';
+      const scelte = [];
       for (const it of results) {
         const li = document.createElement('li');
-        li.textContent = it.title || it.url || '(senza titolo)';
-        li.title = it.url || '';
+        const label = document.createElement('label');
+        const box = document.createElement('input');
+        box.type = 'checkbox';
+        box.checked = true;
+        const titolo = document.createElement('span');
+        titolo.textContent = it.title || it.url || '(senza titolo)';
+        li.title = [it.title, it.url].filter(Boolean).join('\n');
+        label.append(box, titolo);
+        li.appendChild(label);
         ul.appendChild(li);
+        scelte.push({ it, box });
       }
       panel.appendChild(ul);
 
       const del = document.createElement('button');
       del.className = 'dash-action-btn dash-action-btn-danger';
       del.type = 'button';
-      del.textContent = `🗑 Elimina definitivamente ${quante(results.length)}`;
+      const spuntate = () => scelte.filter((x) => x.box.checked).map((x) => x.it);
+      const etichetta = () => {
+        const n = spuntate().length;
+        del.textContent = `🗑 Elimina definitivamente ${quante(n)}`;
+        del.disabled = n === 0;
+      };
+      ul.addEventListener('change', etichetta);
+      etichetta();
       del.addEventListener('click', async () => {
         if (del.disabled) return;
+        const scelta = spuntate();
+        if (!scelta.length) return;
         // Livello 3 (#146.2): eliminazione irreversibile → l'utente deve
         // digitare espressamente "conferma".
-        const text = `Eliminare definitivamente ${quante(results.length)} dall’archivio.`;
+        const text = `Eliminare definitivamente ${quante(scelta.length)} dall’archivio.`;
         const ok = window.SN_CONFIRM_UI
           ? await window.SN_CONFIRM_UI.confirmTyped({ title: 'Eliminazione definitiva', text, okLabel: 'Elimina' })
           : window.confirm(`${text} L’operazione non è reversibile.`);
         if (!ok || del.disabled) return;
         del.disabled = true;
+        scelte.forEach((x) => { x.box.disabled = true; });
         del.textContent = 'Elimino…';
-        const res = await send({ type: MSG.DELETE_ARCHIVED_TABS, ids: results.map((x) => x.id) });
+        const res = await send({ type: MSG.DELETE_ARCHIVED_TABS, ids: scelta.map((x) => x.id) });
         if (!res || !res.ok) {
-          del.disabled = false;
-          del.textContent = `🗑 Elimina definitivamente ${quante(results.length)}`;
+          scelte.forEach((x) => { x.box.disabled = false; });
+          etichetta();
           note.textContent = 'Eliminazione non riuscita: l’archivio è com’era. Riprova.';
           return;
         }
         const removed = res.removed || 0;
         del.remove();
         ul.remove();
-        note.textContent = `✓ Eliminate definitivamente ${quante(removed)}.`;
+        note.textContent = removed === 1
+          ? '✓ Eliminata definitivamente 1 scheda.'
+          : `✓ Eliminate definitivamente ${quante(removed)}.`;
         segnaConfermata(a, { eliminate: removed }, activity);
       });
       panel.appendChild(del);

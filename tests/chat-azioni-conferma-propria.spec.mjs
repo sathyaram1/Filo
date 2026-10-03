@@ -51,9 +51,10 @@ async function fakeChat(app, giri) {
 
 // Archivio finto: `schede` = [{ title, gatto, senzaVettore? }]. Il vettore dice
 // «gatto» o «altro»; il giudice finto prende le righe col titolo sui gatti.
-// `guasti`: quante chiamate del giudice falliscono prima di rispondere.
-async function seedArchive(app, schede, { guasti = 0 } = {}) {
-  await app.evaluate(async (_electron, { schede: s, guasti: g }) => {
+// `guasti`: quante chiamate del giudice falliscono prima di rispondere (con
+// `guastiSu`, solo quelle che contengono quel testo); `ritardo`: ms per giudizio.
+async function seedArchive(app, schede, { guasti = 0, guastiSu = '', ritardo = 0 } = {}) {
+  await app.evaluate(async (_electron, { schede: s, guasti: g, guastiSu: su, ritardo: rit }) => {
     const EM = globalThis.SN_TEST_MODELS.registry['qwen-embed'].model;
     const items = s.map((x, i) => ({
       id: `t${i}`, url: `https://sito${i}.example.com/`, title: x.title, favicon: '',
@@ -69,12 +70,13 @@ async function seedArchive(app, schede, { guasti = 0 } = {}) {
       const out = (text) => ({ text, provider: attempts[0].provider, model: attempts[0].model, usage: {} });
       if (!/eliminare dall'archivio/.test(sys)) return out('{}');
       globalThis.__giudice.chiamate += 1;
-      if (globalThis.__giudice.guasti > 0) { globalThis.__giudice.guasti -= 1; throw new Error('rete giù'); }
       const user = String(messages[1].content || '');
+      if (rit) await new Promise((r) => setTimeout(r, rit));
+      if (globalThis.__giudice.guasti > 0 && (!su || user.includes(su))) { globalThis.__giudice.guasti -= 1; throw new Error('rete giù'); }
       const presi = [...user.matchAll(/^#(\d+) (.*)$/gm)].filter((m) => /gatt/i.test(m[2])).map((m) => Number(m[1]));
       return out(JSON.stringify({ pertinenti: presi }));
     };
-  }, { schede, guasti });
+  }, { schede, guasti, guastiSu, ritardo });
 }
 
 const archiviate = (app) => app.evaluate(async () => (await globalThis.SN_ARCHIVED_TABS.list()).map((x) => x.title));
@@ -253,4 +255,72 @@ test('assistente sulla pagina: il riordino confermato parte, la cancellazione da
   expect(r.output.error).toContain('home');
   expect((await invia('filo_confirm_action', cancella)).executed).toBe(false);
   expect(await archiviate(app)).toEqual(['Gatti persiani']);
+});
+
+
+test('archivio grande: mentre giudica il pannello dice quante schede ha guardato, e «Riprova» rifà solo i blocchi mancati', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configure(app);
+  const schede = [{ title: 'Gatti persiani', gatto: true }];
+  for (let i = 0; i < 200; i++) schede.push({ title: i === 120 ? 'Gatto vecchio' : `Vecchia ${i}`, senzaVettore: true });
+  // Il blocco con «Vecchia 199» fallisce al tentativo e alla ripresa.
+  await seedArchive(app, schede, { guasti: 2, guastiSu: 'Vecchia 199', ritardo: 300 });
+  await fakeChat(app, [
+    { toolCalls: [{ id: 'c4', name: 'CANCELLA_ARCHIVIO', arguments: '{"query":"gatti"}' }] },
+    { text: 'Ecco.' },
+  ]);
+
+  await chiedi(page, 'cancella dall\'archivio le pagine sui gatti');
+  const note = page.locator('.dash-delete-panel .dash-delete-note');
+  await expect(note).toContainText(/\d+ di 201 schede guardate/, { timeout: 10_000 });
+  await expect(note).toHaveText(/Non sono riuscito a capire/, { timeout: 10_000 });
+  const prima = await app.evaluate(() => globalThis.__giudice.chiamate);
+
+  await page.locator('.dash-delete-panel .dash-action-btn', { hasText: 'Riprova' }).click();
+  await expect(note).toHaveText(/Trovate 2 schede pertinenti/, { timeout: 10_000 });
+  await expect(page.locator('.dash-delete-list li')).toHaveText(['Gatti persiani', 'Gatto vecchio']);
+  expect(await app.evaluate(() => globalThis.__giudice.chiamate)).toBe(prima + 1);
+});
+
+test('una scheda proposta per sbaglio si toglie dall\'elenco e resta; senza spunte non si elimina niente', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configure(app);
+  const lungo = 'Gatti persiani: carattere, cura del pelo e alimentazione, guida completa per chi vuole adottarne uno';
+  // «Gattopardo» è un romanzo, ma il giudice finto lo prende.
+  await seedArchive(app, [
+    { title: lungo, gatto: true },
+    { title: 'Il Gattopardo, recensione', gatto: true },
+    { title: 'Ricetta della torta', gatto: false },
+  ]);
+  await fakeChat(app, [
+    { toolCalls: [{ id: 'c5', name: 'CANCELLA_ARCHIVIO', arguments: '{"query":"gatti"}' }] },
+    { text: 'Ecco.' },
+  ]);
+
+  await chiedi(page, 'cancella dall\'archivio le pagine sui gatti');
+  const panel = page.locator('.dash-delete-panel');
+  const righe = panel.locator('.dash-delete-list li');
+  await expect(righe).toHaveCount(2, { timeout: 15_000 });
+  // Il titolo accorciato coi puntini si legge intero al passaggio.
+  expect(await righe.first().getAttribute('title')).toContain(lungo);
+
+  const del = panel.locator('.dash-action-btn-danger');
+  await righe.nth(0).getByRole('checkbox').uncheck();
+  await righe.nth(1).getByRole('checkbox').uncheck();
+  await expect(del).toBeDisabled();
+  await expect(del).toHaveText('🗑 Elimina definitivamente 0 schede');
+  await righe.nth(0).getByRole('checkbox').check();
+  await expect(del).toHaveText('🗑 Elimina definitivamente 1 scheda');
+
+  await del.click();
+  await fillConfirmInput(page, 'conferma');
+  await clickConfirm(page, 'danger');
+  await expect(panel.locator('.dash-delete-note')).toHaveText('✓ Eliminata definitivamente 1 scheda.', { timeout: 5_000 });
+  expect((await archiviate(app)).sort()).toEqual(['Il Gattopardo, recensione', 'Ricetta della torta']);
 });

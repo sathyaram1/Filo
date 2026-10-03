@@ -118,7 +118,14 @@ module.exports = function register(on, ctx) {
   on(MSG.SEARCH_ARCHIVED_TABS, async (msg) => searchArchivedTabs(msg.query));
 
   // Spende una chiamata al modello per ogni blocco di schede: solo dalle pagine di Filo.
-  on(MSG.ARCHIVIO_DA_CANCELLARE, soloFilo(async (msg) => archivioDaCancellare(msg && msg.query)));
+  // L'avanzamento torna solo alla pagina che ha chiesto, col numero della sua richiesta.
+  on(MSG.ARCHIVIO_DA_CANCELLARE, soloFilo(async (msg, sender) => archivioDaCancellare(msg && msg.query, {
+    avanzamento: (fatte, totali) => {
+      const wc = sender && sender.wc;
+      if (!wc || wc.isDestroyed()) return;
+      wc.send('filo:broadcast', { type: MSG.ARCHIVIO_DA_CANCELLARE_AVANZAMENTO, richiesta: msg && msg.richiesta, fatte, totali });
+    },
+  })));
 
   on(MSG.DELETE_ARCHIVED_TABS, async (msg) => {
     const r = await ArchivedTabs.removeMany(msg.ids || []);

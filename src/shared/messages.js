@@ -60,6 +60,8 @@
     // §5 — le schede archiviate da proporre per la cancellazione: solo le
     // pertinenti, tutte. { query } → { ok, results | null, error? }
     ARCHIVIO_DA_CANCELLARE: 'archivio_da_cancellare',
+    // Main → la pagina che ha chiesto: { richiesta, fatte, totali } schede giudicate.
+    ARCHIVIO_DA_CANCELLARE_AVANZAMENTO: 'archivio_da_cancellare_avanzamento',
     // §5 — cancellazione PERMANENTE di più tab archiviate (dopo conferma). { ids }
     DELETE_ARCHIVED_TABS: 'delete_archived_tabs',
     // Deck builder Commander (DECK-BUILDER-SPEC.md): CRUD dei mazzi, storage
