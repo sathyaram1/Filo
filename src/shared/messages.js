@@ -644,7 +644,8 @@
     AUTH_STATUS: 'auth_status',                    // → { ok, signedIn, profile|null }
     AUTH_CHANGED: 'auth_changed',                  // broadcast → { signedIn, profile|null }
 
-    // Clipboard history (per il menu "Incolla")
+    // Clipboard history (per il menu "Incolla"). Chi legge e chi scrive da un sito: services/appuntiDaiSiti.js. L'elenco
+    // lo dà solo GET; le scritture rispondono { ok } e basta.
     GET_CLIPBOARD_HISTORY: 'get_clipboard_history',
     PUSH_CLIPBOARD_ENTRY: 'push_clipboard_entry',     // { entry }
     UPDATE_CLIPBOARD_DESCRIPTION: 'update_clipboard_description', // { dataUrl, description }
