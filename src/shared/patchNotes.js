@@ -12,7 +12,7 @@
       version: '0.2.230', date: '2026-10-03',
       features: [],
       fixes: [
-        'In Altro, Modelli e Preferenze quello che scrivi in una casella resta salvato anche se subito dopo cambi scheda o chiudi la pagina, senza cliccare altrove: domini esclusi, limite di spesa, chiavi, ore dell\'archivio automatico, durata delle notifiche, nome della voce. Anche il nome nuovo di una categoria vale senza premere «Rinomina».',
+        'In Altro, Modelli e Preferenze quello che scrivi in una casella non si perde più se subito dopo cambi scheda o chiudi la pagina: domini esclusi, limite di spesa, chiavi, ore dell\'archivio automatico, durata delle notifiche, nome della voce. Il nome nuovo di una categoria vale anche senza premere «Rinomina».',
       ],
     },
     {
