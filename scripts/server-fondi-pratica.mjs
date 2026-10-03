@@ -132,7 +132,9 @@ export async function esegui(argv, deps = {}) {
     // Chiusa dalla fusione dell'app dello stesso lavoro, da poco: questa è l'ultima parte (#915).
     let tardiva = null;
     if (letta.status === 'done') {
-      const t = parteTardiva({ status: letta.status, parti: letta.parti, parte: 'server', locale: letta.locale, ora: (deps.ora || Date.now)() });
+      const t = parteTardiva({
+        status: letta.status, parti: letta.parti, parte: 'server', ramo: a.ramo, solo: a.soloServer, locale: letta.locale, ora: (deps.ora || Date.now)(),
+      });
       if (!t.ok) { err(`La pratica ${chi} è chiusa e non vale per questo ramo: ${t.motivo}. Per un lavoro nuovo aprine una. Non ho toccato niente.`); return 3; }
       tardiva = t;
     } else {
