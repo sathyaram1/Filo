@@ -22,7 +22,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as d from './driver.mjs';
 import { generate, extractJson, getApiKey, imagePart } from './llm.mjs';
-import { pushIssue } from './feedback.mjs';
+import { pushIssue, credenziale } from './feedback.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
