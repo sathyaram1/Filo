@@ -161,10 +161,21 @@ function cartellaModuli(root) {
   try { return realpathSync(join(root, 'node_modules')); } catch (_) { return ''; }
 }
 
+// Una prova interrotta (Ctrl+C, timeout di chi l'ha lanciata) lascia il worktree registrato col collegamento:
+// col lucchetto un `git worktree remove --force` qualunque si rifiuta invece di svuotare node_modules attraverso
+// il collegamento, e i resti li toglie la prova dopo (pulisciResti).
+export const MOTIVO_LUCCHETTO = 'prova degli unit sulla fusione: contiene un collegamento a node_modules. Prima togli il collegamento (cmd /c rmdir <cartella>\\node_modules), poi unlock e remove; mai remove -f -f';
+const NOME_BASE = /^filo-fusione-[A-Za-z0-9]{6}$/;
+const FILE_PID = 'pid';
+// Una cartella di prova senza pid (o illeggibile) si considera viva finché è più giovane di così.
+const VIVA_SENZA_PID_MS = 3 * TETTO_UNIT_MS;
+
 function apriAlbero(git, base, nome, sha, moduli) {
   const dir = join(base, nome);
   const r = git(['worktree', 'add', '--detach', '--quiet', dir, sha]);
   if (!r.ok) return { errore: `non riesco a preparare la cartella di prova (${primaRiga(r.out)})` };
+  const l = git(['worktree', 'lock', '--reason', MOTIVO_LUCCHETTO, dir]);
+  if (!l.ok) return { dir, errore: `non riesco a mettere il lucchetto alla cartella di prova (${primaRiga(l.out)})` };
   if (moduli) {
     try { symlinkSync(moduli, join(dir, 'node_modules'), 'junction'); } catch (e) {
       return { dir, errore: `non riesco a collegare node_modules nella cartella di prova (${e.message})` };
