@@ -1324,7 +1324,9 @@
         rimuovi: centro(riga.querySelector('.sn-menu-history-remove')),
       })),
       vuoto: [...sub.querySelectorAll('.sn-menu-empty')].filter(visibile).map((e) => e.textContent).join(' '),
-      cerca: cerca ? { centro: centro(cerca), valore: cerca.value, fuoco: sub.getRootNode().activeElement === cerca } : null,
+      cerca: cerca ? {
+        centro: centro(cerca), valore: cerca.value, segnaposto: cerca.placeholder, fuoco: sub.getRootNode().activeElement === cerca,
+      } : null,
       svuota: centro(sub.querySelector('.sn-menu-history-clear-btn')),
       riquadro: { left: r.left, top: r.top, right: r.right, bottom: r.bottom },
       lista: lista ? {
