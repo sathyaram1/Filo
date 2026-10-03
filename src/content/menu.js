@@ -1386,7 +1386,7 @@
       cerca: cerca ? {
         centro: centro(cerca), valore: cerca.value, segnaposto: cerca.placeholder, fuoco: sub.getRootNode().activeElement === cerca,
       } : null,
-      svuota: centro(sub.querySelector('.sn-menu-history-clear-btn')),
+      svuota: centro(svuota),
       riquadro: { left: r.left, top: r.top, right: r.right, bottom: r.bottom },
       lista: lista ? {
         centro: centro(lista), scrollTop: lista.scrollTop, scrollHeight: lista.scrollHeight, clientHeight: lista.clientHeight,
