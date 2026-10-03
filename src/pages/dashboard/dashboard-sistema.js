@@ -37,25 +37,25 @@
     disegna();
     chiedi();
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') { disegna(); chiedi(); }
+      if (document.visibilityState === 'visible') { disegna(); chiedi({ subito: true }); }
       programmaRichiamo();
     });
     // Il browser se ne accorge per primo: il main rilegge subito invece di aspettare il suo giro.
-    window.addEventListener('online', chiedi);
-    window.addEventListener('offline', chiedi);
+    window.addEventListener('online', () => chiedi({ subito: true }));
+    window.addEventListener('offline', () => chiedi({ subito: true }));
     programmaRichiamo();
     programmaOra();
   }
 
-  async function chiedi() {
+  async function chiedi({ subito = false } = {}) {
     let r = null;
-    try { r = await send({ type: MSG.SISTEMA_STATO }); } catch (_) {}
+    try { r = await send({ type: MSG.SISTEMA_STATO, subito }); } catch (_) {}
     if (r && r.ok && r.stato) aggiornato(r.stato);
   }
 
   function programmaRichiamo() {
     if (richiamo) clearInterval(richiamo);
-    richiamo = document.visibilityState === 'hidden' ? null : setInterval(chiedi, RICHIAMO_MS);
+    richiamo = document.visibilityState === 'hidden' ? null : setInterval(() => chiedi(), RICHIAMO_MS);
   }
 
   // L'ora cambia al minuto pieno, non un minuto dopo l'apertura della scheda.

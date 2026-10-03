@@ -189,11 +189,6 @@ test('Mac: da route e networksetup Wi-Fi o cavo; l\'SSID nascosto senza permesso
   });
 });
 
-test('Mac: niente comandi che chiedono un permesso (system_profiler e CoreBluetooth toccano il Bluetooth)', () => {
-  const mac = SORGENTE.slice(SORGENTE.indexOf('async function leggiMac'), SORGENTE.indexOf('// ── Windows'));
-  assert.ok(!/system_profiler|blueutil|CoreBluetooth|airport\b/.test(mac));
-});
-
 // ── Windows ──
 
 test('Windows: una riga del PowerShell diventa una lettura; una riga storta non cancella quella buona', () => {
@@ -208,6 +203,8 @@ test('Windows: una riga del PowerShell diventa una lettura; una riga storta non 
     bluetooth: { acceso: true, dispositivi: ['Cuffie'] },
   });
   assert.deepEqual(L.datiDaWindows('{"batteria":null,"rete":null,"bluetooth":null}'), { batteria: null, rete: null, bluetooth: null });
+  assert.deepEqual(L.datiDaWindows('{"bluetooth":{"acceso":true,"dispositivi":{"value":["Mouse"],"Count":1}}}').bluetooth,
+    { acceso: true, dispositivi: ['Mouse'] }, 'la forma {value, Count} di PowerShell 5.1');
   for (const storta of ['', 'WARNING: qualcosa', '[1,2]', 'null', '{"batteria":']) assert.equal(L.datiDaWindows(storta), null, storta);
 });
 

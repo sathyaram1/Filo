@@ -281,6 +281,7 @@ async function leggiMac(esec = esegui) {
 const SCRIPT_WINDOWS = String.raw`
 $ErrorActionPreference = 'SilentlyContinue'
 $ProgressPreference = 'SilentlyContinue'
+try { Remove-TypeData System.Array } catch {}
 try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false } catch {}
 $genitore = __GENITORE__
 try { Add-Type -AssemblyName System.Windows.Forms } catch {}
@@ -298,7 +299,10 @@ $nlm = $null
 try { $nlm = [Activator]::CreateInstance([Type]::GetTypeFromCLSID([Guid]'DCB00C01-570F-4A9B-8D69-199FDBA5723B')) } catch {}
 $ultimo = ''
 $btPrima = $null
+$nomiPrima = $null
+$giri = 0
 while ($true) {
+  $giri += 1
   try { $null = [System.Diagnostics.Process]::GetProcessById($genitore) } catch { exit }
   $o = [ordered]@{ batteria = $null; rete = $null; bluetooth = $null }
   try {
@@ -338,7 +342,9 @@ while ($true) {
         if ($bt.Count -gt 0) {
           $acceso = @($bt | Where-Object { [string]$_.State -eq 'On' }).Count -gt 0
           $nomi = @()
-          if ($acceso) {
+          if ($acceso -and ($null -ne $nomiPrima) -and (($giri % 3) -ne 0)) {
+            $nomi = $nomiPrima
+          } elseif ($acceso) {
             try {
               $elenco = New-Object System.Collections.ArrayList
               foreach ($sel in @([Windows.Devices.Bluetooth.BluetoothDevice]::GetDeviceSelectorFromConnectionStatus('Connected'), [Windows.Devices.Bluetooth.BluetoothLEDevice]::GetDeviceSelectorFromConnectionStatus('Connected'))) {
@@ -348,6 +354,7 @@ while ($true) {
               $nomi = @($elenco)
             } catch { $nomi = $null }
           }
+          if ($acceso) { $nomiPrima = $nomi } else { $nomiPrima = $null }
           $o.bluetooth = [ordered]@{ acceso = $acceso; dispositivi = $nomi }
         }
       }
@@ -370,7 +377,11 @@ function datiDaWindows(riga) {
   try { j = JSON.parse(String(riga || '').trim()); } catch (_) { return null; }
   if (!j || typeof j !== 'object' || Array.isArray(j)) return null;
   const rete = j.rete && typeof j.rete === 'object' ? { tipo: j.rete.tipo || null, nome: j.rete.nome || null } : null;
-  return { batteria: j.batteria || null, rete, bluetooth: j.bluetooth || null };
+  let bluetooth = j.bluetooth && typeof j.bluetooth === 'object' ? { ...j.bluetooth } : null;
+  // Windows PowerShell 5.1 a volte scrive un elenco come {value, Count}: si riprende l'elenco.
+  const d = bluetooth && bluetooth.dispositivi;
+  if (d && typeof d === 'object' && !Array.isArray(d) && Array.isArray(d.value)) bluetooth.dispositivi = d.value;
+  return { batteria: j.batteria || null, rete, bluetooth };
 }
 
 function lettoreWindows({ avvia = spawn, pid = process.pid, quandoCambia = () => {} } = {}) {
@@ -569,6 +580,7 @@ function offline() {
   return onlineDaElectron() === false;
 }
 
+// Le prove staccano il caricatore e la rete di un computer finto: il giro, l'annuncio e la home restano quelli veri.
 const _perProve = {
   usaLettore(fn) { lettoreProve = typeof fn === 'function' ? fn : null; firma = null; return leggiAdesso(); },
   leggiOra: () => leggiAdesso(),

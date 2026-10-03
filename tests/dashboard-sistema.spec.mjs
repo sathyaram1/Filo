@@ -193,6 +193,17 @@ test('tasto destro: dettagli, copia, nascondi; la voce torna dallo stesso riquad
   await page.keyboard.press('Escape');
   await expect(box).toHaveCount(0);
 
+  // Da tastiera: Invio apre lo stesso riquadro, le frecce scorrono le voci, Copia copia la frase.
+  await voce(page, 'rete').focus();
+  await page.keyboard.press('Enter');
+  await expect(box.locator('.dash-sis-info')).toContainText('Collegato al Wi-Fi «Casa di Anna»');
+  await page.keyboard.press('ArrowDown');
+  await expect(box.getByText('Copia', { exact: true })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(box.getByText('Copiato', { exact: true })).toBeVisible();
+  await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('Collegato al Wi-Fi «Casa di Anna»');
+  await expect(box).toHaveCount(0);
+
   await voce(page, 'batteria').click({ button: 'right' });
   await expect(box.locator('.dash-sis-info')).toContainText('Batteria al 42%');
   // Il riquadro aperto segue la lettura: il caricatore attaccato si vede anche lì.
