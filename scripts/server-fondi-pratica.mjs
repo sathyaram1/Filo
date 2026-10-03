@@ -168,7 +168,7 @@ export async function esegui(argv, deps = {}) {
       ? `resterebbe chiusa, con la nota di quest'ultima parte (l'ha chiusa la fusione della parte ${NOME_PARTE.app}, ${quando})`
       : chiude
         ? `si chiuderebbe con «${notaFine(a.ramo, '')}»`
-        : `resterebbe aperta: manca la parte ${NOME_PARTE.app}, ${chiudeApp}. Se il lavoro sta solo sul server: ${soloComando}`;
+        : `resterebbe aperta: manca la parte ${NOME_PARTE.app}, ${chiudeApp}${ramiApp.length ? '' : `. Se il lavoro sta solo sul server: ${soloComando}`}`;
     if (a.dryRun) {
       const k = lancia(cartella, [a.ramo, '--dry-run'], figlio);
       log(tardiva
