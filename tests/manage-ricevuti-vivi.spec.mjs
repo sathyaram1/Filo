@@ -108,8 +108,24 @@ test('arrivata In coda: il punto sta nella riga del titolo, che resta all\'altez
   expect(Math.abs(await altezzaTitolo('f515') - riferimento)).toBeLessThan(3);
 });
 
-test('in secondo piano o ridotta a icona non legge; tornando in vista si allinea subito', async ({ openTab, shell, app }) => {
-  const docs = [fb('f716', 716, 'design'), fb('f515', 515, 'working')];
+// Fuori vista niente letture anche col ritmo stretto; al rientro il cambio arriva
+// in pochi secondi col ritmo a minuti, quindi l'ha portato il rientro.
+async function fuoriVistaERitorno(page, app, { esci, rientra, cambia, attesi }) {
+  const come = await app.evaluate(esci);
+  await page.waitForTimeout(600);
+  const fuori = await page.evaluate(() => window.__srv.letture);
+  await page.evaluate(() => window.__mgTest.setLiveTiming({ pollMs: 800 }));
+  await page.waitForTimeout(3000);
+  expect(await page.evaluate(() => window.__srv.letture)).toBe(fuori);
+  await page.evaluate(() => window.__mgTest.setLiveTiming({ pollMs: 10 * 60 * 1000 }));
+  await cambia();
+  await app.evaluate(rientra, come);
+  await expect.poll(() => ids(page), { timeout: 4000 }).toEqual(attesi);
+  return come;
+}
+
+test('in secondo piano, ridotta a icona o nascosta non legge; tornando in vista si allinea subito', async ({ openTab, shell, app }) => {
+  const docs = [fb('f716', 716, 'design'), fb('f515', 515, 'working'), fb('f600', 600, 'todo')];
   const page = await apri(openTab, docs, { tempi: { pollMs: 800, rientroMs: 300, clockMs: 200 } });
   await page.evaluate(() => window.__mgTest.setTab('inbox'));
   await expect.poll(() => page.evaluate(() => window.__srv.letture)).toBeGreaterThan(1);
