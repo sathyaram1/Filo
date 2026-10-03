@@ -284,6 +284,7 @@ class AnteprimeSchede {
     if (!tab) return;
     tab._anteprimaAttesa = 0;
     tab._anteprimaRipresa = false;
+    tab._anteprimaPersa = false;
     this.coda = this.coda.filter((id) => id !== tab.id);
   }
 
