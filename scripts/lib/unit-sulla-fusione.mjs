@@ -193,7 +193,7 @@ export function lanciaUnit(dir, base, nome, { timeoutMs = TETTO_UNIT_MS } = {}) 
     r = spawnSync(process.execPath, [
       runner, '--test-reporter=spec', '--test-reporter-destination=stdout',
       `--test-reporter=${REPORTER}`, `--test-reporter-destination=${dest}`,
-    ], { cwd: dir, stdio: ['ignore', fd, fd], timeout: timeoutMs, windowsHide: true });
+    ], { cwd: dir, env, stdio: ['ignore', fd, fd], timeout: timeoutMs, windowsHide: true });
   } finally { closeSync(fd); }
   if (r.error && r.error.code === 'ETIMEDOUT') return { errore: `unit oltre il tetto di ${Math.round(timeoutMs / 60000)} minuti` };
   if (r.error) return { errore: `non riesco a lanciare gli unit (${r.error.message})` };
