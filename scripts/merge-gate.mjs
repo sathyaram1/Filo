@@ -44,11 +44,11 @@
 //          non combacia col biglietto, via libera che non copre la punta): il
 //          server l'ha già messa a registro.
 
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pinnedRepoRoot, absolutizeRecipe, TOOLS_ROOT } from './lib/tools-pin.mjs';
-import { merge } from './routine-channel.mjs';
+import { merge, heartbeat } from './routine-channel.mjs';
 import { readTicket } from './lib/routine-ticket.mjs';
 import { headSha, currentBranch, findStateIdByBranch, readBranchState } from './lib/branch-integrity.mjs';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
