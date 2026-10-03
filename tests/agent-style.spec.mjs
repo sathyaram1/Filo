@@ -414,6 +414,7 @@ test('#592 — scrivere in chat mentre Filo lavora non conferma lo stile; da tas
   await page.screenshot({ path: 'tests/.shots/stile-agente-popup-mentre-scrivi.png' });
 
   // Chi usa la tastiera sceglie OK col tabulatore (dopo Annulla) e lo preme.
+  await aspettaConfermaPronta(page);
   await page.keyboard.press('Tab');
   await page.keyboard.press('Tab');
   await page.keyboard.press('Enter');
