@@ -6,15 +6,16 @@
   'use strict';
 
   const LIVELLI = Object.freeze([
-    Object.freeze({ id: 'conservativo', nome: 'Conservativo', frase: 'Da solo fa solo quello che resta in chat o si disfa con un gesto. Dopo aver letto cose scritte da altri chiede anche per quelle, e quello che non si disfa non lo fa.' }),
-    Object.freeze({ id: 'default', nome: 'Normale', frase: 'Fa da solo quello che si rimedia e ti chiede prima di ciò che non si disfa. Dopo aver letto cose scritte da altri chiede prima di ciò che dura, e per ciò che non si disfa vuole la parola «conferma».' }),
-    Object.freeze({ id: 'automatico', nome: 'Automatico', frase: 'Fa da solo quasi tutto e ti chiede solo prima di ciò che non si disfa. Dopo aver letto cose scritte da altri chiede anche prima di ciò che dura.' }),
+    Object.freeze({ id: 'conservativo', nome: 'Conservativo', frase: 'Senza chiederti fa solo quello che resta in chat o si disfa con un gesto. Dopo aver letto cose scritte da altri chiede anche per quello, e ciò che non si disfa non lo fa.' }),
+    Object.freeze({ id: 'default', nome: 'Normale', frase: 'Fa da solo quello che si rimedia e ti chiede prima di ciò che non si disfa. Dopo aver letto cose scritte da altri chiede anche prima di ciò che dura, e per ciò che non si disfa vuole la parola «conferma».' }),
+    Object.freeze({ id: 'automatico', nome: 'Automatico', frase: 'Come Normale, ma dopo aver letto cose scritte da altri, per ciò che non si disfa basta un OK invece della parola «conferma».' }),
     Object.freeze({ id: 'yolo', nome: 'Yolo', frase: 'Fa tutto da solo, con un guardiano che rilegge ogni uscita.' }),
   ]);
   const LIVELLO_PREDEFINITO = 'default';
 
   // Il guardiano dei registri e quello di uscita non esistono ancora: finché mancano, yolo non si sceglie
-  // e una cella «+G» chiede invece di partire. Quando arrivano diventano veri qui, e solo qui.
+  // e una cella «+G» chiede invece di partire. Quando arrivano diventano veri qui, e solo qui: allora
+  // va riscritta anche la frase di Automatico, che oggi descrive la tabella senza guardiano.
   const GUARDIANO_REGISTRI = false;
 
   const CLASSI = Object.freeze({
