@@ -305,12 +305,12 @@
     var t = timeAgo(p.atMs, nowMs);
     var quando = t ? (t === 'adesso' ? ' di adesso' : ' di ' + t) : '';
     var titolo = 'Gli unit test sono girati sul risultato della fusione con main com’era allora (' + shortSha(p.mainSha)
-      + '). Approvando non si rifanno: se main nel frattempo è andato avanti, quello che fondi insieme non l’ha provato nessuno.';
+      + '). Approvando non si rifanno, quindi se main nel frattempo è andato avanti la combinazione che fondi non l’ha provata nessuno.';
     if (p.esito === 'verde' || p.esito === 'main_contenuto') return { testo: 'Unit verdi sulla fusione con main' + quando, titolo: titolo };
     if (p.esito === 'rosso_anche_su_main') {
-      return { testo: 'Unit rossi anche su main da solo' + (t ? ', ' + t : '') + ': la fusione non ne rompeva altri', titolo: titolo };
+      return { testo: 'Unit già rossi su main da solo' + (t ? ' ' + t : '') + ', la fusione non ne rompeva altri', titolo: titolo };
     }
-    if (p.esito === 'conflitto') return { testo: 'Unit non provati: la fusione con main' + quando + ' andava in conflitto', titolo: titolo };
+    if (p.esito === 'conflitto') return { testo: 'Unit non provati, la fusione con main' + quando + ' andava in conflitto', titolo: titolo };
     return null;
   }
 
