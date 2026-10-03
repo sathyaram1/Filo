@@ -65,10 +65,12 @@ async function elencoLeggibile(sender, origin) {
 }
 
 /** Aggiungere, togliere, svuotare: da un sito solo dopo un gesto dell'utente su quella scheda (copia, voce del menu). */
-function scritturaAmmessa(sender, origin) {
+function scritturaAmmessa(sender, origin, voce) {
   if (daFilo(origin, sender)) return true;
   const t = sender && sender.wc && sender.wc._filoGestoAlle;
-  return Boolean(t && Date.now() - t < SCRITTURA_DOPO_IL_GESTO_MS);
+  if (!(t && Date.now() - t < SCRITTURA_DOPO_IL_GESTO_MS)) return false;
+  // Dallo sfondo passa solo la copia d'immagine che arriva con la sua descrizione, a scheda già cambiata.
+  return mittenteInVista(sender) || Boolean(voce && voce.type === 'image');
 }
 
 module.exports = { elencoLeggibile, scritturaAmmessa, mittenteInVista, menuApertoQui, ATTESA_DEL_MENU_MS, SCRITTURA_DOPO_IL_GESTO_MS };
