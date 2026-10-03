@@ -1100,14 +1100,24 @@ html, body {
 /* A destra scorre la colonna intera: le carte non si schiacciano sotto «altro» quando la finestra è bassa. */
 .dash-right > .dash-carte { flex: none; padding: 2px; }
 
-/* Ora, batteria, rete e Bluetooth (#873): una riga in fondo alla colonna destra, dove sul desktop sta l'orologio
-   di sistema. L'ora a sinistra, le icone a destra; il colore solo per quello che chiede attenzione. */
+/* Ora, batteria, rete e Bluetooth (#873): in fondo alla colonna destra, dove sul desktop sta l'orologio di
+   sistema. L'ora sopra, le icone sotto; il colore solo per quello che chiede attenzione. Il rientro allinea
+   l'ora e la prima icona al testo delle carte qui sopra. */
 .dash-sistema {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  margin-left: 14px;
+}
+.dash-sis-icone {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 2px;
   min-width: 0;
+  max-width: 100%;
 }
 .dash-sis-voce {
   display: inline-flex;
@@ -1115,6 +1125,7 @@ html, body {
   gap: 5px;
   height: 30px;
   min-width: 0;
+  max-width: 100%;
   padding: 0 8px;
   border-radius: 10px;
   color: var(--dash-ink-soft);
@@ -1132,9 +1143,10 @@ html, body {
 }
 .dash-sis-voce:active { transform: translateY(0.5px); }
 .dash-sis-voce[data-voce="ora"] {
-  margin-right: auto;
-  font-size: 15px;
+  height: 38px;
+  font-size: 24px;
   font-weight: 600;
+  letter-spacing: -0.01em;
   color: var(--dash-ink);
 }
 .dash-sis-icona { display: inline-flex; flex: none; }

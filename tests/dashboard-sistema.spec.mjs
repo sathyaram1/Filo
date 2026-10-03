@@ -84,6 +84,19 @@ test('la home mostra ora, batteria, rete e Bluetooth, e ognuna si aggiorna da so
   // Torna la rete: «offline» se ne va.
   await cambia(app, PIENO);
   await expect(voce(page, 'rete')).toHaveText('Casa di Anna', { timeout: giro + 3_000 });
+
+  // Col tema scuro la riga resta leggibile: le voci prendono i colori della home, non quelli fissi.
+  await app.evaluate(async () => globalThis.__filoHandlers.handleMessage(
+    { type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } },
+    { url: 'filo://preferences/preferences.html' },
+  ));
+  await expect(page.locator('html')).toHaveAttribute('data-sn-theme', 'dark', { timeout: 5_000 });
+  const colori = await page.evaluate(() => ({
+    voce: getComputedStyle(document.querySelector('.dash-sis-voce[data-voce="ora"]')).color,
+    fondo: getComputedStyle(document.body).backgroundColor,
+  }));
+  expect(colori.voce).not.toBe(colori.fondo);
+  await page.screenshot({ path: 'tests/.shots/873-home-scuro.png' }).catch(() => {});
 });
 
 test('un dato che il computer non dice non compare, e la riga resta in piedi', async ({ app }) => {
@@ -167,7 +180,7 @@ test('un sito non legge il nome della rete né dei dispositivi', async ({ app })
   expect(JSON.stringify(r)).not.toContain('Casa di Anna');
 });
 
-test('tasto destro: dettagli, copia, nascondi; la voce torna dallo stesso riquadro e dalle Preferenze', async ({ app }) => {
+test('tasto destro: dettagli, copia, nascondi; la voce torna dallo stesso riquadro e dalle Preferenze', async ({ app, shell }) => {
   await finto(app, PIENO);
   const page = await newtab(app);
   await expect(voce(page, 'batteria')).toBeVisible({ timeout: 8_000 });
@@ -200,25 +213,20 @@ test('tasto destro: dettagli, copia, nascondi; la voce torna dallo stesso riquad
   await expect(voce(page, 'batteria')).toBeVisible();
 
   // Dalle Preferenze: la casella toglie l'ora dalla home aperta, senza ricaricarla.
-  const pref = await app.evaluate(async ({ BrowserWindow }) => {
-    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
-    await win._filoTabs.create?.('filo://preferences/preferences.html');
-    return !!win;
-  });
-  expect(pref).toBe(true);
+  await shell.evaluate(() => window.filoShell.tabs.open('filo://preferences/preferences.html'));
   let prefPage = null;
   for (let i = 0; i < 100 && !prefPage; i++) {
     prefPage = app.windows().find((w) => w.url().startsWith('filo://preferences/'));
     if (!prefPage) await new Promise((r) => setTimeout(r, 100));
   }
-  if (prefPage) {
-    await prefPage.waitForLoadState('domcontentloaded');
-    await expect(prefPage.locator('#homeSisOra')).toBeChecked({ timeout: 8_000 });
-    await prefPage.locator('#homeSisOra').uncheck();
-    await expect(voce(page, 'ora')).toBeHidden({ timeout: 5_000 });
-    await prefPage.locator('#homeSisOra').check();
-    await expect(voce(page, 'ora')).toBeVisible({ timeout: 5_000 });
-  }
+  expect(prefPage, 'la pagina Preferenze non si è aperta').toBeTruthy();
+  await prefPage.waitForLoadState('domcontentloaded');
+  await expect(prefPage.locator('#homeSisOra')).toBeChecked({ timeout: 8_000 });
+  await expect(prefPage.locator('#homeSisBatteria')).toBeChecked();
+  await prefPage.locator('#homeSisOra').uncheck();
+  await expect(voce(page, 'ora')).toBeHidden({ timeout: 5_000 });
+  await prefPage.locator('#homeSisOra').check();
+  await expect(voce(page, 'ora')).toBeVisible({ timeout: 5_000 });
 });
 
 test('a parole: «togli il Bluetooth dalla home» lo toglie dalla home aperta, e lo rimette', async ({ app }) => {
@@ -241,8 +249,11 @@ test('trascinata nella chat, una voce porta la sua frase', async ({ app }) => {
   await finto(app, PIENO);
   const page = await newtab(app);
   await expect(voce(page, 'batteria')).toBeVisible({ timeout: 8_000 });
-  await voce(page, 'batteria').dragTo(page.locator('#inputForm'), { targetPosition: { x: 4, y: 4 } });
+  await voce(page, 'batteria').dragTo(page.locator('#input'));
   await expect(page.locator('#input')).toHaveValue('Batteria al 42%, non collegata alla corrente');
+  // Accanto al campo, sul bordo del modulo: la frase va in coda a quello che c'era.
+  await voce(page, 'rete').dragTo(page.locator('#sendBtn'));
+  await expect(page.locator('#input')).toHaveValue('Batteria al 42%, non collegata alla corrente Collegato al Wi-Fi «Casa di Anna»');
 });
 
 test('il lettore vero di Linux: quello che il contenitore non ha non compare', async ({ app }) => {

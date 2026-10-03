@@ -1163,19 +1163,21 @@
   });
   inputForm.addEventListener('dragover', (e) => { e.preventDefault(); });
   // Un file diventa un allegato; un testo trascinato (una voce della colonna destra, una frase da
-  // un'altra scheda) entra nel campo, dove cade il puntatore o in coda.
+  // un'altra scheda) entra nel campo dove sta il cursore. Il dragover qui sopra dice a Chromium che il
+  // trascinamento lo gestisce la pagina, e allora il campo non inserisce più niente da sé.
   inputForm.addEventListener('drop', (e) => {
+    e.preventDefault();
     const files = e.dataTransfer?.files;
     if (files && files.length) {
-      e.preventDefault();
       for (const f of files) handleDroppedFile(f);
       return;
     }
-    if (e.target === inputEl) return;
-    e.preventDefault();
     const testo = e.dataTransfer?.getData('text/plain') || '';
     if (!testo) return;
-    inputEl.value = inputEl.value ? `${inputEl.value.replace(/\s+$/, '')} ${testo}` : testo;
+    const prima = inputEl.value.slice(0, inputEl.selectionStart);
+    const dopo = inputEl.value.slice(inputEl.selectionEnd);
+    const pezzo = `${prima && !/\s$/.test(prima) ? ' ' : ''}${testo}${dopo && !/^\s/.test(dopo) ? ' ' : ''}`;
+    inputEl.setRangeText(pezzo, inputEl.selectionStart, inputEl.selectionEnd, 'end');
     inputEl.focus();
     autoGrowInput();
     Comandi.updateInputClass();

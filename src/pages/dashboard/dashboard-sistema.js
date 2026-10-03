@@ -13,6 +13,7 @@
   let send = null;
   let MSG = null;
   let host = null;
+  let riga = null;
   let ICONS = {};
   let stato = null;
   let visibili = { ora: true, batteria: true, rete: true, bluetooth: true };
@@ -29,6 +30,9 @@
     MSG = deps.MSG;
     host = deps.host;
     ICONS = deps.ICONS || {};
+    // L'ora sopra, grande; sotto la riga delle icone, che in una colonna stretta va a capo da sola.
+    riga = document.createElement('div');
+    riga.className = 'dash-sis-icone';
     for (const v of ORDINE) voci[v] = creaVoce(v);
     disegna();
     chiedi();
@@ -103,7 +107,8 @@
       e.dataTransfer.setData('text/plain', d.copia);
       e.dataTransfer.effectAllowed = 'copy';
     });
-    host.appendChild(el);
+    if (v === 'ora') host.append(el, riga);
+    else riga.appendChild(el);
     return { el, icona, testo, chiaveIcona: null };
   }
 
@@ -117,6 +122,7 @@
     if (!host) return;
     const d = descrizione();
     let qualcuna = false;
+    let icone = false;
     for (const v of ORDINE) {
       const x = d[v];
       const voce = voci[v];
@@ -124,6 +130,7 @@
       if (voce.el.hidden !== !mostra) voce.el.hidden = !mostra;
       if (!mostra) continue;
       qualcuna = true;
+      if (v !== 'ora') icone = true;
       const chiave = x.icona ? `${x.icona}:${x.livello == null ? '' : x.livello}` : '';
       if (voce.chiaveIcona !== chiave) {
         voce.icona.innerHTML = x.icona ? svgDi(x) : '';
@@ -136,6 +143,7 @@
       voce.el.dataset.stato = x.offline ? 'offline' : x.bassa ? 'bassa' : x.spento ? 'spento' : '';
     }
     host.hidden = !qualcuna;
+    riga.hidden = !icone;
     if (box) aggiornaBox(d);
   }
 
