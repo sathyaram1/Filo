@@ -1207,8 +1207,8 @@ function perimetroLettura(sender) {
 
 // Le fonti che il compito ha letto: la pagina su cui vive l'assistente e ciò che hanno portato le azioni
 // già fatte, turni passati compresi. Le dichiara il registro, mai il modello (#530).
-function fontiDelCompito(sender, contesto) {
-  const fonti = [];
+function fontiDelCompito(sender, contesto, fontiLette = null) {
+  const fonti = Array.isArray(fontiLette) ? fontiLette.filter(Boolean) : [];
   const origine = String(sender?.tab?.url || sender?.url || '');
   if (/^https?:/i.test(origine)) {
     let host = '';
