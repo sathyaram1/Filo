@@ -36,6 +36,7 @@ async function modelloFinto(app, risposte) {
 async function apriAiuto(shell, page) {
   const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
   await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
+  await expect(page.locator('.sn-sidebar')).toBeVisible({ timeout: 8_000 });
   await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
 }
 
@@ -44,24 +45,34 @@ async function scriviAllAiuto(page, testo) {
   await page.press('.sn-sidebar-input textarea', 'Enter');
 }
 
-// Tutto ciò che è arrivato al modello, senza l'indirizzo del server di prova (la porta potrebbe contenere le cifre).
+// Il testo arrivato al modello, senza l'indirizzo del server di prova e l'immagine della pagina: la porta e il
+// base64 possono contenere per caso le cifre di un codice corto.
 async function arrivato(app, page) {
   const testo = await app.evaluate(() => JSON.stringify(globalThis.__visti || []));
-  return testo.split(new URL(page.url()).origin).join('');
+  return testo.split(new URL(page.url()).origin).join('').replace(/data:image\/[a-z]+;base64,[A-Za-z0-9+/=]+/g, '');
 }
 
 function rigaDelCampo(testo) {
   return (testo.split('\\n').find((r) => r.includes(':: #c')) || '').replace(/\\"/g, '"');
 }
 
+// Su http un modulo con password o carta fa comparire l'avviso del sito sospetto, che rende la pagina inerte
+// finché non si sceglie «Continua»: è quello che farebbe l'utente prima di scrivere.
+async function superaAvviso(page) {
+  const continua = page.getByRole('button', { name: 'Continua' });
+  await expect(continua).toBeVisible({ timeout: 10_000 });
+  await continua.click();
+  await expect(continua).toHaveCount(0, { timeout: 6_000 });
+}
+
 const modulo = (campo) => `<!doctype html><html><head><title>Accesso</title></head><body><h1>Area clienti</h1>
   <form><div>${campo}</div><button type="button">Accedi</button></form></body></html>`;
 
 const SEGRETI = [
-  { nome: 'la password sotto l’etichetta «Password»', campo: '<label for="c">Password</label> <input id="c" type="password">', valore: 'Gatto.Rosso.77', etichetta: 'Password' },
-  { nome: 'la password resa visibile dal sito', campo: '<label for="c">Password</label> <input id="c" type="text">', valore: 'Gatto.Rosso.77', etichetta: 'Password' },
-  { nome: 'il numero di carta senza segnaposto', campo: '<label for="c">Numero della carta</label> <input id="c" autocomplete="cc-number" inputmode="numeric">', valore: '4111 1111 1111 1111', etichetta: 'Numero della carta' },
-  { nome: 'il codice di sicurezza nella sua etichetta', campo: '<label>CVV <input id="c" inputmode="numeric"></label>', valore: '8264', etichetta: 'CVV' },
+  { nome: 'la password sotto l’etichetta «Password»', campo: '<label for="c">Password</label> <input id="c" type="password">', valore: 'Gatto.Rosso.77', etichetta: 'Password', avviso: true },
+  { nome: 'la password resa visibile dal sito', campo: '<label for="c">Password</label> <input id="c" type="text">', valore: 'Gatto.Rosso.77', etichetta: 'Password', avviso: true },
+  { nome: 'il numero di carta senza segnaposto', campo: '<label for="c">Numero della carta</label> <input id="c" autocomplete="cc-number" inputmode="numeric">', valore: '4111 1111 1111 1111', etichetta: 'Numero della carta', avviso: true },
+  { nome: 'il codice di sicurezza nella sua etichetta', campo: '<label>CVV <input id="c" inputmode="numeric"></label>', valore: '8264', etichetta: 'CVV', avviso: true },
   { nome: 'un codice che il sito copre coi puntini', campo: '<label for="c">Codice</label> <input id="c" style="-webkit-text-security:disc">', valore: 'Zq7Kp2xW', etichetta: 'Codice' },
 ];
 
@@ -69,7 +80,9 @@ for (const caso of SEGRETI) {
   test(`${caso.nome}: al modello arriva il campo col suo nome, non quello che c'è scritto`, async ({ app, shell, openTab, testServer }) => {
     test.setTimeout(60_000);
     const page = await testServer.openReady(openTab, modulo(caso.campo));
+    if (caso.avviso) await superaAvviso(page);
     await page.fill('#c', caso.valore);
+    await expect(page.locator('#c')).toHaveValue(caso.valore);
     await preparaModelli(app);
     await modelloFinto(app, [['', JSON.stringify({ text: 'Premi «Accedi».', status: 'done' })]]);
     await apriAiuto(shell, page);
@@ -87,6 +100,7 @@ test('un campo qualunque senza nome continua a farsi riconoscere da quello che c
   test.setTimeout(60_000);
   const page = await testServer.openReady(openTab, modulo('<input id="c">'));
   await page.fill('#c', 'biciclette rosse');
+  await expect(page.locator('#c')).toHaveValue('biciclette rosse');
   await preparaModelli(app);
   await modelloFinto(app, [['', JSON.stringify({ text: 'Premi «Accedi».', status: 'done' })]]);
   await apriAiuto(shell, page);
@@ -98,7 +112,9 @@ test('un campo qualunque senza nome continua a farsi riconoscere da quello che c
 test('il clic sul campo della password indicato dall’assistente lo racconta col nome del campo', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(60_000);
   const page = await testServer.openReady(openTab, modulo('<label for="c">Password</label> <input id="c" type="password">'));
+  await superaAvviso(page);
   await page.fill('#c', 'Gatto.Rosso.77');
+  await expect(page.locator('#c')).toHaveValue('Gatto.Rosso.77');
   await preparaModelli(app);
   await modelloFinto(app, [
     ['cliccato', JSON.stringify({ text: 'Ora premi «Accedi».', status: 'done' })],
