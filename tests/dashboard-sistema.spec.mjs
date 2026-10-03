@@ -2,7 +2,7 @@
 //
 // Il lettore vero del computer si sostituisce con uno finto dal main (`_perProve.usaLettore`): il resto è la
 // strada vera, cioè il giro del main che rilegge da solo, l'annuncio alle pagine e la riga della home che si
-// aggiorna senza ricaricare. L'ultima prova usa il lettore vero del contenitore Linux.
+// aggiorna senza ricaricare. L'ultima prova usa il lettore vero del sistema, dove gira su Linux.
 //
 // Senza il lavoro: la home non ha #sistema, lo STATO non ha SISTEMA, e la chat offline dà un errore di rete
 // generico.

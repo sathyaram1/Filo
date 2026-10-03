@@ -1,5 +1,5 @@
 // Batteria, rete e Bluetooth del computer: un lettore per piattaforma, senza permessi, senza modello, senza console.
-// Non comanda niente; un dato che il sistema dà solo con un permesso si omette. I testi stanno in src/shared/sistema.js.
+// Non comanda niente e non chiede permessi: patterns/il-computer-si-legge-senza-permessi-e-finche-serve.md.
 // Prove: tests/unit/statoSistema.test.mjs (lettori), tests/dashboard-sistema.spec.mjs (home e chat).
 
 'use strict';
