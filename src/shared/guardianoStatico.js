@@ -460,6 +460,8 @@
   }
 
   function oscuraTesto(s, chiavi) {
+    // Una foto mandata al modello è pixel, non testo: decodificarla costerebbe e non troverebbe niente.
+    if (/^data:image\//i.test(s.slice(0, 16))) return s.split(chiavi[0].v).length > 1 ? chiavi.reduce((a, c) => a.split(c.v).join(OSCURATO), s) : s;
     let t = s;
     for (const c of chiavi) {
       t = t.split(c.v).join(OSCURATO);
