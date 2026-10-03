@@ -829,7 +829,10 @@
   function resolveActionText(page) {
     const provided = String(page.text ?? page.testo ?? page.query ?? page.selection ?? '').trim();
     if (provided) return provided;
-    try { return (window.getSelection?.()?.toString() || '').trim(); } catch (_) { return ''; }
+    try {
+      if (Extract?.selezioneSegreta?.()) return '';
+      return (window.getSelection?.()?.toString() || '').trim();
+    } catch (_) { return ''; }
   }
 
   // Immagine bersaglio: per selettore, per src, altrimenti la più grande visibile.
@@ -978,12 +981,15 @@
   }
 
   // I campi segreti leggibili a schermo arrivano al modello coperti dai puntini (#810.7): misurati prima e dopo lo
-  // scatto, se la pagina scorre nel frattempo. Se coprirli non riesce, l'immagine non parte.
+  // scatto, se la pagina scorre nel frattempo; quelli dei riquadri incorporati li misura il main. Se coprirli non
+  // riesce, l'immagine non parte.
   async function captureScreenshot() {
     try {
       const prima = Extract.campiSegretiInVista();
-      const r = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB });
-      if (r?.ok && r.dataUrl) return await coperta(r.dataUrl, prima.concat(Extract.campiSegretiInVista()));
+      const r = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB, campiSegreti: true });
+      if (!r?.ok || !r.dataUrl || r.riquadriNonCoperti) return null;
+      const riquadri = Array.isArray(r.riquadri) ? r.riquadri : [];
+      return await coperta(r.dataUrl, prima.concat(riquadri, Extract.campiSegretiInVista()));
     } catch (_) {}
     return null;
   }

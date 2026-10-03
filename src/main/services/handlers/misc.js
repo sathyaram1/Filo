@@ -3,6 +3,7 @@
 
 const { safeFetch } = require('../safe-fetch');
 const { avvisoNellaFinestra } = require('../avvisoFinestra');
+const { campiSegretiNeiRiquadri } = require('../campiNeiRiquadri');
 const auth = require('../../auth/google-auth');
 // L'identità da allegare a un invio che il server limita per identità: la
 // chiede la coda dei percorsi condivisi, al momento in cui spedisce.
@@ -227,7 +228,13 @@ module.exports = function register(on, ctx) {
     if (!win || !win._filoTabs) return { ok: false, error: 'no window' };
     const tab = win._filoTabs.tabs.find((t) => t.id === win._filoTabs.activeId);
     if (!tab) return { ok: false, error: 'no active tab' };
-    const img = await tab.view.webContents.capturePage();
+    const wc = tab.view.webContents;
+    // Per un modello (#810.7): con l'immagine, dove stanno i campi segreti dei riquadri incorporati, da coprire.
+    if (msg && msg.campiSegreti) {
+      const [img, riquadri] = await Promise.all([wc.capturePage(), campiSegretiNeiRiquadri(wc)]);
+      return { ok: true, dataUrl: img.toDataURL(), riquadri: riquadri.campi, riquadriNonCoperti: riquadri.nonCoperti };
+    }
+    const img = await wc.capturePage();
     return { ok: true, dataUrl: img.toDataURL() };
   });
 

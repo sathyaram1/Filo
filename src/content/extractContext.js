@@ -125,7 +125,13 @@
       }
     } catch (_) {}
 
-    return { selection: text, sentence };
+    return selezioneSegreta(target) ? { selection: text, sentence: text, segreto: true } : { selection: text, sentence };
+  }
+
+  // Una selezione dentro un campo segreto resta all'utente: si copia e si taglia, ma non va a nessun modello (#810.7).
+  function selezioneSegreta(target) {
+    const el = target?.closest?.('input, textarea') || document.activeElement;
+    return !!el && /^(INPUT|TEXTAREA)$/.test(el.tagName) && campoSegreto(el);
   }
 
   // Estrazione del testo principale via euristiche semplici (no Readability per ridurre bundle).
@@ -1119,6 +1125,7 @@
     extractInteractiveOutline,
     nomeElemento,
     campoSegreto,
+    selezioneSegreta,
     campiSegretiInVista,
     viewportInfo,
     expandAncestors,

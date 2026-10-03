@@ -528,6 +528,10 @@
       Popup.showToast(I18n.t('err_no_selection'));
       return;
     }
+    if (selInfo.segreto) {
+      Popup.showToast(I18n.t('err_secret_selection'));
+      return;
+    }
     let title;
     if (action === ACTIONS.EXPLAIN) title = I18n.t('popup_explain_title');
     else if (action === ACTIONS.EXPLAIN_DEEP) title = I18n.t('popup_explain_deep_title');
@@ -575,7 +579,7 @@
     if (deps.isBlocked()) return;
     if (document.hidden) return;
     const sel = Extract.getSelectionWithSentence();
-    if (!sel) return;
+    if (!sel || sel.segreto) return;
     const key = explainKey(sel.selection);
     if (key.length < 3) return;
     // Stessa selezione di prima: l'entry esistente sta già lavorando (o ha il risultato).
