@@ -101,6 +101,17 @@ service cloud.firestore {
             && d.localOnly.get('at', 0) > 0);
     }
 
+    // `localMerges` { app?, server? } (#915): quando ogni parte di un lavoro
+    // locale è arrivata su main, in millisecondi. Lo scrivono il server e
+    // server:fondi (admin); la pratica si chiude all'ultima parte.
+    function localMergesValido(d) {
+      return !('localMerges' in d)
+        || (d.localMerges is map
+            && d.localMerges.keys().hasOnly(['app', 'server'])
+            && (!('app' in d.localMerges) || (d.localMerges.app is int && d.localMerges.app > 0))
+            && (!('server' in d.localMerges) || (d.localMerges.server is int && d.localMerges.server > 0)));
+    }
+
     // Allowlist amministratori. Gestita SOLO da console Firebase.
     match /admins/{email} {
       allow read: if isAdmin();
@@ -359,6 +370,8 @@ service cloud.firestore {
                     'mergePreapproved',
                     // #908: il segno «solo in locale» (forma: localOnlyValido).
                     'localOnly',
+                    // #915: le parti del lavoro locale già su main (forma: localMergesValido).
+                    'localMerges',
                     // #595: il ripasso dei documenti vecchi con prefisso riservato.
                     'senderProof',
                     'capabilityGapId']) // F4: permettere update del gap id (backfill)
@@ -480,6 +493,7 @@ service cloud.firestore {
                 && request.resource.data.mergePreapproved.get('at', '').size() <= 40))
         && livelliValidi(request.resource.data)
         && localOnlyValido(request.resource.data)
+        && localMergesValido(request.resource.data)
         && (!('senderProof' in request.resource.data)
             || request.resource.data.senderProof in ['admin', 'server'])
         // F4: capabilityGapId (opzionale) — id strutturale del gap di capacità
