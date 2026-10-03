@@ -7,7 +7,7 @@ import {
   closeSync, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, realpathSync, rmSync, symlinkSync, unlinkSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { sommaRiepiloghi, perLaRiga } from '../run-unit-tests.mjs';
 
@@ -28,7 +28,13 @@ const primaRiga = (s) => String(s || '').split(/\r?\n/).find((r) => r.trim()) ||
 
 /** Un test rosso in una riga che due cartelle diverse scrivono uguale. PURA. */
 export function chiaveTest(r, root) {
-  const file = r && r.file ? perLaRiga(String(r.file).replace(/^file:\/\//, ''), root) : '?';
+  let file = r && r.file ? perLaRiga(String(r.file), root) : '?';
+  // Fuori dalla cartella (forma corta e lunga dello stesso percorso su Windows): conta il pezzo da tests/ in poi.
+  if (isAbsolute(file)) {
+    const barre = file.replace(/\\/g, '/');
+    const i = barre.lastIndexOf('/tests/');
+    if (i >= 0) file = barre.slice(i + 1);
+  }
   return `${file} › ${String((r && r.nome) ?? '?')}`;
 }
 
@@ -209,7 +215,7 @@ export function provaUnitSullaFusione({ root, punta, git = gitIn(root), lancia =
   if (!/^[0-9a-f]{40}$/i.test(String(punta || ''))) return { errore: 'punta del ramo non valida', mainSha };
   if (git(['merge-base', '--is-ancestor', mainSha, punta]).ok) return { esito: 'main_contenuto', mainSha };
 
-  const base = mkdtempSync(join(tmpdir(), 'filo-fusione-'));
+  const base = realpathSync.native(mkdtempSync(join(tmpdir(), 'filo-fusione-')));
   const nessunHook = join(base, 'nessun-hook');
   mkdirSync(nessunHook);
   const moduli = cartellaModuli(root);
