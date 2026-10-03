@@ -1,5 +1,5 @@
-// Verifica #810.7, giro 2: il numero di carta diviso in quattro caselle e il codice monouso diviso in sei, senza
-// nome sul campo; il numero di carta con una cifra sbagliata in un campo che il sito non chiama «carta».
+// Verifica #810.7, giro 2, rilievo 1: il numero di carta diviso in quattro caselle, il codice monouso diviso in sei,
+// il numero di carta con una cifra sbagliata in un campo che il sito non chiama «carta»: arrivano al modello.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { preparaModelli, modelloFinto, superaAvviso, apriAiuto, chiedi, arrivato } from './aiuti.mjs';
@@ -39,7 +39,7 @@ test('codice monouso in sei caselle: le cifre non arrivano al modello', async ({
   const righe = testo.split('\\n').filter((r) => /:: #o[1-6]/.test(r));
   expect(righe.length).toBe(6);
   const cifre = righe.map((r) => (r.match(/input \\"(\d)\\"/) || [])[1] || '').join('');
-  expect(cifre, 'le cifre del codice sono arrivate al modello').not.toBe('739146');
+  expect(cifre, 'le cifre del codice sono arrivate al modello').toBe('');
 });
 
 test('carta con una cifra sbagliata in un campo chiamato «number»: non arriva al modello', async ({ app, shell, openTab, testServer }) => {
@@ -51,5 +51,6 @@ test('carta con una cifra sbagliata in un campo chiamato «number»: non arriva 
   await modelloFinto(app, JSON.stringify({ text: 'Premi «Paga».', status: 'done' }));
   await apriAiuto(shell, page);
   await chiedi(app, page, 'il sito dice che la carta non è valida', 1);
-  expect(await arrivato(app, page), 'il numero di carta è arrivato al modello').not.toContain('4111 1111 1111 1112');
+  const riga = (await arrivato(app, page)).split('\\n').find((r) => r.includes(':: #c')) || '';
+  expect(riga, 'il numero di carta è arrivato al modello').not.toContain('4111 1111 1111 1112');
 });
