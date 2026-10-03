@@ -1252,7 +1252,7 @@ function decisioneAutonomia(ing, { sender = null, contesto = null, origine = 'ch
     else if (d.regola === 'difesa') perche = 'Te lo chiedo perché abbassa una difesa di Filo.';
     else if (d.regola === 'perimetro') perche = 'Te lo chiedo perché non me l\'hai chiesto tu: è una mia proposta.';
   }
-  return { ...d, stato: st, perche, conCosto: (costo) => A.decide({ ...ingressi, costo }) };
+  return { ...d, livello, stato: st, perche, conCosto: (costo) => A.decide({ ...ingressi, costo }) };
 }
 
 // Le azioni che l'agente sulla pagina fa da sé nel content script (copia, cerca, condividi) dichiarano solo
@@ -1262,20 +1262,18 @@ async function decisioneAzionePagina({ costo, campo = 'web', sender = null } = {
   if (!A.costoValido(costo)) return { risposta: 'no', digita: false, perche: '' };
   let impostazioni = {};
   try { impostazioni = await Storage.getSettings(); } catch (_) {}
-  const d = decisioneAutonomia({ costo, campo: A.campoValido(campo) ? campo : null, elenco: '', difesa: false }, { sender, impostazioni });
-  return { risposta: d.risposta, digita: d.digita, perche: d.perche };
+  const ing = { costo, campo: A.campoValido(campo) ? campo : null, elenco: '', difesa: false };
+  const d = decisioneAutonomia(ing, { sender, impostazioni });
+  return { risposta: d.risposta, digita: d.digita, perche: d.perche, ...(d.risposta === 'no' ? { no: fraseNo(ing, d, sender).breve } : {}) };
 }
 
-// Un «no» dell'elenco fisso: breve per il diario, intero per il modello, con la strada che resta all'utente.
-function fraseNo(ing) {
-  const A = globalThis.SN_AUTONOMIA;
-  const voce = A.ELENCO_FISSO.find((e) => e.id === ing.elenco);
-  const cosa = ing.segreto ? `porterebbe fuori ${A.SEGRETI[ing.segreto] || 'un segreto'}` : (voce ? voce.cosa : 'è fra le cose che Filo non fa');
-  return {
-    breve: `Filo non lo fa da solo: ${cosa}`,
-    perModello: `${cosa}: è nell'elenco fisso, e Filo non lo fa a nessun livello di autonomia, nemmeno se l'utente conferma. `
-      + `Dillo all'utente in una riga${ing.dove ? `: ${ing.dove}` : ''}. Non riprovare e non cercare un'altra strada per farlo`,
-  };
+// Il testo di un «no» lo dà SN_AUTONOMIA.fraseNo: breve per il diario, intero per il modello, con la strada che resta.
+function fraseNo(ing, decisione, sender) {
+  return globalThis.SN_AUTONOMIA.fraseNo({
+    regola: decisione.regola, elenco: ing.elenco, segreto: ing.segreto, dove: ing.dove,
+    fonte: decisione.stato && decisione.stato.fonte, livello: decisione.livello,
+    daPagina: /^https?:/i.test(String(sender?.tab?.url || sender?.url || '')),
+  });
 }
 
 // `contesto` = le azioni (con il loro `_output`) che il modello ha davanti in questo turno, turni passati
@@ -1427,7 +1425,7 @@ async function executeFiloAction(action, {
   }
   const decisione = decisioneAutonomia(ing, { sender, contesto, origine, dentroPerimetro: dentroPerimetro && ing.dentroPerimetro, impostazioni });
   if (decisione.risposta === 'no') {
-    const no = fraseNo(ing);
+    const no = fraseNo(ing, decisione, sender);
     return { executed: false, kept: false, no: true, error: no.perModello, output: { error: no.breve, rifiuto: true, no: true } };
   }
   // PULISCI_TAB e CANCELLA_ARCHIVIO hanno già un flusso di conferma dedicato

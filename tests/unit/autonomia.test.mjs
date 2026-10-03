@@ -128,6 +128,35 @@ test('sopra la tabella (c): l\'elenco fisso dice no a ogni livello, stato, costo
   }
 });
 
+test('il testo di un no: «a nessun livello» solo per l\'elenco fisso; quello della tabella dice cosa ha letto e le strade', () => {
+  const d = A.decideDettaglio({ livello: 'conservativo', stato: 'contaminato', costo: 3 });
+  assert.equal(d.risposta, 'no');
+  const fonte = { classe: 5, motivo: 'ho fatto una ricerca sul web' };
+  const tabella = A.fraseNo({ regola: d.regola, fonte, livello: 'conservativo' });
+  for (const t of [tabella.breve, tabella.perModello]) {
+    assert.doesNotMatch(t, /nessun livello|elenco fisso|fra le cose che Filo non fa/, t);
+    assert.match(t, /ricerca sul web/);
+    assert.match(t, /conversazione nuova/);
+    assert.match(t, /Preferenze/);
+  }
+  assert.match(tabella.breve, /Conservativo/);
+  assert.doesNotMatch(tabella.perModello, /non cercare un'altra strada/);
+  // Sulla pagina web la pagina stessa è la fonte: una conversazione nuova nasce uguale, resta il livello.
+  const pagina = A.fraseNo({ regola: d.regola, fonte, livello: 'conservativo', daPagina: true });
+  assert.doesNotMatch(`${pagina.breve} ${pagina.perModello}`, /conversazione nuova/);
+  assert.match(pagina.perModello, /Preferenze/);
+  // Lo stesso no, uscito dal perimetro, è ancora un no della tabella.
+  const fuori = A.decideDettaglio({ livello: 'conservativo', stato: 'contaminato', costo: 3, dentroPerimetro: false });
+  assert.equal(fuori.risposta, 'no');
+  assert.doesNotMatch(A.fraseNo({ regola: fuori.regola, fonte, livello: 'conservativo' }).perModello, /nessun livello/);
+
+  const e = A.decideDettaglio({ livello: 'automatico', stato: 'pulito', costo: 1, elenco: 'cancella-definitivo' });
+  const elenco = A.fraseNo({ regola: e.regola, elenco: 'cancella-definitivo', dove: 'In Preferenze.' });
+  assert.match(elenco.perModello, /nessun livello/);
+  assert.match(elenco.perModello, /In Preferenze\./);
+  assert.match(A.fraseNo({ regola: 'elenco', elenco: 'segreto', segreto: 'password' }).breve, /una password/);
+});
+
 test('sopra la tabella (d): abbassare una difesa vuole «conferma» a ogni livello', () => {
   for (const livello of Object.keys(A.TABELLA)) {
     for (const stato of ['pulito', 'contaminato']) {

@@ -862,7 +862,7 @@
       let d = null;
       try { d = await chrome.runtime.sendMessage({ type: MSG.FILO_DECIDI_PAGINA, costo: spec.costo, campo: 'web' }); } catch (_) {}
       const risposta = d && d.ok ? d.risposta : 'chiede';
-      if (risposta === 'no') { appendActionLog(`${label}: Filo non la fa da solo`); return false; }
+      if (risposta === 'no') { appendActionLog(`${label}: non applicata, ${(d && d.no) || 'Filo non la fa da solo'}`); return false; }
       if (risposta !== 'si') {
         const Ui = global.SN_CONFIRM_UI;
         let detail = '';
