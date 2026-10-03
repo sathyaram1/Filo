@@ -294,6 +294,12 @@ async function run() {
   if (o.feedback && allIssuesRef.length) {
     const minRank = rank[o.minSeverity] || 1;
     const toPush = allIssuesRef.filter((i) => (rank[i.severity] || 0) >= minRank);
+    const { idToken, motivo } = await credenziale.ottieni();
+    if (!idToken) {
+      console.log(`\n✗ Non invio ${toPush.length} issue ai feedback: manca il token admin (${motivo}). `
+        + 'Senza la prova del mittente l\'esploratore sarebbe un utente. Restano nel report qui sopra.');
+      return;
+    }
     console.log(`\nInvio ${toPush.length} issue ai feedback (modello ${o.model})…`);
     for (const i of toPush) {
       try {
