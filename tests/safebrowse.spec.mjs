@@ -801,7 +801,7 @@ for (const [dove, js] of [['nella stessa scheda', 'location.href=u'], ['in una s
 const finestreFuoriDaFilo = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
   .filter((w) => !w._filoTabs && !w.isDestroyed() && w.isVisible() && /^https?:/.test(w.webContents.getURL())).map((w) => w.webContents.getURL()));
 
-test('la pagina in lista apre da sola una finestrella di accesso del suo sito: nessuna finestra fuori dall\'avviso', async ({ app, shell }) => {
+test('la pagina in lista apre da sola una finestrella di accesso del suo sito: diventa una scheda sotto l\'avviso', async ({ app, shell }) => {
   const h = 'conto-finestrella.com';
   await serviInCaricamento(app, {
     [h + '/login']: '<title>Attendere</title><p>Caricamento…</p><script>setTimeout(function(){'
@@ -811,9 +811,13 @@ test('la pagina in lista apre da sola una finestrella di accesso del suo sito: n
   await apriSenzaAspettare(app, shell, `https://${h}/login`);
   const avviso = await vistaAvviso(app);
   await expect(avviso.getByText(SEGNALATO)).toBeVisible({ timeout: 8_000 });
-  await new Promise((r) => setTimeout(r, 4000));
+  await expect.poll(() => urlAttiva(app), { timeout: 8_000 }).toContain(`${h}/oauth/authorize`);
   expect(await finestreFuoriDaFilo(app)).toEqual([]);
-  expect((await copertura(app)).coperta).toBe(true);
+  await expect.poll(() => copertura(app)).toEqual(COPERTA);
+  await scriviDallaTastiera(app, 'segreto');
+  await expect(avviso.getByPlaceholder('confermo')).toHaveValue('segreto');
+  const accesso = app.windows().find((w) => { try { return w.url().includes('/oauth/authorize'); } catch (_) { return false; } });
+  expect(await accesso.evaluate(() => ({ k: window.__k, pw: document.getElementById('pw').value }))).toEqual({ k: '', pw: '' });
 });
 
 test('una finestrella di accesso che apre un sito in lista torna in una scheda, sotto l\'avviso', async ({ app, shell }) => {
