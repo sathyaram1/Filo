@@ -753,6 +753,11 @@ async function main() {
   const message = messageForOwnerMerge(reply, branch, { feedbackId: pratica ? pratica.id : '', feedbackNum: pratica ? pratica.seq : '' });
   if (code === 0) console.log(`\n${message}`);
   else console.error(`\n${message}`);
+  if (pratica && pratica.id) {
+    const { fraseDaScrivere } = await import('./owner-feedback.mjs');
+    const frase = await fraseDaScrivere(pratica.id, pratica.seq ? `#${pratica.seq}` : pratica.id);
+    if (frase) console.log(`\n${frase}`);
+  }
   process.exit(code);
 }
 
