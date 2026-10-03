@@ -974,6 +974,7 @@
     activeMenu.subAnchor = anchorEl;
     activeMenu.subMode = 'edge';
     placeSub(sub, anchorEl, 'edge');
+    sorveglia(sub, host);
     attachSubmenuHover(sub);
   }
 
