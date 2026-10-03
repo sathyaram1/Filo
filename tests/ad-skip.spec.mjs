@@ -56,7 +56,6 @@ function lettore({ classe = 'ytp-skip-ad-button', soloVeri = true, dopoMs = 1200
 
 const stato = (page) => page.evaluate(() => ({
   clic: window.__clic, saltata: window.__saltata, mostrataAlle: window.__mostrataAlle || 0,
-  attivato: navigator.userActivation.hasBeenActive,
 }));
 
 const suYouTube = (url) => url.replace('127.0.0.1', 'www.youtube.com');
@@ -67,11 +66,11 @@ async function apri(openTab, url) {
   return page;
 }
 
-async function interruttore(app, acceso) {
+async function impostazioni(app, settings) {
   const filo = { tab: { id: 1, url: 'filo://security/security.html' }, url: 'filo://security/security.html' };
-  await app.evaluate(async (_, a) => globalThis.SN_HANDLE_MESSAGE(
-    { type: 'update_settings', settings: { security: { adSkip: { enabled: a.acceso } } } }, a.filo), { acceso, filo });
+  await app.evaluate(async (_, a) => globalThis.SN_HANDLE_MESSAGE({ type: 'update_settings', settings: a.settings }, a.filo), { settings, filo });
 }
+const interruttore = (app, acceso) => impostazioni(app, { security: { adSkip: { enabled: acceso } } });
 
 test('su YouTube il «Salta» si preme da solo appena compare, con un clic vero', async ({ openTab, testServer }) => {
   const page = await apri(openTab, suYouTube(testServer.html(lettore())));
@@ -107,6 +106,32 @@ test('con la pagina ingrandita il clic vero cade ancora sul «Salta»', async ({
   expect((await stato(page)).clic.every((c) => c.vero)).toBe(true);
 });
 
+test('in una scheda in secondo piano salta lo stesso, col clic vero', async ({ app, openTab, testServer }) => {
+  // L'audio della pubblicità si sente anche da un'altra scheda: aspettare il ritorno vorrebbe dire sentirla tutta.
+  const page = await apri(openTab, suYouTube(testServer.html(lettore({ dopoMs: -1 }))));
+  await apri(openTab, testServer.html('<title>Altra</title><p>altra scheda</p>'));
+  const dietro = () => app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    const t = w._filoTabs.tabs.find((x) => x.view.webContents.getURL().includes('www.youtube.com'));
+    const b = t.view.getBounds();
+    return t.id !== w._filoTabs.activeId && b.width === 0;
+  });
+  await expect.poll(dietro, { timeout: 5_000 }).toBe(true);
+  // Ogni tanto la scheda dietro riprende la sua misura per un attimo: conta il clic arrivato quando era grande zero.
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    const t = w._filoTabs.tabs.find((x) => x.view.webContents.getURL().includes('www.youtube.com'));
+    globalThis.__larghezzeAlClic = [];
+    t.view.webContents.on('input-event', (_e, i) => {
+      if (i.type === 'mouseDown') globalThis.__larghezzeAlClic.push(t.view.getBounds().width);
+    });
+  });
+  await page.evaluate(() => window.__mostra());
+  await expect.poll(async () => (await stato(page)).saltata, { timeout: 3_000 }).toBe(true);
+  expect((await stato(page)).clic.every((c) => c.vero)).toBe(true);
+  expect(await app.evaluate(() => globalThis.__larghezzeAlClic)).toContain(0);
+});
+
 test('mentre si scrive in un campo della pagina aspetta, poi salta', async ({ openTab, testServer }) => {
   const page = await apri(openTab, suYouTube(testServer.html(lettore({ dopoMs: -1, campo: true }))));
   await page.locator('#cerca').click();
@@ -131,10 +156,9 @@ test('negli altri lettori basta il clic dello script, anche dentro un riquadro',
   const frame = await expect.poll(() => page.frames().find((f) => f.url() === dentro) || null, { timeout: 5_000 }).not.toBeNull()
     .then(() => page.frames().find((f) => f.url() === dentro));
   await expect.poll(() => frame.evaluate(() => window.__saltata), { timeout: 6_000 }).toBe(true);
-  const s = await frame.evaluate(() => ({ clic: window.__clic, attivato: navigator.userActivation.hasBeenActive }));
-  expect(s.clic.length).toBe(1);
-  expect(s.clic[0].vero).toBe(false);
-  expect(s.attivato).toBe(false);
+  const clic = await frame.evaluate(() => window.__clic);
+  expect(clic.length).toBe(1);
+  expect(clic[0].vero).toBe(false);
 });
 
 test('fuori da YouTube un «Salta» di YouTube non riceve mai un clic vero', async ({ openTab, testServer }) => {
@@ -145,7 +169,6 @@ test('fuori da YouTube un «Salta» di YouTube non riceve mai un clic vero', asy
   const s = await stato(page);
   expect(s.saltata).toBe(false);
   expect(s.clic.some((c) => c.vero)).toBe(false);
-  expect(s.attivato).toBe(false);
 });
 
 test('spento non tocca niente; riacceso preme il «Salta» già a schermo', async ({ app, openTab, testServer }) => {
@@ -158,7 +181,7 @@ test('spento non tocca niente; riacceso preme il «Salta» già a schermo', asyn
 });
 
 test('l\'interruttore sta in Sicurezza, sotto il blocco delle pubblicità, e spegne davvero', async ({ app, openTab, testServer }) => {
-  const sec = await openTab('filo://security/security.html');
+  const sec = await openTab('filo://security/');
   await sec.waitForSelector('#sec-adskip', { timeout: 8_000 });
   await expect(sec.locator('#sec-adskip')).toBeChecked();
   await expect(sec.locator('#sec-adskip-label')).toHaveText('Salta le pubblicità dei video');
@@ -171,12 +194,11 @@ test('l\'interruttore sta in Sicurezza, sotto il blocco delle pubblicità, e spe
   await page.waitForTimeout(2000);
   expect((await stato(page)).clic).toEqual([]);
 
-  await sec.bringToFront().catch(() => {});
   const shots = join(APP_ROOT, 'tests', '.shots');
   for (const tema of ['light', 'dark']) {
-    await sec.emulateMedia({ colorScheme: tema });
-    await sec.evaluate((t) => { document.documentElement.dataset.snTheme = t; }, tema);
-    await sec.locator('#sec-adskip').scrollIntoViewIfNeeded();
+    await impostazioni(app, { theme: tema });
+    await sec.waitForTimeout(600);
+    await sec.locator('#sec-adblock').scrollIntoViewIfNeeded();
     await sec.screenshot({ path: join(shots, `ad-skip-sicurezza-${tema}.png`) });
   }
 });

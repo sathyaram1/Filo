@@ -105,14 +105,18 @@
     return { x: (x - vv.offsetLeft) * vv.scale, y: (y - vv.offsetTop) * vv.scale };
   }
 
+  // Rifiuti del main che non passano: qui il clic vero non arriverà, si torna al clic dello script.
+  const RIFIUTI_FERMI = new Set(['forbidden', 'off']);
+
   // false = per ora non si preme (l'utente è occupato): il tentativo non si conta.
+  // Un «Salta» coperto o fuori dal riquadro visibile prende il clic dello script.
   function premi(el, s) {
     if (clicVero && !s.finto) {
       if (utenteOccupato()) return false;
       const p = centro(el);
       if (p) {
         send({ type: T_CLICK, x: p.x, y: p.y }, (r) => {
-          if (!r || (!r.ok && r.code !== 'presto')) s.finto = true;
+          if (!r || (!r.ok && RIFIUTI_FERMI.has(r.code))) s.finto = true;
         });
         return true;
       }
@@ -150,6 +154,12 @@
     pianifica(visibili ? PASSO_MS : PASSO_NASCOSTI_MS);
   }
 
+  function riprova() {
+    if (!seguiti.size) return;
+    for (const s of seguiti.values()) { s.prossimo = 0; s.tentativi = Math.min(s.tentativi, TENTATIVI - 1); }
+    giro();
+  }
+
   function suAnimazione(e) {
     if (!attivo || e.animationName !== ANIM) return;
     const el = e.target;
@@ -181,12 +191,8 @@
       window.addEventListener(t, suPuntatore, { capture: true, passive: true });
     }
     window.addEventListener('blur', () => { premuto = false; });
-    // Tornando sulla scheda si riprova subito, anche il «Salta» su cui i tentativi erano finiti.
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState !== 'visible' || !seguiti.size) return;
-      for (const s of seguiti.values()) { s.prossimo = 0; s.tentativi = Math.min(s.tentativi, TENTATIVI - 1); }
-      giro();
-    });
+    // Tornando sulla pagina (finestra ridotta a icona e riaperta) si riprova subito, anche dove i tentativi erano finiti.
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') riprova(); });
     chrome.runtime.onMessage.addListener((m) => { if (m && m.type === T_UPDATE) carica(); });
   } catch (_) {}
 

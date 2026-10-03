@@ -73,11 +73,21 @@ function rimettiPuntatore(wc, win, vista) {
   } catch (_) {}
 }
 
+// La scheda in secondo piano ha la vista grande zero ma la pagina tiene la sua misura, e il clic le arriva lo stesso:
+// lì il limite è l'area della finestra, dove la pagina tornerà.
+function areaDelClic(view, win) {
+  let b = null;
+  try { b = view.getBounds(); } catch (_) { b = null; }
+  if (b && b.width > 0 && b.height > 0) return b;
+  let c = null;
+  try { c = win && win.getContentBounds(); } catch (_) { c = null; }
+  return c && c.width > 0 && c.height > 0 ? { x: 0, y: 0, width: c.width, height: c.height } : null;
+}
+
 function clicVero(wc, msg, { win, view, ora = Date.now() } = {}) {
   if (!wc || !view || (wc.isDestroyed && wc.isDestroyed())) return { ok: false, code: 'scheda' };
   if (ora - (ultimoClic.get(wc) || 0) < INTERVALLO_MS) return { ok: false, code: 'presto' };
-  let b = null;
-  try { b = view.getBounds(); } catch (_) { b = null; }
+  const b = areaDelClic(view, win);
   let zoom = 1;
   try { zoom = wc.getZoomFactor(); } catch (_) { zoom = 1; }
   const p = b && puntoNellaVista(msg, zoom, b.width, b.height);
