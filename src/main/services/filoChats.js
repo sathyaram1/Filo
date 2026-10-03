@@ -320,6 +320,7 @@
     list, listIndex, get, needsTriage, listDangling, listUntriaged, uuid,
     open: (...a) => inCoda(() => open(...a)),
     append: (...a) => inCoda(() => append(...a)),
+    segnaFonti: (...a) => inCoda(() => segnaFonti(...a)),
     close: (...a) => inCoda(() => close(...a)),
     setTriage: (...a) => inCoda(() => setTriage(...a)),
     setUserTriage: (...a) => inCoda(() => setUserTriage(...a)),
