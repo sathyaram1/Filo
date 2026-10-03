@@ -434,6 +434,12 @@ export async function fraseDaScrivere(id, rif = id, opts = {}) {
   } catch (_) { return ''; }
 }
 
+// Il tetto di `userNote` nelle regole del database: oltre, la frase si rifiuta col numero, mai tagliata.
+const FRASE_MAX = 500;
+function fraseTroppoLunga(testo) {
+  return testo.length > FRASE_MAX ? `la frase è di ${testo.length} caratteri e la bacheca ne tiene ${FRASE_MAX}: accorciala` : '';
+}
+
 /**
  * Solo la frase per chi ha segnalato, stato invariato: `<n|id> --frase "…"`. Dai Ricevuti no, come ogni passaggio di una
  * sessione (partenzaVietata): lì decide l'owner. Su una pratica chiusa sì: la bacheca la mostra alla prossima sincronizzazione.
