@@ -61,6 +61,4 @@
   } else {
     onReady();
   }
-
-  global.SN_SAFEBROWSE_UI = { requestVerdict, _state: () => level };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

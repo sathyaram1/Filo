@@ -126,123 +126,125 @@ test('chiave GSB condivisa: quando è impostata raggiunge il motore per TUTTI (s
   expect(active.on).toBe(true);
 });
 
-test('interstitial "pericoloso": copre la pagina e si toglie solo con "confermo" → Procedi', async ({ app, openTab, testServer }) => {
-  // Pagina esterna reale (127.0.0.1) con i content script montati. Di per sé è
-  // "safe"; iniettiamo il verdetto pericoloso come fa il main dopo l'analisi.
-  const page = await testServer.openReady(openTab, '<title>SB_VICTIM</title><p>contenuto pagina</p>');
+// L'avviso sta in una vista sopra la scheda (#813.5), non nella pagina: qui la si trova, si guarda cosa copre e si
+// scrive come scrive la tastiera vera, nel webContents che ha il fuoco.
+async function vistaAvviso(app, ms = 8000) {
+  const fine = Date.now() + ms;
+  while (Date.now() < fine) {
+    const p = app.windows().find((w) => { try { return w.url().startsWith('filo://shell/avviso-sito.html'); } catch (_) { return false; } });
+    if (p) return p;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  throw new Error('la vista dell\'avviso non è nata');
+}
 
-  // Broadcast del verdetto al tab esterno (senza url → il content lo applica
-  // alla pagina corrente). Replica esattamente ciò che fa _sbBroadcast.
-  await app.evaluate(({ BrowserWindow }) => {
+function copertura(app) {
+  return app.evaluate(({ BrowserWindow, webContents }) => {
     for (const w of BrowserWindow.getAllWindows()) {
-      if (!w._filoTabs) continue;
-      for (const t of w._filoTabs.tabs) {
-        const u = t.view?.webContents?.getURL?.() || '';
-        if (!/^https?:/.test(u)) continue;
-        t.view.webContents.send('filo:broadcast', {
-          type: 'safebrowse_update',
-          level: 'pericoloso',
-          message: { title: 'Sito pericoloso', body: 'Questo non è PayPal. Il dominio è paypa1.com, ti sta chiedendo la password.' },
-        });
-      }
+      const tm = w._filoTabs;
+      if (!tm) continue;
+      const tab = tm.tabs.find((t) => t.id === tm.activeId);
+      const v = tm.avvisoSito.vista;
+      const figli = w.contentView.children;
+      const vb = v ? v.getBounds() : null;
+      const tb = tab.view.getBounds();
+      const col = webContents.getFocusedWebContents();
+      let tastiera = 'altro';
+      if (v && col === v.webContents) tastiera = 'avviso';
+      else if (col === tab.view.webContents) tastiera = 'pagina';
+      return {
+        coperta: tm.avvisoSito.coperta() === tab,
+        sopra: !!v && figli.indexOf(v) > figli.indexOf(tab.view),
+        stessiBordi: !!vb && vb.x === tb.x && vb.y === tb.y && vb.width === tb.width && vb.height === tb.height && tb.width > 0,
+        tastiera,
+      };
     }
+    return null;
   });
+}
 
-  // L'overlay vive in uno Shadow DOM aperto: Playwright lo attraversa.
-  await expect(page.getByText('Sito pericoloso')).toBeVisible({ timeout: 6_000 });
-  await expect(page.getByText(/Questo non è PayPal/)).toBeVisible();
+async function scriviDallaTastiera(app, testo) {
+  await app.evaluate(({ webContents }, t) => {
+    const wc = webContents.getFocusedWebContents();
+    if (!wc) throw new Error('nessun webContents ha la tastiera');
+    for (const ch of t) {
+      const tasto = ch === '\r' ? 'Return' : ch;
+      wc.sendInputEvent({ type: 'keyDown', keyCode: tasto });
+      wc.sendInputEvent({ type: 'char', keyCode: ch });
+      wc.sendInputEvent({ type: 'keyUp', keyCode: tasto });
+    }
+  }, testo);
+}
 
-  // Il pulsante "Procedi comunque" è inerte finché non si scrive "confermo".
-  const proceed = page.getByRole('button', { name: 'Procedi comunque' });
-  await expect(proceed).toBeVisible();
+const COPERTA = { coperta: true, sopra: true, stessiBordi: true, tastiera: 'avviso' };
+const SEGNALATO = 'Sito segnalato come pericoloso';
 
-  await page.getByPlaceholder('confermo').fill('confermo');
+test('interstitial "pericoloso": copre la pagina e si toglie solo con "confermo" → Procedi', async ({ app, shell }) => {
+  await serviInCaricamento(app, { 'conto-paypa1.com/login': MODULO + '<input id="campo">' }, { gsbListed: true });
+  const page = await apriSenzaAspettare(app, shell, 'https://conto-paypa1.com/login');
+  const avviso = await vistaAvviso(app);
+  await expect(avviso.getByText(SEGNALATO)).toBeVisible({ timeout: 6_000 });
+  await expect(avviso.getByText(/Google Safe Browsing classifica conto-paypa1\.com/)).toBeVisible();
+  await expect.poll(() => copertura(app)).toEqual(COPERTA);
+  // Nella pagina del sito non c'è niente di Filo da coprire, spostare o premere.
+  await page.waitForLoadState('domcontentloaded');
+  expect(await page.evaluate(() => document.querySelectorAll('[id^="filo-safebrowse"]').length)).toBe(0);
+
+  const proceed = avviso.getByRole('button', { name: 'Procedi comunque' });
+  await expect(proceed).toBeDisabled();
+  await scriviDallaTastiera(app, 'confermo');
+  await expect(avviso.getByPlaceholder('confermo')).toHaveValue('confermo');
   await proceed.click();
 
-  // Dopo la conferma l'overlay sparisce (bypass registrato per il dominio).
-  await expect(page.getByText('Sito pericoloso')).toHaveCount(0, { timeout: 6_000 });
+  // Bypass registrato: l'avviso va via, non torna col verdetto ripetuto, e la tastiera torna alla pagina.
+  await expect.poll(async () => (await copertura(app)).coperta).toBe(false);
+  await expect.poll(async () => (await copertura(app)).tastiera).toBe('pagina');
+  await page.waitForTimeout(2000);
+  expect((await copertura(app)).coperta).toBe(false);
+  await page.locator('#campo').fill('ok');
+  await expect(page.locator('#campo')).toHaveValue('ok');
 });
 
-test('interstitial "pericoloso": "Torna indietro" su scheda NUOVA esce SENZA confermare il sito (#288)', async ({ app, openTab, testServer }) => {
-  // Scheda appena aperta su un URL: cronologia vuota (history.length === 1), il
-  // caso del bug. "Torna indietro" deve solo uscire (about:blank), MAI registrare
-  // il bypass del dominio come farebbe "Procedi comunque".
-  const page = await testServer.openReady(openTab, '<title>SB_BACK</title><p>contenuto pagina</p>');
-
-  // Sanity: la scheda è davvero senza cronologia (altrimenti il ramo del bug non
-  // verrebbe esercitato e il test sarebbe inutile).
+test('interstitial "pericoloso": "Torna indietro" su scheda NUOVA esce SENZA confermare il sito (#288)', async ({ app, shell }) => {
+  await serviInCaricamento(app, { 'conto-indietro.com/login': MODULO }, { gsbListed: true });
+  const page = await apriSenzaAspettare(app, shell, 'https://conto-indietro.com/login');
+  const avviso = await vistaAvviso(app);
+  await expect(avviso.getByText(SEGNALATO)).toBeVisible({ timeout: 6_000 });
+  await expect.poll(async () => (await copertura(app)).coperta).toBe(true);
   expect(await page.evaluate(() => history.length)).toBe(1);
 
-  await app.evaluate(({ BrowserWindow }) => {
-    for (const w of BrowserWindow.getAllWindows()) {
-      if (!w._filoTabs) continue;
-      for (const t of w._filoTabs.tabs) {
-        const u = t.view?.webContents?.getURL?.() || '';
-        if (!/^https?:/.test(u)) continue;
-        t.view.webContents.send('filo:broadcast', {
-          type: 'safebrowse_update',
-          level: 'pericoloso',
-          message: { title: 'Sito pericoloso', body: 'Questo non è PayPal. Ti sta chiedendo la password.' },
-        });
-      }
-    }
-  });
-
-  await expect(page.getByText('Sito pericoloso')).toBeVisible({ timeout: 6_000 });
-
-  // Clic su "Torna indietro": la pagina esce verso about:blank.
-  await page.getByRole('button', { name: 'Torna indietro' }).click();
+  await avviso.getByRole('button', { name: 'Torna indietro' }).click();
   await page.waitForFunction(() => location.href === 'about:blank', null, { timeout: 6_000 });
+  await expect.poll(async () => (await copertura(app)).coperta).toBe(false);
 
-  // COMPORTAMENTO ATTESO: nessun dominio è stato confermato in ALCUN tab. Col
-  // bug, "Torna indietro" inviava T_PROCEED → safebrowseProceed aggiungeva il
-  // registrable a tab.sbBypass (size 1): il sito restava "confermato" per la
-  // scheda. Dopo il fix nessun bypass viene mai registrato.
+  // Nessun dominio confermato: «Torna indietro» non è mai «Procedi comunque».
   const bypassed = await app.evaluate(({ BrowserWindow }) => {
     const all = [];
     for (const w of BrowserWindow.getAllWindows()) {
-      if (!w._filoTabs) continue;
-      for (const t of w._filoTabs.tabs) {
-        if (t.sbBypass && t.sbBypass.size) all.push(...t.sbBypass);
-      }
+      for (const t of (w._filoTabs && w._filoTabs.tabs) || []) if (t.sbBypass && t.sbBypass.size) all.push(...t.sbBypass);
     }
     return all;
   });
   expect(bypassed).toEqual([]);
 });
 
-test('popup "sospetto": è un popup di conferma e si chiude solo con "Continua" (#176)', async ({ app, openTab, testServer }) => {
-  // Pagina esterna reale: di per sé "safe". Iniettiamo il verdetto "sospetto"
-  // come fa il main dopo l'analisi (es. il sito casinò del feedback #176).
-  const page = await testServer.openReady(openTab, '<title>SB_SUSPECT</title><p>contenuto pagina</p>');
-
-  await app.evaluate(({ BrowserWindow }) => {
-    for (const w of BrowserWindow.getAllWindows()) {
-      if (!w._filoTabs) continue;
-      for (const t of w._filoTabs.tabs) {
-        const u = t.view?.webContents?.getURL?.() || '';
-        if (!/^https?:/.test(u)) continue;
-        t.view.webContents.send('filo:broadcast', {
-          type: 'safebrowse_update',
-          level: 'sospetto',
-          message: { title: 'Sito potenzialmente sospetto', body: 'Chiede credenziali o dati personali su un dominio non ufficiale.' },
-        });
-      }
-    }
-  });
-
-  // L'avviso compare come popup di conferma (non più la striscia "Ho capito"):
-  // titolo + corpo visibili, e i due pulsanti di scelta esplicita.
-  await expect(page.getByText('Sito potenzialmente sospetto')).toBeVisible({ timeout: 6_000 });
-  await expect(page.getByText(/credenziali o dati personali/)).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Ho capito' })).toHaveCount(0);
-  const proceed = page.getByRole('button', { name: 'Continua' });
-  await expect(proceed).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Torna indietro' })).toBeVisible();
-
-  // Solo dopo la conferma esplicita ("Continua") il popup sparisce.
+test('popup "sospetto": è un popup di conferma e si chiude solo con "Continua" (#176)', async ({ app, shell }) => {
+  await serviInCaricamento(app, { 'area-riservata-popup.it/accesso': MODULO });
+  const page = await apriSenzaAspettare(app, shell, 'http://area-riservata-popup.it/accesso');
+  const avviso = await vistaAvviso(app);
+  await expect(avviso.getByText('Sito potenzialmente sospetto')).toBeVisible({ timeout: 8_000 });
+  await expect(avviso.getByRole('button', { name: 'Ho capito' })).toHaveCount(0);
+  await expect(avviso.getByRole('button', { name: 'Torna indietro' })).toBeVisible();
+  await expect.poll(() => copertura(app)).toEqual(COPERTA);
+  // Comparso sotto le dita di chi scriveva, «Continua» non si prende l'Invio che era per la pagina.
+  const proceed = avviso.getByRole('button', { name: 'Continua' });
+  await scriviDallaTastiera(app, '\r');
+  expect((await copertura(app)).coperta).toBe(true);
+  await expect(proceed).toBeEnabled({ timeout: 3_000 });
   await proceed.click();
-  await expect(page.getByText('Sito potenzialmente sospetto')).toHaveCount(0, { timeout: 6_000 });
+  await expect.poll(async () => (await copertura(app)).coperta).toBe(false);
+  await page.locator('#pw').fill('segreto');
+  await expect(page.locator('#pw')).toHaveValue('segreto');
 });
 
 test('pagina pubblicata da un utente: chiudere l\'avviso su un modulo non silenzia gli altri moduli nella scheda', async ({ app, openTab, testServer }) => {
@@ -428,12 +430,17 @@ const MODULO_LENTO = '<title>Accedi</title><form><input name="email" placeholder
   + '<input type="password" id="pw" name="pw" placeholder="Password"><button>Accedi</button></form>'
   + '<script src="/lento.js"></script><p>fine pagina</p>';
 
-// Il click sul campo cade sull'avviso: quello che l'utente scrive non arriva alla pagina.
-async function provaAScrivereLaPassword(page) {
-  const box = await page.locator('#pw').boundingBox();
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-  await page.keyboard.type('segreto');
+// Quello che si scrive dalla tastiera va all'avviso, e la pagina non ne riceve niente.
+async function scriveNellAvviso(app, page, avviso) {
+  await scriviDallaTastiera(app, 'segreto');
+  await expect(avviso.getByPlaceholder('confermo')).toHaveValue('segreto');
   return page.locator('#pw').inputValue();
+}
+
+async function procedi(app, avviso) {
+  await avviso.getByPlaceholder('confermo').fill('confermo');
+  await avviso.getByRole('button', { name: 'Procedi comunque' }).click();
+  await expect.poll(async () => (await copertura(app)).coperta).toBe(false);
 }
 
 test('pagina segnalata da Google che resta in caricamento: l\'avviso copre il modulo prima che finisca (#813.1)', async ({ app, shell }) => {
@@ -441,23 +448,19 @@ test('pagina segnalata da Google che resta in caricamento: l\'avviso copre il mo
   try {
     const page = await apriSenzaAspettare(app, shell, 'https://conto-verifica-accesso.com/login');
     await expect(page.locator('#pw')).toBeVisible({ timeout: 8_000 });
-    await expect(page.getByText('Sito segnalato come pericoloso')).toBeVisible({ timeout: 6_000 });
+    const avviso = await vistaAvviso(app);
+    await expect(avviso.getByText(SEGNALATO)).toBeVisible({ timeout: 6_000 });
+    await expect.poll(() => copertura(app)).toEqual(COPERTA);
     expect(await page.evaluate(() => document.readyState)).toBe('loading');
-    // La tastiera è dell'avviso: chi stava per scrivere la password la scrive lì, non nella pagina.
-    await page.keyboard.type('segreto');
-    await expect(page.getByPlaceholder('confermo')).toHaveValue('segreto');
-    expect(await provaAScrivereLaPassword(page)).toBe('');
+    expect(await scriveNellAvviso(app, page, avviso)).toBe('');
     // Un verdetto ripetuto (a pagina pronta, dal main) non cancella quello che si sta scrivendo nell'avviso.
-    await page.getByPlaceholder('confermo').fill('confer');
+    await avviso.getByPlaceholder('confermo').fill('confer');
     await chiudiLenti(app);
     await page.waitForFunction(() => document.readyState !== 'loading', null, { timeout: 8_000 });
-    await page.waitForTimeout(800);
-    await expect(page.getByPlaceholder('confermo')).toHaveValue('confer');
-    // L'avviso resta sopra la pagina costruita, e si chiude solo come sempre.
-    expect(await page.evaluate(() => document.documentElement.lastElementChild.id)).toBe('filo-safebrowse-host');
-    await page.getByPlaceholder('confermo').fill('confermo');
-    await page.getByRole('button', { name: 'Procedi comunque' }).click();
-    await expect(page.getByText('Sito segnalato come pericoloso')).toHaveCount(0, { timeout: 6_000 });
+    await page.waitForTimeout(2000);
+    await expect(avviso.getByPlaceholder('confermo')).toHaveValue('confer');
+    expect(await copertura(app)).toEqual(COPERTA);
+    await procedi(app, avviso);
     await page.locator('#pw').fill('segreto');
     await expect(page.locator('#pw')).toHaveValue('segreto');
   } finally {
@@ -470,9 +473,10 @@ test('campo password che compare mentre la pagina carica: l\'avviso che ne dipen
   try {
     const page = await apriSenzaAspettare(app, shell, 'http://area-riservata-clienti.it/accesso');
     await expect(page.locator('#pw')).toBeVisible({ timeout: 8_000 });
-    await expect(page.getByText('Sito potenzialmente sospetto')).toBeVisible({ timeout: 6_000 });
+    const avviso = await vistaAvviso(app);
+    await expect(avviso.getByText('Sito potenzialmente sospetto')).toBeVisible({ timeout: 6_000 });
+    await expect.poll(() => copertura(app)).toEqual(COPERTA);
     expect(await page.evaluate(() => document.readyState)).toBe('loading');
-    expect(await provaAScrivereLaPassword(page)).toBe('');
   } finally {
     await chiudiLenti(app);
   }
@@ -483,68 +487,65 @@ test('verdetto pronto prima che la pagina mandi il primo byte: l\'avviso compare
   try {
     const page = await apriSenzaAspettare(app, shell, 'https://conto-verifica-accesso.com/login?tardi');
     await expect(page.locator('#pw')).toBeVisible({ timeout: 8_000 });
-    await expect(page.getByText('Sito segnalato come pericoloso')).toBeVisible({ timeout: 6_000 });
+    const avviso = await vistaAvviso(app);
+    await expect(avviso.getByText(SEGNALATO)).toBeVisible({ timeout: 6_000 });
+    await expect.poll(() => copertura(app)).toEqual(COPERTA);
     expect(await page.evaluate(() => document.readyState)).toBe('loading');
-    // Disegnato prima di <body>, l'avviso è stato spostato in fondo senza perdere il fuoco.
-    expect(await page.evaluate(() => document.documentElement.lastElementChild.id)).toBe('filo-safebrowse-host');
-    await page.keyboard.type('segreto');
-    await expect(page.getByPlaceholder('confermo')).toHaveValue('segreto');
-    await expect(page.locator('#pw')).toHaveValue('');
+    expect(await scriveNellAvviso(app, page, avviso)).toBe('');
   } finally {
     await chiudiLenti(app);
   }
 });
 
 // Sulle pagine ospitate il modulo sta in un riquadro: se il riquadro non finisce mai di caricarsi, l'avviso non lo aspetta.
-test('Google Sites: il riquadro col modulo che resta in caricamento fa comparire l\'avviso (#813.1)', async ({ app, shell }) => {
-  await serviInCaricamento(app, {
+for (const [nome, url, pagine] of [
+  ['Google Sites: il riquadro col modulo', 'https://sites.google.com/view/posta-appesa', {
     'sites.google.com/view/posta-appesa': '<h1>Accesso alla posta</h1>'
       + '<iframe src="https://9999-atari-embeds.googleusercontent.com/embeds/x/user.html" width="500" height="300"></iframe>',
     '9999-atari-embeds.googleusercontent.com/embeds/x/user.html': `${ACCESSO}<script src="/lento.js"></script>`,
-  }, { ospitate: true });
-  try {
-    const page = await apriSenzaAspettare(app, shell, 'https://sites.google.com/view/posta-appesa');
-    await expect(page.getByText('Pagina pubblicata da un utente')).toBeVisible({ timeout: 10_000 });
-  } finally {
-    await chiudiLenti(app);
-  }
-});
-
-test('Apps Script: il riquadro interno col modulo che resta in caricamento fa comparire l\'avviso (#813.1)', async ({ app, shell }) => {
-  await serviInCaricamento(app, {
+  }],
+  ['Apps Script: il riquadro interno col modulo', 'https://script.google.com/macros/s/AKfyAppeso/exec', {
     'script.google.com/macros/s/AKfyAppeso/exec': '<iframe src="https://n-xyz-0lu-script.googleusercontent.com/panel" width="600" height="400"></iframe>',
     'n-xyz-0lu-script.googleusercontent.com/panel': '<iframe src="https://n-xyz-1lu-script.googleusercontent.com/user" width="580" height="380"></iframe>',
     'n-xyz-1lu-script.googleusercontent.com/user': `<h1>Microsoft 365</h1>${ACCESSO}<script src="/lento.js"></script>`,
-  }, { ospitate: true });
-  try {
-    const page = await apriSenzaAspettare(app, shell, 'https://script.google.com/macros/s/AKfyAppeso/exec');
-    await expect(page.getByText('Pagina pubblicata da un utente')).toBeVisible({ timeout: 10_000 });
-  } finally {
-    await chiudiLenti(app);
-  }
-});
+  }],
+]) {
+  test(`${nome} che resta in caricamento fa comparire l'avviso (#813.1)`, async ({ app, shell }) => {
+    await serviInCaricamento(app, pagine, { ospitate: true });
+    try {
+      await apriSenzaAspettare(app, shell, url);
+      const avviso = await vistaAvviso(app, 10_000);
+      await expect(avviso.getByText('Pagina pubblicata da un utente')).toBeVisible({ timeout: 10_000 });
+      await expect.poll(async () => (await copertura(app)).coperta).toBe(true);
+    } finally {
+      await chiudiLenti(app);
+    }
+  });
+}
 
-// L'avviso è una modale sopra la pagina: la pagina non gli riprende la tastiera e non gli sale sopra con una sua modale.
 const MODULO = '<title>Accedi</title><form><input name="email" placeholder="Email">'
   + '<input type="password" id="pw" name="pw" placeholder="Password"><button>Accedi</button></form>';
+// La pagina che ruba la password ascolta i tasti in tutto il documento.
+const ASCOLTA = '<script>window.__k="";window.__i="";'
+  + 'window.addEventListener("keydown",function(e){window.__k+=e.key},true);'
+  + 'document.addEventListener("input",function(e){window.__i+=(e.data||"")},true);</script>';
+const sentiti = (page) => page.evaluate(() => ({ k: window.__k, i: window.__i }));
 
 test('la pagina segnalata si riprende il fuoco dopo l\'avviso: quello che si scrive resta nell\'avviso', async ({ app, shell }) => {
-  await serviInCaricamento(app, { 'conto-verifica-fuoco.com/login': MODULO
-    + '<script>setTimeout(function(){document.getElementById("pw").focus()},2000)</script>' }, { gsbListed: true });
+  await serviInCaricamento(app, { 'conto-verifica-fuoco.com/login': MODULO + ASCOLTA
+    + '<script>setInterval(function(){window.focus();document.getElementById("pw").focus()},500)</script>' }, { gsbListed: true });
   const page = await apriSenzaAspettare(app, shell, 'https://conto-verifica-fuoco.com/login');
-  await expect(page.getByText('Sito segnalato come pericoloso')).toBeVisible({ timeout: 8_000 });
-  await page.waitForTimeout(2800);
-  await page.keyboard.type('segreto');
-  await expect(page.getByPlaceholder('confermo')).toHaveValue('segreto');
-  await expect(page.locator('#pw')).toHaveValue('');
+  const avviso = await vistaAvviso(app);
+  await expect(avviso.getByText(SEGNALATO)).toBeVisible({ timeout: 8_000 });
+  await page.waitForTimeout(2000);
+  expect(await copertura(app)).toEqual(COPERTA);
+  expect(await scriveNellAvviso(app, page, avviso)).toBe('');
+  expect(await sentiti(page)).toEqual({ k: '', i: '' });
   // Esc non toglie l'avviso: si toglie solo dai suoi pulsanti.
-  await page.keyboard.press('Escape');
-  await page.keyboard.press('Escape');
+  await scriviDallaTastiera(app, '\u001b\u001b');
   await page.waitForTimeout(300);
-  await expect(page.getByPlaceholder('confermo')).toBeVisible();
-  await page.getByPlaceholder('confermo').fill('confermo');
-  await page.getByRole('button', { name: 'Procedi comunque' }).click();
-  await expect(page.getByText('Sito segnalato come pericoloso')).toHaveCount(0, { timeout: 6_000 });
+  expect((await copertura(app)).coperta).toBe(true);
+  await procedi(app, avviso);
   await page.locator('#pw').fill('segreto');
   await expect(page.locator('#pw')).toHaveValue('segreto');
 });
@@ -555,31 +556,189 @@ for (const quando of ['prima', 'dopo']) {
     await serviInCaricamento(app, { [`conto-modale-${quando}.com/login`]: '<title>Accedi</title><dialog id="d"><form>'
       + '<input type="password" id="pw"></form></dialog><script>var d=document.getElementById("d");' + apri + '</script>' }, { gsbListed: true });
     const page = await apriSenzaAspettare(app, shell, `https://conto-modale-${quando}.com/login`);
-    await expect(page.getByText('Sito segnalato come pericoloso')).toBeVisible({ timeout: 8_000 });
+    const avviso = await vistaAvviso(app);
+    await expect(avviso.getByText(SEGNALATO)).toBeVisible({ timeout: 8_000 });
     await page.waitForFunction(() => document.getElementById('d').open, null, { timeout: 6_000 });
     await page.waitForTimeout(300);
-    const box = await page.locator('#pw').boundingBox();
-    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-    await page.keyboard.type('segreto');
-    await expect(page.locator('#pw')).toHaveValue('');
-    await page.getByPlaceholder('confermo').fill('confermo');
-    await page.getByRole('button', { name: 'Procedi comunque' }).click();
-    await expect(page.getByText('Sito segnalato come pericoloso')).toHaveCount(0, { timeout: 6_000 });
+    expect(await copertura(app)).toEqual(COPERTA);
+    expect(await scriveNellAvviso(app, page, avviso)).toBe('');
+    await procedi(app, avviso);
     await page.locator('#pw').fill('segreto');
     await expect(page.locator('#pw')).toHaveValue('segreto');
   });
 }
 
 test('popup del sito sospetto: la pagina che si riprende il fuoco non riceve quello che si scrive', async ({ app, shell }) => {
-  await serviInCaricamento(app, { 'area-riservata-fuoco.it/accesso': MODULO
+  await serviInCaricamento(app, { 'area-riservata-fuoco.it/accesso': MODULO + ASCOLTA
     + '<script>setTimeout(function(){document.getElementById("pw").focus()},2000)</script>' });
   const page = await apriSenzaAspettare(app, shell, 'http://area-riservata-fuoco.it/accesso');
-  await expect(page.getByText('Sito potenzialmente sospetto')).toBeVisible({ timeout: 8_000 });
+  const avviso = await vistaAvviso(app);
+  await expect(avviso.getByText('Sito potenzialmente sospetto')).toBeVisible({ timeout: 8_000 });
   await page.waitForTimeout(2800);
-  await page.keyboard.type('segreto');
+  expect(await copertura(app)).toEqual(COPERTA);
+  await scriviDallaTastiera(app, 'segreto\r');
+  expect((await copertura(app)).coperta).toBe(true);
   await expect(page.locator('#pw')).toHaveValue('');
-  await page.getByRole('button', { name: 'Continua' }).click();
-  await expect(page.getByText('Sito potenzialmente sospetto')).toHaveCount(0, { timeout: 6_000 });
+  expect(await sentiti(page)).toEqual({ k: '', i: '' });
+  await avviso.getByRole('button', { name: 'Continua' }).click();
+  await expect.poll(async () => (await copertura(app)).coperta).toBe(false);
   await page.locator('#pw').fill('segreto');
   await expect(page.locator('#pw')).toHaveValue('segreto');
+});
+
+// #813.5 — l'avviso sta fuori dalla pagina che avvisa: la pagina non sente quello che ci si scrive, non lo copre e
+// non lo cancella.
+test('la pagina in lista ascolta i tasti di tutto il documento: quello che si scrive nell\'avviso non le arriva', async ({ app, shell }) => {
+  await serviInCaricamento(app, { 'conto-ascolta.com/login': MODULO + ASCOLTA + '<script src="/lento.js"></script>' }, { gsbListed: true });
+  try {
+    const page = await apriSenzaAspettare(app, shell, 'https://conto-ascolta.com/login');
+    const avviso = await vistaAvviso(app);
+    await expect(avviso.getByText(SEGNALATO)).toBeVisible({ timeout: 8_000 });
+    await expect.poll(() => copertura(app)).toEqual(COPERTA);
+    await scriviDallaTastiera(app, 'segreto');
+    await expect(avviso.getByPlaceholder('confermo')).toHaveValue('segreto');
+    expect(await sentiti(page)).toEqual({ k: '', i: '' });
+  } finally {
+    await chiudiLenti(app);
+  }
+});
+
+test('un riquadro a tutto schermo aperto dalla pagina non copre l\'avviso, e i tasti non le arrivano', async ({ app, shell }) => {
+  await serviInCaricamento(app, { 'conto-popover.com/login': '<title>Accedi</title><div id="p" popover="manual" '
+    + 'style="width:100vw;height:100vh;max-width:none;max-height:none;inset:0;margin:0;background:#fff">'
+    + '<input type="password" id="pw" placeholder="Password"></div>' + ASCOLTA
+    + '<script>setTimeout(function(){var p=document.getElementById("p");p.showPopover();document.getElementById("pw").focus()},2000)</script>' }, { gsbListed: true });
+  const page = await apriSenzaAspettare(app, shell, 'https://conto-popover.com/login');
+  const avviso = await vistaAvviso(app);
+  await expect(avviso.getByText(SEGNALATO)).toBeVisible({ timeout: 8_000 });
+  await page.waitForFunction(() => document.getElementById('p').matches(':popover-open'), null, { timeout: 6_000 });
+  await page.waitForTimeout(500);
+  expect(await copertura(app)).toEqual(COPERTA);
+  expect(await scriveNellAvviso(app, page, avviso)).toBe('');
+  expect(await sentiti(page)).toEqual({ k: '', i: '' });
+});
+
+for (const [nome, js] of [
+  ['document.write', 'document.open();document.write(F);document.close();'],
+  ['sostituzione dei figli di <html>', 'var b=document.createElement("body");b.innerHTML=F;document.documentElement.replaceChildren(document.head,b);'],
+]) {
+  test(`la pagina si riscrive a caricamento finito (${nome}): l'avviso resta e il campo password non si scrive`, async ({ app, shell }) => {
+    const h = 'conto-riscrive-' + (nome.startsWith('document') ? 'a' : 'b') + '.com';
+    await serviInCaricamento(app, { [h + '/login']: '<title>Attendere</title><p>Caricamento…</p><script>var F='
+      + JSON.stringify(MODULO) + ';setTimeout(function(){' + js + '},2500)</script>' }, { gsbListed: true });
+    const page = await apriSenzaAspettare(app, shell, 'https://' + h + '/login');
+    const avviso = await vistaAvviso(app);
+    await expect(avviso.getByText(SEGNALATO)).toBeVisible({ timeout: 8_000 });
+    await page.waitForFunction(() => !!document.getElementById('pw'), null, { timeout: 8_000 });
+    await page.waitForTimeout(1500);
+    expect(await copertura(app)).toEqual(COPERTA);
+    await expect(avviso.getByText(SEGNALATO)).toBeVisible();
+    expect(await scriveNellAvviso(app, page, avviso)).toBe('');
+  });
+}
+
+test('i tasti del browser valgono anche dall\'avviso, che segue la scheda: Ctrl+T, il ritorno, Ctrl+W', async ({ app, shell }) => {
+  await serviInCaricamento(app, { 'conto-schede.com/login': MODULO }, { gsbListed: true });
+  await apriSenzaAspettare(app, shell, 'https://conto-schede.com/login');
+  const avviso = await vistaAvviso(app);
+  await expect(avviso.getByText(SEGNALATO)).toBeVisible({ timeout: 8_000 });
+  await expect.poll(() => copertura(app)).toEqual(COPERTA);
+  const schede = () => app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    return { n: tm.tabs.length, attiva: tm.tabs.find((t) => t.id === tm.activeId).view.webContents.getURL() };
+  });
+  const prima = (await schede()).n;
+  const tasto = (key, mod) => app.evaluate(({ webContents }, { key, mod }) => {
+    const wc = webContents.getFocusedWebContents();
+    wc.sendInputEvent({ type: 'keyDown', keyCode: key, modifiers: [mod] });
+    wc.sendInputEvent({ type: 'keyUp', keyCode: key, modifiers: [mod] });
+  }, { key, mod });
+  await tasto('T', 'control');
+  await expect.poll(async () => (await schede()).n).toBe(prima + 1);
+  // Sulla scheda nuova l'avviso non c'è e la tastiera è sua.
+  await expect.poll(async () => (await copertura(app)).coperta).toBe(false);
+  await expect.poll(async () => (await copertura(app)).tastiera).toBe('pagina');
+  // Tornati sulla scheda del sito, l'avviso la copre di nuovo e si riprende la tastiera.
+  await app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    tm.activate(tm.tabs.find((t) => /conto-schede/.test(t.view.webContents.getURL())).id);
+  });
+  await expect.poll(() => copertura(app)).toEqual(COPERTA);
+  await tasto('W', 'control');
+  await expect.poll(async () => (await schede()).n).toBe(prima);
+  expect((await schede()).attiva).not.toContain('conto-schede');
+  expect((await copertura(app)).coperta).toBe(false);
+});
+
+// Il menu di Filo si apre sopra l'avviso: chiedere a Filo del sito e segnalare il falso allarme si fanno in una scheda di
+// Filo, lontano dalla pagina sotto l'avviso, che resta coperta.
+async function menuDellAvviso(app, avviso) {
+  await avviso.locator('#titolo').click({ button: 'right' });
+  let menu = null;
+  await expect.poll(async () => {
+    for (const w of app.windows()) {
+      try {
+        if (!w.url().startsWith('data:text/html')) continue;
+        if (await w.evaluate(() => [...document.querySelectorAll('button.item')].some((b) => /falso allarme/.test(b.textContent)))) { menu = w; return true; }
+      } catch (_) {}
+    }
+    return false;
+  }, { timeout: 8_000 }).toBe(true);
+  return menu;
+}
+
+async function schedaNuova(app, url) {
+  const fine = Date.now() + 10_000;
+  while (Date.now() < fine) {
+    const p = app.windows().find((w) => { try { return w.url().startsWith(url); } catch (_) { return false; } });
+    if (p) return p;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  throw new Error(`nessuna scheda ${url}`);
+}
+
+test('tasto destro sull\'avviso: il menu di Filo sta sopra e porta alla segnalazione e alla domanda a Filo', async ({ app, shell }) => {
+  await serviInCaricamento(app, { 'conto-destro.com/login': MODULO }, { gsbListed: true });
+  await apriSenzaAspettare(app, shell, 'https://conto-destro.com/login');
+  const avviso = await vistaAvviso(app);
+  await expect(avviso.getByText(SEGNALATO)).toBeVisible({ timeout: 8_000 });
+  await expect.poll(() => copertura(app)).toEqual(COPERTA);
+
+  let menu = await menuDellAvviso(app, avviso);
+  expect(await menu.evaluate(() => [...document.querySelectorAll('button.item')].map((b) => b.textContent.trim())))
+    .toEqual(['Chiedi a Filo di questo sito', 'Segnala un falso allarme', 'Copia l\'indirizzo', 'Torna indietro']);
+  // Il menu è una finestra figlia, visibile, sopra la vista dell'avviso.
+  expect(await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    return BrowserWindow.getAllWindows().some((w) => w !== win && w.getParentWindow() === win && w.isVisible());
+  })).toBe(true);
+
+  await menu.evaluate(() => [...document.querySelectorAll('button.item')].find((b) => /falso allarme/.test(b.textContent)).click());
+  const home = await schedaNuova(app, 'filo://newtab/');
+  await expect(home.locator('.sn-fb-text')).toBeVisible({ timeout: 10_000 });
+  await expect(home.locator('.sn-fb-text')).toHaveValue(/Falso allarme: Filo ha segnalato come pericoloso https:\/\/conto-destro\.com\/login/);
+  await expect(home.locator('.sn-fb-text')).toHaveValue(new RegExp(SEGNALATO));
+  // Chiusa senza inviare, la segnalazione resta come bozza.
+  await expect.poll(() => home.evaluate(async () => (await chrome.storage.local.get(['sn_feedback_draft_text'])).sn_feedback_draft_text || ''))
+    .toMatch(/Falso allarme/);
+
+  // Tornati al sito, l'avviso è ancora lì; dal suo menu la domanda a Filo parte da sola in una scheda nuova.
+  await app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    tm.activate(tm.tabs.find((t) => /conto-destro/.test(t.view.webContents.getURL())).id);
+  });
+  await expect.poll(() => copertura(app)).toEqual(COPERTA);
+  const homeAperte = app.windows().filter((w) => { try { return w.url().startsWith('filo://newtab/'); } catch (_) { return false; } });
+  menu = await menuDellAvviso(app, avviso);
+  await menu.evaluate(() => [...document.querySelectorAll('button.item')].find((b) => /Chiedi a Filo/.test(b.textContent)).click());
+  let chat = null;
+  await expect.poll(() => {
+    chat = app.windows().find((w) => { try { return w.url().startsWith('filo://newtab/') && !homeAperte.includes(w); } catch (_) { return false; } });
+    return !!chat;
+  }, { timeout: 10_000 }).toBe(true);
+  await expect(chat.locator('.dash-bubble-user')).toContainText('https://conto-destro.com/login', { timeout: 10_000 });
+  await expect(chat.locator('.dash-bubble-user')).toContainText('È davvero da evitare?');
+  // La richiesta vale una volta: ricaricata, la home non rimanda la domanda.
+  expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs
+    .filter((t) => t._richiestaCasa).length)).toBe(0);
 });
