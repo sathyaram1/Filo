@@ -885,8 +885,9 @@
   });
   caselle.registra('pagina', (avvisi) => save({ avvisi }));
   const CASELLA = /^(text|password|number|search|url|email)$/;
-  // Un tetto di spesa a metà («1» scrivendo «15») fermerebbe le richieste di quell'istante: parte solo all'uscita.
-  const SOLO_ALL_USCITA = new Set(['monthlyLimit']);
+  // A metà hanno effetto subito: il tetto «1» scrivendo «15» ferma le richieste, una chiave tronca viene rifiutata e
+  // il rifiuto resta scritto. Partono solo all'uscita; incollare parte subito.
+  const SOLO_ALL_USCITA = new Set(['monthlyLimit', 'apiKey', 'apiKeyTavily']);
 
   // La chiave OpenRouter si mette e si toglie anche dalla pagina Crediti
   // (#629), e questa pagina risalva TUTTO il modulo a ogni modifica: con la
