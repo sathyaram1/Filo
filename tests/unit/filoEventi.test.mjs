@@ -5,8 +5,9 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { readFileSync, writeFileSync, appendFileSync, existsSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, writeFileSync, appendFileSync, existsSync, rmSync, readdirSync, statSync } from 'node:fs';
+import { join, dirname, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import '../../src/shared/chatArchive.js';
 import '../../src/shared/filoEventi.js';
@@ -288,4 +289,23 @@ test('periodo(): ultima ora, oggi, tutto e le ultime N ore', () => {
   assert.deepEqual(E.periodo('tutto', { ora }), { da: null, a: null });
   assert.equal(Date.parse(E.periodo('', { ore: 3, ora }).da), ora.getTime() - 3 * 3600e3);
   assert.equal(E.periodo('boh', { ora }), null);
+});
+
+test('il filo lo scrive un modulo solo, e solo in coda o riscrivendo dopo una cancellazione', () => {
+  const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+  const sorgenti = [];
+  const giro = (d) => {
+    for (const e of readdirSync(d)) {
+      const p = join(d, e);
+      if (statSync(p).isDirectory()) giro(p);
+      else if (e.endsWith('.js')) sorgenti.push(p);
+    }
+  };
+  giro(join(ROOT, 'src'));
+  const chi = sorgenti.filter((p) => readFileSync(p, 'utf8').includes('eventi.jsonl')).map((p) => relative(ROOT, p).replace(/\\/g, '/'));
+  assert.deepEqual(chi.sort(), ['src/main/services/exportData.js', 'src/main/services/ilFilo.js']);
+  const modulo = readFileSync(join(ROOT, 'src', 'main', 'services', 'ilFilo.js'), 'utf8');
+  const aperture = [...modulo.matchAll(/fsp\.open\(([^,]+),\s*'([a-z+]+)'\)/g)].map((m) => [m[1].trim(), m[2]]);
+  assert.deepEqual(aperture, [['fileEventi()', 'a'], ['tmp', 'w']], 'il file del filo si apre solo in coda (o il temporaneo della compattazione)');
+  assert.doesNotMatch(modulo, /writeFile\(\s*fileEventi\(\)|truncate|ftruncate/, 'il file del filo non si riscrive sul posto');
 });

@@ -33,6 +33,9 @@ Nessun tetto e nessun taglio.
   `applica`; non apre file suoi. Un tipo che una versione non conosce resta su disco e si salta in lettura.
 - Leggere-decidere-scrivere passa da `transazione`: due schede che chattano insieme non si mangiano un messaggio.
 - Il profilo segreto aprirà un'istanza sua con `creaFilo({ cartella })`, che non vede questa.
+- Titoli e indirizzi delle pagine visitate li scrivono i siti: chi li porta in un prompt li imbusta come contenuto
+  esterno ([Il canale fidato non trasporta testo di fuori](il-canale-fidato-non-trasporta-testo-di-fuori.md)), e
+  chi li mostra li scrive come testo, mai come markup.
 
 Sentinella: `tests/unit/filoEventi.test.mjs` (formato, sola aggiunta, cancellazione byte per byte, incognito,
 migrazione, nessun tetto, velocità con 50.000 eventi). Prove dell'app: `tests/filo-linea-del-tempo.spec.mjs`.

@@ -7,10 +7,12 @@ import { _electron as electron } from '@playwright/test';
 import { clickConfirm, confirmText } from './helpers/confirm.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const { buildExportZip } = createRequire(import.meta.url)('../src/main/services/exportData.js');
 const fileFilo = (userData) => join(userData, 'filo', 'eventi.jsonl');
 const leggiFilo = (userData) => (existsSync(fileFilo(userData)) ? readFileSync(fileFilo(userData), 'utf8') : '');
 const eventi = (userData) => leggiFilo(userData).split('\n').filter(Boolean).map((r) => JSON.parse(r));
@@ -124,7 +126,7 @@ test('un messaggio è su disco appena esiste, e chiudere l’app di colpo a met�
     expect(eventi(userData).filter((e) => e.chat === 'chat-crash').map((e) => e.msg.text))
       .toEqual(['Prima domanda, con risposta', 'Risposta di Filo.']);
 
-    app.evaluate(() => { globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'Seconda domanda RESTA-APPESA', threadHistory: [], chatId: 'chat-crash' }); });
+    app.evaluate(() => { globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'Seconda domanda RESTA-APPESA', threadHistory: [], chatId: 'chat-crash' }); }).catch(() => {});
     await expect.poll(() => leggiFilo(userData).includes('Seconda domanda RESTA-APPESA'), { timeout: 10_000 }).toBe(true);
     process.kill(app.process().pid, 'SIGKILL');
     await chiudiApp(app);
@@ -305,4 +307,45 @@ test('Esporta e Importa dati su un profilo vuoto riportano il filo intero', asyn
     rmSync(sorgente, { recursive: true, force: true });
     rmSync(destinazione, { recursive: true, force: true });
   }
+});
+
+test('un export di prima del filo, con le chat in data.json, si importa e le chat entrano nel filo', async () => {
+  test.setTimeout(90_000);
+  const userData = cartellaTemporanea('filo-866-vecchio-');
+  const zip = join(userData, 'vecchio.zip');
+  writeFileSync(zip, buildExportZip({ filo_chats: CHAT_VECCHIE, filo_memory: { PROFILO: 'Ada' } }));
+  const { app, shell } = await avvia(userData);
+  try {
+    await app.evaluate(({ dialog }, p) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [p] }); }, zip);
+    const page = await paginaInterna(app, shell, 'filo://security/security.html');
+    await page.locator('#sec-import-btn').click();
+    await expect.poll(() => confirmText(page), { timeout: 15_000 }).toContain('1 sezione di dati e nessuna immagine, più 2 chat con Filo');
+    await clickConfirm(page, 'ok');
+    await expect.poll(() => app.evaluate(async () => (await globalThis.SN_FILO_CHATS.list()).map((c) => c.messages.length)), { timeout: 15_000 })
+      .toEqual([3, 2]);
+    await app.evaluate(() => globalThis.__filoStorage.whenSettled());
+    expect(JSON.parse(readFileSync(join(userData, 'storage.json'), 'utf8')).filo_chats).toBeUndefined();
+    expect(leggiFilo(userData)).toContain('Secondo te la coscienza è emergente?');
+  } finally {
+    await chiudiApp(app);
+    rmSync(userData, { recursive: true, force: true });
+  }
+});
+
+test('un sito non conta né cancella le pagine visitate, nemmeno chiedendolo come azione', async ({ app, openTab, testServer }) => {
+  const userData = await app.evaluate(() => process.env.FILO_USER_DATA);
+  const sito = await testServer.openReady(openTab, '<!doctype html><title>Sito curioso</title><h1>ciao</h1>');
+  await expect.poll(() => leggiFilo(userData).includes('Sito curioso'), { timeout: 20_000 }).toBe(true);
+  const host = new URL(sito.url()).host + '/';
+  const chiedi = (m) => app.evaluate(async ({ webContents }, { host, m }) => {
+    const wc = webContents.getAllWebContents().filter((w) => !w.isDestroyed() && String(w.getURL()).includes(host)).pop();
+    return wc.executeJavaScriptInIsolatedWorld(999, [{ code: `chrome.runtime.sendMessage(${JSON.stringify(m)})` }]);
+  }, { host, m });
+  expect((await chiedi({ type: 'filo_pagine_conta', periodo: 'tutto' }))?.error).toBe('forbidden');
+  expect((await chiedi({ type: 'filo_pagine_cancella', periodo: 'tutto' }))?.error).toBe('forbidden');
+  const azione = await chiedi({ type: 'filo_run_action', action: { type: 'CANCELLA_PAGINE', periodo: 'tutto' } });
+  expect(azione?.executed).not.toBe(true);
+  const conferma = await chiedi({ type: 'filo_confirm_action', action: { type: 'CANCELLA_PAGINE', periodo: 'tutto' } });
+  expect(conferma?.executed).not.toBe(true);
+  expect(leggiFilo(userData)).toContain('Sito curioso');
 });

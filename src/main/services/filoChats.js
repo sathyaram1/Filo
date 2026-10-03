@@ -15,7 +15,7 @@
   }
 
   const list = () => F().chats();
-  const get = (id) => (id ? F().chat(id) : Promise.resolve(null));
+  const get = (id) => (id ? F().chat(String(id)) : Promise.resolve(null));
 
   // Per la Cronologia: senza i messaggi, che con anni di chat sarebbero megabyte a ogni apertura della pagina.
   async function listIndex() {
@@ -34,7 +34,7 @@
   }
 
   function open({ id, onboarding = false, startedAt = null } = {}) {
-    const chatId = id || uuid();
+    const chatId = id ? String(id) : uuid();
     return F().transazione(async (t) => {
       const c = t.chat(chatId);
       if (c) return global.SN_FILO_EVENTI.copiaChat(c);
@@ -46,7 +46,7 @@
 
   // Ogni messaggio è un evento del filo, su disco appena esiste. `meta.onboarding` marca l'intervista di benvenuto.
   function append(id, turns, meta) {
-    const chatId = id || uuid();
+    const chatId = id ? String(id) : uuid();
     const list0 = Array.isArray(turns) ? turns : [turns];
     const msgs = list0.map((tt) => CA().toStoredMessage(tt)).filter(Boolean);
     if (!msgs.length) return Promise.resolve(null);
@@ -67,6 +67,7 @@
   // Ritorna la chat chiusa, o null se non c'è niente da chiudere: una home aperta e mai usata non è una conversazione.
   function close(id) {
     if (!id) return Promise.resolve(null);
+    id = String(id);
     return F().transazione(async (t) => {
       const c = t.chat(id);
       if (!c) return null;
@@ -93,6 +94,7 @@
   // Titolo e tipo scelti DALL'UTENTE vincono e non vengono più riscritti dal classificatore.
   function setUserTriage(id, { title, kind } = {}) {
     if (!id) return Promise.resolve(null);
+    id = String(id);
     return F().transazione(async (t) => {
       const c = t.chat(id);
       if (!c) return null;
@@ -110,6 +112,7 @@
   // Titolo e tipo del classificatore (li calcola chi ha il modello: handlers.js).
   function setTriage(id, { title, kind } = {}) {
     if (!id) return Promise.resolve(null);
+    id = String(id);
     return F().transazione(async (t) => {
       const c = t.chat(id);
       if (!c) return null;
@@ -144,6 +147,7 @@
   // Cancellare è un evento in coda, e il contenuto della chat sparisce anche dal file.
   async function remove(id) {
     if (id) {
+      id = String(id);
       await F().transazione(async (t) => {
         if (t.chat(id)) await t.scrivi([t.evento(T().CANCELLAZIONE, { chat: id }, { autore: 'utente' })]);
       });

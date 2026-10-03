@@ -168,8 +168,13 @@ function creaFilo({ cartella } = {}) {
     return E().crea(tipo, campi, { autore, ts, id, dispositivo: normale.dispositivo || 'sconosciuto' });
   }
 
-  async function scrivi(incog, eventi) {
-    const validi = (Array.isArray(eventi) ? eventi : [eventi]).filter((ev) => E().valido(ev));
+  // Un evento fuori formato non si butta in silenzio: chi scrive lo deve sapere (per la chat lo registra handlers.js).
+  async function scrivi(incog, eventi, { scartaInvalidi = false } = {}) {
+    const tutti = Array.isArray(eventi) ? eventi : [eventi];
+    const validi = tutti.filter((ev) => E().valido(ev));
+    if (validi.length < tutti.length && !scartaInvalidi) {
+      throw new Error(`evento del filo fuori formato: ${tutti.filter((ev) => !E().valido(ev)).map((ev) => ev && ev.tipo).join(', ')}`);
+    }
     if (!validi.length) return { scritti: [], tolti: 0 };
     let tolti = 0;
     if (incog) {
@@ -201,7 +206,7 @@ function creaFilo({ cartella } = {}) {
         incognito: incog,
         chat: (id) => (id ? v.stato.chat.get(id) || null : null),
         evento,
-        scrivi: (eventi) => scrivi(incog, eventi),
+        scrivi: (eventi, o) => scrivi(incog, eventi, o),
       });
     });
   }
@@ -263,7 +268,7 @@ function creaFilo({ cartella } = {}) {
   function importa(testo, opts) {
     return transazione(async (t) => {
       const { eventi, scartate } = E().analizza(Buffer.isBuffer(testo) ? testo.toString('utf8') : testo);
-      const { scritti } = await t.scrivi(eventi);
+      const { scritti } = await t.scrivi(eventi, { scartaInvalidi: true });
       return { aggiunti: scritti.length, scartate };
     }, opts);
   }

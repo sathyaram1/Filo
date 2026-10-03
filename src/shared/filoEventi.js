@@ -51,12 +51,19 @@
     }
   }
 
+  // Un'ora in un'altra forma (numero, data senza millisecondi) si normalizza: un evento non si perde per l'orologio.
+  function normaTs(ts) {
+    if (ts == null || ts === '') return new Date().toISOString();
+    const t = typeof ts === 'number' ? ts : Date.parse(ts);
+    return Number.isFinite(t) ? new Date(t).toISOString() : new Date().toISOString();
+  }
+
   // L'ordine dei campi è fisso: due dispositivi che scrivono lo stesso evento producono la stessa riga.
   function crea(tipo, campi, { id, ts, dispositivo, autore } = {}) {
     const ev = {
       v: VERSIONE,
       id: id || uuid(),
-      ts: ts || new Date().toISOString(),
+      ts: isoValida(ts) ? ts : normaTs(ts),
       dispositivo: String(dispositivo || ''),
       autore: AUTORI.includes(autore) ? autore : 'utente',
       tipo,
@@ -188,7 +195,7 @@
 
   function copiaChat(c) {
     if (!c) return null;
-    const out = { ...c, messages: c.messages.slice() };
+    const out = { ...c, messages: c.messages.map((m) => ({ ...m })) };
     delete out._pos;
     return out;
   }
