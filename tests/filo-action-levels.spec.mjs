@@ -6,7 +6,7 @@
 // dispatch (anche se arrivano già "confermate" dal client).
 
 import { test, expect } from './fixtures/electron.mjs';
-import { CONFIRM_HOST, confirmState, confirmText, clickConfirm, fillConfirmInput, mouseClickConfirm, pointWhenConfirmAppears } from './helpers/confirm.mjs';
+import { CONFIRM_HOST, confirmState, confirmText, clickConfirm, fillConfirmInput, mouseClickConfirm, pointWhenConfirmAppears, aspettaConfermaPronta } from './helpers/confirm.mjs';
 
 const NEWTAB = 'filo://newtab/';
 
