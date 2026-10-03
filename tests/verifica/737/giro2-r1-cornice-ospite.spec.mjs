@@ -40,7 +40,7 @@ function ospite(src, trappola) {
     <iframe id="yt" src="${src}" width="720" height="420"></iframe>
     <iframe id="trappola" src="${trappola}" style="position:absolute;left:0;top:0;width:724px;height:424px;border:0"></iframe>
   </div>
-  <script>addEventListener('message',(e)=>{const d=e.data;if(d&&typeof d.filoAdSkip==='string'&&e.source!==document.getElementById('trappola').contentWindow){document.getElementById('trappola').contentWindow.postMessage({rilancia:d},'*');}});</script>
+  <script>window.__rilanciati=0;addEventListener('message',(e)=>{const d=e.data;if(d&&typeof d==='object'&&e.source!==document.getElementById('trappola').contentWindow){window.__rilanciati++;document.getElementById('trappola').contentWindow.postMessage({rilancia:d},'*');}});</script>
   </body>`;
 }
 
@@ -51,5 +51,7 @@ test('il riquadro del sito ospite messo sopra al lettore non riceve il clic vero
   await expect.poll(() => page.frames().find((f) => f.url() === dentro) || null, { timeout: 5_000 }).not.toBeNull();
   const trappola = page.frames().find((f) => f.url() === urlTrappola);
   await page.waitForTimeout(6000);
+  // Ogni messaggio del lettore, qualunque sia la sua forma, il sito lo ripete dal suo riquadro.
+  expect(await page.evaluate(() => window.__rilanciati)).toBeGreaterThan(0);
   expect(await trappola.evaluate(() => window.__gesti)).toEqual([]);
 });
