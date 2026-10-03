@@ -3757,7 +3757,7 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
   const memory = await FiloMem.getMemory();
   const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(memory);
   const lezioni = await lessonsBufferText();
-  const { stateText } = await FiloState.assemble();
+  const { stateText } = await FiloState.assemble({ sistema: false });
   // #379.5 — i "file" dell'editor (appunti inclusi: sono file come gli altri)
   // entrano nel contesto come riassunti, non come testo integrale. Sostituisce
   // la vecchia iniezione degli appunti dall'archivio (silo ormai vuoto dopo la
