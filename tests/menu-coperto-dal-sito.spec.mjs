@@ -160,6 +160,20 @@ test('un velo che non tocca il menu non ferma niente, e il primo clic sul menu a
   await expect(avvisoCoperto(page)).toHaveCount(0);
 });
 
+test('il menu rimpicciolito per compensare lo zoom della pagina conta i clic come prima', async ({ app, openTab, testServer }) => {
+  await app.evaluate(({ clipboard }, s) => clipboard.writeText(s), SEGRETO);
+  const page = await apri(openTab, testServer);
+  await page.locator('#campo').click({ button: 'right' });
+  await expect(page.locator('.sn-menu-paste-main')).toBeVisible();
+  await app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    tm.tabs.find((t) => t.id === tm.activeId).view.webContents.setZoomFactor(1.5);
+  });
+  await expect.poll(() => page.locator('.sn-menu').first().evaluate((m) => m.style.transform)).toMatch(/scale\(0\.6/);
+  await page.locator('.sn-menu-paste-main').click();
+  await expect(page.locator('#campo')).toHaveValue(SEGRETO);
+});
+
 test('il foglio di stile del sito non porta il menu sotto il suo velo', async ({ app, openTab, testServer }) => {
   const page = await apri(openTab, testServer, `<!doctype html><html><head>
     <style>.sn-menu { z-index: 1 !important; position: absolute !important; display: contents !important; }</style>

@@ -34,9 +34,9 @@ export async function apriCronologia(app, page, campo) {
   return cronologiaPronta(app, page);
 }
 
-// Il pannello aperto, quando ogni sua voce conterebbe un clic: il browser deve averla vista scoperta (#589.11).
+// Il pannello aperto, quando ogni sua voce a schermo conterebbe un clic: il browser deve averla vista scoperta (#589.11).
 export async function cronologiaPronta(app, page) {
-  const pronta = (s) => !!s && s.voci.every((v) => v.pronta) && s.svuotaPronta !== false;
+  const pronta = (s) => !!s && s.voci.every((v) => v.pronta !== false) && s.svuotaPronta !== false;
   await expect.poll(async () => pronta(await statoCronologia(app, page)), { timeout: 5000 }).toBe(true);
   return statoCronologia(app, page);
 }
