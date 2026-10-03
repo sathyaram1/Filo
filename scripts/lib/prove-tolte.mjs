@@ -85,6 +85,23 @@ export function baseDelConfronto(shaCritica, shaPulizia, root) {
 }
 
 /**
+ * Dopo un «pass» la pulizia non si registra: la sigilla il rilascio di chi ha verificato. È il punto fermo più
+ * recente che discende dalla critica e da lei ha solo tolto prove del giro (la tolleranza dei cancelli), o ''.
+ * Un rebase riscrive i commit ma non i punti fermi: un commit di chi riallinea non lo diventa (#880, #679).
+ */
+export function puliziaDelPass(shaCritica, punti, root) {
+  const critica = String(shaCritica || '');
+  if (!SHA.test(critica)) return '';
+  const shas = (Array.isArray(punti) ? punti : []).map((p) => String((p && p.sha) || '')).filter((s) => SHA.test(s) && s !== critica);
+  for (const sha of [...new Set(shas.reverse())]) {
+    try { execFileSync('git', ['merge-base', '--is-ancestor', critica, sha], { cwd: root, stdio: 'ignore' }); } catch (_) { continue; }
+    const tol = soloProveTolte(diffDopoLaVerifica(critica, sha, root));
+    if (tol.ok && tol.files.length) return sha;
+  }
+  return '';
+}
+
+/**
  * Il commit della pulizia, fra la critica e HEAD: solo prove o casi TOLTI, tutti da una cartella del
  * giro (`cartella`, o una sola se non la si sa). Stessa regola di «dopo un verdetto si può solo togliere».
  * `{ ok, motivo, sha, files, cancellate, cambiate, vecchie }`: `motivo` è già la frase per chi l'ha lanciata;
