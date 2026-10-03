@@ -151,6 +151,42 @@ test('se la scheda davanti si nasconde a metà, quella di dietro non resta allar
   m.anteprime.chiudi();
 });
 
+test('con Filo ridotto a icona la foto di una scheda di dietro aspetta, e la scatta quando la finestra torna', async () => {
+  const davanti = scheda('d');
+  const dietro = scheda('b');
+  const m = manager([davanti, dietro], 'd');
+  let ridotta = true;
+  m.win.isMinimized = () => ridotta;
+  m.anteprime = new AnteprimeSchede(m, { ritenta: 20 });
+  m.anteprime.nataDietro(dietro);
+  m.anteprime.caricata(dietro);
+  await new Promise((r) => setTimeout(r, 200));
+  assert.equal(m.anteprime.get('b'), null);
+  assert.equal(m.anteprime.inCattura(dietro), false, 'ridotta a icona non si allarga niente');
+  assert.equal(m.anteprime.tieneSveglia(dietro), true, 'la finestra ferma non consuma i tentativi');
+  ridotta = false;
+  m.anteprime.riprendi();
+  await aspetta(() => m.anteprime.get('b'));
+  m.anteprime.chiudi();
+});
+
+test('una scheda di dietro che non si riesce a fotografare, finiti i tentativi, riparte quando la finestra torna', async () => {
+  const davanti = scheda('d');
+  const dietro = scheda('b', { disegnata: false });
+  const m = manager([davanti, dietro], 'd');
+  m.anteprime = new AnteprimeSchede(m, { ritenta: 20, tettoDisegno: 50 });
+  m.anteprime.nataDietro(dietro);
+  m.anteprime.caricata(dietro);
+  await aspetta(() => !m.anteprime.tieneSveglia(dietro), 5000);
+  assert.equal(m.anteprime.get('b'), null);
+  // Una finestra coperta da un'altra smette di disegnare senza dirlo: il fuoco la rimette in coda.
+  dietro.view.webContents.capturePage = async () => immagine(false);
+  m.anteprime.riprendi();
+  await aspetta(() => m.anteprime.get('b'));
+  assert.equal(dietro.view.bounds, 'zero');
+  m.anteprime.chiudi();
+});
+
 // Una spia finta: conta i cambi come quella vera, e si sa quando l'hanno spenta.
 function conSpia(tab) {
   const spia = { n: 0, spenta: 0 };
