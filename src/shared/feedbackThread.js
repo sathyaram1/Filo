@@ -133,8 +133,8 @@
   //   routine:<slug> → 'routine'  audit automatico delle routine cloud (blu)
   //   local:<slug>   → 'local'    sessione locale di Claude (viola)
   //   <altro>        → 'user'     alpha tester esterno (arancione)
-  function originOf(clientId) {
-    const c = String(clientId || '');
+  function originOf(fb) {
+    const c = senderOf(fb);
     if (c.startsWith('owner:')) return 'owner';
     if (c.startsWith('agent:')) return 'agent';
     if (c.startsWith('routine:')) return 'routine';
