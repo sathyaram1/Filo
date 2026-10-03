@@ -88,8 +88,35 @@ async function uploadImage(buffer, mime = 'image/png') {
   return `${STORAGE_BASE}/${encodeURIComponent(name)}?alt=media&token=${token}`;
 }
 
-// Crea un documento feedback per una issue d'agente.
-export async function pushIssue({ model, severity, area, title, detail, foundAt, screenshotPath }) {
+/**
+ * Il token admin dell'owner: { idToken } oppure { idToken: '', motivo }. Oggetto, non funzione: i test lo
+ * sostituiscono. Stessa strada di scripts/claude-feedback.mjs.
+ */
+export const credenziale = {
+  async ottieni() {
+    const { findAdminRefreshToken, mintIdToken } = await import('../../scripts/lib/firestore-auth.mjs');
+    const rt = findAdminRefreshToken();
+    if (!rt) return { idToken: '', motivo: 'nessuna credenziale admin su questa macchina (node scripts/admin-login.mjs)' };
+    try {
+      return { idToken: await mintIdToken(rt) };
+    } catch (e) {
+      return { idToken: '', motivo: String((e && e.message) || e) };
+    }
+  },
+};
+
+async function cifra(testo) {
+  if (!CRYPTO.isEnabled()) throw new Error('cifratura non disponibile: la segnalazione non parte in chiaro');
+  return CRYPTO.encryptForOwner(String(testo));
+}
+
+// Crea un documento feedback per una issue d'agente. `idToken` assente: lo chiede a `credenziale`.
+export async function pushIssue({ model, severity, area, title, detail, foundAt, screenshotPath, idToken = '' }) {
+  if (!idToken) {
+    const c = await credenziale.ottieni();
+    if (!c.idToken) throw new Error(`manca il token admin (${c.motivo}): senza la prova del mittente l'esploratore sarebbe un utente, non invio`);
+    idToken = c.idToken;
+  }
   let images = [];
   if (screenshotPath) {
     try {
