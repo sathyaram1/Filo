@@ -1,5 +1,6 @@
 // Il lavoro locale sul server ha la sua pratica (#908): il comando del repo Filo la controlla, la prende in carico,
-// lancia server:fondi di filo-security con la pratica e a fusione riuscita la chiude. Rete e server finti.
+// lancia server:fondi di filo-security con la pratica e a fusione riuscita la chiude, se la parte dell'app non manca
+// (#915). Rete e server finti.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -28,13 +29,16 @@ test('leggiArgomenti: ramo, pratica e prova a vuoto, anche quando npm si prende 
   assert.equal(leggiArgomenti(['claude/x']).pratica, null);
 });
 
-function doc(id, { clientId = 'local:claude', senderProof = 'admin', status = 'todo', locale = true } = {}) {
+function doc(id, { clientId = 'local:claude', senderProof = 'admin', status = 'todo', locale = true, parti = null } = {}) {
   const fields = {
     seq: { integerValue: '910' }, clientId: { stringValue: clientId }, status: { stringValue: status },
     statusPublic: { stringValue: 'open' }, notes: { stringValue: '' },
   };
   if (senderProof) fields.senderProof = { stringValue: senderProof };
   if (locale) fields.localOnly = { mapValue: { fields: { by: { stringValue: 'local:claude' }, at: { integerValue: '1' } } } };
+  if (parti) {
+    fields.localMerges = { mapValue: { fields: Object.fromEntries(Object.entries(parti).map(([k, v]) => [k, { integerValue: String(v) }])) } };
+  }
   return { name: `projects/x/databases/(default)/documents/feedback/${id}`, fields };
 }
 
@@ -49,6 +53,9 @@ async function conRete(docs, fn) {
   try { return await fn(scritture); } finally { globalThis.fetch = vero; }
 }
 
+const ORA = Date.parse('2026-10-03T10:00:00Z');
+const ORE = 3600 * 1000;
+
 function giro({ docs, argv, codiceServer = 0, ramiAperti = [] }) {
   return conRete(docs, async (scritture) => {
     const lanci = [];
@@ -57,7 +64,7 @@ function giro({ docs, argv, codiceServer = 0, ramiAperti = [] }) {
       env: {}, bearer: 'finto', base: FIRESTORE_BASE, funzioni: '/srv/functions',
       log: (s) => righe.push(String(s)), err: (s) => righe.push(String(s)),
       lancia: (cartella, args, env) => { lanci.push({ cartella, args, pratica: env[PRATICA_ENV] }); return codiceServer; },
-      punta: () => 'a'.repeat(40), ramiAperti: () => ramiAperti,
+      punta: () => 'a'.repeat(40), ramiAperti: () => ramiAperti, ora: () => ORA,
     });
     return { k, lanci, scritture, testo: righe.join('\n') };
   });
@@ -97,9 +104,10 @@ test('davvero: presa in carico, server con la pratica, e a fusione riuscita la p
   const r = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p'] });
   assert.equal(r.k, 0, r.testo);
   assert.deepEqual(r.lanci, [{ cartella: '/srv/functions', args: ['claude/x'], pratica: '#910' }]);
-  assert.equal(r.scritture.length, 2, r.scritture.join('\n'));
+  assert.equal(r.scritture.length, 3, r.scritture.join('\n'));
   assert.ok(!r.scritture[0].includes('resolvedInVersion'), 'la prima scrittura è la presa in carico');
-  assert.ok(r.scritture[1].includes('resolvedInVersion'), 'la seconda chiude la pratica');
+  assert.match(r.scritture[1], /updateMask\.fieldPaths=localMerges\.server$/, 'poi la parte del server, su main');
+  assert.ok(r.scritture[2].includes('resolvedInVersion'), 'l’ultima chiude la pratica');
   assert.match(r.testo, /Pratica #910 chiusa/);
 });
 
@@ -114,9 +122,51 @@ test('se il server si ferma la pratica resta in lavorazione, con la nota del mot
 test('un lavoro che tocca anche l’app: dopo il server la pratica resta aperta, la chiude la fusione dell’app', async () => {
   const r = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p'], ramiAperti: ['claude/app'] });
   assert.equal(r.k, 0, r.testo);
-  assert.equal(r.scritture.length, 2);
+  assert.equal(r.scritture.length, 3);
+  assert.ok(r.scritture.some((u) => u.includes('localMerges.server')), 'la parte del server è registrata');
   assert.ok(r.scritture.every((u) => !u.includes('resolvedInVersion')), 'non si chiude');
-  assert.match(r.testo, /resta aperta: la chiude la fusione di claude\/app/);
+  assert.match(r.testo, /resta aperta: manca la parte dell’app, la chiude la fusione di claude\/app \(npm run finish -- --feedback 910\)/);
+});
+
+test('la parte dell’app già su main secondo la pratica: un suo ramo rimasto in giro non la tiene aperta', async () => {
+  const d = doc('p', { status: 'working', parti: { app: ORA - ORE } });
+  const r = await giro({ docs: { p: d }, argv: ['claude/x', '--feedback', 'p'], ramiAperti: ['claude/app'] });
+  assert.equal(r.k, 0, r.testo);
+  assert.ok(r.scritture.at(-1).includes('resolvedInVersion'), 'si chiude');
+  assert.match(r.testo, /Pratica #910 chiusa/);
+});
+
+test('pratica chiusa da poco dalla fusione dell’app dello stesso lavoro: il server la usa, non la riapre, la annota', async () => {
+  const d = doc('p', { status: 'done', parti: { app: ORA - 3 * ORE } });
+  const prova = await giro({ docs: { p: d }, argv: ['claude/x', '--feedback', 'p', '--dry-run'] });
+  assert.equal(prova.k, 0, prova.testo);
+  assert.deepEqual(prova.scritture, []);
+  assert.match(prova.testo, /resterebbe chiusa/);
+
+  const r = await giro({ docs: { p: d }, argv: ['claude/x', '--feedback', 'p'], ramiAperti: ['claude/app'] });
+  assert.equal(r.k, 0, r.testo);
+  assert.deepEqual(r.lanci, [{ cartella: '/srv/functions', args: ['claude/x'], pratica: '#910' }]);
+  assert.equal(r.scritture.length, 2, 'nessuna presa in carico: la parte e la nota');
+  assert.match(r.scritture[0], /localMerges\.server$/);
+  assert.match(r.testo, /meno di 48 ore fa/);
+  assert.match(r.testo, /resta chiusa/);
+});
+
+test('pratica chiusa che non viene dall’app da poco: si rifiuta prima di toccare il server, col perché', async () => {
+  const casi = [
+    [{ status: 'done', parti: { app: ORA - 49 * ORE } }, /più di 48 ore/],
+    [{ status: 'done', parti: { app: ORA - ORE, server: ORA - ORE } }, /parte del server di questo lavoro è già su main/],
+    [{ status: 'done' }, /non l’ha chiusa la fusione della parte dell’app/],
+    [{ status: 'done', parti: { app: ORA - ORE }, locale: false }, /segno «solo in locale»/],
+  ];
+  for (const [opz, motivo] of casi) {
+    const r = await giro({ docs: { p: doc('p', opz) }, argv: ['claude/x', '--feedback', 'p'] });
+    assert.equal(r.k, 3, r.testo);
+    assert.match(r.testo, motivo);
+    assert.match(r.testo, /aprine una/);
+    assert.deepEqual(r.lanci, []);
+    assert.deepEqual(r.scritture, []);
+  }
 });
 
 test('ramiApertiDellaPratica: i rami dell’app legati alla pratica in ogni worktree, tranne quelli già su main', () => {
@@ -131,4 +181,22 @@ test('ramiApertiDellaPratica: i rami dell’app legati alla pratica in ogni work
   };
   assert.deepEqual(ramiApertiDellaPratica('p', { radice: '/a', git, leggi: (f) => stati[f] || null }), ['claude/app']);
   assert.deepEqual(ramiApertiDellaPratica('z', { radice: '/a', git, leggi: (f) => stati[f] || null }), []);
+});
+
+test('ramiApertiDellaPratica: il ramo dell’app con lo stesso nome di quello del server conta anche senza start', () => {
+  const lista = 'worktree /a\nHEAD 1\nbranch refs/heads/main\n';
+  const stati = { [join('/a', '.claude', 'verify-local.json')]: { 'claude/di-altri': { feedbackId: 'q' } } };
+  const esistono = new Set(['refs/heads/claude/gemello', 'refs/heads/claude/di-altri', 'refs/heads/claude/fuso']);
+  const git = (cwd, args) => {
+    if (args[0] === 'worktree') return lista;
+    if (args[0] === 'rev-parse') return esistono.has(args[3]) ? 'x' : null;
+    return args[2] === 'claude/fuso' ? '' : null;
+  };
+  const leggi = (f) => stati[f] || null;
+  const con = (ramoGemello) => ramiApertiDellaPratica('p', { radice: '/a', git, leggi, ramoGemello });
+  assert.deepEqual(con('claude/gemello'), ['claude/gemello']);
+  assert.deepEqual(con('claude/di-altri'), [], 'legato a un’altra pratica');
+  assert.deepEqual(con('claude/fuso'), [], 'già su main');
+  assert.deepEqual(con('claude/assente'), []);
+  assert.deepEqual(con('main'), []);
 });
