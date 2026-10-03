@@ -30,7 +30,15 @@ function creaIsolata() {
 test('crea gira da sola, come nel riquadro di un altro sito', () => {
   const s = creaIsolata();
   assert.equal(s.campoSegreto(campo({ type: 'password' })), true);
-  assert.deepEqual(s.campiInVista(), []);
+  assert.equal(s.campiInVista().length, 0);
+  const { codiceMisura } = require('../../src/main/services/campiNeiRiquadri.js');
+  const carta = { ...campo({ name: 'number' }, '4111 1111 1111 1111'),
+    getBoundingClientRect: () => ({ left: 10, top: 20, right: 210, bottom: 50, width: 200, height: 30 }) };
+  const window = { innerWidth: 800, innerHeight: 600, getComputedStyle: () => ({ backgroundColor: 'rgb(1, 2, 3)', color: 'red', fontSize: '16px' }),
+    document: { querySelectorAll: () => [carta], getElementById: () => null } };
+  const misurati = vm.runInNewContext(codiceMisura(), { window });
+  assert.equal(misurati.length, 1, 'il riquadro deve riconoscere il numero di carta da solo');
+  assert.equal(misurati[0].sfondo, 'rgb(1, 2, 3)');
 });
 
 test('il numero di carta si riconosce dal valore, qualunque nome abbia il campo', () => {

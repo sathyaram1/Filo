@@ -90,4 +90,4 @@ async function campiSegretiNeiRiquadri(webContents) {
   return { campi, nonCoperti };
 }
 
-module.exports = { campiSegretiNeiRiquadri };
+module.exports = { campiSegretiNeiRiquadri, codiceMisura };

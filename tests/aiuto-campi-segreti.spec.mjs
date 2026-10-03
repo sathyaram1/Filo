@@ -10,7 +10,7 @@ async function preparaModelli(app) {
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
-      models: { [C.ACTIONS.HELP]: 'deepseek-flash', [C.ACTIONS.SPELLCHECK_WORD]: 'deepseek-flash' },
+      models: { [C.ACTIONS.HELP]: 'deepseek-flash', [C.ACTIONS.SPELLCHECK_WORD]: 'deepseek-flash', [C.ACTIONS.EXPLAIN]: 'deepseek-flash' },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
   });
@@ -74,6 +74,8 @@ const SEGRETI = [
   { nome: 'il numero di carta senza segnaposto', campo: '<label for="c">Numero della carta</label> <input id="c" autocomplete="cc-number" inputmode="numeric">', valore: '4111 1111 1111 1111', etichetta: 'Numero della carta', avviso: true },
   { nome: 'il codice di sicurezza nella sua etichetta', campo: '<label>CVV <input id="c" inputmode="numeric"></label>', valore: '8264', etichetta: 'CVV', avviso: true },
   { nome: 'un codice che il sito copre coi puntini', campo: '<label for="c">Codice</label> <input id="c" style="-webkit-text-security:disc">', valore: 'Zq7Kp2xW', etichetta: 'Codice' },
+  { nome: 'il numero di carta in un campo che il sito chiama solo «cc-number»', campo: '<div>Numero della carta</div><input id="c" name="cc-number">', valore: '4111 1111 1111 1111', etichetta: '' },
+  { nome: 'il numero di carta in un campo dal nome qualunque', campo: '<input id="c" name="q">', valore: '5500 0000 0000 0004', etichetta: '' },
 ];
 
 for (const caso of SEGRETI) {
@@ -93,6 +95,7 @@ for (const caso of SEGRETI) {
     expect(testo, 'quello che l’utente ha scritto nel campo è arrivato al modello').not.toContain(caso.valore);
     expect(testo).not.toContain(caso.valore.replace(/\s/g, ''));
     expect(rigaDelCampo(testo), 'il modello deve sapere quale campo è').toContain(`"${caso.etichetta}`);
+    expect(rigaDelCampo(testo), 'il campo deve restare nell’elenco').toContain(':: #c');
   });
 }
 
@@ -199,4 +202,98 @@ test('nell’immagine della pagina che va al modello il numero della carta è co
     return n;
   }, immagini);
   expect(diversi, 'il numero scritto nel campo si vede nell’immagine').toBe(0);
+});
+
+// Quante cifre cambiano fra due immagini della pagina dentro il rettangolo r: zero vuol dire che il numero non si legge.
+async function pixelDiversi(page, [a, b], r) {
+  return page.evaluate(async ([a, b, r]) => {
+    const pixel = async (url) => {
+      const byte = Uint8Array.from(atob(url.slice(url.indexOf(',') + 1)), (c) => c.charCodeAt(0));
+      const img = await createImageBitmap(new Blob([byte]));
+      const cv = document.createElement('canvas');
+      cv.width = img.width; cv.height = img.height;
+      const ctx = cv.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const sx = img.width / window.innerWidth, sy = img.height / window.innerHeight;
+      return ctx.getImageData(Math.round(r.left * sx), Math.round(r.top * sy), Math.round(r.width * sx), Math.round(r.height * sy)).data;
+    };
+    const [pa, pb] = [await pixel(a), await pixel(b)];
+    let n = 0;
+    for (let i = 0; i < pa.length; i++) if (pa[i] !== pb[i]) n++;
+    return n;
+  }, [a, b, r]);
+}
+
+async function immaginiConDueCarte(app, shell, page, scrivi) {
+  await preparaModelli(app);
+  await modelloFinto(app, [['', JSON.stringify({ text: 'Premi «Accedi».', status: 'done' })]]);
+  await apriAiuto(shell, page);
+  const immagini = [];
+  for (const [i, valore] of ['4111 1111 1111 1111', '5500 0000 0000 0004'].entries()) {
+    await scrivi(valore);
+    await scriviAllAiuto(page, 'aiutami a pagare');
+    await expect.poll(() => app.evaluate(() => globalThis.__visti.length), { timeout: 20_000 }).toBe(i + 1);
+    immagini.push(await app.evaluate(() => {
+      const utente = [...globalThis.__visti.at(-1)].reverse().find((m) => m.role === 'user');
+      const parte = Array.isArray(utente.content) && utente.content.find((p) => p.type === 'image_url');
+      return parte ? parte.image_url.url : null;
+    }));
+  }
+  expect(immagini[0], 'al modello deve arrivare l’immagine della pagina').toMatch(/^data:image\//);
+  expect(immagini[1]).toMatch(/^data:image\//);
+  return immagini;
+}
+
+// Il campo della carta di un servizio di pagamento sta in un riquadro di un altro sito, che la pagina non vede.
+test('nell’immagine che va al modello è coperto anche il numero scritto nel riquadro di pagamento di un altro sito', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const riquadro = testServer.html(`<!doctype html><html><body style="margin:0;background:#fff">
+    <input id="n" autocomplete="cc-number" placeholder="1234 1234 1234 1234"
+      style="width:300px;font-size:20px;border:0;outline:0;caret-color:transparent"></body></html>`, { pubblico: true });
+  const page = await testServer.openReady(openTab,
+    modulo(`<label>Carta</label><iframe id="f" src="${riquadro}" style="width:340px;height:40px;border:0;padding:4px"></iframe>`));
+  const campo = page.frameLocator('#f').locator('#n');
+  await expect(campo).toBeVisible({ timeout: 10_000 });
+  const immagini = await immaginiConDueCarte(app, shell, page, (v) => campo.fill(v));
+  const f = await page.locator('#f').boundingBox();
+  expect(await pixelDiversi(page, immagini, { left: f.x + 4, top: f.y + 4, width: 300, height: f.height - 8 }),
+    'il numero scritto nel riquadro di pagamento si legge nell’immagine').toBe(0);
+});
+
+test('nell’immagine è coperto il numero di carta anche quando il campo si chiama solo «Numero»', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, modulo('<fieldset><legend>Carta di credito</legend><label for="c">Numero</label> '
+    + '<input id="c" name="number" style="width:300px;font-size:18px;outline:0;caret-color:transparent"></fieldset>'));
+  const immagini = await immaginiConDueCarte(app, shell, page, (v) => page.fill('#c', v));
+  const b = await page.locator('#c').boundingBox();
+  expect(await pixelDiversi(page, immagini, { left: b.x + 3, top: b.y + 3, width: b.width - 6, height: b.height - 6 }),
+    'il numero scritto nel campo si legge nell’immagine').toBe(0);
+});
+
+// Selezionare del testo prepara la spiegazione del tasto destro: dentro il campo della carta non deve partire niente,
+// e il menu sulla selezione tiene Taglia e Copia ma non la spiegazione.
+test('il numero di carta selezionato nel suo campo non parte verso la spiegazione', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, modulo('<label for="c">Numero della carta</label> '
+    + '<input id="c" autocomplete="cc-number" style="width:280px"> <label for="n">Note</label> <input id="n" style="width:280px">'));
+  await superaAvviso(page);
+  await page.fill('#c', '4111 1111 1111 1111');
+  await page.fill('#n', 'consegna al portone verde');
+  await preparaModelli(app);
+  await modelloFinto(app, [['', 'Una frase.']]);
+
+  await page.locator('#c').click();
+  await page.keyboard.press('Control+a');
+  await page.locator('#c').click({ button: 'right', position: { x: 12, y: 8 } });
+  const menu = page.locator('.sn-menu');
+  await expect(menu).toBeVisible();
+  await expect(menu.getByText('Copia', { exact: true })).toBeVisible();
+  await expect(menu.locator('.sn-menu-inline-explain')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+
+  // Un campo qualunque, selezionato allo stesso modo, la spiegazione la chiede: è la prova che il tempo è bastato.
+  await page.locator('#n').click();
+  await page.keyboard.press('Control+a');
+  await expect.poll(() => arrivato(app, page), { timeout: 15_000 }).toContain('portone verde');
+  expect(await arrivato(app, page), 'il numero di carta selezionato è partito verso il modello').not.toContain('4111');
 });
