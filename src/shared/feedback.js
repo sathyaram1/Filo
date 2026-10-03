@@ -882,6 +882,8 @@
       if (res.status === 401 || res.status === 403) {
         authRefused = res.status;
         delete doc.fields.senderProof;
+        delete doc.fields.priority;
+        delete doc.fields.priorityManual;
         res = null;
       } else {
         senderProof = 'admin';
