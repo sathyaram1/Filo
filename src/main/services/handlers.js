@@ -1775,7 +1775,8 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         // niente, ma l'utente deve saperlo anche se il modello non lo dice.
         if (built.rifiuto) return { executed: false, kept: false, output: { error: built.rifiuto, rifiuto: true } };
         await applySettingsUpdate(built.partial);
-        return { executed: true, kept: true };
+        // Il nome leggibile serve alla riga della chat quando il valore era già quello (niente evento).
+        return { executed: true, kept: true, output: { etichetta: built.label } };
       }
       case 'IMPOSTA_ESTETICA': {
         // Filo cambia un token estetico (colore/font/raggio/opacità) su

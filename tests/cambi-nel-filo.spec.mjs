@@ -319,3 +319,52 @@ test('G — lo zoom chiesto in chat è un evento che si annulla; una raffica di 
   expect(ev).toMatchObject({ via: 'interfaccia', dove: 'zoom' });
   expect(ev.cambi[0]).toMatchObject({ prima: 100, dopo });
 });
+
+test('H — annulla quando lo stato era già tornato com\'era: l\'annullo resta, e «rifai» rimette il cambio', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await homeDi(app);
+  await configura(app);
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'h1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"tema","valore":"scuro"}' }] },
+    { text: 'Fatto.' },
+  ]);
+  await scrivi(page, 'tema scuro', 'Fatto.');
+  // Nel frattempo l'utente lo rimette a mano.
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ theme: 'light' }); });
+  const bolla = page.locator('.dash-bubble-user', { hasText: 'tema scuro' });
+  const pop = bolla.locator('.dash-cambi-pop');
+  await bolla.hover();
+  await pop.locator('.dash-cambi-annulla').click();
+  await expect(pop.locator('.dash-cambi-riga')).toHaveClass(/dash-cambi-annullato/);
+  expect((await impostazioni(app)).theme).toBe('light');
+  await bolla.hover();
+  await pop.locator('.dash-cambi-annulla', { hasText: 'rifai' }).click();
+  await expect.poll(async () => (await impostazioni(app)).theme).toBe('dark');
+  await expect(pop.locator('.dash-cambi-riga')).not.toHaveClass(/dash-cambi-annullato/);
+  await ripristina(app);
+});
+
+test('I — un sito non legge né annulla i cambi: solo le pagine di Filo', async ({ app }) => {
+  await configura(app);
+  const r = await app.evaluate(async () => {
+    const H = globalThis.__filoHandlers;
+    const { MSG } = globalThis.SN_MSG;
+    await globalThis.SN_REGISTRO_CAMBI.attesa();
+    const lista = (await globalThis.chrome.storage.local.get('filo_cambi')).filo_cambi || [];
+    const id = lista[lista.length - 1].id;
+    const sito = { tab: { url: 'http://sito-ostile.example/' }, url: 'http://sito-ostile.example/' };
+    const filo = { tab: { url: 'filo://newtab/' }, url: 'filo://newtab/' };
+    return {
+      leggiSito: await H.handleMessage({ type: MSG.CAMBI_LEGGI, ids: [id] }, sito),
+      annullaSito: await H.handleMessage({ type: MSG.CAMBI_ANNULLA, id }, sito),
+      tema: (await globalThis.SN_STORAGE.getSettings()).theme,
+      leggiFilo: await H.handleMessage({ type: MSG.CAMBI_LEGGI, ids: [id] }, filo),
+    };
+  });
+  expect(r.leggiSito.code).toBe('forbidden');
+  expect(r.annullaSito.code).toBe('forbidden');
+  expect(r.tema).toBe('light');
+  expect(r.leggiFilo.ok).toBe(true);
+  expect(r.leggiFilo.eventi[0].frasi.join(' ')).toContain('tema: come il sistema → chiaro');
+});

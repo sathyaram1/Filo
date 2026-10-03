@@ -118,6 +118,15 @@ function registraZoom({ host, prima, dopo }, { incognito } = {}) {
   return registra({ tipo: 'zoom', cambi: [{ chiave: `zoom:${host}`, prima: a, dopo: b }] }, { incognito: incognito ?? Disco.inIncognito() });
 }
 
+// L'annullo di uno stato che era già tornato com'era non ha valori suoi: annullarlo (rifare) vuol
+// dire rimettere i valori «dopo» del cambio che annullava.
+function daRimettere(e, lista) {
+  if (!e || !e.annulla || (Array.isArray(e.cambi) && e.cambi.length)) return e;
+  const originale = lista.find((x) => x.id === e.annulla);
+  if (!originale) return e;
+  return { ...e, tipo: originale.tipo, cambi: originale.cambi.map((c) => ({ ...c, prima: c.dopo, dopo: c.prima, vuotoPrima: c.vuotoDopo, vuotoDopo: c.vuotoPrima })) };
+}
+
 function vista(e, lista) {
   const chiusi = K().annullati(lista);
   return {
@@ -129,7 +138,7 @@ function vista(e, lista) {
     provenienza: K().provenienza(e),
     annulla: e.annulla || null,
     annullatoDa: chiusi.get(e.id) || null,
-    annullabile: K().annullabile(e),
+    annullabile: K().annullabile(daRimettere(e, lista)),
   };
 }
 
@@ -150,7 +159,7 @@ async function ultimi({ max = 40 } = {}) {
 async function livelloDi(id) {
   await attesa();
   const lista = await leggiLista();
-  const e = bersaglio(lista, id);
+  const e = daRimettere(bersaglio(lista, id), lista);
   return e ? { livello: K().livello(e), frase: K().frase(e), id: e.id } : null;
 }
 
@@ -170,9 +179,10 @@ function bersaglio(lista, id) {
 async function annulla(id, prov = {}) {
   await attesa();
   const lista = await leggiLista();
-  const e = bersaglio(lista, id ? String(id) : null);
-  if (!e) return { ok: false, motivo: id ? 'cambio non trovato' : 'nessun cambio da annullare' };
-  if (K().annullati(lista).has(e.id)) return { ok: false, motivo: 'già annullato', id: e.id };
+  const trovato = bersaglio(lista, id ? String(id) : null);
+  if (!trovato) return { ok: false, motivo: id ? 'cambio non trovato' : 'nessun cambio da annullare' };
+  if (K().annullati(lista).has(trovato.id)) return { ok: false, motivo: 'già annullato', id: trovato.id };
+  const e = daRimettere(trovato, lista);
   if (!K().annullabile(e)) return { ok: false, motivo: 'il valore di prima non è conservato (è un segreto)', id: e.id };
   const raccolti = [];
   let saltati = [];

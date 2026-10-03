@@ -29,6 +29,7 @@
   }
 
   function crea(bolla) {
+    bolla.dataset.cambiTesto = bolla.textContent;
     bolla.classList.add('dash-bubble-cambi');
     const segno = document.createElement('button');
     segno.type = 'button';
@@ -147,6 +148,30 @@
     aggiorna([s]).catch(() => {});
   }
 
+  // Una conversazione ridisegnata da capo (l'intervista di benvenuto si riallinea a ogni turno) rifà
+  // le bolle: i segni si riprendono dalla bolla con lo stesso testo, contata nello stesso ordine.
+  function bolleUtente(area) {
+    return [...area.querySelectorAll('.dash-bubble-user')];
+  }
+  function testoDi(bolla) {
+    return bolla.dataset.cambiTesto != null ? bolla.dataset.cambiTesto : bolla.textContent;
+  }
+  function fotografa(area) {
+    const bolle = bolleUtente(area);
+    return [...segni].filter((s) => area.contains(s.bolla)).map((s) => {
+      const testo = testoDi(s.bolla);
+      const n = bolle.filter((b) => testoDi(b) === testo).indexOf(s.bolla);
+      return { testo, n, ids: s.ids.slice() };
+    });
+  }
+  function rimetti(area, foto) {
+    const bolle = bolleUtente(area);
+    for (const f of Array.isArray(foto) ? foto : []) {
+      const b = bolle.filter((x) => testoDi(x) === f.testo)[f.n];
+      if (b) segna(b, f.ids);
+    }
+  }
+
   let attesa = null;
   function init(deps) {
     if (deps && deps.send) send = deps.send;
@@ -165,5 +190,5 @@
     });
   }
 
-  global.SN_DASH_CAMBI = { init, segna, aggiorna };
+  global.SN_DASH_CAMBI = { init, segna, aggiorna, fotografa, rimetti };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

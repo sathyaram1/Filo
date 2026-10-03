@@ -364,9 +364,8 @@
     IMPOSTA_PREFERENZA: (a) => {
       const f = frasiCambi(a);
       if (f) return { icon: '⚙', text: `Impostato · ${f}` };
-      const k = pulito(a.chiave || a.key || '').replace(/_/g, ' ');
-      const v = pulito(a.valore ?? a.value);
-      return { icon: '⚙', text: `Già così · ${k}${v ? `: ${v}` : ''}` };
+      const etichetta = pulito(a._output && a._output.etichetta);
+      return { icon: '⚙', text: etichetta ? `Già così · ${etichetta}` : 'Impostazione già così' };
     },
     ANNULLA_CAMBIO: (a) => {
       const f = pulito(a._output && a._output.frase);

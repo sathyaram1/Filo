@@ -338,7 +338,8 @@ test('E — un tentativo fallito lo dice in riga; un’impostazione applicata su
   await expect(ok).toHaveCount(1);
   await expect(ok.locator('.dash-activity-label')).toHaveText(/^Ha cambiato un'impostazione · \d+ s$/);
   await ok.locator('.dash-activity-head').click();
-  await expect(ok.locator('.dash-activity-row', { hasText: 'Impostato · tema = scuro' })).toBeVisible();
+  // #867 — la riga dice il cambio con le parole della pagina Preferenze, non la chiave col segno di uguale.
+  await expect(ok.locator('.dash-activity-row', { hasText: 'Impostato · tema: come il sistema → scuro' })).toBeVisible();
   await page.screenshot({ path: 'tests/agent/.out/attivita-fallito-e-riprova.png' });
 
   await app.evaluate(() => { try { globalThis.__restoreProvider5?.(); } catch (_) {} });
