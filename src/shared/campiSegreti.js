@@ -87,6 +87,21 @@
       } catch (_) { return false; }
     }
 
+    // Una password resta tale quando il sito la mostra in chiaro: da lì il campo può non dire più cos'è.
+    const eranoCoperti = new WeakSet();
+    if (ricorda) {
+      try {
+        const segna = (e) => {
+          const el = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target;
+          if (el && el.tagName === 'INPUT' && copertoAschermo(el)) eranoCoperti.add(el);
+        };
+        for (const tipo of ['focusin', 'input']) win.addEventListener(tipo, segna, true);
+        new win.MutationObserver((lista) => {
+          for (const m of lista) if (String(m.oldValue || '').toLowerCase() === 'password') eranoCoperti.add(m.target);
+        }).observe(doc, { subtree: true, attributes: true, attributeFilter: ['type'], attributeOldValue: true });
+      } catch (_) {}
+    }
+
     // Un numero con la forma di una carta anche se sbagliato: l'utente chiede aiuto proprio quando il sito lo rifiuta.
     // Dalle 14 cifre in su e con la prima di un circuito, per lasciare fuori telefoni e codici a barre.
     function formaDiCarta(valore) {
