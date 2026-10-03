@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import {
   proveTolte, percorsoRipristino, esitoProveTolte, controllaProveTolte, controllaPulizia, baseDelConfronto,
-  PREFISSO_RIPRISTINO, testoPuliziaFuoriNumero, numeriDelNome, nomeNumeratoStorto, numeraRilievi,
+  PREFISSO_RIPRISTINO, testoPuliziaFuoriNumero, numeriDelNome, nomeNumeratoStorto, numeraRilievi, puliziaDelPass,
 } from '../../scripts/lib/prove-tolte.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -290,7 +290,8 @@ test('le due consegne, locale e routine, passano da questo controllo, con la pul
   const routine = readFileSync(resolve(ROOT, 'scripts', 'dispatch.mjs'), 'utf8');
   assert.match(locale, /baseDelConfronto\(aperto\.pending\.sha, aperto\.pending\.shaPulizia/);
   assert.match(locale, /controllaProveTolte\(\{ shaPrima: base, root: ROOT,/);
-  assert.match(routine, /baseDelConfronto\(shaCritica, guard\.state\?\.puliziaSha/);
+  assert.match(routine, /baseDelConfronto\(shaCritica, guard\.state\?\.puliziaSha \|\| puliziaPass/);
+  assert.match(routine, /verifierVerdict === 'pass' \? puliziaDelPass\(shaCritica, guard\.state\?\.checkpoints/, 'dopo un pass la base è la pulizia sigillata (#880)');
   assert.match(routine, /controllaProveTolte\(\{\s*shaPrima: baseTolte/);
   assert.doesNotMatch(`${locale}\n${routine}`, /messiDaParte:/, 'nessuna delle due passa più un lasciapassare');
 });
@@ -384,7 +385,7 @@ function riallineatoDopoIlPass({ primaDelRebase = null } = {}) {
 test('#880: dopo un pass la pulizia sigillata è la base del riallineamento, e la prova del rilievo diventato feedback non si rilancia', () => {
   const { dir, critica, pulizia, punti } = riallineatoDopoIlPass();
   try {
-    assert.notEqual(execFileSync('git', ['merge-base', '--is-ancestor', critica, 'HEAD'], { cwd: dir, stdio: 'ignore' }) === null && false, true);
+    assert.throws(() => execFileSync('git', ['merge-base', '--is-ancestor', critica, 'HEAD'], { cwd: dir, stdio: 'ignore' }), undefined, 'il rebase ha riscritto il ramo');
     assert.equal(puliziaDelPass(critica, punti, dir), pulizia);
     assert.equal(baseDelConfronto(critica, puliziaDelPass(critica, punti, dir), dir), pulizia);
     const visti = [];

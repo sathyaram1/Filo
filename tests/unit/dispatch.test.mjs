@@ -100,7 +100,9 @@ test('applyPulizia: ammessa solo a correzione aperta e con rilievi messi da part
   assert.match(applyPulizia({ ...aperta, messiDaParteGiro: { sha: 'a'.repeat(40), n: 0 } }, buona).message, /nessun rilievo/);
   assert.equal(applyPulizia({ ...aperta, messiDaParteGiro: { sha: 'c'.repeat(40), n: 2 } }, buona).ok, false,
     'il conto di una critica vecchia non vale per questa');
-  assert.equal(applyPulizia(applyVerifierVerdict(aperta, 'pass', '', 'a'.repeat(40)), buona).ok, false);
+  const dopoPass = applyPulizia(applyVerifierVerdict(aperta, 'pass', '', 'a'.repeat(40)), buona);
+  assert.equal(dopoPass.ok, false);
+  assert.match(dopoPass.message, /verifica superata la pulizia non si registra[^]*rilascio del biglietto la sigilla/, 'dopo un pass basta il commit (#880)');
   assert.match(applyPulizia(aperta, { ok: false, motivo: 'qui c\'è codice' }).message, /qui c'è codice/);
   const larga = { ...buona, cancellate: [...buona.cancellate, 'tests/verifica/9/giro1-r2-c.spec.mjs'] };
   assert.match(applyPulizia(aperta, larga).message, /giro1-r2-c\.spec\.mjs: r2 non è fra i rilievi messi da parte/,
