@@ -377,13 +377,11 @@ function lettoreWindows({ avvia = spawn, pid = process.pid, quandoCambia = () =>
   let figlio = null;
   let ultimo = null;
   let guasti = 0;
-  let voluto = false;
   let attese = [];
   const sveglia = () => { const a = attese; attese = []; for (const r of a) r(); };
 
   function assicura() {
     if (figlio || guasti >= 3) return;
-    voluto = false;
     let buffer = '';
     try {
       figlio = avvia('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', scriptWindows(pid)],
@@ -406,10 +404,11 @@ function lettoreWindows({ avvia = spawn, pid = process.pid, quandoCambia = () =>
         if (d) { ultimo = d; guasti = 0; sveglia(); quandoCambia(); }
       }
     });
+    // Un'uscita che non abbiamo chiesto è un guasto: dopo tre di fila il lettore si arrende, senza ripartire in loop.
     const finito = () => {
       if (figlio === questo) figlio = null;
       sveglia();
-      if (!voluto) guasti += 1;
+      if (!questo.fermatoDaNoi && !questo.contato) { questo.contato = true; guasti += 1; }
     };
     questo.on('error', finito);
     questo.on('exit', finito);
@@ -424,8 +423,10 @@ function lettoreWindows({ avvia = spawn, pid = process.pid, quandoCambia = () =>
   }
 
   function ferma() {
-    voluto = true;
-    if (figlio) { try { figlio.kill(); } catch (_) {} }
+    if (figlio) {
+      figlio.fermatoDaNoi = true;
+      try { figlio.kill(); } catch (_) {}
+    }
     figlio = null;
     sveglia();
   }

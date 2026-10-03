@@ -17,7 +17,7 @@
   // Il nome di una rete o di un dispositivo lo sceglie chi la gestisce: niente caratteri invisibili né a capo.
   function pulisciNome(v) {
     if (typeof v !== 'string') return null;
-    const s = v.replace(/[\u0000-\u001f\u007f-\u009f​-‏ -‮⁠-⁯﻿]/g, ' ')
+    const s = v.replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/g, ' ')
       .replace(/\s+/g, ' ').trim();
     if (!s) return null;
     const lettere = Array.from(s);
