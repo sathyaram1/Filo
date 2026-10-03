@@ -19,6 +19,9 @@ module.exports = function register(on, ctx) {
   // content script dei siti visitati (vedi
   // patterns/nuovo-tipo-di-messaggio-decidi-subito-se-le-pagine-web.md).
   const isFilo = (origin) => String(origin || '').startsWith('filo://');
+  // Chat, memoria, timer e notifiche li usano solo le pagine di Filo: la chat risponde con lo stato intero (#589.12).
+  const soloFilo = (fn) => (msg, sender, origin) => (
+    isFilo(origin) ? fn(msg, sender, origin) : { ok: false, code: 'forbidden', error: 'forbidden' });
 
   // Quello che l'utente ha scritto nella conversazione dell'assistente di pagina: un codice
   // scritto da lui può uscire (#810).
@@ -30,12 +33,11 @@ module.exports = function register(on, ctx) {
     try { ctx.broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED }); } catch (_) {}
   };
 
-  on(MSG.FILO_CHAT, async (msg, sender, origin) => {
+  on(MSG.FILO_CHAT, soloFilo(async (msg, sender) => {
     try {
       // #525 — `chatId` è la targa della conversazione in corso: il main ci
       // scrive dentro il messaggio dell'utente e la risposta, turno per turno.
-      // Solo dalle pagine di Filo: una pagina web non apre chat nell'archivio.
-      const chatId = isFilo(origin) ? (msg.chatId || null) : null;
+      const chatId = msg.chatId || null;
       const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images, reasoningReqId: msg.reasoningReqId, internal: !!msg.internal, daModello: !!msg.daModello, chatId, sender });
       return { ok: true, ...r };
     } catch (e) {
@@ -57,7 +59,7 @@ module.exports = function register(on, ctx) {
       const keyRefused = Boolean(W && typeof W.keyRefusalOf === 'function' && W.keyRefusalOf(e));
       return { ok: false, error, code: (e && e.code) || 'UNKNOWN', status: Number(e && e.status) || 0, keyRefused, actions };
     }
-  });
+  }));
 
   // L'utente ha confermato dal client (popup livello 2 / "conferma" digitata
   // livello 3) un'azione rimasta in sospeso: la eseguiamo ora. Il livello
@@ -144,7 +146,7 @@ module.exports = function register(on, ctx) {
     return { ok: true, ...r };
   });
 
-  on(MSG.FILO_GET_MEMORY, async () => ({ ok: true, memory: await FiloMem.getMemory() }));
+  on(MSG.FILO_GET_MEMORY, soloFilo(async () => ({ ok: true, memory: await FiloMem.getMemory() })));
 
   // Rileggere e togliere una riga di memoria alla volta (#592): è il posto dove
   // l'utente controlla quello che entra in ogni conversazione. Leggere o
@@ -380,45 +382,45 @@ module.exports = function register(on, ctx) {
   // file dell'editor, ci scrive l'azione SALVA_APPUNTO e si leggono/modificano
   // aprendo l'editor come qualsiasi altro documento.
 
-  on(MSG.FILO_GET_TIMERS, async () => ({ ok: true, timers: await FiloMem.gcTimers() }));
+  on(MSG.FILO_GET_TIMERS, soloFilo(async () => ({ ok: true, timers: await FiloMem.gcTimers() })));
 
-  on(MSG.FILO_ADD_TIMER, async (msg) => {
+  on(MSG.FILO_ADD_TIMER, soloFilo(async (msg) => {
     const t = await FiloMem.addTimer({ label: msg.label, seconds: msg.seconds });
     if (t) broadcastLiveUpdate();
     return { ok: true, timer: t };
-  });
+  }));
 
-  on(MSG.FILO_DELETE_TIMER, async (msg) => {
+  on(MSG.FILO_DELETE_TIMER, soloFilo(async (msg) => {
     const list = await FiloMem.deleteTimer(msg.id);
     broadcastLiveUpdate();
     return { ok: true, timers: list };
-  });
+  }));
 
-  on(MSG.FILO_PAUSE_TIMER, async (msg) => {
+  on(MSG.FILO_PAUSE_TIMER, soloFilo(async (msg) => {
     const list = await FiloMem.pauseTimer(msg.id);
     broadcastLiveUpdate();
     return { ok: true, timers: list };
-  });
+  }));
 
-  on(MSG.FILO_RESUME_TIMER, async (msg) => {
+  on(MSG.FILO_RESUME_TIMER, soloFilo(async (msg) => {
     const list = await FiloMem.resumeTimer(msg.id);
     broadcastLiveUpdate();
     return { ok: true, timers: list };
-  });
+  }));
 
-  on(MSG.FILO_STOP_TIMER_ALARM, async (msg) => {
+  on(MSG.FILO_STOP_TIMER_ALARM, soloFilo(async (msg) => {
     const list = await FiloMem.stopTimerAlarm(msg.id);
     broadcastLiveUpdate();
     return { ok: true, timers: list };
-  });
+  }));
 
-  on(MSG.FILO_GET_NOTIFICATIONS, async () => ({ ok: true, notifications: await FiloMem.listNotifications() }));
+  on(MSG.FILO_GET_NOTIFICATIONS, soloFilo(async () => ({ ok: true, notifications: await FiloMem.listNotifications() })));
 
-  on(MSG.FILO_DISMISS_NOTIFICATION, async (msg) => {
+  on(MSG.FILO_DISMISS_NOTIFICATION, soloFilo(async (msg) => {
     const list = await FiloMem.dismissNotification(msg.id, { acted: !!msg.acted });
     broadcastLiveUpdate();
     return { ok: true, notifications: list.filter((n) => !n.dismissed) };
-  });
+  }));
 
   // F4 — Annulla un auto-feedback appena inviato (undo dal toast).
   // Marca il feedback come `ignored` via updateStatus. Usa l'ID token admin se

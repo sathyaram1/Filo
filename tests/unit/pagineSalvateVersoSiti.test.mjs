@@ -1,6 +1,6 @@
 // #589.12 — l'elenco «salva per dopo» (indirizzi, titoli, miniature, categorie) non esce verso un sito, da nessun
-// canale di handlers/pages.js né dal messaggio della home; le pagine di Filo lo leggono intero. Ogni handler nuovo del
-// file passa da qui da solo: chi risponde a un sito con una voce intera diventa rosso.
+// canale di handlers/pages.js né dal messaggio della home, dallo stato o dalla chat di Filo; le pagine di Filo lo leggono
+// intero. Ogni handler nuovo di pages.js passa da qui da solo: chi risponde a un sito con una voce intera diventa rosso.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -122,4 +122,12 @@ test('lo stato di Filo, che contiene il messaggio della home e le schede aperte,
   const inizio = src.indexOf('on(MSG.FILO_GET_STATE');
   const corpo = src.slice(inizio, src.indexOf('FiloState.assemble(', inizio));
   assert.match(corpo, /if \(!isFilo\(origin\)\) return \{[^}]*forbidden/, 'FILO_GET_STATE risponde anche a un sito');
+});
+
+test('la chat di Filo, che ha davanti lo stato intero, e memoria, timer e notifiche rispondono solo alle pagine di Filo', () => {
+  const src = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers', 'filo.js'), 'utf8');
+  const tipi = ['FILO_CHAT', 'FILO_GET_MEMORY', 'FILO_GET_TIMERS', 'FILO_ADD_TIMER', 'FILO_DELETE_TIMER', 'FILO_PAUSE_TIMER',
+    'FILO_RESUME_TIMER', 'FILO_STOP_TIMER_ALARM', 'FILO_GET_NOTIFICATIONS', 'FILO_DISMISS_NOTIFICATION'];
+  for (const t of tipi) assert.match(src, new RegExp(`on\\(MSG\\.${t}, soloFilo\\(`), `${t} risponde anche a un sito`);
+  assert.match(src, /const soloFilo = \(fn\) => \(msg, sender, origin\) => \(\s*isFilo\(origin\) \? fn\(/);
 });

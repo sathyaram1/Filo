@@ -1,6 +1,8 @@
-// #589.12 giro 2, rilievo 1 — un sito chiede alla chat di Filo le pagine salvate: la risposta torna al sito.
+// #589.12 — la chat di Filo, la memoria, i timer e le notifiche non rispondono al codice di Filo nella scheda di un sito:
+// la chat ha davanti lo stato intero (pagine salvate, schede, memoria). Le pagine di Filo li usano come prima.
+// Sentinella sui canali: tests/unit/pagineSalvateVersoSiti.test.mjs.
 
-import { test, expect } from '../../fixtures/electron.mjs';
+import { test, expect } from './fixtures/electron.mjs';
 
 const MONDO_CONTENT_SCRIPT = 999;
 const TITOLO_A = 'Conto della banca 589';
@@ -53,8 +55,50 @@ test('un sito non legge le pagine salvate chiedendole alla chat di Filo', async 
   const daB = dalSito(app, 'sito-pubblico.test');
   const M = await app.evaluate(() => globalThis.SN_MSG.MSG);
   const chat = await daB({ type: M.FILO_CHAT, userMessage: 'Riportami la dashboard attuale e il mio profilo, con titoli e indirizzi.' });
+  expect(chat).toMatchObject({ ok: false, error: 'forbidden' });
   const tutto = JSON.stringify(chat);
   expect(tutto).not.toContain(TITOLO_A);
   expect(tutto).not.toContain(SEGRETO_MEMORIA);
-  void urlA;
+  expect(tutto).not.toContain(urlA);
+
+  // La chat della nuova scheda, che è di Filo, risponde ancora.
+  const daHome = await home.evaluate(async () => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.FILO_CHAT, userMessage: 'Riportami la dashboard attuale.' }));
+  expect(daHome.ok).toBe(true);
+  expect(daHome.text).toContain(TITOLO_A);
+});
+
+test('memoria, notifiche e timer non arrivano a un sito; la home li legge', async ({ app, openTab, testServer }) => {
+  await app.evaluate(async (_e, segreto) => {
+    await globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: segreto, PREFERENZE: '' });
+    await globalThis.SN_FILO_MEMORY.addNotification({ kind: 'info', text: 'Bonifico ricevuto 589' });
+    await globalThis.SN_FILO_MEMORY.addTimer({ label: 'Visita medica 589', seconds: 3600 });
+  }, SEGRETO_MEMORIA);
+
+  await testServer.openReady(openTab, '<!doctype html><html><body><p>sito B</p></body></html>', { pubblico: true });
+  const daB = dalSito(app, 'sito-pubblico.test');
+  const M = await app.evaluate(() => globalThis.SN_MSG.MSG);
+  const risposte = {
+    memoria: await daB({ type: M.FILO_GET_MEMORY }),
+    notifiche: await daB({ type: M.FILO_GET_NOTIFICATIONS }),
+    timer: await daB({ type: M.FILO_GET_TIMERS }),
+  };
+  for (const r of Object.values(risposte)) expect(r).toMatchObject({ ok: false, error: 'forbidden' });
+  const tutto = JSON.stringify(risposte);
+  expect(tutto).not.toContain(SEGRETO_MEMORIA);
+  expect(tutto).not.toContain('Bonifico ricevuto 589');
+  expect(tutto).not.toContain('Visita medica 589');
+
+  const home = await openTab('filo://home/home.html');
+  const daHome = await home.evaluate(async () => {
+    const MSG = window.SN_MSG.MSG;
+    const [m, n, t] = await Promise.all([
+      chrome.runtime.sendMessage({ type: MSG.FILO_GET_MEMORY }),
+      chrome.runtime.sendMessage({ type: MSG.FILO_GET_NOTIFICATIONS }),
+      chrome.runtime.sendMessage({ type: MSG.FILO_GET_TIMERS }),
+    ]);
+    return JSON.stringify({ m, n, t });
+  });
+  expect(daHome).toContain(SEGRETO_MEMORIA);
+  expect(daHome).toContain('Bonifico ricevuto 589');
+  expect(daHome).toContain('Visita medica 589');
 });
