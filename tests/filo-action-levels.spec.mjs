@@ -6,7 +6,7 @@
 // dispatch (anche se arrivano già "confermate" dal client).
 
 import { test, expect } from './fixtures/electron.mjs';
-import { CONFIRM_HOST, confirmState, confirmText, clickConfirm, fillConfirmInput, mouseClickConfirm, pointWhenConfirmAppears } from './helpers/confirm.mjs';
+import { CONFIRM_HOST, confirmState, confirmText, clickConfirm, fillConfirmInput, mouseClickConfirm, pointWhenConfirmAppears, aspettaConfermaPronta } from './helpers/confirm.mjs';
 
 const NEWTAB = 'filo://newtab/';
 
@@ -318,7 +318,7 @@ test('nell’Aiuto, dopo l’invio o dopo un popup confermato da tastiera, «con
       .then(() => window.SN_CONFIRM_UI.confirmTyped({ title: 'Filo chiede conferma', text: 'Eliminare tutta la memoria.' }));
   });
   await expect(page.locator(CONFIRM_HOST)).toBeVisible();
-  await page.waitForTimeout(600);
+  await aspettaConfermaPronta(page);
   for (const tasto of ['Tab', 'Tab', 'Enter']) {
     await page.keyboard.press(tasto);
     await page.waitForTimeout(100);
