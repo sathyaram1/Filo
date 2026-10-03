@@ -491,7 +491,9 @@
       const v = String((s && s.valore) || '').trim();
       if (v.length < min) continue;
       const norm = v.toLowerCase().replace(/[^a-z0-9]+/g, '');
-      if (u.forme.some((f) => f.includes(v)) || (norm.length >= min && u.alnum.includes(norm))) {
+      // Lo stesso riconoscimento che lo toglie dai messaggi verso i modelli: travestito, al contrario o codificato, esce uguale.
+      const travestito = !!G && typeof G.oscuraSegreti === 'function' && G.oscuraSegreti(uscente, [v]) !== uscente;
+      if (travestito || u.forme.some((f) => f.includes(v)) || (norm.length >= min && u.alnum.includes(norm))) {
         return { ...niente, blocca: true, regola: 'custodito', frase: `${verbo}: conteneva ${CUSTODITI[s.tipo] || CUSTODITI.chiave}` };
       }
     }
