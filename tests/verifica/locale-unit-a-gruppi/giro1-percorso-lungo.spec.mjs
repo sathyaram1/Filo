@@ -50,7 +50,7 @@ test('un rosso nell’ultimo gruppo fa rosso l’esito e il test rosso è elenca
   try {
     const r = lancia(dir);
     expect(r.status).not.toBe(0);
-    expect(r.out).toContain(`${N} test, ${N - 1} passati, 1 falliti`);
+    expect(r.out).toContain(`${N} test, ${N - 1} passati, 1 fallito`);
     expect(r.out).toMatch(/✖ .*prova-068-.*caso-68/);
     expect(r.out).toMatch(/\[test:unit\] ROSSO:/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
