@@ -1039,6 +1039,10 @@
 
     async function cerca() {
       panel.querySelectorAll('.dash-delete-list, .dash-action-btn').forEach((el) => el.remove());
+      if (!query) {
+        note.textContent = 'Non so quali schede eliminare: dimmi di cosa parlano.';
+        return;
+      }
       note.dataset.cerco = '1';
       note.textContent = `Cerco nell’archivio: “${query}”…`;
       const r = await send({ type: MSG.ARCHIVIO_DA_CANCELLARE, query });

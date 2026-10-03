@@ -599,7 +599,7 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   border-radius: 10px;
   background: color-mix(in srgb, #c0392b 6%, transparent);
 }
-.dash-delete-note { font-size: 13px; margin-bottom: 6px; }
+.dash-delete-note { font-size: 13px; margin-bottom: 6px; overflow-wrap: anywhere; }
 /* Il modello sta giudicando le schede: niente avanzamento da stimare, una rotella. */
 .dash-delete-note[data-cerco="1"]::before {
   content: '';
