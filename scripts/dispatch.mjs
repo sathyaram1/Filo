@@ -1857,6 +1857,7 @@ export function serverCtx(bucket, fromServer, diff = '') {
       // La ripresa dopo la risposta dell'owner (solo per chi riprende: il
       // server non la manda a chi verifica).
       ripresa: payload && payload.ripresa && typeof payload.ripresa === 'object' ? payload.ripresa : null,
+      ...(role === 'fixer' && typeof (payload && payload.critique) === 'string' ? { critique: payload.critique } : {}),
       ...(role === 'verifier' ? { scope: payload && payload.scope, perimetro: (payload && payload.perimetro) || null } : {}),
     };
   }
