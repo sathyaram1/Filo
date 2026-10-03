@@ -158,12 +158,26 @@ test('un lavoro che tocca anche l’app: dopo il server la pratica resta aperta,
   assert.match(r.testo, /resta aperta: manca la parte dell’app, la chiude la fusione di claude\/app \(npm run finish -- --feedback 910\)/);
 });
 
-test('la parte dell’app già su main secondo la pratica: un suo ramo rimasto in giro non la tiene aperta', async () => {
+test('la parte dell’app già su main secondo la pratica, e nessun suo ramo fuori da main: si chiude', async () => {
   const d = doc('p', { status: 'working', parti: { app: ORA - ORE } });
-  const r = await giro({ docs: { p: d }, argv: ['claude/x', '--feedback', 'p'], ramiAperti: ['claude/app'] });
+  const r = await giro({ docs: { p: d }, argv: ['claude/x', '--feedback', 'p'] });
   assert.equal(r.k, 0, r.testo);
   assert.ok(r.scritture.at(-1).includes('resolvedInVersion'), 'si chiude');
   assert.match(r.testo, /Pratica #910 chiusa/);
+});
+
+test('la parte dell’app già fusa una volta ma con un ramo legato ancora fuori da main (un seguito, o la pratica riaperta): resta aperta', async () => {
+  for (const status of ['working', 'todo']) {
+    const d = doc('p', { status, parti: { app: ORA - ORE, ramo: 'claude/app' } });
+    const r = await giro({ docs: { p: d }, argv: ['claude/x', '--feedback', 'p'], ramiAperti: ['claude/app'] });
+    assert.equal(r.k, 0, r.testo);
+    assert.ok(r.scritture.every((u) => !u.includes('resolvedInVersion')), `${status}: non si chiude`);
+    assert.match(r.testo, /resta aperta: manca la parte dell’app, la chiude la fusione di claude\/app/);
+    assert.doesNotMatch(r.testo, /--solo-server/, 'non si consiglia un comando che col ramo legato verrebbe rifiutato');
+    const prova = await giro({ docs: { p: d }, argv: ['claude/x', '--feedback', 'p', '--dry-run'], ramiAperti: ['claude/app'] });
+    assert.match(prova.testo, /resterebbe aperta/);
+    assert.doesNotMatch(prova.testo, /--solo-server/);
+  }
 });
 
 test('pratica chiusa da poco dalla fusione dell’app dello stesso lavoro: il server la usa, non la riapre, la annota', async () => {
