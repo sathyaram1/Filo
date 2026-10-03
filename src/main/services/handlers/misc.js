@@ -542,6 +542,10 @@ module.exports = function register(on, ctx) {
       // Chiesto al momento della spedizione: fra l'accodamento e l'invio
       // possono passare ore (offline), e l'owner può aver chiuso la sessione.
       tokenOwner: async () => (auth.isAdmin() ? (await auth.getIdToken()) || '' : ''),
+      onAttesaOwner: () => avvisoNellaFinestra(
+        'Il tuo feedback aspetta il tuo accesso da owner: parte con la tua firma appena rientri.',
+        { chiave: 'feedback-attesa-accesso-owner' },
+      ),
       log: (...a) => { try { console.log('[Filo feedback]', ...a); } catch (_) {} },
     });
   }
