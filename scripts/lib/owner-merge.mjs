@@ -92,7 +92,8 @@ export function classifyOwnerMerge(status, body) {
 /**
  * Quello che il server dice della pratica locale (#908), solo se lo dice. PURA.
  * Tutto sta in `r.local` (localView in filo-security ownerMerge.js): ammessa →
- * num, skippedL5, blocks ({ gate, label, detail } o il solo nome), record, closed; non ammessa → reason, detail.
+ * num, skippedL5, blocks ({ gate, label, detail } o il solo nome), record, closed, approvato (il sì dell'owner a un
+ * feedback non suo, #913); non ammessa → reason, detail.
  */
 function campiLocali(r) {
   const loc = (r.local && typeof r.local === 'object') ? r.local : null;
