@@ -99,7 +99,7 @@
             rinuncia: !!x.rinuncia,
             motivoRinuncia: x.motivoRinuncia || '',
             attesaAccesso: !!x.attesaAccesso,
-            avvisatoAccesso: !!x.avvisatoAccesso,
+            avvisatoAccesso: x.avvisatoAccesso === true ? 'assente' : String(x.avvisatoAccesso || ''),
           }));
       }
     } catch (e) { logFn('load fallito:', e?.message || e); }
