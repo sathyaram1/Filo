@@ -118,7 +118,7 @@ test('senza --solo-server e senza un ramo dell’app in vista la pratica resta a
   const r = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p'] });
   assert.equal(r.k, 0, r.testo);
   assert.equal(r.scritture.length, 3);
-  assert.match(r.scritture[1], /updateMask\.fieldPaths=localMerges\.server$/, 'la parte del server, senza «solo»');
+  assert.match(r.scritture[1], /updateMask\.fieldPaths=localMerges\.server&updateMask\.fieldPaths=localMerges\.ramo$/, 'la parte del server col suo ramo, senza «solo»');
   assert.ok(r.scritture.every((u) => !u.includes('resolvedInVersion')), 'non si chiude');
   assert.match(r.testo, /resta aperta: manca la parte dell’app, la chiude la fusione di quella parte \(npm run finish -- --feedback 910\)/);
   assert.match(r.testo, /npm run server:fondi -- claude\/x --feedback 910 --solo-server/);
