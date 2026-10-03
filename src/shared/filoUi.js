@@ -106,7 +106,8 @@
   }
 
   // Lo script del sito raggiunge ogni nodo del suo documento e sa fabbricarci sopra clic, passaggi e tasti:
-  // a un pezzo di Filo arrivano solo quelli dell'utente (#589.8). Va messo per primo, appena il nodo nasce.
+  // a un pezzo di Filo arrivano solo quelli dell'utente (#589.8). Il cancello sta su OGNI nodo, non sulla radice:
+  // un pulsante che il sito sposta fuori dal pezzo se lo porta dietro. Si chiama prima di attaccare al documento.
   const GESTI = ['click', 'dblclick', 'auxclick', 'contextmenu', 'mousedown', 'mouseup', 'mousemove',
     'mouseover', 'mouseout', 'mouseenter', 'mouseleave', 'pointerdown', 'pointerup', 'pointermove',
     'pointerover', 'pointerout', 'pointerenter', 'pointerleave', 'keydown', 'keyup', 'keypress',
