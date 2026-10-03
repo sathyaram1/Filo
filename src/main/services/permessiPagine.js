@@ -140,14 +140,14 @@ function seguiGesti(wc) {
       const type = (input && input.type) || '';
       if (!GESTI.has(type) || String(input.key || '') === 'Escape') return;
       wc._filoGestoAlle = Date.now();
+      // Un sito che annulla il `contextmenu` spegne il `context-menu` qui sotto, non il tasto destro vero (#589.4 giro 2).
+      if (tastoDelMenu(input)) segnaMenu(wc, wc.mainFrame);
     });
     // Un riquadro di un altro sito non passa da `input-event`: lì il tasto destro e i tasti premuti arrivano da qui.
     // Il menu tiene anche il riquadro dove l'utente l'ha aperto: un evento finto della pagina non arriva qui (#589.4).
     wc.on('context-menu', (_e, params) => {
       wc._filoGestoAlle = Date.now();
-      let nodo = null; let origine = null;
-      try { if (params && params.frame) { nodo = params.frame.frameTreeNodeId; origine = params.frame.origin; } } catch (_) {}
-      wc._filoMenuAperto = { alle: Date.now(), nodo, origine };
+      segnaMenu(wc, params && params.frame);
     });
     wc.on('before-input-event', (_e, input) => {
       if (input && input.type === 'keyDown' && String(input.key || '') !== 'Escape') wc._filoGestoAlle = Date.now();
