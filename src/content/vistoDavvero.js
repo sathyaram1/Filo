@@ -341,6 +341,8 @@
     _test: {
       stato: (el) => voci.get(el)?.stato ?? null,
       pronta: (el) => !ATTIVO || giudica(voci.get(el), global.performance.now()) === 'ok',
+      // Scoperta senza attesa: comparsa così, o liberata da un pezzo nostro.
+      libera: (el) => { const r = voci.get(el); return !!r && r.stato === 'visibile' && r.da === -Infinity; },
     },
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
