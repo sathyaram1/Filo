@@ -305,7 +305,6 @@ export function provaUnitSullaFusione({ root, punta, git = gitIn(root), lancia =
   if (!/^[0-9a-f]{40}$/i.test(String(punta || ''))) return { errore: 'punta del ramo non valida', mainSha };
   if (git(['merge-base', '--is-ancestor', mainSha, punta]).ok) return { esito: 'main_contenuto', mainSha };
 
-  pulisciResti({ git });
   const base = realpathSync.native(mkdtempSync(join(tmpdir(), 'filo-fusione-')));
   try { writeFileSync(join(base, FILE_PID), String(process.pid)); } catch (_) { /* senza pid la cartella vale viva per età */ }
   const nessunHook = join(base, 'nessun-hook');
