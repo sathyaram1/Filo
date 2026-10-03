@@ -11,7 +11,10 @@ decide **una funzione sola**, `decideDettaglio` in `src/shared/autonomia.js`
 (#530), con cinque ingressi che il motore conosce senza chiederli al modello:
 il livello di autonomia scelto dall'utente, lo stato del compito (pulito o
 contaminato, dalla classe peggiore fra le fonti lette: le letture lo dichiarano
-nel registro con `fonte`), il costo, il perimetro e l'origine. Sopra la tabella
+nel registro con `fonte`; ciò che una chat ha letto lo tiene il main per chat,
+e nell'archivio della chat, perché lo storico che la pagina rimanda a ogni turno
+si perde riprendendo la chat e si ferma agli ultimi venti messaggi), il costo,
+il perimetro e l'origine. Sopra la tabella
 stanno l'elenco fisso (no a ogni livello: segreti, molti destinatari,
 credenziali, regole, cancellazioni definitive) e la difesa abbassata («conferma»
 a ogni livello). Il dispatch (`executeFiloAction` nel main) **rifiuta le azioni
