@@ -925,7 +925,7 @@
       if (done) return;
       done = true;
       if (chiudiScheda) salvataggioInCorso = false;
-      if (timer) { clearTimeout(timer); timer = null; }
+      if (timer) { timer.annulla(); timer = null; }
       pill.dataset.snClosing = '1';
       pill.classList.remove('sn-save-confirm-visible');
       setTimeout(() => { try { Popup.unmountToast(pill); } catch (_) {} }, 220);
@@ -939,7 +939,8 @@
     pill.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); finish(true); }
     });
-    timer = setTimeout(() => finish(false), AUTO_CLOSE_MS);
+    // Nella pila: col puntatore sopra aspetta, come gli altri avvisi (la scheda si chiude dopo).
+    timer = Popup.tempoAvviso(AUTO_CLOSE_MS, () => finish(false), { deveScadere: true });
   }
 
   async function saveLink(linkEl) {

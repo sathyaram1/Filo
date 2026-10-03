@@ -185,13 +185,14 @@
 
     <section>
       <h2>Notifiche</h2>
-      <p class="sn-muted">I messaggi che Filo mostra in basso a destra (schede riordinate, blocchi di siti, ecc.).</p>
-      <label for="notifDuration" class="sn-muted" style="display:block;margin-bottom:4px;">Durata (secondi) — <strong>0 = resta finché non la chiudi</strong></label>
+      <p class="sn-muted">Gli avvisi in basso a destra, nella barra e dentro le pagine. Finché ci tieni sopra il puntatore non se ne vanno.</p>
+      <label for="notifDuration" class="sn-muted" style="display:block;margin-bottom:4px;">Durata in secondi, <strong>0 = restano finché non li chiudi</strong></label>
       <input type="number" id="notifDuration" min="0" max="120" step="1" style="width:120px;" />
+      <p class="sn-muted" id="notifDurationHint" style="margin:6px 0 0;">Una conferma breve come «Copiato» dura meno, un avviso con un pulsante di più, sempre in proporzione.</p>
       <div class="sn-toggle-row" style="margin-top:12px;">
         <label>
           <input type="checkbox" id="notifSoundEnabled" />
-          <span>Riproduci un suono quando compare una notifica</span>
+          <span>Suono quando arriva un avviso. Le conferme di un tuo gesto, come «Copiato», restano mute.</span>
         </label>
       </div>
       <label for="notifSound" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Suono</label>

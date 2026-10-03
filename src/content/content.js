@@ -183,6 +183,7 @@
     settings = await fetchSettings();
     applyTheme(settings.theme);
     applyThemeTokens(settings.themeTokens);
+    self.SN_AVVISI?.imposta(settings.notifications);
 
     // Le tre cose qui sotto descrivono la SCHEDA: il colore che la tinge e i
     // segnali su quanto è stata usata. Un riquadro incorporato non ne sa nulla —
@@ -2150,6 +2151,7 @@
       settings = msg.settings;
       applyTheme(settings.theme);
       applyThemeTokens(settings.themeTokens);
+      self.SN_AVVISI?.imposta(settings.notifications);
       // Colore identità delle tab: i parametri di estrazione possono essere
       // cambiati (a voce o nelle Preferenze). Ricalcola il colore del favicon
       // coi nuovi parametri così la tinta della tab si aggiorna live.

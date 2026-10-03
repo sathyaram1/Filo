@@ -446,6 +446,7 @@ function loadScripts() {
   try { require(path.join(SHARED_DIR, 'calcMarkers.js')); } catch (e) { console.error('[Filo CS] calcMarkers', e); } // #724 — calcolatrice e marker [[calc:]]: PRIMA di popup.js
   try { require(path.join(SHARED_DIR, 'overlayPlacement.js')); } catch (e) { console.error('[Filo CS] overlayPlacement', e); } // #500 — geometria di menu e riquadro risposta: PRIMA di popup.js e menu.js
   try { require(path.join(CONTENT_DIR, 'extractContext.js')); } catch (e) { console.error('[Filo CS] extractContext', e); }
+  try { require(path.join(SHARED_DIR, 'avvisiTempo.js')); } catch (e) { console.error('[Filo CS] avvisiTempo', e); } // tempi della pila degli avvisi: PRIMA di popup.js
   try { require(path.join(CONTENT_DIR, 'popup.js')); } catch (e) { console.error('[Filo CS] popup', e); }
   try { require(path.join(CONTENT_DIR, 'menu.js')); } catch (e) { console.error('[Filo CS] menu', e); }
   try { require(path.join(CONTENT_DIR, 'highlight.js')); } catch (e) { console.error('[Filo CS] highlight', e); }

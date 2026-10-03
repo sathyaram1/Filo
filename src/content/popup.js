@@ -1193,6 +1193,13 @@
   // fuori dal viewport. Teniamo i più recenti, che sono i più rilevanti.
   const MAX_TOAST_STACK = 4;
 
+  // Col puntatore su un avviso della pila i tempi di tutti aspettano (regola in avvisiTempo.js).
+  let tempiPila = null;
+  function tempi() {
+    if (!tempiPila) tempiPila = global.SN_AVVISI.orologio();
+    return tempiPila;
+  }
+
   function toastHost() {
     // `isConnected`: se la pagina rifà il DOM (SPA che rimpiazza il body) il
     // vecchio contenitore resta orfano e gli avvisi successivi sparirebbero.
@@ -1218,7 +1225,7 @@
     for (let i = 0; i < over; i++) {
       const c = live[i]; // i più vecchi stanno in cima: si appende in coda
       if (typeof c._snDispose === 'function') { try { c._snDispose(); } catch (_) {} continue; }
-      try { c.remove(); } catch (_) {}
+      unmountToast(c);
     }
   }
 
@@ -1247,7 +1254,9 @@
   function mountToast(el, opts = {}) {
     if (!el) return el;
     if (opts.sticky) el.dataset.snSticky = '1';
+    tempi().segui(el);
     toastHost().appendChild(el);
+    tempi().ripulisci();
     enforceToastCap();
     syncToastOverflow();
     return el;
@@ -1257,7 +1266,16 @@
   // ricalcola l'overflow dello stack.
   function unmountToast(el) {
     try { el?.remove(); } catch (_) {}
+    if (el) tempi().lascia(el);
     syncToastOverflow();
+  }
+
+  // Il tempo di un avviso agganciato alla pila: in scala con la durata delle Preferenze, fermo col
+  // puntatore sopra. `ms` è quello che vale con la durata standard; 0 = resta finché non lo si chiude.
+  // `deveScadere`: alla scadenza succede qualcosa (si chiude la scheda), e la durata 0 non lo rimanda per sempre.
+  function tempoAvviso(ms, onScade, { deveScadere = false } = {}) {
+    const d = global.SN_AVVISI.durata(ms);
+    return tempi().avvia(d || (deveScadere ? ms : 0), onScade);
   }
 
   // ----------------------------------------------------------------
@@ -1272,12 +1290,12 @@
     t.className = 'sn-toast';
     t.textContent = text;
     let closed = false;
-    let timer = null;
+    let tempo = null;
     // Rimozione immediata usata dallo sfratto per tetto: niente animazione, ma
     // il timer va spento o continuerebbe a puntare a un elemento morto.
     t._snDispose = () => {
       closed = true;
-      if (timer) { clearTimeout(timer); timer = null; }
+      if (tempo) { tempo.annulla(); tempo = null; }
       unmountToast(t);
     };
     mountToast(t);
@@ -1285,14 +1303,20 @@
     const close = () => {
       if (closed) return;
       closed = true;
-      if (timer) { clearTimeout(timer); timer = null; }
+      if (tempo) { tempo.annulla(); tempo = null; }
       // Marcato in uscita: non occupa più uno slot del tetto mentre sfuma.
       t.dataset.snClosing = '1';
       t.classList.remove('sn-toast-visible');
       setTimeout(() => unmountToast(t), 250);
     };
-    const duration = opts.duration === 0 ? 0 : (opts.duration || 2200);
-    if (duration > 0) timer = setTimeout(close, duration);
+    // Sotto il puntatore il toast prende i clic: chiuderlo è la risposta, e l'unica strada con la durata a 0.
+    // Chi ne sta selezionando il testo non lo perde.
+    t.addEventListener('click', () => {
+      const sel = t.ownerDocument.getSelection && t.ownerDocument.getSelection();
+      if (sel && !sel.isCollapsed && t.contains(sel.anchorNode)) return;
+      close();
+    });
+    tempo = tempoAvviso(opts.duration === 0 ? 0 : (opts.duration || 2200), close);
     return { close, el: t };
   }
 
@@ -1306,6 +1330,7 @@
     showToast,
     mountToast,
     unmountToast,
+    tempoAvviso,
     attachZoomCompensation,
     renderMarkdown,
     resolveCalcMarkers,

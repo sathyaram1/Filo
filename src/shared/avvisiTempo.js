@@ -97,10 +97,17 @@
 
     // Va chiamata anche quando l'avviso esce dal documento: sparendo sotto il cursore non manda mouseleave.
     function lascia(el) {
-      if (sotto.delete(el) && !sotto.size) ferma(false);
+      sotto.delete(el);
+      ripulisci();
     }
 
-    return { avvia, ferma, segui, lascia, fermo: () => fermo };
+    // Un avviso portato via insieme al suo contenitore (una pagina che rifà il DOM) non è più sotto niente.
+    function ripulisci() {
+      for (const x of sotto) if (x.isConnected === false) sotto.delete(x);
+      if (!sotto.size) ferma(false);
+    }
+
+    return { avvia, ferma, segui, lascia, ripulisci, fermo: () => fermo };
   }
 
   global.SN_AVVISI = { STANDARD_SEC, RIPRESA_MS, imposta, durata, orologio };
