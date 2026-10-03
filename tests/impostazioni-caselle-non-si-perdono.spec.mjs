@@ -63,9 +63,7 @@ test('Altro: un dominio escluso e Ctrl+W subito, riaprendo la pagina c\'è', asy
   await expect(riaperta.locator('#blocklist')).toHaveValue('primo.it\nsecondo.it', { timeout: 8000 });
 });
 
-test('Altro: il nome nuovo di una categoria vale senza «Rinomina»; vuoto non la rinomina', async ({ app, shell, openTab }) => {
-  const nomi = () => app.evaluate(async () => (await globalThis.SN_STORAGE_RAW_CATEGORIE()).map((c) => c.name)).catch(() => null);
-  void nomi;
+test('Altro: il nome nuovo di una categoria vale senza «Rinomina»; vuoto non la rinomina', async ({ shell, openTab }) => {
   const leggi = (page) => page.evaluate(async () => ((await chrome.storage.local.get('categories')).categories || []).map((c) => c.name));
   const altro = await openTab('filo://options/altro.html');
   await altro.waitForLoadState('domcontentloaded');
@@ -84,6 +82,8 @@ test('Altro: il nome nuovo di una categoria vale senza «Rinomina»; vuoto non l
 
   await scriviAlPostoDi(altro, '.sn-cat-row input', ' ');
   await altro.keyboard.press('Backspace');
+  // Un clic sulla barra delle schede toglie prima il fuoco alla finestra: il nome vuoto parte lì, senza rinominare.
+  await altro.evaluate(() => window.dispatchEvent(new Event('blur')));
   const torna2 = await altraSchedaEPoiQui(shell);
   await torna2();
   await expect(casella).toHaveValue('Ufficio', { timeout: 4000 });

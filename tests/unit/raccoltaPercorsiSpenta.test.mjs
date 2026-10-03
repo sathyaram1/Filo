@@ -146,9 +146,8 @@ test('nessun testo dell’app promette che i passi aiutano altri utenti', SPENTA
 test('il manifesto e le note di versione dicono che i passi restano sul computer', SPENTA, () => {
   const aiuto = globalThis.SN_CAPABILITIES.get('help-sidebar');
   assert.match(`${aiuto.desc} ${aiuto.doesNot}`, /non escono dal tuo computer/);
-  const { NOTES, cmpVersion } = globalThis.SN_PATCH_NOTES;
-  const prossima = [...NOTES].sort((a, b) => cmpVersion(b.version, a.version))[0];
-  const righe = [...(prossima.features || []), ...(prossima.fixes || [])];
+  // In un blocco qualunque: uscita la versione che la porta, la riga resta lì e sopra se ne apre un altro.
+  const righe = globalThis.SN_PATCH_NOTES.NOTES.flatMap((n) => [...(n.features || []), ...(n.fixes || [])]);
   assert.ok(righe.some((r) => /Ha funzionato/.test(r) && /non escono dal computer/.test(r)),
     'chi aggiorna deve sapere che la domanda è sparita, e perché');
 });

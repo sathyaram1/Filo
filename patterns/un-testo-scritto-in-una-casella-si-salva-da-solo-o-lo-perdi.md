@@ -113,9 +113,35 @@ sito e concludeva che la lista non funzionava (#590.2).
   Playwright fa credere alla pagina di avere sempre il fuoco, quindi niente
   `blur`: Ctrl+W si prova con `sendInputEvent`, prima il Ctrl da solo e poi la
   lettera.
-- **Dove:** `testoCambiato`, `spedisci`, `uscita`, `righe`, `save` e
-  `saveCookies` in `src/pages/security/security.js`; `riapplicaListaBloccati`,
-  `_seguiLista` e `activate` in `src/main/tabs.js`. Test:
+- **Dove:** pausa e uscite in `SN_CASELLE` (`src/shared/caselleAlSicuro.js`);
+  `uscita`, `righe`, `save` e `saveCookies` in
+  `src/pages/security/security.js`; `riapplicaListaBloccati`, `_seguiLista` e
+  `activate` in `src/main/tabs.js`. Test:
   `tests/security-liste-non-si-perdono.spec.mjs` e i casi sulla riga a metà
-  in `tests/siteBlock-strade.spec.mjs`. Le pagine Opzioni e Altro
-  hanno ancora campi che si salvano solo al `change` (#590.5).
+  in `tests/siteBlock-strade.spec.mjs`.
+
+## Le altre pagine delle impostazioni passano dallo stesso punto
+
+In Altro, Modelli e Preferenze le caselle si salvavano solo al `change`, o dopo
+una pausa che Ctrl+W tagliava: un dominio escluso, il limite di spesa, le
+chiavi, le ore dell'archivio automatico tornavano com'erano (#590.5).
+
+- **Una pagina, un modulo.** Ogni pagina crea il suo `SN_CASELLE.crea()`,
+  iscrive chi salva e gli passa ogni `input`; pausa, Ctrl da solo, fuoco che
+  esce, `TAB_IN_VISTA` e ricarica li ascolta il modulo. Una casella nuova non
+  scrive i suoi ascoltatori di uscita: si iscrive.
+- **Un valore che a metà vale altro parte solo all'uscita** (`pausa: false`).
+  Scrivendo «15» il limite di spesa passerebbe da «1» e fermerebbe le richieste
+  di quell'istante; il nome di una categoria a metà finirebbe nelle altre
+  pagine. Un numero che serve a vedere l'effetto mentre lo si regola, come il
+  colore delle schede, la pausa la tiene.
+- **Gli avvisi aspettano l'uscita anche qui.** Una riga nuova del registro dei
+  modelli, scritta partendo dalla stringa, a metà non ha ancora il nickname:
+  mentre si scrive una riga corretta si ripulisce ma una nuova non si accende,
+  e il «Salvato» non compare finché una riga resta fuori.
+- **All'uscita la casella dice il valore in uso.** Un numero fuori scala torna
+  al valore salvato, un nome di categoria svuotato torna al nome che la
+  categoria ha davvero.
+- **Dove:** `caselle` in `src/pages/options/altro.js`,
+  `src/pages/options/options.js`, `src/pages/preferences/preferences.js`. Test:
+  `tests/impostazioni-caselle-non-si-perdono.spec.mjs`.

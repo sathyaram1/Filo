@@ -61,6 +61,7 @@
   async function renderCategories() {
     const list = $('categoriesList');
     list.innerHTML = '';
+    caselleCategorie.clear();
     const [catsRes, pagesRes] = await Promise.all([
       chrome.runtime.sendMessage({ type: MSG.GET_CATEGORIES }),
       chrome.runtime.sendMessage({ type: MSG.GET_SAVED_PAGES }),
@@ -100,6 +101,7 @@
     // Il nome scritto vale anche senza «Rinomina» (#590.5): parte all'uscita dal campo o dalla scheda, non a metà
     // parola, e la lista non si ridisegna sotto il cursore. Il tasto resta e conferma sempre.
     const nome = `categoria:${cat.id}`;
+    caselleCategorie.set(input, cat);
     caselle.registra(nome, (uscita) => rinomina(cat, input, { ripristina: uscita }));
     input.addEventListener('input', (e) => caselle.cambiato(nome, e, { pausa: false }));
     input.addEventListener('change', () => rinomina(cat, input, { ripristina: true }));
@@ -167,8 +169,14 @@
     mostraSalvato();
   }
 
-  // La lista dei domini esclusi non ha un «Salva» e chiudere la scheda non avvisa la pagina (#590.5).
-  const caselle = window.SN_CASELLE.crea();
+  // Domini esclusi e nomi delle categorie non hanno un «Salva», e chiudere la scheda non avvisa la pagina (#590.5).
+  // Il nome svuotato può essere già partito col fuoco uscito dalla finestra: all'uscita vera la casella lo ridice.
+  const caselleCategorie = new Map();
+  const caselle = window.SN_CASELLE.crea({
+    uscita() {
+      for (const [input, cat] of caselleCategorie) if (!input.value.trim()) input.value = cat.name;
+    },
+  });
   caselle.registra('blocklist', () => save());
 
   document.addEventListener('DOMContentLoaded', () => {
