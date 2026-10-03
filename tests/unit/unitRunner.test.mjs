@@ -301,7 +301,7 @@ describe('a gruppi, ciò che node fa una volta per corsa resta uno', () => {
   test('un documento su stdout, junit o lcov, passa anch’esso per una copia; i formati che scorrono restano su stdout', () => {
     const c = (k) => `COPIA${k}`;
     assert.deepEqual(rapportiDaRiunire(['--test-reporter=junit'], c),
-      { flags: ['--test-reporter=junit', '--test-reporter-destination=COPIA0'], rapporti: ['stdout'] });
+      { flags: ['--test-reporter=junit', '--test-reporter-destination=COPIA0'], rapporti: ['stdout'], accodati: [] });
     assert.deepEqual(rapportiDaRiunire(['--test-reporter', 'lcov', '--test-reporter-destination', 'stdout'], c).rapporti, ['stdout']);
     assert.deepEqual(rapportiDaRiunire(['--test-reporter=spec'], c).rapporti, []);
     const misti = ['--test-reporter=dot', '--test-reporter=junit', '--test-reporter-destination=x'];
