@@ -100,9 +100,8 @@
   // pseudonimo e l'email non arriva all'owner. Vista e regalo sono quelli della
   // pagina «Inviti e utenti»: un regalo scritto altrove non arriva a nessuno.
   const USERS_PAGINA = 50;
-  const USO_GIFT = 'Uso: /gift NUMERO PSEUDONIMO, per esempio /gift 2000 e lo pseudonimo. '
-    + 'Basta l’inizio, se è di una persona sola: gli pseudonimi li elenca /users.';
-  const DOVE_PSEUDONIMO = 'la persona trova il suo nella pagina Crediti, alla voce «Il tuo pseudonimo»';
+  const USO_GIFT = 'Uso: /gift NUMERO PSEUDONIMO. Basta l’inizio dello pseudonimo, se è di una persona sola. '
+    + 'Gli pseudonimi li elenca /users.';
 
   function crediti(n) { return global.SN_WALLET.formatCredits(n); }
 
@@ -113,6 +112,9 @@
       .filter(Boolean);
     return [...new Set(pezzi)];
   }
+
+  // Quello che l'owner ha scritto torna in chat per intero solo se ci sta in una riga.
+  function citato(t) { return t.length > 40 ? `${t.slice(0, 40)}…` : t; }
 
   // «2.000» scritto all'italiana sono duemila crediti, non due.
   function numeroCrediti(raw) {
@@ -175,7 +177,7 @@
     usersMostrati += pagina.length;
     const totale = usersElenco.length;
     const testa = usersCerca && totale === 1 ? 'Trovata:'
-      : `${usersCerca ? `Persone con uno pseudonimo che comincia per «${usersCerca}»` : 'Persone con un portafoglio'} ${primo}-${usersMostrati} di ${totale}:`;
+      : `${usersCerca ? `Persone con uno pseudonimo che comincia per «${citato(usersCerca)}»` : 'Persone con un portafoglio'} ${primo}-${usersMostrati} di ${totale}:`;
     const coda = usersMostrati < totale
       ? `\n\nScrivi /users altri per le prossime${usersCerca ? '' : ', o /users e l’inizio di uno pseudonimo per cercare una persona'}.`
       : '';
@@ -193,12 +195,12 @@
       return;
     }
     if (dopo.includes('@')) {
-      showFiloLine('Le persone si cercano per pseudonimo, non per email: scrivi /users e l’inizio di uno pseudonimo, o /users per vederle tutte.', chat);
+      showFiloLine('Le persone si cercano per pseudonimo, non per email. Scrivi /users e l’inizio di uno pseudonimo, o /users per vederle tutte.', chat);
       return;
     }
     const pezzi = /^tutti$/i.test(dopo) ? [] : pezziScritti(dopo);
     if (pezzi.length > 1) {
-      showFiloLine(`Ci sono ${pezzi.length} pseudonimi (${pezzi.join(', ')}): cercane uno per volta.`, chat);
+      showFiloLine(`Hai scritto ${pezzi.length} pseudonimi (${pezzi.join(', ')}). Cercane uno per volta.`, chat);
       return;
     }
     const cerca = pezzi[0] || '';
@@ -206,7 +208,7 @@
     usersMostrati = 0;
     usersCerca = cerca;
     const giro = ++usersGiro;
-    showFiloLine(cerca ? `Cerco chi ha uno pseudonimo che comincia per «${cerca}»…` : 'Recupero le persone con un portafoglio…', chat);
+    showFiloLine(cerca ? `Cerco chi ha uno pseudonimo che comincia per «${citato(cerca)}»…` : 'Recupero le persone con un portafoglio…', chat);
     const vista = await leggiVista();
     // Un «/users» dato mentre questa risposta viaggiava vale al suo posto.
     if (giro !== usersGiro) return;
@@ -214,7 +216,7 @@
     usersElenco = cerca ? chiComincia(vista.utenti, cerca) : vista.utenti;
     if (!usersElenco.length) {
       showFiloLine(cerca
-        ? `Nessuno ha uno pseudonimo che comincia per «${cerca}». Scrivi /users per vederle tutte.`
+        ? `Non trovo uno pseudonimo che comincia per «${citato(cerca)}». Con /users le vedi tutte.`
         : 'Nessuna persona ha ancora un portafoglio.', chat);
       return;
     }
@@ -236,29 +238,29 @@
       return;
     }
     if (chi.includes('@')) {
-      showFiloLine(`I regali vanno per pseudonimo, non per email: nessun regalo fatto. ${maiuscola(DOVE_PSEUDONIMO)}; poi scrivi /gift ${amount} e il suo pseudonimo.`, chat);
+      showFiloLine(`I regali ora vanno per pseudonimo, non per email, quindi non ho regalato niente. La persona trova il suo nella pagina Crediti, alla voce «Il tuo pseudonimo». Con quello scrivi /gift ${amount} PSEUDONIMO.`, chat);
       return;
     }
     const pezzi = pezziScritti(chi);
     if (pezzi.length !== 1) {
       showFiloLine(pezzi.length > 1
-        ? `Ci sono ${pezzi.length} pseudonimi (${pezzi.join(', ')}): nessun regalo fatto. Scrivi /gift una volta per ciascuno.`
+        ? `Hai scritto ${pezzi.length} pseudonimi (${pezzi.join(', ')}), quindi non ho regalato niente. Scrivi /gift una volta per ciascuno.`
         : USO_GIFT, chat);
       return;
     }
     const inizio = pezzi[0];
-    showFiloLine(`Regalo ${crediti(amount)} crediti a «${inizio}»…`, chat);
+    showFiloLine(`Regalo ${crediti(amount)} crediti a «${citato(inizio)}»…`, chat);
     const vista = await leggiVista();
     if (vista.errore) { showFiloLine(vista.errore, chat); return; }
     const trovati = chiComincia(vista.utenti, inizio);
     if (!trovati.length) {
-      showFiloLine(`Nessuno ha uno pseudonimo che comincia per «${inizio}»: nessun regalo fatto. Scrivi /users per vederle tutte.`, chat);
+      showFiloLine(`Non trovo uno pseudonimo che comincia per «${citato(inizio)}», quindi non ho regalato niente. Con /users le vedi tutte.`, chat);
       return;
     }
     if (trovati.length > 1) {
       const nomi = trovati.slice(0, 10).map((u) => u.pseudonym).join(', ');
       const resto = trovati.length > 10 ? ` e altri ${trovati.length - 10}` : '';
-      showFiloLine(`«${inizio}» è l’inizio di ${trovati.length} pseudonimi (${nomi}${resto}): nessun regalo fatto. Scrivi qualche carattere in più.`, chat);
+      showFiloLine(`«${citato(inizio)}» è l’inizio di ${trovati.length} pseudonimi (${nomi}${resto}), quindi non ho regalato niente. Scrivi qualche carattere in più.`, chat);
       return;
     }
     const pseudonym = trovati[0].pseudonym;
@@ -276,7 +278,7 @@
       if (rifiuto || (res && res.reason) || guasto.certo) {
         showFiloLine(`Regalo non fatto: ${rifiuto || (res && res.reason) || guasto.frase}.`, chat);
       } else {
-        showFiloLine(`Non so se il regalo è arrivato: ${guasto.frase}. Controlla con /users ${pseudonym} prima di riprovare.`, chat);
+        showFiloLine(`Non so se il regalo è arrivato, ${guasto.frase}. Prima di riprovare controlla il saldo con /users ${pseudonym}.`, chat);
       }
       return;
     }
@@ -285,7 +287,7 @@
     const lei = (dopo.utenti || []).find((u) => u.pseudonym === pseudonym);
     const saldo = lei && lei.balance && lei.balance.credits != null
       ? `Nuovo saldo: ${crediti(lei.balance.credits)} crediti.`
-      : `Il saldo nuovo non sono riuscito a leggerlo: lo vedi con /users ${pseudonym}.`;
+      : `Il saldo nuovo non sono riuscito a leggerlo, lo vedi con /users ${pseudonym}.`;
     showFiloLine(`✓ Regalati ${crediti(dati)} crediti a ${pseudonym}. ${saldo}`, chat);
   }
 

@@ -143,7 +143,7 @@ test('«/users INIZIO» cerca per inizio dello pseudonimo, in qualunque maiuscol
 
 test('una ricerca senza risultati lo dice e indica come vederle tutte', async () => {
   const riga = await comando('/users zz');
-  assert.match(riga, /Nessuno ha uno pseudonimo che comincia per «zz»/);
+  assert.match(riga, /Non trovo uno pseudonimo che comincia per «zz»/);
   assert.match(riga, /\/users/);
   assert.match(await comando('/users altri'), /Non ho altre persone/);
 });
@@ -197,7 +197,7 @@ test('«/gift NUMERO EMAIL» non regala niente e dice dove la persona trova lo p
   assert.equal(richieste.length, 0);
   assert.match(riga, /pseudonimo/);
   assert.match(riga, /pagina Crediti/);
-  assert.match(riga, /nessun regalo/i);
+  assert.match(riga, /non ho regalato niente/);
 });
 
 test('un inizio di più persone non regala a nessuna e le nomina', async () => {
@@ -206,11 +206,11 @@ test('un inizio di più persone non regala a nessuna e le nomina', async () => {
   assert.match(riga, /16 pseudonimi/);
   assert.ok(riga.includes(pseudo(0x60)));
   assert.match(riga, /e altri 6/, 'quelli oltre i primi dieci si contano, non spariscono');
-  assert.match(riga, /nessun regalo fatto/);
+  assert.match(riga, /non ho regalato niente/);
 });
 
 test('un inizio che non è di nessuno, o due pseudonimi insieme, non regalano niente', async () => {
-  assert.match(await comando('/gift 10 zz'), /Nessuno ha uno pseudonimo che comincia per «zz»/);
+  assert.match(await comando('/gift 10 zz'), /Non trovo uno pseudonimo che comincia per «zz»/);
   const due = await comando(`/gift 10 ${pseudo(1)}, ${pseudo(2)}`);
   assert.ok(due.includes(pseudo(1)) && due.includes(pseudo(2)), due);
   assert.equal(di(MSG.WALLET_OWNER_GRANT).length, 0);

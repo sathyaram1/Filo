@@ -276,8 +276,8 @@
   }
 
   // ── Il proprio pseudonimo (#895) ────────────────────────────────────────────
-  // Si copia col clic o dal tasto destro. Cambia solo con un portafoglio nuovo:
-  // chi copia prende quello a schermo adesso, anche a metà dell'animazione.
+  // Si copia col clic o dal tasto destro. Cambia solo con un portafoglio nuovo,
+  // e chi copia prende quello a schermo adesso, anche a metà dell'animazione.
   let pseudonimoAttesa = null;
   function renderPseudonym(p) {
     const btn = $('pseudonym');
@@ -329,7 +329,7 @@
     menu.setAttribute('role', 'menu');
     const info = document.createElement('div');
     info.className = 'sn-wallet-ctx-info';
-    info.textContent = 'Basta questo a chi ti vuole regalare crediti: email e nome restano tuoi.';
+    info.textContent = 'Basta questo per ricevere un regalo di crediti. Email e nome restano tuoi.';
     const voce = document.createElement('div');
     voce.className = 'sn-select-option';
     voce.setAttribute('role', 'menuitem');

@@ -172,7 +172,7 @@ test('la pagina Crediti mostra il proprio pseudonimo solo con un portafoglio, e 
   await page.click('#pseudonym', { button: 'right' });
   const menu = page.locator('.sn-wallet-me-menu');
   await expect(menu).toBeVisible();
-  await expect(menu).toContainText('regalare crediti');
+  await expect(menu).toContainText('regalo di crediti');
   await menu.getByRole('menuitem', { name: 'Copia lo pseudonimo' }).click();
   await expect(menu).toHaveCount(0);
   expect(await leggiAppunti(app)).toBe(MIO);
@@ -215,7 +215,7 @@ test('«/gift NUMERO INIZIO» fa salire quel portafoglio e la persona vede il mo
 
   // «f00» è l'inizio di due persone: nessun regalo, e le nomina.
   await scriviNellaHome(home, '/gift 500 f00');
-  await expect(ultimaBolla(home)).toContainText('nessun regalo fatto', { timeout: 10_000 });
+  await expect(ultimaBolla(home)).toContainText('non ho regalato niente', { timeout: 10_000 });
   await expect(ultimaBolla(home)).toContainText('f00e000000000001');
   expect(stato.richieste.filter((r) => r.url === '/walletGrant')).toHaveLength(0);
 
@@ -231,9 +231,12 @@ test('«/gift NUMERO INIZIO» fa salire quel portafoglio e la persona vede il mo
   await expect(movimento).toContainText('+500');
   await expect(movimento).toContainText('Regalo di Filo');
 
-  // La vista owner lo conta: la riga di quella persona è salita.
-  const owner = await openTab('filo://credits/owner.html');
-  const rigaOwner = owner.locator('#ownerUsers tbody tr.sn-wallet-user', { hasText: MIO });
+  // La vista owner lo conta: la riga di quella persona è salita. (Le due pagine
+  // hanno lo stesso host: ci si arriva dal rimando, come fa l'owner.)
+  await crediti.click('#ownerLink a');
+  await crediti.waitForURL(/owner\.html/);
+  const rigaOwner = crediti.locator('#ownerUsers tbody tr.sn-wallet-user')
+    .filter({ has: crediti.locator('td.sn-wallet-pseudonym', { hasText: MIO }) });
   await expect(rigaOwner).toContainText(await fmt(5500), { timeout: 15_000 });
 });
 
