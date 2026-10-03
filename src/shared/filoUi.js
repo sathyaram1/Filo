@@ -104,5 +104,18 @@
     } catch (_) { return false; }
   }
 
-  global.SN_FILO_UI = { ATTR, SELECTOR, mark, is, inside, aperti, onMark };
+  // Lo script del sito raggiunge ogni nodo del suo documento e sa fabbricarci sopra clic, passaggi e tasti:
+  // a un pezzo di Filo arrivano solo quelli dell'utente (#589.8). Va messo per primo, appena il nodo nasce.
+  const GESTI = ['click', 'dblclick', 'auxclick', 'contextmenu', 'mousedown', 'mouseup', 'mousemove',
+    'mouseover', 'mouseout', 'mouseenter', 'mouseleave', 'pointerdown', 'pointerup', 'pointermove',
+    'pointerover', 'pointerout', 'pointerenter', 'pointerleave', 'keydown', 'keyup', 'keypress',
+    'beforeinput', 'input', 'change', 'wheel', 'dragstart', 'dragenter', 'dragover', 'drop',
+    'touchstart', 'touchmove', 'touchend'];
+  function fermaIFinti(e) { if (!e.isTrusted) e.stopImmediatePropagation(); }
+  function soloGestiVeri(el) {
+    try { for (const t of GESTI) el.addEventListener(t, fermaIFinti, true); } catch (_) {}
+    return el;
+  }
+
+  global.SN_FILO_UI = { ATTR, SELECTOR, mark, is, inside, aperti, onMark, soloGestiVeri };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
