@@ -18,15 +18,6 @@ async function patchWebTabs(app, patch) {
   }, patch);
 }
 
-// Il titolo che la carta d'anteprima mostra a schermo, '' se la carta non si vede.
-function titoloInCarta(app) {
-  return app.evaluate(async ({ BrowserWindow }) => {
-    const c = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed() && w.webContents.getURL() === 'filo://shell/anteprima.html');
-    if (!c || !c.isVisible()) return '';
-    return c.webContents.executeJavaScript(`document.getElementById('carta').hidden ? '' : document.getElementById('titolo').textContent`);
-  });
-}
-
 async function openPage(openTab, testServer, title) {
   const page = await openTab(testServer.html(`<title>${title}</title><link rel="icon" href="${FAV}"><h1 id="ok">x</h1>`));
   await page.waitForSelector('#ok');
@@ -153,11 +144,32 @@ test('scheda stretta: l\'avviso audio resta sempre, la favicon cede solo quando 
   }
 });
 
-test('ogni controllo dentro la scheda ha il suo suggerimento di Filo, non il titolo della pagina', async ({ app, shell, openTab, testServer }) => {
-  await app.evaluate(({ ipcMain }) => {
-    globalThis.__suggerimenti = [];
-    ipcMain.on('shell:tooltip-show', (_e, d) => globalThis.__suggerimenti.push(d && d.text));
+// Suggerimento e carta come li vede chi guarda: le finestre figlie visibili, cosa dicono e dove stanno.
+async function riquadri(app) {
+  return app.evaluate(async ({ BrowserWindow }) => {
+    const out = { suggerimento: null, carta: null };
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (w.isDestroyed() || !w.isVisible()) continue;
+      const url = w.webContents.getURL();
+      const leggi = (js) => w.webContents.executeJavaScript(js).catch(() => null);
+      if (url === 'filo://shell/anteprima.html') {
+        out.carta = { testo: await leggi("document.getElementById('titolo').textContent"), ...w.getBounds() };
+      } else if (url.startsWith('data:')) {
+        const testo = await leggi("(document.getElementById('tip') || {}).textContent ?? null");
+        if (testo != null) out.suggerimento = { testo, ...w.getBounds() };
+      }
+    }
+    return out;
   });
+}
+const siCoprono = (a, b) => !!a && !!b && a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+const scritte = async (app) => {
+  const r = await riquadri(app);
+  return { carta: r.carta && r.carta.testo, suggerimento: r.suggerimento && r.suggerimento.testo };
+};
+
+// Il titolo della scheda lo dice la carta (#430); il suggerimento di un controllo prende il suo posto, mai sopra (#589.16).
+test('ogni controllo dentro la scheda ha il suo suggerimento di Filo, non il titolo della pagina', async ({ app, shell, openTab, testServer }) => {
   await openTab(testServer.html('<title>Musica di sottofondo</title>'));
   await openTab(testServer.html('<title>Podcast</title>'));
   // Le schede si allargano e stringono mentre i titoli arrivano: si passa col puntatore solo a barra ferma.
@@ -168,38 +180,68 @@ test('ogni controllo dentro la scheda ha il suo suggerimento di Filo, non il tit
   await expect(shell.locator(`.tab[data-id="${muta}"]`)).toHaveClass(/active/);
   await expect(shell.locator('.tab .tab-alert[title]')).toHaveCount(0);
 
+  const titoli = { [suona]: 'Musica di sottofondo', [muta]: 'Podcast' };
+  const via = async () => {
+    await shell.mouse.move(2, 2);
+    await expect.poll(() => scritte(app), { timeout: 3000, message: 'puntatore fuori dalla barra' }).toEqual({ carta: null, suggerimento: null });
+  };
+  const sulTitolo = async (id) => {
+    await shell.locator(`.tab[data-id="${id}"] .title`).hover();
+    await expect.poll(() => scritte(app), { timeout: 3000, message: `titolo di ${titoli[id]}` })
+      .toEqual({ carta: titoli[id], suggerimento: null });
+  };
+
   const ctrlW = await shell.evaluate(() => (window.SN_TASTI ? window.SN_TASTI.etichetta('Ctrl+W') : 'Ctrl+W'));
   const casi = [
-    [`.tab[data-id="${suona}"] .audio-ind`, 'Silenzia'],
-    [`.tab[data-id="${muta}"] .mute-ind`, 'Riattiva audio'],
-    [`.tab[data-id="${muta}"] .proxy-ind`, 'Aperta da un altro paese'],
-    [`.tab[data-id="${muta}"] .close`, `Chiudi scheda (${ctrlW})`],
-    [`.tab[data-id="${suona}"] .close`, 'Chiudi scheda'],
+    [suona, '.audio-ind', 'Silenzia'],
+    [muta, '.mute-ind', 'Riattiva audio'],
+    [muta, '.proxy-ind', 'Aperta da un altro paese'],
+    [muta, '.close', `Chiudi scheda (${ctrlW})`],
+    [suona, '.close', 'Chiudi scheda'],
   ];
-  const titolo = `.tab[data-id="${suona}"] .title`;
-  const suggerimenti = () => app.evaluate(() => globalThis.__suggerimenti.slice());
-  const passaSopra = async (sel) => { await shell.mouse.move(2, 2); await shell.locator(sel).hover(); };
+  for (const [id, cls, atteso] of casi) {
+    await via();
+    await sulTitolo(id);
+    await shell.locator(`.tab[data-id="${id}"] ${cls}`).hover();
+    await expect.poll(async () => (await scritte(app)).suggerimento, { timeout: 3000, message: cls }).toBe(atteso);
+    const r = await riquadri(app);
+    expect(siCoprono(r.suggerimento, r.carta), `${cls}: ${JSON.stringify(r)}`).toBe(false);
+    // Tornando sul titolo la carta torna e il suggerimento se ne va.
+    await sulTitolo(id);
+  }
+  // Oltre l'attesa del suggerimento: la carta non ha un doppione di testo sotto.
+  await new Promise((r) => setTimeout(r, 600));
+  expect(await scritte(app)).toEqual({ carta: titoli[casi.at(-1)[0]], suggerimento: null });
 
-  // Il titolo della scheda dietro lo dice la carta d'anteprima (#430) quando è accesa, il suggerimento quando è
-  // spenta; i controlli hanno il loro in tutti e due i casi, e da spenta non ereditano quello della scheda.
-  for (const anteprima of [true, false]) {
-    if (!anteprima) {
-      await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { tabPreview: { enabled: false } } }));
-      await expect(shell.locator(`.tab[data-id="${suona}"]`)).toHaveAttribute('data-tip', 'Musica di sottofondo', { timeout: 5000 });
-    }
-    for (const [sel, atteso] of casi) {
-      await passaSopra(sel);
-      await expect.poll(async () => (await suggerimenti()).at(-1) || '', { timeout: 3000, message: `${sel}, anteprima ${anteprima}` }).toBe(atteso);
-    }
-    const prima = (await suggerimenti()).length;
-    await passaSopra(titolo);
-    if (anteprima) {
-      await expect.poll(() => titoloInCarta(app), { timeout: 3000 }).toBe('Musica di sottofondo');
-      // Oltre l'attesa del suggerimento: la carta non ha un doppione di testo sotto.
-      await new Promise((r) => setTimeout(r, 600));
-      expect((await suggerimenti()).slice(prima)).not.toContain('Musica di sottofondo');
-    } else {
-      await expect.poll(async () => (await suggerimenti()).at(-1) || '', { timeout: 3000, message: titolo }).toBe('Musica di sottofondo');
-    }
+  // Attraversando la croce verso la scheda accanto la carta passa all'altra senza spegnersi: niente lampo.
+  await via();
+  await sulTitolo(suona);
+  const centro = async (sel) => {
+    const b = await shell.locator(sel).boundingBox();
+    return [b.x + b.width / 2, b.y + b.height / 2];
+  };
+  const croce = await centro(`.tab[data-id="${suona}"] .close`);
+  const accanto = await centro(`.tab[data-id="${muta}"] .title`);
+  await app.evaluate(({ ipcMain }) => {
+    globalThis.__spente = 0;
+    ipcMain.on('anteprima:nascondi', () => { globalThis.__spente++; });
+  });
+  await shell.mouse.move(...croce);
+  await shell.mouse.move(...accanto);
+  await expect.poll(() => scritte(app), { timeout: 3000, message: 'carta sulla scheda accanto' }).toEqual({ carta: 'Podcast', suggerimento: null });
+  expect(await app.evaluate(() => globalThis.__spente), 'la carta si è spenta passando sulla croce').toBe(0);
+
+  // Con l'anteprima spenta dalle Preferenze il titolo torna nel suggerimento, e i controlli tengono il loro.
+  await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { tabPreview: { enabled: false } } }));
+  await expect(shell.locator(`.tab[data-id="${suona}"]`)).toHaveAttribute('data-tip', 'Musica di sottofondo', { timeout: 5000 });
+  await via();
+  await shell.locator(`.tab[data-id="${suona}"] .title`).hover();
+  await expect.poll(() => scritte(app), { timeout: 3000, message: 'titolo senza anteprima' })
+    .toEqual({ carta: null, suggerimento: 'Musica di sottofondo' });
+  for (const [id, cls, atteso] of casi) {
+    await via();
+    await shell.locator(`.tab[data-id="${id}"] ${cls}`).hover();
+    await expect.poll(() => scritte(app), { timeout: 3000, message: `${cls} senza anteprima` })
+      .toEqual({ carta: null, suggerimento: atteso });
   }
 });
