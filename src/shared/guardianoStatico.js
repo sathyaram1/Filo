@@ -421,21 +421,96 @@
   // Opzioni non la mette davanti al modello, che così non la può far uscire.
   const OSCURATO = '[segreto custodito da Filo]';
 
+  // Un segreto si riconosce anche travestito (#810): maiuscole, al contrario, spezzato da separatori o a capo,
+  // in base64, esadecimale o percentuale. Chi lo stampa così da un comando non deve poterlo passare a un modello.
+  const alnumMinuscolo = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const rovescio = (s) => [...s].reverse().join('');
+  const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const STAMPABILE = /^[\x09\x0a\x0d\x20-\x7e]*$/;
+
+  function decodifiche(tok) {
+    const out = [];
+    let cur = tok;
+    for (let i = 0; i < 3 && /%[0-9A-Fa-f]{2}/.test(cur); i++) {
+      const dec = cur.replace(/(?:%[0-9A-Fa-f]{2})+/g, (p) => { try { return decodeURIComponent(p); } catch (_) { return p.replace(/%([0-9A-Fa-f]{2})/g, (m, h) => String.fromCharCode(parseInt(h, 16))); } });
+      if (dec === cur) break;
+      out.push(dec);
+      cur = dec;
+    }
+    for (const run of tok.match(/[A-Za-z0-9+/_-]{16,}/g) || []) {
+      const b = run.replace(/-/g, '+').replace(/_/g, '/');
+      // Un pezzo di base64 tagliato in un punto qualsiasi si riallinea togliendo da uno a tre caratteri.
+      for (let k = 0; k < 4; k++) {
+        const pezzo = b.slice(k, k + Math.floor((b.length - k) / 4) * 4);
+        if (pezzo.length < 16) break;
+        try {
+          const bin = typeof atob === 'function' ? atob(pezzo) : Buffer.from(pezzo, 'base64').toString('binary');
+          if (STAMPABILE.test(bin)) out.push(bin);
+        } catch (_) { /* non era base64 */ }
+      }
+    }
+    for (const run of tok.match(/[0-9A-Fa-f]{24,}/g) || []) {
+      for (let k = 0; k < 2; k++) {
+        let h = '';
+        for (let i = k; i + 1 < run.length; i += 2) h += String.fromCharCode(parseInt(run.slice(i, i + 2), 16));
+        if (STAMPABILE.test(h)) out.push(h);
+      }
+    }
+    return out;
+  }
+
+  function oscuraTesto(s, chiavi) {
+    let t = s;
+    for (const c of chiavi) {
+      t = t.split(c.v).join(OSCURATO);
+      t = t.replace(c.re, OSCURATO);
+    }
+    // Base64 a righe (il comando base64 va a capo ogni 76 caratteri) si legge come un pezzo solo.
+    t = t.replace(/[A-Za-z0-9+/=_-]{16,}(?:[ \t]*\r?\n[ \t]*[A-Za-z0-9+/=_-]{4,})+|\S{8,}/g, (tok) => {
+      // Una foto mandata al modello è pixel, non testo: decodificarla costerebbe e non troverebbe niente.
+      if (/^data:image\//i.test(tok)) return tok;
+      const compatto = tok.replace(/\s+/g, '');
+      const forme = decodifiche(compatto).map(alnumMinuscolo);
+      return chiavi.some((c) => forme.some((f) => f.includes(c.norm) || f.includes(c.rov))) ? OSCURATO : tok;
+    });
+    // Separatori qualunque fra un carattere e l'altro: si confronta la sola forma alfanumerica e si toglie il tratto originale.
+    let piatto = alnumMinuscolo(t);
+    for (const c of chiavi) {
+      for (const cerca of [c.norm, c.rov]) {
+        let guardia = 0;
+        while (piatto.includes(cerca) && guardia++ < 1000) {
+          const pos = [];
+          for (let i = 0; i < t.length; i++) if (/[A-Za-z0-9]/.test(t[i])) pos.push(i);
+          const at = piatto.indexOf(cerca);
+          t = t.slice(0, pos[at]) + OSCURATO + t.slice(pos[at + cerca.length - 1] + 1);
+          piatto = alnumMinuscolo(t);
+        }
+      }
+    }
+    return t;
+  }
+
   function oscuraSegreti(valore, segreti) {
-    const lista = (Array.isArray(segreti) ? segreti : [])
-      .map((x) => testo(x).trim())
-      .filter((x) => x.length >= SEGRETO_MIN);
-    if (!lista.length || valore == null) return valore;
-    let tutto = '';
-    try { tutto = JSON.stringify(valore); } catch (_) { return valore; }
-    if (!lista.some((x) => tutto.includes(x))) return valore;
+    const chiavi = [];
+    for (const x of Array.isArray(segreti) ? segreti : []) {
+      const v = testo(x).trim();
+      const norm = alnumMinuscolo(v);
+      if (v.length < SEGRETO_MIN || norm.length < SEGRETO_MIN) continue;
+      chiavi.push({ v, norm, rov: rovescio(norm), re: new RegExp(`${escRe(v)}|${escRe(rovescio(v))}`, 'gi') });
+    }
+    if (!chiavi.length || valore == null) return valore;
+    // Lo stesso oggetto quando non c'è niente da togliere: chi lo riceve non paga una copia.
     const giro = (v, n) => {
-      if (typeof v === 'string') return lista.reduce((acc, x) => acc.split(x).join(OSCURATO), v);
+      if (typeof v === 'string') return oscuraTesto(v, chiavi);
       if (n > 12 || !v || typeof v !== 'object') return v;
-      if (Array.isArray(v)) return v.map((x) => giro(x, n + 1));
-      const o = {};
-      for (const k of Object.keys(v)) o[k] = giro(v[k], n + 1);
-      return o;
+      let cambiato = false;
+      const o = Array.isArray(v) ? [] : {};
+      for (const k of Object.keys(v)) {
+        const x = giro(v[k], n + 1);
+        if (x !== v[k]) cambiato = true;
+        o[k] = x;
+      }
+      return cambiato ? o : v;
     };
     return giro(valore, 0);
   }
