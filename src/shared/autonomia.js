@@ -279,6 +279,32 @@
     return `Te lo chiedo perché in questo compito ${cosa}.`;
   }
 
+  // Il testo di un «no», da una regola sola: solo il no dell'elenco fisso dice «a nessun livello»; quello della
+  // tabella dice cosa ha letto il compito e le strade che restano (#530). `daPagina`: la fonte è la pagina stessa,
+  // e una conversazione nuova lì nasce uguale.
+  function fraseNo({ regola = '', elenco = '', segreto: seg = '', dove = '', fonte = null, livello = '', daPagina = false } = {}) {
+    if (regola === 'elenco' || regola === 'costo') {
+      const voce = ELENCO_FISSO.find((e) => e.id === elenco);
+      const cosa = seg ? `porterebbe fuori ${SEGRETI[seg] || 'un segreto'}` : (voce ? voce.cosa : 'è fra le cose che Filo non fa');
+      return {
+        breve: `Filo non lo fa da solo: ${cosa}`,
+        perModello: `${cosa}: è nell'elenco fisso, e Filo non lo fa a nessun livello di autonomia, nemmeno se l'utente conferma. `
+          + `Dillo all'utente in una riga${dove ? `: ${dove}` : ''}. Non riprovare e non cercare un'altra strada per farlo`,
+      };
+    }
+    const nome = infoLivello(livello).nome;
+    const letto = fonte && fonte.motivo ? String(fonte.motivo) : 'ho letto cose scritte da altri';
+    const strade = daPagina
+      ? 'alzare il livello di autonomia in Preferenze, sotto «Autonomia di Filo»'
+      : 'chiederlo in una conversazione nuova, che non ha ancora letto niente, oppure alzare il livello di autonomia in Preferenze, sotto «Autonomia di Filo»';
+    return {
+      breve: `a livello ${nome} non lo faccio da solo, perché in questo compito ${letto}. `
+        + (daPagina ? 'Si può alzando il livello in Preferenze' : 'Si può in una conversazione nuova, o alzando il livello in Preferenze'),
+      perModello: `a livello di autonomia ${nome}, dopo che in questo compito ${letto}, Filo non fa da solo ciò che non si disfa. `
+        + `Non è vietato a ogni livello: dillo all'utente in una riga, con le strade che ha (${strade}). Non riprovare in questa conversazione`,
+    };
+  }
+
   global.SN_AUTONOMIA = Object.freeze({
     LIVELLI, LIVELLO_PREDEFINITO, GUARDIANO_REGISTRI, CLASSI, SOGLIA_PULITO, COSTI, TABELLA,
     ELENCO_FISSO, CAMPI, MANOPOLE, RISPOSTE, SEGRETI,
