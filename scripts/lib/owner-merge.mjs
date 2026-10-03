@@ -107,6 +107,7 @@ function campiLocali(r) {
       out.record = String(loc.record || '').slice(0, 128);
     }
     if (typeof loc.closed === 'boolean') out.closed = loc.closed;
+    if (loc.approvato === true) out.approvato = true;
     return out;
   }
   out.localReason = String(loc.reason || 'pratica_non_ammessa').slice(0, 80);
