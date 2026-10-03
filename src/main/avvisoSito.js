@@ -170,7 +170,7 @@ class AvvisoSito {
       const tab = this.su;
       if (!tab) return;
       // Un clic arrivato mentre l'avviso passava a un'altra scheda vale per quella che l'utente vedeva.
-      if (dati && testo(dati.scheda) !== testo(tab.id)) return;
+      if (!dati || testo(dati.scheda) !== testo(tab.id)) return;
       if (canale === 'avviso-sito:scelta') {
         const scelta = testo(dati && dati.scelta);
         if (SCELTE.has(scelta)) this.scegli(tab, scelta, { testo: testo(dati && dati.testo) });
