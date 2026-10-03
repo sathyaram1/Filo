@@ -1,0 +1,101 @@
+/* Avviso del sito pericoloso o sospetto, nella sua vista sopra la scheda (src/main/avvisoSito.js).
+   Il fondo scuro lo dà la vista: la pagina disegna solo la carta. */
+
+:root {
+  --carta: #fff;
+  --testo: #1a1a1a;
+  --corpo: #374151;
+  --tenue: #6b7280;
+  --campo: #fff;
+  --bordo-campo: #d1d5db;
+  --accento: #b91c1c;
+  --su-accento: #fff;
+  --ombra: 0 24px 60px rgba(0, 0, 0, 0.45);
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+:root[data-livello="sospetto"] { --accento: #9a3412; }
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --carta: #241d1a;
+    --testo: #f4eee9;
+    --corpo: #d9d0c9;
+    --tenue: #a99f97;
+    --campo: #2e2622;
+    --bordo-campo: #54473f;
+    --accento: #ef5350;
+    --ombra: 0 24px 60px rgba(0, 0, 0, 0.6);
+  }
+  :root[data-livello="sospetto"] { --accento: #f0853c; }
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  font: 15px/1.5 var(--font);
+}
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+#carta {
+  max-width: 520px;
+  width: 100%;
+  box-sizing: border-box;
+  max-height: 100%;
+  overflow: auto;
+  background: var(--carta);
+  color: var(--testo);
+  border-radius: 16px;
+  padding: 28px 28px 24px;
+  box-shadow: var(--ombra);
+  text-align: center;
+  outline: none;
+  animation: entra 0.16s ease-out;
+}
+#carta[hidden], #conferma[hidden] { display: none; }
+@keyframes entra { from { opacity: 0; transform: translateY(6px) scale(0.98); } }
+
+.icona { font-size: 46px; line-height: 1; margin-bottom: 12px; }
+h1 { font: 700 22px/1.25 var(--font); color: var(--accento); margin: 0 0 10px; overflow-wrap: anywhere; }
+#corpo { font-size: 15.5px; color: var(--corpo); margin: 0 0 22px; overflow-wrap: anywhere; }
+
+#conferma label { display: block; font-size: 13px; color: var(--tenue); margin-bottom: 8px; }
+#parola {
+  font: 15px/1.2 var(--font);
+  text-align: center;
+  width: 180px;
+  padding: 9px 10px;
+  margin-bottom: 18px;
+  border: 1.5px solid var(--bordo-campo);
+  border-radius: 8px;
+  outline: none;
+  box-sizing: border-box;
+  color: var(--testo);
+  background: var(--campo);
+  transition: border-color 0.15s ease;
+}
+#parola:hover, #parola:focus { border-color: var(--accento); }
+
+.pulsanti { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+button {
+  font: 600 15px/1.2 var(--font);
+  padding: 10px 18px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.15s ease, filter 0.15s ease;
+}
+button:hover { transform: translateY(-1px); filter: brightness(1.08); }
+button:active { transform: translateY(0); }
+button:focus-visible { outline: 2px solid var(--accento); outline-offset: 2px; }
+.primario { color: var(--su-accento); background: var(--accento); }
+.secondario { color: var(--accento); background: transparent; box-shadow: inset 0 0 0 1.5px var(--accento); }
+/* Spento finché non si può: «confermo» non ancora scritto, o la carta appena comparsa sotto il cursore. */
+button:disabled { opacity: 0.45; cursor: default; transform: none; filter: none; }
