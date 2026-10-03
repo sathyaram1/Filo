@@ -43,7 +43,7 @@ test('una scheda di sfondo non legge l\'elenco, nemmeno col menu appena aperto, 
 
 test('la scheda in vista legge solo col menu aperto nel suo riquadro: un clic qualunque non basta', async () => {
   const s = sito();
-  s.wc.emetti('input-event', {}, { type: 'mouseDown', button: 'left' });
+  s.wc.emetti('input-event', {}, { type: 'mouseDown', modifiers: ['leftbuttondown'] });
   const t0 = Date.now();
   assert.equal(await leggi(s), false, 'un clic che non apre il menu');
   assert.ok(Date.now() - t0 >= Appunti.ATTESA_DEL_MENU_MS - 50, 'prima del no si aspetta il segnale del menu');
@@ -105,14 +105,35 @@ test('Filo legge e scrive sempre, la cornice compresa', async () => {
   assert.equal(Appunti.scritturaAmmessa({ isShell: true, url: '' }, ''), true);
 });
 
-test('un sito scrive solo entro un minuto da un gesto sulla sua scheda, anche se nel frattempo è passata sullo sfondo', () => {
-  const s = sito({ tab: { id: 2, url: 'https://sito.example/' } });
+test('un sito scrive solo entro un minuto da un gesto, nella scheda in vista', () => {
+  const s = sito();
   assert.equal(Appunti.scritturaAmmessa(s, 'https://sito.example/'), false, 'senza gesto');
   apriMenu(s, RIQUADRO);
   assert.equal(Appunti.scritturaAmmessa(s, 'https://sito.example/'), true, 'il menu aperto è un gesto');
   s.wc._filoGestoAlle = Date.now() - Appunti.SCRITTURA_DOPO_IL_GESTO_MS - 1;
   assert.equal(Appunti.scritturaAmmessa(s, 'https://sito.example/'), false, 'gesto troppo vecchio');
   assert.equal(Appunti.scritturaAmmessa({ url: 'https://sito.example/' }, 'https://sito.example/'), false, 'mittente senza scheda');
+});
+
+test('passata sullo sfondo, la scheda non svuota né aggiunge testo: arriva solo la copia d\'immagine col gesto fatto prima', () => {
+  const s = sito({ tab: { id: 2, url: 'https://sito.example/' } });
+  apriMenu(s, PRINCIPALE);
+  assert.equal(Appunti.scritturaAmmessa(s, 'https://sito.example/'), false, 'svuotare o togliere dallo sfondo');
+  assert.equal(Appunti.scritturaAmmessa(s, 'https://sito.example/', { type: 'text', text: 'voce del sito' }), false);
+  assert.equal(Appunti.scritturaAmmessa(s, 'https://sito.example/', { type: 'image', dataUrl: 'data:image/png;base64,AA' }), true);
+  s.wc._filoGestoAlle = 0;
+  assert.equal(Appunti.scritturaAmmessa(s, 'https://sito.example/', { type: 'image', dataUrl: 'data:image/png;base64,AA' }), false, 'senza gesto nemmeno l\'immagine');
+});
+
+test('il tasto destro vero sulla pagina vale come menu aperto anche se il sito annulla l\'evento del menu', async () => {
+  const s = sito();
+  s.wc.mainFrame = PRINCIPALE;
+  s.wc.emetti('input-event', {}, { type: 'mouseDown', modifiers: ['rightbuttondown'] });
+  assert.equal(await leggi(s), true);
+  assert.equal(await leggi({ ...s, frame: RIQUADRO }), false, 'non vale per il riquadro di un altro sito');
+  s.wc._filoMenuAperto = null;
+  s.wc.emetti('input-event', {}, { type: 'rawKeyDown', key: 'ContextMenu' });
+  assert.equal(await leggi(s), true, 'il tasto del menu sulla tastiera');
 });
 
 test('un mittente senza finestra non legge; una finestra aperta da un sito legge solo se si vede', async () => {

@@ -133,7 +133,8 @@ function lasciapassare(wc, tipo) {
 
 function tastoDelMenu(input) {
   const type = input.type;
-  if (type === 'mouseDown') return input.button === 'right';
+  // Electron non dà il pulsante: il tasto destro premuto sta fra i modificatori.
+  if (type === 'mouseDown') return Array.isArray(input.modifiers) && input.modifiers.includes('rightbuttondown');
   return (type === 'rawKeyDown' || type === 'keyDown') && input.key === 'ContextMenu';
 }
 

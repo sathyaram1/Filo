@@ -126,3 +126,34 @@ test('una scheda di sfondo senza gesti non svuota la cronologia e non ci aggiung
   const r = await shell.evaluate(() => window.filoShell.message({ type: 'get_clipboard_history' }));
   expect(r.items.map((i) => i.text)).toEqual([PASSWORD]);
 });
+
+test('su un sito che annulla il tasto destro in cattura su window il menu Incolla mostra ancora la cronologia', async ({ shell, openTab, testServer }) => {
+  await copiaPassword(shell);
+  const page = await testServer.openReady(openTab, CAMPO.replace('</body>', "<script>window.addEventListener('contextmenu', (e) => e.preventDefault(), true);</script></body>"), { pubblico: true });
+  const sub = await cronologiaDelMenu(page);
+  await expect(sub).toContainText(PASSWORD);
+});
+
+test('il tasto destro nel riquadro di un altro sito non apre la cronologia alla pagina che lo ospita', async ({ app, shell, openTab, testServer }) => {
+  await copiaPassword(shell);
+  const dentro = testServer.html(CAMPO).replace('127.0.0.1', 'blocked.test');
+  const page = await testServer.openReady(openTab,
+    `<!doctype html><html><body style="margin:0;padding:12px"><iframe id="embed" src="${dentro}" width="640" height="460"></iframe></body></html>`, { pubblico: true });
+  await page.frameLocator('#embed').locator('#ta').click({ button: 'right' });
+  await expect(page.frameLocator('#embed').locator('.sn-menu')).toBeVisible();
+  const r = await dalSito(app, 'sito-pubblico.test')({ type: 'get_clipboard_history' });
+  expect(JSON.stringify(r), 'la pagina ospite ha avuto la cronologia col menu aperto nel riquadro').not.toContain(PASSWORD);
+});
+
+test('passata sullo sfondo dopo un clic, la scheda non svuota la cronologia; la copia d\'immagine in arrivo si registra', async ({ app, shell, openTab, testServer }) => {
+  await copiaPassword(shell);
+  const page = await testServer.openReady(openTab, CAMPO, { pubblico: true });
+  await page.locator('#ok').click();
+  await testServer.openReady(openTab, CAMPO);
+  const sfondo = dalSito(app, 'sito-pubblico.test');
+  expect(await sfondo({ type: 'clear_clipboard_history' })).toMatchObject({ ok: false, code: 'forbidden' });
+  expect(await sfondo({ type: 'push_clipboard_entry', entry: { type: 'text', text: 'voce del sito' } })).toMatchObject({ ok: false, code: 'forbidden' });
+  expect(await sfondo({ type: 'push_clipboard_entry', entry: { type: 'image', dataUrl: 'data:image/png;base64,AA', description: 'foto' } })).toEqual({ ok: true });
+  const r = await shell.evaluate(() => window.filoShell.message({ type: 'get_clipboard_history' }));
+  expect(r.items.map((i) => i.text || i.description)).toEqual(['foto', PASSWORD]);
+});

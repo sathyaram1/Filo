@@ -239,7 +239,7 @@ module.exports = function register(on, ctx) {
   });
 
   on(MSG.PUSH_CLIPBOARD_ENTRY, async (msg, sender, origin) => {
-    if (!AppuntiDaiSiti.scritturaAmmessa(sender, origin)) return vietato;
+    if (!AppuntiDaiSiti.scritturaAmmessa(sender, origin, msg.entry)) return vietato;
     const cap = SN_CONST.CLIPBOARD_HISTORY_MAX;
     const list = await Storage.getRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
     const arr = Array.isArray(list) ? list : [];

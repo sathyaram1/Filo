@@ -4,8 +4,8 @@
 // I canali DAVVERO riservati che nessun content script di pagina web usa
 // (cronologia AI, costi) restano ammessi solo da origine filo://. Le scritture
 // della cronologia appunti passano anche da origine web, perché il menu "Incolla"
-// gira su qualunque pagina (#256), ma solo dopo un gesto dell'utente su quella
-// scheda e senza rispondere con l'elenco; descrivere un'immagine resta aperto.
+// gira su qualunque pagina (#256), ma solo dopo un gesto dell'utente sulla scheda
+// in vista e senza rispondere con l'elenco; descrivere un'immagine resta aperto.
 // La regola: services/appuntiDaiSiti.js; l'elenco a un sito: tests/appunti-dai-siti.spec.mjs.
 
 import { test, expect } from './fixtures/electron.mjs';
@@ -22,7 +22,9 @@ test('#246/#256 i canali riservati (AI/costi) sono negati da origine web; la cro
     const send = (type, sender, extra = {}) =>
       globalThis.SN_HANDLE_MESSAGE({ type, ...extra }, sender);
     // Il gesto dell'utente sulla scheda lo segna il main (services/permessiPagine.js).
-    S = { ...S, web: { ...S.web, wc: { _filoGestoAlle: Date.now() } } };
+    // Una finestra che si vede: le scritture da un sito passano solo dalla scheda in vista.
+    const win = { isDestroyed: () => false, isVisible: () => true, isMinimized: () => false };
+    S = { ...S, web: { ...S.web, win, wc: { _filoGestoAlle: Date.now() } } };
 
     // Semina 3 voci (da origine web, come fa il content script su copia) così
     // rimozione e svuotamento hanno qualcosa su cui agire.
@@ -83,7 +85,8 @@ test('#246/#589.4 da un\'origine web le scritture della cronologia appunti passa
   const out = await app.evaluate(async (_electron, arg) => {
     const MSG = globalThis.SN_MSG.MSG;
     const { filo } = arg.senders;
-    const web = { ...arg.senders.web, wc: { _filoGestoAlle: Date.now() } };
+    const win = { isDestroyed: () => false, isVisible: () => true, isMinimized: () => false };
+    const web = { ...arg.senders.web, win, wc: { _filoGestoAlle: Date.now() } };
     const send = (type, sender, extra = {}) =>
       globalThis.SN_HANDLE_MESSAGE({ type, ...extra }, sender);
 
@@ -94,7 +97,7 @@ test('#246/#589.4 da un\'origine web le scritture della cronologia appunti passa
     const removed = await send(MSG.REMOVE_CLIPBOARD_ENTRY, web, { entry: { type: 'text', text: 'non-c-e' } });
     // La descrizione arriva da un modello anche molto dopo il gesto.
     const updated = await send(MSG.UPDATE_CLIPBOARD_DESCRIPTION, arg.senders.web, { dataUrl, description: 'descr web' });
-    // Un mittente web senza scheda in vista non legge l'elenco.
+    // Un mittente web senza il menu aperto non legge l'elenco.
     const webGet = await send(MSG.GET_CLIPBOARD_HISTORY, web);
     const after = await send(MSG.GET_CLIPBOARD_HISTORY, filo);
     return { pushed, updated, removed, webGet, after };

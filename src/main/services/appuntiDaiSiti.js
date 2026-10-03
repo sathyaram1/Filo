@@ -1,5 +1,5 @@
 // Chi tocca la cronologia appunti (dentro ci sono anche le password copiate). Filo sempre; un sito legge l'elenco solo
-// dal riquadro dove l'utente ha appena aperto il menu, nella scheda che guarda, e scrive solo dopo un suo gesto (#589.4).
+// dal riquadro dove l'utente ha appena aperto il menu, nella scheda che guarda, e lì scrive solo dopo un suo gesto (#589.4).
 // Le scritture non rispondono mai con l'elenco. Prove: tests/appunti-dai-siti.spec.mjs, tests/unit/appuntiDaiSiti.test.mjs.
 'use strict';
 
