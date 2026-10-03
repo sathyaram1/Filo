@@ -137,16 +137,24 @@
     }
     const lista = b.dispositivi;
     let righe;
-    if (lista === null) righe = ['Bluetooth acceso'];
-    else if (!lista.length) righe = ['Bluetooth acceso', 'Nessun dispositivo collegato'];
-    else righe = ['Bluetooth acceso', `Collegati: ${lista.join(', ')}`];
+    let copia;
+    if (lista === null) {
+      righe = ['Bluetooth acceso'];
+      copia = 'Bluetooth acceso';
+    } else if (!lista.length) {
+      righe = ['Bluetooth acceso', 'Nessun dispositivo collegato'];
+      copia = 'Bluetooth acceso, nessun dispositivo collegato';
+    } else {
+      righe = ['Bluetooth acceso', `Collegati: ${lista.join(', ')}`];
+      copia = `Bluetooth acceso, collegati: ${lista.join(', ')}`;
+    }
     return {
       testo: lista && lista.length ? String(lista.length) : '',
       hover: 'Bluetooth acceso',
       icona: 'bluetooth',
       spento: false,
       dettaglio: righe,
-      copia: righe.join(': '),
+      copia,
     };
   }
 
