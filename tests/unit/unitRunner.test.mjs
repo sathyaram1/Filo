@@ -305,7 +305,7 @@ describe('a gruppi, ciò che node fa una volta per corsa resta uno', () => {
     assert.deepEqual(rapportiDaRiunire(['--test-reporter', 'lcov', '--test-reporter-destination', 'stdout'], c).rapporti, ['stdout']);
     assert.deepEqual(rapportiDaRiunire(['--test-reporter=spec'], c).rapporti, []);
     const misti = ['--test-reporter=dot', '--test-reporter=junit', '--test-reporter-destination=x'];
-    assert.deepEqual(rapportiDaRiunire(misti, c), { flags: misti, rapporti: [] }, 'numeri diversi: decide node, che rifiuta');
+    assert.deepEqual(rapportiDaRiunire(misti, c), { flags: misti, rapporti: [], accodati: [] }, 'numeri diversi: decide node, che rifiuta');
   });
 
   test('i file dati a mano si separano dalle opzioni, anche dai valori scritti dopo l’opzione', () => {
