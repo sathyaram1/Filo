@@ -227,10 +227,25 @@ test('ramiApertiDellaPratica: i rami dell’app legati alla pratica in ogni work
   };
   const git = (cwd, args) => {
     if (args[0] === 'worktree') return lista;
+    if (args[0] === 'rev-parse') return 'x';
     return args[2] === 'claude/vecchio' ? '' : null; // il vecchio è già dentro origin/main
   };
   assert.deepEqual(ramiApertiDellaPratica('p', { radice: '/a', git, leggi: (f) => stati[f] || null }), ['claude/app']);
   assert.deepEqual(ramiApertiDellaPratica('z', { radice: '/a', git, leggi: (f) => stati[f] || null }), []);
+});
+
+test('ramiApertiDellaPratica: un ramo legato e poi cancellato non conta: non è una parte che può ancora arrivare', () => {
+  const lista = 'worktree /a\nHEAD 1\nbranch refs/heads/claude/altro\n';
+  const stati = { [join('/a', '.claude', 'verify-local.json')]: { 'claude/vecchio': { feedbackId: 'p' }, 'claude/vivo': { feedbackId: 'p' } } };
+  const esistono = new Set(['refs/heads/claude/vivo', 'refs/heads/claude/altro']);
+  const git = (cwd, args) => {
+    if (args[0] === 'worktree') return lista;
+    if (args[0] === 'rev-parse') return esistono.has(args[3]) ? 'x' : null;
+    return null; // né il vecchio (che non c'è più) né il vivo sono dentro origin/main
+  };
+  assert.deepEqual(ramiApertiDellaPratica('p', { radice: '/a', git, leggi: (f) => stati[f] || null }), ['claude/vivo']);
+  esistono.delete('refs/heads/claude/vivo');
+  assert.deepEqual(ramiApertiDellaPratica('p', { radice: '/a', git, leggi: (f) => stati[f] || null }), []);
 });
 
 test('ramiApertiDellaPratica: rilegge origin/main prima di guardare, così un ramo appena fuso da npm run finish non tiene aperto', () => {

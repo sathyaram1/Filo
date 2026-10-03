@@ -55,7 +55,7 @@ export const notaInizio = (ramo) => `Lavoro sul server: porto ${ramo} su main di
 export const notaFine = (ramo, sha) => `Fuso su main di filo-security: ${ramo}${sha ? ` a ${sha.slice(0, 9)}` : ''}. In produzione va col deploy, npm run server:pubblica.`;
 
 /**
- * I rami dell'app legati alla pratica (verify-local start --feedback, in ogni worktree del repo) e non ancora su
+ * I rami dell'app legati alla pratica (verify-local start --feedback, in ogni worktree del repo), ancora esistenti e non ancora su
  * origin/main: un lavoro che tocca app e server lo chiude la fusione dell'app, che salta L5 solo a pratica aperta.
  * `ramoGemello`: il ramo dell'app con lo stesso nome di quello del server conta anche senza start, se non è di un'altra pratica.
  */
@@ -72,6 +72,8 @@ export function ramiApertiDellaPratica(id, { radice = ROOT, git = gitIn, leggi =
     for (const [ramo, e] of Object.entries(stato)) {
       if (e && e.feedbackId && e.feedbackId !== id) altrui.add(ramo);
       if (!e || e.feedbackId !== id) continue;
+      // Un ramo legato e poi cancellato non è una parte che può ancora arrivare: contato, terrebbe aperta la pratica per sempre.
+      if (git(radice, ['rev-parse', '--verify', '--quiet', `refs/heads/${ramo}`]) === null) continue;
       if (git(radice, ['merge-base', '--is-ancestor', ramo, 'refs/remotes/origin/main']) === null) rami.add(ramo);
     }
   }
