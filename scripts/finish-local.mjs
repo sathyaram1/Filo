@@ -482,6 +482,17 @@ export function senzaPraticaStop({ checkOnly, pratica }) {
   ].join('\n');
 }
 
+/** Perché il finish si ferma dopo la prova degli unit sulla fusione (#929). PURA. */
+export function fermoDopoLaProva(prova) {
+  const p = prova || {};
+  if (p.errore) {
+    return `✗ Non ho potuto provare gli unit sul risultato della fusione con main: ${p.errore}.\n`
+      + '  Non ho chiesto la fusione. Il ramo è spedito e intatto: rilancia npm run finish.';
+  }
+  return '✗ Gli unit sono rossi sul risultato della fusione con main, e su main da solo no: non ho chiesto la fusione.\n'
+    + '  Riallinea il ramo (git merge origin/main, o rebase), fai tornare verdi i test elencati sopra e rilancia npm run finish.';
+}
+
 async function praticaDelLavoro(valore) {
   const branchCorrente = git(['rev-parse', '--abbrev-ref', 'HEAD']).out;
   const scritta = (readState()[branchCorrente] || {});
