@@ -51,6 +51,19 @@ test('il tasto destro in un riquadro arriva dopo la domanda: vale se arriva entr
   assert.equal(await esito, true);
 });
 
+test('le domande che arrivano insieme aspettano il gesto una volta sola', async () => {
+  const wc = wcFinto();
+  const a = Permessi.gestoEntro(wc, 200);
+  const b = Permessi.gestoEntro(wc, 200);
+  assert.equal(a, b, 'una raffica di domande da una pagina non moltiplica le attese');
+  assert.equal(await a, false);
+  assert.equal(wc._filoAttesaGesto, null);
+  const c = Permessi.gestoEntro(wc, 200);
+  assert.notEqual(c, a, 'finita l\'attesa, la domanda dopo ne apre un\'altra');
+  wc._filoGestoAlle = Date.now();
+  assert.equal(await c, true);
+});
+
 test('un tasto premuto in un riquadro è un gesto, Esc no', () => {
   const wc = wcFinto();
   Permessi.seguiGesti(wc);
