@@ -65,14 +65,84 @@
     return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
   }
 
+  function pulisciNome(nome) {
+    return senzaAccenti(nome).replace(/^(la|il|lo|le|i|gli|l')\s*/, '').replace(/^carta\s+(de(i|gli|ll[ae']?|l)\s*)?/, '').trim();
+  }
+
   // Il nome come lo dice l'utente («la carta dei mazzi», «Editor») → id del catalogo, o null.
-  function risolvi(nome) {
-    const s = senzaAccenti(nome).replace(/^(la|il|lo|le|i|gli)\s+/, '').replace(/^carta\s+(de(i|gli|ll[ae']?|l)\s*)?/, '');
+  // `esatto`: niente nomi contenuti nella frase («il file scaricato» non è l'Editor).
+  function risolvi(nome, { esatto = false } = {}) {
+    const s = pulisciNome(nome);
     if (!s) return null;
     if (IDS.includes(s)) return s;
     for (const c of CARTE) if (senzaAccenti(c.titolo) === s || c.nomi.includes(s)) return c.id;
+    if (esatto) return null;
     for (const c of CARTE) if (c.nomi.some((n) => s.includes(n))) return c.id;
     return null;
+  }
+
+  // ===== La colonna di sinistra: una regola sola per la home e per la chat =====
+  // Uno scaricamento finito resta fra le cose accadute per un giorno: dopo lo si ritrova negli Scaricamenti.
+  const DOWNLOAD_RECENTE_MS = 24 * 60 * 60 * 1000;
+  const DOWNLOAD_ATTIVI = ['progressing', 'paused', 'pending'];
+  function downloadVisibile(r, ora = Date.now()) {
+    if (!r || !r.id) return false;
+    if (DOWNLOAD_ATTIVI.includes(r.state)) return true;
+    if (r.state !== 'completed' && r.state !== 'interrupted') return false;
+    const fine = Date.parse(r.endedAt || r.startedAt || '');
+    return Number.isFinite(fine) && ora - fine < DOWNLOAD_RECENTE_MS;
+  }
+  const scadenza = (t) => { const v = Date.parse(t && t.endsAt); return Number.isFinite(v) ? v : Infinity; };
+  const nomeTimer = (t) => t.label || (t.kind === 'alarm' ? 'Sveglia' : 'Timer');
+
+  // Le carte di sinistra nell'ordine in cui si vedono, senza le nascoste: i Crediti e ciò che suona in cima, poi
+  // le altre nell'ordine dell'utente (le nuove davanti, nell'ordine di Filo: lavori, scaricamenti in corso, timer
+  // per scadenza, avvisi, scaricamenti finiti). Ogni voce porta `ref`, la cosa da cui la carta nasce.
+  function sinistra({ timers = [], notifiche = [], downloads = [], lavori = [], crediti = false } = {}, layout, ora = Date.now()) {
+    const nascoste = new Set(normalizza(layout).nascoste);
+    const voce = (chiave, tipo, titolo, ref) => ({ chiave, tipo, titolo, ref });
+    const vT = (t) => voce(`timer:${t.id}`, t.kind === 'alarm' ? 'sveglia' : 'timer', nomeTimer(t), t);
+    const vD = (r) => voce(`download:${r.id}`, 'download', r.filename || 'download', r);
+    const cima = [];
+    if (crediti && !nascoste.has('crediti')) cima.push(voce('crediti', 'crediti', 'Crediti', null));
+    for (const t of lista(timers).filter((x) => x && x.ringing)) cima.push(vT(t));
+    const vis = lista(downloads).filter((r) => downloadVisibile(r, ora));
+    const resto = [
+      ...lista(lavori).filter((l) => l && l.id).map((l) => voce(`lavoro:${l.id}`, 'lavoro', l.testo || 'lavoro in corso', l)),
+      ...vis.filter((r) => DOWNLOAD_ATTIVI.includes(r.state)).map(vD),
+      ...lista(timers).filter((x) => x && !x.ringing).sort((a, b) => scadenza(a) - scadenza(b)).map(vT),
+      ...lista(notifiche).filter((n) => n && n.id).map((n) => voce(`avviso:${n.id}`, 'avviso', String(n.text || ''), n)),
+      ...vis.filter((r) => !DOWNLOAD_ATTIVI.includes(r.state)).map(vD),
+    ].filter((v) => !nascoste.has(v.chiave));
+    const perChiave = new Map(resto.map((v) => [v.chiave, v]));
+    return [...cima, ...ordinaSinistra(resto.map((v) => v.chiave), layout).map((k) => perChiave.get(k))];
+  }
+
+  const TIPI_SINISTRA = {
+    timer: ['timer'], sveglia: ['sveglia', 'sveglie'], download: ['scaricamento', 'scaricamenti', 'download', 'file scaricato'],
+    avviso: ['avviso', 'avvisi', 'notifica', 'notifiche'], lavoro: ['lavoro', 'lavori', 'comando'], crediti: ['crediti'],
+  };
+  // Le carte di sinistra che l'utente intende con un nome («l'avviso del backup», «gli avvisi», la chiave della
+  // carta). `perTipo`: il nome era il tipo, quindi valgono tutte quelle di quel tipo.
+  function trovaSinistra(nome, voci) {
+    const raw = String(nome == null ? '' : nome).trim();
+    const esatta = lista(voci).find((v) => v.chiave === raw);
+    if (esatta) return { voci: [esatta], perTipo: false };
+    const s = pulisciNome(raw).replace(/^(de(i|gli|ll[ae']?|l)|di)\s*/, '');
+    if (!s) return { voci: [], perTipo: false };
+    const tit = (v) => senzaAccenti(v.titolo);
+    for (const [tipo, nomi] of Object.entries(TIPI_SINISTRA)) {
+      if (nomi.includes(s)) return { voci: lista(voci).filter((v) => v.tipo === tipo), perTipo: true };
+    }
+    let trovate = lista(voci).filter((v) => tit(v) === s);
+    if (!trovate.length) trovate = lista(voci).filter((v) => tit(v).length > 1 && (tit(v).includes(s) || s.includes(tit(v))));
+    if (!trovate.length) {
+      // «l'avviso del backup»: via il tipo davanti, restano le parole che contano.
+      const parole = s.split(/[^a-z0-9]+/).filter((w) => w.length > 2 && !Object.values(TIPI_SINISTRA).flat().includes(w)
+        && !['del', 'dei', 'della', 'delle', 'dello', 'degli', 'per', 'con', 'che'].includes(w));
+      if (parole.length) trovate = lista(voci).filter((v) => parole.every((w) => tit(v).includes(w)));
+    }
+    return { voci: trovate, perTipo: false };
   }
 
   // Mette `id` prima di `prima` (null = in fondo). Un `prima` che non c'è vale «in fondo».
