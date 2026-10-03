@@ -837,12 +837,12 @@
     'claude-haiku': 'deepseek',
   };
 
-  // Fornitori esclusi in più quando l'interruttore è acceso. Anthropic non è
-  // nella lista base (la politica ammette i suoi modelli): qui ci finisce perché
-  // il punto dell'interruttore è poter rifiutare anche quella scelta.
+  // Fornitori esclusi in più quando l'interruttore è acceso. Gli host di Anthropic
+  // non sono nella lista base (la politica ammette i suoi modelli): qui ci finiscono
+  // perché il punto dell'interruttore è poter rifiutare anche quella scelta.
   // I produttori dei «modelli stretti» ammessi dalla politica stanno qui per lo
   // stesso motivo: pesi chiusi comprati dal produttore, l'interruttore li spegne.
-  const OPEN_WEIGHTS_EXTRA_EXCLUDED = ['Anthropic', 'Claude Platform on AWS', 'TypeSafe'];
+  const OPEN_WEIGHTS_EXTRA_EXCLUDED = [...PRODUCER_ONLY_MODELS.flatMap((r) => r.hosts), 'TypeSafe'];
 
   // Lista di esclusione EFFETTIVA da usare per una richiesta. PURA.
   function effectiveExcludedProviders(excluded, openWeightsOnly) {
