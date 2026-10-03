@@ -763,6 +763,8 @@
     // #530 — l'agente "Aiuto" chiede se una sua azione sulla pagina (copia, cerca,
     // condividi) parte, chiede o no. { costo, campo } → { risposta, digita, perche, no? }.
     FILO_DECIDI_PAGINA: 'filo_decidi_pagina',
+    // #530 — l'Aiuto si è aperto: comincia una conversazione nuova, che non ha ancora letto niente. {}
+    FILO_AIUTO_NUOVO: 'filo_aiuto_nuovo',
 
     // #405 — un'azione di PAGINA invocata dal menu aperto dentro un riquadro
     // incorporato (iframe). Il riquadro conosce solo se stesso: tradurre,

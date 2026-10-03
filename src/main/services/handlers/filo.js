@@ -4,7 +4,7 @@
 module.exports = function register(on, ctx) {
   const {
     MSG, winOf, broadcastLiveUpdate, handleFiloChat, handleFiloGenerateDashboard,
-    executeFiloAction, decisioneAzionePagina, segnaLetturaAiuto, maybeRunCompactor, closeAndTriageChat, archiviaCongedoAccoglienza,
+    executeFiloAction, decisioneAzionePagina, segnaLetturaAiuto, nuovaConversazioneAiuto, maybeRunCompactor, closeAndTriageChat, archiviaCongedoAccoglienza,
     saveOnboarding, finishOnboarding, claimOnboardingResume,
   } = ctx;
   const FiloMem = globalThis.SN_FILO_MEMORY;
@@ -59,9 +59,8 @@ module.exports = function register(on, ctx) {
   // anche con confirmed:true): un client compromesso non può far eseguire
   // un'azione fuori registro.
   on(MSG.FILO_CONFIRM_ACTION, async (msg, sender) => {
-    const conversazione = String((msg && msg.conversazione) || '');
-    const r = await executeFiloAction(msg.action, { confirmed: true, sender, assistente: msg.assistente === true, conversazione });
-    if (r && r.output && msg.assistente === true) segnaLetturaAiuto(sender, { ...msg.action, _output: r.output }, conversazione);
+    const r = await executeFiloAction(msg.action, { confirmed: true, sender, assistente: msg.assistente === true });
+    if (r && r.output && msg.assistente === true) segnaLetturaAiuto(sender, { ...msg.action, _output: r.output });
     return { ok: true, ...r };
   });
 
@@ -73,17 +72,22 @@ module.exports = function register(on, ctx) {
   // Le azioni fuori registro vengono rifiutate dal dispatch, esattamente come
   // per la chat: la sidebar non è un canale privilegiato.
   on(MSG.FILO_RUN_ACTION, async (msg, sender) => {
-    const conversazione = String((msg && msg.conversazione) || '');
-    const r = await executeFiloAction(msg.action, { sender, assistente: true, conversazione });
-    if (r && r.output) segnaLetturaAiuto(sender, { ...msg.action, _output: r.output }, conversazione);
+    const r = await executeFiloAction(msg.action, { sender, assistente: true });
+    if (r && r.output) segnaLetturaAiuto(sender, { ...msg.action, _output: r.output });
     return { ok: true, ...r };
   });
 
   // Anche da una pagina web, di proposito: la sidebar vive lì. Risponde solo cosa farebbe Filo; l'azione la
   // esegue comunque il codice di Filo nel content script, quindi chi lo chiama non ottiene niente di più.
   on(MSG.FILO_DECIDI_PAGINA, async (msg, sender) => {
-    const r = await decisioneAzionePagina({ costo: msg && msg.costo, campo: msg && msg.campo, sender, conversazione: String((msg && msg.conversazione) || '') });
+    const r = await decisioneAzionePagina({ costo: msg && msg.costo, campo: msg && msg.campo, sender });
     return { ok: true, ...r };
+  });
+
+  // Anche da una pagina web: toglie solo ciò che ha letto l'Aiuto di quella scheda, e lì la pagina sporca comunque.
+  on(MSG.FILO_AIUTO_NUOVO, async (msg, sender) => {
+    nuovaConversazioneAiuto(sender);
+    return { ok: true };
   });
 
   on(MSG.FILO_GET_STATE, async () => {

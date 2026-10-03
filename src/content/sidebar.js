@@ -44,8 +44,6 @@
   let session = null;
   function newSession() {
     return {
-      // La targa della conversazione: ciò che ha letto vale per lei, non per la pagina (#530).
-      id: (global.crypto && global.crypto.randomUUID) ? global.crypto.randomUUID() : `a${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`,
       initialUrl: '',
       executedSteps: [],
       rawUserMessages: [],
@@ -58,7 +56,6 @@
   const MAX_WEB_SEARCHES_PER_SESSION = 2;
 
   function isOpen() { return !!root; }
-  function conversazione() { return (session && session.id) || ''; }
 
   function close() {
     if (!root) return;
@@ -84,6 +81,8 @@
     collapsed = false;
     aiPrefersOpen = true;
     session = newSession();
+    // Ciò che ha letto la conversazione di prima non vale per questa (#530).
+    try { chrome.runtime.sendMessage({ type: MSG.FILO_AIUTO_NUOVO }).catch(() => {}); } catch (_) {}
     // L'URL "iniziale" è quello al momento dell'apertura della sidebar — anche
     // se l'utente è arrivato qui da altre pagine, contano solo le azioni che
     // farà DA QUI in avanti.
@@ -709,7 +708,7 @@
     }
     let res = null;
     try {
-      res = await chrome.runtime.sendMessage({ type: MSG.FILO_RUN_ACTION, action, conversazione: conversazione() });
+      res = await chrome.runtime.sendMessage({ type: MSG.FILO_RUN_ACTION, action });
     } catch (_) {}
     if (!res || !res.ok) { appendActionLog(`${label}: non riuscita`); return false; }
 
@@ -728,7 +727,7 @@
       if (!ok) { appendActionLog(`${label}: annullata`); return false; }
       let c = null;
       try {
-        c = await chrome.runtime.sendMessage({ type: MSG.FILO_CONFIRM_ACTION, action, assistente: true, conversazione: conversazione() });
+        c = await chrome.runtime.sendMessage({ type: MSG.FILO_CONFIRM_ACTION, action, assistente: true });
       } catch (_) {}
       return scriviEsito(label, action, c);
     }
@@ -863,7 +862,7 @@
     // Senza risposta dal main si chiede: il caso prudente.
     if (!spec.viaFilo) {
       let d = null;
-      try { d = await chrome.runtime.sendMessage({ type: MSG.FILO_DECIDI_PAGINA, costo: spec.costo, campo: 'web', conversazione: conversazione() }); } catch (_) {}
+      try { d = await chrome.runtime.sendMessage({ type: MSG.FILO_DECIDI_PAGINA, costo: spec.costo, campo: 'web' }); } catch (_) {}
       const risposta = d && d.ok ? d.risposta : 'chiede';
       if (risposta === 'no') { appendActionLog(`${label}: non applicata, ${(d && d.no) || 'Filo non la fa da solo'}`); return false; }
       if (risposta !== 'si') {
@@ -1058,7 +1057,7 @@
         let ricercaWeb = null;
         let esitoVuoto = '';
         try {
-          const r = await chrome.runtime.sendMessage({ type: MSG.WEB_SEARCH, query: parsed.query, conversazione: conversazione() });
+          const r = await chrome.runtime.sendMessage({ type: MSG.WEB_SEARCH, query: parsed.query });
           if (r?.ok && Array.isArray(r.results) && r.results.length) {
             ricercaWeb = { query: parsed.query, provider: r.provider || '', results: r.results };
           } else {
@@ -1344,7 +1343,7 @@
   // senza dover passare dal modello. Stesso pattern di window.__filoDashActions.
   global.__filoSidebarTest = {
     runFiloAction, filoActionLabel,
-    runPageAction, parseAssistantOutput, conversazione,
+    runPageAction, parseAssistantOutput,
     resolveImageEl, resolveLinkEl, resolveActionText,
     // Il riquadrino «Ha funzionato?»: da lì il percorso finisce in una raccolta
     // che legge chiunque, quindi quello che c'è scritto è una promessa (#584).

@@ -14,8 +14,8 @@ contaminato, dalla classe peggiore fra le fonti lette: le letture lo dichiarano
 nel registro con `fonte`. Ciò che è stato letto vale per la **conversazione che
 l'utente ha davanti**, mai per un contenitore: non per lo storico che la pagina
 rimanda, che si perde riprendendo la chat e si ferma agli ultimi venti messaggi,
-e non per la scheda. La chat lo tiene per targa, anche nel suo archivio; l'Aiuto
-manda la targa del pannello, e chiuso e riaperto è una conversazione nuova), il costo,
+e non per la scheda. La chat lo tiene per targa, anche nel suo archivio; per
+l'Aiuto ogni apertura del pannello, o pagina nuova, è una conversazione nuova), il costo,
 il perimetro e l'origine. Sopra la tabella
 stanno l'elenco fisso (no a ogni livello: segreti, molti destinatari,
 credenziali, regole, cancellazioni definitive) e la difesa abbassata («conferma»

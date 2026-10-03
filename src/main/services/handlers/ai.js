@@ -624,7 +624,7 @@ module.exports = function register(on, ctx) {
       const settings = await getEffectiveSettings();
       const tavilyKey = settings.apiKeys?.tavily || '';
       const r = await WebSearch.search({ query: msg.query, tavilyKey, maxResults: 5 });
-      segnaLetturaAiuto(sender, { type: 'CERCA_WEB', query: msg.query, _output: r }, String(msg.conversazione || ''));
+      segnaLetturaAiuto(sender, { type: 'CERCA_WEB', query: msg.query, _output: r });
       return { ok: true, ...r };
     } catch (e) {
       return { ok: false, error: e.message || String(e), results: [] };

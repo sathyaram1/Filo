@@ -338,8 +338,8 @@ test('chat a Normale: «riordina le schede» parte senza bottone e il diario dic
   }
 });
 
-// La ricerca come la fa il pannello: con la targa della sua conversazione.
-const cercaDallAiuto = (query) => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.WEB_SEARCH, query, conversazione: window.__filoSidebarTest.conversazione() });
+// La ricerca come la fa il pannello aperto.
+const cercaDallAiuto = (query) => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.WEB_SEARCH, query });
 
 test('l\'Aiuto su una pagina di Filo ricorda la sua ricerca sul web: dopo, il costo 2 chiede e dice perché', async ({ app, openTab }) => {
   await app.evaluate(async () => {
@@ -386,7 +386,7 @@ test('l\'Aiuto chiuso e riaperto è una conversazione nuova: non porta con sé l
   const page = await openTab(PREFS);
   await page.waitForFunction(() => typeof window.__filoSidebarTest?.runPageAction === 'function', null, { timeout: 10000 });
   const comando = { type: 'ESEGUI_COMANDO', comando: 'rm prova-inesistente-530-aiuto.txt' };
-  const lancia = () => page.evaluate((a) => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.FILO_RUN_ACTION, action: a, conversazione: window.__filoSidebarTest.conversazione() }), comando);
+  const lancia = () => page.evaluate((a) => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.FILO_RUN_ACTION, action: a }), comando);
 
   await page.evaluate(() => window.SN_SIDEBAR.open());
   await page.evaluate(cercaDallAiuto, 'qualcosa');
