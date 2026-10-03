@@ -11,6 +11,7 @@
     {
       version: '0.2.229', date: '2026-09-11',
       features: [
+        'Il Red Team va in pausa fino al rilascio. Tornerà, e classifica e codici d’invito restano come sono.',
         'Filo rifiuta i banner dei cookie anche quando il sito li mette in un riquadro dentro la pagina, e ne riconosce molti di più. Quelli che offrono solo «Accetta», o «accetta o abbonati», li nasconde senza accettare niente, e la pagina torna a scorrere. Col tasto destro sulla scheda, o in Sicurezza, vedi cosa ha fatto su ogni sito e rimetti il banner se ti serve.',
         'Un programma scaricato da un sito (.exe, .msi, .bat, .dmg, .iso, .pkg, .sh, .jar\u2026) non arriva pi\u00f9 nei Download in silenzio. Filo si ferma, ti dice che \u00e8 un programma e da quale sito arriva, e lo scarica solo se rispondi di s\u00ec. Nell\u2019elenco degli scaricamenti i programmi si riconoscono a colpo d\u2019occhio, e aprirne uno chiede una seconda conferma, perch\u00e9 aprirlo vuol dire eseguirlo. Gli altri file scendono come sempre. Se preferisci, in Sicurezza spegni la domanda o elenchi i siti di cui ti fidi.',
         'Indietro e avanti adesso si fanno come in qualsiasi browser: Alt+\u2190 e Alt+\u2192 (su Mac Cmd+[ e Cmd+]) e i due tasti laterali del mouse, su qualunque pagina e anche mentre stai scrivendo in un campo. Su Mac funziona anche lo scorrimento orizzontale a due dita.',

@@ -1734,10 +1734,23 @@
     // 4. Feedback (alpha) + Red-team (invia attacco)
     items.push({ type: 'separator' });
     items.push(buildFeedbackItem());
-    items.push(buildRedteamAttackItem());
+    // In pausa (#896) la voce c'è solo per chi vede il Red Team. Si richiede a ogni apertura: vale dalla successiva.
+    refreshRedteamVisibile();
+    if (redteamVisibile) items.push(buildRedteamAttackItem());
 
     return items;
   }
+
+  // Parte nascosta: per difetto la voce manca a chi la vedrebbe fino alla risposta, per eccesso porta tutti in un vicolo cieco.
+  let redteamVisibile = false;
+  function refreshRedteamVisibile() {
+    try {
+      Promise.resolve(chrome.runtime.sendMessage({ type: MSG.REDTEAM_VISIBILITY }))
+        .then((r) => { redteamVisibile = !!(r && r.ok && r.visible); })
+        .catch(() => {});
+    } catch (_) {}
+  }
+  refreshRedteamVisibile();
 
   // Red-team — "Invia attacco" (spec §8.1): apre un pannello dedicato (mirrors
   // il flusso feedback) con due campi separati (testo attacco + descrizione) e
@@ -2107,7 +2120,7 @@
     if (msg?.type === MSG.TOP_FRAME_COMMAND) {
       try {
         if (msg.surface === 'feedback') self.SN_FEEDBACK_UI?.open();
-        else if (msg.surface === 'redteam') self.SN_REDTEAM_ATTACK_UI?.open();
+        else if (msg.surface === 'redteam') { if (redteamVisibile) self.SN_REDTEAM_ATTACK_UI?.open(); }
         else if (msg.surface === 'help') openHelpSidebar();
         else MenuIcons.runIconAction(msg.iconId);
       } catch (e) { console.error('[SN] azione di pagina dal riquadro', e); }

@@ -19,6 +19,7 @@
 //     desc:     'Cosa fa, in termini utente. Niente nomi di file/funzioni.',
 //     invoke:   'Come si attiva (shortcut / voce di menu / pagina).',
 //     doesNot:  'Confine: cosa NON fa (opzionale, ma prezioso per F4).',
+//     cancello: 'redteam',              // opzionale: la voce esiste solo per chi ha quel cancello aperto
 //   }
 //
 // `desc`/`invoke`/`doesNot` sono per l'utente finale, non tecnici.
@@ -416,11 +417,11 @@
     // ─────────────────────────── Pagine interne ──────────────────────────────
     {
       id: 'home-page', title: 'Home di Filo', category: 'pages',
-      desc: 'La pagina della nuova scheda: al centro l’assistente a cui chiedere qualsiasi cosa, azioni e suggerimenti, un messaggio in evidenza e gli aggiornamenti recenti. In alto a destra ci sono le icone per Red Team, Cronologia, Impostazioni, App e Profilo.',
+      desc: 'La pagina della nuova scheda: al centro l’assistente a cui chiedere qualsiasi cosa, azioni e suggerimenti, un messaggio in evidenza e gli aggiornamenti recenti. In alto a destra ci sono le icone per Cronologia, Impostazioni, App e Profilo.',
       invoke: 'Apri una nuova scheda, l\'icona Home in alto a destra nella home, oppure indirizzo filo://newtab/.',
     },
     {
-      id: 'red-team', title: 'Red Team', category: 'pages',
+      id: 'red-team', title: 'Red Team', category: 'pages', cancello: 'redteam',
       desc: 'Il programma per mettere alla prova la sicurezza di Filo: provi a farne aggirare le difese e, per i tentativi riconosciuti come attacchi reali, guadagni crediti e sali in classifica. La pagina raccoglie le tue statistiche e i tuoi record, la classifica dei partecipanti e le regole del gioco. Per partecipare davvero serve un codice di invito, che leghi al tuo account e sblocca le statistiche personali.',
       invoke: 'Icona a scudo rosso in alto a destra nella home (nuova scheda), oppure indirizzo filo://redteam/redteam.html.',
       doesNot: 'Senza un codice di invito puoi leggere regole e classifica ma non accumulare punteggi. La creazione dei codici di invito è riservata a chi gestisce Filo.',
@@ -517,26 +518,32 @@
   ];
 
   // ── API ────────────────────────────────────────────────────────────────────
+  // `aperti` = i cancelli aperti per chi chiede, es. { redteam: true }. Una voce con `cancello` chiuso non esiste:
+  // l'agente non la propone e non la racconta (#896). Senza `aperti` i cancelli sono chiusi.
+
+  function visibili(aperti) {
+    return CAPABILITIES.filter((c) => !c.cancello || (aperti && aperti[c.cancello] === true));
+  }
 
   // Indice COMPATTO (id + titolo + categoria), pensato per stare sempre in
   // contesto all'agente senza pesare: il dettaglio si recupera con get(id).
-  function index() {
-    return CAPABILITIES.map((c) => ({ id: c.id, title: c.title, category: c.category }));
+  function index(aperti) {
+    return visibili(aperti).map((c) => ({ id: c.id, title: c.title, category: c.category }));
   }
 
   // Dettaglio completo di una capacità per id (o undefined).
-  function get(id) {
-    return CAPABILITIES.find((c) => c.id === id);
+  function get(id, aperti) {
+    return visibili(aperti).find((c) => c.id === id);
   }
 
   // Tutte le capacità di una categoria.
-  function byCategory(category) {
-    return CAPABILITIES.filter((c) => c.category === category);
+  function byCategory(category, aperti) {
+    return visibili(aperti).filter((c) => c.category === category);
   }
 
   // Tutte le capacità (copia per non far mutare l'originale).
-  function all() {
-    return CAPABILITIES.slice();
+  function all(aperti) {
+    return visibili(aperti);
   }
 
   // ── Rendering per il prompt dell'agente (F2) ────────────────────────────────
@@ -547,10 +554,11 @@
   // esatto (invoke) e i limiti (doesNot) c'è renderDetailForPrompt(ids), che
   // l'agente recupera on-demand con l'azione CAPACITA_DETTAGLIO. L'id tra []
   // serve all'agente per chiedere il dettaglio della voce giusta.
-  function renderIndexForPrompt() {
+  function renderIndexForPrompt(aperti) {
     const lines = [];
+    const elenco = visibili(aperti);
     for (const [cat, label] of Object.entries(CATEGORIES)) {
-      const items = CAPABILITIES.filter((c) => c.category === cat);
+      const items = elenco.filter((c) => c.category === cat);
       if (!items.length) continue;
       lines.push(`${label}:`);
       for (const c of items) lines.push(`  - ${c.title} [${c.id}]`);
@@ -562,13 +570,13 @@
   // per id, formattato per essere reinserito nel contesto dell'agente come
   // OSSERVAZIONE (dati, non istruzioni). Gli id sconosciuti vengono segnalati
   // esplicitamente così l'agente non finge di averli trovati.
-  function renderDetailForPrompt(ids) {
+  function renderDetailForPrompt(ids, aperti) {
     const list = Array.isArray(ids) ? ids : (ids ? [ids] : []);
     if (!list.length) return '(nessuna capacità richiesta)';
     const blocks = [];
     for (const rawId of list) {
       const id = String(rawId || '').trim();
-      const c = get(id);
+      const c = get(id, aperti);
       if (!c) {
         blocks.push(`• "${id}": nessuna capacità con questo id (Filo non sa fare questa cosa).`);
         continue;

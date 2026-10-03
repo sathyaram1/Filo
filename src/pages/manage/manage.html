@@ -93,6 +93,15 @@
       min-width: 22px; text-align: left;
     }
     .mg-switch.mg-switch--disabled { cursor: not-allowed; opacity: 0.5; }
+    /* Il Red Team (#896): la levetta risponde al passaggio del puntatore e, mentre salva, pulsa. */
+    #mgRtRoot label.mg-switch:not(.mg-switch--disabled):hover .mg-switch-track {
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--sn-accent) 22%, transparent);
+    }
+    #mgRtRoot .mg-switch-track { transition: background 0.15s, box-shadow 0.15s; }
+    #mgRtRoot label.mg-switch.mg-rt-salva .mg-switch-track { animation: mg-rt-pulsa 0.9s ease-in-out infinite; }
+    @keyframes mg-rt-pulsa { 50% { opacity: 0.55; } }
+    .mg-rt-stato:empty { display: none; }
+    .mg-rt-stato.mg-err { color: #c0392b; }
     /* Variante piccola per gli interruttori figli: le levette incolonnate a destra, perché con quattro voci di
        lunghezza diversa si veda a colpo d'occhio quali sono accese. */
     .sn-page label.mg-switch--sm {
@@ -1242,7 +1251,7 @@
       <button type="button" class="mg-tab" data-tab="resolved" role="tab">Risolti</button>
       <button type="button" class="mg-tab" data-tab="archived" role="tab">Archiviati</button>
       <button type="button" class="mg-tab" data-tab="fbstats" role="tab">Statistiche feedback</button>
-      <button type="button" class="mg-tab" data-tab="stats" role="tab">Statistiche Red Team</button>
+      <button type="button" class="mg-tab" data-tab="stats" role="tab">Red Team</button>
       <button type="button" class="mg-tab" data-tab="models" role="tab">Modelli di supporto</button>
       <button type="button" class="mg-tab" data-tab="automation" role="tab">Automazioni</button>
       <button type="button" class="mg-tab" data-tab="log" role="tab">Log</button>
@@ -1511,10 +1520,19 @@
       </div>
     </section>
 
+    <!-- Il Red Team in pausa (#896): l'interruttore lo legge e lo scrive manageRedteam.js. -->
     <section class="mg-panel" id="panel-stats" data-panel="stats">
-      <div class="mg-coming">
-        <div class="mg-coming-icon">📊</div>
-        <div>In arrivo</div>
+      <div class="mg-automation" id="mgRtRoot">
+        <section class="mg-auto-block">
+          <label class="mg-switch mg-switch--disabled" id="mgRtOpenSwitch"
+            title="Spento, il Red Team lo vedi solo tu. Acceso, torna a tutti senza una versione nuova.">
+            <span class="mg-switch-text">Red Team aperto a tutti</span>
+            <input type="checkbox" id="mgRtOpenToggle" disabled />
+            <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+            <span class="mg-switch-state" id="mgRtOpenState">Off</span>
+          </label>
+          <p class="mg-auto-block-desc mg-rt-stato" id="mgRtOpenMsg" role="status"></p>
+        </section>
       </div>
     </section>
 
@@ -1957,5 +1975,6 @@
   <div class="mg-lightbox" id="mgLightbox"><img id="mgLightboxImg" alt=""></div>
 
   <script src="manage.js"></script>
+  <script src="manageRedteam.js"></script>
 </body>
 </html>

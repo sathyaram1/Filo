@@ -1749,6 +1749,8 @@
       window.addEventListener('resize', closeSortMenu);
     }, 0);
   }
+  // Lo stesso menu per le schede che vivono in un file loro (manageRedteam.js).
+  window.SN_MANAGE_MENU = { apri: apriMenu };
   // L'esito si legge nel dettaglio: dal menu la pratica si apre, così il messaggio ha dove stare.
   function segnoDalMenu(fb, valore) {
     if (selectedId !== fb._id) openDetail(fb._id);

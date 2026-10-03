@@ -517,3 +517,14 @@
 .rt-ms-left { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 
 .rt-empty, .rt-error { margin-top: 16px; }
+
+/* In pausa (#896): la stessa frase e la stessa forma di pausa.html. */
+.rt-pausa {
+  min-height: calc(100vh / var(--sn-zoom, 1));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+.rt-pausa p { margin: 0; font-size: 18px; line-height: 1.5; color: var(--sn-muted); text-align: center; }

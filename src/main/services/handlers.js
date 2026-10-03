@@ -1668,7 +1668,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
         const ids = Array.isArray(action.ids) ? action.ids
           : (action.id ? [action.id]
             : (action.capacita != null ? [].concat(action.capacita) : []));
-        const detail = Caps ? Caps.renderDetailForPrompt(ids) : '';
+        const detail = Caps ? Caps.renderDetailForPrompt(ids, cancelliAperti()) : '';
         return { executed: true, kept: true, output: { capabilities: ids, detail } };
       }
       case 'CERCA_CHAT': {
@@ -2083,6 +2083,11 @@ function finishOnboarding({ userMessage = '', filoReply = '', stateText = '', le
       // strada normale. Restare dentro l'accoglienza sarebbe il vicolo cieco.
       done(null);
     });
+}
+
+// Le capacità che l'agente conosce dipendono da chi usa Filo: il Red Team in pausa solo a chi lo vede (#896).
+function cancelliAperti() {
+  try { return { redteam: require('./redteamGate').visibile() }; } catch (_) { return {}; }
 }
 
 function broadcastLiveUpdate() {
@@ -2705,7 +2710,7 @@ function maybeProposeFeedbackAction({ textReply, rawActions, userMessage, thread
     if (/feedback|segnala/i.test(String(userMessage || ''))) return null;
 
     const Caps = globalThis.SN_CAPABILITIES;
-    const analysis = AF.analyzeReply(textReply, rawActions, userMessage, Caps ? Caps.all() : []);
+    const analysis = AF.analyzeReply(textReply, rawActions, userMessage, Caps ? Caps.all(cancelliAperti()) : []);
     if (!analysis || !analysis.kind) return null;
     return AF.composeProposal(analysis, { userMessage, textReply });
   } catch (e) {
@@ -2742,7 +2747,7 @@ async function maybeAutoFeedback({ textReply, rawActions, userMessage, sender, p
     if (!autoEnabled) return;
 
     const Caps = globalThis.SN_CAPABILITIES;
-    const capabilities = Caps ? Caps.all() : [];
+    const capabilities = Caps ? Caps.all(cancelliAperti()) : [];
     const analysis = AF.analyzeReply(textReply, rawActions, userMessage, capabilities);
     if (!analysis || !analysis.kind) return;
 
@@ -2953,7 +2958,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // Indice COMPATTO delle capacità di Filo, sempre in contesto: l'agente sa SE
   // Filo fa una cosa e chiede il dettaglio on-demand con CAPACITA_DETTAGLIO (F2).
   const Caps = globalThis.SN_CAPABILITIES;
-  const capacita = Caps ? Caps.renderIndexForPrompt() : '';
+  const capacita = Caps ? Caps.renderIndexForPrompt(cancelliAperti()) : '';
   const Tools = globalThis.SN_ACTION_TOOLS;
   const tools = Tools ? Tools.definitions({ sistema: process.platform, onboarding: onbActive }) : null;
   const cambi = await cambiP;
