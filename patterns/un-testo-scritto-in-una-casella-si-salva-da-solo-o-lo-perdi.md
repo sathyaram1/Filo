@@ -144,6 +144,11 @@ chiavi, le ore dell'archivio automatico tornavano com'erano (#590.5).
   segmento a metà arriva come `scrivendo`; la scelta dalla tendina, un
   segmento aggiunto o tolto e il valore confermato o respinto partono al
   momento.
+- **Quello che parte prima della conferma passa dallo stesso controllo.** Un
+  modello che l'azione respinge, lasciato col clic, torna indietro; salvato da
+  pausa, Ctrl+W o cambio di scheda finiva salvato lo stesso. Chi salva prima
+  legge il segmento a metà già controllato (respinto vale l'ultimo accettato),
+  e all'uscita vera il segmento si conferma come al clic, avviso compreso.
 - **Gli avvisi aspettano l'uscita anche qui.** Una riga nuova del registro dei
   modelli, scritta partendo dalla stringa, a metà non ha ancora il nickname:
   mentre si scrive una riga corretta si ripulisce ma una nuova non si accende,

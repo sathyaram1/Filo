@@ -881,6 +881,7 @@
   // scheda non avvisa la pagina (#590.5): tutto parte da qui. Uscendo si accendono gli avvisi sulle righe scartate.
   const caselle = window.SN_CASELLE.crea({
     uscita() {
+      if (modelChains) ModelChain.conferma(modelChains);
       const { missingNickRows, dupRows } = collectModelRegistry();
       markRegistryRowIssues(missingNickRows, dupRows);
     },

@@ -183,3 +183,33 @@ test('Preferenze: il nome della voce personalizzata e Ctrl+W subito è salvato',
   await expect.poll(() => schedaAperta(shell, 'filo://preferences'), { timeout: 5000 }).toBe(false);
   await expect.poll(async () => (await impostazioni(shell)).tts.modelVoice, { timeout: 4000 }).toBe('voce-nuova');
 });
+
+test('Modelli: un modello che l\'azione respinge non si salva né con Ctrl+W né cambiando scheda, come col clic', async ({ app, shell, openTab }) => {
+  await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { useDefaultModels: false } }));
+  const modelli = await openTab('filo://options/options.html');
+  await expect(modelli.locator('#modelsGrid .sn-chain input').first()).toBeVisible({ timeout: 8000 });
+  const idx = await modelli.evaluate(() => window.SN_MODEL_CHAIN.actionLabels().findIndex(([a]) => a === 'describe_image'));
+  const catena = modelli.locator('#modelsGrid .sn-chain').nth(idx);
+  const seg = catena.locator('input').first();
+  const prima = (await impostazioni(shell)).models.describe_image;
+  const primo = prima.split(',')[0].trim();
+  expect(primo).not.toBe('deepseek-flash');
+
+  // Fermo oltre la pausa lunga: parte il resto, il modello respinto no.
+  await scriviAlPostoDi(modelli, `#modelsGrid .sn-chain >> nth=${idx} >> input >> nth=0`, 'deepseek-flash');
+  await new Promise((r) => setTimeout(r, 3600));
+  expect((await impostazioni(shell)).models.describe_image).toBe(prima);
+
+  // Via e ritorno: la casella dice il modello in uso e perché l'altro è rimasto fuori.
+  const torna = await altraSchedaEPoiQui(shell);
+  await torna();
+  await expect(seg).toHaveValue(primo);
+  await expect(catena.locator('.sn-chain-msg')).not.toHaveText('');
+  expect((await impostazioni(shell)).models.describe_image).toBe(prima);
+
+  await scriviAlPostoDi(modelli, `#modelsGrid .sn-chain >> nth=${idx} >> input >> nth=0`, 'deepseek-flash');
+  await ctrlW(app);
+  await expect.poll(() => schedaAperta(shell, 'filo://options/options'), { timeout: 5000 }).toBe(false);
+  await new Promise((r) => setTimeout(r, 800));
+  expect((await impostazioni(shell)).models.describe_image).toBe(prima);
+});
