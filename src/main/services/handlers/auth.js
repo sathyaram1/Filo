@@ -40,8 +40,15 @@ async function callSecurityFunction(name, data = {}) {
   });
   if (!res.ok) {
     let detail = '';
-    try { detail = (await res.json())?.error?.message || ''; } catch (_) {}
-    throw new Error(`callable ${name} ${res.status}${detail ? ': ' + detail : ''}`);
+    let code = '';
+    try {
+      const err = (await res.json())?.error || {};
+      detail = err.message || '';
+      code = err.status || '';
+    } catch (_) {}
+    // Codice e spiegazione del server restano attaccati all'errore: chi chiama sceglie la frase per l'owner.
+    throw Object.assign(new Error(`callable ${name} ${res.status}${detail ? ': ' + detail : ''}`),
+      { httpStatus: res.status, code: String(code), detail: String(detail) });
   }
   const body = await res.json();
   return body && body.result;
