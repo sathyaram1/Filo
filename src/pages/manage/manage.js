@@ -3212,6 +3212,7 @@
       mgManage.hidden = true;
       if (mgOwnerBar) mgOwnerBar.hidden = true;
       chiudiRiapertura();
+      chiudiConfermaSegno();
       closeSidebar();
       renderList();
     } catch (e) {
@@ -3304,7 +3305,8 @@
 
   // ── Segno di mittente pericoloso (#922) ───────────────────────────────────
   // Lo tiene il server: qui c'è la copia letta, per mittente. Toglierlo è un gesto suo, con una conferma che
-  // dice cosa cambia; approvare non lo tocca (MR.FRASE_SEGNO_ERRATO dice perché).
+  // dice cosa cambia; approvare non lo tocca (il perché sta accanto a MR.FRASE_SEGNO_ERRATO).
+  // Un segno può arrivare mentre la pagina è aperta (un attacco nuovo): la copia si rilegge dopo due minuti.
   const SEGNO_VALIDO_MS = 2 * 60 * 1000;
 
   // Senza un mittente leggibile due feedback non si possono dire dello stesso: la copia resta del feedback.
@@ -3351,11 +3353,9 @@
     if (s.flagged) {
       const motivo = MR.motivoSegnoText(s.reason);
       const quando = s.flaggedAt ? formatDate(s.flaggedAt) : '';
-      return {
-        tipo: 'segnato',
-        testo: `⚑ Mittente segnato come pericoloso${motivo ? `: ${motivo}` : ''}${quando && quando !== '—' ? ` · dal ${quando}` : ''}`,
-        titolo: 'Finché il segno resta, ogni suo feedback si ferma al filtro d’ingresso.',
-      };
+      const testo = `⚑ Mittente segnato come pericoloso${motivo ? `: ${motivo}` : ''}${quando && quando !== '—' ? ` · dal ${quando}` : ''}`;
+      // In testata il motivo lungo si accorcia a due righe: qui sopra resta intero.
+      return { tipo: 'segnato', testo, titolo: `${testo}\nFinché il segno resta, ogni suo feedback si ferma al filtro d’ingresso.` };
     }
     if (s.clearedAt) {
       const motivo = MR.motivoSegnoText(s.reason);
@@ -4766,7 +4766,7 @@
       if (String(mgUserNoteText.value || '') !== String(mgUserNoteText.dataset.saved || '')) return true;
     }
     // Una conferma del segno aperta (#922): ridisegnare la chiuderebbe mentre l'owner la legge.
-    if (mgSegnoConferma && !mgSegnoConferma.hidden) return true;
+    if (mgSegnoConferma && !mgSegnoConferma.hidden && mgSegnoConferma.offsetParent !== null) return true;
     if (document.querySelector('#mgSideSegno .mg-segno-conferma:not([hidden])')) return true;
     return false;
   }
