@@ -390,6 +390,11 @@ class TabManager {
     for (const ev of ['minimize', 'restore', 'hide', 'show']) {
       try { this.win.on?.(ev, () => this._annunciaVista()); } catch (_) {}
     }
+    // La finestra torna a disegnare: le anteprime rimaste da scattare ripartono (#430). Il fuoco copre la finestra
+    // che era solo coperta da un'altra, che non avvisa quando smette di disegnare.
+    for (const ev of ['restore', 'show', 'focus']) {
+      try { this.win.on?.(ev, () => this.anteprime.riprendi()); } catch (_) {}
+    }
   }
 
   // Chi guarda: la scheda attiva di una finestra né nascosta né ridotta a
