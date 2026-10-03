@@ -225,10 +225,9 @@
     if (chiave === rec.chiave) return;
     rec.chiave = chiave;
     const s = rec.sonda.style;
-    if (vuota) { rec.r = null; s.display = 'none'; return; }
+    if (vuota) { rec.r = null; s.cssText = STILE_SONDA + FUORI; return; }
     rec.r = { left: l, top: t, right: d, bottom: b };
     s.left = l + 'px'; s.top = t + 'px'; s.width = (d - l) + 'px'; s.height = (b - t) + 'px';
-    s.display = 'block';
   }
 
   // Un nostro pezzo sopra il menu (avviso, conferma): copre anche lui, ma non è il sito.
