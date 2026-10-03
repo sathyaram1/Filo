@@ -1207,9 +1207,9 @@ function perimetroLettura(sender) {
 
 // Le fonti che il compito ha letto: la pagina su cui vive l'assistente e ciò che hanno portato le azioni
 // già fatte, turni passati compresi. Le dichiara il registro, mai il modello (#530).
-function fontiDelCompito(sender, contesto, fontiLette = null, assistente = false) {
+function fontiDelCompito(sender, contesto, fontiLette = null, assistente = false, conversazione = '') {
   const fonti = Array.isArray(fontiLette) ? fontiLette.filter(Boolean) : [];
-  if (assistente) fonti.push(...fontiDellAiuto(sender));
+  if (assistente) fonti.push(...fontiDellAiuto(sender, conversazione));
   const origine = String(sender?.tab?.url || sender?.url || '');
   if (/^https?:/i.test(origine)) {
     let host = '';
@@ -1247,15 +1247,16 @@ async function segnaFonteLetta(chatId, fontiLette, action) {
   }
 }
 
-// Ciò che l'Aiuto ha letto sulla sua scheda (#530): su una pagina di Filo l'indirizzo non sporca il compito, la
-// ricerca sul web del pannello sì. Lo tiene il main per la scheda, fino alla navigazione successiva.
-const fontiPerAiuto = new WeakMap();     // webContents → fonti lette dall'Aiuto
+// Ciò che l'Aiuto ha letto (#530) vale per la sua conversazione, come per la chat: la targa la manda il pannello,
+// e chiuso e riaperto è una conversazione nuova. Su una pagina di Filo l'indirizzo non sporca, la ricerca sì.
+const fontiPerAiuto = new WeakMap();     // webContents → { conversazione, fonti } dell'Aiuto aperto lì
 const aiutoAscoltato = new WeakSet();
-function fontiDellAiuto(sender) {
+function fontiDellAiuto(sender, conversazione = '') {
   const wc = sender && sender.wc;
-  return (wc && fontiPerAiuto.get(wc)) || [];
+  const c = wc && fontiPerAiuto.get(wc);
+  return c && c.conversazione === String(conversazione || '') ? c.fonti : [];
 }
-function segnaLetturaAiuto(sender, action) {
+function segnaLetturaAiuto(sender, action, conversazione = '') {
   const wc = sender && sender.wc;
   const f = wc && globalThis.SN_ACTION_LEVELS && globalThis.SN_ACTION_LEVELS.fonteDi(action);
   if (!f) return;
@@ -1263,10 +1264,12 @@ function segnaLetturaAiuto(sender, action) {
     aiutoAscoltato.add(wc);
     try { wc.on('did-navigate', () => fontiPerAiuto.delete(wc)); } catch (_) {}
   }
-  const fonti = fontiPerAiuto.get(wc) || [];
+  const id = String(conversazione || '');
+  const prima = fontiPerAiuto.get(wc);
+  const fonti = prima && prima.conversazione === id ? prima.fonti : [];
   const voce = { classe: f.classe, campo: f.campo || null, chiave: String(f.chiave || ''), motivo: String(f.motivo || '') };
   if (!fonti.some((x) => x.chiave === voce.chiave && x.classe === voce.classe)) fonti.push(voce);
-  fontiPerAiuto.set(wc, fonti);
+  fontiPerAiuto.set(wc, { conversazione: id, fonti });
 }
 
 // Un documento della cartella Download l'ha scritto qualcun altro: classe 5, non 4 (#530).
@@ -1281,11 +1284,11 @@ function fileScaricato(p) {
 
 // L'unico punto del main che chiede a SN_AUTONOMIA se un'azione parte (#530). Il guardiano di uscita non
 // esiste ancora: le celle «+G» chiedono. `perche` è la frase del popup quando non è ovvio cosa fa chiedere.
-function decisioneAutonomia(ing, { sender = null, contesto = null, fontiLette = null, assistente = false, origine = 'chat', dentroPerimetro = true, impostazioni = null } = {}) {
+function decisioneAutonomia(ing, { sender = null, contesto = null, fontiLette = null, assistente = false, conversazione = '', origine = 'chat', dentroPerimetro = true, impostazioni = null } = {}) {
   const A = globalThis.SN_AUTONOMIA;
   const aut = (impostazioni && impostazioni.autonomia) || {};
   const livello = A.livelloAttivo(aut.livello);
-  const st = A.stato({ fonti: fontiDelCompito(sender, contesto, fontiLette, assistente), livello, spostamenti: aut.fonti, manopole: aut.manopole });
+  const st = A.stato({ fonti: fontiDelCompito(sender, contesto, fontiLette, assistente, conversazione), livello, spostamenti: aut.fonti, manopole: aut.manopole });
   const ingressi = {
     livello, stato: st.stato, costo: ing.costo, campo: ing.campo, manopole: aut.manopole,
     elenco: ing.elenco, difesa: ing.difesa, origine, dentroPerimetro, guardiano: false,
@@ -1303,13 +1306,13 @@ function decisioneAutonomia(ing, { sender = null, contesto = null, fontiLette = 
 
 // Le azioni che l'agente sulla pagina fa da sé nel content script (copia, cerca, condividi) dichiarano solo
 // il costo: la risposta è la stessa del dispatch, con la pagina web come fonte letta.
-async function decisioneAzionePagina({ costo, campo = 'web', sender = null } = {}) {
+async function decisioneAzionePagina({ costo, campo = 'web', sender = null, conversazione = '' } = {}) {
   const A = globalThis.SN_AUTONOMIA;
   if (!A.costoValido(costo)) return { risposta: 'no', digita: false, perche: '' };
   let impostazioni = {};
   try { impostazioni = await Storage.getSettings(); } catch (_) {}
   const ing = { costo, campo: A.campoValido(campo) ? campo : null, elenco: '', difesa: false };
-  const d = decisioneAutonomia(ing, { sender, assistente: true, impostazioni });
+  const d = decisioneAutonomia(ing, { sender, assistente: true, conversazione, impostazioni });
   return { risposta: d.risposta, digita: d.digita, perche: d.perche, ...(d.risposta === 'no' ? { no: fraseNo(ing, d, sender).breve } : {}) };
 }
 
@@ -1325,7 +1328,7 @@ function fraseNo(ing, decisione, sender) {
 // `contesto` = le azioni (con il loro `_output`) che il modello ha davanti in questo turno, turni passati
 // compresi: dicono cosa il compito ha letto (#530) e servono all'anti-esfiltrazione di NAVIGA.
 async function executeFiloAction(action, {
-  confirmed = false, sender = null, contesto = null, fontiLette = null, assistente = false,
+  confirmed = false, sender = null, contesto = null, fontiLette = null, assistente = false, conversazione = '',
   richiesta = '', origine = 'chat', dentroPerimetro = true,
 } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
@@ -1469,7 +1472,7 @@ async function executeFiloAction(action, {
     console.warn('[Filo] azione non registrata o senza costo, rifiutata:', type);
     return { executed: false, kept: false, rejected: true };
   }
-  const decisione = decisioneAutonomia(ing, { sender, contesto, fontiLette, assistente, origine, dentroPerimetro: dentroPerimetro && ing.dentroPerimetro, impostazioni });
+  const decisione = decisioneAutonomia(ing, { sender, contesto, fontiLette, assistente, conversazione, origine, dentroPerimetro: dentroPerimetro && ing.dentroPerimetro, impostazioni });
   if (decisione.risposta === 'no') {
     const no = fraseNo(ing, decisione, sender);
     return { executed: false, kept: false, no: true, error: no.perModello, output: { error: no.breve, rifiuto: true, no: true } };
@@ -1973,11 +1976,11 @@ async function executeFiloAction(action, {
             return { executed: false, kept: false, output: { error: String(e?.message || e) } };
           }
         }
-        return { executed: false, kept: true, domanda: decisione.digita ? 'conferma' : 'chiede' };
+        return { executed: false, kept: true, domanda: decisione.digita ? 'conferma' : 'chiede', perche: decisione.perche };
       case 'CANCELLA_ARCHIVIO':
         // L'elenco dei match lo mostra il pannello del client, ma come chiedere lo dice la risposta di
         // SN_AUTONOMIA (#530), non il pannello: `domanda` viaggia con l'azione.
-        return { executed: false, kept: true, domanda: decisione.digita ? 'conferma' : (daChiedere ? 'chiede' : 'si') };
+        return { executed: false, kept: true, domanda: decisione.digita ? 'conferma' : (daChiedere ? 'chiede' : 'si'), perche: decisione.perche };
       case 'CANCELLA_MEMORIA': {
         // Livello 3: a questo punto l'utente ha già digitato "conferma" (gate sopra).
         // Azzera tutti i moduli di memoria (PROFILO, PREFERENZE, espansioni) e il
@@ -3226,6 +3229,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         // bottone che apre il popup/box e poi manda MSG.FILO_CONFIRM_ACTION.
         if (res.needsConfirm) rendered._confirm = { level: res.needsConfirm, text: res.describe || '', ...(res.avviso ? { avviso: res.avviso } : {}) };
         if (res.domanda) rendered._domanda = res.domanda;
+        if (res.domanda && res.perche) rendered._perche = res.perche;
         // Output di un comando eseguito subito (livello 1) o esito bloccato
         // (terminale spento): il client lo mostra in chat (#146.6).
         if (res.output) rendered._output = res.output;

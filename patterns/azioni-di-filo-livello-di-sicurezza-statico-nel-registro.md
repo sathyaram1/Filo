@@ -11,11 +11,11 @@ decide **una funzione sola**, `decideDettaglio` in `src/shared/autonomia.js`
 (#530), con cinque ingressi che il motore conosce senza chiederli al modello:
 il livello di autonomia scelto dall'utente, lo stato del compito (pulito o
 contaminato, dalla classe peggiore fra le fonti lette: le letture lo dichiarano
-nel registro con `fonte`; ciò che una chat ha letto lo tiene il main per chat,
-e nell'archivio della chat, perché lo storico che la pagina rimanda a ogni turno
-si perde riprendendo la chat e si ferma agli ultimi venti messaggi; ciò che ha
-letto l'Aiuto, ricerca sul web compresa, lo tiene il main per scheda fino alla
-navigazione, perché su una pagina di Filo l'indirizzo non sporca niente), il costo,
+nel registro con `fonte`. Ciò che è stato letto vale per la **conversazione che
+l'utente ha davanti**, mai per un contenitore: non per lo storico che la pagina
+rimanda, che si perde riprendendo la chat e si ferma agli ultimi venti messaggi,
+e non per la scheda. La chat lo tiene per targa, anche nel suo archivio; l'Aiuto
+manda la targa del pannello, e chiuso e riaperto è una conversazione nuova), il costo,
 il perimetro e l'origine. Sopra la tabella
 stanno l'elenco fisso (no a ogni livello: segreti, molti destinatari,
 credenziali, regole, cancellazioni definitive) e la difesa abbassata («conferma»

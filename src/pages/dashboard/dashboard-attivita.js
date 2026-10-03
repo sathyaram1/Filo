@@ -446,6 +446,11 @@
     CANCELLA_MEMORIA: 'Memoria non cancellata', CANCELLA_ARCHIVIO: 'Archivio non svuotato',
     INVIA_FEEDBACK: 'Segnalazione non inviata',
   };
+  // Riordino e svuotamento dell'archivio chiedono col loro pannello: come chiedere lo porta `_domanda` (#530).
+  const DOMANDE_PANNELLO = { PULISCI_TAB: 'riordino delle schede', CANCELLA_ARCHIVIO: 'eliminazione dall’archivio' };
+  // Aspetta una risposta dell'utente, da un popup o dal pannello dell'azione: non è un'azione fallita, e il suo bottone resta.
+  function aspettaUtente(a) { return !!(a && (a._confirm || a._domanda)); }
+
   function activityRowFor(a) {
     if (!a) return null;
     // In attesa di conferma: il bottone lo mostra la chat, ma nel diario resta
@@ -460,6 +465,7 @@
       return { icon: '❔', text: `Conferma chiesta · ${prima || String(a.type || '').toLowerCase()}`, failed: true };
     }
     const type = String(a.type || '').toUpperCase();
+    if (a._domanda) return { icon: '❔', text: `Conferma chiesta · ${DOMANDE_PANNELLO[type] || type.toLowerCase()}`, failed: true };
     // Non riuscita: la riga lo DICE, invece di raccontare un successo che non
     // c'è stato (un documento inesistente diceva «Leggo il documento…»).
     if (a._executed === false) {
@@ -603,7 +609,7 @@
       // (riga che racconta, bottone che porta all'editor) vale per tutto ciò
       // che aspetta una conferma: la riga dice che Filo l'ha chiesta, il
       // bottone è come si risponde.
-      const anche = a._confirm
+      const anche = aspettaUtente(a)
         || (ROW_AND_BUTTON.includes(String(a.type || '').toUpperCase()) && a._executed !== false)
         || apribileComunque(a);
       if (activity) {
@@ -625,7 +631,7 @@
       // cieco (era il caso di un link con un indirizzo non ammesso). La sua
       // riga sta già nel diario. Un'azione IN ATTESA DI CONFERMA non è
       // «fallita»: non è ancora partita, e il suo bottone è tutto il punto.
-      if (!a._confirm && !apribileComunque(a) && ((a._traccia && !anche) || a._executed === false)) continue;
+      if (!aspettaUtente(a) && !apribileComunque(a) && ((a._traccia && !anche) || a._executed === false)) continue;
       const btn = renderActionButton(a, { onAck, activity });
       if (btn) wrap.appendChild(btn);
       if (String(a.type || '').toUpperCase() === 'SALVA_APPUNTO') hasAck = true;
@@ -1004,19 +1010,21 @@
       };
       btn.addEventListener('click', async () => {
         if (btn.disabled) return;
-        if (await chiediSecondoRegola(a._domanda, { title: 'Riordino delle schede', text: TESTO_RIORDINO, okLabel: 'Procedi' })) riordina();
+        if (await chiediSecondoRegola(a._domanda, { title: 'Riordino delle schede', text: TESTO_RIORDINO, okLabel: 'Procedi' }, a._perche)) riordina();
       });
       return btn;
     }
     if (type === 'CANCELLA_ARCHIVIO') {
-      return renderDeleteArchivePanel(a.query || a.testo || '', a._domanda);
+      return renderDeleteArchivePanel(a.query || a.testo || '', a._domanda, a._perche);
     }
     return null;
   }
 
   // Come chiedere lo dice la regola di autonomia del main (#530), mai il pannello. Senza risposta: la parola.
-  async function chiediSecondoRegola(domanda, opts) {
+  // `perche`: la frase della regola quando a far chiedere è ciò che il compito ha letto.
+  async function chiediSecondoRegola(domanda, opts, perche = '') {
     if (domanda === 'si') return true;
+    if (perche) opts = { ...opts, text: `${opts.text}\n\n${perche}` };
     const Ui = window.SN_CONFIRM_UI;
     if (!Ui) return window.confirm(opts.text);
     return domanda === 'chiede' ? Ui.confirm(opts) : Ui.confirmTyped(opts);
@@ -1030,14 +1038,14 @@
     const r = await send({ type: MSG.FILO_RUN_ACTION, action: { type: 'PULISCI_TAB' } });
     if (r && r.executed) return { archived: Number(r.output && r.output.archived) || 0 };
     if (!r || !r.kept) return { errore: (r && r.output && r.output.error) || 'non riuscito' };
-    if (!(await chiediSecondoRegola(r.domanda, { title: 'Riordino delle schede', text: TESTO_RIORDINO, okLabel: 'Procedi' }))) return { annullato: true };
+    if (!(await chiediSecondoRegola(r.domanda, { title: 'Riordino delle schede', text: TESTO_RIORDINO, okLabel: 'Procedi' }, r.perche))) return { annullato: true };
     const t = await send({ type: MSG.RUN_TAB_TRIAGE });
     return { archived: (t && t.archived) || 0 };
   }
 
   // §5 — pannello di cancellazione retroattiva: cerca le schede pertinenti nella
   // cronologia e le elimina DEFINITIVAMENTE dopo conferma esplicita.
-  function renderDeleteArchivePanel(query, domanda) {
+  function renderDeleteArchivePanel(query, domanda, perche = '') {
     const panel = document.createElement('div');
     panel.className = 'dash-delete-panel';
     const note = document.createElement('div');
@@ -1072,7 +1080,7 @@
       del.addEventListener('click', async () => {
         if (del.disabled) return;
         const text = `Eliminare definitivamente ${results.length} ${results.length === 1 ? 'scheda' : 'schede'} dall’archivio.`;
-        if (!(await chiediSecondoRegola(domanda, { title: 'Eliminazione definitiva', text, okLabel: 'Elimina' }))) return;
+        if (!(await chiediSecondoRegola(domanda, { title: 'Eliminazione definitiva', text, okLabel: 'Elimina' }, perche))) return;
         del.disabled = true;
         del.textContent = 'Elimino…';
         const res = await send({ type: MSG.DELETE_ARCHIVED_TABS, ids: results.map((x) => x.id) });
