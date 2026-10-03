@@ -114,6 +114,19 @@ test('sotto il velo non partono nemmeno Incolla e Detta', async ({ app, openTab,
   await page.locator('.sn-menu-split-main', { hasText: 'Detta' }).click();
   await page.waitForTimeout(800);
   expect(await page.evaluate(() => document.documentElement.innerText), 'il microfono non si accende').not.toMatch(/Ti ascolto|Microfono/);
+
+  // Il sito porta il fuoco su Incolla e chiede di premere Spazio: anche il clic da tastiera vuole la voce scoperta.
+  await page.evaluate(() => {
+    window.togli();
+    window.alMenu(() => { window.stendi(); document.querySelector('.sn-menu-paste-main').focus(); });
+  });
+  await page.locator('#campo').click({ button: 'right' });
+  await expect(page.locator('#velo')).toBeVisible();
+  await page.waitForTimeout(700);
+  await page.keyboard.press('Space');
+  await page.waitForTimeout(800);
+  expect(await page.locator('#campo').inputValue(), 'Spazio sotto il velo non incolla').not.toContain(SEGRETO);
+  await expect(page.locator('.sn-menu')).toHaveCount(0);
 });
 
 test('un velo tolto mentre la mano arriva sulla voce non lascia passare il clic: prima va visto', async ({ app, openTab, testServer }) => {
@@ -135,6 +148,7 @@ test('un velo tolto mentre la mano arriva sulla voce non lascia passare il clic:
   await page.mouse.click(incolla.x, incolla.y);
   await expect(avvisoCoperto(page)).toBeVisible();
   expect(await page.locator('#campo').inputValue()).not.toContain(SEGRETO);
+  await page.screenshot({ path: 'tests/.shots/menu-coperto-avviso.png' });
 
   // Lo stesso velo, ma la voce resta scoperta il tempo di vederla: il clic incolla.
   await page.evaluate(() => window.alMenu(() => {
