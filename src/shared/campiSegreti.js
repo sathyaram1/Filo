@@ -5,8 +5,9 @@
 (function (global) {
   'use strict';
 
-  // `cartaValida(testo)`: il riconoscimento del numero di carta, quello di SN_GUARDIANO_STATICO.
-  function crea(win, cartaValida) {
+  // `cartaValida(testo)`: il riconoscimento del numero di carta, quello di SN_GUARDIANO_STATICO. `ricorda`: solo chi
+  // resta nella pagina (il content script), non la misura usa e getta del main.
+  function crea(win, cartaValida, { ricorda = false } = {}) {
     const doc = win.document;
     const CAMPO_CON_VALORE = /^(INPUT|TEXTAREA|SELECT)$/;
     const INPUT_BOTTONE = /^(button|submit|reset|image|checkbox|radio|hidden|file|range|color)$/i;
