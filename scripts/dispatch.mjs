@@ -748,15 +748,15 @@ export function buildPayload(bucket, ctx = {}) {
           historyDropped: Number(ctx.historyDropped) || 0,
         };
       }
-      // Riallineamento del ramo dopo un conflitto di fusione. Il lavoro era
-      // già verificato: niente critica e niente serie, o la consegna direbbe
-      // il contrario del testo di ruolo (che vieta di toccare altro).
+      // Riallineamento del ramo: il lavoro era già verificato, quindi niente serie. Il perché lo scrive il server
+      // (conflitto, o unit rossi sulla fusione con l'elenco dei test, #929): senza, chi riallinea non sa cosa far tornare verde.
       return {
         case: 'riallineamento',
         branch: bucket.branch,
         id: bucket.id,
         num: bucket.num,
         feedback: ctx.feedback || null,
+        ...(typeof ctx.critique === 'string' && ctx.critique.trim() ? { critique: ctx.critique } : {}),
         ...conDecisioni(ctx),
       };
     }
