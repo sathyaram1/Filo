@@ -944,85 +944,11 @@
     return parts.join(' > ');
   }
 
-  // Il testo di un'etichetta senza i campi che contiene: un <select> dentro la <label> porterebbe tutte le voci.
-  function testoSenzaCampi(nodo) {
-    let out = '';
-    const giu = (n) => {
-      for (const c of n.childNodes || []) {
-        if (c.nodeType === 3) out += c.nodeValue;
-        else if (c.nodeType === 1 && !/^(SELECT|TEXTAREA|SCRIPT|STYLE|TEMPLATE)$/.test(c.tagName)) giu(c);
-      }
-    };
-    giu(nodo);
-    return out;
-  }
-
-  // L'etichetta che il sito lega al campo (aria-labelledby, <label for>, <label> che lo avvolge).
-  function etichettaCollegata(el) {
-    const parti = [];
-    const doc = el.ownerDocument || document;
-    for (const id of String(el.getAttribute?.('aria-labelledby') || '').split(/\s+/)) {
-      const t = id && doc.getElementById(id);
-      if (t && t !== el) parti.push(testoSenzaCampi(t));
-    }
-    if (!parti.length) { try { for (const l of el.labels || []) parti.push(testoSenzaCampi(l)); } catch (_) {} }
-    return parti.join(' ').replace(/\s+/g, ' ').trim();
-  }
-
+  // Le regole dei campi segreti stanno in src/shared/campiSegreti.js, le stesse che il main porta nei riquadri.
+  const Segreti = global.SN_CAMPI_SEGRETI.crea(window, (t) => !!global.SN_GUARDIANO_STATICO?.cartaValida?.(t));
+  const { campoSegreto, etichettaCollegata } = Segreti;
+  const campiSegretiInVista = Segreti.campiInVista;
   const CAMPO_CON_VALORE = /^(INPUT|TEXTAREA|SELECT)$/;
-  const INPUT_BOTTONE = /^(button|submit|reset|image)$/i;
-  const AUTOCOMPLETE_SEGRETO = /(^|\s)(current-password|new-password|one-time-code|cc-[a-z-]+)(\s|$)/i;
-  const PAROLE_SEGRETE = new RegExp(['pass ?word', 'passwd', 'pwd', 'passcode', 'pass_code', 'passwort', 'contrase[ñn]a',
-    'mot de passe', '\\bsenha\\b', 'parola d.ordine', '(^|[^a-z])(pin|otp|cvv2?|cvc2?|csc)([^a-z]|$)',
-    'codice (di )?(sicurezza|verifica)', 'security code', 'verification code', 'carta di (credito|debito)',
-    'numero (della |di )?carta', 'credit ?card', 'debit ?card', 'card ?number', 'card_number', 'cardnumber',
-    'n[uú]mero de (la )?tarjeta', 'tarjeta de (cr[eé]dito|d[eé]bito)', 'num[eé]ro de (la )?carte',
-    'carte (bancaire|de cr[eé]dit)', 'kartennummer', 'kreditkarte'].join('|'), 'i');
-
-  // Il browser o il sito mostrano già i puntini al posto del testo.
-  function copertoAschermo(el) {
-    if (el.type === 'password' || String(el.getAttribute?.('type') || '').toLowerCase() === 'password') return true;
-    try {
-      const cs = window.getComputedStyle(el);
-      const puntini = cs.webkitTextSecurity || cs.getPropertyValue('-webkit-text-security');
-      return !!puntini && puntini !== 'none';
-    } catch (_) { return false; }
-  }
-
-  // I campi segreti compilati che a schermo si leggono (un numero di carta, una password resa visibile), con
-  // quanto serve a ridisegnarli coperti nell'immagine della pagina che va al modello.
-  function campiSegretiInVista() {
-    const out = [];
-    for (const el of document.querySelectorAll('input, textarea, select')) {
-      if (!el.value || !campoSegreto(el) || copertoAschermo(el)) continue;
-      const r = el.getBoundingClientRect();
-      if (!r.width || !r.height || r.bottom <= 0 || r.right <= 0 || r.top >= window.innerHeight || r.left >= window.innerWidth) continue;
-      const cs = window.getComputedStyle(el);
-      // Uno sfondo trasparente o velato lascerebbe trasparire le cifre sotto la copertura.
-      const velato = /^transparent$|^rgba\(.*,\s*(0?\.\d+|0)\)$/.test(cs.backgroundColor);
-      const sfondo = velato ? '#ffffff' : cs.backgroundColor;
-      const bordo = (lato) => parseFloat(cs[`border${lato}Width`]) || 0;
-      out.push({
-        left: r.left + bordo('Left'), top: r.top + bordo('Top'),
-        width: Math.max(1, r.width - bordo('Left') - bordo('Right')), height: Math.max(1, r.height - bordo('Top') - bordo('Bottom')),
-        sfondo, testo: cs.color || '#000000', corpo: parseFloat(cs.fontSize) || 14,
-      });
-    }
-    return out;
-  }
-
-  // Un campo il cui valore non esce mai dalla pagina verso un modello (#810.7): password, codici, dati della
-  // carta. Lo dice il tipo, l'autocompletamento, il testo coperto dai puntini o il nome che il sito gli dà.
-  function campoSegreto(el) {
-    if (!el || el.nodeType !== 1 || !CAMPO_CON_VALORE.test(el.tagName)) return false;
-    const tipo = String(el.getAttribute('type') || '').toLowerCase();
-    if (el.tagName === 'INPUT' && INPUT_BOTTONE.test(tipo)) return false;
-    if (copertoAschermo(el)) return true;
-    if (AUTOCOMPLETE_SEGRETO.test(String(el.getAttribute('autocomplete') || ''))) return true;
-    const nomi = ['aria-label', 'placeholder', 'name', 'id', 'title'].map((a) => el.getAttribute(a) || '');
-    nomi.push(etichettaCollegata(el));
-    return PAROLE_SEGRETE.test(nomi.join(' ').replace(/([a-z])([A-Z])/g, '$1 $2'));
-  }
 
   // Come chiamare un elemento descrivendolo al modello o nel registro delle azioni. Il valore di un campo
   // serve solo quando non ha nessun nome, e mai se è segreto.
