@@ -62,6 +62,8 @@ const safebrowseMethods = {
     const SB = globalThis.SN_SAFEBROWSE;
     const tab = this.tabs.find((t) => t.id === tabId);
     if (!SB || !tab) return { ok: true, level: 'safe', message: null };
+    url = sitoDellaPagina(url, [tab._urlNavigato, tab._sbApertaDa]);
+    if (!url) return { ok: true, level: 'safe', message: null };
     let verdict;
     try {
       verdict = SB.analyze(url, { ...ctx, budgetUrl: tab._urlNavigato }, (next) => {
@@ -85,17 +87,54 @@ const safebrowseMethods = {
   _sbOnNavigate(tab, url) {
     const SB = globalThis.SN_SAFEBROWSE;
     if (!tab || !url) return;
-    if (!/^https?:\/\//i.test(url)) { this._sbMostra(tab, null, null); return; }
+    const sito = sitoDellaPagina(url, [tab._urlNavigato, tab._sbApertaDa]);
+    if (!sito) { this._sbMostra(tab, null, null); return; }
     if (!SB) return;
     // L'indirizzo da cui la pagina è arrivata davvero: quello che si scrive dopo non sposta il conto (#591), qui e nel
     // blocco geografico.
-    tab._urlNavigato = url;
+    tab._urlNavigato = sito;
     try {
-      const verdict = SB.analyze(url, {}, (next) => {
-        this._sbMostra(tab, url, this._sbApplyState(tab, next));
+      const verdict = SB.analyze(sito, {}, (next) => {
+        this._sbMostra(tab, sito, this._sbApplyState(tab, next));
       });
-      this._sbMostra(tab, url, this._sbApplyState(tab, verdict));
+      this._sbMostra(tab, sito, this._sbApplyState(tab, verdict));
     } catch (_) {}
+  },
+
+  // Una finestrella di accesso non ha l'avviso: se ci si apre un sito da avviso, torna in una scheda, dove l'avviso c'è.
+  // `origine`: la scheda che l'ha aperta, il cui «confermo» vale anche qui.
+  _sbGuardaFinestrella(win, origine) {
+    const SB = globalThis.SN_SAFEBROWSE;
+    const pwc = win && win.webContents;
+    if (!SB || !pwc) return;
+    let spostata = false;
+    const sposta = () => {
+      if (spostata || win.isDestroyed() || pwc.isDestroyed()) return;
+      spostata = true;
+      const url = pwc.getURL();
+      const id = this.openTab(url, { activate: true, openedByLink: true, apriComunque: this._siteAllowedIn(origine, url) });
+      const nuova = this.tabs.find((t) => t.id === id);
+      if (nuova && origine) nuova._sbApertaDa = origine._urlNavigato;
+      setImmediate(() => { try { win.close(); } catch (_) {} });
+    };
+    const giudica = (hints) => {
+      if (pwc.isDestroyed()) return;
+      const url = pwc.getURL();
+      const sito = sitoDellaPagina(url, [origine && origine._urlNavigato]);
+      if (!sito) return;
+      const decidi = (v) => {
+        const a = origine ? this._sbApplyState(origine, v) : v;
+        if (a && (a.level === 'pericoloso' || a.level === 'sospetto') && !pwc.isDestroyed() && pwc.getURL() === url) sposta();
+      };
+      try { decidi(SB.analyze(sito, hints, decidi)); } catch (_) {}
+    };
+    pwc.on('did-navigate', () => giudica({}));
+    // Il sospetto che nasce dal campo password lo vede solo la pagina caricata.
+    pwc.on('did-finish-load', async () => {
+      let h = null;
+      try { h = await pwc.executeJavaScript(`(${pageHints.toString()})(document)`); } catch (_) {}
+      if (h && (h.hasPassword || h.hasPayment)) giudica({ hasPassword: !!h.hasPassword, hasPayment: !!h.hasPayment });
+    });
   },
 
   // Sulle pagine ospitate il modulo sta spesso in un riquadro incorporato, che il content script della pagina non vede.
@@ -241,8 +280,27 @@ const safebrowseMethods = {
   },
 };
 
+// Un documento blob: lo scrive la pagina che l'ha creato e vale quanto lei: la pagina web conosciuta della stessa
+// origine (`note`: quella della scheda, o di chi l'ha aperta), altrimenti l'origine. Una pagina che non è un sito: null.
+function sitoDellaPagina(url, note = []) {
+  if (/^https?:\/\//i.test(url || '')) return url;
+  if (!/^blob:/i.test(url || '')) return null;
+  let origine = '';
+  try { origine = new URL(url).origin; } catch (_) {}
+  if (!/^https?:\/\//i.test(origine)) return null;
+  for (const n of note) {
+    try { if (n && new URL(n).origin === origine) return n; } catch (_) {}
+  }
+  return origine + '/';
+}
+
+function hostDi(u) {
+  const x = new URL(u);
+  return x.protocol === 'blob:' ? new URL(x.pathname).host : x.host;
+}
+
 function stessoSito(a, b) {
-  try { return new URL(a).host === new URL(b).host; } catch (_) { return true; }
+  try { return hostDi(a) === hostDi(b); } catch (_) { return true; }
 }
 
 // Installa i metodi sul prototype di TabManager (mixin). `this` resta l'istanza.

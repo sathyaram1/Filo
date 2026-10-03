@@ -37,9 +37,15 @@ tasto destro di Filo restava sotto la modale, inerte.
   punto del tasto destro escono, con l'id della scheda che si vedeva).
 - **Copre la scheda intera**, con i suoi bordi, in cima alle schede e sotto gli
   avvisi della barra (`layout()` posa prima lei, poi `avvisi`). Il fondo scuro
-  è della **vista** (`setBackgroundColor`), non della sua pagina: la scheda è
-  coperta anche nei millisecondi in cui la pagina dell'avviso si carica. Il
-  `backdrop-filter` non attraversa le viste: il fondo è quasi opaco.
+  lo disegna la **pagina dell'avviso**: quello della vista (`setBackgroundColor`)
+  non si vede sopra un'altra vista, quindi al primo avviso di una finestra, nei
+  millisecondi in cui la sua pagina si carica, la scheda si vede ma clic e tasti
+  sono già della vista. Il `backdrop-filter` non attraversa le viste: il fondo è
+  quasi opaco.
+- **Il sito vale anche fuori dalla sua pagina web**: un documento `blob:` si
+  giudica come la pagina che l'ha creato (nella scheda o in una scheda aperta da
+  lei), e una finestrella di accesso con un sito da avviso torna in una scheda,
+  dove l'avviso c'è. Una pagina sotto l'avviso non apre finestrelle.
 - **Lo stato sta nel main, per scheda** (`tab.sbAvviso`, `_sbMostra` in
   `src/main/tabs/tabSafebrowse.js`). Il content script manda solo indirizzo e
   indizi; un verdetto in ritardo per un sito da cui la scheda è andata via non

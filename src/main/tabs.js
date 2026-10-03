@@ -2489,7 +2489,8 @@ class TabManager {
       // avrebbe una scheda aperta su quella URL (Cookies.MODES.PRIVACY →
       // partizione per-sito; altrimenti null = sessione condivisa), per non
       // spezzare un eventuale login Google già presente in Filo.
-      if (tab.isInternal === false && isAuthPopup(url)) {
+      // Una pagina sotto l'avviso del sito pericoloso non apre finestre: sopra la sua scheda starebbero fuori dall'avviso.
+      if (tab.isInternal === false && isAuthPopup(url) && !tab.sbAvviso) {
         if (this._maybeBlockNavigation(tab, url)) return { action: 'deny' };
         return this._allowAuthPopup(url);
       }
@@ -2506,12 +2507,15 @@ class TabManager {
       // ogni apertura veniva attivata, quindi l'utente veniva strappato dalla
       // pagina che stava leggendo — lo stesso attrito della musica che passava
       // davanti da sola.
-      this.openTab(url, {
+      const aperta = this.openTab(url, {
         activate: disposition !== 'background-tab',
         openedByLink: true,
         apriComunque: this._siteAllowedIn(tab, url),
         permessoRichieste: this._siteAllowedIn(tab, url) && !!tab._permessoRichieste,
       });
+      // Un blob: aperto dalla pagina si giudica come lei (src/main/tabs/tabSafebrowse.js).
+      const nuova = this.tabs.find((t) => t.id === aperta);
+      if (nuova) nuova._sbApertaDa = tab._urlNavigato;
       return { action: 'deny' };
     });
 
@@ -2629,6 +2633,7 @@ class TabManager {
       return { action: 'deny' };
     });
     pwc.on('did-create-window', (child) => this._hardenAuthPopup(child, origine));
+    this._sbGuardaFinestrella(win, origine);
   }
 
   // Notifica la shell che un popup è stato bloccato sul tab `tabId`. La shell
