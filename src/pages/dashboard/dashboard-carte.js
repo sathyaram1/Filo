@@ -332,20 +332,26 @@
     };
   }
 
+  // L'icona del sito se si carica, altrimenti quella del tipo di suggerimento.
+  const ICONA_SUGGERIMENTO = { gmail: 'mailOpen', calendar: 'calendar', editor: 'editor', file: 'folder', note: 'note', link: 'globe', web: 'globe' };
   function faviconDi(s) {
     const tipo = String((s.action && s.action.type) || '').toUpperCase();
     const url = tipo === 'NAVIGA' ? d.faviconUrl(s.action.url) : '';
     const ico = el('span', 'dash-carta-voce-ico');
     ico.setAttribute('aria-hidden', 'true');
-    const iniziale = () => { ico.textContent = (String(s.icon || s.text || '·').trim()[0] || '·').toUpperCase(); };
+    const generica = () => {
+      const ICONS = global.SN_ICONS || {};
+      const nome = ICONA_SUGGERIMENTO[s.icon] || (tipo === 'NAVIGA' ? 'globe' : 'sparkles');
+      ico.innerHTML = typeof ICONS[nome] === 'function' ? ICONS[nome](14) : '';
+    };
     if (url) {
       const img = el('img');
       img.src = url;
       img.alt = '';
       img.referrerPolicy = 'no-referrer';
-      img.onerror = () => { img.remove(); iniziale(); };
+      img.onerror = () => { img.remove(); generica(); };
       ico.appendChild(img);
-    } else iniziale();
+    } else generica();
     return ico;
   }
 
@@ -406,7 +412,6 @@
         chiave: id, tipo: id, icona: def.icona, titolo: def.titolo, ...corpo,
         togli: () => muovi({ tipo: 'togli', carta: id }), etichettaTogli: 'Togli dalla home',
         sposta: true,
-        altreVoci: def.url && id !== 'rapide' ? [{ etichetta: `Apri ${def.titolo}`, fai: () => apri(def.url) }] : [],
       };
     });
   }
@@ -769,6 +774,12 @@
     });
   }
   function agganciaAltro() {
+    // Fuori da un'icona, il tasto destro su «altro» rimette la home com'era all'inizio.
+    altroEl.addEventListener('contextmenu', (e) => {
+      if (e.target.closest('.dash-altro-app, .dash-altro-rimetti')) return;
+      e.preventDefault();
+      apriMenu(e.clientX, e.clientY, [{ etichetta: 'Rimetti le carte com’erano', fai: () => muovi({ tipo: 'ripristina' }) }]);
+    });
     altroEl.addEventListener('dragover', (e) => {
       if (!presa || presa.colonna !== 'destra') return;
       e.preventDefault();
@@ -789,7 +800,10 @@
   function apriNelFilo(art) {
     const c = art && art._carta;
     if (!c) return;
-    d.apriNelFilo({ chat: c.chat || null, testo: c.filo || '', esterno: c.esterno || '' });
+    Promise.resolve(d.apriNelFilo({ chat: c.chat || null, testo: c.filo || '', esterno: c.esterno || '' })).then((r) => {
+      if (r === 'accoglienza') avviso('Prima finiamo di presentarci, poi la carta si apre nel filo.');
+      else if (r === 'risponde') avviso('Filo sta ancora rispondendo: riprova fra un attimo.');
+    });
   }
 
   function scriviImpostazione(parziale) {

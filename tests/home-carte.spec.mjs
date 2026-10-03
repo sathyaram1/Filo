@@ -5,6 +5,7 @@
 // percentuale e poi «Apri», l'Editor mostra i documenti recenti e ne apre uno, i Mazzi si scambiano con
 // l'Editor e si tolgono e si rimettono da «altro» anche dopo il riavvio, i suggerimenti sono una carta
 // sola, senza chiave la prima carta porta ai Crediti, e la stessa mossa si chiede a Filo a parole.
+// Le foto (chiara, scura, col menu, in conversazione) finiscono in tests/.shots/; FILO_TEST_SCALE=1.25 per la scala.
 
 import { test, expect, argomentiScala, chiudiApp } from './fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
@@ -125,6 +126,8 @@ test('uno scaricamento mostra la percentuale mentre arriva e, finito, «Apri»',
     const carta = page.locator('#accade .dash-carta[data-tipo="download"]', { hasText: 'preventivo-tetto.bin' });
     await expect(carta.locator('.dash-carta-stato')).toHaveText(/^\d{1,2}% · /, { timeout: 10_000 });
     await expect(carta.locator('.dash-carta-avanza')).toBeVisible();
+    mkdirSync(SHOTS, { recursive: true });
+    await page.screenshot({ path: join(SHOTS, 'home-carte-download.png') });
     await expect(carta.locator('.dash-carta-stato')).toHaveText(/^scaricato · 1,5 MB$/, { timeout: 20_000 });
     await expect(carta.locator('.dash-carta-az.principale')).toHaveText('Apri');
     await expect(carta.locator('.dash-carta-az.secondaria')).toHaveText('Cartella');
@@ -258,25 +261,50 @@ test('hover e tasto destro su ogni carta; la stessa mossa si chiede a Filo a par
   await expect(page.locator('#altro .dash-altro-app[data-id="mazzi"][data-tolta="1"]')).toBeVisible();
 });
 
-test('foto della home a carte, chiara e scura', async ({ app }) => {
-  test.setTimeout(45_000);
+test('foto della home a carte, chiara e scura, ferma, col menu e in conversazione', async ({ app }) => {
+  test.setTimeout(60_000);
   const page = await home(app);
   const m = await MSG(page);
   await manda(page, { type: m.FILO_ADD_TIMER, label: 'Pasta', seconds: 252 });
   await app.evaluate(async () => {
-    const C = globalThis.SN_CONST;
-    const n = await globalThis.SN_FILO_MEMORY.addNotification({ kind: 'alert', text: 'L’aggiornamento è pronto: si installa alla prossima apertura.' });
-    void n; void C;
+    const ora = Date.now();
+    const quando = (n) => new Date(ora - n * 36e5).toISOString();
+    const file = (id, title, q) => ({ id, meta: { title, created: q, modified: q, version: 1 }, modules: [], content: {} });
+    await chrome.storage.local.set({
+      'filo.editor.collection': { version: 1, activeId: 'a', files: [file('a', 'Lettera al condominio', quando(1)), file('b', 'Appunti riunione del lunedì', quando(26)), file('c', 'Ricette', quando(200))] },
+      decks: [
+        { id: 'd1', nome: 'Atraxa superfriends', carte: [], created_at: quando(50), updated_at: quando(3) },
+        { id: 'd2', nome: 'Krenko goblin', carte: [], created_at: quando(90), updated_at: quando(80) },
+      ],
+      savedPages: [
+        { id: 's1', url: 'https://www.trenitalia.com/', title: 'Orari dei treni per Bologna', savedAt: quando(2) },
+        { id: 's2', url: 'https://it.wikipedia.org/wiki/Orca', title: 'Orca — Wikipedia', savedAt: quando(5) },
+      ],
+    });
+    await globalThis.SN_FILO_MEMORY.addAlarm({ label: 'palestra', time: '07:00', repeat: 'feriali' });
+    await globalThis.SN_FILO_MEMORY.addNotification({ kind: 'alert', text: 'L’aggiornamento è pronto: si installa alla prossima apertura.' });
   });
-  await manda(page, { type: m.FILO_GET_TIMERS });
   await page.reload();
   await home(app);
+  await expect(page.locator('#tieni .dash-carta[data-tipo="mazzi"] .dash-carta-voce')).toHaveCount(2);
   mkdirSync(SHOTS, { recursive: true });
   const scala = process.env.FILO_TEST_SCALE ? `-${process.env.FILO_TEST_SCALE}` : '';
   for (const tema of ['light', 'dark']) {
     await manda(page, { type: m.UPDATE_SETTINGS, settings: { theme: tema } });
     await expect(page.locator('html')).toHaveAttribute('data-sn-theme', tema);
+    await page.mouse.move(640, 300);
     await page.waitForTimeout(300);
     await page.screenshot({ path: join(SHOTS, `home-carte-${tema}${scala}.png`) });
+    const editor = page.locator('#tieni .dash-carta[data-tipo="editor"]');
+    await editor.hover();
+    await editor.click({ button: 'right', position: { x: 30, y: 12 } });
+    await page.waitForTimeout(250);
+    await page.screenshot({ path: join(SHOTS, `home-carte-menu-${tema}${scala}.png`) });
+    await page.keyboard.press('Escape');
   }
+  await page.locator('#accade .dash-carta[data-tipo="avviso"]').click({ position: { x: 30, y: 12 } });
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'aggiornamento è pronto' })).toBeVisible();
+  await page.mouse.move(640, 300);
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: join(SHOTS, `home-carte-filo${scala}.png`) });
 });

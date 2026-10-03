@@ -432,7 +432,8 @@
   // Ogni carta è una conversazione: quella che l'ha fatta nascere, se c'è ancora, altrimenti una frase di Filo
   // in coda al filo a schermo (o in una conversazione nuova). La frase entra nello storico: il modello la vede.
   async function apriNelFilo({ chat = null, testo = '', esterno = '' } = {}) {
-    if (Accoglienza.isActive() || sending) { inputEl.focus(); return false; }
+    if (Accoglienza.isActive()) return 'accoglienza';
+    if (sending) return 'risponde';
     if (chat && chat === chatId && body.dataset.state === 'thread') { inputEl.focus(); return true; }
     if (chat && chat !== chatId) {
       const r = await send({ type: MSG.FILO_CHAT_FOCUS, id: chat });
