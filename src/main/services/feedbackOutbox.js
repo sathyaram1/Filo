@@ -178,7 +178,8 @@
           else anyFail = true;
           continue;
         }
-        if (Date.now() - it.queuedAt > MAX_AGE_MS) {
+        // Una voce dell'owner che aspetta il suo accesso non scade: buttarla perderebbe il feedback, che parte appena torna.
+        if (!it.attesaAccesso && Date.now() - it.queuedAt > MAX_AGE_MS) {
           logFn('voce scaduta dopo troppi tentativi, rinuncio:', it.id);
           remove(it.id);
           continue;
