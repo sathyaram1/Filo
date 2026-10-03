@@ -1,6 +1,6 @@
 // Handler di dominio: rilevamento siti pericolosi e cookie/consenso.
-// Il verdetto safebrowse vive nel TabManager (per tab: bypass/dismiss); qui
-// inoltriamo alla finestra MITTENTE così l'overlay/banner agisce sul tab giusto.
+// Il verdetto safebrowse vive nel TabManager (per scheda: bypass e chiusura); i pulsanti dell'avviso non passano di
+// qui ma dalla sua vista (src/main/avvisoSito.js): una pagina non può confermarsi da sola.
 
 const { soloFilo } = require('./origine');
 
@@ -16,19 +16,14 @@ module.exports = function register(on, ctx) {
     return win._filoTabs.safebrowseGet(tabId, msg.url || origin, ctxPage);
   });
 
-  on(MSG.SAFEBROWSE_PROCEED, async (msg, sender, origin) => {
+  // La home aperta dal tasto destro sull'avviso del sito pericoloso prende la domanda o la segnalazione che il main le
+  // ha lasciato (#813.5). Solo pagine di Filo: un sito non deve poter leggere né consumare la richiesta.
+  on(MSG.CASA_RICHIESTA, soloFilo(async (msg, sender) => {
     const win = winOf(sender);
     const tabId = sender?.tab?.id;
-    if (!win || !win._filoTabs || !tabId) return { ok: false };
-    return win._filoTabs.safebrowseProceed(tabId, msg.url || origin);
-  });
-
-  on(MSG.SAFEBROWSE_DISMISS, async (msg, sender, origin) => {
-    const win = winOf(sender);
-    const tabId = sender?.tab?.id;
-    if (!win || !win._filoTabs || !tabId) return { ok: false };
-    return win._filoTabs.safebrowseDismiss(tabId, msg.url || origin);
-  });
+    if (!win || !win._filoTabs || !tabId) return { ok: true, richiesta: null };
+    return { ok: true, richiesta: win._filoTabs.richiestaCasa(tabId) };
+  }));
 
   // Geo-block: l'utente ha accettato la proposta inline (#151) → instrada la tab
   // dal paese indicato. Il tabId arriva dal sender (content script).

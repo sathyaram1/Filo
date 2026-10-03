@@ -589,20 +589,13 @@
     WEB_SEARCH: 'web_search',                      // { query } → { ok, results: [{title,url,snippet}], provider }
 
     // === Rilevamento siti pericolosi (src/main/services/safebrowse/) ===
-    // Il content script chiede il verdetto per la URL corrente (+ indizi di
-    // pagina: presenza campo password/pagamento). Il main risponde col livello
-    // e un messaggio specifico. → { ok, level:'safe'|'sospetto'|'pericoloso',
-    // message:{title,body}|null, registrable }
+    // Il content script manda la URL corrente e gli indizi (campo password/pagamento); il main mostra l'avviso in una
+    // vista sopra la scheda, i cui pulsanti non passano da questo canale, che i siti raggiungono (#813.5).
+    // → { ok, level:'safe'|'sospetto'|'pericoloso', message:{title,body}|null, registrable }
     SAFEBROWSE_GET: 'safebrowse_get',              // { url, hasPassword?, hasPayment? }
-    // L'utente ha scritto "confermo" sull'interstitial "pericoloso": registra un
-    // bypass per (tab, dominio) così la pagina non viene più coperta. → { ok }
-    SAFEBROWSE_PROCEED: 'safebrowse_proceed',      // { url }
-    // L'utente ha chiuso con "ok" il banner "sospetto": non riproporlo per
-    // questo dominio nel tab. → { ok }
-    SAFEBROWSE_DISMISS: 'safebrowse_dismiss',      // { url }
-    // Broadcast main→content: il verdetto per la URL è cambiato (navigazione o
-    // arricchimento asincrono RDAP/GSB/sandbox). Il content (ri)disegna l'avviso.
-    SAFEBROWSE_UPDATE: 'safebrowse_update',         // → { url, level, message }
+    // La home aperta dal tasto destro sull'avviso chiede cosa le ha lasciato il main: la domanda a Filo sul sito o la
+    // segnalazione del falso allarme, una volta sola. Solo pagine filo://. → { ok, richiesta: { tipo, testo } | null }
+    CASA_RICHIESTA: 'casa_richiesta',
 
     // === Geo-block: proposta inline (proxy-per-tab-spec.md §5, feedback #151) ===
     // Broadcast main→content: un contenuto bloccato in Italia è stato rilevato su
