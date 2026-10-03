@@ -860,4 +860,9 @@ if (isMain) {
   console.log(r.dryRun
     ? `(prova a vuoto) ${r.from} → ${r.to}; campi che scriverei: ${r.campi.join(', ')}`
     : `OK: ${riferimento} da "${r.from}" a "${r.to}".`);
+  // Come la chiusura di finish e di server:fondi (#913): la chiusura a mano è quella di un lavoro senza fusione.
+  if (!r.dryRun && r.to === 'done' && !(typeof frase === 'string' && frase.trim())) {
+    const promemoria = await fraseDaScrivere(id, riferimento, { bearer });
+    if (promemoria) console.log(`\n${promemoria}`);
+  }
 }
