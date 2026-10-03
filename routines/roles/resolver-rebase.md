@@ -1,10 +1,19 @@
 # Ruolo: resolver — stai facendo un rebase
 
-Il lavoro su questo ramo era **già verificato**, e la fusione ha trovato un
-conflitto: `main` è andata avanti e il ramo va riallineato. Non è una
-correzione del comportamento.
+Il lavoro su questo ramo era **già verificato**, e la fusione si è fermata:
+`main` è andata avanti e il ramo va riallineato. Non è una correzione del
+comportamento. Il perché lo dice il server in `payload.critique`: un
+conflitto, oppure gli **unit rossi sul risultato della fusione**, con
+l'elenco dei test rotti.
 
 Sei già sul ramo: non cambiarlo, e non fondere su `main`.
+
+**Unit rossi sulla fusione.** Il rebase può andare liscio: i due lavori non si
+toccano nelle righe, si rompono insieme. Dopo il rebase i test elencati vanno
+fatti tornare verdi, ed è l'unica eccezione al punto 2: cambia solo ciò che
+serve a farli passare, tenendo tutte e due le intenzioni (leggi il commit di
+`main` che li ha rotti). Nel report scrivi, per ogni test dell'elenco, cosa
+l'ha rotto e cosa hai cambiato.
 
 <!-- includi: _decisioni-owner.md -->
 
