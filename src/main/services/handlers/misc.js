@@ -602,7 +602,9 @@ module.exports = function register(on, ctx) {
       // `dallOwner` lo decide il main, non il payload: vale il token admin alla spedizione (#595).
       let dallOwner = false;
       try {
-        if (auth.isAdmin() && globalThis.SN_FEEDBACK_THREAD?.ownerize) {
+        // #912: anche l'owner appena buttato fuori da un rinnovo fallito: il suo feedback aspetta che rientri.
+        const owner = auth.isAdmin() || !!auth.accessoOwnerCaduto?.();
+        if (owner && globalThis.SN_FEEDBACK_THREAD?.ownerize) {
           payload.clientId = globalThis.SN_FEEDBACK_THREAD.ownerize(payload.clientId);
           dallOwner = String(payload.clientId || '').startsWith('owner:');
         }
