@@ -23,7 +23,8 @@ il clic sul pulsante del sito.
      sulla radice di ogni pezzo attaccato al documento, **per primo**, appena il
      nodo nasce (`src/shared/filoUi.js`);
    - un ascoltatore su `window`/`document` che fa qualcosa di più che chiudere
-     (il trascinamento delle icone) guarda `e.isTrusted` da sé.
+     (il trascinamento delle icone) guarda `e.isTrusted` da sé, come fa già il
+     cartellino dello zoom (`gestoVero` in `src/preload/wheel-zoom.js`).
 
    Un'azione nostra che apre un pannello chiama la funzione, non `el.click()`:
    il clic fabbricato da codice nostro è identico a quello del sito, e il
