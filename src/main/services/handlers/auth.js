@@ -1277,6 +1277,36 @@ module.exports = function register(on, ctx) {
     return out;
   }));
 
+  // Il segno di mittente pericoloso (#922). La frase di `clear` arriva dalla pagina, che la manda solo dopo
+  // il sì dell'owner: qui non si inventa, e il server rifiuta qualunque altra.
+  on(MSG.FEEDBACK_SENDER_FLAG, ownerOnly(async (msg) => {
+    const feedbackId = String(msg?.feedbackId || '').trim();
+    const action = String(msg?.action || '');
+    if (!feedbackId) return { ok: false, error: 'Manca il feedback di cui leggere il mittente.' };
+    if (action !== 'read' && action !== 'clear') return { ok: false, error: 'Sul segno si può solo leggere o togliere.' };
+    const data = { feedbackId, action };
+    if (action === 'clear') data.conferma = String(msg?.conferma ?? '');
+    let r;
+    try {
+      r = await callSecurityFunction('ownerSenderFlag', data);
+    } catch (e) {
+      return { ok: false, error: erroreSegno(e) };
+    }
+    if (!r || r.ok === false) {
+      return { ok: false, error: (r && (r.detail || r.reason || r.error)) || 'Il server non ha risposto sul segno.' };
+    }
+    const out = {
+      ok: true,
+      flagged: r.flagged === true,
+      reason: typeof r.reason === 'string' ? r.reason : '',
+      flaggedAt: aIso(r.flaggedAt),
+      clearedAt: aIso(r.clearedAt),
+    };
+    // Una risposta di `clear` che non riporta l'ora la conosce comunque chi l'ha chiesta.
+    if (action === 'clear' && !out.flagged && !out.clearedAt) out.clearedAt = new Date().toISOString();
+    return out;
+  }));
+
   on(MSG.MERGE_APPROVAL_DISCARD, ownerOnly(async (msg) => {
     const r = await callSecurityFunction('ownerMergeApprovals', { op: 'discard', id: String(msg?.id || '') });
     if (r && r.ok === false) return { ok: false, error: r.detail || r.reason || 'Non riuscita.' };
