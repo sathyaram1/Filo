@@ -161,7 +161,22 @@ class AnteprimeSchede {
     try { this.m.layout(); } catch (_) {}
   }
 
-  riprendi() { this._prossima(); }
+  // La finestra torna a disegnare (riaperta, rimessa a fuoco, pagina davanti di nuovo visibile): ogni scheda di
+  // dietro che aspetta ancora la sua foto torna in coda, anche quella che aveva finito i tentativi.
+  riprendi() {
+    if (this.spento) return;
+    for (const tab of this.m.tabs) {
+      if (tab.id === this.m.activeId || !vivo(tab)) continue;
+      if (tab._anteprimaPersa) {
+        tab._anteprimaPersa = false;
+        tab._anteprimaAttesa = TENTATIVI;
+        tab._anteprimaRipresa = false;
+        try { tab.view.setVisible?.(true); } catch (_) {}
+      }
+      if (this.tieneSveglia(tab) && !tab.loading && !this.coda.includes(tab.id)) this.coda.push(tab.id);
+    }
+    this._prossima();
+  }
 
   pota(idsVivi) {
     const tolte = [];
