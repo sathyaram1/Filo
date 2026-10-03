@@ -654,7 +654,7 @@ export async function scrivi(id, to, nota, opts = {}) {
     }
   }
   if (typeof opts.frase === 'string' && opts.frase.trim()) {
-    set('userNote', opts.frase.trim().slice(0, 500));
+    set('userNote', opts.frase.trim());
   }
   if (typeof opts.branch === 'string') set('branch', opts.branch.slice(0, 200));
   if (typeof opts.reason === 'string') {
