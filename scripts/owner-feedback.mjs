@@ -375,14 +375,19 @@ export async function partiDellaPratica(id, opts = {}) {
   return { ok: true, status: from, parti: partiDaCampi(doc.fields), locale: !!doc.fields?.localOnly?.mapValue };
 }
 
-/** La parte di un lavoro locale arrivata su main, nella pratica (#915): `localMerges.<parte>` = adesso, in ms. */
+/**
+ * La parte di un lavoro locale arrivata su main, nella pratica (#915): `localMerges.<parte>` = adesso, in ms.
+ * `opts.solo`: il lavoro stava tutto in questa parte, e `localMerges.solo` lo dice a chi arrivasse dopo.
+ */
 export async function registraParte(id, parte, opts = {}) {
   if (!PARTI.includes(parte)) return { ok: false, motivo: `parte sconosciuta: ${parte}` };
   const at = Math.floor(opts.ora ?? Date.now());
   if (opts.dryRun) return { ok: true, dryRun: true, at };
   const bearer = opts.bearer || await acquireBearer();
-  const fields = { localMerges: { mapValue: { fields: { [parte]: { integerValue: String(at) } } } } };
-  const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?updateMask.fieldPaths=localMerges.${parte}`, {
+  const campi = { [parte]: { integerValue: String(at) }, ...(opts.solo ? { solo: { stringValue: parte } } : {}) };
+  const fields = { localMerges: { mapValue: { fields: campi } } };
+  const q = Object.keys(campi).map((k) => `updateMask.fieldPaths=localMerges.${k}`).join('&');
+  const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?${q}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
     body: JSON.stringify({ fields }),

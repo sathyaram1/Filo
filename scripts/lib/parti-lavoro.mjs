@@ -9,7 +9,10 @@ export const PARTI = Object.freeze(['app', 'server']);
 export const FINESTRA_PARTE_TARDIVA_MS = 48 * 60 * 60 * 1000;
 export const NOME_PARTE = Object.freeze({ app: 'dell’app', server: 'del server' });
 
-/** `localMerges` dai campi REST del feedback: { app?: ms, server?: ms }, le parti già su main. PURA. */
+/**
+ * `localMerges` dai campi REST del feedback: { app?: ms, server?: ms }, le parti già su main, e `solo` se una parte
+ * ha chiuso la pratica dicendo che il lavoro stava tutto lì (server:fondi --solo-server). PURA.
+ */
 export function partiDaCampi(fields) {
   const m = fields?.localMerges?.mapValue?.fields || {};
   const out = {};
@@ -18,6 +21,7 @@ export function partiDaCampi(fields) {
     const at = Number(v?.integerValue ?? v?.doubleValue);
     if (Number.isFinite(at) && at > 0) out[p] = at;
   }
+  if (PARTI.includes(m.solo?.stringValue)) out.solo = m.solo.stringValue;
   return out;
 }
 
@@ -34,6 +38,8 @@ export function parteTardiva({ status, parti = {}, parte, locale = false, ora = 
   const altra = PARTI.find((p) => p !== parte);
   if (parti[parte]) return no(`la parte ${NOME_PARTE[parte]} di questo lavoro è già su main`);
   if (!parti[altra]) return no(`non l’ha chiusa la fusione della parte ${NOME_PARTE[altra]} di un lavoro locale`);
+  // Lavoro dichiarato tutto dall'altra parte: nessun ramo di questa parte può farsi passare per il suo seguito.
+  if (parti.solo === altra) return no(`l’ha chiusa la parte ${NOME_PARTE[altra]} dicendo che il lavoro stava tutto lì`);
   const eta = ora - parti[altra];
   if (eta > FINESTRA_PARTE_TARDIVA_MS || eta < -10 * 60 * 1000) {
     return no(`la parte ${NOME_PARTE[altra]} è su main da più di ${FINESTRA_PARTE_TARDIVA_MS / 3600000} ore`);
