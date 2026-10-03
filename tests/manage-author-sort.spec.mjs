@@ -213,7 +213,7 @@ const FBS_PROVA = [
   { _id: 'FR', seq: 63, subSeq: 0, priority: 0, name: 'Routine finta',   clientId: 'routine:verifier', senderProof: 'utente', text: 'finto', createdAt: '2026-09-30T10:03:00Z' },
 ];
 
-test('un prefisso riservato senza prova del mittente si legge come utente non provato', async ({ openTab }) => {
+test('un prefisso riservato senza prova del mittente si legge come un utente qualunque', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK_THREAD && window.SN_MANAGE_REVIEW);
