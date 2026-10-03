@@ -320,16 +320,17 @@ test('prova vera: un rosso instabile si riprova da solo e non ferma la fusione',
 test('prova vera: due test verdi da soli che si rompono sempre insieme non sono instabili, e fermano la fusione', () => {
   const r = repoFinto();
   try {
-    // Ciascuno lascia un segno legato alla corsa (il `node --test` padre) e cade se trova quello dell'altro: da soli
-    // passano sempre, nella stessa suite mai, con qualunque parallelismo.
-    const insieme = (io, altro) => "import { test } from 'node:test';\nimport assert from 'node:assert';\n"
-      + "import { existsSync, writeFileSync } from 'node:fs';\nimport { join } from 'node:path';\n"
-      + `test('${io} da solo', async () => { const d = join(process.cwd(), '..');\n`
-      + `  writeFileSync(join(d, \`segno-\${process.ppid}-${io}\`), 'x');\n`
-      + '  await new Promise((ok) => setTimeout(ok, 300));\n'
-      + `  assert.ok(!existsSync(join(d, \`segno-\${process.ppid}-${altro}\`)), 'insieme no'); });\n`;
-    const punta = r.ramo('claude/insieme', () => r.scrivi('tests/unit/ramo.test.mjs', insieme('ramo', 'main')));
-    r.suMain(() => r.scrivi('tests/unit/main.test.mjs', insieme('main', 'ramo')));
+    // Il test di main lascia un segno legato alla corsa (il `node --test` padre), quello del ramo cade se lo trova:
+    // da solo passa sempre, nella stessa suite mai, in parallelo o in fila (main.test viene prima).
+    const diMain = "import { test } from 'node:test';\nimport { writeFileSync } from 'node:fs';\nimport { join } from 'node:path';\n"
+      + "test('main da solo', () => writeFileSync(join(process.cwd(), '..', `segno-${process.ppid}`), 'x'));\n";
+    const delRamo = "import { test } from 'node:test';\nimport assert from 'node:assert';\nimport { existsSync } from 'node:fs';\n"
+      + "import { join } from 'node:path';\ntest('ramo da solo', async () => {\n"
+      + '  for (let i = 0; i < 40; i++) {\n'
+      + "    assert.ok(!existsSync(join(process.cwd(), '..', `segno-${process.ppid}`)), 'insieme a main no');\n"
+      + '    await new Promise((ok) => setTimeout(ok, 100));\n  }\n});\n';
+    const punta = r.ramo('claude/insieme', () => r.scrivi('tests/unit/ramo.test.mjs', delRamo));
+    r.suMain(() => r.scrivi('tests/unit/main.test.mjs', diMain));
     r.ok(['checkout', '-q', 'claude/insieme']);
     const p = provaIn(r, punta);
     assert.equal(p.esito, 'rosso_sulla_fusione', JSON.stringify(p));
