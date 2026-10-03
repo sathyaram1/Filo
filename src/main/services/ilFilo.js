@@ -4,7 +4,6 @@
 
 'use strict';
 
-const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const path = require('node:path');
 
@@ -33,7 +32,7 @@ function creaFilo({ cartella } = {}) {
 
   const normale = { stato: E().nuovoStato(), caricato: false, caricando: null, dispositivo: '' };
   // L'incognito ha un filo suo in memoria: si vede solo da lì e sparisce con l'ultima finestra incognito.
-  let incognito = { stato: E().nuovoStato(), righe: [] };
+  let incognito = { stato: E().nuovoStato(), eventi: [] };
 
   let coda = Promise.resolve();
   function inCoda(fn) {
@@ -174,12 +173,14 @@ function creaFilo({ cartella } = {}) {
     if (!validi.length) return { scritti: [], tolti: 0 };
     let tolti = 0;
     if (incog) {
+      const scritti = [];
       for (const ev of validi) {
         const r = E().applica(incognito.stato, ev);
-        if (r.nuovo) incognito.righe.push(E().riga(ev));
+        if (r.nuovo) { incognito.eventi.push(ev); scritti.push(ev); }
         tolti += r.tolti;
       }
-      return { scritti: validi, tolti };
+      if (tolti) incognito.eventi = E().compatta(incognito.eventi);
+      return { scritti, tolti };
     }
     const nuovi = validi.filter((ev) => !normale.stato.ids.has(ev.id));
     if (!nuovi.length) return { scritti: [], tolti: 0 };
@@ -194,7 +195,7 @@ function creaFilo({ cartella } = {}) {
   function transazione(fn, opts) {
     const incog = inIncognito(opts);
     return inCoda(async () => {
-      if (!incog) await carica();
+      await carica();
       const v = incog ? incognito : normale;
       return fn({
         incognito: incog,
@@ -207,7 +208,7 @@ function creaFilo({ cartella } = {}) {
 
   async function vista(opts) {
     const incog = inIncognito(opts);
-    if (!incog) await carica();
+    await carica();
     return incog ? incognito : normale;
   }
 
@@ -252,8 +253,8 @@ function creaFilo({ cartella } = {}) {
   async function esporta(opts) {
     const incog = inIncognito(opts);
     return inCoda(async () => {
-      if (incog) return Buffer.from(incognito.righe.join(''), 'utf8');
       await carica();
+      if (incog) return Buffer.from(incognito.eventi.map(E().riga).join(''), 'utf8');
       try { return await fsp.readFile(fileEventi()); } catch (e) { if (e.code === 'ENOENT') return Buffer.alloc(0); throw e; }
     });
   }
@@ -280,7 +281,7 @@ function creaFilo({ cartella } = {}) {
   }
 
   function resetIncognito() {
-    incognito = { stato: E().nuovoStato(), righe: [] };
+    incognito = { stato: E().nuovoStato(), eventi: [] };
   }
 
   async function dispositivo() {
@@ -302,6 +303,3 @@ function creaFilo({ cartella } = {}) {
 const filo = creaFilo();
 globalThis.SN_IL_FILO = filo;
 module.exports = { ...filo, creaFilo };
-
-// Dai test di Playwright il file del filo si legge da fuori: il percorso serve a loro.
-void fs;

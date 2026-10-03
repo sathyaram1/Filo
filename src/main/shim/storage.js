@@ -127,6 +127,11 @@ function runNormale(fn) {
   return als.run({ incognito: false }, fn);
 }
 
+// Il filo (src/main/services/ilFilo.js) migra le chat dal disco anche se la prima richiesta arriva da un incognito.
+function fuoriDaIncognito(fn) {
+  return als.run({ incognito: false }, fn);
+}
+
 // Azzera l'overlay incognito. Chiamato dalla chiusura dell'ultima finestra
 // incognito: nulla di ciò che è stato navigato/scritto sopravvive.
 function resetIncognito() {
@@ -417,6 +422,7 @@ module.exports = {
   setSync,
   runIncognito,
   runNormale,
+  fuoriDaIncognito,
   resetIncognito,
   inIncognito,
 };
