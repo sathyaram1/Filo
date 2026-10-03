@@ -464,6 +464,16 @@
         if (sottoIlPuntatore(id)) invia(id);
       }, RITARDO);
     }
+    // Croce, avviso audio e paese hanno il loro suggerimento, che cade dove sta la carta (#589.16): la carta gli
+    // cede il posto quando lui compare, non prima, o attraversando la croce verso la scheda accanto lampeggerebbe.
+    function suUnControllo(target, el) {
+      const c = target.closest('[data-tip]');
+      return !!c && c !== el && el.contains(c);
+    }
+    function cede() {
+      if (timer) { clearTimeout(timer); timer = null; attesaDi = null; }
+      if (aperta && !vaVia) vaVia = setTimeout(nascondi, SUGGERIMENTO_RITARDO);
+    }
     // Una scheda appena rifatta non ha ancora :hover col puntatore fermo sopra: conta dove sta il puntatore.
     function sottoIlPuntatore(id) {
       const el = elDi(id);
