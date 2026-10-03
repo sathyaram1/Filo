@@ -422,6 +422,11 @@ describe('a gruppi, ciò che node fa una volta per corsa resta uno', () => {
     // «dei 8», «dei 11»: l'articolo davanti a un numero cambia con la sua lettura.
     const otto = testoRiepilogo({ somma: sommaRiepiloghi(Array(8).fill([])), gruppi: 8, file: 8, esiti: Array(8).fill(0), rapporti: ['r.xml'] });
     assert.doesNotMatch(otto, /\bdei (8|11)\b/);
+    const misti = testoRiepilogo({ somma: sommaRiepiloghi([[], []]), gruppi: 2, file: 2, esiti: [0, 0], rapporti: ['r.xml', 'b.tap'], accodati: ['stdout', 'b.tap'] });
+    assert.match(misti, /rapporti di tutti i gruppi sono riuniti in r\.xml\./);
+    assert.match(misti, /sull'uscita standard c'è un rapporto per gruppo, uno dopo l'altro/);
+    assert.match(misti, /in b\.tap c'è un rapporto per gruppo, uno dopo l'altro/);
+    assert.doesNotMatch(misti, /riuniti[^\n]*b\.tap/);
   });
 });
 
