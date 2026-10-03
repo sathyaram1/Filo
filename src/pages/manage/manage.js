@@ -2755,11 +2755,12 @@
     // Chi ha scritto, in chiaro (#443): l'identificativo grezzo diceva
     // "filo:chat" dove serviva leggere "Filo, per conto di un utente". Resta
     // ispezionabile passandoci sopra e nel pannello del mittente.
-    mgDetailHead.innerHTML = `Da <a class="mg-sender-link" id="senderLink" href="#" data-client="${esc(clientId)}" title="${esc(clientId)}">${esc(senderLabel(fb))}</a> il ${dateStr}`;
+    mgDetailHead.innerHTML = `Da <a class="mg-sender-link" id="senderLink" href="#" data-client="${esc(clientId)}" title="${esc(clientId)}">${esc(senderLabel(fb))}</a> il ${dateStr}<div class="mg-segno" id="mgSegnoTestata" hidden></div>`;
     document.getElementById('senderLink').addEventListener('click', (e) => {
       e.preventDefault();
       openSidebarSender(senderKeyOf(fb));
     });
+    leggiSegno(fb);
 
     // La fila dei cinque livelli: triangolo, cerchi, rombo, pentagono,
     // quadrato. Ogni forma cliccata si apre nel pannello di destra.
