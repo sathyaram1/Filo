@@ -85,6 +85,13 @@ server un verdetto raccontato non lo legge).
    ```bash
    node scripts/merge-gate.mjs <branch>
    ```
+   **Dura minuti, non secondi**: prima di chiedere fa girare gli unit sul
+   risultato della fusione del ramo con origin/main, in una cartella
+   temporanea (dai cinque ai venti minuti, di più se main si muove e la prova
+   si rifà). Lancialo in sottofondo e aspettalo a pezzi, come dice il
+   contratto: una chiamata tagliata a metà non chiede niente. Se gli unit sono
+   rossi solo sulla fusione il server non fonde e rimanda il lavoro al
+   riallineamento con l'elenco (exit 20): non è un tuo fail.
    Anche la richiesta di fusione parla del commit, non del ramo: dichiara la
    punta della directory, e prima di partire rifà i due controlli del passo 1.
    Se il ramo si è mosso dopo il TUO verdetto, il rifiuto ti scrive cosa
