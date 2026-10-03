@@ -172,13 +172,46 @@ function offFor(off, host) {
 }
 
 // Un selettore con graffe, commenti o una @ in testa (@import) uscirebbe dalla sua regola e scriverebbe CSS nella pagina.
-function toCss(selectors) {
+// Con `gate` ogni regola vale finché la radice della pagina non porta quell'attributo: Electron non sa togliere un foglio
+// dell'utente, e spegnere il blocco deve far tornare i riquadri nelle pagine aperte.
+function toCss(selectors, gate) {
   const out = [];
   for (const sel of selectors) {
     if (typeof sel !== 'string' || !sel || /[{}]|\/\*|\*\/|^\s*@/.test(sel)) continue;
-    out.push(`${sel}{display:none!important}`);
+    const g = gate ? sottoCancello(sel, gate) : sel;
+    if (g) out.push(`${g}{display:none!important}`);
   }
   return out.join('\n');
+}
+
+const GATE_RE = /^data-filo-[a-z0-9]{1,16}$/;
+
+function cancello(gate) {
+  return typeof gate === 'string' && GATE_RE.test(gate) ? gate : '';
+}
+
+// Divide l'elenco ai livelli alti e prefissa ogni selettore con la radice aperta; uno che parte dalla radice la porta in sé.
+function sottoCancello(sel, gate) {
+  const parti = [];
+  let depth = 0;
+  let quote = '';
+  let start = 0;
+  for (let i = 0; i < sel.length; i++) {
+    const c = sel[i];
+    if (c === '\\') { i++; continue; }
+    if (quote) { if (c === quote) quote = ''; continue; }
+    if (c === '"' || c === "'") quote = c;
+    else if (c === '(' || c === '[') depth++;
+    else if (c === ')' || c === ']') depth--;
+    else if (c === ',' && depth === 0) { parti.push(sel.slice(start, i)); start = i + 1; }
+  }
+  if (quote || depth !== 0) return '';
+  parti.push(sel.slice(start));
+  const aperta = `:not([${gate}])`;
+  return parti.map((p) => p.trim()).filter(Boolean).map((p) => {
+    const m = p.match(/^(html|:root)(?![\w-])/i);
+    return m ? m[1] + aperta + p.slice(m[1].length) : `:root${aperta} ${p}`;
+  }).join(',');
 }
 
 // ─── stato in-memory ────────────────────────────────────────────────────────
@@ -245,24 +278,43 @@ function pageHost(href) {
 
 // Alla nascita della pagina: le regole complesse generiche e quelle scritte per il suo sito. `tokens` dice se
 // vale la pena mandare dopo gli id e le classi che la pagina incontra.
-function cosmeticForPage(href) {
+function cosmeticForPage(href, gate) {
   const host = pageHost(href);
-  if (!enabled || !host) return { css: '', tokens: false };
+  if (!enabled || !host) return { on: false, css: '', tokens: false };
   const off = offFor(hideOff, host);
-  if (off.all) return { css: '', tokens: false };
+  if (off.all) return { on: true, css: '', tokens: false };
   const { complex, specific } = CB.forHostIn(cosmetic, host);
   const generic = !off.generic && (cosmetic.ids.size + cosmetic.classes.size) > 0;
-  return { css: toCss(off.generic ? specific : complex.concat(specific)), tokens: generic };
+  return { on: true, css: toCss(off.generic ? specific : complex.concat(specific), cancello(gate)), tokens: generic };
 }
 
 // Gli id e le classi della pagina che le regole generiche nascondono, come CSS da aggiungere.
-function cosmeticForTokens(href, ids, classes) {
+function cosmeticForTokens(href, ids, classes, gate) {
   const host = pageHost(href);
   if (!enabled || !host) return '';
   const off = offFor(hideOff, host);
   if (off.all || off.generic) return '';
   const clean = (arr) => (Array.isArray(arr) ? arr.slice(0, 5000).filter((x) => typeof x === 'string' && x && x.length <= 120) : []);
-  return toCss(CB.matchTokensIn(cosmetic, host, clean(ids), clean(classes)));
+  return toCss(CB.matchTokensIn(cosmetic, host, clean(ids), clean(classes)), cancello(gate));
+}
+
+// Un'immagine o un riquadro fermati qui lascerebbero il buco dell'annuncio: la pagina li chiude (preload/nascondi-pubblicita.js).
+// I video no: un lettore che cambia sorgente sullo stesso elemento resterebbe chiuso col film.
+const DA_CHIUDERE = new Set(['image', 'subFrame', 'object']);
+
+function chiudiInPagina(details) {
+  if (!details || !DA_CHIUDERE.has(details.resourceType)) return;
+  const wc = details.webContents;
+  try { if (wc && !wc.isDestroyed()) wc.send('filo:adblock-chiudi', details.url); } catch (_) {}
+}
+
+// Acceso o spento, le pagine già aperte mettono o tolgono i loro riquadri senza aspettare di essere ricaricate.
+function avvisaLePagine() {
+  let all = [];
+  try { all = require('electron').webContents.getAllWebContents(); } catch (_) { return; }
+  for (const wc of all) {
+    try { if (!wc.isDestroyed() && /^https?:/i.test(wc.getURL())) wc.send('filo:adblock-stato'); } catch (_) {}
+  }
 }
 
 // ─── cache su disco ─────────────────────────────────────────────────────────
@@ -430,6 +482,7 @@ async function init(settings) {
 function configureFromSettings(settings) {
   const was = enabled;
   enabled = isEnabled(settings);
+  if (was !== enabled) avvisaLePagine();
   if (process.env.NODE_ENV === 'test' || process.env.FILO_SMOKE) return;
   if (enabled) {
     ensurePeriodicRefresh();
@@ -468,12 +521,14 @@ module.exports = {
   isHostsFile,
   cosmeticForPage,
   cosmeticForTokens,
+  sottoCancello,
   setCosmeticForTest,
   normalizeDomain,
   isBlockedHost,
   isBlockedUrl,
   isWhitelistedHost,
   shouldBlock,
+  chiudiInPagina,
   refresh,
   init,
   configureFromSettings,

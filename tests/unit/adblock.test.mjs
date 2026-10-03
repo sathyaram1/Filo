@@ -162,7 +162,7 @@ test('occultamento: $generichide e $elemhide spengono le regole dove la lista lo
   assert.equal(acc.tokens, false);
   assert.doesNotMatch(acc.css, /div-gpt-ad/);
   assert.equal(A.cosmeticForTokens('https://accounts.google.com/', ['ad_top'], []), '');
-  assert.deepEqual(A.cosmeticForPage('https://www.negozio.test/'), { css: '', tokens: false });
+  assert.deepEqual(A.cosmeticForPage('https://www.negozio.test/'), { on: true, css: '', tokens: false });
   assert.equal(A.cosmeticForPage('https://altro.test/').tokens, false);
   assert.equal(A.cosmeticForPage('https://niente.test/').tokens, true);
 });
@@ -178,11 +178,11 @@ test('occultamento: un selettore con graffe non scrive CSS nella pagina', () => 
 test('occultamento: spento col toggle, e fuori dalle pagine web', () => {
   A.setCosmeticForTest(LISTA);
   A.configureFromSettings({ security: { adblock: { enabled: false } } });
-  assert.deepEqual(A.cosmeticForPage('https://www.betaseries.com/'), { css: '', tokens: false });
+  assert.deepEqual(A.cosmeticForPage('https://www.betaseries.com/'), { on: false, css: '', tokens: false });
   assert.equal(A.cosmeticForTokens('https://www.example.org/', ['ad_top'], []), '');
   A.configureFromSettings({});
-  assert.deepEqual(A.cosmeticForPage('filo://home/'), { css: '', tokens: false });
-  assert.deepEqual(A.cosmeticForPage('file:///C:/x.html'), { css: '', tokens: false });
+  assert.deepEqual(A.cosmeticForPage('filo://home/'), { on: false, css: '', tokens: false });
+  assert.deepEqual(A.cosmeticForPage('file:///C:/x.html'), { on: false, css: '', tokens: false });
 });
 
 test('aggiornamento: le regole di occultamento vengono dalle liste EasyList, non dai commenti di un file hosts', async () => {
@@ -222,4 +222,32 @@ test('cache: le regole sopravvivono al riavvio, e una cache di prima delle regol
   assert.equal(A.isBlockedHost('vecchio.test'), true, 'i domini della cache vecchia valgono finché non arriva la nuova');
   assert.equal(A.status().updatedAt, 0, 'cache senza regole di occultamento: da riscaricare');
   assert.ok(JSON.parse(readFileSync(file, 'utf8')).domains.length);
+});
+
+test('un elemento fermato dal blocco si chiude nella pagina: immagini, riquadri e oggetti, non video né script', () => {
+  const inviati = [];
+  const wc = { isDestroyed: () => false, send: (canale, url) => inviati.push([canale, url]) };
+  for (const resourceType of ['image', 'subFrame', 'object', 'media', 'script', 'xhr', 'mainFrame']) {
+    A.chiudiInPagina({ resourceType, url: `https://ads.test/${resourceType}`, webContents: wc });
+  }
+  A.chiudiInPagina({ resourceType: 'image', url: 'https://ads.test/senza-pagina' });
+  A.chiudiInPagina({ resourceType: 'image', url: 'https://ads.test/chiusa', webContents: { isDestroyed: () => true, send: () => { throw new Error('chiusa'); } } });
+  assert.deepEqual(inviati.map(([, u]) => u), ['https://ads.test/image', 'https://ads.test/subFrame', 'https://ads.test/object']);
+  assert.ok(inviati.every(([c]) => c === 'filo:adblock-chiudi'));
+});
+
+test('regole sotto cancello: ogni selettore dell\'elenco prende la radice aperta, uno malformato si scarta', () => {
+  const g = 'data-filo-abc123';
+  assert.equal(A.sottoCancello('.ad', g), ':root:not([data-filo-abc123]) .ad');
+  assert.equal(A.sottoCancello('div[title="a,b"], .x > a', g), ':root:not([data-filo-abc123]) div[title="a,b"],:root:not([data-filo-abc123]) .x > a');
+  assert.equal(A.sottoCancello('html.mobile .ad', g), 'html:not([data-filo-abc123]).mobile .ad');
+  assert.equal(A.sottoCancello(':root .ad', g), ':root:not([data-filo-abc123]) .ad');
+  assert.equal(A.sottoCancello('.blockSearch:has(.adsbygoogle, .x)', g), ':root:not([data-filo-abc123]) .blockSearch:has(.adsbygoogle, .x)');
+  assert.equal(A.sottoCancello('div:has(.ad', g), '');
+  assert.equal(A.sottoCancello('a[href="x', g), '');
+  A.setCosmeticForTest('##.ad-slot\n##div:has(.rotto\n##div[id^="gpt"]');
+  A.configureFromSettings({});
+  assert.equal(A.cosmeticForPage('https://pagina.test/', g).css, ':root:not([data-filo-abc123]) div[id^="gpt"]{display:none!important}');
+  assert.equal(A.cosmeticForTokens('https://pagina.test/', [], ['ad-slot'], g), ':root:not([data-filo-abc123]) .ad-slot{display:none!important}');
+  assert.equal(A.cosmeticForTokens('https://pagina.test/', [], ['ad-slot'], 'x]{} body'), '.ad-slot{display:none!important}');
 });

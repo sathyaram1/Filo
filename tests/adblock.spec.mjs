@@ -230,3 +230,43 @@ test('anche nella finestra incognito la pubblicità in lista non si carica (#576
   await fireRequest(page, BLOCKED);
   expect(await waitErr(app)).toBe('net::ERR_BLOCKED_BY_CLIENT');
 });
+
+// Un annuncio fuori dai contenitori che le liste conoscono: bloccato in rete, non deve lasciare il suo buco in pagina.
+test('immagine e riquadro di un server pubblicitario bloccato si chiudono, il testo resta', async ({ app, openTab, testServer }) => {
+  await configureAdblock(app, { enabled: true, domains: ['blocked.test'] });
+  const adUrl = testServer.html('<!doctype html><body style="background:#c00">ANNUNCIO</body>').replace('127.0.0.1', 'blocked.test');
+  const page = await testServer.openReady(openTab, `<!doctype html><title>PUB_BUCO</title>
+<h1>Pantheon S01E02</h1>
+<iframe id="pub" src="${adUrl}" width="728" height="90"></iframe>
+<a href="/partner"><img id="img" src="${adUrl.replace(/\/\d+$/, '/banner.gif')}" width="300" height="250"></a>
+<p id="testo">testo dopo</p>
+<script>setTimeout(() => { const i = new Image(300, 250); i.id = 'tarda'; i.src = '${adUrl.replace(/\/\d+$/, '/tarda.gif')}'; document.body.appendChild(i); }, 300);</script>`, { pubblico: true });
+  await page.waitForSelector('#tarda', { state: 'attached', timeout: 5_000 });
+  const altezze = () => page.evaluate(() => ({
+    riquadro: document.getElementById('pub').getBoundingClientRect().height,
+    immagine: document.getElementById('img').getBoundingClientRect().height,
+    tarda: document.getElementById('tarda').getBoundingClientRect().height,
+    testo: document.getElementById('testo').getBoundingClientRect().height > 0,
+  }));
+  await expect.poll(altezze, { timeout: 5_000 }).toEqual({ riquadro: 0, immagine: 0, tarda: 0, testo: true });
+});
+
+test('spento il blocco dalla pagina Sicurezza, le pagine aperte rimostrano i riquadri; riacceso, li tolgono di nuovo', async ({ app, openTab, testServer }) => {
+  await regoleOcculta(app, true);
+  const html = (t) => `<!doctype html><title>${t}</title><style>.ad-slot{display:block!important}</style><div class="ad-slot">riquadro</div><p id="t">testo</p>`;
+  const prima = await testServer.openReady(openTab, html('PUB_LIVE_1'), { pubblico: true });
+  const disp = (p) => () => p.evaluate(() => getComputedStyle(document.querySelector('.ad-slot')).display);
+  await expect.poll(disp(prima), { timeout: 5_000 }).toBe('none');
+  const sec = await openTab('filo://security/');
+  await sec.waitForSelector('#sec-adblock', { timeout: 8_000 });
+  await sec.locator('#sec-adblock').uncheck();
+  await expect.poll(disp(prima), { timeout: 5_000 }).toBe('block');
+  // Aperta a blocco spento: nessuna regola in pagina finché non si riaccende.
+  const dopo = await testServer.openReady(openTab, html('PUB_LIVE_2'), { pubblico: true });
+  expect(await disp(dopo)()).toBe('block');
+  await sec.bringToFront();
+  await sec.locator('#sec-adblock').check();
+  await expect.poll(disp(prima), { timeout: 5_000 }).toBe('none');
+  await expect.poll(disp(dopo), { timeout: 5_000 }).toBe('none');
+  expect(await prima.evaluate(() => getComputedStyle(document.getElementById('t')).display)).toBe('block');
+});

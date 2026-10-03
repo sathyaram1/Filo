@@ -8,16 +8,17 @@ const ELEMENTI = 'img,iframe,frame,embed,object';
 const MAX_BLOCCATI = 500;
 
 module.exports = function nascondiPubblicita({ ipcRenderer, webFrame, href }) {
-  let keys = [];
-  // Una risposta chiesta prima di uno spegnimento non deve rimettere le regole dopo.
-  let giro = 0;
+  // Electron non toglie un foglio dell'utente: le regole valgono finché la radice non porta questo attributo (blocco spento).
+  // Il nome cambia a ogni pagina, così un sito non lo mette da sé per tenersi la pubblicità.
+  const GATE = 'data-filo-' + Math.random().toString(36).slice(2, 10);
+  let inserite = false;
   let attivo = false;
   let generiche = false;
   let observer = null;
 
-  const insert = (css, g) => {
-    if (g !== giro || typeof css !== 'string' || !css) return;
-    try { keys.push(webFrame.insertCSS(css, { cssOrigin: 'user' })); } catch (_) {}
+  const insert = (css) => {
+    if (typeof css !== 'string' || !css) return;
+    try { webFrame.insertCSS(css, { cssOrigin: 'user' }); } catch (_) {}
   };
 
   const asked = new Set();
@@ -50,19 +51,18 @@ module.exports = function nascondiPubblicita({ ipcRenderer, webFrame, href }) {
   const flush = () => {
     timer = null;
     if (!attivo || !generiche || (!ids.length && !classes.length)) return;
-    const g = giro;
-    const msg = { ids: ids.splice(0, 5000), classes: classes.splice(0, 5000) };
-    ipcRenderer.invoke('filo:adblock-tokens', msg).then((css) => insert(css, g)).catch(() => {});
+    const msg = { ids: ids.splice(0, 5000), classes: classes.splice(0, 5000), gate: GATE };
+    ipcRenderer.invoke('filo:adblock-tokens', msg).then(insert).catch(() => {});
     schedule();
   };
 
   const survey = (root) => {
     if (!root || root.nodeType !== 1) return;
-    let nodes = [];
-    try { nodes = root.querySelectorAll(generiche ? '[id],[class]' : ELEMENTI); } catch (_) {}
-    if (generiche) collect(root);
-    if (bloccati.size) { segna(root); for (const n of nodes) if (n.matches && n.matches(ELEMENTI)) segna(n); }
-    if (generiche) for (const n of nodes) collect(n);
+    const sotto = (sel) => { try { return root.querySelectorAll(sel); } catch (_) { return []; } };
+    if (bloccati.size) { segna(root); for (const n of sotto(ELEMENTI)) segna(n); }
+    if (!generiche) return;
+    collect(root);
+    for (const n of sotto('[id],[class]')) collect(n);
   };
 
   const schedule = () => {
@@ -85,24 +85,23 @@ module.exports = function nascondiPubblicita({ ipcRenderer, webFrame, href }) {
 
   const accendi = () => {
     let cfg = null;
-    try { cfg = ipcRenderer.sendSync('filo:adblock-css', (window.location && window.location.href) || href); } catch (_) {}
-    if (!cfg || typeof cfg !== 'object') return;
+    try { cfg = ipcRenderer.sendSync('filo:adblock-css', (window.location && window.location.href) || href, GATE); } catch (_) {}
+    if (!cfg || typeof cfg !== 'object' || !cfg.on) return;
     attivo = true;
     generiche = !!cfg.tokens;
-    insert(`[${CHIUSO}]{display:none!important}`, giro);
-    insert(cfg.css, giro);
-    asked.clear();
-    ids = [];
-    classes = [];
+    try { if (document.documentElement) document.documentElement.removeAttribute(GATE); } catch (_) {}
+    if (!inserite) {
+      inserite = true;
+      insert(`:root:not([${GATE}]) [${CHIUSO}]{display:none!important}`);
+      insert(cfg.css);
+    }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', osserva, { once: true });
     else osserva();
   };
 
   const spegni = () => {
-    giro++;
     attivo = false;
-    for (const k of keys) { try { webFrame.removeCSS(k); } catch (_) {} }
-    keys = [];
+    try { document.documentElement.setAttribute(GATE, ''); } catch (_) {}
   };
 
   ipcRenderer.on('filo:adblock-stato', () => { spegni(); accendi(); });

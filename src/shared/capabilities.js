@@ -487,8 +487,8 @@
     },
     {
       id: 'ad-blocking', title: 'Blocca la pubblicità', category: 'settings',
-      desc: 'Filo blocca pubblicità e tracker con liste pubbliche (EasyList, con le sue liste per i siti italiani e francesi, e StevenBlack) che si aggiornano da sole ogni settimana. Le richieste ai server della pubblicità non partono, e i riquadri pubblicitari che restano nella pagina spariscono: quelli rimasti vuoti e i banner che il sito mette da sé. Vale anche nella finestra in incognito.',
-      invoke: 'Acceso da solo. Si spegne e si riaccende in Impostazioni → Sicurezza, con «Blocca pubblicità e tracker», o chiedendolo a Filo in chat (chiede conferma prima di cambiarlo).',
+      desc: 'Filo blocca pubblicità e tracker con liste pubbliche (EasyList, con le sue liste per i siti italiani e francesi, e StevenBlack) che si aggiornano da sole ogni settimana. Le richieste ai server della pubblicità non partono, e i riquadri pubblicitari che restano nella pagina spariscono: quelli rimasti vuoti, le immagini e i riquadri fermati dal blocco e i banner che il sito mette da sé. Vale anche nella finestra in incognito.',
+      invoke: 'Acceso da solo. Si spegne e si riaccende in Impostazioni → Sicurezza, con «Blocca pubblicità e tracker», o chiedendolo a Filo in chat (chiede conferma prima di cambiarlo); vale subito anche nelle pagine già aperte.',
       doesNot: 'Non si spegne per un sito solo. Non blocca i server dei servizi più usati (Google, YouTube, Facebook, Amazon…), quindi la pubblicità dentro i video di YouTube resta. Non toglie gli avvisi dei siti che chiedono di spegnere il blocco.',
     },
     {

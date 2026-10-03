@@ -236,14 +236,11 @@ function ensureRequestHook(ses) {
       callback({ cancel: false });
       return;
     }
-    if (s.enabled && isTrackerUrl(details.url)) {
-      callback({ cancel: true });
-      return;
-    }
     let ad = null;
     try { ad = require('./adblock'); } catch (_) {}
-    if (ad && ad.shouldBlock && ad.shouldBlock(details.url)) {
+    if ((s.enabled && isTrackerUrl(details.url)) || (ad && ad.shouldBlock && ad.shouldBlock(details.url))) {
       callback({ cancel: true });
+      if (ad) ad.chiudiInPagina(details);
       return;
     }
     callback({ cancel: false });

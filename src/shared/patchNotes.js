@@ -23,7 +23,7 @@
         'Nella pagina Crediti trovi il tuo pseudonimo: basta quello per ricevere un regalo di crediti.',
         'Col tasto destro sull\'avviso di un sito pericoloso puoi chiedere a Filo di quel sito o segnalare un falso allarme. Si apre una scheda nuova e il sito resta coperto.',
         'Quando un video parte con una pubblicità che si può saltare, Filo preme «Salta» da solo appena il pulsante compare, su YouTube (anche nei video incorporati in altri siti) e negli altri lettori più diffusi. Se preferisci guardarle, lo spegni in Sicurezza o chiedendolo a Filo.',
-        'La pubblicità sparisce anche dove prima restava: i riquadri vuoti lasciati dagli annunci bloccati e i banner che il sito mette da sé. Filo usa anche le liste per i siti italiani e francesi e blocca la pubblicità pure nella finestra in incognito. Il blocco si spegne e si riaccende anche chiedendolo a Filo.',
+        'La pubblicità sparisce anche dove prima restava: i riquadri vuoti e le immagini rotte lasciati dagli annunci bloccati, e i banner che il sito mette da sé. Filo usa anche le liste per i siti italiani e francesi e blocca la pubblicità pure nella finestra in incognito. Il blocco si spegne e si riaccende anche chiedendolo a Filo, e vale subito anche nelle pagine già aperte.',
       ],
       fixes: [
         'L\'avviso dei siti pericolosi e sospetti adesso sta sopra la pagina, fuori dalla sua portata, e resta lì finché non scegli tu.',

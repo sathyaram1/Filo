@@ -117,9 +117,9 @@ function registerIpcHandlers() {
   });
 
   // #576 — i riquadri pubblicitari da nascondere nella pagina che sta per caricarsi: SINCRONO, o compaiono prima.
-  ipcMain.on('filo:adblock-css', (event, href) => {
+  ipcMain.on('filo:adblock-css', (event, href, gate) => {
     try {
-      event.returnValue = require('./services/adblock').cosmeticForPage(String(href || ''));
+      event.returnValue = require('./services/adblock').cosmeticForPage(String(href || ''), gate);
     } catch (_) {
       event.returnValue = { css: '', tokens: false };
     }
@@ -129,7 +129,7 @@ function registerIpcHandlers() {
   ipcMain.handle('filo:adblock-tokens', (event, msg) => {
     try {
       const href = (event.senderFrame && event.senderFrame.url) || '';
-      return require('./services/adblock').cosmeticForTokens(href, msg && msg.ids, msg && msg.classes);
+      return require('./services/adblock').cosmeticForTokens(href, msg && msg.ids, msg && msg.classes, msg && msg.gate);
     } catch (_) {
       return '';
     }
