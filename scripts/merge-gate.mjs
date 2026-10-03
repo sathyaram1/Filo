@@ -316,6 +316,25 @@ export function testoRamoDiverso(nominato, corrente) {
     + 'Posizionati sul ramo del lavoro e rilancia, oppure nomina il ramo su cui sei.';
 }
 
+/**
+ * Tiene vivo il lavoro sul server finché gira la prova degli unit: dura minuti, a volte più dell'ora di silenzio dopo
+ * cui il semaforo cade, e in cloud nient'altro batte intanto (verifica #929 giro 3). Gli unit bloccano questo processo,
+ * quindi batte un figlio, fermato alla fine. Un battito subito: quello del figlio arriva solo dopo il suo avvio.
+ */
+export async function tieniVivo(ticket, { batti = heartbeat, avvia = spawn, script = resolve(__dirname, 'routine-channel.mjs') } = {}) {
+  try { await batti(ticket); } catch (_) { /* il figlio ci riprova */ }
+  let figlio = null;
+  try {
+    figlio = avvia(process.execPath, [script, 'heartbeat', '--loop'], {
+      env: { ...process.env, FILO_ROUTINE_TICKET: ticket, FILO_REPO_ROOT: ROOT }, stdio: 'ignore', windowsHide: true,
+    });
+    if (figlio && typeof figlio.on === 'function') figlio.on('error', () => {});
+  } catch (_) { figlio = null; }
+  const ferma = () => { try { if (figlio) figlio.kill(); } catch (_) { /* già uscito */ } };
+  process.once('exit', ferma);
+  return { ferma, figlio };
+}
+
 export function exitCodeFor(reply) {
   const r = reply || {};
   if (r.ok === true && r.result === 'merged') return 0;
