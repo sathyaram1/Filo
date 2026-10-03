@@ -300,11 +300,16 @@ class AnteprimeSchede {
   _siPuo(tab) {
     const m = this.m;
     if (this.spento || !vivo(tab) || !this.tieneSveglia(tab) || tab.id === m.activeId || tab.loading) return false;
+    return !this._finestraFerma();
+  }
+
+  // Colpa della finestra, non della scheda: la foto aspetta riprendi() senza consumare tentativi.
+  _finestraFerma() {
+    const m = this.m;
     const davanti = m.tabs.find((t) => t.id === m.activeId);
-    if (!vivo(davanti) || m._attivaNascosta) return false;
+    if (!vivo(davanti) || m._attivaNascosta) return true;
     const w = m.win;
-    if (!w || w.isDestroyed() || !w.isVisible() || w.isMinimized()) return false;
-    return true;
+    return !w || w.isDestroyed() || !w.isVisible() || w.isMinimized();
   }
 
   async _prossima() {
