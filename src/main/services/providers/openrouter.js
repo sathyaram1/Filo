@@ -437,9 +437,10 @@
   // richiesta non parte. Host sconosciuti (rete, 404, elenco vuoto): si chiama,
   // e resta il riscontro a posteriori.
   const HOSTS_FRESH_MS = 60 * 60 * 1000;
+  const HOSTS_RETRY_MS = 5 * 60 * 1000;
   const HOSTS_TIMEOUT_MS = 10000;
   const HOSTS_MAX_MODELS = 500;
-  const hostsCache = new Map(); // id → { at, hosts, pending }
+  const hostsCache = new Map(); // id → { until, hosts, pending }
 
   function endpointsUrl(model) {
     const id = String(model == null ? '' : model).trim();
@@ -465,22 +466,24 @@
     return hosts;
   }
 
-  // [{ name, tag }] o null se non si sa. Un valore vecchio si usa mentre si rilegge.
+  // [{ name, tag }] o null se non si sa. Un elenco scaduto si usa mentre si rilegge;
+  // una lettura fallita si ritenta dopo qualche minuto, non a ogni frase dettata.
   async function modelHosts({ apiKey, model } = {}) {
     const key = String(model == null ? '' : model).trim();
     if (!key) return null;
     const hit = hostsCache.get(key);
-    const fresh = hit && hit.hosts && Date.now() - hit.at < HOSTS_FRESH_MS;
-    if (fresh) return hit.hosts;
     if (hit && hit.pending) return hit.hosts || hit.pending;
-    const entry = { at: hit ? hit.at : 0, hosts: hit ? hit.hosts : null, pending: null };
+    if (hit && Date.now() < hit.until) return hit.hosts;
+    const entry = { until: 0, hosts: hit ? hit.hosts : null, pending: null };
     entry.pending = fetchModelHosts(apiKey, key)
       .then((hosts) => {
-        if (hosts) { entry.hosts = hosts; entry.at = Date.now(); }
+        entry.hosts = hosts;
+        entry.until = Date.now() + (hosts ? HOSTS_FRESH_MS : HOSTS_RETRY_MS);
         return entry.hosts;
       })
       .catch((e) => {
         console.warn(`[Filo policy] host di "${key}" non letti:`, (e && e.message) || e);
+        entry.until = Date.now() + HOSTS_RETRY_MS;
         return entry.hosts;
       })
       .finally(() => { entry.pending = null; });
@@ -528,6 +531,7 @@
   // con i byte e basta: chi ha servito non è nella risposta, ma l'id della
   // generazione sì (header), e con quello si chiede dopo (lookupServedBy).
   async function synthesizeSpeech({ apiKey, model, text, voice, speed, providerRouting, signal }) {
+    await ensureAllowedHost({ apiKey, model, providerRouting });
     const body = { model, input: String(text == null ? '' : text), response_format: 'pcm' };
     if (voice) body.voice = voice;
     const sp = Number(speed);
@@ -560,6 +564,7 @@
   // l'estensione ('wav', 'mp3', 'webm', …). `language` è un codice ISO-639-1
   // ('it'): se manca, il modello la riconosce da sé.
   async function transcribe({ apiKey, model, audioBase64, format, language, providerRouting, signal }) {
+    await ensureAllowedHost({ apiKey, model, providerRouting });
     const body = { model, input_audio: { data: audioBase64, format: format || 'wav' } };
     if (language) body.language = language;
     const pb = providerBlock(providerRouting, model);
@@ -692,6 +697,7 @@
   global.SN_PROVIDER_OPENROUTER = {
     listModels, complete, streamComplete, reasoningField, providerBlock, extractServedBy,
     cachedPromptTokens, synthesizeSpeech, transcribe, embed, lookupServedBy, keyInfo, fetchWithKey,
+    modelHosts, forgetModelHosts,
     createToolCallAccumulator, createReasoningDetailsAccumulator, toolsFields,
     ENDPOINT, SPEECH_ENDPOINT, TRANSCRIPTIONS_ENDPOINT, EMBEDDINGS_ENDPOINT, GENERATION_ENDPOINT, AUTH_KEY_ENDPOINT, CREDITS_ENDPOINT,
   };

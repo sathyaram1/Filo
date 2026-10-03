@@ -337,9 +337,10 @@
     // imposta — mostrarlo com'è vale molto più di una frase generica.
     // Stesso trattamento quando il modello c'è ma pretende il nome di una voce
     // che Filo non conosce: il messaggio dice dove scriverlo.
-    const spiegato = ['NO_MODEL_FOR_ACTION', 'TTS_VOICE_REQUIRED', 'TTS_VOICE_UNKNOWN'];
+    // E quando nessun fornitore ammesso serve il modello: la richiesta non è partita.
+    const spiegato = ['NO_MODEL_FOR_ACTION', 'TTS_VOICE_REQUIRED', 'TTS_VOICE_UNKNOWN', 'NO_ALLOWED_HOST'];
     if (spiegato.includes(res.errorCode) && res.error) {
-      try { Popup.showToast(I18n.t('tts_model_fallback_reason', String(res.error))); } catch (_) {}
+      try { Popup.showToast(I18n.t('tts_model_fallback_reason', String(res.error)), { duration: 9000 }); } catch (_) {}
       return;
     }
     const key = res.error === 'no_tts_model' ? 'tts_model_fallback_nokey' : 'tts_model_fallback';
@@ -548,13 +549,14 @@
   const DICTATE_LIVE_CHARS = 140;
 
   // Perché la dettatura non è partita, detto all'utente. Un errore di
-  // CONFIGURAZIONE dei modelli (nessun modello per questa funzione, o «solo
-  // pesi aperti» senza un modello che ascolti) arriva già spiegato e va
-  // mostrato com'è: dice cosa fare per rimetterla in piedi.
+  // CONFIGURAZIONE dei modelli (nessun modello per questa funzione, «solo pesi
+  // aperti» senza un modello che ascolti, nessun fornitore ammesso) arriva già
+  // spiegato e va mostrato com'è: dice cosa fare per rimetterla in piedi.
+  const dictationConfigError = (res) => Boolean(res && !res.ok && res.error
+    && ['NO_MODEL_FOR_ACTION', 'NO_OPEN_WEIGHTS_MODEL', 'NO_ALLOWED_HOST'].includes(res.code));
+
   function explainDictationFailure(res) {
-    const spiegato = (res?.code === 'NO_MODEL_FOR_ACTION' || res?.code === 'NO_OPEN_WEIGHTS_MODEL')
-      && res.error;
-    if (spiegato) Popup.showToast(res.error, { duration: 9000 });
+    if (dictationConfigError(res)) Popup.showToast(res.error, { duration: 9000 });
     else Popup.showToast(I18n.t('err_provider_failed'));
   }
 
@@ -651,7 +653,15 @@
         if (state.interimBusy || state.stopped || state.failed) return;
         state.interimBusy = true;
         transcribe(seg, true)
-          .then((res) => { if (res?.ok && !state.stopped) showLive(res.text); })
+          .then((res) => {
+            if (res?.ok && !state.stopped) showLive(res.text);
+            // Un errore di configurazione non passa da sé: si dice subito, non a fine frase.
+            else if (dictationConfigError(res) && !state.stopped && !state.failed) {
+              state.failed = true;
+              explainDictationFailure(res);
+              stopDictation();
+            }
+          })
           .catch(() => {})
           .finally(() => { state.interimBusy = false; });
       },
