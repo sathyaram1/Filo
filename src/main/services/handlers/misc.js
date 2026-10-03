@@ -3,6 +3,7 @@
 
 const { safeFetch } = require('../safe-fetch');
 const { avvisoNellaFinestra } = require('../avvisoFinestra');
+const Foto = require('../fotoDellaPagina');
 const auth = require('../../auth/google-auth');
 // L'identità da allegare a un invio che il server limita per identità: la
 // chiede la coda dei percorsi condivisi, al momento in cui spedisce.
@@ -223,11 +224,9 @@ module.exports = function register(on, ctx) {
   }
 
   on(MSG.CAPTURE_VISIBLE_TAB, async (msg, sender) => {
-    const win = winOf(sender);
-    if (!win || !win._filoTabs) return { ok: false, error: 'no window' };
-    const tab = win._filoTabs.tabs.find((t) => t.id === win._filoTabs.activeId);
-    if (!tab) return { ok: false, error: 'no active tab' };
-    const img = await tab.view.webContents.capturePage();
+    const wc = Foto.paginaDaFotografare(sender);
+    if (!wc) return { ok: false, code: 'fuori_vista', error: 'la pagina non è in vista' };
+    const img = await wc.capturePage();
     return { ok: true, dataUrl: img.toDataURL() };
   });
 
@@ -481,8 +480,8 @@ module.exports = function register(on, ctx) {
     // impila sopra lo screenshot della pagina per ottenere un'immagine di
     // tutta l'app col disegno. I tratti sono già parte del DOM della shell
     // (canvas di disegno), quindi vengono catturati direttamente.
-    const win = winOf(sender);
-    if (!win || !win._filoTabs) return { ok: false, error: 'no window' };
+    const win = Foto.barraDaFotografare(sender);
+    if (!win) return { ok: false, code: 'fuori_vista', error: 'la pagina non è in vista' };
     try {
       const barH = win._filoTabs.topChromeHeight();
       if (barH <= 0) return { ok: false, error: 'no topbar' };

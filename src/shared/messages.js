@@ -237,7 +237,8 @@
     //   servito e costo. { pseudonym } → { ok, detail } (detail.found false se
     //   lo pseudonimo non esiste).
     WALLET_OWNER_USER_DETAIL: 'wallet_owner_user_detail',
-    CAPTURE_VISIBLE_TAB: 'capture_visible_tab',
+    // Le due foto (pagina e barra) vanno solo alla pagina in vista, che inquadra sé stessa: services/fotoDellaPagina.js.
+    CAPTURE_VISIBLE_TAB: 'capture_visible_tab', // → { ok, dataUrl? }
     // "Salva immagine come…" dal menu contestuale. Instradato dal main
     // (session download + will-download) perché l'attributo `download` di un
     // <a> lato pagina è onorato da Chromium SOLO per URL same-origin/blob:/

@@ -13,6 +13,7 @@
       features: [],
       fixes: [
         'In Altro, Modelli e Preferenze quello che scrivi in una casella non si perde più se subito dopo cambi scheda o chiudi la pagina: domini esclusi, limite di spesa, chiavi, ore dell\'archivio automatico, durata delle notifiche, nome della voce. Il nome nuovo di una categoria vale anche senza premere «Rinomina».',
+        'Lo screenshot fatto col tasto destro dentro una finestra di accesso, come quella di «Accedi con Google», fotografa quella finestra e non la scheda che sta dietro.',
       ],
     },
     {
