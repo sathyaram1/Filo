@@ -325,8 +325,8 @@ toglie prima di guardare, o `localhost.` passerebbe dove `localhost` non passa.
 Lì il nome direbbe come si chiama la tua macchina o per chi lavori. Dove non si
 raccoglie, l'Aiuto non chiede nemmeno «Ha funzionato?», ed è lo stesso motivo
 per cui oggi non lo chiede da nessuna parte: una promessa di condivisione che
-non si avvera è peggio del silenzio. La seconda: su tutti gli altri decide il secondo
-modello, che il nome del sito ce l'ha davanti insieme al resto e sa che
+non si avvera è peggio del silenzio. La seconda: su tutti gli altri decide il
+secondo modello, che il nome del sito ce l'ha davanti insieme al resto e sa che
 `mariorossi.github.io` dice di chi è il sito, non cos'è.
 
 Dalla sezione di partenza sparisce anche il **nome utente scritto a lettere**,
@@ -368,8 +368,9 @@ microsecondo, e la rimanda a chiunque legga. Non c'è regola che la tolga. Due
 percorsi arrivati su due siti diversi a meno di un secondo l'uno dall'altro
 sono della stessa persona nella stessa sessione — la chiave che togliere
 l'identificativo doveva eliminare, rifatta con l'orologio. Quindi, a raccolta
-accesa, Filo **non spedisce un percorso quando lo fai**: lo tiene sul tuo computer e lo manda più
-tardi, a un'ora sorteggiata nelle ventiquattr'ore successive, uno alla volta.
+accesa, Filo **non spedisce un percorso quando lo fai**: lo tiene sul tuo
+computer e lo manda più tardi, a un'ora sorteggiata nelle ventiquattr'ore
+successive, uno alla volta.
 Due percorsi della stessa sessione partono a ore di distanza, in ordine
 qualsiasi, mescolati a quelli di tutti gli altri.
 

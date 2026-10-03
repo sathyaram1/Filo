@@ -1,11 +1,6 @@
-// La raccolta dei percorsi dell'Aiuto è spenta fino a dopo il lancio (#897): la
-// funzione del server che li riceve non esiste. Una sessione che finisce con
-// passi eseguiti non chiede «Ha funzionato?», non paga i due modelli di
-// pulizia, e la coda rimasta da una versione precedente si butta all'avvio.
-// La lettura invece resta: i percorsi del sito entrano ancora nel prompt.
-//
-// Il sito ha un nome da Internet che porta al server di prova: da 127.0.0.1 la
-// raccolta non partirebbe comunque, e la prova non direbbe niente.
+// Raccolta dei percorsi spenta (#897): a fine sessione niente «Ha funzionato?», niente modelli
+// di pulizia, coda vecchia buttata all'avvio; la lettura dei percorsi resta. Il sito ha un nome
+// da Internet che porta al server di prova: da 127.0.0.1 la raccolta non partirebbe comunque.
 
 import { test as base, expect, chiudiApp, argomentiScala } from './fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
