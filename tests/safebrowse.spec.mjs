@@ -379,7 +379,7 @@ test('Google Sites: un modulo montato secondi dopo il caricamento del riquadro f
 // Una pagina che non finisce di caricarsi (#813.1): il modulo è già a schermo, lo script dopo non arriva mai. Il server
 // tiene aperto lo script finché la prova non lo chiude, e la scheda si apre senza aspettare il DOMContentLoaded.
 async function serviInCaricamento(app, pagine, providers) {
-  await app.evaluate(async ({ session, net }, { pg, gsbListed }) => {
+  await app.evaluate(async ({ session, net }, { pg, gsbListed, ospitate }) => {
     globalThis.__sbLenti = [];
     const risposta = (req) => {
       const u = new URL(req.url);
@@ -402,9 +402,10 @@ async function serviInCaricamento(app, pagine, providers) {
     globalThis.SN_SAFEBROWSE.setProviders({
       gsb: gsbListed ? async () => ({ listed: true, category: 'phishing' }) : null,
       rdap: null, ct: null, sandbox: null,
-      llm: async () => ({ suspicious: false, reason: null }),
+      llm: async (meta) => (ospitate && meta.hostedOn && (meta.hasPassword || meta.hasPayment)
+        ? { suspicious: true, reasonKey: 'hosted_credentials', reason: null, confidence: 'high' } : { suspicious: false, reason: null }),
     });
-  }, { pg: pagine, gsbListed: !!(providers && providers.gsbListed) });
+  }, { pg: pagine, gsbListed: !!(providers && providers.gsbListed), ospitate: !!(providers && providers.ospitate) });
 }
 
 async function chiudiLenti(app) {
@@ -489,6 +490,35 @@ test('verdetto pronto prima che la pagina mandi il primo byte: l\'avviso compare
     await page.keyboard.type('segreto');
     await expect(page.getByPlaceholder('confermo')).toHaveValue('segreto');
     await expect(page.locator('#pw')).toHaveValue('');
+  } finally {
+    await chiudiLenti(app);
+  }
+});
+
+// Sulle pagine ospitate il modulo sta in un riquadro: se il riquadro non finisce mai di caricarsi, l'avviso non lo aspetta.
+test('Google Sites: il riquadro col modulo che resta in caricamento fa comparire l\'avviso (#813.1)', async ({ app, shell }) => {
+  await serviInCaricamento(app, {
+    'sites.google.com/view/posta-appesa': '<h1>Accesso alla posta</h1>'
+      + '<iframe src="https://9999-atari-embeds.googleusercontent.com/embeds/x/user.html" width="500" height="300"></iframe>',
+    '9999-atari-embeds.googleusercontent.com/embeds/x/user.html': `${ACCESSO}<script src="/lento.js"></script>`,
+  }, { ospitate: true });
+  try {
+    const page = await apriSenzaAspettare(app, shell, 'https://sites.google.com/view/posta-appesa');
+    await expect(page.getByText('Pagina pubblicata da un utente')).toBeVisible({ timeout: 10_000 });
+  } finally {
+    await chiudiLenti(app);
+  }
+});
+
+test('Apps Script: il riquadro interno col modulo che resta in caricamento fa comparire l\'avviso (#813.1)', async ({ app, shell }) => {
+  await serviInCaricamento(app, {
+    'script.google.com/macros/s/AKfyAppeso/exec': '<iframe src="https://n-xyz-0lu-script.googleusercontent.com/panel" width="600" height="400"></iframe>',
+    'n-xyz-0lu-script.googleusercontent.com/panel': '<iframe src="https://n-xyz-1lu-script.googleusercontent.com/user" width="580" height="380"></iframe>',
+    'n-xyz-1lu-script.googleusercontent.com/user': `<h1>Microsoft 365</h1>${ACCESSO}<script src="/lento.js"></script>`,
+  }, { ospitate: true });
+  try {
+    const page = await apriSenzaAspettare(app, shell, 'https://script.google.com/macros/s/AKfyAppeso/exec');
+    await expect(page.getByText('Pagina pubblicata da un utente')).toBeVisible({ timeout: 10_000 });
   } finally {
     await chiudiLenti(app);
   }
