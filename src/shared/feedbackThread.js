@@ -196,8 +196,8 @@
     secaudit: 'verifier',
     residuo: 'residuo',
   };
-  function authorKind(clientId) {
-    var c = String(clientId || '');
+  function authorKind(fb) {
+    var c = senderOf(fb);
     if (c.indexOf('auto:') === 0 || c.indexOf('filo:') === 0) return 'filo';
     if (c.indexOf('owner:') === 0) return 'owner';
     // La sessione locale prima del ramo agent/routine: non ha ruoli dopo i due
