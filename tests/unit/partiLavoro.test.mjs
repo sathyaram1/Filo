@@ -29,16 +29,20 @@ test('le parti fuse dai campi REST: solo app e server, solo numeri positivi', ()
   assert.equal(FINESTRA_PARTE_TARDIVA_MS, 48 * ORE);
 });
 
-test('parte tardiva: solo a pratica chiusa dall’altra parte da meno di 48 ore, locale, una volta per parte', () => {
-  const base = { status: 'done', parti: { app: ORA - ORE }, parte: 'server', locale: true, ora: ORA };
+test('parte tardiva: solo a pratica chiusa dall’altra parte da meno di 48 ore, locale, una volta per parte, dallo stesso ramo', () => {
+  const base = { status: 'done', parti: { app: ORA - ORE, ramo: 'claude/lavoro' }, parte: 'server', ramo: 'claude/lavoro', locale: true, ora: ORA };
   assert.deepEqual(parteTardiva(base), { ok: true, altra: 'app', at: ORA - ORE });
   const no = [
     [{ status: 'working' }, /non è chiusa/],
-    [{ parti: { app: ORA - 49 * ORE } }, /più di 48 ore/],
-    [{ parti: { app: ORA + ORE } }, /più di 48 ore/],
-    [{ parti: { app: ORA - ORE, server: ORA - ORE } }, /già su main/],
+    [{ parti: { app: ORA - 49 * ORE, ramo: 'claude/lavoro' } }, /più di 48 ore/],
+    [{ parti: { app: ORA + ORE, ramo: 'claude/lavoro' } }, /più di 48 ore/],
+    [{ parti: { app: ORA - ORE, server: ORA - ORE, ramo: 'claude/lavoro' } }, /già su main/],
     [{ parti: {} }, /non l’ha chiusa/],
-    [{ parti: { app: ORA - ORE, solo: 'app' } }, /stava tutto lì/],
+    [{ parti: { app: ORA - ORE, solo: 'app', ramo: 'claude/lavoro' } }, /stava tutto lì/],
+    // Un altro lavoro che cita la pratica: ramo diverso, nessun ramo registrato, o il lavoro detto tutto in questa parte.
+    [{ ramo: 'claude/un-altro-lavoro' }, /l’ha chiusa la fusione di claude\/lavoro.*stesso nome/],
+    [{ parti: { app: ORA - ORE } }, /non dice quale ramo/],
+    [{ solo: true }, /non è di questo lavoro/],
     [{ locale: false }, /solo in locale/],
     [{ parte: 'altro' }, /sconosciuta/],
   ];
