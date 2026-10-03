@@ -30,6 +30,7 @@ const { collegaScorciatoie } = require('./shortcuts');
 const { AvvisiSopraPagina } = require('./avvisiSopraPagina');
 const { AnteprimeSchede } = require('./tabs/anteprime');
 const CartaAnteprima = require('./popup-anteprima');
+const { AvvisoSito } = require('./avvisoSito');
 
 // #441 — eventi di solo PUNTAMENTO: il cursore che attraversa la pagina non è
 // un'interazione dell'utente con quella scheda (tutto il resto — click, tasti,
@@ -311,6 +312,12 @@ class TabManager {
         const t = this.tabs.find((x) => x.id === this.activeId);
         return (t && t.view) || null;
       },
+    });
+    this.avvisoSito = new AvvisoSito(window, {
+      schedaAttiva: () => this.tabs.find((x) => x.id === this.activeId) || null,
+      scegli: (tab, scelta, dati) => this._sbScelta(tab, scelta, dati),
+      menu: (tab) => this._sbVociMenu(tab),
+      restituisciTastiera: () => this._tastieraAllaSchedaAttiva(),
     });
     // §1.2 — cache del colore identità per dominio (host → 'rgb(r,g,b)'). Così
     // una nuova tab su un dominio già visto mostra subito la sua tinta, senza
@@ -1582,12 +1589,15 @@ class TabManager {
   // vede più, o su niente perché la view chiusa se l'è portata via: senza, dopo
   // Ctrl+W, Alt+cifra o Alt+S i tasti non arrivano a nessuno finché non si
   // clicca (#838). La barra che ha la tastiera la tiene; Filo dietro non la ruba.
+  // Una scheda coperta dall'avviso del sito pericoloso dà la tastiera all'avviso, mai alla pagina (#813.5).
   _tastieraAllaSchedaAttiva() {
     const tab = this.tabs.find((t) => t.id === this.activeId);
     if (!tab || this.win.isDestroyed() || !this.win.isFocused()) return;
+    const avviso = this.avvisoSito.coperta() === tab ? this.avvisoSito.webContents() : null;
+    const dest = avviso || tab.view.webContents;
     const col = require('electron').webContents.getFocusedWebContents();
-    if (col === this.win.webContents || col === tab.view.webContents) return;
-    try { tab.view.webContents.focus(); } catch (_) {}
+    if (col === this.win.webContents || col === dest) return;
+    try { dest.focus(); } catch (_) {}
   }
 
   // §2.1 — segnali di attività riportati dal content script (input, scroll,
@@ -1797,6 +1807,7 @@ class TabManager {
     // Con la scheda davanti nascosta, una di dietro allargata per la sua anteprima si vedrebbe.
     this._attivaNascosta = !visible;
     if (visible) this.anteprime.riprendi(); else this.anteprime.interrompi();
+    this.avvisoSito.nascondi(!visible);
   }
 
   // Solo la scheda davanti si vede; una aperta dietro resta «visibile» a 0×0 finché non ha l'anteprima (#430).
@@ -1831,6 +1842,8 @@ class TabManager {
         tab.view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
       }
     }
+    // L'ordine conta: l'avviso del sito sta sopra la scheda, gli avvisi della barra sopra di lui.
+    this.avvisoSito.posa();
     this.avvisi.posa();
   }
 
@@ -1952,6 +1965,7 @@ class TabManager {
       this.setContentFullscreen(false);
     });
     collegaScorciatoie(wc, () => this.win);
+    this._sbGuardiaTastiera(tab, wc);
     wc.on('before-input-event', (event, input) => {
       // #514 — l'ultimo tasto era l'Esc? Serve a `enter-html-full-screen`, che
       // da un Esc non fa passare nessuna richiesta di schermo pieno. Qui,
@@ -2974,9 +2988,8 @@ class TabManager {
 
   // ─── rilevamento siti pericolosi ─────────────────────────────────────────
   // (vedi src/main/services/safebrowse/ e src/main/tabs/tabSafebrowse.js).
-  // I metodi safebrowse (_sbState, _sbApplyState, _sbBroadcast, safebrowseGet,
-  // _sbOnNavigate, safebrowseProceed, safebrowseDismiss) sono estratti in
-  // tabSafebrowse.js e installati sul prototype in fondo a questo file (mixin).
+  // I metodi safebrowse sono estratti in tabSafebrowse.js e installati sul
+  // prototype in fondo a questo file (mixin); l'avviso lo disegna avvisoSito.js.
 
   // ─── rilevamento geo-block (livello 1 deterministico) + regole d'azione ───
   // (vedi src/main/services/geoBlock.js, proxy-per-tab-spec.md §4-§5 e
@@ -3131,7 +3144,7 @@ class TabManager {
 
 // Installa i blocchi estratti come metodi di TabManager (mixin). Le definizioni
 // vivono in moduli separati per leggibilità; qui li agganciamo al prototype così
-// `this._sbBroadcast(...)`, `this._geoTextCheck(...)`, ecc. restano metodi
+// `this._sbMostra(...)`, `this._geoTextCheck(...)`, ecc. restano metodi
 // d'istanza identici a prima del refactor.
 installSafebrowse(TabManager);
 installGeoBlock(TabManager);

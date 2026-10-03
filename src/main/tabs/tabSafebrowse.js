@@ -1,14 +1,6 @@
-// Rilevamento siti pericolosi (safebrowse) — estratto da tabs.js come livello
-// separato. (vedi src/main/services/safebrowse/.) Tutto best-effort: NIENTE
-// blocca mai la navigazione. L'overlay "pericoloso"/banner "sospetto" vive in
-// un content script sulla pagina; qui calcoliamo il verdetto e lo spingiamo via
-// broadcast SAFEBROWSE_UPDATE. Bypass (confermo) e dismiss (ok) sono per
-// (tab, dominio) e durano solo finché il tab vive.
-//
-// Questi metodi vengono installati sul prototype di TabManager (mixin): `this`
-// è l'istanza TabManager, quindi `this.tabs`, `this._sbBroadcast(...)`, ecc.
-// funzionano identici a quando vivevano inline in tabs.js. Le dipendenze sono
-// solo i globali SN_SAFEBROWSE / SN_MSG (caricati dal loader), come prima.
+// Rilevamento siti pericolosi per scheda (mixin di TabManager): verdetto, bypass e chiusura per (scheda, dominio).
+// L'avviso lo disegna la vista sopra la scheda (src/main/avvisoSito.js), mai la pagina; il content script manda indizi.
+// Niente blocca la navigazione. Regole: patterns/un-avviso-su-una-pagina-non-sta-dentro-la-pagina.md
 
 const { pageHints } = require('../../content/safebrowseHints.js');
 
@@ -35,26 +27,33 @@ const safebrowseMethods = {
     return verdict;
   },
 
-  // Spinge il verdetto al content script del tab (l'overlay/banner si ridisegna).
-  _sbBroadcast(tab, url, verdict) {
-    // Memorizza l'ultimo livello di sicurezza applicato al tab: è l'input
-    // "sito flaggato sospetto/pericoloso" delle regole d'azione geo-block
-    // (#151), che NON deve mai aggirare i controlli di sicurezza di Filo.
-    try { tab.sbLevel = verdict ? (verdict.level || 'safe') : 'safe'; } catch (_) {}
-    const T = (globalThis.SN_MSG && globalThis.SN_MSG.MSG && globalThis.SN_MSG.MSG.SAFEBROWSE_UPDATE) || 'safebrowse_update';
-    try {
-      tab.view.webContents.send('filo:broadcast', {
-        type: T,
-        url,
-        level: verdict ? verdict.level : 'safe',
-        message: verdict ? (verdict.message || null) : null,
-      });
-    } catch (_) {}
+  // Un verdetto arrivato in ritardo per un sito da cui la scheda è già andata via non vale più.
+  _sbMostra(tab, url, verdict) {
+    const wc = tab && tab.view && tab.view.webContents;
+    if (!wc || wc.isDestroyed()) return;
+    if (url && !stessoSito(url, wc.getURL())) return;
+    const level = verdict ? (verdict.level || 'safe') : 'safe';
+    // È anche l'input «sito flaggato» delle regole geo-block (#151), che non devono aggirare i controlli di sicurezza.
+    tab.sbLevel = level;
+    tab.sbAvviso = (level === 'pericoloso' || level === 'sospetto')
+      ? { level, message: verdict.message || null, url: url || wc.getURL() } : null;
+    if (tab.id === this.activeId) this.layout();
   },
 
-  // Richiesto dal content script (SAFEBROWSE_GET) quando la pagina parte. Ritorna
-  // SUBITO il verdetto sincrono (rispettando bypass/dismiss) e, se ci sono
-  // segnali di rete da approfondire, li avvia: a verdetto cambiato fa broadcast.
+  // Coperta dall'avviso, la scheda non riceve tasti: se il fuoco ci torna (un clic sulla barra, la finestra che
+  // riprende il primo piano, una pagina che chiama focus()), torna all'avviso.
+  _sbGuardiaTastiera(tab, wc) {
+    const coperta = () => this.avvisoSito && this.avvisoSito.coperta() === tab && tab.view.webContents === wc;
+    wc.on('before-input-event', (event, input) => {
+      if (event.daAvvisoSito || !coperta()) return;
+      event.preventDefault();
+      if (input.type === 'keyDown') this.avvisoSito.prendiTastiera();
+    });
+    wc.on('focus', () => setTimeout(() => { if (coperta()) this.avvisoSito.prendiTastiera(); }, 0));
+  },
+
+  // Chiesto dal content script (SAFEBROWSE_GET) all'apertura del documento e quando compaiono campi sensibili: il
+  // verdetto sincrono si mostra subito, quello dei segnali di rete quando arriva.
   safebrowseGet(tabId, url, ctx = {}) {
     const SB = globalThis.SN_SAFEBROWSE;
     const tab = this.tabs.find((t) => t.id === tabId);
@@ -62,12 +61,13 @@ const safebrowseMethods = {
     let verdict;
     try {
       verdict = SB.analyze(url, { ...ctx, budgetUrl: tab._urlNavigato }, (next) => {
-        this._sbBroadcast(tab, url, this._sbApplyState(tab, next));
+        this._sbMostra(tab, url, this._sbApplyState(tab, next));
       });
     } catch (_) {
       return { ok: true, level: 'safe', message: null };
     }
     const applied = this._sbApplyState(tab, verdict);
+    this._sbMostra(tab, url, applied);
     return {
       ok: true,
       level: applied.level,
@@ -76,19 +76,21 @@ const safebrowseMethods = {
     };
   },
 
-  // did-navigate: ricontrolla l'URL FINALE (dopo i redirect) e spinge il verdetto
-  // al content script. Salta le pagine interne filo://.
+  // did-navigate: ricontrolla l'URL FINALE (dopo i redirect). Una pagina che non è un sito (filo://, about:blank)
+  // toglie l'avviso del documento di prima.
   _sbOnNavigate(tab, url) {
     const SB = globalThis.SN_SAFEBROWSE;
-    if (!SB || !tab || !url || /^filo:\/\//i.test(url)) return;
+    if (!tab || !url) return;
+    if (!/^https?:\/\//i.test(url)) { this._sbMostra(tab, null, null); return; }
+    if (!SB) return;
     // L'indirizzo da cui la pagina è arrivata davvero: quello che si scrive dopo non sposta il conto (#591), qui e nel
     // blocco geografico.
     tab._urlNavigato = url;
     try {
       const verdict = SB.analyze(url, {}, (next) => {
-        this._sbBroadcast(tab, url, this._sbApplyState(tab, next));
+        this._sbMostra(tab, url, this._sbApplyState(tab, next));
       });
-      this._sbBroadcast(tab, url, this._sbApplyState(tab, verdict));
+      this._sbMostra(tab, url, this._sbApplyState(tab, verdict));
     } catch (_) {}
   },
 
@@ -130,16 +132,15 @@ const safebrowseMethods = {
     if ((hints.hasPassword || hints.hasPayment) && wc.getURL() === url) {
       tab._sbCampiUrl = url;
       try {
-        const v = SB.analyze(url, hints, (next) => this._sbBroadcast(tab, url, this._sbApplyState(tab, next)));
-        if (v && v.level !== 'safe') this._sbBroadcast(tab, url, this._sbApplyState(tab, v));
+        const v = SB.analyze(url, hints, (next) => this._sbMostra(tab, url, this._sbApplyState(tab, next)));
+        if (v && v.level !== 'safe') this._sbMostra(tab, url, this._sbApplyState(tab, v));
       } catch (_) {}
       return;
     }
     tab._sbFrameTimer = setTimeout(() => this._sbScanFrames(tab, giro), 1500);
   },
 
-  // L'utente ha scritto "confermo" sull'interstitial "pericoloso": registra il
-  // bypass per (tab, dominio) e ridisegna (l'overlay sparisce).
+  // L'utente ha scritto "confermo" sull'avviso "pericoloso": bypass per (scheda, dominio), l'avviso va via.
   safebrowseProceed(tabId, url) {
     const SB = globalThis.SN_SAFEBROWSE;
     const tab = this.tabs.find((t) => t.id === tabId);
@@ -149,12 +150,11 @@ const safebrowseMethods = {
       const key = SB && SB.scopeOf(url);
       if (key) tab.sbBypass.add(key);
     } catch (_) {}
-    this._sbBroadcast(tab, url, { level: 'safe', message: null });
+    this._sbMostra(tab, url, { level: 'safe', message: null });
     return { ok: true };
   },
 
-  // L'utente ha chiuso con "ok" il banner "sospetto": non riproporlo per questo
-  // dominio in questo tab.
+  // L'utente ha scelto «Continua» sul "sospetto": non riproporlo per questo dominio in questa scheda.
   safebrowseDismiss(tabId, url) {
     const SB = globalThis.SN_SAFEBROWSE;
     const tab = this.tabs.find((t) => t.id === tabId);
@@ -164,10 +164,82 @@ const safebrowseMethods = {
       const key = SB && SB.scopeOf(url);
       if (key) tab.sbDismissed.add(key);
     } catch (_) {}
-    this._sbBroadcast(tab, url, { level: 'safe', message: null });
+    this._sbMostra(tab, url, { level: 'safe', message: null });
     return { ok: true };
   },
+
+  // «Torna indietro» non conferma mai il sito (#288): si torna alla pagina di prima, o si esce su una pagina vuota.
+  safebrowseIndietro(tabId) {
+    const tab = this.tabs.find((t) => t.id === tabId);
+    if (!tab) return { ok: false };
+    const wc = tab.view.webContents;
+    let puo = false;
+    try { puo = wc.navigationHistory ? wc.navigationHistory.canGoBack() : wc.canGoBack(); } catch (_) {}
+    if (puo) this.goBack(tabId);
+    else { try { wc.loadURL('about:blank'); } catch (_) {} }
+    return { ok: true };
+  },
+
+  // Pulsanti e tasto destro dell'avviso. «Procedi» vale solo con «confermo» scritto (livello 3, actionLevels.js).
+  _sbScelta(tab, scelta, dati = {}) {
+    const a = tab && tab.sbAvviso;
+    if (!a) return;
+    if (scelta === 'procedi') {
+      if (a.level === 'pericoloso' && String(dati.testo || '').trim().toLowerCase() === 'confermo') {
+        this.safebrowseProceed(tab.id, a.url);
+      }
+    } else if (scelta === 'continua') {
+      if (a.level === 'sospetto') this.safebrowseDismiss(tab.id, a.url);
+    } else if (scelta === 'indietro') {
+      this.safebrowseIndietro(tab.id);
+    } else if (scelta === 'copia') {
+      try { require('electron').clipboard.writeText(a.url); } catch (_) {}
+    } else if (scelta === 'chiedi' || scelta === 'segnala') {
+      this._sbApriCasa(tab, scelta);
+    }
+  },
+
+  _sbVociMenu() {
+    return [
+      { label: 'Chiedi a Filo di questo sito', icon: 'help', action: 'avviso-sito:chiedi' },
+      { label: 'Segnala un falso allarme', icon: 'feedback', action: 'avviso-sito:segnala' },
+      { type: 'separator' },
+      { label: 'Copia l\'indirizzo', icon: 'duplicate', action: 'avviso-sito:copia' },
+      { label: 'Torna indietro', action: 'avviso-sito:indietro' },
+    ];
+  },
+
+  // Domanda e segnalazione si fanno in una scheda di Filo: la pagina sotto l'avviso non deve vedere né il pannello né
+  // quello che ci si scrive. La home appena aperta se le prende con CASA_RICHIESTA, una volta sola.
+  _sbApriCasa(tab, tipo) {
+    const a = tab.sbAvviso;
+    if (!a) return;
+    const titolo = (a.message && a.message.title) || '';
+    const corpo = (a.message && a.message.body) || '';
+    const cosa = a.level === 'pericoloso' ? 'pericoloso' : 'sospetto';
+    // Nella domanda va solo quello che Filo ha scritto da sé: il corpo può portare il giudizio di un modello sulla
+    // pagina, che è testo di fuori e non entra nel messaggio dell'utente.
+    const testo = tipo === 'chiedi'
+      ? `Filo mi ha avvisato che questo sito è ${cosa}: ${a.url}${titolo ? ` («${titolo}»)` : ''}. `
+        + 'È davvero da evitare? Cosa mi consigli di fare?'
+      : `Falso allarme: Filo ha segnalato come ${cosa} ${a.url}${titolo ? `\nAvviso: ${titolo}` : ''}`
+        + `${corpo ? `\n${corpo}` : ''}\nPerché non lo è: `;
+    const id = this.openTab('filo://newtab/', { allowDuplicate: true });
+    const nuova = this.tabs.find((t) => t.id === id);
+    if (nuova) nuova._richiestaCasa = { tipo, testo };
+  },
+
+  richiestaCasa(tabId) {
+    const tab = this.tabs.find((t) => t.id === tabId);
+    const r = (tab && tab._richiestaCasa) || null;
+    if (tab) tab._richiestaCasa = null;
+    return r;
+  },
 };
+
+function stessoSito(a, b) {
+  try { return new URL(a).host === new URL(b).host; } catch (_) { return true; }
+}
 
 // Installa i metodi sul prototype di TabManager (mixin). `this` resta l'istanza.
 function installSafebrowse(TabManager) {
