@@ -20,6 +20,8 @@ require(join(ROOT, 'src', 'shared', 'wallet.js'));
 require(join(ROOT, 'src', 'pages', 'dashboard', 'dashboard-comandi.js'));
 const MSG = globalThis.SN_MSG.MSG;
 const C = globalThis.SN_DASH_COMANDI;
+// I numeri si scrivono con la regola della pagina Crediti (#816), qualunque sia l'ICU che gira.
+const fmt = (n) => globalThis.SN_WALLET.formatCredits(n);
 
 const pseudo = (i) => `${i.toString(16).padStart(4, '0')}c0ffee12abcd`;
 // Dalla più nuova: la persona 0 è entrata per ultima.
@@ -80,10 +82,10 @@ const di = (tipo) => richieste.filter((r) => r.type === tipo);
 test('«/users» mostra pseudonimi, saldi e chi ha invitato, nessuna email, cinquanta per volta', async () => {
   const riga = await comando('/users');
   assert.match(riga, /^Persone con un portafoglio 1-50 di 120:/);
-  assert.ok(riga.includes(`• ${pseudo(0)} — 5.000 crediti, invitata da te`), riga);
-  assert.ok(riga.includes(`• ${pseudo(1)} — 5.001 crediti, invitata da ${pseudo(2)}`), riga);
-  assert.ok(riga.includes(`• ${pseudo(2)} — 5.002 crediti\n`), 'senza chi ha invitato la riga non inventa niente');
-  assert.ok(riga.includes(pseudo(49)) && !riga.includes(pseudo(50)));
+  assert.ok(riga.includes(`• ${pseudo(0)} — ${fmt(5000)} crediti, invitata da te`), riga);
+  assert.ok(riga.includes(`• ${pseudo(1)} — ${fmt(5001)} crediti, invitata da ${pseudo(2)}`), riga);
+  assert.ok(riga.includes(`• ${pseudo(2)} — ${fmt(5002)} crediti\n`), 'senza chi ha invitato la riga non inventa niente');
+  assert.ok(riga.includes(`• ${pseudo(49)}`) && !riga.includes(`• ${pseudo(50)}`));
   assert.ok(!riga.includes('@'));
   assert.match(riga, /\/users altri/, 'chi legge deve sapere come vedere le prossime');
   assert.equal(di(MSG.WALLET_OWNER_OVERVIEW).length, 1);
@@ -130,10 +132,10 @@ test('con esattamente cinquanta persone non si offre una pagina che non c’è',
 });
 
 test('«/users INIZIO» cerca per inizio dello pseudonimo, in qualunque maiuscola', async () => {
-  const una = await comando(`/users ${pseudo(99)}`);
-  assert.equal(una, `Trovata:\n• ${pseudo(99)} — 5.099 crediti`);
+  const una = await comando(`/users ${pseudo(98)}`);
+  assert.equal(una, `Trovata:\n• ${pseudo(98)} — ${fmt(5098)} crediti`);
   const sedici = await comando('/users 006C');
-  assert.equal(sedici, `Trovata:\n• ${pseudo(0x6c)} — 5.108 crediti, invitata da te`);
+  assert.equal(sedici, `Trovata:\n• ${pseudo(0x6c)} — ${fmt(5108)} crediti, invitata da te`);
   const gruppo = await comando('/users «006»');
   assert.match(gruppo, /^Persone con uno pseudonimo che comincia per «006» 1-16 di 16:/);
   assert.ok(!gruppo.includes(pseudo(0x70)));
@@ -177,7 +179,7 @@ test('«/gift NUMERO INIZIO» regala alla persona per la strada del portafoglio 
   const riga = await comando('/gift 500 0063');
   const [g] = di(MSG.WALLET_OWNER_GRANT);
   assert.deepEqual({ ...g }, { type: MSG.WALLET_OWNER_GRANT, pseudonym: pseudo(0x63), credits: 500, why: 'owner' });
-  assert.equal(riga, `✓ Regalati 500 crediti a ${pseudo(0x63)}. Nuovo saldo: 5.599 crediti.`);
+  assert.equal(riga, `✓ Regalati 500 crediti a ${pseudo(0x63)}. Nuovo saldo: ${fmt(5599)} crediti.`);
   assert.equal(di(MSG.WALLET_OWNER_OVERVIEW).length, 2, 'il saldo nuovo si rilegge dopo il regalo');
 });
 
@@ -215,7 +217,7 @@ test('un inizio che non è di nessuno, o due pseudonimi insieme, non regalano ni
 });
 
 test('numero non valido o argomenti mancanti: si spiega l’uso, nessuna richiesta', async () => {
-  assert.match(await comando('/gift abc 0063'), /numero di crediti valido/);
+  assert.match(await comando('/gift abc zz'), /numero di crediti valido/);
   assert.match(await comando('/gift 0 0063'), /numero di crediti valido/);
   assert.match(await comando('/gift 500'), /Uso: \/gift NUMERO PSEUDONIMO/);
   assert.equal(richieste.length, 0);
