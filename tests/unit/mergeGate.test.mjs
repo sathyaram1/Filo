@@ -204,9 +204,10 @@ test('una prova degli unit più lunga della finestra di silenzio non fa arrivare
     g(casa, 'init', '-q', '--bare', '--initial-branch=main', origin);
     g(casa, 'clone', '-q', origin, lavoro);
     for (const f of ['scripts/run-unit-tests.mjs', 'scripts/lib/riga-di-comando.mjs']) {
-      execFileSync(process.execPath, ['-e', `require('fs').mkdirSync(require('path').dirname(process.argv[2]),{recursive:true});require('fs').copyFileSync(process.argv[1],process.argv[2])`, resolve(__dirname, '..', '..', f), join(lavoro, f)]);
+      mkdirSync(dirname(join(lavoro, f)), { recursive: true });
+      copyFileSync(resolve(__dirname, '..', '..', f), join(lavoro, f));
     }
-    execFileSync(process.execPath, ['-e', "require('fs').mkdirSync(process.argv[1],{recursive:true})", join(lavoro, 'tests', 'unit')]);
+    mkdirSync(join(lavoro, 'tests', 'unit'), { recursive: true });
     writeFileSync(join(lavoro, 'package.json'), '{"type":"module"}\n');
     writeFileSync(join(lavoro, 'tests', 'unit', 'base.test.mjs'), "import test from 'node:test'; test('base', () => {});\n");
     g(lavoro, 'add', '-A'); g(lavoro, 'commit', '-qm', 'base'); g(lavoro, 'push', '-q', 'origin', 'main');
