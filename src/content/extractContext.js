@@ -994,7 +994,7 @@
     } catch (_) {}
     const nomi = ['aria-label', 'placeholder', 'name', 'id', 'title'].map((a) => el.getAttribute(a) || '');
     nomi.push(etichettaCollegata(el));
-    return PAROLE_SEGRETE.test(nomi.join(' '));
+    return PAROLE_SEGRETE.test(nomi.join(' ').replace(/([a-z])([A-Z])/g, '$1 $2'));
   }
 
   // Come chiamare un elemento descrivendolo al modello o nel registro delle azioni. Il valore di un campo
@@ -1005,7 +1005,7 @@
       || el.getAttribute?.('placeholder') || '';
     const campo = CAMPO_CON_VALORE.test(el.tagName);
     const valore = campo && !campoSegreto(el) ? el.value : '';
-    const testo = nome || valore || (campo ? '' : (el.innerText || el.textContent || ''));
+    const testo = nome || valore || (el.tagName === 'INPUT' ? '' : (el.innerText || el.textContent || ''));
     return String(testo).replace(/\s+/g, ' ').trim();
   }
 
@@ -1164,6 +1164,8 @@
     pageMeta,
     pageExcerpt,
     extractInteractiveOutline,
+    nomeElemento,
+    campoSegreto,
     viewportInfo,
     expandAncestors,
     canRevealElement,

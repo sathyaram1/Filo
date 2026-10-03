@@ -506,21 +506,13 @@
     } catch (_) { /* fail silently — è telemetria best-effort */ }
   }
 
-  // Etichetta breve (≤4 parole) per descrivere un'azione utente.
-  // Preferenza: testo dell'elemento → aria-label → tag.
+  // Etichetta breve (≤4 parole) per descrivere un'azione utente: va al modello, quindi passa da
+  // `nomeElemento`, che non legge mai il valore di un campo segreto (#810.7).
   function describeElementBriefly(el) {
     if (!el) return '';
-    const raw = (
-      el.getAttribute?.('aria-label')
-      || (el.innerText || el.textContent || '').trim()
-      || el.getAttribute?.('alt')
-      || el.getAttribute?.('placeholder')
-      || el.value
-      || el.tagName.toLowerCase()
-    ).replace(/\s+/g, ' ').trim();
+    const raw = (() => { try { return Extract?.nomeElemento?.(el) || ''; } catch (_) { return ''; } })();
     if (!raw) return el.tagName.toLowerCase();
-    const words = raw.split(' ');
-    return words.slice(0, 4).join(' ');
+    return raw.split(' ').slice(0, 4).join(' ');
   }
 
   // ---------- Parsing risposta AI ----------
