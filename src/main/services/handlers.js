@@ -2685,6 +2685,7 @@ const CAMPI_SALVATI = {
   SVEGLIA: ['label', 'etichetta'],
   SALVA_LEZIONE: ['testo', 'text', 'lezione'],
   DIMENTICA: ['_righe'],
+  ANNULLA_CAMBIO: ['_fraseCambio'],
 };
 
 // I testi salvati che una descrizione ripete (#592.4): nella frase di Filo
@@ -4499,10 +4500,12 @@ Registro.collega({
   applicaImpostazioni: (parziale) => applySettingsUpdate(parziale),
   aggiornaVivo: () => broadcastLiveUpdate(),
   aggiornaRegoleProxy: () => refreshProxyRulesAllWindows(),
+  // Lo zoom di un sito vale per la sua sessione: un annullo dell'incognito non tocca le finestre normali.
   zoomSu: async (host, percentuale) => {
+    const incognito = require('../shim/storage').inIncognito();
     for (const w of BrowserWindow.getAllWindows()) {
       const tm = w._filoTabs;
-      if (!tm || typeof tm.zoomSulSito !== 'function') continue;
+      if (!tm || typeof tm.zoomSulSito !== 'function' || !!w._filoIncognito !== incognito) continue;
       if (await tm.zoomSulSito(host, percentuale)) return true;
     }
     return false;

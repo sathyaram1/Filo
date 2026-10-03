@@ -475,6 +475,12 @@
       invoke: 'Pagina filo://preferences/preferences.html.',
     },
     {
+      id: 'undo-changes', title: 'Rimetti com’era un cambio, da dovunque venga', category: 'settings',
+      desc: 'Ogni cambio allo stato di Filo resta segnato con chi l’ha fatto: impostazioni, aspetto, tema, sveglie e timer, regole del proxy, zoom di un sito. Vale per quelli chiesti in chat e per quelli fatti a mano nelle pagine delle impostazioni, e Filo li vede tutti. Quando lo chiedi in chat, sulla tua bolla compare un piccolo segno: al passaggio del mouse dice cosa è cambiato, per esempio «tema: chiaro → scuro», e offre «annulla». Anche l’annullo resta segnato, e si rifà con «rifai».',
+      invoke: 'Passa il mouse sul segno della tua bolla in chat e premi «annulla», oppure scrivi a Filo «rimetti come prima».',
+      doesNot: 'Le chiavi API e gli indirizzi dei proxy non vengono conservati: un loro cambio si vede ma non si annulla. In una finestra incognito i cambi restano solo finché la finestra è aperta. I cambi fatti dalle pagine non hanno ancora una riga nella home: per ora li ritrova Filo quando glielo chiedi.',
+    },
+    {
       id: 'security', title: 'Sicurezza e privacy', category: 'settings',
       desc: 'Protezione dalla fuga del tuo indirizzo IP, blocco dei popup, gestione dei cookie (manuale / predefinita / privacy massima), lista dei siti bloccati e lista dei siti fidati. Un sito bloccato non si apre da nessuna strada (link, risultati di una ricerca, barra della home, redirect, finestrelle, indietro e avanti, azioni di Filo) finché non scegli «Apri comunque» (nella notifica, sulla pagina «Sito bloccato» o sotto la risposta di Filo in chat o nell\'assistente sulla pagina); una scheda già aperta su un sito che metti in lista passa subito alla pagina «Sito bloccato», anche alla riapertura di Filo, e da lì un collegamento porta alla lista.',
       invoke: 'Pagina filo://security/security.html.',

@@ -173,6 +173,9 @@ test('annullare rimette i valori di prima, anche dentro le mappe sostituite inte
   assert.deepEqual(parziale, { theme: 'light', themeTokens: { accent: '#111111' }, security: { cookies: { mode: 'default' } } });
   assert.equal(K.livello(evento), 2, 'rimettere la gestione dei cookie chiede la conferma che chiede cambiarla');
   assert.equal(K.livello({ cambi: [evento.cambi[0]] }), 1);
+  const timer = (id) => ({ chiave: `timer:${id}`, prima: null, dopo: { id } });
+  assert.equal(K.livello({ cambi: [timer('a')] }), 1);
+  assert.equal(K.livello({ cambi: [timer('a'), timer('b')] }), 2, 'togliere più timer insieme chiede conferma, come CANCELLA_SVEGLIA');
 });
 
 test('un annullo annullato rimette in piedi il cambio di prima', () => {

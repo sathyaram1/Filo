@@ -703,7 +703,14 @@ function corpo(sorgente, inizio) {
 
 describe('sentinella: ogni uscita passa dalla porta unica', () => {
   const handlers = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers.js'), 'utf8');
-  const esegui = corpo(handlers, 'async function executeFiloAction(');
+  // executeFiloAction dichiara solo la provenienza dei cambi (#867) e passa tutto a eseguiAzioneFilo.
+  const esegui = corpo(handlers, 'async function eseguiAzioneFilo(');
+
+  test('executeFiloAction non fa niente da sé: ogni azione passa dal corpo che ha la porta', () => {
+    const fuori = corpo(handlers, 'async function executeFiloAction(');
+    assert.ok(/eseguiAzioneFilo\(action, opzioni\)/.test(fuori), 'executeFiloAction non delega a eseguiAzioneFilo');
+    assert.ok(!/switch \(type\)|\.openTab\(|runCommand\(/.test(fuori), 'executeFiloAction esegue qualcosa per conto suo');
+  });
 
   test('executeFiloAction chiama la porta prima del gate dei livelli e di ogni esecuzione', () => {
     const porta = esegui.indexOf('controllaUscita(');

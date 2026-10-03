@@ -3,8 +3,13 @@
 // Ogni prova asserisce il successo dal punto di vista dell'utente: senza il registro sono rosse.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { createRequire } from 'node:module';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
+
+const require = createRequire(import.meta.url);
+const { buildExportZip } = require('../src/main/services/exportData.js');
 
 async function trovaPagina(app, prova, timeout = 10_000) {
   const deadline = Date.now() + timeout;
@@ -20,6 +25,8 @@ const homeDi = (app) => trovaPagina(app, (u) => u.startsWith('filo://newtab') &&
 async function configura(app, extra = {}) {
   await app.evaluate(async (_e, ex) => {
     const C = globalThis.SN_CONST;
+    // L'intervista di benvenuto ha una chat sua: qui serve la chat di tutti i giorni.
+    await globalThis.SN_STORAGE.setRaw(C.STORAGE_KEYS.FILO_ONBOARDING, { done: true, closedAt: Date.now() });
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
@@ -100,13 +107,15 @@ test('A — «tema scuro» in chat: segno sulla bolla, «tema: chiaro → scuro 
   await expect(page.locator('.dash-activity-row', { hasText: 'Impostato · tema: chiaro → scuro' })).toHaveCount(1);
   await expect(page.locator('.dash-activity-row', { hasText: '=' })).toHaveCount(0);
   await bolla.hover();
-  await page.screenshot({ path: 'tests/.shots/cambi-segno-tema.png' });
+  await page.screenshot({ path: 'tests/.shots/cambi-segno-tema-scuro.png' });
 
   await pop.locator('.dash-cambi-annulla').click();
   await expect.poll(async () => (await impostazioni(app)).theme).toBe('light');
   await expect(pop.locator('.dash-cambi-riga')).toHaveClass(/dash-cambi-annullato/);
   await expect(pop.locator('.dash-cambi-annulla')).toHaveText('rifai');
   await expect(segno).toHaveClass(/dash-cambi-tutti-annullati/);
+  await bolla.hover();
+  await page.screenshot({ path: 'tests/.shots/cambi-segno-annullato-chiaro.png' });
 
   // L'annullo resta come evento, che annulla quello della chat.
   const eventi = await registro(app);
@@ -178,20 +187,23 @@ test('D — da una finestra incognito nessun evento arriva su disco, ma lì dent
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   await configura(app);
   await shell.evaluate(() => window.filoShell.openIncognito());
-  const incog = await trovaPagina(app, (u) => u.startsWith('filo://newtab') && app.windows().length > 2
-    && u !== (app.windows().find((w) => w.url().startsWith('filo://newtab'))?.url() || '') ? true : false, 3_000).catch(() => null)
-    || await (async () => {
-      const deadline = Date.now() + 10_000;
-      while (Date.now() < deadline) {
-        for (const w of app.windows()) {
-          if (!w.url().startsWith('filo://newtab')) continue;
-          const inc = await w.evaluate(() => document.documentElement.dataset.incognito === '1').catch(() => false);
-          if (inc) return w;
-        }
-        await new Promise((r) => setTimeout(r, 150));
-      }
-      throw new Error('home incognito non trovata');
-    })();
+  // Le due home hanno lo stesso indirizzo: quella della finestra incognito la segna il main.
+  await expect.poll(() => app.evaluate(async ({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoIncognito);
+    const t = w && w._filoTabs && w._filoTabs.tabs[0];
+    if (!t || !t.view || !String(t.view.webContents.getURL()).startsWith('filo://newtab')) return false;
+    try { await t.view.webContents.executeJavaScript('document.documentElement.dataset.provaIncognito = "1"; true'); } catch (_) { return false; }
+    return true;
+  }), { timeout: 10_000 }).toBe(true);
+  let incog = null;
+  await expect.poll(async () => {
+    for (const w of app.windows()) {
+      if (!w.url().startsWith('filo://newtab')) continue;
+      if (await w.evaluate(() => document.documentElement.dataset.provaIncognito === '1').catch(() => false)) { incog = w; return true; }
+    }
+    return false;
+  }, { timeout: 10_000 }).toBe(true);
+  await expect(incog.locator('#input')).toBeVisible();
   await modelloFinto(app, [
     { toolCalls: [{ id: 'i1', name: 'TIMER', arguments: '{"secondi":600,"etichetta":"segreto incognito"}' }] },
     { text: 'Avviato.' },
@@ -213,20 +225,16 @@ test('D — da una finestra incognito nessun evento arriva su disco, ma lì dent
 test('E — un\'importazione di dati diventa un evento suo, e si annulla come gli altri', async ({ app }) => {
   test.setTimeout(30_000);
   await configura(app);
-  const esito = await app.evaluate(async ({ dialog }) => {
-    const path = require('node:path');
-    const fs = require('node:fs');
-    const os = require('node:os');
-    const { buildExportZip } = require(path.join(process.cwd(), 'src/main/services/exportData.js'));
-    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'filo-imp-')), 'backup.zip');
-    fs.writeFileSync(file, buildExportZip({ settings: { theme: 'dark', textScale: 1.25 } }));
-    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] });
+  const file = join(cartellaTemporanea('filo-imp-cambi-'), 'backup.zip');
+  writeFileSync(file, buildExportZip({ settings: { theme: 'dark', textScale: 1.25 } }));
+  const esito = await app.evaluate(async ({ dialog }, f) => {
+    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [f] });
     const H = globalThis.__filoHandlers;
     const mittente = { url: 'filo://security/security.html', tab: { url: 'filo://security/security.html' } };
     const anteprima = await H.handleMessage({ type: globalThis.SN_MSG.MSG.IMPORT_DATA_PREVIEW }, mittente);
     const fatto = await H.handleMessage({ type: globalThis.SN_MSG.MSG.IMPORT_DATA_APPLY, token: anteprima.token }, mittente);
     return { anteprima: !!anteprima.ok, fatto: !!fatto.ok };
-  }).catch((e) => ({ errore: String(e) }));
+  }, file);
   expect(esito).toEqual({ anteprima: true, fatto: true });
   expect((await impostazioni(app)).theme).toBe('dark');
   const ev = (await registro(app)).filter((e) => e.via === 'importazione').pop();
@@ -262,13 +270,52 @@ test('F — un timer chiesto in chat: annulla lo toglie, e riaperta la chat il s
   await expect(pop.locator('.dash-cambi-riga')).toHaveClass(/dash-cambi-annullato/);
 
   // La chat riaperta dall'archivio ritrova il segno, già annullato.
-  const chatId = await page.evaluate(() => new URLSearchParams(location.search).get('chat')
-    || document.body.dataset.chatId || null).catch(() => null);
-  const id = chatId || await app.evaluate(async () => (await globalThis.SN_FILO_CHATS.list())[0].id);
+  const id = await app.evaluate(async () => (await globalThis.SN_FILO_CHATS.list())[0].id);
   await page.goto(`filo://newtab/?chat=${encodeURIComponent(id)}`);
   const riaperta = page.locator('.dash-bubble-user', { hasText: 'timer 10 minuti' });
   await expect(riaperta.locator('.dash-cambi-segno')).toHaveClass(/dash-cambi-tutti-annullati/, { timeout: 10_000 });
   await riaperta.hover();
   await expect(riaperta.locator('.dash-cambi-pop')).toContainText('nuovo timer «pasta», 10 min');
   await ripristina(app);
+});
+
+const PAGINA = `<!doctype html><html><head><meta charset="utf-8"><title>zoom</title></head>
+<body><h1>una pagina qualunque</h1><p>testo da ingrandire</p></body></html>`;
+
+async function zoomDi(app, page) {
+  const url = await page.evaluate(() => location.href);
+  return app.evaluate(({ webContents }, u) => {
+    for (const wc of webContents.getAllWebContents()) {
+      let qui = '';
+      try { qui = wc.getURL(); } catch (_) {}
+      if (qui === u) return Math.round(wc.getZoomFactor() * 100);
+    }
+    return null;
+  }, url);
+}
+
+test('G — lo zoom chiesto in chat è un evento che si annulla; una raffica di tasti è UN evento', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, PAGINA);
+  const r = await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    return globalThis.SN_EXECUTE_FILO_ACTION({ type: 'ZOOM_PAGINA', percentuale: 150 }, { sender: { win, wc: win.webContents, url: 'filo://newtab/' } });
+  });
+  expect(r.executed).toBe(true);
+  expect(r.cambi).toHaveLength(1);
+  expect(r.cambi[0].frase).toMatch(/^zoom di [\w.-]+: 100% → 150%$/);
+  await expect.poll(() => zoomDi(app, page)).toBe(150);
+  const annullo = await app.evaluate((_e, id) => globalThis.SN_REGISTRO_CAMBI.annulla(id, { via: 'interfaccia' }), r.cambi[0].id);
+  expect(annullo.ok).toBe(true);
+  await expect.poll(() => zoomDi(app, page)).toBe(100);
+
+  const prima = (await registro(app)).length;
+  await page.locator('h1').click();
+  for (let i = 0; i < 3; i++) await page.keyboard.press('Control+Equal');
+  await expect.poll(() => zoomDi(app, page)).toBeGreaterThan(125);
+  const dopo = await zoomDi(app, page);
+  await expect.poll(async () => (await registro(app)).slice(prima).filter((e) => e.tipo === 'zoom').length, { timeout: 5_000 }).toBe(1);
+  const ev = (await registro(app)).slice(prima).find((e) => e.tipo === 'zoom');
+  expect(ev).toMatchObject({ via: 'interfaccia', dove: 'zoom' });
+  expect(ev.cambi[0]).toMatchObject({ prima: 100, dopo });
 });

@@ -402,9 +402,11 @@
   function annullabile(evento) {
     return !!evento && Array.isArray(evento.cambi) && evento.cambi.some((c) => !c.segreto);
   }
+  // Come CANCELLA_SVEGLIA: toccare più timer insieme chiede conferma.
   function livello(evento) {
-    let max = 1;
-    for (const c of (evento && evento.cambi) || []) {
+    const cambi = (evento && evento.cambi) || [];
+    let max = cambi.filter((c) => String(c.chiave || '').startsWith('timer:')).length > 1 ? 2 : 1;
+    for (const c of cambi) {
       const k = String(c.chiave || '');
       if (k.startsWith('timer:') || k.startsWith('zoom:')) continue;
       if (k.startsWith('proxy:')) { max = Math.max(max, 1); continue; }
@@ -457,8 +459,15 @@
         saltati.push(fraseCambio(c));
         continue;
       }
-      if (idx >= 0) out[idx] = { ...out[idx], ...pick(c.prima, CAMPI_TIMER) };
-      else out.unshift({ ...c.prima, ringing: false });
+      // Una sveglia ricorrente rimessa dopo la sua ora riparte dalla prossima, invece di suonare subito.
+      let voce = c.prima;
+      const M = global.SN_FILO_MEMORY;
+      if (ricorrente(voce) && new Date(voce.endsAt).getTime() <= adesso && M && M.nextAlarmOccurrence) {
+        const dopo = M.nextAlarmOccurrence(voce, adesso);
+        if (dopo) voce = { ...voce, endsAt: new Date(dopo).toISOString() };
+      }
+      if (idx >= 0) out[idx] = { ...out[idx], ...pick(voce, CAMPI_TIMER) };
+      else out.unshift({ ...voce, ringing: false });
     }
     return { lista: out, saltati };
   }
