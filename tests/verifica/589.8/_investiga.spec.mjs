@@ -1,25 +1,28 @@
 import { test, expect } from '../../fixtures/electron.mjs';
 
 const S = 'pw-Segreta-589-otto';
+const cerca = `window.cerca = (q) => { getSelection().removeAllRanges(); return window.find(q, true, false, true); };`;
 
-test('find: closed shadow vs cross-origin iframe vs sandbox srcdoc', async ({ openTab, testServer }) => {
-  const figlio = testServer.html(`<!doctype html><html><body><div id="x">${S}</div></body></html>`, { pubblico: true });
-  const top = testServer.html(`<!doctype html><html><body style="padding:30px">
-    <div id="host"></div>
-    <iframe id="cross" src="${figlio}" style="width:300px;height:80px"></iframe>
-    <iframe id="sbx" sandbox="allow-scripts" srcdoc="<div>${S}</div>" style="width:300px;height:80px"></iframe>
-    <script>
-      const sr = document.getElementById('host').attachShadow({ mode: 'closed' });
-      sr.innerHTML = '<div>' + ${JSON.stringify(S)} + '</div>';
-      window.cerca = (q) => { getSelection().removeAllRanges(); return window.find(q, true, false, true); };
-    </script>
-  </body></html>`);
-  const page = await openTab(top);
-  await page.waitForTimeout(500);
-  const r = await page.evaluate((s) => ({
-    shadowChiuso: window.cerca(s),
-    innerText: document.body.innerText.includes(s),
-  }), S);
-  console.log('INVESTIGA', JSON.stringify(r));
+test('find pierces closed shadow?', async ({ openTab, testServer }) => {
+  const url = testServer.html(`<!doctype html><html><body><div id="host"></div><script>
+    document.getElementById('host').attachShadow({ mode: 'closed' }).innerHTML = '<div>'+${JSON.stringify(S)}+'</div>';
+    ${cerca}</script></body></html>`);
+  const p = await openTab(url); await p.waitForTimeout(300);
+  console.log('SHADOW_CHIUSO', await p.evaluate((s) => window.cerca(s), S), 'innerText', await p.evaluate((s)=>document.body.innerText.includes(s),S));
+  expect(true).toBe(true);
+});
+
+test('find descends cross-origin iframe?', async ({ openTab, testServer }) => {
+  const child = testServer.html(`<!doctype html><html><body><div>${S}</div></body></html>`, { pubblico: true });
+  const url = testServer.html(`<!doctype html><html><body><iframe src="${child}" style="width:300px;height:80px"></iframe><script>${cerca}</script></body></html>`);
+  const p = await openTab(url); await p.waitForTimeout(500);
+  console.log('CROSS_ORIGIN', await p.evaluate((s) => window.cerca(s), S));
+  expect(true).toBe(true);
+});
+
+test('find descends sandbox srcdoc iframe?', async ({ openTab, testServer }) => {
+  const url = testServer.html(`<!doctype html><html><body><iframe sandbox="allow-scripts" srcdoc="<div>${S}</div>" style="width:300px;height:80px"></iframe><script>${cerca}</script></body></html>`);
+  const p = await openTab(url); await p.waitForTimeout(500);
+  console.log('SANDBOX_SRCDOC', await p.evaluate((s) => window.cerca(s), S));
   expect(true).toBe(true);
 });
