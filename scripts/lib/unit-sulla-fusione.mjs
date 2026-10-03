@@ -162,10 +162,9 @@ function cartellaModuli(root) {
   try { return realpathSync(join(root, 'node_modules')); } catch (_) { return ''; }
 }
 
-// Una prova interrotta (Ctrl+C, timeout di chi l'ha lanciata) lascia il worktree registrato col collegamento:
-// col lucchetto un `git worktree remove --force` qualunque si rifiuta invece di svuotare node_modules attraverso
-// il collegamento, e i resti li toglie la prova dopo (pulisciResti).
-export const MOTIVO_LUCCHETTO = 'prova degli unit sulla fusione: contiene un collegamento a node_modules. Prima togli il collegamento (cmd /c rmdir <cartella>\\node_modules), poi unlock e remove; mai remove -f -f';
+// La cartella di prova è un clone che condivide gli oggetti, non un worktree: un worktree interrotto resta
+// nell'elenco del repo, e il `worktree unlock` + `remove --force` che git stesso suggerisce svuota node_modules
+// attraverso il collegamento (verifica #929 giro 2). I resti li toglie pulisciResti, all'inizio di ogni prova.
 const NOME_BASE = /^filo-fusione-[A-Za-z0-9]{6}$/;
 const FILE_PID = 'pid';
 // Una cartella di prova senza pid (o illeggibile) si considera viva finché è più giovane di così.
@@ -173,10 +172,17 @@ const VIVA_SENZA_PID_MS = 3 * TETTO_UNIT_MS;
 
 function apriAlbero(git, base, nome, sha, moduli) {
   const dir = join(base, nome);
-  const r = git(['worktree', 'add', '--detach', '--quiet', dir, sha]);
-  if (!r.ok) return { errore: `non riesco a preparare la cartella di prova (${primaRiga(r.out)})` };
-  const l = git(['worktree', 'lock', '--reason', MOTIVO_LUCCHETTO, dir]);
-  if (!l.ok) return { dir, errore: `non riesco a mettere il lucchetto alla cartella di prova (${primaRiga(l.out)})` };
+  const radice = git(['rev-parse', '--show-toplevel']);
+  if (!radice.ok) return { errore: `non riesco a leggere la cartella del repo (${primaRiga(radice.out)})` };
+  const c = git(['clone', '--quiet', '--shared', '--no-checkout', radice.out, dir]);
+  if (!c.ok) return { errore: `non riesco a preparare la cartella di prova (${primaRiga(c.out)})` };
+  const gd = gitIn(dir);
+  const co = gd(['checkout', '--quiet', '--detach', sha]);
+  if (!co.ok) return { dir, errore: `non riesco a preparare la cartella di prova (${primaRiga(co.out)})` };
+  // Come in un worktree: origin e origin/main sono quelli del repo, non il clone locale da cui nasce.
+  const url = git(['remote', 'get-url', 'origin']);
+  if (url.ok && url.out) gd(['remote', 'set-url', 'origin', url.out]);
+  gd(['update-ref', `refs/remotes/origin/${MAIN}`, sha]);
   if (moduli) {
     try { symlinkSync(moduli, join(dir, 'node_modules'), 'junction'); } catch (e) {
       return { dir, errore: `non riesco a collegare node_modules nella cartella di prova (${e.message})` };
