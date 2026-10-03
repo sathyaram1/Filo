@@ -1032,6 +1032,9 @@
   function showTooltip(target, text) {
     if (!text) return;
     const el = ensureTooltipEl();
+    // Sopra i pannelli aperti dopo di lei (stesso piano: vale l'ordine), sotto le sonde (#589.11).
+    const host = menuHost();
+    host.insertBefore(el, global.SN_VISTO?.prima(host, el) || null);
     el.dataset.snTheme = document.documentElement.dataset.snTheme || '';
     el.textContent = text;
     el.style.display = '';
