@@ -18,6 +18,10 @@ const execAction = (app, action, opts) =>
 const getSettings = (page) =>
   page.evaluate(async () => (await chrome.runtime.sendMessage({ type: 'get_settings' })).settings);
 
+// Il terminale è acceso di serie (#892): le prove che lo accendono partono da spento.
+const spegniTerminale = (page) =>
+  page.evaluate(() => chrome.runtime.sendMessage({ type: 'update_settings', settings: { terminal: { enabled: false } } }));
+
 test('livello 1 esegue subito, senza chiedere nulla', async ({ app, openTab }) => {
   const page = await openTab(NEWTAB);
   const r = await execAction(app, { type: 'TIMER', seconds: 60, label: 'Pasta' });
@@ -30,6 +34,7 @@ test('livello 1 esegue subito, senza chiedere nulla', async ({ app, openTab }) =
 
 test('livello 2 non esegue senza conferma; la conferma esegue davvero', async ({ app, openTab }) => {
   const page = await openTab(NEWTAB);
+  await spegniTerminale(page);
   const action = { type: 'IMPOSTA_PREFERENZA', chiave: 'terminale', valore: 'on' };
 
   // Senza conferma: l'azione NON viene eseguita, torna al client con il
@@ -65,6 +70,7 @@ test('le azioni non registrate sono rifiutate, anche se "confermate"', async ({ 
 
 test('il bottone in chat apre il popup di conferma: Annulla non applica, OK applica', async ({ openTab }) => {
   const page = await openTab(NEWTAB);
+  await spegniTerminale(page);
   const action = {
     type: 'IMPOSTA_PREFERENZA', chiave: 'terminale', valore: 'on',
     _confirm: { level: 2, text: 'Impostare: Modalità terminale → attiva' },
@@ -100,6 +106,7 @@ test('il bottone in chat apre il popup di conferma: Annulla non applica, OK appl
 
 test('#183: più impostazioni di livello 2 in una risposta → i popup si aprono in sequenza, nessun chip inerte da cliccare', async ({ openTab }) => {
   const page = await openTab(NEWTAB);
+  await spegniTerminale(page);
   // Due impostazioni sensibili nella stessa risposta (come nel feedback #183:
   // "voglio non crei bottoni ma applichi direttamente").
   const actions = [
