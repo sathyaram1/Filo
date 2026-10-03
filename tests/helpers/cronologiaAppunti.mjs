@@ -35,7 +35,7 @@ export async function apriCronologia(app, page, campo) {
   return statoCronologia(app, page);
 }
 
-// Testi delle voci visibili, quando sono `n` (comodo con expect.poll).
+// Testi delle voci visibili, null a pannello chiuso (comodo con expect.poll).
 export async function testiCronologia(app, page) {
   const s = await statoCronologia(app, page);
   return s ? s.voci.map((v) => v.testo) : null;
