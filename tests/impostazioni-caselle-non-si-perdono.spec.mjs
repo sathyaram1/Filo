@@ -90,6 +90,45 @@ test('Altro: il nome nuovo di una categoria vale senza «Rinomina»; vuoto non l
   expect(await leggi(altro)).toEqual(['Ufficio']);
 });
 
+test('Altro: un nome a metà uguale a un\'altra categoria non le fonde; «Rinomina» sì', async ({ app, openTab }) => {
+  const leggi = (page) => page.evaluate(async () => ((await chrome.storage.local.get('categories')).categories || []).map((c) => c.name).sort());
+  const altro = await openTab('filo://options/altro.html');
+  await altro.waitForLoadState('domcontentloaded');
+  await altro.evaluate(async () => {
+    await chrome.storage.local.set({ categories: [{ id: 'cat-a', name: 'Lavoro' }, { id: 'cat-b', name: 'Lavoro vecchio' }] });
+  });
+  await altro.reload();
+  await expect(altro.locator('.sn-cat-row input')).toHaveCount(2, { timeout: 8000 });
+  const riga = altro.locator('.sn-cat-row').filter({ has: altro.locator('input[value="Lavoro vecchio"]') });
+  const casella = riga.locator('input');
+
+  // Ctrl+Backspace parte subito, e a metà il nome è «Lavoro».
+  await casella.click();
+  await altro.keyboard.press('End');
+  await altro.keyboard.press('Control+Backspace');
+  await expect(riga.locator('.sn-cat-meta')).toHaveClass(/sn-cat-warn/, { timeout: 3000 });
+  expect(await leggi(altro)).toEqual(['Lavoro', 'Lavoro vecchio']);
+  // Fermo oltre la pausa lunga, uguale.
+  await new Promise((r) => setTimeout(r, 3600));
+  expect(await leggi(altro)).toEqual(['Lavoro', 'Lavoro vecchio']);
+
+  await altro.keyboard.type('archiviato');
+  await expect(riga.locator('.sn-cat-meta')).not.toHaveClass(/sn-cat-warn/);
+  await ctrlW(app);
+  const riaperta = await openTab('filo://options/altro.html');
+  await expect.poll(() => leggi(riaperta), { timeout: 5000 }).toEqual(['Lavoro', 'Lavoro archiviato']);
+
+  // Confermato col tasto, il nome già preso le unisce come prima.
+  await expect(riaperta.locator('.sn-cat-row input')).toHaveCount(2, { timeout: 8000 });
+  const seconda = riaperta.locator('.sn-cat-row').filter({ has: riaperta.locator('input[value="Lavoro archiviato"]') });
+  await seconda.locator('input').click();
+  await riaperta.keyboard.press('Control+A');
+  await riaperta.keyboard.type('lavoro');
+  await seconda.getByRole('button', { name: 'Rinomina' }).click();
+  await expect.poll(() => leggi(riaperta), { timeout: 4000 }).toEqual(['Lavoro']);
+  await expect(riaperta.locator('.sn-cat-row input')).toHaveCount(1);
+});
+
 test('Modelli: il limite di spesa scritto e un clic su un\'altra scheda è quello nuovo, e a metà non parte', async ({ shell, openTab }) => {
   await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { monthlyLimitEur: 5 } }));
   const modelli = await openTab('filo://options/options.html');
