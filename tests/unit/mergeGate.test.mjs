@@ -145,6 +145,96 @@ test('merged → exit 0, e al server arrivano biglietto, branch e il COMMIT da f
   } finally { srv.close(); }
 });
 
+// ─── il lavoro resta vivo mentre girano gli unit sulla fusione (#929, verifica giro 3) ───
+
+const { attesaBattito } = await import('../../scripts/routine-channel.mjs');
+const { tieniVivo } = await import('../../scripts/merge-gate.mjs');
+
+test('il battito si fa dentro la scadenza detta dal server: dieci minuti con un\'ora, più fitto con meno', () => {
+  const ora = Date.parse('2026-10-03T10:00:00Z');
+  const fra = (ms) => new Date(ora + ms).toISOString();
+  assert.equal(attesaBattito(fra(60 * 60 * 1000), ora), 10 * 60 * 1000);
+  assert.equal(attesaBattito(fra(6000), ora), 2000);
+  assert.equal(attesaBattito(fra(1500), ora), 1000);
+  assert.equal(attesaBattito('', ora), 10 * 60 * 1000);
+  assert.equal(attesaBattito('non una data', ora), 10 * 60 * 1000);
+});
+
+test('tieniVivo: un battito subito, poi un figlio che batte col biglietto nell\'ambiente, fermato alla fine', async () => {
+  const battuti = [];
+  let avviato = null;
+  let ucciso = false;
+  const v = await tieniVivo('biglietto-x', {
+    batti: async (t) => { battuti.push(t); return { ok: true }; },
+    avvia: (cmd, args, opz) => { avviato = { cmd, args, opz }; return { on() {}, kill() { ucciso = true; } }; },
+    script: 'canale.mjs',
+  });
+  assert.deepEqual(battuti, ['biglietto-x']);
+  assert.deepEqual(avviato.args, ['canale.mjs', 'heartbeat', '--loop']);
+  assert.equal(avviato.opz.env.FILO_ROUTINE_TICKET, 'biglietto-x');
+  assert.ok(!avviato.args.includes('biglietto-x'), 'il biglietto non sta nella riga di comando');
+  assert.equal(ucciso, false);
+  v.ferma();
+  assert.equal(ucciso, true);
+});
+
+test('una prova degli unit più lunga della finestra di silenzio non fa arrivare la fusione a biglietto morto', async () => {
+  const SILENZIO_MS = 8000;
+  const casa = cartellaTemporanea('filo-mg-battito-');
+  const g = (cwd, ...a) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  let ultimoSegno = Date.now();
+  const vie = [];
+  const srv = createServer((req, res) => {
+    req.on('data', () => {});
+    req.on('end', () => {
+      const vivo = Date.now() - ultimoSegno <= SILENZIO_MS;
+      vie.push(`${req.url}${vivo ? '' : ' (morto)'}`);
+      res.setHeader('Content-Type', 'application/json');
+      if (!vivo) { res.statusCode = 403; res.end(JSON.stringify({ ok: false, reason: 'dead_ticket' })); return; }
+      ultimoSegno = Date.now();
+      if (req.url.endsWith('/routineHeartbeat')) res.end(JSON.stringify({ ok: true, expiresAt: new Date(ultimoSegno + SILENZIO_MS).toISOString() }));
+      else res.end(JSON.stringify({ ok: true, result: 'merged', sha: 'f'.repeat(40) }));
+    });
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  try {
+    const origin = join(casa, 'origin.git');
+    const lavoro = join(casa, 'lavoro');
+    const altro = join(casa, 'altro');
+    g(casa, 'init', '-q', '--bare', '--initial-branch=main', origin);
+    g(casa, 'clone', '-q', origin, lavoro);
+    for (const f of ['scripts/run-unit-tests.mjs', 'scripts/lib/riga-di-comando.mjs']) {
+      execFileSync(process.execPath, ['-e', `require('fs').mkdirSync(require('path').dirname(process.argv[2]),{recursive:true});require('fs').copyFileSync(process.argv[1],process.argv[2])`, resolve(__dirname, '..', '..', f), join(lavoro, f)]);
+    }
+    execFileSync(process.execPath, ['-e', "require('fs').mkdirSync(process.argv[1],{recursive:true})", join(lavoro, 'tests', 'unit')]);
+    writeFileSync(join(lavoro, 'package.json'), '{"type":"module"}\n');
+    writeFileSync(join(lavoro, 'tests', 'unit', 'base.test.mjs'), "import test from 'node:test'; test('base', () => {});\n");
+    g(lavoro, 'add', '-A'); g(lavoro, 'commit', '-qm', 'base'); g(lavoro, 'push', '-q', 'origin', 'main');
+    g(casa, 'clone', '-q', origin, altro);
+    writeFileSync(join(altro, 'nuovo.txt'), 'main va avanti\n');
+    g(altro, 'add', '-A'); g(altro, 'commit', '-qm', 'main avanti'); g(altro, 'push', '-q', 'origin', 'main');
+    g(lavoro, 'checkout', '-q', '-b', 'claude/lungo');
+    writeFileSync(join(lavoro, 'tests', 'unit', 'lungo.test.mjs'), `import test from 'node:test'; test('lungo', async () => { await new Promise((r) => setTimeout(r, ${SILENZIO_MS * 2})); });\n`);
+    g(lavoro, 'add', '-A'); g(lavoro, 'commit', '-qm', 'ramo'); g(lavoro, 'push', '-q', 'origin', 'claude/lungo');
+    const tmp = join(casa, 'tmp');
+    execFileSync(process.execPath, ['-e', "require('fs').mkdirSync(process.argv[1])", tmp]);
+    ultimoSegno = Date.now();
+    const esito = await new Promise((ok) => {
+      const env = { ...process.env, FILO_REPO_ROOT: lavoro, FILO_ROUTINE_TICKET: 'biglietto-lungo', FILO_ROUTINE_API: `http://127.0.0.1:${srv.address().port}`, TEMP: tmp, TMP: tmp, TMPDIR: tmp };
+      const p = spawn(process.execPath, [MERGE_GATE, 'claude/lungo'], { cwd: lavoro, env, stdio: ['ignore', 'pipe', 'pipe'] });
+      let out = '';
+      p.stdout.on('data', (c) => { out += c; });
+      p.stderr.on('data', (c) => { out += c; });
+      p.on('close', (code) => ok({ code, out }));
+    });
+    assert.equal(esito.code, 0, `${esito.out}\n${vie.join('\n')}`);
+    assert.ok(vie.some((v) => v === '/routineMerge'), vie.join('\n'));
+  } finally {
+    srv.close();
+    rmSync(casa, { recursive: true, force: true });
+  }
+});
+
 test('blocked (L5 sul server) → exit 10, col motivo del blocco', async () => {
   const { srv, port } = await fintoServer({ ok: true, result: 'blocked', reason: 'guard_the_guards: firestore.rules' });
   try {
