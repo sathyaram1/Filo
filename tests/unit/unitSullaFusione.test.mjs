@@ -244,3 +244,52 @@ test('chiudiAlbero toglie prima il collegamento: con un collegamento che non si 
     rmSync(casa, { recursive: true, force: true });
   }
 });
+
+// ─── I clienti: cosa si manda, come si legge la risposta ─────────────────────
+
+const { askServerMerge, classifyOwnerMerge, exitCodeForOwnerMerge, messageForOwnerMerge, erroreDiConnessione } = await import('../../scripts/lib/owner-merge.mjs');
+const { exitCodeFor } = await import('../../scripts/merge-gate.mjs');
+const { fermoDopoLaProva } = await import('../../scripts/finish-local.mjs');
+
+test('finish: la prova viaggia con la richiesta, e «main mosso»/«unit rossi» hanno un nome e un\'uscita', async () => {
+  process.env.FILO_ADMIN_REFRESH_TOKEN = 'refresh-finto';
+  const vero = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ id_token: 'id-finto' }), text: async () => '' });
+  const corpi = [];
+  try {
+    const campo = { esito: 'verde', mainSha: SHA };
+    const r = await askServerMerge({
+      branch: 'claude/x', sha: SHA, provaUnit: campo, url: 'https://esempio/ownerMerge',
+      fetchImpl: async (_u, o) => { corpi.push(JSON.parse(o.body)); return { status: 200, text: async () => JSON.stringify({ result: { ok: true, result: 'main_moved', mainSha: 'b'.repeat(40) } }) }; },
+    });
+    assert.deepEqual(corpi[0].data.provaUnit, campo);
+    assert.deepEqual(r, { outcome: 'main_moved', mainSha: 'b'.repeat(40) });
+    // #933: dopo minuti di test la connessione può essere chiusa dall'altra parte; un secondo tentativo.
+    let volte = 0;
+    const r2 = await askServerMerge({
+      branch: 'claude/x', sha: SHA, url: 'https://esempio/ownerMerge',
+      fetchImpl: async () => {
+        if (volte++ === 0) throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'UND_ERR_SOCKET' } });
+        return { status: 200, text: async () => JSON.stringify({ result: { ok: true, result: 'merged', sha: 'c'.repeat(40) } }) };
+      },
+    });
+    assert.equal(r2.outcome, 'merged');
+    assert.equal(volte, 2);
+  } finally {
+    globalThis.fetch = vero;
+    delete process.env.FILO_ADMIN_REFRESH_TOKEN;
+  }
+  assert.equal(erroreDiConnessione(new Error('ENOTFOUND')), false, 'un nome che non si risolve non si ritenta');
+  const rossi = classifyOwnerMerge(200, { result: { ok: true, result: 'unit_rossi', reason: 'unit rossi: 2' } });
+  assert.equal(rossi.outcome, 'unit_rossi');
+  assert.equal(exitCodeForOwnerMerge(rossi), 20);
+  assert.equal(exitCodeForOwnerMerge({ outcome: 'main_moved' }), 1);
+  assert.match(messageForOwnerMerge({ outcome: 'main_moved', mainSha: 'b'.repeat(40) }), /Main si è mosso a ogni prova/);
+  assert.match(fermoDopoLaProva({ esito: 'rosso_sulla_fusione' }), /non ho chiesto la fusione/);
+  assert.match(fermoDopoLaProva({ errore: 'git giù' }), /git giù/);
+});
+
+test('cancello delle routine: unit rossi sulla fusione escono 20, come un conflitto (il server ha già riallineato)', () => {
+  assert.equal(exitCodeFor({ ok: true, result: 'unit_rossi' }), 20);
+  assert.equal(exitCodeFor({ ok: true, result: 'main_moved' }), 1);
+});
