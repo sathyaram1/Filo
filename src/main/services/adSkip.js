@@ -50,8 +50,8 @@ function mittenteConClicVero(sender) {
  * Fuori dalla vista, o non un numero, è null: il clic non parte.
  */
 function puntoNellaVista(msg, zoom, larghezza, altezza) {
-  const x = Number(msg && msg.x);
-  const y = Number(msg && msg.y);
+  if (!msg || typeof msg.x !== 'number' || typeof msg.y !== 'number') return null;
+  const { x, y } = msg;
   const z = Number(zoom) > 0 ? Number(zoom) : 1;
   if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0) return null;
   const px = Math.round(x * z);

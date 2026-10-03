@@ -73,7 +73,7 @@ test('due clic veri sulla stessa scheda distano almeno l\'intervallo', () => {
   assert.equal(A.clicVero(wc, { x: 1, y: 1 }, { view: vista, ora: 1e6 + A.INTERVALLO_MS }).ok, true);
   const altra = finta();
   assert.equal(A.clicVero(altra, { x: 1, y: 1 }, { view: vista, ora: 1e6 + 1 }).ok, true, 'un\'altra scheda ha il suo conto');
-  assert.equal(A.clicVero(finta(), { x: 900, y: 1 }, { view: vista, ora: 1 }).code, 'punto');
+  assert.equal(A.clicVero(finta(), { x: 900, y: 1 }, { view: vista, ora: 1e6 }).code, 'punto');
   assert.equal(wc.eventi.length, 6);
 });
 
