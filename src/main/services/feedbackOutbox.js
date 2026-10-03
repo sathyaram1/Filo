@@ -202,14 +202,12 @@
           let idToken = '';
           if (it.dallOwner) {
             try { idToken = (tokenOwnerFn && await tokenOwnerFn()) || ''; } catch (_) { idToken = ''; }
-            if (!idToken) logFn('voce dell\'owner senza accesso valido: parte anonima e passa dai giudici', it.id);
+            if (!idToken) { attendiAccesso(it, 'nessun accesso valido'); anyFail = true; continue; }
           }
-          const result = idToken ? await fb.submit(payload, { idToken }) : await fb.submit(payload);
+          // #912: la voce dell'owner parte con la prova o non parte; da anonima diventerebbe un utente che nessuno riprende.
+          const result = idToken ? await fb.submit(payload, { idToken, soloAdmin: true }) : await fb.submit(payload);
           remove(it.id);
           logFn('inviato:', it.id);
-          if (idToken && result && result.senderProof !== 'admin') {
-            logFn('token dell\'owner rifiutato' + (result.authRefused ? ` (${result.authRefused})` : '') + ': partita anonima', it.id);
-          }
           try { onDoneFn && onDoneFn(it, result); } catch (_) {}
           backoff = backoffMin; // successo → azzera il backoff
         } catch (e) {
