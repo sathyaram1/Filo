@@ -102,29 +102,53 @@ const safebrowseMethods = {
   },
 
   // Una finestrella di accesso non ha l'avviso: se ci si apre un sito da avviso, torna in una scheda, dove l'avviso c'è.
+  // Il sito è quello che ne scrive il documento (l'origine, anche di una pagina vuota scritta da chi l'ha aperta), e
+  // vale quanto la scheda che l'ha aperta: quando lei riceve l'avviso, la finestrella del suo sito la segue.
   // `origine`: la scheda che l'ha aperta, il cui «confermo» vale anche qui.
   _sbGuardaFinestrella(win, origine) {
     const SB = globalThis.SN_SAFEBROWSE;
     const pwc = win && win.webContents;
     if (!SB || !pwc) return;
+    const note = () => [origine && origine._urlNavigato];
+    const sitoOra = () => {
+      if (pwc.isDestroyed()) return null;
+      let o = null;
+      try { o = pwc.mainFrame.origin; } catch (_) {}
+      return sitoDellaPagina(pwc.getURL(), note(), o);
+    };
     let spostata = false;
     const sposta = () => {
       if (spostata || win.isDestroyed() || pwc.isDestroyed()) return;
       spostata = true;
-      const url = pwc.getURL();
-      const id = this.openTab(url, { activate: true, openedByLink: true, apriComunque: this._siteAllowedIn(origine, url) });
-      const nuova = this.tabs.find((t) => t.id === id);
-      if (nuova && origine) nuova._sbApertaDa = origine._urlNavigato;
+      // Una pagina vuota scritta dal sito non si ricarica in una scheda: ci va il sito, sotto il suo avviso.
+      const url = /^(https?|blob):/i.test(pwc.getURL()) ? pwc.getURL() : sitoOra();
+      if (url) {
+        const id = this.openTab(url, { activate: true, openedByLink: true, apriComunque: this._siteAllowedIn(origine, url) });
+        const nuova = this.tabs.find((t) => t.id === id);
+        if (nuova && origine) nuova._sbApertaDa = origine._urlNavigato;
+      }
       setImmediate(() => { try { win.close(); } catch (_) {} try { this.win.focus(); } catch (_) {} });
     };
+    const segueLApritore = () => {
+      const a = origine && origine.sbAvviso;
+      const sito = a && sitoOra();
+      if (sito && stessoSito(sito, a.url)) sposta();
+    };
+    if (origine) {
+      if (!origine._sbFinestrelle) origine._sbFinestrelle = new Set();
+      origine._sbFinestrelle.add(segueLApritore);
+      win.once('closed', () => origine._sbFinestrelle.delete(segueLApritore));
+    }
+    // Il verdetto in ritardo vale finché la finestrella mostra lo stesso sito, anche con l'indirizzo cambiato sul posto.
     const giudica = (hints) => {
-      if (pwc.isDestroyed()) return;
-      const url = pwc.getURL();
-      const sito = sitoDellaPagina(url, [origine && origine._urlNavigato]);
+      const sito = sitoOra();
       if (!sito) return;
+      segueLApritore();
+      if (spostata) return;
       const decidi = (v) => {
         const a = origine ? this._sbApplyState(origine, v) : v;
-        if (a && (a.level === 'pericoloso' || a.level === 'sospetto') && !pwc.isDestroyed() && pwc.getURL() === url) sposta();
+        const ora = sitoOra();
+        if (a && (a.level === 'pericoloso' || a.level === 'sospetto') && ora && stessoSito(sito, ora)) sposta();
       };
       try { decidi(SB.analyze(sito, hints, decidi)); } catch (_) {}
     };
