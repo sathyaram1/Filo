@@ -77,7 +77,7 @@ L.provaUnitSullaFusione({ root: ${JSON.stringify(repo)}, punta, scrivi: () => {}
     expect(existsSync(join(canarino, 'pacchetto', 'index.js'))).toBe(true);
   } finally {
     const L = await import(LIB);
-    L.togliCollegamento(join(resto, 'node_modules'));
+    if (resto) L.togliCollegamento(join(resto, 'node_modules'));
     L.pulisciResti({ git: L.gitIn(repo) });
     L.togliCollegamento(join(repo, 'node_modules'));
   }
