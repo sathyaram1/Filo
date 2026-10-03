@@ -100,7 +100,7 @@
       required: ['url'],
     },
     TIMER: {
-      description: 'Crea un timer nella colonna destra della home.',
+      description: 'Crea un timer: compare come carta nella colonna sinistra della home.',
       properties: {
         secondi: I('Durata in secondi.'),
         etichetta: S('Nome del timer (es. "Pasta").'),

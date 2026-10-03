@@ -1493,7 +1493,7 @@ async function executeFiloAction(action, opzioni = {}) {
   return res;
 }
 
-async function eseguiAzioneFilo(action, { confirmed = false, sender = null, contesto = null, assistente = false, parole = '', avanzamento = null } = {}) {
+async function eseguiAzioneFilo(action, { confirmed = false, sender = null, contesto = null, assistente = false, parole = '', avanzamento = null, chatId = null } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
   // Da un sito (anche via una chat aperta da lì) passano solo le azioni della
@@ -1765,7 +1765,8 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         // Niente caratteri di controllo (byte nullo compreso) in un'etichetta
         // che poi va nel diario e nella colonna dei timer.
         const label = cleanLabel(action.label || action.etichetta) || 'Timer';
-        const entry = await FiloMem.addTimer({ label, seconds });
+        // La conversazione che l'ha chiesto: la carta del timer nella home la riapre (#870).
+        const entry = await FiloMem.addTimer({ label, seconds, chat: chatId });
         if (entry) broadcastLiveUpdate();
         return { executed: !!entry, kept: !!entry };
       }
@@ -1778,6 +1779,7 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
           label: cleanLabel(action.label ?? action.etichetta),
           time: action.time ?? action.orario ?? action.at ?? '',
           repeat: action.ripeti ?? action.repeat ?? action.giorni ?? action.days,
+          chat: chatId,
         });
         if (entry) broadcastLiveUpdate();
         return { executed: !!entry, kept: !!entry };
@@ -2342,6 +2344,17 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
             max: esito.max,
           },
         };
+      }
+      case 'CARTA_HOME': {
+        const op = String(action.operazione ?? action.op ?? '').trim().toLowerCase();
+        const tipo = { togli: 'togli', rimetti: 'aggiungi', aggiungi: 'aggiungi', sposta: 'sposta', ripristina: 'ripristina' }[op];
+        if (!tipo) return { executed: false, kept: false, output: { error: 'operazione sconosciuta' } };
+        const verso = String(action.verso ?? '').trim().toLowerCase().replace('giù', 'giu') || undefined;
+        const esito = await require('./carteHome').modifica({ tipo, carta: action.carta, verso, prima: action.prima_di ?? null });
+        const dove = globalThis.SN_CARTE_HOME.descrivi(esito.layout);
+        if (esito.errore) return { executed: false, kept: false, output: { error: esito.errore, ...dove } };
+        if (esito.cambiato) broadcastToFiloPages({ type: MSG.CARTE_HOME_CAMBIATE, layout: esito.layout });
+        return { executed: true, kept: true, output: dove };
       }
       case 'COMANDO_FINESTRA': {
         // #419 — l'agente della home aziona i controlli del browser Filo (schermo
@@ -3465,7 +3478,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       const avvia = (a) => (a._argsError
         ? Promise.resolve({ executed: false, kept: false, rejected: true, error: a._argsError })
         : executeFiloAction(a, {
-          sender, contesto: azioniViste, parole: paroleUtente,
+          sender, contesto: azioniViste, parole: paroleUtente, chatId,
           // Le azioni lunghe dicono a che punto sono: la riga d'attesa le conta.
           avanzamento: canPush ? (fatti, totali) => push('filo:action', {
             kind: 'progress', type: String(a.type || '').toUpperCase(), callId: a._callId || '', fatti, totali,

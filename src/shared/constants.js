@@ -104,7 +104,7 @@
     FILO_NOTES: 'filo_notes',
     // Timer attivi: array di {id, label, endsAt, paused?, remainingMs?}.
     FILO_TIMERS: 'filo_timers',
-    // Notifiche live nella colonna destra. Array di {id, ts, kind, text, action?, dismissed?}.
+    // Avvisi di Filo: carte della colonna sinistra della home (#870). Array di {id, ts, kind, text, action?, dismissed?}.
     FILO_NOTIFICATIONS: 'filo_notifications',
     // Disposizione delle carte della home (#870): { versione, destra, tolte, sinistra, nascoste }.
     // La forma e le mosse stanno in src/shared/carteHome.js; la scrive solo src/main/services/carteHome.js.
