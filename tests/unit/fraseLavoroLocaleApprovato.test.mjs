@@ -54,7 +54,8 @@ test('presa e chiusura della pratica ricordano la frase, e il comando che la scr
       assert.match(r.avviso, /frase/);
       assert.match(r.avviso, /npm run feedback -- u1 --frase/);
     }
-    assert.match(await mod.fraseDaScrivere('u1', '#950', OPTS), /npm run feedback -- #950 --frase/);
+    // finish e server:fondi passano «#950»: incollato, il cancelletto aprirebbe un commento della shell.
+    assert.match(await mod.fraseDaScrivere('u1', '#950', OPTS), /npm run feedback -- 950 --frase/);
   });
   await conRete(utente({ userNote: 'Ora il terminale parte' }), async () => {
     assert.equal((await mod.praticaPerLaSessione('u1', OPTS)).avviso, '');
