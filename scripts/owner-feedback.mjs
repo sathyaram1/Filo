@@ -378,13 +378,18 @@ export async function partiDellaPratica(id, opts = {}) {
 /**
  * La parte di un lavoro locale arrivata su main, nella pratica (#915): `localMerges.<parte>` = adesso, in ms.
  * `opts.solo`: il lavoro stava tutto in questa parte, e `localMerges.solo` lo dice a chi arrivasse dopo.
+ * `opts.ramo`: il ramo fuso; una parte tardiva vale solo col suo stesso nome (parteTardiva).
  */
 export async function registraParte(id, parte, opts = {}) {
   if (!PARTI.includes(parte)) return { ok: false, motivo: `parte sconosciuta: ${parte}` };
   const at = Math.floor(opts.ora ?? Date.now());
   if (opts.dryRun) return { ok: true, dryRun: true, at };
   const bearer = opts.bearer || await acquireBearer();
-  const campi = { [parte]: { integerValue: String(at) }, ...(opts.solo ? { solo: { stringValue: parte } } : {}) };
+  const campi = {
+    [parte]: { integerValue: String(at) },
+    ...(opts.solo ? { solo: { stringValue: parte } } : {}),
+    ...(RAMO_RE.test(String(opts.ramo || '')) ? { ramo: { stringValue: opts.ramo } } : {}),
+  };
   const fields = { localMerges: { mapValue: { fields: campi } } };
   const q = Object.keys(campi).map((k) => `updateMask.fieldPaths=localMerges.${k}`).join('&');
   const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?${q}`, {
