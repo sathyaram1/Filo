@@ -2489,13 +2489,15 @@ class TabManager {
       // avrebbe una scheda aperta su quella URL (Cookies.MODES.PRIVACY →
       // partizione per-sito; altrimenti null = sessione condivisa), per non
       // spezzare un eventuale login Google già presente in Filo.
-      // Una pagina sotto l'avviso del sito pericoloso non apre finestre: sopra la sua scheda starebbero fuori dall'avviso.
-      if (tab.isInternal === false && isAuthPopup(url) && !tab.sbAvviso) {
+      const accesso = tab.isInternal === false && isAuthPopup(url);
+      if (accesso) {
         if (this._maybeBlockNavigation(tab, url)) return { action: 'deny' };
-        return this._allowAuthPopup(url);
+        // Una pagina sotto l'avviso del sito pericoloso non apre finestre, che starebbero fuori dall'avviso: la
+        // finestrella diventa una scheda, dove l'avviso c'è.
+        if (!tab.sbAvviso) return this._allowAuthPopup(url);
       }
       const isAdLikePopup = disposition === 'new-window';
-      if (tab.isInternal === false && this.security.blockPopups && isAdLikePopup) {
+      if (!accesso && tab.isInternal === false && this.security.blockPopups && isAdLikePopup) {
         this._notifyPopupBlocked(tab.id, url);
         return { action: 'deny' };
       }
