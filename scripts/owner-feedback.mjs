@@ -36,6 +36,7 @@
 //                                                         [--dry-run]
 //   node scripts/owner-feedback.mjs <n|id> --preapprova     (solo il segno, stato invariato)
 //   node scripts/owner-feedback.mjs <n|id> --chiedi-prima
+//   node scripts/owner-feedback.mjs <n|id> --frase "…"     (solo la frase per chi ha segnalato, stato invariato)
 //   node scripts/owner-feedback.mjs <n|id> --solo-locale    (segno «solo in locale»)
 //   node scripts/owner-feedback.mjs <n|id> --non-locale
 //   node scripts/owner-feedback.mjs <n|id> --serve-locale ["perché"]
@@ -412,8 +413,7 @@ export async function praticaPerLaSessione(id, opts = {}) {
   if (!opts.allaChiusura && !MR.isLocalOnly(fb) && STATI_DEL_LAVORO_LOCALE.includes(fb.status)) {
     return { ok: false, motivo: SENZA_SEGNO, utente: false, senzaSegno: true };
   }
-  return { ok: true, avviso: [avvisoDaCampi(doc.fields), avvisoFrase(fb, id)].filter(Boolean).join('
-') };
+  return { ok: true, avviso: [avvisoDaCampi(doc.fields), avvisoFrase(fb, id)].filter(Boolean).join('\n') };
 }
 
 /** Il promemoria della frase per chi ha segnalato (regola: SN_MANAGE_REVIEW.fraseAttesa), '' se non serve. PURA. */
@@ -439,6 +439,7 @@ export async function fraseDaScrivere(id, rif = id, opts = {}) {
 export async function scriviFrase(id, frase, opts = {}) {
   const testo = String(frase || '').trim();
   if (!testo) return { ok: false, motivo: 'la frase è vuota' };
+  if (testo.length > 500) return { ok: false, motivo: `la frase è di ${testo.length} caratteri e la bacheca ne tiene 500: accorciala` };
   const bearer = opts.bearer || await acquireBearer();
   const doc = await getDoc(id, bearer, ['status']);
   if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
@@ -446,15 +447,15 @@ export async function scriviFrase(id, frase, opts = {}) {
   if (!leggibile) return { ok: false, motivo: 'stato attuale non decifrabile: non so dove sta la pratica' };
   const vietata = partenzaVietata(from);
   if (vietata) return { ok: false, motivo: vietata };
-  const fields = { userNote: toFsValue(testo.slice(0, 500)) };
-  if (opts.dryRun) return { ok: true, dryRun: true, tagliata: testo.length > 500 };
+  const fields = { userNote: toFsValue(testo) };
+  if (opts.dryRun) return { ok: true, dryRun: true };
   const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?updateMask.fieldPaths=userNote`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
     body: JSON.stringify({ fields }),
   });
   if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
-  return { ok: true, tagliata: testo.length > 500 };
+  return { ok: true };
 }
 
 /**
@@ -685,6 +686,7 @@ if (isMain) {
   const uso = () => {
     console.error('Uso: node scripts/owner-feedback.mjs <numero|id> <status> "nota" [--branch <nome>] [--reason <slug>] [--frase "riga per chi ha segnalato"] [--starred|--unstar] [--preapprova|--chiedi-prima] [--come-routine] [--dry-run]');
     console.error('     node scripts/owner-feedback.mjs <numero|id> --preapprova | --chiedi-prima   (solo il segno, stato invariato)');
+    console.error('     node scripts/owner-feedback.mjs <numero|id> --frase "riga per chi ha segnalato"   (solo la frase, stato invariato)');
     console.error('     node scripts/owner-feedback.mjs <numero|id> --solo-locale | --non-locale    (segno «solo in locale», stato invariato)');
     console.error('     node scripts/owner-feedback.mjs <numero|id> --serve-locale ["perché"]       (feedback di un utente → Ricevuti, «richiede lavoro locale»)');
     console.error('     node scripts/owner-feedback.mjs <numero|id> --riconosci                      (prova del mittente su un feedback tuo o di una tua sessione: solo su tua parola)');
@@ -811,6 +813,20 @@ if (isMain) {
     console.log(r.dryRun
       ? `[dry-run] ${riferimento}: ${preapprova ? 'metterei' : 'toglierei'} il segno «fondi senza chiedermelo» (${r.campi.join(', ')})`
       : `${riferimento}: ${preapprova ? `da ora si fonde senza chiedere (segno di ${r.segno.by})` : 'da ora ti chiede prima di fondere'}`);
+    process.exit(0);
+  }
+
+  // Solo la frase per chi ha segnalato, stato invariato: `<id> --frase "…"`.
+  if (id && !status && typeof frase === 'string') {
+    if (typeof preapprova === 'boolean' || typeof starred === 'boolean' || branch !== undefined || reason !== undefined) {
+      console.error('RIFIUTATO: --frase senza stato va da sola — non ho toccato niente.');
+      process.exit(1);
+    }
+    const r = await scriviFrase(id, frase, { dryRun, bearer });
+    if (!r.ok) { console.error(`RIFIUTATO: ${r.motivo} — non ho toccato niente.`); process.exit(3); }
+    console.log(r.dryRun
+      ? `[dry-run] ${riferimento}: scriverei la frase per chi ha segnalato, stato invariato`
+      : `${riferimento}: frase per chi ha segnalato scritta; la bacheca la mostra alla prossima sincronizzazione.`);
     process.exit(0);
   }
 
