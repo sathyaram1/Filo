@@ -1223,6 +1223,29 @@ function fontiDelCompito(sender, contesto, fontiLette = null) {
   return fonti;
 }
 
+// Ciò che una chat ha letto resta suo anche fuori dallo storico che la pagina rimanda a ogni turno (riaperta
+// dall'archivio, oltre gli ultimi venti messaggi): lo tiene il main, per la sessione e nell'archivio (#530).
+const fontiPerChat = new Map();   // chatId → fonti lette dalla chat
+async function fontiDellaChat(chatId) {
+  if (!chatId) return [];
+  if (!fontiPerChat.has(chatId)) {
+    let salvate = [];
+    try { const c = FiloChats && await FiloChats.get(chatId); salvate = Array.isArray(c && c.fonti) ? c.fonti : []; } catch (_) {}
+    if (!fontiPerChat.has(chatId)) fontiPerChat.set(chatId, salvate.slice());
+  }
+  return fontiPerChat.get(chatId);
+}
+async function segnaFonteLetta(chatId, fontiLette, action) {
+  const f = globalThis.SN_ACTION_LEVELS && globalThis.SN_ACTION_LEVELS.fonteDi(action);
+  if (!f || !Array.isArray(fontiLette)) return;
+  const voce = { classe: f.classe, campo: f.campo || null, chiave: String(f.chiave || ''), motivo: String(f.motivo || '') };
+  if (fontiLette.some((x) => x && x.chiave === voce.chiave && x.classe === voce.classe)) return;
+  fontiLette.push(voce);
+  if (chatId && FiloChats && FiloChats.segnaFonti) {
+    try { await FiloChats.segnaFonti(chatId, [voce]); } catch (e) { console.warn('[Filo] fonte della chat non archiviata:', e?.message || e); }
+  }
+}
+
 // Un documento della cartella Download l'ha scritto qualcun altro: classe 5, non 4 (#530).
 function fileScaricato(p) {
   if (!p) return false;
