@@ -136,6 +136,8 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     FILO_CHAT: 'filo-assistant',
     FILO_GENERATE_DASHBOARD: 'generate-dashboard',
     FILO_RUN_ACTION: 'agent-actions',
+    // #530 — l'agente sulla pagina chiede se una sua azione parte, chiede o no.
+    FILO_DECIDI_PAGINA: 'autonomy-levels',
     FILO_CONFIRM_ACTION: 'agent-actions',
     FILO_GET_MEMORY: 'filo-memory',
     // #592 — la memoria riga per riga nelle Preferenze: rileggerla e toglierne una.

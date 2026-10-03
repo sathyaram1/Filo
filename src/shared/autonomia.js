@@ -172,6 +172,32 @@
     return classeValida(da) && a < da ? 'conferma' : 'si';
   }
 
+  // Il livello che vale davvero: uno che non si può scegliere (yolo senza guardiano) vale il predefinito.
+  function livelloAttivo(id) { return selezionabile(id) ? id : LIVELLO_PREDEFINITO; }
+
+  // Un backup che rientra non alza il livello, non accende fiducia e non spegne manopole (regola d):
+  // dove i due dicono cose diverse vince la più stretta.
+  function unisciPiuStretta(attuale, entrante) {
+    const a = attuale && typeof attuale === 'object' ? attuale : {};
+    const e = entrante && typeof entrante === 'object' ? entrante : {};
+    const la = livelloDa(a.livello);
+    const le = livelloDa(e.livello);
+    const out = { livello: indice(le) < indice(la) ? le : la, manopole: {}, fonti: {} };
+    for (const campo of Object.keys(CAMPI)) {
+      const ma = (a.manopole && a.manopole[campo]) || {};
+      const me = (e.manopole && e.manopole[campo]) || {};
+      const m = { diffida: ma.diffida === true || me.diffida === true, grave: ma.grave === true || me.grave === true };
+      if (m.diffida || m.grave) out.manopole[campo] = m;
+    }
+    const fa = a.fonti && typeof a.fonti === 'object' ? a.fonti : {};
+    const fe = e.fonti && typeof e.fonti === 'object' ? e.fonti : {};
+    for (const k of Object.keys(fa)) {
+      if (!classeValida(fa[k])) continue;
+      out.fonti[k] = classeValida(fe[k]) ? Math.max(fa[k], fe[k]) : fa[k];
+    }
+    return out;
+  }
+
   // ── segreti: controlli deterministici, mai un modello ────────────────────────
   const CHIAVI_API = [
     /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
@@ -186,7 +212,7 @@
     /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/,
   ];
   const PAROLA_PASSWORD = /(?:password|passwd|pwd|passphrase|parola\s+d['’]ordine|chiave\s+segreta|secret)\s*(?:[:=]|\bè\b|\bis\b|\bera\b)\s*["'«“]?([^\s"'»”,;&]{4,})/gi;
-  const PAROLA_CODICE = /(?:\botp\b|\b2fa\b|\bone[-\s]?time\b|\bpin\b|\bcodic[ei]\s+(?:di\s+)?(?:verifica|accesso|sicurezza|conferma|recupero|backup|autenticazione|usa\s+e\s+getta|monouso|temporane[oi]|sms)\b|\b(?:recovery|backup|verification|security)\s+codes?\b)\D{0,24}?(\d[A-Za-z0-9]{3,}|[A-Za-z0-9]{4,}(?:[-\s][A-Za-z0-9]{4,}){1,9})/gi;
+  const PAROLA_CODICE = /(?:\botp\b|\b2fa\b|\bone[-\s]?time\b|\bpin\b|\bcodic[ei]\s+(?:di\s+)?(?:verifica|accesso|sicurezza|conferma|recupero|backup|autenticazione|usa\s+e\s+getta|monouso|temporane[oi]|sms)\b|\b(?:recovery|backup|verification|security)\s+codes?\b)[\s:=]*(?:(?:è|e'|is|era|was)\s+)?["'«“]?(\d[A-Za-z0-9]{3,}|[A-Za-z0-9]{4,}(?:[-\s][A-Za-z0-9]{4,}){1,9})/gi;
 
   function sembraPassword(tok) {
     const s = String(tok || '');
@@ -255,7 +281,7 @@
   global.SN_AUTONOMIA = Object.freeze({
     LIVELLI, LIVELLO_PREDEFINITO, GUARDIANO_REGISTRI, CLASSI, SOGLIA_PULITO, COSTI, TABELLA,
     ELENCO_FISSO, CAMPI, MANOPOLE, RISPOSTE, SEGRETI,
-    livelloValido, livelloDa, selezionabile, infoLivello, livelliSelezionabili,
+    livelloValido, livelloDa, livelloAttivo, selezionabile, infoLivello, livelliSelezionabili, unisciPiuStretta,
     costoValido, campoValido, classeValida, costoEffettivo, classeFonte, stato,
     decide, decideDettaglio, richiestaCambioLivello, richiestaSpostamentoFonte,
     segreto, frasePerche,

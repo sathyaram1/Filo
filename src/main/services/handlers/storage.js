@@ -91,6 +91,9 @@ module.exports = function register(on, ctx) {
     const defaults = JSON.parse(JSON.stringify(SN_CONST.DEFAULT_SETTINGS));
     if (current && current.apiKeys) defaults.apiKeys = current.apiKeys;
     if (current && current.modelRegistry) defaults.modelRegistry = current.modelRegistry;
+    // Tornare al predefinito non alza l'autonomia di Filo: alzarla vuole «conferma» (#530).
+    const A = globalThis.SN_AUTONOMIA;
+    if (A && current) defaults.autonomia = A.unisciPiuStretta(current.autonomia, defaults.autonomia);
     await Storage.setSettings(defaults);
     // Ripersiste i default e li propaga ovunque (broadcast SETTINGS_UPDATED,
     // tema nativo, sicurezza, fingerprint, safebrowse, cookie, colore tab).
@@ -211,6 +214,11 @@ module.exports = function register(on, ctx) {
       // posto valori identici sveglierebbe per niente i listener onChanged
       // (e i loro effetti collaterali) su tutto lo storage.
       const settings = merged[SETTINGS_KEY];
+      // Un backup non alza l'autonomia di Filo: alzarla vuole «conferma» (#530).
+      const A = globalThis.SN_AUTONOMIA;
+      if (A && settings && typeof settings === 'object') {
+        settings.autonomia = A.unisciPiuStretta((current[SETTINGS_KEY] || {}).autonomia, ((pending.data || {})[SETTINGS_KEY] || {}).autonomia);
+      }
       const rest = {};
       for (const k of Object.keys(merged)) {
         if (k === SETTINGS_KEY) continue;

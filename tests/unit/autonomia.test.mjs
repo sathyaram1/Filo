@@ -283,6 +283,7 @@ test('segreti: controlli deterministici, che non gridano al lupo', () => {
   assert.equal(A.segreto('l’otp non arriva mai'), '');
   assert.equal(A.segreto('ricetta della pasta e fagioli'), '');
   assert.equal(A.segreto('https://www.youtube.com/watch?v=dQw4w9WgXcQ'), '');
+  assert.equal(A.segreto('https://www.pinterest.com/pin/123456789/'), '', 'una parola chiave in un percorso non è un codice');
   assert.equal(A.segreto('IT60X0542811101000000123456', { richiesta: 'manda IT60 X054 2811 1010 0000 0123 456' }), '');
 });
 

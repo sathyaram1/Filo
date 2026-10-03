@@ -17,6 +17,7 @@
   <script src="filo://shared/storage.js"></script>
   <script src="filo://shared/sounds.js"></script>
   <script src="filo://shared/confirmUi.js"></script>
+  <script src="filo://shared/autonomia.js"></script>
   <script src="filo://shared/onboarding.js"></script>
   <style>
     /* Rifare un'intervista di benvenuto non cancella quella di prima: restano qui, rileggibili. */
@@ -119,6 +120,13 @@
       <select id="agentStylePreset"></select>
       <textarea id="agentStyleText" rows="4" placeholder="Es. Rispondi sempre in italiano, con un tono pacato e qualche esempio pratico." style="width:100%;margin-top:10px;"></textarea>
       <p id="agentStyleNote" class="agent-style-note" aria-live="polite" hidden></p>
+    </section>
+
+    <section id="autonomia">
+      <h2 id="autonomiaTitolo">Autonomia di Filo</h2>
+      <p class="sn-muted">Filo fa da solo quello che può disfare. Quando legge cose scritte da altri, fa meno. Tu scegli con un livello quanto si fida.</p>
+      <div class="sn-cookie-modes" id="autonomiaLivelli" role="radiogroup" aria-labelledby="autonomiaTitolo"></div>
+      <span id="autonomiaHint" class="sn-saved-indicator" aria-live="polite">Salvato</span>
     </section>
 
     <section>

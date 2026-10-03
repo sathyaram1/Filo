@@ -1229,9 +1229,10 @@ function fileScaricato(p) {
 function decisioneAutonomia(ing, { sender = null, contesto = null, origine = 'chat', dentroPerimetro = true, impostazioni = null } = {}) {
   const A = globalThis.SN_AUTONOMIA;
   const aut = (impostazioni && impostazioni.autonomia) || {};
-  const st = A.stato({ fonti: fontiDelCompito(sender, contesto), livello: aut.livello, spostamenti: aut.fonti, manopole: aut.manopole });
+  const livello = A.livelloAttivo(aut.livello);
+  const st = A.stato({ fonti: fontiDelCompito(sender, contesto), livello, spostamenti: aut.fonti, manopole: aut.manopole });
   const ingressi = {
-    livello: aut.livello, stato: st.stato, costo: ing.costo, campo: ing.campo, manopole: aut.manopole,
+    livello, stato: st.stato, costo: ing.costo, campo: ing.campo, manopole: aut.manopole,
     elenco: ing.elenco, difesa: ing.difesa, origine, dentroPerimetro, guardiano: false,
   };
   const d = A.decideDettaglio(ingressi);

@@ -27,6 +27,7 @@
   const inputEl = $('input');
   const sendBtn = $('sendBtn');
   const dashDir = $('dashDir');
+  const autonomiaEl = $('dashAutonomia');
 
   // ===== Stato locale =====
   let suggestions = [];
@@ -1269,6 +1270,7 @@
         applyHomeMessageVisibility();
       }
       if (msg.settings && msg.settings.terminal) Term.applySettings(msg.settings.terminal);
+      if (msg.settings && msg.settings.autonomia) mostraAutonomia(msg.settings.autonomia);
       // Aggiorna suoneria in live se l'utente la cambia dalle opzioni.
       if (msg.settings && msg.settings.timerRingtone && RINGTONES[msg.settings.timerRingtone]) {
         _timerRingTone = msg.settings.timerRingtone;
@@ -1809,6 +1811,35 @@
     } catch (_) {}
   });
 
+  // #530 — il livello di autonomia attivo, sempre in vista accanto a dove si scrive.
+  function mostraAutonomia(aut) {
+    const A = self.SN_AUTONOMIA;
+    if (!autonomiaEl || !A) return;
+    const info = A.infoLivello(A.livelloAttivo(aut && aut.livello));
+    const livelli = A.livelliSelezionabili();
+    const n = livelli.findIndex((l) => l.id === info.id) + 1;
+    const tacche = document.createElement('span');
+    tacche.className = 'dash-autonomia-tacche';
+    tacche.setAttribute('aria-hidden', 'true');
+    for (let i = 1; i <= livelli.length; i++) {
+      const t = document.createElement('span');
+      t.className = `dash-autonomia-tacca${i <= n ? ' piena' : ''}`;
+      tacche.appendChild(t);
+    }
+    const nome = document.createElement('span');
+    nome.textContent = info.nome;
+    autonomiaEl.replaceChildren(tacche, nome);
+    autonomiaEl.dataset.livello = info.id;
+    autonomiaEl.title = 'Quanto Filo fa da solo · clic per cambiarlo';
+    autonomiaEl.setAttribute('aria-label', `Autonomia di Filo: ${info.nome}. Clic per cambiarla.`);
+    autonomiaEl.hidden = false;
+  }
+  if (autonomiaEl) {
+    autonomiaEl.addEventListener('click', () => {
+      send({ type: MSG.OPEN_URL, url: 'filo://preferences/preferences.html#autonomia' });
+    });
+  }
+
   (async function init() {
     renderControls();
     refreshRedteamVisibile();
@@ -1816,6 +1847,7 @@
     try {
       const settings = await self.SN_STORAGE?.getSettings?.();
       showHomeMessage = settings?.showHomeMessage !== false;
+      mostraAutonomia(settings?.autonomia);
       Term.setEnabled(!!settings?.terminal?.enabled);
       Term.setShell(settings?.terminal?.shell || 'powershell');
       // Suoneria timer: legge la preferenza; se non impostata o non valida usa 'default'.
