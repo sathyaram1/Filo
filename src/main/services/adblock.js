@@ -261,7 +261,7 @@ function cosmeticForTokens(href, ids, classes) {
   if (!enabled || !host) return '';
   const off = offFor(hideOff, host);
   if (off.all || off.generic) return '';
-  const clean = (arr) => (Array.isArray(arr) ? arr.filter((x) => typeof x === 'string' && x && x.length <= 120) : []);
+  const clean = (arr) => (Array.isArray(arr) ? arr.slice(0, 5000).filter((x) => typeof x === 'string' && x && x.length <= 120) : []);
   return toCss(CB.matchTokensIn(cosmetic, host, clean(ids), clean(classes)));
 }
 
@@ -341,7 +341,7 @@ function fetchList(url) {
 
 // Scarica tutte le sorgenti, fonde i domini, e se ne ottiene almeno una valida
 // aggiorna lo stato in-memory + la cache. Dedup dei refresh concorrenti.
-function refresh({ force = false, sources = DEFAULT_SOURCES } = {}) {
+function refresh({ force = false, sources = DEFAULT_SOURCES, fetchImpl = fetchList } = {}) {
   if (refreshing) return refreshing;
   refreshing = (async () => {
     try {
@@ -350,7 +350,7 @@ function refresh({ force = false, sources = DEFAULT_SOURCES } = {}) {
       if (!force && lastUpdatedAt && (Date.now() - lastUpdatedAt) < REFRESH_INTERVAL_MS) {
         return { ok: true, skipped: true, count: blockedDomains.size };
       }
-      const texts = await Promise.all(sources.map((u) => fetchList(u)));
+      const texts = await Promise.all(sources.map((u) => fetchImpl(u)));
       const merged = new Set();
       const nextCosmetic = CB.emptyList();
       const nextOff = emptyOff();

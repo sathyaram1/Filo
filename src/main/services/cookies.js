@@ -258,6 +258,13 @@ function applyTrackerBlocking(ses, enabled) {
   state.enabled = !!enabled;
 }
 
+// Finestra incognito e scheda col proxy hanno una sessione loro: senza, lì la pubblicità passava intera (#576).
+// Accende solo le liste della pubblicità; il blocco tracker resta com'era.
+function coverAdblock(ses) {
+  const state = ensureRequestHook(ses);
+  if (state) state.filtri = true;
+}
+
 // ─── sessioni per-sito (modalità privacy) ─────────────────────────────────
 
 const { registerFiloProtocolForSession } = require('../protocol');
@@ -488,6 +495,7 @@ module.exports = {
   ensureHeaderHook,
   applyGpc,
   applyTrackerBlocking,
+  coverAdblock,
   ensureRequestHook,
   chiudiHost,
   permettiRichieste,

@@ -486,6 +486,12 @@
       doesNot: 'Non blocca la navigazione e non chiude la scheda: la pagina carica sotto l\'avviso.',
     },
     {
+      id: 'ad-blocking', title: 'Blocca la pubblicità', category: 'settings',
+      desc: 'Filo blocca pubblicità e tracker con liste pubbliche (EasyList, con le sue liste per i siti italiani e francesi, e StevenBlack) che si aggiornano da sole ogni settimana. Le richieste ai server della pubblicità non partono, e i riquadri pubblicitari che restano nella pagina spariscono: quelli rimasti vuoti e i banner che il sito mette da sé. Vale anche nella finestra in incognito.',
+      invoke: 'Acceso da solo. Si spegne e si riaccende in Impostazioni → Sicurezza, con «Blocca pubblicità e tracker».',
+      doesNot: 'Non si spegne per un sito solo. Non blocca i server dei servizi più usati (Google, YouTube, Facebook, Amazon…), quindi la pubblicità dentro i video di YouTube resta. Non toglie gli avvisi dei siti che chiedono di spegnere il blocco.',
+    },
+    {
       id: 'cookie-banners', title: 'Banner dei cookie rifiutati da soli', category: 'settings',
       desc: 'In modalità Automatico e Privacy Filo rifiuta da solo i banner dei cookie, anche quando stanno in un riquadro dentro la pagina. Quelli che non hanno un «rifiuta» (solo «Accetta», o «accetta o abbonati») li nasconde, senza accettare niente, e se la pagina era rimasta ferma o scurita la sblocca. Dove il sito lo dice, controlla che il rifiuto sia stato registrato davvero.',
       invoke: 'Da solo, a ogni pagina. Il tasto destro sulla scheda dice cosa è successo su quel sito («Cookie non necessari rifiutati» o «Banner dei cookie nascosto»), anche tornandoci dopo in un\'altra scheda o dopo un riavvio, e offre «Mostra il banner dei cookie» per rivederlo; sullo stesso menu «Rifiuta i cookie in automatico qui» torna indietro. In Impostazioni → Sicurezza si vedono tutti e due gli elenchi: i siti coi banner visibili («Rifiuta in automatico») e quelli dove Filo ha rifiutato o nascosto («Mostra il banner»).',

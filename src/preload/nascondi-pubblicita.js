@@ -31,13 +31,13 @@ module.exports = function nascondiPubblicita({ ipcRenderer, webFrame, href }) {
     }
   };
 
+  // Il main ne guarda 5000 per tipo a richiesta: una pagina che ne crea di più li manda a pezzi.
   const flush = () => {
     timer = null;
     if (!ids.length && !classes.length) return;
-    const msg = { ids, classes };
-    ids = [];
-    classes = [];
+    const msg = { ids: ids.splice(0, 5000), classes: classes.splice(0, 5000) };
     ipcRenderer.invoke('filo:adblock-tokens', msg).then(insert).catch(() => {});
+    schedule();
   };
 
   const survey = (root) => {

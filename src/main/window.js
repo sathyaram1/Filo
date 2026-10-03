@@ -161,6 +161,7 @@ function createIncognitoWindow() {
   // filo:// è registrato globalmente solo sulla sessione di default: i tab di
   // questa partizione non lo vedrebbero. Registriamolo qui.
   registerFiloProtocolForSession(ses);
+  try { require('./services/cookies').coverAdblock(ses); } catch (_) {}
 
   const win = new BrowserWindow({
     width: 1180,
