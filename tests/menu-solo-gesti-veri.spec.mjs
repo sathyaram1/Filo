@@ -127,8 +127,9 @@ test('un riquadro di un altro sito dentro la pagina non apre il menu con un tast
   </body></html>`);
 
   await page.locator('#qui').click();
-  const frame = await expect.poll(() => page.frames().find((f) => f.url().includes('sito-pubblico.test')) || null).not.toBeNull()
-    .then(() => page.frames().find((f) => f.url().includes('sito-pubblico.test')));
+  const delRiquadro = () => page.frames().find((f) => f.url().includes('sito-pubblico.test'));
+  await expect.poll(() => !!delRiquadro()).toBe(true);
+  const frame = delRiquadro();
   await frame.waitForFunction(() => window.__fatto === true, null, { timeout: 10_000 });
   expect(await frame.evaluate(() => window.__menuMai)).toBe(false);
   expect(await frame.evaluate(() => window.cosaVede())).not.toContain(SEGRETO);
