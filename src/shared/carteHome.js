@@ -224,7 +224,8 @@
   }
 
   global.SN_CARTE_HOME = {
-    CARTE, APP, IDS, VERSIONE, TETTO_ORDINE, TETTO_NASCOSTE,
+    CARTE, APP, IDS, VERSIONE, TETTO_ORDINE, TETTO_NASCOSTE, DOWNLOAD_RECENTE_MS,
     carta, predefinita, normalizza, risolvi, applica, ordinaSinistra, descrivi,
+    downloadVisibile, sinistra, trovaSinistra,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

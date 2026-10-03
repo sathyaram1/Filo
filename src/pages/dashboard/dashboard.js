@@ -181,6 +181,7 @@
     faviconUrl: (url) => faviconUrl(url),
     apriNelFilo: (o) => apriNelFilo(o),
     scriviNelCampo: (t) => scriviNelCampo(t),
+    chatCorrente: () => chatId,
   });
   // ===== Suoneria timer =====
   // Singleton AudioContext + oscillatori per la suoneria del timer.

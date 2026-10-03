@@ -19,14 +19,15 @@
     suggerimentiPronti: false,
     tuttiSuggerimenti: false,
     downloads: [],
+    lavori: [],
     editor: null,
     mazzi: null,
     impostazioni: null,
   };
 
-  // Un download finito resta fra le cose accadute per un giorno: dopo lo si ritrova negli Scaricamenti.
-  const DOWNLOAD_RECENTE_MS = 24 * 60 * 60 * 1000;
   const VOCI_IN_CARTA = 5;
+  // Un lavoro diventa carta solo se dura: una risposta di un attimo non deve far lampeggiare la colonna.
+  const LAVORO_LUNGO_MS = 3000;
   const SUGGERIMENTI_VISIBILI = 5;
   const URL_EDITOR = 'filo://editor/editor.html';
   const URL_MAZZI = 'filo://decks/decks.html';
@@ -148,14 +149,6 @@
   }
 
   // ===== Scaricamenti =====
-  const ATTIVI = new Set(['progressing', 'paused', 'pending']);
-  function downloadVisibile(r) {
-    if (!r || !r.id) return false;
-    if (ATTIVI.has(r.state)) return true;
-    if (r.state !== 'completed' && r.state !== 'interrupted') return false;
-    const fine = Date.parse(r.endedAt || r.startedAt || '');
-    return Number.isFinite(fine) && Date.now() - fine < DOWNLOAD_RECENTE_MS;
-  }
   function percento(r) {
     return r.totalBytes > 0 ? Math.min(100, Math.round((r.receivedBytes / r.totalBytes) * 100)) : null;
   }
@@ -256,24 +249,42 @@
     };
   }
 
-  // L'ordine di Filo è l'urgenza; quello dell'utente, se ha spostato qualcosa, vince, tranne su quello che suona.
+  // ===== Lavori lunghi in corso (una risposta di Filo, un comando del terminale) =====
+  // Quello di questa scheda si vede già al centro: a sinistra vanno quelli che stanno altrove.
+  let lavoroTimer = null;
+  function lavoriLunghi() {
+    const ora = Date.now();
+    const mio = d.chatCorrente();
+    const altrove = dati.lavori.filter((l) => l && !(l.chat && l.chat === mio));
+    const prossimo = altrove.map((l) => l.iniziato + LAVORO_LUNGO_MS - ora).filter((x) => x > 0);
+    clearTimeout(lavoroTimer);
+    if (prossimo.length) lavoroTimer = setTimeout(disegna, Math.min(...prossimo) + 50);
+    return altrove.filter((l) => ora - l.iniziato >= LAVORO_LUNGO_MS);
+  }
+  function cartaLavoro(l) {
+    const comando = l.tipo === 'comando';
+    const carta = {
+      chiave: `lavoro:${l.id}`, tipo: 'lavoro', icona: comando ? 'terminal' : 'sparkles',
+      titolo: comando ? 'Comando in corso' : 'Filo sta lavorando', stato: l.testo || '…', lungo: true, avanza: -1,
+      chat: l.chat || null,
+      togli: () => muovi({ tipo: 'nascondi', chiave: `lavoro:${l.id}` }), etichettaTogli: 'Togli dalla home',
+      filo: comando ? `Sto ancora eseguendo il comando «${l.testo}».` : `Sto ancora lavorando a «${l.testo}».`,
+    };
+    carta.principale = { etichetta: 'Vai', forte: true, fai: () => apriCartaNelFilo(carta) };
+    return carta;
+  }
+
+  // L'ordine (urgenza di Filo, poi quello dell'utente) lo decide il modulo condiviso: la chat lo legge uguale.
+  const PER_TIPO = {
+    crediti: () => cartaCrediti(), timer: cartaTimer, sveglia: cartaTimer, download: cartaDownload,
+    avviso: cartaAvviso, lavoro: cartaLavoro,
+  };
   function carteSinistra() {
-    const nascoste = new Set((layout && layout.nascoste) || []);
-    const out = [];
-    const cred = suggerimentoCrediti();
-    if (cred && !nascoste.has('crediti')) out.push(cartaCrediti());
-    const suonano = dati.timers.filter((t) => t.ringing).map(cartaTimer);
-    const resto = [];
-    for (const r of dati.downloads.filter((x) => ATTIVI.has(x.state) && downloadVisibile(x))) resto.push(cartaDownload(r));
-    const inCorso = dati.timers.filter((t) => !t.ringing)
-      .sort((a, b) => Date.parse(a.endsAt) - Date.parse(b.endsAt));
-    for (const t of inCorso) resto.push(cartaTimer(t));
-    for (const n of dati.notifiche) resto.push(cartaAvviso(n));
-    for (const r of dati.downloads.filter((x) => !ATTIVI.has(x.state) && downloadVisibile(x))) resto.push(cartaDownload(r));
-    const visibili = resto.filter((c) => !nascoste.has(c.chiave));
-    const ordine = C.ordinaSinistra(visibili.map((c) => c.chiave), layout);
-    const perChiave = new Map(visibili.map((c) => [c.chiave, c]));
-    return [...out, ...suonano, ...ordine.map((k) => perChiave.get(k))];
+    const voci = C.sinistra({
+      timers: dati.timers, notifiche: dati.notifiche, downloads: dati.downloads, lavori: lavoriLunghi(),
+      crediti: !!suggerimentoCrediti(),
+    }, layout);
+    return voci.map((v) => PER_TIPO[v.tipo](v.ref));
   }
 
   // ===== Le carte di destra =====
@@ -309,6 +320,7 @@
       stato: e ? (file.length ? plurale(file.length, 'documento', 'documenti') : 'nessun documento') : '…',
       voci,
       principale: { etichetta: file.length ? 'Apri l’Editor' : 'Scrivi', fai: () => apri(URL_EDITOR) },
+      apri: () => apri(URL_EDITOR),
       filo: file.length
         ? `Nell’Editor hai ${plurale(file.length, 'documento', 'documenti')}${titoli ? `; gli ultimi: ${titoli}` : ''}.`
         : 'L’Editor è vuoto: quando vuoi, scriviamo qualcosa insieme.',
@@ -328,6 +340,7 @@
       stato: m ? (mazzi.length ? plurale(mazzi.length, 'mazzo', 'mazzi') : 'nessun mazzo') : '…',
       voci,
       principale: { etichetta: mazzi.length ? 'Apri i Mazzi' : 'Nuovo mazzo', fai: () => apri(URL_MAZZI) },
+      apri: () => apri(URL_MAZZI),
       filo: mazzi.length ? `Hai ${plurale(mazzi.length, 'mazzo', 'mazzi')}${nomi ? `: ${nomi}` : ''}.` : 'Non hai ancora nessun mazzo.',
     };
   }
@@ -398,6 +411,7 @@
       stato: null,
       pastiglie: p,
       principale: { etichetta: 'Preferenze', fai: () => apri(URL_PREFERENZE) },
+      apri: () => apri(URL_PREFERENZE),
       filo: `Impostazioni rapide: ${p.map((x) => `${x.etichetta.toLowerCase()} ${x.acceso ? 'acceso' : 'spento'}`).join(', ')}.`,
     };
   }
@@ -506,11 +520,10 @@
       art.appendChild(piede);
     }
 
-    // A sinistra la carta è una conversazione che Filo ha cominciato: il clic la apre nel filo.
-    art.addEventListener('click', () => { if (colonna === 'sinistra') apriNelFilo(art); });
+    art.addEventListener('click', () => usaCarta(art));
     art.addEventListener('keydown', (e) => {
       if (e.target !== art) return;
-      if (e.key === 'Enter') { e.preventDefault(); if (colonna === 'sinistra' || !art._carta.principale) apriNelFilo(art); else art._carta.principale.fai(); }
+      if (e.key === 'Enter') { e.preventDefault(); usaCarta(art); }
       else if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
         e.preventDefault();
         const r = art.getBoundingClientRect();
@@ -807,9 +820,20 @@
     });
   }
 
+  // Clic e Invio fanno la stessa cosa. A sinistra la carta è una conversazione che Filo ha cominciato: si apre nel
+  // filo. A destra si apre quello che la carta tiene (l'app), o nel filo se non tiene un'app.
+  function usaCarta(art) {
+    const c = art && art._carta;
+    if (!c) return;
+    if (art.dataset.colonna === 'destra' && c.apri) c.apri();
+    else apriNelFilo(art);
+  }
+
   // ===== «Apri nel filo» =====
   function apriNelFilo(art) {
-    const c = art && art._carta;
+    apriCartaNelFilo(art && art._carta);
+  }
+  function apriCartaNelFilo(c) {
     if (!c) return;
     Promise.resolve(d.apriNelFilo({ chat: c.chat || null, testo: c.filo || '', esterno: c.esterno || '' })).then((r) => {
       if (r === 'accoglienza') avviso('Prima finiamo di presentarci, poi la carta si apre nel filo.');
@@ -844,6 +868,11 @@
     dati.mazzi = r && r.ok && Array.isArray(r.decks) ? r.decks : [];
     disegna();
   }
+  async function caricaLavori() {
+    const r = await d.send({ type: MSG.LAVORI_IN_CORSO });
+    dati.lavori = r && r.ok && Array.isArray(r.lavori) ? r.lavori : [];
+    disegna();
+  }
   async function caricaImpostazioni() {
     try { dati.impostazioni = await global.SN_STORAGE.getSettings(); } catch (_) { dati.impostazioni = {}; }
     disegna();
@@ -868,15 +897,17 @@
       if (!msg) return;
       if (msg.type === MSG.CARTE_HOME_CAMBIATE && msg.layout) { layout = C.normalizza(msg.layout); disegna(); }
       else if (msg.type === MSG.DOWNLOADS_UPDATED) ricaricaDownloadsPresto();
+      else if (msg.type === MSG.LAVORI_CAMBIATI && Array.isArray(msg.lavori)) { dati.lavori = msg.lavori; disegna(); }
       else if (msg.type === MSG.FILO_LIVE_UPDATED) caricaEditor().catch(() => {});
       else if (msg.type === MSG.SETTINGS_UPDATED && msg.settings) { dati.impostazioni = msg.settings; disegna(); }
       else if (msg.type === MSG.TAB_IN_VISTA && msg.inVista) {
         caricaEditor().catch(() => {});
         caricaMazzi().catch(() => {});
         caricaDownloads().catch(() => {});
+        caricaLavori().catch(() => {});
       }
     });
-    return Promise.all([caricaLayout(), caricaDownloads(), caricaEditor(), caricaMazzi(), caricaImpostazioni()]).catch(() => {});
+    return Promise.all([caricaLayout(), caricaDownloads(), caricaEditor(), caricaMazzi(), caricaImpostazioni(), caricaLavori()]).catch(() => {});
   }
 
   global.SN_DASH_CARTE = {
