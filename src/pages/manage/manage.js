@@ -182,6 +182,11 @@
   let currentTab    = 'inbox';  // tab lista attiva (inbox/queue/resolved/archived)
   let currentList   = [];       // feedback della tab corrente, ordinati
   let selectedId    = null;     // ID del feedback selezionato nel pannello centrale
+  // Segno di mittente pericoloso (#922): copia letta per mittente, i segni in corso di togliersi, e il
+  // mittente aperto nel pannello di destra col feedback con cui chiederne il segno.
+  const segniMittente = new Map();
+  const segniInVolo = new Set();
+  let mittenteAperto = null;
   let allByClient   = {};       // clientId → array di feedback (per il pannello mittente)
   let starredOnly   = false;    // filtro ⭐ della tab Archiviati (DB2)
   let confirmedOnly = false;    // filtro "Bloccati confermati" (attack/spam confermati)
@@ -344,6 +349,7 @@
     if (nuovo === isAdmin) return;
     isAdmin = nuovo;
     imgCache.clear();
+    segniMittente.clear();
     // Anche le risposte sulle pillole dei documenti: dipendono da chi guarda
     // esattamente come quelle delle immagini, e tenerne una sola delle due
     // avrebbe lasciato metà del difetto in piedi.
@@ -3299,11 +3305,7 @@
   // ── Segno di mittente pericoloso (#922) ───────────────────────────────────
   // Lo tiene il server: qui c'è la copia letta, per mittente. Toglierlo è un gesto suo, con una conferma che
   // dice cosa cambia; approvare non lo tocca (MR.FRASE_SEGNO_ERRATO dice perché).
-  const segniMittente = new Map();
-  const segniInVolo = new Set();
   const SEGNO_VALIDO_MS = 2 * 60 * 1000;
-  // Il mittente aperto nel pannello di destra, e il feedback con cui chiederne il segno.
-  let mittenteAperto = null;
 
   // Senza un mittente leggibile due feedback non si possono dire dello stesso: la copia resta del feedback.
   function chiaveSegno(fb) {
@@ -3390,14 +3392,14 @@
   // Accanto all'approvazione, e solo su un feedback fermato proprio dal segno che c'è ancora.
   function aggiornaBottoneSegno(fb) {
     if (!mgActionsRow) return;
-    const c'è = mgActionsRow.querySelector('#mgSegnoBtn');
+    const esiste = mgActionsRow.querySelector('#mgSegnoBtn');
     const serve = !!(isAdmin && fb && !mgActions.hidden && MR.fermatoDalSegno(fb) && segnoAttivo(fb));
     if (!serve) {
-      if (c'è) c'è.remove();
+      if (esiste) esiste.remove();
       chiudiConfermaSegno();
       return;
     }
-    if (c'è) return;
+    if (esiste) return;
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'sn-btn sn-btn-secondary';
@@ -4231,6 +4233,7 @@
 
   // ── Pannello laterale ─────────────────────────────────────────────────────
   function openSidebar(title, html) {
+    mittenteAperto = null;
     mgSideEmpty.hidden = true;
     mgSide.hidden = false;
     mgSideTitle.textContent = title;
@@ -4238,6 +4241,7 @@
   }
 
   function closeSidebar() {
+    mittenteAperto = null;
     mgSide.hidden = true;
     mgSideEmpty.hidden = false;
     mgSideTitle.textContent = '';
@@ -4549,11 +4553,19 @@
         <div class="mg-sender-stat">${esc(clientId === '__anon__' ? 'anonimo' : clientId)}</div>
         <div class="mg-sender-stat">${esc(oldestStr)}</div>
         <div class="mg-sender-stat">Feedback totali: <strong>${total}</strong></div>
+        <div class="mg-sender-segno" id="mgSideSegno" hidden></div>
         <div class="mg-sender-list" id="senderFbList">${listHtml || '<em>Nessun feedback.</em>'}</div>
       </div>
     `;
     segnaForma(null);
     openSidebar('Mittente', html);
+    // Il segno si chiede col feedback che l'owner sta guardando, se è di questo mittente.
+    const rif = group.find((f) => f._id === selectedId) || group[0] || null;
+    if (rif) {
+      mittenteAperto = { clientId, fbId: rif._id };
+      leggiSegno(rif);
+      disegnaSegnoMittente();
+    }
 
     // Click su un feedback del mittente → carica nel pannello centrale
     const listEl = document.getElementById('senderFbList');
@@ -4753,6 +4765,9 @@
     if (mgUserNote && mgUserNoteText) {
       if (String(mgUserNoteText.value || '') !== String(mgUserNoteText.dataset.saved || '')) return true;
     }
+    // Una conferma del segno aperta (#922): ridisegnare la chiuderebbe mentre l'owner la legge.
+    if (mgSegnoConferma && !mgSegnoConferma.hidden) return true;
+    if (document.querySelector('#mgSideSegno .mg-segno-conferma:not([hidden])')) return true;
     return false;
   }
 
