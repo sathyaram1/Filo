@@ -78,3 +78,45 @@ test('token rifiutato: si riparte anonimi, senza prova, e il risultato lo dice',
     } finally { f.restore(); }
   }
 });
+
+// #912: da anonimo un nome riservato non parte; il mittente resta, nello spazio di chi non ha la prova.
+async function chiaviDiProva() {
+  const pair = await webcrypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+  const pub = Buffer.from(new Uint8Array(await webcrypto.subtle.exportKey('raw', pair.publicKey))).toString('base64url');
+  const priv = Buffer.from(new Uint8Array(await webcrypto.subtle.exportKey('pkcs8', pair.privateKey))).toString('base64');
+  return { pub, priv };
+}
+async function mittenteSpedito(create, priv) {
+  return globalThis.SN_FEEDBACK_CRYPTO.decrypt(create.body.fields.clientId.stringValue, priv);
+}
+
+test('#912 — da anonimo un nome riservato parte come utente, anche quello dell’owner col token rifiutato', async () => {
+  const { pub, priv } = await chiaviDiProva();
+  const salvata = globalThis.SN_FEEDBACK_PUBKEY;
+  globalThis.SN_FEEDBACK_PUBKEY = pub;
+  try {
+    for (const clientId of ['owner:abc', 'Local:claude', 'routine:residuo', 'agent:gemini']) {
+      const f = installFetch();
+      try {
+        await FB.submit({ text: 'ciao', clientId });
+        assert.equal(await mittenteSpedito(f.create[0], priv), `non-provato:${clientId}`, clientId);
+      } finally { f.restore(); }
+    }
+    const rifiutato = installFetch([401, 200]);
+    try {
+      await FB.submit({ text: 'ciao', clientId: 'owner:abc' }, { idToken: 'tok-scaduto' });
+      assert.equal(await mittenteSpedito(rifiutato.create[0], priv), 'owner:abc', 'col token il nome parte com’è');
+      assert.equal(await mittenteSpedito(rifiutato.create[1], priv), 'non-provato:owner:abc', 'la ripartenza anonima no');
+    } finally { rifiutato.restore(); }
+    // Chi non usa un nome riservato parte com'è.
+    for (const clientId of ['c-utente', 'filo:chat', 'auto:capacita', 'uid:123']) {
+      const f = installFetch();
+      try {
+        await FB.submit({ text: 'ciao', clientId });
+        assert.equal(await mittenteSpedito(f.create[0], priv), clientId, clientId);
+      } finally { f.restore(); }
+    }
+  } finally {
+    globalThis.SN_FEEDBACK_PUBKEY = salvata;
+  }
+});
