@@ -66,6 +66,7 @@ function deserializeFromDisk(data) {
 
 const STATE = {
   loaded: false,
+  loading: null,
   data: {},
   filePath: null,
   pending: null,
