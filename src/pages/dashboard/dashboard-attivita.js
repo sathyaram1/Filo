@@ -696,8 +696,9 @@
   const PREF_TERMINALE = 'filo://preferences/preferences.html#sec-terminal';
 
   // La prima volta che Filo propone o esegue un comando (#892): cosa succede e
-  // dove si spegne, una volta sola per profilo (lo decide il main).
+  // dove si spegne. Disegnata, è detta: da qui il main non la allega più.
   function notaPrimaVolta() {
+    Promise.resolve().then(() => global.SN_STORAGE.setRaw(global.SN_CONST.STORAGE_KEYS.FILO_TERMINALE_SPIEGATO, true)).catch(() => {});
     const nota = document.createElement('div');
     nota.className = 'dash-cmd-primavolta';
     nota.append('Per questo uso il terminale del computer: quello che legge parte subito, quello che cambia qualcosa te lo chiedo prima. Si spegne in ');
