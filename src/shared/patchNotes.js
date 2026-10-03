@@ -9,6 +9,13 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.230', date: '2026-10-03',
+      features: [],
+      fixes: [
+        'In Altro, Modelli e Preferenze quello che scrivi in una casella non si perde più se subito dopo cambi scheda o chiudi la pagina: domini esclusi, limite di spesa, chiavi, ore dell\'archivio automatico, durata delle notifiche, nome della voce. Il nome nuovo di una categoria vale anche senza premere «Rinomina».',
+      ],
+    },
+    {
       version: '0.2.229', date: '2026-09-11',
       features: [
         'Il Red Team va in pausa fino al rilascio. Tornerà, e classifica e codici d’invito restano come sono.',

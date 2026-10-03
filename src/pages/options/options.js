@@ -382,7 +382,9 @@
     // Editor a segmenti "Modelli per azione": una catena di fallback per azione.
     modelChains = ModelChain.renderGrid($('modelsGrid'), {
       models: settings.models || {},
-      onChange: saveDebounced,
+      // Mentre si scrive in un segmento basta l'`input` che sale alla pagina; una scelta dalla tendina, un segmento
+      // aggiunto o tolto e un valore confermato o respinto partono subito.
+      onChange: (scrivendo) => { if (!scrivendo) { caselle.cambiato('pagina'); caselle.subito(true); } },
       // Registry LIVE (dalle righe correnti, anche non salvate) così la
       // validazione modello↔funzione riflette subito le modifiche.
       getRegistry: () => collectModelRegistry().registry,
@@ -614,9 +616,16 @@
   }
 
   // Evidenzia (bordo + messaggio inline sotto la riga, niente alert bloccante)
-  // le righe scartate dall'ultimo save(); ripulisce tutte le altre.
-  function markRegistryRowIssues(missingNickRows, dupRows) {
+  // le righe scartate dall'ultimo save(); ripulisce tutte le altre. Con
+  // `soloTogliere` (mentre si scrive) una riga corretta si ripulisce ma una
+  // nuova non si accende: a metà, una riga senza nickname è solo incompleta.
+  function markRegistryRowIssues(missingNickRows, dupRows, soloTogliere) {
     const host = $('modelRegistryList');
+    const gia = soloTogliere ? new Set(host.querySelectorAll('.sn-model-row.sn-row-invalid')) : null;
+    if (gia) {
+      missingNickRows = (missingNickRows || []).filter((row) => gia.has(row));
+      dupRows = (dupRows || []).filter((d) => gia.has(d.row));
+    }
     for (const row of host.querySelectorAll('.sn-model-row:not(.sn-model-row-head)')) {
       row.classList.remove('sn-row-invalid');
       row.querySelector('.sn-model-nick').classList.remove('sn-input-invalid');
@@ -802,7 +811,10 @@
     $('modelsStatus').textContent = errors.length ? errors.join(' · ') : `${total} modelli`;
   }
 
-  async function save() {
+  // Con `avvisi: false` (mentre si scrive) le righe scartate non si dicono ancora.
+  async function save(opts) {
+    caselle.spedita('pagina');
+    const avvisi = !(opts && opts.avvisi === false);
     const apiKey = $('apiKey').value.trim();
     const apiKeyTavily = $('apiKeyTavily').value.trim();
 
@@ -828,9 +840,10 @@
 
     // Aggiorna la datalist dei nickname (per-action) col registry appena salvato.
     populateNicknames(registry);
-    markRegistryRowIssues(missingNickRows, dupRows);
+    markRegistryRowIssues(missingNickRows, dupRows, !avvisi);
 
     const hasDiscarded = (missingNickRows && missingNickRows.length) || (dupRows && dupRows.length);
+    if (hasDiscarded && !avvisi) return;
     const hint = $('savedHint');
     hint.textContent = hasDiscarded ? I18n.t('options_model_row_not_saved') : I18n.t('options_saved');
     hint.classList.toggle('sn-hint-warn', !!hasDiscarded);
@@ -864,11 +877,17 @@
     }
   }
 
-  let saveTimer = null;
-  function saveDebounced() {
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(save, 400);
-  }
+  // Chiavi, limite di spesa, righe del registro e modelli per azione non hanno un «Salva», e chiudere o cambiare
+  // scheda non avvisa la pagina (#590.5): tutto parte da qui. Uscendo si accendono gli avvisi sulle righe scartate.
+  const caselle = window.SN_CASELLE.crea({
+    uscita() {
+      if (modelChains) ModelChain.conferma(modelChains);
+      const { missingNickRows, dupRows } = collectModelRegistry();
+      markRegistryRowIssues(missingNickRows, dupRows);
+    },
+  });
+  caselle.registra('pagina', (avvisi) => save({ avvisi }));
+  const CASELLA = /^(text|password|number|search|url|email)$/;
 
   // La chiave OpenRouter si mette e si toglie anche dalla pagina Crediti
   // (#629), e questa pagina risalva TUTTO il modulo a ogni modifica: con la
@@ -888,10 +907,25 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
-    // Niente pulsante "Salva": ogni modifica viene applicata e persistita
-    // subito. I controlli testuali salvano allo `change` (cioè al blur), gli
-    // altri (select/checkbox) immediatamente.
-    $('page').addEventListener('change', () => saveDebounced());
+    // Niente pulsante "Salva": un `change` (interruttore, tendina, campo lasciato) parte subito. Qui ogni casella a
+    // metà ha effetto (il tetto «1» scrivendo «15» ferma le richieste, una chiave tronca viene rifiutata, un modello
+    // che non esiste fallisce), quindi aspetta la pausa lunga; incollare parte subito.
+    $('page').addEventListener('input', (e) => {
+      const t = e.target;
+      if (!t || !(t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && CASELLA.test(t.type)))) return;
+      caselle.cambiato('pagina', e, { pausa: window.SN_CASELLE.PAUSA_LUNGA_MS });
+      // L'avviso di una riga del registro si toglie mentre la si corregge; uno nuovo aspetta l'uscita.
+      if (t.closest('.sn-model-row.sn-row-invalid')) {
+        const { missingNickRows, dupRows } = collectModelRegistry();
+        markRegistryRowIssues(missingNickRows, dupRows, true);
+      }
+    });
+    // L'editor dei modelli per azione dice da sé quando un segmento è confermato.
+    $('page').addEventListener('change', (e) => {
+      if (e.target && e.target.closest && e.target.closest('.sn-chain')) return;
+      caselle.cambiato('pagina');
+      caselle.subito(true);
+    });
     // Qualunque cosa cambi (interruttore, modelli per azione, registry) può
     // cambiare l'effetto di "solo pesi aperti": lo ricalcoliamo sempre.
     $('page').addEventListener('change', renderOpenWeightsImpact);
