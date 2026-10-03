@@ -63,16 +63,19 @@ settantina di spec lo guarda coi locator. Se un giorno ci entra un dato privato
 
 ## Provarlo
 
-I locator non attraversano uno shadow root chiuso. Lo stato del pannello si
-chiede a `SN_MENU._test.cronologia()` nel mondo dei content script (isolato sui
-siti, la pagina stessa su `filo://`) con `tests/helpers/cronologiaAppunti.mjs`; i
-clic sono quelli veri del mouse sulle coordinate che l'hook restituisce. Sui
-siti la pagina non vede l'hook: vive nel mondo isolato.
+I locator non attraversano uno shadow root chiuso, e il testo non è un nodo ma
+contenuto generato. Lo stato del pannello si chiede a `SN_MENU._test.cronologia()`
+nel mondo dei content script (isolato sui siti, la pagina stessa su `filo://`)
+con `tests/helpers/cronologiaAppunti.mjs`: il testo di ogni voce lo legge
+dall'`aria-label`, non dal nodo. I clic sono quelli veri del mouse sulle
+coordinate che l'hook restituisce. Sui siti la pagina non vede l'hook: vive nel
+mondo isolato.
 
 La prova dell'attacco sta in `tests/menu-solo-gesti-veri.spec.mjs`: lo script
 del sito fa tutto da sé dentro il clic dell'utente, anche da un riquadro di un
-altro sito, e la cronologia non gli arriva; aperta dall'utente si vede e si
-incolla.
+altro sito, e la cronologia non gli arriva; a cronologia aperta dall'utente la
+ricerca testuale del browser, interrogata lettera per lettera, non ricostruisce
+il testo, che l'utente intanto vede e incolla.
 
 ## Limite noto
 
