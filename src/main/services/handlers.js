@@ -1309,7 +1309,7 @@ async function decisioneAzionePagina({ costo, campo = 'web', sender = null } = {
   let impostazioni = {};
   try { impostazioni = await Storage.getSettings(); } catch (_) {}
   const ing = { costo, campo: A.campoValido(campo) ? campo : null, elenco: '', difesa: false };
-  const d = decisioneAutonomia(ing, { sender, impostazioni });
+  const d = decisioneAutonomia(ing, { sender, assistente: true, impostazioni });
   return { risposta: d.risposta, digita: d.digita, perche: d.perche, ...(d.risposta === 'no' ? { no: fraseNo(ing, d, sender).breve } : {}) };
 }
 
