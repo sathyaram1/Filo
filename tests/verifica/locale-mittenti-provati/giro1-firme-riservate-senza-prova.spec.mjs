@@ -44,7 +44,9 @@ test('Gestione: icona, etichetta, bolla e gruppo del mittente seguono la prova, 
   const testata = page.locator('#senderLink');
   await expect(testata).toContainText('Utente');
   await expect(testata).not.toContainText(/Owner|owner/);
-  await expect(page.locator('.mg-detail .mg-bubble--model, #mgDetail .mg-bubble--model')).toHaveCount(0);
+  const segnalazione = page.locator('.mg-bubble').filter({ hasText: 'testo della segnalazione' }).first();
+  await expect(segnalazione).toHaveClass(/mg-bubble--user/);
+  await expect(segnalazione.locator('.mg-bubble-who')).toHaveText('Utente');
 
   // Il pannello del mittente del falso owner non contiene i feedback dell'owner vero.
   await testata.click();
