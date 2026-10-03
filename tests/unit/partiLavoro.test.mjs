@@ -86,7 +86,7 @@ test('la parte del server che manca si giudica su origin/main appena riletto: un
 test('finish manda al server le parti del server che mancano, solo con la pratica', async () => {
   const src = readFileSync(join(ROOT, 'scripts', 'finish-local.mjs'), 'utf8');
   assert.match(src, /partiServerInSospeso\(branch, \{ cartellaServer: cartellaDelServer\(ROOT\) \}\)/);
-  assert.match(src, /askServerMerge\(\{ branch, sha: cur, feedbackId: [^}]*pendingParts \}\)/);
+  assert.match(src, /askServerMerge\(\{ branch, sha: cur, feedbackId: [^}]*pendingParts(, provaUnit)? \}\)/);
 
   process.env.FILO_ADMIN_REFRESH_TOKEN = 'refresh-finto';
   const corpi = [];
