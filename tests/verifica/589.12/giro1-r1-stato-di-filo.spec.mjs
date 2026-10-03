@@ -19,7 +19,7 @@ function dalSito(app, host) {
 test('lo stato di Filo chiesto da un sito non contiene la pagina salvata da un altro sito', async ({ app, openTab, testServer }) => {
   const a = await testServer.openReady(
     openTab,
-    `<!doctype html><html><head><title>${TITOLO_A}</title></head><body><h1>Saldo</h1></body></html>`,
+    `<!doctype html><html><head><title>${TITOLO_A}</title></head><body style="margin:0;height:100vh;background:#2a6"><h1>Saldo</h1></body></html>`,
   );
   const urlA = a.url();
   await a.click('body', { button: 'right', position: { x: 300, y: 200 } });
