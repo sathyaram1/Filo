@@ -320,7 +320,11 @@ class AnteprimeSchede {
         const id = this.coda.shift();
         const tab = this.m.tabs.find((t) => t.id === id);
         if (!tab || !this.tieneSveglia(tab)) continue;
-        if (!this._siPuo(tab)) { this._piuTardi(tab); continue; }
+        if (!this._siPuo(tab)) {
+          if (!this.spento && vivo(tab) && this.tieneSveglia(tab) && this._finestraFerma()) continue;
+          this._piuTardi(tab);
+          continue;
+        }
         const ok = await this._sotto(tab);
         if (!ok) this._piuTardi(tab);
       }
