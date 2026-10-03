@@ -114,8 +114,29 @@
     'beforeinput', 'input', 'change', 'wheel', 'dragstart', 'dragenter', 'dragover', 'drop',
     'touchstart', 'touchmove', 'touchend'];
   function fermaIFinti(e) { if (!e.isTrusted) e.stopImmediatePropagation(); }
+  const chiusi = new WeakSet();
+  function chiudi(n) {
+    if (!n || n.nodeType !== 1 || chiusi.has(n)) return;
+    chiusi.add(n);
+    for (const t of GESTI) n.addEventListener(t, fermaIFinti, true);
+  }
+  function chiudiAlbero(n) {
+    chiudi(n);
+    if (n && n.querySelectorAll) for (const d of n.querySelectorAll('*')) chiudi(d);
+  }
+  // Ciò che entra dopo nel pezzo (contenuti che arrivano in ritardo) lo chiude l'osservatore: è la rete, non la
+  // strada principale, perché un osservatore del sito creato prima del nostro viene avvisato per primo.
+  const osservati = new WeakSet();
   function soloGestiVeri(el) {
-    try { for (const t of GESTI) el.addEventListener(t, fermaIFinti, true); } catch (_) {}
+    try {
+      chiudiAlbero(el);
+      if (!osservati.has(el) && typeof MutationObserver === 'function') {
+        osservati.add(el);
+        new MutationObserver((ms) => {
+          for (const m of ms) for (const n of m.addedNodes) chiudiAlbero(n);
+        }).observe(el, { childList: true, subtree: true });
+      }
+    } catch (_) {}
     return el;
   }
 
