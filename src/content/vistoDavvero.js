@@ -236,7 +236,7 @@
     const Ui = global.SN_FILO_UI;
     if (!r || !Ui || typeof Ui.aperti !== 'function') return false;
     for (const el of Ui.aperti()) {
-      if (el === ospite || sotto.has(el)) continue;
+      if (sotto.has(el)) continue;
       let q, z;
       try { q = el.getBoundingClientRect(); z = Number(global.getComputedStyle(el).zIndex); } catch (_) { continue; }
       if (!(z > Number(Z)) || !q.width || !q.height) continue;

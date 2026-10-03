@@ -190,7 +190,8 @@ test('un velo della pagina sopra un riquadro incorporato copre anche il menu ape
   const delRiquadro = () => page.frames().find((f) => f.url().includes('sito-pubblico.test'));
   await expect.poll(() => !!delRiquadro()).toBe(true);
   const frame = delRiquadro();
-  await frame.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
+  // Nei riquadri i content script si montano al primo gesto: il tasto destro li monta e si rigioca.
+  await frame.waitForSelector('#campo');
 
   await frame.locator('#campo').click({ button: 'right' });
   await expect(frame.locator('.sn-menu-paste-main')).toBeVisible();

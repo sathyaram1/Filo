@@ -14,7 +14,7 @@ sottomenu. Può nascondere il menu e toglierlo subito: l'utente non vede niente.
 Il controllo del main sul gesto recente non bastava, perché un gesto vero c'era:
 il clic sul pulsante del sito.
 
-## Le due regole
+## Le tre regole
 
 1. **Solo gesti veri.** Ogni ingresso accetta solo eventi `isTrusted`:
    - il tasto destro che apre il menu, nel ponte del page-preload (vale anche nei
@@ -71,11 +71,53 @@ il clic sul pulsante del sito.
    `@font-face` rimpiazza; un font chiamato per nome, anche quello scelto
    dall'utente, lì non entra. Sulle pagine `filo://` il font dell'utente resta.
 
+3. **Un clic conta solo dove l'utente vedeva la voce.** Il caso (#589.11): dopo
+   un tasto destro vero sul suo campo, il sito stende sopra tutto un velo bianco
+   che il mouse attraversa (`pointer-events: none`), con due quadrati da cliccare:
+   uno sulla freccia di Incolla, uno sulla prima voce della cronologia. I gesti
+   sono veri, la regola 1 li lascia passare, e la password finisce nel campo.
+   La guardia (`src/content/vistoDavvero.js`) chiede al browser se la voce è
+   scoperta (IntersectionObserver v2, `isVisible`) e conta il clic solo allora:
+   - **non lo chiede alla voce** ma a una **sonda** trasparente posata sopra di
+     lei: la compensazione dello zoom, la sfocatura dietro al menu e la sua
+     dissolvenza fanno rispondere «non visibile» a ogni voce. Le sonde stanno in
+     un host chiuso, **allo stesso piano del menu e subito dopo i suoi pezzi**:
+     le copre tutto ciò che copre il menu, mai il menu, i sotto-menu o le
+     etichette. Per questo ogni pezzo entra da `monta` (prima delle sonde), e
+     etichetta e anteprima del trascinamento stanno sul piano del menu
+     (2147483646), non sopra;
+   - le sonde sono **in catena**, ognuna dentro la precedente: due sonde
+     sovrapposte (dove due pannelli si toccano) si coprirebbero, un discendente
+     no. Una voce nascosta porta la sonda fuori dallo schermo, mai a
+     `display: none`, che nasconderebbe la catena sotto di lei;
+   - il browser ricalcola le coperture solo se qualcosa cambia forma: uno
+     z-index alzato da solo non lo vede. Un pixel che va e viene a ogni
+     fotogramma, nell'host, lo costringe a guardare;
+   - posizione, piano e `display` del pannello sono **inchiodati in linea con
+     `!important`** e rimessi a posto a ogni cambio: un foglio del sito che
+     abbassa il menu sotto il suo velo lascerebbe il velo fra il menu e le
+     sonde. Lo stesso per l'host delle sonde, anche contro `popover`;
+   - una voce **scoperta da poco aspetta mezzo secondo**: un velo tolto mentre
+     la mano arriva non lascia il tempo di vedere. Non aspetta chi compare
+     (menu appena aperto, voce rivelata da un filtro) e chi era coperto da un
+     pezzo di Filo sopra al menu (un avviso, la conferma di «Svuota»), se il
+     browser lo dice appena quel pezzo se ne va;
+   - si giudica alla **pressione**; un clic da tastiera, che non ha pressione, si
+     giudica lì. Un clic fermato chiude il menu e lo dice con un avviso.
+
+   Sulle pagine `filo://` la guardia è spenta: nessuno script può coprire il menu.
+
 Il resto del menu resta nel documento: non porta dati di altri siti, e una
 settantina di spec lo guarda coi locator. Se un giorno ci entra un dato privato
 (appunti, password, cose di un'altra scheda), entra in un pannello chiuso.
 
 ## Provarlo
+
+Il velo, il velo tolto all'ultimo istante, il foglio che abbassa il menu e i
+pezzi di Filo che non contano come velo: `tests/menu-coperto-dal-sito.spec.mjs`;
+la logica dell'attesa in `tests/unit/vistoDavvero.test.mjs`. Prima di cliccare
+una voce della cronologia gli spec aspettano che il browser l'abbia vista
+scoperta (`cronologiaPronta` in `tests/helpers/cronologiaAppunti.mjs`).
 
 I locator non attraversano uno shadow root chiuso, e il testo non è un nodo ma
 contenuto generato. Lo stato del pannello si chiede a `SN_MENU._test.cronologia()`
@@ -93,6 +135,10 @@ il testo, che l'utente intanto vede e incolla.
 
 ## Limite noto
 
-Un sito controlla lo stile dei nodi che stanno nel suo documento: può nascondere
-o coprire il menu e far cliccare all'utente un punto che non vede. È un gesto
-vero, quindi passa. Il cancello chiude le strade senza l'utente, non il raggiro.
+Un sito controlla lo stile e i nodi del menu che stanno nel suo documento. La
+regola 3 ferma ciò che il sito disegna **sopra** il menu; non ferma ciò che fa
+**al** menu: il suo CSS sulle nostre classi (colori trasparenti, opacità, un
+`::after` dentro un nostro nodo) o il suo script sui nostri nodi. La cura vera
+è disegnare il menu fuori dal documento del sito. E su una pagina che filtra
+l'intero documento (`html { filter: … }`, scala di grigi o colori invertiti) il
+browser non sa più dire che il menu è visibile: lì i clic si fermano.
