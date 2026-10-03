@@ -3286,7 +3286,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     : maybeProposeFeedbackAction({ textReply, rawActions, userMessage, threadHistory: cleanHistory });
   if (proposal) {
     // La segnalazione la propone Filo, non l'ha chiesta l'utente: è fuori dal perimetro del compito.
-    const res = await executeFiloAction(proposal, { sender, contesto: azioniViste, richiesta, dentroPerimetro: false });
+    const res = await executeFiloAction(proposal, { sender, contesto: azioniViste, fontiLette, richiesta, dentroPerimetro: false });
     if (res.kept) {
       const rendered = res.needsConfirm
         ? { ...proposal, _confirm: { level: res.needsConfirm, text: res.describe || '', ...(res.avviso ? { avviso: res.avviso } : {}) } }
