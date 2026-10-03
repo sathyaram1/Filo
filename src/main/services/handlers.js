@@ -1281,11 +1281,11 @@ function fileScaricato(p) {
 
 // L'unico punto del main che chiede a SN_AUTONOMIA se un'azione parte (#530). Il guardiano di uscita non
 // esiste ancora: le celle «+G» chiedono. `perche` è la frase del popup quando non è ovvio cosa fa chiedere.
-function decisioneAutonomia(ing, { sender = null, contesto = null, fontiLette = null, origine = 'chat', dentroPerimetro = true, impostazioni = null } = {}) {
+function decisioneAutonomia(ing, { sender = null, contesto = null, fontiLette = null, assistente = false, origine = 'chat', dentroPerimetro = true, impostazioni = null } = {}) {
   const A = globalThis.SN_AUTONOMIA;
   const aut = (impostazioni && impostazioni.autonomia) || {};
   const livello = A.livelloAttivo(aut.livello);
-  const st = A.stato({ fonti: fontiDelCompito(sender, contesto, fontiLette), livello, spostamenti: aut.fonti, manopole: aut.manopole });
+  const st = A.stato({ fonti: fontiDelCompito(sender, contesto, fontiLette, assistente), livello, spostamenti: aut.fonti, manopole: aut.manopole });
   const ingressi = {
     livello, stato: st.stato, costo: ing.costo, campo: ing.campo, manopole: aut.manopole,
     elenco: ing.elenco, difesa: ing.difesa, origine, dentroPerimetro, guardiano: false,
