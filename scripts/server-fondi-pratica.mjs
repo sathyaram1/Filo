@@ -201,11 +201,12 @@ export async function esegui(argv, deps = {}) {
       return annotata.ok ? 0 : 1;
     }
     if (!chiude) {
-      const nota = `${notaFine(a.ramo, sha)} La pratica resta aperta: manca la parte ${NOME_PARTE.app}, non ancora su main, e ${chiudeApp}. Se il lavoro stava solo sul server: ${soloComando}.`;
+      const nota = `${notaFine(a.ramo, sha)} La pratica resta aperta: manca la parte ${NOME_PARTE.app}, non ancora su main, e ${chiudeApp}.${ramiApp.length ? '' : ` Se il lavoro stava solo sul server: ${soloComando}.`}`;
       const annotata = await of.annotaPratica(r.id, nota, { bearer });
       if (!annotata.ok) err(`${a.ramo} è su main del server, ma la pratica ${chi} non l'ha registrato (${annotata.motivo}).`);
       log(`${a.ramo} è su main del server. La pratica ${chi} resta aperta: manca la parte ${NOME_PARTE.app}, ${chiudeApp}.`);
-      log(`Se il lavoro stava solo sul server, chiudila con: ${soloComando}`);
+      // Con un ramo dell'app legato --solo-server si rifiuta: consigliarlo manderebbe in un vicolo.
+      if (!ramiApp.length) log(`Se il lavoro stava solo sul server, chiudila con: ${soloComando}`);
       log('Per il deploy: npm run server:pubblica, da filo-security/functions.');
       return annotata.ok ? 0 : 1;
     }
