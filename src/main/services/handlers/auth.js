@@ -54,6 +54,37 @@ async function callSecurityFunction(name, data = {}) {
   return body && body.result;
 }
 
+// Un errore di ownerSenderFlag detto all'owner. Su frase o stato sbagliati la spiegazione è del server.
+const ERRORI_SEGNO = {
+  PERMISSION_DENIED: 'Il server dice che questo account non può toccare il segno: serve quello del proprietario.',
+  NOT_FOUND: 'Il server non trova questo feedback o il suo mittente.',
+  UNAUTHENTICATED: 'Sessione scaduta: rifai l\'accesso.',
+};
+function erroreSegno(e) {
+  const code = String(e?.code || '').toUpperCase();
+  const detail = String(e?.detail || '').trim();
+  if (code === 'INVALID_ARGUMENT' || code === 'FAILED_PRECONDITION') return detail || 'Il server ha rifiutato la richiesta.';
+  if (ERRORI_SEGNO[code]) return detail ? `${ERRORI_SEGNO[code]} (${detail})` : ERRORI_SEGNO[code];
+  if (e?.httpStatus) return `Il server ha risposto con un errore ${e.httpStatus}${detail ? `: ${detail}` : ''}.`;
+  // `fetch` fallisce con un TypeError quando il server non si raggiunge; il resto ha già la sua frase.
+  if (e?.name === 'TypeError') return 'Il server non risponde: controlla la connessione e riprova.';
+  return e?.message || 'Non riuscito.';
+}
+
+// Un istante del server (ISO, millisecondi, secondi o Timestamp serializzato) come ISO; '' se non c'è.
+function aIso(v) {
+  if (v == null || v === '') return '';
+  let ms = NaN;
+  if (typeof v === 'number') ms = v < 1e11 ? v * 1000 : v;
+  else if (typeof v === 'string') ms = /^\d+$/.test(v.trim()) ? aIsoMs(Number(v)) : Date.parse(v);
+  else if (typeof v === 'object') {
+    const s = v._seconds ?? v.seconds;
+    if (typeof s === 'number') ms = s * 1000;
+  }
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : '';
+}
+function aIsoMs(n) { return n < 1e11 ? n * 1000 : n; }
+
 // ---- Slot chiave privata feedback (S1.3) ----------------------------------------
 // La chiave privata non deve MAI uscire dal main process né essere passata al
 // renderer. Il main la legge da env FILO_FEEDBACK_PRIVKEY oppure da
