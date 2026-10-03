@@ -331,7 +331,9 @@ async function refreshIfNeeded() {
   });
   if (!res.ok) {
     // Refresh token revocato/scaduto → sessione non più valida.
-    signOut();
+    const eraOwner = isAdmin();
+    chiudiSessione();
+    if (eraOwner) segnaOwnerCaduto(true);
     throw new Error(`refresh sessione fallito (${res.status})`);
   }
   const j = await res.json(); // { id_token, refresh_token, expires_in }
