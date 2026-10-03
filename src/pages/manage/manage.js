@@ -3296,6 +3296,261 @@
     });
   }
 
+  // ── Segno di mittente pericoloso (#922) ───────────────────────────────────
+  // Lo tiene il server: qui c'è la copia letta, per mittente. Toglierlo è un gesto suo, con una conferma che
+  // dice cosa cambia; approvare non lo tocca (MR.FRASE_SEGNO_ERRATO dice perché).
+  const segniMittente = new Map();
+  const segniInVolo = new Set();
+  const SEGNO_VALIDO_MS = 2 * 60 * 1000;
+  // Il mittente aperto nel pannello di destra, e il feedback con cui chiederne il segno.
+  let mittenteAperto = null;
+
+  // Senza un mittente leggibile due feedback non si possono dire dello stesso: la copia resta del feedback.
+  function chiaveSegno(fb) {
+    const c = String((fb && fb.clientId) || '').trim();
+    if (!c || MR.valueUnreadable(c)) return 'fb:' + String((fb && fb._id) || '');
+    return 'm:' + senderKeyOf(fb);
+  }
+  function segnoDi(fb) { return fb ? segniMittente.get(chiaveSegno(fb)) || null : null; }
+  function segnoAttivo(fb) { const s = segnoDi(fb); return !!(s && s.flagged); }
+
+  function leggiSegno(fb, opts) {
+    if (!isAdmin || !fb || !fb._id) return;
+    const k = chiaveSegno(fb);
+    const prima = segniMittente.get(k);
+    if (prima && prima.leggo) return;
+    if (prima && prima.letto && !(opts && opts.forza) && Date.now() - prima.letto < SEGNO_VALIDO_MS) return;
+    const inizio = Date.now();
+    segniMittente.set(k, Object.assign({}, prima, { leggo: true }));
+    sendToMain({ type: FEEDBACK_SENDER_FLAG, feedbackId: fb._id, action: 'read' })
+      .catch((e) => ({ ok: false, error: e?.message || String(e) }))
+      .then((r) => {
+        const ora = segniMittente.get(k) || {};
+        // Un segno tolto mentre questa lettura era in volo vale più di lei.
+        if (ora.scritto && ora.scritto > inizio) { segniMittente.set(k, Object.assign({}, ora, { leggo: false })); return; }
+        if (r && r.ok !== false) {
+          segniMittente.set(k, { flagged: !!r.flagged, reason: r.reason || '', flaggedAt: r.flaggedAt || '',
+            clearedAt: r.clearedAt || '', letto: Date.now() });
+        } else if (r && (r.code === 'not_admin' || r.code === 'forbidden')) {
+          // Il main non ci riconosce come owner: non c'è niente da dire, e niente da ritentare a ogni apertura.
+          segniMittente.set(k, { letto: Date.now() });
+        } else {
+          // Una lettura fallita non cancella quella buona di prima: la tiene, e alla prossima apertura riprova.
+          const vecchio = ora.letto ? ora : {};
+          segniMittente.set(k, Object.assign({}, vecchio, { leggo: false, letto: 0, errore: (r && r.error) || 'Lettura non riuscita.' }));
+        }
+        disegnaSegno();
+      });
+  }
+
+  // La riga che dice il segno, in dati: la usano la testata e il pannello del mittente.
+  function rigaSegno(s) {
+    if (!s) return null;
+    if (s.flagged) {
+      const motivo = MR.motivoSegnoText(s.reason);
+      const quando = s.flaggedAt ? formatDate(s.flaggedAt) : '';
+      return {
+        tipo: 'segnato',
+        testo: `⚑ Mittente segnato come pericoloso${motivo ? `: ${motivo}` : ''}${quando && quando !== '—' ? ` · dal ${quando}` : ''}`,
+        titolo: 'Finché il segno resta, ogni suo feedback si ferma al filtro d’ingresso.',
+      };
+    }
+    if (s.clearedAt) {
+      const motivo = MR.motivoSegnoText(s.reason);
+      return { tipo: 'tolto', testo: `Segno tolto il ${formatDate(s.clearedAt)}`, titolo: motivo ? `Era: ${motivo}` : '' };
+    }
+    if (s.errore) return { tipo: 'errore', testo: 'Segno del mittente non letto', titolo: s.errore };
+    return null;
+  }
+
+  function nodoRigaSegno(riga, fb) {
+    const el = document.createElement('span');
+    el.className = `mg-segno-testo mg-segno--${riga.tipo}`;
+    el.textContent = riga.testo;
+    if (riga.titolo) el.title = riga.titolo;
+    if (riga.tipo !== 'errore') return el;
+    const wrap = document.createElement('span');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'mg-segno-riprova';
+    btn.textContent = 'Riprova';
+    btn.addEventListener('click', () => { btn.disabled = true; leggiSegno(fb, { forza: true }); });
+    wrap.append(el, btn);
+    return wrap;
+  }
+
+  function disegnaSegnoTestata(fb) {
+    const el = document.getElementById('mgSegnoTestata');
+    if (!el) return;
+    const riga = (isAdmin && fb) ? rigaSegno(segnoDi(fb)) : null;
+    el.replaceChildren(...(riga ? [nodoRigaSegno(riga, fb)] : []));
+    el.hidden = !riga;
+  }
+
+  // Accanto all'approvazione, e solo su un feedback fermato proprio dal segno che c'è ancora.
+  function aggiornaBottoneSegno(fb) {
+    if (!mgActionsRow) return;
+    const c'è = mgActionsRow.querySelector('#mgSegnoBtn');
+    const serve = !!(isAdmin && fb && !mgActions.hidden && MR.fermatoDalSegno(fb) && segnoAttivo(fb));
+    if (!serve) {
+      if (c'è) c'è.remove();
+      chiudiConfermaSegno();
+      return;
+    }
+    if (c'è) return;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'sn-btn sn-btn-secondary';
+    b.id = 'mgSegnoBtn';
+    b.textContent = 'Il segno era un errore';
+    b.title = 'Toglie il segno a chi l’ha mandato. Approvare da solo non lo toglie.';
+    b.addEventListener('click', apriConfermaSegno);
+    const accept = mgActionsRow.querySelector('[data-action-key="accept"]');
+    if (accept) accept.after(b); else mgActionsRow.appendChild(b);
+  }
+
+  function disegnaSegno() {
+    const fb = selectedId ? allFeedbacks.find((f) => f._id === selectedId) : null;
+    disegnaSegnoTestata(fb);
+    aggiornaBottoneSegno(fb);
+    disegnaSegnoMittente();
+  }
+
+  async function togliSegno(fbId) {
+    const fb = allFeedbacks.find((f) => f._id === fbId);
+    if (!fb) return { ok: false, error: 'Questo feedback non è più in pagina.' };
+    const k = chiaveSegno(fb);
+    if (segniInVolo.has(k)) return { ok: false, error: 'Sto già togliendo questo segno.' };
+    segniInVolo.add(k);
+    let r;
+    try {
+      r = await sendToMain({ type: FEEDBACK_SENDER_FLAG, feedbackId: fb._id, action: 'clear', conferma: MR.FRASE_SEGNO_ERRATO });
+    } catch (e) {
+      r = { ok: false, error: e?.message || String(e) };
+    } finally {
+      segniInVolo.delete(k);
+    }
+    if (!r || r.ok === false) return { ok: false, error: (r && r.error) || 'Il server non ha tolto il segno.' };
+    const prima = segniMittente.get(k) || {};
+    segniMittente.set(k, {
+      flagged: !!r.flagged, reason: r.reason || prima.reason || '', flaggedAt: r.flaggedAt || prima.flaggedAt || '',
+      clearedAt: r.clearedAt || '', letto: Date.now(), scritto: Date.now(),
+    });
+    disegnaSegno();
+    return { ok: true };
+  }
+
+  const DOMANDA_SEGNO = 'Togli il segno a questo mittente? Da adesso i suoi feedback passano dai giudici come quelli di '
+    + 'tutti. Quelli già arrivati restano dove sono.';
+
+  // La conferma, una sola per le due strade (dettaglio e pannello del mittente).
+  function boxConfermaSegno(fbId, { onNo, onEsito }) {
+    const frag = document.createDocumentFragment();
+    const domanda = document.createElement('div');
+    domanda.className = 'mg-segno-domanda';
+    domanda.textContent = DOMANDA_SEGNO;
+    const riga = document.createElement('div');
+    riga.className = 'mg-actions-row';
+    const no = document.createElement('button');
+    no.type = 'button';
+    no.className = 'sn-btn sn-btn-secondary mg-segno-no';
+    no.textContent = 'Annulla';
+    const si = document.createElement('button');
+    si.type = 'button';
+    si.className = 'sn-btn mg-segno-si';
+    si.textContent = 'Togli il segno';
+    no.addEventListener('click', onNo);
+    si.addEventListener('click', async () => {
+      si.disabled = true; no.disabled = true;
+      si.textContent = 'Tolgo il segno…';
+      const r = await togliSegno(fbId);
+      si.disabled = false; no.disabled = false;
+      si.textContent = 'Togli il segno';
+      onEsito(r);
+    });
+    riga.append(no, si);
+    frag.append(domanda, riga);
+    return frag;
+  }
+
+  function chiudiConfermaSegno() {
+    if (!mgSegnoConferma) return;
+    mgSegnoConferma.hidden = true;
+    mgSegnoConferma.replaceChildren();
+  }
+
+  function apriConfermaSegno() {
+    if (!mgSegnoConferma || !selectedId) return;
+    const id = selectedId;
+    setActionMsg('', '');
+    mgSegnoConferma.replaceChildren(boxConfermaSegno(id, {
+      onNo: chiudiConfermaSegno,
+      onEsito: (r) => {
+        if (selectedId !== id) {
+          toast(r.ok ? 'Segno tolto.' : `Il segno resta: ${r.error}`, r.ok ? 'ok' : 'err');
+          return;
+        }
+        chiudiConfermaSegno();
+        if (r.ok) setActionMsg('Segno tolto: i prossimi feedback di questo mittente passano dai giudici.', 'ok');
+        else setActionMsg(`Il segno resta: ${r.error}`, 'err');
+      },
+    }));
+    mgSegnoConferma.hidden = false;
+    const no = mgSegnoConferma.querySelector('.mg-segno-no');
+    if (no) no.focus();
+  }
+  if (mgSegnoConferma) {
+    mgSegnoConferma.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); chiudiConfermaSegno(); }
+    });
+  }
+
+  // Il pannello del mittente: stessa riga della testata, stesso gesto, stessa conferma.
+  function disegnaSegnoMittente() {
+    const el = document.getElementById('mgSideSegno');
+    if (!el || !mittenteAperto) return;
+    // Una conferma aperta non si ridisegna sotto le mani: il suo esito ridisegna da sé.
+    if (el.querySelector('.mg-segno-conferma:not([hidden])')) return;
+    const fb = allFeedbacks.find((f) => f._id === mittenteAperto.fbId) || null;
+    const riga = (isAdmin && fb) ? rigaSegno(segnoDi(fb)) : null;
+    el.replaceChildren();
+    el.hidden = !riga;
+    if (!riga) return;
+    el.appendChild(nodoRigaSegno(riga, fb));
+    if (!segnoAttivo(fb)) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-btn sn-btn-secondary mg-segno-btn';
+    btn.id = 'mgSideSegnoBtn';
+    btn.textContent = 'Il segno era un errore';
+    btn.title = 'Toglie il segno a questo mittente.';
+    const conferma = document.createElement('div');
+    conferma.className = 'mg-segno-conferma';
+    conferma.hidden = true;
+    const esito = document.createElement('span');
+    esito.className = 'mg-action-msg';
+    esito.setAttribute('role', 'status');
+    const chiudi = () => { conferma.hidden = true; conferma.replaceChildren(); btn.hidden = false; };
+    btn.addEventListener('click', () => {
+      esito.textContent = '';
+      conferma.replaceChildren(boxConfermaSegno(fb._id, {
+        onNo: chiudi,
+        onEsito: (r) => {
+          chiudi();
+          if (r.ok) { disegnaSegnoMittente(); toast('Segno tolto: i prossimi feedback di questo mittente passano dai giudici.', 'ok'); return; }
+          esito.className = 'mg-action-msg mg-err';
+          esito.textContent = `Il segno resta: ${r.error}`;
+        },
+      }));
+      conferma.hidden = false;
+      btn.hidden = true;
+      const no = conferma.querySelector('.mg-segno-no');
+      if (no) no.focus();
+    });
+    conferma.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); chiudi(); } });
+    el.append(btn, conferma, esito);
+  }
+
   function setManageMsg(text, kind) {
     mgManageMsg.textContent = text || '';
     mgManageMsg.className = 'mg-action-msg' + (kind ? ` mg-${kind}` : '');
