@@ -1,24 +1,14 @@
 // Confine d'origine dei canali cronologia appunti / cronologia AI / costi
-// (feedback #246, aggiornato dal #256).
+// (feedback #246, aggiornato dal #256 e dal #589.4).
 //
-// Regola: i canali DAVVERO riservati che nessun content script di pagina web usa
-// (cronologia AI, costi) restano ammessi solo da origine filo://. Invece TUTTE le
-// operazioni della cronologia appunti — leggere, aggiungere, aggiornare la
-// descrizione, RIMUOVERE una voce e SVUOTARE la cronologia — sono consentite anche
-// da origine web, perché il menu "Incolla" con la sua cronologia gira su qualunque
-// pagina e l'utente deve poterla gestire da lì (#256).
-//
-// Perché svuotare/rimuovere da origine web è sicuro quanto leggere: la lettura
-// (GET_CLIPBOARD_HISTORY) è già consentita da origine web — è l'operazione più
-// sensibile (vedere ciò che hai copiato) — e la rimozione per-voce permette
-// comunque di svuotare in loop. Gating lo svuotamento non aggiungeva protezione
-// reale: la barriera vera resta l'isolamento di contesto (il main world delle
-// pagine ostili non vede chrome.runtime).
-//
-// Gli assert affermano il SUCCESSO della difesa E il SUCCESSO della feature:
-// - senza il gate sui canali riservati, questi passerebbero da origine web → rosso;
-// - se si (ri)mettesse il gate sui canali della cronologia appunti, gestirla da
-//   origine web fallirebbe → rosso.
+// I canali DAVVERO riservati che nessun content script di pagina web usa
+// (cronologia AI, costi) restano ammessi solo da origine filo://. Le scritture
+// della cronologia appunti — aggiungere, aggiornare la descrizione, RIMUOVERE una
+// voce e SVUOTARE — passano anche da origine web, perché il menu "Incolla" gira
+// su qualunque pagina (#256), ma non rispondono con l'elenco. L'elenco lo dà solo
+// la lettura, e a un sito solo dalla scheda in vista dopo un gesto (#589.4,
+// tests/appunti-dai-siti.spec.mjs): qui il mittente web non ha scheda, quindi
+// la lettura si rifà da filo://.
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -50,10 +40,10 @@ test('#246/#256 i canali riservati (AI/costi) sono negati da origine web; la cro
       webCosts: await send(MSG.GET_COSTS, S.web),
       // Cronologia appunti: rimozione singola da origine web (togli 'gate-b').
       webRemoveEntry: await send(MSG.REMOVE_CLIPBOARD_ENTRY, S.web, { entry: { type: 'text', text: 'gate-b' } }),
-      afterRemove: await send(MSG.GET_CLIPBOARD_HISTORY, S.web),
+      afterRemove: await send(MSG.GET_CLIPBOARD_HISTORY, S.filo),
       // Cronologia appunti: svuotamento da origine web.
       webClearClip: await send(MSG.CLEAR_CLIPBOARD_HISTORY, S.web),
-      afterClear: await send(MSG.GET_CLIPBOARD_HISTORY, S.web),
+      afterClear: await send(MSG.GET_CLIPBOARD_HISTORY, S.filo),
       // Da origine filo://: i riservati funzionano.
       filoGetHist: await send(MSG.GET_HISTORY, S.filo),
       filoCosts: await send(MSG.GET_COSTS, S.filo),
@@ -87,37 +77,33 @@ test('#246/#256 i canali riservati (AI/costi) sono negati da origine web; la cro
   expect(out.filoClearHist.ok).toBe(true);
 });
 
-test('#246 la cronologia appunti resta usabile da un\'origine web (menu Incolla su qualunque pagina)', async ({ app, shell }) => {
+test('#246/#589.4 da un\'origine web le scritture della cronologia appunti passano senza riportare l\'elenco', async ({ app, shell }) => {
   void shell;
   const SENTINEL = 'CLIP_246_' + Date.now();
   const out = await app.evaluate(async (_electron, arg) => {
     const MSG = globalThis.SN_MSG.MSG;
-    const web = arg.senders.web;
-    const send = (type, extra = {}) =>
-      globalThis.SN_HANDLE_MESSAGE({ type, ...extra }, web);
+    const { web, filo } = arg.senders;
+    const send = (type, sender, extra = {}) =>
+      globalThis.SN_HANDLE_MESSAGE({ type, ...extra }, sender);
 
-    // Aggiungi una voce da origine web (come fa il content script su copia/incolla).
-    const pushed = await send(MSG.PUSH_CLIPBOARD_ENTRY, {
-      entry: { type: 'text', text: arg.sentinel },
-    });
-    // Rileggi la cronologia da origine web (come fa il menu Incolla).
-    const got = await send(MSG.GET_CLIPBOARD_HISTORY);
-    // Aggiungi e aggiorna la descrizione di un'immagine da origine web.
+    // Copia/incolla su un sito: la voce entra in cronologia.
+    const pushed = await send(MSG.PUSH_CLIPBOARD_ENTRY, web, { entry: { type: 'text', text: arg.sentinel } });
     const dataUrl = 'data:image/png;base64,AAAA';
-    await send(MSG.PUSH_CLIPBOARD_ENTRY, { entry: { type: 'image', dataUrl } });
-    const updated = await send(MSG.UPDATE_CLIPBOARD_DESCRIPTION, {
-      dataUrl, description: 'descr web',
-    });
-    const after = await send(MSG.GET_CLIPBOARD_HISTORY);
-    return { pushed, got, updated, after };
+    await send(MSG.PUSH_CLIPBOARD_ENTRY, web, { entry: { type: 'image', dataUrl } });
+    const updated = await send(MSG.UPDATE_CLIPBOARD_DESCRIPTION, web, { dataUrl, description: 'descr web' });
+    const removed = await send(MSG.REMOVE_CLIPBOARD_ENTRY, web, { entry: { type: 'text', text: 'non-c-e' } });
+    // Un mittente web senza scheda in vista non legge l'elenco.
+    const webGet = await send(MSG.GET_CLIPBOARD_HISTORY, web);
+    const after = await send(MSG.GET_CLIPBOARD_HISTORY, filo);
+    return { pushed, updated, removed, webGet, after };
   }, { sentinel: SENTINEL, senders: SENDERS });
 
-  // Push da web è consentito e restituisce la lista aggiornata.
-  expect(out.pushed.ok).toBe(true);
-  // La lettura da web vede la voce appena inserita (feature: menu Incolla).
-  expect(out.got.ok).toBe(true);
-  expect(out.got.items.some((i) => i.type === 'text' && i.text === SENTINEL)).toBe(true);
-  // La descrizione immagine, aggiornata da web, è persistita.
-  expect(out.updated.ok).toBe(true);
+  for (const r of [out.pushed, out.updated, out.removed]) {
+    expect(r).toEqual({ ok: true });
+  }
+  expect(out.webGet).toEqual({ ok: false, code: 'forbidden', error: 'forbidden' });
+  // Le scritture da web sono persistite.
+  expect(out.after.ok).toBe(true);
+  expect(out.after.items.some((i) => i.type === 'text' && i.text === SENTINEL)).toBe(true);
   expect(out.after.items.some((i) => i.type === 'image' && i.description === 'descr web')).toBe(true);
 });

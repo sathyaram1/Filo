@@ -27,6 +27,7 @@ module.exports = function register(on, ctx) {
     chiaviStoragePerOrigine, scritturaStorageAmmessa, scritturaImpostazioniAmmessa,
   } = require('../impostazioniPerOrigine');
   const vietato = { ok: false, code: 'forbidden', error: 'forbidden' };
+  const AppuntiDaiSiti = require('../appuntiDaiSiti');
 
   // ── canali interni per lo shim chrome.* nel renderer ──────────────────
   on('_storage:get', async (msg, sender, origin) => {
@@ -228,17 +229,11 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // ── Cronologia appunti: NON guardata per origine, di proposito ────────
-  // Questi tre canali (leggi/aggiungi/aggiorna-descrizione) sono usati dai
-  // content script di Filo sulle pagine web esterne — il menu "Incolla" con la
-  // cronologia funziona su QUALSIASI pagina, quindi arrivano con un'origine
-  // http(s):// legittima. Metterci un gate isFilo() spegnerebbe la cronologia
-  // appunti ovunque tranne le pagine interne: sarebbe una regressione, non una
-  // difesa. La barriera contro le pagine ostili resta l'isolamento di contesto
-  // (il main world delle pagine esterne non vede chrome.runtime — confermato dai
-  // test di audit). Le operazioni "tutto o niente" o riservate (svuota
-  // cronologia, cronologia AI, costi) sì che sono guardate: vedi sotto.
-  on(MSG.GET_CLIPBOARD_HISTORY, async () => {
+  // ── Cronologia appunti ────────────────────────────────────────────────
+  // Il menu «Incolla» vive dentro le pagine di qualunque sito: aggiungere, togliere, descrivere e svuotare restano
+  // aperti, ma l'elenco lo dà solo la lettura e solo a chi la può fare (services/appuntiDaiSiti.js, #589.4).
+  on(MSG.GET_CLIPBOARD_HISTORY, async (msg, sender, origin) => {
+    if (!(await AppuntiDaiSiti.elencoLeggibile(sender, origin))) return vietato;
     const list = await Storage.getRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
     return { ok: true, items: Array.isArray(list) ? list : [] };
   });
@@ -248,7 +243,7 @@ module.exports = function register(on, ctx) {
     const list = await Storage.getRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
     const arr = Array.isArray(list) ? list : [];
     const e = msg.entry;
-    if (!e) return { ok: true, items: arr };
+    if (!e) return { ok: true };
     const norm = (s) => (s || '').replace(/\s+/g, ' ').trim();
     const keyOf = (x) => {
       if (!x) return '';
@@ -268,7 +263,7 @@ module.exports = function register(on, ctx) {
     filtered.unshift({ ...e, ts: Date.now() });
     const trimmed = filtered.slice(0, cap);
     await Storage.setRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, trimmed);
-    return { ok: true, items: trimmed };
+    return { ok: true };
   });
 
   on(MSG.UPDATE_CLIPBOARD_DESCRIPTION, async (msg) => {
@@ -283,22 +278,15 @@ module.exports = function register(on, ctx) {
       }
     }
     if (updated) await Storage.setRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, arr);
-    return { ok: true, items: arr };
+    return { ok: true };
   });
 
-  // Rimuovi UNA voce dalla cronologia appunti. È l'operazione simmetrica a PUSH
-  // (aggiungi una voce): il menu "Incolla" con la cronologia vive su QUALSIASI
-  // pagina, quindi la rimozione di una singola voce — come la lettura e
-  // l'aggiunta — deve funzionare anche da origine web. Non è guardata per
-  // origine, esattamente come GET/PUSH/UPDATE_DESCRIPTION: la barriera resta
-  // l'isolamento di contesto (il main world delle pagine ostili non vede
-  // chrome.runtime). Il raggio d'azione è una sola voce (l'utente ha copiato una
-  // password e vuole toglierla subito dalla cronologia, senza cambiare pagina).
+  // Una voce sola: l'utente ha copiato una password e la toglie dal menu Incolla, sulla pagina dov'è (#256).
   on(MSG.REMOVE_CLIPBOARD_ENTRY, async (msg) => {
     const list = await Storage.getRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
     const arr = Array.isArray(list) ? list : [];
     const e = msg.entry;
-    if (!e) return { ok: true, items: arr };
+    if (!e) return { ok: true };
     const norm = (s) => (s || '').replace(/\s+/g, ' ').trim();
     const keyOf = (x) => {
       if (!x) return '';
@@ -311,21 +299,10 @@ module.exports = function register(on, ctx) {
     if (next.length !== arr.length) {
       await Storage.setRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, next);
     }
-    return { ok: true, items: next };
+    return { ok: true };
   });
 
-  // Svuota TUTTA la cronologia appunti. Storicamente era gated a filo:// come
-  // difesa-in-profondità (feedback #246: "nessun content script web ha motivo di
-  // azzerarla"). Quella premessa è caduta col menu cronologia (feedback #256):
-  // l'utente deve poter svuotare la cronologia dallo stesso menu "Incolla" che la
-  // mostra, che gira su qualunque pagina. E il gate non offre più protezione
-  // reale: la lettura (GET) è già consentita da origine web (l'operazione più
-  // sensibile — leggere ciò che hai copiato), e la rimozione per-voce
-  // (REMOVE_CLIPBOARD_ENTRY) pure; un attaccante che bucasse l'isolamento di
-  // contesto potrebbe già leggere tutto o svuotare in loop con REMOVE. Quindi lo
-  // svuotamento si allinea alle altre operazioni della cronologia appunti (non
-  // guardato per origine). Restano gated a filo:// i canali DAVVERO riservati che
-  // nessun content script web usa: cronologia AI e costi (vedi sotto).
+  // Svuotare sta nello stesso menu Incolla che mostra la cronologia, su qualunque pagina (#256).
   on(MSG.CLEAR_CLIPBOARD_HISTORY, async () => {
     await Storage.setRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
     return { ok: true };
