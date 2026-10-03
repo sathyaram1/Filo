@@ -221,7 +221,12 @@
           const payload = it.name ? Object.assign({}, it.payload, { name: it.name }) : it.payload;
           let idToken = '';
           if (it.dallOwner) {
-            idToken = (tokenOwnerFn && await tokenOwnerFn()) || '';
+            try { idToken = (tokenOwnerFn && await tokenOwnerFn()) || ''; } catch (e) {
+              it.attempts = (it.attempts || 0) + 1;
+              anyFail = true;
+              logFn('token dell\'owner non ottenuto (rete, riprovo):', it.id, e?.message || e);
+              continue;
+            }
             if (!idToken) { attendiAccesso(it, 'nessun accesso valido', 'assente'); anyFail = true; continue; }
           }
           // #912: la voce dell'owner parte con la prova o non parte; da anonima diventerebbe un utente che nessuno riprende.
