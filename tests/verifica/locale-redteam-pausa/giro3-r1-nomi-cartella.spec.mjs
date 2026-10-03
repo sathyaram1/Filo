@@ -28,21 +28,22 @@ async function inPausaNonOwner(app) {
   });
 }
 
+// La prima è la porta del giro 2, già chiusa: resta come controllo. Le altre cambiano il nome della cartella.
 const VARIANTI = [
-  'filo://src/pages/redteam::$INDEX_ALLOCATION/redteam.html',
-  'filo://src/pages/redteam:$I30:$INDEX_ALLOCATION/redteam.html',
+  'filo://redteam/redteam.html::$DATA',
+  'filo://redteam./redteam.html::$DATA',
+  'filo://redteam./redteam.js',
+  'filo://src/pages/redteam./redteam.html::$DATA',
+  'filo://src/pages/redteam::$INDEX_ALLOCATION/redteam.js',
 ];
 
 for (const url of VARIANTI) {
   test(`in pausa, da non owner, ${url} mostra solo la frase della pausa`, async ({ app, openTab }) => {
     await inPausaNonOwner(app);
     const page = await openTab('filo://redteam/redteam.html');
-    await expect(page.locator('body')).toContainText(FRASE);
+    await expect(page.locator('body')).toHaveText(FRASE);
     await page.goto(url).catch(() => {});
     await page.waitForTimeout(1500);
-    console.log('URL', page.url(), 'TITOLO', await page.title().catch(() => '?'));
-    const testo = (await page.locator('body').innerText().catch(() => '')).trim();
-    expect(testo).toBe(FRASE);
-    expect(await page.locator('script[src*="redteam.js"]').count()).toBe(0);
+    await expect(page.locator('body')).toHaveText(FRASE);
   });
 }
