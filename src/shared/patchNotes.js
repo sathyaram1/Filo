@@ -93,6 +93,7 @@
         'Quando chiudi una scheda col mouse, le altre non cambiano larghezza finché il puntatore resta sulla fila delle schede, e non ti si ridimensionano sotto la mano. Si risistemano quando porti via il puntatore.',
         'Un clic sulla X di una scheda, o col tasto centrale, la chiude anche mentre un\'altra scheda sta caricando o cambia titolo. Prima a volte non succedeva niente e toccava cliccare di nuovo.',
         'Quando una tua segnalazione viene risolta, Filo torna ad avvisarti della ricompensa. Da fine settembre la domanda al server falliva sempre e l\'avviso non arrivava.',
+        'L\'avviso dei siti pericolosi compare appena la pagina si apre, anche se non ha finito di caricarsi. Prima un sito truffa che restava in caricamento ti lasciava scrivere la password senza nessun avviso. E mentre l\'avviso è aperto la pagina sotto non può più prendersi la tastiera né coprirlo con una sua finestra.',
       ],
     },
     {
