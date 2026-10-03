@@ -478,7 +478,7 @@
   function startTabDrag(e, t, el) {
     if (e.button !== 0) return;
     // Non iniziare un drag dai controlli interni (chiudi, indicatori audio…).
-    if (e.target.closest('.close, .mute-ind, .audio-ind, .proxy-ind')) return;
+    if (e.target.closest('.close, .tab-alert, .proxy-ind')) return;
     drag = { id: t.id, el, startX: e.clientX, moved: false };
     window.addEventListener('mousemove', onTabPointerMove);
     window.addEventListener('mouseup', onTabPointerUp);
@@ -516,6 +516,8 @@
       el.style.minWidth = '';
       el.style.maxWidth = '';
     }
+    // Da ferme le schede hanno misurato la larghezza fermata: senza rimisurarle restano strette fino al prossimo ridisegno.
+    misuraLarghezzeNaturali();
   }
 
   // Sulla pagina, e su Windows sulle zone di trascinamento della finestra, la
@@ -772,6 +774,21 @@
     });
   }
 
+  // La scheda è un contenitore (le icone cedono il posto per priorità, shell.css) e così non darebbe
+  // più alla striscia la larghezza del suo contenuto: la si misura con tutto in vista e la si restituisce.
+  function misuraLarghezzeNaturali() {
+    const schede = [...tabsEl.children];
+    if (!schede.length) return;
+    schede.forEach((el) => el.classList.add('misura'));
+    const pad = getComputedStyle(schede[0]);
+    const bordi = parseFloat(pad.paddingLeft) + parseFloat(pad.paddingRight);
+    const larghe = schede.map((el) => el.getBoundingClientRect().width);
+    schede.forEach((el, i) => {
+      el.style.setProperty('--tab-naturale', `${Math.max(0, Math.ceil(larghe[i] - bordi))}px`);
+      el.classList.remove('misura');
+    });
+  }
+
   function render() {
     // Durante una trascinata non ridisegnare: cancellare i nodi farebbe perdere
     // il riferimento alla tab trascinata e interromperebbe il drag. Il riordino
@@ -850,40 +867,14 @@
         }
       }
 
-      // Slot favicon / spinner. Quando la tab suona, l'icona audio SOSTITUISCE
-      // la favicon in questo slot: un unico indicatore, sempre visibile a
-      // qualsiasi larghezza (lo slot è a larghezza fissa), che non si sovrappone
-      // mai alla favicon né viene duplicato altrove nella tab.
       const ico = document.createElement('div');
       if (t.loading) {
         ico.className = 'spinner';
-      } else if (isAudible) {
-        // L'icona audio prende il posto della favicon (nessun overlay sotto).
-        ico.className = 'favicon favicon-audible';
-        ico.innerHTML = AUDIO_IND_SVG;
-        // Clic sullo slot favicon-audible muta la tab.
-        ico.setAttribute('role', 'button');
-        ico.title = 'Silenzia';
-        ico.setAttribute('aria-label', 'Audio in riproduzione — clicca per silenziare');
-        ico.addEventListener('click', (e) => { e.stopPropagation(); api.tabs.setMuted(t.id); });
       } else {
         ico.className = 'favicon';
         if (t.favicon) ico.style.backgroundImage = `url("${t.favicon}")`;
       }
       el.appendChild(ico);
-
-      // Indicatore "audio mutato": un altoparlante barrato accanto al titolo,
-      // così l'utente sa quali tab ha silenziato senza doverci passare sopra.
-      if (t.muted) {
-        const m = document.createElement('span');
-        m.className = 'mute-ind';
-        m.setAttribute('role', 'button');
-        m.title = 'Riattiva audio';
-        m.setAttribute('aria-label', 'Audio mutato — clicca per riattivare');
-        m.innerHTML = MUTE_IND_SVG;
-        m.addEventListener('click', (e) => { e.stopPropagation(); api.tabs.setMuted(t.id); });
-        el.appendChild(m);
-      }
 
       // Indicatore "aperta da un altro paese": globo + codice paese accanto al
       // titolo, così si riconoscono a colpo d'occhio le tab instradate altrove.
@@ -891,6 +882,7 @@
         const p = document.createElement('span');
         p.className = 'proxy-ind';
         p.setAttribute('aria-label', 'Aperta da un altro paese');
+        p.dataset.tip = 'Aperta da un altro paese';
         p.innerHTML = PROXY_IND_SVG + '<span class="cc">' + t.proxy.country.toUpperCase() + '</span>';
         el.appendChild(p);
       }
@@ -900,6 +892,23 @@
       title.textContent = tabLabel(t);
       el.appendChild(title);
 
+      // Avviso audio dopo il titolo, come in Chrome (#431): suona o mutata stanno
+      // nello stesso posto, così il clic che muta lascia lì il tasto per riattivare.
+      if (t.muted || isAudible) {
+        const a = document.createElement('span');
+        a.className = 'tab-alert ' + (t.muted ? 'mute-ind' : 'audio-ind');
+        a.setAttribute('role', 'button');
+        // Ogni controllo dentro la scheda porta il suo data-tip (mai `title`): senza, il suggerimento
+        // di Filo risale a quello della scheda e dice il titolo della pagina (#431).
+        a.dataset.tip = t.muted ? 'Riattiva audio' : 'Silenzia';
+        a.setAttribute('aria-label', t.muted
+          ? 'Audio mutato — clicca per riattivare'
+          : 'Audio in riproduzione — clicca per silenziare');
+        a.innerHTML = t.muted ? MUTE_IND_SVG : AUDIO_IND_SVG;
+        a.addEventListener('click', (e) => { e.stopPropagation(); api.tabs.setMuted(t.id); });
+        el.appendChild(a);
+      }
+
       // Tasto destro su una tab → menu contestuale (Duplica / Muta / Chiudi).
       el.addEventListener('contextmenu', (e) => {
         e.preventDefault();
@@ -908,6 +917,8 @@
 
       const close = document.createElement('span');
       close.className = 'close';
+      // La scorciatoia chiude la scheda attiva: sulle altre la croce non la promette.
+      close.dataset.tip = t.id === state.activeId ? `Chiudi scheda (${tasto('Ctrl+W')})` : 'Chiudi scheda';
       if (typeof ICONS.close === 'function') close.innerHTML = ICONS.close(12);
       else close.textContent = '×';
       close.addEventListener('click', (e) => {
@@ -926,6 +937,7 @@
       });
       tabsEl.appendChild(el);
     }
+    misuraLarghezzeNaturali();
 
     tabsEl.style.flex = larghezzeFerme && strisciaFerma ? `0 0 ${strisciaFerma}px` : '';
 

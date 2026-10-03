@@ -16,6 +16,7 @@
       fixes: [
         'In Altro, Modelli e Preferenze quello che scrivi in una casella non si perde più se subito dopo cambi scheda o chiudi la pagina: domini esclusi, limite di spesa, chiavi, ore dell\'archivio automatico, durata delle notifiche, nome della voce. Il nome nuovo di una categoria vale anche senza premere «Rinomina».',
         'Lo screenshot fatto col tasto destro dentro una finestra di accesso, come quella di «Accedi con Google», fotografa quella finestra e non la scheda che sta dietro.',
+        'Sulla scheda che suona resta l\'icona del sito. L\'altoparlante sta dopo il titolo, come in Chrome, ha il colore delle scritte e prende il posto dell\'icona solo quando la scheda è troppo stretta per tutte e due. Un clic toglie l\'audio, e nello stesso punto trovi il tasto per rimetterlo. Se ti fermi col puntatore sull\'altoparlante o sulla croce, il suggerimento dice cosa fa il clic, non più il titolo della pagina.',
       ],
     },
     {
