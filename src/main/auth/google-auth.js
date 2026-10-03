@@ -406,6 +406,7 @@ module.exports = {
   isSignedIn,
   isRemembered,
   isAdmin,
+  accessoOwnerCaduto,
   // esportati per i test
   _internals: { decodeJwtPayload, startLoopback },
 };
