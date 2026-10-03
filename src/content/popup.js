@@ -1316,6 +1316,7 @@
       if (sel && !sel.isCollapsed && t.contains(sel.anchorNode)) return;
       close();
     });
+    global.SN_AVVISI.chiudibile(t, close);
     tempo = tempoAvviso(opts.duration === 0 ? 0 : (opts.duration || 2200), close);
     return { close, el: t };
   }

@@ -1298,6 +1298,7 @@
         hideToast(el);
       });
       dkToastTempi.segui(el);
+      window.SN_AVVISI.chiudibile(el, () => hideToast(el));
       document.body.appendChild(el);
     }
     el.textContent = text;

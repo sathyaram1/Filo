@@ -190,3 +190,57 @@ test('tema scuro: l’avviso col puntatore sopra si schiarisce appena e il testo
   const luce = (c) => { const [r, g, b] = c.match(/\d+(\.\d+)?/g).map(Number); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
   expect(luce(testo) - luce(sopra)).toBeGreaterThan(100);
 });
+
+// Prendendo il puntatore l'avviso prende anche il tasto destro: il menu deve essere il suo, come nella barra.
+test('tasto destro su un avviso della pagina: il menu offre «Chiudi», e la scelta lo chiude', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, PAGE);
+  await copiaUrl(page);
+  const avviso = page.locator('.sn-toast');
+  await puntatoreSopra(page, avviso);
+  await page.mouse.down({ button: 'right' });
+  await page.mouse.up({ button: 'right' });
+  const voci = page.locator('.sn-menu .sn-menu-item');
+  await expect(voci).toHaveText(['Chiudi']);
+  await voci.first().click();
+  await expect(avviso).toHaveCount(0, { timeout: 1500 });
+});
+
+test('editor: tasto destro sull’avviso con «Annulla» offre «Annulla» e «Chiudi», e «Annulla» fa quello che fa il pulsante', async ({ openTab }) => {
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('#doc');
+  await page.click('#docSwitch');
+  await page.click('#docNew');
+  await page.click('#docSwitch');
+  await expect(page.locator('.ed-doc-item')).toHaveCount(2);
+  await page.locator('.ed-doc-item').nth(0).locator('.ed-doc-del').click();
+  const avviso = page.locator('.ed-toast.show');
+  await puntatoreSopra(page, avviso);
+  await page.mouse.down({ button: 'right' });
+  await page.mouse.up({ button: 'right' });
+  const voci = page.locator('.sn-menu .sn-menu-item');
+  await expect(voci).toHaveText([/Annulla/, 'Chiudi']);
+  const testo = (await avviso.locator('span').textContent()).trim();
+  await voci.first().click();
+  await expect(page.locator('.ed-toast', { hasText: testo })).toHaveCount(0, { timeout: 1500 });
+  await page.click('#docSwitch');
+  await expect(page.locator('.ed-doc-item')).toHaveCount(2);
+});
+
+test('mazzi: tasto destro sull’avviso offre «Chiudi», e la scelta lo chiude', async ({ openTab }) => {
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await page.click('#newDeck');
+  await page.click('#deckName');
+  await page.locator('.dk-switcher .sn-select-option', { hasText: 'Budget' }).click();
+  const campo = page.locator('#deckBudgetEdit');
+  await campo.pressSequentially('abc');
+  await campo.press('Enter');
+  const avviso = page.locator('.dk-toast.show');
+  await puntatoreSopra(page, avviso);
+  await page.mouse.down({ button: 'right' });
+  await page.mouse.up({ button: 'right' });
+  const voci = page.locator('.sn-menu .sn-menu-item');
+  await expect(voci).toHaveText(['Chiudi']);
+  await voci.first().click();
+  await expect(avviso).toHaveCount(0, { timeout: 1500 });
+});

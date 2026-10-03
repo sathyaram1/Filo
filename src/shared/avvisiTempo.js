@@ -112,5 +112,19 @@
     return { avvia, ferma, segui, lascia, ripulisci, fermo: () => fermo };
   }
 
-  global.SN_AVVISI = { STANDARD_SEC, RIPRESA_MS, imposta, durata, orologio };
+  // Un avviso prende il puntatore, quindi anche il tasto destro: il menu deve parlare dell'avviso (le sue
+  // azioni e «Chiudi», come nella barra), non della pagina sotto. Chi lo disegna dice qui come si chiude.
+  const CHIUDI = Symbol('snChiudiAvviso');
+  function chiudibile(el, chiudi) {
+    if (el && typeof chiudi === 'function') el[CHIUDI] = chiudi;
+    return el;
+  }
+  function avvisoSotto(nodo) {
+    for (let n = nodo; n; n = n.parentElement) {
+      if (typeof n[CHIUDI] === 'function') return { el: n, chiudi: n[CHIUDI] };
+    }
+    return null;
+  }
+
+  global.SN_AVVISI = { STANDARD_SEC, RIPRESA_MS, imposta, durata, orologio, chiudibile, avvisoSotto };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
