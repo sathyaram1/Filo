@@ -450,12 +450,18 @@ async function main() {
 
   // Gli unit sul RISULTATO della fusione con main di adesso (#929): due lavori verdi da soli possono rompere main
   // insieme. Un rosso solo sulla fusione lo dice al server, che rimanda il lavoro al riallineamento con l'elenco.
-  const giro = await chiediConProva({
-    root: ROOT, punta,
-    chiedi: (provaUnit) => merge(ticket, source, provaUnit ? { sha: punta, provaUnit } : { sha: punta }),
-    mainMosso: (r) => !!(r && r.ok === true && r.result === 'main_moved'),
-    scrivi: (s) => console.error(`[merge-gate] ${s}`),
-  });
+  const battito = await tieniVivo(ticket);
+  let giro;
+  try {
+    giro = await chiediConProva({
+      root: ROOT, punta,
+      chiedi: (provaUnit) => merge(ticket, source, provaUnit ? { sha: punta, provaUnit } : { sha: punta }),
+      mainMosso: (r) => !!(r && r.ok === true && r.result === 'main_moved'),
+      scrivi: (s) => console.error(`[merge-gate] ${s}`),
+    });
+  } finally {
+    battito.ferma();
+  }
   const reply = giro.reply;
   if (giro.esaurito) {
     console.error(`[merge-gate] ERROR: main si è mosso a ogni prova (${giro.tentativi} tentativi): niente fusione. Il lavoro è intatto sul ramo; rilancia questo comando.`);
