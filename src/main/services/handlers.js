@@ -3349,9 +3349,9 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // l'ha provocata. `onbActive` marca la chat dell'intervista di benvenuto:
   // quella è SEMPRE una conversazione, qualunque cosa dica il classificatore.
   if (chatId) {
-    // Nell'archivio solo ciò che è successo: riaperta, la chat racconta al passato
-    // ogni azione salvata. Una conferma data dopo la aggiunge la scheda (FILO_CHAT_NOTE).
-    const successe = renderedActions.filter((x) => x && x._executed && !x._confirm);
+    // Nell'archivio solo ciò che è successo, più le azioni fermate (#810) che riaperta racconta come tali.
+    // Una conferma data dopo la aggiunge la scheda (FILO_CHAT_NOTE).
+    const successe = renderedActions.filter((x) => x && ((x._executed && !x._confirm) || (x._output && x._output.blocked === 'segreto')));
     const dopo = await appendToChatArchive(
       chatId,
       { role: 'filo', text: textReply, actions: successe, ...(lettiRisposta.length ? { letti: lettiRisposta } : {}) },
