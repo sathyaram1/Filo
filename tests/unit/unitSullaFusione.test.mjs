@@ -319,32 +319,32 @@ test('prova vera: un rosso instabile si riprova da solo e non ferma la fusione',
 
 // ─── Una prova interrotta a metà (Ctrl+C, timeout di chi la lancia) ──────────
 //
-// Un worktree di prova interrotto resterebbe nell'elenco del repo col collegamento a node_modules, e il
-// `worktree unlock` + `remove --force` che git stesso suggerisce lo svuoterebbe (verifica #929 giro 2): la cartella di
-// prova non è un worktree, quindi nessun comando di git del repo la raggiunge.
+// Un worktree di prova interrotto resta nell'elenco del repo, e il `worktree unlock` + `remove --force` che git stesso
+// suggerisce attraverserebbe un collegamento al suo interno svuotando node_modules (verifica #929 giro 2): il
+// collegamento sta nella cartella base, accanto ai worktree, e nessun comando di git su un worktree lo incontra.
 
-test('durante la prova la cartella non è un worktree del repo: unlock e remove --force non la raggiungono', () => {
+test('durante la prova i worktree non contengono collegamenti: unlock e remove --force lasciano intatto node_modules', () => {
   const r = repoFinto();
   try {
-    const punta = r.ramo('claude/fuori-elenco', () => r.scrivi('nuovo.txt', 'x\n'));
+    const punta = r.ramo('claude/senza-collegamento', () => r.scrivi('nuovo.txt', 'x\n'));
     r.suMain(() => r.scrivi('altro.txt', 'y\n'));
-    let elenco = null;
-    let rimossa = null;
-    let origine = null;
+    let dentro = null;
+    let trovaModuli = null;
+    let rimosso = null;
     const p = provaUnitSullaFusione({
       root: r.lavoro, punta, scrivi: () => {},
       lancia: (dir) => {
-        elenco = r.ok(['worktree', 'list', '--porcelain']).split('\n').filter((l) => l.startsWith('worktree ')).length;
-        origine = gitIn(dir)(['rev-parse', 'refs/remotes/origin/main']).out;
+        dentro = existsSync(join(dir, 'node_modules'));
+        trovaModuli = existsSync(join(dir, '..', 'node_modules', 'sentinella.txt'));
         r.g(['worktree', 'unlock', dir]);
-        rimossa = r.g(['worktree', 'remove', '--force', dir]).ok;
+        rimosso = r.g(['worktree', 'remove', '--force', dir]).ok;
         return { ok: true, rossi: [] };
       },
     });
     assert.equal(p.esito, 'verde');
-    assert.equal(elenco, 1, 'la cartella di prova non compare fra i worktree del repo');
-    assert.equal(rimossa, false, 'remove --force dal repo non la tocca');
-    assert.equal(origine, p.mainSha, 'origin/main nella cartella di prova è il main provato');
+    assert.equal(dentro, false, 'nessun node_modules dentro il worktree di prova');
+    assert.equal(trovaModuli, true, 'node_modules si trova risalendo dal worktree');
+    assert.equal(rimosso, true, 'la pulizia che git suggerisce va fino in fondo');
     pulita(r);
   } finally {
     rmSync(r.casa, { recursive: true, force: true });
@@ -359,15 +359,14 @@ test('i resti di una prova interrotta si tolgono alla richiesta dopo anche se il
   try {
     const morto = spawnSync(process.execPath, ['-e', 'console.log(process.pid)'], { encoding: 'utf8' }).stdout.trim();
     writeFileSync(join(base, 'pid'), morto);
-    const dir = join(base, 'fusione');
-    execFileSync('git', ['clone', '--quiet', '--shared', r.lavoro, dir]);
-    collegaCartella(join(r.lavoro, 'node_modules'), join(dir, 'node_modules'));
+    collegaCartella(join(r.lavoro, 'node_modules'), join(base, 'node_modules'));
+    r.ok(['worktree', 'add', '--detach', '--quiet', join(base, 'fusione'), 'HEAD']);
     const punta = r.ok(['rev-parse', 'HEAD']);
     assert.equal(provaUnitSullaFusione({ root: r.lavoro, punta, scrivi: () => {} }).esito, 'main_contenuto');
     assert.ok(!existsSync(base), 'i resti sono stati tolti');
     pulita(r);
   } finally {
-    togliCollegamento(join(base, 'fusione', 'node_modules'));
+    togliCollegamento(join(base, 'node_modules'));
     rmSync(base, { recursive: true, force: true });
     rmSync(r.casa, { recursive: true, force: true });
   }
