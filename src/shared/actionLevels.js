@@ -85,6 +85,14 @@
     if (v === true) return true;
     return /^(true|1|si|sì|yes|tutte|tutti)$/i.test(String(v ?? ''));
   }
+  function periodoDetto(action) {
+    const ore = Number(action && action.ore);
+    if (Number.isFinite(ore) && ore > 0) return ore === 1 ? 'dell’ultima ora' : `delle ultime ${ore} ore`;
+    const p = String((action && action.periodo) || '').toLowerCase();
+    if (p === 'oggi') return 'di oggi';
+    if (p === 'tutto') return 'di sempre';
+    return 'dell’ultima ora';
+  }
   function timerRefLabel(action) {
     const kind = String((action && (action.tipo ?? action.kind)) || '').toLowerCase();
     const cosa = /timer/.test(kind) ? 'i timer' : (/svegli|alarm/.test(kind) ? 'le sveglie' : 'sveglie e timer');
@@ -336,6 +344,19 @@
       describeDone: (a) => {
         const n = Number(a && a._output && a._output.eliminate) || 0;
         return `Eliminate DEFINITIVAMENTE dall'archivio ${n} ${n === 1 ? 'scheda' : 'schede'} su “${a.query || a.testo || ''}”`;
+      },
+    },
+    // #866 — come in ogni browser: il popup dice quante pagine e di quale periodo, il conto lo fa il main (`_n`).
+    CANCELLA_PAGINE: {
+      level: 2,
+      describe: (a) => {
+        const n = Number(a && a._n);
+        const quali = Number.isFinite(n) ? (n === 1 ? 'la pagina visitata' : `le ${n} pagine visitate`) : 'le pagine visitate';
+        return `Cancellare ${quali} ${periodoDetto(a)}.\nFilo non le ricorderà più. Chat e schede chiuse restano.`;
+      },
+      describeDone: (a) => {
+        const n = Number(a && a._output && a._output.cancellate) || 0;
+        return n ? `Cancellate ${n === 1 ? '1 pagina visitata' : `${n} pagine visitate`} ${periodoDetto(a)}` : `Nessuna pagina visitata ${periodoDetto(a)}`;
       },
     },
     CANCELLA_MEMORIA: {

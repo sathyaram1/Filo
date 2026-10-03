@@ -319,6 +319,12 @@
       doesNot: 'Niente sparisce da solo: non c’è una pulizia automatica, e nessuna chat esce dal tuo computer. Le chat fatte in una finestra in incognito non vengono salvate. Non entrano qui le conversazioni con l’Aiuto che compare sopra le pagine web: quelle vivono finché la pagina è aperta. Le immagini che incolli in chat non si conservano; rileggendo la chat trovi scritto quante ce n’erano.',
     },
     {
+      id: 'visited-pages', title: 'Filo ricorda le pagine visitate', category: 'save',
+      desc: 'Ogni pagina che apri in una scheda (indirizzo, titolo e quando l’hai aperta) entra nella linea del tempo di Filo insieme alle chat, sul tuo computer, senza un limite di quante ne tiene. Le cancelli quando vuoi: quelle dell’ultima ora, di oggi, delle ultime ore che dici tu o tutte, e spariscono anche dal disco. Esporta dati e Importa dati le portano con sé, insieme alle chat.',
+      invoke: 'Chiedilo a Filo a parole ("cancella le pagine dell’ultima ora", "cancella la cronologia di oggi", "cancella le pagine delle ultime 3 ore", "cancella tutta la cronologia"): ti dice quante sono e aspetta il tuo OK. Oppure pagina Sicurezza (filo://security/security.html), sezione «Pagine visitate»: «Cancella l’ultima ora», «Cancella oggi», «Cancella tutto».',
+      doesNot: 'Non ricorda le pagine aperte in incognito, e niente esce dal tuo computer. Per ora non c’è una pagina per sfogliarle e Filo non le usa ancora per rispondere. Cancellarle non tocca le chat né le schede chiuse della Cronologia.',
+    },
+    {
       id: 'chat-archive-recall', title: 'Filo rilegge le vostre chat di prima', category: 'assistant',
       desc: 'Puoi dire "riprendi la discussione di ieri sulla coscienza" o "cosa mi avevi detto su quella cosa?": Filo cerca fra le chat che avete già fatto nella nuova scheda, rilegge quella giusta e riparte da lì invece di ricominciare da capo.',
       invoke: 'Chiediglielo a parole nella nuova scheda, nominando l’argomento o quando ne avevate parlato.',

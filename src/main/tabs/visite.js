@@ -20,7 +20,7 @@ class VisiteSchede {
 
   // Ricaricare, o cambiare solo il frammento (#sezione), non è una pagina nuova.
   navigata(wc, scheda, url, { inPagina = false } = {}) {
-    this.scrivi(wc);
+    this.scrivi(wc, { titoloAttuale: false });
     if (!registrabile(url)) return;
     const prima = this.ultime.get(wc);
     if (prima && senzaFrammento(prima) === senzaFrammento(url)) return;
@@ -43,13 +43,14 @@ class VisiteSchede {
     if (v && !v.inPagina) this.scrivi(wc);
   }
 
-  scrivi(wc) {
+  // Alla navigazione dopo il titolo della scheda è già quello della pagina nuova: vale l'ultimo visto per questa.
+  scrivi(wc, { titoloAttuale = true } = {}) {
     const v = this.inAttesa.get(wc);
     if (!v) return;
     this.inAttesa.delete(wc);
     clearTimeout(v.timer);
     let titolo = v.titolo;
-    try { if (!wc.isDestroyed()) titolo = wc.getTitle() || titolo; } catch (_) {}
+    try { if (titoloAttuale && !wc.isDestroyed()) titolo = wc.getTitle() || titolo; } catch (_) {}
     Promise.resolve()
       .then(() => this.registra({ url: v.url, titolo, scheda: v.scheda, ts: v.ts }, { incognito: this.incognito }))
       .catch((e) => console.warn('[Filo] pagina visitata non registrata:', e?.message || e));

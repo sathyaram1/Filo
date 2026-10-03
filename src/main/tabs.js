@@ -29,6 +29,7 @@ const { indiceSaltoScheda, comandoNavigazione } = globalThis.SN_TASTI;
 const { collegaScorciatoie } = require('./shortcuts');
 const { AvvisiSopraPagina } = require('./avvisiSopraPagina');
 const { AnteprimeSchede } = require('./tabs/anteprime');
+const { VisiteSchede } = require('./tabs/visite');
 const CartaAnteprima = require('./popup-anteprima');
 const { AvvisoSito } = require('./avvisoSito');
 
@@ -308,6 +309,7 @@ class TabManager {
     this.partition = partition || null;
     this.tabs = []; // [{ id, view, title, url, favicon, loading, canBack, canFwd }]
     this.activeId = null;
+    this.visite = new VisiteSchede({ incognito: this.incognito });
     this.anteprime = new AnteprimeSchede(this, {
       suNuova: (id, dato) => CartaAnteprima.precarica(window, id, dato),
       suTolte: (ids) => CartaAnteprima.dimentica(window, ids),
@@ -1956,6 +1958,7 @@ class TabManager {
   _wireEvents(tab) {
     const wc = tab.view.webContents;
     this._registraPermessoRichieste(tab);
+    try { wc.once('destroyed', () => this.visite.scrivi(wc, { titoloAttuale: false })); } catch (_) {}
     const update = (patch) => {
       Object.assign(tab, patch);
       this._broadcast();
@@ -2302,6 +2305,7 @@ class TabManager {
         canFwd: canGoFwd(wc),
       });
       if (tab.view && tab.view.webContents === wc) this.anteprime.caricata(tab);
+      this.visite.caricata(wc);
       // §3.2 — cattura un estratto del contenuto (best-effort) da usare per la
       // ricerca semantica dell'archivio e per il triage. Solo pagine web.
       if (!tab.isInternal && /^https?:\/\//i.test(wc.getURL() || '')) {
@@ -2313,7 +2317,10 @@ class TabManager {
         } catch (_) {}
       }
     });
-    wc.on('page-title-updated', (_e, title) => update({ title: title || tab.title }));
+    wc.on('page-title-updated', (_e, title) => {
+      update({ title: title || tab.title });
+      this.visite.titolo(wc, title);
+    });
     wc.on('page-favicon-updated', (_e, favicons) => update({ favicon: favicons?.[0] || '' }));
     wc.on('did-navigate', (_e, url, httpResponseCode) => {
       // #412 — questa scheda ha committato una vera navigazione main-frame:
@@ -2333,6 +2340,7 @@ class TabManager {
         return;
       }
       this._assestaEsito(tab);
+      this.visite.navigata(wc, tab.id, url);
       // Documento nuovo: lo zoom che la pagina vecchia dichiarava di sé non
       // vale più (#686).
       tab.zoomProprio = null;
@@ -2389,6 +2397,7 @@ class TabManager {
     wc.on('did-navigate-in-page', (_e, url, isMainFrame) => {
       update({ url: userUrl(url), canBack: canGoBack(wc), canFwd: canGoFwd(wc) });
       if (isMainFrame === true && tab.view && tab.view.webContents === wc) this.anteprime.navigata(tab, { inPagina: true });
+      if (isMainFrame === true) this.visite.navigata(wc, tab.id, url, { inPagina: true });
     });
     // #441 — l'utente ha toccato DAVVERO questa scheda? Serve a non chiudere
     // come "pagina-ponte" una scheda con cui ha interagito. Il segnale arriva

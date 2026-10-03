@@ -2,12 +2,12 @@
 // cancellazione toglie dal disco solo quello che copre, e nessun tetto taglia niente. Niente Electron: il filo
 // scrive in una cartella temporanea.
 
-import { test } from 'node:test';
+import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { mkdtempSync, readFileSync, writeFileSync, appendFileSync, existsSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, writeFileSync, appendFileSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import '../../src/shared/chatArchive.js';
 import '../../src/shared/filoEventi.js';
 
@@ -30,7 +30,11 @@ require('../../src/main/services/filoChats.js');
 const E = globalThis.SN_FILO_EVENTI;
 const Chats = globalThis.SN_FILO_CHATS;
 
-function nuovo(cartella = mkdtempSync(join(tmpdir(), 'filo-ev-'))) {
+const cartelle = new Set();
+after(() => { for (const c of cartelle) rmSync(c, { recursive: true, force: true }); });
+
+function nuovo(cartella = cartellaTemporanea('filo-ev-')) {
+  cartelle.add(cartella);
   const f = creaFilo({ cartella });
   globalThis.SN_IL_FILO = f;
   return { f, cartella, file: join(cartella, 'eventi.jsonl') };

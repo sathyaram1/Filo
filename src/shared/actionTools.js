@@ -242,6 +242,14 @@
       properties: { query: S('Descrizione di cosa cancellare.') },
       required: ['query'],
     },
+    CANCELLA_PAGINE: {
+      description: 'Cancella le pagine visitate che Filo ricorda ("cancella le pagine dell\'ultima ora", "togli la cronologia di oggi", "cancella tutta la cronologia"). Il sistema mostra all\'utente quante sono e le toglie solo col suo OK: non chiederlo tu a parole. Non tocca le chat né le schede chiuse.',
+      properties: {
+        periodo: S('Quali pagine: "ultima_ora", "oggi" o "tutto". Per un numero di ore usa `ore`.', { enum: ['ultima_ora', 'oggi', 'tutto'] }),
+        ore: I('Le ultime N ore ("cancella le pagine delle ultime 3 ore"); ometti per un periodo con nome.'),
+      },
+      required: [],
+    },
     CANCELLA_MEMORIA: {
       description: 'Cancella DEFINITIVAMENTE tutta la memoria di Filo (profilo, preferenze apprese, lezioni). Il sistema chiede all\'utente di digitare "conferma" prima di eseguire; non parte mai senza. NON dichiarare di averlo già fatto.',
       properties: {},

@@ -590,24 +590,37 @@
     security_export_title: 'Esporta dati Filo',
     security_export_label: 'Esporta dati',
     security_export_desc:
-      'Salva tutti i tuoi dati di Filo (memorie degli agenti, pagine salvate, ' +
-      'cronologia incolla, costi e impostazioni) in un file .zip che contiene un ' +
-      'data.json e le immagini copiate come file separati. Utile come backup o per ' +
-      'trasferire i dati su un altro computer.',
+      'Salva tutti i tuoi dati di Filo (memorie degli agenti, chat con Filo, pagine ' +
+      'visitate, pagine salvate, cronologia incolla, costi e impostazioni) in un file ' +
+      '.zip che contiene un data.json, il filo delle chat e delle pagine visitate e le ' +
+      'immagini copiate come file separati. Utile come backup o per trasferire i dati ' +
+      'su un altro computer.',
     security_export_btn: 'Esporta dati (.zip)',
     security_export_done: 'Dati esportati',
     security_export_fail: 'Esportazione non riuscita',
     security_import_title: 'Importa dati Filo',
     security_import_btn: 'Importa dati (.zip)',
     security_import_desc:
-      'Ricarica un .zip esportato da Filo: rimette al loro posto memorie, pagine ' +
-      'salvate, cronologia, immagini e impostazioni. Quello che hai già non viene ' +
+      'Ricarica un .zip esportato da Filo: rimette al loro posto memorie, chat con ' +
+      'Filo, pagine visitate, pagine salvate, cronologia, immagini e impostazioni. ' +
+      'Quello che hai già non viene ' +
       'cancellato — le liste si uniscono e, dove c\'è un conflitto, vince il backup.',
+    security_visite_title: 'Pagine visitate',
+    security_visite_desc: 'Filo ricorda le pagine che apri nelle schede, sul tuo computer. Quelle aperte in incognito no.',
+    security_visite_ora: 'Cancella l’ultima ora',
+    security_visite_oggi: 'Cancella oggi',
+    security_visite_tutto: 'Cancella tutto',
+    security_visite_confirm_title: 'Cancellare le pagine visitate?',
+    // %1 = "la pagina visitata" / "le N pagine visitate", %2 = "nell’ultima ora" / "oggi" / "da sempre"
+    security_visite_confirm_text: 'Filo dimentica %1 %2. Le chat e le schede chiuse restano.',
+    security_visite_confirm_ok: 'Cancella',
+    security_visite_nessuna: 'Nessuna pagina da cancellare',
+    security_visite_fail: 'Cancellazione non riuscita',
     security_import_confirm_title: 'Importa dati da backup',
-    // %1 = nome file, %2 = " (del …)" o vuoto, %3/%4 = conteggi già declinati
+    // %1 = nome file, %2 = " (del …)" o vuoto, %3/%4 = conteggi già declinati, %5 = chat e pagine del filo o vuoto
     security_import_confirm_text:
-      'Da "%1"%2: %3 e %4.\n\n' +
-      'Nulla di ciò che hai ora viene cancellato: le liste (pagine salvate, ' +
+      'Da "%1"%2: %3 e %4%5.\n\n' +
+      'Nulla di ciò che hai ora viene cancellato: le liste (chat, pagine visitate, pagine salvate, ' +
       'cronologia, appunti) si uniscono senza duplicati e le sezioni che qui non ' +
       'esistono vengono aggiunte. Dove lo stesso dato esiste in entrambi, vince ' +
       'quello del backup. Le impostazioni del backup diventano attive subito.',

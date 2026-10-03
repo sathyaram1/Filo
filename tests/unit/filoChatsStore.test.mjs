@@ -2,12 +2,11 @@
 // (src/main/services/ilFilo.js): due scritture che partono insieme non si mangiano a vicenda, e una domanda
 // riprovata dopo un errore non finisce scritta due volte. Niente Electron: il filo scrive in una cartella temporanea.
 
-import { test } from 'node:test';
+import { test, after } from 'node:test';
+import { rmSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import '../../src/shared/chatArchive.js';
 import '../../src/shared/filoEventi.js';
 
@@ -20,8 +19,13 @@ const { creaFilo } = require('../../src/main/services/ilFilo.js');
 require('../../src/main/services/filoChats.js');
 const Store = globalThis.SN_FILO_CHATS;
 
+const cartelle = [];
+after(() => { for (const c of cartelle) rmSync(c, { recursive: true, force: true }); });
+
 function azzera() {
-  globalThis.SN_IL_FILO = creaFilo({ cartella: mkdtempSync(join(tmpdir(), 'filo-chat-')) });
+  const cartella = cartellaTemporanea('filo-chat-');
+  cartelle.push(cartella);
+  globalThis.SN_IL_FILO = creaFilo({ cartella });
 }
 
 const turno = (role, text, ts) => ({ role, text, ts });
