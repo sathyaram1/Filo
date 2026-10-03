@@ -43,6 +43,14 @@ test('se main si muove fra il controllo e la fusione, il server non fonde sul ma
     async mergeDryRun() { return { ok: true, status: 'clean' }; },
     // L'API vera fonde su main com'è adesso: qui un'altra fusione è appena atterrata.
     async mergeSha() { main = ALTRA_FUSIONE; fusaSu = main; return { ok: true, status: 'merged', sha: 'e'.repeat(40) }; },
+    // La fusione condizionata della cura: stessa corsa, ma main avanza solo se è ancora quello atteso, come fa GitHub
+    // con un aggiornamento del riferimento non forzato.
+    async mergeShaSuMain(_sha, atteso) {
+      main = ALTRA_FUSIONE;
+      if (main !== atteso) return { ok: true, status: 'main_moved', mainSha: main };
+      fusaSu = main;
+      return { ok: true, status: 'merged', sha: 'e'.repeat(40) };
+    },
   };
   const orig = console.log;
   console.log = () => {};
