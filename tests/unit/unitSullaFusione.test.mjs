@@ -352,23 +352,22 @@ test('durante la prova la cartella non è un worktree del repo: unlock e remove 
 
 test('i resti di una prova interrotta si tolgono alla richiesta dopo anche se il ramo contiene già main', () => {
   const r = repoFinto();
-  const tmp = cartellaTemporanea('filo-929-resti-');
+  // Nella temporanea vera, dove la prova la cerca, col pid di un processo che è già finito.
+  const base = mkdtempSync(join(tmpdir(), 'filo-fusione-'));
   try {
-    const base = join(tmp, 'filo-fusione-mort02');
-    mkdirSync(base);
-    writeFileSync(join(base, 'pid'), '4242');
+    const morto = spawnSync(process.execPath, ['-e', 'console.log(process.pid)'], { encoding: 'utf8' }).stdout.trim();
+    writeFileSync(join(base, 'pid'), morto);
     const dir = join(base, 'fusione');
     execFileSync('git', ['clone', '--quiet', '--shared', r.lavoro, dir]);
     collegaCartella(join(r.lavoro, 'node_modules'), join(dir, 'node_modules'));
     const punta = r.ok(['rev-parse', 'HEAD']);
-    // La stessa pulizia che la prova fa all'inizio, con la temporanea finta: il ramo è main stesso.
-    assert.deepEqual(pulisciResti({ git: r.g, tmp, vivo: () => false }), [base]);
-    assert.ok(!existsSync(base));
     assert.equal(provaUnitSullaFusione({ root: r.lavoro, punta, scrivi: () => {} }).esito, 'main_contenuto');
+    assert.ok(!existsSync(base), 'i resti sono stati tolti');
     pulita(r);
   } finally {
+    togliCollegamento(join(base, 'fusione', 'node_modules'));
+    rmSync(base, { recursive: true, force: true });
     rmSync(r.casa, { recursive: true, force: true });
-    rmSync(tmp, { recursive: true, force: true });
   }
 });
 
