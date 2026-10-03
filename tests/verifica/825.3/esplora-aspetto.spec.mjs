@@ -14,6 +14,7 @@ async function newtabPage(app) {
 async function configure(app, theme) {
   await app.evaluate(async (_e, th) => {
     const C = globalThis.SN_CONST;
+    await globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] });
     await globalThis.SN_STORAGE.updateSettings({
       theme: th,
       useDefaultModels: false,
@@ -75,6 +76,10 @@ for (const theme of ['light', 'dark']) {
     const page = await newtabPage(app);
     await expect(page.locator('#input')).toBeVisible();
     await configure(app, theme);
+    await page.reload();
+    await expect(page.locator('#input')).toBeVisible();
+    console.log('TEMA', await page.locator('html').getAttribute('data-sn-theme'));
+    await app.evaluate(({ nativeTheme }, th) => { nativeTheme.themeSource = th; }, theme);
     const schede = [
       { title: 'Gatti persiani: carattere, cura del pelo e alimentazione, guida completa per chi vuole adottarne uno', gatto: true },
       { title: 'Il Gattopardo, recensione', gatto: true },
@@ -117,4 +122,27 @@ test('embedding non disponibile: cosa dice il pannello', async ({ app, shell }) 
   console.log('NOTA', await panel.locator('.dash-delete-note').textContent());
   console.log('BOTTONI', await panel.locator('.dash-action-btn').allTextContents());
   await page.screenshot({ path: 'tests/.shots/825-3-g3-embed-rotto.png' });
+});
+
+test('chat riaperta dall\'archivio: cosa racconta di una cancellazione mai confermata', async ({ app, shell, openTab }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configure(app, 'light');
+  await seedArchive(app, [{ title: 'Gatti persiani', gatto: true }, { title: 'Torta', gatto: false }]);
+  await fakeChat(app, [
+    { toolCalls: [{ id: 'p1', name: 'PULISCI_TAB', arguments: '{}' }, { id: 'c1', name: 'CANCELLA_ARCHIVIO', arguments: '{"query":"gatti"}' }] },
+    { text: 'Ecco: premi il bottone per riordinare, e qui sotto le schede da eliminare.' },
+  ]);
+  await chiedi(page, 'fai pulizia delle schede e cancella dall\'archivio le pagine sui gatti');
+  await expect(page.locator('.dash-delete-list li')).toHaveCount(1, { timeout: 15_000 });
+  await page.waitForTimeout(1500);
+  const chats = await app.evaluate(() => globalThis.SN_FILO_CHATS.list());
+  console.log('CHATS', JSON.stringify(chats.map((c) => ({ id: c.id, msgs: c.messages }))));
+  await app.evaluate((_e, id) => globalThis.SN_CLOSE_FILO_CHAT(id), chats[0].id);
+  await page.goto(`filo://dashboard/dashboard.html?chat=${encodeURIComponent(chats[0].id)}`);
+  await expect(page.locator('.dash-bubble')).toHaveCount(2, { timeout: 8_000 });
+  console.log('REPLAY', await page.locator('.dash-bubble-note[data-replay]').allTextContents());
+  await page.screenshot({ path: 'tests/.shots/825-3-g3-replay.png' });
 });
