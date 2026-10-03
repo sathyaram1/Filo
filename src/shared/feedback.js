@@ -698,6 +698,8 @@
   // dashboard e a far risalire chi triagia all'originale.
   // `opts.idToken` (#595): solo il token admin. Create autenticata con `senderProof: 'admin'`;
   // token rifiutato (401/403) → si riparte anonimi e il risultato lo dice (`authRefused`).
+  // I nomi che valgono solo con la prova (gemello di RESERVED_SENDER_RE in feedbackThread.js).
+  const NOME_RISERVATO_RE = /^(owner|routine|agent|local):/i;
   async function submit({ text, url, title, userAgent, clientId, clientIdHash, images, files, name, parentId, capabilityGapId, submissionId }, opts = {}) {
     const idToken = (opts && typeof opts.idToken === 'string') ? opts.idToken : '';
     // #908: un lavoro locale nasce solo con la prova; da anonimo diventerebbe un feedback d'utente.
@@ -878,8 +880,7 @@
         body: JSON.stringify(doc),
       });
       // #912: un nome riservato col token rifiutato non riparte da anonimo: sarebbe un utente che nessuno può dire suo.
-      const riservato = /^(owner|routine|agent|local):/i.test(String(clientId || ''));
-      if ((soloAdmin || riservato) && (res.status === 401 || res.status === 403)) {
+      if ((soloAdmin || NOME_RISERVATO_RE.test(String(clientId || ''))) && (res.status === 401 || res.status === 403)) {
         throw Object.assign(new Error(`firestore create fallito (${res.status}): token admin rifiutato, e questo feedback non parte da anonimo`), { accessoOwner: true });
       }
       if (res.status === 401 || res.status === 403) {
@@ -893,9 +894,9 @@
       }
     }
     if (!res) {
-      // #912: da anonimo un nome riservato non parte, nemmeno quello dell'owner col token rifiutato: è un utente,
-      // nello stesso spazio in cui lo mette il server (senderOf in feedbackThread.js).
-      if (/^(owner|routine|agent|local):/i.test(String(clientId || ''))) {
+      // #912: un nome riservato senza token è un utente, nello stesso spazio in cui lo mette il server
+      // (senderOf in feedbackThread.js).
+      if (NOME_RISERVATO_RE.test(String(clientId || ''))) {
         doc.fields.clientId = toFsValue(await maybeEncrypt('non-provato:' + String(clientId)));
       }
       res = await fetch(endpoint, {
