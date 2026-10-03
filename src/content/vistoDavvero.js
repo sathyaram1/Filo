@@ -323,6 +323,7 @@
     try { moGenitore?.disconnect(); } catch (_) {}
     moGenitore = null;
     genitore = null;
+    rimettiEffetti();
     try { ospite?.remove(); } catch (_) {}
   }
 
