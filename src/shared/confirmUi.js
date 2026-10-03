@@ -428,6 +428,9 @@
         hasInput: !!q('.sn-confirm-input'),
         textScrolls: !!(textEl && textEl.scrollHeight > textEl.clientHeight + 1),
         selectionBg,
+        // Un sì vero (clic o invio) vale solo da qui: prima è il gesto partito per altro (#592).
+        pronto: !!(active.pronto && active.pronto()),
+        fuoco: (active.root.activeElement && active.root.activeElement.className) || '',
       };
     },
     // Clicca un bottone: which = 'ok' | 'cancel' | 'danger'.
