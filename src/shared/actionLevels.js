@@ -318,7 +318,7 @@
     CANCELLA_ARCHIVIO: {
       level: 3,
       describe: (a) => `Eliminare dall'archivio le schede su “${a.query || a.testo || ''}”.\n`
-        + 'L\'eliminazione è DEFINITIVA.',
+        + 'Vengono eliminate DEFINITIVAMENTE: non si possono recuperare.',
       describeDone: (a) => {
         const n = Number(a && a._output && a._output.eliminate) || 0;
         return `Eliminate DEFINITIVAMENTE dall'archivio ${n} ${n === 1 ? 'scheda' : 'schede'} su “${a.query || a.testo || ''}”`;
