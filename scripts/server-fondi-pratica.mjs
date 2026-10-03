@@ -154,8 +154,14 @@ export async function esegui(argv, deps = {}) {
     const numero = chi.replace(/^#/, '');
     const chiudeApp = `la chiude la fusione di ${ramiApp.length ? ramiApp.join(', ') : 'quella parte'} (npm run finish -- --feedback ${numero})`;
     const soloComando = `npm run server:fondi -- ${a.ramo} --feedback ${numero} --solo-server`;
+    // Ci si ferma prima di fondere: dopo, la pratica sarebbe chiusa e il rilancio senza --solo-server rifiutato.
     if (solo && ramiApp.length) {
-      err(`Attenzione: dici che il lavoro sta solo sul server, ma ${ramiApp.join(', ')} dell'app è legato a questa pratica e non è su main. Chiusa così, la sua fusione non salterà L5: se è di questo lavoro, rilancia senza --solo-server.`);
+      err([
+        `Dici che il lavoro sta solo sul server, ma ${ramiApp.join(', ')} dell'app è legato a questa pratica e non è su main.`,
+        `Se è di questo lavoro, rilancia senza --solo-server: ${soloComando.replace(/ --solo-server$/, '')}`,
+        'Se non lo è, legalo alla sua pratica e rilancia questo comando. Non ho toccato niente.',
+      ].join('\n'));
+      return 1;
     }
     const dopo = tardiva
       ? `resterebbe chiusa, con la nota di quest'ultima parte (l'ha chiusa la fusione della parte ${NOME_PARTE.app}, ${quando})`
