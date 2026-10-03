@@ -302,6 +302,16 @@
         return { partial: { autoArchive: { onIdle: b } }, label: `Archivia quando inattivo → ${b ? 'attivo' : 'disattivato'}` };
       },
     },
+    // #737 — sta nella pagina Sicurezza accanto all'ad-block, ma non apre né chiude niente: si applica subito.
+    {
+      keys: ['salta_pubblicita', 'salta pubblicità', 'salta pubblicita', 'salta le pubblicità', 'salta le pubblicita',
+        'salta annunci', 'salta gli annunci', 'pubblicità dei video', 'pubblicita dei video', 'skip ads', 'salta ads'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { security: { adSkip: { enabled: b } } }, label: `Salta le pubblicità dei video → ${b ? 'attivo' : 'disattivato'}` };
+      },
+    },
 
     // ── Sicurezza / privacy — livello 2 (popup di conferma prima di applicare) ──
     {

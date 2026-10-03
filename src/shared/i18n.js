@@ -435,6 +435,10 @@
       'il caricamento di pubblicità e tracker. Le liste si scaricano dalla rete, restano ' +
       'in cache sul tuo computer e si aggiornano da sole una volta a settimana. I siti ' +
       'che usi davvero (Google, YouTube, banche…) non vengono mai bloccati.',
+    options_security_adskip: 'Salta le pubblicità dei video',
+    options_security_adskip_desc:
+      'Quando un video, per esempio su YouTube, mostra una pubblicità col pulsante «Salta», ' +
+      'Filo lo preme appena compare. Quelle che non si possono saltare restano come sono.',
     options_security_siteblock: 'Blocca l’apertura dei siti in blacklist',
     options_security_siteblock_desc:
       'Impedisce di APRIRE i siti in blacklist (non solo le loro pubblicità), anche dai ' +

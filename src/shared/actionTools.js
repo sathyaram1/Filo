@@ -268,6 +268,7 @@
         + '• velocita_voce: numero 0.5-2 ; tono_voce: numero 0-2 (lettura ad alta voce)\n'
         + '• protezione_ip: true | false [conferma] (anti-leak WebRTC)\n'
         + '• blocco_popup: true | false [conferma]\n'
+        + '• salta_pubblicita: true | false (preme da solo il «Salta» delle pubblicità dei video, per esempio su YouTube)\n'
         + '• navigazione_sicura: true | false [conferma] (rilevamento siti pericolosi)\n'
         + '• gestione_cookie: "manuale" | "automatico" | "privacy" [conferma]\n'
         + '• fingerprint: "off" | "default" | "privacy" [conferma] (anti-fingerprinting)\n'
