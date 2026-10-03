@@ -156,6 +156,7 @@ test('un lavoro che tocca anche l’app: dopo il server la pratica resta aperta,
   assert.ok(r.scritture.some((u) => u.includes('localMerges.server')), 'la parte del server è registrata');
   assert.ok(r.scritture.every((u) => !u.includes('resolvedInVersion')), 'non si chiude');
   assert.match(r.testo, /resta aperta: manca la parte dell’app, la chiude la fusione di claude\/app \(npm run finish -- --feedback 910\)/);
+  assert.doesNotMatch(r.testo, /--solo-server/, 'col ramo dell’app legato --solo-server si rifiuta: non si consiglia');
 });
 
 test('la parte dell’app già su main secondo la pratica, e nessun suo ramo fuori da main: si chiude', async () => {
