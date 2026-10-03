@@ -7,11 +7,6 @@ import { preparaModelli, modelloFinto, superaAvviso, apriAiuto, chiedi, arrivato
 const pagina = (corpo) => `<!doctype html><html><head><title>Pagamento</title></head><body><h1>Pagamento</h1>
   <form>${corpo}<button type="button">Paga</button></form></body></html>`;
 
-async function righeCampi(app, page, corpo, valori, avviso) {
-  const p = await page;
-  return p;
-}
-
 test('carta in quattro caselle: le cifre non arrivano al modello', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(60_000);
   const caselle = [1, 2, 3, 4].map((i) => `<input id="k${i}" maxlength="4" inputmode="numeric" style="width:60px">`).join(' ');
