@@ -841,14 +841,14 @@
           else icon.textContent = '🖼';
           const desc = document.createElement('span');
           desc.className = 'sn-menu-label';
-          desc.textContent = entry.description || 'Immagine';
+          testoNascosto(desc, b, entry.description || 'Immagine');
           b.appendChild(icon);
           b.appendChild(desc);
         } else {
           const lbl = document.createElement('span');
           lbl.className = 'sn-menu-label';
           const text = (entry.text || '').replace(/\s+/g, ' ').trim();
-          lbl.textContent = text.length > 40 ? text.slice(0, 40) + '…' : text;
+          testoNascosto(lbl, b, text.length > 40 ? text.slice(0, 40) + '…' : text);
           b.appendChild(lbl);
         }
         b.addEventListener('click', () => {
