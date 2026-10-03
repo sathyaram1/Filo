@@ -19,6 +19,8 @@ const ORE = 3600 * 1000;
 test('le parti fuse dai campi REST: solo app e server, solo numeri positivi', () => {
   const campi = (m) => ({ localMerges: { mapValue: { fields: m } } });
   assert.deepEqual(partiDaCampi(campi({ app: { integerValue: '5' }, server: { integerValue: '0' }, altro: { integerValue: '9' } })), { app: 5 });
+  assert.deepEqual(partiDaCampi(campi({ server: { integerValue: '5' }, solo: { stringValue: 'server' } })), { server: 5, solo: 'server' });
+  assert.deepEqual(partiDaCampi(campi({ server: { integerValue: '5' }, solo: { stringValue: 'tutto' } })), { server: 5 });
   assert.deepEqual(partiDaCampi({}), {});
   assert.deepEqual(partiDaCampi(undefined), {});
   assert.deepEqual([...PARTI], ['app', 'server']);
@@ -34,6 +36,7 @@ test('parte tardiva: solo a pratica chiusa dall’altra parte da meno di 48 ore,
     [{ parti: { app: ORA + ORE } }, /più di 48 ore/],
     [{ parti: { app: ORA - ORE, server: ORA - ORE } }, /già su main/],
     [{ parti: {} }, /non l’ha chiusa/],
+    [{ parti: { app: ORA - ORE, solo: 'app' } }, /stava tutto lì/],
     [{ locale: false }, /solo in locale/],
     [{ parte: 'altro' }, /sconosciuta/],
   ];
@@ -110,13 +113,14 @@ test('cosa legge chi lancia finish: la parte che manca e come chiuderla, o la pr
   assert.match(sola, /Pratica #915 chiusa\./, 'un lavoro di una parte sola si chiude come prima');
 });
 
-test('regole: localMerges lo scrive solo l’admin, nella forma { app?, server? } con interi positivi', () => {
+test('regole: localMerges lo scrive solo l’admin, nella forma { app?, server?, solo? } con interi positivi', () => {
   const rules = readFileSync(join(ROOT, 'firestore.rules'), 'utf8').replace(/\/\/[^\n]*/g, '');
   const m = /function localMergesValido\(d\) \{([\s\S]*?)\n\s*\}/.exec(rules);
   assert.ok(m, 'funzione localMergesValido non trovata');
   const corpo = m[1].replace(/\s+/g, ' ');
   assert.match(corpo, /!\('localMerges' in d\)/);
-  assert.match(corpo, /keys\(\)\.hasOnly\(\['app', 'server'\]\)/);
+  assert.match(corpo, /keys\(\)\.hasOnly\(\['app', 'server', 'solo'\]\)/);
+  assert.match(corpo, /d\.localMerges\.solo in \['app', 'server'\]/);
   assert.match(corpo, /d\.localMerges\.app is int && d\.localMerges\.app > 0/);
   assert.match(corpo, /d\.localMerges\.server is int && d\.localMerges\.server > 0/);
 

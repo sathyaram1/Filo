@@ -19,7 +19,9 @@ test('cartellaDelServer: il checkout del server accanto al repo, dal checkout pr
 });
 
 test('leggiArgomenti: ramo, pratica e prova a vuoto, anche quando npm si prende le opzioni', () => {
-  assert.deepEqual(leggiArgomenti(['claude/x', '--feedback', '910']), { ramo: 'claude/x', pratica: '910', dryRun: false, nota: null });
+  assert.deepEqual(leggiArgomenti(['claude/x', '--feedback', '910']), { ramo: 'claude/x', pratica: '910', dryRun: false, soloServer: false, nota: null });
+  assert.equal(leggiArgomenti(['claude/x', '--feedback', '910', '--solo-server']).soloServer, true);
+  assert.equal(leggiArgomenti(['claude/x', '--feedback', '910'], { npm_config_solo_server: 'true' }).soloServer, true);
   assert.equal(leggiArgomenti(['claude/x', '--feedback=#910', '--dry-run']).dryRun, true);
   const npm = leggiArgomenti(['claude/x'], { npm_config_feedback: '910', npm_config_dry_run: 'true' });
   assert.equal(npm.pratica, '910');
@@ -100,15 +102,34 @@ test('a vuoto: il server parte con la pratica e --dry-run, e sulla pratica non s
   assert.deepEqual(r.scritture, []);
 });
 
-test('davvero: presa in carico, server con la pratica, e a fusione riuscita la pratica si chiude', async () => {
-  const r = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p'] });
+test('davvero, con --solo-server: presa in carico, server con la pratica, a fusione riuscita si chiude e lo dice', async () => {
+  const r = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'] });
   assert.equal(r.k, 0, r.testo);
   assert.deepEqual(r.lanci, [{ cartella: '/srv/functions', args: ['claude/x'], pratica: '#910' }]);
   assert.equal(r.scritture.length, 3, r.scritture.join('\n'));
   assert.ok(!r.scritture[0].includes('resolvedInVersion'), 'la prima scrittura è la presa in carico');
-  assert.match(r.scritture[1], /updateMask\.fieldPaths=localMerges\.server$/, 'poi la parte del server, su main');
+  assert.match(r.scritture[1], /fieldPaths=localMerges\.server&updateMask\.fieldPaths=localMerges\.solo$/, 'poi la parte del server, sola');
   assert.ok(r.scritture[2].includes('resolvedInVersion'), 'l’ultima chiude la pratica');
   assert.match(r.testo, /Pratica #910 chiusa/);
+});
+
+test('senza --solo-server e senza un ramo dell’app in vista la pratica resta aperta, e si dice come chiuderla', async () => {
+  const r = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p'] });
+  assert.equal(r.k, 0, r.testo);
+  assert.equal(r.scritture.length, 3);
+  assert.match(r.scritture[1], /updateMask\.fieldPaths=localMerges\.server$/, 'la parte del server, senza «solo»');
+  assert.ok(r.scritture.every((u) => !u.includes('resolvedInVersion')), 'non si chiude');
+  assert.match(r.testo, /resta aperta: manca la parte dell’app, la chiude la fusione di quella parte \(npm run finish -- --feedback 910\)/);
+  assert.match(r.testo, /npm run server:fondi -- claude\/x --feedback 910 --solo-server/);
+  const prova = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--dry-run'] });
+  assert.match(prova.testo, /resterebbe aperta/);
+});
+
+test('--solo-server con un ramo dell’app legato alla pratica: lo dice, e la chiude come richiesto', async () => {
+  const r = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], ramiAperti: ['claude/app'] });
+  assert.equal(r.k, 0, r.testo);
+  assert.match(r.testo, /claude\/app dell'app è legato a questa pratica/);
+  assert.ok(r.scritture.at(-1).includes('resolvedInVersion'));
 });
 
 test('se il server si ferma la pratica resta in lavorazione, con la nota del motivo', async () => {
@@ -141,7 +162,8 @@ test('pratica chiusa da poco dalla fusione dell’app dello stesso lavoro: il se
   const prova = await giro({ docs: { p: d }, argv: ['claude/x', '--feedback', 'p', '--dry-run'] });
   assert.equal(prova.k, 0, prova.testo);
   assert.deepEqual(prova.scritture, []);
-  assert.match(prova.testo, /resterebbe chiusa/);
+  assert.match(prova.testo, /non si riapre e, a fusione riuscita, resterebbe chiusa/);
+  assert.doesNotMatch(prova.testo, /andrebbe in lavorazione/);
 
   const r = await giro({ docs: { p: d }, argv: ['claude/x', '--feedback', 'p'], ramiAperti: ['claude/app'] });
   assert.equal(r.k, 0, r.testo);
