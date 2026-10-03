@@ -47,14 +47,19 @@ test('prova interrotta, poi la pulizia che git stesso suggerisce sul worktree ri
 const punta = ${JSON.stringify(git(repo, 'rev-parse', 'HEAD'))};
 L.provaUnitSullaFusione({ root: ${JSON.stringify(repo)}, punta, scrivi: () => {} });`;
   const figlio = spawn(process.execPath, ['--input-type=module', '-e', script], { cwd: repo, stdio: 'ignore', detached: process.platform !== 'win32' });
+  // La cartella della prova si cerca dove la prova la crea, la temporanea di sistema, dal pid che ci scrive: non
+  // dall'elenco dei worktree, che è un modo di farla e non quello che l'owner vede.
   let resto = '';
   const fine = Date.now() + 60_000;
   while (Date.now() < fine) {
-    const l = git(repo, 'worktree', 'list', '--porcelain').split(/\r?\n/).filter((r) => r.startsWith('worktree ')).map((r) => r.slice(9));
-    resto = l.find((p) => /filo-fusione-/.test(p)) || '';
+    for (const n of readdirSync(tmpdir()).filter((x) => /^filo-fusione-/.test(x))) {
+      const base = join(tmpdir(), n);
+      try { if (readFileSync(join(base, 'pid'), 'utf8').trim() === String(figlio.pid)) resto = join(base, 'fusione'); } catch (_) { /* non è la nostra */ }
+    }
     if (resto && existsSync(join(resto, 'node_modules'))) break;
     await new Promise((r) => setTimeout(r, 300));
   }
+  if (!resto) uccidi(figlio.pid);
   expect(resto, 'la prova non è partita').not.toBe('');
   await new Promise((r) => setTimeout(r, 1500));
   uccidi(figlio.pid);
