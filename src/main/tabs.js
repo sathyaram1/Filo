@@ -218,7 +218,7 @@ const TAB_ROW_HEIGHT = 40;
 // (taglia/copia/incolla) invece di restare inerte, es. nell'editor.
 const NATIVE_MENU_PAGES = [
   'filo://options/', 'filo://preferences/', 'filo://security/', 'filo://history/',
-  'filo://feedback/', 'filo://spellcheck/', 'filo://editor/', 'filo://admin-defaults/',
+  'filo://spellcheck/', 'filo://editor/', 'filo://admin-defaults/',
   'filo://manage/',
 ];
 
