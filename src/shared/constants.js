@@ -2686,6 +2686,7 @@
     PRODUCER_ONLY_MODELS,
     producerOnlyRule,
     servedPolicyViolation,
+    hostPolicyViolation,
     missingExcludedProviders,
     providerIgnoreList,
     excludedProviderReasons,
