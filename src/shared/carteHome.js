@@ -123,26 +123,32 @@
     avviso: ['avviso', 'avvisi', 'notifica', 'notifiche'], lavoro: ['lavoro', 'lavori', 'comando'], crediti: ['crediti'],
   };
   // Le carte di sinistra che l'utente intende con un nome («l'avviso del backup», «gli avvisi», la chiave della
-  // carta). `perTipo`: il nome era il tipo, quindi valgono tutte quelle di quel tipo.
+  // carta). `perTipo`: il nome era solo il tipo, quindi valgono tutte quelle di quel tipo. `tipo`: il nome ne
+  // nomina uno, quindi la carta cercata è di sinistra anche se non si trova.
+  const VUOTE = ['del', 'dei', 'della', 'delle', 'dello', 'degli', 'per', 'con', 'che', 'dalla', 'home'];
   function trovaSinistra(nome, voci) {
+    const tutte = lista(voci);
     const raw = String(nome == null ? '' : nome).trim();
-    const esatta = lista(voci).find((v) => v.chiave === raw);
-    if (esatta) return { voci: [esatta], perTipo: false };
+    const esatta = tutte.find((v) => v.chiave === raw);
+    if (esatta) return { voci: [esatta], perTipo: false, tipo: esatta.tipo };
     const s = pulisciNome(raw).replace(/^(de(i|gli|ll[ae']?|l)|di)\s*/, '');
-    if (!s) return { voci: [], perTipo: false };
-    const tit = (v) => senzaAccenti(v.titolo);
+    if (!s) return { voci: [], perTipo: false, tipo: null };
     for (const [tipo, nomi] of Object.entries(TIPI_SINISTRA)) {
-      if (nomi.includes(s)) return { voci: lista(voci).filter((v) => v.tipo === tipo), perTipo: true };
+      if (nomi.includes(s)) return { voci: tutte.filter((v) => v.tipo === tipo), perTipo: true, tipo };
     }
-    let trovate = lista(voci).filter((v) => tit(v) === s);
-    if (!trovate.length) trovate = lista(voci).filter((v) => tit(v).length > 1 && (tit(v).includes(s) || s.includes(tit(v))));
+    const tit = (v) => senzaAccenti(v.titolo);
+    const parole = s.split(/[^a-z0-9]+/).filter((w) => w.length > 2);
+    const tipo = (Object.entries(TIPI_SINISTRA).find(([, nomi]) => nomi.some((n) => parole.includes(n) || s.includes(`${n} `))) || [null])[0];
+    const candidate = tipo ? tutte.filter((v) => v.tipo === tipo) : tutte;
+    let trovate = candidate.filter((v) => tit(v) === s);
+    if (!trovate.length) trovate = candidate.filter((v) => tit(v).length > 1 && (tit(v).includes(s) || s.includes(tit(v))));
     if (!trovate.length) {
-      // «l'avviso del backup»: via il tipo davanti, restano le parole che contano.
-      const parole = s.split(/[^a-z0-9]+/).filter((w) => w.length > 2 && !Object.values(TIPI_SINISTRA).flat().includes(w)
-        && !['del', 'dei', 'della', 'delle', 'dello', 'degli', 'per', 'con', 'che'].includes(w));
-      if (parole.length) trovate = lista(voci).filter((v) => parole.every((w) => tit(v).includes(w)));
+      const piene = parole.filter((w) => !VUOTE.includes(w) && !Object.values(TIPI_SINISTRA).flat().includes(w));
+      if (piene.length) trovate = candidate.filter((v) => piene.every((w) => tit(v).includes(w)));
+      // «togli lo scaricamento» detto con altre parole: se di quel tipo ce n'è uno solo, è quello.
+      if (!trovate.length && tipo && candidate.length === 1) trovate = candidate;
     }
-    return { voci: trovate, perTipo: false };
+    return { voci: trovate, perTipo: false, tipo };
   }
 
   // Mette `id` prima di `prima` (null = in fondo). Un `prima` che non c'è vale «in fondo».

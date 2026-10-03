@@ -27,6 +27,7 @@ const inFlightStreams = new Map(); // requestId → AbortController
 // possiede: i comandi successivi della stessa scheda riusano lo stesso
 // processo (variabili, $env, cwd persistono). Muore alla chiusura della scheda.
 const shellSessions = new Map(); // webContents.id → sessione shell persistente
+const comandiInCorso = new Map(); // webContents.id → chiude la carta del comando nella home (#870)
 
 // La finestra di Filo di cui `wc` è la barra, o null. Essere il frame principale di una
 // finestra non basta: un popup di accesso è una finestra vera con dentro un sito (#589.3).
@@ -217,7 +218,7 @@ function registerIpcHandlers() {
   // Esegue un comando in streaming su una shell PERSISTENTE per scheda. SOLO
   // per le pagine interne fidate (filo://): le pagine web esterne NON devono
   // poter avviare una shell.
-  ipcMain.handle('shell:start', (event, { execId, command, cwd, shell } = {}) => {
+  ipcMain.handle('shell:start', (event, { execId, command, cwd, shell, chat } = {}) => {
     const url = event.sender.getURL() || '';
     if (!url.startsWith('filo://')) return { ok: false, error: 'forbidden' };
     if (!execId || typeof command !== 'string') return { ok: false, error: 'bad-args' };
@@ -249,6 +250,9 @@ function registerIpcHandlers() {
     // una frase di Filo, e la porta delle uscite deve saperlo (#810). Si tiene la coda, dove finisce l'esito.
     const stampato = [];
     let quanto = 0;
+    const fineLavoro = require('./services/lavoriInCorso').inizia({ tipo: 'comando', chat, testo: command, wc: event.sender });
+    comandiInCorso.set(key, fineLavoro);
+    const chiudi = () => { fineLavoro(); if (comandiInCorso.get(key) === fineLavoro) comandiInCorso.delete(key); };
     session.exec(command, {
       onData: (d) => {
         const pezzo = String((d && d.chunk) || '');
@@ -257,8 +261,8 @@ function registerIpcHandlers() {
         while (quanto > MAX_STAMPATO && stampato.length > 1) quanto -= stampato.shift().length;
         send('data', d);
       },
-      onExit: (e) => { SegretiLetti.ricorda(stampato.join(''), "dall'output di un comando"); send('exit', e); },
-      onError: (e) => send('error', e),
+      onExit: (e) => { chiudi(); SegretiLetti.ricorda(stampato.join(''), "dall'output di un comando"); send('exit', e); },
+      onError: (e) => { chiudi(); send('error', e); },
     });
     return { ok: true };
   });
@@ -309,6 +313,8 @@ function registerIpcHandlers() {
   // dashboard (che la ripassa). Le variabili impostate prima dello Stop vanno
   // perse: è il compromesso per un'interruzione affidabile su Windows.
   ipcMain.on('shell:abort', (event) => {
+    const fine = comandiInCorso.get(event.sender.id);
+    if (fine) { fine(); comandiInCorso.delete(event.sender.id); }
     const s = shellSessions.get(event.sender.id);
     if (s) { try { s.kill(); } catch (_) {} shellSessions.delete(event.sender.id); }
   });

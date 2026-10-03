@@ -110,12 +110,65 @@ test('i promemoria di sinistra hanno un tetto e cade il più vecchio', () => {
   assert.ok(!l.nascoste.includes('download:0'));
 });
 
-test('lo strumento della chat conosce esattamente le carte del catalogo', () => {
+test('lo strumento della chat nomina ogni carta di destra e accetta anche quelle di sinistra', () => {
   const def = globalThis.SN_ACTION_TOOLS.definitions().find((d) => d.function.name === 'CARTA_HOME');
   assert.ok(def, 'manca lo strumento CARTA_HOME');
   const p = def.function.parameters.properties;
-  assert.deepEqual(p.carta.enum, C.IDS);
-  assert.deepEqual(p.prima_di.enum, C.IDS);
+  for (const id of C.IDS) assert.match(p.carta.description, new RegExp(`\\b${id} =`), `la chat non conosce la carta ${id}`);
+  // Un elenco chiuso rifiuterebbe «l'avviso del backup» prima ancora di arrivare al main.
+  assert.equal(p.carta.enum, undefined);
+  assert.equal(p.prima_di.enum, undefined);
+  assert.match(def.function.description, /sinistra/);
+});
+
+test('la colonna di sinistra ha lo stesso ordine per la home e per la chat', () => {
+  const ora = Date.parse('2026-10-03T12:00:00Z');
+  const iso = (ms) => new Date(ora + ms).toISOString();
+  const dati = {
+    timers: [
+      { id: 't2', label: 'Forno', endsAt: iso(600e3) },
+      { id: 't1', label: 'Pasta', endsAt: iso(60e3) },
+      { id: 's1', kind: 'alarm', label: 'palestra', endsAt: iso(-1e3), ringing: true },
+    ],
+    notifiche: [{ id: 'n1', text: 'Il backup delle foto è finito.' }],
+    downloads: [
+      { id: 'd1', state: 'completed', filename: 'preventivo.pdf', endedAt: iso(-60e3) },
+      { id: 'd2', state: 'progressing', filename: 'video.mp4' },
+      { id: 'd3', state: 'completed', filename: 'vecchio.zip', endedAt: iso(-2 * 864e5) },
+    ],
+    lavori: [{ id: 'risposta-1', tipo: 'risposta', chat: 'c1', testo: 'confronta i preventivi', iniziato: ora }],
+    crediti: true,
+  };
+  const chiavi = (l) => C.sinistra(dati, l, ora).map((v) => v.chiave);
+  assert.deepEqual(chiavi(null), [
+    'crediti', 'timer:s1', 'lavoro:risposta-1', 'download:d2', 'timer:t1', 'timer:t2', 'avviso:n1', 'download:d1',
+  ]);
+  // L'ordine scelto dall'utente vale sotto quello che suona; una carta nascosta non c'è.
+  const l = C.applica(C.applica(null, { tipo: 'ordina-sinistra', ordine: ['avviso:n1', 'timer:t2'] }).layout, { tipo: 'nascondi', chiave: 'download:d1' }).layout;
+  assert.deepEqual(chiavi(l).slice(0, 4), ['crediti', 'timer:s1', 'lavoro:risposta-1', 'download:d2']);
+  assert.ok(chiavi(l).indexOf('avviso:n1') < chiavi(l).indexOf('timer:t2'));
+  assert.ok(!chiavi(l).includes('download:d1'));
+});
+
+test('una carta di sinistra si trova dalle parole dell’utente, senza confondersi con quelle di destra', () => {
+  const sx = C.sinistra({
+    timers: [{ id: 't1', label: 'Pasta', endsAt: new Date(Date.now() + 6e4).toISOString() }],
+    notifiche: [{ id: 'n1', text: 'Il backup delle foto è finito.' }, { id: 'n2', text: 'Aggiornamento pronto' }],
+    downloads: [{ id: 'd1', state: 'completed', filename: 'preventivo.pdf', endedAt: new Date().toISOString() }],
+  }, null);
+  const trova = (q) => C.trovaSinistra(q, sx);
+  assert.deepEqual(trova('avviso:n2').voci.map((v) => v.chiave), ['avviso:n2']);
+  assert.deepEqual(trova('l’avviso del backup').voci.map((v) => v.chiave), ['avviso:n1']);
+  assert.deepEqual(trova("l'avviso del backup").voci.map((v) => v.chiave), ['avviso:n1']);
+  assert.deepEqual(trova('gli avvisi').voci.map((v) => v.chiave), ['avviso:n1', 'avviso:n2']);
+  assert.equal(trova('gli avvisi').perTipo, true);
+  assert.deepEqual(trova('lo scaricamento del file').voci.map((v) => v.chiave), ['download:d1']);
+  assert.deepEqual(trova('preventivo').voci.map((v) => v.chiave), ['download:d1']);
+  assert.deepEqual(trova('il timer della pasta').voci.map((v) => v.chiave), ['timer:t1']);
+  assert.deepEqual(trova('mazzi').voci, []);
+  // «lo scaricamento del file»: fra i nomi dell'Editor c'è «file», ma esatto non lo è.
+  assert.equal(C.risolvi('lo scaricamento del file', { esatto: true }), null);
+  assert.equal(C.risolvi('la carta dei mazzi', { esatto: true }), 'mazzi');
 });
 
 test('l’azione è di livello 1 e la descrizione usa il nome che l’utente vede', () => {
@@ -153,7 +206,7 @@ test('due mosse quasi insieme non si cancellano: il main le mette in fila', asyn
 
 test('i canali delle carte rispondono solo alle pagine di Filo', () => {
   const src = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers', 'filo.js'), 'utf8');
-  for (const tipo of ['CARTE_HOME_GET', 'CARTE_HOME_MODIFICA', 'EDITOR_RECENTI']) {
+  for (const tipo of ['CARTE_HOME_GET', 'CARTE_HOME_MODIFICA', 'EDITOR_RECENTI', 'LAVORI_IN_CORSO']) {
     assert.match(src, new RegExp(`on\\(MSG\\.${tipo}, soloFilo\\(`), `${tipo} risponde anche a un sito`);
   }
 });

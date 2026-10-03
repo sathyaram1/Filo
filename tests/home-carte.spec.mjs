@@ -46,8 +46,9 @@ const manda = (page, msg) => page.evaluate((m) => new Promise((ok) => chrome.run
 const MSG = (page) => page.evaluate(() => window.SN_MSG.MSG);
 const ordineDestra = (page) => page.locator('#tieni > .dash-carta').evaluateAll((ns) => ns.map((n) => n.dataset.chiave));
 
-async function modelloFinto(app, risposte) {
-  await app.evaluate(async (_e, risp) => {
+// `ritardoMs`: quanto ci mette il modello finto a rispondere (un lavoro lungo).
+async function modelloFinto(app, risposte, ritardoMs = 0) {
+  await app.evaluate(async (_e, { risp, ritardo }) => {
     const C = globalThis.SN_CONST;
     // Col modello pronto partirebbe l'intervista di benvenuto: qui l'utente è già stato accolto.
     await chrome.storage.local.set({ filo_onboarding: { done: true } });
@@ -60,11 +61,12 @@ async function modelloFinto(app, risposte) {
     globalThis.__giro = 0;
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onDelta }) => {
       const r = risp[Math.min(globalThis.__giro++, risp.length - 1)];
+      if (ritardo) await new Promise((ok) => setTimeout(ok, ritardo));
       const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {}, reasoningDetails: [] };
       if (r.testo) { try { onDelta && onDelta(r.testo); } catch (_) {} }
       return { ...base, text: r.testo || '', toolCalls: r.strumenti || [], finishReason: r.strumenti ? 'tool_calls' : 'stop' };
     };
-  }, risposte);
+  }, { risp: risposte, ritardo: ritardoMs });
 }
 
 test('il timer chiesto in chat ha la sua carta a sinistra: conta, scade e il clic riapre lo scambio', async ({ app }) => {
@@ -315,4 +317,72 @@ test('foto della home a carte, chiara e scura, ferma, col menu e in conversazion
   const fuori = await page.locator('.dash-carta').evaluateAll((ns) => ns.filter((n) => n.scrollWidth > n.clientWidth + 1).length);
   expect(fuori, 'una carta ha contenuto che esce di lato').toBe(0);
   await page.screenshot({ path: join(SHOTS, `home-carte-stretta${scala}.png`) });
+});
+
+test('anche le carte di sinistra si chiedono a Filo: un avviso si chiude, un timer va in cima', async ({ app }) => {
+  test.setTimeout(60_000);
+  const page = await home(app);
+  await app.evaluate(async () => {
+    await globalThis.SN_FILO_MEMORY.addNotification({ kind: 'info', text: 'Il backup delle foto è finito.' });
+    await globalThis.SN_FILO_MEMORY.addTimer({ label: 'Pasta', seconds: 60 });
+    await globalThis.SN_FILO_MEMORY.addTimer({ label: 'Forno', seconds: 900 });
+  });
+  // Con la chiave la carta dei Crediti non c'è: nella colonna resta solo quello che succede.
+  await modelloFinto(app, [
+    { strumenti: [{ id: 'c1', name: 'CARTA_HOME', arguments: '{"operazione":"togli","carta":"l\'avviso del backup"}' }] },
+    { strumenti: [{ id: 'c2', name: 'CARTA_HOME', arguments: '{"operazione":"sposta","carta":"il timer del forno","verso":"cima"}' }] },
+    { testo: 'Fatto: avviso chiuso e forno in cima.' },
+  ]);
+  await page.reload();
+  await home(app);
+  const avviso = page.locator('#accade .dash-carta[data-tipo="avviso"]', { hasText: 'backup delle foto' });
+  await expect(avviso).toBeVisible();
+  const ordineSinistra = () => page.locator('#accade > .dash-carta').evaluateAll((ns) => ns.map((n) => n.querySelector('.dash-carta-tit').textContent));
+  await expect.poll(ordineSinistra).toEqual(['Pasta', 'Forno', 'Filo']);
+
+  await page.locator('#input').fill('chiudi l’avviso del backup e metti il forno in cima');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'avviso chiuso' })).toBeVisible({ timeout: 10_000 });
+  await expect(avviso).toHaveCount(0);
+  await expect.poll(ordineSinistra).toEqual(['Forno', 'Pasta']);
+  // Lo sa anche il registro: chiuso è chiuso, non solo nascosto da questa scheda.
+  expect(await app.evaluate(async () => (await globalThis.SN_FILO_MEMORY.listNotifications()).length)).toBe(0);
+});
+
+test('un lavoro lungo in un’altra scheda compare a sinistra; «Vai» porta lì, e finito sparisce', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  const a = await home(app);
+  await modelloFinto(app, [{ testo: 'Ecco il confronto fra i tre preventivi.' }], 9_000);
+  await a.locator('#input').fill('confronta i tre preventivi che ti ho mandato');
+  await a.locator('#sendBtn').click();
+  // Nella scheda che lavora la risposta si vede già al centro: lì la carta non serve.
+  await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/'));
+  let b = null;
+  await expect.poll(() => { b = app.windows().find((w) => w !== a && w.url().startsWith('filo://newtab')); return !!b; }).toBe(true);
+  await b.waitForLoadState('domcontentloaded');
+  const carta = b.locator('#accade .dash-carta[data-tipo="lavoro"]');
+  await expect(carta).toBeVisible({ timeout: 8_000 });
+  await expect(carta.locator('.dash-carta-tit')).toHaveText('Filo sta lavorando');
+  await expect(carta.locator('.dash-carta-stato')).toHaveText('confronta i tre preventivi che ti ho mandato');
+  await expect(a.locator('#accade .dash-carta[data-tipo="lavoro"]')).toHaveCount(0);
+
+  await carta.locator('.dash-carta-az.principale').click();
+  // «Vai» riporta alla scheda della conversazione, non ne apre una copia qui.
+  await expect.poll(() => shell.evaluate(() => [...document.querySelectorAll('.tab')].findIndex((t) => t.classList.contains('active')))).toBe(0);
+  await expect(b.locator('#threadView')).toBeHidden();
+  await expect(a.locator('.dash-bubble-filo', { hasText: 'confronto fra i tre preventivi' })).toBeVisible({ timeout: 15_000 });
+  await expect(b.locator('#accade .dash-carta[data-tipo="lavoro"]')).toHaveCount(0);
+});
+
+test('sulle carte di destra il clic fa quello che fa Invio', async ({ app }) => {
+  const page = await home(app);
+  await page.locator('#tieni .dash-carta[data-tipo="editor"]').click({ position: { x: 150, y: 20 } });
+  await finestraCon(app, 'filo://editor/editor.html');
+});
+
+test('senza chiave la home non indica pagine salvate che non ci sono', async ({ app }) => {
+  const page = await home(app);
+  const msg = page.locator('#homeMessage');
+  await expect(msg).toContainText('Crediti', { timeout: 10_000 });
+  await expect(msg).not.toContainText('pagine salvate');
 });

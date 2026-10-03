@@ -34,10 +34,12 @@ module.exports = function register(on, ctx) {
   };
 
   on(MSG.FILO_CHAT, soloFilo(async (msg, sender) => {
+    let fineLavoro = () => {};
     try {
       // #525 — `chatId` è la targa della conversazione in corso: il main ci
       // scrive dentro il messaggio dell'utente e la risposta, turno per turno.
       const chatId = msg.chatId || null;
+      fineLavoro = require('../lavoriInCorso').inizia({ tipo: 'risposta', chat: chatId, testo: msg.userMessage, wc: sender && sender.wc });
       const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images, reasoningReqId: msg.reasoningReqId, internal: !!msg.internal, daModello: !!msg.daModello, chatId, sender });
       return { ok: true, ...r };
     } catch (e) {
@@ -58,6 +60,8 @@ module.exports = function register(on, ctx) {
       const W = globalThis.SN_WALLET;
       const keyRefused = Boolean(W && typeof W.keyRefusalOf === 'function' && W.keyRefusalOf(e));
       return { ok: false, error, code: (e && e.code) || 'UNKNOWN', status: Number(e && e.status) || 0, keyRefused, actions };
+    } finally {
+      fineLavoro();
     }
   }));
 
@@ -464,6 +468,7 @@ module.exports = function register(on, ctx) {
     if (esito.cambiato) ctx.broadcastToFiloPages({ type: MSG.CARTE_HOME_CAMBIATE, layout: esito.layout });
     return { ok: true, layout: esito.layout };
   }));
+  on(MSG.LAVORI_IN_CORSO, soloFilo(async () => ({ ok: true, lavori: require('../lavoriInCorso').elenco() })));
   on(MSG.EDITOR_RECENTI, soloFilo(async () => require('../editorFiles').recenti()));
 
   // F4 — Annulla un auto-feedback appena inviato (undo dal toast).

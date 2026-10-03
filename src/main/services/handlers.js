@@ -2350,8 +2350,19 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         const tipo = { togli: 'togli', rimetti: 'aggiungi', aggiungi: 'aggiungi', sposta: 'sposta', ripristina: 'ripristina' }[op];
         if (!tipo) return { executed: false, kept: false, output: { error: 'operazione sconosciuta' } };
         const verso = String(action.verso ?? '').trim().toLowerCase().replace('giù', 'giu') || undefined;
+        const CH = globalThis.SN_CARTE_HOME;
+        // Una carta di sinistra si cerca prima per chiave, poi un nome esatto di destra, poi per nome a sinistra:
+        // «lo scaricamento del file» non deve finire sull'Editor, che fra i suoi nomi ha «file».
+        if (tipo !== 'ripristina') {
+          const sx = await carteSinistraPerChat(sender);
+          const perChiave = sx.find((v) => v.chiave === String(action.carta ?? '').trim());
+          if (perChiave || !CH.risolvi(action.carta, { esatto: true })) {
+            const trovate = perChiave ? { voci: [perChiave], perTipo: false, tipo: perChiave.tipo } : CH.trovaSinistra(action.carta, sx);
+            if (trovate.voci.length || trovate.tipo || !CH.risolvi(action.carta)) return cartaSinistraDaChat({ tipo, verso, action, sx, trovate });
+          }
+        }
         const esito = await require('./carteHome').modifica({ tipo, carta: action.carta, verso, prima: action.prima_di ?? null });
-        const dove = globalThis.SN_CARTE_HOME.descrivi(esito.layout);
+        const dove = CH.descrivi(esito.layout);
         if (esito.errore) return { executed: false, kept: false, output: { error: esito.errore, ...dove } };
         if (esito.cambiato) broadcastToFiloPages({ type: MSG.CARTE_HOME_CAMBIATE, layout: esito.layout });
         return { executed: true, kept: true, output: dove };
@@ -3777,6 +3788,80 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
 }
 
 // Messaggio "senza chiave API": istantaneo, dalle pagine salvate. Niente LLM.
+// ===== Le carte di sinistra della home dalla chat (#870) =====
+// La chat vede la colonna come la home: stesse carte, stesso ordine (SN_CARTE_HOME.sinistra). Senza chiave la
+// chat non risponde, quindi la carta dei Crediti qui non c'è.
+async function carteSinistraPerChat(sender) {
+  const CH = globalThis.SN_CARTE_HOME;
+  let downloads = [];
+  try {
+    const DL = require('./downloads');
+    downloads = DL.list(DL.scopeOfWindow(sender && sender.win)) || [];
+  } catch (_) {}
+  const [timers, notifiche, layout] = await Promise.all([
+    FiloMem.gcTimers().catch(() => []),
+    FiloMem.listNotifications().catch(() => []),
+    require('./carteHome').leggi(),
+  ]);
+  const lavori = require('./lavoriInCorso').elenco();
+  return CH.sinistra({ timers, notifiche, downloads, lavori }, layout);
+}
+
+async function cartaSinistraDaChat({ tipo, verso, action, sx, trovate }) {
+  const CH = globalThis.SN_CARTE_HOME;
+  const Carte = require('./carteHome');
+  const elenco = (voci) => voci.map((v) => ({ carta: v.chiave, tipo: v.tipo, titolo: v.titolo }));
+  const no = (error) => ({ executed: false, kept: false, output: { error, sinistra: elenco(sx), ...CH.descrivi(null) } });
+  const voci = trovate.voci;
+  if (!voci.length) return no('carta sconosciuta: scegli fra queste (carta = la chiave)');
+  if (voci.length > 1 && !(trovate.perTipo && tipo === 'togli')) {
+    return { executed: false, kept: false, output: { error: 'più carte con quel nome: quale?', candidate: elenco(voci) } };
+  }
+  if (tipo === 'aggiungi') return no('le carte di sinistra non si rimettono: «ripristina» fa tornare quelle nascoste');
+  if (tipo === 'togli') {
+    if (voci.some((v) => v.tipo === 'timer' || v.tipo === 'sveglia')) {
+      return no('un timer o una sveglia si tolgono con CANCELLA_SVEGLIA');
+    }
+    let avvisi = 0;
+    for (const v of voci) {
+      if (v.tipo === 'avviso') { await FiloMem.dismissNotification(v.ref.id); avvisi++; }
+      else {
+        const esito = await Carte.modifica({ tipo: 'nascondi', chiave: v.chiave });
+        if (esito.cambiato) broadcastToFiloPages({ type: MSG.CARTE_HOME_CAMBIATE, layout: esito.layout });
+      }
+    }
+    if (avvisi) broadcastLiveUpdate();
+    return { executed: true, kept: true, output: { tolte: elenco(voci) } };
+  }
+  // sposta: la nuova posizione nell'ordine che l'utente vede.
+  const v = voci[0];
+  const ordine = sx.map((x) => x.chiave).filter((k) => k !== v.chiave);
+  const at = sx.findIndex((x) => x.chiave === v.chiave);
+  let dove;
+  if (action.prima_di != null) {
+    const rif = sx.find((x) => x.chiave === String(action.prima_di)) || CH.trovaSinistra(action.prima_di, sx).voci[0];
+    if (!rif || rif.chiave === v.chiave) return no('la carta di riferimento non è a sinistra');
+    dove = ordine.indexOf(rif.chiave);
+  } else if (verso === 'cima') dove = 0;
+  else if (verso === 'fondo') dove = ordine.length;
+  else if (verso === 'su') dove = Math.max(0, at - 1);
+  else if (verso === 'giu') dove = Math.min(ordine.length, at + 1);
+  else return no('verso sconosciuto');
+  ordine.splice(dove, 0, v.chiave);
+  const esito = await Carte.modifica({ tipo: 'ordina-sinistra', ordine });
+  if (esito.errore) return no(esito.errore);
+  if (esito.cambiato) broadcastToFiloPages({ type: MSG.CARTE_HOME_CAMBIATE, layout: esito.layout });
+  return { executed: true, kept: true, output: { spostata: v.titolo, sinistra: elenco(ordinaCome(sx, esito.layout)) } };
+}
+
+function ordinaCome(sx, layout) {
+  const CH = globalThis.SN_CARTE_HOME;
+  const per = (t) => sx.filter((x) => x.tipo === t).map((x) => x.ref);
+  return CH.sinistra({
+    timers: [...per('timer'), ...per('sveglia')], notifiche: per('avviso'), downloads: per('download'), lavori: per('lavoro'),
+  }, layout);
+}
+
 function buildNoKeyDashboard(settings, saved) {
   const suggestions = saved.slice(0, 5).map((p) => ({
     icon: 'link', text: p.title || p.url,
@@ -3794,7 +3879,7 @@ function buildNoKeyDashboard(settings, saved) {
   }
   const message = settings.apiKeys?.openrouter
     ? 'Buongiorno. Filo è qui.'
-    : 'Per attivare Filo serve un codice d\'invito: riscattalo nella pagina Crediti e ricevi i crediti per usare i modelli. Se preferisci, lì puoi mettere una tua chiave OpenRouter. Intanto, le tue pagine salvate sono qui.';
+    : `Per attivare Filo serve un codice d'invito: riscattalo nella pagina Crediti e ricevi i crediti per usare i modelli. Se preferisci, lì puoi mettere una tua chiave OpenRouter.${saved.length ? ' Intanto, le tue pagine salvate sono fra i suggerimenti.' : ''}`;
   return { message, suggestions };
 }
 
