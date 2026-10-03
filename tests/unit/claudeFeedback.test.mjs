@@ -416,3 +416,46 @@ test('#914 una routine si riconosce dalla dichiarazione, dal biglietto o dal ruo
   writeRole(vuota, 'new-work');
   assert.equal(isRoutineInstance(vuota, { env: {} }), true, 'il ruolo scritto da dispatch');
 });
+
+test('#914 la priorità scelta parte col documento, e senza scelta non se ne inventa una', async () => {
+  SCRIPT.credenziale.ottieni = async () => ({ idToken: 'tok-owner' });
+  try {
+    await conSubmit(async (_p, opts) => ({ id: 'd', seq: 4, senderProof: opts && opts.idToken ? 'admin' : '' }), async (visti) => {
+      const out = [];
+      const orig = console.log;
+      console.log = (...a) => out.push(a.join(' '));
+      try {
+        assert.equal(await SCRIPT.main(['T', 'X', '--non-locale', '--priorita', '0']), SCRIPT.EXIT.FATTO);
+        assert.equal(await SCRIPT.main(['T', 'X', '--non-locale']), SCRIPT.EXIT.FATTO);
+      } finally { console.log = orig; }
+      assert.equal(visti.opts[0].priority, 0, 'lo 0 è una priorità da scrivere');
+      assert.equal('priority' in visti.opts[1], false);
+      assert.match(out.join('\n'), /Priorità 0 impostata/);
+      assert.match(out.join('\n'), /la decide il giudice di priorità/);
+    });
+  } finally {
+    SCRIPT.credenziale.ottieni = CRED_FINTA;
+  }
+});
+
+test('#914 la create admin porta priorità cifrata e priorityManual; la create anonima no', async () => {
+  const corpi = [];
+  const origFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    if (init.method === 'POST' && /\/feedback\?/.test(String(url))) {
+      corpi.push({ auth: !!(init.headers && init.headers.Authorization), body: JSON.parse(init.body) });
+      return { ok: true, status: 200, json: async () => ({ name: 'projects/p/databases/(default)/documents/feedback/x' }), text: async () => '' };
+    }
+    return { ok: false, status: 404, json: async () => ({}), text: async () => '' };
+  };
+  try {
+    await FB.submit({ text: 't', clientId: 'local:claude', name: 'n' }, { idToken: 'tok', soloAdmin: true, priority: 2 });
+    await FB.submit({ text: 't', clientId: 'utente', name: 'n' }, { priority: 2 });
+  } finally { globalThis.fetch = origFetch; }
+  const admin = corpi.find((c) => c.auth);
+  const anonimo = corpi.find((c) => !c.auth);
+  assert.ok(admin && anonimo, 'due create, una autenticata e una no');
+  assert.match(admin.body.fields.priority.stringValue, /^FENC1:/, 'cifrata: il documento è pubblico');
+  assert.equal(admin.body.fields.priorityManual.booleanValue, true);
+  assert.equal('priority' in anonimo.body.fields, false, 'il create anonimo non la ammette');
+});

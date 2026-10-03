@@ -62,3 +62,19 @@ test('i tre ruoli di chi risolve dicono come rimandare un lavoro che si fa solo 
     assert.match(t, /le\s+routine non ne aprono/, ruolo);
   }
 });
+
+test('«richiede lavoro locale» dice il vero secondo chi ha aperto il feedback', () => {
+  const rimandato = (over) => ({ status: 'design', statusReason: 'locale', notes: 'Richiede lavoro locale.', ...over });
+  const owner = MR.judgesNote(rimandato({ clientId: 'owner:me', senderProof: 'admin' })).text;
+  const sessione = MR.judgesNote(rimandato({ clientId: 'local:claude', senderProof: 'admin' })).text;
+  const routine = MR.judgesNote(rimandato({ clientId: 'routine:residuo', senderProof: 'server' })).text;
+  const utente = MR.judgesNote(rimandato({ clientId: 'utente-1' })).text;
+  const senzaProva = MR.judgesNote(rimandato({ clientId: 'owner:me' })).text;
+  for (const t of [owner, sessione]) {
+    assert.match(t, /Solo lavoro locale/);
+    assert.doesNotMatch(t, /feedback degli utenti/);
+  }
+  assert.match(routine, /routine/);
+  assert.doesNotMatch(routine, /feedback degli utenti/);
+  for (const t of [utente, senzaProva]) assert.match(t, /feedback degli utenti non si lavorano/);
+});

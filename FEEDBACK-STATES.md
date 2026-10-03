@@ -197,8 +197,8 @@ scritta dal server o dall'admin, mai per il solo nome (`functions/src/nascita.js
 
 - lavoro locale (§4b): `todo` nei Lavori locali, senza nemmeno L0;
 - sessione per le routine (`local:` + `senderProof: 'admin'`, senza segno: `claude-feedback.mjs
-  --non-locale`): L0, poi `todo` In coda (`pipeline.skipped: 'session_proven'`), senza giudice
-  di priorità (la mette la sessione con `--priorita`);
+  --non-locale`): L0, poi `todo` In coda (`pipeline.skipped: 'session_proven'`); la priorità
+  scelta con `--priorita` nasce col documento (`priorityManual`), senza scelta la decide il giudice;
 - routine (`routine:`/`agent:` + `senderProof: 'server'`: ritrovamenti, derivati, allarmi della
   costruzione): L0, poi dove dice `config/automation.routineBirth` (`pipeline.skipped:
   'routine_proven'`). `ricevuti`, o campo assente o ignoto → `aligned`; `interruttori` → `todo`
@@ -206,7 +206,9 @@ scritta dal server o dall'admin, mai per il solo nome (`functions/src/nascita.js
   altrimenti `aligned`; `coda` → `todo` con l'automatica accesa. Si cambia dalla console.
 
 Il prompt dei giudici dice che a loro arriva solo un utente: un linguaggio da sviluppatore o
-da agente è un segnale sospetto. Una ri-valutazione passa sempre dai giudici.
+da agente è un segnale sospetto. Non a un mittente provato (l'owner dall'app, la ri-valutazione
+di una routine o di una sessione): lì il tono tecnico è normale. Una ri-valutazione passa
+sempre dai giudici.
 
 Le routine non aprono lavoro locale: il canale non scrive il segno, e dentro una routine
 `claude-feedback.mjs` e `owner-feedback.mjs --solo-locale` si rifiutano. Un lavoro che si fa
