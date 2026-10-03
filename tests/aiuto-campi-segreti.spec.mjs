@@ -363,3 +363,56 @@ test('nell’immagine è coperto il numero di carta scritto in un campo dentro u
   expect(await pixelDiversi(page, immagini, { left: b.x + 3, top: b.y + 3, width: b.width - 6, height: b.height - 6 }),
     'il numero scritto nel componente si legge nell’immagine').toBe(0);
 });
+
+// Una password che il sito rende visibile resta una password anche se il campo ha un nome qualunque e la scritta
+// accanto non è legata né dice «password» in una lingua che Filo conosce.
+test('la password resa visibile dal sito non arriva al modello, né nella descrizione né nell’immagine', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, modulo('<div>Hasło</div><input id="c" name="haslo" type="password" '
+    + 'style="width:300px;font-size:18px;outline:0;caret-color:transparent"> '
+    + '<button type="button" id="occhio" onclick="c.type = c.type === \'password\' ? \'text\' : \'password\'">Mostra</button>'));
+  await superaAvvisoSeCe(page);
+  await preparaModelli(app);
+  await modelloFinto(app, [['', JSON.stringify({ text: 'Premi «Accedi».', status: 'done' })]]);
+  await apriAiuto(shell, page);
+  const immagini = [];
+  for (const [i, valore] of ['Gatto.Rosso.77', 'Mela.Verde.42'].entries()) {
+    if (i) await page.click('#occhio');
+    await expect(page.locator('#c')).toHaveAttribute('type', 'password');
+    await page.fill('#c', valore);
+    await page.click('#occhio');
+    await expect(page.locator('#c')).toHaveAttribute('type', 'text');
+    await scriviAllAiuto(page, 'non riesco ad entrare');
+    await expect.poll(() => app.evaluate(() => globalThis.__visti.length), { timeout: 20_000 }).toBe(i + 1);
+    immagini.push(await app.evaluate(() => {
+      const utente = [...globalThis.__visti.at(-1)].reverse().find((m) => m.role === 'user');
+      const parte = Array.isArray(utente.content) && utente.content.find((p) => p.type === 'image_url');
+      return parte ? parte.image_url.url : null;
+    }));
+  }
+  const testo = await arrivato(app, page);
+  expect(testo, 'la password è arrivata al modello').not.toMatch(/Gatto\.Rosso|Mela\.Verde/);
+  expect(rigaDelCampo(testo), 'il modello deve sapere quale campo è').toContain('"Hasło"');
+  expect(immagini[1]).toMatch(/^data:image\//);
+  const b = await page.locator('#c').boundingBox();
+  expect(await pixelDiversi(page, immagini, { left: b.x + 3, top: b.y + 3, width: b.width - 6, height: b.height - 6 }),
+    'la password si legge nell’immagine').toBe(0);
+});
+
+// Un campo senza nome si chiama con la scritta che lo precede, non con quello che l'utente ci ha scritto: un codice
+// monouso in un campo solo arrivava al modello come nome del campo.
+test('il codice monouso in un campo solo arriva al modello col testo che lo precede, non con le cifre', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, modulo('<p>Inserisci il codice che ti abbiamo mandato via SMS</p>'
+    + '<input id="c" maxlength="6" inputmode="numeric">'));
+  await superaAvvisoSeCe(page);
+  await page.fill('#c', '739146');
+  await preparaModelli(app);
+  await modelloFinto(app, [['', JSON.stringify({ text: 'Premi «Accedi».', status: 'done' })]]);
+  await apriAiuto(shell, page);
+  await scriviAllAiuto(page, 'non funziona');
+  await expect(page.locator('.sn-sidebar', { hasText: 'Premi «Accedi».' })).toBeVisible({ timeout: 20_000 });
+  const testo = await arrivato(app, page);
+  expect(testo, 'il codice è arrivato al modello').not.toContain('739146');
+  expect(rigaDelCampo(testo)).toContain('"Inserisci il codice che ti abbiamo mandato via SMS"');
+});

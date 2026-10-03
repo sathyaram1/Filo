@@ -952,18 +952,18 @@
   }
 
   // Le regole dei campi segreti stanno in src/shared/campiSegreti.js, le stesse che il main porta nei riquadri.
-  const Segreti = global.SN_CAMPI_SEGRETI.crea(window, (t) => !!global.SN_GUARDIANO_STATICO?.cartaValida?.(t));
-  const { campoSegreto, etichettaCollegata } = Segreti;
+  const Segreti = global.SN_CAMPI_SEGRETI.crea(window, (t) => !!global.SN_GUARDIANO_STATICO?.cartaValida?.(t), { ricorda: true });
+  const { campoSegreto, etichettaCollegata, etichettaVicina } = Segreti;
   const campiSegretiInVista = Segreti.campiInVista;
   const CAMPO_CON_VALORE = /^(INPUT|TEXTAREA|SELECT)$/;
 
   // Come chiamare un elemento descrivendolo al modello o nel registro delle azioni. Il valore di un campo
-  // serve solo quando non ha nessun nome, e mai se è segreto.
+  // serve solo quando non ha nessun nome, nemmeno il testo scritto subito prima, e mai se è segreto.
   function nomeElemento(el) {
     if (!el || el.nodeType !== 1) return '';
-    const nome = el.getAttribute?.('aria-label') || el.getAttribute?.('alt') || etichettaCollegata(el)
-      || el.getAttribute?.('placeholder') || '';
     const campo = CAMPO_CON_VALORE.test(el.tagName);
+    const nome = el.getAttribute?.('aria-label') || el.getAttribute?.('alt') || etichettaCollegata(el)
+      || el.getAttribute?.('placeholder') || (campo ? etichettaVicina(el) : '') || '';
     const valore = campo && !campoSegreto(el) ? el.value : '';
     const testo = nome || valore || (el.tagName === 'INPUT' ? '' : (el.innerText || el.textContent || ''));
     return String(testo).replace(/\s+/g, ' ').trim();
