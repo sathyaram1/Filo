@@ -186,6 +186,8 @@ export function lanciaUnit(dir, base, nome, { timeoutMs = TETTO_UNIT_MS } = {}) 
   const dest = join(base, `${nome}.jsonl`);
   const log = join(base, `${nome}.log`);
   const fd = openSync(log, 'w');
+  // Lanciata da dentro un `node --test`, questa variabile farebbe dei test provati dei figli suoi: niente rapporti.
+  const { NODE_TEST_CONTEXT: _figlio, ...env } = process.env;
   let r;
   try {
     r = spawnSync(process.execPath, [
