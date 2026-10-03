@@ -146,12 +146,12 @@ export function rapportiDaRiunire(flags, copia) {
     if (!DOCUMENTI.has(r)) accodati.push(d);
     return [`${REPORTER}=${r}`, `${DESTINAZIONE}=${daRiunire ? copia(rapporti.length - 1) : d}`];
   });
-  return { flags: [...resto, ...coppie], rapporti };
+  return { flags: [...resto, ...coppie], rapporti, accodati };
 }
 
-/** Dove sta un rapporto riunito, detto in una frase. PURA. */
+/** Dove sta un rapporto, detto in una frase. PURA. */
 export function doveRapporto(d) {
-  return d === 'stdout' ? "sull'uscita standard" : `in ${d}`;
+  return d === 'stdout' ? "sull'uscita standard" : d === 'stderr' ? "sull'uscita degli errori" : `in ${d}`;
 }
 
 /** I rapporti dei gruppi in uno: dei junit resta un documento solo, gli altri formati si accodano. PURA. */
