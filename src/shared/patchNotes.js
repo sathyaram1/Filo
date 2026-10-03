@@ -12,9 +12,11 @@
       version: '0.2.232', date: '2026-10-03',
       features: [
         'Gli avvisi in basso a destra non se ne vanno finché ci tieni sopra il puntatore, anche quelli dentro le pagine come «Copiato»: un clic li chiude, e il tasto destro offre «Chiudi» e le loro azioni. La durata scelta in Preferenze adesso vale per tutti, e durata e suono li puoi chiedere anche a Filo: «fai durare gli avvisi 10 secondi», «metti il suono carillon alle notifiche».',
+        'La pubblicità sparisce anche dove prima restava: i riquadri vuoti e le immagini rotte lasciati dagli annunci bloccati, e i banner che il sito mette da sé. Filo usa anche le liste per i siti italiani e francesi e blocca la pubblicità pure nella finestra in incognito. Il blocco si spegne e si riaccende anche chiedendolo a Filo, e vale subito anche nelle pagine già aperte.',
       ],
       fixes: [
         'Lettura ad alta voce e dettatura non partono più verso un fornitore che Filo esclude. Se il modello che hai scelto lo serve solo lui, Filo te lo dice e non manda niente.',
+        'Alcuni siti come dev.to finivano sulla pagina «Sito bloccato», e le immagini di imgur sparivano dalle pagine che le mostrano: una regola delle liste della pubblicità valeva per un pezzo del sito e Filo la applicava al sito intero. Adesso i siti si aprono e le immagini tornano.',
       ],
     },
     {
@@ -23,11 +25,9 @@
         'Nella pagina Crediti trovi il tuo pseudonimo: basta quello per ricevere un regalo di crediti.',
         'Col tasto destro sull\'avviso di un sito pericoloso puoi chiedere a Filo di quel sito o segnalare un falso allarme. Si apre una scheda nuova e il sito resta coperto.',
         'Quando un video parte con una pubblicità che si può saltare, Filo preme «Salta» da solo appena il pulsante compare, su YouTube (anche nei video incorporati in altri siti) e negli altri lettori più diffusi. Se preferisci guardarle, lo spegni in Sicurezza o chiedendolo a Filo.',
-        'La pubblicità sparisce anche dove prima restava: i riquadri vuoti e le immagini rotte lasciati dagli annunci bloccati, e i banner che il sito mette da sé. Filo usa anche le liste per i siti italiani e francesi e blocca la pubblicità pure nella finestra in incognito. Il blocco si spegne e si riaccende anche chiedendolo a Filo, e vale subito anche nelle pagine già aperte.',
       ],
       fixes: [
         'L\'avviso dei siti pericolosi e sospetti adesso sta sopra la pagina, fuori dalla sua portata, e resta lì finché non scegli tu.',
-        'Alcuni siti come dev.to finivano sulla pagina «Sito bloccato», e le immagini di imgur sparivano dalle pagine che le mostrano: una regola delle liste della pubblicità valeva per un pezzo del sito e Filo la applicava al sito intero. Adesso i siti si aprono e le immagini tornano.',
       ],
     },
     {
