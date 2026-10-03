@@ -276,7 +276,7 @@ export function provaUnitSullaFusione({ root, punta, git = gitIn(root), lancia =
       if (main.errore) return { errore: main.errore, mainSha };
       d = decidiEsito({ fusione, main });
     }
-    return { ...d, mainSha, ...(d.esito === 'rosso_sulla_fusione' ? { coda: fusione.coda } : {}) };
+    return { ...d, mainSha, ...(instabili.length ? { instabili } : {}), ...(d.esito === 'rosso_sulla_fusione' ? { coda: fusione.coda } : {}) };
   } finally {
     const rimasti = alberi.map((dir) => chiudiAlbero(git, dir)).filter((r) => !r.ok);
     if (rimasti.length) {
