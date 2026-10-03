@@ -462,6 +462,13 @@
       card.appendChild(ria);
     }
 
+    var prova = provaNote(req, now);
+    if (prova) {
+      var pr = el('p', 'sn-mac-prova', prova.testo);
+      pr.title = prova.titolo;
+      card.appendChild(pr);
+    }
+
     var blocks = Array.isArray(req.blocks) ? req.blocks : [];
     if (blocks.length) {
       card.appendChild(el('p', 'sn-mac-why', nota ? 'Bloccata perché (solo il nuovo):' : 'Bloccata perché:'));
