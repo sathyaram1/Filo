@@ -1009,6 +1009,7 @@
     activeMenu.subMode = 'anchor';
 
     placeSub(sub, anchorEl, 'anchor');
+    sorveglia(sub);
     // Senza questo, il timer di mouseleave sull'ancora (overflow) chiude il
     // sub-menu appena il cursore entra nella griglia (feedback alpha).
     attachSubmenuHover(sub);
