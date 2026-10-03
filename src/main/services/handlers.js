@@ -3222,6 +3222,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         push('filo:action', { kind: 'done', action: rendered, kept: !res.rejected, executed: !!res.executed });
         results.push({ action: a, res, rendered });
         azioniViste.push(rendered);
+        await segnaFonteLetta(chatId, fontiLette, rendered);
       }
       // Il testo scritto in un giro con azioni è una nota di lavoro («cerco il
       // meteo…»), non la risposta: la scheda lo sposta nel blocco di attività.
