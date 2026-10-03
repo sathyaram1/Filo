@@ -88,6 +88,7 @@ class AnteprimeSchede {
   nataDietro(tab) {
     tab._anteprimaAttesa = TENTATIVI;
     tab._anteprimaRipresa = false;
+    tab._anteprimaPersa = false;
     this._segui(tab, { nuova: true });
   }
 
