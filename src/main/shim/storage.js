@@ -149,8 +149,15 @@ function filePath() {
   return STATE.filePath;
 }
 
-async function loadIfNeeded() {
-  if (STATE.loaded) return;
+// Una lettura sola, e chi arriva mentre è in corso aspetta quella: due letture
+// in parallelo all'avvio rimettevano il file sopra una scrittura appena fatta (#897).
+function loadIfNeeded() {
+  if (STATE.loaded) return Promise.resolve();
+  if (!STATE.loading) STATE.loading = leggiFile();
+  return STATE.loading;
+}
+
+async function leggiFile() {
   try {
     const txt = await fsp.readFile(filePath(), 'utf8');
     STATE.data = deserializeFromDisk(JSON.parse(txt) || {});
