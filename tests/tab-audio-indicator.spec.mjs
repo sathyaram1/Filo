@@ -250,6 +250,8 @@ test('ogni controllo dentro la scheda ha il suo suggerimento di Filo, non il tit
   await shell.locator(`.tab[data-id="${suona}"] .title`).hover();
   await expect.poll(() => scritte(app), { timeout: 3000, message: 'titolo senza anteprima' })
     .toEqual({ carta: null, suggerimento: 'Musica di sottofondo' });
+  await patchWebTabs(app, [{ audible: true }]);
+  await expect(shell.locator('.tab .tab-alert')).toHaveCount(2, { timeout: 10_000 });
   for (const [id, cls, atteso] of casi) {
     await via();
     await shell.locator(`.tab[data-id="${id}"] ${cls}`).hover();
