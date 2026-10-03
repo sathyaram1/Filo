@@ -125,7 +125,8 @@ test('regole: localMerges lo scrive solo l’admin, nella forma { app?, server?,
   assert.ok(m, 'funzione localMergesValido non trovata');
   const corpo = m[1].replace(/\s+/g, ' ');
   assert.match(corpo, /!\('localMerges' in d\)/);
-  assert.match(corpo, /keys\(\)\.hasOnly\(\['app', 'server', 'solo'\]\)/);
+  assert.match(corpo, /keys\(\)\.hasOnly\(\['app', 'server', 'solo', 'ramo'\]\)/);
+  assert.match(corpo, /d\.localMerges\.ramo is string && d\.localMerges\.ramo\.size\(\) <= 200 && d\.localMerges\.ramo\.matches\('\^claude\//);
   assert.match(corpo, /d\.localMerges\.solo in \['app', 'server'\]/);
   assert.match(corpo, /d\.localMerges\.app is int && d\.localMerges\.app > 0/);
   assert.match(corpo, /d\.localMerges\.server is int && d\.localMerges\.server > 0/);
