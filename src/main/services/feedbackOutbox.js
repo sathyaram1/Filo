@@ -203,6 +203,7 @@
           remove(it.id);
           continue;
         }
+        if (it.tokenRifiutato) continue;
         const fb = feedback();
         if (!fb || typeof fb.submit !== 'function') { anyFail = true; break; }
         try {
