@@ -277,6 +277,11 @@ async function nuovoFlusso() {
   return f;
 }
 
+// Per il confronto delle uscite (#810): i valori, mai a un prompt.
+function segreti() {
+  return [session?.refreshToken, session?.idToken].filter(Boolean);
+}
+
 function signOut() {
   session = null;
   ricordata = false;
@@ -360,6 +365,7 @@ function isAdmin() {
 
 module.exports = {
   restore,
+  segreti,
   signIn,
   signOut,
   getIdToken,

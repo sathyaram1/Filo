@@ -11,6 +11,7 @@
 const { BrowserWindow } = require('electron');
 const Defaults = require('./defaultsStore');
 const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra } = require('./impostazioniPerOrigine');
+const SegretiLetti = require('./segretiLetti');
 
 const { SN_CONST, SN_MSG } = globalThis;
 const { ACTIONS, PROMPTS } = SN_CONST;
@@ -24,6 +25,8 @@ const Gate = globalThis.SN_MODEL_GATE.create({
   routing: (s) => providerRouting(s),
   noteServed: (s, action, r) => noteServedProvider(s, action, r),
   costs: Costs,
+  segreti: async () => (await segretiCustoditi()).map((x) => x.valore),
+  ricordaEsterni: (messages) => SegretiLetti.ricordaBuste(messages),
 });
 const SavedPages = globalThis.SN_SAVED_PAGES;
 const History = globalThis.SN_HISTORY;
@@ -1200,9 +1203,157 @@ function perimetroLettura(sender) {
   return { cwd, home, win, maiuscole: win || process.platform === 'darwin' };
 }
 
+async function segretiCustoditi() {
+  let salvate = {};
+  let effettive = {};
+  try { salvate = await Storage.getSettings(); } catch (_) {}
+  try { effettive = await getEffectiveSettings(); } catch (_) {}
+  return require('./segretiCustoditi').custoditi({ impostazioni: [salvate, effettive] });
+}
+
+// Quello che l'assistente vede nella schermata, non solo il testo in chiaro: riquadri, caselle, parti
+// incapsulate (#810). Un riquadro interno si legge nel suo mondo: un sito ostile nasconde solo sé stesso.
+const MONDO_USCITE = 1002;
+const MAX_TESTO_PAGINA = 8000000;
+const MAX_RIQUADRI = 60;
+const LEGGI_PAGINA_JS = `(function(){try{
+var out=[String(document.title||''),String((document.body&&document.body.innerText)||'')];
+var NO={hidden:1,checkbox:1,radio:1,file:1,submit:1,button:1,reset:1,image:1,range:1,color:1};
+function etichetta(c){var t='';try{if(c.labels&&c.labels.length)t=c.labels[0].innerText||'';}catch(e){}
+if(!t)t=c.getAttribute('aria-label')||c.getAttribute('placeholder')||c.getAttribute('title')||'';
+if(!t&&c.previousElementSibling)t=c.previousElementSibling.innerText||'';
+if(!t&&c.parentElement)t=c.parentElement.innerText||'';return String(t).slice(-120);}
+function campi(root){var cc=root.querySelectorAll('input,textarea');for(var i=0;i<cc.length&&i<5000;i++){var c=cc[i];
+if(NO[String(c.type||'').toLowerCase()])continue;var v=String(c.value||'');if(v.trim())out.push(etichetta(c)+' '+v);}}
+var visti=0;function ombre(root,n){if(n>8)return;var tt=root.querySelectorAll('*');
+for(var i=0;i<tt.length&&visti<300000;i++){visti++;var sr=tt[i].shadowRoot;if(!sr)continue;
+for(var k=0;k<sr.children.length;k++){var e=sr.children[k];out.push(String(e.innerText||e.textContent||''));}
+campi(sr);ombre(sr,n+1);}}
+campi(document);ombre(document,0);return out.join('\\n');}catch(e){return '';}})()`;
+async function testoDellaPagina(sender) {
+  const url = String(sender?.tab?.url || sender?.url || '');
+  const wc = sender?.wc;
+  if (!/^https?:/i.test(url) || !wc || wc.isDestroyed?.()) return null;
+  let host = '';
+  try { host = new URL(url).hostname; } catch (_) {}
+  const leggi = (avvia) => {
+    let p;
+    try { p = Promise.resolve(avvia()); } catch (_) { return Promise.resolve(''); }
+    return Promise.race([
+      p.catch(() => ''),
+      new Promise((res) => { const t = setTimeout(() => res(''), 3000); t.unref?.(); }),
+    ]);
+  };
+  const letture = [leggi(() => wc.executeJavaScriptInIsolatedWorld(MONDO_USCITE, [{ code: LEGGI_PAGINA_JS }]))];
+  let riquadri = [];
+  try { riquadri = (wc.mainFrame && wc.mainFrame.framesInSubtree) || []; } catch (_) {}
+  for (const f of riquadri) {
+    if (letture.length > MAX_RIQUADRI) break;
+    if (f === wc.mainFrame || f.detached) continue;
+    letture.push(leggi(() => f.executeJavaScript(LEGGI_PAGINA_JS)));
+  }
+  const testo = (await Promise.all(letture)).map((t) => String(t || '')).filter((t) => t.trim()).join('\n\n');
+  return { testo: testo.length > MAX_TESTO_PAGINA ? testo.slice(-MAX_TESTO_PAGINA) : testo, host };
+}
+
+// I segreti che l'assistente ha avuto davanti qui (#810): la pagina può cambiare senza ricaricarsi, il
+// codice letto prima resta. Si svuota a ogni caricamento, quando anche l'assistente ricomincia.
+const LETTI_DALL_AIUTO = new WeakMap();
+const MAX_LETTI_AIUTO = 50000;
+// `payload` è la richiesta dell'assistente: il sommario degli elementi (etichette e valori che il
+// testo della pagina non ha) e i risultati di una sua ricerca entrano anche loro nel contesto.
+async function ricordaLettoDallAiuto(sender, payload = null) {
+  const G = globalThis.SN_GUARDIANO_STATICO;
+  const wc = sender?.wc;
+  if (!G || !wc) return;
+  const p = await testoDellaPagina(sender);
+  const dallaPagina = p && p.host ? `dalla pagina ${p.host}` : 'dalla pagina';
+  const fonti = [{ testo: p ? p.testo : '', fonte: dallaPagina }];
+  if (payload && typeof payload.outline === 'string') fonti.push({ testo: payload.outline, fonte: dallaPagina });
+  const risultati = payload && payload.esterno && payload.esterno.ricercaWeb && payload.esterno.ricercaWeb.results;
+  if (Array.isArray(risultati)) {
+    const t = risultati.filter(Boolean).map((r) => `${r.title || ''}\n${r.url || ''}\n${r.snippet || ''}`).join('\n');
+    fonti.push({ testo: t, fonte: 'dai risultati di una ricerca' });
+  }
+  let reg = LETTI_DALL_AIUTO.get(wc);
+  if (!reg) {
+    reg = SegretiLetti.registro(MAX_LETTI_AIUTO);
+    LETTI_DALL_AIUTO.set(wc, reg);
+    try { wc.on('did-navigate', () => reg.svuota()); } catch (_) {}
+  }
+  for (const f of fonti) {
+    if (typeof f.testo !== 'string' || !f.testo.trim()) continue;
+    const trovati = G.segretiNelTesto(f.testo);
+    reg.aggiungiTutti(trovati, f.fonte);
+    SegretiLetti.aggiungiTutti(trovati, f.fonte);
+  }
+}
+
+function ricordaLettoInChat(azioni, storia = []) {
+  const Exfil = globalThis.SN_URL_EXFIL;
+  if (Exfil) for (const e of Exfil.contestoDaAzioni(azioni).esterni) SegretiLetti.ricorda(e.testo, e.fonte);
+  // Di una frase di Filo conta solo ciò che veniva da fuori quando l'ha scritta: una password che propone lui
+  // resta sua. L'esito di un comando lanciato a mano invece è testo di fuori per intero.
+  for (const m of Array.isArray(storia) ? storia : []) {
+    if (!m || m.role !== 'filo') continue;
+    for (const x of Array.isArray(m.letti) ? m.letti.slice(0, 200) : []) {
+      if (x && typeof x.valore === 'string') SegretiLetti.aggiungi({ valore: x.valore, regola: String(x.regola || 'codice') }, String(x.fonte || 'da fuori'));
+    }
+    if (typeof m.esterno === 'string' && m.esterno && typeof m.text === 'string') SegretiLetti.ricorda(m.text, m.esterno);
+  }
+}
+
+function lettiDallAiuto(sender) {
+  const reg = sender?.wc ? LETTI_DALL_AIUTO.get(sender.wc) : null;
+  return reg ? reg.tutti() : [];
+}
+
+// La porta unica delle uscite (#810, regole in src/shared/urlExfil.js → valutaUscita): la
+// chiamano executeFiloAction e la ricerca dell'assistente di pagina, prima di ogni livello.
+async function controllaUscita(action, { sender = null, contesto = null, parole = '' } = {}) {
+  const Exfil = globalThis.SN_URL_EXFIL;
+  const tipo = String((action && action.type) || '').toUpperCase();
+  if (!Exfil || !Exfil.verboUscita(tipo)) return { blocca: false, exfil: false };
+  const origine = sender?.tab?.url || sender?.url || '';
+  const daPagina = /^https?:/i.test(origine);
+  return Exfil.valutaUscita(action, {
+    segreti: await segretiCustoditi(),
+    azioni: Array.isArray(contesto) ? contesto : [],
+    pagina: daPagina ? await testoDellaPagina(sender) : null,
+    letti: (daPagina ? lettiDallAiuto(sender) : []).concat(SegretiLetti.tutti()),
+    parole: typeof parole === 'string' ? parole : '',
+    memoria: (tipo === 'NAVIGA' || tipo === 'CERCA_WEB') ? await navExfilCorpus() : '',
+    daPagina,
+  });
+}
+
+// Un indirizzo che una pagina di Filo apre o passa al sistema l'ha scelto quasi sempre un modello (#810): passa dalla
+// porta qualunque gesto l'abbia chiesto (clic, menu del tasto destro, posta). Fermato, la pagina lo dice se `avvisa`.
+const SCHEMI_USCITA = /^(?:https?|mailto|tel|sms):/i;
+async function apriDaFilo(url, { wc = null, parole = '', apri, avvisa = true, tipo = 'NAVIGA' } = {}) {
+  const indirizzo = String(url || '').trim();
+  let pagina = '';
+  try { pagina = wc && !wc.isDestroyed?.() ? String(wc.getURL() || '') : ''; } catch (_) { pagina = ''; }
+  let u = { blocca: false };
+  try {
+    u = await controllaUscita({ type: tipo, url: indirizzo }, { sender: wc ? { wc, url: pagina } : null, parole });
+  } catch (e) {
+    console.warn('[Filo] controllo delle uscite non riuscito', e?.message || e);
+  }
+  if (u.blocca) {
+    if (avvisa && wc) spingiAllaScheda(wc, { type: MSG.USCITA_FERMATA, frase: u.frase }, { inVista: true });
+    return { aperto: false, frase: u.frase };
+  }
+  if (typeof apri === 'function') apri();
+  return { aperto: true };
+}
+// tabs.js non vede i gestori: le aperture delle pagine di Filo (window.open, link con target) arrivano da qui.
+globalThis.SN_USCITA_DA_FILO = (url, wc, apri) => (SCHEMI_USCITA.test(String(url || '')) ? apriDaFilo(url, { wc, apri }) : (apri(), Promise.resolve({ aperto: true })));
+
 // `contesto` = le azioni (con il loro `_output`) che il modello ha davanti in
 // questo turno, turni passati compresi: servono all'anti-esfiltrazione di NAVIGA.
-async function executeFiloAction(action, { confirmed = false, sender = null, contesto = null, assistente = false } = {}) {
+// `parole` = ciò che l'utente ha scritto in chat: un codice scritto da lui può uscire.
+async function executeFiloAction(action, { confirmed = false, sender = null, contesto = null, assistente = false, parole = '' } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
   // Da un sito (anche via una chat aperta da lì) passano solo le azioni della
@@ -1226,45 +1377,19 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
     } catch (_) {}
   }
 
-  // NAVIGA: difesa anti-esfiltrazione. Una pagina ostile (prompt injection) può
-  // far aprire al modello un URL che PORTA FUORI dati che aveva nel contesto
-  // (memoria, appunti, output dei comandi e documenti letti nel turno)
-  // codificandoli nella query/path/sottodominio. Il fallback strutturale scatta
-  // quando nel contesto è entrato testo scritto da altri (#587: conta cosa il
-  // modello ha letto, non chi manda il messaggio). Se sospetto, `_exfil` PRIMA
-  // del gate (mai dall'LLM): livello 2 con l'URL completo. Vedi src/shared/urlExfil.js.
-  if (type === 'NAVIGA') {
-    try {
-      const Exfil = globalThis.SN_URL_EXFIL;
-      const url = String(action.url ?? action.href ?? action.link ?? '').trim();
-      if (Exfil && url) {
-        const origin = sender?.tab?.url || sender?.url || '';
-        const v = Exfil.valutaNaviga(url, {
-          memoria: await navExfilCorpus(),
-          azioni: Array.isArray(contesto) ? contesto : [],
-          daPagina: /^https?:/i.test(origin),
-        });
-        if (v.exfil) { action._exfil = true; action._exfilReason = v.reason; }
-      }
-    } catch (_) {}
-  }
-
-  // CERCA_WEB: la query esce dal computer verso il motore di ricerca, come un
-  // NAVIGA porta fuori l'URL. Stessa difesa: se il testo cercato porta un
-  // segreto della memoria o un pezzo di ciò che il modello ha letto nel turno,
-  // `_exfil` PRIMA del gate (mai dall'LLM) → livello 2 con la query mostrata.
-  if (type === 'CERCA_WEB') {
-    try {
-      const Exfil = globalThis.SN_URL_EXFIL;
-      const query = String(action.query ?? action.q ?? action.testo ?? action.text ?? '').trim();
-      if (Exfil && query) {
-        const v = Exfil.valutaRicerca(query, {
-          memoria: await navExfilCorpus(),
-          azioni: Array.isArray(contesto) ? contesto : [],
-        });
-        if (v.exfil) { action._exfil = true; action._exfilReason = v.reason; }
-      }
-    } catch (_) {}
+  // Le uscite (elenco in src/shared/urlExfil.js, USCITE) passano dalla porta unica
+  // PRIMA del gate: un segreto che esce si ferma a ogni livello, anche confermato. Il resto del
+  // verdetto è l'anti-esfiltrazione di #587, che alza NAVIGA e CERCA_WEB a livello 2 con
+  // `_exfil` (mai dall'LLM). Vedi src/shared/urlExfil.js.
+  try {
+    const u = await controllaUscita(action, { sender, contesto, parole });
+    if (u.blocca) {
+      const comando = type === 'ESEGUI_COMANDO' ? { command: String(action.comando ?? action.command ?? action.cmd ?? '').trim() } : {};
+      return { executed: false, kept: false, output: { blocked: 'segreto', frase: u.frase, ...comando } };
+    }
+    if (u.exfil) { action._exfil = true; action._exfilReason = u.reason; }
+  } catch (e) {
+    console.warn('[Filo] controllo delle uscite non riuscito', e?.message || e);
   }
 
   // CANCELLA_SVEGLIA / MODIFICA_SVEGLIA: il livello dipende da QUANTE sveglie o
@@ -2466,7 +2591,19 @@ function observationsForPrompt(actions) {
     fileReadsForPrompt(actions), documentReadsForPrompt(actions), transparencyDocsForPrompt(actions),
     chatSearchesForPrompt(actions), confirmedActionsForPrompt(actions), proxyUnavailableForPrompt(actions),
     apertureFermateDopoForPrompt(actions),
+    fermateForPrompt(actions),
   ].filter(Boolean).join('\n\n');
+}
+
+// Le azioni fermate perché portavano fuori un segreto (#810): nei turni dopo, e nella chat riaperta, il modello
+// non le dà per fatte e non le riprova in un'altra forma.
+function fermateForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const righe = actions
+    .filter((a) => a && ((a._output && a._output.blocked === 'segreto') || String(a.type || '').toUpperCase() === 'FERMATA'))
+    .map((a) => `- ${(a._output && a._output.frase) || "un'azione che avrebbe portato fuori un segreto"}`);
+  if (!righe.length) return '';
+  return `[NON fatte, fermate da Filo: un segreto non esce a nessun livello, nessuna conferma lo sblocca e non va riprovato in un'altra forma.\n${righe.join('\n')}]`;
 }
 
 // Da un altro paese senza fornitore (#771): l'esito torna al modello anche nel
@@ -2597,6 +2734,12 @@ function toolResultText({ action, res, rendered }) {
     const why = (res && res.error) || 'azione non registrata o parametri non validi';
     return `Azione ${type} NON eseguita: ${why}. Correggi e riprova, o rispondi all'utente senza.`;
   }
+  if (res.output && res.output.blocked === 'segreto') {
+    return `Azione ${type} NON eseguita, e non si può eseguire: ${res.output.frase || 'conteneva un segreto'}. `
+      + 'È un blocco fisso di Filo: nessuna conferma e nessun livello lo sblocca. Non riprovare in un\'altra forma '
+      + '(spezzato, codificato, in un altro campo o con un\'altra azione). Di\' all\'utente in una riga cosa hai '
+      + 'fermato, senza ripetere il dato: se vuole mandarlo davvero, lo fa lui a mano.';
+  }
   const obs = observationsForPrompt([rendered]);
   if (obs) return obs;
   if (type === 'NAVIGA' && res.output && res.output.blocked === 'site') {
@@ -2697,7 +2840,7 @@ function toolResultText({ action, res, rendered }) {
 //
 // Deterministico di proposito: il prompt chiede al modello di farlo da sé, ma un
 // invariante come questo non può dipendere dall'umore di un LLM.
-function maybeProposeFeedbackAction({ textReply, rawActions, userMessage, threadHistory }) {
+function maybeProposeFeedbackAction({ textReply, rawActions, userMessage, threadHistory, citaRisposta = true }) {
   try {
     const AF = globalThis.SN_AUTO_FEEDBACK;
     if (!AF || typeof AF.composeProposal !== 'function') return null;
@@ -2718,7 +2861,7 @@ function maybeProposeFeedbackAction({ textReply, rawActions, userMessage, thread
     const Caps = globalThis.SN_CAPABILITIES;
     const analysis = AF.analyzeReply(textReply, rawActions, userMessage, Caps ? Caps.all(cancelliAperti()) : []);
     if (!analysis || !analysis.kind) return null;
-    return AF.composeProposal(analysis, { userMessage, textReply });
+    return AF.composeProposal(analysis, { userMessage, textReply: citaRisposta ? textReply : '' });
   } catch (e) {
     console.warn('[#360] proposta di segnalazione non composta:', e?.message || e);
     return null;
@@ -2817,7 +2960,8 @@ async function editorFileSummaries() {
   } catch (_) { return ''; }
 }
 
-async function handleFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, chatId = null, sender = null }) {
+// `daModello`: il messaggio l'ha scritto un modello (un suggerimento della home), anche se parte dalla casella dell'utente.
+async function handleFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, daModello = false, chatId = null, sender = null }) {
   await FiloMem.touchSession();
   await FiloMem.appendRaw({ type: 'chat_user', summary: String(userMessage || '').slice(0, 200) });
   // #524 — l'intervista di benvenuto si legge PRIMA di qualsiasi altra cosa,
@@ -2849,6 +2993,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       role: 'user',
       text: String(userMessage || ''),
       images: Array.isArray(images) ? images.length : (image ? 1 : 0),
+      ...(daModello ? { daModello: true } : {}),
     }, { onboarding: onbActive });
   }
   // La conversazione dell'intervista viene tenuta da parte mano a mano: è così
@@ -2905,6 +3050,14 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // decidono se un NAVIGA di questo turno può portare fuori dati (#587).
   const azioniViste = [];
   for (const m of cleanHistory) if (m && Array.isArray(m.actions)) azioniViste.push(...m.actions);
+  // Le parole dell'utente in questa chat: un codice che ha scritto lui può uscire (#810). Un turno
+  // interno non è sua voce.
+  // Nemmeno il testo di un suggerimento della home: lo scrive un modello.
+  const paroleUtente = cleanHistory.filter((m) => m && m.role !== 'filo' && !m.daModello).map((m) => String(m.text || ''))
+    .concat(internal || daModello ? [] : [String(userMessage || '')]).join('\n');
+  // Quello che la chat ha davanti e non ha scritto l'utente entra nel registro dei segreti letti (#810). Anche
+  // le frasi di Filo: riaperta dalla Cronologia, la chat non ha più l'esito che aveva portato il codice.
+  ricordaLettoInChat(azioniViste, cleanHistory);
   for (const m of cleanHistory) {
     const role = m.role === 'filo' ? 'assistant' : 'user';
     let content = String(m.text || '');
@@ -3053,7 +3206,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       const esiti = new Map();
       const avvia = (a) => (a._argsError
         ? Promise.resolve({ executed: false, kept: false, rejected: true, error: a._argsError })
-        : executeFiloAction(a, { sender, contesto: azioniViste }));
+        : executeFiloAction(a, { sender, contesto: azioniViste, parole: paroleUtente }));
       const apertura = (a) => !!a && !a._argsError && String(a.type || '').toUpperCase() === 'NAVIGA';
       for (let i = 0; i < actions.length; i++) {
         const a = actions[i];
@@ -3063,6 +3216,8 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
           else esiti.set(a, avvia(a));
         }
         const res = await esiti.get(a);
+        // Fermata (#810): l'archivio la salva come tale.
+        if (res.output && res.output.blocked === 'segreto') a._output = res.output;
         // Contiene la home con il nome utente: serve solo al gate, non alla chat.
         delete a._perimetro;
         const rendered = { ...a };
@@ -3089,6 +3244,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         push('filo:action', { kind: 'done', action: rendered, kept: !res.rejected, executed: !!res.executed });
         results.push({ action: a, res, rendered });
         azioniViste.push(rendered);
+        ricordaLettoInChat([rendered]);
       }
       // Il testo scritto in un giro con azioni è una nota di lavoro («cerco il
       // meteo…»), non la risposta: la scheda lo sposta nel blocco di attività.
@@ -3147,11 +3303,19 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // #360 — Filo ha ammesso una mancanza e non ha proposto niente: la proposta di
   // segnalazione entra tra le azioni di QUESTO turno, così l'utente la trova già
   // scritta nella stessa bolla invece di doverla chiedere.
-  const proposal = internal
+  let proposal = internal
     ? null // turno di prosecuzione automatica: il "messaggio utente" è un nudge nostro
     : maybeProposeFeedbackAction({ textReply, rawActions, userMessage, threadHistory: cleanHistory });
   if (proposal) {
-    const res = await executeFiloAction(proposal, { sender });
+    // La proposta è un'uscita come le altre: passa dalla porta con quello che la chat ha letto (#810).
+    // Se la risposta citata porta un segreto letto da fuori, la proposta parte senza citarla.
+    const conContesto = { sender, contesto: azioniViste, parole: paroleUtente };
+    let res = await executeFiloAction(proposal, conContesto);
+    if (res.output && res.output.blocked === 'segreto') {
+      proposal = maybeProposeFeedbackAction({ textReply, rawActions, userMessage, threadHistory: cleanHistory, citaRisposta: false });
+      res = proposal ? await executeFiloAction(proposal, conContesto) : { kept: false };
+      if (res.output && res.output.blocked === 'segreto') { proposal = null; res = { kept: false }; }
+    }
     if (res.kept) {
       const rendered = res.needsConfirm
         ? { ...proposal, _confirm: { level: res.needsConfirm, text: res.describe || '' } }
@@ -3162,13 +3326,16 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   }
   const actionsToRun = proposal ? [...rawActions, proposal] : rawActions;
   await FiloMem.appendRaw({ type: 'chat_filo', summary: textReply.slice(0, 200), extra: { actions: actionsToRun } });
+  // I segreti letti da fuori che la risposta ripete, con la loro fonte: restano con la frase (#810).
+  let lettiRisposta = [];
+  try { lettiRisposta = globalThis.SN_URL_EXFIL.lettiNelTesto(textReply, SegretiLetti.tutti()); } catch (_) {}
   // #525 — la risposta di Filo raggiunge l'archivio insieme al messaggio che
   // l'ha provocata. `onbActive` marca la chat dell'intervista di benvenuto:
   // quella è SEMPRE una conversazione, qualunque cosa dica il classificatore.
   if (chatId) {
     const dopo = await appendToChatArchive(
       chatId,
-      { role: 'filo', text: textReply, actions: actionsToRun },
+      { role: 'filo', text: textReply, actions: actionsToRun, ...(lettiRisposta.length ? { letti: lettiRisposta } : {}) },
       { onboarding: onbActive },
     );
     // La chat può essere finita mentre Filo stava ancora rispondendo: l'utente
@@ -3203,14 +3370,17 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   }
   // F4 — Feedback autonomo: fire-and-forget, non blocca la risposta all'utente.
   // Se in questo turno abbiamo già proposto la segnalazione all'utente (#360),
-  // quella anonima non parte: una sola segnalazione per lo stesso buco.
-  maybeAutoFeedback({ textReply, rawActions, userMessage, sender, proposed: !!proposal }).catch(() => {});
+  // quella anonima non parte: una sola segnalazione per lo stesso buco. Nemmeno dopo
+  // un'azione fermata perché portava fuori un segreto (#810): il «non ho potuto» è voluto.
+  const fermata = renderedActions.some((x) => x && x._output && x._output.blocked === 'segreto');
+  if (!fermata) maybeAutoFeedback({ textReply, rawActions, userMessage, sender, proposed: !!proposal }).catch(() => {});
   return {
     text: textReply, actions: renderedActions, model: r.model, provider: r.provider, costEur,
     // Le note scritte a metà lavoro e il ragionamento strutturato dell'ultimo
     // giro: la scheda li tiene con la conversazione, e il ragionamento torna
     // al modello al turno dopo.
     notes, reasoningDetails,
+    ...(lettiRisposta.length ? { letti: lettiRisposta } : {}),
     ...(keyFallback ? { keyFallback } : {}),
     // Il client lo usa per dire subito che sta preparando la home invece di
     // lasciare la chat muta finché non arriva FILO_ONBOARDING_DONE.
@@ -3367,6 +3537,13 @@ async function generateDashboardFromInputs(inputs) {
     }
   }
   if (!message) message = 'Filo è in ascolto.';
+  // Un suggerimento che porterebbe fuori un segreto perde l'azione e tiene la frase della porta (#810): la home
+  // chiede l'icona del sito appena lo mostra, prima di ogni clic, e al clic deve dire cosa ha fermato.
+  for (let i = 0; i < suggestions.length; i++) {
+    let u = null;
+    try { u = suggestions[i].action ? await controllaUscita(suggestions[i].action) : null; } catch (_) {}
+    if (u && u.blocca) suggestions[i] = { ...suggestions[i], action: null, fermata: u.frase };
+  }
   await FiloMem.setDashboardCache({ message, suggestions, signature: inputs.signature });
   return { message, suggestions, ts: new Date().toISOString() };
 }
@@ -3505,6 +3682,11 @@ const handlerCtx = {
   handleFiloChat,
   handleFiloGenerateDashboard,
   executeFiloAction,
+  controllaUscita,
+  apriDaFilo,
+  SCHEMI_USCITA,
+  ricordaLettoDallAiuto,
+  ricordaLettoInChat,
   maybeRunCompactor,
   // Archivio delle chat (#525)
   closeAndTriageChat,
@@ -4189,6 +4371,7 @@ globalThis.SN_GEO_CLASSIFY = async function geoClassify(input) {
 // Esposto su globalThis per i test Playwright (app.evaluate non ha require):
 // è il dispatch con il gate dei livelli di sicurezza (#146.2).
 globalThis.SN_EXECUTE_FILO_ACTION = executeFiloAction;
+globalThis.SN_SEGRETI_LETTI = SegretiLetti;
 // Idem per la chat della home: i test ne ispezionano il prompt costruito (#158).
 globalThis.SN_HANDLE_FILO_CHAT = handleFiloChat;
 // #525 — chiusura + classificazione di una chat archiviata: gli spec devono

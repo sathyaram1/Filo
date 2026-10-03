@@ -1827,11 +1827,13 @@
 
   // Azioni sul collegamento (senza la sezione "Spiega", come sopra).
   function buildLinkActionItems(linkEl) {
+    // Un collegamento scritto da un modello di Filo si apre e si scarica solo dal main, dopo la porta delle uscite (#810).
+    const diFilo = !!(linkEl.classList && linkEl.classList.contains('filo-md-link') && Popup && Popup.apriCollegamento);
     const out = [
       {
         type: 'item',
         label: I18n.t('menu_open_in_new_tab'),
-        onClick: () => window.open(linkEl.href, '_blank', 'noopener'),
+        onClick: () => (diFilo ? Popup.apriCollegamento(linkEl) : window.open(linkEl.href, '_blank', 'noopener')),
       },
     ];
     // "Salva file" — gemello di "Salva immagine come" per i link a un file
@@ -1842,7 +1844,7 @@
       out.push({
         type: 'item',
         label: I18n.t('menu_save_file'),
-        onClick: () => Actions.downloadLink(linkEl),
+        onClick: () => (diFilo ? Popup.scaricaCollegamento(linkEl) : Actions.downloadLink(linkEl)),
       });
     }
     out.push(

@@ -66,6 +66,9 @@
     send,
     faviconUrl: (url) => faviconUrl(url),
     applyCommandCwd: (actions) => Term.applyCommandCwd(actions),
+    // Le parole dell'utente in questa chat viaggiano con l'OK: un codice scritto da lui può uscire (#810).
+    paroleUtente: () => paroleUtente(),
+    apriProposta: (url, vicino) => apriProposta(url, vicino),
   });
   // #590 — una pagina aperta da Filo che si è spostata da sé su un sito bloccato dopo la risposta.
   if (window.filo?.onAperturaFermata) {
@@ -85,12 +88,12 @@
   // quella aperta quando è pronta: chi la produce prende la targa (`chatDellaRiga`)
   // al momento del comando e la passa qui. Un comando lento più un ritorno alla
   // home la mettevano nella chat sbagliata, o in una chat nuova mai fatta.
-  const archiviaRiga = (text, role, chat) => {
+  const archiviaRiga = (text, role, chat, esterno) => {
     // L'intervista di benvenuto ha una conversazione sua e un modo suo di
     // finire: le sue righe le archivia lei.
     if (Accoglienza.isActive()) return null;
     const id = chat || ensureChatId();
-    try { send({ type: MSG.FILO_CHAT_NOTE, id, text, role }); } catch (_) {}
+    try { send({ type: MSG.FILO_CHAT_NOTE, id, text, role, ...(esterno ? { esterno } : {}) }); } catch (_) {}
     return id;
   };
   const chatDellaRiga = () => (Accoglienza.isActive() ? null : ensureChatId());
@@ -375,9 +378,14 @@
         note.textContent = Att.summarizeActivity(types, false);
         bubblesEl.appendChild(note);
       }
+      // Cosa veniva da fuori resta con la frase (#810): la porta delle uscite lo rilegge da qui.
+      const fuori = isUser ? {} : {
+        ...(Array.isArray(m.letti) && m.letti.length ? { letti: m.letti } : {}),
+        ...(typeof m.esterno === 'string' && m.esterno ? { esterno: m.esterno } : {}),
+      };
       threadHistory.push(isUser
-        ? { role: 'user', text }
-        : { role: 'filo', text, actions: types.map((t) => ({ type: t })) });
+        ? { role: 'user', text, ...(m.daModello ? { daModello: true } : {}) }
+        : { role: 'filo', text, actions: types.map((t) => ({ type: t })), ...fuori });
     }
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
     inputEl.focus();
@@ -396,6 +404,48 @@
   // Favicon di un sito a partire dall'URL. Usa il servizio Google s2 —
   // gratis, niente API key, regge i casi mancanti restituendo un'icona
   // grigia generica. Ritorna '' per URL non http(s) (es. file://, mailto:).
+  // Quello che l'utente ha scritto in questa chat: un codice scritto da lui può uscire (#810). Il testo di un
+  // suggerimento della home no, l'ha scritto un modello.
+  function paroleUtente() {
+    return threadHistory.filter((m) => m && m.role !== 'filo' && !m.daModello).map((m) => String(m.text || ''));
+  }
+
+  // Un indirizzo web che un modello ha proposto qui si apre solo dal main, dopo la porta delle uscite, con
+  // l'indirizzo che si apre davvero (#810). Se si ferma, la riga lo dice accanto a ciò che è stato cliccato.
+  async function apriProposta(url, vicino = null) {
+    let r = null;
+    try { r = await send({ type: MSG.FILO_APRI_PROPOSTA, url, parole: paroleUtente() }); } catch (_) {}
+    if (r && r.frase) notaFermata(r.frase, vicino);
+  }
+  function notaFermata(frase, vicino) {
+    if (vicino && vicino.dataset.fermata) return;
+    if (vicino) vicino.dataset.fermata = '1';
+    const nota = document.createElement('div');
+    nota.className = 'dash-bubble-note dash-fermata-clic';
+    nota.textContent = `🔒 ${frase.charAt(0).toUpperCase()}${frase.slice(1)}`;
+    const li = vicino && vicino.closest('li');
+    const dopo = vicino && (vicino.closest('.dash-bubble-actions') || vicino.closest('.dash-bubble'));
+    if (li) li.appendChild(nota);
+    else if (dopo) dopo.insertAdjacentElement('afterend', nota);
+    else bubblesEl.appendChild(nota);
+  }
+  // Ogni collegamento web o di posta della pagina (risposte, bottoni) passa da apriProposta, anche col tasto centrale.
+  const apriDaCollegamento = (e) => {
+    if (e.type === 'auxclick' && e.button !== 1) return;
+    const a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+    if (!a || !/^(?:https?|mailto|tel|sms):/i.test(a.href)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    apriProposta(a.href, a);
+  };
+  document.addEventListener('click', apriDaCollegamento, true);
+  document.addEventListener('auxclick', apriDaCollegamento, true);
+  // Un'apertura chiesta dal menu del tasto destro la ferma il main: la riga va accanto al collegamento di quel menu.
+  let ultimoTastoDestro = null;
+  document.addEventListener('contextmenu', (e) => {
+    ultimoTastoDestro = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+  }, true);
+
   function faviconUrl(rawUrl) {
     if (!rawUrl) return '';
     try {
@@ -442,7 +492,7 @@
       text.textContent = s.text || '';
       btn.appendChild(icon);
       btn.appendChild(text);
-      btn.addEventListener('click', () => onSuggestionClick(s));
+      btn.addEventListener('click', () => onSuggestionClick(s, btn));
       li.appendChild(btn);
       suggestionsEl.appendChild(li);
     }
@@ -456,7 +506,8 @@
     renderSuggestions();
   });
 
-  async function onSuggestionClick(s) {
+  async function onSuggestionClick(s, vicino = null) {
+    if (s.fermata) { notaFermata(String(s.fermata), vicino); return; }
     const a = s.action;
     if (!a) return;
     const type = String(a.type || '').toUpperCase();
@@ -474,19 +525,17 @@
       send({ type: MSG.RUN_TAB_TRIAGE });
       return;
     }
+    // Il suggerimento l'ha scritto un modello (#810): un indirizzo passa dalla porta delle uscite, e il suo testo va
+    // in chat come suo, non come parole dell'utente né come comando con la barra.
     if (type === 'NAVIGA' && a.url) {
-      chrome.tabs.create({ url: a.url });
+      apriProposta(a.url, vicino);
     } else if (type === 'APRI_FILE' && (a.path || a.url)) {
       const url = a.url || a.path;
-      if (/^https?:|^chrome-extension:|^chrome:/.test(url)) chrome.tabs.create({ url });
+      if (/^https?:/.test(url)) apriProposta(url, vicino);
     } else if (type === 'CHAT' && a.prompt) {
-      // Trigger interno: prepopola la chat con il prompt.
-      inputEl.value = a.prompt;
-      inputForm.dispatchEvent(new Event('submit'));
+      submitMessage(String(a.prompt), { daModello: true });
     } else {
-      // Fallback: trasforma la voce in messaggio chat.
-      inputEl.value = s.text || '';
-      inputForm.dispatchEvent(new Event('submit'));
+      submitMessage(String(s.text || ''), { daModello: true });
     }
   }
 
@@ -785,7 +834,7 @@
     return h;
   }
 
-  async function runFiloTurn({ userMessage, images = [], internal = false, activity = null }) {
+  async function runFiloTurn({ userMessage, images = [], internal = false, daModello = false, activity = null }) {
     // Blocco di attività della domanda (#521): lo crea e lo chiude chi guida
     // la sequenza dei turni (runTurnAndContinue); qui ci si scrive dentro.
     const pending = activity || Att.create(bubblesEl);
@@ -875,6 +924,7 @@
       threadHistory: historyWithout(userMessage),
       reasoningReqId,
       internal,
+      ...(daModello ? { daModello: true } : {}),
       // #525 — la chat si archivia nel main, mentre la si fa.
       chatId: ensureChatId(),
     };
@@ -994,6 +1044,7 @@
       if (turn.text) { entry.reasoning = turn.text; entry.reasoningMs = turn.ms; }
       if (Array.isArray(r.reasoningDetails) && r.reasoningDetails.length) entry.reasoningDetails = r.reasoningDetails;
       if (Array.isArray(r.notes) && r.notes.length) entry.notes = r.notes;
+      if (Array.isArray(r.letti) && r.letti.length) entry.letti = r.letti;
       threadHistory.push(entry);
       Term.applyCommandCwd(r.actions);
       // Chi guida la sequenza deve poter assorbire questa bolla nel blocco se
@@ -1004,7 +1055,8 @@
     return r;
   }
 
-  async function submitMessage(text) {
+  // `daModello`: il testo viene da un suggerimento della home, non dalle dita dell'utente (#810).
+  async function submitMessage(text, { daModello = false } = {}) {
     if ((!text && pendingImages.length === 0) || sending) return;
     sending = true;
     sendBtn.disabled = true;
@@ -1017,7 +1069,7 @@
     if (body.dataset.state !== 'thread') goThread();
 
     // Bolla utente
-    threadHistory.push({ role: 'user', text: text || '(immagine)' });
+    threadHistory.push({ role: 'user', text: text || '(immagine)', ...(daModello ? { daModello: true } : {}) });
     const userBubble = makeBubble({ role: 'user', text: text || '' });
     // Mostra TUTTE le immagini inviate nella bolla, ognuna ingrandibile al click.
     imagesToSend.forEach((src, i) => {
@@ -1029,7 +1081,7 @@
     });
     bubblesEl.appendChild(userBubble);
 
-    await runTurnAndContinue({ userMessage: text || 'Descrivi questa immagine.', images: imagesToSend });
+    await runTurnAndContinue({ userMessage: text || 'Descrivi questa immagine.', images: imagesToSend, daModello });
   }
 
   // Un turno + la sua eventuale prosecuzione autonoma, e il rilascio della barra
@@ -1222,7 +1274,10 @@
 
   // ===== Bridge cambio stato live dal background =====
   chrome.runtime.onMessage.addListener((msg) => {
-    if (msg?.type === MSG.FILO_LIVE_UPDATED) {
+    if (msg?.type === MSG.USCITA_FERMATA && msg.frase) {
+      const vicino = ultimoTastoDestro && ultimoTastoDestro.isConnected ? ultimoTastoDestro : null;
+      notaFermata(String(msg.frase), vicino);
+    } else if (msg?.type === MSG.FILO_LIVE_UPDATED) {
       refreshLive().catch(() => {});
     } else if (msg?.type === MSG.FILO_CHATS_UPDATED && msg.cancellata) {
       // #525 — qualcuno ha cancellato dalla Cronologia la conversazione che
