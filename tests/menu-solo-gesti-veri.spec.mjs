@@ -134,3 +134,42 @@ test('un riquadro di un altro sito dentro la pagina non apre il menu con un tast
   expect(await frame.evaluate(() => window.__menuMai)).toBe(false);
   expect(await frame.evaluate(() => window.cosaVede())).not.toContain(SEGRETO);
 });
+
+test('la cronologia aperta dall\'utente non si fa leggere dal sito con la ricerca testuale del browser', async ({ app, shell, openTab, testServer }) => {
+  await conCronologia(shell);
+  await app.evaluate(({ clipboard }, s) => clipboard.writeText(s), SEGRETO);
+  const page = await testServer.openReady(openTab, PAGINA);
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
+
+  // Prima che l'utente apra la cronologia il segreto non è nel documento: window.find non lo trova.
+  expect(await page.evaluate(() => window.find('pw-Segreta', true, false, true))).toBe(false);
+
+  // L'utente apre lui la cronologia per incollare.
+  await page.locator('#campo').click({ button: 'right' });
+  await page.locator('.sn-menu-paste-arrow').hover();
+  await expect.poll(() => testiCronologia(app, page)).toContain(SEGRETO);
+
+  // Il sito prova a ricostruire il testo interrogando window.find lettera per lettera: non ci riesce
+  // (il testo è contenuto generato, non un nodo cercabile).
+  const ricostruito = await page.evaluate(() => {
+    const abc = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_';
+    let noto = 'pw-';
+    if (!window.find(noto, true, false, true)) return 'niente';
+    for (let g = 0; g < 60; g++) {
+      let ok = false;
+      for (const c of abc) {
+        getSelection().removeAllRanges();
+        if (window.find(noto + c, true, false, true)) { noto += c; ok = true; break; }
+      }
+      if (!ok) break;
+    }
+    return noto;
+  });
+  expect(ricostruito, 'il sito non deve ricostruire il testo della cronologia').not.toBe(SEGRETO);
+
+  // Resta ciò che serve all'utente: la voce la vede e la incolla lui.
+  const voce = (await statoCronologia(app, page)).voci.find((v) => v.testo === SEGRETO);
+  await page.mouse.move(voce.incolla.x, voce.incolla.y, { steps: 3 });
+  await page.mouse.click(voce.incolla.x, voce.incolla.y);
+  await expect(page.locator('#campo')).toHaveValue(SEGRETO);
+});

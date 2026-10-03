@@ -35,13 +35,27 @@ il clic sul pulsante del sito.
    chiudere non dà niente al sito). Sulle pagine `filo://` il codice è tutto
    nostro: lì il menu si apre anche da un evento fabbricato, e gli spec lo usano.
 
-2. **Quello che non è del sito non entra nel suo documento.** La cronologia degli
-   appunti arriva da altri siti e da altre app, password comprese: anche aperta
-   dall'utente, il sito non deve poterla leggere. Sta in uno shadow root
-   `closed`, e nel documento c'è solo un host vuoto. I fogli di stile del
-   documento lì dentro non arrivano: si portano i nostri con
-   `adoptedStyleSheets` (che la CSP del sito non blocca, un `<style>` sì).
-   Stesso schema del dialogo di conferma (#249, `src/shared/confirmUi.js`).
+2. **Quello che non è del sito non entra nel suo documento come testo.** La
+   cronologia degli appunti arriva da altri siti e da altre app, password
+   comprese: anche aperta dall'utente, il sito non deve poterla leggere. Sta in
+   uno shadow root `closed`, e nel documento c'è solo un host vuoto. I fogli di
+   stile del documento lì dentro non arrivano: si portano i nostri con
+   `adoptedStyleSheets` (che la CSP del sito non blocca, un `<style>` sì). Stesso
+   schema del dialogo di conferma (#249, `src/shared/confirmUi.js`).
+
+   Lo shadow chiuso ferma `innerHTML`, la selezione e `getComputedStyle`, **ma
+   non `window.find`**: la ricerca testuale del browser attraversa anche lo
+   shadow chiuso e, interrogata lettera per lettera da uno script, ricostruisce
+   un **nodo di testo** parola per parola (#589.8, il buco che la sola scatola
+   chiusa lasciava aperto). La regola unica: il testo di una voce **non diventa
+   mai un nodo di testo** nel documento. Lo si rende come **contenuto generato**
+   (`::before { content: var(--sn-gentesto) }`) da una proprietà posata
+   sull'elemento dentro lo shadow chiuso — glifi, non testo cercabile — e il nome
+   accessibile sta in un **attributo** (`aria-label`), che la ricerca non trova e
+   che il sito non legge oltre il confine dello shadow chiuso. `window.find` non
+   guarda dentro il contenuto generato; così nessuna strada del sito (find,
+   `innerHTML`, selezione, `getComputedStyle`) vede i caratteri. Un dato privato
+   nuovo nel menu segue la stessa regola: niente nodo di testo.
 
 Il resto del menu resta nel documento: non porta dati di altri siti, e una
 settantina di spec lo guarda coi locator. Se un giorno ci entra un dato privato
