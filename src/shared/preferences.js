@@ -522,6 +522,26 @@
         return { partial: { timerRingtone: tone }, label: `Suoneria timer → ${labelMap[tone]}` };
       },
     },
+
+    // ── Anteprima delle schede (#430) — reversibile, innocua → livello 1 ──
+    {
+      keys: ['anteprima_schede', 'anteprima delle schede', 'anteprima schede', 'anteprima delle tab', 'anteprima tab', 'tabpreview'],
+      // In fondo all'elenco: una chiave vaga («tab», «schede») resta di chi la prendeva prima.
+      // Un sì/no la accende o la spegne; una misura la accende a quella misura.
+      build(v) {
+        const s = String(v == null ? '' : v).trim().toLowerCase();
+        const MISURE = { piccola: 'piccola', piccole: 'piccola', 'più piccola': 'piccola', small: 'piccola',
+          media: 'media', normale: 'media', medie: 'media', medium: 'media',
+          grande: 'grande', grandi: 'grande', 'più grande': 'grande', large: 'grande' };
+        if (MISURE[s]) {
+          const size = MISURE[s];
+          return { partial: { tabPreview: { enabled: true, size } }, label: `Anteprima delle schede → ${size}` };
+        }
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { tabPreview: { enabled: b } }, label: `Anteprima delle schede → ${b ? 'accesa' : 'spenta'}` };
+      },
+    },
   ];
 
   // Trova il setter giusto per una chiave (match esatto, poi fuzzy) e costruisce

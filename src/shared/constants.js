@@ -2250,6 +2250,9 @@
     // Mostra il commento proattivo di Filo al centro della home (newtab).
     // Disattivabile da Preferenze per chi preferisce una home più sobria.
     showHomeMessage: true,
+    // Carta con l'anteprima della scheda al passaggio del puntatore sulla barra (#430). size: 'piccola' |
+    // 'media' | 'grande' (le larghezze stanno in src/main/popup-anteprima.js).
+    tabPreview: { enabled: true, size: 'media' },
     // Colore identità delle tab (spec "Colore identità delle tab"): i sei
     // parametri che governano come si estrae il colore dal favicon e quanto
     // tinge la tab. La fonte di verità dei default/range/commenti è

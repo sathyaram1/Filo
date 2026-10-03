@@ -815,6 +815,7 @@
   const toccati = new Set();
   const CAMPO_DI = {
     theme: 'theme', textScale: 'textScale', showHomeMessage: 'showHomeMessage',
+    tabPreviewEnabled: 'tabPreview.enabled', tabPreviewSize: 'tabPreview.size',
     agentStylePreset: 'agentStyle', agentStyleText: 'agentStyle', timerRingtone: 'timerRingtone',
     terminalEnabled: 'terminal.enabled', terminalShell: 'terminal.shell',
     ttsVoice: 'tts.voice', ttsRate: 'tts.rate', ttsPitch: 'tts.pitch',
@@ -830,6 +831,8 @@
       case 'theme': return $('theme').value;
       case 'textScale': return parseFloat($('textScale').value) || 1;
       case 'showHomeMessage': return $('showHomeMessage').checked;
+      case 'tabPreview.enabled': return $('tabPreviewEnabled').checked;
+      case 'tabPreview.size': return misuraAnteprima($('tabPreviewSize').value);
       case 'agentStyle': return currentStyleText();
       case 'timerRingtone': return $('timerRingtone').value || 'default';
       case 'terminal.enabled': return $('terminalEnabled').checked;
@@ -858,6 +861,8 @@
       case 'theme': return s.theme || 'system';
       case 'textScale': return Number(s.textScale ?? 1);
       case 'showHomeMessage': return s.showHomeMessage !== false;
+      case 'tabPreview.enabled': return !(s.tabPreview && s.tabPreview.enabled === false);
+      case 'tabPreview.size': return misuraAnteprima(s.tabPreview && s.tabPreview.size);
       case 'agentStyle': return String(s.agentStyle || '').trim();
       case 'timerRingtone': return s.timerRingtone || 'default';
       case 'terminal.enabled': return !!(s.terminal && s.terminal.enabled === true);
@@ -874,6 +879,10 @@
       case 'notifications.sound': return notif.sound || 'default';
       default: return undefined;
     }
+  }
+
+  function misuraAnteprima(v) {
+    return ['piccola', 'media', 'grande'].includes(v) ? v : 'media';
   }
 
   async function persist() {
@@ -926,6 +935,10 @@
       $('textScale').value = opt ? scale : '1';
     }
     if (vuole('showHomeMessage')) $('showHomeMessage').checked = settings.showHomeMessage !== false;
+    const tp = settings.tabPreview || {};
+    if (vuole('tabPreview.enabled')) $('tabPreviewEnabled').checked = tp.enabled !== false;
+    if (vuole('tabPreview.size')) $('tabPreviewSize').value = misuraAnteprima(tp.size);
+    $('tabPreviewSize').disabled = !$('tabPreviewEnabled').checked;
 
     if (vuole('agentStyle')) {
       $('agentStyleText').value = settings.agentStyle || '';
@@ -1154,6 +1167,11 @@
       persist();
     });
     $('showHomeMessage').addEventListener('change', persist);
+    $('tabPreviewEnabled').addEventListener('change', () => {
+      $('tabPreviewSize').disabled = !$('tabPreviewEnabled').checked;
+      persist();
+    });
+    $('tabPreviewSize').addEventListener('change', persist);
     $('autoArchiveEnabled').addEventListener('change', persist);
     $('autoArchiveOnClose').addEventListener('change', persist);
     $('autoArchiveIdleHours').addEventListener('change', persist);

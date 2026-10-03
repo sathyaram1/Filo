@@ -28,6 +28,8 @@ require('../shared/tasti'); // nome E comportamento delle scorciatoie, per il si
 const { indiceSaltoScheda, comandoNavigazione } = globalThis.SN_TASTI;
 const { collegaScorciatoie } = require('./shortcuts');
 const { AvvisiSopraPagina } = require('./avvisiSopraPagina');
+const { AnteprimeSchede } = require('./tabs/anteprime');
+const CartaAnteprima = require('./popup-anteprima');
 
 // #441 — eventi di solo PUNTAMENTO: il cursore che attraversa la pagina non è
 // un'interazione dell'utente con quella scheda (tutto il resto — click, tasti,
@@ -297,6 +299,11 @@ class TabManager {
     this.partition = partition || null;
     this.tabs = []; // [{ id, view, title, url, favicon, loading, canBack, canFwd }]
     this.activeId = null;
+    this.anteprime = new AnteprimeSchede(this, {
+      suNuova: (id, dato) => CartaAnteprima.precarica(window, id, dato),
+      suTolte: (ids) => CartaAnteprima.dimentica(window, ids),
+    });
+    if (window && typeof window.once === 'function') window.once('closed', () => this.anteprime.chiudi());
     this.avvisi = new AvvisiSopraPagina(window, {
       alto: () => this._altezzaCornice(),
       restituisciTastiera: () => this._tastieraAllaSchedaAttiva(),
@@ -382,6 +389,11 @@ class TabManager {
     this._wireShellZoomKeys();
     for (const ev of ['minimize', 'restore', 'hide', 'show']) {
       try { this.win.on?.(ev, () => this._annunciaVista()); } catch (_) {}
+    }
+    // La finestra torna a disegnare: le anteprime rimaste da scattare ripartono (#430). Il fuoco copre la finestra
+    // che era solo coperta da un'altra, che non avvisa quando smette di disegnare.
+    for (const ev of ['restore', 'show', 'focus']) {
+      try { this.win.on?.(ev, () => this.anteprime.riprendi()); } catch (_) {}
     }
   }
 
@@ -883,10 +895,12 @@ class TabManager {
     // Caricare con bounds 0x0 può far andare in fallimento le capturePage
     // successive con "Current display surface not available".
     if (activate) {
+      this.anteprime.congeda(this.tabs.find((t) => t.id === this.activeId));
       this.activeId = id;
       tab.activateSeq = this._nextActivationSeq();
       this.layout();
     } else {
+      this.anteprime.nataDietro(tab);
       // Scheda in SECONDO PIANO (#376): non ruba il primo piano. layout() le dà
       // bounds {0,0,0,0} — senza questa chiamata la view appena creata resta con
       // i bounds di default e può disegnarsi sopra la scheda attiva (stesso
@@ -901,7 +915,7 @@ class TabManager {
     else view.webContents.loadURL(url);
     if (activate) {
       // Riaffermo la visibilità su tutti i tab dopo loadURL.
-      for (const t of this.tabs) t.view.setVisible?.(t.id === id);
+      for (const t of this.tabs) t.view.setVisible?.(this._visibile(t));
       this._tastieraAllaSchedaAttiva();
     }
     // #152 — born proxied: se il dominio ha una regola persistente, la scheda
@@ -1544,6 +1558,8 @@ class TabManager {
   activate(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
+    if (this.activeId !== id) this.anteprime.congeda(this.tabs.find((t) => t.id === this.activeId));
+    this.anteprime.mostrata(tab);
     this.activeId = id;
     // §2.1 segnale: quando una tab diventa attiva è "usata adesso". Aggiorna sia
     // il momento di ultima attivazione sia l'ultima interazione (proxy grossolano;
@@ -1554,7 +1570,7 @@ class TabManager {
     tab.activateSeq = this._nextActivationSeq(); // ordine MRU per la chiusura tab
     this._lastAppInteractionAt = now; // attivare una tab = usare Filo (§2.1)
     for (const t of this.tabs) {
-      t.view.setVisible?.(t.id === id);
+      t.view.setVisible?.(this._visibile(t));
     }
     this.layout();
     this._tastieraAllaSchedaAttiva();
@@ -1698,7 +1714,7 @@ class TabManager {
     else view.webContents.loadURL(opts.loadUrl || url);
     // Visibilità coerente con lo stato attivo: solo la scheda attiva è visibile,
     // le altre (inclusa la view appena ricreata se non attiva) restano nascoste.
-    for (const t of this.tabs) t.view.setVisible?.(t.id === this.activeId);
+    for (const t of this.tabs) t.view.setVisible?.(this._visibile(t));
     if (wasActive) this._tastieraAllaSchedaAttiva();
     this._broadcast();
   }
@@ -1778,6 +1794,14 @@ class TabManager {
   setActiveVisible(visible) {
     const tab = this.tabs.find((t) => t.id === this.activeId);
     if (tab) tab.view.setVisible?.(visible);
+    // Con la scheda davanti nascosta, una di dietro allargata per la sua anteprima si vedrebbe.
+    this._attivaNascosta = !visible;
+    if (visible) this.anteprime.riprendi(); else this.anteprime.interrompi();
+  }
+
+  // Solo la scheda davanti si vede; una aperta dietro resta «visibile» a 0×0 finché non ha l'anteprima (#430).
+  _visibile(t) {
+    return t.id === this.activeId || this.anteprime.tieneSveglia(t);
   }
 
   // ─── layout ─────────────────────────────────────────────────────────────
@@ -1800,6 +1824,9 @@ class TabManager {
         if (process.env.FILO_SMOKE) {
           console.log(`[layout] tab ${tab.id.slice(0, 6)} active bounds`, JSON.stringify(b), 'win', w, 'x', h);
         }
+      } else if (this.anteprime.inCattura(tab)) {
+        const top = this._altezzaCornice();
+        tab.view.setBounds({ x: 0, y: top, width: w, height: Math.max(0, h - top) });
       } else {
         tab.view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
       }
@@ -2213,6 +2240,7 @@ class TabManager {
         canBack: canGoBack(wc),
         canFwd: canGoFwd(wc),
       });
+      if (tab.view && tab.view.webContents === wc) this.anteprime.caricata(tab);
       // §3.2 — cattura un estratto del contenuto (best-effort) da usare per la
       // ricerca semantica dell'archivio e per il triage. Solo pagine web.
       if (!tab.isInternal && /^https?:\/\//i.test(wc.getURL() || '')) {
@@ -2233,6 +2261,7 @@ class TabManager {
       // MAI, quindi resta a about:blank). Il flag protegge dal chiuderla per
       // sbaglio se poi parte un download da una pagina che ha già contenuto.
       tab._everNavigated = true;
+      if (tab.view && tab.view.webContents === wc) this.anteprime.navigata(tab);
       if (tab._vistaNuova && tab._vistaNuova.wc === wc) tab._vistaNuova = null;
       this._sostituisciVoceBloccata(wc, url);
       // #590 — una navigazione già partita quando il suo sito è entrato in lista arriva lo stesso: si ferma qui.
@@ -2296,7 +2325,10 @@ class TabManager {
         }
       }
     });
-    wc.on('did-navigate-in-page', (_e, url) => update({ url: userUrl(url), canBack: canGoBack(wc), canFwd: canGoFwd(wc) }));
+    wc.on('did-navigate-in-page', (_e, url, isMainFrame) => {
+      update({ url: userUrl(url), canBack: canGoBack(wc), canFwd: canGoFwd(wc) });
+      if (isMainFrame === true && tab.view && tab.view.webContents === wc) this.anteprime.navigata(tab, { inPagina: true });
+    });
     // #441 — l'utente ha toccato DAVVERO questa scheda? Serve a non chiudere
     // come "pagina-ponte" una scheda con cui ha interagito. Il segnale arriva
     // dal main (non dal content script, che manda un campione di attività anche
@@ -2988,6 +3020,7 @@ class TabManager {
   }
 
   _broadcast() {
+    this.anteprime.pota(new Set(this.tabs.map((t) => t.id)));
     // La shell è il primary webContents della BrowserWindow.
     try {
       this.win.webContents.send('tabs:updated', this.snapshot());

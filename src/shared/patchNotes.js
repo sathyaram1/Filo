@@ -11,6 +11,7 @@
     {
       version: '0.2.230', date: '2026-10-03',
       features: [
+        'Passa il mouse su una scheda e vedi subito cosa c\'è dentro: titolo, sito e un\'immagine della pagina, già pronta, anche per le schede aperte in secondo piano che non hai ancora guardato. In Preferenze la spegni o scegli quanto è grande.',
         'Ogni comando che Filo propone nel terminale ti dice prima a parole cosa fa, e sotto trovi il comando vero. Su un\'installazione nuova la modalità terminale è già accesa, quindi a «quanto spazio ho sul disco?» Filo risponde senza che tu debba accendere niente. Quello che legge parte subito, quello che cambia qualcosa ti chiede prima un OK, per cancellare scrivi «conferma». Se ce l\'avevi spenta resta spenta, e la accendi in Preferenze o chiedendolo a Filo.',
       ],
       fixes: [

@@ -1541,6 +1541,10 @@ test('cancellata la domanda lunga, la risposta si riprende lo spazio', async ({ 
   const corpoPrima = await page.evaluate(() => (
     document.querySelector('.sn-popup .sn-popup-body').getBoundingClientRect().height
   ));
+  const casella = () => page.evaluate(() => (
+    document.querySelector('.sn-popup .sn-popup-input').getBoundingClientRect().height
+  ));
+  const casellaPrima = await casella();
 
   await domandaLunga(page);
   const corpoStretto = await page.evaluate(() => (
@@ -1549,6 +1553,9 @@ test('cancellata la domanda lunga, la risposta si riprende lo spazio', async ({ 
   expect(corpoStretto, 'il corpo non ha ceduto spazio alla domanda').toBeLessThan(corpoPrima - 5);
 
   await page.locator('.sn-popup .sn-popup-input').fill('');
+  // Col segnaposto che va a capo, la casella misurata da vuota restava una riga più alta di com'era nata.
+  await expect.poll(casella, { timeout: 5000, message: 'cancellata la domanda, la casella non è tornata com\'era' })
+    .toBeLessThanOrEqual(casellaPrima + 0.5);
   await expect.poll(
     async () => page.evaluate(() => (
       document.querySelector('.sn-popup .sn-popup-body').getBoundingClientRect().height
