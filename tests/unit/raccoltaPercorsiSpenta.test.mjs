@@ -158,7 +158,8 @@ test('SECURITY.md dice che la raccolta è spenta e cosa manca per riaccenderla',
   const breve = sec.slice(sec.indexOf('## In breve'), sec.indexOf('## 1.'));
   assert.match(breve, /non li raccoglie e non li manda a nessuno/);
   const otto = sec.slice(sec.indexOf('## 8.'), sec.indexOf('## 9.'));
-  const stato = otto.slice(otto.indexOf('**Stato:'), otto.indexOf('\n\n'));
+  const inizio = otto.indexOf('**Stato:');
+  const stato = otto.slice(inizio, otto.indexOf('\n\n', inizio));
   assert.match(stato, /spenta fino a dopo il lancio/);
   assert.match(stato, /`pathSubmit`/);
   assert.match(stato, /non escono dal\s+computer/);

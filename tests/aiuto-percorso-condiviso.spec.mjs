@@ -8,6 +8,10 @@
 // che la riga ci sia accanto ai pulsanti, e che il percorso parta davvero
 // quando si risponde.
 //
+// Il riquadro compare solo a raccolta accesa (oggi è spenta, #897: la prova sta
+// in aiuto-raccolta-spenta.spec.mjs); qui lo si disegna direttamente, perché
+// è quello che tornerà il giorno in cui si riaccende.
+//
 // Senza il fix il primo test è rosso: sotto la domanda non c'era niente.
 
 import { test, expect } from './fixtures/electron.mjs';
