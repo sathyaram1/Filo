@@ -710,6 +710,27 @@
     return host;
   }
 
+  // Il testo di una voce della cronologia (password e testi di altri siti) non diventa MAI un nodo di testo nel
+  // documento del sito: la ricerca del browser (window.find) attraversa anche lo shadow chiuso e leggerebbe un
+  // nodo lettera per lettera (#589.8). Lo rendiamo come contenuto generato da una proprietà posata sull'elemento
+  // dentro lo shadow chiuso — glifi, non testo cercabile — e il nome accessibile sta in un attributo, che la
+  // ricerca non trova e che il sito non legge oltre il confine dello shadow chiuso.
+  function cssString(s) {
+    let out = '"';
+    for (const ch of String(s)) {
+      const c = ch.codePointAt(0);
+      if (ch === '"' || ch === '\\') out += '\\' + ch;
+      else if (c < 0x20 || c === 0x7f) out += '\\' + c.toString(16) + ' ';
+      else out += ch;
+    }
+    return out + '"';
+  }
+  function testoNascosto(labelEl, btnEl, s) {
+    labelEl.classList.add('sn-menu-gentesto');
+    labelEl.style.setProperty('--sn-gentesto', cssString(s));
+    if (btnEl) btnEl.setAttribute('aria-label', s);
+  }
+
   // Sotto-menu cronologia incolla. Si ancora alla freccetta.
   // `handlers` può essere una funzione (retrocompat: solo onPick) o un oggetto
   // { onPick, onRemove, onClear }.
