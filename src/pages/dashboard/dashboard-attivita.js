@@ -270,6 +270,8 @@
     RIPRISTINA_STILE_PAGINA: () => 'rimesso la pagina com\'era',
     COMANDO_FINESTRA: () => 'azionato un comando della finestra',
     INVIA_FEEDBACK: () => 'preparato una segnalazione',
+    PULISCI_TAB: () => 'riordinato le schede',
+    CANCELLA_ARCHIVIO: () => 'eliminato schede dall\'archivio',
   };
   // `hasReasoning`: il modello ha davvero ragionato. Senza, un blocco che
   // contiene solo una frase intermedia non può intitolarsi «Ragionamento».
@@ -409,6 +411,14 @@
       return { icon: '🖌', text: `Aspetto della pagina · ${d || 'modificato'}` };
     },
     RIPRISTINA_STILE_PAGINA: () => ({ icon: '🖌', text: 'Aspetto della pagina ripristinato' }),
+    PULISCI_TAB: (a) => {
+      const n = Number(a._output && a._output.archived) || 0;
+      return { icon: '🧹', text: n ? `Schede riordinate · ${n} ${n === 1 ? 'archiviata' : 'archiviate'}` : 'Schede riordinate · nessuna da archiviare' };
+    },
+    CANCELLA_ARCHIVIO: (a) => {
+      const n = Number(a._output && a._output.eliminate) || 0;
+      return { icon: '🗑', text: `Eliminate dall’archivio · ${n} ${n === 1 ? 'scheda' : 'schede'}` };
+    },
     COMANDO_FINESTRA: (a) => {
       const labels = {
         fullscreen: 'Schermo intero', minimize: 'Finestra ridotta a icona', home: 'Home aperta',
@@ -740,11 +750,14 @@
 
   function renderActionButton(a, { onAck, activity = null } = {}) {
     const type = String(a.type || '').toUpperCase();
+    // In attesa di conferma come le altre, ma la si dà dalla loro UI: il
+    // bottone del riordino, il pannello con l'elenco da eliminare.
+    if (type === 'PULISCI_TAB') return renderBottoneRiordino(a, activity);
+    if (type === 'CANCELLA_ARCHIVIO') return renderDeleteArchivePanel(a, activity);
     // Azione sospesa in attesa di conferma (#146.2): il main non l'ha eseguita
     // (livello 2 o 3) e ha allegato spiegazione + livello. Il bottone apre il
     // popup OK/Annulla (2) o il box "digita conferma" (3); solo dopo il sì
     // dell'utente l'azione parte davvero via MSG.FILO_CONFIRM_ACTION.
-    // PULISCI_TAB e CANCELLA_ARCHIVIO non passano di qui: hanno la loro UI.
     if (a._confirm && a._confirm.level >= 2) {
       const btn = document.createElement('button');
       btn.className = 'dash-action-btn dash-action-btn-primary';
@@ -804,14 +817,7 @@
         // il MODELLO al turno dopo — l'oggetto è lo stesso che sta nello
         // storico della conversazione, quindi basta segnarlo qui. Senza,
         // a «l'hai attivato?» il modello poteva solo tirare a indovinare.
-        if (r && r.executed) {
-          a._confirmed = true;
-          a._executed = true;
-          delete a._confirm;
-          if (r.output) a._output = r.output;
-          const row = activityRowFor(a);
-          if (activity && row) activity.addRow(a.type, row.icon, row.text, !!row.failed);
-        }
+        if (r && r.executed) segnaConfermata(a, r.output, activity);
         // #146.6 — comando confermato (livello 2/3): mostra l'output in chat.
         if (isCmd) {
           btn.textContent = (r && r.executed) ? `✓ ${short}` : `✗ ${short}`;
@@ -973,59 +979,95 @@
       btn.textContent = `📅 ${a.title || a.titolo || ''}`;
       return btn;
     }
-    if (type === 'PULISCI_TAB') {
-      // Bottone di conferma: la pulizia parte SOLO al click (con conferma),
-      // mai automaticamente (spec §2.1).
-      const btn = document.createElement('button');
-      btn.className = 'dash-action-btn dash-action-btn-primary';
-      btn.type = 'button';
-      btn.textContent = '🧹 Riordina e archivia le schede';
-      btn.addEventListener('click', async () => {
-        if (btn.disabled) return;
-        // Livello 2 (#146.2): popup Filo che spiega la modifica, non il
-        // window.confirm nativo (PATTERNS.md: niente default del browser).
-        const text = 'Filo valuterà tutte le schede aperte e archivierà quelle non più utili. '
-          + 'Le schede archiviate restano riapribili da “Tab archiviate”.';
-        const ok = window.SN_CONFIRM_UI
-          ? await window.SN_CONFIRM_UI.confirm({ title: 'Riordino delle schede', text, okLabel: 'Procedi' })
-          : window.confirm(`${text} Procedo?`);
-        if (!ok) return;
-        btn.disabled = true;
-        btn.textContent = '🧹 Riordino in corso…';
-        const r = await send({ type: MSG.RUN_TAB_TRIAGE });
-        const n = (r && r.archived) || 0;
-        btn.textContent = n > 0
-          ? `✓ Archiviate ${n} ${n === 1 ? 'scheda' : 'schede'}`
-          : '✓ Nessuna scheda da archiviare';
-      });
-      return btn;
-    }
-    if (type === 'CANCELLA_ARCHIVIO') {
-      return renderDeleteArchivePanel(a.query || a.testo || '');
-    }
     return null;
   }
 
-  // §5 — pannello di cancellazione retroattiva: cerca le schede pertinenti nella
-  // cronologia e le elimina DEFINITIVAMENTE dopo conferma esplicita.
-  function renderDeleteArchivePanel(query) {
+  // Confermata e fatta: lo sanno il diario e, al turno dopo, il modello (è lo
+  // stesso oggetto che sta nello storico della conversazione).
+  function segnaConfermata(a, output, activity) {
+    a._confirmed = true;
+    a._executed = true;
+    delete a._confirm;
+    if (output) a._output = output;
+    const row = activityRowFor(a);
+    if (activity && row) activity.addRow(a.type, row.icon, row.text, !!row.failed);
+  }
+
+  // La pulizia parte SOLO al click, con conferma, mai da sola (spec §2.1).
+  function renderBottoneRiordino(a, activity) {
+    const btn = document.createElement('button');
+    btn.className = 'dash-action-btn dash-action-btn-primary';
+    btn.type = 'button';
+    btn.textContent = '🧹 Riordina e archivia le schede';
+    btn.addEventListener('click', async () => {
+      if (btn.disabled) return;
+      // Livello 2 (#146.2): popup Filo che spiega la modifica, non il
+      // window.confirm nativo (PATTERNS.md: niente default del browser).
+      const text = 'Filo valuterà tutte le schede aperte e archivierà quelle non più utili. '
+        + 'Le schede archiviate restano riapribili da “Tab archiviate”.';
+      const ok = window.SN_CONFIRM_UI
+        ? await window.SN_CONFIRM_UI.confirm({ title: 'Riordino delle schede', text, okLabel: 'Procedi' })
+        : window.confirm(`${text} Procedo?`);
+      if (!ok) return;
+      btn.disabled = true;
+      btn.textContent = '🧹 Riordino in corso…';
+      const r = await send({ type: MSG.RUN_TAB_TRIAGE });
+      if (!r || !r.ok) {
+        btn.disabled = false;
+        btn.textContent = '🧹 Riordino non riuscito · riprova';
+        return;
+      }
+      const n = r.archived || 0;
+      btn.textContent = n > 0
+        ? `✓ Archiviate ${n} ${n === 1 ? 'scheda' : 'schede'}`
+        : '✓ Nessuna scheda da archiviare';
+      segnaConfermata(a, { archived: n }, activity);
+    });
+    return btn;
+  }
+
+  // §5 — pannello di cancellazione retroattiva: propone TUTTE e SOLE le schede
+  // archiviate pertinenti (le sceglie il main) e le elimina DEFINITIVAMENTE
+  // dopo conferma esplicita.
+  function renderDeleteArchivePanel(a, activity) {
+    const query = String(a.query || a.testo || '').trim();
     const panel = document.createElement('div');
     panel.className = 'dash-delete-panel';
     const note = document.createElement('div');
     note.className = 'dash-delete-note';
-    note.textContent = `Cerco nell’archivio: “${query}”…`;
     panel.appendChild(note);
 
-    (async () => {
-      const r = await send({ type: MSG.SEARCH_ARCHIVED_TABS, query });
-      const results = (r && Array.isArray(r.results)) ? r.results.slice(0, 20) : null;
-      if (!results || !results.length) {
-        note.textContent = results
-          ? `Nessuna scheda archiviata corrisponde a “${query}”.`
-          : 'Ricerca non disponibile (manca la chiave per la ricerca semantica).';
+    async function cerca() {
+      panel.querySelectorAll('.dash-delete-list, .dash-action-btn').forEach((el) => el.remove());
+      note.dataset.cerco = '1';
+      note.textContent = `Cerco nell’archivio: “${query}”…`;
+      const r = await send({ type: MSG.ARCHIVIO_DA_CANCELLARE, query });
+      delete note.dataset.cerco;
+      const results = (r && r.ok && Array.isArray(r.results)) ? r.results : null;
+      if (!results) {
+        if (r && r.ok && r.results === null) {
+          note.textContent = 'Ricerca non disponibile (manca la chiave per la ricerca semantica).';
+          return;
+        }
+        // Senza un giudizio completo non si propone niente: un elenco a metà
+        // farebbe credere di aver tolto tutto.
+        note.textContent = `Non sono riuscito a capire quali schede riguardano “${query}”.`;
+        const again = document.createElement('button');
+        again.className = 'dash-action-btn';
+        again.type = 'button';
+        again.textContent = 'Riprova';
+        again.addEventListener('click', () => { cerca(); });
+        panel.appendChild(again);
         return;
       }
-      note.textContent = `Trovate ${results.length} schede pertinenti a “${query}”. Verranno eliminate DEFINITIVAMENTE:`;
+      if (!results.length) {
+        note.textContent = `Nessuna scheda archiviata riguarda “${query}”.`;
+        return;
+      }
+      const quante = (n) => `${n} ${n === 1 ? 'scheda' : 'schede'}`;
+      note.textContent = results.length === 1
+        ? `Trovata 1 scheda pertinente a “${query}”. Verrà eliminata DEFINITIVAMENTE:`
+        : `Trovate ${results.length} schede pertinenti a “${query}”. Verranno eliminate DEFINITIVAMENTE:`;
       const ul = document.createElement('ul');
       ul.className = 'dash-delete-list';
       for (const it of results) {
@@ -1039,27 +1081,34 @@
       const del = document.createElement('button');
       del.className = 'dash-action-btn dash-action-btn-danger';
       del.type = 'button';
-      del.textContent = `🗑 Elimina definitivamente ${results.length} ${results.length === 1 ? 'scheda' : 'schede'}`;
+      del.textContent = `🗑 Elimina definitivamente ${quante(results.length)}`;
       del.addEventListener('click', async () => {
         if (del.disabled) return;
         // Livello 3 (#146.2): eliminazione irreversibile → l'utente deve
         // digitare espressamente "conferma".
-        const text = `Eliminare definitivamente ${results.length} ${results.length === 1 ? 'scheda' : 'schede'} dall’archivio.`;
+        const text = `Eliminare definitivamente ${quante(results.length)} dall’archivio.`;
         const ok = window.SN_CONFIRM_UI
           ? await window.SN_CONFIRM_UI.confirmTyped({ title: 'Eliminazione definitiva', text, okLabel: 'Elimina' })
           : window.confirm(`${text} L’operazione non è reversibile.`);
-        if (!ok) return;
+        if (!ok || del.disabled) return;
         del.disabled = true;
         del.textContent = 'Elimino…';
         const res = await send({ type: MSG.DELETE_ARCHIVED_TABS, ids: results.map((x) => x.id) });
-        const removed = (res && res.removed) || 0;
+        if (!res || !res.ok) {
+          del.disabled = false;
+          del.textContent = `🗑 Elimina definitivamente ${quante(results.length)}`;
+          note.textContent = 'Eliminazione non riuscita: l’archivio è com’era. Riprova.';
+          return;
+        }
+        const removed = res.removed || 0;
         del.remove();
         ul.remove();
-        note.textContent = `✓ Eliminate definitivamente ${removed} ${removed === 1 ? 'scheda' : 'schede'}.`;
+        note.textContent = `✓ Eliminate definitivamente ${quante(removed)}.`;
+        segnaConfermata(a, { eliminate: removed }, activity);
       });
       panel.appendChild(del);
-    })();
-
+    }
+    cerca();
     return panel;
   }
 

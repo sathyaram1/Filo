@@ -305,15 +305,24 @@
       level: 1,
       describe: (a) => `Creare l'evento "${a.title || a.titolo || ''}"`,
     },
+    // La prima riga di describe è quella che il diario mostra mentre si aspetta il clic.
     PULISCI_TAB: {
       level: 2,
-      describe: () => 'Valutare le schede aperte e archiviare quelle non più utili. '
+      describe: () => 'Riordinare le schede e archiviare quelle non più utili.\n'
         + 'Le schede archiviate restano riapribili da “Tab archiviate”.',
+      describeDone: (a) => {
+        const n = Number(a && a._output && a._output.archived) || 0;
+        return n ? `Schede riordinate: archiviate ${n} non più utili` : 'Schede riordinate: nessuna da archiviare';
+      },
     },
     CANCELLA_ARCHIVIO: {
       level: 3,
-      describe: (a) => `Eliminare DEFINITIVAMENTE dall'archivio le schede pertinenti a `
-        + `“${a.query || a.testo || ''}”.`,
+      describe: (a) => `Eliminare dall'archivio le schede su “${a.query || a.testo || ''}”.\n`
+        + 'L\'eliminazione è DEFINITIVA.',
+      describeDone: (a) => {
+        const n = Number(a && a._output && a._output.eliminate) || 0;
+        return `Eliminate DEFINITIVAMENTE dall'archivio ${n} ${n === 1 ? 'scheda' : 'schede'} su “${a.query || a.testo || ''}”`;
+      },
     },
     CANCELLA_MEMORIA: {
       // Cancella tutti i moduli di memoria di Filo (PROFILO, PREFERENZE, espansioni)

@@ -4,7 +4,7 @@
 const { soloFilo } = require('./origine');
 
 module.exports = function register(on, ctx) {
-  const { MSG, winOf, searchArchivedTabs } = ctx;
+  const { MSG, winOf, searchArchivedTabs, archivioDaCancellare } = ctx;
   const ArchivedTabs = globalThis.SN_ARCHIVED_TABS;
 
   on('_tabs:create', async (msg, sender) => {
@@ -116,6 +116,9 @@ module.exports = function register(on, ctx) {
   });
 
   on(MSG.SEARCH_ARCHIVED_TABS, async (msg) => searchArchivedTabs(msg.query));
+
+  // Spende una chiamata al modello per ogni blocco di schede: solo dalle pagine di Filo.
+  on(MSG.ARCHIVIO_DA_CANCELLARE, soloFilo(async (msg) => archivioDaCancellare(msg && msg.query)));
 
   on(MSG.DELETE_ARCHIVED_TABS, async (msg) => {
     const r = await ArchivedTabs.removeMany(msg.ids || []);

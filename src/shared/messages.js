@@ -57,6 +57,9 @@
     REOPEN_ARCHIVED_TAB: 'reopen_archived_tab',
     // §3.2 — ricerca semantica nell'archivio (embedding Google). { query }
     SEARCH_ARCHIVED_TABS: 'search_archived_tabs',
+    // §5 — le schede archiviate da proporre per la cancellazione: solo le
+    // pertinenti, tutte. { query } → { ok, results | null, error? }
+    ARCHIVIO_DA_CANCELLARE: 'archivio_da_cancellare',
     // §5 — cancellazione PERMANENTE di più tab archiviate (dopo conferma). { ids }
     DELETE_ARCHIVED_TABS: 'delete_archived_tabs',
     // Deck builder Commander (DECK-BUILDER-SPEC.md): CRUD dei mazzi, storage
