@@ -218,7 +218,7 @@ test('una prova degli unit più lunga della finestra di silenzio non fa arrivare
     writeFileSync(join(lavoro, 'tests', 'unit', 'lungo.test.mjs'), `import test from 'node:test'; test('lungo', async () => { await new Promise((r) => setTimeout(r, ${SILENZIO_MS * 2})); });\n`);
     g(lavoro, 'add', '-A'); g(lavoro, 'commit', '-qm', 'ramo'); g(lavoro, 'push', '-q', 'origin', 'claude/lungo');
     const tmp = join(casa, 'tmp');
-    execFileSync(process.execPath, ['-e', "require('fs').mkdirSync(process.argv[1])", tmp]);
+    mkdirSync(tmp);
     ultimoSegno = Date.now();
     const esito = await new Promise((ok) => {
       const env = { ...process.env, FILO_REPO_ROOT: lavoro, FILO_ROUTINE_TICKET: 'biglietto-lungo', FILO_ROUTINE_API: `http://127.0.0.1:${srv.address().port}`, TEMP: tmp, TMP: tmp, TMPDIR: tmp };
