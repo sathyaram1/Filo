@@ -162,33 +162,27 @@ function cartellaModuli(root) {
   try { return realpathSync(join(root, 'node_modules')); } catch (_) { return ''; }
 }
 
-// La cartella di prova è un clone che condivide gli oggetti, non un worktree: un worktree interrotto resta
-// nell'elenco del repo, e il `worktree unlock` + `remove --force` che git stesso suggerisce svuota node_modules
-// attraverso il collegamento (verifica #929 giro 2). I resti li toglie pulisciResti, all'inizio di ogni prova.
+// Il collegamento a node_modules sta nella cartella base, accanto ai worktree e non dentro: un worktree interrotto
+// resta nell'elenco del repo, e il `worktree unlock` + `remove --force` che git suggerisce attraverserebbe un
+// collegamento al suo interno svuotando node_modules (verifica #929 giro 2). Node lo trova risalendo le cartelle.
 const NOME_BASE = /^filo-fusione-[A-Za-z0-9]{6}$/;
 const FILE_PID = 'pid';
 // Una cartella di prova senza pid (o illeggibile) si considera viva finché è più giovane di così.
 const VIVA_SENZA_PID_MS = 3 * TETTO_UNIT_MS;
 
-function apriAlbero(git, base, nome, sha, moduli) {
+function apriAlbero(git, base, nome, sha) {
   const dir = join(base, nome);
-  const radice = git(['rev-parse', '--show-toplevel']);
-  if (!radice.ok) return { errore: `non riesco a leggere la cartella del repo (${primaRiga(radice.out)})` };
-  const c = git(['clone', '--quiet', '--shared', '--no-checkout', radice.out, dir]);
-  if (!c.ok) return { errore: `non riesco a preparare la cartella di prova (${primaRiga(c.out)})` };
-  const gd = gitIn(dir);
-  const co = gd(['checkout', '--quiet', '--detach', sha]);
-  if (!co.ok) return { dir, errore: `non riesco a preparare la cartella di prova (${primaRiga(co.out)})` };
-  // Come in un worktree: origin e origin/main sono quelli del repo, non il clone locale da cui nasce.
-  const url = git(['remote', 'get-url', 'origin']);
-  if (url.ok && url.out) gd(['remote', 'set-url', 'origin', url.out]);
-  gd(['update-ref', `refs/remotes/origin/${MAIN}`, sha]);
-  if (moduli) {
-    try { symlinkSync(moduli, join(dir, 'node_modules'), 'junction'); } catch (e) {
-      return { dir, errore: `non riesco a collegare node_modules nella cartella di prova (${e.message})` };
-    }
-  }
+  const r = git(['worktree', 'add', '--detach', '--quiet', dir, sha]);
+  if (!r.ok) return { errore: `non riesco a preparare la cartella di prova (${primaRiga(r.out)})` };
   return { dir };
+}
+
+/** La cartella base di una prova, senza mai attraversare il collegamento: prima lui, poi il resto. */
+function togliBase(base) {
+  const c = togliCollegamento(join(base, 'node_modules'));
+  if (!c.ok) return c;
+  try { rmSync(base, { recursive: true, force: true }); } catch (_) { /* lo dice il controllo sotto */ }
+  return existsSync(base) ? { ok: false, motivo: `non riesco a togliere ${base}` } : { ok: true };
 }
 
 function pidVivo(pid) {
@@ -235,8 +229,7 @@ export function pulisciResti({ git, tmp = tmpdir(), vivo = pidVivo, oraMs = Date
     const chiusi = [...dirs].map((d) => (existsSync(d) ? chiudiAlbero(git, d) : (git(['worktree', 'unlock', d]), { ok: true })));
     // La base si toglie solo se nessun collegamento è rimasto dentro: rmSync non li segue, ma non si rischia.
     if (chiusi.every((c) => c.ok) && !['fusione', 'main'].some((n) => { try { lstatSync(join(base, n, 'node_modules')); return true; } catch (_) { return false; } })) {
-      try { rmSync(base, { recursive: true, force: true }); } catch (_) { /* resta: la prossima prova riprova */ }
-      tolte.push(base);
+      if (togliBase(base).ok) tolte.push(base);
     }
   }
   if (basi.size) git(['worktree', 'prune']);
@@ -311,9 +304,16 @@ export function provaUnitSullaFusione({ root, punta, git = gitIn(root), lancia =
   mkdirSync(nessunHook);
   const moduli = cartellaModuli(root);
   const alberi = [];
+  if (moduli) {
+    try { symlinkSync(moduli, join(base, 'node_modules'), 'junction'); } catch (e) {
+      const t = togliBase(base);
+      if (!t.ok) console.error(`[unit sulla fusione] ${t.motivo}`);
+      return { errore: `non riesco a collegare node_modules nella cartella di prova (${e.message})`, mainSha };
+    }
+  }
   const opz = { timeoutMs };
   try {
-    const a = apriAlbero(git, base, 'fusione', mainSha, moduli);
+    const a = apriAlbero(git, base, 'fusione', mainSha);
     if (a.dir) alberi.push(a.dir);
     if (a.errore) return { errore: a.errore, mainSha };
     const ga = gitIn(a.dir);
@@ -348,7 +348,7 @@ export function provaUnitSullaFusione({ root, punta, git = gitIn(root), lancia =
     let d = decidiEsito({ fusione });
     if (d.serveMain) {
       scrivi(`▸ Unit rossi sulla fusione (${fusione.rossi.length}): li riprovo su main da solo`);
-      const b = apriAlbero(git, base, 'main', mainSha, moduli);
+      const b = apriAlbero(git, base, 'main', mainSha);
       if (b.dir) alberi.push(b.dir);
       if (b.errore) return { errore: b.errore, mainSha };
       const main = lancia(b.dir, base, 'main', opz);
@@ -357,11 +357,13 @@ export function provaUnitSullaFusione({ root, punta, git = gitIn(root), lancia =
     }
     return { ...d, mainSha, ...(instabili.length ? { instabili } : {}), ...(d.esito === 'rosso_sulla_fusione' ? { coda: fusione.coda } : {}) };
   } finally {
-    const rimasti = alberi.map((dir) => chiudiAlbero(git, dir)).filter((r) => !r.ok);
+    const collegamento = togliCollegamento(join(base, 'node_modules'));
+    const rimasti = [...alberi.map((dir) => chiudiAlbero(git, dir)), collegamento].filter((r) => !r.ok);
     if (rimasti.length) {
       for (const r of rimasti) console.error(`[unit sulla fusione] ${r.motivo}: cartella lasciata in ${base}. Togli prima il collegamento node_modules con \`cmd /c rmdir\` (o \`rm\` del solo collegamento), mai una rimozione ricorsiva.`);
     } else {
-      try { rmSync(base, { recursive: true, force: true }); } catch (_) { /* cartella temporanea: la pulisce il sistema */ }
+      const t = togliBase(base);
+      if (!t.ok) console.error(`[unit sulla fusione] ${t.motivo}`);
     }
   }
 }
