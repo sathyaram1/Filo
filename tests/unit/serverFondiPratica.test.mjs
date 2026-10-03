@@ -233,6 +233,18 @@ test('ramiApertiDellaPratica: i rami dell’app legati alla pratica in ogni work
   assert.deepEqual(ramiApertiDellaPratica('z', { radice: '/a', git, leggi: (f) => stati[f] || null }), []);
 });
 
+test('ramiApertiDellaPratica: rilegge origin/main prima di guardare, così un ramo appena fuso da npm run finish non tiene aperto', () => {
+  const lista = 'worktree /a\nHEAD 1\nbranch refs/heads/claude/app\n';
+  const stati = { [join('/a', '.claude', 'verify-local.json')]: { 'claude/app': { feedbackId: 'p' } } };
+  let riletto = false;
+  const git = (cwd, args) => {
+    if (args[0] === 'worktree') return lista;
+    if (args[0] === 'fetch') { riletto = true; return ''; }
+    return riletto ? '' : null; // prima del fetch origin/main locale è indietro
+  };
+  assert.deepEqual(ramiApertiDellaPratica('p', { radice: '/a', git, leggi: (f) => stati[f] || null }), []);
+});
+
 test('ramiApertiDellaPratica: il ramo dell’app con lo stesso nome di quello del server conta anche senza start', () => {
   const lista = 'worktree /a\nHEAD 1\nbranch refs/heads/main\n';
   const stati = { [join('/a', '.claude', 'verify-local.json')]: { 'claude/di-altri': { feedbackId: 'q' } } };
