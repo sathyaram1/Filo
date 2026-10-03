@@ -14,10 +14,15 @@ test('chat a Normale dopo una ricerca: il popup del riordino dice perché chiede
   try {
     await modelloFinto(app, [
       { toolCalls: [{ id: 'c1', name: 'CERCA_WEB', arguments: JSON.stringify({ query: 'meteo' }) }] },
+      { text: 'Sole.' },
       { toolCalls: [{ id: 'p1', name: 'PULISCI_TAB', arguments: '{}' }] },
-      { text: 'Fatto.' },
+      { text: 'Ecco.' },
     ]);
-    await chiedi(page, 'cerca il meteo e poi riordina le schede');
+    await chiedi(page, 'cerca il meteo');
+    await expect(page.locator('.dash-bubble').filter({ hasText: 'Sole.' })).toBeVisible({ timeout: 15000 });
+    await chiedi(page, 'riordina le schede');
+    await page.waitForTimeout(3000);
+    for (const b of await page.locator('button', { hasText: /Come ha lavorato/ }).all()) { try { await b.click({ timeout: 1000 }); } catch (_) {} }
     const btn = page.locator('button', { hasText: 'Riordina e archivia le schede' });
     await expect(btn).toBeVisible({ timeout: 15000 });
     await btn.click();
