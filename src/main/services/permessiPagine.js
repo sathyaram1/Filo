@@ -132,11 +132,13 @@ function lasciapassare(wc, tipo) {
 }
 
 // Dentro un riquadro di un altro sito la domanda del tasto destro arriva prima del segnale del menu che fa da gesto:
-// se il gesto non c'è ancora lo si aspetta per `attesaMs`, poi è no.
+// se il gesto non c'è ancora lo si aspetta per `attesaMs`, poi è no. Le domande che arrivano insieme aspettano una volta sola.
 function gestoEntro(wc, attesaMs) {
   if (gestoRecente(wc)) return Promise.resolve(true);
+  if (!wc) return Promise.resolve(false);
+  if (wc._filoAttesaGesto) return wc._filoAttesaGesto;
   const fine = Date.now() + Math.max(0, Number(attesaMs) || 0);
-  return new Promise((resolve) => {
+  const attesa = new Promise((resolve) => {
     const guarda = () => {
       if (gestoRecente(wc)) { resolve(true); return; }
       let morta = !wc;
