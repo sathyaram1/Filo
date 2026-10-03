@@ -318,7 +318,7 @@ test('nell’Aiuto, dopo l’invio o dopo un popup confermato da tastiera, «con
       .then(() => window.SN_CONFIRM_UI.confirmTyped({ title: 'Filo chiede conferma', text: 'Eliminare tutta la memoria.' }));
   });
   await expect(page.locator(CONFIRM_HOST)).toBeVisible();
-  await page.waitForTimeout(600);
+  await aspettaConfermaPronta(page);
   for (const tasto of ['Tab', 'Tab', 'Enter']) {
     await page.keyboard.press(tasto);
     await page.waitForTimeout(100);
