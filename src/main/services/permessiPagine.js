@@ -38,8 +38,7 @@ const DOPO_UN_GESTO = new Set(['notifications']);
 // che è anche quello che la pagina deve avere per leggerli.
 const COL_GESTO_SENZA_DOMANDA = new Set(['local-fonts']);
 const GESTO_MS = 5000;
-const GESTI = new Set(['mouseDown', 'mouseUp', 'rawKeyDown', 'keyDown', 'char', 'touchStart', 'touchEnd', 'gestureTap',
-  'gestureLongPress', 'gestureLongTap', 'gestureTwoFingerTap', 'contextMenu']);
+const GESTI = new Set(['mouseDown', 'mouseUp', 'rawKeyDown', 'keyDown', 'char', 'touchStart', 'touchEnd', 'gestureTap']);
 const LASCIAPASSARE_MS = 5000;
 // Il lasciapassare di Detta copre il microfono e basta: con la fotocamera la pagina avrebbe un sì mai dato (#591, giro 18).
 const PARTI_LASCIAPASSARE = { media: new Set(['audio']), appunti: new Set(['appunti']) };
@@ -132,20 +131,11 @@ function lasciapassare(wc, tipo) {
   return true;
 }
 
-// Ogni strada con cui Chromium apre il menu, perché un sito che annulla il `contextmenu` non la spenga (#589.4 giro 3).
 function tastoDelMenu(input) {
   const type = input.type;
-  const mod = Array.isArray(input.modifiers) ? input.modifiers : [];
-  // Electron non dà il pulsante: il tasto premuto sta fra i modificatori.
-  if (type === 'mouseDown') {
-    if (mod.includes('rightbuttondown')) return true;
-    if (process.platform === 'darwin') return mod.includes('leftbuttondown') && mod.includes('control');
-    return false;
-  }
-  if (type === 'rawKeyDown' || type === 'keyDown') {
-    return input.key === 'ContextMenu' || (input.key === 'F10' && mod.includes('shift'));
-  }
-  return type === 'gestureLongPress' || type === 'gestureLongTap' || type === 'gestureTwoFingerTap' || type === 'contextMenu';
+  // Electron non dà il pulsante: il tasto destro premuto sta fra i modificatori.
+  if (type === 'mouseDown') return Array.isArray(input.modifiers) && input.modifiers.includes('rightbuttondown');
+  return (type === 'rawKeyDown' || type === 'keyDown') && input.key === 'ContextMenu';
 }
 
 function segnaMenu(wc, frame) {

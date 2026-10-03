@@ -90,7 +90,13 @@ let contextMenuHandler = null;
 try {
   globalThis.__snSetContextMenuHandler = (fn) => { contextMenuHandler = fn; };
   window.addEventListener('contextmenu', (e) => {
-    if (typeof contextMenuHandler === 'function') { contextMenuHandler(e); return; }
+    // Il sito non deve vedere il clic che apre il menu di Filo, nemmeno dal suo ascolto in cattura su window: se lo annulla,
+    // il main non sa che l'utente ha aperto il menu e Incolla resta senza cronologia (#589.4). Chromium lo emette lo stesso.
+    if (typeof contextMenuHandler === 'function') {
+      contextMenuHandler(e);
+      if (!e.shiftKey) { try { e.stopImmediatePropagation(); } catch (_) {} }
+      return;
+    }
     // #405 — primo tasto destro dentro un riquadro: i content script non sono
     // ancora montati (li montiamo solo all'uso). Montali ORA e rigioca questo
     // stesso clic appena l'handler è pronto, così il primo tentativo apre il
@@ -99,7 +105,7 @@ try {
     // Shift resta la via di fuga anche qui: con Shift premuto non tocchiamo
     // l'evento e lasciamo che il riquadro faccia quello che farebbe da solo.
     if (e.shiftKey) return;
-    try { e.stopPropagation(); } catch (_) {}
+    try { e.stopImmediatePropagation(); } catch (_) {}
     replayContextMenu(e);
     ensureContentScripts();
   }, { capture: true });

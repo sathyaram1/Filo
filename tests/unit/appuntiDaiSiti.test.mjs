@@ -136,25 +136,6 @@ test('il tasto destro vero sulla pagina vale come menu aperto anche se il sito a
   assert.equal(await leggi(s), true, 'il tasto del menu sulla tastiera');
 });
 
-test('ogni strada che apre il menu vale anche se il sito annulla l\'evento: Shift+F10, pressione lunga, Ctrl+clic su Mac', async () => {
-  const prova = async (input, piattaforma) => {
-    const prima = Object.getOwnPropertyDescriptor(process, 'platform');
-    if (piattaforma) Object.defineProperty(process, 'platform', { value: piattaforma });
-    try {
-      const s = sito();
-      s.wc.mainFrame = PRINCIPALE;
-      s.wc.emetti('input-event', {}, input);
-      return Appunti.menuApertoQui(s);
-    } finally { Object.defineProperty(process, 'platform', prima); }
-  };
-  assert.equal(await prova({ type: 'rawKeyDown', key: 'F10', modifiers: ['shift'] }), true, 'Shift+F10');
-  assert.equal(await prova({ type: 'rawKeyDown', key: 'F10', modifiers: [] }), false, 'F10 da solo apre la barra dei menu, non il menu');
-  assert.equal(await prova({ type: 'gestureLongPress' }), true, 'pressione lunga sullo schermo tattile');
-  assert.equal(await prova({ type: 'mouseDown', modifiers: ['leftbuttondown', 'control'] }, 'darwin'), true, 'Ctrl+clic su Mac');
-  assert.equal(await prova({ type: 'mouseDown', modifiers: ['leftbuttondown', 'control'] }, 'win32'), false, 'Ctrl+clic su Windows apre in una scheda nuova');
-  assert.equal(await prova({ type: 'mouseDown', modifiers: ['leftbuttondown', 'control'] }, 'linux'), false, 'Ctrl+clic su Linux, uguale');
-});
-
 test('un mittente senza finestra non legge; una finestra aperta da un sito legge solo se si vede', async () => {
   assert.equal(Appunti.mittenteInVista({ url: 'https://sito.example/' }), false);
   const popup = (visibile, ridotta) => ({ tab: null, win: { isDestroyed: () => false, isVisible: () => visibile, isMinimized: () => ridotta } });
