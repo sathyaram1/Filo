@@ -243,6 +243,7 @@ function ensureRequestHook(ses) {
       if (ad) ad.chiudiInPagina(details);
       return;
     }
+    if (ad && ad.ricordaRichiesta) ad.ricordaRichiesta(details);
     callback({ cancel: false });
   });
   return state;

@@ -298,22 +298,52 @@ function cosmeticForTokens(href, ids, classes, gate) {
   return toCss(CB.matchTokensIn(cosmetic, host, clean(ids), clean(classes)), cancello(gate));
 }
 
-// Un'immagine o un riquadro fermati qui lascerebbero il buco dell'annuncio: la pagina li chiude (preload/nascondi-pubblicita.js).
-// I video no: un lettore che cambia sorgente sullo stesso elemento resterebbe chiuso col film.
+// Un'immagine o un riquadro fermati qui lascerebbero il buco dell'annuncio: il frame che li contiene li chiude
+// (preload/nascondi-pubblicita.js). I video no: un lettore che cambia sorgente sullo stesso elemento resterebbe chiuso col film.
 const DA_CHIUDERE = new Set(['image', 'subFrame', 'object']);
+const RIQUADRO_FERMATO = 'filo:adblock-riquadro-fermato';
+
+// L'elemento porta l'indirizzo di partenza: se un rinvio porta a un server in lista, il blocco vede solo l'ultimo.
+const PRIMI_MAX = 2000;
+const primi = new Map();
+
+function ricordaRichiesta(details) {
+  if (!details || !DA_CHIUDERE.has(details.resourceType) || primi.has(details.id)) return;
+  primi.set(details.id, details.url);
+  if (primi.size > PRIMI_MAX) primi.delete(primi.keys().next().value);
+}
 
 function chiudiInPagina(details) {
   if (!details || !DA_CHIUDERE.has(details.resourceType)) return;
+  const urls = [details.url];
+  const primo = primi.get(details.id);
+  primi.delete(details.id);
+  if (typeof primo === 'string' && primo !== details.url) urls.push(primo);
+  let frame = null;
+  try { frame = details.frame || null; } catch (_) {}
+  if (details.resourceType === 'subFrame' && frame) {
+    // Il riquadro sta nel frame padre, e uno mandato altrove da uno script non porta l'indirizzo: si fa riconoscere lui.
+    try { frame.executeJavaScript(`try{parent.postMessage(${JSON.stringify(RIQUADRO_FERMATO)},'*')}catch(e){}`).catch(() => {}); } catch (_) {}
+    try { frame = frame.parent || null; } catch (_) { frame = null; }
+  }
+  if (frame) {
+    try { frame.send('filo:adblock-chiudi', urls); return; } catch (_) {}
+  }
   const wc = details.webContents;
-  try { if (wc && !wc.isDestroyed()) wc.send('filo:adblock-chiudi', details.url); } catch (_) {}
+  try { if (wc && !wc.isDestroyed()) wc.send('filo:adblock-chiudi', urls); } catch (_) {}
 }
 
-// Acceso o spento, le pagine già aperte mettono o tolgono i loro riquadri senza aspettare di essere ricaricate.
+// Acceso o spento, le pagine già aperte, riquadri compresi, mettono o tolgono i loro riquadri senza essere ricaricate.
 function avvisaLePagine() {
   let all = [];
   try { all = require('electron').webContents.getAllWebContents(); } catch (_) { return; }
   for (const wc of all) {
-    try { if (!wc.isDestroyed() && /^https?:/i.test(wc.getURL())) wc.send('filo:adblock-stato'); } catch (_) {}
+    try {
+      if (wc.isDestroyed() || !/^https?:/i.test(wc.getURL())) continue;
+      for (const f of wc.mainFrame.framesInSubtree) {
+        try { f.send('filo:adblock-stato', enabled); } catch (_) {}
+      }
+    } catch (_) {}
   }
 }
 
@@ -529,6 +559,8 @@ module.exports = {
   isWhitelistedHost,
   shouldBlock,
   chiudiInPagina,
+  ricordaRichiesta,
+  RIQUADRO_FERMATO,
   refresh,
   init,
   configureFromSettings,
