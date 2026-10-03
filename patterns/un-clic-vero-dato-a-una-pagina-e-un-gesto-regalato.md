@@ -33,5 +33,14 @@ voleva.
   della vista, la pagina in pixel CSS. Una scheda in secondo piano ha la vista
   grande zero ma la pagina tiene la sua misura, e il clic le arriva lo stesso.
 
+- **Un riquadro di un altro sito vive in un processo suo**: `sendInputEvent`
+  arriva solo al frame principale, e il gesto vero lo riceve la pagina che
+  ospita il riquadro, non il riquadro. Per il lettore di YouTube incorporato il
+  clic passa dal protocollo di debug (`Input.dispatchMouseEvent`), che lo
+  instrada come il mouse fino al riquadro sotto il punto. Il punto lo conferma
+  la pagina ospite (il suo content script, legato alla richiesta da un gettone
+  monouso): dove sta il riquadro, e che sopra non ci sia un elemento del sito.
+
 Prove: `tests/unit/adSkip.test.mjs`, `tests/ad-skip.spec.mjs` (il «Salta» finto
-di YouTube su un sito qualunque non riceve mai un clic vero).
+di YouTube su un sito qualunque non riceve mai un clic vero; il sito che ospita
+il lettore incorporato non riceve gesti, nemmeno con un suo elemento sopra).

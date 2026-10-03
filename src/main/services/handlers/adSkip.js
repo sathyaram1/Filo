@@ -16,14 +16,31 @@ module.exports = function register(on, ctx) {
     return { ok: true, enabled, clicVero: enabled && AdSkip.mittenteConClicVero(sender) };
   });
 
-  on(MSG.AD_SKIP_CLICK, async (msg, sender) => {
-    if (!AdSkip.attivo(await impostazioni())) return { ok: false, code: 'off' };
-    if (!AdSkip.mittenteConClicVero(sender)) return { ok: false, code: 'forbidden', error: 'forbidden' };
+  function vistaDellaScheda(sender) {
     const win = winOf(sender);
     const tab = win && win._filoTabs && Array.isArray(win._filoTabs.tabs)
       ? win._filoTabs.tabs.find((t) => t.view && t.view.webContents === sender.wc)
       : null;
-    if (!tab) return { ok: false, code: 'scheda' };
-    return AdSkip.clicVero(sender.wc, msg, { win, view: tab.view });
+    return tab ? { win, view: tab.view } : null;
+  }
+
+  on(MSG.AD_SKIP_CLICK, async (msg, sender) => {
+    if (!AdSkip.attivo(await impostazioni())) return { ok: false, code: 'off' };
+    const modo = AdSkip.modoClicVero(sender);
+    if (!modo) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    const dove = vistaDellaScheda(sender);
+    if (!dove) return { ok: false, code: 'scheda' };
+    if (modo === 'riquadro') return AdSkip.richiestaDalRiquadro(sender, msg);
+    return AdSkip.clicVero(sender.wc, msg, dove);
+  });
+
+  // La pagina che ospita il lettore di YouTube dice dove cade il «Salta» nella sua vista: risponde solo il suo content script.
+  on(MSG.AD_SKIP_FRAME_POINT, async (msg, sender) => {
+    if (!AdSkip.attivo(await impostazioni())) return { ok: false, code: 'off' };
+    const p = AdSkip.puntoDalPadre(sender, msg);
+    if (!p) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    const dove = vistaDellaScheda(sender);
+    if (!dove) return { ok: false, code: 'scheda' };
+    return AdSkip.clicNelRiquadro(sender.wc, p, dove);
   });
 };

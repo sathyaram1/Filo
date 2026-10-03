@@ -1,6 +1,6 @@
 // Le pubblicità dei video che si possono saltare: appena il lettore mostra «Salta», Filo lo preme (#737).
 // Non accorcia quelle senza «Salta» e non clicca altro che i pulsanti di SALTA. Gira in ogni frame http(s).
-// Il clic vero lo dà il main (services/adSkip.js) dove la config lo concede; altrove un clic dello script.
+// Il clic vero lo dà il main (services/adSkip.js) dove la config lo concede, altrove un clic dello script; regole lì.
 
 (function (global) {
   'use strict';
@@ -10,6 +10,7 @@
   const T_CONFIG = MSG.AD_SKIP_CONFIG || 'ad_skip_config';
   const T_CLICK = MSG.AD_SKIP_CLICK || 'ad_skip_click';
   const T_UPDATE = MSG.AD_SKIP_CONFIG_UPDATE || 'ad_skip_config_update';
+  const T_FRAME_POINT = MSG.AD_SKIP_FRAME_POINT || 'ad_skip_frame_point';
 
   // I «Salta» dei lettori: YouTube nelle sue tre generazioni, Google IMA (il lettore pubblicitario di molti siti), JW Player.
   const SALTA = [
@@ -117,6 +118,9 @@
       if (p) {
         send({ type: T_CLICK, x: p.x, y: p.y }, (r) => {
           if (!r || (!r.ok && RIFIUTI_FERMI.has(r.code))) s.finto = true;
+          else if (r.code === 'cornice' && typeof r.gettone === 'string') {
+            try { window.parent.postMessage({ filoAdSkip: r.gettone, x: p.x, y: p.y }, '*'); } catch (_) {}
+          }
         });
         return true;
       }
@@ -170,6 +174,31 @@
     giro();
   }
 
+  // Nella pagina che ospita il lettore: il punto chiesto dal riquadro, nella vista di qui, se lì sopra c'è proprio lui.
+  // Un elemento del sito messo sopra al riquadro non deve ricevere il clic vero.
+  function suMessaggio(e) {
+    const d = e.data;
+    if (!attivo || !d || typeof d !== 'object' || typeof d.filoAdSkip !== 'string') return;
+    if (typeof d.x !== 'number' || typeof d.y !== 'number' || utenteOccupato()) return;
+    let f = null;
+    try {
+      for (const el of document.querySelectorAll('iframe')) { if (el.contentWindow === e.source) { f = el; break; } }
+    } catch (_) { f = null; }
+    if (!f) return;
+    const r = f.getBoundingClientRect();
+    // Un riquadro ruotato o in scala non ha i px del suo contenuto: il punto non si saprebbe dove cade.
+    if (Math.abs(r.width - f.offsetWidth) > 1 || Math.abs(r.height - f.offsetHeight) > 1) return;
+    const cs = getComputedStyle(f);
+    const x = r.left + f.clientLeft + (parseFloat(cs.paddingLeft) || 0) + d.x;
+    const y = r.top + f.clientTop + (parseFloat(cs.paddingTop) || 0) + d.y;
+    let sopra = null;
+    try { sopra = document.elementFromPoint(x, y); } catch (_) { sopra = null; }
+    if (sopra !== f) return;
+    const vv = window.visualViewport;
+    const p = vv ? { x: (x - vv.offsetLeft) * vv.scale, y: (y - vv.offsetTop) * vv.scale } : { x, y };
+    send({ type: T_FRAME_POINT, gettone: d.filoAdSkip, x: p.x, y: p.y, rx: d.x, ry: d.y });
+  }
+
   function suPuntatore(e) {
     if (!e.isTrusted) return;
     if (e.type === 'pointerdown') premuto = true;
@@ -193,6 +222,7 @@
       window.addEventListener(t, suPuntatore, { capture: true, passive: true });
     }
     window.addEventListener('blur', () => { premuto = false; });
+    if (window.top === window) window.addEventListener('message', suMessaggio);
     // Tornando sulla pagina (finestra ridotta a icona e riaperta) si riprova subito, anche dove i tentativi erano finiti.
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') riprova(); });
     chrome.runtime.onMessage.addListener((m) => { if (m && m.type === T_UPDATE) carica(); });

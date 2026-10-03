@@ -632,11 +632,14 @@
 
     // === Pubblicità dei video da saltare (#737, src/content/adSkip.js) ===
     // Aperti alle pagine web di proposito: li chiede il content script di ogni frame, e non portano dati dell'utente.
-    // `clicVero` dice se questo frame può chiedere il clic vero: solo il frame principale di una scheda su YouTube.
+    // `clicVero` dice se questo frame può chiedere il clic vero: il frame principale di una scheda su YouTube, o il
+    // lettore di YouTube incorporato direttamente in una pagina (lì il clic parte quando la pagina ospite conferma il punto).
     AD_SKIP_CONFIG: 'ad_skip_config',               // {} → { ok, enabled, clicVero }
     // Il «Salta» premuto dal main con un clic vero nel punto dato (px CSS del riquadro visibile); il main ricontrolla
     // interruttore, frame e sito, e ne dà uno ogni 800 ms per scheda.
-    AD_SKIP_CLICK: 'ad_skip_click',                 // { x, y } → { ok, code? }
+    AD_SKIP_CLICK: 'ad_skip_click',                 // { x, y } → { ok, code? } | dal riquadro { ok:false, code:'cornice', gettone }
+    // Dalla pagina ospite: il punto del riquadro nella sua vista, dopo aver visto che lì sopra c'è il riquadro.
+    AD_SKIP_FRAME_POINT: 'ad_skip_frame_point',     // { gettone, x, y, rx, ry } → { ok, code? }
     // Broadcast main→content quando l'interruttore cambia: il content rilegge la config.
     AD_SKIP_CONFIG_UPDATE: 'ad_skip_config_update',
 

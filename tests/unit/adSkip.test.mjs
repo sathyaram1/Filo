@@ -94,3 +94,38 @@ test('dalla chat si accende e si spegne subito, senza conferma', () => {
   assert.deepEqual(globalThis.SN_PREF.buildPreferencePartial('salta pubblicità', 'sì').partial, { security: { adSkip: { enabled: true } } });
   assert.equal(globalThis.SN_PREF.buildPreferencePartial('salta_pubblicita', 'boh'), null);
 });
+
+test('il lettore di YouTube incorporato in una pagina: solo se figlio diretto del frame principale', () => {
+  const main = { frameTreeNodeId: 1, url: 'https://blog.example/articolo' };
+  const wc = { mainFrame: main };
+  const tab = { id: 7 };
+  const figlio = (url, parent = main) => ({ wc, tab, frame: { frameTreeNodeId: 5, url, parent } });
+  assert.equal(A.modoClicVero(figlio('https://www.youtube.com/embed/x')), 'riquadro');
+  assert.equal(A.modoClicVero(figlio('https://www.youtube-nocookie.com/embed/x')), 'riquadro');
+  assert.equal(A.modoClicVero(figlio('https://evil.example/embed/x')), null);
+  assert.equal(A.modoClicVero(figlio('https://www.youtube.com/embed/x', { frameTreeNodeId: 4 })), null, 'un riquadro dentro un riquadro');
+  assert.equal(A.modoClicVero({ wc, tab, frame: main }), null, 'la pagina ospite non è YouTube');
+  assert.equal(A.modoClicVero({ ...figlio('https://www.youtube.com/embed/x'), tab: null }), null);
+  assert.equal(A.hostIncorporato('https://youtube-nocookie.com.evil.example/'), false);
+});
+
+test('il punto del riquadro lo conferma una volta sola la pagina ospite della stessa scheda', () => {
+  const main = { frameTreeNodeId: 1, url: 'https://blog.example/' };
+  const wc = { mainFrame: main };
+  const dalRiquadro = { wc, tab: { id: 1 }, frame: { frameTreeNodeId: 5, url: 'https://www.youtube.com/embed/x', parent: main } };
+  const ospite = { wc, tab: { id: 1 }, frame: main };
+  const chiedi = () => A.richiestaDalRiquadro(dalRiquadro, { x: 10, y: 20 }, { ora: 1000 });
+  const r = chiedi();
+  assert.equal(r.code, 'cornice');
+  assert.match(r.gettone, /^[0-9a-f]{32}$/);
+  const risposta = (g, extra = {}) => ({ gettone: g, x: 110, y: 220, rx: 10, ry: 20, ...extra });
+  assert.deepEqual(A.puntoDalPadre(ospite, risposta(r.gettone), { ora: 1100 }), { x: 110, y: 220 });
+  assert.equal(A.puntoDalPadre(ospite, risposta(r.gettone), { ora: 1100 }), null, 'il gettone vale una volta');
+  assert.equal(A.puntoDalPadre(ospite, risposta(chiedi().gettone), { ora: 1000 + A.GETTONE_MS + 1 }), null, 'scaduto');
+  assert.equal(A.puntoDalPadre(ospite, risposta(chiedi().gettone, { rx: 11 }), { ora: 1100 }), null, 'un altro punto');
+  const altraScheda = { wc: { mainFrame: main }, tab: { id: 2 }, frame: main };
+  assert.equal(A.puntoDalPadre(altraScheda, risposta(chiedi().gettone), { ora: 1100 }), null, 'un\'altra scheda');
+  assert.equal(A.puntoDalPadre(dalRiquadro, risposta(chiedi().gettone), { ora: 1100 }), null, 'il riquadro stesso');
+  assert.equal(A.puntoDalPadre(ospite, risposta('ff'.repeat(16)), { ora: 1100 }), null, 'un gettone inventato');
+  assert.equal(A.richiestaDalRiquadro(dalRiquadro, { x: -1, y: 0 }).code, 'punto');
+});

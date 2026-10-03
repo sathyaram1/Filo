@@ -15,7 +15,7 @@ const test = base.extend({
   app: async ({}, use) => {
     const userData = cartellaTemporanea('filo-adskip-');
     const app = await electron.launch({
-      args: [...argomentiScala, '--host-resolver-rules=MAP www.youtube.com 127.0.0.1, MAP sito-pubblico.test 127.0.0.1', '.'],
+      args: [...argomentiScala, '--host-resolver-rules=MAP www.youtube.com 127.0.0.1, MAP www.youtube-nocookie.com 127.0.0.1, MAP sito-pubblico.test 127.0.0.1', '.'],
       cwd: APP_ROOT,
       env: { ...process.env, FILO_USER_DATA: userData, FILO_DOWNLOAD_DIR: join(userData, 'downloads'), NODE_ENV: 'test' },
     });
@@ -176,6 +176,54 @@ test('negli altri lettori basta il clic dello script, anche dentro un riquadro',
   const clic = await frame.evaluate(() => window.__clic);
   expect(clic.length).toBe(1);
   expect(clic[0].vero).toBe(false);
+});
+
+// La pagina che ospita il lettore conta i gesti veri che riceve: quelli spettano al riquadro, non a lei.
+function ospite(src, { sopra = false } = {}) {
+  return `<!doctype html><title>Blog</title><body style="margin:8px"><p>articolo</p>
+  <script>window.__gesti=[];['pointerdown','mousedown','click'].forEach((t)=>document.addEventListener(t,(e)=>{if(e.isTrusted)window.__gesti.push(t+':'+e.target.tagName);},true));</script>
+  <div style="position:relative;width:724px;height:424px">
+    <iframe id="yt" src="${src}" width="720" height="420"></iframe>
+    ${sopra ? '<div id="sopra" style="position:absolute;inset:0;background:transparent"></div>' : ''}
+  </div></body>`;
+}
+
+async function riquadro(page, url) {
+  await expect.poll(() => page.frames().find((f) => f.url() === url) || null, { timeout: 5_000 }).not.toBeNull();
+  return page.frames().find((f) => f.url() === url);
+}
+
+test('un video di YouTube incorporato in un altro sito salta la pubblicità, e il gesto resta al lettore', async ({ app, openTab, testServer }) => {
+  // Ogni giro su un sito ospite diverso (una scheda per sito); lo zoom sposta il punto, il clic deve cadere lo stesso.
+  for (const [host, zoom, pubblico] of [['www.youtube.com', 1.5, false], ['www.youtube-nocookie.com', 1, true]]) {
+    const dentro = testServer.html(lettore({ dopoMs: -1 })).replace('127.0.0.1', host);
+    const page = await apri(openTab, testServer.html(ospite(dentro), { pubblico }));
+    const frame = await riquadro(page, dentro);
+    if (zoom !== 1) {
+      await app.evaluate(({ webContents }, h) => {
+        webContents.getAllWebContents().find((w) => { try { return new URL(w.getURL()).hostname === h; } catch (_) { return false; } })
+          .setZoomFactor(1.5);
+      }, new URL(page.url()).hostname);
+      await expect.poll(() => page.evaluate(() => window.devicePixelRatio), { timeout: 5_000 }).toBeGreaterThan(1.4);
+    }
+    await frame.waitForFunction(() => typeof window.__mostra === 'function');
+    await frame.evaluate(() => window.__mostra());
+    await expect.poll(() => frame.evaluate(() => window.__saltata), { timeout: 5_000, message: host }).toBe(true);
+    const clic = await frame.evaluate(() => window.__clic);
+    expect(clic.every((c) => c.vero), host).toBe(true);
+    expect(await page.evaluate(() => window.__gesti), host).toEqual([]);
+  }
+});
+
+test('se il sito che ospita il lettore ci mette sopra un suo elemento, quell\'elemento non riceve il clic vero', async ({ openTab, testServer }) => {
+  const dentro = suYouTube(testServer.html(lettore({ dopoMs: -1 })));
+  const page = await apri(openTab, testServer.html(ospite(dentro, { sopra: true })));
+  const frame = await riquadro(page, dentro);
+  await frame.waitForFunction(() => typeof window.__mostra === 'function');
+  await frame.evaluate(() => window.__mostra());
+  await page.waitForTimeout(3000);
+  expect(await page.evaluate(() => window.__gesti)).toEqual([]);
+  expect((await frame.evaluate(() => window.__clic)).some((c) => c.vero)).toBe(false);
 });
 
 test('fuori da YouTube un «Salta» di YouTube non riceve mai un clic vero', async ({ openTab, testServer }) => {
