@@ -230,15 +230,16 @@ module.exports = function register(on, ctx) {
   });
 
   // ── Cronologia appunti ────────────────────────────────────────────────
-  // Il menu «Incolla» vive dentro le pagine di qualunque sito: aggiungere, togliere, descrivere e svuotare restano
-  // aperti, ma l'elenco lo dà solo la lettura e solo a chi la può fare (services/appuntiDaiSiti.js, #589.4).
+  // Il menu «Incolla» vive dentro le pagine di qualunque sito: chi legge e chi scrive lo decide services/appuntiDaiSiti.js
+  // (#589.4). Descrivere resta aperto: la descrizione arriva da un modello quando vuole, e serve l'immagine esatta.
   on(MSG.GET_CLIPBOARD_HISTORY, async (msg, sender, origin) => {
     if (!(await AppuntiDaiSiti.elencoLeggibile(sender, origin))) return vietato;
     const list = await Storage.getRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
     return { ok: true, items: Array.isArray(list) ? list : [] };
   });
 
-  on(MSG.PUSH_CLIPBOARD_ENTRY, async (msg) => {
+  on(MSG.PUSH_CLIPBOARD_ENTRY, async (msg, sender, origin) => {
+    if (!AppuntiDaiSiti.scritturaAmmessa(sender, origin)) return vietato;
     const cap = SN_CONST.CLIPBOARD_HISTORY_MAX;
     const list = await Storage.getRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
     const arr = Array.isArray(list) ? list : [];
@@ -282,7 +283,8 @@ module.exports = function register(on, ctx) {
   });
 
   // Una voce sola: l'utente ha copiato una password e la toglie dal menu Incolla, sulla pagina dov'è (#256).
-  on(MSG.REMOVE_CLIPBOARD_ENTRY, async (msg) => {
+  on(MSG.REMOVE_CLIPBOARD_ENTRY, async (msg, sender, origin) => {
+    if (!AppuntiDaiSiti.scritturaAmmessa(sender, origin)) return vietato;
     const list = await Storage.getRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
     const arr = Array.isArray(list) ? list : [];
     const e = msg.entry;
@@ -303,7 +305,8 @@ module.exports = function register(on, ctx) {
   });
 
   // Svuotare sta nello stesso menu Incolla che mostra la cronologia, su qualunque pagina (#256).
-  on(MSG.CLEAR_CLIPBOARD_HISTORY, async () => {
+  on(MSG.CLEAR_CLIPBOARD_HISTORY, async (msg, sender, origin) => {
+    if (!AppuntiDaiSiti.scritturaAmmessa(sender, origin)) return vietato;
     await Storage.setRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
     return { ok: true };
   });

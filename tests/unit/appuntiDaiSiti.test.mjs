@@ -1,5 +1,5 @@
-// #589.4 — chi legge l'elenco della cronologia appunti: Filo sempre, un sito solo dalla scheda in vista e dopo un gesto
-// su quella scheda (anche il tasto destro in un riquadro di un altro sito, che arriva dopo la domanda).
+// #589.4 — chi tocca la cronologia appunti: Filo sempre; un sito legge l'elenco solo dal riquadro dove l'utente ha appena
+// aperto il menu, nella scheda in vista, e scrive solo dopo un gesto dell'utente su quella scheda.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,46 +22,71 @@ function finestra({ attiva = 1, vista = true } = {}) {
   return { isDestroyed: () => false, _filoTabs: { inVista: (id) => vista && id === attiva } };
 }
 
-const sito = (over = {}) => ({ tab: { id: 1, url: 'https://sito.example/' }, url: 'https://sito.example/', win: finestra(), wc: wcFinto(), ...over });
+const PRINCIPALE = { frameTreeNodeId: 3, origin: 'https://sito.example' };
+const RIQUADRO = { frameTreeNodeId: 4, origin: 'https://pubblicita.example' };
 
-test('una scheda di sfondo non legge l\'elenco, nemmeno subito dopo un gesto, e non aspetta', async () => {
+const sito = (over = {}) => {
+  const wc = wcFinto();
+  Permessi.seguiGesti(wc);
+  return { tab: { id: 1, url: 'https://sito.example/' }, url: 'https://sito.example/', win: finestra(), wc, frame: PRINCIPALE, ...over };
+};
+const apriMenu = (s, frame) => s.wc.emetti('context-menu', {}, { frame });
+const leggi = (s) => Appunti.elencoLeggibile(s, 'https://sito.example/');
+
+test('una scheda di sfondo non legge l\'elenco, nemmeno col menu appena aperto, e non aspetta', async () => {
   const s = sito({ tab: { id: 2, url: 'https://sito.example/' } });
-  s.wc._filoGestoAlle = Date.now();
+  apriMenu(s, PRINCIPALE);
   const t0 = Date.now();
-  assert.equal(await Appunti.elencoLeggibile(s, 'https://sito.example/'), false);
+  assert.equal(await leggi(s), false);
   assert.ok(Date.now() - t0 < 200, 'il rifiuto per la scheda di sfondo è subito');
 });
 
-test('la scheda in vista senza gesto non legge; con un gesto recente sì', async () => {
+test('la scheda in vista legge solo col menu aperto nel suo riquadro: un clic qualunque non basta', async () => {
   const s = sito();
+  s.wc.emetti('input-event', {}, { type: 'mouseDown', button: 'left' });
   const t0 = Date.now();
-  assert.equal(await Appunti.elencoLeggibile(s, 'https://sito.example/'), false);
-  assert.ok(Date.now() - t0 >= Appunti.ATTESA_DEL_GESTO_MS - 50, 'prima del no si aspetta il segnale del menu');
-  s.wc._filoGestoAlle = Date.now();
-  assert.equal(await Appunti.elencoLeggibile(s, 'https://sito.example/'), true);
-  s.wc._filoGestoAlle = Date.now() - Permessi.GESTO_MS - 1;
-  assert.equal(await Appunti.elencoLeggibile(s, 'https://sito.example/'), false, 'un gesto vecchio non vale');
+  assert.equal(await leggi(s), false, 'un clic che non apre il menu');
+  assert.ok(Date.now() - t0 >= Appunti.ATTESA_DEL_MENU_MS - 50, 'prima del no si aspetta il segnale del menu');
+  apriMenu(s, PRINCIPALE);
+  assert.equal(await leggi(s), true);
+  s.wc._filoMenuAperto.alle = Date.now() - Permessi.GESTO_MS - 1;
+  assert.equal(await leggi(s), false, 'un menu vecchio non vale');
 });
 
-test('il tasto destro in un riquadro arriva dopo la domanda: vale se arriva entro l\'attesa', async () => {
+test('il menu aperto nella pagina non vale per il riquadro di un altro sito, e viceversa', async () => {
   const s = sito();
-  Permessi.seguiGesti(s.wc);
-  const esito = Appunti.elencoLeggibile(s, 'https://sito.example/');
-  setTimeout(() => s.wc.emetti('context-menu', {}, {}), 60);
+  apriMenu(s, PRINCIPALE);
+  assert.equal(await leggi({ ...s, frame: RIQUADRO }), false, 'il riquadro non ha avuto il menu');
+  apriMenu(s, RIQUADRO);
+  assert.equal(await leggi({ ...s, frame: RIQUADRO }), true);
+  assert.equal(await leggi(s), false, 'ora il menu è del riquadro');
+  assert.equal(await leggi({ ...s, frame: { frameTreeNodeId: 4, origin: 'https://altro.example' } }), false,
+    'stesso riquadro passato a un altro sito');
+  assert.equal(await leggi({ ...s, frame: null }), false, 'senza riquadro noto non si legge');
+});
+
+test('il segnale del menu arriva dopo la domanda: vale se arriva entro l\'attesa', async () => {
+  const s = sito();
+  const esito = leggi({ ...s, frame: RIQUADRO });
+  setTimeout(() => apriMenu(s, RIQUADRO), 60);
   assert.equal(await esito, true);
 });
 
-test('le domande che arrivano insieme aspettano il gesto una volta sola', async () => {
-  const wc = wcFinto();
-  const a = Permessi.gestoEntro(wc, 200);
-  const b = Permessi.gestoEntro(wc, 200);
-  assert.equal(a, b, 'una raffica di domande da una pagina non moltiplica le attese');
+test('le domande che arrivano insieme dallo stesso riquadro aspettano una volta sola', async () => {
+  const s = sito();
+  const a = leggi(s);
+  const b = leggi(s);
+  assert.equal(s.wc._filoAttesaMenu.size, 1, 'una raffica di domande non moltiplica le attese');
   assert.equal(await a, false);
-  assert.equal(wc._filoAttesaGesto, null);
-  const c = Permessi.gestoEntro(wc, 200);
-  assert.notEqual(c, a, 'finita l\'attesa, la domanda dopo ne apre un\'altra');
-  wc._filoGestoAlle = Date.now();
-  assert.equal(await c, true);
+  assert.equal(await b, false);
+  assert.equal(s.wc._filoAttesaMenu.size, 0);
+});
+
+test('una navigazione della pagina dimentica il menu', async () => {
+  const s = sito();
+  apriMenu(s, PRINCIPALE);
+  s.wc.emetti('did-start-navigation', { isMainFrame: true, isSameDocument: false });
+  assert.equal(s.wc._filoMenuAperto, null);
 });
 
 test('un tasto premuto in un riquadro è un gesto, Esc no', () => {
@@ -73,9 +98,21 @@ test('un tasto premuto in un riquadro è un gesto, Esc no', () => {
   assert.ok(wc._filoGestoAlle > 0);
 });
 
-test('Filo legge sempre, la cornice compresa', async () => {
+test('Filo legge e scrive sempre, la cornice compresa', async () => {
   assert.equal(await Appunti.elencoLeggibile({ url: 'filo://newtab/' }, 'filo://newtab/'), true);
   assert.equal(await Appunti.elencoLeggibile({ isShell: true, url: '' }, ''), true);
+  assert.equal(Appunti.scritturaAmmessa({ url: 'filo://newtab/' }, 'filo://newtab/'), true);
+  assert.equal(Appunti.scritturaAmmessa({ isShell: true, url: '' }, ''), true);
+});
+
+test('un sito scrive solo entro un minuto da un gesto sulla sua scheda, anche se nel frattempo è passata sullo sfondo', () => {
+  const s = sito({ tab: { id: 2, url: 'https://sito.example/' } });
+  assert.equal(Appunti.scritturaAmmessa(s, 'https://sito.example/'), false, 'senza gesto');
+  apriMenu(s, RIQUADRO);
+  assert.equal(Appunti.scritturaAmmessa(s, 'https://sito.example/'), true, 'il menu aperto è un gesto');
+  s.wc._filoGestoAlle = Date.now() - Appunti.SCRITTURA_DOPO_IL_GESTO_MS - 1;
+  assert.equal(Appunti.scritturaAmmessa(s, 'https://sito.example/'), false, 'gesto troppo vecchio');
+  assert.equal(Appunti.scritturaAmmessa({ url: 'https://sito.example/' }, 'https://sito.example/'), false, 'mittente senza scheda');
 });
 
 test('un mittente senza finestra non legge; una finestra aperta da un sito legge solo se si vede', async () => {
@@ -92,9 +129,9 @@ test('una scheda che chiude durante l\'attesa non legge', async () => {
   const s = sito();
   let morta = false;
   s.wc.isDestroyed = () => morta;
-  const esito = Appunti.elencoLeggibile(s, 'https://sito.example/');
+  const esito = leggi(s);
   setTimeout(() => { morta = true; }, 40);
   const t0 = Date.now();
   assert.equal(await esito, false);
-  assert.ok(Date.now() - t0 < Appunti.ATTESA_DEL_GESTO_MS);
+  assert.ok(Date.now() - t0 < Appunti.ATTESA_DEL_MENU_MS);
 });
