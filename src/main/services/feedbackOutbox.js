@@ -109,6 +109,7 @@
     if (typeof opts.onDone === 'function') onDoneFn = opts.onDone;
     if (typeof opts.onGiveUp === 'function') onGiveUpFn = opts.onGiveUp;
     if (typeof opts.tokenOwner === 'function') tokenOwnerFn = opts.tokenOwner;
+    if (typeof opts.onAttesaOwner === 'function') onAttesaOwnerFn = opts.onAttesaOwner;
     if (typeof opts.log === 'function') logFn = opts.log;
     if (Number.isFinite(opts.backoffMin)) { backoffMin = opts.backoffMin; backoff = opts.backoffMin; }
     if (Number.isFinite(opts.backoffMax)) backoffMax = opts.backoffMax;
