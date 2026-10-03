@@ -439,7 +439,7 @@
         const C = global.SN_CMD_CLASSIFY;
         let perche = '';
         try { perche = (cmd && C && C.classifyDetail) ? C.classifyDetail(cmd, a._perimetro).motivo : ''; } catch (_) {}
-        return `Eseguire nel terminale:\n${cmd || '(comando vuoto)'}`
+        return `${spiegazioneComando(a)}\n\nIl comando, nel terminale:\n${cmd || '(comando vuoto)'}`
           + (cwd ? `\nCartella di lavoro: ${cwd}` : '')
           + (perche ? `\nPerché te lo chiedo: ${perche}` : '');
       },
