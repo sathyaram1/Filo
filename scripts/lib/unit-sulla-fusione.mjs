@@ -184,6 +184,55 @@ function apriAlbero(git, base, nome, sha, moduli) {
   return { dir };
 }
 
+function pidVivo(pid) {
+  try { process.kill(pid, 0); return true; } catch (e) { return !!(e && e.code === 'EPERM'); }
+}
+
+/** La cartella di prova appartiene a una prova ancora in corso (qui o in un'altra sessione)? Nel dubbio sì. */
+function provaViva(base, { vivo = pidVivo, oraMs = Date.now() } = {}) {
+  let pid = NaN;
+  try { pid = Number.parseInt(readFileSync(join(base, FILE_PID), 'utf8'), 10); } catch (_) { /* senza pid: decide l'età */ }
+  if (Number.isInteger(pid) && pid > 0) return pid !== process.pid && vivo(pid);
+  try { return oraMs - statSync(base).mtimeMs < VIVA_SENZA_PID_MS; } catch (_) { return false; }
+}
+
+/**
+ * Toglie i resti delle prove interrotte: worktree registrati nel repo e cartelle nella temporanea di sistema, solo
+ * di prove non più vive, sempre togliendo prima il collegamento. Mai un throw. @returns {string[]} le cartelle tolte
+ */
+export function pulisciResti({ git, tmp = tmpdir(), vivo = pidVivo, oraMs = Date.now() } = {}) {
+  const basi = new Map();
+  const aggiungi = (base, dir) => {
+    if (!NOME_BASE.test(basename(base))) return;
+    if (!basi.has(base)) basi.set(base, new Set());
+    if (dir) basi.get(base).add(dir);
+  };
+  const l = git(['worktree', 'list', '--porcelain']);
+  if (l.ok) {
+    for (const r of l.out.split(/\r?\n/)) {
+      if (!r.startsWith('worktree ')) continue;
+      const dir = r.slice(9).trim();
+      if (['fusione', 'main'].includes(basename(dir))) aggiungi(dirname(dir), dir);
+    }
+  }
+  try {
+    for (const n of readdirSync(tmp)) aggiungi(join(tmp, n), '');
+  } catch (_) { /* temporanea illeggibile: restano i registrati */ }
+  const tolte = [];
+  for (const [base, dirs] of basi) {
+    if (existsSync(base) && provaViva(base, { vivo, oraMs })) continue;
+    for (const nome of ['fusione', 'main']) dirs.add(join(base, nome));
+    const chiusi = [...dirs].map((d) => (existsSync(d) ? chiudiAlbero(git, d) : (git(['worktree', 'unlock', d]), { ok: true })));
+    // La base si toglie solo se nessun collegamento è rimasto dentro: rmSync non li segue, ma non si rischia.
+    if (chiusi.every((c) => c.ok) && !['fusione', 'main'].some((n) => { try { lstatSync(join(base, n, 'node_modules')); return true; } catch (_) { return false; } })) {
+      try { rmSync(base, { recursive: true, force: true }); } catch (_) { /* resta: la prossima prova riprova */ }
+      tolte.push(base);
+    }
+  }
+  if (basi.size) git(['worktree', 'prune']);
+  return tolte;
+}
+
 function coda(file, righe = 40) {
   try { return readFileSync(file, 'utf8').trimEnd().split(/\r?\n/).slice(-righe).join('\n'); } catch (_) { return ''; }
 }
