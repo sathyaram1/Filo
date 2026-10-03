@@ -176,9 +176,12 @@ if (!IS_SUBFRAME) try {
 } catch (e) { /* la protezione non deve MAI bloccare il caricamento della pagina */ }
 
 // #576 — i riquadri della pubblicità che il blocco di rete lascia vuoti o che il sito serve da sé: regole in preload/nascondi-pubblicita.js.
-if (!IS_SUBFRAME) try {
+// Ciò che il blocco ferma si chiude in ogni frame, riquadri compresi: lì può stare l'annuncio.
+try {
+  const nascondi = require('./nascondi-pubblicita.js');
+  nascondi.chiudiBloccati({ ipcRenderer, webFrame });
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
-  if (/^https?:/i.test(loc)) require('./nascondi-pubblicita.js')({ ipcRenderer, webFrame, href: loc });
+  if (!IS_SUBFRAME && /^https?:/i.test(loc)) nascondi({ ipcRenderer, webFrame, href: loc });
 } catch (e) { /* come sopra: mai bloccare il caricamento */ }
 
 // Il sito è entrato o uscito dall'elenco coi banner dei cookie: la sua risposta va via prima che i suoi script

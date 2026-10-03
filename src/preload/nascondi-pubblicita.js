@@ -1,13 +1,108 @@
 // Nasconde i riquadri pubblicitari che il blocco di rete lascia in pagina, con le regole delle liste (services/adblock.js).
-// Foglio di stile dell'utente: batte gli !important del sito e la CSP non lo ferma. Solo nel frame principale.
-// Gli id e le classi della pagina si chiedono al main man mano che compaiono: le regole generiche sono troppe per mandarle tutte.
+// Foglio di stile dell'utente: batte gli !important del sito e la CSP non lo ferma. Le regole solo nel frame principale;
+// la chiusura di ciò che il blocco ha fermato in ogni frame, perché l'annuncio può stare dentro un riquadro.
 
-// Un'immagine o un riquadro che il blocco ha fermato si chiude, o resta il buco grande quanto l'annuncio.
 const CHIUSO = 'data-filo-pub-chiuso';
 const ELEMENTI = 'img,iframe,frame,embed,object';
 const MAX_BLOCCATI = 500;
+const RIQUADRO_FERMATO = 'filo:adblock-riquadro-fermato';
 
-module.exports = function nascondiPubblicita({ ipcRenderer, webFrame, href }) {
+// Un'immagine o un riquadro che il blocco ha fermato si chiude, o resta il buco grande quanto l'annuncio.
+function chiudiBloccati({ ipcRenderer, webFrame }) {
+  // Electron non toglie un foglio dell'utente: la regola vale finché la radice non porta questo attributo (blocco spento).
+  const GATE = 'data-filo-' + Math.random().toString(36).slice(2, 10);
+  let regola = false;
+  let observer = null;
+  const bloccati = new Set();
+
+  // Un riquadro che mostrava solo l'annuncio fermato resterebbe un rettangolo bianco: chiesto al padre di chiuderlo.
+  // Solo se l'elemento ne copriva almeno metà, e a frame caricato: un pixel di tracciamento non chiude un riquadro vero.
+  let inRiquadro = false;
+  try { inRiquadro = window.parent !== window; } catch (_) { inRiquadro = true; }
+  let annuncio = false;
+  let avvisato = false;
+  const visibile = (n) => { const r = n.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+  const vuoto = () => {
+    const b = document.body;
+    if (!b || (b.innerText || '').trim()) return false;
+    let media = [];
+    try { media = b.querySelectorAll('img,video,canvas,svg,iframe,frame,embed,object'); } catch (_) {}
+    for (const n of media) if (visibile(n)) return false;
+    return true;
+  };
+  const avvisaIlPadre = () => {
+    if (avvisato || !annuncio) return;
+    if (document.readyState !== 'complete') { window.addEventListener('load', avvisaIlPadre, { once: true }); return; }
+    if (!vuoto()) return;
+    avvisato = true;
+    try { window.parent.postMessage(RIQUADRO_FERMATO, '*'); } catch (_) {}
+  };
+
+  const chiudi = (el) => {
+    if (!regola) {
+      regola = true;
+      try { webFrame.insertCSS(`:root:not([${GATE}]) [${CHIUSO}]{display:none!important}`, { cssOrigin: 'user' }); } catch (_) {}
+    }
+    if (inRiquadro && !annuncio) {
+      try {
+        const r = el.getBoundingClientRect();
+        annuncio = r.width * r.height > 0 && r.width * r.height >= 0.5 * window.innerWidth * window.innerHeight;
+      } catch (_) {}
+    }
+    el.setAttribute(CHIUSO, '');
+    if (inRiquadro) avvisaIlPadre();
+  };
+  const srcDi = (el) => [el.currentSrc, el.src, el.data].filter((s) => typeof s === 'string' && s);
+  const segna = (el) => {
+    if (el && el.nodeType === 1 && srcDi(el).some((s) => bloccati.has(s))) chiudi(el);
+  };
+  const giro = (root) => {
+    if (!root || root.nodeType !== 1) return;
+    segna(root);
+    let nodes = [];
+    try { nodes = root.querySelectorAll(ELEMENTI); } catch (_) {}
+    for (const n of nodes) segna(n);
+  };
+
+  ipcRenderer.on('filo:adblock-chiudi', (_e, urls) => {
+    for (const u of Array.isArray(urls) ? urls : [urls]) {
+      if (typeof u !== 'string' || !u) continue;
+      bloccati.add(u);
+      if (bloccati.size > MAX_BLOCCATI) bloccati.delete(bloccati.values().next().value);
+    }
+    giro(document.documentElement);
+    if (observer) return;
+    observer = new MutationObserver((records) => {
+      for (const r of records) for (const n of r.addedNodes) giro(n);
+    });
+    try { observer.observe(document, { childList: true, subtree: true }); } catch (_) {}
+  });
+  // Un riquadro mandato da uno script a un indirizzo in lista non lo porta scritto: si fa riconoscere lui.
+  // Chi manda il segnale può chiudere solo il proprio riquadro.
+  window.addEventListener('message', (e) => {
+    if (e.data !== RIQUADRO_FERMATO || !e.source) return;
+    let frames = [];
+    try { frames = document.querySelectorAll('iframe,frame'); } catch (_) {}
+    for (const f of frames) if (f.contentWindow === e.source) chiudi(f);
+  });
+  // L'errore di un'immagine arriva prima o dopo l'avviso del main: chi arriva secondo chiude.
+  window.addEventListener('error', (e) => { if (bloccati.size) segna(e.target); }, true);
+  // Un'immagine che poi carica una sorgente buona (banner a rotazione) torna visibile.
+  window.addEventListener('load', (e) => {
+    const t = e.target;
+    if (t && t.nodeType === 1 && t.tagName === 'IMG' && t.hasAttribute(CHIUSO) && !srcDi(t).some((s) => bloccati.has(s))) {
+      t.removeAttribute(CHIUSO);
+    }
+  }, true);
+  ipcRenderer.on('filo:adblock-stato', (_e, acceso) => {
+    try {
+      if (acceso === false) document.documentElement.setAttribute(GATE, '');
+      else document.documentElement.removeAttribute(GATE);
+    } catch (_) {}
+  });
+}
+
+function nascondiPubblicita({ ipcRenderer, webFrame, href }) {
   // Electron non toglie un foglio dell'utente: le regole valgono finché la radice non porta questo attributo (blocco spento).
   // Il nome cambia a ogni pagina, così un sito non lo mette da sé per tenersi la pubblicità.
   const GATE = 'data-filo-' + Math.random().toString(36).slice(2, 10);
@@ -25,12 +120,6 @@ module.exports = function nascondiPubblicita({ ipcRenderer, webFrame, href }) {
   let ids = [];
   let classes = [];
   let timer = null;
-
-  const bloccati = new Set();
-  const srcDi = (el) => [el.currentSrc, el.src, el.data].filter((s) => typeof s === 'string' && s);
-  const segna = (el) => {
-    if (el && el.nodeType === 1 && srcDi(el).some((s) => bloccati.has(s))) el.setAttribute(CHIUSO, '');
-  };
 
   const collect = (el) => {
     const id = el.id;
@@ -57,12 +146,11 @@ module.exports = function nascondiPubblicita({ ipcRenderer, webFrame, href }) {
   };
 
   const survey = (root) => {
-    if (!root || root.nodeType !== 1) return;
-    const sotto = (sel) => { try { return root.querySelectorAll(sel); } catch (_) { return []; } };
-    if (bloccati.size) { segna(root); for (const n of sotto(ELEMENTI)) segna(n); }
-    if (!generiche) return;
+    if (!generiche || !root || root.nodeType !== 1) return;
     collect(root);
-    for (const n of sotto('[id],[class]')) collect(n);
+    let nodes = [];
+    try { nodes = root.querySelectorAll('[id],[class]'); } catch (_) {}
+    for (const n of nodes) collect(n);
   };
 
   const schedule = () => {
@@ -76,7 +164,7 @@ module.exports = function nascondiPubblicita({ ipcRenderer, webFrame, href }) {
     again();
     if (observer) return;
     observer = new MutationObserver((records) => {
-      if (!attivo || (!generiche && !bloccati.size)) return;
+      if (!attivo || !generiche) return;
       for (const r of records) for (const n of r.addedNodes) survey(n);
       schedule();
     });
@@ -92,7 +180,6 @@ module.exports = function nascondiPubblicita({ ipcRenderer, webFrame, href }) {
     try { if (document.documentElement) document.documentElement.removeAttribute(GATE); } catch (_) {}
     if (!inserite) {
       inserite = true;
-      insert(`:root:not([${GATE}]) [${CHIUSO}]{display:none!important}`);
       insert(cfg.css);
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', osserva, { once: true });
@@ -106,24 +193,9 @@ module.exports = function nascondiPubblicita({ ipcRenderer, webFrame, href }) {
 
   ipcRenderer.on('filo:adblock-stato', () => { spegni(); accendi(); });
 
-  ipcRenderer.on('filo:adblock-chiudi', (_e, url) => {
-    if (typeof url !== 'string' || !url) return;
-    bloccati.add(url);
-    if (bloccati.size > MAX_BLOCCATI) bloccati.delete(bloccati.values().next().value);
-    let nodes = [];
-    try { nodes = document.querySelectorAll(ELEMENTI); } catch (_) {}
-    for (const n of nodes) segna(n);
-  });
-  // L'errore di un'immagine arriva prima o dopo l'avviso del main: chi arriva secondo chiude.
-  window.addEventListener('error', (e) => { if (bloccati.size) segna(e.target); }, true);
-  // Un'immagine che poi carica una sorgente buona (banner a rotazione) torna visibile.
-  window.addEventListener('load', (e) => {
-    const t = e.target;
-    if (t && t.nodeType === 1 && t.tagName === 'IMG' && t.hasAttribute(CHIUSO) && !srcDi(t).some((s) => bloccati.has(s))) {
-      t.removeAttribute(CHIUSO);
-    }
-  }, true);
-
   accendi();
   window.addEventListener('load', again, { once: true });
-};
+}
+
+module.exports = nascondiPubblicita;
+module.exports.chiudiBloccati = chiudiBloccati;
