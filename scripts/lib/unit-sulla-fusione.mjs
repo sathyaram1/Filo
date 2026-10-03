@@ -294,6 +294,8 @@ export function lanciaUnit(dir, base, nome, { timeoutMs = TETTO_UNIT_MS, file = 
 export function provaUnitSullaFusione({ root, punta, git = gitIn(root), lancia = lanciaUnit, scrivi = (s) => console.log(s), timeoutMs = TETTO_UNIT_MS } = {}) {
   const remoti = git(['remote']);
   if (!remoti.ok) return { errore: `git non risponde (${primaRiga(remoti.out)})` };
+  // I resti delle prove interrotte si tolgono a ogni richiesta, anche quando la prova poi non serve.
+  pulisciResti({ git });
   if (!remoti.out.split(/\s+/).includes('origin')) return { saltata: true, motivo: 'nessun origin da cui prendere main' };
   const f = git(['fetch', '--quiet', 'origin', `+refs/heads/${MAIN}:refs/remotes/origin/${MAIN}`]);
   if (!f.ok) return { errore: `non riesco a scaricare main da origin (${primaRiga(f.out)})` };
