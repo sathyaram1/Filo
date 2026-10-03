@@ -161,6 +161,14 @@
     catch (_) { return true; }
   }
 
+  // Detto una volta per voce; un avvisatore che risponde `false` (nessuno a cui dirlo) riprova al giro dopo.
+  function attendiAccesso(it, motivo) {
+    it.attesaAccesso = true;
+    logFn('voce dell\'owner ferma finché torna il suo accesso:', it.id, motivo);
+    if (it.avvisatoAccesso || !onAttesaOwnerFn) return;
+    try { it.avvisatoAccesso = onAttesaOwnerFn(it) !== false; } catch (_) { it.avvisatoAccesso = true; }
+  }
+
   // Tenta di inviare TUTTA la coda una volta. Ritorna true se la coda è vuota
   // dopo il tentativo. Su fallimento (offline) le voci restano in coda e, se
   // `auto`, viene pianificato un nuovo tentativo con backoff crescente.
