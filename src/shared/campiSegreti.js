@@ -188,7 +188,7 @@
       return out;
     }
 
-    return { campoSegreto, copertoAschermo, etichettaCollegata, campiInVista };
+    return { campoSegreto, copertoAschermo, etichettaCollegata, etichettaVicina, campiInVista };
   }
 
   global.SN_CAMPI_SEGRETI = { crea };
