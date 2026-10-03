@@ -599,6 +599,10 @@ export async function scrivi(id, to, nota, opts = {}) {
   if (opts.preapprova === true && statusToPublic && statusToPublic(to) === 'closed') {
     return { ok: false, motivo: `lo stato «${to}» chiude la pratica: il segno «fondi senza chiedermelo» non conterebbe. Ometti --preapprova (o usa --chiedi-prima).` };
   }
+  if (typeof opts.frase === 'string') {
+    const lunga = fraseTroppoLunga(opts.frase.trim());
+    if (lunga) return { ok: false, motivo: lunga };
+  }
   const bearer = opts.bearer || await acquireBearer();
   // La pratica coi campi di ogni altro passaggio (CAMPI_PRATICA: senza il sì dell'owner un approvato
   // sembra un utente, #913) più le note da fondere. La lettura va nel conto di chi ci ha mandato qui (#680).
