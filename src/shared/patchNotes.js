@@ -11,10 +11,10 @@
     {
       version: '0.2.230', date: '2026-10-03',
       features: [
-        'Col tasto destro sull\'avviso di un sito pericoloso puoi chiedere a Filo di quel sito o segnalare un falso allarme: si apre una scheda nuova, e il sito resta coperto.',
+        'Col tasto destro sull\'avviso di un sito pericoloso puoi chiedere a Filo di quel sito o segnalare un falso allarme. Si apre una scheda nuova e il sito resta coperto.',
       ],
       fixes: [
-        'Un sito segnalato come pericoloso o sospetto non può più coprire o far sparire l\'avviso di Filo, né sentire quello che scrivi mentre l\'avviso è aperto.',
+        'L\'avviso dei siti pericolosi e sospetti adesso sta sopra la pagina, fuori dalla sua portata, e resta lì finché non scegli tu.',
         'In Altro, Modelli e Preferenze quello che scrivi in una casella non si perde più se subito dopo cambi scheda o chiudi la pagina: domini esclusi, limite di spesa, chiavi, ore dell\'archivio automatico, durata delle notifiche, nome della voce. Il nome nuovo di una categoria vale anche senza premere «Rinomina».',
         'Lo screenshot fatto col tasto destro dentro una finestra di accesso, come quella di «Accedi con Google», fotografa quella finestra e non la scheda che sta dietro.',
       ],
