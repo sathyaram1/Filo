@@ -56,6 +56,7 @@
   // = non c'era nessuno a cui dirlo, la voce resta in coda e si riprova)
   let onGiveUpFn = null;
   let tokenOwnerFn = null;
+  let onAttesaOwnerFn = null;
   let logFn = function () { try { console.log.apply(console, ['[feedback-outbox]'].concat([].slice.call(arguments))); } catch (_) {} };
   let backoffMin = 3000;
   let backoffMax = 30000;
