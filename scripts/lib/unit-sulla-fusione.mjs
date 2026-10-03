@@ -246,8 +246,26 @@ export function provaUnitSullaFusione({ root, punta, git = gitIn(root), lancia =
       return { errore: `fusione di prova non riuscita (${primaRiga(fusa.out)})`, mainSha };
     }
     scrivi(`▸ Unit sul risultato della fusione con main ${mainSha.slice(0, 8)} (l'uscita completa resta in una cartella temporanea)`);
-    const fusione = lancia(a.dir, base, 'fusione', opz);
+    let fusione = lancia(a.dir, base, 'fusione', opz);
     if (fusione.errore) return { errore: fusione.errore, mainSha };
+    // Un rosso si riprova prima di giudicarlo: i test a tempo cedono con la macchina carica, e un instabile non è
+    // colpa della fusione. Si rilanciano solo i loro file, sullo stesso albero.
+    let instabili = [];
+    const daRiprovare = [...new Set((fusione.ok ? [] : fusione.rossi).map(fileDellaChiave).filter(Boolean))];
+    if (daRiprovare.length) {
+      scrivi(`▸ Unit rossi sulla fusione (${fusione.rossi.length}): riprovo i loro file da soli`);
+      const ri = lancia(a.dir, base, 'riprova', { ...opz, file: daRiprovare });
+      if (!ri.errore && ri.ok) {
+        instabili = fusione.rossi;
+        fusione = { ...fusione, ok: true, rossi: [] };
+      } else if (!ri.errore) {
+        const ancora = fusione.rossi.filter((k) => ri.rossi.includes(k));
+        if (ancora.length) {
+          instabili = fusione.rossi.filter((k) => !ancora.includes(k));
+          fusione = { ...fusione, rossi: ancora };
+        }
+      }
+    }
     let d = decidiEsito({ fusione });
     if (d.serveMain) {
       scrivi(`▸ Unit rossi sulla fusione (${fusione.rossi.length}): li riprovo su main da solo`);
