@@ -1,15 +1,6 @@
-// AUDIT (prober): nella dashboard di gestione (filo://manage), il dettaglio di
-// un feedback mostra le IMMAGINI allegate alla segnalazione originale
-// (fb.images) ma NON i FILE allegati (fb.files: pdf/txt/log caricati dal
-// tester col box feedback). La vecchia dashboard (filo://feedback) li mostra
-// (filesListHtml); la nuova bolla della segnalazione in manage.js (renderThread,
-// bolla 1) mappa solo fb.images → l'allegato-file del tester è invisibile
-// all'owner nella superficie unificata. Asimmetria tra cammini equivalenti.
-//
-// Assert di SUCCESSO: aprendo il dettaglio di un feedback con un file allegato,
-// nel thread deve comparire un riferimento cliccabile al file (nome visibile),
-// come già avviene per le immagini. Oggi fallisce: il nome del file non compare
-// da nessuna parte nel dettaglio.
+// Nel dettaglio di Gestione la bolla della segnalazione deve mostrare anche i
+// FILE allegati dal tester (fb.files: pdf/txt/log), non solo le immagini:
+// altrimenti l'allegato-file è invisibile all'owner.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { mkdirSync } from 'node:fs';
@@ -32,8 +23,6 @@ const FB_WITH_FILE = {
   files: [{ name: 'crash-log.txt', url: 'https://example.com/crash-log.txt', type: 'text/plain' }],
 };
 
-// Assert vivo: la bolla della segnalazione in manage mostra sia le immagini
-// sia i file allegati (parità con la vecchia dashboard filo://feedback).
 test('il dettaglio di manage mostra anche i FILE allegati alla segnalazione, non solo le immagini', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
@@ -57,7 +46,6 @@ test('il dettaglio di manage mostra anche i FILE allegati alla segnalazione, non
   mkdirSync('tests/.shots', { recursive: true });
   await page.screenshot({ path: 'tests/.shots/audit-manage-file-attachment.png' });
 
-  // Il FILE allegato deve comparire con un riferimento cliccabile (parità con
-  // le immagini e con la vecchia dashboard filo://feedback). Oggi: 0 match.
+  // Il FILE allegato deve comparire con un riferimento cliccabile, come le immagini.
   await expect(page.locator('#mgThread a', { hasText: 'crash-log.txt' })).toHaveCount(1);
 });
