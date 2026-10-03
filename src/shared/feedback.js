@@ -889,11 +889,18 @@
         senderProof = 'admin';
       }
     }
-    if (!res) res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(doc),
-    });
+    if (!res) {
+      // #912: da anonimo un nome riservato non parte, nemmeno quello dell'owner col token rifiutato: è un utente,
+      // nello stesso spazio in cui lo mette il server (senderOf in feedbackThread.js).
+      if (/^(owner|routine|agent|local):/i.test(String(clientId || ''))) {
+        doc.fields.clientId = toFsValue(await maybeEncrypt('non-provato:' + String(clientId)));
+      }
+      res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(doc),
+      });
+    }
     if (!senderProof && res.status === 403) {
       // Rules non ancora aggiornate ai campi nuovi (name/seq/subSeq/parentId/clientIdHash):
       // meglio un feedback senza numero/titolo/collegamento che un invio
