@@ -69,6 +69,8 @@ export function partiServerInSospeso(ramo, { cartellaServer = '', git = gitIn } 
   const ref = [`refs/heads/${ramo}`, `refs/remotes/origin/${ramo}`]
     .find((r) => git(radice, ['rev-parse', '--verify', '--quiet', r]) !== null);
   if (!ref) return [];
+  // Conta lo stato vero dei rami, non quello che la pratica ricorda: un seguito dopo la prima fusione è ancora fuori.
+  git(radice, ['fetch', '--quiet', 'origin', 'main']);
   if (git(radice, ['merge-base', '--is-ancestor', ref, 'refs/remotes/origin/main']) !== null) return [];
   return [{ part: 'server', branch: ramo }];
 }
