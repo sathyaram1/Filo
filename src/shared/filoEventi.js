@@ -16,7 +16,7 @@
   });
   const AUTORI = Object.freeze(['utente', 'filo', 'automazione']);
   const ORA_MS = 60 * 60 * 1000;
-  const PERIODI = Object.freeze(['ultima_ora', 'oggi', 'tutto']);
+  const PERIODI = Object.freeze(['ultima_ora', 'oggi', 'ieri', 'tutto']);
 
   function uuid() {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
@@ -278,16 +278,41 @@
     return eventi;
   }
 
-  // «Ultima ora», «oggi», «tutto», o le ultime N ore: il periodo che una cancellazione di pagine copre.
-  function periodo(nome, { ore, ora } = {}) {
+  // Un giorno scritto senza ora («2026-10-02») vale per il giorno intero dell'utente, non dalla mezzanotte di Greenwich.
+  function istante(x, { fineGiorno = false } = {}) {
+    if (x == null || x === '') return null;
+    const g = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(x).trim());
+    if (g) {
+      const d = new Date(Number(g[1]), Number(g[2]) - 1, Number(g[3]));
+      return fineGiorno ? new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime() - 1 : d.getTime();
+    }
+    const t = typeof x === 'number' ? x : Date.parse(x);
+    return Number.isFinite(t) ? t : NaN;
+  }
+
+  // Il periodo che una cancellazione di pagine copre: un nome («ultima ora», «oggi», «ieri», «tutto»), le ultime N ore
+  // o N giorni, o un intervallo qualsiasi (`da`/`a`, istanti o giorni) per «ieri sera» o «la settimana scorsa».
+  function periodo(nome, { ore, giorni, da, a, ora } = {}) {
     const adesso = ora instanceof Date ? ora : new Date();
+    const mezzanotte = new Date(adesso.getFullYear(), adesso.getMonth(), adesso.getDate());
+    if ((da != null && da !== '') || (a != null && a !== '')) {
+      const t0 = istante(da);
+      const t1 = istante(a, { fineGiorno: true });
+      if (Number.isNaN(t0) || Number.isNaN(t1)) return null;
+      const fine = t1 == null ? adesso.getTime() : Math.min(t1, adesso.getTime());
+      if (t0 != null && t0 > fine) return null;
+      return { da: t0 == null ? null : new Date(t0).toISOString(), a: new Date(fine).toISOString() };
+    }
     const n = Number(ore);
     if (Number.isFinite(n) && n > 0) return { da: new Date(adesso.getTime() - n * ORA_MS).toISOString(), a: adesso.toISOString() };
+    const gg = Number(giorni);
+    if (Number.isFinite(gg) && gg > 0) return { da: new Date(adesso.getTime() - gg * 24 * ORA_MS).toISOString(), a: adesso.toISOString() };
     const p = String(nome || '').toLowerCase().replace(/[\s-]+/g, '_');
     if (p === 'tutto' || p === 'tutte' || p === 'sempre') return { da: null, a: null };
-    if (p === 'oggi') {
-      const mezzanotte = new Date(adesso.getFullYear(), adesso.getMonth(), adesso.getDate());
-      return { da: mezzanotte.toISOString(), a: adesso.toISOString() };
+    if (p === 'oggi') return { da: mezzanotte.toISOString(), a: adesso.toISOString() };
+    if (p === 'ieri') {
+      const ieri = new Date(mezzanotte.getFullYear(), mezzanotte.getMonth(), mezzanotte.getDate() - 1);
+      return { da: ieri.toISOString(), a: new Date(mezzanotte.getTime() - 1).toISOString() };
     }
     if (p === 'ultima_ora' || p === 'ora') return { da: new Date(adesso.getTime() - ORA_MS).toISOString(), a: adesso.toISOString() };
     return null;

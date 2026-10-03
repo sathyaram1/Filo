@@ -86,10 +86,19 @@
     return /^(true|1|si|sì|yes|tutte|tutti)$/i.test(String(v ?? ''));
   }
   function periodoDetto(action) {
+    const vuoto = (v) => v == null || v === '';
+    if (action && (!vuoto(action.da) || !vuoto(action.a)) && action._periodo) {
+      const quando = (iso) => new Date(iso).toLocaleString('it-IT', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+      const { da, a } = action._periodo;
+      return da ? `dal ${quando(da)} al ${quando(a)}` : `fino al ${quando(a)}`;
+    }
     const ore = Number(action && action.ore);
     if (Number.isFinite(ore) && ore > 0) return ore === 1 ? 'dell’ultima ora' : `delle ultime ${ore} ore`;
+    const giorni = Number(action && action.giorni);
+    if (Number.isFinite(giorni) && giorni > 0) return giorni === 1 ? 'dell’ultimo giorno' : `degli ultimi ${giorni} giorni`;
     const p = String((action && (action.periodo || action._nomePeriodo)) || '').toLowerCase();
     if (p === 'oggi') return 'di oggi';
+    if (p === 'ieri') return 'di ieri';
     if (p === 'tutto') return 'di sempre';
     return 'dell’ultima ora';
   }

@@ -11,12 +11,15 @@ const registrabile = (url) => /^(https?|file):/i.test(String(url || ''));
 const senzaFrammento = (url) => String(url || '').split('#')[0];
 
 // history.replaceState non aggiunge voci né sposta quella attiva: è così che si distingue da una pagina nuova.
+// La voce dietro serve a cronologia piena (50 voci): lì una pagina nuova toglie la più vecchia e indice e lunghezza restano.
 function voceAttiva(wc) {
   try {
     const h = wc.navigationHistory;
     const i = h.getActiveIndex();
     const n = h.length();
-    return Number.isInteger(i) && Number.isInteger(n) ? { i, n } : null;
+    if (!Number.isInteger(i) || !Number.isInteger(n)) return null;
+    const dietro = i > 0 ? String((h.getEntryAtIndex(i - 1) || {}).url || '') : '';
+    return { i, n, dietro };
   } catch (_) { return null; }
 }
 
@@ -35,7 +38,8 @@ class VisiteSchede {
     const vocePrima = this.voci.get(wc);
     if (voce) this.voci.set(wc, voce); else this.voci.delete(wc);
     // La pagina che riscrive la propria voce (una mappa spostata, un filtro) resta la stessa visita, come nei browser.
-    if (inPagina && voce && vocePrima && voce.i === vocePrima.i && voce.n === vocePrima.n) {
+    if (inPagina && voce && vocePrima && voce.i === vocePrima.i && voce.n === vocePrima.n
+      && voce.dietro === vocePrima.dietro) {
       if (!registrabile(url)) return;
       this.ultime.set(wc, url);
       const v = this.inAttesa.get(wc);

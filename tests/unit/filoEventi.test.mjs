@@ -291,6 +291,24 @@ test('periodo(): ultima ora, oggi, tutto e le ultime N ore', () => {
   assert.equal(E.periodo('boh', { ora }), null);
 });
 
+test('periodo(): ieri, gli ultimi N giorni e un intervallo qualsiasi, coi giorni dell’utente', () => {
+  const ora = new Date(2026, 9, 3, 15, 30);
+  const ieri = E.periodo('ieri', { ora });
+  assert.equal(Date.parse(ieri.da), new Date(2026, 9, 2).getTime());
+  assert.equal(Date.parse(ieri.a), new Date(2026, 9, 3).getTime() - 1);
+  assert.equal(Date.parse(E.periodo('', { giorni: 7, ora }).da), ora.getTime() - 7 * 86400e3);
+  const sera = E.periodo('', { da: '2026-10-02T19:00:00', a: '2026-10-02T23:59:00', ora });
+  assert.equal(Date.parse(sera.da), new Date(2026, 9, 2, 19).getTime());
+  assert.equal(Date.parse(sera.a), new Date(2026, 9, 2, 23, 59).getTime());
+  const giorno = E.periodo('', { da: '2026-09-28', a: '2026-09-28', ora });
+  assert.equal(Date.parse(giorno.da), new Date(2026, 8, 28).getTime());
+  assert.equal(Date.parse(giorno.a), new Date(2026, 8, 29).getTime() - 1);
+  assert.equal(Date.parse(E.periodo('', { da: '2026-10-01', ora }).a), ora.getTime(), 'senza fine vale fino a adesso');
+  assert.equal(Date.parse(E.periodo('', { a: '2027-01-01', ora }).a), ora.getTime(), 'il futuro non si cancella prima');
+  assert.equal(E.periodo('', { da: 'boh', ora }), null);
+  assert.equal(E.periodo('', { da: '2026-10-03', a: '2026-10-01', ora }), null);
+});
+
 test('il filo lo scrive un modulo solo, e solo in coda o riscrivendo dopo una cancellazione', () => {
   const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
   const sorgenti = [];

@@ -440,3 +440,48 @@ test('«cancella le pagine di YouTube» chiede l’OK col conto di quel sito e t
   expect(testo).not.toContain('Video due');
   expect(testo).toContain('Wikipedia');
 });
+
+test('una pagina che riscrive il proprio indirizzo (una mappa spostata) resta una pagina visitata', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const userData = await app.evaluate(() => process.env.FILO_USER_DATA);
+  const page = await openTab(testServer.html('<!doctype html><title>Mappa</title><p>mappa</p>'));
+  const visite = () => eventi(userData).filter((e) => e.tipo === 'navigazione');
+  await expect.poll(() => visite().length, { timeout: 20_000 }).toBe(1);
+  for (let i = 0; i < 20; i++) {
+    await page.evaluate((k) => history.replaceState(null, '', location.pathname + '?@41.9,12.' + k + ',15z'), i);
+    await page.waitForTimeout(80);
+  }
+  // Una pagina nuova dentro la stessa (pushState, come un video dopo l'altro) resta invece una visita in più.
+  await page.evaluate(() => { history.pushState(null, '', '/altro-video'); document.title = 'Altro video'; });
+  await expect.poll(() => visite().length, { timeout: 10_000 }).toBe(2);
+  await page.waitForTimeout(1000);
+  await app.evaluate(() => globalThis.SN_IL_FILO.quandoFermo());
+  expect(visite().map((e) => e.titolo)).toEqual(['Mappa', 'Altro video']);
+});
+
+test('«cancella le pagine di ieri sera» e «di ieri» chiedono l’OK per quel periodo e lasciano il resto', async ({ app }) => {
+  const userData = await app.evaluate(() => process.env.FILO_USER_DATA);
+  await app.evaluate(async () => {
+    const ieri = (h) => { const d = new Date(); d.setDate(d.getDate() - 1); d.setHours(h, 0, 0, 0); return d.toISOString(); };
+    await globalThis.SN_IL_FILO.registraVisita({ url: 'https://mattina.test/', titolo: 'Ieri mattina', ts: ieri(10) });
+    await globalThis.SN_IL_FILO.registraVisita({ url: 'https://sera.test/', titolo: 'Ieri sera', ts: ieri(21) });
+    await globalThis.SN_IL_FILO.registraVisita({ url: 'https://oggi.test/', titolo: 'Pagina di oggi' });
+  });
+  // Un intervallo qualsiasi passa da `da`/`a`, con l'ora locale, e il popup dice le ore.
+  const da = await app.evaluate(() => { const d = new Date(); d.setDate(d.getDate() - 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T20:00:00`; });
+  const sera = { type: 'CANCELLA_PAGINE', da, a: da.replace('T20:00:00', 'T23:59:59') };
+  const chiestaSera = await app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a), sera);
+  expect(chiestaSera.needsConfirm).toBe(2);
+  expect(chiestaSera.describe).toMatch(/la pagina visitata dal .*20:00 al .*23:59/);
+  await app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a, { confirmed: true }), sera);
+  expect(leggiFilo(userData)).not.toContain('Ieri sera');
+  expect(leggiFilo(userData)).toContain('Ieri mattina');
+
+  const chiesta = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CANCELLA_PAGINE', periodo: 'ieri' }));
+  expect(chiesta.needsConfirm).toBe(2);
+  expect(chiesta.describe).toContain('la pagina visitata di ieri');
+  const fatta = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'CANCELLA_PAGINE', periodo: 'ieri' }, { confirmed: true }));
+  expect(fatta.output.cancellate).toBe(1);
+  expect(leggiFilo(userData)).not.toContain('Ieri mattina');
+  expect(leggiFilo(userData)).toContain('Pagina di oggi');
+});

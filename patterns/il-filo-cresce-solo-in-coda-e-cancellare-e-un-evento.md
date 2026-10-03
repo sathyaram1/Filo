@@ -28,6 +28,9 @@ Nessun tetto e nessun taglio.
   per chi passa da lì: un file scritto per conto proprio la romperebbe. Il filo decide l'incognito alla
   richiesta (contesto dell'IPC, o la finestra per le pagine visitate) e tiene quell'altro filo in RAM fino
   alla chiusura dell'ultima finestra incognito.
+- **Una visita è una voce nuova della cronologia della scheda.** Ricaricare, cambiare il frammento, riaprire le
+  schede di prima o riscrivere la propria voce (una mappa spostata, un filtro) non è una pagina nuova; una pagina
+  nuova dentro la stessa (un video dopo l'altro) sì. Sentinella `tests/unit/visiteSchede.test.mjs`.
 - **Un tetto è una cancellazione automatica.** Il vecchio registro grezzo (5000 voci, testi a 200 caratteri)
   è esattamente il taglio silenzioso che le regole del repo vietano.
 

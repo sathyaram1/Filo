@@ -245,8 +245,11 @@
     CANCELLA_PAGINE: {
       description: 'Cancella le pagine visitate che Filo ricorda ("cancella le pagine dell\'ultima ora", "togli la cronologia di oggi", "cancella tutta la cronologia", "cancella le pagine di YouTube"). Il sistema mostra all\'utente quante sono e le toglie solo col suo OK: non chiederlo tu a parole. Non tocca le chat né le schede chiuse.',
       properties: {
-        periodo: S('Quali pagine: "ultima_ora", "oggi" o "tutto". Per un numero di ore usa `ore`. Con `sito` e senza periodo valgono tutte le pagine di quel sito.', { enum: ['ultima_ora', 'oggi', 'tutto'] }),
+        periodo: S('Quali pagine: "ultima_ora", "oggi", "ieri" o "tutto". Per un numero di ore o di giorni usa `ore` o `giorni`, per un intervallo qualsiasi `da`/`a`. Con `sito` e senza periodo valgono tutte le pagine di quel sito.', { enum: ['ultima_ora', 'oggi', 'ieri', 'tutto'] }),
         ore: I('Le ultime N ore ("cancella le pagine delle ultime 3 ore"); ometti per un periodo con nome.'),
+        giorni: I('Gli ultimi N giorni ("cancella le pagine dell\'ultima settimana" = 7).'),
+        da: S('Inizio di un intervallo qualsiasi ("ieri sera", "la settimana scorsa", "dal 2 ottobre"): istante ISO con l\'ora locale, o giorno AAAA-MM-GG (dalla sua mezzanotte).'),
+        a: S('Fine dell\'intervallo, come `da` (un giorno vale fino alla sua fine); ometti per "fino a adesso".'),
         sito: S('Solo le pagine di questo sito ("youtube.com", o il nome "youtube"); ometti per tutti i siti.'),
       },
       required: [],
