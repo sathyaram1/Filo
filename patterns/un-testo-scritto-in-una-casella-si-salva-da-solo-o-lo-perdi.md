@@ -130,11 +130,20 @@ chiavi, le ore dell'archivio automatico tornavano com'erano (#590.5).
   iscrive chi salva e gli passa ogni `input`; pausa, Ctrl da solo, fuoco che
   esce, `TAB_IN_VISTA` e ricarica li ascolta il modulo. Una casella nuova non
   scrive i suoi ascoltatori di uscita: si iscrive.
-- **Un valore che a metà vale altro parte solo all'uscita** (`pausa: false`).
-  Scrivendo «15» il limite di spesa passerebbe da «1» e fermerebbe le richieste
-  di quell'istante; il nome di una categoria a metà finirebbe nelle altre
-  pagine. Un numero che serve a vedere l'effetto mentre lo si regola, come il
-  colore delle schede, la pausa la tiene.
+- **Un valore che a metà ha effetto aspetta la pausa lunga** (tre secondi,
+  `PAUSA_LUNGA_MS`) o l'uscita. Scrivendo «15» il limite di spesa passerebbe
+  da «1» e fermerebbe le richieste di quell'istante; con una chiave tronca la
+  richiesta verrebbe rifiutata e pagata coi crediti; un modello scritto a metà
+  fallirebbe; il nome di una categoria a metà finirebbe nelle altre pagine.
+  Senza nessuna pausa no: la scheda chiusa col mouse arriva alla pagina al più
+  come fuoco che esce, e le prove non lo sanno riprodurre. Incollare parte
+  subito.
+  Un numero che serve a vedere l'effetto mentre lo si regola, come il colore
+  delle schede, tiene la pausa breve.
+- **Una scelta finita parte subito.** Nell'editor dei modelli per azione il
+  segmento a metà arriva come `scrivendo`; la scelta dalla tendina, un
+  segmento aggiunto o tolto e il valore confermato o respinto partono al
+  momento.
 - **Gli avvisi aspettano l'uscita anche qui.** Una riga nuova del registro dei
   modelli, scritta partendo dalla stringa, a metà non ha ancora il nickname:
   mentre si scrive una riga corretta si ripulisce ma una nuova non si accende,

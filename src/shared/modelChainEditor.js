@@ -208,7 +208,8 @@
     let refs = splitRefs(value);
     if (!refs.length) refs = [''];
 
-    function emit() { if (typeof onChange === 'function') onChange(); }
+    // `scrivendo`: il segmento è a metà, non ancora confermato né validato.
+    function emit(scrivendo) { if (typeof onChange === 'function') onChange(!!scrivendo); }
     function getValue() { return refs.map((s) => s.trim()).filter(Boolean).join(', '); }
 
     function render(focusIdx) {
@@ -257,7 +258,7 @@
           inp.value = lastGood; fit(inp);
           refs[i] = lastGood; emit();
         };
-        inp.addEventListener('input', () => { refs[i] = inp.value; fit(inp); emit(); });
+        inp.addEventListener('input', () => { refs[i] = inp.value; fit(inp); emit(true); });
         inp.addEventListener('change', () => {
           const val = inp.value.trim();
           const v = validate ? validate(val) : { ok: true };

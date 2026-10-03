@@ -382,7 +382,9 @@
     // Editor a segmenti "Modelli per azione": una catena di fallback per azione.
     modelChains = ModelChain.renderGrid($('modelsGrid'), {
       models: settings.models || {},
-      onChange: () => caselle.cambiato('pagina'),
+      // Mentre si scrive in un segmento basta l'`input` che sale alla pagina; una scelta dalla tendina, un segmento
+      // aggiunto o tolto e un valore confermato o respinto partono subito.
+      onChange: (scrivendo) => { if (!scrivendo) { caselle.cambiato('pagina'); caselle.subito(true); } },
       // Registry LIVE (dalle righe correnti, anche non salvate) così la
       // validazione modello↔funzione riflette subito le modifiche.
       getRegistry: () => collectModelRegistry().registry,
@@ -885,9 +887,6 @@
   });
   caselle.registra('pagina', (avvisi) => save({ avvisi }));
   const CASELLA = /^(text|password|number|search|url|email)$/;
-  // A metà hanno effetto subito: il tetto «1» scrivendo «15» ferma le richieste, una chiave tronca viene rifiutata e
-  // il rifiuto resta scritto. Partono solo all'uscita; incollare parte subito.
-  const SOLO_ALL_USCITA = new Set(['monthlyLimit', 'apiKey', 'apiKeyTavily']);
 
   // La chiave OpenRouter si mette e si toglie anche dalla pagina Crediti
   // (#629), e questa pagina risalva TUTTO il modulo a ogni modifica: con la
@@ -907,14 +906,25 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
-    // Niente pulsante "Salva": un `change` (interruttore, tendina, campo lasciato) parte subito, una casella anche
-    // mentre si scrive.
+    // Niente pulsante "Salva": un `change` (interruttore, tendina, campo lasciato) parte subito. Qui ogni casella a
+    // metà ha effetto (il tetto «1» scrivendo «15» ferma le richieste, una chiave tronca viene rifiutata, un modello
+    // che non esiste fallisce), quindi aspetta la pausa lunga; incollare parte subito.
     $('page').addEventListener('input', (e) => {
       const t = e.target;
       if (!t || !(t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && CASELLA.test(t.type)))) return;
-      caselle.cambiato('pagina', e, { pausa: !SOLO_ALL_USCITA.has(t.id) });
+      caselle.cambiato('pagina', e, { pausa: window.SN_CASELLE.PAUSA_LUNGA_MS });
+      // L'avviso di una riga del registro si toglie mentre la si corregge; uno nuovo aspetta l'uscita.
+      if (t.closest('.sn-model-row.sn-row-invalid')) {
+        const { missingNickRows, dupRows } = collectModelRegistry();
+        markRegistryRowIssues(missingNickRows, dupRows, true);
+      }
     });
-    $('page').addEventListener('change', () => { caselle.cambiato('pagina'); caselle.subito(true); });
+    // L'editor dei modelli per azione dice da sé quando un segmento è confermato.
+    $('page').addEventListener('change', (e) => {
+      if (e.target && e.target.closest && e.target.closest('.sn-chain')) return;
+      caselle.cambiato('pagina');
+      caselle.subito(true);
+    });
     // Qualunque cosa cambi (interruttore, modelli per azione, registry) può
     // cambiare l'effetto di "solo pesi aperti": lo ricalcoliamo sempre.
     $('page').addEventListener('change', renderOpenWeightsImpact);

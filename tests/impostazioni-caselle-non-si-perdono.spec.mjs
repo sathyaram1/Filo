@@ -90,7 +90,7 @@ test('Altro: il nome nuovo di una categoria vale senza «Rinomina»; vuoto non l
   expect(await leggi(altro)).toEqual(['Ufficio']);
 });
 
-test('Modelli: il limite di spesa scritto e un clic su un\'altra scheda è quello nuovo, e a metà non parte', async ({ app, shell, openTab }) => {
+test('Modelli: il limite di spesa scritto e un clic su un\'altra scheda è quello nuovo, e a metà non parte', async ({ shell, openTab }) => {
   await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { monthlyLimitEur: 5 } }));
   const modelli = await openTab('filo://options/options.html');
   await expect(modelli.locator('#monthlyLimit')).toHaveValue('5', { timeout: 8000 });
@@ -104,24 +104,27 @@ test('Modelli: il limite di spesa scritto e un clic su un\'altra scheda è quell
   await scriviAlPostoDi(riaperta, '#monthlyLimit', '1');
   await new Promise((r) => setTimeout(r, 900));
   expect((await impostazioni(shell)).monthlyLimitEur).toBe(7);
+  // Fermo abbastanza, parte anche senza uscire.
   await riaperta.keyboard.type('5');
-  await ctrlW(app);
-  await expect.poll(async () => (await impostazioni(shell)).monthlyLimitEur, { timeout: 4000 }).toBe(15);
+  await expect.poll(async () => (await impostazioni(shell)).monthlyLimitEur, { timeout: 6000 }).toBe(15);
 });
 
-test('Modelli: una chiave scritta e Ctrl+W subito è salvata', async ({ app, shell, openTab }) => {
+test('Modelli: una chiave scritta e Ctrl+W subito è salvata, e a metà non parte', async ({ app, shell, openTab }) => {
   await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { useDefaultModels: false, apiKeys: { openrouter: '', tavily: '' } } }));
   const modelli = await openTab('filo://options/options.html');
   await expect(modelli.locator('#apiKeyTavily')).toBeVisible({ timeout: 8000 });
   await modelli.locator('#apiKeyTavily').click();
-  await modelli.keyboard.type('tvly-chiave-scritta');
+  await modelli.keyboard.type('tvly-chiave');
+  await new Promise((r) => setTimeout(r, 900));
+  expect((await impostazioni(shell)).apiKeys.tavily).toBe('');
+  await modelli.keyboard.type('-scritta');
   await ctrlW(app);
 
   await expect.poll(() => schedaAperta(shell, 'filo://options/options'), { timeout: 5000 }).toBe(false);
   await expect.poll(async () => (await impostazioni(shell)).apiKeys.tavily, { timeout: 4000 }).toBe('tvly-chiave-scritta');
 });
 
-test('Modelli: una riga del registro senza nickname non grida mentre si scrive; cambiata scheda e tornati sì', async ({ shell, openTab }) => {
+test('Modelli: una riga del registro senza nickname non grida mentre si scrive; cambiata scheda e tornati sì', async ({ app, shell, openTab }) => {
   await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { useDefaultModels: false } }));
   const modelli = await openTab('filo://options/options.html');
   await expect(modelli.locator('#sec-model-registry')).toBeVisible({ timeout: 8000 });
@@ -140,7 +143,8 @@ test('Modelli: una riga del registro senza nickname non grida mentre si scrive; 
 
   await riga.locator('.sn-model-nick').click();
   await modelli.keyboard.type('nuovo');
-  await expect(riga).not.toHaveClass(/sn-row-invalid/, { timeout: 4000 });
+  await expect(riga).not.toHaveClass(/sn-row-invalid/);
+  await ctrlW(app);
   await expect.poll(async () => ((await impostazioni(shell)).modelRegistry.nuovo || {}).model, { timeout: 4000 }).toBe('vendor/modello-nuovo');
 });
 

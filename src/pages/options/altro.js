@@ -98,12 +98,12 @@
     meta.textContent = I18n.t('options_category_pages', count);
     row.appendChild(meta);
 
-    // Il nome scritto vale anche senza «Rinomina» (#590.5): parte all'uscita dal campo o dalla scheda, non a metà
-    // parola, e la lista non si ridisegna sotto il cursore. Il tasto resta e conferma sempre.
+    // Il nome scritto vale anche senza «Rinomina» (#590.5): un nome a metà finirebbe nelle altre pagine, quindi parte
+    // quando sta fermo o all'uscita, e la lista non si ridisegna sotto il cursore. Il tasto resta e conferma sempre.
     const nome = `categoria:${cat.id}`;
     caselleCategorie.set(input, cat);
     caselle.registra(nome, (uscita) => rinomina(cat, input, { ripristina: uscita }));
-    input.addEventListener('input', (e) => caselle.cambiato(nome, e, { pausa: false }));
+    input.addEventListener('input', (e) => caselle.cambiato(nome, e, { pausa: window.SN_CASELLE.PAUSA_LUNGA_MS }));
     input.addEventListener('change', () => rinomina(cat, input, { ripristina: true }));
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); rinomina(cat, input, { ripristina: true, conferma: true }); }

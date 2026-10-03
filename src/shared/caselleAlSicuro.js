@@ -9,6 +9,9 @@
   // partono subito, perché chi incolla e chiude tiene il Ctrl giù da prima e alla pagina non arriva un Ctrl nuovo.
   const BATTUTA = new Set(['insertText', 'insertLineBreak', 'insertParagraph', 'insertCompositionText', 'deleteContentBackward', 'deleteContentForward']);
   const PAUSA_MS = 400;
+  // Per un valore che a metà vale altro e ha effetto subito (un tetto «1» scrivendo «15»): parte quando sta fermo,
+  // come la lista dei bloccati che le schede aperte seguono dopo tre secondi, o all'uscita.
+  const PAUSA_LUNGA_MS = 3000;
 
   // `uscita` gira all'uscita vera (scheda in secondo piano, ricarica): lì si accendono gli avvisi rimasti in attesa.
   function crea(opts) {
@@ -28,13 +31,11 @@
       }
     }
 
-    // `pausa: false` per un valore che a metà vale altro e ha effetto subito: parte solo all'uscita.
     function cambiato(nome, e, o) {
       daSpedire.add(nome);
       if (e && e.inputType && !BATTUTA.has(e.inputType)) { parti(false); return; }
-      if (o && o.pausa === false) return;
       clearTimeout(timer);
-      timer = setTimeout(() => parti(false), PAUSA_MS);
+      timer = setTimeout(() => parti(false), (o && o.pausa) || PAUSA_MS);
     }
 
     function spedita(nome) {
@@ -73,9 +74,8 @@
       cambiato,
       spedita,
       subito,
-      inSospeso: (nome) => (nome ? daSpedire.has(nome) : daSpedire.size > 0),
     };
   }
 
-  global.SN_CASELLE = { crea, BATTUTA, PAUSA_MS };
+  global.SN_CASELLE = { crea, BATTUTA, PAUSA_MS, PAUSA_LUNGA_MS };
 })(typeof window !== 'undefined' ? window : globalThis);
