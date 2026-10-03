@@ -149,6 +149,23 @@ test('mentre si scrive in un campo della pagina aspetta, poi salta', async ({ op
   expect(await page.locator('#cerca').inputValue()).toBe('gatti');
 });
 
+test('col lettore fuori dalla vista aspetta di rivederlo, poi salta col clic vero', async ({ openTab, testServer }) => {
+  const html = lettore({ dopoMs: -1 }).replace('</body>', '<div style="height:3000px">commenti</div></body>');
+  const page = await apri(openTab, suYouTube(testServer.html(html)));
+  await page.evaluate(() => window.scrollTo(0, 2000));
+  await page.evaluate(() => window.__mostra());
+  await page.waitForTimeout(2000);
+  let s = await stato(page);
+  expect(s.saltata).toBe(false);
+  expect(s.clic.filter((c) => c.vero)).toEqual([]);
+  expect(s.clic.length).toBeLessThanOrEqual(1);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const tornato = Date.now();
+  await expect.poll(async () => (await stato(page)).saltata, { timeout: 3_000 }).toBe(true);
+  s = await stato(page);
+  expect(s.clic.find((c) => c.vero).alle - tornato).toBeLessThan(1000);
+});
+
 test('negli altri lettori basta il clic dello script, anche dentro un riquadro', async ({ openTab, testServer }) => {
   const dentro = testServer.html(lettore({ classe: 'videoAdUiSkipButton', soloVeri: false, titolo: 'IMA' }), { pubblico: true });
   const page = await apri(openTab, testServer.html(`<!doctype html><title>Ospite</title><body>

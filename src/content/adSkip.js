@@ -24,7 +24,7 @@
   const PASSO_MS = 250;
   const PASSO_NASCOSTI_MS = 1000;
   // Un clic che non ha effetto non si ripete a raffica: i tentativi si diradano fino a uno ogni dieci secondi.
-  const ATTESE_MS = [600, 1200, 2400, 4800, 9600];
+  const ATTESE_MS = [500, 1000, 1500, 2500, 5000, 10000];
   const TENTATIVI = 12;
   // Un «Salta» sparito si segue ancora un po': il lettore lo riusa per la pubblicità dopo.
   const SEGUI_NASCOSTO_MS = 120000;
@@ -108,8 +108,8 @@
   // Rifiuti del main che non passano: qui il clic vero non arriverà, si torna al clic dello script.
   const RIFIUTI_FERMI = new Set(['forbidden', 'off']);
 
-  // false = per ora non si preme (l'utente è occupato): il tentativo non si conta.
-  // Un «Salta» coperto o fuori dal riquadro visibile prende il clic dello script.
+  // false = per ora non si preme: il tentativo non si conta e si riguarda al giro dopo.
+  // Un «Salta» coperto o fuori dalla vista (si sta leggendo più giù) prende un clic dello script, poi si aspetta di vederlo.
   function premi(el, s) {
     if (clicVero && !s.finto) {
       if (utenteOccupato()) return false;
@@ -120,6 +120,8 @@
         });
         return true;
       }
+      if (s.scriptProvato) return false;
+      s.scriptProvato = true;
     }
     try { el.click(); } catch (_) {}
     return true;
@@ -144,7 +146,7 @@
       }
       visibili++;
       // Riapparso: è la pubblicità dopo, i tentativi ripartono.
-      if (!s.visibile) { s.visibile = true; s.tentativi = 0; s.prossimo = 0; s.finto = false; }
+      if (!s.visibile) Object.assign(s, { visibile: true, tentativi: 0, prossimo: 0, finto: false, scriptProvato: false });
       s.visto = ora;
       if (ora < s.prossimo || s.tentativi >= TENTATIVI) continue;
       if (!premi(el, s)) continue;
