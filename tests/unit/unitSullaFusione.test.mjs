@@ -293,3 +293,25 @@ test('cancello delle routine: unit rossi sulla fusione escono 20, come un confli
   assert.equal(exitCodeFor({ ok: true, result: 'unit_rossi' }), 20);
   assert.equal(exitCodeFor({ ok: true, result: 'main_moved' }), 1);
 });
+
+test('prova vera: un rosso instabile si riprova da solo e non ferma la fusione', () => {
+  const r = repoFinto();
+  try {
+    // Rosso alla prima corsa, verde alla seconda: il segno sta nella cartella della prova, fuori dall'albero.
+    const instabile = "import { test } from 'node:test';\nimport assert from 'node:assert';\nimport { existsSync, writeFileSync } from 'node:fs';\n"
+      + "import { join } from 'node:path';\ntest('a tempo', () => { const s = join(process.cwd(), '..', 'gia-provato'); "
+      + "if (!existsSync(s)) { writeFileSync(s, 'x'); assert.fail('troppo lento'); } });\n";
+    const punta = r.ramo('claude/instabile', () => r.scrivi('tests/unit/tempo.test.mjs', instabile));
+    r.suMain(() => r.scrivi('altro.txt', 'y\n'));
+    r.ok(['checkout', '-q', 'claude/instabile']);
+    const righe = [];
+    const p = provaUnitSullaFusione({ root: r.lavoro, punta, scrivi: (s) => righe.push(s) });
+    assert.equal(p.esito, 'verde', JSON.stringify(p));
+    assert.deepEqual(p.instabili, ['tests/unit/tempo.test.mjs › a tempo']);
+    assert.ok(!righe.some((s) => /su main da solo/.test(s)), 'verde alla riprova: main non serve');
+    assert.match(testoProva(p), /instabili/);
+    pulita(r);
+  } finally {
+    rmSync(r.casa, { recursive: true, force: true });
+  }
+});
