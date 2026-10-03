@@ -49,7 +49,7 @@ async function withRouter(hosts, run) {
     const u = String(url);
     if (u.endsWith('/endpoints')) {
       calls.endpoints.push(u);
-      const model = decodeURIComponent(u.slice(OR.ENDPOINT.indexOf('/api/v1/') + '/api/v1/models/'.length, -'/endpoints'.length));
+      const model = decodeURIComponent(u.slice(`${OR.MODELS_ENDPOINT}/`.length, -'/endpoints'.length));
       const h = hosts[model];
       if (typeof h === 'function') return h();
       return h || jsonRes({ error: 'not found' }, 404);
