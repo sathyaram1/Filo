@@ -144,6 +144,16 @@ test('su un sito che annulla il tasto destro il menu aperto da tastiera con Shif
   await expect(page.locator('.sn-menu-history-sub')).toContainText(PASSWORD);
 });
 
+test('nel riquadro di un altro sito che annulla il tasto destro il menu Incolla mostra la cronologia', async ({ shell, openTab, testServer }) => {
+  await copiaPassword(shell);
+  const blocca = "<script>window.addEventListener('contextmenu', (e) => e.preventDefault(), true);</script></body>";
+  const dentro = testServer.html(CAMPO.replace('</body>', blocca)).replace('127.0.0.1', 'blocked.test');
+  const page = await testServer.openReady(openTab,
+    `<!doctype html><html><body style="margin:0;padding:12px"><iframe id="embed" src="${dentro}" width="640" height="460"></iframe></body></html>`);
+  const sub = await cronologiaDelMenu(page.frameLocator('#embed'));
+  await expect(sub).toContainText(PASSWORD);
+});
+
 test('il tasto destro nel riquadro di un altro sito non apre la cronologia alla pagina che lo ospita', async ({ app, shell, openTab, testServer }) => {
   await copiaPassword(shell);
   const dentro = testServer.html(CAMPO).replace('127.0.0.1', 'blocked.test');
