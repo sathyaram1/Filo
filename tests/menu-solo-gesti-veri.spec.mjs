@@ -173,3 +173,40 @@ test('la cronologia aperta dall\'utente non si fa leggere dal sito con la ricerc
   await page.mouse.click(voce.incolla.x, voce.incolla.y);
   await expect(page.locator('#campo')).toHaveValue(SEGRETO);
 });
+
+// Un font del sito diviso in un pezzo per carattere: i pezzi che il browser carica dicono quali caratteri ha
+// disegnato. Il sito lo dichiara col nome di ogni famiglia che il pannello potrebbe chiedere, generiche comprese.
+const FAMIGLIE_SPIA = ['Spia', 'Segoe UI', 'Roboto', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'];
+const ALFABETO = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_';
+const PAGINA_FONT = `<!doctype html><html><head><style>
+${FAMIGLIE_SPIA.flatMap((fam) => [...ALFABETO].map((c) => {
+    const cp = c.codePointAt(0).toString(16);
+    return `@font-face{font-family:'${fam}';src:url('/spia-${cp}.woff');unicode-range:U+${cp};}`;
+  })).join('\n')}
+html { --sn-font: 'Spia', monospace !important; }
+.sn-menu, .sn-menu * { font-family: monospace !important; }
+</style></head><body style="padding:40px;font-family:monospace">
+  <input id="campo" style="width:320px;font-size:16px">
+  <script>
+  window.caratteriVisti = () => [...document.fonts].filter((f) => f.status !== 'unloaded')
+    .map((f) => String.fromCodePoint(parseInt(f.unicodeRange.replace(/^U\\+/i, ''), 16))).join('');
+  </script>
+</body></html>`;
+
+test('la cronologia aperta dall\'utente non dice al sito quali caratteri contiene, nemmeno col suo font', async ({ app, shell, openTab, testServer }) => {
+  await conCronologia(shell);
+  const page = await testServer.openReady(openTab, PAGINA_FONT);
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
+  expect(await page.evaluate(() => window.caratteriVisti())).toBe('');
+
+  await page.locator('#campo').click({ button: 'right' });
+  await page.locator('.sn-menu-paste-arrow').hover();
+  await expect.poll(() => testiCronologia(app, page)).toContain(SEGRETO);
+  await page.waitForTimeout(800);
+
+  const visti = await page.evaluate(() => window.caratteriVisti());
+  // 5, 8, 9 e la S maiuscola stanno solo nella password.
+  for (const c of ['5', '8', '9', 'S']) {
+    expect(visti, `il sito non deve sapere che la cronologia contiene «${c}»`).not.toContain(c);
+  }
+});
