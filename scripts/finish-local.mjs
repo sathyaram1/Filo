@@ -71,6 +71,7 @@ import { preparaLancioElectron } from './lib/schermo-virtuale.mjs';
 import { lottiPerRigaDiComando } from './lib/riga-di-comando.mjs';
 import { readMarker } from './lib/routine-role.mjs';
 import { partiServerInSospeso } from './lib/parti-lavoro.mjs';
+import { chiediConProva } from './lib/unit-sulla-fusione.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
 import mergeApprovalSignal from '../src/main/services/mergeApprovalSignal.js';
 
