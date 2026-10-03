@@ -30,17 +30,10 @@ module.exports = function register(on, ctx) {
     if (!modo) return { ok: false, code: 'forbidden', error: 'forbidden' };
     const dove = vistaDellaScheda(sender);
     if (!dove) return { ok: false, code: 'scheda' };
-    if (modo === 'riquadro') return AdSkip.richiestaDalRiquadro(sender, msg);
+    if (modo === 'riquadro') return AdSkip.clicDalRiquadro(sender, msg, dove);
     return AdSkip.clicVero(sender.wc, msg, dove);
   });
 
-  // La pagina che ospita il lettore di YouTube dice dove cade il «Salta» nella sua vista: risponde solo il suo content script.
-  on(MSG.AD_SKIP_FRAME_POINT, async (msg, sender) => {
-    if (!AdSkip.attivo(await impostazioni())) return { ok: false, code: 'off' };
-    const p = AdSkip.puntoDalPadre(sender, msg);
-    if (!p) return { ok: false, code: 'forbidden', error: 'forbidden' };
-    const dove = vistaDellaScheda(sender);
-    if (!dove) return { ok: false, code: 'scheda' };
-    return AdSkip.clicNelRiquadro(sender.wc, p, dove);
-  });
+  // Un frame sopra il lettore incorporato risponde dove sta il riquadro figlio: vale solo la risposta del frame interrogato.
+  on(MSG.AD_SKIP_HERE, async (msg, sender) => ({ ok: AdSkip.rispostaDalFrame(sender, msg) }));
 };

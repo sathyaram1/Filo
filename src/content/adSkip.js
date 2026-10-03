@@ -10,7 +10,8 @@
   const T_CONFIG = MSG.AD_SKIP_CONFIG || 'ad_skip_config';
   const T_CLICK = MSG.AD_SKIP_CLICK || 'ad_skip_click';
   const T_UPDATE = MSG.AD_SKIP_CONFIG_UPDATE || 'ad_skip_config_update';
-  const T_FRAME_POINT = MSG.AD_SKIP_FRAME_POINT || 'ad_skip_frame_point';
+  const T_WHERE = MSG.AD_SKIP_WHERE || 'ad_skip_where';
+  const T_HERE = MSG.AD_SKIP_HERE || 'ad_skip_here';
 
   // I «Salta» dei lettori: YouTube nelle sue tre generazioni, Google IMA (il lettore pubblicitario di molti siti), JW Player.
   const SALTA = [
@@ -42,6 +43,14 @@
   const seguiti = new Map();
   let timer = null;
   let premuto = false;
+  const inCima = window.top === window;
+  // Il nome con cui questo frame si presenta alla pagina sopra: pubblico, la pagina lo vede; lega le domande del main.
+  const mioTag = (() => {
+    try { return Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, '0')).join(''); }
+    catch (_) { return String(Math.random()).slice(2) + String(Date.now()); }
+  })();
+  // I riquadri di questa pagina che si sono presentati: il tag e l'origine vera del messaggio, non quella che dicono.
+  const figli = new WeakMap();
 
   // Un <style> che la CSP del sito blocca resta senza foglio: allora un foglio costruito, che la CSP non guarda.
   function metti() {
@@ -116,11 +125,9 @@
       if (utenteOccupato()) return false;
       const p = centro(el);
       if (p) {
-        send({ type: T_CLICK, x: p.x, y: p.y }, (r) => {
+        send({ type: T_CLICK, x: p.x, y: p.y, tag: mioTag }, (r) => {
           if (!r || (!r.ok && RIFIUTI_FERMI.has(r.code))) s.finto = true;
-          else if (r.code === 'cornice' && typeof r.gettone === 'string') {
-            try { window.parent.postMessage({ filoAdSkip: r.gettone, x: p.x, y: p.y }, '*'); } catch (_) {}
-          }
+          else if (r.code === 'ignoto') presentati();
         });
         return true;
       }
@@ -174,29 +181,59 @@
     giro();
   }
 
-  // Nella pagina che ospita il lettore: il punto chiesto dal riquadro, nella vista di qui, se lì sopra c'è proprio lui.
-  // Un elemento del sito messo sopra al riquadro non deve ricevere il clic vero.
+  // Il lettore incorporato si presenta alla pagina sopra, e ogni frame intermedio fa lo stesso col suo: così ciascuno
+  // sa quale dei suoi riquadri è il figlio che il main gli nominerà. Mai al momento del clic: la pagina non deve saperlo.
+  function presentati() {
+    if (inCima) return;
+    try { window.parent.postMessage({ filoAdSkipCiao: mioTag }, '*'); } catch (_) {}
+  }
+
+  function riquadroDi(win) {
+    try {
+      for (const el of document.querySelectorAll('iframe, frame')) { if (el.contentWindow === win) return el; }
+    } catch (_) {}
+    return null;
+  }
+
   function suMessaggio(e) {
     const d = e.data;
-    if (!attivo || !d || typeof d !== 'object' || typeof d.filoAdSkip !== 'string') return;
-    if (typeof d.x !== 'number' || typeof d.y !== 'number' || utenteOccupato()) return;
+    if (!e.isTrusted || !d || typeof d !== 'object' || typeof d.filoAdSkipCiao !== 'string') return;
+    if (!d.filoAdSkipCiao || d.filoAdSkipCiao.length > 64) return;
+    const el = riquadroDi(e.source);
+    if (!el) return;
+    figli.set(el, { tag: d.filoAdSkipCiao, origine: String(e.origin || '') });
+    presentati();
+  }
+
+  // Dove cade nella vista di questo frame il punto (x, y) del riquadro figlio con quel tag e quell'origine.
+  // Un elemento del sito messo sopra al riquadro non deve ricevere il clic vero: allora niente.
+  function dove(q) {
+    if (!attivo) return { code: 'off' };
+    if (utenteOccupato()) return { code: 'occupato' };
     let f = null;
+    let visto = false;
     try {
-      for (const el of document.querySelectorAll('iframe')) { if (el.contentWindow === e.source) { f = el; break; } }
+      for (const el of document.querySelectorAll('iframe, frame')) {
+        const r = figli.get(el);
+        if (!r || r.tag !== q.tag) continue;
+        visto = true;
+        if (r.origine === q.origine) { f = el; break; }
+      }
     } catch (_) { f = null; }
-    if (!f) return;
+    if (!f) return { code: visto ? 'coperto' : 'ignoto' };
+    if (typeof q.x !== 'number' || typeof q.y !== 'number' || q.x > f.clientWidth || q.y > f.clientHeight) return { code: 'coperto' };
     const r = f.getBoundingClientRect();
     // Un riquadro ruotato o in scala non ha i px del suo contenuto: il punto non si saprebbe dove cade.
-    if (Math.abs(r.width - f.offsetWidth) > 1 || Math.abs(r.height - f.offsetHeight) > 1) return;
+    if (Math.abs(r.width - f.offsetWidth) > 1 || Math.abs(r.height - f.offsetHeight) > 1) return { code: 'coperto' };
     const cs = getComputedStyle(f);
-    const x = r.left + f.clientLeft + (parseFloat(cs.paddingLeft) || 0) + d.x;
-    const y = r.top + f.clientTop + (parseFloat(cs.paddingTop) || 0) + d.y;
+    const x = r.left + f.clientLeft + (parseFloat(cs.paddingLeft) || 0) + q.x;
+    const y = r.top + f.clientTop + (parseFloat(cs.paddingTop) || 0) + q.y;
     let sopra = null;
     try { sopra = document.elementFromPoint(x, y); } catch (_) { sopra = null; }
-    if (sopra !== f) return;
-    const vv = window.visualViewport;
+    if (sopra !== f) return { code: 'coperto' };
+    const vv = inCima ? window.visualViewport : null;
     const p = vv ? { x: (x - vv.offsetLeft) * vv.scale, y: (y - vv.offsetTop) * vv.scale } : { x, y };
-    send({ type: T_FRAME_POINT, gettone: d.filoAdSkip, x: p.x, y: p.y, rx: d.x, ry: d.y });
+    return { x: p.x, y: p.y, tag: mioTag };
   }
 
   function suPuntatore(e) {
@@ -208,6 +245,7 @@
   function imposta(r) {
     attivo = !!(r && r.ok && r.enabled);
     clicVero = attivo && !!r.clicVero;
+    if (clicVero) presentati();
     if (attivo) metti();
     else togli();
   }
@@ -222,10 +260,13 @@
       window.addEventListener(t, suPuntatore, { capture: true, passive: true });
     }
     window.addEventListener('blur', () => { premuto = false; });
-    if (window.top === window) window.addEventListener('message', suMessaggio);
+    window.addEventListener('message', suMessaggio);
     // Tornando sulla pagina (finestra ridotta a icona e riaperta) si riprova subito, anche dove i tentativi erano finiti.
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') riprova(); });
-    chrome.runtime.onMessage.addListener((m) => { if (m && m.type === T_UPDATE) carica(); });
+    chrome.runtime.onMessage.addListener((m) => {
+      if (m && m.type === T_UPDATE) carica();
+      else if (m && m.type === T_WHERE && typeof m.id === 'string') send({ type: T_HERE, id: m.id, ...dove(m) });
+    });
   } catch (_) {}
 
   carica();

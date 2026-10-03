@@ -95,37 +95,75 @@ test('dalla chat si accende e si spegne subito, senza conferma', () => {
   assert.equal(globalThis.SN_PREF.buildPreferencePartial('salta_pubblicita', 'boh'), null);
 });
 
-test('il lettore di YouTube incorporato in una pagina: solo se figlio diretto del frame principale', () => {
-  const main = { frameTreeNodeId: 1, url: 'https://blog.example/articolo' };
-  const wc = { mainFrame: main };
-  const tab = { id: 7 };
-  const figlio = (url, parent = main) => ({ wc, tab, frame: { frameTreeNodeId: 5, url, parent } });
-  assert.equal(A.modoClicVero(figlio('https://www.youtube.com/embed/x')), 'riquadro');
-  assert.equal(A.modoClicVero(figlio('https://www.youtube-nocookie.com/embed/x')), 'riquadro');
-  assert.equal(A.modoClicVero(figlio('https://evil.example/embed/x')), null);
-  assert.equal(A.modoClicVero(figlio('https://www.youtube.com/embed/x', { frameTreeNodeId: 4 })), null, 'un riquadro dentro un riquadro');
-  assert.equal(A.modoClicVero({ wc, tab, frame: main }), null, 'la pagina ospite non è YouTube');
-  assert.equal(A.modoClicVero({ ...figlio('https://www.youtube.com/embed/x'), tab: null }), null);
+// Una pagina con dentro `livelli` riquadri uno nell'altro, l'ultimo il lettore all'indirizzo dato.
+function annidati(urlLettore, origini = []) {
+  const main = { frameTreeNodeId: 1, url: 'https://blog.example/articolo', origin: 'https://blog.example' };
+  let padre = main;
+  for (const [i, o] of origini.entries()) padre = { frameTreeNodeId: 10 + i, url: o + '/x', origin: o, parent: padre };
+  const lettore = { frameTreeNodeId: 5, url: urlLettore, origin: new URL(urlLettore).origin, parent: padre };
+  return { wc: { mainFrame: main }, tab: { id: 7 }, frame: lettore };
+}
+
+test('il lettore di YouTube incorporato, anche dentro altri riquadri: ogni anello ha un\'origine vera', () => {
+  assert.equal(A.modoClicVero(annidati('https://www.youtube.com/embed/x')), 'riquadro');
+  assert.equal(A.modoClicVero(annidati('https://www.youtube-nocookie.com/embed/x')), 'riquadro');
+  assert.equal(A.modoClicVero(annidati('https://www.youtube.com/embed/x', ['https://cdn.incorpora.example'])), 'riquadro');
+  assert.equal(A.modoClicVero(annidati('https://evil.example/embed/x')), null);
+  const s = annidati('https://www.youtube.com/embed/x', ['https://cdn.incorpora.example']);
+  assert.deepEqual(A.catena(s).map((a) => [a.frame.frameTreeNodeId, a.origineFiglio]),
+    [[10, 'https://www.youtube.com'], [1, 'https://cdn.incorpora.example']]);
+  // Un'origine opaca la può avere anche un riquadro del sito chiuso in una sandbox: non si distingue.
+  assert.equal(A.modoClicVero(annidati('https://www.youtube.com/embed/x', ['null'])), null);
+  const profondo = annidati('https://www.youtube.com/embed/x', Array.from({ length: 12 }, (_, i) => `https://l${i}.example`));
+  assert.equal(A.modoClicVero(profondo), null, 'una catena senza fine non si percorre');
+  const { wc, tab } = annidati('https://www.youtube.com/embed/x');
+  assert.equal(A.modoClicVero({ wc, tab, frame: wc.mainFrame }), null, 'la pagina ospite non è YouTube');
+  assert.equal(A.modoClicVero({ ...annidati('https://www.youtube.com/embed/x'), tab: null }), null);
   assert.equal(A.hostIncorporato('https://youtube-nocookie.com.evil.example/'), false);
 });
 
-test('il punto del riquadro lo conferma una volta sola la pagina ospite della stessa scheda', () => {
-  const main = { frameTreeNodeId: 1, url: 'https://blog.example/' };
+test('il clic dal riquadro parte solo se ogni frame sopra conferma il punto, dal più vicino alla pagina', async () => {
+  const s = annidati('https://www.youtube.com/embed/x', ['https://cdn.incorpora.example']);
+  const eventi = [];
+  const debuggerFinto = { isAttached: () => false, attach() {}, detach() {}, sendCommand: async (c, p) => { eventi.push([p.type, p.x, p.y]); } };
+  s.wc = Object.assign(s.wc, { isDestroyed: () => false, getZoomFactor: () => 1, debugger: debuggerFinto, sendInputEvent() {} });
+  const dove = { view: vista };
+  const domande = [];
+  const chiedi = (risposte) => async (wc, frame, q) => { domande.push([frame.frameTreeNodeId, q]); return risposte.shift(); };
+  const r = await A.clicDalRiquadro(s, { x: 10, y: 20, tag: 'aa' }, dove, {
+    chiedi: chiedi([{ x: 16, y: 26, tag: 'bb' }, { x: 116, y: 226, tag: 'cc' }]), ora: 5e6,
+  });
+  assert.deepEqual(r, { ok: true });
+  assert.deepEqual(domande, [
+    [10, { tag: 'aa', origine: 'https://www.youtube.com', x: 10, y: 20 }],
+    [1, { tag: 'bb', origine: 'https://cdn.incorpora.example', x: 16, y: 26 }],
+  ]);
+  assert.deepEqual(eventi[1], ['mousePressed', 116, 226]);
+  for (const [risposte, code] of [[[{ no: 'coperto' }], 'coperto'], [[{ x: 1, y: 1, tag: 'b' }, { no: 'ignoto' }], 'ignoto'], [[null], 'tempo']]) {
+    eventi.length = 0;
+    const r2 = await A.clicDalRiquadro(s, { x: 10, y: 20, tag: 'aa' }, dove, { chiedi: chiedi(risposte), ora: 9e6 });
+    assert.equal(r2.code, code);
+    assert.equal(eventi.length, 0, 'nessun clic');
+  }
+  assert.equal((await A.clicDalRiquadro(s, { x: 10, y: 20 }, dove, { chiedi: chiedi([]), ora: 9e6 })).code, 'punto', 'senza il nome del lettore');
+});
+
+test('alla domanda del main risponde solo il frame interrogato', () => {
+  const main = { frameTreeNodeId: 1, url: 'https://blog.example/', origin: 'https://blog.example' };
+  const inviati = [];
+  main.send = (canale, m) => inviati.push(m);
   const wc = { mainFrame: main };
-  const dalRiquadro = { wc, tab: { id: 1 }, frame: { frameTreeNodeId: 5, url: 'https://www.youtube.com/embed/x', parent: main } };
-  const ospite = { wc, tab: { id: 1 }, frame: main };
-  const chiedi = () => A.richiestaDalRiquadro(dalRiquadro, { x: 10, y: 20 }, { ora: 1000 });
-  const r = chiedi();
-  assert.equal(r.code, 'cornice');
-  assert.match(r.gettone, /^[0-9a-f]{32}$/);
-  const risposta = (g, extra = {}) => ({ gettone: g, x: 110, y: 220, rx: 10, ry: 20, ...extra });
-  assert.deepEqual(A.puntoDalPadre(ospite, risposta(r.gettone), { ora: 1100 }), { x: 110, y: 220 });
-  assert.equal(A.puntoDalPadre(ospite, risposta(r.gettone), { ora: 1100 }), null, 'il gettone vale una volta');
-  assert.equal(A.puntoDalPadre(ospite, risposta(chiedi().gettone), { ora: 1000 + A.GETTONE_MS + 1 }), null, 'scaduto');
-  assert.equal(A.puntoDalPadre(ospite, risposta(chiedi().gettone, { rx: 11 }), { ora: 1100 }), null, 'un altro punto');
-  const altraScheda = { wc: { mainFrame: main }, tab: { id: 2 }, frame: main };
-  assert.equal(A.puntoDalPadre(altraScheda, risposta(chiedi().gettone), { ora: 1100 }), null, 'un\'altra scheda');
-  assert.equal(A.puntoDalPadre(dalRiquadro, risposta(chiedi().gettone), { ora: 1100 }), null, 'il riquadro stesso');
-  assert.equal(A.puntoDalPadre(ospite, risposta('ff'.repeat(16)), { ora: 1100 }), null, 'un gettone inventato');
-  assert.equal(A.richiestaDalRiquadro(dalRiquadro, { x: -1, y: 0 }).code, 'punto');
+  // La domanda parte davvero dal main verso quel frame soltanto; la risposta la sblocca.
+  const s = { wc, tab: { id: 1 }, frame: { frameTreeNodeId: 5, url: 'https://www.youtube.com/embed/x', origin: 'https://www.youtube.com', parent: main } };
+  const attesa = A.clicDalRiquadro(s, { x: 1, y: 1, tag: 'aa' }, { view: vista }, { ora: 2e7 });
+  return Promise.resolve().then(async () => {
+    const id = inviati[0].id;
+    assert.equal(inviati[0].type, 'ad_skip_where');
+    assert.equal(A.rispostaDalFrame({ wc, frame: { frameTreeNodeId: 5 } }, { id, x: 1, y: 1, tag: 'zz' }), false, 'il riquadro stesso');
+    assert.equal(A.rispostaDalFrame({ wc: { mainFrame: main }, frame: main }, { id, x: 1, y: 1, tag: 'zz' }), false, 'un\'altra scheda');
+    assert.equal(A.rispostaDalFrame({ wc, frame: main }, { id: 'inventato', x: 1, y: 1, tag: 'zz' }), false);
+    assert.equal(A.rispostaDalFrame({ wc, frame: main }, { id, code: 'coperto' }), true);
+    assert.equal((await attesa).code, 'coperto');
+    assert.equal(A.rispostaDalFrame({ wc, frame: main }, { id, x: 1, y: 1, tag: 'zz' }), false, 'una risposta vale una volta');
+  });
 });

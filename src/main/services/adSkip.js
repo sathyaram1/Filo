@@ -1,5 +1,5 @@
 // Il «Salta» delle pubblicità dei video premuto come lo premerebbe l'utente (#737): un clic del content script è finto e YouTube lo riconosce.
-// Solo a YouTube (frame principale, o lettore incorporato col punto confermato dalla pagina ospite): altrove un sito si
+// Solo a YouTube (frame principale, o lettore incorporato col punto confermato dai frame sopra di lui): altrove un sito si
 // fabbricherebbe un pulsante per avere gesti veri. Regole: tests/unit/adSkip.test.mjs; il lato pagina è src/content/adSkip.js.
 'use strict';
 
@@ -51,20 +51,30 @@ function urlDelFrame(sender) {
   try { return String(sender.frame.url || ''); } catch (_) { return ''; }
 }
 
-// Un riquadro figlio diretto del frame principale: più in fondo la pagina che lo ospita non saprebbe dov'è.
-function figlioDelPrincipale(sender) {
+// Dal lettore in su fino al frame principale: ogni anello è un frame che deve ritrovare nella sua pagina il riquadro
+// figlio, riconosciuto dall'origine. Un'origine opaca («null») la può avere anche un riquadro del sito: lì niente.
+const MAX_ANELLI = 8;
+function catena(sender) {
   try {
-    const wc = sender && sender.wc;
-    const f = sender && sender.frame;
-    return Boolean(wc && f && wc.mainFrame && f.parent && f.parent.frameTreeNodeId === wc.mainFrame.frameTreeNodeId);
-  } catch (_) { return false; }
+    const mainId = sender.wc.mainFrame.frameTreeNodeId;
+    const anelli = [];
+    let figlio = sender.frame;
+    while (figlio.frameTreeNodeId !== mainId) {
+      const padre = figlio.parent;
+      const origine = String(figlio.origin || '');
+      if (!padre || anelli.length >= MAX_ANELLI || !/^https?:\/\/[^/]+$/.test(origine)) return null;
+      anelli.push({ frame: padre, origineFiglio: origine });
+      figlio = padre;
+    }
+    return anelli.length ? anelli : null;
+  } catch (_) { return null; }
 }
 
 /** Come il mittente può avere il clic vero: 'principale' (YouTube), 'riquadro' (lettore incorporato), o null. */
 function modoClicVero(sender) {
   if (!sender || !sender.tab) return null;
   if (framePrincipale(sender)) return hostConClicVero(urlDelFrame(sender)) ? 'principale' : null;
-  if (figlioDelPrincipale(sender) && hostIncorporato(urlDelFrame(sender))) return 'riquadro';
+  if (hostIncorporato(urlDelFrame(sender)) && catena(sender)) return 'riquadro';
   return null;
 }
 
@@ -72,36 +82,34 @@ function mittenteConClicVero(sender) {
   return modoClicVero(sender) !== null;
 }
 
-// Il lettore incorporato chiede, la pagina che lo ospita risponde dove sta: il gettone lega le due metà.
-const GETTONE_MS = 3000;
-const inAttesa = new Map();
-
 function numero(v) { return typeof v === 'number' && Number.isFinite(v); }
 
-/** Il riquadro di YouTube chiede il clic: il main tiene il punto e dà un gettone da passare alla pagina ospite. */
-function richiestaDalRiquadro(sender, msg, { ora = Date.now() } = {}) {
-  if (!msg || !numero(msg.x) || !numero(msg.y) || msg.x < 0 || msg.y < 0) return { ok: false, code: 'punto' };
-  for (const [k, r] of inAttesa) if (r.scade < ora || r.wc === sender.wc) inAttesa.delete(k);
-  const gettone = require('crypto').randomBytes(16).toString('hex');
-  inAttesa.set(gettone, {
-    wc: sender.wc, padre: sender.frame.parent.frameTreeNodeId, x: msg.x, y: msg.y, scade: ora + GETTONE_MS,
+// Le domande ai frame sopra il lettore vanno dal main al content script e ritorno, mai per la pagina: un sito che
+// sapesse quando arriva il clic ci infilerebbe sopra un suo elemento fra il controllo e il clic.
+const DOMANDA_MS = 1500;
+const domande = new Map();
+const tipoDove = () => (globalThis.SN_MSG && globalThis.SN_MSG.MSG && globalThis.SN_MSG.MSG.AD_SKIP_WHERE) || 'ad_skip_where';
+
+function chiediAlFrame(wc, frame, domanda) {
+  return new Promise((risolvi) => {
+    const id = require('crypto').randomBytes(16).toString('hex');
+    let timer = null;
+    const fine = (r) => { clearTimeout(timer); domande.delete(id); risolvi(r); };
+    timer = setTimeout(() => fine(null), DOMANDA_MS);
+    domande.set(id, { wc, ftn: frame.frameTreeNodeId, fine });
+    try { frame.send('filo:broadcast', { type: tipoDove(), id, ...domanda }); } catch (_) { fine(null); }
   });
-  return { ok: false, code: 'cornice', gettone };
 }
 
-/**
- * La pagina ospite (il suo frame principale, la stessa scheda) dice dove cade nella sua vista il punto chiesto dal
- * riquadro, dopo aver visto che lì sopra c'è il riquadro. Il gettone vale una volta. Restituisce il punto o null.
- */
-function puntoDalPadre(sender, msg, { ora = Date.now() } = {}) {
-  const g = msg && typeof msg.gettone === 'string' ? msg.gettone : '';
-  const r = g && inAttesa.get(g);
-  if (!r) return null;
-  inAttesa.delete(g);
-  if (r.scade < ora || !sender || sender.wc !== r.wc || !framePrincipale(sender)) return null;
-  try { if (sender.frame.frameTreeNodeId !== r.padre) return null; } catch (_) { return null; }
-  if (msg.rx !== r.x || msg.ry !== r.y || !numero(msg.x) || !numero(msg.y)) return null;
-  return { x: msg.x, y: msg.y };
+/** La risposta di un frame a una domanda: vale solo dal frame a cui è stata fatta. true se era attesa. */
+function rispostaDalFrame(sender, msg) {
+  const d = msg && typeof msg.id === 'string' ? domande.get(msg.id) : null;
+  if (!d || !sender || sender.wc !== d.wc) return false;
+  try { if (sender.frame.frameTreeNodeId !== d.ftn) return false; } catch (_) { return false; }
+  const ok = numero(msg.x) && numero(msg.y) && msg.x >= 0 && msg.y >= 0
+    && typeof msg.tag === 'string' && msg.tag.length > 0 && msg.tag.length <= 64;
+  d.fine(ok ? { x: msg.x, y: msg.y, tag: msg.tag } : { no: msg.code === 'ignoto' ? 'ignoto' : 'coperto' });
+  return true;
 }
 
 /**
@@ -188,7 +196,28 @@ async function clicNelRiquadro(wc, msg, { win, view, ora = Date.now() } = {}) {
   return { ok: true };
 }
 
+/**
+ * Il lettore incorporato chiede il clic nel suo punto: ogni frame sopra di lui, dal più vicino alla pagina della
+ * scheda, ritrova il riquadro figlio, vede che sopra non c'è altro e dà il punto nella sua vista.
+ */
+async function clicDalRiquadro(sender, msg, dove, { chiedi = chiediAlFrame, ora = Date.now() } = {}) {
+  const wc = sender.wc;
+  if (ora - (ultimoClic.get(wc) || 0) < INTERVALLO_MS) return { ok: false, code: 'presto' };
+  const anelli = catena(sender);
+  if (!anelli) return { ok: false, code: 'forbidden', error: 'forbidden' };
+  if (!msg || !numero(msg.x) || !numero(msg.y) || msg.x < 0 || msg.y < 0) return { ok: false, code: 'punto' };
+  if (typeof msg.tag !== 'string' || !msg.tag || msg.tag.length > 64) return { ok: false, code: 'punto' };
+  let p = { x: msg.x, y: msg.y, tag: msg.tag };
+  for (const a of anelli) {
+    const r = await chiedi(wc, a.frame, { tag: p.tag, origine: a.origineFiglio, x: p.x, y: p.y });
+    if (!r) return { ok: false, code: 'tempo' };
+    if (r.no) return { ok: false, code: r.no };
+    p = r;
+  }
+  return clicNelRiquadro(wc, p, { ...dove, ora });
+}
+
 module.exports = {
-  attivo, configureFromSettings, hostConClicVero, hostIncorporato, modoClicVero, mittenteConClicVero,
-  richiestaDalRiquadro, puntoDalPadre, puntoNellaVista, clicVero, clicNelRiquadro, INTERVALLO_MS, GETTONE_MS,
+  attivo, configureFromSettings, hostConClicVero, hostIncorporato, modoClicVero, mittenteConClicVero, catena,
+  rispostaDalFrame, clicDalRiquadro, puntoNellaVista, clicVero, clicNelRiquadro, INTERVALLO_MS,
 };

@@ -37,10 +37,20 @@ voleva.
   arriva solo al frame principale, e il gesto vero lo riceve la pagina che
   ospita il riquadro, non il riquadro. Per il lettore di YouTube incorporato il
   clic passa dal protocollo di debug (`Input.dispatchMouseEvent`), che lo
-  instrada come il mouse fino al riquadro sotto il punto. Il punto lo conferma
-  la pagina ospite (il suo content script, legato alla richiesta da un gettone
-  monouso): dove sta il riquadro, e che sopra non ci sia un elemento del sito.
+  instrada come il mouse fino al riquadro sotto il punto.
+- **Il punto del riquadro lo conferma ogni frame sopra di lui**, dal più vicino
+  alla pagina della scheda, a qualunque profondità (i servizi di incorporamento
+  mettono il lettore in un riquadro dentro un riquadro): il main chiede a
+  ciascuno, direttamente al suo content script, dove cade il punto e se sopra al
+  riquadro figlio c'è altro. Il figlio lo riconosce dall'origine vera del
+  messaggio con cui si è presentato (`e.origin`, `isTrusted`), mai da un nome:
+  il nome lo vede la pagina, che lo ripeterebbe da un suo riquadro messo sopra
+  (#737 giro 2). Origine opaca: niente clic vero.
+- **La pagina non deve sapere quando arriva il clic**: le domande del main non
+  passano dai messaggi della pagina. Un sito avvisato infilerebbe un suo
+  elemento sopra al lettore fra il controllo e il clic.
 
 Prove: `tests/unit/adSkip.test.mjs`, `tests/ad-skip.spec.mjs` (il «Salta» finto
 di YouTube su un sito qualunque non riceve mai un clic vero; il sito che ospita
-il lettore incorporato non riceve gesti, nemmeno con un suo elemento sopra).
+il lettore incorporato non riceve gesti, nemmeno con un suo elemento o un suo
+riquadro sopra; il lettore dentro un riquadro intermedio salta).

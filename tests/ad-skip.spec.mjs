@@ -226,6 +226,50 @@ test('se il sito che ospita il lettore ci mette sopra un suo elemento, quell\'el
   expect((await frame.evaluate(() => window.__clic)).some((c) => c.vero)).toBe(false);
 });
 
+// Il sito copre il lettore con un SUO riquadro e gli fa ripetere al padre ogni messaggio che arriva dal lettore:
+// si presenta col nome del lettore, ma la sua origine è quella del sito.
+const TRAPPOLA = `<!doctype html><body style="margin:0;background:transparent"><script>
+  window.__gesti=[];['pointerdown','mousedown','click'].forEach((t)=>document.addEventListener(t,(e)=>{if(e.isTrusted)window.__gesti.push(t);},true));
+  addEventListener('message',(e)=>{if(e.source===parent&&e.data&&e.data.rilancia)parent.postMessage(e.data.rilancia,'*');});
+  </script></body>`;
+
+test('il sito che ospita il lettore non si prende il clic vero ripetendo i messaggi del lettore da un suo riquadro', async ({ openTab, testServer }) => {
+  const dentro = suYouTube(testServer.html(lettore({ dopoMs: -1 })));
+  const urlTrappola = testServer.html(TRAPPOLA);
+  const page = await apri(openTab, testServer.html(`<!doctype html><title>Blog</title><body style="margin:8px"><p>articolo</p>
+  <div style="position:relative;width:724px;height:424px">
+    <iframe id="yt" src="${dentro}" width="720" height="420"></iframe>
+    <iframe id="trappola" src="${urlTrappola}" style="position:absolute;left:0;top:0;width:724px;height:424px;border:0"></iframe>
+  </div>
+  <script>window.__rilanciati=0;addEventListener('message',(e)=>{const t=document.getElementById('trappola').contentWindow;
+    if(e.source!==t&&e.data&&typeof e.data==='object'){window.__rilanciati++;t.postMessage({rilancia:e.data},'*');}});</script></body>`));
+  const frame = await riquadro(page, dentro);
+  const trappola = await riquadro(page, urlTrappola);
+  await frame.waitForFunction(() => typeof window.__mostra === 'function');
+  await frame.evaluate(() => window.__mostra());
+  await page.waitForTimeout(4000);
+  expect(await page.evaluate(() => window.__rilanciati), 'il lettore si è presentato e il sito l\'ha ripetuto').toBeGreaterThan(0);
+  expect(await trappola.evaluate(() => window.__gesti)).toEqual([]);
+  expect(await page.evaluate(() => window.__gesti || [])).toEqual([]);
+  // Tolto il riquadro del sito, il «Salta» si preme: il lettore era quello giusto, solo coperto.
+  await page.evaluate(() => document.getElementById('trappola').remove());
+  await expect.poll(() => frame.evaluate(() => window.__saltata), { timeout: 15_000 }).toBe(true);
+});
+
+test('il lettore di YouTube dentro un riquadro intermedio salta la pubblicità', async ({ openTab, testServer }) => {
+  // Molte piattaforme di articoli passano da un servizio di incorporamento: il lettore è un riquadro dentro un riquadro.
+  const dentro = suYouTube(testServer.html(lettore({ dopoMs: -1 })));
+  const mezzo = testServer.html(`<!doctype html><body style="margin:6px"><iframe src="${dentro}" width="700" height="400" style="border:0"></iframe></body>`)
+    .replace('127.0.0.1', 'sito-pubblico.test');
+  const page = await apri(openTab, testServer.html(ospite(mezzo)));
+  const frame = await riquadro(page, dentro);
+  await frame.waitForFunction(() => typeof window.__mostra === 'function');
+  await frame.evaluate(() => window.__mostra());
+  await expect.poll(() => frame.evaluate(() => window.__saltata), { timeout: 8_000 }).toBe(true);
+  expect((await frame.evaluate(() => window.__clic)).every((c) => c.vero)).toBe(true);
+  expect(await page.evaluate(() => window.__gesti)).toEqual([]);
+});
+
 test('fuori da YouTube un «Salta» di YouTube non riceve mai un clic vero', async ({ openTab, testServer }) => {
   // Un sito qualunque può disegnarsi un pulsante con quella classe: un clic vero gli regalerebbe un gesto dell'utente.
   const page = await apri(openTab, testServer.html(lettore()));
