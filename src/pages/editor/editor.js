@@ -4144,6 +4144,8 @@
   // all'altezza col contenitore che scorre.
   const ED_TOAST_MAX = 4;
   let edToastHost = null;
+  // Col puntatore su un avviso i tempi di tutta la pila aspettano (regola in avvisiTempo.js).
+  const edToastTempi = window.SN_AVVISI.orologio();
   function edToastHostEl() {
     if (!edToastHost || !edToastHost.isConnected) {
       edToastHost = document.getElementById('edToasts');
@@ -4184,13 +4186,14 @@
   function removeEdToast(el, immediate) {
     if (!el || el.dataset.closing === '1') return;
     el.dataset.closing = '1';
-    if (el._timer) clearTimeout(el._timer);
+    if (el._tempo) el._tempo.annulla();
     // Via un avviso, quelli sopra scivolano giù al suo posto: la pila si è
     // ridisegnata sotto il cursore.
     staleClick.arm();
     el.classList.remove('show');
-    if (immediate) { try { el.remove(); } catch (_) {} syncEdToastOverflow(); return; }
-    setTimeout(() => { try { el.remove(); } catch (_) {} syncEdToastOverflow(); }, 220);
+    const via = () => { try { el.remove(); } catch (_) {} edToastTempi.lascia(el); syncEdToastOverflow(); };
+    if (immediate) { via(); return; }
+    setTimeout(via, 220);
   }
   // `action` opzionale = { label, onClick }: aggiunge un bottone cliccabile nel
   // toast (es. "Annulla" dopo una modifica automatica di Filo).
@@ -4212,8 +4215,18 @@
       });
       el.appendChild(btn);
     }
+    // Il clic sull'avviso (fuori dal suo pulsante) lo chiude: è l'unica strada con la durata a 0.
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('.ed-toast-action')) return;
+      const sel = document.getSelection();
+      if (sel && !sel.isCollapsed && el.contains(sel.anchorNode)) return;
+      removeEdToast(el);
+    });
+    edToastTempi.segui(el);
+    window.SN_AVVISI.chiudibile(el, () => removeEdToast(el));
     const host = edToastHostEl();
     host.appendChild(el);
+    edToastTempi.ripulisci();
     // Un avviso nuovo prende il posto in fondo alla pila — proprio dove poteva
     // esserci il bottone appena premuto.
     staleClick.arm();
@@ -4223,7 +4236,7 @@
     el.classList.add('show');
     syncEdToastOverflow();
     // Con un'azione lascio più tempo per cliccarla.
-    el._timer = setTimeout(() => removeEdToast(el), hasAction ? 7000 : 3400);
+    el._tempo = edToastTempi.avvia(window.SN_AVVISI.durata(hasAction ? 7000 : 3400), () => removeEdToast(el));
     return el;
   }
 

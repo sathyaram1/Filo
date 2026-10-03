@@ -275,14 +275,19 @@
   box-shadow: var(--sn-shadow);
   opacity: 0;
   transform: translateY(8px);
-  transition: opacity 200ms ease, transform 200ms ease;
+  transition: opacity 200ms ease, transform 200ms ease, background 150ms ease;
   pointer-events: none;
 }
 
+/* Visibile prende il puntatore (sopra, i tempi della pila aspettano; un clic lo chiude); il vuoto attorno
+   resta della pagina, e mentre sfuma torna trasparente. */
 .sn-toast.sn-toast-visible {
   opacity: 1;
   transform: translateY(0);
+  pointer-events: auto;
+  cursor: pointer;
 }
+.sn-toast.sn-toast-visible:hover { background: var(--sn-hover); }
 
 /* Pill della dettatura: si comporta come un toast ma è interattiva, cliccandola si ferma la registrazione. */
 .sn-dictate-pill {

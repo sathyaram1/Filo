@@ -4309,7 +4309,15 @@
 
   // Toast discreto in basso a destra: l'esito di un'azione deve arrivare anche
   // se nel frattempo l'owner ha chiuso il pannello o cambiato scheda.
-  let mgToastTimer = null;
+  // Tempi in avvisiTempo.js: in scala con le Preferenze, fermi col puntatore sopra.
+  const mgToastTempi = window.SN_AVVISI.orologio();
+  let mgToastTempo = null;
+  function nascondiToast(el) {
+    if (mgToastTempo) mgToastTempo.annulla();
+    mgToastTempo = null;
+    el.classList.remove('show');
+    mgToastTempi.lascia(el);
+  }
   function toast(text, kind, ms) {
     let el = document.getElementById('mgToast');
     if (!el) {
@@ -4317,16 +4325,23 @@
       el.id = 'mgToast';
       el.className = 'mg-toast';
       el.setAttribute('role', 'status');
+      el.addEventListener('click', () => {
+        const sel = document.getSelection();
+        if (sel && !sel.isCollapsed && el.contains(sel.anchorNode)) return;
+        nascondiToast(el);
+      });
+      mgToastTempi.segui(el);
+      window.SN_AVVISI.chiudibile(el, () => nascondiToast(el));
       document.body.appendChild(el);
     }
     el.textContent = String(text || '');
     el.dataset.kind = kind || '';
     void el.offsetWidth;
     el.classList.add('show');
-    clearTimeout(mgToastTimer);
+    if (mgToastTempo) mgToastTempo.annulla();
     // Le frasi degli esiti sono lunghe: quattro secondi e mezzo per leggerle,
     // di più quando chi chiama ne mette insieme più d'una.
-    mgToastTimer = setTimeout(() => el.classList.remove('show'), Math.max(4500, Number(ms) || 0));
+    mgToastTempo = mgToastTempi.avvia(window.SN_AVVISI.durata(Math.max(4500, Number(ms) || 0)), () => nascondiToast(el));
   }
 
   // ── Il pannello di un livello ─────────────────────────────────────────────

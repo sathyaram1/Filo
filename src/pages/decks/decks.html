@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="filo://style/theme.css" />
   <link rel="stylesheet" href="filo://style/pages.css" />
   <script src="filo://shared/themeTokens.js"></script>
+  <script src="filo://shared/avvisiTempo.js"></script>
   <script src="filo://shared/pageBootstrap.js"></script>
   <script src="filo://shared/constants.js"></script>
   <script src="filo://shared/contenutoEsterno.js"></script>
@@ -481,7 +482,9 @@
       transition: opacity 0.18s ease, transform 0.18s ease;
       pointer-events: none; z-index: 2147483001;
     }
-    .dk-toast.show { opacity: 1; transform: translateY(0); }
+    /* Visibile prende il puntatore (sopra, il tempo aspetta; un clic lo chiude); nascosto torna trasparente. */
+    .dk-toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; cursor: pointer; }
+    .dk-toast.show:hover { background: var(--sn-hover, var(--sn-bg)); }
 
     .dk-back { margin-bottom: 12px; }
   </style>

@@ -1276,8 +1276,15 @@
   }
 
   // Toast discreto in basso a destra (conferme di import/export non
-  // bloccanti): stesso pattern del toast dell'editor.
-  let dkToastTimer = null;
+  // bloccanti): stesso pattern del toast dell'editor. Tempi in avvisiTempo.js.
+  const dkToastTempi = window.SN_AVVISI.orologio();
+  let dkToastTempo = null;
+  function hideToast(el) {
+    if (dkToastTempo) dkToastTempo.annulla();
+    dkToastTempo = null;
+    el.classList.remove('show');
+    dkToastTempi.lascia(el);
+  }
   function showToast(text) {
     let el = document.getElementById('dkToast');
     if (!el) {
@@ -1285,13 +1292,20 @@
       el.id = 'dkToast';
       el.className = 'dk-toast';
       el.setAttribute('role', 'status');
+      el.addEventListener('click', () => {
+        const sel = document.getSelection();
+        if (sel && !sel.isCollapsed && el.contains(sel.anchorNode)) return;
+        hideToast(el);
+      });
+      dkToastTempi.segui(el);
+      window.SN_AVVISI.chiudibile(el, () => hideToast(el));
       document.body.appendChild(el);
     }
     el.textContent = text;
     void el.offsetWidth;
     el.classList.add('show');
-    clearTimeout(dkToastTimer);
-    dkToastTimer = setTimeout(() => el.classList.remove('show'), 3400);
+    if (dkToastTempo) dkToastTempo.annulla();
+    dkToastTempo = dkToastTempi.avvia(window.SN_AVVISI.durata(3400), () => hideToast(el));
   }
 
   // ── Import/Export rigido (§11), via switcher ────────────────────────────────
