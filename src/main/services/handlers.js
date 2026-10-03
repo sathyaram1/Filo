@@ -1472,8 +1472,17 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
     return { executed: false, kept: false, rejected: true };
   }
   // PULISCI_TAB e CANCELLA_ARCHIVIO si confermano dalla loro UI (bottone del
-  // riordino, pannello con l'elenco), non dal popup generico: vedi lo switch.
-  const hasBespokeConfirm = type === 'PULISCI_TAB' || type === 'CANCELLA_ARCHIVIO';
+  // riordino, pannello con l'elenco), che ha solo la chat della home: vedi lo switch.
+  // L'assistente sulla pagina usa il popup generico, e senza l'elenco davanti
+  // una cancellazione definitiva non si propone (#825.3).
+  if (type === 'CANCELLA_ARCHIVIO' && assistente) {
+    return {
+      executed: false,
+      kept: false,
+      output: { rifiuto: true, error: 'l\'elenco delle schede da eliminare si vede e si conferma dalla chat di Filo nella home' },
+    };
+  }
+  const hasBespokeConfirm = (type === 'PULISCI_TAB' || type === 'CANCELLA_ARCHIVIO') && !assistente;
   if (level >= 2 && !confirmed && !hasBespokeConfirm) {
     // Da qui in poi QUESTO mittente potrà confermare questa stessa azione
     // (difesa in profondità #250): registriamo il pending prima di sospendere.
@@ -1952,9 +1961,17 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
         };
       }
       case 'PULISCI_TAB':
+        // Il popup generico spiega lo stesso riordino del bottone: confermato lì, si esegue.
+        if (confirmed) {
+          const win = winOf(sender);
+          if (!win || !win._filoTabs) return { executed: false, kept: true };
+          const r = await win._filoTabs.runAutoTriage({ trigger: 'manual' });
+          return { executed: true, kept: true, output: { archived: (r && r.archived) || 0 } };
+        }
+        return { executed: false, kept: true, needsConfirm: level, describe: Levels ? Levels.describe(action) : '' };
       case 'CANCELLA_ARCHIVIO':
-        // Aspettano il clic dell'utente sulla loro UI: è un'attesa di conferma,
-        // e detta come «non eseguita» la chat le nascondeva come fallite (#825.3).
+        // Aspetta il clic sul suo pannello: è un'attesa di conferma, e detta come
+        // «non eseguita» la chat la nascondeva come fallita (#825.3).
         return confirmed
           ? { executed: false, kept: true }
           : { executed: false, kept: true, needsConfirm: level, describe: Levels ? Levels.describe(action) : '' };

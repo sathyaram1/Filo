@@ -200,3 +200,57 @@ test('più di 20 schede pertinenti: il pannello le propone e le elimina tutte', 
   expect(rimaste).toHaveLength(70 - gatti);
   expect(rimaste.every((t) => t.startsWith('Altro'))).toBe(true);
 });
+
+test('titolo lungo nell\'elenco: il pannello di cancellazione resta dentro la bolla di Filo', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await configure(app);
+  await seedArchive(app, [
+    { title: 'Gatti persiani: carattere, cura del pelo e alimentazione, guida completa per chi vuole adottarne uno', gatto: true },
+    { title: 'Cibo per gatti', gatto: true },
+    { title: 'Ricetta della torta', gatto: false },
+  ]);
+  await fakeChat(app, [
+    { toolCalls: [{ id: 'c3', name: 'CANCELLA_ARCHIVIO', arguments: '{"query":"gatti"}' }] },
+    { text: 'Ecco le schede sui gatti.' },
+  ]);
+
+  await chiedi(page, 'cancella dall\'archivio le pagine sui gatti');
+  const panel = page.locator('.dash-delete-panel');
+  await expect(panel.locator('.dash-delete-list li')).toHaveCount(2, { timeout: 15_000 });
+  const destra = (loc) => loc.evaluate((el) => el.getBoundingClientRect().right);
+  const bolla = page.locator('.dash-bubble-filo', { has: panel });
+  expect(await destra(panel)).toBeLessThanOrEqual(await destra(bolla));
+});
+
+// L'assistente sulla pagina conferma col popup generico: il riordino lì si
+// esegue davvero, la cancellazione (che vuole l'elenco davanti) non si propone.
+test('assistente sulla pagina: il riordino confermato parte, la cancellazione dall\'archivio non chiede un sì a vuoto', async ({ app, shell }) => {
+  test.setTimeout(30_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await app.evaluate(({ BrowserWindow }) => {
+    globalThis.__triage = 0;
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (w._filoTabs) w._filoTabs.runAutoTriage = async () => { globalThis.__triage += 1; return { archived: 1 }; };
+    }
+  });
+  await seedArchive(app, [{ title: 'Gatti persiani', gatto: true }]);
+  const invia = (type, action) => page.evaluate(([t, a]) => chrome.runtime.sendMessage({ type: t, action: a, assistente: true }), [type, action]);
+
+  const riordino = { type: 'PULISCI_TAB' };
+  expect((await invia('filo_run_action', riordino)).needsConfirm).toBeTruthy();
+  const fatto = await invia('filo_confirm_action', riordino);
+  expect(fatto).toMatchObject({ executed: true, output: { archived: 1 } });
+  expect(await app.evaluate(() => globalThis.__triage)).toBe(1);
+
+  const cancella = { type: 'CANCELLA_ARCHIVIO', query: 'gatti' };
+  const r = await invia('filo_run_action', cancella);
+  expect(r.needsConfirm).toBeFalsy();
+  expect(r.output).toMatchObject({ rifiuto: true });
+  expect(r.output.error).toContain('home');
+  expect((await invia('filo_confirm_action', cancella)).executed).toBe(false);
+  expect(await archiviate(app)).toEqual(['Gatti persiani']);
+});

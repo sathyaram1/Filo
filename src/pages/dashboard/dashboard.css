@@ -592,7 +592,11 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   border: 1px dashed var(--dash-line-strong);
   border-radius: 8px;
 }
+/* Riga intera delle azioni e mai oltre: i titoli lunghi si accorciano coi puntini invece di allargare la bolla. */
 .dash-delete-panel {
+  flex: 1 1 100%;
+  min-width: 0;
+  box-sizing: border-box;
   margin-top: 8px;
   padding: 10px 12px;
   border: 1px solid color-mix(in srgb, #c0392b 40%, transparent);
