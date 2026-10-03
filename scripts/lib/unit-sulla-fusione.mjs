@@ -92,7 +92,12 @@ export function testoProva(prova) {
   if (p.errore) return `▸ Unit sulla fusione: prova non riuscita (${p.errore}).`;
   switch (p.esito) {
     case 'main_contenuto': return `▸ Unit sulla fusione: il ramo contiene già main (${m}), il risultato è il ramo stesso.`;
-    case 'verde': return `▸ Unit sulla fusione con main ${m}: verdi.`;
+    case 'verde': {
+      const ins = Array.isArray(p.instabili) ? p.instabili : [];
+      if (!ins.length) return `▸ Unit sulla fusione con main ${m}: verdi.`;
+      return [`▸ Unit sulla fusione con main ${m}: verdi. Rossi al primo giro e verdi riprovati da soli, quindi instabili e non della fusione:`,
+        ...ins.map((r) => `    ~ ${r}`)].join('\n');
+    }
     case 'conflitto': return `▸ Unit sulla fusione con main ${m}: non provati, la fusione va in conflitto${p.file && p.file.length ? ` su ${p.file.join(', ')}` : ''}.`;
     case 'rosso_anche_su_main':
       return `▸ Unit sulla fusione con main ${m}: rossi, ma rossi anche su main da solo e senza test rotti in più. Non è colpa del ramo: si fonde.`;
