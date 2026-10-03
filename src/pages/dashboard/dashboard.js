@@ -462,17 +462,8 @@
     if (!a) return;
     const type = String(a.type || '').toUpperCase();
     if (type === 'PULISCI_TAB') {
-      // §6 — suggerimento di pulizia dalla home: STESSA conferma del bottone chat.
-      // Popup Filo (SN_CONFIRM_UI), non il window.confirm nativo del browser
-      // (PATTERNS.md: niente default del browser). Fallback al nativo solo se il
-      // modulo non è caricato.
-      const text = 'Filo valuterà tutte le schede aperte e archivierà quelle non più utili. '
-        + 'Le schede archiviate restano riapribili da “Tab archiviate”.';
-      const ok = window.SN_CONFIRM_UI
-        ? await window.SN_CONFIRM_UI.confirm({ title: 'Riordino delle schede', text, okLabel: 'Procedi' })
-        : window.confirm(`${text} Procedo?`);
-      if (!ok) return;
-      send({ type: MSG.RUN_TAB_TRIAGE });
+      // §6 — suggerimento di pulizia dalla home: stessa regola e stesso popup della chat (#530).
+      Att.riordinaSchede();
       return;
     }
     if (type === 'NAVIGA' && a.url) {

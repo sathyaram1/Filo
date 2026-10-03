@@ -1428,9 +1428,8 @@ async function executeFiloAction(action, {
     const no = fraseNo(ing, decisione, sender);
     return { executed: false, kept: false, no: true, error: no.perModello, output: { error: no.breve, rifiuto: true, no: true } };
   }
-  // PULISCI_TAB e CANCELLA_ARCHIVIO hanno già un flusso di conferma dedicato
-  // lato client (bottone → RUN_TAB_TRIAGE / pannello eliminazione): restano
-  // `kept` come prima e la conferma la gestisce la loro UI specifica.
+  // PULISCI_TAB e CANCELLA_ARCHIVIO lavorano in un pannello del client (bottone → RUN_TAB_TRIAGE / elenco
+  // da eliminare): niente sospensione qui, il pannello chiede come dice `domanda` (sotto, nello switch).
   const hasBespokeConfirm = type === 'PULISCI_TAB' || type === 'CANCELLA_ARCHIVIO';
   const daChiedere = decisione.risposta !== 'si';
   if (daChiedere && !confirmed && !hasBespokeConfirm) {
@@ -1917,12 +1916,22 @@ async function executeFiloAction(action, {
         };
       }
       case 'PULISCI_TAB':
-        // Non eseguiamo subito: il client mostra un bottone di conferma; al
-        // click manda RUN_TAB_TRIAGE. Teniamo il bottone nella bolla.
-        return { executed: false, kept: true };
+        // Quando la regola dice sì il riordino parte qui, come ogni azione (#530); se no il pannello chiede.
+        if (!daChiedere) {
+          const tm = winOf(sender)?._filoTabs;
+          if (!tm) return { executed: false, kept: false, output: { error: 'nessuna finestra con schede' } };
+          try {
+            const r = await tm.runAutoTriage({ trigger: 'manual' });
+            return { executed: true, kept: false, output: { archived: (r && r.archived) || 0 } };
+          } catch (e) {
+            return { executed: false, kept: false, output: { error: String(e?.message || e) } };
+          }
+        }
+        return { executed: false, kept: true, domanda: decisione.digita ? 'conferma' : 'chiede' };
       case 'CANCELLA_ARCHIVIO':
-        // §5 — azione distruttiva: il client mostra l'elenco dei match + conferma.
-        return { executed: false, kept: true };
+        // L'elenco dei match lo mostra il pannello del client, ma come chiedere lo dice la risposta di
+        // SN_AUTONOMIA (#530), non il pannello: `domanda` viaggia con l'azione.
+        return { executed: false, kept: true, domanda: decisione.digita ? 'conferma' : (daChiedere ? 'chiede' : 'si') };
       case 'CANCELLA_MEMORIA': {
         // Livello 3: a questo punto l'utente ha già digitato "conferma" (gate sopra).
         // Azzera tutti i moduli di memoria (PROFILO, PREFERENZE, espansioni) e il
@@ -2700,6 +2709,12 @@ function toolResultText({ action, res, rendered }) {
   if (type === 'NAVIGA' && res.output && res.output.blocked === 'scheme') {
     return 'Pagina NON aperta: l\'indirizzo non è una pagina web (ammessi solo http e https). Non riprovare con lo stesso indirizzo.';
   }
+  if (type === 'PULISCI_TAB' && res.executed && res.output) {
+    const n = Number(res.output.archived) || 0;
+    return n > 0
+      ? `Schede riordinate: ${n} archiviate, riapribili da «Tab archiviate». Dillo all'utente in una riga.`
+      : 'Schede riordinate: nessuna da archiviare. Dillo all\'utente in una riga.';
+  }
   if (res.output && res.output.blocked === 'disabled') {
     return 'Comando NON eseguito: la modalità terminale è spenta. Proponi all\'utente di attivarla (IMPOSTA_PREFERENZA modalita_terminale true) e non riprovare finché non è attiva.';
   }
@@ -3162,6 +3177,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         // Azione sospesa in attesa di conferma (#146.2): il client renderizza il
         // bottone che apre il popup/box e poi manda MSG.FILO_CONFIRM_ACTION.
         if (res.needsConfirm) rendered._confirm = { level: res.needsConfirm, text: res.describe || '', ...(res.avviso ? { avviso: res.avviso } : {}) };
+        if (res.domanda) rendered._domanda = res.domanda;
         // Output di un comando eseguito subito (livello 1) o esito bloccato
         // (terminale spento): il client lo mostra in chat (#146.6).
         if (res.output) rendered._output = res.output;

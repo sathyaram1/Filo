@@ -374,6 +374,17 @@ test('sentinella: ogni superficie che fa agire Filo chiede la risposta al modulo
   for (const riga of tab.split('\n').filter((r) => /^\s+[a-z_]+:\s*\{/.test(r))) assert.match(riga, /costo:\s*[0-3]/, riga.trim());
   assert.match(side, /MSG\.FILO_DECIDI_PAGINA/);
   assert.match(h, /async function decisioneAzionePagina[\s\S]*?decisioneAutonomia\(/);
+  // I pannelli propri della chat (riordino delle schede, svuota archivio) chiedono come dice la risposta del main.
+  assert.match(h, /case 'CANCELLA_ARCHIVIO':\s*\n[\s\S]*?domanda: decisione\./, 'i pannelli ricevono la risposta del modulo');
+  const att = readFileSync(join(ROOT, 'src', 'pages', 'dashboard', 'dashboard-attivita.js'), 'utf8');
+  const pannelli = att.slice(att.indexOf("if (type === 'PULISCI_TAB') {"), att.indexOf('function init(deps)'))
+    .replace(/async function chiediSecondoRegola[\s\S]*?\n {2}\}\n/, '');
+  assert.ok(pannelli.includes('chiediSecondoRegola(a._domanda') && pannelli.includes('chiediSecondoRegola(domanda'), 'i pannelli chiedono secondo la regola');
+  assert.doesNotMatch(pannelli, /SN_CONFIRM_UI|confirmTyped|\bconfirm\(/, 'un pannello non decide da sé come chiedere');
+  for (const altra of ['dashboard.js', 'dashboard-comandi.js']) {
+    const t = readFileSync(join(ROOT, 'src', 'pages', 'dashboard', altra), 'utf8');
+    assert.doesNotMatch(t, /RUN_TAB_TRIAGE/, `${altra}: il riordino delle schede passa da riordinaSchede, che chiede alla regola`);
+  }
   // Le lezioni che Filo si scrive da solo dopo la chat passano dalla stessa regola di SALVA_LEZIONE.
   const chat = h.slice(h.indexOf('async function handleFiloChat('));
   const chiamata = chat.indexOf('maybeRunLessonAgent({ userMessage, filoReply: textReply');

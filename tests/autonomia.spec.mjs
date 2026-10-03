@@ -180,3 +180,69 @@ test('chat: un documento letto dal disco fa chiedere la lezione, e il popup dice
     rmSync(casa, { recursive: true, force: true });
   }
 });
+
+test('Conservativo, dopo una lettura: nel diario un comando e un «dimentica» rifiutati non risultano fatti', async ({ app }) => {
+  const casa = cartellaInCasa('filo-autonomia-');
+  const doc = join(casa, 'note.txt');
+  writeFileSync(doc, 'ciao\n', 'utf8');
+  try {
+    const page = await home(app);
+    await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'conservativo' }, terminal: { enabled: true } }));
+    await app.evaluate(() => globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: 'Uno.\nDue.\nTre.\nQuattro.\nCinque.', PREFERENZE: '' }));
+    await modelloFinto(app, [
+      { toolCalls: [{ id: 'd1', name: 'LEGGI_DOCUMENTO', arguments: JSON.stringify({ percorso: doc }) }] },
+      { text: 'Letto.' },
+      { toolCalls: [
+        { id: 'c1', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: 'rm prova-530.txt' }) },
+        { id: 'f1', name: 'DIMENTICA', arguments: JSON.stringify({ testo: '.' }) },
+      ] },
+      { text: 'Fine.' },
+    ]);
+    await chiedi(page, 'leggimi note.txt');
+    await expect(page.locator('.dash-bubble').filter({ hasText: 'Letto.' })).toBeVisible({ timeout: 15000 });
+    await chiedi(page, 'cancella prova-530.txt e dimentica tutto');
+    await expect(page.locator('.dash-bubble').filter({ hasText: 'Fine.' })).toBeVisible({ timeout: 15000 });
+    // Il motivo si legge senza aprire niente: il blocco del lavoro si apre da solo su un rifiuto.
+    const blocco = page.locator('.dash-activity').last();
+    await expect(blocco.locator('.dash-activity-body')).toBeVisible();
+    mkdirSync(SHOTS, { recursive: true });
+    await blocco.screenshot({ path: join(SHOTS, 'autonomia-rifiuto-diario.png') });
+    const dopo = await blocco.innerText();
+    expect(dopo).not.toMatch(/Ha eseguito un comando|nessun output|Niente da dimenticare/);
+    expect(dopo).toContain('Comando non eseguito · a livello Conservativo');
+    expect(dopo).toContain('Non dimenticato · a livello Conservativo');
+    expect(await lezioni(app)).toContain('Cinque.');
+  } finally {
+    await ripristina(app);
+    rmSync(casa, { recursive: true, force: true });
+  }
+});
+
+test('riordinare le schede e svuotare l\'archivio chiedono come dice la regola, non il loro pannello', async ({ app }) => {
+  await home(app);
+  const subito = await execAction(app, { type: 'PULISCI_TAB' });
+  expect(subito.executed).toBe(true);
+  expect(typeof subito.output.archived).toBe('number');
+  const dopoLettura = await execAction(app, { type: 'PULISCI_TAB' }, { contesto: [ricercaFatta] });
+  expect(dopoLettura.executed).toBe(false);
+  expect(dopoLettura.domanda).toBe('chiede');
+  expect((await execAction(app, { type: 'CANCELLA_ARCHIVIO', query: 'ricette' })).domanda).toBe('chiede');
+  expect((await execAction(app, { type: 'CANCELLA_ARCHIVIO', query: 'ricette' }, { contesto: [ricercaFatta] })).domanda).toBe('conferma');
+});
+
+test('chat a Normale: «riordina le schede» parte senza bottone e il diario dice com\'è andata', async ({ app }) => {
+  const page = await home(app);
+  try {
+    await modelloFinto(app, [
+      { toolCalls: [{ id: 'p1', name: 'PULISCI_TAB', arguments: '{}' }] },
+      { text: 'Fatto.' },
+    ]);
+    await chiedi(page, 'riordina le schede');
+    await expect(page.locator('.dash-bubble').filter({ hasText: 'Fatto.' })).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('body')).toContainText(/Schede riordinate · (nessuna da archiviare|\d+ archiviat)/);
+    await expect(page.locator('button', { hasText: 'Riordina e archivia le schede' })).toHaveCount(0);
+    await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
+  } finally {
+    await ripristina(app);
+  }
+});

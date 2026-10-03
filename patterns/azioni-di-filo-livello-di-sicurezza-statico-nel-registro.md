@@ -17,7 +17,9 @@ credenziali, regole, cancellazioni definitive) e la difesa abbassata («conferma
 a ogni livello). Il dispatch (`executeFiloAction` nel main) **rifiuta le azioni
 non registrate o senza costo**, e nessuna superficie decide da sé: nemmeno le
 azioni che l'agente sulla pagina fa nel content script, che dichiarano il costo
-e chiedono la risposta al main (`MSG.FILO_DECIDI_PAGINA`). Sentinella:
+e chiedono la risposta al main (`MSG.FILO_DECIDI_PAGINA`), né i pannelli propri
+della chat (riordino delle schede, svuota archivio), che chiedono come dice la
+`domanda` arrivata dal main. Sentinella:
 `tests/unit/autonomia.test.mjs`. Nelle regole che seguono, scritte prima del
 #530, «livello 2» vuol dire «chiede» e «livello 3» vuol dire «conferma».
 
@@ -52,7 +54,10 @@ e chiedono la risposta al main (`MSG.FILO_DECIDI_PAGINA`). Sentinella:
   che racconta e il bottone che porta all'editor; un'azione in attesa di
   conferma ha la riga «Conferma chiesta …» e il bottone per rispondere (senza
   quella riga un turno di sola richiesta non lasciava blocco, e alla conferma
-  non c'era più dove scrivere che era stata data).
+  non c'era più dove scrivere che era stata data). Un no della regola (`_output.no`) è
+  un'azione che non è partita: la riga dice «non eseguito» col motivo e il
+  blocco si apre da solo (un comando rifiutato si raccontava come eseguito,
+  un «dimentica» rifiutato come «niente da dimenticare»).
 - **Quello che succede DOPO la risposta deve arrivare al modello.** Una
   conferma data nel popup (livello 2 e 3) e le azioni già eseguite in un
   tentativo interrotto da un guasto non stanno in nessun messaggio: rientrano

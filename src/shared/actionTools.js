@@ -232,7 +232,7 @@
       required: ['percorso'],
     },
     PULISCI_TAB: {
-      description: 'Mostra un bottone "Riordina e archivia le schede"; l\'utente conferma e Filo archivia le tab non più utili (riapribili dalla cronologia). NON archiviare nulla da solo: spiega in una frase cosa farà.',
+      description: 'Valuta le schede aperte e archivia quelle non più utili (riapribili da «Tab archiviate»). Se il livello di autonomia lo consente parte subito e ti torna quante ne ha archiviate; se no compare un bottone che l\'utente conferma. Usalo solo se l\'utente chiede di riordinare le schede.',
       properties: {},
       required: [],
     },

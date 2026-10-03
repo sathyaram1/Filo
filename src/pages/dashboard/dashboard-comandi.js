@@ -222,19 +222,13 @@
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
   }
 
-  // "/pulisci" (o "/pulizia"): avvia il riordino/archiviazione delle schede non
-  // più utili, con la STESSA conferma del bottone "🧹 Riordina e archivia le
-  // schede" (mai automatico, spec §2.1). Riusa il popup Filo SN_CONFIRM_UI.
+  // "/pulisci" (o "/pulizia"): il riordino delle schede con la stessa regola e lo stesso popup della chat (#530).
   async function runTabCleanup(chat) {
-    const text = 'Filo valuterà tutte le schede aperte e archivierà quelle non più utili. '
-      + 'Le schede archiviate restano riapribili da “Tab archiviate”.';
-    const ok = window.SN_CONFIRM_UI
-      ? await window.SN_CONFIRM_UI.confirm({ title: 'Riordino delle schede', text, okLabel: 'Procedi' })
-      : window.confirm(`${text} Procedo?`);
-    if (!ok) return;
     showFiloLine('🧹 Riordino in corso…', chat);
-    const r = await send({ type: MSG.RUN_TAB_TRIAGE });
-    const n = (r && r.archived) || 0;
+    const r = await global.SN_DASH_ATTIVITA.riordinaSchede();
+    if (r.annullato) { showFiloLine('Riordino annullato.', chat); return; }
+    if (r.errore) { showFiloLine(`Riordino non riuscito: ${r.errore}.`, chat); return; }
+    const n = r.archived;
     showFiloLine(n > 0
       ? `✓ Archiviate ${n} ${n === 1 ? 'scheda' : 'schede'}.`
       : '✓ Nessuna scheda da archiviare.', chat);
