@@ -58,8 +58,9 @@ function raccogli(ctx, evento) {
   for (let c = ctx; c; c = c.padre) if (Array.isArray(c.raccolti)) c.raccolti.push(voce);
 }
 
-function registra({ tipo, cambi }, { incognito = Disco.inIncognito() } = {}) {
-  if (!Array.isArray(cambi) || !cambi.length) return null;
+// `vuoto`: solo per l'annullo di uno stato che era già tornato com'era.
+function registra({ tipo, cambi }, { incognito = Disco.inIncognito(), vuoto = false } = {}) {
+  if (!Array.isArray(cambi) || (!cambi.length && !vuoto)) return null;
   const ctx = corrente();
   const p = ctx || { via: 'filo' };
   const evento = {
@@ -186,18 +187,19 @@ async function annulla(id, prov = {}) {
       const FM = globalThis.SN_FILO_MEMORY;
       const r = K().annulloTimer(e, await FM.listTimers());
       saltati = r.saltati;
-      await FM.setRaw(CHIAVI().FILO_TIMERS, r.lista);
+      await globalThis.chrome.storage.local.set({ [CHIAVI().FILO_TIMERS]: r.lista });
       app.aggiornaVivo();
     } else if (e.tipo === 'proxy') {
       const FM = globalThis.SN_FILO_MEMORY;
-      await FM.setRaw(CHIAVI().FILO_PROXY_RULES, K().annulloRegoleProxy(e, await FM.listProxyRules()));
+      const regole = K().annulloRegoleProxy(e, await FM.listProxyRules());
+      await globalThis.chrome.storage.local.set({ [CHIAVI().FILO_PROXY_RULES]: regole });
       app.aggiornaRegoleProxy();
     } else if (e.tipo === 'zoom') {
       const c = e.cambi[0];
       riuscito = !!(app.zoomSu && await app.zoomSu(String(c.chiave).slice(5), c.prima));
     }
     // Lo stato era già quello di prima (rimesso a mano nel frattempo): l'annullo resta come evento.
-    if (riuscito && !raccolti.length) registra({ tipo: e.tipo, cambi: [] }, {});
+    if (riuscito && !raccolti.length) registra({ tipo: e.tipo, cambi: [] }, { vuoto: true });
   });
   if (!riuscito) return { ok: false, motivo: 'la pagina di quel sito non è aperta', id: e.id };
   return { ok: true, id: e.id, frase: K().frase(e), eventi: raccolti, saltati };

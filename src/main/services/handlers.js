@@ -13,6 +13,7 @@ const Defaults = require('./defaultsStore');
 const { settingsForOwnerAction, fillMovedSlots, ownerSlotFor } = require('./resolveSupportModel');
 const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra } = require('./impostazioniPerOrigine');
 const SegretiLetti = require('./segretiLetti');
+const Registro = require('./registroCambi');
 
 const { SN_CONST, SN_MSG } = globalThis;
 const { ACTIONS, PROMPTS } = SN_CONST;
@@ -1365,7 +1366,22 @@ async function primaVoltaDelTerminale() {
 }
 
 // `parole` = ciò che l'utente ha scritto in chat: un codice scritto da lui può uscire.
-async function executeFiloAction(action, { confirmed = false, sender = null, contesto = null, assistente = false, parole = '' } = {}) {
+function idDelCambio(action) {
+  const id = String(action.id ?? action.cambio ?? action.evento ?? '').trim();
+  return id || null;
+}
+
+// Ogni stato che l'azione scrive diventa un evento del filo nel salvataggio (registroCambi.js):
+// qui si dichiara solo che li ha chiesti la chat, e si raccolgono per il segno sulla bolla.
+async function executeFiloAction(action, opzioni = {}) {
+  const raccolti = [];
+  const via = opzioni.assistente ? 'assistente' : 'chat';
+  const res = await Registro.con({ via, raccolti }, () => eseguiAzioneFilo(action, opzioni));
+  if (raccolti.length && res && typeof res === 'object') return { ...res, cambi: raccolti };
+  return res;
+}
+
+async function eseguiAzioneFilo(action, { confirmed = false, sender = null, contesto = null, assistente = false, parole = '' } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
   // Da un sito (anche via una chat aperta da lì) passano solo le azioni della
@@ -1474,6 +1490,14 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
   }
 
   if (type === 'ESEGUI_COMANDO' || type === 'LEGGI_DOCUMENTO') action._perimetro = perimetroLettura(sender);
+
+  // Il livello di un annullo è quello del cambio che rimette: lo legge il main dal registro, sempre,
+  // sopra qualunque valore arrivato con l'azione.
+  if (type === 'ANNULLA_CAMBIO') {
+    const bersaglio = await Registro.livelloDi(idDelCambio(action));
+    action._livelloCambio = bersaglio ? bersaglio.livello : 1;
+    action._fraseCambio = bersaglio ? bersaglio.frase : '';
+  }
 
   // ── gate dei livelli di sicurezza (#146.2) ────────────────────────────────
   // Il livello è assegnato STATICAMENTE nel registro (src/shared/actionLevels.js),
@@ -2115,6 +2139,12 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
         if (!tm || !tab) return { executed: false, kept: false, output: { restyle: 'no-page' } };
         const r = await tm.clearPageStyle(tab);
         return { executed: !!(r && r.ok), kept: false };
+      }
+      case 'ANNULLA_CAMBIO': {
+        // «Rimetti come prima»: vale per i cambi chiesti in chat e per quelli fatti dalle pagine.
+        const r = await Registro.annulla(idDelCambio(action), { via: assistente ? 'assistente' : 'chat' });
+        if (!r.ok) return { executed: false, kept: false, output: { error: r.motivo, ...(r.id ? { id: r.id } : {}) } };
+        return { executed: true, kept: false, output: { annullato: r.id, frase: r.frase, saltati: r.saltati || [] } };
       }
       case 'ZOOM_PAGINA': {
         // #686 — lo zoom della pagina si chiede anche a parole, non solo con
@@ -3262,6 +3292,8 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         // Output di un comando eseguito subito (livello 1) o esito bloccato
         // (terminale spento): il client lo mostra in chat (#146.6).
         if (res.output) rendered._output = res.output;
+        // I cambi di stato che l'azione ha lasciato: il segno sulla bolla dell'utente (#867).
+        if (Array.isArray(res.cambi) && res.cambi.length) rendered._cambi = res.cambi;
         // L'esito viaggia con l'azione: il diario del lavoro deve poter dire
         // «fatto» o «non riuscito», non solo «l'ha chiamata».
         rendered._executed = !!res.executed;
@@ -3370,9 +3402,14 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     // Nell'archivio solo ciò che è successo, più le azioni fermate (#810) che riaperta racconta come tali.
     // Una conferma data dopo la aggiunge la scheda (FILO_CHAT_NOTE).
     const successe = renderedActions.filter((x) => x && ((x._executed && !x._confirm) || (x._output && x._output.blocked === 'segreto')));
+    const cambi = renderedActions.flatMap((x) => (x && Array.isArray(x._cambi) ? x._cambi.map((c) => c.id) : []));
     const dopo = await appendToChatArchive(
       chatId,
-      { role: 'filo', text: textReply, actions: successe, ...(lettiRisposta.length ? { letti: lettiRisposta } : {}) },
+      {
+        role: 'filo', text: textReply, actions: successe,
+        ...(lettiRisposta.length ? { letti: lettiRisposta } : {}),
+        ...(cambi.length ? { cambi } : {}),
+      },
       { onboarding: onbActive },
     );
     // La chat può essere finita mentre Filo stava ancora rispondendo: l'utente
