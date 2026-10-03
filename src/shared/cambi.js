@@ -68,7 +68,7 @@
     'security.blockPopups': { nome: 'blocco dei popup non richiesti', valore: ATTIVO, livello: 2 },
     'security.safeBrowse.enabled': { nome: 'avviso sui siti pericolosi', valore: ATTIVO, livello: 2 },
     'security.safeBrowse.safeBrowsingKey': { nome: 'chiave del controllo dei siti pericolosi', segreto: true },
-    'security.safeBrowse.networkSignals': { nome: 'controlli di rete sui siti', valore: ATTIVI(), livello: 2 },
+    'security.safeBrowse.networkSignals': { nome: 'controlli di rete sui siti', valore: sino('attivi', 'spenti'), livello: 2 },
     'security.safeBrowse.llmJudge': { nome: 'giudizio AI sui siti sospetti', valore: ATTIVO, livello: 2 },
     'security.safeBrowse.sandbox': { nome: 'link sospetti in una finestra isolata', valore: sino('sì', 'no'), livello: 2 },
     'security.cookies.mode': { nome: 'gestione dei cookie', valori: { manual: 'manuale', default: 'automatica', privacy: 'privacy massima' }, livello: 2 },
@@ -87,7 +87,6 @@
     'proxy.bypass': { nome: 'siti esclusi dal proxy', valore: (v) => v || 'nessuno', livello: 2 },
     'proxy.defaultCountry': { nome: 'paese predefinito del proxy', valore: (v) => nomePaese(v), livello: 1 },
   };
-  function ATTIVI() { return sino('attivi', 'spenti'); }
 
   // ── Esclusioni: le scritture che NON diventano un evento, ognuna col suo perché ──
   // Unico posto dove si decide cosa non entra nel filo; la sentinella vuole un motivo per ognuna.
@@ -288,8 +287,11 @@
       }
       if (c.prima && !c.dopo) return `tolt${c.prima.kind === 'alarm' ? 'a' : 'o'} ${c.prima.kind === 'alarm' ? 'la' : 'il'} ${nomeTimer(c.prima)}`;
       if (c.prima && c.dopo) {
-        if (c.dopo.kind === 'alarm') return `${nomeTimer({ ...c.prima, atTime: '' , endsAt: c.prima.endsAt })} → ${c.dopo.atTime || oraDi(c.dopo.endsAt)}`;
-        return `${nomeTimer(c.dopo)}: scade alle ${oraDi(c.prima.endsAt)} → ${oraDi(c.dopo.endsAt)}`;
+        const oraPrima = c.prima.kind === 'alarm' ? (c.prima.atTime || oraDi(c.prima.endsAt)) : oraDi(c.prima.endsAt);
+        const oraDopo = c.dopo.kind === 'alarm' ? (c.dopo.atTime || oraDi(c.dopo.endsAt)) : oraDi(c.dopo.endsAt);
+        if (oraPrima === oraDopo && !uguale(c.prima.label, c.dopo.label)) return `${nomeTimer(c.prima)} → «${breve(c.dopo.label, 40)}»`;
+        if (c.dopo.kind === 'alarm') return `${nomeTimer(c.prima)} → ${oraDopo}`;
+        return `${nomeTimer(c.dopo)}: scade alle ${oraPrima} → ${oraDopo}`;
       }
       return 'un timer';
     }
