@@ -293,6 +293,7 @@ describe('a gruppi, ciò che node fa una volta per corsa resta uno', () => {
       (k) => `COPIA${k}`,
     );
     assert.deepEqual(r.rapporti, ['out.xml', 'b.tap']);
+    assert.deepEqual(r.accodati, ['stdout', 'b.tap'], 'spec e tap restano uno per gruppo, file o stdout che sia');
     assert.deepEqual(r.flags, ['--test-reporter=junit', '--test-reporter-destination=COPIA0', '--test-reporter=spec',
       '--test-reporter-destination=stdout', '--test-reporter=tap', '--test-reporter-destination=COPIA1']);
   });
