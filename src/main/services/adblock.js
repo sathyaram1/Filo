@@ -313,6 +313,23 @@ function ricordaRichiesta(details) {
   if (primi.size > PRIMI_MAX) primi.delete(primi.keys().next().value);
 }
 
+// La pagina d'errore può sostituire il documento prima che lo script parta, e il frame vecchio non risponde più:
+// si riprova sul frame di adesso, ritrovato dal padre.
+const SEGNALE = `try{parent.postMessage(${JSON.stringify(RIQUADRO_FERMATO)},'*')}catch(e){}`;
+function riconosciRiquadro(frame, padre, id) {
+  const esegui = (f) => { try { f.executeJavaScript(SEGNALE).catch(() => {}); } catch (_) {} };
+  if (frame) esegui(frame);
+  if (!padre || id == null) return;
+  for (const ms of [250, 1000]) {
+    setTimeout(() => {
+      try {
+        const f = padre.frames.find((x) => x.frameTreeNodeId === id);
+        if (f) esegui(f);
+      } catch (_) {}
+    }, ms);
+  }
+}
+
 function chiudiInPagina(details) {
   if (!details || !DA_CHIUDERE.has(details.resourceType)) return;
   const urls = [details.url];
@@ -323,10 +340,16 @@ function chiudiInPagina(details) {
   try { frame = details.frame || null; } catch (_) {}
   if (details.resourceType === 'subFrame' && frame) {
     // Il riquadro sta nel frame padre, e uno mandato altrove da uno script non porta l'indirizzo: si fa riconoscere lui.
-    try { frame.executeJavaScript(`try{parent.postMessage(${JSON.stringify(RIQUADRO_FERMATO)},'*')}catch(e){}`).catch(() => {}); } catch (_) {}
+    let figlio = null;
+    try { figlio = frame.frameTreeNodeId; } catch (_) {}
     try { frame = frame.parent || null; } catch (_) { frame = null; }
+    riconosciRiquadro(details.frame, frame, figlio);
   }
   if (frame) {
+    // Il padre serve anche per un'immagine: dentro un riquadro scritto dalla pagina il preload non gira.
+    let padre = null;
+    try { padre = details.resourceType === 'subFrame' ? null : frame.parent; } catch (_) {}
+    try { if (padre) padre.send('filo:adblock-chiudi', urls); } catch (_) {}
     try { frame.send('filo:adblock-chiudi', urls); return; } catch (_) {}
   }
   const wc = details.webContents;

@@ -232,8 +232,34 @@ test('un elemento fermato dal blocco si chiude nella pagina: immagini, riquadri 
   }
   A.chiudiInPagina({ resourceType: 'image', url: 'https://ads.test/senza-pagina' });
   A.chiudiInPagina({ resourceType: 'image', url: 'https://ads.test/chiusa', webContents: { isDestroyed: () => true, send: () => { throw new Error('chiusa'); } } });
-  assert.deepEqual(inviati.map(([, u]) => u), ['https://ads.test/image', 'https://ads.test/subFrame', 'https://ads.test/object']);
+  assert.deepEqual(inviati.map(([, u]) => u), [['https://ads.test/image'], ['https://ads.test/subFrame'], ['https://ads.test/object']]);
   assert.ok(inviati.every(([c]) => c === 'filo:adblock-chiudi'));
+});
+
+test('un annuncio arrivato con un rinvio porta anche l\'indirizzo di partenza, che è quello scritto nella pagina', () => {
+  const inviati = [];
+  const wc = { isDestroyed: () => false, send: (_c, urls) => inviati.push(urls) };
+  A.ricordaRichiesta({ id: 901, resourceType: 'image', url: 'https://partner.test/click' });
+  A.ricordaRichiesta({ id: 901, resourceType: 'image', url: 'https://ads.test/creativo.gif' });
+  A.chiudiInPagina({ id: 901, resourceType: 'image', url: 'https://ads.test/creativo.gif', webContents: wc });
+  A.chiudiInPagina({ id: 901, resourceType: 'image', url: 'https://ads.test/creativo.gif', webContents: wc });
+  assert.deepEqual(inviati, [['https://ads.test/creativo.gif', 'https://partner.test/click'], ['https://ads.test/creativo.gif']]);
+});
+
+test('un annuncio dentro un riquadro: l\'avviso va al riquadro e al suo padre; un riquadro fermato si fa riconoscere dal padre', () => {
+  const inviati = [];
+  const eseguiti = [];
+  const padre = { send: (_c, urls) => inviati.push(['padre', urls]), frames: [] };
+  const riquadro = { parent: padre, frameTreeNodeId: 7, send: (_c, urls) => inviati.push(['riquadro', urls]), executeJavaScript: (js) => { eseguiti.push(js); return Promise.resolve(); } };
+  A.chiudiInPagina({ id: 902, resourceType: 'image', url: 'https://ads.test/dentro.gif', frame: riquadro });
+  assert.deepEqual(inviati, [['padre', ['https://ads.test/dentro.gif']], ['riquadro', ['https://ads.test/dentro.gif']]]);
+  inviati.length = 0;
+  A.chiudiInPagina({ id: 903, resourceType: 'subFrame', url: 'https://ads.test/nav.html', frame: riquadro });
+  assert.deepEqual(inviati, [['padre', ['https://ads.test/nav.html']]]);
+  assert.equal(eseguiti.length, 1);
+  assert.ok(eseguiti[0].includes(A.RIQUADRO_FERMATO) && eseguiti[0].includes('parent.postMessage'));
+  const preload = readFileSync(join(__dirname, '..', '..', 'src', 'preload', 'nascondi-pubblicita.js'), 'utf8');
+  assert.ok(preload.includes(`'${A.RIQUADRO_FERMATO}'`), 'il preload ascolta lo stesso segnale che il main fa mandare');
 });
 
 test('regole sotto cancello: ogni selettore dell\'elenco prende la radice aperta, uno malformato si scarta', () => {

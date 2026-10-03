@@ -4,36 +4,42 @@
 
 const CHIUSO = 'data-filo-pub-chiuso';
 const ELEMENTI = 'img,iframe,frame,embed,object';
+const MEDIA = 'img,video,canvas,svg,iframe,frame,embed,object';
 const MAX_BLOCCATI = 500;
 const RIQUADRO_FERMATO = 'filo:adblock-riquadro-fermato';
+
+const area = (r) => (r.width > 0 && r.height > 0 ? r.width * r.height : 0);
+
+// Un riquadro che mostra solo l'annuncio fermato è un rettangolo bianco. Senza testo né immagini visibili lo è.
+function vuoto(doc) {
+  const b = doc && doc.body;
+  if (!b || (b.innerText || '').trim()) return false;
+  let media = [];
+  try { media = b.querySelectorAll(MEDIA); } catch (_) {}
+  for (const n of media) if (area(n.getBoundingClientRect())) return false;
+  return true;
+}
 
 // Un'immagine o un riquadro che il blocco ha fermato si chiude, o resta il buco grande quanto l'annuncio.
 function chiudiBloccati({ ipcRenderer, webFrame }) {
   // Electron non toglie un foglio dell'utente: la regola vale finché la radice non porta questo attributo (blocco spento).
   const GATE = 'data-filo-' + Math.random().toString(36).slice(2, 10);
   let regola = false;
+  let acceso = true;
   let observer = null;
   const bloccati = new Set();
+  // Dentro i riquadri scritti dalla pagina il preload non gira: lì si chiude da qui, con lo stile sull'elemento.
+  const dentro = new Set();
 
-  // Un riquadro che mostrava solo l'annuncio fermato resterebbe un rettangolo bianco: chiesto al padre di chiuderlo.
-  // Solo se l'elemento ne copriva almeno metà, e a frame caricato: un pixel di tracciamento non chiude un riquadro vero.
   let inRiquadro = false;
   try { inRiquadro = window.parent !== window; } catch (_) { inRiquadro = true; }
+  // Solo un elemento che copriva almeno metà del riquadro ne fa un annuncio: un pixel di tracciamento non chiude un riquadro vero.
   let annuncio = false;
   let avvisato = false;
-  const visibile = (n) => { const r = n.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
-  const vuoto = () => {
-    const b = document.body;
-    if (!b || (b.innerText || '').trim()) return false;
-    let media = [];
-    try { media = b.querySelectorAll('img,video,canvas,svg,iframe,frame,embed,object'); } catch (_) {}
-    for (const n of media) if (visibile(n)) return false;
-    return true;
-  };
   const avvisaIlPadre = () => {
     if (avvisato || !annuncio) return;
     if (document.readyState !== 'complete') { window.addEventListener('load', avvisaIlPadre, { once: true }); return; }
-    if (!vuoto()) return;
+    if (!vuoto(document)) return;
     avvisato = true;
     try { window.parent.postMessage(RIQUADRO_FERMATO, '*'); } catch (_) {}
   };
@@ -44,17 +50,43 @@ function chiudiBloccati({ ipcRenderer, webFrame }) {
       try { webFrame.insertCSS(`:root:not([${GATE}]) [${CHIUSO}]{display:none!important}`, { cssOrigin: 'user' }); } catch (_) {}
     }
     if (inRiquadro && !annuncio) {
-      try {
-        const r = el.getBoundingClientRect();
-        annuncio = r.width * r.height > 0 && r.width * r.height >= 0.5 * window.innerWidth * window.innerHeight;
-      } catch (_) {}
+      try { annuncio = area(el.getBoundingClientRect()) >= 0.5 * window.innerWidth * window.innerHeight; } catch (_) {}
     }
     el.setAttribute(CHIUSO, '');
     if (inRiquadro) avvisaIlPadre();
   };
   const srcDi = (el) => [el.currentSrc, el.src, el.data].filter((s) => typeof s === 'string' && s);
-  const segna = (el) => {
-    if (el && el.nodeType === 1 && srcDi(el).some((s) => bloccati.has(s))) chiudi(el);
+  const fermato = (el) => !!el && el.nodeType === 1 && srcDi(el).some((s) => bloccati.has(s));
+  const segna = (el) => { if (fermato(el)) chiudi(el); };
+
+  const nascondiDentro = (n, si) => {
+    try {
+      if (si) n.style.setProperty('display', 'none', 'important');
+      else n.style.removeProperty('display');
+    } catch (_) {}
+  };
+  const giroDentro = (frame, doc, livello) => {
+    let copre = false;
+    let nodes = [];
+    try { nodes = doc.querySelectorAll(ELEMENTI); } catch (_) {}
+    for (const n of nodes) {
+      if (!fermato(n) || dentro.has(n)) continue;
+      try { copre = copre || area(n.getBoundingClientRect()) >= 0.5 * area(frame.getBoundingClientRect()); } catch (_) {}
+      dentro.add(n);
+      if (dentro.size > MAX_BLOCCATI) dentro.delete(dentro.values().next().value);
+      if (acceso) nascondiDentro(n, true);
+    }
+    if (copre && vuoto(doc)) chiudi(frame);
+    if (livello < 3) cercaDentro(doc, livello + 1);
+  };
+  const cercaDentro = (root, livello) => {
+    let frames = [];
+    try { frames = root.querySelectorAll('iframe,frame'); } catch (_) {}
+    for (const f of frames) {
+      let doc = null;
+      try { doc = f.contentDocument; } catch (_) {}
+      if (doc && doc.documentElement) giroDentro(f, doc, livello);
+    }
   };
   const giro = (root) => {
     if (!root || root.nodeType !== 1) return;
@@ -62,6 +94,7 @@ function chiudiBloccati({ ipcRenderer, webFrame }) {
     let nodes = [];
     try { nodes = root.querySelectorAll(ELEMENTI); } catch (_) {}
     for (const n of nodes) segna(n);
+    cercaDentro(root, 0);
   };
 
   ipcRenderer.on('filo:adblock-chiudi', (_e, urls) => {
@@ -90,15 +123,15 @@ function chiudiBloccati({ ipcRenderer, webFrame }) {
   // Un'immagine che poi carica una sorgente buona (banner a rotazione) torna visibile.
   window.addEventListener('load', (e) => {
     const t = e.target;
-    if (t && t.nodeType === 1 && t.tagName === 'IMG' && t.hasAttribute(CHIUSO) && !srcDi(t).some((s) => bloccati.has(s))) {
-      t.removeAttribute(CHIUSO);
-    }
+    if (t && t.nodeType === 1 && t.tagName === 'IMG' && t.hasAttribute(CHIUSO) && !fermato(t)) t.removeAttribute(CHIUSO);
   }, true);
-  ipcRenderer.on('filo:adblock-stato', (_e, acceso) => {
+  ipcRenderer.on('filo:adblock-stato', (_e, stato) => {
+    acceso = stato !== false;
     try {
-      if (acceso === false) document.documentElement.setAttribute(GATE, '');
-      else document.documentElement.removeAttribute(GATE);
+      if (acceso) document.documentElement.removeAttribute(GATE);
+      else document.documentElement.setAttribute(GATE, '');
     } catch (_) {}
+    for (const n of dentro) nascondiDentro(n, acceso);
   });
 }
 
