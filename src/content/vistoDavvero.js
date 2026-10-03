@@ -177,7 +177,7 @@
       const rec = Object.assign(nuovoStato(), {
         voce: v, pannello, sonda: DOC.createElement('div'), clip: ritagli(v, pannello), chiave: null, r: null,
       });
-      rec.sonda.style.cssText = STILE_SONDA + 'display:none;';
+      rec.sonda.style.cssText = STILE_SONDA + FUORI;
       voci.set(v, rec);
       perSonda.set(rec.sonda, rec);
       nuove.push(rec);
