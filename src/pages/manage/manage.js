@@ -241,12 +241,10 @@
     // altre girano da sole, questa nasce da una conversazione.
     local:    { icon: '💻', label: 'Claude (sessione locale)' },
     claude:   { icon: '🤖', label: 'Claude (ruolo non indicato)' },
-    // #595: si firma col prefisso dell'owner o di una sua istanza ma senza prova; per la pipeline è un utente.
-    unproven: { icon: '❔', label: 'Utente, prefisso riservato senza prova' },
   };
+  // Dal feedback, non dal clientId: un nome riservato senza prova è un utente come gli altri (#912).
   function authorKindOf(fb) {
-    if (MR && MR.isUnprovenSender && MR.isUnprovenSender(fb)) return 'unproven';
-    return (TH && TH.authorKind) ? TH.authorKind(fb && fb.clientId) : 'user';
+    return (TH && TH.authorKind) ? TH.authorKind(fb || {}) : 'user';
   }
   function authorMetaOf(fb) {
     return AUTHOR_META[authorKindOf(fb)] || AUTHOR_META.user;
