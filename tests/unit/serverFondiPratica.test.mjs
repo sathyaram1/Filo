@@ -39,7 +39,8 @@ function doc(id, { clientId = 'local:claude', senderProof = 'admin', status = 't
   if (senderProof) fields.senderProof = { stringValue: senderProof };
   if (locale) fields.localOnly = { mapValue: { fields: { by: { stringValue: 'local:claude' }, at: { integerValue: '1' } } } };
   if (parti) {
-    fields.localMerges = { mapValue: { fields: Object.fromEntries(Object.entries(parti).map(([k, v]) => [k, { integerValue: String(v) }])) } };
+    const valore = (v) => (typeof v === 'string' ? { stringValue: v } : { integerValue: String(v) });
+    fields.localMerges = { mapValue: { fields: Object.fromEntries(Object.entries(parti).map(([k, v]) => [k, valore(v)])) } };
   }
   return { name: `projects/x/databases/(default)/documents/feedback/${id}`, fields };
 }
