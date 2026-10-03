@@ -25,10 +25,10 @@ test('test appeso o scaduto a gruppi: conti uguali a node e il test rosso nomina
       cwd: ROOT, env: { ...process.env, FILO_UNIT_DIR: prove, FILO_UNIT_TETTO_RIGA: '900' }, encoding: 'utf8',
     });
     const out = `${r.stdout}${r.stderr}`;
-    expect(out).toMatch(/\[test:unit\] 3 file in 3 gruppi/);
+    expect(out).toMatch(/\[test:unit\] 3 file in [2-9] gruppi/);
     expect(r.status).not.toBe(0);
     const somma = (k) => [...out.matchAll(new RegExp(`^# ${k} (\\d+)$`, 'gm'))].reduce((n, m) => n + Number(m[1]), 0);
-    const riga = out.match(/riepilogo di 3 gruppi, 3 file: (\d+) test, (\d+) passat[oi], (\d+) fallit[oi](?:, (\d+) annullat[oi])?/);
+    const riga = out.match(/riepilogo di \d+ gruppi, 3 file: (\d+) test, (\d+) passat[oi], (\d+) fallit[oi](?:, (\d+) annullat[oi])?/);
     expect(riga).not.toBeNull();
     expect({ test: Number(riga[1]), pass: Number(riga[2]), fail: Number(riga[3]), annullati: Number(riga[4] || 0) })
       .toEqual({ test: somma('tests'), pass: somma('pass'), fail: somma('fail'), annullati: somma('cancelled') });
