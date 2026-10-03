@@ -529,7 +529,9 @@ async function main() {
     '                       (con npm: `npm run finish -- --check`, oppure `npm run finish:check`)',
     '  --feedback <N>       la pratica di questo lavoro (numero o id): senza, quella scritta da',
     '                       verify-local start --feedback. Senza nessuna delle due non si chiude.',
-    '                       Un lavoro locale provato non aspetta il sì',
+    '                       Un lavoro locale provato, o approvato da te, non aspetta il sì.',
+    '                       Su un feedback di un utente la frase per lui la scrive la sessione:',
+    '                       npm run feedback -- <N> --frase "…" (vale anche a pratica chiusa)',
     '  --help               questa schermata',
   ].join('\n');
   if (argv.includes('--help') || argv.includes('-h')) { console.log(AIUTO); return; }
@@ -758,6 +760,11 @@ async function main() {
   const message = messageForOwnerMerge(reply, branch, { feedbackId: pratica ? pratica.id : '', feedbackNum: pratica ? pratica.seq : '' });
   if (code === 0) console.log(`\n${message}`);
   else console.error(`\n${message}`);
+  if (pratica && pratica.id) {
+    const { fraseDaScrivere } = await import('./owner-feedback.mjs');
+    const frase = await fraseDaScrivere(pratica.id, pratica.seq ? `#${pratica.seq}` : pratica.id);
+    if (frase) console.log(`\n${frase}`);
+  }
   process.exit(code);
 }
 

@@ -33,7 +33,7 @@ export function partiDaCampi(fields) {
  * La parte `parte`, dal ramo `ramo`, può usare la pratica chiusa? Solo se è un lavoro locale, l'ha chiusa la fusione
  * dell'altra parte da meno di FINESTRA_PARTE_TARDIVA_MS, questa non è ancora su main e il ramo ha lo stesso nome di
  * quello fuso: lo stesso nome è come si riconoscono le parti di un lavoro (#915). `solo`: chi fonde dice che il
- * lavoro sta tutto in questa parte. Il mittente provato lo controlla chi chiama. PURA.
+ * lavoro sta tutto in questa parte. Il mittente provato, o il sì dell'owner (#913), lo controlla chi chiama. PURA.
  * @returns {{ ok: true, altra: string, at: number } | { ok: false, motivo: string }}
  */
 export function parteTardiva({ status, parti = {}, parte, ramo = '', solo = false, locale = false, ora = Date.now() } = {}) {

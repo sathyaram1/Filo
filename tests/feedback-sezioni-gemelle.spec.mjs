@@ -285,7 +285,7 @@ test('#509 — le due pagine offrono le stesse azioni sulla stessa segnalazione'
   }
 
   // Le due invarianti dette per esteso, sulla pagina di riferimento.
-  expect(azioniFb.z4).toEqual(['→ In coda', 'Conferma attacco', 'Conferma spam', 'Archivia']);
+  expect(azioniFb.z4).toEqual(['→ In coda', '💻 Lavoro locale', 'Conferma attacco', 'Conferma spam', 'Archivia']);
   expect(azioniFb.z6).toEqual(['Archivia', 'Riapri']);
   for (const id of ['z7', 'z8', 'z9', 'zA', 'zB']) {
     expect(azioniFb[id], `archiviata ${id}: solo il ripristino`).toEqual(['↩ Ripristina']);

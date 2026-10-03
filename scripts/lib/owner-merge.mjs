@@ -93,8 +93,8 @@ export function classifyOwnerMerge(status, body) {
 /**
  * Quello che il server dice della pratica locale (#908), solo se lo dice. PURA.
  * Tutto sta in `r.local` (localView in filo-security ownerMerge.js): ammessa →
- * num, skippedL5, blocks ({ gate, label, detail } o il solo nome), record, closed, late, pending, noted;
- * non ammessa → reason, detail.
+ * num, skippedL5, blocks ({ gate, label, detail } o il solo nome), record, closed, late, pending, noted,
+ * approvato e daRoutine (il sì dell'owner a un feedback non suo, #913); non ammessa → reason, detail.
  */
 function campiLocali(r) {
   const loc = (r.local && typeof r.local === 'object') ? r.local : null;
@@ -113,6 +113,8 @@ function campiLocali(r) {
     }
     if (loc.late && typeof loc.late === 'object') out.late = { part: String(loc.late.part || ''), at: String(loc.late.at || '').slice(0, 40) };
     if (typeof loc.noted === 'boolean') out.noted = loc.noted;
+    if (loc.approvato === true) out.approvato = true;
+    if (loc.approvato === true && loc.daRoutine === true) out.daRoutine = true;
     return out;
   }
   out.localReason = String(loc.reason || 'pratica_non_ammessa').slice(0, 80);
@@ -159,7 +161,7 @@ export function messageForOwnerMerge(reply, branch = 'il ramo', ctx = {}) {
       const righe = [`✓ '${branch}' fuso su main dal server${r.sha ? ` (${String(r.sha).slice(0, 8)})` : ''}.`];
       if (r.skippedL5) {
         const blocchi = Array.isArray(r.blocks) ? r.blocks : [];
-        righe.push(`  L5 saltato: lavoro locale di ${pratica}, mittente provato.`);
+        righe.push(`  L5 saltato: lavoro locale di ${pratica}, ${r.approvato ? `feedback ${r.daRoutine ? 'di una routine' : 'di un utente'} che hai approvato come lavoro locale` : 'mittente provato'}.`);
         righe.push(blocchi.length
           ? `  Blocchi registrati (${blocchi.length}), li rileggi in Gestione → Automazioni, «Fuse senza chiedere»:\n${blocchi.map((t) => `    · ${bloccoInRiga(t)}`).join('\n')}`
           : '  Nessun blocco registrato: i controlli non avrebbero fermato niente.');
@@ -185,7 +187,8 @@ export function messageForOwnerMerge(reply, branch = 'il ramo', ctx = {}) {
         + (r.localDetail || r.localReason
           ? `  L5 non è stato saltato: ${r.localDetail || r.localReason}.\n`
           : (ctx.feedbackId ? '' : '  Nessuna pratica collegata: con npm run finish -- --feedback <N> il lavoro locale\n'
-            + '  di un feedback tuo o di una sessione, con la prova del mittente, non aspetta.\n'))
+            + '  di un feedback tuo o di una sessione con la prova del mittente, o che hai approvato\n'
+            + '  come lavoro locale, non aspetta.\n'))
         + (r.requestId
           ? '\n  L\'ho messa IN ATTESA: approvala da Filo, nella dashboard di gestione\n'
             + '  (l\'avviso in cima ai Ricevuti). Da lì puoi anche scartarla.\n'
