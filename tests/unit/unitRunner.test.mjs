@@ -342,6 +342,20 @@ describe('a gruppi, ciò che node fa una volta per corsa resta uno', () => {
     } finally { rmSync(casa, { recursive: true, force: true }); }
   });
 
+  test('a gruppi un tap su file non si dice riunito: il riepilogo dice che ha un rapporto per gruppo', () => {
+    const casa = cartellaTemporanea('filo-runner-tap-file-');
+    try {
+      for (const n of ['a', 'b']) writeFileSync(join(casa, `${n}.test.mjs`), `import { test } from 'node:test';\ntest('${n}', () => {});\n`);
+      const dest = join(casa, 'r.tap');
+      const r = lanciaSu(casa, ['--test-reporter=tap', `--test-reporter-destination=${dest}`], { FILO_UNIT_TETTO_RIGA: '1' });
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+      assert.doesNotMatch(r.stdout, /riuniti/);
+      assert.ok(r.stdout.includes(`in ${dest} c'è un rapporto per gruppo, uno dopo l'altro`), r.stdout);
+      assert.match(r.stdout, /i conti di tutta la suite sono in questo riepilogo/);
+      assert.equal((readFileSync(dest, 'utf8').match(/^TAP version/gm) || []).length, 2);
+    } finally { rmSync(casa, { recursive: true, force: true }); }
+  });
+
   test('a gruppi un file dato a mano gira una volta, e i conti tornano', () => {
     const casa = cartellaTemporanea('filo-runner-argomento-');
     const fuori = cartellaTemporanea('filo-runner-argomento-extra-');
