@@ -131,6 +131,18 @@ function lasciapassare(wc, tipo) {
   return true;
 }
 
+function tastoDelMenu(input) {
+  const type = input.type;
+  if (type === 'mouseDown') return input.button === 'right';
+  return (type === 'rawKeyDown' || type === 'keyDown') && input.key === 'ContextMenu';
+}
+
+function segnaMenu(wc, frame) {
+  let nodo = null; let origine = null;
+  try { if (frame) { nodo = frame.frameTreeNodeId; origine = frame.origin; } } catch (_) {}
+  wc._filoMenuAperto = { alle: Date.now(), nodo, origine };
+}
+
 // Il gesto conta per il documento su cui è stato fatto: il clic che porta altrove non vale per la pagina d'arrivo.
 function seguiGesti(wc) {
   if (!wc || wc._filoGestiSeguiti) return;
