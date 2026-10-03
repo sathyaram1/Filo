@@ -530,8 +530,8 @@
     // ────────────────────────────── Crediti ──────────────────────────────────
     {
       id: 'credits', title: 'Crediti e consumi', category: 'credits',
-      desc: 'Mostra il saldo dei crediti, quando si ricaricano e un grafico di come li hai spesi tra le varie azioni. Sotto ci sono i movimenti, cioè da dove arrivano i crediti che hai: l’invito riscattato, la quota di ogni giorno, i regali e i premi per le segnalazioni che mandi e per quelle che Filo risolve. Puoi anche chiedere a Filo in chat quanti crediti ti restano: te lo dice al volo, senza aprire la pagina.',
-      invoke: 'Chiedendolo a Filo in chat ("quanti crediti mi restano?"), oppure dalla pagina filo://credits/credits.html per il dettaglio e il grafico.',
+      desc: 'Mostra il saldo dei crediti, quando si ricaricano e un grafico di come li hai spesi tra le varie azioni. Sotto ci sono i movimenti, cioè da dove arrivano i crediti che hai: l’invito riscattato, la quota di ogni giorno, i regali e i premi per le segnalazioni che mandi e per quelle che Filo risolve. Se hai un portafoglio, sotto il saldo c’è il tuo pseudonimo, il nome con cui compari sul server di Filo. Lo copi con un clic o dal tasto destro, e basta quello per ricevere un regalo di crediti senza dare email o nome. Puoi anche chiedere a Filo in chat quanti crediti ti restano: te lo dice al volo, senza aprire la pagina.',
+      invoke: 'Chiedendolo a Filo in chat ("quanti crediti mi restano?"), oppure dalla pagina filo://credits/credits.html per il dettaglio, il grafico e il tuo pseudonimo («Il tuo pseudonimo», sotto il saldo).',
     },
     {
       id: 'invites', title: 'Inviti e crediti di Filo', category: 'credits',
