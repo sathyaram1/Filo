@@ -108,7 +108,10 @@ service cloud.firestore {
     function localMergesValido(d) {
       return !('localMerges' in d)
         || (d.localMerges is map
-            && d.localMerges.keys().hasOnly(['app', 'server', 'solo'])
+            && d.localMerges.keys().hasOnly(['app', 'server', 'solo', 'ramo'])
+            && (!('ramo' in d.localMerges)
+                || (d.localMerges.ramo is string && d.localMerges.ramo.size() <= 200
+                    && d.localMerges.ramo.matches('^claude/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$')))
             && (!('app' in d.localMerges) || (d.localMerges.app is int && d.localMerges.app > 0))
             && (!('server' in d.localMerges) || (d.localMerges.server is int && d.localMerges.server > 0))
             && (!('solo' in d.localMerges) || d.localMerges.solo in ['app', 'server']));
