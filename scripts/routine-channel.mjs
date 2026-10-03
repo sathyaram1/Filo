@@ -729,7 +729,7 @@ export async function merge(t, branch, opts) {
       reason: String(body.reason || ''),
       sha: String(body.sha || ''),
       approval: String(body.approval || ''),
-      mainSha: String(body.mainSha || ''),
+      ...(body.mainSha ? { mainSha: String(body.mainSha) } : {}),
     };
   }
   return { ok: false, reason: String((body && body.reason) || `http_${status}`) };
