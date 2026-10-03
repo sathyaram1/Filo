@@ -65,11 +65,11 @@ test('col token admin: create autenticata con senderProof admin, token solo sull
   } finally { f.restore(); }
 });
 
-test('token rifiutato: si riparte anonimi, senza prova, e il risultato lo dice', async () => {
+test('token rifiutato su un nome qualunque: si riparte anonimi, senza prova, e il risultato lo dice', async () => {
   for (const rifiuto of [401, 403]) {
     const f = installFetch([rifiuto, 200]);
     try {
-      const r = await FB.submit({ text: 'ciao', clientId: 'owner:abc' }, { idToken: 'tok-scaduto' });
+      const r = await FB.submit({ text: 'ciao', clientId: 'c-utente' }, { idToken: 'tok-scaduto' });
       assert.equal(f.create.length, 2);
       assert.equal(f.create[1].headers.Authorization, undefined);
       assert.ok(!('senderProof' in f.create[1].body.fields), 'la seconda create è quella anonima');
