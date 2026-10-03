@@ -864,6 +864,13 @@
           at: Math.round(Number(localOnly.at) || Date.now()),
         });
       }
+      // La priorità scelta da chi apre nasce col documento (#914): il server decide alla nascita se giudicarla,
+      // e una scritta dopo arriverebbe quando il giudice ha già scelto. Solo admin: il create anonimo non la ammette.
+      const prioritaScelta = opts && opts.priority;
+      if (Number.isInteger(prioritaScelta) && prioritaScelta >= 0 && prioritaScelta <= 3) {
+        doc.fields.priority = { stringValue: await maybeEncrypt(String(prioritaScelta)) };
+        doc.fields.priorityManual = { booleanValue: true };
+      }
       res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
