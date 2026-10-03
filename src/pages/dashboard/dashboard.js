@@ -540,7 +540,10 @@
     }
     // Il suggerimento l'ha scritto un modello (#810): un indirizzo passa dalla porta delle uscite, e il suo testo va
     // in chat come suo, non come parole dell'utente né come comando con la barra.
-    if (type === 'NAVIGA' && a.url) {
+    // Una pagina di Filo non è un'uscita: la porta delle uscite la rifiuterebbe e il clic non farebbe niente.
+    if (type === 'NAVIGA' && /^filo:\/\//i.test(String(a.url || ''))) {
+      send({ type: MSG.OPEN_URL, url: a.url });
+    } else if (type === 'NAVIGA' && a.url) {
       apriProposta(a.url, vicino);
     } else if (type === 'APRI_FILE' && (a.path || a.url)) {
       const url = a.url || a.path;

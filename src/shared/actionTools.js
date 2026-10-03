@@ -408,7 +408,7 @@
     CARTA_HOME: {
       description: 'Dispone le carte della colonna destra della home, quelle che l\'utente tiene ("togli la carta dei mazzi", "rimetti l\'editor", "metti i suggerimenti in cima", "rimetti le carte com\'erano"). Una carta tolta diventa un\'icona in «altro», sotto le carte, e da lì si rimette. Le carte di sinistra (timer, sveglie, scaricamenti, avvisi) raccontano cosa sta succedendo: non si dispongono da qui, si tolgono togliendo la cosa (CANCELLA_SVEGLIA per un timer o una sveglia).',
       properties: {
-        operazione: S('togli, rimetti, sposta, oppure ripristina (tutte le carte di destra al loro posto di partenza).', { enum: ['togli', 'rimetti', 'sposta', 'ripristina'] }),
+        operazione: S('togli, rimetti, sposta, oppure ripristina (tutte le carte al loro posto di partenza, e tornano anche quelle di sinistra che erano state solo nascoste, come uno scaricamento finito o la carta dei Crediti).', { enum: ['togli', 'rimetti', 'sposta', 'ripristina'] }),
         carta: S('editor = Editor (documenti recenti), mazzi = Mazzi del deck builder, suggerimenti = «Filo ti suggerisce», rapide = Impostazioni rapide. Serve a tutte le operazioni tranne ripristina.', { enum: ['editor', 'mazzi', 'suggerimenti', 'rapide'] }),
         verso: S('Dove metterla, per sposta (e cima per rimetti): su o giu di un posto, cima, fondo.', { enum: ['su', 'giu', 'cima', 'fondo'] }),
         prima_di: S('In alternativa a verso: la carta davanti a cui metterla.', { enum: ['editor', 'mazzi', 'suggerimenti', 'rapide'] }),

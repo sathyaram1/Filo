@@ -32,6 +32,7 @@
   const URL_MAZZI = 'filo://decks/decks.html';
   const URL_SCARICAMENTI = 'filo://downloads/downloads.html';
   const URL_PREFERENZE = 'filo://preferences/preferences.html';
+  const URL_CREDITI = 'filo://credits/credits.html';
 
   // ===== Piccoli attrezzi =====
   function el(tag, cls, testo) {
@@ -245,11 +246,11 @@
   function suggerimentoCrediti() {
     return dati.suggerimenti.find((s) => s && s.carta === 'crediti') || null;
   }
-  function cartaCrediti(s) {
+  function cartaCrediti() {
     return {
       chiave: 'crediti', tipo: 'crediti', icona: 'credits', titolo: 'Crediti',
       stato: 'Riscatta l’invito e Filo si accende',
-      principale: { etichetta: 'Apri Crediti', forte: true, fai: (btn) => d.onSuggestionClick(s, btn) },
+      principale: { etichetta: 'Apri Crediti', forte: true, fai: () => apri(URL_CREDITI) },
       togli: () => muovi({ tipo: 'nascondi', chiave: 'crediti' }), etichettaTogli: 'Togli dalla home',
       filo: 'Per accendermi serve un codice d’invito: lo riscatti nella pagina Crediti, dove puoi anche mettere una tua chiave OpenRouter.',
     };
@@ -260,7 +261,7 @@
     const nascoste = new Set((layout && layout.nascoste) || []);
     const out = [];
     const cred = suggerimentoCrediti();
-    if (cred && !nascoste.has('crediti')) out.push(cartaCrediti(cred));
+    if (cred && !nascoste.has('crediti')) out.push(cartaCrediti());
     const suonano = dati.timers.filter((t) => t.ringing).map(cartaTimer);
     const resto = [];
     for (const r of dati.downloads.filter((x) => ATTIVI.has(x.state) && downloadVisibile(x))) resto.push(cartaDownload(r));
@@ -434,20 +435,22 @@
     const tit = el('span', 'dash-carta-tit', c.titolo);
     tit.title = c.titolo;
     testa.appendChild(tit);
+    art.appendChild(testa);
+    const mani = el('div', 'dash-carta-mani');
     const filo = el('button', 'dash-carta-filo', 'apri nel filo');
     filo.type = 'button';
     filo.title = 'Apri nel filo';
     filo.addEventListener('click', (e) => { e.stopPropagation(); apriNelFilo(art); });
-    testa.appendChild(filo);
+    mani.appendChild(filo);
     if (c.togli) {
-      const x = el('button', 'dash-carta-togli', '×');
+      const x = el('button', 'dash-carta-togli', '\u00D7');
       x.type = 'button';
       x.title = c.etichettaTogli || 'Togli';
       x.setAttribute('aria-label', x.title);
       x.addEventListener('click', (e) => { e.stopPropagation(); art._carta.togli(); });
-      testa.appendChild(x);
+      mani.appendChild(x);
     }
-    art.appendChild(testa);
+    art.appendChild(mani);
 
     if (c.stato != null) {
       const st = el('div', `dash-carta-stato${c.grande ? ' grande' : ''}${c.lungo ? ' lungo' : ''}`, c.stato);

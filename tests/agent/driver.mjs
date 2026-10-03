@@ -241,7 +241,7 @@ export async function activeView(app, shell) {
 
 // Script eseguito in pagina: trova elementi interagibili visibili e ne ritorna i rect.
 function COLLECT_FN() {
-  const sel = 'a[href], button, input, textarea, select, [role="button"], [role="menuitem"], [contenteditable="true"], [data-add], [data-sr], .ed-switch-icon, .ed-cell-empty, .dash-suggestion, .apps-item';
+  const sel = 'a[href], button, input, textarea, select, [role="button"], [role="menuitem"], [contenteditable="true"], [data-add], [data-sr], .ed-switch-icon, .ed-cell-empty, .dash-carta, .dash-carta-voce, .dash-altro-app, .apps-item';
   const els = Array.from(document.querySelectorAll(sel));
   const out = [];
   for (const el of els) {

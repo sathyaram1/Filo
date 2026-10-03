@@ -48,6 +48,8 @@ const ordineDestra = (page) => page.locator('#tieni > .dash-carta').evaluateAll(
 async function modelloFinto(app, risposte) {
   await app.evaluate(async (_e, risp) => {
     const C = globalThis.SN_CONST;
+    // Col modello pronto partirebbe l'intervista di benvenuto: qui l'utente è già stato accolto.
+    await chrome.storage.local.set({ filo_onboarding: { done: true } });
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
@@ -181,7 +183,7 @@ test('trascino i Mazzi sopra l’Editor e si scambiano; tolti finiscono in «alt
 
     // Dal «+» si rimettono, in fondo.
     await icona.hover();
-    await page.locator('#altro .dash-altro-cella', { has: icona }).locator('.dash-altro-rimetti').click();
+    await page.locator('#altro .dash-altro-cella', { has: page.locator('.dash-altro-app[data-id="mazzi"]') }).locator('.dash-altro-rimetti').click();
     await expect.poll(() => ordineDestra(page)).toEqual(['editor', 'suggerimenti', 'rapide', 'mazzi']);
 
     // E si ritolgono, e l'Editor va in fondo: dopo il riavvio è tutto com'era.
@@ -235,7 +237,7 @@ test('hover e tasto destro su ogni carta; la stessa mossa si chiede a Filo a par
 
   for (const carta of await page.locator('.dash-carta').all()) {
     await carta.hover();
-    await expect(carta.locator('.dash-carta-filo')).toHaveCSS('opacity', '1');
+    await expect(carta.locator('.dash-carta-mani')).toHaveCSS('opacity', '1');
     await carta.click({ button: 'right', position: { x: 30, y: 12 } });
     const menu = page.locator('.dash-menu');
     await expect(menu).toBeVisible();

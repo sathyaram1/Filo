@@ -105,7 +105,8 @@
       const n = normalizza(layout);
       return errore ? { layout: prima, cambiato: false, errore } : { layout: n, cambiato: !uguali(n, prima) };
     };
-    if (tipo === 'ripristina') return fine({ ...prima, destra: IDS.slice(), tolte: [] });
+    // «Come all'inizio» vale per tutta la home: anche le carte di sinistra solo nascoste tornano a vedersi.
+    if (tipo === 'ripristina') return fine(predefinita());
     if (tipo === 'nascondi') {
       if (!chiaveValida(m.chiave)) return fine(prima, 'chiave della carta mancante');
       return fine({ ...prima, nascoste: [...prima.nascoste.filter((k) => k !== m.chiave), m.chiave] });
