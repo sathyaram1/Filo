@@ -172,8 +172,9 @@ test('legare un lavoro locale a una pratica: sì a owner e sessioni con la prova
   }
   await conRete(documento('r1', { clientId: 'routine:worker', senderProof: 'server', status: 'todo' }), async () => {
     const r = await mod.praticaPerLaSessione('r1', OPTS);
-    assert.deepEqual([r.ok, r.utente], [false, false]);
-    assert.doesNotMatch(mod.rifiutoPratica('r1', r), /--serve-locale/);
+    assert.deepEqual([r.ok, r.utente, r.routine], [false, false, true]);
+    // #914: una routine che scopre il lavoro locale lo rimanda nei Ricevuti, dove l'owner lo approva (#913).
+    assert.match(mod.rifiutoPratica('r1', r), /owner-feedback.mjs r1 --serve-locale/);
   });
 });
 
@@ -433,5 +434,37 @@ test('--non-locale su un lavoro locale chiuso: toglie il segno, lo dice, e non c
     assert.equal(r.chiusa, true);
     assert.equal(scritture.length, 1, scritture.join('\n'));
     assert.match(scritture[0], /^PATCH .*\/feedback\/c1\?updateMask\.fieldPaths=localOnly$/);
+  } finally { globalThis.fetch = vero; }
+});
+
+// #913: il Firestore vero risponde coi soli campi chiesti. Un passaggio che non chiede il sì dell'owner vede un utente.
+test('approvato come lavoro locale: i passaggi di npm run feedback e la presa in carico lo accettano, con la maschera vera', async () => {
+  const si = { mapValue: { fields: { by: { stringValue: 'owner@esempio' }, at: { integerValue: '1790000000000' } } } };
+  const docs = {
+    inCoda: documento('inCoda', { clientId: 'utente-7', status: 'todo', statusPublic: 'open', localOnly: si, localApproval: si }),
+    inLavoro: documento('inLavoro', { clientId: 'utente-7', status: 'working', statusPublic: 'open', localOnly: si, localApproval: si }),
+    senzaSi: documento('senzaSi', { clientId: 'utente-7', status: 'todo', statusPublic: 'open', localOnly: si }),
+  };
+  const vero = globalThis.fetch;
+  globalThis.fetch = async (url, opts = {}) => {
+    const u = new URL(String(url));
+    const doc = docs[decodeURIComponent(u.pathname.split('/').pop())];
+    if ((opts.method || 'GET') !== 'GET') return { ok: true, status: 200, json: async () => ({}), text: async () => '' };
+    const maschera = u.searchParams.getAll('mask.fieldPaths');
+    const fields = maschera.length ? Object.fromEntries(Object.entries(doc.fields).filter(([k]) => maschera.includes(k))) : doc.fields;
+    return { ok: true, status: 200, json: async () => ({ name: doc.name, fields }), text: async () => '' };
+  };
+  try {
+    const o = { ...OPTS, dryRun: true };
+    for (const [id, to, attore] of [['inCoda', 'working', 'routine'], ['inLavoro', 'revision_capability', 'routine'], ['inLavoro', 'done', 'routine']]) {
+      const r = await mod.scrivi(id, to, '', { ...o, attore });
+      assert.equal(r.ok, true, `${id} → ${to}: ${r.motivo}`);
+    }
+    const presa = await mod.annotaPratica('inCoda', '', o);
+    assert.equal(presa.ok, true, presa.motivo);
+    assert.equal(presa.to, 'working');
+    const rifiuto = await mod.scrivi('senzaSi', 'working', '', { ...o, attore: 'routine' });
+    assert.equal(rifiuto.ok, false);
+    assert.equal(rifiuto.utente, true);
   } finally { globalThis.fetch = vero; }
 });

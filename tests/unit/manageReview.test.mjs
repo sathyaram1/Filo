@@ -1174,17 +1174,17 @@ const stati  = (fb, opts) => MR.ownerActions(fb, opts).map((a) => a.to);
 
 test('ownerActions: Ricevuti → in coda, le conferme che servono, archivia', () => {
   // Allineato: nessuna conferma da offrire.
-  assert.deepEqual(chiavi({ status: 'aligned' }), ['accept', 'archive']);
+  assert.deepEqual(chiavi({ status: 'aligned' }), ['accept', 'accept_local', 'archive']);
   // Attacco: una conferma sola, quella giusta.
-  assert.deepEqual(chiavi({ status: 'attack' }), ['accept', 'confirm_attack', 'archive']);
-  assert.deepEqual(chiavi({ status: 'spam' }), ['accept', 'confirm_spam', 'archive']);
+  assert.deepEqual(chiavi({ status: 'attack' }), ['accept', 'accept_local', 'confirm_attack', 'archive']);
+  assert.deepEqual(chiavi({ status: 'spam' }), ['accept', 'accept_local', 'confirm_spam', 'archive']);
   // File sospetto: non è ancora classificato, quindi le conferme sono DUE.
   // Ne offriva una sola sulla dashboard di gestione: una delle due decisioni
   // esisteva su una strada sola.
   assert.deepEqual(chiavi({ status: 'suspicious_file' }),
-    ['accept', 'confirm_attack', 'confirm_spam', 'archive']);
+    ['accept', 'accept_local', 'confirm_attack', 'confirm_spam', 'archive']);
   assert.deepEqual(stati({ status: 'suspicious_file' }),
-    ['todo', 'attack_confirmed', 'spam_confirmed', 'archived']);
+    ['todo', 'todo', 'attack_confirmed', 'spam_confirmed', 'archived']);
 });
 
 test('ownerActions: In coda → chiudi a mano o archivia; un `done` non ancora uscito non si richiude', () => {
@@ -1250,7 +1250,7 @@ test('ownerActions: stato illeggibile → nessuna azione (su tutte le superfici)
 
 test('ownerActions: stati storti (assente, vuoto, nullo, inventato) → trattati come Ricevuti', () => {
   for (const fb of [{}, { status: '' }, { status: null }, { status: 'zzz-inventato' }]) {
-    assert.deepEqual(chiavi(fb), ['accept', 'archive'], JSON.stringify(fb));
+    assert.deepEqual(chiavi(fb), ['accept', 'accept_local', 'archive'], JSON.stringify(fb));
   }
 });
 

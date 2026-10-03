@@ -751,6 +751,7 @@
       status: item.status, notes: item.notes, userNote: item.userNote,
       priority: item.priority, reviewDecision: item.reviewDecision,
       archiveOverride: item.archiveOverride, starred: item.starred,
+      localOnly: item.localOnly, localApproval: item.localApproval,
     };
     Object.assign(item, optimistic);
     if (!silenzioso && !inPlace) applyFilter();
@@ -778,6 +779,7 @@
   // dashboard di gestione legge la stessa tabella, quindi sulla stessa
   // segnalazione le due pagine offrono le stesse azioni per costruzione. Qui
   // resta solo il MODO di disegnarle (pulsanti dentro la scheda).
+  const TITOLO_LAVORO_LOCALE = 'Diventa un lavoro locale. Nessuna routine lo prende, lo chiude una sessione e la fusione non aspetta il tuo sì.';
   function actionsFor(f) {
     // Non-admin: niente pulsanti d'azione (sola lettura).
     if (!isAdmin) return '';
@@ -794,8 +796,10 @@
       if (a.kind === 'reopen') {
         return `<button class="sn-btn sn-btn-secondary fb-reopen-start" data-id="${id}">${escapeHtml(a.label)}</button>`;
       }
+      // #913: «Lavoro locale» scrive anche il segno e il sì dell'owner, come nella gemella.
+      const locale = a.locale ? ` data-local="1" title="${escapeHtml(TITOLO_LAVORO_LOCALE)}"` : '';
       return `<button class="sn-btn${a.primary ? '' : ' sn-btn-secondary'} fb-act"`
-        + ` data-id="${id}" data-to="${escapeHtml(a.to)}"${EXTRA[a.kind] || ''}>${escapeHtml(a.label)}</button>`;
+        + ` data-id="${id}" data-to="${escapeHtml(a.to)}"${EXTRA[a.kind] || ''}${locale}>${escapeHtml(a.label)}</button>`;
     }).join('\n');
   }
 
@@ -1254,6 +1258,12 @@
           payload.reviewDecision = 'accepted';
           payload.reviewedAt = new Date().toISOString();
           ottimistico.reviewDecision = 'accepted';
+        }
+        if (b.dataset.local) {
+          payload.localOnly = true;
+          payload.localApproval = true;
+          ottimistico.localOnly = { by: 'te', at: Date.now() };
+          ottimistico.localApproval = { by: 'te', at: Date.now() };
         }
         if (b.dataset.reject) {
           payload.reviewDecision = 'rejected';

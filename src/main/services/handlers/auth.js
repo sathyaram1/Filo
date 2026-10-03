@@ -342,11 +342,19 @@ module.exports = function register(on, ctx) {
         if (msg.localOnly) { try { email = String(auth.getTokenClaims()?.email || ''); } catch (_) {} }
         localOnly = msg.localOnly ? { by: email || 'owner', at: Date.now() } : null;
       }
+      // #913: «approvalo come lavoro locale» su un feedback non tuo. Resta anche se il segno si toglie: senza, il
+      // segno non si rimetterebbe più, perché il sì si dà solo dai Ricevuti.
+      let localApproval;
+      if (msg.localApproval === true) {
+        let email = '';
+        try { email = String(auth.getTokenClaims()?.email || ''); } catch (_) {}
+        localApproval = { by: email || 'owner', at: Date.now() };
+      }
       // «È mio» (#908): l'unico valore che l'owner può dare è la sua prova.
       const senderProof = msg.senderProof === 'admin' ? 'admin' : undefined;
       await globalThis.SN_FEEDBACK.updateStatus(
         id,
-        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, mergePreapproved, localOnly, senderProof },
+        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, mergePreapproved, localOnly, localApproval, senderProof },
         { idToken },
       );
       // Il triage cambia quello che la bacheca deve mostrare (un fix chiuso
