@@ -122,10 +122,11 @@ test('la durata delle Preferenze vale anche per gli avvisi delle pagine, e a 0 r
 test('nella nuova scheda (dove è nata la segnalazione) l’avviso aspetta il puntatore', async ({ openTab }) => {
   const page = await openTab('filo://newtab/');
   await page.waitForFunction(() => !!(globalThis.SN_POPUP && globalThis.SN_AVVISI), null, { timeout: 8000 });
-  await page.evaluate(() => globalThis.SN_POPUP.showToast('Avviso nella nuova scheda'));
+  // 3 s e non i 2,2 di «Copiato»: a pagina appena aperta l'ingresso può tardare e il puntatore arrivare a tempo scaduto.
+  await page.evaluate(() => globalThis.SN_POPUP.showToast('Avviso nella nuova scheda', { duration: 3000 }));
   const avviso = page.locator('.sn-toast', { hasText: 'Avviso nella nuova scheda' });
   await puntatoreSopra(page, avviso);
-  await page.waitForTimeout(3500);
+  await page.waitForTimeout(4500);
   await expect(avviso).toBeVisible();
   await shot(page, 'avviso-630-nuova-scheda');
   await page.mouse.move(20, 300, { steps: 4 });
@@ -243,4 +244,22 @@ test('mazzi: tasto destro sull’avviso offre «Chiudi», e la scelta lo chiude'
   await expect(voci).toHaveText(['Chiudi']);
   await voci.first().click();
   await expect(avviso).toHaveCount(0, { timeout: 1500 });
+});
+
+// Non solo i toast: tutto ciò che sta nella pila della pagina (qui la conferma di «Salva per dopo») ha il suo menu.
+test('tasto destro sulla conferma «Salvata in»: il menu offre «Apri la lista» e «Chiudi», e «Chiudi» la chiude', async ({ openTab }) => {
+  const page = await openTab('filo://newtab/');
+  await page.waitForFunction(() => !!(globalThis.SN_ACTIONS && globalThis.SN_AVVISI), null, { timeout: 8000 });
+  await page.evaluate(() => globalThis.SN_ACTIONS.showSaveConfirm({ id: 'x1', category: 'Lavoro' }, { chiudiScheda: false }));
+  const pill = page.locator('.sn-save-confirm');
+  await expect(pill).toHaveClass(/sn-save-confirm-visible/);
+  await page.waitForTimeout(250);
+  const b = await pill.boundingBox();
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 4 });
+  await page.mouse.down({ button: 'right' });
+  await page.mouse.up({ button: 'right' });
+  const voci = page.locator('.sn-menu .sn-menu-item');
+  await expect(voci).toHaveText(['Apri la lista', 'Chiudi']);
+  await voci.nth(1).click();
+  await expect(pill).toHaveCount(0, { timeout: 1500 });
 });

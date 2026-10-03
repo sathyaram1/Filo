@@ -618,7 +618,8 @@
     // Nello stack degli avvisi in pagina (#409), così non finisce sotto o sopra
     // un toast che arriva nel frattempo. `sticky`: è l'unico comando per
     // fermare la dettatura, il tetto dello stack non deve poterlo sfrattare.
-    Popup.mountToast(pill, { sticky: true });
+    // Chiuderla è fermare la dettatura: un microfono acceso senza la pill non si fermerebbe più.
+    Popup.mountToast(pill, { sticky: true, chiudi: () => stopDictation() });
 
     const state = {
       stream, ctx, pill, stopped: false, interimBusy: false, finals: 0, failed: false,

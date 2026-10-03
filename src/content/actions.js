@@ -918,7 +918,11 @@
     pill.appendChild(cta);
     // Nello stack degli avvisi in pagina (#409). `sticky`: porta l'unica strada
     // verso la lista "Aperti per dopo", un toast in arrivo non deve sfrattarla.
-    Popup.mountToast(pill, { sticky: true });
+    Popup.mountToast(pill, {
+      sticky: true,
+      chiudi: () => finish(false),
+      azioni: [{ label: I18n.t('toast_saved_open'), fn: () => finish(true) }],
+    });
     requestAnimationFrame(() => pill.classList.add('sn-save-confirm-visible'));
 
     const finish = (openList) => {

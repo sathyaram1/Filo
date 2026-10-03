@@ -545,12 +545,15 @@
         'durata avvisi', 'durata degli avvisi', 'durata toast', 'tempo notifiche', 'notifications.durationsec'],
       build(v) {
         const s = String(v == null ? '' : v).trim().toLowerCase();
+        // Una cifra decide sempre («resta 8 secondi» è 8); le parole del «per sempre» contano solo senza cifre,
+        // e «non restano» chiede il contrario.
         let n;
-        if (/(sempre|infinit|finch[eé]|resta|restano|non spar|le chiudo|la chiudo)/.test(s)) n = 0;
-        else {
+        if (/\d/.test(s)) {
           n = parseItalianNumber(s);
           if (/min/.test(s)) n *= 60;
-        }
+        } else if (/\bnon\s+rest/.test(s)) return null;
+        else if (/(sempre|infinit|finch[eé]|resta|non spar|le chiudo|la chiudo)/.test(s)) n = 0;
+        else return null;
         if (!Number.isFinite(n) || n < 0) return null;
         n = Math.round(n);
         if (n > NOTIF_SEC_MAX) {

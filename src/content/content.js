@@ -736,11 +736,15 @@
   }
 
   // Le azioni dell'avviso e «Chiudi», nello stesso ordine del menu degli avvisi della barra.
-  function openAvvisoMenu({ el, chiudi }, e) {
+  function openAvvisoMenu({ el, chiudi, azioni }, e) {
     const items = [];
-    for (const b of el.querySelectorAll('button')) {
-      const label = (b.textContent || '').trim();
-      if (label) items.push({ type: 'item', label, onClick: () => b.click() });
+    if (azioni) {
+      for (const a of azioni) items.push({ type: 'item', label: a.label, onClick: () => a.fn() });
+    } else {
+      for (const b of el.querySelectorAll('button')) {
+        const label = (b.textContent || '').trim();
+        if (label) items.push({ type: 'item', label, onClick: () => b.click() });
+      }
     }
     items.push({ type: 'item', label: I18n.t('popup_close'), onClick: () => chiudi() });
     Menu.open({ x: e.clientX, y: e.clientY, items });

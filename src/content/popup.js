@@ -1251,9 +1251,12 @@
 
   // API per gli altri avvisi in pagina ancorati allo stesso angolo: li aggancia
   // allo stack invece che direttamente al documento.
+  // Tutto ciò che entra nella pila risponde al tasto destro col suo menu (regola in avvisiTempo.js):
+  // `chiudi` e `azioni` li dà chi lo mostra; senza, «Chiudi» lo toglie dalla pila.
   function mountToast(el, opts = {}) {
     if (!el) return el;
     if (opts.sticky) el.dataset.snSticky = '1';
+    global.SN_AVVISI.chiudibile(el, opts.chiudi || (() => unmountToast(el)), opts.azioni);
     tempi().segui(el);
     toastHost().appendChild(el);
     tempi().ripulisci();

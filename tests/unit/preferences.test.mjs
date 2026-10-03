@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { readFileSync } from 'node:fs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -385,4 +386,21 @@ test('i toni che la chat sa scegliere sono quelli che Filo sa suonare', () => {
   for (const etichetta of Object.values(globalThis.SN_SOUNDS.TONE_LABELS)) {
     assert.ok(desc.toLowerCase().includes(`"${etichetta.toLowerCase()}"`), `il tono ${etichetta} manca nell'elenco della chat`);
   }
+});
+
+test('durata degli avvisi a parole: una cifra vince sulle parole del «per sempre», e «non restano» non li rende eterni', () => {
+  const P = globalThis.SN_PREF;
+  const sec = (v) => P.buildPreferencePartial('durata_notifiche', v)?.partial?.notifications?.durationSec;
+  assert.equal(sec('resta 8 secondi'), 8);
+  assert.equal(sec('restano 2 minuti'), 120);
+  assert.equal(sec('sempre'), 0);
+  assert.equal(sec('finché non li chiudo'), 0);
+  assert.notEqual(sec('non restano'), 0);
+});
+
+test('Preferenze, Notifiche: l’etichetta del suono non spiega l’interfaccia', () => {
+  const html = readFileSync(join(__dirname, '..', '..', 'src', 'pages', 'preferences', 'preferences.html'), 'utf8');
+  const m = html.match(/id="notifSoundEnabled"[^]*?<span>([^<]*)<\/span>/);
+  assert.ok(m, 'casella del suono degli avvisi non trovata');
+  assert.equal(m[1].trim(), 'Suono quando arriva un avviso');
 });

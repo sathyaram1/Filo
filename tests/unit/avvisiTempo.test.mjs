@@ -190,3 +190,30 @@ test('ogni pila di avvisi a scomparsa prende i tempi da qui', () => {
   // Nessun avviso della pagina torna a un setTimeout fisso.
   assert.doesNotMatch(leggi('src/content/popup.js'), /setTimeout\(close,/);
 });
+
+test('tasto destro: dal nodo sotto il puntatore si risale all’avviso, con la sua chiusura e le azioni dichiarate', () => {
+  const avviso = { parentElement: null };
+  const testo = { parentElement: avviso };
+  let chiuso = 0;
+  A.chiudibile(avviso, () => { chiuso++; }, [{ label: 'Apri la lista', fn: () => {} }, { label: '', fn: () => {} }, null]);
+  const r = A.avvisoSotto(testo);
+  assert.equal(r.el, avviso);
+  assert.deepEqual(r.azioni.map((a) => a.label), ['Apri la lista']);
+  r.chiudi();
+  assert.equal(chiuso, 1);
+  A.chiudibile(avviso, () => {});
+  assert.equal(A.avvisoSotto(testo).azioni, null, 'senza azioni dichiarate il menu prende i pulsanti dell’avviso');
+  assert.equal(A.avvisoSotto({ parentElement: null }), null);
+});
+
+test('ogni cosa che entra nella pila degli avvisi della pagina ha il suo menu del tasto destro', () => {
+  const popup = readFileSync(join(ROOT, 'src', 'content', 'popup.js'), 'utf8');
+  const corpo = popup.slice(popup.indexOf('function mountToast('), popup.indexOf('function unmountToast('));
+  assert.match(corpo, /SN_AVVISI\.chiudibile\(el,/);
+  for (const f of ['actions.js', 'tts.js']) {
+    const src = readFileSync(join(ROOT, 'src', 'content', f), 'utf8');
+    for (const m of src.matchAll(/Popup\.mountToast\(pill,\s*\{([^)]*)\}\)/g)) {
+      assert.match(m[1], /chiudi:/, `${f}: la pill nella pila deve dire come si chiude (fermarla, finire il salvataggio)`);
+    }
+  }
+});

@@ -113,15 +113,19 @@
   }
 
   // Un avviso prende il puntatore, quindi anche il tasto destro: il menu deve parlare dell'avviso (le sue
-  // azioni e «Chiudi», come nella barra), non della pagina sotto. Chi lo disegna dice qui come si chiude.
+  // azioni e «Chiudi», come nella barra), non della pagina sotto. Chi lo disegna dice qui come si chiude e,
+  // se le sue azioni non sono pulsanti, quali sono ([{ label, fn }]).
   const CHIUDI = Symbol('snChiudiAvviso');
-  function chiudibile(el, chiudi) {
-    if (el && typeof chiudi === 'function') el[CHIUDI] = chiudi;
+  function chiudibile(el, chiudi, azioni) {
+    if (el && typeof chiudi === 'function') {
+      el[CHIUDI] = { chiudi, azioni: Array.isArray(azioni) ? azioni.filter((a) => a && a.label && typeof a.fn === 'function') : null };
+    }
     return el;
   }
   function avvisoSotto(nodo) {
     for (let n = nodo; n; n = n.parentElement) {
-      if (typeof n[CHIUDI] === 'function') return { el: n, chiudi: n[CHIUDI] };
+      const d = n[CHIUDI];
+      if (d) return { el: n, chiudi: d.chiudi, azioni: d.azioni };
     }
     return null;
   }
