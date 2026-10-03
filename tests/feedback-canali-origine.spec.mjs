@@ -287,3 +287,40 @@ test('l\'avviso «l\'accesso è cambiato» non arriva alle schede sui siti, e po
     expect(c.avvisi.length, `${c.url}: l'avviso con dentro il profilo è arrivato a un sito visitato`).toBe(0);
   }
 });
+
+test('l\'archivio delle schede chiuse si legge, si cerca e si cancella solo dalle pagine di Filo', async ({ app, shell }) => {
+  void shell;
+
+  const out = await app.evaluate(async (_electron, mittenti) => {
+    const MSG = globalThis.SN_MSG.MSG;
+    const A = globalThis.SN_ARCHIVED_TABS;
+    const a = await A.archive({ url: 'https://banca.example/estratto', title: 'Banca online, estratto conto' });
+    const porte = () => ({
+      elenco: { type: MSG.GET_ARCHIVED_TABS },
+      ricerca: { type: MSG.SEARCH_ARCHIVED_TABS, query: 'banca' },
+      daCancellare: { type: MSG.ARCHIVIO_DA_CANCELLARE, query: 'banca' },
+      eliminaGruppo: { type: MSG.DELETE_ARCHIVED_TABS, ids: [a.id] },
+      eliminaUna: { type: MSG.REMOVE_ARCHIVED_TAB, id: a.id },
+      svuota: { type: MSG.CLEAR_ARCHIVED_TABS },
+    });
+    const res = {};
+    for (const [prov, mittente] of Object.entries(mittenti)) {
+      res[prov] = {};
+      for (const [nome, msg] of Object.entries(porte())) res[prov][nome] = await globalThis.SN_HANDLE_MESSAGE(msg, mittente);
+    }
+    const rimaste = (await A.list()).map((x) => x.title);
+    const daFilo = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.GET_ARCHIVED_TABS }, { url: 'filo://archive/archive.html' });
+    return { res, rimaste, daFilo };
+  }, { sito: SITO, sitoConScheda: SITO_CON_SCHEDA });
+
+  for (const [prov, porte] of Object.entries(out.res)) {
+    for (const [porta, r] of Object.entries(porte)) {
+      expect(r.ok, `${prov}/${porta}: un sito visitato non deve ottenere niente`).toBe(false);
+      expect(String(r.code || ''), `${prov}/${porta}`).toBe('forbidden');
+      expect(JSON.stringify(r), `${prov}/${porta}: il titolo è uscito verso il sito`).not.toContain('Banca online');
+    }
+  }
+  expect(out.rimaste, 'un sito ha cancellato schede dall\'archivio').toEqual(['Banca online, estratto conto']);
+  expect(out.daFilo.ok).toBe(true);
+  expect(out.daFilo.tabs.map((x) => x.title)).toEqual(['Banca online, estratto conto']);
+});

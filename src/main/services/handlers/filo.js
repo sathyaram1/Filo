@@ -226,14 +226,17 @@ module.exports = function register(on, ctx) {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
     const id = msg.id;
     const text = String(msg.text || '');
-    if (!id || !text.trim()) return { ok: false, error: 'niente da archiviare' };
+    // Un'azione confermata dopo il turno (bottone, pannello): la riga senza testo che la racconta.
+    const actions = (Array.isArray(msg.actions) ? msg.actions : [])
+      .filter((t) => typeof t === 'string' && /^[A-Z_]{2,40}$/.test(t)).slice(0, 20).map((type) => ({ type }));
+    if (!id || (!text.trim() && !actions.length)) return { ok: false, error: 'niente da archiviare' };
     // La scheda che scrive questa riga sta vivendo la chat: quando sparisce,
     // la chat è finita — come per un turno normale.
     if (sender && sender.wc) ctx.affidaChat(id, sender.wc);
     const role = msg.role === 'user' ? 'user' : 'filo';
     // L'esito di un comando lanciato a mano l'ha scritto il comando: riaperta, la chat lo tratta da letto (#810).
     const esterno = role === 'filo' && msg.esterno === 'comando' ? "dall'output di un comando" : '';
-    await FiloChats.append(id, { role, text, ...(esterno ? { esterno } : {}) });
+    await FiloChats.append(id, { role, text, ...(actions.length ? { actions } : {}), ...(esterno ? { esterno } : {}) });
     return { ok: true };
   });
 
