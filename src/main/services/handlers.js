@@ -3033,6 +3033,8 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // decidono se un NAVIGA di questo turno può portare fuori dati (#587).
   const azioniViste = [];
   for (const m of cleanHistory) if (m && Array.isArray(m.actions)) azioniViste.push(...m.actions);
+  const fontiLette = chatId ? await fontiDellaChat(chatId) : [];
+  for (const a of azioniViste) await segnaFonteLetta(chatId, fontiLette, a);
   // Cosa ha scritto l'utente nel compito: le coordinate bancarie che ci stanno dentro le ha chieste lui (#530).
   const richiesta = [...cleanHistory.filter((m) => m && m.role !== 'filo').map((m) => String(m.text || '')), String(userMessage || '')].join('\n');
   for (const m of cleanHistory) {
