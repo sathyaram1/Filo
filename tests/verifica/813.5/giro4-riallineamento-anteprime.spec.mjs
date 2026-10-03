@@ -42,7 +42,7 @@ function stato(app) {
     return {
       coperta: tm.avvisoSito.coperta() === tab,
       avvisoInCima: !!v && figli[figli.length - 1] === v,
-      avvisoVisibile: !!v && v.getVisible() && vb.width > 0 && vb.width === tb.width && vb.height === tb.height,
+      avvisoVisibile: !!v && vb.width > 0 && vb.width === tb.width && vb.height === tb.height,
       tastiera: v && col === v.webContents ? 'avviso' : (col === tab.view.webContents ? 'pagina' : 'altro'),
       dietroSotto: dietro ? figli.indexOf(dietro.view) < figli.indexOf(tab.view) : null,
       fotoDietro: dietro ? !!tm.anteprime.get(dietro.id) : null,
