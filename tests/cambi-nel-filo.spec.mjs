@@ -494,3 +494,43 @@ test('M — passare sul testo della bolla non apre la pastiglia sopra la rispost
   await expect.poll(async () => (await impostazioni(app)).theme).toBe('light');
   await ripristina(app);
 });
+
+test('N — il clic sul segno apre e richiude la pastiglia; da tastiera il fuoco sul segno la apre', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await homeDi(app);
+  await configura(app);
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 't1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"tema","valore":"scuro"}' }] },
+    { text: 'Fatto.' },
+  ]);
+  await scrivi(page, 'tema scuro', 'Fatto.');
+  const bolla = page.locator('.dash-bubble-user', { hasText: 'tema scuro' });
+  const segno = bolla.locator('.dash-cambi-segno');
+  const pop = bolla.locator('.dash-cambi-pop');
+  // Al tocco il passaggio del mouse non c'è: il primo clic la lascia aperta, il secondo la richiude.
+  await segno.click();
+  await page.mouse.move(5, 400);
+  await page.waitForTimeout(900);
+  await expect(pop).toHaveCSS('opacity', '1');
+  await segno.click();
+  await page.mouse.move(5, 400);
+  await page.waitForTimeout(900);
+  await expect(pop).toHaveCSS('opacity', '0');
+  // Il clic su «annulla» non la inchioda aperta sopra la risposta di prima.
+  await segno.hover();
+  await pop.locator('.dash-cambi-annulla').click();
+  await expect.poll(async () => (await impostazioni(app)).theme).toBe('light');
+  await page.mouse.move(5, 400);
+  await page.waitForTimeout(900);
+  await expect(pop).toHaveCSS('opacity', '0');
+  // Da tastiera: il fuoco sul segno la apre, e resta aperta sui suoi bottoni.
+  await page.keyboard.press('Shift');
+  await segno.focus();
+  await expect(pop).toHaveCSS('opacity', '1');
+  await page.keyboard.press('Tab');
+  await expect(pop.locator('.dash-cambi-annulla')).toBeFocused();
+  await page.waitForTimeout(900);
+  await expect(pop).toHaveCSS('opacity', '1');
+  await ripristina(app);
+});
