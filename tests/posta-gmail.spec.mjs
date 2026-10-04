@@ -2,6 +2,7 @@
 // già entrato. Il Gmail è finto (tests/helpers/fintoGmail.mjs), servito dal mini server; quello vero non si prova
 // in cloud. Il modello è finto ma legge davvero gli esiti: se la mail non arrivasse, non saprebbe la data.
 
+import { join } from 'node:path';
 import { test, expect } from './fixtures/electron.mjs';
 import { home, chiedi } from './helpers/chatFinta.mjs';
 import { paginaGmail } from './helpers/fintoGmail.mjs';
@@ -119,6 +120,7 @@ test('«rispondi a Marco che va bene giovedì»: la bozza resta aperta in Gmail 
   // Il bottone in chat porta alla scheda di Gmail, dove l'utente rilegge e preme Invia.
   const vai = page.locator('.dash-action-btn', { hasText: 'Rivedi la bozza in Gmail' });
   await expect(vai).toBeVisible();
+  await page.screenshot({ path: join(process.cwd(), 'tests', '.shots', 'posta-bozza-chat.png') });
   await vai.click();
   await expect.poll(() => shell.evaluate(async () => {
     const s = await window.filoShell.tabs.snapshot();

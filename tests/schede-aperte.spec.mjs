@@ -94,7 +94,8 @@ test('una scheda dietro: Filo legge il testo che si vede, apre e scrive come una
   for (const n of ['UNO', 'DUE', 'TRE', 'QUATTRO', 'CINQUE']) expect(prima).not.toContain(`NASCOSTO-${n}`);
   expect(prima).toMatch(/\d+\. pulsante «Mostra altro»/);
   expect(prima).toContain('sito non fra i fidati');
-  expect(prima).not.toContain('Password');
+  // La scritta «Password» si vede, ma il suo campo non è fra quelli in cui Filo può scrivere.
+  expect(prima).not.toMatch(/\d+\. campo «Password»/);
 
   // Nella pagina è successo quello che la chat dice: la parte in più si vede, il nome è scritto.
   await expect(negozio.locator('#extra')).toBeAttached();
@@ -215,4 +216,8 @@ test('Preferenze: l\'interruttore è acceso e spiegato; aggiungere un fidato vuo
   await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).schedeAperte)).toEqual({ leggere: false });
   await sezione.scrollIntoViewIfNeeded();
   await page.screenshot({ path: join(SHOTS, 'preferenze-schede-aperte.png') });
+  await page.locator('#theme').selectOption('dark');
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.snTheme)).toBe('dark');
+  await sezione.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: join(SHOTS, 'preferenze-schede-aperte-scuro.png') });
 });
