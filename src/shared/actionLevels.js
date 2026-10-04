@@ -146,7 +146,7 @@
 
   // Un testo del modello in un popup: una riga, senza invisibili, con un tetto che si vede (…).
   function testoBreve(v, max = 120) {
-    const t = String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f-\u009f​-‏ -‮⁠-⁯﻿]+/g, ' ')
+    const t = String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]+/g, ' ')
       .replace(/\s+/g, ' ').trim();
     const segni = Array.from(t);
     return segni.length > max ? `${segni.slice(0, max - 1).join('').trimEnd()}…` : t;
@@ -423,6 +423,7 @@
     // `_sconsiglio` li prepara il main prima del cancello, mai il modello.
     SEGNA_FIDATO: {
       level: 3, costo: 1, campo: null, difesa: true,
+      avviso: 'Così Filo si fida di più: si toglie quando vuoi, anche dalle Preferenze.',
       describe: (a) => {
         const voce = testoBreve(a && (a._voce || a.mittente || a.sito));
         if (a && (a._tipo === 'sito' || (!a.mittente && a.sito))) {
@@ -719,5 +720,12 @@
     try { return (entry.describeDone ? entry.describeDone(action) : entry.describe(action)) || ''; } catch (_) { return ''; }
   }
 
-  global.SN_ACTION_LEVELS = { REGISTRY, levelFor, describe, describeDone, spiegazioneComando };
+  // La frase che al posto di «non è reversibile» spiega perché si chiede di scrivere «conferma» ('' se non c'è).
+  function avviso(action) {
+    const entry = action && typeof action === 'object' ? REGISTRY[String(action.type || '').toUpperCase()] : null;
+    if (!entry || !entry.avviso) return '';
+    try { return String(typeof entry.avviso === 'function' ? entry.avviso(action) : entry.avviso) || ''; } catch (_) { return ''; }
+  }
+
+  global.SN_ACTION_LEVELS = { REGISTRY, levelFor, describe, describeDone, avviso, spiegazioneComando };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

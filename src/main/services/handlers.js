@@ -1705,6 +1705,7 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
       kept: true,
       needsConfirm: level,
       describe: Levels ? Levels.describe(action) : '',
+      avviso: Levels && Levels.avviso ? Levels.avviso(action) : '',
     };
   }
   // #250 — Un'azione che RICHIEDE conferma non può arrivare `confirmed` da una
@@ -2126,6 +2127,16 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
           out = { ok: false, errore: 'pagina', dettaglio: String((e && e.message) || e).slice(0, 200) };
         }
         out = out && typeof out === 'object' ? out : { ok: false, errore: 'pagina' };
+        // Quello che torna viaggia con la chat (archivio, turni dopo): il tetto è quello che il modello legge.
+        if (typeof out.testo === 'string' && out.testo.length > MAX_TESTO_SCHEDA) {
+          out.testo = out.testo.slice(0, MAX_TESTO_SCHEDA);
+          out.troncato = true;
+        }
+        if (Array.isArray(out.messaggi)) {
+          out.messaggiTotali = out.messaggi.length;
+          out.messaggi = out.messaggi.slice(-MAX_MAIL).map((m) => (m && typeof m.testo === 'string' && m.testo.length > MAX_TESTO_MAIL
+            ? { ...m, testo: m.testo.slice(0, MAX_TESTO_MAIL), troncato: true } : m));
+        }
         const F = globalThis.SN_FIDUCIA;
         const fonti = [out.fonte, ...(Array.isArray(out.messaggi) ? out.messaggi.map((m) => m && m.fonte) : []),
           ...(Array.isArray(out.righe) ? out.righe.map((r) => r && r.fonte) : [])];
@@ -2142,10 +2153,10 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         if (type === 'SEGNA_FIDATO') {
           const r = await Fiducia.aggiungi({ ...voce, via: 'chat' });
           if (r.errore) return { executed: false, kept: false, output: { error: r.errore } };
-          return { executed: true, kept: false, output: { voce: r.voce, tipo: action._tipo, gia: !r.aggiunto } };
+          return { executed: true, kept: false, output: { ok: true, voce: r.voce, tipo: action._tipo, gia: !r.aggiunto } };
         }
         const r = await Fiducia.togli(voce);
-        return { executed: r.tolto, kept: false, output: { voce: r.voce, tipo: action._tipo, ...(r.tolto ? {} : { error: 'non era fra i fidati' }) } };
+        return { executed: r.tolto, kept: false, output: { ok: r.tolto, voce: r.voce, tipo: action._tipo, ...(r.tolto ? {} : { error: 'non era fra i fidati' }) } };
       }
 
       case 'LEGGI_DOCUMENTO': {
@@ -2886,6 +2897,163 @@ function documentReadsForPrompt(actions) {
   return blocks.join('\n\n').trim();
 }
 
+// #534 — gli esiti delle schede aperte e della posta. Il testo di una pagina o di una mail torna imbustato; chi è
+// fidato lo dice una riga di Filo FUORI dalla busta, con l'indirizzo già ripulito: un mittente che si chiama
+// «Marco (fidato)» resta dentro, e lì non conta.
+const TIPI_SCHEDE = new Set(['LEGGI_SCHEDA', 'APRI_ELEMENTO', 'SCRIVI_CAMPO', 'SCORRI_PAGINA', 'POSTA_ELENCO',
+  'POSTA_CERCA', 'POSTA_LEGGI', 'POSTA_BOZZA', 'SEGNA_FIDATO', 'TOGLI_FIDATO']);
+const MAX_TESTO_SCHEDA = 60000;
+const MAX_TESTO_MAIL = 20000;
+const MAX_MAIL = 60;
+const ERRORI_SCHEDE = {
+  spento: 'La lettura delle schede aperte è spenta nelle Preferenze: non posso leggere né guidare le schede, posta compresa. Dillo all\'utente e proponi di riaccenderla (IMPOSTA_PREFERENZA leggere_schede true).',
+  'nessuna-scheda': null,
+  accesso: 'Gmail chiede di entrare: l\'utente deve accedere da sé nella scheda (Filo non tocca le pagine dell\'account Google e non chiede password). Diglielo, e quando è dentro riprova.',
+  'non-pronta': 'La scheda di Gmail non mostra la casella: sta ancora caricando o la pagina non è quella della posta. Riprova fra poco; se succede ancora, dillo all\'utente.',
+  uscita: 'La scheda di Gmail è finita su un\'altra pagina mentre ci lavoravo. Dillo all\'utente e riprova.',
+  vietata: 'È una pagina dell\'account Google: per regola Filo non la legge e non la tocca. Dillo all\'utente.',
+  'non-web': 'Quella scheda è una pagina di Filo, non un sito: scegli una scheda web da TAB APERTE.',
+  chiusa: 'La scheda è stata chiusa mentre ci lavoravo.',
+  pagina: 'La pagina non ha risposto. Riprova una volta; se non va, dillo all\'utente.',
+  'non-trovato': null,
+  vietato: null,
+  modulo: null,
+  esterno: null,
+  'nuova-scheda': null,
+  riservato: 'NON scritto: è un campo di password, di una carta o di un codice. Lì scrive solo l\'utente: diglielo.',
+  'non-campo': 'Quello non è un campo in cui si scrive: rileggi la scheda con LEGGI_SCHEDA e scegli un campo.',
+  'elenco-perso': 'Non so più quale messaggio fosse quel numero: richiedi l\'elenco (POSTA_ELENCO o POSTA_CERCA) e usa il numero nuovo, oppure passa `cerca`.',
+  quale: 'Non hai detto quale messaggio: usa il numero di POSTA_ELENCO o POSTA_CERCA, oppure `cerca` con mittente o oggetto.',
+  'non-aperta': 'Il messaggio non si è aperto nella scheda di Gmail. Riprova una volta; se non va, dillo all\'utente.',
+  vuota: 'La ricerca era vuota: scrivi cosa cercare.',
+  'nessuna-ricerca': 'Non trovo la casella di ricerca nella scheda di Gmail. Dillo all\'utente.',
+  'testo-vuoto': 'La bozza non ha testo: scrivilo tu per intero e richiama POSTA_BOZZA.',
+  'manca-destinatario': 'Per un messaggio nuovo serve l\'indirizzo del destinatario: chiedilo all\'utente (o cercalo nella posta) e riprova.',
+  'nessun-destinatario': 'Nella finestra del messaggio non trovo il campo dei destinatari. Dillo all\'utente.',
+  'rispondi-mancante': 'Non trovo il pulsante Rispondi nella conversazione aperta. Dillo all\'utente.',
+  'scrivi-mancante': 'Non trovo il pulsante per scrivere un messaggio nuovo nella scheda di Gmail. Dillo all\'utente.',
+  'bozza-non-aperta': 'La finestra della bozza non si è aperta. Riprova una volta; se non va, dillo all\'utente.',
+  'bozza-non-scritta': 'Non sono riuscito a scrivere il testo nella bozza. Dillo all\'utente: la finestra è aperta e può scriverlo lui.',
+};
+
+function etichettaFonte(f) {
+  return f && f.classe === 3 ? 'mittente fidato' : 'mittente sconosciuto';
+}
+
+function righePostaForPrompt(o, intestazione) {
+  const E = globalThis.SN_ESTERNO;
+  const righe = Array.isArray(o.righe) ? o.righe.filter(Boolean) : [];
+  if (!righe.length) return `${intestazione} Nessun messaggio.`;
+  const nuovi = righe.filter((r) => r.nuovo).length;
+  const fidati = righe.filter((r) => r.fonte && r.fonte.classe === 3).map((r) => r.i);
+  const corpo = righe.map((r) => `${r.i}. ${r.nuovo ? 'NUOVO · ' : ''}da ${r.mittente || '?'}${r.indirizzo ? ` <${r.indirizzo}>` : ''} · ${r.data || ''}\n`
+    + `   Oggetto: ${r.oggetto || '(senza oggetto)'}${r.anteprima ? `\n   Anteprima: ${r.anteprima}` : ''}`).join('\n');
+  return `${intestazione} ${righe.length} messaggi, ${nuovi} nuovi (non letti). Il numero è quello da passare a POSTA_LEGGI o POSTA_BOZZA.\n`
+    + `[Mittenti fidati: ${fidati.length ? `messaggi ${fidati.join(', ')}` : 'nessuno'}. Gli altri sono di mittenti sconosciuti.]\n`
+    + E.imbusta({ tipo: 'POSTA_LETTA', testo: corpo, conIntestazione: true, max: MAX_TESTO_SCHEDA });
+}
+
+function conversazioneForPrompt(o) {
+  const E = globalThis.SN_ESTERNO;
+  const messaggi = (Array.isArray(o.messaggi) ? o.messaggi.filter(Boolean) : []).slice(-MAX_MAIL);
+  if (!messaggi.length) return 'La conversazione si è aperta ma non ci ho trovato testo da leggere. Dillo all\'utente.';
+  const totali = Math.max(Number(o.messaggiTotali) || 0, messaggi.length);
+  const parti = [`[Conversazione dalla scheda di Gmail: ${totali} mail${totali > messaggi.length ? `; qui ci sono le ultime ${messaggi.length}, le prime ${totali - messaggi.length} non sono riportate` : ''}.]`];
+  if (o.oggetto) parti.push(E.imbustaCampi({ tipo: 'POSTA_LETTA', campi: { Oggetto: o.oggetto }, conIntestazione: true }));
+  messaggi.forEach((m, k) => {
+    const F = globalThis.SN_FIDUCIA;
+    const indirizzo = F.indirizzo(m.indirizzo);
+    parti.push(`[Mail ${k + 1} di ${messaggi.length} · ${indirizzo ? `da ${indirizzo}` : 'mittente senza indirizzo'} · ${etichettaFonte(m.fonte)}]\n`
+      + E.imbustaCampi({
+        tipo: 'POSTA_LETTA', campi: { Mittente: m.mittente, Data: m.data }, conIntestazione: !o.oggetto && k === 0, max: MAX_TESTO_MAIL + 1000,
+        corpo: `${m.testo || '(vuota)'}${m.troncato ? '\n(mail lunga: il resto non è riportato)' : ''}`,
+      }));
+  });
+  return parti.join('\n');
+}
+
+function schedaForPrompt(type, a, o) {
+  const E = globalThis.SN_ESTERNO;
+  const err = String(o.errore || '');
+  const nome = E.perCanaleSistema(o.nome || '');
+  if (o.ok !== true) {
+    if (ERRORI_SCHEDE[err]) return `Azione ${type} non riuscita. ${ERRORI_SCHEDE[err]}`;
+    if (err === 'nessuna-scheda') {
+      return type.startsWith('POSTA_')
+        ? 'Non c\'è nessuna scheda di Gmail aperta. Chiedi all\'utente: «Apro Gmail? Se sei già dentro, leggo da lì». Se dice sì, apri https://mail.google.com con NAVIGA e riprova.'
+        : 'Nessuna scheda web corrisponde a quella indicata: guarda TAB APERTE e riprova col numero della riga o con parole del titolo.';
+    }
+    if (err === 'non-trovato') {
+      return type.startsWith('POSTA_')
+        ? 'Nessun messaggio corrisponde. Prova una ricerca diversa (POSTA_CERCA) o chiedi all\'utente.'
+        : 'Nessun elemento con quel nome o numero è visibile nella scheda: rileggila con LEGGI_SCHEDA e usa un numero o un nome dell\'elenco.';
+    }
+    if (err === 'vietato' || err === 'modulo') {
+      return `NON fatto: «${nome}» ${err === 'modulo' ? 'spedisce un modulo' : 'invia, paga, pubblica o cancella qualcosa'}, e quel clic Filo non lo fa: `
+        + 'lo fa l\'utente. Diglielo in una riga e non cercare un\'altra strada per farlo.';
+    }
+    if (err === 'esterno' || err === 'nuova-scheda') {
+      return `Il link «${nome}» porta ${err === 'esterno' ? 'su un altro sito' : 'in una scheda nuova'}: se serve aprilo con NAVIGA, con questo indirizzo.\n`
+        + E.imbustaCampi({ tipo: 'DATI_LINK', campi: { Indirizzo: o.url || '' }, conIntestazione: true });
+    }
+    if (type === 'SEGNA_FIDATO' || type === 'TOGLI_FIDATO') return `NON fatto: ${E.perCanaleSistema(o.error || 'niente da cambiare')}.`;
+    return `Azione ${type} non riuscita${err ? ` (${E.perCanaleSistema(err)})` : ''}. Non ripeterla uguale: dillo all'utente.`;
+  }
+  const dove = o.scheda ? `«${E.perCanaleSistema(o.scheda.titolo || o.scheda.host || '')}»` : 'la scheda';
+  const nuovi = Array.isArray(o.fidatiNuovi) && o.fidatiNuovi.length
+    ? `\n[Dalla cartella Inviati: ${o.fidatiNuovi.length} indirizzi a cui l'utente ha scritto sono ora mittenti fidati; si vedono e si tolgono nelle Preferenze.]`
+    : '';
+  if (type === 'POSTA_ELENCO' || (type === 'LEGGI_SCHEDA' && Array.isArray(o.righe))) {
+    const t = type === 'POSTA_ELENCO' ? '[Posta in arrivo dalla scheda di Gmail.' : '[Elenco della posta che c\'è sullo schermo della scheda di Gmail.';
+    return `${righePostaForPrompt(o, `${t}]`)}${nuovi}`;
+  }
+  if (type === 'POSTA_CERCA') {
+    const forse = o.cambiata === false ? ' La pagina non è cambiata dopo la ricerca: questi potrebbero essere i messaggi che c\'erano già. Dillo all\'utente se non corrispondono.' : '';
+    return `${righePostaForPrompt(o, `[Ricerca nella posta: «${E.perCanaleSistema(o.query || '')}».${forse}]`)}${nuovi}`;
+  }
+  if (type === 'POSTA_LEGGI' || (type === 'LEGGI_SCHEDA' && Array.isArray(o.messaggi))) return `${conversazioneForPrompt(o)}${nuovi}`;
+  if (type === 'POSTA_BOZZA') {
+    const F = globalThis.SN_FIDUCIA;
+    const a = (Array.isArray(o.destinatari) ? o.destinatari : []).map((x) => F.indirizzo(x)).filter(Boolean);
+    return `Bozza ${o.risposta ? 'di risposta ' : ''}pronta nella scheda di Gmail e NON inviata${a.length ? `, per ${a.join(', ')}` : ''}. `
+      + 'L\'utente la rilegge e preme lui Invia: tu non puoi inviarla. Diglielo in una riga («te l\'ho lasciata pronta in Gmail, la mandi tu»).'
+      + nuovi;
+  }
+  if (type === 'LEGGI_SCHEDA') {
+    const el = Array.isArray(o.elementi) ? o.elementi : [];
+    const righe = el.map((x) => `${x.n}. ${x.tipo} «${x.nome || ''}»${x.valore ? ` = ${x.valore}` : ''}`).join('\n');
+    const oltre = o.totaleElementi > el.length ? `\n[Ci sono altri ${o.totaleElementi - el.length} elementi oltre a questi: per usarne uno chiamalo per nome, o scorri la pagina.]` : '';
+    const fidato = o.fonte && o.fonte.classe === 3 ? 'sito fidato dall\'utente' : 'sito non fra i fidati';
+    return `[Scheda ${dove} · ${E.perCanaleSistema(o.scheda && o.scheda.host)} · ${fidato}${o.troncato ? ' · pagina molto lunga: il testo si ferma a un certo punto' : ''}]\n`
+      + E.imbustaCampi({ tipo: 'SCHEDA_APERTA', campi: { Indirizzo: o.scheda && o.scheda.url, Titolo: o.scheda && o.scheda.titolo }, corpo: o.testo || '(nessun testo visibile)', conIntestazione: true, max: MAX_TESTO_SCHEDA })
+      + (righe ? `\n[Elementi con cui si può interagire: il numero va in APRI_ELEMENTO o SCRIVI_CAMPO.]\n${E.imbusta({ tipo: 'OUTLINE_PAGINA', testo: righe, conIntestazione: true })}${oltre}` : '');
+  }
+  if (type === 'APRI_ELEMENTO') {
+    const avviso = o.vietataDopo ? ' La scheda è finita su una pagina dell\'account Google: lì Filo non legge e non tocca niente.' : '';
+    return `Aperto «${nome}» nella scheda ${dove}.${avviso} Per vedere cosa è cambiato rileggi con LEGGI_SCHEDA.`;
+  }
+  if (type === 'SCRIVI_CAMPO') return `Scritto nel campo «${nome}» della scheda ${dove}, senza inviare niente.`;
+  if (type === 'SCORRI_PAGINA') {
+    const fine = o.inFondo ? ' Sei in fondo alla pagina.' : (o.inCima ? ' Sei in cima.' : '');
+    return `${o.spostato ? 'Scorsa' : 'Non si è mossa:'} la scheda ${dove}.${fine} Rileggi con LEGGI_SCHEDA.`;
+  }
+  if (type === 'SEGNA_FIDATO') return o.gia ? `${o.voce} era già fra i fidati.` : `Segnato come fidato: ${o.voce}.`;
+  if (type === 'TOGLI_FIDATO') return `Tolto dai fidati: ${o.voce}.`;
+  return '';
+}
+
+function schedeForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const out = [];
+  for (const a of actions) {
+    const type = String((a && a.type) || '').toUpperCase();
+    if (!TIPI_SCHEDE.has(type) || !a._output || typeof a._output !== 'object' || a._confirm) continue;
+    const t = schedaForPrompt(type, a, a._output);
+    if (t) out.push(t);
+  }
+  return out.join('\n\n');
+}
+
 // Tutti gli esiti che tornano al modello, per un elenco di azioni eseguite:
 // output dei comandi, dettagli delle capacità, risultati di ricerca, file e
 // documenti letti, documenti di trasparenza. Mai istruzioni: fuori dalla busta
@@ -2895,7 +3063,7 @@ function observationsForPrompt(actions) {
   return [
     commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), webSearchResultsForPrompt(actions),
     fileReadsForPrompt(actions), documentReadsForPrompt(actions), transparencyDocsForPrompt(actions),
-    chatSearchesForPrompt(actions), confirmedActionsForPrompt(actions), proxyUnavailableForPrompt(actions),
+    chatSearchesForPrompt(actions), schedeForPrompt(actions), confirmedActionsForPrompt(actions), proxyUnavailableForPrompt(actions),
     apertureFermateDopoForPrompt(actions),
     fermateForPrompt(actions),
   ].filter(Boolean).join('\n\n');
@@ -3568,7 +3736,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         delete rendered._argsError;
         // Azione sospesa in attesa di conferma (#146.2): il client renderizza il
         // bottone che apre il popup/box e poi manda MSG.FILO_CONFIRM_ACTION.
-        if (res.needsConfirm) rendered._confirm = { level: res.needsConfirm, text: res.describe || '' };
+        if (res.needsConfirm) rendered._confirm = { level: res.needsConfirm, text: res.describe || '', ...(res.avviso ? { avviso: res.avviso } : {}) };
         // Output di un comando eseguito subito (livello 1) o esito bloccato
         // (terminale spento): il client lo mostra in chat (#146.6).
         if (res.output) rendered._output = res.output;

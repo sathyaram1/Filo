@@ -2,7 +2,6 @@
 // testo visibile, elementi per nome, clic e scrittura senza gesti veri. Un clic che invia, paga o cancella non esiste.
 // Chi lo chiama: src/main/services/schedeAperte.js e postaGmail.js. Prove: tests/schede-aperte.spec.mjs, tests/posta-gmail.spec.mjs.
 
-/* eslint-disable no-restricted-globals */
 function paginaGuidata() {
   'use strict';
 
@@ -27,7 +26,7 @@ function paginaGuidata() {
     + 'pubblica(?:re)?|publish|tweet|condividi|share|post now|posta ora)(?:$|[^a-z])', 'i');
 
   const norm = (s) => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '')
-    .replace(/[​-‏‪-‮⁠-⁯﻿]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+    .replace(/[\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
   const breve = (s, n) => {
     const t = String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
     return t.length > n ? `${t.slice(0, n - 1)}…` : t;
@@ -98,7 +97,7 @@ function paginaGuidata() {
           if (ok === undefined) { ok = testoLeggibile(p); leggibili.set(p, ok); }
           if (!ok) return;
         }
-        const t = nodo.nodeValue.replace(/[\s ]+/g, ' ');
+        const t = nodo.nodeValue.replace(/[\s\u00a0]+/g, ' ');
         if (!t.trim()) {
           const u = pezzi[pezzi.length - 1];
           if (u && u !== '\n' && !u.endsWith(' ')) pezzi.push(' ');
@@ -516,9 +515,9 @@ function paginaGuidata() {
       const p = n.parentElement;
       if (p && !mostrato(p)) continue;
       const v = n.nodeValue;
-      if (!trovato && prima.trim() && /^[\s ]*[-–—][\s ]/.test(v)) {
+      if (!trovato && prima.trim() && /^[\s\u00a0]*[-–—][\s\u00a0]/.test(v)) {
         trovato = true;
-        dopo += v.replace(/^[\s ]*[-–—][\s ]*/, '');
+        dopo += v.replace(/^[\s\u00a0]*[-–—][\s\u00a0]*/, '');
         continue;
       }
       if (trovato) dopo += v; else prima += v;

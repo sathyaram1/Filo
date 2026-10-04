@@ -220,6 +220,8 @@ module.exports = function register(on, ctx) {
       const dati = { ...pending.data };
       const chatVecchie = dati[FILO_CHATS_KEY];
       delete dati[FILO_CHATS_KEY];
+      // Un backup non alza la fiducia (#534): mittenti e siti fidati si aggiungono solo con una conferma.
+      delete dati[SN_CONST.STORAGE_KEYS.FILO_FIDUCIA];
       if (pending.filo) await IlFilo.importa(pending.filo);
       if (Array.isArray(chatVecchie) && chatVecchie.length) await IlFilo.importaChatSalvate(chatVecchie);
       try { ctx.broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED }); } catch (_) {}

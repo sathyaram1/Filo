@@ -818,7 +818,7 @@
     tabPreviewEnabled: 'tabPreview.enabled', tabPreviewSize: 'tabPreview.size',
     agentStylePreset: 'agentStyle', agentStyleText: 'agentStyle', timerRingtone: 'timerRingtone',
     terminalEnabled: 'terminal.enabled', terminalShell: 'terminal.shell',
-    nomiSensatiScaricamenti: 'nomiSensati.scaricamenti',
+    nomiSensatiScaricamenti: 'nomiSensati.scaricamenti', schedeLeggere: 'schedeAperte.leggere',
     ttsVoice: 'tts.voice', ttsRate: 'tts.rate', ttsPitch: 'tts.pitch',
     ttsModelVoice: 'tts.modelVoice', ttsModelVoiceCustom: 'tts.modelVoice',
     autoArchiveEnabled: 'autoArchive.enabled', autoArchiveIdleHours: 'autoArchive.idleHours',
@@ -838,6 +838,7 @@
       case 'timerRingtone': return $('timerRingtone').value || 'default';
       case 'terminal.enabled': return $('terminalEnabled').checked;
       case 'nomiSensati.scaricamenti': return $('nomiSensatiScaricamenti').checked;
+      case 'schedeAperte.leggere': return $('schedeLeggere').checked;
       case 'terminal.shell': return $('terminalShell').value;
       case 'tts.voice': return $('ttsVoice').value || '';
       case 'tts.rate': return parseFloat($('ttsRate').value) || 1;
@@ -869,6 +870,7 @@
       case 'timerRingtone': return s.timerRingtone || 'default';
       case 'terminal.enabled': return !!(s.terminal && s.terminal.enabled === true);
       case 'nomiSensati.scaricamenti': return !!(s.nomiSensati && s.nomiSensati.scaricamenti === true);
+      case 'schedeAperte.leggere': return !(s.schedeAperte && s.schedeAperte.leggere === false);
       case 'terminal.shell': return (s.terminal && s.terminal.shell) || '';
       case 'tts.voice': return tts.voice || '';
       case 'tts.rate': return Number(tts.rate) || 1;
@@ -957,6 +959,7 @@
     const terminal = settings.terminal || {};
     if (vuole('terminal.enabled')) $('terminalEnabled').checked = terminal.enabled === true;
     if (vuole('nomiSensati.scaricamenti')) $('nomiSensatiScaricamenti').checked = !!(settings.nomiSensati && settings.nomiSensati.scaricamenti === true);
+    if (vuole('schedeAperte.leggere')) $('schedeLeggere').checked = !(settings.schedeAperte && settings.schedeAperte.leggere === false);
     if (vuole('terminal.shell')) {
       const sel = $('terminalShell');
       const suWindows = shellDiWindows();
@@ -1097,6 +1100,113 @@
     caricaMemoria();
   }
 
+  // ── Mittenti e siti fidati (#534) ────────────────────────────────────────
+  // Togliere abbassa la fiducia e parte subito; aggiungere la alza e vuole «conferma» scritta (regola d di #530).
+  const VIA_FIDATO = { inviati: 'dagli Inviati', chat: 'segnato in chat', preferenze: 'aggiunto qui' };
+
+  async function caricaFidati() {
+    if (!$('fidatiMittenti')) return;
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.FIDUCIA_VISTA }); } catch (_) {}
+    if (r && r.ok) disegnaFidati(r);
+  }
+
+  function disegnaFidati({ mittenti = [], siti = [] }) {
+    elencoFidati('fidatiMittenti', 'fidatiMittentiConto', mittenti.map((m) => ({ testo: m.indirizzo, via: m.via, togli: { mittente: m.indirizzo } })),
+      'Nessun mittente fidato, per ora.');
+    elencoFidati('fidatiSiti', 'fidatiSitiConto', siti.map((x) => ({ testo: x.sito, via: x.via, togli: { sito: x.sito } })),
+      'Nessun sito fidato.');
+  }
+
+  function elencoFidati(id, idConto, voci, vuoto) {
+    const box = $(id);
+    box.textContent = '';
+    $(idConto).textContent = voci.length ? `(${voci.length})` : '';
+    if (!voci.length) {
+      const p = document.createElement('p');
+      p.className = 'sn-muted';
+      p.textContent = vuoto;
+      box.appendChild(p);
+      return;
+    }
+    for (const v of voci) {
+      const row = document.createElement('div');
+      row.className = 'mem-riga';
+      const t = document.createElement('span');
+      t.className = 'mem-testo';
+      t.textContent = v.testo;
+      const via = document.createElement('span');
+      via.className = 'fid-via';
+      via.textContent = VIA_FIDATO[v.via] || '';
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'mem-via';
+      b.textContent = '×';
+      b.title = 'Togli dai fidati';
+      b.setAttribute('aria-label', `Togli dai fidati: ${v.testo}`);
+      b.addEventListener('click', () => togliFidato(b, v.togli));
+      row.append(t, via, b);
+      box.appendChild(row);
+    }
+  }
+
+  async function togliFidato(b, togli) {
+    b.disabled = true;
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.FIDUCIA_TOGLI, ...togli }); } catch (_) {}
+    const hint = $('fidatiHint');
+    if (hint) hint.textContent = r && r.ok && r.tolto ? 'Tolto dai fidati' : 'Non c\'era più: ecco com\'è adesso';
+    flashSaved('fidatiHint');
+    caricaFidati();
+  }
+
+  function erroreFidato(tipo, testo) {
+    const el = $(tipo === 'sito' ? 'fidatiSitoErrore' : 'fidatiMittenteErrore');
+    el.textContent = testo;
+    el.hidden = !testo;
+  }
+
+  let aggiuntaInCorso = false;
+  async function aggiungiFidato(tipo) {
+    if (aggiuntaInCorso) return;
+    const input = $(tipo === 'sito' ? 'fidatiSitoNuovo' : 'fidatiMittenteNuovo');
+    const scritto = input.value.trim();
+    if (!scritto) { erroreFidato(tipo, tipo === 'sito' ? 'Scrivi il nome del sito.' : 'Scrivi un indirizzo email.'); return; }
+    aggiuntaInCorso = true;
+    try {
+      let p = null;
+      try { p = await chrome.runtime.sendMessage({ type: MSG.FIDUCIA_PREPARA, [tipo]: scritto }); } catch (_) {}
+      if (!p || !p.ok) { erroreFidato(tipo, (p && p.error) || 'Non sono riuscito a leggerlo: riprova.'); return; }
+      erroreFidato(tipo, '');
+      if (p.gia) {
+        input.value = '';
+        $('fidatiHint').textContent = `${p.voce} era già fra i fidati`;
+        flashSaved('fidatiHint');
+        return;
+      }
+      const Ui = window.SN_CONFIRM_UI;
+      const testo = tipo === 'sito'
+        ? `Quello che Filo legge su ${p.voce} non conterà più come scritto da uno sconosciuto.${p.sconsiglio ? `\n\n${p.sconsiglio}` : ''}`
+        : `Le mail di ${p.voce} non conteranno più come scritte da uno sconosciuto.`;
+      const ok = Ui ? await Ui.confirmTyped({
+        title: tipo === 'sito' ? 'Sito fidato' : 'Mittente fidato',
+        text: testo,
+        avviso: 'Così Filo si fida di più: si toglie quando vuoi da qui.',
+        okLabel: 'Segna come fidato',
+      }) : false;
+      if (!ok) return;
+      let r = null;
+      try { r = await chrome.runtime.sendMessage({ type: MSG.FIDUCIA_AGGIUNGI, [tipo]: p.voce }); } catch (_) {}
+      if (!r || !r.ok) { erroreFidato(tipo, (r && r.error) || 'Non sono riuscito a salvarlo: riprova.'); return; }
+      input.value = '';
+      $('fidatiHint').textContent = 'Segnato come fidato';
+      flashSaved('fidatiHint');
+      caricaFidati();
+    } finally {
+      aggiuntaInCorso = false;
+    }
+  }
+
   let caricato = false;
 
   async function load() {
@@ -1152,10 +1262,12 @@
       chrome.runtime.onMessage.addListener((msg) => {
         if (msg && msg.type === MSG.SETTINGS_UPDATED && msg.settings) riallinea(msg.settings);
         if (msg && msg.type === MSG.FILO_MEMORY_CHANGED && Array.isArray(msg.moduli)) disegnaMemoria(msg);
+        if (msg && msg.type === MSG.FIDUCIA_CAMBIATA) caricaFidati();
       });
     } catch (_) {}
     load();
     caricaMemoria();
+    caricaFidati();
 
     // Tema e dimensione testo: anteprima immediata + salvataggio.
     $('theme').addEventListener('change', () => {
@@ -1185,7 +1297,11 @@
     $('autoArchiveIdleHours').addEventListener('blur', canonAutoArchiveIdle);
     $('terminalEnabled').addEventListener('change', persist);
     $('nomiSensatiScaricamenti').addEventListener('change', persist);
+    $('schedeLeggere').addEventListener('change', persist);
     $('terminalShell').addEventListener('change', persist);
+    $('fidatiMittenteForm').addEventListener('submit', (e) => { e.preventDefault(); aggiungiFidato('mittente'); });
+    $('fidatiSitoForm').addEventListener('submit', (e) => { e.preventDefault(); aggiungiFidato('sito'); });
+    for (const id of ['fidatiMittenteNuovo', 'fidatiSitoNuovo']) $(id).addEventListener('input', () => erroreFidato(id === 'fidatiSitoNuovo' ? 'sito' : 'mittente', ''));
 
     // Lettura ad alta voce: la lista voci può popolarsi in ritardo.
     if (ttsSupported() && typeof window.speechSynthesis.addEventListener === 'function') {
