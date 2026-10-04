@@ -1748,7 +1748,51 @@
         addBtn('Rimuovi', () => api.downloads.remove(r.id).then((res) => syncFromList(res && res.items)).catch(() => {}));
       }
       row.appendChild(actions);
+      if (r.state === 'completed' && !apri) {
+        row.addEventListener('contextmenu', (e) => { e.preventDefault(); menuRiga(r, e.clientX, e.clientY); });
+      }
       return row;
+    }
+
+    // #950 — il tasto destro su un file del pannello: le stesse azioni della pagina Scaricamenti, compreso il
+    // nome sensato. Il riquadro per scriverlo sta nella pagina (qui non c'è spazio per la casella e l'esito).
+    let rigaMenuId = '';
+    async function menuRiga(r, x, y) {
+      rigaMenuId = r.id;
+      const entries = [];
+      if (!r.missing) entries.push({ label: 'Apri file', action: 'dl-riga-apri' });
+      entries.push({ label: 'Apri cartella', action: 'dl-riga-cartella' });
+      const N = window.SN_NOMI_FILE;
+      if (!r.missing && !r.exe && N && N.tipoDi(r.filename)) {
+        let disp = false;
+        try { disp = !!((await api.message({ type: 'file_nome_stato' })) || {}).disponibile; } catch (_) { disp = false; }
+        if (disp) entries.push({ label: 'Dai un nome sensato', action: 'dl-riga-nome' });
+      }
+      if (!r.missing && r.nomeOriginale) entries.push({ label: 'Rimetti il nome di prima', action: 'dl-riga-rimetti' });
+      entries.push({ type: 'separator' }, { label: 'Rimuovi', action: 'dl-riga-rimuovi' });
+      if (rigaMenuId !== r.id) return;
+      api.popupMenu(entries, x, y);
+    }
+    if (api.onMenuAction) {
+      api.onMenuAction((action) => {
+        if (typeof action !== 'string' || !action.startsWith('dl-riga-') || !rigaMenuId) return;
+        const id = rigaMenuId;
+        if (action === 'dl-riga-apri') openDownloadFile(id);
+        else if (action === 'dl-riga-cartella') openDownloadFolder(id);
+        else if (action === 'dl-riga-nome') {
+          api.tabs.open(`filo://downloads/downloads.html?rinomina=${encodeURIComponent(id)}`);
+          closePanel();
+        } else if (action === 'dl-riga-rimetti') {
+          api.downloads.rimettiNome(id).then((res) => {
+            avvisiRiga.set(id, res && res.ok
+              ? (res.cambiato ? `Il nome di prima era occupato: ora è «${res.nome}»` : `Nome di prima rimesso: ${res.nome}`)
+              : ((res && res.frase) || 'Non sono riuscito a rimettere il nome di prima'));
+            if (panelOpen) renderPanel();
+          }).catch(() => {});
+        } else if (action === 'dl-riga-rimuovi') {
+          api.downloads.remove(id).then((res) => syncFromList(res && res.items)).catch(() => {});
+        }
+      });
     }
 
     // reserveTop = altezza del pannello (capped) così la view della pagina

@@ -437,6 +437,13 @@
     window.SN_PAGE_BOOTSTRAP.applyTheme(settings.theme);
     aggiornaDisponibilita();
     await reload();
+    // Il tasto destro del pannello degli scaricamenti in alto porta qui, col riquadro aperto su quel file.
+    const daRinominare = new URLSearchParams(location.search).get('rinomina');
+    if (daRinominare) {
+      try { history.replaceState(null, '', location.pathname); } catch (_) {}
+      const r = items.find((x) => x.id === daRinominare);
+      if (r) daiNome(r);
+    }
   }
 
   document.addEventListener('DOMContentLoaded', () => {

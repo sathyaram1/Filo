@@ -15,6 +15,21 @@
   let aperto = null;     // { el, chiudi }
   let menuAperto = null; // { el, chiudi }
 
+  // Il nome di prima resta a un tasto destro di distanza anche dopo che il riquadro con «Annulla» si è chiuso:
+  // percorso attuale → nome con cui il file era prima della prima rinomina fatta da questa pagina.
+  const rimettibili = new Map();
+  function ricorda(r) {
+    if (!r || !r.a || !r.prima || r.invariato) return;
+    const prima = (rimettibili.get(r.da) || {}).prima || r.prima;
+    rimettibili.delete(r.da);
+    const nomeAttuale = String(r.a).split(/[\\/]/).pop();
+    if (nomeAttuale !== prima) rimettibili.set(r.a, { prima });
+  }
+  function nomeDiPrima(percorso) {
+    const x = rimettibili.get(String(percorso || ''));
+    return x ? x.prima : '';
+  }
+
   // La voce del menu compare solo se c'è un modello per farla funzionare; la risposta vale qualche secondo.
   let stato = { at: 0, valore: false, attesa: null };
   function disponibile() {
@@ -166,6 +181,9 @@
     let fatto = null;
     let attivo = true;
     let timerChiusura = null;
+    // Un Invio dato mentre Filo legge ancora vale per il nome che sta arrivando, non per quello vecchio.
+    let caricando = true;
+    let confermaInAttesa = false;
 
     const mostraStato = (testo, { carica = false, errore = false } = {}) => {
       statoEl.hidden = !testo;
@@ -197,7 +215,14 @@
       global.addEventListener('resize', chiudi);
     }, 0);
 
-    campo.addEventListener('input', () => { toccato = true; });
+    campo.addEventListener('input', () => {
+      toccato = true;
+      if (confermaInAttesa) {
+        confermaInAttesa = false;
+        ok.disabled = false;
+        mostraStato('Leggo il file…', { carica: true });
+      }
+    });
     campo.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); conferma(); }
     });
@@ -207,23 +232,37 @@
     const bersaglio = downloadId ? { downloadId } : { percorso };
 
     mostraStato('Leggo il file…', { carica: true });
-    send({ type: MSG().FILE_NOME_PROPONI, ...bersaglio }).then((r) => {
+    const senzaProposta = (frase) => {
+      caricando = false;
       if (!attivo || fatto) return;
-      if (r && r.ok && r.proposta) {
-        mostraStato('');
-        if (!toccato) {
-          campo.value = r.proposta;
-          try { campo.focus({ preventScroll: true }); campo.select(); } catch (_) {}
-        }
-        return;
+      if (confermaInAttesa) { confermaInAttesa = false; ok.disabled = false; }
+      mostraStato(frase || 'Non sono riuscito a leggere il file: scrivi tu il nome', { errore: true });
+      try { campo.focus({ preventScroll: true }); } catch (_) {}
+    };
+    send({ type: MSG().FILE_NOME_PROPONI, ...bersaglio }).then((r) => {
+      if (!(r && r.ok && r.proposta)) { senzaProposta(r && r.frase); return; }
+      caricando = false;
+      if (!attivo || fatto) return;
+      mostraStato('');
+      if (!toccato) {
+        campo.value = r.proposta;
+        try { campo.focus({ preventScroll: true }); campo.select(); } catch (_) {}
       }
-      mostraStato((r && r.frase) || 'Non sono riuscito a leggere il file: scrivi tu il nome', { errore: true });
-    }).catch(() => {
-      if (attivo && !fatto) mostraStato('Non sono riuscito a leggere il file: scrivi tu il nome', { errore: true });
-    });
+      if (confermaInAttesa) {
+        confermaInAttesa = false;
+        ok.disabled = false;
+        conferma();
+      }
+    }).catch(() => senzaProposta(''));
 
     async function conferma() {
-      if (lavora || fatto) return;
+      if (lavora || fatto || confermaInAttesa) return;
+      if (caricando && !toccato) {
+        confermaInAttesa = true;
+        ok.disabled = true;
+        mostraStato('Rinomino appena ho il nome…', { carica: true });
+        return;
+      }
       const voluto = campo.value;
       if (!voluto.trim()) { mostraStato('Scrivi un nome', { errore: true }); campo.focus(); return; }
       lavora = true;
@@ -240,6 +279,7 @@
         return;
       }
       fatto = r;
+      ricorda(r);
       if (typeof suRinominato === 'function') try { suRinominato(r); } catch (_) {}
       mostraFatto(r);
     }
@@ -269,6 +309,7 @@
           const e0 = x && Array.isArray(x.esiti) ? x.esiti[0] : null;
           if (!attivo) return;
           if (e0 && e0.ok) {
+            rimettibili.delete(r.a);
             testo.textContent = e0.cambiato ? `Il nome di prima era preso: ora è ${e0.nome}` : `Nome di prima rimesso: ${e0.nome}`;
             annulla.remove();
             if (typeof suRimesso === 'function') try { suRimesso(e0); } catch (_) {}
@@ -291,5 +332,63 @@
     return el;
   }
 
-  global.SN_RINOMINA_UI = { apri, chiudi, menu, chiudiMenu, disponibile, tipoSupportato, VOCE: VOCE_MENU.label };
+  // Un riquadro con una riga sola d'esito, ancorato come quello della rinomina.
+  function esito(ancora, testo, { errore = false } = {}) {
+    chiudi();
+    const el = doc.createElement('div');
+    el.className = 'sn-rinomina';
+    el.setAttribute('role', 'status');
+    const riga = doc.createElement('div');
+    riga.className = errore ? 'sn-rinomina-stato sn-rinomina-errore' : 'sn-rinomina-esito';
+    const t = doc.createElement('span');
+    t.className = 'sn-rinomina-esito-testo';
+    t.textContent = testo;
+    t.title = testo;
+    riga.appendChild(t);
+    el.appendChild(riga);
+    doc.body.appendChild(el);
+    posiziona(el, ancora);
+    const fuori = (e) => { if (!el.contains(e.target)) chiudi(); };
+    const tasti = (e) => { if (e.key === 'Escape') { e.preventDefault(); chiudi(); } };
+    const timer = setTimeout(chiudi, 5000);
+    aperto = {
+      el,
+      chiudi: () => {
+        clearTimeout(timer);
+        el.remove();
+        doc.removeEventListener('mousedown', fuori, true);
+        doc.removeEventListener('keydown', tasti, true);
+      },
+    };
+    setTimeout(() => {
+      if (!aperto || aperto.el !== el) return;
+      doc.addEventListener('mousedown', fuori, true);
+      doc.addEventListener('keydown', tasti, true);
+    }, 0);
+    return el;
+  }
+
+  // La voce «Rimetti il nome di prima» dei menu: c'è solo per un file rinominato da questa pagina.
+  const VOCE_RIMETTI = 'Rimetti il nome di prima';
+  async function rimetti({ ancora, percorso, suRimesso } = {}) {
+    const prima = nomeDiPrima(percorso);
+    if (!prima) return null;
+    let x = null;
+    try { x = await send({ type: MSG().FILE_RIMETTI_NOMI, coppie: [{ attuale: percorso, prima }] }); } catch (_) { x = null; }
+    const e0 = x && Array.isArray(x.esiti) ? x.esiti[0] : null;
+    if (e0 && e0.ok) {
+      rimettibili.delete(String(percorso));
+      // Prima l'esito, poi chi aggiorna: un elenco che si ridisegna toglie l'ancora a cui il riquadro si appoggia.
+      if (ancora) esito(ancora, e0.cambiato ? `Il nome di prima era preso: ora è ${e0.nome}` : `Nome di prima rimesso: ${e0.nome}`);
+      if (typeof suRimesso === 'function') try { suRimesso(e0); } catch (_) {}
+      return e0;
+    }
+    if (ancora) esito(ancora, (e0 && e0.frase) || 'Non sono riuscito a rimettere il nome di prima', { errore: true });
+    return null;
+  }
+
+  global.SN_RINOMINA_UI = {
+    apri, chiudi, menu, chiudiMenu, disponibile, tipoSupportato, nomeDiPrima, rimetti,
+    VOCE: VOCE_MENU.label, VOCE_RIMETTI,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

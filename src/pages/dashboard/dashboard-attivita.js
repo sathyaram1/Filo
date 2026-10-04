@@ -843,6 +843,7 @@
         if (disp && percorso && R.tipoSupportato(nome)) {
           voci.push([R.VOCE, () => R.apri({ ancora: btn, percorso, nome, suRinominato: aggiorna, suRimesso: aggiorna })]);
         }
+        if (R.nomeDiPrima(percorso)) voci.push([R.VOCE_RIMETTI, () => R.rimetti({ ancora: btn, percorso, suRimesso: aggiorna })]);
         R.menu(x, y, voci, { ancora: btn });
       });
     };

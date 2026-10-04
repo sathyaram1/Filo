@@ -344,13 +344,12 @@ test('acceso in Preferenze, uno scaricamento col nome che non dice niente prende
   const { rec, chiudi } = await scarica('scan_00999.pdf', BOLLETTA, { shell, openTab, testServer });
   try {
     const nuovo = join(rec.savePath, '..', NOME_NUOVO);
-    await expect.poll(() => existsSync(nuovo), { timeout: 20000 }).toBe(true);
-    expect(existsSync(rec.savePath)).toBe(false);
+    // Il nome nuovo nasce un attimo prima che il vecchio sparisca (mai sovrascrivere): si aspetta l'insieme.
+    await expect.poll(() => existsSync(nuovo) && !existsSync(rec.savePath), { timeout: 20000 }).toBe(true);
     const vista = await avvisi();
     const annulla = vista.locator('.shell-notif-action', { hasText: 'Annulla' }).last();
     await expect(annulla).toBeVisible({ timeout: 10000 });
     await annulla.click();
-    await expect.poll(() => existsSync(rec.savePath), { timeout: 10000 }).toBe(true);
-    expect(existsSync(nuovo)).toBe(false);
+    await expect.poll(() => existsSync(rec.savePath) && !existsSync(nuovo), { timeout: 10000 }).toBe(true);
   } finally { await chiudi(); }
 });

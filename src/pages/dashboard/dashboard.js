@@ -1173,6 +1173,9 @@
       if (disp && Rinomina.tipoSupportato(nome)) {
         voci.push([Rinomina.VOCE, () => Rinomina.apri({ ancora, percorso, nome, suRinominato, suRimesso: suRinominato })]);
       }
+      if (Rinomina.nomeDiPrima(percorso)) {
+        voci.push([Rinomina.VOCE_RIMETTI, () => Rinomina.rimetti({ ancora, percorso, suRimesso: suRinominato })]);
+      }
       voci.push(['Togli dal messaggio', togli]);
       Rinomina.menu(x, y, voci, { ancora });
     });
