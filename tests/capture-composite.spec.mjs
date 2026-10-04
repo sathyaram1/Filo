@@ -64,8 +64,6 @@ async function scattoVerificato(app, shell, nome) {
   expect(vista.y, 'la scheda attiva deve lasciare spazio alla shell sopra di sé').toBeGreaterThanOrEqual(LATO + 8);
   const shellR = { id: 'cc-shell', x: Math.round(cb.width / 2), y: 4, lato: LATO, rgb: VERDE };
   const vistaR = { id: 'cc-vista', x: 40, y: 40, lato: LATO, rgb: MAGENTA };
-  const pagina = app.windows().find((w) => w.url() === (async () => '')());
-  void pagina;
   await shell.evaluate(posaRiquadro, shellR);
   await app.evaluate(async ({ BrowserWindow }, { codice, r }) => {
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
