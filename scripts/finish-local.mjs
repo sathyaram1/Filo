@@ -783,7 +783,7 @@ async function main() {
   // crea niente e non approva niente, fa solo rileggere l'elenco vero — ed è
   // l'unica cosa che impedisce all'avviso di cui parla il messaggio qui sotto
   // di comparire soltanto a chi apre una scheda nuova.
-  if (reply?.outcome === 'blocked' && reply.requestId) mergeApprovalSignal.note(reply.requestId);
+  if (richiestaForseInAttesa(reply)) mergeApprovalSignal.note(reply.requestId);
   const code = exitCodeForOwnerMerge(reply);
   const message = messageForOwnerMerge(reply, branch, { feedbackId: pratica ? pratica.id : '', feedbackNum: pratica ? pratica.seq : '' });
   if (code === 0) console.log(`\n${message}`);
