@@ -2090,16 +2090,36 @@
   // Il main blocca un window.open() non richiesto e manda { tabId, url, host }: è un avviso della
   // pila in basso a destra, con «Apri» per aprirlo comunque (la chip sotto la barra la copriva la scheda).
   if (api.tabs.onPopupBlocked) {
+    // Una pagina che riprova di continuo ha un avviso solo: i tentativi lo aggiornano senza allungarlo, e chiuso o
+    // scaduto tace finché la scheda resta su quella pagina (#737.1 giro 3). Una voce per scheda.
+    const popupAvvisati = new Map();
     api.tabs.onPopupBlocked((info) => {
       if (!info || !info.url) return;
-      const { url, tabId } = info;
-      // Una pagina che riprova di continuo non riempie la pila: l'avviso della sua scheda si aggiorna sull'ultimo.
-      NOTIFS.show(`Bloccato popup da ${info.host || '?'}`, {
-        unica: `popup-bloccato:${tabId}`,
+      const { tabId } = info;
+      const pagina = String(info.pagina || '');
+      const testo = `Bloccato popup da ${info.host || '?'}`;
+      const prima = popupAvvisati.get(tabId);
+      if (prima && prima.pagina === pagina) {
+        if (prima.carta && prima.carta.isConnected && prima.carta.dataset.closing !== '1') {
+          prima.url = info.url;
+          const msg = prima.carta.querySelector('.shell-notif-msg');
+          if (msg && msg.textContent !== testo) msg.textContent = testo;
+        }
+        return;
+      }
+      const voce = { pagina, url: info.url, carta: null };
+      popupAvvisati.set(tabId, voce);
+      voce.carta = NOTIFS.show(testo, {
         durationSec: 8,
-        actions: [{ label: 'Apri', onClick: () => { try { api.tabs.openBlockedPopup(url, false, tabId); } catch (_) {} } }],
+        actions: [{ label: 'Apri', onClick: () => { try { api.tabs.openBlockedPopup(voce.url, false, tabId); } catch (_) {} } }],
       });
     });
+    if (api.tabs.onUpdate) {
+      api.tabs.onUpdate((snap) => {
+        const vive = new Set(((snap && snap.tabs) || []).map((t) => t && t.id));
+        for (const id of popupAvvisati.keys()) if (!vive.has(id)) popupAvvisati.delete(id);
+      });
+    }
   }
 
   // ─── Domande dei permessi (#591.1) ──────────────────────────────────────
