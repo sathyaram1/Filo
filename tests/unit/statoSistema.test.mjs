@@ -7,10 +7,10 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import { mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import fs, { mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, nomeSuDisco, nomiVeri } from '../helpers/percorsi.mjs';
 import { execFileSync } from 'node:child_process';
 
 const require = createRequire(import.meta.url);
@@ -21,7 +21,7 @@ const SORGENTE = readFileSync(join(ROOT, 'src', 'main', 'services', 'statoSistem
 function albero(file) {
   const radice = cartellaTemporanea('filo-sysfs-');
   for (const [p, contenuto] of Object.entries(file)) {
-    const pieno = join(radice, ...p.split('/'));
+    const pieno = join(radice, ...p.split('/').map((s) => nomeSuDisco(s)));
     mkdirSync(dirname(pieno), { recursive: true });
     if (contenuto === null) mkdirSync(pieno, { recursive: true });
     else writeFileSync(pieno, contenuto);
@@ -57,11 +57,15 @@ test('Linux: senza «capacity» la carica si conta da energia o carica; un fisso
     'sys/class/power_supply/BAT0/charge_full': '3000\n', 'sys/class/power_supply/BAT0/status': 'Full\n',
   });
   const fisso = albero({ 'sys/class/power_supply/ucsi-source-psy-USBC000:001/type': 'USB\n', 'sys/class/power_supply/ucsi-source-psy-USBC000:001/online': '1\n' });
+  const ripristina = nomiVeri(fs, fisso);
   try {
     assert.deepEqual(L.batteriaLinux(r), { livello: 50, inCarica: false, collegata: true });
+    assert.deepEqual(fs.readdirSync(join(fisso, 'sys', 'class', 'power_supply')), ['ucsi-source-psy-USBC000:001']);
+    assert.equal(fs.readFileSync(join(fisso, 'sys', 'class', 'power_supply', 'ucsi-source-psy-USBC000:001', 'online'), 'utf8'), '1\n');
     assert.equal(L.batteriaLinux(fisso), null);
     assert.equal(L.batteriaLinux(join(fisso, 'non-esiste')), null);
   } finally {
+    ripristina();
     rmSync(r, { recursive: true, force: true });
     rmSync(fisso, { recursive: true, force: true });
   }
