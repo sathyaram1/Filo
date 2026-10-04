@@ -2322,10 +2322,13 @@ class TabManager {
       // ricerca semantica dell'archivio e per il triage. Solo pagine web.
       if (!tab.isInternal && /^https?:\/\//i.test(wc.getURL() || '')) {
         try {
+          const letta = wc.getURL();
           wc.executeJavaScript(
             '(function(){try{return (document.body&&document.body.innerText||"").replace(/\\s+/g," ").slice(0,2000);}catch(e){return "";}})()',
             true,
-          ).then((txt) => { if (typeof txt === 'string' && txt) tab.contentExtract = txt; }).catch(() => {});
+          ).then((txt) => {
+            if (typeof txt === 'string' && txt && !wc.isDestroyed() && wc.getURL() === letta) tab.contentExtract = txt;
+          }).catch(() => {});
         } catch (_) {}
       }
     });
@@ -2341,6 +2344,8 @@ class TabManager {
       // MAI, quindi resta a about:blank). Il flag protegge dal chiuderla per
       // sbaglio se poi parte un download da una pagina che ha già contenuto.
       tab._everNavigated = true;
+      // Il testo letto è della pagina di prima: sotto l'indirizzo nuovo partirebbe col suo nome (#1004).
+      tab.contentExtract = '';
       if (tab.view && tab.view.webContents === wc) this.anteprime.navigata(tab);
       if (tab._vistaNuova && tab._vistaNuova.wc === wc) tab._vistaNuova = null;
       this._sostituisciVoceBloccata(wc, url);

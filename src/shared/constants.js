@@ -127,6 +127,9 @@
     // true dopo il primo comando che Filo propone o esegue in chat: la frase che
     // spiega il terminale si dice una volta sola, anche dopo un riavvio (#892).
     FILO_TERMINALE_SPIEGATO: 'filo_terminale_spiegato',
+    // I siti (dominio registrabile) dove Filo ha visto un campo password o carta: restano delicati anche dopo un
+    // riavvio, quando la scheda riaperta è già dentro l'area riservata e il campo non c'è più (#1004).
+    SITI_CON_CAMPI: 'filo_siti_con_campi',
     // Ultima versione di cui l'utente ha visto il recap aggiornamento (popup
     // all'avvio). All'avvio si confronta con app.getVersion(): se è più vecchia
     // e ci sono note (src/shared/patchNotes.js), mostra il recap. Vedi C4.
