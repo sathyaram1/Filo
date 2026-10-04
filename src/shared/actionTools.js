@@ -578,12 +578,13 @@
   const NAMES = Object.keys(TOOLS);
 
   // Le definizioni nel formato che OpenRouter (stile OpenAI) capisce.
-  function definitions({ sistema, onboarding = false } = {}) {
+  function definitions({ sistema, onboarding = false, schede = true } = {}) {
     const ctx = { sistema };
     const out = [];
     for (const name of NAMES) {
       const t = TOOLS[name];
       if (t.soloOnboarding && !onboarding) continue;
+      if (t.schede && !schede) continue;
       const description = typeof t.description === 'function' ? t.description(ctx) : t.description;
       out.push({
         type: 'function',
