@@ -198,9 +198,9 @@ function righeDellaRichiesta(r) {
     case 'decided':
       return giaDecisa('questa versione era già stata decisa (approvata o\n  scartata), e una richiesta decisa non si riapre.');
     default:
-      return `  Il server dice di averla messa in attesa, ma non sono riuscito a controllarlo${r.requestCheck ? `\n  (${r.requestCheck})` : ''}.`
-        + ' Se in cima ai Ricevuti della dashboard di gestione l\'avviso\n'
-        + '  non c\'è, questa versione era già stata decisa e non si riapre.\n'
+      return `  Il server dice di averla messa in attesa, ma non sono riuscito a\n  controllarlo${r.requestCheck ? ` (${r.requestCheck})` : ''}.\n`
+        + '  Se in cima ai Ricevuti della dashboard di gestione non c\'è l\'avviso,\n'
+        + '  questa versione era già stata decisa e non si riapre.\n'
         + RIPROPONI;
   }
 }
