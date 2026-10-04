@@ -3277,8 +3277,9 @@ function schedaForPrompt(type, a, o) {
         + 'te lo dice lui: allora richiama APRI_ELEMENTO e gli verrà chiesto un OK. Altrimenti diglielo in una riga e lascialo premere a lui.';
     }
     if (err === 'cambiato') return `NON fatto: nella pagina quell'elemento adesso è «${nome}», non quello che l'utente ha approvato. Rileggi la scheda con LEGGI_SCHEDA e chiedi di nuovo.`;
-    if (err === 'esterno' || err === 'nuova-scheda') {
-      return `Il link «${nome}» porta ${err === 'esterno' ? 'su un altro sito' : 'in una scheda nuova'}: se serve aprilo con NAVIGA, con questo indirizzo.\n`
+    if (err === 'esterno' || err === 'nuova-scheda' || err === 'stesso-sito') {
+      const dove = err === 'esterno' ? 'su un altro sito' : err === 'stesso-sito' ? 'a un\'altra pagina dello stesso sito' : 'in una scheda nuova';
+      return `Il link «${nome}» porta ${dove}: Filo non preme i link, se serve aprilo con NAVIGA, con questo indirizzo.\n`
         + E.imbustaCampi({ tipo: 'DATI_LINK', campi: { Indirizzo: o.url || '' }, conIntestazione: true });
     }
     if (type === 'SEGNA_FIDATO' || type === 'TOGLI_FIDATO') return `NON fatto: ${E.perCanaleSistema(o.error || 'niente da cambiare')}.`;

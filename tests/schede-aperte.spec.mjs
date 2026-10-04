@@ -139,7 +139,8 @@ test('i pulsanti che spediscono o pagano con un altro nome non si premono, e que
   ]);
   await chiedi(page, 'programma la mail per domani e paga');
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Fatto.' })).toBeVisible({ timeout: 60_000 });
-  expect(await pagina.evaluate(() => window.__clic)).toEqual(['ordini']);
+  // Un link si segue col suo indirizzo, senza premerlo: il codice che la pagina ci ha messo sopra non parte.
+  expect(await pagina.evaluate(() => [window.__clic, location.hash])).toEqual([[], '#ordini']);
   const rifiuti = (await ultimoEsito(app, 1)).slice(-vietati.length);
   for (const r of rifiuti) expect(r).toContain('invia, paga, pubblica o cancella');
 });
@@ -180,6 +181,38 @@ test('un pulsante che non si limita a mostrare non si preme da solo: chiede l\'O
   await page.screenshot({ path: join(SHOTS, 'schede-premere-conferma.png') });
   await clickConfirm(page, 'ok');
   await expect.poll(() => pagina.evaluate(() => window.__clic)).toEqual(['menu', 'rsvp']);
+});
+
+// Cosa fa un clic lo decide la pagina: un link che ordina, un «#!» che salda, un nome che comincia come «mostra»,
+// una scelta di un elenco, un pulsante che apre un menu. Senza OK non parte niente; il link vero torna come indirizzo.
+const TRAVESTITI = `<!doctype html><html><head><meta charset="utf-8"><title>Cassa travestita</title></head><body>
+<a href="/carrello/concludi" data-method="post" onclick="window.__clic.push('link'); return false;">Concludi ordine</a>
+<a href="#!" onclick="window.__clic.push('ancora')">Completa e salda</a>
+<div role="button" onclick="window.__clic.push('riduci')">Riduci il piano</div>
+<button type="button" aria-haspopup="true" onclick="window.__clic.push('popup')">Ordina</button>
+<div role="listbox" aria-label="Piano"><div role="option" onclick="window.__clic.push('scelta')">Piano Premium 19 €/mese</div></div>
+<script>window.__clic = [];</script>
+</body></html>`;
+
+test('un link, un «#!», un nome che sembra mostrare, una scelta: il codice della pagina non parte senza OK', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const pagina = await testServer.openReady(openTab, TRAVESTITI);
+  const qui = await pagina.evaluate(() => location.pathname);
+  await dietro(shell);
+  const page = await home(app);
+  const S = 'Cassa travestita';
+  const nomi = ['Concludi ordine', 'Completa e salda', 'Riduci il piano', 'Ordina', 'Piano Premium'];
+  await modello(app, [
+    { toolCalls: nomi.map((e, k) => ({ id: `t${k}`, name: 'APRI_ELEMENTO', arguments: { scheda: S, elemento: e } })) },
+    { text: 'Ti chiedo conferma.' },
+  ]);
+  await chiedi(page, 'concludi l\'ordine');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Ti chiedo conferma.' })).toBeVisible({ timeout: 60_000 });
+  for (const n of nomi.slice(1)) await expect(page.locator('.dash-action-btn', { hasText: `Premere «${n}` })).toBeVisible();
+  expect(await pagina.evaluate(() => [window.__clic, location.pathname])).toEqual([[], qui]);
+  const [link] = await ultimoEsito(app, 1);
+  expect(link).toContain('porta a un\'altra pagina dello stesso sito');
+  expect(link).toContain('/carrello/concludi');
 });
 
 const BLOG = `<!doctype html><html><head><meta charset="utf-8"><title>Blog di tutti</title></head><body>

@@ -246,7 +246,7 @@
       schede: true,
     },
     APRI_ELEMENTO: {
-      description: 'Apre un elemento di una scheda come farebbe una persona: un link dello stesso sito, un pulsante che apre o mostra qualcosa, una riga di un elenco, un menu. NON esiste per i pulsanti che inviano, pagano, pubblicano o cancellano, né per inviare un modulo: quelli li preme l\'utente, e il sistema te lo dice. Un altro pulsante, che non si limita a mostrare, si preme solo dopo l\'OK dell\'utente: il sistema glielo chiede da sé. Un link verso un altro sito non lo segue: aprilo con NAVIGA.',
+      description: 'Apre un elemento di una scheda come farebbe una persona: un pulsante che apre o mostra qualcosa, una riga di un elenco, una scheda, un menu. NON esiste per i pulsanti che inviano, pagano, pubblicano o cancellano, né per inviare un modulo: quelli li preme l\'utente, e il sistema te lo dice. Un altro pulsante, che non si limita a mostrare, si preme solo dopo l\'OK dell\'utente: il sistema glielo chiede da sé. Un link non lo preme: ti dà il suo indirizzo, e se serve lo apri con NAVIGA.',
       properties: {
         scheda: S('Quale scheda (come in LEGGI_SCHEDA). Ometti per quella davanti.'),
         elemento: S('Il numero dell\'elemento nell\'ultimo LEGGI_SCHEDA di quella scheda, oppure il suo nome come lo vede l\'utente ("Mostra altro", "Posta in arrivo").'),

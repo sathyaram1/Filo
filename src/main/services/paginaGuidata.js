@@ -30,7 +30,7 @@ function regoleComandi() {
 function paginaGuidata(regoleComandi) {
   'use strict';
 
-  const VERSIONE = 3;
+  const VERSIONE = 4;
   if (window.__filoPagina && window.__filoPagina.versione === VERSIONE) return;
   const RC = regoleComandi();
 
@@ -328,24 +328,29 @@ function paginaGuidata(regoleComandi) {
     P('pointerup', 0); M('mouseup', 0); M('click', 0);
   }
 
-  // Senza chiedere si apre solo ciò che mostra: un collegamento, una riga, una scheda, un menu, un «Mostra altro».
-  // Ogni altro pulsante può spedire o pagare con un nome che nessun elenco conosce: lo preme l'utente con un OK.
-  const MOSTRA = /^(?:mostra|visualizza|vedi|guarda|leggi|apri|espandi|comprimi|riduci|nascondi|altro|altri|altre|di piu|carica (?:altr|di piu|ancora)|more|show|view|see|read|open|expand|collapse|load more|avanti|indietro|successiv|precedent|prossim|next|prev|previous|back|pagina|page|torna|cerca|search|filtra|filtri|filter|ordina per|sort by|menu|dettagli|details|chiudi$|close$)/;
-  function vaAltrove(a) {
-    const h = String(a.getAttribute('href') || '').trim();
-    return !!h && h !== '#' && !/^javascript:/i.test(h);
+  // Cosa fa un clic lo decide il codice della pagina, non la forma o il nome dell'elemento: senza OK si apre solo una
+  // riga, una scheda, un'espansione o un pulsante che si chiama per intero «Mostra altro»; un collegamento non si preme.
+  const MOSTRA = /^(?:(?:mostra|visualizza|vedi|leggi|carica|show|view|see|read|load) (?:altro|altri|altre|di piu|tutto|tutti|tutte|ancora|meno|more|all|less|dettagli|details)|mostra|visualizza|vedi|espandi|comprimi|riduci|chiudi|show|view|expand|collapse|close|altro|di piu|more|dettagli|details|piu recenti|meno recenti|newer|older|pagina (?:successiva|precedente)|(?:next|previous) page)$/;
+  // Dove porta un collegamento vero. «#», «#!», «#0», «javascript:» o la pagina stessa sono pulsanti travestiti: null.
+  function destinazione(el) {
+    const a = el.closest('a[href]');
+    if (!a) return null;
+    let u = null;
+    try { u = new URL(a.getAttribute('href'), location.href); } catch (_) { return null; }
+    if (u.protocol === 'javascript:') return null;
+    const stessa = u.origin === location.origin && u.pathname === location.pathname && u.search === location.search;
+    if (stessa && !/^#!?[\p{L}/]/u.test(u.hash)) return null;
+    return { a, u, stessa };
   }
   function genere(el) {
     if (vietato(el)) return 'vietato';
     if (inviaModulo(el)) return 'modulo';
+    if (destinazione(el)) return 'mostra';
     const t = tipoDi(el);
-    const r = el.getAttribute('role') || '';
-    if (t === 'campo' || t === 'riga' || r === 'tab' || r === 'option' || el.tagName.toUpperCase() === 'SUMMARY') return 'mostra';
-    const a = el.closest('a[href]');
-    if (a && vaAltrove(a)) return 'mostra';
-    if (el.hasAttribute('aria-expanded') || /^(true|menu|listbox|tree|grid)$/.test(el.getAttribute('aria-haspopup') || '')) return 'mostra';
-    if (nomiDi(el).some((n) => n.split(' ').length <= 6 && MOSTRA.test(n))) return 'mostra';
-    return 'altro';
+    if (t === 'campo' || t === 'riga' || el.getAttribute('role') === 'tab' || el.tagName.toUpperCase() === 'SUMMARY'
+      || el.hasAttribute('aria-expanded')) return 'mostra';
+    const nomi = nomiDi(el);
+    return nomi.length && nomi.every((n) => MOSTRA.test(n)) ? 'mostra' : 'altro';
   }
   function genereDi(rif) {
     const el = trova(rif);
@@ -361,14 +366,14 @@ function paginaGuidata(regoleComandi) {
     if (g === 'vietato' || g === 'modulo') return { ok: false, motivo: g, nome };
     if (g === 'altro' && !confermato) return { ok: false, motivo: 'conferma', nome };
     if (confermato && mostrato != null && norm(breve(nome, 120)) !== norm(mostrato)) return { ok: false, motivo: 'cambiato', nome };
-    const a = el.closest('a[href]');
-    if (a) {
-      let u = null;
-      try { u = new URL(a.getAttribute('href'), location.href); } catch (_) { u = null; }
-      if (u && u.protocol !== 'javascript:') {
-        if (u.origin !== location.origin) return { ok: false, motivo: 'esterno', nome, url: u.href };
-        if (/^_blank$/i.test(a.getAttribute('target') || '')) return { ok: false, motivo: 'nuova-scheda', nome, url: u.href };
-      }
+    // Un collegamento si segue col suo indirizzo, mai premendolo: il codice della pagina che ci sta sopra non parte.
+    const d = destinazione(el);
+    if (d) {
+      if (d.u.origin !== location.origin) return { ok: false, motivo: 'esterno', nome, url: d.u.href };
+      if (/^_blank$/i.test(d.a.getAttribute('target') || '')) return { ok: false, motivo: 'nuova-scheda', nome, url: d.u.href };
+      if (!d.stessa) return { ok: false, motivo: 'stesso-sito', nome, url: d.u.href };
+      location.hash = d.u.hash;
+      return { ok: true, nome, tipo: 'link' };
     }
     if (campo(el)) {
       try { el.scrollIntoView({ block: 'center' }); el.focus({ preventScroll: true }); } catch (_) {}
