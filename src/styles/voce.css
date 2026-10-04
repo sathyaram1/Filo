@@ -62,10 +62,8 @@
 .sn-voce-btn[data-stato="avvio"],
 .sn-voce-btn[data-stato="trascrive"],
 .sn-voce-btn[data-stato="attesa"] { color: var(--sn-accent); }
-.sn-voce-btn[data-stato="trascrive"] .sn-voce-anello,
-.sn-voce-btn[data-occupato] .sn-voce-anello { display: block; animation: sn-voce-giro 0.9s linear infinite; }
-.sn-voce-btn[data-stato="trascrive"] .sn-voce-anello circle,
-.sn-voce-btn[data-occupato] .sn-voce-anello circle { stroke-dasharray: 28 72; animation: none; }
+.sn-voce-btn[data-stato="trascrive"] .sn-voce-anello { display: block; animation: sn-voce-giro 0.9s linear infinite; }
+.sn-voce-btn[data-stato="trascrive"] .sn-voce-anello circle { stroke-dasharray: 28 72; }
 @keyframes sn-voce-giro { to { transform: rotate(360deg); } }
 
 /* L'attimo per annullare: la croce, e l'anello che si svuota; quando è vuoto la richiesta parte. */
@@ -78,9 +76,12 @@
   animation: sn-voce-attesa var(--sn-voce-attesa, 2500ms) linear forwards;
 }
 @keyframes sn-voce-attesa { to { stroke-dashoffset: 100; } }
+/* Finita l'attesa ma la chat sta ancora rispondendo: l'arco gira finché la richiesta può partire. */
+.sn-voce-btn[data-stato="attesa"][data-occupato] .sn-voce-anello { animation: sn-voce-giro 0.9s linear infinite; }
+.sn-voce-btn[data-stato="attesa"][data-occupato] .sn-voce-anello circle { stroke-dasharray: 28 72; animation: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .sn-voce-btn[data-stato="ascolta"]::after { animation: none; opacity: 0; }
   .sn-voce-btn[data-stato="trascrive"] .sn-voce-anello,
-  .sn-voce-btn[data-occupato] .sn-voce-anello { animation-duration: 2.4s; }
+  .sn-voce-btn[data-stato="attesa"][data-occupato] .sn-voce-anello { animation-duration: 2.4s; }
 }

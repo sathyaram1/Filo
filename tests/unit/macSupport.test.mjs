@@ -299,6 +299,8 @@ const SORGENTI_DEI_NOMI = {
     'manifesto unico letto su tutti i sistemi: cita entrambe le forme, e il test qui sotto lo verifica voce per voce',
   'src/shared/patchNotes.js':
     'diario delle versioni già uscite: si scrive una volta e non si riscrive',
+  'src/shared/voceChat.js':
+    'il tasto del microfono delle chat in forma canonica, come la tabella di shortcuts.js: lo riconosce e lo nomina SN_TASTI',
 };
 
 // Le forme con cui si chiede il nome giusto invece di inventarlo.

@@ -151,6 +151,11 @@
         form.requestSubmit();
       }
     });
+    // Il tasto microfono: si parla, e la richiesta parte come con l'invio (o resta da correggere).
+    global.SN_VOCE_CHAT?.collega({
+      campo: ta, contenitore: form, prima: form.querySelector('button[type="submit"]'),
+      invia: () => form.requestSubmit(),
+    });
     // Focus o tasto sull'input → riapri la chat
     ta.addEventListener('focus', () => expand({ ai: false }));
     ta.addEventListener('input', () => { if (collapsed) expand({ ai: false }); });

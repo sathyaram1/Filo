@@ -976,6 +976,28 @@
       risk: 'Cambia i siti dove Filo non interviene sulle pagine: lì non aggiunge niente alla pagina, '
         + 'né i suoi menu né i suoi aiuti.',
     }),
+
+    // ── Microfono delle chat — reversibile, innocuo → livello 1 ──
+    {
+      scrive: ['dictation.autoSend'],
+      aiuto: '"invia da solo" | "lascia il testo da correggere" (col tasto microfono delle chat: finito di parlare la richiesta parte da sola dopo un attimo per annullare, oppure il testo resta nella casella)',
+      keys: ['invio_vocale', 'invio vocale', 'invio della dettatura', 'invio dettatura', 'microfono delle chat',
+        'microfono chat', 'dictation.autosend'],
+      // Le parole delle due scelte di Preferenze valgono quanto un sì/no; un «non» le rovescia.
+      build(v) {
+        const s = String(v == null ? '' : v).trim().toLowerCase();
+        const nega = /\b(non|mai)\b/.test(s);
+        let b;
+        if (/(da sol|automatic|subito|appena finisco)/.test(s)) b = !nega;
+        else if (/(lascia|corregg|a mano|manual|rilegg|controll)/.test(s)) b = nega;
+        else b = parsePrefBool(v);
+        if (b === null) return null;
+        return {
+          partial: { dictation: { autoSend: b } },
+          label: `Microfono delle chat → ${b ? 'invia da solo' : 'lascia il testo da correggere'}`,
+        };
+      },
+    },
   ];
 
   // Le righe «chiave: valori» della descrizione di IMPOSTA_PREFERENZA: escono da qui, dove sta il setter,

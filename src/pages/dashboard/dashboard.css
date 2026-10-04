@@ -1236,6 +1236,8 @@ html, body {
   align-items: center;
   justify-content: center;
 }
+/* Il microfono sta accanto all'invio, della sua misura, con l'inchiostro tenue: l'invio resta il gesto principale. */
+.dash-input-wrap { --sn-voce-size: 36px; --sn-voce-ink: var(--dash-ink-soft); }
 .dash-send:hover { opacity: 0.85; }
 .dash-send[disabled] { opacity: 0.4; cursor: not-allowed; }
 

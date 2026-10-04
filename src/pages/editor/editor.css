@@ -363,7 +363,7 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 .ed-chat-msg { font-size: 12px; padding: 6px 9px; border-radius: 10px; max-width: 92%; white-space: pre-wrap; }
 .ed-chat-msg.user { align-self: flex-end; background: var(--sn-accent); color: #fff; }
 .ed-chat-msg.assistant { align-self: flex-start; background: var(--sn-bg); border: 1px solid var(--sn-border); }
-.ed-chat-input { display: flex; gap: 4px; }
+.ed-chat-input { display: flex; gap: 4px; align-items: center; --sn-voce-size: 30px; --sn-voce-ink: var(--sn-muted); }
 .ed-chat-input textarea {
   flex: 1 1 auto; resize: none; height: 34px; padding: 7px 8px;
   border: 1px solid var(--sn-border); border-radius: 8px;
@@ -371,8 +371,8 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
   font-family: inherit; outline: none;
 }
 .ed-chat-input textarea:focus { border-color: var(--sn-accent); }
-.ed-chat-input button {
-  flex: 0 0 auto; padding: 0 10px; border: none; border-radius: 8px;
+.ed-chat-input button[data-chat="send"] {
+  flex: 0 0 auto; align-self: stretch; padding: 0 10px; border: none; border-radius: 8px;
   background: var(--sn-accent); color: #fff; cursor: pointer; font-size: 12px;
 }
 

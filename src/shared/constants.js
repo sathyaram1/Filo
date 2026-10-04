@@ -2353,6 +2353,9 @@
       // testo). Gli id stanno in ttsVoices.js.
       modelVoice: '',
     },
+    // Il tasto microfono delle chat (src/shared/voceChat.js): finito di parlare, la richiesta parte da sola
+    // dopo un attimo per annullare (true) o il testo resta nella casella da correggere (false).
+    dictation: { autoSend: true },
     // Notifiche/toast in basso a destra della shell (spec #170.1). È la base
     // riusata dai blocchi (#170.2/#170.3) per segnalare gli eventi.
     // - durationSec: secondi prima dell'auto-dismiss. 0 = infinita: la notifica

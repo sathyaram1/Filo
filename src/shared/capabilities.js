@@ -159,8 +159,8 @@
     {
       id: 'dictate', title: 'Detta', category: 'writing',
       desc: 'Detta in un campo di testo: il testo compare mentre parli, frase dopo frase, nel punto dove sta il cursore. Trascrive con un modello a pesi aperti, nella lingua che parli.',
-      invoke: 'In un campo modificabile, dal menu del tasto destro scegli "Detta"; clicca il riquadro rosso per fermare. La freccetta accanto sceglie il modello.',
-      doesNot: 'Si ferma da sola dopo cinque minuti. Le frasi provvisorie si vedono nel riquadro, nel campo entrano solo quelle chiuse da una pausa.',
+      invoke: 'In un campo modificabile, dal menu del tasto destro scegli "Detta"; clicca il riquadro rosso per fermare. La freccetta accanto sceglie il modello. Nella casella di una chat di Filo "Detta" fa quello che fa il suo microfono (vedi «Parla a Filo»).',
+      doesNot: 'Si ferma da sola dopo cinque minuti. Le frasi provvisorie si vedono nel riquadro, nel campo entrano solo quelle chiuse da una pausa. Se il microfono non ha il permesso, non c’è, o la trascrizione non riesce, un avviso dice cosa fare.',
     },
     {
       id: 'search-web', title: 'Cerca sul web', category: 'selection',
@@ -356,6 +356,12 @@
       desc: 'Apre un assistente laterale che vede la pagina e ti aiuta passo passo: può evidenziare elementi, suggerire dove cliccare, aprire menu nascosti e proporre cosa scrivere in un campo (lo invii tu). I passi che fai con lui, per ora, non escono dal tuo computer.',
       invoke: 'Alt+H (Ctrl+Alt+H su Mac).',
       doesNot: 'Non invia i moduli al posto tuo: ogni azione che modifica la pagina richiede una tua conferma. Per ora non ti chiede se ha funzionato e non condivide con nessuno i passi delle tue sessioni.',
+    },
+    {
+      id: 'voice-chat', title: 'Parla a Filo', category: 'assistant',
+      desc: 'Accanto all’invio delle chat di Filo (la nuova scheda, l’Aiuto su una pagina, la chat del documento nell’Editor) c’è un microfono: lo premi e parli. Mentre ascolta si accende e si muove con la tua voce; quando smetti di parlare per un paio di secondi si ferma da solo, trascrive e mette il testo nella casella, dove stava il cursore. Poi la richiesta parte da sola: al posto del microfono compare una croce con un anello che si svuota in due secondi e mezzo, e in quel tempo la fermi cliccando la croce, con Esc o scrivendo nella casella. Se preferisci rileggere prima, il testo resta nella casella e lo mandi tu: lo scegli in Preferenze, sezione «Microfono delle chat», oppure chiedendolo a Filo ("quando parlo lascia il testo da correggere"). Trascrive con lo stesso modello di «Detta», nella lingua che parli.',
+      invoke: 'Clic sul microfono accanto all’invio, oppure Ctrl+Shift+Spazio (Cmd+Shift+Spazio su Mac) mentre scrivi nella chat; nella nuova scheda la scorciatoia vale in tutta la pagina. Un altro clic smette subito di ascoltare. Nella casella di una chat anche il tasto destro → "Detta" fa lo stesso. Nelle pagine di Filo il tasto destro sul microfono dice anche se la richiesta parte da sola o resta da correggere, e lo cambia.',
+      doesNot: 'Se il microfono non ha il permesso, non c’è o la trascrizione non riesce, un avviso dice cosa fare. Esc mentre ascolta tiene quello che hai detto ma non lo invia. Smette da solo dopo cinque minuti, o dopo otto secondi se non hai detto niente. Se Filo sta ancora rispondendo, la richiesta aspetta che abbia finito.',
     },
     {
       id: 'web-search-assistant', title: 'Ricerca sul web dell’assistente', category: 'assistant',

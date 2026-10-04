@@ -843,6 +843,7 @@
       case 'notifications.durationSec': return clampNotifDurationSec(parseInt($('notifDuration').value, 10));
       case 'notifications.soundEnabled': return $('notifSoundEnabled').checked;
       case 'notifications.sound': return $('notifSound').value || 'default';
+      case 'dictation.autoSend': return $('dictationAutoSend').value !== 'no';
       default: return undefined;
     }
   }
@@ -878,6 +879,7 @@
       case 'notifications.durationSec': return clampNotifDurationSec(Number.isFinite(dur) && dur >= 0 ? dur : 5);
       case 'notifications.soundEnabled': return notif.soundEnabled === true;
       case 'notifications.sound': return notif.sound || 'default';
+      case 'dictation.autoSend': return !(s.dictation && s.dictation.autoSend === false);
       default: return undefined;
     }
   }
@@ -979,6 +981,10 @@
       const notifSound = notif.sound || 'default';
       const nsOpt = [...$('notifSound').options].find((o) => o.value === notifSound);
       $('notifSound').value = nsOpt ? notifSound : 'default';
+    }
+
+    if (vuole('dictation.autoSend')) {
+      $('dictationAutoSend').value = settings.dictation && settings.dictation.autoSend === false ? 'no' : 'si';
     }
 
     if (vuole('timerRingtone')) {
@@ -1220,6 +1226,7 @@
     $('notifDuration').addEventListener('blur', canonNotifDuration);
     $('notifSoundEnabled').addEventListener('change', persist);
     $('notifSound').addEventListener('change', persist);
+    $('dictationAutoSend').addEventListener('change', persist);
     $('notifSoundPreview').addEventListener('click', previewNotifSound);
 
     // Suoneria timer: salva al cambio + anteprima.
