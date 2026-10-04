@@ -318,3 +318,28 @@ test('il blocco della pubblicità è nel manifesto delle capacità, e si dice ch
   assert.match(ad.invoke, /chiedendolo a Filo/);
   assert.ok(Caps.get('settings-by-chat'));
 });
+
+test('una chiave detta a metà che indica più voci è un rifiuto con le chiavi, mai la prima che somiglia', () => {
+  const r = P.buildPreferencePartial('pubblicità', false);
+  assert.ok(r && r.rifiuto, '«pubblicità» ha cambiato una voce a caso');
+  assert.match(r.rifiuto, /salta_pubblicita/);
+  assert.match(r.rifiuto, /blocco_pubblicita/);
+  assert.ok(P.buildPreferencePartial('siti', false).rifiuto);
+  // Scritta con l'accento o il trattino basso, o contenendo per intero una chiave, resta quella voce.
+  assert.deepEqual(P.buildPreferencePartial('blocco_pubblicità', false).partial, { security: { adblock: { enabled: false } } });
+  assert.deepEqual(P.buildPreferencePartial('adblocker', false).partial, { security: { adblock: { enabled: false } } });
+  assert.deepEqual(P.buildPreferencePartial('tracker', false).partial, { security: { adblock: { enabled: false } } });
+  // Ogni chiave dichiarata resta raggiungibile da sola.
+  for (const s of P.PREF_SETTERS) {
+    const r2 = P.buildPreferencePartial(s.keys[0], 'x');
+    assert.ok(!(r2 && r2.rifiuto && /più impostazioni/.test(r2.rifiuto)), `${s.keys[0]} risulta ambigua`);
+  }
+});
+
+test('le voci di lettura tornano automatiche con «predefinita», «di serie» o un no, invece di salvarle come nome', () => {
+  for (const v of ['predefinita', 'predefinito', 'di serie', 'automatica', 'nessuna', false, 'no']) {
+    assert.equal(P.buildPreferencePartial('voce_modello', v).partial.tts.modelVoice, '', `voce naturale «${v}»`);
+    assert.equal(P.buildPreferencePartial('voce', v).partial.tts.voice, '', `voce di riserva «${v}»`);
+  }
+  assert.equal(P.buildPreferencePartial('voce', 'Microsoft Elsa').partial.tts.voice, 'Microsoft Elsa');
+});

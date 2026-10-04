@@ -89,6 +89,9 @@ test('A — «spegni il blocco della pubblicità»: conferma, interruttore spent
   await chat.screenshot({ path: 'tests/.shots/impostazioni-chat-conferma-adblock.png' });
   await clickConfirm(chat, 'ok');
   await expect.poll(async () => (await impostazioni(app)).security.adblock.enabled, { timeout: 5_000 }).toBe(false);
+  // Dopo l'OK il pulsante dice la cosa fatta, non «Filo vuole impostare».
+  const pulsante = chat.locator('.dash-bubble-filo', { hasText: 'Ti chiedo conferma.' }).locator('.dash-action-btn');
+  await expect(pulsante).toHaveText('✓ Impostazione applicata: Blocco di pubblicità e tracker → disattivato', { timeout: 5_000 });
 
   // Cosa è cambiato e come tornare indietro: il segno sulla bolla.
   const bolla = chat.locator('.dash-bubble-user', { hasText: 'spegni il blocco della pubblicità' });
