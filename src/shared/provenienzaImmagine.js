@@ -886,11 +886,14 @@
   // un file muto non è una risposta, ed è il caso più frequente.
   // `sistema` è voce di Filo, `etichetta` è quello che dice il file: chi compone
   // il prompt tiene le due cose separate, o il file parla con l'autorità di Filo.
-  function notaPerModello(res) {
+  function notaPerModello(res, opzioni) {
     const etichetta = frase(res);
     if (etichetta) {
+      const dove = opzioni && opzioni.daCopia
+        ? 'dell’immagine originale da cui l’utente ha copiato questa (gli appunti le hanno tolte alla copia, i pixel sono gli stessi)'
+        : 'dell’immagine';
       return {
-        sistema: 'ho letto in locale le etichette di origine dell’immagine e l’esito è nel blocco qui sotto; '
+        sistema: `ho letto in locale le etichette di origine ${dove} e l’esito è nel blocco qui sotto; `
           + 'Filo legge solo ciò che il file dichiara e non giudica mai i pixel, quindi riporta quell’esito senza aggiungerci un verdetto tuo',
         etichetta,
       };
