@@ -57,6 +57,21 @@ test('il clic dell\'utente apre la scheda che chiede, una sola per clic', async 
   await expect.poll(() => aperteSu(app, collegata), { timeout: 8000 }).toBe(1);
 });
 
+test('un clic lento come quello di una persona apre una scheda sola, anche se la pagina ne chiede alla pressione e al clic', async ({ app, openTab, testServer }) => {
+  const a = testServer.html('<title>PRESSIONE</title>');
+  const b = testServer.html('<title>CLIC</title>');
+  const page = await openTab(testServer.html(`<div id="z" style="width:400px;height:300px">zona</div><script>
+    document.addEventListener('mousedown',function(){window.open(${JSON.stringify(a)})});
+    document.addEventListener('click',function(){window.open(${JSON.stringify(b)})});</script>`));
+  await page.mouse.move(100, 100);
+  await page.mouse.down();
+  await page.waitForTimeout(150);
+  await page.mouse.up();
+  await expect.poll(() => aperteSu(app, a), { timeout: 8000 }).toBe(1);
+  await page.waitForTimeout(1500);
+  expect(await aperteSu(app, b), 'il rilascio dello stesso clic non apre la seconda').toBe(0);
+});
+
 test('il clic dentro un riquadro di un altro sito apre la sua scheda; da solo il riquadro non apre niente', async ({ app, openTab, testServer }) => {
   const daSolo = testServer.html('<title>RIQUADRO DA SOLO</title>');
   const colClic = testServer.html('<title>RIQUADRO COL CLIC</title>');

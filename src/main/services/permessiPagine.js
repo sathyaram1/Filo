@@ -39,6 +39,13 @@ const DOPO_UN_GESTO = new Set(['notifications']);
 const COL_GESTO_SENZA_DOMANDA = new Set(['local-fonts']);
 const GESTO_MS = 5000;
 const GESTI = new Set(['mouseDown', 'mouseUp', 'rawKeyDown', 'keyDown', 'char', 'touchStart', 'touchEnd', 'gestureTap']);
+// Come in Chrome una finestra la apre l'inizio di un gesto: il rilascio dello stesso clic o il carattere dello stesso
+// tasto non ne aprono un'altra (#737.1 giro 2). Due ascolti dello stesso input, a pochi ms, sono un gesto solo.
+const AVVII_DI_UN_GESTO = new Set(['mouseDown', 'rawKeyDown', 'keyDown', 'touchEnd']);
+const STESSO_GESTO_MS = 50;
+// Il clic che Filo dà da sé a una pagina (il «Salta» delle pubblicità) non è un gesto di nessuno: l'input che ne segue,
+// anche quello che il riquadro riferisce dopo, si ignora per questo tempo.
+const CLIC_DI_FILO_MS = 1500;
 const TASTI_SENZA_GESTO = new Set(['Escape', 'Control', 'Shift', 'Alt', 'AltGraph', 'Meta', 'OS', 'Super', 'Hyper', 'CapsLock', 'NumLock', 'ScrollLock', 'Fn', 'FnLock', 'Symbol', 'SymbolLock']);
 const LASCIAPASSARE_MS = 5000;
 // Il lasciapassare di Detta copre il microfono e basta: con la fotocamera la pagina avrebbe un sì mai dato (#591, giro 18).
@@ -162,7 +169,10 @@ function seguiGesti(wc) {
     wc.on('input-event', (_e, input) => {
       const type = (input && input.type) || '';
       if (!GESTI.has(type) || !tastoPerLaPagina(input)) return;
+      const mouse = !/key|char/i.test(type);
+      if (mouse && clicDiFiloInCorso(wc)) return;
       wc._filoGestoAlle = Date.now();
+      if (AVVII_DI_UN_GESTO.has(type)) segnaGestoPerFinestra(wc);
       // Un sito che annulla il `contextmenu` spegne il `context-menu` qui sotto, non il tasto destro vero (#589.4 giro 2).
       if (tastoDelMenu(input)) segnaMenu(wc, wc.mainFrame);
     });
@@ -176,12 +186,12 @@ function seguiGesti(wc) {
     // chi lo ferma lo fa negli altri ascolti, quindi si guarda dopo che sono passati tutti.
     wc.on('before-input-event', (e, input) => {
       if (!input || input.type !== 'keyDown' || !tastoPerLaPagina(input) || (e && e.daAvvisoSito)) return;
-      queueMicrotask(() => { if (!(e && e.defaultPrevented)) wc._filoGestoAlle = Date.now(); });
+      queueMicrotask(() => { if (!(e && e.defaultPrevented)) { wc._filoGestoAlle = Date.now(); segnaGestoPerFinestra(wc); } });
     });
     wc.on('did-start-navigation', (e, _url, isInPlace, isMainFrame) => {
       const principale = e && typeof e.isMainFrame === 'boolean' ? e.isMainFrame : isMainFrame;
       const stessa = e && typeof e.isSameDocument === 'boolean' ? e.isSameDocument : isInPlace;
-      if (principale && !stessa) { wc._filoGestoAlle = 0; wc._filoGestoRiquadroAlle = 0; wc._filoMenuAperto = null; }
+      if (principale && !stessa) { wc._filoGestoAlle = 0; wc._filoGestoFinestraAlle = 0; wc._filoMenuAperto = null; }
     });
   } catch (_) {}
 }
@@ -195,13 +205,27 @@ function gestoRecente(wc) {
 // Vale per le finestre, non per le domande dei permessi della pagina, che vogliono un gesto sulla pagina.
 function gestoNelRiquadro(wc, frame) {
   try {
-    if (!wc || !frame || !frame.parent) return;
-    wc._filoGestoRiquadroAlle = Date.now();
+    if (!wc || !frame || !frame.parent || clicDiFiloInCorso(wc)) return;
+    segnaGestoPerFinestra(wc);
   } catch (_) {}
 }
 
+function segnaGestoPerFinestra(wc) {
+  const ora = Date.now();
+  if (ora - (wc._filoGestoFinestraAlle || 0) < STESSO_GESTO_MS) return;
+  wc._filoGestoFinestraAlle = ora;
+}
+
+function clicDiFilo(wc) {
+  if (wc) wc._filoClicDiFiloFino = Date.now() + CLIC_DI_FILO_MS;
+}
+
+function clicDiFiloInCorso(wc) {
+  return Boolean(wc && wc._filoClicDiFiloFino && Date.now() < wc._filoClicDiFiloFino);
+}
+
 function gestoSullaScheda(wc) {
-  const t = Math.max((wc && wc._filoGestoAlle) || 0, (wc && wc._filoGestoRiquadroAlle) || 0);
+  const t = (wc && wc._filoGestoFinestraAlle) || 0;
   return t && Date.now() - t < GESTO_MS ? t : 0;
 }
 
@@ -441,7 +465,7 @@ function statoNotifiche(ses, url) {
 
 module.exports = {
   installa, negaTutto, rispondi, lasciapassare, seguiGesti, scelteDi, dimentica, nomeDaMostrare, statoNotifiche,
-  carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica, gestoNelRiquadro, gestoSullaScheda, gestoPerUnaFinestra,
+  carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica, gestoNelRiquadro, gestoSullaScheda, gestoPerUnaFinestra, clicDiFilo,
   TIPI, INNOCUI, NON_DISPONIBILI, COL_GESTO_SENZA_DOMANDA, GESTO_MS, TASTI_SENZA_GESTO, tastoPerLaPagina, _inAttesa: inAttesa,
   _usaDisco: (d) => { disco = () => d; },
 };

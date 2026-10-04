@@ -371,12 +371,14 @@ if (IS_SUBFRAME) {
     const SENZA_GESTO = new Set(['Escape', 'Control', 'Shift', 'Alt', 'AltGraph', 'Meta', 'OS', 'Super', 'Hyper', 'CapsLock', 'NumLock', 'ScrollLock', 'Fn', 'FnLock', 'Symbol', 'SymbolLock']);
     const gesto = (e) => {
       if (!e.isTrusted || (e.type === 'keydown' && SENZA_GESTO.has(e.key))) return;
+      if (e.type === 'pointerdown' && e.pointerType === 'touch') return;
       const ora = Date.now();
       if (ora - ultimoGesto < 100) return;
       ultimoGesto = ora;
       try { ipcRenderer.send('filo:gesto-riquadro'); } catch (_) {}
     };
-    for (const ev of ['pointerdown', 'mousedown', 'pointerup', 'keydown', 'touchend']) {
+    // Solo l'inizio di un gesto, come nella pagina: il rilascio dello stesso clic non è un gesto nuovo (il tocco finisce).
+    for (const ev of ['pointerdown', 'mousedown', 'keydown', 'touchend']) {
       window.addEventListener(ev, gesto, { capture: true, passive: true });
     }
   } catch (_) {}

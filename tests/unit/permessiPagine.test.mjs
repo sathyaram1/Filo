@@ -355,6 +355,58 @@ test('una finestra la apre solo un gesto vero di adesso, uno per finestra, anche
   } finally { orologio.mock.restore(); }
 });
 
+// #737.1 giro 2 — il rilascio dello stesso clic o il carattere dello stesso tasto non aprono una seconda finestra.
+test('un gesto apre una finestra sola: la pressione la apre, il rilascio dello stesso clic no', async () => {
+  let ora = 2_000_000;
+  const orologio = mock.method(Date, 'now', () => ora);
+  try {
+    const wc = wcFinto('https://notizie.example/');
+    wc.mainFrame = { parent: null };
+    Permessi.seguiGesti(wc);
+    wc.emetti('input-event', {}, { type: 'mouseDown' });
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), true, 'alla pressione');
+    ora += 150;
+    wc.emetti('input-event', {}, { type: 'mouseUp' });
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'al rilascio dello stesso clic');
+
+    ora += 400;
+    wc.emetti('input-event', {}, { type: 'rawKeyDown', key: 'a' });
+    wc.emetti('before-input-event', { defaultPrevented: false }, { type: 'keyDown', key: 'a' });
+    await new Promise((r) => setImmediate(r));
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), true, 'al tasto');
+    ora += 80;
+    wc.emetti('input-event', {}, { type: 'char', key: 'a' });
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'il carattere dello stesso tasto');
+    ora += 20;
+    Permessi.gestoNelRiquadro(wc, { parent: wc.mainFrame });
+    ora += 300;
+    wc.emetti('input-event', {}, { type: 'mouseDown' });
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), true, 'un clic nuovo è un gesto nuovo');
+  } finally { orologio.mock.restore(); }
+});
+
+test('il clic che Filo dà da sé a una pagina non è un gesto, nemmeno riferito dal riquadro; i tasti dell\'utente sì', async () => {
+  let ora = 3_000_000;
+  const orologio = mock.method(Date, 'now', () => ora);
+  try {
+    const wc = wcFinto('https://blog.example/');
+    wc.mainFrame = { parent: null };
+    Permessi.seguiGesti(wc);
+    Permessi.clicDiFilo(wc);
+    wc.emetti('input-event', {}, { type: 'mouseDown' });
+    wc.emetti('input-event', {}, { type: 'mouseUp' });
+    ora += 300;
+    Permessi.gestoNelRiquadro(wc, { parent: wc.mainFrame });
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'nessuna finestra dal clic di Filo');
+    wc.emetti('before-input-event', { defaultPrevented: false }, { type: 'keyDown', key: 'x' });
+    await new Promise((r) => setImmediate(r));
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), true, 'il tasto premuto intanto dall\'utente');
+    ora += 2000;
+    wc.emetti('input-event', {}, { type: 'mouseDown' });
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), true, 'passato il clic di Filo, il clic dell\'utente torna a valere');
+  } finally { orologio.mock.restore(); }
+});
+
 test('un modificatore da solo o una scorciatoia di Filo non sono un gesto dato alla pagina (#737.1)', async () => {
   require('../../src/shared/tasti.js');
   const tasto = (key, mods = {}) => ({ type: 'rawKeyDown', key, control: false, alt: false, shift: false, meta: false, ...mods });

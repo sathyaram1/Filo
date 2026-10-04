@@ -58,7 +58,9 @@ voleva.
 - **Le finestre le decide il main sul gesto vero**, perché Electron non ha il blocco dei popup di Chrome: col blocco
   acceso una scheda nuova passa solo entro cinque secondi da un input vero sulla scheda, una per gesto
   (`gestoPerUnaFinestra` in `src/main/services/permessiPagine.js`). Il clic in un riquadro di un altro sito il main
-  non lo vede: lo segnala il preload del riquadro, solo se `isTrusted`.
+  non lo vede: lo segnala il preload del riquadro, solo se `isTrusted`. Il gesto lo apre il suo inizio (pressione,
+  tasto, fine del tocco): il rilascio dello stesso clic non è una seconda finestra. Il clic vero che Filo dà da sé
+  (`clicDiFilo`, il «Salta») non è un gesto di nessuno, nemmeno quando il riquadro lo riferisce (#737.1 giro 2).
 
 Prove: `tests/unit/gestoNonRegalato.test.mjs` (nessuno script di Filo nelle pagine porta il gesto),
 `tests/popup-senza-gesto.spec.mjs`, `tests/unit/adSkip.test.mjs`, `tests/ad-skip.spec.mjs` (il «Salta» finto
