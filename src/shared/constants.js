@@ -1714,6 +1714,8 @@
 
     describeImage: () =>
       `Descrivi in modo molto breve (massimo 5 parole) il contenuto principale di questa immagine. ` +
+      // #946 — sull'origine parla solo la riga che Filo legge nel file, sopra la descrizione.
+      `Non dire se sembra generata con l'AI, ritoccata o reale: della sua origine non parli. ` +
       `Rispondi solo con la descrizione, in italiano, senza preamboli, virgolette o punto finale.`,
 
     transcribeImage: () =>
