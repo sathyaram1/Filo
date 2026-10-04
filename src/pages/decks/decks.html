@@ -25,6 +25,7 @@
     /* App deck builder Commander (DECK-BUILDER-SPEC.md): tre schermate su hash routing — libreria, builder,
        partita — e una sola .dk-screen visibile alla volta. */
     .dk-screen[hidden] { display: none; }
+    .sn-toolbar .sn-btn[hidden] { display: none; }
 
     .dk-thumb {
       aspect-ratio: 626 / 457; /* proporzione dell'art crop Scryfall */
@@ -495,7 +496,7 @@
       <h1>Deck builder MTG</h1>
       <div class="sn-toolbar">
         <button class="sn-btn" id="newDeck">+ Nuovo mazzo</button>
-        <button class="sn-btn sn-btn-secondary" id="openGame">Partita</button>
+        <button class="sn-btn sn-btn-secondary" id="openGame" hidden>Partita</button>
       </div>
       <div id="deckGrid" class="sn-card-grid"></div>
       <div id="deckEmpty" class="sn-empty" hidden>
