@@ -686,11 +686,17 @@
     return msg;
   }
 
+  // Gli strumenti che con la lettura delle schede spenta non esistono.
+  function delleSchede(type) {
+    const t = TOOLS[String(type || '').toUpperCase()];
+    return !!(t && t.schede);
+  }
+
   function toolMessage(callId, content) {
     return { role: 'tool', tool_call_id: String(callId || ''), content: String(content == null ? '' : content) };
   }
 
   global.SN_ACTION_TOOLS = {
-    TOOLS, NAMES, definitions, haRisultato, toolCallsToActions, legacyEnvelope, assistantMessage, toolMessage,
+    TOOLS, NAMES, definitions, haRisultato, toolCallsToActions, legacyEnvelope, assistantMessage, toolMessage, delleSchede,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

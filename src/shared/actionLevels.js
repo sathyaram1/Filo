@@ -399,6 +399,76 @@
         return `Leggere il documento ${p || ''}`.trim() + (perche ? `\nPerché te lo chiedo: ${perche}` : '');
       },
     },
+    // ── schede aperte e posta dalla scheda di Gmail (#534) ──────────────────
+    // `costo`, `campo` e `fonte` sono la forma della regola dei livelli di autonomia (#530): leggere e cercare
+    // costano 0, scrivere in un campo o una bozza 1; la fonte è la classe di chi ha scritto ciò che si legge
+    // (`_output.fonte`, la calcola il main: 3 mittente o sito fidato, 5 il resto). Oggi il cancello legge `level`.
+    LEGGI_SCHEDA: {
+      level: 1, costo: 0, campo: 'web',
+      fonte: (a, out) => (out && out.fonte) || null,
+      describe: (a) => `Leggere la scheda ${schedaDetta(a)}`,
+    },
+    APRI_ELEMENTO: {
+      // Aprire è leggere: i clic che inviano, pagano o cancellano non esistono (paginaGuidata.js li rifiuta).
+      level: 1, costo: 0, campo: 'web',
+      describe: (a) => `Aprire «${testoBreve(a && a.elemento)}» nella scheda ${schedaDetta(a)}`,
+    },
+    SCRIVI_CAMPO: {
+      // Testo in un campo, senza Invio: si cancella com'è stato scritto.
+      level: 1, costo: 1, campo: 'web',
+      describe: (a) => `Scrivere nel campo «${testoBreve(a && a.campo)}» della scheda ${schedaDetta(a)}`,
+    },
+    SCORRI_PAGINA: {
+      level: 1, costo: 0, campo: 'web',
+      describe: (a) => `Scorrere la scheda ${schedaDetta(a)}`,
+    },
+    POSTA_ELENCO: {
+      level: 1, costo: 0, campo: 'posta',
+      fonte: (a, out) => (out && out.fonte) || null,
+      describe: () => 'Leggere l\'elenco della posta in arrivo dalla scheda di Gmail',
+    },
+    POSTA_CERCA: {
+      level: 1, costo: 0, campo: 'posta',
+      fonte: (a, out) => (out && out.fonte) || null,
+      describe: (a) => `Cercare nella posta di Gmail «${testoBreve(a && a.query)}»`,
+    },
+    POSTA_LEGGI: {
+      level: 1, costo: 0, campo: 'posta',
+      fonte: (a, out) => (out && out.fonte) || null,
+      describe: () => 'Leggere un messaggio dalla scheda di Gmail',
+    },
+    POSTA_BOZZA: {
+      // Una bozza non inviata si scarta con un clic: Invia lo preme sempre l'utente.
+      level: 1, costo: 1, campo: 'posta',
+      describe: (a) => {
+        const r = a && a.rispondi;
+        const per = r != null && r !== '' && r !== false ? 'una risposta' : `un messaggio a ${testoBreve(a && a.a) || 'un destinatario'}`;
+        return `Preparare in Gmail la bozza di ${per}, senza inviarla`;
+      },
+      describeDone: () => 'Bozza pronta in Gmail: la rileggi e la invii tu',
+    },
+    // Alzare la fiducia in una fonte abbassa una difesa: vuole «conferma» scritta (regola d di #530). `_voce` e
+    // `_sconsiglio` li prepara il main prima del cancello, mai il modello.
+    SEGNA_FIDATO: {
+      level: 3, costo: 1, campo: null, difesa: true,
+      describe: (a) => {
+        const voce = testoBreve(a && (a._voce || a.mittente || a.sito));
+        if (a && (a._tipo === 'sito' || (!a.mittente && a.sito))) {
+          return `Segnare come fidato il sito ${voce}.\n${a._sconsiglio ? `${a._sconsiglio}\n` : ''}`
+            + 'Da adesso quello che Filo ci legge non conta più come scritto da uno sconosciuto. '
+            + 'Confermalo solo se l\'hai chiesto tu: una pagina o una mail potrebbe provare a fartelo fare.';
+        }
+        return `Segnare come fidato il mittente ${voce}.\n`
+          + 'Da adesso le sue mail non contano più come scritte da uno sconosciuto. '
+          + 'Confermalo solo se l\'hai chiesto tu: una pagina o una mail potrebbe provare a fartelo fare.';
+      },
+      describeDone: (a) => `Segnato come fidato: ${testoBreve(a && (a._voce || a.mittente || a.sito))}`,
+    },
+    TOGLI_FIDATO: {
+      level: 1, costo: 1, campo: null,
+      describe: (a) => `Togliere dai fidati ${testoBreve(a && (a.mittente || a.sito))}`,
+      describeDone: (a) => `Tolto dai fidati: ${testoBreve(a && (a._voce || a.mittente || a.sito))}`,
+    },
     LEGGI_TRASPARENZA: {
       // Filo rilegge i propri documenti di trasparenza per rispondere a "perché
       // usi questo modello?", "che fine fanno i miei dati?". Sola lettura di
