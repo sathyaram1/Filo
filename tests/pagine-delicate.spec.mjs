@@ -186,6 +186,32 @@ test('il testo letto da una pagina delicata non parte sotto l\'indirizzo della p
   expect((await voceDi(app, 'Immagine')).snippet).not.toContain('Saldo');
 });
 
+test('il titolo di una pagina delicata non resta sulla scheda quando la pagina dopo non ne ha uno', async ({ app, shell, openTab, testServer }) => {
+  await modelliFinti(app);
+  const IBAN = 'IT60X0542811101000000123456';
+  const senzaTitolo = testServer.html('<!doctype html><html><head></head><body><p>Una pagina pubblica qualunque.</p></body></html>')
+    .replace('127.0.0.1', 'blocked.test');
+  const banca = await testServer.openReady(openTab,
+    `<!doctype html><html><head><title>Movimenti del conto ${IBAN}</title></head><body>${CON_PASSWORD}<a id="via" href="${senzaTitolo}">vai</a></body></html>`,
+    { pubblico: true });
+  await expect.poll(() => app.evaluate(() => globalThis.SN_DELICATE.haCampi('sito-pubblico.test')), { timeout: 8_000 }).toBe(true);
+  await banca.click('#via');
+  const davanti = () => shell.evaluate(async () => {
+    const s = await window.filoShell.tabs.snapshot();
+    return s.tabs.find((t) => t.id === s.activeId) || {};
+  });
+  await expect.poll(async () => (await davanti()).url || '', { timeout: 8_000 }).toContain('blocked.test');
+  await expect.poll(async () => (await davanti()).title || '', { timeout: 8_000 }).toContain('blocked.test');
+
+  const stato = await app.evaluate(async () => (await globalThis.SN_FILO_STATE.assemble({ sistema: false })).stateText);
+  expect(stato).not.toContain(IBAN);
+  await shell.evaluate(async (i) => window.filoShell.tabs.close(i), (await davanti()).id);
+  await expect.poll(async () => (await app.evaluate(async () => (await globalThis.SN_ARCHIVED_TABS.list()).length)), { timeout: 8_000 })
+    .toBeGreaterThan(0);
+  await new Promise((r) => setTimeout(r, 1_500));
+  expect((await mandato(app)).some((m) => m.testo.includes(IBAN))).toBe(false);
+});
+
 test('dalla chat della home una scheda aperta diventa delicata col suo titolo, senza scriverne l\'indirizzo', async ({ app, openTab, testServer }) => {
   await testServer.openReady(openTab,
     '<!doctype html><html><head><title>Studio Rossi - Area clienti</title></head><body><p>Dichiarazione dei redditi</p></body></html>',
