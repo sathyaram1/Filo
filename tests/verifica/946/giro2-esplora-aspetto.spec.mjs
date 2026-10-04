@@ -14,7 +14,7 @@ test('la riga nei due temi, forte e debole', async ({ app, openTab, testServer }
     <img id="a" src="${forte}" width="300" height="300">
     <img id="b" src="${debole}" width="300" height="300"></body></html>`);
   for (const tema of ['light', 'dark']) {
-    await app.evaluate((_e, t) => globalThis.SN_STORAGE.updateSettings({ theme: t }), tema);
+    await page.evaluate((t) => { document.documentElement.dataset.snTheme = t; }, tema);
     await page.waitForTimeout(500);
     for (const id of ['a', 'b']) {
       await page.locator('#' + id).click({ button: 'right', position: { x: 40, y: 40 } });
