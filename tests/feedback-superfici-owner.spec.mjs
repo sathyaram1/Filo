@@ -10,9 +10,8 @@
 // Qui si guarda quello che l'utente ottiene davvero:
 //   1. /feedback in chat NON apre più quella pagina a chi non la può leggere, e
 //      dice la strada che funziona (mandare un feedback si può sempre);
-//   2. chi ci arriva lo stesso — anche dal vecchio indirizzo della posta, che
-//      porta a Gestione — legge una frase che spiega, non «Errore nel
-//      caricamento» e non «controlla la connessione»;
+//   2. chi ci arriva lo stesso — scrivendo l'indirizzo — legge una frase che
+//      spiega, non «Errore nel caricamento» e non «controlla la connessione»;
 //   3. l'invio di un feedback continua a funzionare.
 //
 // Senza la correzione (1) è rosso: il comando apre una scheda nuova.
@@ -20,7 +19,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 
 const HOME = 'filo://newtab/';
-const VECCHIO_INDIRIZZO = 'filo://feedback/feedback.html';
+const INBOX = 'filo://feedback/feedback.html';
 const MANAGE = 'filo://manage/manage.html';
 
 test('/feedback da chi non gestisce i feedback: nessuna scheda nuova, e la strada giusta detta a parole', async ({ app, openTab }) => {
@@ -50,17 +49,19 @@ test('/feedback da chi non gestisce i feedback: nessuna scheda nuova, e la strad
     }
     return urls;
   });
-  expect(dopo.filter((u) => u.includes('manage/manage.html'))).toHaveLength(0);
+  expect(dopo.filter((u) => u.includes('feedback/feedback.html'))).toHaveLength(0);
   expect(dopo.length).toBe(primaSchede);
 });
 
-test('il vecchio indirizzo della posta porta a Gestione', async ({ app, shell }) => {
-  await shell.evaluate((u) => window.filoShell.tabs.open(u), VECCHIO_INDIRIZZO);
-  const suGestione = () => app.windows().find((w) => w.url().startsWith('filo://manage/'));
-  await expect.poll(() => app.windows().map((w) => w.url()).filter((u) => /^filo:\/\/(manage|feedback)\//.test(u)),
-    { timeout: 20_000 }).toEqual([expect.stringMatching(/^filo:\/\/manage\//)]);
-  const page = suGestione();
-  await expect(page.locator('#mgListEmpty')).toBeVisible({ timeout: 20_000 });
+test('arrivandoci per indirizzo, la posta spiega invece di dare un errore', async ({ openTab }) => {
+  const page = await openTab(INBOX);
+  await page.waitForLoadState('domcontentloaded');
+  const riquadro = page.locator('#empty');
+  await expect(riquadro).toBeVisible({ timeout: 15_000 });
+  const testo = (await riquadro.innerText()).toLowerCase();
+  expect(testo).toContain('gestisce');
+  expect(testo).not.toContain('connessione');
+  expect(testo).not.toContain('errore');
 });
 
 test('anche Gestione dice che è un permesso che manca, non un guasto', async ({ openTab }) => {

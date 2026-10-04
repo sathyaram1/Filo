@@ -82,10 +82,6 @@ async function filoHandler(request) {
       return new Response('Forbidden', { status: 403 });
     }
 
-    // La vecchia posta dei feedback non c'è più: una scheda ripristinata o un
-    // segnalibro che la apre arriva a Gestione invece che su un errore.
-    if (host === 'feedback') return Response.redirect('filo://manage/manage.html', 302);
-
     let fsPath;
     if (host === 'shell') {
       fsPath = path.join(SRC, 'renderer', rel || 'shell.html');

@@ -148,6 +148,7 @@
       { label: 'Bacheca', icon: 'board', url: 'filo://board/board.html' },
     ];
     if (isAdmin) {
+      entries.push({ label: 'Feedback', icon: 'feedback', url: 'filo://feedback/feedback.html' });
       entries.push({ label: 'Gestione', icon: 'feedback', url: 'filo://manage/manage.html' });
     }
     return entries;
@@ -1113,6 +1114,7 @@
     'preferences/preferences.html': 'Preferenze',
     'admin-defaults/admin-defaults.html': 'Modelli predefiniti',
     'editor/editor.html': 'Editor',
+    'feedback/feedback.html': 'Feedback',
     'history/history.html': 'Cronologia AI',
     'archive/archive.html': 'Cronologia',
     'home/home.html': 'Aperti per dopo',

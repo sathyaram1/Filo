@@ -36,6 +36,7 @@ segnalazione era indistinguibile da una archiviata qualsiasi (#509, terzo giro).
   decisione dell'owner sono le stesse parole della gemella.
 - **Dove:** `ownerActions`, `ownerActionFor`, `ownerActionAllowsStatus`,
   `stateBadge`, `valueUnreadable` in `src/shared/manageReview.js`; consumate da
+  `actionsFor()`/`patch()` in `src/pages/feedback/feedback.js` e da
   `renderActions()`/`applyAction()`/`renderDetailState()` in
   `src/pages/manage/manage.js`. Test:
   `tests/feedback-sezioni-gemelle.spec.mjs` (confronta gli elenchi di pulsanti

@@ -147,7 +147,8 @@ test('#495 — negli Archiviati il numero segue il filtro ⭐ (dice quello che s
 // Alla larghezza minima consentita alla finestra (720) i bottoni si
 // stringevano e spezzavano le parole: "In" / "coda" / "(0)" su tre righe, e la
 // barra alta il doppio. Il numero smetteva di leggersi come parte del nome.
-// La regola: a capo vanno le schede INTERE, mai le parole.
+// La pagina gemella dei feedback risolve lo stesso problema mandando a capo le
+// schede INTERE (tests/feedback-tabs-wrap.spec.mjs): stessa regola qui.
 //
 // Senza il fix (`flex-wrap: wrap` + `white-space: nowrap`) il primo assert è
 // rosso: i pezzi di una stessa scheda stanno su righe diverse.

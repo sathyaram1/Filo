@@ -292,23 +292,16 @@ test('gli allegati della segnalazione salgono cifrati come quelli dei commenti',
 
 // ── La pagina che carica da sola deve avere la cifratura sotto mano ──────────
 
-test('una pagina che carica nel deposito carica anche la cifratura', async () => {
-  // Gli allegati caricati dalla PAGINA (`SN_FEEDBACK.uploadAttachment`) senza i
-  // due script in pagina non trovano `SN_FEEDBACK_CRYPTO`: per mesi sono saliti
-  // in chiaro. Fermarsi non è la cura: la pagina la cifratura deve averla.
-  const { readFileSync, readdirSync, existsSync } = await import('node:fs');
-  const pagine = join(ROOT, 'src', 'pages');
-  for (const nome of readdirSync(pagine)) {
-    const cartella = join(pagine, nome);
-    const js = readdirSync(cartella).filter((f) => f.endsWith('.js'))
-      .map((f) => readFileSync(join(cartella, f), 'utf8')).join('\n');
-    if (!/uploadAttachment\s*\(/.test(js)) continue;
-    const htmlFile = join(cartella, `${nome}.html`);
-    assert.ok(existsSync(htmlFile), `${nome}: carica nel deposito ma non trovo ${nome}.html`);
-    const html = readFileSync(htmlFile, 'utf8');
-    assert.match(html, /shared\/feedbackPublicKey\.js/, `manca la chiave pubblica in ${nome}.html`);
-    assert.match(html, /shared\/feedbackCrypto\.js/, `manca il modulo di cifratura in ${nome}.html`);
-  }
+test('la pagina dei feedback carica la cifratura: è lei a caricare nel deposito', async () => {
+  // Sentinella. Gli allegati dei commenti li carica il codice della PAGINA
+  // (`SN_FEEDBACK.uploadAttachment`), non il main: senza questi due script in
+  // pagina `SN_FEEDBACK_CRYPTO` lì non esiste, ed è per questo che per mesi
+  // quegli allegati sono saliti in chiaro. Ora il caricamento si fermerebbe
+  // invece di ripiegare — ma fermarsi non è la cura: la cura è averla.
+  const { readFileSync } = await import('node:fs');
+  const html = readFileSync(join(ROOT, 'src', 'pages', 'feedback', 'feedback.html'), 'utf8');
+  assert.match(html, /shared\/feedbackPublicKey\.js/, 'manca la chiave pubblica nella pagina dei feedback');
+  assert.match(html, /shared\/feedbackCrypto\.js/, 'manca il modulo di cifratura nella pagina dei feedback');
 });
 
 test('ogni punto che carica nel deposito passa dalla cifratura', async () => {

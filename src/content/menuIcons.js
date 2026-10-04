@@ -142,7 +142,7 @@
     // anche dai layout che l'utente si era salvato: i builder filtrano su
     // `registry[id]`.
     if (isOwner) {
-      registry.feedbackApp = { id: 'feedbackApp', icon: I('feedback'), label: I18n.t('menu_open_feedback'), onClick: () => chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: 'filo://manage/manage.html' }) };
+      registry.feedbackApp = { id: 'feedbackApp', icon: I('feedback'), label: I18n.t('menu_open_feedback'), onClick: () => chrome.runtime.sendMessage({ type: MSG.OPEN_URL, url: 'filo://feedback/feedback.html' }) };
     }
     return registry;
   }

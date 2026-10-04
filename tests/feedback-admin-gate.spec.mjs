@@ -1,20 +1,36 @@
-// Il vero cancello del triage e dell'interruttore dell'autonomia sta nel main:
-// anche aggirando la UI, senza un amministratore loggato (userData pulito) le
-// scritture tornano ok:false. Prima del gating un non-admin poteva spostare un
-// feedback o ATTIVARE l'autonomia per tutti.
+// Gating admin del triage feedback.
+//
+// La gestione dei feedback (spostare di stato, priorità, note) è riservata
+// agli amministratori loggati. Su userData pulito NON c'è sessione, quindi:
+//   - la pagina feedback mostra il banner "sola lettura" + pulsante Accedi;
+//   - non compaiono pulsanti d'azione (.fb-act);
+//   - il main RIFIUTA qualsiasi feedback_update con { ok:false } (è il vero
+//     gate: anche aggirando la UI, la scrittura non parte senza un admin).
+//
+// Pre-condizione che senza il fix fallirebbe: prima del gating chiunque poteva
+// spostare un feedback in "todo". Ora feedback_update da sloggato torna ok:false.
 
 import { test, expect } from './fixtures/electron.mjs';
 
-const MANAGE_URL = 'filo://manage/manage.html';
+const FEEDBACK_URL = 'filo://feedback/feedback.html';
 
-async function pagina(openTab) {
-  const page = await openTab(MANAGE_URL);
-  await page.waitForFunction(() => window.filo && typeof window.filo.message === 'function');
-  return page;
-}
+test('feedback: da sloggato la pagina è in sola lettura (banner + niente azioni)', async ({ openTab }) => {
+  const page = await openTab(FEEDBACK_URL);
+
+  // Il banner di sola lettura deve comparire (auth_status → non admin).
+  await expect(page.locator('#adminBanner')).toBeVisible({ timeout: 8_000 });
+  await expect(page.locator('#adminSignIn')).toBeVisible();
+
+  // Nessun pulsante d'azione di triage in pagina.
+  await expect(page.locator('.fb-act')).toHaveCount(0);
+});
 
 test('feedback: il main rifiuta feedback_update da utente non admin', async ({ openTab }) => {
-  const page = await pagina(openTab);
+  const page = await openTab(FEEDBACK_URL);
+  await expect(page.locator('#adminBanner')).toBeVisible({ timeout: 8_000 });
+
+  // Tentativo diretto di scrittura (come farebbe la UI): deve essere rifiutato
+  // dal main perché non c'è un admin loggato.
   const res = await page.evaluate(() =>
     window.filo.message({ type: 'feedback_update', id: 'non-esiste', status: 'todo' })
   );
@@ -23,16 +39,15 @@ test('feedback: il main rifiuta feedback_update da utente non admin', async ({ o
   expect(String(res.error || '')).toMatch(/amministrator/i);
 });
 
-test('automazione: il main rifiuta automation_get/set da utente non admin', async ({ openTab }) => {
-  const page = await pagina(openTab);
-
-  const get = await page.evaluate(() => window.filo.message({ type: 'automation_get' }));
-  expect(get).toBeTruthy();
-  expect(get.ok).toBe(false);
-  expect(String(get.error || '')).toMatch(/amministrator/i);
-
-  const set = await page.evaluate(() => window.filo.message({ type: 'automation_set', enabled: true }));
-  expect(set).toBeTruthy();
-  expect(set.ok).toBe(false);
-  expect(String(set.error || '')).toMatch(/amministrator/i);
+test('feedback: un accesso non riuscito dal banner dice il perché lì, senza finestre di sistema', async ({ app, openTab }) => {
+  await app.evaluate(({ shell }) => { shell.openExternal = async () => { throw new Error('Failed to open'); }; });
+  const page = await openTab(FEEDBACK_URL);
+  await expect(page.locator('#adminSignIn')).toBeVisible({ timeout: 8_000 });
+  let dialogo = null;
+  page.on('dialog', (d) => { dialogo = d.message(); d.dismiss().catch(() => {}); });
+  await page.locator('#adminSignIn').click();
+  await expect(page.locator('#adminBannerText')).toContainText('aprire il browser');
+  await expect(page.locator('#adminBannerText')).toHaveClass(/fb-admin-ko/);
+  await expect(page.locator('#adminSignIn')).toBeEnabled();
+  expect(dialogo).toBeNull();
 });

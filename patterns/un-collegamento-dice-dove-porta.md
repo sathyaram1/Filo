@@ -50,8 +50,7 @@ puntino. Due forme, misurate:
 ## Dove vive
 
 - `SN_FEEDBACK.linkLabel` in `src/shared/feedback.js` — pura, una fonte sola.
-- Chi la usa: nessuno, da quando la vecchia pagina dei feedback è stata tolta;
-  chi mostra di nuovo un indirizzo come collegamento passa da qui.
+- Chi la usa: `src/pages/feedback/feedback.js` (l'indirizzo in cima alla scheda).
 - Guardie: `tests/unit/feedbackLinkLabel.test.mjs` (la forma della scritta, caso
   per caso) e `tests/feedback-indirizzo-della-pagina.spec.mjs` (che la pagina la
   usi davvero).

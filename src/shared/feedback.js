@@ -917,10 +917,11 @@
     return { id: json.name?.split('/').pop() || '', seq, images: uploaded, files: uploadedFiles, failed, ...prova };
   }
 
-  // ── La dimensione di una pagina di lettura ──────────────────────────────
-  // Una lettura ne chiede al massimo questi, dal più recente al più vecchio.
-  // È una FINESTRA, non un totale: chi vuole l'insieme pagina col cursore
-  // (`listAllPaged`, patterns/una-pagina-dei-piu-recenti-non-e-tutto.md).
+  // ── Il tetto del caricamento, e come si dice ──────────────────────────────
+  // Le pagine che ELENCANO i feedback (dashboard di gestione, pagina feedback,
+  // bacheca) ne chiedono al massimo questi, dal più recente al più vecchio.
+  // È un TETTO, non un totale: appena la raccolta lo supera, i più vecchi
+  // restano fuori e nessun conteggio calcolato in pagina può vederli.
   const LIST_PAGE_SIZE = 500;
 
   // ── Cosa si scarica per ELENCARE, e cosa solo per APRIRE ─────────────────
@@ -961,17 +962,32 @@
     return !!(fb && fb._proiezione);
   }
 
+  // Il caricamento ha toccato il tetto? Allora ogni numero che ne deriva è un
+  // "almeno N", non un totale.
+  function listHitCap(loaded, pageSize) {
+    const cap = Number(pageSize) > 0 ? Number(pageSize) : LIST_PAGE_SIZE;
+    return Array.isArray(loaded) && loaded.length >= cap;
+  }
+
   // Come si scrive un conteggio accanto al nome di una sezione: "(24)" quando
-  // il numero è il totale, "(24+)" quando la lettura non è arrivata in fondo e
+  // il numero è il totale, "(24+)" quando il caricamento ha toccato il tetto e
   // quindi è solo un minimo. Un numero che afferma un totale che non conosce
-  // sembra una risposta ed è peggio di nessun numero.
+  // sembra una risposta ed è peggio di nessun numero; il "+" costa un carattere
+  // e dice la verità (caricare TUTTO costerebbe letture, ed è una scelta
+  // dell'owner, non di questa riga).
   function countLabel(n, truncated) {
     const v = Math.max(0, Math.trunc(Number(n) || 0));
     return truncated ? `(${v}+)` : `(${v})`;
   }
 
-  // Perché c'è il "+": lo spiega l'hover, e la stessa frase completa il vuoto
-  // di una sezione che sembra vuota.
+  // Perché c'è il "+": lo spiega l'hover, così il segno non resta un enigma.
+  // La stessa frase serve anche a una sezione che sembra vuota (i feedback più
+  // vecchi non sono in pagina), quindi non nomina il numero: vale in entrambi.
+  const COUNT_CAP_HINT =
+    `Caricati i ${LIST_PAGE_SIZE} feedback più recenti: se ce ne sono di più vecchi, non sono in pagina e non entrano nel conto.`;
+
+  // Chi legge TUTTO (la dashboard di gestione) ha il "+" solo se la lettura
+  // completa si è fermata prima della fine: lì il motivo è un altro.
   const COUNT_INCOMPLETE_HINT =
     'La lettura dei feedback si è fermata prima della fine: i più vecchi mancano e non entrano nel conto.';
 
@@ -2167,7 +2183,9 @@
     CAMPI_LISTA,
     CAMPI_DETTAGLIO,
     soloLista,
+    listHitCap,
     countLabel,
+    COUNT_CAP_HINT,
     COUNT_INCOMPLETE_HINT,
     updateStatus,
     // S1.F2.1: mapping status fine → valore pubblico grossolano (in chiaro).

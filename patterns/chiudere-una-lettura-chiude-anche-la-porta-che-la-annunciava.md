@@ -53,7 +53,7 @@ sicurezza spegne l'unico canale da cui arrivano le segnalazioni.
 faceva già), `src/content/menuIcons.js` (l'icona entra nel registro solo se
 `isOwner`: un id assente sparisce anche dai layout che l'utente si era salvato),
 `src/pages/dashboard/dashboard-comandi.js` (il comando `/feedback` e l'elenco di
-`/help`), `src/pages/manage/manage.js` per la
+`/help`), `src/pages/manage/manage.js` e `src/pages/feedback/feedback.js` per la
 frase che si legge arrivandoci per indirizzo.
 
 Lo stato di owner si CHIEDE al main (`MSG.AUTH_STATUS`) e parte da «no»:

@@ -1,6 +1,6 @@
 // L'elenco scarica una PROIEZIONE, il dettaglio il documento intero — #677.
 //
-// IL CASO. Aprire Gestione scaricava cinquecento
+// IL CASO. Aprire Gestione o la pagina dei feedback scaricava cinquecento
 // documenti INTERI: report della lavorazione, livelli, allegati. Sono i campi
 // che pesano, e nessuno di loro sta in una riga d'elenco. Ora la lista chiede
 // i soli campi che mostra, ordina e filtra; il resto arriva quando quel
@@ -16,6 +16,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 
+const PAGINA_FEEDBACK = 'filo://feedback/feedback.html';
 const PAGINA_GESTIONE = 'filo://manage/manage.html';
 
 const ALLEGATO = 'https://firebasestorage.googleapis.com/v0/b/x/o/feedback%2Fprova.png?alt=media';
@@ -86,7 +87,38 @@ async function collezioneFinta(page, riga, intero) {
   }, { r: riga, i: intero });
 }
 
-test('in Gestione la lista mostra la riga, e il dettaglio si completa aprendolo', async ({ openTab }) => {
+test('la pagina dei feedback mostra la riga, e la conversazione arriva quando serve', async ({ openTab }) => {
+  const page = await openTab(PAGINA_FEEDBACK);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__fbTest && window.SN_FEEDBACK, null, { timeout: 15_000 });
+  await admin(page);
+  await collezioneFinta(page, RIGA, INTERO);
+  await page.evaluate(() => window.__fbTest.setAdmin(true, { email: 'owner@example.invalid' }));
+  // Il cammino vero: la lista proiettata entra da SN_FEEDBACK.list, e il
+  // completamento della sezione parte da solo al primo disegno.
+  await page.evaluate(async () => {
+    const righe = await window.SN_FEEDBACK.list({ pageSize: 500, fields: window.SN_FEEDBACK.CAMPI_LISTA });
+    window.__fbTest.setData(righe);
+  });
+
+  const card = page.locator('.fb-card[data-id="fb677"]');
+  await expect(card).toBeVisible({ timeout: 10_000 });
+  // La riga dice quello che diceva prima: numero e titolo.
+  await expect(card.locator('.fb-title')).toContainText('#677');
+  await expect(card.locator('.fb-title')).toContainText('Aprire senza scaricare tutto due volte');
+  // La segnalazione originale c'è, e con lei la conversazione e l'allegato:
+  // sono arrivati col completamento, non col caricamento della lista.
+  await expect(card.locator('.fb-bubble-body').first()).toContainText('Gestione ci mette una vita');
+  await expect(card.locator('.fb-notes')).toHaveValue(/caricamento chiede i documenti interi/);
+  // L'allegato della segnalazione c'è: che poi l'immagine si decifri o no è
+  // un'altra storia, e non è quella che questa prova racconta.
+  await expect(card.locator('.fb-imgs')).toHaveCount(1);
+
+  const chiesti = await page.evaluate(() => window.__chiesti);
+  expect(chiesti).toEqual(['fb677']);
+});
+
+test('in Gestione la lista è la stessa, e il dettaglio si completa aprendolo', async ({ openTab }) => {
   const page = await openTab(PAGINA_GESTIONE);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK, null, { timeout: 20_000 });
@@ -180,6 +212,139 @@ test('rispondere a un chiarimento non cancella il report della lavorazione', asy
   const [inviato] = await page.evaluate(() => window.__inviati);
   expect(inviato.notes).toContain(REPORT);
   expect(inviato.notes).toContain('Prendi la seconda.');
+});
+
+// Una sezione più grande di un blocco di lettura: i dettagli arrivano a
+// gruppi, e alla fine OGNI scheda ha la sua conversazione — anche l'ultima.
+// Una scheda rimasta senza mostrerebbe una conversazione vuota, che si legge
+// come «non c'è niente da leggere».
+test('una sezione lunga si completa tutta, non solo il primo blocco', async ({ openTab }) => {
+  const QUANTI = 260;
+  const page = await openTab(PAGINA_FEEDBACK);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__fbTest && window.SN_FEEDBACK, null, { timeout: 15_000 });
+  await admin(page);
+
+  await page.evaluate((quanti) => {
+    const righe = Array.from({ length: quanti }, (_, i) => ({
+      _id: `m${i}`,
+      _proiezione: true,
+      seq: 1000 + i,
+      subSeq: 0,
+      name: `Segnalazione ${i}`,
+      text: `Testo ${i}`,
+      status: 'unlabeled',
+      statusPublic: 'open',
+      clientId: 'tester',
+      createdAt: new Date(Date.UTC(2026, 8, 20) - i * 3600_000).toISOString(),
+    }));
+    window.__blocchi = 0;
+    window.SN_FEEDBACK.getMany = async (ids) => {
+      window.__blocchi += 1;
+      return ids.map((id) => {
+        const r = righe.find((x) => x._id === id);
+        const { _proiezione, ...resto } = r;
+        return { ...resto, notes: `NOTA DI ${id}` };
+      });
+    };
+    window.__fbTest.setAdmin(true, { email: 'owner@example.invalid' });
+    window.__fbTest.setData(righe.map((r) => ({ ...r })));
+  }, QUANTI);
+
+  await expect(page.locator('.fb-card')).toHaveCount(QUANTI, { timeout: 30_000 });
+  // Più di un blocco di lettura, e l'ULTIMA scheda ha la sua conversazione.
+  expect(await page.evaluate(() => window.__blocchi)).toBeGreaterThan(1);
+  await expect(page.locator('.fb-card[data-id="m259"] .fb-notes')).toHaveValue('NOTA DI m259');
+  await expect(page.locator('.fb-card[data-id="m0"] .fb-notes')).toHaveValue('NOTA DI m0');
+});
+
+// La sezione si chiede UNA volta, anche se l'owner tocca la pagina mentre
+// arriva. Ogni gesto durante l'attesa (una lettera nella ricerca, un cambio di
+// sezione, la casella «Solo automatici») ridisegna la lista, e senza il
+// registro delle richieste già partite ogni ridisegno ricomprava la sezione
+// intera: dodici lettere, tredici volte gli stessi documenti con dentro gli
+// allegati. Senza il fix queste due sono rosse sul conteggio.
+
+const LENTE = [0, 1, 2, 3, 4, 5].map((i) => ({
+  _id: `fbL${i}`,
+  _proiezione: true,
+  seq: 900 + i,
+  subSeq: 0,
+  name: `Segnalazione lenta ${i}`,
+  text: `Testo della segnalazione lenta ${i}`,
+  status: 'unlabeled',
+  statusPublic: 'open',
+  clientId: 'tester-1',
+  createdAt: `2026-09-2${i % 10}T10:00:00.000Z`,
+}));
+
+async function sezioneLenta(page, rows) {
+  await page.evaluate((r) => {
+    window.__chiesti = [];
+    window.SN_FEEDBACK.list = async () => JSON.parse(JSON.stringify(r));
+    window.SN_FEEDBACK.getMany = async (ids) => {
+      window.__chiesti.push(...ids);
+      // Lenta apposta: è la finestra in cui l'owner tocca la pagina.
+      await new Promise((res) => setTimeout(res, 1500));
+      return ids.map((id) => {
+        const base = r.find((x) => x._id === id);
+        if (!base) return null;
+        const { _proiezione, ...resto } = JSON.parse(JSON.stringify(base));
+        return { ...resto, notes: `Report della lavorazione di ${id}`, images: [], files: [] };
+      }).filter(Boolean);
+    };
+  }, rows);
+}
+
+async function ripetuti(page) {
+  const chiesti = await page.evaluate(() => window.__chiesti);
+  const conteggi = {};
+  for (const id of chiesti) conteggi[id] = (conteggi[id] || 0) + 1;
+  return { conteggi, ripetuti: Object.entries(conteggi).filter(([, n]) => n > 1) };
+}
+
+async function pronta(openTab) {
+  const page = await openTab(PAGINA_FEEDBACK);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__fbTest && window.SN_FEEDBACK, null, { timeout: 20_000 });
+  await admin(page);
+  await sezioneLenta(page, LENTE);
+  await page.evaluate(() => window.__fbTest.setAdmin(true, { email: 'owner@example.invalid' }));
+  await page.evaluate(async () => {
+    const lista = await window.SN_FEEDBACK.list({ pageSize: 500, fields: window.SN_FEEDBACK.CAMPI_LISTA });
+    window.__fbTest.setData(lista);
+  });
+  await expect(page.locator('#list')).toContainText('Caricamento', { timeout: 5000 });
+  return page;
+}
+
+test('scrivere nella ricerca mentre la sezione arriva non la ricompra', async ({ openTab }) => {
+  const page = await pronta(openTab);
+  await page.locator('#search').type('segnalazione', { delay: 40 });
+  await expect(page.locator('.fb-card').first()).toBeVisible({ timeout: 20_000 });
+  await page.waitForTimeout(1500);
+  const { conteggi, ripetuti: doppi } = await ripetuti(page);
+  expect(doppi, `documenti chiesti più di una volta: ${JSON.stringify(conteggi)}`).toEqual([]);
+});
+
+test('cambiare sezione mentre arriva non ricompra la sezione di prima', async ({ openTab }) => {
+  const page = await pronta(openTab);
+  await page.evaluate(() => window.__fbTest.setTab('resolved'));
+  await page.evaluate(() => window.__fbTest.setTab('inbox'));
+  await expect(page.locator('.fb-card').first()).toBeVisible({ timeout: 20_000 });
+  await page.waitForTimeout(1500);
+  const { conteggi, ripetuti: doppi } = await ripetuti(page);
+  expect(doppi, `documenti chiesti più di una volta: ${JSON.stringify(conteggi)}`).toEqual([]);
+});
+
+test('premere «Solo automatici» mentre la sezione arriva non la ricompra', async ({ openTab }) => {
+  const page = await pronta(openTab);
+  await page.locator('#agentOnly').click();
+  await page.locator('#agentOnly').click();
+  await expect(page.locator('.fb-card').first()).toBeVisible({ timeout: 20_000 });
+  await page.waitForTimeout(1500);
+  const { conteggi, ripetuti: doppi } = await ripetuti(page);
+  expect(doppi, `documenti chiesti più di una volta: ${JSON.stringify(conteggi)}`).toEqual([]);
 });
 
 // ── Un ridisegno non porta via quello che l'owner sta scrivendo ─────────────
@@ -457,6 +622,44 @@ test('«Riprova» non porta via quello che l_owner sta scrivendo', async ({ open
   await expect(page.locator('#mgThread')).toContainText('Report della lavorazione', { timeout: 10_000 });
 });
 
+// La gemella, stessa causa: nella pagina dei feedback una scheda il cui
+// documento non è tornato si disegnava senza conversazione e con la casella
+// delle note vuota, che invita a scriverci. Adesso la scheda lo dice con le
+// parole della gemella in Gestione, offre «Riprova», e la casella non c'è:
+// non si può scrivere al posto di un report che non si è letto.
+test('nella pagina dei feedback una conversazione mai arrivata si dice, e non si sovrascrive', async ({ openTab }) => {
+  const page = await openTab(PAGINA_FEEDBACK);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__fbTest && window.SN_FEEDBACK, null, { timeout: 20_000 });
+  await admin(page);
+  await page.evaluate((r) => {
+    window.__inviati = [];
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'feedback_update') { window.__inviati.push(msg); return { ok: true }; }
+      if (msg && msg.type === 'auth_status') return { ok: true, isAdmin: true, profile: { email: 'owner@example.invalid' } };
+      if (msg && msg.type === 'feedback_decrypt_fields') return { ok: true, list: msg.list };
+      return orig(msg);
+    };
+    window.__avvisi = [];
+    window.alert = (t) => { window.__avvisi.push(String(t)); };
+    // Il documento non torna: la scheda nasce senza conversazione.
+    window.SN_FEEDBACK.getMany = async () => [];
+    window.__fbTest.setAdmin(true, { email: 'owner@example.invalid' });
+    window.__fbTest.setData([JSON.parse(JSON.stringify(r))]);
+  }, RIGA);
+
+  const card = page.locator('.fb-card[data-id="fb677"]');
+  await expect(card).toBeVisible({ timeout: 15_000 });
+  await expect(card).toContainText('non è arrivato');
+  await expect(card.locator('.fb-riprova-dettaglio')).toBeVisible();
+  // La casella che scriverebbe sopra il report non viene nemmeno offerta.
+  await expect(card.locator('.fb-notes')).toHaveCount(0);
+  await page.waitForTimeout(600);
+  const inviati = await page.evaluate(() => window.__inviati);
+  expect(inviati, `non deve partire nessuna scrittura: ${JSON.stringify(inviati)}`).toEqual([]);
+});
+
 // ─────────────────────────────────────────────────────────────────────────
 // La riga riletta dal giro al minuto NON prende il posto del documento
 // intero già in mano. Prima lo sostituiva, e con lui se ne andava la nota
@@ -563,6 +766,96 @@ test('Gestione: dopo un giro al minuto una lettura già fallita resta tale', asy
   await expect.poll(() => page.evaluate(() => window.__dettagli), { timeout: 10_000 }).toBe(2);
 });
 
+test('pagina feedback: con la rete giù i gesti non ricomprano la lettura fallita', async ({ openTab }) => {
+  const page = await openTab(PAGINA_FEEDBACK);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__fbTest && window.SN_FEEDBACK, null, { timeout: 20_000 });
+  await admin(page);
+  await page.evaluate((riga) => {
+    window.__n = 0;
+    window.SN_FEEDBACK.list = async () => [JSON.parse(JSON.stringify(riga))];
+    window.SN_FEEDBACK.getMany = async () => { window.__n += 1; throw new Error('Failed to fetch'); };
+    window.__fbTest.setAdmin(true, { email: 'o@e.invalid' });
+    window.__fbTest.setData([JSON.parse(JSON.stringify(riga))]);
+  }, RIGA_LIVE);
+
+  await expect(page.locator('.fb-load-retry')).toBeVisible({ timeout: 15_000 });
+  const primo = await page.evaluate(() => window.__n);
+
+  // Senza premere «Riprova»: si scrive nella ricerca e si cambia sezione.
+  await page.locator('#search').fill('abc');
+  await page.waitForTimeout(1000);
+  await page.locator('[data-tab="queue"]').click();
+  await page.locator('[data-tab="inbox"]').click();
+  await page.waitForTimeout(1000);
+  expect(await page.evaluate(() => window.__n)).toBe(primo);
+
+  // Il «Riprova» della scheda, invece, ci riprova davvero.
+  await page.locator('#search').fill('');
+  await page.locator('.fb-card[data-id="fbA"] .fb-riprova-dettaglio').click();
+  await expect.poll(() => page.evaluate(() => window.__n), { timeout: 10_000 }).toBe(primo + 1);
+});
+
+
+// ─────────────────────────────────────────────────────────────────────────
+// Senza la chiave privata la conversazione non comparirebbe comunque: non
+// si scarica. Restano gli allegati, che si vedono lo stesso.
+// ─────────────────────────────────────────────────────────────────────────
+
+test('senza la chiave la pagina non chiede il documento intero di tutte le segnalazioni', async ({ openTab }) => {
+  const page = await openTab(PAGINA_FEEDBACK);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__fbTest && window.SN_FEEDBACK, null, { timeout: 20_000 });
+  await admin(page);
+
+  const esito = await page.evaluate(async () => {
+    const righe = [];
+    for (let i = 0; i < 40; i += 1) {
+      righe.push({
+        _id: `x${i}`, _proiezione: true, seq: 1000 + i, subSeq: 0,
+        name: `Segnalazione ${i}`, text: `testo ${i}`,
+        status: 'FENC1:abcdef', statusPublic: 'open',
+        clientId: 't', createdAt: `2026-09-${(i % 28) + 1}T10:00:00.000Z`,
+      });
+    }
+    window.__chiesti = [];
+    window.__campi = null;
+    window.SN_FEEDBACK.list = async () => JSON.parse(JSON.stringify(righe));
+    window.SN_FEEDBACK.getMany = async (ids, opts) => {
+      window.__chiesti.push(...ids);
+      window.__campi = (opts && opts.fields) || null;
+      return ids.map((id) => {
+        const { _proiezione, ...resto } = righe.find((x) => x._id === id);
+        // Il server torna solo i campi chiesti.
+        return { ...resto, images: [], files: [] };
+      });
+    };
+    window.__fbTest.setAdmin(true, { email: 'o@e.invalid' });
+    window.__fbTest.setData(JSON.parse(JSON.stringify(righe)));
+    await new Promise((r) => setTimeout(r, 1500));
+    return {
+      chiesti: window.__chiesti.length,
+      campi: window.__campi,
+      sezioni: !document.getElementById('tabs').hidden,
+      schede: document.querySelectorAll('.fb-card').length,
+    };
+  });
+
+  // L'elenco unico è voluto: gli stati non si leggono. A non esserlo era il
+  // conto che ci veniva dietro.
+  expect(esito.sezioni).toBe(false);
+  expect(esito.schede).toBe(40);
+  // La parte che pesa (report, livelli, commento di revisione) non si chiede:
+  // senza la chiave la conversazione non comparirebbe comunque.
+  expect(Array.isArray(esito.campi), 'il documento intero non va chiesto').toBe(true);
+  expect(esito.campi).not.toContain('notes');
+  expect(esito.campi).not.toContain('livelli');
+  // Gli allegati sì: quelli si vedono anche senza chiave.
+  expect(esito.campi).toContain('images');
+  expect(esito.campi).toContain('files');
+});
+
+
 // ─────────────────────────────────────────────────────────────────────────
 // Col resto non arrivato le forme non inventano un esito: dicono che non si
 // sa ancora. E il «Riprova» del pannello sta dentro il pannello.
@@ -574,6 +867,27 @@ const RIGA_FORME = {
   status: 'unlabeled', statusPublic: 'open', priority: 2,
   clientId: 'tester-1', createdAt: '2026-09-21T10:00:00.000Z',
 };
+
+
+test('pagina feedback: una conversazione non arrivata si dice, non si disegna vuota', async ({ openTab }) => {
+  const page = await openTab(PAGINA_FEEDBACK);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__fbTest && window.SN_FEEDBACK, null, { timeout: 20_000 });
+  await admin(page);
+  await page.evaluate((riga) => {
+    window.SN_FEEDBACK.list = async () => [JSON.parse(JSON.stringify(riga))];
+    // Il documento non torna (sul server non c'è più, o la risposta lo salta).
+    window.SN_FEEDBACK.getMany = async () => [];
+    window.__fbTest.setAdmin(true, { email: 'o@e.invalid' });
+    window.__fbTest.setData([JSON.parse(JSON.stringify(riga))]);
+  }, RIGA_FORME);
+
+  const card = page.locator('.fb-card[data-id="fbA"]');
+  await expect(card).toBeVisible({ timeout: 15_000 });
+  await page.screenshot({ path: 'tests/.shots/677-giro5-silenzio.png', fullPage: true });
+  // La gemella dice la stessa cosa con le stesse parole e offre di riprovare.
+  await expect(card).toContainText(/non è arrivat/);
+});
 
 test('Gestione: col resto non arrivato l_audit non si dichiara «non fatto»', async ({ openTab }) => {
   const page = await openTab(PAGINA_GESTIONE);
@@ -647,4 +961,47 @@ test('il pannello dice che il resto non è arrivato, e il «Riprova» sta al suo
     expect(box.x).toBeGreaterThanOrEqual(panel.x - 1);
     expect(box.x + box.width).toBeLessThanOrEqual(panel.x + panel.width + 1);
     await page.screenshot({ path: 'tests/.shots/677-giro4-riprova.png' });
+});
+
+test('la sezione che finisce di arrivare non cancella quello che scrivo nell_altra', async ({ openTab }) => {
+  const page = await openTab(PAGINA_FEEDBACK);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__fbTest && window.SN_FEEDBACK, null, { timeout: 20_000 });
+  await admin(page);
+
+  await page.evaluate(() => {
+    const righe = [
+      { _id: 'lento1', _proiezione: true, seq: 801, subSeq: 0, name: 'Lenta', text: 'Testo lento',
+        status: 'unlabeled', statusPublic: 'open', clientId: 't', createdAt: '2026-09-21T10:00:00.000Z' },
+      { _id: 'coda1', _proiezione: true, seq: 802, subSeq: 0, name: 'In coda', text: 'Testo in coda',
+        status: 'todo', statusPublic: 'open', clientId: 't', createdAt: '2026-09-22T10:00:00.000Z' },
+    ];
+    window.SN_FEEDBACK.list = async () => JSON.parse(JSON.stringify(righe));
+    window.SN_FEEDBACK.getMany = async (ids) => {
+      // I Ricevuti arrivano con molto comodo: è la finestra in cui l'owner
+      // passa a un'altra sezione e si mette a scrivere.
+      if (ids.includes('lento1')) await new Promise((r) => setTimeout(r, 4000));
+      return ids.map((id) => {
+        const base = righe.find((x) => x._id === id);
+        const { _proiezione, ...resto } = base;
+        return { ...resto, notes: `NOTA DI ${id}` };
+      });
+    };
+    window.__fbTest.setAdmin(true, { email: 'owner@example.invalid' });
+    window.__fbTest.setData(JSON.parse(JSON.stringify(righe)));
+  });
+
+  // Mentre i Ricevuti arrivano, passo a «In coda»: quella sezione c'è subito.
+  await page.locator('[data-tab="queue"]').click();
+  const nota = page.locator('.fb-card[data-id="coda1"] .fb-notes');
+  await expect(nota).toBeVisible({ timeout: 15_000 });
+  await nota.fill('Sto scrivendo la mia nota di lavorazione.');
+
+  // Arriva la sezione di prima, che nessuno sta guardando.
+  await page.waitForTimeout(5000);
+  await expect(nota).toHaveValue('Sto scrivendo la mia nota di lavorazione.');
+  // E la sezione di prima è arrivata davvero: senza questo la prova sarebbe
+  // verde perché non è successo niente.
+  await page.locator('[data-tab="inbox"]').click();
+  await expect(page.locator('.fb-card[data-id="lento1"] .fb-notes')).toHaveValue('NOTA DI lento1', { timeout: 10_000 });
 });

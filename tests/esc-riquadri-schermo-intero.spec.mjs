@@ -210,6 +210,26 @@ test('home: la domanda di conferma si annulla col primo Esc, lo schermo intero r
   await expect.poll(async () => (await stato(app)).cf, { timeout: 8000 }).toBe(false);
 });
 
+test('pagina dei feedback: l\'immagine ingrandita si chiude col primo Esc', async ({ app, openTab }) => {
+  const page = await openTab('filo://feedback/feedback.html');
+  await page.waitForSelector('#lightbox', { state: 'attached', timeout: 8000 });
+  await entra(app);
+  // Lo stato in cui mette la pagina il clic su un'immagine allegata.
+  await page.evaluate(() => {
+    document.getElementById('lightboxImg').src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    document.getElementById('lightbox').classList.add('open');
+  });
+  await expect(page.locator('#lightbox.open')).toBeVisible({ timeout: 4000 });
+  await new Promise((r) => setTimeout(r, 400));
+
+  await esc(app);
+  await expect(page.locator('#lightbox.open')).toHaveCount(0);
+  expect((await stato(app)).cf, 'il primo Esc non doveva togliere lo schermo intero').toBe(true);
+
+  await esc(app);
+  await expect.poll(async () => (await stato(app)).cf, { timeout: 8000 }).toBe(false);
+});
+
 // Le due voci del menu del tasto destro che aprono un riquadro loro: nessuna
 // delle due sa niente dello schermo intero, e funzionano lo stesso.
 async function voceDelMenu(page, id) {

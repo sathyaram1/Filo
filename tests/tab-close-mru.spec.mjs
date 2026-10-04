@@ -17,7 +17,7 @@ test('chiudere la tab attiva riporta alla penultima vista, non all’adiacente',
       A: await open('filo://history/history.html'),
       B: await open('filo://security/security.html'),
       C: await open('filo://options/options.html'),
-      D: await open('filo://editor/editor.html'),
+      D: await open('filo://feedback/feedback.html'),
     };
   });
 
