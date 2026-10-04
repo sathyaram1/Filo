@@ -446,8 +446,15 @@ function lettoreWindows({ avvia = spawn, pid = process.pid, quandoCambia = () =>
     sveglia();
   }
 
+  // `ultimo` è solo la riga del processo vivo; `ultimaRiga` resta a chi disegna mentre il lettore riparte.
   // Un lettore che si è arreso non ha più niente di vero da dire: meglio una voce che sparisce che una che mente.
-  return { assicura, pronto, ferma, ultimo: () => (fresco || figlio ? ultimo : null), attivo: () => !!figlio };
+  return {
+    assicura, pronto, ferma,
+    ultimo: () => (fresco ? ultimo : null),
+    ultimaRiga: () => (figlio ? ultimo : null),
+    inAttesa: () => !!figlio && !fresco,
+    attivo: () => !!figlio,
+  };
 }
 
 // ── Il monitor: chi guarda chiede, il lettore gira finché qualcuno guarda ────
@@ -492,16 +499,18 @@ function lettoreDiWindows() {
   return windows;
 }
 
+// `fresco: false` quando il PowerShell che riparte non ha ancora scritto: la home tiene la riga di prima, la chat no.
 async function lettoreDiSistema() {
   if (process.platform === 'win32') {
     const w = lettoreDiWindows();
     w.assicura();
     await w.pronto(ATTESA_PRIMA_LETTURA_MS);
-    return componi(w.ultimo(), onlineDaElectron());
+    if (w.inAttesa()) return { grezzo: componi(w.ultimaRiga(), onlineDaElectron()), fresco: false };
+    return { grezzo: componi(w.ultimo(), onlineDaElectron()), fresco: true };
   } else if (process.platform === 'darwin') {
-    return componi(await leggiMac(), onlineDaElectron());
+    return { grezzo: componi(await leggiMac(), onlineDaElectron()), fresco: true };
   } else {
-    return componi(await leggiLinux(), onlineDaElectron());
+    return { grezzo: componi(await leggiLinux(), onlineDaElectron()), fresco: true };
   }
 }
 
@@ -512,10 +521,11 @@ function annuncia() {
   } catch (_) {}
 }
 
-function pubblica(grezzo) {
+// `letto` è l'ora della lettura vera: una riga di prima del sonno ridisegnata non la rinfresca.
+function pubblica(grezzo, { fresco = true } = {}) {
   const nuovo = S().normalizza(grezzo);
   const f = JSON.stringify(nuovo);
-  stato = { ...nuovo, letto: Date.now() };
+  stato = { ...nuovo, letto: fresco ? Date.now() : (stato ? stato.letto : 0) };
   if (f !== firma) {
     firma = f;
     annuncia();
@@ -527,7 +537,11 @@ function leggiAdesso() {
   if (letturaInCorso) return letturaInCorso;
   letturaInCorso = (async () => {
     try {
-      pubblica(lettoreProve ? await lettoreProve() : await lettoreDiSistema());
+      if (lettoreProve) pubblica(await lettoreProve());
+      else {
+        const { grezzo, fresco } = await lettoreDiSistema();
+        pubblica(grezzo, { fresco });
+      }
     } catch (_) {}
     letturaInCorso = null;
     return stato;
@@ -586,13 +600,17 @@ function schedaDavanti(wc) {
   if (wc && osservatori.has(wc.id)) richiedi();
 }
 
-// Per la chat: lo stato di adesso, aspettando la prima lettura se nessuno guardava.
+const frescoPer = (chiesto) => !!stato && chiesto - stato.letto <= GIRO_MS * 2;
+
+// Per la chat: lo stato di adesso, aspettando la prima lettura se nessuno guardava. Se la lettura nuova non arriva,
+// null («il computer non ha risposto»): lo stato di prima della pausa non si dà per letto adesso.
 async function statoPerChat() {
+  const chiesto = Date.now();
   richiedi();
-  if (!stato || Date.now() - stato.letto > GIRO_MS * 2) {
+  if (!frescoPer(chiesto)) {
     await Promise.race([leggiAdesso(), new Promise((r) => setTimeout(r, ATTESA_PRIMA_LETTURA_MS + 500))]);
   }
-  return stato;
+  return frescoPer(chiesto) ? stato : null;
 }
 
 // Chi deve dire «sei offline» (gli errori della chat) chiede qui: la risposta non aspetta un giro.

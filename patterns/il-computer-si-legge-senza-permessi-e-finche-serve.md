@@ -43,7 +43,9 @@ giorno, è un costo vero. Quindi:
   sveglio il lettore; quando la finestra la riporta davanti, il lettore riparte
   da sé;
 - un lettore che riparte non consegna la lettura di prima del sonno come
-  fresca: chi chiede aspetta la riga nuova;
+  fresca: chi chiede aspetta la riga nuova, e se non arriva in tempo la chat
+  riceve «il computer non ha risposto», non il dato vecchio (la home intanto
+  tiene la riga di prima);
 - su Windows il PowerShell parte alla prima richiesta, legge ogni due secondi
   con chiamate che non aprono altri processi, scrive solo quando la lettura
   cambia, ed esce da sé se Filo non c'è più (controlla il processo che l'ha

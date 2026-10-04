@@ -267,9 +267,35 @@ test('Windows: dopo il sonno chi chiede aspetta la riga nuova, non riceve quella
   assert.equal(w.ultimo(), null, 'fermo, il lettore non ha niente di vero da dire');
   // Il caricatore si stacca mentre il lettore dorme; poi qualcuno chiede.
   w.assicura();
-  assert.equal(w.ultimo().batteria.livello, 80, 'mentre riparte chi disegna tiene l\'ultima lettura');
+  assert.equal(w.ultimo(), null, 'mentre riparte la riga di prima non è una lettura');
+  assert.equal(w.ultimaRiga().batteria.livello, 80, 'mentre riparte chi disegna tiene l\'ultima riga');
+  assert.equal(w.inAttesa(), true);
   await w.pronto(2000);
   assert.deepEqual(w.ultimo().batteria, { livello: 30, inCarica: false, collegata: false });
+  assert.equal(w.inAttesa(), false);
+  w.ferma();
+});
+
+test('Windows: un PowerShell che riparte più lento dell\'attesa non fa passare la riga di prima del sonno per nuova', async () => {
+  let avvii = 0;
+  const w = L.lettoreWindows({
+    avvia: () => {
+      const f = figlioFinto();
+      avvii += 1;
+      const b = avvii === 1 ? { livello: 80, inCarica: true, collegata: true } : { livello: 30, inCarica: false, collegata: false };
+      setTimeout(() => f.stdout.write(`${JSON.stringify({ batteria: b })}\n`), avvii === 1 ? 10 : 400);
+      return f;
+    },
+  });
+  w.assicura();
+  await w.pronto(2000);
+  w.ferma();
+  w.assicura();
+  await w.pronto(100);
+  assert.equal(w.ultimo(), null, 'scaduta l\'attesa, il lettore non ha ancora niente di nuovo da dire');
+  assert.equal(w.inAttesa(), true);
+  await w.pronto(2000);
+  assert.equal(w.ultimo().batteria.livello, 30);
   w.ferma();
 });
 

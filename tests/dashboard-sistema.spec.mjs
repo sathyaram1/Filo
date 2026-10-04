@@ -322,3 +322,25 @@ test('con la home dietro un\'altra scheda il lettore si addormenta, e riparte qu
   await expect(voce(page, 'batteria')).toHaveText('41%', { timeout: 3_000 });
   await app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.veglia(0));
 });
+
+test('dopo una pausa del lettore, se la lettura nuova tarda, la chat non riceve lo stato di prima come letto adesso', async ({ app, openTab, testServer }) => {
+  await finto(app, { ...PIENO, batteria: { livello: 80, inCarica: true, collegata: true } });
+  // La home va dietro un sito e il lettore si ferma; intanto il caricatore si stacca e il computer risponde lento.
+  await openTab(testServer.html('<h1>un sito qualunque</h1>'));
+  await app.evaluate(() => globalThis.SN_SISTEMA_MAIN.ferma());
+  const giro = await app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.GIRO_MS);
+  await new Promise((r) => setTimeout(r, giro * 2 + 1_000));
+  const testo = await app.evaluate(async () => {
+    globalThis.__sistemaFinto = { batteria: { livello: 30, inCarica: false, collegata: false }, rete: null, bluetooth: null };
+    globalThis.SN_SISTEMA_MAIN._perProve.usaLettore(async () => {
+      await new Promise((r) => setTimeout(r, 5_000));
+      return globalThis.__sistemaFinto;
+    });
+    return (await globalThis.SN_FILO_STATE.assemble({ creditiFreschi: true })).stateText;
+  });
+  expect(testo).not.toContain('Batteria: 80%');
+  expect(testo).toContain('il computer non ha risposto');
+  // Quando la lettura arriva, il turno dopo la sa.
+  await expect.poll(async () => app.evaluate(async () => (await globalThis.SN_FILO_STATE.assemble({ creditiFreschi: true })).stateText),
+    { timeout: 10_000 }).toContain('Batteria: 30%');
+});
