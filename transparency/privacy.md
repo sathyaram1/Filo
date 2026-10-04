@@ -106,7 +106,7 @@ Oltre ai modelli e al server di Filo, alcune funzioni parlano con altri servizi.
 - **I registri dei domini e dei certificati** (rdap.org e crt.sh). Per i siti che mostrano già qualche segnale sospetto, ricevono il nome del sito, per sapere da quanto tempo esiste.
 - **Tavily, o DuckDuckGo senza chiave.** Quando l'agente cerca sul web, ricevono la ricerca che l'agente ha formulato.
 - **Il sito che stai visitando.** Quando apri l'Aiuto, Filo gli chiede le sue istruzioni per agenti (il file llms.txt), se ne ha.
-- **Il sito di un link.** Quando chiedi cos'è un link, Filo gli chiede titolo e descrizione della pagina.
+- **Il sito di un link.** Quando fai tasto destro su un link, Filo chiede subito a quel sito titolo e descrizione della pagina, per spiegarti dove porta. Non lo fa se l'indirizzo sembra portare con sé dati che non devono uscire o se aprirlo farebbe già qualcosa.
 - **Il servizio di icone di Google.** Nella home, per mostrare l'icona dei siti che Filo ti suggerisce, riceve il nome di quei siti.
 - **Google, come motore di ricerca.** Quando scrivi nella barra qualcosa che non è un indirizzo, la ricerca si apre sulla pagina dei risultati di Google. Lo stesso dal tasto destro: «cerca» su un testo selezionato apre la ricerca di Google, e la ricerca di un'immagine apre Google Lens, che riceve l'indirizzo dell'immagine.
 - **GitHub, EasyList e Fanboy.** All'avvio GitHub riceve la richiesta della versione più recente; da questi tre Filo scarica anche le liste per bloccare la pubblicità e i banner dei cookie.
