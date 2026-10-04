@@ -1,4 +1,4 @@
-// Esplorazione del giro 2 (verifica locale, letture-delta): l'avviso del giro sull'intestazione della lista
+// Prova del giro 2, rilievo 3 (verifica locale, letture-delta): l'avviso del giro sull'intestazione della lista
 // resta spiegato (il suggerimento al passaggio del mouse) anche quando lo stesso giro porta righe nuove.
 
 import { test, expect } from '../../fixtures/electron.mjs';
