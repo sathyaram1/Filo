@@ -420,6 +420,32 @@ test('due comandi di fila non si accavallano: il secondo parte quando il primo h
   } finally { C._perProve.usaComputer(null); }
 });
 
+test('leggere un elenco non fa la fila dei comandi; due letture in volo sono una, ma non dopo un comando finito', async () => {
+  const ordine = [];
+  const attese = [];
+  const pc = finto({ dispositivi: [{ indirizzo: '00:11:22:33:44:55', nome: 'Cuffie', collegato: false }] });
+  const lento = {
+    ...pc,
+    async btElenco() { ordine.push('elenco'); await new Promise((r) => attese.push(r)); return pc.btElenco(); },
+    async radio(p) { ordine.push(`radio ${p.acceso}`); return pc.radio(p); },
+  };
+  C._perProve.usaComputer(lento);
+  try {
+    const a = C.comanda({ cosa: 'bluetooth', elenca: true });
+    const b = C.comanda({ cosa: 'bluetooth', elenca: true });
+    const spento = await C.comanda({ cosa: 'bluetooth', acceso: false });
+    assert.equal(spento.ok, true, 'il comando non aspetta la lettura in volo');
+    assert.deepEqual(ordine, ['elenco', 'radio false']);
+    const c = C.comanda({ cosa: 'bluetooth', elenca: true });
+    await new Promise((r) => setTimeout(r, 10));
+    assert.deepEqual(ordine, ['elenco', 'radio false', 'elenco'], 'dopo un comando finito la lettura riparte');
+    for (const libera of attese) libera();
+    const [ra, rb, rc] = await Promise.all([a, b, c]);
+    assert.equal(ra, rb);
+    assert.equal(rc.acceso, false);
+  } finally { C._perProve.usaComputer(null); }
+});
+
 test('le impostazioni che Filo apre stanno in un elenco fisso: nessun indirizzo arriva da fuori', () => {
   assert.equal(C.uriImpostazioni('win-posizione'), 'ms-settings:privacy-location');
   assert.equal(C.uriImpostazioni('https://esempio.it'), null);

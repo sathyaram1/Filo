@@ -15,7 +15,7 @@ const PARTENZA = {
 };
 
 // L'esecutore finto cambia la stessa lettura che il lettore finto restituisce: come un computer vero.
-async function computerFinto(app, { stato = PARTENZA, dispositivi = [], reti = [], negato = null } = {}) {
+async function computerFinto(app, { stato = PARTENZA, dispositivi = [], reti = [], negato = null, letturaMs = 0 } = {}) {
   await app.evaluate(async (_, a) => {
     globalThis.__pc = JSON.parse(JSON.stringify(a.stato));
     globalThis.__pcChiamate = [];
@@ -23,6 +23,7 @@ async function computerFinto(app, { stato = PARTENZA, dispositivi = [], reti = [
     const disp = a.dispositivi;
     const reti = a.reti;
     const traccia = (nome, p) => globalThis.__pcChiamate.push([nome, p || {}]);
+    const lettura = () => new Promise((r) => setTimeout(r, a.letturaMs));
     globalThis.SN_COMANDI_SISTEMA._perProve.usaComputer({
       async volume(p) {
         traccia('volume', p);
@@ -42,7 +43,7 @@ async function computerFinto(app, { stato = PARTENZA, dispositivi = [], reti = [
         } else pc.bluetooth = { acceso: p.acceso, dispositivi: p.acceso ? disp.filter((d) => d.collegato).map((d) => d.nome) : [] };
         return { ok: true, acceso: p.acceso };
       },
-      async btElenco() { traccia('btElenco'); return { ok: true, acceso: pc.bluetooth.acceso, dispositivi: disp.map((d) => ({ ...d })) }; },
+      async btElenco() { traccia('btElenco'); await lettura(); return { ok: true, acceso: pc.bluetooth.acceso, dispositivi: disp.map((d) => ({ ...d })) }; },
       async btCollega(p) {
         traccia('btCollega', p);
         const d = disp.find((x) => x.indirizzo === p.indirizzo);
@@ -50,7 +51,7 @@ async function computerFinto(app, { stato = PARTENZA, dispositivi = [], reti = [
         pc.bluetooth.dispositivi = disp.filter((x) => x.collegato).map((x) => x.nome);
         return { ok: true, collegato: p.collega };
       },
-      async wifiElenco() { traccia('wifiElenco'); return { ok: true, acceso: pc.wifi.acceso, reti: reti.map((r) => ({ nome: r, attiva: pc.rete.nome === r })), attuale: pc.rete.nome || null }; },
+      async wifiElenco() { traccia('wifiElenco'); await lettura(); return { ok: true, acceso: pc.wifi.acceso, reti: reti.map((r) => ({ nome: r, attiva: pc.rete.nome === r })), attuale: pc.rete.nome || null }; },
       async wifiCollega(p) {
         traccia('wifiCollega', p);
         pc.rete = { online: true, tipo: 'wifi', nome: p.rete };
@@ -58,7 +59,7 @@ async function computerFinto(app, { stato = PARTENZA, dispositivi = [], reti = [
       },
     });
     await globalThis.SN_SISTEMA_MAIN._perProve.usaLettore(async () => globalThis.__pc);
-  }, { stato, dispositivi, reti, negato });
+  }, { stato, dispositivi, reti, negato, letturaMs });
 }
 
 const computer = (app) => app.evaluate(() => JSON.parse(JSON.stringify(globalThis.__pc)));
@@ -220,6 +221,53 @@ test('in chat: una rete detta a metà si trova, e cambiare rete chiede conferma 
   await clickConfirm(page, 'ok');
   await expect.poll(async () => (await computer(app)).rete.nome).toBe('Ufficio 5G');
   await expect(voce(page, 'rete')).toHaveText('Ufficio 5G', { timeout: 5_000 });
+});
+
+test('con tante reti conosciute il riquadro scorre, con la rotella e con le frecce, e si arriva all\'ultima', async ({ app }) => {
+  const reti = ['Casa', ...Array.from({ length: 40 }, (_, i) => `Rete numero ${i + 1}`)];
+  await computerFinto(app, { reti });
+  const page = await home(app);
+  await expect(voce(page, 'rete')).toHaveText('Casa', { timeout: 8_000 });
+  await voce(page, 'rete').click();
+  const ultima = opzione(page, 'Collegati a Rete numero 40');
+  await expect(ultima).toBeAttached({ timeout: 5_000 });
+  const b = await riquadro(page).boundingBox();
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+  await page.mouse.wheel(0, 2000);
+  await page.waitForTimeout(300);
+  await expect(riquadro(page)).toBeVisible();
+  await expect(ultima).toBeInViewport();
+  // La pagina sotto che scorre invece lo chiude, come prima.
+  await page.evaluate(() => window.dispatchEvent(new Event('scroll')));
+  await expect(riquadro(page)).toHaveCount(0);
+
+  // Dalla prima voce, freccia su gira in fondo (Nascondi, Copia, poi l'ultima rete), sotto il bordo del riquadro.
+  await voce(page, 'rete').click();
+  await expect(ultima).toBeAttached({ timeout: 5_000 });
+  await riquadro(page).locator('.sn-select-option').first().focus();
+  for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowUp');
+  await page.waitForTimeout(300);
+  await expect(page.locator(':focus')).toHaveText('Collegati a Rete numero 40');
+  await page.keyboard.press('Enter');
+  await expect.poll(async () => (await computer(app)).rete.nome).toBe('Rete numero 40');
+});
+
+test('aperto il riquadro del Bluetooth, il tasto spegne subito: non aspetta l\'elenco dei dispositivi, e le letture non si accodano', async ({ app }) => {
+  await computerFinto(app, { letturaMs: 4000, dispositivi: [{ indirizzo: '00:11:22:33:44:55', nome: 'Cuffie', collegato: false }] });
+  const page = await home(app);
+  await expect(voce(page, 'bluetooth')).toHaveAttribute('title', 'Bluetooth acceso', { timeout: 8_000 });
+  // Aperto e richiuso due volte cercando la voce giusta, poi il gesto.
+  for (let i = 0; i < 2; i++) {
+    await voce(page, 'bluetooth').click();
+    await page.keyboard.press('Escape');
+  }
+  await voce(page, 'bluetooth').click();
+  await opzione(page, 'Spegni il Bluetooth').click();
+  await expect.poll(async () => (await computer(app)).bluetooth.acceso, { timeout: 2_000 }).toBe(false);
+  await expect(opzione(page, 'Accendi il Bluetooth')).toBeVisible({ timeout: 2_000 });
+  // Tre aperture con la lettura ancora in volo sono una lettura sola, e il suo elenco arriva nel riquadro aperto.
+  await expect(opzione(page, 'Collega Cuffie')).toBeVisible({ timeout: 10_000 });
+  expect((await chiamate(app)).filter((c) => c[0] === 'btElenco').length).toBe(1);
 });
 
 test('un sito non comanda il computer: le due porte rispondono «rifiutato» fuori da Filo', async ({ app, shell }) => {
