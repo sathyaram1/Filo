@@ -32,7 +32,7 @@ async function apri(page, feedbacks, pending, approveReply) {
     window.filo.message = async (msg) => {
       const t = msg && msg.type;
       if (t === 'auth_status') return { ok: true, signedIn: true, isAdmin: true, profile: null };
-      if (t === 'merge_approvals_get') return { ok: true, pending: cfg.pending, failed: [], recent: [], preapproved: [], ttlMs: 7 * GIORNO };
+      if (t === 'merge_approvals_get') return { ok: true, pending: cfg.pending, failed: [], recent: [], preapproved: [], ttlMs: 7 * cfg.GIORNO };
       if (t === 'merge_approval_approve') { window.__chiamate.push('approve'); await new Promise((r) => setTimeout(r, 300)); return cfg.approveReply || { ok: true, result: 'merged', sha: 'deadbeefcafe' }; }
       if (t === 'merge_approval_discard') { window.__chiamate.push('discard'); return { ok: true, result: 'discarded' }; }
       return orig(msg);
