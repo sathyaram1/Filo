@@ -278,3 +278,14 @@ test('un collegamento di posta cliccato apre il programma di posta anche se la p
   await page.locator('#l').click({ noWaitAfter: true });
   await expect.poll(() => app.evaluate(() => globalThis.__esterni), { timeout: 6000 }).toEqual(['mailto:x@y.it']);
 });
+
+test('il pulsante di un modulo che apre una scheda la apre anche se la pagina apre una pubblicità a ogni clic', async ({ app, openTab, testServer }) => {
+  const ad = testServer.html('<title>AD</title>');
+  const dest = testServer.html('<title>DEST</title>');
+  const page = await testServer.openReady(openTab, `<!doctype html><body style="padding:24px">
+    <form action="${dest}" method="get" target="_blank"><input name="q" value="ciao mondo"><button id="b">Cerca</button></form>
+    <script>var AD=${JSON.stringify(ad)};${PUBBLICITA}</script></body>`);
+  await page.waitForTimeout(5600);
+  await page.locator('#b').click();
+  await expect.poll(async () => (await schede(app)).filter((x) => x.startsWith(`${dest}?q=ciao`)).length, { timeout: 6000 }).toBe(1);
+});

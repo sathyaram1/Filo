@@ -406,11 +406,22 @@ try {
     window.addEventListener(ev, gesto, { capture: true, passive: true });
   }
   const SCHEMI_APRIBILI = /^(https?|mailto|tel|sms):/i;
+  // Il pulsante d'invio cliccato porta dove lo manda il suo modulo: con GET i campi diventano la domanda dell'indirizzo.
+  const indirizzoDelModulo = (percorso) => {
+    try {
+      const b = percorso.find((n) => n && n.form && /^(submit|image)$/i.test(n.type || ''));
+      if (!b) return '';
+      const f = b.form;
+      const u = new URL(b.hasAttribute('formaction') ? b.formAction : f.action, document.baseURI);
+      if (String(b.formMethod || f.method || 'get').toLowerCase() === 'get') u.search = new URLSearchParams(new FormData(f, b)).toString();
+      return u.href;
+    } catch (_) { return ''; }
+  };
   const scelto = (e) => {
     if (!e.isTrusted || (e.type === 'auxclick' && e.button !== 1)) return;
     const percorso = typeof e.composedPath === 'function' ? e.composedPath() : [e.target];
     const a = percorso.find((n) => n && (n.localName === 'a' || n.localName === 'area') && n.href);
-    const url = a ? String(a.href) : '';
+    const url = a ? String(a.href) : indirizzoDelModulo(percorso);
     if (!SCHEMI_APRIBILI.test(url)) return;
     try { ipcRenderer.sendSync('filo:apertura-scelta', url); } catch (_) {}
   };
