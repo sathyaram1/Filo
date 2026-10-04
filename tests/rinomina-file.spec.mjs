@@ -38,8 +38,8 @@ const NOME_NUOVO = 'Bolletta luce Enel Marzo 2026.pdf';
 
 // Il modello dei nomi risponde con le prime due righe del contenuto che gli arriva (e lo ricorda): se il
 // testo del PDF non gli arrivasse, il nome non avrebbe le parole del documento.
-async function modelloDeiNomi(app) {
-  await app.evaluate(async () => {
+async function modelloDeiNomi(app, { ritardoMs = 0 } = {}) {
+  await app.evaluate(async (_e, ritardoMs) => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
@@ -49,13 +49,14 @@ async function modelloDeiNomi(app) {
     });
     globalThis.__nomiVisti = [];
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
+      if (ritardoMs) await new Promise((r) => setTimeout(r, ritardoMs));
       const u = messages.find((m) => m.role === 'user');
       const testo = typeof u.content === 'string' ? u.content : u.content.map((p) => p.text || '').join('\n');
       globalThis.__nomiVisti.push(testo);
       const m = /Nome attuale:[^\n]*\n\n([^\n]+)\n([^\n]+)/.exec(testo);
       return { text: m ? `«${m[1]} ${m[2]}.pdf»` : 'NESSUN NOME', model: attempts[0].model, provider: attempts[0].provider, usage: {} };
     };
-  });
+  }, ritardoMs);
 }
 
 async function scarica(nome, corpo, { shell, openTab, testServer }) {
@@ -351,5 +352,141 @@ test('acceso in Preferenze, uno scaricamento col nome che non dice niente prende
     await expect(annulla).toBeVisible({ timeout: 10000 });
     await annulla.click();
     await expect.poll(() => existsSync(rec.savePath) && !existsSync(nuovo), { timeout: 10000 }).toBe(true);
+  } finally { await chiudi(); }
+});
+
+// Clic altrove dopo «Rinomina»: il riquadro con «Annulla» se ne va, il nome di prima resta al tasto destro.
+async function rinominaEChiudi(page) {
+  await page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Dai un nome sensato' }).click();
+  await expect(page.locator('.sn-rinomina-campo')).toHaveValue('Bolletta luce Enel Marzo 2026', { timeout: 15000 });
+  await page.locator('.sn-rinomina-ok').click();
+  await expect(page.locator('.sn-rinomina-esito-testo')).toHaveText(`Rinominato: ${NOME_NUOVO}`);
+  await page.mouse.click(5, 5);
+  await expect(page.locator('.sn-rinomina')).toHaveCount(0);
+}
+
+test('in chat, chiuso il riquadro, «Rimetti il nome di prima» dal tasto destro del file trovato e di quello trascinato', async ({ app }) => {
+  test.setTimeout(90_000);
+  const dir = cartellaTemporanea('filo-nomi-rimetti-');
+  const trovato = join(dir, 'scan_00231.pdf');
+  writeFileSync(trovato, BOLLETTA);
+  try {
+    await modelloFinto(app, [
+      { toolCalls: [{ id: 'f1', name: 'APRI_FILE', arguments: JSON.stringify({ percorso: trovato, etichetta: 'scan_00231.pdf' }) }] },
+      { text: 'Eccolo.' },
+    ]);
+    await modelloDeiNomi(app);
+    const page = await home(app);
+    await chiedi(page, 'trova la bolletta');
+    const chip = page.locator('a.dash-action-btn').first();
+    await expect(chip).toHaveText('scan_00231.pdf', { timeout: 15000 });
+    await chip.click({ button: 'right' });
+    await rinominaEChiudi(page);
+    await chip.click({ button: 'right' });
+    await page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Rimetti il nome di prima' }).click();
+    await expect(page.locator('.sn-rinomina-esito-testo')).toHaveText('Nome di prima rimesso: scan_00231.pdf');
+    expect(readdirSync(dir)).toEqual(['scan_00231.pdf']);
+    await expect(chip).toHaveAttribute('href', trovato);
+    // Rimesso, la voce non c'è più: non c'è un nome di prima da rimettere.
+    await page.keyboard.press('Escape');
+    await chip.click({ button: 'right' });
+    await expect(page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Rimetti' })).toHaveCount(0);
+    await page.keyboard.press('Escape');
+
+    await page.evaluate((p) => {
+      window.filo.percorsoDelFile = () => p;
+      const dt = new DataTransfer();
+      dt.items.add(new File(['%PDF'], 'scan_00231.pdf', { type: 'application/pdf' }));
+      document.getElementById('inputForm').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+    }, trovato);
+    const trascinato = page.locator('.dash-file-chip');
+    await expect(trascinato).toHaveText(/scan_00231\.pdf/);
+    await trascinato.click({ button: 'right' });
+    await rinominaEChiudi(page);
+    await expect(trascinato).toHaveText(/Bolletta luce Enel Marzo 2026\.pdf/);
+    await trascinato.click({ button: 'right' });
+    await page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Rimetti il nome di prima' }).click();
+    await expect(trascinato).toHaveText(/scan_00231\.pdf/);
+    expect(readdirSync(dir)).toEqual(['scan_00231.pdf']);
+  } finally {
+    await ripristina(app);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('Invio mentre Filo legge ancora il file: rinomina col nome che arriva, non con quello vecchio', async ({ app }) => {
+  test.setTimeout(90_000);
+  const dir = cartellaTemporanea('filo-nomi-presto-');
+  const vecchio = join(dir, 'scan_00231.pdf');
+  writeFileSync(vecchio, BOLLETTA);
+  try {
+    await modelloFinto(app, [
+      { toolCalls: [{ id: 'f1', name: 'APRI_FILE', arguments: JSON.stringify({ percorso: vecchio, etichetta: 'scan_00231.pdf' }) }] },
+      { text: 'Eccolo.' },
+    ]);
+    await modelloDeiNomi(app, { ritardoMs: 2500 });
+    const page = await home(app);
+    await chiedi(page, 'trova la bolletta');
+    const chip = page.locator('a.dash-action-btn', { hasText: 'scan_00231.pdf' });
+    await expect(chip).toBeVisible({ timeout: 15000 });
+    await chip.click({ button: 'right' });
+    await page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Dai un nome sensato' }).click();
+    await expect(page.locator('.sn-rinomina-stato')).toContainText('Leggo');
+    await page.locator('.sn-rinomina-campo').press('Enter');
+    await expect(page.locator('.sn-rinomina-stato')).toContainText('Rinomino appena ho il nome');
+    await expect(page.locator('.sn-rinomina-esito-testo')).toHaveText(`Rinominato: ${NOME_NUOVO}`, { timeout: 15000 });
+    expect(readdirSync(dir)).toEqual([NOME_NUOVO]);
+  } finally {
+    await ripristina(app);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// Il menu del pannello è una finestra a sé che si chiude quando perde il fuoco: senza gestore di finestre il
+// fuoco a volte glielo porta via la scheda sotto, e si riprova. Il clic che chiude il menu può «fallire» proprio
+// perché è arrivato: l'esito lo dice il disco, dopo.
+async function sceltaDalPannello(app, riga, testo) {
+  for (let tentativo = 0; tentativo < 3; tentativo++) {
+    await riga.click({ button: 'right' });
+    const fine = Date.now() + 3000;
+    while (Date.now() < fine) {
+      for (const popup of app.windows().filter((w) => !w.isClosed() && w.url().startsWith('data:text/html')).reverse()) {
+        const voce = popup.locator('.menu .item', { hasText: testo });
+        let c = 0;
+        try { c = await voce.count(); } catch (_) { c = 0; }
+        if (!c) continue;
+        try { await voce.click({ timeout: 2000 }); } catch (_) {}
+        return true;
+      }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  }
+  return false;
+}
+
+test('pannello degli scaricamenti in alto: tasto destro → «Dai un nome sensato» porta al riquadro, poi «Rimetti il nome di prima»', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  await modelloDeiNomi(app);
+  const { rec, chiudi } = await scarica('scan_00231.pdf', BOLLETTA, { shell, openTab, testServer });
+  try {
+    if (!(await shell.locator('#dl-panel').isVisible())) await shell.locator('#dl-indicator').click();
+    await expect(shell.locator('#dl-panel')).toBeVisible({ timeout: 10000 });
+    const riga = shell.locator('#dl-panel .dl-row', { hasText: 'scan_00231.pdf' });
+    await expect(riga).toBeVisible();
+    expect(await sceltaDalPannello(app, riga, 'Dai un nome sensato')).toBe(true);
+    await expect.poll(() => app.windows().some((w) => w.url().startsWith('filo://downloads/')), { timeout: 10000 }).toBe(true);
+    const dl = app.windows().find((w) => w.url().startsWith('filo://downloads/'));
+    await expect(dl.locator('.sn-rinomina-campo')).toHaveValue('Bolletta luce Enel Marzo 2026', { timeout: 15000 });
+    await dl.locator('.sn-rinomina-ok').click();
+    await expect(dl.locator('.sn-rinomina-esito-testo')).toHaveText(`Rinominato: ${NOME_NUOVO}`);
+    const nuovo = join(rec.savePath, '..', NOME_NUOVO);
+    expect(existsSync(nuovo)).toBe(true);
+
+    if (!(await shell.locator('#dl-panel').isVisible())) await shell.locator('#dl-indicator').click();
+    const rinominata = shell.locator('#dl-panel .dl-row', { hasText: NOME_NUOVO });
+    await expect(rinominata).toBeVisible({ timeout: 10000 });
+    expect(await sceltaDalPannello(app, rinominata, 'Rimetti il nome di prima')).toBe(true);
+    await expect.poll(() => existsSync(rec.savePath) && !existsSync(nuovo), { timeout: 10000 }).toBe(true);
+    await expect(shell.locator('#dl-panel .dl-row', { hasText: 'Nome di prima rimesso: scan_00231.pdf' })).toBeVisible({ timeout: 10000 });
   } finally { await chiudi(); }
 });
