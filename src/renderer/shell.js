@@ -1757,7 +1757,9 @@
     // #950 — il tasto destro su un file del pannello: le stesse azioni della pagina Scaricamenti, compreso il
     // nome sensato. Il riquadro per scriverlo sta nella pagina (qui non c'è spazio per la casella e l'esito).
     let rigaMenuId = '';
-    async function menuRiga(r, x, y) {
+    async function menuRiga(riga, x, y) {
+      // La riga resta in pagina mentre il record cambia (nome nuovo, file sparito): conta quello di adesso.
+      const r = dls.get(riga.id) || riga;
       rigaMenuId = r.id;
       const entries = [];
       if (!r.missing) entries.push({ label: 'Apri file', action: 'dl-riga-apri' });

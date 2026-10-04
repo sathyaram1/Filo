@@ -79,8 +79,9 @@ test('file trovato in chat: rinominato e chiuso il riquadro, il nome di prima si
     expect(existsSync(join(dir, NUOVO))).toBe(true);
 
     await rimettiDalMenu(page, chip);
-    await expect.poll(() => existsSync(vecchio), { timeout: 10000 }).toBe(true);
-    expect(existsSync(join(dir, NUOVO))).toBe(false);
+    await expect.poll(() => existsSync(vecchio) && !existsSync(join(dir, NUOVO)), { timeout: 10000 }).toBe(true);
+    await expect(chip).toHaveText('scan_00231.pdf');
+    await page.screenshot({ path: join(process.cwd(), 'tests', '.shots', 'v950-rimesso-chat.png') });
   } finally {
     await ripristina(app);
     rmSync(dir, { recursive: true, force: true });
@@ -109,8 +110,8 @@ test('file trascinato dove si scrive: rinominato e chiuso il riquadro, il nome d
     expect(existsSync(join(dir, NUOVO))).toBe(true);
 
     await rimettiDalMenu(page, chip);
-    await expect.poll(() => existsSync(vecchio), { timeout: 10000 }).toBe(true);
-    expect(existsSync(join(dir, NUOVO))).toBe(false);
+    await expect.poll(() => existsSync(vecchio) && !existsSync(join(dir, NUOVO)), { timeout: 10000 }).toBe(true);
+    await expect(page.locator('.dash-file-chip')).toHaveText(/scan_00231\.pdf/);
   } finally {
     await ripristina(app);
     rmSync(dir, { recursive: true, force: true });

@@ -6,17 +6,26 @@ import { createServer } from 'node:http';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-async function voceDelMenu(app, testo) {
-  const deadline = Date.now() + 8000;
-  while (Date.now() < deadline) {
-    const popup = app.windows().find((w) => w.url().startsWith('data:text/html'));
-    if (popup) {
-      const voce = popup.locator('.menu .item', { hasText: testo });
-      try { if (await voce.count()) return voce; } catch (_) { /* popup che si sta chiudendo */ }
+// Tasto destro sulla riga e clic sulla voce del menu a comparsa (una finestra a sé, che si chiude quando perde
+// il fuoco: senza gestore di finestre il fuoco a volte glielo porta via la scheda sotto, e si riprova).
+async function scegli(app, riga, testo) {
+  for (let tentativo = 0; tentativo < 3; tentativo++) {
+    await riga.click({ button: 'right' });
+    const deadline = Date.now() + 3000;
+    while (Date.now() < deadline) {
+      for (const popup of app.windows().filter((w) => !w.isClosed() && w.url().startsWith('data:text/html')).reverse()) {
+        const voce = popup.locator('.menu .item', { hasText: testo });
+        let c = 0;
+        try { c = await voce.count(); } catch (_) { c = 0; }
+        if (!c) continue;
+        // La scelta chiude il menu: il clic può «fallire» proprio perché è arrivato. Lo dice il disco, dopo.
+        try { await voce.click({ timeout: 2000 }); } catch (_) {}
+        return true;
+      }
+      await new Promise((r) => setTimeout(r, 100));
     }
-    await new Promise((r) => setTimeout(r, 100));
   }
-  return null;
+  return false;
 }
 
 test('tasto destro su un file nel pannello degli scaricamenti → «Dai un nome sensato» → file rinominato', async ({ app, shell, openTab, testServer }) => {
@@ -53,18 +62,10 @@ test('tasto destro su un file nel pannello degli scaricamenti → «Dai un nome 
     await expect(shell.locator('#dl-panel')).toBeVisible({ timeout: 10000 });
     const riga = shell.locator('#dl-panel .dl-row', { hasText: 'scan_00231.txt' });
     await expect(riga).toBeVisible();
-    await riga.click({ button: 'right' });
-    const voce = await voceDelMenu(app, 'Dai un nome sensato');
-    expect(voce, 'il tasto destro sulla riga offre «Dai un nome sensato»').not.toBeNull();
-    await voce.click();
+    expect(await scegli(app, riga, 'Dai un nome sensato'), 'il tasto destro sulla riga offre «Dai un nome sensato»').toBe(true);
 
-    const dl = app.windows().find((w) => w.url().startsWith('filo://downloads/'))
-      || await app.waitForEvent('window', { predicate: (w) => w.url().startsWith('filo://downloads/'), timeout: 10000 }).catch(() => null);
-    let pagina = dl;
-    if (!pagina) {
-      await expect.poll(() => app.windows().some((w) => w.url().startsWith('filo://downloads/')), { timeout: 10000 }).toBe(true);
-      pagina = app.windows().find((w) => w.url().startsWith('filo://downloads/'));
-    }
+    await expect.poll(() => app.windows().some((w) => w.url().startsWith('filo://downloads/')), { timeout: 10000 }).toBe(true);
+    const pagina = app.windows().find((w) => w.url().startsWith('filo://downloads/'));
     await expect(pagina.locator('.sn-rinomina-campo')).toHaveValue('Bolletta luce Enel marzo 2026', { timeout: 15000 });
     await pagina.locator('.sn-rinomina-ok').click();
     await expect(pagina.locator('.sn-rinomina-esito-testo')).toHaveText('Rinominato: Bolletta luce Enel marzo 2026.txt');
@@ -74,10 +75,7 @@ test('tasto destro su un file nel pannello degli scaricamenti → «Dai un nome 
     if (!(await shell.locator('#dl-panel').isVisible())) await shell.locator('#dl-indicator').click();
     const rinominata = shell.locator('#dl-panel .dl-row', { hasText: 'Bolletta luce Enel marzo 2026.txt' });
     await expect(rinominata).toBeVisible({ timeout: 10000 });
-    await rinominata.click({ button: 'right' });
-    const rimetti = await voceDelMenu(app, 'Rimetti il nome di prima');
-    expect(rimetti, 'il tasto destro offre «Rimetti il nome di prima»').not.toBeNull();
-    await rimetti.click();
+    expect(await scegli(app, rinominata, 'Rimetti il nome di prima'), 'il tasto destro offre «Rimetti il nome di prima»').toBe(true);
     await expect.poll(() => existsSync(rec.savePath), { timeout: 10000 }).toBe(true);
   } finally {
     try { srv.closeAllConnections?.(); } catch (_) {}
