@@ -58,3 +58,20 @@ test('dopo una lettura completa della pagina il primo giro prende l\'ora del ser
   fs.scrivi('d1');
   assert.deepEqual(ids(await w.tick({ force: true })), ['d1']);
 });
+
+test('orologio del PC avanti: una scrittura firmata da un orologio dieci secondi indietro arriva al giro dopo', async () => {
+  let ora = Date.parse('2026-10-04T10:00:00Z');
+  const iso = (ms) => new Date(ms).toISOString();
+  const docs = new Map([['d0', { _id: 'd0', ut: ora - 3600e3, upd: ora - 3600e3 }]]);
+  const riga = (d) => ({ _id: d._id, _updateTime: iso(d.ut), updatedAt: iso(d.upd) });
+  const w = LIVE.makeWatcher({
+    listVersions: async () => ({ versions: [...docs.values()].map(riga), complete: true, readTime: iso(ora) }),
+    listChangedSince: async ({ since }) => ({ rows: [...docs.values()].filter((d) => d.upd > Date.parse(since)).map(riga), complete: true, readTime: iso(ora) }),
+    now: () => ora + 3 * 60e3, pollMs: 1000, reconcileMs: 3600e3,
+  });
+  assert.equal((await w.tick({ force: true })).kind, 'reconcile');
+  ora += 5000;
+  docs.set('d1', { _id: 'd1', ut: ora, upd: ora - 10000 });
+  ora += 55000;
+  assert.deepEqual(ids(await w.tick({ force: true })), ['d1']);
+});

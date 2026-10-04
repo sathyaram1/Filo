@@ -41,7 +41,8 @@ async function fingiFirestore(app, docs, { registro = [], numeri = {} } = {}) {
       C.cambiati += 1;
       const rows = globalThis.__docs.filter((d) => d.updatedAt > since).map(copia);
       C.cambiatiDoc += rows.length;
-      return { rows, complete: true };
+      // Come Firestore, che rimanda l'ora della lettura anche senza documenti: il giro ci prende il confine.
+      return { rows, complete: true, readTime: new Date().toISOString() };
     };
     FB.versionsOf = async (ids) => {
       C.seguiti.push(ids.slice());
