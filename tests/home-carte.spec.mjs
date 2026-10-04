@@ -692,3 +692,23 @@ test('le carte fisse in cima a sinistra non si scavalcano: il menu non lo offre 
   await expect(page.locator('.dash-bubble-filo', { hasText: 'resta in cima' })).toBeVisible({ timeout: 10_000 });
   expect((await esitiLetti(app))[1]).toContain('sta in cima finché suona');
 });
+
+test('alla larghezza minima della finestra le carte restano ai lati e il campo di scrittura sta al centro', async ({ app }) => {
+  test.setTimeout(45_000);
+  const page = await home(app);
+  await app.evaluate(async () => { await globalThis.SN_FILO_MEMORY.addTimer({ label: 'Pasta', seconds: 900 }); });
+  await page.reload();
+  await home(app);
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(600, 760));
+  await expect.poll(() => page.evaluate(() => innerWidth)).toBeLessThanOrEqual(720);
+  await expect(page.locator('#accade .dash-carta[data-tipo="timer"]', { hasText: 'Pasta' })).toBeVisible();
+  await expect(page.locator('#tieni .dash-carta[data-tipo="editor"]')).toBeVisible();
+  const r = await page.evaluate(() => {
+    const box = (s) => document.querySelector(s).getBoundingClientRect();
+    return { campo: box('#inputForm'), sx: box('#left'), dx: box('#right'), larga: document.documentElement.scrollWidth, vw: innerWidth };
+  });
+  expect(r.campo.left).toBeGreaterThanOrEqual(r.sx.right);
+  expect(r.campo.right).toBeLessThanOrEqual(r.dx.left);
+  expect(r.larga).toBeLessThanOrEqual(r.vw);
+  await page.screenshot({ path: join(SHOTS, 'home-carte-stretta.png') });
+});

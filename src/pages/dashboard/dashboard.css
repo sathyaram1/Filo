@@ -63,9 +63,9 @@ html, body {
 @media (max-width: 980px) {
   .dash { grid-template-columns: 200px 1fr 200px; padding: 28px 20px 20px; gap: 16px; }
 }
+/* Le colonne non si nascondono: le carte (un timer che suona) servono anche nella finestra più stretta o col testo ingrandito. */
 @media (max-width: 720px) {
-  .dash { grid-template-columns: 1fr; }
-  .dash-left, .dash-right { display: none; }
+  .dash { grid-template-columns: 170px 1fr 170px; padding: 24px 12px 16px; gap: 12px; }
 }
 
 .dash-left {
@@ -1115,6 +1115,7 @@ html, body {
   margin: 0 auto;
   width: 100%;
   max-width: 720px;
+  box-sizing: border-box;
 }
 .dash-input {
   flex: 1;
@@ -1229,10 +1230,6 @@ html, body {
 }
 .dash-lightbox.open { display: flex; }
 .dash-lightbox img { max-width: 95vw; max-height: 95vh; border-radius: 8px; }
-
-@media (max-width: 720px) {
-  .dash-input-wrap { grid-column: 1; }
-}
 
 .dash-dir {
   flex-basis: 100%;
