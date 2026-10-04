@@ -39,7 +39,7 @@ test('con la coda viva e la rete pronta la segnalazione arriva a «inviata»', a
   console.log('VOCE', JSON.stringify(v));
 });
 
-test('testi insoliti e tema scuro', async ({ app, openTab }) => {
+test('testi insoliti e tema scuro', async ({ app, shell, openTab }) => {
   await app.evaluate(async () => {
     const M = globalThis.SN_SEGNALAZIONI_MIE;
     await M.registra({ id: 'lungo', testo: 'parola'.repeat(2000) + '\n' + 'x '.repeat(4000), allegati: ['a.png', 'b.pdf'], stato: 'inviata', num: '12' });
@@ -55,8 +55,11 @@ test('testi insoliti e tema scuro', async ({ app, openTab }) => {
   const largo = await bacheca.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
   console.log('SCROLL ORIZZONTALE', largo);
   await bacheca.screenshot({ path: 'tests/.shots/v986-chiaro.png', fullPage: false });
-  await app.evaluate(({ nativeTheme }) => { nativeTheme.themeSource = 'dark'; });
-  await bacheca.waitForTimeout(800);
+  await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { theme: 'dark' } }));
+  await bacheca.reload();
+  await expect(bacheca.locator('#bdMie .bd-mia')).toHaveCount(5);
+  await bacheca.locator('#bdMie .bd-mia[data-id="html"] .bd-mia-testa').click();
+  await bacheca.mouse.move(5, 5);
+  await bacheca.waitForTimeout(500);
   await bacheca.screenshot({ path: 'tests/.shots/v986-scuro.png', fullPage: false });
-  await app.evaluate(({ nativeTheme }) => { nativeTheme.themeSource = 'system'; });
 });
