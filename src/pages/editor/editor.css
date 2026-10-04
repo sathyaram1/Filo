@@ -376,7 +376,7 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 }
 .ed-chat-input textarea:focus { border-color: var(--sn-accent); }
 .ed-chat-input button[data-chat="send"] {
-  flex: 0 0 auto; align-self: stretch; padding: 0 10px; border: none; border-radius: 8px;
+  flex: 0 0 auto; height: 34px; padding: 0 10px; border: none; border-radius: 8px;
   background: var(--sn-accent); color: #fff; cursor: pointer; font-size: 12px;
 }
 
