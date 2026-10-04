@@ -159,8 +159,8 @@ test('lettura: la segnalazione automatica mai scritta vale attiva, come la mostr
 test('la pagina Preferenze salva esattamente le voci della fonte unica', () => {
   const src = fs.readFileSync(path.join(radice, 'src/pages/preferences/preferences.js'), 'utf8');
   assert.ok(src.includes("SN_VOCI_IMPOSTAZIONI.campi('preferences')"), 'la pagina non prende più i suoi campi dalla fonte unica');
-  const salvati = new Set([...src.matchAll(/case '([a-zA-Z.]+)': return \$\(/g)].map((m) => m[1]));
-  salvati.add('agentStyle').add('tts.modelVoice');
+  const corpo = src.slice(src.indexOf('function valoreDelCampo'), src.indexOf('function valoreSalvato'));
+  const salvati = new Set([...corpo.matchAll(/case '([a-zA-Z.]+)': return /g)].map((m) => m[1]));
   const voci = new Set(Object.values(V.campi('preferences')));
   assert.deepEqual([...voci].filter((p) => !salvati.has(p)), [], 'voci che la pagina non sa salvare');
   assert.deepEqual([...salvati].filter((p) => !voci.has(p)), [], 'campi della pagina senza voce');
