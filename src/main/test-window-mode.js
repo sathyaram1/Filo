@@ -22,9 +22,9 @@
 //   la loro opacità, e in modalità a tutto schermo si aprirebbero sopra lo
 //   schermo vero anche con la madre fuori campo.
 //
-// NON vale per `test:shoot`/`test:smoke`, che fotografano la finestra REALE
-// composita: lì l'immagine È il risultato e serve una finestra vera su uno
-// schermo vero. Quegli strumenti non impostano la variabile.
+// NON vale per `test:shoot`/`test:smoke`: lì guardare la finestra è lo scopo
+// del comando. Quegli strumenti non impostano la variabile. Le loro foto non
+// passano dallo schermo, quindi vengono anche con la finestra parcheggiata.
 
 // Dove parcheggiare la finestra: abbastanza lontano da stare fuori da qualsiasi
 // disposizione di monitor plausibile, non così tanto da uscire dai limiti che i

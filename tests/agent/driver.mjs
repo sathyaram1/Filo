@@ -96,6 +96,7 @@ async function componiFinestra({ BrowserWindow, nativeImage }) {
   const win = tutte.find((w) => w._filoTabs) || tutte[0];
   if (!win) return { ok: false, errore: 'nessuna finestra aperta' };
   const cb = win.getContentBounds();
+  if (!cb.width || !cb.height) return { ok: false, errore: 'la finestra non ha area visibile (ridotta a icona?)' };
   const strati = [{ nome: 'shell', wc: win.webContents, x: 0, y: 0 }];
   // L'ordine dei figli è l'ordine di disegno. Filo nasconde schede e avvisi
   // azzerandone i bounds: Electron 33 non dice se una vista è visibile.
