@@ -39,6 +39,8 @@ const DOPO_UN_GESTO = new Set(['notifications']);
 const COL_GESTO_SENZA_DOMANDA = new Set(['local-fonts']);
 const GESTO_MS = 5000;
 const GESTI = new Set(['mouseDown', 'mouseUp', 'rawKeyDown', 'keyDown', 'char', 'touchStart', 'touchEnd', 'gestureTap']);
+// Concessi di fabbrica, ma come in Chrome solo subito dopo un gesto: senza, una pagina si prende lo schermo da sola.
+const INNOCUI_COL_GESTO = new Set(['fullscreen']);
 const LASCIAPASSARE_MS = 5000;
 // Il lasciapassare di Detta copre il microfono e basta: con la fotocamera la pagina avrebbe un sì mai dato (#591, giro 18).
 const PARTI_LASCIAPASSARE = { media: new Set(['audio']), appunti: new Set(['appunti']) };
@@ -168,7 +170,7 @@ function seguiGesti(wc) {
     wc.on('did-start-navigation', (e, _url, isInPlace, isMainFrame) => {
       const principale = e && typeof e.isMainFrame === 'boolean' ? e.isMainFrame : isMainFrame;
       const stessa = e && typeof e.isSameDocument === 'boolean' ? e.isSameDocument : isInPlace;
-      if (principale && !stessa) { wc._filoGestoAlle = 0; wc._filoMenuAperto = null; }
+      if (principale && !stessa) { wc._filoGestoAlle = 0; wc._filoGestoRiquadroAlle = 0; wc._filoMenuAperto = null; }
     });
   } catch (_) {}
 }
@@ -176,6 +178,28 @@ function seguiGesti(wc) {
 function gestoRecente(wc) {
   const t = wc && wc._filoGestoAlle;
   return Boolean(t && Date.now() - t < GESTO_MS);
+}
+
+// Il clic in un riquadro di un altro sito non passa da `input-event`: lo segnala il preload del riquadro, solo se vero.
+// Vale per finestre e schermo pieno, non per le domande dei permessi della pagina, che vogliono un gesto sulla pagina.
+function gestoNelRiquadro(wc, frame) {
+  try {
+    if (!wc || !frame || !frame.parent) return;
+    wc._filoGestoRiquadroAlle = Date.now();
+  } catch (_) {}
+}
+
+function gestoSullaScheda(wc) {
+  const t = Math.max((wc && wc._filoGestoAlle) || 0, (wc && wc._filoGestoRiquadroAlle) || 0);
+  return t && Date.now() - t < GESTO_MS ? t : 0;
+}
+
+// Un gesto apre una finestra sola, come in Chrome: la seconda della stessa raffica nessuno l'ha chiesta (#737.1).
+function gestoPerUnaFinestra(wc) {
+  const t = gestoSullaScheda(wc);
+  if (!t || t <= (wc._filoGestoUsatoAlle || 0)) return false;
+  wc._filoGestoUsatoAlle = t;
+  return true;
 }
 
 // Il dominio registrato va sempre letto: con un indirizzo lungo la parte che sceglie chi attacca è quella davanti.
@@ -267,6 +291,7 @@ function installa(ses, { schedaDi, prima, esterno } = {}) {
         return;
       }
       const tipo = TIPI[permission];
+      if (INNOCUI_COL_GESTO.has(permission)) { callback(Boolean(gestoSullaScheda(wc))); return; }
       if (!tipo) { callback(INNOCUI.has(permission)); return; }
       // Una richiesta di media senza microfono né fotocamera è la condivisione dello schermo, che Filo non sa dare.
       if (tipo === 'media' && !partiNote(details).length) { callback(false); return; }
@@ -406,7 +431,7 @@ function statoNotifiche(ses, url) {
 
 module.exports = {
   installa, negaTutto, rispondi, lasciapassare, seguiGesti, scelteDi, dimentica, nomeDaMostrare, statoNotifiche,
-  carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica,
+  carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica, gestoNelRiquadro, gestoSullaScheda, gestoPerUnaFinestra,
   TIPI, INNOCUI, NON_DISPONIBILI, COL_GESTO_SENZA_DOMANDA, GESTO_MS, _inAttesa: inAttesa,
   _usaDisco: (d) => { disco = () => d; },
 };

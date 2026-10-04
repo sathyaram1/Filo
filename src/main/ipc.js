@@ -147,6 +147,10 @@ function registerIpcHandlers() {
     try { event.sender._filoActiveFrame = event.senderFrame || null; } catch (_) {}
   });
 
+  ipcMain.on('filo:gesto-riquadro', (event) => {
+    require('./services/permessiPagine').gestoNelRiquadro(event.sender, event.senderFrame);
+  });
+
   ipcMain.handle('filo:message', async (event, msg) => {
     const info = senderInfo(event);
     // In incognito avvolgiamo l'handler in runIncognito(): ogni lettura/scrittura
