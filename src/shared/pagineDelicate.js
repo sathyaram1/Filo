@@ -84,9 +84,16 @@
     return pulisci(p && p.siti);
   }
 
+  // I siti che l'utente ha tolto fra quelli segnati da Filo per un campo password o carta: valgono solo per quel motivo.
+  function nonDelicati(settings) {
+    const p = settings && settings.security && settings.security.pagineDelicate;
+    return pulisci(p && p.nonDelicati);
+  }
+
   // Il motivo per cui una pagina è delicata ('utente', una categoria dell'elenco, 'campi'), o null. `campi(host)` dice se
   // il sito ha mostrato un campo password o carta.
-  function classifica(url, { attivo: acceso = true, sitiUtente: propri = [], elenco: categorie = PREDEFINITI, campi = null } = {}) {
+  function classifica(url, { attivo: acceso = true, sitiUtente: propri = [], elenco: categorie = PREDEFINITI, campi = null,
+    nonDelicati: tolti = [] } = {}) {
     if (!acceso) return null;
     const h = host(url);
     if (!h) return null;
@@ -94,7 +101,7 @@
     for (const [k, lista] of Object.entries(categorie || {})) {
       if (Array.isArray(lista) && dentro(h, lista)) return k;
     }
-    if (typeof campi === 'function' && campi(h)) return 'campi';
+    if (typeof campi === 'function' && campi(h) && !dentro(h, pulisci(tolti))) return 'campi';
     return null;
   }
 
@@ -135,6 +142,6 @@
     return NOMI[motivo] || String(motivo || '');
   }
 
-  global.SN_PAGINE_DELICATE = { PREDEFINITI, host, elenco, attivo, sitiUtente, classifica, nome, risolviSchede };
+  global.SN_PAGINE_DELICATE = { PREDEFINITI, host, elenco, attivo, sitiUtente, nonDelicati, classifica, nome, risolviSchede };
   if (typeof module !== 'undefined' && module.exports) module.exports = global.SN_PAGINE_DELICATE;
 })(typeof globalThis !== 'undefined' ? globalThis : self);

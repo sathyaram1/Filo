@@ -82,14 +82,30 @@ async function filtro(settingsIn) {
     sitiUtente: PD.sitiUtente(settings),
     elenco: PD.elenco(elencoRemoto()),
     campi: haCampi,
+    nonDelicati: PD.nonDelicati(settings),
   };
   const f = (url) => PD.classifica(url, opzioni);
   f.attivo = opzioni.attivo;
-  // Una scheda archiviata porta il motivo di quando si è chiusa.
-  f.voce = (it) => (opzioni.attivo && it && it.delicata) || f(it && it.url);
+  // Una scheda archiviata porta il motivo di quando si è chiusa; un sito tolto dopo dai segnati per il campo ne è fuori.
+  const tolto = (url) => {
+    const h = PD.host(url);
+    return Boolean(h) && opzioni.nonDelicati.some((d) => h === d || h.endsWith(`.${d}`));
+  };
+  f.voce = (it) => {
+    const m = opzioni.attivo && it && it.delicata;
+    if (m && !(m === 'campi' && tolto(it.url))) return m;
+    return f(it && it.url);
+  };
   return f;
 }
 
-globalThis.SN_DELICATE = { segnaCampi, haCampi, filtro, carica, dimentica };
+// I siti segnati per un campo password o carta che restano anche dopo un riavvio: quelli che l'utente vede in Sicurezza.
+// Quelli visti solo in incognito non ci sono, e non escono.
+async function elencoCampi() {
+  await carica();
+  return [...salvati].sort();
+}
+
+globalThis.SN_DELICATE = { segnaCampi, haCampi, filtro, carica, dimentica, elencoCampi };
 
 module.exports = globalThis.SN_DELICATE;

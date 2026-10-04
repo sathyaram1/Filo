@@ -550,6 +550,10 @@
     options_security_delicate_sites_invalid:
       'Queste righe non sono domini validi e verranno ignorate (usa un dominio ' +
       'con estensione, es. studiorossi.it): %s',
+    options_security_delicate_campi_title: 'Siti dove Filo ha visto un campo password o carta',
+    options_security_delicate_campi_togli: 'Non è delicato',
+    options_security_delicate_campi_tolto: 'non delicato per te',
+    options_security_delicate_campi_rimetti: 'Torna delicato',
     // F4 — Feedback autonomo
     options_security_auto_feedback: 'Segnalazione automatica dei problemi',
     options_security_auto_feedback_desc:

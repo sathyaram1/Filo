@@ -48,6 +48,7 @@
     $('sec-delicate-label').textContent = I18n.t('options_security_delicate');
     $('sec-delicate-desc').textContent = I18n.t('options_security_delicate_desc');
     $('sec-delicate-sites-label').textContent = I18n.t('options_security_delicate_sites_label');
+    $('sec-delicate-campi-title').textContent = I18n.t('options_security_delicate_campi_title');
     $('sec-p2p-box-title').textContent = I18n.t('options_security_p2p_box_title');
     $('sec-p2p-box-body').textContent = I18n.t('options_security_p2p_box_body');
     $('sec-proxy-box-title').textContent = I18n.t('options_security_proxy_box_title');
@@ -312,6 +313,7 @@
     $('sec-delicate-sites').value = righe(del.siti, del.righeScartate);
     setDelicateError(parseBlacklist($('sec-delicate-sites').value).invalid);
     syncDelicateEnabled();
+    loadDelicateCampi();
     const sb = sec.safeBrowse || {};
     $('sec-safebrowse').checked = sb.enabled !== false;
     $('sec-safebrowse-network').checked = sb.networkSignals !== false;
@@ -594,6 +596,55 @@
     $('sec-delicate-sites').disabled = !on;
   }
 
+  // I siti che Filo ha segnato da solo per un campo password o carta: tutti visibili, e ognuno si toglie e si rimette.
+  let delicateCampi = [];
+  let delicateCampiSig = '';
+  async function loadDelicateCampi() {
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.PAGINE_DELICATE_CAMPI }); } catch (_) {}
+    const siti = r && r.ok && Array.isArray(r.siti) ? r.siti : [];
+    const sig = siti.map((x) => x.sito + (x.tolto ? '-' : '')).join('\n');
+    if (sig === delicateCampiSig) return;
+    delicateCampiSig = sig;
+    delicateCampi = siti;
+    renderDelicateCampi();
+  }
+
+  function renderDelicateCampi() {
+    const box = $('sec-delicate-campi');
+    const list = $('sec-delicate-campi-list');
+    list.innerHTML = '';
+    box.hidden = !delicateCampi.length;
+    for (const it of delicateCampi) {
+      const li = document.createElement('li');
+      const span = document.createElement('span');
+      span.textContent = leggibile(it.sito);
+      if (it.tolto) {
+        const what = document.createElement('span');
+        what.className = 'sn-muted';
+        what.style.marginLeft = '8px';
+        what.textContent = I18n.t('options_security_delicate_campi_tolto');
+        span.appendChild(what);
+      }
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sn-btn-secondary';
+      btn.textContent = I18n.t(it.tolto ? 'options_security_delicate_campi_rimetti' : 'options_security_delicate_campi_togli');
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        // L'elenco ha già tutti i tolti: è da lì che si scrive quello nuovo.
+        const tolti = delicateCampi.filter((x) => x.tolto && x.sito !== it.sito).map((x) => x.sito);
+        if (!it.tolto) tolti.push(it.sito);
+        await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { security: { pagineDelicate: { nonDelicati: tolti.sort() } } } });
+        delicateCampiSig = '';
+        await loadDelicateCampi();
+      });
+      li.appendChild(span);
+      li.appendChild(btn);
+      list.appendChild(li);
+    }
+  }
+
   // Una riga che non è un dominio non protegge niente, e chi l'ha scritta crede di sì.
   function setDelicateError(invalidRows) {
     const el = $('sec-delicate-sites-error');
@@ -837,6 +888,7 @@
         const p = JSON.stringify(msg.settings.proxy || {});
         if (p !== lastProxy) { lastProxy = p; renderProxyBox(); }
         riallinea(msg.settings);
+        loadDelicateCampi();
       }
       const c = msg && msg.type === MSG.SETTINGS_UPDATED && msg.settings && msg.settings.security && msg.settings.security.cookies;
       if (!c || !Array.isArray(c.bannerSites)) return;
@@ -850,11 +902,11 @@
   // In una scheda di Filo il cambio di scheda non passa da `visibilitychange` (resta per il
   // ricaricamento): lo annuncia il main con TAB_IN_VISTA. L'uscita la ascolta SN_CASELLE.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') loadCookieDone();
+    if (document.visibilityState === 'visible') { loadCookieDone(); loadDelicateCampi(); }
   });
   if (chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((msg) => {
-      if (msg && msg.type === MSG.TAB_IN_VISTA && msg.inVista) loadCookieDone();
+      if (msg && msg.type === MSG.TAB_IN_VISTA && msg.inVista) { loadCookieDone(); loadDelicateCampi(); }
       if (msg && msg.type === MSG.PERMESSI_SITI_CAMBIATI) renderSitePerms();
     });
   }

@@ -156,3 +156,14 @@ test('a parole: «questo sito» e «scheda: <titolo>» diventano il sito della s
   assert.match(PD.risolviSchede('aggiungi scheda: a', { schede: [schede[0], schede[1]] }).rifiuto, /più schede/);
   assert.deepEqual(r('aggiungi studiorossi.it'), { valore: 'aggiungi studiorossi.it' });
 });
+
+test('un sito tolto dai segnati per il campo password non è più delicato per quel motivo, e solo per quello', () => {
+  const campi = (h) => ['google.com', 'banca-locale.it'].some((d) => h === d || h.endsWith(`.${d}`));
+  const c = (url, nonDelicati) => PD.classifica(url, { campi, nonDelicati, sitiUtente: ['studiorossi.it'] });
+  assert.equal(c('https://docs.google.com/document/d/1', []), 'campi');
+  assert.equal(c('https://docs.google.com/document/d/1', ['google.com']), null, 'vale anche per i sottodomini');
+  assert.equal(c('https://online.banca-locale.it/', ['google.com']), 'campi', 'gli altri siti segnati restano');
+  assert.equal(c('https://mail.google.com/', ['google.com']), 'posta', 'la posta di serie resta delicata');
+  assert.equal(c('https://www.studiorossi.it/', ['studiorossi.it']), 'utente', 'un sito aggiunto dall\'utente resta delicato');
+  assert.deepEqual(PD.nonDelicati({ security: { pagineDelicate: { nonDelicati: ['www.Google.com', '', 3] } } }), ['google.com']);
+});

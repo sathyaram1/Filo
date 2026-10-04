@@ -241,3 +241,48 @@ test('in Gestione l\'owner vede e cambia gli elenchi di posta, banche e sanità,
   expect(inviato.banche).toContain('bancaprova.it');
   expect(inviato.banche).toContain('intesasanpaolo.com');
 });
+
+const titoloDavanti = (shell) => shell.evaluate(async () => {
+  const s = await window.filoShell.tabs.snapshot();
+  return (s.tabs.find((t) => t.id === s.activeId) || {}).title;
+});
+
+test('in Sicurezza si vedono i siti segnati per il campo password: uno tolto torna al riassunto, e si rimette', async ({ app, shell, openTab, testServer }) => {
+  await modelliFinti(app);
+  await testServer.openReady(openTab, `<!doctype html><html><head><title>Accesso</title></head><body>${CON_PASSWORD}</body></html>`, { pubblico: true });
+  await expect.poll(() => app.evaluate(() => globalThis.SN_DELICATE.haCampi('sito-pubblico.test')), { timeout: 8_000 }).toBe(true);
+
+  const sicurezza = await openTab('filo://security/security.html');
+  const riga = sicurezza.locator('#sec-delicate-campi-list li', { hasText: 'sito-pubblico.test' });
+  await expect(sicurezza.locator('#sec-delicate-campi-title')).toHaveText('Siti dove Filo ha visto un campo password o carta', { timeout: 8000 });
+  await riga.getByRole('button', { name: 'Non è delicato' }).click();
+  await expect(riga).toContainText('non delicato per te');
+  await expect.poll(async () => (await impostazioni(shell)).security.pagineDelicate.nonDelicati, { timeout: 4000 })
+    .toEqual(['sito-pubblico.test']);
+
+  const t = await apriEChiudi({ app, shell, openTab, testServer }, 'Documento condiviso', '<p>Verbale della riunione di giovedì</p>');
+  await expect.poll(() => titoloDavanti(shell), { timeout: 8_000 }).toBe('Documento condiviso');
+  await t.chiudi();
+  await expect.poll(() => voceDi(app, 'Documento condiviso'), { timeout: 8_000 })
+    .toEqual(expect.objectContaining({ delicata: null, summary: 'Riassunto finto della pagina.' }));
+
+  await sicurezza.bringToFront();
+  await riga.getByRole('button', { name: 'Torna delicato' }).click();
+  await expect.poll(async () => (await impostazioni(shell)).security.pagineDelicate.nonDelicati, { timeout: 4000 }).toEqual([]);
+  const t2 = await apriEChiudi({ app, shell, openTab, testServer }, 'Il mio conto', `<p>${SEGRETO}</p>`);
+  await expect.poll(() => titoloDavanti(shell), { timeout: 8_000 }).toBe('Il mio conto');
+  await t2.chiudi();
+  await expect.poll(() => voceDi(app, 'Il mio conto'), { timeout: 8_000 })
+    .toEqual({ delicata: 'campi', summary: '', snippet: '', embedding: false });
+});
+
+test('un campo carta nel riquadro di un servizio di pagamento rende delicata la pagina che lo contiene', async ({ app, openTab, testServer }) => {
+  const riquadro = testServer.html('<!doctype html><html><body><input autocomplete="cc-number" name="cardnumber"></body></html>')
+    .replace('127.0.0.1', 'blocked.test');
+  const cassa = await testServer.openReady(openTab,
+    `<!doctype html><html><head><title>Cassa</title></head><body><p>Spedizione a Mario Rossi</p><iframe src="${riquadro}"></iframe></body></html>`,
+    { pubblico: true });
+  await cassa.frameLocator('iframe').locator('input[name=cardnumber]').click();
+  await expect.poll(() => app.evaluate(() => globalThis.SN_DELICATE.haCampi('sito-pubblico.test')), { timeout: 8_000 }).toBe(true);
+  expect(await app.evaluate(() => globalThis.SN_DELICATE.haCampi('blocked.test')), 'il riquadro non segna sé stesso').toBe(false);
+});

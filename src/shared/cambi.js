@@ -90,6 +90,7 @@
     'security.downloads.trustedSites': { nome: 'siti fidati per i programmi', elenco: true, livello: 2 },
     'security.pagineDelicate.enabled': { nome: 'pagine delicate tenute lontane dai modelli', valore: sino('sì', 'no'), livello: 2 },
     'security.pagineDelicate.siti': { nome: 'siti delicati aggiunti da te', elenco: true, livello: 2 },
+    'security.pagineDelicate.nonDelicati': { nome: 'siti non delicati per te, anche col campo password', elenco: true, livello: 2 },
     'security.autoFeedback': { nome: 'segnalazione automatica dei problemi', valore: ATTIVA, livello: 2 },
     'proxy.datacenter': { nome: 'indirizzo del proxy economico', segreto: true },
     'proxy.residential': { nome: 'indirizzo del proxy residenziale', segreto: true },

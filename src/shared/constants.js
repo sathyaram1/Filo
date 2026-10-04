@@ -2501,6 +2501,8 @@
         enabled: true,
         siti: [],
         righeScartate: [],
+        // Tolti in Sicurezza fra i siti che Filo ha segnato per un campo password o carta: valgono solo per quel motivo.
+        nonDelicati: [],
       },
     },
     // Modalità terminale: Filo risponde con un comando a «quanto spazio ho sul
