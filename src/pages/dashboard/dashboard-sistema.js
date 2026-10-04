@@ -24,6 +24,7 @@
   let richiamo = null;
   let tickOra = null;
   let impostazioniLette = false;
+  let svegliatoPerChat = 0;
 
   const Sis = () => global.SN_SISTEMA;
   const segue = () => DAL_COMPUTER.some((v) => visibili[v] !== false);
@@ -57,6 +58,16 @@
     let r = null;
     try { r = await send({ type: MSG.SISTEMA_STATO, subito }); } catch (_) {}
     if (r && r.ok && r.stato) aggiornato(r.stato);
+  }
+
+  // Chi scrive in chat manderà presto un turno che vuole lo stato di adesso: il lettore parte mentre si scrive,
+  // così all'invio la lettura è pronta. Serve solo alla home che non lo tiene già sveglio da sé.
+  function scrive() {
+    if (!send || segue() || document.visibilityState === 'hidden') return;
+    const adesso = Date.now();
+    if (adesso - svegliatoPerChat < 20 * 1000) return;
+    svegliatoPerChat = adesso;
+    send({ type: MSG.SISTEMA_STATO, perChat: true }).catch(() => {});
   }
 
   function programmaRichiamo() {
@@ -280,5 +291,5 @@
     el.style.top = `${Math.max(4, Math.min(y, vh - h - 4))}px`;
   }
 
-  global.SN_DASH_SISTEMA = { init, aggiornato, applicaImpostazioni, chiudiBox };
+  global.SN_DASH_SISTEMA = { init, aggiornato, applicaImpostazioni, chiudiBox, scrive };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -153,6 +153,11 @@ module.exports = function register(on, ctx) {
     const schede = sender && sender.win && sender.win._filoTabs;
     const davanti = !(schede && sender.tab) || schede.activeId === sender.tab.id;
     const segue = !(msg && msg.segue === false);
+    // Chi sta scrivendo in chat sveglia il lettore per il turno che arriva, senza diventare una pagina che lo segue.
+    if (msg && msg.perChat === true) {
+      if (davanti) Sistema.richiedi();
+      return { ok: true, stato: Sistema.stato() };
+    }
     Sistema.richiedi({ davanti, chi: sender && sender.wc, segue });
     // La pagina che ha visto cadere o tornare la rete non aspetta il giro: la lettura nuova arriva con l'annuncio.
     if (davanti && segue && msg && msg.subito === true) Sistema.leggiAdesso();

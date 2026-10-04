@@ -1100,15 +1100,19 @@ html, body {
 /* A destra scorre la colonna intera: le carte non si schiacciano sotto «altro» quando la finestra è bassa. */
 .dash-right > .dash-carte { flex: none; padding: 2px; }
 
-/* Ora, batteria, rete e Bluetooth (#873) dove sul desktop sta l'orologio: colore solo per ciò che chiede
-   attenzione, e il rientro allinea le voci al testo delle carte qui sopra. */
+/* Ora, batteria, rete e Bluetooth (#873) dove sul desktop sta l'orologio, allineate al testo delle carte; restano
+   appoggiate al bordo basso anche quando gli avvisi allungano la colonna. Colore solo per ciò che chiede attenzione. */
 .dash-sistema {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
   min-width: 0;
-  margin-left: 14px;
+  padding: 8px 0 4px 14px;
+  background: var(--dash-paper);
 }
 .dash-sis-icone {
   display: flex;

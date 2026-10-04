@@ -334,6 +334,37 @@ test('Windows: lo script non chiede permessi e non usa le API del Wi-Fi, e scriv
   }
 });
 
+test('nessuna strada verso fuori vuol dire offline anche se Chromium dice online (ponti di Docker, WSL2, macchine virtuali)', async () => {
+  // Linux: col Wi-Fi staccato resta solo la rete interna del ponte di Docker, nessuna rotta predefinita.
+  const ponte = albero({
+    'proc/net/route': 'Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT\n'
+      + 'docker0\t000011AC\t00000000\t0001\t0\t0\t0\t0000FFFF\t0\t0\t0\n',
+    'proc/net/ipv6_route': '',
+    'sys/class/net/docker0': null,
+  });
+  // Senza le rotte leggibili non si sa niente: non si dice offline.
+  const muto = albero({ 'sys/class/net': null });
+  try {
+    const parti = await L.leggiLinux(ponte, async () => null);
+    assert.deepEqual(L.componi(parti, true).rete, { online: false });
+    assert.deepEqual(L.componi(await L.leggiLinux(muto, async () => null), true).rete, { online: true, tipo: null, nome: null });
+  } finally {
+    rmSync(ponte, { recursive: true, force: true });
+    rmSync(muto, { recursive: true, force: true });
+  }
+  // Mac: `route` risponde senza interfaccia (nessuna rotta predefinita); se non risponde affatto, non si sa.
+  const mac = (route) => L.leggiMac(async (file) => ({ pmset: '', route, defaults: null })[file] ?? null);
+  assert.deepEqual(L.componi(await mac(''), true).rete, { online: false });
+  assert.deepEqual(L.componi(await mac(null), true).rete, { online: true, tipo: null, nome: null });
+  // Windows: lo script scrive {uscita:false} quando nessuna connessione ha Internet o un gateway.
+  assert.deepEqual(L.componi(L.datiDaWindows('{"batteria":null,"rete":{"uscita":false},"bluetooth":null}'), true).rete, { online: false });
+  assert.deepEqual(L.componi(L.datiDaWindows('{"batteria":null,"rete":{"tipo":"cavo","nome":null},"bluetooth":null}'), true).rete,
+    { online: true, tipo: 'cavo', nome: null });
+  // Le connessioni senza Internet e senza gateway (gli adattatori virtuali lato computer) non si scelgono.
+  assert.match(L.SCRIPT_WINDOWS, /GatewayAddresses/);
+  assert.match(L.SCRIPT_WINDOWS, /IsConnectedToInternet\) -and \(-not \$uscite/);
+});
+
 test('online lo decide Chromium: offline toglie tipo e nome, online tiene quello che la piattaforma sa', () => {
   const parti = { batteria: { livello: 5 }, rete: { tipo: 'wifi', nome: 'Casa' }, bluetooth: null };
   assert.deepEqual(L.componi(parti, false).rete, { online: false });

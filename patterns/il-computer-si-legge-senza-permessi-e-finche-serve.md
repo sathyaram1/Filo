@@ -37,7 +37,8 @@ PowerShell costa mezzo secondo di processore: ogni pochi secondi, per tutto il
 giorno, è un costo vero. Quindi:
 
 - la home in vista chiede ogni 30 secondi, un turno di chat chiede una volta, e
-  il lettore si ferma 90 secondi dopo l'ultima richiesta;
+  il lettore si ferma 90 secondi dopo l'ultima richiesta; chi scrive in chat lo
+  sveglia mentre scrive, così il turno non aspetta l'avvio a freddo;
 - «in vista» lo decide il main, non la pagina: una scheda dietro le altre per
   Chromium resta `visible`, quindi la sua richiesta riceve lo stato ma non tiene
   sveglio il lettore; quando la finestra la riporta davanti, il lettore riparte
@@ -58,8 +59,13 @@ giorno, è un costo vero. Quindi:
   dell'avviso (o una riga di Windows scritta prima) non lo smentisce: per
   dieci secondi l'avviso vince, poi torna a decidere la lettura.
 
-Collegato o no lo decide Chromium (`net.isOnline`) su tutti i sistemi; Wi-Fi o
-cavo e il nome li dice la piattaforma.
+Offline lo dice Chromium (`net.isOnline`), oppure la piattaforma quando nessuna
+strada porta fuori: Chromium conta anche gli adattatori virtuali sempre accesi
+(Docker, WSL2, Hyper-V, macchine virtuali) e col Wi-Fi staccato direbbe online.
+Su Linux e Mac è la rotta predefinita che manca; su Windows nessuna connessione
+con Internet o con un gateway (quelle virtuali lato computer non ne hanno). Una
+rotta che non si riesce a leggere non dice offline. Wi-Fi o cavo e il nome li
+dice la piattaforma.
 
 ## La riga di Windows è tutta ASCII
 

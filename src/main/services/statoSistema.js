@@ -21,11 +21,14 @@ function S() {
   return globalThis.SN_SISTEMA;
 }
 
-function esegui(file, args, { timeout = COMANDO_MS } = {}) {
+// `vuotoSeEsce`: un comando che è partito e ha risposto «non c'è» (uscita diversa da 0) dà '', non null come un guasto.
+function esegui(file, args, { timeout = COMANDO_MS, vuotoSeEsce = false } = {}) {
   return new Promise((resolve) => {
     try {
-      execFile(file, args, { timeout, windowsHide: true, encoding: 'utf8', maxBuffer: 4 * 1024 * 1024 },
-        (err, stdout) => resolve(err ? null : String(stdout || '')));
+      execFile(file, args, { timeout, windowsHide: true, encoding: 'utf8', maxBuffer: 4 * 1024 * 1024 }, (err, stdout) => {
+        if (!err) resolve(String(stdout || ''));
+        else resolve(vuotoSeEsce && typeof err.code === 'number' && !err.killed ? '' : null);
+      });
     } catch (_) {
       resolve(null);
     }
@@ -137,9 +140,11 @@ function connessioneDaNmcli(testo) {
   return nome && nome !== '--' ? nome : null;
 }
 
+// `uscita: false`: le rotte si leggono e nessuna porta fuori. Chromium conta anche i ponti virtuali (Docker, macchine
+// virtuali) e direbbe online: è la piattaforma a sapere che fuori non si va.
 async function reteLinux(radice, esec) {
   const iface = interfacciaVersoFuori(radice);
-  if (!iface) return null;
+  if (!iface) return leggiFile(radice, 'proc', 'net', 'route') !== null ? { uscita: false } : null;
   const tipo = tipoInterfacciaLinux(radice, iface);
   let nome = null;
   if (tipo === 'wifi') {
@@ -259,7 +264,7 @@ let portePerMac = { testo: null, quando: 0 };
 async function leggiMac(esec = esegui) {
   const [pm, rotta, bt] = await Promise.all([
     esec('pmset', ['-g', 'batt']),
-    esec('route', ['-n', 'get', 'default']),
+    esec('route', ['-n', 'get', 'default'], { vuotoSeEsce: true }),
     esec('defaults', ['read', '/Library/Preferences/com.apple.Bluetooth', 'ControllerPowerState']),
   ]);
   let rete = null;
@@ -271,6 +276,9 @@ async function leggiMac(esec = esegui) {
     const tipo = tipoDaPortaMac(portaDaNetworksetup(portePerMac.testo, iface));
     const nome = tipo === 'wifi' ? ssidDaIpconfig(await esec('ipconfig', ['getsummary', iface])) : null;
     rete = { tipo, nome };
+  } else if (rotta !== null) {
+    // `route` ha risposto e non c'è una rotta predefinita: gli adattatori di Parallels o VMware non portano fuori.
+    rete = { uscita: false };
   }
   return { batteria: batteriaDaPmset(pm), rete, bluetooth: bluetoothDaDefaults(bt) };
 }
@@ -317,21 +325,28 @@ while ($true) {
   } catch {}
   try {
     $tipi = @{}
+    $uscite = @{}
     foreach ($n in [System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces()) {
-      $tipi[([string]$n.Id).Trim('{}').ToLower()] = [string]$n.NetworkInterfaceType
+      $id = ([string]$n.Id).Trim('{}').ToLower()
+      $tipi[$id] = [string]$n.NetworkInterfaceType
+      $gw = 0
+      try { $gw = @($n.GetIPProperties().GatewayAddresses | Where-Object { $_.Address -and -not $_.Address.Equals([System.Net.IPAddress]::Any) -and -not $_.Address.Equals([System.Net.IPAddress]::IPv6Any) }).Count } catch {}
+      $uscite[$id] = $gw -gt 0
     }
     if ($nlm) {
       $scelta = $null
       foreach ($c in @($nlm.GetNetworkConnections())) {
         if (-not $c.IsConnected) { continue }
-        $t = $tipi[([string]$c.GetAdapterId()).Trim('{}').ToLower()]
+        $a = ([string]$c.GetAdapterId()).Trim('{}').ToLower()
+        if ((-not $c.IsConnectedToInternet) -and (-not $uscite[$a])) { continue }
+        $t = $tipi[$a]
         $v = @{ tipo = $null; nome = $null; peso = 0 }
         if ($t -eq 'Wireless80211') { $v.tipo = 'wifi' } elseif ($t -like '*Ethernet*') { $v.tipo = 'cavo' }
         if ($v.tipo -eq 'wifi') { try { $v.nome = [string]$c.GetNetwork().GetName() } catch {} }
         $v.peso = ([int][bool]$c.IsConnectedToInternet) * 2 + [int][bool]$v.tipo
         if ((-not $scelta) -or ($v.peso -gt $scelta.peso)) { $scelta = $v }
       }
-      if ($scelta) { $o.rete = [ordered]@{ tipo = $scelta.tipo; nome = $scelta.nome } }
+      if ($scelta) { $o.rete = [ordered]@{ tipo = $scelta.tipo; nome = $scelta.nome } } else { $o.rete = [ordered]@{ uscita = $false } }
     }
   } catch {}
   if ($attendi) {
@@ -378,7 +393,8 @@ function datiDaWindows(riga) {
   let j;
   try { j = JSON.parse(String(riga || '').trim()); } catch (_) { return null; }
   if (!j || typeof j !== 'object' || Array.isArray(j)) return null;
-  const rete = j.rete && typeof j.rete === 'object' ? { tipo: j.rete.tipo || null, nome: j.rete.nome || null } : null;
+  let rete = j.rete && typeof j.rete === 'object' ? { tipo: j.rete.tipo || null, nome: j.rete.nome || null } : null;
+  if (rete && j.rete.uscita === false) rete = { uscita: false };
   let bluetooth = j.bluetooth && typeof j.bluetooth === 'object' ? { ...j.bluetooth } : null;
   // Windows PowerShell 5.1 a volte scrive un elenco come {value, Count}: si riprende l'elenco.
   const d = bluetooth && bluetooth.dispositivi;
@@ -477,11 +493,12 @@ function onlineDaElectron() {
   }
 }
 
-// Online lo decide Chromium per tutti e tre i sistemi; come si esce e con che nome lo dice la piattaforma.
+// Offline lo dice Chromium, oppure la piattaforma quando nessuna strada porta fuori (`uscita: false`): Chromium conta
+// anche gli adattatori virtuali sempre accesi. Come si esce e con che nome lo dice la piattaforma.
 function componi(parti, online) {
   const p = parti || {};
   let rete = null;
-  if (online === false) rete = { online: false };
+  if (online === false || (p.rete && p.rete.uscita === false)) rete = { online: false };
   else if (online === true) rete = { online: true, tipo: p.rete ? p.rete.tipo : null, nome: p.rete ? p.rete.nome : null };
   else if (p.rete) rete = { online: true, tipo: p.rete.tipo, nome: p.rete.nome };
   return { batteria: p.batteria || null, rete, bluetooth: p.bluetooth || null };
@@ -633,10 +650,12 @@ async function statoPerChat() {
   return frescoPer(chiesto) ? stato : null;
 }
 
-// Chi deve dire «sei offline» (gli errori della chat) chiede qui: la risposta non aspetta un giro.
+// Chi deve dire «sei offline» (gli errori della chat) chiede qui: la risposta non aspetta un giro. Col lettore sveglio
+// vale anche la piattaforma (nessuna strada fuori); addormentato, il suo stato è vecchio e resta Chromium.
 function offline() {
-  if (lettoreProve) return !!(stato && stato.rete && stato.rete.online === false);
-  return onlineDaElectron() === false;
+  const letto = !!(stato && stato.rete && stato.rete.online === false);
+  if (lettoreProve) return letto;
+  return onlineDaElectron() === false || (!!giro && letto);
 }
 
 // Le prove staccano il caricatore e la rete di un computer finto: il giro, l'annuncio e la home restano quelli veri.
