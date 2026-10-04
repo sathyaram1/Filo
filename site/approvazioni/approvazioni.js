@@ -177,7 +177,7 @@
       s.inLettura = true;
       el.aggiorna.classList.add('is-lettura');
       var prima = s.impronta === null;
-      if (prima) dici('Leggo le richieste…', 'wait');
+      if (prima && el.stato.hidden) dici('Leggo le richieste…', 'wait');
       try {
         var r = await chiama('list');
         if (!r || r.ok === false) throw { dettaglio: r && (r.detail || r.reason) };
