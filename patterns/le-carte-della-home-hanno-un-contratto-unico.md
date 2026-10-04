@@ -38,7 +38,9 @@ un file scaricato) viaggia con la sua provenienza, come l'esito di un comando.
   La stessa mossa arriva dalla chat con l'azione `CARTA_HOME` («togli la carta dei mazzi»).
 - **Tolta non vuol dire persa.** Una carta di destra tolta diventa un'icona in «altro», da cui si rimette
   col clic sul «+», col tasto destro o trascinandola nella colonna. Togliere una carta di sinistra toglie la
-  cosa che racconta (il timer, l'avviso) o, se è solo un ricordo (uno scaricamento finito), la nasconde.
+  cosa che racconta (il timer, l'avviso) o, se è solo un ricordo (i Crediti, uno scaricamento finito), la nasconde:
+  finché la cosa c'è, la carta nascosta sta anch'essa in «altro» (`nascosteSinistra`) e si rimette da sola (mossa
+  `mostra`, anche a parole), senza passare da «come all'inizio», che disfa la disposizione dell'utente.
 - **Clic e Invio fanno la stessa cosa.** A sinistra aprono nel filo; a destra aprono l'app della carta
   (`apri`), o nel filo se non ne ha una (`usaCarta`).
 - **La colonna di sinistra ha un ordine solo.** `SN_CARTE_HOME.sinistra` decide quali carte ci sono e in che
@@ -53,7 +55,8 @@ un file scaricato) viaggia con la sua provenienza, come l'esito di un comando.
   «Vai» porta alla conversazione che li fa.
 - **L'incognito ha le sue carte.** Un lavoro porta l'ambito della sua finestra (lo stesso degli scaricamenti) e
   ogni pagina riceve solo quelli del suo; una mossa fatta in incognito si annuncia solo alle finestre incognito,
-  perché lì la disposizione vive in memoria. Un annuncio che dipende dalla finestra passa a
+  perché lì la disposizione vive in memoria. Parte però da quella dell'utente: la chiave sta fra quelle che
+  l'incognito legge dal disco, come la disposizione delle icone. Un annuncio che dipende dalla finestra passa a
   `broadcastToFiloPages` una funzione dell'ambito, non un messaggio unico.
 - **Una voce dentro una carta ha il suo tasto destro.** Un documento, un mazzo, un suggerimento: «Apri» quella
   voce e «Apri nel filo» con la sua frase; il menu della carta resta sul resto della carta.

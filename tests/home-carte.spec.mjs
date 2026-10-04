@@ -548,3 +548,83 @@ test('«Nuovo mazzo» sulla carta vuota apre un mazzo nuovo', async ({ app }) =>
   await expect.poll(() => mazzi.url(), { timeout: 8_000 }).toContain('#/deck/');
   await expect(page.locator('#tieni .dash-carta[data-tipo="mazzi"] .dash-carta-stato')).toHaveText('1 mazzo');
 });
+
+test('la carta dei Crediti tolta va in «altro» e si rimette da sola: la destra resta come l’ha disposta l’utente', async ({ app }) => {
+  test.setTimeout(60_000);
+  const page = await home(app);
+  await page.locator('#tieni .dash-carta[data-tipo="mazzi"]').click({ button: 'right' });
+  await page.locator('.dash-menu .dash-menu-voce', { hasText: 'Togli dalla home' }).click();
+  await expect(page.locator('#tieni .dash-carta[data-tipo="mazzi"]')).toHaveCount(0);
+  const disposta = await ordineDestra(page);
+
+  const crediti = page.locator('#accade .dash-carta[data-tipo="crediti"]');
+  await crediti.click({ button: 'right' });
+  await page.locator('.dash-menu .dash-menu-voce', { hasText: /^Togli/ }).click();
+  await expect(crediti).toHaveCount(0);
+
+  const inAltro = page.locator('#altro .dash-altro-app[data-tolta="1"]', { hasText: 'Crediti' });
+  await expect(inAltro).toHaveCount(1);
+  await inAltro.click({ button: 'right' });
+  await expect(page.locator('.dash-menu .dash-menu-voce')).toHaveText(['Apri Crediti', 'Rimetti nella home']);
+  await page.locator('.dash-menu .dash-menu-voce', { hasText: 'Rimetti' }).click();
+  await expect(crediti).toBeVisible();
+  await expect(inAltro).toHaveCount(0);
+  expect(await ordineDestra(page)).toEqual(disposta);
+  await page.reload();
+  await home(app);
+  await expect(crediti).toBeVisible();
+});
+
+test('uno scaricamento tolto dalla home torna chiesto a parole, e la disposizione resta', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const srv = createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Disposition': 'attachment; filename="bolletta-luce.bin"' });
+    res.end(Buffer.alloc(2048, 0x61));
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  try {
+    const sito = await testServer.openReady(openTab, `<a id="f" href="http://127.0.0.1:${srv.address().port}/bolletta-luce.bin">bolletta</a>`);
+    await sito.locator('#f').click();
+    const page = await home(app);
+    const carta = page.locator('#accade .dash-carta[data-tipo="download"]', { hasText: 'bolletta-luce.bin' });
+    await expect(carta.locator('.dash-carta-stato')).toHaveText(/^scaricato/, { timeout: 15_000 });
+    await page.locator('#tieni .dash-carta[data-tipo="mazzi"]').click({ button: 'right' });
+    await page.locator('.dash-menu .dash-menu-voce', { hasText: 'Togli dalla home' }).click();
+    await carta.hover();
+    await carta.locator('.dash-carta-togli').click();
+    await expect(carta).toHaveCount(0);
+    await expect(page.locator('#altro .dash-altro-app[data-tolta="1"]', { hasText: 'bolletta-luce.bin' })).toBeVisible();
+
+    await modelloFinto(app, [
+      { strumenti: [{ id: 'c1', name: 'CARTA_HOME', arguments: '{"operazione":"rimetti","carta":"lo scaricamento della bolletta"}' }] },
+      { testo: 'Rimesso nella home.' },
+    ]);
+    await page.locator('#input').fill('rimetti nella home lo scaricamento della bolletta');
+    await page.locator('#sendBtn').click();
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'Rimesso' })).toBeVisible({ timeout: 10_000 });
+    await expect(carta).toBeVisible();
+    await expect(page.locator('#tieni .dash-carta[data-tipo="mazzi"]')).toHaveCount(0);
+  } finally {
+    try { srv.closeAllConnections?.(); } catch (_) {}
+    await new Promise((r) => srv.close(r));
+  }
+});
+
+test('una finestra incognito mostra le carte di destra come le ha disposte l’utente', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  const normale = await home(app);
+  await normale.locator('#tieni .dash-carta[data-tipo="mazzi"]').click({ button: 'right' });
+  await normale.locator('.dash-menu .dash-menu-voce', { hasText: 'Togli dalla home' }).click();
+  await expect(normale.locator('#tieni .dash-carta[data-tipo="mazzi"]')).toHaveCount(0);
+  const disposta = await ordineDestra(normale);
+
+  const inc = await homeIncognito(app, shell, normale);
+  await expect.poll(() => ordineDestra(inc)).toEqual(disposta);
+  await expect(inc.locator('#altro .dash-altro-app[data-id="mazzi"][data-tolta="1"]')).toBeVisible();
+  // E quello che si muove lì resta lì.
+  await inc.locator('#altro .dash-altro-app[data-id="mazzi"] + .dash-altro-rimetti').click();
+  await expect(inc.locator('#tieni .dash-carta[data-tipo="mazzi"]')).toHaveCount(1);
+  await normale.reload();
+  await expect(normale.locator('#tieni .dash-carta').first()).toBeVisible({ timeout: 10_000 });
+  await expect(normale.locator('#tieni .dash-carta[data-tipo="mazzi"]')).toHaveCount(0);
+});
