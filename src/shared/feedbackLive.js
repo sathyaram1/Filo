@@ -254,8 +254,23 @@
     }
     const motivo = (e) => (e && e.message ? e.message : String(e));
 
+    // Il confine della domanda si prende dall'ora del SERVER (commit visti, ora della lettura), mai da quella del PC:
+    // un PC avanti di tre minuti non vedeva più niente (verifica locale letture-delta, r2). Il PC solo finché manca.
+    let oraServer = 0;
+    function oraDi(r) {
+      const t = Date.parse(r && r._updateTime);
+      if (Number.isFinite(t)) return t;
+      const u = Date.parse(r && r.updatedAt);
+      return Number.isFinite(u) ? u : 0;
+    }
+    function vedi(righe, readTime) {
+      for (const r of Array.isArray(righe) ? righe : []) oraServer = Math.max(oraServer, oraDi(r));
+      const rt = Date.parse(readTime);
+      if (Number.isFinite(rt)) oraServer = Math.max(oraServer, rt);
+    }
+
     function since() {
-      const base = lastTickAt || (now() - overlapMs);
+      const base = oraServer || lastTickAt || (now() - overlapMs);
       return new Date(Math.max(0, base - overlapMs)).toISOString();
     }
 
