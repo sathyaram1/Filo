@@ -228,7 +228,7 @@ const UI_RUNTIME = `
         var p = node.parentElement;
         while (p && p !== root) {
           var tag = p.tagName;
-          if (tag === 'A' || tag === 'SUP' || tag === 'H1' || tag === 'H2' || tag === 'I') {
+          if (tag === 'A' || tag === 'SUP' || tag === 'H1' || tag === 'H2' || tag === 'I' || tag === 'CODE') {
             return NodeFilter.FILTER_REJECT;
           }
           p = p.parentElement;
