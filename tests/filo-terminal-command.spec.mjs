@@ -145,7 +145,7 @@ test('#201 — una concatenazione di soli comandi sicuri esegue senza conferma',
 test('#516 — una lettura composta (conteggio, controllo che la cartella esista) esegue senza conferma', async ({ app, openTab }) => {
   const page = await openTab(NEWTAB);
   await enableTerminal(page);
-  const dir = fs.mkdtempSync(path.join(tempCanonico(), 'filo516-'));
+  const dir = cartellaTemporanea('filo516-');
   for (const f of ['a.txt', 'b.txt', 'c.txt']) fs.writeFileSync(path.join(dir, f), 'x');
   try {
     // La forma della segnalazione nella shell che gira davvero; fuori da Windows
