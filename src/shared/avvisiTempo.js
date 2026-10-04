@@ -91,7 +91,7 @@
       if (!el || el.__snOrologio) return el;
       el.__snOrologio = true;
       el.addEventListener('mousemove', (e) => {
-        if (!e.isTrusted || sotto.has(el)) return;
+        if (!e.isTrusted) return;
         sotto.add(el);
         ferma(true);
       });
