@@ -138,7 +138,7 @@
 
     function disegna(r) {
       var imp = impronta(r);
-      var occupata = el.fusioni.querySelector('.is-armed, .is-busy');
+      var occupata = UI.occupata(el.fusioni);
       if (!s.forza && (imp === s.impronta || occupata)) return;
       s.forza = false;
       s.impronta = imp;
