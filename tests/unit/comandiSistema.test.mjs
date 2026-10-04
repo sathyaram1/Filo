@@ -201,13 +201,22 @@ test('Linux: un dispositivo abbinato si collega col suo indirizzo, che è l\'uni
     timeout: 'shift; exec "$@"',
     bluetoothctl: `case "$1" in
   show) echo "Controller AA:AA:AA:AA:AA:AA"; echo "	Powered: yes" ;;
-  devices) echo "Device 00:11:22:33:44:55 x"; echo "Device 66:77:88:99:AA:BB y" ;;
-  info) if [ "$2" = 00:11:22:33:44:55 ]; then printf '	Name: x\\n	Alias: ${nome}\\n	Paired: yes\\n	Connected: no\\n'; else printf '	Name: y\\n	Paired: no\\n'; fi ;;
+  devices) echo "Device 00:11:22:33:44:55 x"; echo "Device 66:77:88:99:AA:BB y"; echo "Device 12:34:56:78:9A:BC z" ;;
+  info) cat >/dev/null
+    case "$2" in
+      00:11:22:33:44:55) printf '	Name: x\\n	Alias: ${nome}\\n	Paired: yes\\n	Connected: no\\n' ;;
+      12:34:56:78:9A:BC) printf '	Name: Mouse\\n	Paired: yes\\n	Connected: yes\\n' ;;
+      *) printf '	Name: y\\n	Paired: no\\n' ;;
+    esac ;;
   connect) echo "Connection successful" ;;
 esac`,
   });
   const elenco = C.interpretaBtElenco(C.leggiUscita(pc.esegui('bt-elenco', {}, 'linux')), 'linux');
-  assert.deepEqual(elenco, { ok: true, acceso: true, dispositivi: [{ indirizzo: '00:11:22:33:44:55', nome, collegato: false }] });
+  // `info` legge l'ingresso come fa bluetoothctl: non deve mangiarsi i dispositivi che vengono dopo.
+  assert.deepEqual(elenco, { ok: true, acceso: true, dispositivi: [
+    { indirizzo: '00:11:22:33:44:55', nome, collegato: false },
+    { indirizzo: '12:34:56:78:9A:BC', nome: 'Mouse', collegato: true },
+  ] });
   pc.esegui('bt-collega', { indirizzo: '00:11:22:33:44:55', collega: true }, 'linux');
   assert.deepEqual(pc.chiamate('bluetoothctl').filter((a) => a[0] === 'connect'), [['connect', '00:11:22:33:44:55']]);
   assert.deepEqual(readdirSync(pc.lavoro), []);

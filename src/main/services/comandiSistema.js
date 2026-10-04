@@ -563,7 +563,7 @@ else dice errore nessuna-radio; exit 0; fi
 timeout 8 bluetoothctl devices 2>/dev/null | while read -r tipo ind resto; do
   [ "$tipo" = Device ] || continue
   case "$ind" in [0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]) ;; *) continue ;; esac
-  INFO=$(timeout 5 bluetoothctl info "$ind" 2>/dev/null)
+  INFO=$(timeout 5 bluetoothctl info "$ind" 2>/dev/null </dev/null)
   printf '%s\n' "$INFO" | grep -q 'Paired: yes' || continue
   dice dispositivo "$ind"
   printf '%s\n' "$INFO" | grep -E '^[[:space:]]*(Alias|Name|Connected):' | grezzo
@@ -1069,6 +1069,7 @@ function spiega(errore, { cosa, piattaforma = process.platform, nome = '' } = {}
     ambiguo: { frase: `Più di un nome somiglia a «${nome}»: quale?` },
     occupato: { frase: 'Il sistema sta ancora eseguendo il comando di prima.' },
     'non-supportato': { frase: 'Su questo sistema Filo non sa ancora comandarlo.' },
+    prove: { frase: 'Durante le prove automatiche Filo non comanda il computer vero.' },
   };
   const voce = T[errore] || { frase: 'Il sistema non ha eseguito il comando.' };
   const fuori = { errore, frase: voce.frase };
@@ -1323,6 +1324,8 @@ function comanda(richiesta) {
   if (q.errore) return Promise.resolve({ ok: false, cosa: String((richiesta && richiesta.cosa) || ''), errore: 'richiesta', frase: q.errore });
   return inFila(async () => {
     try {
+      // Una prova che si è dimenticata il computer finto non cambia il volume o la rete di chi la lancia.
+      if (!computerFinto && process.env.NODE_ENV === 'test') return fallito('prove', q);
       if (!computerFinto && !PIATTAFORME.includes(process.platform)) return fallito('non-supportato', q);
       if (q.cosa === 'volume') return await volume(q);
       if (q.cosa === 'bluetooth') return await bluetooth(q);
