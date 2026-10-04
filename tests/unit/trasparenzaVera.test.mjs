@@ -48,6 +48,9 @@ test('del feedback restano in chiaro titolo della pagina e browser, e il documen
   const cifrati = /maybeEncrypt\(text \|\| ''\)/.test(fb) && /maybeEncrypt\(url \|\| ''\)/.test(fb);
   assert.ok(cifrati, 'testo e indirizzo del feedback non risultano più cifrati: il documento sulla privacy dice che lo sono');
   legame(chiaro, privacy, 'Restano in chiaro il titolo della pagina, browser e sistema', 'titolo e browser in chiaro');
+  const nomiChiari = /uploadedFiles\.push\(\{[^}]*\bname: fname\b/.test(fb);
+  legame(nomiChiari, privacy, 'i nomi dei file che alleghi', 'nomi dei file allegati in chiaro');
+  legame(nomiChiari, privacy, 'lo pseudonimo e i nomi dei file allegati restano in chiaro', 'nomi dei file fra i punti deboli');
 });
 
 test('l\'installer non è firmato con un certificato, e il documento sulla sicurezza lo dice', () => {
