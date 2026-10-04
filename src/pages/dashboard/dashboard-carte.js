@@ -345,6 +345,17 @@
     };
   }
 
+  // «Nuovo mazzo» porta a un mazzo nuovo, non alla libreria; un doppio clic non ne crea due.
+  let creaMazzo = null;
+  function nuovoMazzo() {
+    if (creaMazzo) return creaMazzo;
+    creaMazzo = d.send({ type: MSG.DECKS_CREATE }).then((r) => {
+      apri(r && r.ok && r.deck ? `${URL_MAZZI}#/deck/${encodeURIComponent(r.deck.id)}` : URL_MAZZI);
+      return caricaMazzi();
+    }).catch(() => {}).finally(() => { creaMazzo = null; });
+    return creaMazzo;
+  }
+
   function cartaMazzi() {
     const m = dati.mazzi;
     const mazzi = (m || []).slice().sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')));
