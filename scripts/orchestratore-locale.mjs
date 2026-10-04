@@ -1,0 +1,402 @@
+// L'orchestratore dei lavori locali (#956): worktree, lavoratore, verificatori, chiusura e deploy, senza una sessione in mezzo.
+// La sessione resta per le decisioni: legge `stato` e risponde con `riprendi`. Logica e regole in scripts/lib/orchestratore.mjs.
+// Uso: npm run orchestra -- aggiungi <N>… | avvia [opzioni] [--dry-run] | stato | riprendi <N> ["risposta"] | togli <N>
+
+import { spawn, execFileSync } from 'node:child_process';
+import {
+  existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmdirSync, symlinkSync, unlinkSync, writeFileSync,
+} from 'node:fs';
+import { cpus, freemem, homedir } from 'node:os';
+import { delimiter, dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import {
+  OPZIONI_BASE, coda, creaMotore, nuovaPratica, rigaStato, riprendi,
+} from './lib/orchestratore.mjs';
+import { cartellaDelServer } from './server-fondi-pratica.mjs';
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const USO = 'Uso: npm run orchestra -- aggiungi <N> [<N>…] [--slug <nome>] [--file <regola,regola>] [--richiesta "<testo>"]\n'
+  + '                          avvia [--paralleli N] [--tetto N] [--derivati non-locale|locale|nessuno] [--tieni-worktree] [--budget-istanza <$>] [--dry-run [<N>…]]\n'
+  + '                          stato | riprendi <N> ["<risposta dell’owner>"] | togli <N>';
+
+// I ruoli prendono modello e sforzo dagli agenti delle routine: una scelta sola per lo stesso lavoro, in locale e in cloud.
+export const AGENTE_DEL_RUOLO = Object.freeze({ lavoratore: 'routine-nuovo-lavoro', verificatore: 'routine-worker' });
+
+export function radicePrincipale(root = ROOT) {
+  const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: root, encoding: 'utf8' }).trim();
+  return resolve(common, '..');
+}
+
+export function percorsi(env = process.env, root = ROOT) {
+  const radice = radicePrincipale(root);
+  const funzioni = cartellaDelServer(radice);
+  const serverRadice = funzioni ? dirname(funzioni) : '';
+  const note = resolve(env.FILO_ORCH_DIR || join(radice, '..', 'orchestratore-locale'));
+  const fileRegole = join(radice, '..', 'SOTTOAGENTI-LOCALI.md');
+  return {
+    radice,
+    serverRadice,
+    note,
+    regole: existsSync(fileRegole) ? readFileSync(fileRegole, 'utf8') : '',
+    wt: (slug) => join(radice, '.claude', 'worktrees', slug),
+    wtServer: (slug) => join(serverRadice, '.claude', 'worktrees', slug),
+  };
+}
+
+/** Modello e sforzo dal frontmatter di un agente (.claude/agents/<nome>.md). PURA sul testo. */
+export function frontmatter(testo) {
+  const m = /^---\r?\n([\s\S]*?)\r?\n---/.exec(String(testo || ''));
+  const out = {};
+  if (!m) return out;
+  for (const riga of m[1].split(/\r?\n/)) {
+    const kv = /^([a-zA-Z_-]+):\s*(.*)$/.exec(riga);
+    if (kv) out[kv[1]] = kv[2].trim();
+  }
+  return out;
+}
+
+export function modelloDelRuolo(ruolo, root = ROOT) {
+  const nome = AGENTE_DEL_RUOLO[ruolo];
+  const f = join(root, '.claude', 'agents', `${nome}.md`);
+  if (!existsSync(f)) throw new Error(`manca ${f}: modello e sforzo del ${ruolo} si leggono da lì`);
+  const fm = frontmatter(readFileSync(f, 'utf8'));
+  if (!fm.model || !fm.effort) throw new Error(`${f} senza model o effort nel frontmatter`);
+  return { model: fm.model, effort: fm.effort };
+}
+
+const confrontaVersioni = (a, b) => {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i += 1) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) - (pb[i] || 0);
+  return 0;
+};
+
+/** Il binario di Claude Code: FILO_CLAUDE_BIN, poi il PATH, poi dove lo installa l'app desktop. */
+export function trovaClaude(env = process.env, piattaforma = process.platform) {
+  if (env.FILO_CLAUDE_BIN) return env.FILO_CLAUDE_BIN;
+  const nomi = piattaforma === 'win32' ? ['claude.exe'] : ['claude'];
+  for (const d of String(env.PATH || env.Path || '').split(delimiter).filter(Boolean)) {
+    for (const n of nomi) if (existsSync(join(d, n))) return join(d, n);
+  }
+  if (piattaforma === 'win32') {
+    const base = join(env.APPDATA || join(homedir(), 'AppData', 'Roaming'), 'Claude', 'claude-code');
+    const versioni = existsSync(base) ? readdirSync(base).filter((v) => /^\d+(\.\d+)*$/.test(v)).sort(confrontaVersioni).reverse() : [];
+    for (const v of versioni) {
+      for (const h of readdirSync(join(base, v))) if (existsSync(join(base, v, h, 'claude.exe'))) return join(base, v, h, 'claude.exe');
+    }
+  } else {
+    for (const c of [join(homedir(), '.local', 'bin', 'claude'), join(homedir(), '.claude', 'local', 'claude')]) if (existsSync(c)) return c;
+  }
+  return '';
+}
+
+/** Gli argomenti di `claude -p` per un ruolo. PURA. */
+export function argomentiClaude({ model, effort, nome, addDirs = [], permessi = 'auto', budget = '' }) {
+  return [
+    '-p', '--output-format', 'json', '--model', model, '--effort', effort,
+    '--permission-mode', permessi, '-n', nome,
+    ...addDirs.flatMap((d) => ['--add-dir', d]),
+    ...(budget ? ['--max-budget-usd', String(budget)] : []),
+  ];
+}
+
+/** L'uscita JSON di `claude -p` → { ok, testo, costo, errore }. PURA. */
+export function leggiUscitaClaude(stdout, stderr = '', code = 0) {
+  const t = String(stdout || '').trim();
+  let j = null;
+  for (const pezzo of [t, t.slice(t.lastIndexOf('\n{') + 1)]) {
+    try { j = JSON.parse(pezzo); break; } catch (_) { /* il prossimo */ }
+  }
+  if (!j || typeof j !== 'object') return { ok: false, testo: '', costo: 0, errore: coda(`${stderr}\n${t}`, 6) || `uscita ${code}` };
+  const ok = !j.is_error && code === 0 && (j.subtype === undefined || j.subtype === 'success');
+  return { ok, testo: String(j.result || ''), costo: Number(j.total_cost_usd) || 0, errore: ok ? '' : String(j.result || j.subtype || `uscita ${code}`) };
+}
+
+/** La richiesta dell'owner dalle cornici di feedback:leggi: titolo e testo. PURA. */
+export function richiestaDaLettura(testo) {
+  const t = String(testo || '').replace(/\r\n/g, '\n');
+  const pezzo = (nome) => {
+    const m = new RegExp(`\\[${nome}:[^\\]\\n]*Inizio (\\w+)\\]\\n([\\s\\S]*?)\\n\\[Fine \\1\\]`).exec(t);
+    return m ? m[2].trim() : '';
+  };
+  return [pezzo('Titolo'), pezzo('Testo')].filter(Boolean).join('\n\n');
+}
+
+function esegui(cmd, args, { cwd, input, timeoutMs, env } = {}) {
+  return new Promise((ok) => {
+    const bin = cmd === 'node' ? process.execPath : cmd;
+    let stdout = '';
+    let stderr = '';
+    let scaduto = false;
+    const figlio = spawn(bin, args, { cwd, env: env || process.env, windowsHide: true });
+    const timer = timeoutMs ? setTimeout(() => { scaduto = true; figlio.kill(); }, timeoutMs) : null;
+    figlio.stdout.on('data', (d) => { stdout += d; });
+    figlio.stderr.on('data', (d) => { stderr += d; });
+    figlio.on('error', (e) => { stderr += String(e.message || e); });
+    figlio.on('close', (code) => {
+      if (timer) clearTimeout(timer);
+      if (scaduto) stderr += `\ntempo scaduto (${Math.round(timeoutMs / 60_000)} min): processo fermato`;
+      ok({ code: code === null ? 1 : code, stdout, stderr, out: `${stdout}\n${stderr}`.trim() });
+    });
+    if (input !== undefined) figlio.stdin.end(String(input));
+    else figlio.stdin.end();
+  });
+}
+
+function carico() {
+  const misura = () => cpus().reduce((a, c) => {
+    const tot = Object.values(c.times).reduce((x, y) => x + y, 0);
+    return { tot: a.tot + tot, idle: a.idle + c.times.idle };
+  }, { tot: 0, idle: 0 });
+  const a = misura();
+  return new Promise((ok) => setTimeout(() => {
+    const b = misura();
+    const tot = b.tot - a.tot;
+    ok({ cpu: tot > 0 ? Math.round(100 * (1 - (b.idle - a.idle) / tot)) : 0, liberaGB: freemem() / 2 ** 30 });
+  }, 2000));
+}
+
+function negozio(file) {
+  const vuoto = () => ({ coda: [], pratiche: {} });
+  const leggi = () => {
+    try { return existsSync(file) ? { ...vuoto(), ...JSON.parse(readFileSync(file, 'utf8')) } : vuoto(); } catch (e) {
+      throw new Error(`${file} illeggibile (${e.message}): non lo sovrascrivo`);
+    }
+  };
+  const scrivi = (s) => {
+    mkdirSync(dirname(file), { recursive: true });
+    const tmp = `${file}.${process.pid}.tmp`;
+    writeFileSync(tmp, `${JSON.stringify(s, null, 2)}\n`);
+    renameSync(tmp, file);
+  };
+  return { leggi, scrivi, salvaPratica: (p) => { const s = leggi(); s.pratiche[p.num] = p; scrivi(s); } };
+}
+
+function memoria(iniziale) {
+  const s = JSON.parse(JSON.stringify(iniziale));
+  return { leggi: () => JSON.parse(JSON.stringify(s)), salvaPratica: (p) => { s.pratiche[p.num] = JSON.parse(JSON.stringify(p)); } };
+}
+
+const sistemaFs = {
+  esiste: (p) => { try { lstatSync(p); return true; } catch (_) { return false; } },
+  collega: (verso, link) => symlinkSync(verso, link, process.platform === 'win32' ? 'junction' : 'dir'),
+  // Mai ricorsivo: si toglie il collegamento, non quello a cui punta.
+  scollega: (link) => {
+    const st = lstatSync(link);
+    if (!st.isSymbolicLink()) return;
+    if (process.platform === 'win32') rmdirSync(link);
+    else unlinkSync(link);
+  },
+};
+
+function pubblicaDavvero(P) {
+  const cwd = join(P.serverRadice, 'functions');
+  // Su Windows il deploy del server va lanciato da PowerShell (giro locale del 04/10, LOCAL.md § Deploy).
+  if (process.platform === 'win32') return esegui('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', 'npm run server:pubblica'], { cwd, timeoutMs: 60 * 60_000 });
+  return esegui('npm', ['run', 'server:pubblica'], { cwd, timeoutMs: 60 * 60_000 });
+}
+
+function depVere(P, opz, log) {
+  const bin = trovaClaude();
+  if (!bin) throw new Error('Claude Code non trovato: imposta FILO_CLAUDE_BIN col percorso del binario');
+  const ruoli = { lavoratore: modelloDelRuolo('lavoratore'), verificatore: modelloDelRuolo('verificatore') };
+  mkdirSync(join(P.note, 'log'), { recursive: true });
+  // Un'istanza figlia non deve credersi dentro la sessione che l'ha lanciata.
+  const env = { ...process.env };
+  delete env.CLAUDECODE;
+  return {
+    store: negozio(join(P.note, 'stato.json')),
+    esegui,
+    async claude({ ruolo, prompt, cwd, addDirs, nome }) {
+      const r = await esegui(bin, argomentiClaude({ ...ruoli[ruolo], nome, addDirs, budget: opz.budgetIstanza }), {
+        cwd, input: prompt, env, timeoutMs: opz.oreIstanza * 60 * 60_000,
+      });
+      const f = join(P.note, 'log', `${nome.replace(/[^a-z0-9]+/gi, '-')}-${new Date().toISOString().replace(/[:.]/g, '')}.json`);
+      writeFileSync(f, `${r.stdout}\n${r.stderr ? `\n--- stderr ---\n${r.stderr}` : ''}`);
+      return leggiUscitaClaude(r.stdout, r.stderr, r.code);
+    },
+    verifica: (wt) => {
+      if (!existsSync(wt)) return {};
+      return { ...verifyLocal.verdictForCurrentBranch(wt), dirty: verifyLocal.isDirty(wt) };
+    },
+    pubblica: () => pubblicaDavvero(P),
+    carico,
+    dormi: (ms) => new Promise((ok) => setTimeout(ok, ms)),
+    log,
+    ora: () => new Date().toISOString(),
+    percorsi: P,
+    fs: sistemaFs,
+    annota: async (id, testo) => {
+      const { annotaPratica } = await import('./owner-feedback.mjs');
+      return annotaPratica(id, testo);
+    },
+    richiestaDi: async (num) => richiestaDaLettura((await esegui('node', ['scripts/leggi-feedback.mjs', String(num)], { cwd: ROOT })).stdout),
+  };
+}
+
+/** Le dipendenze della prova a vuoto: stampano quello che farebbero, e il giro va dritto al «superata». */
+function depAVuoto(P, stato, log) {
+  const fatti = new Set();
+  const giri = new Map();
+  const finto = (cmd, args, cwd) => {
+    const a = args.join(' ');
+    if (cmd === 'git' && /rev-parse --verify/.test(a)) return { code: 1, out: '' };
+    if (cmd === 'git' && /rev-list --count origin\/main\.\.(HEAD|refs)/.test(a)) return { code: 0, out: '1' };
+    if (cmd === 'git' && /diff --name-only/.test(a)) return { code: 0, out: 'scripts/esempio.mjs' };
+    if (cmd === 'node' && /verify-local\.mjs start/.test(a)) { giri.set(cwd, 'avviata'); return { code: 0, out: '(il compito del verificatore)' }; }
+    return { code: 0, out: '' };
+  };
+  return {
+    store: memoria(stato),
+    esegui: async (cmd, args, { cwd } = {}) => {
+      log(`[a vuoto] ${cwd ? `(${cwd}) ` : ''}${cmd} ${args.map((x) => (/\s/.test(x) ? JSON.stringify(x.length > 200 ? `${x.slice(0, 197)}…` : x) : x)).join(' ')}`);
+      const r = finto(cmd, args, cwd);
+      return { ...r, stdout: r.out };
+    },
+    claude: async ({ ruolo, cwd, nome }) => {
+      log(`[a vuoto] claude -p (${ruolo}, ${JSON.stringify(modelloDelRuolo(ruolo))}) «${nome}» in ${cwd}`);
+      if (ruolo === 'verificatore') giri.set(cwd, 'superata');
+      return { ok: true, testo: 'fatto', costo: 0 };
+    },
+    verifica: (wt) => {
+      const g = giri.get(wt);
+      if (g === 'superata') return { ok: true, entry: { request: 'x', verdict: 'pass', derived: [] } };
+      if (g === 'avviata') return { ok: false, entry: { request: 'x' } };
+      return {};
+    },
+    pubblica: async () => { log(`[a vuoto] (${join(P.serverRadice, 'functions')}) npm run server:pubblica`); return { code: 0, out: '' }; },
+    carico: async () => ({ cpu: 0, liberaGB: 99 }),
+    dormi: () => new Promise((ok) => setImmediate(ok)),
+    log,
+    ora: () => new Date().toISOString(),
+    percorsi: P,
+    fs: {
+      esiste: (p) => fatti.has(p) || sistemaFs.esiste(p),
+      collega: (verso, link) => { fatti.add(link); log(`[a vuoto] collego ${link} → ${verso}`); },
+      scollega: (link) => { fatti.delete(link); log(`[a vuoto] tolgo il collegamento ${link}`); },
+    },
+    annota: async () => {},
+    richiestaDi: async (num) => `(la richiesta del feedback #${num})`,
+  };
+}
+
+let verifyLocal;
+
+function opzioniDa(args) {
+  const opz = { ...OPZIONI_BASE, budgetIstanza: '', oreIstanza: 4, dryRun: false, numeri: [] };
+  for (let i = 0; i < args.length; i += 1) {
+    const a = args[i];
+    const val = () => { const v = args[i + 1]; i += 1; if (v === undefined) throw new Error(`${a} vuole un valore`); return v; };
+    if (a === '--paralleli') opz.paralleli = Math.max(1, Number(val()) || 1);
+    else if (a === '--tetto') opz.tetto = Math.max(1, Number(val()) || 1);
+    else if (a === '--derivati') { opz.derivati = val(); if (!['non-locale', 'locale', 'nessuno'].includes(opz.derivati)) throw new Error('--derivati: non-locale, locale o nessuno'); }
+    else if (a === '--tieni-worktree') opz.tieniWorktree = true;
+    else if (a === '--budget-istanza') opz.budgetIstanza = val();
+    else if (a === '--ore-istanza') opz.oreIstanza = Math.max(0.5, Number(val()) || 4);
+    else if (a === '--cpu-max') opz.cpuMax = Number(val());
+    else if (a === '--cpu-chiusura') opz.cpuChiusura = Number(val());
+    else if (a === '--dry-run') opz.dryRun = true;
+    else if (/^\d+$/.test(a) && opz.dryRun) opz.numeri.push(Number(a));
+    else throw new Error(`argomento non capito: ${a}`);
+  }
+  return opz;
+}
+
+function vivo(pid) {
+  try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; }
+}
+
+async function main(argv) {
+  const [cmd, ...rest] = argv;
+  const P = percorsi();
+  const store = negozio(join(P.note, 'stato.json'));
+  const ora = () => new Date().toISOString();
+
+  if (cmd === 'aggiungi') {
+    const nums = rest.filter((a) => /^#?\d+$/.test(a)).map((a) => Number(a.replace('#', '')));
+    const val = (k) => { const i = rest.indexOf(k); return i >= 0 ? rest[i + 1] : undefined; };
+    if (!nums.length) throw new Error('aggiungi vuole almeno un numero di feedback');
+    if (nums.length > 1 && (val('--slug') || val('--richiesta'))) throw new Error('--slug e --richiesta valgono per un lavoro solo');
+    const s = store.leggi();
+    for (const n of nums) {
+      if (s.pratiche[n] && !['fuso'].includes(s.pratiche[n].fase)) { console.log(`#${n} è già in coda (${s.pratiche[n].fase})`); continue; }
+      s.pratiche[n] = nuovaPratica({ num: n, slug: val('--slug'), richiesta: val('--richiesta'), file: (val('--file') || '').split(',').map((x) => x.trim()).filter(Boolean), ora: ora() });
+      s.coda = (s.coda || []).filter((x) => x !== n).concat([n]);
+      console.log(`#${n} in coda: ramo claude/${s.pratiche[n].slug}`);
+    }
+    store.scrivi(s);
+    return 0;
+  }
+
+  if (cmd === 'stato' || !cmd) {
+    const s = store.leggi();
+    const lock = join(P.note, 'avvia.lock');
+    const pid = existsSync(lock) ? Number(readFileSync(lock, 'utf8')) : 0;
+    console.log(pid && vivo(pid) ? `Orchestratore in corso (pid ${pid}).` : 'Orchestratore fermo.');
+    if (!(s.coda || []).length) console.log('Coda vuota.');
+    for (const n of s.coda || []) if (s.pratiche[n]) console.log(rigaStato(s.pratiche[n]));
+    return 0;
+  }
+
+  if (cmd === 'riprendi') {
+    const n = Number(String(rest[0] || '').replace('#', ''));
+    const s = store.leggi();
+    s.pratiche[n] = riprendi(s.pratiche[n], rest.slice(1).join(' '));
+    store.scrivi(s);
+    console.log(`#${n} ripresa: ${s.pratiche[n].fase}${s.pratiche[n].compito === 'decisione' ? ' (con la tua risposta)' : ''}. Riparte col prossimo «avvia».`);
+    return 0;
+  }
+
+  if (cmd === 'togli') {
+    const n = Number(String(rest[0] || '').replace('#', ''));
+    const s = store.leggi();
+    const p = s.pratiche[n];
+    if (!p) throw new Error(`#${n} non è in coda`);
+    if (!['in-coda', 'fermo', 'fuso'].includes(p.fase)) throw new Error(`#${n} è in ${p.fase}: si toglie da ferma, in coda o fusa`);
+    delete s.pratiche[n];
+    s.coda = (s.coda || []).filter((x) => x !== n);
+    store.scrivi(s);
+    console.log(`#${n} tolta dalla coda (worktree e ramo restano).`);
+    return 0;
+  }
+
+  if (cmd === 'avvia') {
+    const opz = opzioniDa(rest);
+    const log = (riga) => {
+      const r = `${ora().slice(0, 19)} ${riga}`;
+      console.log(r);
+      if (!opz.dryRun) try { mkdirSync(P.note, { recursive: true }); writeFileSync(join(P.note, 'orchestratore.log'), `${r}\n`, { flag: 'a' }); } catch (_) { /* il log non ferma il giro */ }
+    };
+    if (opz.dryRun) {
+      const s = store.leggi();
+      for (const n of opz.numeri) {
+        if (!s.pratiche[n]) { s.pratiche[n] = nuovaPratica({ num: n, ora: ora() }); s.coda = (s.coda || []).concat([n]); }
+      }
+      if (!(s.coda || []).length) { console.log('Coda vuota: niente da provare (avvia --dry-run <N> prova un lavoro senza metterlo in coda).'); return 0; }
+      const motore = creaMotore(depAVuoto(P, s, log), { ...opz, pausaMs: 0 });
+      const fine = await motore.avvia();
+      for (const n of fine.coda) console.log(rigaStato(fine.pratiche[n]));
+      return 0;
+    }
+    verifyLocal = await import('./verify-local.mjs');
+    const lock = join(P.note, 'avvia.lock');
+    mkdirSync(P.note, { recursive: true });
+    if (existsSync(lock) && vivo(Number(readFileSync(lock, 'utf8')))) throw new Error(`un orchestratore è già in corso (pid ${readFileSync(lock, 'utf8').trim()})`);
+    writeFileSync(lock, String(process.pid));
+    try {
+      const fine = await creaMotore(depVere(P, opz, log), opz).avvia();
+      for (const n of fine.coda) console.log(rigaStato(fine.pratiche[n]));
+    } finally {
+      try { unlinkSync(lock); } catch (_) { /* già tolto */ }
+    }
+    return 0;
+  }
+
+  console.error(USO);
+  return 1;
+}
+
+const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
+if (isMain) {
+  main(process.argv.slice(2)).then((c) => process.exit(c), (e) => { console.error(`✗ ${(e && e.message) || e}`); process.exit(1); });
+}
