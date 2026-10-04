@@ -263,3 +263,32 @@ test('F — un dominio escluso aggiunto dalla chat compare nella pagina Altro ap
   await expect.poll(async () => (await impostazioni(app)).blocklist, { timeout: 5_000 }).toEqual(['banca.it', 'esempio.org', 'posta.it']);
   await ripristina(app);
 });
+
+// Annullare un cambio a un elenco toglie solo i siti di quel cambio: rimettere l'elenco intero perdeva b.it.
+test('G — annullare «blocca a.it» dal segno lascia bloccato b.it, aggiunto dopo', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const chat = await homeDi(app);
+  await configura(app);
+  const blacklist = async () => (await impostazioni(app)).security.siteBlock.blacklist;
+
+  await modelloFinto(app, [imposta('siti_bloccati', 'aggiungi a.it'), { text: 'Bloccato a.it.' }]);
+  await scrivi(chat, 'blocca a.it');
+  await clickConfirm(chat, 'ok', { timeout: 10_000 });
+  await expect.poll(blacklist, { timeout: 5_000 }).toEqual(['a.it']);
+  await expect(chat.locator('.dash-bubble-filo', { hasText: 'Bloccato a.it.' })).toBeVisible({ timeout: 10_000 });
+
+  await modelloFinto(app, [imposta('siti_bloccati', 'aggiungi b.it', 'i2'), { text: 'Bloccato b.it.' }]);
+  await scrivi(chat, 'blocca b.it');
+  await clickConfirm(chat, 'ok', { timeout: 10_000 });
+  await expect.poll(blacklist, { timeout: 5_000 }).toEqual(['a.it', 'b.it']);
+  await expect(chat.locator('.dash-bubble-filo', { hasText: 'Bloccato b.it.' })).toBeVisible({ timeout: 10_000 });
+
+  const bolla = chat.locator('.dash-bubble-user', { hasText: 'blocca a.it' });
+  await bolla.locator('.dash-cambi-segno').hover();
+  const pop = bolla.locator('.dash-cambi-pop');
+  await expect(pop).toContainText('aggiunto a.it');
+  await pop.locator('.dash-cambi-annulla').click();
+  await expect.poll(blacklist, { timeout: 5_000 }).toEqual(['b.it']);
+  await ripristina(app);
+});
