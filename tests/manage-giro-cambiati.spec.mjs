@@ -166,3 +166,23 @@ test('il registro dei worker porta il nome: quel feedback si rilegge e si segue,
   expect(fine.seguiti.every((ids) => ids.length === 1 && ids[0] === 'coda-b')).toBe(true);
   expect(fine.tutti).toBe(1);
 });
+
+// Un avviso del giro (lettura interrotta, tetto dei seguiti, registro illeggibile) si vede senza passarci sopra.
+test('un avviso del giro si vede sull\'intestazione della lista, e sparisce col giro pulito', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
+  await page.evaluate(() => window.__mgTest.whenReady());
+  await page.evaluate(() => {
+    window.__mgTest.setData([{ _id: 'a1', _updateTime: 't1', name: 'Uno', text: 'x', seq: 1, subSeq: 0, status: 'design', createdAt: '2026-09-01T10:00:00Z' }]);
+    window.__mgTest.setTab('inbox');
+  });
+  const head = page.locator('#mgListHead');
+  const dopo = () => head.evaluate((el) => getComputedStyle(el, '::after').content);
+  expect(await dopo()).toBe('none');
+  await page.evaluate(() => window.__mgTest.liveMessage({ kind: 'changed', rows: [], avvisi: ['cambiati: troppe pagine, riallineamento completo al giro dopo'] }));
+  await expect(head).toHaveAttribute('title', /troppe pagine/);
+  expect(await dopo()).toContain('da riallineare');
+  await page.evaluate(() => window.__mgTest.liveMessage({ kind: 'changed', rows: [] }));
+  await expect.poll(dopo).toBe('none');
+});
