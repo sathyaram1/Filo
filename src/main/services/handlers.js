@@ -1563,6 +1563,22 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
     } catch (_) {}
   }
 
+  // Un elenco di siti che resterebbe com'è (aggiungere un sito che c'è già, toglierne uno che non c'è)
+  // non chiede conferma per poi non fare niente: lo si sa prima del gate, mai dall'LLM (#949).
+  if (type === 'IMPOSTA_PREFERENZA') {
+    delete action._invariato;
+    try {
+      const built = global.SN_PREF.buildPreferencePartial(
+        action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza,
+        action.valore ?? action.value ?? action.valoreNuovo ?? action.val,
+      );
+      if (built && built.elenco) {
+        const r = global.SN_PREF.applicaElenco(built.elenco, await Storage.getSettings());
+        if (r.invariato) action._invariato = r.invariato;
+      }
+    } catch (_) {}
+  }
+
   // Le uscite (elenco in src/shared/urlExfil.js, USCITE) passano dalla porta unica
   // PRIMA del gate: un segreto che esce si ferma a ogni livello, anche confermato. Il resto del
   // verdetto è l'anti-esfiltrazione di #587, che alza NAVIGA e CERCA_WEB a livello 2 con
@@ -1958,11 +1974,20 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         const chiave = action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza;
         const valore = action.valore ?? action.value ?? action.valoreNuovo ?? action.val;
         const built = global.SN_PREF.buildPreferencePartial(chiave, valore);
-        if (!built) return { executed: false, kept: false };
         // Un rifiuto spiegato resta nel diario col suo perché: non è successo
         // niente, ma l'utente deve saperlo anche se il modello non lo dice.
-        if (built.rifiuto) return { executed: false, kept: false, output: { error: built.rifiuto, rifiuto: true } };
-        await applySettingsUpdate(built.partial);
+        // `perModello` (le chiavi, i valori ammessi) va solo al modello.
+        const no = built ? (built.rifiuto ? built : null) : global.SN_PREF.spiegaNonValida(chiave, valore);
+        if (no) return { executed: false, kept: false, output: { error: no.rifiuto, rifiuto: true, ...(no.perModello ? { perModello: no.perModello } : {}) } };
+        if (action._invariato) return { executed: false, kept: false, output: { error: action._invariato, invariato: true } };
+        // Un elenco (siti bloccati, fidati…) si cambia a voci sull'elenco di adesso (#949).
+        let partial = built.partial;
+        if (built.elenco) {
+          const r = global.SN_PREF.applicaElenco(built.elenco, await Storage.getSettings());
+          if (r.invariato) return { executed: false, kept: false, output: { error: r.invariato, invariato: true } };
+          partial = r.partial;
+        }
+        await applySettingsUpdate(partial);
         // Il nome leggibile serve alla riga della chat quando il valore era già quello (niente evento).
         return { executed: true, kept: true, output: { etichetta: built.label } };
       }
@@ -1976,6 +2001,17 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         const T = globalThis.SN_THEME_TOKENS;
         const token = action.token ?? action.nome ?? action.name ?? action.chiave ?? action.elemento;
         const valore = action.valore ?? action.value ?? action.val ?? action.colore;
+        // Il ↺ della riga nelle Preferenze, chiesto a parole (#949): il token torna al suo valore di serie.
+        if (T && T.get(token) && /^(predefinit[oa]|default|di serie|originale|ripristina(lo|la)?)$/i.test(String(valore ?? '').trim())) {
+          const correnti = await Storage.getSettings();
+          const restanti = { ...(correnti.themeTokens || {}) };
+          if (!Object.prototype.hasOwnProperty.call(restanti, token)) {
+            return { executed: false, kept: false, output: { error: `${T.get(token).label} è già al suo valore predefinito`, invariato: true } };
+          }
+          delete restanti[token];
+          await applySettingsUpdate({ themeTokens: restanti });
+          return { executed: true, kept: true };
+        }
         if (!T || !T.validate(token, valore)) return { executed: false, kept: false };
         const settings = await Storage.getSettings();
         const overrides = { ...(settings.themeTokens || {}) };
@@ -2026,6 +2062,28 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         // «riletto la trasparenza» per una cosa che nessuno ha letto (#515).
         const trovato = !!(T && (!doc || T.get(doc)));
         return { executed: trovato, kept: true, output: { doc: doc || null, text, missing: !trovato } };
+      }
+      case 'LEGGI_IMPOSTAZIONI': {
+        // #949 — com'è impostato Filo adesso, per «com'è impostato X?». Sola lettura, senza le chiavi.
+        const V = globalThis.SN_VOCI_IMPOSTAZIONI;
+        const cerca = String(action.cerca ?? action.query ?? action.chiave ?? action.testo ?? '').replace(/\s+/g, ' ').trim().slice(0, 200);
+        if (!V) return { executed: false, kept: true, output: { error: 'lettura non disponibile' } };
+        const settings = await Storage.getSettings();
+        let permessiSiti = null;
+        try { permessiSiti = require('./permessiPagine').righeRicordate(); } catch (_) {}
+        const r = V.righePerModello(settings, { cerca, tema: resolveTheme(settings), sistema: process.platform, altrove: { permessiSiti } });
+        return { executed: true, kept: true, output: { cerca, righe: r.righe, trovate: r.trovate, totale: r.totale } };
+      }
+      case 'TOGLI_PERMESSO_SITO': {
+        // #949 — la stessa cosa del «Togli» nella pagina Sicurezza: una risposta ricordata se ne va, il sito tornerà a chiedere.
+        const r = require('./permessiPagine').togliPerChat(action.sito ?? action.dominio ?? action.site, action.permesso ?? action.parte);
+        if (r.errore) return { executed: false, kept: false, output: { error: r.errore, rifiuto: true } };
+        if (!r.tolte.length) {
+          const ci = r.restano.length ? `ci sono: ${r.restano.join('; ')}` : 'non ce n\'è nessuna';
+          return { executed: false, kept: false, output: { error: `nessuna risposta ricordata per ${r.host}${action.permesso ? ` (${action.permesso})` : ''}: ${ci}`, invariato: true } };
+        }
+        broadcastToFiloPages({ type: MSG.PERMESSI_SITI_CAMBIATI });
+        return { executed: true, kept: false, output: { tolte: r.tolte } };
       }
       case 'EVENTO_CALENDARIO':
         return { executed: false, kept: true };
@@ -2580,6 +2638,26 @@ function commandOutputsForPrompt(actions) {
 // un turno precedente (F2): l'agente vede i dati esatti (cosa fa / come si attiva
 // / limiti) e risponde all'utente senza indovinare l'invocazione a memoria.
 // Sono DATI affidabili di sistema, non istruzioni.
+// Le impostazioni lette con LEGGI_IMPOSTAZIONI (#949), anche nei turni dopo. I valori li può aver scritti
+// un modello (lo stile, i nomi delle voci, i siti in elenco): stanno nel recinto dei testi salvati.
+function impostazioniLetteForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const E = globalThis.SN_ESTERNO;
+  const blocchi = [];
+  for (const a of actions) {
+    if (!a || String(a.type || '').toUpperCase() !== 'LEGGI_IMPOSTAZIONI') continue;
+    const o = a._output;
+    if (!o || !Array.isArray(o.righe)) continue;
+    const cerca = o.cerca ? E.neutralizza(o.cerca, { unaRiga: true }) : '';
+    const testa = !cerca ? 'tutte le voci'
+      : (o.trovate ? `le voci che c'entrano con «${cerca}»` : `nessuna voce c'entra con «${cerca}», quindi tutte`);
+    blocchi.push(`[Impostazioni di Filo lette con LEGGI_IMPOSTAZIONI (${testa}): sono i valori veri di quel momento, `
+      + 'rispondi con questi; se nel frattempo ne hai cambiata una, rileggila. Per cambiarne una usa la chiave fra parentesi quadre.]\n'
+      + E.imbusta({ tipo: 'TESTO_SALVATO', conIntestazione: true, testo: o.righe.map((r) => E.neutralizza(r, { unaRiga: true })).join('\n') }));
+  }
+  return blocchi.join('\n\n').trim();
+}
+
 function capabilityDetailsForPrompt(actions) {
   if (!Array.isArray(actions)) return '';
   const blocks = [];
@@ -2890,7 +2968,7 @@ function documentReadsForPrompt(actions) {
 // dell'editor compresi, arriva imbustato (#593, #592.4).
 function observationsForPrompt(actions) {
   return [
-    commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), webSearchResultsForPrompt(actions),
+    commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), impostazioniLetteForPrompt(actions), webSearchResultsForPrompt(actions),
     fileReadsForPrompt(actions), documentReadsForPrompt(actions), transparencyDocsForPrompt(actions),
     chatSearchesForPrompt(actions), confirmedActionsForPrompt(actions), proxyUnavailableForPrompt(actions),
     apertureFermateDopoForPrompt(actions),
@@ -3098,6 +3176,10 @@ function toolResultText({ action, res, rendered }) {
       ? `Dimenticate:\n${nomiSalvati(res.output.dimenticate)}`
       : 'Nella memoria nessuna riga corrispondeva: niente da togliere. Non ripetere uguale: copia la riga com\'è nella memoria, o chiedi all\'utente quale intende.';
   }
+  if (type === 'TOGLI_PERMESSO_SITO' && res.executed && res.output && Array.isArray(res.output.tolte)) {
+    return `Tolte le risposte ricordate (il sito tornerà a chiedere):\n${nomiSalvati(res.output.tolte)}\n`
+      + 'Nella risposta di\' in una frase cosa hai tolto e che per ridarlo basta rispondere «Consenti» quando il sito lo richiede.';
+  }
   if (type === 'MODIFICA_SVEGLIA' && res.output && Array.isArray(res.output.updated)) {
     return res.output.updated.length ? `Spostate:\n${nomiSalvati(res.output.updated)}` : 'Nessuna sveglia o timer corrispondeva: niente da spostare. Non ripetere uguale: chiedi all\'utente quale intende.';
   }
@@ -3139,12 +3221,24 @@ function toolResultText({ action, res, rendered }) {
     let done = '';
     try { done = descriviPerModello(action, { fatto: true }); } catch (_) {}
     done = String(done || describe()).replace(/\.+\s*$/, '');
+    // #949 — un cambio fatto da Filo dice cosa ha cambiato e come si torna indietro.
+    if (type === 'IMPOSTA_PREFERENZA' || type === 'IMPOSTA_ESTETICA') {
+      return `Eseguita: ${done}. Nella risposta di' in una frase cosa hai cambiato e che si rimette com'era con «annulla» `
+        + 'sul segno accanto al messaggio dell\'utente, o chiedendolo a te.';
+    }
     return `Eseguita: ${done}.`;
   }
+  if (res.output && res.output.invariato && res.output.error) {
+    return `Niente da cambiare: ${res.output.error}. Dillo all'utente in una riga; non ripetere l'azione uguale.`;
+  }
   if (res.output && res.output.rifiuto && res.output.error) {
-    const cosa = type === 'SALVA_LEZIONE' ? 'Lezione NON salvata' : 'Impostazione NON applicata';
-    return `${cosa}: ${res.output.error}. Non è stato salvato niente, nemmeno accorciato: `
-      + 'dillo all\'utente e, se vuole, riprova con un testo che stia nel limite.';
+    if (type === 'SALVA_LEZIONE') {
+      return `Lezione NON salvata: ${res.output.error}. Non è stato salvato niente, nemmeno accorciato: `
+        + 'dillo all\'utente e, se vuole, riprova con un testo che stia nel limite.';
+    }
+    const come = res.output.perModello || 'Dillo all\'utente e, se vuole, riprova con un valore ammesso.';
+    if (type === 'IMPOSTA_PREFERENZA') return `Impostazione NON applicata: ${res.output.error}. Non è stato salvato niente, nemmeno in parte. ${come}`;
+    return `Azione ${type} NON eseguita: ${res.output.error}. Non è cambiato niente: dillo all'utente in una riga.`;
   }
   // Tenuta ma non eseguita dal main: è un bottone in chat (evento, file,
   // pulizia schede, cancellazione archivio) che l'utente aziona da sé.

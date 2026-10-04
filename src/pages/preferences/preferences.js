@@ -813,21 +813,9 @@
   // cambio arrivato da altrove (la chat, un'altra scheda) non li riscrive. Il
   // resto della pagina segue la memoria (#592).
   const toccati = new Set();
-  const CAMPO_DI = {
-    theme: 'theme', textScale: 'textScale', showHomeMessage: 'showHomeMessage',
-    homeSisOra: 'homeSistema.ora', homeSisBatteria: 'homeSistema.batteria',
-    homeSisRete: 'homeSistema.rete', homeSisBluetooth: 'homeSistema.bluetooth',
-    tabPreviewEnabled: 'tabPreview.enabled', tabPreviewSize: 'tabPreview.size',
-    agentStylePreset: 'agentStyle', agentStyleText: 'agentStyle', timerRingtone: 'timerRingtone',
-    terminalEnabled: 'terminal.enabled', terminalShell: 'terminal.shell',
-    nomiSensatiScaricamenti: 'nomiSensati.scaricamenti',
-    ttsVoice: 'tts.voice', ttsRate: 'tts.rate', ttsPitch: 'tts.pitch',
-    ttsModelVoice: 'tts.modelVoice', ttsModelVoiceCustom: 'tts.modelVoice',
-    autoArchiveEnabled: 'autoArchive.enabled', autoArchiveIdleHours: 'autoArchive.idleHours',
-    autoArchiveOnClose: 'autoArchive.onClose',
-    notifDuration: 'notifications.durationSec', notifSoundEnabled: 'notifications.soundEnabled',
-    notifSound: 'notifications.sound',
-  };
+  // Quale campo scrive quale impostazione: lo dice la fonte unica delle voci, la stessa da cui la chat
+  // legge e cambia ogni preferenza (#949).
+  const CAMPO_DI = window.SN_VOCI_IMPOSTAZIONI.campi('preferences');
 
   function valoreDelCampo(k) {
     switch (k) {

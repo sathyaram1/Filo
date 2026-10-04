@@ -72,7 +72,12 @@ module.exports = function register(on, ctx) {
   // un'azione fuori registro.
   on(MSG.FILO_CONFIRM_ACTION, async (msg, sender) => {
     const r = await executeFiloAction(msg.action, { confirmed: true, sender, assistente: msg.assistente === true, parole: paroleDa(msg) });
-    return { ok: true, ...r };
+    // Dopo l'OK il pulsante dice la cosa fatta, non quella proposta («Filo vuole…»): il testo lo dà il registro,
+    // col risultato vero davanti (quante pagine cancellate, quante schede archiviate), come la riga del diario.
+    const Levels = globalThis.SN_ACTION_LEVELS;
+    const fatto = r && r.executed && Levels && Levels.describeDone
+      ? String(Levels.describeDone({ ...msg.action, _output: r.output }) || '').split('\n')[0].trim() : '';
+    return { ok: true, ...r, ...(fatto ? { fatto } : {}) };
   });
 
   // #867 — il segno sulla bolla chiede come stanno i suoi cambi, e il suo «annulla» li rimette com'erano.

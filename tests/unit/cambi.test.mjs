@@ -178,6 +178,19 @@ test('annullare rimette i valori di prima, anche dentro le mappe sostituite inte
   assert.equal(K.livello({ cambi: [timer('a'), timer('b')] }), 2, 'togliere più timer insieme chiede conferma, come CANCELLA_SVEGLIA');
 });
 
+test('annullare un cambio a un elenco di siti tocca solo i siti di quel cambio, non quelli cambiati dopo', () => {
+  const blocca = { cambi: [{ chiave: 'security.siteBlock.blacklist', prima: ['x.it'], dopo: ['x.it', 'a.it'] }] };
+  const adesso = { security: { siteBlock: { blacklist: ['x.it', 'a.it', 'b.it'] } } };
+  assert.deepEqual(K.annulloImpostazioni(blocca, adesso, S.REPLACE_KEYS).security.siteBlock.blacklist, ['x.it', 'b.it']);
+  // Al rovescio: un «togli» annullato rimette il sito tolto al suo posto, e non riporta quelli tolti dopo.
+  const togli = { cambi: [{ chiave: 'blocklist', prima: ['a.it', 'b.it', 'c.it'], dopo: ['a.it', 'c.it'] }] };
+  assert.deepEqual(K.annulloImpostazioni(togli, { blocklist: ['a.it', 'd.it'] }, S.REPLACE_KEYS).blocklist, ['a.it', 'b.it', 'd.it']);
+  // Un elenco che prima non c'era.
+  const primo = { cambi: [{ chiave: 'security.cookies.trustedSites', prima: undefined, dopo: ['a.it'] }] };
+  assert.deepEqual(K.annulloImpostazioni(primo, { security: { cookies: { trustedSites: ['a.it', 'b.it'] } } }, S.REPLACE_KEYS)
+    .security.cookies.trustedSites, ['b.it']);
+});
+
 test('un annullo annullato rimette in piedi il cambio di prima', () => {
   const lista = [{ id: 'c1' }, { id: 'c2', annulla: 'c1' }];
   assert.equal(K.annullati(lista).get('c1'), 'c2');

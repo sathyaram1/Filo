@@ -54,7 +54,7 @@
     'autoArchive.onClose': { nome: 'riordino alla riapertura', valore: ATTIVO, livello: 1 },
     'notifications.durationSec': { nome: 'durata delle notifiche', valore: (v) => (Number(v) ? `${numero(v)} s` : 'finché non la chiudi'), livello: 1 },
     'notifications.soundEnabled': { nome: 'suono delle notifiche', valore: ATTIVO, livello: 1 },
-    'notifications.sound': { nome: 'suono scelto per le notifiche', valori: { default: 'standard' }, livello: 1 },
+    'notifications.sound': { nome: 'suono scelto per le notifiche', valori: { default: 'standard', gentle: 'delicata', urgent: 'urgente', chime: 'carillon' }, livello: 1 },
     'featureFlags.spellcheck': { nome: 'correttore ortografico', valore: ATTIVO, livello: 1 },
     'featureFlags.help': { nome: 'barra dell\'Aiuto', valore: ATTIVA, livello: 1 },
     'featureFlags.categorize': { nome: 'categorizzazione automatica', valore: ATTIVA, livello: 1 },
@@ -84,6 +84,7 @@
     'security.siteBlock.blacklist': { nome: 'domini in blacklist', elenco: true, livello: 2 },
     'security.downloads.confirmExecutables': { nome: 'domanda prima di scaricare un programma', valore: ATTIVA, livello: 2 },
     'security.downloads.trustedSites': { nome: 'siti fidati per i programmi', elenco: true, livello: 2 },
+    'security.autoFeedback': { nome: 'segnalazione automatica dei problemi', valore: ATTIVA, livello: 2 },
     'proxy.datacenter': { nome: 'indirizzo del proxy economico', segreto: true },
     'proxy.residential': { nome: 'indirizzo del proxy residenziale', segreto: true },
     'proxy.bypass': { nome: 'siti esclusi dal proxy', valore: (v) => v || 'nessuno', livello: 2 },
@@ -319,8 +320,11 @@
       const piu = b.filter((x) => !a.includes(x));
       const meno = a.filter((x) => !b.includes(x));
       const parti = [];
-      if (piu.length) parti.push(`aggiunt${piu.length > 1 ? 'i' : 'o'} ${elencoDi(piu)}`);
-      if (meno.length) parti.push(`tolt${meno.length > 1 ? 'i' : 'o'} ${elencoDi(meno)}`);
+      // Gli elenchi sono di siti: münchen.de, non la forma «xn--» con cui si salva.
+      const N = global.SN_NOMI_SITO;
+      const leggibili = (l) => elencoDi(N && N.leggibile ? l.map((x) => N.leggibile(x)) : l);
+      if (piu.length) parti.push(`aggiunt${piu.length > 1 ? 'i' : 'o'} ${leggibili(piu)}`);
+      if (meno.length) parti.push(`tolt${meno.length > 1 ? 'i' : 'o'} ${leggibili(meno)}`);
       return `${nome}: ${parti.join(', ') || 'riordinati'}`;
     }
     if (v && v.testo) {
@@ -440,9 +444,20 @@
         if (!semplice(nodo[seg[i]])) nodo[seg[i]] = {};
         nodo = nodo[seg[i]];
       }
-      nodo[seg[seg.length - 1]] = c.prima;
+      const v = voce(c.chiave);
+      nodo[seg[seg.length - 1]] = v && v.elenco ? elencoAnnullato(c, seg.reduce((x, k) => (semplice(x) ? x[k] : undefined), correnti)) : c.prima;
     }
     return parziale;
+  }
+  // Un elenco di siti si annulla a voci sull'elenco di adesso: via quelle che il cambio aggiunse, di nuovo
+  // quelle che tolse. Rimettere l'elenco intero perdeva i siti cambiati dopo (#949).
+  function elencoAnnullato(c, attuale) {
+    const arr = (x) => (Array.isArray(x) ? x : []);
+    const prima = arr(c.prima);
+    const dopo = arr(c.dopo);
+    const out = arr(attuale).filter((x) => prima.includes(x) || !dopo.includes(x));
+    prima.forEach((x, i) => { if (!dopo.includes(x) && !out.includes(x)) out.splice(Math.min(i, out.length), 0, x); });
+    return out;
   }
 
   // La lista dei timer rimessa com'era. Un timer tolto che nel frattempo sarebbe già scaduto non
@@ -527,6 +542,7 @@
     cambiTimer,
     cambiRegoleProxy,
     fraseCambio,
+    valore: (chiave, x) => valoreDi(voce(chiave), x),
     frasi,
     frase,
     provenienza,
