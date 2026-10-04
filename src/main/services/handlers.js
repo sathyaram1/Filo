@@ -3247,8 +3247,9 @@ function schedaForPrompt(type, a, o) {
     return `Azione ${type} non riuscita${err ? ` (${E.perCanaleSistema(err)})` : ''}. Non ripeterla uguale: dillo all'utente.`;
   }
   const dove = o.scheda ? `«${E.perCanaleSistema(o.scheda.titolo || o.scheda.host || '')}»` : 'la scheda';
-  const nuovi = Array.isArray(o.fidatiNuovi) && o.fidatiNuovi.length
-    ? `\n[Dalla cartella Inviati: ${o.fidatiNuovi.length} indirizzi a cui l'utente ha scritto sono ora mittenti fidati; si vedono e si tolgono nelle Preferenze.]`
+  const n = Array.isArray(o.fidatiNuovi) ? o.fidatiNuovi.length : 0;
+  const nuovi = n
+    ? `\n[Dalla cartella Inviati: ${n === 1 ? '1 indirizzo a cui l\'utente ha scritto ora è un mittente fidato' : `${n} indirizzi a cui l'utente ha scritto ora sono mittenti fidati`}; si vedono e si tolgono nelle Preferenze.]`
     : '';
   if (type === 'POSTA_ELENCO' || (type === 'LEGGI_SCHEDA' && Array.isArray(o.righe))) {
     const t = type === 'POSTA_ELENCO' ? '[Posta in arrivo dalla scheda di Gmail.' : '[Elenco della posta che c\'è sullo schermo della scheda di Gmail.';

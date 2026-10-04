@@ -209,7 +209,8 @@ test('senza una scheda di Gmail Filo propone di aprirla, e al sì la apre e legg
   await chiedi(page, 'ho mail nuove?');
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Apro Gmail? Se sei già dentro, leggo da lì' })).toBeVisible({ timeout: 60_000 });
   await chiedi(page, 'sì');
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'In arrivo: 3 messaggi, 2 nuovi.' })).toBeVisible({ timeout: 60_000 });
+  // Gmail si apre davanti, come quando lo apre l'utente: la risposta arriva nella chat rimasta dietro.
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'In arrivo: 3 messaggi, 2 nuovi.' })).toBeAttached({ timeout: 60_000 });
 });
 
 test('con la lettura delle schede spenta, la posta non è fra gli strumenti e una chiamata forzata non parte', async ({ app, shell, openTab, testServer }) => {
