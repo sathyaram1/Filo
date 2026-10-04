@@ -155,6 +155,44 @@ async function analizzaImmagine(byte) {
   return res;
 }
 
+// Gli appunti ricodificano un'immagine copiata e ne buttano le etichette (#946):
+// l'esito letto sull'originale si ricorda per i pixel della copia, e la chat lo ritrova.
+const MAX_COPIE = 500;
+const copie = new Map();
+
+function immagine(x) {
+  if (!x) return null;
+  if (typeof x.toBitmap === 'function') return x;
+  try { return require('electron').nativeImage.createFromBuffer(Buffer.from(x)); } catch (_) { return null; }
+}
+function impronta(x) {
+  const img = immagine(x);
+  if (!img || img.isEmpty()) return '';
+  const { width, height } = img.getSize();
+  return require('node:crypto').createHash('sha256').update(`${width}x${height}:`).update(img.toBitmap()).digest('hex');
+}
+
+async function ricordaCopia(originale, copiate) {
+  const res = await analizzaImmagine(originale);
+  if (!res.trovato) return false;
+  let ricordata = false;
+  for (const c of copiate || []) {
+    const k = impronta(c);
+    if (!k) continue;
+    copie.delete(k);
+    copie.set(k, res);
+    ricordata = true;
+  }
+  while (copie.size > MAX_COPIE) copie.delete(copie.keys().next().value);
+  return ricordata;
+}
+
+function origineDellaCopia(byte) {
+  if (!copie.size) return null;
+  const k = impronta(byte);
+  return (k && copie.get(k)) || null;
+}
+
 function stato() {
   return {
     scaricato: !!ancore,
