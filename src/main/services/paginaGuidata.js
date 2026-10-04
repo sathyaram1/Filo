@@ -241,14 +241,20 @@ function paginaGuidata() {
     return cand.length ? cand[0].el : null;
   }
 
-  function nomiCompleti(el) {
+  // Un pulsante si giudica dal nome, comunque sia lungo; una riga o un link solo se il nome è un comando, non un testo
+  // che parla di inviare («Come inviare un pacco» si apre).
+  function nomiDi(el) {
     return [nomeDi(el), el.getAttribute('aria-label'), el.getAttribute('title'), el.getAttribute('data-tooltip'),
-      el.value && /^(submit|button)$/i.test(el.type || '') ? el.value : '', el.innerText].filter(Boolean).join(' | ');
+      el.tagName.toUpperCase() === 'INPUT' ? el.value : ''].filter(Boolean).map(norm);
   }
+  const comando = (n) => !!n && n.split(' ').length <= 5 && VIETATI.test(n);
   function vietato(el) {
-    if (VIETATI.test(norm(nomiCompleti(el)))) return true;
-    const capo = el.parentElement && el.parentElement.closest('button,[role=button],a[href],[role=link],[role=menuitem]');
-    return !!capo && VIETATI.test(norm(nomiCompleti(capo)));
+    const t = tipoDi(el);
+    const nomi = nomiDi(el);
+    if (t !== 'riga' && t !== 'link' && nomi.some((n) => VIETATI.test(n))) return true;
+    if (nomi.some(comando)) return true;
+    const capo = el.parentElement && el.parentElement.closest('button,[role=button],[role=menuitem]');
+    return !!capo && nomiDi(capo).some((n) => VIETATI.test(n));
   }
   function moduloDiRicerca(form) {
     return form.getAttribute('role') === 'search' || !!form.closest('[role=search]')
@@ -487,8 +493,7 @@ function paginaGuidata() {
     for (const el of [radice, ...radice.querySelectorAll('[title],[aria-label]')]) {
       for (const k of ['title', 'aria-label']) {
         const v = el.getAttribute && el.getAttribute(k);
-        if (v && v.length < 80 && /\d{1,2}[:/.\s]\d{1,2}|\d{4}/.test(v) && !EMAIL.test(v)) { EMAIL.lastIndex = 0; return v.trim(); }
-        EMAIL.lastIndex = 0;
+        if (v && v.length < 80 && /\d{1,2}[:/.\s]\d{1,2}|\d{4}/.test(v) && !/[^\s@]+@[^\s@]+\.[a-z]{2,}/i.test(v)) return v.trim();
       }
     }
     return '';
@@ -666,7 +671,13 @@ function paginaGuidata() {
     const f = bozzaAperta();
     if (!f) return { aperta: false };
     const destinatari = [];
-    const intestazione = f.a ? (f.a.closest('[role=dialog],form,table,div') || f.radice) : f.radice;
+    // Il riquadro della bozza, non la conversazione intorno: i mittenti dei messaggi sopra non sono destinatari.
+    let intestazione = f.corpo.parentElement;
+    for (let k = 0; intestazione && intestazione !== f.radice && k < 12; k++) {
+      if (intestazione.querySelector('[email],[data-hovercard-id]') || (f.a && intestazione.contains(f.a))) break;
+      intestazione = intestazione.parentElement;
+    }
+    intestazione = intestazione || f.radice;
     for (const el of intestazione.querySelectorAll('[email],[data-hovercard-id]')) {
       if (f.corpo && f.corpo.contains(el)) continue;
       for (const e of emailIn(`${el.getAttribute('email') || ''} ${el.getAttribute('data-hovercard-id') || ''}`)) if (!destinatari.includes(e)) destinatari.push(e);
