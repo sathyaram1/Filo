@@ -251,6 +251,40 @@ test('una segnalazione mandata prima dell\'elenco: la sezione non dice che non c
   await expect(riga.first().locator('.bd-mia-risposta')).toHaveText('Risposta: Adesso riprende da solo.');
 });
 
+test('chi ha segnalazioni di prima trova la sezione anche aprendo la Bacheca dal menu, con la frase che spiega il vuoto', async ({ app, shell, openTab }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await app.evaluate(async () => {
+    await globalThis.chrome.storage.local.set({ sn_feedback_client_id: 'cid-tester-di-settembre' });
+    await globalThis.SN_FEEDBACK_MINE.ricordaId('fbDoc-vecchia');
+  });
+  const bacheca = await openTab(BACHECA);
+  await expect(bacheca.locator('#bdMie')).toBeVisible({ timeout: 8_000 });
+  await expect(bacheca.locator('#bdMieVuoto')).toContainText('prima di questa versione');
+  await expect(bacheca.locator('#bdMiglioramentiTitolo')).toBeVisible();
+});
+
+test('chi non ha mai segnalato non vede la sezione aprendo la Bacheca dal menu', async ({ openTab }) => {
+  const bacheca = await openTab(BACHECA);
+  await bacheca.waitForTimeout(800);
+  await expect(bacheca.locator('#bdMie')).toBeHidden();
+});
+
+test('aperta una riga, il titolo lungo si legge per intero', async ({ app, openTab }) => {
+  await app.evaluate(() => globalThis.SN_SEGNALAZIONI_MIE.registra({
+    id: 'lunga', testo: 'Testo', stato: 'inviata', num: '990',
+    titolo: 'Il colore del bordo delle schede non cambia mai, qualunque cosa scelga nelle impostazioni avanzate, nemmeno dopo il riavvio di Filo e la pulizia della cache',
+  }));
+  const bacheca = await openTab(`${BACHECA}#segnalazioni`);
+  const titolo = righe(bacheca).first().locator('.bd-mia-titolo');
+  expect(await titolo.evaluate((el) => el.scrollWidth > el.clientWidth + 1)).toBe(true);
+  await righe(bacheca).first().locator('.bd-mia-testa').click();
+  await expect.poll(() => titolo.evaluate((el) => el.scrollWidth > el.clientWidth + 1)).toBe(false);
+  await expect(titolo).toContainText('pulizia della cache');
+  await bacheca.screenshot({ path: 'tests/.shots/segnalazioni-mie-titolo-intero.png' });
+  await righe(bacheca).first().locator('.bd-mia-testa').click();
+  await expect.poll(() => titolo.evaluate((el) => el.scrollWidth > el.clientWidth + 1)).toBe(true);
+});
+
 // ── Riavvio: la stessa cartella dati in tre avvii ──────────────────────────────
 async function avvia(userData) {
   const app = await electron.launch({
