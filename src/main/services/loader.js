@@ -137,6 +137,7 @@ require(path.join(SVC, 'costTracker.js'));
 require(path.join(SVC, 'savedPages.js'));
 require(path.join(SVC, 'historyStore.js'));
 require(path.join(SVC, 'archivedTabs.js'));
+require(path.join(SVC, 'segnalazioniMie.js')); // #986 — la copia locale delle segnalazioni mandate da qui
 require(path.join(SVC, 'ilFilo.js'));     // #866 — la linea del tempo: l'unico che legge e scrive il suo file
 require(path.join(SVC, 'filoChats.js'));  // #525 — dipende da SN_CHAT_ARCHIVE e SN_IL_FILO
 require(path.join(SVC, 'deckStore.js'));   // dipende da SN_DECKS (shared/decks.js)

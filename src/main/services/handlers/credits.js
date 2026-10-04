@@ -354,7 +354,7 @@ module.exports = function register(on, ctx) {
           // così alla prossima apertura non ricompare.
           await Credits.award({ kind: 'feedback_resolved', credits, ref: fid });
         }
-        rewards.push({
+        const annuncio = {
           id: fid,
           num: FB.formatNum ? FB.formatNum(f.seq, f.subSeq) : '',
           name: String(f.name || '').slice(0, 200),
@@ -362,7 +362,15 @@ module.exports = function register(on, ctx) {
           // Risolta o chiusa senza modifiche: il riquadro non le racconta uguali.
           status: f.status === 'done' || !f.status ? 'done' : 'closed',
           credits,
-        });
+        };
+        rewards.push(annuncio);
+        // #986 — l'annuncio è anche il momento in cui la copia locale passa a «risolta»: dopo, non torna.
+        try {
+          await globalThis.SN_SEGNALAZIONI_MIE?.chiusa?.(fid, {
+            stato: annuncio.status === 'closed' ? 'chiusa' : 'risolta',
+            num: annuncio.num, titolo: annuncio.name, risposta: annuncio.explanation,
+          });
+        } catch (_) {}
       }
       await MINE.segnaControllo(adesso, { visti: guardati, impara: imparati, scansione });
       const totalCredits = rewards.reduce((s, r) => s + r.credits, 0);
