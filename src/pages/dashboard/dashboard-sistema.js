@@ -191,7 +191,7 @@
     if (e.key === 'Escape') { e.preventDefault(); const da = box.ancora; chiudiBox(); if (da && da.isConnected) da.focus(); return; }
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
     if (e.target && e.target.type === 'range') return;
-    const opzioni = [...box.el.querySelectorAll('.sn-select-option:not([aria-disabled="true"])')];
+    const opzioni = [...box.el.querySelectorAll('.sn-select-option:not([aria-disabled="true"]):not([hidden])')];
     if (!opzioni.length) return;
     e.preventDefault();
     const i = opzioni.indexOf(document.activeElement);
