@@ -29,6 +29,11 @@ La regola, in tre pezzi:
   tiene su disco; **finché non l'ha mai avuto dice «firma valida, firmatario non
   verificato»**, che non è «sconosciuto»: sono due stati diversi e hanno due frasi
   diverse. Un elenco scaricato male non prende il posto di quello buono.
+- **Un certificato scaduto oggi non accusa una firma di ieri.** La firma vale se
+  è stata fatta quando il certificato valeva, e lo dice solo una marca temporale
+  la cui firma regge e la cui autorità sta nel secondo elenco ufficiale, quello
+  delle autorità di marcatura (#946). Senza una marca così, il certificato
+  scaduto rende le credenziali «incomplete».
 - **Quello che la firma non copre non è firmato.** In C2PA il claim elenca le
   asserzioni con la loro impronta: si legge solo quello che combacia, e il
   legame duro sui byte del file decide se le credenziali parlano ancora di
@@ -64,7 +69,10 @@ stessi byte che la descrizione ha già scaricato — mai un secondo download. Le
 dei siti veri stanno quasi sempre su un altro dominio, che lo script della pagina
 non può leggere: quei byte li scarica il main, come «Salva immagine come…»
 (#946; prima descrizione e origine tacevano proprio sui siti veri, e le prove
-servite dallo stesso host non se ne accorgevano). Nell'Aiuto della pagina si leggono le immagini che l'utente ha davanti, dalle
+servite dallo stesso host non se ne accorgevano). Una copia negli appunti perde
+le etichette (gli appunti ricodificano l'immagine): l'esito letto sull'originale
+al momento di «Copia immagine» si ricorda per i pixel della copia, e la chat lo
+ritrova quando l'immagine torna incollata. Nell'Aiuto della pagina si leggono le immagini che l'utente ha davanti, dalle
 più grandi, a ogni sua domanda. In
 chat lo stesso controllo si fa su **ogni** immagine allegata, senza provare a
 indovinare se l'utente stava chiedendo proprio quello: capirlo dall'intento
