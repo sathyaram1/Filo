@@ -27,6 +27,9 @@ const IDENTITA = ['-c', 'user.name=filo-prova-fusione', '-c', 'user.email=prova-
 
 const primaRiga = (s) => String(s || '').split(/\r?\n/).find((r) => r.trim()) || '';
 
+// Le due forme su ogni sistema: per l'`isAbsolute` POSIX `C:\…` è relativo, e la chiave resterebbe intera.
+const assoluto = (p) => isAbsolute(p) || win32.isAbsolute(p);
+
 /** Un test rosso in una riga che due cartelle diverse scrivono uguale. PURA. */
 export function chiaveTest(r, root) {
   let file = r && r.file ? perLaRiga(String(r.file), root) : '?';
@@ -252,7 +255,7 @@ function leggiRighe(file) {
 /** Il file di un test rosso, dalla sua chiave. PURA. '' se non c'è. */
 export function fileDellaChiave(chiave) {
   const f = String(chiave || '').split(' › ')[0];
-  return f && f !== '?' && !isAbsolute(f) && !f.split('/').includes('..') ? f : '';
+  return f && f !== '?' && !assoluto(f) && !f.split('/').includes('..') ? f : '';
 }
 
 /**
