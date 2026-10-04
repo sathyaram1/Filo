@@ -2,11 +2,37 @@
 // testo visibile, elementi per nome, clic e scrittura senza gesti veri. Un clic che invia, paga o cancella non esiste.
 // Chi lo chiama: src/main/services/schedeAperte.js e postaGmail.js. Prove: tests/schede-aperte.spec.mjs, tests/posta-gmail.spec.mjs.
 
-function paginaGuidata() {
+// Quando un nome (già normalizzato: minuscolo, senza accenti) è un comando che invia, paga, pubblica o cancella.
+// Gira dentro la pagina insieme al copione: niente riferimenti fuori da qui. Regole: tests/unit/schedeAperte.test.mjs.
+function regoleComandi() {
+  const P = (s) => new RegExp(`(?:^|[^a-z0-9])(?:${s})(?:$|[^a-z0-9])`);
+  // Un verbo che da solo invia, paga o cancella, in qualunque forma lo scriva un sito.
+  const AZIONE = P('invia(?:re)?|invio|send|manda(?:re)?|spedisci|spedire|enviar|envio|envoyer|senden|'
+    + 'paga(?:re)?|pay|acquista(?:re)?|compra(?:re)?|buy|checkout|ordina ora|order now|place order|'
+    + 'procedi al pagamento|elimina(?:re)?|delete|cancella(?:re)?|rimuovi|remove|trash|cestino|discard|scarta|spam|'
+    + 'unsubscribe|annulla (?:l.)?iscrizione|disiscriviti|submit|dona(?:re)?|donate|abbonati|subscribe|'
+    + 'pubblica(?:re)?|publish|tweet|condividi|share|post now|posta ora');
+  // «Conferma ordine», «Esegui bonifico», «Autorizza pagamento»: un verbo che chiude più la cosa che chiude.
+  const CHIUDE = P('conferma(?:re)?|confermo|confirm|autorizza(?:re)?|authori[sz]e|approva(?:re)?|approve|'
+    + 'esegui(?:re)?|execute|effettua(?:re)?|completa(?:re)?|complete|procedi|proceed|finalizza(?:re)?|place|invia');
+  const COSA = P('ordine|ordini|order|pagamento|pagamenti|payment|bonifico|bonifici|transfer|trasferimento|'
+    + 'acquisto|acquisti|purchase|prenotazione|booking|ricarica|transazione|transaction|addebito|giroconto|'
+    + 'operazione|operation|invio|spedizione|iscrizione|abbonamento|donazione|eliminazione|cancellazione|rimozione');
+  // Il «Conferma» o l'«OK» nudo di un riquadro: dice cosa fa solo il riquadro intorno.
+  const NUDO = /^(?:conferma|confermo|confirm|ok|okay|si|yes|autorizza|authori[sz]e|approva|approve|procedi|proceed|continua|continue|esegui|completa|complete)(?: ora| now)?$/;
+  return {
+    vietato: (n) => !!n && (AZIONE.test(n) || (CHIUDE.test(n) && COSA.test(n))),
+    cosa: (n) => !!n && COSA.test(n),
+    nudo: (n) => !!n && NUDO.test(n),
+  };
+}
+
+function paginaGuidata(regoleComandi) {
   'use strict';
 
-  const VERSIONE = 1;
+  const VERSIONE = 2;
   if (window.__filoPagina && window.__filoPagina.versione === VERSIONE) return;
+  const RC = regoleComandi();
 
   const BLOCCHI = new Set(['block', 'flex', 'grid', 'list-item', 'table', 'table-row', 'table-caption', 'flow-root',
     'table-row-group', 'table-header-group', 'table-footer-group', 'inline-table']);
