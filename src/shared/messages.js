@@ -748,6 +748,18 @@
     // Main → sole pagine filo://: la memoria è cambiata. Porta { moduli, lezioni }
     // come FILO_MEMORY_VIEW, così chi la mostra non la richiede.
     FILO_MEMORY_CHANGED: 'filo_memory_changed',
+    // Mittenti e siti fidati (#534), per le Preferenze. Tutti solo pagine filo://: sono dati dell'utente, e
+    // alzare la fiducia la dà solo chi la chiede da Filo.
+    // VISTA → { ok, mittenti: [{ indirizzo, via, dal }], siti: [{ sito, via, dal }] }
+    FIDUCIA_VISTA: 'fiducia_vista',
+    // PREPARA { mittente | sito } → { ok, tipo, voce, gia, sconsiglio }: cosa si segnerebbe, prima della conferma.
+    FIDUCIA_PREPARA: 'fiducia_prepara',
+    // AGGIUNGI { mittente | sito } → { ok, voce, aggiunto, error }. Chi la manda ha già avuto la «conferma».
+    FIDUCIA_AGGIUNGI: 'fiducia_aggiungi',
+    // TOGLI { mittente | sito } → { ok, tolto }. Senza conferma: abbassa la fiducia.
+    FIDUCIA_TOGLI: 'fiducia_togli',
+    // Main → pagine filo://: gli elenchi sono cambiati (dalla chat, dalle Preferenze, dagli Inviati).
+    FIDUCIA_CAMBIATA: 'fiducia_cambiata',
     // Stato della micro-intervista di benvenuto (#524). Solo pagine filo://.
     // Risposta: { ok, onboarding: { done, ticked, thread, … }, welcome }
     FILO_GET_ONBOARDING: 'filo_get_onboarding',
