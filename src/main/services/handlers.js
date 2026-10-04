@@ -1496,7 +1496,7 @@ async function executeFiloAction(action, opzioni = {}) {
   return res;
 }
 
-async function eseguiAzioneFilo(action, { confirmed = false, sender = null, contesto = null, assistente = false, parole = '', avanzamento = null } = {}) {
+async function eseguiAzioneFilo(action, { confirmed = false, sender = null, contesto = null, assistente = false, parole = '', avanzamento = null, chatId = null } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
   // Da un sito (anche via una chat aperta da lì) passano solo le azioni della
@@ -1797,7 +1797,8 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         // Niente caratteri di controllo (byte nullo compreso) in un'etichetta
         // che poi va nel diario e nella colonna dei timer.
         const label = cleanLabel(action.label || action.etichetta) || 'Timer';
-        const entry = await FiloMem.addTimer({ label, seconds });
+        // La conversazione che l'ha chiesto: la carta del timer nella home la riapre (#870).
+        const entry = await FiloMem.addTimer({ label, seconds, chat: chatId });
         if (entry) broadcastLiveUpdate();
         return { executed: !!entry, kept: !!entry };
       }
@@ -1810,6 +1811,7 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
           label: cleanLabel(action.label ?? action.etichetta),
           time: action.time ?? action.orario ?? action.at ?? '',
           repeat: action.ripeti ?? action.repeat ?? action.giorni ?? action.days,
+          chat: chatId,
         });
         if (entry) broadcastLiveUpdate();
         return { executed: !!entry, kept: !!entry };
@@ -2436,6 +2438,33 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
             max: esito.max,
           },
         };
+      }
+      case 'CARTA_HOME': {
+        const op = String(action.operazione ?? action.op ?? '').trim().toLowerCase();
+        const tipo = { togli: 'togli', rimetti: 'aggiungi', aggiungi: 'aggiungi', sposta: 'sposta', ripristina: 'ripristina' }[op];
+        if (!tipo) return { executed: false, kept: false, output: { error: 'operazione sconosciuta' } };
+        const verso = String(action.verso ?? '').trim().toLowerCase().replace('giù', 'giu') || undefined;
+        const CH = globalThis.SN_CARTE_HOME;
+        // Una carta di sinistra si cerca prima per chiave, poi un nome esatto di destra, poi per nome a sinistra:
+        // «lo scaricamento del file» non deve finire sull'Editor, che fra i suoi nomi ha «file».
+        // «Rimetti» una carta di sinistra tolta (uno scaricamento, un lavoro): torna lei sola, la disposizione resta.
+        if (tipo === 'aggiungi' && !CH.risolvi(action.carta, { esatto: true })) {
+          const rimessa = await rimettiSinistraDaChat({ action, sender, chatId });
+          if (rimessa) return rimessa;
+        }
+        if (tipo !== 'ripristina') {
+          const sx = await carteSinistraPerChat(sender, chatId);
+          const perChiave = sx.find((v) => v.chiave === String(action.carta ?? '').trim());
+          if (perChiave || !CH.risolvi(action.carta, { esatto: true })) {
+            const trovate = perChiave ? { voci: [perChiave], perTipo: false, tipo: perChiave.tipo } : CH.trovaSinistra(action.carta, sx);
+            if (trovate.voci.length || trovate.tipo || !CH.risolvi(action.carta)) return cartaSinistraDaChat({ tipo, verso, action, sx, trovate, sender });
+          }
+        }
+        const esito = await require('./carteHome').modifica({ tipo, carta: action.carta, verso, prima: action.prima_di ?? null });
+        const dove = CH.descrivi(esito.layout);
+        if (esito.errore) return { executed: false, kept: false, output: { error: esito.errore, ...dove } };
+        if (esito.cambiato) annunciaCarteHome(esito.layout, sender);
+        return { executed: true, kept: true, output: dove };
       }
       case 'COMANDO_FINESTRA': {
         // #419 — l'agente della home aziona i controlli del browser Filo (schermo
@@ -3341,7 +3370,10 @@ function toolResultText({ action, res, rendered }) {
   if (res.kept) return `Proposta all'utente come bottone in chat: ${describe()}. Non serve altro da parte tua.`;
   // Non eseguita e senza niente da mostrare: mancava qualcosa (nessuna scheda
   // web attiva, un riferimento che non trova niente, un dato vuoto).
-  const detail = res.output ? ` (${JSON.stringify(res.output).slice(0, 200)})` : '';
+  // Il dettaglio è quello che serve a riprovare (l'elenco delle carte con le chiavi): tetto largo, e un taglio si dice.
+  const TETTO_DETTAGLIO = 8000;
+  const json = res.output ? JSON.stringify(res.output) : '';
+  const detail = json ? ` (${json.length > TETTO_DETTAGLIO ? `${json.slice(0, TETTO_DETTAGLIO)}… [tagliato: ${json.length} caratteri in tutto]` : json})` : '';
   // Le azioni sulla scheda web (proxy, stile della pagina) falliscono quasi
   // sempre per lo stesso motivo: non c'è una scheda web attiva.
   const PAGE_ACTIONS = ['PROXY_TAB', 'RIMUOVI_PROXY', 'RIMUOVI_PROXY_TUTTE', 'REGOLA_PROXY_DOMINIO', 'RIMUOVI_REGOLA_PROXY', 'STILE_PAGINA', 'RIPRISTINA_STILE_PAGINA'];
@@ -3732,7 +3764,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       const avvia = (a) => (a._argsError
         ? Promise.resolve({ executed: false, kept: false, rejected: true, error: a._argsError })
         : executeFiloAction(a, {
-          sender, contesto: azioniViste, parole: paroleUtente,
+          sender, contesto: azioniViste, parole: paroleUtente, chatId,
           // Le azioni lunghe dicono a che punto sono: la riga d'attesa le conta.
           avanzamento: canPush ? (fatti, totali) => push('filo:action', {
             kind: 'progress', type: String(a.type || '').toUpperCase(), callId: a._callId || '', fatti, totali,
@@ -4031,15 +4063,112 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
 }
 
 // Messaggio "senza chiave API": istantaneo, dalle pagine salvate. Niente LLM.
+// ===== Le carte di sinistra della home dalla chat (#870) =====
+// La chat vede la colonna come la home: stesse carte, stesso ordine (SN_CARTE_HOME.sinistra). Senza chiave la
+// chat non risponde, quindi la carta dei Crediti qui non c'è. `chatId`: la conversazione che chiede.
+async function carteSinistraPerChat(sender, chatId = null, { tolte = false } = {}) {
+  const CH = globalThis.SN_CARTE_HOME;
+  const ambito = ambitoDellaFinestra(sender && sender.win);
+  let downloads = [];
+  try { downloads = require('./downloads').list(ambito) || []; } catch (_) {}
+  const [timers, notifiche, layout] = await Promise.all([
+    FiloMem.gcTimers().catch(() => []),
+    FiloMem.listNotifications().catch(() => []),
+    require('./carteHome').leggi(),
+  ]);
+  const lavori = require('./lavoriInCorso').elenco(ambito);
+  return (tolte ? CH.nascosteSinistra : CH.sinistra)({ timers, notifiche, downloads, lavori, chat: chatId }, layout);
+}
+
+// null se il nome non è di una carta di sinistra tolta: allora decide il resto di CARTA_HOME.
+async function rimettiSinistraDaChat({ action, sender, chatId }) {
+  const CH = globalThis.SN_CARTE_HOME;
+  const tolte = await carteSinistraPerChat(sender, chatId, { tolte: true });
+  const trovate = CH.trovaSinistra(action.carta, tolte);
+  if (!trovate.voci.length) return null;
+  const elenco = (voci) => voci.map((v) => ({ carta: v.chiave, tipo: v.tipo, titolo: v.titolo }));
+  if (trovate.voci.length > 1 && !trovate.perTipo) {
+    return { executed: false, kept: false, output: { error: 'più carte tolte con quel nome: quale?', candidate: elenco(trovate.voci) } };
+  }
+  let ultimo = null;
+  for (const v of trovate.voci) {
+    const esito = await require('./carteHome').modifica({ tipo: 'mostra', chiave: v.chiave });
+    if (esito.cambiato) ultimo = esito.layout;
+  }
+  if (ultimo) annunciaCarteHome(ultimo, sender);
+  return { executed: true, kept: true, output: { rimesse: elenco(trovate.voci) } };
+}
+
+async function cartaSinistraDaChat({ tipo, verso, action, sx, trovate, sender }) {
+  const CH = globalThis.SN_CARTE_HOME;
+  const Carte = require('./carteHome');
+  const elenco = (voci) => voci.map((v) => ({ carta: v.chiave, tipo: v.tipo, titolo: v.titolo }));
+  const destra = CH.descrivi(await Carte.leggi());
+  const no = (error) => ({ executed: false, kept: false, output: { error, sinistra: elenco(sx), ...destra } });
+  const voci = trovate.voci;
+  if (!voci.length) return no('carta sconosciuta: scegli fra queste (carta = la chiave)');
+  if (voci.length > 1 && !(trovate.perTipo && tipo === 'togli')) {
+    return { executed: false, kept: false, output: { error: 'più carte con quel nome: quale?', candidate: elenco(voci) } };
+  }
+  if (tipo === 'aggiungi') return no('la carta è già nella home');
+  if (tipo === 'togli') {
+    if (voci.some((v) => v.tipo === 'timer' || v.tipo === 'sveglia')) {
+      return no('un timer o una sveglia si tolgono con CANCELLA_SVEGLIA');
+    }
+    let avvisi = 0;
+    for (const v of voci) {
+      if (v.tipo === 'avviso') { await FiloMem.dismissNotification(v.ref.id); avvisi++; }
+      else {
+        const esito = await Carte.modifica({ tipo: 'nascondi', chiave: v.chiave });
+        if (esito.cambiato) annunciaCarteHome(esito.layout, sender);
+      }
+    }
+    if (avvisi) broadcastLiveUpdate();
+    return { executed: true, kept: true, output: { tolte: elenco(voci) } };
+  }
+  // sposta: la nuova posizione nell'ordine che l'utente vede, fra le carte che non stanno in cima per regola.
+  const v = voci[0];
+  const FISSA = 'sta in cima finché suona: non si sposta e non si scavalca';
+  if (v.fissa) return no(`la carta «${v.titolo}» ${FISSA}`);
+  const mobili = sx.filter((x) => !x.fissa);
+  const ordine = mobili.map((x) => x.chiave).filter((k) => k !== v.chiave);
+  const at = mobili.findIndex((x) => x.chiave === v.chiave);
+  let dove;
+  if (action.prima_di != null) {
+    const rif = sx.find((x) => x.chiave === String(action.prima_di)) || CH.trovaSinistra(action.prima_di, sx).voci[0];
+    if (!rif || rif.chiave === v.chiave) return no('la carta di riferimento non è a sinistra');
+    if (rif.fissa) return no(`la carta «${rif.titolo}» ${FISSA}`);
+    dove = ordine.indexOf(rif.chiave);
+  } else if (verso === 'cima') dove = 0;
+  else if (verso === 'fondo') dove = ordine.length;
+  else if (verso === 'su') dove = Math.max(0, at - 1);
+  else if (verso === 'giu') dove = Math.min(ordine.length, at + 1);
+  else return no('verso sconosciuto');
+  ordine.splice(dove, 0, v.chiave);
+  const esito = await Carte.modifica({ tipo: 'ordina-sinistra', ordine });
+  if (esito.errore) return no(esito.errore);
+  if (esito.cambiato) annunciaCarteHome(esito.layout, sender);
+  return { executed: true, kept: true, output: { spostata: v.titolo, sinistra: elenco(ordinaCome(sx, esito.layout)) } };
+}
+
+function ordinaCome(sx, layout) {
+  const CH = globalThis.SN_CARTE_HOME;
+  const per = (t) => sx.filter((x) => x.tipo === t).map((x) => x.ref);
+  return CH.sinistra({
+    timers: [...per('timer'), ...per('sveglia')], notifiche: per('avviso'), downloads: per('download'), lavori: per('lavoro'),
+  }, layout);
+}
+
 function buildNoKeyDashboard(settings, saved) {
   const suggestions = saved.slice(0, 5).map((p) => ({
     icon: 'link', text: p.title || p.url,
     action: { type: 'NAVIGA', url: p.url, label: p.title || p.url },
     importance: 2,
   }));
-  // La prima cosa che un utente nuovo deve fare sta a un clic, non in un menu.
+  // La prima cosa che un utente nuovo deve fare sta a un clic, non in un menu: nella home è la prima carta (#870).
   if (!settings.apiKeys?.openrouter) {
     suggestions.unshift({
+      carta: 'crediti',
       icon: 'credits', text: 'Apri Crediti e riscatta l\'invito',
       action: { type: 'NAVIGA', url: 'filo://credits/credits.html', label: 'Crediti' },
       importance: 3,
@@ -4047,7 +4176,7 @@ function buildNoKeyDashboard(settings, saved) {
   }
   const message = settings.apiKeys?.openrouter
     ? 'Buongiorno. Filo è qui.'
-    : 'Per attivare Filo serve un codice d\'invito: riscattalo nella pagina Crediti e ricevi i crediti per usare i modelli. Se preferisci, lì puoi mettere una tua chiave OpenRouter. Intanto, le tue pagine salvate sono qui.';
+    : `Per attivare Filo serve un codice d'invito: riscattalo nella pagina Crediti e ricevi i crediti per usare i modelli. Se preferisci, lì puoi mettere una tua chiave OpenRouter.${saved.length ? ' Intanto, le tue pagine salvate sono fra i suggerimenti.' : ''}`;
   return { message, suggestions };
 }
 
@@ -4203,6 +4332,8 @@ const handlerCtx = {
   filoWin,
   broadcastToTabs,
   broadcastToFiloPages,
+  annunciaCarteHome,
+  ambitoDellaFinestra,
   broadcastLiveUpdate,
   getEffectiveSettings,
   fillMovedSlots,
@@ -5072,18 +5203,32 @@ function broadcastToTabs(message) {
 // Il frame principale basta: qui non ci sono destinatari nei riquadri
 // incorporati (le pagine filo:// non ne ospitano di privilegiati). Anche fra le
 // finestre solo quelle di Filo: un popup di accesso è la pagina di un sito.
+//
+// `message` può essere una funzione dell'ambito della finestra (quello degli scaricamenti: '' o la partizione
+// incognito) che dà il messaggio per quella finestra, o null per saltarla: così l'incognito resta separato.
 function broadcastToFiloPages(message) {
-  const aFilo = (wc) => {
+  const aFilo = (wc, m) => {
     try {
-      if (wc && !wc.isDestroyed?.() && isFilo(wc.getURL())) wc.send('filo:broadcast', message);
+      if (wc && !wc.isDestroyed?.() && isFilo(wc.getURL())) wc.send('filo:broadcast', m);
     } catch (_) {}
   };
   try {
     for (const win of BrowserWindow.getAllWindows()) {
-      if (win._filoTabs) for (const t of win._filoTabs.tabs) aFilo(t.view?.webContents);
-      aFilo(win.webContents);
+      const m = typeof message === 'function' ? message(ambitoDellaFinestra(win)) : message;
+      if (m == null) continue;
+      if (win._filoTabs) for (const t of win._filoTabs.tabs) aFilo(t.view?.webContents, m);
+      aFilo(win.webContents, m);
     }
   } catch (_) {}
+}
+function ambitoDellaFinestra(win) {
+  try { return require('./downloads').scopeOfWindow(win); } catch (_) { return ''; }
+}
+// Le carte della home si annunciano solo alle finestre dell'ambito di chi le ha mosse: in incognito la
+// disposizione vive in memoria, e la finestra normale non deve vederla cambiare.
+function annunciaCarteHome(layout, sender) {
+  const ambito = ambitoDellaFinestra(sender && sender.win);
+  broadcastToFiloPages((a) => (a === ambito ? { type: MSG.CARTE_HOME_CAMBIATE, layout } : null));
 }
 
 // Configura il rilevatore di siti pericolosi (services/safebrowse) dalle

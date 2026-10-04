@@ -121,6 +121,22 @@
     return M.formatRepeat(raw);
   }
 
+  // Il nome che l'utente vede sulla carta, non l'id che il modello manda.
+  function descriviCarta(a, fatto) {
+    const C = global.SN_CARTE_HOME;
+    // Un nome di destra si riconosce solo esatto: «lo scaricamento del file» è una carta di sinistra, non l'Editor.
+    const id = C ? C.risolvi(a && a.carta, { esatto: true }) : null;
+    const detto = String((a && a.carta) || '').trim();
+    // Una chiave («avviso:…») non è un nome da mostrare: la frase resta senza.
+    const nome = id ? ` «${C.carta(id).titolo}»` : (detto && !/^[a-z]+:/.test(detto) ? ` «${detto.length > 60 ? `${detto.slice(0, 59)}…` : detto}»` : '');
+    const op = String((a && (a.operazione ?? a.op)) || '').toLowerCase();
+    if (op === 'ripristina') return fatto ? 'Carte della home rimesse com\'erano all\'inizio' : 'Rimettere le carte della home com\'erano all\'inizio';
+    if (op === 'togli' && !id) return fatto ? `Carta${nome} tolta dalla home` : `Togliere la carta${nome} dalla home`;
+    if (op === 'togli') return fatto ? `Carta${nome} tolta dalla home: ora è un'icona in «altro»` : `Togliere la carta${nome} dalla home`;
+    if (op === 'rimetti' || op === 'aggiungi') return fatto ? `Carta${nome} rimessa nella home` : `Rimettere la carta${nome} nella home`;
+    return fatto ? `Carta${nome} spostata nella home` : `Spostare la carta${nome} nella home`;
+  }
+
   // Perché LEGGI_DOCUMENTO esce dal perimetro di lettura ('' se ci sta). Senza
   // classificatore non si sa: si chiede.
   function documentoFuori(a) {
@@ -642,6 +658,13 @@
         };
         return labels[cmd] || 'Azionare un comando della finestra di Filo';
       },
+    },
+    // #870 — le carte della home, come le dispone l'utente trascinandole. Livello 1: ogni mossa si annulla con
+    // quella opposta, e una carta tolta resta in «altro», da cui si rimette.
+    CARTA_HOME: {
+      level: 1,
+      describe: (a) => descriviCarta(a, false),
+      describeDone: (a) => descriviCarta(a, true),
     },
     // ── estetica del CONTENUTO della pagina via chat (#185) ───────────────────
     // Filo cambia l'aspetto del testo della pagina che l'utente sta guardando

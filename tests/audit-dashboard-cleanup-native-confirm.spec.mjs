@@ -56,7 +56,7 @@ test('il suggerimento "Riordina schede" usa il confirm di Filo, non quello nativ
   });
 
   // Il suggerimento deve essere renderizzato.
-  const sug = page.locator('.dash-suggestion');
+  const sug = page.locator('.dash-carta[data-tipo="suggerimenti"] .dash-carta-voce');
   await expect(sug.first()).toBeVisible({ timeout: 5_000 });
 
   // Strumenta i due cammini di conferma per capire QUALE viene usato.

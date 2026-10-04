@@ -55,6 +55,7 @@
     REGOLA_PROXY_DOMINIO: 'globePinned',
     RIMUOVI_REGOLA_PROXY: 'globeOff',
     COMANDO_FINESTRA: 'windowFrame',
+    CARTA_HOME: 'home',
     ZOOM_PAGINA: 'zoomPagina',
     STILE_PAGINA: 'brush',
     RIPRISTINA_STILE_PAGINA: 'undo',

@@ -398,8 +398,8 @@
     },
     {
       id: 'generate-dashboard', title: 'Dashboard personale di Filo', category: 'assistant',
-      desc: 'Quando apri una nuova scheda, Filo prepara un breve messaggio per te e qualche suggerimento utile, in base a ciò che stavi facendo e a ciò che ricorda di te.',
-      invoke: 'Si genera da sola all’apertura di una nuova scheda; il messaggio centrale si può nascondere dalle Preferenze ("Commento nella home").',
+      desc: 'Quando apri una nuova scheda, Filo prepara un breve messaggio per te e qualche suggerimento utile, in base a ciò che stavi facendo e a ciò che ricorda di te. I suggerimenti stanno nella carta «Filo ti suggerisce», a destra nella home.',
+      invoke: 'Si genera da sola all’apertura di una nuova scheda; «Aggiorna» sulla carta dei suggerimenti la rifà subito. Il messaggio centrale si può nascondere dalle Preferenze ("Commento nella home"); la carta dei suggerimenti si toglie come ogni carta della home.',
       doesNot: 'I suggerimenti nascono dai tuoi dati locali e non vengono inviati all’esterno.',
     },
     {
@@ -422,7 +422,7 @@
     },
     {
       id: 'agent-actions', title: 'Filo agisce al posto tuo', category: 'assistant',
-      desc: 'Su tua richiesta Filo può compiere azioni per te: aprire pagine o file, dare un nome sensato ai tuoi file, cercare sul web, leggere le schede aperte e la posta di Gmail, prepararti una bozza, mettere timer e sveglie (e poi cancellarle o spostarle), salvare appunti, regolare preferenze e aspetto, archiviare schede, persino inviare un feedback a tuo nome.',
+      desc: 'Su tua richiesta Filo può compiere azioni per te: aprire pagine o file, dare un nome sensato ai tuoi file, cercare sul web, leggere le schede aperte e la posta di Gmail, prepararti una bozza, mettere timer e sveglie (e poi cancellarle o spostarle), salvare appunti, regolare preferenze e aspetto, disporre le carte della home, archiviare schede, persino inviare un feedback a tuo nome.',
       invoke: 'Chiedile a parole all’assistente (nuova scheda) oppure all’assistente laterale di pagina (Alt+H, Ctrl+Alt+H su Mac).',
       doesNot: 'Le azioni delicate ti vengono prima descritte e partono solo dopo la tua conferma; le più rischiose (cancellazioni irreversibili) chiedono di digitare "conferma". Non esegue nulla di delicato di nascosto. Se un link che sta per aprire, o una ricerca sul web che sta per fare, contiene dati letti dal tuo computer, prima te lo mostra e aspetta il tuo OK. Non fa mai uscire un segreto: se un link, una ricerca, un comando, un feedback, un collegamento (anche di posta, anche nelle risposte dell’assistente di pagina) o un suggerimento che apri o scarichi con un clic o dal menu del tasto destro, il testo che l’assistente di pagina propone per un campo, o quello che Filo scrive in un campo di una pagina, in una ricerca nella posta o in una bozza, conterrebbe una chiave che Filo custodisce, oppure un codice monouso o di recupero, una password, una chiave, una carta o un IBAN letti da una pagina, un documento, una ricerca o un comando (e non scritti da te in chat), l’azione non parte a nessun livello, nemmeno col tuo OK, e in chat compare cosa è stato fermato. Se vuoi mandarlo davvero, lo fai tu a mano.',
     },
@@ -440,28 +440,34 @@
     },
     {
       id: 'filo-timers', title: 'Timer', category: 'assistant',
-      desc: 'Chiedi a Filo di farti da timer ("timer di 10 minuti per la pasta"): il conto alla rovescia compare in alto nella nuova scheda e, allo scadere, parte un avviso sonoro che puoi fermare, più una notifica di sistema. Puoi mettere in pausa un timer e riprenderlo quando vuoi, e puoi chiedere a Filo di annullarlo o di cambiargli la durata invece di rifarlo da capo.',
-      invoke: 'Chiedi un timer all’assistente; i timer attivi e quelli che stanno suonando si vedono in alto nella nuova scheda. Sulla scheda del timer trovi ⏸ per metterlo in pausa e ▶ per riprenderlo. Per toglierlo, la × sulla scheda oppure chiedilo a Filo ("annulla il timer della pasta").',
+      desc: 'Chiedi a Filo di farti da timer ("timer di 10 minuti per la pasta"): il conto alla rovescia compare in una carta della home e, allo scadere, parte un avviso sonoro che puoi fermare, più una notifica di sistema. Puoi mettere in pausa un timer e riprenderlo quando vuoi, e puoi chiedere a Filo di annullarlo o di cambiargli la durata invece di rifarlo da capo.',
+      invoke: 'Chiedi un timer all’assistente; i timer attivi e quelli che stanno suonando sono carte nella colonna sinistra della home, col conto alla rovescia. Sulla carta trovi «Pausa» e «Riprendi», e «Ferma» quando suona; cliccando la carta si riapre la conversazione in cui l’avevi chiesto. Per toglierlo, la × sulla carta o la voce "Togli il timer" del suo tasto destro, oppure chiedilo a Filo ("annulla il timer della pasta").',
       doesNot: 'La suoneria si sente quando la nuova scheda è aperta; la notifica di sistema arriva comunque finché Filo è in esecuzione, anche ridotto a icona. Con Filo completamente chiuso non suona nulla.',
     },
     {
       id: 'filo-alarms', title: 'Sveglie', category: 'assistant',
       desc: 'Chiedi a Filo una sveglia ("mettimi una sveglia alle 7 per lavoro", "sveglia tra 3 ore"): all’orario stabilito parte un avviso sonoro nella nuova scheda e una notifica di sistema. Se l’orario è già passato oggi, la sveglia viene messa per domani. Può anche ripetersi: dille quando ("il lunedì e il mercoledì", "nei giorni feriali", "tutte le mattine") e suona a ogni giorno indicato, senza rimetterla ogni volta. Le sveglie già messe le gestisci sempre a parole: cancellarne una, cancellarle tutte, o spostarne l’orario.',
-      invoke: 'Chiedi la sveglia all’assistente; le sveglie programmate compaiono in alto nella nuova scheda con il loro orario (e i giorni, se si ripete) e puoi rimuoverle con la ×. A parole: "cancella la sveglia della palestra", "leva tutte le sveglie", "sposta quella delle 7 alle 8".',
+      invoke: 'Chiedi la sveglia all’assistente; le sveglie programmate sono carte nella colonna sinistra della home, con il loro orario (e i giorni, se si ripete): «Sposta» ti prepara la frase da finire nel campo di scrittura, la × la toglie. A parole: "cancella la sveglia della palestra", "leva tutte le sveglie", "sposta quella delle 7 alle 8".',
       doesNot: 'Non suona se Filo è completamente chiuso: il browser deve restare in esecuzione (va bene anche ridotto a icona). Per svegliarti al mattino affidati anche a una sveglia vera. La ripetizione va a giorni della settimana: non sa fare "ogni due settimane" o "il primo del mese".',
     },
     {
       id: 'filo-notifications', title: 'Avvisi di Filo', category: 'assistant',
-      desc: 'Filo può mostrarti dei brevi avvisi in alto nella nuova scheda (promemoria o segnalazioni discrete) che puoi chiudere quando li hai visti.',
-      invoke: 'Compaiono in alto nella nuova scheda; chiudili con la loro "X".',
+      desc: 'Filo può mostrarti dei brevi avvisi (promemoria o segnalazioni discrete) come carte nella colonna sinistra della home, che puoi chiudere quando li hai visti.',
+      invoke: 'Compaiono come carte a sinistra nella home; chiudili con «Chiudi», con la × o col tasto destro. Cliccando la carta l’avviso si apre nella conversazione, dove puoi chiedere a Filo cosa fare.',
       doesNot: 'Restano dentro Filo: non sono notifiche del sistema operativo.',
     },
 
     // ─────────────────────────── Pagine interne ──────────────────────────────
     {
       id: 'home-page', title: 'Home di Filo', category: 'pages',
-      desc: 'La pagina della nuova scheda: al centro l’assistente a cui chiedere qualsiasi cosa, azioni e suggerimenti, un messaggio in evidenza e gli aggiornamenti recenti. In alto a destra ci sono le icone per Cronologia, Impostazioni, App e Profilo.',
+      desc: 'La pagina della nuova scheda: al centro l’assistente a cui chiedere qualsiasi cosa, con un messaggio in evidenza e gli aggiornamenti recenti; ai lati le carte. A sinistra quello che sta accadendo (timer, sveglie, scaricamenti, avvisi), a destra quello che tieni tu (Editor, Mazzi, «Filo ti suggerisce», Impostazioni rapide) e sotto «altro», con le app che una carta non ce l’hanno. In alto a destra ci sono le icone per Cronologia, Impostazioni, App e Profilo.',
       invoke: 'Apri una nuova scheda, l\'icona Home in alto a destra nella home, oppure indirizzo filo://newtab/.',
+    },
+    {
+      id: 'home-cards', title: 'Le carte della home', category: 'pages',
+      desc: 'Ogni carta ha un titolo, il suo stato, un’azione principale e «apri nel filo», che apre la cosa nella conversazione al centro: un timer riapre la chat in cui l’avevi chiesto, le altre carte fanno scrivere a Filo di cosa si tratta, così puoi continuare a parole. A sinistra: i timer col conto alla rovescia (cambiano stato quando scadono), le sveglie, gli scaricamenti con la percentuale e poi «Apri» e «Cartella» (quelli finiti restano un giorno, poi li trovi negli Scaricamenti, filo://downloads/downloads.html), gli avvisi di Filo, i lavori lunghi in corso in un’altra scheda (Filo che sta ancora rispondendo, un comando del terminale: «Vai» ti porta lì) e, finché non hai crediti né una chiave, la carta che porta ai Crediti (filo://credits/credits.html). A destra: l’Editor coi documenti recenti (un clic ne apre uno; filo://editor/editor.html), i Mazzi coi mazzi (filo://decks/decks.html), «Filo ti suggerisce» e le Impostazioni rapide (tema scuro, terminale, anteprima delle schede; «Preferenze» apre filo://preferences/preferences.html). In «altro» ci sono Aperti per dopo (filo://home/home.html), Scaricamenti, Cronologia (filo://archive/archive.html) e la Bacheca (filo://board/board.html), più le carte che hai tolto. La disposizione resta dopo il riavvio, e una finestra in incognito parte da quella (quello che cambi lì non viene salvato). Un clic su una carta di sinistra la apre nella conversazione; su una carta di destra apre la sua app, come Invio. Una carta trascinata nel campo di scrittura vi scrive il suo titolo e il suo stato.',
+      invoke: 'Trascina una carta sopra o sotto un’altra per spostarla; passandoci sopra compaiono «apri nel filo» e la × per toglierla. Tasto destro su una carta: le sue azioni, "Apri nel filo", "Sposta su", "Sposta giù" e "Togli" (da tastiera: Maiusc+F10 o il tasto menu; Canc la toglie). Tasto destro su un documento, un mazzo o un suggerimento dentro la carta: "Apri" quella voce o "Apri nel filo" per parlarne con Filo. Una carta tolta diventa un’icona in «altro» (a sinistra quelle che non spariscono con la cosa che raccontano: i Crediti, uno scaricamento finito): la rimetti col «+», con la voce "Rimetti nella home" del suo tasto destro o trascinandola nella sua colonna, e il resto della disposizione non cambia. Puoi anche chiederlo a Filo: "togli la carta dei mazzi", "rimetti l’editor", "metti i suggerimenti in cima", "rimetti le carte com’erano", e a sinistra "chiudi l’avviso del backup", "togli lo scaricamento dalla home", "rimetti lo scaricamento della bolletta", "metti il timer del forno in cima".',
+      doesNot: 'Le carte di sinistra le mette Filo quando succede qualcosa: non se ne aggiungono a mano. Togliere un timer, una sveglia o un avviso lo toglie davvero; togliere uno scaricamento lo toglie solo dalla home (resta negli Scaricamenti). Sotto i 720 pixel di larghezza le colonne con le carte si nascondono. Una finestra incognito ha le sue carte: i suoi lavori in corso e le carte spostate lì non compaiono nella finestra normale.',
     },
     {
       id: 'red-team', title: 'Red Team', category: 'pages', cancello: 'redteam',
