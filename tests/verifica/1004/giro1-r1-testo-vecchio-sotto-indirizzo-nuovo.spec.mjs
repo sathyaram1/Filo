@@ -47,7 +47,6 @@ test('il testo di una pagina delicata non parte sotto l\'indirizzo della pagina 
 
   await expect.poll(async () => (await app.evaluate(async () => (await globalThis.SN_ARCHIVED_TABS.list()).length)), { timeout: 8_000 })
     .toBeGreaterThan(0);
-  await banca.waitForTimeout?.(0).catch(() => {});
   await new Promise((r) => setTimeout(r, 2_000));
   const partito = await app.evaluate(() => globalThis.__mandato.slice());
   expect(partito.some((t) => t.includes('Saldo disponibile')), 'il testo della banca è arrivato al modello del riassunto').toBe(false);
