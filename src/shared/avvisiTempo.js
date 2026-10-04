@@ -85,11 +85,13 @@
 
     // Per le pile disegnate nella stessa pagina: l'avviso dice da sé quando il puntatore entra ed esce.
     // Solo gesti veri: in una pagina web lo script del sito non deve poter tenere fermo un avviso.
+    // Ferma il puntatore che si muove, non mouseenter: un avviso comparso sotto un cursore fermo (sul
+    // tasto appena premuto) riceve mouseenter senza che nessuno lo legga, e non se ne andrebbe più (#954).
     function segui(el) {
       if (!el || el.__snOrologio) return el;
       el.__snOrologio = true;
-      el.addEventListener('mouseenter', (e) => {
-        if (!e.isTrusted) return;
+      el.addEventListener('mousemove', (e) => {
+        if (!e.isTrusted || sotto.has(el)) return;
         sotto.add(el);
         ferma(true);
       });
