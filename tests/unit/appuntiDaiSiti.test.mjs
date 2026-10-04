@@ -89,12 +89,15 @@ test('una navigazione della pagina dimentica il menu', async () => {
   assert.equal(s.wc._filoMenuAperto, null);
 });
 
-test('un tasto premuto in un riquadro è un gesto, Esc no', () => {
+test('un tasto premuto in un riquadro è un gesto, Esc no', async () => {
   const wc = wcFinto();
   Permessi.seguiGesti(wc);
+  // Il tasto conta dopo tutti gli ascolti, che potrebbero tenerselo (#737.1).
   wc.emetti('before-input-event', {}, { type: 'keyDown', key: 'Escape' });
+  await new Promise((r) => setImmediate(r));
   assert.ok(!wc._filoGestoAlle);
   wc.emetti('before-input-event', {}, { type: 'keyDown', key: 'v' });
+  await new Promise((r) => setImmediate(r));
   assert.ok(wc._filoGestoAlle > 0);
 });
 
