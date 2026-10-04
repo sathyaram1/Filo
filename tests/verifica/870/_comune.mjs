@@ -1,4 +1,4 @@
-// Attrezzi condivisi dalle prove del giro 1 di #870.
+// Attrezzi condivisi dalle prove dei giri di #870.
 import { expect } from '../../fixtures/electron.mjs';
 
 export async function homeTab(app, escludi = []) {
