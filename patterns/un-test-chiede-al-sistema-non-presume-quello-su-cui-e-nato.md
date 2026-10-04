@@ -82,6 +82,21 @@ nasceva rosso solo per l'owner, per settimane (undici spec così):
   una costruita con `mkdtempSync` prova su un percorso che sulla macchina dell'owner non
   esiste, e una sentinella lo impedisce.
 
+Gli ultimi quattro rossi di quella macchina (#650) presumevano altro:
+
+- **L'uscita di un comando ha la forma della sua shell.** `pwd` in PowerShell è una
+  tabella («Path», «----», il percorso): si legge l'ultima riga piena, non tutto lo stdout.
+- **Il fuoco non c'è.** In Electron Playwright non finge il fuoco come in un browser, e la
+  finestra della suite, parcheggiata fuori schermo mentre l'owner lavora, spesso non ce
+  l'ha: un `change` che nasce dal passaggio del fuoco da una casella all'altra non arriva.
+  La prova manda lei il gesto che conferma.
+- **Un segnale acceso da prima.** «Salvato» resta a schermo un secondo e mezzo: lo
+  accende anche il salvataggio precedente, e aspettarlo non dice che è arrivato il
+  secondo. Si aspetta il valore salvato.
+- **Una cache che la prova non vede.** Il colore identità di una scheda si ricorda per
+  host, e tre pagine dello stesso server di prova sono un host solo: appena aperta, una
+  scheda porta il colore della sorella. Si aspetta che ognuna abbia il suo.
+
 ## Il cancello di pubblicazione (#931)
 
 Gli unit test girano su Windows in un posto solo: il cancello prima di una versione,
