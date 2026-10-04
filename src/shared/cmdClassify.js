@@ -1198,7 +1198,10 @@
   // chiamata di metodo, che non si classifica.
   function apreGruppo(s, i) {
     if (i === 0 || /[\s,!]/.test(s[i - 1])) return true;
-    return s[i - 1] === ':' && /(^|\s)-[A-Za-z]+:$/.test(s.slice(0, i));
+    if (s[i - 1] !== ':') return false;
+    let k = i - 2;
+    while (k >= 0 && /[A-Za-z]/.test(s[k])) k -= 1;
+    return k < i - 2 && s[k] === '-' && (k === 0 || /\s/.test(s[k - 1]));
   }
 
   // `if (…) {…} elseif (…) {…} else {…}`: condizioni e corpi diventano pezzi.
