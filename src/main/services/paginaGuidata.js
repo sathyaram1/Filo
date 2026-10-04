@@ -43,14 +43,6 @@ function paginaGuidata(regoleComandi) {
     + '[role=menuitemcheckbox],[role=menuitemradio],[role=tab],[role=option],[role=checkbox],[role=switch],[role=radio],'
     + '[role=textbox],[role=searchbox],[role=combobox],[role=row],[role=treeitem],[contenteditable=""],'
     + '[contenteditable="true"],[contenteditable="plaintext-only"]';
-  // Il nome di un comando che invia, paga, pubblica o cancella. Su questi Filo non clicca: l'utente lo fa da sé.
-  const VIETATI = new RegExp('(?:^|[^a-z])(?:invia(?:re)?|invia ora|send|send now|manda(?:re)?|spedisci|spedire|'
-    + 'enviar|envoyer|senden|paga(?:re)?|pay|paga ora|pay now|acquista(?:re)?|compra(?:re)?|buy|checkout|'
-    + 'conferma (?:l.?ordine|il pagamento|l.?acquisto)|place order|procedi al pagamento|elimina(?:re)?|'
-    + 'elimina definitivamente|delete|cancella(?:re)?|rimuovi|remove|trash|cestino|discard|scarta|spam|'
-    + 'unsubscribe|annulla (?:l.)?iscrizione|disiscriviti|submit|dona(?:re)?|donate|abbonati|subscribe|'
-    + 'pubblica(?:re)?|publish|tweet|condividi|share|post now|posta ora)(?:$|[^a-z])', 'i');
-
   const norm = (s) => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '')
     .replace(/[\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
   const breve = (s, n) => {
