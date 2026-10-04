@@ -1041,6 +1041,8 @@ test('#516 — basta un pezzo che non legge e il costrutto resta 3', () => {
     'if (Test-Path x) { gci } | Remove-Item',
     'if (Test-Path x) gci',
     'if (Test-Path x) { gci } else if (Test-Path y) { gci }',
+    'if (Test-Path x) { 0; Remove-Item x }',            // un valore seguito da altro non è più un valore solo
+    'if (Test-Path x) { 0 Remove-Item x }',
     '(Remove-Item x).Count',
     '(gci; Remove-Item x).Count',
     '(gci).Delete()',                                    // chiamata di metodo
