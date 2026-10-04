@@ -25,7 +25,8 @@ function finti() {
       if (/rev-list --count origin\/main\.\.HEAD/.test(a)) return { code: 0, out: '2', stdout: '2' };
       if (/rev-list --count/.test(a)) return { code: 0, out: '0', stdout: '0' };
       if (/claude-feedback/.test(a)) { aperti.push(String(opts.input || '')); return { code: 0, out: `Aperto #${900 + aperti.length}`, stdout: '' }; }
-      if (/verify-local\.mjs start/.test(a)) return { code: 0, out: 'compito', stdout: 'compito' };
+      // Come verify-local start: ogni giro riapre la richiesta, i rilievi messi da parte restano.
+      if (/verify-local.mjs start/.test(a)) { stato = withRequest(stato, RAMO, { request: 'x', sha: 'a' }); return { code: 0, out: 'compito', stdout: 'compito' }; }
       return { code: 0, out: '', stdout: '' };
     },
     claude: async ({ ruolo }) => {
@@ -54,7 +55,6 @@ function finti() {
 test('due giri mettono da parte un rilievo ciascuno: ogni rilievo finisce in un feedback solo', async () => {
   const d = finti();
   const fine = (await creaMotore(d, { pausaMs: 0 }).avvia()).pratiche[7];
-  console.log(JSON.stringify(fine.fermo), d.aperti.map((t) => t.slice(0, 300)));
   expect(fine.fase).toBe('fuso');
   expect(d.aperti.filter((t) => t.includes('BETA')).length).toBe(1);
   expect(d.aperti.filter((t) => t.includes('ALFA')).length).toBe(1);
