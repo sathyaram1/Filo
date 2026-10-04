@@ -10,7 +10,7 @@ import { cpus, freemem, homedir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  OPZIONI_BASE, coda, creaMotore, nuovaPratica, rigaStato, riprendi, slugDi, togliWorktree,
+  OPZIONI_BASE, apriDerivatiDi, coda, creaMotore, nuovaPratica, rigaStato, riprendi, slugDi, togliWorktree,
 } from './lib/orchestratore.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
 
@@ -353,11 +353,18 @@ async function main(argv) {
     return 0;
   }
 
-  if (cmd === 'stato' || !cmd) {
-    const s = store.leggi();
+  // Il pid dell'orchestratore vivo, 0 se nessuno: un lavoro rimasto a metà da uno chiuso non lo guida più nessuno.
+  const inCorso = () => {
     const lock = join(P.note, 'avvia.lock');
     const pid = existsSync(lock) ? Number(readFileSync(lock, 'utf8')) : 0;
-    console.log(pid && vivo(pid) ? `Orchestratore in corso (pid ${pid}).` : 'Orchestratore fermo.');
+    return pid && vivo(pid) ? pid : 0;
+  };
+  const aMeta = (p) => p && !['in-coda', 'fermo', 'fuso'].includes(p.fase);
+
+  if (cmd === 'stato' || !cmd) {
+    const s = store.leggi();
+    const pid = inCorso();
+    console.log(pid ? `Orchestratore in corso (pid ${pid}).` : 'Orchestratore fermo.');
     if (!(s.coda || []).length) console.log('Coda vuota.');
     for (const n of s.coda || []) if (s.pratiche[n]) console.log(rigaStato(s.pratiche[n]));
     return 0;
@@ -366,6 +373,15 @@ async function main(argv) {
   if (cmd === 'riprendi') {
     const n = Number(String(rest[0] || '').replace('#', ''));
     const s = store.leggi();
+    if (aMeta(s.pratiche[n])) {
+      const pid = inCorso();
+      const fase = s.pratiche[n].fase;
+      if (pid) throw new Error(`#${n} è in ${fase} e la sta guidando l’orchestratore in corso (pid ${pid}): si riprende da ferma`);
+      const da = `#${n} è rimasta in ${fase} da un orchestratore che non gira più: riparte da sola col prossimo «avvia», dal punto in cui sta il ramo`;
+      if (rest.slice(1).join(' ').trim()) throw new Error(`${da}. Una risposta vale per un lavoro fermo: non l’ho registrata.`);
+      console.log(`${da}.`);
+      return 0;
+    }
     s.pratiche[n] = riprendi(s.pratiche[n], rest.slice(1).join(' '));
     store.scrivi(s);
     console.log(`#${n} ripresa: ${s.pratiche[n].fase}${s.pratiche[n].compito === 'decisione' ? ' (con la tua risposta)' : ''}. Riparte col prossimo «avvia».`);
@@ -377,13 +393,26 @@ async function main(argv) {
     const s = store.leggi();
     const p = s.pratiche[n];
     if (!p) throw new Error(`#${n} non è in coda`);
-    if (!['in-coda', 'fermo', 'fuso'].includes(p.fase)) throw new Error(`#${n} è in ${p.fase}: si toglie da ferma, in coda o fusa`);
+    const pid = aMeta(p) ? inCorso() : 0;
+    if (pid) throw new Error(`#${n} è in ${p.fase} e la sta guidando l’orchestratore in corso (pid ${pid}): si toglie da ferma, in coda o fusa`);
+    // Il registro della verifica sta nel worktree e se ne va con lui: esterni e messi da parte diventano feedback prima.
+    const giaAperti = (p.derivatiAperti || []).length;
+    if (p.fase !== 'fuso' && existsSync(P.wt(p.slug))) {
+      verifyLocal = await import('./verify-local.mjs');
+      const depTogli = { esegui, percorsi: P, verifica: (wt) => (existsSync(wt) ? verifyLocal.verdictForCurrentBranch(wt) : {}) };
+      const falliti = await apriDerivatiDi(depTogli, p, { salva: (q) => { s.pratiche[n] = q; store.scrivi(s); } });
+      if (falliti) {
+        throw new Error(`#${n} non tolta: ${falliti === 1 ? 'un rilievo non si è aperto' : `${falliti} rilievi non si sono aperti`} come feedback, e col worktree se ne andrebbe:\n${p.avvisi.filter((a) => a.startsWith('feedback non aperto')).join('\n')}\nRiprova togli: quelli già aperti non si riaprono.`);
+      }
+    }
     delete s.pratiche[n];
     s.coda = (s.coda || []).filter((x) => x !== n);
     store.scrivi(s);
     const avvisi = await togliWorktree({ esegui, fs: sistemaFs, percorsi: P }, p);
     console.log(`#${n} tolta dalla coda; worktree tolti${avvisi.length ? ' salvo questi' : ''}, il ramo resta.`);
     for (const a of avvisi) console.log(`  ${a}`);
+    const nuovi = (p.derivatiAperti || []).slice(giaAperti);
+    if (nuovi.length) console.log(`  feedback aperti dai rilievi rimasti: ${nuovi.map((d) => (d.num ? `#${d.num}` : d.titolo)).join(', ')}`);
     return 0;
   }
 

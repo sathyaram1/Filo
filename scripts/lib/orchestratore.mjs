@@ -330,6 +330,28 @@ export async function togliWorktree(dep, p) {
   return avvisi;
 }
 
+const avvisaUnaVolta = (p, a) => { p.avvisi = p.avvisi || []; if (!p.avvisi.includes(a)) p.avvisi.push(a); };
+
+/**
+ * Apre come feedback i rilievi esterni e messi da parte che il registro della verifica ha e la pratica non ha ancora aperto.
+ * La usano il motore dopo ogni passo e togli prima di rimuovere il worktree, che quel registro se lo porta via. → quanti non aperti.
+ */
+export async function apriDerivatiDi(dep, p, { derivati = OPZIONI_BASE.derivati, salva = () => {} } = {}) {
+  if (derivati === 'nessuno') return 0;
+  const wt = dep.percorsi.wt(p.slug);
+  const entry = (dep.verifica(wt) || {}).entry || {};
+  p.derivatiAperti = p.derivatiAperti || [];
+  let falliti = 0;
+  for (const d of derivatiDaAprire(p, entry.derived)) {
+    const r = await dep.esegui('node', ['scripts/claude-feedback.mjs', d.titolo, '-', `--${derivati}`, '--priorita', String(d.priorita)], { cwd: wt, input: d.testo });
+    const m = /#(\d+)/.exec(String(r.out || ''));
+    if (r.code === 0) p.derivatiAperti.push({ chiave: d.chiave, titolo: d.titolo, num: m ? Number(m[1]) : null });
+    else { falliti += 1; avvisaUnaVolta(p, `feedback non aperto per «${d.titolo}»: ${coda(r.out, 2)}`); }
+    salva(p);
+  }
+  return falliti;
+}
+
 /**
  * Il motore. dep = {
  *   store: { leggi() → { coda, pratiche }, salvaPratica(p) },
@@ -619,17 +641,7 @@ export function creaMotore(dep, opzioni = {}) {
     return 'ok';
   }
 
-  async function apriDerivati(p) {
-    if (opz.derivati === 'nessuno') return;
-    const entry = (dep.verifica(P.wt(p.slug)) || {}).entry || {};
-    for (const d of derivatiDaAprire(p, entry.derived)) {
-      const r = await dep.esegui('node', ['scripts/claude-feedback.mjs', d.titolo, '-', `--${opz.derivati}`, '--priorita', String(d.priorita)], { cwd: P.wt(p.slug), input: d.testo });
-      const m = /#(\d+)/.exec(String(r.out || ''));
-      if (r.code === 0) p.derivatiAperti.push({ chiave: d.chiave, titolo: d.titolo, num: m ? Number(m[1]) : null });
-      else p.avvisi.push(`feedback non aperto per «${d.titolo}»: ${coda(r.out, 2)}`);
-      salva(p);
-    }
-  }
+  const apriDerivati = (p) => apriDerivatiDi(dep, p, { derivati: opz.derivati, salva });
 
   async function pulisci(p) {
     p.avvisi.push(...await togliWorktree(dep, p));
@@ -650,6 +662,10 @@ export function creaMotore(dep, opzioni = {}) {
         else return p;
       } catch (e) {
         esito = ferma(p, `errore dell'orchestratore: ${String((e && e.stack) || e).split('\n').slice(0, 3).join(' · ')}`);
+      }
+      // Dopo ogni passo, non solo alla fusione: un lavoro che si ferma o viene tolto non tiene nascosti esterni e messi da parte.
+      if (p.fase !== 'fuso') {
+        try { await apriDerivati(p); } catch (e) { avvisaUnaVolta(p, `feedback dei rilievi non aperti: ${primaRiga(String((e && e.message) || e))}`); }
       }
       salva(p);
       if (esito === 'fermo') return p;

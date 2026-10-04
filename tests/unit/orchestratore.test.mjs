@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  attesaLimite, caricoBasta, chiaveVerdetto, classificaFinish, creaMotore, decidiDopoVerifica, derivatiDaAprire, nuovaPratica, passoDalRamo,
+  apriDerivatiDi, attesaLimite, caricoBasta, chiaveVerdetto, classificaFinish, creaMotore, decidiDopoVerifica, derivatiDaAprire, nuovaPratica, passoDalRamo,
   promptLavoratore, promptVerificatore, regolaFile, richiestaArg, riprendi, rigaStato, serveDeploy, siSovrappongono, toccaRegole, togliWorktree,
 } from '../../scripts/lib/orchestratore.mjs';
 import {
@@ -112,7 +112,7 @@ test('giro intero: lavoratore, due verifiche, server su main, app, deploy, rilie
   assert.deepEqual(p.derivatiAperti.map((d) => d.num), [1001]);
   assert.equal(p.costo, 1.5);
   const r = b.righe();
-  const ordine = [/claude lavoratore/, /verify-local\.mjs start fai X --feedback 7/, /claude verificatore/, /verify-local\.mjs start$/, /server-fondi-pratica\.mjs claude\/sette --feedback 7$/, /finish-local\.mjs --feedback 7/, /server:pubblica/, /claude-feedback\.mjs .* - --non-locale --priorita 1/, /scollega/, /worktree remove/];
+  const ordine = [/claude lavoratore/, /verify-local\.mjs start fai X --feedback 7/, /claude verificatore/, /verify-local\.mjs start$/, /claude verificatore/, /claude-feedback\.mjs .* - --non-locale --priorita 1/, /server-fondi-pratica\.mjs claude\/sette --feedback 7$/, /finish-local\.mjs --feedback 7/, /server:pubblica/, /scollega/, /worktree remove/];
   let prima = -1;
   for (const re of ordine) {
     const i = r.findIndex((x, k) => k > prima && re.test(x));
@@ -770,4 +770,69 @@ test('aggiungi: un ramo di un altro lavoro aperto si rifiuta se scelto con --slu
   assert.match(agg('8').stdout, /claude\/lavoro-8-2/);
   const s = JSON.parse(readFileSync(join(d, 'stato.json'), 'utf8'));
   assert.deepEqual(Object.values(s.pratiche).map((p) => p.slug).sort(), ['doppio', 'lavoro-8', 'lavoro-8-2']);
+});
+
+test('esterni e messi da parte diventano feedback appena la critica li registra, anche se il lavoro si ferma; mai due volte', async () => {
+  const esterno = { level: 1, sede: 'e', text: 'altro lavoro Z' };
+  const fermata = ({ cwd, per }) => {
+    per[cwd] = { entry: { ...per[cwd].entry, verdict: 'fail', critique: '- [2i?] scegli A o B', derived: [esterno], at: 'giro-fermo', sha: 1 } };
+    return { ok: true, testo: 'fatto', costo: 0 };
+  };
+  const b = banco({ errori: [() => ({ ok: true, testo: 'fatto', costo: 0 }), fermata], derived: [esterno] });
+  let p = (await b.motore.avvia()).pratiche[7];
+  assert.equal(p.fase, 'fermo');
+  assert.deepEqual(p.derivatiAperti.map((d) => d.num), [1001]);
+  b.stato.pratiche[7] = riprendi(p, 'la B');
+  p = (await b.motore.avvia()).pratiche[7];
+  assert.equal(p.fase, 'fuso', JSON.stringify(p.fermo));
+  assert.equal(b.righe().filter((r) => /claude-feedback/.test(r)).length, 1);
+});
+
+test('apriDerivatiDi: un feedback che non si apre resta da aprire, con un avviso solo; gli altri non si riaprono', async () => {
+  const p = nuovaPratica({ num: 7, slug: 'sette' });
+  const derived = [{ level: 1, sede: 'e', text: 'altro lavoro Z' }, { level: 0, sede: 'e', text: 'altro lavoro W' }];
+  let rete = false;
+  const righe = [];
+  const dep = {
+    percorsi: { wt: (s) => `/r/.claude/worktrees/${s}` },
+    verifica: () => ({ entry: { derived } }),
+    esegui: async (cmd, args) => {
+      righe.push(args[1]);
+      return /Z/.test(args[1]) || rete ? { code: 0, out: 'Aperto #1001' } : { code: 1, out: 'fetch failed' };
+    },
+  };
+  assert.equal(await apriDerivatiDi(dep, p), 1);
+  assert.equal(await apriDerivatiDi(dep, p), 1);
+  assert.equal(p.avvisi.length, 1);
+  rete = true;
+  assert.equal(await apriDerivatiDi(dep, p), 0);
+  assert.deepEqual(righe, ['altro lavoro Z', 'altro lavoro W', 'altro lavoro W', 'altro lavoro W']);
+  assert.equal(await apriDerivatiDi(dep, p, { derivati: 'nessuno' }), 0);
+});
+
+test('lavoro rimasto a metà da un orchestratore chiuso: togli lo toglie, riprendi dice che riparte da sé; con uno vivo entrambi rifiutano', () => {
+  const d = cartellaTemporanea('orch-a-meta-');
+  const orch = (...a) => spawnSync(process.execPath, ['scripts/orchestratore-locale.mjs', ...a], {
+    cwd: ROOT, encoding: 'utf8', env: { ...process.env, FILO_ORCH_DIR: d }, timeout: 60_000,
+  });
+  assert.equal(orch('aggiungi', '7', '--slug', 'a-meta-prova', '--richiesta', 'una prova').status, 0);
+  const f = join(d, 'stato.json');
+  const s = JSON.parse(readFileSync(f, 'utf8'));
+  Object.assign(s.pratiche[7], { fase: 'verifica', giri: 1, giriTotali: 1 });
+  writeFileSync(f, JSON.stringify(s));
+
+  writeFileSync(join(d, 'avvia.lock'), String(process.pid));
+  assert.match(orch('togli', '7').stderr, /orchestratore in corso/);
+  assert.match(orch('riprendi', '7').stderr, /orchestratore in corso/);
+
+  const morto = spawnSync(process.execPath, ['-e', '']).pid;
+  writeFileSync(join(d, 'avvia.lock'), String(morto));
+  const r = orch('riprendi', '7');
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /riparte da sola col prossimo «avvia»/);
+  assert.match(orch('riprendi', '7', 'la B').stderr, /non l’ho registrata/);
+  assert.equal(JSON.parse(readFileSync(f, 'utf8')).pratiche[7].fase, 'verifica');
+  const t = orch('togli', '7');
+  assert.equal(t.status, 0, t.stderr);
+  assert.equal(JSON.parse(readFileSync(f, 'utf8')).pratiche[7], undefined);
 });
