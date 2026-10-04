@@ -89,14 +89,54 @@ async function provaCrash({ app, openTab, testServer }, modo) {
   return trovata;
 }
 
-test('crash con SIGKILL al processo del renderer', async ({ app, shell, openTab, testServer }) => {
-  void shell;
-  const ok = await provaCrash({ app, openTab, testServer }, 'kill');
-  expect(ok).toBe(true);
-});
 
-test('crash con forcefullyCrashRenderer', async ({ app, shell, openTab, testServer }) => {
+test('forcefullyCrashRenderer: quanto resta a morire, e su cosa e bloccato', async ({ app, shell, openTab, testServer }) => {
   void shell;
-  const ok = await provaCrash({ app, openTab, testServer }, 'forza');
-  expect(ok).toBe(true);
+  test.setTimeout(200_000);
+  const righe = [];
+  const t0 = Date.now();
+  const proc = app.process();
+  proc.stderr.on('data', (b) => { for (const r of String(b).split('\n')) if (r.trim()) righe.push(`+${Date.now() - t0}ms [err] ${r.slice(0, 300)}`); });
+  const url = testServer.html('<!DOCTYPE html><title>viva</title><p>contenuto</p>');
+  await openTab(url);
+  const pid = await app.evaluate(({ webContents, BrowserWindow }, target) => {
+    const shellWc = webContents.getAllWebContents().find((w) => w.getURL().startsWith('filo://shell/'));
+    const mainWin = BrowserWindow.fromWebContents(shellWc);
+    const wc = webContents.getAllWebContents().find((w) => w.getURL() === target && BrowserWindow.fromWebContents(w) === mainWin);
+    const p = wc.getOSProcessId();
+    wc.forcefullyCrashRenderer();
+    return p;
+  }, url);
+  let morto = -1;
+  for (let i = 0; i < 120; i++) {
+    await new Promise((r) => setTimeout(r, 1000));
+    const vivo = leggi(`/proc/${pid}/stat`);
+    const errore = app.windows().some((w) => { try { return w.url().startsWith('filo://error/'); } catch (_) { return false; } });
+    if (i === 4) {
+      const helper = sh("pgrep -f systemd-coredump | head -5").trim().split('\n').filter(Boolean);
+      console.log('DIAG helper pids: ' + helper.join(','));
+      for (const h of helper) {
+        console.log(`DIAG helper ${h} status:\n` + sh(`grep -E 'State|PPid|Name' /proc/${h}/status`));
+        console.log(`DIAG helper ${h} stack:\n` + sh(`sudo cat /proc/${h}/stack`));
+        console.log(`DIAG helper ${h} cmdline: ` + sh(`tr '\\0' ' ' < /proc/${h}/cmdline`));
+        console.log(`DIAG helper ${h} fd:\n` + sh(`sudo ls -l /proc/${h}/fd`));
+      }
+      console.log(`DIAG renderer ${pid} thread:\n` + sh(`for t in /proc/${pid}/task/*; do echo "$t $(cat $t/stat | cut -d' ' -f2,3) wchan=$(cat $t/wchan)"; done`));
+      console.log(`DIAG renderer ${pid} stack dei thread non idle:\n` + sh(`for t in /proc/${pid}/task/*; do s=$(cut -d' ' -f3 $t/stat); if [ "$s" != "I" ]; then echo "== $t $s"; sudo cat $t/stack; fi; done`));
+      console.log(`DIAG renderer ${pid} VmSize/VmRSS: ` + sh(`grep -E 'VmSize|VmRSS|Threads' /proc/${pid}/status`));
+      console.log('DIAG coredump.conf: ' + sh('cat /etc/systemd/coredump.conf 2>&1 | grep -v "^#" ; ls /etc/systemd/coredump.conf.d 2>&1; systemctl status systemd-coredump.socket --no-pager 2>&1 | head -5'));
+      console.log('DIAG suid_dumpable: ' + leggi('/proc/sys/fs/suid_dumpable'));
+    }
+    if (i % 10 === 9) console.log(`DIAG t=${i + 1}s renderer=${vivo.startsWith('ERR') ? 'sparito' : vivo.split(' ')[2]} paginaErrore=${errore}`);
+    if (vivo.startsWith('ERR') && morto < 0) { morto = i + 1; console.log(`DIAG renderer sparito a ${morto}s, paginaErrore=${errore}`); }
+    if (morto > 0 && errore) break;
+  }
+  console.log('DIAG coredumpctl:\n' + sh('coredumpctl list --no-pager 2>&1 | tail -5; sudo ls -la /var/lib/systemd/coredump 2>&1 | tail -5'));
+  console.log('DIAG journal coredump:\n' + sh("sudo journalctl --no-pager -n 25 -t systemd-coredump 2>&1 | cut -c1-300"));
+  console.log('DIAG stderr app:\n' + righe.join('\n'));
+  const tc = Date.now();
+  await chiudiApp(app);
+  console.log(`DIAG chiudiApp (gruppo): ${Date.now() - tc}ms`);
+  await new Promise((r) => setTimeout(r, 1500));
+  console.log('DIAG processi dopo la chiusura:\n' + processiElectron());
 });
