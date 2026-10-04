@@ -796,6 +796,8 @@
   // Cartelle di profilo appena sotto la home (`Application Data` e `Cookies` sono giunzioni verso AppData).
   const PROFILO = new Set(['appdata', 'application data', 'local settings', 'cookies', 'library', '_netrc']);
   const JOLLY = /[*?[\]{}\uFFFD]/;
+  // Dove stava un gruppo `( \u2026 )`: un valore che si conosce solo eseguendolo (vedi `smonta`).
+  const SEGNAPOSTO = '$_\uE000';
   // Senza contesto: cartella di lavoro e home coincidono, un relativo si dà per interno.
   const SENZA_CONTESTO = { cwd: '/~', home: '/~', win: false, maiuscole: false };
 
