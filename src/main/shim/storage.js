@@ -104,6 +104,8 @@ const INCOGNITO = {
 // Vedi STORAGE_KEYS in src/shared/constants.js.
 const INCOGNITO_READABLE = new Set([
   'settings', 'blocklist', 'sn_personal_dict', 'sn_autocorrect', 'sn_icon_layout',
+  // La disposizione delle carte della home (#870): come le icone, la scelta dell'utente vale anche in incognito.
+  'filo_carte_home',
 ]);
 
 // I conti di Filo (spesa del mese contro il limite, saldo dei crediti) valgono per tutte le finestre: in incognito si

@@ -4436,6 +4436,11 @@
   loadVersions();                           // storico dall'archivio app (async)
   loadTrash();                              // documenti eliminati recuperabili
   loadCollection();                         // da localStorage (sincrono)
-  activateFile(STORE.activeFile(collection)); // apre l'ultimo file attivo
-  reloadFromArchive();                      // fonde i file scritti da Filo (appunti/migrazione)
+  // ?file=<id>: un documento scelto da fuori (la carta dell'Editor nella home, #870). Può stare solo
+  // nell'archivio (un appunto scritto da Filo a editor chiuso): lo si cerca di nuovo dopo la fusione.
+  const fileChiesto = (() => { try { return new URLSearchParams(location.search).get('file') || ''; } catch (_) { return ''; } })();
+  activateFile((fileChiesto && STORE.findFile(collection, fileChiesto)) || STORE.activeFile(collection));
+  reloadFromArchive().then(() => {
+    if (fileChiesto && STORE.findFile(collection, fileChiesto) && (!doc || doc.id !== fileChiesto)) switchToFile(fileChiesto);
+  });
 })();
