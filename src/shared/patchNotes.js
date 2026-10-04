@@ -26,6 +26,7 @@
         'Lettura ad alta voce e dettatura non partono più verso un fornitore che Filo esclude. Se il modello che hai scelto lo serve solo lui, Filo te lo dice e non manda niente.',
         'Quando elimini una chat dalla Cronologia, il suo testo sparisce anche dall\'elenco delle richieste fatte ai modelli: lì restano solo i costi.',
         'Con tante schede aperte, la X non finisce più mezza sotto la scheda accanto, e il clic non apre la vicina al posto di chiudere. Sulle schede troppo strette resta solo l\'icona del sito, al centro, e le chiudi col clic centrale o col tasto destro. La scheda attiva ha sempre la sua X.',
+        'Se Filo usa il terminale solo per guardare, per esempio per contare i file di una cartella o controllare che esista prima di elencarla, parte subito. Prima ti chiedeva di scrivere «conferma» come per una cancellazione.',
       ],
     },
     {
