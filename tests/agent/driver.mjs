@@ -4,10 +4,9 @@
 //   launchFilo()           → { app, shell }   (userData isolato in temp)
 //   bringToFront(app)
 //   contentBounds(app)     → { x, y, width, height, scale }
-//   captureComposite(...)  → cattura OS-level della finestra composita (shell
-//                            + WebContentsView native). Gli screenshot Playwright
-//                            per-pagina NON mostrano la composizione nativa, per
-//                            questo serve una cattura a livello di sistema.
+//   captureComposite(...)  → PNG della finestra come la si vede: shell, viste e
+//                            finestre figlie ricomposte. Gli screenshot Playwright
+//                            per-pagina vedono una pagina sola.
 //   activeView(app, shell) → la Page Playwright della tab attiva
 //   markInteractables(...) → disegna badge numerati sugli elementi cliccabili e
 //                            ritorna la mappa indice→{page,x,y,...}
@@ -19,10 +18,9 @@
 // (con y-SHELL_HEIGHT nelle coordinate della pagina view).
 
 import { _electron as electron } from 'playwright';
-import { mkdirSync, rmSync, statSync } from 'node:fs';
+import { mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execFileSync, execSync } from 'node:child_process';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import { argomentiScala } from '../helpers/scala.mjs';
 
@@ -75,148 +73,98 @@ export async function contentBounds(app) {
   });
 }
 
-// HWND della finestra principale (stringa decimale dell'handle).
-export async function windowHandle(app) {
-  return app.evaluate(async ({ BrowserWindow }) => {
-    // Filtra la window principale (quella con _filoTabs) per evitare di
-    // prendere mini-window secondarie come il tooltip o il popup-menu.
-    const all = BrowserWindow.getAllWindows();
-    const win = all.find((w) => w._filoTabs) || all[0];
-    const buf = win.getNativeWindowHandle();
-    // little-endian; su 64-bit l'handle sta nei primi 8 byte.
-    let v = 0n;
-    for (let i = Math.min(buf.length, 8) - 1; i >= 0; i--) v = (v << 8n) | BigInt(buf[i]);
-    return v.toString();
-  });
-}
-
-// Cattura nativa composita (shell + WebContentsView).
-//
-// Su Windows usa Win32 PrintWindow(PW_RENDERFULLCONTENT): cattura il contenuto
-// reale della finestra anche se non è in primo piano/occlusa — robusto, niente
-// dipendenza dal focus.
-//
-// Su Linux (cloud/xvfb): usa `scrot` per catturare l'intero display virtuale X11.
-// Electron gira dentro xvfb, quindi il framebuffer X include già il composito
-// shell + WebContentsView. Richiede la variabile d'ambiente DISPLAY (impostata
-// automaticamente da xvfb-run) e il binario `scrot` installato (scrot 1.x+).
-// Fallback: se scrot non è disponibile, prova con xwd + ImageMagick convert.
-//
-// IMPORTANTE (Windows): NON portare la finestra in foreground qui. Farlo
-// ruberebbe il focus da tastiera alla WebContentsView attiva, rompendo la
-// digitazione tra uno step e l'altro.
+// Cattura composita: la shell, le viste sopra di lei e le finestre figlie
+// (menu, tooltip), ricomposte dentro Electron con capturePage. Non chiede niente
+// allo schermo, quindi vale con la finestra parcheggiata fuori campo dei test
+// (src/main/test-window-mode.js), sotto xvfb e su ogni sistema. Non sposta né
+// mette a fuoco la finestra: un menu aperto si chiuderebbe, e la digitazione
+// fra due passi finirebbe altrove.
 export async function captureComposite(app, outPath) {
-  if (process.platform === 'linux') {
-    return captureCompositeLinux(app, outPath);
-  }
-  // Windows: Win32 PrintWindow
-  const hwnd = await windowHandle(app);
-  const safePath = outPath.replace(/\\/g, '\\\\');
-  const ps = `
-Add-Type -AssemblyName System.Drawing
-Add-Type -ReferencedAssemblies System.Drawing -TypeDefinition @"
-using System;
-using System.Runtime.InteropServices;
-using System.Drawing;
-public class WinCap {
-  [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
-  [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr h, IntPtr hdc, uint flags);
-  [DllImport("user32.dll")] public static extern bool GetClientRect(IntPtr h, out RECT r);
-  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
-  [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L, T, R, B; }
-  public static void Shoot(IntPtr h, string path) {
-    SetProcessDPIAware();
-    RECT wr; GetWindowRect(h, out wr);
-    int w = wr.R - wr.L, ht = wr.B - wr.T;
-    Bitmap bmp = new Bitmap(w, ht);
-    Graphics g = Graphics.FromImage(bmp);
-    IntPtr hdc = g.GetHdc();
-    PrintWindow(h, hdc, 2); // PW_RENDERFULLCONTENT
-    g.ReleaseHdc(hdc); g.Dispose();
-    bmp.Save(path, System.Drawing.Imaging.ImageFormat.Png);
-    bmp.Dispose();
-  }
-}
-"@
-[WinCap]::Shoot([IntPtr]${hwnd}, '${safePath}')
-`;
-  try {
-    execFileSync('powershell.exe', ['-NoProfile', '-Command', ps], { stdio: 'pipe', encoding: 'utf8' });
-  } catch (e) {
-    throw new Error('captureComposite PS fallita: ' + (e.stderr || e.message));
+  const esito = await app.evaluate(componiFinestra);
+  if (!esito.ok) throw new Error('captureComposite: ' + esito.errore);
+  mkdirSync(dirname(outPath), { recursive: true });
+  writeFileSync(outPath, Buffer.from(esito.png, 'base64'));
+  if (esito.mancanti.length) {
+    console.warn(`[captureComposite] ${outPath}: senza immagine, quindi assenti dallo scatto: ${esito.mancanti.join(', ')}`);
   }
   return outPath;
 }
 
-// Cattura X11 su Linux: usa scrot per catturare il display virtuale (xvfb).
-// Il composito shell + WebContentsView è già nel framebuffer X → nessun workaround.
-// Prima porta la finestra in primo piano (altrimenti potrebbe essere dietro un
-// altro client X, anche se xvfb di solito ha solo Electron).
-async function captureCompositeLinux(app, outPath) {
-  const display = process.env.DISPLAY || ':0';
-
-  // Porta la finestra in primo piano nel display X (importante: in xvfb non c'è
-  // un window manager, quindi moveTop + show garantisce che sia visibile nel fb).
-  try {
-    await app.evaluate(async ({ BrowserWindow }) => {
-      const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs) || BrowserWindow.getAllWindows()[0];
-      if (!win) return;
-      win.show();
-      win.moveTop();
-      win.focus();
-    });
-    await sleep(300); // attendi che X dispatchi gli eventi di layout
-  } catch (_) {}
-
-  // Prova prima scrot (disponibile su Ubuntu/Debian dal pacchetto `scrot`).
-  const scrot = resolveExecutable('scrot');
-  if (scrot) {
-    try {
-      execFileSync(scrot, ['-D', display, '--overwrite', outPath], {
-        stdio: 'pipe',
-        encoding: 'utf8',
-        env: { ...process.env, DISPLAY: display },
-      });
-      return outPath;
-    } catch (e) {
-      throw new Error('captureCompositeLinux scrot fallita: ' + (e.stderr || e.message));
+// Gira nel processo main (passata a app.evaluate): niente riferimenti esterni.
+async function componiFinestra({ BrowserWindow, nativeImage }) {
+  const tutte = BrowserWindow.getAllWindows().filter((w) => !w.isDestroyed());
+  const win = tutte.find((w) => w._filoTabs) || tutte[0];
+  if (!win) return { ok: false, errore: 'nessuna finestra aperta' };
+  const cb = win.getContentBounds();
+  const strati = [{ nome: 'shell', wc: win.webContents, x: 0, y: 0 }];
+  // L'ordine dei figli è l'ordine di disegno. Filo nasconde schede e avvisi
+  // azzerandone i bounds: Electron 33 non dice se una vista è visibile.
+  const visita = (vista, ox, oy) => {
+    for (const figlia of vista.children || []) {
+      if (typeof figlia.getVisible === 'function' && !figlia.getVisible()) continue;
+      const b = figlia.getBounds();
+      if (b.width <= 0 || b.height <= 0) continue;
+      const wc = figlia.webContents;
+      if (wc && !wc.isDestroyed()) strati.push({ nome: wc.getURL(), wc, x: ox + b.x, y: oy + b.y });
+      visita(figlia, ox + b.x, oy + b.y);
     }
+  };
+  visita(win.contentView, 0, 0);
+  for (const f of win.getChildWindows()) {
+    if (f.isDestroyed() || !f.isVisible() || f.isMinimized()) continue;
+    const b = f.getContentBounds();
+    strati.push({ nome: f.webContents.getURL(), wc: f.webContents, x: b.x - cb.x, y: b.y - cb.y });
   }
 
-  // Fallback: xwd → ImageMagick convert (presente su quasi tutte le distro Linux).
-  const xwd = resolveExecutable('xwd');
-  const convert = resolveExecutable('convert');
-  if (xwd && convert) {
-    try {
-      const xwdData = execFileSync(xwd, ['-display', display, '-root', '-silent'], {
-        stdio: ['ignore', 'pipe', 'pipe'],
-        env: { ...process.env, DISPLAY: display },
-      });
-      // xwd emette un formato XWD (X Window Dump), ImageMagick lo converte in PNG.
-      const tmpXwd = outPath + '.xwd';
-      require('node:fs').writeFileSync(tmpXwd, xwdData);
-      execFileSync(convert, [tmpXwd, outPath], { stdio: 'pipe' });
-      try { require('node:fs').unlinkSync(tmpXwd); } catch (_) {}
-      return outPath;
-    } catch (e) {
-      throw new Error('captureCompositeLinux xwd/convert fallita: ' + (e.stderr || e.message));
+  const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
+  // Una vista appena posata può non avere ancora un fotogramma: si riprova.
+  const pixel = async (wc) => {
+    for (let i = 0; i < 5; i++) {
+      try {
+        const img = await wc.capturePage();
+        if (!img.isEmpty()) {
+          const sf = img.getScaleFactors()[0] || 1;
+          const bmp = img.toBitmap({ scaleFactor: sf });
+          const width = img.getSize(sf).width;
+          const height = width ? bmp.length / (4 * width) : 0;
+          if (width > 0 && Number.isInteger(height) && height > 0) return { width, height, bmp };
+        }
+      } catch (_) { /* webContents in chiusura: si riprova, poi si dichiara */ }
+      await pausa(150);
     }
-  }
-
-  throw new Error(
-    'captureCompositeLinux: nessun tool di cattura disponibile. ' +
-    'Installa `scrot` (apt-get install -y scrot) oppure `xwd` + ImageMagick `convert`.'
-  );
-}
-
-// Risolve il percorso di un eseguibile, restituisce null se non trovato.
-function resolveExecutable(name) {
-  try {
-    const path = execSync(`which ${name}`, { stdio: 'pipe', encoding: 'utf8' }).trim();
-    return path || null;
-  } catch (_) {
     return null;
-  }
+  };
+  const immagini = await Promise.all(strati.map((s) => pixel(s.wc)));
+  if (!immagini[0]) return { ok: false, errore: 'la shell non ha restituito nessuna immagine' };
+
+  const W = immagini[0].width;
+  const H = immagini[0].height;
+  // Le viste si posano in pixel logici, le immagini sono in pixel fisici.
+  const S = W / cb.width;
+  const tela = Buffer.alloc(W * H * 4);
+  const mancanti = [];
+  // Alfa premoltiplicato (come lo dà Chromium): sopra = src + sotto·(1 − αsrc).
+  strati.forEach((s, i) => {
+    const img = immagini[i];
+    if (!img) { mancanti.push(s.nome); return; }
+    const dx = Math.round(s.x * S);
+    const dy = Math.round(s.y * S);
+    const x0 = Math.max(0, -dx);
+    const x1 = Math.min(img.width, W - dx);
+    for (let y = Math.max(0, -dy); y < img.height && y + dy < H; y++) {
+      for (let x = x0; x < x1; x++) {
+        const si = (y * img.width + x) * 4;
+        const a = img.bmp[si + 3];
+        if (a === 0) continue;
+        const di = ((y + dy) * W + (x + dx)) * 4;
+        if (a === 255) { img.bmp.copy(tela, di, si, si + 4); continue; }
+        const k = (255 - a) / 255;
+        for (let c = 0; c < 4; c++) tela[di + c] = Math.min(255, img.bmp[si + c] + Math.round(tela[di + c] * k));
+      }
+    }
+  });
+  const png = nativeImage.createFromBitmap(tela, { width: W, height: H }).toPNG();
+  return { ok: true, png: png.toString('base64'), mancanti };
 }
 
 // Trova la Page della tab attiva interrogando il main per l'URL attivo.
