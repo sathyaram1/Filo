@@ -9,6 +9,7 @@ import { readdirSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { CONFIRM_HOST, clickConfirm } from './helpers/confirm.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const BACHECA = 'filo://board/board.html';
