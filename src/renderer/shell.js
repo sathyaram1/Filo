@@ -2093,7 +2093,9 @@
     api.tabs.onPopupBlocked((info) => {
       if (!info || !info.url) return;
       const { url, tabId } = info;
+      // Una pagina che riprova di continuo non riempie la pila: l'avviso della sua scheda si aggiorna sull'ultimo.
       NOTIFS.show(`Bloccato popup da ${info.host || '?'}`, {
+        unica: `popup-bloccato:${tabId}`,
         durationSec: 8,
         actions: [{ label: 'Apri', onClick: () => { try { api.tabs.openBlockedPopup(url, false, tabId); } catch (_) {} } }],
       });
