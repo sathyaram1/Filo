@@ -221,6 +221,21 @@
     return touch(next);
   }
 
+  // Cambia il commander (id vuoto = lo toglie) per tutte le strade: il nuovo esce dall'elenco, quello di prima ci
+  // rientra come carta normale, così non si perde mai in silenzio (#302, #789). Stesso commander = mazzo invariato.
+  function replaceCommander(deck, scryfallId, meta = null) {
+    const id = String(scryfallId || '').trim();
+    const prev = String(deck.commander || '').trim();
+    if (id === prev) return { deck, previousId: '', previousName: '' };
+    let carte = id ? deck.carte.filter((c) => c.scryfall_id !== id) : deck.carte;
+    if (prev && !carte.some((c) => c.scryfall_id === prev)) carte = [...carte, { scryfall_id: prev, qty: 1, tags: [] }];
+    return {
+      deck: setCommander({ ...deck, carte }, id, meta),
+      previousId: prev,
+      previousName: prev ? String((deck.commanderMeta && deck.commanderMeta.name) || '').trim() : '',
+    };
+  }
+
   // Parsa il testo del campo budget come lo scrive l'utente. L'app mostra
   // TUTTI i prezzi in formato italiano («12,50 €»), quindi il tetto scritto
   // con la virgola decimale è l'input più naturale: qui la virgola è un
