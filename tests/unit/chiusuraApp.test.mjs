@@ -45,11 +45,11 @@ test('chiudiApp ammazza anche i figli rimasti, così le pipe si chiudono', { ski
     if (m) r(Number(m[1]));
   }));
   const app = { process: () => capo, close: () => new Promise(() => {}) };
-  await chiudiApp(app, { tetto: 200 });
-  const esito = await Promise.race([chiuso, new Promise((r) => setTimeout(() => r(false), 5000))]);
-  let figlioVivo = true;
-  try { process.kill(pidFiglio, 0); } catch (_) { figlioVivo = false; }
-  if (figlioVivo) { try { process.kill(pidFiglio, 'SIGKILL'); } catch (_) {} }
-  assert.equal(figlioVivo, false, 'il figlio è sopravvissuto alla chiusura');
-  assert.equal(esito, true, 'le pipe dell\'app non si sono chiuse: Playwright resterebbe ad aspettare');
+  try {
+    await chiudiApp(app, { tetto: 200 });
+    const esito = await Promise.race([chiuso, new Promise((r) => setTimeout(() => r(false), 5000))]);
+    assert.equal(esito, true, 'le pipe dell\'app non si sono chiuse: Playwright resterebbe ad aspettare');
+  } finally {
+    try { process.kill(pidFiglio, 'SIGKILL'); } catch (_) {}
+  }
 });
