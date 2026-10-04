@@ -113,6 +113,9 @@ module.exports = function register(on, ctx) {
       const { buildExportZip } = require('../exportData');
 
       const allData = await DiskStorage.get(null);
+      // Mittenti e siti fidati non escono (#534): un backup che rientra non può alzare la fiducia, e loro si
+      // ritrovano dagli Inviati o si risegnano con «conferma».
+      delete allData[SN_CONST.STORAGE_KEYS.FILO_FIDUCIA];
       // L'archivio delle schede ha file suoi: nel backup torna sotto la chiave di sempre.
       const archivio = await globalThis.SN_ARCHIVED_TABS.list();
       if (archivio.length) allData[ARCHIVE_KEY] = archivio;

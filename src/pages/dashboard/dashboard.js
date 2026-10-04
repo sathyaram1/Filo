@@ -702,6 +702,7 @@
     POSTA_BOZZA: 'Preparo la bozza in Gmail…',
     SEGNA_FIDATO: 'Segno come fidato…',
     TOGLI_FIDATO: 'Tolgo dai fidati…',
+    ELENCA_FIDATI: 'Rileggo i fidati…',
   };
   function startLabelFor(type) {
     return START_LABELS[String(type || '').toUpperCase()] || 'Eseguo un\'azione…';

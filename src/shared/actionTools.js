@@ -321,6 +321,12 @@
       },
       required: [],
     },
+    ELENCA_FIDATI: {
+      description: 'Ti torna l\'elenco dei mittenti e dei siti fidati, con da dove vengono (dagli Inviati, segnati in chat, aggiunti nelle Preferenze). Sola lettura: usalo per «di chi ti fidi?».',
+      properties: {},
+      required: [],
+      risultato: true,
+    },
     TOGLI_FIDATO: {
       description: 'Toglie un mittente (per indirizzo) o un sito dai fidati. Parte subito, senza conferma.',
       properties: {

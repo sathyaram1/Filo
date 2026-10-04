@@ -425,7 +425,7 @@
       id: 'trusted-senders-sites', title: 'Mittenti e siti fidati', category: 'assistant',
       desc: 'Le mail dei mittenti fidati e le pagine dei siti fidati non contano come scritte da uno sconosciuto. I mittenti fidati sono gli indirizzi a cui hai scritto, che Filo trova nella cartella Inviati di Gmail una volta a settimana, più quelli che segni tu («fidati di marco@uni.it»); i siti fidati li segni tu («considera fidato il sito della banca»). Se in un sito scrivono in tanti (commenti, post, autori diversi), Filo te lo sconsiglia e ti lascia scegliere. Gli elenchi restano sul tuo computer.',
       invoke: 'A parole all’assistente, oppure nelle Preferenze, sotto «Schede aperte e posta», dove li vedi tutti e li togli con la ×.',
-      doesNot: 'Un mittente si riconosce dal suo indirizzo, mai dal nome che mostra. Per aggiungere un fidato devi scrivere «conferma»; per toglierlo no. Un mittente che togli non torna da solo dagli Inviati, e un backup che reimporti non aggiunge fidati.',
+      doesNot: 'Un mittente si riconosce dal suo indirizzo, mai dal nome che mostra. Per aggiungere un fidato devi scrivere «conferma»; per toglierlo no. Un mittente che togli non torna da solo dagli Inviati. Esporta dati non porta con sé gli elenchi: dopo un ripristino i mittenti tornano dagli Inviati, e gli altri li risegni.',
     },
     {
       id: 'agent-actions', title: 'Filo agisce al posto tuo', category: 'assistant',

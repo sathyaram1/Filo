@@ -75,6 +75,7 @@
     POSTA_BOZZA: 'pencil',
     SEGNA_FIDATO: 'lock',
     TOGLI_FIDATO: 'lock',
+    ELENCA_FIDATI: 'lock',
   };
 
   const PREVISTE = {

@@ -293,6 +293,7 @@
     POSTA_BOZZA: (n) => (n > 1 ? `preparato ${n} bozze` : 'preparato una bozza'),
     SEGNA_FIDATO: () => 'segnato un fidato',
     TOGLI_FIDATO: () => 'tolto un fidato',
+    ELENCA_FIDATI: () => 'riletto i fidati',
   };
   // `hasReasoning`: il modello ha davvero ragionato. Senza, un blocco che
   // contiene solo una frase intermedia non può intitolarsi «Ragionamento».
@@ -535,6 +536,12 @@
     },
     SEGNA_FIDATO: (a) => ({ icon: '🔒', text: `${a._output && a._output.gia ? 'Era già fidato' : 'Segnato come fidato'} · ${pulito(a._output && a._output.voce)}` }),
     TOGLI_FIDATO: (a) => ({ icon: '🔓', text: `Tolto dai fidati · ${pulito(a._output && a._output.voce)}` }),
+    ELENCA_FIDATI: (a) => {
+      const o = a._output || {};
+      const m = Array.isArray(o.mittenti) ? o.mittenti.length : 0;
+      const s = Array.isArray(o.siti) ? o.siti.length : 0;
+      return { icon: '🔒', text: `Riletti i fidati · ${m === 1 ? '1 mittente' : `${m} mittenti`}, ${s === 1 ? '1 sito' : `${s} siti`}` };
+    },
     COMANDO_FINESTRA: (a) => {
       const labels = {
         fullscreen: 'Schermo intero', minimize: 'Finestra ridotta a icona', home: 'Home aperta',
@@ -567,7 +574,7 @@
     VOLUME: 'Volume non cambiato', BLUETOOTH: 'Bluetooth non cambiato', WIFI: 'Wi-Fi non cambiato',
     LEGGI_SCHEDA: 'Scheda non letta', APRI_ELEMENTO: 'Non aperto', SCRIVI_CAMPO: 'Non scritto',
     SCORRI_PAGINA: 'Pagina non scorsa', POSTA_ELENCO: 'Posta non letta', POSTA_CERCA: 'Ricerca nella posta non riuscita',
-    POSTA_LEGGI: 'Mail non letta', POSTA_BOZZA: 'Bozza non preparata', SEGNA_FIDATO: 'Non segnato', TOGLI_FIDATO: 'Non tolto',
+    POSTA_LEGGI: 'Mail non letta', POSTA_BOZZA: 'Bozza non preparata', SEGNA_FIDATO: 'Non segnato', TOGLI_FIDATO: 'Non tolto', ELENCA_FIDATI: 'Elenco non letto',
   };
   // Il perché di un'azione sulle schede che non è riuscita, in parole: la frase lunga la riceve il modello.
   const MOTIVI_SCHEDE = {
