@@ -27,11 +27,12 @@
 //     shell di default su Windows è PowerShell, e lì leggere significa scrivere
 //     pipeline. Un solo segmento non riconosciuto, o uno scriptblock che
 //     potrebbe invocare qualcosa, e la pipeline resta 3.
-//   • background (&), redirezioni (>, >>, <), sostituzioni ($(...), ${...},
-//     backtick) e newline NON sono semplici sequenze: il comando non è
-//     "interamente riconoscibile" → 3, sempre. Non proviamo a fare il parsing
-//     del quoting: un falso positivo qui costa solo più attrito (digitare
-//     "conferma"), mai un'esecuzione silenziosa indebita.
+//   • background (&), redirezioni (>, >>, <), `${...}`, backtick e newline NON
+//     sono semplici sequenze: il comando non è "interamente riconoscibile" → 3,
+//     sempre. Un falso positivo qui costa solo più attrito (digitare
+//     "conferma"), mai un'esecuzione silenziosa indebita. I gruppi `( )`,
+//     `@( )`, `$( )` e l'`if` di PowerShell si classificano per ciò che
+//     eseguono (vedi `smonta`).
 //   • le VIRGOLETTE vengono tolte prima di classificare (vedi `unquote`): tutte
 //     le shell supportate eseguono `git checkout "."`, `git checkout .""` e
 //     `git checkout .` allo stesso identico modo, quindi devono ricevere lo
