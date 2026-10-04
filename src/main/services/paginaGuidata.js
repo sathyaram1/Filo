@@ -14,7 +14,7 @@ function regoleComandi() {
     + 'pubblica(?:re)?|publish|tweet|condividi|share|post now|posta ora');
   // «Conferma ordine», «Esegui bonifico», «Autorizza pagamento»: un verbo che chiude più la cosa che chiude.
   const CHIUDE = P('conferma(?:re)?|confermo|confirm|autorizza(?:re)?|authori[sz]e|approva(?:re)?|approve|'
-    + 'esegui(?:re)?|execute|effettua(?:re)?|completa(?:re)?|complete|procedi|proceed|finalizza(?:re)?|place|invia');
+    + 'esegui(?:re)?|execute|effettua(?:re)?|completa(?:re)?|complete|procedi|proceed|finalizza(?:re)?|place');
   const COSA = P('ordine|ordini|order|pagamento|pagamenti|payment|bonifico|bonifici|transfer|trasferimento|'
     + 'acquisto|acquisti|purchase|prenotazione|booking|ricarica|transazione|transaction|addebito|giroconto|'
     + 'operazione|operation|invio|spedizione|iscrizione|abbonamento|donazione|eliminazione|cancellazione|rimozione');
@@ -270,14 +270,32 @@ function paginaGuidata(regoleComandi) {
     return [nomeDi(el), el.getAttribute('aria-label'), el.getAttribute('title'), el.getAttribute('data-tooltip'),
       el.tagName.toUpperCase() === 'INPUT' ? el.value : ''].filter(Boolean).map(norm);
   }
-  const comando = (n) => !!n && n.split(' ').length <= 5 && VIETATI.test(n);
+  const comando = (n, parole = 5) => !!n && n.split(' ').length <= parole && RC.vietato(n);
+  const RIQUADRI = '[role=dialog],[role=alertdialog],[role=menu],[role=listbox],[role=region],[role=form],form';
+  // Il nome di un riquadro: la sua etichetta o il suo primo titolo («Programma invio», «Conferma il pagamento»).
+  function nomiRiquadro(c) {
+    const out = [c.getAttribute('aria-label') || ''];
+    const ids = c.getAttribute('aria-labelledby');
+    if (ids) out.push(ids.split(/\s+/).map((id) => { const x = document.getElementById(id); return x ? x.textContent || '' : ''; }).join(' '));
+    const h = [...c.querySelectorAll('h1,h2,h3,h4,[role=heading]')].find((x) => x.closest(RIQUADRI) === c);
+    if (h) out.push(breve(h.textContent, 160));
+    return out.filter((s) => s.trim()).map(norm);
+  }
+  // Una scelta dentro un riquadro che invia o paga invia o paga anche lei, comunque si chiami («Domani mattina, 8:00»).
   function vietato(el) {
     const t = tipoDi(el);
     const nomi = nomiDi(el);
-    if (t !== 'riga' && t !== 'link' && nomi.some((n) => VIETATI.test(n))) return true;
-    if (nomi.some(comando)) return true;
+    if (t !== 'riga' && t !== 'link' && nomi.some(RC.vietato)) return true;
+    if (nomi.some((n) => comando(n))) return true;
     const capo = el.parentElement && el.parentElement.closest('button,[role=button],[role=menuitem]');
-    return !!capo && nomiDi(capo).some((n) => VIETATI.test(n));
+    if (capo && nomiDi(capo).some(RC.vietato)) return true;
+    const nudo = nomi.some(RC.nudo);
+    for (let c = el.parentElement && el.parentElement.closest(RIQUADRI); c; c = c.parentElement && c.parentElement.closest(RIQUADRI)) {
+      const nc = nomiRiquadro(c);
+      if (nc.some((n) => comando(n, 8))) return true;
+      if (nudo && nc.some(RC.cosa)) return true;
+    }
+    return false;
   }
   function moduloDiRicerca(form) {
     return form.getAttribute('role') === 'search' || !!form.closest('[role=search]')
