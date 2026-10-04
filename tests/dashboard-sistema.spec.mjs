@@ -323,6 +323,42 @@ test('con la home dietro un\'altra scheda il lettore si addormenta, e riparte qu
   await app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.veglia(0));
 });
 
+test('con la finestra ridotta a icona la home non tiene sveglio il lettore, e riaprendola riparte subito', async ({ app }) => {
+  await finto(app, PIENO);
+  await app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.veglia(2_000));
+  const page = await newtab(app);
+  const attivo = () => app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.attivo());
+  const giro = await app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.GIRO_MS);
+  await expect.poll(attivo, { timeout: 8_000 }).toBe(true);
+  // Senza un gestore di finestre (il contenitore) ridurre non riesce: nascosta, per la pagina è lo stesso.
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    w.minimize();
+    if (!w.isMinimized()) w.hide();
+  });
+  // La home ridotta resta «visible» e continua a chiedere, qui più spesso della veglia come il richiamo vero.
+  await page.evaluate(() => {
+    const fine = Date.now() + 20_000;
+    window.__chiedeSempre = true;
+    (async () => {
+      while (window.__chiedeSempre && Date.now() < fine) {
+        await window.filo.message({ type: window.SN_MSG.MSG.SISTEMA_STATO }).catch(() => {});
+        await new Promise((r) => setTimeout(r, 1_000));
+      }
+    })();
+  });
+  await expect.poll(attivo, { timeout: 2_000 + giro * 2 + 3_000 }).toBe(false);
+  await page.evaluate(() => { window.__chiedeSempre = false; });
+  await cambia(app, { ...PIENO, batteria: { livello: 39, inCarica: false, collegata: false } });
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    if (w.isMinimized()) w.restore(); else w.show();
+  });
+  await expect.poll(attivo, { timeout: 2_000 }).toBe(true);
+  await expect(voce(page, 'batteria')).toHaveText('39%', { timeout: 3_000 });
+  await app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.veglia(0));
+});
+
 test('dopo una pausa del lettore, se la lettura nuova tarda, la chat non riceve lo stato di prima come letto adesso', async ({ app, openTab, testServer }) => {
   await finto(app, { ...PIENO, batteria: { livello: 80, inCarica: true, collegata: true } });
   // La home va dietro un sito e il lettore si ferma; intanto il caricatore si stacca e il computer risponde lento.

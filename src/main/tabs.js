@@ -433,6 +433,8 @@ class TabManager {
       if (t._inVista === ora) continue;
       t._inVista = ora;
       const wc = t.view?.webContents;
+      // Una home che torna in vista (scheda o finestra) rivede subito batteria e rete (#873).
+      if (ora) { try { globalThis.SN_SISTEMA_MAIN?.schedaDavanti?.(wc); } catch (_) {} }
       try {
         if (!wc || wc.isDestroyed?.() || !String(wc.getURL() || '').startsWith('filo://')) continue;
         wc.send('filo:broadcast', { type: 'tab_in_vista', inVista: ora });
@@ -1593,8 +1595,6 @@ class TabManager {
     this.layout();
     this._tastieraAllaSchedaAttiva();
     if (tab._listaTimer) this._seguiLista(tab, { ora: true });
-    // Una home che torna davanti rivede subito batteria e rete (#873): dietro non teneva sveglio il lettore.
-    try { globalThis.SN_SISTEMA_MAIN?.schedaDavanti?.(tab.view.webContents); } catch (_) {}
     this._broadcast();
   }
 

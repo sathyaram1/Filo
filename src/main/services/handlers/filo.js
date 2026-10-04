@@ -151,7 +151,8 @@ module.exports = function register(on, ctx) {
   on(MSG.SISTEMA_STATO, soloFilo(async (msg, sender) => {
     const Sistema = require('../statoSistema');
     const schede = sender && sender.win && sender.win._filoTabs;
-    const davanti = !(schede && sender.tab) || schede.activeId === sender.tab.id;
+    // Guarda chi può vederla: scheda attiva di una finestra né ridotta a icona né nascosta (la pagina resta «visible»).
+    const davanti = !(schede && sender.tab) || schede.inVista(sender.tab.id);
     const segue = !(msg && msg.segue === false);
     // Chi sta scrivendo in chat sveglia il lettore per il turno che arriva, senza diventare una pagina che lo segue.
     if (msg && msg.perChat === true) {

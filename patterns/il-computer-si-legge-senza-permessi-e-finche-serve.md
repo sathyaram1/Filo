@@ -39,10 +39,12 @@ giorno, è un costo vero. Quindi:
 - la home in vista chiede ogni 30 secondi, un turno di chat chiede una volta, e
   il lettore si ferma 90 secondi dopo l'ultima richiesta; chi scrive in chat lo
   sveglia mentre scrive, così il turno non aspetta l'avvio a freddo;
-- «in vista» lo decide il main, non la pagina: una scheda dietro le altre per
+- «in vista» lo decide il main, non la pagina, con la stessa regola delle altre
+  pagine che leggono a intervalli: scheda attiva di una finestra né ridotta a
+  icona né nascosta. Una scheda dietro le altre o in una finestra ridotta per
   Chromium resta `visible`, quindi la sua richiesta riceve lo stato ma non tiene
-  sveglio il lettore; quando la finestra la riporta davanti, il lettore riparte
-  da sé;
+  sveglio il lettore; quando torna in vista (scheda o finestra), il lettore
+  riparte da sé;
 - una home che non mostra niente letto dal computer (batteria, rete e Bluetooth
   nascoste: l'ora la sa la pagina) non chiede e non è fra chi guarda, così
   nemmeno tornando davanti sveglia il lettore;
