@@ -27,8 +27,7 @@ function firestore({ conReadTime = false } = {}) {
     listChangedSince: async ({ since }) => ({
       rows: [...docs.values()].filter((d) => Date.parse(d._updateTime) > Date.parse(since)).map((d) => ({ ...d })),
       complete: true,
-      // Firestore conta in microsecondi: una scrittura dopo la lettura ha sempre un'ora più grande.
-      ...(conReadTime ? { readTime: new Date(Date.now() - 1).toISOString() } : {}),
+      ...(conReadTime ? { readTime: ora() } : {}),
     }),
   };
 }
