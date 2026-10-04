@@ -47,8 +47,8 @@ test('«invia da solo» e «lascia il testo da correggere» si chiedono anche a 
     .find((d) => d.function.name === 'IMPOSTA_PREFERENZA').function.description;
   assert.match(desc, /invio_vocale/, 'il modello non sa che la chiave esiste');
   assert.equal(globalThis.SN_CONST.DEFAULT_SETTINGS.dictation.autoSend, true, 'di serie la richiesta parte da sola');
-  const frase = globalThis.SN_CAMBI.frase({ chiave: 'dictation.autoSend', prima: true, dopo: false });
-  assert.ok(frase && !/undefined/.test(frase), `il cambio si racconta: ${frase}`);
+  const frase = globalThis.SN_CAMBI.fraseCambio({ chiave: 'dictation.autoSend', prima: true, dopo: false });
+  assert.equal(frase, 'invio di quello che detti nelle chat: da solo → a mano, dopo averlo corretto');
 });
 
 test('un microfono negato, assente o occupato dice cosa fare, col posto giusto del sistema', () => {
