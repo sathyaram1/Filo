@@ -5199,6 +5199,8 @@
       testDataInjected = true;
       arrivate.clear();
       allFeedbacks = Array.isArray(fbs) ? fbs : [];
+      // `incompleto`: come se il freno sulle pagine avesse interrotto la lettura.
+      caricoIncompleto = !!(opts && opts.incompleto);
       dataLoaded = true;
       loadFailed = false;
       reindexByClient();

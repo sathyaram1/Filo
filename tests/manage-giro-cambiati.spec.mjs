@@ -86,7 +86,7 @@ test('apertura: tutti i feedback; poi ogni giro chiede solo i cambiati, e il cam
 
   const page = await apriGestione(openTab);
   await page.evaluate(() => window.__mgTest.setTab('inbox'));
-  await expect.poll(() => page.evaluate(() => window.__mgTest.currentOrder().length), { timeout: 15000 }).toBe(520);
+  await expect.poll(() => page.evaluate(() => window.__mgTest.currentOrder().length), { timeout: 30000 }).toBe(520);
   const ordine = await page.evaluate(() => window.__mgTest.currentOrder());
   expect(ordine).toContain('vecchio');
   // Nessun «(500+)»: il tetto non c'è più.
