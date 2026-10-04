@@ -254,8 +254,8 @@
     }
     const motivo = (e) => (e && e.message ? e.message : String(e));
 
-    // Il confine della domanda si prende dall'ora del SERVER (commit visti, ora della lettura), mai da quella del PC:
-    // un PC avanti di tre minuti non vedeva più niente (#676). Il PC solo finché manca.
+    // Il confine non va mai oltre l'ultima ora del SERVER vista (commit, ora della lettura): col solo orologio del PC,
+    // avanti di tre minuti, il giro non vedeva più niente (#676). Il margine resta per chi firma col suo orologio.
     let oraServer = 0;
     function oraDi(r) {
       const t = Date.parse(r && r._updateTime);
@@ -270,8 +270,8 @@
     }
 
     function since() {
-      const base = oraServer || lastTickAt || (now() - overlapMs);
-      return new Date(Math.max(0, base - overlapMs)).toISOString();
+      const locale = (lastTickAt || (now() - overlapMs)) - overlapMs;
+      return new Date(Math.max(0, oraServer ? Math.min(locale, oraServer) : locale)).toISOString();
     }
 
     async function contaInvii(precedente) {
