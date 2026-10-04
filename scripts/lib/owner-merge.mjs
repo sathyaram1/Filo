@@ -174,6 +174,37 @@ function righeDelleParti(r, pratica, num) {
   return righe;
 }
 
+const RIPROPONI = '  Per riproporla serve un commit nuovo, anche vuoto, poi rilancia npm run finish:\n'
+  + '    git commit --allow-empty -m "riproposta"';
+
+/** Il seguito di un blocco: dove sta la richiesta, o perché in Filo non c'è niente da approvare (#486). PURA. */
+function righeDellaRichiesta(r) {
+  if (!r.requestId) {
+    return '  Non sono riuscito a metterla in attesa: nell\'app non comparirà niente da\n'
+      + '  approvare. Riprova, e se non torna vanno rideployate le funzioni di sicurezza.';
+  }
+  const giaDecisa = (perche) => `  NON l'ho messa in attesa: ${perche}\n  In Filo non c'è niente da approvare.\n${RIPROPONI}`;
+  switch (r.requestState) {
+    case 'pending':
+      return '  L\'ho messa IN ATTESA: approvala da Filo, nella dashboard di gestione\n'
+        + '  (l\'avviso in cima ai Ricevuti). Da lì puoi anche scartarla.\n'
+        + '  Se la pagina è già aperta l\'avviso compare da solo, non serve riaprirla.\n'
+        + '  Vale per il commit appena controllato e per 7 giorni: se scade, o se il\n'
+        + '  ramo si muove, rilancia npm run finish.';
+    case 'discarded':
+      return giaDecisa('questa versione era già stata SCARTATA, e una richiesta\n  decisa non si riapre.');
+    case 'used':
+      return giaDecisa(`questa versione era già stata APPROVATA${r.requestOutcome === 'conflict' ? ', e la fusione\n  era finita in conflitto' : ''}. Un'approvazione vale una volta sola.`);
+    case 'decided':
+      return giaDecisa('questa versione era già stata decisa (approvata o\n  scartata), e una richiesta decisa non si riapre.');
+    default:
+      return `  Il server dice di averla messa in attesa, ma non sono riuscito a controllarlo${r.requestCheck ? `\n  (${r.requestCheck})` : ''}.`
+        + ' Se in cima ai Ricevuti della dashboard di gestione l\'avviso\n'
+        + '  non c\'è, questa versione era già stata decisa e non si riapre.\n'
+        + RIPROPONI;
+  }
+}
+
 /**
  * Cosa legge l'owner. PURA. Una riga di esito e, quando serve, la riga che
  * dice cosa fare adesso — mai un motivo tecnico lasciato lì da interpretare.
