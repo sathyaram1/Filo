@@ -223,7 +223,7 @@
       white-space: pre-wrap; overflow-wrap: break-word;
       font-style: italic; user-select: text;
     }
-    /* Nomi carta in prosa [[...]] (§3.5): span hoverable. */
+    /* Nomi carta fuori dalle righe (prosa [[...]] §3.5, commander nell'intestazione): span hoverable. */
     .dk-prose-card {
       color: var(--sn-accent); cursor: default;
       text-decoration: underline dotted; text-underline-offset: 2px;
@@ -260,7 +260,9 @@
       font: inherit; font-size: 13px; line-height: 1; cursor: pointer;
     }
     .dk-add:hover { border-color: var(--sn-accent); color: var(--sn-accent); }
-    .dk-add[data-in="1"] { color: var(--sn-accent); border-color: var(--sn-accent); }
+    .dk-add[data-in="1"], .dk-add[data-in="cmd"] { color: var(--sn-accent); border-color: var(--sn-accent); }
+    /* Il commander nei risultati: già nel mazzo, nell'intestazione; il segno resta, il clic non fa niente. */
+    .dk-add[data-in="cmd"] { cursor: default; }
     /* Barra input in fondo alla colonna: la ricerca È la chat (§3.1). */
     .dk-chat-form { border-top: 1px solid var(--sn-border); padding: 8px; }
     #chatInput {
@@ -351,7 +353,8 @@
       font: inherit; font-size: 13px; padding: 3px 9px; cursor: pointer;
     }
     .dk-car-btn:hover { border-color: var(--sn-accent); color: var(--sn-accent); }
-    #carouselToggle[data-in="1"] { color: var(--sn-accent); border-color: var(--sn-accent); }
+    #carouselToggle[data-in="1"], #carouselToggle[data-in="cmd"] { color: var(--sn-accent); border-color: var(--sn-accent); }
+    #carouselToggle[data-in="cmd"] { cursor: default; }
     .dk-carousel-hint { font-size: 11px; color: var(--sn-muted); margin: 4px 0 0; }
 
     /* Grafici in puro HTML/CSS, niente librerie (PATTERNS.md): la curva è una riga di colonnine flex, i colori

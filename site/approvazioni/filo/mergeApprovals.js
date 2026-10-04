@@ -396,6 +396,34 @@
     return n;
   }
 
+  // Una conferma a metà (tasto armato, o richiesta in volo) blocca ogni ridisegno automatico
+  // di `root`: rifatta sotto il cursore, la card perdeva la conferma e spostava i tasti (#550).
+  var LIBERA = 'sn-mac-libera';
+  function occupata(root) {
+    return !!(root && root.querySelector
+      && root.querySelector('.sn-mac-btn-go.is-armed, .sn-mac-card.is-busy:not(.is-done)'));
+  }
+  // Rimanda `fn` a quando `root` si libera; vale l'ultima chiesta, perché ognuna ridisegna lo stato di quel momento.
+  function quandoLibera(root, fn) {
+    if (!root) return;
+    if (!occupata(root)) { root.__snMacDopo = null; fn(); return; }
+    root.__snMacDopo = fn;
+    if (root.__snMacAscolta) return;
+    root.__snMacAscolta = true;
+    root.addEventListener(LIBERA, function () {
+      Promise.resolve().then(function () {
+        var f = root.__snMacDopo;
+        if (!f || occupata(root)) return;
+        root.__snMacDopo = null;
+        f();
+      });
+    });
+  }
+  function liberata(card) {
+    var Ev = global.CustomEvent;
+    if (typeof Ev === 'function') card.dispatchEvent(new Ev(LIBERA, { bubbles: true }));
+  }
+
   /**
    * Una richiesta = una card.
    *
@@ -504,12 +532,20 @@
       armed = false;
       approveBtn.textContent = 'Approva e fondi';
       approveBtn.classList.remove('is-armed');
+      approveBtn.style.minWidth = '';
       if (armTimer) { clearTimeout(armTimer); armTimer = null; }
+      liberata(card);
     }
     function setBusy(on) {
       approveBtn.disabled = !!on;
       discardBtn.disabled = !!on;
       card.classList.toggle('is-busy', !!on);
+      if (!on) liberata(card);
+    }
+    // Esito definitivo: i tasti restano spenti, ma la rilettura che toglie la card può passare.
+    function finita() {
+      card.classList.add('is-done');
+      liberata(card);
     }
     function say(msg) {
       if (!msg) { status.hidden = true; status.textContent = ''; return; }
@@ -518,10 +554,14 @@
       status.dataset.kind = msg.kind;
     }
 
-    approveBtn.addEventListener('click', function () {
+    approveBtn.addEventListener('click', function (e) {
+      // La coda di un doppio clic (`detail > 1`) non è la conferma: fonderebbe in un gesto solo.
+      if (armed && e && e.detail > 1) return;
       if (!armed) {
-        // Conferma sul posto: un click solo non manda niente su main.
+        // Conferma sul posto: un click solo non manda niente su main. Il secondo
+        // clic cade dove è caduto il primo: il tasto armato non si accorcia, o Scarta gli scivola sotto (#550).
         armed = true;
+        approveBtn.style.minWidth = approveBtn.getBoundingClientRect().width + 'px';
         approveBtn.textContent = 'Confermi?';
         approveBtn.classList.add('is-armed');
         armTimer = setTimeout(disarm, 5000);
@@ -534,7 +574,7 @@
         .then(function (reply) {
           var msg = outcomeMessage(reply, req);
           say(msg);
-          if ((msg.kind === 'ok' || msg.reload) && o.onDone) o.onDone();
+          if ((msg.kind === 'ok' || msg.reload) && o.onDone) { finita(); o.onDone(); }
           else setBusy(false);
         })
         .catch(function (e) {
@@ -549,7 +589,7 @@
       Promise.resolve(o.onDiscard ? o.onDiscard(req) : null)
         .then(function (reply) {
           var msg = outcomeMessage(reply, req);
-          if (msg.kind === 'ok' && o.onDone) { o.onDone(); return; }
+          if (msg.kind === 'ok' && o.onDone) { finita(); o.onDone(); return; }
           say(msg);
           setBusy(false);
         })
@@ -561,8 +601,9 @@
 
     actions.appendChild(discardBtn);
     actions.appendChild(approveBtn);
-    card.appendChild(status);
+    // L'esito sotto i tasti: comparendo sopra li spingeva giù, e il clic per riprovare cadeva fuori.
     card.appendChild(actions);
+    card.appendChild(status);
     // Un tentativo già fatto — e non riuscito — resta scritto sulla card: un
     // avviso che passa lo legge solo chi è davanti allo schermo in quel momento.
     var prima = o.esitoIniziale ? o.esitoIniziale(req) : null;
@@ -645,8 +686,8 @@
         });
     });
     actions.appendChild(okBtn);
-    card.appendChild(status);
     card.appendChild(actions);
+    card.appendChild(status);
     return card;
   }
 
@@ -655,6 +696,11 @@
     var o = opts || {};
     var list = Array.isArray(o.requests) ? o.requests : [];
     var failed = Array.isArray(o.failed) ? o.failed : [];
+    if (occupata(host)) {
+      quandoLibera(host, function () { render(host, o); });
+      return list.length + failed.length;
+    }
+    host.__snMacDopo = null;
     host.replaceChildren();
     host.hidden = list.length === 0 && failed.length === 0;
     if (!list.length && !failed.length) return 0;
@@ -955,6 +1001,8 @@
     outcomeMessage: outcomeMessage,
     richiesteCoperte: richiesteCoperte,
     render: render,
+    occupata: occupata,
+    quandoLibera: quandoLibera,
     renderRecent: renderRecent,
     preapprovedBy: preapprovedBy,
     segnoPreapprovazione: segnoPreapprovazione,

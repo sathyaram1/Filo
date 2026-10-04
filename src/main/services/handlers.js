@@ -2047,6 +2047,15 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         try { const { app } = require('electron'); userAgent = `Filo desktop ${app.getVersion()}`; } catch (_) {}
         try {
           const r = await FB.submit({ text: testo, name: titolo, clientId: 'filo:chat', userAgent });
+          // #986 — scritta da Filo ma confermata dall'utente: è sua, e la ritrova con le altre.
+          if (r && r.id) {
+            try {
+              await globalThis.SN_SEGNALAZIONI_MIE?.registra?.({
+                id: r.id, feedbackId: r.id, testo, titolo, stato: 'inviata',
+                num: FB.formatNum ? FB.formatNum(r.seq, 0) : '',
+              });
+            } catch (_) {}
+          }
           return { executed: !!(r && r.id), kept: false };
         } catch (e) {
           console.warn('[Filo] invio feedback fallito', e?.message || e);

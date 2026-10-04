@@ -50,7 +50,10 @@ cade nel vuoto e la finestra resta com'era. La prova chiede `isMinimized()`; se 
 sistema non l'ha ridotta, finge la sua risposta (`isMinimized` vero ed evento
 `minimize`, poi il contrario) e prova lo stesso cammino del codice. Sostituire la
 riduzione con un'altra uscita dalla vista lascerebbe la riduzione provata solo sul
-Windows dell'owner. Riferimento: `tests/manage-ricevuti-vivi.spec.mjs`.
+Windows dell'owner. Lo fa `riduciAIcona`/`rialza` (`tests/helpers/riduzione.mjs`), e
+nessuno spec chiama `minimize()` da solo: la home (#873) era nata due giorni dopo questa
+regola nascondendo la finestra al posto di ridurla (#810.10). Sentinella:
+`tests/unit/riduzioneNeiTest.test.mjs`.
 
 ## Il contenitore che disegna adagio (#592.11)
 
@@ -103,8 +106,8 @@ Sentinella delle due forme: `tests/unit/cartelleTemporanee.test.mjs`.
 Gli unit girano in parallelo, e spesso più verifiche girano insieme sulla stessa
 macchina. «Due milioni di caratteri in meno di un secondo e mezzo» passava sempre da
 solo e cadeva in quasi ogni corsa completa: a macchina carica la stessa valutazione
-arriva a tre secondi senza che il codice sia cambiato, e un rosso degli unit ferma
-`finish:check` prima degli spec.
+arriva a tre secondi senza che il codice sia cambiato, e un rosso degli unit rende
+rosso `finish:check` (che con `--check` corre lo stesso gli spec, #874.1).
 
 Un tempo non si confronta con millisecondi fissi. Si confronta con un lavoro di
 riferimento misurato accanto, nello stesso processo: il carico rallenta tutti e due e il

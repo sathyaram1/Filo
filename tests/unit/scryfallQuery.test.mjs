@@ -193,7 +193,7 @@ test('isFresh: dentro il TTL sì, oltre no, timestamp rotto no', () => {
 
 const NONE = {
   reply: '', query: '', filter: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '', tagWith: [],
-  import: [], commanderName: '', clearChat: false,
+  import: [], commanderName: '', replaceCommander: false, clearChat: false,
 };
 
 test('parseAgentReply: JSON pulito → campi normalizzati', () => {
@@ -273,6 +273,14 @@ test('parseAgentReply: commander — stringa non vuota si accetta, tipi sbagliat
   assert.equal(Q.parseAgentReply('{"commander":" Niv-Mizzet, Parun "}').commanderName, 'Niv-Mizzet, Parun');
   assert.equal(Q.parseAgentReply('{"commander":42}').commanderName, '');
   assert.equal(Q.parseAgentReply('{}').commanderName, '');
+});
+
+test('parseAgentReply: replaceCommander vale solo se è true ed è accompagnato dal nome (#789)', () => {
+  assert.equal(Q.parseAgentReply('{"commander":"Atraxa, Praetors\' Voice","replaceCommander":true}').replaceCommander, true);
+  assert.equal(Q.parseAgentReply('{"commander":"Atraxa, Praetors\' Voice"}').replaceCommander, false, 'una menzione non sostituisce');
+  assert.equal(Q.parseAgentReply('{"commander":"Atraxa","replaceCommander":"true"}').replaceCommander, false);
+  assert.equal(Q.parseAgentReply('{"replaceCommander":true}').replaceCommander, false, 'senza nome non c\'è niente da mettere');
+  assert.equal(Q.parseAgentReply('{"commander":"  ","replaceCommander":true}').replaceCommander, false);
 });
 
 // ── proseSegments ([[Nome Carta]] §3.5) ──────────────────────────────────────

@@ -222,36 +222,41 @@ module.exports = function register(on, ctx) {
       let reply = parsed.reply;
       let deckOut = null;
 
-      // Imposta il commander AUTOMATICAMENTE (feedback #337). Quando l'utente
-      // vuole costruire attorno a un commander preciso, o dichiara qual è il
-      // commander di QUESTO mazzo (es. "facciamo un mazzo con Krenko", "il mio
-      // commander è Atraxa"), l'agente torna "commander" SENZA una lista da
-      // importare. Filo lo imposta subito e — se nello stesso turno c'è anche una
-      // ricerca — la filtra sui colori del commander appena scelto: senza questo,
-      // la ricerca partirebbe con "(nessun vincolo)" e proporrebbe carte fuori
-      // colore, cioè l'esatto attrito segnalato. NON tocca un commander già
-      // impostato (serve un'azione esplicita/dedicata, §8.4) e resta reversibile
-      // ("Rimuovi commander", feedback #302). L'import di una lista incollata
-      // (parsed.import) è il ramo SEPARATO più sotto, dove il commander è invece
-      // un CANDIDATO da confermare insieme alle carte, mai scritto in automatico.
-      let commanderJustSet = false;
-      if (parsed.commanderName && !parsed.import.length && !deck.commander) {
-        const found = await Scry.named(parsed.commanderName).catch(() => null);
-        if (found) {
-          const saved = await Store.put(Decks.setCommander(deck, found.id, {
-            name: found.name, colors: found.colorIdentity, artCrop: found.artCrop,
-          }));
-          if (saved) {
-            deckOut = saved;
-            identityColors = (saved.commanderMeta && Array.isArray(saved.commanderMeta.colors))
-              ? saved.commanderMeta.colors : identityColors;
-            commanderJustSet = true;
-            reply = [reply, `Ho impostato ${found.name} come commander: le ricerche ora restano nei suoi colori.`]
+      // Commander a parole (#337, #789): su un mazzo senza commander basta il nome (build-around); uno già impostato
+      // cambia solo col segnale esplicito di sostituzione, e il vecchio rientra nel mazzo. Va PRIMA della ricerca,
+      // che così resta nei colori del commander appena scelto. La sostituzione esplicita vale anche accanto a una
+      // lista incollata; senza segnale il commander della lista è solo un candidato dell'import, sotto.
+      if (parsed.commanderName && (!parsed.import.length || parsed.replaceCommander)) {
+        // Riletto adesso: mentre il modello rispondeva l'utente può aver cambiato il mazzo da un'altra strada.
+        const base = (await Store.get(deck.id)) || deck;
+        if (base.commander && !parsed.replaceCommander) {
+          const same = String(parsed.commanderName).toLowerCase() === String((base.commanderMeta && base.commanderMeta.name) || '').toLowerCase();
+          if (!same) {
+            reply = [reply, `Il commander resta [[${base.commanderMeta && base.commanderMeta.name ? base.commanderMeta.name : parsed.commanderName}]]. Per cambiarlo chiedimi di sostituirlo, o usa «Imposta come commander» col tasto destro su una carta.`]
               .filter(Boolean).join('\n');
           }
         } else {
-          reply = [reply, `Non ho trovato su Scryfall il commander «${parsed.commanderName}», quindi non l'ho impostato.`]
-            .filter(Boolean).join('\n');
+          const found = await Scry.named(parsed.commanderName).catch(() => null);
+          if (!found) {
+            reply = [reply, `Non ho trovato su Scryfall il commander «${parsed.commanderName}», quindi non l'ho ${base.commander ? 'cambiato' : 'impostato'}.`]
+              .filter(Boolean).join('\n');
+          } else if (found.id === base.commander) {
+            reply = [reply, `[[${found.name}]] è già il commander di questo mazzo.`].filter(Boolean).join('\n');
+          } else {
+            const swap = Decks.replaceCommander(base, found.id, {
+              name: found.name, colors: found.colorIdentity, artCrop: found.artCrop,
+            });
+            const saved = await Store.put(swap.deck);
+            if (saved) {
+              deckOut = saved;
+              identityColors = (saved.commanderMeta && Array.isArray(saved.commanderMeta.colors))
+                ? saved.commanderMeta.colors : identityColors;
+              reply = [reply, swap.previousId
+                ? `Ora il commander è [[${found.name}]] e le ricerche restano nei suoi colori. ${swap.previousName ? `[[${swap.previousName}]]` : 'Quello di prima'} torna nel mazzo come carta normale.`
+                : `Ho impostato [[${found.name}]] come commander: le ricerche ora restano nei suoi colori.`]
+                .filter(Boolean).join('\n');
+            }
+          }
         }
       }
       if (parsed.query) {
@@ -420,9 +425,9 @@ module.exports = function register(on, ctx) {
       // conferma della ricerca: l'aggiunta al mazzo resta un'azione esplicita
       // dell'utente (toggle riga o "Aggiungi tutte"), mai automatica.
       let importPending = null;
-      // `commanderJustSet` esclude il commander già consumato sopra (build-around):
-      // qui resta solo il commander-CANDIDATO dell'import di una lista incollata.
-      const importCommanderName = commanderJustSet ? '' : parsed.commanderName;
+      // Il commander senza lista o sostituito su richiesta l'ha già gestito il ramo sopra: qui resta solo il CANDIDATO
+      // di una lista incollata.
+      const importCommanderName = parsed.import.length && !parsed.replaceCommander ? parsed.commanderName : '';
       if (parsed.import.length || importCommanderName) {
         const qtyById = {};
         const notFound = [];
@@ -443,7 +448,15 @@ module.exports = function register(on, ctx) {
         }
         importPending = { qtyById, commanderId };
         const n = cardIds.length;
+        // Il commander della lista non scavalca quello del mazzo (lo cambia solo un'azione dedicata), ma va detto:
+        // come nell'import dal selettore, una scelta dell'utente non sparisce in silenzio.
+        const onDeck = deckOut || deck;
+        const keptName = onDeck.commanderMeta && onDeck.commanderMeta.name;
+        const kept = commanderId && onDeck.commander && commanderId !== onDeck.commander
+          ? `La lista indica [[${cards[commanderId].name}]] come commander, ma il mazzo ha già ${keptName ? `[[${keptName}]]` : 'il suo'}: resta quello. Per cambiarlo, tasto destro su [[${cards[commanderId].name}]] → «Imposta come commander».`
+          : '';
         reply = [reply, n ? `Ho riconosciuto ${n} cart${n === 1 ? 'a' : 'e'}: conferma qui sotto quali aggiungere.` : '',
+          kept,
           notFound.length ? `Non ho trovato su Scryfall: ${notFound.join(', ')}.` : '']
           .filter(Boolean).join('\n');
       }
@@ -452,7 +465,7 @@ module.exports = function register(on, ctx) {
       // SISTEMA (mai fidarsi che il modello "abbia già fatto"). Il mazzo
       // aggiornato torna alla pagina, che rinfresca header e statistiche.
       if (parsed.hasBudget) {
-        const saved = await Store.put(Decks.setBudget(deck, parsed.budget));
+        const saved = await Store.put(Decks.setBudget(deckOut || (await Store.get(deck.id)) || deck, parsed.budget));
         if (saved) {
           deckOut = saved;
           reply = [reply, parsed.budget === null
@@ -544,32 +557,27 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // Imposta il commander (§8.4): risolve la carta, scrive id + meta di
-  // presentazione (nome, color identity, art crop) e incrementa la versione.
-  // La legalità (banned/non leggendaria) NON blocca qui: è una riga delle
-  // statistiche (§9.1), non un divieto d'inserimento.
+  // Imposta, cambia o toglie (scryfallId vuoto, #302) il commander (§8.4) con la regola unica di
+  // Decks.replaceCommander: `previous` dice alla pagina quale carta è rientrata nel mazzo. La legalità non blocca
+  // qui: è una riga delle statistiche (§9.1).
   on(MSG.DECKS_SET_COMMANDER, async (msg) => {
     const deck = await Store.get(String(msg?.id || ''));
     if (!deck) return { ok: false, error: 'not_found' };
     try {
-      // scryfallId vuoto = RIMUOVI il commander (torna a "nessun commander").
-      // È l'inverso di "imposta come commander": senza questo ramo un mazzo
-      // resterebbe bloccato col commander impostato per sbaglio (feedback #302).
       const wantId = String(msg?.scryfallId || '').trim();
-      if (!wantId) {
-        const cleared = Decks.setCommander(deck, '', null);
-        const saved = await Store.put(cleared);
-        return saved ? { ok: true, deck: saved } : { ok: false, error: 'save_failed' };
+      let card = null;
+      if (wantId) {
+        card = await Scry.card(wantId);
+        if (!card) return { ok: false, error: 'card_not_found' };
       }
-      const card = await Scry.card(wantId);
-      if (!card) return { ok: false, error: 'card_not_found' };
-      const next = Decks.setCommander(deck, card.id, {
-        name: card.name,
-        colors: card.colorIdentity,
-        artCrop: card.artCrop,
-      });
-      const saved = await Store.put(next);
-      return saved ? { ok: true, deck: saved } : { ok: false, error: 'save_failed' };
+      const swap = Decks.replaceCommander(deck, card ? card.id : '', card
+        ? { name: card.name, colors: card.colorIdentity, artCrop: card.artCrop } : null);
+      const saved = swap.deck === deck ? deck : await Store.put(swap.deck);
+      if (!saved) return { ok: false, error: 'save_failed' };
+      return {
+        ok: true, deck: saved,
+        ...(swap.previousId ? { previous: { id: swap.previousId, name: swap.previousName } } : {}),
+      };
     } catch (e) {
       return { ok: false, error: e?.message || 'set commander fallito' };
     }

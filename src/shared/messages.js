@@ -162,6 +162,13 @@
     // non ha creato lui (ramo admin delle regole), quindi quel passo resta al
     // triage. { id, text } → { ok, feedbackId, balance } | { ok:false, error }.
     BOARD_REOPEN: 'board_reopen',
+    // #986 — la copia locale delle segnalazioni mandate da questo computer. Testi scritti dall'utente: solo dalle
+    // superfici di Filo (soloFilo), mai da un sito. {} → { ok, voci } (in incognito { ok, voci: [], incognito: true })
+    SEGNALAZIONI_MIE_LIST: 'segnalazioni_mie_list',
+    // { id } → { ok, voci }: la voce esce dall'elenco e dal disco; la segnalazione mandata resta dov'è.
+    SEGNALAZIONI_MIE_TOGLI: 'segnalazioni_mie_togli',
+    // Segnale BROADCAST main→pagine filo:// (mai incognito): l'elenco è cambiato. Senza dati: si rilegge con LIST.
+    SEGNALAZIONI_MIE_CAMBIATE: 'segnalazioni_mie_cambiate',
     // Broadcast main→renderer: l'utente corrente ha ricevuto crediti in regalo
     // (#210.4). { amount } → la home mostra un popup una volta sola.
     GIFT_NOTICE: 'gift_notice',
