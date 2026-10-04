@@ -113,7 +113,8 @@ Un chiarimento su cosa dimostra una tabella verde: dieci modelli che non trovano
 3. **La catena ha un anello dichiaratamente debole.** L'installer non è firmato con un certificato, e dentro l'eseguibile entrano chiavi che non stanno nel codice pubblico. Il controllo descritto sopra copre il codice e la costruzione, e il passaggio fino al tuo disco solo se lo fai a mano.
 4. **Le difese che imparano non imparano ancora.** L'archivio degli attacchi si riempie ma nessun giudice ci si allena, l'arresto automatico non c'è e il red team è in pausa. Oggi il sistema si difende con i cinque livelli e con il mio interruttore.
 5. **Chi scrive il codice e chi lo controlla sono entrambi LLM.** Li tengo decorrelati (modelli diversi, ruoli separati, nessuno approva sé stesso), ma una classe di errori condivisa da tutti i modelli di una generazione passerebbe. È una versione nuova di un problema vecchio: anche i revisori umani condividono i punti ciechi della loro epoca.
-6. **Il codice del server non è pubblico.** Quello che dico del server, dai giudici al cancello che fonde il codice, va preso sulla parola: è il prezzo di tenere nascosto il bersaglio.
+6. **Due strade saltano il mio clic.** Il lavoro locale e il segno «fondi senza chiedermelo» portano su main modifiche alle aree sensibili senza la mia approvazione nell'app, e si comandano anche dal terminale, dove un LLM ha le mie credenziali. Quello che saltano resta registrato, ma lo leggo dopo la fusione, non prima.
+7. **Il codice del server non è pubblico.** Quello che dico del server, dai giudici al cancello che fonde il codice, va preso sulla parola: è il prezzo di tenere nascosto il bersaglio.
 
 ---
 
