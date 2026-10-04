@@ -102,6 +102,7 @@
   const X = 13; // il filo corre al centro dello spazio a sinistra del blocco
   const RIGA = 12; // metà della prima riga di una sezione: lì sta il nodo
   const R_NODO = 3.4;
+  const ARIA_GOMITOLO = 8; // px fra il bordo del gomitolo e il riassunto, quanti ne ha un gomitolo piccolo
   const SVG = 'http://www.w3.org/2000/svg';
   const facile = (t) => (t < 0.5 ? 4 * t * t * t : 1 - ((-2 * t + 2) ** 3) / 2);
   const lerp = (a, b, t) => a + (b - a) * t;
