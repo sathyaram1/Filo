@@ -133,12 +133,24 @@
     try { global.SN_BROADCAST_FILO && global.SN_BROADCAST_FILO((ambito) => (ambito ? null : { type: tipo })); } catch (_) {}
   }
 
+  /** Le voci che una segnalazione nuova rimanda: le «non partita» con lo stesso testo. PURA. */
+  function rimandate(voci, nuova) {
+    const testo = String((nuova && nuova.testo) || '').trim();
+    if (!testo) return [];
+    return (Array.isArray(voci) ? voci : [])
+      .filter((x) => x && x.id !== nuova.id && x.stato === 'non_partita' && String(x.testo || '').trim() === testo)
+      .map((x) => x.id);
+  }
+
   /** Scrive una segnalazione appena mandata. Dall'incognito non scrive niente. */
   async function registra(dati) {
     if (Disco.inIncognito()) return null;
     const v = voce(dati);
     if (!v.id) return null;
-    const r = (await apri()).aggiungi(v);
+    const d = await apri();
+    const r = d.aggiungi(v);
+    // Una «non partita» rimandata, da «Rimanda» o riscritta a mano, lascia il posto a quella partita (#986).
+    if (r) d.togli(rimandate(d.tutti(), v));
     if (r) annuncia();
     return r;
   }
