@@ -2637,8 +2637,8 @@ function impostazioniLetteForPrompt(actions) {
     const cerca = o.cerca ? E.neutralizza(o.cerca, { unaRiga: true }) : '';
     const testa = !cerca ? 'tutte le voci'
       : (o.trovate ? `le voci che c'entrano con «${cerca}»` : `nessuna voce c'entra con «${cerca}», quindi tutte`);
-    blocchi.push(`[Impostazioni di Filo lette adesso (${testa}): sono i valori veri, rispondi con questi. `
-      + 'Per cambiarne una usa la chiave fra parentesi quadre.]\n'
+    blocchi.push(`[Impostazioni di Filo lette con LEGGI_IMPOSTAZIONI (${testa}): sono i valori veri di quel momento, `
+      + 'rispondi con questi; se nel frattempo ne hai cambiata una, rileggila. Per cambiarne una usa la chiave fra parentesi quadre.]\n'
       + E.imbusta({ tipo: 'TESTO_SALVATO', conIntestazione: true, testo: o.righe.map((r) => E.neutralizza(r, { unaRiga: true })).join('\n') }));
   }
   return blocchi.join('\n\n').trim();
