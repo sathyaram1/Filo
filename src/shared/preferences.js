@@ -376,8 +376,12 @@
       keys: ['ore_inattivita', 'ore inattivita', 'ore di inattivita', 'ore_inattivita_archivio', 'idlehours', 'ore inattività'],
       build(v) {
         // Con la virgola: «1,5» è un'ora e mezza, non 15. La pagina tiene ore intere.
-        let n = parseItalianNumber(v);
+        // L'unità detta conta: «2 giorni» sono 48 ore, non 2; senza cifra «una settimana» è una.
+        const s = String(v == null ? '' : v).trim().toLowerCase();
+        const per = /settiman/.test(s) ? 168 : /giorn|giornat/.test(s) ? 24 : /\bmin/.test(s) ? 1 / 60 : 1;
+        let n = /\d/.test(s) ? parseItalianNumber(s) : (/mezz/.test(s) ? 0.5 : (per !== 1 || /\bor[ae]\b/.test(s) ? 1 : NaN));
         if (!Number.isFinite(n)) return null;
+        n *= per;
         if (n <= 0) return { rifiuto: `le ore di inattività vanno da 1 a 168, e ${String(v).trim()} è fuori` };
         n = Math.min(168, Math.max(1, Math.round(n)));
         return { partial: { autoArchive: { idleHours: n } }, label: `Archivia dopo ${n} ${n === 1 ? 'ora' : 'ore'} di inattività` };
