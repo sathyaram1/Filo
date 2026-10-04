@@ -501,8 +501,10 @@ test('con batteria, rete, Bluetooth e volume nascoste la home non sveglia il let
 test('con la colonna destra più alta della finestra ora e batteria restano dentro la finestra', async ({ app }) => {
   await finto(app, PIENO);
   // Gli avvisi stanno nella colonna sinistra (#870): a destra la colonna si allunga solo se la finestra è bassa.
-  await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0].setSize(1280, 520); });
+  // Prima la home: appena lanciata l'app la finestra può non esserci ancora, e il ridimensionamento cadrebbe nel vuoto.
   const page = await newtab(app);
+  await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0].setSize(1280, 520); });
+  await expect.poll(() => page.evaluate(() => window.innerHeight)).toBeLessThan(520);
   await expect(voce(page, 'batteria')).toHaveText('42%', { timeout: 8_000 });
   const dentro = () => page.evaluate(() => {
     const r = document.querySelector('#sistema .dash-sis-voce[data-voce="batteria"]').getBoundingClientRect();
