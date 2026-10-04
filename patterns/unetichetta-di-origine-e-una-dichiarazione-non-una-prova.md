@@ -60,7 +60,11 @@ Filo, i nomi no.
 riquadro «Spiega immagine» compare su quattro rami del menu del tasto destro
 (immagine cliccata, immagine dentro un link, sotto un velo, sotto un velo dentro
 un link): il controllo sta dentro il riquadro, non dentro i rami, e gira sugli
-stessi byte che la descrizione ha già scaricato — mai un secondo download. Nell'Aiuto della pagina si leggono le immagini che l'utente ha davanti, dalle
+stessi byte che la descrizione ha già scaricato — mai un secondo download. Le foto
+dei siti veri stanno quasi sempre su un altro dominio, che lo script della pagina
+non può leggere: quei byte li scarica il main, come «Salva immagine come…»
+(#946; prima descrizione e origine tacevano proprio sui siti veri, e le prove
+servite dallo stesso host non se ne accorgevano). Nell'Aiuto della pagina si leggono le immagini che l'utente ha davanti, dalle
 più grandi, a ogni sua domanda. In
 chat lo stesso controllo si fa su **ogni** immagine allegata, senza provare a
 indovinare se l'utente stava chiedendo proprio quello: capirlo dall'intento
