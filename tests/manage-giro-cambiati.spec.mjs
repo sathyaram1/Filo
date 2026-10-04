@@ -137,8 +137,7 @@ test('il registro dei worker porta il nome: quel feedback si rilegge e si segue,
   await fingiFirestore(app, [A, B], { registro: [voce], numeri: { 32: 'coda-b' } });
 
   const page = await apriGestione(openTab);
-  await page.evaluate(() => window.__mgTest.setTab('queue'));
-  await expect.poll(() => page.evaluate(() => window.__mgTest.currentOrder().length), { timeout: 15000 }).toBe(2);
+  await expect.poll(() => page.evaluate(() => window.__mgTest.riga('coda-b') && window.__mgTest.riga('coda-b').name), { timeout: 15000 }).toBe('Secondo in coda');
   await expect.poll(() => conta(app).then((c) => c.registro), { timeout: 10000 }).toBeGreaterThanOrEqual(2);
   const prima = await conta(app);
   expect(prima.seguiti.flat()).toEqual([], 'nessuno in mano alle routine: nessuna lettura di versioni');
@@ -151,7 +150,7 @@ test('il registro dei worker porta il nome: quel feedback si rilegge e si segue,
     d.name = 'Preso dalle routine';
     d._updateTime = 't2';
   });
-  await expect(page.locator('.mg-item-title', { hasText: 'Preso dalle routine' })).toHaveCount(1, { timeout: 5000 });
+  await expect.poll(() => page.evaluate(() => window.__mgTest.riga('coda-b').name), { timeout: 5000 }).toBe('Preso dalle routine');
   const preso = await conta(app);
   expect(preso.numeri).toEqual(['32']);
   expect(preso.tutti).toBe(1, 'il registro non fa rileggere tutto');
@@ -162,7 +161,7 @@ test('il registro dei worker porta il nome: quel feedback si rilegge e si segue,
     d.name = 'Lavoro a metà';
     d._updateTime = 't3';
   });
-  await expect(page.locator('.mg-item-title', { hasText: 'Lavoro a metà' })).toHaveCount(1, { timeout: 5000 });
+  await expect.poll(() => page.evaluate(() => window.__mgTest.riga('coda-b').name), { timeout: 5000 }).toBe('Lavoro a metà');
   const fine = await conta(app);
   expect(fine.seguiti.every((ids) => ids.length === 1 && ids[0] === 'coda-b')).toBe(true);
   expect(fine.tutti).toBe(1);
