@@ -1642,7 +1642,7 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         : (action._tipo === 'sito' ? 'non è un sito valido' : 'manca il mittente (un indirizzo email) o il sito');
       return { executed: false, kept: false, output: { error } };
     }
-    if (type === 'SEGNA_FIDATO' && action._tipo === 'sito') {
+    if (type === 'SEGNA_FIDATO' && action._tipo === 'sito' && !confirmed) {
       let segnali = null;
       try { segnali = await Schede.segnaliSito(winOf(sender), action._voce); } catch (_) {}
       action._sconsiglio = F.sconsiglio(action._voce, segnali);
