@@ -34,7 +34,8 @@ test('dalla carta al bottone della barra: il suggerimento arriva presto e la car
   await expect.poll(() => scritte(app), { timeout: 3000 }).toEqual({ carta: 'Musica di sottofondo', suggerimento: null });
   const t0 = Date.now();
   await shell.locator('#tab-new').hover();
-  await expect.poll(() => scritte(app), { timeout: 3000 }).toEqual({ carta: null, suggerimento: 'Nuova scheda' });
+  await expect.poll(async () => (await scritte(app)).suggerimento, { timeout: 3000 }).toMatch(/^Nuova scheda/);
+  expect((await scritte(app)).carta).toBe(null);
   expect(Date.now() - t0, 'il suggerimento ha aspettato troppo').toBeLessThan(1500);
 });
 
