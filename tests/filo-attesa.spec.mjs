@@ -247,11 +247,11 @@ test('B — un passo che non riesce: il cappio si stringe e si riapre, il puntin
   await blocco.locator('.dash-activity-head').click();
   const testa = blocco.locator('.dash-activity-seg-head').first();
   await expect(testa).toContainText('Documento non letto');
-  // Il puntino non c'è (raggio zero) e il cappio resta aperto sul filo.
-  await page.waitForTimeout(800);
+  // Il puntino non c'è (raggio zero) e il cappio resta aperto sul filo, a srotolamento finito.
+  await expect(blocco).toHaveAttribute('data-filo', 'srotolato');
+  await expect.poll(() => blocco.locator('.dash-activity-filo-tratto').evaluate((p) => p.getBBox().width), { timeout: 4_000 })
+    .toBeGreaterThan(7);
   expect(Number(await blocco.locator('.dash-activity-nodo').getAttribute('r'))).toBe(0);
-  const forma = await blocco.locator('.dash-activity-filo-tratto').evaluate((p) => p.getBBox().width);
-  expect(forma).toBeGreaterThan(7);
   await page.screenshot({ path: 'tests/.shots/filo-attesa-cappio-aperto.png' });
   await ripristina(app);
 });
