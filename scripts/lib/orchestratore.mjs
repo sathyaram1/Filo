@@ -51,6 +51,14 @@ export function attesaLimite(testo, adessoMs, opz = OPZIONI_BASE) {
   return opz.pausaLimiteMs;
 }
 
+/** I rilievi di una correzione in sospeso sul ramo, '' se non ce n'è una. PURA. */
+export function rilieviSospesi(v) {
+  const e = (v && v.entry) || {};
+  if (e.verdict !== 'fix-pending') return '';
+  const f = e.pending && Array.isArray(e.pending.findings) ? e.pending.findings : [];
+  return f.length ? ROUND.formatFindings(f) : '(i rilievi li ristampa node scripts/verify-local.mjs status)';
+}
+
 /** Le ultime righe di un'uscita, per il motivo di una fermata. PURA. */
 export function coda(testo, righe = 12) {
   return String(testo || '').trim().split('\n').slice(-righe).join('\n');
@@ -257,6 +265,8 @@ export function riprendi(p, risposta) {
   const r = String(risposta || '').trim();
   const f = p.fermo || {};
   // Si riparte dal passo che si era fermato: una fusione in attesa d'approvazione non rifà la verifica (l'approvazione vale per quel commit).
+  // Una risposta data lì vale solo se l'approvazione non c'è: la chiusura prova prima a fondere.
+  if (f.attesaApprovazione) { q.fase = 'chiusura'; q.risposta = r; return q; }
   if (q.fusa && (q.fusa.app || q.fusa.server)) { q.fase = 'chiusura'; return q; }
   if (f.dove === 'chiusura' && !r) { q.fase = 'chiusura'; return q; }
   if (f.correzione) { q.compito = 'correzione'; q.risposta = r; q.fase = 'lavoro'; return q; }
@@ -352,7 +362,10 @@ export function creaMotore(dep, opzioni = {}) {
   async function lavora(p) {
     const wtApp = P.wt(p.slug);
     const fp = p.fermoPrima || {};
-    const crit = ['decisione', 'correzione'].includes(p.compito) ? (fp.correzione || fp.domanda || fp.motivo || '') : '';
+    // Il compito lo decide lo stato del ramo, non chi stava girando quando il lavoro si è fermato.
+    const sospesi = p.compito === 'riallinea' ? '' : rilieviSospesi(dep.verifica(wtApp));
+    if (sospesi) p.compito = 'correzione';
+    const crit = sospesi || (['decisione', 'correzione'].includes(p.compito) ? (fp.correzione || fp.domanda || fp.motivo || '') : '');
     dep.log(`#${p.num} lavoratore (${p.compito})`);
     const r = await istanza(p, 'lavoratore', promptLavoratore({ p, regole: P.regole, wtApp, wtServer: wtServerSeC(p), cartellaNote: P.note, crit }), `filo #${p.num} lavoratore`);
     if (!r.ok) return ferma(p, `il lavoratore non ha finito: ${primaRiga(r.errore)}`);
@@ -396,6 +409,8 @@ export function creaMotore(dep, opzioni = {}) {
   async function giro(p) {
     if (p.giri >= opz.tetto) return ferma(p, `tetto dei giri raggiunto (${opz.tetto}) senza un esito superato`);
     const wt = P.wt(p.slug);
+    // verify-local start rifiuta un ramo con una correzione in sospeso: prima la si consegna.
+    if (rilieviSospesi(dep.verifica(wt))) { p.compito = 'correzione'; p.fase = 'lavoro'; return 'ok'; }
     if ((await preStart(p, wt)) === 'riallinea') return riallinea(p, 'il merge di origin/main va in conflitto');
     const primo = !((dep.verifica(wt) || {}).entry || {}).request;
     const args = ['scripts/verify-local.mjs', 'start', ...(primo ? [richiestaArg(p.richiesta), '--feedback', String(p.num)] : [])];
@@ -443,7 +458,13 @@ export function creaMotore(dep, opzioni = {}) {
       const k = classificaFinish(r);
       if (k === 'fuso') return 'ok';
       if (k === 'conflitto') return riallinea(p, 'finish trova un conflitto con main');
-      if (k === 'attesa-owner') return ferma(p, 'la fusione aspetta la tua approvazione in Filo (Gestione → Automazioni)');
+      if (k === 'attesa-owner' && p.risposta) {
+        dep.log(`#${p.num} fusione non approvata: applico la tua risposta`);
+        p.compito = 'decisione';
+        p.fase = 'lavoro';
+        return 'ok';
+      }
+      if (k === 'attesa-owner') return ferma(p, 'la fusione aspetta la tua approvazione in Filo (Gestione → Automazioni), poi npm run orchestra -- riprendi', '', { attesaApprovazione: true });
       if ((k === 'superato' || k === 'transitorio') && t < opz.ritenta) {
         dep.log(`#${p.num} finish: ${k}, riprovo`);
         await dep.dormi(opz.pausaMs);
@@ -504,6 +525,7 @@ export function creaMotore(dep, opzioni = {}) {
     if (!opz.tieniWorktree) await pulisci(p);
     p.fase = 'fuso';
     p.fermo = null;
+    p.risposta = '';
     dep.log(`#${p.num} fuso`);
     return 'ok';
   }

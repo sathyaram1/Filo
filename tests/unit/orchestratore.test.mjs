@@ -227,6 +227,49 @@ test('fusione in attesa dell’approvazione e ripresa: rilancia finish, niente v
   assert.equal(volte, 2);
 });
 
+test('correzione interrotta (tetto di spesa) e ripresa, con o senza risposta: riparte la correzione coi rilievi, mai uno start rifiutato', async () => {
+  const errori = [];
+  const b = banco({ verdetti: ['fix-pending'], server: false, errori });
+  let p = (await b.motore.avvia()).pratiche[7];
+  errori.push('error_max_budget_usd');
+  b.stato.pratiche[7] = riprendi(p, '');
+  p = (await b.motore.avvia()).pratiche[7];
+  assert.equal(p.fase, 'fermo');
+  assert.match(p.fermo.motivo, /il lavoratore non ha finito/);
+  for (const risposta of ['', 'riprova pure']) {
+    const prima = b.prompt.length;
+    const start = b.righe().filter((x) => /verify-local\.mjs start/.test(x)).length;
+    b.stato.pratiche[7] = riprendi(p, risposta);
+    p = (await b.motore.avvia()).pratiche[7];
+    const nuovi = b.prompt.slice(prima);
+    assert.equal(nuovi[0].ruolo, 'lavoratore', risposta);
+    assert.match(nuovi[0].testo, /- \[2i\] manca Y/);
+    assert.match(nuovi[0].testo, /verify-local\.mjs corretto/);
+    if (risposta) assert.match(nuovi[0].testo, /riprova pure/);
+    assert.equal(b.righe().filter((x) => /verify-local\.mjs start/.test(x)).length, start);
+    assert.match(p.fermo.motivo, /correzione non è stata consegnata/);
+  }
+});
+
+test('fusione in attesa dell’approvazione ripresa con un testo: con l’approvazione fonde, senza applica il testo', async () => {
+  for (const approvata of [true, false]) {
+    let volte = 0;
+    const b = banco({ server: false, risposte: [[/finish-local/, () => { volte += 1; return volte === 1 || !approvata ? { code: 10, out: 'bloccata' } : { code: 0, out: 'fuso' }; }]] });
+    let p = (await b.motore.avvia()).pratiche[7];
+    const prima = b.prompt.length;
+    b.stato.pratiche[7] = riprendi(p, 'approvata, ma rinomina il comando');
+    p = (await b.motore.avvia()).pratiche[7];
+    const nuovi = b.prompt.slice(prima);
+    if (approvata) {
+      assert.equal(p.fase, 'fuso');
+      assert.deepEqual(nuovi, []);
+    } else {
+      assert.equal(nuovi[0].ruolo, 'lavoratore');
+      assert.match(nuovi[0].testo, /rinomina il comando/);
+    }
+  }
+});
+
 test('una fermata qualunque ripresa con una risposta: il lavoratore legge il motivo', async () => {
   const b = banco({ verdetti: ['nulla', 'nulla'], server: false });
   const p = (await b.motore.avvia()).pratiche[7];
