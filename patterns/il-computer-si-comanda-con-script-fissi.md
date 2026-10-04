@@ -55,7 +55,10 @@ della chat stessa) chiede conferma quando lo decide il modello; il tasto è già
 gesto dell'utente. Il livello legge `_richiestaSistema`, scritta dal main con la
 stessa funzione che poi esegue: quello che si conferma è quello che parte. I
 comandi vanno uno alla volta (una coda), e quello che cambiano si vede subito
-nella home (`dopoComando`), poi la lettura vera lo conferma.
+nella home (`dopoComando`), poi la lettura vera lo conferma. Leggere un elenco
+(reti, dispositivi) non fa quella coda: un riquadro aperto non deve far aspettare
+il gesto dopo, e due letture uguali in volo sono una sola, finché non finisce un
+comando che può aver cambiato l'elenco.
 
 ## I permessi: una frase e il posto dove si concede
 
