@@ -490,7 +490,7 @@ describe('quale ramo NON si spedisce mai', () => {
 // Un rosso d'ambiente (rosso anche su main su questa macchina) spacciato per
 // regressione blocca la pubblicazione di un lavoro sano: l'elenco tracciato
 // dice quali sono, e il cancello li separa da quelli che devono essere verdi.
-import { splitKnownRed, esitoVerificaPerCheck, specDaRilanciare } from '../../scripts/finish-local.mjs';
+import { splitKnownRed, esitoVerificaPerCheck, specDaRilanciare, esitoUnitPerCheck } from '../../scripts/finish-local.mjs';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 // `--check` promette solo i controlli: chi verifica lo lancia al posto della
@@ -531,6 +531,31 @@ test('senza verifica superata, o con --check, gli spec si rifanno come sempre', 
   // sua, ancora senza esito, e deve fare i controlli davvero.
   assert.deepEqual(specDaRilanciare({ checkOnly: true, ok: true, sha: 'a'.repeat(40) }), { rilancia: true, nota: '' });
   assert.deepEqual(specDaRilanciare({ checkOnly: true, ok: false }), { rilancia: true, nota: '' });
+});
+
+// Chi verifica lancia `--check` per avere gli spec delle aree: un unit rosso, anche uno rosso uguale su main, li
+// saltava tutti e il controllo finiva prima di correrli (#874.1).
+test('--check: un unit rosso non salta gli spec delle aree, e l\'esito finale resta rosso', () => {
+  const check = esitoUnitPerCheck({ checkOnly: true });
+  assert.equal(check.ferma, false);
+  assert.match(check.messaggio, /spec delle aree/);
+  assert.match(check.messaggio, /rosso/);
+  const finish = esitoUnitPerCheck({ checkOnly: false });
+  assert.equal(finish.ferma, true, 'senza --check non si pubblica e non si paga il resto');
+  assert.match(finish.messaggio, /non pubblico/);
+
+  const codice = SORGENTE.split('\n').filter((r) => !/^\s*\/\//.test(r)).join('\n');
+  const unit = codice.indexOf("run('npm', ['run', 'test:unit']");
+  const spec = codice.indexOf('runSpecsALotti(blocking');
+  assert.ok(unit > 0 && spec > unit, 'gli spec delle aree vengono dopo gli unit');
+  const fraIDue = codice.slice(unit, spec);
+  assert.match(fraIDue, /esitoUnitPerCheck\(\{ checkOnly \}\)/);
+  assert.doesNotMatch(fraIDue.replace(/if \(esito\.ferma\) process\.exit\(1\);/, ''), /process\.exit\(/,
+    'fra unit e spec l\'unica uscita è quella senza --check');
+  const fineRossa = codice.indexOf('if (unitRossi)', spec);
+  const verde = codice.indexOf('Controlli passati (--check');
+  assert.ok(fineRossa > spec && fineRossa < verde, 'un unit rosso non arriva mai a «Controlli passati»');
+  assert.match(codice.slice(fineRossa, verde), /process\.exit\(1\)/);
 });
 
 test('splitKnownRed: i rossi noti escono dal gruppo bloccante, gli altri restano', () => {

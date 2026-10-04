@@ -106,8 +106,8 @@ Sentinella delle due forme: `tests/unit/cartelleTemporanee.test.mjs`.
 Gli unit girano in parallelo, e spesso più verifiche girano insieme sulla stessa
 macchina. «Due milioni di caratteri in meno di un secondo e mezzo» passava sempre da
 solo e cadeva in quasi ogni corsa completa: a macchina carica la stessa valutazione
-arriva a tre secondi senza che il codice sia cambiato, e un rosso degli unit ferma
-`finish:check` prima degli spec.
+arriva a tre secondi senza che il codice sia cambiato, e un rosso degli unit rende
+rosso `finish:check` (che con `--check` corre lo stesso gli spec, #874.1).
 
 Un tempo non si confronta con millisecondi fissi. Si confronta con un lavoro di
 riferimento misurato accanto, nello stesso processo: il carico rallenta tutti e due e il
