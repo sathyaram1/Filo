@@ -129,7 +129,7 @@
 
   // ── Il titolo come chiave: i contatori di notifica e i numeri che cambiano non lo rendono un titolo nuovo ──
 
-  const INVISIBILI = /[­͏؜ᅟᅠ឴឵᠋-᠏​-‏‪-‮⁠-⁯ㅤ︀-️﻿ﾠ]/g;
+  const INVISIBILI = /[\u00AD\u034F\u061C\u115F\u1160\u17B4\u17B5\u180B-\u180F\u200B-\u200F\u202A-\u202E\u2060-\u206F\u3164\uFE00-\uFE0F\uFEFF\uFFA0]/g;
   const SEGNI_NON_LETTO = /^[\s●•⚫⬤○⭕\u{1F534}\u{1F7E0}\u{1F7E1}\u{1F7E2}\u{1F535}\u{1F7E3}\u{1F514}\u{1F4AC}*]+/u;
   const CONTATORE = /\s*[([{]\s*\d{1,3}(?:[., ]\d{3})*\+?\s*[)\]}]/g;
   const NUMERO = /(?<![\p{L}\p{N}])\d[\d.,:/]*(?![\p{L}\p{N}])/gu;
@@ -175,7 +175,7 @@
     t = t.replace(TAG, (run) => ` ${Array.from(run, (c) => String.fromCharCode(c.codePointAt(0) - 0xE0000)).join('')} `);
     t = t.normalize('NFKC').replace(INVISIBILI, '').toLowerCase();
     let out = '';
-    for (const ch of t.normalize('NFD').replace(/[̀-ͯ]/g, '')) out += CONFONDIBILI.get(ch) || ch;
+    for (const ch of t.normalize('NFD').replace(/[\u0300-\u036F]/g, '')) out += CONFONDIBILI.get(ch) || ch;
     return out.slice(0, TETTO);
   }
 

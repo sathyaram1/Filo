@@ -310,6 +310,19 @@ function get() {
   return out;
 }
 
+// La regola sui titoli delle schede (#927): quella del documento condiviso se è una regola valida, altrimenti
+// quella del codice. Si ricompila solo quando il documento cambia, non a ogni titolo.
+let regolaTitoliMemo = { fonte: undefined, regola: null };
+function regolaTitoli() {
+  const T = globalThis.SN_TITOLI_SCHEDE;
+  if (!T) return null;
+  const grezza = remoteModels ? remoteModels.titoliSchede : undefined;
+  if (regolaTitoliMemo.fonte !== grezza || !regolaTitoliMemo.regola) {
+    regolaTitoliMemo = { fonte: grezza, regola: T.regolaDaRemoto(grezza) || T.REGOLA };
+  }
+  return regolaTitoliMemo.regola;
+}
+
 // Versione "pubblica" della config predefinita per l'editor admin: NON espone
 // le chiavi vere, solo se ciascuna è configurata (così la pagina può mostrare
 // uno stato senza far trapelare il segreto nel renderer).
@@ -790,6 +803,7 @@ module.exports = {
   get,
   fornitoreUsabile,
   getPublicForAdmin,
+  regolaTitoli,
   refresh,
   refreshIfStale,
   DEFAULT_MAX_AGE_MS,
