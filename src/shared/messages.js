@@ -281,6 +281,18 @@
     DOWNLOAD_CANCEL: 'download_cancel',
     DOWNLOAD_PAUSE: 'download_pause',
     DOWNLOAD_RESUME: 'download_resume',
+    // #950 — rimette il nome con cui lo scaricamento era arrivato. { id } → { ok, nome } | { ok:false, frase }
+    DOWNLOAD_RIMETTI_NOME: 'download_rimetti_nome',
+    // #950 — nome sensato a un file dell'utente. Toccano il disco e rispondono con percorsi assoluti: solo dalle
+    // superfici di Filo (soloFilo), mai da un sito. Il percorso arriva intero, o come { downloadId }.
+    // {} → { disponibile } (c'è un modello: la voce del menu compare solo allora)
+    FILE_NOME_STATO: 'file_nome_stato',
+    // { percorso | downloadId } → { ok, percorso, nome, base, ext, proposta } | { ok:false, errore, frase, nome, base, ext }
+    FILE_NOME_PROPONI: 'file_nome_proponi',
+    // { percorso | downloadId, nome } → { ok, da, a, nome, prima } | { ok:false, errore, frase }
+    FILE_RINOMINA: 'file_rinomina',
+    // { coppie: [{ attuale, prima }] } → { ok, esiti }
+    FILE_RIMETTI_NOMI: 'file_rimetti_nomi',
     // Segnale BROADCAST main→superfici: "la cronologia scaricamenti è cambiata"
     // (parte/avanza/finisce un download). VOLUTAMENTE contentless (nessun nome
     // file né percorso): la pagina filo://downloads lo riceve e ri-legge la

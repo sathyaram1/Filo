@@ -1432,6 +1432,17 @@
             const id = a.revealDownloadId;
             return { label: a.label, onClick: () => openDownloadFolder(id) };
           }
+          // #950 — il nome dato da solo a uno scaricamento: «Annulla» rimette quello con cui era arrivato.
+          if (a && a.rimettiNomeDownloadId && !a.onClick && api.downloads && api.downloads.rimettiNome) {
+            const id = a.rimettiNomeDownloadId;
+            return {
+              label: a.label,
+              onClick: () => api.downloads.rimettiNome(id).then((r) => {
+                if (r && r.ok) NOTIFS.show(r.cambiato ? `Il nome di prima era occupato: ora è «${r.nome}»` : `Nome di prima rimesso: ${r.nome}`);
+                else NOTIFS.show((r && r.frase) || 'Non sono riuscito a rimettere il nome di prima');
+              }).catch(() => {}),
+            };
+          }
           return a;
         }),
       };

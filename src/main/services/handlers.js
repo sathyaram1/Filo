@@ -3825,6 +3825,7 @@ require('./handlers/safebrowse')(on, handlerCtx);
 require('./handlers/adSkip')(on, handlerCtx);     // #737 — pubblicità dei video da saltare
 require('./handlers/redteam')(on, handlerCtx);
 require('./handlers/misc')(on, handlerCtx);
+require('./handlers/file')(on, handlerCtx);       // #950 — nome sensato ai file dell'utente
 
 // ─── handler centrale richiamato dall'IPC ───────────────────────────────────
 

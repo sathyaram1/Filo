@@ -55,11 +55,15 @@ function ESE() { return globalThis.SN_ESEGUIBILI; }
 // finché le impostazioni non sono arrivate, un programma si ferma comunque.
 let chiediEseguibili = true;
 let sitiFidati = [];
+// #950 — un nome sensato da solo agli scaricamenti che arrivano con un nome che non dice niente. Spento di
+// serie: il contenuto del file va a un modello senza che l'utente l'abbia chiesto per quel file.
+let nomeDaSolo = false;
 
 function configureFromSettings(settings) {
   const d = (settings && settings.security && settings.security.downloads) || {};
   chiediEseguibili = d.confirmExecutables !== false;
   sitiFidati = Array.isArray(d.trustedSites) ? d.trustedSites.slice() : [];
+  nomeDaSolo = !!(settings && settings.nomiSensati && settings.nomiSensati.scaricamenti === true);
 }
 
 // Un programma da un sito che l'utente ha dichiarato fidato scende come un PDF.
@@ -296,6 +300,8 @@ function publicRecord(r) {
     exe: !!r.exe,
     site: r.site || '',
     siteUncertain: !!r.siteUncertain,
+    // #950 — il nome con cui il file era arrivato, finché Filo l'ha cambiato: le superfici offrono di rimetterlo.
+    nomeOriginale: r.nomeOriginale || '',
   };
 }
 
@@ -464,6 +470,69 @@ function completa(rec) {
       { label: 'Apri cartella', revealDownloadId: rec.id },
     ],
   }, scopeOf(rec));
+  if (nomeDaSolo) nominaDaSolo(rec);
+}
+
+// #950 — solo i nomi che non dicono niente («scan_00231.pdf»): un nome scelto da qualcuno resta. L'incognito
+// no: lì il contenuto di un file non parte verso un modello senza che l'utente lo chieda.
+async function nominaDaSolo(rec) {
+  const NF = globalThis.SN_NOMI_FILE;
+  if (!NF || scopeOf(rec) || rec.exe || !rec.savePath) return;
+  if (!NF.tipoDi(rec.filename) || !NF.nomeSenzaSenso(rec.filename)) return;
+  const Nomi = require('./nomiFile');
+  const p = await Nomi.proponi(rec.savePath);
+  if (!records.has(rec.id) || rec.state !== 'completed') return;
+  if (!p.ok) {
+    // Senza modello, o col modello che non risponde, l'utente che ha acceso la funzione deve saperlo.
+    if (p.errore === 'modello') shellToast(`Nessun nome dato a ${shortName(rec.filename)}: ${p.frase}`, { durationSec: 10 }, '');
+    return;
+  }
+  const r = await Nomi.rinomina(rec.savePath, p.proposta);
+  if (!r.ok || r.invariato) return;
+  shellToast(`Nome dato: ${shortName(r.nome)}`, {
+    durationSec: 10,
+    actions: [
+      { label: 'Annulla', rimettiNomeDownloadId: rec.id },
+      { label: 'Apri file', openDownloadId: rec.id },
+    ],
+  }, '');
+}
+
+const stessoPercorso = (a, b) => (process.platform === 'win32' || process.platform === 'darwin'
+  ? String(a).toLowerCase() === String(b).toLowerCase()
+  : String(a) === String(b));
+
+// #950 — un file dell'elenco cambiato di nome da Filo (da qualunque strada): la voce lo segue, invece di
+// dichiararlo sparito, e ricorda il nome di arrivo per poterlo rimettere.
+function rinominato(da, a) {
+  let toccati = 0;
+  for (const rec of records.values()) {
+    if (!rec.savePath || !stessoPercorso(rec.savePath, da)) continue;
+    if (!rec.nomeOriginale) rec.nomeOriginale = rec.filename;
+    forgetExists(rec.savePath);
+    rec.savePath = a;
+    rec.filename = path.basename(a);
+    if (rec.filename === rec.nomeOriginale) rec.nomeOriginale = '';
+    forgetExists(a);
+    toccati += 1;
+    broadcast('renamed', rec);
+  }
+  if (toccati) persist();
+  return toccati;
+}
+
+function percorsoDi(id, scope = '') {
+  const rec = recordIn(id, scope);
+  return rec && rec.state === 'completed' ? (rec.savePath || '') : '';
+}
+
+async function rimettiNome(id, scope = '') {
+  const rec = recordIn(id, scope);
+  if (!rec) return { ok: false, frase: 'Questo scaricamento non è più nell’elenco' };
+  if (!rec.nomeOriginale) return { ok: false, frase: 'Ha già il nome con cui era arrivato' };
+  const r = await require('./nomiFile').rinomina(rec.savePath, rec.nomeOriginale, { esatto: true });
+  if (!r.ok) return { ok: false, frase: r.frase };
+  return { ok: true, nome: r.nome, cambiato: !!r.cambiato };
 }
 
 // ─── intercettazione ────────────────────────────────────────────────────
@@ -962,6 +1031,9 @@ function resume(id, scope = '') {
 
 module.exports = {
   init,
+  rinominato,
+  percorsoDi,
+  rimettiNome,
   attachSession,
   forgetScope,
   scopeOfWindow,
