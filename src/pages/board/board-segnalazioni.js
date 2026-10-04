@@ -105,10 +105,7 @@
       }
       clearTimeout(timer); timer = null;
       togli.disabled = true;
-      try {
-        const r = await send({ type: 'segnalazioni_mie_togli', id });
-        if (r && r.ok && Array.isArray(r.voci)) { voci = r.voci; disegna(); return; }
-      } catch (_) {}
+      if (await togliVoce(id)) return;
       togli.disabled = false;
       riposo();
     });
