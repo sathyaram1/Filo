@@ -66,7 +66,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { verdictForCurrentBranch, readState } from './verify-local.mjs';
-import { askServerMerge, messageForOwnerMerge, exitCodeForOwnerMerge } from './lib/owner-merge.mjs';
+import { askServerMerge, messageForOwnerMerge, exitCodeForOwnerMerge, richiestaForseInAttesa } from './lib/owner-merge.mjs';
 import { preparaLancioElectron } from './lib/schermo-virtuale.mjs';
 import { lottiPerRigaDiComando } from './lib/riga-di-comando.mjs';
 import { readMarker } from './lib/routine-role.mjs';
@@ -778,12 +778,12 @@ async function main() {
     process.exit(1);
   }
   const reply = giro.reply;
-  // Il server ha aperto una richiesta: suona il campanello, così una finestra
+  // C'è (o può esserci) una richiesta in attesa: suona il campanello, così una finestra
   // di Filo GIÀ APERTA se ne accorge da sola. Non è un permesso in più — non
   // crea niente e non approva niente, fa solo rileggere l'elenco vero — ed è
   // l'unica cosa che impedisce all'avviso di cui parla il messaggio qui sotto
   // di comparire soltanto a chi apre una scheda nuova.
-  if (reply?.outcome === 'blocked' && reply.requestId) mergeApprovalSignal.note(reply.requestId);
+  if (richiestaForseInAttesa(reply)) mergeApprovalSignal.note(reply.requestId);
   const code = exitCodeForOwnerMerge(reply);
   const message = messageForOwnerMerge(reply, branch, { feedbackId: pratica ? pratica.id : '', feedbackNum: pratica ? pratica.seq : '' });
   if (code === 0) console.log(`\n${message}`);
