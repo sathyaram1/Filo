@@ -41,6 +41,7 @@ test('tasto destro su un’immagine in una scheda col proxy: il download non esc
       await wc.session.setProxy({ proxyRules: `http://127.0.0.1:${portaProxy}`, proxyBypassRules: '<-loopback>' });
       await wc.session.clearCache();
     }, { indirizzo, portaProxy });
+    richieste.length = 0;
     await page.reload();
     await page.waitForFunction(() => document.getElementById('foto').naturalWidth > 0);
     // La premessa: la pagina passa dal proxy.
