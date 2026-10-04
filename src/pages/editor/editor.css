@@ -363,16 +363,20 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 .ed-chat-msg { font-size: 12px; padding: 6px 9px; border-radius: 10px; max-width: 92%; white-space: pre-wrap; }
 .ed-chat-msg.user { align-self: flex-end; background: var(--sn-accent); color: #fff; }
 .ed-chat-msg.assistant { align-self: flex-start; background: var(--sn-bg); border: 1px solid var(--sn-border); }
-.ed-chat-input { display: flex; gap: 4px; }
+.ed-chat-input { display: flex; gap: 4px; align-items: flex-end; --sn-voce-size: 30px; --sn-voce-ink: var(--sn-muted); }
+.ed-chat-input .sn-voce-btn { margin-bottom: 2px; }
+/* La casella cresce con quello che contiene (anche il suggerimento, che col microfono accanto va a capo):
+   la barra di scorrimento (sottile) compare solo oltre il tetto di altezza. */
 .ed-chat-input textarea {
-  flex: 1 1 auto; resize: none; height: 34px; padding: 7px 8px;
+  flex: 1 1 auto; resize: none; field-sizing: content; min-height: 34px; max-height: 84px;
+  overflow-y: auto; scrollbar-width: thin; padding: 7px 8px; line-height: 1.4;
   border: 1px solid var(--sn-border); border-radius: 8px;
   background: var(--sn-bg); color: var(--sn-fg); font-size: 12px;
   font-family: inherit; outline: none;
 }
 .ed-chat-input textarea:focus { border-color: var(--sn-accent); }
-.ed-chat-input button {
-  flex: 0 0 auto; padding: 0 10px; border: none; border-radius: 8px;
+.ed-chat-input button[data-chat="send"] {
+  flex: 0 0 auto; height: 34px; padding: 0 10px; border: none; border-radius: 8px;
   background: var(--sn-accent); color: #fff; cursor: pointer; font-size: 12px;
 }
 
@@ -564,9 +568,10 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
   transition: opacity 0.18s ease, transform 0.18s ease;
   pointer-events: none; z-index: 200;
 }
-.ed-toast.show { opacity: 1; transform: translateY(0); }
-/* Toast con azione (es. "Annulla"): testo + bottone in riga. Il bottone deve
-   restare cliccabile anche se il toast di suo ha pointer-events: none. */
+/* Visibile prende il puntatore: sopra, i tempi aspettano; un clic lo chiude. Mentre sfuma torna trasparente. */
+.ed-toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; cursor: pointer; transition: opacity 0.18s ease, transform 0.18s ease, background 0.15s ease; }
+.ed-toast.show:hover { background: var(--sn-hover, var(--sn-bg)); }
+/* Toast con azione (es. "Annulla"): testo + bottone in riga. */
 .ed-toast:has(.ed-toast-action) { display: flex; align-items: center; gap: 12px; }
 .ed-toast-action {
   pointer-events: auto;

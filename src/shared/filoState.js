@@ -2,6 +2,7 @@
 //
 // Non coinvolge LLM. Raccoglie:
 //   - TEMPO (data/ora, sessione, ultima interazione)
+//   - SISTEMA (batteria, rete, Bluetooth: dal main, src/main/services/statoSistema.js)
 //   - TAB APERTE (URL/titolo/focus, ultima attività via chrome.tabs)
 //   - PROCESSI ATTIVI (timer, notifiche pending)
 //   - NOTIFICHE NON GESTITE
@@ -87,12 +88,31 @@
     }
   }
 
+  // Batteria, rete e Bluetooth di adesso (#873): li legge il main, senza modello. `undefined` dove il lettore
+  // non c'è (una pagina), `null` se c'è e non ha risposto.
+  async function readSistema() {
+    const M = global.SN_SISTEMA_MAIN;
+    if (!M || typeof M.statoPerChat !== 'function') return undefined;
+    try { return (await M.statoPerChat()) || null; } catch (_) { return null; }
+  }
+
   // `creditiFreschi`: la chiede un turno di chat, dove «quanti crediti ho?» va
   // risposto col saldo di adesso; la home si accontenta dell'ultimo letto.
-  async function assemble({ creditiFreschi = false } = {}) {
+  // I cambi di stato recenti (#867): li tiene il registro del main, che qui c'è solo nel main.
+  async function readCambi() {
+    try {
+      const R = global.SN_REGISTRO_CAMBI;
+      return R && typeof R.ultimi === 'function' ? await R.ultimi() : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // `sistema: false`: il messaggio della home resta in cache per ore, e una batteria citata lì invecchierebbe.
+  async function assemble({ creditiFreschi = false, sistema: conSistema = true } = {}) {
     const Mem = global.SN_FILO_MEMORY;
     const now = new Date();
-    const [tabs, session, timers, notifications, dashboardCache, rawLog, credits] = await Promise.all([
+    const [tabs, session, timers, notifications, dashboardCache, rawLog, credits, cambi, sistema] = await Promise.all([
       listTabs(),
       Mem.getSession(),
       Mem.listTimers(),
@@ -100,6 +120,8 @@
       Mem.getDashboardCache(),
       Mem.listRaw({ since: new Date(Date.now() - 24 * 3600 * 1000).toISOString(), limit: 50 }),
       readCredits({ fresco: creditiFreschi }),
+      readCambi(),
+      conSistema ? readSistema() : Promise.resolve(undefined),
     ]);
 
     const sessionInfo = session.sessionStartedAt
@@ -148,8 +170,10 @@
         ageRel: formatRelativeTime(n.ts),
       })),
       recentActions: rawLog,
+      cambi: cambi ? { righe: cambi.righe || [], tolti: cambi.tolti || 0 } : null,
       dashboard: dashboardCache,
       credits,
+      sistema,
     };
 
     const stateText = renderForPrompt(state);
@@ -201,6 +225,27 @@
     return out;
   }
 
+  // Le righe le scrive Filo; il nome del Wi-Fi e dei dispositivi li sceglie chi li gestisce, e vanno in busta.
+  function righeSistema(sistema) {
+    const out = ['SISTEMA (letto dal computer adesso, senza modello: «quanta batteria ho?», «sono online?», «il Bluetooth è acceso?» si rispondono da qui)'];
+    const Sis = global.SN_SISTEMA;
+    if (!sistema || !Sis) {
+      out.push('(il computer non ha risposto: batteria, rete e Bluetooth adesso non li sai, non tirare a indovinare)');
+      return out;
+    }
+    const { righe, nomi } = Sis.righePrompt(sistema);
+    out.push(...righe);
+    if (nomi.length) {
+      const E = esterno();
+      out.push(E.imbusta({
+        tipo: 'NOMI_DISPOSITIVI',
+        conIntestazione: true,
+        testo: nomi.map((n) => E.neutralizza(n, { unaRiga: true })).join('\n'),
+      }));
+    }
+    return out;
+  }
+
   function renderForPrompt(state) {
     const lines = [];
     lines.push('═══ FILO STATE ═══', '');
@@ -215,6 +260,7 @@
       lines.push(`Inizio sessione: ${formatDate(state.time.session.startedAt)} (${state.time.session.ageMin} min fa, ${state.time.session.count} interazioni)`);
     }
     lines.push('');
+    if (state.sistema !== undefined) lines.push(...righeSistema(state.sistema), '');
     // CREDITI — se l'utente chiede quanti crediti gli restano, rispondi con
     // questo saldo. Senza portafoglio la ricarica è DAILY_REFILL, letta dal
     // valore in vigore e non scritta a mano.
@@ -275,7 +321,7 @@
           // countdown (che per una sveglia a ore di distanza confonderebbe).
           const d = new Date(t.endsAt);
           const hhmm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-          // Ricorrenza: dicitura unica con la colonna destra (SN_FILO_MEMORY),
+          // Ricorrenza: dicitura unica con le carte della home (SN_FILO_MEMORY),
           // così l'agente e l'utente leggono la stessa cosa.
           const M = global.SN_FILO_MEMORY;
           const rep = (t.repeat && t.repeat.length && M && M.formatRepeat) ? M.formatRepeat(t.repeat) : '';
@@ -297,6 +343,15 @@
         .map((a) => `- [${formatRelativeTime(a.ts)}] ${a.type}: ${a.summary}`)));
     }
     lines.push('');
+    // Le frasi portano nomi di timer e valori che può aver scritto un modello: recinto come sopra.
+    if (state.cambi) {
+      lines.push('CAMBI RECENTI (impostazioni, aspetto, sveglie e timer, regole del proxy, zoom; dal più vecchio al più nuovo)');
+      lines.push('Fatti dalla chat o dalle pagine, sono lo stesso evento: «rimetti come prima» si fa con ANNULLA_CAMBIO e l\'id.');
+      if (!state.cambi.righe.length) lines.push('(nessuno)');
+      else lines.push(salvati(state.cambi.righe));
+      if (state.cambi.tolti > 0) lines.push(`(più ${state.cambi.tolti} cambi più vecchi, non elencati qui)`);
+      lines.push('');
+    }
     lines.push('DASHBOARD ATTUALE');
     if (state.dashboard) {
       const righe = [`Messaggio: "${String(state.dashboard.message || '').slice(0, 200)}"`];

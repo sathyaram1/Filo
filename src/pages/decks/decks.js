@@ -24,6 +24,10 @@
   }
   function send(msg) { return chrome.runtime.sendMessage(msg); }
 
+  // La Partita è uno stub (spec §12): finché il tavolo non c'è nessuna strada ci porta, né il
+  // pulsante né un #/game ripreso da cronologia, sessione o link, perché è un vicolo cieco (#391).
+  const PARTITA_PRONTA = false;
+
   let decks = [];        // cache della lista per la libreria
   let current = null;    // mazzo aperto nel builder
 
@@ -166,7 +170,10 @@
       await renderBuilder(true); // apertura: la chat parte dall'ultimo scambio
       return;
     }
-    if (r.screen === 'game') { show('game'); return; }
+    if (r.screen === 'game') {
+      if (PARTITA_PRONTA) { show('game'); return; }
+      history.replaceState(null, '', '#/');
+    }
     current = null;
     await loadLibrary();
     show('library');
@@ -1276,8 +1283,15 @@
   }
 
   // Toast discreto in basso a destra (conferme di import/export non
-  // bloccanti): stesso pattern del toast dell'editor.
-  let dkToastTimer = null;
+  // bloccanti): stesso pattern del toast dell'editor. Tempi in avvisiTempo.js.
+  const dkToastTempi = window.SN_AVVISI.orologio();
+  let dkToastTempo = null;
+  function hideToast(el) {
+    if (dkToastTempo) dkToastTempo.annulla();
+    dkToastTempo = null;
+    el.classList.remove('show');
+    dkToastTempi.lascia(el);
+  }
   function showToast(text) {
     let el = document.getElementById('dkToast');
     if (!el) {
@@ -1285,13 +1299,20 @@
       el.id = 'dkToast';
       el.className = 'dk-toast';
       el.setAttribute('role', 'status');
+      el.addEventListener('click', () => {
+        const sel = document.getSelection();
+        if (sel && !sel.isCollapsed && el.contains(sel.anchorNode)) return;
+        hideToast(el);
+      });
+      dkToastTempi.segui(el);
+      window.SN_AVVISI.chiudibile(el, () => hideToast(el));
       document.body.appendChild(el);
     }
     el.textContent = text;
     void el.offsetWidth;
     el.classList.add('show');
-    clearTimeout(dkToastTimer);
-    dkToastTimer = setTimeout(() => el.classList.remove('show'), 3400);
+    if (dkToastTempo) dkToastTempo.annulla();
+    dkToastTempo = dkToastTempi.avvia(window.SN_AVVISI.durata(3400), () => hideToast(el));
   }
 
   // ── Import/Export rigido (§11), via switcher ────────────────────────────────
@@ -2048,6 +2069,7 @@
       const res = await send({ type: MSG.DECKS_CREATE });
       if (res && res.ok) location.hash = `#/deck/${encodeURIComponent(res.deck.id)}`;
     });
+    $('openGame').hidden = !PARTITA_PRONTA;
     $('openGame').addEventListener('click', () => { location.hash = '#/game'; });
     $('backToLibrary').addEventListener('click', () => { location.hash = '#/'; });
     $('gameBack').addEventListener('click', () => { location.hash = '#/'; });

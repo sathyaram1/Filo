@@ -396,7 +396,7 @@ ipcRenderer.on('shortcut:triggered', (_event, payload = {}) => {
 // DOMContentLoaded della pagina ospite.
 
 const STYLES = [
-  'theme.css', 'menu.css', 'popup.css', 'sidebar.css',
+  'theme.css', 'menu.css', 'popup.css', 'sidebar.css', 'voce.css',
   'highlight.css', 'spellcheck.css', 'feedback.css', 'redteam-attack.css',
 ];
 
@@ -446,6 +446,7 @@ function loadScripts() {
   try { require(path.join(SHARED_DIR, 'calcMarkers.js')); } catch (e) { console.error('[Filo CS] calcMarkers', e); } // #724 — calcolatrice e marker [[calc:]]: PRIMA di popup.js
   try { require(path.join(SHARED_DIR, 'overlayPlacement.js')); } catch (e) { console.error('[Filo CS] overlayPlacement', e); } // #500 — geometria di menu e riquadro risposta: PRIMA di popup.js e menu.js
   try { require(path.join(CONTENT_DIR, 'extractContext.js')); } catch (e) { console.error('[Filo CS] extractContext', e); }
+  try { require(path.join(SHARED_DIR, 'avvisiTempo.js')); } catch (e) { console.error('[Filo CS] avvisiTempo', e); } // tempi della pila degli avvisi: PRIMA di popup.js
   try { require(path.join(CONTENT_DIR, 'popup.js')); } catch (e) { console.error('[Filo CS] popup', e); }
   try { require(path.join(CONTENT_DIR, 'menu.js')); } catch (e) { console.error('[Filo CS] menu', e); }
   try { require(path.join(CONTENT_DIR, 'highlight.js')); } catch (e) { console.error('[Filo CS] highlight', e); }
@@ -456,6 +457,7 @@ function loadScripts() {
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'cookieRules.js')); } catch (e) { console.error('[Filo CS] cookieRules', e); }
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'cookieBanners.js')); } catch (e) { console.error('[Filo CS] cookieBanners', e); }
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'cookies.js')); } catch (e) { console.error('[Filo CS] cookies', e); }
+  try { require(path.join(CONTENT_DIR, 'adSkip.js')); } catch (e) { console.error('[Filo CS] adSkip', e); } // #737 — nei riquadri è già partito da solo
   try { require(path.join(SHARED_DIR, 'feedback.js')); } catch (e) { console.error('[Filo CS] feedback shared', e); }
   try { require(path.join(SHARED_DIR, 'feedbackClientIdHash.js')); } catch (e) { console.error('[Filo CS] feedbackClientIdHash', e); } // S1.F2.2
   try { require(path.join(SHARED_DIR, 'feedbackAttachTypes.js')); } catch (e) { console.error('[Filo CS] feedbackAttachTypes', e); }
@@ -468,6 +470,8 @@ function loadScripts() {
   try { require(path.join(SHARED_DIR, 'modelCaps.js')); } catch (e) { console.error('[Filo CS] modelCaps', e); }
   try { require(path.join(SHARED_DIR, 'ttsVoices.js')); } catch (e) { console.error('[Filo CS] ttsVoices', e); }
   try { require(path.join(SHARED_DIR, 'dictationSegmenter.js')); } catch (e) { console.error('[Filo CS] dictationSegmenter', e); }
+  try { require(path.join(SHARED_DIR, 'ascolto.js')); } catch (e) { console.error('[Filo CS] ascolto', e); } // microfono e trascrizione: Detta e le chat
+  try { require(path.join(SHARED_DIR, 'voceChat.js')); } catch (e) { console.error('[Filo CS] voceChat', e); } // tasto microfono delle chat, a cui «Detta» passa la mano
   try { require(path.join(CONTENT_DIR, 'tts.js')); } catch (e) { console.error('[Filo CS] tts', e); }
   try { require(path.join(CONTENT_DIR, 'editBox.js')); } catch (e) { console.error('[Filo CS] editBox', e); }
   try { require(path.join(CONTENT_DIR, 'actions.js')); } catch (e) { console.error('[Filo CS] actions', e); }
@@ -492,6 +496,7 @@ function start() {
 
 // #754 — molti banner dei cookie vivono in un riquadro (Sourcepoint, TrustArc, varianti di Didomi e
 // Quantcast): lì il modulo cookie parte da solo, senza il resto di Filo, e solo sulle pagine web.
+// #737 — così il «Salta» delle pubblicità: il lettore incorporato e quello di Google IMA stanno in un riquadro.
 function startCookiesInFrame() {
   let href = '';
   try { href = window.location.href || ''; } catch (_) {}
@@ -499,6 +504,7 @@ function startCookiesInFrame() {
   const go = () => {
     try { require(path.join(CONTENT_DIR, 'cookieRules.js')); } catch (e) { console.error('[Filo CS] cookieRules (riquadro)', e); }
     try { require(path.join(CONTENT_DIR, 'cookies.js')); } catch (e) { console.error('[Filo CS] cookies (riquadro)', e); }
+    try { require(path.join(CONTENT_DIR, 'adSkip.js')); } catch (e) { console.error('[Filo CS] adSkip (riquadro)', e); }
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go, { once: true });
   else go();
@@ -534,7 +540,6 @@ function waitForContentScripts(fn) {
 // L'avviso del sito pericoloso non aspetta la pagina costruita: un modulo password già a schermo sopra uno script che
 // non arriva mai resterebbe scrivibile senza avviso (#813.1). loadScripts() ritrova questi moduli già caricati.
 function startSafebrowse() {
-  try { require(path.join(SHARED_DIR, 'filoUi.js')); } catch (e) { console.error('[Filo CS] filoUi', e); }
   try { require(path.join(SHARED_DIR, 'messages.js')); } catch (e) { console.error('[Filo CS] messages', e); }
   try { require(path.join(CONTENT_DIR, 'safebrowse.js')); } catch (e) { console.error('[Filo CS] safebrowse', e); }
 }

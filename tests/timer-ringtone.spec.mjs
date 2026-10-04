@@ -37,35 +37,35 @@ test('timer alla scadenza: stato ringing visibile e stop lo rimuove', async ({ a
   }, msgType);
 
   // Aspetta che il timer appaia nella colonna live.
-  await expect(page.locator('#live .dash-live-card')).toHaveCount(1, { timeout: 4_000 });
+  await expect(page.locator('#accade .dash-carta[data-tipo="timer"]')).toHaveCount(1, { timeout: 4_000 });
 
   // Aspetta che il timer scada e passi in stato ringing (timeout 6s).
   // Il contenitore live riceve data-ringing="1" quando almeno un timer squilla.
   await expect
     .poll(
-      () => page.evaluate(() => document.getElementById('live').dataset.ringing),
+      () => page.evaluate(() => document.getElementById('accade').dataset.suona),
       { timeout: 6_000, intervals: [200] },
     )
     .toBe('1');
 
   // (b) Il timer è ancora visibile (card con data-ringing="1" presente).
-  await expect(page.locator('#live .dash-live-card[data-ringing="1"]')).toBeVisible();
+  await expect(page.locator('#accade .dash-carta[data-suona="1"]')).toBeVisible();
 
   // (c) Il pulsante "Ferma" è visibile e funzionante.
-  const stopBtn = page.locator('#live .dash-live-stop');
+  const stopBtn = page.locator('#accade .dash-carta[data-suona="1"] .dash-carta-az.principale');
   await expect(stopBtn).toBeVisible();
   await stopBtn.click();
 
   // Dopo "Ferma" il timer è rimosso e lo stato ringing torna a "0".
   await expect
     .poll(
-      () => page.evaluate(() => document.getElementById('live').dataset.ringing),
+      () => page.evaluate(() => document.getElementById('accade').dataset.suona),
       { timeout: 4_000, intervals: [200] },
     )
     .toBe('0');
 
   // La card del timer non è più presente.
-  await expect(page.locator('#live .dash-live-card[data-ringing="1"]')).toHaveCount(0);
+  await expect(page.locator('#accade .dash-carta[data-suona="1"]')).toHaveCount(0);
 });
 
 test('preferenza timerRingtone: si salva e persiste al reload', async ({ openTab }) => {

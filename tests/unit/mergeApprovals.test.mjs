@@ -433,8 +433,8 @@ describe('richiesteCoperte: quali richieste ferme copre il segno «fondi senza c
 describe('i lavori locali (#908)', () => {
   test('la provenienza locale porta la sua pratica, quando c’è', () => {
     assert.equal(UI.originLabel({ origin: 'locale', num: '#908' }), 'lavoro locale · feedback #908');
-    assert.equal(UI.originLabel({ origin: 'locale' }), 'lavoro tuo, da questo computer');
-    assert.equal(UI.originLabel({}), 'lavoro tuo, da questo computer');
+    assert.equal(UI.originLabel({ origin: 'locale' }), 'lavoro tuo, in locale');
+    assert.equal(UI.originLabel({}), 'lavoro tuo, in locale');
   });
 
   test('una fusione che ha saltato L5 si legge come tale nella traccia', () => {
@@ -461,5 +461,17 @@ describe('i lavori locali (#908)', () => {
     }
     assert.match(pattern, /#908/);
     assert.match(riga, /lavoro locale provato/);
+  });
+});
+
+describe('la prova degli unit sulla fusione nella richiesta (#929)', () => {
+  test('dice su quale main e quanto tempo fa; al clic non si rifà, e il suggerimento lo spiega', () => {
+    const p = UI.provaNote({ provaUnit: { esito: 'verde', mainSha: 'b'.repeat(40), atMs: ORA - 3 * ORE } }, ORA);
+    assert.equal(p.testo, 'Unit verdi sulla fusione con main di 3 ore fa');
+    assert.match(p.titolo, /bbbbbbbb/);
+    assert.match(p.titolo, /non si rifanno/);
+    assert.match(UI.provaNote({ provaUnit: { esito: 'rosso_anche_su_main', mainSha: 'b'.repeat(40), atMs: ORA } }, ORA).testo, /già rossi su main/);
+    assert.match(UI.provaNote({ provaUnit: { esito: 'conflitto', mainSha: 'b'.repeat(40), atMs: ORA } }, ORA).testo, /conflitto/);
+    assert.equal(UI.provaNote({}, ORA), null, 'una richiesta di prima non dice niente');
   });
 });

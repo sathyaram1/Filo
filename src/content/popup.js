@@ -845,9 +845,12 @@
   //  • `scrollHeight` comprende l'IMBOTTITURA, `height` (se il box è
   //    content-box) no. Scriverlo tal quale lasciava la casella più alta del
   //    suo testo di quei pixel, e non li restituiva più: cancellata la domanda
-  //    la casella restava gonfia e la risposta non si riprendeva lo spazio.
+  //    la casella restava gonfia e la risposta non si riprendeva lo spazio;
+  //  • vuota torna alla misura con cui è nata: misurata, andrebbe a capo col
+  //    segnaposto lungo e resterebbe una riga più alta di prima di scrivere.
   function autoGrow(el) {
     if (!el) return;
+    if (!el.value) { el.style.height = ''; return; }
     el.style.height = 'auto';
     let pad = 0;
     try {
@@ -1190,6 +1193,13 @@
   // fuori dal viewport. Teniamo i più recenti, che sono i più rilevanti.
   const MAX_TOAST_STACK = 4;
 
+  // Col puntatore su un avviso della pila i tempi di tutti aspettano (regola in avvisiTempo.js).
+  let tempiPila = null;
+  function tempi() {
+    if (!tempiPila) tempiPila = global.SN_AVVISI.orologio();
+    return tempiPila;
+  }
+
   function toastHost() {
     // `isConnected`: se la pagina rifà il DOM (SPA che rimpiazza il body) il
     // vecchio contenitore resta orfano e gli avvisi successivi sparirebbero.
@@ -1215,7 +1225,7 @@
     for (let i = 0; i < over; i++) {
       const c = live[i]; // i più vecchi stanno in cima: si appende in coda
       if (typeof c._snDispose === 'function') { try { c._snDispose(); } catch (_) {} continue; }
-      try { c.remove(); } catch (_) {}
+      unmountToast(c);
     }
   }
 
@@ -1241,10 +1251,15 @@
 
   // API per gli altri avvisi in pagina ancorati allo stesso angolo: li aggancia
   // allo stack invece che direttamente al documento.
+  // Tutto ciò che entra nella pila risponde al tasto destro col suo menu (regola in avvisiTempo.js):
+  // `chiudi` e `azioni` li dà chi lo mostra; senza, «Chiudi» lo toglie dalla pila.
   function mountToast(el, opts = {}) {
     if (!el) return el;
     if (opts.sticky) el.dataset.snSticky = '1';
+    global.SN_AVVISI.chiudibile(el, opts.chiudi || (() => unmountToast(el)), opts.azioni);
+    tempi().segui(el);
     toastHost().appendChild(el);
+    tempi().ripulisci();
     enforceToastCap();
     syncToastOverflow();
     return el;
@@ -1254,7 +1269,16 @@
   // ricalcola l'overflow dello stack.
   function unmountToast(el) {
     try { el?.remove(); } catch (_) {}
+    if (el) tempi().lascia(el);
     syncToastOverflow();
+  }
+
+  // Il tempo di un avviso agganciato alla pila: in scala con la durata delle Preferenze, fermo col
+  // puntatore sopra. `ms` è quello che vale con la durata standard; 0 = resta finché non lo si chiude.
+  // `deveScadere`: alla scadenza succede qualcosa (si chiude la scheda), e la durata 0 non lo rimanda per sempre.
+  function tempoAvviso(ms, onScade, { deveScadere = false } = {}) {
+    const d = global.SN_AVVISI.durata(ms);
+    return tempi().avvia(d || (deveScadere ? ms : 0), onScade);
   }
 
   // ----------------------------------------------------------------
@@ -1269,12 +1293,12 @@
     t.className = 'sn-toast';
     t.textContent = text;
     let closed = false;
-    let timer = null;
+    let tempo = null;
     // Rimozione immediata usata dallo sfratto per tetto: niente animazione, ma
     // il timer va spento o continuerebbe a puntare a un elemento morto.
     t._snDispose = () => {
       closed = true;
-      if (timer) { clearTimeout(timer); timer = null; }
+      if (tempo) { tempo.annulla(); tempo = null; }
       unmountToast(t);
     };
     mountToast(t);
@@ -1282,14 +1306,21 @@
     const close = () => {
       if (closed) return;
       closed = true;
-      if (timer) { clearTimeout(timer); timer = null; }
+      if (tempo) { tempo.annulla(); tempo = null; }
       // Marcato in uscita: non occupa più uno slot del tetto mentre sfuma.
       t.dataset.snClosing = '1';
       t.classList.remove('sn-toast-visible');
       setTimeout(() => unmountToast(t), 250);
     };
-    const duration = opts.duration === 0 ? 0 : (opts.duration || 2200);
-    if (duration > 0) timer = setTimeout(close, duration);
+    // Sotto il puntatore il toast prende i clic: chiuderlo è la risposta, e l'unica strada con la durata a 0.
+    // Chi ne sta selezionando il testo non lo perde.
+    t.addEventListener('click', () => {
+      const sel = t.ownerDocument.getSelection && t.ownerDocument.getSelection();
+      if (sel && !sel.isCollapsed && t.contains(sel.anchorNode)) return;
+      close();
+    });
+    global.SN_AVVISI.chiudibile(t, close);
+    tempo = tempoAvviso(opts.duration === 0 ? 0 : (opts.duration || 2200), close);
     return { close, el: t };
   }
 
@@ -1303,6 +1334,7 @@
     showToast,
     mountToast,
     unmountToast,
+    tempoAvviso,
     attachZoomCompensation,
     renderMarkdown,
     resolveCalcMarkers,

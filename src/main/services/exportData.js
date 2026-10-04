@@ -3,6 +3,7 @@
 // Produce un .zip con:
 //   - data.json   → tutto lo storage di Filo (memorie agenti, pagine salvate,
 //                   cronologia incolla, costi, ecc.)
+//   - filo/eventi.jsonl → il filo (#866): chat e pagine visitate, così com'è su disco
 //   - images/…    → le immagini copiate/salvate, estratte dai data-URL base64
 //                   incorporati nello storage. Nel JSON il data-URL viene
 //                   sostituito col percorso relativo del file (es.
@@ -132,8 +133,10 @@ function extractImages(node, images) {
   }
 }
 
-// Costruisce il Buffer ZIP a partire dallo storage Filo.
-function buildExportZip(storageData) {
+const VOCE_FILO = 'filo/eventi.jsonl';
+
+// Costruisce il Buffer ZIP a partire dallo storage Filo e, se c'è, dal filo.
+function buildExportZip(storageData, { filo = null } = {}) {
   const clone = JSON.parse(JSON.stringify(storageData ?? {}));
   const images = [];
   extractImages(clone, images);
@@ -143,12 +146,14 @@ function buildExportZip(storageData) {
     exportedAt: new Date().toISOString(),
     imageCount: images.length,
     note: 'Esportazione dati Filo. data.json contiene tutte le impostazioni e i '
-      + 'contenuti; le immagini copiate/salvate sono nella cartella images/.',
+      + 'contenuti; le immagini copiate/salvate sono nella cartella images/; '
+      + 'le chat con Filo e le pagine visitate stanno in filo/eventi.jsonl, un evento per riga.',
   };
 
   const entries = [
     { name: 'data.json', buffer: Buffer.from(JSON.stringify(clone, null, 2), 'utf8') },
     { name: 'manifest.json', buffer: Buffer.from(JSON.stringify(manifest, null, 2), 'utf8') },
+    ...(filo && filo.length ? [{ name: VOCE_FILO, buffer: Buffer.isBuffer(filo) ? filo : Buffer.from(String(filo), 'utf8') }] : []),
     ...images,
   ];
   return zipStore(entries);
@@ -288,7 +293,8 @@ function readExportZip(zipBuffer) {
     try { exportedAt = String(JSON.parse(manifest.toString('utf8')).exportedAt || ''); } catch (_) {}
   }
 
-  return { data, imageCount: stats.images, exportedAt, sectionCount: Object.keys(data).length };
+  const filo = files.get(prefix + VOCE_FILO) || null;
+  return { data, imageCount: stats.images, exportedAt, sectionCount: Object.keys(data).length, filo };
 }
 
 // --- fusione con i dati già presenti ----------------------------------------

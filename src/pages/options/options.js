@@ -79,7 +79,8 @@
     if (!Usage || typeof Usage.byArea !== 'function') return;
 
     for (const group of Usage.byArea()) {
-      const rows = group.entries.filter((e) => e.from !== 'user');
+      // Una funzione che usa solo chi gestisce Filo (`action`) qui è rumore (#465).
+      const rows = group.entries.filter((e) => e.from !== 'user' && !e.action);
       if (!rows.length) continue;
 
       const head = document.createElement('div');
@@ -139,7 +140,10 @@
 
   function effectiveModelConfig() {
     if ($('useDefaultModels').checked) {
-      return defaultModelsPublic || { models: {}, modelRegistry: {} };
+      const cfg = defaultModelsPublic || { models: {}, modelRegistry: {} };
+      // La config condivisa può portare ancora funzioni che qui non ci sono più (#465).
+      const qui = new Set((ModelChain.actionLabels() || []).map(([a]) => a));
+      return { ...cfg, models: Object.fromEntries(Object.entries(cfg.models || {}).filter(([a]) => qui.has(a))) };
     }
     return {
       models: ModelChain.collect(modelChains || {}),
@@ -895,13 +899,15 @@
   // chiave a com'era prima (o la cancellava, se all'apertura non c'era). Al
   // cambio arrivato da fuori il campo si riallinea, a meno che l'utente ci
   // stia scrivendo dentro proprio adesso.
+  // Lo stesso per gli altri campi semplici, che la chat cambia a parole (#949): le voci le dà la fonte unica.
   if (chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((msg) => {
-      if (!msg || msg.type !== MSG.SETTINGS_UPDATED || !msg.settings || !msg.settings.apiKeys) return;
-      const field = $('apiKey');
-      if (!field || document.activeElement === field) return;
-      const now = String(msg.settings.apiKeys.openrouter || '');
-      if (field.value !== now) field.value = now;
+      if (!msg || msg.type !== MSG.SETTINGS_UPDATED || !msg.settings) return;
+      const toccati = window.SN_VOCI_IMPOSTAZIONI.riallineaPagina('options', msg.settings, {
+        salta: (id, percorso, el) => document.hasFocus() && document.activeElement === el,
+      });
+      if (toccati.includes('useDefaultModels')) applyDefaultModelsVisibility();
+      if (toccati.length) renderOpenWeightsImpact();
     });
   }
 

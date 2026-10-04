@@ -56,7 +56,7 @@ export const PIATTAFORME = {
  */
 export const PASSI = {
   strumento: 'il prelievo del codice di questa corsa, quello che porta lo strumento di questo avviso',
-  riparo: "la copia dello strumento di questo avviso fuori dalla copia di lavoro",
+  riparo: "la copia degli strumenti di questa corsa (questo avviso, l'installazione che ritenta) fuori dalla copia di lavoro",
   bersaglio: 'la scelta della versione a cui attaccarsi e del codice da costruire',
   checkout: 'il prelievo del codice di questa versione',
   node: 'la preparazione di Node',

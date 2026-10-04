@@ -9,13 +9,49 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.232', date: '2026-10-03',
+      features: [
+        'Filo dà un nome che dice cosa contiene ai file che hai già sul computer. Fai tasto destro su un file negli Scaricamenti, su uno che Filo ti trova in chat o su uno che trascini dove scrivi, e scegli «Dai un nome sensato». Al posto di «scan_00231.pdf» ti propone per esempio «Bolletta luce marzo 2026.pdf», e prima di confermare lo puoi correggere. In chat puoi chiederlo per una cartella intera: vedi l\'elenco dei nomi vecchi e nuovi, confermi, e «Annulla» rimette tutto com\'era. In Preferenze puoi farlo fare da solo ai file che scarichi.',
+        'Puoi chiedere a Filo di alzare o abbassare il volume, metterlo muto, accendere e spegnere Bluetooth e Wi-Fi, collegare le cuffie o una rete che il computer conosce già: «alza il volume al 40%», «collega le cuffie», «collegati alla rete di casa». Le stesse cose le fai con un clic sulle voci in fondo alla home, dove adesso c\'è anche il volume. Se il sistema non dà il permesso, Filo ti dice quale serve e ti porta dove si concede.',
+        'Nella pagina Trasparenza ci sono Privacy e Sicurezza: cosa resta sul tuo computer, cosa esce e verso chi, i punti deboli, e come controllare che il file che hai scaricato venga dal codice pubblico. Puoi anche chiedere a Filo «quali dati condividi?»: ti risponde col testo scritto.',
+        'La home adesso è fatta di carte. A sinistra c\'è quello che sta succedendo: timer e sveglie col conto alla rovescia, scaricamenti con la percentuale e poi «Apri», gli avvisi di Filo. A destra c\'è quello che tieni tu: l\'Editor coi documenti recenti, i Mazzi, «Filo ti suggerisce» e le impostazioni rapide. Le sposti trascinandole, le togli e le rimetti da «altro», e al prossimo avvio le ritrovi dove le hai lasciate. Se Filo sta ancora lavorando a una risposta in un\'altra scheda, o gira un comando lungo, lo vedi a sinistra e «Vai» ti porta lì. Un clic su una carta di sinistra la apre nella conversazione: un timer ti riporta alla chat in cui l\'avevi chiesto. Puoi anche dirlo a Filo, per esempio «togli la carta dei mazzi» o «chiudi l\'avviso del backup».',
+        'Col tasto destro su un\'immagine Filo ti dice se è stata creata con l\'AI, quando è il file a dichiararlo. In cima alla descrizione trovi chi lo dichiara e se la sua firma è valida. Filo lo legge sul tuo computer, senza spendere crediti. Se il file non porta etichette non compare niente: uno screenshot o un social le cancellano, quindi quel silenzio non vuol dire che la foto sia vera. Puoi chiederlo anche in chat o all\'Aiuto della pagina.',
+        'In fondo alla colonna destra della home trovi ora, batteria, rete e Bluetooth, e si aggiornano da soli. Filo li sa anche in chat, quindi puoi chiedergli quanta batteria hai o se sei online. Un clic su una voce mostra i dettagli, e quelle che non ti servono le nascondi da lì o dalle Preferenze.',
+        'Ogni impostazione si cambia chiedendola a Filo, anche quelle della pagina Sicurezza come il blocco della pubblicità, e Filo sa dirti com\'è impostata adesso («blocchi la pubblicità?», «quali siti ho bloccato?», «quali siti possono usare il microfono?»). Puoi anche togliere a parole un permesso dato a un sito. Prima di toccare la sicurezza ti chiede un OK, e ogni cambio si annulla dal segno sulla tua bolla.',
+        'Nelle chat di Filo, accanto all\'invio, c\'è un microfono. Lo premi e parli: quando hai finito il testo compare nella casella e la richiesta parte da sola, con un attimo per fermarla. Se preferisci rileggere prima di mandarla, lo scegli in Preferenze o lo chiedi a Filo.',
+        'Gli avvisi in basso a destra non se ne vanno finché ci tieni sopra il puntatore, anche quelli dentro le pagine come «Copiato»: un clic li chiude, e il tasto destro offre «Chiudi» e le loro azioni. La durata scelta in Preferenze adesso vale per tutti, e durata e suono li puoi chiedere anche a Filo: «fai durare gli avvisi 10 secondi», «metti il suono carillon alle notifiche».',
+        'Filo ricorda le pagine che apri nelle schede, sul tuo computer, accanto alle chat. Quelle aperte in incognito no. Le cancelli quando vuoi chiedendolo a Filo («cancella le pagine dell\'ultima ora», «di ieri sera», «di YouTube») o in Sicurezza, dove scegli fra l\'ultima ora, oggi e tutto, e spariscono anche dal disco. Esporta dati e Importa dati le portano con sé.',
+      ],
+      fixes: [
+        'Le schede chiuse restano in Cronologia finché non le cancelli tu. Prima, passate le 5000, le più vecchie sparivano da sole, e dopo le 2000 la ricerca per contenuto non le trovava più. Adesso le trova tutte, anche le più vecchie, già alla prima ricerca.',
+        '«Copia immagine» funziona anche sulle foto che i siti tengono su un altro dominio. Se la incolli in chat e chiedi se è fatta con l\'AI, Filo risponde come col tasto destro.',
+        'Lettura ad alta voce e dettatura non partono più verso un fornitore che Filo esclude. Se il modello che hai scelto lo serve solo lui, Filo te lo dice e non manda niente.',
+        'Quando elimini una chat dalla Cronologia, il suo testo sparisce anche dall\'elenco delle richieste fatte ai modelli: lì restano solo i costi.',
+        'Con tante schede aperte, la X non finisce più mezza sotto la scheda accanto, e il clic non apre la vicina al posto di chiudere. Sulle schede troppo strette resta solo l\'icona del sito, al centro, e le chiudi col clic centrale o col tasto destro. La scheda attiva ha sempre la sua X.',
+      ],
+    },
+    {
+      version: '0.2.231', date: '2026-10-03',
+      features: [
+        'Nella pagina Crediti trovi il tuo pseudonimo: basta quello per ricevere un regalo di crediti.',
+        'Col tasto destro sull\'avviso di un sito pericoloso puoi chiedere a Filo di quel sito o segnalare un falso allarme. Si apre una scheda nuova e il sito resta coperto.',
+        'Quando chiedi a Filo di cambiare qualcosa, come il tema, una sveglia o lo zoom, sulla tua bolla compare un segno. Passaci sopra: vedi cosa è cambiato e lo annulli con un clic. «Rimetti come prima» funziona anche per i cambi fatti a mano nelle impostazioni.',
+        'Quando un video parte con una pubblicità che si può saltare, Filo preme «Salta» da solo appena il pulsante compare, su YouTube (anche nei video incorporati in altri siti) e negli altri lettori più diffusi. Se preferisci guardarle, lo spegni in Sicurezza o chiedendolo a Filo.',
+      ],
+      fixes: [
+        'L\'avviso dei siti pericolosi e sospetti adesso sta sopra la pagina, fuori dalla sua portata, e resta lì finché non scegli tu.',
+      ],
+    },
+    {
       version: '0.2.230', date: '2026-10-03',
       features: [
+        'Passa il mouse su una scheda e vedi subito cosa c\'è dentro: titolo, sito e un\'immagine della pagina, già pronta, anche per le schede aperte in secondo piano che non hai ancora guardato. In Preferenze la spegni o scegli quanto è grande.',
         'Ogni comando che Filo propone nel terminale ti dice prima a parole cosa fa, e sotto trovi il comando vero. Su un\'installazione nuova la modalità terminale è già accesa, quindi a «quanto spazio ho sul disco?» Filo risponde senza che tu debba accendere niente. Quello che legge parte subito, quello che cambia qualcosa ti chiede prima un OK, per cancellare scrivi «conferma». Se ce l\'avevi spenta resta spenta, e la accendi in Preferenze o chiedendolo a Filo.',
       ],
       fixes: [
         'In Altro, Modelli e Preferenze quello che scrivi in una casella non si perde più se subito dopo cambi scheda o chiudi la pagina: domini esclusi, limite di spesa, chiavi, ore dell\'archivio automatico, durata delle notifiche, nome della voce. Il nome nuovo di una categoria vale anche senza premere «Rinomina».',
         'Lo screenshot fatto col tasto destro dentro una finestra di accesso, come quella di «Accedi con Google», fotografa quella finestra e non la scheda che sta dietro.',
+        'Sulla scheda che suona resta l\'icona del sito. L\'altoparlante sta dopo il titolo, come in Chrome, ha il colore delle scritte e prende il posto dell\'icona solo quando la scheda è troppo stretta per tutte e due. Un clic toglie l\'audio, e nello stesso punto trovi il tasto per rimetterlo. Se ti fermi col puntatore sull\'altoparlante o sulla croce, il suggerimento dice cosa fa il clic, non più il titolo della pagina.',
       ],
     },
     {

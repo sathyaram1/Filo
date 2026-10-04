@@ -166,10 +166,10 @@
       // Una riga di azione: icona e due parole («Timer avviato · 5 min»).
       // `failed`: la riga resta (è successo qualcosa) ma il riassunto non la
       // conta — «Ha avviato un timer» su un timer non avviato è una bugia.
-      addRow(type, rowIcon, text, failed = false) {
+      addRow(type, rowIcon, text, failed = false, cambi = null) {
         closeTurnReasoning();
         if (!failed) doneTypes.push(String(type || '').toUpperCase());
-        append(makeActivityRow(rowIcon, text));
+        append(makeActivityRow(rowIcon, text, cambi));
         if (phase !== 'done') setPhase('act', text);
       },
       // Esito di un comando eseguito subito (livello 1): riga di comando e
@@ -234,6 +234,8 @@
         head.title = open ? 'Nascondi' : 'Mostra cosa ha fatto Filo';
       },
       remove() { wrap.remove(); },
+      // Il blocco sta subito sotto la bolla dell'utente che l'ha chiesto: da qui la si ritrova.
+      el: wrap,
     };
   }
 
@@ -246,9 +248,12 @@
     CERCA_WEB: (n) => (n > 1 ? `cercato sul web ${n} volte` : 'cercato sul web'),
     CERCA_CHAT: (n) => (n > 1 ? `riletto ${n} conversazioni di prima` : 'riletto una conversazione di prima'),
     LEGGI_DOCUMENTO: (n) => (n > 1 ? `letto ${n} documenti` : 'letto un documento'),
+    RINOMINA_FILE: () => 'dato un nome ai file',
     LEGGI_FILE: (n) => (n > 1 ? `letto ${n} file` : 'letto un file'),
     LEGGI_TRASPARENZA: () => 'riletto la trasparenza',
     CAPACITA_DETTAGLIO: () => 'verificato cosa sa fare',
+    LEGGI_IMPOSTAZIONI: () => 'letto le impostazioni',
+    TOGLI_PERMESSO_SITO: () => 'tolto un permesso a un sito',
     TIMER: (n) => (n > 1 ? `avviato ${n} timer` : 'avviato un timer'),
     SVEGLIA: (n) => (n > 1 ? `impostato ${n} sveglie` : 'impostato una sveglia'),
     CANCELLA_SVEGLIA: () => 'cancellato una sveglia',
@@ -257,6 +262,7 @@
     ESEGUI_COMANDO: (n) => (n > 1 ? `eseguito ${n} comandi` : 'eseguito un comando'),
     IMPOSTA_PREFERENZA: (n) => (n > 1 ? `cambiato ${n} impostazioni` : 'cambiato un\'impostazione'),
     IMPOSTA_ESTETICA: (n) => (n > 1 ? `cambiato ${n} dettagli dell'aspetto` : 'cambiato l\'aspetto'),
+    ANNULLA_CAMBIO: (n) => (n > 1 ? `rimesso com'era ${n} cambi` : 'rimesso com\'era un cambio'),
     SALVA_APPUNTO: (n) => (n > 1 ? `salvato ${n} appunti` : 'salvato un appunto'),
     SALVA_LEZIONE: (n) => (n > 1 ? `memorizzato ${n} cose` : 'memorizzato una cosa'),
     DIMENTICA: (n) => (n > 1 ? `dimenticato ${n} cose` : 'dimenticato una cosa'),
@@ -270,6 +276,10 @@
     STILE_PAGINA: () => 'cambiato l\'aspetto della pagina',
     RIPRISTINA_STILE_PAGINA: () => 'rimesso la pagina com\'era',
     COMANDO_FINESTRA: () => 'azionato un comando della finestra',
+    CARTA_HOME: (n) => (n > 1 ? `sistemato ${n} carte della home` : 'sistemato una carta della home'),
+    VOLUME: () => 'cambiato il volume',
+    BLUETOOTH: () => 'comandato il Bluetooth',
+    WIFI: () => 'comandato il Wi-Fi',
     INVIA_FEEDBACK: () => 'preparato una segnalazione',
     PULISCI_TAB: () => 'riordinato le schede',
     CANCELLA_ARCHIVIO: () => 'eliminato schede dall\'archivio',
@@ -301,9 +311,13 @@
   // chi disegna una risposta senza blocco (replay, altre superfici) — fra le
   // azioni della bolla. Tiene la classe della traccia (#376): non è un bottone
   // e non deve sembrarlo.
-  function makeActivityRow(rowIcon, text) {
+  // `cambi`: gli id degli eventi del filo che la riga racconta; il tasto destro e lo stato
+  // «annullato» li leggono da lì (dashboard-cambi.js).
+  function makeActivityRow(rowIcon, text, cambi = null) {
     const el = document.createElement('div');
     el.className = 'dash-action-step dash-activity-row';
+    const ids = Array.isArray(cambi) ? cambi.filter(Boolean) : [];
+    if (ids.length) el.dataset.cambi = ids.join(' ');
     const ic = document.createElement('span');
     ic.className = 'dash-activity-row-icon';
     ic.setAttribute('aria-hidden', 'true');
@@ -324,6 +338,10 @@
   // di controllo (un byte nullo nell'etichetta finiva tale e quale nel diario).
   function pulito(v) {
     return String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, '').trim();
+  }
+  function frasiCambi(a) {
+    const l = Array.isArray(a && a._cambi) ? a._cambi : [];
+    return l.map((c) => pulito(c && c.frase)).filter(Boolean).join('; ');
   }
   const ACTIVITY_ROWS = {
     TIMER: (a) => {
@@ -352,10 +370,17 @@
     EVENTO_CALENDARIO: (a) => ({ icon: '📅', text: `Evento creato · ${a.title || a.titolo || ''}` }),
     // Impostazione applicata subito (livello 1, es. il tema): prima non
     // lasciava traccia in chat, come se non fosse successo niente.
+    // La frase è quella dell'evento del filo, col nome della pagina Preferenze (#557, #867); senza
+    // evento il valore era già quello.
     IMPOSTA_PREFERENZA: (a) => {
-      const k = a.chiave || a.key || '';
-      const v = a.valore ?? a.value;
-      return { icon: '⚙', text: `Impostato · ${k}${v !== undefined && v !== '' ? ` = ${v}` : ''}` };
+      const f = frasiCambi(a);
+      if (f) return { icon: '⚙', text: `Impostato · ${f}` };
+      const etichetta = pulito(a._output && a._output.etichetta);
+      return { icon: '⚙', text: etichetta ? `Già così · ${etichetta}` : 'Impostazione già così' };
+    },
+    ANNULLA_CAMBIO: (a) => {
+      const f = pulito(a._output && a._output.frase);
+      return { icon: '↩', text: `Rimesso com’era${f ? ` · prima di: ${f}` : ''}` };
     },
     // Passi intermedi (#368/#376): la ricerca è già partita nel main e i
     // risultati rientrano nel turno successivo, dove compare la risposta.
@@ -366,6 +391,14 @@
       return { icon: '💬', text: `Cerco fra le chat di prima: ${q}` };
     },
     CAPACITA_DETTAGLIO: () => ({ icon: '📖', text: 'Verifico cosa so fare' }),
+    LEGGI_IMPOSTAZIONI: (a) => {
+      const c = String(a.cerca || '').trim();
+      return { icon: '⚙', text: c ? `Leggo come è impostato: ${c}` : 'Leggo le impostazioni' };
+    },
+    TOGLI_PERMESSO_SITO: (a) => {
+      const tolte = (a._output && Array.isArray(a._output.tolte)) ? a._output.tolte.map(pulito).filter(Boolean) : [];
+      return { icon: '⚙', text: `Permesso tolto · ${tolte.length ? tolte.join('; ') : String(a.sito || '')}` };
+    },
     LEGGI_FILE: (a) => {
       const title = (a._output && a._output.title) || '';
       return { icon: '📄', text: title ? `Leggo: ${title}` : 'Leggo un file' };
@@ -375,6 +408,7 @@
       return { icon: '📄', text: nome ? `Leggo il documento: ${nome}` : 'Leggo il documento' };
     },
     LEGGI_TRASPARENZA: () => ({ icon: '📄', text: 'Rileggo la pagina di trasparenza' }),
+    RINOMINA_FILE: (a) => ({ icon: '✎', text: testoRinominati(a._output) }),
     // Le azioni che non lasciano niente da cliccare in chat: prima sparivano
     // del tutto, e l'utente non sapeva dove fosse finito il suo appunto.
     SALVA_APPUNTO: (a) => {
@@ -402,6 +436,8 @@
       const T = window.SN_THEME_TOKENS;
       const t = T && T.get && T.get(tok);
       const val = a.valore ?? a.value ?? a.val ?? a.colore;
+      const f = frasiCambi(a);
+      if (f) return { icon: '🎨', text: `Aspetto · ${f.replace(/^aspetto, /, '')}` };
       return { icon: '🎨', text: `Aspetto · ${(t && t.label) || tok}${val ? ` = ${val}` : ''}` };
     },
     PROXY_TAB: (a) => ({ icon: '🌍', text: `Scheda aperta da · ${String(a.country || a.paese || '').toUpperCase()}` }),
@@ -422,6 +458,29 @@
       const n = Number(a._output && a._output.eliminate) || 0;
       return { icon: '🗑', text: `Eliminate dall’archivio · ${n} ${n === 1 ? 'scheda' : 'schede'}` };
     },
+    // Il nome è quello della carta toccata davvero (#870): a sinistra lo dice l'esito, a destra lo si risolve come il
+    // main. Le parole del modello da sole ingannano: «l'avviso del documento» contiene un nome dell'Editor.
+    CARTA_HOME: (a) => {
+      const C = self.SN_CARTE_HOME;
+      const o = a._output || {};
+      const corto = (t) => { const x = String(t || '').replace(/\s+/g, ' ').trim(); return x.length > 60 ? `${x.slice(0, 59)}…` : x; };
+      let nome = '';
+      const toccate = Array.isArray(o.tolte) && o.tolte.length ? o.tolte : (Array.isArray(o.rimesse) && o.rimesse.length ? o.rimesse : null);
+      if (toccate) nome = toccate.length === 1 ? corto(toccate[0].titolo) : `${toccate.length} carte`;
+      else if (o.spostata) nome = corto(o.spostata);
+      else if (Array.isArray(o.destra) && !o.error && C) { const id = C.risolvi(a.carta); nome = id ? C.carta(id).titolo : ''; }
+      const op = String(a.operazione || '').toLowerCase();
+      const cosa = { togli: 'Carta tolta', rimetti: 'Carta rimessa', aggiungi: 'Carta rimessa', sposta: 'Carta spostata' }[op];
+      if (op === 'ripristina') return { icon: '🏠', text: 'Carte della home rimesse com\'erano' };
+      return { icon: '🏠', text: `${cosa || 'Carta della home'}${nome ? ` · ${nome}` : ''}` };
+    },
+    // #874 — il numero e i nomi veri, quelli che il sistema ha confermato.
+    VOLUME: (a) => {
+      const o = a._output || {};
+      return { icon: '🔊', text: typeof o.volume === 'number' ? `Volume al ${o.volume}%${o.muto ? ' · muto' : ''}` : 'Volume cambiato' };
+    },
+    BLUETOOTH: (a) => rigaRadio(a, 'Bluetooth'),
+    WIFI: (a) => rigaRadio(a, 'Wi-Fi'),
     COMANDO_FINESTRA: (a) => {
       const labels = {
         fullscreen: 'Schermo intero', minimize: 'Finestra ridotta a icona', home: 'Home aperta',
@@ -438,18 +497,40 @@
     CANCELLA_SVEGLIA: 'Niente da cancellare', MODIFICA_SVEGLIA: 'Niente da spostare',
     SALVA_APPUNTO: 'Appunto non salvato', SALVA_LEZIONE: 'Non memorizzato',
     DIMENTICA: 'Niente da dimenticare',
-    CERCA_WEB: 'Ricerca non riuscita', LEGGI_FILE: 'File non letto',
+    CERCA_WEB: 'Ricerca non riuscita', LEGGI_FILE: 'File non letto', RINOMINA_FILE: 'Nessun file rinominato',
     CERCA_CHAT: 'Conversazione non ritrovata',
     LEGGI_DOCUMENTO: 'Documento non letto', LEGGI_TRASPARENZA: 'Documento non disponibile',
-    CAPACITA_DETTAGLIO: 'Verifica non riuscita', NAVIGA: 'Link non aperto',
+    CAPACITA_DETTAGLIO: 'Verifica non riuscita', NAVIGA: 'Link non aperto', LEGGI_IMPOSTAZIONI: 'Impostazioni non lette',
+    TOGLI_PERMESSO_SITO: 'Permesso non tolto',
     IMPOSTA_PREFERENZA: 'Impostazione non applicata', IMPOSTA_ESTETICA: 'Aspetto non cambiato',
+    ANNULLA_CAMBIO: 'Niente annullato',
     STILE_PAGINA: 'Aspetto della pagina non cambiato', RIPRISTINA_STILE_PAGINA: 'Aspetto della pagina non ripristinato',
     PROXY_TAB: 'Scheda non instradata', RIMUOVI_PROXY: 'Proxy non tolto',
     RIMUOVI_PROXY_TUTTE: 'Proxy non tolti', REGOLA_PROXY_DOMINIO: 'Regola non salvata',
     RIMUOVI_REGOLA_PROXY: 'Regola non tolta', COMANDO_FINESTRA: 'Comando non eseguito',
+    CARTA_HOME: 'Carta della home non cambiata',
     EVENTO_CALENDARIO: 'Evento non creato', ONBOARDING: 'Accoglienza non aggiornata',
+    VOLUME: 'Volume non cambiato', BLUETOOTH: 'Bluetooth non cambiato', WIFI: 'Wi-Fi non cambiato',
   };
+  function rigaRadio(a, radio) {
+    const o = a._output || {};
+    const icon = radio === 'Wi-Fi' ? '📶' : '🎧';
+    if (Array.isArray(o.elenco)) return { icon, text: radio === 'Wi-Fi' ? 'Letto le reti conosciute' : 'Letto i dispositivi abbinati' };
+    if (typeof o.acceso === 'boolean') return { icon, text: `${radio} ${o.acceso ? 'acceso' : 'spento'}` };
+    const nome = o.dispositivo || o.rete || '';
+    if (o.gia) return { icon, text: `Già così · ${nome}` };
+    // Il sistema ha preso la richiesta ma non ha ancora confermato: la riga non promette di più.
+    if (radio === 'Wi-Fi') return { icon, text: `${o.confermato === false ? 'Collegamento chiesto' : 'Collegato al Wi-Fi'} · ${nome}` };
+    if (o.collegato === null) return { icon, text: `Collegamento chiesto · ${nome}` };
+    return { icon, text: `${o.collegato === false ? 'Scollegato' : 'Collegato'} · ${nome}` };
+  }
   function activityRowFor(a) {
+    const row = rigaAttivita(a);
+    if (!row || row.failed) return row;
+    const ids = (Array.isArray(a._cambi) ? a._cambi : []).map((c) => (typeof c === 'string' ? c : c && c.id)).filter(Boolean);
+    return ids.length ? { ...row, cambi: ids } : row;
+  }
+  function rigaAttivita(a) {
     if (!a) return null;
     // In attesa di conferma: il bottone lo mostra la chat, ma nel diario resta
     // la traccia che Filo l'ha CHIESTO — se no un turno fatto di sola richiesta
@@ -492,6 +573,7 @@
     if (o.proxy === 'non_disponibile') return 'non ancora disponibile';
     if (o.proxy === 'no_web_tab') return 'nessuna pagina web aperta';
     if (o.found === false) return 'non trovato';
+    if (o.ok === false && o.errore && o.frase) return String(o.frase);
     if (o.ok === false && o.detail) return String(o.detail);
     if (o.error) return String(o.error);
     return '';
@@ -511,7 +593,7 @@
       return true;
     }
     const row = activityRowFor(a);
-    if (row) { activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed); return true; }
+    if (row) { activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed, row.cambi); return true; }
     return false;
   }
 
@@ -523,13 +605,36 @@
   // dove l'appunto è finito, e il controllo per scegliere la tinta esatta.
   // Aggiungerne una qui è obbligatorio quando le si dà una riga: senza, la riga
   // si mangia il bottone e la funzione sparisce dalla chat.
-  const ROW_AND_BUTTON = ['SALVA_APPUNTO', 'IMPOSTA_ESTETICA'];
+  const ROW_AND_BUTTON = ['SALVA_APPUNTO', 'IMPOSTA_ESTETICA', 'RINOMINA_FILE'];
 
   // Una pagina che il modello voleva aprire e che la lista dei siti bloccati ha fermato: la
   // notifica se ne va in pochi secondi, e la chat le tiene il suo «Apri comunque» (#590).
   function apribileComunque(a) {
     const o = a && a._output;
     return isType(a, 'NAVIGA') && a._executed === false && !!o && o.blocked === 'site' && /^https?:\/\//i.test(String(o.url || ''));
+  }
+
+  // #874 — un comando del sistema fermato da un permesso che manca: la frase sta nella riga, il tasto apre il posto
+  // delle impostazioni dove si concede (l'indirizzo lo sceglie il main da un elenco suo, qui passa solo la chiave).
+  function permessoDaConcedere(a) {
+    const o = a && a._output;
+    return (isType(a, 'VOLUME') || isType(a, 'BLUETOOTH') || isType(a, 'WIFI')) && a._executed === false
+      && !!o && typeof o.apri === 'string' && !!o.apri;
+  }
+
+  function bottonePermesso(a) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'dash-action-btn';
+    btn.textContent = 'Apri le impostazioni';
+    btn.title = String(a._output.dove || a._output.frase || '');
+    btn.addEventListener('click', async () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      await send({ type: MSG.SISTEMA_APRI_IMPOSTAZIONI, chiave: a._output.apri }).catch(() => null);
+      setTimeout(() => { btn.disabled = false; }, 1500);
+    });
+    return btn;
   }
 
   function bottoneApriComunque(a) {
@@ -570,7 +675,7 @@
     const chip = document.querySelector(`[data-call-id="${CSS.escape(String(callId))}"]`);
     if (chip && apribileComunque(a)) {
       const row = activityRowFor(a);
-      if (row) chip.before(makeActivityRow(row.icon, row.text));
+      if (row) chip.before(makeActivityRow(row.icon, row.text, row.cambi));
       chip.replaceWith(bottoneApriComunque(a));
     }
     return true;
@@ -596,7 +701,7 @@
       // bottone è come si risponde.
       const anche = a._confirm
         || (ROW_AND_BUTTON.includes(String(a.type || '').toUpperCase()) && a._executed !== false)
-        || apribileComunque(a);
+        || apribileComunque(a) || permessoDaConcedere(a);
       if (activity) {
         if (told) {
           // Già in cronologia; resta solo l'eventuale bottone (link, conferma).
@@ -607,7 +712,7 @@
       } else {
         const row = activityRowFor(a);
         if (row) {
-          wrap.appendChild(makeActivityRow(row.icon, row.text));
+          wrap.appendChild(makeActivityRow(row.icon, row.text, row.cambi));
           if (!anche) continue;
         }
       }
@@ -616,7 +721,7 @@
       // cieco (era il caso di un link con un indirizzo non ammesso). La sua
       // riga sta già nel diario. Un'azione IN ATTESA DI CONFERMA non è
       // «fallita»: non è ancora partita, e il suo bottone è tutto il punto.
-      if (!a._confirm && !apribileComunque(a) && ((a._traccia && !anche) || a._executed === false)) continue;
+      if (!a._confirm && !apribileComunque(a) && !permessoDaConcedere(a) && ((a._traccia && !anche) || a._executed === false)) continue;
       const btn = renderActionButton(a, { onAck, activity });
       if (btn) wrap.appendChild(btn);
       if (String(a.type || '').toUpperCase() === 'SALVA_APPUNTO') hasAck = true;
@@ -784,10 +889,95 @@
     return el;
   }
 
+  // #950 — un file trovato da Filo: dal tasto destro si apre o gli si dà un nome sensato, e il riferimento in
+  // chat segue il nome nuovo (un clic dopo apre il file, non il percorso che non c'è più).
+  const nomeDelPercorso = (p) => String(p || '').split(/[\\/]/).pop();
+  function menuDelFile(btn, a) {
+    const R = window.SN_RINOMINA_UI;
+    if (!R) return;
+    const aggiorna = (r) => {
+      if (!r || !r.a) return;
+      const vecchio = String(a.percorso || a.path || '');
+      const etichetta = String(a.etichetta || a.label || '');
+      a.percorso = r.a;
+      if (a.path) a.path = r.a;
+      if (etichetta && (etichetta === vecchio || etichetta === nomeDelPercorso(vecchio))) {
+        if (a.etichetta) a.etichetta = r.nome; else a.label = r.nome;
+      }
+      btn.href = r.a;
+      btn.textContent = a.etichetta || a.label || r.a;
+    };
+    const apriMenu = (e) => {
+      e.preventDefault();
+      const rect = btn.getBoundingClientRect();
+      const x = e.type === 'contextmenu' && e.clientX ? e.clientX : rect.left;
+      const y = e.type === 'contextmenu' && e.clientY ? e.clientY : rect.bottom;
+      R.disponibile().then((disp) => {
+        const percorso = String(a.percorso || a.path || '');
+        const nome = nomeDelPercorso(percorso);
+        const voci = [['Apri', () => btn.click()]];
+        if (disp && percorso && R.tipoSupportato(nome)) {
+          voci.push([R.VOCE, () => R.apri({ ancora: btn, percorso, nome, suRinominato: aggiorna, suRimesso: aggiorna })]);
+        }
+        if (R.nomeDiPrima(percorso)) voci.push([R.VOCE_RIMETTI, () => R.rimetti({ ancora: btn, percorso, suRimesso: aggiorna })]);
+        R.menu(x, y, voci, { ancora: btn });
+      });
+    };
+    btn.addEventListener('contextmenu', apriMenu);
+    btn.addEventListener('keydown', (e) => {
+      if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) apriMenu(e);
+    });
+  }
+
+  function testoRinominati(o) {
+    const n = o && Array.isArray(o.rinominati) ? o.rinominati.length : 0;
+    const no = o && Array.isArray(o.falliti) ? o.falliti.length : 0;
+    const quanti = n === 1 ? 'Rinominato un file' : `Rinominati ${n} file`;
+    return no ? `${quanti} · ${no} non riusciti` : quanti;
+  }
+  function motivoNessunaRinomina(o) {
+    const f = o && Array.isArray(o.falliti) && o.falliti[0];
+    return f && f.perche ? `Non rinominati: ${f.perche}` : 'Non rinominati';
+  }
+  // «Annulla» dopo una rinomina dalla chat: rimette i nomi di prima di TUTTI i file del lotto.
+  function bottoneRimettiNomi(a) {
+    const o = a && a._output;
+    const fatti = o && Array.isArray(o.rinominati) ? o.rinominati : [];
+    if (!fatti.length) return null;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'dash-action-btn';
+    btn.textContent = o.rimessi ? '↺ Nomi di prima rimessi' : '↺ Annulla';
+    btn.title = fatti.length === 1 ? `Rimetti «${fatti[0].prima}»` : `Rimetti i nomi di prima ai ${fatti.length} file`;
+    btn.disabled = !!o.rimessi;
+    btn.addEventListener('click', async () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      let r = null;
+      try { r = await send({ type: MSG.FILE_RIMETTI_NOMI, coppie: fatti.map((x) => ({ attuale: x.a, prima: x.prima })) }); } catch (_) { r = null; }
+      const esiti = r && Array.isArray(r.esiti) ? r.esiti : [];
+      const ok = esiti.filter((e) => e && e.ok).length;
+      if (ok && ok === fatti.length) {
+        o.rimessi = true;
+        btn.textContent = '↺ Nomi di prima rimessi';
+        return;
+      }
+      btn.disabled = false;
+      const primo = esiti.find((e) => e && !e.ok);
+      btn.textContent = ok ? `↺ Rimessi ${ok} su ${fatti.length}: riprova` : '↺ Annulla non riuscito: riprova';
+      if (primo && primo.frase) btn.title = primo.frase;
+      // Quelli già rimessi non si rimettono due volte: alla prossima pressione restano solo gli altri.
+      const rimasti = fatti.filter((x, i) => !(esiti[i] && esiti[i].ok));
+      o.rinominati = rimasti;
+    });
+    return btn;
+  }
+
   function renderActionButton(a, { onAck, activity = null } = {}) {
     const type = String(a.type || '').toUpperCase();
     // In attesa di conferma come le altre, ma la si dà dalla loro UI: il
     // bottone del riordino, il pannello con l'elenco da eliminare.
+    if (permessoDaConcedere(a)) return bottonePermesso(a);
     if (type === 'PULISCI_TAB') return renderBottoneRiordino(a, activity);
     if (type === 'CANCELLA_ARCHIVIO') return renderDeleteArchivePanel(a, activity);
     // Azione sospesa in attesa di conferma (#146.2): il main non l'ha eseguita
@@ -836,7 +1026,7 @@
       // partirebbe a nome dell'utente. Il popup non invia nulla: mostra il testo
       // e aspetta l'OK, esattamente come nella sidebar (che già fa così).
       // Le azioni distruttive (livello 3) e i comandi restano a click esplicito.
-      const AUTO_CONFIRM_TYPES = ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'INVIA_FEEDBACK', 'SALVA_LEZIONE', 'DIMENTICA'];
+      const AUTO_CONFIRM_TYPES = ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'INVIA_FEEDBACK', 'SALVA_LEZIONE', 'DIMENTICA', 'RINOMINA_FILE', 'BLUETOOTH', 'WIFI'];
       if (AUTO_CONFIRM_TYPES.includes(type) && a._confirm.level === 2) {
         btn.dataset.autoConfirm = '1';
       }
@@ -861,7 +1051,7 @@
           a._executed = false;
           delete a._confirm;
           const row = activityRowFor(a);
-          if (activity && row) activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed);
+          if (activity && row) activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed, row.cambi);
           btn.textContent = `🔒 ${row ? row.text : 'Fermata'}`;
           return;
         }
@@ -870,7 +1060,7 @@
         // il MODELLO al turno dopo — l'oggetto è lo stesso che sta nello
         // storico della conversazione, quindi basta segnarlo qui. Senza,
         // a «l'hai attivato?» il modello poteva solo tirare a indovinare.
-        if (r && r.executed) segnaConfermata(a, r.output, activity);
+        if (r && r.executed) segnaConfermata(a, r.output, activity, r.cambi);
         // #146.6 — comando confermato (livello 2/3): mostra l'output in chat.
         if (isCmd) {
           segnaComando((r && r.executed) ? '✓' : '✗');
@@ -878,7 +1068,19 @@
           if (r && r.output) applyCommandCwd([{ _output: r.output }]);
           return;
         }
-        btn.textContent = (r && r.executed) ? `✓ ${shortLabel}` : '✗ Non eseguita';
+        const fatto = r && typeof r.fatto === 'string' ? r.fatto.trim() : '';
+        btn.textContent = (r && r.executed) ? `✓ ${fatto ? (fatto.length > 140 ? `${fatto.slice(0, 139)}…` : fatto) : shortLabel}` : '✗ Non eseguita';
+        if (fatto.length > 140) btn.title = fatto;
+        // #874 — il sistema ha detto no dopo l'OK (un permesso, una rete fuori portata): la frase e, se serve, il tasto.
+        if ((type === 'BLUETOOTH' || type === 'WIFI') && r && !r.executed && r.output && r.output.frase) {
+          btn.textContent = `✗ ${r.output.frase}`;
+          if (r.output.apri) btn.after(bottonePermesso({ ...a, _executed: false, _output: r.output }));
+        }
+        // #950 — i file rinominati: il bottone dice quanti, e accanto c'è la strada per rimetterli com'erano.
+        if (type === 'RINOMINA_FILE') {
+          btn.textContent = (r && r.executed) ? `✓ ${testoRinominati(r.output)}` : `✗ ${motivoNessunaRinomina(r && r.output)}`;
+          if (r && r.executed) btn.after(bottoneRimettiNomi(a));
+        }
         // #146.4 — modifica estetica illeggibile (livello 2): confermata ed
         // applicata, offriamo subito il box per correggere il valore.
         if (r && r.executed && type === 'IMPOSTA_ESTETICA') {
@@ -946,6 +1148,7 @@
       btn.appendChild(document.createTextNode(bgTabId ? `▸ ${label}` : `↗ ${label}`));
       return btn;
     }
+    if (type === 'RINOMINA_FILE') return bottoneRimettiNomi(a);
     if (type === 'APRI_FILE') {
       const btn = document.createElement('a');
       btn.className = 'dash-action-btn';
@@ -954,6 +1157,7 @@
       btn.target = '_blank';
       btn.rel = 'noopener';
       btn.textContent = a.etichetta || a.label || (filePath || 'File');
+      menuDelFile(btn, a);
       return btn;
     }
     if (type === 'TIMER') {
@@ -1019,6 +1223,10 @@
       const nome = (a._output && a._output.name) || '';
       return stepTrace(nome ? `📄 Leggo il documento: ${nome}` : '📄 Leggo il documento');
     }
+    if (type === 'LEGGI_IMPOSTAZIONI') {
+      const c = String(a.cerca || '').trim();
+      return stepTrace(c ? `⚙ Leggo come è impostato: ${c}` : '⚙ Leggo le impostazioni');
+    }
     if (type === 'LEGGI_TRASPARENZA') {
       // Traccia del passo intermedio: Filo rilegge le scelte dell'owner messe
       // per iscritto prima di rispondere sul perché di un modello o di un dato.
@@ -1037,15 +1245,20 @@
 
   // Confermata e fatta: lo sanno il diario e, al turno dopo, il modello (è lo
   // stesso oggetto che sta nello storico della conversazione).
-  function segnaConfermata(a, output, activity) {
+  function segnaConfermata(a, output, activity, cambi) {
     a._confirmed = true;
     a._executed = true;
     delete a._confirm;
     if (output) a._output = output;
+    const ids = Array.isArray(cambi) ? cambi : [];
+    if (ids.length) {
+      a._cambi = ids;
+      if (activity && activity.el && global.SN_DASH_CAMBI) global.SN_DASH_CAMBI.segna(activity.el, ids);
+    }
     const row = activityRowFor(a);
-    if (activity && row) activity.addRow(a.type, row.icon, row.text, !!row.failed);
+    if (activity && row) activity.addRow(a.type, row.icon, row.text, !!row.failed, row.cambi);
     // L'archivio delle chat ha salvato il turno senza le azioni in attesa: questa adesso è successa.
-    try { archiviaAzione(String(a.type || '').toUpperCase()); } catch (_) {}
+    try { archiviaAzione(String(a.type || '').toUpperCase(), ids.map((c) => c.id)); } catch (_) {}
   }
 
   // La pulizia parte SOLO al click, con conferma, mai da sola (spec §2.1).

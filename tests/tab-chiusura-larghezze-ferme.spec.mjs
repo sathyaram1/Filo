@@ -83,16 +83,22 @@ test('chiudendo con la X le altre schede tengono la larghezza, e la X accanto re
 
 test('chiusa l’ultima scheda, il + resta dov’era e il clic seguente non apre una scheda', async ({ shell }) => {
   // Con 22 schede quelle inattive sono strette quanto il +: se il + scorresse a sinistra finirebbe sotto il puntatore.
+  // Così strette non hanno la X (tests/tab-scheda-stretta.spec.mjs): si chiudono col clic centrale.
   const N = 22;
   await apriSchede(shell, N);
   await shell.evaluate(async (id) => window.filoShell.tabs.activate(id), await idInPosizione(shell, 0));
   await expect(shell.locator('#tabs .tab').first()).toHaveClass(/active/);
+  // Le schede finiscono di caricare in tempi diversi da una macchina all'altra: si misura a caricamento finito.
+  await expect(shell.locator('#tabs .tab .spinner')).toHaveCount(0, { timeout: 15_000 });
   const prima = await larghezze(shell);
   const piu = () => shell.evaluate(() => document.getElementById('tab-new').getBoundingClientRect().left);
   const piuPrima = await piu();
-  const punto = await centroChiudi(shell, await idInPosizione(shell, N - 1));
+  const punto = await shell.evaluate(() => {
+    const r = document.querySelector('#tabs .tab:last-child').getBoundingClientRect();
+    return { x: (r.left + r.right) / 2, y: (r.top + r.bottom) / 2 };
+  });
   await shell.mouse.move(punto.x, punto.y);
-  await shell.mouse.click(punto.x, punto.y);
+  await shell.mouse.click(punto.x, punto.y, { button: 'middle' });
   await expect.poll(() => verdettoUguali(shell, prima, N - 1), { timeout: 8_000 }).toBe('uguali');
   expect(Math.abs((await piu()) - piuPrima)).toBeLessThan(0.5);
 
@@ -155,4 +161,23 @@ test('una scheda nuova mentre le larghezze sono ferme rimette la striscia in mis
 
   await shell.locator('#tab-new').click();
   await expect.poll(() => verdettoAllargate(shell, prima, QUANTE - 1), { timeout: 8_000 }).toBe('allargate');
+});
+
+test('lasciata la fila, le schede si allargano subito, senza aspettare che un\'altra scheda cambi', async ({ shell }) => {
+  await apriSchede(shell, QUANTE);
+  const punto = await centroChiudi(shell, await idInPosizione(shell, 5));
+  await shell.mouse.move(punto.x, punto.y);
+  await shell.mouse.click(punto.x, punto.y);
+  await expect(shell.locator('#tabs .tab')).toHaveCount(QUANTE - 1, { timeout: 8_000 });
+  await shell.waitForTimeout(800);
+
+  // Rilascio e misura nello stesso giro di JS: nessun aggiornamento delle schede può ridisegnare in mezzo.
+  const esito = await shell.evaluate(() => {
+    const inattive = () => [...document.querySelectorAll('#tabs .tab:not(.active)')].map((el) => el.getBoundingClientRect().width);
+    const prima = inattive();
+    document.dispatchEvent(new MouseEvent('mousemove', { clientX: 400, clientY: 300, bubbles: true }));
+    const dopo = inattive();
+    return { prima: prima[0], dopo: dopo[0], ferme: dopo.filter((w, i) => !(w > prima[i] + 0.5)).length };
+  });
+  expect(esito, JSON.stringify(esito)).toMatchObject({ ferme: 0 });
 });

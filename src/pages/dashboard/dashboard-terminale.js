@@ -299,6 +299,7 @@
       command,
       cwd: currentCwd,
       shell: terminalShell,
+      chat: chatDelComando,
       onData: ({ chunk, stream }) => appendOut(chunk, stream === 'stderr'),
       onExit: ({ code, cwd }) => {
         if (cwd) setCwd(cwd);

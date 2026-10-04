@@ -130,7 +130,7 @@ test('notifiche e messaggio della home: recintati nella chat e nel generatore de
     };
     try {
       await globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'novità?', threadHistory: [] });
-      await globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.FILO_GENERATE_DASHBOARD, force: true }, {});
+      await globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.FILO_GENERATE_DASHBOARD, force: true }, { url: 'filo://newtab/' });
     } finally {
       globalThis.SN_PROVIDERS.completeWithFallback = orig;
     }

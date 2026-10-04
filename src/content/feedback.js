@@ -205,7 +205,8 @@
     } catch (_) {}
   }
 
-  function open() {
+  // `testo`: una segnalazione già scritta da Filo (il falso allarme dal tasto destro sull'avviso di un sito, #813.5).
+  function open({ testo: proposta = '' } = {}) {
     if (activeRoot) return;
     const root = document.createElement('div');
     root.className = 'sn-fb-overlay';
@@ -296,11 +297,20 @@
       clearTimeout(saveTimer);
       saveTimer = setTimeout(saveDraft, 250);
     });
-    // Ripristina l'eventuale bozza salvata (solo se l'utente non ha già scritto).
+    // Ripristina l'eventuale bozza salvata (solo se l'utente non ha già scritto). Il testo proposto da Filo si
+    // aggiunge alla bozza, non la sostituisce: la bozza è dell'utente.
+    const inFondo = () => { try { textEl.setSelectionRange(textEl.value.length, textEl.value.length); } catch (_) {} };
+    if (typeof proposta === 'string' && proposta) { textEl.value = proposta; inFondo(); }
     try {
       chrome.storage.local.get([DRAFT_KEY]).then((r) => {
         const saved = r?.[DRAFT_KEY];
-        if (saved && activeRoot === root && !textEl.value) textEl.value = saved;
+        if (activeRoot !== root) return;
+        if (saved && !textEl.value) textEl.value = saved;
+        else if (saved && proposta && textEl.value === proposta && !saved.includes(proposta)) {
+          textEl.value = `${saved}\n\n${proposta}`;
+          inFondo();
+        }
+        if (proposta) saveDraft();
       }).catch(() => {});
     } catch (_) {}
 
@@ -838,6 +848,7 @@
 
     updateClearBtn();
     textEl.focus();
+    if (proposta) inFondo();
   }
 
   global.SN_FEEDBACK_UI = { open, close };

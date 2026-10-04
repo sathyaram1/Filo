@@ -60,6 +60,9 @@
   // un'altra scheda fa avanzare la stessa intervista.
   function renderOnboardingThread(state) {
     const thread = Array.isArray(state?.thread) ? state.thread : [];
+    // I segni dei cambi chiesti durante l'intervista sopravvivono al ridisegno (#867).
+    const Cambi = global.SN_DASH_CAMBI;
+    const segni = Cambi ? Cambi.fotografa(bubblesEl) : [];
     bubblesEl.innerHTML = '';
     // Lo stato viaggia con l'azzeramento: la home lo usa per legare TUTTA
     // l'intervista a una sola chat in archivio (#525), anche quando si svolge
@@ -71,6 +74,7 @@
       pushHistory({ role, text: m.text });
       bubblesEl.appendChild(makeBubble({ role, text: m.text, markdown: role === 'filo' }));
     }
+    if (Cambi && segni.length) Cambi.rimetti(bubblesEl, segni);
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
   }
 

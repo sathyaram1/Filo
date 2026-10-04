@@ -1,8 +1,9 @@
 // Dashboard Filo (new tab). Controller UI.
 //
 // Stati visibili:
-//   - "home"   → messaggio centrale proattivo + suggerimenti pieni
-//   - "thread" → conversazione in corso (bolle). Colonna sx collassa a icone.
+//   - "home"   → messaggio centrale proattivo
+//   - "thread" → conversazione in corso (bolle)
+// Ai lati, in tutti e due gli stati, le carte (#870): le disegna dashboard-carte.js.
 //
 // Ogni nuova query dalla home apre un nuovo thread (vedi spec sezione 2.1).
 // Niente persistenza cross-tab del thread: ad ogni nuovo new-tab si riparte
@@ -20,9 +21,7 @@
   const homeView = $('homeView');
   const threadView = $('threadView');
   const bubblesEl = $('bubbles');
-  const suggestionsEl = $('suggestions');
-  const expandBtn = $('expandBtn');
-  const liveEl = $('live');
+  const accadeEl = $('accade');
   const inputForm = $('inputForm');
   const inputEl = $('input');
   const sendBtn = $('sendBtn');
@@ -31,7 +30,6 @@
   // ===== Stato locale =====
   let suggestions = [];
   let showHomeMessage = true; // commento centrale (disattivabile da Preferenze)
-  let expanded = false;
   let threadHistory = []; // [{role: 'user'|'filo', text, actions?}]
   // #525 — la targa della chat in corso. Viaggia con ogni messaggio: è il main
   // a scrivere la conversazione su disco, turno per turno, così una chat
@@ -41,18 +39,24 @@
   let sending = false;
   let liveTickHandle = null;
   let pendingImages = []; // dataUrl delle immagini incollate (multiple)
+  // #950 — file trascinati dal disco: { percorso, nome }. Il percorso parte col messaggio, come se l'utente
+  // l'avesse incollato; le immagini arrivate dal disco ricordano il loro.
+  let pendingFiles = [];
+  const percorsiImmagini = new Map();
 
   // ===== Le parti della home =====
   //
-  // Qui restano chat e turni, la home (messaggio centrale e suggerimenti), la
-  // colonna live, i controlli in alto a destra, il recap e i premi. Il resto
-  // vive accanto, in quattro moduli che si registrano su globalThis e ricevono
+  // Qui restano chat e turni, il messaggio centrale, timer e avvisi (con la
+  // suoneria), i suggerimenti, i controlli in alto a destra, il recap e i premi.
+  // Il resto vive accanto, in moduli che si registrano su globalThis e ricevono
   // da qui le loro dipendenze:
   //
   //   SN_DASH_ATTIVITA    il blocco di attività, le righe del diario, i bottoni
   //   SN_DASH_ONBOARDING  la micro-intervista di benvenuto (#524)
   //   SN_DASH_COMANDI     i comandi con lo slash e la colorazione dell'input
   //   SN_DASH_TERMINALE   cartella corrente, colori ANSI, comandi di shell
+  //   SN_DASH_CARTE       le carte ai lati e «altro» (#870)
+  //   SN_DASH_SISTEMA     ora, batteria, rete e Bluetooth in fondo alla colonna destra (#873)
   //
   // Lo stato che due parti condividono non si copia: si chiede a chi lo
   // possiede — la cartella del terminale al terminale, "sto inviando" a questo
@@ -61,6 +65,8 @@
   const Accoglienza = self.SN_DASH_ONBOARDING;
   const Comandi = self.SN_DASH_COMANDI;
   const Term = self.SN_DASH_TERMINALE;
+  const Carte = self.SN_DASH_CARTE;
+  const Sistema = self.SN_DASH_SISTEMA;
 
   Att.init({
     send,
@@ -69,11 +75,15 @@
     // Le parole dell'utente in questa chat viaggiano con l'OK: un codice scritto da lui può uscire (#810).
     paroleUtente: () => paroleUtente(),
     apriProposta: (url, vicino) => apriProposta(url, vicino),
-    archiviaAzione: (type) => {
+    archiviaAzione: (type, cambi) => {
       const id = chatDellaRiga();
-      if (id) { try { send({ type: MSG.FILO_CHAT_NOTE, id, text: '', role: 'filo', actions: [type] }); } catch (_) {} }
+      const ids = Array.isArray(cambi) ? cambi : [];
+      if (id) { try { send({ type: MSG.FILO_CHAT_NOTE, id, text: '', role: 'filo', actions: [type], ...(ids.length ? { cambi: ids } : {}) }); } catch (_) {} }
     },
   });
+  // #867 — il segno sulla bolla dell'utente per i cambi di stato che il suo messaggio ha chiesto.
+  const Cambi = self.SN_DASH_CAMBI;
+  Cambi.init({ send });
   // #590 — una pagina aperta da Filo che si è spostata da sé su un sito bloccato dopo la risposta.
   if (window.filo?.onAperturaFermata) {
     window.filo.onAperturaFermata((data) => {
@@ -105,6 +115,7 @@
   // basta: mostrarla riporterebbe l'utente dentro una chat che aveva chiuso.
   const inChatAperta = (chat) => !chat || chat === chatId;
 
+  Sistema.init({ send, MSG, host: $('sistema'), ICONS: self.SN_ICONS });
   Term.init({
     dashDir,
     inputEl,
@@ -161,6 +172,19 @@
     },
     setSuggestions: (list) => { suggestions = list; renderSuggestions(); },
     loadDashboard: () => loadDashboard(),
+  });
+  Carte.init({
+    send,
+    accadeEl,
+    tieniEl: $('tieni'),
+    altroEl: $('altro'),
+    refreshLive: () => refreshLive(),
+    onSuggestionClick: (s, vicino) => onSuggestionClick(s, vicino),
+    aggiornaSuggerimenti: () => loadDashboard({ force: true }).catch(() => {}),
+    faviconUrl: (url) => faviconUrl(url),
+    apriNelFilo: (o) => apriNelFilo(o),
+    scriviNelCampo: (t) => scriviNelCampo(t),
+    chatCorrente: () => chatId,
   });
   // ===== Suoneria timer =====
   // Singleton AudioContext + oscillatori per la suoneria del timer.
@@ -346,21 +370,28 @@
     catch (_) { return null; }
   }
 
-  async function reopenChat(id) {
+  async function reopenChat(id, { chiudiPrima = false } = {}) {
     const r = await send({ type: MSG.FILO_CHAT_GET, id });
     const chat = r && r.ok && r.chat;
     if (!chat || !Array.isArray(chat.messages) || !chat.messages.length) return false;
+    // Da una carta della home (#870): la conversazione a schermo si chiude come col ritorno alla home.
+    if (chiudiPrima && chatId && chatId !== chat.id) { closeCurrentChat(); Term.nuovaChat(false); }
     chatId = chat.id;
     threadHistory = [];
     bubblesEl.innerHTML = '';
     goThread();
+    let bollaUtente = null;
     for (const m of chat.messages) {
       const isUser = m.role === 'user';
       const text = String(m.text || '');
       const types = Array.isArray(m.actions) ? m.actions : [];
       if (text.trim()) {
-        bubblesEl.appendChild(makeBubble({ role: isUser ? 'user' : 'filo', text, markdown: !isUser }));
+        const b = makeBubble({ role: isUser ? 'user' : 'filo', text, markdown: !isUser });
+        bubblesEl.appendChild(b);
+        if (isUser) bollaUtente = b;
       }
+      // I cambi chiesti con quel messaggio ritrovano il loro segno, col loro stato di adesso.
+      if (!isUser && Array.isArray(m.cambi) && m.cambi.length && bollaUtente) Cambi.segna(bollaUtente, m.cambi);
       // Le immagini incollate non stanno nell'archivio (sono data URL da
       // centinaia di KB l'una), ma il loro NUMERO sì: va detto. Senza, chi
       // rilegge trova «cosa vedi in questo grafico?» riferito al nulla e non
@@ -401,15 +432,46 @@
     return true;
   }
 
-  // ===== Suggerimenti (colonna sinistra) =====
-  function iconLabel(icon) {
-    const map = {
-      gmail: 'M', calendar: 'C', editor: 'E', file: 'F',
-      link: '↗', note: '✎', web: '🌐',
-    };
-    return map[icon] || (icon ? icon[0].toUpperCase() : '·');
+  // ===== «Apri nel filo» (#870) =====
+  // Ogni carta è una conversazione: quella che l'ha fatta nascere, se c'è ancora, altrimenti una frase di Filo
+  // in coda al filo a schermo (o in una conversazione nuova). La frase entra nello storico: il modello la vede.
+  async function apriNelFilo({ chat = null, testo = '', esterno = '' } = {}) {
+    if (Accoglienza.isActive()) return 'accoglienza';
+    if (sending) return 'risponde';
+    if (chat && chat === chatId && body.dataset.state === 'thread') { inputEl.focus(); return true; }
+    if (chat && chat !== chatId) {
+      const r = await send({ type: MSG.FILO_CHAT_FOCUS, id: chat });
+      if (r && r.portato) return true;
+      if (await reopenChat(chat, { chiudiPrima: true }).catch(() => false)) return true;
+    }
+    if (!testo) return false;
+    // La stessa carta aperta due volte non ripete la frase: è già l'ultima cosa che Filo ha detto qui.
+    const ultimo = threadHistory[threadHistory.length - 1];
+    if (body.dataset.state === 'thread' && ultimo && ultimo.role === 'filo' && ultimo.text === testo) {
+      bubblesEl.scrollTop = bubblesEl.scrollHeight;
+      inputEl.focus();
+      return true;
+    }
+    const DA_FUORI = { download: 'dal nome di un file scaricato' };
+    archiviaRiga(testo, 'filo', null, esterno);
+    threadHistory.push({ role: 'filo', text: testo, actions: [], ...(DA_FUORI[esterno] ? { esterno: DA_FUORI[esterno] } : {}) });
+    goThread();
+    bubblesEl.appendChild(makeBubble({ role: 'filo', text: testo }));
+    bubblesEl.scrollTop = bubblesEl.scrollHeight;
+    inputEl.focus();
+    return true;
   }
 
+  // Un'azione che si finisce a parole («Sposta la sveglia … alle »): il testo resta nel campo, il cursore in fondo.
+  function scriviNelCampo(testo) {
+    inputEl.value = testo;
+    autoGrowInput();
+    Comandi.updateInputClass();
+    inputEl.focus();
+    try { inputEl.setSelectionRange(testo.length, testo.length); } catch (_) {}
+  }
+
+  // ===== Suggerimenti =====
   // Favicon di un sito a partire dall'URL. Usa il servizio Google s2 —
   // gratis, niente API key, regge i casi mancanti restituendo un'icona
   // grigia generica. Ritorna '' per URL non http(s) (es. file://, mailto:).
@@ -464,56 +526,10 @@
     } catch (_) { return ''; }
   }
 
-  function renderSuggestions() {
-    // Default visibili: importance >= 3, max 5. Espanso: max 12.
-    const sorted = [...suggestions].sort((a, b) => (b.importance || 0) - (a.importance || 0));
-    const visible = expanded
-      ? sorted.slice(0, 12)
-      : sorted.filter((s) => (s.importance || 0) >= 3).slice(0, 5);
-    suggestionsEl.innerHTML = '';
-    for (const s of visible) {
-      const li = document.createElement('li');
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'dash-suggestion';
-      btn.title = s.text || '';
-      const icon = document.createElement('span');
-      icon.className = 'dash-sug-icon';
-      icon.dataset.icon = s.icon || '';
-      // Per le azioni NAVIGA mostriamo la favicon del sito al posto della
-      // letterina generica: più riconoscibile a colpo d'occhio. Se la favicon
-      // non carica (404/rete) torniamo all'iniziale.
-      const navUrl = (String(s.action?.type || '').toUpperCase() === 'NAVIGA') ? s.action?.url : '';
-      const favUrl = faviconUrl(navUrl);
-      if (favUrl) {
-        const img = document.createElement('img');
-        img.className = 'dash-sug-favicon';
-        img.src = favUrl;
-        img.alt = '';
-        img.referrerPolicy = 'no-referrer';
-        img.onerror = () => { img.remove(); icon.textContent = iconLabel(s.icon); };
-        icon.appendChild(img);
-      } else {
-        icon.textContent = iconLabel(s.icon);
-      }
-      const text = document.createElement('span');
-      text.className = 'dash-sug-text';
-      text.textContent = s.text || '';
-      btn.appendChild(icon);
-      btn.appendChild(text);
-      btn.addEventListener('click', () => onSuggestionClick(s, btn));
-      li.appendChild(btn);
-      suggestionsEl.appendChild(li);
-    }
-    // Espandibile solo se ci sono più di 5 elementi e qualcuno è sotto soglia 3.
-    const moreAvailable = sorted.length > visible.length;
-    expandBtn.hidden = !moreAvailable;
-    expandBtn.querySelector('span').textContent = expanded ? 'Mostra meno' : 'Mostra tutti';
+  // I suggerimenti sono UNA carta fra le altre (#870): li disegna la parte delle carte.
+  function renderSuggestions({ pronti = true } = {}) {
+    Carte.setSuggerimenti(suggestions, { pronti });
   }
-  expandBtn.addEventListener('click', () => {
-    expanded = !expanded;
-    renderSuggestions();
-  });
 
   async function onSuggestionClick(s, vicino = null) {
     if (s.fermata) { notaFermata(String(s.fermata), vicino); return; }
@@ -536,7 +552,10 @@
     }
     // Il suggerimento l'ha scritto un modello (#810): un indirizzo passa dalla porta delle uscite, e il suo testo va
     // in chat come suo, non come parole dell'utente né come comando con la barra.
-    if (type === 'NAVIGA' && a.url) {
+    // Una pagina di Filo non è un'uscita: la porta delle uscite la rifiuterebbe e il clic non farebbe niente.
+    if (type === 'NAVIGA' && /^filo:\/\//i.test(String(a.url || ''))) {
+      send({ type: MSG.OPEN_URL, url: a.url });
+    } else if (type === 'NAVIGA' && a.url) {
       apriProposta(a.url, vicino);
     } else if (type === 'APRI_FILE' && (a.path || a.url)) {
       const url = a.url || a.path;
@@ -548,7 +567,7 @@
     }
   }
 
-  // ===== Colonna destra (live) =====
+  // ===== Timer, sveglie e avvisi: carte a sinistra (#870) =====
   async function refreshLive() {
     const [timersR, notiR] = await Promise.all([
       send({ type: MSG.FILO_GET_TIMERS }),
@@ -556,53 +575,9 @@
     ]);
     const timers = (timersR?.ok && timersR.timers) || [];
     const notifications = (notiR?.ok && notiR.notifications) || [];
-    liveEl.innerHTML = '';
-    // Notifiche per prime (avvisi), poi timer (processi).
-    for (const n of notifications) {
-      liveEl.appendChild(renderLiveCard({
-        kind: n.kind === 'alert' ? 'alert' : (n.kind || 'info'),
-        text: n.text,
-        onDismiss: () => send({ type: MSG.FILO_DISMISS_NOTIFICATION, id: n.id }).then(refreshLive),
-      }));
-    }
-    for (const t of timers) {
-      if (t.ringing) {
-        liveEl.appendChild(renderRingingCard(t));
-      } else if (t.kind === 'alarm') {
-        // #322 — la sveglia mostra l'ORARIO programmato, non un countdown
-        // mm:ss (un conto alla rovescia di ore sarebbe illeggibile). La × la
-        // rimuove, come per i timer.
-        liveEl.appendChild(renderLiveCard({
-          kind: 'process',
-          text: `⏰ Sveglia ${fmtAlarmWhen(t)}${t.label ? `\n${t.label}` : ''}`,
-          onDismiss: () => send({ type: MSG.FILO_DELETE_TIMER, id: t.id }).then(refreshLive),
-        }));
-      } else {
-        // Timer in pausa: il countdown è congelato, `endsAt` non è più
-        // affidabile (il "now" avanza mentre il timer è fermo) → usa il tempo
-        // rimanente salvato al momento della pausa.
-        const remaining = (t.paused && Number.isFinite(t.remainingMs))
-          ? Math.max(0, Math.round(t.remainingMs / 1000))
-          : Math.max(0, Math.round((new Date(t.endsAt).getTime() - Date.now()) / 1000));
-        // #323 — countdown "da orologio": M:SS sotto l'ora, H:MM:SS oltre, così
-        // un timer di 2 ore mostra "2:00:00" e non "120:00".
-        const clock = (self.SN_TIME ? self.SN_TIME.fmtCountdown(remaining)
-          : `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')}`);
-        const txt = `${t.label}\n${clock}${t.paused ? ' (in pausa)' : ''}`;
-        liveEl.appendChild(renderLiveCard({
-          kind: 'process',
-          text: txt,
-          paused: !!t.paused,
-          onToggle: () => send({
-            type: t.paused ? MSG.FILO_RESUME_TIMER : MSG.FILO_PAUSE_TIMER,
-            id: t.id,
-          }).then(refreshLive),
-          onDismiss: () => send({ type: MSG.FILO_DELETE_TIMER, id: t.id }).then(refreshLive),
-        }));
-      }
-    }
+    Carte.setVive({ timers, notifiche: notifications });
 
-    // Gestione suoneria: parte se c'è almeno un timer ringing, si ferma altrimenti.
+    // La suoneria parte se c'è almeno un timer che suona e si ferma quando non ce ne sono più.
     const hasRinging = timers.some((t) => t.ringing);
     if (hasRinging) {
       startAlarm();
@@ -610,14 +585,7 @@
       stopAlarm();
     }
 
-    // Stato osservabile per i test Playwright (non dipende dall'audio che in
-    // headless non suona): data-ringing="1" sul contenitore live.
-    liveEl.dataset.ringing = hasRinging ? '1' : '0';
-
-    // Ticker per i timer: aggiorna il rendering ogni secondo SOLO se ci sono
-    // timer attivi (compresi i ringing — un timer ringing non è in pausa
-    // quindi !t.paused è già true, ma includiamo t.ringing esplicitamente
-    // per robustezza nel caso futura variazione della logica di pausa).
+    // Il conto alla rovescia si ridisegna ogni secondo solo finché c'è qualcosa che scorre o suona.
     const hasActiveTimer = timers.some((t) => !t.paused || t.ringing);
     if (hasActiveTimer && !liveTickHandle) {
       liveTickHandle = setInterval(refreshLive, 1000);
@@ -627,110 +595,6 @@
     }
   }
 
-  // Quando suona una sveglia. Se si RIPETE, il giorno della prossima occorrenza
-  // non è l'informazione utile ("07:55 di domani" per una sveglia del lunedì e
-  // del mercoledì dice meno del vero): si mostrano l'orario e i giorni, con la
-  // stessa dicitura che legge l'assistente ("feriali", "lun+mer").
-  function fmtAlarmWhen(t) {
-    const M = self.SN_FILO_MEMORY;
-    const rep = (t.repeat && t.repeat.length && M && M.formatRepeat) ? M.formatRepeat(t.repeat) : '';
-    if (!rep) return fmtAlarmTime(t.endsAt);
-    const d = new Date(t.endsAt);
-    const hhmm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    return `${hhmm} · ${rep}`;
-  }
-
-  // Orario "umano" di una sveglia: HH:MM, con l'indicazione del giorno solo se
-  // non è oggi (#322).
-  function fmtAlarmTime(iso) {
-    const d = new Date(iso);
-    const hhmm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    const now = new Date();
-    if (d.toDateString() === now.toDateString()) return hhmm;
-    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    if (d.toDateString() === tomorrow.toDateString()) return `${hhmm} di domani`;
-    return `${hhmm} del ${d.getDate()}/${d.getMonth() + 1}`;
-  }
-
-  // Card speciale per un timer/sveglia che sta suonando: bordo animato + "Ferma".
-  function renderRingingCard(t) {
-    const div = document.createElement('div');
-    div.className = 'dash-live-card';
-    div.dataset.kind = 'process';
-    div.dataset.ringing = '1';
-
-    const textEl = document.createElement('div');
-    textEl.className = 'dash-live-text';
-    // Su una sveglia ricorrente diciamo anche i giorni: "Ferma" la zittisce ora
-    // e la lascia in lista per la prossima volta, quindi va detto.
-    const M = self.SN_FILO_MEMORY;
-    const rep = (t.repeat && t.repeat.length && M && M.formatRepeat) ? M.formatRepeat(t.repeat) : '';
-    textEl.textContent = t.kind === 'alarm'
-      ? `⏰ Sveglia${t.label ? ` — ${t.label}` : ''}${rep ? ` · ${rep}` : ''}`
-      : `⏰ ${t.label} — scaduto`;
-    div.appendChild(textEl);
-
-    const stopBtn = document.createElement('button');
-    stopBtn.className = 'dash-live-stop';
-    stopBtn.type = 'button';
-    stopBtn.textContent = 'Ferma';
-    stopBtn.addEventListener('click', () => {
-      send({ type: MSG.FILO_STOP_TIMER_ALARM, id: t.id }).then(refreshLive);
-    });
-    div.appendChild(stopBtn);
-
-    // Pulsante × per dismissione rapida (stessa azione di "Ferma"). Sulle
-    // sveglie RICORRENTI i due pulsanti non fanno più la stessa cosa: "Ferma"
-    // zittisce quella di adesso e la lascia per la prossima volta, la × la
-    // toglie del tutto — che è quello che la × fa su ogni altra card della
-    // colonna, e senza questo ramo una sveglia ricorrente non si potrebbe
-    // togliere proprio mentre suona.
-    const dismissBtn = document.createElement('button');
-    dismissBtn.className = 'dash-live-dismiss';
-    dismissBtn.type = 'button';
-    dismissBtn.setAttribute('aria-label', rep ? 'Rimuovi la sveglia' : 'Ferma');
-    if (rep) dismissBtn.title = 'Rimuovi la sveglia';
-    dismissBtn.textContent = '\xD7';
-    dismissBtn.addEventListener('click', () => {
-      send({ type: rep ? MSG.FILO_DELETE_TIMER : MSG.FILO_STOP_TIMER_ALARM, id: t.id }).then(refreshLive);
-    });
-    div.appendChild(dismissBtn);
-
-    return div;
-  }
-
-  function renderLiveCard({ kind, text, paused, onToggle, onDismiss }) {
-    const div = document.createElement('div');
-    div.className = 'dash-live-card';
-    div.dataset.kind = kind;
-    const t = document.createElement('div');
-    t.className = 'dash-live-text';
-    t.textContent = text;
-    div.appendChild(t);
-    // Pausa/ripresa: solo per i countdown (chi passa onToggle). Il pulsante sta
-    // accanto alla × e cambia icona/etichetta in base allo stato.
-    if (onToggle) {
-      const pb = document.createElement('button');
-      pb.className = 'dash-live-pause';
-      pb.type = 'button';
-      pb.setAttribute('aria-label', paused ? 'Riprendi' : 'Pausa');
-      pb.title = paused ? 'Riprendi' : 'Pausa';
-      pb.textContent = paused ? '▶' : '⏸';
-      pb.addEventListener('click', onToggle);
-      div.appendChild(pb);
-    }
-    if (onDismiss) {
-      const btn = document.createElement('button');
-      btn.className = 'dash-live-dismiss';
-      btn.type = 'button';
-      btn.setAttribute('aria-label', 'Rimuovi');
-      btn.textContent = '×';
-      btn.addEventListener('click', onDismiss);
-      div.appendChild(btn);
-    }
-    return div;
-  }
-
   // Mostra/nasconde il commento centrale di Filo (Preferenze → "Commento nella
   // home"). I suggerimenti nella colonna sinistra restano comunque visibili.
   function applyHomeMessageVisibility() {
@@ -738,22 +602,23 @@
   }
 
   // ===== Generazione dashboard (messaggio centro + suggerimenti) =====
+  // Un ricalcolo spinto dal main mentre la richiesta è in volo è più nuovo della sua risposta, e uno arrivato
+  // prima vale quanto la cache che la risposta servirebbe: i suggerimenti che ha portato restano («Aggiorna» no).
+  let giroDashboard = 0;
+  let spinteDashboard = 0;
   async function loadDashboard({ force = false } = {}) {
+    const giro = ++giroDashboard;
+    renderSuggestions({ pronti: false });
     if (showHomeMessage) {
       homeMessageEl.classList.add('dash-home-msg-loading');
       homeMessageEl.textContent = '…';
     }
     const r = await send({ type: MSG.FILO_GENERATE_DASHBOARD, force });
-    if (!r?.ok) {
-      homeMessageEl.classList.remove('dash-home-msg-loading');
-      homeMessageEl.textContent = 'Filo è in ascolto.';
-      suggestions = [];
-      renderSuggestions();
-      return;
-    }
+    if (giro !== giroDashboard) return;
     homeMessageEl.classList.remove('dash-home-msg-loading');
-    homeMessageEl.textContent = r.message || 'Filo è in ascolto.';
-    suggestions = Array.isArray(r.suggestions) ? r.suggestions : [];
+    homeMessageEl.textContent = (r?.ok && r.message) || 'Filo è in ascolto.';
+    if (!force && spinteDashboard) { renderSuggestions(); return; }
+    suggestions = (r?.ok && Array.isArray(r.suggestions)) ? r.suggestions : [];
     renderSuggestions();
   }
 
@@ -810,6 +675,8 @@
     LEGGI_DOCUMENTO: 'Leggo il documento…',
     LEGGI_TRASPARENZA: 'Rileggo la pagina di trasparenza…',
     CAPACITA_DETTAGLIO: 'Verifico cosa so fare…',
+    LEGGI_IMPOSTAZIONI: 'Leggo come sei impostato…',
+    TOGLI_PERMESSO_SITO: 'Tolgo un permesso…',
     ESEGUI_COMANDO: 'Eseguo un comando…',
     TIMER: 'Avvio un timer…',
     SVEGLIA: 'Imposto una sveglia…',
@@ -820,9 +687,20 @@
     IMPOSTA_PREFERENZA: 'Cambio un\'impostazione…',
     IMPOSTA_ESTETICA: 'Cambio l\'aspetto…',
     INVIA_FEEDBACK: 'Preparo una segnalazione…',
+    RINOMINA_FILE: 'Leggo i file per dar loro un nome…',
+    CARTA_HOME: 'Sistemo le carte della home…',
+    VOLUME: 'Cambio il volume…',
+    BLUETOOTH: 'Chiedo al Bluetooth…',
+    WIFI: 'Chiedo al Wi-Fi…',
   };
   function startLabelFor(type) {
     return START_LABELS[String(type || '').toUpperCase()] || 'Eseguo un\'azione…';
+  }
+  // Un'azione che lavora su più cose dice quante ne ha fatte: «3 di 40» al posto di un'attesa al buio.
+  function progressLabelFor(type, fatti, totali) {
+    const base = startLabelFor(type);
+    const n = Number(totali);
+    return n > 1 ? `${base} ${Math.min(Number(fatti) || 0, n)} di ${n}` : base;
   }
 
   // Un singolo turno del modello: bolla "sta pensando" + reasoning live, invio
@@ -911,8 +789,11 @@
         if (!data || data.reqId !== reasoningReqId) return;
         if (data.kind === 'start') {
           pending.working(startLabelFor(data.type));
+        } else if (data.kind === 'progress') {
+          pending.working(progressLabelFor(data.type, data.fatti, data.totali));
         } else if (data.kind === 'done') {
           const a = data.action;
+          if (a && Array.isArray(a._cambi)) Cambi.segna(pending.el, a._cambi);
           if (a && data.kept !== false && Att.tellActionInActivity(pending, a) && a._callId) shown.add(a._callId);
         } else if (data.kind === 'round') {
           if (streamBubble) {
@@ -942,6 +823,10 @@
       msg.images = images;
     }
     const r = await send(msg);
+    // Anche quelle arrivate senza evento in diretta (o con un guasto dopo): il segno non dipende dalla diretta.
+    for (const a of (Array.isArray(r?.actions) ? r.actions : [])) {
+      if (a && Array.isArray(a._cambi)) Cambi.segna(pending.el, a._cambi);
+    }
 
     if (offReasoning) { try { offReasoning(); } catch (_) {} }
     if (offAnswer) { try { offAnswer(); } catch (_) {} }
@@ -1066,11 +951,14 @@
 
   // `daModello`: il testo viene da un suggerimento della home, non dalle dita dell'utente (#810).
   async function submitMessage(text, { daModello = false } = {}) {
-    if ((!text && pendingImages.length === 0) || sending) return;
+    if ((!text && pendingImages.length === 0 && pendingFiles.length === 0) || sending) return;
     sending = true;
     sendBtn.disabled = true;
     const imagesToSend = pendingImages.slice();
+    const righeFile = [...pendingFiles.map((f) => f.percorso), ...imagesToSend.map((d) => percorsiImmagini.get(d))]
+      .filter(Boolean).map((p) => `File: ${p}`);
     clearImagePreviews();
+    if (righeFile.length) text = [text || (imagesToSend.length ? 'Descrivi questa immagine.' : ''), ...righeFile].filter(Boolean).join('\n');
     // Svuota subito la textarea: la bolla utente è già visibile, niente attesa.
     inputEl.value = '';
     autoGrowInput();
@@ -1133,9 +1021,42 @@
   // ===== Image paste / drop (multi-immagine) =====
   const imgPreviewsEl = $('imgPreviews');
 
+  const Rinomina = window.SN_RINOMINA_UI;
+  const percorsoDelFile = (f) => {
+    try { return (window.filo && window.filo.percorsoDelFile) ? window.filo.percorsoDelFile(f) : ''; } catch (_) { return ''; }
+  };
+  const nomeDaPercorso = (p) => String(p || '').split(/[\\/]/).pop() || String(p || '');
+  // Il tasto destro su un file della barra di scrittura: il nome sensato prima di mandarlo, o toglierlo.
+  function menuFileInArrivo(e, { percorso, togli, suRinominato }) {
+    e.preventDefault();
+    const ancora = e.currentTarget;
+    const r = ancora.getBoundingClientRect();
+    const x = e.type === 'contextmenu' && e.clientX ? e.clientX : r.left;
+    const y = e.type === 'contextmenu' && e.clientY ? e.clientY : r.bottom;
+    const nome = nomeDaPercorso(percorso);
+    Promise.resolve(Rinomina ? Rinomina.disponibile() : false).then((disp) => {
+      if (!Rinomina) return;
+      const voci = [];
+      if (disp && Rinomina.tipoSupportato(nome)) {
+        voci.push([Rinomina.VOCE, () => Rinomina.apri({ ancora, percorso, nome, suRinominato, suRimesso: suRinominato })]);
+      }
+      if (Rinomina.nomeDiPrima(percorso)) {
+        voci.push([Rinomina.VOCE_RIMETTI, () => Rinomina.rimetti({ ancora, percorso, suRimesso: suRinominato })]);
+      }
+      voci.push(['Togli dal messaggio', togli]);
+      Rinomina.menu(x, y, voci, { ancora });
+    });
+  }
+  function conMenuFile(el, opzioni) {
+    el.addEventListener('contextmenu', (e) => menuFileInArrivo(e, opzioni()));
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) menuFileInArrivo(e, opzioni());
+    });
+  }
+
   function renderImagePreviews() {
     imgPreviewsEl.innerHTML = '';
-    imgPreviewsEl.hidden = pendingImages.length === 0;
+    imgPreviewsEl.hidden = pendingImages.length === 0 && pendingFiles.length === 0;
     pendingImages.forEach((dataUrl, idx) => {
       const wrap = document.createElement('div');
       wrap.className = 'dash-img-preview';
@@ -1153,27 +1074,75 @@
       rm.setAttribute('aria-label', 'Rimuovi immagine');
       rm.addEventListener('click', () => {
         pendingImages.splice(idx, 1);
+        percorsiImmagini.delete(dataUrl);
         renderImagePreviews();
       });
       wrap.appendChild(img);
       wrap.appendChild(rm);
+      if (percorsiImmagini.has(dataUrl)) {
+        wrap.title = percorsiImmagini.get(dataUrl);
+        conMenuFile(img, () => ({
+          percorso: percorsiImmagini.get(dataUrl),
+          togli: () => { pendingImages = pendingImages.filter((d) => d !== dataUrl); percorsiImmagini.delete(dataUrl); renderImagePreviews(); },
+          suRinominato: (r) => { if (r && r.a) percorsiImmagini.set(dataUrl, r.a); renderImagePreviews(); },
+        }));
+      }
       imgPreviewsEl.appendChild(wrap);
     });
+    for (const f of pendingFiles) {
+      const chip = document.createElement('div');
+      chip.className = 'dash-file-chip';
+      chip.tabIndex = 0;
+      chip.title = f.percorso;
+      const nome = document.createElement('span');
+      nome.className = 'dash-file-chip-nome';
+      nome.textContent = f.nome;
+      const rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'dash-img-remove dash-file-chip-togli';
+      rm.textContent = '×';
+      rm.setAttribute('aria-label', 'Togli il file');
+      rm.title = 'Togli';
+      const togli = () => { pendingFiles = pendingFiles.filter((x) => x !== f); renderImagePreviews(); };
+      rm.addEventListener('click', togli);
+      conMenuFile(chip, () => ({
+        percorso: f.percorso,
+        togli,
+        suRinominato: (r) => { if (r && r.a) { f.percorso = r.a; f.nome = r.nome || nomeDaPercorso(r.a); } renderImagePreviews(); },
+      }));
+      chip.append(nome, rm);
+      imgPreviewsEl.appendChild(chip);
+    }
   }
-  function addPendingImage(dataUrl) {
+  function addPendingImage(dataUrl, percorso) {
     pendingImages.push(dataUrl);
+    if (percorso) percorsiImmagini.set(dataUrl, percorso);
+    renderImagePreviews();
+  }
+  function addPendingFile(percorso) {
+    if (!percorso || pendingFiles.some((f) => f.percorso === percorso)) return;
+    pendingFiles.push({ percorso, nome: nomeDaPercorso(percorso) });
     renderImagePreviews();
   }
   function clearImagePreviews() {
     pendingImages = [];
+    pendingFiles = [];
+    percorsiImmagini.clear();
     renderImagePreviews();
   }
-  function handleImageFile(file) {
+  function handleImageFile(file, percorso = '') {
     if (!file || !file.type.startsWith('image/')) return;
-    if (file.size > 4 * 1024 * 1024) return;
+    if (file.size > 4 * 1024 * 1024) { if (percorso) addPendingFile(percorso); return; }
     const reader = new FileReader();
-    reader.onload = () => addPendingImage(reader.result);
+    reader.onload = () => addPendingImage(reader.result, percorso);
     reader.readAsDataURL(file);
+  }
+  // Un file dal disco: le immagini si vedono (e il modello le guarda), gli altri entrano col loro percorso.
+  function handleDroppedFile(file) {
+    if (!file) return;
+    const percorso = percorsoDelFile(file);
+    if (file.type && file.type.startsWith('image/')) handleImageFile(file, percorso);
+    else if (percorso) addPendingFile(percorso);
   }
   inputForm.addEventListener('paste', (e) => {
     const items = e.clipboardData?.items;
@@ -1198,10 +1167,25 @@
     }
   });
   inputForm.addEventListener('dragover', (e) => { e.preventDefault(); });
+  // Un file diventa un allegato; un testo trascinato (una voce della colonna destra, una frase da
+  // un'altra scheda) entra nel campo dove sta il cursore. Il dragover qui sopra dice a Chromium che il
+  // trascinamento lo gestisce la pagina, e allora il campo non inserisce più niente da sé.
   inputForm.addEventListener('drop', (e) => {
     e.preventDefault();
     const files = e.dataTransfer?.files;
-    if (files) for (const f of files) handleImageFile(f);
+    if (files && files.length) {
+      for (const f of files) handleDroppedFile(f);
+      return;
+    }
+    const testo = e.dataTransfer?.getData('text/plain') || '';
+    if (!testo) return;
+    const prima = inputEl.value.slice(0, inputEl.selectionStart);
+    const dopo = inputEl.value.slice(inputEl.selectionEnd);
+    const pezzo = `${prima && !/\s$/.test(prima) ? ' ' : ''}${testo}${dopo && !/^\s/.test(dopo) ? ' ' : ''}`;
+    inputEl.setRangeText(pezzo, inputEl.selectionStart, inputEl.selectionEnd, 'end');
+    inputEl.focus();
+    autoGrowInput();
+    Comandi.updateInputClass();
   });
 
   // ===== Lightbox: click su un'immagine per ingrandirla =====
@@ -1246,7 +1230,7 @@
   inputForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const text = inputEl.value.trim();
-    if (!text && pendingImages.length === 0) return;
+    if (!text && pendingImages.length === 0 && pendingFiles.length === 0) return;
     // "/dominio.tld": non navigare DI SLANCIO verso un sito inesistente
     // (porterebbe a una pagina bianca). Verifica il DNS (await se non già in
     // cache) e, se il dominio non esiste, dillo e offri di aprire lo stesso —
@@ -1279,7 +1263,15 @@
 
   // Evidenziazione live mentre si scrive: arancione = comando Filo (o sito),
   // azzurro = comando shell (solo in modalità terminale).
-  inputEl.addEventListener('input', () => { Comandi.updateInputClass(); autoGrowInput(); });
+  inputEl.addEventListener('input', () => { Comandi.updateInputClass(); autoGrowInput(); Sistema.scrive(); });
+
+  // Il tasto microfono: si parla, e la richiesta parte come col tasto d'invio (o resta da correggere).
+  // La scorciatoia vale in tutta la home, che è la sua chat.
+  window.SN_VOCE_CHAT?.collega({
+    campo: inputEl, contenitore: inputForm, prima: sendBtn, ambito: document,
+    invia: () => (inputForm.requestSubmit ? inputForm.requestSubmit() : inputForm.dispatchEvent(new Event('submit'))),
+    occupato: () => sending,
+  });
 
   // ===== Bridge cambio stato live dal background =====
   chrome.runtime.onMessage.addListener((msg) => {
@@ -1288,6 +1280,8 @@
       notaFermata(String(msg.frase), vicino);
     } else if (msg?.type === MSG.FILO_LIVE_UPDATED) {
       refreshLive().catch(() => {});
+    } else if (msg?.type === MSG.SISTEMA_AGGIORNATO) {
+      Sistema.aggiornato(msg.stato);
     } else if (msg?.type === MSG.FILO_CHATS_UPDATED && msg.cancellata) {
       // #525 — qualcuno ha cancellato dalla Cronologia la conversazione che
       // sta ancora qui a schermo. Continuare a scriverci dentro la farebbe
@@ -1317,6 +1311,8 @@
       // #155 — il ricalcolo in background della home è pronto: aggiorna
       // messaggio + suggerimenti senza rifare la chiamata all'LLM.
       if (Accoglienza.isActive()) return; // l'intervista è ancora a schermo
+      giroDashboard++;
+      spinteDashboard++;
       if (showHomeMessage) {
         homeMessageEl.classList.remove('dash-home-msg-loading');
         homeMessageEl.textContent = msg.message || 'Filo è in ascolto.';
@@ -1328,6 +1324,7 @@
       Accoglienza.maybeOpenOnboardingLater().catch(() => {});
     } else if (msg?.type === MSG.SETTINGS_UPDATED) {
       applySavedTheme().catch(() => {});
+      if (msg.settings) Sistema.applicaImpostazioni(msg.settings);
       if (msg.settings && typeof msg.settings.showHomeMessage === 'boolean') {
         showHomeMessage = msg.settings.showHomeMessage;
         applyHomeMessageVisibility();
@@ -1873,6 +1870,24 @@
     } catch (_) {}
   });
 
+  // Aperta dal tasto destro sull'avviso di un sito pericoloso (#813.5): la domanda su quel sito parte da sola, il falso
+  // allarme apre «Invia feedback» già scritto. Durante l'intervista di benvenuto la domanda resta scritta e la manda l'utente.
+  async function richiestaDellAvviso(inAccoglienza) {
+    const r = await send({ type: MSG.CASA_RICHIESTA });
+    const q = r && r.ok && r.richiesta;
+    if (!q || typeof q.testo !== 'string' || !q.testo) return;
+    if (q.tipo === 'segnala') {
+      const fine = Date.now() + 5000;
+      while (!self.SN_FEEDBACK_UI && Date.now() < fine) await new Promise((ok) => setTimeout(ok, 50));
+      self.SN_FEEDBACK_UI?.open({ testo: q.testo });
+    } else if (q.tipo === 'chiedi') {
+      if (!inAccoglienza) { submitMessage(q.testo); return; }
+      inputEl.value = q.testo;
+      autoGrowInput();
+      inputEl.focus();
+    }
+  }
+
   (async function init() {
     renderControls();
     refreshRedteamVisibile();
@@ -1880,6 +1895,7 @@
     try {
       const settings = await self.SN_STORAGE?.getSettings?.();
       showHomeMessage = settings?.showHomeMessage !== false;
+      Sistema.applicaImpostazioni(settings);
       Term.setEnabled(!!settings?.terminal?.enabled);
       Term.setShell(settings?.terminal?.shell || 'powershell');
       // Suoneria timer: legge la preferenza; se non impostata o non valida usa 'default'.
@@ -1914,6 +1930,7 @@
     // Nessuna intervista aperta: se l'ultima si era chiusa a metà, la home lo
     // dice — finché l'utente non risponde a quella riga.
     else Accoglienza.refreshOnboardingNotice().catch(() => {});
+    richiestaDellAvviso(!!onbState).catch((e) => console.warn('[Filo] richiesta dall\'avviso', e));
     // Popup all'avvio, in sequenza per non sovrapporsi: prima il recap
     // aggiornamento (solo se c'è una versione precedente vista e note nuove),
     // POI il ringraziamento per i feedback risolti (C5). Se il recap non compare,

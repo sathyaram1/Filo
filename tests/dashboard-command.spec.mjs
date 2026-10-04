@@ -408,13 +408,13 @@ test.describe('comandi extra (timer/incognito/no-flicker)', () => {
     await expect(input).toHaveClass(/is-cmd-filo/);
     await expect(input).not.toHaveClass(/is-cmd-unknown/);
 
-    // Inviando "/set timer 1" compare un timer "Timer" nell'area live con il
+    // Inviando "/set timer 1" compare un timer "Timer" fra le carte della home con il
     // conto alla rovescia (~1:00).
     await submit(page, '/set timer 1');
-    const card = page.locator('#live .dash-live-card');
+    const card = page.locator('#accade .dash-carta[data-tipo="timer"]');
     await expect(card).toHaveCount(1, { timeout: 8_000 });
-    await expect(card.locator('.dash-live-text')).toContainText('Timer');
-    await expect(card.locator('.dash-live-text')).toContainText(/\d:\d\d/);
+    await expect(card).toContainText('Timer');
+    await expect(card).toContainText(/\d:\d\d/);
   });
 
   test('"/set timer 5:00" interpreta minuti:secondi', async () => {
@@ -423,10 +423,10 @@ test.describe('comandi extra (timer/incognito/no-flicker)', () => {
     await expect(input).toBeVisible({ timeout: 8_000 });
 
     await submit(page, '/set timer 5:00');
-    const card = page.locator('#live .dash-live-card');
+    const card = page.locator('#accade .dash-carta[data-tipo="timer"]');
     await expect(card).toHaveCount(1, { timeout: 8_000 });
     // 5 minuti → il countdown parte vicino a 5:00 (4:59/5:00).
-    await expect(card.locator('.dash-live-text')).toContainText(/[45]:\d\d/);
+    await expect(card).toContainText(/[45]:\d\d/);
   });
 
   test('"/set timer" senza durata valida non crea timer e spiega l\'uso', async () => {
@@ -436,7 +436,7 @@ test.describe('comandi extra (timer/incognito/no-flicker)', () => {
 
     await submit(page, '/set timer abc');
     // Nessun timer creato.
-    await expect(page.locator('#live .dash-live-card')).toHaveCount(0);
+    await expect(page.locator('#accade .dash-carta[data-tipo="timer"]')).toHaveCount(0);
     // Filo risponde con l'uso corretto nel thread.
     await expect(page.locator('.dash-bubble')).toContainText(/set timer/i, { timeout: 8_000 });
   });
@@ -456,8 +456,8 @@ test.describe('comandi extra (timer/incognito/no-flicker)', () => {
       // Filo risponde con l'uso corretto nel thread (nuova bolla)…
       await expect.poll(() => bubbles.count(), { timeout: 8_000 }).toBeGreaterThan(before);
       await expect(bubbles.last()).toContainText(/set timer/i);
-      // …e nessun timer compare nell'area live.
-      await expect(page.locator('#live .dash-live-card')).toHaveCount(0);
+      // …e nessun timer compare fra le carte della home.
+      await expect(page.locator('#accade .dash-carta[data-tipo="timer"]')).toHaveCount(0);
     }
   });
 

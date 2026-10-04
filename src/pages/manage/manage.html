@@ -9,6 +9,7 @@
   <!-- Stesso foglio della gemella nella prima schermata, così le due superfici non possono divergere. -->
   <link rel="stylesheet" href="filo://style/mergeApprovals.css" />
   <script src="filo://shared/themeTokens.js"></script>
+  <script src="filo://shared/avvisiTempo.js"></script>
   <script src="filo://shared/pageBootstrap.js"></script>
   <script src="filo://shared/constants.js"></script>
   <script src="filo://shared/contenutoEsterno.js"></script>
@@ -241,7 +242,8 @@
     .mg-search-input::placeholder { color: var(--sn-muted); }
     /* Il type=search del browser aggiunge una "x" nativa blu che stona col tema: resta solo la nostra. */
     .mg-search-input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
-    .mg-search-msg { font-size: 12px; color: var(--sn-muted); flex: 0 0 auto; }
+    /* Il motivo di un ripiego può essere lungo: va a capo e lascia metà riga al campo. */
+    .mg-search-msg { font-size: 12px; color: var(--sn-muted); flex: 0 1 auto; min-width: 0; max-width: 50%; }
     .mg-search-msg.mg-err { color: #c0392b; }
     .mg-search-close {
       all: unset; cursor: pointer; flex: 0 0 auto;
@@ -978,7 +980,9 @@
       transition: opacity 0.18s ease, transform 0.18s ease;
       pointer-events: none; z-index: 2147483001;
     }
-    .mg-toast.show { opacity: 1; transform: translateY(0); }
+    /* Visibile prende il puntatore (sopra, il tempo aspetta; un clic lo chiude); nascosto torna trasparente. */
+    .mg-toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; cursor: pointer; }
+    .mg-toast.show:hover { background: var(--sn-hover, var(--sn-bg)); }
     .mg-toast[data-kind="err"] { border-left-color: #c0392b; }
     .mg-toast[data-kind="ok"]  { border-left-color: #2e9e5b; }
 
@@ -1219,6 +1223,7 @@
     .mg-sm-slots-title {
       margin: 0 0 12px; font-size: 14px; font-weight: 600; color: var(--sn-fg);
     }
+    .mg-sm-slots-title--next { margin-top: 28px; }
     .mg-sm-slots {
       display: flex; flex-direction: column; gap: 16px;
     }
@@ -1571,10 +1576,10 @@
         <div id="mgSmEditor" hidden>
           <h2>Modelli di supporto</h2>
           <p class="mg-sm-intro">
-            I giudici di sicurezza e gli altri compiti interni usano modelli e
-            chiavi DEDICATI, separati dal resto di Filo. Imposta qui la chiave, dai
-            un nickname a ogni modello e scegli quale modello usa ogni giudice. Il
-            tutto viene salvato nel cloud e letto dal backend di sicurezza.
+            I giudici di sicurezza usano modelli e chiavi DEDICATI, separati dal
+            resto di Filo. Imposta qui la chiave, dai un nickname a ogni modello e
+            scegli quale modello usa ogni giudice e ogni strumento di questa
+            dashboard. Il tutto viene salvato nel cloud.
           </p>
 
           <!-- Chiave dei giudici: separata dal resto di Filo. -->
@@ -1661,6 +1666,19 @@
               <div class="mg-sm-chain-host" id="mgSmChain-judgePriority"></div>
               <span class="mg-sm-slot-desc">
                 Assegna la priorità ai feedback (F5).
+              </span>
+            </div>
+          </div>
+
+          <!-- Funzioni che solo l'owner usa, nella sua app: fuori da Opzioni e Modelli predefiniti (#465). -->
+          <h3 class="mg-sm-slots-title mg-sm-slots-title--next">Modello per la gestione</h3>
+          <div class="mg-sm-slots" id="mgSmSlotsManage">
+            <div class="mg-sm-slot" data-slot="manageSearch">
+              <label>Ricerca fra i feedback</label>
+              <div class="mg-sm-chain-host" id="mgSmChain-manageSearch"></div>
+              <span class="mg-sm-slot-desc">
+                Ordina per pertinenza i feedback quando cerchi in questa pagina.
+                Gira sul tuo computer con la chiave del resto di Filo, non con quella dei giudici.
               </span>
             </div>
           </div>

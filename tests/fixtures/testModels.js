@@ -166,6 +166,7 @@
     [A.MANAGE_SEARCH]: 'deepseek-flash, gemma-lite',
     [A.ARCHIVE_EMBED]: 'qwen-embed',
     [A.PROVIDER_TEST]: 'deepseek-flash, gemma-lite',
+    [A.FILE_NAME]: 'gemma, glm',
   };
 
   global.SN_TEST_MODELS = { registry, models };
