@@ -144,6 +144,24 @@
     return t || 'Uso il terminale del computer';
   }
 
+  function nomeLeggibile(n) {
+    const N = global.SN_NOMI_FILE;
+    const s = N ? N.nomeVisibile(n) : String(n == null ? '' : n).replace(/[\u0000-\u001f\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/g, '');
+    return s.trim();
+  }
+  function elencoRinomine(a) {
+    const proposte = Array.isArray(a && a._proposte) ? a._proposte : [];
+    const saltati = Array.isArray(a && a._saltati) ? a._saltati : [];
+    const n = proposte.length;
+    const righe = proposte.map((p) => `«${nomeLeggibile(p && p.prima)}» → «${nomeLeggibile(p && p.nome)}»`);
+    let t = `${n === 1 ? 'Rinominare questo file' : `Rinominare questi ${n} file`}:\n${righe.join('\n')}`;
+    if (saltati.length) {
+      t += `\n\nRestano come sono:\n${saltati.map((x) => `«${nomeLeggibile(x && x.nome)}»: ${nomeLeggibile(x && x.perche)}`).join('\n')}`;
+    }
+    if (a && a._oltre > 0) t += `\n\nNe restano altri ${a._oltre}: chiedimelo di nuovo dopo questi.`;
+    return `${t}\n\nL'estensione non cambia e nessun file viene sovrascritto. Dopo puoi rimettere i nomi di prima con «Annulla».`;
+  }
+
   const REGISTRY = {
     NAVIGA: {
       // Aprire un link è di norma innocuo → livello 1, diretto. ECCEZIONE
@@ -170,6 +188,17 @@
     TIMER: {
       level: 1,
       describe: (a) => `Avviare il timer "${a.label || a.etichetta || 'Timer'}"`,
+    },
+    // Rinominare file dell'utente (#950): si torna indietro con «Annulla», ma un programma che cercava il file
+    // per nome non lo trova più → 2. L'elenco vecchio → nuovo lo prepara il main (`_proposte`), mai il modello.
+    RINOMINA_FILE: {
+      level: 2,
+      describe: (a) => elencoRinomine(a),
+      describeDone: (a) => {
+        const fatti = a && a._output && Array.isArray(a._output.rinominati) ? a._output.rinominati : null;
+        const n = fatti ? fatti.length : (Array.isArray(a && a._proposte) ? a._proposte.length : 0);
+        return n === 1 ? 'Rinominato un file (si rimette com\'era con «Annulla»)' : `Rinominati ${n} file (si rimettono com'erano con «Annulla»)`;
+      },
     },
     SVEGLIA: {
       level: 1,

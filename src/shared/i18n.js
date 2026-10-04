@@ -352,6 +352,7 @@
     options_action_editor_chat: 'Editor — chat col documento',
     options_action_archive_embed: 'Indicizzazione delle schede archiviate',
     options_action_provider_test: 'Prova di un fornitore (pulsante «Prova»)',
+    options_action_file_name: 'Nome sensato ai file (legge l\'inizio del file o una miniatura)',
     // Elenco (di sola lettura) degli altri punti in cui Filo usa un modello:
     // quelli che girano sui server di Filo e quelli che un modello non lo usano.
     options_h_model_usage: 'Dove altro Filo usa un modello',

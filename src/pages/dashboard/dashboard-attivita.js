@@ -248,6 +248,7 @@
     CERCA_WEB: (n) => (n > 1 ? `cercato sul web ${n} volte` : 'cercato sul web'),
     CERCA_CHAT: (n) => (n > 1 ? `riletto ${n} conversazioni di prima` : 'riletto una conversazione di prima'),
     LEGGI_DOCUMENTO: (n) => (n > 1 ? `letto ${n} documenti` : 'letto un documento'),
+    RINOMINA_FILE: () => 'dato un nome ai file',
     LEGGI_FILE: (n) => (n > 1 ? `letto ${n} file` : 'letto un file'),
     LEGGI_TRASPARENZA: () => 'riletto la trasparenza',
     CAPACITA_DETTAGLIO: () => 'verificato cosa sa fare',
@@ -393,6 +394,7 @@
       return { icon: '📄', text: nome ? `Leggo il documento: ${nome}` : 'Leggo il documento' };
     },
     LEGGI_TRASPARENZA: () => ({ icon: '📄', text: 'Rileggo la pagina di trasparenza' }),
+    RINOMINA_FILE: (a) => ({ icon: '✎', text: testoRinominati(a._output) }),
     // Le azioni che non lasciano niente da cliccare in chat: prima sparivano
     // del tutto, e l'utente non sapeva dove fosse finito il suo appunto.
     SALVA_APPUNTO: (a) => {
@@ -458,7 +460,7 @@
     CANCELLA_SVEGLIA: 'Niente da cancellare', MODIFICA_SVEGLIA: 'Niente da spostare',
     SALVA_APPUNTO: 'Appunto non salvato', SALVA_LEZIONE: 'Non memorizzato',
     DIMENTICA: 'Niente da dimenticare',
-    CERCA_WEB: 'Ricerca non riuscita', LEGGI_FILE: 'File non letto',
+    CERCA_WEB: 'Ricerca non riuscita', LEGGI_FILE: 'File non letto', RINOMINA_FILE: 'Nessun file rinominato',
     CERCA_CHAT: 'Conversazione non ritrovata',
     LEGGI_DOCUMENTO: 'Documento non letto', LEGGI_TRASPARENZA: 'Documento non disponibile',
     CAPACITA_DETTAGLIO: 'Verifica non riuscita', NAVIGA: 'Link non aperto',
@@ -550,7 +552,7 @@
   // dove l'appunto è finito, e il controllo per scegliere la tinta esatta.
   // Aggiungerne una qui è obbligatorio quando le si dà una riga: senza, la riga
   // si mangia il bottone e la funzione sparisce dalla chat.
-  const ROW_AND_BUTTON = ['SALVA_APPUNTO', 'IMPOSTA_ESTETICA'];
+  const ROW_AND_BUTTON = ['SALVA_APPUNTO', 'IMPOSTA_ESTETICA', 'RINOMINA_FILE'];
 
   // Una pagina che il modello voleva aprire e che la lista dei siti bloccati ha fermato: la
   // notifica se ne va in pochi secondi, e la chat le tiene il suo «Apri comunque» (#590).
@@ -811,6 +813,90 @@
     return el;
   }
 
+  // #950 — un file trovato da Filo: dal tasto destro si apre o gli si dà un nome sensato, e il riferimento in
+  // chat segue il nome nuovo (un clic dopo apre il file, non il percorso che non c'è più).
+  const nomeDelPercorso = (p) => String(p || '').split(/[\\/]/).pop();
+  function menuDelFile(btn, a) {
+    const R = window.SN_RINOMINA_UI;
+    if (!R) return;
+    const aggiorna = (r) => {
+      if (!r || !r.a) return;
+      const vecchio = String(a.percorso || a.path || '');
+      const etichetta = String(a.etichetta || a.label || '');
+      a.percorso = r.a;
+      if (a.path) a.path = r.a;
+      if (etichetta && (etichetta === vecchio || etichetta === nomeDelPercorso(vecchio))) {
+        if (a.etichetta) a.etichetta = r.nome; else a.label = r.nome;
+      }
+      btn.href = r.a;
+      btn.textContent = a.etichetta || a.label || r.a;
+    };
+    const apriMenu = (e) => {
+      e.preventDefault();
+      const rect = btn.getBoundingClientRect();
+      const x = e.type === 'contextmenu' && e.clientX ? e.clientX : rect.left;
+      const y = e.type === 'contextmenu' && e.clientY ? e.clientY : rect.bottom;
+      R.disponibile().then((disp) => {
+        const percorso = String(a.percorso || a.path || '');
+        const nome = nomeDelPercorso(percorso);
+        const voci = [['Apri', () => btn.click()]];
+        if (disp && percorso && R.tipoSupportato(nome)) {
+          voci.push([R.VOCE, () => R.apri({ ancora: btn, percorso, nome, suRinominato: aggiorna, suRimesso: aggiorna })]);
+        }
+        if (R.nomeDiPrima(percorso)) voci.push([R.VOCE_RIMETTI, () => R.rimetti({ ancora: btn, percorso, suRimesso: aggiorna })]);
+        R.menu(x, y, voci, { ancora: btn });
+      });
+    };
+    btn.addEventListener('contextmenu', apriMenu);
+    btn.addEventListener('keydown', (e) => {
+      if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) apriMenu(e);
+    });
+  }
+
+  function testoRinominati(o) {
+    const n = o && Array.isArray(o.rinominati) ? o.rinominati.length : 0;
+    const no = o && Array.isArray(o.falliti) ? o.falliti.length : 0;
+    const quanti = n === 1 ? 'Rinominato un file' : `Rinominati ${n} file`;
+    return no ? `${quanti} · ${no} non riusciti` : quanti;
+  }
+  function motivoNessunaRinomina(o) {
+    const f = o && Array.isArray(o.falliti) && o.falliti[0];
+    return f && f.perche ? `Non rinominati: ${f.perche}` : 'Non rinominati';
+  }
+  // «Annulla» dopo una rinomina dalla chat: rimette i nomi di prima di TUTTI i file del lotto.
+  function bottoneRimettiNomi(a) {
+    const o = a && a._output;
+    const fatti = o && Array.isArray(o.rinominati) ? o.rinominati : [];
+    if (!fatti.length) return null;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'dash-action-btn';
+    btn.textContent = o.rimessi ? '↺ Nomi di prima rimessi' : '↺ Annulla';
+    btn.title = fatti.length === 1 ? `Rimetti «${fatti[0].prima}»` : `Rimetti i nomi di prima ai ${fatti.length} file`;
+    btn.disabled = !!o.rimessi;
+    btn.addEventListener('click', async () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      let r = null;
+      try { r = await send({ type: MSG.FILE_RIMETTI_NOMI, coppie: fatti.map((x) => ({ attuale: x.a, prima: x.prima })) }); } catch (_) { r = null; }
+      const esiti = r && Array.isArray(r.esiti) ? r.esiti : [];
+      const ok = esiti.filter((e) => e && e.ok).length;
+      if (ok && ok === fatti.length) {
+        o.rimessi = true;
+        btn.textContent = '↺ Nomi di prima rimessi';
+        return;
+      }
+      btn.disabled = false;
+      const primo = esiti.find((e) => e && !e.ok);
+      btn.textContent = ok ? `↺ Rimessi ${ok} su ${fatti.length}: riprova` : '↺ Annulla non riuscito: riprova';
+      if (primo && primo.frase) btn.title = primo.frase;
+      // Quelli già rimessi non si rimettono due volte: alla prossima pressione restano solo gli altri.
+      const rimasti = fatti.filter((x, i) => !(esiti[i] && esiti[i].ok));
+      o.rinominati = rimasti;
+    });
+    return btn;
+  }
+
   function renderActionButton(a, { onAck, activity = null } = {}) {
     const type = String(a.type || '').toUpperCase();
     // In attesa di conferma come le altre, ma la si dà dalla loro UI: il
@@ -863,7 +949,7 @@
       // partirebbe a nome dell'utente. Il popup non invia nulla: mostra il testo
       // e aspetta l'OK, esattamente come nella sidebar (che già fa così).
       // Le azioni distruttive (livello 3) e i comandi restano a click esplicito.
-      const AUTO_CONFIRM_TYPES = ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'INVIA_FEEDBACK', 'SALVA_LEZIONE', 'DIMENTICA'];
+      const AUTO_CONFIRM_TYPES = ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'INVIA_FEEDBACK', 'SALVA_LEZIONE', 'DIMENTICA', 'RINOMINA_FILE'];
       if (AUTO_CONFIRM_TYPES.includes(type) && a._confirm.level === 2) {
         btn.dataset.autoConfirm = '1';
       }
@@ -906,6 +992,11 @@
           return;
         }
         btn.textContent = (r && r.executed) ? `✓ ${shortLabel}` : '✗ Non eseguita';
+        // #950 — i file rinominati: il bottone dice quanti, e accanto c'è la strada per rimetterli com'erano.
+        if (type === 'RINOMINA_FILE') {
+          btn.textContent = (r && r.executed) ? `✓ ${testoRinominati(r.output)}` : `✗ ${motivoNessunaRinomina(r && r.output)}`;
+          if (r && r.executed) btn.after(bottoneRimettiNomi(a));
+        }
         // #146.4 — modifica estetica illeggibile (livello 2): confermata ed
         // applicata, offriamo subito il box per correggere il valore.
         if (r && r.executed && type === 'IMPOSTA_ESTETICA') {
@@ -973,6 +1064,7 @@
       btn.appendChild(document.createTextNode(bgTabId ? `▸ ${label}` : `↗ ${label}`));
       return btn;
     }
+    if (type === 'RINOMINA_FILE') return bottoneRimettiNomi(a);
     if (type === 'APRI_FILE') {
       const btn = document.createElement('a');
       btn.className = 'dash-action-btn';
@@ -981,6 +1073,7 @@
       btn.target = '_blank';
       btn.rel = 'noopener';
       btn.textContent = a.etichetta || a.label || (filePath || 'File');
+      menuDelFile(btn, a);
       return btn;
     }
     if (type === 'TIMER') {

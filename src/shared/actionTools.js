@@ -232,6 +232,23 @@
       },
       required: ['percorso'],
     },
+    RINOMINA_FILE: {
+      description: ({ sistema }) => 'Dà un nome sensato a file del computer dell\'utente. Filo legge l\'inizio di ciascuno '
+        + '(PDF, immagini, documenti Word e LibreOffice, testo) e propone un nome che dice cosa contiene; l\'estensione '
+        + 'non cambia mai e nessun file viene sovrascritto. L\'utente vede l\'elenco vecchio → nuovo e conferma, e dopo '
+        + 'può rimettere tutto com\'era con «Annulla». Indica i file con `percorsi`, oppure una `cartella`: di una cartella '
+        + 'si prendono i file col nome che non dice niente (scan_00231, IMG_2026…, documento (3)), con `tutti` true anche '
+        + 'gli altri. Se è l\'utente a dettare il nome, passalo in `nome` con un solo file. Per rimettere un nome di prima '
+        + `usa \`nome\` col nome di prima. Esempio di percorso: ${sistemaInfo(sistema).esempioPercorso}`,
+      properties: {
+        percorsi: { type: 'array', items: { type: 'string' }, description: 'I file da rinominare (percorso assoluto, o con ~ per la cartella dell\'utente).' },
+        cartella: S('Una cartella: si rinominano i file che contiene (non le sottocartelle).'),
+        tutti: B('Con `cartella`: anche i file che hanno già un nome comprensibile. Di norma false.'),
+        nome: S('Il nome deciso dall\'utente per UN file, senza estensione.'),
+      },
+      required: [],
+      risultato: true,
+    },
     PULISCI_TAB: {
       description: 'Mostra un bottone "Riordina e archivia le schede"; l\'utente conferma e Filo archivia le tab non più utili (riapribili dalla cronologia). NON archiviare nulla da solo: spiega in una frase cosa farà.',
       properties: {},
@@ -277,6 +294,7 @@
         + '• archiviazione_automatica: true | false ; archivia_alla_riapertura: true | false ; archivia_se_inattivo: true | false\n'
         + '• ore_inattivita: numero 1-168 (dopo quante ore archiviare)\n'
         + `• modalita_terminale: true | false [conferma] ; shell_terminale: ${sistemaInfo(sistema).shellPref} [conferma]\n`
+        + '• nomi_sensati_scaricamenti: true | false [conferma] (nome sensato da solo ai file scaricati col nome che non dice niente)\n'
         + '• velocita_voce: numero 0.5-2 ; tono_voce: numero 0-2 (lettura ad alta voce)\n'
         + '• durata_notifiche: secondi 0-120 (quanto restano gli avvisi in basso a destra, nella barra e nelle pagine; quelli brevi e quelli con un pulsante restano in proporzione; 0 = finché l\'utente non li chiude)\n'
         + '• suono_notifiche: true | false | "standard" | "delicata" | "urgente" | "carillon" (suono degli avvisi della barra; un tono lo accende con quel tono)\n'

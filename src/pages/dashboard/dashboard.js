@@ -41,6 +41,10 @@
   let sending = false;
   let liveTickHandle = null;
   let pendingImages = []; // dataUrl delle immagini incollate (multiple)
+  // #950 — file trascinati dal disco: { percorso, nome }. Il percorso parte col messaggio, come se l'utente
+  // l'avesse incollato; le immagini arrivate dal disco ricordano il loro.
+  let pendingFiles = [];
+  const percorsiImmagini = new Map();
 
   // ===== Le parti della home =====
   //
@@ -829,9 +833,16 @@
     IMPOSTA_PREFERENZA: 'Cambio un\'impostazione…',
     IMPOSTA_ESTETICA: 'Cambio l\'aspetto…',
     INVIA_FEEDBACK: 'Preparo una segnalazione…',
+    RINOMINA_FILE: 'Leggo i file per dar loro un nome…',
   };
   function startLabelFor(type) {
     return START_LABELS[String(type || '').toUpperCase()] || 'Eseguo un\'azione…';
+  }
+  // Un'azione che lavora su più cose dice quante ne ha fatte: «3 di 40» al posto di un'attesa al buio.
+  function progressLabelFor(type, fatti, totali) {
+    const base = startLabelFor(type);
+    const n = Number(totali);
+    return n > 1 ? `${base} ${Math.min(Number(fatti) || 0, n)} di ${n}` : base;
   }
 
   // Un singolo turno del modello: bolla "sta pensando" + reasoning live, invio
@@ -920,6 +931,8 @@
         if (!data || data.reqId !== reasoningReqId) return;
         if (data.kind === 'start') {
           pending.working(startLabelFor(data.type));
+        } else if (data.kind === 'progress') {
+          pending.working(progressLabelFor(data.type, data.fatti, data.totali));
         } else if (data.kind === 'done') {
           const a = data.action;
           if (a && Array.isArray(a._cambi)) Cambi.segna(pending.el, a._cambi);
@@ -1080,11 +1093,14 @@
 
   // `daModello`: il testo viene da un suggerimento della home, non dalle dita dell'utente (#810).
   async function submitMessage(text, { daModello = false } = {}) {
-    if ((!text && pendingImages.length === 0) || sending) return;
+    if ((!text && pendingImages.length === 0 && pendingFiles.length === 0) || sending) return;
     sending = true;
     sendBtn.disabled = true;
     const imagesToSend = pendingImages.slice();
+    const righeFile = [...pendingFiles.map((f) => f.percorso), ...imagesToSend.map((d) => percorsiImmagini.get(d))]
+      .filter(Boolean).map((p) => `File: ${p}`);
     clearImagePreviews();
+    if (righeFile.length) text = [text || (imagesToSend.length ? 'Descrivi questa immagine.' : ''), ...righeFile].filter(Boolean).join('\n');
     // Svuota subito la textarea: la bolla utente è già visibile, niente attesa.
     inputEl.value = '';
     autoGrowInput();
@@ -1147,9 +1163,42 @@
   // ===== Image paste / drop (multi-immagine) =====
   const imgPreviewsEl = $('imgPreviews');
 
+  const Rinomina = window.SN_RINOMINA_UI;
+  const percorsoDelFile = (f) => {
+    try { return (window.filo && window.filo.percorsoDelFile) ? window.filo.percorsoDelFile(f) : ''; } catch (_) { return ''; }
+  };
+  const nomeDaPercorso = (p) => String(p || '').split(/[\\/]/).pop() || String(p || '');
+  // Il tasto destro su un file della barra di scrittura: il nome sensato prima di mandarlo, o toglierlo.
+  function menuFileInArrivo(e, { percorso, togli, suRinominato }) {
+    e.preventDefault();
+    const ancora = e.currentTarget;
+    const r = ancora.getBoundingClientRect();
+    const x = e.type === 'contextmenu' && e.clientX ? e.clientX : r.left;
+    const y = e.type === 'contextmenu' && e.clientY ? e.clientY : r.bottom;
+    const nome = nomeDaPercorso(percorso);
+    Promise.resolve(Rinomina ? Rinomina.disponibile() : false).then((disp) => {
+      if (!Rinomina) return;
+      const voci = [];
+      if (disp && Rinomina.tipoSupportato(nome)) {
+        voci.push([Rinomina.VOCE, () => Rinomina.apri({ ancora, percorso, nome, suRinominato, suRimesso: suRinominato })]);
+      }
+      if (Rinomina.nomeDiPrima(percorso)) {
+        voci.push([Rinomina.VOCE_RIMETTI, () => Rinomina.rimetti({ ancora, percorso, suRimesso: suRinominato })]);
+      }
+      voci.push(['Togli dal messaggio', togli]);
+      Rinomina.menu(x, y, voci, { ancora });
+    });
+  }
+  function conMenuFile(el, opzioni) {
+    el.addEventListener('contextmenu', (e) => menuFileInArrivo(e, opzioni()));
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) menuFileInArrivo(e, opzioni());
+    });
+  }
+
   function renderImagePreviews() {
     imgPreviewsEl.innerHTML = '';
-    imgPreviewsEl.hidden = pendingImages.length === 0;
+    imgPreviewsEl.hidden = pendingImages.length === 0 && pendingFiles.length === 0;
     pendingImages.forEach((dataUrl, idx) => {
       const wrap = document.createElement('div');
       wrap.className = 'dash-img-preview';
@@ -1167,27 +1216,75 @@
       rm.setAttribute('aria-label', 'Rimuovi immagine');
       rm.addEventListener('click', () => {
         pendingImages.splice(idx, 1);
+        percorsiImmagini.delete(dataUrl);
         renderImagePreviews();
       });
       wrap.appendChild(img);
       wrap.appendChild(rm);
+      if (percorsiImmagini.has(dataUrl)) {
+        wrap.title = percorsiImmagini.get(dataUrl);
+        conMenuFile(img, () => ({
+          percorso: percorsiImmagini.get(dataUrl),
+          togli: () => { pendingImages = pendingImages.filter((d) => d !== dataUrl); percorsiImmagini.delete(dataUrl); renderImagePreviews(); },
+          suRinominato: (r) => { if (r && r.a) percorsiImmagini.set(dataUrl, r.a); renderImagePreviews(); },
+        }));
+      }
       imgPreviewsEl.appendChild(wrap);
     });
+    for (const f of pendingFiles) {
+      const chip = document.createElement('div');
+      chip.className = 'dash-file-chip';
+      chip.tabIndex = 0;
+      chip.title = f.percorso;
+      const nome = document.createElement('span');
+      nome.className = 'dash-file-chip-nome';
+      nome.textContent = f.nome;
+      const rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'dash-img-remove dash-file-chip-togli';
+      rm.textContent = '×';
+      rm.setAttribute('aria-label', 'Togli il file');
+      rm.title = 'Togli';
+      const togli = () => { pendingFiles = pendingFiles.filter((x) => x !== f); renderImagePreviews(); };
+      rm.addEventListener('click', togli);
+      conMenuFile(chip, () => ({
+        percorso: f.percorso,
+        togli,
+        suRinominato: (r) => { if (r && r.a) { f.percorso = r.a; f.nome = r.nome || nomeDaPercorso(r.a); } renderImagePreviews(); },
+      }));
+      chip.append(nome, rm);
+      imgPreviewsEl.appendChild(chip);
+    }
   }
-  function addPendingImage(dataUrl) {
+  function addPendingImage(dataUrl, percorso) {
     pendingImages.push(dataUrl);
+    if (percorso) percorsiImmagini.set(dataUrl, percorso);
+    renderImagePreviews();
+  }
+  function addPendingFile(percorso) {
+    if (!percorso || pendingFiles.some((f) => f.percorso === percorso)) return;
+    pendingFiles.push({ percorso, nome: nomeDaPercorso(percorso) });
     renderImagePreviews();
   }
   function clearImagePreviews() {
     pendingImages = [];
+    pendingFiles = [];
+    percorsiImmagini.clear();
     renderImagePreviews();
   }
-  function handleImageFile(file) {
+  function handleImageFile(file, percorso = '') {
     if (!file || !file.type.startsWith('image/')) return;
-    if (file.size > 4 * 1024 * 1024) return;
+    if (file.size > 4 * 1024 * 1024) { if (percorso) addPendingFile(percorso); return; }
     const reader = new FileReader();
-    reader.onload = () => addPendingImage(reader.result);
+    reader.onload = () => addPendingImage(reader.result, percorso);
     reader.readAsDataURL(file);
+  }
+  // Un file dal disco: le immagini si vedono (e il modello le guarda), gli altri entrano col loro percorso.
+  function handleDroppedFile(file) {
+    if (!file) return;
+    const percorso = percorsoDelFile(file);
+    if (file.type && file.type.startsWith('image/')) handleImageFile(file, percorso);
+    else if (percorso) addPendingFile(percorso);
   }
   inputForm.addEventListener('paste', (e) => {
     const items = e.clipboardData?.items;
@@ -1215,7 +1312,7 @@
   inputForm.addEventListener('drop', (e) => {
     e.preventDefault();
     const files = e.dataTransfer?.files;
-    if (files) for (const f of files) handleImageFile(f);
+    if (files) for (const f of files) handleDroppedFile(f);
   });
 
   // ===== Lightbox: click su un'immagine per ingrandirla =====
@@ -1260,7 +1357,7 @@
   inputForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const text = inputEl.value.trim();
-    if (!text && pendingImages.length === 0) return;
+    if (!text && pendingImages.length === 0 && pendingFiles.length === 0) return;
     // "/dominio.tld": non navigare DI SLANCIO verso un sito inesistente
     // (porterebbe a una pagina bianca). Verifica il DNS (await se non già in
     // cache) e, se il dominio non esiste, dillo e offri di aprire lo stesso —
