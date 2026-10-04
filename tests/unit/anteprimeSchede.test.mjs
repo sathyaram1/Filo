@@ -293,12 +293,13 @@ test('una scheda chiusa porta via la sua foto', async () => {
   assert.deepEqual(tolte, ['a']);
 });
 
-test('a parole: si spegne, si riaccende a una misura, e le chiavi vaghe restano di chi le aveva', () => {
+test('a parole: si spegne, si riaccende a una misura, e le chiavi vaghe non passano in silenzio alla voce nuova', () => {
   const P = globalThis.SN_PREF;
   assert.deepEqual(P.buildPreferencePartial('anteprima_schede', 'no').partial, { tabPreview: { enabled: false } });
   assert.deepEqual(P.buildPreferencePartial('anteprima delle schede', 'più grande').partial, { tabPreview: { enabled: true, size: 'grande' } });
   assert.deepEqual(P.buildPreferencePartial('anteprima_schede', 'piccola').partial, { tabPreview: { enabled: true, size: 'piccola' } });
   assert.equal(P.buildPreferencePartial('anteprima_schede', 'boh'), null);
-  assert.ok(P.buildPreferencePartial('tab', 'vivaci').partial.tabColor);
-  assert.ok(P.buildPreferencePartial('schede', 'sì').partial.autoArchive);
+  // «tab» e «schede» indicano più voci: Filo riceve un rifiuto con le chiavi, compresa quella di prima (#949).
+  assert.match(P.buildPreferencePartial('tab', 'vivaci').rifiuto, /colore_tab/);
+  assert.match(P.buildPreferencePartial('schede', 'sì').rifiuto, /archiviazione_automatica/);
 });
