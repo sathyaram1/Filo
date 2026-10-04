@@ -127,6 +127,44 @@ test('una firma che non torna non diventa mai una dichiarazione', () => {
   assert.match(P.frase(r), /la firma non è valida/);
 });
 
+// #946: il formato fino al 2023 circa tiene la catena sotto «x5chain», fuori dalla parte protetta.
+test('credenziali nel formato del 2023: la firma valida resta valida e l’origine si legge', () => {
+  const r = conElenco(pngFirmato({ ...firmatario(), catenaVecchia: true }));
+  assert.equal(r.prova, 'firmata');
+  assert.equal(r.firmatario, 'riconosciuto');
+  assert.equal(P.frase(r), 'Generata con l’AI, lo dichiara OpenAI nelle credenziali firmate.');
+});
+
+test('un file vero nel formato del 2023, valido per il lettore di riferimento, non è «firma non valida»', () => {
+  const r = P.analizza(readFileSync(join(process.cwd(), 'tests', 'fixtures', 'provenienza', 'c2pa-formato-2023.jpg')));
+  assert.notEqual(r.prova, 'firma-rotta');
+  assert.doesNotMatch(P.frase(r), /non è valida/);
+});
+
+test('una chiave RSA dichiarata «solo PSS» si rilegge come RSA quando il motore non la decodifica (Electron)', async () => {
+  const { X509Certificate } = await import('node:crypto');
+  const I = P._interni;
+  const store = I.leggiContenitore(new Uint8Array(readFileSync(join(process.cwd(), 'tests', 'fixtures', 'provenienza', 'c2pa-formato-2023.jpg')))).c2pa[0];
+  const manifesti = store.figli.filter((f) => f.tipo === 'jumb');
+  const firma = manifesti[manifesti.length - 1].figli.find((f) => f.etichetta === 'c2pa.signature');
+  let cose = I.cborDecode(firma.figli.find((f) => f.tipo !== 'jumd').dati);
+  if (cose && cose.__tag !== undefined) cose = cose.valore;
+  const [foglia, emittente] = cose[1].x5chain.map((c) => new X509Certificate(Buffer.from(c)));
+  assert.equal(emittente.publicKey.asymmetricKeyType, 'rsa-pss', 'la premessa: una chiave «solo PSS»');
+  const comeElectron = { raw: emittente.raw, get publicKey() { throw new Error('PUBLIC_KEY_DECODE_ERROR'); } };
+  const chiave = I.chiavePubblica(comeElectron);
+  assert.equal(chiave.asymmetricKeyType, 'rsa');
+  assert.ok(foglia.verify(chiave), 'la chiave riletta verifica la firma che l’emittente ha messo sul certificato');
+});
+
+test('una firma che Filo non sa verificare non viene detta «non valida»', () => {
+  const r = conElenco(pngFirmato({ ...firmatario(), algCose: -47 }));
+  assert.equal(r.prova, 'non-verificabile');
+  assert.equal(r.origine, null);
+  assert.doesNotMatch(P.frase(r), /non è valida|Generata/);
+  assert.match(P.frase(r), /non sa verificare/);
+});
+
 test('chi non è nell’elenco viene detto tale, col nome che si è dato', () => {
   const r = conElenco(pngFirmato({ cert: certificato({ organizzazione: 'Acme Immagini Srl' }) }));
   assert.equal(r.prova, 'firmata');
@@ -177,6 +215,20 @@ test('nell’etichetta XMP il programma si nomina senza il sistema su cui girava
     + 'Iptc4xmpExt:DigitalSourceType="http://cv.iptc.org/newscodes/digitalsourcetype/compositeWithTrainedAlgorithmicMedia"/>';
   assert.equal(P.frase(P.analizza(pngConXmp(pngSpoglio(), xmp))),
     'Modificata con l’AI secondo il file stesso (Adobe Photoshop 25.0), senza firma che lo confermi.');
+});
+
+test('XMP con gli attributi fra apici semplici si legge come con le virgolette', () => {
+  const xmp = "<rdf:Description xmp:CreatorTool='Midjourney' "
+    + "Iptc4xmpExt:DigitalSourceType='http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia'/>";
+  assert.equal(P.frase(P.analizza(pngConXmp(pngSpoglio(), xmp))),
+    'Generata con l’AI secondo il file stesso (Midjourney), senza firma che lo confermi.');
+});
+
+test('nell’XMP l’autore scritto prima del programma non nasconde il programma', () => {
+  const xmp = '<dc:creator><rdf:Seq><rdf:li>Mario Rossi</rdf:li></rdf:Seq></dc:creator>'
+    + '<xmp:CreatorTool>Adobe Firefly</xmp:CreatorTool>'
+    + '<Iptc4xmpExt:DigitalSourceType>http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia</Iptc4xmpExt:DigitalSourceType>';
+  assert.equal(P.analizza(pngConXmp(pngSpoglio(), xmp)).dichiarante, 'Adobe');
 });
 
 test('compositeWithTrainedAlgorithmicMedia in XMP resta «modificata»', () => {

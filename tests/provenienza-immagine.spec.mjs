@@ -408,6 +408,52 @@ test('nella chat della Home le credenziali di un’immagine incollata arrivano a
   expect(await app.evaluate(cerca)).toContain('Generata con l’AI secondo credenziali firmate da C2PA Test Signing Cert');
 });
 
+// Un file vero del 2023, valido per il lettore di riferimento: catena sotto «x5chain» e chiavi RSA «solo PSS»,
+// che il motore crittografico di Electron non decodifica da solo (#946).
+test('credenziali valide nel formato del 2023: il menu non dice che la firma non è valida', async ({ app, openTab, testServer }) => {
+  const file = fixture('c2pa-formato-2023.jpg');
+  const esito = await app.evaluate((_e, b64) => globalThis.__filoFirmatariC2pa.analizzaImmagine(Buffer.from(b64, 'base64')), file.toString('base64'));
+  expect(esito.prova).not.toBe('firma-rotta');
+  expect(esito.prova).not.toBe('non-verificabile');
+
+  const page = await testServer.openReady(openTab, pagina(testServer.asset(file, 'image/jpeg')));
+  await page.waitForFunction(() => document.getElementById('foto').naturalWidth > 0);
+  const menu = await apriMenuSullaFoto(page);
+  await expect(menu.locator('.sn-menu-link-body')).toBeVisible({ timeout: 10000 });
+  await page.waitForTimeout(2000);
+  const riga = menu.locator(RIGA);
+  expect((await riga.isVisible()) ? await riga.getAttribute('aria-label') : '').not.toMatch(/non è valida/);
+});
+
+// Le immagini non tornano nei turni dopo: la domanda fatta al messaggio seguente deve trovare l'esito (#946).
+test('nella chat della Home, «è fatta con l’AI?» al messaggio dopo l’immagine trova lo stesso esito', async ({ app, openTab }) => {
+  await modelloFinto(app);
+  const home = await openTab('filo://newtab/');
+  await expect(home.locator('#input')).toBeVisible({ timeout: 10000 });
+  await home.evaluate((dati) => {
+    const bin = atob(dati);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    const dt = new DataTransfer();
+    dt.items.add(new File([arr], 'generata.jpg', { type: 'image/jpeg' }));
+    document.getElementById('inputForm').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+  }, fixture('c2pa-ufficiale-ai.jpg').toString('base64'));
+  await expect(home.locator('#imgPreviews .dash-img-preview img')).toHaveCount(1, { timeout: 5000 });
+  await home.locator('#input').fill('cosa c’è in questa immagine?');
+  await home.locator('#sendBtn').click();
+  const turno = (_e, d) => globalThis.__turniOrigine.find((t) => t.includes(d) && t.includes('Sei Filo')) || '';
+  await expect.poll(() => app.evaluate(turno, 'cosa c’è in questa'), { timeout: 20000 }).not.toBe('');
+
+  await expect(home.locator('#input')).toBeEditable({ timeout: 10000 });
+  await home.locator('#input').fill('ed è fatta con l’AI?');
+  await home.locator('#sendBtn').click();
+  await expect.poll(() => app.evaluate(turno, 'ed è fatta con'), { timeout: 20000 }).not.toBe('');
+  const secondo = await app.evaluate(turno, 'ed è fatta con');
+  expect(secondo).not.toContain('data:image');
+  expect(secondo).toContain('Generata con l’AI secondo credenziali firmate da C2PA Test Signing Cert');
+  expect(secondo).toContain('messaggi precedenti di questa chat');
+});
+
 // ── Copiata col tasto destro e incollata in chat (#946) ──────────────────────
 // Gli appunti ricodificano l'immagine e ne buttano le etichette: la chat deve dire
 // lo stesso del tasto destro, perché l'esito letto sull'originale viaggia con la copia.

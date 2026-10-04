@@ -414,20 +414,26 @@
     const t = String(testo || '');
     const fonti = [];
     // Quantificatori con un tetto: senza, un XMP ripetitivo costa il quadrato della sua lunghezza (#946).
-    const re = /DigitalSourceType\s{0,200}(?:=\s{0,200}"([^"]{0,400})"|>\s{0,200}([^<]{0,400})<)/gi;
+    // XML ammette gli attributi fra apici semplici quanto fra virgolette.
+    const re = /DigitalSourceType\s{0,200}(?:=\s{0,200}(?:"([^"]{0,400})"|'([^']{0,400})')|>\s{0,200}([^<]{0,400})<)/gi;
     let m;
-    while ((m = re.exec(t))) fonti.push((m[1] || m[2] || '').trim());
-    const res2 = /DigitalSourceType[^>]{0,400}rdf:resource\s{0,200}=\s{0,200}"([^"]{0,400})"/i.exec(t);
-    if (res2) fonti.push(res2[1]);
+    while ((m = re.exec(t))) fonti.push((m[1] || m[2] || m[3] || '').trim());
+    const res2 = /DigitalSourceType[^>]{0,400}rdf:resource\s{0,200}=\s{0,200}(?:"([^"]{0,400})"|'([^']{0,400})')/i.exec(t);
+    if (res2) fonti.push(res2[1] || res2[2]);
     let origine = null;
     for (const f of fonti) {
       const c = codiceSorgente(f);
       if (c === 'ai') { origine = 'ai'; break; }
       if (c && !origine) origine = c;
     }
-    const chi = /(?:xmp:CreatorTool|photoshop:Credit|dc:creator|tiff:Make)\s{0,200}(?:=\s{0,200}"([^"]{0,400})"|>\s{0,200}([^<]{0,400})<)/i.exec(t);
+    // Il programma prima dell'autore: è lui che dice se l'immagine è generata, in qualunque ordine stiano nel file.
+    let nome = '';
+    for (const campo of ['xmp:CreatorTool', 'photoshop:Credit', 'dc:creator', 'tiff:Make']) {
+      const chi = new RegExp(campo + `\\s{0,200}(?:=\\s{0,200}(?:"([^"]{0,400})"|'([^']{0,400})')|>\\s{0,200}(?:<rdf:(?:Seq|Bag|Alt)>\\s{0,200}<rdf:li[^>]{0,200}>)?([^<]{0,400})<)`, 'i').exec(t);
+      nome = chi ? String(chi[1] || chi[2] || chi[3] || '').trim() : '';
+      if (nome) break;
+    }
     // «Adobe Photoshop 25.0 (Windows)»: il sistema su cui girava non dice chi dichiara.
-    const nome = chi ? String(chi[1] || chi[2] || '').trim() : '';
     return { origine, dichiarante: nome.replace(/\s*\((?:windows|macintosh|mac ?os[^)]*|linux|android|ios)\)$/i, '') };
   }
 
@@ -473,8 +479,10 @@
     const alg = ALG_COSE[String(testa['1'])];
     if (!alg) return { valida: false, motivo: 'firma_algoritmo_ignoto', soggetto: '' };
 
-    let catena = testa['33'];
-    if (catena === undefined && nonProtetto && typeof nonProtetto === 'object') catena = nonProtetto['33'];
+    // Fino al 2023 circa la catena stava sotto l'etichetta testuale «x5chain», di solito fuori dalla parte protetta:
+    // il lettore di riferimento la legge ancora, e un file valido non va detto «firma non valida» (#946).
+    const fuori = nonProtetto && typeof nonProtetto === 'object' ? nonProtetto : {};
+    let catena = [testa['33'], testa.x5chain, fuori['33'], fuori.x5chain].find((c) => c !== undefined);
     if (catena && !Array.isArray(catena)) catena = [catena];
     if (!Array.isArray(catena) || !catena.length) return { valida: false, motivo: 'firma_senza_certificato', soggetto: '' };
 
@@ -486,9 +494,13 @@
     const sig = concat([cborTstr('Signature1'), cborBstr(protetto), cborBstr(new Uint8Array(0)), cborBstr(u8(claimBytes))]);
     const dati = Buffer.from(concat([cborLen(4, 4), sig]));
 
+    // Una chiave che questo motore crittografico non sa leggere non rende falsa la firma: la rende non verificabile (#946).
+    let chiave;
+    try { chiave = chiavePubblica(certs[0]); } catch (_) {
+      return { valida: false, motivo: 'non_verificabile', soggetto: '' };
+    }
     let ok = false;
     try {
-      const chiave = certs[0].publicKey;
       if (alg.tipo === 'eddsa') ok = crypto.verify(null, dati, chiave, Buffer.from(firma));
       else if (alg.tipo === 'ec') ok = crypto.verify(alg.hash, dati, { key: chiave, dsaEncoding: 'ieee-p1363' }, Buffer.from(firma));
       else if (alg.tipo === 'pss') {
@@ -498,14 +510,16 @@
           saltLength: crypto.constants.RSA_PSS_SALTLEN_DIGEST,
         }, Buffer.from(firma));
       } else ok = crypto.verify(alg.hash, dati, chiave, Buffer.from(firma));
-    } catch (_) { ok = false; }
+    } catch (_) {
+      return { valida: false, motivo: 'non_verificabile', soggetto: '' };
+    }
     if (!ok) return { valida: false, motivo: 'firma_non_valida', soggetto: '' };
 
     // La catena serve a sapere CHI ha firmato: un anello che non torna rende il
     // nome sul certificato una parola come un'altra, non un'attribuzione.
     let catenaIntegra = true;
     for (let i = 0; i + 1 < certs.length; i++) {
-      try { if (!certs[i].verify(certs[i + 1].publicKey)) catenaIntegra = false; } catch (_) { catenaIntegra = false; }
+      try { if (!certs[i].verify(chiavePubblica(certs[i + 1]))) catenaIntegra = false; } catch (_) { catenaIntegra = false; }
     }
     return {
       valida: true,
@@ -557,8 +571,31 @@
     }
     return 'sconosciuto';
   }
+  // Il motore crittografico di Electron non decodifica le chiavi RSA dichiarate «solo per PSS» (id-RSASSA-PSS),
+  // che Node legge: i byte della chiave sono quelli di una RSA qualunque, quindi si rileggono con l'identificativo generico.
+  const OID_RSA_PSS = '1.2.840.113549.1.1.10';
+  const ALG_RSA = Uint8Array.from([0x30, 0x0d, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01, 0x05, 0x00]);
+  function chiavePubblica(cert) {
+    try { return cert.publicKey; } catch (e) {
+      const crypto = nodeMod('node:crypto');
+      const spki = crypto && spkiComeRsa(cert.raw);
+      if (!spki) throw e;
+      return crypto.createPublicKey({ key: Buffer.from(spki), format: 'der', type: 'spki' });
+    }
+  }
+  function spkiComeRsa(raw) {
+    const campi = derFigli(derFigli(der(u8(raw), 0))[0]);
+    const spki = campi[(campi[0].tag === 0xa0 ? 1 : 0) + 5];
+    if (!spki || spki.tag !== 0x30) return null;
+    const [alg, bit] = derFigli(spki);
+    if (!alg || !bit || derOid(derFigli(alg)[0]) !== OID_RSA_PSS) return null;
+    const corpo = concat([ALG_RSA, bit.tutto]);
+    const n = corpo.length;
+    const lunghezza = n < 0x80 ? [n] : n < 0x100 ? [0x81, n] : n < 0x10000 ? [0x82, n >> 8, n & 255] : [0x83, n >> 16, (n >> 8) & 255, n & 255];
+    return concat([Uint8Array.from([0x30, ...lunghezza]), corpo]);
+  }
   function emessoDa(figlio, padre) {
-    try { return !!padre.ca && !!figlio.checkIssued(padre) && figlio.verify(padre.publicKey); } catch (_) { return false; }
+    try { return !!padre.ca && !!figlio.checkIssued(padre) && figlio.verify(chiavePubblica(padre)); } catch (_) { return false; }
   }
 
   // L'elenco scaricato è un PEM con righe di commento in mezzo: vale ogni
@@ -705,7 +742,7 @@
 
       const verifica = (cert) => {
         try {
-          const chiave = cert.publicKey;
+          const chiave = chiavePubblica(cert);
           const h = algFirma.hash || hashFirma;
           if (algFirma.tipo === 'eddsa') return crypto.verify(null, Buffer.from(firmato), chiave, Buffer.from(valoreFirma.dentro));
           if (algFirma.tipo === 'pss') {
@@ -940,8 +977,9 @@
     if (!firma.valida) {
       // Credenziali che non reggono la verifica: si dice che ci sono e che non
       // valgono, mai cosa affermano — sarebbe ripetere il testo di chi le ha messe.
+      // «Non valida» solo se la verifica è stata fatta e ha fallito: una firma che Filo non sa leggere non è falsa.
       return {
-        trovato: true, origine: null, prova: 'firma-rotta', dichiarante: '',
+        trovato: true, origine: null, prova: firma.motivo === 'firma_non_valida' ? 'firma-rotta' : 'non-verificabile', dichiarante: '',
         firmatario: '', avvisi: [firma.motivo || 'firma_non_valida'], fonte: 'c2pa',
       };
     }
@@ -1044,6 +1082,9 @@
     if (res.prova === 'firma-rotta') {
       return 'Ha credenziali di origine, ma la firma non è valida. Non dicono niente su questa immagine.';
     }
+    if (res.prova === 'non-verificabile') {
+      return 'Ha credenziali di origine in una forma che Filo non sa verificare: non dice niente su cosa affermano.';
+    }
     if (res.avvisi && res.avvisi.includes('file_cambiato')) {
       return chi
         ? `Il file è stato cambiato dopo la firma di ${chi}, quindi le sue credenziali non valgono più.`
@@ -1102,6 +1143,6 @@
 
   global.SN_PROVENIENZA = {
     analizza, frase, notaPerModello, ancoreDaPem,
-    _interni: { leggiMarca, marcaValida, pulisci, nomeLeggibile, cborDecode: cborTesta, jumbfBoxes, leggiContenitore, leggiXmp, codiceSorgente, verificaCose, fileIntatto, statoFirmatario },
+    _interni: { chiavePubblica, leggiMarca, marcaValida, pulisci, nomeLeggibile, cborDecode: cborTesta, jumbfBoxes, leggiContenitore, leggiXmp, codiceSorgente, verificaCose, fileIntatto, statoFirmatario },
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

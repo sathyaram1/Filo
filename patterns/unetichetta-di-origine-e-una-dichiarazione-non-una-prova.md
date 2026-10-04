@@ -34,6 +34,13 @@ La regola, in tre pezzi:
   la cui firma regge e la cui autorità sta nel secondo elenco ufficiale, quello
   delle autorità di marcatura (#946). Senza una marca così, il certificato
   scaduto rende le credenziali «incomplete».
+- **«Non so verificarla» non è «non è valida».** «La firma non è valida» si
+  dice solo quando la verifica è stata fatta e ha fallito. Una forma che Filo non
+  sa leggere (un algoritmo che non conosce, una chiave che il motore crittografico
+  non decodifica) ha la sua frase. I formati più vecchi si leggono come li legge
+  il lettore di riferimento, e le prove girano anche dentro Electron, il cui
+  motore crittografico non è quello di Node: lì un file valido del 2023 risultava
+  «non valido» (#946).
 - **Quello che la firma non copre non è firmato.** In C2PA il claim elenca le
   asserzioni con la loro impronta: si legge solo quello che combacia, e il
   legame duro sui byte del file decide se le credenziali parlano ancora di

@@ -271,6 +271,9 @@ export function pngFirmato({
   generatore = 'Filo test/1.0',
   guastaFirma = false,
   marca = null,
+  // Il formato fino al 2023 circa: catena sotto «x5chain», fuori dalla parte protetta.
+  catenaVecchia = false,
+  algCose = -7,
 } = {}) {
   const dove = 8 + 25;
   const impronta = crypto.createHash('sha256').update(base).digest();
@@ -300,18 +303,19 @@ export function pngFirmato({
       signature: 'self#jumbf=c2pa.signature',
       alg: 'sha256',
     });
-    const protetto = cbor({ '1': -7, '33': catena.length ? [cert.der, ...catena.map((c) => c.der)] : cert.der });
+    const derCatena = catena.length ? [cert.der, ...catena.map((c) => c.der)] : cert.der;
+    const protetto = cbor(catenaVecchia ? { '1': algCose } : { '1': algCose, '33': derCatena });
     const daFirmare = Buffer.concat([
       Buffer.from([0x84]), cbor('Signature1'), cbor(protetto), cbor(Buffer.alloc(0)), cbor(claim),
     ]);
     let firma = crypto.sign('sha256', daFirmare, { key: cert.privateKey, dsaEncoding: 'ieee-p1363' });
     if (guastaFirma) { firma = Buffer.from(firma); firma[0] ^= 0xff; }
-    let nonProtetto = {};
+    let nonProtetto = catenaVecchia ? { x5chain: Array.isArray(derCatena) ? derCatena : [derCatena] } : {};
     if (marca) {
       // v1: la marca copre il claim; v2 (sigTst2): copre la firma stessa.
       const dati = cbor(['CounterSignature', protetto, Buffer.alloc(0), marca.v2 ? cbor(firma) : claim]);
       const token = marcaTemporale({ ...marca, dati });
-      nonProtetto = { [marca.v2 ? 'sigTst2' : 'sigTst']: { tstTokens: [{ val: token }] } };
+      nonProtetto = { ...nonProtetto, [marca.v2 ? 'sigTst2' : 'sigTst']: { tstTokens: [{ val: token }] } };
     }
     const cose = cbor([protetto, nonProtetto, null, firma]);
     return superbox('store', 'c2pa',
