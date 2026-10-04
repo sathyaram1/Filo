@@ -35,6 +35,7 @@ const PAGINA = `<!doctype html><html><head><meta charset="utf-8"><title>Cassa a 
 <a href="/carrello/concludi" data-method="post" onclick="window.__clic.push('link-concludi'); return false;">Concludi ordine</a>
 <a href="/abbonamento/rinnova" class="btn" onclick="window.__clic.push('link-rinnova'); return false;">Rinnova abbonamento</a>
 <a href="/abbonamento" data-turbo-method="delete" onclick="window.__clic.push('link-disdici'); return false;">Disdici</a>
+<a href="#!" onclick="window.__clic.push('ancora-paga')">Completa e salda</a>
 <div role="button" onclick="window.__clic.push('riduci')">Riduci il piano</div>
 <button type="button" aria-haspopup="true" onclick="window.__clic.push('popup')">Ordina</button>
 <div role="listbox" aria-label="Piano"><div role="option" onclick="window.__clic.push('option')">Piano Premium 19 €/mese</div></div>
@@ -50,7 +51,7 @@ test('collegamenti, scelte e nomi che sembrano mostrare ma ordinano o disdicono 
   });
   const page = await home(app);
   const S = 'Cassa a link';
-  const nomi = ['Concludi ordine', 'Rinnova abbonamento', 'Disdici', 'Riduci il piano', 'Ordina', 'Piano Premium'];
+  const nomi = ['Concludi ordine', 'Rinnova abbonamento', 'Disdici', 'Riduci il piano', 'Ordina', 'Piano Premium', 'Completa e salda'];
   await modello(app, [
     { toolCalls: nomi.map((e, k) => ({ id: `v${k}`, name: 'APRI_ELEMENTO', arguments: { scheda: S, elemento: e } })) },
     { text: 'Fatto.' },
