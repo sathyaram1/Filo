@@ -75,7 +75,7 @@ Sulla bacheca pubblica dentro l'app un feedback compare solo quando è chiuso, e
 
 Filo stesso, quando si accorge che non sa fare una cosa che gli chiedi o che qualcosa non ha funzionato, può mandare da solo una segnalazione generica: senza le tue parole e senza l'indirizzo della pagina, con un avviso che ti lascia annullarla. È acceso di serie e si spegne nelle impostazioni di Sicurezza.
 
-Il feedback resta sul server senza scadenza: è la storia di come Filo è cambiato, e serve a chi arriva dopo. Se vuoi che un tuo feedback sparisca, scrivimelo e lo cancello a mano. Un feedback che i giudici classificano come attacco finisce anche in un archivio separato, che serve ad allenare i giudici del futuro.
+Il feedback resta sul server senza scadenza: è la storia di come Filo è cambiato, e serve a chi arriva dopo. Se vuoi che un tuo feedback sparisca, scrivimelo e lo cancello a mano. Un feedback che i giudici classificano come attacco finisce anche in un archivio separato, che serve ad allenare i giudici del futuro: con il testo ci sono il codice dell'installazione, browser e sistema.
 
 ## I crediti
 
