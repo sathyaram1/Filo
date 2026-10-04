@@ -11,7 +11,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, collegaCartella } from '../helpers/percorsi.mjs';
 import {
-  decidiEsito, campoPerIlServer, chiaveTest, testoProva, togliCollegamento, chiudiAlbero, gitIn,
+  decidiEsito, campoPerIlServer, chiaveTest, fileDellaChiave, testoProva, togliCollegamento, chiudiAlbero, gitIn,
   provaUnitSullaFusione, chiediConProva, pulisciResti, TETTO_ROSSI,
 } from '../../scripts/lib/unit-sulla-fusione.mjs';
 
@@ -42,6 +42,14 @@ test('lo stesso test rosso ha la stessa chiave in due cartelle diverse', () => {
   assert.equal(a, b);
   // Fuori dalla cartella (forma corta e lunga di Windows): conta il pezzo da tests/.
   assert.equal(chiaveTest({ nome: 'n', file: 'C:\\ALTRO~1\\fusione\\tests\\unit\\a.test.mjs' }, 'C:\\altro nome\\fusione'), 'tests/unit/a.test.mjs › n');
+  assert.equal(chiaveTest({ nome: 'n', file: '/private/tmp/x/fusione/tests/unit/a.test.mjs' }, '/tmp/x/fusione'), 'tests/unit/a.test.mjs › n');
+});
+
+test('una chiave rimasta assoluta, in qualunque forma, non è un file da riprovare', () => {
+  assert.equal(fileDellaChiave('tests/unit/a.test.mjs › n'), 'tests/unit/a.test.mjs');
+  assert.equal(fileDellaChiave('C:\\altrove\\a.test.mjs › n'), '');
+  assert.equal(fileDellaChiave('/altrove/a.test.mjs › n'), '');
+  assert.equal(fileDellaChiave('../fuori/a.test.mjs › n'), '');
 });
 
 test('il campo per il server: niente campo senza origin, «non_provata» col motivo, elenco dei rossi col tetto dichiarato', () => {
