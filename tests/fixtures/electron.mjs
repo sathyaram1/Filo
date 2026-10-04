@@ -49,8 +49,38 @@ export async function chiudiApp(app, { tetto = 5000 } = {}) {
   if (pid) { try { process.kill(pid, 'SIGKILL'); } catch (_) {} }
 }
 
+// Quello che l'app scrive su stdout/stderr (in test le righe render-process-gone e did-fail-load)
+// Playwright non lo mostra: senza, un rosso che c'è solo in GitHub non si spiega (#639).
+const TETTO_RIGHE_APP = 20_000;
+function registraUsciteApp(app) {
+  const righe = [];
+  let perse = 0;
+  const t0 = Date.now();
+  const prendi = (canale) => {
+    let resto = '';
+    return (pezzo) => {
+      const parti = (resto + pezzo.toString('utf8')).split('\n');
+      resto = parti.pop();
+      for (const r of parti) {
+        righe.push(`+${Date.now() - t0}ms [${canale}] ${r}`);
+        if (righe.length > TETTO_RIGHE_APP) { righe.shift(); perse++; }
+      }
+    };
+  };
+  try {
+    const proc = app.process();
+    proc.stdout?.on('data', prendi('out'));
+    proc.stderr?.on('data', prendi('err'));
+  } catch (_) {}
+  return () => [
+    'Uscita dell\'app (stdout e stderr dal momento in cui Playwright l\'ha agganciata):',
+    ...(perse ? [`… ${perse} righe più vecchie non tenute: il tetto è ${TETTO_RIGHE_APP}`] : []),
+    ...righe,
+  ].join('\n');
+}
+
 export const test = base.extend({
-  app: async ({}, use) => {
+  app: async ({}, use, testInfo) => {
     // Canonica, non abbreviata: vedi tests/helpers/percorsi.mjs. Da qui esce
     // anche FILO_DOWNLOAD_DIR, che gli spec degli scaricamenti confrontano con
     // il percorso che l'app riporta.
