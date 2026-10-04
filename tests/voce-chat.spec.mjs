@@ -515,3 +515,35 @@ test('Invio a mano mentre trascrive: l\'ultima frase resta nella casella invece 
   await page.waitForTimeout(4000);
   await expect(page.locator('.dash-bubble-user')).toHaveCount(1);
 });
+
+// Un invio a mano con qualunque gesto (qui il clic sul tasto d'invio) vale quanto Invio: il microfono smette
+// e quello che arriva ancora resta nella casella invece di partire come secondo messaggio.
+for (const quando of ['ascolta', 'trascrive']) {
+  test(`clic sul tasto d'invio mentre ${quando}: l'ultima frase resta nella casella e non parte`, async ({ app, shell }) => {
+    test.setTimeout(90_000);
+    await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+    await prepara(app);
+    await trascrizioneLenta(app);
+    const page = await home(app);
+    const mic = page.locator('.dash-input-wrap .sn-voce-btn');
+    await mic.click();
+    await expect(mic).toHaveAttribute('data-stato', 'ascolta', { timeout: 5_000 });
+    await page.waitForTimeout(1200);
+    await voce(page, false);
+    await expect(page.locator('#input')).toHaveValue('prima frase', { timeout: 5_000 });
+    await voce(page, true);
+    await page.waitForTimeout(1200);
+    if (quando === 'trascrive') {
+      await mic.click();
+      await expect(mic).toHaveAttribute('data-stato', 'trascrive', { timeout: 2_000 });
+    }
+    await page.locator('#sendBtn').click();
+    await expect(page.locator('.dash-bubble-user', { hasText: 'prima frase' })).toBeVisible({ timeout: 8_000 });
+    await expect(mic).not.toHaveAttribute('data-stato', 'ascolta', { timeout: 2_000 });
+    await voce(page, false);
+    await expect(page.locator('#input')).toHaveValue('seconda frase', { timeout: 10_000 });
+    await page.waitForTimeout(4000);
+    await expect(page.locator('.dash-bubble-user')).toHaveCount(1);
+    await expect(page.locator('#input')).toHaveValue('seconda frase');
+  });
+}

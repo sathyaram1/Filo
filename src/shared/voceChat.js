@@ -102,7 +102,10 @@
     // Un sito che ospita la chat non accende il microfono di Filo con un clic fabbricato.
     try { global.SN_FILO_UI && global.SN_FILO_UI.soloGestiVeri(b); } catch (_) {}
 
-    const c = { campo, bottone: b, stato: 'pronto', giro: 0, sessione: null, toccato: false, daSolo: true, timer: 0, atteso: '', dal: 0, attesaMs: 0 };
+    const c = {
+      campo, bottone: b, stato: 'pronto', giro: 0, sessione: null, toccato: false, preso: false, lasciato: '',
+      daSolo: true, timer: 0, atteso: '', dal: 0, attesaMs: 0,
+    };
 
     function imposta(stato) {
       c.stato = stato;
@@ -123,6 +126,7 @@
     // La voce entra dove sta il cursore, staccata da quello che c'è intorno.
     function inserisci(testo) {
       if (!campo.isConnected) return;
+      presaInMano();
       const v = campo.value;
       let da = campo.selectionStart;
       let a = campo.selectionEnd;
@@ -133,6 +137,16 @@
       campo.setRangeText(pezzo, da, a, 'end');
       // La chat ricalcola altezza e colori come per un tasto premuto; questo evento non è un tocco dell'utente.
       campo.dispatchEvent(new Event('input', { bubbles: true }));
+      c.lasciato = campo.value;
+    }
+
+    // La casella cambiata né dal microfono né dalla tastiera: la chat l'ha inviata, con qualunque gesto (Invio,
+    // clic sul tasto d'invio, altro). L'utente ha preso in mano la richiesta: quello che arriva ancora resta lì.
+    function presaInMano() {
+      if (!c.sessione || c.preso || campo.value === c.lasciato) return false;
+      c.preso = true;
+      tieni();
+      return true;
     }
 
     async function ascolta() {
@@ -141,7 +155,9 @@
       const giro = ++c.giro;
       imposta('avvio');
       c.toccato = false;
+      c.preso = false;
       if (document.activeElement !== campo) caretInFondo(campo);
+      c.lasciato = campo.value;
       c.daSolo = await impostazioneFresca();
       if (giro !== c.giro) return;
       const sessione = await Ascolto.avvia({
@@ -150,6 +166,7 @@
           if (giro !== c.giro) return;
           // La chat è sparita (l'Aiuto chiuso, il modulo tolto): il microfono non resta acceso per nessuno.
           if (!campo.isConnected) { if (c.sessione) c.sessione.ferma('annulla'); return; }
+          if (presaInMano()) return;
           b.style.setProperty('--sn-voce-livello', Number(v || 0).toFixed(2));
         },
         suFrase: (testo) => { if (giro === c.giro) inserisci(testo); },
@@ -164,6 +181,7 @@
 
     function finito(giro, esito) {
       if (giro !== c.giro) return;
+      if (c.sessione && campo.isConnected && campo.value !== c.lasciato) c.toccato = true;
       c.sessione = null;
       const parte = esito.frasi > 0 && !esito.errore && ['utente', 'finito', 'tempo'].includes(esito.motivo)
         && c.daSolo && !c.toccato && campo.isConnected && campo.value.trim();
@@ -232,6 +250,7 @@
     const suInput = (e) => {
       if (!e.isTrusted) return;
       c.toccato = true;
+      c.lasciato = campo.value;
       if (c.stato === 'attesa') annullaInvio();
     };
     campo.addEventListener('input', suInput);
