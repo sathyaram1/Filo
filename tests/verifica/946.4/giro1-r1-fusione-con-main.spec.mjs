@@ -7,7 +7,6 @@ import { execFileSync } from 'node:child_process';
 import { writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
 
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const LIB = 'scripts/lib/unit-sulla-fusione.mjs';
@@ -35,5 +34,4 @@ test('il ramo si fonde con main senza conflitti e la libreria fusa si carica', a
   } finally {
     rmSync(fusa, { force: true });
   }
-  void cartellaTemporanea;
 });
