@@ -47,9 +47,9 @@ const chiamate = (app) => app.evaluate(() => globalThis.__chiamate || []);
 const esitiDi = (c) => (c ? c.messages.filter((m) => m.role === 'tool').map((m) => String(m.content)).join('\n\n') : '');
 
 // Il Gmail finto in una scheda dietro, la chat della home davanti: come chi scrive a Filo con la posta aperta.
-async function gmailDietro(app, shell, openTab, testServer) {
+async function gmailDietro(app, shell, openTab, testServer, opzioni = {}) {
   await app.evaluate((_e, o) => { process.env.FILO_GMAIL_ORIGIN = o; }, testServer.origin);
-  const url = testServer.html(paginaGmail());
+  const url = testServer.html(paginaGmail(opzioni));
   const gmail = await openTab(url);
   await expect(gmail).toHaveTitle(/Posta in arrivo.*Gmail/);
   await shell.evaluate(async () => {
@@ -145,7 +145,8 @@ test('«rispondi a Marco che va bene giovedì»: la bozza resta aperta in Gmail 
 
 test('un messaggio nuovo: destinatario, oggetto e testo nella finestra di Gmail, e Invia non lo preme nessuno', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(120_000);
-  const { gmail, page } = await gmailDietro(app, shell, openTab, testServer);
+  // Il campo dei destinatari con l'etichetta all'inverso, come in certe versioni di Gmail.
+  const { gmail, page } = await gmailDietro(app, shell, openTab, testServer, { etichettaA: 'A destinatari' });
   await modello(app, [
     { toolCalls: [{ id: 'n1', name: 'POSTA_BOZZA', arguments: { a: 'luca@example.org', oggetto: 'Cena', testo: 'Ci vediamo sabato alle 20?' } }] },
     { text: 'Pronta.' },

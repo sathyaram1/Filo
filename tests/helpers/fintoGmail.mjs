@@ -27,8 +27,9 @@ export const INVIATI = [
   { id: 's1', a: 'Marco Bianchi', indirizzo: 'marco@uni.it', oggetto: 'Re: appunti di fisica', data: '1 ott', testo: 'Grazie degli appunti!' },
 ];
 
-export function paginaGmail({ posta = POSTA, inviati = INVIATI, account = ACCOUNT } = {}) {
-  const dati = JSON.stringify({ posta, inviati, account }).replace(/</g, '\\u003c');
+// `etichettaA`: Gmail chiama il campo dei destinatari in modi diversi a seconda della versione.
+export function paginaGmail({ posta = POSTA, inviati = INVIATI, account = ACCOUNT, etichettaA = 'Destinatari A' } = {}) {
+  const dati = JSON.stringify({ posta, inviati, account, etichettaA }).replace(/</g, '\\u003c');
   return `<!doctype html><html><head><meta charset="utf-8"><title>Gmail</title>
 <style>
   body { font-family: sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; }
@@ -130,10 +131,11 @@ export function paginaGmail({ posta = POSTA, inviati = INVIATI, account = ACCOUN
     const d = document.createElement('div');
     d.setAttribute('role', 'dialog');
     d.setAttribute('aria-label', 'Nuovo messaggio');
-    d.innerHTML = '<div>Nuovo messaggio</div><div class="dest"><span class="chips"></span><input aria-label="Destinatari A" id="a"></div>'
+    d.innerHTML = '<div>Nuovo messaggio</div><div class="dest"><span class="chips"></span><input id="a"></div>'
       + '<input aria-label="Oggetto" placeholder="Oggetto" name="subjectbox" id="oggetto">'
       + '<div contenteditable="true" role="textbox" aria-label="Corpo del messaggio" id="corpo"></div>';
     const a = d.querySelector('#a');
+    a.setAttribute('aria-label', D.etichettaA);
     // Come Gmail: lasciando il campo, l'indirizzo scritto diventa un'etichetta col suo attributo email.
     a.addEventListener('blur', () => {
       const v = a.value.trim();
