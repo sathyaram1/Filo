@@ -285,6 +285,56 @@ test('aperta una riga, il titolo lungo si legge per intero', async ({ app, openT
   await expect.poll(() => titolo.evaluate((el) => el.scrollWidth > el.clientWidth + 1)).toBe(true);
 });
 
+test('«/feedback» nella home porta chi non gestisce i feedback alle sue segnalazioni', async ({ app, openTab }) => {
+  await app.evaluate(() => globalThis.SN_SEGNALAZIONI_MIE.registra({ id: 'mia', testo: 'Il tasto Salva non salva', stato: 'inviata', num: '990' }));
+  const home = await openTab('filo://newtab/');
+  const box = home.locator('#dashInput, #input, textarea').first();
+  await expect(box).toBeVisible({ timeout: 10_000 });
+  await box.fill('/feedback');
+  await box.press('Enter');
+  const bacheca = () => app.windows().find((w) => { try { return w.url().startsWith(BACHECA); } catch (_) { return false; } });
+  await expect.poll(() => !!bacheca(), { timeout: 8_000 }).toBe(true);
+  await expect(righe(bacheca())).toHaveCount(1);
+  await expect(righe(bacheca()).first().locator('.bd-mia-titolo')).toHaveText('#990 Il tasto Salva non salva');
+});
+
+test('tasto destro su una riga: copia il testo, rimanda quella non partita già scritta, togli', async ({ app, openTab }) => {
+  await app.evaluate(async () => {
+    const M = globalThis.SN_SEGNALAZIONI_MIE;
+    await M.registra({ id: 'ok', testo: 'Il tasto Salva non salva', stato: 'inviata', num: '990', creataIl: '2026-10-04T10:00:00Z' });
+    await M.registra({ id: 'ferma', testo: 'Il video si blocca a metà', creataIl: '2026-10-03T10:00:00Z' });
+    await M.nonPartita('ferma');
+  });
+  const bacheca = await openTab(`${BACHECA}#segnalazioni`);
+  await expect(righe(bacheca)).toHaveCount(2);
+  const menu = bacheca.locator('.bd-mia-menu');
+
+  await righe(bacheca).first().locator('.bd-mia-titolo').click({ button: 'right' });
+  await expect(menu).toBeVisible();
+  await expect(menu.locator('.sn-select-option')).toHaveText(['Copia il testo', 'Togli dall’elenco']);
+  await menu.getByText('Copia il testo').click();
+  await expect(menu).toHaveCount(0);
+  await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('Il tasto Salva non salva');
+
+  const ferma = righe(bacheca).filter({ hasText: 'Il video si blocca' });
+  await ferma.locator('.bd-mia-titolo').click({ button: 'right' });
+  await expect(menu.locator('.sn-select-option')).toHaveText(['Copia il testo', 'Rimanda', 'Togli dall’elenco']);
+  await menu.getByText('Rimanda').click();
+  await expect(bacheca.locator('.sn-fb-modal')).toBeVisible();
+  await expect(bacheca.locator('.sn-fb-text')).toHaveValue('Il video si blocca a metà');
+  await bacheca.locator('.sn-fb-cancel').click();
+  await expect(bacheca.locator('.sn-fb-modal')).toHaveCount(0);
+
+  await ferma.locator('.bd-mia-titolo').click({ button: 'right' });
+  await bacheca.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await ferma.locator('.bd-mia-titolo').click({ button: 'right' });
+  await menu.getByText('Togli dall’elenco').click();
+  await expect(righe(bacheca)).toHaveCount(1);
+  const ids = await app.evaluate(async () => (await globalThis.SN_SEGNALAZIONI_MIE.elenco()).map((v) => v.id));
+  expect(ids).toEqual(['ok']);
+});
+
 // ── Riavvio: la stessa cartella dati in tre avvii ──────────────────────────────
 async function avvia(userData) {
   const app = await electron.launch({
