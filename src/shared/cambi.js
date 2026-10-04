@@ -441,9 +441,20 @@
         if (!semplice(nodo[seg[i]])) nodo[seg[i]] = {};
         nodo = nodo[seg[i]];
       }
-      nodo[seg[seg.length - 1]] = c.prima;
+      const v = voce(c.chiave);
+      nodo[seg[seg.length - 1]] = v && v.elenco ? elencoAnnullato(c, seg.reduce((x, k) => (semplice(x) ? x[k] : undefined), correnti)) : c.prima;
     }
     return parziale;
+  }
+  // Un elenco di siti si annulla a voci sull'elenco di adesso: via quelle che il cambio aggiunse, di nuovo
+  // quelle che tolse. Rimettere l'elenco intero perdeva i siti cambiati dopo (#949).
+  function elencoAnnullato(c, attuale) {
+    const arr = (x) => (Array.isArray(x) ? x : []);
+    const prima = arr(c.prima);
+    const dopo = arr(c.dopo);
+    const out = arr(attuale).filter((x) => prima.includes(x) || !dopo.includes(x));
+    prima.forEach((x, i) => { if (!dopo.includes(x) && !out.includes(x)) out.splice(Math.min(i, out.length), 0, x); });
+    return out;
   }
 
   // La lista dei timer rimessa com'era. Un timer tolto che nel frattempo sarebbe già scaduto non
