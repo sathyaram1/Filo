@@ -60,16 +60,14 @@ function registraUsciteApp(app) {
   const righe = [];
   let perse = 0;
   const t0 = Date.now();
-  const prendi = (canale) => {
-    let resto = '';
-    return (pezzo) => {
-      const parti = (resto + pezzo.toString('utf8')).split('\n');
-      resto = parti.pop();
-      for (const r of parti) {
-        righe.push(`+${Date.now() - t0}ms [${canale}] ${r}`);
-        if (righe.length > TETTO_RIGHE_APP) { righe.shift(); perse++; }
-      }
-    };
+  const resti = { out: '', err: '' };
+  const prendi = (canale) => (pezzo) => {
+    const parti = (resti[canale] + pezzo.toString('utf8')).split('\n');
+    resti[canale] = parti.pop();
+    for (const r of parti) {
+      righe.push(`+${Date.now() - t0}ms [${canale}] ${r}`);
+      if (righe.length > TETTO_RIGHE_APP) { righe.shift(); perse++; }
+    }
   };
   try {
     const proc = app.process();
@@ -80,6 +78,7 @@ function registraUsciteApp(app) {
     'Uscita dell\'app (stdout e stderr dal momento in cui Playwright l\'ha agganciata):',
     ...(perse ? [`… ${perse} righe più vecchie non tenute: il tetto è ${TETTO_RIGHE_APP}`] : []),
     ...righe,
+    ...Object.entries(resti).filter(([, r]) => r).map(([c, r]) => `[${c}, senza a capo] ${r}`),
   ].join('\n');
 }
 
