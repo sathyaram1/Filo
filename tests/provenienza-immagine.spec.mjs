@@ -53,7 +53,7 @@ test('un’immagine con credenziali firmate fa comparire la riga che dice chi lo
 
   const riga = menu.locator(RIGA);
   await expect(riga).toBeVisible({ timeout: 10000 });
-  await expect(riga).toHaveText('Generata con l’AI, lo dichiara OpenAI nelle credenziali firmate.');
+  await expect(riga).toHaveAttribute('aria-label', 'Generata con l’AI, lo dichiara OpenAI nelle credenziali firmate.');
   await expect(riga).not.toHaveClass(/sn-menu-origine-debole/);
   await page.screenshot({ path: 'tests/.shots/provenienza-immagine-firmata.png' }).catch(() => {});
 });
@@ -64,7 +64,7 @@ test('prima di aver mai scaricato l’elenco: firma valida, firmatario non verif
   const menu = await apriMenuSullaFoto(page);
 
   const riga = menu.locator(RIGA);
-  await expect(riga).toHaveText(
+  await expect(riga).toHaveAttribute('aria-label',
     'Generata con l’AI secondo credenziali firmate da OpenAI. Firma valida, firmatario non verificato.',
     { timeout: 10000 },
   );
@@ -80,7 +80,7 @@ test('un certificato che si chiama «OpenAI» ma non arriva all’elenco non vie
   const menu = await apriMenuSullaFoto(page);
 
   const riga = menu.locator(RIGA);
-  await expect(riga).toHaveText(
+  await expect(riga).toHaveAttribute('aria-label',
     'Generata con l’AI secondo credenziali firmate da OpenAI, che non è nell’elenco ufficiale dei firmatari riconosciuti.',
     { timeout: 10000 },
   );
@@ -110,7 +110,7 @@ test('la riga compare anche quando l’immagine è dentro un collegamento', asyn
   const page = await testServer.openReady(openTab, pagina(src, { dentroUnLink: true }));
   const menu = await apriMenuSullaFoto(page);
 
-  await expect(menu.locator(RIGA)).toHaveText('Scattata con una fotocamera, firmata da Leica Camera.', { timeout: 10000 });
+  await expect(menu.locator(RIGA)).toHaveAttribute('aria-label', 'Scattata con una fotocamera, firmata da Leica Camera.', { timeout: 10000 });
   // Il ramo del link resta quello di sempre: la riga si aggiunge, non sostituisce.
   await expect(menu.getByText('Apri in nuova tab', { exact: false }).first()).toBeVisible();
 });
@@ -127,7 +127,7 @@ test('la riga compare anche quando l’immagine sta sotto un velo trasparente', 
   await page.locator('#velo').click({ button: 'right', position: { x: 20, y: 20 } });
   const menu = page.locator('.sn-menu');
   await expect(menu).toBeVisible();
-  await expect(menu.locator(RIGA)).toHaveText('Generata con l’AI, lo dichiara OpenAI nelle credenziali firmate.', { timeout: 10000 });
+  await expect(menu.locator(RIGA)).toHaveAttribute('aria-label', 'Generata con l’AI, lo dichiara OpenAI nelle credenziali firmate.', { timeout: 10000 });
 });
 
 test('un file cambiato dopo la firma lo dice, e non ripete quello che le credenziali affermavano', async ({ app, openTab, testServer }) => {
@@ -140,8 +140,8 @@ test('un file cambiato dopo la firma lo dice, e non ripete quello che le credenz
 
   const riga = menu.locator(RIGA);
   await expect(riga).toBeVisible({ timeout: 10000 });
-  await expect(riga).toContainText('cambiato dopo la firma');
-  await expect(riga).not.toContainText('Generata con');
+  await expect(riga).toHaveAttribute('aria-label', /cambiato dopo la firma/);
+  await expect(riga).not.toHaveAttribute('aria-label', /Generata con/);
 });
 
 test('un’etichetta senza firma si presenta come dichiarazione del file, non come prova', async ({ openTab, testServer }) => {
@@ -151,7 +151,7 @@ test('un’etichetta senza firma si presenta come dichiarazione del file, non co
 
   const riga = menu.locator(RIGA);
   await expect(riga).toBeVisible({ timeout: 10000 });
-  await expect(riga).toContainText('senza firma che lo confermi');
+  await expect(riga).toHaveAttribute('aria-label', /senza firma che lo confermi/);
   await expect(riga).toHaveClass(/sn-menu-origine-debole/);
 });
 
@@ -250,7 +250,7 @@ async function rigaSu(testServer, openTab, byte, tipo) {
 
 test('un JPEG firmato dall’SDK ufficiale del C2PA fa comparire la riga', async ({ openTab, testServer }) => {
   const { riga } = await rigaSu(testServer, openTab, fixture('c2pa-ufficiale-ai.jpg'), 'image/jpeg');
-  await expect(riga).toHaveText(
+  await expect(riga).toHaveAttribute('aria-label',
     'Generata con l’AI secondo credenziali firmate da C2PA Test Signing Cert. Firma valida, firmatario non verificato.',
     { timeout: 10000 },
   );
@@ -260,12 +260,12 @@ test('lo stesso JPEG cambiato dopo la firma lo dice', async ({ openTab, testServ
   const b = Buffer.from(fixture('c2pa-ufficiale-ai.jpg'));
   b[b.length - 30] ^= 0x5a;
   const { riga } = await rigaSu(testServer, openTab, b, 'image/jpeg');
-  await expect(riga).toContainText('cambiato dopo la firma', { timeout: 10000 });
+  await expect(riga).toHaveAttribute('aria-label', /cambiato dopo la firma/, { timeout: 10000 });
 });
 
 test('generata con l’AI e poi ritagliata con le credenziali: la riga lo dice ancora', async ({ openTab, testServer }) => {
   const { riga } = await rigaSu(testServer, openTab, fixture('c2pa-ufficiale-ritagliata.jpg'), 'image/jpeg');
-  await expect(riga).toContainText('Generata con l’AI', { timeout: 10000 });
+  await expect(riga).toHaveAttribute('aria-label', /Generata con l’AI/, { timeout: 10000 });
 });
 
 // La prova di #946: la STESSA immagine firmata, ricompressa come fa un salvataggio
@@ -284,7 +284,7 @@ test('la stessa immagine firmata, ricompressa senza metadati, non fa comparire n
   </body></html>`);
   const menu = page.locator('.sn-menu');
   await page.locator('#firmata').click({ button: 'right', position: { x: 20, y: 20 } });
-  await expect(menu.locator(RIGA)).toContainText('Generata con l’AI', { timeout: 10000 });
+  await expect(menu.locator(RIGA)).toHaveAttribute('aria-label', /Generata con l’AI/, { timeout: 10000 });
   await page.keyboard.press('Escape');
   await expect(menu).toBeHidden();
 
@@ -318,8 +318,14 @@ test('un’immagine servita da un altro dominio fa comparire la riga e la descri
   expect(await page.evaluate((u) => fetch(u).then(() => 'letta', () => 'bloccata'), src)).toBe('bloccata');
 
   const menu = await apriMenuSullaFoto(page);
-  await expect(menu.locator(RIGA)).toContainText('Generata con l’AI', { timeout: 10000 });
-  await expect(menu.locator('.sn-menu-link-body')).toHaveText('un quadrato arancione', { timeout: 10000 });
+  await expect(menu.locator(RIGA)).toHaveAttribute('aria-label', /Generata con l’AI/, { timeout: 10000 });
+  await expect(menu.locator('.sn-menu-link-body')).toHaveAttribute('aria-label', 'un quadrato arancione', { timeout: 10000 });
+  // Quei byte il sito non li poteva leggere: non deve ritrovare con la sua ricerca quello che Filo ne dice.
+  expect(await page.evaluate(() => [window.find('quadrato arancione'), window.find('Signing Cert')])).toEqual([false, false]);
+  // Il testo si vede lo stesso: la riga e la descrizione occupano spazio.
+  for (const sel of [RIGA, '.sn-menu-link-body']) {
+    expect((await menu.locator(sel).boundingBox()).height).toBeGreaterThan(8);
+  }
 });
 
 // ── «questa foto è fatta con l'AI?» chiesto all'Aiuto della pagina ──────────
@@ -358,7 +364,7 @@ test('all’Aiuto della pagina il modello riceve lo stesso esito del tasto destr
   await modelloFinto(app);
   const page = await testServer.openReady(openTab, pagina(testServer.asset(fixture('c2pa-ufficiale-ai.jpg'), 'image/jpeg')));
   const menu = await apriMenuSullaFoto(page);
-  await expect(menu.locator(RIGA)).toContainText('Generata con l’AI', { timeout: 10000 });
+  await expect(menu.locator(RIGA)).toHaveAttribute('aria-label', /Generata con l’AI/, { timeout: 10000 });
 
   const prompt = await chiediAllAiuto(app, page, 'questa foto è fatta con l’AI?');
   const dentro = (prompt.split('<<<ETICHETTA_FILE>>>')[1] || '').split('<<<FINE_ETICHETTA_FILE>>>')[0];
