@@ -1094,6 +1094,30 @@ test('#516 SICUREZZA — il valore di un gruppo non può fare da flag che il tes
   assert.equal(lvl('git checkout ("main")'), 2);
 });
 
+test('#516 SICUREZZA — il valore di un gruppo può essere uno scriptblock: niente cmdlet che lo eseguono', () => {
+  // `Sort-Object`, `Where-Object`, `Select-Object`… eseguono uno scriptblock passato
+  // come argomento; con un input dal tubo lo fa qualunque cmdlet (delay-bind);
+  // `-replace` e `-split` lo fanno in PowerShell 7. Il gruppo può leggere soltanto,
+  // ma il suo valore (`(Get-Command f).ScriptBlock`) è codice.
+  for (const cmd of [
+    'gci | Sort-Object (Get-Command mkdir).ScriptBlock',
+    'gci | Where-Object (Get-Command mkdir | Select-Object -ExpandProperty ScriptBlock)',
+    'gci | where (Get-Command f).ScriptBlock',
+    'gci | Get-Content (Get-Command f).ScriptBlock',
+    'gci | cd (Get-Location)',
+    'Select-Object -InputObject (gci) -Property (Get-Command f).ScriptBlock',
+    'Format-Table -InputObject (gci) (Get-Command f).ScriptBlock',
+    'Measure-Object -InputObject (gci) (Get-Command f).ScriptBlock',
+    '(gci).Name -replace "a", (Get-Command f).ScriptBlock',
+    '(gci).Name -split (Get-Command f).ScriptBlock',
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" dovrebbe restare livello 3`);
+  }
+  // Stampato, o passato come oggetto lungo il tubo, uno scriptblock resta testo.
+  assert.equal(lvl('Write-Output (Get-Command f).ScriptBlock'), 1);
+  assert.equal(lvl('(Get-Command f).ScriptBlock | Sort-Object'), 1);
+});
+
 test('#516 — dentro i gruppi vale il perimetro di lettura', () => {
   const det = (cmd) => C.classifyDetail(cmd, WIN);
   // Una lettura che esce dal perimetro chiede un OK anche dentro un costrutto.

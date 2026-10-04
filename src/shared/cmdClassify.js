@@ -1170,7 +1170,7 @@
   const LETTERALE_G = new RegExp(LETTERALE, 'gi');
   const TERMINE_RE = /^(?:'[^']*'|"[^"]*"|-?\d+(?:\.\d+)?(?:kb|mb|gb|tb|pb)?|\$(?:env:)?[A-Za-z_]\w*)/i;
   const MEMBRI_RE = /^(?:\.[A-Za-z_]\w*|\[-?\d+\])*/;
-  const OPERATORE_RE = /^\s*(?:-[ci]?(?:eq|ne|gt|ge|lt|le|like|notlike|match|notmatch|contains|notcontains|in|notin|replace|split|join|and|or|xor)(?![\w-])|[+*/%,]|-(?=\s))/i;
+  const OPERATORE_RE = /^\s*(?:-[ci]?(?:eq|ne|gt|ge|lt|le|like|notlike|match|notmatch|contains|notcontains|in|notin|join|and|or|xor)(?![\w-])|[+*/%,]|-(?=\s))/i;
   const UNARIO_RE = /^\s*(?:!|-not(?![\w-]))/i;
   const STRINGA_RE = /^(?:'[^']*'|"[^"]*")$/;
 
@@ -1300,7 +1300,7 @@
         out += `Write-Output ${SEGNAPOSTO}`;
         i = r.fine;
       } else {
-        const prog = programOf(dequote(resto));
+        const prog = programOf(/^\S*/.exec(resto)[0]);
         while (i < s.length) {
           const ch = s[i];
           if (ch === ';' || ch === '|' || (ch === '&' && s[i + 1] === '&')) break;
@@ -1308,6 +1308,7 @@
           let j;
           if (ch === '"' || ch === "'") {
             j = s.indexOf(ch, i + 1);
+            if (j < 0) return TRE;
             out += s.slice(i, j + 1);
           } else if (ch === '{') {
             // Uno scriptblock resta com'è (lo giudica segmentIsRead), ma senza gruppi dentro.
@@ -1341,13 +1342,21 @@
     return { testo: out, pezzi, lasciato, mosso };
   }
 
-  // Un gruppo come argomento vale qualcosa che si sa solo eseguendolo, e verso un
-  // programma esterno (o in bash) può essere anche un flag: `git checkout $(echo .)`.
-  // Si accetta solo dove nessun argomento cambia il livello o il perimetro.
+  // Un gruppo come argomento vale qualcosa che si sa solo eseguendolo: verso un
+  // programma esterno (o in bash) può essere un flag (`git checkout $(echo .)`), in
+  // PowerShell uno scriptblock (`(Get-Command f).ScriptBlock`), che questi cmdlet
+  // eseguono, e con un input dal tubo qualunque cmdlet. Si accetta solo dove nessun
+  // valore cambia il livello o il perimetro, e in testa alla pipeline.
+  const ESEGUONO_BLOCCHI = new Set([
+    'select-object', 'select', 'sort-object', 'group-object', 'group', 'measure-object', 'measure',
+    'compare-object', 'format-table', 'ft', 'format-list', 'fl', 'format-wide', 'fw', 'where',
+  ]);
   function gruppoComeArgomento(prog) {
-    return (PS_READ.has(prog) || LEVEL1.has(prog) || SPOSTAMENTI.has(prog))
+    return (PS_READ.has(prog) || LEVEL1.has(prog) || SPOSTAMENTI.has(prog)) && !ESEGUONO_BLOCCHI.has(prog)
       && !LEVEL1_MUTATES[prog] && prog !== 'grep' && prog !== 'findstr';
   }
+  const gruppiAlPosto = (testo) => testo.split(/;|&&|\|\|/).every((istr) => istr.split('|')
+    .every((seg, i) => !seg.includes(SEGNAPOSTO) || (i === 0 && gruppoComeArgomento(programOf(dequote(seg))))));
 
   function classifica(cmd, c, prof) {
     const trimmed = String(cmd).trim();
@@ -1356,7 +1365,7 @@
     if (sm === null) return classificaPiatta(trimmed, c);
     // Il testo lasciato fuori non passa dai controlli dei separatori: non ne deve avere, neanche fra virgolette.
     if (sm === TRE || /[;|&<>]/.test(sm.lasciato)) return TRE;
-    if (sm.testo.split(/;|&&|\|\|?/).some((p) => p.includes(SEGNAPOSTO) && !gruppoComeArgomento(programOf(dequote(p))))) return TRE;
+    if (!gruppiAlPosto(sm.testo)) return TRE;
     const ignota = { ...c, cwd: null };
     let det = classificaPiatta(sm.testo.trim(), sm.mosso ? ignota : c);
     if (nomiVariabili(sm.lasciato).some((n) => !VAR_INNOCUE.has(n))) det = peggiore(det, due(MOTIVI.variabili));
