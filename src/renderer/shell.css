@@ -303,8 +303,8 @@ html[data-chrome-compact="1"] .addr {
   .tab > .tab-alert { margin: 0 auto; }
 }
 
-/* Scheda stretta senza avviso, stessa priorità e stesso conto (icona 16, X 18, paese ~26, gap 6): senza,
-   con tante schede la X usciva dalla sua e il clic sul suo centro cadeva sulla vicina (#945). */
+/* Scheda stretta senza avviso, stessa priorità e stesso conto: senza, con tante schede la X usciva dalla sua
+   e il clic sul suo centro cadeva sulla vicina (#945). Prova in tests/tab-scheda-stretta.spec.mjs. */
 @container tab (width < 78px) {
   .tab:not(:has(> .tab-alert)) > .proxy-ind { display: none; }
 }
