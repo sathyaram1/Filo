@@ -124,6 +124,9 @@
     // true dopo il primo comando che Filo propone o esegue in chat: la frase che
     // spiega il terminale si dice una volta sola, anche dopo un riavvio (#892).
     FILO_TERMINALE_SPIEGATO: 'filo_terminale_spiegato',
+    // Mittenti e siti fidati (#534, forma in src/shared/fiducia.js). Un backup che rientra non la tocca:
+    // alzare la fiducia passa solo da una conferma.
+    FILO_FIDUCIA: 'filo_fiducia',
     // Ultima versione di cui l'utente ha visto il recap aggiornamento (popup
     // all'avvio). All'avvio si confronta con app.getVersion(): se è più vecchia
     // e ci sono note (src/shared/patchNotes.js), mostra il recap. Vedi C4.
