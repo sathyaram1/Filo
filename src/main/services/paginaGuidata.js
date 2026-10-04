@@ -458,8 +458,8 @@ function paginaGuidata() {
     add(testoDi(radice, 6000).testo);
     return out;
   }
-  function conNome(re, radice) {
-    return interattivi().filter((el) => (!radice || radice.contains(el)) && re.test(norm(nomeDi(el))));
+  function conNome(re, radice, lista = null) {
+    return (lista || interattivi()).filter((el) => (!radice || radice.contains(el)) && re.test(norm(nomeDi(el))));
   }
   function principale() {
     return [...document.querySelectorAll('[role=main]')].find(inVista) || document.querySelector('[role=main]') || document.body;
@@ -490,7 +490,8 @@ function paginaGuidata() {
   function stato() {
     const ricerca = campoRicerca();
     const dentro = !!(ricerca && document.querySelector('[role=main]'));
-    const conv = dentro && (conNome(R.rispondi).length > 0 || conNome(R.tutti).length > 0);
+    const els = dentro ? interattivi() : [];
+    const conv = dentro && (conNome(R.rispondi, null, els).length > 0 || conNome(R.tutti, null, els).length > 0);
     return {
       dentro, vista: !dentro ? 'fuori' : (conv ? 'conversazione' : 'elenco'),
       account: account(), titolo: document.title, url: location.href, cartella: cartellaDa(document.title),
@@ -702,7 +703,9 @@ function paginaGuidata() {
     if (!f || !f.corpo) return { ok: false, motivo: 'nessuna-bozza' };
     if (a) {
       if (!f.a) return { ok: false, motivo: 'nessun-destinatario' };
-      scriviIn(f.a, String(a));
+      // Una bozza ripresa ha già il destinatario fra le etichette: riscriverlo lo raddoppierebbe.
+      const gia = [...f.radice.querySelectorAll('[email]')].some((x) => norm(x.getAttribute('email')) === norm(a));
+      if (!gia) scriviIn(f.a, String(a));
     }
     if (oggetto && f.oggetto) scriviIn(f.oggetto, String(oggetto));
     if (testo) {
