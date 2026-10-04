@@ -12,7 +12,7 @@ import {
   promptVerificatore, regolaFile, richiestaArg, riprendi, rigaStato, serveDeploy, siSovrappongono, toccaRegole,
 } from '../../scripts/lib/orchestratore.mjs';
 import {
-  accessoDaStatus, argomentiClaude, frontmatter, leggiUscitaClaude, modelloDelRuolo, richiestaDaLettura, trovaClaude,
+  accessoDaStatus, argomentiClaude, envFiglio, frontmatter, leggiUscitaClaude, modelloDelRuolo, richiestaDaLettura, trovaClaude,
 } from '../../scripts/orchestratore-locale.mjs';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
@@ -368,6 +368,11 @@ test('accesso della riga di comando: senza, avvia si ferma prima di lanciare ist
   assert.equal(accessoDaStatus('{"loggedIn": true, "authMethod": "claude.ai"}'), true);
   assert.equal(accessoDaStatus('{"loggedIn": false, "authMethod": "none"}'), false);
   assert.equal(accessoDaStatus('Not logged in'), false);
+});
+
+test('l’istanza figlia non eredita la sessione che la lancia, e lo sforzo lo dice --effort', () => {
+  const e = envFiglio({ CLAUDECODE: '1', CLAUDE_EFFORT: 'low', CLAUDE_CODE_SESSION_ID: 'x', CLAUDE_CODE_MESSAGING_TOKEN: 't', PATH: '/bin', CLAUDE_CODE_OAUTH_TOKEN: 'o', ANTHROPIC_BASE_URL: 'u' });
+  assert.deepEqual(Object.keys(e).sort(), ['ANTHROPIC_BASE_URL', 'CLAUDE_CODE_OAUTH_TOKEN', 'PATH']);
 });
 
 test('richiesta dalle cornici di feedback:leggi', () => {

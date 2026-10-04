@@ -112,6 +112,13 @@ export function leggiUscitaClaude(stdout, stderr = '', code = 0) {
   return { ok, testo: String(j.result || ''), costo: Number(j.total_cost_usd) || 0, errore: ok ? '' : String(j.result || j.subtype || `uscita ${code}`) };
 }
 
+// Le variabili della sessione che lancia: un'istanza figlia che le eredita si crede dentro di lei (e CLAUDE_EFFORT batte --effort).
+const DELLA_SESSIONE = /^(CLAUDECODE|CLAUDE_PID|CLAUDE_EFFORT|CLAUDE_CODE_(SESSION_ID|HOST_SESSION_ID|CHILD_SESSION|SESSION_ATTENDED|ENTRYPOINT|EXECPATH|MESSAGING_\w+|SDK_HAS_HOST_AUTH_REFRESH))$/;
+/** L'ambiente di un'istanza figlia. PURA. */
+export function envFiglio(env) {
+  return Object.fromEntries(Object.entries(env || {}).filter(([k]) => !DELLA_SESSIONE.test(k)));
+}
+
 /** `claude auth status` → l'istanza figlia avrà un accesso suo? PURA. */
 export function accessoDaStatus(stdout) {
   try { return JSON.parse(String(stdout || '').trim()).loggedIn === true; } catch (_) { return false; }
@@ -212,9 +219,7 @@ function depVere(P, opz, log) {
   const bin = trovaClaude();
   if (!bin) throw new Error('Claude Code non trovato: imposta FILO_CLAUDE_BIN col percorso del binario');
   const ruoli = { lavoratore: modelloDelRuolo('lavoratore'), verificatore: modelloDelRuolo('verificatore') };
-  // Un'istanza figlia non deve credersi dentro la sessione che l'ha lanciata.
-  const env = { ...process.env };
-  delete env.CLAUDECODE;
+  const env = envFiglio(process.env);
   const auth = spawnSync(bin, ['auth', 'status'], { encoding: 'utf8', env, timeout: 60_000, windowsHide: true });
   if (!accessoDaStatus(auth.stdout)) throw new Error(SENZA_ACCESSO);
   mkdirSync(join(P.note, 'log'), { recursive: true });
@@ -400,10 +405,11 @@ async function main(argv) {
     try {
       const fine = await creaMotore(depVere(P, opz, log), opz).avvia();
       for (const n of fine.coda) console.log(rigaStato(fine.pratiche[n]));
+      // 2 = qualche lavoro fermo: chi ha lanciato in sottofondo lo sa dal codice, senza leggere le righe.
+      return fine.coda.some((n) => fine.pratiche[n] && fine.pratiche[n].fase === 'fermo') ? 2 : 0;
     } finally {
       try { unlinkSync(lock); } catch (_) { /* già tolto */ }
     }
-    return 0;
   }
 
   console.error(USO);
