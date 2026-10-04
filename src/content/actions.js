@@ -764,7 +764,7 @@
               body.textContent = res?.error || I18n.t('err_provider_failed');
               return;
             }
-            body.textContent = res.text;
+            testoChiuso(body, res.text);
           } catch (e) {
             if (cancelled) return;
             el.classList.remove('sn-menu-inline-loading');
