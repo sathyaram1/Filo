@@ -103,6 +103,20 @@ test('un invio che non parte resta scritto come «non partito», mai «in parten
   await M.togli('sub-3');
 });
 
+test('rimandata, una segnalazione «non partita» lascia il posto a quella partita: una riga sola', async () => {
+  await M.registra({ id: 'sub-r1', testo: 'Il video si blocca' });
+  await M.nonPartita('sub-r1');
+  await M.registra({ id: 'sub-r2', testo: 'Altro testo' });
+  await M.nonPartita('sub-r2');
+  await M.registra({ id: 'sub-r3', testo: '  Il video si blocca \n' });
+  const ids = (await M.elenco()).map((x) => x.id);
+  assert.ok(ids.includes('sub-r3'));
+  assert.ok(!ids.includes('sub-r1'), 'la copia non partita resta accanto a quella rimandata');
+  assert.ok(ids.includes('sub-r2'), 'una non partita con un altro testo non va toccata');
+  assert.deepEqual(M.rimandate([{ id: 'x', stato: 'inviata', testo: 'a' }, { id: 'y', stato: 'non_partita', testo: '' }], { id: 'z', testo: '' }), []);
+  for (const id of ['sub-r2', 'sub-r3']) await M.togli(id);
+});
+
 test('dopo un riavvio l\'elenco c\'è ancora; una voce tolta sparisce dal disco e non torna', async () => {
   await M.registra({ id: 'da-togliere', testo: 'TESTO-DA-TOGLIERE-986' });
   assert.equal(suDisco('TESTO-DA-TOGLIERE-986').length, 1);
