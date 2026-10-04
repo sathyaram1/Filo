@@ -1,5 +1,5 @@
-// Batteria, rete e Bluetooth del computer: un lettore per piattaforma, senza permessi, senza modello, senza console.
-// Non comanda niente e non chiede permessi: patterns/il-computer-si-legge-senza-permessi-e-finche-serve.md.
+// Batteria, rete, Bluetooth e volume del computer: un lettore per piattaforma, senza permessi, senza modello, senza console.
+// Non comanda e non chiede permessi (lo fa comandiSistema.js): patterns/il-computer-si-legge-senza-permessi-e-finche-serve.md.
 // Prove: tests/unit/statoSistema.test.mjs (lettori), tests/dashboard-sistema.spec.mjs (home e chat).
 
 'use strict';
@@ -202,9 +202,42 @@ async function bluetoothLinux(radice, esec) {
   return (testo && bluetoothDaBluez(testo)) || bluetoothDaRfkill(radice);
 }
 
+// La radio del Wi-Fi dall'interruttore del kernel: senza una radio wlan non si dice niente.
+function wifiDaRfkill(radice = '/') {
+  const base = ['sys', 'class', 'rfkill'];
+  const radio = [];
+  for (const nome of cartella(radice, ...base)) {
+    if (leggiFile(radice, ...base, nome, 'type') !== 'wlan') continue;
+    radio.push(!(leggiFile(radice, ...base, nome, 'soft') === '1' || leggiFile(radice, ...base, nome, 'hard') === '1'));
+  }
+  return radio.length ? { acceso: radio.some(Boolean) } : null;
+}
+
+// «Volume: 0.40 [MUTED]» (wpctl), «Volume: front-left: 26214 /  40% / …» (pactl), «[40%] [on]» (amixer).
+function volumeDaWpctl(testo) {
+  const m = /Volume:\s*([\d.]+)/.exec(String(testo || ''));
+  return m ? { livello: Math.round(Number(m[1]) * 100), muto: /\[MUTED\]/.test(testo) } : null;
+}
+function volumeDaPactl(volume, muto) {
+  const m = /(\d+)%/.exec(String(volume || ''));
+  return m ? { livello: Number(m[1]), muto: /:\s*(yes|s[iì])\b/i.test(String(muto || '')) } : null;
+}
+function volumeDaAmixer(testo) {
+  const m = /\[(\d+)%\]/.exec(String(testo || ''));
+  return m ? { livello: Number(m[1]), muto: /\[off\]/.test(testo) } : null;
+}
+
+async function volumeLinux(esec) {
+  const w = volumeDaWpctl(await esec('wpctl', ['get-volume', '@DEFAULT_AUDIO_SINK@']));
+  if (w) return w;
+  const p = await esec('pactl', ['get-sink-volume', '@DEFAULT_SINK@']);
+  if (p) return volumeDaPactl(p, await esec('pactl', ['get-sink-mute', '@DEFAULT_SINK@']));
+  return volumeDaAmixer(await esec('amixer', ['-M', 'get', 'Master']));
+}
+
 async function leggiLinux(radice = '/', esec = esegui) {
-  const [rete, bluetooth] = await Promise.all([reteLinux(radice, esec), bluetoothLinux(radice, esec)]);
-  return { batteria: batteriaLinux(radice), rete, bluetooth };
+  const [rete, bluetooth, volume] = await Promise.all([reteLinux(radice, esec), bluetoothLinux(radice, esec), volumeLinux(esec)]);
+  return { batteria: batteriaLinux(radice), rete, bluetooth, volume, wifi: wifiDaRfkill(radice) };
 }
 
 // ── Mac: pmset, route, networksetup, ipconfig, defaults ──────────────────────
@@ -263,18 +296,37 @@ function bluetoothDaDefaults(testo) {
 
 let portePerMac = { testo: null, quando: 0 };
 
+// «40,false»: il volume è «missing value» quando l'uscita non ne ha uno (un monitor HDMI).
+function volumeDaOsascript(testo) {
+  const m = /^\s*(\d+)\s*,\s*(true|false)\s*$/.exec(String(testo || ''));
+  return m ? { livello: Number(m[1]), muto: m[2] === 'true' } : null;
+}
+
+function dispositivoWifiMac(testo) {
+  const m = /Hardware Port:\s*(?:Wi-Fi|AirPort)\s*\n\s*Device:\s*(\S+)/.exec(String(testo || ''));
+  return m ? m[1] : null;
+}
+
+function wifiDaNetworksetup(testo) {
+  const m = /:\s*(On|Off)\s*$/m.exec(String(testo || ''));
+  return m ? { acceso: m[1] === 'On' } : null;
+}
+
 async function leggiMac(esec = esegui) {
-  const [pm, rotta, bt] = await Promise.all([
+  if (!portePerMac.testo || Date.now() - portePerMac.quando > 60 * 1000) {
+    portePerMac = { testo: await esec('networksetup', ['-listallhardwareports']), quando: Date.now() };
+  }
+  const dispositivoWifi = dispositivoWifiMac(portePerMac.testo);
+  const [pm, rotta, bt, vol, wifi] = await Promise.all([
     esec('pmset', ['-g', 'batt']),
     esec('route', ['-n', 'get', 'default'], { vuotoSeEsce: true }),
     esec('defaults', ['read', '/Library/Preferences/com.apple.Bluetooth', 'ControllerPowerState']),
+    esec('osascript', ['-e', 'set s to get volume settings', '-e', 'return ((output volume of s) as string) & "," & ((output muted of s) as string)']),
+    dispositivoWifi ? esec('networksetup', ['-getairportpower', dispositivoWifi]) : Promise.resolve(null),
   ]);
   let rete = null;
   const iface = interfacciaDaRoute(rotta);
   if (iface) {
-    if (!portePerMac.testo || Date.now() - portePerMac.quando > 60 * 1000) {
-      portePerMac = { testo: await esec('networksetup', ['-listallhardwareports']), quando: Date.now() };
-    }
     const tipo = tipoDaPortaMac(portaDaNetworksetup(portePerMac.testo, iface));
     const nome = tipo === 'wifi' ? ssidDaIpconfig(await esec('ipconfig', ['getsummary', iface])) : null;
     rete = { tipo, nome };
@@ -282,7 +334,7 @@ async function leggiMac(esec = esegui) {
     // `route` ha risposto e non c'è una rotta predefinita: gli adattatori di Parallels o VMware non portano fuori.
     rete = { uscita: false };
   }
-  return { batteria: batteriaDaPmset(pm), rete, bluetooth: bluetoothDaDefaults(bt) };
+  return { batteria: batteriaDaPmset(pm), rete, bluetooth: bluetoothDaDefaults(bt), volume: volumeDaOsascript(vol), wifi: wifiDaNetworksetup(wifi) };
 }
 
 // ── Windows: un PowerShell solo, che resta aperto e scrive una riga quando qualcosa cambia ──
@@ -309,6 +361,12 @@ try { $null = [Windows.Devices.Bluetooth.BluetoothLEDevice,Windows.Devices.Bluet
 try { $null = [Windows.Devices.Enumeration.DeviceInformation,Windows.Devices.Enumeration,ContentType=WindowsRuntime] } catch {}
 $nlm = $null
 try { $nlm = [Activator]::CreateInstance([Type]::GetTypeFromCLSID([Guid]'DCB00C01-570F-4A9B-8D69-199FDBA5723B')) } catch {}
+$conVolume = $false
+try {
+Add-Type -TypeDefinition @'
+__VOLUME__'@
+$conVolume = $true
+} catch {}
 $ultimo = ''
 $btPrima = $null
 $nomiPrima = $null
@@ -316,7 +374,10 @@ $giri = 0
 while ($true) {
   $giri += 1
   try { $null = [System.Diagnostics.Process]::GetProcessById($genitore) } catch { exit }
-  $o = [ordered]@{ batteria = $null; rete = $null; bluetooth = $null }
+  $o = [ordered]@{ batteria = $null; rete = $null; bluetooth = $null; volume = $null; wifi = $null }
+  if ($conVolume) {
+    try { $o.volume = [ordered]@{ livello = [FiloSistema.Volume]::Livello(); muto = [FiloSistema.Volume]::EMuto() } } catch {}
+  }
   try {
     $p = [System.Windows.Forms.SystemInformation]::PowerStatus
     $f = [int]$p.BatteryChargeStatus
@@ -357,6 +418,8 @@ while ($true) {
       $radios = & $attendi ([Windows.Devices.Radios.Radio]::GetRadiosAsync()) ([System.Collections.Generic.IReadOnlyList[Windows.Devices.Radios.Radio]])
       if ($null -ne $radios) {
         $letto = $true
+        $wf = @($radios | Where-Object { [string]$_.Kind -eq 'WiFi' })
+        if ($wf.Count -gt 0) { $o.wifi = [ordered]@{ acceso = (@($wf | Where-Object { [string]$_.State -eq 'On' }).Count -gt 0) } }
         $bt = @($radios | Where-Object { [string]$_.Kind -eq 'Bluetooth' })
         if ($bt.Count -gt 0) {
           $acceso = @($bt | Where-Object { [string]$_.State -eq 'On' }).Count -gt 0
@@ -387,8 +450,10 @@ while ($true) {
 }
 `;
 
+// Il volume si legge con lo stesso C# con cui comandiSistema.js lo cambia: una copia sola.
 function scriptWindows(pid) {
-  return SCRIPT_WINDOWS.replace('__GENITORE__', String(Math.trunc(Number(pid)) || 0));
+  const volume = require('./comandiSistema')._interni.CS_VOLUME;
+  return SCRIPT_WINDOWS.replace('__GENITORE__', String(Math.trunc(Number(pid)) || 0)).replace('__VOLUME__', () => volume);
 }
 
 function datiDaWindows(riga) {
@@ -401,7 +466,7 @@ function datiDaWindows(riga) {
   // Windows PowerShell 5.1 a volte scrive un elenco come {value, Count}: si riprende l'elenco.
   const d = bluetooth && bluetooth.dispositivi;
   if (d && typeof d === 'object' && !Array.isArray(d) && Array.isArray(d.value)) bluetooth.dispositivi = d.value;
-  return { batteria: j.batteria || null, rete, bluetooth };
+  return { batteria: j.batteria || null, rete, bluetooth, volume: j.volume || null, wifi: j.wifi || null };
 }
 
 function lettoreWindows({ avvia = spawn, pid = process.pid, quandoCambia = () => {} } = {}) {
@@ -503,7 +568,7 @@ function componi(parti, online) {
   if (online === false || (p.rete && p.rete.uscita === false)) rete = { online: false };
   else if (online === true) rete = { online: true, tipo: p.rete ? p.rete.tipo : null, nome: p.rete ? p.rete.nome : null };
   else if (p.rete) rete = { online: true, tipo: p.rete.tipo, nome: p.rete.nome };
-  return { batteria: p.batteria || null, rete, bluetooth: p.bluetooth || null };
+  return { batteria: p.batteria || null, rete, bluetooth: p.bluetooth || null, volume: p.volume || null, wifi: p.wifi || null };
 }
 
 let stato = null;
@@ -683,6 +748,23 @@ function ferma() {
   if (windows) windows.ferma();
 }
 
+// #874 — quello che un comando ha appena cambiato si vede subito; la lettura che segue lo conferma o lo corregge.
+function dopoComando(parziale) {
+  const p = parziale && typeof parziale === 'object' ? parziale : {};
+  if (stato) {
+    const nuovo = { ...stato };
+    if (p.volume) nuovo.volume = { ...(stato.volume || {}), ...p.volume };
+    if (p.wifi && typeof p.wifi.acceso === 'boolean') nuovo.wifi = { acceso: p.wifi.acceso };
+    if (p.bluetooth && typeof p.bluetooth.acceso === 'boolean') {
+      nuovo.bluetooth = p.bluetooth.acceso ? { acceso: true, dispositivi: stato.bluetooth ? stato.bluetooth.dispositivi : null } : { acceso: false, dispositivi: [] };
+    }
+    pubblica(nuovo);
+  }
+  leggiAdesso();
+  // Una radio o un collegamento si assestano in qualche secondo: si rilegge ancora, anche con la home dietro.
+  setTimeout(() => { leggiAdesso(); }, 2500).unref?.();
+}
+
 // Una scheda dietro le altre per Chromium resta «visibile» e continua a chiedere: `davanti: false` risponde
 // senza tenere sveglio il lettore, che legge solo finché qualcuno guarda.
 // `segue: false` è una home che non mostra niente letto dal computer: riceve lo stato, non sveglia il lettore.
@@ -748,6 +830,7 @@ const _perProve = {
 };
 
 const api = {
+  dopoComando,
   richiedi,
   schedaDavanti,
   stato: () => stato,
@@ -773,6 +856,10 @@ module.exports = {
   connessioneDaNmcli,
   bluetoothDaBluez,
   bluetoothDaRfkill,
+  wifiDaRfkill,
+  volumeDaWpctl,
+  volumeDaPactl,
+  volumeDaAmixer,
   leggiLinux,
   batteriaDaPmset,
   interfacciaDaRoute,
@@ -780,6 +867,9 @@ module.exports = {
   tipoDaPortaMac,
   ssidDaIpconfig,
   bluetoothDaDefaults,
+  volumeDaOsascript,
+  dispositivoWifiMac,
+  wifiDaNetworksetup,
   leggiMac,
   SCRIPT_WINDOWS,
   scriptWindows,

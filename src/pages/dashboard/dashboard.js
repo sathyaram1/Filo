@@ -689,6 +689,9 @@
     INVIA_FEEDBACK: 'Preparo una segnalazione…',
     RINOMINA_FILE: 'Leggo i file per dar loro un nome…',
     CARTA_HOME: 'Sistemo le carte della home…',
+    VOLUME: 'Cambio il volume…',
+    BLUETOOTH: 'Chiedo al Bluetooth…',
+    WIFI: 'Chiedo al Wi-Fi…',
   };
   function startLabelFor(type) {
     return START_LABELS[String(type || '').toUpperCase()] || 'Eseguo un\'azione…';

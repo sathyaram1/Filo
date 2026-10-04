@@ -1,11 +1,11 @@
-// Ora, batteria, rete e Bluetooth come Filo li dice: dalla lettura del sistema ai testi della home e alle righe del prompt.
+// Ora, batteria, rete, Bluetooth e volume come Filo li dice: dalla lettura del sistema ai testi della home e al prompt.
 // Logica pura: chi legge il computer è src/main/services/statoSistema.js; un dato che manca resta null e non si inventa.
 // Prove: tests/unit/sistema.test.mjs.
 
 (function (global) {
   'use strict';
 
-  const VOCI = ['ora', 'batteria', 'rete', 'bluetooth'];
+  const VOCI = ['ora', 'batteria', 'rete', 'bluetooth', 'volume'];
   // Un SSID sta in 32 byte; un nome Bluetooth arriva a 248. Oltre, il taglio si vede.
   const NOME_MAX = 64;
   const DISPOSITIVI_MAX = 30;
@@ -60,6 +60,20 @@
     return { acceso: true, dispositivi };
   }
 
+  // Oltre 100 c'è l'amplificazione di PipeWire: si dice com'è.
+  function normalizzaVolume(v) {
+    if (!v || typeof v !== 'object') return null;
+    const n = Number(v.livello);
+    if (v.livello === null || v.livello === '' || !Number.isFinite(n)) return null;
+    return { livello: Math.max(0, Math.min(150, Math.round(n))), muto: v.muto === true };
+  }
+
+  // La radio del Wi-Fi, accesa o spenta: è diversa da «collegato» (accesa e fuori portata è offline).
+  function normalizzaWifi(w) {
+    if (!w || typeof w !== 'object' || typeof w.acceso !== 'boolean') return null;
+    return { acceso: w.acceso };
+  }
+
   // Una lettura che arriva da fuori (un lettore di piattaforma, una prova) nella forma che il resto conosce.
   function normalizza(raw) {
     const r = raw && typeof raw === 'object' ? raw : {};
@@ -67,6 +81,8 @@
       batteria: normalizzaBatteria(r.batteria),
       rete: normalizzaRete(r.rete),
       bluetooth: normalizzaBluetooth(r.bluetooth),
+      volume: normalizzaVolume(r.volume),
+      wifi: normalizzaWifi(r.wifi),
     };
   }
 
@@ -102,16 +118,22 @@
     };
   }
 
-  function descriviRete(r) {
-    if (!r) return null;
+  function descriviRete(r, w) {
+    if (!r) {
+      // Senza lettura della rete, la radio spenta basta a dirlo: il tasto per riaccenderla deve restare raggiungibile.
+      if (w && w.acceso === false) return { testo: '', hover: 'Wi-Fi spento', icona: 'wifiOff', offline: false, spento: true, wifi: false, dettaglio: ['Wi-Fi spento'], copia: 'Wi-Fi spento' };
+      return null;
+    }
     if (!r.online) {
+      const spento = !!w && w.acceso === false;
       return {
         testo: 'offline',
-        hover: 'Offline',
+        hover: spento ? 'Wi-Fi spento' : 'Offline',
         icona: 'wifiOff',
         offline: true,
-        dettaglio: ['Offline', 'Il computer non è collegato a nessuna rete'],
-        copia: 'Offline: il computer non è collegato a nessuna rete',
+        wifi: w ? w.acceso : null,
+        dettaglio: spento ? ['Offline', 'Il Wi-Fi è spento'] : ['Offline', 'Il computer non è collegato a nessuna rete'],
+        copia: spento ? 'Offline: il Wi-Fi è spento' : 'Offline: il computer non è collegato a nessuna rete',
       };
     }
     if (r.tipo === 'wifi') {
@@ -121,14 +143,31 @@
         hover: 'Wi-Fi',
         icona: 'wifi',
         offline: false,
+        wifi: true,
         dettaglio: [`Collegato al ${dove}`],
         copia: `Collegato al ${dove}`,
       };
     }
+    const wifi = w ? w.acceso : null;
+    const nota = wifi === false ? ['Wi-Fi spento'] : [];
     if (r.tipo === 'cavo') {
-      return { testo: '', hover: 'Cavo', icona: 'ethernet', offline: false, dettaglio: ['Collegato via cavo'], copia: 'Collegato via cavo' };
+      return { testo: '', hover: 'Cavo', icona: 'ethernet', offline: false, wifi, dettaglio: ['Collegato via cavo', ...nota], copia: 'Collegato via cavo' };
     }
-    return { testo: '', hover: 'Collegato', icona: 'globe', offline: false, dettaglio: ['Collegato alla rete'], copia: 'Collegato alla rete' };
+    return { testo: '', hover: 'Collegato', icona: 'globe', offline: false, wifi, dettaglio: ['Collegato alla rete', ...nota], copia: 'Collegato alla rete' };
+  }
+
+  function descriviVolume(v) {
+    if (!v) return null;
+    return {
+      testo: `${v.livello}%`,
+      hover: v.muto ? 'Muto' : 'Volume',
+      icona: v.muto ? 'volumeMute' : 'volume',
+      livello: v.livello,
+      muto: v.muto,
+      spento: v.muto,
+      dettaglio: v.muto ? [`Volume al ${v.livello}%`, 'Muto'] : [`Volume al ${v.livello}%`],
+      copia: v.muto ? `Volume al ${v.livello}%, muto` : `Volume al ${v.livello}%`,
+    };
   }
 
   function descriviBluetooth(b) {
@@ -165,8 +204,9 @@
     return {
       ora: descriviOra(adesso),
       batteria: descriviBatteria(s.batteria),
-      rete: descriviRete(s.rete),
+      rete: descriviRete(s.rete, s.wifi),
       bluetooth: descriviBluetooth(s.bluetooth),
+      volume: descriviVolume(s.volume),
     };
   }
 
@@ -201,6 +241,10 @@
       const resto = n > DISPOSITIVI_MAX ? ` e altri ${n - DISPOSITIVI_MAX}` : '';
       nomi.push(`Dispositivi Bluetooth collegati: ${elenco}${resto}`);
     }
+    if (s.wifi) righe.push(`Wi-Fi: ${s.wifi.acceso ? 'acceso' : 'spento'}.`);
+    const v = s.volume;
+    if (!v) righe.push('Volume: il sistema non lo dice.');
+    else righe.push(`Volume: ${v.livello}%${v.muto ? ', in muto' : ''}.`);
     return { righe, nomi };
   }
 

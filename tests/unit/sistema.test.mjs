@@ -26,6 +26,8 @@ const PIENO = {
   batteria: { livello: 42, inCarica: false, collegata: false },
   rete: { online: true, tipo: 'wifi', nome: 'Casa' },
   bluetooth: { acceso: true, dispositivi: ['Cuffie', 'Mouse'] },
+  volume: { livello: 40, muto: false },
+  wifi: { acceso: true },
 };
 
 test('ogni voce con un dato ha testo, hover di una o due parole e il dettaglio per il riquadro', () => {
@@ -114,12 +116,15 @@ test('le righe dello STATO dicono anche quello che manca, così il modello non t
   assert.match(vuoto.righe.join('\n'), /Batteria: nessuna/);
   assert.match(vuoto.righe.join('\n'), /Rete: il sistema non lo dice/);
   assert.match(vuoto.righe.join('\n'), /Bluetooth: nessun adattatore/);
+  assert.match(vuoto.righe.join('\n'), /Volume: il sistema non lo dice/);
   assert.deepEqual(vuoto.nomi, []);
   const pieno = S.righePrompt(PIENO);
   assert.deepEqual(pieno.righe, [
     'Batteria: 42%, non collegata alla corrente.',
     'Rete: collegato via Wi-Fi (nome della rete qui sotto).',
     'Bluetooth: acceso, 2 dispositivi collegati (nomi qui sotto).',
+    'Wi-Fi: acceso.',
+    'Volume: 40%.',
   ]);
   assert.deepEqual(pieno.nomi, ['Rete Wi-Fi: Casa', 'Dispositivi Bluetooth collegati: Cuffie, Mouse']);
   assert.match(S.righePrompt({ rete: { online: false } }).righe[1], /OFFLINE/);
@@ -214,14 +219,14 @@ test('la chat offline lo dice: «offline» invece di «problema di rete», e sol
 });
 
 test('le voci si tolgono e si rimettono a parole, una alla volta', () => {
-  for (const [chiave, voce] of [['ora_home', 'ora'], ['batteria_home', 'batteria'], ['rete_home', 'rete'], ['bluetooth_home', 'bluetooth'], ['orologio_home', 'ora'], ['wifi_home', 'rete']]) {
+  for (const [chiave, voce] of [['ora_home', 'ora'], ['batteria_home', 'batteria'], ['rete_home', 'rete'], ['bluetooth_home', 'bluetooth'], ['orologio_home', 'ora'], ['wifi_home', 'rete'], ['volume_home', 'volume'], ['audio_home', 'volume']]) {
     const via = P.buildPreferencePartial(chiave, false);
     assert.deepEqual(via.partial, { homeSistema: { [voce]: false } }, chiave);
     assert.equal(via.level, 1);
     assert.deepEqual(P.buildPreferencePartial(chiave, 'mostra').partial, { homeSistema: { [voce]: true } }, chiave);
   }
   assert.equal(P.buildPreferencePartial('batteria_home', 'boh'), null);
-  assert.deepEqual(S.vociVisibili({}), { ora: true, batteria: true, rete: true, bluetooth: true });
-  assert.deepEqual(S.vociVisibili({ homeSistema: { rete: false } }), { ora: true, batteria: true, rete: false, bluetooth: true });
-  assert.deepEqual(globalThis.SN_CONST.DEFAULT_SETTINGS.homeSistema, { ora: true, batteria: true, rete: true, bluetooth: true });
+  assert.deepEqual(S.vociVisibili({}), { ora: true, batteria: true, rete: true, bluetooth: true, volume: true });
+  assert.deepEqual(S.vociVisibili({ homeSistema: { rete: false } }), { ora: true, batteria: true, rete: false, bluetooth: true, volume: true });
+  assert.deepEqual(globalThis.SN_CONST.DEFAULT_SETTINGS.homeSistema, { ora: true, batteria: true, rete: true, bluetooth: true, volume: true });
 });

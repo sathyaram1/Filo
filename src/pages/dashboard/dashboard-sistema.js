@@ -1,13 +1,13 @@
-// Ora, batteria, rete e Bluetooth in fondo alla colonna destra della home (#873).
-// Non legge il computer (lo fa il main) e non sceglie le parole (src/shared/sistema.js): disegna, e si aggiorna senza
-// rifare i nodi. Al caricamento registra e basta; il DOM lo tocca init().
+// Ora, batteria, rete, Bluetooth e volume in fondo alla colonna destra della home (#873); dal loro riquadro si comandano (#874).
+// Non legge il computer e non lo comanda (lo fa il main, dalla stessa porta della chat) e non sceglie le parole
+// (src/shared/sistema.js): disegna, e si aggiorna senza rifare i nodi. Il DOM lo tocca init().
 (function (global) {
   'use strict';
 
-  const ORDINE = ['ora', 'batteria', 'rete', 'bluetooth'];
-  // L'ora la sa la pagina; le altre tre le legge il main, e solo per loro la home tiene sveglio il lettore.
-  const DAL_COMPUTER = ['batteria', 'rete', 'bluetooth'];
-  const NOMI = { ora: "l'ora", batteria: 'la batteria', rete: 'la rete', bluetooth: 'il Bluetooth' };
+  const ORDINE = ['ora', 'batteria', 'rete', 'bluetooth', 'volume'];
+  // L'ora la sa la pagina; le altre le legge il main, e solo per loro la home tiene sveglio il lettore.
+  const DAL_COMPUTER = ['batteria', 'rete', 'bluetooth', 'volume'];
+  const NOMI = { ora: "l'ora", batteria: 'la batteria', rete: 'la rete', bluetooth: 'il Bluetooth', volume: 'il volume' };
   // Il main legge finché qualcuno chiede: una home in vista chiede più spesso di quanto il lettore si addormenti.
   const RICHIAMO_MS = 30 * 1000;
   const ICONA_PX = 16;
@@ -18,7 +18,7 @@
   let riga = null;
   let ICONS = {};
   let stato = null;
-  let visibili = { ora: true, batteria: true, rete: true, bluetooth: true };
+  let visibili = { ora: true, batteria: true, rete: true, bluetooth: true, volume: true };
   const voci = {};
   let box = null;
   let richiamo = null;
@@ -139,10 +139,10 @@
     return { el, icona, testo, chiaveIcona: null };
   }
 
-  function svgDi(d) {
+  function svgDi(d, px = ICONA_PX) {
     const f = ICONS[d.icona];
     if (typeof f !== 'function') return '';
-    return d.icona === 'battery' ? f(ICONA_PX, d.livello) : f(ICONA_PX);
+    return d.icona === 'battery' ? f(px, d.livello) : f(px);
   }
 
   function disegna() {
@@ -190,7 +190,8 @@
     if (!box) return;
     if (e.key === 'Escape') { e.preventDefault(); const da = box.ancora; chiudiBox(); if (da && da.isConnected) da.focus(); return; }
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-    const opzioni = [...box.el.querySelectorAll('.sn-select-option')];
+    if (e.target && e.target.type === 'range') return;
+    const opzioni = [...box.el.querySelectorAll('.sn-select-option:not([aria-disabled="true"])')];
     if (!opzioni.length) return;
     e.preventDefault();
     const i = opzioni.indexOf(document.activeElement);
@@ -215,6 +216,229 @@
       box.info.dataset.testo = testo;
     }
     box.copia = x.copia;
+    aggiornaComandi(x);
+  }
+
+  // ── I comandi nel riquadro (#874): la stessa porta dell'azione della chat, quindi lo stesso risultato ──
+
+  // Il volume chiesto mentre un altro sta ancora partendo: vale l'ultimo, gli altri non si mettono in fila.
+  let volumeVoluto = null;
+  let volumeInVolo = false;
+
+  async function comanda(richiesta) {
+    let r = null;
+    try { r = await send({ type: MSG.SISTEMA_COMANDA, richiesta }); } catch (_) {}
+    return r && typeof r === 'object' ? r : { ok: false, frase: 'Filo non ha risposto: riprova.' };
+  }
+
+  function creaOpzione(testo, fn, cls = '') {
+    const opt = document.createElement('div');
+    opt.className = `sn-select-option${cls ? ` ${cls}` : ''}`;
+    opt.setAttribute('role', 'menuitem');
+    opt.tabIndex = 0;
+    opt.textContent = testo;
+    const vai = () => { if (opt.getAttribute('aria-disabled') !== 'true') fn(opt); };
+    opt.addEventListener('click', vai);
+    opt.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); vai(); }
+    });
+    return opt;
+  }
+
+  function inAttesa(opt, si) {
+    if (!opt) return;
+    opt.classList.toggle('dash-sis-occupato', si);
+    if (si) opt.setAttribute('aria-disabled', 'true');
+    else opt.removeAttribute('aria-disabled');
+    if (si && !opt.querySelector('.dash-sis-rotella')) {
+      const r = document.createElement('span');
+      r.className = 'dash-sis-rotella';
+      r.setAttribute('aria-hidden', 'true');
+      opt.prepend(r);
+    } else if (!si) {
+      const r = opt.querySelector('.dash-sis-rotella');
+      if (r) r.remove();
+    }
+  }
+
+  // Un comando non riuscito dice perché, e se manca un permesso apre il posto dove si concede.
+  function mostraErrore(dove, r) {
+    if (!dove) return;
+    dove.replaceChildren();
+    dove.hidden = !r;
+    if (!r) return;
+    const frase = document.createElement('div');
+    frase.textContent = r.frase || 'Il sistema non ha eseguito il comando.';
+    dove.appendChild(frase);
+    if (r.dove) {
+      const come = document.createElement('div');
+      come.className = 'dash-sis-come';
+      come.textContent = r.dove;
+      dove.appendChild(come);
+    }
+    if (r.apri) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'dash-sis-apri';
+      b.textContent = 'Apri le impostazioni';
+      b.addEventListener('click', () => { send({ type: MSG.SISTEMA_APRI_IMPOSTAZIONI, chiave: r.apri }).catch(() => {}); });
+      dove.appendChild(b);
+    }
+    if (box) posiziona(box.el, box.ancora, box.punto);
+  }
+
+  async function esegui(opt, richiesta, dopo) {
+    const questo = box;
+    inAttesa(opt, true);
+    const r = await comanda(richiesta);
+    if (!questo || box !== questo) return;
+    inAttesa(opt, false);
+    mostraErrore(questo.errore, r.ok ? null : r);
+    if (r.ok && dopo) dopo(r);
+  }
+
+  async function chiediVolume(livello) {
+    volumeVoluto = livello;
+    if (volumeInVolo) return;
+    volumeInVolo = true;
+    const questo = box;
+    if (questo && questo.cursoreRiga) questo.cursoreRiga.classList.add('dash-sis-occupato');
+    while (volumeVoluto != null) {
+      const n = volumeVoluto;
+      volumeVoluto = null;
+      const r = await comanda({ cosa: 'volume', livello: n });
+      if (box && box === questo) mostraErrore(questo.errore, r.ok ? null : r);
+      if (!r.ok) volumeVoluto = null;
+    }
+    volumeInVolo = false;
+    if (questo && questo.cursoreRiga) questo.cursoreRiga.classList.remove('dash-sis-occupato');
+  }
+
+  function etichettaRadioWifi(x) {
+    if (x.wifi === true || (x.wifi == null && x.icona === 'wifi')) return 'Spegni il Wi-Fi';
+    if (x.wifi === false || x.offline) return 'Accendi il Wi-Fi';
+    return null;
+  }
+
+  // Gli elenchi (dispositivi abbinati, reti conosciute) si chiedono all'apertura: il primo che l'utente cerca è lì.
+  async function caricaElenco(questo) {
+    const cosa = questo.voce === 'rete' ? 'wifi' : 'bluetooth';
+    const lista = questo.elenco;
+    lista.replaceChildren();
+    const attesa = document.createElement('div');
+    attesa.className = 'dash-sis-attesa';
+    const rot = document.createElement('span');
+    rot.className = 'dash-sis-rotella';
+    rot.setAttribute('aria-hidden', 'true');
+    attesa.append(rot, document.createTextNode(cosa === 'wifi' ? 'Leggo le reti conosciute…' : 'Leggo i dispositivi abbinati…'));
+    lista.appendChild(attesa);
+    const r = await comanda({ cosa, elenca: true });
+    if (box !== questo) return;
+    lista.replaceChildren();
+    if (!r.ok) {
+      const err = document.createElement('div');
+      err.className = 'dash-sis-errore';
+      lista.appendChild(err);
+      mostraErrore(err, r);
+      return;
+    }
+    const voci = Array.isArray(r.elenco) ? r.elenco : [];
+    const titolo = document.createElement('div');
+    titolo.className = 'dash-sis-titolo';
+    titolo.textContent = voci.length
+      ? (cosa === 'wifi' ? 'Reti conosciute' : 'Dispositivi abbinati')
+      : (cosa === 'wifi' ? 'Il computer non conosce nessuna rete Wi-Fi' : 'Nessun dispositivo abbinato');
+    lista.appendChild(titolo);
+    for (const v of voci) lista.appendChild(voceElenco(questo, cosa, v));
+    posiziona(questo.el, questo.ancora, questo.punto);
+  }
+
+  function voceElenco(questo, cosa, v) {
+    if (cosa === 'wifi') {
+      if (v.attiva) {
+        const opt = creaOpzione(`Collegato a ${v.nome}`, () => {}, 'dash-sis-attuale');
+        opt.setAttribute('aria-disabled', 'true');
+        return opt;
+      }
+      const opt = creaOpzione(`Collegati a ${v.nome}`, (o) => esegui(o, { cosa: 'wifi', rete: v.nome }, () => caricaElenco(questo)));
+      opt.title = v.nome;
+      return opt;
+    }
+    const collegato = v.collegato === true;
+    const opt = creaOpzione(`${collegato ? 'Scollega' : 'Collega'} ${v.nome}`, (o) => esegui(o, { cosa: 'bluetooth', dispositivo: v.nome, collega: !collegato }, () => caricaElenco(questo)));
+    opt.title = v.nome;
+    if (collegato) opt.classList.add('dash-sis-attuale');
+    return opt;
+  }
+
+  function creaComandi(questo, x) {
+    const v = questo.voce;
+    if (v !== 'volume' && v !== 'bluetooth' && v !== 'rete') return null;
+    const wrap = document.createElement('div');
+    wrap.className = 'dash-sis-comandi';
+    if (v === 'volume') {
+      const riga = document.createElement('div');
+      riga.className = 'dash-sis-cursore';
+      const ico = document.createElement('span');
+      ico.className = 'dash-sis-icona';
+      const cursore = document.createElement('input');
+      cursore.type = 'range';
+      cursore.min = '0';
+      cursore.max = '100';
+      cursore.step = '1';
+      cursore.setAttribute('aria-label', 'Volume del computer');
+      const valore = document.createElement('span');
+      valore.className = 'dash-sis-valore';
+      cursore.addEventListener('input', () => { valore.textContent = `${cursore.value}%`; });
+      cursore.addEventListener('change', () => chiediVolume(Number(cursore.value)));
+      riga.append(ico, cursore, valore);
+      const muto = creaOpzione('', (o) => esegui(o, { cosa: 'volume', muto: !(questo.ultimo && questo.ultimo.muto) }));
+      wrap.append(riga, muto);
+      Object.assign(questo, { cursore, valore, muto, icoVolume: ico, cursoreRiga: riga });
+    } else {
+      const radio = creaOpzione('', (o) => {
+        const x2 = questo.ultimo || {};
+        const acceso = v === 'rete' ? (o.dataset.accendi === '1') : !!x2.spento;
+        esegui(o, { cosa: v === 'rete' ? 'wifi' : 'bluetooth', acceso });
+      });
+      wrap.appendChild(radio);
+      const lista = document.createElement('div');
+      lista.className = 'dash-sis-elenco';
+      wrap.appendChild(lista);
+      Object.assign(questo, { radio, elenco: lista });
+    }
+    const errore = document.createElement('div');
+    errore.className = 'dash-sis-errore';
+    errore.hidden = true;
+    wrap.appendChild(errore);
+    questo.errore = errore;
+    return wrap;
+  }
+
+  function aggiornaComandi(x) {
+    if (!box || !box.comandi) return;
+    box.ultimo = x;
+    if (box.voce === 'volume') {
+      const fermo = !volumeInVolo && volumeVoluto == null && document.activeElement !== box.cursore;
+      if (fermo) {
+        box.cursore.value = String(Math.min(100, x.livello));
+        box.valore.textContent = `${x.livello}%`;
+      }
+      box.icoVolume.innerHTML = svgDi(x, 14);
+      if (!box.muto.classList.contains('dash-sis-occupato')) box.muto.textContent = x.muto ? 'Togli il muto' : 'Metti muto';
+      return;
+    }
+    if (box.radio.classList.contains('dash-sis-occupato')) return;
+    if (box.voce === 'bluetooth') {
+      box.radio.textContent = x.spento ? 'Accendi il Bluetooth' : 'Spegni il Bluetooth';
+      return;
+    }
+    const etichetta = etichettaRadioWifi(x);
+    box.radio.hidden = !etichetta;
+    if (etichetta) {
+      box.radio.textContent = etichetta;
+      box.radio.dataset.accendi = etichetta === 'Accendi il Wi-Fi' ? '1' : '0';
+    }
   }
 
   function imposta(voce, mostra) {
@@ -242,27 +466,24 @@
     righeInfo(info, x);
     info.dataset.testo = x.dettaglio.join('\n');
     el.appendChild(info);
+    const questo = { el, info, voce: v, ancora, punto, copia: x.copia };
+    const comandi = creaComandi(questo, x);
+    if (comandi) { el.appendChild(comandi); questo.comandi = comandi; }
     const azioni = [['Copia', (opt) => copia(opt)], [`Nascondi ${NOMI[v]}`, () => { chiudiBox(); imposta(v, false); }]];
     for (const altra of ORDINE) {
       if (altra !== v && visibili[altra] === false && d[altra]) {
         azioni.push([`Mostra ${NOMI[altra]}`, () => { chiudiBox(); imposta(altra, true); }]);
       }
     }
-    for (const [etichetta, fn] of azioni) {
-      const opt = document.createElement('div');
-      opt.className = 'sn-select-option';
-      opt.setAttribute('role', 'menuitem');
-      opt.tabIndex = 0;
-      opt.textContent = etichetta;
-      opt.addEventListener('click', () => fn(opt));
-      opt.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(opt); }
-      });
-      el.appendChild(opt);
-    }
+    const altre = document.createElement('div');
+    altre.className = 'dash-sis-altre';
+    for (const [etichetta, fn] of azioni) altre.appendChild(creaOpzione(etichetta, fn));
+    el.appendChild(altre);
     document.body.appendChild(el);
+    box = questo;
+    aggiornaComandi(x);
     posiziona(el, ancora, punto);
-    box = { el, info, voce: v, ancora, copia: x.copia };
+    if (questo.elenco && (v === 'bluetooth' || etichettaRadioWifi(x))) caricaElenco(questo);
     setTimeout(() => {
       document.addEventListener('mousedown', fuori, true);
       document.addEventListener('keydown', tasto, true);

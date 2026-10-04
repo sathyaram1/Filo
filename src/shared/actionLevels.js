@@ -663,11 +663,12 @@
       },
       describe: (a) => {
         const r = (a && a._richiestaSistema) || {};
+        const nome = (a && a._nomeSistema) || r.nome;
         if (r.elenca) return 'Leggere i dispositivi Bluetooth abbinati';
         if (r.nome && r.collega === false) {
-          return `Scollegare «${r.nome}» dal Bluetooth.\n\nSe è una tastiera, un mouse o le cuffie che stai usando, smette di funzionare finché non lo ricolleghi.`;
+          return `Scollegare «${nome}» dal Bluetooth.\n\nSe è una tastiera, un mouse o le cuffie che stai usando, smette di funzionare finché non lo ricolleghi.`;
         }
-        if (r.nome) return `Collegare «${r.nome}» col Bluetooth`;
+        if (r.nome) return `Collegare «${nome}» col Bluetooth`;
         if (r.acceso === true) return 'Accendere il Bluetooth';
         if (r.acceso === false) {
           return 'Spegnere il Bluetooth.\n\nCuffie, casse, tastiere e mouse Bluetooth si scollegano finché non lo riaccendi, dal tasto nella home o chiedendolo a Filo.';
@@ -683,9 +684,10 @@
       },
       describe: (a) => {
         const r = (a && a._richiestaSistema) || {};
+        const nome = (a && a._nomeSistema) || r.nome;
         if (r.elenca) return 'Leggere le reti Wi-Fi che il computer conosce';
         if (r.nome) {
-          return `Collegare il computer alla rete Wi-Fi «${r.nome}».\n\nPer qualche secondo la connessione di adesso cade: scaricamenti e chiamate in corso possono interrompersi.`;
+          return `Collegare il computer alla rete Wi-Fi «${nome}».\n\nPer qualche secondo la connessione di adesso cade: scaricamenti e chiamate in corso possono interrompersi.`;
         }
         if (r.acceso === true) return 'Accendere il Wi-Fi';
         if (r.acceso === false) {

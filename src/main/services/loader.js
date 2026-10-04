@@ -150,6 +150,7 @@ require(path.join(SVC, 'llmsTxt.js'));
 require(path.join(SVC, 'webSearch.js'));
 require(path.join(SVC, 'fxRates.js'));
 require(path.join(SVC, 'statoSistema.js')); // batteria, rete, Bluetooth del computer: SN_SISTEMA_MAIN per lo STATO
+require(path.join(SVC, 'comandiSistema.js')); // #874 volume, Bluetooth e Wi-Fi a comando: SN_COMANDI_SISTEMA
 require(path.join(SVC, 'safebrowse', 'index.js'));
 require(path.join(SVC, 'geoBlock.js'));
 require(path.join(SVC, 'geoBlockClassifier.js'));

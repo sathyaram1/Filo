@@ -277,6 +277,9 @@
     RIPRISTINA_STILE_PAGINA: () => 'rimesso la pagina com\'era',
     COMANDO_FINESTRA: () => 'azionato un comando della finestra',
     CARTA_HOME: (n) => (n > 1 ? `sistemato ${n} carte della home` : 'sistemato una carta della home'),
+    VOLUME: () => 'cambiato il volume',
+    BLUETOOTH: () => 'comandato il Bluetooth',
+    WIFI: () => 'comandato il Wi-Fi',
     INVIA_FEEDBACK: () => 'preparato una segnalazione',
     PULISCI_TAB: () => 'riordinato le schede',
     CANCELLA_ARCHIVIO: () => 'eliminato schede dall\'archivio',
@@ -471,6 +474,13 @@
       if (op === 'ripristina') return { icon: '🏠', text: 'Carte della home rimesse com\'erano' };
       return { icon: '🏠', text: `${cosa || 'Carta della home'}${nome ? ` · ${nome}` : ''}` };
     },
+    // #874 — il numero e i nomi veri, quelli che il sistema ha confermato.
+    VOLUME: (a) => {
+      const o = a._output || {};
+      return { icon: '🔊', text: typeof o.volume === 'number' ? `Volume al ${o.volume}%${o.muto ? ' · muto' : ''}` : 'Volume cambiato' };
+    },
+    BLUETOOTH: (a) => rigaRadio(a, 'Bluetooth'),
+    WIFI: (a) => rigaRadio(a, 'Wi-Fi'),
     COMANDO_FINESTRA: (a) => {
       const labels = {
         fullscreen: 'Schermo intero', minimize: 'Finestra ridotta a icona', home: 'Home aperta',
@@ -500,7 +510,18 @@
     RIMUOVI_REGOLA_PROXY: 'Regola non tolta', COMANDO_FINESTRA: 'Comando non eseguito',
     CARTA_HOME: 'Carta della home non cambiata',
     EVENTO_CALENDARIO: 'Evento non creato', ONBOARDING: 'Accoglienza non aggiornata',
+    VOLUME: 'Volume non cambiato', BLUETOOTH: 'Bluetooth non cambiato', WIFI: 'Wi-Fi non cambiato',
   };
+  function rigaRadio(a, radio) {
+    const o = a._output || {};
+    const icon = radio === 'Wi-Fi' ? '📶' : '🎧';
+    if (Array.isArray(o.elenco)) return { icon, text: radio === 'Wi-Fi' ? 'Letto le reti conosciute' : 'Letto i dispositivi abbinati' };
+    if (typeof o.acceso === 'boolean') return { icon, text: `${radio} ${o.acceso ? 'acceso' : 'spento'}` };
+    const nome = o.dispositivo || o.rete || '';
+    if (o.gia) return { icon, text: `Già collegato · ${nome}` };
+    if (radio === 'Wi-Fi') return { icon, text: `Collegato al Wi-Fi · ${nome}` };
+    return { icon, text: `${o.collegato === false ? 'Scollegato' : 'Collegato'} · ${nome}` };
+  }
   function activityRowFor(a) {
     const row = rigaAttivita(a);
     if (!row || row.failed) return row;
@@ -550,6 +571,7 @@
     if (o.proxy === 'non_disponibile') return 'non ancora disponibile';
     if (o.proxy === 'no_web_tab') return 'nessuna pagina web aperta';
     if (o.found === false) return 'non trovato';
+    if (o.ok === false && o.errore && o.frase) return String(o.frase);
     if (o.ok === false && o.detail) return String(o.detail);
     if (o.error) return String(o.error);
     return '';
@@ -588,6 +610,29 @@
   function apribileComunque(a) {
     const o = a && a._output;
     return isType(a, 'NAVIGA') && a._executed === false && !!o && o.blocked === 'site' && /^https?:\/\//i.test(String(o.url || ''));
+  }
+
+  // #874 — un comando del sistema fermato da un permesso che manca: la frase sta nella riga, il tasto apre il posto
+  // delle impostazioni dove si concede (l'indirizzo lo sceglie il main da un elenco suo, qui passa solo la chiave).
+  function permessoDaConcedere(a) {
+    const o = a && a._output;
+    return (isType(a, 'VOLUME') || isType(a, 'BLUETOOTH') || isType(a, 'WIFI')) && a._executed === false
+      && !!o && typeof o.apri === 'string' && !!o.apri;
+  }
+
+  function bottonePermesso(a) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'dash-action-btn';
+    btn.textContent = 'Apri le impostazioni';
+    btn.title = String(a._output.dove || a._output.frase || '');
+    btn.addEventListener('click', async () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      await send({ type: MSG.SISTEMA_APRI_IMPOSTAZIONI, chiave: a._output.apri }).catch(() => null);
+      setTimeout(() => { btn.disabled = false; }, 1500);
+    });
+    return btn;
   }
 
   function bottoneApriComunque(a) {
@@ -654,7 +699,7 @@
       // bottone è come si risponde.
       const anche = a._confirm
         || (ROW_AND_BUTTON.includes(String(a.type || '').toUpperCase()) && a._executed !== false)
-        || apribileComunque(a);
+        || apribileComunque(a) || permessoDaConcedere(a);
       if (activity) {
         if (told) {
           // Già in cronologia; resta solo l'eventuale bottone (link, conferma).
@@ -674,7 +719,7 @@
       // cieco (era il caso di un link con un indirizzo non ammesso). La sua
       // riga sta già nel diario. Un'azione IN ATTESA DI CONFERMA non è
       // «fallita»: non è ancora partita, e il suo bottone è tutto il punto.
-      if (!a._confirm && !apribileComunque(a) && ((a._traccia && !anche) || a._executed === false)) continue;
+      if (!a._confirm && !apribileComunque(a) && !permessoDaConcedere(a) && ((a._traccia && !anche) || a._executed === false)) continue;
       const btn = renderActionButton(a, { onAck, activity });
       if (btn) wrap.appendChild(btn);
       if (String(a.type || '').toUpperCase() === 'SALVA_APPUNTO') hasAck = true;
@@ -930,6 +975,7 @@
     const type = String(a.type || '').toUpperCase();
     // In attesa di conferma come le altre, ma la si dà dalla loro UI: il
     // bottone del riordino, il pannello con l'elenco da eliminare.
+    if (permessoDaConcedere(a)) return bottonePermesso(a);
     if (type === 'PULISCI_TAB') return renderBottoneRiordino(a, activity);
     if (type === 'CANCELLA_ARCHIVIO') return renderDeleteArchivePanel(a, activity);
     // Azione sospesa in attesa di conferma (#146.2): il main non l'ha eseguita
