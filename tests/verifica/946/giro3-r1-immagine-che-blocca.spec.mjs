@@ -50,18 +50,55 @@ for (const [nome, crea] of Object.entries(CASI)) {
       <img id="foto" src="${src}" width="160" height="160"></body></html>`);
     await page.waitForFunction(() => document.getElementById('foto').naturalWidth > 0);
     await page.locator('#foto').click({ button: 'right', position: { x: 20, y: 20 } });
-    await expect(page.locator('.sn-menu')).toBeVisible();
 
-    // Il processo principale tiene finestra, schede e scorciatoie: per sei secondi
-    // deve rispondere sempre entro un secondo.
+    // Il processo principale tiene finestra, schede e scorciatoie: dal clic in poi,
+    // per otto secondi, deve rispondere sempre entro un secondo.
     let peggiore = 0;
-    const fine = Date.now() + 6000;
+    const fine = Date.now() + 8000;
     while (Date.now() < fine) {
       const t = Date.now();
       await app.evaluate(() => 1);
       peggiore = Math.max(peggiore, Date.now() - t);
       await new Promise((r) => setTimeout(r, 100));
     }
+    await expect(page.locator('.sn-menu')).toBeVisible();
     expect(peggiore).toBeLessThan(1000);
   });
 }
+
+// Stessa immagine, nessun tasto destro su di lei: basta chiedere qualcosa all'Aiuto
+// mentre è visibile, perché l'Aiuto legge da solo le etichette delle immagini che hai davanti.
+test('una domanda qualsiasi all’Aiuto, con l’immagine ripetitiva visibile: Filo resta reattivo', async ({ app, openTab, testServer }) => {
+  test.setTimeout(180_000);
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.HELP]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    const finto = async ({ attempts }) => ({ text: JSON.stringify({ text: 'Ecco.', status: 'done' }), model: attempts[0].model, provider: attempts[0].provider, usage: {} });
+    globalThis.SN_PROVIDERS.completeWithFallback = finto;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = finto;
+  });
+  const src = testServer.asset(CASI['XMP ripetitivo'](), 'image/png');
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:24px;min-height:600px">
+    <img id="foto" src="${src}" width="160" height="160"><p id="testo" style="margin-top:200px">Un paragrafo qualsiasi.</p></body></html>`);
+  await page.waitForFunction(() => document.getElementById('foto').naturalWidth > 0);
+  await page.locator('#testo').click({ button: 'right' });
+  await page.locator('.sn-menu').getByText('Aiuto', { exact: true }).click();
+  await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 8000 });
+  await page.fill('.sn-sidebar-input textarea', 'riassumi la pagina');
+  await page.press('.sn-sidebar-input textarea', 'Enter');
+
+  let peggiore = 0;
+  const fine = Date.now() + 8000;
+  while (Date.now() < fine) {
+    const t = Date.now();
+    await app.evaluate(() => 1);
+    peggiore = Math.max(peggiore, Date.now() - t);
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  expect(peggiore).toBeLessThan(1000);
+});
