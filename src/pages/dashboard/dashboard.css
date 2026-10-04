@@ -367,6 +367,7 @@ html, body {
   position: fixed;
   z-index: 1100;
   min-width: 180px;
+  max-width: 320px;
   padding: 4px;
   background: var(--dash-card);
   border: 1px solid var(--dash-line-strong);
@@ -384,6 +385,9 @@ html, body {
   font-family: inherit;
   font-size: 13px;
   text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: pointer;
   transition: background 0.12s ease, padding-left 0.12s ease;
 }

@@ -301,6 +301,22 @@
       const v = art._carta && art._carta.voci && art._carta.voci[i];
       if (v) v.fai(b);
     });
+    // Il tasto destro su un documento parla di quel documento; su «altri…» o «Mostra tutti» vale la carta.
+    const menuVoce = (e, x, y) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const v = art._carta && art._carta.voci && art._carta.voci[i];
+      if (!v || v.piano) { apriMenu(x, y, vociMenu(art)); return; }
+      const voci = [{ etichetta: `Apri «${v.testo}»`, fai: () => v.fai(b) }];
+      if (v.filo) voci.push({ etichetta: 'Apri nel filo', fai: () => apriCartaNelFilo({ filo: v.filo }) });
+      apriMenu(x, y, voci);
+    };
+    b.addEventListener('contextmenu', (e) => menuVoce(e, e.clientX, e.clientY));
+    b.addEventListener('keydown', (e) => {
+      if (e.key !== 'ContextMenu' && !(e.shiftKey && e.key === 'F10')) return;
+      const r = b.getBoundingClientRect();
+      menuVoce(e, r.left + 12, r.bottom);
+    });
     li.appendChild(b);
     return li;
   }
@@ -308,10 +324,14 @@
   function cartaEditor() {
     const e = dati.editor;
     const file = (e && e.file) || [];
-    const voci = file.slice(0, VOCI_IN_CARTA).map((f) => ({
-      testo: f.titolo, coda: quando(f.modificato),
-      fai: () => apri(`${URL_EDITOR}?file=${encodeURIComponent(f.id)}`),
-    }));
+    const voci = file.slice(0, VOCI_IN_CARTA).map((f) => {
+      const coda = quando(f.modificato);
+      return {
+        testo: f.titolo, coda,
+        fai: () => apri(`${URL_EDITOR}?file=${encodeURIComponent(f.id)}`),
+        filo: `Il documento «${f.titolo}» è nell’Editor${coda ? ` (ultima modifica: ${coda})` : ''}.`,
+      };
+    });
     if (file.length > VOCI_IN_CARTA) voci.push({ testo: `altri ${file.length - VOCI_IN_CARTA} nell’Editor`, fai: () => apri(URL_EDITOR), piano: true });
     const titoli = file.slice(0, 3).map((f) => `«${f.titolo}»`).join(', ');
     return {
@@ -328,10 +348,14 @@
   function cartaMazzi() {
     const m = dati.mazzi;
     const mazzi = (m || []).slice().sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')));
-    const voci = mazzi.slice(0, VOCI_IN_CARTA).map((x) => ({
-      testo: x.nome || 'Mazzo', coda: quando(x.updated_at),
-      fai: () => apri(`${URL_MAZZI}#/deck/${encodeURIComponent(x.id)}`),
-    }));
+    const voci = mazzi.slice(0, VOCI_IN_CARTA).map((x) => {
+      const coda = quando(x.updated_at);
+      return {
+        testo: x.nome || 'Mazzo', coda,
+        fai: () => apri(`${URL_MAZZI}#/deck/${encodeURIComponent(x.id)}`),
+        filo: `Il mazzo «${x.nome || 'Mazzo'}» è nei Mazzi${coda ? ` (ultima modifica: ${coda})` : ''}.`,
+      };
+    });
     if (mazzi.length > VOCI_IN_CARTA) voci.push({ testo: `altri ${mazzi.length - VOCI_IN_CARTA} nei Mazzi`, fai: () => apri(URL_MAZZI), piano: true });
     const nomi = mazzi.slice(0, 3).map((x) => `«${x.nome || 'Mazzo'}»`).join(', ');
     return {
@@ -370,7 +394,7 @@
     const tutti = dati.suggerimenti.filter((s) => s && s.text && s.carta !== 'crediti')
       .sort((a, b) => (b.importance || 0) - (a.importance || 0));
     const visibili = dati.tuttiSuggerimenti ? tutti : tutti.slice(0, SUGGERIMENTI_VISIBILI);
-    const voci = visibili.map((s) => ({ testo: s.text, iconaEl: faviconDi(s), fai: (b) => d.onSuggestionClick(s, b) }));
+    const voci = visibili.map((s) => ({ testo: s.text, iconaEl: faviconDi(s), fai: (b) => d.onSuggestionClick(s, b), filo: `Ti suggerisco: ${s.text}` }));
     if (tutti.length > SUGGERIMENTI_VISIBILI) {
       voci.push({
         testo: dati.tuttiSuggerimenti ? 'Mostra meno' : `Mostra tutti (${tutti.length})`, piano: true,
@@ -688,6 +712,7 @@
       nodo.appendChild(b);
     }
     document.body.appendChild(nodo);
+    for (const b of nodo.querySelectorAll('.dash-menu-voce')) if (b.scrollWidth > b.clientWidth) b.title = b.textContent;
     const w = nodo.offsetWidth;
     const h = nodo.offsetHeight;
     nodo.style.left = `${Math.max(4, Math.min(x, global.innerWidth - w - 4))}px`;

@@ -39,7 +39,7 @@ module.exports = function register(on, ctx) {
       // #525 — `chatId` è la targa della conversazione in corso: il main ci
       // scrive dentro il messaggio dell'utente e la risposta, turno per turno.
       const chatId = msg.chatId || null;
-      fineLavoro = require('../lavoriInCorso').inizia({ tipo: 'risposta', chat: chatId, testo: msg.userMessage, wc: sender && sender.wc });
+      fineLavoro = require('../lavoriInCorso').inizia({ tipo: 'risposta', chat: chatId, testo: msg.userMessage, wc: sender && sender.wc, ambito: ctx.ambitoDellaFinestra(sender && sender.win) });
       const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images, reasoningReqId: msg.reasoningReqId, internal: !!msg.internal, daModello: !!msg.daModello, chatId, sender });
       return { ok: true, ...r };
     } catch (e) {
@@ -462,13 +462,15 @@ module.exports = function register(on, ctx) {
 
   // #870 — le carte della home. La stessa mossa arriva dalla chat (azione CARTA_HOME) e passa dallo stesso posto.
   on(MSG.CARTE_HOME_GET, soloFilo(async () => ({ ok: true, layout: await require('../carteHome').leggi() })));
-  on(MSG.CARTE_HOME_MODIFICA, soloFilo(async (msg) => {
+  on(MSG.CARTE_HOME_MODIFICA, soloFilo(async (msg, sender) => {
     const esito = await require('../carteHome').modifica(msg && msg.mossa);
     if (esito.errore) return { ok: false, error: esito.errore, layout: esito.layout };
-    if (esito.cambiato) ctx.broadcastToFiloPages({ type: MSG.CARTE_HOME_CAMBIATE, layout: esito.layout });
+    if (esito.cambiato) ctx.annunciaCarteHome(esito.layout, sender);
     return { ok: true, layout: esito.layout };
   }));
-  on(MSG.LAVORI_IN_CORSO, soloFilo(async () => ({ ok: true, lavori: require('../lavoriInCorso').elenco() })));
+  on(MSG.LAVORI_IN_CORSO, soloFilo(async (msg, sender) => ({
+    ok: true, lavori: require('../lavoriInCorso').elenco(ctx.ambitoDellaFinestra(sender && sender.win)),
+  })));
   on(MSG.EDITOR_RECENTI, soloFilo(async () => require('../editorFiles').recenti()));
 
   // F4 — Annulla un auto-feedback appena inviato (undo dal toast).

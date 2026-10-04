@@ -250,7 +250,8 @@ function registerIpcHandlers() {
     // una frase di Filo, e la porta delle uscite deve saperlo (#810). Si tiene la coda, dove finisce l'esito.
     const stampato = [];
     let quanto = 0;
-    const fineLavoro = require('./services/lavoriInCorso').inizia({ tipo: 'comando', chat, testo: command, wc: event.sender });
+    const ambito = require('./services/downloads').scopeOfWindow(senderInfo(event).win);
+    const fineLavoro = require('./services/lavoriInCorso').inizia({ tipo: 'comando', chat, testo: command, wc: event.sender, ambito });
     comandiInCorso.set(key, fineLavoro);
     const chiudi = () => { fineLavoro(); if (comandiInCorso.get(key) === fineLavoro) comandiInCorso.delete(key); };
     session.exec(command, {

@@ -2358,13 +2358,13 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
           const perChiave = sx.find((v) => v.chiave === String(action.carta ?? '').trim());
           if (perChiave || !CH.risolvi(action.carta, { esatto: true })) {
             const trovate = perChiave ? { voci: [perChiave], perTipo: false, tipo: perChiave.tipo } : CH.trovaSinistra(action.carta, sx);
-            if (trovate.voci.length || trovate.tipo || !CH.risolvi(action.carta)) return cartaSinistraDaChat({ tipo, verso, action, sx, trovate });
+            if (trovate.voci.length || trovate.tipo || !CH.risolvi(action.carta)) return cartaSinistraDaChat({ tipo, verso, action, sx, trovate, sender });
           }
         }
         const esito = await require('./carteHome').modifica({ tipo, carta: action.carta, verso, prima: action.prima_di ?? null });
         const dove = CH.descrivi(esito.layout);
         if (esito.errore) return { executed: false, kept: false, output: { error: esito.errore, ...dove } };
-        if (esito.cambiato) broadcastToFiloPages({ type: MSG.CARTE_HOME_CAMBIATE, layout: esito.layout });
+        if (esito.cambiato) annunciaCarteHome(esito.layout, sender);
         return { executed: true, kept: true, output: dove };
       }
       case 'COMANDO_FINESTRA': {
@@ -3796,21 +3796,19 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
 // chat non risponde, quindi la carta dei Crediti qui non c'è. `chatId`: la conversazione che chiede.
 async function carteSinistraPerChat(sender, chatId = null) {
   const CH = globalThis.SN_CARTE_HOME;
+  const ambito = ambitoDellaFinestra(sender && sender.win);
   let downloads = [];
-  try {
-    const DL = require('./downloads');
-    downloads = DL.list(DL.scopeOfWindow(sender && sender.win)) || [];
-  } catch (_) {}
+  try { downloads = require('./downloads').list(ambito) || []; } catch (_) {}
   const [timers, notifiche, layout] = await Promise.all([
     FiloMem.gcTimers().catch(() => []),
     FiloMem.listNotifications().catch(() => []),
     require('./carteHome').leggi(),
   ]);
-  const lavori = require('./lavoriInCorso').elenco();
+  const lavori = require('./lavoriInCorso').elenco(ambito);
   return CH.sinistra({ timers, notifiche, downloads, lavori, chat: chatId }, layout);
 }
 
-async function cartaSinistraDaChat({ tipo, verso, action, sx, trovate }) {
+async function cartaSinistraDaChat({ tipo, verso, action, sx, trovate, sender }) {
   const CH = globalThis.SN_CARTE_HOME;
   const Carte = require('./carteHome');
   const elenco = (voci) => voci.map((v) => ({ carta: v.chiave, tipo: v.tipo, titolo: v.titolo }));
@@ -3831,7 +3829,7 @@ async function cartaSinistraDaChat({ tipo, verso, action, sx, trovate }) {
       if (v.tipo === 'avviso') { await FiloMem.dismissNotification(v.ref.id); avvisi++; }
       else {
         const esito = await Carte.modifica({ tipo: 'nascondi', chiave: v.chiave });
-        if (esito.cambiato) broadcastToFiloPages({ type: MSG.CARTE_HOME_CAMBIATE, layout: esito.layout });
+        if (esito.cambiato) annunciaCarteHome(esito.layout, sender);
       }
     }
     if (avvisi) broadcastLiveUpdate();
@@ -3854,7 +3852,7 @@ async function cartaSinistraDaChat({ tipo, verso, action, sx, trovate }) {
   ordine.splice(dove, 0, v.chiave);
   const esito = await Carte.modifica({ tipo: 'ordina-sinistra', ordine });
   if (esito.errore) return no(esito.errore);
-  if (esito.cambiato) broadcastToFiloPages({ type: MSG.CARTE_HOME_CAMBIATE, layout: esito.layout });
+  if (esito.cambiato) annunciaCarteHome(esito.layout, sender);
   return { executed: true, kept: true, output: { spostata: v.titolo, sinistra: elenco(ordinaCome(sx, esito.layout)) } };
 }
 
@@ -4039,6 +4037,8 @@ const handlerCtx = {
   filoWin,
   broadcastToTabs,
   broadcastToFiloPages,
+  annunciaCarteHome,
+  ambitoDellaFinestra,
   broadcastLiveUpdate,
   getEffectiveSettings,
   fillMovedSlots,
@@ -4907,18 +4907,32 @@ function broadcastToTabs(message) {
 // Il frame principale basta: qui non ci sono destinatari nei riquadri
 // incorporati (le pagine filo:// non ne ospitano di privilegiati). Anche fra le
 // finestre solo quelle di Filo: un popup di accesso è la pagina di un sito.
+//
+// `message` può essere una funzione dell'ambito della finestra (quello degli scaricamenti: '' o la partizione
+// incognito) che dà il messaggio per quella finestra, o null per saltarla: così l'incognito resta separato.
 function broadcastToFiloPages(message) {
-  const aFilo = (wc) => {
+  const aFilo = (wc, m) => {
     try {
-      if (wc && !wc.isDestroyed?.() && isFilo(wc.getURL())) wc.send('filo:broadcast', message);
+      if (wc && !wc.isDestroyed?.() && isFilo(wc.getURL())) wc.send('filo:broadcast', m);
     } catch (_) {}
   };
   try {
     for (const win of BrowserWindow.getAllWindows()) {
-      if (win._filoTabs) for (const t of win._filoTabs.tabs) aFilo(t.view?.webContents);
-      aFilo(win.webContents);
+      const m = typeof message === 'function' ? message(ambitoDellaFinestra(win)) : message;
+      if (m == null) continue;
+      if (win._filoTabs) for (const t of win._filoTabs.tabs) aFilo(t.view?.webContents, m);
+      aFilo(win.webContents, m);
     }
   } catch (_) {}
+}
+function ambitoDellaFinestra(win) {
+  try { return require('./downloads').scopeOfWindow(win); } catch (_) { return ''; }
+}
+// Le carte della home si annunciano solo alle finestre dell'ambito di chi le ha mosse: in incognito la
+// disposizione vive in memoria, e la finestra normale non deve vederla cambiare.
+function annunciaCarteHome(layout, sender) {
+  const ambito = ambitoDellaFinestra(sender && sender.win);
+  broadcastToFiloPages((a) => (a === ambito ? { type: MSG.CARTE_HOME_CAMBIATE, layout } : null));
 }
 
 // Configura il rilevatore di siti pericolosi (services/safebrowse) dalle

@@ -442,6 +442,13 @@
       if (await reopenChat(chat, { chiudiPrima: true }).catch(() => false)) return true;
     }
     if (!testo) return false;
+    // La stessa carta aperta due volte non ripete la frase: è già l'ultima cosa che Filo ha detto qui.
+    const ultimo = threadHistory[threadHistory.length - 1];
+    if (body.dataset.state === 'thread' && ultimo && ultimo.role === 'filo' && ultimo.text === testo) {
+      bubblesEl.scrollTop = bubblesEl.scrollHeight;
+      inputEl.focus();
+      return true;
+    }
     const DA_FUORI = { download: 'dal nome di un file scaricato' };
     archiviaRiga(testo, 'filo', null, esterno);
     threadHistory.push({ role: 'filo', text: testo, actions: [], ...(DA_FUORI[esterno] ? { esterno: DA_FUORI[esterno] } : {}) });
