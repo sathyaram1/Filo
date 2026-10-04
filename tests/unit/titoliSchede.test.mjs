@@ -275,7 +275,8 @@ describe('la chiave del titolo', () => {
 
   test('i titoli diversi restano diversi', () => {
     assert.notEqual(T.chiave('Meteo Roma'), T.chiave('Meteo Milano'));
-    assert.equal(T.chiave('  Meteo   Roma ​'), 'Meteo Roma');
+    assert.equal(T.chiave('  Meteo Roma ​'), 'Meteo Roma');
+    assert.equal(T.chiave('Inbox (3) - a@b.it - Gmail'), T.chiave('Inbox - a@b.it - Gmail'), 'senza contatore è lo stesso titolo');
   });
 
   test('stessa chiave, stessa risposta', () => {
