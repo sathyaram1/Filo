@@ -255,7 +255,8 @@
     const motivo = (e) => (e && e.message ? e.message : String(e));
 
     // Il confine non va mai oltre l'ultima ora del SERVER vista (commit, ora della lettura): col solo orologio del PC,
-    // avanti di tre minuti, il giro non vedeva più niente (#676). Il margine resta per chi firma col suo orologio.
+    // avanti di tre minuti, il giro non vedeva più niente (#676). Il margine vale anche lì: chi firma col suo
+    // orologio, qualche secondo indietro, cadrebbe prima di quell'ora.
     let oraServer = 0;
     function oraDi(r) {
       const t = Date.parse(r && r._updateTime);
