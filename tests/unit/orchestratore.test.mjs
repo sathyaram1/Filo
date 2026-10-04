@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  caricoBasta, classificaFinish, creaMotore, decidiDopoVerifica, derivatiDaAprire, nuovaPratica, promptLavoratore,
+  attesaLimite, caricoBasta, classificaFinish, creaMotore, decidiDopoVerifica, derivatiDaAprire, nuovaPratica, promptLavoratore,
   promptVerificatore, regolaFile, richiestaArg, riprendi, rigaStato, serveDeploy, siSovrappongono, toccaRegole,
 } from '../../scripts/lib/orchestratore.mjs';
 import {
@@ -21,7 +21,7 @@ const ROOT = resolve(fileURLToPath(import.meta.url), '..', '..', '..');
 // ─── Il motore con tutto finto ───────────────────────────────────────────────
 // `verdetti`: uno per verificatore lanciato ('fixed' | 'pass' | 'fail' | 'nulla' | 'fix-pending').
 // `risposte`: [regex sul comando, { code, out } | funzione] in ordine; vince la prima che combacia.
-function banco({ pratiche = [nuovaPratica({ num: 7, slug: 'sette', richiesta: 'fai X' })], verdetti = ['pass'], risposte = [], carichi = null, esiste = null, server = true, derived = [], opz = {} } = {}) {
+function banco({ pratiche = [nuovaPratica({ num: 7, slug: 'sette', richiesta: 'fai X' })], verdetti = ['pass'], risposte = [], carichi = null, esiste = null, server = true, derived = [], opz = {}, errori = [] } = {}) {
   const stato = { coda: pratiche.map((p) => p.num), pratiche: Object.fromEntries(pratiche.map((p) => [p.num, p])) };
   const chiamate = [];
   const prompt = [];
@@ -29,6 +29,7 @@ function banco({ pratiche = [nuovaPratica({ num: 7, slug: 'sette', richiesta: 'f
   const collegamenti = new Set();
   const alberi = new Set();
   const coda = [...verdetti];
+  const dormite = [];
   const fintoEsiste = (p) => (esiste ? esiste(p) : collegamenti.has(p) || alberi.has(p));
   const dep = {
     store: { leggi: () => JSON.parse(JSON.stringify(stato)), salvaPratica: (p) => { stato.pratiche[p.num] = JSON.parse(JSON.stringify(p)); } },
@@ -56,6 +57,7 @@ function banco({ pratiche = [nuovaPratica({ num: 7, slug: 'sette', richiesta: 'f
     claude: async ({ ruolo, prompt: testo, cwd }) => {
       prompt.push({ ruolo, testo });
       chiamate.push({ riga: `claude ${ruolo}`, cwd });
+      if (errori.length) return { ok: false, testo: '', costo: 0, errore: errori.shift() };
       if (ruolo === 'verificatore') {
         const v = coda.length ? coda.shift() : 'pass';
         const e = { ...(per[cwd].entry || {}) };
@@ -71,7 +73,7 @@ function banco({ pratiche = [nuovaPratica({ num: 7, slug: 'sette', richiesta: 'f
     verifica: (wt) => per[wt] || {},
     pubblica: async () => { chiamate.push({ riga: 'server:pubblica' }); return { code: 0, out: '' }; },
     carico: async () => (carichi ? carichi() : { cpu: 10, liberaGB: 16 }),
-    dormi: () => new Promise((ok) => setImmediate(ok)),
+    dormi: (ms) => { dormite.push(ms); return new Promise((ok) => setImmediate(ok)); },
     log: () => {},
     ora: () => '2026-10-04T10:00:00Z',
     percorsi: { radice: '/r', serverRadice: server ? '/s' : '', note: '/n', regole: 'REGOLE FISSE', wt: (s) => `/r/.claude/worktrees/${s}`, wtServer: (s) => `/s/.claude/worktrees/${s}` },
@@ -84,7 +86,7 @@ function banco({ pratiche = [nuovaPratica({ num: 7, slug: 'sette', richiesta: 'f
     richiestaDi: async () => 'richiesta letta',
   };
   const motore = creaMotore(dep, { pausaMs: 0, ...opz });
-  return { motore, stato, chiamate, prompt, righe: () => chiamate.map((c) => c.riga) };
+  return { motore, stato, chiamate, prompt, dormite, righe: () => chiamate.map((c) => c.riga) };
 }
 
 const indice = (righe, re) => righe.findIndex((r) => re.test(r));
@@ -107,6 +109,12 @@ test('giro intero: lavoratore, due verifiche, server su main, app, deploy, rilie
     prima = i;
   }
   assert.ok(indice(r, /scollega \/r\/\.claude\/worktrees\/sette\/node_modules/) < indice(r, /worktree remove \/r\/\.claude\/worktrees\/sette/), 'la junction si toglie prima del worktree');
+});
+
+test('il verificatore riceve la cartella delle note, come il lavoratore', async () => {
+  const b = banco({ server: false });
+  await b.motore.avvia();
+  for (const ruolo of ['lavoratore', 'verificatore']) assert.match(b.prompt.find((x) => x.ruolo === ruolo).testo, /`\/n[`/]/);
 });
 
 test('il verificatore riceve il compito di start (solo stdout, niente bilanci) e le regole fisse; il lavoratore il numero e le note', async () => {
@@ -180,6 +188,71 @@ test('correzione registrata ma non consegnata: fermo coi rilievi', async () => {
   const b = banco({ verdetti: ['fix-pending'] });
   const fine = await b.motore.avvia();
   assert.match(fine.pratiche[7].fermo.motivo, /non ha consegnato la correzione:\n- \[2i\] manca Y/);
+});
+
+test('correzione non consegnata e ripresa: il lavoratore riceve i rilievi e consegna con corretto, senza start', async () => {
+  const b = banco({ verdetti: ['fix-pending'], server: false });
+  let p = (await b.motore.avvia()).pratiche[7];
+  assert.equal(p.fase, 'fermo');
+  const q = riprendi(p, '');
+  assert.equal(q.compito, 'correzione');
+  b.stato.pratiche[7] = q;
+  const verificatori = b.prompt.filter((x) => x.ruolo === 'verificatore').length;
+  p = (await b.motore.avvia()).pratiche[7];
+  const ultimo = b.prompt[b.prompt.length - 1];
+  assert.equal(ultimo.ruolo, 'lavoratore');
+  assert.match(ultimo.testo, /- \[2i\] manca Y/);
+  assert.match(ultimo.testo, /verify-local\.mjs corretto/);
+  // Il finto non consegna: si ferma di nuovo coi rilievi, senza un verificatore in più, e la ripresa con una risposta li riporta.
+  assert.equal(p.fase, 'fermo');
+  assert.match(p.fermo.motivo, /correzione non è stata consegnata/);
+  assert.equal(b.prompt.filter((x) => x.ruolo === 'verificatore').length, verificatori);
+  const r = riprendi(p, 'tieni la A');
+  assert.equal(r.compito, 'correzione');
+  assert.equal(r.risposta, 'tieni la A');
+  assert.match(promptLavoratore({ p: r, regole: '', wtApp: '/w', wtServer: '', cartellaNote: '/n', crit: r.fermoPrima.correzione }), /manca Y[\s\S]*tieni la A/);
+});
+
+test('fusione in attesa dell’approvazione e ripresa: rilancia finish, niente verifica nuova', async () => {
+  let volte = 0;
+  const b = banco({ server: false, risposte: [[/finish-local/, () => { volte += 1; return volte === 1 ? { code: 10, out: 'bloccata dai controlli' } : { code: 0, out: 'fuso' }; }]] });
+  let p = (await b.motore.avvia()).pratiche[7];
+  assert.equal(p.fase, 'fermo');
+  assert.equal(p.fermo.dove, 'chiusura');
+  const prima = b.righe().filter((x) => /^claude |verify-local/.test(x)).length;
+  b.stato.pratiche[7] = riprendi(p, '');
+  p = (await b.motore.avvia()).pratiche[7];
+  assert.equal(p.fase, 'fuso');
+  assert.equal(b.righe().filter((x) => /^claude |verify-local/.test(x)).length, prima);
+  assert.equal(volte, 2);
+});
+
+test('una fermata qualunque ripresa con una risposta: il lavoratore legge il motivo', async () => {
+  const b = banco({ verdetti: ['nulla', 'nulla'], server: false });
+  const p = (await b.motore.avvia()).pratiche[7];
+  const q = riprendi(p, 'riprova');
+  assert.equal(q.compito, 'decisione');
+  const t = promptLavoratore({ p: q, regole: '', wtApp: '/w', wtServer: '', cartellaNote: '/n', crit: q.fermoPrima.domanda || q.fermoPrima.motivo });
+  assert.match(t, /non hanno registrato la critica/);
+});
+
+test('limite d’uso: l’istanza aspetta e riparte, e il lavoro arriva in fondo; oltre il tetto di ore si ferma col motivo', async () => {
+  const b = banco({ server: false, errori: ["You've hit your limit · resets 3pm (Europe/Rome)", 'Claude AI usage limit reached|1759590000'] });
+  const p = (await b.motore.avvia()).pratiche[7];
+  assert.equal(p.fase, 'fuso');
+  assert.ok(b.dormite.includes(15 * 60_000));
+  assert.ok(b.dormite.includes(60_000));
+  const c = banco({ server: false, errori: Array(60).fill('5-hour limit reached ∙ resets 3pm'), opz: { oreLimite: 1 } });
+  const f = (await c.motore.avvia()).pratiche[7];
+  assert.equal(f.fase, 'fermo');
+  assert.match(f.fermo.motivo, /limite d’uso ancora attivo dopo 1 ore/);
+});
+
+test('attesaLimite: solo il limite d’uso, fino all’ora che dice', () => {
+  assert.equal(attesaLimite('API Error: 529 overloaded', 0), 0);
+  assert.equal(attesaLimite('Claude AI usage limit reached|1759600000', 1759590000000), 10_060_000);
+  assert.equal(attesaLimite('Claude AI usage limit reached|1759600000', 1759700000000), 60_000);
+  assert.equal(attesaLimite('Weekly limit reached', 0, { pausaLimiteMs: 5 }), 5);
 });
 
 test('ramo con un merge commit e indietro: merge di origin/main prima di start; se va in conflitto, lo riallinea il lavoratore', async () => {
@@ -336,8 +409,9 @@ test('riprendi e nuovaPratica', () => {
 
 test('prompt del verificatore: niente report del lavoratore, la parte server se c’è', () => {
   const p = nuovaPratica({ num: 9, slug: 'nove' });
-  const v = promptVerificatore({ p, regole: '', wtApp: '/w', wtServer: '/s/w', brief: 'B' });
+  const v = promptVerificatore({ p, regole: '', wtApp: '/w', wtServer: '/s/w', brief: 'B', cartellaNote: '/n' });
   assert.match(v, /worktree `\/s\/w` di filo-security/);
+  assert.match(v, /Cartella temporanea, fuori dal repo[^\n]*`\/n`/);
   assert.match(v, /════ COMPITO ════\nB$/);
   const l = promptLavoratore({ p: { ...p, compito: 'riallinea' }, regole: '', wtApp: '/w', wtServer: '', cartellaNote: '/n' });
   assert.match(l, /git merge origin\/main/);
