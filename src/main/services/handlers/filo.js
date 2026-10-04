@@ -152,9 +152,10 @@ module.exports = function register(on, ctx) {
     const Sistema = require('../statoSistema');
     const schede = sender && sender.win && sender.win._filoTabs;
     const davanti = !(schede && sender.tab) || schede.activeId === sender.tab.id;
-    Sistema.richiedi({ davanti, chi: sender && sender.wc });
+    const segue = !(msg && msg.segue === false);
+    Sistema.richiedi({ davanti, chi: sender && sender.wc, segue });
     // La pagina che ha visto cadere o tornare la rete non aspetta il giro: la lettura nuova arriva con l'annuncio.
-    if (davanti && msg && msg.subito === true) Sistema.leggiAdesso();
+    if (davanti && segue && msg && msg.subito === true) Sistema.leggiAdesso();
     return { ok: true, stato: Sistema.stato() };
   }));
 

@@ -5,6 +5,8 @@
   'use strict';
 
   const ORDINE = ['ora', 'batteria', 'rete', 'bluetooth'];
+  // L'ora la sa la pagina; le altre tre le legge il main, e solo per loro la home tiene sveglio il lettore.
+  const DAL_COMPUTER = ['batteria', 'rete', 'bluetooth'];
   const NOMI = { ora: "l'ora", batteria: 'la batteria', rete: 'la rete', bluetooth: 'il Bluetooth' };
   // Il main legge finché qualcuno chiede: una home in vista chiede più spesso di quanto il lettore si addormenti.
   const RICHIAMO_MS = 30 * 1000;
@@ -21,8 +23,10 @@
   let box = null;
   let richiamo = null;
   let tickOra = null;
+  let impostazioniLette = false;
 
   const Sis = () => global.SN_SISTEMA;
+  const segue = () => DAL_COMPUTER.some((v) => visibili[v] !== false);
   const descrizione = () => Sis().descrivi(stato, new Date());
 
   function init(deps) {
@@ -35,7 +39,8 @@
     riga.className = 'dash-sis-icone';
     for (const v of ORDINE) voci[v] = creaVoce(v);
     disegna();
-    chiedi();
+    // La prima richiesta aspetta le impostazioni: chi ha nascosto le tre voci non sveglia il lettore a ogni scheda.
+    setTimeout(() => { if (!impostazioniLette) { impostazioniLette = true; chiedi(); } }, 2000);
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') { disegna(); chiedi({ subito: true }); }
       programmaRichiamo();
@@ -48,6 +53,7 @@
   }
 
   async function chiedi({ subito = false } = {}) {
+    if (!segue()) return;
     let r = null;
     try { r = await send({ type: MSG.SISTEMA_STATO, subito }); } catch (_) {}
     if (r && r.ok && r.stato) aggiornato(r.stato);
@@ -71,9 +77,19 @@
     disegna();
   }
 
-  function applicaImpostazioni(settings) {
-    visibili = Sis().vociVisibili(settings);
+  // Una voce del computer che ricompare si legge subito; l'ultima che sparisce lascia dormire il lettore.
+  function cambiaVisibili(nuove) {
+    const prima = impostazioniLette ? segue() : null;
+    visibili = nuove;
+    impostazioniLette = true;
     disegna();
+    if (prima === segue()) return;
+    if (segue()) chiedi({ subito: true });
+    else send({ type: MSG.SISTEMA_STATO, segue: false }).catch(() => {});
+  }
+
+  function applicaImpostazioni(settings) {
+    cambiaVisibili(Sis().vociVisibili(settings));
   }
 
   function creaVoce(v) {
@@ -191,8 +207,7 @@
   }
 
   function imposta(voce, mostra) {
-    visibili = { ...visibili, [voce]: mostra };
-    disegna();
+    cambiaVisibili({ ...visibili, [voce]: mostra });
     send({ type: MSG.UPDATE_SETTINGS, settings: { homeSistema: { [voce]: mostra } } }).catch(() => {});
   }
 

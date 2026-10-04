@@ -344,3 +344,34 @@ test('dopo una pausa del lettore, se la lettura nuova tarda, la chat non riceve 
   await expect.poll(async () => app.evaluate(async () => (await globalThis.SN_FILO_STATE.assemble({ creditiFreschi: true })).stateText),
     { timeout: 10_000 }).toContain('Batteria: 30%');
 });
+
+test('con batteria, rete e Bluetooth nascoste la home non sveglia il lettore, neanche tornando davanti; rimettendone una riparte', async ({ app, openTab, testServer }) => {
+  await finto(app, PIENO);
+  await app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.veglia(2_000));
+  const page = await newtab(app);
+  const attivo = () => app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.attivo());
+  const giro = await app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.GIRO_MS);
+  await page.evaluate(() => window.filo.message({
+    type: window.SN_MSG.MSG.UPDATE_SETTINGS,
+    settings: { homeSistema: { batteria: false, rete: false, bluetooth: false } },
+  }));
+  await expect(voce(page, 'bluetooth')).toBeHidden({ timeout: 5_000 });
+  await expect(voce(page, 'ora')).toBeVisible();
+  // Le strade che prima la svegliavano: la rete che torna, la home che torna davanti a un'altra scheda.
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await openTab(testServer.html('<h1>un sito qualunque</h1>'));
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    const home = w._filoTabs.tabs.find((t) => t.view.webContents.getURL().startsWith('filo://newtab'));
+    w._filoTabs.activate(home.id);
+  });
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await expect.poll(attivo, { timeout: 2_000 + giro * 2 + 3_000 }).toBe(false);
+  await new Promise((r) => setTimeout(r, giro + 500));
+  expect(await attivo()).toBe(false);
+  // Rimessa la batteria, il lettore riparte subito e la voce ha il suo numero.
+  await page.evaluate(() => window.filo.message({ type: window.SN_MSG.MSG.UPDATE_SETTINGS, settings: { homeSistema: { batteria: true } } }));
+  await expect.poll(attivo, { timeout: 3_000 }).toBe(true);
+  await expect(voce(page, 'batteria')).toHaveText('42%');
+  await app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.veglia(0));
+});

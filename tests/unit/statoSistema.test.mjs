@@ -11,6 +11,7 @@ import { mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { execFileSync } from 'node:child_process';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -347,4 +348,62 @@ test('ogni piattaforma ha il suo ramo, scritto intero', () => {
   assert.match(f, /process\.platform === 'win32'/);
   assert.match(f, /process\.platform === 'darwin'/);
   assert.match(f, /\} else \{[\s\S]*leggiLinux/);
+});
+
+// Il monitor gira in un Node a parte, con la piattaforma e l'avviso del caricatore finti: qui il contenitore è Linux.
+function simula(corpo) {
+  const MODULO = JSON.stringify(join(ROOT, 'src', 'main', 'services', 'statoSistema.js'));
+  const codice = `
+const { EventEmitter } = require('node:events');
+const Module = require('node:module');
+const pm = new EventEmitter();
+const vero = Module._load;
+Module._load = function (r, ...a) { return r === 'electron' ? { powerMonitor: pm, app: { on() {} }, net: { isOnline: () => true } } : vero.call(this, r, ...a); };
+const attesa = (ms) => new Promise((r) => setTimeout(r, ms));
+const storia = [];
+const MODULO = ${MODULO};
+const nota = (S) => storia.push(S.stato() && S.stato().batteria ? S.stato().batteria.collegata : null);
+${corpo}`;
+  return JSON.parse(execFileSync(process.execPath, ['-e', codice], { encoding: 'utf8', timeout: 20_000 }).trim().split('\n').pop());
+}
+
+test('staccando il caricatore la voce non torna «collegata» per una lettura fatta prima dell\'avviso (Windows e Mac)', () => {
+  // Windows: l'avviso arriva subito, il PowerShell scrive la riga nuova al suo giro.
+  const windows = simula(`
+Object.defineProperty(process, 'platform', { value: 'win32' });
+const cp = require('node:child_process');
+const { PassThrough } = require('node:stream');
+let figlio;
+cp.spawn = () => { figlio = new EventEmitter(); figlio.stdout = new PassThrough(); figlio.kill = () => {}; return figlio; };
+const S = require(MODULO);
+const riga = (c) => JSON.stringify({ batteria: { livello: 100, inCarica: false, collegata: c }, rete: null, bluetooth: null }) + '\\n';
+(async () => {
+  S.richiedi();
+  await attesa(50); figlio.stdout.write(riga(true)); await attesa(100);
+  pm.emit('on-battery');
+  for (let i = 0; i < 6; i++) { await attesa(100); nota(S); }
+  figlio.stdout.write(riga(false)); await attesa(50); nota(S);
+  pm.emit('on-ac'); await attesa(50); nota(S);
+  console.log(JSON.stringify(storia)); process.exit(0);
+})();`);
+  assert.deepEqual(windows, [false, false, false, false, false, false, false, true]);
+  // Mac: il caricatore si stacca mentre la lettura del giro è in corso.
+  const mac = simula(`
+Object.defineProperty(process, 'platform', { value: 'darwin' });
+const cp = require('node:child_process');
+let collegata = true;
+cp.execFile = (file, args, opts, cb) => {
+  const c = collegata;
+  const out = file === 'pmset' ? "Now drawing from '" + (c ? 'AC Power' : 'Battery Power') + "'\\n -InternalBattery-0 (id=1)\\t100%; " + (c ? 'charged' : 'discharging') + "; 0:00 remaining present: true\\n" : '';
+  setTimeout(() => cb(null, out), 400);
+};
+const S = require(MODULO);
+(async () => {
+  S.richiedi();
+  await attesa(3100);
+  collegata = false; pm.emit('on-battery');
+  for (let i = 0; i < 6; i++) { await attesa(150); nota(S); }
+  console.log(JSON.stringify(storia)); process.exit(0);
+})();`);
+  assert.deepEqual(mac, [false, false, false, false, false, false]);
 });

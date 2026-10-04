@@ -42,6 +42,9 @@ giorno, è un costo vero. Quindi:
   Chromium resta `visible`, quindi la sua richiesta riceve lo stato ma non tiene
   sveglio il lettore; quando la finestra la riporta davanti, il lettore riparte
   da sé;
+- una home che non mostra niente letto dal computer (batteria, rete e Bluetooth
+  nascoste: l'ora la sa la pagina) non chiede e non è fra chi guarda, così
+  nemmeno tornando davanti sveglia il lettore;
 - un lettore che riparte non consegna la lettura di prima del sonno come
   fresca: chi chiede aspetta la riga nuova, e se non arriva in tempo la chat
   riceve «il computer non ha risposto», non il dato vecchio (la home intanto
@@ -51,7 +54,9 @@ giorno, è un costo vero. Quindi:
   cambia, ed esce da sé se Filo non c'è più (controlla il processo che l'ha
   lanciato), oltre che quando Filo lo ferma;
 - staccando il caricatore Windows e macOS avvisano subito (`powerMonitor`):
-  l'icona cambia senza aspettare il giro.
+  l'icona cambia senza aspettare il giro, e una lettura cominciata prima
+  dell'avviso (o una riga di Windows scritta prima) non lo smentisce: per
+  dieci secondi l'avviso vince, poi torna a decidere la lettura.
 
 Collegato o no lo decide Chromium (`net.isOnline`) su tutti i sistemi; Wi-Fi o
 cavo e il nome li dice la piattaforma.

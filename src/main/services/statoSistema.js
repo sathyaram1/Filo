@@ -13,6 +13,8 @@ const GIRO_MS = 3000;
 const VEGLIA_MS = 90 * 1000;
 const COMANDO_MS = 2500;
 const ATTESA_PRIMA_LETTURA_MS = 3000;
+// L'avviso del caricatore vince sulle letture fatte prima di lui; oltre questo tempo torna a decidere la lettura.
+const EVENTO_VALE_MS = 10 * 1000;
 
 function S() {
   if (!globalThis.SN_SISTEMA) require('../../shared/sistema.js');
@@ -387,6 +389,7 @@ function datiDaWindows(riga) {
 function lettoreWindows({ avvia = spawn, pid = process.pid, quandoCambia = () => {} } = {}) {
   let figlio = null;
   let ultimo = null;
+  let quando = 0;
   // Dopo un sonno l'ultima riga è di prima: resta per chi disegna, ma chi chiede aspetta quella nuova.
   let fresco = false;
   let guasti = 0;
@@ -415,7 +418,7 @@ function lettoreWindows({ avvia = spawn, pid = process.pid, quandoCambia = () =>
       while ((a = buffer.indexOf('\n')) >= 0) {
         const d = datiDaWindows(buffer.slice(0, a));
         buffer = buffer.slice(a + 1);
-        if (d) { ultimo = d; fresco = true; guasti = 0; sveglia(); quandoCambia(); }
+        if (d) { ultimo = d; quando = Date.now(); fresco = true; guasti = 0; sveglia(); quandoCambia(); }
       }
     });
     // Un'uscita che non abbiamo chiesto è un guasto: dopo tre di fila il lettore si arrende, senza ripartire in loop.
@@ -454,6 +457,8 @@ function lettoreWindows({ avvia = spawn, pid = process.pid, quandoCambia = () =>
     ultimaRiga: () => (figlio ? ultimo : null),
     inAttesa: () => !!figlio && !fresco,
     attivo: () => !!figlio,
+    // Il PowerShell scrive solo quando qualcosa cambia: la riga vale per il momento in cui è arrivata.
+    quando: () => quando,
   };
 }
 
@@ -505,8 +510,8 @@ async function lettoreDiSistema() {
     const w = lettoreDiWindows();
     w.assicura();
     await w.pronto(ATTESA_PRIMA_LETTURA_MS);
-    if (w.inAttesa()) return { grezzo: componi(w.ultimaRiga(), onlineDaElectron()), fresco: false };
-    return { grezzo: componi(w.ultimo(), onlineDaElectron()), fresco: true };
+    if (w.inAttesa()) return { grezzo: componi(w.ultimaRiga(), onlineDaElectron()), fresco: false, lettoAlle: w.quando() };
+    return { grezzo: componi(w.ultimo(), onlineDaElectron()), fresco: true, lettoAlle: w.quando() };
   } else if (process.platform === 'darwin') {
     return { grezzo: componi(await leggiMac(), onlineDaElectron()), fresco: true };
   } else {
@@ -533,14 +538,24 @@ function pubblica(grezzo, { fresco = true } = {}) {
   return stato;
 }
 
+// Una lettura cominciata (o una riga di Windows scritta) prima dell'avviso del caricatore non lo smentisce.
+let avvisoCorrente = null;
+function dopoAvviso(grezzo, lettoAlle) {
+  const a = avvisoCorrente;
+  if (!a || !grezzo || !grezzo.batteria || lettoAlle >= a.quando || Date.now() - a.quando > EVENTO_VALE_MS) return grezzo;
+  const b = grezzo.batteria;
+  return { ...grezzo, batteria: { ...b, collegata: a.collegata, inCarica: a.collegata && b.inCarica === true } };
+}
+
 function leggiAdesso() {
   if (letturaInCorso) return letturaInCorso;
   letturaInCorso = (async () => {
     try {
-      if (lettoreProve) pubblica(await lettoreProve());
+      const inizio = Date.now();
+      if (lettoreProve) pubblica(dopoAvviso(await lettoreProve(), inizio));
       else {
-        const { grezzo, fresco } = await lettoreDiSistema();
-        pubblica(grezzo, { fresco });
+        const { grezzo, fresco, lettoAlle = inizio } = await lettoreDiSistema();
+        pubblica(dopoAvviso(grezzo, lettoAlle), { fresco });
       }
     } catch (_) {}
     letturaInCorso = null;
@@ -551,7 +566,8 @@ function leggiAdesso() {
 
 // Staccando il caricatore Windows e macOS lo dicono subito: l'icona cambia senza aspettare il giro.
 function correggiCorrente(collegata) {
-  if (stato && stato.batteria && !lettoreProve) {
+  avvisoCorrente = { collegata, quando: Date.now() };
+  if (stato && stato.batteria) {
     pubblica({ ...stato, batteria: { ...stato.batteria, collegata, inCarica: collegata && stato.batteria.inCarica } });
   }
   leggiAdesso();
@@ -577,13 +593,17 @@ function ferma() {
 
 // Una scheda dietro le altre per Chromium resta «visibile» e continua a chiedere: `davanti: false` risponde
 // senza tenere sveglio il lettore, che legge solo finché qualcuno guarda.
-function richiedi({ davanti = true, chi = null } = {}) {
-  if (chi && typeof chi.id === 'number' && !osservatori.has(chi.id)) {
-    osservatori.add(chi.id);
+// `segue: false` è una home che non mostra niente letto dal computer: riceve lo stato, non sveglia il lettore.
+function richiedi({ davanti = true, chi = null, segue = true } = {}) {
+  if (chi && typeof chi.id === 'number') {
     const id = chi.id;
-    try { chi.once('destroyed', () => osservatori.delete(id)); } catch (_) {}
+    if (!segue) osservatori.delete(id);
+    else if (!osservatori.has(id)) {
+      osservatori.add(id);
+      try { chi.once('destroyed', () => osservatori.delete(id)); } catch (_) {}
+    }
   }
-  if (!davanti) return;
+  if (!davanti || !segue) return;
   ultimaRichiesta = Date.now();
   if (giro) return;
   aggancia();
