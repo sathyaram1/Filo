@@ -44,7 +44,7 @@ export async function fetchRitentato(url, init, { fetchImpl = fetch, tentativi =
       return await fetchImpl(url, init);
     } catch (e) {
       if (i >= tentativi || !erroreDiSocket(e)) {
-        if (e && typeof e === 'object') e.tentativi = i;
+        try { if (e && typeof e === 'object') e.tentativi = i; } catch (_) { /* errore non estendibile: si rilancia com'è */ }
         throw e;
       }
       await sleep(attese[Math.min(i - 1, attese.length - 1)] || 0);
