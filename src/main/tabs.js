@@ -2108,7 +2108,8 @@ class TabManager {
       // fallire li consegniamo al sistema (apre posta/telefono), come un browser.
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
-        openExternalScheme(url);
+        if (tab.isInternal === false) this._esternoDallaPagina(wc, tab.id, url);
+        else openExternalScheme(url);
         return;
       }
       // «Apri comunque» della pagina «Sito bloccato» che il main ha messo in questa scheda (#590).
@@ -2138,7 +2139,8 @@ class TabManager {
     wc.on('will-redirect', (event, url) => {
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
-        openExternalScheme(url);
+        if (tab.isInternal === false) this._esternoDallaPagina(wc, tab.id, url);
+        else openExternalScheme(url);
         return;
       }
       // #590 — un redirect è un cambio d'indirizzo come gli altri: senza, un
@@ -2510,9 +2512,9 @@ class TabManager {
     });
 
     // Apertura nuove tab: tutto resta dentro Filo come nuovo tab. Col blocco dei popup attivo passa solo ciò che segue
-    // un gesto vero dell'utente, uno per gesto (#737.1); una finestra con le misure ('new-window') non passa mai.
+    // un gesto vero dell'utente, uno per gesto e di chi l'ha ricevuto (#737.1), qualunque forma chieda la pagina.
     wc.setWindowOpenHandler((details) => {
-      const { url, disposition } = details;
+      const { url, disposition, referrer } = details;
       // Da una pagina di Filo l'indirizzo l'ha scelto quasi sempre un modello: passa dalla porta delle uscite (#810).
       if (tab.isInternal && typeof globalThis.SN_USCITA_DA_FILO === 'function') {
         globalThis.SN_USCITA_DA_FILO(url, wc, () => {
@@ -2524,7 +2526,8 @@ class TabManager {
       // non-web — stessa difesa di will-navigate (file:// → leak NTLM, ecc.).
       // mailto:/tel:/sms: vengono consegnati all'OS invece di essere ignorati.
       if (isWebUnsafeNav(url)) {
-        openExternalScheme(url);
+        if (tab.isInternal === false) this._esternoDallaPagina(wc, tab.id, url, referrer);
+        else openExternalScheme(url);
         return { action: 'deny' };
       }
       // #209 — i popup di login ("Continua con Google" e simili) NON sono
@@ -2547,9 +2550,11 @@ class TabManager {
       // spezzare un eventuale login Google già presente in Filo.
       const accesso = tab.isInternal === false && isAuthPopup(url);
       // Anche la finestra di un accesso vero nasce da un clic su «Accedi con…»: l'indirizzo lo sceglie la pagina.
-      if (tab.isInternal === false && this.security.blockPopups
-        && ((!accesso && disposition === 'new-window') || !Permessi.gestoPerUnaFinestra(wc))) {
-        this._notifyPopupBlocked(tab.id, url);
+      const riaperta = accesso && this._riaperturaDiAccesso(tab, url);
+      if (tab.isInternal === false && this.security.blockPopups && !riaperta && !Permessi.gestoPerUnaFinestra(wc, referrer)) {
+        // «Apri» sull'avviso la fa ripartire dalla pagina, perché l'accesso possa tornarle l'esito.
+        if (accesso) tab._accessoBloccato = { url, nome: details.frameName || '', misure: details.features || '', pagina: wc.getURL() };
+        this._notifyPopupBlocked(tab.id, url, wc);
         return { action: 'deny' };
       }
       if (accesso) {
@@ -2658,7 +2663,7 @@ class TabManager {
     pwc.on('will-navigate', (event, url) => {
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
-        openExternalScheme(url);
+        this._esternoDallaPagina(pwc, origine ? origine.id : null, url);
         return;
       }
       if (this._maybeBlockNavigation(origine, url)) ferma(event);
@@ -2669,19 +2674,19 @@ class TabManager {
     pwc.on('will-redirect', (event, url) => {
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
-        openExternalScheme(url);
+        this._esternoDallaPagina(pwc, origine ? origine.id : null, url);
         return;
       }
       if (event.isMainFrame === false) return;
       if (this._maybeBlockNavigation(origine, url)) ferma(event);
     });
-    pwc.setWindowOpenHandler(({ url }) => {
+    pwc.setWindowOpenHandler(({ url, referrer }) => {
       if (isWebUnsafeNav(url)) {
-        openExternalScheme(url);
+        this._esternoDallaPagina(pwc, origine ? origine.id : null, url, referrer);
         return { action: 'deny' };
       }
-      if (this.security.blockPopups && !Permessi.gestoPerUnaFinestra(pwc)) {
-        this._notifyPopupBlocked(origine ? origine.id : null, url);
+      if (this.security.blockPopups && !Permessi.gestoPerUnaFinestra(pwc, referrer)) {
+        this._notifyPopupBlocked(origine ? origine.id : null, url, pwc);
         return { action: 'deny' };
       }
       if (isAuthPopup(url)) {
@@ -2701,11 +2706,32 @@ class TabManager {
 
   // Notifica la shell che un popup è stato bloccato sul tab `tabId`. La shell
   // mostra l'avviso "Bloccato popup da <host>" con «Apri» per aprirlo.
-  _notifyPopupBlocked(tabId, url) {
+  // `pagina`: l'avviso chiuso dall'utente tace finché la scheda resta su quella pagina.
+  _notifyPopupBlocked(tabId, url, wc = null) {
     try {
       const host = globalThis.SN_NOMI_SITO.sitoDi(url) || url;
-      this.win.webContents.send('tabs:popup-blocked', { tabId, url, host });
+      let pagina = '';
+      try { pagina = wc ? String(wc.getURL() || '').split('#')[0] : ''; } catch (_) {}
+      this.win.webContents.send('tabs:popup-blocked', { tabId, url, host, pagina });
     } catch (_) {}
+  }
+
+  // Posta, telefono e SMS chiesti da una pagina: col blocco dei popup acceso partono solo da un gesto, come le finestre.
+  _esternoDallaPagina(wc, tabId, url, referrer) {
+    if (!isOsDelegatedScheme(url)) return;
+    if (this.security.blockPopups && !Permessi.gestoPerUnaFinestra(wc, referrer)) {
+      this._notifyPopupBlocked(tabId, url, wc);
+      return;
+    }
+    openExternalScheme(url);
+  }
+
+  // Il lasciapassare che «Apri» dà alla finestra di accesso che la pagina richiede su suo ordine: una volta, subito.
+  _riaperturaDiAccesso(tab, url) {
+    const r = tab && tab._riaperturaAccesso;
+    if (!r || r.url !== url || Date.now() > r.fino) return false;
+    tab._riaperturaAccesso = null;
+    return true;
   }
 
   // Chiamato da IPC quando l'utente clicca "Apri" sull'avviso — il popup era
@@ -2715,12 +2741,29 @@ class TabManager {
   // `daScheda`: la scheda che aveva chiesto il popup, il cui «Apri comunque» vale anche per lui.
   openBlockedPopup(url, { apriComunque = false, daScheda = null } = {}) {
     const origine = daScheda ? this.tabs.find((t) => t.id === daScheda) : null;
+    if (openExternalScheme(url)) return;
+    if (this._riapriAccessoDallaPagina(origine, url)) return;
     const eredita = this._siteAllowedIn(origine, url);
     this.openTab(url, {
       activate: true,
       apriComunque: !!apriComunque || eredita,
       permessoRichieste: !!apriComunque || (eredita && !!origine._permessoRichieste),
     });
+  }
+
+  // Una finestra di accesso aperta da Filo sarebbe staccata dal sito e l'esito non gli tornerebbe: la riapre la pagina
+  // stessa, dal mondo isolato (che la pagina non può alterare), finché è ancora quella che l'aveva chiesta.
+  _riapriAccessoDallaPagina(tab, url) {
+    const a = tab && tab._accessoBloccato;
+    if (!a || a.url !== url || tab.isInternal !== false || !isAuthPopup(url)) return false;
+    let wc = null;
+    try { wc = tab.view.webContents; } catch (_) {}
+    if (!wc || wc.isDestroyed() || wc.getURL() !== a.pagina) return false;
+    tab._accessoBloccato = null;
+    tab._riaperturaAccesso = { url, fino: Date.now() + RIAPERTURA_ACCESSO_MS };
+    const codice = `void window.open(${JSON.stringify(url)}, ${JSON.stringify(a.nome)}, ${JSON.stringify(a.misure)})`;
+    try { wc.executeJavaScriptInIsolatedWorld(MONDO_RIAPERTURA, [{ code: codice }], false).catch(() => {}); } catch (_) { return false; }
+    return true;
   }
 
   // #412 — un link "Scarica" con target=_blank (o window.open) apre una nuova

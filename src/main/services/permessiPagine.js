@@ -172,7 +172,7 @@ function seguiGesti(wc) {
       const mouse = !/key|char/i.test(type);
       if (mouse && clicDiFiloInCorso(wc)) return;
       wc._filoGestoAlle = Date.now();
-      if (AVVII_DI_UN_GESTO.has(type)) segnaGestoPerFinestra(wc);
+      if (AVVII_DI_UN_GESTO.has(type)) segnaGestoPerFinestra(wc, originiDelFrame(wc.mainFrame, wc));
       // Un sito che annulla il `contextmenu` spegne il `context-menu` qui sotto, non il tasto destro vero (#589.4 giro 2).
       if (tastoDelMenu(input)) segnaMenu(wc, wc.mainFrame);
     });
@@ -186,7 +186,9 @@ function seguiGesti(wc) {
     // chi lo ferma lo fa negli altri ascolti, quindi si guarda dopo che sono passati tutti.
     wc.on('before-input-event', (e, input) => {
       if (!input || input.type !== 'keyDown' || !tastoPerLaPagina(input) || (e && e.daAvvisoSito)) return;
-      queueMicrotask(() => { if (!(e && e.defaultPrevented)) { wc._filoGestoAlle = Date.now(); segnaGestoPerFinestra(wc); } });
+      queueMicrotask(() => {
+        if (!(e && e.defaultPrevented)) { wc._filoGestoAlle = Date.now(); segnaGestoPerFinestra(wc, originiDelFrame(wc.mainFrame, wc)); }
+      });
     });
     wc.on('did-start-navigation', (e, _url, isInPlace, isMainFrame) => {
       const principale = e && typeof e.isMainFrame === 'boolean' ? e.isMainFrame : isMainFrame;
@@ -206,14 +208,31 @@ function gestoRecente(wc) {
 function gestoNelRiquadro(wc, frame) {
   try {
     if (!wc || !frame || !frame.parent || clicDiFiloInCorso(wc)) return;
-    segnaGestoPerFinestra(wc);
+    segnaGestoPerFinestra(wc, originiDelFrame(frame, wc));
   } catch (_) {}
 }
 
-function segnaGestoPerFinestra(wc) {
+// Come in Chromium il gesto attiva il frame che l'ha ricevuto e i suoi antenati, non i riquadri di altri siti che
+// contiene: il clic sull'articolo non vale per la pubblicità incorporata (#737.1 giro 3).
+function originiDelFrame(frame, wc) {
+  const out = [];
+  const aggiungi = (o) => { if (o && o !== 'null' && !out.includes(o)) out.push(o); };
+  for (let f = frame, n = 0; f && n < 64; f = f.parent, n++) {
+    try { aggiungi(f.origin); } catch (_) {}
+    try { aggiungi(new URL(f.url).origin); } catch (_) {}
+  }
+  if (wc && (!frame || !frame.parent)) { try { aggiungi(new URL(wc.getURL()).origin); } catch (_) {} }
+  return out;
+}
+
+function segnaGestoPerFinestra(wc, origini = []) {
   const ora = Date.now();
-  if (ora - (wc._filoGestoFinestraAlle || 0) < STESSO_GESTO_MS) return;
+  if (ora - (wc._filoGestoFinestraAlle || 0) < STESSO_GESTO_MS) {
+    for (const o of origini) (wc._filoGestoOrigini ||= new Set()).add(o);
+    return;
+  }
   wc._filoGestoFinestraAlle = ora;
+  wc._filoGestoOrigini = new Set(origini);
 }
 
 function clicDiFilo(wc) {
@@ -230,11 +249,21 @@ function gestoSullaScheda(wc) {
 }
 
 // Un gesto apre una finestra sola, come in Chrome: la seconda della stessa raffica nessuno l'ha chiesta (#737.1).
-function gestoPerUnaFinestra(wc) {
+// Chi chiede si riconosce dal referrer: un frame di un sito che il gesto non ha toccato non lo usa. Chi lo nasconde
+// resta riconoscibile solo come «la scheda», come prima.
+function gestoPerUnaFinestra(wc, referrer) {
   const t = gestoSullaScheda(wc);
   if (!t || t <= (wc._filoGestoUsatoAlle || 0)) return false;
+  const chi = origineDelReferrer(referrer);
+  if (chi && wc._filoGestoOrigini && wc._filoGestoOrigini.size && !wc._filoGestoOrigini.has(chi)) return false;
   wc._filoGestoUsatoAlle = t;
   return true;
+}
+
+function origineDelReferrer(referrer) {
+  const u = referrer && typeof referrer === 'object' ? referrer.url : referrer;
+  if (!u) return '';
+  try { const o = new URL(String(u)).origin; return o && o !== 'null' ? o : ''; } catch (_) { return ''; }
 }
 
 // Il dominio registrato va sempre letto: con un indirizzo lungo la parte che sceglie chi attacca è quella davanti.
