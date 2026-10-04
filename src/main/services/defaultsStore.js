@@ -331,8 +331,13 @@ function getPublicForAdmin() {
       tavily: Boolean(eff.apiKeys.tavily),
     },
     safeBrowsingKeyPresent: Boolean(eff.safeBrowsingKey),
+    // #1004 — gli elenchi delle pagine delicate in vigore, e quelli del codice: l'editor salva solo le categorie che
+    // se ne discostano, così una banca aggiunta con un rilascio arriva anche dove l'owner non ha toccato niente.
+    sitiDelicati: PD() ? PD().elenco(eff.sitiDelicati) : (eff.sitiDelicati || {}),
+    sitiDelicatiDiSerie: PD() ? PD().elenco(null) : {},
   };
 }
+const PD = () => globalThis.SN_PAGINE_DELICATE || null;
 
 async function patchDoc(docPath, fields, mask, idToken) {
   const qs = mask.map((m) => `updateMask.fieldPaths=${encodeURIComponent(m)}`).join('&');
@@ -405,6 +410,16 @@ async function update(partial, idToken) {
   if (typeof partial.providerSort === 'string') {
     modelFields.providerSort = toFsValue(partial.providerSort.trim());
     modelMask.push('providerSort');
+  }
+  // #1004 — le categorie delle pagine delicate: l'oggetto inviato sostituisce quello remoto per intero.
+  if (partial.sitiDelicati && typeof partial.sitiDelicati === 'object' && !Array.isArray(partial.sitiDelicati)) {
+    const clean = {};
+    for (const [k, v] of Object.entries(partial.sitiDelicati)) {
+      if (!/^[a-z0-9_-]{1,40}$/i.test(k) || !Array.isArray(v)) continue;
+      clean[k] = [...new Set(v.filter((x) => typeof x === 'string').map((x) => x.trim().toLowerCase()).filter(Boolean))];
+    }
+    modelFields.sitiDelicati = toFsValue(clean);
+    modelMask.push('sitiDelicati');
   }
   if (modelMask.length) {
     await patchDoc(MODELS_DOC, modelFields, modelMask, idToken);

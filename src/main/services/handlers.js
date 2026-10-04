@@ -1623,6 +1623,21 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
   // non chiede conferma per poi non fare niente: lo si sa prima del gate, mai dall'LLM (#949).
   if (type === 'IMPOSTA_PREFERENZA') {
     delete action._invariato;
+    // «Questo sito», «scheda: <titolo>» fra i siti delicati: la chat vede i titoli delle schede, non gli indirizzi (#1004).
+    try {
+      const chiave = action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza;
+      const setter = global.SN_PREF.setterDellaChiave(chiave);
+      if (setter && setter.scrive.includes('security.pagineDelicate.siti')) {
+        const { tm, tab } = targetWebTab(sender);
+        const schede = tm ? tm.tabs.filter((t) => !t.isInternal).map((t) => ({ url: t.url, title: t.title })) : [];
+        const r = globalThis.SN_PAGINE_DELICATE.risolviSchede(
+          action.valore ?? action.value ?? action.valoreNuovo ?? action.val,
+          { schede, attiva: tab ? tab.url : '' },
+        );
+        if (r.rifiuto) return { executed: false, kept: false, output: { error: r.rifiuto, rifiuto: true } };
+        action.valore = r.valore;
+      }
+    } catch (_) {}
     try {
       const built = global.SN_PREF.buildPreferencePartial(
         action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza,

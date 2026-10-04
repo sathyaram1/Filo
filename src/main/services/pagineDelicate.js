@@ -11,6 +11,7 @@ const conCampi = new Set();
 // Quelli da tenere anche dopo un riavvio: la scheda riaperta è già dentro l'area riservata, dove il campo non c'è.
 const salvati = new Set();
 let caricati = null;
+let letti = false;
 
 const chiaveDisco = () => (globalThis.SN_CONST && globalThis.SN_CONST.STORAGE_KEYS.SITI_CON_CAMPI) || 'filo_siti_con_campi';
 
@@ -21,6 +22,7 @@ function carica() {
       for (const k of Array.isArray(lista) ? lista : []) {
         if (typeof k === 'string' && k) { conCampi.add(k); salvati.add(k); }
       }
+      letti = true;
     }).catch(() => { caricati = null; });
   }
   return caricati;
@@ -40,8 +42,22 @@ async function segnaCampi(url, { incognito = false } = {}) {
   conCampi.add(k);
   if (incognito || salvati.has(k)) return;
   await carica();
-  if (salvati.has(k)) return;
+  // Senza aver letto quelli già salvati, scrivere li cancellerebbe.
+  if (!letti || salvati.has(k)) return;
   salvati.add(k);
+  try { await globalThis.SN_STORAGE.setRaw(chiaveDisco(), [...salvati]); } catch (_) {}
+}
+
+// Cancellate le pagine visitate di un sito, o tutte, se ne va anche il ricordo del suo campo password: è una traccia
+// di dove si è stati. Un periodo parziale non dice quando il campo si è visto, e il ricordo resta.
+async function dimentica({ da = null, a = null, sito = '' } = {}) {
+  const n = String(sito || '').toLowerCase().replace(/^www\./, '');
+  if (!n && (da != null || a != null)) return;
+  // Come per le pagine: senza punto vale ogni dominio con quel nome, col punto il dominio e i suoi sottodomini.
+  const delSito = (k) => !n || (n.includes('.') ? k === n || k.endsWith(`.${n}`) || n.endsWith(`.${k}`) : k.split('.').includes(n));
+  await carica();
+  for (const k of [...conCampi]) if (delSito(k)) { conCampi.delete(k); salvati.delete(k); }
+  if (!letti) return;
   try { await globalThis.SN_STORAGE.setRaw(chiaveDisco(), [...salvati]); } catch (_) {}
 }
 
@@ -74,6 +90,6 @@ async function filtro(settingsIn) {
   return f;
 }
 
-globalThis.SN_DELICATE = { segnaCampi, haCampi, filtro, carica };
+globalThis.SN_DELICATE = { segnaCampi, haCampi, filtro, carica, dimentica };
 
 module.exports = globalThis.SN_DELICATE;

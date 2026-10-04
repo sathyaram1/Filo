@@ -98,10 +98,43 @@
     return null;
   }
 
+  const piano = (t) => String(t == null ? '' : t).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ').trim();
+
+  // «Questo sito», «questa pagina», «scheda: <titolo>» in un elenco di siti detto a parole: la chat vede i titoli delle
+  // schede, non gli indirizzi. `schede` [{url, title}], `attiva` l'indirizzo della scheda web davanti.
+  // Torna { valore } coi siti al posto dei riferimenti, o { rifiuto } se un riferimento non porta a un sito solo.
+  function risolviSchede(valore, { schede = [], attiva = '' } = {}) {
+    let testo = String(valore == null ? '' : valore);
+    const web = (Array.isArray(schede) ? schede : []).filter((t) => t && host(t.url));
+    let rifiuto = null;
+    const perTitolo = (detto) => {
+      const ago = piano(detto);
+      if (!ago) { rifiuto = rifiuto || 'manca il titolo della scheda'; return ''; }
+      const siti = [...new Set(web.filter((t) => {
+        const tit = piano(t.title);
+        return tit && (tit.includes(ago) || (tit.length >= 4 && ago.includes(tit)));
+      }).map((t) => host(t.url)))];
+      if (siti.length === 1) return siti[0];
+      rifiuto = rifiuto || (siti.length
+        ? `«${detto.trim()}» è il titolo di più schede (${siti.join(', ')}): scrivi il sito`
+        : `nessuna scheda aperta ha per titolo «${detto.trim()}»`);
+      return '';
+    };
+    testo = testo.replace(/\b(?:(?:la|della|nella)\s+)?scheda\s*:?\s*[«"“]([^»"”]*)[»"”]/gi, (_m, t) => perTitolo(t));
+    testo = testo.replace(/\b(?:(?:la|della|nella)\s+)?scheda\s*:\s*([^,;\n]*)/gi, (_m, t) => perTitolo(t));
+    testo = testo.replace(/\b(questo sito|questa pagina|questa scheda|la pagina aperta|il sito aperto)\b/gi, () => {
+      const h = host(attiva);
+      if (!h) rifiuto = rifiuto || 'non c\'è una pagina web aperta';
+      return h;
+    });
+    return rifiuto ? { rifiuto } : { valore: testo };
+  }
+
   function nome(motivo) {
     return NOMI[motivo] || String(motivo || '');
   }
 
-  global.SN_PAGINE_DELICATE = { PREDEFINITI, host, elenco, attivo, sitiUtente, classifica, nome };
+  global.SN_PAGINE_DELICATE = { PREDEFINITI, host, elenco, attivo, sitiUtente, classifica, nome, risolviSchede };
   if (typeof module !== 'undefined' && module.exports) module.exports = global.SN_PAGINE_DELICATE;
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -429,6 +429,13 @@
     admin_defaults_excluded_kind_producer: 'Produce i modelli',
     admin_defaults_excluded_kind_unreliable: 'Serve male',
     admin_defaults_excluded_note: 'Nota (quando, cosa è successo)',
+    // Pagine delicate (#1004)
+    admin_defaults_delicate: 'Pagine delicate',
+    admin_defaults_delicate_desc:
+      'I siti di posta, banche e sanità di cui il riassunto delle schede chiuse e la pulizia automatica non mandano il testo ai modelli. Uno per riga; un dominio vale anche per i suoi sottodomini. Vale per tutti gli utenti: una categoria salvata qui sostituisce quella scritta nel codice, una lasciata com\'è segue il codice.',
+    admin_defaults_delicate_posta: 'Posta',
+    admin_defaults_delicate_banche: 'Banche',
+    admin_defaults_delicate_sanita: 'Sanità',
     admin_defaults_excluded_unknown: 'Nessun fornitore di OpenRouter si chiama così: questa voce non esclude nessuno.',
     admin_defaults_excluded_guess: 'Forse «%s»?',
     admin_defaults_excluded_drift_title: 'Esclusioni del codice che questa lista non copre',

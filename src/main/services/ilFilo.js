@@ -265,6 +265,7 @@ function creaFilo({ cartella } = {}) {
       const pagine = { da: periodo.da ?? null, a: periodo.a ?? null, ...(sito ? { sito } : {}) };
       const ev = t.evento(E().TIPI.CANCELLAZIONE, { pagine }, { autore: 'utente' });
       const { tolti } = await t.scrivi([ev]);
+      try { await globalThis.SN_DELICATE?.dimentica(pagine); } catch (_) {}
       return tolti;
     }, opts);
   }

@@ -101,3 +101,58 @@ test('a parole: si spegne il riassunto, si spegne la protezione con conferma, si
   assert.deepEqual(s.elenco.voci, ['studiorossi.it']);
   assert.match(P.buildPreferencePartial('siti_delicati', 'aggiungi commercialista').rifiuto, /«commercialista» non è un dominio/);
 });
+
+test('main: il campo password visto resta dopo un riavvio, e dall\'incognito non si scrive', async () => {
+  const disco = {};
+  const prima = globalThis.SN_STORAGE;
+  globalThis.SN_STORAGE = {
+    getRaw: async (k, d) => (k in disco ? JSON.parse(JSON.stringify(disco[k])) : d),
+    setRaw: async (k, v) => { disco[k] = JSON.parse(JSON.stringify(v)); },
+    getSettings: async () => ({}),
+  };
+  const nuovo = () => {
+    delete require.cache[require.resolve('../../src/main/services/pagineDelicate.js')];
+    return require('../../src/main/services/pagineDelicate.js');
+  };
+  try {
+    const D1 = nuovo();
+    await D1.segnaCampi('https://accesso.portale-commercialista.example/login');
+    await D1.segnaCampi('https://banca-in-incognito.example/login', { incognito: true });
+    assert.equal((await D1.filtro())('https://banca-in-incognito.example/conto'), 'campi', 'in incognito vale per la sessione');
+
+    const D2 = nuovo();
+    const fuori = await D2.filtro();
+    assert.equal(fuori('https://area.portale-commercialista.example/documenti'), 'campi');
+    assert.equal(fuori('https://banca-in-incognito.example/conto'), null);
+
+    // Cancellate le pagine visitate di quel sito, o tutte, il ricordo se ne va anche dal disco.
+    await D2.segnaCampi('https://posta-ufficio.example/owa');
+    await D2.dimentica({ da: Date.now() - 3600_000, a: null });
+    assert.equal((await D2.filtro())('https://posta-ufficio.example/owa'), 'campi', 'un periodo parziale non basta');
+    await D2.dimentica({ sito: 'portale-commercialista' });
+    assert.equal((await D2.filtro())('https://area.portale-commercialista.example/'), null);
+    assert.deepEqual(disco.filo_siti_con_campi, ['posta-ufficio.example']);
+    await D2.dimentica({});
+    assert.deepEqual(disco.filo_siti_con_campi, []);
+  } finally {
+    globalThis.SN_STORAGE = prima;
+    delete require.cache[require.resolve('../../src/main/services/pagineDelicate.js')];
+  }
+});
+
+test('a parole: «questo sito» e «scheda: <titolo>» diventano il sito della scheda aperta', () => {
+  const schede = [
+    { url: 'https://www.studiorossi.it/area-clienti', title: 'Studio Rossi – Area clienti' },
+    { url: 'https://it.wikipedia.org/wiki/Gatto', title: 'Gatto - Wikipedia' },
+    { url: 'https://it.wikipedia.org/wiki/Cane', title: 'Cane - Wikipedia' },
+  ];
+  const r = (v, attiva = '') => PD.risolviSchede(v, { schede, attiva });
+  assert.deepEqual(r('aggiungi scheda: Studio Rossi - Area clienti'), { valore: 'aggiungi studiorossi.it' });
+  assert.deepEqual(r('aggiungi la scheda «studio rossi»'), { valore: 'aggiungi studiorossi.it' });
+  assert.deepEqual(r('aggiungi questo sito', 'https://www.studiorossi.it/x'), { valore: 'aggiungi studiorossi.it' });
+  assert.deepEqual(r('aggiungi scheda: wikipedia'), { valore: 'aggiungi it.wikipedia.org' }, 'più schede dello stesso sito sono un sito solo');
+  assert.match(r('aggiungi questo sito').rifiuto, /non c'è una pagina web aperta/);
+  assert.match(r('aggiungi scheda: Commercialista Bianchi').rifiuto, /nessuna scheda aperta/);
+  assert.match(PD.risolviSchede('aggiungi scheda: a', { schede: [schede[0], schede[1]] }).rifiuto, /più schede/);
+  assert.deepEqual(r('aggiungi studiorossi.it'), { valore: 'aggiungi studiorossi.it' });
+});

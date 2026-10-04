@@ -574,8 +574,8 @@
     },
     {
       id: 'pagine-delicate', title: 'Le pagine delicate non vanno ai modelli', category: 'settings',
-      desc: 'Il riassunto delle schede chiuse e la pulizia automatica delle schede non mandano a nessun modello il testo delle pagine delicate: posta, banche, sanità, le pagine dove Filo ha visto un campo password o di carta (vale per tutto quel sito fino alla chiusura di Filo) e i siti che aggiungi tu. Di queste Filo tiene solo titolo e indirizzo, e nella chat una scheda delicata aperta compare solo col nome del sito. L’elenco di posta, banche e sanità si aggiorna da remoto.',
-      invoke: 'Impostazioni → Sicurezza → «Non mandare ai modelli le pagine delicate» (acceso di serie), e sotto i tuoi siti, uno per riga. Oppure chiedendolo a Filo: «il sito del mio commercialista, studiorossi.it, è delicato» (serve l’indirizzo del sito), «quali siti delicati ho?», «manda anche le pagine delicate».',
+      desc: 'Il riassunto delle schede chiuse e la pulizia automatica delle schede non mandano a nessun modello il testo delle pagine delicate: posta, banche, sanità, le pagine dove Filo ha visto un campo password o di carta (vale per tutto quel sito, anche dopo un riavvio, finché non cancelli le sue pagine visitate) e i siti che aggiungi tu. Di queste Filo tiene solo titolo e indirizzo, e nella chat una scheda delicata aperta compare solo col nome del sito. L’elenco di posta, banche e sanità si aggiorna da remoto.',
+      invoke: 'Impostazioni → Sicurezza → «Non mandare ai modelli le pagine delicate» (acceso di serie), e sotto i tuoi siti, uno per riga. Oppure chiedendolo a Filo: «questo sito è delicato», «la pagina del mio commercialista è delicata» con la sua scheda aperta, «studiorossi.it è delicato», «quali siti delicati ho?», «manda anche le pagine delicate».',
       doesNot: 'Non tocca quello che chiedi tu su una pagina (spiegazioni, traduzioni, l’Aiuto): lì il testo va al modello perché l’hai chiesto. Il riconoscimento dei blocchi geografici resta com’è, perché guarda solo pagine d’errore. Non decide quali siti sono delicati con un modello: valgono gli elenchi e il campo password visto.',
     },
     {

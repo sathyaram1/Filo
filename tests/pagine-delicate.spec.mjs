@@ -2,6 +2,7 @@
 // chiuse si spegne. Modello ed embedding finti registrano tutto quello che ricevono: si guarda cosa è partito.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { clickConfirm, confirmText, CONFIRM_HOST } from './helpers/confirm.mjs';
 
 const SEGRETO = 'Saldo disponibile 12.345,67 euro bonifico a Mario Rossi';
 
@@ -158,4 +159,85 @@ test('in Preferenze il riassunto delle schede chiuse si spegne e si riaccende', 
   await expect.poll(async () => (await impostazioni(shell)).riassuntoSchede.enabled, { timeout: 4000 }).toBe(false);
   await pref.locator('#riassuntoSchede').check();
   await expect.poll(async () => (await impostazioni(shell)).riassuntoSchede.enabled, { timeout: 4000 }).toBe(true);
+});
+
+test('il testo letto da una pagina delicata non parte sotto l\'indirizzo della pagina dopo, anche se quella non ha testo', async ({ app, shell, openTab, testServer }) => {
+  await modelliFinti(app);
+  // blocked.test risponde dal mini server: un altro sito pubblico, qui con una pagina senza testo (un'immagine, un PDF).
+  const vuota = testServer.html('<!doctype html><html><head><title>Immagine</title></head><body></body></html>')
+    .replace('127.0.0.1', 'blocked.test');
+  const banca = await testServer.openReady(openTab,
+    `<!doctype html><html><head><title>Il mio conto</title></head><body>${CON_PASSWORD}<a id="via" href="${vuota}">vai</a></body></html>`,
+    { pubblico: true });
+  await expect.poll(() => app.evaluate(() => globalThis.SN_DELICATE.haCampi('sito-pubblico.test')), { timeout: 8_000 }).toBe(true);
+  await banca.waitForTimeout(800);
+  await banca.click('#via');
+  await expect.poll(() => shell.evaluate(async () => {
+    const s = await window.filoShell.tabs.snapshot();
+    return (s.tabs.find((t) => t.id === s.activeId) || {}).url || '';
+  }), { timeout: 8_000 }).toContain('blocked.test');
+  await banca.waitForTimeout(800);
+  const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
+  await shell.evaluate(async (i) => window.filoShell.tabs.close(i), id);
+
+  await expect.poll(() => voceDi(app, 'Immagine'), { timeout: 8_000 }).not.toBeNull();
+  await new Promise((r) => setTimeout(r, 1_500));
+  expect((await mandato(app)).some((m) => m.testo.includes('Saldo disponibile'))).toBe(false);
+  expect((await voceDi(app, 'Immagine')).snippet).not.toContain('Saldo');
+});
+
+test('dalla chat della home una scheda aperta diventa delicata col suo titolo, senza scriverne l\'indirizzo', async ({ app, openTab, testServer }) => {
+  await testServer.openReady(openTab,
+    '<!doctype html><html><head><title>Studio Rossi - Area clienti</title></head><body><p>Dichiarazione dei redditi</p></body></html>',
+    { pubblico: true });
+  const home = await openTab('filo://newtab/');
+  await home.evaluate(() => window.SN_SIDEBAR.open());
+  const corsa = home.evaluate(() => window.__filoSidebarTest.runFiloAction(
+    { type: 'IMPOSTA_PREFERENZA', chiave: 'siti_delicati', valore: 'aggiungi scheda: Studio Rossi - Area clienti' }));
+  await expect(home.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
+  expect(await confirmText(home)).toContain('sito-pubblico.test');
+  await clickConfirm(home, 'ok');
+  await corsa;
+  await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).security.pagineDelicate.siti), { timeout: 5_000 })
+    .toEqual(['sito-pubblico.test']);
+});
+
+test('in Gestione l\'owner vede e cambia gli elenchi di posta, banche e sanità, e salva solo quello che ha toccato', async ({ app, openTab }) => {
+  const [elenco, diSerie] = await app.evaluate(() => [
+    globalThis.SN_PAGINE_DELICATE.elenco(null), globalThis.SN_PAGINE_DELICATE.elenco(null)]);
+  const page = await openTab('filo://admin-defaults/admin-defaults.html');
+  // La pagina vuole un owner loggato, che qui non c'è: le risposte del main sono finte, i messaggi si registrano.
+  await page.addInitScript(({ elenco: el, diSerie: ds }) => {
+    window.__sent = [];
+    const config = { apiKeysPresent: {}, modelRegistry: {}, models: {}, excludedProviders: [], sitiDelicati: el, sitiDelicatiDiSerie: ds };
+    const stub = async (msg) => {
+      window.__sent.push(msg);
+      if (msg.type === 'defaults_get') return { ok: true, config };
+      if (msg.type === 'defaults_update') return { ok: true, config };
+      if (msg.type === 'default_providers_list') return { ok: true, items: [] };
+      return { ok: true };
+    };
+    if (window.chrome && window.chrome.runtime) window.chrome.runtime.sendMessage = stub;
+    else window.chrome = { runtime: { sendMessage: stub } };
+  }, { elenco, diSerie });
+  await page.reload();
+  await expect(page.locator('#editor')).toBeVisible({ timeout: 8_000 });
+  await expect(page.locator('#h-delicate')).toHaveText('Pagine delicate');
+  await expect(page.locator('#delicate-banche')).toHaveValue(/intesasanpaolo\.com/);
+  await expect(page.locator('label[for="delicate-sanita"]')).toHaveText('Sanità');
+
+  await page.locator('#saveBtn').click();
+  await expect.poll(() => page.evaluate(() => window.__sent.filter((m) => m.type === 'defaults_update').length)).toBe(1);
+  expect(await page.evaluate(() => window.__sent.find((m) => m.type === 'defaults_update').config.sitiDelicati)).toBeUndefined();
+
+  const banche = await page.locator('#delicate-banche').inputValue();
+  await page.locator('#delicate-banche').fill(`${banche}\nhttps://www.BancaProva.it/accesso`);
+  await page.locator('#delicate-banche').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'tests/.shots/pagine-delicate-gestione.png' });
+  await page.locator('#saveBtn').click();
+  await expect.poll(() => page.evaluate(() => window.__sent.filter((m) => m.type === 'defaults_update').length)).toBe(2);
+  const inviato = await page.evaluate(() => window.__sent.filter((m) => m.type === 'defaults_update')[1].config.sitiDelicati);
+  expect(Object.keys(inviato)).toEqual(['banche']);
+  expect(inviato.banche).toContain('bancaprova.it');
+  expect(inviato.banche).toContain('intesasanpaolo.com');
 });
