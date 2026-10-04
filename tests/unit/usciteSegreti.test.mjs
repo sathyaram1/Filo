@@ -9,6 +9,7 @@ import { createRequire } from 'node:module';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { costoInUnita } from '../helpers/tempoRelativo.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -493,12 +494,13 @@ describe('un testo lungo non tiene fermo il processo principale', () => {
     'Nel 2019 il 45% delle banche usava codici OTP via SMS; il costo medio era 0,05 euro per messaggio.',
     'Un token hardware one-time password come il modello RSA SecurID 700 mostra 6 cifre ogni 60 secondi.',
   ];
-  test('due milioni di caratteri sul 2FA in meno di un secondo e mezzo', () => {
+  test('due milioni di caratteri sul 2FA costano poco, anche a macchina carica', () => {
     let testo = '';
     for (let i = 0; testo.length < 2000000; i++) testo += `${frasi[i % frasi.length]} Riferimento ${10000 + (i * 7919) % 90000}.\n`;
-    const t = Date.now();
-    X.valutaUscita({ type: 'NAVIGA', url: 'https://example.org/guida' }, { pagina: { testo, host: 'forum.example' } });
-    assert.ok(Date.now() - t < 1500, `${Date.now() - t} ms`);
+    let v;
+    const c = costoInUnita(() => { v = X.valutaUscita({ type: 'NAVIGA', url: 'https://example.org/guida' }, { pagina: { testo, host: 'forum.example' } }); }, { tetto: 100 });
+    assert.ok(c.entro, c.come);
+    assert.equal(v.blocca, false);
   });
   test('trentamila codici letti: anche l\'ultimo si ferma', () => {
     let testo = '';
@@ -657,9 +659,10 @@ describe('i segreti custoditi non arrivano a un modello', () => {
     const lungo = 'Lorem ipsum https://example.com/a/b?id=abcdef1234567890 aGVsbG8gd29ybGQgZnJvbSBmaWxv 6c6f72656d20697073756d\n'.repeat(5000);
     const foto = `data:image/png;base64,${Buffer.alloc(300000, 7).toString('base64')}`;
     const m = [{ role: 'user', content: [{ type: 'text', text: lungo }, { type: 'image_url', image_url: { url: foto } }] }];
-    const t0 = Date.now();
-    assert.equal(G.oscuraSegreti(m, [CHIAVE]), m);
-    assert.ok(Date.now() - t0 < 2000);
+    let fuori;
+    const c = costoInUnita(() => { fuori = G.oscuraSegreti(m, [CHIAVE]); }, { tetto: 50 });
+    assert.equal(fuori, m);
+    assert.ok(c.entro, c.come);
   });
 
   test('il cancello dei modelli manda i messaggi oscurati', async () => {

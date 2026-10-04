@@ -4,7 +4,7 @@
 
 export const GIRI = 5;
 
-const TESTO = 'Il codice 482913 scade alle 12:00; rif. ABC-123, https://example.com/a?b=1&c=due.\n'.repeat(1500);
+const TESTO = 'Il codice 482913 scade alle 12:00; rif. ABC-123, https://example.com/a?b=1&c=due.\n'.repeat(6000);
 const REGOLE = [/\d+/g, /\b\w+\b/g, /https?:\/\/\S+/g];
 let pozzo = 0;
 

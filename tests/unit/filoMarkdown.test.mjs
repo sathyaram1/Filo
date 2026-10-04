@@ -16,6 +16,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { costoInUnita } from '../helpers/tempoRelativo.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -130,10 +131,9 @@ test('#853 in coda a un URL nudo si stacca solo l\'elenco chiuso: ogni altro car
 test('#853 una coda lunghissima dopo un URL nudo non blocca il disegno', () => {
   for (const coda of [')', '.', '*', '.)', "'"]) {
     const testo = 'Vedi https://example.com/pagina' + coda.repeat(50_000);
-    const t0 = performance.now();
-    const html = render(testo);
-    const ms = performance.now() - t0;
-    assert.ok(ms < 1000, `coda ${JSON.stringify(coda)}: ${Math.round(ms)} ms`);
+    let html;
+    const c = costoInUnita(() => { html = render(testo); }, { tetto: 10 });
+    assert.ok(c.entro, `coda ${JSON.stringify(coda)}: ${c.come}`);
     assert.match(html, /href="https:\/\/example\.com\/pagina"/);
   }
 });
