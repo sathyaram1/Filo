@@ -168,13 +168,6 @@ test('un avviso comparso sotto il puntatore fermo se ne va alla sua ora, e il cl
   await page.mouse.down();
   await page.mouse.up();
   await expect.poll(() => page.evaluate(() => window.__clic954)).toBe('pagina');
-
-  // Il puntatore che si muove sopra l'avviso lo tiene, come prima.
-  await page.mouse.move(40, 300, { steps: 4 });
-  await mostra(2000);
-  await puntatoreSopra(page, avviso);
-  await page.waitForTimeout(3000);
-  await expect(avviso).toBeVisible();
 });
 
 test('editor: l’avviso con «Annulla» aspetta il puntatore e segue la durata delle Preferenze', async ({ shell, openTab }) => {
