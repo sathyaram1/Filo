@@ -202,10 +202,27 @@ test('senza clic una pagina non apre il programma di posta; col clic sì', async
   await app.evaluate(({ shell }) => { globalThis.__esterni = []; shell.openExternal = async (u) => { globalThis.__esterni.push(u); }; });
   const page = await openTab(testServer.html(`<a id="m" href="mailto:x@y.it" style="position:fixed;left:0;top:0;width:200px;height:60px;display:block">scrivici</a>
     <script>setTimeout(function(){window.open('mailto:a@b.it')},500);setTimeout(function(){location.href='mailto:c@d.it'},1200)</script>`));
-  await expect((await avvisi()).locator('.shell-notif.show', { hasText: 'Bloccato popup' })).toBeVisible({ timeout: 8000 });
+  await expect((await avvisi()).locator('.shell-notif.show', { hasText: 'Bloccata la posta aperta da 127.0.0.1' })).toBeVisible({ timeout: 8000 });
   await page.waitForTimeout(1500);
   expect(await app.evaluate(() => globalThis.__esterni)).toEqual([]);
   // Col mouse su un punto noto: la navigazione verso mailto: fermata non finisce mai, e un locator la aspetterebbe.
   await page.mouse.click(50, 30);
   await expect.poll(() => app.evaluate(() => globalThis.__esterni), { timeout: 6000 }).toEqual(['mailto:x@y.it']);
 });
+
+// Giro 4: posta, telefono e SMS non sono un sito, e l'avviso non mostra l'indirizzo come se lo fosse.
+for (const [indirizzo, testo] of [
+  ['mailto:a@b.it', 'Bloccata la posta aperta da 127.0.0.1'],
+  ['tel:+390612345', 'Bloccata la chiamata avviata da 127.0.0.1'],
+  ['sms:+390612345', "Bloccato l'SMS aperto da 127.0.0.1"],
+]) {
+  test(`l'avviso di ${indirizzo.split(':')[0]} aperto da solo nomina il sito che ci ha provato e l'app, e «Apri» la apre`, async ({ app, openTab, testServer, avvisi }) => {
+    await app.evaluate(({ shell }) => { globalThis.__esterni = []; shell.openExternal = async (u) => { globalThis.__esterni.push(u); }; });
+    await openTab(testServer.html(`<title>Sito</title><p>x</p><script>setTimeout(function(){window.open(${JSON.stringify(indirizzo)})},600)</script>`));
+    const carta = (await avvisi()).locator('.shell-notif.show', { hasText: testo });
+    await expect(carta).toBeVisible({ timeout: 8000 });
+    expect(await carta.innerText()).not.toContain(indirizzo);
+    await carta.locator('.shell-notif-action', { hasText: 'Apri' }).click();
+    await expect.poll(() => app.evaluate(() => globalThis.__esterni), { timeout: 6000 }).toEqual([indirizzo]);
+  });
+}
