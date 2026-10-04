@@ -218,9 +218,12 @@
     return `Te lo sconsiglio: ${h} ${elenco}, e quello che ci scrive uno sconosciuto passerebbe per fidato.`;
   }
 
+  const VIA = { inviati: 'dagli Inviati', chat: 'segnato in chat', preferenze: 'aggiunto nelle Preferenze' };
+  function nomeVia(via) { return VIA[via] || 'segnato a mano'; }
+
   global.SN_FIDUCIA = {
     MAX_VOCI, RILEGGI_INVIATI_MS, SITI_DI_MOLTI,
-    indirizzo, sito, hostDi, vuoto, normalizza, fidatoMittente, sitoFidato, fonteMittente, fonteSito, peggiore,
+    nomeVia, indirizzo, sito, hostDi, vuoto, normalizza, fidatoMittente, sitoFidato, fonteMittente, fonteSito, peggiore,
     aggiungi, togli, inviatiDaRileggere, daInviati, piattaformaDiMolti, motiviMoltiAutori, sconsiglio,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

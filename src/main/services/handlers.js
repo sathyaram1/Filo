@@ -2190,7 +2190,13 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         const settings = await Storage.getSettings();
         let permessiSiti = null;
         try { permessiSiti = require('./permessiPagine').righeRicordate(); } catch (_) {}
-        const r = V.righePerModello(settings, { cerca, tema: resolveTheme(settings), sistema: process.platform, altrove: { permessiSiti } });
+        let mittentiFidati = null; let sitiFidati = null;
+        try {
+          const f = await require('./fiduciaStore').vista();
+          mittentiFidati = f.mittenti.map((m) => `${m.indirizzo} (${globalThis.SN_FIDUCIA.nomeVia(m.via)})`);
+          sitiFidati = f.siti.map((x) => `${x.sito} (${globalThis.SN_FIDUCIA.nomeVia(x.via)})`);
+        } catch (_) {}
+        const r = V.righePerModello(settings, { cerca, tema: resolveTheme(settings), sistema: process.platform, altrove: { permessiSiti, mittentiFidati, sitiFidati } });
         return { executed: true, kept: true, output: { cerca, righe: r.righe, trovate: r.trovate, totale: r.totale } };
       }
       case 'TOGLI_PERMESSO_SITO': {

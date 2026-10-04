@@ -47,8 +47,16 @@
         schedeLeggere: 'schedeAperte.leggere',
       },
       gruppi: { tokenCode: 'themeTokens.*', tabColorCode: 'tabColor.*' },
-      fuori: {},
+      altrove: { fidatiMittenti: 'mittentiFidati', fidatiSiti: 'sitiFidati' },
+      fuori: {
+        fidatiMittenteNuovo: 'aggiunge un indirizzo ai mittenti fidati, che non stanno nelle impostazioni: dalla chat è SEGNA_FIDATO',
+        fidatiSitoNuovo: 'aggiunge un sito ai siti fidati, che non stanno nelle impostazioni: dalla chat è SEGNA_FIDATO',
+      },
       messaggi: {
+        FIDUCIA_VISTA: 'ELENCA_FIDATI',
+        FIDUCIA_PREPARA: 'SEGNA_FIDATO',
+        FIDUCIA_AGGIUNGI: 'SEGNA_FIDATO',
+        FIDUCIA_TOGLI: 'TOGLI_FIDATO',
         FILO_MEMORY_VIEW: 'DIMENTICA',
         FILO_MEMORY_FORGET: 'DIMENTICA',
         FILO_GET_ONBOARDING: 'rilegge le interviste di benvenuto passate per mostrarle: non è un valore da cambiare',
@@ -138,6 +146,16 @@
       nome: 'permessi dei siti (risposte ricordate)',
       come: 'TOGLI_PERMESSO_SITO per toglierne una',
       parole: 'permessi permesso microfono fotocamera appunti posizione notifiche schermi presenza strumenti consentito negato',
+    },
+    mittentiFidati: {
+      nome: 'mittenti fidati (posta letta dalla scheda di Gmail)',
+      come: 'SEGNA_FIDATO per aggiungerne uno, TOGLI_FIDATO per toglierlo',
+      parole: 'mittenti mittente fidati fidato fiducia posta mail email indirizzi gmail inviati',
+    },
+    sitiFidati: {
+      nome: 'siti fidati (pagine lette dalle schede aperte)',
+      come: 'SEGNA_FIDATO per aggiungerne uno, TOGLI_FIDATO per toglierlo',
+      parole: 'siti sito fidati fidato fiducia pagine schede lettura',
     },
   };
 
