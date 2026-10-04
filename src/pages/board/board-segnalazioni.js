@@ -113,7 +113,96 @@
       riposo();
     });
 
+    el.addEventListener('contextmenu', (e) => {
+      const v = voci.find((x) => x.id === id);
+      if (!v) return;
+      e.preventDefault();
+      apriMenu(e.clientX, e.clientY, vociMenu(v));
+    });
+
     return { el, titolo, sub, stato, testo, allegati, risposta };
+  }
+
+  // Il tasto destro su una riga: quello che si fa con QUELLA segnalazione (filo_design, tasto destro).
+  function vociMenu(v) {
+    const testo = String(v.testo || '').trim();
+    const out = [{
+      label: testo ? 'Copia il testo' : 'Copia il titolo',
+      run: async () => {
+        try { await navigator.clipboard.writeText(testo || titoloDi(v)); } catch (_) { return; }
+        try { window.SN_POPUP?.showToast?.('Copiato', { duration: 1600 }); } catch (_) {}
+      },
+    }];
+    // Il testo l'ha conservato Filo: rimandarla non vuol dire riscriverla (gli allegati vanno rimessi).
+    if (v.stato === 'non_partita' && testo) {
+      out.push({ label: 'Rimanda', run: () => { try { window.SN_FEEDBACK_UI?.open?.({ testo }); } catch (_) {} } });
+    }
+    out.push({ label: 'Togli dall’elenco', run: () => togliVoce(v.id) });
+    return out;
+  }
+
+  async function togliVoce(id) {
+    try {
+      const r = await send({ type: 'segnalazioni_mie_togli', id });
+      if (r && r.ok && Array.isArray(r.voci)) { voci = r.voci; disegna(); return true; }
+    } catch (_) {}
+    return false;
+  }
+
+  let menuAperto = null;
+  function chiudiMenu() {
+    if (!menuAperto) return;
+    menuAperto.remove();
+    menuAperto = null;
+    document.removeEventListener('mousedown', fuori, true);
+    document.removeEventListener('keydown', tasto, true);
+    window.removeEventListener('scroll', chiudiMenu, true);
+    window.removeEventListener('resize', chiudiMenu);
+  }
+  function fuori(ev) { if (menuAperto && !menuAperto.contains(ev.target)) chiudiMenu(); }
+  function tasto(ev) {
+    if (!menuAperto) return;
+    if (ev.key === 'Escape') { ev.preventDefault(); chiudiMenu(); return; }
+    if (ev.key !== 'ArrowDown' && ev.key !== 'ArrowUp') return;
+    ev.preventDefault();
+    const opz = [...menuAperto.querySelectorAll('.sn-select-option')];
+    const i = opz.indexOf(document.activeElement);
+    const n = ev.key === 'ArrowDown' ? (i + 1) % opz.length : (i <= 0 ? opz.length - 1 : i - 1);
+    opz[n]?.focus();
+  }
+  function apriMenu(x, y, items) {
+    chiudiMenu();
+    const menu = document.createElement('div');
+    menu.className = 'sn-select-pop bd-mia-menu';
+    menu.setAttribute('role', 'menu');
+    for (const it of items) {
+      const opt = document.createElement('div');
+      opt.className = 'sn-select-option';
+      opt.setAttribute('role', 'menuitem');
+      opt.tabIndex = -1;
+      opt.textContent = it.label;
+      const fai = () => { chiudiMenu(); it.run(); };
+      opt.addEventListener('click', fai);
+      opt.addEventListener('keydown', (ev) => {
+        if (ev.key !== 'Enter' && ev.key !== ' ') return;
+        ev.preventDefault();
+        fai();
+      });
+      menu.appendChild(opt);
+    }
+    document.body.appendChild(menu);
+    const w = menu.offsetWidth; const h = menu.offsetHeight;
+    menu.style.left = `${Math.max(4, Math.min(x, window.innerWidth - w - 4))}px`;
+    menu.style.top = `${Math.max(4, Math.min(y, window.innerHeight - h - 4))}px`;
+    menuAperto = menu;
+    menu.tabIndex = -1;
+    try { menu.focus(); } catch (_) {}
+    setTimeout(() => {
+      document.addEventListener('mousedown', fuori, true);
+      document.addEventListener('keydown', tasto, true);
+      window.addEventListener('scroll', chiudiMenu, true);
+      window.addEventListener('resize', chiudiMenu);
+    }, 0);
   }
 
   function aggiornaRiga(r, v) {
