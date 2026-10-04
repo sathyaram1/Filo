@@ -159,11 +159,27 @@ test('l\'annuncio di una segnalazione più vecchia dell\'elenco la fa entrare; u
   assert.equal(v.risposta, 'Riprende da solo.');
   assert.equal(v.creataIl, prima);
 
-  await M.chiusa('fbTolta', { stato: 'risolta', creataIl: dopo, titolo: 'Tolta' });
+  // Le schede più vecchie hanno la data vuota: sono di prima.
   await M.chiusa('fbSenzaData', { stato: 'chiusa', titolo: 'Senza data' });
+  assert.equal((await M.elenco()).find((x) => x.id === 'fbSenzaData').stato, 'chiusa');
+
+  // Mandata dopo la nascita dell'elenco e assente: non ci era entrata (incognito), non entra all'annuncio.
+  await M.chiusa('fbDopo', { stato: 'risolta', creataIl: dopo, titolo: 'Dopo' });
   await Disco.runIncognito(() => M.chiusa('fbDaIncognito', { stato: 'risolta', creataIl: prima }));
-  const ids = (await M.elenco()).map((x) => x.id);
-  assert.ok(!ids.includes('fbTolta') && !ids.includes('fbSenzaData') && !ids.includes('fbDaIncognito'));
+  let ids = (await M.elenco()).map((x) => x.id);
+  assert.ok(!ids.includes('fbDopo') && !ids.includes('fbDaIncognito'));
+
+  // Tolta dall'utente, anche se di prima e senza data, non torna con un altro annuncio, nemmeno dopo un riavvio.
+  await M.registra({ id: 'sub-tolta', testo: 'TESTO-TOLTA-986' });
+  await M.inviata('sub-tolta', { feedbackId: 'fbTolta' });
+  await M.togli('sub-tolta');
+  await M.togli('fbSenzaData');
+  M = avvia();
+  await M.chiusa('fbTolta', { stato: 'risolta', creataIl: prima });
+  await M.chiusa('fbSenzaData', { stato: 'chiusa' });
+  ids = (await M.elenco()).map((x) => x.id);
+  assert.ok(!ids.includes('sub-tolta') && !ids.includes('fbTolta') && !ids.includes('fbSenzaData'));
+  assert.deepEqual(suDisco('TESTO-TOLTA-986'), [], 'di una voce tolta non resta il testo');
 
   // La data di nascita regge il riavvio: non si sposta in avanti a ogni avvio.
   M = avvia();

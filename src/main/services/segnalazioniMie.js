@@ -79,11 +79,14 @@
     return Object.keys(patch).length ? patch : null;
   }
 
-  // Quando l'elenco è nato su questo computer: solo una segnalazione più vecchia può entrarci dopo l'invio (vedi `chiusa`).
+  // Chi entra nell'elenco solo all'annuncio (vedi `chiusa`) non deve essere una voce tolta dall'utente: di quelle resta
+  // l'identificativo, mai il testo. La data di nascita esclude anche ciò che l'incognito non ha scritto.
+  const fs = require('node:fs');
   const FILE_NASCITA = 'nato-il.txt';
+  const FILE_TOLTE = 'tolte.json';
   let nataIl = 0;
+  let tolte = new Set();
   function leggiNascita() {
-    const fs = require('node:fs');
     const file = path.join(cartella(), FILE_NASCITA);
     try {
       const t = Date.parse(fs.readFileSync(file, 'utf8').trim());
@@ -96,6 +99,18 @@
     } catch (_) {}
     return ora;
   }
+  function leggiTolte() {
+    try {
+      const a = JSON.parse(fs.readFileSync(path.join(cartella(), FILE_TOLTE), 'utf8'));
+      return new Set(Array.isArray(a) ? a.map(String) : []);
+    } catch (_) { return new Set(); }
+  }
+  function scriviTolte() {
+    try {
+      fs.mkdirSync(cartella(), { recursive: true });
+      fs.writeFileSync(path.join(cartella(), FILE_TOLTE), JSON.stringify([...tolte]) + '\n', 'utf8');
+    } catch (_) {}
+  }
 
   let apertura = null;
   function apri() {
@@ -104,6 +119,7 @@
         const d = creaDeposito({ cartella: cartella(), meseDi });
         await d.carica();
         nataIl = leggiNascita();
+        tolte = leggiTolte();
         return d;
       })();
       apertura.catch(() => { apertura = null; });
@@ -157,8 +173,9 @@
     const d = await apri();
     const fid = String(feedbackId || '');
     if (!fid || perFeedback(fid)(d) || Disco.inIncognito()) return aggiorna(perFeedback(fid), evento, dati);
+    // Una scheda può non avere la data (le più vecchie la scrivono vuota): senza, la segnalazione è di prima.
     const quando = Date.parse(creataIl || '');
-    if (!Number.isFinite(quando) || quando >= nataIl) return null;
+    if (tolte.has(fid) || (Number.isFinite(quando) && quando >= nataIl)) return null;
     const v = voce({ id: fid, feedbackId: fid, creataIl, stato: 'inviata', num: dati.num, titolo: dati.titolo });
     const patch = applica(v, evento, dati) || {};
     const r = d.aggiungi({ ...v, ...patch }, { inCoda: true });
@@ -183,6 +200,11 @@
   async function togli(id) {
     if (Disco.inIncognito()) return [];
     const d = await apri();
+    const v = d.prendi(String(id || ''));
+    if (v) {
+      for (const k of [v.id, v.feedbackId]) if (k) tolte.add(String(k));
+      scriviTolte();
+    }
     if (d.togli([String(id || '')])) annuncia();
     return d.tutti();
   }
@@ -190,6 +212,8 @@
   async function svuota() {
     if (Disco.inIncognito()) return;
     (await apri()).svuota();
+    tolte = new Set();
+    try { fs.unlinkSync(path.join(cartella(), FILE_TOLTE)); } catch (_) {}
     annuncia();
   }
 
