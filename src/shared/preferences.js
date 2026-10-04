@@ -361,9 +361,11 @@
       aiuto: 'numero 1-168 (dopo quante ore di inattività archiviare)',
       keys: ['ore_inattivita', 'ore inattivita', 'ore di inattivita', 'ore_inattivita_archivio', 'idlehours', 'ore inattività'],
       build(v) {
-        let n = parseInt(String(v == null ? '' : v).replace(/[^0-9]/g, ''), 10);
-        if (!Number.isFinite(n) || n < 1) return null;
-        n = Math.min(168, n);
+        // Con la virgola: «1,5» è un'ora e mezza, non 15. La pagina tiene ore intere.
+        let n = parseItalianNumber(v);
+        if (!Number.isFinite(n)) return null;
+        if (n <= 0) return { rifiuto: `le ore di inattività vanno da 1 a 168, e ${String(v).trim()} è fuori` };
+        n = Math.min(168, Math.max(1, Math.round(n)));
         return { partial: { autoArchive: { idleHours: n } }, label: `Archivia dopo ${n} ore di inattività` };
       },
     },
