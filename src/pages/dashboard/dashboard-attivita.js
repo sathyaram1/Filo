@@ -1020,7 +1020,9 @@
           if (r && r.output) applyCommandCwd([{ _output: r.output }]);
           return;
         }
-        btn.textContent = (r && r.executed) ? `✓ ${shortLabel}` : '✗ Non eseguita';
+        const fatto = r && typeof r.fatto === 'string' ? r.fatto.trim() : '';
+        btn.textContent = (r && r.executed) ? `✓ ${fatto ? (fatto.length > 140 ? `${fatto.slice(0, 139)}…` : fatto) : shortLabel}` : '✗ Non eseguita';
+        if (fatto.length > 140) btn.title = fatto;
         // #950 — i file rinominati: il bottone dice quanti, e accanto c'è la strada per rimetterli com'erano.
         if (type === 'RINOMINA_FILE') {
           btn.textContent = (r && r.executed) ? `✓ ${testoRinominati(r.output)}` : `✗ ${motivoNessunaRinomina(r && r.output)}`;
