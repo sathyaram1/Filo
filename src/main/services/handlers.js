@@ -1962,7 +1962,14 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         // Un rifiuto spiegato resta nel diario col suo perché: non è successo
         // niente, ma l'utente deve saperlo anche se il modello non lo dice.
         if (built.rifiuto) return { executed: false, kept: false, output: { error: built.rifiuto, rifiuto: true } };
-        await applySettingsUpdate(built.partial);
+        // Un elenco (siti bloccati, fidati…) si cambia a voci sull'elenco di adesso (#949).
+        let partial = built.partial;
+        if (built.elenco) {
+          const r = global.SN_PREF.applicaElenco(built.elenco, await Storage.getSettings());
+          if (r.invariato) return { executed: false, kept: false, output: { error: r.invariato, invariato: true } };
+          partial = r.partial;
+        }
+        await applySettingsUpdate(partial);
         // Il nome leggibile serve alla riga della chat quando il valore era già quello (niente evento).
         return { executed: true, kept: true, output: { etichetta: built.label } };
       }
@@ -1976,6 +1983,17 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         const T = globalThis.SN_THEME_TOKENS;
         const token = action.token ?? action.nome ?? action.name ?? action.chiave ?? action.elemento;
         const valore = action.valore ?? action.value ?? action.val ?? action.colore;
+        // Il ↺ della riga nelle Preferenze, chiesto a parole (#949): il token torna al suo valore di serie.
+        if (T && T.get(token) && /^(predefinit[oa]|default|di serie|originale|ripristina(lo|la)?)$/i.test(String(valore ?? '').trim())) {
+          const correnti = await Storage.getSettings();
+          const restanti = { ...(correnti.themeTokens || {}) };
+          if (!Object.prototype.hasOwnProperty.call(restanti, token)) {
+            return { executed: false, kept: false, output: { error: `${T.get(token).label} è già al suo valore predefinito`, invariato: true } };
+          }
+          delete restanti[token];
+          await applySettingsUpdate({ themeTokens: restanti });
+          return { executed: true, kept: true };
+        }
         if (!T || !T.validate(token, valore)) return { executed: false, kept: false };
         const settings = await Storage.getSettings();
         const overrides = { ...(settings.themeTokens || {}) };
@@ -2026,6 +2044,15 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         // «riletto la trasparenza» per una cosa che nessuno ha letto (#515).
         const trovato = !!(T && (!doc || T.get(doc)));
         return { executed: trovato, kept: true, output: { doc: doc || null, text, missing: !trovato } };
+      }
+      case 'LEGGI_IMPOSTAZIONI': {
+        // #949 — com'è impostato Filo adesso, per «com'è impostato X?». Sola lettura, senza le chiavi.
+        const V = globalThis.SN_VOCI_IMPOSTAZIONI;
+        const cerca = String(action.cerca ?? action.query ?? action.chiave ?? action.testo ?? '').replace(/\s+/g, ' ').trim().slice(0, 200);
+        if (!V) return { executed: false, kept: true, output: { error: 'lettura non disponibile' } };
+        const settings = await Storage.getSettings();
+        const r = V.righePerModello(settings, { cerca, tema: resolveTheme(settings), sistema: process.platform });
+        return { executed: true, kept: true, output: { cerca, righe: r.righe, trovate: r.trovate, totale: r.totale } };
       }
       case 'EVENTO_CALENDARIO':
         return { executed: false, kept: true };
@@ -2580,6 +2607,26 @@ function commandOutputsForPrompt(actions) {
 // un turno precedente (F2): l'agente vede i dati esatti (cosa fa / come si attiva
 // / limiti) e risponde all'utente senza indovinare l'invocazione a memoria.
 // Sono DATI affidabili di sistema, non istruzioni.
+// Le impostazioni lette con LEGGI_IMPOSTAZIONI (#949), anche nei turni dopo. I valori li può aver scritti
+// un modello (lo stile, i nomi delle voci, i siti in elenco): stanno nel recinto dei testi salvati.
+function impostazioniLetteForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const E = globalThis.SN_ESTERNO;
+  const blocchi = [];
+  for (const a of actions) {
+    if (!a || String(a.type || '').toUpperCase() !== 'LEGGI_IMPOSTAZIONI') continue;
+    const o = a._output;
+    if (!o || !Array.isArray(o.righe)) continue;
+    const cerca = o.cerca ? E.neutralizza(o.cerca, { unaRiga: true }) : '';
+    const testa = !cerca ? 'tutte le voci'
+      : (o.trovate ? `le voci che c'entrano con «${cerca}»` : `nessuna voce c'entra con «${cerca}», quindi tutte`);
+    blocchi.push(`[Impostazioni di Filo lette adesso (${testa}): sono i valori veri, rispondi con questi. `
+      + 'Per cambiarne una usa la chiave fra parentesi quadre.]\n'
+      + E.imbusta({ tipo: 'TESTO_SALVATO', conIntestazione: true, testo: o.righe.map((r) => E.neutralizza(r, { unaRiga: true })).join('\n') }));
+  }
+  return blocchi.join('\n\n').trim();
+}
+
 function capabilityDetailsForPrompt(actions) {
   if (!Array.isArray(actions)) return '';
   const blocks = [];
@@ -2890,7 +2937,7 @@ function documentReadsForPrompt(actions) {
 // dell'editor compresi, arriva imbustato (#593, #592.4).
 function observationsForPrompt(actions) {
   return [
-    commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), webSearchResultsForPrompt(actions),
+    commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), impostazioniLetteForPrompt(actions), webSearchResultsForPrompt(actions),
     fileReadsForPrompt(actions), documentReadsForPrompt(actions), transparencyDocsForPrompt(actions),
     chatSearchesForPrompt(actions), confirmedActionsForPrompt(actions), proxyUnavailableForPrompt(actions),
     apertureFermateDopoForPrompt(actions),
@@ -3139,7 +3186,15 @@ function toolResultText({ action, res, rendered }) {
     let done = '';
     try { done = descriviPerModello(action, { fatto: true }); } catch (_) {}
     done = String(done || describe()).replace(/\.+\s*$/, '');
+    // #949 — un cambio fatto da Filo dice cosa ha cambiato e come si torna indietro.
+    if (type === 'IMPOSTA_PREFERENZA' || type === 'IMPOSTA_ESTETICA') {
+      return `Eseguita: ${done}. Nella risposta di' in una frase cosa hai cambiato e che si rimette com'era con «annulla» `
+        + 'sul segno accanto al messaggio dell\'utente, o chiedendolo a te.';
+    }
     return `Eseguita: ${done}.`;
+  }
+  if (res.output && res.output.invariato && res.output.error) {
+    return `Niente da cambiare: ${res.output.error}. Dillo all'utente in una riga; non ripetere l'azione uguale.`;
   }
   if (res.output && res.output.rifiuto && res.output.error) {
     const cosa = type === 'SALVA_LEZIONE' ? 'Lezione NON salvata' : 'Impostazione NON applicata';

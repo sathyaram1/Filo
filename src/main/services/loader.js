@@ -96,6 +96,7 @@ require(path.join(SHARED, 'actionTools.js'));  // le azioni come strumenti del m
 require(path.join(SHARED, 'pageRestyle.js'));
 require(path.join(SHARED, 'zoomPagina.js'));  // zoom della pagina: passo, limiti, livello↔percentuale (una regola sola per tasti e chat)
 require(path.join(SHARED, 'cambi.js'));  // #867 — i cambi di stato come eventi del filo: frasi, confronto, annullo (logica pura)
+require(path.join(SHARED, 'vociImpostazioni.js'));  // #949 — le voci delle pagine delle impostazioni: cosa legge e cambia la chat
 require(path.join(SHARED, 'ttsChunk.js'));
 require(path.join(SHARED, 'ttsCache.js'));
 require(path.join(SHARED, 'ttsVoices.js'));          // voci del modello di lettura (Kokoro)

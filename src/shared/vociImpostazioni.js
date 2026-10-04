@@ -124,17 +124,21 @@
   }
 
   // ── Le voci per la chat ────────────────────────────────────────────────────
+  // Come la chat la cambia: la chiave di IMPOSTA_PREFERENZA, o il token di IMPOSTA_ESTETICA.
   function chiaveDi(percorso) {
-    if (percorso.startsWith('themeTokens.')) return `IMPOSTA_ESTETICA token ${percorso.slice(12)}`;
+    if (percorso.startsWith('themeTokens.')) return { come: `IMPOSTA_ESTETICA token ${percorso.slice(12)}`, chiave: '', conferma: false };
     const P = global.SN_PREF;
     const s = P && P.setterDi ? P.setterDi(percorso) : null;
-    return s ? { chiave: s.keys[0], conferma: s.level === 2 } : null;
+    return s ? { come: `chiave ${s.keys[0]}`, chiave: s.keys[0], conferma: s.level === 2 } : { come: '', chiave: '', conferma: false };
+  }
+  function minuscola(s) {
+    return s.charAt(0).toLowerCase() + s.slice(1);
   }
   function nomeDi(percorso) {
     if (percorso.startsWith('themeTokens.')) {
       const T = global.SN_THEME_TOKENS;
       const t = T && T.get ? T.get(percorso.slice(12)) : null;
-      return `aspetto, ${t && t.label ? t.label.toLowerCase() : percorso.slice(12)}`;
+      return `aspetto, ${t && t.label ? minuscola(t.label) : percorso.slice(12)}`;
     }
     const K = global.SN_CAMBI;
     const v = K && K.voce ? K.voce(percorso) : null;
@@ -155,8 +159,7 @@
         pagina,
         titolo: pagina ? PAGINE[pagina].titolo : 'Altre impostazioni',
         nome: nomeDi(percorso),
-        chiave: typeof k === 'string' ? k : (k ? k.chiave : ''),
-        conferma: !!(k && k.conferma),
+        ...k,
       });
     };
     for (const [pagina, def] of Object.entries(PAGINE)) {
@@ -188,7 +191,7 @@
     const parole = piano(cerca).split(/\s+/).filter((w) => w.length >= 3 && !NON_CERCARE.has(w)).map(radice);
     if (!parole.length) return tutte;
     return tutte.filter((v) => {
-      const testo = piano(`${v.nome} ${v.chiave} ${v.percorso} ${v.titolo} ${sinonimi(v.percorso)}`);
+      const testo = piano(`${v.nome} ${v.come} ${v.percorso} ${v.titolo} ${sinonimi(v.percorso)}`);
       return parole.some((w) => testo.includes(w));
     });
   }
@@ -202,7 +205,10 @@
       const nome = percorso.slice(12);
       const over = (settings && settings.themeTokens) || {};
       const eff = T && T.effectiveValue ? T.effectiveValue(nome, over, tema) : v;
-      return `${eff == null ? 'predefinito' : eff}${has(over, nome) ? ' (personalizzato)' : ' (predefinito)'}`;
+      const t = T && T.get ? T.get(nome) : null;
+      const cat = t && t.category && has(over, t.category) && T.get(t.category);
+      const da = has(over, nome) ? 'personalizzato' : (cat ? `segue ${minuscola(cat.label)}` : 'predefinito');
+      return `${eff == null ? 'predefinito' : eff} (${da})`;
     }
     const K = global.SN_CAMBI;
     const voce = K && K.voce ? K.voce(percorso) : null;
@@ -232,7 +238,7 @@
         titolo = v.titolo;
         righe.push(v.pagina ? `${titolo} (pagina)` : `${titolo} (si cambiano dalla chat o dalle loro pagine)`);
       }
-      const chiave = v.chiave ? ` [chiave ${v.chiave}${v.conferma ? ', chiede conferma' : ''}]` : '';
+      const chiave = v.come ? ` [${v.come}${v.conferma ? ', chiede conferma' : ''}]` : '';
       righe.push(`- ${v.nome}: ${valoreLeggibile(v.percorso, settings, { tema, sistema })}${chiave}`);
     }
     return { righe, trovate: nessuna ? 0 : scelte.length, totale: tutte.length };
