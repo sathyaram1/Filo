@@ -93,8 +93,10 @@ test('chiusa l’ultima scheda, il + resta dov’era e il clic seguente non apre
   const prima = await larghezze(shell);
   const piu = () => shell.evaluate(() => document.getElementById('tab-new').getBoundingClientRect().left);
   const piuPrima = await piu();
-  const ultima = await shell.locator('#tabs .tab').last().boundingBox();
-  const punto = { x: ultima.x + ultima.width / 2, y: ultima.y + ultima.height / 2 };
+  const punto = await shell.evaluate(() => {
+    const r = document.querySelector('#tabs .tab:last-child').getBoundingClientRect();
+    return { x: (r.left + r.right) / 2, y: (r.top + r.bottom) / 2 };
+  });
   await shell.mouse.move(punto.x, punto.y);
   await shell.mouse.click(punto.x, punto.y, { button: 'middle' });
   await expect.poll(() => verdettoUguali(shell, prima, N - 1), { timeout: 8_000 }).toBe('uguali');

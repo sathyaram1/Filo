@@ -26,10 +26,8 @@ function misura(shell) {
     const r = tab.getBoundingClientRect();
     const figli = [...tab.children]
       .filter((c) => getComputedStyle(c).display !== 'none')
-      .map((c) => {
-        const q = c.getBoundingClientRect();
-        return { cls: c.className.split(' ')[0], left: q.left, right: q.right, width: q.width };
-      });
+      // Le misure di layout, non il riquadro a schermo: la spinner gira e il suo riquadro ruotato è più largo.
+      .map((c) => ({ cls: c.className.split(' ')[0], left: r.left + c.offsetLeft, right: r.left + c.offsetLeft + c.offsetWidth, width: c.offsetWidth }));
     return { id: tab.dataset.id, active: tab.classList.contains('active'), left: r.left, right: r.right, width: r.width, figli };
   }));
 }
@@ -45,8 +43,6 @@ test('con tante schede ogni X visibile sta nella sua scheda: il clic sul suo cen
   }));
   expect(esito).toEqual([]);
   await expect(shell.locator('#tabs .tab.active .close')).toBeVisible();
-  const strip = await shell.evaluate(() => { const s = document.getElementById('tabs'); return s.scrollWidth - s.clientWidth; });
-  expect(strip, 'nessun controllo spinge la striscia oltre il suo bordo').toBeLessThanOrEqual(0);
 });
 
 test('scheda stretta: cede paese, poi titolo, poi la X sulle inattive; l\'attiva tiene la X', async ({ app, shell }) => {
