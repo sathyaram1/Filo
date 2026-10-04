@@ -1,5 +1,5 @@
-// Verifica #789 giro 1: esplorazione avversariale (sostituzione dai risultati con commander già impostato,
-// lista incollata con un altro commander, aspetto dell'intestazione e del menu in tema chiaro e scuro).
+// Verifica #789 giro 1, rilievo 2: il tasto destro sulla carta grande del carosello offre le azioni della carta,
+// compreso «Imposta come commander», come la riga da cui è stato aperto.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
@@ -74,81 +74,18 @@ async function setCmd(page, id, cmd) {
 }
 const menu = (page) => page.locator('.dk-ctxmenu .sn-select-option');
 
-test('risultati: sostituire un commander già impostato rimette il vecchio nel mazzo e lo dice', async ({ app, openTab }) => {
+test('tasto destro sulla carta nel carosello: le azioni della carta', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   await mockScryfall(app);
   await mockProvider(app);
   const page = await openTab('filo://decks/decks.html');
   await page.waitForLoadState('domcontentloaded');
-  const deckId = await newDeck(page);
-  await setCmd(page, deckId, 'niv-1');
+  await newDeck(page);
   await page.fill('#chatInput', 'is:commander');
   await page.press('#chatInput', 'Enter');
   const results = page.locator('.dk-msg-bot').last().locator('.dk-cardlist .dk-row');
-  await expect(results.first()).toBeVisible();
-  await results.filter({ hasText: 'Atraxa' }).click({ button: 'right' });
-  await page.screenshot({ path: 'tests/.shots/v789-menu-chiaro.png' });
-  await menu(page).filter({ hasText: 'Imposta come commander' }).click();
-  await expect(page.locator('#commanderLine')).toContainText('Atraxa');
-  await expect(page.locator('#deckList .dk-row[data-card-id="niv-1"]')).toHaveCount(1);
-  await expect(page.locator('#dkToast')).toContainText('Niv-Mizzet, Parun torna nel mazzo');
-  await expect(page.locator('#deckNameText')).toHaveText('Atraxa, Praetors\' Voice');
-  const d = await getDeck(page, deckId);
-  expect(d.commander).toBe('atx-1');
-  // Il vecchio commander, ora carta normale nei risultati, mostra di essere nel mazzo.
-  await expect(results.filter({ hasText: 'Niv-Mizzet' }).locator('.dk-add')).toHaveAttribute('data-in', '1');
-  await page.locator('#commanderLine .dk-prose-card').hover();
-  await expect(page.locator('#statePreview')).toBeVisible();
-  await page.screenshot({ path: 'tests/.shots/v789-header-chiaro.png' });
-});
-
-test('lista incollata in chat con un commander diverso su un mazzo che ne ha già uno', async ({ app, openTab }) => {
-  test.setTimeout(60_000);
-  await mockScryfall(app);
-  await mockProvider(app);
-  const page = await openTab('filo://decks/decks.html');
-  await page.waitForLoadState('domcontentloaded');
-  const deckId = await newDeck(page);
-  await setCmd(page, deckId, 'niv-1');
-  await page.fill('#chatInput', 'ti incollo la mia lista: Commander Atraxa, 1 Lightning Bolt');
-  await page.press('#chatInput', 'Enter');
-  const bubble = page.locator('.dk-msg-bot').last();
-  await expect(bubble.locator('[data-import-all]')).toBeVisible();
-  await bubble.locator('[data-import-all]').click();
-  await page.waitForTimeout(600);
-  const d = await getDeck(page, deckId);
-  const toast = await page.locator('#dkToast').textContent().catch(() => '');
-  console.log('IMPORT', JSON.stringify({ cmd: d.commander, carte: d.carte.map((c) => c.scryfall_id), toast, bubble: await bubble.textContent() }));
-  // Atraxa, il commander della lista, deve restare da qualche parte o il silenzio deve rompersi.
-  const visto = d.commander === 'atx-1' || d.carte.some((c) => c.scryfall_id === 'atx-1') || /atraxa/i.test(toast);
-  expect(visto).toBe(true);
-});
-
-test('aspetto in tema scuro: intestazione col commander e menu sui risultati', async ({ app, openTab }) => {
-  test.setTimeout(60_000);
-  await mockScryfall(app);
-  await mockProvider(app);
-  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }));
-  const page = await openTab('filo://decks/decks.html');
-  await page.waitForLoadState('domcontentloaded');
-  const deckId = await newDeck(page);
-  await setCmd(page, deckId, 'niv-1');
-  await page.fill('#chatInput', 'is:commander');
-  await page.press('#chatInput', 'Enter');
-  const results = page.locator('.dk-msg-bot').last().locator('.dk-cardlist .dk-row');
-  await expect(results.first()).toBeVisible();
-  await page.locator('#commanderLine .dk-prose-card').click();
-  await expect(page.locator('#stateCarousel')).toBeVisible();
-  await page.screenshot({ path: 'tests/.shots/v789-header-scuro-carosello.png' });
-  await page.keyboard.press('Escape');
-  await results.filter({ hasText: 'Bolt' }).click({ button: 'right' });
-  await page.screenshot({ path: 'tests/.shots/v789-menu-scuro.png' });
-  // Tasto destro sull'immagine della carta nel carosello: quali azioni offre?
-  await page.keyboard.press('Escape');
-  await results.filter({ hasText: 'Atraxa' }).click();
+  await results.filter({ hasText: 'Niv-Mizzet' }).click();
   await expect(page.locator('#stateCarousel')).toBeVisible();
   await page.locator('#carouselImg').click({ button: 'right' });
-  await page.waitForTimeout(300);
-  console.log('CAROUSEL-MENU', JSON.stringify(await menu(page).allTextContents()));
-  await page.screenshot({ path: 'tests/.shots/v789-carosello-destro.png' });
+  await expect(menu(page).filter({ hasText: 'Imposta come commander' })).toHaveCount(1);
 });
