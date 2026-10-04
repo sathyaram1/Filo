@@ -366,6 +366,15 @@ dashboard scriveva "in attesa di ripresa". Adesso:
    I `pipeline.*` grezzi restano per audit, ma nessun consumer li legge più per lo stato.
 2. Mittenti fidati: mai attack/spam (come oggi in classifyBlock); flag identità su fidato
    → `unlabeled` per ri-giudizio.
+2b. **`updatedAt` su OGNI scrittura di un feedback** (#676), timestamp e mai testo,
+   anche `createdAt` (i sotto-feedback creati dal server lo avevano testo). La Gestione
+   legge tutto all'apertura e poi chiede «chi è stato scritto dopo questo istante?»:
+   app, script e server lo firmano. Finché il server non lo firma ovunque, il giro
+   guarda tre segni senza orologio (ora di Firestore dei feedback in mano alle
+   routine, contatore degli invii, registro dei worker col numero del feedback
+   preso). Le regole ammettono il campo nei tre rami (create, update admin, update
+   routine) e pretendono una data. Racconto:
+   patterns/chi-guarda-in-continuo-chiede-cosa-e-cambiato.md.
 3. Gate deterministico file sospetti (vive QUI, decisione owner): gira PRIMA dei giudici
    su ogni feedback con allegati; flag → `suspicious_file` e NON va al panel finché
    l'owner non decide. Contesto noto: il widget accetta via drag&drop tipi non ammessi

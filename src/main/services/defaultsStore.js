@@ -771,8 +771,12 @@ async function setCreditsKnobs(patch, idToken) {
 // (owner-gated) per la tab "Log" della dashboard. Ritorna le voci più recenti
 // PRIMA (ordine decrescente per istante d'avvio), già normalizzate. Documento o
 // campo assente / lettura fallita ⇒ lista vuota (mai un errore per un log).
-async function getWorkerLog(idToken) {
-  const doc = await fetchDoc(AUTOMATION_DOC, idToken);
+// `severo`: una lettura fallita lancia invece di valere «registro vuoto» (il giro
+// della Gestione deve distinguere «non lo so» da «niente di nuovo», #676.1).
+async function getWorkerLog(idToken, { severo = false } = {}) {
+  const letto = await leggiDoc(AUTOMATION_DOC, idToken);
+  if (severo && (!letto.risposto || !letto.doc)) throw new Error('registro dei worker non letto');
+  const doc = letto.doc;
   const raw = doc && Array.isArray(doc.workerLog) ? doc.workerLog : [];
   const entries = raw
     .filter((e) => e && typeof e === 'object')

@@ -292,7 +292,9 @@ service cloud.firestore {
       // scripts/claude-feedback.mjs col token admin per scrivere `senderProof`
       // (#595), la prova del mittente che il create anonimo sotto NON ammette:
       // la sentinella tests/unit/firestoreRulesSenderProof.test.mjs lo tiene vero.
-      allow create: if isAdmin() && localOnlyValido(request.resource.data) && localApprovalValido(request.resource.data);
+      allow create: if isAdmin() && localOnlyValido(request.resource.data) && localApprovalValido(request.resource.data)
+        // #676: una data, mai testo (anche qui il giro della Gestione la confronta).
+        && (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp);
 
       // `name` = titolo breve generato da un LLM all'invio; `seq`/`subSeq` =
       // numero progressivo leggibile (#22, #22.1) calcolato dal client.
@@ -305,9 +307,12 @@ service cloud.firestore {
            'files', 'createdAt', 'seq', 'subSeq', 'parentId',
            'statusPublic',   // S1.F2.1: aggiunto statusPublic (sempre in chiaro, nuovo nei submit)
            'capabilityGapId', // F4: id gap capacità per dedup auto-feedback (F5)
-           'walletPseudonym' // #652: pseudonimo del portafoglio — a chi accreditare il premio
+           'walletPseudonym', // #652: pseudonimo del portafoglio — a chi accreditare il premio
+           'updatedAt'       // #676: l'ora dell'ultima scrittura — la dashboard ci chiede "cosa è cambiato?"
           ]
         )
+        && (!('updatedAt' in request.resource.data)
+            || request.resource.data.updatedAt is timestamp)
         // #652: se c'è, è uno pseudonimo di portafoglio (16 hex). Facoltativo:
         // chi non ha un portafoglio manda il feedback e basta.
         && request.resource.data.get('walletPseudonym', '') is string
@@ -382,6 +387,12 @@ service cloud.firestore {
                     // 'userNote' la frase in chiaro per chi ha mandato il feedback.
                     'userNote',
                     'archiveOverride', 'reopenRequests',
+                    // #676: l'ora dell'ultima scrittura, firmata da chi scrive.
+                    // È il campo su cui la dashboard chiede «cosa è cambiato
+                    // da allora?» invece di rileggere la collezione a ogni
+                    // giro: chi scrive un feedback senza rimetterlo rende quel
+                    // cambiamento invisibile fino alla riconciliazione.
+                    'updatedAt',
                     // I livelli L3/L4 (vincolo di forma: livelliValidi, in cima).
                     'livelli',
                     // La pre-approvazione della fusione, per singola pratica:
@@ -496,6 +507,10 @@ service cloud.firestore {
         // archiviare nonostante il punteggio. '' = nessun override (substrato
         // SN_BOARD_ARCHIVE.hasOwnerOverride).
         && request.resource.data.get('archiveOverride', '') in ['', 'archived', 'keep_open']
+        // #676: una DATA, mai testo. Scritta come testo il confronto per data
+        // non la riconosce, e quel feedback resta fuori dal giro per sempre.
+        && (!('updatedAt' in request.resource.data)
+            || request.resource.data.updatedAt is timestamp)
         // `reopenRequests` (DC4): l'admin può azzerarlo (es. {}) quando un fix
         // riaperto viene risistemato e rispedito, sbloccando una futura
         // riapertura sullo stesso doc. Nessun vincolo di forma extra qui: il
@@ -585,7 +600,9 @@ service cloud.firestore {
       allow update: if
         isRoutine()
         && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['status', 'notes', 'resolvedAt', 'statusReason', 'workingSince', 'branch', 'livelli'])
+          // `updatedAt` (#676): il server firma l'ora come chiunque altro, o
+          // la dashboard non vede più quello che scrive fino al riallineamento.
+          .hasOnly(['status', 'notes', 'resolvedAt', 'statusReason', 'workingSince', 'branch', 'livelli', 'updatedAt'])
         && request.resource.data.get('status', 'new') in
              ['todo', 'working', 'revision_capability', 'revision_security', 'done', 'design', 'clarify']
         && request.resource.data.get('statusReason', '') is string
@@ -599,6 +616,8 @@ service cloud.firestore {
         // che poi bloccano l'owner.
         && request.resource.data.get('notes', '') is string
         && request.resource.data.get('notes', '').size() <= 60000
+        && (!('updatedAt' in request.resource.data)
+            || request.resource.data.updatedAt is timestamp)
         && livelliValidi(request.resource.data);
 
       // Cancellazione: solo admin.

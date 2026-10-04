@@ -495,6 +495,14 @@
     // e `complete: false` dice che il freno sulle pagine è scattato — un
     // troncamento che non si dichiara passa per un totale.
     FEEDBACK_FETCH: 'feedback_fetch',
+    // #676 — il giro dei cambiati della Gestione: uno nel main per tutte le
+    // pagine, e gira solo quando una Gestione IN VISTA lo chiede. Solo filo://, solo admin.
+    //   { watch?:[id], giro?:bool, force?:bool, off?:bool }
+    //     → { ok, subscribed, scartati?, giro?: esito }
+    FEEDBACK_LIVE_SUBSCRIBE: 'feedback_live_subscribe',
+    // L'esito di un giro alle ALTRE pagine iscritte:
+    //   { kind:'changed', rows } | { kind:'reconcile', versions, complete }, + avvisi?
+    FEEDBACK_LIVE_CHANGED: 'feedback_live_changed',
     // S1.3: decifratura campi feedback lato main (la chiave privata NON lascia
     // mai il main process). Il renderer manda i campi con valori potenzialmente
     // cifrati; il main li decifra e torna il plaintext. Owner-only.

@@ -812,7 +812,7 @@ module.exports = function register(on, ctx) {
         };
       }
       try {
-        return await handler(msg);
+        return await handler(msg, sender, origin);
       } catch (e) {
         return { ok: false, error: e?.message || String(e) };
       }
@@ -922,8 +922,16 @@ module.exports = function register(on, ctx) {
     // caricamento della dashboard. `complete` viaggia con le righe: se il
     // freno sulle pagine è scattato, chi guarda deve poterlo dire.
     if (op === 'listAll') {
-      const { rows, complete } = await FB.listAllPaged({ timeoutMs, idToken });
-      return { ok: true, rows, complete };
+      const fields = (Array.isArray(msg.fields) && msg.fields.length) ? msg.fields : null;
+      const startedAt = Date.now();
+      const { rows, complete } = await FB.listAllPaged({ timeoutMs, idToken, fields });
+      // `lista`: è il caricamento della Gestione (#676), che ora legge tutto: le
+      // schede si riuniscono, la vista si rimette in pari e il giro riparte da qui.
+      if (msg.lista !== true) return { ok: true, rows, complete };
+      scheduleViewSync({ rows });
+      const w = liveWatcherDi();
+      if (w && complete) w.allineato(startedAt);
+      return { ok: true, rows: await mergeCardFields(rows), complete };
     }
     if (op !== 'list' && op !== 'versions') return { ok: false, error: `lettura non prevista: ${op}` };
 
@@ -942,6 +950,119 @@ module.exports = function register(on, ctx) {
     // un attimo dopo.
     scheduleViewSync({ rows });
     return { ok: true, rows: await mergeCardFields(rows) };
+  }));
+
+  // ── #676: il giro dei cambiati della Gestione, uno solo, qui nel main ────
+  // Non ha un orologio suo: gira quando una Gestione IN VISTA lo chiede, e
+  // l'esito arriva a chi l'ha chiesto e alle altre iscritte. La logica sta in
+  // SN_FEEDBACK_LIVE.makeWatcher; la regola in
+  // patterns/chi-guarda-in-continuo-chiede-cosa-e-cambiato.md.
+  const liveSubs = new Map();   // wc → Set degli id che quella pagina segue da vicino
+  let liveWatcher = null;
+
+  function liveToken() {
+    return auth.getIdToken().then((t) => {
+      if (!t) throw new Error('sessione scaduta');
+      return t;
+    });
+  }
+
+  function liveWatcherDi() {
+    if (liveWatcher) return liveWatcher;
+    const LIVE = globalThis.SN_FEEDBACK_LIVE;
+    const FB = FEEDBACK();
+    if (!LIVE || !LIVE.makeWatcher || !FB) return null;
+    const campi = Array.isArray(FB.CAMPI_LISTA) ? FB.CAMPI_LISTA : null;
+    liveWatcher = LIVE.makeWatcher({
+      onWarn: (m) => console.warn('[feedback] giro:', m),
+      seguiti: () => {
+        const out = new Set();
+        for (const ids of liveSubs.values()) for (const id of ids) out.add(id);
+        return Array.from(out);
+      },
+      versionsOf: async (ids) => FB.versionsOf(ids, { timeoutMs: 20000, idToken: await liveToken() }),
+      readRows: async (ids) => {
+        const rows = await FB.getMany(ids, { timeoutMs: 20000, idToken: await liveToken(), fields: campi });
+        return mergeCardFields(rows, { mirate: true });
+      },
+      submissionCount: async () => FB.submissionCount({ timeoutMs: 20000, idToken: await liveToken() }),
+      avviiRoutine: async () => Defaults.getWorkerLog(await liveToken(), { severo: true }),
+      idDelNumero: async (num) => FB.idDelNumero(num, { timeoutMs: 20000, idToken: await liveToken() }),
+      listVersions: async () => {
+        const { rows, complete } = await FB.listAllPaged({ timeoutMs: 20000, idToken: await liveToken(), fields: ['__name__'] });
+        return { versions: rows.map((r) => ({ _id: r._id, _updateTime: r._updateTime })), complete };
+      },
+      listChangedSince: async ({ since }) => {
+        const out = await FB.listChangedSince({ since, timeoutMs: 20000, idToken: await liveToken(), fields: campi });
+        const rows = await mergeCardFields(out.rows, { mirate: true });
+        return { rows, complete: out.complete };
+      },
+    });
+    return liveWatcher;
+  }
+
+  // La posta dell'owner non esce da filo://: una scheda andata su un sito si toglie.
+  function liveIscritteValide() {
+    for (const wc of Array.from(liveSubs.keys())) {
+      try {
+        if (!wc || (wc.isDestroyed && wc.isDestroyed()) || !String(wc.getURL() || '').startsWith('filo://')) liveSubs.delete(wc);
+      } catch (_) { liveSubs.delete(wc); }
+    }
+  }
+
+  function liveAvvisaAltre(payload, mittente) {
+    liveIscritteValide();
+    const msg = { type: MSG.FEEDBACK_LIVE_CHANGED, ...payload };
+    for (const wc of liveSubs.keys()) {
+      if (wc === mittente) continue;
+      try { wc.send('filo:broadcast', msg); } catch (_) { liveSubs.delete(wc); }
+    }
+  }
+
+  // Una pagina che non è in vista non tiene vivo il giro (#676, punto 6): la
+  // pagina lo sa già, ma la porta lo ricontrolla.
+  function inVistaDi(sender) {
+    try {
+      const win = typeof ctx.winOf === 'function' ? ctx.winOf(sender) : null;
+      const tabs = win && win._filoTabs;
+      if (!tabs || !sender || !sender.tab || !sender.tab.id || typeof tabs.inVista !== 'function') return true;
+      return tabs.inVista(sender.tab.id);
+    } catch (_) { return true; }
+  }
+
+  //   { off:true }                  → smette di ricevere
+  //   { watch:[id…] }               → gli id da seguire da vicino
+  //   { giro:true, force? }         → un giro adesso; torna il suo esito
+  on(MSG.FEEDBACK_LIVE_SUBSCRIBE, ownerOnly(async (msg, sender) => {
+    const LIVE = globalThis.SN_FEEDBACK_LIVE;
+    const wc = sender && sender.wc;
+    if (!wc) return { ok: false, error: 'mittente sconosciuto' };
+    if (msg && msg.off === true) {
+      liveSubs.delete(wc);
+      return { ok: true, subscribed: false };
+    }
+    let scartati = 0;
+    if (Array.isArray(msg && msg.watch)) {
+      // Solo nomi di documento: un id con una barra uscirebbe dalla collezione.
+      const puliti = Array.from(new Set(msg.watch.map((s) => String(s || '')).filter((s) => /^[A-Za-z0-9_-]{1,120}$/.test(s))));
+      const tetto = (LIVE && LIVE.SEGUITI_TETTO) || 500;
+      scartati = Math.max(0, puliti.length - tetto);
+      liveSubs.set(wc, new Set(puliti.slice(0, tetto)));
+    } else if (!liveSubs.has(wc)) {
+      liveSubs.set(wc, new Set());
+    }
+    if (!wc.__filoLiveBound) {
+      wc.__filoLiveBound = true;
+      try { wc.once('destroyed', () => liveSubs.delete(wc)); } catch (_) {}
+    }
+    const base = { ok: true, subscribed: true, ...(scartati ? { scartati } : {}) };
+    if (!(msg && msg.giro === true)) return base;
+    if (!inVistaDi(sender)) return { ...base, giro: { kind: 'fuori-vista' } };
+    const w = liveWatcherDi();
+    if (!w) return { ok: false, error: 'giro non disponibile' };
+    const esito = await w.tick({ force: msg.force === true });
+    if (esito && esito.kind !== 'skipped') liveAvvisaAltre(esito, wc);
+    return { ...base, giro: esito };
   }));
 
   // ── Chi pubblica la vista, e quando ──────────────────────────────────────
