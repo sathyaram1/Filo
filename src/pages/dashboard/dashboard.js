@@ -172,6 +172,13 @@
     },
     pushHistory: (m) => { threadHistory.push(m); },
     isSending: () => sending,
+    // La conversazione dell'intervista è già quella a schermo: stessi messaggi, nello stesso ordine.
+    giaAschermo: (state) => {
+      const riga = (m) => `${m.role === 'filo' ? 'filo' : 'user'}\n${String(m.text || '').trim()}`;
+      const loro = (Array.isArray(state && state.thread) ? state.thread : []).map(riga);
+      const nostri = threadHistory.filter((m) => !m.interno && (m.role !== 'filo' || String(m.text || '').trim())).map(riga);
+      return loro.length === nostri.length && loro.every((x, i) => x === nostri[i]);
+    },
     beginSending: () => { sending = true; aggiornaTasto(); },
     runTurnAndContinue: (args) => runTurnAndContinue(args),
     isHomeMessageVisible: () => showHomeMessage,

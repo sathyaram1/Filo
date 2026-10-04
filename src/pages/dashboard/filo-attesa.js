@@ -163,7 +163,7 @@
   }
   function nascondiHint() { if (hint) hint.classList.remove('dash-filo-hint-vis'); }
 
-  // `wrap`: il blocco (position: relative); `body`: le righe; `head`: la riga del gomitolo, sopra le righe.
+  // `wrap`: il blocco (position: relative), con la riga del gomitolo in cima; `body`: le righe sotto.
   // `apri(seg)`: cosa fa un clic su un nodo.
   function crea({ wrap, body, apri = () => {} }) {
     const piano = document.createElementNS(SVG, 'svg');

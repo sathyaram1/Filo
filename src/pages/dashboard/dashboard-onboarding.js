@@ -29,6 +29,7 @@
   let resetHistory = null;
   let pushHistory = null;
   let isSending = null;
+  let giaAschermo = null;
   let beginSending = null;
   let runTurnAndContinue = null;
   let isHomeMessageVisible = null;
@@ -104,6 +105,9 @@
     // se questa home mostrava la riga «abbiamo chiuso a metà», adesso mente.
     if (!onboardingActive) { hideOnboardingNotice(); return; }
     if (isSending()) return;
+    // L'annuncio del turno appena finito QUI arriva anche dopo la risposta: ridisegnare la stessa conversazione
+    // butterebbe via il blocco di attività e i bottoni delle azioni.
+    if (giaAschermo && giaAschermo(state)) return;
     renderOnboardingThread(state);
   }
 
@@ -318,6 +322,7 @@
     resetHistory = deps.resetHistory;
     pushHistory = deps.pushHistory;
     isSending = deps.isSending;
+    giaAschermo = deps.giaAschermo || null;
     beginSending = deps.beginSending;
     runTurnAndContinue = deps.runTurnAndContinue;
     isHomeMessageVisible = deps.isHomeMessageVisible;
