@@ -52,7 +52,7 @@ function richiesta(id, branch, extra = {}) {
   const ora = Date.now();
   return {
     id, branch, sha: 'abcdef1234567890abcdef1234567890abcdef12', who: 'sathyarampontillo@gmail.com', origin: 'local', num: '',
-    blocks: [{ gate: 'guard_the_guards', label: 'Tocca le guardie di sicurezza', detail: ['src/main/auth/config.js'] }],
+    blocks: [{ gate: 'guard_the_guards', label: 'Tocca le guardie di sicurezza', items: ['src/main/auth/config.js'] }],
     createdAtMs: ora - 3 * 60 * 1000, expiresAtMs: ora + 6 * 86400000, expired: false, used: false, discarded: false, outcome: '',
     ...extra,
   };
@@ -166,6 +166,7 @@ test('senza Filo: l\'owner accede col suo account, vede la fusione ferma e la ap
     await expect(page.locator('.ap-vuoto')).toBeVisible();
     await expect(page.locator('.sn-mac-recent-row').first()).toContainText('approvata e fusa');
     await expect(page.locator('.ap-stato'), 'l\'esito resta scritto dopo che la card se ne va').toContainText('Fatto');
+    await page.screenshot({ path: 'tests/.shots/approvazioni-web-fatto.png' }).catch(() => {});
   } finally {
     await chiudi();
   }

@@ -18,6 +18,8 @@
 //   sta lì, prima dei feedback, non su una superficie a parte. Prima l'avviso
 //   viveva anche sulla prima schermata del browser: due posti per la stessa
 //   decisione erano rumore per la home di tutti i giorni.
+//   Dal #489 le stesse card si disegnano anche nella pagina da browser (site/approvazioni): è la via
+//   d'uscita per il giorno in cui Filo non parte, non un secondo posto da guardare.
 //
 //   Il modulo resta separato dalla pagina perché tiene insieme le due rese —
 //   l'avviso da decidere (Ricevuti) e la traccia delle decisioni passate
