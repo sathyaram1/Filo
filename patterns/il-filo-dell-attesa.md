@@ -33,7 +33,7 @@ filo, i nodi, il gomitolo e i titoli); cosa succede lo decide il blocco
 - **I titoli si calcolano, non si generano** (`titoloNodo`, tabella `TITOLI`;
   prove in `tests/unit/filoAttesa.test.mjs`). Un'azione: «Cercato sul web ·
   orari treni». Più azioni dello stesso tipo: il plurale dal verbo e dal
-  conto, al massimo tre dettagli e poi `+N` («Lette tre pagine · a, b, c»).
+  conto, al massimo tre dettagli e poi `+N` («Aperte tre pagine · a, b, c»).
   Tipi diversi: si contano («3 azioni · sveglia, appunto, pagina»). Un'azione
   non riuscita o in attesa di conferma tiene la frase della sua riga: il
   titolo non promette il contrario. Un tipo d'azione nuovo va in `TITOLI`.
