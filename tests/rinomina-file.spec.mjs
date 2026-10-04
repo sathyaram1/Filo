@@ -33,6 +33,36 @@ function pdfConTesto(righe) {
   return Buffer.from(out, 'latin1');
 }
 
+// Una scansione in bianco e nero: la pagina è un'immagine a 1 bit per punto, senza testo (il modo «testo» degli
+// scanner da ufficio). Righe nere su bianco.
+function scansioneBiancoNero() {
+  const w = 600, h = 800, riga = Math.ceil(w / 8);
+  const bit = Buffer.alloc(riga * h, 0xff);
+  for (let y = 100; y < 700; y += 40) for (let k = 0; k < 8; k++) bit.fill(0x00, (y + k) * riga + 8, (y + k) * riga + riga - 8);
+  const contenuto = 'q 595 0 0 842 0 0 cm /Im1 Do Q';
+  const oggetti = [
+    Buffer.from('<< /Type /Catalog /Pages 2 0 R >>'),
+    Buffer.from('<< /Type /Pages /Kids [3 0 R] /Count 1 >>'),
+    Buffer.from('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /XObject << /Im1 5 0 R >> >> /Contents 4 0 R >>'),
+    Buffer.from(`<< /Length ${contenuto.length} >>\nstream\n${contenuto}\nendstream`),
+    Buffer.concat([Buffer.from(`<< /Type /XObject /Subtype /Image /Width ${w} /Height ${h} /ColorSpace /DeviceGray /BitsPerComponent 1 /Length ${bit.length} >>\nstream\n`), bit, Buffer.from('\nendstream')]),
+  ];
+  let out = Buffer.from('%PDF-1.4\n', 'latin1');
+  const pos = [];
+  oggetti.forEach((o, i) => { pos.push(out.length); out = Buffer.concat([out, Buffer.from(`${i + 1} 0 obj\n`), o, Buffer.from('\nendobj\n')]); });
+  const xref = out.length;
+  return Buffer.concat([out, Buffer.from(`xref\n0 ${oggetti.length + 1}\n0000000000 65535 f \n`
+    + pos.map((x) => `${String(x).padStart(10, '0')} 00000 n \n`).join('')
+    + `trailer\n<< /Size ${oggetti.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`)]);
+}
+
+// Un PDF col testo in testa e 30 MB di zavorra dopo: oltre il tetto della lettura intera dei documenti.
+function pdfGrande(righe) {
+  const base = pdfConTesto(righe).toString('latin1');
+  const zavorra = 30 * 1024 * 1024;
+  return Buffer.concat([Buffer.from(base, 'latin1'), Buffer.from(`\n% ${'A'.repeat(zavorra)}\n`, 'latin1')]);
+}
+
 const BOLLETTA = pdfConTesto(['Bolletta luce Enel', 'Marzo 2026', 'Totale da pagare 54,20 euro']);
 const NOME_NUOVO = 'Bolletta luce Enel Marzo 2026.pdf';
 
@@ -530,4 +560,49 @@ test('col nome automatico acceso, il nome dato a mano mentre Filo legge ancora i
     expect(existsSync(join(rec.savePath, '..', 'Luce marzo scelto da me.pdf'))).toBe(true);
     expect(existsSync(join(rec.savePath, '..', NOME_NUOVO))).toBe(false);
   } finally { await chiudi(); }
+});
+
+test('una scansione in bianco e nero e un PDF da 30 MB prendono un nome: dal tasto destro e dall\'elenco in chat', async ({ app }) => {
+  test.setTimeout(120_000);
+  const dir = cartellaInCasa('filo-nomi-scansioni-');
+  writeFileSync(join(dir, 'scan_00900.pdf'), pdfGrande(['Manuale lavatrice Bosch', 'Serie 6']));
+  writeFileSync(join(dir, 'scan_00901.pdf'), scansioneBiancoNero());
+  try {
+    await modelloFinto(app, [
+      { toolCalls: [{ id: 'f1', name: 'APRI_FILE', arguments: JSON.stringify({ percorso: join(dir, 'scan_00901.pdf'), etichetta: 'scan_00901.pdf' }) }] },
+      { text: 'Eccolo.' },
+      { toolCalls: [{ id: 'r1', name: 'RINOMINA_FILE', arguments: JSON.stringify({ cartella: dir }) }] },
+      { text: 'Ti ho preparato i nomi nuovi.' },
+    ]);
+    await modelloDeiNomi(app);
+    // La scansione arriva al modello come immagine: lì il nome lo legge dalla pagina.
+    await app.evaluate(() => {
+      const testo = globalThis.SN_PROVIDERS.completeWithFallback;
+      globalThis.SN_PROVIDERS.completeWithFallback = async (o) => {
+        const u = o.messages.find((m) => m.role === 'user');
+        if (Array.isArray(u.content) && u.content.some((p) => p.type === 'image_url')) {
+          return { text: 'Bolletta acqua aprile 2026', model: o.attempts[0].model, provider: o.attempts[0].provider, usage: {} };
+        }
+        return testo(o);
+      };
+    });
+    const page = await home(app);
+    await chiedi(page, 'trova la scansione');
+    const chip = page.locator('a.dash-action-btn', { hasText: 'scan_00901.pdf' });
+    await expect(chip).toBeVisible({ timeout: 15000 });
+    await chip.click({ button: 'right' });
+    await page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Dai un nome sensato' }).click();
+    await expect(page.locator('.sn-rinomina-campo')).toHaveValue('Bolletta acqua aprile 2026', { timeout: 20000 });
+    await page.keyboard.press('Escape');
+
+    await chiedi(page, 'rinomina i file in quella cartella con nomi che abbiano senso');
+    await expect.poll(() => confirmText(page), { timeout: 30000 }).toContain('«scan_00900.pdf» → «Manuale lavatrice Bosch Serie 6.pdf»');
+    expect(await confirmText(page)).toContain('«scan_00901.pdf» → «Bolletta acqua aprile 2026.pdf»');
+    await clickConfirm(page, 'ok');
+    await expect(page.locator('.dash-action-btn', { hasText: 'Rinominati 2 file' })).toBeVisible({ timeout: 15000 });
+    expect(readdirSync(dir).sort()).toEqual(['Bolletta acqua aprile 2026.pdf', 'Manuale lavatrice Bosch Serie 6.pdf']);
+  } finally {
+    await ripristina(app);
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
