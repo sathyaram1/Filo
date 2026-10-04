@@ -199,6 +199,17 @@ test('«spegni» e «accendi» sono un sì e un no', () => {
   assert.deepEqual(P.buildPreferencePartial('blocco_pubblicita', 'spento').partial, { security: { adblock: { enabled: false } } });
 });
 
+test('le ore di inattività con la virgola restano quelle: «1,5» non diventa 15', () => {
+  const ore = (v) => { const r = P.buildPreferencePartial('ore_inattivita', v); return r && r.partial ? r.partial.autoArchive.idleHours : r; };
+  assert.equal(ore('1,5'), 2);
+  assert.equal(ore('1.5'), 2);
+  assert.equal(ore(2.5), 3);
+  assert.equal(ore('12 ore'), 12);
+  assert.equal(ore('1.000'), 168);
+  assert.match(ore('-5').rifiuto, /da 1 a 168/);
+  assert.match(ore('0').rifiuto, /da 1 a 168/);
+});
+
 test('LEGGI_IMPOSTAZIONI è uno strumento di sola lettura, e non lo chiede un sito', () => {
   const L = globalThis.SN_ACTION_LEVELS;
   assert.equal(L.levelFor({ type: 'LEGGI_IMPOSTAZIONI', cerca: 'tema' }), 1);
