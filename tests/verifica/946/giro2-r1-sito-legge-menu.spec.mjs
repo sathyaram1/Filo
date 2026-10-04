@@ -13,6 +13,6 @@ test('il sito non ritrova con window.find il testo del riquadro su un’immagine
     <img id="foto" src="${src}" width="200" height="200"></body></html>`);
   await page.waitForFunction(() => document.getElementById('foto').naturalWidth > 0);
   await page.locator('#foto').click({ button: 'right', position: { x: 20, y: 20 } });
-  await expect(page.locator('.sn-menu .sn-menu-origine')).toContainText('Signing Cert', { timeout: 10000 });
+  await expect(page.locator('.sn-menu .sn-menu-origine')).toHaveAttribute('aria-label', /Signing Cert/, { timeout: 10000 });
   expect(await page.evaluate(() => window.find('Signing Cert'))).toBe(false);
 });

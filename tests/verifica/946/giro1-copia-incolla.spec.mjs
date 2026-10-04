@@ -34,7 +34,7 @@ for (const [nome, tipo] of [['c2pa-ufficiale-ai.png', 'image/png'], ['c2pa-uffic
       <img id="foto" src="${src}" width="160" height="160"></body></html>`);
     await page.locator('#foto').click({ button: 'right', position: { x: 20, y: 20 } });
     const menu = page.locator('.sn-menu');
-    await expect(menu.locator('.sn-menu-origine')).toContainText('Generata con l’AI', { timeout: 10000 });
+    await expect(menu.locator('.sn-menu-origine')).toHaveAttribute('aria-label', /Generata con l’AI/, { timeout: 10000 });
     await menu.getByText('Copia immagine', { exact: true }).click();
     await expect.poll(() => app.evaluate(({ clipboard }) => !clipboard.readImage().isEmpty()), { timeout: 8000 }).toBe(true);
 
