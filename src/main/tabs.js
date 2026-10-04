@@ -1828,7 +1828,29 @@ class TabManager {
 
   // Solo la scheda davanti si vede; una aperta dietro resta «visibile» a 0×0 finché non ha l'anteprima (#430).
   _visibile(t) {
-    return t.id === this.activeId || this.anteprime.tieneSveglia(t);
+    return t.id === this.activeId || this.anteprime.tieneSveglia(t) || t._alLavoro > 0;
+  }
+
+  // Filo legge o guida una scheda di dietro (#534): finché lavora, la scheda ha l'area della pagina sotto quella
+  // davanti, così si disegna e risponde come aperta. Torna la funzione che la rimette a dormire.
+  alLavoro(id) {
+    const tab = this.tabs.find((t) => t.id === id);
+    if (!tab) return () => {};
+    tab._alLavoro = (tab._alLavoro || 0) + 1;
+    if (tab.id !== this.activeId && tab._alLavoro === 1) {
+      try { this.win.contentView.addChildView(tab.view, 0); } catch (_) {}
+      try { tab.view.setVisible?.(true); } catch (_) {}
+      this.layout();
+    }
+    let rilasciata = false;
+    return () => {
+      if (rilasciata) return;
+      rilasciata = true;
+      tab._alLavoro = Math.max(0, (tab._alLavoro || 1) - 1);
+      if (tab._alLavoro || !this.tabs.includes(tab) || this.win.isDestroyed()) return;
+      try { tab.view.setVisible?.(this._visibile(tab)); } catch (_) {}
+      this.layout();
+    };
   }
 
   // ─── layout ─────────────────────────────────────────────────────────────
@@ -1851,7 +1873,7 @@ class TabManager {
         if (process.env.FILO_SMOKE) {
           console.log(`[layout] tab ${tab.id.slice(0, 6)} active bounds`, JSON.stringify(b), 'win', w, 'x', h);
         }
-      } else if (this.anteprime.inCattura(tab)) {
+      } else if (this.anteprime.inCattura(tab) || tab._alLavoro > 0) {
         const top = this._altezzaCornice();
         tab.view.setBounds({ x: 0, y: top, width: w, height: Math.max(0, h - top) });
       } else {
