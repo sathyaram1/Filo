@@ -10,10 +10,12 @@
 
 const { BrowserWindow, nativeTheme } = require('electron');
 const { hideForTests } = require('./test-window-mode');
+const { quandoSparita } = require('./popup-anteprima');
 
 let tipWin = null;
 let tipReady = false;
 let pendingShow = null;
+let giro = 0;
 
 function buildHTML() {
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
