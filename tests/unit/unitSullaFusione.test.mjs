@@ -45,6 +45,7 @@ test('lo stesso test rosso ha la stessa chiave in due cartelle diverse', () => {
   assert.equal(chiaveTest({ nome: 'n', file: 'C:\\altro nome\\main\\tests\\unit\\a.test.mjs' }, 'C:\\ALTRO~1\\main'), 'tests/unit/a.test.mjs › n');
   assert.equal(chiaveTest({ nome: 'n', file: '\\\\srv\\cond\\main\\tests\\unit\\a.test.mjs' }, 'D:\\main'), 'tests/unit/a.test.mjs › n');
   assert.equal(chiaveTest({ nome: 'n', file: '/private/tmp/x/fusione/tests/unit/a.test.mjs' }, '/tmp/x/fusione'), 'tests/unit/a.test.mjs › n');
+  assert.equal(chiaveTest({ nome: 'n', file: '/private/var/x/fusione/tests/unit/a.test.mjs' }, '/var/x/fusione'), 'tests/unit/a.test.mjs › n');
 });
 
 test('una chiave rimasta assoluta, in qualunque forma, non è un file da riprovare', () => {
