@@ -111,7 +111,7 @@ function renderInline(text, sources) {
   });
 
   out = out.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-  return out;
+  return out.replace(/(\d+)/g, (_all, i) => `<code>${codici[Number(i)]}</code>`);
 }
 
 function renderBody(body, sources) {
