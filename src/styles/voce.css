@@ -1,0 +1,86 @@
+/* Il tasto microfono delle chat (src/shared/voceChat.js). Prende misura e inchiostro dalla chat che lo ospita
+   (--sn-voce-size, --sn-voce-ink) e l'accento dal tema. Vive anche dentro le pagine dei siti: si azzera da sé. */
+
+.sn-voce-btn {
+  all: unset;
+  box-sizing: border-box;
+  position: relative;
+  flex: 0 0 auto;
+  width: var(--sn-voce-size, 32px);
+  height: var(--sn-voce-size, 32px);
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sn-voce-ink, var(--sn-fg));
+  background: transparent;
+  cursor: pointer;
+  /* L'alone segue la voce a ogni blocco audio (~85 ms): una transizione appena più corta lo rende fluido. */
+  transition: background-color 140ms ease, color 140ms ease, box-shadow 80ms linear, transform 120ms ease;
+}
+.sn-voce-btn[hidden] { display: none; }
+.sn-voce-btn:hover { background: color-mix(in srgb, currentColor 12%, transparent); }
+.sn-voce-btn:active { transform: scale(0.92); }
+.sn-voce-btn:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 2px; }
+.sn-voce-btn svg { display: block; }
+.sn-voce-mic { display: inline-flex; }
+.sn-voce-x { display: none; }
+
+.sn-voce-anello {
+  position: absolute;
+  inset: -3px;
+  width: calc(100% + 6px);
+  height: calc(100% + 6px);
+  display: none;
+  pointer-events: none;
+  overflow: visible;
+}
+.sn-voce-anello circle { fill: none; stroke: var(--sn-accent); stroke-width: 2.5; stroke-linecap: round; }
+
+/* Ascolta: pieno d'accento, con un alone che cresce con la voce e un'onda che respira anche nel silenzio. */
+.sn-voce-btn[data-stato="ascolta"] {
+  background: var(--sn-accent);
+  color: #fff;
+  box-shadow: 0 0 0 calc(2px + var(--sn-voce-livello, 0) * 9px) color-mix(in srgb, var(--sn-accent) 24%, transparent);
+}
+.sn-voce-btn[data-stato="ascolta"]:hover { background: var(--sn-accent); filter: brightness(1.06); }
+.sn-voce-btn[data-stato="ascolta"]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--sn-accent) 50%, transparent);
+  animation: sn-voce-respiro 1.6s ease-out infinite;
+  pointer-events: none;
+}
+@keyframes sn-voce-respiro {
+  from { transform: scale(1); opacity: 0.85; }
+  to { transform: scale(1.75); opacity: 0; }
+}
+
+/* In attesa del microfono e mentre trascrive: l'accento sull'icona, un arco che gira mentre il testo arriva. */
+.sn-voce-btn[data-stato="avvio"],
+.sn-voce-btn[data-stato="trascrive"],
+.sn-voce-btn[data-stato="attesa"] { color: var(--sn-accent); }
+.sn-voce-btn[data-stato="trascrive"] .sn-voce-anello,
+.sn-voce-btn[data-occupato] .sn-voce-anello { display: block; animation: sn-voce-giro 0.9s linear infinite; }
+.sn-voce-btn[data-stato="trascrive"] .sn-voce-anello circle,
+.sn-voce-btn[data-occupato] .sn-voce-anello circle { stroke-dasharray: 28 72; animation: none; }
+@keyframes sn-voce-giro { to { transform: rotate(360deg); } }
+
+/* L'attimo per annullare: la croce, e l'anello che si svuota; quando è vuoto la richiesta parte. */
+.sn-voce-btn[data-stato="attesa"] .sn-voce-mic { display: none; }
+.sn-voce-btn[data-stato="attesa"] .sn-voce-x { display: inline-flex; }
+.sn-voce-btn[data-stato="attesa"] .sn-voce-anello { display: block; transform: rotate(-90deg); }
+.sn-voce-btn[data-stato="attesa"] .sn-voce-anello circle {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 0;
+  animation: sn-voce-attesa var(--sn-voce-attesa, 2500ms) linear forwards;
+}
+@keyframes sn-voce-attesa { to { stroke-dashoffset: 100; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .sn-voce-btn[data-stato="ascolta"]::after { animation: none; opacity: 0; }
+  .sn-voce-btn[data-stato="trascrive"] .sn-voce-anello,
+  .sn-voce-btn[data-occupato] .sn-voce-anello { animation-duration: 2.4s; }
+}
