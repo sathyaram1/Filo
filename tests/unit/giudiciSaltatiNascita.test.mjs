@@ -83,3 +83,35 @@ test('«richiede lavoro locale» dice il vero secondo chi ha aperto il feedback'
   const tasto = MR.ownerActions(rimandato({ clientId: 'routine:residuo', senderProof: 'server' })).find((a) => a.key === 'accept_local');
   assert.ok(tasto && tasto.primary, 'su una routine rimandata «💻 Lavoro locale» è il tasto principale');
 });
+
+// Decisione dell'owner del 04/10: un lavoro di routine nato da un feedback d'utente aspetta la sua fusione.
+const conOrigine = (status, statusReason, extra = {}) => routine({
+  status, statusReason,
+  pipeline: { ...pipeline('routine_proven'), origine: { id: 'o1', num: '#700', stato: 'aperta' }, ...extra },
+});
+
+test('chi aspetta l’origine lo dice col numero, nei Ricevuti, senza «da ri-giudicare»', () => {
+  const fb = conOrigine('unlabeled', 'attesa_origine');
+  assert.equal(MR.classifyLegacyBlock(fb), null);
+  assert.equal(MR.manageTabFor(fb), 'inbox');
+  assert.equal(MR.judgesNote(fb).text, 'Aspetta la fusione di #700, poi entra in coda da solo.');
+  assert.equal(MR.reasonText('attesa_origine'), 'aspetta la fusione del feedback da cui nasce');
+});
+
+test('bloccato con l’origine: rosso come un blocco di sicurezza, e il triangolo dice perché', () => {
+  const fb = conOrigine('design', 'origine_bloccata', { l1Category: 'dangerous', l1Reasons: ['origine_bloccata'] });
+  const b = MR.classifyBlock(fb);
+  assert.equal(b.reason, 'origine_bloccata');
+  assert.equal(b.color, '#c0392b');
+  assert.match(MR.judgesNote(fb).text, /^Fermo perché il feedback da cui nasce \(#700\) è stato bloccato: decidi tu\.$/);
+  const l1 = MR.livelloL1(fb);
+  assert.equal(l1.esito, 'pericoloso');
+  assert.ok(l1.pannello.righe.some((r) => r.valore.includes('il feedback da cui nasce è stato bloccato')));
+  assert.equal(MR.manageTabFor(fb), 'inbox');
+});
+
+test('origine chiusa senza fusione o sparita: nei Ricevuti, e la frase lo dice al posto di «aspetta la tua approvazione»', () => {
+  assert.equal(MR.judgesNote(conOrigine('aligned', 'origine_chiusa')).text, 'Il feedback da cui nasce (#700) si è chiuso senza fusione: decidi tu.');
+  assert.equal(MR.judgesNote(conOrigine('aligned', 'origine_mancante')).text, 'Il feedback da cui nasce (#700) non c’è più: decidi tu.');
+  assert.equal(MR.manageTabFor(conOrigine('aligned', 'origine_chiusa')), 'inbox');
+});
