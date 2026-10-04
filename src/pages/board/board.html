@@ -197,6 +197,11 @@
     .bd-mia-testo { white-space: pre-wrap; color: var(--sn-fg); }
     .bd-mia-allegati { color: var(--sn-muted); }
     .bd-mia-risposta { color: var(--sn-fg); padding-left: 10px; border-left: 2px solid var(--sn-success); }
+    .bd-mia-menu { position: fixed; right: auto; top: auto; min-width: 160px; z-index: 50; }
+    .bd-mia-menu:focus { outline: none; }
+    .bd-mia-menu .sn-select-option:hover, .bd-mia-menu .sn-select-option:focus {
+      background-color: rgba(var(--sn-accent-rgb), 0.18); outline: none;
+    }
     .bd-mie-altre {
       align-self: flex-start; margin-top: 8px; font: inherit; font-size: 13px; cursor: pointer;
       color: var(--sn-muted); background: none; border: none; padding: 2px 0; text-decoration: underline;
