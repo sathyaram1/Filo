@@ -277,6 +277,10 @@ function get() {
     if (typeof remoteModels.providerSort === 'string') {
       out.providerSort = remoteModels.providerSort.trim();
     }
+    // #1004 — gli elenchi delle pagine delicate (posta, banche, sanità): ogni categoria remota sostituisce la sua.
+    if (remoteModels.sitiDelicati && typeof remoteModels.sitiDelicati === 'object') {
+      out.sitiDelicati = remoteModels.sitiDelicati;
+    }
     if (Array.isArray(remoteModels.modelRegistryDeleted)) {
       for (const nick of remoteModels.modelRegistryDeleted) {
         if (typeof nick !== 'string' || !nick) continue;

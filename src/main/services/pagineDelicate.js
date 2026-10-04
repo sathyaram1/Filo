@@ -46,10 +46,6 @@ async function filtro(settingsIn) {
   return (url) => PD.classifica(url, opzioni);
 }
 
-function dimentica() {
-  conCampi.clear();
-}
-
-globalThis.SN_DELICATE = { segnaCampi, haCampi, filtro, dimentica };
+globalThis.SN_DELICATE = { segnaCampi, haCampi, filtro };
 
 module.exports = globalThis.SN_DELICATE;
