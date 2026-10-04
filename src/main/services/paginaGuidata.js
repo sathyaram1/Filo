@@ -271,7 +271,8 @@ function paginaGuidata(regoleComandi) {
       el.tagName.toUpperCase() === 'INPUT' ? el.value : ''].filter(Boolean).map(norm);
   }
   const comando = (n, parole = 5) => !!n && n.split(' ').length <= parole && RC.vietato(n);
-  const RIQUADRI = '[role=dialog],[role=alertdialog],[role=menu],[role=listbox],[role=region],[role=form],form';
+  const FINESTRE = '[role=dialog],[role=alertdialog],[role=menu],[role=listbox]';
+  const RIQUADRI = `${FINESTRE},[role=region],[role=form],form`;
   // Il nome di un riquadro: la sua etichetta o il suo primo titolo («Programma invio», «Conferma il pagamento»).
   function nomiRiquadro(c) {
     const out = [c.getAttribute('aria-label') || ''];
@@ -281,7 +282,8 @@ function paginaGuidata(regoleComandi) {
     if (h) out.push(breve(h.textContent, 160));
     return out.filter((s) => s.trim()).map(norm);
   }
-  // Una scelta dentro un riquadro che invia o paga invia o paga anche lei, comunque si chiami («Domani mattina, 8:00»).
+  // Una scelta in una finestra che invia o paga invia o paga anche lei, comunque si chiami («Domani mattina, 8:00»);
+  // in una pagina o in un modulo conta solo per il «Conferma» nudo, perché lì il titolo può essere l'oggetto di una mail.
   function vietato(el) {
     const t = tipoDi(el);
     const nomi = nomiDi(el);
@@ -292,7 +294,7 @@ function paginaGuidata(regoleComandi) {
     const nudo = nomi.some(RC.nudo);
     for (let c = el.parentElement && el.parentElement.closest(RIQUADRI); c; c = c.parentElement && c.parentElement.closest(RIQUADRI)) {
       const nc = nomiRiquadro(c);
-      if (nc.some((n) => comando(n, 8))) return true;
+      if (c.matches(FINESTRE) && nc.some((n) => comando(n, 8))) return true;
       if (nudo && nc.some(RC.cosa)) return true;
     }
     return false;
@@ -773,6 +775,6 @@ function paginaGuidata(regoleComandi) {
 }
 
 const MONDO = 1534;
-const CODICE = `(${paginaGuidata.toString()})();`;
+const CODICE = `(${paginaGuidata.toString()})(${regoleComandi.toString()});`;
 
-module.exports = { MONDO, CODICE };
+module.exports = { MONDO, CODICE, regoleComandi };

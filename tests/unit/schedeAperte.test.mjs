@@ -8,7 +8,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const Schede = require('../../src/main/services/schedeAperte.js');
 const Posta = require('../../src/main/services/postaGmail.js');
-const { CODICE, MONDO } = require('../../src/main/services/paginaGuidata.js');
+const { CODICE, MONDO, regoleComandi } = require('../../src/main/services/paginaGuidata.js');
 
 test('le pagine dell\'account Google non si leggono e non si toccano, Gmail sì', () => {
   for (const u of ['https://myaccount.google.com/security', 'https://accounts.google.com/v3/signin?service=mail',
@@ -55,4 +55,24 @@ test('il copione della pagina è codice valido, in un mondo suo', () => {
   assert.equal(MONDO, 1534);
   // Un carattere invisibile scritto per davvero nel sorgente spezzerebbe una regex senza dirlo.
   assert.equal(/[\u2028\u2029\u200b-\u200f\ufeff]/.test(CODICE), false);
+});
+
+// Un clic che invia, paga o cancella non esiste anche quando il sito lo chiama in un altro modo: «invio» e non
+// «invia», il verbo che chiude più la cosa che si chiude. Il «Conferma» nudo lo decide il riquadro (spec).
+test('i nomi dei comandi che inviano o pagano si riconoscono nelle forme comuni, e i nomi innocui no', () => {
+  const R = regoleComandi();
+  for (const n of ['invia', 'altre opzioni di invio', 'programma invio', 'schedule send', 'conferma ordine',
+    'conferma l\'ordine', 'effettua l\'ordine', 'esegui bonifico', 'autorizza pagamento', 'conferma il pagamento',
+    'completa l\'acquisto', 'conferma operazione', 'ordina ora', 'paga ora', 'elimina definitivamente', 'segnala come spam']) {
+    assert.equal(R.vietato(n), true, n);
+  }
+  for (const n of ['rispondi', 'inoltra', 'posta inviata', 'inviati', 'mostra altro', 'ordina per data', 'pagamenti',
+    'metodi di pagamento', 'i miei ordini', 'conferma']) {
+    assert.equal(R.vietato(n), false, n);
+  }
+  assert.equal(R.nudo('conferma'), true);
+  assert.equal(R.nudo('ok'), true);
+  assert.equal(R.nudo('conferma indirizzo email'), false);
+  assert.equal(R.cosa('riepilogo del pagamento'), true);
+  assert.equal(R.cosa('il tuo profilo'), false);
 });

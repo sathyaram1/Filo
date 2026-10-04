@@ -111,6 +111,39 @@ test('una scheda dietro: Filo legge il testo che si vede, apre e scrive come una
   expect(dopo).toContain('Spedizione gratuita fino a domenica.');
 });
 
+// Gmail in italiano e una cassa fatta di soli div: i comandi che spediscono o pagano hanno nomi che non dicono
+// «invia» o «paga», e la scelta che spedisce sta in una finestra che non lo ripete.
+const SPEDISCONO = `<!doctype html><html><head><meta charset="utf-8"><title>Pagine che spediscono</title></head><body>
+<div role="button" onclick="window.__clic.push('altre')">Altre opzioni di invio</div>
+<div role="menu"><div role="menuitem" onclick="window.__clic.push('programma')">Programma invio</div></div>
+<div role="dialog"><h2>Programma invio</h2><div role="menuitem" onclick="window.__clic.push('domani')">Domani mattina, 5 ott, 8:00</div></div>
+<div role="button" onclick="window.__clic.push('ordine')">Conferma ordine</div>
+<div role="button" onclick="window.__clic.push('bonifico')">Esegui bonifico</div>
+<div role="button" onclick="window.__clic.push('autorizza')">Autorizza pagamento</div>
+<section role="region" aria-label="Riepilogo"><h3>Conferma il pagamento</h3><div role="button" onclick="window.__clic.push('conferma')">Conferma</div></section>
+<div role="button" onclick="window.__clic.push('ordini')">I miei ordini</div>
+<script>window.__clic = [];</script>
+</body></html>`;
+
+test('i pulsanti che spediscono o pagano con un altro nome non si premono, e quelli che mostrano sì', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const pagina = await testServer.openReady(openTab, SPEDISCONO);
+  await dietro(shell);
+  const page = await home(app);
+  const S = 'Pagine che spediscono';
+  const vietati = ['Altre opzioni di invio', 'Programma invio', 'Domani mattina', 'Conferma ordine', 'Esegui bonifico', 'Autorizza pagamento', 'Conferma'];
+  await modello(app, [
+    { toolCalls: vietati.map((e, k) => ({ id: `v${k}`, name: 'APRI_ELEMENTO', arguments: { scheda: S, elemento: e } })) },
+    { toolCalls: [{ id: 'ok', name: 'APRI_ELEMENTO', arguments: { scheda: S, elemento: 'I miei ordini' } }] },
+    { text: 'Fatto.' },
+  ]);
+  await chiedi(page, 'programma la mail per domani e paga');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Fatto.' })).toBeVisible({ timeout: 60_000 });
+  expect(await pagina.evaluate(() => window.__clic)).toEqual(['ordini']);
+  const rifiuti = (await ultimoEsito(app, 1)).slice(-vietati.length);
+  for (const r of rifiuti) expect(r).toContain('invia, paga, pubblica o cancella');
+});
+
 const BLOG = `<!doctype html><html><head><meta charset="utf-8"><title>Blog di tutti</title></head><body>
 <article><p>Un articolo.</p><span class="author">Anna</span></article>
 <div class="comment"><span class="author">Bruno</span> Bel post.</div>
