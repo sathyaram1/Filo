@@ -2546,16 +2546,17 @@ class TabManager {
       // partizione per-sito; altrimenti null = sessione condivisa), per non
       // spezzare un eventuale login Google già presente in Filo.
       const accesso = tab.isInternal === false && isAuthPopup(url);
+      // Anche la finestra di un accesso vero nasce da un clic su «Accedi con…»: l'indirizzo lo sceglie la pagina.
+      if (tab.isInternal === false && this.security.blockPopups
+        && ((!accesso && disposition === 'new-window') || !Permessi.gestoPerUnaFinestra(wc))) {
+        this._notifyPopupBlocked(tab.id, url);
+        return { action: 'deny' };
+      }
       if (accesso) {
         if (this._maybeBlockNavigation(tab, url)) return { action: 'deny' };
         // Una pagina sotto l'avviso del sito pericoloso non apre finestre, che starebbero fuori dall'avviso: la
         // finestrella diventa una scheda, dove l'avviso c'è.
         if (!tab.sbAvviso) return this._allowAuthPopup(url);
-      }
-      if (!accesso && tab.isInternal === false && this.security.blockPopups
-        && (disposition === 'new-window' || !Permessi.gestoPerUnaFinestra(wc))) {
-        this._notifyPopupBlocked(tab.id, url);
-        return { action: 'deny' };
       }
       // #170.3 — la lista dei siti bloccati la applica openTab; un «Apri comunque»
       // dato qui vale anche per le schede che apre sullo stesso sito.
