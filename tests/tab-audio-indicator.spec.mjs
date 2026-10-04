@@ -61,8 +61,10 @@ test('la scheda che suona tiene la favicon, e l\'icona audio sta dopo il titolo 
     }));
     expect(colori.icona).toBe(colori.titolo);
   }
-  const glow = await shell.locator('.tab.audible').first().evaluate((el) => getComputedStyle(el).animationName);
-  expect(glow).toContain('tab-glow-pulse');
+  // Scheda e stile letti nello stesso istante: la barra ridisegna le schede, e una appena sostituita dà uno stile vuoto (#944).
+  await expect.poll(() => shell.evaluate(() => [...document.querySelectorAll('.tab.audible')]
+    .map((el) => getComputedStyle(el).animationName)), { timeout: 3000 })
+    .toEqual(['tab-glow-pulse', 'tab-glow-pulse']);
 });
 
 test('clic sull\'icona audio: silenzia e al suo posto compare il tasto per riattivare, che la riporta', async ({ app, shell, openTab, testServer }) => {
