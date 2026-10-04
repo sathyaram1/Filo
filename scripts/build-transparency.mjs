@@ -184,6 +184,7 @@ function renderPlain(body, sources) {
       return `${label} [${idx + 1}]`;
     })
     .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
     .replace(/^##\s+/gm, '\n')
     .replace(/^---$/gm, '')
     .replace(/\n{3,}/g, '\n\n')
