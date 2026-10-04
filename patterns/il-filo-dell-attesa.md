@@ -52,7 +52,9 @@ filo, i nodi, il gomitolo e i titoli); cosa succede lo decide il blocco
   riga sola: il riassunto (`summarizeActivity`) e la durata del lavoro. Sono
   gli stessi punti del filo mandati sulla spirale per lunghezza d'arco, non una
   figura nuova: un lavoro lungo fa un gomitolo più grosso, e srotolare è la
-  stessa animazione al contrario. Se dopo il testo arriva un'azione, quel
+  stessa animazione al contrario. Il riassunto si sposta quanto serve a
+  lasciare a un gomitolo grosso l'aria di uno piccolo (prova J dello spec).
+  Se dopo il testo arriva un'azione, quel
   testo era una nota: il gomitolo si srotola e il lavoro continua.
 - **Fermare.** Mentre Filo lavora il posto dell'invio lo prende un quadrato
   (`#stopBtn`, stesso posto, colore d'accento) e Invio fa la stessa cosa:

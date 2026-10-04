@@ -505,3 +505,50 @@ test('I — chi ferma insistendo (doppio clic, Invio ripetuto o tenuto) ferma e 
   expect(await chiamate()).toBe(4);
   await ripristina(app);
 });
+
+test('J — un gomitolo grosso lascia al riassunto la stessa aria di uno piccolo', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await configureModel(app);
+  await senzaAccoglienza(app, page);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const aria = (blocco) => blocco.evaluate((b) => {
+    const filo = b.querySelector('.dash-activity-filo-tratto').getBoundingClientRect();
+    return b.querySelector('.dash-activity-label').getBoundingClientRect().left - filo.right;
+  });
+  await copione(app, [
+    { pensa: ['Un timer. '], ogni: 120, dopoStrumenti: 100, strumenti: [{ id: 'j0', name: 'TIMER', arguments: '{"secondi":90,"etichetta":"Uno"}' }] },
+    { pensa: ['Fine. '], ogni: 120, testo: 'Un timer.' },
+  ]);
+  await page.locator('#input').fill('un timer');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Un timer.' })).toBeVisible({ timeout: 10_000 });
+  const piccolo = page.locator('.dash-activity').first();
+  await expect(piccolo).toHaveAttribute('data-filo', 'gomitolo');
+  const ariaPiccolo = await aria(piccolo);
+
+  const passi = [];
+  for (let i = 0; i < 10; i++) {
+    passi.push({ pensa: [`Passo ${i} del lavoro lungo. `], ogni: 100, dopoStrumenti: 100, strumenti: [{ id: `jl${i}`, name: 'TIMER', arguments: `{"secondi":${100 + i},"etichetta":"T${i}"}` }] });
+  }
+  passi.push({ pensa: ['Fine. '], ogni: 120, testo: 'Dieci timer.' });
+  await copione(app, passi);
+  await page.locator('#input').fill('dieci timer');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Dieci timer.' })).toBeVisible({ timeout: 20_000 });
+  const grosso = page.locator('.dash-activity').last();
+  await expect(grosso).toHaveAttribute('data-filo', 'gomitolo');
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: 'tests/.shots/filo-attesa-gomitolo-grosso.png' });
+  expect(await aria(grosso)).toBeGreaterThanOrEqual(Math.min(ariaPiccolo, 8) - 1);
+  // Srotolato, il riassunto torna in fila con le righe sotto.
+  await grosso.locator('.dash-activity-head').click();
+  await expect(grosso).toHaveAttribute('data-filo', 'srotolato');
+  const allineati = await grosso.evaluate((b) => Math.abs(
+    b.querySelector('.dash-activity-label').getBoundingClientRect().left
+    - b.querySelector('.dash-activity-seg-head').getBoundingClientRect().left,
+  ));
+  expect(allineati).toBeLessThan(1.5);
+  await ripristina(app);
+});
