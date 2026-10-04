@@ -97,6 +97,13 @@
   function tonoDa(v) {
     return TONI[String(v == null ? '' : v).trim().toLowerCase()] || null;
   }
+  // «Torna com'era di serie» detto per una voce: non è il nome di una voce, né lo è un sì/no.
+  const VOCE_AUTOMATICA = /^(?:auto|automatic[ao]|nessun[ao]?|niente|default|predefinit[ao]|di serie|standard|originale|normale|quella di serie)$/;
+  function voceAutomatica(v) {
+    if (typeof v === 'boolean' || typeof v === 'number') return true;
+    const s = String(v == null ? '' : v).trim().toLowerCase().replace(/[.!]+$/, '');
+    return VOCE_AUTOMATICA.test(s) || parsePrefBool(s) !== null;
+  }
   // Lo stesso tetto del campo nelle Preferenze.
   const NOTIF_SEC_MAX = 120;
   const VOCE_MAX = 200;
@@ -464,6 +471,7 @@
       build(v) {
         const s = String(v == null ? '' : v).trim();
         if (!s) return null;
+        if (voceAutomatica(v)) return { partial: { tts: { voice: '' } }, label: 'Voce di lettura → automatica' };
         return { partial: { tts: { voice: s } }, label: `Voce di lettura → "${s}"` };
       },
     },
@@ -478,7 +486,7 @@
         const s = String(v == null ? '' : v).trim();
         if (!s) return null;
         const low = s.toLowerCase();
-        if (['auto', 'automatica', 'automatico', 'lingua', 'nessuna', 'default'].includes(low)) {
+        if (voceAutomatica(v) || low === 'lingua') {
           return { partial: { tts: { modelVoice: '' } }, label: 'Voce naturale → automatica (segue la lingua del testo)' };
         }
         const Voices = global.SN_TTS_VOICES;
@@ -987,10 +995,33 @@
     for (const setter of PREF_SETTERS) {
       if (setter.keys.includes(key)) return withLevel(setter);
     }
+    const nk = pianoChiave(key);
+    const esatto = PREF_SETTERS.find((s) => s.keys.some((k) => pianoChiave(k) === nk));
+    if (esatto) return withLevel(esatto);
+    // Una chiave detta a metà vale solo se indica una voce sola: «pubblicità» è sia il blocco sia il salto
+    // dei video, e scegliere la prima cambierebbe quella sbagliata. Vince la chiave più lunga contenuta in quella
+    // detta («adblocker» → adblock); se nessuna è contenuta, la detta deve stare dentro le chiavi di una voce sola.
+    let migliore = null;
+    let lunga = 0;
+    let pari = false;
     for (const setter of PREF_SETTERS) {
-      if (setter.keys.some((k) => key.includes(k) || k.includes(key))) return withLevel(setter);
+      for (const k of setter.keys) {
+        const pk = pianoChiave(k);
+        if (!pk || !nk.includes(pk)) continue;
+        if (pk.length > lunga) { migliore = setter; lunga = pk.length; pari = false; } else if (pk.length === lunga && setter !== migliore) pari = true;
+      }
+    }
+    const candidati = migliore && !pari ? [migliore]
+      : (migliore ? PREF_SETTERS.filter((s) => s.keys.some((k) => pianoChiave(k).length === lunga && nk.includes(pianoChiave(k))))
+        : PREF_SETTERS.filter((s) => s.keys.some((k) => pianoChiave(k).includes(nk))));
+    if (candidati.length === 1) return withLevel(candidati[0]);
+    if (candidati.length > 1) {
+      return { rifiuto: `«${String(rawKey).trim().slice(0, 60)}» può voler dire più impostazioni (${candidati.map((s) => s.keys[0]).join(', ')}): usa la chiave esatta di quella che l'utente ha chiesto` };
     }
     return null;
+  }
+  function pianoChiave(s) {
+    return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[_\-]+/g, ' ').replace(/\s+/g, ' ').trim();
   }
 
   // Una lezione è la sorella dello stile (#592): il popup mostra il testo che si
