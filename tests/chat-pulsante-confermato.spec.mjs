@@ -1,7 +1,7 @@
-// Verifica #949 giro 8, rilievo 1: dopo l'OK il pulsante nella risposta di Filo dice il risultato vero.
+// Dopo l'OK il pulsante nella risposta di Filo dice il risultato vero (#949), come la riga del diario.
 // Cancellare a parole le pagine visitate di un sito, confermato, non deve dire «Nessuna pagina visitata».
 
-import { test, expect } from '../../fixtures/electron.mjs';
+import { test, expect } from './fixtures/electron.mjs';
 
 async function homeDi(app) {
   const deadline = Date.now() + 10_000;
@@ -28,7 +28,7 @@ test('cancellare le pagine di un sito dalla chat: dopo l\'OK il pulsante dice qu
       await globalThis.SN_IL_FILO.registraVisita({ url, titolo });
     }
     const orig = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
-    globalThis.__g8_restore = () => { globalThis.SN_PROVIDERS.streamCompleteWithFallback = orig; };
+    globalThis.__pc_restore = () => { globalThis.SN_PROVIDERS.streamCompleteWithFallback = orig; };
     let n = 0;
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onDelta }) => {
       n += 1;
@@ -47,9 +47,9 @@ test('cancellare le pagine di un sito dalla chat: dopo l\'OK il pulsante dice qu
   await expect.poll(() => chat.evaluate(() => !!window.SN_CONFIRM_UI._test.state()), { timeout: 5_000 }).toBe(true);
   await chat.evaluate(() => window.SN_CONFIRM_UI._test.click('danger') || window.SN_CONFIRM_UI._test.click('ok'));
   await expect(pulsante).toHaveText(/^✓/, { timeout: 8_000 });
-  await chat.screenshot({ path: 'tests/.shots/verifica-949-g8-pulsante.png' }).catch(() => {});
+  await chat.screenshot({ path: 'tests/.shots/chat-pulsante-confermato.png' }).catch(() => {});
   const testo = await pulsante.textContent();
   expect(testo, 'le due pagine sono state cancellate: il pulsante non può dire che non ce n\'erano').not.toMatch(/Nessuna pagina/);
   expect(testo).toMatch(/2 pagine/);
-  await app.evaluate(() => { try { globalThis.__g8_restore?.(); } catch (_) {} });
+  await app.evaluate(() => { try { globalThis.__pc_restore?.(); } catch (_) {} });
 });

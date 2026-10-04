@@ -374,3 +374,30 @@ test('un\'ora di inattività si scrive al singolare', () => {
   assert.equal(P.buildPreferencePartial('ore_inattivita', '1').label, 'Archivia dopo 1 ora di inattività');
   assert.equal(P.buildPreferencePartial('ore_inattivita', '3').label, 'Archivia dopo 3 ore di inattività');
 });
+
+test('la domanda dell\'utente passata com\'è come ricerca: il pezzo eliso e la punteggiatura non sono parole da cercare', () => {
+  const s = { security: { adblock: { enabled: false }, siteBlock: { blacklist: ['facebook.com'] } } };
+  const tutto = V.righePerModello(s, { cerca: 'com\'è impostato?', sistema: 'linux' });
+  assert.equal(tutto.trovate, tutto.totale);
+  assert.ok(tutto.righe.includes('- blocco di pubblicità e tracker: spento [chiave blocco_pubblicita, chiede conferma]'));
+  assert.ok(!tutto.righe.join('\n').includes('con la ricerca'), '«com» di «com\'è» non è un sito da cercare');
+  const tema = V.righePerModello({ theme: 'dark' }, { cerca: 'che tema ho?' });
+  assert.ok(tema.trovate > 0 && tema.trovate < tema.totale);
+  assert.ok(tema.righe.includes('- tema: scuro [chiave tema]'));
+  const anteprima = V.righePerModello({}, { cerca: 'com\'è la dimensione dell\'anteprima?' }).righe.join('\n');
+  assert.match(anteprima, /dimensione dell'anteprima delle schede: media/);
+  assert.doesNotMatch(anteprima, /stile dell'agente|IP locale/);
+});
+
+test('le ore di inattività capiscono l\'unità detta: «2 giorni» sono 48 ore, «una settimana» 168', () => {
+  const ore = (v) => { const r = P.buildPreferencePartial('ore_inattivita', v); return r && r.partial ? r.partial.autoArchive.idleHours : r; };
+  assert.equal(ore('2 giorni'), 48);
+  assert.equal(ore('un giorno'), 24);
+  assert.equal(ore('una settimana'), 168);
+  assert.equal(ore('1 settimana'), 168);
+  assert.equal(ore('90 minuti'), 2);
+  assert.equal(ore('mezza giornata'), 12);
+  assert.equal(ore('12 ore'), 12);
+  assert.equal(ore(3), 3);
+  assert.equal(ore('mai'), null);
+});
