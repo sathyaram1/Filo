@@ -1419,7 +1419,12 @@ async function preparaRinomina(action, sender) {
     }
   }
   candidati = [...new Set(candidati)];
-  if (!candidati.length) return { proposte: [], saltati, oltre: 0, errore: elenco.length || cartella ? '' : 'indica i file o una cartella' };
+  if (!candidati.length) {
+    const errore = !elenco.length && !cartella ? 'indica i file o una cartella'
+      : (!elenco.length && !vero(action.tutti ?? action.all)
+        ? 'nella cartella ogni file ha già un nome che dice cos\'è: se vuoi rinominarli lo stesso, chiedilo' : '');
+    return { proposte: [], saltati, oltre: 0, errore };
+  }
   const oltre = Math.max(0, candidati.length - LOTTO_RINOMINA);
   candidati = candidati.slice(0, LOTTO_RINOMINA);
   const dettato = typeof action.nome === 'string' && action.nome.trim() && candidati.length === 1 ? action.nome : '';
