@@ -242,7 +242,7 @@
 
   global.SN_SEGNALAZIONI_MIE = {
     CHIAVE_BACKUP, STATI,
-    nomiAllegati, voce, applica,
+    nomiAllegati, voce, applica, rimandate,
     registra, inviata, nonPartita, chiusa, elenco, togli, svuota, importa, cartella, haPrecedenti,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
