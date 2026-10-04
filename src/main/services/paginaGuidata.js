@@ -688,7 +688,8 @@ function paginaGuidata() {
       testo: f.corpo ? String(f.corpo.innerText || '') : '',
     };
   }
-  function compila({ a = '', oggetto = '', testo = '' } = {}) {
+  // `prima` è il testo che Filo aveva scritto in questa bozza: quello si sostituisce, quello dell'utente resta sotto.
+  function compila({ a = '', oggetto = '', testo = '', prima = '' } = {}) {
     const f = bozzaAperta();
     if (!f || !f.corpo) return { ok: false, motivo: 'nessuna-bozza' };
     if (a) {
@@ -697,8 +698,10 @@ function paginaGuidata() {
     }
     if (oggetto && f.oggetto) scriviIn(f.oggetto, String(oggetto));
     if (testo) {
-      const vuoto = !norm(f.corpo.innerText || '');
-      scriviIn(f.corpo, String(testo), { inCima: vuoto && f.corpo.childNodes.length > 0 });
+      const attuale = norm(f.corpo.innerText || '');
+      if (!attuale) scriviIn(f.corpo, String(testo), { inCima: f.corpo.childNodes.length > 0 });
+      else if (prima && attuale === norm(prima)) scriviIn(f.corpo, String(testo));
+      else scriviIn(f.corpo, `${testo}\n\n`, { inCima: true });
     }
     return { ok: true };
   }
@@ -710,7 +713,7 @@ function paginaGuidata() {
       stato, righe, apriRiga, espandi, conversazione, vaiA, cerca, inviaRicerca,
       apriScrivi, apriRisposta, compila, letturaBozza, bozzaAperta: () => {
         const f = bozzaAperta();
-        return f ? { a: !!f.a, oggetto: !!f.oggetto, corpo: !!f.corpo } : null;
+        return f ? { a: !!f.a, oggetto: !!f.oggetto, corpo: !!f.corpo, dialogo: f.radice.getAttribute('role') === 'dialog' } : null;
       },
     },
   };
