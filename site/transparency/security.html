@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Filo — Sicurezza</title>
-<meta name="description" content="Questa sezione non è ancora scritta." />
+<meta name="description" content="Come cerco i problemi, cosa succede quando li trovo, e i limiti di tutto questo." />
 <style>
 /* Documenti di trasparenza — foglio UNICO per le due superfici, così la pagina pubblica e quella interna
    non divergono: dentro Filo i colori vengono dai token del tema, sul sito da fallback e da :root qui sotto.
@@ -110,6 +110,17 @@
 .sn-doc li { margin-bottom: 0.55rem; }
 
 .sn-doc strong { font-weight: 600; }
+
+/* I comandi da copiare: si devono distinguere dalla prosa e andare a capo senza allargare la pagina. */
+.sn-doc code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 0.86em;
+  padding: 0.05em 0.35em;
+  background: var(--sn-hover, #ffffff);
+  border: 1px solid var(--sn-border, #e0dcd4);
+  border-radius: var(--sn-radius, 6px);
+  overflow-wrap: anywhere;
+}
 
 .sn-doc hr {
   border: 0;
@@ -233,16 +244,184 @@ html:not([data-sn-theme]) body {
     <a class="sn-doc-brand" href="../">Filo</a>
     <nav class="sn-nav">
       <a class="sn-nav-item" href="./models.html">Modelli</a>
-      <a class="sn-nav-item is-soon" href="./privacy.html" title="in arrivo" aria-label="Privacy: non ancora scritta">Privacy</a>
-      <a class="sn-nav-item is-active is-soon" href="./security.html" title="in arrivo" aria-label="Sicurezza: non ancora scritta">Sicurezza</a>
+      <a class="sn-nav-item" href="./privacy.html">Privacy</a>
+      <a class="sn-nav-item is-active" href="./security.html">Sicurezza</a>
       <a class="sn-nav-item is-soon" href="./business.html" title="in arrivo" aria-label="Come si sostiene: non ancora scritta">Come si sostiene</a>
     </nav>
   </header>
   <h1>Sicurezza</h1>
-  <p class="sn-doc-sub">Questa sezione non è ancora scritta.</p>
+  <p class="sn-doc-sub">Come cerco i problemi, cosa succede quando li trovo, e i limiti di tutto questo.</p>
+  <p class="sn-doc-meta">Ultima revisione: 2026-10-04</p>
   <article id="doc-body">
-<p>Quello che c’è scritto: <a href="./models.html">Politica sui modelli</a>.</p>
+<p>Filo è un caso strano per la sicurezza, per due motivi:</p>
+<ol>
+<li>è un programma che cambia da solo, guidato dalle richieste degli utenti: il suo codice lo scrivono interamente agenti AI (quasi solo Claude);</li>
+<li>Filo stesso usa agenti AI che possono agire sul tuo computer.</li>
+</ol>
+<p>A questi due problemi, che quasi nessun altro software ha, si sommano quelli classici (per esempio un difetto che permette di rubare dati), e una domanda che vale per qualunque programma scaricato: il file che hai installato viene davvero dal codice che dico? Il documento risponde nell&#39;ordine.</p>
+<h2 id="un-programma-che-si-riscrive-da-solo">Un programma che si riscrive da solo</h2>
+<p>Il percorso è questo: un utente scrive un feedback dall&#39;app, un agente lo lavora e produce una modifica al codice, la modifica viene pubblicata e arriva a tutti con l&#39;aggiornamento automatico. È il cuore di Filo, ed è anche il suo rischio più particolare: il feedback è testo scritto da uno sconosciuto, e un testo costruito apposta potrebbe provare a ingannare l&#39;agente e fargli scrivere codice dannoso. Se ci riuscisse, il danno non sarebbe su un computer: sarebbe su tutti.</p>
+<p><strong>Com&#39;è oggi.</strong> Dalla correzione in poi il giro va da solo: una modifica che supera tutti i controlli viene fusa nel codice dal server, e ogni sei ore l&#39;ultima versione che ha passato la suite completa dei test diventa un aggiornamento per tutti. All&#39;ingresso invece decido io. Per ogni tipo di mittente (gli utenti, Filo stesso quando segnala un suo limite, i miei agenti, io) c&#39;è un interruttore che dice se un feedback giudicato sicuro può entrare in lavorazione da solo o deve aspettare un mio OK. Sopra a tutti c&#39;è un interruttore generale, che è anche il freno d&#39;emergenza: spento, nessun feedback entra in lavorazione senza di me. Li accendo per gradi, man mano che il sistema dimostra di reggere.</p>
+<p>La difesa non è un muro solo: sono cinque livelli, e funzionano come le difese di un organismo. Nessuno, da solo, è infallibile; è l&#39;insieme a rendere difficile l&#39;infezione, perché ogni strato ha una natura diversa e ciò che supera uno strato si ferma su un altro.</p>
+<ol>
+<li><strong>Il filtro all&#39;ingresso</strong> (senza AI, sul server). Prima che un modello legga il feedback, un filtro deterministico guarda mittente e comportamento: gli account e i testi con i segni tipici di un inganno vengono fermati e messi in attesa di revisione umana, i comportamenti da spam rallentati. Un attacco ben fatto, da un account con una storia pulita, qui può passare: questo livello non ferma il colpo singolo, impedisce i cento tentativi e l&#39;intasamento. È la pelle: non blocca tutto, ma costringe tutto a passare da pochi ingressi sorvegliati.</li>
+<li><strong>I giudici.</strong> Più modelli, scelti apposta diversi tra loro, leggono il feedback e lo classificano: attacco, spam, fuori linea col design di Filo, o richiesta legittima. Vale il verdetto più severo del gruppo: per passare bisogna ingannarli tutti insieme. Chi viene classificato come attaccante resta fuori.</li>
+<li><strong>L&#39;agente può rifiutare.</strong> Chi scrive il codice non è obbligato a eseguire: ha l&#39;istruzione esplicita di fermarsi e segnalare se un compito, anche a lavoro iniziato, si rivela rischioso, insensato o sospetto.</li>
+<li><strong>La verifica cieca.</strong> Un&#39;istanza separata esamina la modifica senza mai vedere il feedback che l&#39;ha originata: giudica il codice in sé. Anche se esistesse una parola magica capace di prendere il controllo di qualunque modello, questo controllo non la leggerebbe mai.</li>
+<li><strong>Il pavimento deterministico.</strong> Controlli senza AI sul codice prodotto, che le parole non possono aggirare: ogni modifica alle aree critiche finisce in revisione umana. Per esempio l&#39;aggiornamento automatico, il login, la gestione delle chiavi, le protezioni, l&#39;aggiunta di librerie o di servizi esterni. Sono tarati alla massima paranoia: un falso positivo costa un mio clic, un falso negativo costerebbe molto di più.</li>
+</ol>
+<p>A valle dei cinque livelli c&#39;è la pubblicazione, che ha le sue regole. Sul ramo principale del codice non scrive nessun umano e nessun agente: scrive solo il server, con un&#39;identità sua, dopo aver rifatto per conto suo i controlli deterministici sulla versione esatta che fonde. Le modifiche alle aree sensibili le sblocco solo io, con un clic dentro l&#39;app. Nessuno strumento da terminale lo fa, ed è voluto: sulla macchina di sviluppo gira un LLM, e un&#39;approvazione che un LLM può dare da solo non è un&#39;approvazione. Infine l&#39;eseguibile lo costruisce un&#39;esecuzione pubblica su GitHub, a partire dal codice pubblico: come controllarlo lo spiego più sotto.</p>
+<h2 id="le-difese-che-imparano">Le difese che imparano</h2>
+<p>L&#39;idea più importante di questo sistema non sta in nessuno dei cinque livelli: è che l&#39;insieme impari, come un sistema immunitario. I meccanismi sono tre, e oggi sono a punti diversi.</p>
+<p><strong>Ogni attacco lascia memoria.</strong> Ogni feedback classificato come attacco finisce in un archivio a parte. Il piano è rafforzare periodicamente uno dei giudici proprio su quell&#39;archivio: come dopo un&#39;infezione restano gli anticorpi, dopo un attacco i giudici riconoscerebbero meglio quella famiglia di inganni. Oggi l&#39;archivio si riempie, ma il giudice che dovrebbe impararne lavora ancora con istruzioni fisse.</p>
+<p><strong>Se le difese cadono, il sistema si ferma.</strong> Il piano: se un attacco riesce a ingannare tutti i giudici insieme (per essere fermato più avanti), la lavorazione dei feedback si blocca finché il gruppo non viene rinforzato con un giudice che a quell&#39;attacco resiste. È la febbre: fermarsi costa, ma continuare infetti costerebbe di più. Oggi questo arresto non scatta da solo: lo do io, con l&#39;interruttore generale.</p>
+<p><strong>Il vaccino è aperto a tutti.</strong> Un canale red team dentro l&#39;app permette a chiunque di mandare attacchi veri contro i giudici, mai contro il codice in produzione, con ricompense in crediti per chi li inganna. Sono attacchi veri nel contenuto ma incapaci di fare danno: esattamente ciò che serve per allenare le difese prima dell&#39;infezione vera. Il canale esiste, ma per ora è in pausa: torna dopo il rilascio pubblico.</p>
+<p>Quando tutti e tre saranno accesi, attaccare questo sistema sarà un pessimo affare: ogni tentativo lo lascerà più forte di come l&#39;ha trovato.</p>
+<p>Detto questo, <strong>i livelli sono giovani.</strong> I controlli descritti più sotto hanno già trovato punti da rinforzare, e ogni livello deve ancora ricevere test dedicati e varianti più robuste.</p>
+<p>Un&#39;ultima nota su cosa questo documento rivela: l&#39;architettura, non i parametri. Quali soglie fanno scattare i filtri, quali modelli fanno da giudici e come sono scritti i loro prompt restano riservati, perché sono il bersaglio. Per lo stesso motivo il codice del server che fa questi controlli non è pubblico, a differenza di quello dell&#39;app.</p>
+<h2 id="gli-agenti-dentro-filo">Gli agenti dentro Filo</h2>
+<p>Filo non si limita a rispondere in chat: agisce. Apre pagine, archivia schede, cambia l&#39;aspetto dell&#39;app, imposta timer, legge i documenti che gli chiedi e usa il terminale del tuo computer. Il rischio è quello della prima sezione, con un bersaglio diverso: l&#39;agente legge il web, e il web è testo scritto da sconosciuti. Là un testo ostile prova a entrare nel codice di tutti; qui prova a comandare l&#39;agente che agisce sulla tua macchina.</p>
+<p>La difesa poggia su una regola sola, applicata dappertutto: <strong>ogni azione che Filo può compiere ha un livello di rischio assegnato dal codice, mai deciso dall&#39;AI.</strong> Un&#39;azione che nel codice non ha un livello non parte. I livelli sono tre, e misurano una cosa concreta: quanto è reversibile l&#39;azione.</p>
+<ol>
+<li><strong>Reversibile del tutto.</strong> Si esegue subito, senza chiedere: avviare un timer, cambiare un colore, aprire un link. Sui link c&#39;è un&#39;eccezione. Visitare un indirizzo è comunque una comunicazione verso l&#39;esterno, quindi se l&#39;indirizzo sembra portare con sé dati che l&#39;agente aveva sotto gli occhi, l&#39;apertura sale di livello e si ferma su una conferma che ti mostra l&#39;indirizzo per intero. Lo stesso vale per una ricerca sul web.</li>
+<li><strong>Reversibile ma con possibili inconvenienti.</strong> Si ferma su una conferma che spiega cosa sta per succedere e quali sono i rischi, e parte solo col tuo OK. Per esempio inviare un feedback a tuo nome, archiviare le schede che non usi più, fissare una regola nella memoria di Filo.</li>
+<li><strong>Irreversibile.</strong> Cancellazioni e azioni senza ritorno. Qui la conferma ha attrito in più: devi scrivere tu la parola «conferma».</li>
+</ol>
+<p><strong>Il terminale.</strong> Dal 3 ottobre 2026 è acceso di serie. A fare la sicurezza non è l&#39;interruttore ma il livello di ogni singolo comando, che il codice calcola sul comando che sta per partire. I comandi che leggono soltanto, come guardare quanto spazio c&#39;è sul disco o quali file ci sono in una cartella, partono subito. Quelli che cambiano qualcosa chiedono un OK. Le cancellazioni, i comandi pericolosi e qualunque comando che il codice non riconosce chiedono la parola «conferma». Ogni comando dice prima a parole cosa fa, e sotto c&#39;è il comando vero. Il terminale si spegne dalle Preferenze, e per riaccenderlo dalla chat serve una conferma.</p>
+<p>Due difese di contorno che è giusto sapere. All&#39;agente è negato per costruzione chiudere finestre e schede, non per rischio ma per principio: ciò che stai guardando lo chiudi tu. E i documenti fuori dalla tua cartella utente (altri dischi, file nascosti, la cartella del profilo) li legge solo dopo un tuo OK.</p>
+<p><strong>Filo può essere manipolato in azioni non distruttive.</strong> Un sito potrebbe convincerlo a spingere un prodotto: comprarlo da solo non può, perché le azioni chiedono conferma, ma potrebbe parlartene meglio di quanto sarebbe giusto. Col progresso dei modelli questi attacchi funzionano sempre meno, ma il problema non è risolto.</p>
+<p><strong>Leggere non chiede permesso.</strong> I comandi che leggono e i documenti nella tua cartella utente partono senza conferma: un testo ostile che convincesse l&#39;agente a leggere un file privato lo metterebbe davanti al modello. Portarlo fuori dal computer è più difficile, perché un link o una ricerca che sembrano trasportare dati si fermano su una conferma; ma è un controllo che riconosce le forme note, non una garanzia.</p>
+<p><strong>Le conferme funzionano solo se le leggi.</strong> Quasi tutte le richieste di Filo sono innocue, ed è un bene con un effetto collaterale: dopo un po&#39; ci si abitua all&#39;idea che gli avvisi siano falsi allarmi e si smette di leggerli, e il giorno dell&#39;errore o della manipolazione vera il problema passa sotto gli occhi senza essere visto. La parola «conferma» per le azioni distruttive è rara apposta, per strappare attenzione almeno nei punti critici; ma nessuna conferma può obbligarti a leggerla.</p>
+<h2 id="da-dove-viene-il-file-che-hai-scaricato">Da dove viene il file che hai scaricato</h2>
+<p>Le versioni di Filo le costruisce e le pubblica un&#39;esecuzione automatica su GitHub, il flusso «Release Filo» del repository pubblico, partendo dal codice pubblico. Lo puoi controllare da te per ogni versione, in tre passi.</p>
+<ol>
+<li><strong>Il numero di controllo.</strong> Calcola l&#39;impronta SHA-256 del file che hai scaricato. Su Windows, nel prompt dei comandi aperto nella cartella del file: <code>certutil -hashfile Filo-Setup.exe SHA256</code>. Su Mac, nel Terminale: <code>shasum -a 256 Filo-Mac.dmg</code>. Su Linux: <code>sha256sum Filo-Linux.AppImage</code>. Poi apri la pagina delle versioni di Filo su GitHub<sup class="sn-ref"><a href="#fonte-1" aria-label="fonte 1">1</a></sup>: accanto a ogni file c&#39;è la sua impronta SHA-256, calcolata da GitHub quando il file è stato caricato. I due numeri devono essere uguali. La stessa impronta c&#39;è anche nell&#39;elenco delle versioni in formato macchina<sup class="sn-ref"><a href="#fonte-2" aria-label="fonte 2">2</a></sup>, alla voce digest di ogni file.</li>
+<li><strong>Chi l&#39;ha pubblicato.</strong> Sulla stessa pagina, in cima alla versione, c&#39;è chi l&#39;ha pubblicata: deve essere github-actions, cioè un&#39;esecuzione automatica del repository, non una persona.</li>
+<li><strong>Il codice di partenza.</strong> Ogni versione ha un&#39;etichetta, per esempio v0.2.231, che punta al commit esatto da cui è stata costruita: dalla pagina della versione, il link al commit ti porta a quel codice. Anche l&#39;esecuzione che l&#39;ha costruita è pubblica: fra le esecuzioni del flusso «Release Filo»<sup class="sn-ref"><a href="#fonte-3" aria-label="fonte 3">3</a></sup> c&#39;è quella che nel passo «Riepilogo» scrive «Pubblicata v0.2.231», e nel suo registro si leggono il commit di partenza e ogni passo della costruzione. GitHub tiene questi registri per un tempo limitato, di serie novanta giorni.</li>
+</ol>
+<p><strong>Cosa dimostrano questi passi, e cosa no.</strong> Dimostrano che il file è quello che un&#39;esecuzione pubblica del repository ha costruito da quel commit, e che nessuno l&#39;ha cambiato dopo. Non dimostrano due cose. La prima: durante la costruzione dentro l&#39;eseguibile entrano le chiavi dei servizi che Filo usa di serie, che nel codice pubblico non ci sono; quindi chi ricostruisce Filo dallo stesso commit non ottiene lo stesso identico file, e il confronto va fatto con l&#39;impronta pubblicata. La seconda: l&#39;installer non è firmato con un certificato. Senza, Windows e macOS non sanno dire chi l&#39;ha prodotto e ti mostrano un avviso, e questo controllo lo devi fare a mano invece che il sistema da solo. Dove l&#39;aggiornamento è automatico, Filo scarica dalla stessa pagina e confronta l&#39;impronta del file con quella pubblicata prima di installarlo: così sa che il file è arrivato intero, non chi l&#39;ha fatto.</p>
+<h2 id="la-sicurezza-classica-come-lavoro-accumulato">La sicurezza classica, come lavoro accumulato</h2>
+<p>L&#39;assunto su cui costruisco questa parte: la solidità di un sistema si misura dalla quantità di lavoro d&#39;attacco che ha subito. Oggi è vero in parte; lo sarà sempre di più man mano che i modelli diventano attaccanti competenti quanto gli umani, e poi più di loro. Filo oggi è piccolo e vale poco come bersaglio. Man mano che cresce, deve crescere anche il lavoro speso per difenderlo.</p>
+<p>La conseguenza pratica: la sicurezza di Filo non deve essere un&#39;affermazione, deve essere un registro. Diversi modelli di frontiera esaminano a intervalli tutto il sistema (l&#39;app, il server, le regole del database, la catena di pubblicazione) cercando problemi, e l&#39;esito di ogni corsa finisce in una tabella pubblica. Il registro dice quanto lavoro d&#39;attacco è stato fatto, da chi, e cosa ha trovato. Sta a te giudicare se basta.</p>
+<p><strong>Il registro non è ancora partito.</strong> Lo strumento che fa girare i controlli e scrive la tabella è da costruire, e i controlli fatti finora li ho lanciati a mano, fuori da ogni registro. Quello che segue è il metodo con cui partirà.</p>
+<p>Un chiarimento su cosa dimostra una tabella verde: dieci modelli che non trovano niente misurano i modelli, non il sistema. Il segnale forte non è il verde perpetuo, è la riga rossa diventata verde: prova che i controlli sanno trovare, e che quando trovano il problema viene chiuso. Se questa tabella fosse sempre verde dovresti sospettare dei controlli, non ammirare il sistema.</p>
+<p><strong>Chi controlla.</strong> Tutti i modelli di frontiera ammessi dalla politica sui modelli: i modelli di Anthropic più i migliori modelli a pesi aperti, serviti da fornitori indipendenti. Modelli diversi hanno punti ciechi diversi: la varietà del gruppo vale quanto la forza del singolo.</p>
+<p><strong>Ogni quanto.</strong> Un giro completo a cadenza fissa. Un giro straordinario quando esce un modello sensibilmente più capace, perché «niente trovato dai modelli dell&#39;anno scorso» perde valore col tempo. E un giro mirato dopo ogni problema risolto.</p>
+<p><strong>Fino a saturazione.</strong> Quando un controllo trova un problema e il problema viene risolto, il controllo si rilancia sull&#39;area toccata: dove c&#39;era un buco spesso ce n&#39;è un altro della stessa famiglia. Si smette quando i giri non trovano più niente di nuovo.</p>
+<p><strong>Chi risolve.</strong> La correzione la scrive la stessa catena di agenti che sviluppa Filo, passando dagli stessi cancelli di tutte le modifiche. In tabella pubblicherò il tempo effettivo tra il ritrovamento e la correzione pubblicata: preferisco un numero misurato a una promessa.</p>
+<p><strong>Cosa pubblico e cosa no.</strong> Un problema comparirà in tabella solo dopo essere stato risolto. È la regola della divulgazione responsabile applicata a me stesso: un problema aperto è un&#39;informazione utile solo a chi vuole sfruttarlo. Per lo stesso motivo la tabella riporterà la gravità e l&#39;area, non la ricetta: sapere che «un modello ha trovato un problema medio nelle regole del database, risolto in N ore» ti dice quanto lavora il sistema senza dare a nessuno una mappa. Sapere invece cosa viene controllato e da chi non aiuta un attaccante, e quindi è pubblico per intero: è la parte di trasparenza che costa poco e vale molto.</p>
+<p><strong>La tabella.</strong> Una riga per modello per corsa: la data, il modello (e chi lo serve), l&#39;area controllata, l&#39;esito. In testa, due numeri: da quanti giorni nessun modello trova niente, e quanti problemi sono stati trovati e risolti in totale. Il secondo numero che cresce non è una cattiva notizia: è il registro che lavora.</p>
+<p><strong>Se un problema lo trovi tu.</strong> Segnalalo dall&#39;app, dal canale dei feedback. Il testo viaggia cifrato e lo leggono i giudici, gli agenti che lo lavorano e io. Vale la regola che applico a me stesso: sulla bacheca pubblica il problema compare solo a correzione fatta, con un titolo breve e senza i dettagli.</p>
+<h2 id="i-punti-deboli">I punti deboli</h2>
+<ol>
+<li><strong>Il verde misura i modelli, non il sistema.</strong> L&#39;ho già detto sopra, ma è il limite principale e merita di stare anche qui: un problema che nessun modello di oggi sa trovare resta invisibile fino al modello di domani.</li>
+<li><strong>Gli attaccanti veri non pubblicano i loro esiti.</strong> Il registro accumulerà il lavoro d&#39;attacco che commissiono io; quello di un attaccante reale non lo vedo finché non colpisce.</li>
+<li><strong>La catena ha un anello dichiaratamente debole.</strong> L&#39;installer non è firmato con un certificato, e dentro l&#39;eseguibile entrano chiavi che non stanno nel codice pubblico. Il controllo descritto sopra copre il codice e la costruzione, e il passaggio fino al tuo disco solo se lo fai a mano.</li>
+<li><strong>Le difese che imparano non imparano ancora.</strong> L&#39;archivio degli attacchi si riempie ma nessun giudice ci si allena, l&#39;arresto automatico non c&#39;è e il red team è in pausa. Oggi il sistema si difende con i cinque livelli e con il mio interruttore.</li>
+<li><strong>Chi scrive il codice e chi lo controlla sono entrambi LLM.</strong> Li tengo decorrelati (modelli diversi, ruoli separati, nessuno approva sé stesso), ma una classe di errori condivisa da tutti i modelli di una generazione passerebbe. È una versione nuova di un problema vecchio: anche i revisori umani condividono i punti ciechi della loro epoca.</li>
+<li><strong>Il codice del server non è pubblico.</strong> Quello che dico del server, dai giudici al cancello che fonde il codice, va preso sulla parola: è il prezzo di tenere nascosto il bersaglio.</li>
+</ol>
+<hr />
+<p>Scritto da Sathya con Claude, che è anche l&#39;oggetto di metà di questo documento.</p>
+<section class="sn-fonti"><h2 id="fonti">Fonti</h2><ol class="sn-fonti-list">
+<li id="fonte-1"><span class="sn-fonte-n">1</span> <a href="https://github.com/sathyaram1/Filo/releases" target="_blank" rel="noopener noreferrer">versioni di Filo su GitHub</a> <span class="sn-fonte-dom">github.com</span></li>
+<li id="fonte-2"><span class="sn-fonte-n">2</span> <a href="https://api.github.com/repos/sathyaram1/Filo/releases/latest" target="_blank" rel="noopener noreferrer">elenco delle versioni in formato macchina</a> <span class="sn-fonte-dom">api.github.com</span></li>
+<li id="fonte-3"><span class="sn-fonte-n">3</span> <a href="https://github.com/sathyaram1/Filo/actions/workflows/release.yml" target="_blank" rel="noopener noreferrer">esecuzioni del flusso «Release Filo»</a> <span class="sn-fonte-dom">github.com</span></li>
+</ol></section>
   </article>
 </main>
+<div class="sn-gloss-pop" id="gloss-pop" hidden></div>
+<script>
+(function () {
+  'use strict';
+  var GLOSSARY = {"pesi aperti":"I numeri che costituiscono un modello, pubblicati da chi lo ha addestrato: chiunque può scaricarli ed eseguirli, quindi usarli non paga il laboratorio che li ha prodotti.","fornitori indipendenti":"Aziende che si limitano a far girare modelli altrui sui propri computer: pagarle non finanzia chi il modello lo ha addestrato.","modelli stretti":"Modelli che sanno fare una cosa sola, come riconoscere a quale categoria appartiene un testo, trascrivere una voce o leggere ad alta voce: non conversano e non ragionano.","system card":"Il documento che un laboratorio pubblica insieme a un nuovo modello, con le prove di sicurezza fatte prima di metterlo in commercio.","welfare dei modelli":"La domanda se un modello possa avere un'esperienza propria e, in caso, se stia bene o male: nessuno oggi sa rispondere.","Responsible Scaling Policy":"L'impegno pubblico di Anthropic a fermare lo sviluppo se un modello supera certe soglie di pericolosità, verificate anche da revisori esterni.","OpenRouter":"Il servizio che smista le richieste di Filo verso i vari fornitori di modelli: uno solo da pagare, tutti i modelli raggiungibili.","LLM":"Large Language Model: il tipo di modello che sta dietro agli assistenti come Claude o ChatGPT.","super PAC":"Negli Stati Uniti, un fondo che può raccogliere donazioni illimitate per sostenere un candidato senza limiti di spesa.","open source":"Il codice di Filo è pubblico: chiunque può leggerlo, modificarlo e distribuirne una propria versione.","rischi esistenziali":"I modi in cui questa tecnologia potrebbe danneggiare l'umanità intera, non un singolo utente.","Safe Browsing":"La lista di siti pericolosi mantenuta da Google e usata da quasi tutti i browser per avvisarti prima di aprire una pagina truffa.","ritenzione zero":"L'impegno di chi fa girare un modello a non conservare né la richiesta né la risposta, una volta risposto.","pseudonimo":"Un codice che tiene insieme i dati della stessa installazione senza dire di chi sono.","impronta":"Un numero calcolato da un dato con una formula a senso unico: dallo stesso dato esce sempre lo stesso numero, ma dal numero non si risale al dato.","Firebase":"Il servizio di Google su cui gira il server di Filo: database, accesso e funzioni.","red team":"Chi attacca un sistema apposta, con permesso, per trovarne i punti deboli prima che li trovi qualcun altro."};
+
+  function applyGlossary(root, glossary) {
+    if (!root || !glossary) return;
+    var terms = Object.keys(glossary).filter(function (t) { return t.charAt(0) !== '_'; });
+    terms.sort(function (a, b) { return b.length - a.length; });
+    var done = Object.create(null);
+    var walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: function (node) {
+        var p = node.parentElement;
+        while (p && p !== root) {
+          var tag = p.tagName;
+          if (tag === 'A' || tag === 'SUP' || tag === 'H1' || tag === 'H2' || tag === 'I' || tag === 'CODE') {
+            return NodeFilter.FILTER_REJECT;
+          }
+          p = p.parentElement;
+        }
+        return node.nodeValue && node.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      }
+    });
+    var pending = [];
+    var node;
+    while ((node = walker.nextNode())) pending.push(node);
+
+    for (var i = 0; i < pending.length; i++) {
+      var textNode = pending[i];
+      for (var t = 0; t < terms.length; t++) {
+        var term = terms[t];
+        if (done[term]) continue;
+        var value = textNode.nodeValue;
+        var at = value.toLowerCase().indexOf(term.toLowerCase());
+        if (at === -1) continue;
+        var before = value.slice(0, at);
+        var match = value.slice(at, at + term.length);
+        var after = value.slice(at + term.length);
+        var el = textNode.ownerDocument.createElement('i');
+        el.className = 'sn-gloss';
+        el.setAttribute('tabindex', '0');
+        el.setAttribute('role', 'button');
+        el.setAttribute('data-gloss', glossary[term]);
+        el.textContent = match;
+        var frag = textNode.ownerDocument.createDocumentFragment();
+        if (before) frag.appendChild(textNode.ownerDocument.createTextNode(before));
+        frag.appendChild(el);
+        var tail = null;
+        if (after) { tail = textNode.ownerDocument.createTextNode(after); frag.appendChild(tail); }
+        textNode.parentNode.replaceChild(frag, textNode);
+        done[term] = true;
+        if (tail) { textNode = tail; } else { break; }
+      }
+    }
+  }
+
+  // Tooltip: hover col mouse, tocco e tastiera ovunque. Il riquadro è UNO solo,
+  // riposizionato — così il testo delle glosse non resta nel documento come
+  // testo fantasma che il Ctrl+F della pagina troverebbe senza mostrarlo.
+  function mountGlossaryUi(root, pop) {
+    if (!root || !pop) return;
+    function show(el) {
+      pop.textContent = el.getAttribute('data-gloss') || '';
+      pop.hidden = false;
+      var r = el.getBoundingClientRect();
+      pop.style.top = (r.bottom + window.scrollY + 6) + 'px';
+      pop.style.left = '0px';
+      var left = r.left + window.scrollX;
+      var max = document.documentElement.clientWidth - 12;
+      if (left + pop.offsetWidth > max) left = Math.max(12, max - pop.offsetWidth);
+      pop.style.left = left + 'px';
+    }
+    function hide() { pop.hidden = true; }
+    function target(e) {
+      return e.target && e.target.closest ? e.target.closest('.sn-gloss') : null;
+    }
+    document.addEventListener('mouseover', function (e) { var el = target(e); if (el) show(el); });
+    document.addEventListener('mouseout', function (e) { if (target(e)) hide(); });
+    document.addEventListener('click', function (e) {
+      var el = target(e);
+      if (el) { show(el); e.stopPropagation(); } else { hide(); }
+    });
+    document.addEventListener('focusin', function (e) { var el = target(e); if (el) show(el); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') hide(); });
+    window.addEventListener('scroll', hide, { passive: true });
+  }
+
+  var body = document.getElementById('doc-body');
+  applyGlossary(body, GLOSSARY);
+  mountGlossaryUi(body, document.getElementById('gloss-pop'));
+})();
+</script>
 </body>
 </html>
