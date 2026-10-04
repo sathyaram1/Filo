@@ -276,6 +276,8 @@ function gestoDiFilo(wc) {
   wc._filoGestoUsatoAlle = Math.max(wc._filoGestoUsatoAlle || 0, wc._filoGestoFinestraAlle || 0);
   wc._filoGestoAlle = 0;
   wc._filoGestoDiFilo = true;
+  // Vale invece per ciò che Filo fa da quel menu (gli appunti di Filo, services/appuntiDaiSiti.js).
+  wc._filoGestoUiAlle = Date.now();
 }
 
 // Ciò che l'utente ha scelto di aprire (il collegamento che ha cliccato, la voce del menu di Filo) si apre anche se la
