@@ -150,7 +150,8 @@
   function dominioDa(raw) {
     let s = String(raw || '').trim().toLowerCase().replace(/^["'«(]+|["'»),.;]+$/g, '').replace(/^([a-z]+:\/\/)?\*?\.+/, '$1');
     if (!s) return '';
-    if (s.includes('://')) { try { s = new URL(s).hostname; } catch (_) { return ''; } }
+    // Come la pagina Sicurezza: URL scrive un nome accentato (münchen.de) nella forma ASCII con cui il sito si confronta.
+    try { s = new URL(s.includes('://') ? s : `http://${s}`).hostname; } catch (_) { if (s.includes('://')) return ''; }
     s = s.split('/')[0].split('?')[0].split(':')[0].replace(/^\.+|\.+$/g, '').replace(/^www\./, '');
     const N = nomiSito();
     return N && N.valido(s) ? s : '';
