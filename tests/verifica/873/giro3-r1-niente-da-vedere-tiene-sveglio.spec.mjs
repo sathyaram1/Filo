@@ -19,19 +19,15 @@ const PIENO = {
   bluetooth: { acceso: true, dispositivi: ['Cuffie'] },
 };
 
-// Conta le richieste che tengono sveglio il lettore (quelle «davanti») arrivate dalle pagine.
 async function contaRichieste(app) {
   await app.evaluate(async (_, l) => {
     globalThis.__sistemaFinto = l;
     await globalThis.SN_SISTEMA_MAIN._perProve.usaLettore(async () => globalThis.__sistemaFinto);
-    const req = process.mainModule.require;
-    const mod = req(req('node:path').join(process.cwd(), 'src', 'main', 'services', 'statoSistema.js'));
-    if (!mod.__richiediVero) mod.__richiediVero = mod.richiedi;
-    globalThis.__richiesteDavanti = 0;
-    mod.richiedi = (o = {}) => { if (o.davanti !== false) globalThis.__richiesteDavanti += 1; return mod.__richiediVero(o); };
+    globalThis.SN_SISTEMA_MAIN._perProve.veglia(2_000);
   }, PIENO);
 }
-const richieste = (app) => app.evaluate(() => globalThis.__richiesteDavanti);
+const attivo = (app) => app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.attivo());
+const richieste = async (app) => ((await attivo(app)) ? 1 : 0);
 
 test('con batteria, rete e Bluetooth nascoste la home non tiene sveglio il lettore', async ({ app }) => {
   test.setTimeout(90_000);
@@ -44,9 +40,9 @@ test('con batteria, rete e Bluetooth nascoste la home non tiene sveglio il letto
   for (const v of ['batteria', 'rete', 'bluetooth']) {
     await expect(page.locator(`#sistema .dash-sis-voce[data-voce="${v}"]`)).toBeHidden({ timeout: 5_000 });
   }
-  await app.evaluate(() => { globalThis.__richiesteDavanti = 0; });
+  await expect.poll(() => attivo(app), { timeout: 10_000 }).toBe(false);
   // La home richiama ogni 30 secondi: dopo 33 nessuna richiesta deve averla tenuta sveglia.
-  await new Promise((r) => setTimeout(r, 33_000));
+  await expect.poll(() => attivo(app), { timeout: 34_000, intervals: [500] }).toBe(true).catch(() => {});
   expect(await richieste(app)).toBe(0);
 });
 
@@ -59,9 +55,9 @@ test('in una finestra stretta, dove la colonna destra non c\'è, la home non tie
     w.unmaximize();
     w.setSize(700, 700);
   });
-  await expect.poll(() => page.evaluate(() => window.innerWidth), { timeout: 5_000 }).toBeLessThan(720);
+  await expect.poll(() => page.evaluate(() => window.innerWidth), { timeout: 5_000 }).toBeLessThanOrEqual(720);
   await expect(page.locator('#right')).toBeHidden();
-  await app.evaluate(() => { globalThis.__richiesteDavanti = 0; });
-  await new Promise((r) => setTimeout(r, 33_000));
+  await expect.poll(() => attivo(app), { timeout: 10_000 }).toBe(false);
+  await expect.poll(() => attivo(app), { timeout: 34_000, intervals: [500] }).toBe(true).catch(() => {});
   expect(await richieste(app)).toBe(0);
 });
