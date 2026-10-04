@@ -2509,12 +2509,8 @@ class TabManager {
       }
     });
 
-    // Apertura nuove tab: tutto resta dentro Filo come nuovo tab — a meno che
-    // il popup blocker sia attivo e l'apertura sembri un popup pubblicitario
-    // (cioè non un click su <a target="_blank">). Heuristic: il disposition
-    // 'new-window' corrisponde a window.open() esplicito con features (size,
-    // toolbar, ecc.), che è la firma classica degli ad popup. Disposition
-    // 'foreground-tab' e 'background-tab' sono link cliccati dall'utente.
+    // Apertura nuove tab: tutto resta dentro Filo come nuovo tab. Col blocco dei popup attivo passa solo ciò che segue
+    // un gesto vero dell'utente, uno per gesto (#737.1); una finestra con le misure ('new-window') non passa mai.
     wc.setWindowOpenHandler((details) => {
       const { url, disposition } = details;
       // Da una pagina di Filo l'indirizzo l'ha scelto quasi sempre un modello: passa dalla porta delle uscite (#810).
@@ -2556,8 +2552,8 @@ class TabManager {
         // finestrella diventa una scheda, dove l'avviso c'è.
         if (!tab.sbAvviso) return this._allowAuthPopup(url);
       }
-      const isAdLikePopup = disposition === 'new-window';
-      if (!accesso && tab.isInternal === false && this.security.blockPopups && isAdLikePopup) {
+      if (!accesso && tab.isInternal === false && this.security.blockPopups
+        && (disposition === 'new-window' || !Permessi.gestoPerUnaFinestra(wc))) {
         this._notifyPopupBlocked(tab.id, url);
         return { action: 'deny' };
       }
@@ -2686,6 +2682,10 @@ class TabManager {
       if (isAuthPopup(url)) {
         if (this._maybeBlockNavigation(origine, url)) return { action: 'deny' };
         return this._allowAuthPopup(url);
+      }
+      if (this.security.blockPopups && !Permessi.gestoPerUnaFinestra(pwc)) {
+        this._notifyPopupBlocked(origine ? origine.id : null, url);
+        return { action: 'deny' };
       }
       this.openTab(url, {
         activate: true,
