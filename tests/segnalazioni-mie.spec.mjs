@@ -319,6 +319,7 @@ test('tasto destro su una riga: copia il testo, rimanda quella non partita già 
   const ferma = righe(bacheca).filter({ hasText: 'Il video si blocca' });
   await ferma.locator('.bd-mia-titolo').click({ button: 'right' });
   await expect(menu.locator('.sn-select-option')).toHaveText(['Copia il testo', 'Rimanda', 'Togli dall’elenco']);
+  await bacheca.screenshot({ path: 'tests/.shots/segnalazioni-mie-tasto-destro.png' });
   await menu.getByText('Rimanda').click();
   await expect(bacheca.locator('.sn-fb-modal')).toBeVisible();
   await expect(bacheca.locator('.sn-fb-text')).toHaveValue('Il video si blocca a metà');
