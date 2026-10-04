@@ -21,7 +21,6 @@ async function mockScryfall(app) {
       let body = null;
       if (u.pathname === '/cards/search') body = { data: [NIV, BOLT, ELF], has_more: false };
       else if (u.pathname === '/cards/named') body = NIV;
-      else if (u.pathname === '/cards/collection') body = { data: [] };
       else if (BY_ID[u.pathname.replace('/cards/', '')]) body = BY_ID[u.pathname.replace('/cards/', '')];
       else if (u.pathname === '/symbology') body = { data: [] };
       if (!body) return { ok: false, status: 404, json: async () => ({}) };
@@ -112,7 +111,9 @@ test('tasto destro su un risultato in chat: imposta come commander, aggiungi e r
   expect(deck.commanderMeta.colors).toEqual(['U', 'R']);
   // È il commander, non anche una carta dell'elenco: la riga lo dice e il + non lo duplica.
   await expect(niv.locator('.dk-add')).toHaveAttribute('data-in', 'cmd');
-  await niv.locator('.dk-add').click();
+  await niv.locator('.dk-add').click({ force: true });
+  // Un'aggiunta arriverebbe dopo un giro di IPC: si lascia il tempo di farla prima di contare.
+  await page.waitForTimeout(400);
   await expect(page.locator('#deckList .dk-row')).toHaveCount(0);
   await niv.click({ button: 'right' });
   await expect(menu(page)).toHaveText(['Rimuovi commander', 'Apri su Scryfall']);
@@ -205,7 +206,8 @@ test('il nome del commander nell\'intestazione: anteprima al passaggio, carosell
   await expect(page.locator('#carouselToggle')).toHaveText('✓ commander');
   // Invio nel carosello non duplica il commander fra le carte.
   await page.keyboard.press('Enter');
-  await page.locator('#carouselToggle').click();
+  await page.locator('#carouselToggle').click({ force: true });
+  await page.waitForTimeout(400);
   await expect(page.locator('#deckList .dk-row')).toHaveCount(0);
   expect((await getDeck(page, deckId)).carte).toEqual([]);
 });

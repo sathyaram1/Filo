@@ -294,7 +294,7 @@
     $('deckNameText').textContent = current.nome;
     const line = $('commanderLine');
     const commanderName = current.commander && current.commanderMeta && current.commanderMeta.name;
-    line.textContent = commanderName ? 'Commander: ' : 'Nessun commander — impostalo col tasto destro su una carta.';
+    line.textContent = commanderName ? 'Commander: ' : 'Nessun commander. Impostalo col tasto destro su una carta.';
     if (commanderName) {
       // Il nome del commander è un nome di carta come gli altri (§5.1): anteprima al passaggio, carosello al clic.
       const name = document.createElement('span');
@@ -786,7 +786,7 @@
   async function setCommanderTo(cardId) {
     const r = await send({ type: MSG.DECKS_SET_COMMANDER, id: current.id, scryfallId: cardId });
     if (!r || !r.ok) {
-      showToast('Commander non cambiato: il mazzo non è stato aggiornato.');
+      showToast('Non sono riuscito a cambiare il commander.');
       return;
     }
     if (!current || r.deck.id !== current.id) return;

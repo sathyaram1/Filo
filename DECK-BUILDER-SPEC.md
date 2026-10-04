@@ -57,6 +57,7 @@ I messaggi non sono testo: sono **contenuto tipizzato**. Una bolla può contener
 
 - Nome (tronca con ellissi) + **costo di mana** destro-allineato, renderizzato con i simboli SVG ufficiali di Scryfall (`{2}{U}{R}` → glifi; minuscoli, cacheati per sempre).
 - Spunta/toggle "aggiungi al mazzo" per riga.
+- Tasto destro (anche sui nomi in prosa, §3.5): aggiungi/rimuovi dal mazzo · imposta come commander · apri su Scryfall; sul commander del mazzo: rimuovi commander.
 - Ordinamento default per CMC.
 - **Nessuna immagine caricata** finché non c'è hover.
 
@@ -185,7 +186,9 @@ Nome del mazzo + **commander** (sempre visibile). Click sul nome → **switcher*
 
 - La sua **color identity filtra ogni ricerca** automaticamente (§4).
 - Statistiche su 100 singleton; check duplicati, identity per carta, banned list (`legalities.commander` di Scryfall) come riga del pannello stats.
-- Mostrato nell'header e come art crop nella libreria (§10).
+- Mostrato nell'header e come art crop nella libreria (§10). Il nome nell'header è un consumatore della preview (§5.1): hover = anteprima, click = carosello.
+- Una regola sola per cambiarlo (tasto destro, chat, rimozione): il nuovo esce dall'elenco, quello di prima ci rientra come carta normale e una riga lo dice (#302, #789). Il commander non entra anche fra le carte.
+- In chat un commander già impostato cambia solo col segnale esplicito di sostituzione del modello (`replaceCommander`); una menzione o un paragone non lo toccano.
 
 ---
 

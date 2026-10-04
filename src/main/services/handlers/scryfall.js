@@ -226,21 +226,23 @@ module.exports = function register(on, ctx) {
       // cambia solo col segnale esplicito di sostituzione, e il vecchio rientra nel mazzo. Va PRIMA della ricerca,
       // che così resta nei colori del commander appena scelto. Il commander di una lista incollata è l'import, sotto.
       if (parsed.commanderName && !parsed.import.length) {
-        if (deck.commander && !parsed.replaceCommander) {
-          const same = String(parsed.commanderName).toLowerCase() === String((deck.commanderMeta && deck.commanderMeta.name) || '').toLowerCase();
+        // Riletto adesso: mentre il modello rispondeva l'utente può aver cambiato il mazzo da un'altra strada.
+        const base = (await Store.get(deck.id)) || deck;
+        if (base.commander && !parsed.replaceCommander) {
+          const same = String(parsed.commanderName).toLowerCase() === String((base.commanderMeta && base.commanderMeta.name) || '').toLowerCase();
           if (!same) {
-            reply = [reply, `Il commander resta [[${deck.commanderMeta && deck.commanderMeta.name ? deck.commanderMeta.name : parsed.commanderName}]]: per cambiarlo chiedimi di sostituirlo, o usa «Imposta come commander» col tasto destro su una carta.`]
+            reply = [reply, `Il commander resta [[${base.commanderMeta && base.commanderMeta.name ? base.commanderMeta.name : parsed.commanderName}]]. Per cambiarlo chiedimi di sostituirlo, o usa «Imposta come commander» col tasto destro su una carta.`]
               .filter(Boolean).join('\n');
           }
         } else {
           const found = await Scry.named(parsed.commanderName).catch(() => null);
           if (!found) {
-            reply = [reply, `Non ho trovato su Scryfall il commander «${parsed.commanderName}», quindi non l'ho ${deck.commander ? 'cambiato' : 'impostato'}.`]
+            reply = [reply, `Non ho trovato su Scryfall il commander «${parsed.commanderName}», quindi non l'ho ${base.commander ? 'cambiato' : 'impostato'}.`]
               .filter(Boolean).join('\n');
-          } else if (found.id === deck.commander) {
+          } else if (found.id === base.commander) {
             reply = [reply, `[[${found.name}]] è già il commander di questo mazzo.`].filter(Boolean).join('\n');
           } else {
-            const swap = Decks.replaceCommander(deck, found.id, {
+            const swap = Decks.replaceCommander(base, found.id, {
               name: found.name, colors: found.colorIdentity, artCrop: found.artCrop,
             });
             const saved = await Store.put(swap.deck);
@@ -249,7 +251,7 @@ module.exports = function register(on, ctx) {
               identityColors = (saved.commanderMeta && Array.isArray(saved.commanderMeta.colors))
                 ? saved.commanderMeta.colors : identityColors;
               reply = [reply, swap.previousId
-                ? `Commander cambiato: ora è [[${found.name}]] e le ricerche restano nei suoi colori. ${swap.previousName ? `[[${swap.previousName}]]` : 'Quello di prima'} torna nel mazzo come carta normale.`
+                ? `Ora il commander è [[${found.name}]] e le ricerche restano nei suoi colori. ${swap.previousName ? `[[${swap.previousName}]]` : 'Quello di prima'} torna nel mazzo come carta normale.`
                 : `Ho impostato [[${found.name}]] come commander: le ricerche ora restano nei suoi colori.`]
                 .filter(Boolean).join('\n');
             }
@@ -453,7 +455,7 @@ module.exports = function register(on, ctx) {
       // SISTEMA (mai fidarsi che il modello "abbia già fatto"). Il mazzo
       // aggiornato torna alla pagina, che rinfresca header e statistiche.
       if (parsed.hasBudget) {
-        const saved = await Store.put(Decks.setBudget(deckOut || deck, parsed.budget));
+        const saved = await Store.put(Decks.setBudget(deckOut || (await Store.get(deck.id)) || deck, parsed.budget));
         if (saved) {
           deckOut = saved;
           reply = [reply, parsed.budget === null
