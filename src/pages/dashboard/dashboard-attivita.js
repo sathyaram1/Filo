@@ -8,8 +8,9 @@
 //
 // `create` appende il blocco al container che gli si dà e ritorna l'oggetto
 // `activity` che il turno di Filo si passa di mano in mano (pushReasoning,
-// working, addRow, addCommand, absorbBubble, dropNote, endTurn, finish,
-// remove). Il container è esplicito apposta: chi disegna un blocco decide
+// working, addRow, addCommand, azioneSenzaRiga, absorbBubble, dropNote,
+// fineGiro, fineDiretta, endTurn, taglia, finish, remove). Il filo che lo
+// disegna sta in filo-attesa.js. Il container è esplicito apposta: chi disegna un blocco decide
 // dove, invece di scoprire a posteriori che finisce sempre nelle bolle.
 //
 // Forma del modulo: IIFE che si registra su globalThis e NON tocca il DOM al
@@ -31,160 +32,348 @@
     return a && String(a.type || '').toUpperCase() === t;
   }
 
-  // ===== Blocco di attività della domanda (#521) =====
-  // UNO per messaggio dell'utente, sopra la risposta finale. Raccoglie tutto
-  // ciò che Filo fa prima di rispondere, anche su più turni automatici
-  // (ragiona, cerca, legge, ragiona ancora, risponde). Filo non «ragiona e
-  // basta»: agisce, e il blocco è «Filo sta facendo qualcosa».
-  //
-  // Chiuso di default, sempre: il 90 % delle volte l'utente vuole che il lavoro
-  // sia invisibile. La riga in testa dice cosa succede ADESSO — rotella e
-  // «Aspetto la risposta…», poi «Sta ragionando · …ultima frase», poi «Cerco
-  // sul web: …» — e a lavoro finito diventa il riassunto («Ha cercato sul web e
-  // letto un documento · 1 min 20 s»). Un click apre la cronologia completa:
-  // ragionamento, azioni, note intermedie, esiti dei comandi, nell'ordine in
-  // cui sono avvenuti. Niente frasi inventate: le vecchie righe «Consulto la
-  // memoria…» erano teatro, non stato.
-  //
-  // Se alla fine non c'è niente da raccontare, il blocco si toglie da solo.
+  // ===== Blocco di attività della domanda (#521, #578) =====
+  // UNO per messaggio dell'utente, sopra la risposta. Mentre Filo lavora a sinistra corre un filo: niente scritte
+  // di stato, solo la trama del ragionamento e un nodo per ogni pensiero che ha fatto nascere delle azioni. Quando
+  // comincia la risposta il filo si avvolge in un gomitolo col riassunto e la durata; un clic lo srotola.
+  // Regole: patterns/il-filo-dell-attesa.md. Senza niente da raccontare il blocco si toglie da solo.
   function createActivity(container) {
+    const Filo = global.SN_FILO_ATTESA;
     const wrap = document.createElement('div');
     wrap.className = 'dash-activity';
     wrap.dataset.phase = 'wait';
+    wrap.dataset.filo = 'disteso';
+    wrap.setAttribute('aria-busy', 'true');
+    wrap.setAttribute('aria-label', 'Filo sta lavorando');
     const head = document.createElement('button');
     head.type = 'button';
     head.className = 'dash-activity-head';
-    head.setAttribute('aria-expanded', 'false');
-    head.title = 'Mostra cosa ha fatto Filo';
-    const icon = document.createElement('span');
-    icon.className = 'dash-activity-icon';
-    icon.setAttribute('aria-hidden', 'true');
+    head.setAttribute('aria-expanded', 'true');
+    head.hidden = true;
     const label = document.createElement('span');
     label.className = 'dash-activity-label';
-    label.textContent = 'Aspetto la risposta…';
-    head.append(icon, label);
+    head.append(label);
     const body = document.createElement('div');
     body.className = 'dash-activity-body';
-    body.hidden = true;
     wrap.append(head, body);
     container.appendChild(wrap);
     container.scrollTop = container.scrollHeight;
 
     const startedAt = Date.now();
     let phase = 'wait';
-    let open = false;
-    let items = 0;
-    // Ragionamento del turno in corso (un blocco per turno nella cronologia).
-    let reasoningEl = null;
+    // Ragionamento del turno per lo storico del thread: l'ultimo blocco chiuso torna con endTurn.
     let turnReasoning = '';
-    // Il modello ha ragionato almeno una volta in questo lavoro: senza, il
-    // riassunto non può chiamarsi «Ragionamento».
-    let sawReasoning = false;
     let turnStartedAt = 0;
     let lastTurn = { text: '', ms: 0 };
-    // Quante voci c'erano quando è partito il testo del turno (vedi answerStarted).
-    let turnMark = null;
+    let sawReasoning = false;
     // Tipi delle azioni compiute, nell'ordine: da qui nasce il riassunto.
     const doneTypes = [];
+    // Le sezioni: un pensiero e le azioni che ne sono nate. `viva` è quella che riceve adesso.
+    const segs = [];
+    let viva = null;
+    let aperta = null;
+    let fermato = false;
+    let inDiretta = true;
+    let fineLavoro = 0;
+    let anonime = 0;
 
-    const followBody = () => {
-      const near = body.scrollHeight - body.scrollTop - body.clientHeight < 32;
-      if (near) body.scrollTop = body.scrollHeight;
-    };
     const followThread = () => {
       const near = container.scrollHeight - container.scrollTop - container.clientHeight < 48;
       if (near) container.scrollTop = container.scrollHeight;
     };
-    const setOpen = (v) => {
-      open = !!v;
-      body.hidden = !open;
-      head.setAttribute('aria-expanded', open ? 'true' : 'false');
-      head.title = open ? 'Nascondi' : 'Mostra cosa ha fatto Filo';
-      // Aperto a lavoro finito si legge dall'inizio; aperto mentre lavora si
-      // guarda l'ultima cosa.
-      if (open) body.scrollTop = phase === 'done' ? 0 : body.scrollHeight;
-      followThread();
-    };
-    head.addEventListener('click', () => setOpen(!open));
-    const setPhase = (p, text) => {
+    const setPhase = (p) => {
       phase = p;
       wrap.dataset.phase = p;
-      label.textContent = text;
+      if (p === 'done') { wrap.removeAttribute('aria-busy'); wrap.removeAttribute('aria-label'); }
     };
-    const lastSentence = (t) => {
-      const parts = String(t || '').replace(/\s+/g, ' ').trim().split(/(?<=[.!?…])\s+/);
-      return parts[parts.length - 1] || '';
-    };
-    const append = (el) => {
-      body.appendChild(el);
-      items += 1;
-      followBody();
+    const filo = Filo.crea({ wrap, body, apri: (el) => { const s = segs.find((x) => x.el === el); if (s) apri(s); } });
+
+    function apri(seg, forza = null) {
+      if (seg.stato === 'coda') return;
+      const v = forza === null ? aperta !== seg : forza;
+      if (aperta && aperta !== seg) { aperta.corpo.hidden = true; aperta.el.classList.remove('dash-activity-seg-aperta'); aperta.testa.setAttribute('aria-expanded', 'false'); }
+      aperta = v ? seg : null;
+      seg.corpo.hidden = !v;
+      seg.el.classList.toggle('dash-activity-seg-aperta', v);
+      seg.testa.setAttribute('aria-expanded', v ? 'true' : 'false');
+      if (v) seg.corpo.scrollTop = seg.stato === 'pensa' ? seg.corpo.scrollHeight : 0;
+      filo.sveglia();
       followThread();
-    };
-    // Chiude il blocco di ragionamento del turno (se c'era) e lo mette da parte
-    // per lo storico del thread.
-    const closeTurnReasoning = () => {
-      if (!turnReasoning) return;
-      lastTurn = { text: turnReasoning, ms: Date.now() - turnStartedAt };
-      turnReasoning = '';
-      reasoningEl = null;
-    };
+    }
+
+    function nuovaSeg(stato) {
+      const el = document.createElement('div');
+      el.className = 'dash-activity-seg';
+      const testa = document.createElement('button');
+      testa.type = 'button';
+      testa.className = 'dash-activity-seg-head';
+      testa.setAttribute('aria-expanded', 'false');
+      const eti = document.createElement('span');
+      eti.className = 'dash-activity-seg-label';
+      testa.append(eti);
+      const trama = document.createElement('div');
+      trama.className = 'dash-activity-trama';
+      const tramaTesto = document.createElement('span');
+      trama.append(tramaTesto);
+      const corpo = document.createElement('div');
+      corpo.className = 'dash-activity-seg-body';
+      corpo.hidden = true;
+      const esiti = document.createElement('div');
+      esiti.className = 'dash-activity-esiti';
+      corpo.append(esiti);
+      el.append(testa, trama, corpo);
+      // La coda (l'ultimo pensiero) resta l'ultima: chi arriva dopo la risposta le passa davanti.
+      const coda = segs.find((s) => s.stato === 'coda');
+      body.insertBefore(el, coda ? coda.el : null);
+      const seg = { el, testa, eti, trama, tramaTesto, corpo, esiti, cot: null, testo: '', voci: [], attese: new Set(), nodo: null, esito: null, stato: '' };
+      testa.addEventListener('click', () => apri(seg));
+      trama.addEventListener('click', () => apri(seg));
+      if (coda) segs.splice(segs.indexOf(coda), 0, seg); else segs.push(seg);
+      statoSeg(seg, stato);
+      return seg;
+    }
+    function statoSeg(seg, stato) {
+      seg.stato = stato;
+      seg.el.dataset.stato = stato;
+      if (stato === 'coda') { seg.corpo.hidden = false; if (aperta === seg) aperta = null; }
+    }
+    // Il pensiero ha fatto nascere delle azioni: il filo si annoda sulla sua riga.
+    function annoda(seg, testo) {
+      if (seg.stato !== 'agisce') {
+        if (seg.stato === 'coda') seg.corpo.hidden = aperta !== seg;
+        statoSeg(seg, 'agisce');
+      }
+      if (testo) scrivi(seg, testo);
+      if (!seg.nodo) seg.nodo = filo.nodo(seg.el, seg.eti.textContent);
+    }
+    function scrivi(seg, t) {
+      if (seg.eti.textContent === t) return;
+      seg.eti.textContent = t;
+      if (seg.nodo) seg.nodo.titolo(t);
+    }
+    const completa = (seg) => seg.voci.length > 0 && seg.voci.length >= seg.attese.size;
+    // Tutti gli esiti del nodo sono arrivati (o il giro è finito): il titolo diventa quello vero e il nodo tiene
+    // o cede. Cede solo se nessuna delle sue azioni è andata: il filo non mente sull'esito.
+    function chiudiNodo(seg) {
+      if (!seg.voci.length) return;
+      scrivi(seg, Filo.titoloNodo(seg.voci.map((x) => x.voce)));
+      if (seg.esito || !seg.nodo) return;
+      seg.esito = seg.voci.every((x) => x.voce.esito === 'fallita') ? 'cede' : 'tiene';
+      if (seg.esito === 'cede') seg.nodo.cede(); else seg.nodo.tiene();
+    }
+    function chiudiSeg(seg) {
+      if (!seg) return;
+      if (seg.stato === 'agisce') chiudiNodo(seg);
+      if (viva === seg) viva = null;
+    }
+    // Il gomitolo e la riga col riassunto.
+    function riassunto() {
+      const ms = (fineLavoro || Date.now()) - startedAt;
+      const fatto = summarizeActivity(doneTypes, sawReasoning);
+      if (fermato) return `Fermato · ${doneTypes.length ? `${fatto.charAt(0).toLowerCase()}${fatto.slice(1)} · ` : ''}${fmtActivityDuration(ms)}`;
+      return `${fatto} · ${fmtActivityDuration(ms)}`;
+    }
+    const haCose = () => sawReasoning || segs.some((s) => s.testo || s.corpo.querySelector('.dash-activity-note, .dash-activity-row, .dash-activity-cmd'));
+    let tendina = 0;
+    function tendi(aperto, dur) {
+      const mio = ++tendina;
+      if (aperto) {
+        body.hidden = false;
+        if (dur <= 0) { body.style.maxHeight = ''; body.style.opacity = ''; return; }
+        body.style.maxHeight = '0px';
+        body.style.opacity = '0';
+        requestAnimationFrame(() => {
+          if (mio !== tendina) return;
+          body.style.maxHeight = `${body.scrollHeight}px`;
+          body.style.opacity = '';
+        });
+        setTimeout(() => { if (mio === tendina) body.style.maxHeight = ''; filo.sveglia(); }, dur + 40);
+      } else {
+        if (dur <= 0) { body.hidden = true; return; }
+        body.style.maxHeight = `${body.scrollHeight}px`;
+        void body.offsetHeight;
+        body.style.maxHeight = '0px';
+        body.style.opacity = '0';
+        setTimeout(() => { if (mio === tendina) body.hidden = true; }, dur + 40);
+      }
+    }
+    function mostraTesta() {
+      label.textContent = riassunto();
+      if (!head.hidden) return;
+      head.hidden = false;
+      requestAnimationFrame(() => { wrap.dataset.testa = '1'; });
+    }
+    function avvolgi() {
+      if (wrap.dataset.filo === 'gomitolo') return;
+      if (!haCose()) { wrap.classList.add('dash-activity-vuoto'); return; }
+      wrap.classList.remove('dash-activity-vuoto');
+      mostraTesta();
+      wrap.dataset.filo = 'gomitolo';
+      head.setAttribute('aria-expanded', 'false');
+      head.title = 'Mostra cosa ha fatto Filo';
+      const dur = filo.avvolgi(1);
+      tendi(false, dur);
+    }
+    function srotola() {
+      wrap.dataset.filo = phase === 'done' || phase === 'answer' ? 'srotolato' : 'disteso';
+      head.setAttribute('aria-expanded', 'true');
+      head.title = 'Riavvolgi';
+      body.hidden = false;
+      const dur = filo.durataGomitolo();
+      if (dur > 0) { body.style.maxHeight = '0px'; body.style.opacity = '0'; }
+      filo.avvolgi(0);
+      tendi(true, dur);
+      followThread();
+    }
+    head.addEventListener('click', () => { if (wrap.dataset.filo === 'gomitolo') srotola(); else avvolgi(); });
+    // Il testo che sembrava la risposta era una nota: il lavoro riprende, il gomitolo si srotola.
+    function torna() {
+      wrap.classList.remove('dash-activity-vuoto');
+      if (phase !== 'answer') return;
+      if (viva && viva.stato === 'coda') { statoSeg(viva, 'pensa'); viva.corpo.hidden = aperta !== viva; }
+      if (wrap.dataset.filo === 'gomitolo') srotola();
+      wrap.dataset.filo = 'disteso';
+      head.hidden = true;
+      delete wrap.dataset.testa;
+      filo.riapri();
+    }
+    // Dove va un esito che arriva: nella sezione viva se sta pensando o agendo, altrimenti in una nuova.
+    function bersaglio() {
+      if (viva && (viva.stato === 'agisce' || viva.stato === 'pensa')) return viva;
+      return nuovaSeg('agisce');
+    }
+    function trova(a) {
+      if (!a) return null;
+      for (const s of segs) {
+        const x = s.voci.find((v) => v.a === a || (a._callId && v.a && v.a._callId === a._callId));
+        if (x) return { seg: s, x };
+      }
+      return null;
+    }
+    // Un esito registrato nel nodo. `a` è l'azione, quando c'è: la stessa azione confermata dopo aggiorna la sua voce.
+    function registra(voce, a = null) {
+      if (inDiretta && !fermato) torna();
+      const gia = trova(a);
+      let seg;
+      if (gia) {
+        seg = gia.seg;
+        gia.x.voce = voce;
+        gia.x.a = a;
+      } else {
+        seg = bersaglio();
+        annoda(seg);
+        seg.voci.push({ voce, a });
+      }
+      if (completa(seg) || !inDiretta || phase === 'done') chiudiNodo(seg);
+      if (phase !== 'done' && !fermato && inDiretta) setPhase('act');
+      if (wrap.dataset.filo === 'gomitolo') filo.avvolgi(1, { subito: true });
+      return seg;
+    }
+    function esitoDi(a, failed, tipo) {
+      if (String(tipo || '').toUpperCase() === 'FERMATA') return 'fallita';
+      if (a && a._confirm) return 'chiesta';
+      return failed ? 'fallita' : 'ok';
+    }
+    function aggiungiEsito(seg, el) {
+      seg.esiti.appendChild(el);
+      filo.sveglia();
+      followThread();
+    }
 
     return {
       el: wrap,
-      // Un pezzo di ragionamento vero dal modello.
+      // Un pezzo di ragionamento vero dal modello: scorre come trama sulla riga viva.
       pushReasoning(text) {
-        if (phase === 'done' || !text) return;
+        if (phase === 'done' || fermato || !text) return;
+        if (inDiretta) torna();
         sawReasoning = true;
-        if (!reasoningEl) {
-          reasoningEl = document.createElement('div');
-          reasoningEl.className = 'dash-activity-reasoning';
-          turnStartedAt = Date.now();
-          append(reasoningEl);
-        }
+        if (!turnReasoning) turnStartedAt = Date.now();
         turnReasoning += text;
-        reasoningEl.textContent = turnReasoning;
-        setPhase('reason', `Sta ragionando · ${lastSentence(turnReasoning)}`);
-        followBody();
+        let seg = viva;
+        if (!seg || (seg.stato !== 'pensa' && seg.stato !== 'coda')) {
+          chiudiSeg(seg);
+          seg = viva = nuovaSeg('pensa');
+        }
+        if (!seg.cot) {
+          seg.cot = document.createElement('div');
+          seg.cot.className = 'dash-activity-reasoning';
+          seg.corpo.insertBefore(seg.cot, seg.corpo.firstChild);
+        }
+        seg.testo += text;
+        seg.cot.textContent = seg.testo;
+        seg.tramaTesto.textContent = seg.testo.replace(/\s+/g, ' ').trim().slice(-90);
+        if (aperta === seg) seg.corpo.scrollTop = seg.corpo.scrollHeight;
+        if (seg.stato === 'pensa') { setPhase('reason'); filo.pensa(); }
         followThread();
       },
-      // È partito il testo di una risposta (finale o intermedia). Da qui in poi
-      // le righe del turno (azioni, comandi) vengono DOPO il testo: se poi
-      // quel testo entra in cronologia come nota, va messo qui, non in coda.
+      // È partito il testo di una risposta: l'ultimo pensiero diventa la coda e il filo si avvolge. Se poi arriva
+      // un'azione, quel testo era una nota e il lavoro riprende (torna).
       answerStarted() {
         closeTurnReasoning();
-        turnMark = body.childElementCount;
-        if (phase !== 'done') setPhase('act', 'Scrivo la risposta…');
+        if (fermato || phase === 'done') return;
+        if (viva && viva.stato === 'agisce' && !completa(viva)) return;
+        if (viva && viva.stato === 'pensa') statoSeg(viva, 'coda');
+        else chiudiSeg(viva);
+        fineLavoro = Date.now();
+        setPhase('answer');
+        filo.chiudi();
+        avvolgi();
       },
-      // Il modello ha appena nominato un'azione: la riga in testa lo dice
-      // subito («Cerco sul web…»), la riga vera arriva con l'esito.
-      working(text) {
-        if (phase === 'done' || !text) return;
+      // Il modello ha nominato un'azione (`callId`) o ne dice l'avanzamento: la riga lo dice subito, il filo si
+      // annoda e si tende. Le azioni chiamate insieme fanno un nodo solo.
+      working(text, callId) {
+        if (phase === 'done' || fermato || !text) return;
         closeTurnReasoning();
-        setPhase('act', text);
+        torna();
+        let seg = viva;
+        const nuova = callId !== undefined;
+        if (!seg || seg.stato === 'fermato' || (seg.stato === 'agisce' && nuova && completa(seg))) {
+          chiudiSeg(seg);
+          seg = viva = nuovaSeg('agisce');
+        }
+        if (nuova) seg.attese.add(callId || `#${++anonime}`);
+        annoda(seg, completa(seg) ? '' : text);
+        setPhase('act');
+        filo.agisce();
+        followThread();
       },
-      // Una riga di azione: icona e due parole («Timer avviato · 5 min»).
-      // `failed`: la riga resta (è successo qualcosa) ma il riassunto non la
-      // conta — «Ha avviato un timer» su un timer non avviato è una bugia.
-      addRow(type, rowIcon, text, failed = false, cambi = null) {
+      // Fine di un giro con azioni: il nodo si chiude anche se qualche esito non è arrivato.
+      fineGiro() {
+        if (viva && viva.stato === 'agisce') chiudiNodo(viva);
+      },
+      // Il turno è tornato dal main: da qui in poi le righe raccontano, non fanno ripartire il filo.
+      fineDiretta() { inDiretta = false; },
+      // Una riga di azione: icona e due parole («Timer avviato · 5 min»), dentro il nodo della sua azione.
+      // `failed`: la riga resta (è successo qualcosa) ma il riassunto non la conta.
+      addRow(type, rowIcon, text, failed = false, cambi = null, a = null) {
         closeTurnReasoning();
         if (!failed) doneTypes.push(String(type || '').toUpperCase());
-        append(makeActivityRow(rowIcon, text, cambi));
-        if (phase !== 'done') setPhase('act', text);
+        const seg = registra({ tipo: type, testo: text, esito: esitoDi(a, failed, type) }, a);
+        aggiungiEsito(seg, makeActivityRow(rowIcon, text, cambi));
       },
-      // Esito di un comando eseguito subito (livello 1): riga di comando e
-      // output, nella cronologia — non nella bolla della risposta.
-      addCommand(out, spiegazione = '') {
+      // Esito di un comando eseguito subito (livello 1): riga di comando e output, nel suo nodo.
+      addCommand(out, spiegazione = '', a = null) {
         closeTurnReasoning();
         doneTypes.push('ESEGUI_COMANDO');
+        const seg = registra({ tipo: 'ESEGUI_COMANDO', testo: `Eseguito · ${spiegazione || (out && out.command) || 'comando'}`, esito: 'ok' }, a);
         const el = renderCommandResult(out, spiegazione);
         el.classList.add('dash-activity-cmd');
-        append(el);
-        if (phase !== 'done') setPhase('act', `Eseguito · ${spiegazione || (out && out.command) || 'comando'}`);
+        aggiungiEsito(seg, el);
       },
-      // La bolla di un turno che NON era l'ultimo («Provo subito tutti e tre…»)
-      // entra nella cronologia come nota e sparisce dalla conversazione: per
-      // l'utente conta la risposta, non il commento a metà lavoro.
+      // Un'azione che in chat è un bottone (un link aperto) o che il registro ha scartato: il nodo la conta e la
+      // nomina, la riga non c'è.
+      azioneSenzaRiga(a, { scartata = false } = {}) {
+        if (!a) return;
+        const tipo = String(a.type || '').toUpperCase();
+        const fallita = scartata || a._executed === false;
+        const o = a._output || {};
+        let dettaglio = '';
+        try { if (tipo === 'NAVIGA') dettaglio = new URL(String(a.url || o.url || '')).hostname.replace(/^www\./, ''); } catch (_) {}
+        if (tipo === 'APRI_FILE') dettaglio = String(a.percorso || a.path || '').split(/[\\/]/).pop();
+        const testo = fallita ? (FAILED_LABELS[tipo] || 'Azione non riuscita') : '';
+        registra({ tipo, testo, dettaglio, esito: a._confirm ? 'chiesta' : (fallita ? 'fallita' : 'ok') }, a);
+      },
+      // La bolla di un giro che NON era l'ultimo («Provo subito tutti e tre…») diventa una nota del suo nodo.
       absorbBubble(bubble) {
         if (!bubble || !bubble.isConnected) return;
         const text = (bubble.textContent || '').trim();
@@ -193,50 +382,80 @@
         const note = document.createElement('div');
         note.className = 'dash-activity-note';
         note.textContent = text;
-        // Nell'ordine vero: il testo è stato scritto PRIMA delle azioni del turno.
-        const at = (turnMark !== null && turnMark <= body.childElementCount) ? body.children[turnMark] || null : null;
-        body.insertBefore(note, at);
-        items += 1;
-        turnMark = null;
-        followBody();
+        const seg = viva && viva.stato === 'agisce' ? viva : bersaglio();
+        seg.corpo.insertBefore(note, seg.esiti);
+        filo.sveglia();
         followThread();
       },
-      // La nota che il main ha promosso a risposta (ultimo giro muto: la frase
-      // scritta insieme alle azioni era la risposta) non resta anche qui: una
-      // frase sola, nella bolla, non due.
+      // La nota che il main ha promosso a risposta non resta anche qui: una frase sola, nella bolla.
       dropNote(text) {
         const t = String(text || '').trim();
         if (!t) return;
         const notes = body.querySelectorAll('.dash-activity-note');
         const last = notes[notes.length - 1];
-        if (last && (last.textContent || '').trim() === t) { last.remove(); items -= 1; }
+        if (last && (last.textContent || '').trim() === t) last.remove();
       },
-      // Fine di un turno: chiude il ragionamento del turno e lo restituisce
-      // (per lo storico del thread).
       endTurn() {
         closeTurnReasoning();
         const t = lastTurn;
         lastTurn = { text: '', ms: 0 };
         return t;
       },
-      // Fine di tutto il lavoro: la riga diventa il riassunto; senza niente
-      // dentro, il blocco non ha ragione di restare.
-      // `failed`: il lavoro si è interrotto per un errore. Il blocco resta (il
-      // ragionamento aiuta a capire cosa stava tentando) ma lo dice in riga,
-      // così dopo un «Riprova» non sembra un lavoro riuscito impilato sopra
-      // l'altro.
+      // Fermato dall'utente: il filo si taglia, la riga in corso resta col ragionamento a metà e il blocco NON si
+      // richiude, perché chi ferma vuole vedere cosa era stato fatto.
+      taglia() {
+        if (fermato || phase === 'done') return;
+        fermato = true;
+        closeTurnReasoning();
+        if (!fineLavoro) fineLavoro = Date.now();
+        if (viva && (viva.stato === 'pensa' || viva.stato === 'coda') && wrap.dataset.filo !== 'gomitolo') {
+          statoSeg(viva, 'fermato');
+          scrivi(viva, 'Fermato qui');
+          apri(viva, true);
+        }
+        filo.taglia();
+        wrap.dataset.fermato = '1';
+        wrap.classList.remove('dash-activity-vuoto');
+        if (wrap.dataset.filo !== 'gomitolo') {
+          wrap.dataset.filo = 'srotolato';
+          head.setAttribute('aria-expanded', 'true');
+          head.title = 'Riavvolgi';
+          mostraTesta();
+        }
+        setPhase('done');
+        followThread();
+      },
+      get fermato() { return fermato; },
+      // Fine di tutto il lavoro: la riga diventa il riassunto. `failed`: interrotto da un guasto, il blocco resta
+      // e lo dice.
       finish({ failed = false } = {}) {
         closeTurnReasoning();
-        if (!items) { wrap.remove(); setPhase('done', ''); return; }
-        const summary = `${summarizeActivity(doneTypes, sawReasoning)} · ${fmtActivityDuration(Date.now() - startedAt)}`;
-        setPhase('done', failed ? `Tentativo non riuscito · ${summary}` : summary);
+        inDiretta = false;
+        for (const s of segs) if (s.stato === 'agisce') chiudiNodo(s);
+        if (viva && viva.stato === 'pensa') statoSeg(viva, fermato ? 'fermato' : 'coda');
+        viva = null;
+        if (!haCose() && !fermato) { filo.distruggi(); wrap.remove(); setPhase('done'); return; }
+        if (!fineLavoro) fineLavoro = Date.now();
+        setPhase('done');
+        if (fermato) {
+          filo.taglia();
+          label.textContent = riassunto();
+          return;
+        }
+        filo.chiudi();
+        wrap.classList.remove('dash-activity-vuoto');
+        avvolgi();
+        label.textContent = failed ? `Tentativo non riuscito · ${riassunto()}` : riassunto();
         if (failed) wrap.dataset.failed = '1';
-        head.title = open ? 'Nascondi' : 'Mostra cosa ha fatto Filo';
       },
-      remove() { wrap.remove(); },
-      // Il blocco sta subito sotto la bolla dell'utente che l'ha chiesto: da qui la si ritrova.
-      el: wrap,
+      remove() { filo.distruggi(); wrap.remove(); },
     };
+
+    function closeTurnReasoning() {
+      if (!turnReasoning) return;
+      lastTurn = { text: turnReasoning, ms: Date.now() - turnStartedAt };
+      turnReasoning = '';
+    }
   }
 
   // «Ha cercato sul web, impostato una sveglia e letto un documento»: il
@@ -589,11 +808,13 @@
     // va nella cronologia del blocco, non sotto la risposta. Se è stato
     // bloccato (terminale spento) resta in vista: è un problema da leggere.
     if (isType(a, 'ESEGUI_COMANDO') && !a._confirm && a._output && !a._output.blocked) {
-      activity.addCommand(a._output, spiegazioneDi(a));
+      activity.addCommand(a._output, spiegazioneDi(a), a);
       return true;
     }
     const row = activityRowFor(a);
-    if (row) { activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed, row.cambi); return true; }
+    if (row) { activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed, row.cambi, a); return true; }
+    // Un link aperto resta un bottone sotto la risposta, ma il nodo del filo lo conta e lo nomina.
+    if (activity.azioneSenzaRiga) activity.azioneSenzaRiga(a);
     return false;
   }
 
@@ -1051,7 +1272,7 @@
           a._executed = false;
           delete a._confirm;
           const row = activityRowFor(a);
-          if (activity && row) activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed, row.cambi);
+          if (activity && row) activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed, row.cambi, a);
           btn.textContent = `🔒 ${row ? row.text : 'Fermata'}`;
           return;
         }
@@ -1256,7 +1477,7 @@
       if (activity && activity.el && global.SN_DASH_CAMBI) global.SN_DASH_CAMBI.segna(activity.el, ids);
     }
     const row = activityRowFor(a);
-    if (activity && row) activity.addRow(a.type, row.icon, row.text, !!row.failed, row.cambi);
+    if (activity && row) activity.addRow(a.type, row.icon, row.text, !!row.failed, row.cambi, a);
     // L'archivio delle chat ha salvato il turno senza le azioni in attesa: questa adesso è successa.
     try { archiviaAzione(String(a.type || '').toUpperCase(), ids.map((c) => c.id)); } catch (_) {}
   }

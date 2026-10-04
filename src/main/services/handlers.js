@@ -3182,8 +3182,10 @@ function apertureFermateDopoForPrompt(actions) {
 // Un tentativo interrotto a metà da un guasto (rete, fornitore): queste azioni
 // sono state eseguite PRIMA che tutto si fermasse, e ripeterle vuol dire un
 // secondo timer, un secondo appunto. Dato di sistema, non istruzione.
-function interruptedActionsForPrompt(actions) {
-  if (!Array.isArray(actions)) return '';
+// `fermato`: l'ha fermato l'utente col quadrato (#578), non un guasto. Lo si dice anche senza azioni fatte: al turno
+// dopo il modello deve sapere che la risposta di prima non c'è.
+function interruptedActionsForPrompt(actions, { fermato = false } = {}) {
+  if (!Array.isArray(actions)) actions = [];
   const righe = [];
   for (const a of actions) {
     if (!a || a._executed === false || a._confirm) continue;
@@ -3193,6 +3195,11 @@ function interruptedActionsForPrompt(actions) {
       if (d) cosa = d.replace(/\.+\s*$/, '');
     } catch (_) {}
     righe.push(`- ${cosa}`);
+  }
+  if (fermato) {
+    return righe.length
+      ? `[L'utente ti ha fermato a metà lavoro, prima che rispondessi. Queste cose ERANO GIÀ STATE FATTE:\n${righe.join('\n')}\nNon rifarle.]`
+      : '[L\'utente ti ha fermato a metà lavoro, prima che rispondessi.]';
   }
   return righe.length
     ? `[Il tentativo si è interrotto per un guasto, ma queste cose ERANO GIÀ STATE FATTE:\n${righe.join('\n')}\nNon rifarle: riprendi da qui.]`
@@ -3521,6 +3528,17 @@ async function editorFileSummaries() {
 }
 
 // `daModello`: il messaggio l'ha scritto un modello (un suggerimento della home), anche se parte dalla casella dell'utente.
+// I turni di chat in corso, per chi li vuole fermare (#578): reqId → { wcId, ctrl, fermato }. Solo in memoria.
+const turniInCorso = new Map();
+function fermaFiloChat(reqId, wc) {
+  const t = reqId ? turniInCorso.get(String(reqId)) : null;
+  // Ferma solo la scheda che l'ha avviato: un'altra pagina di Filo non tocca il lavoro di questa.
+  if (!t || t.wcId !== (wc && wc.id)) return false;
+  t.fermato = true;
+  try { t.ctrl.abort(); } catch (_) {}
+  return true;
+}
+
 async function handleFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, daModello = false, chatId = null, sender = null }) {
   await FiloMem.touchSession();
   await FiloMem.appendRaw({ type: 'chat_user', summary: String(userMessage || '').slice(0, 200) });
@@ -3628,7 +3646,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       // fatto davvero. Senza questa riga, al «Riprova» il modello rifaceva il
       // timer che aveva appena messo.
       if (m.interrotto) {
-        const fatte = interruptedActionsForPrompt(m.actions);
+        const fatte = interruptedActionsForPrompt(m.actions, { fermato: !!m.fermato });
         if (fatte) parts.push(fatte);
       }
       const obs = observationsForPrompt(m.actions);
@@ -3723,17 +3741,28 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // rispondere: allora l'utente deve saperlo, non ricevere l'ultima nota di
   // lavoro spacciata per risposta.
   let exhausted = true;
+  // Fermato dall'utente (#578): la chiamata in volo si interrompe e nessuna azione nuova parte; quelle già partite
+  // finiscono e restano raccontate. Una risposta già finita invece arriva: fermare riguarda il lavoro che resta.
+  const turno = { wcId: wc && wc.id, ctrl: new AbortController(), fermato: false };
+  if (reasoningReqId) turniInCorso.set(String(reasoningReqId), turno);
+  let fermato = false;
   try {
     for (let round = 1; round <= MAX_ROUNDS; round++) {
+      if (turno.fermato) { fermato = true; break; }
       // La scheda scrive la riga del ripiego sotto la risposta: niente avviso in più (#662).
       const giro = () => handleAIRequest({
         action: ACTIONS.FILO_CHAT,
         payload: { ...payloadBase, threadMessages },
         origin: 'filo:chat',
-        onReasoning, onText, onToolCall, tools,
+        onReasoning, onText, onToolCall, tools, signal: turno.ctrl.signal,
       });
       const KW = global.SN_WALLET_MAIN;
-      r = await (KW && KW.conRipiegoDetto ? KW.conRipiegoDetto(giro) : giro());
+      try {
+        r = await (KW && KW.conRipiegoDetto ? KW.conRipiegoDetto(giro) : giro());
+      } catch (e) {
+        if (turno.fermato) { fermato = true; break; }
+        throw e;
+      }
       if (r && r.keyFallback) keyFallback = r.keyFallback;
       costEur += Number(r.costEur) || 0;
       let text = String(r.text || '');
@@ -3770,6 +3799,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         exhausted = false;
         break;
       }
+      if (turno.fermato) { fermato = true; break; }
       const roundRendered = [];
       const results = [];
       // Le aperture di pagina di fila partono insieme: ognuna aspetta l'esito della sua scheda,
@@ -3787,6 +3817,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       const apertura = (a) => !!a && !a._argsError && String(a.type || '').toUpperCase() === 'NAVIGA';
       for (let i = 0; i < actions.length; i++) {
         const a = actions[i];
+        if (!esiti.has(a) && turno.fermato) { fermato = true; break; }
         rawActions.push(a);
         if (!esiti.has(a)) {
           if (apertura(a)) for (let j = i; j < actions.length && apertura(actions[j]); j++) esiti.set(actions[j], avvia(actions[j]));
@@ -3825,6 +3856,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         azioniViste.push(rendered);
         ricordaLettoInChat([rendered]);
       }
+      if (fermato) break;
       // Il testo scritto in un giro con azioni è una nota di lavoro («cerco il
       // meteo…»), non la risposta: la scheda lo sposta nel blocco di attività.
       if (text.trim()) notes.push(text.trim());
@@ -3854,6 +3886,22 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     // già stato fatto invece di rifarlo.
     try { e.filoActions = renderedActions; } catch (_) {}
     throw e;
+  } finally {
+    if (reasoningReqId && turniInCorso.get(String(reasoningReqId)) === turno) turniInCorso.delete(String(reasoningReqId));
+  }
+  if (fermato) {
+    if (onbActive && !internal) releaseOnboardingResume();
+    // Nell'archivio della chat restano le azioni che sono successe davvero: riaperta, la chat racconta cosa era stato
+    // fatto prima che l'utente fermasse.
+    const successe = renderedActions.filter((x) => x && ((x._executed && !x._confirm) || (x._output && x._output.blocked === 'segreto')));
+    if (chatId && successe.length) {
+      const cambi = successe.flatMap((x) => (x && Array.isArray(x._cambi) ? x._cambi.map((c) => c.id) : []));
+      await appendToChatArchive(chatId, { role: 'filo', text: '', actions: successe, ...(cambi.length ? { cambi } : {}) }, { onboarding: onbActive });
+    }
+    return {
+      text: '', actions: renderedActions, stopped: true, notes, reasoningDetails: [], costEur,
+      model: r && r.model, provider: r && r.provider,
+    };
   }
   // #162 — quando Filo vuole solo ESEGUIRE qualcosa (es. aprire un link) non
   // deve scrivere testo di riempimento: il "(vuoto)" che compariva era un
@@ -4368,6 +4416,7 @@ const handlerCtx = {
   searchArchivedTabs,
   archivioDaCancellare,
   handleFiloChat,
+  fermaFiloChat,
   handleFiloGenerateDashboard,
   executeFiloAction,
   controllaUscita,
