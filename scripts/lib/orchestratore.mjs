@@ -93,6 +93,8 @@ export function ramoDi(p) { return `claude/${p.slug}`; }
 // verify-local start prende per opzione o percorso un testo che comincia con un trattino o una barra.
 export const richiestaArg = (r) => String(r || '').replace(/^[\s\-‐-―−/\\]+/, '');
 const primaRiga = (t) => String(t || '').split('\n')[0];
+// Il lavoratore ha finito e ha lasciato solo file: tolti quelli, si riparte dalla verifica. Il testo riconosce anche le fermate scritte prima del segno.
+const MOTIVO_SPORCO = 'il lavoratore ha lasciato modifiche non salvate';
 
 /** Una pratica nuova in coda. PURA. */
 export function nuovaPratica({ num, slug, richiesta = '', file = [], ora = '' }) {
@@ -207,7 +209,7 @@ export function derivatiDaAprire(p, derived) {
 const testa = (regole) => (regole ? [String(regole).trim(), '', '════════'] : []);
 
 /** Il compito del lavoratore. Le regole fisse viaggiano in testa, intere: ogni istanza parte senza memoria. PURA. */
-export function promptLavoratore({ p, regole, wtApp, wtServer, cartellaNote, crit = '' }) {
+export function promptLavoratore({ p, regole, wtApp, wtServer, cartellaNote, crit = '', giaLavoro = false }) {
   const righe = [...testa(regole), 'Sei un lavoratore di una sessione locale di Filo, lanciato dall’orchestratore automatico (#956). Segui le regole fisse qui sopra.', ''];
   if (p.compito === 'riallinea') {
     righe.push(
@@ -236,7 +238,7 @@ export function promptLavoratore({ p, regole, wtApp, wtServer, cartellaNote, cri
     );
   } else {
     righe.push(`Lavoro: feedback #${p.num} (\`npm run feedback:leggi -- ${p.num}\`).`);
-    if (p.giriTotali > 0) righe.push('Il ramo ha già del lavoro: riprendilo da dove è rimasto, non ricominciare.');
+    if (p.giriTotali > 0 || giaLavoro) righe.push('Il ramo ha già del lavoro: riprendilo da dove è rimasto, non ricominciare.');
   }
   righe.push(
     '',
@@ -295,6 +297,7 @@ export function riprendi(p, risposta) {
   if (q.fusa && (q.fusa.app || q.fusa.server)) { q.fase = 'chiusura'; return q; }
   if (f.dove === 'chiusura' && !r) { q.fase = 'chiusura'; return q; }
   if (f.correzione) { q.compito = 'correzione'; q.risposta = r; q.fase = 'lavoro'; return q; }
+  if (!r && f.dove === 'lavoro' && (f.lavoroFinito || String(f.motivo || '').startsWith(MOTIVO_SPORCO))) { q.compito = 'lavoro'; q.fase = 'verifica'; return q; }
   if (r) { q.compito = 'decisione'; q.risposta = r; q.fase = 'lavoro'; return q; }
   if (!q.giriTotali || f.dove === 'lavoro') { q.fase = 'lavoro'; return q; }
   q.fase = 'verifica';
@@ -424,12 +427,14 @@ export function creaMotore(dep, opzioni = {}) {
     const sospesi = p.compito === 'riallinea' ? '' : rilieviSospesi(dep.verifica(wtApp));
     if (sospesi) p.compito = 'correzione';
     const crit = sospesi || (['decisione', 'correzione'].includes(p.compito) ? (fp.correzione || fp.domanda || fp.motivo || '') : '');
+    // Un lavoratore interrotto, o un orchestratore riavviato, lascia commit sul ramo: chi riparte lo sa dal ramo, non dal numero di giri.
+    const giaLavoro = p.compito === 'lavoro' && ((await avanti(wtApp)) > 0 || (await serverAvanti(p)) > 0);
     dep.log(`#${p.num} lavoratore (${p.compito})`);
-    const r = await istanza(p, 'lavoratore', promptLavoratore({ p, regole: P.regole, wtApp, wtServer: wtServerSeC(p), cartellaNote: P.note, crit }), `filo #${p.num} lavoratore`);
+    const r = await istanza(p, 'lavoratore', promptLavoratore({ p, regole: P.regole, wtApp, wtServer: wtServerSeC(p), cartellaNote: P.note, crit, giaLavoro }), `filo #${p.num} lavoratore`);
     const consegnata = p.compito === 'correzione' && ((dep.verifica(wtApp) || {}).entry || {}).verdict === 'fixed';
     if (!r.ok && !consegnata) return ferma(p, `il lavoratore non ha finito: ${primaRiga(r.errore)}`);
     const st = await git(wtApp, 'status', '--porcelain');
-    if (String(st.out).trim()) return ferma(p, `il lavoratore ha lasciato modifiche non salvate:\n${coda(st.out)}`);
+    if (String(st.out).trim()) return ferma(p, `${MOTIVO_SPORCO}:\n${coda(st.out)}`, '', { lavoroFinito: true });
     if (p.compito === 'lavoro' && !(await avanti(wtApp)) && !(await serverAvanti(p))) {
       return ferma(p, `il lavoratore non ha lasciato commit sul ramo (sua riga: ${primaRiga(r.testo).slice(0, 200)})`);
     }
@@ -544,9 +549,22 @@ export function creaMotore(dep, opzioni = {}) {
     if (P.serverRadice) await git(P.serverRadice, 'fetch', 'origin');
     const nApp = await avanti(wt);
     const nSrv = await serverAvanti(p);
-    if (!nApp && !nSrv && !p.fusa.app && !p.fusa.server) return ferma(p, 'niente da fondere: il ramo non ha commit oltre origin/main, né qui né sul server');
     const fileApp = String((await git(wt, 'diff', '--name-only', 'origin/main...HEAD')).out || '').split('\n').map((x) => x.trim()).filter(Boolean);
     if (fileApp.length) p.fileApp = fileApp;
+    if (nSrv) p.serverDaFondere = true;
+    salva(p);
+    // Commit che c'erano e ora stanno dentro origin/main senza una fusione registrata: li ha fusi il server
+    // (approvazione in Filo, risposta persa, orchestratore chiuso a metà). Si riparte da lì, deploy compreso.
+    const dentroMain = async (cwd, ref) => (await git(cwd, 'merge-base', '--is-ancestor', ref, 'origin/main')).code === 0;
+    if (!nApp && !p.fusa.app && (p.fileApp || []).length && await dentroMain(wt, 'HEAD')) {
+      dep.log(`#${p.num} l'app è già su main`);
+      p.fusa.app = true;
+    }
+    if (!nSrv && !p.fusa.server && p.serverDaFondere && P.serverRadice && await dentroMain(P.serverRadice, `refs/heads/${ramoDi(p)}`)) {
+      dep.log(`#${p.num} il server è già su main`);
+      p.fusa.server = true;
+    }
+    if (!nApp && !nSrv && !p.fusa.app && !p.fusa.server) return ferma(p, 'niente da fondere: il ramo non ha commit oltre origin/main, né qui né sul server');
 
     while (chiusure > 0 || !caricoBasta(await dep.carico(), opz, true)) {
       dep.log(`#${p.num} chiusura in attesa: un'altra chiusura in corso o macchina carica`);
