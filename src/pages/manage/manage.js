@@ -5050,15 +5050,13 @@
 
   // Avvisi del giro (freno sulle pagine, tetto dei seguiti, registro
   // illeggibile): si dicono sull'intestazione della lista, non si tacciono.
-  let avvisoGiro = '';
   function segnaAvvisoGiro(avvisi) {
     const testo = (Array.isArray(avvisi) ? avvisi : []).filter(Boolean).join(' · ');
     if (testo) console.warn('[manage] giro:', testo);
     avvisoGiro = testo;
     if (!mgListHead) return;
     mgListHead.classList.toggle('mg-list-head--avviso', !!testo);
-    if (testo) mgListHead.title = `Aggiornamento: ${testo}`;
-    else if (mgListHead.title && mgListHead.title.startsWith('Aggiornamento: ')) mgListHead.removeAttribute('title');
+    aggiornaSegnoFerma();
   }
 
   function applicaEsito(esito, gen = liveGen) {
