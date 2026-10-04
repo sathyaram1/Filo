@@ -5,7 +5,9 @@
 // QUALI preferenze sono modificabili e COME interpretarne i valori è la stessa
 // esposta dalla pagina Preferenze, e deve restare testabile senza Electron.
 //
-// Espone SN_PREF = { buildPreferencePartial, parsePrefBool, PREF_SETTERS, lezioneDaAzione }.
+// Espone SN_PREF = { buildPreferencePartial, parsePrefBool, PREF_SETTERS, lezioneDaAzione, applicaElenco,
+// righeDescrizione, setterDi }. Ogni setter dichiara `scrive` (i percorsi di cui è la chiave) e `aiuto` (la riga
+// che la chat legge nella descrizione dello strumento): sentinella in tests/unit/vociImpostazioni.test.mjs.
 // `buildPreferencePartial(chiave, valore)` → { partial, label, level, risk },
 // { rifiuto } col perché, oppure null se chiave/valore non sono validi. Solo le
 // preferenze qui elencate sono scrivibili. Dal #146.5 l'elenco copre TUTTE le
@@ -33,8 +35,10 @@
     if (typeof v === 'boolean') return v;
     if (typeof v === 'number') return v !== 0;
     const s = String(v == null ? '' : v).trim().toLowerCase();
-    if (['true', 'si', 'sì', 'on', 'attiva', 'attivo', 'attivare', 'attivata', 'attivato', 'mostra', 'mostrare', 'abilita', 'abilitato', 'abilitare', '1', 'yes', 'y'].includes(s)) return true;
-    if (['false', 'no', 'off', 'disattiva', 'disattivo', 'disattivare', 'disattivata', 'disattivato', 'nascondi', 'nascondere', 'disabilita', 'disabilitato', 'disabilitare', '0', 'n'].includes(s)) return false;
+    if (['true', 'si', 'sì', 'on', 'attiva', 'attivo', 'attivare', 'attivata', 'attivato', 'mostra', 'mostrare', 'abilita', 'abilitato', 'abilitare',
+      'accendi', 'accendere', 'acceso', 'accesa', '1', 'yes', 'y'].includes(s)) return true;
+    if (['false', 'no', 'off', 'disattiva', 'disattivo', 'disattivare', 'disattivata', 'disattivato', 'nascondi', 'nascondere', 'disabilita', 'disabilitato', 'disabilitare',
+      'spegni', 'spegnere', 'spento', 'spenta', '0', 'n'].includes(s)) return false;
     return null;
   }
 
@@ -102,7 +106,7 @@
   }
 
   // Un interruttore della pagina Sicurezza: a parole sì/no, livello 2 col rischio in chiaro (#949).
-  function interruttore({ keys, percorso, nome, risk, aiuto }) {
+  function interruttore({ keys, percorso, nome, risk, aiuto, stati = ['attivo', 'disattivato'] }) {
     return {
       keys,
       scrive: [percorso],
@@ -112,7 +116,7 @@
       build(v) {
         const b = parsePrefBool(v);
         if (b === null) return null;
-        return { partial: nidifica(percorso, b), label: `${nome} → ${b ? 'attivo' : 'disattivato'}` };
+        return { partial: nidifica(percorso, b), label: `${nome} → ${b ? stati[0] : stati[1]}` };
       },
     };
   }
@@ -222,7 +226,7 @@
       scrive: [`tabColor.${chiave}`],
       aiuto: () => {
         const m = metaColoreTab(chiave);
-        return m ? `numero ${m.min}-${m.max} (${m.label.toLowerCase()}, predefinito ${m.def}: ${m.comment})` : 'numero';
+        return m ? `numero ${m.min}-${m.max} (${m.label.toLowerCase()} del colore delle tab, predefinito ${m.def})` : 'numero';
       },
       build(v) {
         const m = metaColoreTab(chiave);
@@ -378,6 +382,8 @@
       },
     },
     {
+      scrive: ['nomiSensati.scaricamenti'],
+      aiuto: 'true | false (nome sensato da solo ai file scaricati col nome che non dice niente)',
       keys: ['nomi_sensati_scaricamenti', 'nome sensato agli scaricamenti', 'nomi sensati', 'rinomina scaricamenti',
         'rinomina i file scaricati', 'nomi dei file scaricati', 'nomisensati'],
       // Da accesa il contenuto dei file scaricati va a un modello senza una richiesta per ciascuno: conferma.
@@ -862,6 +868,7 @@
       keys: ['liste_pubbliche_blocco', 'liste pubbliche', 'liste pubbliche come blacklist', 'usa le liste pubbliche'],
       percorso: 'security.siteBlock.useAdblockLists',
       nome: 'Liste pubbliche come blacklist',
+      stati: ['in uso', 'spente'],
       aiuto: 'true | false (tratta come bloccati anche i siti di pubblicità e tracciamento delle liste pubbliche)',
       risk: 'Decide se Filo tratta come bloccati anche i siti di pubblicità e tracciamento delle liste pubbliche, oltre '
         + 'a quelli che hai messo tu. Spegnerlo lascia aprire quei siti.',
@@ -870,6 +877,7 @@
       keys: ['controlli_rete_siti', 'controlli di rete', 'controlli rete', 'età del dominio', 'eta del dominio'],
       percorso: 'security.safeBrowse.networkSignals',
       nome: 'Controlli di rete sui siti',
+      stati: ['attivi', 'spenti'],
       aiuto: 'true | false (chiede a servizi pubblici l\'età del dominio e del certificato, per riconoscere le truffe)',
       risk: 'Controlla le richieste a servizi pubblici sull’età del dominio e del certificato, un forte segnale di truffa. '
         + 'Spegnerle rende meno probabile l’avviso su un sito nato da pochi giorni per ingannarti.',
@@ -886,6 +894,7 @@
       keys: ['link_sospetti_isolati', 'finestra isolata', 'link sospetti', 'apri i link sospetti in una finestra isolata'],
       percorso: 'security.safeBrowse.sandbox',
       nome: 'Link sospetti in una finestra isolata',
+      stati: ['sì', 'no'],
       aiuto: 'true | false (segue prima in una finestra nascosta i link accorciati o con molti redirect)',
       risk: 'Controlla la finestra isolata in cui Filo segue prima i link accorciati o con molti redirect. Spegnerla '
         + 'fa aprire quei link direttamente, senza sapere prima dove portano.',
@@ -894,6 +903,7 @@
       keys: ['segnalazione_automatica', 'segnalazione automatica', 'segnalazione automatica dei problemi', 'segnalazioni automatiche', 'feedback automatico'],
       percorso: 'security.autoFeedback',
       nome: 'Segnalazione automatica dei problemi',
+      stati: ['attiva', 'disattivata'],
       aiuto: 'true | false (segnala in forma anonima a chi sviluppa Filo quando non riesce a fare una cosa; tenerla attiva vale 10 crediti al giorno)',
       risk: 'Decide se Filo manda da solo una segnalazione anonima e generica a chi lo sviluppa quando non riesce a fare '
         + 'una cosa: mai indirizzi né testi delle conversazioni. Spegnerla toglie anche i 10 crediti extra al giorno.',
@@ -935,8 +945,8 @@
       percorso: 'blocklist',
       nome: 'Domini dove Filo non interviene',
       aiuto: 'siti dove Filo non aggiunge niente alle pagine',
-      risk: 'Cambia i siti dove Filo non interviene sulle pagine: lì niente menu, niente aiuti e niente protezioni '
-        + 'che Filo aggiunge alla pagina.',
+      risk: 'Cambia i siti dove Filo non interviene sulle pagine: lì non aggiunge niente alla pagina, '
+        + 'né i suoi menu né i suoi aiuti.',
     }),
   ];
 
@@ -980,5 +990,13 @@
     return { testo };
   }
 
-  global.SN_PREF = { buildPreferencePartial, parsePrefBool, parseItalianNumber, PREF_SETTERS, lezioneDaAzione };
+  // Il setter di un'impostazione, dal percorso che scrive: è la chiave con cui la chat la cambia.
+  function setterDi(percorso) {
+    return PREF_SETTERS.find((s) => Array.isArray(s.scrive) && s.scrive.includes(percorso)) || null;
+  }
+
+  global.SN_PREF = {
+    buildPreferencePartial, parsePrefBool, parseItalianNumber, PREF_SETTERS, lezioneDaAzione,
+    applicaElenco, righeDescrizione, setterDi, PARAMETRI_COLORE_TAB,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
