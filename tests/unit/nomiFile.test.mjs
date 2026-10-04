@@ -24,7 +24,7 @@ test('il nome proposto perde virgolette, etichette ed estensione riscritta dal m
 });
 
 test('caratteri che un disco rifiuta o che girano il testo non arrivano al nome', () => {
-  assert.equal(N.pulisci('Bolletta 03/2026: luce', { ext: '.pdf' }), 'Bolletta 03-2026- luce');
+  assert.equal(N.pulisci('Bolletta 03/2026: luce', { ext: '.pdf' }), 'Bolletta 03-2026 - luce');
   assert.equal(N.pulisci('a<b>c|d?e*f"g', {}), 'abcdefg');
   assert.equal(N.pulisci('fattura\u202Efdp.exe', { ext: '.pdf' }), 'fatturafdp.exe');
   assert.equal(N.pulisci('...nascosto', {}), 'nascosto');

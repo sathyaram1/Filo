@@ -66,7 +66,7 @@
     const e = String(ext || '');
     if (e && s.toLowerCase().endsWith(e.toLowerCase())) s = s.slice(0, s.length - e.length);
     else s = s.replace(ESTENSIONI_NOTE, '');
-    s = s.replace(/[\\/:]/g, '-').replace(/[<>"|?*]/g, '');
+    s = s.replace(/\s*:\s*/g, ' - ').replace(/[\\/]/g, '-').replace(/[<>"|?*]/g, '');
     s = s.replace(/\s+/g, ' ').replace(/\s*-\s*-+\s*/g, ' - ').trim();
     s = s.replace(/^[.\-\s]+/, '').replace(/[.\s]+$/, '');
     s = tagliaAllaParola(s, MAX_BASE).replace(/[.\s]+$/, '');

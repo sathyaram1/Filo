@@ -291,6 +291,8 @@
     // brevissima per misurare latenza e velocità. Prima era un id scritto nel
     // codice, quindi si provava un modello diverso da quelli davvero in uso.
     PROVIDER_TEST: 'provider_test',
+    // Nome sensato a un file dell'utente dal suo contenuto (#950): legge l'inizio del testo o una miniatura.
+    FILE_NAME: 'file_name',
   };
 
   // === Crediti (gamification) ===
@@ -384,6 +386,7 @@
     [ACTIONS.FILO_TAB_SUMMARY]: 'Gestione schede',
     [ACTIONS.FILO_TAB_SEARCH]: 'Gestione schede',
     [ACTIONS.FILO_CHAT_TRIAGE]: 'Chat con Filo',
+    [ACTIONS.FILE_NAME]: 'Nomi dei file',
   };
 
   function creditUsageGroup(action) {
@@ -434,6 +437,7 @@
     [ACTIONS.MANAGE_SEARCH]: 'Gestione — ricerca fra i feedback',
     [ACTIONS.ARCHIVE_EMBED]: 'Archivio schede — indicizzazione',
     [ACTIONS.PROVIDER_TEST]: 'Prova di un fornitore',
+    [ACTIONS.FILE_NAME]: 'Nome sensato a un file',
   };
 
   function actionLabel(action) {
@@ -505,6 +509,7 @@
     [ACTIONS.MANAGE_SEARCH]: '',
     [ACTIONS.ARCHIVE_EMBED]: '',
     [ACTIONS.PROVIDER_TEST]: '',
+    [ACTIONS.FILE_NAME]: '',
   };
 
   // ── Politica sui fornitori (host upstream) ───────────────────────────────────
