@@ -4,13 +4,7 @@
 (function () {
   'use strict';
 
-  const sezione = document.getElementById('bdMie');
-  const conto = document.getElementById('bdMieConto');
-  const lista = document.getElementById('bdMieLista');
-  const vuoto = document.getElementById('bdMieVuoto');
-  const altre = document.getElementById('bdMieAltre');
-  const titoloMigliorie = document.getElementById('bdMiglioramentiTitolo');
-  if (!sezione || !lista) return;
+  let sezione, conto, lista, vuoto, altre, titoloMigliorie;
 
   // Chiusa, la sezione mostra le più recenti: in cima alla bacheca non deve spingere giù i miglioramenti.
   const RECENTI = 3;
@@ -191,20 +185,32 @@
     }
   }
 
-  altre.addEventListener('click', () => { tutte = !tutte; disegna(); });
+  function init() {
+    sezione = document.getElementById('bdMie');
+    conto = document.getElementById('bdMieConto');
+    lista = document.getElementById('bdMieLista');
+    vuoto = document.getElementById('bdMieVuoto');
+    altre = document.getElementById('bdMieAltre');
+    titoloMigliorie = document.getElementById('bdMiglioramentiTitolo');
+    if (!sezione || !lista) return;
 
-  window.addEventListener('hashchange', () => {
-    if (location.hash !== '#segnalazioni') return;
-    tutte = true;
-    carica.portata = false;
-    carica();
-  });
+    altre.addEventListener('click', () => { tutte = !tutte; disegna(); });
 
-  if (window.chrome?.runtime?.onMessage?.addListener) {
-    window.chrome.runtime.onMessage.addListener((msg) => {
-      if (msg && msg.type === 'segnalazioni_mie_cambiate') carica();
+    window.addEventListener('hashchange', () => {
+      if (location.hash !== '#segnalazioni') return;
+      tutte = true;
+      carica.portata = false;
+      carica();
     });
+
+    if (window.chrome?.runtime?.onMessage?.addListener) {
+      window.chrome.runtime.onMessage.addListener((msg) => {
+        if (msg && msg.type === 'segnalazioni_mie_cambiate') carica();
+      });
+    }
+
+    carica();
   }
 
-  carica();
+  window.SN_BOARD_SEGNALAZIONI = { init };
 })();

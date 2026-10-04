@@ -178,6 +178,8 @@ test('in incognito l\'elenco non si scrive e non si vede', async ({ app, shell }
 
   // Una segnalazione mandata fuori c'è, ma la bacheca dell'incognito non la mostra.
   await app.evaluate(() => globalThis.SN_SEGNALAZIONI_MIE.registra({ id: 'fuori', testo: 'Mandata fuori' }));
+  const vista = await privata.evaluate(() => window.filo.message({ type: 'segnalazioni_mie_list' }));
+  expect(vista).toEqual({ ok: true, voci: [], incognito: true });
   await privata.reload();
   await privata.waitForFunction(() => window.__boardTest);
   await privata.waitForTimeout(500);
