@@ -377,30 +377,182 @@
 
   const UUID_C2PA = 'd8fec3d61b0e483c92975828877ec481';
 
-  function bmff(b) {
-    const res = { c2pa: null, xmp: [], testiPng: null, formato: 'bmff' };
-    let i = 0;
-    while (i + 8 <= b.length) {
+  // I box di un livello: { tipo, inizio, fine, testa }. `testa` include l'usertype dei box uuid.
+  function boxBmff(b, da, a) {
+    const out = [];
+    let i = da;
+    while (i + 8 <= a) {
       let size = be32(b, i);
       const tipo = fourcc(b, i + 4);
       let testa = 8;
       if (size === 1) {
-        if (i + 16 > b.length) break;
+        if (i + 16 > a) break;
         size = be32(b, i + 8) * 4294967296 + be32(b, i + 12);
         testa = 16;
-      } else if (size === 0) size = b.length - i;
-      if (size < testa || i + size > b.length) break;
-      if (tipo === 'uuid' && i + testa + 16 <= b.length) {
-        let hex = '';
-        for (let k = i + testa; k < i + testa + 16; k++) hex += b[k].toString(16).padStart(2, '0');
-        if (hex === UUID_C2PA && !res.c2pa) {
-          const dati = b.subarray(i + testa + 16, i + size);
-          res.c2pa = jumbfBoxes(dati, 0, dati.length);
-        }
-      }
+      } else if (size === 0) size = a - i;
+      if (size < testa || i + size > a) break;
+      if (tipo === 'uuid') testa += 16;
+      out.push({ tipo, inizio: i, fine: i + size, testa: Math.min(testa, size) });
       i += size;
     }
+    return out;
+  }
+  function uuidDi(b, box) {
+    if (box.tipo !== 'uuid' || box.testa - 16 < 8) return '';
+    let hex = '';
+    for (let k = box.inizio + box.testa - 16; k < box.inizio + box.testa; k++) hex += b[k].toString(16).padStart(2, '0');
+    return hex;
+  }
+
+  // Lo standard mette davanti al JUMBF versione e flag, lo scopo del box e, per «manifest», una posizione da 8 byte.
+  function jumbfDaUuid(b, box) {
+    let p = box.inizio + box.testa + 4;
+    let fine = p;
+    while (fine < box.fine && fine - p < 64 && b[fine] !== 0) fine++;
+    if (fine >= box.fine || b[fine] !== 0) return null;
+    const scopo = latin1(b, p, fine - p);
+    if (scopo !== 'manifest') return null;
+    p = fine + 1 + 8;
+    const boxes = p < box.fine ? jumbfBoxes(b, p, box.fine) : [];
+    return boxes.some((x) => x.tipo === 'jumb') ? boxes : null;
+  }
+
+  // Nei file BMFF l'XMP è un elemento dentro meta/mdat, puntato da tabelle di posizioni:
+  // il pacchetto è testo in chiaro, quindi lo si cerca dov'è invece di ricostruire le tabelle.
+  const XMP_APRE = [0x3c, 0x78, 0x3a, 0x78, 0x6d, 0x70, 0x6d, 0x65, 0x74, 0x61]; // <x:xmpmeta
+  const XMP_CHIUDE = '</x:xmpmeta>';
+  const MAX_XMP = 4 * 1024 * 1024;
+  function cercaXmp(b, da, a, out) {
+    let i = da;
+    while (out.length < 8) {
+      i = b.indexOf(XMP_APRE[0], i);
+      if (i < 0 || i + XMP_APRE.length > a) return;
+      let uguale = true;
+      for (let k = 1; k < XMP_APRE.length; k++) if (b[i + k] !== XMP_APRE[k]) { uguale = false; break; }
+      if (!uguale) { i++; continue; }
+      const testo = utf8(b, i, Math.min(a - i, MAX_XMP));
+      const chiude = testo.indexOf(XMP_CHIUDE);
+      if (chiude < 0) return;
+      out.push(testo.slice(0, chiude + XMP_CHIUDE.length));
+      i += chiude + XMP_CHIUDE.length;
+    }
+  }
+
+  function bmff(b) {
+    const res = { c2pa: null, xmp: [], testiPng: null, formato: 'bmff' };
+    for (const box of boxBmff(b, 0, b.length)) {
+      if (uuidDi(b, box) === UUID_C2PA) {
+        if (!res.c2pa) res.c2pa = jumbfDaUuid(b, box);
+        continue;
+      }
+      if (box.tipo === 'meta' || box.tipo === 'mdat' || box.tipo === 'uuid') cercaXmp(b, box.inizio, box.fine, res.xmp);
+    }
     return res;
+  }
+
+  // Il legame duro dei file BMFF: si escludono i box che l'asserzione nomina; dalla
+  // versione 2 ogni box di primo livello rimasto porta nell'impronta anche la propria posizione.
+  function boxPerPercorso(b, xpath) {
+    const passi = String(xpath || '').split('/').filter(Boolean);
+    if (!passi.length || passi.length > 8) return [];
+    let livello = boxBmff(b, 0, b.length);
+    let trovati = [];
+    for (let n = 0; n < passi.length; n++) {
+      const m = /^([^[\]]{1,4})(?:\[(\d+)\])?$/.exec(passi[n]);
+      if (!m) return [];
+      trovati = livello.filter((x) => x.tipo === m[1].padEnd(4, ' ').slice(0, 4) || x.tipo === m[1]);
+      if (m[2] !== undefined) trovati = trovati[Number(m[2])] ? [trovati[Number(m[2])]] : [];
+      if (n + 1 < passi.length) {
+        livello = [];
+        for (const t of trovati) livello.push(...boxBmff(b, t.inizio + t.testa + (t.tipo === 'meta' ? 4 : 0), t.fine));
+      }
+    }
+    return trovati;
+  }
+  function fileIntattoBmff(hashBmff, byteFile) {
+    const h = hashBmff && hashBmff.dati;
+    if (!h || typeof h !== 'object') return null;
+    const atteso = u8(h.hash);
+    if (!atteso.length) return null;
+    const crypto = nodeMod('node:crypto');
+    if (!crypto) return null;
+    const b = byteFile;
+    const escluse = [];
+    let posizioni = boxBmff(b, 0, b.length).map((x) => x.inizio);
+    for (const ex of Array.isArray(h.exclusions) ? h.exclusions : []) {
+      if (!ex || typeof ex !== 'object') continue;
+      for (const box of boxPerPercorso(b, ex.xpath)) {
+        const lungo = box.fine - box.inizio;
+        if (ex.length != null && Number(ex.length) !== lungo) continue;
+        const dopo = box.inizio + box.testa;
+        if (ex.version != null && b[dopo] !== Number(ex.version)) continue;
+        if (ex.flags != null) {
+          const f = u8(ex.flags);
+          const voluti = ((f[0] || 0) << 16) | ((f[1] || 0) << 8) | (f[2] || 0);
+          const veri = (b[dopo + 1] << 16) | (b[dopo + 2] << 8) | b[dopo + 3];
+          if (ex.exact === false ? (voluti | veri) !== voluti : voluti !== veri) continue;
+        }
+        if (Array.isArray(ex.data) && !ex.data.every((d) => {
+          const v = u8(d && d.value);
+          const da = box.inizio + (Number(d && d.offset) || 0);
+          return da + v.length <= b.length && ugualiByte(b.subarray(da, da + v.length), v);
+        })) continue;
+        if (Array.isArray(ex.subset)) {
+          for (const s of ex.subset) {
+            const off = Number(s && s.offset) || 0;
+            if (off > lungo) continue;
+            const l = Number(s && s.length) ? Math.min(Number(s.length), lungo - off) : lungo - off;
+            escluse.push([box.inizio + off, box.inizio + off + l]);
+          }
+        } else {
+          escluse.push([box.inizio, box.fine]);
+          posizioni = posizioni.filter((p) => p !== box.inizio);
+        }
+      }
+    }
+    escluse.sort((x, y) => x[0] - y[0]);
+    const incluse = [];
+    let i = 0;
+    for (const [da, a] of escluse) {
+      if (da > i) incluse.push([i, da]);
+      i = Math.max(i, a);
+    }
+    if (i < b.length) incluse.push([i, b.length]);
+    const conPosizioni = hashBmff.versione > 1;
+    // Come il lettore di riferimento: la posizione di un box entra nell'impronta subito prima dei suoi byte.
+    const pezzi = [];
+    for (const [da, a] of incluse) {
+      let inizio = da;
+      if (conPosizioni) {
+        for (const p of posizioni) {
+          if (p < inizio || p >= a) continue;
+          if (p > inizio) pezzi.push({ da: inizio, a: p });
+          pezzi.push({ posizione: p });
+          inizio = p;
+        }
+      }
+      pezzi.push({ da: inizio, a });
+    }
+    if (conPosizioni && incluse.length) {
+      const primo = incluse[0][0];
+      const ultimo = incluse[incluse.length - 1][1] - 1;
+      for (const p of posizioni) {
+        if (incluse.some(([da, a]) => p >= da && p < a)) continue;
+        if (p > primo && p < ultimo) pezzi.push({ posizione: p, dopo: true });
+      }
+      pezzi.sort((x, y) => (x.posizione != null ? x.posizione : x.da) - (y.posizione != null ? y.posizione : y.da));
+    }
+    const nome = { sha256: 'sha256', sha384: 'sha384', sha512: 'sha512' }[String(h.alg || hashBmff.alg || 'sha256').toLowerCase()];
+    if (!nome) return false;
+    const hasher = crypto.createHash(nome);
+    for (const pz of pezzi) {
+      if (pz.posizione != null) {
+        const o = Buffer.alloc(8);
+        o.writeBigUInt64BE(BigInt(pz.posizione));
+        hasher.update(o);
+      } else if (pz.a > pz.da) hasher.update(b.subarray(pz.da, pz.a));
+    }
+    return ugualiByte(u8(hasher.digest()), atteso);
   }
 
   // ─────────────────────────────── XMP e IPTC ──────────────────────────────
@@ -821,6 +973,10 @@
       if (!dati) continue;
       const etichetta = box.etichetta.replace(/__\d+$/, '');
       if (etichetta === 'c2pa.hash.data') out.hashDati = cborTesta(dati);
+      else if (/^c2pa\.hash\.bmff(\.v\d+)?$/.test(etichetta)) {
+        const v = /\.v(\d+)$/.exec(etichetta);
+        out.hashBmff = { dati: cborTesta(dati), versione: v ? Number(v[1]) : 1, alg: claim.alg };
+      }
       else if (/^c2pa\.ingredient(\.v\d+)?$/.test(etichetta)) {
         const ing = cborTesta(dati);
         const rif = ing && (ing.activeManifest || ing.c2pa_manifest);
