@@ -45,6 +45,13 @@ giorno, è un costo vero. Quindi:
   Chromium resta `visible`, quindi la sua richiesta riceve lo stato ma non tiene
   sveglio il lettore; quando torna in vista (scheda o finestra), il lettore
   riparte da sé;
+- prima di tutto l'utente deve esserci: con lo schermo bloccato o senza un tasto né
+  un movimento del mouse da cinque minuti (`powerMonitor`) nessuna pagina tiene
+  sveglio il lettore, qualunque cosa sia in vista. È una regola sola per ogni modo
+  di non esserci, non un caso per porta; mentre manca si controlla solo la sua
+  presenza, e al ritorno il lettore riparte. Un turno di chat legge comunque una
+  volta. Nei test lo schermo virtuale non riceve input veri: lì l'inattività del
+  sistema non si consulta, e le prove la simulano;
 - una home che non mostra niente letto dal computer (batteria, rete e Bluetooth
   nascoste: l'ora la sa la pagina) non chiede e non è fra chi guarda, così
   nemmeno tornando davanti sveglia il lettore;

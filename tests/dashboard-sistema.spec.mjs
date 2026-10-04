@@ -359,6 +359,61 @@ test('con la finestra ridotta a icona la home non tiene sveglio il lettore, e ri
   await app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.veglia(0));
 });
 
+// La home davanti continua a chiedere come col suo richiamo, qui più spesso della veglia.
+async function chiedeSempre(page) {
+  await page.evaluate(() => {
+    const fine = Date.now() + 20_000;
+    window.__chiedeSempre = true;
+    (async () => {
+      while (window.__chiedeSempre && Date.now() < fine) {
+        await window.filo.message({ type: window.SN_MSG.MSG.SISTEMA_STATO }).catch(() => {});
+        await new Promise((r) => setTimeout(r, 1_000));
+      }
+    })();
+  });
+}
+
+test('con lo schermo bloccato o l\'utente lontano la home davanti non tiene sveglio il lettore, e al ritorno riparte', async ({ app }) => {
+  await finto(app, PIENO);
+  await app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.veglia(2_000));
+  const page = await newtab(app);
+  const attivo = () => app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.attivo());
+  const giro = await app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.GIRO_MS);
+  await expect.poll(attivo, { timeout: 8_000 }).toBe(true);
+
+  // Il blocco lo dice il sistema con un avviso; nel contenitore non c'è una sessione da bloccare e lo si simula.
+  await app.evaluate(({ powerMonitor }) => { powerMonitor.emit('lock-screen'); });
+  await chiedeSempre(page);
+  await expect.poll(attivo, { timeout: 2_000 + giro * 2 + 3_000 }).toBe(false);
+  await cambia(app, { ...PIENO, batteria: { livello: 37, inCarica: false, collegata: false } });
+  await app.evaluate(({ powerMonitor }) => { powerMonitor.emit('unlock-screen'); });
+  await expect.poll(attivo, { timeout: 2_000 }).toBe(true);
+  await expect(voce(page, 'batteria')).toHaveText('37%', { timeout: 3_000 });
+
+  // Nessun tasto né mouse da minuti (schermo spento senza blocco): stessa regola, e al primo movimento riparte.
+  await app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.inattivita('idle'));
+  await expect.poll(attivo, { timeout: giro * 2 + 3_000 }).toBe(false);
+  await cambia(app, { ...PIENO, batteria: { livello: 36, inCarica: false, collegata: false } });
+  await app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.inattivita('active'));
+  await expect.poll(attivo, { timeout: giro + 2_000 }).toBe(true);
+  await expect(voce(page, 'batteria')).toHaveText('36%', { timeout: 3_000 });
+
+  // Un turno di chat con l'utente assente legge comunque lo stato di adesso.
+  await app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.inattivita('idle'));
+  await expect.poll(attivo, { timeout: giro * 2 + 3_000 }).toBe(false);
+  // Oltre i due giri in cui una lettura vale ancora come fresca.
+  await new Promise((r) => setTimeout(r, giro * 2 + 500));
+  await cambia(app, { ...PIENO, batteria: { livello: 35, inCarica: false, collegata: false } });
+  const perChat = await app.evaluate(async () => (await globalThis.SN_SISTEMA_MAIN.statoPerChat())?.batteria?.livello);
+  expect(perChat).toBe(35);
+
+  await page.evaluate(() => { window.__chiedeSempre = false; });
+  await app.evaluate(() => {
+    globalThis.SN_SISTEMA_MAIN._perProve.inattivita();
+    globalThis.SN_SISTEMA_MAIN._perProve.veglia(0);
+  });
+});
+
 test('dopo una pausa del lettore, se la lettura nuova tarda, la chat non riceve lo stato di prima come letto adesso', async ({ app, openTab, testServer }) => {
   await finto(app, { ...PIENO, batteria: { livello: 80, inCarica: true, collegata: true } });
   // La home va dietro un sito e il lettore si ferma; intanto il caricatore si stacca e il computer risponde lento.

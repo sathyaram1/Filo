@@ -15,6 +15,8 @@ const COMANDO_MS = 2500;
 const ATTESA_PRIMA_LETTURA_MS = 3000;
 // L'avviso del caricatore vince sulle letture fatte prima di lui; oltre questo tempo torna a decidere la lettura.
 const EVENTO_VALE_MS = 10 * 1000;
+// Senza un tasto né un movimento del mouse da tanto, l'utente non è davanti allo schermo (spesso già spento).
+const ASSENTE_DOPO_S = 5 * 60;
 
 function S() {
   if (!globalThis.SN_SISTEMA) require('../../shared/sistema.js');
@@ -515,6 +517,10 @@ let letturaInCorso = null;
 let lettoreProve = null;
 let agganciato = false;
 let windows = null;
+let bloccato = false;
+let ritorno = null;
+// Nei test lo schermo virtuale non riceve input veri e il sistema lo darebbe inattivo dopo cinque minuti.
+let inattivita = process.env.FILO_USER_DATA ? () => 'active' : (s) => electron().powerMonitor.getSystemIdleState(s);
 
 function lettoreDiWindows() {
   if (!windows) windows = lettoreWindows({ quandoCambia: () => { leggiAdesso(); } });
@@ -590,6 +596,48 @@ function correggiCorrente(collegata) {
   leggiAdesso();
 }
 
+// Una regola sola per ogni modo di non esserci: schermo bloccato, oppure nessun tasto né mouse da cinque minuti.
+// Un sistema che non sa dirlo (Wayland, per esempio) conta l'utente presente, come prima.
+function utenteCe() {
+  if (bloccato) return false;
+  try {
+    const s = inattivita(ASSENTE_DOPO_S);
+    return s !== 'idle' && s !== 'locked';
+  } catch (_) {
+    return true;
+  }
+}
+
+// Una pagina che segue il sistema è la scheda in vista di una sua finestra.
+function osservatoreInVista() {
+  try {
+    for (const w of electron().BrowserWindow.getAllWindows()) {
+      const tm = w._filoTabs;
+      if (!tm || w.isDestroyed()) continue;
+      for (const t of tm.tabs || []) {
+        const wc = t.view && t.view.webContents;
+        if (wc && osservatori.has(wc.id) && tm.inVista(t.id)) return true;
+      }
+    }
+  } catch (_) {}
+  return false;
+}
+
+// Mentre l'utente non c'è e una home resta in vista, si controlla solo la sua presenza (nessun processo):
+// appena torna, il lettore riparte senza aspettare il richiamo della home.
+function aspettaRitorno() {
+  if (ritorno) return;
+  ritorno = setInterval(() => {
+    const presente = utenteCe();
+    if (presente || !osservatoreInVista()) {
+      clearInterval(ritorno);
+      ritorno = null;
+      if (presente && osservatoreInVista()) richiedi();
+    }
+  }, GIRO_MS);
+  if (ritorno.unref) ritorno.unref();
+}
+
 function aggancia() {
   if (agganciato) return;
   agganciato = true;
@@ -598,6 +646,8 @@ function aggancia() {
     e.powerMonitor.on('on-ac', () => { if (giro) correggiCorrente(true); });
     e.powerMonitor.on('on-battery', () => { if (giro) correggiCorrente(false); });
     e.powerMonitor.on('resume', () => { if (giro) leggiAdesso(); });
+    e.powerMonitor.on('lock-screen', () => { bloccato = true; if (giro) { ferma(); aspettaRitorno(); } });
+    e.powerMonitor.on('unlock-screen', () => { bloccato = false; if (osservatoreInVista()) richiedi(); });
   } catch (_) {}
   try { e.app.on('will-quit', ferma); } catch (_) {}
 }
@@ -605,13 +655,16 @@ function aggancia() {
 function ferma() {
   if (giro) clearInterval(giro);
   giro = null;
+  if (ritorno) clearInterval(ritorno);
+  ritorno = null;
   if (windows) windows.ferma();
 }
 
 // Una scheda dietro le altre per Chromium resta «visibile» e continua a chiedere: `davanti: false` risponde
 // senza tenere sveglio il lettore, che legge solo finché qualcuno guarda.
 // `segue: false` è una home che non mostra niente letto dal computer: riceve lo stato, non sveglia il lettore.
-function richiedi({ davanti = true, chi = null, segue = true } = {}) {
+// Con l'utente assente nessuna pagina lo tiene sveglio; un turno di chat (`perChat`) legge comunque una volta.
+function richiedi({ davanti = true, chi = null, segue = true, perChat = false } = {}) {
   if (chi && typeof chi.id === 'number') {
     const id = chi.id;
     if (!segue) osservatori.delete(id);
@@ -621,11 +674,13 @@ function richiedi({ davanti = true, chi = null, segue = true } = {}) {
     }
   }
   if (!davanti || !segue) return;
+  aggancia();
+  if (!perChat && !utenteCe()) { aspettaRitorno(); return; }
   ultimaRichiesta = Date.now();
   if (giro) return;
-  aggancia();
   giro = setInterval(() => {
     if (Date.now() - ultimaRichiesta > vegliaMs) { ferma(); return; }
+    if (!utenteCe()) { ferma(); aspettaRitorno(); return; }
     leggiAdesso();
   }, GIRO_MS);
   if (giro.unref) giro.unref();
@@ -643,7 +698,7 @@ const frescoPer = (chiesto) => !!stato && chiesto - stato.letto <= GIRO_MS * 2;
 // null («il computer non ha risposto»): lo stato di prima della pausa non si dà per letto adesso.
 async function statoPerChat() {
   const chiesto = Date.now();
-  richiedi();
+  richiedi({ perChat: true });
   if (!frescoPer(chiesto)) {
     await Promise.race([leggiAdesso(), new Promise((r) => setTimeout(r, ATTESA_PRIMA_LETTURA_MS + 500))]);
   }
@@ -664,6 +719,8 @@ const _perProve = {
   leggiOra: () => leggiAdesso(),
   attivo: () => !!giro,
   veglia(ms) { vegliaMs = Number(ms) > 0 ? Number(ms) : VEGLIA_MS; },
+  // Lo stato d'inattività che darebbe il sistema ('active' | 'idle' | 'locked'); senza argomento, sempre presente.
+  inattivita(v) { inattivita = () => (typeof v === 'string' ? v : 'active'); },
   GIRO_MS,
 };
 
