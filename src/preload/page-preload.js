@@ -170,7 +170,7 @@ if (!IS_SUBFRAME) try {
     const cfg = ipcRenderer.sendSync('filo:fp-config', loc) || { level: 0, seed: 0 };
     if (cfg && cfg.level > 0) {
       const { buildGuardSource } = require('./fingerprint-guard.js');
-      webFrame.executeJavaScript(buildGuardSource(cfg.seed, cfg.level), true).catch(() => {});
+      webFrame.executeJavaScript(buildGuardSource(cfg.seed, cfg.level), false).catch(() => {});
     }
   }
 } catch (e) { /* la protezione non deve MAI bloccare il caricamento della pagina */ }
@@ -362,8 +362,8 @@ try {
   }
 } catch (_) { /* mai bloccare il caricamento della pagina */ }
 
-// Il main vede l'input della pagina, non quello di un riquadro di un altro sito: senza questo il clic sul lettore
-// incorporato non aprirebbe finestre né lo schermo pieno (#737.1). Solo l'input vero: la pagina non lo fabbrica.
+// Il main vede l'input della pagina, non quello di un riquadro di un altro sito: senza questo, col blocco dei popup, il
+// clic dentro il riquadro non aprirebbe la scheda che chiede (#737.1). Solo l'input vero: la pagina non lo fabbrica.
 if (IS_SUBFRAME) {
   try {
     let ultimoGesto = 0;

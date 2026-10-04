@@ -60,7 +60,8 @@ test('dai risultati di una ricerca il sito della lista si ferma, cliccato o aper
   const risultati = rete.pagina('www.bing.com', '/search', `<a id="diretto" href="${bersaglio}">risultato</a> <a id="nuova" target="_blank" href="${r}">risultato</a>`);
   await apri(app, shell, risultati);
   const tab = app.windows().find((w) => w.url().includes('www.bing.com'));
-  await tab.evaluate(() => document.getElementById('nuova').click());
+  // Il clic vero: col blocco dei popup una scheda nuova la apre solo l'utente (#737.1).
+  await tab.click('#nuova');
   await shell.waitForTimeout(1500);
   await tab.evaluate(() => document.getElementById('diretto').click());
   await shell.waitForTimeout(1500);

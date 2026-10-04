@@ -1,6 +1,6 @@
-// #737.1 — Col blocco dei popup acceso una pagina non apre schede né va a schermo pieno senza un gesto vero
-// dell'utente, in qualunque forma lo chieda; il clic dell'utente (anche in un riquadro di un altro sito) sì, uno per gesto.
-// Le regole: src/main/services/permessiPagine.js (gestoPerUnaFinestra, INNOCUI_COL_GESTO).
+// #737.1 — Col blocco dei popup acceso una pagina non apre schede né va a schermo pieno senza un gesto vero dell'utente;
+// il clic dell'utente (anche in un riquadro di un altro sito) sì, uno per gesto. Regole: gestoPerUnaFinestra in
+// src/main/services/permessiPagine.js; lo schermo pieno lo rifiuta Chromium se Filo non regala il gesto.
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -8,7 +8,7 @@ const schede = (app) => app.evaluate(({ BrowserWindow }) => {
   const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
   return tm.tabs.map((t) => { try { return t.view.webContents.getURL(); } catch (_) { return t.url || ''; } });
 });
-const aperteSu = async (app, u) => (await schede(app)).filter((x) => x === u).length;
+const aperteSu = async (app, u) => (await schede(app)).filter((x) => x.replace(/\?$/, '') === u).length;
 
 // Ogni evaluate di Playwright attiva la pagina come un gesto: le pagine qui chiedono da sole, coi loro timer.
 const FORME = {
@@ -75,7 +75,7 @@ test('il clic dentro un riquadro di un altro sito apre la sua scheda; da solo il
 test('col blocco spento la scheda che la pagina apre da sola passa', async ({ app, openTab, testServer }) => {
   await app.evaluate(({ BrowserWindow }) => {
     const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
-    tm.setSecurity({ ...tm.security, blockPopups: false });
+    tm.security.blockPopups = false;
   });
   const bersaglio = testServer.html('<title>PASSA</title>');
   await openTab(testServer.html(`<script>setTimeout(function(){window.open(${JSON.stringify(bersaglio)})},400)</script>`));
@@ -90,7 +90,7 @@ test('lo schermo intero lo prende solo il clic dell\'utente, anche dentro un riq
   const dentro = testServer.html(SCHERMO(0), { pubblico: true });
   const page = await openTab(testServer.html(`${SCHERMO(600)}<iframe src="${dentro}" allow="fullscreen" width="400" height="200"></iframe>`));
   await page.waitForTimeout(1800);
-  expect(await page.evaluate(() => [window.__fs, !!document.fullscreenElement])).toEqual([['no'], false]);
+  expect(await page.evaluate(() => [window.__fs, !!document.fullscreenElement]), 'rifiutato, non lasciato in sospeso').toEqual([['no'], false]);
 
   await page.click('#b');
   await expect.poll(() => page.evaluate(() => !!document.fullscreenElement), { timeout: 6000 }).toBe(true);
@@ -98,7 +98,6 @@ test('lo schermo intero lo prende solo il clic dell\'utente, anche dentro un riq
   await expect.poll(() => page.evaluate(() => !!document.fullscreenElement), { timeout: 6000 }).toBe(false);
 
   const riquadro = page.frames().find((f) => f.url() === dentro);
-  await page.waitForTimeout(5500);
   await riquadro.click('#b');
   await expect.poll(() => riquadro.evaluate(() => !!document.fullscreenElement), { timeout: 6000 }).toBe(true);
 });

@@ -321,3 +321,36 @@ test('le notifiche si leggono «da chiedere» finché l\'utente non decide; il n
   assert.equal(Permessi.statoNotifiche(ses, 'https://posta.example/'), 'default');
   assert.equal(Permessi.statoNotifiche(ses, 'filo://options/'), 'default');
 });
+
+// #737.1 — col blocco dei popup una pagina apre una finestra solo dopo un gesto vero dell'utente, una per gesto.
+test('una finestra la apre solo un gesto vero di adesso, uno per finestra, anche dentro un riquadro', () => {
+  let ora = 1_000_000;
+  const orologio = mock.method(Date, 'now', () => ora);
+  try {
+    const wc = wcFinto('https://notizie.example/');
+    wc.mainFrame = { parent: null };
+    Permessi.seguiGesti(wc);
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'nessun gesto');
+    wc.emetti('input-event', {}, { type: 'mouseMove' });
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'il puntatore che passa non è un gesto');
+    wc.emetti('input-event', {}, { type: 'mouseDown' });
+    ora += 50;
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), true);
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'la seconda finestra dello stesso clic');
+
+    ora += 300;
+    Permessi.gestoNelRiquadro(wc, wc.mainFrame);
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'dal frame principale vale solo l\'input che vede il main');
+    Permessi.gestoNelRiquadro(wc, { parent: wc.mainFrame });
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), true, 'il clic vero nel riquadro di un altro sito');
+
+    ora += 300;
+    Permessi.gestoNelRiquadro(wc, { parent: wc.mainFrame });
+    ora += Permessi.GESTO_MS + 1;
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'un gesto di cinque secondi fa non vale più');
+
+    wc.emetti('input-event', {}, { type: 'keyDown', key: 'Enter' });
+    wc.emetti('did-start-navigation', { isMainFrame: true, isSameDocument: false });
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'il gesto non passa alla pagina dove porta');
+  } finally { orologio.mock.restore(); }
+});

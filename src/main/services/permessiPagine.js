@@ -39,8 +39,6 @@ const DOPO_UN_GESTO = new Set(['notifications']);
 const COL_GESTO_SENZA_DOMANDA = new Set(['local-fonts']);
 const GESTO_MS = 5000;
 const GESTI = new Set(['mouseDown', 'mouseUp', 'rawKeyDown', 'keyDown', 'char', 'touchStart', 'touchEnd', 'gestureTap']);
-// Concessi di fabbrica, ma come in Chrome solo subito dopo un gesto: senza, una pagina si prende lo schermo da sola.
-const INNOCUI_COL_GESTO = new Set(['fullscreen']);
 const LASCIAPASSARE_MS = 5000;
 // Il lasciapassare di Detta copre il microfono e basta: con la fotocamera la pagina avrebbe un sì mai dato (#591, giro 18).
 const PARTI_LASCIAPASSARE = { media: new Set(['audio']), appunti: new Set(['appunti']) };
@@ -181,7 +179,7 @@ function gestoRecente(wc) {
 }
 
 // Il clic in un riquadro di un altro sito non passa da `input-event`: lo segnala il preload del riquadro, solo se vero.
-// Vale per finestre e schermo pieno, non per le domande dei permessi della pagina, che vogliono un gesto sulla pagina.
+// Vale per le finestre, non per le domande dei permessi della pagina, che vogliono un gesto sulla pagina.
 function gestoNelRiquadro(wc, frame) {
   try {
     if (!wc || !frame || !frame.parent) return;
@@ -291,7 +289,6 @@ function installa(ses, { schedaDi, prima, esterno } = {}) {
         return;
       }
       const tipo = TIPI[permission];
-      if (INNOCUI_COL_GESTO.has(permission)) { callback(Boolean(gestoSullaScheda(wc))); return; }
       if (!tipo) { callback(INNOCUI.has(permission)); return; }
       // Una richiesta di media senza microfono né fotocamera è la condivisione dello schermo, che Filo non sa dare.
       if (tipo === 'media' && !partiNote(details).length) { callback(false); return; }

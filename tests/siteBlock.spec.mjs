@@ -357,7 +357,8 @@ test('#590 link in una nuova scheda e redirect verso un sito della lista: blocca
     await page.waitForSelector('#redir', { timeout: 8000 });
     const prima = (await tabUrls(app)).length;
 
-    await page.evaluate(() => document.getElementById('blank').click());
+    // Il clic vero: col blocco dei popup una scheda nuova la apre solo l'utente (#737.1).
+    await page.click('#blank');
     await expect((await avvisi()).locator('.shell-notif', { hasText: 'Sito bloccato' }).first()).toBeVisible({ timeout: 6000 });
     await page.waitForTimeout(500);
     expect((await tabUrls(app)).length).toBe(prima);

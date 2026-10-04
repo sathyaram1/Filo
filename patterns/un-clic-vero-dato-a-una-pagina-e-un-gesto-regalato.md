@@ -50,7 +50,18 @@ voleva.
   passano dai messaggi della pagina. Un sito avvisato infilerebbe un suo
   elemento sopra al lettore fra il controllo e il clic.
 
-Prove: `tests/unit/adSkip.test.mjs`, `tests/ad-skip.spec.mjs` (il «Salta» finto
+- **Anche uno script di Filo regala il gesto, se lo porta**: `executeJavaScript(codice, true)` attiva la pagina
+  come un clic, e per cinque secondi la pagina va a schermo pieno senza che l'utente tocchi niente (#737.1: ogni
+  pagina lo riceveva al caricamento, dalla guardia anti-fingerprint e dalle letture del testo). Gli script che Filo
+  fa girare nelle pagine passano `false`: leggere e scrivere proprietà non ha bisogno del gesto. Senza regali, lo
+  schermo pieno lo rifiuta Chromium da solo, e la pagina riceve il rifiuto invece di restare in sospeso.
+- **Le finestre le decide il main sul gesto vero**, perché Electron non ha il blocco dei popup di Chrome: col blocco
+  acceso una scheda nuova passa solo entro cinque secondi da un input vero sulla scheda, una per gesto
+  (`gestoPerUnaFinestra` in `src/main/services/permessiPagine.js`). Il clic in un riquadro di un altro sito il main
+  non lo vede: lo segnala il preload del riquadro, solo se `isTrusted`.
+
+Prove: `tests/unit/gestoNonRegalato.test.mjs` (nessuno script di Filo nelle pagine porta il gesto),
+`tests/popup-senza-gesto.spec.mjs`, `tests/unit/adSkip.test.mjs`, `tests/ad-skip.spec.mjs` (il «Salta» finto
 di YouTube su un sito qualunque non riceve mai un clic vero; il sito che ospita
 il lettore incorporato non riceve gesti, nemmeno con un suo elemento o un suo
 riquadro sopra; il lettore dentro un riquadro intermedio salta).

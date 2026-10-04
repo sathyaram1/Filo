@@ -783,6 +783,13 @@ const urlAttiva = (app) => app.evaluate(({ BrowserWindow }) => {
 for (const [dove, js] of [['nella stessa scheda', 'location.href=u'], ['in una scheda nuova', 'window.open(u)']]) {
   test(`la pagina in lista si riscrive in una sua copia blob (${dove}): l'avviso resta e i tasti non le arrivano`, async ({ app, shell }) => {
     const h = `conto-blob-${js.length}.com`;
+    // Senza un clic la scheda nuova la ferma il blocco dei popup (#737.1): qui conta chi l'ha spento.
+    if (js.startsWith('window.open')) {
+      await app.evaluate(({ BrowserWindow }) => {
+        const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+        tm.security.blockPopups = false;
+      });
+    }
     await serviInCaricamento(app, { [h + '/login']: '<title>Attendere</title><p>Caricamento…</p><script>var F='
       + JSON.stringify(BLOB_MODULO).replace(/<\//g, '<\\/')
       + ';setTimeout(function(){var u=URL.createObjectURL(new Blob([F],{type:"text/html"}));' + js + '},2500)</script>' }, { gsbListed: true });

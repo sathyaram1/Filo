@@ -537,7 +537,7 @@ class TabManager {
     if (!owner) return;
     try {
       owner.view.webContents
-        .executeJavaScript('try { if (document.fullscreenElement) document.exitFullscreen(); } catch (_) {} true', true)
+        .executeJavaScript('try { if (document.fullscreenElement) document.exitFullscreen(); } catch (_) {} true', false)
         .catch(() => {});
     } catch (_) {}
   }
@@ -1343,7 +1343,7 @@ class TabManager {
       try {
         contentExtract = await t.view.webContents.executeJavaScript(
           '(function(){try{return (document.body&&document.body.innerText||"").replace(/\\s+/g," ").slice(0,800);}catch(e){return "";}})()',
-          true,
+          false,
         );
       } catch (_) {}
       out.push({
@@ -1540,7 +1540,7 @@ class TabManager {
     try {
       const exact = await tab.view.webContents.executeJavaScript(
         '(()=>{try{const d=document.documentElement;const max=(d.scrollHeight||0)-window.innerHeight;return max>0?Math.max(0,Math.min(100,(window.scrollY||d.scrollTop||0)/max*100)):0;}catch(e){return null;}})()',
-        true,
+        false,
       );
       if (typeof exact === 'number') scrollPct = exact;
     } catch (_) {}
@@ -2255,7 +2255,7 @@ class TabManager {
         try {
           wc.executeJavaScript(
             'try{Object.defineProperty(navigator,"globalPrivacyControl",{get:function(){return true;},configurable:true});}catch(e){}',
-            true,
+            false,
           ).catch(() => {});
         } catch (_) {}
       }
@@ -2280,7 +2280,7 @@ class TabManager {
       const pct = Math.max(0, Math.min(100, tab.restoreScrollPct));
       tab.restoreScrollPct = null; // applica una volta sola
       const js = `(()=>{try{const d=document.documentElement;const max=(d.scrollHeight||0)-window.innerHeight;if(max>0)window.scrollTo(0,max*${pct}/100);}catch(e){}})()`;
-      const run = () => { try { wc.executeJavaScript(js, true).catch(() => {}); } catch (_) {} };
+      const run = () => { try { wc.executeJavaScript(js, false).catch(() => {}); } catch (_) {} };
       run();
       setTimeout(run, 500); // riprova dopo l'eventuale layout/lazy-load
     });
@@ -2317,7 +2317,7 @@ class TabManager {
         try {
           wc.executeJavaScript(
             '(function(){try{return (document.body&&document.body.innerText||"").replace(/\\s+/g," ").slice(0,2000);}catch(e){return "";}})()',
-            true,
+            false,
           ).then((txt) => { if (typeof txt === 'string' && txt) tab.contentExtract = txt; }).catch(() => {});
         } catch (_) {}
       }
