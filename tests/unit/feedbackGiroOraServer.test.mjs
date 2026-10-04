@@ -13,9 +13,13 @@ require(join(SRC, 'feedbackLive.js'));
 const LIVE = globalThis.SN_FEEDBACK_LIVE;
 
 // Firestore finto: `_updateTime` è il commit, con l'ora del server (Date.now() vero); `readTime` l'ora della lettura.
+// Le ore crescono sempre, come i microsecondi di Firestore: al millesimo una scrittura subito dopo la lettura
+// prendeva la stessa ora della lettura e la prova diventava rossa a caso.
 function firestore({ conReadTime = false } = {}) {
   const docs = new Map();
-  const ora = () => new Date().toISOString();
+  let ultima = 0;
+  const istante = () => { ultima = Math.max(Date.now(), ultima + 1); return ultima; };
+  const ora = () => new Date(istante()).toISOString();
   for (let i = 0; i < 4; i += 1) docs.set(`d${i}`, { _id: `d${i}`, _updateTime: new Date(Date.now() - 3600e3).toISOString() });
   return {
     scrivi(id) { docs.set(id, { _id: id, _updateTime: ora() }); },
