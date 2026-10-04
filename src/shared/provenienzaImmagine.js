@@ -500,6 +500,7 @@
       soggetto: campoCert(certs[0].subject, 'O') || campoCert(certs[0].subject, 'CN') || '',
       catenaIntegra,
       scaduto: scaduto(certs[0]),
+      marca: scaduto(certs[0]) ? leggiMarca(nonProtetto, protetto, claimBytes, firma) : null,
       certificati: certs,
     };
   }
