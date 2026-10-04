@@ -309,7 +309,7 @@ export function exitCodeForOwnerMerge(reply) {
  * La domanda al server: "fondi questo ramo, che alla mia ultima verifica era
  * questo commit". Ritorna sempre un esito classificato, mai un'eccezione.
  */
-export async function askServerMerge({ branch, sha = '', feedbackId = '', pendingParts = [], provaUnit = null, fetchImpl = fetch, url = OWNER_MERGE_URL } = {}) {
+export async function askServerMerge({ branch, sha = '', feedbackId = '', pendingParts = [], provaUnit = null, fetchImpl = fetch, url = OWNER_MERGE_URL, listUrl = OWNER_MERGE_APPROVALS_URL } = {}) {
   const refresh = findAdminRefreshToken();
   if (!refresh) return { outcome: 'no_owner_credential' };
 
