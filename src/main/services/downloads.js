@@ -58,12 +58,16 @@ let sitiFidati = [];
 // #950 — un nome sensato da solo agli scaricamenti che arrivano con un nome che non dice niente. Spento di
 // serie: il contenuto del file va a un modello senza che l'utente l'abbia chiesto per quel file.
 let nomeDaSolo = false;
+// Senza modello l'avviso arriva una volta, non a ogni scaricamento; riacceso l'interruttore, di nuovo.
+let avvisatoSenzaNome = false;
 
 function configureFromSettings(settings) {
   const d = (settings && settings.security && settings.security.downloads) || {};
   chiediEseguibili = d.confirmExecutables !== false;
   sitiFidati = Array.isArray(d.trustedSites) ? d.trustedSites.slice() : [];
+  const prima = nomeDaSolo;
   nomeDaSolo = !!(settings && settings.nomiSensati && settings.nomiSensati.scaricamenti === true);
+  if (nomeDaSolo && !prima) avvisatoSenzaNome = false;
 }
 
 // Un programma da un sito che l'utente ha dichiarato fidato scende come un PDF.
@@ -484,7 +488,10 @@ async function nominaDaSolo(rec) {
   if (!records.has(rec.id) || rec.state !== 'completed') return;
   if (!p.ok) {
     // Senza modello, o col modello che non risponde, l'utente che ha acceso la funzione deve saperlo.
-    if (p.errore === 'modello') shellToast(`Nessun nome dato a ${shortName(rec.filename)}: ${p.frase}`, { durationSec: 10 }, '');
+    if (p.errore === 'modello' && !avvisatoSenzaNome) {
+      avvisatoSenzaNome = true;
+      shellToast(`Nessun nome dato a ${shortName(rec.filename)}. ${p.frase}`, { durationSec: 10 }, '');
+    }
     return;
   }
   const r = await Nomi.rinomina(rec.savePath, p.proposta);

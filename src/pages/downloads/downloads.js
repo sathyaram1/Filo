@@ -171,7 +171,7 @@
   function daiNome(r) {
     const ancora = rigaDi(r);
     if (!Rinomina || !ancora) return;
-    Rinomina.apri({ ancora: ancora.querySelector('.dl-name') || ancora, downloadId: r.id, nome: r.filename, suRinominato: reload, suRimesso: reload });
+    Rinomina.apri({ ancora, downloadId: r.id, nome: r.filename, suRinominato: reload, suRimesso: reload });
   }
   async function rimettiNome(r) {
     const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_RIMETTI_NOME, id: r.id });
@@ -370,10 +370,12 @@
     if (r.state === 'completed' && !r.missing) {
       row.addEventListener('click', () => openFile(r));
     }
-    // Tasto destro = menu completo (centralità del tasto destro in Filo).
+    // Tasto destro = menu completo (centralità del tasto destro in Filo). La riga può restare in pagina a più
+    // ridisegni (SN_RIGHE_VIVE): il menu si costruisce sulla voce di ADESSO, non su quella che l'ha creata.
+    const attuale = () => items.find((x) => x.id === r.id) || r;
     row.addEventListener('contextmenu', (e) => {
       e.preventDefault();
-      openCtxMenu(e.clientX, e.clientY, r);
+      openCtxMenu(e.clientX, e.clientY, attuale());
     });
     // Tastiera: Invio/Spazio = primaria (apri se completato); Menu/Shift+F10 = menu.
     row.addEventListener('keydown', (e) => {
@@ -382,7 +384,7 @@
       } else if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
         e.preventDefault();
         const rect = row.getBoundingClientRect();
-        openCtxMenu(rect.left, rect.bottom, r);
+        openCtxMenu(rect.left, rect.bottom, attuale());
       }
     });
     return row;

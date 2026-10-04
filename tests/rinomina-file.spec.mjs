@@ -89,8 +89,8 @@ test('tasto destro su un file trovato in chat → «Dai un nome sensato»: nome 
     await modelloDeiNomi(app);
     const page = await home(app);
     await chiedi(page, 'trova la scansione della bolletta');
-    const chip = page.locator('a.dash-action-btn', { hasText: 'scan_00231.pdf' });
-    await expect(chip).toBeVisible({ timeout: 15000 });
+    const chip = page.locator('a.dash-action-btn');
+    await expect(chip).toHaveText('scan_00231.pdf', { timeout: 15000 });
 
     await chip.click({ button: 'right' });
     const voce = page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Dai un nome sensato' });
@@ -286,8 +286,8 @@ test('un file trascinato dove si scrive: entra col percorso, e dal tasto destro 
       dt.items.add(new File(['%PDF'], 'scan_00231.pdf', { type: 'application/pdf' }));
       document.getElementById('inputForm').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
     }, vecchio);
-    const chip = page.locator('.dash-file-chip', { hasText: 'scan_00231.pdf' });
-    await expect(chip).toBeVisible();
+    const chip = page.locator('.dash-file-chip');
+    await expect(chip).toHaveText(/scan_00231\.pdf/);
     await chip.click({ button: 'right' });
     await page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Dai un nome sensato' }).click();
     await expect(page.locator('.sn-rinomina-campo')).toHaveValue('Bolletta luce Enel Marzo 2026', { timeout: 15000 });
@@ -309,12 +309,15 @@ test('un file trascinato dove si scrive: entra col percorso, e dal tasto destro 
 test('acceso in Preferenze, uno scaricamento col nome che non dice niente prende un nome sensato da solo, con «Annulla»', async ({ app, shell, openTab, testServer, avvisi }) => {
   test.setTimeout(120_000);
   await modelloDeiNomi(app);
-  await app.evaluate(async () => {
-    await globalThis.SN_STORAGE.updateSettings({ nomiSensati: { scaricamenti: true } });
-    require('./src/main/services/downloads').configureFromSettings(await globalThis.SN_STORAGE.getSettings());
-  }).catch(async () => {
-    await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ nomiSensati: { scaricamenti: true } }); });
-  });
+  const pref = await openTab('filo://preferences/preferences.html');
+  const casella = pref.locator('#nomiSensatiScaricamenti');
+  await expect(casella).not.toBeChecked();
+  await casella.check();
+  await expect.poll(() => app.evaluate(async () => {
+    const s = await globalThis.SN_STORAGE.getSettings();
+    return !!(s.nomiSensati && s.nomiSensati.scaricamenti);
+  })).toBe(true);
+  await pref.locator('#sec-nomi-file').screenshot({ path: join(SHOTS, 'rinomina-preferenze.png') });
   const { rec, chiudi } = await scarica('scan_00999.pdf', BOLLETTA, { shell, openTab, testServer });
   try {
     const nuovo = join(rec.savePath, '..', NOME_NUOVO);

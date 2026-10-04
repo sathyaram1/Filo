@@ -29,6 +29,8 @@ function collega(d) { Object.assign(deps, d || {}); }
 
 function electron() { return require('electron'); }
 
+const maiuscola = (t) => (t ? String(t).charAt(0).toUpperCase() + String(t).slice(1) : '');
+
 function frase(codice) {
   return {
     non_trovato: 'Il file non c’è più: forse è stato spostato o cancellato',
@@ -247,13 +249,16 @@ async function proponi(percorso) {
   const s = await statFile(full);
   if (s.errore) return { ok: false, errore: s.errore, frase: frase(s.errore), ...fondo };
   const c = await contenuto(full);
-  if (c.errore) return { ok: false, errore: c.errore, frase: c.dettaglio || frase(c.errore), ...fondo };
+  if (c.errore) return { ok: false, errore: c.errore, frase: maiuscola(c.dettaglio || frase(c.errore)), ...fondo };
   if (typeof deps.chiamaModello !== 'function') return { ok: false, errore: 'modello', frase: frase('non_riuscito'), ...fondo };
   let grezzo = '';
   try {
     grezzo = await deps.chiamaModello(messaggi({ nome, lingua: deps.lingua(), testo: c.testo, immagine: c.immagine }));
   } catch (e) {
-    return { ok: false, errore: 'modello', frase: (e && e.message) || 'Il modello non ha risposto', ...fondo };
+    // Una frase per l'utente, mai il messaggio grezzo del fornitore (quello resta nei log).
+    console.warn('[Filo nomi] proposta non riuscita:', (e && e.message) || e);
+    const CE = globalThis.SN_CHAT_ERRORS;
+    return { ok: false, errore: 'modello', frase: (CE && CE.sentence(e)) || 'Il modello non ha risposto: riprova', ...fondo };
   }
   const proposta = N().pulisci(grezzo, { ext });
   if (!proposta) return { ok: false, errore: 'nessun_nome', frase: frase('nessun_nome'), ...fondo };
