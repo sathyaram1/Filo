@@ -77,7 +77,7 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
       'senza sandbox spenta e schermo virtuale Electron non parte; senza il JSON il verdetto non ha niente da leggere');
     assert.match(suite, /apt-get install -y xvfb/, 'xvfb va installato: sul runner non c\'è');
     assert.match(suite, /ensure-electron\.mjs/, 'il binario di Electron va assicurato');
-    assert.match(suite, /npm ci/);
+    assert.match(suite, /node scripts\/npm-ci-ritenta\.mjs/, 'le dipendenze si installano con lo script che ritenta un download che non arriva');
   });
 
   test('il passo della suite ha un tetto suo, sotto quello del job: scaduto, il verdetto e l\'allarme girano lo stesso', () => {

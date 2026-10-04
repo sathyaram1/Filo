@@ -39,7 +39,7 @@ jobs:
           node-version: 20
 
       - name: Install dipendenze
-        run: npm ci
+        run: node scripts/npm-ci-ritenta.mjs
 
       # Se un giorno `npm ci` non scaricasse Electron, la suite sarebbe «rossa» per un motivo non del codice.
       - name: Binario di Electron
@@ -125,7 +125,7 @@ jobs:
           VERDETTO=$(tail -c 2500 verdetto.log 2>/dev/null || echo "(nessun verdetto: la suite non e partita)")
           if [ "$SUITE_OUTCOME" != "success" ] && [ "$SUITE_OUTCOME" != "failure" ]; then
             # La suite non e' nemmeno partita: e' rosso un passo prima di lei.
-            VERDETTO="La suite NON e partita: e rosso uno dei passi che la preparano (l installazione delle dipendenze con npm ci, il binario di Electron, lo schermo virtuale xvfb). Non e un rosso del codice di Filo: guarda il registro di questa esecuzione (Actions), sistema quel passo (un lockfile fuori sincrono, un download che non arriva) e la prossima corsa riprova.
+            VERDETTO="La suite NON e partita: e rosso uno dei passi che la preparano (l installazione delle dipendenze con npm ci, che ritenta gia da sola per qualche minuto, il binario di Electron, lo schermo virtuale xvfb). Non e un rosso del codice di Filo: guarda il registro di questa esecuzione (Actions), sistema quel passo (un lockfile fuori sincrono, un download giu da piu di qualche minuto) e la prossima corsa riprova.
           ${VERDETTO}"
           elif [ ! -f suite-risultati.json ]; then
             VERDETTO="La suite non ha lasciato il JSON dei risultati: o non e partita, oppure ha superato il tetto del passo (200 minuti, di norma un Electron rimasto appeso) ed e stata interrotta prima della fine. Guarda il registro del passo Suite Playwright completa in questa esecuzione (Actions).

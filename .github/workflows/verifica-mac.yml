@@ -63,7 +63,7 @@ jobs:
           node-version: 20
 
       - name: Install dipendenze
-        run: npm ci
+        run: node scripts/npm-ci-ritenta.mjs
 
       # La sentinella guarda la CONFIGURAZIONE (che il pacchetto Mac sia ancora
       # previsto, coi nomi giusti). Gira prima della costruzione: se la ricetta

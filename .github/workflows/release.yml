@@ -158,9 +158,11 @@ jobs:
             fi
           fi
 
+      # Il commit provato dalla suite può essere più vecchio dello script che ritenta: lì resta il `npm ci` semplice.
       - name: Install dipendenze
         if: steps.check.outputs.should_release == 'true'
-        run: npm ci
+        shell: bash
+        run: if [ -f scripts/npm-ci-ritenta.mjs ]; then node scripts/npm-ci-ritenta.mjs; else npm ci; fi
 
       # ─── CANCELLO PRIMA DELLA PUBBLICAZIONE ──────────────────────────────
       # Fino al 2026-08-07 questo lavoro prendeva il ramo principale COSI' COM'E'
@@ -414,18 +416,20 @@ jobs:
       #   affatto se il prelievo fallisce. Finche' l'avviso dipendeva da quella
       #   copia, un guasto nei primi passi lo lasciava muto e la corsa verde —
       #   lo stesso silenzio del #733. Qui si prende il codice di QUESTA corsa e
-      #   lo si mette al riparo fuori dalla copia di lavoro.
+      #   lo si mette al riparo fuori dalla copia di lavoro; con lui l'installazione
+      #   che ritenta, che un tag vecchio non ha.
       - name: Il codice di questa corsa (porta lo strumento dell'avviso)
         id: strumento
         uses: actions/checkout@v4
 
-      - name: Lo strumento dell'avviso al riparo dalla copia di lavoro
+      - name: Gli strumenti di questa corsa al riparo dalla copia di lavoro
         id: riparo
         shell: bash
         run: |
           set -e
-          mkdir -p "${{ runner.temp }}/allarme/scripts"
+          mkdir -p "${{ runner.temp }}/allarme/scripts" "${{ runner.temp }}/strumenti"
           cp scripts/release-platform-alarm.mjs scripts/build-alarm.mjs "${{ runner.temp }}/allarme/scripts/"
+          cp scripts/npm-ci-ritenta.mjs "${{ runner.temp }}/strumenti/"
 
       # Il numero della versione e il codice da costruire vengono da due posti
       # diversi a seconda della strada. Appena uscita: li passa la meta'
@@ -479,7 +483,8 @@ jobs:
 
       - name: Install dipendenze
         id: dipendenze
-        run: npm ci
+        shell: bash
+        run: node "${{ runner.temp }}/strumenti/npm-ci-ritenta.mjs"
 
       # Guardia: se qui non c'e' il codice che il server ha scritto per questa
       # versione, si sta costruendo un codice diverso da quello pubblicato per
@@ -648,13 +653,14 @@ jobs:
         id: strumento
         uses: actions/checkout@v4
 
-      - name: Lo strumento dell'avviso al riparo dalla copia di lavoro
+      - name: Gli strumenti di questa corsa al riparo dalla copia di lavoro
         id: riparo
         shell: bash
         run: |
           set -e
-          mkdir -p "${{ runner.temp }}/allarme/scripts"
+          mkdir -p "${{ runner.temp }}/allarme/scripts" "${{ runner.temp }}/strumenti"
           cp scripts/release-platform-alarm.mjs scripts/build-alarm.mjs "${{ runner.temp }}/allarme/scripts/"
+          cp scripts/npm-ci-ritenta.mjs "${{ runner.temp }}/strumenti/"
 
       # Il numero della versione e il codice da costruire vengono da due posti
       # diversi a seconda della strada. Appena uscita: li passa la meta'
@@ -708,7 +714,8 @@ jobs:
 
       - name: Install dipendenze
         id: dipendenze
-        run: npm ci
+        shell: bash
+        run: node "${{ runner.temp }}/strumenti/npm-ci-ritenta.mjs"
 
       # Stessa guardia della meta' Mac: se qui non c'e' il codice che il server
       # ha scritto per questa versione, si sta costruendo un codice diverso da
