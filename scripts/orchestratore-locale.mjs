@@ -10,7 +10,7 @@ import { cpus, freemem, homedir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  OPZIONI_BASE, coda, creaMotore, nuovaPratica, rigaStato, riprendi, togliWorktree,
+  OPZIONI_BASE, coda, creaMotore, nuovaPratica, rigaStato, riprendi, slugDi, togliWorktree,
 } from './lib/orchestratore.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
 
@@ -339,7 +339,12 @@ async function main(argv) {
     const s = store.leggi();
     for (const n of nums) {
       if (s.pratiche[n] && !['fuso'].includes(s.pratiche[n].fase)) { console.log(`#${n} è già in coda (${s.pratiche[n].fase})`); continue; }
-      s.pratiche[n] = nuovaPratica({ num: n, slug: val('--slug'), richiesta: val('--richiesta'), file: (val('--file') || '').split(',').map((x) => x.trim()).filter(Boolean), ora: ora() });
+      // Due lavori aperti sullo stesso ramo dividerebbero worktree, verifica e fusione.
+      const di = (slug) => Object.values(s.pratiche).find((q) => q && q.num !== n && q.fase !== 'fuso' && q.slug === slug);
+      let slug = String(val('--slug') || '').trim();
+      if (slug && di(slug)) throw new Error(`il ramo claude/${slug} è già del lavoro #${di(slug).num}: scegli un altro --slug`);
+      if (!slug) for (let k = 1; !slug || di(slug); k += 1) slug = k === 1 ? slugDi(n) : `${slugDi(n)}-${k}`;
+      s.pratiche[n] = nuovaPratica({ num: n, slug, richiesta: val('--richiesta'), file: (val('--file') || '').split(',').map((x) => x.trim()).filter(Boolean), ora: ora() });
       s.coda = (s.coda || []).filter((x) => x !== n).concat([n]);
       console.log(`#${n} in coda: ramo claude/${s.pratiche[n].slug}`);
     }
