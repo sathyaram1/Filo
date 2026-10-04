@@ -272,7 +272,7 @@
 
     function since() {
       const locale = (lastTickAt || (now() - overlapMs)) - overlapMs;
-      return new Date(Math.max(0, oraServer ? Math.min(locale, oraServer) : locale)).toISOString();
+      return new Date(Math.max(0, oraServer ? Math.min(locale, oraServer - overlapMs) : locale)).toISOString();
     }
 
     async function contaInvii(precedente) {
