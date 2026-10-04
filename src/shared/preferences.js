@@ -96,6 +96,147 @@
   // Lo stesso tetto del campo nelle Preferenze.
   const NOTIF_SEC_MAX = 120;
 
+  function tettoStile() {
+    const C = global.SN_CONST;
+    return C && C.AGENT_STYLE_MAX ? `al massimo ${C.AGENT_STYLE_MAX} caratteri` : 'con un tetto di lunghezza';
+  }
+
+  // Un interruttore della pagina Sicurezza: a parole sì/no, livello 2 col rischio in chiaro (#949).
+  function interruttore({ keys, percorso, nome, risk, aiuto }) {
+    return {
+      keys,
+      scrive: [percorso],
+      aiuto: aiuto || 'true | false',
+      level: 2,
+      risk,
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: nidifica(percorso, b), label: `${nome} → ${b ? 'attivo' : 'disattivato'}` };
+      },
+    };
+  }
+
+  function nidifica(percorso, valore) {
+    const seg = String(percorso).split('.');
+    const out = {};
+    let nodo = out;
+    for (let i = 0; i < seg.length - 1; i++) { nodo[seg[i]] = {}; nodo = nodo[seg[i]]; }
+    nodo[seg[seg.length - 1]] = valore;
+    return out;
+  }
+  function dentro(o, percorso) {
+    return String(percorso).split('.').reduce((x, k) => (x && typeof x === 'object' ? x[k] : undefined), o);
+  }
+
+  // ── Elenchi di siti (#949) ─────────────────────────────────────────────────
+  // Il setter dice cosa fare all'elenco («aggiungi x.it», «togli y.com», «solo …», «svuota»); chi
+  // conosce l'elenco di adesso (il main) lo applica con applicaElenco. Un dominio non valido è un
+  // rifiuto col suo nome, mai una voce scartata in silenzio.
+  const OP_ELENCO = [
+    ['aggiungi', /^(?:\+|(?:aggiungi|aggiungere|aggiungo|metti|inserisci|includi|blocca)\b)\s*:?\s*/i],
+    ['togli', /^(?:-|(?:togli|togliere|tolgo|rimuovi|rimuovere|leva|elimina|cancella|sblocca|escludi)\b)\s*:?\s*/i],
+    ['sostituisci', /^(?:=|(?:solo|soltanto|sostituisci(?:\s+con)?|imposta|elenco)\b)\s*:?\s*/i],
+  ];
+  const SVUOTA = /^(?:svuota(?:\s+l'?elenco)?|nessuno|nessuna|niente|vuoto|vuota|azzera|togli\s+tutt[oi]|rimuovi\s+tutt[oi]|cancella\s+tutt[oi])[.!]?$/i;
+  const CONGIUNZIONI = new Set(['e', 'ed', 'and', 'poi', 'anche', 'il', 'lo', 'la', 'sito', 'siti', 'dominio', 'domini']);
+  function nomiSito() {
+    return global.SN_NOMI_SITO || (typeof require === 'function' ? require('./nomiSito.js') : null);
+  }
+  function dominioDa(raw) {
+    let s = String(raw || '').trim().toLowerCase().replace(/^["'«(]+|["'»),.;]+$/g, '').replace(/^([a-z]+:\/\/)?\*?\.+/, '$1');
+    if (!s) return '';
+    if (s.includes('://')) { try { s = new URL(s).hostname; } catch (_) { return ''; } }
+    s = s.split('/')[0].split('?')[0].split(':')[0].replace(/^\.+|\.+$/g, '').replace(/^www\./, '');
+    const N = nomiSito();
+    return N && N.valido(s) ? s : '';
+  }
+  function opElenco(v) {
+    const s = String(v == null ? '' : v).trim();
+    if (!s) return null;
+    if (SVUOTA.test(s)) return { op: 'sostituisci', voci: [] };
+    let op = 'aggiungi';
+    let resto = s;
+    for (const [nome, re] of OP_ELENCO) {
+      const m = s.match(re);
+      if (m) { op = nome; resto = s.slice(m[0].length); break; }
+    }
+    const pezzi = resto.split(/[\s,;]+/).map((x) => x.trim()).filter((x) => x && !CONGIUNZIONI.has(x.toLowerCase()));
+    if (!pezzi.length) return null;
+    const voci = [];
+    const errati = [];
+    for (const p of pezzi) {
+      const d = dominioDa(p);
+      if (!d) errati.push(p);
+      else if (!voci.includes(d)) voci.push(d);
+    }
+    if (errati.length) {
+      return { rifiuto: `${errati.map((x) => `«${x}»`).join(', ')} non ${errati.length > 1 ? 'sono domini' : 'è un dominio'}: scrivi il sito con la sua estensione, come facebook.com` };
+    }
+    return { op, voci };
+  }
+  function elenco({ keys, percorso, nome, risk, aiuto }) {
+    return {
+      keys,
+      scrive: [percorso],
+      aiuto: `"aggiungi <siti>" | "togli <siti>" | "solo <siti>" | "svuota" (${aiuto}; più siti separati da virgole)`,
+      level: 2,
+      risk,
+      build(v) {
+        const o = opElenco(v);
+        if (!o || o.rifiuto) return o;
+        const lista = o.voci.join(', ');
+        const label = o.op === 'aggiungi' ? `${nome}: aggiungi ${lista}`
+          : o.op === 'togli' ? `${nome}: togli ${lista}`
+            : (o.voci.length ? `${nome}: solo ${lista}` : `${nome}: svuota l'elenco`);
+        return { partial: nidifica(percorso, o.voci), label, elenco: { percorso, op: o.op, voci: o.voci, nome } };
+      },
+    };
+  }
+  // L'elenco nuovo a partire da quello di adesso: { partial } da salvare, o { invariato } col perché.
+  function applicaElenco(e, correnti) {
+    const attuale = (Array.isArray(dentro(correnti, e.percorso)) ? dentro(correnti, e.percorso) : [])
+      .filter((x) => typeof x === 'string' && x.trim());
+    let nuovo;
+    if (e.op === 'aggiungi') nuovo = attuale.concat(e.voci.filter((x) => !attuale.includes(x)));
+    else if (e.op === 'togli') nuovo = attuale.filter((x) => !e.voci.includes(x));
+    else nuovo = e.voci.slice();
+    if (nuovo.length === attuale.length && nuovo.every((x, i) => x === attuale[i])) {
+      const ha = attuale.length ? `adesso contiene: ${attuale.join(', ')}` : 'adesso è vuoto';
+      const perche = e.op === 'aggiungi' ? `${e.voci.join(', ')} ${e.voci.length > 1 ? 'ci sono' : 'c\'è'} già`
+        : e.op === 'togli' ? `${e.voci.join(', ')} non ${e.voci.length > 1 ? 'ci sono' : 'c\'è'}` : 'è già così';
+      return { invariato: `nell'elenco «${e.nome}» ${perche} (${ha})` };
+    }
+    return { partial: nidifica(e.percorso, nuovo), lista: nuovo };
+  }
+
+  // I sei parametri del colore delle tab, uno per uno come nella pagina (#949). Range e nomi li dà tabColor.js.
+  function metaColoreTab(chiave) {
+    const TC = global.SN_TAB_COLOR;
+    return TC && Array.isArray(TC.IDENTITY_PARAM_META) ? TC.IDENTITY_PARAM_META.find((m) => m.key === chiave) : null;
+  }
+  const PARAMETRI_COLORE_TAB = ['saturazione_tab', 'luminosita_tab', 'opacita_tab', 'soglia_saturazione', 'peso_centralita', 'bucket_tinta'];
+  function parametroColoreTab(chiave) {
+    return {
+      keys: [chiave, chiave.replace(/_/g, ' '), `${chiave.replace(/_/g, ' ')} delle tab`],
+      scrive: [`tabColor.${chiave}`],
+      aiuto: () => {
+        const m = metaColoreTab(chiave);
+        return m ? `numero ${m.min}-${m.max} (${m.label.toLowerCase()}, predefinito ${m.def}: ${m.comment})` : 'numero';
+      },
+      build(v) {
+        const m = metaColoreTab(chiave);
+        if (!m) return null;
+        const s = String(v == null ? '' : v).trim().toLowerCase();
+        let n = /^(predefinit|default|normale|standard|ripristin)/.test(s) ? m.def : parseItalianNumber(s);
+        if (!Number.isFinite(n)) return null;
+        if (n < m.min || n > m.max) return { rifiuto: `${m.label.toLowerCase()} va da ${m.min} a ${m.max}, e ${s} è fuori` };
+        if (m.step >= 1) n = Math.round(n);
+        return { partial: { tabColor: { [chiave]: n } }, label: `Colore delle tab, ${m.label.toLowerCase()} → ${String(n).replace('.', ',')}` };
+      },
+    };
+  }
+
   // Ogni voce: sinonimi di chiave + build(valore) → { partial, label }.
   // `partial` è il pezzo di settings da fondere (deepMerge preserva i campi
   // annidati vicini); `label` è la conferma leggibile per l'utente.
@@ -106,6 +247,8 @@
   // l'impostazione e quali rischi comporta toccarla.
   const PREF_SETTERS = [
     {
+      scrive: ['theme'],
+      aiuto: '"sistema" | "chiaro" | "scuro"',
       keys: ['tema', 'theme', 'aspetto'],
       build(v) {
         const s = String(v == null ? '' : v).trim().toLowerCase();
@@ -121,6 +264,8 @@
       },
     },
     {
+      scrive: ['textScale'],
+      aiuto: '"piccolo" | "normale" | "grande" | "molto grande" | "enorme" (o una percentuale)',
       keys: ['dimensione_testo', 'dimensione testo', 'dimensione del testo', 'textscale', 'grandezza testo', 'grandezza del testo', 'testo', 'font'],
       build(v) {
         const s = String(v == null ? '' : v).trim().toLowerCase();
@@ -139,6 +284,8 @@
       },
     },
     {
+      scrive: ['showHomeMessage'],
+      aiuto: 'true | false (commento di Filo al centro della home)',
       keys: ['commento_home', 'commento nella home', 'commento home', 'messaggio home', 'messaggio nella home', 'showhomemessage', 'commento'],
       build(v) {
         const b = parsePrefBool(v);
@@ -161,6 +308,8 @@
       },
     })),
     {
+      scrive: ['agentStyle'],
+      aiuto: () => `testo libero, ${tettoStile()} (come deve scrivere Filo; "nessuno" lo toglie)`,
       keys: ['stile_agente', 'stile agente', "stile dell'agente", 'agentstyle', 'stile'],
       // Entra in ogni prompt conversazionale e ci resta: proposto dal modello,
       // passa dal popup col testo esatto (#592). Anche toglierlo, che lo perde.
@@ -182,6 +331,8 @@
       },
     },
     {
+      scrive: ['autoArchive.enabled'],
+      aiuto: 'true | false (riordino e archiviazione automatici delle schede)',
       keys: ['archiviazione_automatica', 'archiviazione automatica', 'gestione automatica delle schede', 'gestione automatica schede', 'autoarchive', 'archiviazione', 'archivia automaticamente'],
       build(v) {
         const b = parsePrefBool(v);
@@ -190,6 +341,8 @@
       },
     },
     {
+      scrive: ['autoArchive.onClose'],
+      aiuto: 'true | false (riordina anche alla riapertura di Filo)',
       keys: ['archivia_alla_riapertura', 'riordina alla riapertura', 'archivia alla riapertura', 'autoarchiveonclose'],
       build(v) {
         const b = parsePrefBool(v);
@@ -198,6 +351,8 @@
       },
     },
     {
+      scrive: ['autoArchive.idleHours'],
+      aiuto: 'numero 1-168 (dopo quante ore di inattività archiviare)',
       keys: ['ore_inattivita', 'ore inattivita', 'ore di inattivita', 'ore_inattivita_archivio', 'idlehours', 'ore inattività'],
       build(v) {
         let n = parseInt(String(v == null ? '' : v).replace(/[^0-9]/g, ''), 10);
@@ -207,6 +362,8 @@
       },
     },
     {
+      scrive: ['terminal.enabled'],
+      aiuto: 'true | false',
       keys: ['modalita_terminale', 'modalità terminale', 'modalita terminale', 'terminale', 'terminal'],
       // La modalità terminale dà a Filo accesso alla shell: conferma esplicita.
       level: 2,
@@ -235,6 +392,8 @@
       },
     },
     {
+      scrive: ['terminal.shell'],
+      aiuto: (ctx) => ctx.shellPref,
       keys: ['shell_terminale', 'shell terminale', 'shell'],
       level: 2,
       risk: 'Sceglie quale shell usa Filo per eseguire i comandi del terminale (su Windows '
@@ -257,6 +416,8 @@
       },
     },
     {
+      scrive: ['tts.rate'],
+      aiuto: 'numero 0.5-2 (velocità della lettura ad alta voce)',
       keys: ['velocita_voce', 'velocità voce', 'velocita voce', 'velocità lettura', 'velocita lettura', 'ttsrate'],
       build(v) {
         let n = parseItalianNumber(v);
@@ -266,6 +427,8 @@
       },
     },
     {
+      scrive: ['tts.pitch'],
+      aiuto: 'numero 0-2 (tono della lettura ad alta voce)',
       keys: ['tono_voce', 'tono voce', 'tono lettura', 'ttspitch'],
       build(v) {
         let n = parseItalianNumber(v);
@@ -278,6 +441,8 @@
       // La voce TTS è una stringa URI (voiceURI o nome del sistema): si imposta
       // passando la stringa esatta come valore (il sistema la riconosce all'avvio).
       // Reversibile (puoi cambiarla di nuovo) → livello 1.
+      scrive: ['tts.voice'],
+      aiuto: 'il nome di una voce installata nel sistema (voce di riserva della lettura)',
       keys: ['voce', 'voce lettura', 'voce tts', 'ttsvoice', 'voce del sistema'],
       build(v) {
         const s = String(v == null ? '' : v).trim();
@@ -289,6 +454,8 @@
       // Voce del MODELLO di lettura (quella naturale): si indica per nome
       // ("Sara", "Nicola") o per id ("if_sara"); "automatica" torna a seguire
       // la lingua del testo. Reversibile → livello 1.
+      scrive: ['tts.modelVoice'],
+      aiuto: '"automatica" o il nome di una voce naturale, come "Sara" o "Nicola" (voce della lettura ad alta voce)',
       keys: ['voce_modello', 'voce del modello', 'voce naturale', 'voce modello', 'ttsmodelvoice'],
       build(v) {
         const s = String(v == null ? '' : v).trim();
@@ -313,6 +480,8 @@
 
     // ── Funzionalità (interruttori) — reversibili, nessun rischio → livello 1 ──
     {
+      scrive: ['featureFlags.spellcheck'],
+      aiuto: 'true | false (correttore ortografico AI)',
       keys: ['correttore', 'correttore ortografico', 'correttore_ortografico', 'controllo ortografico', 'spellcheck', 'correzione'],
       build(v) {
         const b = parsePrefBool(v);
@@ -321,6 +490,8 @@
       },
     },
     {
+      scrive: ['featureFlags.help'],
+      aiuto: 'true | false (barra laterale dell\'Aiuto)',
       keys: ['sidebar_aiuto', 'sidebar aiuto', 'pannello aiuto', 'aiuto', 'help', 'assistente aiuto'],
       build(v) {
         const b = parsePrefBool(v);
@@ -329,6 +500,8 @@
       },
     },
     {
+      scrive: ['featureFlags.categorize'],
+      aiuto: 'true | false (categorie automatiche delle pagine)',
       keys: ['categorizzazione', 'categorie automatiche', 'categorizza', 'categorie'],
       build(v) {
         const b = parsePrefBool(v);
@@ -337,6 +510,8 @@
       },
     },
     {
+      scrive: ['autoArchive.onIdle'],
+      aiuto: 'true | false (archivia quando Filo resta inattivo)',
       keys: ['archivia_se_inattivo', 'archivia quando inattivo', 'archiviazione su inattivita', 'archivia se inattivo', 'archiviazione inattivita'],
       build(v) {
         const b = parsePrefBool(v);
@@ -346,6 +521,8 @@
     },
     // #737 — sta nella pagina Sicurezza accanto all'ad-block, ma non apre né chiude niente: si applica subito.
     {
+      scrive: ['security.adSkip.enabled'],
+      aiuto: 'true | false (preme da solo il «Salta» delle pubblicità dei video, per esempio su YouTube)',
       keys: ['salta_pubblicita', 'salta pubblicità', 'salta pubblicita', 'salta le pubblicità', 'salta le pubblicita',
         'salta annunci', 'salta gli annunci', 'pubblicità dei video', 'pubblicita dei video', 'skip ads', 'salta ads'],
       build(v) {
@@ -357,6 +534,8 @@
 
     // ── Sicurezza / privacy — livello 2 (popup di conferma prima di applicare) ──
     {
+      scrive: ['security.protectIpLeak'],
+      aiuto: 'true | false (anti-leak WebRTC)',
       keys: ['protezione_ip', 'protezione ip', 'proteggi ip', 'protezione ip locale', 'webrtc', 'protezione webrtc', 'ip locale'],
       level: 2,
       risk: 'Controlla la protezione che impedisce ai siti di scoprire il tuo indirizzo IP locale '
@@ -368,6 +547,8 @@
       },
     },
     {
+      scrive: ['security.blockPopups'],
+      aiuto: 'true | false',
       keys: ['blocco_popup', 'blocco popup', 'blocca popup', 'popup', 'finestre popup'],
       level: 2,
       risk: 'Controlla il blocco delle finestre popup. Disattivarlo permette ai siti di aprire '
@@ -379,6 +560,8 @@
       },
     },
     {
+      scrive: ['security.safeBrowse.enabled'],
+      aiuto: 'true | false (avviso sui siti pericolosi)',
       keys: ['navigazione_sicura', 'navigazione sicura', 'rilevamento siti pericolosi', 'siti pericolosi', 'safe browsing', 'safebrowsing', 'protezione phishing', 'rilevamento phishing'],
       level: 2,
       risk: 'Controlla il rilevamento dei siti pericolosi (phishing e malware). Disattivarlo '
@@ -390,6 +573,8 @@
       },
     },
     {
+      scrive: ['security.downloads.confirmExecutables'],
+      aiuto: 'true | false (chiede prima di scaricare o aprire un programma)',
       keys: ['conferma_programmi', 'conferma programmi', 'conferma prima di scaricare un programma',
         'chiedi prima di scaricare un programma', 'avviso programmi scaricati', 'download eseguibili',
         'scaricamento programmi', 'file eseguibili'],
@@ -407,6 +592,8 @@
       },
     },
     {
+      scrive: ['security.cookies.mode'],
+      aiuto: '"manuale" | "automatico" | "privacy"',
       keys: ['gestione_cookie', 'gestione cookie', 'gestione dei cookie', 'cookie', 'banner cookie', 'banner dei cookie'],
       level: 2,
       risk: 'Decide come Filo gestisce i cookie dei siti. Le modalità più permissive aumentano '
@@ -425,6 +612,8 @@
       },
     },
     {
+      scrive: ['security.fingerprint.mode'],
+      aiuto: '"off" | "default" | "privacy" (anti-fingerprinting)',
       keys: ['fingerprint', 'anti-fingerprinting', 'anti fingerprinting', 'antifingerprint', 'impronta digitale', 'protezione impronta', 'protezione fingerprint'],
       level: 2,
       risk: 'Controlla la protezione contro il fingerprinting, cioè il riconoscimento del tuo '
@@ -445,6 +634,8 @@
 
     // ── Modelli / provider / chiavi / costi — livello 2 (conferma) ──
     {
+      scrive: ['useDefaultModels'],
+      aiuto: 'true | false',
       keys: ['modelli_predefiniti', 'modelli predefiniti', 'usa modelli predefiniti', 'modelli di default', 'configurazione predefinita modelli'],
       level: 2,
       risk: 'Decide se Filo usa i modelli AI predefiniti o la tua configurazione personalizzata. '
@@ -456,6 +647,8 @@
       },
     },
     {
+      scrive: ['openWeightsOnly'],
+      aiuto: 'true | false (spegne tutti i modelli proprietari, Anthropic compresa, e lascia solo modelli a pesi aperti serviti da fornitori indipendenti)',
       keys: ['solo_pesi_aperti', 'solo pesi aperti', 'modelli a pesi aperti', 'solo modelli a pesi aperti',
         'solo modelli aperti', 'modelli aperti', 'modelli proprietari', 'niente modelli proprietari',
         'disattiva modelli proprietari', 'open weights'],
@@ -473,6 +666,8 @@
       },
     },
     {
+      scrive: ['provider'],
+      aiuto: '"openrouter"',
       keys: ['provider', 'fornitore', 'provider ai', 'provider modelli'],
       level: 2,
       risk: 'Cambia il fornitore AI che elabora le tue richieste. '
@@ -486,6 +681,8 @@
       },
     },
     {
+      scrive: ['apiKeys.openrouter'],
+      aiuto: 'la chiave API di OpenRouter come testo',
       keys: ['chiave_openrouter', 'chiave openrouter', 'api key openrouter', 'chiave api openrouter', 'openrouter key'],
       level: 2,
       risk: 'Imposta la chiave API di OpenRouter. È una credenziale che autorizza spese sul tuo '
@@ -498,6 +695,8 @@
     },
 
     {
+      scrive: ['apiKeys.tavily'],
+      aiuto: 'la chiave API di Tavily come testo',
       keys: ['chiave_tavily', 'chiave tavily', 'api key tavily', 'chiave ricerca', 'chiave api tavily', 'tavily key'],
       level: 2,
       risk: 'Imposta la chiave API di Tavily, il servizio di ricerca web. È una credenziale '
@@ -509,6 +708,8 @@
       },
     },
     {
+      scrive: ['monthlyLimitEur'],
+      aiuto: 'numero in euro (limite di spesa mensile)',
       keys: ['limite_spesa', 'limite di spesa', 'limite spesa', 'limite di spesa mensile', 'limite mensile', 'budget mensile', 'spesa massima', 'limite costi', 'budget'],
       level: 2,
       risk: 'Imposta il tetto di spesa mensile per le richieste AI. Alzarlo può far aumentare i '
@@ -531,6 +732,7 @@
     // profondo su `tabColor`, quindi un preset parziale lascia intatti gli altri
     // parametri. La regolazione fine dei singoli numeri sta nelle Preferenze.
     {
+      aiuto: '"più vivaci" | "più neutre" | "nessuno" | "più preciso" | "predefinito" (colore identità delle tab: "vivaci"=tinte accese, "neutre"=tinte spente, "nessuno"=tab senza colore, "più preciso"=estrai meglio quando la tab prende il colore sbagliato, "predefinito"=ripristina; i sei valori uno per uno hanno le loro chiavi qui sotto)',
       keys: ['colore_tab', 'colore delle tab', 'colore tab', 'colori tab', 'colori delle tab',
         'colore schede', 'colori schede', 'tinta tab', 'tinta delle tab', 'vivacita tab', 'vivacità tab'],
       build(v) {
@@ -558,6 +760,8 @@
 
     // ── Suoneria timer — reversibile, innocuo → livello 1 ──
     {
+      scrive: ['timerRingtone'],
+      aiuto: '"standard" | "delicata" | "urgente" | "carillon"',
       keys: ['suoneria_timer', 'suoneria timer', 'suoneria', 'ringtone', 'timer ringtone', 'suono timer', 'tono timer'],
       level: 1,
       build(v) {
@@ -569,6 +773,8 @@
 
     // ── Avvisi in basso a destra (barra e pagine) — reversibili, innocui → livello 1 ──
     {
+      scrive: ['notifications.durationSec'],
+      aiuto: 'secondi 0-120 (quanto restano gli avvisi in basso a destra, nella barra e nelle pagine; quelli brevi e quelli con un pulsante restano in proporzione; 0 = finché l\'utente non li chiude)',
       keys: ['durata_notifiche', 'durata notifiche', 'durata delle notifiche', 'durata notifica', 'durata della notifica',
         'durata avvisi', 'durata degli avvisi', 'durata toast', 'tempo notifiche', 'notifications.durationsec'],
       build(v) {
@@ -594,6 +800,8 @@
       },
     },
     {
+      scrive: ['notifications.soundEnabled', 'notifications.sound'],
+      aiuto: 'true | false | "standard" | "delicata" | "urgente" | "carillon" (suono degli avvisi della barra; un tono lo accende con quel tono)',
       keys: ['suono_notifiche', 'suono notifiche', 'suono delle notifiche', 'suono notifica', 'suono della notifica',
         'suono avvisi', 'suono degli avvisi', 'tono notifiche', 'notifications.sound'],
       // Un sì/no lo accende o lo spegne; un tono lo accende con quel tono.
@@ -610,6 +818,8 @@
 
     // ── Anteprima delle schede (#430) — reversibile, innocua → livello 1 ──
     {
+      scrive: ['tabPreview.enabled', 'tabPreview.size'],
+      aiuto: 'true | false | "piccola" | "media" | "grande" (carta con l\'anteprima di una scheda al passaggio del mouse sulla barra)',
       keys: ['anteprima_schede', 'anteprima delle schede', 'anteprima schede', 'anteprima delle tab', 'anteprima tab', 'tabpreview'],
       // In fondo all'elenco: una chiave vaga («tab», «schede») resta di chi la prendeva prima.
       // Un sì/no la accende o la spegne; una misura la accende a quella misura.
