@@ -501,6 +501,12 @@
       invoke: 'Pagina filo://preferences/preferences.html, oppure chiedendolo a Filo in chat.',
     },
     {
+      id: 'settings-by-chat', title: 'Ogni impostazione si legge e si cambia chiedendola', category: 'settings',
+      desc: 'Ogni voce delle pagine Preferenze (anche le avanzate: i colori e i caratteri dell’aspetto, i sei valori del colore delle schede), Sicurezza, Modelli e Altro si cambia scrivendolo a Filo, e Filo sa dire com’è impostata adesso («com’è impostato il blocco della pubblicità?», «quali siti ho bloccato?»). Gli elenchi di siti (bloccati, fidati, esclusi) si cambiano un sito alla volta. Le voci che toccano sicurezza, privacy, modelli, chiavi e spese chiedono prima un OK, con la spiegazione di cosa cambia; le altre si applicano subito. Ogni cambio dice cosa è cambiato e si rimette com’era dal segno accanto al tuo messaggio. Una pagina delle impostazioni già aperta mostra subito il valore nuovo.',
+      invoke: 'Scrivilo a Filo in chat: «spegni il blocco della pubblicità», «metti il tema scuro», «blocca facebook.com», «com’è impostato?».',
+      doesNot: 'Le chiavi API non le legge mai ad alta voce: dice solo se ci sono. Il modello di ogni singola funzione e il registro dei modelli si scelgono ancora nella pagina Modelli. I pulsanti che fanno un’azione invece di cambiare un valore (ripristina tutto, rifai l’intervista, esporta i dati) restano nelle loro pagine.',
+    },
+    {
       id: 'undo-changes', title: 'Rimetti com’era un cambio, da dovunque venga', category: 'settings',
       desc: 'Ogni cambio allo stato di Filo resta segnato con chi l’ha fatto: impostazioni, aspetto, tema, sveglie e timer, regole del proxy, zoom di un sito. Vale per quelli chiesti in chat e per quelli fatti a mano nelle pagine delle impostazioni, e Filo li vede tutti. Quando lo chiedi in chat, sulla tua bolla compare un piccolo segno: al passaggio del mouse dice cosa è cambiato, per esempio «tema: chiaro → scuro», e offre «annulla». Anche l’annullo resta segnato, e si rifà con «rifai».',
       invoke: 'Passa il mouse sul segno della tua bolla in chat e premi «annulla» (o fai tasto destro sulla bolla, o sulla riga che racconta il cambio), oppure scrivi a Filo «rimetti come prima».',
@@ -509,7 +515,7 @@
     {
       id: 'security', title: 'Sicurezza e privacy', category: 'settings',
       desc: 'Protezione dalla fuga del tuo indirizzo IP, blocco dei popup, gestione dei cookie (manuale / predefinita / privacy massima), lista dei siti bloccati e lista dei siti fidati. Un sito bloccato non si apre da nessuna strada (link, risultati di una ricerca, barra della home, redirect, finestrelle, indietro e avanti, azioni di Filo) finché non scegli «Apri comunque» (nella notifica, sulla pagina «Sito bloccato» o sotto la risposta di Filo in chat o nell\'assistente sulla pagina); una scheda già aperta su un sito che metti in lista passa subito alla pagina «Sito bloccato», anche alla riapertura di Filo, e da lì un collegamento porta alla lista.',
-      invoke: 'Pagina filo://security/security.html.',
+      invoke: 'Pagina filo://security/security.html, oppure chiedendolo a Filo in chat: prima di cambiare una voce della sicurezza chiede un OK, tranne per «Salta le pubblicità dei video».',
     },
     {
       id: 'dangerous-sites', title: 'Avviso dei siti pericolosi', category: 'settings',
@@ -522,6 +528,12 @@
       desc: 'In modalità Automatico e Privacy Filo rifiuta da solo i banner dei cookie, anche quando stanno in un riquadro dentro la pagina. Quelli che non hanno un «rifiuta» (solo «Accetta», o «accetta o abbonati») li nasconde, senza accettare niente, e se la pagina era rimasta ferma o scurita la sblocca. Dove il sito lo dice, controlla che il rifiuto sia stato registrato davvero.',
       invoke: 'Da solo, a ogni pagina. Il tasto destro sulla scheda dice cosa è successo su quel sito («Cookie non necessari rifiutati» o «Banner dei cookie nascosto»), anche tornandoci dopo in un\'altra scheda o dopo un riavvio, e offre «Mostra il banner dei cookie» per rivederlo; sullo stesso menu «Rifiuta i cookie in automatico qui» torna indietro. In Impostazioni → Sicurezza si vedono tutti e due gli elenchi: i siti coi banner visibili («Rifiuta in automatico») e quelli dove Filo ha rifiutato o nascosto («Mostra il banner»).',
       doesNot: 'In modalità Manuale non tocca nessun banner. Non avvisa da solo quando rifiuta o nasconde qualcosa. Non nasconde i messaggi che non parlano di cookie (avviso sull\'adblocker, limite di articoli gratuiti). Una scelta fatta in una finestra incognito resta lì. In Privacy non tiene sul disco cosa ha fatto sui siti non fidati. «Mostra il banner» toglie solo la risposta che il clic sul banner ha creato, non l\'accesso o le preferenze del sito.',
+    },
+    {
+      id: 'ad-block', title: 'Blocco di pubblicità e tracker', category: 'settings',
+      desc: 'Filo blocca da sé pubblicità e tracker: le richieste verso i domini delle liste pubbliche e gratuite (StevenBlack, EasyList) si fermano prima di partire, così annunci e script che seguono cosa fai da un sito all’altro non si caricano nemmeno. Le liste restano sul tuo computer e si aggiornano da sole una volta a settimana; un elenco di siti legittimi non viene bloccato anche se finisce per errore in una lista.',
+      invoke: 'Attivo di serie. Si spegne in Impostazioni → Sicurezza → «Blocca pubblicità e tracker», o chiedendolo a Filo («spegni il blocco della pubblicità»), che chiede prima un OK. A «blocchi la pubblicità?» Filo risponde con lo stato vero.',
+      doesNot: 'Non nasconde lo spazio vuoto che un annuncio bloccato lascia nella pagina, e non ferma la pubblicità che arriva dallo stesso dominio del sito, come gli annunci dentro i video di YouTube (quelli li salta «Salta le pubblicità dei video»). Se al primo avvio manca la rete, parte senza liste finché non riesce a scaricarle.',
     },
     {
       id: 'video-ad-skip', title: 'Pubblicità dei video saltate da sole', category: 'settings',
@@ -544,7 +556,7 @@
     {
       id: 'auto-feedback', title: 'Segnalazione automatica dei problemi', category: 'settings',
       desc: 'Quando Filo non riesce a fare qualcosa che gli chiedi, invia automaticamente una segnalazione anonima e generica a chi sviluppa l\'app — senza includere URL o testo personale. Tenerlo attivo premia con 10 crediti extra al giorno.',
-      invoke: 'Impostazioni → Sicurezza → "Segnalazione automatica dei problemi".',
+      invoke: 'Impostazioni → Sicurezza → "Segnalazione automatica dei problemi", oppure chiedendolo a Filo.',
       doesNot: 'Non invia mai URL, testo delle conversazioni o dati personali: solo una nota generica sulla funzione mancante.',
     },
     {

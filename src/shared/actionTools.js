@@ -50,8 +50,13 @@
     overlay: 'anche la barra laterale',
     'button.bg': 'è questo per "rendi i bottoni di un colore"',
   };
+  // Nel main i moduli sono già caricati dal loader; negli unit test che caricano solo questo, li porta require.
+  function modulo(nome, file) {
+    if (!global[nome] && typeof require === 'function') { try { require(file); } catch (_) {} }
+    return global[nome] || null;
+  }
   function righeToken() {
-    const T = global.SN_THEME_TOKENS;
+    const T = modulo('SN_THEME_TOKENS', './themeTokens.js');
     if (!T || typeof T.names !== 'function') return '';
     return T.names().map((n) => {
       const t = T.get(n) || {};
@@ -256,6 +261,23 @@
       },
       required: ['percorso'],
     },
+    RINOMINA_FILE: {
+      description: ({ sistema }) => 'Dà un nome sensato a file del computer dell\'utente. Filo legge l\'inizio di ciascuno '
+        + '(PDF, immagini, documenti Word e LibreOffice, testo) e propone un nome che dice cosa contiene; l\'estensione '
+        + 'non cambia mai e nessun file viene sovrascritto. L\'utente vede l\'elenco vecchio → nuovo e conferma, e dopo '
+        + 'può rimettere tutto com\'era con «Annulla». Indica i file con `percorsi`, oppure una `cartella`: di una cartella '
+        + 'si prendono i file col nome che non dice niente (scan_00231, IMG_2026…, documento (3)), con `tutti` true anche '
+        + 'gli altri. Se è l\'utente a dettare il nome, passalo in `nome` con un solo file. Per rimettere un nome di prima '
+        + `usa \`nome\` col nome di prima. Esempio di percorso: ${sistemaInfo(sistema).esempioPercorso}`,
+      properties: {
+        percorsi: { type: 'array', items: { type: 'string' }, description: 'I file da rinominare (percorso assoluto, o con ~ per la cartella dell\'utente).' },
+        cartella: S('Una cartella: si rinominano i file che contiene (non le sottocartelle).'),
+        tutti: B('Con `cartella`: anche i file che hanno già un nome comprensibile. Di norma false.'),
+        nome: S('Il nome deciso dall\'utente per UN file, senza estensione.'),
+      },
+      required: [],
+      risultato: true,
+    },
     PULISCI_TAB: {
       description: 'Mostra un bottone "Riordina e archivia le schede"; l\'utente conferma e Filo archivia le tab non più utili (riapribili dalla cronologia). NON archiviare nulla da solo: spiega in una frase cosa farà.',
       properties: {},
@@ -291,7 +313,7 @@
     IMPOSTA_PREFERENZA: {
       // L'elenco delle chiavi esce dai setter (SN_PREF.righeDescrizione): una voce nuova arriva da sola (#949).
       description: ({ sistema }) => {
-        const P = global.SN_PREF;
+        const P = modulo('SN_PREF', './preferences.js');
         const righe = P && typeof P.righeDescrizione === 'function'
           ? P.righeDescrizione({ sistema, shellPref: sistemaInfo(sistema).shellPref }) : [];
         return 'Modifica un\'impostazione dell\'app: ogni voce delle pagine Preferenze, Sicurezza, Modelli e Altro ha la sua chiave qui sotto. '

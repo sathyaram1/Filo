@@ -40,6 +40,7 @@
     LEGGI_FILE: 'readDocument',
     LEGGI_DOCUMENTO: 'readDocument',
     LEGGI_TRASPARENZA: 'transparency',
+    LEGGI_IMPOSTAZIONI: 'options',
     EVENTO_CALENDARIO: 'calendar',
     PULISCI_TAB: 'broom',
     CANCELLA_ARCHIVIO: 'trash',

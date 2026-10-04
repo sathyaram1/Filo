@@ -33,6 +33,7 @@
         timerRingtone: 'timerRingtone',
         terminalEnabled: 'terminal.enabled',
         terminalShell: 'terminal.shell',
+        nomiSensatiScaricamenti: 'nomiSensati.scaricamenti',
       },
       gruppi: { tokenCode: 'themeTokens.*', tabColorCode: 'tabColor.*' },
       fuori: {},

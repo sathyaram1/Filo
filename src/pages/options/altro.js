@@ -55,6 +55,7 @@
     window.SN_PAGE_THEME = settings.theme;
     window.SN_PAGE_BOOTSTRAP.applyTheme(settings.theme);
     $('blocklist').value = (settings.blocklist || []).join('\n');
+    mostrato = $('blocklist').value;
     await renderCategories();
   }
 
@@ -187,8 +188,13 @@
     mostraSalvato._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
   }
 
+  // L'elenco come la pagina l'ha letto o scritto l'ultima volta: un cambio arrivato da altrove (la chat)
+  // si mostra solo se qui non si sta scrivendo (#949).
+  let mostrato = null;
+
   async function save() {
     caselle.spedita('blocklist');
+    mostrato = $('blocklist').value;
     const blocklist = $('blocklist').value.split('\n').map((s) => s.trim()).filter(Boolean);
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { blocklist } });
     mostraSalvato();
@@ -203,6 +209,16 @@
     },
   });
   caselle.registra('blocklist', () => save());
+
+  if (chrome.runtime && chrome.runtime.onMessage) {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (!msg || msg.type !== MSG.SETTINGS_UPDATED || !msg.settings || mostrato === null) return;
+      const el = $('blocklist');
+      if (document.activeElement === el || el.value !== mostrato) return;
+      const toccati = window.SN_VOCI_IMPOSTAZIONI.riallineaPagina('altro', msg.settings);
+      if (toccati.length) mostrato = el.value;
+    });
+  }
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
