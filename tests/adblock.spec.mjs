@@ -306,3 +306,32 @@ setTimeout(() => { document.getElementById('mandato').contentWindow.location.hre
     rinvii.close();
   }
 });
+
+// Successo per l'utente: il clic sul link porta alla pagina di destinazione, servita davvero (blocked.test risolve in locale).
+async function clicSulLink(app, openTab, testServer) {
+  const dest = testServer.html('<!doctype html><title>DESTINAZIONE</title><h1>Negozio</h1>').replace('127.0.0.1', 'blocked.test');
+  const page = await testServer.openReady(openTab, `<!doctype html><title>ARTICOLO</title><a id="l" href="${dest}">Compra qui</a>`, { pubblico: true });
+  await page.evaluate(() => document.getElementById('l').click());
+  const arrivato = () => app.evaluate(({ webContents }, u) => webContents.getAllWebContents()
+    .some((w) => w.getURL() === u && w.getTitle() === 'DESTINAZIONE'), dest);
+  await expect.poll(arrivato, { timeout: 8_000 }).toBe(true);
+}
+
+test('un link verso un dominio che le liste fermano solo dentro gli altri siti si apre (#576)', async ({ app, openTab, testServer }) => {
+  await app.evaluate(({}) => {
+    const A = globalThis.__filoAdblock;
+    A.setDomainsForTest([...A.parseList('||blocked.test^$script,subdocument,third-party')], []);
+    A.configureFromSettings({ security: { adblock: { enabled: true } } });
+  });
+  await clicSulLink(app, openTab, testServer);
+});
+
+test('con le liste fuori dal blocco dei siti, un link verso un dominio in lista si apre invece di finire su «Pagina bloccata» (#576)', async ({ app, shell, openTab, testServer }) => {
+  await configureAdblock(app, { enabled: true, domains: ['blocked.test'] });
+  await shell.evaluate(() => window.filoShell.message({
+    type: 'update_settings',
+    settings: { security: { siteBlock: { enabled: true, useAdblockLists: false, blacklist: [] } } },
+  }));
+  await shell.evaluate(() => new Promise((r) => setTimeout(r, 300)));
+  await clicSulLink(app, openTab, testServer);
+});

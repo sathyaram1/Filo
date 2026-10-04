@@ -21,7 +21,7 @@ const DEFAULT_SOURCES = [
 
 // Una cache scritta prima delle regole di occultamento (e del parser che non blocca più siti interi per una
 // regola di percorso) va riscaricata subito, non fra una settimana.
-const CACHE_FORMAT = 2;
+const CACHE_FORMAT = 3;
 
 // Aggiornamento automatico: settimanale (le liste cambiano lentamente).
 const REFRESH_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -72,11 +72,30 @@ function bloccaIlDominio(opts) {
   return true;
 }
 
+// Una regola solo di terzi o solo per certi tipi (script, riquadri, immagini) non vale per la pagina che l'utente apre:
+// presa per un sito da fermare, quel dominio non si apriva più nemmeno con un clic o scrivendolo (#576).
+const TIPI_PAGINA = new Set(['document', 'doc', 'all', 'popup']);
+
+function valePerLaPagina(opts) {
+  if (opts === undefined) return true;
+  let tipi = false;
+  let terzi = false;
+  let pagina = false;
+  for (let o of opts.split(',')) {
+    o = o.trim().toLowerCase();
+    if (!o || o[0] === '~' || o.includes('=')) continue;
+    if (o === 'third-party' || o === '3p') terzi = true;
+    else if (TIPI_PAGINA.has(o)) pagina = true;
+    else if (o !== 'first-party' && o !== '1p' && o !== 'important' && o !== 'match-case') tipi = true;
+  }
+  return pagina || (!terzi && !tipi);
+}
+
 // Estrae l'insieme di domini da bloccare dal testo di una lista. Riconosce sia
 // il formato hosts (0.0.0.0/127.0.0.1 dominio) sia le regole EasyList con ancora
 // di dominio (||dominio^). Ignora commenti, regole cosmetiche (##, #@#), regole
-// di eccezione (@@) e tutto ciò che non è un dominio pulito.
-function parseList(text) {
+// di eccezione (@@) e tutto ciò che non è un dominio pulito. In `pagine` i domini le cui regole valgono anche per la pagina.
+function parseList(text, pagine) {
   const out = new Set();
   if (!text) return out;
   const lines = String(text).split(/\r?\n/);
@@ -101,6 +120,7 @@ function parseList(text) {
       if (m && bloccaIlDominio(m[2])) {
         const d = normalizeDomain(m[1]);
         if (d) out.add(d);
+        if (d && pagine && valePerLaPagina(m[2])) pagine.add(d);
       }
       continue;
     }
@@ -111,7 +131,10 @@ function parseList(text) {
     if (parts.length >= 2 && (parts[0] === '0.0.0.0' || parts[0] === '127.0.0.1')) {
       const d = normalizeDomain(parts[1]);
       // 'localhost' e simili non sono domini da bloccare.
-      if (d && d !== 'localhost' && d.includes('.')) out.add(d);
+      if (d && d !== 'localhost' && d.includes('.')) {
+        out.add(d);
+        if (pagine) pagine.add(d);
+      }
     }
   }
   return out;
@@ -217,6 +240,7 @@ function sottoCancello(sel, gate) {
 // ─── stato in-memory ────────────────────────────────────────────────────────
 
 let blockedDomains = new Set();   // domini caricati dalle liste
+let pageDomains = new Set();      // quelli le cui regole valgono anche per la pagina aperta (blocco dei siti)
 const whitelistSet = new Set(BASE_WHITELIST.map((d) => d.toLowerCase()));
 let enabled = false;              // toggle utente (settings.security.adblock.enabled)
 let lastUpdatedAt = 0;            // ms epoch dell'ultimo refresh riuscito
@@ -253,6 +277,13 @@ function isBlockedHost(host) {
   if (!host) return false;
   if (isWhitelistedHost(host)) return false;
   return matchesSuffix(host, blockedDomains);
+}
+
+// Per il blocco dei siti (siteBlock.js): la pagina aperta dall'utente si ferma solo per le regole che valgono per lei.
+function isBlockedSite(host) {
+  if (!host) return false;
+  if (isWhitelistedHost(host)) return false;
+  return matchesSuffix(host, pageDomains);
 }
 
 function isBlockedUrl(url) {
@@ -385,6 +416,8 @@ async function loadCache() {
     const data = JSON.parse(raw);
     if (data && Array.isArray(data.domains)) {
       blockedDomains = new Set(data.domains);
+      // Una cache di prima non le distingue: finché non si riscarica valgono tutte, com'era.
+      pageDomains = Array.isArray(data.pagine) ? new Set(data.pagine) : blockedDomains;
       const current = data.format === CACHE_FORMAT && data.cosmetic;
       lastUpdatedAt = current ? (Number(data.updatedAt) || 0) : 0;
       if (current) {
@@ -405,6 +438,7 @@ async function saveCache() {
       updatedAt: lastUpdatedAt,
       count: blockedDomains.size,
       domains: Array.from(blockedDomains),
+      pagine: Array.from(pageDomains),
       cosmetic: CB.toJson(cosmetic),
       hideOff: { all: [...hideOff.all], generic: [...hideOff.generic] },
     });
@@ -457,13 +491,14 @@ function refresh({ force = false, sources = DEFAULT_SOURCES, fetchImpl = fetchLi
       }
       const texts = await Promise.all(sources.map((u) => fetchImpl(u)));
       const merged = new Set();
+      const pagine = new Set();
       const nextCosmetic = CB.emptyList();
       const nextOff = emptyOff();
       let any = false;
       for (const text of texts) {
         if (!text) continue;
         any = true;
-        for (const d of parseList(text)) merged.add(d);
+        for (const d of parseList(text, pagine)) merged.add(d);
         if (isHostsFile(text)) continue;
         CB.parseCosmetic(text, nextCosmetic, { estese: true });
         parseHideOff(text, nextOff);
@@ -473,6 +508,7 @@ function refresh({ force = false, sources = DEFAULT_SOURCES, fetchImpl = fetchLi
         return { ok: false, error: 'download_failed', count: blockedDomains.size };
       }
       blockedDomains = merged;
+      pageDomains = pagine;
       // Se solo le liste di occultamento non sono arrivate, si tengono le regole che c'erano.
       if (nextCosmetic.ids.size + nextCosmetic.classes.size + nextCosmetic.complex.length + nextCosmetic.specific.size) {
         cosmetic = nextCosmetic;
@@ -545,9 +581,10 @@ function configureFromSettings(settings) {
   }
 }
 
-// Solo per i test: inietta una lista di domini senza toccare la rete.
-function setDomainsForTest(domains) {
+// Solo per i test: inietta una lista di domini senza toccare la rete. `pagine` assente: valgono tutti anche per la pagina.
+function setDomainsForTest(domains, pagine) {
   blockedDomains = new Set((Array.isArray(domains) ? domains : []).map((d) => String(d).toLowerCase()));
+  pageDomains = Array.isArray(pagine) ? new Set(pagine.map((d) => String(d).toLowerCase())) : blockedDomains;
   lastUpdatedAt = Date.now();
 }
 
@@ -578,6 +615,7 @@ module.exports = {
   setCosmeticForTest,
   normalizeDomain,
   isBlockedHost,
+  isBlockedSite,
   isBlockedUrl,
   isWhitelistedHost,
   shouldBlock,

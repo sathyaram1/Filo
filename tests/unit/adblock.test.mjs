@@ -100,6 +100,34 @@ test('parseList: una regola con un percorso dopo ^ non blocca il sito intero (#5
   assert.ok(set.has('popup.vere.test'));
 });
 
+test('parseList: una regola solo di terzi o solo per certi tipi non ferma la pagina aperta dall\'utente (#576)', () => {
+  const pagine = new Set();
+  const set = A.parseList([
+    '0.0.0.0 hosts.test',
+    '||nuda.test^',
+    '||terzi.test^$third-party',
+    '||script.test^$script,subdocument,third-party',
+    '||immagine.test^$image',
+    '||documento.test^$document',
+    '||popup.test^$popup,third-party',
+    '||nonterzi.test^$~third-party',
+    '||importante.test^$important',
+  ].join('\n'), pagine);
+  for (const d of ['hosts.test', 'nuda.test', 'terzi.test', 'script.test', 'immagine.test', 'documento.test', 'popup.test', 'nonterzi.test', 'importante.test']) {
+    assert.ok(set.has(d), d + ' resta fermato dentro le pagine');
+  }
+  assert.deepEqual([...pagine].sort(), ['documento.test', 'hosts.test', 'importante.test', 'nonterzi.test', 'nuda.test', 'popup.test']);
+});
+
+test('isBlockedSite: il blocco dei siti vede solo i domini che valgono per la pagina', async () => {
+  await A.refresh({ force: true, sources: ['l'], fetchImpl: async () => '||terzi.test^$third-party\n||nuda.test^' });
+  assert.equal(A.isBlockedHost('terzi.test'), true);
+  assert.equal(A.isBlockedSite('terzi.test'), false);
+  assert.equal(A.isBlockedSite('www.nuda.test'), true);
+  A.setDomainsForTest(['a.test']);
+  assert.equal(A.isBlockedSite('a.test'), true);
+});
+
 test('parseList: le regole che cambiano la richiesta o valgono su certi siti non bloccano il dominio', () => {
   const set = A.parseList([
     '||sito-con-csp.test^$csp=script-src \'self\'',

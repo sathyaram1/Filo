@@ -16,6 +16,7 @@
       ],
       fixes: [
         'Lettura ad alta voce e dettatura non partono più verso un fornitore che Filo esclude. Se il modello che hai scelto lo serve solo lui, Filo te lo dice e non manda niente.',
+        'I link di affiliazione negli articoli, e i siti che le liste della pubblicità fermano solo quando compaiono dentro altri siti, finivano su «Sito bloccato»: adesso si aprono. E se in Sicurezza hai tolto le liste della pubblicità dal blocco dei siti, quei siti si aprono davvero invece di finire su «Pagina bloccata».',
         'Alcuni siti come dev.to finivano sulla pagina «Sito bloccato», e le immagini di imgur sparivano dalle pagine che le mostrano: una regola delle liste della pubblicità valeva per un pezzo del sito e Filo la applicava al sito intero. Adesso i siti si aprono e le immagini tornano.',
       ],
     },

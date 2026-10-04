@@ -238,7 +238,9 @@ function ensureRequestHook(ses) {
     }
     let ad = null;
     try { ad = require('./adblock'); } catch (_) {}
-    if ((s.enabled && isTrackerUrl(details.url)) || (ad && ad.shouldBlock && ad.shouldBlock(details.url))) {
+    // La pagina che l'utente apre non si ferma qui in silenzio: la decide il blocco dei siti, che avvisa con «Apri comunque» (#576).
+    const pagina = details.resourceType === 'mainFrame';
+    if ((s.enabled && isTrackerUrl(details.url)) || (!pagina && ad && ad.shouldBlock && ad.shouldBlock(details.url))) {
       callback({ cancel: true });
       if (ad) ad.chiudiInPagina(details);
       return;
