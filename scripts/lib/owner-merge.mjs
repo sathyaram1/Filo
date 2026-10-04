@@ -69,6 +69,9 @@ export function richiestaForseInAttesa(reply) {
   return r.outcome === 'blocked' && !!r.requestId && !['discarded', 'used', 'decided'].includes(r.requestState);
 }
 
+// La stessa approvazione da un browser qualunque (#489): serve il giorno in cui è Filo a non aprirsi.
+export const PAGINA_APPROVAZIONI = 'https://filo-8b9cb.web.app';
+
 /**
  * Dalla risposta grezza del server a un esito con un nome. PURA.
  *
@@ -189,6 +192,8 @@ function righeDellaRichiesta(r) {
       return '  L\'ho messa IN ATTESA: approvala da Filo, nella dashboard di gestione\n'
         + '  (l\'avviso in cima ai Ricevuti). Da lì puoi anche scartarla.\n'
         + '  Se la pagina è già aperta l\'avviso compare da solo, non serve riaprirla.\n'
+        + `  Se Filo non si apre: ${PAGINA_APPROVAZIONI} da un browser qualunque,\n`
+        + '  con l\'account del proprietario.\n'
         + '  Vale per il commit appena controllato e per 7 giorni: se scade, o se il\n'
         + '  ramo si muove, rilancia npm run finish.';
     case 'discarded':
