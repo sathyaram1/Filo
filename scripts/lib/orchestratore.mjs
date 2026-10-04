@@ -188,11 +188,21 @@ export function serveDeploy(p, fileApp) {
 }
 export function toccaRegole(fileApp) { return (fileApp || []).some((f) => FILE_REGOLE.includes(f)); }
 
-/** I feedback da aprire per i rilievi che il lavoro non ha corretto, raggruppati come li apre il server. PURA. */
+const chiaveRilievo = (f) => `${f.level}${f.sede}:${String(f.text).slice(0, 80)}`;
+
+/** Come togli apre i rilievi rimasti: come li apriva l'avvia che ha guidato il lavoro. PURA. */
+export const modoDerivati = (p) => (p && p.derivati) || OPZIONI_BASE.derivati;
+
+/**
+ * I feedback da aprire per i rilievi che il lavoro non ha corretto, raggruppati come li apre il server. PURA.
+ * Il registro accumula i messi da parte giro dopo giro: si salta il singolo rilievo già aperto, non il gruppo, o ogni giro ripete i precedenti.
+ */
 export function derivatiDaAprire(p, derived) {
-  const fatti = new Set((p.derivatiAperti || []).map((d) => d.chiave));
-  return ROUND.derivedGroups(Array.isArray(derived) ? derived : []).map((g) => {
-    const chiave = g.findings.map((f) => `${f.level}${f.sede}:${String(f.text).slice(0, 80)}`).join('|');
+  const fatti = new Set((p.derivatiAperti || []).flatMap((d) => (Array.isArray(d.chiavi) ? d.chiavi : String(d.chiave || '').split('|'))));
+  const nuovi = ROUND.derivedGroups(Array.isArray(derived) ? derived : []).flatMap((g) => g.findings).filter((f) => !fatti.has(chiaveRilievo(f)));
+  return ROUND.derivedGroups(nuovi).map((g) => {
+    const chiavi = g.findings.map(chiaveRilievo);
+    const chiave = chiavi.join('|');
     const prima = primaRiga(g.findings[0].text).replace(/\s+/g, ' ').trim();
     const titolo = g.tipo === 'rimasti' && g.findings.length > 1
       ? `Rilievi rimasti del lavoro locale #${p.num}`
@@ -202,8 +212,8 @@ export function derivatiDaAprire(p, derived) {
       '',
       ROUND.formatFindings(g.findings),
     ].join('\n');
-    return { chiave, titolo, testo, priorita: g.priority };
-  }).filter((d) => !fatti.has(d.chiave));
+    return { chiave, chiavi, titolo, testo, priorita: g.priority };
+  });
 }
 
 const testa = (regole) => (regole ? [String(regole).trim(), '', '════════'] : []);
@@ -345,7 +355,7 @@ export async function apriDerivatiDi(dep, p, { derivati = OPZIONI_BASE.derivati,
   for (const d of derivatiDaAprire(p, entry.derived)) {
     const r = await dep.esegui('node', ['scripts/claude-feedback.mjs', d.titolo, '-', `--${derivati}`, '--priorita', String(d.priorita)], { cwd: wt, input: d.testo });
     const m = /#(\d+)/.exec(String(r.out || ''));
-    if (r.code === 0) p.derivatiAperti.push({ chiave: d.chiave, titolo: d.titolo, num: m ? Number(m[1]) : null });
+    if (r.code === 0) p.derivatiAperti.push({ chiave: d.chiave, chiavi: d.chiavi, titolo: d.titolo, num: m ? Number(m[1]) : null });
     else { falliti += 1; avvisaUnaVolta(p, `feedback non aperto per «${d.titolo}»: ${coda(r.out, 2)}`); }
     salva(p);
   }
@@ -696,6 +706,7 @@ export function creaMotore(dep, opzioni = {}) {
         p.tentativi = p.tentativi || {};
         if (p.fase === 'in-coda' || p.ripreso) p.giri = 0;
         delete p.ripreso;
+        p.derivati = opz.derivati;
         dep.log(`#${p.num} parte (${p.fase})`);
         const corsa = guida(p).finally(() => attivi.delete(p.num));
         attivi.set(p.num, { p, corsa });

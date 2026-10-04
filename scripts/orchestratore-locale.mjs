@@ -10,7 +10,7 @@ import { cpus, freemem, homedir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  OPZIONI_BASE, apriDerivatiDi, coda, creaMotore, nuovaPratica, rigaStato, riprendi, slugDi, togliWorktree,
+  OPZIONI_BASE, apriDerivatiDi, coda, creaMotore, modoDerivati, nuovaPratica, rigaStato, riprendi, slugDi, togliWorktree,
 } from './lib/orchestratore.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
 
@@ -400,7 +400,7 @@ async function main(argv) {
     if (p.fase !== 'fuso' && existsSync(P.wt(p.slug))) {
       verifyLocal = await import('./verify-local.mjs');
       const depTogli = { esegui, percorsi: P, verifica: (wt) => (existsSync(wt) ? verifyLocal.verdictForCurrentBranch(wt) : {}) };
-      const falliti = await apriDerivatiDi(depTogli, p, { salva: (q) => { s.pratiche[n] = q; store.scrivi(s); } });
+      const falliti = await apriDerivatiDi(depTogli, p, { derivati: modoDerivati(p), salva: (q) => { s.pratiche[n] = q; store.scrivi(s); } });
       if (falliti) {
         throw new Error(`#${n} non tolta: ${falliti === 1 ? 'un rilievo non si è aperto' : `${falliti} rilievi non si sono aperti`} come feedback, e col worktree se ne andrebbe:\n${p.avvisi.filter((a) => a.startsWith('feedback non aperto')).join('\n')}\nRiprova togli: quelli già aperti non si riaprono.`);
       }

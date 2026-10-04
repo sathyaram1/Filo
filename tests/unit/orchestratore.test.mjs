@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  apriDerivatiDi, attesaLimite, caricoBasta, chiaveVerdetto, classificaFinish, creaMotore, decidiDopoVerifica, derivatiDaAprire, nuovaPratica, passoDalRamo,
+  apriDerivatiDi, modoDerivati, attesaLimite, caricoBasta, chiaveVerdetto, classificaFinish, creaMotore, decidiDopoVerifica, derivatiDaAprire, nuovaPratica, passoDalRamo,
   promptLavoratore, promptVerificatore, regolaFile, richiestaArg, riprendi, rigaStato, serveDeploy, siSovrappongono, toccaRegole, togliWorktree,
 } from '../../scripts/lib/orchestratore.mjs';
 import {
@@ -446,6 +446,43 @@ test('derivatiDaAprire: raggruppati come sul server, e mai due volte', () => {
   assert.match(d[0].testo, /lavoro locale #7 \(ramo claude\/sette\)/);
   p.derivatiAperti.push({ chiave: d[0].chiave });
   assert.equal(derivatiDaAprire(p, der).length, 2);
+});
+
+test('rimasti messi da parte in due giri: il secondo feedback porta solo il nuovo, anche dopo pratiche registrate col solo gruppo', () => {
+  const alfa = { level: 2, sede: 'i', text: 'riepilogo ALFA fermo' };
+  const beta = { level: 2, sede: 'i', text: 'coda BETA disordinata' };
+  const p = { num: 7, slug: 'sette', derivatiAperti: [] };
+  const [primo] = derivatiDaAprire(p, [alfa]);
+  p.derivatiAperti.push({ chiave: primo.chiave, chiavi: primo.chiavi });
+  const dopo = derivatiDaAprire(p, [alfa, beta]);
+  assert.deepEqual(dopo.map((d) => d.titolo), ['coda BETA disordinata']);
+  assert.doesNotMatch(dopo[0].testo, /ALFA/);
+  const vecchia = { num: 7, slug: 'sette', derivatiAperti: [{ chiave: primo.chiave }] };
+  assert.deepEqual(derivatiDaAprire(vecchia, [alfa, beta]).map((d) => d.titolo), ['coda BETA disordinata']);
+});
+
+test('giro intero con un rimasto messo da parte a ogni giro: ogni rilievo in un feedback solo', async () => {
+  const b = banco({ verdetti: ['fixed', 'fixed', 'pass'] });
+  const giri = [[{ level: 2, sede: 'i', text: 'ALFA' }], [{ level: 2, sede: 'i', text: 'ALFA' }, { level: 2, sede: 'i', text: 'BETA' }]];
+  const vera = b.dep.claude;
+  b.dep.claude = async (x) => {
+    const r = await vera(x);
+    if (x.ruolo === 'verificatore') b.per[x.cwd].entry.derived = giri.shift() || b.per[x.cwd].entry.derived || [];
+    return r;
+  };
+  const p = (await b.motore.avvia()).pratiche[7];
+  assert.equal(p.fase, 'fuso');
+  const aperti = b.chiamate.filter((c) => /claude-feedback/.test(c.riga)).map((c) => c.input);
+  assert.equal(aperti.filter((t) => /ALFA/.test(t)).length, 1);
+  assert.equal(aperti.filter((t) => /BETA/.test(t)).length, 1);
+});
+
+test('togli apre i rilievi rimasti come li apriva avvia: l’opzione dei derivati resta sulla pratica', async () => {
+  const b = banco({ opz: { derivati: 'nessuno' } });
+  const p = (await b.motore.avvia()).pratiche[7];
+  assert.equal(p.derivati, 'nessuno');
+  assert.equal(modoDerivati(p), 'nessuno');
+  assert.equal(modoDerivati(nuovaPratica({ num: 9 })), 'non-locale');
 });
 
 test('riprendi e nuovaPratica', () => {
