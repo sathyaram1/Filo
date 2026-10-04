@@ -67,6 +67,13 @@ giorno, è un costo vero. Quindi:
   l'icona cambia senza aspettare il giro, e una lettura cominciata prima
   dell'avviso (o una riga di Windows scritta prima) non lo smentisce: per
   dieci secondi l'avviso vince, poi torna a decidere la lettura.
+- i segnali che non costano niente (l'avviso del caricatore; su Linux la
+  batteria letta dai file del kernel mentre si aspetta il ritorno dell'utente)
+  valgono finché una home è in vista, anche col lettore addormentato perché
+  l'utente è fermo da minuti; a schermo bloccato no, allo sblocco si rilegge;
+- ogni lettura fuori dal richiamo della home (un avviso, un turno di chat, la
+  rete che cade) passa dal giro, che si spegne da sé: nessun lettore resta
+  acceso senza chi lo ferma.
 
 Offline lo dice Chromium (`net.isOnline`), oppure la piattaforma quando nessuna
 strada porta fuori: Chromium conta anche gli adattatori virtuali sempre accesi

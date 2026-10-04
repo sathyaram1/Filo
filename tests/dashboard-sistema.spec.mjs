@@ -414,6 +414,35 @@ test('con lo schermo bloccato o l\'utente lontano la home davanti non tiene sveg
   });
 });
 
+test('con l\'utente fermo davanti alla home, staccando il caricatore la voce cambia subito, e il lettore torna a dormire', async ({ app }) => {
+  await finto(app, { ...PIENO, batteria: { livello: 80, inCarica: false, collegata: true } });
+  const page = await newtab(app);
+  await expect(voce(page, 'batteria')).toHaveAttribute('title', 'Collegata', { timeout: 8_000 });
+  const attivo = () => app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.attivo());
+  const giro = await app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.GIRO_MS);
+
+  // Cinque minuti senza tasti né mouse (legge, segue un lavoro lungo): il lettore dorme, la home resta in vista.
+  await app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.inattivita('idle'));
+  await expect.poll(attivo, { timeout: giro * 2 + 3_000 }).toBe(false);
+
+  // Lo stacco lo dice il sistema con un avviso, che non costa niente; la lettura che segue porta anche il livello nuovo.
+  await app.evaluate(({ powerMonitor }) => {
+    globalThis.__sistemaFinto = { ...globalThis.__sistemaFinto, batteria: { livello: 79, inCarica: false, collegata: false } };
+    powerMonitor.emit('on-battery');
+  });
+  await expect(voce(page, 'batteria')).toHaveAttribute('title', 'A batteria', { timeout: 2_000 });
+  await expect(voce(page, 'batteria')).toHaveText('79%', { timeout: 3_000 });
+  // Una lettura sola: con l'utente ancora fermo il lettore si riaddormenta al giro dopo.
+  await expect.poll(attivo, { timeout: giro * 2 + 3_000 }).toBe(false);
+
+  // Col computer bloccato l'avviso non sveglia niente: allo sblocco si rilegge comunque.
+  await app.evaluate(({ powerMonitor }) => { powerMonitor.emit('lock-screen'); });
+  await app.evaluate(({ powerMonitor }) => { powerMonitor.emit('on-ac'); });
+  expect(await attivo()).toBe(false);
+  await app.evaluate(({ powerMonitor }) => { powerMonitor.emit('unlock-screen'); });
+  await app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.inattivita());
+});
+
 test('dopo una pausa del lettore, se la lettura nuova tarda, la chat non riceve lo stato di prima come letto adesso', async ({ app, openTab, testServer }) => {
   await finto(app, { ...PIENO, batteria: { livello: 80, inCarica: true, collegata: true } });
   // La home va dietro un sito e il lettore si ferma; intanto il caricatore si stacca e il computer risponde lento.

@@ -161,7 +161,7 @@ module.exports = function register(on, ctx) {
     }
     Sistema.richiedi({ davanti, chi: sender && sender.wc, segue });
     // La pagina che ha visto cadere o tornare la rete non aspetta il giro: la lettura nuova arriva con l'annuncio.
-    if (davanti && segue && msg && msg.subito === true) Sistema.leggiAdesso();
+    if (davanti && segue && msg && msg.subito === true) Sistema.leggiUnaVolta();
     return { ok: true, stato: Sistema.stato() };
   }));
 
