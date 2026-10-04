@@ -112,15 +112,21 @@ function doShow(parentWin, text, x, y) {
 }
 
 function showTooltip(parentWin, text, x, y) {
-  ensureWin(parentWin);
-  if (!tipReady) {
-    pendingShow = { text, x, y };
-    return;
-  }
-  doShow(parentWin, text, x, y);
+  const mio = ++giro;
+  quandoSparita(parentWin, () => {
+    // Nascosto o sostituito mentre aspettava la carta: non compare più.
+    if (mio !== giro || !parentWin || parentWin.isDestroyed()) return;
+    ensureWin(parentWin);
+    if (!tipReady) {
+      pendingShow = { text, x, y };
+      return;
+    }
+    doShow(parentWin, text, x, y);
+  });
 }
 
 function hideTooltip() {
+  giro++;
   if (tipWin && !tipWin.isDestroyed() && tipWin.isVisible()) tipWin.hide();
   pendingShow = null;
 }
