@@ -484,8 +484,11 @@ async function nominaDaSolo(rec) {
   if (!NF || scopeOf(rec) || rec.exe || !rec.savePath) return;
   if (!NF.tipoDi(rec.filename) || !NF.nomeSenzaSenso(rec.filename)) return;
   const Nomi = require('./nomiFile');
-  const p = await Nomi.proponi(rec.savePath);
+  const letto = rec.savePath;
+  const p = await Nomi.proponi(letto);
   if (!records.has(rec.id) || rec.state !== 'completed') return;
+  // Un nome dato dall'utente mentre il modello leggeva vince sempre su quello automatico.
+  if (rec.savePath !== letto) return;
   if (!p.ok) {
     // Senza modello, o col modello che non risponde, l'utente che ha acceso la funzione deve saperlo.
     if (p.errore === 'modello' && !avvisatoSenzaNome) {
