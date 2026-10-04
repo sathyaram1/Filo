@@ -930,7 +930,7 @@ module.exports = function register(on, ctx) {
       if (msg.lista !== true) return { ok: true, rows, complete };
       scheduleViewSync({ rows });
       const w = liveWatcherDi();
-      if (w && complete) w.allineato(startedAt);
+      if (w && complete) w.allineato(startedAt, rows);
       return { ok: true, rows: await mergeCardFields(rows), complete };
     }
     if (op !== 'list' && op !== 'versions') return { ok: false, error: `lettura non prevista: ${op}` };
@@ -998,7 +998,7 @@ module.exports = function register(on, ctx) {
       listChangedSince: async ({ since }) => {
         const out = await FB.listChangedSince({ since, timeoutMs: 20000, idToken: await liveToken(), fields: campi });
         const rows = await mergeCardFields(out.rows, { mirate: true });
-        return { rows, complete: out.complete };
+        return { rows, complete: out.complete, readTime: out.readTime };
       },
     });
     return liveWatcher;

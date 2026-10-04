@@ -255,7 +255,7 @@
     const motivo = (e) => (e && e.message ? e.message : String(e));
 
     // Il confine della domanda si prende dall'ora del SERVER (commit visti, ora della lettura), mai da quella del PC:
-    // un PC avanti di tre minuti non vedeva più niente (verifica locale letture-delta, r2). Il PC solo finché manca.
+    // un PC avanti di tre minuti non vedeva più niente (#676). Il PC solo finché manca.
     let oraServer = 0;
     function oraDi(r) {
       const t = Date.parse(r && r._updateTime);
@@ -429,14 +429,15 @@
       // Una pagina ha appena letto tutto: vale come riallineamento. Il cursore
       // però non torna avanti se c'era già: una Gestione nascosta da ore deve
       // ricevere al rientro quello che è cambiato mentre non guardava.
-      allineato(at) {
+      // `righe`: quelle appena lette, per prendere l'ora del server se il giro non ce l'ha ancora.
+      allineato(at, righe) {
         const t = Number(at) || now();
         lastReconcileAt = Math.max(lastReconcileAt, t);
-        if (!lastTickAt) lastTickAt = t;
+        if (!lastTickAt) { lastTickAt = t; if (!oraServer) vedi(righe); }
       },
       forceReconcile() { lastReconcileAt = 0; },
       seguitiDalRegistro() { return Array.from(daRegistro.keys()); },
-      _state() { return { lastTickAt, lastReconcileAt, inviiVisti }; },
+      _state() { return { lastTickAt, lastReconcileAt, inviiVisti, oraServer }; },
     };
   }
 

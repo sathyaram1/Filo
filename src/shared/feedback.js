@@ -1354,11 +1354,14 @@
     const visti = new Set();
     let cursor = after || null;
     let complete = false;
+    let readTime = '';
     for (let page = 0; page < Math.max(1, Number(maxPages) || ALL_PAGES_MAX); page += 1) {
       const porta = (global.SN_FEEDBACK && global.SN_FEEDBACK.listChangedDirect) || listChangedDirect;
       // eslint-disable-next-line no-await-in-loop
       const batch = await porta({ since, after: cursor, pageSize: limit, timeoutMs, idToken, fields });
       const arr = Array.isArray(batch) ? batch : [];
+      // La prima pagina: quello scritto dopo può mancare alle pagine successive, mai al giro dopo.
+      if (page === 0 && batch && batch.readTime) readTime = String(batch.readTime);
       let nuove = 0;
       for (const r of arr) {
         const id = String((r && r._id) || '');
@@ -1373,7 +1376,7 @@
       if (arr.length < limit || nuove === 0 || !nome) { complete = true; break; }
       cursor = { at: String((ultima && ultima.updatedAt) || since), name: nome };
     }
-    return { rows, complete };
+    return { rows, complete, readTime };
   }
 
   // Legge i documenti indicati (interi) in UNA richiesta (batchGet). Ritorna
@@ -1682,9 +1685,13 @@
     }
     const arr = await res.json();
     const out = [];
+    let readTime = '';
     for (const row of Array.isArray(arr) ? arr : []) {
       if (row && row.document) out.push(fsDocToObject(row.document));
+      if (!readTime && row && row.readTime) readTime = String(row.readTime);
     }
+    // L'ora del server della lettura, fuori dalle righe: il giro dei cambiati ci prende il confine (#676).
+    if (readTime) Object.defineProperty(out, 'readTime', { value: readTime, enumerable: false });
     return out;
   }
 
