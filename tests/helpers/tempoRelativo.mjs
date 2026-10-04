@@ -25,7 +25,8 @@ function misura(fn, ora) {
 /**
  * Quante unità costa `op`, misurata fra due unità di riferimento (vale la più lenta, che ha visto lo stesso carico).
  * Si ripete solo se il giro supera `tetto`, fino a `giri` volte, e vale il giro migliore: un'operazione lenta lo è a
- * ogni giro, un carico passeggero no.
+ * ogni giro, un carico passeggero no. Un'operazione che ricorda il proprio input va rifatta su un input nuovo a ogni
+ * giro, o dal secondo si misura la memoria.
  */
 export function costoInUnita(op, { tetto = Infinity, giri = GIRI, ora = () => performance.now(), riferimento = unitaDiRiferimento } = {}) {
   let migliore = { unita: Infinity, ms: 0, msRif: 0 };

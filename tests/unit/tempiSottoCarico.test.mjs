@@ -17,7 +17,7 @@ const NUMERO = String.raw`\d[\d_]*(?:\.\d+)?(?:e\d+)?`;
 const INIZIO = /\b(?:const|let|var)\s+(\w+)\s*=\s*(?:Date|performance)\.now\(\)/g;
 
 /** Le righe in cui un tempo misurato senza `await` in mezzo (un timer atteso misura il timer) finisce contro un numero. */
-export function confrontiFissi(testo) {
+function confrontiFissi(testo) {
   const righe = new Set();
   const riga = (i) => testo.slice(0, i).split('\n').length;
   for (const m of testo.matchAll(INIZIO)) {
