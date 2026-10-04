@@ -92,6 +92,10 @@ function parseFrontMatter(raw) {
 function renderInline(text, sources) {
   let out = escapeHtml(text);
 
+  // Un comando da copiare (`…`) si mette da parte prima di link e grassetto: dentro non vale nessun altro segno.
+  const codici = [];
+  out = out.replace(/`([^`]+)`/g, (_all, c) => `${codici.push(c) - 1}`);
+
   out = out.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_all, label, url) => {
     const clean = url.replace(/&amp;/g, '&');
     let idx = sources.findIndex((s) => s.url === clean);
