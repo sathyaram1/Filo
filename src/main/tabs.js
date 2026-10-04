@@ -2344,8 +2344,14 @@ class TabManager {
       // MAI, quindi resta a about:blank). Il flag protegge dal chiuderla per
       // sbaglio se poi parte un download da una pagina che ha già contenuto.
       tab._everNavigated = true;
-      // Il testo letto è della pagina di prima: sotto l'indirizzo nuovo partirebbe col suo nome (#1004).
+      // Testo e titolo letti sono della pagina di prima: sotto l'indirizzo nuovo partirebbero col suo nome (#1004).
+      // Una pagina senza titolo non lo cambia mai: vale quello del documento nuovo, cioè l'indirizzo, come negli altri browser.
       tab.contentExtract = '';
+      if (/^https?:\/\//i.test(url || '')) {
+        let nuovo = '';
+        try { nuovo = wc.getTitle() || ''; } catch (_) {}
+        tab.title = nuovo || userUrl(url);
+      }
       if (tab.view && tab.view.webContents === wc) this.anteprime.navigata(tab);
       if (tab._vistaNuova && tab._vistaNuova.wc === wc) tab._vistaNuova = null;
       this._sostituisciVoceBloccata(wc, url);
