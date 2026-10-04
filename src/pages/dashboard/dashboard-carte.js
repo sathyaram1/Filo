@@ -361,7 +361,7 @@
     return {
       stato: m ? (mazzi.length ? plurale(mazzi.length, 'mazzo', 'mazzi') : 'nessun mazzo') : '…',
       voci,
-      principale: { etichetta: mazzi.length ? 'Apri i Mazzi' : 'Nuovo mazzo', fai: () => apri(URL_MAZZI) },
+      principale: mazzi.length ? { etichetta: 'Apri i Mazzi', fai: () => apri(URL_MAZZI) } : { etichetta: 'Nuovo mazzo', fai: nuovoMazzo },
       apri: () => apri(URL_MAZZI),
       filo: mazzi.length ? `Hai ${plurale(mazzi.length, 'mazzo', 'mazzi')}${nomi ? `: ${nomi}` : ''}.` : 'Non hai ancora nessun mazzo.',
     };
