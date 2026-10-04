@@ -295,6 +295,7 @@
         + '• ore_inattivita: numero 1-168 (dopo quante ore archiviare)\n'
         + `• modalita_terminale: true | false [conferma] ; shell_terminale: ${sistemaInfo(sistema).shellPref} [conferma]\n`
         + '• nomi_sensati_scaricamenti: true | false [conferma] (nome sensato da solo ai file scaricati col nome che non dice niente)\n'
+        + '• leggere_schede: true | false [conferma] (Filo legge e guida le schede aperte, la posta di Gmail compresa)\n'
         + '• velocita_voce: numero 0.5-2 ; tono_voce: numero 0-2 (lettura ad alta voce)\n'
         + '• durata_notifiche: secondi 0-120 (quanto restano gli avvisi in basso a destra, nella barra e nelle pagine; quelli brevi e quelli con un pulsante restano in proporzione; 0 = finché l\'utente non li chiude)\n'
         + '• suono_notifiche: true | false | "standard" | "delicata" | "urgente" | "carillon" (suono degli avvisi della barra; un tono lo accende con quel tono)\n'
