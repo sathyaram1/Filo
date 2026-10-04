@@ -143,3 +143,41 @@ test('il backup rimette le voci che mancano, senza doppioni, e svuota le toglie 
   assert.deepEqual((await M.elenco()).map((v) => v.id).sort(), prima.map((v) => v.id).sort());
   assert.equal((await M.elenco()).find((v) => v.id === 'sub-1').risposta, 'Adesso salva.');
 });
+
+test('l\'annuncio di una segnalazione più vecchia dell\'elenco la fa entrare; una più recente tolta dall\'utente non torna', async () => {
+  await M.elenco();
+  const nato = Date.parse(readFileSync(join(cartella(), 'nato-il.txt'), 'utf8').trim());
+  assert.ok(Number.isFinite(nato));
+  const prima = new Date(nato - 86_400_000).toISOString();
+  const dopo = new Date(nato + 60_000).toISOString();
+
+  await M.chiusa('fbVecchia', { stato: 'risolta', creataIl: prima, num: '640', titolo: 'Il download si fermava', risposta: 'Riprende da solo.' });
+  const v = (await M.elenco()).find((x) => x.id === 'fbVecchia');
+  assert.equal(v.stato, 'risolta');
+  assert.equal(v.num, '640');
+  assert.equal(v.titolo, 'Il download si fermava');
+  assert.equal(v.risposta, 'Riprende da solo.');
+  assert.equal(v.creataIl, prima);
+
+  await M.chiusa('fbTolta', { stato: 'risolta', creataIl: dopo, titolo: 'Tolta' });
+  await M.chiusa('fbSenzaData', { stato: 'chiusa', titolo: 'Senza data' });
+  await Disco.runIncognito(() => M.chiusa('fbDaIncognito', { stato: 'risolta', creataIl: prima }));
+  const ids = (await M.elenco()).map((x) => x.id);
+  assert.ok(!ids.includes('fbTolta') && !ids.includes('fbSenzaData') && !ids.includes('fbDaIncognito'));
+
+  // La data di nascita regge il riavvio: non si sposta in avanti a ogni avvio.
+  M = avvia();
+  await M.elenco();
+  assert.equal(Date.parse(readFileSync(join(cartella(), 'nato-il.txt'), 'utf8').trim()), nato);
+});
+
+test('chi aveva già segnalato lo sa il registro dei numeri', async () => {
+  globalThis.SN_FEEDBACK_MINE = { leggi: async () => ({ ids: [], ereditaFinoA: 0 }) };
+  assert.equal(await M.haPrecedenti(), false);
+  globalThis.SN_FEEDBACK_MINE = { leggi: async () => ({ ids: ['fbX'], ereditaFinoA: 0 }) };
+  assert.equal(await M.haPrecedenti(), true);
+  globalThis.SN_FEEDBACK_MINE = { leggi: async () => ({ ids: [], ereditaFinoA: Date.now() + 1000 }) };
+  assert.equal(await M.haPrecedenti(), true);
+  delete globalThis.SN_FEEDBACK_MINE;
+  assert.equal(await M.haPrecedenti(), false);
+});

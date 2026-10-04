@@ -212,6 +212,45 @@ test('chi non gestisce i feedback, dalla loro pagina, arriva alle sue segnalazio
   await expect(posta.locator('#bdMieVuoto')).toBeVisible();
 });
 
+test('una segnalazione mandata prima dell\'elenco: la sezione non dice che non ce ne sono, e all\'annuncio entra «risolta»', async ({ app, shell, openTab }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  // Chi aggiorna: Filo conosce il numero della segnalazione, la copia locale no.
+  await app.evaluate(async () => {
+    const fresh = globalThis.SN_CREDITS.freshState();
+    fresh.lastAutoFeedbackBonusDate = globalThis.SN_CREDITS.dateKey();
+    await globalThis.SN_CREDITS.writeState(fresh);
+    await globalThis.chrome.storage.local.set({ sn_feedback_client_id: 'cid-tester-di-settembre' });
+    await globalThis.SN_FEEDBACK_MINE.ricordaId('fbDoc-vecchia');
+  });
+
+  const bacheca = await openTab(`${BACHECA}#segnalazioni`);
+  await expect(bacheca.locator('#bdMieVuoto')).toBeVisible();
+  await expect(bacheca.locator('#bdMieVuoto')).not.toContainText('non hai ancora mandato');
+
+  await app.evaluate(async () => {
+    const r = await globalThis.chrome.storage.local.get('sn_feedback_client_id');
+    const H = globalThis.SN_FEEDBACK_CLIENT_ID_HASH;
+    const tag = await H.cardTag('fbDoc-vecchia', await H.hashClientId(r.sn_feedback_client_id));
+    const schede = [{
+      _id: 'fbDoc-vecchia', clientIdTag: tag, status: 'done', statusPublic: 'closed', createdAt: '2026-09-12T10:00:00.000Z',
+      name: 'Il download si fermava', seq: 640, subSeq: 0, userNote: 'Adesso riprende da solo.',
+    }];
+    globalThis.SN_FEEDBACK.getManyPublic = async (ids) => schede.filter((c) => (ids || []).includes(c._id));
+    globalThis.SN_FEEDBACK.listPublic = async () => schede;
+  });
+  const home = app.windows().find((w) => w.url().startsWith('filo://newtab'));
+  await home.reload();
+  await expect(home.locator('#thanksOverlay')).toBeVisible({ timeout: 15_000 });
+
+  const riga = righe(bacheca);
+  await expect(riga).toHaveCount(1);
+  await expect(riga.first().locator('.bd-mia-titolo')).toHaveText('#640 Il download si fermava');
+  await expect(riga.first().locator('.bd-mia-stato')).toHaveText('risolta');
+  await expect(riga.first().locator('.bd-mia-sub')).toContainText('2026');
+  await riga.first().locator('.bd-mia-testa').click();
+  await expect(riga.first().locator('.bd-mia-risposta')).toHaveText('Risposta: Adesso riprende da solo.');
+});
+
 // ── Riavvio: la stessa cartella dati in tre avvii ──────────────────────────────
 async function avvia(userData) {
   const app = await electron.launch({

@@ -19,6 +19,7 @@
 
   let tutte = location.hash === '#segnalazioni';
   let voci = [];
+  let precedenti = false;
   const righe = new Map();
   let giro = 0;
 
@@ -165,6 +166,10 @@
     sezione.hidden = !mostra;
     if (titoloMigliorie) titoloMigliorie.hidden = !mostra;
     vuoto.hidden = n > 0;
+    // Chi ha mandato segnalazioni prima che l'elenco esistesse non deve leggere che non ne ha mai mandate.
+    vuoto.textContent = precedenti
+      ? 'Quelle che hai mandato prima di questa versione compaiono qui quando vengono risolte.'
+      : 'Da questo computer non hai ancora mandato segnalazioni.';
     altre.hidden = n <= RECENTI;
     altre.textContent = tutte ? 'Solo le ultime' : `Tutte e ${n}`;
     altre.setAttribute('aria-expanded', String(tutte));
@@ -178,6 +183,7 @@
     // L'incognito non vede l'elenco: la sezione non compare, come se non ci fosse.
     if (!r || !r.ok || r.incognito) { sezione.hidden = true; if (titoloMigliorie) titoloMigliorie.hidden = true; return; }
     voci = Array.isArray(r.voci) ? r.voci : [];
+    precedenti = !!r.precedenti;
     disegna();
     if (location.hash === '#segnalazioni' && !carica.portata) {
       carica.portata = true;

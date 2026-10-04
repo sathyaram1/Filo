@@ -259,7 +259,7 @@ module.exports = function register(on, ctx) {
   const Mie = () => globalThis.SN_SEGNALAZIONI_MIE;
   on(MSG.SEGNALAZIONI_MIE_LIST, soloFilo(async () => {
     const voci = await Mie().elenco();
-    return voci ? { ok: true, voci } : { ok: true, voci: [], incognito: true };
+    return voci ? { ok: true, voci, precedenti: await Mie().haPrecedenti() } : { ok: true, voci: [], incognito: true };
   }));
   on(MSG.SEGNALAZIONI_MIE_TOGLI, soloFilo(async (msg) => ({ ok: true, voci: await Mie().togli(msg?.id) })));
 

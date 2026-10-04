@@ -79,12 +79,31 @@
     return Object.keys(patch).length ? patch : null;
   }
 
+  // Quando l'elenco è nato su questo computer: solo una segnalazione più vecchia può entrarci dopo l'invio (vedi `chiusa`).
+  const FILE_NASCITA = 'nato-il.txt';
+  let nataIl = 0;
+  function leggiNascita() {
+    const fs = require('node:fs');
+    const file = path.join(cartella(), FILE_NASCITA);
+    try {
+      const t = Date.parse(fs.readFileSync(file, 'utf8').trim());
+      if (Number.isFinite(t)) return t;
+    } catch (_) {}
+    const ora = Date.now();
+    try {
+      fs.mkdirSync(cartella(), { recursive: true });
+      fs.writeFileSync(file, new Date(ora).toISOString() + '\n', 'utf8');
+    } catch (_) {}
+    return ora;
+  }
+
   let apertura = null;
   function apri() {
     if (!apertura) {
       apertura = (async () => {
         const d = creaDeposito({ cartella: cartella(), meseDi });
         await d.carica();
+        nataIl = leggiNascita();
         return d;
       })();
       apertura.catch(() => { apertura = null; });
@@ -128,9 +147,32 @@
 
   const inviata = (id, dati) => aggiorna(perId(id), 'inviata', dati);
   const nonPartita = (id) => aggiorna(perId(id), 'non_partita');
-  /** L'annuncio all'avvio: `stato` è 'risolta' o 'chiusa' (archiviata o doppia, senza modifiche). */
-  const chiusa = (feedbackId, { stato, ...dati } = {}) =>
-    aggiorna(perFeedback(feedbackId), stato === 'chiusa' ? 'chiusa' : 'risolta', dati);
+  /**
+   * L'annuncio all'avvio: `stato` è 'risolta' o 'chiusa' (archiviata o doppia, senza modifiche).
+   * Una segnalazione mandata prima che l'elenco esistesse entra qui, coi dati dell'annuncio; una più recente che
+   * manca l'ha tolta l'utente, e non torna.
+   */
+  async function chiusa(feedbackId, { stato, creataIl, ...dati } = {}) {
+    const evento = stato === 'chiusa' ? 'chiusa' : 'risolta';
+    const d = await apri();
+    const fid = String(feedbackId || '');
+    if (!fid || perFeedback(fid)(d) || Disco.inIncognito()) return aggiorna(perFeedback(fid), evento, dati);
+    const quando = Date.parse(creataIl || '');
+    if (!Number.isFinite(quando) || quando >= nataIl) return null;
+    const v = voce({ id: fid, feedbackId: fid, creataIl, stato: 'inviata', num: dati.num, titolo: dati.titolo });
+    const patch = applica(v, evento, dati) || {};
+    const r = d.aggiungi({ ...v, ...patch }, { inCoda: true });
+    if (r) annuncia();
+    return r;
+  }
+
+  /** Questo computer aveva già mandato segnalazioni (il registro dei numeri le conosce)? */
+  async function haPrecedenti() {
+    try {
+      const reg = await global.SN_FEEDBACK_MINE?.leggi?.();
+      return !!(reg && ((Array.isArray(reg.ids) && reg.ids.length) || reg.ereditaFinoA));
+    } catch (_) { return false; }
+  }
 
   /** L'elenco, o null dall'incognito (che non lo vede). */
   async function elenco() {
@@ -165,7 +207,7 @@
   global.SN_SEGNALAZIONI_MIE = {
     CHIAVE_BACKUP, STATI,
     nomiAllegati, voce, applica,
-    registra, inviata, nonPartita, chiusa, elenco, togli, svuota, importa, cartella,
+    registra, inviata, nonPartita, chiusa, elenco, togli, svuota, importa, cartella, haPrecedenti,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
 

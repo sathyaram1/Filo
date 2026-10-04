@@ -368,6 +368,7 @@ module.exports = function register(on, ctx) {
         try {
           await globalThis.SN_SEGNALAZIONI_MIE?.chiusa?.(fid, {
             stato: annuncio.status === 'closed' ? 'chiusa' : 'risolta',
+            creataIl: f.createdAt,
             num: annuncio.num, titolo: annuncio.name, risposta: annuncio.explanation,
           });
         } catch (_) {}
