@@ -533,6 +533,16 @@
       'Il controllo della blacklist ufficiale di Google (phishing e malware) usa una chiave condivisa, ' +
       'gestita centralmente dall\'amministratore in "Modelli predefiniti": è già attiva per tutti gli ' +
       'account, non devi configurare nulla qui.',
+    // #1004 — pagine delicate
+    options_security_delicate: 'Non mandare ai modelli le pagine delicate',
+    options_security_delicate_desc:
+      'Posta, banca, sanità e le pagine dove hai visto un campo password o carta. Quando chiudi o ' +
+      'riordini queste schede, Filo ne tiene solo titolo e indirizzo e non manda il testo a nessun modello.',
+    options_security_delicate_sites_label:
+      'Altri siti delicati, uno per riga',
+    options_security_delicate_sites_invalid:
+      'Queste righe non sono domini validi e verranno ignorate (usa un dominio ' +
+      'con estensione, es. studiorossi.it): %s',
     // F4 — Feedback autonomo
     options_security_auto_feedback: 'Segnalazione automatica dei problemi',
     options_security_auto_feedback_desc:

@@ -45,6 +45,9 @@
     $('sec-dl-exe-label').textContent = I18n.t('options_security_downloads');
     $('sec-dl-exe-desc').textContent = I18n.t('options_security_downloads_desc');
     $('sec-dl-trusted-label').textContent = I18n.t('options_security_downloads_trusted_label');
+    $('sec-delicate-label').textContent = I18n.t('options_security_delicate');
+    $('sec-delicate-desc').textContent = I18n.t('options_security_delicate_desc');
+    $('sec-delicate-sites-label').textContent = I18n.t('options_security_delicate_sites_label');
     $('sec-p2p-box-title').textContent = I18n.t('options_security_p2p_box_title');
     $('sec-p2p-box-body').textContent = I18n.t('options_security_p2p_box_body');
     $('sec-proxy-box-title').textContent = I18n.t('options_security_proxy_box_title');
@@ -304,6 +307,11 @@
     $('sec-dl-trusted').value = righe(dl.trustedSites, dl.righeScartate);
     setTrustedError(parseBlacklist($('sec-dl-trusted').value).invalid);
     syncDownloadsEnabled();
+    const del = sec.pagineDelicate || {};
+    $('sec-delicate').checked = del.enabled !== false;
+    $('sec-delicate-sites').value = righe(del.siti, del.righeScartate);
+    setDelicateError(parseBlacklist($('sec-delicate-sites').value).invalid);
+    syncDelicateEnabled();
     const sb = sec.safeBrowse || {};
     $('sec-safebrowse').checked = sb.enabled !== false;
     $('sec-safebrowse-network').checked = sb.networkSignals !== false;
@@ -578,6 +586,27 @@
     $('sec-dl-trusted').disabled = !on;
   }
 
+  // Spenta la protezione, l'elenco resta lì ma non vale: si vede attenuato, come quello dei siti fidati.
+  function syncDelicateEnabled() {
+    const on = !!$('sec-delicate').checked;
+    const sub = $('sec-delicate-sub');
+    if (sub) sub.style.opacity = on ? '1' : '0.45';
+    $('sec-delicate-sites').disabled = !on;
+  }
+
+  // Una riga che non è un dominio non protegge niente, e chi l'ha scritta crede di sì.
+  function setDelicateError(invalidRows) {
+    const el = $('sec-delicate-sites-error');
+    if (!el) return;
+    if (invalidRows && invalidRows.length) {
+      el.textContent = I18n.t('options_security_delicate_sites_invalid', invalidRows.join(', '));
+      el.style.display = 'block';
+    } else {
+      el.textContent = '';
+      el.style.display = 'none';
+    }
+  }
+
   // Le righe scartate si dicono, come per la blacklist: un dominio scritto male
   // qui non allenta nessuna difesa, ma chi l'ha scritto crede di sì.
   function setTrustedError(invalidRows) {
@@ -650,6 +679,7 @@
     uscita() {
       setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
       setTrustedError(parseBlacklist($('sec-dl-trusted').value).invalid);
+      setDelicateError(parseBlacklist($('sec-delicate-sites').value).invalid);
       if (String($('cookie-wl-input').value || '').trim()) addWhitelistDomain({ fuoco: false });
     },
   });
@@ -665,6 +695,7 @@
   function leggiSicurezza() {
     const blocco = parseBlacklist($('sec-siteblock-blacklist').value);
     const fidati = parseBlacklist($('sec-dl-trusted').value);
+    const delicati = parseBlacklist($('sec-delicate-sites').value);
     return {
       protectIpLeak: !!$('sec-protect-ip').checked,
       blockPopups: !!$('sec-block-popups').checked,
@@ -687,6 +718,12 @@
         confirmExecutables: !!$('sec-dl-exe').checked,
         trustedSites: fidati.valid,
         righeScartate: fidati.scartate,
+      },
+      // #1004 — le pagine delicate e i siti che l'utente aggiunge all'elenco di serie.
+      pagineDelicate: {
+        enabled: !!$('sec-delicate').checked,
+        siti: delicati.valid,
+        righeScartate: delicati.scartate,
       },
       // F4 — Feedback autonomo: letto da maybeAutoFeedback nel main process.
       autoFeedback: !!$('sec-auto-feedback').checked,
@@ -718,6 +755,7 @@
     if (!(opts && opts.avvisi === false)) {
       setTrustedError(parseBlacklist($('sec-dl-trusted').value).invalid);
       setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
+      setDelicateError(parseBlacklist($('sec-delicate-sites').value).invalid);
     }
     const ora = leggiSicurezza();
     const cambi = soloCambiati(ora, mostrata);
@@ -756,11 +794,13 @@
     const pendenti = foglieDi(soloCambiati(leggiSicurezza(), mostrata));
     // Le righe scartate sono la metà non valida della stessa casella.
     const inSospeso = new Set(pendenti.map((p) => p.replace(/^siteBlock\.righeScartate$/, 'siteBlock.blacklist')
-      .replace(/^downloads\.righeScartate$/, 'downloads.trustedSites')));
+      .replace(/^downloads\.righeScartate$/, 'downloads.trustedSites')
+      .replace(/^pagineDelicate\.righeScartate$/, 'pagineDelicate.siti')));
     const sec = settings.security || {};
     const scartate = {
       'sec-siteblock-blacklist': (sec.siteBlock || {}).righeScartate,
       'sec-dl-trusted': (sec.downloads || {}).righeScartate,
+      'sec-delicate-sites': (sec.pagineDelicate || {}).righeScartate,
     };
     const toccati = Voci.riallineaPagina('security', settings, {
       // La casella dei siti fidati serve ad aggiungerne uno: l'elenco vero è sotto, e si riallinea qui dopo.
@@ -778,8 +818,10 @@
     }
     if (toccati.includes('sec-siteblock-blacklist')) setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
     if (toccati.includes('sec-dl-trusted')) setTrustedError(parseBlacklist($('sec-dl-trusted').value).invalid);
+    if (toccati.includes('sec-delicate-sites')) setDelicateError(parseBlacklist($('sec-delicate-sites').value).invalid);
     syncSiteBlockEnabled();
     syncDownloadsEnabled();
+    syncDelicateEnabled();
     syncSafebrowseEnabled();
     syncCookieMode();
     const ora = leggiSicurezza();
@@ -839,6 +881,9 @@
     $('sec-dl-exe').addEventListener('change', () => { syncDownloadsEnabled(); save(); });
     $('sec-dl-trusted').addEventListener('change', save);
     $('sec-dl-trusted').addEventListener('input', (e) => { setTrustedError([]); caselle.cambiato('liste', e); });
+    $('sec-delicate').addEventListener('change', () => { syncDelicateEnabled(); save(); });
+    $('sec-delicate-sites').addEventListener('change', save);
+    $('sec-delicate-sites').addEventListener('input', (e) => { setDelicateError([]); caselle.cambiato('liste', e); });
     $('sec-safebrowse').addEventListener('change', () => { syncSafebrowseEnabled(); save(); });
     $('sec-safebrowse-network').addEventListener('change', save);
     $('sec-safebrowse-llm').addEventListener('change', save);

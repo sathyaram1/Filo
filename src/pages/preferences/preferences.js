@@ -841,6 +841,7 @@
       case 'autoArchive.enabled': return $('autoArchiveEnabled').checked;
       case 'autoArchive.idleHours': return clampIdleHours(parseInt($('autoArchiveIdleHours').value, 10));
       case 'autoArchive.onClose': return $('autoArchiveOnClose').checked;
+      case 'riassuntoSchede.enabled': return $('riassuntoSchede').checked;
       case 'notifications.durationSec': return clampNotifDurationSec(parseInt($('notifDuration').value, 10));
       case 'notifications.soundEnabled': return $('notifSoundEnabled').checked;
       case 'notifications.sound': return $('notifSound').value || 'default';
@@ -880,6 +881,7 @@
       case 'autoArchive.enabled': return aa.enabled !== false;
       case 'autoArchive.idleHours': return clampIdleHours(Number(aa.idleHours) > 0 ? Number(aa.idleHours) : 6);
       case 'autoArchive.onClose': return aa.onClose !== false;
+      case 'riassuntoSchede.enabled': return !(s.riassuntoSchede && s.riassuntoSchede.enabled === false);
       case 'notifications.durationSec': return clampNotifDurationSec(Number.isFinite(dur) && dur >= 0 ? dur : 5);
       case 'notifications.soundEnabled': return notif.soundEnabled === true;
       case 'notifications.sound': return notif.sound || 'default';
@@ -971,6 +973,7 @@
     if (vuole('autoArchive.enabled')) $('autoArchiveEnabled').checked = aa.enabled !== false;
     if (vuole('autoArchive.onClose')) $('autoArchiveOnClose').checked = aa.onClose !== false;
     if (vuole('autoArchive.idleHours')) $('autoArchiveIdleHours').value = String(Number(aa.idleHours) > 0 ? Number(aa.idleHours) : 6);
+    if (vuole('riassuntoSchede.enabled')) $('riassuntoSchede').checked = !(settings.riassuntoSchede && settings.riassuntoSchede.enabled === false);
 
     const terminal = settings.terminal || {};
     if (vuole('terminal.enabled')) $('terminalEnabled').checked = terminal.enabled === true;
@@ -1210,6 +1213,7 @@
     // Al blur riallinea il campo al valore realmente salvato (clampato), così
     // un numero fuori scala non resta a schermo a mentire sul valore in uso.
     $('autoArchiveIdleHours').addEventListener('blur', canonAutoArchiveIdle);
+    $('riassuntoSchede').addEventListener('change', persist);
     $('terminalEnabled').addEventListener('change', persist);
     $('nomiSensatiScaricamenti').addEventListener('change', persist);
     $('terminalShell').addEventListener('change', persist);
