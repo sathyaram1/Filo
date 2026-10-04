@@ -40,6 +40,7 @@ const CARTELLA_DATI = {
   'auth.bin': { frase: 'la chiave dei crediti e il tuo accesso Google' },
   'segreti-letti.bin': { frase: 'E per un mese i segreti letti' },
   'archivio-schede': { frase: 'le schede aperte e quelle archiviate' },
+  'segnalazioni-mie': { frase: 'una copia delle segnalazioni che hai mandato' },
   filo: { frase: 'le chat, l\'elenco delle richieste fatte ai modelli' },
   quarantena: { frase: 'i download' },
   adblock: { frase: 'le liste per bloccare la pubblicità' },
