@@ -222,6 +222,7 @@ test('ogni controllo dentro la scheda ha il suo suggerimento di Filo, non il tit
     // Tornando sul titolo la carta torna e il suggerimento se ne va.
     await sulTitolo(id);
   }
+  expect(await app.evaluate(() => globalThis.__sopraLaCarta), 'suggerimenti comparsi con la carta ancora a schermo').toBe(0);
   // Oltre l'attesa del suggerimento: la carta non ha un doppione di testo sotto.
   await new Promise((r) => setTimeout(r, 600));
   expect(await scritte(app)).toEqual({ carta: titoli[casi.at(-1)[0]], suggerimento: null });
