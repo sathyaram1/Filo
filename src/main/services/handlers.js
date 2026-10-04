@@ -3175,6 +3175,10 @@ function toolResultText({ action, res, rendered }) {
       ? `Dimenticate:\n${nomiSalvati(res.output.dimenticate)}`
       : 'Nella memoria nessuna riga corrispondeva: niente da togliere. Non ripetere uguale: copia la riga com\'è nella memoria, o chiedi all\'utente quale intende.';
   }
+  if (type === 'TOGLI_PERMESSO_SITO' && res.executed && res.output && Array.isArray(res.output.tolte)) {
+    return `Tolte le risposte ricordate (il sito tornerà a chiedere):\n${nomiSalvati(res.output.tolte)}\n`
+      + 'Nella risposta di\' in una frase cosa hai tolto e che per ridarlo basta rispondere «Consenti» quando il sito lo richiede.';
+  }
   if (type === 'MODIFICA_SVEGLIA' && res.output && Array.isArray(res.output.updated)) {
     return res.output.updated.length ? `Spostate:\n${nomiSalvati(res.output.updated)}` : 'Nessuna sveglia o timer corrispondeva: niente da spostare. Non ripetere uguale: chiedi all\'utente quale intende.';
   }
@@ -3220,10 +3224,6 @@ function toolResultText({ action, res, rendered }) {
     if (type === 'IMPOSTA_PREFERENZA' || type === 'IMPOSTA_ESTETICA') {
       return `Eseguita: ${done}. Nella risposta di' in una frase cosa hai cambiato e che si rimette com'era con «annulla» `
         + 'sul segno accanto al messaggio dell\'utente, o chiedendolo a te.';
-    }
-    if (type === 'TOGLI_PERMESSO_SITO') {
-      return `Eseguita: ${done}. Nella risposta di' in una frase cosa hai tolto e che per ridarlo basta rispondere «Consenti» `
-        + 'quando il sito lo richiede.';
     }
     return `Eseguita: ${done}.`;
   }

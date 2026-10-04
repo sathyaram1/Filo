@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 globalThis.self = globalThis;
-for (const m of ['constants', 'contenutoEsterno', 'timeFormat', 'storage', 'themeTokens', 'tabColor', 'nomiSito',
+for (const m of ['constants', 'contenutoEsterno', 'timeFormat', 'storage', 'i18n', 'themeTokens', 'tabColor', 'nomiSito',
   'ttsVoices', 'filoMemory', 'preferences', 'cambi', 'actionLevels', 'actionTools', 'capabilities', 'vociImpostazioni']) {
   require(`../../src/shared/${m}.js`);
 }
@@ -80,10 +80,77 @@ test('nessuna voce punta a un controllo che la pagina non ha più', () => {
   for (const pagina of Object.keys(HTML)) {
     const ids = idsDi(pagina);
     const def = V.PAGINE[pagina];
-    for (const id of [...Object.keys(def.campi), ...Object.keys(def.gruppi), ...Object.keys(def.fuori)]) {
+    for (const id of [...Object.keys(def.campi), ...Object.keys(def.gruppi), ...Object.keys(def.altrove || {}), ...Object.keys(def.fuori)]) {
       assert.ok(ids.has(id), `${pagina}: la voce #${id} non esiste più in ${HTML[pagina]}`);
     }
   }
+});
+
+// Una sezione che la pagina costruisce da dati suoi (i permessi dei siti) non ha controlli nell'HTML: la si vede dai
+// canali che la pagina usa. Ognuno ha lo strumento della chat che fa lo stesso, o dice perché non serve.
+const JS = {
+  preferences: 'src/pages/preferences/preferences.js',
+  security: 'src/pages/security/security.js',
+  options: 'src/pages/options/options.js',
+  altro: 'src/pages/options/altro.js',
+};
+test('sentinella: ogni canale che una pagina delle impostazioni usa ha la sua strada dalla chat (o dice perché non serve)', () => {
+  for (const [pagina, file] of Object.entries(JS)) {
+    const src = fs.readFileSync(path.join(radice, file), 'utf8');
+    const usati = new Set([...src.matchAll(/type:\s*MSG\.([A-Z_]+)/g)].map((m) => m[1]));
+    usati.delete('UPDATE_SETTINGS');
+    const def = V.PAGINE[pagina].messaggi || {};
+    for (const m of usati) {
+      const via = def[m];
+      assert.ok(via, `${file}: il canale MSG.${m} non è fra i \`messaggi\` della pagina in src/shared/vociImpostazioni.js — la chat saprebbe leggere o cambiare quella parte?`);
+      if (/^[A-Z_]+$/.test(via)) assert.ok(Tools.NAMES.includes(via), `${pagina} MSG.${m}: lo strumento ${via} non esiste`);
+      else assert.ok(via.length > 20, `${pagina} MSG.${m}: un canale senza strumento dice perché`);
+    }
+    for (const m of Object.keys(def)) assert.ok(usati.has(m), `${pagina}: MSG.${m} è dichiarato ma la pagina non lo usa più`);
+  }
+});
+
+test('i permessi dei siti si leggono (anche cercando il permesso o il sito) e la riga dice come toglierli', () => {
+  const S = JSON.parse(JSON.stringify(C.DEFAULT_SETTINGS));
+  const altrove = { permessiSiti: ['meet.google.com · microfono: consentito', 'xn--mnchen-3ya.de · posizione: negato'] };
+  const riga = (r) => r.righe.find((x) => x.startsWith('- permessi dei siti')) || '';
+  for (const cerca of ['microfono', 'quali siti possono usare la fotocamera?', 'permessi dei siti', 'meet.google.com']) {
+    assert.match(riga(V.righePerModello(S, { cerca, altrove })), /2 voci.*meet\.google\.com · microfono: consentito, münchen\.de · posizione: negato.*\[TOGLI_PERMESSO_SITO/, cerca);
+  }
+  assert.match(riga(V.righePerModello(S, { altrove: { permessiSiti: [] } })), /: elenco vuoto \[/);
+  // Senza chi le tiene non si inventa un «nessuno».
+  assert.match(riga(V.righePerModello(S, {})), /: non letto \[/);
+});
+
+test('togliere un permesso dalla chat: per sito e sottodomini, per permesso o tutti; un permesso sconosciuto è un rifiuto', async () => {
+  const Perm = require('../../src/main/services/permessiPagine.js');
+  let salvato = null;
+  const disco = { get: async () => ({ sitePermissions: {
+    'https://meet.google.com|audio': true, 'https://meet.google.com|video': true,
+    'https://www.example.com|posizione': false, 'https://altro.it|notifiche': true,
+  } }), set: async (o) => { salvato = o; } };
+  Perm._usaDisco(disco);
+  await Perm.carica();
+  assert.deepEqual(Perm.righeRicordate(), ['altro.it · notifiche: consentito', 'www.example.com · posizione: negato',
+    'meet.google.com · microfono: consentito', 'meet.google.com · fotocamera: consentito']);
+  const r = Perm.togliPerChat('https://meet.google.com/abc-def', 'microfono');
+  assert.deepEqual(r.tolte, ['meet.google.com · microfono: consentito']);
+  assert.ok(Object.keys(salvato.sitePermissions).includes('https://meet.google.com|video'));
+  assert.ok(!Object.keys(salvato.sitePermissions).includes('https://meet.google.com|audio'));
+  assert.deepEqual(Perm.togliPerChat('example.com', '').tolte, ['www.example.com · posizione: negato']);
+  assert.deepEqual(Perm.togliPerChat('google.com', 'fotocamera').tolte, ['meet.google.com · fotocamera: consentito']);
+  assert.deepEqual(Perm.togliPerChat('altro.it', 'microfono').tolte, []);
+  assert.match(Perm.togliPerChat('altro.it', 'telepatia').errore, /non è un permesso/);
+  assert.match(Perm.togliPerChat('', 'microfono').errore, /non è un sito/);
+  assert.equal(globalThis.SN_ACTION_LEVELS.levelFor({ type: 'TOGLI_PERMESSO_SITO', sito: 'a.it' }), 1);
+  const { azioneAmmessaDa } = require('../../src/main/services/impostazioniPerOrigine.js');
+  assert.equal(azioneAmmessaDa({ type: 'TOGLI_PERMESSO_SITO', sito: 'a.it' }, 'https://esempio.it/'), false);
+});
+
+test('una voce naturale scritta a mano, come nella pagina, si imposta anche a parole', () => {
+  assert.deepEqual(P.buildPreferencePartial('voce_modello', 'Giulia').partial, { tts: { modelVoice: 'Giulia' } });
+  assert.equal(P.buildPreferencePartial('voce_modello', 'Sara').partial.tts.modelVoice, 'if_sara');
+  assert.match(P.buildPreferencePartial('voce_modello', 'x'.repeat(201)).rifiuto, /201 caratteri e il massimo è 200/);
 });
 
 test('sentinella: ogni voce delle pagine si cambia dalla chat, e la chiave la scrive davvero', () => {

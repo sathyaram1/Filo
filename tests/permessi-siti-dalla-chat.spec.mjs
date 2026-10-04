@@ -114,7 +114,8 @@ test('«quali siti possono usare il microfono?» risponde il vero, «togli il mi
   ]);
   await scrivi(chat, 'togli il microfono a meet.google.com');
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'Tolto.' })).toBeVisible({ timeout: 10_000 });
-  await expect(chat.getByText('Permesso tolto · meet.google.com · microfono: consentito')).toBeVisible({ timeout: 5_000 });
+  // La riga del diario («Come ha lavorato») dice cosa è stato tolto.
+  await expect(chat.getByText('Permesso tolto · meet.google.com · microfono: consentito')).toBeAttached({ timeout: 5_000 });
   const esito = (await app.evaluate(() => globalThis.__perm_tool)).pop() || '';
   expect(esito).toContain('il sito tornerà a chiedere');
   const salvate = await app.evaluate(async () => globalThis.SN_STORAGE.getRaw('sitePermissions'));

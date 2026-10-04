@@ -370,7 +370,7 @@ function rigaScelta(s) {
 function righeRicordate() {
   return scelteRicordate().map(rigaScelta);
 }
-// «meet.google.com», «https://www.meet.google.com/abc», «münchen.de» → il nome del sito con cui si confronta.
+// Un sito scritto come capita (con «www.», con l'indirizzo intero, accentato) → il nome con cui si confronta.
 function hostDaTesto(raw) {
   let t = String(raw || '').trim().toLowerCase().replace(/^["'«(]+|["'»),.;]+$/g, '');
   if (!t) return '';
