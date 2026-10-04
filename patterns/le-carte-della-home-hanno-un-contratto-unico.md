@@ -51,6 +51,12 @@ un file scaricato) viaggia con la sua provenienza, come l'esito di un comando.
   di Filo, un comando del terminale) e li annuncia; `lavoriAltrove` decide quali sono carte (dopo qualche
   secondo, mai quello della conversazione che guarda: per la chat la richiesta in corso non è una carta), e
   «Vai» porta alla conversazione che li fa.
+- **L'incognito ha le sue carte.** Un lavoro porta l'ambito della sua finestra (lo stesso degli scaricamenti) e
+  ogni pagina riceve solo quelli del suo; una mossa fatta in incognito si annuncia solo alle finestre incognito,
+  perché lì la disposizione vive in memoria. Un annuncio che dipende dalla finestra passa a
+  `broadcastToFiloPages` una funzione dell'ambito, non un messaggio unico.
+- **Una voce dentro una carta ha il suo tasto destro.** Un documento, un mazzo, un suggerimento: «Apri» quella
+  voce e «Apri nel filo» con la sua frase; il menu della carta resta sul resto della carta.
 - **Una carta nuova si aggiunge al catalogo.** `CARTE` e `APP` in `src/shared/carteHome.js`: chi aveva
   già salvato una disposizione la ritrova in fondo a destra, perché tolte sono solo quelle tolte da lui.
   Colori e misure passano dai token `--dash-*`

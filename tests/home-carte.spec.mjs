@@ -458,3 +458,93 @@ test('una carta di sinistra che non si trova: Filo riceve tutte le carte con la 
   expect(esito).toContain('"altro":["Mazzi"]');
   expect(esito).not.toMatch(/destra[^\]]*Mazzi/);
 });
+
+// La finestra incognito ha le sue carte: i suoi lavori e le sue mosse non arrivano alla finestra normale.
+async function homeIncognito(app, shell, normale) {
+  await shell.evaluate(() => window.filoShell.openIncognito());
+  const scadenza = Date.now() + 15_000;
+  let inc = null;
+  while (!inc && Date.now() < scadenza) {
+    inc = app.windows().find((w) => { try { return w !== normale && w.url().startsWith('filo://newtab'); } catch (_) { return false; } });
+    if (!inc) await new Promise((r) => setTimeout(r, 100));
+  }
+  await inc.waitForLoadState('domcontentloaded');
+  await expect(inc.locator('#tieni .dash-carta').first()).toBeVisible({ timeout: 10_000 });
+  const inIncognito = await app.evaluate(({ webContents, session }) => webContents.getAllWebContents()
+    .filter((wc) => wc.getURL().startsWith('filo://newtab') && wc.session !== session.defaultSession).length);
+  expect(inIncognito).toBe(1);
+  return inc;
+}
+
+test('la domanda fatta in incognito non compare fra le carte della finestra normale', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  const normale = await home(app);
+  await modelloFinto(app, [{ testo: 'Ecco.' }], 12_000);
+  const inc = await homeIncognito(app, shell, normale);
+  await inc.locator('#input').fill('sintomi della malattia di cui non voglio si sappia');
+  await inc.locator('#sendBtn').click();
+  await normale.waitForTimeout(5_000);
+  await expect(normale.locator('#accade')).not.toContainText('sintomi della malattia');
+  await expect(normale.locator('#accade .dash-carta[data-tipo="lavoro"]')).toHaveCount(0);
+  const lavoriNormale = await normale.evaluate(() => new Promise((ok) => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.LAVORI_IN_CORSO }, ok)));
+  expect(lavoriNormale.lavori).toEqual([]);
+});
+
+test('una carta tolta in incognito non cambia la home della finestra normale', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  const normale = await home(app);
+  const inc = await homeIncognito(app, shell, normale);
+  await inc.locator('#tieni .dash-carta[data-tipo="mazzi"]').click({ button: 'right' });
+  await inc.locator('.dash-menu .dash-menu-voce', { hasText: 'Togli dalla home' }).click();
+  await expect(inc.locator('#tieni .dash-carta[data-tipo="mazzi"]')).toHaveCount(0);
+  await normale.waitForTimeout(1_000);
+  await expect(normale.locator('#tieni .dash-carta[data-tipo="mazzi"]')).toHaveCount(1);
+});
+
+test('tasto destro su un documento della carta: il menu è di quel documento', async ({ app }) => {
+  test.setTimeout(45_000);
+  const page = await home(app);
+  await app.evaluate(async () => {
+    const q = new Date().toISOString();
+    const file = (id, title) => ({ id, meta: { title, created: q, modified: q, version: 1 }, modules: [], content: {} });
+    await chrome.storage.local.set({ 'filo.editor.collection': { version: 1, activeId: 'a', files: [file('a', 'Lettera al condominio'), file('b', 'Ricette')] } });
+  });
+  await page.reload();
+  await home(app);
+  const voce = page.locator('#tieni .dash-carta[data-tipo="editor"] .dash-carta-voce', { hasText: 'Ricette' });
+  await voce.click({ button: 'right' });
+  const menu = page.locator('.dash-menu');
+  await expect(menu.locator('.dash-menu-voce')).toHaveText(['Apri «Ricette»', 'Apri nel filo']);
+  await menu.locator('.dash-menu-voce', { hasText: 'Apri nel filo' }).click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Il documento «Ricette» è nell’Editor' })).toBeVisible();
+  await voce.focus();
+  await page.keyboard.press('Shift+F10');
+  await expect(menu.locator('.dash-menu-voce').first()).toHaveText('Apri «Ricette»');
+  await page.keyboard.press('Enter');
+  const ed = await finestraCon(app, 'filo://editor/editor.html');
+  expect(ed.url()).toContain('file=b');
+});
+
+test('la stessa carta aperta due volte nel filo non ripete la frase', async ({ app }) => {
+  test.setTimeout(45_000);
+  const page = await home(app);
+  await app.evaluate(async () => { await globalThis.SN_FILO_MEMORY.addNotification({ kind: 'info', text: 'Il backup delle foto è finito.' }); });
+  await page.reload();
+  await home(app);
+  const avviso = page.locator('#accade .dash-carta[data-tipo="avviso"]');
+  await avviso.click({ position: { x: 30, y: 12 } });
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'backup delle foto' })).toHaveCount(1);
+  await avviso.click({ position: { x: 30, y: 12 } });
+  await page.waitForTimeout(400);
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'backup delle foto' })).toHaveCount(1);
+});
+
+test('«Nuovo mazzo» sulla carta vuota apre un mazzo nuovo', async ({ app }) => {
+  const page = await home(app);
+  const bott = page.locator('#tieni .dash-carta[data-tipo="mazzi"] .dash-carta-az.principale');
+  await expect(bott).toHaveText('Nuovo mazzo');
+  await bott.dblclick();
+  const mazzi = await finestraCon(app, 'filo://decks/');
+  await expect.poll(() => mazzi.url(), { timeout: 8_000 }).toContain('#/deck/');
+  await expect(page.locator('#tieni .dash-carta[data-tipo="mazzi"] .dash-carta-stato')).toHaveText('1 mazzo');
+});
