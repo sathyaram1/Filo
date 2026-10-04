@@ -1,9 +1,6 @@
-// Il giro al minuto della dashboard non si fida di una data scritta a mano
-// (#676). `updatedAt` lo firma chi scrive: il server delle routine non lo
-// firma affatto, e una macchina con l'orologio indietro lo firma nel passato.
-// Qui si verifica che la dashboard veda lo stesso il cambiamento, grazie ai due
-// segni che nessun orologio tocca: l'ora d'ultima scrittura che tiene Firestore
-// (per i feedback che la pagina sta seguendo) e il contatore degli invii.
+// Il giro della Gestione quando chi scrive non firma l'ora (#676): l'ora di
+// Firestore dei seguiti, il contatore degli invii, il registro dei worker
+// (#676.1) e il tetto dei seguiti (#676.2). Senza rete.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,306 +12,240 @@ const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC = join(__dirname, '..', '..', 'src', 'shared');
 require(join(SRC, 'feedbackLive.js'));
+require(join(SRC, 'feedback.js'));
+const FB = globalThis.SN_FEEDBACK;
 const LIVE = globalThis.SN_FEEDBACK_LIVE;
 
-/**
- * Un giro con le due sorgenti senza orologio collegate. `mondo` tiene l'ora
- * vera di Firestore per ciascun feedback e il contatore degli invii; le prove
- * la cambiano come farebbe una scrittura che non firma niente.
- */
-function giro(mondo) {
-  const log = { versioni: 0, cambiati: 0, versionsOf: 0, letti: [], avvisi: [], lamentele: [], contatori: 0 };
+// Un mondo finto: `ore` è l'ora di Firestore per id, `registro` il registro dei
+// worker (o un Error se illeggibile), `numeri` num → id.
+function giro(mondo, extra = {}) {
+  const log = { versioni: 0, cambiati: 0, versionsOf: [], letti: [], numeri: [], registro: 0 };
   let t = 1_000_000;
   const w = LIVE.makeWatcher({
     now: () => t,
-    pageSize: 100,
-    broadcast: (m) => log.avvisi.push(m),
-    onWarn: (m) => log.lamentele.push(String(m)),
     listVersions: async () => {
       log.versioni += 1;
-      return Object.entries(mondo.ore).map(([id, _updateTime]) => ({
-        _id: id, _updateTime, createdAt: '2026-09-01T00:00:00Z',
-      }));
+      return { versions: Object.entries(mondo.ore).map(([_id, _updateTime]) => ({ _id, _updateTime })), complete: true };
     },
-    listChangedSince: async () => {
-      log.cambiati += 1;
-      return { rows: (mondo.cambiati || []).slice(), complete: true };
-    },
-    seguiti: () => mondo.seguiti,
+    listChangedSince: async () => { log.cambiati += 1; return { rows: mondo.cambiati || [], complete: true }; },
+    seguiti: () => mondo.seguiti || [],
     versionsOf: async (ids) => {
-      log.versionsOf += 1;
-      log.ultimiChiesti = ids.slice();
-      return ids.filter((id) => mondo.ore[id]).map((id) => ({ _id: id, _updateTime: mondo.ore[id] }));
+      log.versionsOf.push(ids.slice());
+      return ids.filter((id) => id in mondo.ore).map((id) => ({ _id: id, _updateTime: mondo.ore[id] }));
     },
     readRows: async (ids) => {
       log.letti.push(ids.slice());
-      if (mondo.letturaRotta) throw new Error('rilettura non riuscita');
-      return ids.map((id) => ({ _id: id, _updateTime: mondo.ore[id], createdAt: '2026-09-01T00:00:00Z' }));
+      if (mondo.rotta) throw new Error('rete');
+      return ids.map((id) => ({ _id: id, _updateTime: mondo.ore[id], name: `nome ${id}` }));
     },
     submissionCount: async () => {
-      log.contatori += 1;
-      if (mondo.contatoreRotto) throw new Error('contatore non raggiungibile');
-      return mondo.invii;
+      if (mondo.invii instanceof Error) throw mondo.invii;
+      return mondo.invii ?? null;
     },
-    ultimoAvvioRoutine: async () => {
-      log.registri = (log.registri || 0) + 1;
-      if (mondo.registroRotto) throw new Error('registro non raggiungibile');
-      return mondo.avvio === undefined ? null : mondo.avvio;
+    avviiRoutine: async () => {
+      log.registro += 1;
+      if (mondo.registro instanceof Error) throw mondo.registro;
+      return mondo.registro || [];
     },
+    idDelNumero: async (num) => { log.numeri.push(num); return (mondo.numeri || {})[num] || null; },
+    ...extra,
   });
   return { w, log, avanza: (ms) => { t += ms; } };
 }
 
+async function primoGiroEPoi(w, avanza) {
+  await w.tick({ force: true }); // riallineamento
+  avanza(60_000);
+}
+
 test('una scrittura che non firma l\'ora arriva lo stesso: per i seguiti si guarda l\'ora di Firestore', async () => {
-  const mondo = { ore: { a: 't1', b: 't1' }, seguiti: ['a'], invii: 10 };
+  const mondo = { ore: { a: 't1', b: 't1' }, seguiti: ['a'] };
   const { w, log, avanza } = giro(mondo);
-  await w.tick({ force: true });                 // apertura: riallineamento
-
-  // Il server delle routine prende in carico `a`: scrive stato e presa in
-  // carico, e NON tocca `updatedAt`. La domanda per data non lo porta.
+  await primoGiroEPoi(w, avanza);
   mondo.ore.a = 't2';
-  avanza(LIVE.POLL_MS);
-  await w.tick({ force: true });
-
-  const ultimo = log.avvisi[log.avvisi.length - 1];
-  assert.equal(ultimo.kind, 'changed');
-  assert.deepEqual(ultimo.rows.map((r) => r._id), ['a']);
+  const r = await w.tick();
+  assert.deepEqual(r.rows.map((x) => x._id), ['a']);
+  assert.deepEqual(log.letti, [['a']], 'si rilegge solo il mosso');
 });
 
-test('un seguito che non si è mosso non fa rileggere niente', async () => {
-  const mondo = { ore: { a: 't1' }, seguiti: ['a'], invii: 10 };
+test('un seguito fermo non fa rileggere niente, e nessun seguito non chiede niente', async () => {
+  const mondo = { ore: { a: 't1' }, seguiti: ['a'] };
   const { w, log, avanza } = giro(mondo);
-  await w.tick({ force: true });
-  const dopoApertura = log.avvisi.length;
-  for (let i = 0; i < 3; i += 1) { avanza(LIVE.POLL_MS); await w.tick({ force: true }); }
-  assert.equal(log.versionsOf, 3, 'tre giri, tre controlli dell\'ora vera');
-  assert.deepEqual(log.letti, [], 'niente si è mosso: nessun documento riletto');
-  assert.equal(log.avvisi.length, dopoApertura, 'e nessuna pagina disturbata');
-});
-
-test('nessun feedback da seguire: il giro non chiede niente in più', async () => {
-  const mondo = { ore: { a: 't1' }, seguiti: [], invii: 10 };
-  const { w, log, avanza } = giro(mondo);
-  await w.tick({ force: true });
-  avanza(LIVE.POLL_MS);
-  await w.tick({ force: true });
-  assert.equal(log.versionsOf, 0);
-});
-
-test('oltre il tetto dei seguiti il giro avvisa e si riallinea, invece di tagliare in silenzio', async () => {
-  const tanti = Array.from({ length: LIVE.SEGUITI_TETTO + 7 }, (_, i) => `q${i}`);
-  const mondo = { ore: {}, seguiti: tanti, invii: 10 };
-  for (const id of tanti) mondo.ore[id] = 't1';
-  const { w, log, avanza } = giro(mondo);
-  await w.tick({ force: true });
-  assert.equal(log.versioni, 1);
-
-  avanza(LIVE.POLL_MS);
-  await w.tick({ force: true });
-  assert.equal(log.ultimiChiesti.length, LIVE.SEGUITI_TETTO);
-  assert.ok(log.lamentele.some((m) => m.includes('tetto')), 'il giro dice che qualcuno è rimasto fuori');
-
-  // Chi è rimasto fuori non resta invisibile fino alla mezz'ora: il giro dopo
-  // è un riallineamento completo.
-  avanza(LIVE.POLL_MS);
-  await w.tick({ force: true });
-  assert.equal(log.versioni, 2);
-});
-
-test('un invio nuovo che la domanda per data non vede fa riallineare al giro dopo', async () => {
-  const mondo = { ore: { a: 't1' }, seguiti: [], invii: 10 };
-  const { w, log, avanza } = giro(mondo);
-  await w.tick({ force: true });
-  assert.equal(log.versioni, 1);
-
-  // La segnalazione arriva da una macchina con l'ora indietro: il contatore
-  // degli invii sale, la domanda per data non la trova.
-  mondo.invii = 11;
-  avanza(LIVE.POLL_MS);
-  await w.tick({ force: true });
-  assert.equal(log.versioni, 1, 'il giro in corso non si riallinea a metà');
-
-  avanza(LIVE.POLL_MS);
-  await w.tick({ force: true });
-  assert.equal(log.versioni, 2, 'il giro dopo si riallinea, ed è l\'unico che la vede');
-});
-
-test('il contatore fermo non fa riallineare: i giri a vuoto restano a vuoto', async () => {
-  const mondo = { ore: { a: 't1' }, seguiti: [], invii: 10 };
-  const { w, log, avanza } = giro(mondo);
-  await w.tick({ force: true });
-  for (let i = 0; i < 4; i += 1) { avanza(LIVE.POLL_MS); await w.tick({ force: true }); }
-  assert.equal(log.versioni, 1);
-  assert.equal(log.contatori, 5, 'una lettura del contatore per giro, riallineamento compreso');
-});
-
-test('un contatore non letto non vale «niente di nuovo»', async () => {
-  const mondo = { ore: { a: 't1' }, seguiti: [], invii: 10 };
-  const { w, log, avanza } = giro(mondo);
-  await w.tick({ force: true });
-
-  mondo.contatoreRotto = true;
-  avanza(LIVE.POLL_MS);
-  await w.tick({ force: true });
-  assert.equal(log.versioni, 1, 'una lettura fallita non è un invio nuovo');
-
-  // Torna a rispondere, e nel frattempo un invio c'è stato davvero: il
-  // confronto riparte dal valore di prima, non da quello perso.
-  mondo.contatoreRotto = false;
-  mondo.invii = 11;
-  avanza(LIVE.POLL_MS);
-  await w.tick({ force: true });
-  avanza(LIVE.POLL_MS);
-  await w.tick({ force: true });
-  assert.equal(log.versioni, 2, 'l\'invio arrivato durante il guasto non si perde');
+  await primoGiroEPoi(w, avanza);
+  await w.tick();
+  assert.equal(log.letti.length, 0);
+  mondo.seguiti = [];
+  avanza(60_000);
+  await w.tick();
+  assert.equal(log.versionsOf.length, 1, 'senza seguiti nessuna versionsOf');
 });
 
 test('una rilettura fallita non si dà per fatta: il giro dopo riprova', async () => {
-  const mondo = { ore: { a: 't1' }, seguiti: ['a'], invii: 10, letturaRotta: true };
+  const mondo = { ore: { a: 't1' }, seguiti: ['a'] };
   const { w, log, avanza } = giro(mondo);
-  await w.tick({ force: true });
-
+  await primoGiroEPoi(w, avanza);
   mondo.ore.a = 't2';
-  avanza(LIVE.POLL_MS);
-  await w.tick({ force: true }).catch(() => {});
-  assert.deepEqual(log.letti, [['a']], 'ci ha provato');
-  assert.equal(log.avvisi.length, 1, 'ma alle pagine non è arrivato niente');
-
-  mondo.letturaRotta = false;
-  avanza(LIVE.POLL_MS);
-  await w.tick({ force: true });
-  const ultimo = log.avvisi[log.avvisi.length - 1];
-  assert.equal(ultimo.kind, 'changed');
-  assert.deepEqual(ultimo.rows.map((r) => r._id), ['a']);
+  mondo.rotta = true;
+  await assert.rejects(w.tick());
+  mondo.rotta = false;
+  avanza(60_000);
+  const r = await w.tick();
+  assert.deepEqual(r.rows.map((x) => x._id), ['a']);
+  assert.equal(log.letti.length, 2);
 });
 
-// ── le due domande, come arrivano a Firestore ───────────────────────────────
+// #676.2: chi resta sopra il tetto non sparisce in silenzio.
+test('i seguiti si leggono tutti fino a un tetto largo; sopra, il giro lo dice e si riallinea', async () => {
+  const ore = {};
+  const tanti = [];
+  for (let i = 0; i < 80; i += 1) { ore[`f${i}`] = 't1'; tanti.push(`f${i}`); }
+  const mondo = { ore, seguiti: tanti };
+  const { w, log, avanza } = giro(mondo);
+  assert.ok(LIVE.SEGUITI_TETTO >= 300, 'il tetto è abbondante');
+  await primoGiroEPoi(w, avanza);
+  const r = await w.tick();
+  assert.equal(log.versionsOf[0].length, 80, 'oltre i vecchi 60 nessuno resta fuori');
+  assert.equal(r.avvisi, undefined);
 
-require(join(SRC, 'feedback.js'));
-const FB = globalThis.SN_FEEDBACK;
+  const piccolo = giro({ ore, seguiti: tanti }, { seguitiTetto: 50 });
+  await primoGiroEPoi(piccolo.w, piccolo.avanza);
+  const r2 = await piccolo.w.tick();
+  assert.ok(r2.avvisi.some((m) => /tetto/.test(m)), 'il limite si dice');
+  piccolo.avanza(60_000);
+  assert.equal((await piccolo.w.tick()).kind, 'reconcile');
+});
 
-async function conFetch(risposta, fn) {
+test('versionsOf legge a pezzi e tutti, senza note né allegati', async () => {
   const vere = globalThis.fetch;
-  const chiamate = [];
+  const corpi = [];
   globalThis.fetch = async (url, opts) => {
-    chiamate.push({ url: String(url), body: opts && opts.body ? JSON.parse(opts.body) : null });
-    return { ok: true, status: 200, json: async () => risposta, text: async () => '' };
+    const b = JSON.parse(opts.body);
+    corpi.push(b);
+    return { ok: true, status: 200, text: async () => '', json: async () => b.documents.map((n) => ({ found: { name: n, fields: {}, updateTime: 't' } })) };
   };
-  try { return await fn(chiamate); } finally { globalThis.fetch = vere; }
-}
+  try {
+    const ids = Array.from({ length: 250 }, (_, i) => `id${i}`);
+    const out = await FB.versionsOf(ids);
+    assert.equal(out.length, 250);
+    assert.ok(corpi.length >= 3);
+    assert.ok(corpi.every((b) => b.documents.length <= 100));
+    assert.deepEqual(corpi[0].mask.fieldPaths, ['createdAt']);
+  } finally { globalThis.fetch = vere; }
+});
 
-test('l\'ora vera dei seguiti si chiede in UNA richiesta, e senza tirarsi dietro i testi', async () => {
-  const doc = {
-    name: 'projects/p/databases/(default)/documents/feedback/a',
-    fields: { createdAt: { timestampValue: '2026-09-01T00:00:00Z' } },
-    updateTime: 't9',
+test('un invio che la domanda per data non vede fa riallineare; il conto che torna no', async () => {
+  const mondo = { ore: { a: 't1' }, invii: 10 };
+  const { w, avanza } = giro(mondo);
+  await primoGiroEPoi(w, avanza);
+  mondo.invii = 12;
+  mondo.cambiati = [{ _id: 'n1', seq: 11 }];
+  await w.tick();
+  avanza(60_000);
+  assert.equal((await w.tick()).kind, 'reconcile', 'uno dei due mancava');
+
+  const m2 = { ore: {}, invii: 10 };
+  const g2 = giro(m2);
+  await primoGiroEPoi(g2.w, g2.avanza);
+  m2.invii = 11;
+  m2.cambiati = [{ _id: 'n', seq: 11 }];
+  await g2.w.tick();
+  g2.avanza(60_000);
+  assert.equal((await g2.w.tick()).kind, 'changed');
+});
+
+test('un contatore non letto non vale «niente di nuovo»', async () => {
+  const mondo = { ore: {}, invii: 10 };
+  const { w, avanza } = giro(mondo);
+  await primoGiroEPoi(w, avanza);
+  mondo.invii = new Error('rete');
+  const r = await w.tick();
+  assert.ok(r.avvisi.some((m) => /contatore/.test(m)));
+  mondo.invii = 11;
+  mondo.cambiati = [];
+  avanza(60_000);
+  await w.tick();
+  avanza(60_000);
+  assert.equal((await w.tick()).kind, 'reconcile', 'il confronto resta onesto col valore di prima');
+});
+
+// #676.1: il registro si usa per il NOME, non come «qualcosa è cambiato».
+test('un worker che parte: si rilegge il SUO feedback e lo si segue, senza riallineare né campionare la coda', async () => {
+  const mondo = {
+    ore: { a: 't1', b: 't1', c: 't1' },
+    registro: [{ startedAt: '2026-10-04T09:00:00Z', num: '41', role: 'verifier' }],
+    numeri: { 42: 'b' },
   };
-  await conFetch([{ found: doc }], async (chiamate) => {
-    const out = await FB.versionsOf(['a', 'b']);
-    assert.equal(chiamate.length, 1, 'una richiesta sola per tutti gli id');
-    assert.ok(chiamate[0].url.includes(':batchGet'));
-    assert.equal(chiamate[0].body.documents.length, 2);
-    assert.deepEqual(chiamate[0].body.mask.fieldPaths, ['createdAt'], 'niente note né allegati');
-    assert.deepEqual(out, [{ _id: 'a', _updateTime: 't9', createdAt: '2026-09-01T00:00:00Z' }]);
-  });
+  const { w, log, avanza } = giro(mondo);
+  await primoGiroEPoi(w, avanza);
+  mondo.registro = [{ startedAt: '2026-10-04T09:05:00Z', num: '42', role: 'new-work' }, ...mondo.registro];
+  const r = await w.tick();
+  assert.deepEqual(log.numeri, ['42']);
+  assert.deepEqual(r.rows.map((x) => x._id), ['b'], 'il feedback preso arriva subito');
+  assert.equal(log.versioni, 1, 'nessuna rilettura completa');
+  assert.deepEqual(w.seguitiDalRegistro(), ['b']);
+
+  // Il giro dopo lo segue con l'ora di Firestore: una lettura, solo lui.
+  mondo.ore.b = 't2';
+  avanza(60_000);
+  const r2 = await w.tick();
+  assert.deepEqual(log.versionsOf.at(-1), ['b']);
+  assert.deepEqual(r2.rows.map((x) => x._id), ['b']);
+  avanza(60_000);
+  assert.equal((await w.tick()).kind, 'changed');
+  assert.equal(log.versioni, 1);
+});
+
+test('un feedback del registro esce dai seguiti quando la pagina lo segue da sé o dopo il tempo', async () => {
+  const mondo = { ore: { b: 't1' }, registro: [], numeri: { 7: 'b' } };
+  const { w, avanza } = giro(mondo);
+  await primoGiroEPoi(w, avanza);
+  mondo.registro = [{ startedAt: 'x', num: '#7', role: 'r' }];
+  await w.tick();
+  assert.deepEqual(w.seguitiDalRegistro(), ['b']);
+  avanza(LIVE.REGISTRO_SEGUI_MS + 1);
+  await w.tick();
+  assert.deepEqual(w.seguitiDalRegistro(), []);
+});
+
+test('un registro illeggibile non vale «registro svuotato»', async () => {
+  const voce = { startedAt: '2026-10-04T09:00:00Z', num: '41', role: 'verifier' };
+  const mondo = { ore: { a: 't1' }, registro: [voce], numeri: { 41: 'a' } };
+  const { w, log, avanza } = giro(mondo);
+  await primoGiroEPoi(w, avanza);
+  mondo.registro = new Error('403');
+  const r = await w.tick();
+  assert.ok(r.avvisi.some((m) => /registro/.test(m)));
+  // Torna leggibile con la stessa voce: non è un avvio nuovo.
+  mondo.registro = [voce];
+  avanza(60_000);
+  await w.tick();
+  assert.deepEqual(log.numeri, [], 'la voce già vista non si scambia per una nuova');
+});
+
+test('idDelNumero: una lettura sul seq, e il sotto-numero sceglie il figlio', async () => {
+  const vere = globalThis.fetch;
+  const corpi = [];
+  const doc = (id, seq, sub) => ({ document: { name: `p/feedback/${id}`, fields: { seq: { integerValue: String(seq) }, ...(sub != null ? { subSeq: { integerValue: String(sub) } } : {}) } } });
+  globalThis.fetch = async (url, opts) => {
+    corpi.push(JSON.parse(opts.body));
+    return { ok: true, status: 200, text: async () => '', json: async () => [doc('padre', 676, null), doc('figlio', 676, 1)] };
+  };
+  try {
+    assert.equal(await FB.idDelNumero('676'), 'padre');
+    assert.equal(await FB.idDelNumero('#676.1'), 'figlio');
+    assert.equal(await FB.idDelNumero('676.9'), null);
+    assert.equal(await FB.idDelNumero('boh'), null);
+    assert.equal(corpi.length, 3);
+    assert.deepEqual(corpi[0].structuredQuery.where.fieldFilter.value, { integerValue: '676' });
+  } finally { globalThis.fetch = vere; }
 });
 
 test('il contatore degli invii: una lettura, e «non lo so» non è zero', async () => {
-  await conFetch({ fields: { value: { integerValue: '774' } } }, async (chiamate) => {
-    assert.equal(await FB.submissionCount(), 774);
-    assert.equal(chiamate.length, 1);
-    assert.ok(chiamate[0].url.includes('counters/feedbackSeq'));
-  });
   const vere = globalThis.fetch;
-  globalThis.fetch = async () => ({ ok: false, status: 404, json: async () => ({}), text: async () => '' });
-  try { assert.equal(await FB.submissionCount(), null, 'contatore assente: non lo so, non zero'); }
-  finally { globalThis.fetch = vere; }
-});
-
-// Due invii nello stesso giro, uno con l'ora giusta e uno con l'ora indietro.
-// Guardare se ne è arrivata ALMENO UNA non basta: la prima coprirebbe la
-// seconda, e quella mandata non entrerebbe mai in lista.
-test('di due invii nello stesso giro, quello con l\'ora indietro fa riallineare lo stesso', async () => {
-  const mondo = { ore: { a: 't1' }, seguiti: [], invii: 10 };
-  const { w, log, avanza } = giro(mondo);
-  await w.tick({ force: true });
-  assert.equal(log.versioni, 1);
-
-  // Ne arrivano due: la domanda per data porta solo quella con l'ora giusta.
-  mondo.invii = 12;
-  mondo.cambiati = [{ _id: 'nuova', seq: 11, _updateTime: 't1' }];
-  avanza(LIVE.POLL_MS);
-  await w.tick({ force: true });
-  assert.equal(log.versioni, 1, 'il giro con la domanda per data non rilegge tutto');
-
-  // Il conto non torna (una sola arrivata su due invii), quindi il giro dopo
-  // è un riallineamento completo: è lì che la seconda compare.
-  mondo.cambiati = [];
-  avanza(LIVE.POLL_MS);
-  await w.tick({ force: true });
-  assert.equal(log.versioni, 2);
-});
-
-test('quando il conto degli invii torna, non si rilegge niente', async () => {
-  const mondo = { ore: { a: 't1' }, seguiti: [], invii: 10 };
-  const { w, log, avanza } = giro(mondo);
-  await w.tick({ force: true });
-
-  mondo.invii = 12;
-  mondo.cambiati = [{ _id: 'n1', seq: 11 }, { _id: 'n2', seq: 12 }];
-  avanza(LIVE.POLL_MS);
-  await w.tick({ force: true });
-  mondo.cambiati = [];
-  avanza(LIVE.POLL_MS);
-  await w.tick({ force: true });
-  assert.equal(log.versioni, 1, 'due invii annunciati, due arrivati: niente da riallineare');
-});
-
-// Quale segnalazione prendano in mano le routine, la dashboard non lo può
-// indovinare: il server sceglie con un ordine suo, e riscrive senza firmare
-// l'ora. Il registro dei worker lo dice, e costa una lettura.
-test('un worker delle routine che parte fa riallineare al giro dopo', async () => {
-  const mondo = { ore: { a: 't1' }, seguiti: [], invii: 10, avvio: '' };
-  const { w, log, avanza } = giro(mondo);
-  await w.tick({ force: true });
-  assert.equal(log.versioni, 1);
-
-  avanza(LIVE.POLL_MS);
-  await w.tick({ force: true });
-  assert.equal(log.versioni, 1, 'registro fermo: niente da riallineare');
-
-  // Il server fa partire un lavoro su una segnalazione qualunque della coda.
-  mondo.avvio = '2026-09-24T18:00:00Z|#700|solver';
-  avanza(LIVE.POLL_MS);
-  await w.tick({ force: true });
-  avanza(LIVE.POLL_MS);
-  await w.tick({ force: true });
-  assert.equal(log.versioni, 2, 'il giro dopo rilegge, e la presa in carico compare');
-
-  // Una sola volta per avvio: il registro fermo non fa ripagare niente.
-  avanza(LIVE.POLL_MS);
-  await w.tick({ force: true });
-  avanza(LIVE.POLL_MS);
-  await w.tick({ force: true });
-  assert.equal(log.versioni, 2);
-});
-
-test('un registro dei worker non raggiungibile non si scambia per «niente di nuovo»', async () => {
-  const mondo = { ore: { a: 't1' }, seguiti: [], invii: 10, avvio: 'x|#1|solver' };
-  const { w, log, avanza } = giro(mondo);
-  await w.tick({ force: true });
-
-  mondo.registroRotto = true;
-  avanza(LIVE.POLL_MS);
-  await w.tick({ force: true });
-  assert.equal(log.versioni, 1, 'una lettura fallita non è un avvio');
-  assert.ok(log.lamentele.some((m) => m.includes('registro')));
-
-  // Torna raggiungibile, col valore di prima: nessun falso allarme.
-  mondo.registroRotto = false;
-  avanza(LIVE.POLL_MS);
-  await w.tick({ force: true });
-  avanza(LIVE.POLL_MS);
-  await w.tick({ force: true });
-  assert.equal(log.versioni, 1);
+  try {
+    globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ fields: { value: { integerValue: '774' } } }), text: async () => '' });
+    assert.equal(await FB.submissionCount(), 774);
+    globalThis.fetch = async () => ({ ok: false, status: 404, json: async () => ({}), text: async () => '' });
+    assert.equal(await FB.submissionCount(), null);
+  } finally { globalThis.fetch = vere; }
 });

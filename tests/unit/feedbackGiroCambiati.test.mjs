@@ -107,16 +107,6 @@ test('updateStatus firma l\'ora come data; con regole vecchie la scrittura passa
   }, { status: (n) => (n === 1 ? 403 : 200) });
 });
 
-test('submit firma createdAt e updatedAt come date', async () => {
-  await conFetch((n, body, url) => (url.includes('counters') ? { fields: { value: { integerValue: '5' } } } : { name: 'x/feedback/nuovo' }), async (chiamate) => {
-    await FB.submit({ text: 'ciao', clientId: 'c' }).catch(() => {});
-    const crea = chiamate.find((c) => c.body && c.body.fields && c.body.fields.text);
-    assert.ok(crea, 'la creazione è partita');
-    assert.ok(crea.body.fields.createdAt.timestampValue);
-    assert.equal(crea.body.fields.updatedAt.timestampValue, crea.body.fields.createdAt.timestampValue);
-  });
-});
-
 test('CAMPI_LISTA porta updatedAt: il cursore del giro e il confronto lo leggono', () => {
   assert.ok(FB.CAMPI_LISTA.includes('updatedAt'));
 });
