@@ -2,7 +2,7 @@
 // La sessione resta per le decisioni: legge `stato` e risponde con `riprendi`. Logica e regole in scripts/lib/orchestratore.mjs.
 // Uso: npm run orchestra -- aggiungi <N>… | avvia [opzioni] [--dry-run] | stato | riprendi <N> ["risposta"] | togli <N>
 
-import { spawn, execFileSync } from 'node:child_process';
+import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import {
   existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmdirSync, symlinkSync, unlinkSync, writeFileSync,
 } from 'node:fs';
@@ -112,6 +112,19 @@ export function leggiUscitaClaude(stdout, stderr = '', code = 0) {
   return { ok, testo: String(j.result || ''), costo: Number(j.total_cost_usd) || 0, errore: ok ? '' : String(j.result || j.subtype || `uscita ${code}`) };
 }
 
+/** `claude auth status` → l'istanza figlia avrà un accesso suo? PURA. */
+export function accessoDaStatus(stdout) {
+  try { return JSON.parse(String(stdout || '').trim()).loggedIn === true; } catch (_) { return false; }
+}
+
+// L'app desktop dà l'accesso alle sue sessioni senza passarlo ai processi che lanciano: la riga di comando ne vuole uno suo.
+export const SENZA_ACCESSO = [
+  'Claude Code da riga di comando non ha un accesso suo, e le istanze figlie risponderebbero «Not logged in».',
+  'Una volta sola, dall’owner, in un terminale: `claude auth login` (o `claude setup-token` e la variabile CLAUDE_CODE_OAUTH_TOKEN).',
+  'Non ho lanciato niente.',
+].join('
+');
+
 /** La richiesta dell'owner dalle cornici di feedback:leggi: titolo e testo. PURA. */
 export function richiestaDaLettura(testo) {
   const t = String(testo || '').replace(/\r\n/g, '\n');
@@ -200,10 +213,12 @@ function depVere(P, opz, log) {
   const bin = trovaClaude();
   if (!bin) throw new Error('Claude Code non trovato: imposta FILO_CLAUDE_BIN col percorso del binario');
   const ruoli = { lavoratore: modelloDelRuolo('lavoratore'), verificatore: modelloDelRuolo('verificatore') };
-  mkdirSync(join(P.note, 'log'), { recursive: true });
   // Un'istanza figlia non deve credersi dentro la sessione che l'ha lanciata.
   const env = { ...process.env };
   delete env.CLAUDECODE;
+  const auth = spawnSync(bin, ['auth', 'status'], { encoding: 'utf8', env, timeout: 60_000, windowsHide: true });
+  if (!accessoDaStatus(auth.stdout)) throw new Error(SENZA_ACCESSO);
+  mkdirSync(join(P.note, 'log'), { recursive: true });
   return {
     store: negozio(join(P.note, 'stato.json')),
     esegui,

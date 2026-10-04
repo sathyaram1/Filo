@@ -12,7 +12,7 @@ import {
   promptVerificatore, regolaFile, richiestaArg, riprendi, rigaStato, serveDeploy, siSovrappongono, toccaRegole,
 } from '../../scripts/lib/orchestratore.mjs';
 import {
-  argomentiClaude, frontmatter, leggiUscitaClaude, modelloDelRuolo, richiestaDaLettura, trovaClaude,
+  accessoDaStatus, argomentiClaude, frontmatter, leggiUscitaClaude, modelloDelRuolo, richiestaDaLettura, trovaClaude,
 } from '../../scripts/orchestratore-locale.mjs';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
@@ -362,6 +362,12 @@ test('uscita di claude -p: esito, costo, errore', () => {
   assert.equal(e.ok, false);
   assert.match(e.errore, /error_max_turns/);
   assert.equal(leggiUscitaClaude('niente json', 'API overloaded', 1).ok, false);
+});
+
+test('accesso della riga di comando: senza, avvia si ferma prima di lanciare istanze', () => {
+  assert.equal(accessoDaStatus('{"loggedIn": true, "authMethod": "claude.ai"}'), true);
+  assert.equal(accessoDaStatus('{"loggedIn": false, "authMethod": "none"}'), false);
+  assert.equal(accessoDaStatus('Not logged in'), false);
 });
 
 test('richiesta dalle cornici di feedback:leggi', () => {
