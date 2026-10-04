@@ -118,3 +118,13 @@ torna indietro, costa centinaia di unità.
 
 Un timer atteso (`await` di qualcosa che scade da sé) misura il timer e non il lavoro, e
 resta in millisecondi. Sentinella: `tests/unit/tempiSottoCarico.test.mjs`.
+
+## Il verso opposto (#937)
+
+Una prova nata su Windows che asserisce un percorso `C:\…` cade su Linux se la
+funzione chiede la forma al sistema che la esegue: `isAbsolute('C:\\x')` lì risponde
+falso. Quando il risultato deve essere lo stesso su ogni macchina (la chiave di un test
+rosso confrontata fra due cartelle), si riconoscono entrambe le forme:
+`isAbsolute(p) || win32.isAbsolute(p)`. Un rosso solo su Linux non ferma né le fusioni
+né le versioni, quindi nessun allarme lo segnala: resta finché una routine non lo trova.
+Riferimento: `chiaveTest` in `scripts/lib/unit-sulla-fusione.mjs`.

@@ -103,7 +103,7 @@ async function httpGetToFile(target, referrer, session, kind, hooks) {
       // voce nella barra e per decidere dove far crescere il file parziale.
       let partPath;
       try {
-        partPath = hooks.onHeaders({ filename, totalBytes: total });
+        partPath = hooks.onHeaders({ filename, totalBytes: total, contentType: String(res.headers['content-type'] || '') });
       } catch (e) {
         res.resume();
         try { req.destroy(); } catch (_) {}
@@ -189,6 +189,90 @@ function safeImageFilename(name) {
   n = n.replace(/[\x00-\x1f<>:"/\\|?*]/g, '').replace(/\.{2,}/g, '.').replace(/^\.+/, '').trim();
   if (!n) n = 'immagine';
   return n.slice(0, 200);
+}
+
+// #711 — i byte attraversano il canale e il thread di lettura: il tetto è largo (un PNG
+// da 60 megapixel ci sta dentro), e oltre il chiamante riceve un rifiuto col motivo, mai un silenzio.
+const MAX_BYTE_PROVENIENZA = 64 * 1024 * 1024;
+
+// Il tipo di un'immagine dai suoi primi byte, o '' se non è un'immagine: il download per
+// conto della scheda, coi cookie dell'utente, non restituisce nient'altro (#946).
+function tipoImmagine(b) {
+  const fourcc = (i) => b.toString('latin1', i, i + 4);
+  if (b.length < 4) return '';
+  if (b[0] === 0x89 && fourcc(1) === 'PNG') return 'image/png';
+  if (b[0] === 0xff && b[1] === 0xd8) return 'image/jpeg';
+  if (fourcc(0) === 'RIFF' && fourcc(8) === 'WEBP') return 'image/webp';
+  if (fourcc(0) === 'GIF8') return 'image/gif';
+  if (fourcc(4) === 'ftyp') {
+    const marca = fourcc(8);
+    if (/^avi[fs]$/.test(marca)) return 'image/avif';
+    if (/^(heic|heix|hevc|hevx|heim|heis|mif1|msf1)$/.test(marca)) return 'image/heic';
+    return '';
+  }
+  if (b[0] === 0x42 && b[1] === 0x4d) return 'image/bmp';
+  if (b[0] === 0 && b[1] === 0 && b[2] === 1 && b[3] === 0) return 'image/x-icon';
+  if ((fourcc(0) === 'II*\u0000') || (fourcc(0) === 'MM\u0000*')) return 'image/tiff';
+  if ((b[0] === 0xff && b[1] === 0x0a) || fourcc(4) === 'JXL ') return 'image/jxl';
+  if (fourcc(4) === 'jP  ') return 'image/jp2';
+  return eSvg(b) ? 'image/svg+xml' : '';
+}
+
+// Un SVG comincia con <svg, dopo al più dichiarazione XML, commenti e doctype: una pagina
+// HTML con un'icona SVG dentro non lo è.
+function eSvg(b) {
+  let t = b.toString('utf8', 0, Math.min(b.length, 4096)).replace(/^\uFEFF/, '');
+  for (;;) {
+    t = t.replace(/^\s+/, '');
+    const preambolo = /^(<\?xml[\s\S]*?\?>|<!--[\s\S]*?-->|<!DOCTYPE[^>]*>)/i.exec(t);
+    if (!preambolo) break;
+    t = t.slice(preambolo[0].length);
+  }
+  return /^<svg[\s>]/i.test(t);
+}
+
+// I byte di un'immagine che la pagina mostra ma che il suo script non può leggere
+// (altra origine): stessa strada di «Salva immagine come…», in un file temporaneo.
+async function byteImmagineRemota({ url, referrer, session }) {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const { app } = require('electron');
+  let tmp = '';
+  let tipo = '';
+  let troppo = false;
+  try {
+    await fetchToFile({
+      url, referrer, session, kind: 'image',
+      onHeaders: ({ totalBytes, contentType }) => {
+        if (totalBytes > MAX_BYTE_PROVENIENZA) { troppo = true; throw new Error('troppo grande'); }
+        tipo = contentType;
+        tmp = path.join(app.getPath('temp'), `filo-immagine-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        return tmp;
+      },
+      onProgress: (ricevuti) => { if (ricevuti > MAX_BYTE_PROVENIENZA) troppo = true; },
+      shouldStop: () => troppo,
+    });
+    const byte = await fs.promises.readFile(tmp);
+    if (byte.length > MAX_BYTE_PROVENIENZA) troppo = true;
+    if (troppo) throw new Error('troppo grande');
+    const tipoVero = tipoImmagine(byte);
+    if (!tipoVero) return { ok: false, notImage: true, error: `non è un’immagine (${String(tipo || 'tipo ignoto').split(';')[0]})` };
+    return { ok: true, dataUrl: `data:${tipoVero};base64,${byte.toString('base64')}` };
+  } catch (e) {
+    if (troppo) return { ok: false, tooBig: true, error: `immagine oltre ${MAX_BYTE_PROVENIENZA / (1024 * 1024)} MB` };
+    return { ok: false, error: e?.message || 'immagine non scaricabile' };
+  } finally {
+    if (tmp) fs.promises.unlink(tmp).catch(() => {});
+  }
+}
+
+function bytesDaDataUrl(dataUrl) {
+  const m = /^data:[^,]*;base64,(.*)$/s.exec(String(dataUrl || ''));
+  if (!m) return null;
+  try {
+    const b = Buffer.from(m[1], 'base64');
+    return b.length ? b : null;
+  } catch (_) { return null; }
 }
 
 module.exports = function register(on, ctx) {
@@ -382,6 +466,50 @@ module.exports = function register(on, ctx) {
 
   on(MSG.DOWNLOAD_IMAGE, handleDownload);
   on(MSG.DOWNLOAD_MEDIA, handleDownload);
+
+  // #711 — le etichette di origine di un'immagine, lette dai suoi byte. Nessun
+  // gate d'origine: la risposta parla solo dei byte che il chiamante ha mandato.
+  on(MSG.IMAGE_PROVENANCE, async (msg) => {
+    const byte = bytesDaDataUrl(msg && msg.dataUrl);
+    if (!byte) return { ok: false, error: 'immagine non leggibile' };
+    if (byte.length > MAX_BYTE_PROVENIENZA) {
+      return { ok: false, error: 'immagine troppo grande per il controllo delle etichette', tooBig: true };
+    }
+    const P = globalThis.SN_PROVENIENZA;
+    if (!P) return { ok: false, error: 'controllo non disponibile' };
+    try {
+      const res = await require('../firmatariC2pa').analizzaImmagine(byte);
+      const forte = res.prova === 'firmata' && res.firmatario === 'riconosciuto';
+      return { ok: true, frase: P.frase(res), forte, ...res };
+    } catch (e) {
+      return { ok: false, error: e?.message || 'controllo fallito' };
+    }
+  });
+
+  on(MSG.IMAGE_COPIED, async (msg) => {
+    const originale = bytesDaDataUrl(msg && msg.originale);
+    const copia = bytesDaDataUrl(msg && msg.copia);
+    if (!originale || !copia) return { ok: false, error: 'immagine non leggibile' };
+    if (originale.length > MAX_BYTE_PROVENIENZA || copia.length > MAX_BYTE_PROVENIENZA) {
+      return { ok: false, error: 'immagine troppo grande per il controllo delle etichette', tooBig: true };
+    }
+    let negliAppunti = null;
+    try { negliAppunti = require('electron').clipboard.readImage(); } catch (_) {}
+    try {
+      const ricordata = await require('../firmatariC2pa').ricordaCopia(originale, [copia, negliAppunti]);
+      return { ok: true, ricordata };
+    } catch (e) {
+      return { ok: false, error: e?.message || 'controllo fallito' };
+    }
+  });
+
+  on(MSG.IMAGE_BYTES, async (msg, sender) => {
+    const url = String((msg && msg.url) || '').trim();
+    if (!/^https?:\/\//i.test(url)) return { ok: false, error: 'URL non scaricabile' };
+    const wc = sender && sender.wc;
+    if (!wc || wc.isDestroyed?.()) return { ok: false, error: 'no sender' };
+    return byteImmagineRemota({ url, referrer: String(sender?.tab?.url || sender?.url || ''), session: wc.session });
+  });
 
   // "Salva file" su un link a un file (#410.2). A differenza di
   // DOWNLOAD_IMAGE/MEDIA (byte scaricati a mano nel main), qui facciamo partire

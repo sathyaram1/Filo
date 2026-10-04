@@ -83,6 +83,50 @@ function formatKnownPathsForPrompt(rawPaths) {
   return globalThis.SN_PATHS_SAFETY.formatKnownPathsForPrompt(rawPaths);
 }
 
+// L'esito del controllo locale delle etichette di origine delle immagini allegate (#711).
+// La nota è voce di Filo, la frase del file viaggia imbustata: i nomi li scrive chi ha fatto l'immagine.
+async function noteProvenienzaImmagini(dataUrls) {
+  const P = globalThis.SN_PROVENIENZA;
+  const E = globalThis.SN_ESTERNO;
+  if (!P || !E || !Array.isArray(dataUrls) || !dataUrls.length) return '';
+  const { analizzaImmagine, origineDellaCopia } = require('./firmatariC2pa');
+  const blocchi = [];
+  for (let i = 0; i < dataUrls.length; i++) {
+    const m = /^data:[^,]*;base64,(.*)$/s.exec(String(dataUrls[i] || ''));
+    if (!m) continue;
+    let nota;
+    try {
+      const byte = Buffer.from(m[1], 'base64');
+      const res = await analizzaImmagine(byte);
+      const copia = res.trovato ? null : origineDellaCopia(byte);
+      nota = P.notaPerModello(copia || res, { daCopia: !!copia });
+    } catch (_) { continue; }
+    const quale = dataUrls.length > 1 ? ` (immagine ${i + 1})` : '';
+    const testa = `(Sistema${quale}: ${E.perCanaleSistema(nota.sistema)}.)`;
+    blocchi.push(nota.etichetta
+      ? `${testa}\n${E.imbusta({ tipo: 'ETICHETTA_FILE', testo: nota.etichetta, conIntestazione: true, unaRiga: true })}`
+      : testa);
+  }
+  return blocchi.join('\n\n');
+}
+
+// Le immagini non tornano nei turni dopo: senza, «ed è fatta con l'AI?» al messaggio seguente non aveva più l'esito (#946).
+const MAX_CHAT_CON_ORIGINE = 200;
+const MAX_ESITI_PER_CHAT = 20;
+const origineDelleChat = new Map();
+function ricordaOrigineInChat(chatId, blocco) {
+  if (!chatId || !blocco) return;
+  const lista = origineDelleChat.get(chatId) || [];
+  lista.push(blocco);
+  if (lista.length > MAX_ESITI_PER_CHAT) lista.shift();
+  origineDelleChat.delete(chatId);
+  origineDelleChat.set(chatId, lista);
+  while (origineDelleChat.size > MAX_CHAT_CON_ORIGINE) origineDelleChat.delete(origineDelleChat.keys().next().value);
+}
+function origineGiaLettaInChat(chatId) {
+  return chatId ? PROMPTS.origineGiaLettaInChat(origineDelleChat.get(chatId)) : '';
+}
+
 // #593 — IL TURNO AUTOMATICO DELL'AGENTE AIUTO, E LE DUE COSE CHE CI STANNO
 // DENTRO.
 //
@@ -155,6 +199,8 @@ async function buildMessages(action, payload) {
     const parts = [];
     const userText = payload.userMessage || testoDelTurnoAutomatico(payload);
     if (userText) parts.push({ type: 'text', text: userText });
+    const origine = PROMPTS.origineImmaginiAiuto(payload.origineImmagini);
+    if (origine) parts.push({ type: 'text', text: origine });
     if (payload.screenshot) parts.push({ type: 'image_url', image_url: { url: payload.screenshot } });
     const userMsg = parts.length === 1 && parts[0].type === 'text'
       ? { role: 'user', content: parts[0].text }
@@ -1493,7 +1539,7 @@ async function executeFiloAction(action, opzioni = {}) {
   return res;
 }
 
-async function eseguiAzioneFilo(action, { confirmed = false, sender = null, contesto = null, assistente = false, parole = '', avanzamento = null } = {}) {
+async function eseguiAzioneFilo(action, { confirmed = false, sender = null, contesto = null, assistente = false, parole = '', avanzamento = null, chatId = null } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
   // Da un sito (anche via una chat aperta da lì) passano solo le azioni della
@@ -1513,6 +1559,22 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
       if (T && T.validate(token, valore)) {
         const settings = await Storage.getSettings();
         action._illegible = T.illegibleAfter(token, valore, settings.themeTokens || {}, resolveTheme(settings));
+      }
+    } catch (_) {}
+  }
+
+  // Un elenco di siti che resterebbe com'è (aggiungere un sito che c'è già, toglierne uno che non c'è)
+  // non chiede conferma per poi non fare niente: lo si sa prima del gate, mai dall'LLM (#949).
+  if (type === 'IMPOSTA_PREFERENZA') {
+    delete action._invariato;
+    try {
+      const built = global.SN_PREF.buildPreferencePartial(
+        action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza,
+        action.valore ?? action.value ?? action.valoreNuovo ?? action.val,
+      );
+      if (built && built.elenco) {
+        const r = global.SN_PREF.applicaElenco(built.elenco, await Storage.getSettings());
+        if (r.invariato) action._invariato = r.invariato;
       }
     } catch (_) {}
   }
@@ -1765,7 +1827,8 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         // Niente caratteri di controllo (byte nullo compreso) in un'etichetta
         // che poi va nel diario e nella colonna dei timer.
         const label = cleanLabel(action.label || action.etichetta) || 'Timer';
-        const entry = await FiloMem.addTimer({ label, seconds });
+        // La conversazione che l'ha chiesto: la carta del timer nella home la riapre (#870).
+        const entry = await FiloMem.addTimer({ label, seconds, chat: chatId });
         if (entry) broadcastLiveUpdate();
         return { executed: !!entry, kept: !!entry };
       }
@@ -1778,6 +1841,7 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
           label: cleanLabel(action.label ?? action.etichetta),
           time: action.time ?? action.orario ?? action.at ?? '',
           repeat: action.ripeti ?? action.repeat ?? action.giorni ?? action.days,
+          chat: chatId,
         });
         if (entry) broadcastLiveUpdate();
         return { executed: !!entry, kept: !!entry };
@@ -1910,11 +1974,20 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         const chiave = action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza;
         const valore = action.valore ?? action.value ?? action.valoreNuovo ?? action.val;
         const built = global.SN_PREF.buildPreferencePartial(chiave, valore);
-        if (!built) return { executed: false, kept: false };
         // Un rifiuto spiegato resta nel diario col suo perché: non è successo
         // niente, ma l'utente deve saperlo anche se il modello non lo dice.
-        if (built.rifiuto) return { executed: false, kept: false, output: { error: built.rifiuto, rifiuto: true } };
-        await applySettingsUpdate(built.partial);
+        // `perModello` (le chiavi, i valori ammessi) va solo al modello.
+        const no = built ? (built.rifiuto ? built : null) : global.SN_PREF.spiegaNonValida(chiave, valore);
+        if (no) return { executed: false, kept: false, output: { error: no.rifiuto, rifiuto: true, ...(no.perModello ? { perModello: no.perModello } : {}) } };
+        if (action._invariato) return { executed: false, kept: false, output: { error: action._invariato, invariato: true } };
+        // Un elenco (siti bloccati, fidati…) si cambia a voci sull'elenco di adesso (#949).
+        let partial = built.partial;
+        if (built.elenco) {
+          const r = global.SN_PREF.applicaElenco(built.elenco, await Storage.getSettings());
+          if (r.invariato) return { executed: false, kept: false, output: { error: r.invariato, invariato: true } };
+          partial = r.partial;
+        }
+        await applySettingsUpdate(partial);
         // Il nome leggibile serve alla riga della chat quando il valore era già quello (niente evento).
         return { executed: true, kept: true, output: { etichetta: built.label } };
       }
@@ -1928,6 +2001,17 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         const T = globalThis.SN_THEME_TOKENS;
         const token = action.token ?? action.nome ?? action.name ?? action.chiave ?? action.elemento;
         const valore = action.valore ?? action.value ?? action.val ?? action.colore;
+        // Il ↺ della riga nelle Preferenze, chiesto a parole (#949): il token torna al suo valore di serie.
+        if (T && T.get(token) && /^(predefinit[oa]|default|di serie|originale|ripristina(lo|la)?)$/i.test(String(valore ?? '').trim())) {
+          const correnti = await Storage.getSettings();
+          const restanti = { ...(correnti.themeTokens || {}) };
+          if (!Object.prototype.hasOwnProperty.call(restanti, token)) {
+            return { executed: false, kept: false, output: { error: `${T.get(token).label} è già al suo valore predefinito`, invariato: true } };
+          }
+          delete restanti[token];
+          await applySettingsUpdate({ themeTokens: restanti });
+          return { executed: true, kept: true };
+        }
         if (!T || !T.validate(token, valore)) return { executed: false, kept: false };
         const settings = await Storage.getSettings();
         const overrides = { ...(settings.themeTokens || {}) };
@@ -1978,6 +2062,28 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         // «riletto la trasparenza» per una cosa che nessuno ha letto (#515).
         const trovato = !!(T && (!doc || T.get(doc)));
         return { executed: trovato, kept: true, output: { doc: doc || null, text, missing: !trovato } };
+      }
+      case 'LEGGI_IMPOSTAZIONI': {
+        // #949 — com'è impostato Filo adesso, per «com'è impostato X?». Sola lettura, senza le chiavi.
+        const V = globalThis.SN_VOCI_IMPOSTAZIONI;
+        const cerca = String(action.cerca ?? action.query ?? action.chiave ?? action.testo ?? '').replace(/\s+/g, ' ').trim().slice(0, 200);
+        if (!V) return { executed: false, kept: true, output: { error: 'lettura non disponibile' } };
+        const settings = await Storage.getSettings();
+        let permessiSiti = null;
+        try { permessiSiti = require('./permessiPagine').righeRicordate(); } catch (_) {}
+        const r = V.righePerModello(settings, { cerca, tema: resolveTheme(settings), sistema: process.platform, altrove: { permessiSiti } });
+        return { executed: true, kept: true, output: { cerca, righe: r.righe, trovate: r.trovate, totale: r.totale } };
+      }
+      case 'TOGLI_PERMESSO_SITO': {
+        // #949 — la stessa cosa del «Togli» nella pagina Sicurezza: una risposta ricordata se ne va, il sito tornerà a chiedere.
+        const r = require('./permessiPagine').togliPerChat(action.sito ?? action.dominio ?? action.site, action.permesso ?? action.parte);
+        if (r.errore) return { executed: false, kept: false, output: { error: r.errore, rifiuto: true } };
+        if (!r.tolte.length) {
+          const ci = r.restano.length ? `ci sono: ${r.restano.join('; ')}` : 'non ce n\'è nessuna';
+          return { executed: false, kept: false, output: { error: `nessuna risposta ricordata per ${r.host}${action.permesso ? ` (${action.permesso})` : ''}: ${ci}`, invariato: true } };
+        }
+        broadcastToFiloPages({ type: MSG.PERMESSI_SITI_CAMBIATI });
+        return { executed: true, kept: false, output: { tolte: r.tolte } };
       }
       case 'EVENTO_CALENDARIO':
         return { executed: false, kept: true };
@@ -2343,6 +2449,33 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
           },
         };
       }
+      case 'CARTA_HOME': {
+        const op = String(action.operazione ?? action.op ?? '').trim().toLowerCase();
+        const tipo = { togli: 'togli', rimetti: 'aggiungi', aggiungi: 'aggiungi', sposta: 'sposta', ripristina: 'ripristina' }[op];
+        if (!tipo) return { executed: false, kept: false, output: { error: 'operazione sconosciuta' } };
+        const verso = String(action.verso ?? '').trim().toLowerCase().replace('giù', 'giu') || undefined;
+        const CH = globalThis.SN_CARTE_HOME;
+        // Una carta di sinistra si cerca prima per chiave, poi un nome esatto di destra, poi per nome a sinistra:
+        // «lo scaricamento del file» non deve finire sull'Editor, che fra i suoi nomi ha «file».
+        // «Rimetti» una carta di sinistra tolta (uno scaricamento, un lavoro): torna lei sola, la disposizione resta.
+        if (tipo === 'aggiungi' && !CH.risolvi(action.carta, { esatto: true })) {
+          const rimessa = await rimettiSinistraDaChat({ action, sender, chatId });
+          if (rimessa) return rimessa;
+        }
+        if (tipo !== 'ripristina') {
+          const sx = await carteSinistraPerChat(sender, chatId);
+          const perChiave = sx.find((v) => v.chiave === String(action.carta ?? '').trim());
+          if (perChiave || !CH.risolvi(action.carta, { esatto: true })) {
+            const trovate = perChiave ? { voci: [perChiave], perTipo: false, tipo: perChiave.tipo } : CH.trovaSinistra(action.carta, sx);
+            if (trovate.voci.length || trovate.tipo || !CH.risolvi(action.carta)) return cartaSinistraDaChat({ tipo, verso, action, sx, trovate, sender });
+          }
+        }
+        const esito = await require('./carteHome').modifica({ tipo, carta: action.carta, verso, prima: action.prima_di ?? null });
+        const dove = CH.descrivi(esito.layout);
+        if (esito.errore) return { executed: false, kept: false, output: { error: esito.errore, ...dove } };
+        if (esito.cambiato) annunciaCarteHome(esito.layout, sender);
+        return { executed: true, kept: true, output: dove };
+      }
       case 'COMANDO_FINESTRA': {
         // #419 — l'agente della home aziona i controlli del browser Filo (schermo
         // intero, riduci a icona, menu Impostazioni/App/Account, home): prima poteva
@@ -2505,6 +2638,26 @@ function commandOutputsForPrompt(actions) {
 // un turno precedente (F2): l'agente vede i dati esatti (cosa fa / come si attiva
 // / limiti) e risponde all'utente senza indovinare l'invocazione a memoria.
 // Sono DATI affidabili di sistema, non istruzioni.
+// Le impostazioni lette con LEGGI_IMPOSTAZIONI (#949), anche nei turni dopo. I valori li può aver scritti
+// un modello (lo stile, i nomi delle voci, i siti in elenco): stanno nel recinto dei testi salvati.
+function impostazioniLetteForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const E = globalThis.SN_ESTERNO;
+  const blocchi = [];
+  for (const a of actions) {
+    if (!a || String(a.type || '').toUpperCase() !== 'LEGGI_IMPOSTAZIONI') continue;
+    const o = a._output;
+    if (!o || !Array.isArray(o.righe)) continue;
+    const cerca = o.cerca ? E.neutralizza(o.cerca, { unaRiga: true }) : '';
+    const testa = !cerca ? 'tutte le voci'
+      : (o.trovate ? `le voci che c'entrano con «${cerca}»` : `nessuna voce c'entra con «${cerca}», quindi tutte`);
+    blocchi.push(`[Impostazioni di Filo lette con LEGGI_IMPOSTAZIONI (${testa}): sono i valori veri di quel momento, `
+      + 'rispondi con questi; se nel frattempo ne hai cambiata una, rileggila. Per cambiarne una usa la chiave fra parentesi quadre.]\n'
+      + E.imbusta({ tipo: 'TESTO_SALVATO', conIntestazione: true, testo: o.righe.map((r) => E.neutralizza(r, { unaRiga: true })).join('\n') }));
+  }
+  return blocchi.join('\n\n').trim();
+}
+
 function capabilityDetailsForPrompt(actions) {
   if (!Array.isArray(actions)) return '';
   const blocks = [];
@@ -2815,7 +2968,7 @@ function documentReadsForPrompt(actions) {
 // dell'editor compresi, arriva imbustato (#593, #592.4).
 function observationsForPrompt(actions) {
   return [
-    commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), webSearchResultsForPrompt(actions),
+    commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), impostazioniLetteForPrompt(actions), webSearchResultsForPrompt(actions),
     fileReadsForPrompt(actions), documentReadsForPrompt(actions), transparencyDocsForPrompt(actions),
     chatSearchesForPrompt(actions), confirmedActionsForPrompt(actions), proxyUnavailableForPrompt(actions),
     apertureFermateDopoForPrompt(actions),
@@ -3023,6 +3176,10 @@ function toolResultText({ action, res, rendered }) {
       ? `Dimenticate:\n${nomiSalvati(res.output.dimenticate)}`
       : 'Nella memoria nessuna riga corrispondeva: niente da togliere. Non ripetere uguale: copia la riga com\'è nella memoria, o chiedi all\'utente quale intende.';
   }
+  if (type === 'TOGLI_PERMESSO_SITO' && res.executed && res.output && Array.isArray(res.output.tolte)) {
+    return `Tolte le risposte ricordate (il sito tornerà a chiedere):\n${nomiSalvati(res.output.tolte)}\n`
+      + 'Nella risposta di\' in una frase cosa hai tolto e che per ridarlo basta rispondere «Consenti» quando il sito lo richiede.';
+  }
   if (type === 'MODIFICA_SVEGLIA' && res.output && Array.isArray(res.output.updated)) {
     return res.output.updated.length ? `Spostate:\n${nomiSalvati(res.output.updated)}` : 'Nessuna sveglia o timer corrispondeva: niente da spostare. Non ripetere uguale: chiedi all\'utente quale intende.';
   }
@@ -3064,19 +3221,34 @@ function toolResultText({ action, res, rendered }) {
     let done = '';
     try { done = descriviPerModello(action, { fatto: true }); } catch (_) {}
     done = String(done || describe()).replace(/\.+\s*$/, '');
+    // #949 — un cambio fatto da Filo dice cosa ha cambiato e come si torna indietro.
+    if (type === 'IMPOSTA_PREFERENZA' || type === 'IMPOSTA_ESTETICA') {
+      return `Eseguita: ${done}. Nella risposta di' in una frase cosa hai cambiato e che si rimette com'era con «annulla» `
+        + 'sul segno accanto al messaggio dell\'utente, o chiedendolo a te.';
+    }
     return `Eseguita: ${done}.`;
   }
+  if (res.output && res.output.invariato && res.output.error) {
+    return `Niente da cambiare: ${res.output.error}. Dillo all'utente in una riga; non ripetere l'azione uguale.`;
+  }
   if (res.output && res.output.rifiuto && res.output.error) {
-    const cosa = type === 'SALVA_LEZIONE' ? 'Lezione NON salvata' : 'Impostazione NON applicata';
-    return `${cosa}: ${res.output.error}. Non è stato salvato niente, nemmeno accorciato: `
-      + 'dillo all\'utente e, se vuole, riprova con un testo che stia nel limite.';
+    if (type === 'SALVA_LEZIONE') {
+      return `Lezione NON salvata: ${res.output.error}. Non è stato salvato niente, nemmeno accorciato: `
+        + 'dillo all\'utente e, se vuole, riprova con un testo che stia nel limite.';
+    }
+    const come = res.output.perModello || 'Dillo all\'utente e, se vuole, riprova con un valore ammesso.';
+    if (type === 'IMPOSTA_PREFERENZA') return `Impostazione NON applicata: ${res.output.error}. Non è stato salvato niente, nemmeno in parte. ${come}`;
+    return `Azione ${type} NON eseguita: ${res.output.error}. Non è cambiato niente: dillo all'utente in una riga.`;
   }
   // Tenuta ma non eseguita dal main: è un bottone in chat (evento, file,
   // pulizia schede, cancellazione archivio) che l'utente aziona da sé.
   if (res.kept) return `Proposta all'utente come bottone in chat: ${describe()}. Non serve altro da parte tua.`;
   // Non eseguita e senza niente da mostrare: mancava qualcosa (nessuna scheda
   // web attiva, un riferimento che non trova niente, un dato vuoto).
-  const detail = res.output ? ` (${JSON.stringify(res.output).slice(0, 200)})` : '';
+  // Il dettaglio è quello che serve a riprovare (l'elenco delle carte con le chiavi): tetto largo, e un taglio si dice.
+  const TETTO_DETTAGLIO = 8000;
+  const json = res.output ? JSON.stringify(res.output) : '';
+  const detail = json ? ` (${json.length > TETTO_DETTAGLIO ? `${json.slice(0, TETTO_DETTAGLIO)}… [tagliato: ${json.length} caratteri in tutto]` : json})` : '';
   // Le azioni sulla scheda web (proxy, stile della pagina) falliscono quasi
   // sempre per lo stesso motivo: non c'è una scheda web attiva.
   const PAGE_ACTIONS = ['PROXY_TAB', 'RIMUOVI_PROXY', 'RIMUOVI_PROXY_TUTTE', 'REGOLA_PROXY_DOMINIO', 'RIMUOVI_REGOLA_PROXY', 'STILE_PAGINA', 'RIPRISTINA_STILE_PAGINA'];
@@ -3342,13 +3514,21 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     threadMessages.push(msg);
   }
   const imageList = (Array.isArray(images) && images.length) ? images : (image ? [image] : []);
+  const giaLetta = origineGiaLettaInChat(chatId);
   if (imageList.length) {
     const parts = [];
     if (userMessage) parts.push({ type: 'text', text: String(userMessage) });
     for (const im of imageList) parts.push({ type: 'image_url', image_url: { url: im } });
+    // #711 — «questa foto è fatta con l'AI?» deve avere in chat la stessa
+    // risposta del tasto destro, quindi il controllo si fa SEMPRE: capire
+    // dall'intento quando serve sarebbe una promessa affidata al modello.
+    const origine = await noteProvenienzaImmagini(imageList);
+    if (origine) parts.push({ type: 'text', text: origine });
+    if (giaLetta) parts.push({ type: 'text', text: giaLetta });
     threadMessages.push({ role: 'user', content: parts });
+    ricordaOrigineInChat(chatId, origine);
   } else {
-    threadMessages.push({ role: 'user', content: String(userMessage || '') });
+    threadMessages.push({ role: 'user', content: giaLetta ? `${String(userMessage || '')}\n\n${giaLetta}` : String(userMessage || '') });
   }
 
   // Reasoning "vero" in diretta: se il client ha aperto un canale (reasoningReqId)
@@ -3465,7 +3645,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       const avvia = (a) => (a._argsError
         ? Promise.resolve({ executed: false, kept: false, rejected: true, error: a._argsError })
         : executeFiloAction(a, {
-          sender, contesto: azioniViste, parole: paroleUtente,
+          sender, contesto: azioniViste, parole: paroleUtente, chatId,
           // Le azioni lunghe dicono a che punto sono: la riga d'attesa le conta.
           avanzamento: canPush ? (fatti, totali) => push('filo:action', {
             kind: 'progress', type: String(a.type || '').toUpperCase(), callId: a._callId || '', fatti, totali,
@@ -3671,7 +3851,7 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
   const memory = await FiloMem.getMemory();
   const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(memory);
   const lezioni = await lessonsBufferText();
-  const { stateText } = await FiloState.assemble();
+  const { stateText } = await FiloState.assemble({ sistema: false });
   // #379.5 — i "file" dell'editor (appunti inclusi: sono file come gli altri)
   // entrano nel contesto come riassunti, non come testo integrale. Sostituisce
   // la vecchia iniezione degli appunti dall'archivio (silo ormai vuoto dopo la
@@ -3764,15 +3944,112 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
 }
 
 // Messaggio "senza chiave API": istantaneo, dalle pagine salvate. Niente LLM.
+// ===== Le carte di sinistra della home dalla chat (#870) =====
+// La chat vede la colonna come la home: stesse carte, stesso ordine (SN_CARTE_HOME.sinistra). Senza chiave la
+// chat non risponde, quindi la carta dei Crediti qui non c'è. `chatId`: la conversazione che chiede.
+async function carteSinistraPerChat(sender, chatId = null, { tolte = false } = {}) {
+  const CH = globalThis.SN_CARTE_HOME;
+  const ambito = ambitoDellaFinestra(sender && sender.win);
+  let downloads = [];
+  try { downloads = require('./downloads').list(ambito) || []; } catch (_) {}
+  const [timers, notifiche, layout] = await Promise.all([
+    FiloMem.gcTimers().catch(() => []),
+    FiloMem.listNotifications().catch(() => []),
+    require('./carteHome').leggi(),
+  ]);
+  const lavori = require('./lavoriInCorso').elenco(ambito);
+  return (tolte ? CH.nascosteSinistra : CH.sinistra)({ timers, notifiche, downloads, lavori, chat: chatId }, layout);
+}
+
+// null se il nome non è di una carta di sinistra tolta: allora decide il resto di CARTA_HOME.
+async function rimettiSinistraDaChat({ action, sender, chatId }) {
+  const CH = globalThis.SN_CARTE_HOME;
+  const tolte = await carteSinistraPerChat(sender, chatId, { tolte: true });
+  const trovate = CH.trovaSinistra(action.carta, tolte);
+  if (!trovate.voci.length) return null;
+  const elenco = (voci) => voci.map((v) => ({ carta: v.chiave, tipo: v.tipo, titolo: v.titolo }));
+  if (trovate.voci.length > 1 && !trovate.perTipo) {
+    return { executed: false, kept: false, output: { error: 'più carte tolte con quel nome: quale?', candidate: elenco(trovate.voci) } };
+  }
+  let ultimo = null;
+  for (const v of trovate.voci) {
+    const esito = await require('./carteHome').modifica({ tipo: 'mostra', chiave: v.chiave });
+    if (esito.cambiato) ultimo = esito.layout;
+  }
+  if (ultimo) annunciaCarteHome(ultimo, sender);
+  return { executed: true, kept: true, output: { rimesse: elenco(trovate.voci) } };
+}
+
+async function cartaSinistraDaChat({ tipo, verso, action, sx, trovate, sender }) {
+  const CH = globalThis.SN_CARTE_HOME;
+  const Carte = require('./carteHome');
+  const elenco = (voci) => voci.map((v) => ({ carta: v.chiave, tipo: v.tipo, titolo: v.titolo }));
+  const destra = CH.descrivi(await Carte.leggi());
+  const no = (error) => ({ executed: false, kept: false, output: { error, sinistra: elenco(sx), ...destra } });
+  const voci = trovate.voci;
+  if (!voci.length) return no('carta sconosciuta: scegli fra queste (carta = la chiave)');
+  if (voci.length > 1 && !(trovate.perTipo && tipo === 'togli')) {
+    return { executed: false, kept: false, output: { error: 'più carte con quel nome: quale?', candidate: elenco(voci) } };
+  }
+  if (tipo === 'aggiungi') return no('la carta è già nella home');
+  if (tipo === 'togli') {
+    if (voci.some((v) => v.tipo === 'timer' || v.tipo === 'sveglia')) {
+      return no('un timer o una sveglia si tolgono con CANCELLA_SVEGLIA');
+    }
+    let avvisi = 0;
+    for (const v of voci) {
+      if (v.tipo === 'avviso') { await FiloMem.dismissNotification(v.ref.id); avvisi++; }
+      else {
+        const esito = await Carte.modifica({ tipo: 'nascondi', chiave: v.chiave });
+        if (esito.cambiato) annunciaCarteHome(esito.layout, sender);
+      }
+    }
+    if (avvisi) broadcastLiveUpdate();
+    return { executed: true, kept: true, output: { tolte: elenco(voci) } };
+  }
+  // sposta: la nuova posizione nell'ordine che l'utente vede, fra le carte che non stanno in cima per regola.
+  const v = voci[0];
+  const FISSA = 'sta in cima finché suona: non si sposta e non si scavalca';
+  if (v.fissa) return no(`la carta «${v.titolo}» ${FISSA}`);
+  const mobili = sx.filter((x) => !x.fissa);
+  const ordine = mobili.map((x) => x.chiave).filter((k) => k !== v.chiave);
+  const at = mobili.findIndex((x) => x.chiave === v.chiave);
+  let dove;
+  if (action.prima_di != null) {
+    const rif = sx.find((x) => x.chiave === String(action.prima_di)) || CH.trovaSinistra(action.prima_di, sx).voci[0];
+    if (!rif || rif.chiave === v.chiave) return no('la carta di riferimento non è a sinistra');
+    if (rif.fissa) return no(`la carta «${rif.titolo}» ${FISSA}`);
+    dove = ordine.indexOf(rif.chiave);
+  } else if (verso === 'cima') dove = 0;
+  else if (verso === 'fondo') dove = ordine.length;
+  else if (verso === 'su') dove = Math.max(0, at - 1);
+  else if (verso === 'giu') dove = Math.min(ordine.length, at + 1);
+  else return no('verso sconosciuto');
+  ordine.splice(dove, 0, v.chiave);
+  const esito = await Carte.modifica({ tipo: 'ordina-sinistra', ordine });
+  if (esito.errore) return no(esito.errore);
+  if (esito.cambiato) annunciaCarteHome(esito.layout, sender);
+  return { executed: true, kept: true, output: { spostata: v.titolo, sinistra: elenco(ordinaCome(sx, esito.layout)) } };
+}
+
+function ordinaCome(sx, layout) {
+  const CH = globalThis.SN_CARTE_HOME;
+  const per = (t) => sx.filter((x) => x.tipo === t).map((x) => x.ref);
+  return CH.sinistra({
+    timers: [...per('timer'), ...per('sveglia')], notifiche: per('avviso'), downloads: per('download'), lavori: per('lavoro'),
+  }, layout);
+}
+
 function buildNoKeyDashboard(settings, saved) {
   const suggestions = saved.slice(0, 5).map((p) => ({
     icon: 'link', text: p.title || p.url,
     action: { type: 'NAVIGA', url: p.url, label: p.title || p.url },
     importance: 2,
   }));
-  // La prima cosa che un utente nuovo deve fare sta a un clic, non in un menu.
+  // La prima cosa che un utente nuovo deve fare sta a un clic, non in un menu: nella home è la prima carta (#870).
   if (!settings.apiKeys?.openrouter) {
     suggestions.unshift({
+      carta: 'crediti',
       icon: 'credits', text: 'Apri Crediti e riscatta l\'invito',
       action: { type: 'NAVIGA', url: 'filo://credits/credits.html', label: 'Crediti' },
       importance: 3,
@@ -3780,7 +4057,7 @@ function buildNoKeyDashboard(settings, saved) {
   }
   const message = settings.apiKeys?.openrouter
     ? 'Buongiorno. Filo è qui.'
-    : 'Per attivare Filo serve un codice d\'invito: riscattalo nella pagina Crediti e ricevi i crediti per usare i modelli. Se preferisci, lì puoi mettere una tua chiave OpenRouter. Intanto, le tue pagine salvate sono qui.';
+    : `Per attivare Filo serve un codice d'invito: riscattalo nella pagina Crediti e ricevi i crediti per usare i modelli. Se preferisci, lì puoi mettere una tua chiave OpenRouter.${saved.length ? ' Intanto, le tue pagine salvate sono fra i suggerimenti.' : ''}`;
   return { message, suggestions };
 }
 
@@ -3936,6 +4213,8 @@ const handlerCtx = {
   filoWin,
   broadcastToTabs,
   broadcastToFiloPages,
+  annunciaCarteHome,
+  ambitoDellaFinestra,
   broadcastLiveUpdate,
   getEffectiveSettings,
   fillMovedSlots,
@@ -4804,18 +5083,32 @@ function broadcastToTabs(message) {
 // Il frame principale basta: qui non ci sono destinatari nei riquadri
 // incorporati (le pagine filo:// non ne ospitano di privilegiati). Anche fra le
 // finestre solo quelle di Filo: un popup di accesso è la pagina di un sito.
+//
+// `message` può essere una funzione dell'ambito della finestra (quello degli scaricamenti: '' o la partizione
+// incognito) che dà il messaggio per quella finestra, o null per saltarla: così l'incognito resta separato.
 function broadcastToFiloPages(message) {
-  const aFilo = (wc) => {
+  const aFilo = (wc, m) => {
     try {
-      if (wc && !wc.isDestroyed?.() && isFilo(wc.getURL())) wc.send('filo:broadcast', message);
+      if (wc && !wc.isDestroyed?.() && isFilo(wc.getURL())) wc.send('filo:broadcast', m);
     } catch (_) {}
   };
   try {
     for (const win of BrowserWindow.getAllWindows()) {
-      if (win._filoTabs) for (const t of win._filoTabs.tabs) aFilo(t.view?.webContents);
-      aFilo(win.webContents);
+      const m = typeof message === 'function' ? message(ambitoDellaFinestra(win)) : message;
+      if (m == null) continue;
+      if (win._filoTabs) for (const t of win._filoTabs.tabs) aFilo(t.view?.webContents, m);
+      aFilo(win.webContents, m);
     }
   } catch (_) {}
+}
+function ambitoDellaFinestra(win) {
+  try { return require('./downloads').scopeOfWindow(win); } catch (_) { return ''; }
+}
+// Le carte della home si annunciano solo alle finestre dell'ambito di chi le ha mosse: in incognito la
+// disposizione vive in memoria, e la finestra normale non deve vederla cambiare.
+function annunciaCarteHome(layout, sender) {
+  const ambito = ambitoDellaFinestra(sender && sender.win);
+  broadcastToFiloPages((a) => (a === ambito ? { type: MSG.CARTE_HOME_CAMBIATE, layout } : null));
 }
 
 // Configura il rilevatore di siti pericolosi (services/safebrowse) dalle

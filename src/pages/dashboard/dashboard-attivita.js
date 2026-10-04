@@ -252,6 +252,8 @@
     LEGGI_FILE: (n) => (n > 1 ? `letto ${n} file` : 'letto un file'),
     LEGGI_TRASPARENZA: () => 'riletto la trasparenza',
     CAPACITA_DETTAGLIO: () => 'verificato cosa sa fare',
+    LEGGI_IMPOSTAZIONI: () => 'letto le impostazioni',
+    TOGLI_PERMESSO_SITO: () => 'tolto un permesso a un sito',
     TIMER: (n) => (n > 1 ? `avviato ${n} timer` : 'avviato un timer'),
     SVEGLIA: (n) => (n > 1 ? `impostato ${n} sveglie` : 'impostato una sveglia'),
     CANCELLA_SVEGLIA: () => 'cancellato una sveglia',
@@ -274,6 +276,7 @@
     STILE_PAGINA: () => 'cambiato l\'aspetto della pagina',
     RIPRISTINA_STILE_PAGINA: () => 'rimesso la pagina com\'era',
     COMANDO_FINESTRA: () => 'azionato un comando della finestra',
+    CARTA_HOME: (n) => (n > 1 ? `sistemato ${n} carte della home` : 'sistemato una carta della home'),
     INVIA_FEEDBACK: () => 'preparato una segnalazione',
     PULISCI_TAB: () => 'riordinato le schede',
     CANCELLA_ARCHIVIO: () => 'eliminato schede dall\'archivio',
@@ -385,6 +388,14 @@
       return { icon: '💬', text: `Cerco fra le chat di prima: ${q}` };
     },
     CAPACITA_DETTAGLIO: () => ({ icon: '📖', text: 'Verifico cosa so fare' }),
+    LEGGI_IMPOSTAZIONI: (a) => {
+      const c = String(a.cerca || '').trim();
+      return { icon: '⚙', text: c ? `Leggo come è impostato: ${c}` : 'Leggo le impostazioni' };
+    },
+    TOGLI_PERMESSO_SITO: (a) => {
+      const tolte = (a._output && Array.isArray(a._output.tolte)) ? a._output.tolte.map(pulito).filter(Boolean) : [];
+      return { icon: '⚙', text: `Permesso tolto · ${tolte.length ? tolte.join('; ') : String(a.sito || '')}` };
+    },
     LEGGI_FILE: (a) => {
       const title = (a._output && a._output.title) || '';
       return { icon: '📄', text: title ? `Leggo: ${title}` : 'Leggo un file' };
@@ -444,6 +455,22 @@
       const n = Number(a._output && a._output.eliminate) || 0;
       return { icon: '🗑', text: `Eliminate dall’archivio · ${n} ${n === 1 ? 'scheda' : 'schede'}` };
     },
+    // Il nome è quello della carta toccata davvero (#870): a sinistra lo dice l'esito, a destra lo si risolve come il
+    // main. Le parole del modello da sole ingannano: «l'avviso del documento» contiene un nome dell'Editor.
+    CARTA_HOME: (a) => {
+      const C = self.SN_CARTE_HOME;
+      const o = a._output || {};
+      const corto = (t) => { const x = String(t || '').replace(/\s+/g, ' ').trim(); return x.length > 60 ? `${x.slice(0, 59)}…` : x; };
+      let nome = '';
+      const toccate = Array.isArray(o.tolte) && o.tolte.length ? o.tolte : (Array.isArray(o.rimesse) && o.rimesse.length ? o.rimesse : null);
+      if (toccate) nome = toccate.length === 1 ? corto(toccate[0].titolo) : `${toccate.length} carte`;
+      else if (o.spostata) nome = corto(o.spostata);
+      else if (Array.isArray(o.destra) && !o.error && C) { const id = C.risolvi(a.carta); nome = id ? C.carta(id).titolo : ''; }
+      const op = String(a.operazione || '').toLowerCase();
+      const cosa = { togli: 'Carta tolta', rimetti: 'Carta rimessa', aggiungi: 'Carta rimessa', sposta: 'Carta spostata' }[op];
+      if (op === 'ripristina') return { icon: '🏠', text: 'Carte della home rimesse com\'erano' };
+      return { icon: '🏠', text: `${cosa || 'Carta della home'}${nome ? ` · ${nome}` : ''}` };
+    },
     COMANDO_FINESTRA: (a) => {
       const labels = {
         fullscreen: 'Schermo intero', minimize: 'Finestra ridotta a icona', home: 'Home aperta',
@@ -463,13 +490,15 @@
     CERCA_WEB: 'Ricerca non riuscita', LEGGI_FILE: 'File non letto', RINOMINA_FILE: 'Nessun file rinominato',
     CERCA_CHAT: 'Conversazione non ritrovata',
     LEGGI_DOCUMENTO: 'Documento non letto', LEGGI_TRASPARENZA: 'Documento non disponibile',
-    CAPACITA_DETTAGLIO: 'Verifica non riuscita', NAVIGA: 'Link non aperto',
+    CAPACITA_DETTAGLIO: 'Verifica non riuscita', NAVIGA: 'Link non aperto', LEGGI_IMPOSTAZIONI: 'Impostazioni non lette',
+    TOGLI_PERMESSO_SITO: 'Permesso non tolto',
     IMPOSTA_PREFERENZA: 'Impostazione non applicata', IMPOSTA_ESTETICA: 'Aspetto non cambiato',
     ANNULLA_CAMBIO: 'Niente annullato',
     STILE_PAGINA: 'Aspetto della pagina non cambiato', RIPRISTINA_STILE_PAGINA: 'Aspetto della pagina non ripristinato',
     PROXY_TAB: 'Scheda non instradata', RIMUOVI_PROXY: 'Proxy non tolto',
     RIMUOVI_PROXY_TUTTE: 'Proxy non tolti', REGOLA_PROXY_DOMINIO: 'Regola non salvata',
     RIMUOVI_REGOLA_PROXY: 'Regola non tolta', COMANDO_FINESTRA: 'Comando non eseguito',
+    CARTA_HOME: 'Carta della home non cambiata',
     EVENTO_CALENDARIO: 'Evento non creato', ONBOARDING: 'Accoglienza non aggiornata',
   };
   function activityRowFor(a) {
@@ -991,7 +1020,9 @@
           if (r && r.output) applyCommandCwd([{ _output: r.output }]);
           return;
         }
-        btn.textContent = (r && r.executed) ? `✓ ${shortLabel}` : '✗ Non eseguita';
+        const fatto = r && typeof r.fatto === 'string' ? r.fatto.trim() : '';
+        btn.textContent = (r && r.executed) ? `✓ ${fatto ? (fatto.length > 140 ? `${fatto.slice(0, 139)}…` : fatto) : shortLabel}` : '✗ Non eseguita';
+        if (fatto.length > 140) btn.title = fatto;
         // #950 — i file rinominati: il bottone dice quanti, e accanto c'è la strada per rimetterli com'erano.
         if (type === 'RINOMINA_FILE') {
           btn.textContent = (r && r.executed) ? `✓ ${testoRinominati(r.output)}` : `✗ ${motivoNessunaRinomina(r && r.output)}`;
@@ -1138,6 +1169,10 @@
       // (auto-continue), dove compare la risposta.
       const nome = (a._output && a._output.name) || '';
       return stepTrace(nome ? `📄 Leggo il documento: ${nome}` : '📄 Leggo il documento');
+    }
+    if (type === 'LEGGI_IMPOSTAZIONI') {
+      const c = String(a.cerca || '').trim();
+      return stepTrace(c ? `⚙ Leggo come è impostato: ${c}` : '⚙ Leggo le impostazioni');
     }
     if (type === 'LEGGI_TRASPARENZA') {
       // Traccia del passo intermedio: Filo rilegge le scelte dell'owner messe

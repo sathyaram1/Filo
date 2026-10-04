@@ -34,10 +34,12 @@ module.exports = function register(on, ctx) {
   };
 
   on(MSG.FILO_CHAT, soloFilo(async (msg, sender) => {
+    let fineLavoro = () => {};
     try {
       // #525 — `chatId` è la targa della conversazione in corso: il main ci
       // scrive dentro il messaggio dell'utente e la risposta, turno per turno.
       const chatId = msg.chatId || null;
+      fineLavoro = require('../lavoriInCorso').inizia({ tipo: 'risposta', chat: chatId, testo: msg.userMessage, wc: sender && sender.wc, ambito: ctx.ambitoDellaFinestra(sender && sender.win) });
       const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images, reasoningReqId: msg.reasoningReqId, internal: !!msg.internal, daModello: !!msg.daModello, chatId, sender });
       return { ok: true, ...r };
     } catch (e) {
@@ -58,6 +60,8 @@ module.exports = function register(on, ctx) {
       const W = globalThis.SN_WALLET;
       const keyRefused = Boolean(W && typeof W.keyRefusalOf === 'function' && W.keyRefusalOf(e));
       return { ok: false, error, code: (e && e.code) || 'UNKNOWN', status: Number(e && e.status) || 0, keyRefused, actions };
+    } finally {
+      fineLavoro();
     }
   }));
 
@@ -68,7 +72,12 @@ module.exports = function register(on, ctx) {
   // un'azione fuori registro.
   on(MSG.FILO_CONFIRM_ACTION, async (msg, sender) => {
     const r = await executeFiloAction(msg.action, { confirmed: true, sender, assistente: msg.assistente === true, parole: paroleDa(msg) });
-    return { ok: true, ...r };
+    // Dopo l'OK il pulsante dice la cosa fatta, non quella proposta («Filo vuole…»): il testo lo dà il registro,
+    // col risultato vero davanti (quante pagine cancellate, quante schede archiviate), come la riga del diario.
+    const Levels = globalThis.SN_ACTION_LEVELS;
+    const fatto = r && r.executed && Levels && Levels.describeDone
+      ? String(Levels.describeDone({ ...msg.action, _output: r.output }) || '').split('\n')[0].trim() : '';
+    return { ok: true, ...r, ...(fatto ? { fatto } : {}) };
   });
 
   // #867 — il segno sulla bolla chiede come stanno i suoi cambi, e il suo «annulla» li rimette com'erano.
@@ -142,6 +151,24 @@ module.exports = function register(on, ctx) {
     const { state, stateText } = await FiloState.assemble();
     return { ok: true, state, stateText };
   });
+
+  // Il nome della rete e dei dispositivi dicono dove sei e cosa hai addosso: a un sito non si danno.
+  on(MSG.SISTEMA_STATO, soloFilo(async (msg, sender) => {
+    const Sistema = require('../statoSistema');
+    const schede = sender && sender.win && sender.win._filoTabs;
+    // Guarda chi può vederla: scheda attiva di una finestra né ridotta a icona né nascosta (la pagina resta «visible»).
+    const davanti = !(schede && sender.tab) || schede.inVista(sender.tab.id);
+    const segue = !(msg && msg.segue === false);
+    // Chi sta scrivendo in chat sveglia il lettore per il turno che arriva, senza diventare una pagina che lo segue.
+    if (msg && msg.perChat === true) {
+      if (davanti) Sistema.richiedi();
+      return { ok: true, stato: Sistema.stato() };
+    }
+    Sistema.richiedi({ davanti, chi: sender && sender.wc, segue });
+    // La pagina che ha visto cadere o tornare la rete non aspetta il giro: la lettura nuova arriva con l'annuncio.
+    if (davanti && segue && msg && msg.subito === true) Sistema.leggiUnaVolta();
+    return { ok: true, stato: Sistema.stato() };
+  }));
 
   on(MSG.FILO_GENERATE_DASHBOARD, async (msg, sender, origin) => {
     // Il messaggio della home mette in fila le pagine salvate: a un sito non si dà, come il loro elenco (#589.12).
@@ -255,7 +282,9 @@ module.exports = function register(on, ctx) {
     if (sender && sender.wc) ctx.affidaChat(id, sender.wc);
     const role = msg.role === 'user' ? 'user' : 'filo';
     // L'esito di un comando lanciato a mano l'ha scritto il comando: riaperta, la chat lo tratta da letto (#810).
-    const esterno = role === 'filo' && msg.esterno === 'comando' ? "dall'output di un comando" : '';
+    // Così il nome di un file scaricato, che sceglie il sito, quando una carta della home lo porta nel filo (#870).
+    const ESTERNI = { comando: "dall'output di un comando", download: 'dal nome di un file scaricato' };
+    const esterno = role === 'filo' && Object.hasOwn(ESTERNI, msg.esterno) ? ESTERNI[msg.esterno] : '';
     // I cambi di stato di un'azione confermata dopo il turno (#867): riaperta, la bolla ritrova il segno.
     const cambi = (Array.isArray(msg.cambi) ? msg.cambi : []).filter((c) => typeof c === 'string');
     await FiloChats.append(id, {
@@ -453,6 +482,19 @@ module.exports = function register(on, ctx) {
     broadcastLiveUpdate();
     return { ok: true, notifications: list.filter((n) => !n.dismissed) };
   }));
+
+  // #870 — le carte della home. La stessa mossa arriva dalla chat (azione CARTA_HOME) e passa dallo stesso posto.
+  on(MSG.CARTE_HOME_GET, soloFilo(async () => ({ ok: true, layout: await require('../carteHome').leggi() })));
+  on(MSG.CARTE_HOME_MODIFICA, soloFilo(async (msg, sender) => {
+    const esito = await require('../carteHome').modifica(msg && msg.mossa);
+    if (esito.errore) return { ok: false, error: esito.errore, layout: esito.layout };
+    if (esito.cambiato) ctx.annunciaCarteHome(esito.layout, sender);
+    return { ok: true, layout: esito.layout };
+  }));
+  on(MSG.LAVORI_IN_CORSO, soloFilo(async (msg, sender) => ({
+    ok: true, lavori: require('../lavoriInCorso').elenco(ctx.ambitoDellaFinestra(sender && sender.win)),
+  })));
+  on(MSG.EDITOR_RECENTI, soloFilo(async () => require('../editorFiles').recenti()));
 
   // F4 — Annulla un auto-feedback appena inviato (undo dal toast).
   // Marca il feedback come `ignored` via updateStatus. Usa l'ID token admin se

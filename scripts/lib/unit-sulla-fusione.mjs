@@ -8,7 +8,7 @@ import {
   unlinkSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, dirname, isAbsolute, join, resolve, win32 } from 'node:path';
+import { basename, dirname, join, resolve, win32 } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { sommaRiepiloghi, perLaRiga, allaLettera, NODE_LEGGE_MODELLI } from '../run-unit-tests.mjs';
 
@@ -26,16 +26,15 @@ const MAIN = 'main';
 const IDENTITA = ['-c', 'user.name=filo-prova-fusione', '-c', 'user.email=prova-fusione@filo.invalid', '-c', 'commit.gpgsign=false'];
 
 const primaRiga = (s) => String(s || '').split(/\r?\n/).find((r) => r.trim()) || '';
-
-// Le due forme su ogni sistema: per l'`isAbsolute` POSIX `C:\…` è relativo, e la chiave resterebbe intera.
-const assoluto = (p) => isAbsolute(p) || win32.isAbsolute(p);
+// Assoluto in tutte e due le forme, su ogni piattaforma (win32 copre anche «/…»): con l'isAbsolute del sistema, su
+// Linux «C:\…» restava intero e la stessa chiave usciva diversa.
+const assoluto = (p) => win32.isAbsolute(p);
 
 /** Un test rosso in una riga che due cartelle diverse scrivono uguale. PURA. */
 export function chiaveTest(r, root) {
   let file = r && r.file ? perLaRiga(String(r.file), root) : '?';
   // Fuori dalla cartella (forma corta e lunga dello stesso percorso su Windows): conta il pezzo da tests/ in poi.
-  // win32: un percorso di Windows resta assoluto anche letto da Linux (lo prova lo unit, che gira ovunque).
-  if (isAbsolute(file) || win32.isAbsolute(file)) {
+  if (assoluto(file)) {
     const barre = file.replace(/\\/g, '/');
     const i = barre.lastIndexOf('/tests/');
     if (i >= 0) file = barre.slice(i + 1);

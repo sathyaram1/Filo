@@ -121,6 +121,22 @@
     return M.formatRepeat(raw);
   }
 
+  // Il nome che l'utente vede sulla carta, non l'id che il modello manda.
+  function descriviCarta(a, fatto) {
+    const C = global.SN_CARTE_HOME;
+    // Un nome di destra si riconosce solo esatto: «lo scaricamento del file» è una carta di sinistra, non l'Editor.
+    const id = C ? C.risolvi(a && a.carta, { esatto: true }) : null;
+    const detto = String((a && a.carta) || '').trim();
+    // Una chiave («avviso:…») non è un nome da mostrare: la frase resta senza.
+    const nome = id ? ` «${C.carta(id).titolo}»` : (detto && !/^[a-z]+:/.test(detto) ? ` «${detto.length > 60 ? `${detto.slice(0, 59)}…` : detto}»` : '');
+    const op = String((a && (a.operazione ?? a.op)) || '').toLowerCase();
+    if (op === 'ripristina') return fatto ? 'Carte della home rimesse com\'erano all\'inizio' : 'Rimettere le carte della home com\'erano all\'inizio';
+    if (op === 'togli' && !id) return fatto ? `Carta${nome} tolta dalla home` : `Togliere la carta${nome} dalla home`;
+    if (op === 'togli') return fatto ? `Carta${nome} tolta dalla home: ora è un'icona in «altro»` : `Togliere la carta${nome} dalla home`;
+    if (op === 'rimetti' || op === 'aggiungi') return fatto ? `Carta${nome} rimessa nella home` : `Rimettere la carta${nome} nella home`;
+    return fatto ? `Carta${nome} spostata nella home` : `Spostare la carta${nome} nella home`;
+  }
+
   // Perché LEGGI_DOCUMENTO esce dal perimetro di lettura ('' se ci sta). Senza
   // classificatore non si sa: si chiede.
   function documentoFuori(a) {
@@ -316,6 +332,31 @@
         return `Verificare cosa sa fare Filo${ids.length ? ` (${ids.join(', ')})` : ''}`;
       },
     },
+    // #949 — togliere una risposta ricordata non concede niente: il sito torna a chiedere.
+    TOGLI_PERMESSO_SITO: {
+      level: 1,
+      describe: (a) => {
+        const sito = String((a && (a.sito ?? a.dominio)) || '').trim().slice(0, 80) || 'un sito';
+        const p = String((a && a.permesso) || '').trim().slice(0, 40);
+        return `Togliere ${p ? `il permesso «${p}»` : 'i permessi ricordati'} di ${sito}`;
+      },
+      describeDone: (a) => {
+        const tolte = (a && a._output && Array.isArray(a._output.tolte)) ? a._output.tolte : [];
+        return tolte.length ? `Tolte le risposte ricordate: ${tolte.join('; ')} (il sito tornerà a chiedere)` : 'Nessuna risposta tolta';
+      },
+    },
+    LEGGI_IMPOSTAZIONI: {
+      // #949 — rilegge le impostazioni dell'utente, senza le chiavi: sola lettura, niente esce.
+      level: 1,
+      describe: (a) => {
+        const cerca = String((a && (a.cerca ?? a.query ?? a.chiave)) || '').replace(/\s+/g, ' ').trim();
+        return cerca ? `Leggere com'è impostato «${cerca.slice(0, 60)}»` : 'Leggere le impostazioni';
+      },
+      describeDone: (a) => {
+        const cerca = String((a && (a.cerca ?? a.query ?? a.chiave)) || '').replace(/\s+/g, ' ').trim();
+        return cerca ? `Letto com'è impostato «${cerca.slice(0, 60)}»` : 'Lette le impostazioni';
+      },
+    },
     CERCA_CHAT: {
       // #525 — Filo rilegge le conversazioni passate con lo stesso utente per
       // riprendere un discorso di ieri. Sola lettura di dati che sono già
@@ -430,12 +471,13 @@
     },
     IMPOSTA_PREFERENZA: {
       // Livello per-preferenza: lo dichiara il setter in preferences.js
-      // (default 1). Preferenza sconosciuta/non valida → 2 per prudenza
-      // (tanto il dispatch non la eseguirà comunque). Un `rifiuto` → 1: non
-      // c'è niente da confermare, il dispatch lo respinge spiegando perché.
+      // (default 1). Preferenza sconosciuta/non valida o `rifiuto` → 1: non c'è
+      // niente da confermare, il dispatch la respinge spiegando perché (un OK a vuoto no).
       level: (a) => {
+        // Un elenco che resterebbe com'è: niente da confermare (`_invariato` lo mette il main, #949).
+        if (a && a._invariato) return 1;
         const built = prefBuilt(a);
-        return (built && built.level) || (built ? 1 : 2);
+        return (built && built.level) || 1;
       },
       describe: (a) => {
         const built = prefBuilt(a);
@@ -554,6 +596,13 @@
         };
         return labels[cmd] || 'Azionare un comando della finestra di Filo';
       },
+    },
+    // #870 — le carte della home, come le dispone l'utente trascinandole. Livello 1: ogni mossa si annulla con
+    // quella opposta, e una carta tolta resta in «altro», da cui si rimette.
+    CARTA_HOME: {
+      level: 1,
+      describe: (a) => descriviCarta(a, false),
+      describeDone: (a) => descriviCarta(a, true),
     },
     // ── estetica del CONTENUTO della pagina via chat (#185) ───────────────────
     // Filo cambia l'aspetto del testo della pagina che l'utente sta guardando

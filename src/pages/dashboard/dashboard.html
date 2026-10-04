@@ -6,6 +6,7 @@
   <link rel="icon" href="filo://asset/icons/icon-32.png" />
   <link rel="stylesheet" href="filo://style/theme.css" />
   <link rel="stylesheet" href="dashboard.css" />
+  <link rel="stylesheet" href="filo://style/voce.css" />
   <script src="filo://shared/themeTokens.js"></script>
   <script src="filo://shared/aestheticRefiner.js"></script>
   <script src="filo://shared/pageBootstrap.js"></script>
@@ -14,6 +15,7 @@
   <script src="filo://shared/messages.js"></script>
   <script src="filo://shared/urlNav.js"></script>
   <script src="filo://shared/i18n.js"></script>
+  <script src="filo://shared/tasti.js"></script>
   <script src="filo://shared/filoMarkdown.js"></script>
   <script src="filo://shared/calcMarkers.js"></script>
   <script src="filo://shared/timeFormat.js"></script>
@@ -26,6 +28,12 @@
   <script src="filo://shared/onboarding.js"></script>
   <script src="filo://shared/filoMemory.js"></script>
   <script src="filo://shared/filoState.js"></script>
+  <script src="filo://shared/carteHome.js"></script>
+  <script src="filo://shared/sistema.js"></script>
+  <!-- Il tasto microfono della chat: lo collega dashboard.js, prima che arrivino i content script. -->
+  <script src="filo://shared/dictationSegmenter.js"></script>
+  <script src="filo://shared/ascolto.js"></script>
+  <script src="filo://shared/voceChat.js"></script>
 </head>
 <body data-state="home">
   <!-- I controlli del browser stanno dentro la home, non in una barra in alto: ogni icona aziona il comando
@@ -33,14 +41,10 @@
   <nav class="dash-controls" id="dashControls" aria-label="Controlli Filo"></nav>
   <main class="dash" id="dash">
 
-    <aside class="dash-left" id="left">
-      <ul class="dash-suggestions" id="suggestions"></ul>
-      <button class="dash-expand-btn" id="expandBtn" hidden>
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <polyline points="6 9 12 15 18 9"/>
-        </svg>
-        <span>Mostra tutti</span>
-      </button>
+    <!-- A sinistra quello che accade (Filo lo spinge), a destra quello che l'utente tiene: la differenza è di tempo.
+         Le carte le disegna dashboard-carte.js. -->
+    <aside class="dash-left" id="left" aria-label="Quello che accade">
+      <div class="dash-carte" id="accade"></div>
     </aside>
 
     <section class="dash-center" id="center">
@@ -56,8 +60,10 @@
       </div>
     </section>
 
-    <aside class="dash-right" id="right">
-      <div class="dash-live" id="live"></div>
+    <aside class="dash-right" id="right" aria-label="Quello che tieni">
+      <div class="dash-carte" id="tieni"></div>
+      <section class="dash-altro" id="altro" aria-label="Altro"></section>
+      <div class="dash-sistema" id="sistema" role="group" aria-label="Ora, batteria, rete e Bluetooth" hidden></div>
     </aside>
 
     <form class="dash-input-wrap" id="inputForm" autocomplete="off">
@@ -86,6 +92,8 @@
   <script src="dashboard-onboarding.js"></script>
   <script src="dashboard-comandi.js"></script>
   <script src="dashboard-terminale.js"></script>
+  <script src="dashboard-carte.js"></script>
+  <script src="dashboard-sistema.js"></script>
   <script src="dashboard.js"></script>
 </body>
 </html>

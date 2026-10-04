@@ -236,6 +236,23 @@
     // (#274). { url } → { ok, path?, filename? } | { ok:false, cancelled?, error? }
     // (la risposta arriva a download concluso/annullato).
     DOWNLOAD_IMAGE: 'download_image',
+    // #711 — che cosa DICHIARA un'immagine sulla propria origine (credenziali
+    // C2PA firmate, etichetta IPTC/XMP, parametri di generazione nei PNG).
+    // Letto in locale, niente modelli; la sola rete è l'elenco ufficiale dei
+    // firmatari, che il main rinfresca per conto suo. Aperto anche ai content
+    // script: la risposta parla SOLO dei byte che la pagina ha appena mandato.
+    // { dataUrl } → { ok, frase, forte, origine, prova, dichiarante, firmatario, avvisi }
+    IMAGE_PROVENANCE: 'image_provenance',
+    // #946 — i byte originali di un'immagine di un'altra origine (le foto stanno quasi
+    // sempre su un CDN), che lo script di pagina non può leggere. Scaricati nel main
+    // come «Salva immagine come…», con Referer e cookie della scheda. Restituisce solo immagini.
+    // { url } → { ok, dataUrl } | { ok:false, error, tooBig?, notImage? }
+    IMAGE_BYTES: 'image_bytes',
+    // #946 — «Copia immagine» appena scritta negli appunti: gli appunti la ricodificano
+    // e ne perdono le etichette, quindi il main ricorda l'esito letto sull'originale
+    // per i pixel della copia, e la chat lo ritrova quando la si incolla.
+    // { originale, copia } (data URL) → { ok, ricordata }
+    IMAGE_COPIED: 'image_copied',
     // "Salva video/audio come…" dal menu contestuale su <video>/<audio>.
     // Stesso identico cammino di DOWNLOAD_IMAGE (il download avviene nel main
     // con Referer + cookie della scheda): cambia solo il tipo di file, che
@@ -389,6 +406,7 @@
     // Le risposte ai permessi dei siti che restano fra un avvio e l'altro: la pagina Sicurezza le elenca e le toglie.
     PERMESSI_SITI_GET: 'permessi_siti_get',          // {} → { ok, scelte: [{ origine, parte, si, sotto, dominio }] }
     PERMESSI_SITI_TOGLI: 'permessi_siti_togli',      // { origine, parte } → { ok }
+    PERMESSI_SITI_CAMBIATI: 'permessi_siti_cambiati', // main → pagine di Filo: la chat ha tolto una risposta ricordata
 
     // §2.1 — segnali di attività della tab riportati dal content script, per la
     // decisione di auto-archiviazione. Throttled. { lastInteractionAt?, scrollPct?, formDirty? }
@@ -677,6 +695,12 @@
     // Filo State: assembla stato programmatico (tab aperte, tempo, processi).
     // Risposta: { ok, state: {...}, stateText: "..." }
     FILO_GET_STATE: 'filo_get_state',
+    // Batteria, rete (col nome del Wi-Fi) e Bluetooth (coi nomi dei dispositivi): dati del computer, solo alle
+    // pagine di Filo. La richiesta tiene sveglio il lettore per 90 s: la home la ripete mentre è in vista.
+    // → { ok, stato: { batteria, rete, bluetooth, letto } | null }
+    SISTEMA_STATO: 'sistema_stato',
+    // main → pagine filo:// quando una lettura cambia. { stato }
+    SISTEMA_AGGIORNATO: 'sistema_aggiornato',
     // Genera dashboard (messaggio centro + suggerimenti). Usa cache con cooldown.
     // { force?: boolean }
     // Risposta: { ok, message, suggestions, cached, ts }
@@ -774,6 +798,16 @@
     FILO_STOP_TIMER_ALARM: 'filo_stop_timer_alarm', // { id } — silenzia/rimuove un timer che sta suonando
     FILO_GET_NOTIFICATIONS: 'filo_get_notifications',
     FILO_DISMISS_NOTIFICATION: 'filo_dismiss_notification', // { id }
+    // Le carte della home (#870), solo pagine filo://. La mossa è quella di SN_CARTE_HOME.applica: la pagina
+    // manda il cambio, non la disposizione intera. CAMBIATE va alle pagine di Filo quando la disposizione cambia.
+    CARTE_HOME_GET: 'carte_home_get',             // {} → { ok, layout }
+    CARTE_HOME_MODIFICA: 'carte_home_modifica',   // { mossa } → { ok, layout } | { ok:false, error, layout }
+    CARTE_HOME_CAMBIATE: 'carte_home_cambiate',   // broadcast { layout }
+    // I lavori lunghi in corso (una risposta di Filo, un comando del terminale): la home li mostra a sinistra.
+    LAVORI_IN_CORSO: 'lavori_in_corso',           // {} → { ok, lavori: [{ id, tipo, chat, testo, iniziato }] }
+    LAVORI_CAMBIATI: 'lavori_cambiati',           // broadcast { lavori }
+    // I documenti dell'Editor dal più recente, per la sua carta nella home. Solo pagine filo://.
+    EDITOR_RECENTI: 'editor_recenti',             // {} → { ok, totale, file: [{ id, titolo, modificato }] }
     // L'utente ha confermato (popup livello 2 / digitato "conferma" livello 3)
     // un'azione di Filo rimasta in sospeso: ora va eseguita davvero. { action }
     FILO_CONFIRM_ACTION: 'filo_confirm_action',

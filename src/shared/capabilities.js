@@ -159,8 +159,8 @@
     {
       id: 'dictate', title: 'Detta', category: 'writing',
       desc: 'Detta in un campo di testo: il testo compare mentre parli, frase dopo frase, nel punto dove sta il cursore. Trascrive con un modello a pesi aperti, nella lingua che parli.',
-      invoke: 'In un campo modificabile, dal menu del tasto destro scegli "Detta"; clicca il riquadro rosso per fermare. La freccetta accanto sceglie il modello.',
-      doesNot: 'Si ferma da sola dopo cinque minuti. Le frasi provvisorie si vedono nel riquadro, nel campo entrano solo quelle chiuse da una pausa.',
+      invoke: 'In un campo modificabile, dal menu del tasto destro scegli "Detta"; clicca il riquadro rosso per fermare. La freccetta accanto sceglie il modello. Nella casella di una chat di Filo "Detta" fa quello che fa il suo microfono (vedi «Parla a Filo»).',
+      doesNot: 'Si ferma da sola dopo cinque minuti. Le frasi provvisorie si vedono nel riquadro, nel campo entrano solo quelle chiuse da una pausa. Se il microfono non ha il permesso, non c’è, o la trascrizione non riesce, un avviso dice cosa fare.',
     },
     {
       id: 'search-web', title: 'Cerca sul web', category: 'selection',
@@ -204,8 +204,9 @@
     // ─────────────────── Immagini e cattura schermo ──────────────────────────
     {
       id: 'explain-image', title: 'Spiega un’immagine', category: 'media',
-      desc: 'Descrive un’immagine della pagina, direttamente lì sotto.',
-      invoke: 'Clic destro su un’immagine: la descrizione arriva da sola dentro il menu, non c’è una voce da cliccare.',
+      desc: 'Descrive un’immagine della pagina, direttamente lì sotto. Se il file dichiara la propria origine, in cima al riquadro compare una riga che dice cosa dichiara (generata o modificata con l’AI, oppure scattata con una fotocamera) e chi lo dichiara. Filo legge tre cose: le credenziali firmate (Content Credentials, lo standard C2PA), l’etichetta «Digital Source Type» dei metadati IPTC/XMP e i parametri di generazione che alcuni programmi scrivono dentro i PNG. Delle credenziali controlla la firma, se il file è stato cambiato dopo e se chi ha firmato è nell’elenco ufficiale dei firmatari riconosciuti, che Filo scarica da solo una volta al giorno da chi gestisce lo standard. Se il certificato di chi ha firmato è scaduto, la firma vale solo se una marca temporale di un’autorità riconosciuta dice che è stata fatta quando il certificato valeva. Se l’immagine è stata generata e poi ritoccata, l’origine la trova nella storia che le credenziali si portano dietro. Un’etichetta senza firma la presenta come dichiarazione del file, non come prova. La lettura avviene sul tuo computer, senza crediti, sugli stessi byte che servono alla descrizione. Vale anche se lo chiedi a Filo («questa foto è fatta con l’AI?»): nella chat della Home sulle immagini allegate, anche se la domanda arriva nei messaggi dopo (anche quelle copiate con «Copia immagine» e incollate, che negli appunti perdono le etichette: Filo ricorda cosa diceva l’originale), nell’Aiuto della pagina sulle immagini che hai davanti.',
+      invoke: 'Clic destro su un’immagine: la descrizione arriva da sola dentro il menu, non c’è una voce da cliccare, anche quando l’immagine sta dentro un link o sotto un velo trasparente. Oppure allegala a una chat con Filo e chiediglielo, o chiedilo all’Aiuto della pagina mentre la guardi.',
+      doesNot: 'Sull’origine non tira a indovinare: non guarda i pixel, non dà percentuali e il modello che descrive l’immagine non giudica da dove viene. Non legge i marchi invisibili nei pixel (SynthID di Google e OpenAI, TrustMark di Adobe, il marchio di Stable Diffusion). Se il file non porta etichette sull’origine non compare niente, e quel silenzio non vuol dire che l’immagine sia vera: uno screenshot, un salvataggio che ricomprime o il caricamento su un social le cancellano, e molti generatori non le scrivono affatto. Non riconosce un firmatario dal nome che si dà: conta solo l’elenco ufficiale, e finché Filo non è riuscito a scaricarlo dice «firma valida, firmatario non verificato». Quando la firma non è valida, quando chi ha firmato non è nell’elenco o quando il file è stato cambiato dopo la firma, lo dice; se le credenziali sono in una forma che non sa verificare dice anche questo, senza chiamarle false. Nell’Aiuto della pagina legge le dodici immagini visibili più grandi.',
     },
     {
       id: 'copy-download-image', title: 'Copia o scarica un’immagine', category: 'media',
@@ -357,6 +358,12 @@
       doesNot: 'Non invia i moduli al posto tuo: ogni azione che modifica la pagina richiede una tua conferma. Per ora non ti chiede se ha funzionato e non condivide con nessuno i passi delle tue sessioni.',
     },
     {
+      id: 'voice-chat', title: 'Parla a Filo', category: 'assistant',
+      desc: 'Accanto all’invio delle chat di Filo (la nuova scheda, l’Aiuto su una pagina, la chat del documento nell’Editor) c’è un microfono: lo premi e parli. Mentre ascolta si accende e si muove con la tua voce; quando smetti di parlare per un paio di secondi si ferma da solo, trascrive e mette il testo nella casella, dove stava il cursore. Poi la richiesta parte da sola: al posto del microfono compare una croce con un anello che si svuota in due secondi e mezzo, e in quel tempo la fermi cliccando la croce, con Esc o scrivendo nella casella. Quanto silenzio chiude l’ascolto (da 1 a 8 secondi) e quanto dura l’attimo per annullare (da 0 a 10) li cambi nella stessa sezione delle Preferenze o chiedendolo a Filo ("aspetta di più quando mi fermo a pensare"). Se preferisci rileggere prima, il testo resta nella casella e lo mandi tu: lo scegli in Preferenze, sezione «Microfono delle chat», oppure chiedendolo a Filo ("quando parlo lascia il testo da correggere"). Trascrive con lo stesso modello di «Detta», nella lingua che parli.',
+      invoke: 'Clic sul microfono accanto all’invio, oppure Ctrl+Shift+Spazio (Cmd+Shift+Spazio su Mac) mentre scrivi nella chat; nella nuova scheda la scorciatoia vale in tutta la pagina. Un altro clic smette subito di ascoltare. Nella casella di una chat anche il tasto destro → "Detta" fa lo stesso. Nelle pagine di Filo il tasto destro sul microfono dice anche se la richiesta parte da sola o resta da correggere, e lo cambia.',
+      doesNot: 'Se il microfono non ha il permesso, non c’è o la trascrizione non riesce, un avviso dice cosa fare. Esc mentre ascolta tiene quello che hai detto ma non lo invia. Smette da solo dopo cinque minuti, o dopo otto secondi se non hai detto niente. Se Filo sta ancora rispondendo, la richiesta aspetta che abbia finito.',
+    },
+    {
       id: 'web-search-assistant', title: 'Ricerca sul web dell’assistente', category: 'assistant',
       desc: 'Durante l’aiuto, l’assistente può fare alcune ricerche sul web per rispondere meglio.',
       invoke: 'Automatico all’interno dell’assistente di pagina.',
@@ -398,13 +405,13 @@
     },
     {
       id: 'generate-dashboard', title: 'Dashboard personale di Filo', category: 'assistant',
-      desc: 'Quando apri una nuova scheda, Filo prepara un breve messaggio per te e qualche suggerimento utile, in base a ciò che stavi facendo e a ciò che ricorda di te.',
-      invoke: 'Si genera da sola all’apertura di una nuova scheda; il messaggio centrale si può nascondere dalle Preferenze ("Commento nella home").',
+      desc: 'Quando apri una nuova scheda, Filo prepara un breve messaggio per te e qualche suggerimento utile, in base a ciò che stavi facendo e a ciò che ricorda di te. I suggerimenti stanno nella carta «Filo ti suggerisce», a destra nella home.',
+      invoke: 'Si genera da sola all’apertura di una nuova scheda; «Aggiorna» sulla carta dei suggerimenti la rifà subito. Il messaggio centrale si può nascondere dalle Preferenze ("Commento nella home"); la carta dei suggerimenti si toglie come ogni carta della home.',
       doesNot: 'I suggerimenti nascono dai tuoi dati locali e non vengono inviati all’esterno.',
     },
     {
       id: 'agent-actions', title: 'Filo agisce al posto tuo', category: 'assistant',
-      desc: 'Su tua richiesta Filo può compiere azioni per te: aprire pagine o file, dare un nome sensato ai tuoi file, cercare sul web, mettere timer e sveglie (e poi cancellarle o spostarle), salvare appunti, regolare preferenze e aspetto, archiviare schede, persino inviare un feedback a tuo nome.',
+      desc: 'Su tua richiesta Filo può compiere azioni per te: aprire pagine o file, dare un nome sensato ai tuoi file, cercare sul web, mettere timer e sveglie (e poi cancellarle o spostarle), salvare appunti, regolare preferenze e aspetto, disporre le carte della home, archiviare schede, persino inviare un feedback a tuo nome.',
       invoke: 'Chiedile a parole all’assistente (nuova scheda) oppure all’assistente laterale di pagina (Alt+H, Ctrl+Alt+H su Mac).',
       doesNot: 'Le azioni delicate ti vengono prima descritte e partono solo dopo la tua conferma; le più rischiose (cancellazioni irreversibili) chiedono di digitare "conferma". Non esegue nulla di delicato di nascosto. Se un link che sta per aprire, o una ricerca sul web che sta per fare, contiene dati letti dal tuo computer, prima te lo mostra e aspetta il tuo OK. Non fa mai uscire un segreto: se un link, una ricerca, un comando, un feedback, un collegamento (anche di posta, anche nelle risposte dell’assistente di pagina) o un suggerimento che apri o scarichi con un clic o dal menu del tasto destro, o il testo che l’assistente di pagina propone per un campo, conterrebbe una chiave che Filo custodisce, oppure un codice monouso o di recupero, una password, una chiave, una carta o un IBAN letti da una pagina, un documento, una ricerca o un comando (e non scritti da te in chat), l’azione non parte a nessun livello, nemmeno col tuo OK, e in chat compare cosa è stato fermato. Se vuoi mandarlo davvero, lo fai tu a mano.',
     },
@@ -422,28 +429,40 @@
     },
     {
       id: 'filo-timers', title: 'Timer', category: 'assistant',
-      desc: 'Chiedi a Filo di farti da timer ("timer di 10 minuti per la pasta"): il conto alla rovescia compare in alto nella nuova scheda e, allo scadere, parte un avviso sonoro che puoi fermare, più una notifica di sistema. Puoi mettere in pausa un timer e riprenderlo quando vuoi, e puoi chiedere a Filo di annullarlo o di cambiargli la durata invece di rifarlo da capo.',
-      invoke: 'Chiedi un timer all’assistente; i timer attivi e quelli che stanno suonando si vedono in alto nella nuova scheda. Sulla scheda del timer trovi ⏸ per metterlo in pausa e ▶ per riprenderlo. Per toglierlo, la × sulla scheda oppure chiedilo a Filo ("annulla il timer della pasta").',
+      desc: 'Chiedi a Filo di farti da timer ("timer di 10 minuti per la pasta"): il conto alla rovescia compare in una carta della home e, allo scadere, parte un avviso sonoro che puoi fermare, più una notifica di sistema. Puoi mettere in pausa un timer e riprenderlo quando vuoi, e puoi chiedere a Filo di annullarlo o di cambiargli la durata invece di rifarlo da capo.',
+      invoke: 'Chiedi un timer all’assistente; i timer attivi e quelli che stanno suonando sono carte nella colonna sinistra della home, col conto alla rovescia. Sulla carta trovi «Pausa» e «Riprendi», e «Ferma» quando suona; cliccando la carta si riapre la conversazione in cui l’avevi chiesto. Per toglierlo, la × sulla carta o la voce "Togli il timer" del suo tasto destro, oppure chiedilo a Filo ("annulla il timer della pasta").',
       doesNot: 'La suoneria si sente quando la nuova scheda è aperta; la notifica di sistema arriva comunque finché Filo è in esecuzione, anche ridotto a icona. Con Filo completamente chiuso non suona nulla.',
     },
     {
       id: 'filo-alarms', title: 'Sveglie', category: 'assistant',
       desc: 'Chiedi a Filo una sveglia ("mettimi una sveglia alle 7 per lavoro", "sveglia tra 3 ore"): all’orario stabilito parte un avviso sonoro nella nuova scheda e una notifica di sistema. Se l’orario è già passato oggi, la sveglia viene messa per domani. Può anche ripetersi: dille quando ("il lunedì e il mercoledì", "nei giorni feriali", "tutte le mattine") e suona a ogni giorno indicato, senza rimetterla ogni volta. Le sveglie già messe le gestisci sempre a parole: cancellarne una, cancellarle tutte, o spostarne l’orario.',
-      invoke: 'Chiedi la sveglia all’assistente; le sveglie programmate compaiono in alto nella nuova scheda con il loro orario (e i giorni, se si ripete) e puoi rimuoverle con la ×. A parole: "cancella la sveglia della palestra", "leva tutte le sveglie", "sposta quella delle 7 alle 8".',
+      invoke: 'Chiedi la sveglia all’assistente; le sveglie programmate sono carte nella colonna sinistra della home, con il loro orario (e i giorni, se si ripete): «Sposta» ti prepara la frase da finire nel campo di scrittura, la × la toglie. A parole: "cancella la sveglia della palestra", "leva tutte le sveglie", "sposta quella delle 7 alle 8".',
       doesNot: 'Non suona se Filo è completamente chiuso: il browser deve restare in esecuzione (va bene anche ridotto a icona). Per svegliarti al mattino affidati anche a una sveglia vera. La ripetizione va a giorni della settimana: non sa fare "ogni due settimane" o "il primo del mese".',
     },
     {
       id: 'filo-notifications', title: 'Avvisi di Filo', category: 'assistant',
-      desc: 'Filo può mostrarti dei brevi avvisi in alto nella nuova scheda (promemoria o segnalazioni discrete) che puoi chiudere quando li hai visti.',
-      invoke: 'Compaiono in alto nella nuova scheda; chiudili con la loro "X".',
+      desc: 'Filo può mostrarti dei brevi avvisi (promemoria o segnalazioni discrete) come carte nella colonna sinistra della home, che puoi chiudere quando li hai visti.',
+      invoke: 'Compaiono come carte a sinistra nella home; chiudili con «Chiudi», con la × o col tasto destro. Cliccando la carta l’avviso si apre nella conversazione, dove puoi chiedere a Filo cosa fare.',
       doesNot: 'Restano dentro Filo: non sono notifiche del sistema operativo.',
+    },
+    {
+      id: 'system-status', title: 'Ora, batteria, rete e Bluetooth', category: 'assistant',
+      desc: 'In fondo alla colonna destra della home ci sono l’ora, la batteria (livello, e se è in carica o collegata), la rete (collegato o offline, Wi-Fi o cavo, col nome del Wi-Fi quando il computer lo dà) e il Bluetooth (acceso o spento, e quanti dispositivi sono collegati). Si aggiornano da soli in pochi secondi. Filo li sa anche in chat e a «quanta batteria ho?», «sono online?» o «il Bluetooth è acceso?» risponde subito, senza cercare niente. Se la rete manca, la chat dice che il computer è offline invece di dare un errore generico. Una voce di cui il computer non dice niente (un fisso non ha batteria) non compare.',
+      invoke: 'Sono in fondo alla colonna destra della home. Un clic o il tasto destro su una voce apre un riquadro coi dettagli, da cui la copi o la nascondi; le voci nascoste si rimettono dallo stesso riquadro, dalle Preferenze o chiedendolo a Filo («rimetti la batteria nella home»). Trascinata nella chat, una voce porta la sua frase.',
+      doesNot: 'Non accende né spegne il Bluetooth, non cambia rete e non regola il volume. Non chiede permessi al sistema: quello che ne richiederebbe uno non compare (su Mac, per esempio, i nomi dei dispositivi Bluetooth e, sulle versioni recenti, il nome del Wi-Fi).',
     },
 
     // ─────────────────────────── Pagine interne ──────────────────────────────
     {
       id: 'home-page', title: 'Home di Filo', category: 'pages',
-      desc: 'La pagina della nuova scheda: al centro l’assistente a cui chiedere qualsiasi cosa, azioni e suggerimenti, un messaggio in evidenza e gli aggiornamenti recenti. In alto a destra ci sono le icone per Cronologia, Impostazioni, App e Profilo.',
+      desc: 'La pagina della nuova scheda: al centro l’assistente a cui chiedere qualsiasi cosa, con un messaggio in evidenza e gli aggiornamenti recenti; ai lati le carte. A sinistra quello che sta accadendo (timer, sveglie, scaricamenti, avvisi), a destra quello che tieni tu (Editor, Mazzi, «Filo ti suggerisce», Impostazioni rapide) e sotto «altro», con le app che una carta non ce l’hanno. In alto a destra ci sono le icone per Cronologia, Impostazioni, App e Profilo.',
       invoke: 'Apri una nuova scheda, l\'icona Home in alto a destra nella home, oppure indirizzo filo://newtab/.',
+    },
+    {
+      id: 'home-cards', title: 'Le carte della home', category: 'pages',
+      desc: 'Ogni carta ha un titolo, il suo stato, un’azione principale e «apri nel filo», che apre la cosa nella conversazione al centro: un timer riapre la chat in cui l’avevi chiesto, le altre carte fanno scrivere a Filo di cosa si tratta, così puoi continuare a parole. A sinistra: i timer col conto alla rovescia (cambiano stato quando scadono), le sveglie, gli scaricamenti con la percentuale e poi «Apri» e «Cartella» (quelli finiti restano un giorno, poi li trovi negli Scaricamenti, filo://downloads/downloads.html), gli avvisi di Filo, i lavori lunghi in corso in un’altra scheda (Filo che sta ancora rispondendo, un comando del terminale: «Vai» ti porta lì) e, finché non hai crediti né una chiave, la carta che porta ai Crediti (filo://credits/credits.html). A destra: l’Editor coi documenti recenti (un clic ne apre uno; filo://editor/editor.html), i Mazzi coi mazzi (filo://decks/decks.html), «Filo ti suggerisce» e le Impostazioni rapide (tema scuro, terminale, anteprima delle schede; «Preferenze» apre filo://preferences/preferences.html). In «altro» ci sono Aperti per dopo (filo://home/home.html), Scaricamenti, Cronologia (filo://archive/archive.html) e la Bacheca (filo://board/board.html), più le carte che hai tolto. La disposizione resta dopo il riavvio, e una finestra in incognito parte da quella (quello che cambi lì non viene salvato). Un clic su una carta di sinistra la apre nella conversazione; su una carta di destra apre la sua app, come Invio. Una carta trascinata nel campo di scrittura vi scrive il suo titolo e il suo stato.',
+      invoke: 'Trascina una carta sopra o sotto un’altra per spostarla; passandoci sopra compaiono «apri nel filo» e la × per toglierla. Tasto destro su una carta: le sue azioni, "Apri nel filo", "Sposta su", "Sposta giù" e "Togli" (da tastiera: Maiusc+F10 o il tasto menu; Canc la toglie). Tasto destro su un documento, un mazzo o un suggerimento dentro la carta: "Apri" quella voce o "Apri nel filo" per parlarne con Filo. Una carta tolta diventa un’icona in «altro» (a sinistra quelle che non spariscono con la cosa che raccontano: i Crediti, uno scaricamento finito): la rimetti col «+», con la voce "Rimetti nella home" del suo tasto destro o trascinandola nella sua colonna, e il resto della disposizione non cambia. Puoi anche chiederlo a Filo: "togli la carta dei mazzi", "rimetti l’editor", "metti i suggerimenti in cima", "rimetti le carte com’erano", e a sinistra "chiudi l’avviso del backup", "togli lo scaricamento dalla home", "rimetti lo scaricamento della bolletta", "metti il timer del forno in cima".',
+      doesNot: 'Le carte di sinistra le mette Filo quando succede qualcosa: non se ne aggiungono a mano. Togliere un timer, una sveglia o un avviso lo toglie davvero; togliere uno scaricamento lo toglie solo dalla home (resta negli Scaricamenti). Sotto i 720 pixel di larghezza le colonne con le carte si nascondono. Una finestra incognito ha le sue carte: i suoi lavori in corso e le carte spostate lì non compaiono nella finestra normale.',
     },
     {
       id: 'red-team', title: 'Red Team', category: 'pages', cancello: 'redteam',
@@ -488,6 +507,12 @@
       invoke: 'Pagina filo://preferences/preferences.html, oppure chiedendolo a Filo in chat.',
     },
     {
+      id: 'settings-by-chat', title: 'Ogni impostazione si legge e si cambia chiedendola', category: 'settings',
+      desc: 'Ogni voce delle pagine Preferenze (anche le avanzate: i colori e i caratteri dell’aspetto, i sei valori del colore delle schede), Sicurezza, Modelli e Altro si cambia scrivendolo a Filo, e Filo sa dire com’è impostata adesso («com’è impostato il blocco della pubblicità?», «quali siti ho bloccato?»). Gli elenchi di siti (bloccati, fidati, esclusi) si cambiano un sito alla volta; le risposte date ai siti (microfono, fotocamera, posizione…) si leggono e si tolgono («togli il microfono a meet.google.com»). Le voci che toccano sicurezza, privacy, modelli, chiavi e spese chiedono prima un OK, con la spiegazione di cosa cambia; le altre si applicano subito. Ogni cambio dice cosa è cambiato e si rimette com’era dal segno accanto al tuo messaggio. Una pagina delle impostazioni già aperta mostra subito il valore nuovo.',
+      invoke: 'Scrivilo a Filo in chat: «spegni il blocco della pubblicità», «metti il tema scuro», «blocca facebook.com», «com’è impostato?».',
+      doesNot: 'Le chiavi API non le legge mai ad alta voce: dice solo se ci sono. Il modello di ogni singola funzione e il registro dei modelli si scelgono ancora nella pagina Modelli. I pulsanti che fanno un’azione invece di cambiare un valore (ripristina tutto, rifai l’intervista, esporta i dati) restano nelle loro pagine.',
+    },
+    {
       id: 'undo-changes', title: 'Rimetti com’era un cambio, da dovunque venga', category: 'settings',
       desc: 'Ogni cambio allo stato di Filo resta segnato con chi l’ha fatto: impostazioni, aspetto, tema, sveglie e timer, regole del proxy, zoom di un sito. Vale per quelli chiesti in chat e per quelli fatti a mano nelle pagine delle impostazioni, e Filo li vede tutti. Quando lo chiedi in chat, sulla tua bolla compare un piccolo segno: al passaggio del mouse dice cosa è cambiato, per esempio «tema: chiaro → scuro», e offre «annulla». Anche l’annullo resta segnato, e si rifà con «rifai».',
       invoke: 'Passa il mouse sul segno della tua bolla in chat e premi «annulla» (o fai tasto destro sulla bolla, o sulla riga che racconta il cambio), oppure scrivi a Filo «rimetti come prima».',
@@ -496,7 +521,7 @@
     {
       id: 'security', title: 'Sicurezza e privacy', category: 'settings',
       desc: 'Protezione dalla fuga del tuo indirizzo IP, blocco dei popup, gestione dei cookie (manuale / predefinita / privacy massima), lista dei siti bloccati e lista dei siti fidati. Un sito bloccato non si apre da nessuna strada (link, risultati di una ricerca, barra della home, redirect, finestrelle, indietro e avanti, azioni di Filo) finché non scegli «Apri comunque» (nella notifica, sulla pagina «Sito bloccato» o sotto la risposta di Filo in chat o nell\'assistente sulla pagina); una scheda già aperta su un sito che metti in lista passa subito alla pagina «Sito bloccato», anche alla riapertura di Filo, e da lì un collegamento porta alla lista.',
-      invoke: 'Pagina filo://security/security.html.',
+      invoke: 'Pagina filo://security/security.html, oppure chiedendolo a Filo in chat: prima di cambiare una voce della sicurezza chiede un OK, tranne per «Salta le pubblicità dei video».',
     },
     {
       id: 'dangerous-sites', title: 'Avviso dei siti pericolosi', category: 'settings',
@@ -511,6 +536,12 @@
       doesNot: 'In modalità Manuale non tocca nessun banner. Non avvisa da solo quando rifiuta o nasconde qualcosa. Non nasconde i messaggi che non parlano di cookie (avviso sull\'adblocker, limite di articoli gratuiti). Una scelta fatta in una finestra incognito resta lì. In Privacy non tiene sul disco cosa ha fatto sui siti non fidati. «Mostra il banner» toglie solo la risposta che il clic sul banner ha creato, non l\'accesso o le preferenze del sito.',
     },
     {
+      id: 'ad-block', title: 'Blocco di pubblicità e tracker', category: 'settings',
+      desc: 'Filo blocca da sé pubblicità e tracker: le richieste verso i domini delle liste pubbliche e gratuite (StevenBlack, EasyList) si fermano prima di partire, così annunci e script che seguono cosa fai da un sito all’altro non si caricano nemmeno. Le liste restano sul tuo computer e si aggiornano da sole una volta a settimana; un elenco di siti legittimi non viene bloccato anche se finisce per errore in una lista.',
+      invoke: 'Attivo di serie. Si spegne in Impostazioni → Sicurezza → «Blocca pubblicità e tracker», o chiedendolo a Filo («spegni il blocco della pubblicità»), che chiede prima un OK. A «blocchi la pubblicità?» Filo risponde con lo stato vero.',
+      doesNot: 'Non nasconde lo spazio vuoto che un annuncio bloccato lascia nella pagina, e non ferma la pubblicità che arriva dallo stesso dominio del sito, come gli annunci dentro i video di YouTube (quelli li salta «Salta le pubblicità dei video»). Se al primo avvio manca la rete, parte senza liste finché non riesce a scaricarle.',
+    },
+    {
       id: 'video-ad-skip', title: 'Pubblicità dei video saltate da sole', category: 'settings',
       desc: 'Quando un video mostra una pubblicità che si può saltare, Filo preme «Salta» appena il pulsante compare, con un clic come il tuo. Vale su YouTube, anche nei suoi video incorporati in altri siti, e sui lettori pubblicitari che usano molti siti (Google IMA, JW Player), anche dentro un riquadro della pagina e nelle schede in secondo piano. Su YouTube, se stai scrivendo in un campo della pagina o tieni premuto il mouse, aspetta che tu abbia finito; se hai scorso più giù e il lettore non si vede, lo preme appena torni a vederlo.',
       invoke: 'Da solo, acceso di serie. Si spegne in Impostazioni → Sicurezza → «Salta le pubblicità dei video», o chiedendolo a Filo.',
@@ -518,8 +549,8 @@
     },
     {
       id: 'site-permissions', title: 'Permessi dei siti', category: 'navigation',
-      desc: 'Un sito che vuole il microfono, la fotocamera, quello che hai copiato, la tua posizione, mandarti notifiche, usare tutti i tuoi schermi, sapere quando sei al computer o comandare gli strumenti musicali collegati lo chiede in una striscia sotto le schede, col suo dominio: «Consenti» o «Non consentire». Vale anche per le pagine che un sito si costruisce da sé. La domanda resta finché rispondi; «Consenti» si accende quando smetti di cliccare sulla striscia, così un clic partito per la pagina, o una raffica, non la conferma. Le notifiche si chiedono solo dopo un tuo clic sulla pagina, e finché non rispondi il sito le vede «da chiedere», così un’app di messaggi mostra il suo pulsante per attivarle. Tenere lo schermo acceso, lo schermo pieno e lo spazio per lavorare senza rete passano senza domande, come in Chrome; i font del computer passano subito dopo un tuo clic sulla pagina. La risposta resta anche dopo aver chiuso Filo, tranne in incognito e nei siti usa-e-getta della Privacy massima; la pagina Sicurezza le elenca tutte e le toglie una per una, e dal menu della scheda «Azzera i permessi del sito» toglie quelle del sito aperto. Detta e Incolla di Filo sulle pagine non fanno domande.',
-      invoke: 'Compare da sola quando un sito chiede; si risponde coi due pulsanti della striscia. Impostazioni → Sicurezza → «Permessi dei siti». Tasto destro sulla scheda → «Azzera i permessi del sito».',
+      desc: 'Un sito che vuole il microfono, la fotocamera, quello che hai copiato, la tua posizione, mandarti notifiche, usare tutti i tuoi schermi, sapere quando sei al computer o comandare gli strumenti musicali collegati lo chiede in una striscia sotto le schede, col suo dominio: «Consenti» o «Non consentire». Vale anche per le pagine che un sito si costruisce da sé. La domanda resta finché rispondi; «Consenti» si accende quando smetti di cliccare sulla striscia, così un clic partito per la pagina, o una raffica, non la conferma. Le notifiche si chiedono solo dopo un tuo clic sulla pagina, e finché non rispondi il sito le vede «da chiedere», così un’app di messaggi mostra il suo pulsante per attivarle. Tenere lo schermo acceso, lo schermo pieno e lo spazio per lavorare senza rete passano senza domande, come in Chrome; i font del computer passano subito dopo un tuo clic sulla pagina. La risposta resta anche dopo aver chiuso Filo, tranne in incognito e nei siti usa-e-getta della Privacy massima; la pagina Sicurezza le elenca tutte e le toglie una per una, e dal menu della scheda «Azzera i permessi del sito» toglie quelle del sito aperto. Anche Filo in chat sa dire quali siti hanno un permesso e toglierlo. Detta e Incolla di Filo sulle pagine non fanno domande.',
+      invoke: 'Compare da sola quando un sito chiede; si risponde coi due pulsanti della striscia. Impostazioni → Sicurezza → «Permessi dei siti». Tasto destro sulla scheda → «Azzera i permessi del sito». In chat: «quali siti possono usare il microfono?», «togli la posizione a example.com».',
       doesNot: 'Una pagina non apre altri programmi del computer, tranne posta, telefono e SMS dopo un tuo clic. Non condivide lo schermo e non si collega a dispositivi USB, seriali o HID: Filo non ha ancora la scelta della finestra o del dispositivo.',
     },
     {
@@ -531,7 +562,7 @@
     {
       id: 'auto-feedback', title: 'Segnalazione automatica dei problemi', category: 'settings',
       desc: 'Quando Filo non riesce a fare qualcosa che gli chiedi, invia automaticamente una segnalazione anonima e generica a chi sviluppa l\'app — senza includere URL o testo personale. Tenerlo attivo premia con 10 crediti extra al giorno.',
-      invoke: 'Impostazioni → Sicurezza → "Segnalazione automatica dei problemi".',
+      invoke: 'Impostazioni → Sicurezza → "Segnalazione automatica dei problemi", oppure chiedendolo a Filo.',
       doesNot: 'Non invia mai URL, testo delle conversazioni o dati personali: solo una nota generica sulla funzione mancante.',
     },
     {

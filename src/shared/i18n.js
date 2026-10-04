@@ -19,6 +19,11 @@
     // Traduzione finita, ma il sito ha aggiunto altro testo dopo (scorrimento
     // infinito, schermate che cambiano senza ricaricare).
     menu_translate_new_content: 'Traduci il testo nuovo',
+    // #711 — l'hover della riga di origine: dice il CONFINE della lettura, cioè
+    // perché l'assenza di quella riga non vuol dire niente.
+    menu_origin_hint: 'Filo legge solo le etichette che il file si porta dietro. Uno screenshot le cancella, un social pure, e molti generatori non le scrivono affatto.',
+    menu_image_unreadable: 'Filo non è riuscito a scaricare questa immagine.',
+    menu_origin_hint_unverified: 'Filo non ha ancora scaricato l’elenco ufficiale dei firmatari riconosciuti, quindi per ora sa solo che la firma è valida. Appena lo scarica, lo verifica.',
     menu_explain_deep: 'Approfondisci',
     menu_paste_history: 'Cronologia incolla',
     menu_paste_search: 'Cerca…',
@@ -125,10 +130,26 @@
     menu_dictate_partial: 'Ti ascolto…',
     menu_dictate_model_select: 'Modello per dettatura',
     menu_dictate_not_supported: 'Dettatura non supportata in questo browser',
-    menu_dictate_no_mic: 'Microfono non disponibile o negato',
     menu_dictate_model_set: 'Modello dettatura aggiornato',
     menu_dictate_transcribing: 'Trascrivo l\'audio…',
-    menu_dictate_empty: 'Nessun audio comprensibile',
+
+    // Il microfono (src/shared/ascolto.js) e il suo tasto nelle chat (voceChat.js). Ogni guasto dice cosa fare.
+    voce_parla: 'Parla',
+    voce_ferma: 'Ferma',
+    voce_trascrivo: 'Trascrivo…',
+    voce_annulla_invio: 'Annulla l\'invio',
+    voce_invia_da_solo: 'Invia da solo',
+    voce_lascia_testo: 'Lascia il testo da correggere',
+    voce_err_mic_negato: 'Filo non ha il permesso di usare il microfono: consentilo %s, poi riprova.',
+    voce_dove_mac: 'in Impostazioni di Sistema → Privacy e sicurezza → Microfono',
+    voce_dove_windows: 'in Impostazioni → Privacy e sicurezza → Microfono',
+    voce_dove_linux: 'nelle impostazioni audio del sistema',
+    voce_err_mic_assente: 'Non trovo un microfono: collegane uno e riprova.',
+    voce_err_mic_occupato: 'Il microfono non risponde: forse lo sta usando un\'altra app. Chiudila e riprova.',
+    voce_err_trascrizione: 'Non sono riuscito a trascrivere quello che hai detto: %s',
+    voce_riprova: 'riprova tra poco.',
+    voce_vuoto: 'Non ho capito quello che hai detto: riprova parlando un po\' più vicino al microfono.',
+    voce_err_muto: 'Non ho sentito niente: premi il microfono e parla, o controlla che sia acceso quello giusto.',
     menu_overflow_soon: 'Pannello completo in arrivo',
     menu_link_loading: 'Analizzo il link…',
 
