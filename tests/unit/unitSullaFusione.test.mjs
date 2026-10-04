@@ -537,7 +537,11 @@ test('clone del solo ramo: il primo download di main ha il tetto della storia, e
     const p = provaUnitSullaFusione({ root: clone, punta, git: corto, gitStoria: vero, scrivi: () => {} });
     assert.equal(p.esito, 'verde', JSON.stringify(p));
 
-    const senzaRete = provaUnitSullaFusione({ root: clone, punta, gitStoria: (args) => (args[0] === 'fetch' ? { ok: false, out: 'fatal: rete giù' } : vero(args)), scrivi: () => {} });
+    // Un clone nuovo: il primo, approfondito, non è più tagliato.
+    const clone2 = join(r.casa, 'clone2');
+    execFileSync('git', ['clone', '-q', '--depth', '1', '--branch', 'claude/corto', pathToFileURL(join(r.casa, 'origin.git')).href, clone2]);
+    const vero2 = gitIn(clone2);
+    const senzaRete = provaUnitSullaFusione({ root: clone2, punta, gitStoria: (args) => (args[0] === 'fetch' ? { ok: false, out: 'fatal: rete giù' } : vero2(args)), scrivi: () => {} });
     assert.match(senzaRete.errore, /non riesco a scaricare main/);
     assert.equal(campoPerIlServer(senzaRete).storia.superficiale, true, 'il registro sa che il clone era poco profondo');
   } finally {
