@@ -604,7 +604,6 @@ test('verificatore che registra la critica e poi cade (limite d’uso, rete): no
     };
     const errori = [];
     const b = banco({ server: false, errori, verdetti: ['pass'] });
-    // Il lavoratore del primo lavoro va liscio; poi il verificatore cade dopo la critica, il correttore dopo la consegna.
     const claude = b.dep.claude;
     let n = 0;
     b.dep.claude = async (x) => { n += 1; if (n === 2) errori.push(registraECade); if (n === 3) errori.push(consegna); return claude(x); };
