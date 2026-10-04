@@ -96,9 +96,20 @@
   // già in mano e la nota che una lettura non era tornata, e la pagina le
   // ricomprava al primo clic mostrando intanto «Caricamento…» al posto di un
   // report che aveva già.
+  // Una proiezione porta ogni campo della lista che il documento ha: uno che manca è stato tolto sul server
+  // (pre-approvazione, lavoro locale) e non resta quello vecchio. Voti e riaperture vengono dalla scheda pubblica.
+  function campiTolti(vecchio, nuovo) {
+    const FB = global.SN_FEEDBACK;
+    const lista = FB && Array.isArray(FB.CAMPI_LISTA) ? FB.CAMPI_LISTA : null;
+    const daScheda = (global.SN_FEEDBACK_PUBLIC_VIEW && global.SN_FEEDBACK_PUBLIC_VIEW.USER_FIELDS) || ['votes', 'reopenRequests'];
+    const candidati = lista || (vecchio._proiezione ? Object.keys(vecchio).filter((k) => !k.startsWith('_')) : []);
+    return candidati.filter((k) => !daScheda.includes(k) && k in vecchio && !(k in nuovo));
+  }
+
   function fondi(vecchio, nuovo) {
     if (!vecchio || !nuovo || !nuovo._proiezione) return nuovo;
     const fuso = { ...vecchio, ...nuovo };
+    for (const k of campiTolti(vecchio, nuovo)) delete fuso[k];
     if (!vecchio._proiezione) {
       // Il documento c'è, ma sul server è cambiato: si mostra questo e si
       // rilegge quando serve, invece di svuotare il pannello adesso.
