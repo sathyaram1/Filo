@@ -998,10 +998,19 @@
     if (res?.ok) Popup.showToast(I18n.t('toast_link_saved'));
   }
 
+  function dataUrlToBlob(dataUrl) {
+    const m = /^data:([^;,]*)[^,]*;base64,(.*)$/s.exec(String(dataUrl || ''));
+    if (!m) throw new Error('immagine non leggibile');
+    const bin = atob(m[2]);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], { type: m[1] || 'application/octet-stream' });
+  }
+
   async function copyImage(imgEl) {
     try {
-      const r = await fetch(imgEl.currentSrc || imgEl.src);
-      const blob = await r.blob();
+      const originale = await scaricaImmagine(imgEl.currentSrc || imgEl.src);
+      const blob = dataUrlToBlob(originale);
       let pngBlob = blob;
       // Clipboard API supporta image/png; converte se serve
       if (blob.type !== 'image/png') {
