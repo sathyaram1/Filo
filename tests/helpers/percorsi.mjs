@@ -71,6 +71,33 @@ export function collegaCartella(verso, collegamento) {
   symlinkSync(verso, collegamento, process.platform === 'win32' ? 'junction' : 'dir');
 }
 
+// Un nome che Windows non scrive su disco («:» di un sysfs Linux, #961): lì nasce codificato con `nomeSuDisco`,
+// e `nomiVeri` lo rimette com'è davanti a chi legge con quel `fs`. Altrove il nome nasce vero e `nomiVeri` non fa niente.
+const VIETATI_SU_WINDOWS = /[<>:"|?*]/g;
+const CODIFICATI = /%(3C|3E|3A|22|7C|3F|2A)/g;
+export function nomeSuDisco(nome, sistema = process.platform) {
+  if (sistema !== 'win32') return nome;
+  return nome.replace(VIETATI_SU_WINDOWS, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+}
+
+export function nomiVeri(fs, radice, sistema = process.platform) {
+  if (sistema !== 'win32') return () => {};
+  const dentro = (p) => typeof p === 'string' && !fuoriDa(radice, p);
+  const suDisco = (p) => (dentro(p) ? join(radice, ...path.relative(radice, p).split(/[\\/]/).map((x) => nomeSuDisco(x, sistema))) : p);
+  const originali = {};
+  for (const n of ['readFileSync', 'accessSync', 'existsSync', 'statSync', 'lstatSync', 'readdirSync']) {
+    const f = fs[n];
+    originali[n] = f;
+    fs[n] = n === 'readdirSync'
+      ? function (p, ...r) {
+        const voci = f.call(this, suDisco(p), ...r);
+        return dentro(p) ? voci.map((v) => (typeof v === 'string' ? v.replace(CODIFICATI, (_, h) => String.fromCharCode(parseInt(h, 16))) : v)) : voci;
+      }
+      : function (p, ...r) { return f.call(this, suDisco(p), ...r); };
+  }
+  return () => Object.assign(fs, originali);
+}
+
 // Il percorso sta fuori dalla cartella. Fra due dischi (sul cancello Windows il repo è su D:, la temporanea su C:)
 // `relative` risponde con un percorso assoluto, senza nessun `..` davanti: chiedere solo il `..` lì dice «dentro».
 // `sistema` è `path.win32` nelle prove che girano altrove.
