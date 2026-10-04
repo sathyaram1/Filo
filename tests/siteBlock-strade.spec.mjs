@@ -13,8 +13,10 @@ test('una finestrella di accesso aperta dalla pagina verso il sito della lista n
   await lista(shell, ['blocked.test']);
   const avvisi = await contaAvvisi(app);
   const accesso = rete.pagina('blocked.test', '/dialog', '<h1>SITO DELLA LISTA</h1>') + '?client_id=x&response_type=code&redirect_uri=y';
-  const pagina = rete.pagina('sito.test', '/', `<h1>pagina</h1><script>setTimeout(() => window.open(${JSON.stringify(accesso)}, 'accesso', 'width=500,height=400'), 300)</script>`);
+  // Col blocco dei popup una finestra la apre solo il clic (#737.1).
+  const pagina = rete.pagina('sito.test', '/', `<button id="b" onclick='window.open(${JSON.stringify(accesso)}, "accesso", "width=500,height=400")'>accedi</button>`);
   await apri(app, shell, pagina);
+  await app.windows().find((w) => w.url().includes('sito.test')).click('#b');
   await shell.waitForTimeout(2500);
   expect((await finestre(app)).filter((u) => u.includes('blocked.test'))).toEqual([]);
   expect((await avvisi()).length).toBeGreaterThan(0);

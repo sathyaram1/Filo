@@ -29,9 +29,11 @@ function chiediDa(app, trova) {
 }
 
 async function apriPopupDiAccesso(app, testServer, openTab) {
-  const sito = await testServer.openReady(openTab, '<h1>sito con «Accedi con…»</h1>');
   const login = `${testServer.html('<h1>accedi</h1>')}?client_id=filo589&redirect_uri=http%3A%2F%2Fsito.example%2Fcb`;
-  await sito.evaluate((u) => { window.open(u, '_blank', 'width=480,height=600'); }, login);
+  const sito = await testServer.openReady(openTab, `<h1>sito con «Accedi con…»</h1>
+    <button id="accedi" onclick='window.open(${JSON.stringify(login)}, "_blank", "width=480,height=600")'>Accedi con…</button>`);
+  // Col blocco dei popup anche la finestra di accesso la apre solo il clic (#737.1).
+  await sito.click('#accedi');
   // Il popup è una finestra senza schede, col codice di Filo montato come su ogni pagina.
   await expect.poll(() => app.evaluate(async ({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => !x._filoTabs && String(x.webContents.getURL()).includes('client_id=filo589'));
