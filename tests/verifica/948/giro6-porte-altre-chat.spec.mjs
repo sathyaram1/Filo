@@ -1,8 +1,5 @@
-// #948 giro 6 — esplorazione del verificatore: invio col clic mentre ascolta in Editor e Aiuto, HTML detto, tema scuro.
+// #948 giro 6 — porte ri-provate: invio col clic mentre ascolta in Editor e Aiuto, HTML detto, «Detta» nelle altre chat.
 import { test, expect } from '../../fixtures/electron.mjs';
-import { mkdirSync } from 'node:fs';
-
-const SHOTS = 'tests/.shots';
 
 async function trovaPagina(app, prova, timeout = 10_000) {
   const deadline = Date.now() + timeout;
@@ -142,30 +139,30 @@ test('home: un testo detto con dentro HTML resta testo, e parte', async ({ app, 
   expect(await page.locator('.dash-bubble-user img').count()).toBe(0);
 });
 
-test('home tema scuro: gli stati del microfono', async ({ app, shell }) => {
+test('editor e Aiuto: «Detta» dal tasto destro nella casella accende il microfono di quella chat', async ({ app, shell, openTab }) => {
   test.setTimeout(90_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  await prepara(app, { tema: 'dark', lenta: 2500 });
+  await prepara(app, { frasi: ['domanda detta'] });
   const page = await home(app);
-  mkdirSync(SHOTS, { recursive: true });
-  const mic = page.locator('.dash-input-wrap .sn-voce-btn');
-  const wrap = page.locator('.dash-input-wrap');
-  await wrap.screenshot({ path: `${SHOTS}/g6-scuro-pronto.png` });
-  await mic.hover();
-  await page.waitForTimeout(400);
-  await wrap.screenshot({ path: `${SHOTS}/g6-scuro-hover.png` });
-  await mic.click();
-  await expect(mic).toHaveAttribute('data-stato', 'ascolta', { timeout: 5_000 });
-  await page.waitForTimeout(600);
-  await wrap.screenshot({ path: `${SHOTS}/g6-scuro-ascolta.png` });
-  await page.waitForTimeout(600);
-  await mic.click();
-  await expect(mic).toHaveAttribute('data-stato', 'trascrive', { timeout: 2_000 });
-  await page.mouse.move(5, 5);
-  await page.waitForTimeout(300);
-  await wrap.screenshot({ path: `${SHOTS}/g6-scuro-trascrive.png` });
-  await expect(mic).toHaveAttribute('data-stato', 'attesa', { timeout: 6_000 });
-  await page.waitForTimeout(500);
-  await wrap.screenshot({ path: `${SHOTS}/g6-scuro-attesa.png` });
-  await page.screenshot({ path: `${SHOTS}/g6-scuro-pagina.png` });
+  await page.evaluate(() => window.SN_SIDEBAR.open());
+  const aiuto = page.locator('.sn-sidebar');
+  await aiuto.locator('textarea').click({ button: 'right' });
+  await page.locator('.sn-menu .sn-menu-split-main', { hasText: 'Detta' }).click();
+  await expect(aiuto.locator('.sn-voce-btn')).toHaveAttribute('data-stato', 'ascolta', { timeout: 5_000 });
+  await expect(page.locator('.sn-dictate-pill')).toHaveCount(0);
+  await page.waitForTimeout(1200);
+  await voce(page, false);
+  await expect(aiuto.locator('.sn-sidebar-msg-user', { hasText: 'domanda detta' })).toBeVisible({ timeout: 10_000 });
+
+  const ed = await openTab('filo://editor/editor.html');
+  await ed.waitForSelector('.ed-module[data-type="switch"]');
+  await ed.locator('.ed-switch-icon').nth(1).click();
+  await ed.waitForSelector('.ed-module[data-type="chat"]');
+  await ed.waitForFunction(() => document.documentElement.dataset.filoContentScripts === '1', null, { timeout: 8_000 });
+  await microfonoFinto(ed);
+  const chat = ed.locator('.ed-module[data-type="chat"]');
+  await chat.locator('[data-chat="input"]').click({ button: 'right' });
+  await ed.locator('.sn-menu .sn-menu-split-main', { hasText: 'Detta' }).click();
+  await expect(chat.locator('.sn-voce-btn')).toHaveAttribute('data-stato', 'ascolta', { timeout: 5_000 });
+  await expect(ed.locator('.sn-dictate-pill')).toHaveCount(0);
 });
