@@ -701,6 +701,13 @@
     SISTEMA_STATO: 'sistema_stato',
     // main → pagine filo:// quando una lettura cambia. { stato }
     SISTEMA_AGGIORNATO: 'sistema_aggiornato',
+    // Volume, Bluetooth e Wi-Fi a comando (#874), solo dalle pagine di Filo: aziona il sistema operativo, e a un sito
+    // non si dà. La stessa porta dell'azione della chat. { richiesta: { cosa: 'volume'|'bluetooth'|'wifi', … } }
+    // → { ok, cosa, … } oppure { ok: false, errore, frase, dove?, apri? }
+    SISTEMA_COMANDA: 'sistema_comanda',
+    // Apre la pagina delle impostazioni del sistema dove si concede un permesso mancante. { chiave } (una di
+    // IMPOSTAZIONI in src/main/services/comandiSistema.js: l'indirizzo non arriva mai da chi chiede) → { ok }
+    SISTEMA_APRI_IMPOSTAZIONI: 'sistema_apri_impostazioni',
     // Genera dashboard (messaggio centro + suggerimenti). Usa cache con cooldown.
     // { force?: boolean }
     // Risposta: { ok, message, suggestions, cached, ts }

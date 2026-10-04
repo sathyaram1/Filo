@@ -180,14 +180,52 @@ test('Mac: da route e networksetup Wi-Fi o cavo; l\'SSID nascosto senza permesso
   assert.equal(L.bluetoothDaDefaults(null), null);
   const uscite = {
     pmset: "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=1)\t30%; discharging; 2:00 remaining present: true\n",
-    route: 'interface: en0\n', networksetup: porte, ipconfig: '  SSID : Ufficio\n', defaults: '1\n',
+    route: 'interface: en0\n', networksetup: porte, ipconfig: '  SSID : Ufficio\n', defaults: '1\n', osascript: '40,true\n',
   };
-  const letto = await L.leggiMac(async (file) => uscite[file] ?? null);
+  const letto = await L.leggiMac(async (file, args) => (file === 'networksetup' && args[0] === '-getairportpower'
+    ? `Wi-Fi Power (${args[1]}): On\n` : uscite[file] ?? null));
   assert.deepEqual(letto, {
     batteria: { livello: 30, inCarica: false, collegata: false },
     rete: { tipo: 'wifi', nome: 'Ufficio' },
     bluetooth: { acceso: true, dispositivi: null },
+    volume: { livello: 40, muto: true },
+    wifi: { acceso: true },
   });
+});
+
+test('#874 — Mac: volume da osascript (anche senza uscita regolabile) e radio del Wi-Fi da networksetup', () => {
+  assert.deepEqual(L.volumeDaOsascript('25,false\n'), { livello: 25, muto: false });
+  assert.equal(L.volumeDaOsascript('missing value,false'), null);
+  assert.equal(L.volumeDaOsascript(null), null);
+  assert.equal(L.dispositivoWifiMac('Hardware Port: Ethernet\nDevice: en1\n\nHardware Port: Wi-Fi\nDevice: en0\n'), 'en0');
+  assert.equal(L.dispositivoWifiMac('Hardware Port: Ethernet\nDevice: en1\n'), null);
+  assert.deepEqual(L.wifiDaNetworksetup('Wi-Fi Power (en0): Off\n'), { acceso: false });
+  assert.equal(L.wifiDaNetworksetup('** Error'), null);
+});
+
+test('#874 — Linux: il volume da wpctl, pactl o amixer, e la radio del Wi-Fi dall\'interruttore del kernel', async () => {
+  assert.deepEqual(L.volumeDaWpctl('Volume: 0.40\n'), { livello: 40, muto: false });
+  assert.deepEqual(L.volumeDaWpctl('Volume: 1.25 [MUTED]\n'), { livello: 125, muto: true });
+  assert.deepEqual(L.volumeDaPactl('Volume: front-left: 26214 /  40% / -23.87 dB,   front-right: 26214 /  40%', 'Mute: yes'), { livello: 40, muto: true });
+  assert.deepEqual(L.volumeDaAmixer('  Front Left: Playback 26 [40%] [on]\n'), { livello: 40, muto: false });
+  assert.equal(L.volumeDaWpctl(''), null);
+  const chiesti = [];
+  const v = await L.leggiLinux('/inesistente', async (file, args) => {
+    chiesti.push(file);
+    if (file === 'pactl') return args[0] === 'get-sink-volume' ? 'Volume: front-left: 1 /  15% / x' : 'Mute: no';
+    return null;
+  });
+  assert.deepEqual(v.volume, { livello: 15, muto: false });
+  assert.ok(chiesti.includes('wpctl') && chiesti.indexOf('wpctl') < chiesti.indexOf('pactl'), 'PipeWire prima, PulseAudio dopo');
+  const r = albero({
+    'sys/class/rfkill/rfkill0/type': 'wlan\n', 'sys/class/rfkill/rfkill0/soft': '1\n', 'sys/class/rfkill/rfkill0/hard': '0\n',
+  });
+  try {
+    assert.deepEqual(L.wifiDaRfkill(r), { acceso: false });
+    writeFileSync(join(r, 'sys/class/rfkill/rfkill0/soft'), '0\n');
+    assert.deepEqual(L.wifiDaRfkill(r), { acceso: true });
+  } finally { rmSync(r, { recursive: true, force: true }); }
+  assert.equal(L.wifiDaRfkill('/inesistente'), null);
 });
 
 // ── Windows ──
@@ -202,8 +240,12 @@ test('Windows: una riga del PowerShell diventa una lettura; una riga storta non 
     batteria: { livello: 73, inCarica: true, collegata: true },
     rete: { tipo: 'wifi', nome: 'Caffè' },
     bluetooth: { acceso: true, dispositivi: ['Cuffie'] },
+    volume: null,
+    wifi: null,
   });
-  assert.deepEqual(L.datiDaWindows('{"batteria":null,"rete":null,"bluetooth":null}'), { batteria: null, rete: null, bluetooth: null });
+  assert.deepEqual(L.datiDaWindows('{"batteria":null,"rete":null,"bluetooth":null}'), { batteria: null, rete: null, bluetooth: null, volume: null, wifi: null });
+  const conVolume = L.datiDaWindows('{"volume":{"livello":40,"muto":false},"wifi":{"acceso":false}}');
+  assert.deepEqual([conVolume.volume, conVolume.wifi], [{ livello: 40, muto: false }, { acceso: false }]);
   assert.deepEqual(L.datiDaWindows('{"bluetooth":{"acceso":true,"dispositivi":{"value":["Mouse"],"Count":1}}}').bluetooth,
     { acceso: true, dispositivi: ['Mouse'] }, 'la forma {value, Count} di PowerShell 5.1');
   for (const storta of ['', 'WARNING: qualcosa', '[1,2]', 'null', '{"batteria":']) assert.equal(L.datiDaWindows(storta), null, storta);

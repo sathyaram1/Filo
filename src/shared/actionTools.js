@@ -424,6 +424,34 @@
       },
       required: [],
     },
+    VOLUME: {
+      description: 'Cambia il volume del COMPUTER (l\'uscita audio del sistema, come i tasti del volume della tastiera): "alza il volume al 40%", "abbassa un po\'", "metti muto", "togli il muto". Non è il volume di un video dentro un sito. Il volume di adesso è nella sezione SISTEMA dello STATO: usalo per capire "un po\' più alto" e passa il numero. Dare un livello o alzare toglie anche il muto, come fanno i tasti. Esegue subito; l\'esito ti dice il numero vero.',
+      properties: {
+        livello: I('Livello esatto da 0 a 100.'),
+        verso: S('Un passo di 10 per volta: "su" alza, "giu" abbassa.', { enum: ['su', 'giu'] }),
+        muto: B('true mette muto, false lo toglie.'),
+      },
+      required: [],
+    },
+    BLUETOOTH: {
+      description: 'Comanda il Bluetooth del COMPUTER: acceso o spento ("spegni il Bluetooth"), collegare o scollegare un dispositivo GIÀ abbinato ("collega le cuffie", "scollega la cassa"), oppure leggere l\'elenco dei dispositivi abbinati. Per il dispositivo passa le parole dell\'utente: il sistema trova il nome vero, e se non lo trova ti rimanda l\'elenco. Abbinare un dispositivo nuovo non si fa da qui. Collegare col Bluetooth spento lo accende prima. Spegnere e scollegare chiedono conferma all\'utente: il sistema gliela mostra da sé. Lo stato di adesso è nella sezione SISTEMA dello STATO. Se manca un permesso del sistema l\'esito ti dà la frase e dove si concede: riportala.',
+      properties: {
+        acceso: B('true accende, false spegne.'),
+        dispositivo: S('Il dispositivo abbinato da collegare o scollegare, come lo chiama l\'utente (per esempio "le cuffie Sony").'),
+        collega: B('Con `dispositivo`: true collega (è il valore se lo ometti), false scollega.'),
+        elenca: B('true per avere i dispositivi abbinati, senza cambiare niente.'),
+      },
+      required: [],
+    },
+    WIFI: {
+      description: 'Comanda il Wi-Fi del COMPUTER: acceso o spento ("spegni il Wi-Fi"), collegarsi a una rete che il computer CONOSCE già ("collegati alla rete di casa"), oppure leggere l\'elenco delle reti conosciute. Per la rete passa le parole dell\'utente: il sistema trova il nome vero, e se non lo trova ti rimanda l\'elenco. Una rete mai usata (che vuole la password) non si aggiunge da qui. Spegnere il Wi-Fi e cambiare rete chiedono conferma all\'utente; dopo averlo spento, senza un cavo, non sentirai più l\'utente finché non lo riaccende dal tasto nella home. Lo stato di adesso è nella sezione SISTEMA dello STATO. Se manca un permesso del sistema l\'esito ti dà la frase e dove si concede: riportala.',
+      properties: {
+        acceso: B('true accende, false spegne.'),
+        rete: S('La rete conosciuta a cui collegarsi, come la chiama l\'utente.'),
+        elenca: B('true per avere le reti conosciute, senza cambiare niente.'),
+      },
+      required: [],
+    },
     COMANDO_FINESTRA: {
       description: 'Aziona un controllo del browser Filo (la finestra e la barra in alto), non il sito. "fullscreen" = schermo intero immersivo (la pagina attiva copre tutta la finestra, barre nascoste, Esc esce), non il pulsante del lettore video dentro il sito. NON esiste un comando per CHIUDERE la finestra o le schede. Esegue subito.',
       properties: { comando: S('Uno di: fullscreen, minimize (riduci a icona), home (apri la home di Filo), settings (menu Impostazioni), apps (menu App), account (menu Account).', { enum: ['fullscreen', 'minimize', 'home', 'settings', 'apps', 'account'] }) },

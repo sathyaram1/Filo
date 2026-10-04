@@ -1189,7 +1189,7 @@ function recordPendingConfirm(sender, action) {
   for (const [k, rec] of pendingConfirms) if (rec.scade <= now) pendingConfirms.delete(k);
   pendingConfirms.set(pendingConfirmKey(sender, action), {
     scade: now + PENDING_CONFIRM_TTL,
-    mostrati: { righe: action._righe, targetIds: action._targetIds, proposte: action._proposte },
+    mostrati: { righe: action._righe, targetIds: action._targetIds, proposte: action._proposte, nome: action._nomeSistema },
   });
 }
 function consumePendingConfirm(sender, action) {
@@ -1207,7 +1207,7 @@ function daPaginaDiFilo(sender) {
 // Una pagina di Filo rimanda l'azione col popup che ha mostrato; per le altre
 // vale quello registrato alla richiesta di conferma.
 function bersagliMostrati(sender, action) {
-  if (daPaginaDiFilo(sender)) return { righe: action._righe, targetIds: action._targetIds, proposte: action._proposte };
+  if (daPaginaDiFilo(sender)) return { righe: action._righe, targetIds: action._targetIds, proposte: action._proposte, nome: action._nomeSistema };
   const rec = pendingConfirms.get(pendingConfirmKey(sender, action));
   return rec && rec.scade > Date.now() ? rec.mostrati : null;
 }
@@ -1410,6 +1410,62 @@ globalThis.SN_USCITA_DA_FILO = (url, wc, apri) => (SCHEMI_USCITA.test(String(url
 // chi la disegna, così un turno perso a metà (scheda chiusa, ricarica) non la brucia.
 async function primaVoltaDelTerminale() {
   try { return (await Storage.getRaw(SN_CONST.STORAGE_KEYS.FILO_TERMINALE_SPIEGATO, false)) !== true; } catch (_) { return false; }
+}
+
+// #874 — l'azione della chat nella forma che capiscono i tasti della home: il tipo dice cosa, il resto passa.
+function richiestaDiSistema(type, action) {
+  const { _richiestaSistema, _nomeSistema, ...resto } = action || {};
+  return { ...resto, cosa: type === 'VOLUME' ? 'volume' : type === 'WIFI' ? 'wifi' : 'bluetooth' };
+}
+
+// Parte la rete o il dispositivo che la conferma ha nominato: il nome vero, non le parole del modello.
+function richiestaDaEseguire(type, action) {
+  const r = richiestaDiSistema(type, action);
+  const nome = action && action._nomeSistema;
+  if (nome && type === 'WIFI') return { ...r, rete: nome };
+  if (nome && type === 'BLUETOOTH') return { ...r, dispositivo: nome };
+  return r;
+}
+
+// L'esito col numero e i nomi VERI. I nomi di reti e dispositivi li sceglie chi li gestisce: tornano in busta, e la
+// frase per un errore si compone senza nomi.
+function esitoSistemaPerModello(o) {
+  const E = globalThis.SN_ESTERNO;
+  const busta = (righe) => E.imbusta({ tipo: 'NOMI_DISPOSITIVI', testo: righe.map((r) => `- ${E.neutralizza(r, { unaRiga: true })}`).join('\n') });
+  const C = require('./comandiSistema');
+  if (!o.ok) {
+    if (o.errore === 'richiesta') return `Non fatto: ${o.frase}. Correggi i parametri e riprova.`;
+    const s = C.spiega(o.errore, { cosa: o.cosa });
+    const apri = s.apri ? ' Sotto la tua risposta l\'utente trova il tasto che apre quelle impostazioni: diglielo.' : '';
+    const nomi = Array.isArray(o.candidati) && o.candidati.length
+      ? `\nI nomi che il sistema conosce:\n${busta(o.candidati)}\nSe uno è quello che l'utente intende, richiama con quel nome; altrimenti chiediglielo.`
+      : '';
+    const quale = o.dispositivo || o.rete ? `\nRiguarda:\n${busta([o.dispositivo || o.rete])}` : '';
+    const acceso = o.accesoPrima ? ` Prima ho acceso ${o.cosa === 'wifi' ? 'il Wi-Fi' : 'il Bluetooth'}, che era spento.` : '';
+    return `Non fatto: ${s.frase}${s.dove ? ` ${s.dove}` : ''}${acceso}${apri} Riporta all'utente queste parole; non riprovare uguale.${quale}${nomi}`;
+  }
+  if (o.cosa === 'volume') {
+    const prima = typeof o.prima === 'number' ? ` (prima era al ${o.prima}%)` : '';
+    const limite = o.limitato ? ' Il numero chiesto era fuori da 0-100: si è fermato al limite, dillo all\'utente.' : '';
+    return `Volume del computer ora al ${o.volume}%${o.muto ? ', in muto' : ''}${prima}.${limite}`;
+  }
+  const radio = o.cosa === 'wifi' ? 'Wi-Fi' : 'Bluetooth';
+  if (Array.isArray(o.elenco)) {
+    const stato = o.acceso === true ? ` (${radio} acceso)` : o.acceso === false ? ` (${radio} spento)` : '';
+    if (!o.elenco.length) return o.cosa === 'wifi' ? `Il computer non conosce nessuna rete Wi-Fi${stato}.` : `Nessun dispositivo Bluetooth abbinato${stato}.`;
+    const righe = o.elenco.map((x) => `${x.nome}${x.collegato === true || x.attiva ? ' (collegato)' : ''}`);
+    return `${o.cosa === 'wifi' ? 'Reti Wi-Fi conosciute' : 'Dispositivi Bluetooth abbinati'}${stato}:\n${busta(righe)}`;
+  }
+  if (typeof o.acceso === 'boolean') return `${radio} ${o.acceso ? 'acceso' : 'spento'}.`;
+  const nome = o.dispositivo || o.rete;
+  const acceso = o.accesoPrima ? ` ${radio} era spento: acceso prima.` : '';
+  if (o.gia) return `Era già così, niente da cambiare:\n${busta([nome])}`;
+  if (o.cosa === 'bluetooth') {
+    if (o.collegato === null) return `Collegamento chiesto, ma Windows non l'ha ancora confermato: lo vedi nella home fra poco.${acceso}\n${busta([nome])}`;
+    return `${o.collegato ? 'Collegato' : 'Scollegato'}:${acceso}\n${busta([nome])}`;
+  }
+  if (!o.confermato) return `Collegamento alla rete chiesto: il sistema non dice ancora a quale rete è collegato, lo vedi nella home fra poco.${acceso}\n${busta([nome])}`;
+  return `Collegato alla rete Wi-Fi:${acceso}\n${busta([nome])}`;
 }
 
 // `parole` = ciò che l'utente ha scritto in chat: un codice scritto da lui può uscire.
@@ -1699,6 +1755,37 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
     const bersaglio = await Registro.livelloDi(idDelCambio(action));
     action._livelloCambio = bersaglio ? bersaglio.livello : 1;
     action._fraseCambio = bersaglio ? bersaglio.frase : '';
+  }
+
+  // #874 — il livello di un comando del sistema lo decide la stessa lettura della richiesta che poi la esegue:
+  // scritta qui sempre, sopra qualunque valore arrivato col modello.
+  if (type === 'VOLUME' || type === 'BLUETOOTH' || type === 'WIFI') {
+    const C = require('./comandiSistema');
+    const q = C.normalizzaRichiesta(richiestaDiSistema(type, action));
+    let nome = q.nome || '';
+    // Già com'è chiesto (la rete è quella, le cuffie sono staccate, la radio è spenta): niente da confermare.
+    let gia = false;
+    // Rete e dispositivo da confermare: il popup nomina quello che partirà, trovato prima di chiedere; all'OK parte
+    // quello mostrato. Un nome che non ne trova uno solo torna al modello con l'elenco, senza una conferma a vuoto.
+    if (nome && (type === 'WIFI' || q.collega === false)) {
+      if (confirmed) {
+        const visti = bersagliMostrati(sender, action);
+        if (visti && typeof visti.nome === 'string' && visti.nome) nome = visti.nome;
+      } else {
+        const trovato = await C.risolviNome(q);
+        if (trovato.esito) return { executed: false, kept: false, output: trovato.esito };
+        if (trovato.nome) nome = trovato.nome;
+        gia = trovato.gia === true;
+      }
+    } else if (!nome && q.acceso === false && !confirmed) {
+      const letto = globalThis.SN_SISTEMA_MAIN && typeof globalThis.SN_SISTEMA_MAIN.stato === 'function' ? globalThis.SN_SISTEMA_MAIN.stato() : null;
+      const radio = letto && (type === 'WIFI' ? letto.wifi : letto.bluetooth);
+      gia = !!radio && radio.acceso === false;
+    }
+    action._richiestaSistema = { ...q, ...(nome ? { nome } : {}), ...(gia ? { gia: true } : {}) };
+    // Il nome sta anche fuori, dove il recinto dei testi salvati lo trova (CAMPI_SALVATI).
+    if (nome) action._nomeSistema = nome;
+    else delete action._nomeSistema;
   }
 
   // ── gate dei livelli di sicurezza (#146.2) ────────────────────────────────
@@ -2416,6 +2503,13 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         if (!r.ok) return { executed: false, kept: false, output: { error: r.motivo, ...(r.id ? { id: r.id } : {}) } };
         return { executed: true, kept: false, output: { annullato: r.id, frase: r.frase, saltati: r.saltati || [] } };
       }
+      case 'VOLUME':
+      case 'BLUETOOTH':
+      case 'WIFI': {
+        // #874 — la stessa porta dei tasti della home (MSG.SISTEMA_COMANDA): due cammini, un risultato.
+        const r = await require('./comandiSistema').comanda(richiestaDaEseguire(type, action));
+        return { executed: !!r.ok, kept: false, output: r };
+      }
       case 'ZOOM_PAGINA': {
         // #686 — lo zoom della pagina si chiede anche a parole, non solo con
         // Ctrl +/-/0. Non zooma da qui: gira la richiesta alla scheda attiva
@@ -3003,6 +3097,8 @@ const CAMPI_SALVATI = {
   SALVA_LEZIONE: ['testo', 'text', 'lezione'],
   DIMENTICA: ['_righe'],
   ANNULLA_CAMBIO: ['_fraseCambio'],
+  BLUETOOTH: ['_nomeSistema'],
+  WIFI: ['_nomeSistema'],
 };
 
 // I testi salvati che una descrizione ripete (#592.4): nella frase di Filo
@@ -3183,6 +3279,7 @@ function toolResultText({ action, res, rendered }) {
   if (type === 'MODIFICA_SVEGLIA' && res.output && Array.isArray(res.output.updated)) {
     return res.output.updated.length ? `Spostate:\n${nomiSalvati(res.output.updated)}` : 'Nessuna sveglia o timer corrispondeva: niente da spostare. Non ripetere uguale: chiedi all\'utente quale intende.';
   }
+  if ((type === 'VOLUME' || type === 'BLUETOOTH' || type === 'WIFI') && res.output) return esitoSistemaPerModello(res.output);
   // #686 — lo zoom lo riferisce il numero VERO, non quello chiesto: un «al
   // 900%» finisce al massimo, e l'utente deve sentirselo dire.
   if (type === 'ZOOM_PAGINA' && res.executed && res.output) {

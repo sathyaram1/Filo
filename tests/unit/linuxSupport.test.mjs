@@ -556,7 +556,22 @@ test('su Linux batteria, rete e Bluetooth si leggono dal sistema, senza PowerShe
   const L = require(join(ROOT, 'src', 'main', 'services', 'statoSistema.js'));
   const chiesti = [];
   const letto = await L.leggiLinux(join(ROOT, 'non-esiste'), async (file, args) => { chiesti.push([file, ...args].join(' ')); return null; });
-  assert.deepEqual(letto, { batteria: null, rete: null, bluetooth: null }, 'senza sysfs non si inventa niente');
-  assert.ok(chiesti.every((c) => /^busctl --system /.test(c)), `comandi inattesi: ${chiesti.join(' | ')}`);
-  assert.ok(!chiesti.some((c) => /sudo|pkexec|powershell/i.test(c)));
+  assert.deepEqual(letto, { batteria: null, rete: null, bluetooth: null, volume: null, wifi: null }, 'senza sysfs non si inventa niente');
+  // Il volume (#874) si legge dal server audio, solo leggendo: nessun «set».
+  assert.ok(chiesti.every((c) => /^busctl --system |^wpctl get-volume |^pactl get-sink-|^amixer -M get /.test(c)), `comandi inattesi: ${chiesti.join(' | ')}`);
+  assert.ok(!chiesti.some((c) => /sudo|pkexec|powershell|set-/i.test(c)));
+});
+
+// ── Volume, Bluetooth e Wi-Fi a comando (#874) ───────────────────────────────
+
+test('su Linux volume, Bluetooth e Wi-Fi si comandano con la shell di sistema e i programmi di sempre, senza sudo', () => {
+  const C = require(join(ROOT, 'src', 'main', 'services', 'comandiSistema.js'));
+  for (const [comando, script] of Object.entries(C.SCRIPT.linux)) {
+    assert.ok(!/\bsudo\b|pkexec|powershell|osascript|networksetup|blueutil/i.test(script), `linux/${comando}: programma di un altro sistema o con privilegi`);
+  }
+  assert.equal(C.costruisci('volume', { livello: 1 }, 'linux').shell, 'sh');
+  assert.match(C.SCRIPT.linux.volume, /wpctl[\s\S]*pactl[\s\S]*amixer/, 'PipeWire, poi PulseAudio, poi ALSA');
+  assert.match(C.SCRIPT.linux['wifi-collega'], /nmcli --wait \d+ connection up uuid "\$U"/, 'la rete si sceglie col suo identificativo, non col nome');
+  // La shell vera la decide resolveShell: su Linux «sh» resta la shell di sistema anche se l'utente preferisce PowerShell.
+  if (process.platform === 'linux') assert.equal(resolveShell('sh'), 'sh');
 });

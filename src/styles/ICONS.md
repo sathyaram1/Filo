@@ -118,6 +118,8 @@ self.SN_ICONS_UTIL = { isSvgIcon, wrap };
 | `ethernet` | Presa di rete vista di fronte, coi contatti: collegato via cavo |
 | `bluetooth` | La runa del Bluetooth: acceso |
 | `bluetoothOff` | La runa barrata: Bluetooth spento |
+| `volume` | Altoparlante a cono con due onde: il volume del computer |
+| `volumeMute` | Lo stesso altoparlante con una croce al posto delle onde: muto |
 | `windowFrame` | Cornice con barra del titolo e due pallini: comando della finestra |
 | `brush` | Pennello: stile della pagina |
 | `undo` | Freccia che torna indietro: ripristina |

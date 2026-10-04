@@ -170,6 +170,23 @@ module.exports = function register(on, ctx) {
     return { ok: true, stato: Sistema.stato() };
   }));
 
+  // #874 — i tasti della home comandano volume, Bluetooth e Wi-Fi dalla stessa porta dell'azione della chat. È un
+  // gesto dell'utente su una superficie di Filo: non passa dai livelli, che servono a ciò che decide il modello.
+  on(MSG.SISTEMA_COMANDA, require('./origine').soloFilo(async (msg) => {
+    const Comandi = require('../comandiSistema');
+    return Comandi.comanda(msg && msg.richiesta);
+  }));
+  on(MSG.SISTEMA_APRI_IMPOSTAZIONI, require('./origine').soloFilo(async (msg) => {
+    const uri = require('../comandiSistema').uriImpostazioni(String((msg && msg.chiave) || ''));
+    if (!uri) return { ok: false, error: 'impostazione sconosciuta' };
+    try {
+      await require('electron').shell.openExternal(uri);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: String((e && e.message) || e) };
+    }
+  }));
+
   on(MSG.FILO_GENERATE_DASHBOARD, async (msg, sender, origin) => {
     // Il messaggio della home mette in fila le pagine salvate: a un sito non si dà, come il loro elenco (#589.12).
     if (!isFilo(origin)) return { ok: false, code: 'forbidden', error: 'forbidden' };

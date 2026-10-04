@@ -826,6 +826,7 @@
       case 'homeSistema.batteria': return $('homeSisBatteria').checked;
       case 'homeSistema.rete': return $('homeSisRete').checked;
       case 'homeSistema.bluetooth': return $('homeSisBluetooth').checked;
+      case 'homeSistema.volume': return $('homeSisVolume').checked;
       case 'tabPreview.enabled': return $('tabPreviewEnabled').checked;
       case 'tabPreview.size': return misuraAnteprima($('tabPreviewSize').value);
       case 'agentStyle': return currentStyleText();
@@ -864,6 +865,7 @@
       case 'homeSistema.batteria': return !(s.homeSistema && s.homeSistema.batteria === false);
       case 'homeSistema.rete': return !(s.homeSistema && s.homeSistema.rete === false);
       case 'homeSistema.bluetooth': return !(s.homeSistema && s.homeSistema.bluetooth === false);
+      case 'homeSistema.volume': return !(s.homeSistema && s.homeSistema.volume === false);
       case 'tabPreview.enabled': return !(s.tabPreview && s.tabPreview.enabled === false);
       case 'tabPreview.size': return misuraAnteprima(s.tabPreview && s.tabPreview.size);
       case 'agentStyle': return String(s.agentStyle || '').trim();
@@ -953,6 +955,7 @@
     if (vuole('homeSistema.batteria')) $('homeSisBatteria').checked = sis.batteria !== false;
     if (vuole('homeSistema.rete')) $('homeSisRete').checked = sis.rete !== false;
     if (vuole('homeSistema.bluetooth')) $('homeSisBluetooth').checked = sis.bluetooth !== false;
+    if (vuole('homeSistema.volume')) $('homeSisVolume').checked = sis.volume !== false;
     const tp = settings.tabPreview || {};
     if (vuole('tabPreview.enabled')) $('tabPreviewEnabled').checked = tp.enabled !== false;
     if (vuole('tabPreview.size')) $('tabPreviewSize').value = misuraAnteprima(tp.size);
@@ -1194,7 +1197,7 @@
       persist();
     });
     $('showHomeMessage').addEventListener('change', persist);
-    for (const id of ['homeSisOra', 'homeSisBatteria', 'homeSisRete', 'homeSisBluetooth']) $(id).addEventListener('change', persist);
+    for (const id of ['homeSisOra', 'homeSisBatteria', 'homeSisRete', 'homeSisBluetooth', 'homeSisVolume']) $(id).addEventListener('change', persist);
     $('tabPreviewEnabled').addEventListener('change', () => {
       $('tabPreviewSize').disabled = !$('tabPreviewEnabled').checked;
       persist();

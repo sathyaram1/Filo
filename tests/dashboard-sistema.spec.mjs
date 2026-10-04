@@ -197,7 +197,9 @@ test('tasto destro: dettagli, copia, nascondi; la voce torna dallo stesso riquad
   await voce(page, 'rete').focus();
   await page.keyboard.press('Enter');
   await expect(box.locator('.dash-sis-info')).toContainText('Collegato al Wi-Fi «Casa di Anna»');
-  await page.keyboard.press('ArrowDown');
+  // Prima di Copia ci sono i comandi della voce (#874): le frecce li attraversano.
+  const copiaInFuoco = () => box.getByText('Copia', { exact: true }).evaluate((el) => el === document.activeElement);
+  for (let i = 0; i < 10 && !(await copiaInFuoco()); i++) await page.keyboard.press('ArrowDown');
   await expect(box.getByText('Copia', { exact: true })).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(box.getByText('Copiato', { exact: true })).toBeVisible();
@@ -465,7 +467,7 @@ test('dopo una pausa del lettore, se la lettura nuova tarda, la chat non riceve 
     { timeout: 10_000 }).toContain('Batteria: 30%');
 });
 
-test('con batteria, rete e Bluetooth nascoste la home non sveglia il lettore, neanche tornando davanti; rimettendone una riparte', async ({ app, openTab, testServer }) => {
+test('con batteria, rete, Bluetooth e volume nascoste la home non sveglia il lettore, neanche tornando davanti; rimettendone una riparte', async ({ app, openTab, testServer }) => {
   await finto(app, PIENO);
   await app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.veglia(2_000));
   const page = await newtab(app);
@@ -473,7 +475,7 @@ test('con batteria, rete e Bluetooth nascoste la home non sveglia il lettore, ne
   const giro = await app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.GIRO_MS);
   await page.evaluate(() => window.filo.message({
     type: window.SN_MSG.MSG.UPDATE_SETTINGS,
-    settings: { homeSistema: { batteria: false, rete: false, bluetooth: false } },
+    settings: { homeSistema: { batteria: false, rete: false, bluetooth: false, volume: false } },
   }));
   await expect(voce(page, 'bluetooth')).toBeHidden({ timeout: 5_000 });
   await expect(voce(page, 'ora')).toBeVisible();
@@ -499,8 +501,10 @@ test('con batteria, rete e Bluetooth nascoste la home non sveglia il lettore, ne
 test('con la colonna destra più alta della finestra ora e batteria restano dentro la finestra', async ({ app }) => {
   await finto(app, PIENO);
   // Gli avvisi stanno nella colonna sinistra (#870): a destra la colonna si allunga solo se la finestra è bassa.
-  await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0].setSize(1280, 520); });
+  // Prima la home: appena lanciata l'app la finestra può non esserci ancora, e il ridimensionamento cadrebbe nel vuoto.
   const page = await newtab(app);
+  await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0].setSize(1280, 520); });
+  await expect.poll(() => page.evaluate(() => window.innerHeight)).toBeLessThan(520);
   await expect(voce(page, 'batteria')).toHaveText('42%', { timeout: 8_000 });
   const dentro = () => page.evaluate(() => {
     const r = document.querySelector('#sistema .dash-sis-voce[data-voce="batteria"]').getBoundingClientRect();
@@ -529,7 +533,7 @@ test('con le voci del computer nascoste, scrivere in chat sveglia il lettore per
   const giro = await app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.GIRO_MS);
   await page.evaluate(() => window.filo.message({
     type: window.SN_MSG.MSG.UPDATE_SETTINGS,
-    settings: { homeSistema: { batteria: false, rete: false, bluetooth: false } },
+    settings: { homeSistema: { batteria: false, rete: false, bluetooth: false, volume: false } },
   }));
   await expect(voce(page, 'bluetooth')).toBeHidden({ timeout: 5_000 });
   await expect.poll(attivo, { timeout: 2_000 + giro * 2 + 3_000 }).toBe(false);
