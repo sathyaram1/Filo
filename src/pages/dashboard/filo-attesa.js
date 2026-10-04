@@ -372,6 +372,9 @@
           avv.punti = pts;
           avv.lung = lung;
           fermaNodiSulFilo(pts, lung);
+          // Un gomitolo grosso sposta il riassunto quanto serve a lasciargli l'aria di uno piccolo.
+          const largo = X + raggioGomitolo(lung[lung.length - 1]) + 1 + ARIA_GOMITOLO;
+          wrap.style.setProperty('--dash-gomitolo-spazio', `${Math.max(0, Math.ceil(largo - 26))}px`);
         } else if (avv.m > 0) {
           // Il filo disteso di arrivo è quello delle righe già riaperte (anche se ancora chiuse dalla tendina).
           const fondo = body.offsetTop + Math.max(18, body.scrollHeight) + onda.coda;
