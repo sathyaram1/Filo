@@ -64,7 +64,13 @@
     el.style.left = `${Math.max(4, Math.min(x, vw - el.offsetWidth - 4))}px`;
     el.style.top = `${Math.max(4, Math.min(y, vh - el.offsetHeight - 4))}px`;
     const fuori = (e) => { if (!el.contains(e.target)) chiudiMenu(); };
-    const tasto = (e) => { if (e.key === 'Escape') { e.preventDefault(); chiudiMenu(); if (ancora) try { ancora.focus(); } catch (_) {} } };
+    const tasto = (e) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopPropagation();
+      chiudiMenu();
+      if (ancora) try { ancora.focus(); } catch (_) {}
+    };
     menuAperto = {
       el,
       chiudi: () => {
