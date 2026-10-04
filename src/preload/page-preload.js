@@ -362,6 +362,24 @@ try {
   }
 } catch (_) { /* mai bloccare il caricamento della pagina */ }
 
+// Il main vede l'input della pagina, non quello di un riquadro di un altro sito: senza questo il clic sul lettore
+// incorporato non aprirebbe finestre né lo schermo pieno (#737.1). Solo l'input vero: la pagina non lo fabbrica.
+if (IS_SUBFRAME) {
+  try {
+    let ultimoGesto = 0;
+    const gesto = (e) => {
+      if (!e.isTrusted || e.key === 'Escape') return;
+      const ora = Date.now();
+      if (ora - ultimoGesto < 100) return;
+      ultimoGesto = ora;
+      try { ipcRenderer.send('filo:gesto-riquadro'); } catch (_) {}
+    };
+    for (const ev of ['pointerdown', 'mousedown', 'pointerup', 'keydown', 'touchend']) {
+      window.addEventListener(ev, gesto, { capture: true, passive: true });
+    }
+  } catch (_) {}
+}
+
 // ─── shortcut hook ─────────────────────────────────────────────────────────
 // La scorciatoia (shortcuts.js) fa un webContents.send('shortcut:triggered'); il content
 // script registra un listener via chrome.runtime.onMessage su MSG.SHORTCUT_TRIGGERED.
