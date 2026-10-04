@@ -145,10 +145,11 @@ test('B — «blocca facebook.com» e la segnalazione automatica dalla chat: la 
   await sec.bringToFront();
   await expect(sec.locator('#sec-siteblock-blacklist')).toHaveValue('tiktok.com\nfacebook.com', { timeout: 3_000 });
 
-  // Lo stesso sito una seconda volta: niente da cambiare, e il modello lo sa.
+  // Lo stesso sito una seconda volta: niente da confermare né da cambiare, e il modello lo sa.
   await modelloFinto(app, [imposta('siti_bloccati', 'aggiungi facebook.com', 'i2'), { text: 'C\'era già.' }]);
   await scrivi(chat, 'blocca facebook.com');
-  await clickConfirm(chat, 'ok', { timeout: 10_000 });
+  await expect(chat.locator('.dash-bubble-filo', { hasText: 'C\'era già.' })).toBeVisible({ timeout: 10_000 });
+  await expect(chat.locator('.sn-confirm-host')).toHaveCount(0);
   await expect.poll(async () => (await app.evaluate(() => globalThis.__imp_tool)).join('\n'), { timeout: 10_000 }).toMatch(/Niente da cambiare: .*facebook\.com c'è già/);
   expect((await impostazioni(app)).security.siteBlock.blacklist).toEqual(['tiktok.com', 'facebook.com']);
 
@@ -208,5 +209,15 @@ test('D — una voce avanzata delle Preferenze dalla chat: un valore del colore 
   ]);
   await scrivi(chat, 'a quanto è la saturazione delle tab?');
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'Adesso colore delle tab, saturazione tab: 0,4.' })).toBeVisible({ timeout: 10_000 });
+
+  // Il ↺ di un token, chiesto a parole: torna al valore di serie, e la riga della pagina lo mostra.
+  await app.evaluate(async () => globalThis.SN_STORAGE.updateSettings({ themeTokens: { accent: '#cc2200', radius: '9px' } }));
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'e1', name: 'IMPOSTA_ESTETICA', arguments: JSON.stringify({ token: 'accent', valore: 'predefinito' }) }] },
+    { text: 'Rimesso.' },
+  ]);
+  await scrivi(chat, 'rimetti il colore d\'accento di serie');
+  await expect(chat.locator('.dash-bubble-filo', { hasText: 'Rimesso.' })).toBeVisible({ timeout: 10_000 });
+  await expect.poll(async () => (await impostazioni(app)).themeTokens, { timeout: 5_000 }).toEqual({ radius: '9px' });
   await ripristina(app);
 });

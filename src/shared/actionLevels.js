@@ -462,6 +462,8 @@
       // (tanto il dispatch non la eseguirà comunque). Un `rifiuto` → 1: non
       // c'è niente da confermare, il dispatch lo respinge spiegando perché.
       level: (a) => {
+        // Un elenco che resterebbe com'è: niente da confermare (`_invariato` lo mette il main, #949).
+        if (a && a._invariato) return 1;
         const built = prefBuilt(a);
         return (built && built.level) || (built ? 1 : 2);
       },

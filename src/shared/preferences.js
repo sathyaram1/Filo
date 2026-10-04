@@ -175,7 +175,8 @@
       else if (!voci.includes(d)) voci.push(d);
     }
     if (errati.length) {
-      return { rifiuto: `${errati.map((x) => `«${x}»`).join(', ')} non ${errati.length > 1 ? 'sono domini' : 'è un dominio'}: scrivi il sito con la sua estensione, come facebook.com` };
+      const mostra = (x) => `«${x.length > 60 ? `${x.slice(0, 59)}…` : x}»`;
+      return { rifiuto: `${errati.map(mostra).join(', ')} non ${errati.length > 1 ? 'sono domini' : 'è un dominio'}: scrivi il sito con la sua estensione, come facebook.com` };
     }
     return { op, voci };
   }

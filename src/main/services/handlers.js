@@ -1563,6 +1563,22 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
     } catch (_) {}
   }
 
+  // Un elenco di siti che resterebbe com'è (aggiungere un sito che c'è già, toglierne uno che non c'è)
+  // non chiede conferma per poi non fare niente: lo si sa prima del gate, mai dall'LLM (#949).
+  if (type === 'IMPOSTA_PREFERENZA') {
+    delete action._invariato;
+    try {
+      const built = global.SN_PREF.buildPreferencePartial(
+        action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza,
+        action.valore ?? action.value ?? action.valoreNuovo ?? action.val,
+      );
+      if (built && built.elenco) {
+        const r = global.SN_PREF.applicaElenco(built.elenco, await Storage.getSettings());
+        if (r.invariato) action._invariato = r.invariato;
+      }
+    } catch (_) {}
+  }
+
   // Le uscite (elenco in src/shared/urlExfil.js, USCITE) passano dalla porta unica
   // PRIMA del gate: un segreto che esce si ferma a ogni livello, anche confermato. Il resto del
   // verdetto è l'anti-esfiltrazione di #587, che alza NAVIGA e CERCA_WEB a livello 2 con
@@ -1962,6 +1978,7 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         // Un rifiuto spiegato resta nel diario col suo perché: non è successo
         // niente, ma l'utente deve saperlo anche se il modello non lo dice.
         if (built.rifiuto) return { executed: false, kept: false, output: { error: built.rifiuto, rifiuto: true } };
+        if (action._invariato) return { executed: false, kept: false, output: { error: action._invariato, invariato: true } };
         // Un elenco (siti bloccati, fidati…) si cambia a voci sull'elenco di adesso (#949).
         let partial = built.partial;
         if (built.elenco) {
