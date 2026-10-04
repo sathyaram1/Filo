@@ -1112,6 +1112,8 @@
         else if (t && !t.startsWith('-')) ops.push(...t.split(','));
       }
       for (const t of ops) {
+        // Il valore di un gruppo può essere `env:` o `HKCU:`; Test-Path ne dice solo se esiste.
+        if (t.includes(SEGNAPOSTO) && prog !== 'test-path') return due(MOTIVI.ignoto);
         const d = dove(t, c);
         if (d === MOTIVI.sistema) return due(d);
       }
