@@ -12,7 +12,7 @@ Filo legge molto: le pagine che visiti, quello che scrivi, le tue memorie, i fil
 
 ## Due regole
 
-La prima: **per capire cosa non funziona non guardo quello che fai, leggo quello che mi scrivi.** Al server di Filo arriva quello che decidi di mandare tu, cioè i feedback, e quello che serve ai servizi che usi, cioè i crediti e il red team. La tua navigazione, le tue chat e i tuoi file non ci arrivano.
+La prima: **per capire cosa non funziona non guardo quello che fai, leggo quello che mi scrivi.** Al server di Filo arriva quello che decidi di mandare tu, cioè i feedback (più le segnalazioni generiche che Filo manda da solo, descritte sotto), e quello che serve ai servizi che usi, cioè i crediti e il red team. La tua navigazione, le tue chat e i tuoi file non ci arrivano.
 
 La seconda: **se qualcosa può stare sul tuo computer, sta sul tuo computer.** Le conversazioni, le memorie, gli appunti, le pagine salvate non hanno una copia da nessun'altra parte. Se cambi computer, te li porti con l'esportazione.
 
