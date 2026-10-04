@@ -121,7 +121,7 @@ const SPEDISCONO = `<!doctype html><html><head><meta charset="utf-8"><title>Pagi
 <div role="button" onclick="window.__clic.push('bonifico')">Esegui bonifico</div>
 <div role="button" onclick="window.__clic.push('autorizza')">Autorizza pagamento</div>
 <section role="region" aria-label="Riepilogo"><h3>Conferma il pagamento</h3><div role="button" onclick="window.__clic.push('conferma')">Conferma</div></section>
-<div role="button" onclick="window.__clic.push('ordini')">I miei ordini</div>
+<a href="#ordini" onclick="window.__clic.push('ordini')">I miei ordini</a>
 <script>window.__clic = [];</script>
 </body></html>`;
 
@@ -142,6 +142,44 @@ test('i pulsanti che spediscono o pagano con un altro nome non si premono, e que
   expect(await pagina.evaluate(() => window.__clic)).toEqual(['ordini']);
   const rifiuti = (await ultimoEsito(app, 1)).slice(-vietati.length);
   for (const r of rifiuti) expect(r).toContain('invia, paga, pubblica o cancella');
+});
+
+// Pulsanti che pagano, ordinano, disdicono o rispondono a un invito con nomi che nessun elenco conosce: senza OK
+// non partono, e all'OK dell'utente si preme quello che il popup ha nominato.
+const IGNOTI = `<!doctype html><html><head><meta charset="utf-8"><title>Cassa e invito</title></head><body>
+<button type="button" onclick="window.__clic.push('concludi')">Concludi ordine</button>
+<div role="button" onclick="window.__clic.push('prenota')">Prenota ora</div>
+<div role="button" onclick="window.__clic.push('rinnova')">Rinnova abbonamento</div>
+<div role="button" onclick="window.__clic.push('riprova')">Riprova pagamento</div>
+<div role="button" onclick="window.__clic.push('disdici')">Annulla abbonamento</div>
+<div role="listitem"><p>Invito: Esame di fisica, giovedì 10:00</p><span>Partecipi?</span>
+<div role="button" onclick="window.__clic.push('rsvp')">Sì</div></div>
+<button type="button" aria-expanded="false" onclick="window.__clic.push('menu')">Opzioni</button>
+<script>window.__clic = [];</script>
+</body></html>`;
+
+test('un pulsante che non si limita a mostrare non si preme da solo: chiede l\'OK e all\'OK si preme', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const pagina = await testServer.openReady(openTab, IGNOTI);
+  await dietro(shell);
+  const page = await home(app);
+  const S = 'Cassa e invito';
+  const nomi = ['Concludi ordine', 'Prenota ora', 'Rinnova abbonamento', 'Riprova pagamento', 'Annulla abbonamento', 'Sì', 'Opzioni'];
+  await modello(app, [
+    { toolCalls: nomi.map((e, k) => ({ id: `p${k}`, name: 'APRI_ELEMENTO', arguments: { scheda: S, elemento: e } })) },
+    { text: 'Ti chiedo conferma.' },
+  ]);
+  await chiedi(page, 'concludi l\'ordine e rinnova');
+  const si = page.locator('.dash-action-btn', { hasText: 'Premere «Sì»' });
+  await expect(si).toBeVisible({ timeout: 60_000 });
+  for (const n of nomi.slice(0, 5)) await expect(page.locator('.dash-action-btn', { hasText: `Premere «${n}»` })).toBeVisible();
+  // Un menu che si apre mostra soltanto: parte senza chiedere.
+  await expect.poll(() => pagina.evaluate(() => window.__clic)).toEqual(['menu']);
+  await si.click();
+  await expect.poll(() => confirmText(page)).toContain('Premere «Sì» nella scheda «Cassa e invito» (potrebbe inviare, pagare o cancellare)');
+  await page.screenshot({ path: join(SHOTS, 'schede-premere-conferma.png') });
+  await clickConfirm(page, 'ok');
+  await expect.poll(() => pagina.evaluate(() => window.__clic)).toEqual(['menu', 'rsvp']);
 });
 
 const BLOG = `<!doctype html><html><head><meta charset="utf-8"><title>Blog di tutti</title></head><body>

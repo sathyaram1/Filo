@@ -413,7 +413,7 @@
       id: 'read-open-tabs', title: 'Filo legge le schede aperte', category: 'assistant',
       desc: 'Puoi chiedere a Filo di una pagina che hai aperto («cosa dice l’articolo che ho aperto?», «quanto costa nella scheda del negozio?»): legge il testo come lo vedi tu, senza quello che la pagina nasconde, e ci si muove come faresti tu: apre un link o una sezione, scrive in un campo, scorre. Quello che legge lo tratta come scritto dal sito, non come tue istruzioni.',
       invoke: 'Chiedilo a parole all’assistente (nuova scheda), anche indicando la scheda col suo nome. Si spegne nelle Preferenze, alla voce «Filo può leggere le schede aperte».',
-      doesNot: 'Non preme mai pulsanti che inviano, pagano, pubblicano o cancellano, non spedisce moduli e non scrive nei campi delle password o delle carte: quelli li fai tu. Non segue un link verso un altro sito senza aprirlo come una pagina nuova. Non legge né tocca le pagine del tuo account Google.',
+      doesNot: 'Non preme mai pulsanti che inviano, pagano, pubblicano o cancellano, non spedisce moduli e non scrive nei campi delle password o delle carte: quelli li fai tu. Un pulsante che non si limita a mostrare qualcosa lo preme solo dopo il tuo OK. Non segue un link verso un altro sito senza aprirlo come una pagina nuova. Non legge né tocca le pagine del tuo account Google.',
     },
     {
       id: 'gmail-from-tab', title: 'La posta dalla scheda di Gmail', category: 'assistant',

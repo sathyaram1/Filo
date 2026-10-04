@@ -143,12 +143,22 @@ async function leggi({ win, rif, gmail = null }) {
   });
 }
 
-async function apri({ win, rif, elemento }) {
+// Prima del cancello dei livelli: cosa premerebbe APRI_ELEMENTO e se mostra soltanto ('mostra') o può fare altro.
+async function genere({ win, rif, elemento }) {
+  const p = await preparaScheda(win, rif);
+  if (p.errore) return { genere: 'nessuno', nome: '' };
+  return lavoraSu(win, p.tab, async (wc) => {
+    await assesta(wc, { tetto: 3000 });
+    return chiama(wc, 'genere', [String(elemento == null ? '' : elemento)]);
+  });
+}
+
+async function apri({ win, rif, elemento, confermato = false, nome = null }) {
   const p = await preparaScheda(win, rif);
   if (p.errore) return { ok: false, errore: p.errore, scheda: p.scheda };
   return lavoraSu(win, p.tab, async (wc, tab) => {
     await assesta(wc, { tetto: 3000 });
-    const r = await chiama(wc, 'apri', [String(elemento == null ? '' : elemento)]);
+    const r = await chiama(wc, 'apri', [String(elemento == null ? '' : elemento), { confermato: !!confermato, nome }]);
     if (!r || !r.ok) return { ok: false, errore: (r && r.motivo) || 'non-trovato', nome: r && r.nome, url: r && r.url, scheda: descriviScheda(tab) };
     await pausa(150);
     await assesta(wc, { tetto: 6000 });
@@ -194,5 +204,5 @@ async function segnaliSito(win, sito) {
 
 module.exports = {
   HOST_VIETATI, vietata, abilitata, trovaScheda, descriviScheda, chiama, attendi, assesta, lavoraSu, pausa,
-  leggi, apri, scrivi, scorri, segnaliSito, hostDi, inOrdine, web,
+  leggi, genere, apri, scrivi, scorri, segnaliSito, hostDi, inOrdine, web,
 };

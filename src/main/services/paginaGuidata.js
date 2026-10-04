@@ -30,7 +30,7 @@ function regoleComandi() {
 function paginaGuidata(regoleComandi) {
   'use strict';
 
-  const VERSIONE = 2;
+  const VERSIONE = 3;
   if (window.__filoPagina && window.__filoPagina.versione === VERSIONE) return;
   const RC = regoleComandi();
 
@@ -328,12 +328,39 @@ function paginaGuidata(regoleComandi) {
     P('pointerup', 0); M('mouseup', 0); M('click', 0);
   }
 
-  function apri(rif) {
+  // Senza chiedere si apre solo ciò che mostra: un collegamento, una riga, una scheda, un menu, un «Mostra altro».
+  // Ogni altro pulsante può spedire o pagare con un nome che nessun elenco conosce: lo preme l'utente con un OK.
+  const MOSTRA = /^(?:mostra|visualizza|vedi|guarda|leggi|apri|espandi|comprimi|riduci|nascondi|altro|altri|altre|di piu|carica (?:altr|di piu|ancora)|more|show|view|see|read|open|expand|collapse|load more|avanti|indietro|successiv|precedent|prossim|next|prev|previous|back|pagina|page|torna|cerca|search|filtra|filtri|filter|ordina per|sort by|menu|dettagli|details|chiudi$|close$)/;
+  function vaAltrove(a) {
+    const h = String(a.getAttribute('href') || '').trim();
+    return !!h && h !== '#' && !/^javascript:/i.test(h);
+  }
+  function genere(el) {
+    if (vietato(el)) return 'vietato';
+    if (inviaModulo(el)) return 'modulo';
+    const t = tipoDi(el);
+    const r = el.getAttribute('role') || '';
+    if (t === 'campo' || t === 'riga' || r === 'tab' || r === 'option' || el.tagName.toUpperCase() === 'SUMMARY') return 'mostra';
+    const a = el.closest('a[href]');
+    if (a && vaAltrove(a)) return 'mostra';
+    if (el.hasAttribute('aria-expanded') || /^(true|menu|listbox|tree|grid)$/.test(el.getAttribute('aria-haspopup') || '')) return 'mostra';
+    if (nomiDi(el).some((n) => n.split(' ').length <= 6 && MOSTRA.test(n))) return 'mostra';
+    return 'altro';
+  }
+  function genereDi(rif) {
+    const el = trova(rif);
+    return el ? { genere: genere(el), nome: breve(nomeDi(el), 120) } : { genere: 'nessuno', nome: '' };
+  }
+
+  // `confermato`: l'utente ha detto OK a premere `nome`; se nel frattempo lo stesso riferimento trova altro, non si preme.
+  function apri(rif, { confermato = false, nome: mostrato = null } = {}) {
     const el = trova(rif);
     if (!el) return { ok: false, motivo: 'non-trovato' };
     const nome = nomeDi(el);
-    if (vietato(el)) return { ok: false, motivo: 'vietato', nome };
-    if (inviaModulo(el)) return { ok: false, motivo: 'modulo', nome };
+    const g = genere(el);
+    if (g === 'vietato' || g === 'modulo') return { ok: false, motivo: g, nome };
+    if (g === 'altro' && !confermato) return { ok: false, motivo: 'conferma', nome };
+    if (confermato && mostrato != null && norm(breve(nome, 120)) !== norm(mostrato)) return { ok: false, motivo: 'cambiato', nome };
     const a = el.closest('a[href]');
     if (a) {
       let u = null;
@@ -763,7 +790,7 @@ function paginaGuidata(regoleComandi) {
 
   window.__filoPagina = {
     versione: VERSIONE,
-    leggi, elementi, apri, scrivi, scorri, quiete, segnaliAutori,
+    leggi, elementi, apri, genere: genereDi, scrivi, scorri, quiete, segnaliAutori,
     posta: {
       stato, righe, apriRiga, espandi, conversazione, vaiA, cerca, inviaRicerca,
       apriScrivi, apriRisposta, compila, letturaBozza, bozzaAperta: () => {

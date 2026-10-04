@@ -1767,6 +1767,22 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
     }
   }
 
+  // Cosa premerebbe APRI_ELEMENTO lo guarda il main nella pagina, sempre: un pulsante che non si limita a mostrare
+  // vuole l'OK dell'utente sul nome che il popup gli ha fatto vedere (`_nomeMostrato`, tornato con la conferma).
+  if (type === 'APRI_ELEMENTO') {
+    const mostrato = confirmed && typeof action._nome === 'string' ? action._nome : null;
+    delete action._genere;
+    delete action._nome;
+    delete action._nomeMostrato;
+    let g = null;
+    try {
+      g = await Schede.genere({ win: winOf(sender), rif: action.scheda ?? action.tab ?? action.numero_scheda ?? '', elemento: action.elemento ?? action.nome ?? action.n });
+    } catch (_) { g = null; }
+    action._genere = g && typeof g.genere === 'string' ? g.genere : 'altro';
+    action._nome = g && typeof g.nome === 'string' ? g.nome : '';
+    if (mostrato != null) action._nomeMostrato = mostrato;
+  }
+
   // #950 — l'elenco vecchio → nuovo lo prepara il main leggendo i file, prima della conferma: il popup mostra
   // i nomi veri, e all'OK si rinomina quello che il popup ha mostrato (bersagliMostrati).
   if (type === 'RINOMINA_FILE' && !confirmed) {
@@ -2315,7 +2331,12 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         let out = null;
         try {
           if (type === 'LEGGI_SCHEDA') out = await Schede.leggi({ win, rif, gmail: Posta });
-          else if (type === 'APRI_ELEMENTO') out = await Schede.apri({ win, rif, elemento: action.elemento ?? action.nome ?? action.n });
+          else if (type === 'APRI_ELEMENTO') {
+            out = await Schede.apri({
+              win, rif, elemento: action.elemento ?? action.nome ?? action.n,
+              confermato: !!confirmed && action._genere === 'altro', nome: action._nomeMostrato ?? action._nome ?? null,
+            });
+          }
           else if (type === 'SCRIVI_CAMPO') out = await Schede.scrivi({ win, rif, campo: action.campo ?? action.elemento, testo: action.testo ?? action.text ?? action.valore });
           else if (type === 'SCORRI_PAGINA') out = await Schede.scorri({ win, rif, verso: action.verso ?? action.direzione });
           else if (type === 'POSTA_ELENCO') out = await Posta.elenco(win);
@@ -3251,6 +3272,11 @@ function schedaForPrompt(type, a, o) {
       return `NON fatto: «${nome}» ${err === 'modulo' ? 'spedisce un modulo' : 'invia, paga, pubblica o cancella qualcosa'}, e quel clic Filo non lo fa: `
         + 'lo fa l\'utente. Diglielo in una riga e non cercare un\'altra strada per farlo.';
     }
+    if (err === 'conferma') {
+      return `NON fatto: «${nome}» non si limita a mostrare qualcosa, e potrebbe inviare, pagare o cancellare. Se l'utente vuole che lo premi, `
+        + 'te lo dice lui: allora richiama APRI_ELEMENTO e gli verrà chiesto un OK. Altrimenti diglielo in una riga e lascialo premere a lui.';
+    }
+    if (err === 'cambiato') return `NON fatto: nella pagina quell'elemento adesso è «${nome}», non quello che l'utente ha approvato. Rileggi la scheda con LEGGI_SCHEDA e chiedi di nuovo.`;
     if (err === 'esterno' || err === 'nuova-scheda') {
       return `Il link «${nome}» porta ${err === 'esterno' ? 'su un altro sito' : 'in una scheda nuova'}: se serve aprilo con NAVIGA, con questo indirizzo.\n`
         + E.imbustaCampi({ tipo: 'DATI_LINK', campi: { Indirizzo: o.url || '' }, conIntestazione: true });

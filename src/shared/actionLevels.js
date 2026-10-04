@@ -422,9 +422,14 @@
       describe: (a) => `Leggere la scheda ${schedaDetta(a)}`,
     },
     APRI_ELEMENTO: {
-      // Aprire è leggere: i clic che inviano, pagano o cancellano non esistono (paginaGuidata.js li rifiuta).
-      level: 1, costo: 0, campo: 'web',
-      describe: (a) => `Aprire «${testoBreve(a && a.elemento)}» nella scheda ${schedaDetta(a)}`,
+      // Aprire ciò che mostra è leggere. Un pulsante che non si limita a mostrare vuole un OK (`_genere` lo scrive il
+      // main guardando la pagina); quelli che inviano, pagano o cancellano non esistono (paginaGuidata.js li rifiuta).
+      level: (a) => (a && a._genere === 'altro' ? 2 : 1),
+      costo: (a) => (a && a._genere === 'altro' ? 1 : 0),
+      campo: 'web',
+      describe: (a) => (a && a._genere === 'altro'
+        ? `Premere «${testoBreve(a._nome || a.elemento)}» nella scheda ${schedaDetta(a)} (potrebbe inviare, pagare o cancellare)`
+        : `Aprire «${testoBreve((a && a._nome) || (a && a.elemento))}» nella scheda ${schedaDetta(a)}`),
     },
     SCRIVI_CAMPO: {
       // Testo in un campo, senza Invio: si cancella com'è stato scritto.
