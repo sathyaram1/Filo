@@ -34,6 +34,7 @@
     theme: { nome: 'tema', valori: { light: 'chiaro', dark: 'scuro', system: 'come il sistema' }, livello: 1 },
     textScale: { nome: 'dimensione del testo', valore: percento, livello: 1 },
     showHomeMessage: { nome: 'commento nella home', valore: sino('mostrato', 'nascosto'), livello: 1 },
+    'homeSistema.*': { nome: (k) => `voce «${k === 'bluetooth' ? 'Bluetooth' : k}» nella home`, valore: sino('mostrata', 'nascosta'), livello: 1 },
     'tabPreview.enabled': { nome: 'anteprima delle schede', valore: ATTIVA, livello: 1 },
     'tabPreview.size': { nome: 'dimensione dell\'anteprima delle schede', livello: 1 },
     'tabColor.*': { nome: (k) => `colore delle tab, ${etichettaColoreTab(k)}`, valore: numero, livello: 1 },
