@@ -140,6 +140,18 @@ test('segnare fidato un sito dove scrivono in tanti: lo sconsiglia nel riquadro,
   await expect.poll(() => app.evaluate(async () => ((await globalThis.SN_STORAGE.getRaw('filo_fiducia', null)) || {}).siti || []))
     .toEqual([expect.objectContaining({ sito: 'sito-pubblico.test', via: 'chat' })]);
 
+  // «Di chi ti fidi?» si chiede anche in chat.
+  await modello(app, [
+    { toolCalls: [{ id: 'f3', name: 'ELENCA_FIDATI', arguments: {} }] },
+    { text: 'Ecco di chi mi fido.' },
+  ]);
+  await chiedi(page, 'di chi ti fidi?');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco di chi mi fido.' })).toBeVisible({ timeout: 60_000 });
+  const [elenco] = await ultimoEsito(app, 1);
+  expect(elenco).toContain('Siti fidati (1)');
+  expect(elenco).toContain('- sito-pubblico.test (segnato in chat)');
+  expect(elenco).toContain('Mittenti fidati: nessuno.');
+
   await modello(app, [
     { toolCalls: [{ id: 'f2', name: 'TOGLI_FIDATO', arguments: { sito: 'sito-pubblico.test' } }] },
     { text: 'Tolto.' },

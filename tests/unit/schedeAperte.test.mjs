@@ -54,5 +54,5 @@ test('il copione della pagina è codice valido, in un mondo suo', () => {
   assert.doesNotThrow(() => new Function(CODICE));
   assert.equal(MONDO, 1534);
   // Un carattere invisibile scritto per davvero nel sorgente spezzerebbe una regex senza dirlo.
-  assert.equal(/[  ​-‏﻿]/.test(CODICE), false);
+  assert.equal(/[\u2028\u2029\u200b-\u200f\ufeff]/.test(CODICE), false);
 });

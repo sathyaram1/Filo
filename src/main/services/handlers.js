@@ -2147,6 +2147,11 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         return { executed: out.ok === true, kept: type === 'POSTA_BOZZA' && out.ok === true, output: out };
       }
 
+      case 'ELENCA_FIDATI': {
+        const v = await Fiducia.vista();
+        return { executed: true, kept: false, output: { ok: true, mittenti: v.mittenti, siti: v.siti } };
+      }
+
       case 'SEGNA_FIDATO':
       case 'TOGLI_FIDATO': {
         const voce = { [action._tipo]: action._voce };
@@ -2901,7 +2906,8 @@ function documentReadsForPrompt(actions) {
 // fidato lo dice una riga di Filo FUORI dalla busta, con l'indirizzo già ripulito: un mittente che si chiama
 // «Marco (fidato)» resta dentro, e lì non conta.
 const TIPI_SCHEDE = new Set(['LEGGI_SCHEDA', 'APRI_ELEMENTO', 'SCRIVI_CAMPO', 'SCORRI_PAGINA', 'POSTA_ELENCO',
-  'POSTA_CERCA', 'POSTA_LEGGI', 'POSTA_BOZZA', 'SEGNA_FIDATO', 'TOGLI_FIDATO']);
+  'POSTA_CERCA', 'POSTA_LEGGI', 'POSTA_BOZZA', 'SEGNA_FIDATO', 'TOGLI_FIDATO', 'ELENCA_FIDATI']);
+const MAX_FIDATI_IN_CHAT = 300;
 const MAX_TESTO_SCHEDA = 60000;
 const MAX_TESTO_MAIL = 20000;
 const MAX_MAIL = 60;
@@ -3039,6 +3045,17 @@ function schedaForPrompt(type, a, o) {
     return `${o.spostato ? 'Scorsa' : 'Non si è mossa:'} la scheda ${dove}.${fine} Rileggi con LEGGI_SCHEDA.`;
   }
   if (type === 'SEGNA_FIDATO') return o.gia ? `${o.voce} era già fra i fidati.` : `Segnato come fidato: ${o.voce}.`;
+  if (type === 'ELENCA_FIDATI') {
+    const VIA = { inviati: 'dagli Inviati', chat: 'segnato in chat', preferenze: 'aggiunto nelle Preferenze' };
+    const parte = (nome, voci, chiave) => {
+      const l = (Array.isArray(voci) ? voci : []).filter(Boolean);
+      if (!l.length) return `${nome}: nessuno.`;
+      const righe = l.slice(0, MAX_FIDATI_IN_CHAT).map((v) => `- ${v[chiave]} (${VIA[v.via] || v.via || '?'})`).join('\n');
+      const oltre = l.length > MAX_FIDATI_IN_CHAT ? `\n[Ce ne sono altri ${l.length - MAX_FIDATI_IN_CHAT}: tutti si vedono nelle Preferenze, sotto «Schede aperte e posta».]` : '';
+      return `${nome} (${l.length}):\n${E.imbusta({ tipo: 'TESTO_SALVATO', testo: righe })}${oltre}`;
+    };
+    return `${parte('Mittenti fidati', o.mittenti, 'indirizzo')}\n${parte('Siti fidati', o.siti, 'sito')}\nSi tolgono con TOGLI_FIDATO o nelle Preferenze.`;
+  }
   if (type === 'TOGLI_FIDATO') return `Tolto dai fidati: ${o.voce}.`;
   return '';
 }

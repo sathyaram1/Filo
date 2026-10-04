@@ -437,6 +437,10 @@
       },
       describeDone: (a) => `Segnato come fidato: ${testoBreve(a && (a._voce || a.mittente || a.sito))}`,
     },
+    ELENCA_FIDATI: {
+      level: 1, costo: 0, campo: null,
+      describe: () => 'Rileggere l\'elenco dei mittenti e dei siti fidati',
+    },
     TOGLI_FIDATO: {
       level: 1, costo: 1, campo: null,
       describe: (a) => `Togliere dai fidati ${testoBreve(a && (a.mittente || a.sito))}`,
