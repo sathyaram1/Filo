@@ -243,3 +243,13 @@ test('i canali delle carte rispondono solo alle pagine di Filo', () => {
     assert.match(src, new RegExp(`on\\(MSG\\.${tipo}, soloFilo\\(`), `${tipo} risponde anche a un sito`);
   }
 });
+
+test('a sinistra i Crediti e ciò che suona sono fissi in cima; il resto no', () => {
+  const ora = Date.now();
+  const sx = C.sinistra({
+    crediti: true,
+    timers: [{ id: 't1', label: 'Pasta', endsAt: new Date(ora + 6e5).toISOString() }, { id: 't2', label: 'Forno', ringing: true }],
+    notifiche: [{ id: 'n1', text: 'La lavatrice ha finito.' }],
+  }, null, ora);
+  assert.deepEqual(sx.map((v) => [v.chiave, !!v.fissa]), [['crediti', true], ['timer:t2', true], ['timer:t1', false], ['avviso:n1', false]]);
+});

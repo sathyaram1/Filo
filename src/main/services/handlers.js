@@ -3859,14 +3859,18 @@ async function cartaSinistraDaChat({ tipo, verso, action, sx, trovate, sender })
     if (avvisi) broadcastLiveUpdate();
     return { executed: true, kept: true, output: { tolte: elenco(voci) } };
   }
-  // sposta: la nuova posizione nell'ordine che l'utente vede.
+  // sposta: la nuova posizione nell'ordine che l'utente vede, fra le carte che non stanno in cima per regola.
   const v = voci[0];
-  const ordine = sx.map((x) => x.chiave).filter((k) => k !== v.chiave);
-  const at = sx.findIndex((x) => x.chiave === v.chiave);
+  const FISSA = 'sta in cima finché suona: non si sposta e non si scavalca';
+  if (v.fissa) return no(`la carta «${v.titolo}» ${FISSA}`);
+  const mobili = sx.filter((x) => !x.fissa);
+  const ordine = mobili.map((x) => x.chiave).filter((k) => k !== v.chiave);
+  const at = mobili.findIndex((x) => x.chiave === v.chiave);
   let dove;
   if (action.prima_di != null) {
     const rif = sx.find((x) => x.chiave === String(action.prima_di)) || CH.trovaSinistra(action.prima_di, sx).voci[0];
     if (!rif || rif.chiave === v.chiave) return no('la carta di riferimento non è a sinistra');
+    if (rif.fissa) return no(`la carta «${rif.titolo}» ${FISSA}`);
     dove = ordine.indexOf(rif.chiave);
   } else if (verso === 'cima') dove = 0;
   else if (verso === 'fondo') dove = ordine.length;

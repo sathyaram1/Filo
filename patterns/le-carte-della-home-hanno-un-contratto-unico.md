@@ -41,6 +41,10 @@ un file scaricato) viaggia con la sua provenienza, come l'esito di un comando.
   cosa che racconta (il timer, l'avviso) o, se è solo un ricordo (i Crediti, uno scaricamento finito), la nasconde:
   finché la cosa c'è, la carta nascosta sta anch'essa in «altro» (`nascosteSinistra`) e si rimette da sola (mossa
   `mostra`, anche a parole), senza passare da «come all'inizio», che disfa la disposizione dell'utente.
+- **Lasciata sopra una carta, ne prende il posto.** In qualunque metà la si lasci: chi scende le passa sotto, chi
+  sale o arriva da «altro» le passa sopra; la linea si disegna dove la carta andrà. I Crediti e ciò che suona stanno
+  in cima per regola (`fissa` in `SN_CARTE_HOME.sinistra`): non si spostano e non si scavalcano, e né il menu, né
+  il trascinamento, né la chat lo offrono.
 - **Clic e Invio fanno la stessa cosa.** A sinistra aprono nel filo; a destra aprono l'app della carta
   (`apri`), o nel filo se non ne ha una (`usaCarta`).
 - **La colonna di sinistra ha un ordine solo.** `SN_CARTE_HOME.sinistra` decide quali carte ci sono e in che

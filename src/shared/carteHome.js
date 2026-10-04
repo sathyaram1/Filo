@@ -110,9 +110,11 @@
     const voce = (chiave, tipo, titolo, ref) => ({ chiave, tipo, titolo, ref });
     const vT = (t) => voce(`timer:${t.id}`, t.kind === 'alarm' ? 'sveglia' : 'timer', nomeTimer(t), t);
     const vD = (r) => voce(`download:${r.id}`, 'download', r.filename || 'download', r);
+    // `fissa`: sta in cima per regola, quindi né si sposta né la si scavalca (menu, trascinamento, chat).
     const cima = [];
     if (crediti && !nascoste.has('crediti')) cima.push(voce('crediti', 'crediti', 'Crediti', null));
     for (const t of lista(timers).filter((x) => x && x.ringing)) cima.push(vT(t));
+    for (const v of cima) v.fissa = true;
     const vis = lista(downloads).filter((r) => downloadVisibile(r, ora));
     const resto = [
       ...lavoriAltrove(lavori, chat, ora).map((l) => voce(`lavoro:${l.id}`, 'lavoro', l.testo || 'lavoro in corso', l)),

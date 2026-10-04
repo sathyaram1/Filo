@@ -628,3 +628,67 @@ test('una finestra incognito mostra le carte di destra come le ha disposte l’u
   await expect(normale.locator('#tieni .dash-carta').first()).toBeVisible({ timeout: 10_000 });
   await expect(normale.locator('#tieni .dash-carta[data-tipo="mazzi"]')).toHaveCount(0);
 });
+
+// Trascina col mouse vero `da` fino a `frazione` dell'altezza di `su`, e la lascia lì.
+async function trascinaSu(page, da, su, frazione) {
+  const a = await da.boundingBox();
+  const b = await su.boundingBox();
+  await page.mouse.move(a.x + 60, a.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(a.x + 60, a.y + 10, { steps: 3 });
+  await page.mouse.move(b.x + 60, b.y + b.height * frazione, { steps: 10 });
+  await page.waitForTimeout(150);
+  await page.mouse.up();
+}
+const ordineSx = (page) => page.locator('#accade > .dash-carta').evaluateAll((ns) => ns.map((n) => n.dataset.tipo));
+
+test('una carta lasciata sopra un’altra ne prende il posto, in qualunque metà la si lasci', async ({ app }) => {
+  test.setTimeout(45_000);
+  const page = await home(app);
+  const carta = (t) => page.locator(`#tieni .dash-carta[data-tipo="${t}"]`);
+  await trascinaSu(page, carta('mazzi'), carta('editor'), 0.75);
+  await expect.poll(() => ordineDestra(page)).toEqual(['mazzi', 'editor', 'suggerimenti', 'rapide']);
+  await trascinaSu(page, carta('mazzi'), carta('editor'), 0.25);
+  await expect.poll(() => ordineDestra(page)).toEqual(['editor', 'mazzi', 'suggerimenti', 'rapide']);
+
+  await app.evaluate(async () => {
+    await globalThis.SN_FILO_MEMORY.addTimer({ label: 'Pasta', seconds: 900 });
+    await globalThis.SN_FILO_MEMORY.addNotification({ kind: 'info', text: 'La lavatrice ha finito.' });
+  });
+  await page.reload();
+  await home(app);
+  await expect.poll(() => ordineSx(page)).toEqual(['crediti', 'timer', 'avviso']);
+  await trascinaSu(page, page.locator('#accade .dash-carta[data-tipo="avviso"]'), page.locator('#accade .dash-carta[data-tipo="timer"]'), 0.75);
+  await expect.poll(() => ordineSx(page)).toEqual(['crediti', 'avviso', 'timer']);
+});
+
+test('le carte fisse in cima a sinistra non si scavalcano: il menu non lo offre e la chat lo dice', async ({ app }) => {
+  test.setTimeout(60_000);
+  const page = await home(app);
+  await app.evaluate(async () => {
+    await globalThis.SN_FILO_MEMORY.addTimer({ label: 'Pasta', seconds: 900 });
+    await globalThis.SN_FILO_MEMORY.addTimer({ label: 'Forno', seconds: 1 });
+  });
+  await page.reload();
+  await home(app);
+  await expect(page.locator('#accade .dash-carta[data-suona="1"]')).toHaveCount(1, { timeout: 10_000 });
+  await expect.poll(() => ordineSx(page)).toEqual(['crediti', 'timer', 'timer']);
+  const pasta = page.locator('#accade .dash-carta', { hasText: 'Pasta' });
+  await pasta.click({ button: 'right', position: { x: 30, y: 12 } });
+  await expect(page.locator('.dash-menu .dash-menu-voce', { hasText: 'Apri nel filo' })).toBeVisible();
+  await expect(page.locator('.dash-menu .dash-menu-voce', { hasText: /^Sposta/ })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  const crediti = page.locator('#accade .dash-carta[data-tipo="crediti"]');
+  await crediti.click({ button: 'right', position: { x: 30, y: 12 } });
+  await expect(page.locator('.dash-menu .dash-menu-voce', { hasText: /^Sposta/ })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+
+  await modelloSpia(app, [
+    { strumenti: [{ id: 'c1', name: 'CARTA_HOME', arguments: '{"operazione":"sposta","carta":"il timer della pasta","prima_di":"il timer del forno"}' }] },
+    { testo: 'Il forno sta suonando: resta in cima.' },
+  ]);
+  await page.locator('#input').fill('metti la pasta sopra il forno');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'resta in cima' })).toBeVisible({ timeout: 10_000 });
+  expect((await esitiLetti(app))[1]).toContain('sta in cima finché suona');
+});

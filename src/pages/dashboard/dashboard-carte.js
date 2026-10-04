@@ -284,7 +284,7 @@
   }
   function carteSinistra() {
     programmaLavori();
-    return C.sinistra(datiSinistra(), layout).map((v) => PER_TIPO[v.tipo](v.ref));
+    return C.sinistra(datiSinistra(), layout).map((v) => Object.assign(PER_TIPO[v.tipo](v.ref), { fissa: !!v.fissa }));
   }
 
   // ===== Le carte di destra =====
@@ -469,7 +469,7 @@
   // Una carta si rifà solo se cambia la sua forma; se cambia solo il testo dello stato si scrive quello, così
   // un clic che cade mentre il conto alla rovescia avanza resta sul suo pulsante.
   function forma(c) {
-    return JSON.stringify([c.tipo, c.titolo, c.suona, c.grande, c.lungo, c.avanza != null,
+    return JSON.stringify([c.tipo, c.titolo, c.suona, c.fissa, c.grande, c.lungo, c.avanza != null,
       c.principale && c.principale.etichetta, c.principale && c.principale.forte, c.secondaria && c.secondaria.etichetta,
       (c.voci || []).map((v) => [v.testo, v.coda]), (c.pastiglie || []).map((p) => [p.etichetta, p.acceso]), c.stato == null]);
   }
@@ -480,6 +480,7 @@
     art.dataset.tipo = c.tipo;
     art.dataset.colonna = colonna;
     if (c.suona) art.dataset.suona = '1';
+    if (c.fissa) art.dataset.fissa = '1';
     art.tabIndex = 0;
     art.draggable = true;
     art.setAttribute('aria-label', c.titolo);
@@ -688,7 +689,7 @@
     for (const v of c.altreVoci || []) voci.push(v);
     if (voci.length) voci.push(null);
     voci.push({ etichetta: 'Apri nel filo', fai: () => apriNelFilo(art) });
-    const fratelli = [...art.parentNode.querySelectorAll(':scope > .dash-carta')];
+    const fratelli = mobili(art.parentNode);
     const at = fratelli.indexOf(art);
     if (at > 0) voci.push({ etichetta: 'Sposta su', fai: () => spostaCarta(art, -1) });
     if (at >= 0 && at < fratelli.length - 1) voci.push({ etichetta: 'Sposta giù', fai: () => spostaCarta(art, 1) });
@@ -760,16 +761,20 @@
     });
   }
 
+  // Le carte che si spostano e si scavalcano: non quelle che stanno in cima per regola (i Crediti, ciò che suona).
+  function mobili(host) {
+    return [...host.querySelectorAll(':scope > .dash-carta')].filter((n) => n.dataset.fissa !== '1');
+  }
   // `prima`: la chiave davanti a cui va (null = in fondo).
   function ordinaColonna(colonna, chiave, prima) {
     if (colonna === 'destra') return muovi({ tipo: 'sposta', carta: chiave, prima });
-    const chiavi = [...accadeEl.querySelectorAll(':scope > .dash-carta')].map((n) => n.dataset.chiave).filter((k) => k !== chiave);
+    const chiavi = mobili(accadeEl).map((n) => n.dataset.chiave).filter((k) => k !== chiave);
     const at = prima == null ? -1 : chiavi.indexOf(prima);
     if (at < 0) chiavi.push(chiave); else chiavi.splice(at, 0, chiave);
     return muovi({ tipo: 'ordina-sinistra', ordine: chiavi });
   }
   function spostaCarta(art, passo) {
-    const fratelli = [...art.parentNode.querySelectorAll(':scope > .dash-carta')];
+    const fratelli = mobili(art.parentNode);
     const at = fratelli.indexOf(art);
     const prima = passo < 0 ? fratelli[at - 1] : fratelli[at + 2];
     ordinaColonna(art.dataset.colonna, art.dataset.chiave, prima ? prima.dataset.chiave : null)
@@ -789,7 +794,7 @@
     art.addEventListener('dragstart', (e) => {
       if (e.target !== art) return;
       chiudiMenu();
-      presa = { chiave: art.dataset.chiave, colonna: art.dataset.colonna, el: art };
+      presa = { chiave: art.dataset.chiave, colonna: art.dataset.colonna, el: art, fissa: art.dataset.fissa === '1' };
       trascinando = true;
       art.classList.add('presa');
       const c = art._carta;
@@ -800,20 +805,30 @@
     });
     art.addEventListener('dragend', fineTrascinamento);
   }
-  // Dove cade il puntatore dentro una colonna: la carta sotto, e se si entra sopra o sotto la sua metà.
+  // Dove va la carta lasciata qui. Sopra un'altra carta ne prende il posto, in qualunque punto la si lasci: chi
+  // scende le passa sotto, chi sale o arriva da fuori le passa sopra. Fra due carte decide la metà più vicina.
+  // `segno` e `dove`: la carta su cui si disegna la linea, e da che lato.
   function bersaglio(host, e) {
-    const carte = [...host.querySelectorAll(':scope > .dash-carta')].filter((n) => !presa || n !== presa.el);
+    const tutte = [...host.querySelectorAll(':scope > .dash-carta')];
+    const carte = mobili(host).filter((n) => !presa || n !== presa.el);
+    const sotto = carte.find((n) => { const r = n.getBoundingClientRect(); return e.clientY >= r.top && e.clientY <= r.bottom; });
+    if (sotto) {
+      const scende = presa && tutte.includes(presa.el) && tutte.indexOf(presa.el) < tutte.indexOf(sotto);
+      if (scende) return { prima: carte[carte.indexOf(sotto) + 1] || null, segno: sotto, dove: 'dopo' };
+      return { prima: sotto, segno: sotto, dove: 'prima' };
+    }
     for (const n of carte) {
       const r = n.getBoundingClientRect();
-      if (e.clientY < r.top + r.height / 2) return { prima: n };
+      if (e.clientY < r.top + r.height / 2) return { prima: n, segno: n, dove: 'prima' };
     }
-    return { prima: null, ultima: carte[carte.length - 1] || null };
+    const ultima = carte[carte.length - 1] || null;
+    return { prima: null, segno: ultima, dove: 'dopo' };
   }
   function ammessa(host) {
     if (!presa) return false;
     const daAltro = presa.colonna === 'altro';
     if (host === tieniEl) return presa.colonna === 'destra' || (daAltro && !presa.sinistra);
-    return host === accadeEl && (presa.colonna === 'sinistra' || (daAltro && presa.sinistra));
+    return host === accadeEl && ((presa.colonna === 'sinistra' && !presa.fissa) || (daAltro && presa.sinistra));
   }
   function agganciaColonna(host) {
     host.addEventListener('dragover', (e) => {
@@ -822,8 +837,7 @@
       e.dataTransfer.dropEffect = 'move';
       for (const n of host.querySelectorAll('.sopra-prima, .sopra-dopo')) n.classList.remove('sopra-prima', 'sopra-dopo');
       const b = bersaglio(host, e);
-      if (b.prima) b.prima.classList.add('sopra-prima');
-      else if (b.ultima) b.ultima.classList.add('sopra-dopo');
+      if (b.segno) b.segno.classList.add(b.dove === 'dopo' ? 'sopra-dopo' : 'sopra-prima');
     });
     host.addEventListener('dragleave', (e) => {
       if (host.contains(e.relatedTarget)) return;
