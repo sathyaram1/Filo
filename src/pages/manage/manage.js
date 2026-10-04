@@ -1936,9 +1936,19 @@
     mgListHead.textContent = (n === null || n === undefined)
       ? label
       : `${label} ${countText(n)}`;
-    if (n !== null && n !== undefined && loadHitCap()) mgListHead.title = FB.COUNT_INCOMPLETE_HINT;
-    else mgListHead.removeAttribute('title');
+    testaIncompleta = n !== null && n !== undefined && loadHitCap();
     aggiornaSegnoFerma();
+  }
+
+  // Il suggerimento dell'intestazione lo scrive solo questa: ridisegnando il conteggio si perdeva l'avviso del giro
+  // appena messo (#676).
+  let testaIncompleta = false;
+  let avvisoGiro = '';
+  function scriviTitoloTesta(ferma) {
+    if (!mgListHead) return;
+    const parti = [ferma || (testaIncompleta ? FB.COUNT_INCOMPLETE_HINT : ''), avvisoGiro ? `Aggiornamento: ${avvisoGiro}` : ''].filter(Boolean);
+    if (parti.length) mgListHead.title = parti.join('\n');
+    else mgListHead.removeAttribute('title');
   }
 
   function updateTabCounts() {
