@@ -4,9 +4,9 @@
 //
 // Questo test ASSERISCE il flusso reale end-to-end nella nuova scheda:
 //   1. creo un timer;
-//   2. sulla sua card compare il pulsante ⏸ (prima non c'era nulla);
-//   3. cliccando ⏸ la card mostra "(in pausa)" e il pulsante diventa ▶;
-//   4. cliccando ▶ il timer riparte: "(in pausa)" sparisce e torna ⏸.
+//   2. sulla sua carta compare il pulsante «Pausa» (prima non c'era nulla);
+//   3. cliccando «Pausa» la carta dice "in pausa" e il pulsante diventa «Riprendi»;
+//   4. cliccando «Riprendi» il timer riparte: "in pausa" sparisce e torna «Pausa».
 //
 // Senza il fix il pulsante non esisterebbe (passo 2 rosso) e comunque nessun
 // click potrebbe far apparire "(in pausa)" (passo 3 rosso).
@@ -44,25 +44,25 @@ test('timer: pausa e ripresa dalla card nella nuova scheda', async ({ app, shell
   });
   expect(added?.ok, 'timer creato').toBeTruthy();
 
-  const card = page.locator('.dash-live-card', { hasText: 'TestPausa' });
+  const card = page.locator('#accade .dash-carta', { hasText: 'TestPausa' });
   await expect(card).toBeVisible({ timeout: 8_000 });
 
-  // Stato iniziale: NON in pausa, e il pulsante di pausa esiste (⏸).
-  await expect(card).not.toContainText('(in pausa)');
-  const pauseBtn = card.locator('.dash-live-pause');
-  await expect(pauseBtn).toHaveText('⏸', { timeout: 4_000 });
+  // Stato iniziale: NON in pausa, e il pulsante di pausa esiste.
+  await expect(card).not.toContainText('in pausa');
+  const pauseBtn = card.locator('.dash-carta-az.principale');
+  await expect(pauseBtn).toHaveText('Pausa', { timeout: 4_000 });
 
   // Metto in pausa.
   await pauseBtn.click();
-  await expect(page.locator('.dash-live-card', { hasText: 'TestPausa' }))
-    .toContainText('(in pausa)', { timeout: 4_000 });
-  await expect(page.locator('.dash-live-card', { hasText: 'TestPausa' }).locator('.dash-live-pause'))
-    .toHaveText('▶', { timeout: 4_000 });
+  await expect(page.locator('#accade .dash-carta', { hasText: 'TestPausa' }))
+    .toContainText('in pausa', { timeout: 4_000 });
+  await expect(page.locator('#accade .dash-carta', { hasText: 'TestPausa' }).locator('.dash-carta-az.principale'))
+    .toHaveText('Riprendi', { timeout: 4_000 });
 
   // Riprendo.
-  await page.locator('.dash-live-card', { hasText: 'TestPausa' }).locator('.dash-live-pause').click();
-  await expect(page.locator('.dash-live-card', { hasText: 'TestPausa' }))
-    .not.toContainText('(in pausa)', { timeout: 4_000 });
-  await expect(page.locator('.dash-live-card', { hasText: 'TestPausa' }).locator('.dash-live-pause'))
-    .toHaveText('⏸', { timeout: 4_000 });
+  await page.locator('#accade .dash-carta', { hasText: 'TestPausa' }).locator('.dash-carta-az.principale').click();
+  await expect(page.locator('#accade .dash-carta', { hasText: 'TestPausa' }))
+    .not.toContainText('in pausa', { timeout: 4_000 });
+  await expect(page.locator('#accade .dash-carta', { hasText: 'TestPausa' }).locator('.dash-carta-az.principale'))
+    .toHaveText('Pausa', { timeout: 4_000 });
 });

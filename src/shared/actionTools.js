@@ -100,7 +100,7 @@
       required: ['url'],
     },
     TIMER: {
-      description: 'Crea un timer nella colonna destra della home.',
+      description: 'Crea un timer: compare come carta nella colonna sinistra della home.',
       properties: {
         secondi: I('Durata in secondi.'),
         etichetta: S('Nome del timer (es. "Pasta").'),
@@ -404,6 +404,16 @@
       description: 'Aziona un controllo del browser Filo (la finestra e la barra in alto), non il sito. "fullscreen" = schermo intero immersivo (la pagina attiva copre tutta la finestra, barre nascoste, Esc esce), non il pulsante del lettore video dentro il sito. NON esiste un comando per CHIUDERE la finestra o le schede. Esegue subito.',
       properties: { comando: S('Uno di: fullscreen, minimize (riduci a icona), home (apri la home di Filo), settings (menu Impostazioni), apps (menu App), account (menu Account).', { enum: ['fullscreen', 'minimize', 'home', 'settings', 'apps', 'account'] }) },
       required: ['comando'],
+    },
+    CARTA_HOME: {
+      description: 'Dispone le carte della home. A destra quelle che l\'utente tiene ("togli la carta dei mazzi", "rimetti l\'editor", "metti i suggerimenti in cima", "rimetti le carte com\'erano"): una carta tolta diventa un\'icona in «altro», sotto le carte, e da lì si rimette. A sinistra quello che sta succedendo (timer, sveglie, scaricamenti, avvisi, lavori in corso): si spostano ("metti il timer della pasta in cima") e si tolgono ("togli l\'avviso del backup": un avviso si chiude, uno scaricamento o un lavoro spariscono solo dalla home, e con rimetti tornano). Un timer o una sveglia si tolgono con CANCELLA_SVEGLIA. Se la carta di sinistra non si trova, l\'esito elenca quelle che ci sono con la loro chiave.',
+      properties: {
+        operazione: S('togli, rimetti, sposta, oppure ripristina (tutte le carte al loro posto di partenza, e tornano anche quelle di sinistra che erano state solo nascoste, come uno scaricamento finito o la carta dei Crediti).', { enum: ['togli', 'rimetti', 'sposta', 'ripristina'] }),
+        carta: S('A destra: editor = Editor (documenti recenti), mazzi = Mazzi del deck builder, suggerimenti = «Filo ti suggerisce», rapide = Impostazioni rapide. A sinistra: le parole con cui l\'utente la indica (il nome del timer, del file scaricato, un pezzo del testo dell\'avviso, oppure solo il tipo, come "gli avvisi") o la chiave che un esito precedente ti ha dato. Serve a tutte le operazioni tranne ripristina.'),
+        verso: S('Dove metterla, per sposta (e cima per rimetti): su o giu di un posto, cima, fondo.', { enum: ['su', 'giu', 'cima', 'fondo'] }),
+        prima_di: S('In alternativa a verso: la carta davanti a cui metterla, della stessa colonna.'),
+      },
+      required: ['operazione'],
     },
     // Disponibile solo durante l'intervista di benvenuto (#524): la aggiunge
     // `definitions({ onboarding: true })`.

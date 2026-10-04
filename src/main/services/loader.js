@@ -56,6 +56,7 @@ require(path.join(SHARED, 'paths.js'));
 require(path.join(SHARED, 'onboarding.js'));
 require(path.join(SHARED, 'filoMemory.js'));
 require(path.join(SHARED, 'filoState.js'));
+require(path.join(SHARED, 'carteHome.js')); // #870 — carte della home: catalogo e mosse (logica pura)
 // #525 — archivio delle chat con Filo: titoli, tipi, ricerca (logica pura).
 // Va PRIMA di services/filoChats.js, che ci si appoggia per scrivere.
 require(path.join(SHARED, 'chatArchive.js'));

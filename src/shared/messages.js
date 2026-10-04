@@ -774,6 +774,16 @@
     FILO_STOP_TIMER_ALARM: 'filo_stop_timer_alarm', // { id } — silenzia/rimuove un timer che sta suonando
     FILO_GET_NOTIFICATIONS: 'filo_get_notifications',
     FILO_DISMISS_NOTIFICATION: 'filo_dismiss_notification', // { id }
+    // Le carte della home (#870), solo pagine filo://. La mossa è quella di SN_CARTE_HOME.applica: la pagina
+    // manda il cambio, non la disposizione intera. CAMBIATE va alle pagine di Filo quando la disposizione cambia.
+    CARTE_HOME_GET: 'carte_home_get',             // {} → { ok, layout }
+    CARTE_HOME_MODIFICA: 'carte_home_modifica',   // { mossa } → { ok, layout } | { ok:false, error, layout }
+    CARTE_HOME_CAMBIATE: 'carte_home_cambiate',   // broadcast { layout }
+    // I lavori lunghi in corso (una risposta di Filo, un comando del terminale): la home li mostra a sinistra.
+    LAVORI_IN_CORSO: 'lavori_in_corso',           // {} → { ok, lavori: [{ id, tipo, chat, testo, iniziato }] }
+    LAVORI_CAMBIATI: 'lavori_cambiati',           // broadcast { lavori }
+    // I documenti dell'Editor dal più recente, per la sua carta nella home. Solo pagine filo://.
+    EDITOR_RECENTI: 'editor_recenti',             // {} → { ok, totale, file: [{ id, titolo, modificato }] }
     // L'utente ha confermato (popup livello 2 / digitato "conferma" livello 3)
     // un'azione di Filo rimasta in sospeso: ora va eseguita davvero. { action }
     FILO_CONFIRM_ACTION: 'filo_confirm_action',
