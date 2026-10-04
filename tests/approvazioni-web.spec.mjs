@@ -295,3 +295,21 @@ test('tema scuro del sistema: la pagina lo segue', async () => {
     await chiudi();
   }
 });
+
+test('su uno schermo da telefono si legge e si approva senza scorrere di lato', async () => {
+  const finto = serverFinto({ pending: [richiesta('r1', 'claude/un-ramo-dal-nome-molto-lungo-che-non-deve-allargare-la-pagina')] });
+  const { app, page, chiudi } = await apri(`${sito.origin}/`, finto);
+  try {
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(390, 760));
+    await expect.poll(() => page.evaluate(() => window.innerWidth)).toBeLessThan(420);
+    await page.locator('.ap-accedi').click();
+    const card = page.locator('.sn-mac-card[data-request-id="r1"]');
+    await expect(card).toBeVisible();
+    const sporge = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(sporge, 'un ramo lungo non deve allargare la pagina').toBeLessThanOrEqual(0);
+    await expect(card.locator('.sn-mac-btn-go')).toBeInViewport();
+    await page.screenshot({ path: 'tests/.shots/approvazioni-web-telefono.png' }).catch(() => {});
+  } finally {
+    await chiudi();
+  }
+});
