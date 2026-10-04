@@ -516,3 +516,48 @@ test('storia: si scarica a passi, poi tutta; un clone intero non si tocca; senza
   assert.deepEqual(campoPerIlServer({ errore: 'x', storia: { superficiale: true, approfondito: 50, intera: false } }),
     { esito: 'non_provata', motivo: 'x', storia: { superficiale: true, approfondito: 50, intera: false } });
 });
+
+test('clone del solo ramo: il primo download di main ha il tetto della storia, e se fallisce la misura arriva lo stesso', () => {
+  const r = repoFinto();
+  const clone = join(r.casa, 'clone');
+  try {
+    r.ramo('claude/corto', () => r.scrivi('ramo-1.txt', '1\n'));
+    r.ok(['push', '-q', 'origin', 'claude/corto']);
+    r.suMain(() => r.scrivi('altro.txt', 'y\n'));
+    execFileSync('git', ['clone', '-q', '--depth', '1', '--branch', 'claude/corto', pathToFileURL(join(r.casa, 'origin.git')).href, clone]);
+    const vero = gitIn(clone);
+    const punta = vero(['rev-parse', 'HEAD']).out;
+    // Il git col tetto corto «scade» su ogni download senza limite di profondità da un clone tagliato: è il caso
+    // del repo vero con una rete lenta, dove la storia di main arriva tutta col primo download.
+    const corto = (args) => {
+      const limitato = args.some((a) => /^--(depth|deepen|shallow-)/.test(a));
+      if (args[0] === 'fetch' && !limitato && vero(['rev-parse', '--is-shallow-repository']).out === 'true') return { ok: false, out: 'spawnSync git ETIMEDOUT' };
+      return vero(args);
+    };
+    const p = provaUnitSullaFusione({ root: clone, punta, git: corto, gitStoria: vero, scrivi: () => {} });
+    assert.equal(p.esito, 'verde', JSON.stringify(p));
+
+    const senzaRete = provaUnitSullaFusione({ root: clone, punta, gitStoria: (args) => (args[0] === 'fetch' ? { ok: false, out: 'fatal: rete giù' } : vero(args)), scrivi: () => {} });
+    assert.match(senzaRete.errore, /non riesco a scaricare main/);
+    assert.equal(campoPerIlServer(senzaRete).storia.superficiale, true, 'il registro sa che il clone era poco profondo');
+  } finally {
+    rmSync(r.casa, { recursive: true, force: true });
+  }
+});
+
+test('storia: un approfondimento arrivato alla radice si registra come storia intera', () => {
+  let sup = true;
+  let passi = 0;
+  const fatti = [];
+  const git = (args) => {
+    fatti.push(args.join(' '));
+    if (args[0] === 'rev-parse') return { ok: true, out: String(sup) };
+    if (args[0] === 'merge-base') return { ok: passi >= 2, out: '' };
+    if (args[0] === 'fetch') { passi += 1; if (passi === 2) sup = false; return { ok: true, out: '' }; }
+    return { ok: false, out: '?' };
+  };
+  const s = assicuraStoria({ git, mainSha: SHA, punta: SHA, passi: [5, 20, 100] });
+  assert.deepEqual(s.storia, { superficiale: true, approfondito: 25, intera: true });
+  assert.ok(!fatti.some((f) => f.includes('--unshallow')), 'la storia è già tutta: niente altri download');
+  assert.match(testoStoria(s.storia), /storia intera/);
+});

@@ -303,8 +303,12 @@ export function provaUnitSullaFusione({
   // I resti delle prove interrotte si tolgono a ogni richiesta, anche quando la prova poi non serve.
   pulisciResti({ git });
   if (!remoti.out.split(/\s+/).includes('origin')) return { saltata: true, motivo: 'nessun origin da cui prendere main' };
-  const f = git(['fetch', '--quiet', 'origin', `+refs/heads/${MAIN}:refs/remotes/origin/${MAIN}`]);
-  if (!f.ok) return { errore: `non riesco a scaricare main da origin (${primaRiga(f.out)})` };
+  // Su un clone del solo ramo questo download porta già tutta la storia di main (#958): tetto della storia, e se
+  // fallisce la misura del clone arriva lo stesso al registro.
+  const tagliato = git(['rev-parse', '--is-shallow-repository']);
+  const misura = tagliato.ok && tagliato.out.trim() === 'true' ? { storia: { superficiale: true, approfondito: 0, intera: false } } : {};
+  const f = gitStoria(['fetch', '--quiet', 'origin', `+refs/heads/${MAIN}:refs/remotes/origin/${MAIN}`]);
+  if (!f.ok) return { errore: `non riesco a scaricare main da origin (${primaRiga(f.out)})`, ...misura };
   const m = git(['rev-parse', '--verify', `refs/remotes/origin/${MAIN}^{commit}`]);
   const mainSha = m.ok ? m.out.trim() : '';
   if (!/^[0-9a-f]{40}$/i.test(mainSha)) return { errore: 'non riesco a leggere lo sha di main' };
@@ -335,10 +339,12 @@ export function assicuraStoria({ git, mainSha, punta, passi = PASSI_STORIA } = {
     const f = prendi([`--deepen=${n}`]);
     if (!f.ok) return { errore: `non riesco a scaricare la storia che manca (${primaRiga(f.out)})`, storia };
     storia.approfondito += n;
+    // Un approfondimento arrivato alla radice ha scaricato la storia intera: la misura lo dice.
+    if (!superficiale()) storia.intera = true;
     if (base()) return { storia };
-    if (!superficiale()) break;
+    if (storia.intera) break;
   }
-  if (superficiale()) {
+  if (!storia.intera) {
     const f = prendi(['--unshallow']);
     if (!f.ok) return { errore: `non riesco a scaricare la storia intera (${primaRiga(f.out)})`, storia };
     storia.intera = true;
