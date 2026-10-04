@@ -234,6 +234,16 @@ export function pngConTesto(base, chiave, valore) {
   ]);
 }
 
+/** Aggiunge un testo compresso (zTXt) coi byte già compressi: per i file che decompressi pesano mille volte tanto. */
+export function pngConTestoCompresso(base, chiave, compresso) {
+  const dove = 8 + 25;
+  return Buffer.concat([
+    base.subarray(0, dove),
+    chunkPng('zTXt', Buffer.concat([Buffer.from(chiave, 'latin1'), Buffer.from([0, 0]), compresso])),
+    base.subarray(dove),
+  ]);
+}
+
 /** Aggiunge un pacchetto XMP (iTXt non compresso). */
 export function pngConXmp(base, xmp) {
   const dove = 8 + 25;

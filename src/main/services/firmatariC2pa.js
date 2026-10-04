@@ -22,6 +22,8 @@ const MAX_BYTE = 8 * 1024 * 1024;
 const TIMEOUT_MS = 30_000;
 
 let salvato = { pem: '', scaricatoIl: 0, fonte: '', pemTsa: '' };
+// Il thread di lettura riceve l'elenco solo quando cambia: ogni cambio di `ancore` la fa salire.
+let versioneElenco = 0;
 let ancore = null;
 let ancoreTsa = null;
 let inCorso = null;
@@ -56,6 +58,7 @@ async function carica() {
       ancore = lette;
       const tsa = leggiAncore(salvato.pemTsa);
       ancoreTsa = tsa.length ? tsa : null;
+      versioneElenco++;
       return true;
     }
   } catch (_) {}
@@ -125,6 +128,7 @@ function aggiorna({ forza = false, url = FONTE, urlTsa = url === FONTE ? FONTE_T
       salvato = { pem, scaricatoIl: Date.now(), fonte: url, pemTsa: tsa.length ? pemTsa : salvato.pemTsa };
       ancore = lette;
       if (tsa.length) ancoreTsa = tsa;
+      versioneElenco++;
       ultimoErrore = '';
       try { await salva(); } catch (e) { console.warn('[firmatari-c2pa] elenco non salvato:', e && e.message); }
       return { ok: true, certificati: lette.length, scaricatoIl: salvato.scaricatoIl };
@@ -157,15 +161,18 @@ async function init() {
 const attesa = (ms) => new Promise((r) => { const t = setTimeout(r, ms); if (t.unref) t.unref(); });
 
 // La lettura che usano il menu, la chat e l'Aiuto: una sola, così le strade dicono la stessa cosa.
+function elenco() {
+  return { versione: versioneElenco, pem: ancore ? salvato.pem : '', pemTsa: ancore && ancoreTsa ? salvato.pemTsa : '' };
+}
+
 async function analizzaImmagine(byte) {
-  const P = provenienza();
-  if (!P) throw new Error('controllo non disponibile');
-  let res = P.analizza(byte, { ancore, ancoreTsa });
+  const isolata = require('./provenienzaIsolata');
+  let res = await isolata.analizza(byte, elenco());
   if (!res.trovato || res.firmatario !== 'non_verificato') return res;
   const giro = inCorso || (automatico() && serveAggiornare() ? aggiorna() : null);
   if (!giro) return res;
   await Promise.race([giro, attesa(ATTESA_PRIMA_VOLTA_MS)]);
-  if (ancore) res = P.analizza(byte, { ancore, ancoreTsa });
+  if (ancore) res = await isolata.analizza(byte, elenco());
   return res;
 }
 
@@ -174,15 +181,38 @@ async function analizzaImmagine(byte) {
 const MAX_COPIE = 500;
 const copie = new Map();
 
+// L'impronta decodifica i pixel nel processo principale: un PNG di pochi MB può dichiararne miliardi (#946).
+const MAX_PIXEL_IMPRONTA = 100_000_000;
+
+// Larghezza per altezza dichiarate nell'intestazione di un PNG o di un JPEG, senza decodificare.
+function pixelDichiarati(b) {
+  if (b.length >= 24 && b[0] === 0x89 && b.toString('latin1', 12, 16) === 'IHDR') return b.readUInt32BE(16) * b.readUInt32BE(20);
+  if (b[0] === 0xff && b[1] === 0xd8) {
+    let i = 2;
+    while (i + 9 < b.length) {
+      if (b[i] !== 0xff) { i++; continue; }
+      const m = b[i + 1];
+      if (m === 0xd8 || m === 0x01 || (m >= 0xd0 && m <= 0xd7) || m === 0xff) { i += m === 0xff ? 1 : 2; continue; }
+      if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) return b.readUInt16BE(i + 5) * b.readUInt16BE(i + 7);
+      if (m === 0xd9 || m === 0xda) break;
+      i += 2 + b.readUInt16BE(i + 2);
+    }
+  }
+  return 0;
+}
+
 function immagine(x) {
   if (!x) return null;
   if (typeof x.toBitmap === 'function') return x;
-  try { return require('electron').nativeImage.createFromBuffer(Buffer.from(x)); } catch (_) { return null; }
+  const b = Buffer.from(x);
+  if (pixelDichiarati(b) > MAX_PIXEL_IMPRONTA) return null;
+  try { return require('electron').nativeImage.createFromBuffer(b); } catch (_) { return null; }
 }
 function impronta(x) {
   const img = immagine(x);
   if (!img || img.isEmpty()) return '';
   const { width, height } = img.getSize();
+  if (width * height > MAX_PIXEL_IMPRONTA) return '';
   return require('node:crypto').createHash('sha256').update(`${width}x${height}:`).update(img.toBitmap()).digest('hex');
 }
 
@@ -223,6 +253,7 @@ function _dimentica() {
   salvato = { pem: '', scaricatoIl: 0, fonte: '', pemTsa: '' };
   ancore = null;
   ancoreTsa = null;
+  versioneElenco++;
   ultimoTentativo = 0;
   ultimoErrore = '';
   copie.clear();

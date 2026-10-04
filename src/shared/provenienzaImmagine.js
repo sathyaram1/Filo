@@ -290,6 +290,18 @@
     return res;
   }
 
+  // Un testo compresso può valere mille volte il file (#946): oltre il tetto non si decomprime, ma la chiave da sola resta una prova.
+  const MAX_TESTO_PNG = 16 * 1024 * 1024;
+  const TESTO_OLTRE_TETTO = '…';
+  function decomprimi(zlib, dati) {
+    try {
+      return utf8(u8(zlib.inflateSync(Buffer.from(dati), { maxOutputLength: MAX_TESTO_PNG })));
+    } catch (e) {
+      if (e && (e.code === 'ERR_BUFFER_TOO_LARGE' || e instanceof RangeError)) return TESTO_OLTRE_TETTO;
+      throw e;
+    }
+  }
+
   function testoPng(tipo, d, zlib) {
     let fine = 0;
     while (fine < d.length && d[fine] !== 0) fine++;
@@ -301,7 +313,7 @@
       if (tipo === 'zTXt') {
         p += 1;
         if (!zlib) return null;
-        return { chiave, valore: utf8(u8(zlib.inflateSync(Buffer.from(d.subarray(p))))) };
+        return { chiave, valore: decomprimi(zlib, d.subarray(p)) };
       }
       const compresso = d[p]; p += 2;
       while (p < d.length && d[p] !== 0) p++; p++;
@@ -310,7 +322,7 @@
       const coda = d.subarray(p);
       if (!compresso) return { chiave, valore: utf8(coda) };
       if (!zlib) return null;
-      return { chiave, valore: utf8(u8(zlib.inflateSync(Buffer.from(coda)))) };
+      return { chiave, valore: decomprimi(zlib, coda) };
     } catch (_) { return null; }
   }
 
@@ -401,10 +413,11 @@
   function leggiXmp(testo) {
     const t = String(testo || '');
     const fonti = [];
-    const re = /DigitalSourceType\s*(?:=\s*"([^"]*)"|>\s*([^<]*)<)/gi;
+    // Quantificatori con un tetto: senza, un XMP ripetitivo costa il quadrato della sua lunghezza (#946).
+    const re = /DigitalSourceType\s{0,200}(?:=\s{0,200}"([^"]{0,400})"|>\s{0,200}([^<]{0,400})<)/gi;
     let m;
     while ((m = re.exec(t))) fonti.push((m[1] || m[2] || '').trim());
-    const res2 = /DigitalSourceType[^>]*rdf:resource\s*=\s*"([^"]*)"/i.exec(t);
+    const res2 = /DigitalSourceType[^>]{0,400}rdf:resource\s{0,200}=\s{0,200}"([^"]{0,400})"/i.exec(t);
     if (res2) fonti.push(res2[1]);
     let origine = null;
     for (const f of fonti) {
@@ -412,7 +425,7 @@
       if (c === 'ai') { origine = 'ai'; break; }
       if (c && !origine) origine = c;
     }
-    const chi = /(?:xmp:CreatorTool|photoshop:Credit|dc:creator|tiff:Make)\s*(?:=\s*"([^"]*)"|>\s*([^<]*)<)/i.exec(t);
+    const chi = /(?:xmp:CreatorTool|photoshop:Credit|dc:creator|tiff:Make)\s{0,200}(?:=\s{0,200}"([^"]{0,400})"|>\s{0,200}([^<]{0,400})<)/i.exec(t);
     // «Adobe Photoshop 25.0 (Windows)»: il sistema su cui girava non dice chi dichiara.
     const nome = chi ? String(chi[1] || chi[2] || '').trim() : '';
     return { origine, dichiarante: nome.replace(/\s*\((?:windows|macintosh|mac ?os[^)]*|linux|android|ios)\)$/i, '') };

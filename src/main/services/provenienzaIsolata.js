@@ -60,7 +60,6 @@ function abbandona(w, motivo) {
 
 function avvia() {
   const w = new Worker(codiceThread(), { eval: true, resourceLimits: { maxOldGenerationSizeMb: MEMORIA_MB } });
-  w.unref();
   w.versioneElenco = undefined;
   w.on('message', ({ id, res, errore }) => {
     const a = attese.get(id);
@@ -72,6 +71,8 @@ function avvia() {
   });
   w.on('error', (e) => abbandona(w, `lettura delle etichette interrotta: ${(e && (e.code || e.message)) || e}`));
   w.on('exit', () => abbandona(w, 'lettura delle etichette interrotta'));
+  // Dopo gli ascoltatori: aggiungerli riaggancia il thread al ciclo e Filo non uscirebbe più.
+  w.unref();
   return w;
 }
 
@@ -89,7 +90,8 @@ function analizza(byte, elenco) {
       w.terminate().catch(() => {});
     }, TEMPO_MAX_MS);
     attese.set(id, { resolve, reject, timer, w });
-    w.postMessage({ id, byte: Uint8Array.from(byte), elenco: conElenco ? elenco : null });
+    const copia = byte instanceof ArrayBuffer ? new Uint8Array(byte.slice(0)) : new Uint8Array(byte);
+    w.postMessage({ id, byte: copia, elenco: conElenco ? elenco : null }, [copia.buffer]);
   });
 }
 

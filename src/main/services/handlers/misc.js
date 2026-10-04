@@ -191,24 +191,44 @@ function safeImageFilename(name) {
   return n.slice(0, 200);
 }
 
-// #711 — il controllo è lavoro SINCRONO nel processo principale, e questo canale
-// lo può chiamare anche una pagina web: il tetto tiene una singola chiamata sotto
-// il decimo di secondo. Largo lo stesso (un PNG da 60 megapixel ci sta dentro), e
-// oltre il tetto il chiamante riceve un rifiuto col motivo, mai un silenzio.
+// #711 — i byte attraversano il canale e il thread di lettura: il tetto è largo (un PNG
+// da 60 megapixel ci sta dentro), e oltre il chiamante riceve un rifiuto col motivo, mai un silenzio.
 const MAX_BYTE_PROVENIENZA = 64 * 1024 * 1024;
 
-// Il tipo di un'immagine dai suoi primi byte: il modello che la descrive lo vuole
-// giusto, e l'intestazione del server a volte manca o dice «octet-stream».
-function tipoImmagine(b, dichiarato) {
+// Il tipo di un'immagine dai suoi primi byte, o '' se non è un'immagine: il download per
+// conto della scheda, coi cookie dell'utente, non restituisce nient'altro (#946).
+function tipoImmagine(b) {
   const fourcc = (i) => b.toString('latin1', i, i + 4);
+  if (b.length < 4) return '';
   if (b[0] === 0x89 && fourcc(1) === 'PNG') return 'image/png';
   if (b[0] === 0xff && b[1] === 0xd8) return 'image/jpeg';
   if (fourcc(0) === 'RIFF' && fourcc(8) === 'WEBP') return 'image/webp';
   if (fourcc(0) === 'GIF8') return 'image/gif';
-  if (fourcc(4) === 'ftyp') return /^avi[fs]$/.test(fourcc(8)) ? 'image/avif' : 'image/heic';
+  if (fourcc(4) === 'ftyp') {
+    const marca = fourcc(8);
+    if (/^avi[fs]$/.test(marca)) return 'image/avif';
+    if (/^(heic|heix|hevc|hevx|heim|heis|mif1|msf1)$/.test(marca)) return 'image/heic';
+    return '';
+  }
   if (b[0] === 0x42 && b[1] === 0x4d) return 'image/bmp';
-  const t = String(dichiarato || '').split(';')[0].trim().toLowerCase();
-  return /^image\/[a-z0-9.+-]+$/.test(t) ? t : 'application/octet-stream';
+  if (b[0] === 0 && b[1] === 0 && b[2] === 1 && b[3] === 0) return 'image/x-icon';
+  if ((fourcc(0) === 'II*\u0000') || (fourcc(0) === 'MM\u0000*')) return 'image/tiff';
+  if ((b[0] === 0xff && b[1] === 0x0a) || fourcc(4) === 'JXL ') return 'image/jxl';
+  if (fourcc(4) === 'jP  ') return 'image/jp2';
+  return eSvg(b) ? 'image/svg+xml' : '';
+}
+
+// Un SVG comincia con <svg, dopo al più dichiarazione XML, commenti e doctype: una pagina
+// HTML con un'icona SVG dentro non lo è.
+function eSvg(b) {
+  let t = b.toString('utf8', 0, Math.min(b.length, 4096)).replace(/^\uFEFF/, '');
+  for (;;) {
+    t = t.replace(/^\s+/, '');
+    const preambolo = /^(<\?xml[\s\S]*?\?>|<!--[\s\S]*?-->|<!DOCTYPE[^>]*>)/i.exec(t);
+    if (!preambolo) break;
+    t = t.slice(preambolo[0].length);
+  }
+  return /^<svg[\s>]/i.test(t);
 }
 
 // I byte di un'immagine che la pagina mostra ma che il suo script non può leggere
@@ -235,7 +255,9 @@ async function byteImmagineRemota({ url, referrer, session }) {
     const byte = await fs.promises.readFile(tmp);
     if (byte.length > MAX_BYTE_PROVENIENZA) troppo = true;
     if (troppo) throw new Error('troppo grande');
-    return { ok: true, dataUrl: `data:${tipoImmagine(byte, tipo)};base64,${byte.toString('base64')}` };
+    const tipoVero = tipoImmagine(byte);
+    if (!tipoVero) return { ok: false, notImage: true, error: `non è un’immagine (${String(tipo || 'tipo ignoto').split(';')[0]})` };
+    return { ok: true, dataUrl: `data:${tipoVero};base64,${byte.toString('base64')}` };
   } catch (e) {
     if (troppo) return { ok: false, tooBig: true, error: `immagine oltre ${MAX_BYTE_PROVENIENZA / (1024 * 1024)} MB` };
     return { ok: false, error: e?.message || 'immagine non scaricabile' };

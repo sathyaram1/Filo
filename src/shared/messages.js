@@ -245,8 +245,8 @@
     IMAGE_PROVENANCE: 'image_provenance',
     // #946 — i byte originali di un'immagine di un'altra origine (le foto stanno quasi
     // sempre su un CDN), che lo script di pagina non può leggere. Scaricati nel main
-    // come «Salva immagine come…», con Referer e cookie della scheda.
-    // { url } → { ok, dataUrl } | { ok:false, error, tooBig? }
+    // come «Salva immagine come…», con Referer e cookie della scheda. Restituisce solo immagini.
+    // { url } → { ok, dataUrl } | { ok:false, error, tooBig?, notImage? }
     IMAGE_BYTES: 'image_bytes',
     // #946 — «Copia immagine» appena scritta negli appunti: gli appunti la ricodificano
     // e ne perdono le etichette, quindi il main ricorda l'esito letto sull'originale
