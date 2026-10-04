@@ -31,6 +31,7 @@ Filo non ha un sistema che segnala i crash da solo. Quello che contatta senza ch
 Filo funziona con modelli linguistici, e un modello risponde solo a quello che gli mostri. Il contenuto che esce dal tuo computer è quindi, prima di tutto, quello che serve alla funzione che stai usando:
 
 - **Spiega e traduci.** Il testo selezionato e la frase intorno; per tradurre una pagina intera, il suo testo, a blocchi.
+- **I link.** Quando fai tasto destro su un link, l'indirizzo, il testo del link e il titolo e la descrizione della pagina a cui porta, per spiegarti cosa trovi aprendolo.
 - **L'Aiuto sulla pagina.** Indirizzo e titolo della pagina, la sua struttura e uno screenshot della parte visibile, perché l'agente deve vedere dove cliccare.
 - **La chat con Filo e la home.** La conversazione, le tue memorie, i riassunti dei documenti dell'editor, timer, notifiche, pagine salvate, le azioni recenti e i titoli delle schede aperte (fino a dodici, senza i loro indirizzi).
 - **Il terminale e i documenti.** Quando Filo lancia un comando o legge un file per risponderti, quello che il comando stampa o il file contiene. Il terminale è acceso di serie: i comandi che leggono soltanto partono senza chiedere, e così la lettura dei documenti nella tua cartella utente. Fuori da lì Filo chiede un OK. Il terminale si spegne dalle Preferenze.
