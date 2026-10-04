@@ -44,6 +44,30 @@ const BASE = process.env.FILO_ROUTINE_API
   || 'https://europe-west1-filo-8b9cb.cloudfunctions.net';
 
 export const OWNER_MERGE_URL = `${BASE}/ownerMerge`;
+export const OWNER_MERGE_APPROVALS_URL = `${BASE}/ownerMergeApprovals`;
+
+/**
+ * In che stato è la richiesta `id` secondo l'elenco del deposito (`ownerMergeApprovals`, op list). PURA.
+ * Il server dà il nome della richiesta anche quando il deposito ha rifiutato di riaprirla perché già decisa (#486):
+ * una richiesta rinfrescata adesso è la più nuova, quindi se non sta fra quelle in attesa è stata decisa.
+ * @returns {{ state: 'pending'|'discarded'|'used'|'decided'|'', outcome?: string, motivo?: string }} '' = elenco illeggibile
+ */
+export function statoDellaRichiesta(id, elenco) {
+  const e = (elenco && typeof elenco === 'object') ? elenco : null;
+  if (!id || !e || e.ok !== true || !Array.isArray(e.pending)) return { state: '', motivo: 'l’elenco delle richieste non si legge' };
+  const trova = (k) => (Array.isArray(e[k]) ? e[k] : []).find((v) => v && v.id === id);
+  if (trova('pending')) return { state: 'pending' };
+  const v = trova('failed') || trova('recent') || trova('preapproved');
+  if (v && v.discarded === true) return { state: 'discarded' };
+  if (v && v.used === true) return { state: 'used', outcome: String(v.outcome || '').slice(0, 40) };
+  return { state: 'decided' };
+}
+
+/** La richiesta potrebbe aspettare l'owner: in attesa, o non controllata. PURA. Decide se suonare il campanello. */
+export function richiestaForseInAttesa(reply) {
+  const r = reply || {};
+  return r.outcome === 'blocked' && !!r.requestId && !['discarded', 'used', 'decided'].includes(r.requestState);
+}
 
 /**
  * Dalla risposta grezza del server a un esito con un nome. PURA.
