@@ -74,6 +74,11 @@ test('un\'azione non riuscita o in attesa di conferma tiene la sua frase: il tit
     { tipo: 'CERCA_WEB', testo: 'Ricerca non riuscita', esito: 'fallita' },
   ];
   assert.equal(F.titoloNodo(misto), '2 azioni · ricerca');
+  const nessuna = [
+    { tipo: 'LEGGI_DOCUMENTO', testo: 'Documento non letto · non trovato', esito: 'fallita' },
+    { tipo: 'NAVIGA', testo: 'Link non aperto', esito: 'fallita' },
+  ];
+  assert.equal(F.titoloNodo(nessuna), '2 azioni non riuscite · documento, pagina');
   assert.equal(F.titoloNodo([]), '');
 });
 

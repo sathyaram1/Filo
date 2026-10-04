@@ -62,11 +62,11 @@
     return m ? m[1].trim() : '';
   }
   const primoPezzo = (d) => pulisci(d).split(' · ')[0];
-  function elenco(pezzi, quanti) {
+  function elenco(pezzi) {
     const unici = [];
     for (const p of pezzi) if (p && !unici.includes(p)) unici.push(p);
     const mostrati = unici.slice(0, MAX_DETTAGLI);
-    const restano = quanti - mostrati.length;
+    const restano = unici.length - mostrati.length;
     return mostrati.length ? `${mostrati.join(', ')}${restano > 0 ? ` +${restano}` : ''}` : '';
   }
 
@@ -86,15 +86,16 @@
     const t = TITOLI[tipo];
     const stesso = !!t && v.every((x) => String(x.tipo || '').toUpperCase() === tipo && x.esito === 'ok');
     if (stesso) {
-      const d = elenco(v.map((x) => primoPezzo(pulisci(x.dettaglio) || dettaglioDi(x.testo))), v.length);
+      const d = elenco(v.map((x) => primoPezzo(pulisci(x.dettaglio) || dettaglioDi(x.testo))));
       return d ? `${t[1](v.length)} · ${d}` : t[1](v.length);
     }
     const nomi = v.map((x) => {
       const tt = TITOLI[String(x.tipo || '').toUpperCase()];
       return tt ? tt[2] : primoPezzo(pulisci(x.testo).split(/:\s/)[0]).toLowerCase();
     });
-    const d = elenco(nomi, v.length);
-    return d ? `${v.length} azioni · ${d}` : `${v.length} azioni`;
+    const d = elenco(nomi);
+    const testa = v.every((x) => x.esito === 'fallita') ? `${v.length} azioni non riuscite` : `${v.length} azioni`;
+    return d ? `${testa} · ${d}` : testa;
   }
 
   // ===== Il disegno =====
