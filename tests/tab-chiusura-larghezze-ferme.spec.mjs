@@ -83,16 +83,20 @@ test('chiudendo con la X le altre schede tengono la larghezza, e la X accanto re
 
 test('chiusa l’ultima scheda, il + resta dov’era e il clic seguente non apre una scheda', async ({ shell }) => {
   // Con 22 schede quelle inattive sono strette quanto il +: se il + scorresse a sinistra finirebbe sotto il puntatore.
+  // Così strette non hanno la X (tests/tab-scheda-stretta.spec.mjs): si chiudono col clic centrale.
   const N = 22;
   await apriSchede(shell, N);
   await shell.evaluate(async (id) => window.filoShell.tabs.activate(id), await idInPosizione(shell, 0));
   await expect(shell.locator('#tabs .tab').first()).toHaveClass(/active/);
+  // Le schede finiscono di caricare in tempi diversi da una macchina all'altra: si misura a caricamento finito.
+  await expect(shell.locator('#tabs .tab .spinner')).toHaveCount(0, { timeout: 15_000 });
   const prima = await larghezze(shell);
   const piu = () => shell.evaluate(() => document.getElementById('tab-new').getBoundingClientRect().left);
   const piuPrima = await piu();
-  const punto = await centroChiudi(shell, await idInPosizione(shell, N - 1));
+  const ultima = await shell.locator('#tabs .tab').last().boundingBox();
+  const punto = { x: ultima.x + ultima.width / 2, y: ultima.y + ultima.height / 2 };
   await shell.mouse.move(punto.x, punto.y);
-  await shell.mouse.click(punto.x, punto.y);
+  await shell.mouse.click(punto.x, punto.y, { button: 'middle' });
   await expect.poll(() => verdettoUguali(shell, prima, N - 1), { timeout: 8_000 }).toBe('uguali');
   expect(Math.abs((await piu()) - piuPrima)).toBeLessThan(0.5);
 
