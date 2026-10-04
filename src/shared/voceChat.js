@@ -206,9 +206,17 @@
       if (c.stato === 'ascolta' && c.sessione) { c.sessione.ferma('utente'); return; }
       if (c.stato === 'attesa') annullaInvio();
     }
+    // Un Esc o un Invio finché la sessione non ha consegnato tutto (anche mentre trascrive l'ultima frase):
+    // quello che arriva ancora resta nella casella e non parte da solo.
+    function tieni() {
+      if (!c.sessione) return false;
+      c.toccato = true;
+      c.sessione.ferma('utente');
+      return true;
+    }
     // Esc tiene quello che è stato detto e non invia.
     function esc() {
-      if (c.stato === 'ascolta' && c.sessione) { c.toccato = true; c.sessione.ferma('utente'); return true; }
+      if (tieni()) return true;
       if (c.stato === 'attesa') { annullaInvio(); return true; }
       return false;
     }
@@ -233,7 +241,7 @@
       // stava ancora dicendo resta nella casella invece di partire dopo come un secondo messaggio.
       if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.target === campo) {
         if (c.stato === 'attesa') { smetti(); imposta('pronto'); }
-        if (c.stato === 'ascolta' && c.sessione) { c.toccato = true; c.sessione.ferma('utente'); }
+        tieni();
         return;
       }
       if (e.defaultPrevented) return;

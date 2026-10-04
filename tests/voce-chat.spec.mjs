@@ -459,3 +459,59 @@ test('editor: col microfono accanto, la casella della chat mostra tutto il sugge
   mkdirSync(SHOTS, { recursive: true });
   await chat.screenshot({ path: `${SHOTS}/voce-chat-editor-casella.png` });
 });
+
+// Un Esc o un Invio mentre l'ultima frase è ancora in trascrizione: quello che arriva resta nella casella.
+async function trascrizioneLenta(app, dallaPrima = false) {
+  await app.evaluate((_e, primaLenta) => {
+    let n = 0;
+    globalThis.SN_PROVIDER_OPENROUTER.transcribe = async () => {
+      n += 1;
+      const mio = n;
+      if (mio >= 2 || primaLenta) await new Promise((r) => setTimeout(r, 3000));
+      return { text: mio === 1 ? 'prima frase' : 'seconda frase', usage: { seconds: 1, costUsd: 0 }, generationId: null };
+    };
+  }, dallaPrima);
+}
+
+test('Esc mentre trascrive: quello che hai detto resta nella casella e non parte', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await prepara(app);
+  await trascrizioneLenta(app, true);
+  const page = await home(app);
+  const mic = page.locator('.dash-input-wrap .sn-voce-btn');
+  await mic.click();
+  await expect(mic).toHaveAttribute('data-stato', 'ascolta', { timeout: 5_000 });
+  await page.waitForTimeout(1500);
+  await mic.click();
+  await expect(mic).toHaveAttribute('data-stato', 'trascrive', { timeout: 2_000 });
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#input')).toHaveValue('prima frase', { timeout: 8_000 });
+  await page.waitForTimeout(4000);
+  await expect(page.locator('.dash-bubble-user')).toHaveCount(0);
+  await expect(page.locator('#input')).toHaveValue('prima frase');
+});
+
+test('Invio a mano mentre trascrive: l\'ultima frase resta nella casella invece di partire come secondo messaggio', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await prepara(app);
+  await trascrizioneLenta(app);
+  const page = await home(app);
+  const mic = page.locator('.dash-input-wrap .sn-voce-btn');
+  await mic.click();
+  await expect(mic).toHaveAttribute('data-stato', 'ascolta', { timeout: 5_000 });
+  await page.waitForTimeout(1200);
+  await voce(page, false);
+  await expect(page.locator('#input')).toHaveValue('prima frase', { timeout: 5_000 });
+  await voce(page, true);
+  await page.waitForTimeout(1200);
+  await mic.click();
+  await expect(mic).toHaveAttribute('data-stato', 'trascrive', { timeout: 2_000 });
+  await page.locator('#input').focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.dash-bubble-user', { hasText: 'prima frase' })).toBeVisible({ timeout: 8_000 });
+  await expect(page.locator('#input')).toHaveValue('seconda frase', { timeout: 8_000 });
+  await page.waitForTimeout(4000);
+  await expect(page.locator('.dash-bubble-user')).toHaveCount(1);
+});
