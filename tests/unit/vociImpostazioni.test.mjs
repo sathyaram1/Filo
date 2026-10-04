@@ -186,6 +186,32 @@ test('elenchi di siti: aggiungi, togli, solo, svuota; un nome senza estensione �
   assert.match(P.applicaElenco(b('togli c.it').elenco, correnti).invariato, /c\.it non c'è.*contiene: a\.it/);
 });
 
+test('lettura: cercando un sito torna l\'elenco che lo contiene, anche oltre il tetto delle cento voci', () => {
+  const S = JSON.parse(JSON.stringify(C.DEFAULT_SETTINGS));
+  const riga = (r) => r.righe.find((x) => x.startsWith('- domini in blacklist:')) || '';
+  S.security.siteBlock.blacklist = ['tiktok.com', 'facebook.com'];
+  assert.match(riga(V.righePerModello(S, { cerca: 'facebook.com' })), /facebook\.com/);
+  assert.match(riga(V.righePerModello(S, { cerca: 'facebook' })), /facebook\.com/);
+  // Un sito che non c'è: gli elenchi tornano lo stesso, così Filo può dire che non è bloccato.
+  assert.match(riga(V.righePerModello(S, { cerca: 'youtube.com' })), /2 voci: tiktok\.com, facebook\.com/);
+  S.security.siteBlock.blacklist = Array.from({ length: 150 }, (_, i) => `sito${i}.it`).concat('facebook.com');
+  assert.match(riga(V.righePerModello(S, { cerca: 'siti bloccati' })), /e altri 51 \(chiedi con una parola del sito/);
+  assert.match(riga(V.righePerModello(S, { cerca: 'facebook' })), /151 voci, con la ricerca: facebook\.com; elenco: facebook\.com, sito0\.it/);
+});
+
+test('un sito accentato si mostra come lo legge una persona: conferma, «c\'è già», lettura e segno del cambio', () => {
+  const b = (v) => P.buildPreferencePartial('siti_bloccati', v);
+  assert.equal(b('aggiungi münchen.de').label, 'Siti bloccati → aggiungi münchen.de');
+  const correnti = { security: { siteBlock: { blacklist: ['xn--mnchen-3ya.de'] } } };
+  assert.match(P.applicaElenco(b('aggiungi münchen.de').elenco, correnti).invariato, /münchen\.de c'è già \(adesso contiene: münchen\.de\)/);
+  const S = JSON.parse(JSON.stringify(C.DEFAULT_SETTINGS));
+  S.security.siteBlock.blacklist = ['xn--mnchen-3ya.de'];
+  const r = V.righePerModello(S, { cerca: 'münchen.de' });
+  assert.match(r.righe.find((x) => x.startsWith('- domini in blacklist:')), /münchen\.de/);
+  assert.ok(!r.righe.join('\n').includes('xn--'));
+  assert.match(K.frase({ cambi: [{ chiave: 'security.siteBlock.blacklist', prima: [], dopo: ['xn--mnchen-3ya.de'] }] }), /aggiunto münchen\.de/);
+});
+
 test('i sei valori del colore delle tab: dentro il range si scrivono, fuori è un rifiuto col range', () => {
   for (const k of P.PARAMETRI_COLORE_TAB) assert.ok(globalThis.SN_TAB_COLOR.IDENTITY_PARAM_META.some((m) => m.key === k), k);
   assert.equal(P.PARAMETRI_COLORE_TAB.length, globalThis.SN_TAB_COLOR.IDENTITY_PARAM_META.length);

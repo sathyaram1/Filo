@@ -188,18 +188,41 @@
     const s = P && P.setterDi ? P.setterDi(percorso) : null;
     return s ? s.keys.join(' ') : '';
   }
-  function cercaVoci(tutte, cerca) {
+  // Un sito di un elenco come lo legge una persona: münchen.de, non la forma «xn--» con cui si salva.
+  function sitoLeggibile(x) {
+    const N = global.SN_NOMI_SITO;
+    return N && N.leggibile ? N.leggibile(x) : x;
+  }
+  // Le parole della ricerca che possono essere un sito («facebook», «facebook.com», «münchen.de»).
+  function paroleSito(cerca) {
+    return String(cerca || '').toLowerCase().split(/[\s,;«»"'’?!()]+/)
+      .map((w) => w.replace(/^(?:[a-z]+:\/\/)?(?:www\.)?/, '').replace(/[/.:]+$/, ''))
+      .filter((w) => w.length >= 3 && !NON_CERCARE.has(w));
+  }
+  function sitoCombacia(x, siti) {
+    const a = String(x).toLowerCase();
+    const b = sitoLeggibile(a);
+    return siti.some((w) => a.includes(w) || b.includes(w));
+  }
+  // Una voce combacia per nome, o perché il suo elenco contiene il sito cercato («ho bloccato facebook.com?»).
+  function cercaVoci(tutte, cerca, settings) {
     const parole = piano(cerca).split(/\s+/).filter((w) => w.length >= 3 && !NON_CERCARE.has(w)).map(radice);
     if (!parole.length) return tutte;
+    const siti = paroleSito(cerca);
+    const dominio = siti.some((w) => /[^.]\.[^.\d]{2,}$/.test(w));
     return tutte.filter((v) => {
       const testo = piano(`${v.nome} ${v.come} ${v.percorso} ${v.titolo} ${sinonimi(v.percorso)}`);
-      return parole.some((w) => testo.includes(w));
+      if (parole.some((w) => testo.includes(w))) return true;
+      const lista = settings ? leggi(settings, v.percorso) : null;
+      if (!Array.isArray(lista)) return false;
+      // Cercato un sito con la sua estensione, ogni elenco di siti torna: anche per poter dire «non c'è».
+      return dominio || lista.some((x) => typeof x === 'string' && sitoCombacia(x, siti));
     });
   }
 
   // Il valore come lo legge una persona. I segreti non escono mai.
   const MAX_ELENCO = 100;
-  function valoreLeggibile(percorso, settings, { tema = 'light', sistema = '' } = {}) {
+  function valoreLeggibile(percorso, settings, { tema = 'light', sistema = '', cerca = '' } = {}) {
     const v = leggi(settings, percorso);
     if (percorso.startsWith('themeTokens.')) {
       const T = global.SN_THEME_TOKENS;
@@ -215,10 +238,15 @@
     const voce = K && K.voce ? K.voce(percorso) : null;
     if (voce && voce.segreto) return v ? 'inserita (il valore non si mostra)' : 'non inserita';
     if (Array.isArray(v)) {
-      const l = v.filter((x) => typeof x === 'string' && x.trim());
-      if (!l.length) return 'elenco vuoto';
+      const tutti = v.filter((x) => typeof x === 'string' && x.trim());
+      if (!tutti.length) return 'elenco vuoto';
+      // I siti cercati vengono per primi: oltre il tetto restano visibili, ed è questo che promette la nota.
+      const siti = paroleSito(cerca);
+      const cercati = siti.length ? tutti.filter((x) => sitoCombacia(x, siti)) : [];
+      const l = cercati.concat(tutti.filter((x) => !cercati.includes(x))).map(sitoLeggibile);
       const altri = l.length > MAX_ELENCO ? ` e altri ${l.length - MAX_ELENCO} (chiedi con una parola del sito per vederli)` : '';
-      return `${l.length} ${l.length === 1 ? 'voce' : 'voci'}: ${l.slice(0, MAX_ELENCO).join(', ')}${altri}`;
+      const trovati = cercati.length ? `, con la ricerca: ${cercati.map(sitoLeggibile).join(', ')}` : '';
+      return `${l.length} ${l.length === 1 ? 'voce' : 'voci'}${trovati ? `${trovati}; elenco` : ''}: ${l.slice(0, MAX_ELENCO).join(', ')}${altri}`;
     }
     if (voce && voce.testo) return String(v || '').trim() ? `«${String(v).trim()}»` : 'nessuno';
     if (percorso === 'terminal.shell' && sistema && sistema !== 'win32' && !['bash', 'sh'].includes(v)) return 'shell di sistema (sh)';
@@ -229,7 +257,7 @@
   // Le righe che LEGGI_IMPOSTAZIONI restituisce al modello, divise per pagina.
   function righePerModello(settings, { cerca = '', tema = 'light', sistema = '' } = {}) {
     const tutte = voci();
-    let scelte = cercaVoci(tutte, cerca);
+    let scelte = cercaVoci(tutte, cerca, settings);
     const nessuna = !!String(cerca || '').trim() && !scelte.length;
     if (nessuna) scelte = tutte;
     const righe = [];
@@ -240,7 +268,7 @@
         righe.push(v.pagina ? `${titolo} (pagina)` : `${titolo} (si cambiano dalla chat o dalle loro pagine)`);
       }
       const chiave = v.come ? ` [${v.come}${v.conferma ? ', chiede conferma' : ''}]` : '';
-      righe.push(`- ${v.nome}: ${valoreLeggibile(v.percorso, settings, { tema, sistema })}${chiave}`);
+      righe.push(`- ${v.nome}: ${valoreLeggibile(v.percorso, settings, { tema, sistema, cerca: nessuna ? '' : cerca })}${chiave}`);
     }
     return { righe, trovate: nessuna ? 0 : scelte.length, totale: tutte.length };
   }

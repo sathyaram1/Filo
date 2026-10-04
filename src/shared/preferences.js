@@ -191,13 +191,18 @@
       build(v) {
         const o = opElenco(v);
         if (!o || o.rifiuto) return o;
-        const lista = o.voci.join(', ');
+        const lista = o.voci.map(sitoLeggibile).join(', ');
         const label = o.op === 'aggiungi' ? `${nome} → aggiungi ${lista}`
           : o.op === 'togli' ? `${nome} → togli ${lista}`
             : (o.voci.length ? `${nome} → solo ${lista}` : `${nome} → svuota l'elenco`);
         return { partial: nidifica(percorso, o.voci), label, elenco: { percorso, op: o.op, voci: o.voci, nome } };
       },
     };
+  }
+  // Si salva la forma «xn--» con cui il sito si confronta; a una persona si mostra münchen.de, come fa la pagina.
+  function sitoLeggibile(x) {
+    const N = nomiSito();
+    return N && N.leggibile ? N.leggibile(x) : x;
   }
   // L'elenco nuovo a partire da quello di adesso: { partial } da salvare, o { invariato } col perché.
   function applicaElenco(e, correnti) {
@@ -208,9 +213,10 @@
     else if (e.op === 'togli') nuovo = attuale.filter((x) => !e.voci.includes(x));
     else nuovo = e.voci.slice();
     if (nuovo.length === attuale.length && nuovo.every((x, i) => x === attuale[i])) {
-      const ha = attuale.length ? `adesso contiene: ${attuale.join(', ')}` : 'adesso è vuoto';
-      const perche = e.op === 'aggiungi' ? `${e.voci.join(', ')} ${e.voci.length > 1 ? 'ci sono' : 'c\'è'} già`
-        : e.op === 'togli' ? `${e.voci.join(', ')} non ${e.voci.length > 1 ? 'ci sono' : 'c\'è'}` : 'è già così';
+      const ha = attuale.length ? `adesso contiene: ${attuale.map(sitoLeggibile).join(', ')}` : 'adesso è vuoto';
+      const voci = e.voci.map(sitoLeggibile).join(', ');
+      const perche = e.op === 'aggiungi' ? `${voci} ${e.voci.length > 1 ? 'ci sono' : 'c\'è'} già`
+        : e.op === 'togli' ? `${voci} non ${e.voci.length > 1 ? 'ci sono' : 'c\'è'}` : 'è già così';
       return { invariato: `nell'elenco «${e.nome}» ${perche} (${ha})` };
     }
     return { partial: nidifica(e.percorso, nuovo), lista: nuovo };

@@ -320,8 +320,11 @@
       const piu = b.filter((x) => !a.includes(x));
       const meno = a.filter((x) => !b.includes(x));
       const parti = [];
-      if (piu.length) parti.push(`aggiunt${piu.length > 1 ? 'i' : 'o'} ${elencoDi(piu)}`);
-      if (meno.length) parti.push(`tolt${meno.length > 1 ? 'i' : 'o'} ${elencoDi(meno)}`);
+      // Gli elenchi sono di siti: münchen.de, non la forma «xn--» con cui si salva.
+      const N = global.SN_NOMI_SITO;
+      const leggibili = (l) => elencoDi(N && N.leggibile ? l.map((x) => N.leggibile(x)) : l);
+      if (piu.length) parti.push(`aggiunt${piu.length > 1 ? 'i' : 'o'} ${leggibili(piu)}`);
+      if (meno.length) parti.push(`tolt${meno.length > 1 ? 'i' : 'o'} ${leggibili(meno)}`);
       return `${nome}: ${parti.join(', ') || 'riordinati'}`;
     }
     if (v && v.testo) {
