@@ -123,7 +123,7 @@
   }
 
   function frase(cl) {
-    return `Non ti segnalo più ${CLASSI[classe(cl)]}: le hai sempre lasciate lì. Se le rivuoi, dimmelo o riaccendile dalle Preferenze.`;
+    return `Non ti segnalo più ${CLASSI[classe(cl)]}: gli ultimi avvisi di questo tipo li hai sempre lasciati lì. Se li rivuoi, dimmelo o riaccendili dalle Preferenze.`;
   }
 
   // Quante delle mostrate sono state seguite, per classe: è il numero che le Preferenze mostrano.
