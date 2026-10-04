@@ -239,3 +239,27 @@ test('E — chi scrive nella lista dei siti bloccati non perde l\'a capo quando 
   await expect.poll(async () => (await impostazioni(app)).security.siteBlock.blacklist, { timeout: 5_000 }).toEqual(['tiktok.com', 'x.com']);
   await expect(casella).toHaveValue('tiktok.com\nx.com');
 });
+
+// La pagina Altro rimanda tutta la casella a ogni salvataggio: senza riallinearsi toglieva il dominio della chat.
+test('F — un dominio escluso aggiunto dalla chat compare nella pagina Altro aperta, e scriverci dopo non lo toglie', async ({ app, shell, openTab }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const chat = await homeDi(app);
+  await configura(app);
+  await app.evaluate(async () => globalThis.SN_STORAGE.updateSettings({ blocklist: ['banca.it'] }));
+  const altro = await openTab('filo://options/altro.html');
+  const casella = altro.locator('#blocklist');
+  await expect(casella).toHaveValue('banca.it', { timeout: 8_000 });
+
+  await modelloFinto(app, [imposta('domini_esclusi', 'aggiungi esempio.org'), { text: 'Ti chiedo conferma.' }]);
+  await scrivi(chat, 'non intervenire su esempio.org');
+  await clickConfirm(chat, 'ok', { timeout: 10_000 });
+  await expect.poll(async () => (await impostazioni(app)).blocklist, { timeout: 5_000 }).toEqual(['banca.it', 'esempio.org']);
+  await altro.bringToFront();
+  await expect(casella).toHaveValue('banca.it\nesempio.org', { timeout: 3_000 });
+  await casella.click();
+  await altro.keyboard.press('Control+End');
+  await altro.keyboard.type('\nposta.it');
+  await expect.poll(async () => (await impostazioni(app)).blocklist, { timeout: 5_000 }).toEqual(['banca.it', 'esempio.org', 'posta.it']);
+  await ripristina(app);
+});

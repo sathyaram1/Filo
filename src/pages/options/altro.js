@@ -214,7 +214,9 @@
     chrome.runtime.onMessage.addListener((msg) => {
       if (!msg || msg.type !== MSG.SETTINGS_UPDATED || !msg.settings || mostrato === null) return;
       const el = $('blocklist');
-      if ((document.hasFocus() && document.activeElement === el) || el.value !== mostrato) return;
+      const scritti = el.value.split('\n').map((x) => x.trim()).filter(Boolean);
+      // Uno stesso elenco con altre righe vuote non si riscrive: chi scrive perderebbe l'a capo appena battuto.
+      if (el.value !== mostrato || JSON.stringify(scritti) === JSON.stringify(msg.settings.blocklist || [])) return;
       const toccati = window.SN_VOCI_IMPOSTAZIONI.riallineaPagina('altro', msg.settings);
       if (toccati.length) mostrato = el.value;
     });
