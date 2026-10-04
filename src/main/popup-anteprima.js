@@ -219,4 +219,4 @@ function indirizzoDi(url) {
   try { return new URL(u).hostname.replace(/^www\./i, ''); } catch (_) { return ''; }
 }
 
-module.exports = { precarica, prepara, dimentica, mostra, nascondi };
+module.exports = { precarica, prepara, dimentica, mostra, nascondi, quandoSparita };
