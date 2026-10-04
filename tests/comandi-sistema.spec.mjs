@@ -248,6 +248,59 @@ test('in chat: la conferma nomina la rete che partirà anche trovata per somigli
   expect((await computer(app)).rete.nome).toBe('Cava');
 });
 
+test('in chat, le parole dell\'utente bastano: «le cuffie Sony» collega le Cuffie Sony e «la rete di casa» chiede conferma per Casa', async ({ app }) => {
+  await computerFinto(app, {
+    dispositivi: [{ indirizzo: '00:11:22:33:44:55', nome: 'Cuffie Sony', collegato: false }, { indirizzo: '00:11:22:33:44:66', nome: 'Casse JBL', collegato: false }],
+    reti: ['Casa', 'Ufficio 5G'],
+    stato: { ...PARTENZA, rete: { online: true, tipo: 'wifi', nome: 'Ufficio 5G' } },
+  });
+  const page = await home(app);
+  await expect(voce(page, 'rete')).toHaveText('Ufficio 5G', { timeout: 8_000 });
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'b1', name: 'BLUETOOTH', arguments: JSON.stringify({ dispositivo: 'le cuffie Sony' }) }] },
+    { text: 'Fatto.' },
+  ]);
+  await chiedi(page, 'collega le cuffie Sony');
+  await expect.poll(async () => (await chiamate(app)).filter((c) => c[0] === 'btCollega'), { timeout: 8_000 })
+    .toEqual([['btCollega', { indirizzo: '00:11:22:33:44:55', collega: true }]]);
+  await ripristina(app);
+
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'w1', name: 'WIFI', arguments: JSON.stringify({ rete: 'la rete di casa' }) }] },
+    { text: 'Ti chiedo conferma.' },
+  ]);
+  await chiedi(page, 'collegati alla rete di casa');
+  await expect.poll(() => confirmText(page), { timeout: 8_000 }).toContain('alla rete Wi-Fi «Casa»');
+  await clickConfirm(page, 'ok');
+  await expect.poll(async () => (await computer(app)).rete.nome).toBe('Casa');
+});
+
+test('in chat, quello che è già com\'è chiesto non chiede conferma: rete già quella, cuffie già staccate, Bluetooth già spento', async ({ app }) => {
+  await computerFinto(app, {
+    dispositivi: [{ indirizzo: '00:11:22:33:44:55', nome: 'Cuffie', collegato: false }],
+    reti: ['Casa', 'Ufficio'],
+    stato: { ...PARTENZA, bluetooth: { acceso: false, dispositivi: [] } },
+  });
+  const page = await home(app);
+  await expect(voce(page, 'bluetooth')).toHaveAttribute('title', 'Bluetooth spento', { timeout: 8_000 });
+  const casi = [
+    ['collegati a Casa', 'WIFI', { rete: 'Casa' }],
+    ['scollega le cuffie', 'BLUETOOTH', { dispositivo: 'Cuffie', collega: false }],
+    ['spegni il Bluetooth', 'BLUETOOTH', { acceso: false }],
+  ];
+  for (const [i, [frase, nome, args]] of casi.entries()) {
+    await modelloFinto(app, [{ toolCalls: [{ id: `g${i}`, name: nome, arguments: JSON.stringify(args) }] }, { text: 'Era già così.' }]);
+    await chiedi(page, frase);
+    // L'esito torna al modello senza che un popup lo fermi: non c'era niente che cadesse.
+    await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 8_000 }).toBeGreaterThan(1);
+    await page.waitForTimeout(500);
+    expect(await confirmText(page).catch(() => ''), frase).toBe('');
+    await ripristina(app);
+  }
+  expect((await computer(app)).rete.nome).toBe('Casa');
+  expect((await chiamate(app)).some((c) => c[0] === 'wifiCollega')).toBe(false);
+});
+
 test('acceso o spento dal riquadro o da fuori, l\'elenco del riquadro aperto si rilegge e non dice il contrario della radio', async ({ app }) => {
   const cuffie = { indirizzo: '00:11:22:33:44:55', nome: 'Cuffie', collegato: true };
   await computerFinto(app, { dispositivi: [cuffie], reti: ['Casa', 'Ufficio'], stato: { ...PARTENZA, bluetooth: { acceso: true, dispositivi: ['Cuffie'] } } });

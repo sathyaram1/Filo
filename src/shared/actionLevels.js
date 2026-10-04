@@ -642,7 +642,7 @@
     },
     // ── volume, Bluetooth e Wi-Fi del computer (#874) ───────────────────────
     // Spegnere o staccare quello che sta servendo (le cuffie, la tastiera, la rete della chat stessa) è 2; il resto
-    // 1. Il livello legge `_richiestaSistema`, che il main scrive sempre prima del cancello con la stessa funzione che
+    // 1, e 1 anche ciò che è già com'è chiesto (`gia`: niente cade). Il livello legge `_richiestaSistema`, che il main scrive sempre prima del cancello con la stessa funzione che
     // poi esegue (src/main/services/comandiSistema.js): quello che si conferma è quello che parte.
     VOLUME: {
       level: 1,
@@ -659,6 +659,7 @@
       level: (a) => {
         const r = a && a._richiestaSistema;
         if (!r || r.errore) return 2;
+        if (r.gia === true) return 1;
         return r.acceso === false || (r.nome && r.collega === false) ? 2 : 1;
       },
       describe: (a) => {
@@ -687,6 +688,7 @@
       level: (a) => {
         const r = a && a._richiestaSistema;
         if (!r || r.errore) return 2;
+        if (r.gia === true) return 1;
         return r.acceso === false || !!r.nome ? 2 : 1;
       },
       describe: (a) => {

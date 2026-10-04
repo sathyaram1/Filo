@@ -1104,7 +1104,8 @@ function distanza(a, b) {
 // Le parole che si dicono intorno al nome («le cuffie Sony», «la rete di casa»): nel nome non ci sono quasi mai.
 const CONTORNO = new Set(['il', 'lo', 'la', 'i', 'gli', 'le', 'l', 'un', 'uno', 'una', 'di', 'del', 'dello', 'della',
   'dei', 'degli', 'delle', 'd', 'a', 'al', 'allo', 'alla', 'ai', 'agli', 'alle', 'da', 'dal', 'dalla', 'in', 'nel',
-  'nella', 'con', 'su', 'sul', 'sulla', 'per', 'mio', 'mia', 'miei', 'mie', 'rete', 'wifi', 'wi', 'fi']);
+  'nella', 'dell', 'all', 'dall', 'nell', 'sull', 'con', 'col', 'su', 'sul', 'sulla', 'per', 'mio', 'mia', 'miei', 'mie',
+  'rete', 'wifi', 'wi', 'fi']);
 
 // { scelto } se un nome solo corrisponde; { candidati } se più d'uno; {} se nessuno.
 function scegliNome(chiesto, nomi) {
@@ -1365,8 +1366,9 @@ function comanda(richiesta) {
   return q.elenca ? inLettura(q.cosa, esegui) : inFila(esegui);
 }
 
-// Il nome vero di una rete o di un dispositivo detto a parole, letto prima di chiedere conferma: { nome } se ce n'è
-// uno solo, { esito } (l'errore con l'elenco) se nessuno o più d'uno, {} se l'elenco non si legge.
+// Il nome vero di una rete o di un dispositivo detto a parole, letto prima di chiedere conferma: { nome, gia } se ce
+// n'è uno solo (`gia`: è già come lo si chiede), { esito } (l'errore con l'elenco) se nessuno o più d'uno, {} se
+// l'elenco non si legge.
 async function risolviNome(richiesta) {
   const q = normalizzaRichiesta(richiesta);
   if (q.errore || !q.nome || (q.cosa !== 'wifi' && q.cosa !== 'bluetooth')) return {};
@@ -1374,7 +1376,11 @@ async function risolviNome(richiesta) {
   if (!r.ok || !Array.isArray(r.elenco)) return {};
   const nomi = r.elenco.map((x) => x.nome);
   const s = scegliNome(q.nome, nomi);
-  if (s.scelto) return { nome: s.scelto };
+  if (s.scelto) {
+    const x = r.elenco.find((v) => v.nome === s.scelto) || {};
+    const gia = q.cosa === 'wifi' ? x.attiva === true : typeof x.collegato === 'boolean' && x.collegato === q.collega;
+    return { nome: s.scelto, gia };
+  }
   const errore = s.candidati ? 'ambiguo' : q.cosa === 'wifi' ? 'nessuna-rete' : 'nessun-dispositivo';
   return { esito: { ...fallito(errore, q), candidati: s.candidati || nomi } };
 }

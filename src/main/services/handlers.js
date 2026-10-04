@@ -1763,6 +1763,8 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
     const C = require('./comandiSistema');
     const q = C.normalizzaRichiesta(richiestaDiSistema(type, action));
     let nome = q.nome || '';
+    // Già com'è chiesto (la rete è quella, le cuffie sono staccate, la radio è spenta): niente da confermare.
+    let gia = false;
     // Rete e dispositivo da confermare: il popup nomina quello che partirà, trovato prima di chiedere; all'OK parte
     // quello mostrato. Un nome che non ne trova uno solo torna al modello con l'elenco, senza una conferma a vuoto.
     if (nome && (type === 'WIFI' || q.collega === false)) {
@@ -1773,9 +1775,14 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         const trovato = await C.risolviNome(q);
         if (trovato.esito) return { executed: false, kept: false, output: trovato.esito };
         if (trovato.nome) nome = trovato.nome;
+        gia = trovato.gia === true;
       }
+    } else if (!nome && q.acceso === false && !confirmed) {
+      const letto = globalThis.SN_SISTEMA_MAIN && typeof globalThis.SN_SISTEMA_MAIN.stato === 'function' ? globalThis.SN_SISTEMA_MAIN.stato() : null;
+      const radio = letto && (type === 'WIFI' ? letto.wifi : letto.bluetooth);
+      gia = !!radio && radio.acceso === false;
     }
-    action._richiestaSistema = nome ? { ...q, nome } : q;
+    action._richiestaSistema = { ...q, ...(nome ? { nome } : {}), ...(gia ? { gia: true } : {}) };
     // Il nome sta anche fuori, dove il recinto dei testi salvati lo trova (CAMPI_SALVATI).
     if (nome) action._nomeSistema = nome;
     else delete action._nomeSistema;

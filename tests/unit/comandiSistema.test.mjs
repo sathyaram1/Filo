@@ -339,6 +339,18 @@ test('un nome si trova anche con maiuscole, accenti e un errore di battitura; du
   assert.deepEqual(C.scegliNome('   ', nomi), {});
 });
 
+test('un nome detto con le parole dell\'utente si trova: articoli e «rete di» non devono stare nel nome', () => {
+  assert.deepEqual(C.scegliNome('le cuffie Sony', ['Cuffie Sony', 'Casse JBL']), { scelto: 'Cuffie Sony' });
+  assert.deepEqual(C.scegliNome('le cuffie', ['Cuffie Sony', 'Casse JBL']), { scelto: 'Cuffie Sony' });
+  assert.deepEqual(C.scegliNome('le cuffie sonny', ['Cuffie Sony', 'Casse JBL']), { scelto: 'Cuffie Sony' });
+  assert.deepEqual(C.scegliNome('la rete di casa', ['Casa', 'Ufficio 5G']), { scelto: 'Casa' });
+  assert.deepEqual(C.scegliNome('la rete di casa', ['Casa', 'Casa 5G']), { scelto: 'Casa' });
+  assert.deepEqual(C.scegliNome('la rete dell\'ufficio', ['Ufficio 5G', 'Casa']), { scelto: 'Ufficio 5G' });
+  assert.deepEqual(C.scegliNome('le airpods di marco', ['WH-1000XM4', 'AirPods di Marco']), { scelto: 'AirPods di Marco' });
+  assert.deepEqual(C.scegliNome('rete dell\'ufficio', ['Ufficio 5G', 'Ufficio Ospiti']), { candidati: ['Ufficio 5G', 'Ufficio Ospiti'] });
+  assert.deepEqual(C.scegliNome('la', ['WH-1000XM4', 'AirPods di Marco']), {});
+});
+
 // ── I due cammini su un computer finto ───────────────────────────────────────
 
 function finto(stato) {
@@ -392,7 +404,7 @@ test('prima della conferma il nome detto si risolve nel nome vero, senza cambiar
   const pc = finto({ reti: [{ nome: 'Cava', attiva: false }, { nome: 'Ufficio 5G', attiva: false }, { nome: 'Ufficio Ospiti', attiva: false }] });
   C._perProve.usaComputer(pc);
   try {
-    assert.deepEqual(await C.risolviNome({ cosa: 'wifi', rete: 'casa' }), { nome: 'Cava' });
+    assert.deepEqual(await C.risolviNome({ cosa: 'wifi', rete: 'casa' }), { nome: 'Cava', gia: false });
     const due = await C.risolviNome({ cosa: 'wifi', rete: 'ufficio' });
     assert.equal(due.esito.errore, 'ambiguo');
     assert.deepEqual(due.esito.candidati, ['Ufficio 5G', 'Ufficio Ospiti']);
@@ -492,4 +504,24 @@ test('il livello lo decide la stessa lettura che poi esegue: spegnere e staccare
   assert.equal(L.levelFor({ type: 'BLUETOOTH', acceso: true }), 2);
   assert.equal(livello('WIFI', { acceso: 'boh' }), 2);
   assert.match(L.describe({ type: 'WIFI', _richiestaSistema: C.normalizzaRichiesta({ cosa: 'wifi', acceso: false }) }), /a parole non potrai riaccenderlo/);
+  // Già com'è chiesto: niente cade, niente da confermare.
+  const gia = (type, args) => L.levelFor({ type, ...args, _richiestaSistema: { ...C.normalizzaRichiesta({ ...args, cosa: type.toLowerCase() }), gia: true } });
+  assert.equal(gia('WIFI', { rete: 'casa' }), 1);
+  assert.equal(gia('WIFI', { acceso: false }), 1);
+  assert.equal(gia('BLUETOOTH', { acceso: false }), 1);
+  assert.equal(gia('BLUETOOTH', { dispositivo: 'cuffie', collega: false }), 1);
+});
+
+test('prima della conferma si sa se rete o dispositivo sono già come li si chiede', async () => {
+  const pc = finto({
+    reti: [{ nome: 'Casa', attiva: true }, { nome: 'Ufficio', attiva: false }],
+    dispositivi: [{ indirizzo: '00:11:22:33:44:55', nome: 'Cuffie', collegato: false }, { indirizzo: '00:11:22:33:44:66', nome: 'Tastiera', collegato: true }],
+  });
+  C._perProve.usaComputer(pc);
+  try {
+    assert.deepEqual(await C.risolviNome({ cosa: 'wifi', rete: 'la rete di casa' }), { nome: 'Casa', gia: true });
+    assert.deepEqual(await C.risolviNome({ cosa: 'wifi', rete: 'ufficio' }), { nome: 'Ufficio', gia: false });
+    assert.deepEqual(await C.risolviNome({ cosa: 'bluetooth', dispositivo: 'le cuffie', collega: false }), { nome: 'Cuffie', gia: true });
+    assert.deepEqual(await C.risolviNome({ cosa: 'bluetooth', dispositivo: 'tastiera', collega: false }), { nome: 'Tastiera', gia: false });
+  } finally { C._perProve.usaComputer(null); }
 });

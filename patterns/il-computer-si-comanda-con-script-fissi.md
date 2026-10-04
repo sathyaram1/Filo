@@ -34,8 +34,8 @@ valore arriva intero per costruzione:
   NetworkManager ha dato alla rete, e un indirizzo controllato per il Bluetooth.
 
 Il nome detto dall'utente («le cuffie Sony») si risolve in JavaScript contro
-l'elenco vero (`scegliNome`: maiuscole, accenti e un errore di battitura non
-contano; due candidati si chiedono). Solo il nome esatto, o l'identificativo, va
+l'elenco vero (`scegliNome`: maiuscole, accenti, un errore di battitura e le
+parole intorno al nome, «le», «la rete di», non contano; due candidati si chiedono). Solo il nome esatto, o l'identificativo, va
 al sistema.
 
 ## L'uscita non si fa scrivere da fuori
@@ -51,8 +51,8 @@ busta `NOMI_DISPOSITIVI`.
 L'azione della chat (`VOLUME`, `BLUETOOTH`, `WIFI`) e i tasti del riquadro delle
 voci della home chiamano la stessa `comanda()`. La differenza sta solo nel
 livello: spegnere o staccare ciò che sta servendo (le cuffie, la tastiera, la rete
-della chat stessa) chiede conferma quando lo decide il modello; il tasto è già il
-gesto dell'utente. Il livello legge `_richiestaSistema`, scritta dal main con la
+della chat stessa) chiede conferma quando lo decide il modello, salvo che sia già
+così e niente cada; il tasto è già il gesto dell'utente. Il livello legge `_richiestaSistema`, scritta dal main con la
 stessa funzione che poi esegue: quello che si conferma è quello che parte. I
 comandi vanno uno alla volta (una coda), e quello che cambiano si vede subito
 nella home (`dopoComando`), poi la lettura vera lo conferma. Leggere un elenco
