@@ -2068,8 +2068,21 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         const cerca = String(action.cerca ?? action.query ?? action.chiave ?? action.testo ?? '').replace(/\s+/g, ' ').trim().slice(0, 200);
         if (!V) return { executed: false, kept: true, output: { error: 'lettura non disponibile' } };
         const settings = await Storage.getSettings();
-        const r = V.righePerModello(settings, { cerca, tema: resolveTheme(settings), sistema: process.platform });
+        let permessiSiti = null;
+        try { permessiSiti = require('./permessiPagine').righeRicordate(); } catch (_) {}
+        const r = V.righePerModello(settings, { cerca, tema: resolveTheme(settings), sistema: process.platform, altrove: { permessiSiti } });
         return { executed: true, kept: true, output: { cerca, righe: r.righe, trovate: r.trovate, totale: r.totale } };
+      }
+      case 'TOGLI_PERMESSO_SITO': {
+        // #949 — la stessa cosa del «Togli» nella pagina Sicurezza: una risposta ricordata se ne va, il sito tornerà a chiedere.
+        const r = require('./permessiPagine').togliPerChat(action.sito ?? action.dominio ?? action.site, action.permesso ?? action.parte);
+        if (r.errore) return { executed: false, kept: false, output: { error: r.errore, rifiuto: true } };
+        if (!r.tolte.length) {
+          const ci = r.restano.length ? `ci sono: ${r.restano.join('; ')}` : 'non ce n\'è nessuna';
+          return { executed: false, kept: false, output: { error: `nessuna risposta ricordata per ${r.host}${action.permesso ? ` (${action.permesso})` : ''}: ${ci}`, invariato: true } };
+        }
+        broadcastToFiloPages({ type: MSG.PERMESSI_SITI_CAMBIATI });
+        return { executed: true, kept: false, output: { tolte: r.tolte } };
       }
       case 'EVENTO_CALENDARIO':
         return { executed: false, kept: true };
@@ -3207,6 +3220,10 @@ function toolResultText({ action, res, rendered }) {
     if (type === 'IMPOSTA_PREFERENZA' || type === 'IMPOSTA_ESTETICA') {
       return `Eseguita: ${done}. Nella risposta di' in una frase cosa hai cambiato e che si rimette com'era con «annulla» `
         + 'sul segno accanto al messaggio dell\'utente, o chiedendolo a te.';
+    }
+    if (type === 'TOGLI_PERMESSO_SITO') {
+      return `Eseguita: ${done}. Nella risposta di' in una frase cosa hai tolto e che per ridarlo basta rispondere «Consenti» `
+        + 'quando il sito lo richiede.';
     }
     return `Eseguita: ${done}.`;
   }

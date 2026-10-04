@@ -6,8 +6,10 @@
   'use strict';
 
   // `campi`: id del controllo → percorso nelle impostazioni. `gruppi`: le sezioni che la pagina costruisce
-  // da codice, con il percorso jolly delle loro voci. `fuori`: i controlli che non scrivono un'impostazione,
-  // col perché.
+  // da codice, con il percorso jolly delle loro voci. `altrove`: le sezioni che la pagina costruisce da dati
+  // tenuti fuori dalle impostazioni (vedi ALTROVE). `fuori`: i controlli che non scrivono un'impostazione,
+  // col perché. `messaggi`: ogni altro canale che la pagina usa → lo strumento della chat che fa lo stesso,
+  // o il perché non serve.
   const PAGINE = {
     preferences: {
       titolo: 'Preferenze',
@@ -37,6 +39,16 @@
       },
       gruppi: { tokenCode: 'themeTokens.*', tabColorCode: 'tabColor.*' },
       fuori: {},
+      messaggi: {
+        FILO_MEMORY_VIEW: 'DIMENTICA',
+        FILO_MEMORY_FORGET: 'DIMENTICA',
+        FILO_GET_ONBOARDING: 'rilegge le interviste di benvenuto passate per mostrarle: non è un valore da cambiare',
+        FILO_RESTART_ONBOARDING: 'pulsante che fa un’azione (rifà l’intervista di benvenuto): resta nella pagina',
+        RESET_SETTINGS: 'pulsante che fa un’azione (ripristina tutte le impostazioni): resta nella pagina',
+        TTS_SYNTH: 'prova d’ascolto della voce scelta: non salva niente',
+        TTS_VOICES: 'legge le voci installate per riempire il menu: non salva niente',
+        OPEN_URL: 'apre una pagina collegata: non salva niente',
+      },
     },
     security: {
       titolo: 'Sicurezza',
@@ -64,7 +76,19 @@
         'fp-mode-privacy': 'security.fingerprint.mode',
       },
       gruppi: { 'sec-cookies-banners': 'security.cookies.bannerSites' },
+      altrove: { 'sec-perm-list': 'permessiSiti' },
       fuori: {},
+      messaggi: {
+        PERMESSI_SITI_GET: 'LEGGI_IMPOSTAZIONI',
+        PERMESSI_SITI_TOGLI: 'TOGLI_PERMESSO_SITO',
+        FILO_PAGINE_CONTA: 'CANCELLA_PAGINE',
+        FILO_PAGINE_CANCELLA: 'CANCELLA_PAGINE',
+        COOKIES_SITES: 'mostra i siti dove Filo ha già rifiutato i banner, da passare all’elenco dei banner visibili',
+        PROXY_STATUS: 'mostra se la connessione da un altro paese è configurata: non è un valore da cambiare qui',
+        EXPORT_DATA: 'pulsante che fa un’azione (esporta i dati in un file): resta nella pagina',
+        IMPORT_DATA_PREVIEW: 'pulsante che fa un’azione (importa i dati da un file): resta nella pagina',
+        IMPORT_DATA_APPLY: 'pulsante che fa un’azione (importa i dati da un file): resta nella pagina',
+      },
     },
     options: {
       titolo: 'Modelli',
@@ -77,12 +101,34 @@
       },
       gruppi: {},
       fuori: {},
+      messaggi: {
+        DEFAULT_MODELS_PUBLIC: 'legge i modelli predefiniti condivisi per mostrarli: non salva niente',
+        GET_COSTS: 'legge la spesa del mese per mostrarla: non salva niente',
+        TEST_DEFAULT_MODEL: 'prova di un modello: non salva niente',
+        TEST_PROVIDER: 'prova della chiave: non salva niente',
+      },
     },
     altro: {
       titolo: 'Altro',
       campi: { blocklist: 'blocklist' },
       gruppi: {},
       fuori: {},
+      messaggi: {
+        GET_CATEGORIES: 'le categorie delle pagine salvate sono dati dell’utente, non impostazioni',
+        GET_SAVED_PAGES: 'le categorie delle pagine salvate sono dati dell’utente, non impostazioni',
+        RENAME_CATEGORY: 'le categorie delle pagine salvate sono dati dell’utente, non impostazioni',
+        DELETE_CATEGORY: 'le categorie delle pagine salvate sono dati dell’utente, non impostazioni',
+      },
+    },
+  };
+
+  // Le voci tenute fuori dalle impostazioni: chi le tiene (il main) le passa a righePerModello in `altrove`,
+  // già scritte come righe da leggere.
+  const ALTROVE = {
+    permessiSiti: {
+      nome: 'permessi dei siti (risposte ricordate)',
+      come: 'TOGLI_PERMESSO_SITO per toglierne una',
+      parole: 'permessi permesso microfono fotocamera appunti posizione notifiche schermi presenza strumenti consentito negato',
     },
   };
 
@@ -127,6 +173,7 @@
   // ── Le voci per la chat ────────────────────────────────────────────────────
   // Come la chat la cambia: la chiave di IMPOSTA_PREFERENZA, o il token di IMPOSTA_ESTETICA.
   function chiaveDi(percorso) {
+    if (has(ALTROVE, percorso)) return { come: ALTROVE[percorso].come, chiave: '', conferma: false };
     if (percorso.startsWith('themeTokens.')) return { come: `IMPOSTA_ESTETICA token ${percorso.slice(12)}`, chiave: '', conferma: false };
     const P = global.SN_PREF;
     const s = P && P.setterDi ? P.setterDi(percorso) : null;
@@ -136,6 +183,7 @@
     return s.charAt(0).toLowerCase() + s.slice(1);
   }
   function nomeDi(percorso) {
+    if (has(ALTROVE, percorso)) return ALTROVE[percorso].nome;
     if (percorso.startsWith('themeTokens.')) {
       const T = global.SN_THEME_TOKENS;
       const t = T && T.get ? T.get(percorso.slice(12)) : null;
@@ -164,7 +212,7 @@
       });
     };
     for (const [pagina, def] of Object.entries(PAGINE)) {
-      for (const p of [...Object.values(def.campi), ...Object.values(def.gruppi || {})]) {
+      for (const p of [...Object.values(def.campi), ...Object.values(def.gruppi || {}), ...Object.values(def.altrove || {})]) {
         for (const q of espandi(p)) aggiungi(q, pagina);
       }
     }
@@ -184,6 +232,7 @@
     return w.length > 5 ? w.slice(0, w.length - 2) : w;
   }
   function sinonimi(percorso) {
+    if (has(ALTROVE, percorso)) return ALTROVE[percorso].parole;
     const P = global.SN_PREF;
     const s = P && P.setterDi ? P.setterDi(percorso) : null;
     return s ? s.keys.join(' ') : '';
@@ -224,6 +273,7 @@
   const MAX_ELENCO = 100;
   function valoreLeggibile(percorso, settings, { tema = 'light', sistema = '', cerca = '' } = {}) {
     const v = leggi(settings, percorso);
+    if (has(ALTROVE, percorso) && !Array.isArray(v)) return 'non letto';
     if (percorso.startsWith('themeTokens.')) {
       const T = global.SN_THEME_TOKENS;
       const nome = percorso.slice(12);
@@ -255,7 +305,9 @@
   }
 
   // Le righe che LEGGI_IMPOSTAZIONI restituisce al modello, divise per pagina.
-  function righePerModello(settings, { cerca = '', tema = 'light', sistema = '' } = {}) {
+  function righePerModello(impostazioni, { cerca = '', tema = 'light', sistema = '', altrove = {} } = {}) {
+    const settings = { ...(impostazioni || {}) };
+    for (const k of Object.keys(ALTROVE)) if (Array.isArray(altrove[k])) settings[k] = altrove[k];
     const tutte = voci();
     let scelte = cercaVoci(tutte, cerca, settings);
     const nessuna = !!String(cerca || '').trim() && !scelte.length;
@@ -297,6 +349,6 @@
   }
 
   global.SN_VOCI_IMPOSTAZIONI = {
-    PAGINE, campi, leggi, espandi, voci, cercaVoci, valoreLeggibile, righePerModello, riallineaPagina,
+    PAGINE, ALTROVE, campi, leggi, espandi, voci, cercaVoci, valoreLeggibile, righePerModello, riallineaPagina,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

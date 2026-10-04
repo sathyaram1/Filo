@@ -253,6 +253,7 @@
     LEGGI_TRASPARENZA: () => 'riletto la trasparenza',
     CAPACITA_DETTAGLIO: () => 'verificato cosa sa fare',
     LEGGI_IMPOSTAZIONI: () => 'letto le impostazioni',
+    TOGLI_PERMESSO_SITO: () => 'tolto un permesso a un sito',
     TIMER: (n) => (n > 1 ? `avviato ${n} timer` : 'avviato un timer'),
     SVEGLIA: (n) => (n > 1 ? `impostato ${n} sveglie` : 'impostato una sveglia'),
     CANCELLA_SVEGLIA: () => 'cancellato una sveglia',
@@ -391,6 +392,10 @@
       const c = String(a.cerca || '').trim();
       return { icon: '⚙', text: c ? `Leggo come è impostato: ${c}` : 'Leggo le impostazioni' };
     },
+    TOGLI_PERMESSO_SITO: (a) => {
+      const tolte = (a._output && Array.isArray(a._output.tolte)) ? a._output.tolte.map(pulito).filter(Boolean) : [];
+      return { icon: '⚙', text: `Permesso tolto · ${tolte.length ? tolte.join('; ') : String(a.sito || '')}` };
+    },
     LEGGI_FILE: (a) => {
       const title = (a._output && a._output.title) || '';
       return { icon: '📄', text: title ? `Leggo: ${title}` : 'Leggo un file' };
@@ -486,6 +491,7 @@
     CERCA_CHAT: 'Conversazione non ritrovata',
     LEGGI_DOCUMENTO: 'Documento non letto', LEGGI_TRASPARENZA: 'Documento non disponibile',
     CAPACITA_DETTAGLIO: 'Verifica non riuscita', NAVIGA: 'Link non aperto', LEGGI_IMPOSTAZIONI: 'Impostazioni non lette',
+    TOGLI_PERMESSO_SITO: 'Permesso non tolto',
     IMPOSTA_PREFERENZA: 'Impostazione non applicata', IMPOSTA_ESTETICA: 'Aspetto non cambiato',
     ANNULLA_CAMBIO: 'Niente annullato',
     STILE_PAGINA: 'Aspetto della pagina non cambiato', RIPRISTINA_STILE_PAGINA: 'Aspetto della pagina non ripristinato',

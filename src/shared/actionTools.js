@@ -213,7 +213,7 @@
       risultato: true,
     },
     LEGGI_IMPOSTAZIONI: {
-      description: 'Legge com\'è impostato Filo ADESSO: il valore vero di ogni voce delle pagine Preferenze, Sicurezza, Modelli e Altro, con la chiave per cambiarla. '
+      description: 'Legge com\'è impostato Filo ADESSO: il valore vero di ogni voce delle pagine Preferenze, Sicurezza, Modelli e Altro (anche i permessi dati ai siti), con la chiave per cambiarla. '
         + 'Usalo SEMPRE prima di rispondere a «com\'è impostato X?», «è attivo il blocco della pubblicità?», «che tema ho?», «quali siti ho bloccato?», '
         + 'e prima di un cambio relativo («un po\' più veloce»): non rispondere a memoria né dai valori di serie. Sola lettura. '
         + 'Le chiavi API non tornano mai: solo se ci sono.',
@@ -222,6 +222,17 @@
       },
       required: [],
       risultato: true,
+    },
+    TOGLI_PERMESSO_SITO: {
+      description: 'Toglie una risposta che Filo ricorda per un sito (microfono, fotocamera, appunti, posizione, notifiche, '
+        + 'schermi, presenza, strumenti), come «Togli» nella pagina Sicurezza: «togli il microfono a meet.google.com», '
+        + '«non ricordare più cosa ho risposto a example.com». Quali risposte ci sono lo dice LEGGI_IMPOSTAZIONI. '
+        + 'Toglierla non concede niente: alla prossima richiesta il sito torna a chiedere.',
+      properties: {
+        sito: S('Il sito, come meet.google.com; vale anche per i suoi sottodomini.'),
+        permesso: S('Quale permesso ("microfono", "fotocamera", "appunti", "posizione", "notifiche", "schermi", "presenza", "strumenti"); ometti per toglierle tutte.'),
+      },
+      required: ['sito'],
     },
     LEGGI_TRASPARENZA: {
       description: () => {

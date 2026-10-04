@@ -352,6 +352,50 @@ function togliScelta(origine, parte) {
   return ok;
 }
 
+// ── Le stesse risposte per la chat (#949): lette come nella pagina Sicurezza, tolte per sito e per permesso ──
+const PAROLE_PARTE = {
+  microfono: 'audio', mic: 'audio', audio: 'audio', fotocamera: 'video', videocamera: 'video', webcam: 'video',
+  camera: 'video', video: 'video', appunti: 'appunti', posizione: 'posizione', geolocalizzazione: 'posizione',
+  localizzazione: 'posizione', notifiche: 'notifiche', notifica: 'notifiche', schermi: 'schermi', schermo: 'schermi',
+  presenza: 'presenza', 'presenza al computer': 'presenza', strumenti: 'strumenti', 'strumenti musicali': 'strumenti', midi: 'strumenti',
+};
+function nomeParte(parte) {
+  const S = (globalThis.SN_I18N && globalThis.SN_I18N.STRINGS) || {};
+  const t = S[`options_site_perms_part_${parte}`];
+  return t ? t.toLowerCase() : parte;
+}
+function rigaScelta(s) {
+  return `${s.sotto ? `${s.sotto}.` : ''}${s.dominio} · ${nomeParte(s.parte)}: ${s.si ? 'consentito' : 'negato'}`;
+}
+function righeRicordate() {
+  return scelteRicordate().map(rigaScelta);
+}
+// «meet.google.com», «https://www.meet.google.com/abc», «münchen.de» → il nome del sito con cui si confronta.
+function hostDaTesto(raw) {
+  let t = String(raw || '').trim().toLowerCase().replace(/^["'«(]+|["'»),.;]+$/g, '');
+  if (!t) return '';
+  try { t = new URL(t.includes('://') ? t : `http://${t}`).hostname; } catch (_) { return ''; }
+  return t.replace(/^www\./, '');
+}
+// Toglie le risposte ricordate di un sito (anche dei suoi sottodomini); `permesso` vuoto o «tutti» le toglie tutte.
+// Toglierle non concede niente: alla prossima richiesta il sito torna a chiedere.
+function togliPerChat(sito, permesso) {
+  const host = hostDaTesto(sito);
+  if (!host) return { errore: `«${String(sito || '').slice(0, 60)}» non è un sito: scrivilo come meet.google.com` };
+  const p = String(permesso || '').trim().toLowerCase();
+  const tutti = !p || /^(tutt[oiea]|ogni|qualsiasi|all)$/.test(p);
+  const parte = tutti ? '' : (PAROLE_PARTE[p] || (TIPI[p] ? TIPI[p] : ''));
+  if (!tutti && !parte) return { errore: `«${p.slice(0, 40)}» non è un permesso che un sito chiede (microfono, fotocamera, appunti, posizione, notifiche, schermi, presenza, strumenti)` };
+  const delSito = scelteRicordate().filter((s) => {
+    let h = '';
+    try { h = new URL(s.origine).hostname.replace(/^www\./, ''); } catch (_) { return false; }
+    return h === host || h.endsWith(`.${host}`);
+  });
+  const prese = delSito.filter((s) => tutti || s.parte === parte);
+  for (const s of prese) togliScelta(s.origine, s.parte);
+  return { tolte: prese.map(rigaScelta), restano: righeRicordate(), host, ricarica: prese.some((s) => s.si || s.parte === 'notifiche') };
+}
+
 // Quello che una pagina deve leggere delle notifiche prima di chiedere, come in Chrome: il controllo di Electron sa dire
 // solo sì o no, e il sì mostrerebbe le notifiche senza domanda. La traduzione nella pagina: preload/stato-permessi.js.
 function statoNotifiche(ses, url) {
@@ -362,7 +406,7 @@ function statoNotifiche(ses, url) {
 
 module.exports = {
   installa, negaTutto, rispondi, lasciapassare, seguiGesti, scelteDi, dimentica, nomeDaMostrare, statoNotifiche,
-  carica, scelteRicordate, togliScelta, classifica,
+  carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica,
   TIPI, INNOCUI, NON_DISPONIBILI, COL_GESTO_SENZA_DOMANDA, GESTO_MS, _inAttesa: inAttesa,
   _usaDisco: (d) => { disco = () => d; },
 };

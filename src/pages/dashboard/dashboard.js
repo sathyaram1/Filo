@@ -676,6 +676,7 @@
     LEGGI_TRASPARENZA: 'Rileggo la pagina di trasparenza…',
     CAPACITA_DETTAGLIO: 'Verifico cosa so fare…',
     LEGGI_IMPOSTAZIONI: 'Leggo come sei impostato…',
+    TOGLI_PERMESSO_SITO: 'Tolgo un permesso…',
     ESEGUI_COMANDO: 'Eseguo un comando…',
     TIMER: 'Avvio un timer…',
     SVEGLIA: 'Imposto una sveglia…',

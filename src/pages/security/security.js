@@ -813,6 +813,7 @@
   if (chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((msg) => {
       if (msg && msg.type === MSG.TAB_IN_VISTA && msg.inVista) loadCookieDone();
+      if (msg && msg.type === MSG.PERMESSI_SITI_CAMBIATI) renderSitePerms();
     });
   }
 

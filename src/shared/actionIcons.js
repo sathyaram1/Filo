@@ -41,6 +41,7 @@
     LEGGI_DOCUMENTO: 'readDocument',
     LEGGI_TRASPARENZA: 'transparency',
     LEGGI_IMPOSTAZIONI: 'options',
+    TOGLI_PERMESSO_SITO: 'eraser',
     EVENTO_CALENDARIO: 'calendar',
     PULISCI_TAB: 'broom',
     CANCELLA_ARCHIVIO: 'trash',

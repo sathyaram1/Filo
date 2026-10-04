@@ -332,6 +332,19 @@
         return `Verificare cosa sa fare Filo${ids.length ? ` (${ids.join(', ')})` : ''}`;
       },
     },
+    // #949 — togliere una risposta ricordata non concede niente: il sito torna a chiedere.
+    TOGLI_PERMESSO_SITO: {
+      level: 1,
+      describe: (a) => {
+        const sito = String((a && (a.sito ?? a.dominio)) || '').trim().slice(0, 80) || 'un sito';
+        const p = String((a && a.permesso) || '').trim().slice(0, 40);
+        return `Togliere ${p ? `il permesso «${p}»` : 'i permessi ricordati'} di ${sito}`;
+      },
+      describeDone: (a) => {
+        const tolte = (a && a._output && Array.isArray(a._output.tolte)) ? a._output.tolte : [];
+        return tolte.length ? `Tolte le risposte ricordate: ${tolte.join('; ')} (il sito tornerà a chiedere)` : 'Nessuna risposta tolta';
+      },
+    },
     LEGGI_IMPOSTAZIONI: {
       // #949 — rilegge le impostazioni dell'utente, senza le chiavi: sola lettura, niente esce.
       level: 1,

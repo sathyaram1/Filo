@@ -99,6 +99,7 @@
   }
   // Lo stesso tetto del campo nelle Preferenze.
   const NOTIF_SEC_MAX = 120;
+  const VOCE_MAX = 200;
 
   function tettoStile() {
     const C = global.SN_CONST;
@@ -487,10 +488,13 @@
           // ignorata al momento della lettura (resolveVoice).
           const hit = Voices.allVoices().find((x) => x.id === low || x.id.toLowerCase() === low
             || x.label.toLowerCase() === low || x.label.toLowerCase().split(' ')[0] === low);
-          if (!hit) return null;
-          return { partial: { tts: { modelVoice: hit.id } }, label: `Voce naturale → ${hit.label} (${Voices.LANG_LABELS[hit.lang] || hit.lang})` };
+          if (hit) return { partial: { tts: { modelVoice: hit.id } }, label: `Voce naturale → ${hit.label} (${Voices.LANG_LABELS[hit.lang] || hit.lang})` };
         }
-        return { partial: { tts: { modelVoice: s } }, label: `Voce naturale → "${s}"` };
+        // Come «Altra voce: scrivi il nome…» della pagina: un nome fuori catalogo si salva com'è scritto.
+        const nome = testoVisibile(s);
+        if (!nome) return null;
+        if (nome.length > VOCE_MAX) return { rifiuto: `il nome della voce è lungo ${nome.length} caratteri e il massimo è ${VOCE_MAX}` };
+        return { partial: { tts: { modelVoice: nome } }, label: `Voce naturale → "${nome}" (nome scritto a mano)` };
       },
     },
 
