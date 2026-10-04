@@ -469,3 +469,31 @@ test('il clic sulla pagina non apre la finestra che chiede un riquadro di un alt
     assert.equal(Permessi.gestoPerUnaFinestra(wc, { url: '' }), true, 'chi nasconde da dove chiede resta «la scheda»');
   } finally { orologio.mock.restore(); }
 });
+
+test('il gesto dato all\'interfaccia di Filo non apre finestre alla pagina; l\'apertura scelta dall\'utente passa una volta, anche a gesto speso', () => {
+  let ora = 1_000_000;
+  const orologio = mock.method(Date, 'now', () => ora);
+  const wc = wcFinto('https://sito.example/');
+  Permessi.seguiGesti(wc);
+  wc.emetti('input-event', {}, { type: 'mouseDown' });
+  Permessi.gestoDiFilo(wc);
+  wc.emetti('input-event', {}, { type: 'mouseUp' });
+  assert.equal(Permessi.perUnaFinestra(wc, 'https://pubblicita.example/', 'https://sito.example/'), false, 'il clic sul menu di Filo non è della pagina');
+
+  Permessi.aperturaScelta(wc, 'https://sito.example/articolo');
+  assert.equal(Permessi.perUnaFinestra(wc, 'https://sito.example/articolo', 'https://sito.example/'), true, 'la voce scelta si apre');
+  assert.equal(Permessi.perUnaFinestra(wc, 'https://sito.example/articolo', 'https://sito.example/'), false, 'una volta sola');
+
+  ora += 1000;
+  wc.emetti('input-event', {}, { type: 'mouseDown' });
+  assert.equal(Permessi.perUnaFinestra(wc, 'https://pubblicita.example/', 'https://sito.example/'), true, 'la pubblicità spende il clic sul link');
+  Permessi.aperturaScelta(wc, 'https://sito.example/link');
+  assert.equal(Permessi.perUnaFinestra(wc, 'https://sito.example/link', 'https://sito.example/'), true, 'il link cliccato si apre lo stesso');
+
+  ora += 1000;
+  wc.emetti('input-event', {}, { type: 'mouseDown' });
+  Permessi.aperturaScelta(wc, 'https://sito.example/altro');
+  assert.equal(Permessi.perUnaFinestra(wc, 'https://sito.example/altro', 'https://sito.example/'), true);
+  assert.equal(Permessi.perUnaFinestra(wc, 'https://pubblicita.example/', 'https://sito.example/'), false, 'il link spende anche il gesto: niente pubblicità dopo');
+  orologio.mock.restore();
+});

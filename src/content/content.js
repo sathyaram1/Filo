@@ -1870,7 +1870,7 @@
       {
         type: 'item',
         label: I18n.t('menu_open_in_new_tab'),
-        onClick: () => (diFilo ? Popup.apriCollegamento(linkEl) : window.open(linkEl.href, '_blank', 'noopener')),
+        onClick: () => (diFilo ? Popup.apriCollegamento(linkEl) : Actions.apriInSchedaNuova(linkEl.href)),
       },
     ];
     // "Salva file" — gemello di "Salva immagine come" per i link a un file

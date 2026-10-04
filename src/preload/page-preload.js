@@ -364,25 +364,64 @@ try {
 
 // Il main vede l'input della pagina, non quello di un riquadro di un altro sito: senza questo, col blocco dei popup, il
 // clic dentro il riquadro non aprirebbe la scheda che chiede (#737.1). Solo l'input vero: la pagina non lo fabbrica.
-if (IS_SUBFRAME) {
-  try {
-    let ultimoGesto = 0;
-    // Gli stessi tasti che nella pagina non sono un gesto (TASTI_SENZA_GESTO in services/permessiPagine.js).
-    const SENZA_GESTO = new Set(['Escape', 'Control', 'Shift', 'Alt', 'AltGraph', 'Meta', 'OS', 'Super', 'Hyper', 'CapsLock', 'NumLock', 'ScrollLock', 'Fn', 'FnLock', 'Symbol', 'SymbolLock']);
-    const gesto = (e) => {
-      if (!e.isTrusted || (e.type === 'keydown' && SENZA_GESTO.has(e.key))) return;
-      if (e.type === 'pointerdown' && e.pointerType === 'touch') return;
-      const ora = Date.now();
-      if (ora - ultimoGesto < 100) return;
-      ultimoGesto = ora;
-      try { ipcRenderer.send('filo:gesto-riquadro'); } catch (_) {}
-    };
-    // Solo l'inizio di un gesto, come nella pagina: il rilascio dello stesso clic non è un gesto nuovo (il tocco finisce).
-    for (const ev of ['pointerdown', 'mousedown', 'keydown', 'touchend']) {
-      window.addEventListener(ev, gesto, { capture: true, passive: true });
+// In ogni frame, prima degli ascolti della pagina: il gesto dato all'interfaccia di Filo è di Filo, e il collegamento
+// cliccato si apre anche se la pagina ha speso il gesto per sé (#737.1 giro 6). Regole: services/permessiPagine.js.
+try {
+  let ultimoGesto = 0;
+  let ultimoDiFilo = 0;
+  // Gli stessi tasti che nella pagina non sono un gesto (TASTI_SENZA_GESTO in services/permessiPagine.js).
+  const SENZA_GESTO = new Set(['Escape', 'Control', 'Shift', 'Alt', 'AltGraph', 'Meta', 'OS', 'Super', 'Hyper', 'CapsLock', 'NumLock', 'ScrollLock', 'Fn', 'FnLock', 'Symbol', 'SymbolLock']);
+  const suUiDiFilo = (e) => {
+    const ui = globalThis.SN_FILO_UI;
+    if (!ui || typeof ui.aperti !== 'function') return false;
+    const radici = ui.aperti();
+    if (!radici.length) return false;
+    const percorso = typeof e.composedPath === 'function' ? e.composedPath() : [e.target];
+    return radici.some((r) => {
+      for (let n = r, k = 0; n && k < 32; k++) {
+        if (percorso.includes(n)) return true;
+        const radice = n.getRootNode && n.getRootNode();
+        n = radice && radice.host ? radice.host : null;
+      }
+      return false;
+    });
+  };
+  const gesto = (e) => {
+    if (!e.isTrusted || (e.type === 'keydown' && SENZA_GESTO.has(e.key))) return;
+    const ora = Date.now();
+    if (suUiDiFilo(e)) {
+      // pointerdown e mousedown dello stesso clic sono un gesto solo.
+      if (e.type === 'mousedown' && ora - ultimoDiFilo < 100) return;
+      if (e.type === 'pointerdown') ultimoDiFilo = ora;
+      try { ipcRenderer.sendSync('filo:gesto-di-filo'); } catch (_) {}
+      return;
     }
-  } catch (_) {}
-}
+    if (!IS_SUBFRAME || (e.type === 'pointerdown' && e.pointerType === 'touch')) return;
+    if (ora - ultimoGesto < 100) return;
+    ultimoGesto = ora;
+    try { ipcRenderer.send('filo:gesto-riquadro'); } catch (_) {}
+  };
+  // Solo l'inizio di un gesto, come nella pagina: il rilascio dello stesso clic non è un gesto nuovo (il tocco finisce).
+  for (const ev of ['pointerdown', 'mousedown', 'keydown', 'touchend']) {
+    window.addEventListener(ev, gesto, { capture: true, passive: true });
+  }
+  const SCHEMI_APRIBILI = /^(https?|mailto|tel|sms):/i;
+  const scelto = (e) => {
+    if (!e.isTrusted || (e.type === 'auxclick' && e.button !== 1)) return;
+    const percorso = typeof e.composedPath === 'function' ? e.composedPath() : [e.target];
+    const a = percorso.find((n) => n && (n.localName === 'a' || n.localName === 'area') && n.href);
+    const url = a ? String(a.href) : '';
+    if (!SCHEMI_APRIBILI.test(url)) return;
+    try { ipcRenderer.sendSync('filo:apertura-scelta', url); } catch (_) {}
+  };
+  // Prima della pagina e dopo di lei: un sito che riscrive il collegamento al clic apre quello riscritto.
+  for (const ev of ['click', 'auxclick']) {
+    window.addEventListener(ev, scelto, { capture: true, passive: true });
+    window.addEventListener(ev, scelto, { passive: true });
+  }
+  // Le voci del menu di Filo che aprono un indirizzo lo dichiarano qui prima di aprirlo.
+  globalThis.SN_APERTURA_SCELTA = (url) => { try { ipcRenderer.sendSync('filo:apertura-scelta', String(url || '')); } catch (_) {} };
+} catch (_) {}
 
 // ─── shortcut hook ─────────────────────────────────────────────────────────
 // La scorciatoia (shortcuts.js) fa un webContents.send('shortcut:triggered'); il content

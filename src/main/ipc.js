@@ -150,6 +150,15 @@ function registerIpcHandlers() {
   ipcMain.on('filo:gesto-riquadro', (event) => {
     require('./services/permessiPagine').gestoNelRiquadro(event.sender, event.senderFrame);
   });
+  // Sincroni: devono arrivare prima della finestra che la pagina chiede nello stesso clic (#737.1 giro 6).
+  ipcMain.on('filo:gesto-di-filo', (event) => {
+    require('./services/permessiPagine').gestoDiFilo(event.sender);
+    event.returnValue = true;
+  });
+  ipcMain.on('filo:apertura-scelta', (event, url) => {
+    require('./services/permessiPagine').aperturaScelta(event.sender, url);
+    event.returnValue = true;
+  });
 
   ipcMain.handle('filo:message', async (event, msg) => {
     const info = senderInfo(event);

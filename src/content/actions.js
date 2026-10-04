@@ -1162,8 +1162,15 @@
     return `https://www.google.com/search?q=${encodeURIComponent((text || '').slice(0, 500))}`;
   }
 
+  // Una voce del menu di Filo non usa il gesto della pagina (è di Filo): l'indirizzo scelto lo dichiara prima (#737.1).
+  function apriInSchedaNuova(url) {
+    if (!url) return;
+    try { if (typeof global.SN_APERTURA_SCELTA === 'function') global.SN_APERTURA_SCELTA(url); } catch (_) {}
+    window.open(url, '_blank', 'noopener');
+  }
+
   function searchTextOnWeb(text) {
-    window.open(searchUrlFor(text), '_blank', 'noopener');
+    apriInSchedaNuova(searchUrlFor(text));
   }
 
   // ------------------------------------------------------------
@@ -1396,7 +1403,7 @@
 
   function searchImageOnWeb(imgEl) {
     const url = imageSearchUrlFor(imgEl);
-    if (url) window.open(url, '_blank', 'noopener');
+    apriInSchedaNuova(url);
   }
 
   // ------------------------------------------------------------
@@ -1960,6 +1967,7 @@
     shareCurrentPage,
     shareLink,
     searchTextOnWeb,
+    apriInSchedaNuova,
     searchUrlFor,
     searchImageOnWeb,
     imageSearchUrlFor,

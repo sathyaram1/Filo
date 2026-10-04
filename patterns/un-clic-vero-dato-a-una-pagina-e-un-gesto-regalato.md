@@ -68,6 +68,13 @@ voleva.
   `noreferrer` di ogni pagina con pubblicità (#737.1 giro 3). La forma non conta: una finestra con le misure o un
   Maiuscolo+clic passano col gesto come una scheda. Posta, telefono e SMS chiesti dalla pagina seguono la stessa
   regola; un redirect usa il gesto che ha fatto partire la navigazione.
+- **Il gesto è di chi l'utente ha toccato, e il preload lo dice prima della pagina** (#737.1 giro 6): i suoi ascolti
+  sulla finestra, in cattura, nascono prima di ogni script del sito e parlano al main in modo sincrono, quindi arrivano
+  prima della finestra che la pagina chiede con lo stesso input. Un input sull'interfaccia di Filo disegnata nella
+  pagina (menu, risposte, assistente: le radici di `SN_FILO_UI`, non l'attributo) è di Filo e spende il gesto, come
+  una scorciatoia. Il collegamento cliccato e la voce del menu di Filo che apre un indirizzo dichiarano quell'indirizzo
+  (`aperturaScelta`): si apre una volta anche se la pagina ha già speso il gesto per una sua pubblicità, e spende il
+  gesto rimasto. Il main non sa chi ha chiesto la finestra; il preload sa che cosa l'utente ha toccato.
 
 Prove: `tests/unit/gestoNonRegalato.test.mjs` (nessuno script di Filo nelle pagine porta il gesto),
 `tests/popup-senza-gesto.spec.mjs`, `tests/unit/adSkip.test.mjs`, `tests/ad-skip.spec.mjs` (il «Salta» finto

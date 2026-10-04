@@ -226,3 +226,55 @@ for (const [indirizzo, testo] of [
     await expect.poll(() => app.evaluate(() => globalThis.__esterni), { timeout: 6000 }).toEqual([indirizzo]);
   });
 }
+
+// Giro 6: su una pagina che spende ogni clic per una sua pubblicità, ciò che l'utente ha scelto si apre lo stesso, e il
+// menu di Filo (disegnato sulla pagina) non è un clic dato a lei.
+const PUBBLICITA = "document.addEventListener('mousedown',function(){window.open(AD)})";
+for (const [nome, opz] of Object.entries({ 'il clic centrale': { button: 'middle' }, 'Ctrl+clic': { modifiers: ['Control'] }, 'il clic su un link che apre una scheda': {} })) {
+  test(`${nome} apre il collegamento anche se la pagina apre una pubblicità a ogni clic`, async ({ app, openTab, testServer }) => {
+    const ad = testServer.html('<title>AD</title>');
+    const dest = testServer.html('<title>DEST</title>');
+    const blank = nome.includes('scheda') ? 'target="_blank"' : '';
+    const page = await testServer.openReady(openTab, `<!doctype html><body style="padding:24px"><a id="l" href="${dest}" ${blank}>collegamento</a>
+      <script>var AD=${JSON.stringify(ad)};${PUBBLICITA}</script></body>`);
+    await page.waitForTimeout(5600);
+    await page.locator('#l').click(opz);
+    await expect.poll(() => aperteSu(app, dest), { timeout: 6000 }).toBe(1);
+  });
+}
+
+test('«Apri in nuova tab» del menu di Filo apre il collegamento anche se la pagina apre una pubblicità a ogni clic', async ({ app, openTab, testServer }) => {
+  const ad = testServer.html('<title>AD</title>');
+  const dest = testServer.html('<title>DEST</title>');
+  const page = await testServer.openReady(openTab, `<!doctype html><body style="padding:24px"><a id="l" href="${dest}">collegamento</a>
+    <script>var AD=${JSON.stringify(ad)};${PUBBLICITA}</script></body>`);
+  await page.locator('#l').click({ button: 'right', position: { x: 8, y: 8 } });
+  const menu = page.locator('.sn-menu');
+  await expect(menu).toBeVisible();
+  await page.waitForTimeout(5600);
+  await menu.locator('button', { hasText: 'Apri in nuova tab' }).first().click();
+  await expect.poll(() => aperteSu(app, dest), { timeout: 6000 }).toBe(1);
+});
+
+test('scegliere «Copia URL» nel menu di Filo non lascia alla pagina aprire la sua pubblicità', async ({ app, openTab, testServer }) => {
+  const ad = testServer.html('<title>AD</title>');
+  const page = await testServer.openReady(openTab, `<!doctype html><body style="padding:24px"><a id="l" href="https://example.com/x">collegamento</a>
+    <script>var AD=${JSON.stringify(ad)};document.addEventListener('click',function(){window.open(AD)},true)</script></body>`);
+  await page.locator('#l').click({ button: 'right', position: { x: 8, y: 8 } });
+  const menu = page.locator('.sn-menu');
+  await expect(menu).toBeVisible();
+  await page.waitForTimeout(5600);
+  await menu.locator('button', { hasText: 'Copia URL' }).first().click();
+  await page.waitForTimeout(2000);
+  expect(await aperteSu(app, ad), 'nessuna pubblicità dal clic sul menu di Filo').toBe(0);
+});
+
+test('un collegamento di posta cliccato apre il programma di posta anche se la pagina apre una pubblicità a ogni clic', async ({ app, openTab, testServer }) => {
+  await app.evaluate(({ shell }) => { globalThis.__esterni = []; shell.openExternal = async (u) => { globalThis.__esterni.push(u); }; });
+  const ad = testServer.html('<title>AD</title>');
+  const page = await testServer.openReady(openTab, `<!doctype html><body style="padding:24px"><a id="l" href="mailto:x@y.it">scrivici</a>
+    <script>var AD=${JSON.stringify(ad)};${PUBBLICITA}</script></body>`);
+  await page.waitForTimeout(5600);
+  await page.locator('#l').click({ noWaitAfter: true });
+  await expect.poll(() => app.evaluate(() => globalThis.__esterni), { timeout: 6000 }).toEqual(['mailto:x@y.it']);
+});

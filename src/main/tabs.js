@@ -2554,7 +2554,7 @@ class TabManager {
       const accesso = tab.isInternal === false && isAuthPopup(url);
       // Anche la finestra di un accesso vero nasce da un clic su «Accedi con…»: l'indirizzo lo sceglie la pagina.
       const riaperta = accesso && this._riaperturaDiAccesso(tab, url);
-      if (tab.isInternal === false && this.security.blockPopups && !riaperta && !Permessi.gestoPerUnaFinestra(wc, referrer)) {
+      if (tab.isInternal === false && this.security.blockPopups && !riaperta && !Permessi.perUnaFinestra(wc, url, referrer)) {
         // «Apri» sull'avviso la fa ripartire dalla pagina, perché l'accesso possa tornarle l'esito.
         if (accesso) tab._accessoBloccato = { url, nome: details.frameName || '', misure: details.features || '', pagina: wc.getURL() };
         this._notifyPopupBlocked(tab.id, url, wc);
@@ -2688,7 +2688,7 @@ class TabManager {
         this._esternoDallaPagina(pwc, origine ? origine.id : null, url, referrer);
         return { action: 'deny' };
       }
-      if (this.security.blockPopups && !Permessi.gestoPerUnaFinestra(pwc, referrer)) {
+      if (this.security.blockPopups && !Permessi.perUnaFinestra(pwc, url, referrer)) {
         this._notifyPopupBlocked(origine ? origine.id : null, url, pwc);
         return { action: 'deny' };
       }
@@ -2725,7 +2725,7 @@ class TabManager {
   // `navigazione`: la navigazione è già partita, e il gesto che la porta Permessi l'ha messo da parte.
   _esternoDallaPagina(wc, tabId, url, referrer, { navigazione = false } = {}) {
     if (!isOsDelegatedScheme(url)) return;
-    const gesto = Permessi.gestoPerUnaFinestra(wc, referrer) || (navigazione && Permessi.gestoPerLaNavigazione(wc));
+    const gesto = Permessi.perUnaFinestra(wc, url, referrer) || (navigazione && Permessi.gestoPerLaNavigazione(wc));
     if (this.security.blockPopups && !gesto) {
       this._notifyPopupBlocked(tabId, url, wc);
       return;

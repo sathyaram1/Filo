@@ -46,6 +46,7 @@ const STESSO_GESTO_MS = 50;
 // Il clic che Filo dà da sé a una pagina (il «Salta» delle pubblicità) non è un gesto di nessuno: l'input che ne segue,
 // anche quello che il riquadro riferisce dopo, si ignora per questo tempo.
 const CLIC_DI_FILO_MS = 1500;
+const APERTURA_SCELTA_MS = 2000;
 const TASTI_SENZA_GESTO = new Set(['Escape', 'Control', 'Shift', 'Alt', 'AltGraph', 'Meta', 'OS', 'Super', 'Hyper', 'CapsLock', 'NumLock', 'ScrollLock', 'Fn', 'FnLock', 'Symbol', 'SymbolLock']);
 const LASCIAPASSARE_MS = 5000;
 // Il lasciapassare di Detta copre il microfono e basta: con la fotocamera la pagina avrebbe un sì mai dato (#591, giro 18).
@@ -171,8 +172,11 @@ function seguiGesti(wc) {
       if (!GESTI.has(type) || !tastoPerLaPagina(input)) return;
       const mouse = !/key|char/i.test(type);
       if (mouse && clicDiFiloInCorso(wc)) return;
+      const avvio = AVVII_DI_UN_GESTO.has(type);
+      if (avvio) wc._filoGestoDiFilo = false;
+      else if (wc._filoGestoDiFilo) return;
       wc._filoGestoAlle = Date.now();
-      if (AVVII_DI_UN_GESTO.has(type)) segnaGestoPerFinestra(wc, originiDelFrame(wc.mainFrame, wc));
+      if (avvio) segnaGestoPerFinestra(wc, originiDelFrame(wc.mainFrame, wc));
       // Un sito che annulla il `contextmenu` spegne il `context-menu` qui sotto, non il tasto destro vero (#589.4 giro 2).
       if (tastoDelMenu(input)) segnaMenu(wc, wc.mainFrame);
     });
@@ -187,7 +191,7 @@ function seguiGesti(wc) {
     wc.on('before-input-event', (e, input) => {
       if (!input || input.type !== 'keyDown' || !tastoPerLaPagina(input) || (e && e.daAvvisoSito)) return;
       queueMicrotask(() => {
-        if (!(e && e.defaultPrevented)) { wc._filoGestoAlle = Date.now(); segnaGestoPerFinestra(wc, originiDelFrame(wc.mainFrame, wc)); }
+        if (!(e && e.defaultPrevented)) { wc._filoGestoDiFilo = false; wc._filoGestoAlle = Date.now(); segnaGestoPerFinestra(wc, originiDelFrame(wc.mainFrame, wc)); }
       });
     });
     wc.on('did-start-navigation', (e, _url, isInPlace, isMainFrame) => {
@@ -263,6 +267,43 @@ function gestoPerUnaFinestra(wc, referrer) {
   if (chi && wc._filoGestoOrigini && wc._filoGestoOrigini.size && !wc._filoGestoOrigini.has(chi)) return false;
   wc._filoGestoUsatoAlle = t;
   return true;
+}
+
+// Un clic o un tasto dato all'interfaccia di Filo disegnata sulla pagina (menu, risposte, assistente) è di Filo, non
+// della pagina: come una scorciatoia, non le apre finestre né permessi. Lo riferisce il preload, prima della pagina.
+function gestoDiFilo(wc) {
+  if (!wc) return;
+  wc._filoGestoUsatoAlle = Math.max(wc._filoGestoUsatoAlle || 0, wc._filoGestoFinestraAlle || 0);
+  wc._filoGestoAlle = 0;
+  wc._filoGestoDiFilo = true;
+}
+
+// Ciò che l'utente ha scelto di aprire (il collegamento che ha cliccato, la voce del menu di Filo) si apre anche se la
+// pagina ha già speso il gesto per la sua pubblicità (#737.1 giro 6). Lo segna il preload su un input vero, prima
+// che la pagina apra: vale per quell'indirizzo, una volta, subito.
+function aperturaScelta(wc, url) {
+  const u = indirizzoPieno(url);
+  if (!wc || !u) return;
+  const ora = Date.now();
+  wc._filoAperture = (wc._filoAperture || []).filter((x) => x.fino > ora && x.url !== u).slice(-7);
+  wc._filoAperture.push({ url: u, fino: ora + APERTURA_SCELTA_MS });
+}
+
+// La finestra che la pagina chiede passa se l'utente l'ha scelta o se arriva col gesto; la scelta spende anche il gesto,
+// così la pagina non ne apre un'altra con lo stesso clic.
+function perUnaFinestra(wc, url, referrer) {
+  const u = indirizzoPieno(url);
+  const ora = Date.now();
+  const i = u && wc && wc._filoAperture ? wc._filoAperture.findIndex((x) => x.url === u && x.fino > ora) : -1;
+  if (i < 0) return gestoPerUnaFinestra(wc, referrer);
+  wc._filoAperture.splice(i, 1);
+  const t = gestoSullaScheda(wc);
+  if (t) wc._filoGestoUsatoAlle = Math.max(wc._filoGestoUsatoAlle || 0, t);
+  return true;
+}
+
+function indirizzoPieno(url) {
+  try { return new URL(String(url || '')).href; } catch (_) { return ''; }
 }
 
 function gestoPerLaNavigazione(wc) {
@@ -507,6 +548,7 @@ function statoNotifiche(ses, url) {
 module.exports = {
   installa, negaTutto, rispondi, lasciapassare, seguiGesti, scelteDi, dimentica, nomeDaMostrare, statoNotifiche,
   carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica, gestoNelRiquadro, gestoSullaScheda, gestoPerUnaFinestra, gestoPerLaNavigazione, clicDiFilo,
+  gestoDiFilo, aperturaScelta, perUnaFinestra,
   TIPI, INNOCUI, NON_DISPONIBILI, COL_GESTO_SENZA_DOMANDA, GESTO_MS, TASTI_SENZA_GESTO, tastoPerLaPagina, _inAttesa: inAttesa,
   _usaDisco: (d) => { disco = () => d; },
 };
