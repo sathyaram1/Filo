@@ -118,7 +118,7 @@ async function apri(url, finto) {
   const dati = cartellaTemporanea('filo-browser-nudo-');
   const app = await electron.launch({
     args: [...argomentiScala, join(ROOT, 'tests', 'helpers', 'browserNudo.cjs')],
-    env: { ...process.env, BROWSER_NUDO_URL: url, BROWSER_NUDO_DATI: dati },
+    env: { ...process.env, NODE_ENV: 'test', BROWSER_NUDO_URL: url, BROWSER_NUDO_DATI: dati },
   });
   const page = await app.firstWindow();
   if (finto) await page.route(FUNZIONE, finto.gestisci);

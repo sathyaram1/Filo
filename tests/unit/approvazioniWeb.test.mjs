@@ -3,10 +3,11 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import vm from 'node:vm';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const build = await import(pathToFileURL(join(ROOT, 'scripts', 'build-approvazioni.mjs')).href);
@@ -26,11 +27,23 @@ test('le card, le icone e il tema della pagina sono le copie esatte di quelli de
   assert.equal(build.main(['--controlla'], { log: () => {}, err: () => {} }), 0);
 });
 
-test('il predeploy rifiuta una copia vecchia', () => {
-  const errori = [];
-  const codice = build.main(['--controlla'], { log: () => {}, err: (m) => errori.push(m), radice: join(ROOT, 'tests', 'unit', 'cartella-che-non-esiste') });
-  assert.equal(codice, 3);
-  assert.match(errori.join('\n'), /node scripts\/build-approvazioni\.mjs/);
+test('il predeploy rifiuta una copia vecchia, e la ricopia la rimette in pari', () => {
+  const radice = cartellaTemporanea('filo-approvazioni-');
+  try {
+    for (const [da] of build.COPIE) {
+      mkdirSync(dirname(join(radice, da)), { recursive: true });
+      writeFileSync(join(radice, da), `/* ${da} */\n`);
+    }
+    const errori = [];
+    assert.equal(build.main(['--controlla'], { log: () => {}, err: (m) => errori.push(m), radice }), 3);
+    assert.match(errori.join('\n'), /node scripts\/build-approvazioni\.mjs/);
+    assert.equal(build.main([], { log: () => {}, err: () => {}, radice }), 0);
+    assert.equal(build.main(['--controlla'], { log: () => {}, err: () => {}, radice }), 0);
+    writeFileSync(join(radice, build.COPIE[0][0]), '/* cambiata */\n');
+    assert.equal(build.main(['--controlla'], { log: () => {}, err: () => {}, radice }), 3);
+  } finally {
+    rmSync(radice, { recursive: true, force: true });
+  }
 });
 
 test('firebase.json pubblica la cartella della pagina, dopo la guardia e il controllo delle copie', () => {
@@ -56,7 +69,7 @@ test('ogni file che la pagina carica esiste, e l\'SDK di Google è una versione 
   assert.equal(sdk.length, 2);
   assert.equal(new Set(sdk.map((u) => u.split('/')[3])).size, 1);
   for (const u of rif.filter((x) => !x.startsWith('/__/'))) assert.ok(existsSync(join(CARTELLA, u)), `manca ${u}`);
-  for (const [, a] of build.COPIE) assert.ok(rif.includes(a) || a.endsWith('.js') === false || rif.includes(a), a);
+  for (const [, a] of build.COPIE) assert.ok(rif.includes(a), `la pagina non carica ${a}`);
   assert.ok(rif.indexOf('filo/mergeApprovals.js') < rif.indexOf('approvazioni.js'));
 });
 
@@ -100,7 +113,9 @@ test('l\'impronta cambia quando cambia qualcosa da decidere, non quando passa il
 });
 
 test('la risposta del server arriva alle card nella forma dell\'app', () => {
-  assert.deepEqual(W.rispostaPerCard({ ok: false, reason: 'github_no_token', detail: '' }), { ok: false, error: 'github_no_token' });
-  assert.deepEqual(W.rispostaPerCard({ ok: true, result: 'merged', sha: 'x' }), { ok: true, result: 'merged', sha: 'x' });
+  // La pagina gira in un altro contesto: si confrontano i dati, non i prototipi.
+  const dati = (v) => JSON.parse(JSON.stringify(v));
+  assert.deepEqual(dati(W.rispostaPerCard({ ok: false, reason: 'github_no_token', detail: '' })), { ok: false, error: 'github_no_token' });
+  assert.deepEqual(dati(W.rispostaPerCard({ ok: true, result: 'merged', sha: 'x' })), { ok: true, result: 'merged', sha: 'x' });
   assert.equal(W.rispostaPerCard(null).ok, false);
 });
