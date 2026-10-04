@@ -2712,10 +2712,12 @@ class TabManager {
   // `pagina`: l'avviso chiuso dall'utente tace finché la scheda resta su quella pagina.
   _notifyPopupBlocked(tabId, url, wc = null) {
     try {
-      const host = globalThis.SN_NOMI_SITO.sitoDi(url) || url;
       let pagina = '';
       try { pagina = wc ? String(wc.getURL() || '').split('#')[0] : ''; } catch (_) {}
-      this.win.webContents.send('tabs:popup-blocked', { tabId, url, host, pagina });
+      // Posta, telefono e SMS non hanno un sito: l'avviso nomina la pagina che ci ha provato e l'app, non l'indirizzo.
+      const app = isOsDelegatedScheme(url) ? new URL(url).protocol.toLowerCase().slice(0, -1) : '';
+      const host = (app ? globalThis.SN_NOMI_SITO.sitoDi(pagina) : globalThis.SN_NOMI_SITO.sitoDi(url)) || (app ? '' : url);
+      this.win.webContents.send('tabs:popup-blocked', { tabId, url, host, pagina, app });
     } catch (_) {}
   }
 
