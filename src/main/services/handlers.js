@@ -15,6 +15,9 @@ const { settingsForOwnerAction, fillMovedSlots, ownerSlotFor } = require('./reso
 const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra } = require('./impostazioniPerOrigine');
 const SegretiLetti = require('./segretiLetti');
 const Registro = require('./registroCambi');
+const Schede = require('./schedeAperte');
+const Posta = require('./postaGmail');
+const Fiducia = require('./fiduciaStore');
 
 const { SN_CONST, SN_MSG } = globalThis;
 const { ACTIONS, PROMPTS } = SN_CONST;
@@ -1736,6 +1739,34 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
 
   if (type === 'ESEGUI_COMANDO' || type === 'LEGGI_DOCUMENTO') action._perimetro = perimetroLettura(sender);
 
+  // #534 — con la lettura delle schede spenta, gli strumenti delle schede non esistono (nemmeno chiamati a mano).
+  const ToolsReg = globalThis.SN_ACTION_TOOLS;
+  if (ToolsReg && ToolsReg.delleSchede(type) && !(await Schede.abilitata())) {
+    return { executed: false, kept: false, rejected: true, error: 'la lettura delle schede aperte è spenta nelle Preferenze' };
+  }
+  // Cosa si segna come fidato lo legge il main; di un sito di molti autori il popup dice perché lo sconsiglia.
+  if (type === 'SEGNA_FIDATO' || type === 'TOGLI_FIDATO') {
+    const F = globalThis.SN_FIDUCIA;
+    const mittente = action.mittente ?? action.indirizzo ?? action.email;
+    const sito = action.sito ?? action.dominio ?? action.site;
+    delete action._sconsiglio;
+    action._tipo = '';
+    action._voce = '';
+    if (mittente != null && String(mittente).trim()) { action._tipo = 'mittente'; action._voce = F.indirizzo(mittente); }
+    else if (sito != null && String(sito).trim()) { action._tipo = 'sito'; action._voce = F.sito(sito); }
+    if (!action._voce) {
+      const error = action._tipo === 'mittente'
+        ? 'non è un indirizzo email: un mittente si riconosce dal suo indirizzo, mai dal nome'
+        : (action._tipo === 'sito' ? 'non è un sito valido' : 'manca il mittente (un indirizzo email) o il sito');
+      return { executed: false, kept: false, output: { error } };
+    }
+    if (type === 'SEGNA_FIDATO' && action._tipo === 'sito') {
+      let segnali = null;
+      try { segnali = await Schede.segnaliSito(winOf(sender), action._voce); } catch (_) {}
+      action._sconsiglio = F.sconsiglio(action._voce, segnali);
+    }
+  }
+
   // #950 — l'elenco vecchio → nuovo lo prepara il main leggendo i file, prima della conferma: il popup mostra
   // i nomi veri, e all'OK si rinomina quello che il popup ha mostrato (bersagliMostrati).
   if (type === 'RINOMINA_FILE' && !confirmed) {
@@ -2263,6 +2294,53 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
           output: { fileRead: String(fileId == null ? '' : fileId), found: !!(r && r.ok), title: (r && r.title) || '', text: (r && r.text) || '' },
         };
       }
+      // ── schede aperte e posta di Gmail (#534): il lavoro lo fanno schedeAperte.js e postaGmail.js ──────
+      case 'LEGGI_SCHEDA':
+      case 'APRI_ELEMENTO':
+      case 'SCRIVI_CAMPO':
+      case 'SCORRI_PAGINA':
+      case 'POSTA_ELENCO':
+      case 'POSTA_CERCA':
+      case 'POSTA_LEGGI':
+      case 'POSTA_BOZZA': {
+        const win = winOf(sender);
+        const rif = action.scheda ?? action.tab ?? action.numero_scheda ?? '';
+        let out = null;
+        try {
+          if (type === 'LEGGI_SCHEDA') out = await Schede.leggi({ win, rif, gmail: Posta });
+          else if (type === 'APRI_ELEMENTO') out = await Schede.apri({ win, rif, elemento: action.elemento ?? action.nome ?? action.n });
+          else if (type === 'SCRIVI_CAMPO') out = await Schede.scrivi({ win, rif, campo: action.campo ?? action.elemento, testo: action.testo ?? action.text ?? action.valore });
+          else if (type === 'SCORRI_PAGINA') out = await Schede.scorri({ win, rif, verso: action.verso ?? action.direzione });
+          else if (type === 'POSTA_ELENCO') out = await Posta.elenco(win);
+          else if (type === 'POSTA_CERCA') out = await Posta.cerca(win, { query: action.query ?? action.q ?? action.testo });
+          else if (type === 'POSTA_LEGGI') out = await Posta.leggiMessaggio(win, { numero: action.numero ?? action.n, cerca: action.cerca ?? action.parole ?? '' });
+          else out = await Posta.bozza(win, { a: action.a ?? action.destinatario ?? action.to, oggetto: action.oggetto ?? action.subject, testo: action.testo ?? action.text ?? action.corpo, rispondi: action.rispondi ?? action.risposta, tutti: action.tutti === true });
+        } catch (e) {
+          out = { ok: false, errore: 'pagina', dettaglio: String((e && e.message) || e).slice(0, 200) };
+        }
+        out = out && typeof out === 'object' ? out : { ok: false, errore: 'pagina' };
+        const F = globalThis.SN_FIDUCIA;
+        const fonti = [out.fonte, ...(Array.isArray(out.messaggi) ? out.messaggi.map((m) => m && m.fonte) : []),
+          ...(Array.isArray(out.righe) ? out.righe.map((r) => r && r.fonte) : [])];
+        const peggiore = F.peggiore(fonti);
+        if (peggiore) out.fonte = peggiore;
+        if (Array.isArray(out.fidatiNuovi) && out.fidatiNuovi.length) broadcastToFiloPages({ type: MSG.FIDUCIA_CAMBIATA });
+        // La bozza pronta è un risultato su cui l'utente agisce (la va a rileggere): in chat è un bottone.
+        return { executed: out.ok === true, kept: type === 'POSTA_BOZZA' && out.ok === true, output: out };
+      }
+
+      case 'SEGNA_FIDATO':
+      case 'TOGLI_FIDATO': {
+        const voce = { [action._tipo]: action._voce };
+        if (type === 'SEGNA_FIDATO') {
+          const r = await Fiducia.aggiungi({ ...voce, via: 'chat' });
+          if (r.errore) return { executed: false, kept: false, output: { error: r.errore } };
+          return { executed: true, kept: false, output: { voce: r.voce, tipo: action._tipo, gia: !r.aggiunto } };
+        }
+        const r = await Fiducia.togli(voce);
+        return { executed: r.tolto, kept: false, output: { voce: r.voce, tipo: action._tipo, ...(r.tolto ? {} : { error: 'non era fra i fidati' }) } };
+      }
+
       case 'LEGGI_DOCUMENTO': {
         // Lettura di un DOCUMENTO dal disco dell'utente: PDF (estrazione del
         // testo) e testo semplice. Prima di questa azione i documenti che

@@ -269,6 +269,20 @@
     } catch (_) { return raw.replace(/#.*$/, '').replace(/\/+$/, ''); }
   }
 
+  // I pezzi di testo che una lettura di scheda o di posta ha portato, con da dove vengono.
+  function pezziDiScheda(out) {
+    const t = (v) => (typeof v === 'string' ? v : '');
+    const res = [];
+    if (t(out.testo).trim()) res.push({ testo: out.testo, fonte: `dalla pagina ${t(out.scheda && out.scheda.host) || 'aperta'}` });
+    for (const m of Array.isArray(out.messaggi) ? out.messaggi : []) {
+      if (m && t(m.testo).trim()) res.push({ testo: m.testo, fonte: `da una mail di ${t(m.indirizzo) || t(m.mittente) || 'un mittente'}` });
+    }
+    const righe = (Array.isArray(out.righe) ? out.righe : []).filter(Boolean)
+      .map((r) => `${t(r.mittente)} ${t(r.indirizzo)}\n${t(r.oggetto)}\n${t(r.anteprima)}`).join('\n');
+    if (righe.trim()) res.push({ testo: righe, fonte: 'dall\'elenco della posta' });
+    return res;
+  }
+
   // Cosa hanno portato nel contesto le azioni viste dal modello (turni passati
   // compresi): `letto` = dati del computer, `nonFidato` = è entrato testo scritto
   // da altri, `linkNoti` = gli indirizzi dei risultati di ricerca, `esterni` = i
@@ -300,6 +314,9 @@
         }
         pezzi.push(...letti);
         daFuori(letti.filter(Boolean).join('\n'), 'da una conversazione archiviata');
+      } else if (type === 'LEGGI_SCHEDA' || type === 'POSTA_ELENCO' || type === 'POSTA_CERCA' || type === 'POSTA_LEGGI') {
+        // #534 — una pagina o una mail l'ha scritta qualcun altro, anche quando il mittente è fidato.
+        for (const p of pezziDiScheda(out)) { nonFidato = true; pezzi.push(p.testo); daFuori(p.testo, p.fonte); }
       } else if (type === 'CERCA_WEB') {
         const results = Array.isArray(out.results) ? out.results : [];
         if (results.length) nonFidato = true;
@@ -365,6 +382,10 @@
     ESEGUI_COMANDO: 'non ho eseguito il comando',
     INVIA_FEEDBACK: 'non ho inviato il feedback',
     APRI_FILE: 'non ho preparato il collegamento',
+    // #534 — quello che Filo scrive in una pagina lo legge chi la possiede, anche senza un Invio.
+    SCRIVI_CAMPO: 'non ho scritto nel campo',
+    POSTA_CERCA: 'non ho fatto la ricerca nella posta',
+    POSTA_BOZZA: 'non ho preparato la bozza',
   });
 
   // Le uscite che non sono azioni del registro: il testo che l'assistente di pagina scrive in un campo, lo
