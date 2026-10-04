@@ -124,3 +124,26 @@ test('foto con dati scomodi, chiara e scura, stretta', async ({ app }) => {
   const sw = await page.evaluate(() => [document.documentElement.scrollWidth, window.innerWidth]);
   console.log('SCROLL ORIZZ:', JSON.stringify(sw));
 });
+
+test('un comando lungo nel terminale compare a sinistra in un’altra home, e «Vai» porta lì', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  const a = await homeTab(app);
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: true, shell: 'bash' } }); });
+  await a.reload();
+  await homeTab(app);
+  await expect.poll(() => a.evaluate(() => window.SN_DASH_TERMINALE.isEnabled()), { timeout: 8_000 }).toBe(true);
+  await a.locator('#input').fill('/sleep 12');
+  await a.locator('#input').press('Enter');
+  await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/'));
+  const b = await homeTab(app, [a]);
+  const carta = b.locator('#accade .dash-carta[data-tipo="lavoro"]');
+  await expect(carta).toBeVisible({ timeout: 8_000 });
+  console.log('CARTA COMANDO:', await carta.innerText());
+  await carta.click({ position: { x: 30, y: 12 } });
+  await page_wait(500);
+  const attiva = await shell.evaluate(() => [...document.querySelectorAll('.tab')].findIndex((t) => t.classList.contains('active')));
+  console.log('SCHEDA ATTIVA DOPO CLIC:', attiva);
+  console.log('B THREAD:', await b.locator('#threadView').isVisible(), await b.locator('.dash-bubble-filo').allTextContents());
+  await expect(b.locator('#accade .dash-carta[data-tipo="lavoro"]')).toHaveCount(0, { timeout: 20_000 });
+});
+function page_wait(ms) { return new Promise((r) => setTimeout(r, ms)); }
