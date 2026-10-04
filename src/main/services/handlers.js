@@ -89,13 +89,18 @@ async function noteProvenienzaImmagini(dataUrls) {
   const P = globalThis.SN_PROVENIENZA;
   const E = globalThis.SN_ESTERNO;
   if (!P || !E || !Array.isArray(dataUrls) || !dataUrls.length) return '';
-  const { analizzaImmagine } = require('./firmatariC2pa');
+  const { analizzaImmagine, origineDellaCopia } = require('./firmatariC2pa');
   const blocchi = [];
   for (let i = 0; i < dataUrls.length; i++) {
     const m = /^data:[^,]*;base64,(.*)$/s.exec(String(dataUrls[i] || ''));
     if (!m) continue;
     let nota;
-    try { nota = P.notaPerModello(await analizzaImmagine(Buffer.from(m[1], 'base64'))); } catch (_) { continue; }
+    try {
+      const byte = Buffer.from(m[1], 'base64');
+      const res = await analizzaImmagine(byte);
+      const copia = res.trovato ? null : origineDellaCopia(byte);
+      nota = P.notaPerModello(copia || res, { daCopia: !!copia });
+    } catch (_) { continue; }
     const quale = dataUrls.length > 1 ? ` (immagine ${i + 1})` : '';
     const testa = `(Sistema${quale}: ${E.perCanaleSistema(nota.sistema)}.)`;
     blocchi.push(nota.etichetta
