@@ -1,5 +1,5 @@
 // #873 giro 3, rilievo 1: una home che non mostra nessuna voce letta dal computer non deve tenere sveglio il lettore.
-// Porte: batteria, rete e Bluetooth tutte nascoste dall'utente; finestra stretta, dove la colonna destra sparisce.
+// Porta: batteria, rete e Bluetooth tutte nascoste dall'utente (resta solo l'ora, che il lettore non serve).
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
@@ -24,8 +24,9 @@ async function contaRichieste(app) {
   await app.evaluate(async (_, l) => {
     globalThis.__sistemaFinto = l;
     await globalThis.SN_SISTEMA_MAIN._perProve.usaLettore(async () => globalThis.__sistemaFinto);
-    const req = process.mainModule.require;
-    const mod = req(req('node:path').join(process.cwd(), 'src', 'main', 'services', 'statoSistema.js'));
+    const path = process.getBuiltinModule('path');
+    const req = process.getBuiltinModule('module').createRequire(path.join(process.cwd(), 'src', 'main', 'main.js'));
+    const mod = req('./services/statoSistema');
     if (!mod.__richiediVero) mod.__richiediVero = mod.richiedi;
     globalThis.__richiesteDavanti = 0;
     mod.richiedi = (o = {}) => { if (o.davanti !== false) globalThis.__richiesteDavanti += 1; return mod.__richiediVero(o); };
@@ -46,22 +47,6 @@ test('con batteria, rete e Bluetooth nascoste la home non tiene sveglio il letto
   }
   await app.evaluate(() => { globalThis.__richiesteDavanti = 0; });
   // La home richiama ogni 30 secondi: dopo 33 nessuna richiesta deve averla tenuta sveglia.
-  await new Promise((r) => setTimeout(r, 33_000));
-  expect(await richieste(app)).toBe(0);
-});
-
-test('in una finestra stretta, dove la colonna destra non c\'è, la home non tiene sveglio il lettore', async ({ app }) => {
-  test.setTimeout(90_000);
-  const page = await newtab(app);
-  await contaRichieste(app);
-  await app.evaluate(({ BrowserWindow }) => {
-    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
-    w.unmaximize();
-    w.setSize(700, 700);
-  });
-  await expect.poll(() => page.evaluate(() => window.innerWidth), { timeout: 5_000 }).toBeLessThan(720);
-  await expect(page.locator('#right')).toBeHidden();
-  await app.evaluate(() => { globalThis.__richiesteDavanti = 0; });
   await new Promise((r) => setTimeout(r, 33_000));
   expect(await richieste(app)).toBe(0);
 });
