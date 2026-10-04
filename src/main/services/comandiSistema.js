@@ -1101,6 +1101,11 @@ function distanza(a, b) {
   return prima[n];
 }
 
+// Le parole che si dicono intorno al nome («le cuffie Sony», «la rete di casa»): nel nome non ci sono quasi mai.
+const CONTORNO = new Set(['il', 'lo', 'la', 'i', 'gli', 'le', 'l', 'un', 'uno', 'una', 'di', 'del', 'dello', 'della',
+  'dei', 'degli', 'delle', 'd', 'a', 'al', 'allo', 'alla', 'ai', 'agli', 'alle', 'da', 'dal', 'dalla', 'in', 'nel',
+  'nella', 'con', 'su', 'sul', 'sulla', 'per', 'mio', 'mia', 'miei', 'mie', 'rete', 'wifi', 'wi', 'fi']);
+
 // { scelto } se un nome solo corrisponde; { candidati } se più d'uno; {} se nessuno.
 function scegliNome(chiesto, nomi) {
   const elenco = [...new Set((nomi || []).filter((n) => typeof n === 'string' && n))];
@@ -1108,15 +1113,24 @@ function scegliNome(chiesto, nomi) {
   if (esatto.length === 1) return { scelto: esatto[0] };
   const c = piega(chiesto);
   if (!c) return {};
-  const uguali = elenco.filter((n) => piega(n) === c);
+  const parole = c.split(' ');
+  const essenziali = parole.filter((w) => !CONTORNO.has(w));
+  const nucleo = essenziali.length ? essenziali.join(' ') : c;
+  const uguali = elenco.filter((n) => piega(n) === c || piega(n) === nucleo);
   if (uguali.length === 1) return { scelto: uguali[0] };
   if (uguali.length > 1) return { candidati: uguali };
-  const parole = c.split(' ');
-  const dentro = elenco.filter((n) => { const p = piega(n); return p.includes(c) || parole.every((w) => p.split(' ').some((x) => x.startsWith(w))); });
+  const cercate = nucleo.split(' ');
+  // Ogni parola detta sta nel nome, oppure il nome intero sta fra le parole dette.
+  const dentro = elenco.filter((n) => {
+    const p = piega(n);
+    const pw = p.split(' ');
+    return p.includes(c) || cercate.every((w) => pw.some((x) => x.startsWith(w)))
+      || (pw.some((w) => !CONTORNO.has(w)) && pw.every((w) => parole.includes(w)));
+  });
   if (dentro.length === 1) return { scelto: dentro[0] };
   if (dentro.length > 1) return { candidati: dentro };
-  const tolleranza = c.length <= 4 ? 1 : 2;
-  const vicini = elenco.map((n) => ({ n, d: distanza(piega(n), c) })).filter((x) => x.d <= tolleranza);
+  const tolleranza = nucleo.length <= 4 ? 1 : 2;
+  const vicini = elenco.map((n) => ({ n, d: Math.min(distanza(piega(n), c), distanza(piega(n), nucleo)) })).filter((x) => x.d <= tolleranza);
   if (!vicini.length) return {};
   const migliore = Math.min(...vicini.map((x) => x.d));
   const primi = vicini.filter((x) => x.d === migliore).map((x) => x.n);
