@@ -837,7 +837,117 @@
         return { partial: { tabPreview: { enabled: b } }, label: `Anteprima delle schede → ${b ? 'accesa' : 'spenta'}` };
       },
     },
+
+    // ── #949: le voci che mancavano. In fondo, così una chiave vaga resta di chi la prendeva prima ──
+    ...PARAMETRI_COLORE_TAB.map(parametroColoreTab),
+    interruttore({
+      keys: ['blocco_pubblicita', 'blocco pubblicità', 'blocco pubblicita', 'blocco della pubblicità', 'blocco delle pubblicità',
+        'blocca pubblicità', 'blocca la pubblicità', 'blocca pubblicità e tracker', 'blocco pubblicità e tracker', 'adblock',
+        'ad block', 'ad-block', 'blocco annunci', 'blocco tracker', 'blocca tracker'],
+      percorso: 'security.adblock.enabled',
+      nome: 'Blocco di pubblicità e tracker',
+      aiuto: 'true | false (blocca pubblicità e tracker con le liste pubbliche; attivo di serie)',
+      risk: 'Controlla il blocco delle pubblicità e dei tracker: le richieste verso i domini delle liste pubbliche '
+        + 'si fermano prima di partire. Spegnerlo fa caricare annunci e script che seguono cosa fai da un sito all’altro.',
+    }),
+    interruttore({
+      keys: ['blocco_siti', 'blocco siti', 'blocco dei siti', 'blocca siti', 'blocco siti in blacklist', 'blacklist attiva'],
+      percorso: 'security.siteBlock.enabled',
+      nome: 'Blocco dei siti in blacklist',
+      aiuto: 'true | false (i siti in blacklist non si aprono finché l\'utente non sceglie «Apri comunque»)',
+      risk: 'Controlla il blocco dei siti in blacklist: un sito in elenco non si apre da nessuna strada finché non '
+        + 'scegli «Apri comunque». Spegnerlo fa aprire anche i siti che hai messo in elenco.',
+    }),
+    interruttore({
+      keys: ['liste_pubbliche_blocco', 'liste pubbliche', 'liste pubbliche come blacklist', 'usa le liste pubbliche'],
+      percorso: 'security.siteBlock.useAdblockLists',
+      nome: 'Liste pubbliche come blacklist',
+      aiuto: 'true | false (tratta come bloccati anche i siti di pubblicità e tracciamento delle liste pubbliche)',
+      risk: 'Decide se Filo tratta come bloccati anche i siti di pubblicità e tracciamento delle liste pubbliche, oltre '
+        + 'a quelli che hai messo tu. Spegnerlo lascia aprire quei siti.',
+    }),
+    interruttore({
+      keys: ['controlli_rete_siti', 'controlli di rete', 'controlli rete', 'età del dominio', 'eta del dominio'],
+      percorso: 'security.safeBrowse.networkSignals',
+      nome: 'Controlli di rete sui siti',
+      aiuto: 'true | false (chiede a servizi pubblici l\'età del dominio e del certificato, per riconoscere le truffe)',
+      risk: 'Controlla le richieste a servizi pubblici sull’età del dominio e del certificato, un forte segnale di truffa. '
+        + 'Spegnerle rende meno probabile l’avviso su un sito nato da pochi giorni per ingannarti.',
+    }),
+    interruttore({
+      keys: ['giudizio_ai_siti', 'giudizio ai', 'giudizio ai sui siti', 'giudizio ai sui casi sospetti'],
+      percorso: 'security.safeBrowse.llmJudge',
+      nome: 'Giudizio AI sui siti sospetti',
+      aiuto: 'true | false (un modello valuta gli indizi di identità di un sito rimasto dubbio)',
+      risk: 'Controlla il giudizio di un modello AI sui siti che restano dubbi. Spegnerlo toglie un controllo: '
+        + 'un sito sospetto può aprirsi senza avviso.',
+    }),
+    interruttore({
+      keys: ['link_sospetti_isolati', 'finestra isolata', 'link sospetti', 'apri i link sospetti in una finestra isolata'],
+      percorso: 'security.safeBrowse.sandbox',
+      nome: 'Link sospetti in una finestra isolata',
+      aiuto: 'true | false (segue prima in una finestra nascosta i link accorciati o con molti redirect)',
+      risk: 'Controlla la finestra isolata in cui Filo segue prima i link accorciati o con molti redirect. Spegnerla '
+        + 'fa aprire quei link direttamente, senza sapere prima dove portano.',
+    }),
+    interruttore({
+      keys: ['segnalazione_automatica', 'segnalazione automatica', 'segnalazione automatica dei problemi', 'segnalazioni automatiche', 'feedback automatico'],
+      percorso: 'security.autoFeedback',
+      nome: 'Segnalazione automatica dei problemi',
+      aiuto: 'true | false (segnala in forma anonima a chi sviluppa Filo quando non riesce a fare una cosa; tenerla attiva vale 10 crediti al giorno)',
+      risk: 'Decide se Filo manda da solo una segnalazione anonima e generica a chi lo sviluppa quando non riesce a fare '
+        + 'una cosa: mai indirizzi né testi delle conversazioni. Spegnerla toglie anche i 10 crediti extra al giorno.',
+    }),
+    elenco({
+      keys: ['siti_bloccati', 'siti bloccati', 'blacklist', 'domini in blacklist', 'elenco dei siti bloccati', 'lista dei siti bloccati'],
+      percorso: 'security.siteBlock.blacklist',
+      nome: 'Siti bloccati',
+      aiuto: 'siti che Filo non apre',
+      risk: 'Cambia l’elenco dei siti che Filo non apre. Un sito tolto si riapre da ogni strada; uno aggiunto non si apre '
+        + 'più finché non scegli «Apri comunque».',
+    }),
+    elenco({
+      keys: ['siti_fidati_programmi', 'siti fidati per i programmi', 'siti fidati programmi', 'siti fidati download'],
+      percorso: 'security.downloads.trustedSites',
+      nome: 'Siti fidati per i programmi',
+      aiuto: 'siti da cui un programma scende senza chiedere',
+      risk: 'Cambia i siti da cui un programma scaricato non chiede conferma: da un sito in elenco un programma scende '
+        + 'e si apre senza domande.',
+    }),
+    elenco({
+      keys: ['siti_fidati_cookie', 'siti fidati', 'siti fidati cookie', 'resta connesso', 'siti dove resto connesso'],
+      percorso: 'security.cookies.trustedSites',
+      nome: 'Siti fidati dove resti connesso',
+      aiuto: 'siti dove si resta connessi anche con la privacy massima dei cookie',
+      risk: 'Cambia i siti che fanno eccezione alla privacy massima dei cookie: lì i dati restano fra una visita e '
+        + 'l’altra, così resti connesso, e il sito ti riconosce.',
+    }),
+    elenco({
+      keys: ['siti_con_banner', 'siti con banner', 'banner visibili', 'siti dove vedo i banner', 'mostra i banner dei cookie'],
+      percorso: 'security.cookies.bannerSites',
+      nome: 'Siti dove vedi i banner dei cookie',
+      aiuto: 'siti dove Filo non rifiuta i banner dei cookie e li lascia vedere',
+      risk: 'Cambia i siti dove Filo lascia i banner dei cookie a te invece di rifiutarli da solo: lì una scelta '
+        + 'sbagliata sul banner fa accettare i cookie di tracciamento.',
+    }),
+    elenco({
+      keys: ['domini_esclusi', 'domini esclusi', 'siti esclusi', 'blocklist', 'siti dove filo non interviene'],
+      percorso: 'blocklist',
+      nome: 'Domini dove Filo non interviene',
+      aiuto: 'siti dove Filo non aggiunge niente alle pagine',
+      risk: 'Cambia i siti dove Filo non interviene sulle pagine: lì niente menu, niente aiuti e niente protezioni '
+        + 'che Filo aggiunge alla pagina.',
+    }),
   ];
+
+  // Le righe «chiave: valori» della descrizione di IMPOSTA_PREFERENZA: escono da qui, dove sta il setter,
+  // così una voce nuova arriva alla chat da sola (#949).
+  function righeDescrizione(ctx = {}) {
+    return PREF_SETTERS.map((s) => {
+      const aiuto = typeof s.aiuto === 'function' ? s.aiuto(ctx) : s.aiuto;
+      return `• ${s.keys[0]}: ${aiuto}${s.level === 2 ? ' [conferma]' : ''}`;
+    });
+  }
 
   // Trova il setter giusto per una chiave (match esatto, poi fuzzy) e costruisce
   // il partial. Ritorna { partial, label, level, risk, testo? }, { rifiuto } se il
