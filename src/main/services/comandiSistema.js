@@ -375,8 +375,15 @@ try {
     $esito = [string](Attendi ($r.SetStateAsync([Windows.Devices.Radios.RadioState]$voglio)) ([Windows.Devices.Radios.RadioAccessStatus]))
     if ($esito -ne 'Allowed') { Dice 'errore' ('accesso-' + $esito); exit 0 }
   }
-  Start-Sleep -Milliseconds 300
-  $dopo = @($radio | ForEach-Object { [string]$_.State })
+  # Una radio ci mette un attimo a cambiare: si rilegge finché è arrivata, o finché un interruttore la tiene ferma.
+  $dopo = @()
+  for ($i = 0; $i -lt 12; $i++) {
+    Start-Sleep -Milliseconds 250
+    $ora = Attendi ([Windows.Devices.Radios.Radio]::GetRadiosAsync()) ([System.Collections.Generic.IReadOnlyList[Windows.Devices.Radios.Radio]])
+    $dopo = @($ora | Where-Object { [string]$_.Kind -eq $quale } | ForEach-Object { [string]$_.State })
+    if (@($dopo | Where-Object { $_ -ne $voglio }).Count -eq 0) { break }
+    if (@($dopo | Where-Object { $_ -eq 'Disabled' }).Count -gt 0) { break }
+  }
   Dice 'stato' ($dopo -join ',')
   Dice 'acceso' ([int](@($dopo | Where-Object { $_ -eq 'On' }).Count -gt 0))
 } catch { Dice 'errore' 'eccezione'; Dice 'dettaglio' $_.Exception.Message }
@@ -835,10 +842,19 @@ function dispositiviDaVoci(u, piattaforma) {
   return out;
 }
 
+// blueutil 2.7 e seguenti scrivono JSON; le versioni prima una riga per dispositivo, col nome fra virgolette.
 function dispositiviMac(righe) {
   let j;
-  try { j = JSON.parse(righe.join('\n')); } catch (_) { return null; }
-  if (!Array.isArray(j)) return null;
+  try { j = JSON.parse(righe.join('\n')); } catch (_) { j = null; }
+  if (!Array.isArray(j)) {
+    const testo = righe.filter((r) => /^address:/.test(r));
+    if (!testo.length) return righe.join('').trim() ? null : [];
+    return testo.map((r) => {
+      const ind = /^address:\s*([0-9a-fA-F:-]{17})/.exec(r);
+      const nome = /name:\s*"(.*)"/.exec(r);
+      return ind ? { indirizzo: ind[1].toLowerCase().replace(/:/g, '-'), nome: nome ? nome[1] : ind[1], collegato: !/not connected/.test(r) && /connected/.test(r) } : null;
+    }).filter(Boolean);
+  }
   return j.filter((d) => d && typeof d.address === 'string').map((d) => ({
     indirizzo: d.address.toLowerCase().replace(/:/g, '-'),
     nome: typeof d.name === 'string' && d.name ? d.name : d.address,
@@ -923,7 +939,8 @@ function erroreWlan(codice) {
   if (codice === 5) return 'posizione';
   if (codice === 1062) return 'servizio-wlan';
   if (codice === 1168 || codice === 87) return 'non-trovata';
-  if (codice === -2144067582) return 'radio-spenta';
+  // La radio spenta Windows la dice in due modi: lo stato della radio, o «interfaccia non pronta».
+  if (codice === -2144067582 || codice === 5023) return 'radio-spenta';
   if (codice === -1) return 'tempo';
   return 'sconosciuto';
 }
@@ -1204,7 +1221,8 @@ function normalizzaRichiesta(r) {
       if (errore) return { errore: `nome ${errore}` };
       out.nome = nome;
       if (cosa === 'bluetooth') {
-        const c = q.collega == null || q.collega === '' ? true : booleano(q.collega);
+        // «Spegni le cuffie» arriva come acceso:false col nome: vuol dire scollegarle, non collegarle.
+        const c = q.collega == null || q.collega === '' ? booleano(q.acceso) !== false : booleano(q.collega);
         if (c === null) return { errore: 'collega non capito: true o false' };
         out.collega = c;
       }
@@ -1276,7 +1294,10 @@ async function wifi(q) {
   const rete = elenco.reti.find((x) => x.nome === s.scelto);
   if (rete.attiva) return { ok: true, cosa: 'wifi', rete: rete.nome, confermato: true, gia: true };
   let acceso = false;
-  if (elenco.acceso === false) {
+  // Windows non dice la radio nell'elenco delle reti: la sa il lettore della home.
+  const letta = sistemaMain() && typeof sistemaMain().stato === 'function' ? sistemaMain().stato() : null;
+  const radioSpenta = elenco.acceso === false || (elenco.acceso == null && !!letta && !!letta.wifi && letta.wifi.acceso === false);
+  if (radioSpenta) {
     const on = await computer().radio({ radio: 'wifi', acceso: true });
     if (!on.ok) return fallito(on.errore, q);
     annunciaCambio({ wifi: { acceso: true } });

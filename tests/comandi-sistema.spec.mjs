@@ -225,7 +225,7 @@ test('in chat: una rete detta a metà si trova, e cambiare rete chiede conferma 
 test('un sito non comanda il computer: le due porte rispondono «rifiutato» fuori da Filo', async ({ app, shell }) => {
   void shell;
   await computerFinto(app);
-  const out = await app.evaluate(async () => {
+  const out = await app.evaluate(async ({ BrowserWindow }) => {
     const MSG = globalThis.SN_MSG.MSG;
     const web = { url: 'https://sito-ostile.example/', tab: { url: 'https://sito-ostile.example/' } };
     const filo = { url: 'filo://newtab/' };
@@ -233,11 +233,21 @@ test('un sito non comanda il computer: le due porte rispondono «rifiutato» fuo
     const b = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.SISTEMA_APRI_IMPOSTAZIONI, chiave: 'win-radio' }, web);
     const c = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.SISTEMA_COMANDA, richiesta: { cosa: 'volume', livello: 30 } }, filo);
     const d = await globalThis.SN_EXECUTE_FILO_ACTION({ type: 'VOLUME', livello: 100 }, { sender: web });
-    return { a, b, c, d };
+    // Il modello non può scriversi da sé la richiesta che decide il livello: il main la riscrive sempre.
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    const e = await globalThis.SN_EXECUTE_FILO_ACTION(
+      { type: 'BLUETOOTH', acceso: false, _richiestaSistema: { cosa: 'bluetooth', acceso: true } },
+      { sender: { win, wc: win.webContents, url: 'filo://newtab/' } },
+    );
+    return { a, b, c, d, e };
   });
   expect(out.a.code).toBe('forbidden');
   expect(out.b.code).toBe('forbidden');
   expect(out.c.ok).toBe(true);
   expect(out.d.executed).toBe(false);
-  expect((await computer(app)).volume.livello).toBe(30);
+  expect(out.e.needsConfirm).toBe(2);
+  expect(out.e.executed).toBe(false);
+  const dopo = await computer(app);
+  expect(dopo.volume.livello).toBe(30);
+  expect(dopo.bluetooth.acceso).toBe(true);
 });

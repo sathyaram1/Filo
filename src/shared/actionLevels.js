@@ -675,6 +675,13 @@
         }
         return 'Cambiare il Bluetooth del computer';
       },
+      // Dopo una conferma: quello che è successo, senza i rischi che il popup ha già spiegato.
+      describeDone: (a) => {
+        const r = (a && a._richiestaSistema) || {};
+        const nome = (a && a._nomeSistema) || r.nome;
+        if (r.nome) return r.collega === false ? `Scollegato «${nome}» dal Bluetooth` : `Collegato «${nome}» col Bluetooth`;
+        return r.acceso === false ? 'Bluetooth spento' : r.acceso === true ? 'Bluetooth acceso' : 'Bluetooth cambiato';
+      },
     },
     WIFI: {
       level: (a) => {
@@ -694,6 +701,12 @@
           return 'Spegnere il Wi-Fi.\n\nSenza un cavo il computer resta senza rete, e a parole non potrai riaccenderlo: senza rete Filo non ti sente. Si riaccende dal tasto nella home o dal sistema.';
         }
         return 'Cambiare il Wi-Fi del computer';
+      },
+      describeDone: (a) => {
+        const r = (a && a._richiestaSistema) || {};
+        const nome = (a && a._nomeSistema) || r.nome;
+        if (r.nome) return `Collegato il computer alla rete Wi-Fi «${nome}»`;
+        return r.acceso === false ? 'Wi-Fi spento' : r.acceso === true ? 'Wi-Fi acceso' : 'Wi-Fi cambiato';
       },
     },
     // ── zoom della pagina via chat (#686) ────────────────────────────────────

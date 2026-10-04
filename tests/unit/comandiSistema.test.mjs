@@ -298,6 +298,11 @@ test('Mac: senza blueutil o senza permesso del Bluetooth, una frase e il modo di
   assert.equal(admin.errore, 'admin-wifi');
   const elenco = C.interpretaBtElenco(C.leggiUscita('FILO:uscita=0\nFILO:acceso=1\nFILO:blocco=dispositivi\n| [{"address":"00-11-22-aa-bb-cc","name":"AirPods","connected":true}]\n'), 'darwin');
   assert.deepEqual(elenco.dispositivi, [{ indirizzo: '00-11-22-aa-bb-cc', nome: 'AirPods', collegato: true }]);
+  const vecchio = C.interpretaBtElenco(C.leggiUscita('FILO:uscita=0\nFILO:acceso=1\nFILO:blocco=dispositivi\n'
+    + '| address: 00-11-22-aa-bb-cc, not connected, not favourite, paired, name: "Cassa, \\"bagno\\"", recent access date: 2026-01-01\n'
+    + '| address: 00-11-22-aa-bb-cd, connected (master, -54 dBm), favourite, paired, name: "Mouse", recent access date: 2026-01-01\n'), 'darwin');
+  assert.deepEqual(vecchio.dispositivi.map((d) => [d.nome, d.collegato]), [['Cassa, \\"bagno\\"', false], ['Mouse', true]]);
+  assert.deepEqual(C.interpretaBtElenco(C.leggiUscita('FILO:uscita=0\nFILO:acceso=1\nFILO:blocco=dispositivi\n'), 'darwin').dispositivi, []);
 });
 
 test('Linux: le reti di NetworkManager si leggono anche con «:» e «\\» nel nome', () => {
@@ -412,4 +417,30 @@ test('le impostazioni che Filo apre stanno in un elenco fisso: nessun indirizzo 
   assert.equal(C.uriImpostazioni('__proto__'), null);
   assert.equal(C.uriImpostazioni('toString'), null);
   for (const uri of Object.values(C.IMPOSTAZIONI)) assert.match(uri, /^(ms-settings:|x-apple\.systempreferences:)/);
+});
+
+test('il livello lo decide la stessa lettura che poi esegue: spegnere e staccare chiedono conferma, il resto no', () => {
+  require(join(ROOT, 'src', 'shared', 'actionLevels.js'));
+  const L = globalThis.SN_ACTION_LEVELS;
+  const livello = (type, args) => {
+    const cosa = type === 'VOLUME' ? 'volume' : type.toLowerCase();
+    return L.levelFor({ type, ...args, _richiestaSistema: C.normalizzaRichiesta({ ...args, cosa }) });
+  };
+  assert.equal(livello('VOLUME', { livello: 100 }), 1);
+  assert.equal(livello('VOLUME', { muto: true }), 1);
+  assert.equal(livello('BLUETOOTH', { acceso: true }), 1);
+  assert.equal(livello('BLUETOOTH', { acceso: false }), 2);
+  assert.equal(livello('BLUETOOTH', { acceso: 'no' }), 2, 'un «no» scritto come testo spegne, quindi chiede');
+  assert.equal(livello('BLUETOOTH', { dispositivo: 'cuffie' }), 1);
+  assert.equal(livello('BLUETOOTH', { dispositivo: 'cuffie', collega: false }), 2);
+  assert.equal(livello('BLUETOOTH', { dispositivo: 'cuffie', acceso: false }), 2);
+  assert.equal(livello('BLUETOOTH', { elenca: true }), 1);
+  assert.equal(livello('WIFI', { acceso: true }), 1);
+  assert.equal(livello('WIFI', { acceso: false }), 2);
+  assert.equal(livello('WIFI', { rete: 'casa' }), 2);
+  assert.equal(livello('WIFI', { elenca: true }), 1);
+  // Senza la lettura del main (o con una richiesta che non si capisce) non si abbassa niente.
+  assert.equal(L.levelFor({ type: 'BLUETOOTH', acceso: true }), 2);
+  assert.equal(livello('WIFI', { acceso: 'boh' }), 2);
+  assert.match(L.describe({ type: 'WIFI', _richiestaSistema: C.normalizzaRichiesta({ cosa: 'wifi', acceso: false }) }), /a parole non potrai riaccenderlo/);
 });
