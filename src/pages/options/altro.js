@@ -214,7 +214,7 @@
     chrome.runtime.onMessage.addListener((msg) => {
       if (!msg || msg.type !== MSG.SETTINGS_UPDATED || !msg.settings || mostrato === null) return;
       const el = $('blocklist');
-      if (document.activeElement === el || el.value !== mostrato) return;
+      if ((document.hasFocus() && document.activeElement === el) || el.value !== mostrato) return;
       const toccati = window.SN_VOCI_IMPOSTAZIONI.riallineaPagina('altro', msg.settings);
       if (toccati.length) mostrato = el.value;
     });

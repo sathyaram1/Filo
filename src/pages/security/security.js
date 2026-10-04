@@ -764,10 +764,10 @@
     };
     const toccati = Voci.riallineaPagina('security', settings, {
       // La casella dei siti fidati serve ad aggiungerne uno: l'elenco vero è sotto, e si riallinea qui dopo.
-      // Una casella col fuoco, o che dice già lo stesso elenco con altre righe vuote, non si riscrive: chi scrive
-      // perderebbe l'a capo appena battuto.
+      // Una casella in cui si sta scrivendo, o che dice già lo stesso elenco con altre righe vuote, non si
+      // riscrive: chi scrive perderebbe l'a capo appena battuto. Da una scheda dietro non sta scrivendo nessuno.
       salta: (id, percorso, el) => id === 'cookie-wl-input' || inSospeso.has(percorso.replace(/^security\./, ''))
-        || (el.tagName === 'TEXTAREA' && (document.activeElement === el
+        || (el.tagName === 'TEXTAREA' && ((document.hasFocus() && document.activeElement === el)
           || JSON.stringify(parseBlacklist(el.value).valid) === JSON.stringify(Voci.leggi(settings, percorso)))),
       elenco: (id, lista) => righe(lista, scartate[id]),
     });

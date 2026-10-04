@@ -904,7 +904,7 @@
     chrome.runtime.onMessage.addListener((msg) => {
       if (!msg || msg.type !== MSG.SETTINGS_UPDATED || !msg.settings) return;
       const toccati = window.SN_VOCI_IMPOSTAZIONI.riallineaPagina('options', msg.settings, {
-        salta: (id, percorso, el) => document.activeElement === el,
+        salta: (id, percorso, el) => document.hasFocus() && document.activeElement === el,
       });
       if (toccati.includes('useDefaultModels')) applyDefaultModelsVisibility();
       if (toccati.length) renderOpenWeightsImpact();

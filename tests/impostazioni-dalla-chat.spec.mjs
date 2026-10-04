@@ -1,6 +1,7 @@
 // #949 — ogni impostazione si legge e si cambia chiedendola a Filo: «spegni il blocco della pubblicità»
 // spegne l'interruttore della pagina Sicurezza (anche già aperta), «com'è impostato?» risponde il valore vero,
-// e il cambio si annulla dal segno sulla bolla. Ogni prova asserisce il successo visto dall'utente.
+// e il cambio si annulla dal segno sulla bolla. Ogni prova asserisce il successo visto dall'utente: senza il
+// fix la chiave non esiste e l'interruttore resta acceso.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { clickConfirm, confirmState } from './helpers/confirm.mjs';
@@ -137,6 +138,8 @@ test('B — «blocca facebook.com» e la segnalazione automatica dalla chat: la 
   await app.evaluate(async () => globalThis.SN_STORAGE.updateSettings({ security: { siteBlock: { blacklist: ['tiktok.com'] } } }));
   const sec = await openTab('filo://security/security.html');
   await expect(sec.locator('#sec-siteblock-blacklist')).toHaveValue('tiktok.com', { timeout: 8_000 });
+  // La casella resta col fuoco mentre l'utente va in chat: da dietro nessuno ci sta scrivendo.
+  await sec.locator('#sec-siteblock-blacklist').focus();
 
   await modelloFinto(app, [imposta('siti_bloccati', 'aggiungi facebook.com'), { text: 'Ti chiedo conferma.' }]);
   await scrivi(chat, 'blocca facebook.com');
@@ -220,4 +223,19 @@ test('D — una voce avanzata delle Preferenze dalla chat: un valore del colore 
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'Rimesso.' })).toBeVisible({ timeout: 10_000 });
   await expect.poll(async () => (await impostazioni(app)).themeTokens, { timeout: 5_000 }).toEqual({ radius: '9px' });
   await ripristina(app);
+});
+
+test('E — chi scrive nella lista dei siti bloccati non perde l\'a capo quando la pagina si riallinea al proprio salvataggio', async ({ app, openTab }) => {
+  const sec = await openTab('filo://security/security.html');
+  const casella = sec.locator('#sec-siteblock-blacklist');
+  await expect(casella).toHaveValue('', { timeout: 8_000 });
+  await casella.click();
+  await sec.keyboard.type('tiktok.com');
+  await sec.keyboard.press('Enter');
+  await expect.poll(async () => (await impostazioni(app)).security.siteBlock.blacklist, { timeout: 5_000 }).toEqual(['tiktok.com']);
+  await sec.waitForTimeout(400);
+  await expect(casella).toHaveValue('tiktok.com\n');
+  await sec.keyboard.type('x.com');
+  await expect.poll(async () => (await impostazioni(app)).security.siteBlock.blacklist, { timeout: 5_000 }).toEqual(['tiktok.com', 'x.com']);
+  await expect(casella).toHaveValue('tiktok.com\nx.com');
 });
