@@ -176,6 +176,10 @@ test('elenchi di siti: aggiungi, togli, solo, svuota; un nome senza estensione �
   assert.equal(b('solo a.it, b.it').elenco.op, 'sostituisci');
   assert.deepEqual(b('svuota').elenco, { percorso: 'security.siteBlock.blacklist', op: 'sostituisci', voci: [], nome: 'Siti bloccati' });
   assert.match(b('blocca facebook').rifiuto, /«facebook» non è un dominio/);
+  // Un nome accentato entra come dalla pagina Sicurezza, nella forma ASCII con cui il sito si confronta.
+  assert.deepEqual(b('aggiungi münchen.de').elenco.voci, ['xn--mnchen-3ya.de']);
+  assert.deepEqual(P.buildPreferencePartial('siti_fidati_cookie', 'https://www.Bücher.de/x').elenco.voci, ['xn--bcher-kva.de']);
+  assert.ok(b('aggiungi <script>x</script>.com').rifiuto);
   const correnti = { security: { siteBlock: { blacklist: ['a.it'] } } };
   assert.deepEqual(P.applicaElenco(b('aggiungi b.it').elenco, correnti).partial.security.siteBlock.blacklist, ['a.it', 'b.it']);
   assert.match(P.applicaElenco(b('aggiungi a.it').elenco, correnti).invariato, /a\.it c'è già/);
