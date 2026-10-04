@@ -873,3 +873,26 @@ test('lavoro rimasto a metà da un orchestratore chiuso: togli lo toglie, ripren
   assert.equal(t.status, 0, t.stderr);
   assert.equal(JSON.parse(readFileSync(f, 'utf8')).pratiche[7], undefined);
 });
+
+test('due lavori arrivano alla chiusura insieme: un finish per volta, anche mentre il carico si sta misurando', async () => {
+  const attendi = (ms) => new Promise((ok) => setTimeout(ok, ms));
+  const pr = (num, slug) => ({ ...nuovaPratica({ num, slug, richiesta: 'fai X' }), fase: 'chiusura' });
+  const b = banco({
+    pratiche: [pr(21, 'ventuno'), pr(22, 'ventidue')], server: false, opz: { tieniWorktree: true },
+    carichi: async () => { await attendi(20); return { cpu: 10, liberaGB: 16 }; },
+  });
+  let dentro = 0;
+  let massimo = 0;
+  const esegui = b.dep.esegui;
+  b.dep.esegui = async (cmd, args, o) => {
+    if (!/finish-local/.test(args.join(' '))) return esegui(cmd, args, o);
+    dentro += 1;
+    massimo = Math.max(massimo, dentro);
+    await attendi(50);
+    dentro -= 1;
+    return { code: 0, out: '', stdout: '' };
+  };
+  const fine = await b.motore.avvia();
+  assert.deepEqual([fine.pratiche[21].fase, fine.pratiche[22].fase], ['fuso', 'fuso']);
+  assert.equal(massimo, 1);
+});
