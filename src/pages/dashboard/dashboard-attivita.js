@@ -283,6 +283,16 @@
     INVIA_FEEDBACK: () => 'preparato una segnalazione',
     PULISCI_TAB: () => 'riordinato le schede',
     CANCELLA_ARCHIVIO: () => 'eliminato schede dall\'archivio',
+    LEGGI_SCHEDA: (n) => (n > 1 ? `letto ${n} schede` : 'letto una scheda'),
+    APRI_ELEMENTO: (n) => (n > 1 ? `aperto ${n} elementi della pagina` : 'aperto un elemento della pagina'),
+    SCRIVI_CAMPO: (n) => (n > 1 ? `scritto in ${n} campi` : 'scritto in un campo'),
+    SCORRI_PAGINA: () => 'scorso la pagina',
+    POSTA_ELENCO: () => 'letto la posta in arrivo',
+    POSTA_CERCA: (n) => (n > 1 ? `cercato nella posta ${n} volte` : 'cercato nella posta'),
+    POSTA_LEGGI: (n) => (n > 1 ? `letto ${n} mail` : 'letto una mail'),
+    POSTA_BOZZA: (n) => (n > 1 ? `preparato ${n} bozze` : 'preparato una bozza'),
+    SEGNA_FIDATO: () => 'segnato un fidato',
+    TOGLI_FIDATO: () => 'tolto un fidato',
   };
   // `hasReasoning`: il modello ha davvero ragionato. Senza, un blocco che
   // contiene solo una frase intermedia non può intitolarsi «Ragionamento».
@@ -342,6 +352,29 @@
   function frasiCambi(a) {
     const l = Array.isArray(a && a._cambi) ? a._cambi : [];
     return l.map((c) => pulito(c && c.frase)).filter(Boolean).join('; ');
+  }
+  // Le mail lette: quante, quante nuove, e quante di mittenti fidati (la classe la decide il main).
+  function conInviati(o) {
+    const n = Array.isArray(o.fidatiNuovi) ? o.fidatiNuovi.length : 0;
+    return n ? ` · ${n === 1 ? '1 mittente fidato' : `${n} mittenti fidati`} dagli Inviati` : '';
+  }
+  function rigaPosta(a, o) {
+    const type = String(a.type || '').toUpperCase();
+    if (Array.isArray(o.messaggi)) {
+      const m = o.messaggi;
+      const fidati = m.filter((x) => x && x.fonte && x.fonte.classe === 3).length;
+      const ogg = pulito(o.oggetto);
+      const da = m.length === 1 && m[0] && m[0].indirizzo ? ` · da ${pulito(m[0].indirizzo)}` : '';
+      const quante = m.length === 1 ? 'Letta la mail' : `Letta la conversazione · ${m.length} mail`;
+      const fid = fidati ? ` · ${fidati === m.length ? 'mittente fidato' : `${fidati} di mittenti fidati`}` : '';
+      return { icon: '✉', text: `${quante}${ogg ? ` · ${ogg.length > 50 ? `${ogg.slice(0, 47)}…` : ogg}` : ''}${da}${fid}${conInviati(o)}` };
+    }
+    const r = Array.isArray(o.righe) ? o.righe : [];
+    const nuovi = r.filter((x) => x && x.nuovo).length;
+    if (type === 'POSTA_CERCA') {
+      return { icon: '🔎', text: `Cercato nella posta · ${pulito(o.query || a.query)} · ${r.length === 1 ? '1 trovata' : `${r.length} trovate`}${conInviati(o)}` };
+    }
+    return { icon: '✉', text: `Letta la posta in arrivo · ${r.length} ${r.length === 1 ? 'messaggio' : 'messaggi'}, ${nuovi} ${nuovi === 1 ? 'nuovo' : 'nuovi'}${conInviati(o)}` };
   }
   const ACTIVITY_ROWS = {
     TIMER: (a) => {
@@ -481,6 +514,27 @@
     },
     BLUETOOTH: (a) => rigaRadio(a, 'Bluetooth'),
     WIFI: (a) => rigaRadio(a, 'Wi-Fi'),
+    // #534 — schede aperte e posta: cosa ha letto, e da chi.
+    LEGGI_SCHEDA: (a) => {
+      const o = a._output || {};
+      if (Array.isArray(o.righe) || Array.isArray(o.messaggi)) return rigaPosta(a, o);
+      const t = pulito(o.scheda && (o.scheda.titolo || o.scheda.host));
+      const fid = o.fonte && o.fonte.classe === 3 ? ' · sito fidato' : '';
+      return { icon: '📖', text: `Letta la scheda${t ? ` · ${t.length > 60 ? `${t.slice(0, 57)}…` : t}` : ''}${fid}` };
+    },
+    APRI_ELEMENTO: (a) => ({ icon: '👆', text: `Aperto nella pagina · «${pulito(a._output && a._output.nome).slice(0, 60)}»` }),
+    SCRIVI_CAMPO: (a) => ({ icon: '⌨', text: `Scritto nel campo · «${pulito(a._output && a._output.nome).slice(0, 60)}»` }),
+    SCORRI_PAGINA: () => ({ icon: '↕', text: 'Scorsa la pagina' }),
+    POSTA_ELENCO: (a) => rigaPosta(a, a._output || {}),
+    POSTA_CERCA: (a) => rigaPosta(a, a._output || {}),
+    POSTA_LEGGI: (a) => rigaPosta(a, a._output || {}),
+    POSTA_BOZZA: (a) => {
+      const o = a._output || {};
+      const per = Array.isArray(o.destinatari) && o.destinatari.length ? ` · per ${o.destinatari.map(pulito).join(', ')}` : '';
+      return { icon: '✎', text: `Bozza pronta in Gmail, da inviare tu${per}${conInviati(o)}` };
+    },
+    SEGNA_FIDATO: (a) => ({ icon: '🔒', text: `${a._output && a._output.gia ? 'Era già fidato' : 'Segnato come fidato'} · ${pulito(a._output && a._output.voce)}` }),
+    TOGLI_FIDATO: (a) => ({ icon: '🔓', text: `Tolto dai fidati · ${pulito(a._output && a._output.voce)}` }),
     COMANDO_FINESTRA: (a) => {
       const labels = {
         fullscreen: 'Schermo intero', minimize: 'Finestra ridotta a icona', home: 'Home aperta',
@@ -511,6 +565,22 @@
     CARTA_HOME: 'Carta della home non cambiata',
     EVENTO_CALENDARIO: 'Evento non creato', ONBOARDING: 'Accoglienza non aggiornata',
     VOLUME: 'Volume non cambiato', BLUETOOTH: 'Bluetooth non cambiato', WIFI: 'Wi-Fi non cambiato',
+    LEGGI_SCHEDA: 'Scheda non letta', APRI_ELEMENTO: 'Non aperto', SCRIVI_CAMPO: 'Non scritto',
+    SCORRI_PAGINA: 'Pagina non scorsa', POSTA_ELENCO: 'Posta non letta', POSTA_CERCA: 'Ricerca nella posta non riuscita',
+    POSTA_LEGGI: 'Mail non letta', POSTA_BOZZA: 'Bozza non preparata', SEGNA_FIDATO: 'Non segnato', TOGLI_FIDATO: 'Non tolto',
+  };
+  // Il perché di un'azione sulle schede che non è riuscita, in parole: la frase lunga la riceve il modello.
+  const MOTIVI_SCHEDE = {
+    spento: 'la lettura delle schede è spenta nelle Preferenze', 'nessuna-scheda': 'nessuna scheda adatta aperta',
+    accesso: 'Gmail chiede di entrare', 'non-pronta': 'la pagina non era pronta', uscita: 'la pagina è cambiata',
+    vietata: 'pagina dell\'account Google', 'non-web': 'non è una pagina web', chiusa: 'la scheda è stata chiusa',
+    pagina: 'la pagina non ha risposto', 'non-trovato': 'non trovato', vietato: 'quel clic lo fai tu', modulo: 'quel clic lo fai tu',
+    esterno: 'porta su un altro sito', 'nuova-scheda': 'si apre in un\'altra scheda', riservato: 'campo riservato a te',
+    'non-campo': 'non è un campo', 'elenco-perso': 'elenco da rileggere', quale: 'messaggio non indicato',
+    'non-aperta': 'il messaggio non si è aperto', vuota: 'ricerca vuota', 'nessuna-ricerca': 'casella di ricerca non trovata',
+    'testo-vuoto': 'testo vuoto', 'manca-destinatario': 'manca il destinatario', 'nessun-destinatario': 'campo destinatario non trovato',
+    'rispondi-mancante': 'pulsante Rispondi non trovato', 'scrivi-mancante': 'pulsante Scrivi non trovato',
+    'bozza-non-aperta': 'la bozza non si è aperta', 'bozza-non-scritta': 'testo non scritto',
   };
   function rigaRadio(a, radio) {
     const o = a._output || {};
@@ -574,6 +644,7 @@
     if (o.proxy === 'no_web_tab') return 'nessuna pagina web aperta';
     if (o.found === false) return 'non trovato';
     if (o.ok === false && o.errore && o.frase) return String(o.frase);
+    if (o.ok === false && o.errore && MOTIVI_SCHEDE[o.errore]) return MOTIVI_SCHEDE[o.errore];
     if (o.ok === false && o.detail) return String(o.detail);
     if (o.error) return String(o.error);
     return '';
@@ -605,7 +676,7 @@
   // dove l'appunto è finito, e il controllo per scegliere la tinta esatta.
   // Aggiungerne una qui è obbligatorio quando le si dà una riga: senza, la riga
   // si mangia il bottone e la funzione sparisce dalla chat.
-  const ROW_AND_BUTTON = ['SALVA_APPUNTO', 'IMPOSTA_ESTETICA', 'RINOMINA_FILE'];
+  const ROW_AND_BUTTON = ['SALVA_APPUNTO', 'IMPOSTA_ESTETICA', 'RINOMINA_FILE', 'POSTA_BOZZA'];
 
   // Una pagina che il modello voleva aprire e che la lista dei siti bloccati ha fermato: la
   // notifica se ne va in pochi secondi, e la chat le tiene il suo «Apri comunque» (#590).
@@ -1038,7 +1109,7 @@
       async function runConfirm() {
         if (btn.disabled) return;
         const Ui = window.SN_CONFIRM_UI;
-        const opts = { title: 'Filo chiede conferma', text: a._confirm.text || '' };
+        const opts = { title: 'Filo chiede conferma', text: a._confirm.text || '', avviso: a._confirm.avviso || '' };
         const ok = Ui
           ? await (a._confirm.level >= 3 ? Ui.confirmTyped(opts) : Ui.confirm(opts))
           : window.confirm(opts.text); // fallback se il modulo non è caricato
@@ -1149,6 +1220,22 @@
       return btn;
     }
     if (type === 'RINOMINA_FILE') return bottoneRimettiNomi(a);
+    // #534 — la bozza è pronta nella scheda di Gmail: il bottone porta lì, dove l'utente la rilegge e preme Invia.
+    if (type === 'POSTA_BOZZA' && a._output && a._output.ok && a._output.scheda) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'dash-action-btn';
+      btn.textContent = '✉ Rivedi la bozza in Gmail';
+      btn.title = 'Apre la scheda di Gmail con la bozza: la invii tu';
+      btn.addEventListener('click', async () => {
+        const r = await send({ type: MSG.FOCUS_TAB, id: String(a._output.scheda.id || '') });
+        if (!r || !r.ok) {
+          btn.disabled = true;
+          btn.textContent = 'Scheda di Gmail chiusa: la bozza è fra le Bozze';
+        }
+      });
+      return btn;
+    }
     if (type === 'APRI_FILE') {
       const btn = document.createElement('a');
       btn.className = 'dash-action-btn';

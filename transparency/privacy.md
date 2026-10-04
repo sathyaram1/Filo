@@ -38,6 +38,7 @@ Filo funziona con modelli linguistici, e un modello risponde solo a quello che g
 - **Le schede.** Per proporti quali archiviare, titolo, indirizzo e un estratto delle schede aperte. Quando una scheda finisce nell'archivio, il suo testo, per farne un riassunto e ritrovarla con la ricerca. Le pagine della rete di casa (router, stampanti, dischi di rete) restano fuori.
 - **Correttore e riscrittura.** Il testo che stai scrivendo e il suo contesto. Il correttore è acceso di serie e guarda le aree di testo di ogni sito, mai i campi da una riga né le password.
 - **L'editor.** Il documento, quando gli fai una domanda o quando Filo ne scrive titolo e riassunto.
+- **La posta e le schede aperte.** Quando chiedi a Filo della tua posta o di una pagina che hai aperto, il testo che legge dalla scheda: delle mail il mittente, l'oggetto, la data, l'anteprima e, se la apre, il testo intero; di una pagina, il testo che vedi. Filo la legge dalla scheda di Gmail in cui sei entrato tu: non gli servono password né permessi sul tuo account. Si spegne dalle Preferenze, alla voce «Filo può leggere le schede aperte».
 - **Immagini, voce e lettura.** L'immagine da descrivere o trascrivere, l'audio della dettatura, il testo da leggere ad alta voce.
 - **I siti pericolosi.** Solo dati sul sito: il nome, l'età del dominio, lo stato del certificato, se la pagina chiede password o pagamenti. Mai il contenuto della pagina.
 - **I blocchi geografici.** Quando una pagina sembra bloccata per paese, il dominio, il titolo e poche righe della pagina d'errore.
@@ -115,6 +116,7 @@ Oltre ai modelli e al server di Filo, alcune funzioni parlano con altri servizi.
 - **Il servizio di icone di Google.** Nella home, per mostrare l'icona dei siti che Filo ti suggerisce, riceve il nome di quei siti.
 - **Google, come motore di ricerca.** Quando scrivi nella barra qualcosa che non è un indirizzo, la ricerca si apre sulla pagina dei risultati di Google. Lo stesso dal tasto destro: «cerca» su un testo selezionato apre la ricerca di Google, e la ricerca di un'immagine apre Google Lens, che riceve l'indirizzo dell'immagine.
 - **GitHub, EasyList e Fanboy.** All'avvio GitHub riceve la richiesta della versione più recente; da questi tre Filo scarica anche le liste per bloccare la pubblicità e i banner dei cookie. Da GitHub arriva, una volta al giorno, anche l'elenco dei firmatari riconosciuti delle credenziali sulle immagini, che resta nella cartella dei dati: dire se un'immagine è fatta con l'AI avviene poi tutto sul tuo computer.
+- **Gmail, dalla tua scheda.** Filo non chiama Google per conto suo: guida la pagina di Gmail che hai aperto, come la useresti tu. Quello che fa nella pagina lo vede Google come se l'avessi fatto tu: le ricerche nella posta, e le bozze che Filo prepara, che Gmail salva fra le Bozze del tuo account. Invia lo premi sempre tu. Se Gmail non è aperto, Filo ti chiede prima di aprirlo.
 - **Cambi valuta e carte Magic** (Frankfurter e Scryfall). Per le funzioni corrispondenti, e non ricevono niente di tuo, salvo il nome della carta che cerchi.
 
 Se trovi Filo che contatta qualcosa che non è in questa lista, è un errore di questo documento.

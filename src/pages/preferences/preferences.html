@@ -57,6 +57,13 @@
     .mem-riga:hover .mem-via, .mem-via:focus-visible { opacity: 0.85; }
     .mem-via:hover { background: var(--sn-hover, rgba(127, 127, 127, 0.18)); color: var(--sn-error); }
     .mem-via:disabled { cursor: default; opacity: 0.2; }
+    /* Mittenti e siti fidati (#534): stesse righe della memoria; tanti indirizzi scorrono nel loro riquadro. */
+    .fid-box { max-height: 260px; overflow-y: auto; }
+    .fid-via { flex: 0 0 auto; font-size: 12px; color: var(--sn-muted); align-self: center; }
+    .fid-aggiungi { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+    .fid-aggiungi input { flex: 1 1 240px; min-width: 0; }
+    .fid-errore { color: var(--sn-error); font-size: 12px; margin: 4px 0 0; }
+    .fid-conto { font-weight: 400; opacity: 0.6; }
   </style>
 </head>
 <body>
@@ -262,6 +269,34 @@
         </select>
         <button type="button" class="sn-btn sn-btn-secondary" id="timerRingtonePreview">Prova</button>
       </div>
+    </section>
+
+    <section id="sec-schede">
+      <h2>Schede aperte e posta</h2>
+      <p class="sn-muted">Filo legge le schede che hai aperto e ci si muove come faresti tu: apre un messaggio, cerca, scrive in un campo. Così a «cosa mi ha scritto Marco?» risponde leggendo la tua Gmail, dove sei già entrato, senza password né permessi sul tuo account. Prepara le bozze ma non preme mai Invia, Paga o Elimina: quelli li premi tu. Quello che legge in una pagina o in una mail lo tratta come scritto da altri.</p>
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="schedeLeggere" />
+          <span>Filo può leggere le schede aperte</span>
+        </label>
+      </div>
+      <h3 class="mem-gruppo">Mittenti fidati <span class="fid-conto" id="fidatiMittentiConto"></span></h3>
+      <p class="sn-muted">Le loro mail non contano come scritte da uno sconosciuto. Ci sono gli indirizzi a cui hai scritto, che Filo trova nella cartella Inviati di Gmail, e quelli che segni tu.</p>
+      <div id="fidatiMittenti" class="mem-box fid-box"></div>
+      <form class="fid-aggiungi" id="fidatiMittenteForm" autocomplete="off">
+        <input type="text" id="fidatiMittenteNuovo" placeholder="indirizzo@esempio.it" aria-label="Indirizzo da segnare come fidato" />
+        <button type="submit" class="sn-btn sn-btn-secondary">Aggiungi</button>
+      </form>
+      <p class="fid-errore" id="fidatiMittenteErrore" hidden></p>
+      <h3 class="mem-gruppo">Siti fidati <span class="fid-conto" id="fidatiSitiConto"></span></h3>
+      <p class="sn-muted">Quello che Filo legge in questi siti non conta come scritto da uno sconosciuto. Va bene per un sito con un autore solo, come quello della tua banca.</p>
+      <div id="fidatiSiti" class="mem-box fid-box"></div>
+      <form class="fid-aggiungi" id="fidatiSitoForm" autocomplete="off">
+        <input type="text" id="fidatiSitoNuovo" placeholder="bancaesempio.it" aria-label="Sito da segnare come fidato" />
+        <button type="submit" class="sn-btn sn-btn-secondary">Aggiungi</button>
+      </form>
+      <p class="fid-errore" id="fidatiSitoErrore" hidden></p>
+      <span id="fidatiHint" class="sn-saved-indicator" aria-live="polite">Fatto</span>
     </section>
 
     <section id="sec-terminal">

@@ -692,6 +692,16 @@
     VOLUME: 'Cambio il volume…',
     BLUETOOTH: 'Chiedo al Bluetooth…',
     WIFI: 'Chiedo al Wi-Fi…',
+    LEGGI_SCHEDA: 'Leggo la scheda…',
+    APRI_ELEMENTO: 'Apro nella pagina…',
+    SCRIVI_CAMPO: 'Scrivo nella pagina…',
+    SCORRI_PAGINA: 'Scorro la pagina…',
+    POSTA_ELENCO: 'Leggo la posta…',
+    POSTA_CERCA: 'Cerco nella posta…',
+    POSTA_LEGGI: 'Apro la mail…',
+    POSTA_BOZZA: 'Preparo la bozza in Gmail…',
+    SEGNA_FIDATO: 'Segno come fidato…',
+    TOGLI_FIDATO: 'Tolgo dai fidati…',
   };
   function startLabelFor(type) {
     return START_LABELS[String(type || '').toUpperCase()] || 'Eseguo un\'azione…';

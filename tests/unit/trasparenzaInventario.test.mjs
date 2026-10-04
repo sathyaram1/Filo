@@ -153,6 +153,7 @@ const INDIRIZZI = {
   'html.duckduckgo.com': { frase: 'Tavily, o DuckDuckGo senza chiave' },
   'www.google.com': { frase: 'Il servizio di icone di Google' },
   'lens.google.com': { frase: 'apre Google Lens' },
+  'mail.google.com': { frase: 'Gmail, dalla tua scheda' },
   'raw.githubusercontent.com': { frase: 'GitHub, EasyList e Fanboy' },
   'easylist.to': { frase: 'GitHub, EasyList e Fanboy' },
   'secure.fanboy.co.nz': { frase: 'GitHub, EasyList e Fanboy' },

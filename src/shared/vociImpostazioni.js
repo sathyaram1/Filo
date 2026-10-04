@@ -44,6 +44,7 @@
         terminalEnabled: 'terminal.enabled',
         terminalShell: 'terminal.shell',
         nomiSensatiScaricamenti: 'nomiSensati.scaricamenti',
+        schedeLeggere: 'schedeAperte.leggere',
       },
       gruppi: { tokenCode: 'themeTokens.*', tabColorCode: 'tabColor.*' },
       fuori: {},
