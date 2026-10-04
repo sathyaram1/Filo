@@ -16,6 +16,7 @@
 //   Con `feedbackId` (#908) il server rilegge la pratica: se è un lavoro locale
 //   provato fonde senza chiedere (L5 registra soltanto) e la chiude; se no dice
 //   perché, e la fusione ferma aspetta il sì dell'owner in Gestione, per regola.
+//   Con `pendingParts` (#915) la lascia aperta per la parte del server che manca.
 //
 //   La porta accanto non è stata murata togliendo la credenziale — quella su
 //   questa macchina c'è ancora — ma **su GitHub**: una regola di protezione del
@@ -72,6 +73,9 @@ export function classifyOwnerMerge(status, body) {
     }
     if (r.result === 'conflict') return { outcome: 'conflict', reason: String(r.reason || '') };
     if (r.result === 'stale') return { outcome: 'stale', headSha: String(r.headSha || '') };
+    // #929: main non è più quello su cui sono girati gli unit della fusione; chi chiede rifà la prova.
+    if (r.result === 'main_moved') return { outcome: 'main_moved', mainSha: String(r.mainSha || '') };
+    if (r.result === 'unit_rossi') return { outcome: 'unit_rossi', reason: String(r.reason || '') };
     return { outcome: 'fault', reason: `risposta inattesa: ${String(r.result || '')}` };
   }
   if (status === 200 && r.ok === false) {
@@ -92,8 +96,8 @@ export function classifyOwnerMerge(status, body) {
 /**
  * Quello che il server dice della pratica locale (#908), solo se lo dice. PURA.
  * Tutto sta in `r.local` (localView in filo-security ownerMerge.js): ammessa →
- * num, skippedL5, blocks ({ gate, label, detail } o il solo nome), record, closed, approvato e daRoutine (il sì dell'owner a un
- * feedback non suo, #913); non ammessa → reason, detail.
+ * num, skippedL5, blocks ({ gate, label, detail } o il solo nome), record, closed, late, pending, noted,
+ * approvato e daRoutine (il sì dell'owner a un feedback non suo, #913); non ammessa → reason, detail.
  */
 function campiLocali(r) {
   const loc = (r.local && typeof r.local === 'object') ? r.local : null;
@@ -107,6 +111,11 @@ function campiLocali(r) {
       out.record = String(loc.record || '').slice(0, 128);
     }
     if (typeof loc.closed === 'boolean') out.closed = loc.closed;
+    if (Array.isArray(loc.pending) && loc.pending.length) {
+      out.pending = loc.pending.slice(0, 10).map((p) => ({ part: String(p && p.part || ''), branch: String(p && p.branch || '').slice(0, 200) }));
+    }
+    if (loc.late && typeof loc.late === 'object') out.late = { part: String(loc.late.part || ''), at: String(loc.late.at || '').slice(0, 40) };
+    if (typeof loc.noted === 'boolean') out.noted = loc.noted;
     if (loc.approvato === true) out.approvato = true;
     if (loc.approvato === true && loc.daRoutine === true) out.daRoutine = true;
     return out;
@@ -123,6 +132,22 @@ function bloccoInRiga(t) {
   const det = String(t.detail || '');
   if (!det) return nome;
   return det.length > 2000 ? `${nome}: ${det.slice(0, 2000)}… (elenco intero nella nota della pratica)` : `${nome}: ${det}`;
+}
+
+const NOME_PARTE = { app: 'dell’app', server: 'del server' };
+
+/** Un lavoro con app e server (#915): la pratica resta aperta per la parte che manca, o era già chiusa dall'altra. PURA. */
+function righeDelleParti(r, pratica, num) {
+  const righe = [];
+  if (r.late) {
+    righe.push(`  Pratica ${pratica}: l’aveva chiusa la fusione della parte ${NOME_PARTE[r.late.part] || r.late.part} dello stesso lavoro${r.late.at ? ` (${r.late.at})` : ''}. Questa era l’ultima parte, e la pratica resta chiusa.`);
+  } else if (r.pending && r.pending.length) {
+    righe.push(`  La pratica ${pratica} resta aperta: manca ${r.pending.map((p) => `la parte ${NOME_PARTE[p.part] || p.part} (${p.branch})`).join(', ')}, non ancora su main.`);
+    const n = num ? String(num).replace(/^#+/, '') : '<N>';
+    for (const p of r.pending.filter((x) => x.part === 'server')) righe.push(`  La chiude: npm run server:fondi -- ${p.branch} --feedback ${n}`);
+  } else return righe;
+  if (r.noted === false) righe.push('  La nota nella pratica NON si è scritta: in Gestione non si legge cosa manca.');
+  return righe;
 }
 
 /**
@@ -145,7 +170,9 @@ export function messageForOwnerMerge(reply, branch = 'il ramo', ctx = {}) {
           : '  Nessun blocco registrato: i controlli non avrebbero fermato niente.');
         if (blocchi.length && !r.record) righe.push('  La traccia dei blocchi NON si è registrata: l’elenco resta solo nella nota della pratica e nei log del server.');
       }
-      if (r.closed === true) righe.push(`  Pratica ${pratica} chiusa.`);
+      const parti = righeDelleParti(r, pratica, num);
+      if (parti.length) righe.push(...parti);
+      else if (r.closed === true) righe.push(`  Pratica ${pratica} chiusa.`);
       else if (r.closed === false) righe.push(`  La pratica ${pratica} NON si è chiusa. Chiudila a mano: ${chiudi}`);
       else if (r.localReason) {
         // Il codice è su main ma la pratica resta aperta: una routine potrebbe rilavorarla.
@@ -176,6 +203,14 @@ export function messageForOwnerMerge(reply, branch = 'il ramo', ctx = {}) {
     case 'conflict':
       return `✗ Conflitto: main è andato avanti e le modifiche non si incastrano da sole.\n`
         + '  Fai: git pull --rebase origin main, risolvi, e rilancia npm run finish.';
+    case 'main_moved':
+      return `✗ Main si è mosso a ogni prova degli unit sulla fusione${r.mainSha ? ` (adesso è ${String(r.mainSha).slice(0, 8)})` : ''}: nessuna fusione.
+`
+        + '  Il server fonde solo sul main su cui gli unit sono girati. Rilancia npm run finish.';
+    case 'unit_rossi':
+      return `✗ Il server non ha fuso: gli unit sul risultato della fusione erano rossi${r.reason ? ` (${r.reason})` : ''}.
+`
+        + '  Riallinea il ramo su origin/main, fai tornare verdi gli unit e rilancia npm run finish.';
     case 'stale':
       return `✗ Il ramo è cambiato dopo i controlli${r.headSha ? ` (adesso è ${String(r.headSha).slice(0, 8)})` : ''}.\n`
         + '  Il server fonde solo la versione che è stata controllata: rilancia\n'
@@ -208,7 +243,7 @@ export function messageForOwnerMerge(reply, branch = 'il ramo', ctx = {}) {
  * qualunque altro esito deve fermare chi ha lanciato il comando, anche quando
  * non è colpa di nessuno.
  *
- *   0 fuso · 10 bloccato dai controlli · 20 conflitto · 30 ramo cambiato ·
+ *   0 fuso · 10 bloccato dai controlli · 20 conflitto o unit rossi sulla fusione · 30 ramo cambiato ·
  *   1 tutto il resto (rifiuti, guasti, server assente)
  */
 export function exitCodeForOwnerMerge(reply) {
@@ -217,6 +252,7 @@ export function exitCodeForOwnerMerge(reply) {
     case 'blocked': return 10;
     case 'conflict': return 20;
     case 'stale': return 30;
+    case 'unit_rossi': return 20;
     default: return 1;
   }
 }
@@ -225,7 +261,7 @@ export function exitCodeForOwnerMerge(reply) {
  * La domanda al server: "fondi questo ramo, che alla mia ultima verifica era
  * questo commit". Ritorna sempre un esito classificato, mai un'eccezione.
  */
-export async function askServerMerge({ branch, sha = '', feedbackId = '', fetchImpl = fetch, url = OWNER_MERGE_URL } = {}) {
+export async function askServerMerge({ branch, sha = '', feedbackId = '', pendingParts = [], provaUnit = null, fetchImpl = fetch, url = OWNER_MERGE_URL } = {}) {
   const refresh = findAdminRefreshToken();
   if (!refresh) return { outcome: 'no_owner_credential' };
 
@@ -236,15 +272,25 @@ export async function askServerMerge({ branch, sha = '', feedbackId = '', fetchI
     return { outcome: 'denied', reason: String((e && e.message) || e).slice(0, 200) };
   }
 
+  const richiesta = () => fetchImpl(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ data: {
+      branch: String(branch || ''), sha: String(sha || ''),
+      ...(feedbackId ? { feedbackId: String(feedbackId) } : {}),
+      ...(feedbackId && Array.isArray(pendingParts) && pendingParts.length ? { pendingParts } : {}),
+      ...(provaUnit && typeof provaUnit === 'object' ? { provaUnit } : {}),
+    } }),
+  });
   try {
-    const res = await fetchImpl(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-      body: JSON.stringify({ data: {
-        branch: String(branch || ''), sha: String(sha || ''),
-        ...(feedbackId ? { feedbackId: String(feedbackId) } : {}),
-      } }),
-    });
+    let res;
+    try {
+      res = await richiesta();
+    } catch (e) {
+      // Dopo minuti di test la connessione tenuta viva può essere già chiusa dall'altra parte (#933): un altro tentativo.
+      if (!erroreDiConnessione(e)) throw e;
+      res = await richiesta();
+    }
     const text = await res.text();
     let body = {};
     try { body = text ? JSON.parse(text) : {}; } catch (_) { body = {}; }
@@ -252,4 +298,12 @@ export async function askServerMerge({ branch, sha = '', feedbackId = '', fetchI
   } catch (e) {
     return { outcome: 'unreachable', reason: String((e && e.message) || e).slice(0, 200) };
   }
+}
+
+/** Un `fetch failed` di una connessione chiusa o rifiutata, non una risposta del server. PURA. */
+export function erroreDiConnessione(e) {
+  const causa = (e && e.cause) || {};
+  const codice = String(causa.code || (e && e.code) || '');
+  return /^(ECONNRESET|EPIPE|ECONNREFUSED|ETIMEDOUT|UND_ERR_SOCKET|UND_ERR_CLOSED)$/.test(codice)
+    || (e instanceof TypeError && /fetch failed/i.test(String(e.message || '')));
 }

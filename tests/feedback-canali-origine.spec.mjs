@@ -184,8 +184,6 @@ test('anche le porte di chi ha solo fatto l\'accesso rifiutano per provenienza',
       vota: { type: MSG.BOARD_CAST_VOTE, id: 'fb-uno', vote: 'works' },
       ritiraIlVoto: { type: MSG.BOARD_CLEAR_VOTE, id: 'fb-uno' },
       riapriAPagamento: { type: MSG.BOARD_REOPEN, id: 'fb-uno', text: 'scritto da un sito' },
-      elencoDiChiUsaFilo: { type: MSG.OWNER_LIST_USERS },
-      regaloDiCrediti: { type: MSG.OWNER_GIFT_CREDITS, email: 'chiunque@example.com', amount: 1000 },
     });
     const esegui = async (mittente) => {
       const res = {};
@@ -254,6 +252,38 @@ test('a un sito visitato l\'identità di chi usa Filo non arriva', async ({ app,
   expect(Object.keys(out.filo)).toEqual(expect.arrayContaining(['isAdmin', 'ok', 'profile', 'remembered', 'signedIn', 'uid']));
 });
 
+test('chiedere l\'accesso da un sito non consegna al sito chi è entrato (#810.9)', async ({ app, shell }) => {
+  void shell;
+
+  const out = await app.evaluate(async (_electron, mittenti) => {
+    const M = process.getBuiltinModule('module');
+    const k = Object.keys(M._cache).find((x) => /auth[\\/]google-auth\.js$/.test(x));
+    const ga = M._cache[k].exports;
+    const profilo = { email: 'chi-usa-filo@example.com', name: 'Chi Usa Filo' };
+    ga.signIn = async () => profilo;
+    ga.isSignedIn = () => true;
+    ga.isRemembered = () => true;
+    ga.getProfile = () => profilo;
+    const MSG = globalThis.SN_MSG.MSG;
+    const accedi = (m) => globalThis.SN_HANDLE_MESSAGE({ type: MSG.AUTH_SIGNIN }, m);
+    return {
+      sito: await accedi(mittenti.sito),
+      sitoConScheda: await accedi(mittenti.sitoConScheda),
+      filo: await accedi(mittenti.filo),
+    };
+  }, { sito: SITO, sitoConScheda: SITO_CON_SCHEDA, filo: PAGINA_DI_FILO });
+
+  for (const provenienza of ['sito', 'sitoConScheda']) {
+    const r = out[provenienza];
+    expect(r.ok, `${provenienza}: l'esito dell'accesso arriva anche al sito`).toBe(true);
+    expect(r.signedIn).toBe(true);
+    expect(JSON.stringify(r), `${provenienza}: l'email di chi usa Filo è arrivata al sito`).not.toContain('chi-usa-filo@example.com');
+    expect(Object.keys(r).sort()).toEqual(['isAdmin', 'ok', 'signedIn']);
+  }
+  expect(out.filo.ok).toBe(true);
+  expect(out.filo.profile && out.filo.profile.email).toBe('chi-usa-filo@example.com');
+});
+
 test('l\'avviso «l\'accesso è cambiato» non arriva alle schede sui siti, e porta il profilo solo a Filo', async ({ app, openTab, testServer }) => {
   // La stessa porta vista dal verso opposto: se un sito non può CHIEDERE chi
   // sta usando Filo, non glielo si manda nemmeno da soli. L'avviso di cambio
@@ -286,4 +316,107 @@ test('l\'avviso «l\'accesso è cambiato» non arriva alle schede sui siti, e po
   for (const c of web) {
     expect(c.avvisi.length, `${c.url}: l'avviso con dentro il profilo è arrivato a un sito visitato`).toBe(0);
   }
+});
+
+test('l\'archivio delle schede chiuse si legge, si cerca e si cancella solo dalle pagine di Filo', async ({ app, shell }) => {
+  void shell;
+
+  const out = await app.evaluate(async (_electron, mittenti) => {
+    const MSG = globalThis.SN_MSG.MSG;
+    const A = globalThis.SN_ARCHIVED_TABS;
+    const a = await A.archive({ url: 'https://banca.example/estratto', title: 'Banca online, estratto conto' });
+    const porte = () => ({
+      elenco: { type: MSG.GET_ARCHIVED_TABS },
+      ricerca: { type: MSG.SEARCH_ARCHIVED_TABS, query: 'banca' },
+      daCancellare: { type: MSG.ARCHIVIO_DA_CANCELLARE, query: 'banca' },
+      eliminaGruppo: { type: MSG.DELETE_ARCHIVED_TABS, ids: [a.id] },
+      eliminaUna: { type: MSG.REMOVE_ARCHIVED_TAB, id: a.id },
+      svuota: { type: MSG.CLEAR_ARCHIVED_TABS },
+    });
+    const res = {};
+    for (const [prov, mittente] of Object.entries(mittenti)) {
+      res[prov] = {};
+      for (const [nome, msg] of Object.entries(porte())) res[prov][nome] = await globalThis.SN_HANDLE_MESSAGE(msg, mittente);
+    }
+    const rimaste = (await A.list()).map((x) => x.title);
+    const daFilo = await globalThis.SN_HANDLE_MESSAGE({ type: MSG.GET_ARCHIVED_TABS }, { url: 'filo://archive/archive.html' });
+    return { res, rimaste, daFilo };
+  }, { sito: SITO, sitoConScheda: SITO_CON_SCHEDA });
+
+  for (const [prov, porte] of Object.entries(out.res)) {
+    for (const [porta, r] of Object.entries(porte)) {
+      expect(r.ok, `${prov}/${porta}: un sito visitato non deve ottenere niente`).toBe(false);
+      expect(String(r.code || ''), `${prov}/${porta}`).toBe('forbidden');
+      expect(JSON.stringify(r), `${prov}/${porta}: il titolo è uscito verso il sito`).not.toContain('Banca online');
+    }
+  }
+  expect(out.rimaste, 'un sito ha cancellato schede dall\'archivio').toEqual(['Banca online, estratto conto']);
+  expect(out.daFilo.ok).toBe(true);
+  expect(out.daFilo.tabs.map((x) => x.title)).toEqual(['Banca online, estratto conto']);
+});
+
+test('il riordino delle schede, e la chiusura di una scheda per id, li chiede solo una pagina di Filo (#589.15)', async ({ app, shell, openTab, testServer }) => {
+  // Dal codice di Filo dentro un sito qualunque: senza il confine una delle due
+  // schede doppie finiva nell'archivio e, con un modello, partiva una chiamata pagata.
+  test.setTimeout(60_000);
+  const doppia = testServer.html('<html><head><title>Doppia</title></head><body><p>doppia</p></body></html>');
+  await openTab(doppia);
+  await openTab(doppia);
+  await testServer.openReady(openTab, '<html><head><title>Sito B</title></head><body><p>B</p></body></html>', { pubblico: true });
+
+  const stato = () => app.evaluate(async ({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    const archivio = (await globalThis.SN_ARCHIVED_TABS.list()).map((x) => x.title);
+    return {
+      doppie: tm.tabs.filter((t) => t.title === 'Doppia').map((t) => t.id),
+      ordine: tm.tabs.map((t) => t.id),
+      archivio,
+      chiamate: globalThis.__chiamateTriage,
+    };
+  });
+  await expect.poll(async () => (await stato()).doppie.length, { timeout: 10_000 }).toBe(2);
+
+  await app.evaluate(() => {
+    globalThis.__chiamateTriage = 0;
+    // Il modello configurato: tiene tutto, ma ogni giro è una chiamata.
+    globalThis.SN_TAB_TRIAGE_DECIDE = async () => { globalThis.__chiamateTriage += 1; return { decisions: [] }; };
+  });
+  const prima = await stato();
+
+  // Dal mondo isolato del sito B, cioè dallo stesso canale che usano i content script di Filo.
+  const dalSito = await app.evaluate(async ({ BrowserWindow }, bersaglio) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    const b = tm.tabs.find((t) => /sito-pubblico\.test/.test(t.url || ''));
+    const manda = (m) => b.view.webContents.executeJavaScriptInIsolatedWorld(999, [{
+      code: `chrome.runtime.sendMessage(${JSON.stringify(m)})`,
+    }]);
+    return {
+      riordino: await manda({ type: 'run_tab_triage' }),
+      riordinoColori: await manda({ type: 'reorder_tabs' }),
+      chiudi: await manda({ type: '_tabs:remove', id: bersaglio }),
+      confermaAFreddo: await manda({ type: 'filo_confirm_action', action: { type: 'PULISCI_TAB' } }),
+    };
+  }, prima.doppie[0]);
+
+  for (const porta of ['riordino', 'riordinoColori', 'chiudi']) {
+    expect(dalSito[porta] && dalSito[porta].ok, `${porta}: un sito visitato non deve ottenere niente`).toBe(false);
+    expect(String(dalSito[porta].code || ''), porta).toBe('forbidden');
+  }
+  expect(dalSito.confermaAFreddo.executed, 'una conferma mai chiesta ha lanciato il riordino').toBe(false);
+  const dopo = await stato();
+  expect(dopo.doppie, 'un sito ha chiuso una scheda dell\'utente').toEqual(prima.doppie);
+  expect(dopo.ordine).toEqual(prima.ordine);
+  expect(dopo.archivio).not.toContain('Doppia');
+  expect(dopo.chiamate, 'un sito ha fatto partire una chiamata al modello').toBe(0);
+
+  // Il bottone della home funziona come prima: la doppia va nell'archivio.
+  const home = app.windows().find((w) => w.url().startsWith('filo://newtab'));
+  const r = await home.evaluate(() => chrome.runtime.sendMessage({ type: 'run_tab_triage' }));
+  expect(r).toMatchObject({ ok: true, archived: 1 });
+  const fine = await stato();
+  expect(fine.doppie.length).toBe(1);
+  expect(fine.archivio).toContain('Doppia');
+  expect(fine.chiamate).toBe(1);
+  expect((await home.evaluate(() => chrome.runtime.sendMessage({ type: 'reorder_tabs' }))).ok).toBe(true);
+  void shell;
 });

@@ -294,7 +294,7 @@
         wrap.classList.add('sn-sidebar-choices-used');
         // disabilita visivamente tutti i bottoni
         wrap.querySelectorAll('button').forEach((b) => { b.disabled = true; });
-        submit({ userMessage: c.prompt });
+        submit({ userMessage: c.prompt, daScelta: true });
       });
       wrap.appendChild(btn);
     });
@@ -699,16 +699,69 @@
     });
   } catch (_) {}
 
-  async function runFiloAction(action) {
-    const label = filoActionLabel(action);
+  function logFermata(frase) {
+    const el = appendActionLog(frase);
+    if (el) el.classList.add('sn-sidebar-log-fermata');
+  }
+
+  // Un'uscita fermata (#810): oltre alla riga, l'assistente deve saperlo, come per la ricerca fermata. Una volta
+  // per domanda con un giro in più, perché lo dica; dopo resta solo nella storia, così un modello che insiste non gira.
+  const NOTA_FERMATA = 'l\'azione che avevi chiesto NON è partita, è stata fermata: avrebbe portato fuori un codice, una password, '
+    + 'una chiave o dati bancari letti fuori dalla conversazione, e Filo non li lascia uscire a nessun livello. Non riprovarla '
+    + 'in un\'altra forma; dillo all\'utente in una riga (se vuole la fa lui a mano)';
+  // Un collegamento della risposta fermato al clic: la riga, e la nota nella storia per la domanda dopo. Nessun giro in
+  // più, perché l'ha chiesto l'utente e non il modello.
+  const NOTA_COLLEGAMENTO = 'l\'utente ha cliccato un collegamento della tua risposta, ma non si è aperto: avrebbe portato '
+    + 'fuori un codice, una password, una chiave o dati bancari letti fuori dalla conversazione, e Filo non li lascia uscire '
+    + 'a nessun livello. Non riproporlo in un\'altra forma';
+  function notaFermata(frase) {
+    logFermata(frase);
+    history.push({ role: 'user', content: PROMPTS.turnoAutomaticoAiuto({ nota: NOTA_COLLEGAMENTO, perCronologia: true }), kind: 'action' });
+  }
+  let fermataDetta = false;
+  function fermata(frase) {
+    logFermata(frase);
+    if (fermataDetta) {
+      history.push({ role: 'user', content: PROMPTS.turnoAutomaticoAiuto({ nota: NOTA_FERMATA, perCronologia: true }), kind: 'action' });
+      return;
+    }
+    fermataDetta = true;
+    setTimeout(() => submit({
+      userAction: `${NOTA_FERMATA}. Procedi ora con il JSON normale (highlight / choices / text / status) usando solo ciò che già sai`,
+      preActionUrl: location.href,
+    }), 50);
+  }
+
+  // Quello che l'utente ha scritto qui: il main lascia uscire un codice scritto da lui (#810).
+  // Il testo dietro una scelta lo scrive il modello, e una pagina ostile può dettarlo: non conta.
+  function paroleUtente() {
+    return history.filter((h) => h && h.kind === 'real' && !h.daScelta).map((h) => String(h.content || ''));
+  }
+
+  // La frase della porta delle uscite se il testo per un campo della pagina porterebbe fuori un segreto, se no ''.
+  async function campoFermato(testo) {
+    if (!String(testo || '').trim()) return '';
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.CONTROLLA_CAMPO, testo: String(testo), parole: paroleUtente() });
+      return r && r.blocca ? String(r.frase || '') : '';
+    } catch (_) { return ''; }
+  }
+
+  async function runFiloAction(action, { etichetta = '' } = {}) {
+    const label = etichetta || filoActionLabel(action);
     if (action && String(action.type || '').toUpperCase() === 'NAVIGA' && !action._callId) {
       action._callId = `assistente-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
     }
     let res = null;
     try {
-      res = await chrome.runtime.sendMessage({ type: MSG.FILO_RUN_ACTION, action });
+      res = await chrome.runtime.sendMessage({ type: MSG.FILO_RUN_ACTION, action, parole: paroleUtente() });
     } catch (_) {}
     if (!res || !res.ok) { appendActionLog(`${label}: non riuscita`); return false; }
+    // Un segreto che sarebbe uscito: la riga dice cosa è stato fermato e da dove veniva.
+    if (res.output && res.output.blocked === 'segreto') {
+      fermata(res.output.frase || `${label}: fermata`);
+      return false;
+    }
 
     // Livello ≥ 2: il main NON ha eseguito e ci ha mandato la spiegazione per il
     // popup di conferma di Filo. Mostriamo il popup; solo dopo l'OK rimandiamo
@@ -725,8 +778,12 @@
       if (!ok) { appendActionLog(`${label}: annullata`); return false; }
       let c = null;
       try {
-        c = await chrome.runtime.sendMessage({ type: MSG.FILO_CONFIRM_ACTION, action, assistente: true });
+        c = await chrome.runtime.sendMessage({ type: MSG.FILO_CONFIRM_ACTION, action, assistente: true, parole: paroleUtente() });
       } catch (_) {}
+      if (c && c.output && c.output.blocked === 'segreto') {
+        fermata(c.output.frase || `${label}: fermata`);
+        return false;
+      }
       return scriviEsito(label, action, c);
     }
 
@@ -876,14 +933,14 @@
       switch (page.op) {
         case 'copy': Actions?.copyToClipboard(text); break;
         case 'cut': Actions?.cutSelection(); break;
-        case 'search_text': Actions?.searchTextOnWeb(text); break;
+        case 'search_text': return await runFiloAction({ type: 'NAVIGA', url: Actions.searchUrlFor(text) }, { etichetta: label });
         case 'read_aloud': await Tts?.readAloud(text); break;
         case 'stop_reading': Tts?.stopReading(); break;
         case 'edit_text': global.SN_EDITBOX?.openEditBox(text); break;
         case 'copy_image': await Actions?.copyImage(imgEl); break;
         case 'save_image': Actions?.downloadImage(imgEl); break;
         case 'copy_image_link': Actions?.copyUrlToClipboard(imgEl.currentSrc || imgEl.src); break;
-        case 'search_image': Actions?.searchImageOnWeb(imgEl); break;
+        case 'search_image': return await runFiloAction({ type: 'NAVIGA', url: Actions.imageSearchUrlFor(imgEl) }, { etichetta: label });
         case 'open_link': {
           // "Apri in nuova scheda" è un'azione di sistema già registrata: la
           // instradiamo via il ponte di #192.1 (NAVIGA → TabManager del main).
@@ -982,7 +1039,7 @@
   //   qualcosa che viene da fuori: i risultati di una ricerca web, l'etichetta
   //   di un elemento della pagina. Quella roba NON entra nella nota (#593):
   //   viaggia qui e finisce imbustata, dichiarata dati e recintata.
-  async function submit({ userMessage = '', userAction = '', esterno = null, preActionUrl = '' } = {}) {
+  async function submit({ userMessage = '', userAction = '', esterno = null, preActionUrl = '', daScelta = false } = {}) {
     if (!root) return;
     const wasCollapsed = collapsed;
     // Espandi solo se l'utente ha scritto qualcosa. Sui proseguimenti automatici
@@ -991,8 +1048,9 @@
     if (userMessage) expand({ ai: false });
 
     if (userMessage) {
+      fermataDetta = false;
       appendChatMessage('user', userMessage);
-      history.push({ role: 'user', content: userMessage, kind: 'real' });
+      history.push({ role: 'user', content: userMessage, kind: 'real', ...(daScelta ? { daScelta: true } : {}) });
       // Salva il messaggio raw per il "judge" lato server (vedi pathsCollector).
       // Niente userAction qui: quelli sono note di sistema, non input dell'utente.
       if (session) session.rawUserMessages.push(userMessage);
@@ -1035,7 +1093,6 @@
           return;
         }
         if (session) session.webSearchCount += 1;
-        appendActionLog(`ricerca web: "${parsed.query}"`);
         // #593 — I RISULTATI NON SONO UNA NOTA DI FILO.
         //
         // Titolo, indirizzo e riassunto di ogni risultato li scrive chi
@@ -1048,10 +1105,18 @@
         let ricercaWeb = null;
         let esitoVuoto = '';
         try {
-          const r = await chrome.runtime.sendMessage({ type: MSG.WEB_SEARCH, query: parsed.query });
+          const r = await chrome.runtime.sendMessage({ type: MSG.WEB_SEARCH, query: parsed.query, parole: paroleUtente() });
+          // #810 — la domanda avrebbe portato fuori un segreto: la ricerca non parte, e né la
+          // riga né la nota ripetono la domanda.
+          if (r && r.blocked === 'segreto') {
+            logFermata(r.frase || 'non ho fatto la ricerca');
+            esitoVuoto = 'la ricerca web che avevi chiesto NON è partita: la domanda conteneva un codice, una password, una chiave o dati bancari letti fuori dalla conversazione, e Filo non li lascia uscire a nessun livello. Non riprovarla in altra forma; dillo all\'utente in una riga (se vuole la fa lui a mano)';
+          } else {
+            appendActionLog(`ricerca web: "${parsed.query}"`);
+          }
           if (r?.ok && Array.isArray(r.results) && r.results.length) {
             ricercaWeb = { query: parsed.query, provider: r.provider || '', results: r.results };
-          } else {
+          } else if (!esitoVuoto) {
             esitoVuoto = 'la ricerca web che avevi chiesto non ha dato nessun risultato';
           }
         } catch (_) {
@@ -1222,12 +1287,19 @@
           const onAct = parsed.status === 'continue'
             ? () => onUserAction(parsed.highlight)
             : null;
-          Highlight.show(parsed.highlight.selector, {
-            note: parsed.highlight.note || '',
-            action: parsed.highlight.action,
-            value: parsed.highlight.value,
-            onAction: onAct,
-          });
+          // Il testo proposto per un campo esce verso il sito: prima passa dalla porta delle uscite (#810).
+          const fermo = act === 'fill' ? await campoFermato(parsed.highlight.value) : '';
+          if (fermo) {
+            fermata(fermo);
+            parsed.highlight = null;
+          } else {
+            Highlight.show(parsed.highlight.selector, {
+              note: parsed.highlight.note || '',
+              action: parsed.highlight.action,
+              value: parsed.highlight.value,
+              onAction: onAct,
+            });
+          }
         }
       }
 
@@ -1329,7 +1401,7 @@
     });
   }
 
-  global.SN_SIDEBAR = { open, close, isOpen, ensureNotOverTarget };
+  global.SN_SIDEBAR = { open, close, isOpen, ensureNotOverTarget, paroleUtente, notaFermata };
   // Hook di test: esercita il ponte azioni-Filo (popup di conferma + dispatch)
   // senza dover passare dal modello. Stesso pattern di window.__filoDashActions.
   global.__filoSidebarTest = {

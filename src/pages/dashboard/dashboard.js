@@ -41,6 +41,10 @@
   let sending = false;
   let liveTickHandle = null;
   let pendingImages = []; // dataUrl delle immagini incollate (multiple)
+  // #950 — file trascinati dal disco: { percorso, nome }. Il percorso parte col messaggio, come se l'utente
+  // l'avesse incollato; le immagini arrivate dal disco ricordano il loro.
+  let pendingFiles = [];
+  const percorsiImmagini = new Map();
 
   // ===== Le parti della home =====
   //
@@ -66,7 +70,18 @@
     send,
     faviconUrl: (url) => faviconUrl(url),
     applyCommandCwd: (actions) => Term.applyCommandCwd(actions),
+    // Le parole dell'utente in questa chat viaggiano con l'OK: un codice scritto da lui può uscire (#810).
+    paroleUtente: () => paroleUtente(),
+    apriProposta: (url, vicino) => apriProposta(url, vicino),
+    archiviaAzione: (type, cambi) => {
+      const id = chatDellaRiga();
+      const ids = Array.isArray(cambi) ? cambi : [];
+      if (id) { try { send({ type: MSG.FILO_CHAT_NOTE, id, text: '', role: 'filo', actions: [type], ...(ids.length ? { cambi: ids } : {}) }); } catch (_) {} }
+    },
   });
+  // #867 — il segno sulla bolla dell'utente per i cambi di stato che il suo messaggio ha chiesto.
+  const Cambi = self.SN_DASH_CAMBI;
+  Cambi.init({ send });
   // #590 — una pagina aperta da Filo che si è spostata da sé su un sito bloccato dopo la risposta.
   if (window.filo?.onAperturaFermata) {
     window.filo.onAperturaFermata((data) => {
@@ -85,12 +100,12 @@
   // quella aperta quando è pronta: chi la produce prende la targa (`chatDellaRiga`)
   // al momento del comando e la passa qui. Un comando lento più un ritorno alla
   // home la mettevano nella chat sbagliata, o in una chat nuova mai fatta.
-  const archiviaRiga = (text, role, chat) => {
+  const archiviaRiga = (text, role, chat, esterno) => {
     // L'intervista di benvenuto ha una conversazione sua e un modo suo di
     // finire: le sue righe le archivia lei.
     if (Accoglienza.isActive()) return null;
     const id = chat || ensureChatId();
-    try { send({ type: MSG.FILO_CHAT_NOTE, id, text, role }); } catch (_) {}
+    try { send({ type: MSG.FILO_CHAT_NOTE, id, text, role, ...(esterno ? { esterno } : {}) }); } catch (_) {}
     return id;
   };
   const chatDellaRiga = () => (Accoglienza.isActive() ? null : ensureChatId());
@@ -309,6 +324,7 @@
     // "chat nuova" e alla chiusura dell'app. Prima di svuotare le bolle,
     // perché da qui in poi la conversazione non esiste più in questa pagina.
     closeCurrentChat();
+    Term.nuovaChat(false);
     body.dataset.state = 'home';
     homeView.hidden = false;
     threadView.hidden = true;
@@ -346,13 +362,18 @@
     threadHistory = [];
     bubblesEl.innerHTML = '';
     goThread();
+    let bollaUtente = null;
     for (const m of chat.messages) {
       const isUser = m.role === 'user';
       const text = String(m.text || '');
       const types = Array.isArray(m.actions) ? m.actions : [];
       if (text.trim()) {
-        bubblesEl.appendChild(makeBubble({ role: isUser ? 'user' : 'filo', text, markdown: !isUser }));
+        const b = makeBubble({ role: isUser ? 'user' : 'filo', text, markdown: !isUser });
+        bubblesEl.appendChild(b);
+        if (isUser) bollaUtente = b;
       }
+      // I cambi chiesti con quel messaggio ritrovano il loro segno, col loro stato di adesso.
+      if (!isUser && Array.isArray(m.cambi) && m.cambi.length && bollaUtente) Cambi.segna(bollaUtente, m.cambi);
       // Le immagini incollate non stanno nell'archivio (sono data URL da
       // centinaia di KB l'una), ma il loro NUMERO sì: va detto. Senza, chi
       // rilegge trova «cosa vedi in questo grafico?» riferito al nulla e non
@@ -375,10 +396,19 @@
         note.textContent = Att.summarizeActivity(types, false);
         bubblesEl.appendChild(note);
       }
+      // Cosa veniva da fuori resta con la frase (#810): la porta delle uscite lo rilegge da qui.
+      const fuori = isUser ? {} : {
+        ...(Array.isArray(m.letti) && m.letti.length ? { letti: m.letti } : {}),
+        ...(typeof m.esterno === 'string' && m.esterno ? { esterno: m.esterno } : {}),
+      };
       threadHistory.push(isUser
-        ? { role: 'user', text }
-        : { role: 'filo', text, actions: types.map((t) => ({ type: t })) });
+        ? { role: 'user', text, ...(m.daModello ? { daModello: true } : {}) }
+        : { role: 'filo', text, actions: types.map((t) => ({ type: t })), ...fuori });
     }
+    Term.nuovaChat(chat.messages.some((m) => (
+      (m.role !== 'user' && Array.isArray(m.actions) && m.actions.includes('ESEGUI_COMANDO'))
+      || (m.role === 'user' && /^\//.test(String(m.text || '').trim()) && Comandi.classifyInput(String(m.text)) !== 'filo')
+    )));
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
     inputEl.focus();
     return true;
@@ -396,6 +426,48 @@
   // Favicon di un sito a partire dall'URL. Usa il servizio Google s2 —
   // gratis, niente API key, regge i casi mancanti restituendo un'icona
   // grigia generica. Ritorna '' per URL non http(s) (es. file://, mailto:).
+  // Quello che l'utente ha scritto in questa chat: un codice scritto da lui può uscire (#810). Il testo di un
+  // suggerimento della home no, l'ha scritto un modello.
+  function paroleUtente() {
+    return threadHistory.filter((m) => m && m.role !== 'filo' && !m.daModello).map((m) => String(m.text || ''));
+  }
+
+  // Un indirizzo web che un modello ha proposto qui si apre solo dal main, dopo la porta delle uscite, con
+  // l'indirizzo che si apre davvero (#810). Se si ferma, la riga lo dice accanto a ciò che è stato cliccato.
+  async function apriProposta(url, vicino = null) {
+    let r = null;
+    try { r = await send({ type: MSG.FILO_APRI_PROPOSTA, url, parole: paroleUtente() }); } catch (_) {}
+    if (r && r.frase) notaFermata(r.frase, vicino);
+  }
+  function notaFermata(frase, vicino) {
+    if (vicino && vicino.dataset.fermata) return;
+    if (vicino) vicino.dataset.fermata = '1';
+    const nota = document.createElement('div');
+    nota.className = 'dash-bubble-note dash-fermata-clic';
+    nota.textContent = `🔒 ${frase.charAt(0).toUpperCase()}${frase.slice(1)}`;
+    const li = vicino && vicino.closest('li');
+    const dopo = vicino && (vicino.closest('.dash-bubble-actions') || vicino.closest('.dash-bubble'));
+    if (li) li.appendChild(nota);
+    else if (dopo) dopo.insertAdjacentElement('afterend', nota);
+    else bubblesEl.appendChild(nota);
+  }
+  // Ogni collegamento web o di posta della pagina (risposte, bottoni) passa da apriProposta, anche col tasto centrale.
+  const apriDaCollegamento = (e) => {
+    if (e.type === 'auxclick' && e.button !== 1) return;
+    const a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+    if (!a || !/^(?:https?|mailto|tel|sms):/i.test(a.href)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    apriProposta(a.href, a);
+  };
+  document.addEventListener('click', apriDaCollegamento, true);
+  document.addEventListener('auxclick', apriDaCollegamento, true);
+  // Un'apertura chiesta dal menu del tasto destro la ferma il main: la riga va accanto al collegamento di quel menu.
+  let ultimoTastoDestro = null;
+  document.addEventListener('contextmenu', (e) => {
+    ultimoTastoDestro = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+  }, true);
+
   function faviconUrl(rawUrl) {
     if (!rawUrl) return '';
     try {
@@ -442,7 +514,7 @@
       text.textContent = s.text || '';
       btn.appendChild(icon);
       btn.appendChild(text);
-      btn.addEventListener('click', () => onSuggestionClick(s));
+      btn.addEventListener('click', () => onSuggestionClick(s, btn));
       li.appendChild(btn);
       suggestionsEl.appendChild(li);
     }
@@ -456,7 +528,8 @@
     renderSuggestions();
   });
 
-  async function onSuggestionClick(s) {
+  async function onSuggestionClick(s, vicino = null) {
+    if (s.fermata) { notaFermata(String(s.fermata), vicino); return; }
     const a = s.action;
     if (!a) return;
     const type = String(a.type || '').toUpperCase();
@@ -474,19 +547,17 @@
       send({ type: MSG.RUN_TAB_TRIAGE });
       return;
     }
+    // Il suggerimento l'ha scritto un modello (#810): un indirizzo passa dalla porta delle uscite, e il suo testo va
+    // in chat come suo, non come parole dell'utente né come comando con la barra.
     if (type === 'NAVIGA' && a.url) {
-      chrome.tabs.create({ url: a.url });
+      apriProposta(a.url, vicino);
     } else if (type === 'APRI_FILE' && (a.path || a.url)) {
       const url = a.url || a.path;
-      if (/^https?:|^chrome-extension:|^chrome:/.test(url)) chrome.tabs.create({ url });
+      if (/^https?:/.test(url)) apriProposta(url, vicino);
     } else if (type === 'CHAT' && a.prompt) {
-      // Trigger interno: prepopola la chat con il prompt.
-      inputEl.value = a.prompt;
-      inputForm.dispatchEvent(new Event('submit'));
+      submitMessage(String(a.prompt), { daModello: true });
     } else {
-      // Fallback: trasforma la voce in messaggio chat.
-      inputEl.value = s.text || '';
-      inputForm.dispatchEvent(new Event('submit'));
+      submitMessage(String(s.text || ''), { daModello: true });
     }
   }
 
@@ -762,9 +833,16 @@
     IMPOSTA_PREFERENZA: 'Cambio un\'impostazione…',
     IMPOSTA_ESTETICA: 'Cambio l\'aspetto…',
     INVIA_FEEDBACK: 'Preparo una segnalazione…',
+    RINOMINA_FILE: 'Leggo i file per dar loro un nome…',
   };
   function startLabelFor(type) {
     return START_LABELS[String(type || '').toUpperCase()] || 'Eseguo un\'azione…';
+  }
+  // Un'azione che lavora su più cose dice quante ne ha fatte: «3 di 40» al posto di un'attesa al buio.
+  function progressLabelFor(type, fatti, totali) {
+    const base = startLabelFor(type);
+    const n = Number(totali);
+    return n > 1 ? `${base} ${Math.min(Number(fatti) || 0, n)} di ${n}` : base;
   }
 
   // Un singolo turno del modello: bolla "sta pensando" + reasoning live, invio
@@ -785,7 +863,7 @@
     return h;
   }
 
-  async function runFiloTurn({ userMessage, images = [], internal = false, activity = null }) {
+  async function runFiloTurn({ userMessage, images = [], internal = false, daModello = false, activity = null }) {
     // Blocco di attività della domanda (#521): lo crea e lo chiude chi guida
     // la sequenza dei turni (runTurnAndContinue); qui ci si scrive dentro.
     const pending = activity || Att.create(bubblesEl);
@@ -853,8 +931,11 @@
         if (!data || data.reqId !== reasoningReqId) return;
         if (data.kind === 'start') {
           pending.working(startLabelFor(data.type));
+        } else if (data.kind === 'progress') {
+          pending.working(progressLabelFor(data.type, data.fatti, data.totali));
         } else if (data.kind === 'done') {
           const a = data.action;
+          if (a && Array.isArray(a._cambi)) Cambi.segna(pending.el, a._cambi);
           if (a && data.kept !== false && Att.tellActionInActivity(pending, a) && a._callId) shown.add(a._callId);
         } else if (data.kind === 'round') {
           if (streamBubble) {
@@ -875,6 +956,7 @@
       threadHistory: historyWithout(userMessage),
       reasoningReqId,
       internal,
+      ...(daModello ? { daModello: true } : {}),
       // #525 — la chat si archivia nel main, mentre la si fa.
       chatId: ensureChatId(),
     };
@@ -883,6 +965,10 @@
       msg.images = images;
     }
     const r = await send(msg);
+    // Anche quelle arrivate senza evento in diretta (o con un guasto dopo): il segno non dipende dalla diretta.
+    for (const a of (Array.isArray(r?.actions) ? r.actions : [])) {
+      if (a && Array.isArray(a._cambi)) Cambi.segna(pending.el, a._cambi);
+    }
 
     if (offReasoning) { try { offReasoning(); } catch (_) {} }
     if (offAnswer) { try { offAnswer(); } catch (_) {} }
@@ -994,6 +1080,7 @@
       if (turn.text) { entry.reasoning = turn.text; entry.reasoningMs = turn.ms; }
       if (Array.isArray(r.reasoningDetails) && r.reasoningDetails.length) entry.reasoningDetails = r.reasoningDetails;
       if (Array.isArray(r.notes) && r.notes.length) entry.notes = r.notes;
+      if (Array.isArray(r.letti) && r.letti.length) entry.letti = r.letti;
       threadHistory.push(entry);
       Term.applyCommandCwd(r.actions);
       // Chi guida la sequenza deve poter assorbire questa bolla nel blocco se
@@ -1004,12 +1091,16 @@
     return r;
   }
 
-  async function submitMessage(text) {
-    if ((!text && pendingImages.length === 0) || sending) return;
+  // `daModello`: il testo viene da un suggerimento della home, non dalle dita dell'utente (#810).
+  async function submitMessage(text, { daModello = false } = {}) {
+    if ((!text && pendingImages.length === 0 && pendingFiles.length === 0) || sending) return;
     sending = true;
     sendBtn.disabled = true;
     const imagesToSend = pendingImages.slice();
+    const righeFile = [...pendingFiles.map((f) => f.percorso), ...imagesToSend.map((d) => percorsiImmagini.get(d))]
+      .filter(Boolean).map((p) => `File: ${p}`);
     clearImagePreviews();
+    if (righeFile.length) text = [text || (imagesToSend.length ? 'Descrivi questa immagine.' : ''), ...righeFile].filter(Boolean).join('\n');
     // Svuota subito la textarea: la bolla utente è già visibile, niente attesa.
     inputEl.value = '';
     autoGrowInput();
@@ -1017,7 +1108,7 @@
     if (body.dataset.state !== 'thread') goThread();
 
     // Bolla utente
-    threadHistory.push({ role: 'user', text: text || '(immagine)' });
+    threadHistory.push({ role: 'user', text: text || '(immagine)', ...(daModello ? { daModello: true } : {}) });
     const userBubble = makeBubble({ role: 'user', text: text || '' });
     // Mostra TUTTE le immagini inviate nella bolla, ognuna ingrandibile al click.
     imagesToSend.forEach((src, i) => {
@@ -1029,7 +1120,7 @@
     });
     bubblesEl.appendChild(userBubble);
 
-    await runTurnAndContinue({ userMessage: text || 'Descrivi questa immagine.', images: imagesToSend });
+    await runTurnAndContinue({ userMessage: text || 'Descrivi questa immagine.', images: imagesToSend, daModello });
   }
 
   // Un turno + la sua eventuale prosecuzione autonoma, e il rilascio della barra
@@ -1072,9 +1163,42 @@
   // ===== Image paste / drop (multi-immagine) =====
   const imgPreviewsEl = $('imgPreviews');
 
+  const Rinomina = window.SN_RINOMINA_UI;
+  const percorsoDelFile = (f) => {
+    try { return (window.filo && window.filo.percorsoDelFile) ? window.filo.percorsoDelFile(f) : ''; } catch (_) { return ''; }
+  };
+  const nomeDaPercorso = (p) => String(p || '').split(/[\\/]/).pop() || String(p || '');
+  // Il tasto destro su un file della barra di scrittura: il nome sensato prima di mandarlo, o toglierlo.
+  function menuFileInArrivo(e, { percorso, togli, suRinominato }) {
+    e.preventDefault();
+    const ancora = e.currentTarget;
+    const r = ancora.getBoundingClientRect();
+    const x = e.type === 'contextmenu' && e.clientX ? e.clientX : r.left;
+    const y = e.type === 'contextmenu' && e.clientY ? e.clientY : r.bottom;
+    const nome = nomeDaPercorso(percorso);
+    Promise.resolve(Rinomina ? Rinomina.disponibile() : false).then((disp) => {
+      if (!Rinomina) return;
+      const voci = [];
+      if (disp && Rinomina.tipoSupportato(nome)) {
+        voci.push([Rinomina.VOCE, () => Rinomina.apri({ ancora, percorso, nome, suRinominato, suRimesso: suRinominato })]);
+      }
+      if (Rinomina.nomeDiPrima(percorso)) {
+        voci.push([Rinomina.VOCE_RIMETTI, () => Rinomina.rimetti({ ancora, percorso, suRimesso: suRinominato })]);
+      }
+      voci.push(['Togli dal messaggio', togli]);
+      Rinomina.menu(x, y, voci, { ancora });
+    });
+  }
+  function conMenuFile(el, opzioni) {
+    el.addEventListener('contextmenu', (e) => menuFileInArrivo(e, opzioni()));
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) menuFileInArrivo(e, opzioni());
+    });
+  }
+
   function renderImagePreviews() {
     imgPreviewsEl.innerHTML = '';
-    imgPreviewsEl.hidden = pendingImages.length === 0;
+    imgPreviewsEl.hidden = pendingImages.length === 0 && pendingFiles.length === 0;
     pendingImages.forEach((dataUrl, idx) => {
       const wrap = document.createElement('div');
       wrap.className = 'dash-img-preview';
@@ -1092,27 +1216,75 @@
       rm.setAttribute('aria-label', 'Rimuovi immagine');
       rm.addEventListener('click', () => {
         pendingImages.splice(idx, 1);
+        percorsiImmagini.delete(dataUrl);
         renderImagePreviews();
       });
       wrap.appendChild(img);
       wrap.appendChild(rm);
+      if (percorsiImmagini.has(dataUrl)) {
+        wrap.title = percorsiImmagini.get(dataUrl);
+        conMenuFile(img, () => ({
+          percorso: percorsiImmagini.get(dataUrl),
+          togli: () => { pendingImages = pendingImages.filter((d) => d !== dataUrl); percorsiImmagini.delete(dataUrl); renderImagePreviews(); },
+          suRinominato: (r) => { if (r && r.a) percorsiImmagini.set(dataUrl, r.a); renderImagePreviews(); },
+        }));
+      }
       imgPreviewsEl.appendChild(wrap);
     });
+    for (const f of pendingFiles) {
+      const chip = document.createElement('div');
+      chip.className = 'dash-file-chip';
+      chip.tabIndex = 0;
+      chip.title = f.percorso;
+      const nome = document.createElement('span');
+      nome.className = 'dash-file-chip-nome';
+      nome.textContent = f.nome;
+      const rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'dash-img-remove dash-file-chip-togli';
+      rm.textContent = '×';
+      rm.setAttribute('aria-label', 'Togli il file');
+      rm.title = 'Togli';
+      const togli = () => { pendingFiles = pendingFiles.filter((x) => x !== f); renderImagePreviews(); };
+      rm.addEventListener('click', togli);
+      conMenuFile(chip, () => ({
+        percorso: f.percorso,
+        togli,
+        suRinominato: (r) => { if (r && r.a) { f.percorso = r.a; f.nome = r.nome || nomeDaPercorso(r.a); } renderImagePreviews(); },
+      }));
+      chip.append(nome, rm);
+      imgPreviewsEl.appendChild(chip);
+    }
   }
-  function addPendingImage(dataUrl) {
+  function addPendingImage(dataUrl, percorso) {
     pendingImages.push(dataUrl);
+    if (percorso) percorsiImmagini.set(dataUrl, percorso);
+    renderImagePreviews();
+  }
+  function addPendingFile(percorso) {
+    if (!percorso || pendingFiles.some((f) => f.percorso === percorso)) return;
+    pendingFiles.push({ percorso, nome: nomeDaPercorso(percorso) });
     renderImagePreviews();
   }
   function clearImagePreviews() {
     pendingImages = [];
+    pendingFiles = [];
+    percorsiImmagini.clear();
     renderImagePreviews();
   }
-  function handleImageFile(file) {
+  function handleImageFile(file, percorso = '') {
     if (!file || !file.type.startsWith('image/')) return;
-    if (file.size > 4 * 1024 * 1024) return;
+    if (file.size > 4 * 1024 * 1024) { if (percorso) addPendingFile(percorso); return; }
     const reader = new FileReader();
-    reader.onload = () => addPendingImage(reader.result);
+    reader.onload = () => addPendingImage(reader.result, percorso);
     reader.readAsDataURL(file);
+  }
+  // Un file dal disco: le immagini si vedono (e il modello le guarda), gli altri entrano col loro percorso.
+  function handleDroppedFile(file) {
+    if (!file) return;
+    const percorso = percorsoDelFile(file);
+    if (file.type && file.type.startsWith('image/')) handleImageFile(file, percorso);
+    else if (percorso) addPendingFile(percorso);
   }
   inputForm.addEventListener('paste', (e) => {
     const items = e.clipboardData?.items;
@@ -1140,7 +1312,7 @@
   inputForm.addEventListener('drop', (e) => {
     e.preventDefault();
     const files = e.dataTransfer?.files;
-    if (files) for (const f of files) handleImageFile(f);
+    if (files) for (const f of files) handleDroppedFile(f);
   });
 
   // ===== Lightbox: click su un'immagine per ingrandirla =====
@@ -1185,7 +1357,7 @@
   inputForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const text = inputEl.value.trim();
-    if (!text && pendingImages.length === 0) return;
+    if (!text && pendingImages.length === 0 && pendingFiles.length === 0) return;
     // "/dominio.tld": non navigare DI SLANCIO verso un sito inesistente
     // (porterebbe a una pagina bianca). Verifica il DNS (await se non già in
     // cache) e, se il dominio non esiste, dillo e offri di aprire lo stesso —
@@ -1222,7 +1394,10 @@
 
   // ===== Bridge cambio stato live dal background =====
   chrome.runtime.onMessage.addListener((msg) => {
-    if (msg?.type === MSG.FILO_LIVE_UPDATED) {
+    if (msg?.type === MSG.USCITA_FERMATA && msg.frase) {
+      const vicino = ultimoTastoDestro && ultimoTastoDestro.isConnected ? ultimoTastoDestro : null;
+      notaFermata(String(msg.frase), vicino);
+    } else if (msg?.type === MSG.FILO_LIVE_UPDATED) {
       refreshLive().catch(() => {});
     } else if (msg?.type === MSG.FILO_CHATS_UPDATED && msg.cancellata) {
       // #525 — qualcuno ha cancellato dalla Cronologia la conversazione che
@@ -1809,6 +1984,24 @@
     } catch (_) {}
   });
 
+  // Aperta dal tasto destro sull'avviso di un sito pericoloso (#813.5): la domanda su quel sito parte da sola, il falso
+  // allarme apre «Invia feedback» già scritto. Durante l'intervista di benvenuto la domanda resta scritta e la manda l'utente.
+  async function richiestaDellAvviso(inAccoglienza) {
+    const r = await send({ type: MSG.CASA_RICHIESTA });
+    const q = r && r.ok && r.richiesta;
+    if (!q || typeof q.testo !== 'string' || !q.testo) return;
+    if (q.tipo === 'segnala') {
+      const fine = Date.now() + 5000;
+      while (!self.SN_FEEDBACK_UI && Date.now() < fine) await new Promise((ok) => setTimeout(ok, 50));
+      self.SN_FEEDBACK_UI?.open({ testo: q.testo });
+    } else if (q.tipo === 'chiedi') {
+      if (!inAccoglienza) { submitMessage(q.testo); return; }
+      inputEl.value = q.testo;
+      autoGrowInput();
+      inputEl.focus();
+    }
+  }
+
   (async function init() {
     renderControls();
     refreshRedteamVisibile();
@@ -1850,6 +2043,7 @@
     // Nessuna intervista aperta: se l'ultima si era chiusa a metà, la home lo
     // dice — finché l'utente non risponde a quella riga.
     else Accoglienza.refreshOnboardingNotice().catch(() => {});
+    richiestaDellAvviso(!!onbState).catch((e) => console.warn('[Filo] richiesta dall\'avviso', e));
     // Popup all'avvio, in sequenza per non sovrapporsi: prima il recap
     // aggiornamento (solo se c'è una versione precedente vista e note nuove),
     // POI il ringraziamento per i feedback risolti (C5). Se il recap non compare,

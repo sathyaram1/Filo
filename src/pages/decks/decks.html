@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="filo://style/theme.css" />
   <link rel="stylesheet" href="filo://style/pages.css" />
   <script src="filo://shared/themeTokens.js"></script>
+  <script src="filo://shared/avvisiTempo.js"></script>
   <script src="filo://shared/pageBootstrap.js"></script>
   <script src="filo://shared/constants.js"></script>
   <script src="filo://shared/contenutoEsterno.js"></script>
@@ -24,6 +25,7 @@
     /* App deck builder Commander (DECK-BUILDER-SPEC.md): tre schermate su hash routing — libreria, builder,
        partita — e una sola .dk-screen visibile alla volta. */
     .dk-screen[hidden] { display: none; }
+    .sn-toolbar .sn-btn[hidden] { display: none; }
 
     .dk-thumb {
       aspect-ratio: 626 / 457; /* proporzione dell'art crop Scryfall */
@@ -481,7 +483,9 @@
       transition: opacity 0.18s ease, transform 0.18s ease;
       pointer-events: none; z-index: 2147483001;
     }
-    .dk-toast.show { opacity: 1; transform: translateY(0); }
+    /* Visibile prende il puntatore (sopra, il tempo aspetta; un clic lo chiude); nascosto torna trasparente. */
+    .dk-toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; cursor: pointer; }
+    .dk-toast.show:hover { background: var(--sn-hover, var(--sn-bg)); }
 
     .dk-back { margin-bottom: 12px; }
   </style>
@@ -492,7 +496,7 @@
       <h1>Deck builder MTG</h1>
       <div class="sn-toolbar">
         <button class="sn-btn" id="newDeck">+ Nuovo mazzo</button>
-        <button class="sn-btn sn-btn-secondary" id="openGame">Partita</button>
+        <button class="sn-btn sn-btn-secondary" id="openGame" hidden>Partita</button>
       </div>
       <div id="deckGrid" class="sn-card-grid"></div>
       <div id="deckEmpty" class="sn-empty" hidden>

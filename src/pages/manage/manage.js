@@ -136,6 +136,7 @@
   const mgReopenText    = document.getElementById('mgReopenText');
   const mgReopenCancel  = document.getElementById('mgReopenCancelBtn');
   const mgReopenConfirm = document.getElementById('mgReopenConfirmBtn');
+  const mgSegnoConferma = document.getElementById('mgSegnoConferma');
 
   // Risposta ai chiarimenti (owner-only)
   const mgClarify     = document.getElementById('mgClarify');
@@ -181,6 +182,11 @@
   let currentTab    = 'inbox';  // tab lista attiva (inbox/queue/resolved/archived)
   let currentList   = [];       // feedback della tab corrente, ordinati
   let selectedId    = null;     // ID del feedback selezionato nel pannello centrale
+  // Segno di mittente pericoloso (#922): copia letta per mittente, i segni in corso di togliersi, e il
+  // mittente aperto nel pannello di destra col feedback con cui chiederne il segno.
+  const segniMittente = new Map();
+  const segniInVolo = new Set();
+  let mittenteAperto = null;
   let allByClient   = {};       // clientId → array di feedback (per il pannello mittente)
   let starredOnly   = false;    // filtro ⭐ della tab Archiviati (DB2)
   let confirmedOnly = false;    // filtro "Bloccati confermati" (attack/spam confermati)
@@ -343,6 +349,7 @@
     if (nuovo === isAdmin) return;
     isAdmin = nuovo;
     imgCache.clear();
+    segniMittente.clear();
     // Anche le risposte sulle pillole dei documenti: dipendono da chi guarda
     // esattamente come quelle delle immagini, e tenerne una sola delle due
     // avrebbe lasciato metà del difetto in piedi.
@@ -1052,6 +1059,7 @@
   const TAB_IN_VISTA = (window.SN_MSG?.MSG?.TAB_IN_VISTA) || 'tab_in_vista';
   const TAB_IN_VISTA_GET = (window.SN_MSG?.MSG?.TAB_IN_VISTA_GET) || 'tab_in_vista_get';
   const LIVELLO4_SALTA = (window.SN_MSG?.MSG?.LIVELLO4_SALTA) || 'livello4_salta';
+  const FEEDBACK_SENDER_FLAG = (window.SN_MSG?.MSG?.FEEDBACK_SENDER_FLAG) || 'feedback_sender_flag';
 
   // Perché una richiesta è stata respinta, detto all'owner e non al codice.
   const DENY_LABELS = {
@@ -2488,7 +2496,11 @@
     hideTabBars();
     mgListLoading.hidden = true;
     mgList.innerHTML = '';
-    setSearchMsg(fallback ? 'Modello non disponibile: mostro i risultati per testo.' : '', null);
+    // Il motivo del main dice anche dove si imposta il modello: senza, l'owner lo cercava dove non c'è più (#465).
+    const motivo = fallback && opts && opts.motivo ? String(opts.motivo).trim() : '';
+    setSearchMsg(fallback
+      ? (motivo ? `${motivo} Intanto mostro i risultati per testo.` : 'Modello non disponibile: mostro i risultati per testo.')
+      : '', null);
 
     // "Nessun risultato" al tetto del caricamento significa "nessuno fra quelli
     // caricati": la ricerca legge solo i feedback che stanno in pagina.
@@ -2564,6 +2576,7 @@
 
     const validIds = new Set(candidates.map((c) => c.id));
     let ranked = null;
+    let motivo = '';
     try {
       const r = await sendToMain({
         type: (window.SN_MSG && window.SN_MSG.MSG && window.SN_MSG.MSG.AI_REQUEST) || 'ai_request',
@@ -2578,6 +2591,8 @@
       if (r && r.ok && typeof r.text === 'string') {
         const parsed = SRCH.parseRanking(r.text, validIds);
         if (parsed.length) ranked = parsed;
+      } else if (r && r.ok === false && typeof r.error === 'string') {
+        motivo = r.error;
       }
     } catch (_) { /* ripiego per parole qui sotto */ }
 
@@ -2588,7 +2603,7 @@
       renderSearchResults(ranked, { fallback: false });
     } else {
       // Ripiego per parole: la ricerca trova comunque qualcosa.
-      renderSearchResults(SRCH.keywordSearch(allFeedbacks, query), { fallback: true });
+      renderSearchResults(SRCH.keywordSearch(allFeedbacks, query), { fallback: true, motivo });
     }
   }
 
@@ -2764,11 +2779,12 @@
     // Chi ha scritto, in chiaro (#443): l'identificativo grezzo diceva
     // "filo:chat" dove serviva leggere "Filo, per conto di un utente". Resta
     // ispezionabile passandoci sopra e nel pannello del mittente.
-    mgDetailHead.innerHTML = `Da <a class="mg-sender-link" id="senderLink" href="#" data-client="${esc(clientId)}" title="${esc(clientId)}">${esc(senderLabel(fb))}</a> il ${dateStr}`;
+    mgDetailHead.innerHTML = `Da <a class="mg-sender-link" id="senderLink" href="#" data-client="${esc(clientId)}" title="${esc(clientId)}">${esc(senderLabel(fb))}</a> il ${dateStr}<div class="mg-segno" id="mgSegnoTestata" hidden></div>`;
     document.getElementById('senderLink').addEventListener('click', (e) => {
       e.preventDefault();
       openSidebarSender(senderKeyOf(fb));
     });
+    leggiSegno(fb);
 
     // La fila dei cinque livelli: triangolo, cerchi, rombo, pentagono,
     // quadrato. Ogni forma cliccata si apre nel pannello di destra.
@@ -2797,6 +2813,7 @@
     // La casella e il rombo verde della fila nascono dalla stessa domanda.
     const isClarify = leggibile && MR.aspettaRisposta(fb);
     renderActions(fb);
+    disegnaSegnoTestata(fb);
     mgClarify.hidden = !(isAdmin && isClarify);
     mgClarifyText.value = '';
     setClarifyMsg('', '');
@@ -3108,6 +3125,7 @@
   function renderActions(fb) {
     if (!mgActions || !mgActionsRow) return;
     chiudiRiapertura();
+    chiudiConfermaSegno();
     setActionMsg('', '');
     mgActionsRow.querySelectorAll('button').forEach((b) => b.remove());
     const azioni = (isAdmin && fb) ? MR.ownerActions(fb, { releasedVersion }) : [];
@@ -3143,6 +3161,7 @@
       });
       mgActionsRow.appendChild(b);
     }
+    aggiornaBottoneSegno(fb);
   }
 
   // Una scrittura in volo spegne TUTTA la riga, non solo il bottone premuto:
@@ -3238,6 +3257,7 @@
       mgManage.hidden = true;
       if (mgOwnerBar) mgOwnerBar.hidden = true;
       chiudiRiapertura();
+      chiudiConfermaSegno();
       closeSidebar();
       renderList();
     } catch (e) {
@@ -3326,6 +3346,256 @@
       if (e.key === 'Escape') { e.preventDefault(); chiudiRiapertura(); }
       else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); confermaRiapertura(); }
     });
+  }
+
+  // ── Segno di mittente pericoloso (#922) ───────────────────────────────────
+  // Lo tiene il server: qui c'è la copia letta, per mittente. Toglierlo è un gesto suo, con una conferma che
+  // dice cosa cambia; approvare non lo tocca (il perché sta accanto a MR.FRASE_SEGNO_ERRATO).
+  // Un segno può arrivare mentre la pagina è aperta (un attacco nuovo): la copia si rilegge dopo due minuti.
+  const SEGNO_VALIDO_MS = 2 * 60 * 1000;
+
+  // Senza un mittente leggibile due feedback non si possono dire dello stesso: la copia resta del feedback.
+  function chiaveSegno(fb) {
+    const c = String((fb && fb.clientId) || '').trim();
+    if (!c || MR.valueUnreadable(c)) return 'fb:' + String((fb && fb._id) || '');
+    return 'm:' + senderKeyOf(fb);
+  }
+  function segnoDi(fb) { return fb ? segniMittente.get(chiaveSegno(fb)) || null : null; }
+  function segnoAttivo(fb) { const s = segnoDi(fb); return !!(s && s.flagged); }
+
+  function leggiSegno(fb, opts) {
+    if (!isAdmin || !fb || !fb._id) return;
+    const k = chiaveSegno(fb);
+    const prima = segniMittente.get(k);
+    if (prima && prima.leggo) return;
+    if (prima && prima.letto && !(opts && opts.forza) && Date.now() - prima.letto < SEGNO_VALIDO_MS) return;
+    const inizio = Date.now();
+    segniMittente.set(k, Object.assign({}, prima, { leggo: true }));
+    sendToMain({ type: FEEDBACK_SENDER_FLAG, feedbackId: fb._id, action: 'read' })
+      .catch((e) => ({ ok: false, error: e?.message || String(e) }))
+      .then((r) => {
+        const ora = segniMittente.get(k) || {};
+        // Un segno tolto mentre questa lettura era in volo vale più di lei.
+        if (ora.scritto && ora.scritto > inizio) { segniMittente.set(k, Object.assign({}, ora, { leggo: false })); return; }
+        if (r && r.ok !== false) {
+          segniMittente.set(k, { flagged: !!r.flagged, reason: r.reason || '', flaggedAt: r.flaggedAt || '',
+            clearedAt: r.clearedAt || '', letto: Date.now() });
+        } else if (r && (r.code === 'not_admin' || r.code === 'forbidden')) {
+          // Il main non ci riconosce come owner: non c'è niente da dire, e niente da ritentare a ogni apertura.
+          segniMittente.set(k, { letto: Date.now() });
+        } else {
+          // Una lettura fallita non cancella quella buona di prima: la tiene, e alla prossima apertura riprova.
+          const vecchio = ora.letto ? ora : {};
+          segniMittente.set(k, Object.assign({}, vecchio, { leggo: false, letto: 0, errore: (r && r.error) || 'Lettura non riuscita.' }));
+        }
+        disegnaSegno();
+      });
+  }
+
+  // La riga che dice il segno, in dati: la usano la testata e il pannello del mittente.
+  function rigaSegno(s) {
+    if (!s) return null;
+    if (s.flagged) {
+      const motivo = MR.motivoSegnoText(s.reason);
+      const quando = s.flaggedAt ? formatDate(s.flaggedAt) : '';
+      const testo = `⚑ Mittente segnato come pericoloso${motivo ? `: ${motivo}` : ''}${quando && quando !== '—' ? ` · dal ${quando}` : ''}`;
+      // In testata il motivo lungo si accorcia a due righe: qui sopra resta intero.
+      return { tipo: 'segnato', testo, titolo: `${testo}\nFinché il segno resta, ogni suo feedback si ferma al filtro d’ingresso.` };
+    }
+    if (s.clearedAt) {
+      const motivo = MR.motivoSegnoText(s.reason);
+      return { tipo: 'tolto', testo: `Segno tolto il ${formatDate(s.clearedAt)}`, titolo: motivo ? `Era: ${motivo}` : '' };
+    }
+    if (s.errore) return { tipo: 'errore', testo: 'Segno del mittente non letto', titolo: s.errore };
+    return null;
+  }
+
+  function nodoRigaSegno(riga, fb) {
+    const el = document.createElement('span');
+    el.className = `mg-segno-testo mg-segno--${riga.tipo}`;
+    el.textContent = riga.testo;
+    if (riga.titolo) el.title = riga.titolo;
+    if (riga.tipo !== 'errore') return el;
+    const wrap = document.createElement('span');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'mg-segno-riprova';
+    btn.textContent = 'Riprova';
+    btn.addEventListener('click', () => { btn.disabled = true; leggiSegno(fb, { forza: true }); });
+    wrap.append(el, btn);
+    return wrap;
+  }
+
+  function disegnaSegnoTestata(fb) {
+    const el = document.getElementById('mgSegnoTestata');
+    if (!el) return;
+    const riga = (isAdmin && fb) ? rigaSegno(segnoDi(fb)) : null;
+    el.replaceChildren(...(riga ? [nodoRigaSegno(riga, fb)] : []));
+    el.hidden = !riga;
+  }
+
+  // Accanto all'approvazione, e solo su un feedback fermato proprio dal segno che c'è ancora.
+  function aggiornaBottoneSegno(fb) {
+    if (!mgActionsRow) return;
+    const esiste = mgActionsRow.querySelector('#mgSegnoBtn');
+    const serve = !!(isAdmin && fb && !mgActions.hidden && MR.fermatoDalSegno(fb) && segnoAttivo(fb));
+    if (!serve) {
+      if (esiste) esiste.remove();
+      chiudiConfermaSegno();
+      return;
+    }
+    if (esiste) return;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'sn-btn sn-btn-secondary';
+    b.id = 'mgSegnoBtn';
+    b.textContent = 'Il segno era un errore';
+    b.title = 'Toglie il segno a chi l’ha mandato. Approvare da solo non lo toglie.';
+    b.addEventListener('click', apriConfermaSegno);
+    const accept = mgActionsRow.querySelector('[data-action-key="accept"]');
+    if (accept) accept.after(b); else mgActionsRow.appendChild(b);
+  }
+
+  function disegnaSegno() {
+    const fb = selectedId ? allFeedbacks.find((f) => f._id === selectedId) : null;
+    disegnaSegnoTestata(fb);
+    aggiornaBottoneSegno(fb);
+    disegnaSegnoMittente();
+  }
+
+  async function togliSegno(fbId) {
+    const fb = allFeedbacks.find((f) => f._id === fbId);
+    if (!fb) return { ok: false, error: 'Questo feedback non è più in pagina.' };
+    const k = chiaveSegno(fb);
+    if (segniInVolo.has(k)) return { ok: false, error: 'Sto già togliendo questo segno.' };
+    segniInVolo.add(k);
+    let r;
+    try {
+      r = await sendToMain({ type: FEEDBACK_SENDER_FLAG, feedbackId: fb._id, action: 'clear', conferma: MR.FRASE_SEGNO_ERRATO });
+    } catch (e) {
+      r = { ok: false, error: e?.message || String(e) };
+    } finally {
+      segniInVolo.delete(k);
+    }
+    if (!r || r.ok === false) return { ok: false, error: (r && r.error) || 'Il server non ha tolto il segno.' };
+    const prima = segniMittente.get(k) || {};
+    segniMittente.set(k, {
+      flagged: !!r.flagged, reason: r.reason || prima.reason || '', flaggedAt: r.flaggedAt || prima.flaggedAt || '',
+      clearedAt: r.clearedAt || '', letto: Date.now(), scritto: Date.now(),
+    });
+    disegnaSegno();
+    return { ok: true };
+  }
+
+  const DOMANDA_SEGNO = 'Togli il segno a questo mittente? Da adesso i suoi feedback passano dai giudici come quelli di '
+    + 'tutti. Quelli già arrivati restano dove sono.';
+
+  // La conferma, una sola per le due strade (dettaglio e pannello del mittente).
+  function boxConfermaSegno(fbId, { onNo, onEsito }) {
+    const frag = document.createDocumentFragment();
+    const domanda = document.createElement('div');
+    domanda.className = 'mg-segno-domanda';
+    domanda.textContent = DOMANDA_SEGNO;
+    const riga = document.createElement('div');
+    riga.className = 'mg-actions-row';
+    const no = document.createElement('button');
+    no.type = 'button';
+    no.className = 'sn-btn sn-btn-secondary mg-segno-no';
+    no.textContent = 'Annulla';
+    const si = document.createElement('button');
+    si.type = 'button';
+    si.className = 'sn-btn mg-segno-si';
+    si.textContent = 'Togli il segno';
+    no.addEventListener('click', onNo);
+    si.addEventListener('click', async () => {
+      si.disabled = true; no.disabled = true;
+      si.textContent = 'Tolgo il segno…';
+      const r = await togliSegno(fbId);
+      si.disabled = false; no.disabled = false;
+      si.textContent = 'Togli il segno';
+      onEsito(r);
+    });
+    riga.append(no, si);
+    frag.append(domanda, riga);
+    return frag;
+  }
+
+  function chiudiConfermaSegno() {
+    if (!mgSegnoConferma) return;
+    mgSegnoConferma.hidden = true;
+    mgSegnoConferma.replaceChildren();
+  }
+
+  function apriConfermaSegno() {
+    if (!mgSegnoConferma || !selectedId) return;
+    const id = selectedId;
+    setActionMsg('', '');
+    mgSegnoConferma.replaceChildren(boxConfermaSegno(id, {
+      onNo: chiudiConfermaSegno,
+      onEsito: (r) => {
+        if (selectedId !== id) {
+          toast(r.ok ? 'Segno tolto.' : `Il segno resta: ${r.error}`, r.ok ? 'ok' : 'err');
+          return;
+        }
+        chiudiConfermaSegno();
+        if (r.ok) setActionMsg('Segno tolto: i prossimi feedback di questo mittente passano dai giudici.', 'ok');
+        else setActionMsg(`Il segno resta: ${r.error}`, 'err');
+      },
+    }));
+    mgSegnoConferma.hidden = false;
+    const no = mgSegnoConferma.querySelector('.mg-segno-no');
+    if (no) no.focus();
+  }
+  if (mgSegnoConferma) {
+    mgSegnoConferma.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); chiudiConfermaSegno(); }
+    });
+  }
+
+  // Il pannello del mittente: stessa riga della testata, stesso gesto, stessa conferma.
+  function disegnaSegnoMittente() {
+    const el = document.getElementById('mgSideSegno');
+    if (!el || !mittenteAperto) return;
+    // Una conferma aperta non si ridisegna sotto le mani: il suo esito ridisegna da sé.
+    if (el.querySelector('.mg-segno-conferma:not([hidden])')) return;
+    const fb = allFeedbacks.find((f) => f._id === mittenteAperto.fbId) || null;
+    const riga = (isAdmin && fb) ? rigaSegno(segnoDi(fb)) : null;
+    el.replaceChildren();
+    el.hidden = !riga;
+    if (!riga) return;
+    el.appendChild(nodoRigaSegno(riga, fb));
+    if (!segnoAttivo(fb)) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-btn sn-btn-secondary mg-segno-btn';
+    btn.id = 'mgSideSegnoBtn';
+    btn.textContent = 'Il segno era un errore';
+    btn.title = 'Toglie il segno a questo mittente.';
+    const conferma = document.createElement('div');
+    conferma.className = 'mg-segno-conferma';
+    conferma.hidden = true;
+    const esito = document.createElement('span');
+    esito.className = 'mg-action-msg';
+    esito.setAttribute('role', 'status');
+    const chiudi = () => { conferma.hidden = true; conferma.replaceChildren(); btn.hidden = false; };
+    btn.addEventListener('click', () => {
+      esito.textContent = '';
+      conferma.replaceChildren(boxConfermaSegno(fb._id, {
+        onNo: chiudi,
+        onEsito: (r) => {
+          chiudi();
+          if (r.ok) { disegnaSegnoMittente(); toast('Segno tolto: i prossimi feedback di questo mittente passano dai giudici.', 'ok'); return; }
+          esito.className = 'mg-action-msg mg-err';
+          esito.textContent = `Il segno resta: ${r.error}`;
+        },
+      }));
+      conferma.hidden = false;
+      btn.hidden = true;
+      const no = conferma.querySelector('.mg-segno-no');
+      if (no) no.focus();
+    });
+    conferma.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); chiudi(); } });
+    el.append(btn, conferma, esito);
   }
 
   function setManageMsg(text, kind) {
@@ -4006,6 +4276,7 @@
 
   // ── Pannello laterale ─────────────────────────────────────────────────────
   function openSidebar(title, html) {
+    mittenteAperto = null;
     mgSideEmpty.hidden = true;
     mgSide.hidden = false;
     mgSideTitle.textContent = title;
@@ -4013,6 +4284,7 @@
   }
 
   function closeSidebar() {
+    mittenteAperto = null;
     mgSide.hidden = true;
     mgSideEmpty.hidden = false;
     mgSideTitle.textContent = '';
@@ -4035,7 +4307,15 @@
 
   // Toast discreto in basso a destra: l'esito di un'azione deve arrivare anche
   // se nel frattempo l'owner ha chiuso il pannello o cambiato scheda.
-  let mgToastTimer = null;
+  // Tempi in avvisiTempo.js: in scala con le Preferenze, fermi col puntatore sopra.
+  const mgToastTempi = window.SN_AVVISI.orologio();
+  let mgToastTempo = null;
+  function nascondiToast(el) {
+    if (mgToastTempo) mgToastTempo.annulla();
+    mgToastTempo = null;
+    el.classList.remove('show');
+    mgToastTempi.lascia(el);
+  }
   function toast(text, kind, ms) {
     let el = document.getElementById('mgToast');
     if (!el) {
@@ -4043,16 +4323,23 @@
       el.id = 'mgToast';
       el.className = 'mg-toast';
       el.setAttribute('role', 'status');
+      el.addEventListener('click', () => {
+        const sel = document.getSelection();
+        if (sel && !sel.isCollapsed && el.contains(sel.anchorNode)) return;
+        nascondiToast(el);
+      });
+      mgToastTempi.segui(el);
+      window.SN_AVVISI.chiudibile(el, () => nascondiToast(el));
       document.body.appendChild(el);
     }
     el.textContent = String(text || '');
     el.dataset.kind = kind || '';
     void el.offsetWidth;
     el.classList.add('show');
-    clearTimeout(mgToastTimer);
+    if (mgToastTempo) mgToastTempo.annulla();
     // Le frasi degli esiti sono lunghe: quattro secondi e mezzo per leggerle,
     // di più quando chi chiama ne mette insieme più d'una.
-    mgToastTimer = setTimeout(() => el.classList.remove('show'), Math.max(4500, Number(ms) || 0));
+    mgToastTempo = mgToastTempi.avvia(window.SN_AVVISI.durata(Math.max(4500, Number(ms) || 0)), () => nascondiToast(el));
   }
 
   // ── Il pannello di un livello ─────────────────────────────────────────────
@@ -4325,11 +4612,19 @@
         <div class="mg-sender-stat">${esc(clientId === '__anon__' ? 'anonimo' : clientId)}</div>
         <div class="mg-sender-stat">${esc(oldestStr)}</div>
         <div class="mg-sender-stat">Feedback totali: <strong>${total}</strong></div>
+        <div class="mg-sender-segno" id="mgSideSegno" hidden></div>
         <div class="mg-sender-list" id="senderFbList">${listHtml || '<em>Nessun feedback.</em>'}</div>
       </div>
     `;
     segnaForma(null);
     openSidebar('Mittente', html);
+    // Il segno si chiede col feedback che l'owner sta guardando, se è di questo mittente.
+    const rif = group.find((f) => f._id === selectedId) || group[0] || null;
+    if (rif) {
+      mittenteAperto = { clientId, fbId: rif._id };
+      leggiSegno(rif);
+      disegnaSegnoMittente();
+    }
 
     // Click su un feedback del mittente → carica nel pannello centrale
     const listEl = document.getElementById('senderFbList');
@@ -4529,6 +4824,9 @@
     if (mgUserNote && mgUserNoteText) {
       if (String(mgUserNoteText.value || '') !== String(mgUserNoteText.dataset.saved || '')) return true;
     }
+    // Una conferma del segno aperta (#922): ridisegnare la chiuderebbe mentre l'owner la legge.
+    if (mgSegnoConferma && !mgSegnoConferma.hidden && mgSegnoConferma.offsetParent !== null) return true;
+    if (document.querySelector('#mgSideSegno .mg-segno-conferma:not([hidden])')) return true;
     return false;
   }
 
@@ -4845,7 +5143,7 @@
   // ── Sezione "Modelli di supporto" (DD1) ──────────────────────────────────
   // Slot → editor a segmenti (buildChain del modelChainEditor).
   // Caricato pigro: viene inizializzato la prima volta che l'utente clicca la tab.
-  const SM_SLOTS = ['sanitizer', 'judge1', 'judge2', 'judge3', 'judgeDynamic', 'judgeRedTeam', 'judgePriority'];
+  const SM_SLOTS = ['sanitizer', 'judge1', 'judge2', 'judge3', 'judgeDynamic', 'judgeRedTeam', 'judgePriority', 'manageSearch'];
   // Etichette amichevoli per slot (i giudici del panel L2 sono "Giudice 1/2/3"
   // + "Giudice dinamico"; l'id grezzo non va mai mostrato all'utente). L'HTML
   // ha già le <label> statiche; questa mappa è la sorgente di verità se in
@@ -4858,8 +5156,16 @@
     judgeDynamic:  'Giudice dinamico',
     judgeRedTeam:  'Giudice red-team',
     judgePriority: 'Giudice priorità',
+    manageSearch:  'Ricerca fra i feedback',
   };
   let smChains = {};        // slot → { getValue }
+  // Nickname del registro condiviso (Modelli predefiniti): il server dei giudici
+  // lo unisce al loro, quindi valgono anche qui. Arrivano col GET.
+  let smSharedNicknames = [];
+  // Registro con cui l'app risolve gli slot spostati (#465): arriva col GET.
+  let smAppRegistry = {};
+  // Slot spostati mai impostati → catena mostrata: se al salvataggio è ancora quella non si scrive (#465).
+  let smUnsetShown = {};
   let smLoaded  = false;    // true dopo il primo caricamento riuscito
   let smLoading = false;    // guard anti-doppio-caricamento
 
@@ -4894,9 +5200,40 @@
     // 1. Registro dedicato ai giudici (priorità: compaiono per primi).
     const judgeReg = collectJudgeRegistry();
     for (const nick of Object.keys(judgeReg)) addNick(nick, judgeReg[nick].label);
-    // 2. Registro condiviso predefinito (fallback comodo: flash, haiku, …).
+    // 2. Registro condiviso (Modelli predefiniti).
+    for (const n of smSharedNicknames) addNick(n && n.nick, n && n.label);
     const shared = (window.SN_CONST && window.SN_CONST.DEFAULT_MODEL_REGISTRY) || {};
     for (const nick of Object.keys(shared)) addNick(nick, (shared[nick] || {}).label);
+  }
+
+  // Catalogo OpenRouter del campo «Modello OpenRouter», dal main come in Modelli predefiniti (#465):
+  // finché non arriva la tendina propone i modelli già scritti; se non arriva, il campo resta libero.
+  let smCatalog = null;
+  let smCatalogPending = null;
+  function ensureSmCatalog() {
+    if (smCatalog || smCatalogPending) return smCatalogPending;
+    const type = (window.SN_MSG && window.SN_MSG.MSG && window.SN_MSG.MSG.DEFAULT_MODELS_LIST) || 'default_models_list';
+    smCatalogPending = Promise.resolve()
+      .then(() => sendToMain({ type, provider: 'openrouter' }))
+      .then((r) => { if (r && r.ok && Array.isArray(r.items) && r.items.length) smCatalog = r.items; })
+      .catch(() => {})
+      .finally(() => { smCatalogPending = null; });
+    return smCatalogPending;
+  }
+
+  // `self`: il campo che chiede; senza catalogo il suo testo a metà non è un modello da proporre.
+  function readSmModelOptions(self) {
+    const out = [];
+    const seen = new Set();
+    const add = (id, label) => {
+      const v = String(id || '').trim();
+      if (!v || seen.has(v)) return;
+      seen.add(v);
+      out.push({ value: v, label: label && label !== v ? String(label) : '' });
+    };
+    if (smCatalog) for (const it of smCatalog) add(it && it.id, it && it.label);
+    else if (mgSmRegistryList) for (const el of mgSmRegistryList.querySelectorAll('.sn-model-id')) { if (el !== self) add(el.value, ''); }
+    return out;
   }
 
   // ── Registro modelli dei giudici (nickname → modello OpenRouter) ───────────
@@ -4920,6 +5257,16 @@
     modelIn.setAttribute('autocomplete', 'off');
     modelIn.placeholder = 'modello OpenRouter (es. deepseek/deepseek-v4-pro)';
     modelIn.value = e.model || '';
+    const modelWrap = document.createElement('div');
+    modelWrap.className = 'sn-model-id-wrap';
+    modelWrap.appendChild(modelIn);
+    modelIn.addEventListener('focus', () => { ensureSmCatalog(); });
+    if (window.SN_COMBOBOX) {
+      window.SN_COMBOBOX.attach(modelWrap, modelIn, {
+        readOptions: () => readSmModelOptions(modelIn),
+        onPick: () => populateSmNicknames(),
+      });
+    }
 
     const del = document.createElement('button');
     del.type = 'button';
@@ -4933,7 +5280,7 @@
     modelIn.addEventListener('input', () => populateSmNicknames());
 
     row.appendChild(nickIn);
-    row.appendChild(modelIn);
+    row.appendChild(modelWrap);
     row.appendChild(del);
     return row;
   }
@@ -4972,12 +5319,46 @@
     return out;
   }
 
+  function appSlotAction(slot) {
+    const pairs = (window.SN_MODEL_USAGE && window.SN_MODEL_USAGE.ownerActions && window.SN_MODEL_USAGE.ownerActions()) || [];
+    const hit = pairs.find((p) => p.slot === slot);
+    return hit ? hit.action : '';
+  }
+
+  // Lo stesso registro della risoluzione nell'app: quello in uso lì con sopra quello dei giudici.
+  function appSlotRegistry() {
+    return { ...smAppRegistry, ...collectJudgeRegistry() };
+  }
+
+  function appSlotCtx(action) {
+    const MC = window.SN_MODEL_CHAIN;
+    return {
+      validate: MC.makeValidator ? MC.makeValidator(action, appSlotRegistry) : undefined,
+      isKnown: MC.makeKnownCheck ? MC.makeKnownCheck(appSlotRegistry) : undefined,
+      readOptions: () => {
+        const out = [];
+        const seen = new Set();
+        for (const reg of [collectJudgeRegistry(), smAppRegistry]) {
+          for (const [nick, e] of Object.entries(reg || {})) {
+            if (seen.has(nick)) continue;
+            seen.add(nick);
+            const label = e && e.label && e.label !== nick ? String(e.label) : '';
+            out.push({ value: nick, label });
+          }
+        }
+        return out;
+      },
+    };
+  }
+
   // Rende gli editor a segmenti per tutti gli slot, usando SN_MODEL_CHAIN.buildChain.
   // Ogni chain è attaccata al div #mgSmChain-<slot>.
   function renderSmSlots(models) {
     const ModelChain = window.SN_MODEL_CHAIN;
     if (!ModelChain) return;
     smChains = {};
+    smUnsetShown = {};
+    const unset = Array.isArray(models.movedUnset) ? models.movedUnset : [];
     for (const slot of SM_SLOTS) {
       const host = document.getElementById(`mgSmChain-${slot}`);
       if (!host) continue;
@@ -4987,12 +5368,13 @@
       const labelEl = slotEl && slotEl.querySelector('label');
       if (labelEl && SM_SLOT_LABELS[slot]) labelEl.textContent = SM_SLOT_LABELS[slot];
       host.innerHTML = '';
-      // Nessun validatore di azione (questi slot non corrispondono a un'azione
-      // in SN_CONST.ACTIONS): accettiamo qualunque nickname. Il validatore è
-      // opzionale in buildChain — basta non passarlo.
-      const chain = ModelChain.buildChain(models[slot] || '', null, {});
+      // Gli slot dei giudici non corrispondono a un'azione: accettano qualunque nickname.
+      // Quelli spostati dall'app (#465) hanno i controlli e i suggerimenti che avevano nelle Opzioni.
+      const action = appSlotAction(slot);
+      const chain = ModelChain.buildChain(models[slot] || '', null, action ? appSlotCtx(action) : {});
       host.appendChild(chain.el);
       smChains[slot] = chain;
+      if (unset.includes(slot)) smUnsetShown[slot] = chain.getValue();
     }
   }
 
@@ -5037,6 +5419,9 @@
   // Render dell'editor (chiave + registro giudici + nickname + slot) e reveal.
   // Estratta da loadSupportModels così i test possono esercitarla senza il canale.
   function renderSupportModelsEditor(models) {
+    if (models && Array.isArray(models.sharedNicknames)) smSharedNicknames = models.sharedNicknames;
+    if (models && models.appRegistry && typeof models.appRegistry === 'object') smAppRegistry = models.appRegistry;
+    ensureSmCatalog();
     applyJudgeKeyState(models || {});
     renderJudgeRegistry((models || {}).judgeRegistry || {});
     populateSmNicknames();
@@ -5050,7 +5435,9 @@
     if (!smLoaded) return;
     const models = {};
     for (const slot of SM_SLOTS) {
-      models[slot] = smChains[slot] ? smChains[slot].getValue() : '';
+      const value = smChains[slot] ? smChains[slot].getValue() : '';
+      if (slot in smUnsetShown && value === smUnsetShown[slot]) continue;
+      models[slot] = value;
     }
     const judgeRegistry = collectJudgeRegistry();
     const openrouterKey = mgSmKeyInput ? mgSmKeyInput.value.trim() : '';
@@ -5062,6 +5449,8 @@
       // Ricarica i valori salvati (confirma round-trip Firestore).
       if (mgSmKeyInput) mgSmKeyInput.value = ''; // non riteniamo la chiave in pagina
       applyJudgeKeyState(r.models || {});
+      if (r.models && Array.isArray(r.models.sharedNicknames)) smSharedNicknames = r.models.sharedNicknames;
+      if (r.models && r.models.appRegistry && typeof r.models.appRegistry === 'object') smAppRegistry = r.models.appRegistry;
       renderJudgeRegistry((r.models || {}).judgeRegistry || judgeRegistry);
       populateSmNicknames();
       renderSmSlots(r.models || models);

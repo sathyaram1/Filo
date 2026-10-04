@@ -918,14 +918,18 @@
     pill.appendChild(cta);
     // Nello stack degli avvisi in pagina (#409). `sticky`: porta l'unica strada
     // verso la lista "Aperti per dopo", un toast in arrivo non deve sfrattarla.
-    Popup.mountToast(pill, { sticky: true });
+    Popup.mountToast(pill, {
+      sticky: true,
+      chiudi: () => finish(false),
+      azioni: [{ label: I18n.t('toast_saved_open'), fn: () => finish(true) }],
+    });
     requestAnimationFrame(() => pill.classList.add('sn-save-confirm-visible'));
 
     const finish = (openList) => {
       if (done) return;
       done = true;
       if (chiudiScheda) salvataggioInCorso = false;
-      if (timer) { clearTimeout(timer); timer = null; }
+      if (timer) { timer.annulla(); timer = null; }
       pill.dataset.snClosing = '1';
       pill.classList.remove('sn-save-confirm-visible');
       setTimeout(() => { try { Popup.unmountToast(pill); } catch (_) {} }, 220);
@@ -939,7 +943,8 @@
     pill.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); finish(true); }
     });
-    timer = setTimeout(() => finish(false), AUTO_CLOSE_MS);
+    // Nella pila: col puntatore sopra aspetta, come gli altri avvisi (la scheda si chiude dopo).
+    timer = Popup.tempoAvviso(AUTO_CLOSE_MS, () => finish(false), { deveScadere: true });
   }
 
   async function saveLink(linkEl) {
@@ -1093,9 +1098,12 @@
     copyToClipboard(href);
   }
 
+  function searchUrlFor(text) {
+    return `https://www.google.com/search?q=${encodeURIComponent((text || '').slice(0, 500))}`;
+  }
+
   function searchTextOnWeb(text) {
-    const q = encodeURIComponent((text || '').slice(0, 500));
-    window.open(`https://www.google.com/search?q=${q}`, '_blank', 'noopener');
+    window.open(searchUrlFor(text), '_blank', 'noopener');
   }
 
   // ------------------------------------------------------------
@@ -1320,12 +1328,15 @@
     return items;
   }
 
+  // Lens-style reverse search (più affidabile di searchbyimage)
+  function imageSearchUrlFor(imgEl) {
+    const src = imgEl && (imgEl.currentSrc || imgEl.src);
+    return src ? `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(src)}` : '';
+  }
+
   function searchImageOnWeb(imgEl) {
-    const src = imgEl.currentSrc || imgEl.src;
-    if (!src) return;
-    const q = encodeURIComponent(src);
-    // Lens-style reverse search (più affidabile di searchbyimage)
-    window.open(`https://lens.google.com/uploadbyurl?url=${q}`, '_blank', 'noopener');
+    const url = imageSearchUrlFor(imgEl);
+    if (url) window.open(url, '_blank', 'noopener');
   }
 
   // ------------------------------------------------------------
@@ -1887,7 +1898,9 @@
     shareCurrentPage,
     shareLink,
     searchTextOnWeb,
+    searchUrlFor,
     searchImageOnWeb,
+    imageSearchUrlFor,
     // video / audio
     buildMediaItems,
     buildMediaSpeedItem,

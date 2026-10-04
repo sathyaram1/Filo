@@ -43,6 +43,24 @@ Tre unit test rossi solo su Windows.
 Riferimenti: `tests/unit/documentRead.test.mjs` (nomi ambigui, maiuscole),
 `tests/unit/terminaleCodifica.test.mjs` (preludio per shell, esito dei comandi).
 
+## Il contenitore senza gestore di finestre (#465.1)
+
+Sotto xvfb (le routine, la suite in GitHub) nessuno esegue `minimize()`: la richiesta
+cade nel vuoto e la finestra resta com'era. La prova chiede `isMinimized()`; se il
+sistema non l'ha ridotta, finge la sua risposta (`isMinimized` vero ed evento
+`minimize`, poi il contrario) e prova lo stesso cammino del codice. Sostituire la
+riduzione con un'altra uscita dalla vista lascerebbe la riduzione provata solo sul
+Windows dell'owner. Riferimento: `tests/manage-ricevuti-vivi.spec.mjs`.
+
+## Il contenitore che disegna adagio (#592.11)
+
+Sotto xvfb un fotogramma può arrivare un secondo dopo che il riquadro sta nel DOM:
+`toBeVisible()` guarda il DOM, l'utente vede i fotogrammi. Il dialogo di conferma conta
+dal primo fotogramma il mezzo secondo in cui un gesto vero non vale, e una prova che
+aspettava 600 ms da `toBeVisible()` prima di premere Invio era rossa tre volte su
+quattro. Prima di un gesto che deve valere si chiede al dialogo se è pronto
+(`aspettaConfermaPronta`, `tests/helpers/confirm.mjs`), non si aspetta un tempo fisso.
+
 ## La macchina dell'owner (#563)
 
 Due proprietà che le altre macchine non hanno, e ogni test che le dava per scontate
@@ -60,3 +78,43 @@ nasceva rosso solo per l'owner, per settimane (undici spec così):
   (`tests/helpers/percorsi.mjs`), che la fa canonica e con uno spazio nel nome per tutti:
   una costruita con `mkdtempSync` prova su un percorso che sulla macchina dell'owner non
   esiste, e una sentinella lo impedisce.
+
+## Il cancello di pubblicazione (#931)
+
+Gli unit test girano su Windows in un posto solo: il cancello prima di una versione,
+su una macchina di GitHub dove il repo sta su `D:` e la cartella temporanea su `C:`.
+Lì si rompono due cose che passano dove repo e temporanea stanno sullo stesso disco, e
+il rosso ferma le versioni per tutti:
+
+- **Due dischi.** Fra `D:\…` e `C:\…` `relative` risponde con un percorso assoluto,
+  senza `..`. «Comincia con `..`» dice «dentro» per un file che sta fuori: si chiede a
+  `fuoriDa(cartella, percorso)` (`tests/helpers/percorsi.mjs`). E un nome relativo
+  rimesso insieme con `join(radice, nome)` incolla i due dischi
+  (`D:\a\Filo\Filo\C:\Users\…`): si usa `resolve`.
+- **Il node che gira.** Il processo che esegue la prova tiene aperto il proprio
+  eseguibile, e su Windows nessun nome di quel file si cancella finché gira: un
+  collegamento fisso a `process.execPath` (per fingere un comando) fa fallire la pulizia
+  con EPERM. Si copia.
+
+Sentinella delle due forme: `tests/unit/cartelleTemporanee.test.mjs`.
+
+## La macchina carica (#943)
+
+Gli unit girano in parallelo, e spesso più verifiche girano insieme sulla stessa
+macchina. «Due milioni di caratteri in meno di un secondo e mezzo» passava sempre da
+solo e cadeva in quasi ogni corsa completa: a macchina carica la stessa valutazione
+arriva a tre secondi senza che il codice sia cambiato, e un rosso degli unit ferma
+`finish:check` prima degli spec.
+
+Un tempo non si confronta con millisecondi fissi. Si confronta con un lavoro di
+riferimento misurato accanto, nello stesso processo: il carico rallenta tutti e due e il
+rapporto resta (con ottanta processi occupati su quattro core la valutazione durava fino
+a tre secondi e il rapporto restava fra otto e undici, come a macchina ferma). `costoInUnita`
+(`tests/helpers/tempoRelativo.mjs`) misura l'operazione fra due unità di riferimento,
+ripete solo se il giro sfora e tiene il giro migliore: una regressione vera sfora a ogni
+giro, un carico passeggero no. Il tetto si sceglie una decina di volte sopra il costo
+visto: quello che la prova deve fermare, un algoritmo quadratico o un'espressione che
+torna indietro, costa centinaia di unità.
+
+Un timer atteso (`await` di qualcosa che scade da sé) misura il timer e non il lavoro, e
+resta in millisecondi. Sentinella: `tests/unit/tempiSottoCarico.test.mjs`.

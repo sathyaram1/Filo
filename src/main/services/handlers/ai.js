@@ -5,7 +5,7 @@ module.exports = function register(on, ctx) {
   const {
     MSG, handleAIRequest, getEffectiveSettings, modelForAction, buildAttemptChain,
     providerRouting, openWeightsBlockReason, modelGate,
-    Defaults, isAdmin, broadcastToTabs,
+    Defaults, isAdmin, broadcastToTabs, controllaUscita, ricordaLettoDallAiuto,
   } = ctx;
   const { SN_CONST } = globalThis;
   const WebSearch = globalThis.SN_WEB_SEARCH;
@@ -86,15 +86,19 @@ module.exports = function register(on, ctx) {
   });
 
   on(MSG.AI_REQUEST, async (msg, sender, origin) => {
+    // Quello che l'assistente di pagina ha davanti resta noto alla porta delle uscite (#810),
+    // anche se poi la pagina cambia. Si legge mentre il modello risponde.
+    const lettura = msg && msg.action === SN_CONST.ACTIONS.HELP && /^https?:/i.test(String(sender?.tab?.url || sender?.url || ''))
+      ? ricordaLettoDallAiuto(sender, msg.payload).catch(() => {})
+      : null;
     const r = await handleAIRequest({ action: msg.action, payload: msg.payload, origin });
+    if (lettura) await lettura;
     return { ok: true, ...r };
   });
 
-  // Dedup dell'avviso "lettura a modello non disponibile → voce del browser":
-  // lo segnaliamo al content script (firstFallback:true) solo la PRIMA volta che
-  // ripieghiamo in una sessione dell'app. Torna false appena una sintesi riesce,
-  // così se il modello torna a funzionare e poi ricasca l'utente è di nuovo avvisato.
-  let ttsFallbackAnnounced = false;
+  // Dedup dell'avviso "lettura a modello non disponibile → voce del browser": un motivo si annuncia
+  // una volta (firstFallback:true), un motivo DIVERSO sì (#713: altro modello escluso). Si riarma a ogni sintesi riuscita.
+  let ttsFallbackAnnounced = '';
 
   // Voci che il router ha DICHIARATO per un modello che non è nei cataloghi
   // ("Unknown voice … Supported voices: a, b, c"): dalla seconda richiesta in
@@ -146,8 +150,10 @@ module.exports = function register(on, ctx) {
   }
 
   const ttsFallback = (error, errorCode) => {
-    const firstFallback = !ttsFallbackAnnounced;
-    ttsFallbackAnnounced = true;
+    // I guasti tecnici hanno testi che cambiano a ogni frase: contano come un motivo solo.
+    const motivo = errorCode ? `${errorCode}|${error}` : 'guasto';
+    const firstFallback = ttsFallbackAnnounced !== motivo;
+    ttsFallbackAnnounced = motivo;
     // `errorCode` distingue i guasti tecnici (che il content script traduce in
     // una frase generica) dagli errori di CONFIGURAZIONE dei modelli, il cui
     // messaggio è già scritto per l'utente e va mostrato tale e quale.
@@ -219,7 +225,7 @@ module.exports = function register(on, ctx) {
         if (key) {
           const hit = ttsCache.get(key);
           if (hit) {
-            ttsFallbackAnnounced = false; // sintesi disponibile: riarma l'avviso
+            ttsFallbackAnnounced = ''; // sintesi disponibile: riarma l'avviso
             return {
               ok: true,
               audioBase64: hit.audioBase64,
@@ -237,7 +243,7 @@ module.exports = function register(on, ctx) {
             args: { text, voice: v, speed },
           }), { model: a.model, voice, lang });
           if (key) ttsCache.set(key, { audioBase64: r.audioBase64, mimeType: r.mimeType });
-          ttsFallbackAnnounced = false; // sintesi riuscita: riarma l'avviso
+          ttsFallbackAnnounced = ''; // sintesi riuscita: riarma l'avviso
           return {
             ok: true,
             audioBase64: r.audioBase64,
@@ -618,8 +624,14 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  on(MSG.WEB_SEARCH, async (msg) => {
+  // La domanda esce verso il motore di ricerca: passa dalla porta delle uscite come la
+  // ricerca della chat (#810). Solo il blocco: qui non c'è un popup per l'OK in più.
+  on(MSG.WEB_SEARCH, async (msg, sender) => {
     try {
+      const parole = (Array.isArray(msg && msg.parole) ? msg.parole : [])
+        .filter((x) => typeof x === 'string').join('\n').slice(-200000);
+      const u = await controllaUscita({ type: 'CERCA_WEB', query: msg && msg.query }, { sender, parole });
+      if (u.blocca) return { ok: false, blocked: 'segreto', frase: u.frase, results: [] };
       const settings = await getEffectiveSettings();
       const tavilyKey = settings.apiKeys?.tavily || '';
       const r = await WebSearch.search({ query: msg.query, tavilyKey, maxResults: 5 });

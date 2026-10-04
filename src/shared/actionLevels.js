@@ -85,6 +85,27 @@
     if (v === true) return true;
     return /^(true|1|si|sì|yes|tutte|tutti)$/i.test(String(v ?? ''));
   }
+  function periodoDetto(action) {
+    const vuoto = (v) => v == null || v === '';
+    if (action && (!vuoto(action.da) || !vuoto(action.a)) && action._periodo) {
+      const quando = (iso) => new Date(iso).toLocaleString('it-IT', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+      const { da, a } = action._periodo;
+      return da ? `dal ${quando(da)} al ${quando(a)}` : `fino al ${quando(a)}`;
+    }
+    const ore = Number(action && action.ore);
+    if (Number.isFinite(ore) && ore > 0) return ore === 1 ? 'dell’ultima ora' : `delle ultime ${ore} ore`;
+    const giorni = Number(action && action.giorni);
+    if (Number.isFinite(giorni) && giorni > 0) return giorni === 1 ? 'dell’ultimo giorno' : `degli ultimi ${giorni} giorni`;
+    const p = String((action && (action.periodo || action._nomePeriodo)) || '').toLowerCase();
+    if (p === 'oggi') return 'di oggi';
+    if (p === 'ieri') return 'di ieri';
+    if (p === 'tutto') return 'di sempre';
+    return 'dell’ultima ora';
+  }
+  function sitoDetto(action) {
+    const s = String((action && (action._sito || action.sito)) || '').trim();
+    return s ? ` su ${s}` : '';
+  }
   function timerRefLabel(action) {
     const kind = String((action && (action.tipo ?? action.kind)) || '').toLowerCase();
     const cosa = /timer/.test(kind) ? 'i timer' : (/svegli|alarm/.test(kind) ? 'le sveglie' : 'sveglie e timer');
@@ -107,6 +128,38 @@
     if (!C || !C.fuoriPerimetro) return 'non si sa dove legge';
     const p = a && (a.percorso ?? a.path ?? a.file ?? a.documento ?? a.nome);
     return C.fuoriPerimetro(p, a && a._perimetro);
+  }
+
+  // Cosa fa un comando, a parole (#892): la scrive il modello e apre bottone e
+  // popup, sopra il comando vero. È solo testo, il livello non la legge mai.
+  // Via i caratteri invisibili o che rigirano il testo; il tetto si vede (…).
+  const SPIEGAZIONE_MAX = 300;
+  function spiegazioneComando(a) {
+    const v = a && (a.spiegazione ?? a.descrizione);
+    let t = (typeof v === 'string' ? v : '')
+      .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]+/g, ' ')
+      .replace(/\s+/g, ' ').trim();
+    const segni = Array.from(t);
+    if (segni.length > SPIEGAZIONE_MAX) t = `${segni.slice(0, SPIEGAZIONE_MAX - 1).join('').trimEnd()}…`;
+    return t || 'Uso il terminale del computer';
+  }
+
+  function nomeLeggibile(n) {
+    const N = global.SN_NOMI_FILE;
+    const s = N ? N.nomeVisibile(n) : String(n == null ? '' : n).replace(/[\u0000-\u001f\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/g, '');
+    return s.trim();
+  }
+  function elencoRinomine(a) {
+    const proposte = Array.isArray(a && a._proposte) ? a._proposte : [];
+    const saltati = Array.isArray(a && a._saltati) ? a._saltati : [];
+    const n = proposte.length;
+    const righe = proposte.map((p) => `«${nomeLeggibile(p && p.prima)}» → «${nomeLeggibile(p && p.nome)}»`);
+    let t = `${n === 1 ? 'Rinominare questo file' : `Rinominare questi ${n} file`}:\n${righe.join('\n')}`;
+    if (saltati.length) {
+      t += `\n\nRestano come sono:\n${saltati.map((x) => `«${nomeLeggibile(x && x.nome)}»: ${nomeLeggibile(x && x.perche)}`).join('\n')}`;
+    }
+    if (a && a._oltre > 0) t += `\n\nNe restano altri ${a._oltre}: chiedimelo di nuovo dopo questi.`;
+    return `${t}\n\nL'estensione non cambia e nessun file viene sovrascritto. Dopo puoi rimettere i nomi di prima con «Annulla».`;
   }
 
   const REGISTRY = {
@@ -135,6 +188,17 @@
     TIMER: {
       level: 1,
       describe: (a) => `Avviare il timer "${a.label || a.etichetta || 'Timer'}"`,
+    },
+    // Rinominare file dell'utente (#950): si torna indietro con «Annulla», ma un programma che cercava il file
+    // per nome non lo trova più → 2. L'elenco vecchio → nuovo lo prepara il main (`_proposte`), mai il modello.
+    RINOMINA_FILE: {
+      level: 2,
+      describe: (a) => elencoRinomine(a),
+      describeDone: (a) => {
+        const fatti = a && a._output && Array.isArray(a._output.rinominati) ? a._output.rinominati : null;
+        const n = fatti ? fatti.length : (Array.isArray(a && a._proposte) ? a._proposte.length : 0);
+        return n === 1 ? 'Rinominato un file (si rimette com\'era con «Annulla»)' : `Rinominati ${n} file (si rimettono com'erano con «Annulla»)`;
+      },
     },
     SVEGLIA: {
       level: 1,
@@ -305,15 +369,37 @@
       level: 1,
       describe: (a) => `Creare l'evento "${a.title || a.titolo || ''}"`,
     },
+    // La prima riga di describe è quella che il diario mostra mentre si aspetta il clic.
     PULISCI_TAB: {
       level: 2,
-      describe: () => 'Valutare le schede aperte e archiviare quelle non più utili. '
+      describe: () => 'Riordinare le schede e archiviare quelle non più utili.\n'
         + 'Le schede archiviate restano riapribili da “Tab archiviate”.',
+      describeDone: (a) => {
+        const n = Number(a && a._output && a._output.archived) || 0;
+        return n ? `Schede riordinate: archiviate ${n} non più utili` : 'Schede riordinate: nessuna da archiviare';
+      },
     },
     CANCELLA_ARCHIVIO: {
       level: 3,
-      describe: (a) => `Eliminare DEFINITIVAMENTE dall'archivio le schede pertinenti a `
-        + `“${a.query || a.testo || ''}”.`,
+      describe: (a) => `Eliminare dall'archivio le schede su “${a.query || a.testo || ''}”.\n`
+        + 'Vengono eliminate DEFINITIVAMENTE: non si possono recuperare.',
+      describeDone: (a) => {
+        const n = Number(a && a._output && a._output.eliminate) || 0;
+        return `Eliminate DEFINITIVAMENTE dall'archivio ${n} ${n === 1 ? 'scheda' : 'schede'} su “${a.query || a.testo || ''}”`;
+      },
+    },
+    // #866 — come in ogni browser: il popup dice quante pagine e di quale periodo, il conto lo fa il main (`_n`).
+    CANCELLA_PAGINE: {
+      level: 2,
+      describe: (a) => {
+        const n = Number(a && a._n);
+        const quali = Number.isFinite(n) ? (n === 1 ? 'la pagina visitata' : `le ${n} pagine visitate`) : 'le pagine visitate';
+        return `Cancellare ${quali}${sitoDetto(a)} ${periodoDetto(a)}.\nFilo non le ricorderà più. Chat e schede chiuse restano.`;
+      },
+      describeDone: (a) => {
+        const n = Number(a && a._output && a._output.cancellate) || 0;
+        return n ? `Cancellate ${n === 1 ? '1 pagina visitata' : `${n} pagine visitate`}${sitoDetto(a)} ${periodoDetto(a)}` : `Nessuna pagina visitata${sitoDetto(a)} ${periodoDetto(a)}`;
+      },
     },
     CANCELLA_MEMORIA: {
       // Cancella tutti i moduli di memoria di Filo (PROFILO, PREFERENZE, espansioni)
@@ -416,7 +502,7 @@
         const C = global.SN_CMD_CLASSIFY;
         let perche = '';
         try { perche = (cmd && C && C.classifyDetail) ? C.classifyDetail(cmd, a._perimetro).motivo : ''; } catch (_) {}
-        return `Eseguire nel terminale:\n${cmd || '(comando vuoto)'}`
+        return `${spiegazioneComando(a)}\n\nIl comando, nel terminale:\n${cmd || '(comando vuoto)'}`
           + (cwd ? `\nCartella di lavoro: ${cwd}` : '')
           + (perche ? `\nPerché te lo chiedo: ${perche}` : '');
       },
@@ -488,6 +574,23 @@
       level: 1,
       describe: () => 'Togliere le modifiche di stile applicate alla pagina',
     },
+    // ── rimettere com'era un cambio di stato (#867) ─────────────────────────
+    // Il livello è quello del cambio da rimettere: `_livelloCambio` lo scrive il main dal registro,
+    // sempre, prima del cancello (mai dall'azione del modello). Rimettere la protezione dell'IP
+    // spenta chiede la stessa conferma che chiederebbe spegnerla.
+    ANNULLA_CAMBIO: {
+      level: (a) => (a && a._livelloCambio === 1 ? 1 : 2),
+      describe: (a) => {
+        const f = String((a && a._fraseCambio) || '').trim();
+        const base = f ? `Filo vuole rimettere com'era prima di: ${f}.` : 'Filo vuole rimettere com\'era l\'ultimo cambio.';
+        if (a && a._livelloCambio === 1) return base;
+        return `${base}\n\nTocca un'impostazione di sicurezza, dei modelli o delle spese: conferma solo se l'hai chiesto tu.`;
+      },
+      describeDone: (a) => {
+        const f = String((a && a._fraseCambio) || '').trim();
+        return f ? `Rimesso com'era prima di: ${f}` : 'Cambio annullato';
+      },
+    },
     // ── zoom della pagina via chat (#686) ────────────────────────────────────
     // Livello 1: è la stessa cosa che fanno Ctrl +/- e Ctrl 0, visibile e
     // reversibile in un tasto.
@@ -533,5 +636,5 @@
     try { return (entry.describeDone ? entry.describeDone(action) : entry.describe(action)) || ''; } catch (_) { return ''; }
   }
 
-  global.SN_ACTION_LEVELS = { REGISTRY, levelFor, describe, describeDone };
+  global.SN_ACTION_LEVELS = { REGISTRY, levelFor, describe, describeDone, spiegazioneComando };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

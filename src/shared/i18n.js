@@ -88,6 +88,10 @@
     err_tts_voice_required: 'Il modello di lettura «%s» vuole il nome di una voce, e Filo non ne conosce nessuna per questo modello: scrivilo in Preferenze → Lettura ad alta voce.',
     // %s = id del modello, %s = nome scritto a mano che il modello ha rifiutato.
     err_tts_voice_unknown: 'Il modello di lettura «%s» non conosce la voce «%s»: controlla il nome in Preferenze → Lettura ad alta voce.',
+    // %s = id del modello, %s = chi lo serve («OpenAI», «OpenAI e Azure»).
+    // Voce e dettatura: nessun host ammesso, la richiesta non parte (#713).
+    err_audio_no_allowed_host: 'Il modello «%s» lo serve solo %s, che Filo esclude. Non ho mandato niente: scegli un altro modello.',
+    err_audio_no_allowed_host_many: 'Il modello «%s» lo servono solo %s, che Filo esclude. Non ho mandato niente: scegli un altro modello.',
     menu_dictate: 'Detta',
     menu_screenshot: 'Screenshot',
     menu_screenshot_crop: 'Screenshot di una parte',
@@ -182,6 +186,7 @@
       'Hai scelto solo modelli a pesi aperti: «%s» non lo è, quindi la prova non parte. Spegni «Solo modelli a pesi aperti» per provarlo.',
     err_model_where_own: 'Lo imposti in Opzioni → Modelli per azione.',
     err_model_where_default: 'Stai usando i modelli predefiniti: apri Opzioni, togli «Usa modelli predefiniti» e scegli il modello per questa funzione.',
+    err_model_where_owner: 'Lo imposti in Gestione → Modelli di supporto.',
 
     // Toast
     toast_saved: 'Salvata in: %s',
@@ -345,9 +350,9 @@
     options_action_editor_title: 'Editor — titolo automatico del documento',
     options_action_editor_summary: 'Editor — riassunto automatico del documento',
     options_action_editor_chat: 'Editor — chat col documento',
-    options_action_manage_search: 'Gestione — ricerca fra i feedback',
     options_action_archive_embed: 'Indicizzazione delle schede archiviate',
     options_action_provider_test: 'Prova di un fornitore (pulsante «Prova»)',
+    options_action_file_name: 'Nome sensato ai file (legge l\'inizio del file o una miniatura)',
     // Elenco (di sola lettura) degli altri punti in cui Filo usa un modello:
     // quelli che girano sui server di Filo e quelli che un modello non lo usano.
     options_h_model_usage: 'Dove altro Filo usa un modello',
@@ -366,6 +371,7 @@
     options_category_delete: 'Elimina',
     options_category_delete_confirm: 'Eliminare la categoria "%s"? Le schede diventeranno non categorizzate.',
     options_category_pages: '%s schede',
+    options_category_name_taken: 'C\'è già «%s»: Rinomina le unisce',
 
     // Pagina admin "Modelli predefiniti" (config condivisa via Firestore)
     admin_defaults_title: 'Modelli predefiniti',
@@ -434,6 +440,10 @@
       'il caricamento di pubblicità e tracker. Le liste si scaricano dalla rete, restano ' +
       'in cache sul tuo computer e si aggiornano da sole una volta a settimana. I siti ' +
       'che usi davvero (Google, YouTube, banche…) non vengono mai bloccati.',
+    options_security_adskip: 'Salta le pubblicità dei video',
+    options_security_adskip_desc:
+      'Quando un video, per esempio su YouTube, mostra una pubblicità col pulsante «Salta», ' +
+      'Filo lo preme appena compare. Quelle che non si possono saltare restano come sono.',
     options_security_siteblock: 'Blocca l’apertura dei siti in blacklist',
     options_security_siteblock_desc:
       'Impedisce di APRIRE i siti in blacklist (non solo le loro pubblicità), anche dai ' +
@@ -581,24 +591,37 @@
     security_export_title: 'Esporta dati Filo',
     security_export_label: 'Esporta dati',
     security_export_desc:
-      'Salva tutti i tuoi dati di Filo (memorie degli agenti, pagine salvate, ' +
-      'cronologia incolla, costi e impostazioni) in un file .zip che contiene un ' +
-      'data.json e le immagini copiate come file separati. Utile come backup o per ' +
-      'trasferire i dati su un altro computer.',
+      'Salva tutti i tuoi dati di Filo (memorie degli agenti, chat con Filo, pagine ' +
+      'visitate, pagine salvate, cronologia incolla, costi e impostazioni) in un file ' +
+      '.zip che contiene un data.json, il filo delle chat e delle pagine visitate e le ' +
+      'immagini copiate come file separati. Utile come backup o per trasferire i dati ' +
+      'su un altro computer.',
     security_export_btn: 'Esporta dati (.zip)',
     security_export_done: 'Dati esportati',
     security_export_fail: 'Esportazione non riuscita',
     security_import_title: 'Importa dati Filo',
     security_import_btn: 'Importa dati (.zip)',
     security_import_desc:
-      'Ricarica un .zip esportato da Filo: rimette al loro posto memorie, pagine ' +
-      'salvate, cronologia, immagini e impostazioni. Quello che hai già non viene ' +
+      'Ricarica un .zip esportato da Filo: rimette al loro posto memorie, chat con ' +
+      'Filo, pagine visitate, pagine salvate, cronologia, immagini e impostazioni. ' +
+      'Quello che hai già non viene ' +
       'cancellato — le liste si uniscono e, dove c\'è un conflitto, vince il backup.',
+    security_visite_title: 'Pagine visitate',
+    security_visite_desc: 'Filo ricorda le pagine che apri nelle schede, sul tuo computer. Quelle aperte in incognito no.',
+    security_visite_ora: 'Cancella l’ultima ora',
+    security_visite_oggi: 'Cancella oggi',
+    security_visite_tutto: 'Cancella tutto',
+    security_visite_confirm_title: 'Cancellare le pagine visitate?',
+    // %1 = "la pagina visitata" / "le N pagine visitate", %2 = "nell’ultima ora" / "oggi" / "da sempre"
+    security_visite_confirm_text: 'Filo dimentica %1 %2. Le chat e le schede chiuse restano.',
+    security_visite_confirm_ok: 'Cancella',
+    security_visite_nessuna: 'Nessuna pagina da cancellare',
+    security_visite_fail: 'Cancellazione non riuscita',
     security_import_confirm_title: 'Importa dati da backup',
-    // %1 = nome file, %2 = " (del …)" o vuoto, %3/%4 = conteggi già declinati
+    // %1 = nome file, %2 = " (del …)" o vuoto, %3/%4 = conteggi già declinati, %5 = chat e pagine del filo o vuoto
     security_import_confirm_text:
-      'Da "%1"%2: %3 e %4.\n\n' +
-      'Nulla di ciò che hai ora viene cancellato: le liste (pagine salvate, ' +
+      'Da "%1"%2: %3 e %4%5.\n\n' +
+      'Nulla di ciò che hai ora viene cancellato: le liste (chat, pagine visitate, pagine salvate, ' +
       'cronologia, appunti) si uniscono senza duplicati e le sezioni che qui non ' +
       'esistono vengono aggiunte. Dove lo stesso dato esiste in entrambi, vince ' +
       'quello del backup. Le impostazioni del backup diventano attive subito.',
@@ -626,7 +649,7 @@
     history_reuse: 'riuso %s%',
     history_reuse_title: '%s token su %s riusati da una richiesta precedente invece di essere rielaborati: costano meno e la risposta arriva prima.',
     history_reuse_none_title: 'Nessuna parte di questa richiesta (%s token) è stata riusata da una richiesta precedente: è stata rielaborata tutta.',
-    history_policy_violation: '⚠ fornitore escluso',
+    history_policy_violation: '⚠ fornitore non ammesso',
     // Tempi del turno (idee «Latenza della chat»): quando è arrivato il primo
     // pezzo di ragionamento, la prima parola, e quando è finito.
     history_timing: 'ragiona %s · scrive %s · fine %s',

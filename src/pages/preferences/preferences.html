@@ -18,6 +18,7 @@
   <script src="filo://shared/sounds.js"></script>
   <script src="filo://shared/confirmUi.js"></script>
   <script src="filo://shared/onboarding.js"></script>
+  <script src="filo://shared/caselleAlSicuro.js"></script>
   <style>
     /* Rifare un'intervista di benvenuto non cancella quella di prima: restano qui, rileggibili. */
     .onb-archive { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
@@ -95,6 +96,23 @@
     </section>
 
     <section>
+      <h2>Anteprima delle schede</h2>
+      <p class="sn-muted">Passando il mouse su una scheda vedi cosa contiene, senza aprirla.</p>
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="tabPreviewEnabled" />
+          <span>Mostra l'anteprima al passaggio del mouse</span>
+        </label>
+      </div>
+      <label for="tabPreviewSize" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Dimensione</label>
+      <select id="tabPreviewSize">
+        <option value="piccola">Piccola</option>
+        <option value="media">Media</option>
+        <option value="grande">Grande</option>
+      </select>
+    </section>
+
+    <section>
       <h2>Gestione automatica delle schede</h2>
       <p class="sn-muted">Filo riordina e archivia da sé le schede che non ti servono più, decidendo su tutte insieme. <strong>Archiviare non è perdere</strong>: le schede chiuse restano sempre riapribili da <em>Tab archiviate</em> (cronologia), con lo scroll dov'eri rimasto.</p>
       <div class="sn-toggle-row">
@@ -167,13 +185,13 @@
 
     <section>
       <h2>Notifiche</h2>
-      <p class="sn-muted">I messaggi che Filo mostra in basso a destra (schede riordinate, blocchi di siti, ecc.).</p>
-      <label for="notifDuration" class="sn-muted" style="display:block;margin-bottom:4px;">Durata (secondi) — <strong>0 = resta finché non la chiudi</strong></label>
+      <p class="sn-muted">Gli avvisi in basso a destra, nella barra e dentro le pagine.</p>
+      <label for="notifDuration" class="sn-muted" style="display:block;margin-bottom:4px;">Durata in secondi, <strong>0 = restano finché non li chiudi</strong></label>
       <input type="number" id="notifDuration" min="0" max="120" step="1" style="width:120px;" />
       <div class="sn-toggle-row" style="margin-top:12px;">
         <label>
           <input type="checkbox" id="notifSoundEnabled" />
-          <span>Riproduci un suono quando compare una notifica</span>
+          <span>Suono quando arriva un avviso</span>
         </label>
       </div>
       <label for="notifSound" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Suono</label>
@@ -198,13 +216,13 @@
       </div>
     </section>
 
-    <section>
+    <section id="sec-terminal">
       <h2>Modalità terminale</h2>
-      <p class="sn-muted">Quando è attiva, nella dashboard i comandi che iniziano con <code>/</code> (e che non sono comandi di Filo) vengono eseguiti da una shell di sistema, con l'output mostrato in tempo reale. Sopra la barra di scrittura compare la cartella in cui ti trovi. <strong>Esegue comandi reali sul tuo computer</strong>: attivala solo se sai cosa stai facendo.</p>
+      <p class="sn-muted">Filo usa il terminale del computer per le richieste che lo vogliono, come «quanto spazio ho sul disco?». Quello che legge parte subito, quello che cambia qualcosa ti chiede prima un OK, e per cancellare o per un comando che non riconosce devi scrivere «conferma». Nella home, un messaggio che inizia con <code>/</code> va dritto alla shell, se non è un comando di Filo.</p>
       <div class="sn-toggle-row">
         <label>
           <input type="checkbox" id="terminalEnabled" />
-          <span>Attiva la modalità terminale nella dashboard</span>
+          <span>Attiva la modalità terminale</span>
         </label>
       </div>
       <label for="terminalShell" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Shell da usare</label>
@@ -215,6 +233,17 @@
         <option value="cmd">Prompt dei comandi (cmd)</option>
         <option value="bash">Bash (WSL)</option>
       </select>
+    </section>
+
+    <section id="sec-nomi-file">
+      <h2>Nomi dei file scaricati</h2>
+      <p class="sn-muted">Un file che arriva con un nome che non dice niente («scan_00231.pdf», «IMG_2026…», «documento (3)») prende un nome che dice cosa contiene, come «Bolletta luce marzo 2026.pdf». Filo ne legge l'inizio o una miniatura, l'estensione resta quella, e l'avviso che compare ha «Annulla». I nomi scelti da qualcuno restano com'erano, e nelle finestre in incognito non succede.</p>
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="nomiSensatiScaricamenti" />
+          <span>Dai da solo un nome sensato ai file scaricati</span>
+        </label>
+      </div>
     </section>
 
     <section id="sec-advanced" style="margin-top:32px;border-top:1px solid var(--sn-border);padding-top:8px;">

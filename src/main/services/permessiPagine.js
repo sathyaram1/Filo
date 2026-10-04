@@ -131,6 +131,19 @@ function lasciapassare(wc, tipo) {
   return true;
 }
 
+function tastoDelMenu(input) {
+  const type = input.type;
+  // Electron non dà il pulsante: il tasto destro premuto sta fra i modificatori.
+  if (type === 'mouseDown') return Array.isArray(input.modifiers) && input.modifiers.includes('rightbuttondown');
+  return (type === 'rawKeyDown' || type === 'keyDown') && input.key === 'ContextMenu';
+}
+
+function segnaMenu(wc, frame) {
+  let nodo = null; let origine = null;
+  try { if (frame) { nodo = frame.frameTreeNodeId; origine = frame.origin; } } catch (_) {}
+  wc._filoMenuAperto = { alle: Date.now(), nodo, origine };
+}
+
 // Il gesto conta per il documento su cui è stato fatto: il clic che porta altrove non vale per la pagina d'arrivo.
 function seguiGesti(wc) {
   if (!wc || wc._filoGestiSeguiti) return;
@@ -140,11 +153,22 @@ function seguiGesti(wc) {
       const type = (input && input.type) || '';
       if (!GESTI.has(type) || String(input.key || '') === 'Escape') return;
       wc._filoGestoAlle = Date.now();
+      // Un sito che annulla il `contextmenu` spegne il `context-menu` qui sotto, non il tasto destro vero (#589.4 giro 2).
+      if (tastoDelMenu(input)) segnaMenu(wc, wc.mainFrame);
+    });
+    // Un riquadro di un altro sito non passa da `input-event`: lì il tasto destro e i tasti premuti arrivano da qui.
+    // Il menu tiene anche il riquadro dove l'utente l'ha aperto: un evento finto della pagina non arriva qui (#589.4).
+    wc.on('context-menu', (_e, params) => {
+      wc._filoGestoAlle = Date.now();
+      segnaMenu(wc, params && params.frame);
+    });
+    wc.on('before-input-event', (_e, input) => {
+      if (input && input.type === 'keyDown' && String(input.key || '') !== 'Escape') wc._filoGestoAlle = Date.now();
     });
     wc.on('did-start-navigation', (e, _url, isInPlace, isMainFrame) => {
       const principale = e && typeof e.isMainFrame === 'boolean' ? e.isMainFrame : isMainFrame;
       const stessa = e && typeof e.isSameDocument === 'boolean' ? e.isSameDocument : isInPlace;
-      if (principale && !stessa) wc._filoGestoAlle = 0;
+      if (principale && !stessa) { wc._filoGestoAlle = 0; wc._filoMenuAperto = null; }
     });
   } catch (_) {}
 }

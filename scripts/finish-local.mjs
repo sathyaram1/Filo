@@ -70,6 +70,9 @@ import { askServerMerge, messageForOwnerMerge, exitCodeForOwnerMerge } from './l
 import { preparaLancioElectron } from './lib/schermo-virtuale.mjs';
 import { lottiPerRigaDiComando } from './lib/riga-di-comando.mjs';
 import { readMarker } from './lib/routine-role.mjs';
+import { partiServerInSospeso } from './lib/parti-lavoro.mjs';
+import { chiediConProva, pulisciResti, gitIn } from './lib/unit-sulla-fusione.mjs';
+import { cartellaDelServer } from './server-fondi-pratica.mjs';
 import mergeApprovalSignal from '../src/main/services/mergeApprovalSignal.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -479,6 +482,17 @@ export function senzaPraticaStop({ checkOnly, pratica }) {
   ].join('\n');
 }
 
+/** Perché il finish si ferma dopo la prova degli unit sulla fusione (#929). PURA. */
+export function fermoDopoLaProva(prova) {
+  const p = prova || {};
+  if (p.errore) {
+    return `✗ Non ho potuto provare gli unit sul risultato della fusione con main: ${p.errore}.\n`
+      + '  Non ho chiesto la fusione. Il ramo è spedito e intatto: rilancia npm run finish.';
+  }
+  return '✗ Gli unit sono rossi sul risultato della fusione con main, e su main da solo no: non ho chiesto la fusione.\n'
+    + '  Riallinea il ramo (git merge origin/main, o rebase), fai tornare verdi i test elencati sopra e rilancia npm run finish.';
+}
+
 async function praticaDelLavoro(valore) {
   const branchCorrente = git(['rev-parse', '--abbrev-ref', 'HEAD']).out;
   const scritta = (readState()[branchCorrente] || {});
@@ -596,6 +610,8 @@ async function main() {
     console.error('Ci sono modifiche non salvate: falle salvare (un Edit qualsiasi) prima di chiudere.');
     process.exit(1);
   }
+  // Anche con --check, che la prova sulla fusione non la fa: i resti di una prova interrotta non aspettano la prossima.
+  pulisciResti({ git: gitIn(ROOT) });
 
   // La linea principale VERA è su origin: il ref locale può essere indietro di
   // centinaia di commit (vedi resolveDiffBase). Un fetch qui serve a due cose:
@@ -740,11 +756,28 @@ async function main() {
 
   // 5. La fusione la CHIEDE, non la fa: su main scrive solo il server, con
   //    un'identità che qui non esiste. Lo sha lega la richiesta esattamente al
-  //    codice appena controllato.
-  process.stdout.write('\n▸ Chiedo al server di fondere\n');
-  if (pratica && pratica.id) console.log(`  pratica ${pratica.seq ? `#${pratica.seq}` : pratica.id}`);
-  else console.log('  nessuna pratica collegata: se i controlli fermano, la fusione aspetta il tuo sì');
-  const reply = await askServerMerge({ branch, sha: cur, feedbackId: pratica ? pratica.id : '' });
+  //    codice appena controllato; la prova degli unit sulla fusione (#929) la
+  //    lega al main su cui sono girati.
+  // La parte del server dello stesso lavoro (ramo con lo stesso nome) non ancora su main tiene aperta la pratica (#915).
+  const pendingParts = pratica && pratica.id ? partiServerInSospeso(branch, { cartellaServer: cartellaDelServer(ROOT) }) : [];
+  const giro = await chiediConProva({
+    root: ROOT, punta: cur,
+    fermaSe: (p) => !!(p.errore || p.esito === 'rosso_sulla_fusione'),
+    chiedi: (provaUnit) => {
+      process.stdout.write('\n▸ Chiedo al server di fondere\n');
+      if (pratica && pratica.id) console.log(`  pratica ${pratica.seq ? `#${pratica.seq}` : pratica.id}`);
+      else console.log('  nessuna pratica collegata: se i controlli fermano, la fusione aspetta il tuo sì');
+      for (const p of pendingParts) console.log(`  parte del server non ancora su main: ${p.branch} (la pratica resta aperta per lei)`);
+      return askServerMerge({ branch, sha: cur, feedbackId: pratica ? pratica.id : '', pendingParts, provaUnit });
+    },
+    mainMosso: (r) => !!(r && r.outcome === 'main_moved'),
+    scrivi: (s) => console.log(`\n${s}`),
+  });
+  if (giro.fermo) {
+    console.error(`\n${fermoDopoLaProva(giro.prova)}`);
+    process.exit(1);
+  }
+  const reply = giro.reply;
   // Il server ha aperto una richiesta: suona il campanello, così una finestra
   // di Filo GIÀ APERTA se ne accorge da sola. Non è un permesso in più — non
   // crea niente e non approva niente, fa solo rileggere l'elenco vero — ed è

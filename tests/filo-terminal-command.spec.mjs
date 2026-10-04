@@ -34,7 +34,9 @@ const enableTerminal = (page) =>
   confirmAction(page, { type: 'IMPOSTA_PREFERENZA', chiave: 'terminale', valore: 'on' });
 
 test('modalità terminale spenta → il comando NON viene eseguito', async ({ app, openTab }) => {
-  await openTab(NEWTAB);
+  const page = await openTab(NEWTAB);
+  // Accesa di serie (#892): chi l'ha spenta resta protetto dal blocco rigido.
+  await confirmAction(page, { type: 'IMPOSTA_PREFERENZA', chiave: 'terminale', valore: 'off' });
   const r = await execAction(app, { type: 'ESEGUI_COMANDO', comando: 'echo ciao' });
   expect(r.executed).toBe(false);
   expect(r.output?.blocked).toBe('disabled');

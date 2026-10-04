@@ -156,3 +156,22 @@ test('una scheda nuova mentre le larghezze sono ferme rimette la striscia in mis
   await shell.locator('#tab-new').click();
   await expect.poll(() => verdettoAllargate(shell, prima, QUANTE - 1), { timeout: 8_000 }).toBe('allargate');
 });
+
+test('lasciata la fila, le schede si allargano subito, senza aspettare che un\'altra scheda cambi', async ({ shell }) => {
+  await apriSchede(shell, QUANTE);
+  const punto = await centroChiudi(shell, await idInPosizione(shell, 5));
+  await shell.mouse.move(punto.x, punto.y);
+  await shell.mouse.click(punto.x, punto.y);
+  await expect(shell.locator('#tabs .tab')).toHaveCount(QUANTE - 1, { timeout: 8_000 });
+  await shell.waitForTimeout(800);
+
+  // Rilascio e misura nello stesso giro di JS: nessun aggiornamento delle schede può ridisegnare in mezzo.
+  const esito = await shell.evaluate(() => {
+    const inattive = () => [...document.querySelectorAll('#tabs .tab:not(.active)')].map((el) => el.getBoundingClientRect().width);
+    const prima = inattive();
+    document.dispatchEvent(new MouseEvent('mousemove', { clientX: 400, clientY: 300, bubbles: true }));
+    const dopo = inattive();
+    return { prima: prima[0], dopo: dopo[0], ferme: dopo.filter((w, i) => !(w > prima[i] + 0.5)).length };
+  });
+  expect(esito, JSON.stringify(esito)).toMatchObject({ ferme: 0 });
+});

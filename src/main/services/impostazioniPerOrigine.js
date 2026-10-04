@@ -17,6 +17,8 @@ const CAMPI_WEB = Object.freeze({
   blocklist: true,
   featureFlags: Object.freeze({ spellcheck: true }),
   tts: Object.freeze({ voice: true, rate: true, pitch: true }),
+  // Quanto restano gli avvisi di Filo dentro la pagina: la durata delle Preferenze vale anche lì.
+  notifications: Object.freeze({ durationSec: true }),
   models: Object.freeze({ transcribe_audio: true }),
   // Voci aperte (le scrive anche l'owner dalla config condivisa): di ognuna
   // passa solo quanto serve al menu della dettatura per scegliere il modello.
@@ -37,6 +39,7 @@ const CAMPI_WEB_SCRITTURA = Object.freeze({
 const SPINTE_WEB = Object.freeze(new Set([
   'settings_updated',
   'cookies_config_update',
+  'ad_skip_config_update',
   'feedback_draw_state',
   'show_toast',
   'tts_global_reading',

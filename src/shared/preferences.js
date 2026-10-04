@@ -82,6 +82,20 @@
     return Number.isFinite(n) ? n : NaN;
   }
 
+  // I toni della suoneria e degli avvisi: gli id sono quelli di SN_SOUNDS (sounds.js).
+  const TONI = {
+    standard: 'default', default: 'default', normale: 'default',
+    delicata: 'gentle', gentle: 'gentle', dolce: 'gentle', morbida: 'gentle',
+    urgente: 'urgent', urgent: 'urgent', forte: 'urgent', acuto: 'urgent',
+    carillon: 'chime', chime: 'chime', campanello: 'chime', campana: 'chime',
+  };
+  const TONI_ETICHETTE = { default: 'Standard', gentle: 'Delicata', urgent: 'Urgente', chime: 'Carillon' };
+  function tonoDa(v) {
+    return TONI[String(v == null ? '' : v).trim().toLowerCase()] || null;
+  }
+  // Lo stesso tetto del campo nelle Preferenze.
+  const NOTIF_SEC_MAX = 120;
+
   // Ogni voce: sinonimi di chiave + build(valore) → { partial, label }.
   // `partial` è il pezzo di settings da fondere (deepMerge preserva i campi
   // annidati vicini); `label` è la conferma leggibile per l'utente.
@@ -182,13 +196,28 @@
       keys: ['modalita_terminale', 'modalità terminale', 'modalita terminale', 'terminale', 'terminal'],
       // La modalità terminale dà a Filo accesso alla shell: conferma esplicita.
       level: 2,
-      risk: 'Questa impostazione decide se Filo può eseguire comandi nella shell del tuo computer. '
-        + 'È un permesso potente: una volta attivo, Filo può lanciare comandi (quelli rischiosi '
-        + 'chiederanno comunque una conferma a parte). Attivalo solo se ti fidi di quello che gli chiedi.',
+      risk: 'Questa impostazione decide se Filo può eseguire comandi nella shell del tuo computer, cioè nel terminale. '
+        + 'Da acceso, quello che legge parte subito, quello che cambia qualcosa ti chiede prima un OK, '
+        + 'e per cancellare o per un comando che non riconosce devi scrivere «conferma». '
+        + 'Da spento, Filo non esegue nessun comando.',
       build(v) {
         const b = parsePrefBool(v);
         if (b === null) return null;
         return { partial: { terminal: { enabled: b } }, label: `Modalità terminale → ${b ? 'attiva' : 'disattivata'}` };
+      },
+    },
+    {
+      keys: ['nomi_sensati_scaricamenti', 'nome sensato agli scaricamenti', 'nomi sensati', 'rinomina scaricamenti',
+        'rinomina i file scaricati', 'nomi dei file scaricati', 'nomisensati'],
+      // Da accesa il contenuto dei file scaricati va a un modello senza una richiesta per ciascuno: conferma.
+      level: 2,
+      risk: 'Da accesa, ogni file che scarichi con un nome che non dice niente («scan_00231.pdf», «IMG_2026…») '
+        + 'viene letto da un modello (l\'inizio del testo o una miniatura) e rinominato con un nome che dice cosa '
+        + 'contiene. L\'avviso che compare ha «Annulla». I nomi scelti da qualcuno restano com\'erano.',
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { nomiSensati: { scaricamenti: b } }, label: `Nome sensato ai file scaricati → ${b ? 'attivo' : 'spento'}` };
       },
     },
     {
@@ -299,6 +328,16 @@
         const b = parsePrefBool(v);
         if (b === null) return null;
         return { partial: { autoArchive: { onIdle: b } }, label: `Archivia quando inattivo → ${b ? 'attivo' : 'disattivato'}` };
+      },
+    },
+    // #737 — sta nella pagina Sicurezza accanto all'ad-block, ma non apre né chiude niente: si applica subito.
+    {
+      keys: ['salta_pubblicita', 'salta pubblicità', 'salta pubblicita', 'salta le pubblicità', 'salta le pubblicita',
+        'salta annunci', 'salta gli annunci', 'pubblicità dei video', 'pubblicita dei video', 'skip ads', 'salta ads'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { security: { adSkip: { enabled: b } } }, label: `Salta le pubblicità dei video → ${b ? 'attivo' : 'disattivato'}` };
       },
     },
 
@@ -508,17 +547,70 @@
       keys: ['suoneria_timer', 'suoneria timer', 'suoneria', 'ringtone', 'timer ringtone', 'suono timer', 'tono timer'],
       level: 1,
       build(v) {
-        const s = String(v == null ? '' : v).trim().toLowerCase();
-        const map = {
-          standard: 'default', default: 'default', normale: 'default',
-          delicata: 'gentle', gentle: 'gentle', dolce: 'gentle', morbida: 'gentle',
-          urgente: 'urgent', urgent: 'urgent', forte: 'urgent', acuto: 'urgent',
-          carillon: 'chime', chime: 'chime', campanello: 'chime', campana: 'chime',
-        };
-        const tone = map[s];
+        const tone = tonoDa(v);
         if (!tone) return null;
-        const labelMap = { default: 'Standard', gentle: 'Delicata', urgent: 'Urgente', chime: 'Carillon' };
-        return { partial: { timerRingtone: tone }, label: `Suoneria timer → ${labelMap[tone]}` };
+        return { partial: { timerRingtone: tone }, label: `Suoneria timer → ${TONI_ETICHETTE[tone]}` };
+      },
+    },
+
+    // ── Avvisi in basso a destra (barra e pagine) — reversibili, innocui → livello 1 ──
+    {
+      keys: ['durata_notifiche', 'durata notifiche', 'durata delle notifiche', 'durata notifica', 'durata della notifica',
+        'durata avvisi', 'durata degli avvisi', 'durata toast', 'tempo notifiche', 'notifications.durationsec'],
+      build(v) {
+        const s = String(v == null ? '' : v).trim().toLowerCase();
+        // Una cifra decide sempre («resta 8 secondi» è 8); le parole del «per sempre» contano solo senza cifre,
+        // e «non restano» chiede il contrario.
+        let n;
+        if (/\d/.test(s)) {
+          n = parseItalianNumber(s);
+          if (/min/.test(s)) n *= 60;
+        } else if (/\bnon\s+rest/.test(s)) return null;
+        else if (/(sempre|infinit|finch[eé]|resta|non spar|le chiudo|la chiudo)/.test(s)) n = 0;
+        else return null;
+        if (!Number.isFinite(n) || n < 0) return null;
+        n = Math.round(n);
+        if (n > NOTIF_SEC_MAX) {
+          return { rifiuto: `la durata massima è ${NOTIF_SEC_MAX} secondi; con 0 gli avvisi restano finché non li chiudi` };
+        }
+        return {
+          partial: { notifications: { durationSec: n } },
+          label: n === 0 ? 'Avvisi → restano finché non li chiudi' : `Durata degli avvisi → ${n} s`,
+        };
+      },
+    },
+    {
+      keys: ['suono_notifiche', 'suono notifiche', 'suono delle notifiche', 'suono notifica', 'suono della notifica',
+        'suono avvisi', 'suono degli avvisi', 'tono notifiche', 'notifications.sound'],
+      // Un sì/no lo accende o lo spegne; un tono lo accende con quel tono.
+      build(v) {
+        const tone = tonoDa(v);
+        if (tone) {
+          return { partial: { notifications: { soundEnabled: true, sound: tone } }, label: `Suono degli avvisi → ${TONI_ETICHETTE[tone]}` };
+        }
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { notifications: { soundEnabled: b } }, label: `Suono degli avvisi → ${b ? 'acceso' : 'spento'}` };
+      },
+    },
+
+    // ── Anteprima delle schede (#430) — reversibile, innocua → livello 1 ──
+    {
+      keys: ['anteprima_schede', 'anteprima delle schede', 'anteprima schede', 'anteprima delle tab', 'anteprima tab', 'tabpreview'],
+      // In fondo all'elenco: una chiave vaga («tab», «schede») resta di chi la prendeva prima.
+      // Un sì/no la accende o la spegne; una misura la accende a quella misura.
+      build(v) {
+        const s = String(v == null ? '' : v).trim().toLowerCase();
+        const MISURE = { piccola: 'piccola', piccole: 'piccola', 'più piccola': 'piccola', small: 'piccola',
+          media: 'media', normale: 'media', medie: 'media', medium: 'media',
+          grande: 'grande', grandi: 'grande', 'più grande': 'grande', large: 'grande' };
+        if (MISURE[s]) {
+          const size = MISURE[s];
+          return { partial: { tabPreview: { enabled: true, size } }, label: `Anteprima delle schede → ${size}` };
+        }
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { tabPreview: { enabled: b } }, label: `Anteprima delle schede → ${b ? 'accesa' : 'spenta'}` };
       },
     },
   ];

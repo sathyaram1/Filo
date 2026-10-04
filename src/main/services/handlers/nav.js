@@ -5,7 +5,7 @@
 const { app } = require('electron');
 
 module.exports = function register(on, ctx) {
-  const { MSG, winOf } = ctx;
+  const { MSG, winOf, apriDaFilo, SCHEMI_USCITA } = ctx;
 
   // SICUREZZA (#250): confine d'origine sui comandi distruttivi. Il canale
   // 'filo:message' è raggiungibile sia dalle pagine interne filo:// sia dai
@@ -72,9 +72,17 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
-  on(MSG.OPEN_URL, async (msg, sender) => {
+  on(MSG.OPEN_URL, async (msg, sender, origin) => {
     const win = winOf(sender);
-    if (win?._filoTabs && msg.url) win._filoTabs.openTab(msg.url);
+    if (!win?._filoTabs || !msg.url) return { ok: true };
+    const url = String(msg.url);
+    // Da una pagina di Filo un indirizzo web o di posta passa dalla porta delle uscite (#810); `parole` = scritto dall'utente.
+    if (isFilo(origin) && SCHEMI_USCITA.test(url)) {
+      const parole = (Array.isArray(msg.parole) ? msg.parole : []).filter((x) => typeof x === 'string').join('\n');
+      const r = await apriDaFilo(url, { wc: sender?.wc, parole, apri: () => win._filoTabs.openTab(url) });
+      return { ok: true, ...r };
+    }
+    win._filoTabs.openTab(url);
     return { ok: true };
   });
 

@@ -5,7 +5,7 @@
 // quanto portato dall'estensione. Possiamo assegnare direttamente window.*
 // e l'assegnazione è visibile alla pagina.
 
-const { ipcRenderer, webFrame } = require('electron');
+const { ipcRenderer, webFrame, webUtils } = require('electron');
 
 // ─── SICUREZZA: gate d'origine ─────────────────────────────────────────────
 // Questo preload è PRIVILEGIATO: espone window.filo (IPC, shell, AI stream) e
@@ -42,6 +42,10 @@ const filoApi = {
   // nella modalità terminale non sono le stesse. È un dato pubblico del
   // sistema, non un'informazione dell'utente: nessuna superficie in più.
   sistema: process.platform,
+  // Il percorso su disco di un file trascinato in una pagina di Filo (#950): '' se non viene dal disco.
+  percorsoDelFile: (file) => {
+    try { return (webUtils && webUtils.getPathForFile(file)) || ''; } catch (_) { return ''; }
+  },
   onBroadcast: (fn) => {
     const wrapped = (_event, msg) => { try { fn(msg); } catch (_) {} };
     ipcRenderer.on('filo:broadcast', wrapped);
@@ -311,6 +315,7 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'calcMarkers.js')); // #724 — calcolatrice e marker [[calc:]]: PRIMA di popup.js
   safe(path.join(SHARED, 'overlayPlacement.js')); // #500 — geometria di menu e riquadro risposta: PRIMA di popup.js e menu.js
   safe(path.join(CONTENT, 'extractContext.js'));
+  safe(path.join(SHARED, 'avvisiTempo.js')); // tempi della pila degli avvisi: PRIMA di popup.js
   safe(path.join(CONTENT, 'popup.js'));
   safe(path.join(CONTENT, 'menu.js'));
   safe(path.join(CONTENT, 'highlight.js'));

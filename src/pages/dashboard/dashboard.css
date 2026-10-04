@@ -263,6 +263,61 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   color: var(--dash-paper);
   border-bottom-right-radius: 6px;
 }
+/* #867 — il segno di un cambio sulla bolla dell'utente, come la conferma di lettura: passandoci sopra
+   (sul segno, non sulla bolla che si attraversa leggendo) la frase e «annulla» in una pastiglia. */
+.dash-bubble-cambi { position: relative; margin-bottom: 6px; }
+.dash-cambi-segno {
+  position: absolute; right: 10px; bottom: -9px;
+  width: 19px; height: 19px; padding: 0; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--dash-accent); color: var(--dash-paper);
+  border: 2px solid var(--dash-paper); cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.dash-cambi-segno svg { stroke-width: 3; }
+.dash-cambi-segno:hover, .dash-cambi-segno:focus-visible { transform: scale(1.12); outline: none; }
+.dash-cambi-segno.dash-cambi-tutti-annullati { background: var(--dash-ink-mute); }
+.dash-bubble-cambi.dash-cambi-vuoto .dash-cambi-segno { display: none; }
+.dash-cambi-pop {
+  position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 5;
+  display: flex; flex-direction: column; gap: 4px; width: max-content; max-width: min(460px, 80vw);
+  background: var(--dash-ink); color: var(--dash-paper);
+  border-radius: 12px; padding: 6px 8px 6px 12px;
+  font-size: 12px; line-height: 1.35; white-space: normal; user-select: none;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  opacity: 0; visibility: hidden; transform: translateY(4px);
+  /* Si chiude con un attimo di ritardo: dal segno alla pastiglia il mouse attraversa la bolla. */
+  transition: opacity 0.15s ease 0.35s, transform 0.15s ease 0.35s, visibility 0s linear 0.5s;
+}
+/* Il ponte fra la bolla e la pastiglia: andandoci col mouse non si chiude. */
+.dash-cambi-pop::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 10px; }
+.dash-bubble-cambi.dash-cambi-sotto .dash-cambi-pop { bottom: auto; top: calc(100% + 14px); }
+.dash-bubble-cambi.dash-cambi-sotto .dash-cambi-pop::after { top: auto; bottom: 100%; }
+/* Il fuoco apre solo da tastiera: quello lasciato da un clic terrebbe aperta la pastiglia che il clic ha chiuso. */
+.dash-cambi-segno:hover + .dash-cambi-pop,
+.dash-cambi-pop:hover,
+.dash-cambi-segno:focus-visible + .dash-cambi-pop,
+.dash-cambi-pop:has(:focus-visible),
+.dash-bubble-cambi.dash-cambi-aperto .dash-cambi-pop {
+  opacity: 1; visibility: visible; transform: none;
+  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0s;
+}
+.dash-cambi-riga { display: flex; align-items: center; gap: 9px; }
+.dash-cambi-frase { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.dash-cambi-annullato .dash-cambi-frase { text-decoration: line-through; opacity: 0.6; }
+.dash-cambi-stato { flex: none; opacity: 0.6; font-size: 11px; }
+.dash-activity-row.dash-cambi-annullato > span:nth-child(2) { text-decoration: line-through; opacity: 0.6; }
+.dash-cambi-annulla {
+  flex: none; font: inherit; font-size: 11.5px; cursor: pointer;
+  border: 1px solid currentColor; background: transparent; color: inherit;
+  border-radius: 13px; padding: 1px 9px; opacity: 0.8;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.dash-cambi-annulla:hover, .dash-cambi-annulla:focus-visible {
+  opacity: 1; background: var(--dash-paper); color: var(--dash-ink); border-color: var(--dash-paper); outline: none;
+}
+.dash-cambi-annulla.dash-cambi-in-corso { opacity: 0.5; cursor: progress; }
+
 .dash-bubble-filo {
   align-self: flex-start;
   background: var(--dash-card);
@@ -545,6 +600,43 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   margin-top: 8px;
   width: 100%;
 }
+/* #892 — un comando si presenta prima a parole; il comando vero sta sotto, più piccolo. */
+.dash-cmd-btn {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  max-width: 100%;
+  padding: 7px 14px;
+  border-radius: 14px;
+  text-align: left;
+}
+.dash-cmd-btn-cosa { line-height: 1.35; }
+.dash-cmd-btn-codice {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  opacity: 0.72;
+  word-break: break-all;
+}
+.dash-cmd-cosa {
+  margin-bottom: 4px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--dash-ink-soft);
+}
+/* La frase della prima volta: una riga a sé sopra i bottoni, discreta come una nota. */
+.dash-cmd-primavolta {
+  flex-basis: 100%;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--dash-ink-soft);
+}
+.dash-cmd-primavolta a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.15s ease;
+}
+.dash-cmd-primavolta a:hover { color: var(--dash-accent); }
 /* Riga di comando: scatola QUADRATA col colore della bolla utente, così si distingue a colpo d'occhio
    dalle bolle arrotondate delle istruzioni, e il testo resta leggibile invece che tenue sul trasparente. */
 .dash-cmd-line {
@@ -592,23 +684,60 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   border: 1px dashed var(--dash-line-strong);
   border-radius: 8px;
 }
+/* Riga intera delle azioni e mai oltre: i titoli lunghi si accorciano coi puntini invece di allargare la bolla. */
 .dash-delete-panel {
+  flex: 1 1 100%;
+  min-width: 0;
+  box-sizing: border-box;
   margin-top: 8px;
   padding: 10px 12px;
   border: 1px solid color-mix(in srgb, #c0392b 40%, transparent);
   border-radius: 10px;
   background: color-mix(in srgb, #c0392b 6%, transparent);
 }
-.dash-delete-note { font-size: 13px; margin-bottom: 6px; }
-.dash-delete-list {
+.dash-delete-note { font-size: 13px; margin-bottom: 6px; overflow-wrap: anywhere; }
+/* Il modello sta giudicando le schede: niente avanzamento da stimare, una rotella. */
+.dash-delete-note[data-cerco="1"]::before {
+  content: '';
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  vertical-align: -1px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  opacity: 0.7;
+  animation: dash-activity-spin 0.9s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash-delete-note[data-cerco="1"]::before { animation: none; border-top-color: currentColor; }
+}
+/* Selettore lungo quanto quello delle liste nel testo della bolla, che sennò rimette il rientro. */
+.dash-delete-panel ul.dash-delete-list {
   margin: 6px 0 10px;
-  padding-left: 18px;
+  padding: 0;
+  list-style: none;
   max-height: 180px;
   overflow: auto;
   font-size: 12px;
-  opacity: 0.85;
 }
-.dash-delete-list li { margin: 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dash-delete-list li {
+  margin: 1px 0;
+  padding: 2px 4px;
+  border-radius: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background-color 0.15s ease;
+}
+.dash-delete-list li:hover { background: color-mix(in srgb, #c0392b 10%, transparent); }
+.dash-delete-list label { cursor: pointer; }
+.dash-delete-list input { margin: 0 6px 0 0; vertical-align: -2px; accent-color: #c0392b; cursor: pointer; }
+.dash-delete-list span { opacity: 0.85; }
+/* Tolta dall'elenco: resta visibile, ma si legge che non verrà eliminata. */
+.dash-delete-list input:not(:checked) + span { opacity: 0.45; text-decoration: line-through; }
 
 /* Il raffinamento estetico (color picker, slider) è volutamente poco invadente: lo sfondo resta
    visibile perché l'anteprima live sulle superfici dietro si veda mentre si trascina. */
@@ -911,6 +1040,27 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   width: 48px; height: 48px; border-radius: 8px; object-fit: cover; cursor: zoom-in;
 }
 .dash-img-previews .dash-img-remove { top: -6px; right: -6px; left: auto; }
+/* #950 — un file trascinato dal disco: il nome in una pastiglia, alta quanto le anteprime delle immagini. */
+.dash-file-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 260px;
+  height: 48px;
+  box-sizing: border-box;
+  padding: 0 14px;
+  border: 1px solid var(--dash-ink);
+  border-radius: 8px;
+  color: var(--dash-ink);
+  font-size: 13px;
+  cursor: default;
+  transition: background 0.12s ease;
+}
+.dash-file-chip:hover,
+.dash-file-chip:focus-visible { background: rgba(var(--sn-accent-rgb), 0.12); outline: none; }
+.dash-file-chip-nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-file-chip .dash-file-chip-togli { position: absolute; top: -6px; right: -6px; left: auto; }
 
 .dash-lightbox {
   position: fixed; inset: 0;

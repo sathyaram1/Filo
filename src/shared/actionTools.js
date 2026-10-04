@@ -232,6 +232,23 @@
       },
       required: ['percorso'],
     },
+    RINOMINA_FILE: {
+      description: ({ sistema }) => 'Dà un nome sensato a file del computer dell\'utente. Filo legge l\'inizio di ciascuno '
+        + '(PDF, immagini, documenti Word e LibreOffice, testo) e propone un nome che dice cosa contiene; l\'estensione '
+        + 'non cambia mai e nessun file viene sovrascritto. L\'utente vede l\'elenco vecchio → nuovo e conferma, e dopo '
+        + 'può rimettere tutto com\'era con «Annulla». Indica i file con `percorsi`, oppure una `cartella`: di una cartella '
+        + 'si prendono i file col nome che non dice niente (scan_00231, IMG_2026…, documento (3)), con `tutti` true anche '
+        + 'gli altri. Se è l\'utente a dettare il nome, passalo in `nome` con un solo file. Per rimettere un nome di prima '
+        + `usa \`nome\` col nome di prima. Esempio di percorso: ${sistemaInfo(sistema).esempioPercorso}`,
+      properties: {
+        percorsi: { type: 'array', items: { type: 'string' }, description: 'I file da rinominare (percorso assoluto, o con ~ per la cartella dell\'utente).' },
+        cartella: S('Una cartella: si rinominano i file che contiene (non le sottocartelle).'),
+        tutti: B('Con `cartella`: anche i file che hanno già un nome comprensibile. Di norma false.'),
+        nome: S('Il nome deciso dall\'utente per UN file, senza estensione.'),
+      },
+      required: [],
+      risultato: true,
+    },
     PULISCI_TAB: {
       description: 'Mostra un bottone "Riordina e archivia le schede"; l\'utente conferma e Filo archivia le tab non più utili (riapribili dalla cronologia). NON archiviare nulla da solo: spiega in una frase cosa farà.',
       properties: {},
@@ -241,6 +258,18 @@
       description: 'Cerca nell\'archivio le schede pertinenti a `query` e mostra un pannello di conferma per eliminarle DEFINITIVAMENTE. È distruttiva e permanente: spiega in una frase che è un\'eliminazione definitiva.',
       properties: { query: S('Descrizione di cosa cancellare.') },
       required: ['query'],
+    },
+    CANCELLA_PAGINE: {
+      description: 'Cancella le pagine visitate che Filo ricorda ("cancella le pagine dell\'ultima ora", "togli la cronologia di oggi", "cancella tutta la cronologia", "cancella le pagine di YouTube"). Il sistema mostra all\'utente quante sono e le toglie solo col suo OK: non chiederlo tu a parole. Non tocca le chat né le schede chiuse.',
+      properties: {
+        periodo: S('Quali pagine: "ultima_ora", "oggi", "ieri" o "tutto". Per un numero di ore o di giorni usa `ore` o `giorni`, per un intervallo qualsiasi `da`/`a`. Con `sito` e senza periodo valgono tutte le pagine di quel sito.', { enum: ['ultima_ora', 'oggi', 'ieri', 'tutto'] }),
+        ore: I('Le ultime N ore ("cancella le pagine delle ultime 3 ore"); ometti per un periodo con nome.'),
+        giorni: I('Gli ultimi N giorni ("cancella le pagine dell\'ultima settimana" = 7).'),
+        da: S('Inizio di un intervallo qualsiasi ("ieri sera", "la settimana scorsa", "dal 2 ottobre"): istante ISO con l\'ora locale, o giorno AAAA-MM-GG (dalla sua mezzanotte).'),
+        a: S('Fine dell\'intervallo, come `da` (un giorno vale fino alla sua fine); ometti per "fino a adesso".'),
+        sito: S('Solo le pagine di questo sito ("youtube.com", o il nome "youtube"); ometti per tutti i siti.'),
+      },
+      required: [],
     },
     CANCELLA_MEMORIA: {
       description: 'Cancella DEFINITIVAMENTE tutta la memoria di Filo (profilo, preferenze apprese, lezioni). Il sistema chiede all\'utente di digitare "conferma" prima di eseguire; non parte mai senza. NON dichiarare di averlo già fatto.',
@@ -258,15 +287,20 @@
         + '• tema: "sistema" | "chiaro" | "scuro"\n'
         + '• dimensione_testo: "piccolo" | "normale" | "grande" | "molto grande" | "enorme"\n'
         + '• commento_home: true | false (commento di Filo al centro della home)\n'
+        + '• anteprima_schede: true | false | "piccola" | "media" | "grande" (carta con l\'anteprima di una scheda al passaggio del mouse sulla barra)\n'
         + `• stile_agente: testo libero, ${tettoStile()} (come deve scrivere Filo; "nessuno" lo toglie) [conferma]\n`
         + '• correttore: true | false (correttore ortografico AI)\n'
         + '• sidebar_aiuto: true | false ; categorizzazione: true | false\n'
         + '• archiviazione_automatica: true | false ; archivia_alla_riapertura: true | false ; archivia_se_inattivo: true | false\n'
         + '• ore_inattivita: numero 1-168 (dopo quante ore archiviare)\n'
         + `• modalita_terminale: true | false [conferma] ; shell_terminale: ${sistemaInfo(sistema).shellPref} [conferma]\n`
+        + '• nomi_sensati_scaricamenti: true | false [conferma] (nome sensato da solo ai file scaricati col nome che non dice niente)\n'
         + '• velocita_voce: numero 0.5-2 ; tono_voce: numero 0-2 (lettura ad alta voce)\n'
+        + '• durata_notifiche: secondi 0-120 (quanto restano gli avvisi in basso a destra, nella barra e nelle pagine; quelli brevi e quelli con un pulsante restano in proporzione; 0 = finché l\'utente non li chiude)\n'
+        + '• suono_notifiche: true | false | "standard" | "delicata" | "urgente" | "carillon" (suono degli avvisi della barra; un tono lo accende con quel tono)\n'
         + '• protezione_ip: true | false [conferma] (anti-leak WebRTC)\n'
         + '• blocco_popup: true | false [conferma]\n'
+        + '• salta_pubblicita: true | false (preme da solo il «Salta» delle pubblicità dei video, per esempio su YouTube)\n'
         + '• navigazione_sicura: true | false [conferma] (rilevamento siti pericolosi)\n'
         + '• gestione_cookie: "manuale" | "automatico" | "privacy" [conferma]\n'
         + '• fingerprint: "off" | "default" | "privacy" [conferma] (anti-fingerprinting)\n'
@@ -294,8 +328,11 @@
     },
     ESEGUI_COMANDO: {
       description: 'Esegue un comando shell. Il livello di sicurezza lo decide il SISTEMA dal comando (sola lettura → subito; modifiche recuperabili → conferma; cancellazioni / non riconosciuti / concatenati → digita "conferma"). L\'output ti torna subito e lo vede anche l\'utente. Solo con modalità terminale attiva: se è spenta il sistema te lo dice, e tu proponi di attivarla (IMPOSTA_PREFERENZA modalita_terminale true). UN comando per chiamata, niente concatenazioni con && o ;. La cartella di lavoro è persistente: un "cd" resta valido per i comandi successivi.',
-      properties: { comando: S('Il comando shell esatto.') },
-      required: ['comando'],
+      properties: {
+        comando: S('Il comando shell esatto.'),
+        spiegazione: S('Cosa fa il comando, in una frase semplice e in prima persona, per chi non sa cos\'è un terminale: «Misuro lo spazio libero sul disco», «Cancello la cartella build». È la prima cosa che l\'utente legge, sopra il comando: dice l\'effetto vero, anche quando cancella o cambia qualcosa. Non decide il livello di sicurezza.'),
+      },
+      required: ['comando', 'spiegazione'],
       risultato: true,
     },
     PROXY_TAB: {
@@ -348,6 +385,11 @@
     RIPRISTINA_STILE_PAGINA: {
       description: 'Toglie le modifiche di stile che hai applicato alla pagina con STILE_PAGINA ("rimetti com\'era", "togli le modifiche").',
       properties: {},
+      required: [],
+    },
+    ANNULLA_CAMBIO: {
+      description: 'Rimette com\'era un cambio di stato: un\'impostazione, l\'aspetto, una sveglia o un timer, una regola del proxy, lo zoom di un sito. Per "rimetti come prima", "annulla", "torna com\'era", "no, era meglio prima". I cambi sono nei CAMBI RECENTI dello STATO, con l\'id e da dove sono venuti: valgono allo stesso modo quelli chiesti in chat e quelli fatti dall\'utente nelle pagine delle impostazioni. Passa l\'id del cambio che l\'utente intende; senza id si annulla l\'ultimo ancora in piedi. Anche l\'annullo è un cambio: annullarlo rifà quello di prima. Il livello lo decide il sistema dal cambio: per le impostazioni sensibili chiede lui conferma all\'utente.',
+      properties: { id: S('L\'id del cambio da annullare, dai CAMBI RECENTI (per esempio "c1a2b3c4d5").') },
       required: [],
     },
     ZOOM_PAGINA: {

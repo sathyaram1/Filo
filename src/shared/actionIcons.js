@@ -23,6 +23,7 @@
   const AZIONI = {
     NAVIGA: 'openTab',
     APRI_FILE: 'folder',
+    RINOMINA_FILE: 'pencil',
     TIMER: 'timer',
     SVEGLIA: 'alarm',
     CANCELLA_SVEGLIA: 'alarmOff',
@@ -44,6 +45,7 @@
     CANCELLA_ARCHIVIO: 'trash',
     CANCELLA_MEMORIA: 'eraser',
     DIMENTICA: 'eraser',
+    CANCELLA_PAGINE: 'eraser',
     IMPOSTA_PREFERENZA: 'options',
     IMPOSTA_ESTETICA: 'palette',
     ESEGUI_COMANDO: 'terminal',
@@ -56,6 +58,7 @@
     ZOOM_PAGINA: 'zoomPagina',
     STILE_PAGINA: 'brush',
     RIPRISTINA_STILE_PAGINA: 'undo',
+    ANNULLA_CAMBIO: 'undo',
   };
 
   const PREVISTE = {

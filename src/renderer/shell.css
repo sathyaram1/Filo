@@ -134,6 +134,9 @@ html[data-chrome-compact="1"] .addr {
   transition: background 0.1s ease;
   -webkit-app-region: no-drag;
   app-region: no-drag;
+  /* Contenitore delle priorità delle icone (sotto); la larghezza del contenuto gliela misura shell.js. */
+  container: tab / inline-size;
+  contain-intrinsic-inline-size: var(--tab-naturale, none);
 }
 
 .tab.audible {
@@ -158,6 +161,12 @@ html[data-chrome-compact="1"] .addr {
   min-width: 110px;
   max-width: 320px;
   box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.tab.misura {
+  container-type: normal;
+  flex: none;
+  width: max-content;
 }
 
 .tab.active.audible {
@@ -247,30 +256,18 @@ html[data-chrome-compact="1"] .addr {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.tab .mute-ind {
-  flex: 0 0 13px;
-  height: 13px;
+/* Avviso audio (suona o mutata) dopo il titolo, come in Chrome, col colore delle scritte della scheda (#431). */
+.tab .tab-alert {
+  flex: 0 0 16px;
+  height: 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--fg-soft);
+  color: inherit;
   cursor: pointer;
 }
-.tab .mute-ind svg { display: block; }
-.tab .mute-ind:hover { opacity: 0.7; }
-
-/* Quando la tab suona l'icona audio SOSTITUISCE la favicon: unico indicatore, nessun overlay.
-   Lo slot è a larghezza fissa, così l'icona resta visibile a qualsiasi larghezza di tab. */
-.tab .favicon.favicon-audible {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--accent);
-  cursor: pointer;
-  background-image: none;
-}
-.tab .favicon.favicon-audible svg { display: block; }
-.tab .favicon.favicon-audible:hover { opacity: 0.7; }
+.tab .tab-alert svg { display: block; }
+.tab .tab-alert:hover { opacity: 0.7; }
 
 /* Indicatore "aperta da un altro paese" (proxy per-tab): discreto di proposito, è un segnale
    di viaggio, non di sicurezza. */
@@ -287,6 +284,22 @@ html[data-chrome-compact="1"] .addr {
   font-weight: 600;
   letter-spacing: 0.4px;
   line-height: 1;
+}
+
+/* Scheda stretta con l'avviso audio, priorità come in Chrome: avviso > icona > X (sull'attiva sempre) > paese > titolo.
+   Soglia = spazio di chi resta (icone 16, X 18, paese ~26, gap 6); prova in tests/tab-audio-indicator.spec.mjs. */
+@container tab (width < 100px) {
+  .tab:has(> .tab-alert) > .proxy-ind { display: none; }
+}
+@container tab (width < 68px) {
+  .tab:not(.active):has(> .tab-alert) > .close { display: none; }
+}
+@container tab (width < 44px) {
+  .tab:has(> .tab-alert) > .title { display: none; }
+}
+@container tab (width < 38px) {
+  .tab:has(> .tab-alert) > :is(.favicon, .spinner) { display: none; }
+  .tab > .tab-alert { margin: 0 auto; }
 }
 
 .tab-new {
@@ -601,6 +614,28 @@ html[data-feedback-dim="1"] .shell {
   cursor: pointer;
 }
 .dl-row-btn:hover { background: var(--tab-active); }
+/* #950 — il menu del tasto destro su una riga: dentro il pannello, perché fuori lo coprirebbe la pagina. */
+.dl-row-menu {
+  display: flex;
+  flex-direction: column;
+  margin-top: 6px;
+  padding: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+.dl-row-menu-voce {
+  padding: 6px 10px;
+  border-radius: 6px;
+  font: 12px/1.3 system-ui, sans-serif;
+  color: var(--fg);
+  cursor: pointer;
+  outline: none;
+  transition: background 0.12s ease;
+}
+.dl-row-menu-voce:hover,
+.dl-row-menu-voce:focus-visible { background: var(--tab-bg); }
 /* #588 — un «sì» appena comparso non risponde ancora: si vede spento finché si arma. */
 /* Spento non prende il clic: lo riceve la riga, che così ricomincia l'attesa. */
 .dl-row-btn:disabled { opacity: 0.45; cursor: default; background: var(--tab-bg); pointer-events: none; }

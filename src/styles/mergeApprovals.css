@@ -124,6 +124,13 @@ button.sn-mac-origin-link:focus-visible { outline: 2px solid var(--sn-accent); o
   line-height: 1.4;
   color: color-mix(in srgb, var(--sn-fg) 70%, var(--sn-accent));
 }
+/* Su quale main sono girati gli unit della fusione: sottotono, il dettaglio sta nel suggerimento. */
+.sn-mac-prova {
+  margin: 0;
+  font-size: 12px;
+  color: var(--sn-muted);
+  cursor: help;
+}
 .sn-mac-blocks {
   list-style: none;
   margin: 0;

@@ -120,6 +120,12 @@
       doesNot: 'Non chiude né archivia nessuna scheda: le riordina soltanto (per chiudere quelle non più utili c’è /pulisci).',
     },
     {
+      id: 'tab-preview', title: 'Anteprima di una scheda al passaggio del mouse', category: 'navigation',
+      desc: 'Passando il mouse su una scheda della barra compare una carta con il suo titolo, il sito e un’immagine della pagina com’era l’ultima volta che l’hai vista. Le schede aperte in secondo piano hanno la loro immagine appena finiscono di caricare, anche se non le hai mai aperte. Sulla scheda che hai davanti la carta mostra solo il titolo.',
+      invoke: 'Passa il mouse su una scheda. In Preferenze → «Anteprima delle schede» la spegni o scegli la dimensione (piccola, media, grande); lo stesso chiedendolo a Filo ("spegni l\'anteprima delle schede", "anteprima delle schede più grande").',
+      doesNot: 'L’immagine è quella dell’ultima volta che la pagina si è vista. Una pagina aperta dietro e mai vista si rifà quando cambia (una posta che si riempie tardi), e così una scheda dietro che passa da sola a un’altra pagina, anche senza ricaricare (il video dopo), o una scheda lasciata mentre caricava ancora o appena arrivata; se invece una pagina già vista e ferma cambia mentre è dietro (una chat, un feed che si aggiorna), l’anteprima resta com’era finché non ci torni. Le immagini restano in memoria e non vengono salvate sul computer.',
+    },
+    {
       id: 'open-in-background', title: 'Apri una scheda in secondo piano', category: 'navigation',
       desc: 'Filo può aprire una pagina senza portartici davanti: tu resti dove sei e quello che hai chiesto — un brano, una radio, un podcast — parte lo stesso nella scheda dietro.',
       invoke: 'Chiedilo a parole all’assistente ("mettimi questa canzone", "apri senza cambiare scheda"): quando ciò che apre serve solo da ascoltare, la scheda nasce in secondo piano. Il riferimento che resta nella conversazione ti porta a quella scheda quando vuoi.',
@@ -237,8 +243,9 @@
     },
     {
       id: 'screenshot', title: 'Cattura schermo', category: 'media',
-      desc: 'Cattura la pagina visibile come immagine. Puoi anche selezionare solo una porzione dello schermo.',
+      desc: 'Cattura la pagina visibile come immagine, oppure solo una porzione dello schermo. L’immagine finisce negli appunti e nella cartella Download con un nome che dice cosa mostra: Filo guarda l’immagine e lo scrive da sé. Se il nome non arriva, il file si chiama «screenshot» con data e ora.',
       invoke: 'Menu del tasto destro → "Screenshot" o "Screenshot di una parte".',
+      doesNot: 'Il nome automatico vale per le catture fatte in Filo; per i file che hai già sul computer c’è «Dai un nome sensato».',
     },
     {
       id: 'ocr', title: 'Trascrivi testo da una porzione', category: 'media',
@@ -303,14 +310,20 @@
     },
     {
       id: 'archive', title: 'Cronologia delle schede', category: 'save',
-      desc: 'La cronologia principale: le schede chiuse raggruppate per giorno, una riga per giorno, colorate come le tab in alto; puoi cercarle anche per contenuto e riaprirle.',
+      desc: 'La cronologia principale: le schede chiuse raggruppate per giorno, una riga per giorno, colorate come le tab in alto; puoi cercarle anche per contenuto e riaprirle. Restano tutte finché non le cancelli tu. Una scheda cancellata esce dall\'archivio sul disco; la copia della pagina nella cache di navigazione resta finché il motore non la scarta.',
       invoke: 'Icona «Cronologia» in alto a destra nella home (o dalla home → "Cronologia"), pagina filo://archive/archive.html. Clicca una scheda per riaprirla; tasto destro per il menu: «Riapri» o «Elimina».',
     },
     {
       id: 'chat-archive', title: 'Ritrova le chat con Filo', category: 'save',
       desc: 'Le chat che fai con Filo nella nuova scheda restano sul tuo computer, per intero, e si ritrovano nella stessa pagina delle schede chiuse. Anche i comandi che dai al terminale, se lo tieni acceso, restano dentro la chat dove li hai scritti, con il loro esito. Le discussioni sono in vista; le chat che erano solo un comando ("metti una sveglia") stanno sotto un interruttore, e ci restano finché non le cancelli tu. Cerca una parola e ti trova la chat che la conteneva, anche a metà conversazione; se cerchi una frase intera e nessuna chat la contiene tutta, Filo cerca con le parole che contano e ti dice con quali ha trovato. Clicca una chat per riaprirla per intero e continuare a scrivere da dove eravate. Il titolo lo scrive Filo, ma è tuo: puoi riscriverlo, e puoi spostare una chat fra le conversazioni e i comandi quando l’ha messa nel posto sbagliato.',
-      invoke: 'Pagina filo://archive/archive.html, sezione «Chat con Filo» in alto. Clicca una chat per riaprirla; tasto destro per il menu: «Riapri la chat», «Rinomina», «Sposta fra le conversazioni» o «Sposta fra i comandi», «Elimina la chat». La cancellazione chiede conferma. Una conversazione che stai ancora facendo è segnata «In corso» e cliccandola torni alla scheda dov’è aperta, invece di aprirne una seconda copia.',
+      invoke: 'Pagina filo://archive/archive.html, sezione «Chat con Filo» in alto. Clicca una chat per riaprirla; tasto destro per il menu: «Riapri la chat», «Rinomina», «Sposta fra le conversazioni» o «Sposta fra i comandi», «Elimina la chat». La cancellazione chiede conferma, e il testo della chat sparisce anche dalle copie che Filo ne teneva: l’elenco delle richieste fatte ai modelli (restano i costi), la cache delle risposte e il registro interno. Una conversazione che stai ancora facendo è segnata «In corso» e cliccandola torni alla scheda dov’è aperta, invece di aprirne una seconda copia.',
       doesNot: 'Niente sparisce da solo: non c’è una pulizia automatica, e nessuna chat esce dal tuo computer. Le chat fatte in una finestra in incognito non vengono salvate. Non entrano qui le conversazioni con l’Aiuto che compare sopra le pagine web: quelle vivono finché la pagina è aperta. Le immagini che incolli in chat non si conservano; rileggendo la chat trovi scritto quante ce n’erano.',
+    },
+    {
+      id: 'visited-pages', title: 'Filo ricorda le pagine visitate', category: 'save',
+      desc: 'Ogni pagina che apri in una scheda (indirizzo, titolo e quando l’hai aperta) entra nella linea del tempo di Filo insieme alle chat, sul tuo computer, senza un limite di quante ne tiene. Le cancelli quando vuoi: quelle dell’ultima ora, di oggi, di ieri, delle ultime ore o degli ultimi giorni, di un intervallo che dici tu («ieri sera») o tutte, anche di un sito solo, e spariscono anche dal disco. Riaprire Filo con le schede di prima non conta come una visita nuova, e nemmeno una pagina che cambia il proprio indirizzo mentre la usi (una mappa che sposti). Se una pagina cambia titolo dopo essersi aperta (la posta, un video dopo l’altro dentro lo stesso sito), la visita prende il titolo vero. Esporta dati e Importa dati le portano con sé, insieme alle chat.',
+      invoke: 'Chiedilo a Filo a parole ("cancella le pagine dell’ultima ora", "cancella la cronologia di oggi", "cancella le pagine di ieri sera", "cancella le pagine delle ultime 3 ore", "cancella tutta la cronologia", "cancella le pagine di YouTube"): ti dice quante sono e aspetta il tuo OK. Oppure pagina Sicurezza (filo://security/security.html), sezione «Pagine visitate»: «Cancella l’ultima ora», «Cancella oggi», «Cancella tutto».',
+      doesNot: 'Non ricorda le pagine aperte in incognito, e niente esce dal tuo computer. Per ora non c’è una pagina per sfogliarle e Filo non le usa ancora per rispondere. Cancellarle non tocca le chat né le schede chiuse della Cronologia.',
     },
     {
       id: 'chat-archive-recall', title: 'Filo rilegge le vostre chat di prima', category: 'assistant',
@@ -332,7 +345,7 @@
     {
       id: 'downloads-list', title: 'Elenco degli scaricamenti', category: 'navigation',
       desc: 'La lista di tutti i file scaricati, dal più recente: per ciascuno vedi nome, dimensione, stato (completato, interrotto, annullato, in corso o in attesa della tua conferma), data e dove è stato salvato; gli scaricamenti in corso mostrano barra e percentuale dal vivo. Per ogni voce puoi aprire il file, aprire la cartella che lo contiene, copiarne il percorso, ri-scaricarlo o toglierlo dalla lista; «Svuota elenco» rimuove tutti quelli conclusi. Se un file scaricato non è più al suo posto (l’hai spostato, rinominato o cestinato) la voce si riconosce a colpo d’occhio — attenuata, col nome barrato — e al posto di «Apri file» ti offre di ri-scaricarlo. I programmi in attesa portano la scritta «Programma», dicono da quale sito arrivano e offrono «Scarica» e «Non scaricare» anche se hai già chiuso il pannello in alto. Puoi anche cercare tra gli scaricamenti.',
-      invoke: 'Menu «App» → «Scaricamenti», oppure il pulsante «Vedi tutti» sull’indicatore degli scaricamenti in alto; indirizzo filo://downloads/downloads.html. Clic su una voce completata per aprire il file, tasto destro per il menu con tutte le azioni.',
+      invoke: 'Menu «App» → «Scaricamenti», oppure il pulsante «Vedi tutti» sull’indicatore degli scaricamenti in alto; indirizzo filo://downloads/downloads.html. Clic su una voce completata per aprire il file, tasto destro per il menu con tutte le azioni, compreso «Dai un nome sensato» e, per un file a cui Filo ha cambiato nome, «Rimetti il nome di prima»; le stesse voci ci sono col tasto destro su un file del pannello dell’indicatore. La ricerca trova un file anche col nome con cui era arrivato.',
       doesNot: 'Non ti fa scegliere dove salvare ogni file (finiscono nella cartella Download di sistema) e non riguarda «Salva immagine/video come…» dal tasto destro. Togliere una voce dall’elenco non cancella il file dal disco, e Filo non va a cercare dove è finito un file che hai spostato: ti dice che lì non c’è più e ti apre la cartella dov’era.',
     },
 
@@ -355,8 +368,8 @@
     },
     {
       id: 'transparency-docs', title: 'Perché Filo fa così (trasparenza)', category: 'assistant',
-      desc: 'Le scelte dichiarate di Filo, scritte per esteso e con le fonti: quali modelli AI usa e quali aziende esclude, e perché. Le stesse pagine le puoi leggere anche senza connessione, e puoi chiederne conto a Filo in chat — le rilegge e risponde con quello che c’è scritto, invece di improvvisare. Le sezioni su privacy, sicurezza e su come Filo si sostiene sono in arrivo.',
-      invoke: 'Pagina filo://transparency/transparency.html; in chat basta chiedere perché Filo usa un certo modello o un’azienda invece di un’altra.',
+      desc: 'Le scelte dichiarate di Filo, scritte per esteso e con le fonti: quali modelli AI usa e quali aziende esclude, e perché; quali dati restano sul tuo computer, quali escono, verso chi e perché, con i punti deboli; come sono difesi il codice che si riscrive dai feedback e gli agenti che agiscono sul computer, e come controllare che il file scaricato venga dal codice pubblico. Le stesse pagine le puoi leggere anche senza connessione, e puoi chiederne conto a Filo in chat — le rilegge e risponde con quello che c’è scritto, invece di improvvisare. La sezione su come Filo si sostiene è in arrivo.',
+      invoke: 'Pagina filo://transparency/transparency.html (Modelli, Privacy, Sicurezza); in chat basta chiedere perché Filo usa un certo modello, quali dati condivide o com’è protetto.',
       doesNot: 'Non è un riassunto scritto dall’assistente: è il testo dell’autore di Filo, e quando cambia idea la pagina riporta la data dell’ultima revisione.',
     },
     {
@@ -368,8 +381,20 @@
     {
       id: 'read-user-documents', title: 'Filo legge i tuoi documenti, anche PDF', category: 'assistant',
       desc: 'Indica a Filo un documento sul tuo computer e lui lo legge davvero: bollette, estratti conto, contratti, visure. Vale per i PDF, che prima erano illeggibili, e per i file di testo (txt, csv, md e simili). Puoi chiedergli cose sul contenuto: quant’è la giacenza media, quanto hai pagato di luce a marzo, cosa dice una clausola. Se non ricordi dove hai salvato il file, digli come si chiama più o meno e dove potrebbe essere: lo cerca e poi lo legge.',
-      invoke: 'Chiedilo a parole all’assistente (nuova scheda): "leggi l’estratto conto nei Download", "riassumimi il contratto sul desktop", oppure incolla il percorso del file.',
-      doesNot: 'Legge e basta: non modifica né sposta i tuoi file. Su un PDF che è in realtà una scansione o una foto di un foglio non c’è testo da estrarre, e Filo te lo dice invece di inventarsi cosa c’è scritto. Non legge ancora i documenti Word ed Excel, né i file molto grandi; di un documento lunghissimo legge la prima parte e ti avverte che si è fermato lì. Un file fuori dalla tua cartella personale (un altro disco, una chiavetta, una cartella di sistema) o un file nascosto di configurazione non lo apre senza il tuo OK.',
+      invoke: 'Chiedilo a parole all’assistente (nuova scheda): "leggi l’estratto conto nei Download", "riassumimi il contratto sul desktop", oppure incolla il percorso del file, o trascina il file nel campo dove scrivi.',
+      doesNot: 'Leggere non modifica né sposta i tuoi file (cambiare nome a un file è una cosa a parte, che chiede il tuo OK: vedi «Nome sensato ai tuoi file»). Su un PDF che è in realtà una scansione o una foto di un foglio non c’è testo da estrarre, e Filo te lo dice invece di inventarsi cosa c’è scritto. Non legge ancora i documenti Word ed Excel, né i file molto grandi; di un documento lunghissimo legge la prima parte e ti avverte che si è fermato lì. Un file fuori dalla tua cartella personale (un altro disco, una chiavetta, una cartella di sistema) o un file nascosto di configurazione non lo apre senza il tuo OK.',
+    },
+    {
+      id: 'file-names', title: 'Nome sensato ai tuoi file', category: 'assistant',
+      desc: 'Filo legge l’inizio di un file (PDF, anche scansionato a colori o in bianco e nero, immagini, documenti Word e LibreOffice, testo) e propone un nome che dice cosa contiene, nella lingua del computer: «Bolletta luce marzo 2026.pdf» al posto di «scan_00231.pdf». Il nome arriva già scritto in una casella che puoi correggere; «Rinomina» lo applica e «Annulla» rimette quello di prima. In chat puoi chiederlo per più file insieme («rinomina i file in Download con nomi che abbiano senso»): Filo ti mostra l’elenco vecchio → nuovo, rinomina solo dopo il tuo OK, e sotto lascia «Annulla» per rimettere tutto com’era. Di una cartella prende i file col nome che non dice niente (scan_…, IMG_…, documento (3)); se vuoi anche gli altri, diglielo. Un file trascinato nel campo dove scrivi a Filo entra nel messaggio col suo percorso, e dal suo tasto destro gli dai un nome prima di mandarlo. In Preferenze puoi far dare da solo un nome sensato ai file che scarichi.',
+      invoke: 'Tasto destro su un file → «Dai un nome sensato»: negli Scaricamenti (pagina o pannello dell’indicatore in alto), sui file che Filo ti trova in chat, su un file trascinato nel campo dove scrivi a Filo; dallo stesso tasto destro, dopo, «Rimetti il nome di prima». Oppure chiedilo a parole all’assistente (nuova scheda). Il nome automatico degli scaricamenti si accende in Preferenze → «Nomi dei file scaricati» (spento di serie), o chiedendolo a Filo.',
+      doesNot: 'Non cambia mai l’estensione e non sovrascrive mai un file: se il nome è già preso aggiunge un numero. Non legge archivi, programmi, audio e video: la voce lì non compare. Di un file oltre i 256 MB il nome lo scrivi tu. In chat rinomina al massimo 40 file per volta (ti dice quanti ne restano) e non tocca file fuori dalla tua cartella personale. Il nome automatico degli scaricamenti vale solo per i nomi che non dicono niente, non nelle finestre in incognito. Per leggere il file manda a un modello l’inizio del testo o una miniatura.',
+    },
+    {
+      id: 'terminal-mode', title: 'Filo usa il terminale del computer', category: 'assistant',
+      desc: 'Per le richieste che lo vogliono («quanto spazio ho sul disco?», «trova i file più grandi in Download») Filo lancia un comando nel terminale del computer e ti risponde con quello che ha trovato. Non serve sapere cos’è un terminale. Ogni comando dice prima a parole cosa fa, e sotto c’è il comando vero. Quello che legge parte subito; quello che cambia qualcosa ti chiede prima un OK; per cancellare, o per un comando che non riconosce, devi scrivere «conferma». Quale conferma serve lo decide Filo leggendo il comando, mai il modello. Nella home puoi anche scrivere tu un comando che inizia con / e va dritto alla shell.',
+      invoke: 'È accesa di serie: chiedi a parole all’assistente (nuova scheda). Si spegne in Preferenze, alla voce «Modalità terminale», dove scegli anche la shell; oppure chiedi a Filo di spegnerla.',
+      doesNot: 'Da spenta Filo non esegue nessun comando. Non cambia, installa o cancella niente senza chiedertelo prima.',
     },
     {
       id: 'generate-dashboard', title: 'Dashboard personale di Filo', category: 'assistant',
@@ -379,9 +404,9 @@
     },
     {
       id: 'agent-actions', title: 'Filo agisce al posto tuo', category: 'assistant',
-      desc: 'Su tua richiesta Filo può compiere azioni per te: aprire pagine o file, cercare sul web, mettere timer e sveglie (e poi cancellarle o spostarle), salvare appunti, regolare preferenze e aspetto, archiviare schede, persino inviare un feedback a tuo nome.',
+      desc: 'Su tua richiesta Filo può compiere azioni per te: aprire pagine o file, dare un nome sensato ai tuoi file, cercare sul web, mettere timer e sveglie (e poi cancellarle o spostarle), salvare appunti, regolare preferenze e aspetto, archiviare schede, persino inviare un feedback a tuo nome.',
       invoke: 'Chiedile a parole all’assistente (nuova scheda) oppure all’assistente laterale di pagina (Alt+H, Ctrl+Alt+H su Mac).',
-      doesNot: 'Le azioni delicate ti vengono prima descritte e partono solo dopo la tua conferma; le più rischiose (cancellazioni irreversibili) chiedono di digitare "conferma". Non esegue nulla di delicato di nascosto. Se un link che sta per aprire, o una ricerca sul web che sta per fare, contiene dati letti dal tuo computer, prima te lo mostra e aspetta il tuo OK.',
+      doesNot: 'Le azioni delicate ti vengono prima descritte e partono solo dopo la tua conferma; le più rischiose (cancellazioni irreversibili) chiedono di digitare "conferma". Non esegue nulla di delicato di nascosto. Se un link che sta per aprire, o una ricerca sul web che sta per fare, contiene dati letti dal tuo computer, prima te lo mostra e aspetta il tuo OK. Non fa mai uscire un segreto: se un link, una ricerca, un comando, un feedback, un collegamento (anche di posta, anche nelle risposte dell’assistente di pagina) o un suggerimento che apri o scarichi con un clic o dal menu del tasto destro, o il testo che l’assistente di pagina propone per un campo, conterrebbe una chiave che Filo custodisce, oppure un codice monouso o di recupero, una password, una chiave, una carta o un IBAN letti da una pagina, un documento, una ricerca o un comando (e non scritti da te in chat), l’azione non parte a nessun livello, nemmeno col tuo OK, e in chat compare cosa è stato fermato. Se vuoi mandarlo davvero, lo fai tu a mano.',
     },
     {
       id: 'filo-memory', title: 'Memoria di Filo', category: 'assistant',
@@ -459,8 +484,14 @@
     },
     {
       id: 'preferences', title: 'Preferenze', category: 'settings',
-      desc: 'Tema (chiaro/scuro/sistema), dimensione del testo delle pagine interne, archiviazione automatica delle schede, stile dell’assistente, voce/velocità/tono della lettura, e notifiche.',
-      invoke: 'Pagina filo://preferences/preferences.html.',
+      desc: 'Tema (chiaro/scuro/sistema), dimensione del testo delle pagine interne, archiviazione automatica delle schede, stile dell’assistente, voce/velocità/tono della lettura, durata e suono degli avvisi in basso a destra (la durata vale anche per le conferme dentro le pagine, che restano più brevi in proporzione; ogni avviso aspetta finché ci tieni sopra il puntatore; quelli della barra si chiudono con la X, quelli nelle pagine con un clic; col tasto destro su un avviso il menu offre le sue azioni e «Chiudi»), e la modalità terminale con la sua shell.',
+      invoke: 'Pagina filo://preferences/preferences.html, oppure chiedendolo a Filo in chat.',
+    },
+    {
+      id: 'undo-changes', title: 'Rimetti com’era un cambio, da dovunque venga', category: 'settings',
+      desc: 'Ogni cambio allo stato di Filo resta segnato con chi l’ha fatto: impostazioni, aspetto, tema, sveglie e timer, regole del proxy, zoom di un sito. Vale per quelli chiesti in chat e per quelli fatti a mano nelle pagine delle impostazioni, e Filo li vede tutti. Quando lo chiedi in chat, sulla tua bolla compare un piccolo segno: al passaggio del mouse dice cosa è cambiato, per esempio «tema: chiaro → scuro», e offre «annulla». Anche l’annullo resta segnato, e si rifà con «rifai».',
+      invoke: 'Passa il mouse sul segno della tua bolla in chat e premi «annulla» (o fai tasto destro sulla bolla, o sulla riga che racconta il cambio), oppure scrivi a Filo «rimetti come prima».',
+      doesNot: 'Le chiavi API e gli indirizzi dei proxy non vengono conservati: un loro cambio si vede ma non si annulla. In una finestra incognito i cambi restano solo finché la finestra è aperta. I cambi fatti dalle pagine non hanno ancora una riga nella home: per ora li ritrova Filo quando glielo chiedi.',
     },
     {
       id: 'security', title: 'Sicurezza e privacy', category: 'settings',
@@ -468,10 +499,22 @@
       invoke: 'Pagina filo://security/security.html.',
     },
     {
+      id: 'dangerous-sites', title: 'Avviso dei siti pericolosi', category: 'settings',
+      desc: 'Un sito pericoloso (in lista per phishing o malware, o che imita un marchio e chiede la password) o sospetto viene coperto da un avviso appena si apre, prima che finisca di caricarsi. L\'avviso sta fuori dalla pagina: il sito non lo copre, non lo toglie e non sente quello che ci scrivi. Su un sito pericoloso si prosegue scrivendo «confermo», su uno sospetto con «Continua»; la scelta vale per quel sito in quella scheda finché resta aperta.',
+      invoke: 'Compare da solo. Tasto destro sull\'avviso: «Chiedi a Filo di questo sito» (apre una chat nuova con la domanda), «Segnala un falso allarme» (apre «Invia feedback» già scritto), «Copia l\'indirizzo», «Torna indietro». Impostazioni → Sicurezza → «Avvisa sui siti pericolosi».',
+      doesNot: 'Non blocca la navigazione e non chiude la scheda: la pagina carica sotto l\'avviso.',
+    },
+    {
       id: 'cookie-banners', title: 'Banner dei cookie rifiutati da soli', category: 'settings',
       desc: 'In modalità Automatico e Privacy Filo rifiuta da solo i banner dei cookie, anche quando stanno in un riquadro dentro la pagina. Quelli che non hanno un «rifiuta» (solo «Accetta», o «accetta o abbonati») li nasconde, senza accettare niente, e se la pagina era rimasta ferma o scurita la sblocca. Dove il sito lo dice, controlla che il rifiuto sia stato registrato davvero.',
       invoke: 'Da solo, a ogni pagina. Il tasto destro sulla scheda dice cosa è successo su quel sito («Cookie non necessari rifiutati» o «Banner dei cookie nascosto»), anche tornandoci dopo in un\'altra scheda o dopo un riavvio, e offre «Mostra il banner dei cookie» per rivederlo; sullo stesso menu «Rifiuta i cookie in automatico qui» torna indietro. In Impostazioni → Sicurezza si vedono tutti e due gli elenchi: i siti coi banner visibili («Rifiuta in automatico») e quelli dove Filo ha rifiutato o nascosto («Mostra il banner»).',
       doesNot: 'In modalità Manuale non tocca nessun banner. Non avvisa da solo quando rifiuta o nasconde qualcosa. Non nasconde i messaggi che non parlano di cookie (avviso sull\'adblocker, limite di articoli gratuiti). Una scelta fatta in una finestra incognito resta lì. In Privacy non tiene sul disco cosa ha fatto sui siti non fidati. «Mostra il banner» toglie solo la risposta che il clic sul banner ha creato, non l\'accesso o le preferenze del sito.',
+    },
+    {
+      id: 'video-ad-skip', title: 'Pubblicità dei video saltate da sole', category: 'settings',
+      desc: 'Quando un video mostra una pubblicità che si può saltare, Filo preme «Salta» appena il pulsante compare, con un clic come il tuo. Vale su YouTube, anche nei suoi video incorporati in altri siti, e sui lettori pubblicitari che usano molti siti (Google IMA, JW Player), anche dentro un riquadro della pagina e nelle schede in secondo piano. Su YouTube, se stai scrivendo in un campo della pagina o tieni premuto il mouse, aspetta che tu abbia finito; se hai scorso più giù e il lettore non si vede, lo preme appena torni a vederlo.',
+      invoke: 'Da solo, acceso di serie. Si spegne in Impostazioni → Sicurezza → «Salta le pubblicità dei video», o chiedendolo a Filo.',
+      doesNot: 'Non accorcia le pubblicità senza «Salta» e non lo preme prima che il lettore lo mostri. Su un video di YouTube incorporato non preme se il sito ci ha messo sopra un suo elemento.',
     },
     {
       id: 'site-permissions', title: 'Permessi dei siti', category: 'navigation',
@@ -506,8 +549,8 @@
     // ────────────────────────────── Crediti ──────────────────────────────────
     {
       id: 'credits', title: 'Crediti e consumi', category: 'credits',
-      desc: 'Mostra il saldo dei crediti, quando si ricaricano e un grafico di come li hai spesi tra le varie azioni. Sotto ci sono i movimenti, cioè da dove arrivano i crediti che hai: l’invito riscattato, la quota di ogni giorno, i regali e i premi per le segnalazioni che mandi e per quelle che Filo risolve. Puoi anche chiedere a Filo in chat quanti crediti ti restano: te lo dice al volo, senza aprire la pagina.',
-      invoke: 'Chiedendolo a Filo in chat ("quanti crediti mi restano?"), oppure dalla pagina filo://credits/credits.html per il dettaglio e il grafico.',
+      desc: 'Mostra il saldo dei crediti, quando si ricaricano e un grafico di come li hai spesi tra le varie azioni. Sotto ci sono i movimenti, cioè da dove arrivano i crediti che hai: l’invito riscattato, la quota di ogni giorno, i regali e i premi per le segnalazioni che mandi e per quelle che Filo risolve. Se hai un portafoglio, sotto il saldo c’è il tuo pseudonimo, il nome con cui compari sul server di Filo. Lo copi con un clic o dal tasto destro, e basta quello per ricevere un regalo di crediti senza dare email o nome. Puoi anche chiedere a Filo in chat quanti crediti ti restano: te lo dice al volo, senza aprire la pagina.',
+      invoke: 'Chiedendolo a Filo in chat ("quanti crediti mi restano?"), oppure dalla pagina filo://credits/credits.html per il dettaglio, il grafico e il tuo pseudonimo («Il tuo pseudonimo», sotto il saldo).',
     },
     {
       id: 'invites', title: 'Inviti e crediti di Filo', category: 'credits',

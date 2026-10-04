@@ -16,7 +16,18 @@
 
   function $(id) { return document.getElementById(id); }
 
-  let saveTimer = null;
+  // Nessuna casella della pagina ha un «Salva», e chiudere o cambiare scheda non avvisa la pagina (#590.5): ognuna
+  // parte da qui, dopo una pausa o al primo segno di uscita. Uscendo, i numeri fuori scala tornano al valore in uso.
+  const caselle = window.SN_CASELLE.crea({
+    uscita() {
+      if (!caricato) return;
+      canonAutoArchiveIdle();
+      canonNotifDuration();
+    },
+  });
+  caselle.registra('pref', () => persist());
+  caselle.registra('token', () => persistTokens());
+  caselle.registra('tabColor', () => persistTabColor());
 
   // Indicatore "Salvato": può lampeggiare su più ancore (quella globale a fondo
   // pagina e quella locale della sezione token), così la conferma è visibile
@@ -44,7 +55,6 @@
   // risultano personalizzati finché non li si tocca direttamente.
 
   let currentOverrides = {};
-  let tokensSaveTimer = null;
 
   // Tema risolto (light/dark) com'è applicato ora su <html>: i default di alcuni
   // token differiscono fra chiaro e scuro.
@@ -118,7 +128,7 @@
       input.spellcheck = false;
       input.autocomplete = 'off';
       input.setAttribute('aria-label', t.label || name);
-      input.addEventListener('input', () => onTokenInput(name));
+      input.addEventListener('input', (e) => onTokenInput(name, e));
       input.addEventListener('blur', () => {
         const v = input.value.trim();
         if (v !== '' && !Tokens.validate(name, v)) {
@@ -167,6 +177,7 @@
   let tokenAzzeraTutti = false;
 
   async function persistTokens() {
+    caselle.spedita('token');
     const nomi = [...tokenDaSalvare];
     const tutti = tokenAzzeraTutti;
     tokenDaSalvare.clear();
@@ -211,11 +222,6 @@
     }
   }
 
-  function persistTokensDebounced() {
-    clearTimeout(tokensSaveTimer);
-    tokensSaveTimer = setTimeout(persistTokens, 400);
-  }
-
   // Ridisegna tutte le righe TRANNE quella in `exceptName` (che l'utente sta
   // editando): serve quando si cambia un token-categoria, così i token che ne
   // ereditano (es. link.color da accent) mostrano subito il valore ereditato.
@@ -224,7 +230,7 @@
     for (const name of Tokens.names()) if (name !== exceptName && !tokenInCorso.has(name)) renderTokenRow(name);
   }
 
-  function onTokenInput(name) {
+  function onTokenInput(name, e) {
     const input = $(`tok-${name}`);
     const row = input.closest('.sn-token-row');
     const err = row.querySelector('.sn-token-error');
@@ -253,7 +259,7 @@
     tokenDaSalvare.add(name);
     renderOtherTokenRows(name);
     applyTokensLive();
-    persistTokensDebounced();
+    caselle.cambiato('token', e);
   }
 
   function resetToken(name) {
@@ -385,7 +391,6 @@
   // (via SETTINGS_UPDATED) aggiorna live il colore delle tab. ↺ riporta il
   // singolo parametro al predefinito; il bottone in fondo li azzera tutti.
   let currentTabColor = {};
-  let tabColorSaveTimer = null;
 
   function buildTabColorSection() {
     const box = $('tabColorCode');
@@ -419,7 +424,7 @@
       input.spellcheck = false;
       input.autocomplete = 'off';
       input.setAttribute('aria-label', `${m.label} (${m.min}–${m.max})`);
-      input.addEventListener('input', () => onTabColorInput(m.key));
+      input.addEventListener('input', (e) => onTabColorInput(m.key, e));
       input.addEventListener('blur', () => {
         if (!tabColDaSalvare.has(m.key)) tabColInCorso.delete(m.key);
         renderTabColorRow(m.key);
@@ -469,7 +474,7 @@
   const tabColDaSalvare = new Set();
   const tabColInCorso = new Set();
 
-  function onTabColorInput(key) {
+  function onTabColorInput(key, e) {
     const input = $(`tabcol-${key}`);
     const m = tabColorMeta(key);
     if (!input || !m) return;
@@ -482,7 +487,7 @@
     tabColDaSalvare.add(key);
     const row = input.closest('.sn-token-row');
     if (row) row.classList.toggle('sn-token-modified', n !== m.def);
-    persistTabColorDebounced();
+    caselle.cambiato('tabColor', e);
   }
 
   function resetTabColorParam(key) {
@@ -508,6 +513,7 @@
   }
 
   function persistTabColor() {
+    caselle.spedita('tabColor');
     const clamped = TabColor ? TabColor.clampParams(currentTabColor) : currentTabColor;
     currentTabColor = clamped;
     const parte = {};
@@ -533,11 +539,6 @@
       currentTabColor[m.key] = fresh[m.key];
       renderTabColorRow(m.key);
     }
-  }
-
-  function persistTabColorDebounced() {
-    clearTimeout(tabColorSaveTimer);
-    tabColorSaveTimer = setTimeout(persistTabColor, 400);
   }
 
   // Lo stile come si salva e come arriva al modello: quello che si legge nel
@@ -814,8 +815,10 @@
   const toccati = new Set();
   const CAMPO_DI = {
     theme: 'theme', textScale: 'textScale', showHomeMessage: 'showHomeMessage',
+    tabPreviewEnabled: 'tabPreview.enabled', tabPreviewSize: 'tabPreview.size',
     agentStylePreset: 'agentStyle', agentStyleText: 'agentStyle', timerRingtone: 'timerRingtone',
     terminalEnabled: 'terminal.enabled', terminalShell: 'terminal.shell',
+    nomiSensatiScaricamenti: 'nomiSensati.scaricamenti',
     ttsVoice: 'tts.voice', ttsRate: 'tts.rate', ttsPitch: 'tts.pitch',
     ttsModelVoice: 'tts.modelVoice', ttsModelVoiceCustom: 'tts.modelVoice',
     autoArchiveEnabled: 'autoArchive.enabled', autoArchiveIdleHours: 'autoArchive.idleHours',
@@ -829,9 +832,12 @@
       case 'theme': return $('theme').value;
       case 'textScale': return parseFloat($('textScale').value) || 1;
       case 'showHomeMessage': return $('showHomeMessage').checked;
+      case 'tabPreview.enabled': return $('tabPreviewEnabled').checked;
+      case 'tabPreview.size': return misuraAnteprima($('tabPreviewSize').value);
       case 'agentStyle': return currentStyleText();
       case 'timerRingtone': return $('timerRingtone').value || 'default';
       case 'terminal.enabled': return $('terminalEnabled').checked;
+      case 'nomiSensati.scaricamenti': return $('nomiSensatiScaricamenti').checked;
       case 'terminal.shell': return $('terminalShell').value;
       case 'tts.voice': return $('ttsVoice').value || '';
       case 'tts.rate': return parseFloat($('ttsRate').value) || 1;
@@ -857,9 +863,12 @@
       case 'theme': return s.theme || 'system';
       case 'textScale': return Number(s.textScale ?? 1);
       case 'showHomeMessage': return s.showHomeMessage !== false;
+      case 'tabPreview.enabled': return !(s.tabPreview && s.tabPreview.enabled === false);
+      case 'tabPreview.size': return misuraAnteprima(s.tabPreview && s.tabPreview.size);
       case 'agentStyle': return String(s.agentStyle || '').trim();
       case 'timerRingtone': return s.timerRingtone || 'default';
       case 'terminal.enabled': return !!(s.terminal && s.terminal.enabled === true);
+      case 'nomiSensati.scaricamenti': return !!(s.nomiSensati && s.nomiSensati.scaricamenti === true);
       case 'terminal.shell': return (s.terminal && s.terminal.shell) || '';
       case 'tts.voice': return tts.voice || '';
       case 'tts.rate': return Number(tts.rate) || 1;
@@ -875,7 +884,12 @@
     }
   }
 
+  function misuraAnteprima(v) {
+    return ['piccola', 'media', 'grande'].includes(v) ? v : 'media';
+  }
+
   async function persist() {
+    caselle.spedita('pref');
     const styleOk = syncStyleNote();
     const settings = {};
     const partiti = [];
@@ -896,11 +910,6 @@
     if (!partiti.length) return;
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings });
     flashSaved();
-  }
-
-  function persistDebounced() {
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(persist, 400);
   }
 
   function buildPresetOptions() {
@@ -929,6 +938,10 @@
       $('textScale').value = opt ? scale : '1';
     }
     if (vuole('showHomeMessage')) $('showHomeMessage').checked = settings.showHomeMessage !== false;
+    const tp = settings.tabPreview || {};
+    if (vuole('tabPreview.enabled')) $('tabPreviewEnabled').checked = tp.enabled !== false;
+    if (vuole('tabPreview.size')) $('tabPreviewSize').value = misuraAnteprima(tp.size);
+    $('tabPreviewSize').disabled = !$('tabPreviewEnabled').checked;
 
     if (vuole('agentStyle')) {
       $('agentStyleText').value = settings.agentStyle || '';
@@ -943,6 +956,7 @@
 
     const terminal = settings.terminal || {};
     if (vuole('terminal.enabled')) $('terminalEnabled').checked = terminal.enabled === true;
+    if (vuole('nomiSensati.scaricamenti')) $('nomiSensatiScaricamenti').checked = !!(settings.nomiSensati && settings.nomiSensati.scaricamenti === true);
     if (vuole('terminal.shell')) {
       const sel = $('terminalShell');
       const suWindows = shellDiWindows();
@@ -1157,13 +1171,20 @@
       persist();
     });
     $('showHomeMessage').addEventListener('change', persist);
+    $('tabPreviewEnabled').addEventListener('change', () => {
+      $('tabPreviewSize').disabled = !$('tabPreviewEnabled').checked;
+      persist();
+    });
+    $('tabPreviewSize').addEventListener('change', persist);
     $('autoArchiveEnabled').addEventListener('change', persist);
     $('autoArchiveOnClose').addEventListener('change', persist);
     $('autoArchiveIdleHours').addEventListener('change', persist);
+    $('autoArchiveIdleHours').addEventListener('input', (e) => caselle.cambiato('pref', e));
     // Al blur riallinea il campo al valore realmente salvato (clampato), così
     // un numero fuori scala non resta a schermo a mentire sul valore in uso.
     $('autoArchiveIdleHours').addEventListener('blur', canonAutoArchiveIdle);
     $('terminalEnabled').addEventListener('change', persist);
+    $('nomiSensatiScaricamenti').addEventListener('change', persist);
     $('terminalShell').addEventListener('change', persist);
 
     // Lettura ad alta voce: la lista voci può popolarsi in ritardo.
@@ -1171,13 +1192,13 @@
       window.speechSynthesis.addEventListener('voiceschanged', () => populateVoices());
     }
     $('ttsVoice').addEventListener('change', persist);
-    $('ttsRate').addEventListener('input', () => {
+    $('ttsRate').addEventListener('input', (e) => {
       $('ttsRateVal').textContent = (parseFloat($('ttsRate').value) || 1).toFixed(1) + '×';
-      persistDebounced();
+      caselle.cambiato('pref', e);
     });
-    $('ttsPitch').addEventListener('input', () => {
+    $('ttsPitch').addEventListener('input', (e) => {
       $('ttsPitchVal').textContent = (parseFloat($('ttsPitch').value) || 1).toFixed(1);
-      persistDebounced();
+      caselle.cambiato('pref', e);
     });
     $('ttsPreview').addEventListener('click', previewTts);
     $('ttsModelPreview').addEventListener('click', previewModelVoice);
@@ -1186,10 +1207,12 @@
       if ($('ttsModelVoice').value === CUSTOM_VOICE) $('ttsModelVoiceCustom').focus();
       else persist();
     });
-    $('ttsModelVoiceCustom').addEventListener('input', persistDebounced);
+    $('ttsModelVoiceCustom').addEventListener('input', (e) => caselle.cambiato('pref', e));
+    $('ttsModelVoiceCustom').addEventListener('change', persist);
 
     // Notifiche: durata + suono.
     $('notifDuration').addEventListener('change', persist);
+    $('notifDuration').addEventListener('input', (e) => caselle.cambiato('pref', e));
     $('notifDuration').addEventListener('blur', canonNotifDuration);
     $('notifSoundEnabled').addEventListener('change', persist);
     $('notifSound').addEventListener('change', persist);
@@ -1212,9 +1235,9 @@
       }
       persist();
     });
-    $('agentStyleText').addEventListener('input', () => {
+    $('agentStyleText').addEventListener('input', (e) => {
       syncPresetSelect();
-      if (syncStyleNote()) persistDebounced();
+      if (syncStyleNote()) caselle.cambiato('pref', e);
     });
     // Uscendo dal campo si vede quello che è stato salvato, non un testo con
     // dentro caratteri invisibili o righe vuote in più (gli spazi ai bordi no).

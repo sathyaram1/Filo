@@ -507,6 +507,7 @@ html, body {
   min-width: 60px;
   text-align: right;
 }
+.sn-cat-row .sn-cat-meta.sn-cat-warn { color: var(--sn-error); }
 
 .sn-spell-table {
   display: flex;

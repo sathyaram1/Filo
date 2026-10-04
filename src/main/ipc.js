@@ -13,8 +13,12 @@ const path = require('node:path');
 const { handleMessage, handleStream, broadcastToTabs } = require('./services/handlers');
 const { showPopupMenu } = require('./popup-menu');
 const { showTooltip, hideTooltip } = require('./popup-tooltip');
+const CartaAnteprima = require('./popup-anteprima');
 const { createSession, defaultCwd, commandExists } = require('./services/shell');
 const { resolveShell } = require('./services/terminal');
+const SegretiLetti = require('./services/segretiLetti');
+// Quanto dell'output di un comando lanciato a mano passa dal registro dei segreti letti: quanto una pagina.
+const MAX_STAMPATO = 8000000;
 const { hostResolves } = require('./services/hostResolve');
 const DiskStorage = require('./shim/storage');
 
@@ -72,6 +76,18 @@ function senderInfo(event) {
     // non al solo frame principale.
     frame: event.senderFrame || null,
   };
+}
+
+// La pagina che ha chiesto, come la nomina il registro dei cambi (src/shared/cambi.js, DOVE).
+function provenienzaDi(info) {
+  if (info && info.isShell) return { via: 'interfaccia', dove: 'shell' };
+  let u = null;
+  try { u = new URL(String((info && info.url) || '')); } catch (_) { u = null; }
+  if (u && u.protocol === 'filo:') {
+    const dove = u.hostname === 'options' && /altro/.test(u.pathname) ? 'altro' : u.hostname;
+    return { via: 'interfaccia', dove };
+  }
+  return { via: 'pagina' };
 }
 
 function registerIpcHandlers() {
@@ -136,7 +152,8 @@ function registerIpcHandlers() {
     // dello storage che ne discende (anche dopo await) finisce nell'overlay in
     // RAM invece che su disco. Copre TUTTE le azioni di memoria senza dover
     // gattare ogni singolo case.
-    const run = () => handleMessage(msg, info);
+    // Ogni stato che la richiesta salva diventa un evento del filo che dice da dove è venuto (#867).
+    const run = () => require('./services/registroCambi').con(provenienzaDi(info), () => handleMessage(msg, info));
     try {
       return info.isIncognito ? await DiskStorage.runIncognito(run) : await run();
     } catch (err) {
@@ -228,9 +245,19 @@ function registerIpcHandlers() {
         if (s) { try { s.kill(); } catch (_) {} shellSessions.delete(key); }
       });
     }
+    // Quello che stampa un comando lanciato a mano è testo letto da fuori: la chat riaperta lo rilegge come
+    // una frase di Filo, e la porta delle uscite deve saperlo (#810). Si tiene la coda, dove finisce l'esito.
+    const stampato = [];
+    let quanto = 0;
     session.exec(command, {
-      onData: (d) => send('data', d),
-      onExit: (e) => send('exit', e),
+      onData: (d) => {
+        const pezzo = String((d && d.chunk) || '');
+        stampato.push(pezzo);
+        quanto += pezzo.length;
+        while (quanto > MAX_STAMPATO && stampato.length > 1) quanto -= stampato.shift().length;
+        send('data', d);
+      },
+      onExit: (e) => { SegretiLetti.ricorda(stampato.join(''), "dall'output di un comando"); send('exit', e); },
       onError: (e) => send('error', e),
     });
     return { ok: true };
@@ -435,7 +462,7 @@ function registerIpcHandlers() {
     const win = finestraDellaBarra(event.sender);
     if (!win) return { ok: false, error: 'forbidden' };
     // In incognito l'elenco dei siti si scrive nella memoria della sessione, non sul disco.
-    const run = () => win._filoTabs.setCookieBanners(id, !!show);
+    const run = () => require('./services/registroCambi').con({ via: 'interfaccia', dove: 'menu-scheda' }, () => win._filoTabs.setCookieBanners(id, !!show));
     return win._filoIncognito ? DiskStorage.runIncognito(run) : run();
   });
   // Stato per il menu della shell: la voce compare solo se un endpoint è
@@ -494,6 +521,20 @@ function registerIpcHandlers() {
     const b = win.getContentBounds();
     const z = event.sender.getZoomFactor() || 1;
     return { x: (p.x - b.x) / z, y: (p.y - b.y) / z };
+  });
+
+  // #430 — solo la barra della finestra chiede la carta, e solo per le sue schede.
+  ipcMain.on('anteprima:mostra', (event, dati) => {
+    const win = finestraDellaBarra(event.sender);
+    if (win) CartaAnteprima.mostra(win, dati);
+  });
+  ipcMain.on('anteprima:prepara', (event) => {
+    const win = finestraDellaBarra(event.sender);
+    if (win) CartaAnteprima.prepara(win);
+  });
+  ipcMain.on('anteprima:nascondi', (event) => {
+    const win = finestraDellaBarra(event.sender);
+    if (win) CartaAnteprima.nascondi(win);
   });
 
   // ─── disegno annotazione sulla barra in alto (shell) ─────────────────────

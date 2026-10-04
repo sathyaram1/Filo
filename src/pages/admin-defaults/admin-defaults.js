@@ -16,6 +16,9 @@
 
   // Mappa azione → editor a segmenti della catena di modelli (popolata in applyConfig()).
   let modelChains = {};
+  // Catene lette che la griglia non mostra: il salvataggio riscrive la mappa intera, e senza
+  // queste cancellerebbe la scelta di una funzione spostata in Gestione prima che lì la si salvi (#465).
+  let hiddenModels = {};
 
   // Cache dei cataloghi modelli per provider (come nelle Opzioni), ma recuperati
   // dal MAIN con le chiavi predefinite: questa pagina non vede mai le chiavi.
@@ -534,10 +537,12 @@
       models: models || {},
       getRegistry: () => collectModelRegistry(),
     });
+    hiddenModels = Object.fromEntries(Object.entries(models || {})
+      .filter(([action, chain]) => !(action in modelChains) && typeof chain === 'string'));
   }
 
   function collectModels() {
-    return ModelChain.collect(modelChains);
+    return { ...hiddenModels, ...ModelChain.collect(modelChains) };
   }
 
   // ── Load / Save ─────────────────────────────────────────────────────────────

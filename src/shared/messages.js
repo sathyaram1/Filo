@@ -57,6 +57,11 @@
     REOPEN_ARCHIVED_TAB: 'reopen_archived_tab',
     // §3.2 — ricerca semantica nell'archivio (embedding Google). { query }
     SEARCH_ARCHIVED_TABS: 'search_archived_tabs',
+    // §5 — le schede archiviate da proporre per la cancellazione: solo le
+    // pertinenti, tutte. { query, richiesta } → { ok, results } | { ok: false, error }
+    ARCHIVIO_DA_CANCELLARE: 'archivio_da_cancellare',
+    // Main → la pagina che ha chiesto: { richiesta, fatte, totali } schede giudicate.
+    ARCHIVIO_DA_CANCELLARE_AVANZAMENTO: 'archivio_da_cancellare_avanzamento',
     // §5 — cancellazione PERMANENTE di più tab archiviate (dopo conferma). { ids }
     DELETE_ARCHIVED_TABS: 'delete_archived_tabs',
     // Deck builder Commander (DECK-BUILDER-SPEC.md): CRUD dei mazzi, storage
@@ -157,17 +162,6 @@
     // non ha creato lui (ramo admin delle regole), quindi quel passo resta al
     // triage. { id, text } → { ok, feedbackId, balance } | { ok:false, error }.
     BOARD_REOPEN: 'board_reopen',
-    // Comandi proprietario (#210). Riservati all'owner (auth.isAdmin()).
-    // OWNER_LIST_USERS: una PAGINA dell'elenco degli utenti registrati (campo
-    //   `email` sui doc credits/<uid>), ordinata per email. `after` è l'ultima
-    //   email già ricevuta; `next` la riporta se c'è un'altra pagina, `total`
-    //   è il conteggio di tutti (null se non è arrivato). `cerca` restringe a
-    //   chi ha un'email che comincia così, e `total` conta solo loro.
-    //   { after?, cerca? } → { ok, users:[{email,name,balance}], total, next, cerca } | { ok:false, error }.
-    OWNER_LIST_USERS: 'owner_list_users',
-    // OWNER_GIFT_CREDITS: regala `amount` crediti all'utente con `email`.
-    //   { amount, email } → { ok, email, amount, balance } | { ok:false, error }.
-    OWNER_GIFT_CREDITS: 'owner_gift_credits',
     // Broadcast main→renderer: l'utente corrente ha ricevuto crediti in regalo
     // (#210.4). { amount } → la home mostra un popup una volta sola.
     GIFT_NOTICE: 'gift_notice',
@@ -232,7 +226,8 @@
     //   servito e costo. { pseudonym } → { ok, detail } (detail.found false se
     //   lo pseudonimo non esiste).
     WALLET_OWNER_USER_DETAIL: 'wallet_owner_user_detail',
-    CAPTURE_VISIBLE_TAB: 'capture_visible_tab',
+    // Le due foto (pagina e barra) vanno solo alla pagina in vista, che inquadra sé stessa: services/fotoDellaPagina.js.
+    CAPTURE_VISIBLE_TAB: 'capture_visible_tab', // → { ok, dataUrl? }
     // "Salva immagine come…" dal menu contestuale. Instradato dal main
     // (session download + will-download) perché l'attributo `download` di un
     // <a> lato pagina è onorato da Chromium SOLO per URL same-origin/blob:/
@@ -253,7 +248,8 @@
     // l'intercettazione will-download di #410.1 e ottiene ESATTAMENTE lo stesso
     // trattamento del clic sul link — avanzamento in barra, salvataggio in
     // cartella Download, avviso finale, voce in cronologia (parità dei cammini).
-    // { url } → { ok } | { ok:false, error }
+    // { url, diFilo, parole } → { ok } | { ok:false, error, frase }. `diFilo`: il collegamento l'ha scritto un modello
+    // di Filo, e lo scaricamento passa dalla porta delle uscite (#810).
     DOWNLOAD_LINK: 'download_link',
     // --- Download "nativi" della navigazione (#410.1) --------------------
     // Sono i download che partono cliccando un link a un file (PDF, ZIP,
@@ -285,6 +281,18 @@
     DOWNLOAD_CANCEL: 'download_cancel',
     DOWNLOAD_PAUSE: 'download_pause',
     DOWNLOAD_RESUME: 'download_resume',
+    // #950 — rimette il nome con cui lo scaricamento era arrivato. { id } → { ok, nome } | { ok:false, frase }
+    DOWNLOAD_RIMETTI_NOME: 'download_rimetti_nome',
+    // #950 — nome sensato a un file dell'utente. Toccano il disco e rispondono con percorsi assoluti: solo dalle
+    // superfici di Filo (soloFilo), mai da un sito. Il percorso arriva intero, o come { downloadId }.
+    // {} → { disponibile } (c'è un modello: la voce del menu compare solo allora)
+    FILE_NOME_STATO: 'file_nome_stato',
+    // { percorso | downloadId } → { ok, percorso, nome, base, ext, proposta } | { ok:false, errore, frase, nome, base, ext }
+    FILE_NOME_PROPONI: 'file_nome_proponi',
+    // { percorso | downloadId, nome } → { ok, da, a, nome, prima } | { ok:false, errore, frase }
+    FILE_RINOMINA: 'file_rinomina',
+    // { coppie: [{ attuale, prima }] } → { ok, esiti }
+    FILE_RIMETTI_NOMI: 'file_rimetti_nomi',
     // Segnale BROADCAST main→superfici: "la cronologia scaricamenti è cambiata"
     // (parte/avanza/finisce un download). VOLUTAMENTE contentless (nessun nome
     // file né percorso): la pagina filo://downloads lo riceve e ri-legge la
@@ -565,6 +573,10 @@
     // Stessa origine e stesso cancello delle approvazioni di fusione: solo
     // pagine `filo://`, solo il proprietario.
     LIVELLO4_SALTA: 'livello4_salta',  // { feedbackId } → { ok, esito:'fuso'|'bloccato'|'conflitto'|'ramo_assente', requestId? } | { ok:false, error }
+    // Il segno di mittente pericoloso di chi ha mandato quel feedback (#922), dalla callable ownerSenderFlag.
+    // `clear` toglie il segno solo con la frase della conferma, che la pagina manda dopo il sì dell'owner.
+    // Solo pagine `filo://`, solo il proprietario.
+    FEEDBACK_SENDER_FLAG: 'feedback_sender_flag', // { feedbackId, action:'read'|'clear', conferma? } → { ok, flagged, reason, flaggedAt, clearedAt } | { ok:false, error }
     // BROADCAST (main → pagine): l'elenco è cambiato, eccolo. Non è un
     // handler: nessuno lo "chiama", lo manda il main quando `npm run finish`
     // suona il campanello (services/mergeApprovalSignal.js) o quando l'owner
@@ -578,20 +590,13 @@
     WEB_SEARCH: 'web_search',                      // { query } → { ok, results: [{title,url,snippet}], provider }
 
     // === Rilevamento siti pericolosi (src/main/services/safebrowse/) ===
-    // Il content script chiede il verdetto per la URL corrente (+ indizi di
-    // pagina: presenza campo password/pagamento). Il main risponde col livello
-    // e un messaggio specifico. → { ok, level:'safe'|'sospetto'|'pericoloso',
-    // message:{title,body}|null, registrable }
+    // Il content script manda la URL corrente e gli indizi (campo password/pagamento); il main mostra l'avviso in una
+    // vista sopra la scheda, i cui pulsanti non passano da questo canale, che i siti raggiungono (#813.5).
+    // → { ok, level:'safe'|'sospetto'|'pericoloso', message:{title,body}|null, registrable }
     SAFEBROWSE_GET: 'safebrowse_get',              // { url, hasPassword?, hasPayment? }
-    // L'utente ha scritto "confermo" sull'interstitial "pericoloso": registra un
-    // bypass per (tab, dominio) così la pagina non viene più coperta. → { ok }
-    SAFEBROWSE_PROCEED: 'safebrowse_proceed',      // { url }
-    // L'utente ha chiuso con "ok" il banner "sospetto": non riproporlo per
-    // questo dominio nel tab. → { ok }
-    SAFEBROWSE_DISMISS: 'safebrowse_dismiss',      // { url }
-    // Broadcast main→content: il verdetto per la URL è cambiato (navigazione o
-    // arricchimento asincrono RDAP/GSB/sandbox). Il content (ri)disegna l'avviso.
-    SAFEBROWSE_UPDATE: 'safebrowse_update',         // → { url, level, message }
+    // La home aperta dal tasto destro sull'avviso chiede cosa le ha lasciato il main: la domanda a Filo sul sito o la
+    // segnalazione del falso allarme, una volta sola. Solo pagine filo://. → { ok, richiesta: { tipo, testo } | null }
+    CASA_RICHIESTA: 'casa_richiesta',
 
     // === Geo-block: proposta inline (proxy-per-tab-spec.md §5, feedback #151) ===
     // Broadcast main→content: un contenuto bloccato in Italia è stato rilevato su
@@ -626,15 +631,31 @@
     // Solo pagine filo:// (Sicurezza): «Apri da un altro paese» ha un fornitore? E con quale host.
     PROXY_STATUS: 'proxy_status',                   // {} → { ok, configured, providerHost }
 
+    // === Pubblicità dei video da saltare (#737, src/content/adSkip.js) ===
+    // Aperti alle pagine web di proposito: li chiede il content script di ogni frame, e non portano dati dell'utente.
+    // `clicVero` dice se questo frame può chiedere il clic vero: il frame principale di una scheda su YouTube, o il
+    // lettore di YouTube incorporato (lì il clic parte quando ogni frame sopra di lui ha confermato il punto).
+    AD_SKIP_CONFIG: 'ad_skip_config',               // {} → { ok, enabled, clicVero }
+    // Il «Salta» premuto dal main con un clic vero nel punto dato (px CSS del frame); il main ricontrolla
+    // interruttore, frame e sito, e ne dà uno ogni 800 ms per scheda. Dal lettore incorporato porta anche il suo tag.
+    AD_SKIP_CLICK: 'ad_skip_click',                 // { x, y, tag? } → { ok, code? }
+    // Main→un solo frame sopra il lettore: dove cade nella tua vista il punto (x, y) del riquadro figlio con quel tag
+    // e quell'origine? Il content script risponde con AD_SKIP_HERE.
+    AD_SKIP_WHERE: 'ad_skip_where',                 // { id, tag, origine, x, y }
+    AD_SKIP_HERE: 'ad_skip_here',                   // { id, x, y, tag } | { id, code } → { ok }
+    // Broadcast main→content quando l'interruttore cambia: il content rilegge la config.
+    AD_SKIP_CONFIG_UPDATE: 'ad_skip_config_update',
+
     // === Account "Accedi con Google" (vedi src/main/auth/) ===
     // Login/logout/stato. Tutto vive nel main process: i token non sono mai
     // esposti alle pagine. La risposta porta solo il profilo pubblico.
-    AUTH_SIGNIN: 'auth_signin',                    // → { ok, profile } | { ok: false, code, error: frase per l'utente }
+    AUTH_SIGNIN: 'auth_signin',                    // → { ok, profile, isAdmin, remembered }; a un sito solo { ok, signedIn, isAdmin } | { ok: false, code, error: frase per l'utente }
     AUTH_SIGNOUT: 'auth_signout',                  // → { ok }
-    AUTH_STATUS: 'auth_status',                    // → { ok, signedIn, profile|null }
-    AUTH_CHANGED: 'auth_changed',                  // broadcast → { signedIn, profile|null }
+    AUTH_STATUS: 'auth_status',                    // → { ok, signedIn, isAdmin, profile|null, uid, remembered }; a un sito solo { ok, signedIn, isAdmin }
+    AUTH_CHANGED: 'auth_changed',                  // broadcast alle sole pagine di Filo → { signedIn, isAdmin, profile|null, remembered }
 
-    // Clipboard history (per il menu "Incolla")
+    // Clipboard history (per il menu "Incolla"). Chi legge e chi scrive da un sito: services/appuntiDaiSiti.js. L'elenco
+    // lo dà solo GET; le scritture rispondono { ok } e basta.
     GET_CLIPBOARD_HISTORY: 'get_clipboard_history',
     PUSH_CLIPBOARD_ENTRY: 'push_clipboard_entry',     // { entry }
     UPDATE_CLIPBOARD_DESCRIPTION: 'update_clipboard_description', // { dataUrl, description }
@@ -643,7 +664,7 @@
 
     // Categorie (Fase 2)
     GET_CATEGORIES: 'get_categories',
-    RENAME_CATEGORY: 'rename_category',         // { id, name }
+    RENAME_CATEGORY: 'rename_category',         // { id, name, unisci? } — unisci:false non fonde con un'omonima
     DELETE_CATEGORY: 'delete_category',         // { id }
     MERGE_CATEGORIES: 'merge_categories',       // { fromId, toId }
     MOVE_PAGE_CATEGORY: 'move_page_category',   // { pageId, categoryId }
@@ -686,6 +707,10 @@
     // cancellata: la scheda che quella conversazione la sta ancora vivendo
     // smette di scriverci dentro, invece di farla rinascere al messaggio dopo.
     FILO_CHATS_UPDATED: 'filo_chats_updated',
+    // #866 — le pagine visitate che il filo ricorda, dalla pagina Sicurezza. Solo pagine filo://: è la cronologia
+    // dell'utente. { periodo: 'ultima_ora'|'oggi'|'tutto' } → { ok, n } (quante sono / quante ne ha tolte).
+    FILO_PAGINE_CONTA: 'filo_pagine_conta',
+    FILO_PAGINE_CANCELLA: 'filo_pagine_cancella',
     // Una riga scritta in chat senza passare da un modello: la risposta a un
     // comando con lo slash (l'elenco dei comandi, la conferma di un timer, il
     // resoconto del riordino), il comando di terminale che l'utente ha digitato
@@ -752,6 +777,11 @@
     // L'utente ha confermato (popup livello 2 / digitato "conferma" livello 3)
     // un'azione di Filo rimasta in sospeso: ora va eseguita davvero. { action }
     FILO_CONFIRM_ACTION: 'filo_confirm_action',
+    // I cambi di stato come eventi del filo (#867). Solo dalle pagine di Filo: leggono e riscrivono le
+    // impostazioni dell'utente. LEGGI { ids } → { eventi }; ANNULLA { id } → { ok, eventi }.
+    CAMBI_LEGGI: 'cambi_leggi',
+    CAMBI_ANNULLA: 'cambi_annulla',
+    CAMBI_AGGIORNATI: 'cambi_aggiornati',           // main → pagine di Filo { ids }: un cambio è nato o è stato annullato
 
     // Primo dispatch (non ancora confermato) di UNA singola azione di Filo,
     // usato dall'agente "Aiuto" (sidebar) per attivare le azioni tipizzate di
@@ -760,6 +790,20 @@
     // needsConfirm, describe }: se needsConfirm il client mostra il popup di
     // conferma e poi rimanda l'azione via FILO_CONFIRM_ACTION. { action }
     FILO_RUN_ACTION: 'filo_run_action',
+
+    // #810 — un indirizzo web proposto da un modello in una pagina di Filo si apre solo dopo la porta delle
+    // uscite. { url, parole } → { aperto, frase }
+    FILO_APRI_PROPOSTA: 'filo_apri_proposta',
+    // #810 — un collegamento scritto da un modello nelle superfici di Filo dentro una pagina web (assistente di pagina,
+    // Spiega, richiesta rapida) lo apre il main dopo la porta delle uscite. Aperto ai content script: non dà più di un
+    // window.open. { url, parole, sfondo } → { aperto, frase, avvisato }
+    APRI_COLLEGAMENTO_FILO: 'apri_collegamento_filo',
+    // #810 — main → pagina di Filo: un indirizzo che la pagina ha chiesto di aprire (menu, link) è stato fermato
+    // dalla porta delle uscite. { frase }
+    USCITA_FERMATA: 'uscita_fermata',
+    // #810 — il testo che l'assistente di pagina vuole scrivere in un campo passa dalla porta delle uscite.
+    // { testo, parole } → { blocca, frase }
+    CONTROLLA_CAMPO: 'controlla_campo',
 
     // #405 — un'azione di PAGINA invocata dal menu aperto dentro un riquadro
     // incorporato (iframe). Il riquadro conosce solo se stesso: tradurre,

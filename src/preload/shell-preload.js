@@ -76,6 +76,8 @@ contextBridge.exposeInMainWorld('filoShell', {
     cancel: (id) => ipcRenderer.invoke('filo:message', { type: 'download_cancel', id }),
     pause: (id) => ipcRenderer.invoke('filo:message', { type: 'download_pause', id }),
     resume: (id) => ipcRenderer.invoke('filo:message', { type: 'download_resume', id }),
+    // #950 — rimette il nome con cui il file era arrivato (l'«Annulla» dell'avviso «Nome dato»).
+    rimettiNome: (id) => ipcRenderer.invoke('filo:message', { type: 'download_rimetti_nome', id }),
     // Aggiornamenti live: { kind:'start'|'progress'|'done'|'error'|'missing'|'removed'|'ask', item }
     onEvent: (fn) => {
       const wrapped = (_event, info) => { try { fn(info); } catch (_) {} };
@@ -99,6 +101,12 @@ contextBridge.exposeInMainWorld('filoShell', {
   },
   tooltipShow: (text, x, y) => ipcRenderer.send('shell:tooltip-show', { text, x, y }),
   tooltipHide: () => ipcRenderer.send('shell:tooltip-hide'),
+  // #430 — la carta con l'anteprima della scheda sotto il puntatore.
+  anteprima: {
+    prepara: () => ipcRenderer.send('anteprima:prepara'),
+    mostra: (dati) => ipcRenderer.send('anteprima:mostra', dati),
+    nascondi: () => ipcRenderer.send('anteprima:nascondi'),
+  },
   // §2.3 — toast informativo (es. "Tab riordinate e salvate in cronologia").
   onToast: (fn) => {
     const wrapped = (_event, info) => { try { fn(info); } catch (_) {} };

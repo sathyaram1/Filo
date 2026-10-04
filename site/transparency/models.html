@@ -111,6 +111,17 @@
 
 .sn-doc strong { font-weight: 600; }
 
+/* I comandi da copiare: si devono distinguere dalla prosa e andare a capo senza allargare la pagina. */
+.sn-doc code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 0.86em;
+  padding: 0.05em 0.35em;
+  background: var(--sn-hover, #ffffff);
+  border: 1px solid var(--sn-border, #e0dcd4);
+  border-radius: var(--sn-radius, 6px);
+  overflow-wrap: anywhere;
+}
+
 .sn-doc hr {
   border: 0;
   border-top: 1px solid var(--sn-border, #e0dcd4);
@@ -233,8 +244,8 @@ html:not([data-sn-theme]) body {
     <a class="sn-doc-brand" href="../">Filo</a>
     <nav class="sn-nav">
       <a class="sn-nav-item is-active" href="./models.html">Modelli</a>
-      <a class="sn-nav-item is-soon" href="./privacy.html" title="in arrivo" aria-label="Privacy: non ancora scritta">Privacy</a>
-      <a class="sn-nav-item is-soon" href="./security.html" title="in arrivo" aria-label="Sicurezza: non ancora scritta">Sicurezza</a>
+      <a class="sn-nav-item" href="./privacy.html">Privacy</a>
+      <a class="sn-nav-item" href="./security.html">Sicurezza</a>
       <a class="sn-nav-item is-soon" href="./business.html" title="in arrivo" aria-label="Come si sostiene: non ancora scritta">Come si sostiene</a>
     </nav>
   </header>
@@ -351,7 +362,7 @@ html:not([data-sn-theme]) body {
 <script>
 (function () {
   'use strict';
-  var GLOSSARY = {"pesi aperti":"I numeri che costituiscono un modello, pubblicati da chi lo ha addestrato: chiunque può scaricarli ed eseguirli, quindi usarli non paga il laboratorio che li ha prodotti.","fornitori indipendenti":"Aziende che si limitano a far girare modelli altrui sui propri computer: pagarle non finanzia chi il modello lo ha addestrato.","modelli stretti":"Modelli che sanno fare una cosa sola, come riconoscere a quale categoria appartiene un testo, trascrivere una voce o leggere ad alta voce: non conversano e non ragionano.","system card":"Il documento che un laboratorio pubblica insieme a un nuovo modello, con le prove di sicurezza fatte prima di metterlo in commercio.","welfare dei modelli":"La domanda se un modello possa avere un'esperienza propria e, in caso, se stia bene o male: nessuno oggi sa rispondere.","Responsible Scaling Policy":"L'impegno pubblico di Anthropic a fermare lo sviluppo se un modello supera certe soglie di pericolosità, verificate anche da revisori esterni.","OpenRouter":"Il servizio che smista le richieste di Filo verso i vari fornitori di modelli: uno solo da pagare, tutti i modelli raggiungibili.","LLM":"Large Language Model: il tipo di modello che sta dietro agli assistenti come Claude o ChatGPT.","super PAC":"Negli Stati Uniti, un fondo che può raccogliere donazioni illimitate per sostenere un candidato senza limiti di spesa.","open source":"Il codice di Filo è pubblico: chiunque può leggerlo, modificarlo e distribuirne una propria versione.","rischi esistenziali":"I modi in cui questa tecnologia potrebbe danneggiare l'umanità intera, non un singolo utente."};
+  var GLOSSARY = {"pesi aperti":"I numeri che costituiscono un modello, pubblicati da chi lo ha addestrato: chiunque può scaricarli ed eseguirli, quindi usarli non paga il laboratorio che li ha prodotti.","fornitori indipendenti":"Aziende che si limitano a far girare modelli altrui sui propri computer: pagarle non finanzia chi il modello lo ha addestrato.","modelli stretti":"Modelli che sanno fare una cosa sola, come riconoscere a quale categoria appartiene un testo, trascrivere una voce o leggere ad alta voce: non conversano e non ragionano.","system card":"Il documento che un laboratorio pubblica insieme a un nuovo modello, con le prove di sicurezza fatte prima di metterlo in commercio.","welfare dei modelli":"La domanda se un modello possa avere un'esperienza propria e, in caso, se stia bene o male: nessuno oggi sa rispondere.","Responsible Scaling Policy":"L'impegno pubblico di Anthropic a fermare lo sviluppo se un modello supera certe soglie di pericolosità, verificate anche da revisori esterni.","OpenRouter":"Il servizio che smista le richieste di Filo verso i vari fornitori di modelli: uno solo da pagare, tutti i modelli raggiungibili.","LLM":"Large Language Model: il tipo di modello che sta dietro agli assistenti come Claude o ChatGPT.","super PAC":"Negli Stati Uniti, un fondo che può raccogliere donazioni illimitate per sostenere un candidato senza limiti di spesa.","open source":"Il codice di Filo è pubblico: chiunque può leggerlo, modificarlo e distribuirne una propria versione.","rischi esistenziali":"I modi in cui questa tecnologia potrebbe danneggiare l'umanità intera, non un singolo utente.","Safe Browsing":"La lista di siti pericolosi mantenuta da Google e usata da quasi tutti i browser per avvisarti prima di aprire una pagina truffa.","ritenzione zero":"L'impegno di chi fa girare un modello a non conservare né la richiesta né la risposta, una volta risposto.","pseudonimo":"Un codice che tiene insieme i dati della stessa installazione senza dire di chi sono.","impronta":"Un numero calcolato da un dato con una formula a senso unico: dallo stesso dato esce sempre lo stesso numero, ma dal numero non si risale al dato.","Firebase":"Il servizio di Google su cui gira il server di Filo: database, accesso e funzioni.","red team":"Chi attacca un sistema apposta, con permesso, per trovarne i punti deboli prima che li trovi qualcun altro."};
 
   function applyGlossary(root, glossary) {
     if (!root || !glossary) return;
@@ -363,7 +374,7 @@ html:not([data-sn-theme]) body {
         var p = node.parentElement;
         while (p && p !== root) {
           var tag = p.tagName;
-          if (tag === 'A' || tag === 'SUP' || tag === 'H1' || tag === 'H2' || tag === 'I') {
+          if (tag === 'A' || tag === 'SUP' || tag === 'H1' || tag === 'H2' || tag === 'I' || tag === 'CODE') {
             return NodeFilter.FILTER_REJECT;
           }
           p = p.parentElement;

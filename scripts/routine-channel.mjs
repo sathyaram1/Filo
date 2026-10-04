@@ -353,6 +353,13 @@ export function statoContenitore({ osImpl = os, proc = process, leggi = leggiFil
   };
 }
 
+/** Quanto aspettare il battito dopo: ogni dieci minuti, ma sempre ben dentro la scadenza che il server ha detto. PURA. */
+export function attesaBattito(expiresAt, now = Date.now()) {
+  const resta = Date.parse(String(expiresAt || '')) - now;
+  if (!Number.isFinite(resta) || resta <= 0) return BEAT_EVERY_MS;
+  return Math.min(BEAT_EVERY_MS, Math.max(1000, Math.floor(resta / 3)));
+}
+
 export async function heartbeat(t, opts = {}) {
   const { status, body } = await call('routineHeartbeat', { ticket: t, ...statoContenitore(opts) }, opts);
   if (status === 200 && body && body.ok) return { ok: true, expiresAt: body.expiresAt };
@@ -710,13 +717,17 @@ export async function compare(t, mine, opts) {
  * se la chiede comunque. Questo è il controllo in più, e il posto dove
  * l'informazione arriva.
  *
- * @returns {{ ok:true, result:'merged'|'blocked'|'conflict', reason?, sha?, approval? }
+ * `opts.provaUnit` è l'esito degli unit sul risultato della fusione (#929, scripts/lib/unit-sulla-fusione.mjs):
+ * il server fonde solo se main è ancora lo sha provato, e altrimenti risponde `main_moved`.
+ *
+ * @returns {{ ok:true, result:'merged'|'blocked'|'conflict'|'main_moved'|'unit_rossi', reason?, sha?, approval?, mainSha? }
  *           | { ok:false, reason }}
  */
 export async function merge(t, branch, opts) {
-  const { sha = '', ...rest } = opts && typeof opts === 'object' ? opts : {};
+  const { sha = '', provaUnit = null, ...rest } = opts && typeof opts === 'object' ? opts : {};
   const payload = { ticket: t, branch: String(branch || '') };
   if (String(sha || '')) payload.sha = String(sha);
+  if (provaUnit && typeof provaUnit === 'object') payload.provaUnit = provaUnit;
   const { status, body } = await call('routineMerge', payload, rest);
   if (status === 200 && body && body.ok && body.result) {
     return {
@@ -725,6 +736,7 @@ export async function merge(t, branch, opts) {
       reason: String(body.reason || ''),
       sha: String(body.sha || ''),
       approval: String(body.approval || ''),
+      ...(body.mainSha ? { mainSha: String(body.mainSha) } : {}),
     };
   }
   return { ok: false, reason: String((body && body.reason) || `http_${status}`) };
@@ -1083,7 +1095,7 @@ if (isMain) {
       let primoGuastoMs = 0;
       for (;;) {
         const r = await heartbeat(biglietto);
-        if (r.ok) { primoGuastoMs = 0; await defaultSleep(BEAT_EVERY_MS); continue; }
+        if (r.ok) { primoGuastoMs = 0; await defaultSleep(attesaBattito(r.expiresAt)); continue; }
         if (r.final) { console.error(`battito finito: ${r.reason}`); process.exit(0); }
         const ora = Date.now();
         if (!primoGuastoMs) primoGuastoMs = ora;

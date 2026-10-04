@@ -213,6 +213,7 @@ app.whenReady().then(async () => {
     // blocco alla sessione di default, carica la cache e — se attivo e stantia —
     // avvia un refresh in background. Non blocca l'avvio.
     try { await require('./services/adblock').init(s); } catch (_) {}
+    try { require('./services/adSkip').configureFromSettings(s); } catch (_) {}
     // EasyList Cookie (banner da nascondere): cache su disco e aggiornamento settimanale in sottofondo.
     require('./services/cookieBanners').init(s).catch(() => {});
     // Cosa Filo ha fatto coi banner dei singoli siti: il menu della scheda lo mostra anche alla visita dopo.
@@ -267,6 +268,8 @@ app.whenReady().then(async () => {
   // di finire una conversazione, quindi senza questo giro la chat più comune
   // di tutte resterebbe senza nome in cronologia. In sottofondo: non blocca
   // l'avvio, e se il modello non c'è si riprova alla partenza dopo.
+  // #866 — il filo si legge adesso, e alla prima partenza dopo l'aggiornamento le chat salvate diventano segmenti.
+  try { require('./services/ilFilo').carica().catch(() => {}); } catch (_) {}
   try { require('./services/handlers').sweepPendingChats().catch(() => {}); } catch (_) {}
 
   // Sveglie e timer (#322): controlla nel main le scadenze arrivate, mostra la
@@ -399,24 +402,23 @@ app.whenReady().then(async () => {
           ), 10_000, 'diagnostica content-script');
           console.log('[smoke] content-script diag:', JSON.stringify(csDiag, null, 2));
 
-          // Simula selezione + right-click per verificare che il menu compaia.
-          await entro(csWin.webContents.executeJavaScript(`(() => {
+          // Seleziona e fa un tasto destro come l'utente: uno fabbricato dallo script il menu lo ignora (#589.8).
+          const punto = await entro(csWin.webContents.executeJavaScript(`(() => {
             const span = document.querySelector('.selectable');
-            if (!span) return false;
+            if (!span) return null;
             const range = document.createRange();
             range.selectNodeContents(span);
             const sel = window.getSelection();
             sel.removeAllRanges();
             sel.addRange(range);
             const rect = span.getBoundingClientRect();
-            const evt = new MouseEvent('contextmenu', {
-              bubbles: true, cancelable: true, view: window,
-              clientX: rect.left + rect.width / 2,
-              clientY: rect.top + rect.height / 2,
-              button: 2,
-            });
-            return span.dispatchEvent(evt);
+            return { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2) };
           })()`), 10_000, 'tasto destro simulato');
+          if (punto) {
+            for (const type of ['mouseDown', 'mouseUp']) {
+              csWin.webContents.sendInputEvent({ type, x: punto.x, y: punto.y, button: 'right', clickCount: 1 });
+            }
+          }
           await new Promise((r) => setTimeout(r, 500));
           const menuDiag = await entro(csWin.webContents.executeJavaScript(
             "({ menu: !!document.querySelector('.sn-menu')," +

@@ -51,6 +51,12 @@
   flex: 1;
 }
 
+/* Voci della cronologia incolla: contenuto generato, mai un nodo di testo che la ricerca del sito legga
+   (#589.8, patterns/un-pezzo-di-filo-in-un-sito-ubbidisce-solo-all-utente.md). */
+.sn-menu-gentesto::before {
+  content: var(--sn-gentesto, "");
+}
+
 .sn-menu-item-icon {
   flex: 0 0 auto;
   display: inline-flex;
