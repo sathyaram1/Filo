@@ -778,7 +778,7 @@ async function main() {
     process.exit(1);
   }
   const reply = giro.reply;
-  // Il server ha aperto una richiesta: suona il campanello, così una finestra
+  // C'è (o può esserci) una richiesta in attesa: suona il campanello, così una finestra
   // di Filo GIÀ APERTA se ne accorge da sola. Non è un permesso in più — non
   // crea niente e non approva niente, fa solo rileggere l'elenco vero — ed è
   // l'unica cosa che impedisce all'avviso di cui parla il messaggio qui sotto
