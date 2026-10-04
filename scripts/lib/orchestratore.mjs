@@ -606,7 +606,8 @@ export function creaMotore(dep, opzioni = {}) {
     }
     if (!nApp && !nSrv && !p.fusa.app && !p.fusa.server) return ferma(p, 'niente da fondere: il ramo non ha commit oltre origin/main, né qui né sul server');
 
-    while (chiusure > 0 || !caricoBasta(await dep.carico(), opz, true)) {
+    // Il carico si misura con un'attesa: dopo, il posto si rilegge senza altre attese prima di prenderlo, o due chiusure partono insieme.
+    while (chiusure > 0 || !caricoBasta(await dep.carico(), opz, true) || chiusure > 0) {
       dep.log(`#${p.num} chiusura in attesa: un'altra chiusura in corso o macchina carica`);
       await dep.dormi(opz.pausaMs);
     }
