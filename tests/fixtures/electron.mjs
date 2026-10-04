@@ -121,8 +121,17 @@ export const test = base.extend({
         NODE_ENV: 'test',
       },
     });
+    const usciteApp = registraUsciteApp(app);
     await use(app);
     await chiudiApp(app);
+    // Dopo la chiusura, così ci sono anche le righe di un'app che muore male uscendo.
+    if (testInfo.status !== testInfo.expectedStatus) {
+      try {
+        const file = testInfo.outputPath('uscita-app.txt');
+        writeFileSync(file, usciteApp());
+        await testInfo.attach('uscita-app', { path: file, contentType: 'text/plain' });
+      } catch (_) {}
+    }
     try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
   },
 
