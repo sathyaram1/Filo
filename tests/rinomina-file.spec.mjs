@@ -270,6 +270,29 @@ test('in chat, l\'utente che dice no: niente cambia sul disco', async ({ app }) 
   }
 });
 
+test('in chat, una cartella dove ogni file ha già un nome: niente da confermare, e lo dice', async ({ app }) => {
+  test.setTimeout(90_000);
+  const dir = cartellaInCasa('filo-nomi-pieni-');
+  writeFileSync(join(dir, 'Contratto vecchio.pdf'), BOLLETTA);
+  try {
+    await modelloFinto(app, [
+      { toolCalls: [{ id: 'r1', name: 'RINOMINA_FILE', arguments: JSON.stringify({ cartella: dir }) }] },
+      { text: 'Hanno già nomi chiari.' },
+    ]);
+    await modelloDeiNomi(app);
+    const page = await home(app);
+    await chiedi(page, 'rinomina i file di quella cartella');
+    await expect(page.locator('.dash-bubble', { hasText: 'Hanno già nomi chiari.' })).toBeVisible({ timeout: 15000 });
+    expect(await confirmText(page)).toBe('');
+    const consegnato = (await app.evaluate(() => globalThis.__chatFinta_calls)).map((m) => JSON.stringify(m)).join('\n');
+    expect(consegnato).toContain('Nessun file rinominato');
+    expect(readdirSync(dir)).toEqual(['Contratto vecchio.pdf']);
+  } finally {
+    await ripristina(app);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('un file trascinato dove si scrive: entra col percorso, e dal tasto destro gli si dà un nome prima di mandarlo', async ({ app }) => {
   test.setTimeout(90_000);
   const dir = cartellaTemporanea('filo-nomi-drop-');
