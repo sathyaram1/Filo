@@ -4472,7 +4472,7 @@ async function runTabTriageDecision({ tabs = [], memory = '', trigger = 'idle' }
   const lines = tabs.map((t, i) => {
     // Di una pagina della rete di casa al modello arrivano solo i segnali di Filo: titolo, indirizzo e testo restano qui (#591).
     const casa = isHomeNetworkUrl(t.url);
-    // Di una pagina delicata solo il tipo, che lo dice Filo: la posta si tiene come le altre chat (#1004).
+    // Di una pagina delicata solo il tipo, che lo scrive Filo: basta a tenere aperta la posta (#1004).
     const delicata = casa ? null : (fuori.attivo !== false && t.delicata) || fuori(t.url);
     const parts = casa
       ? [`#${i}`, '[pagina della rete di casa]']
