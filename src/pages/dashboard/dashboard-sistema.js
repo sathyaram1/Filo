@@ -182,10 +182,12 @@
     box = null;
     document.removeEventListener('mousedown', fuori, true);
     document.removeEventListener('keydown', tasto, true);
-    window.removeEventListener('scroll', chiudiBox, true);
+    window.removeEventListener('scroll', scorre, true);
     window.removeEventListener('resize', chiudiBox);
   }
   function fuori(e) { if (box && !box.el.contains(e.target)) chiudiBox(); }
+  // Si chiude se scorre la pagina sotto, non se scorre il suo elenco (reti e dispositivi possono superare lo schermo).
+  function scorre(e) { if (box && !(e.target instanceof Node && box.el.contains(e.target))) chiudiBox(); }
   function tasto(e) {
     if (!box) return;
     if (e.key === 'Escape') { e.preventDefault(); const da = box.ancora; chiudiBox(); if (da && da.isConnected) da.focus(); return; }
@@ -326,6 +328,8 @@
   // Gli elenchi (dispositivi abbinati, reti conosciute) si chiedono all'apertura: il primo che l'utente cerca è lì.
   async function caricaElenco(questo) {
     const cosa = questo.voce === 'rete' ? 'wifi' : 'bluetooth';
+    // Le letture non aspettano i comandi e possono incrociarsi: vale l'ultima chiesta, non quella che arriva per ultima.
+    const giro = (questo.letture = (questo.letture || 0) + 1);
     const lista = questo.elenco;
     lista.replaceChildren();
     const attesa = document.createElement('div');
@@ -336,7 +340,7 @@
     attesa.append(rot, document.createTextNode(cosa === 'wifi' ? 'Leggo le reti conosciute…' : 'Leggo i dispositivi abbinati…'));
     lista.appendChild(attesa);
     const r = await comanda({ cosa, elenca: true });
-    if (box !== questo) return;
+    if (box !== questo || questo.letture !== giro) return;
     lista.replaceChildren();
     if (!r.ok) {
       const err = document.createElement('div');
@@ -490,7 +494,7 @@
     setTimeout(() => {
       document.addEventListener('mousedown', fuori, true);
       document.addEventListener('keydown', tasto, true);
-      window.addEventListener('scroll', chiudiBox, true);
+      window.addEventListener('scroll', scorre, true);
       window.addEventListener('resize', chiudiBox);
     }, 0);
   }

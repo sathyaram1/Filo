@@ -1131,11 +1131,24 @@ const TEMPI_MS = {
 
 let computerFinto = null;
 let coda = Promise.resolve();
+let comandiFiniti = 0;
 
 function inFila(fn) {
-  const giro = coda.then(fn, fn);
+  const giro = coda.then(fn, fn).finally(() => { comandiFiniti += 1; });
   coda = giro.catch(() => {});
   return giro;
+}
+
+// Leggere un elenco non cambia niente: non fa la fila dei comandi (un riquadro aperto non fa aspettare il gesto dopo),
+// e due letture uguali in volo sono una, finché nel frattempo non è finito un comando che può averlo cambiato.
+const lettureInVolo = new Map();
+function inLettura(cosa, fn) {
+  const c = lettureInVolo.get(cosa);
+  if (c && c.giro === comandiFiniti) return c.p;
+  const voce = { giro: comandiFiniti, p: null };
+  voce.p = Promise.resolve().then(fn).finally(() => { if (lettureInVolo.get(cosa) === voce) lettureInVolo.delete(cosa); });
+  lettureInVolo.set(cosa, voce);
+  return voce.p;
 }
 
 async function eseguiScript(comando, p) {
@@ -1322,7 +1335,7 @@ async function wifi(q) {
 function comanda(richiesta) {
   const q = normalizzaRichiesta(richiesta);
   if (q.errore) return Promise.resolve({ ok: false, cosa: String((richiesta && richiesta.cosa) || ''), errore: 'richiesta', frase: q.errore });
-  return inFila(async () => {
+  const esegui = async () => {
     try {
       // Una prova che si è dimenticata il computer finto non cambia il volume o la rete di chi la lancia.
       if (!computerFinto && process.env.NODE_ENV === 'test') return fallito('prove', q);
@@ -1334,7 +1347,8 @@ function comanda(richiesta) {
       console.warn('[Filo] comando del sistema non riuscito', q.cosa, e && e.message ? e.message : e);
       return fallito('sconosciuto', q);
     }
-  });
+  };
+  return q.elenca ? inLettura(q.cosa, esegui) : inFila(esegui);
 }
 
 function uriImpostazioni(chiave) {
