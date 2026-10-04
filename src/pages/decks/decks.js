@@ -318,6 +318,7 @@
     renderDeckList();
     renderChat(stickChat);
     renderStats();
+    syncDetailInDeck();
     refreshPrices();
   }
 
@@ -797,8 +798,8 @@
   function makeCommander(cardId) { return setCommanderTo(cardId); }
   function removeCommander() { return current.commander ? setCommanderTo('') : Promise.resolve(); }
 
-  // Le azioni su una carta fuori dall'elenco del mazzo (risultati, nomi citati, intestazione), le stesse della riga
-  // del mazzo dove hanno senso (§8.3): il commander offre di toglierlo, le altre carte di entrare, uscire o diventarlo.
+  // Le azioni su una carta fuori dall'elenco del mazzo (risultati, nomi citati, intestazione, carta grande), le stesse
+  // della riga del mazzo dove hanno senso (§8.3): il commander offre di toglierlo, le altre di entrare, uscire o diventarlo.
   function cardMenuItems(id, qty = 1) {
     const card = cardsById[id];
     const items = id === current.commander
@@ -1301,7 +1302,11 @@
     }
     await renderBuilder();
     const total = addedCount + updatedCount + (commanderSet ? 1 : 0);
-    showToast(total ? `Aggiunte ${total} cart${total === 1 ? 'a' : 'e'} al mazzo.` : 'Nessuna carta nuova da aggiungere.');
+    // Il commander della lista resta fuori se il mazzo ne ha già un altro: l'avviso lo nomina (#789).
+    const skipped = m.importCommanderId && !commanderSet && current.commander !== m.importCommanderId
+      ? ` ${(cardsById[m.importCommanderId] && cardsById[m.importCommanderId].name) || 'Il commander della lista'} non è diventato commander: il mazzo ha già il suo.`
+      : '';
+    showToast((total ? `Aggiunte ${total} cart${total === 1 ? 'a' : 'e'} al mazzo.` : 'Nessuna carta nuova da aggiungere.') + skipped);
   }
 
   // Toast discreto in basso a destra (conferme di import/export non
@@ -1712,9 +1717,8 @@
     for (const t of (entry && entry.tags) || []) {
       parts.push(`<span class="dk-tag">${esc(t)}</span>`);
     }
-    if (entry || card.id === current.commander) {
-      parts.push('<span class="dk-indeck">✓ già nel mazzo</span>');
-    }
+    if (card.id === current.commander) parts.push('<span class="dk-indeck">✓ commander</span>');
+    else if (entry) parts.push('<span class="dk-indeck">✓ già nel mazzo</span>');
     $('previewCtx').innerHTML = parts.join('');
   }
 
@@ -1825,13 +1829,7 @@
     const card = cardsById[id];
     paintCardImage($('carouselImg'), card || null);
     $('carouselPos').textContent = `${carousel.i + 1}/${carousel.ids.length}`;
-    const added = inDeck(id);
-    const isCommander = id === current.commander;
-    const btn = $('carouselToggle');
-    btn.dataset.in = isCommander ? 'cmd' : (added ? '1' : '0');
-    btn.setAttribute('aria-disabled', isCommander ? 'true' : 'false');
-    btn.textContent = isCommander ? '✓ commander' : (added ? '✓ nel mazzo' : '+ aggiungi');
-    btn.title = isCommander ? 'È il commander del mazzo' : (added ? 'Rimuovi dal mazzo (Invio)' : 'Aggiungi al mazzo (Invio)');
+    syncCarouselToggle();
     // Prefetch di precedente e successiva (§5.1): la navigazione non aspetta.
     // Stesso warm-up (dedup) del precarico delle righe visibili.
     preloadCardImages([carousel.ids[carousel.i - 1], carousel.ids[carousel.i + 1]].filter(Boolean));
@@ -1845,6 +1843,24 @@
       requestOpinions(near).catch(() => {});
     }
     syncCarouselHighlight();
+  }
+
+  function syncCarouselToggle() {
+    const id = carousel.ids[carousel.i];
+    const added = inDeck(id);
+    const isCommander = id === current.commander;
+    const btn = $('carouselToggle');
+    btn.dataset.in = isCommander ? 'cmd' : (added ? '1' : '0');
+    btn.setAttribute('aria-disabled', isCommander ? 'true' : 'false');
+    btn.textContent = isCommander ? '✓ commander' : (added ? '✓ nel mazzo' : '+ aggiungi');
+    btn.title = isCommander ? 'È il commander del mazzo' : (added ? 'Rimuovi dal mazzo (Invio)' : 'Aggiungi al mazzo (Invio)');
+  }
+
+  // Lo stato «nel mazzo / commander» del dettaglio segue il mazzo da qualunque strada cambi (menu, chat, righe),
+  // senza ridipingere l'immagine (resterebbe girata sul retro).
+  function syncDetailInDeck() {
+    if (detailState === 'carousel' && carousel) syncCarouselToggle();
+    else if (detailState === 'preview') { const card = currentDetailCard(); if (card) renderDetailCtx(card); }
   }
 
   function carouselNav(delta) {
@@ -1952,6 +1968,15 @@
     $('carouselFlip').addEventListener('click', (e) => { e.stopPropagation(); flipCardImage($('carouselImg')); });
     $('previewImg').addEventListener('click', () => flipCardImage($('previewImg')));
     $('carouselImg').addEventListener('click', () => flipCardImage($('carouselImg')));
+    // Tasto destro sulla carta grande (§8.3): le stesse azioni della riga da cui è arrivata, commander compreso.
+    const openCardImageMenu = (e) => {
+      const card = current && currentDetailCard();
+      if (!card) return;
+      e.preventDefault();
+      openCtx(e.clientX, e.clientY, cardMenuItems(card.id));
+    };
+    $('previewImg').addEventListener('contextmenu', openCardImageMenu);
+    $('carouselImg').addEventListener('contextmenu', openCardImageMenu);
 
     // Tasto destro sul box modulare (§5.2): scelta del modulo dello slot —
     // vale sia per la preview sia per il carosello (stesso sistema moduli).

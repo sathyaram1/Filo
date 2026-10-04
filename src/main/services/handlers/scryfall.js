@@ -446,7 +446,15 @@ module.exports = function register(on, ctx) {
         }
         importPending = { qtyById, commanderId };
         const n = cardIds.length;
+        // Il commander della lista non scavalca quello del mazzo (lo cambia solo un'azione dedicata), ma va detto:
+        // come nell'import dal selettore, una scelta dell'utente non sparisce in silenzio.
+        const onDeck = deckOut || deck;
+        const keptName = onDeck.commanderMeta && onDeck.commanderMeta.name;
+        const kept = commanderId && onDeck.commander && commanderId !== onDeck.commander
+          ? `La lista indica [[${cards[commanderId].name}]] come commander, ma il mazzo ha già ${keptName ? `[[${keptName}]]` : 'il suo'}: resta quello. Per cambiarlo, tasto destro su [[${cards[commanderId].name}]] → «Imposta come commander».`
+          : '';
         reply = [reply, n ? `Ho riconosciuto ${n} cart${n === 1 ? 'a' : 'e'}: conferma qui sotto quali aggiungere.` : '',
+          kept,
           notFound.length ? `Non ho trovato su Scryfall: ${notFound.join(', ')}.` : '']
           .filter(Boolean).join('\n');
       }

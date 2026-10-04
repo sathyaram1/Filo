@@ -20,7 +20,10 @@ async function mockScryfall(app) {
       const u = new URL(String(url));
       let body = null;
       if (u.pathname === '/cards/search') body = { data: [NIV, BOLT, ELF], has_more: false };
-      else if (u.pathname === '/cards/named') body = NIV;
+      else if (u.pathname === '/cards/named') {
+        const q = String(u.searchParams.get('fuzzy') || u.searchParams.get('exact') || '').toLowerCase();
+        body = Object.values(BY_ID).find((c) => c.name.toLowerCase() === q) || NIV;
+      }
       else if (BY_ID[u.pathname.replace('/cards/', '')]) body = BY_ID[u.pathname.replace('/cards/', '')];
       else if (u.pathname === '/symbology') body = { data: [] };
       if (!body) return { ok: false, status: 404, json: async () => ({}) };
@@ -45,7 +48,9 @@ async function mockProvider(app) {
         ? JSON.stringify({ query: 'is:commander' })
         : /consigliami/i.test(last)
           ? JSON.stringify({ reply: 'Prova [[Niv-Mizzet, Parun]].' })
-          : JSON.stringify({ reply: 'Ok.' });
+          : /incollo/i.test(last)
+            ? JSON.stringify({ commander: 'Niv-Mizzet, Parun', import: [{ name: 'Llanowar Elves', qty: 1 }] })
+            : JSON.stringify({ reply: 'Ok.' });
       return { text, model: attempts[0].model, provider: attempts[0].provider, usage: {} };
     };
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, onDelta }) => {
@@ -210,4 +215,74 @@ test('il nome del commander nell\'intestazione: anteprima al passaggio, carosell
   await page.waitForTimeout(400);
   await expect(page.locator('#deckList .dk-row')).toHaveCount(0);
   expect((await getDeck(page, deckId)).carte).toEqual([]);
+});
+
+test('lista incollata col suo commander su un mazzo che ne ha già uno: la risposta e l\'avviso lo nominano', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  const deckId = await newDeck(page);
+  await seed(page, deckId, { commander: 'bolt-1' });
+
+  await page.fill('#chatInput', 'ti incollo la mia lista: Commander Niv-Mizzet, 1 Llanowar Elves');
+  await page.press('#chatInput', 'Enter');
+  const bubble = page.locator('.dk-msg-bot').last();
+  await expect(bubble).toContainText('La lista indica Niv-Mizzet, Parun come commander, ma il mazzo ha già Lightning Bolt');
+  await bubble.locator('[data-import-all]').click();
+  await expect(page.locator('#dkToast')).toContainText('Niv-Mizzet, Parun non è diventato commander');
+  const deck = await getDeck(page, deckId);
+  expect(deck.commander).toBe('bolt-1');
+  expect(deck.carte.map((c) => c.scryfall_id)).toEqual(['elf-1']);
+  // Dalla riga della lista lo si può ancora fare commander, e il vecchio torna nel mazzo.
+  await bubble.locator('.dk-row[data-card-id="niv-1"]').click({ button: 'right' });
+  await menu(page).filter({ hasText: 'Imposta come commander' }).click();
+  await expect(page.locator('#commanderLine')).toContainText('Niv-Mizzet, Parun');
+  await expect(page.locator('#deckList .dk-row[data-card-id="bolt-1"]')).toHaveCount(1);
+});
+
+test('tasto destro sulla carta grande del carosello: le azioni della carta, e il tasto del carosello le segue', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  const deckId = await newDeck(page);
+
+  await page.fill('#chatInput', 'is:commander');
+  await page.press('#chatInput', 'Enter');
+  const results = page.locator('.dk-msg-bot').last().locator('.dk-cardlist .dk-row');
+  await results.filter({ hasText: 'Niv-Mizzet, Parun' }).click();
+  await expect(page.locator('#stateCarousel')).toBeVisible();
+  await page.locator('#carouselImg').click({ button: 'right' });
+  await expect(menu(page)).toHaveText(['Aggiungi al mazzo', 'Imposta come commander', 'Apri su Scryfall']);
+  await menu(page).filter({ hasText: 'Imposta come commander' }).click();
+  await expect(page.locator('#commanderLine')).toContainText('Niv-Mizzet, Parun');
+  expect((await getDeck(page, deckId)).commander).toBe('niv-1');
+  await expect(page.locator('#carouselToggle')).toHaveText('✓ commander');
+
+  await results.filter({ hasText: 'Lightning Bolt' }).click();
+  await expect(page.locator('#carouselImg')).toHaveAttribute('src', 'https://cards.test/bolt.jpg');
+  await page.locator('#carouselImg').click({ button: 'right' });
+  await menu(page).filter({ hasText: 'Aggiungi al mazzo' }).click();
+  await expect(page.locator('#deckList .dk-row[data-card-id="bolt-1"]')).toHaveCount(1);
+  await expect(page.locator('#carouselToggle')).toHaveText('✓ nel mazzo');
+});
+
+test('l\'anteprima del commander dice che è il commander, come il carosello', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  const deckId = await newDeck(page);
+  await seed(page, deckId, { commander: 'niv-1', cards: ['bolt-1'] });
+
+  await page.locator('#commanderLine .dk-prose-card').hover();
+  await expect(page.locator('#statePreview')).toBeVisible();
+  await expect(page.locator('#previewCtx')).toContainText('✓ commander');
+  await expect(page.locator('#previewCtx')).not.toContainText('già nel mazzo');
+  await page.locator('#deckList .dk-row[data-card-id="bolt-1"]').hover();
+  await expect(page.locator('#previewImg')).toHaveAttribute('src', 'https://cards.test/bolt.jpg');
+  await expect(page.locator('#previewCtx')).toContainText('✓ già nel mazzo');
 });
