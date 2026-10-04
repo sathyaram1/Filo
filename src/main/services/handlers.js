@@ -3732,10 +3732,12 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   const Caps = globalThis.SN_CAPABILITIES;
   const capacita = Caps ? Caps.renderIndexForPrompt(cancelliAperti()) : '';
   const Tools = globalThis.SN_ACTION_TOOLS;
-  const tools = Tools ? Tools.definitions({ sistema: process.platform, onboarding: onbActive }) : null;
+  // #534 — spenta in Preferenze, la lettura delle schede non è fra gli strumenti e il contesto lo dice.
+  const schede = await Schede.abilitata();
+  const tools = Tools ? Tools.definitions({ sistema: process.platform, onboarding: onbActive, schede }) : null;
   const cambi = await cambiP;
   const payloadBase = {
-    profilo, preferenze, espansioni, lezioni, stato: stateText, capacita, cambi,
+    profilo, preferenze, espansioni, lezioni, stato: stateText, capacita, cambi, schede,
     files: fileSummaries,
     onboarding: onboardingText,
     onboardingTurns: onbActive ? Onboarding.userTurns(onbBefore) : 0,
@@ -4449,6 +4451,7 @@ require('./handlers/adSkip')(on, handlerCtx);     // #737 — pubblicità dei vi
 require('./handlers/redteam')(on, handlerCtx);
 require('./handlers/misc')(on, handlerCtx);
 require('./handlers/file')(on, handlerCtx);       // #950 — nome sensato ai file dell'utente
+require('./handlers/fiducia')(on, handlerCtx);    // #534 — mittenti e siti fidati nelle Preferenze
 
 // ─── handler centrale richiamato dall'IPC ───────────────────────────────────
 
