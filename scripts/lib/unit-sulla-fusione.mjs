@@ -20,6 +20,8 @@ const REPORTER = pathToFileURL(resolve(dirname(fileURLToPath(import.meta.url)), 
 export const TENTATIVI = 3;
 // Ampio: in locale gli unit durano 6–20 minuti con la macchina carica. Scaduto, la prova non c'è, e lo si dice.
 export const TETTO_UNIT_MS = 60 * 60 * 1000;
+// La storia intera del repo da una rete lenta: due minuti non bastano.
+export const TETTO_STORIA_MS = 15 * 60 * 1000;
 export const ESITI = Object.freeze(['verde', 'main_contenuto', 'rosso_anche_su_main', 'rosso_sulla_fusione', 'conflitto']);
 export const TETTO_ROSSI = 40;
 const MAIN = 'main';
@@ -75,8 +77,9 @@ export function decidiEsito({ contenuto = false, conflitto = null, fusione = nul
 export function campoPerIlServer(prova) {
   const p = prova || {};
   if (p.saltata) return null;
-  if (p.errore) return { esito: 'non_provata', motivo: String(p.errore).slice(0, 300) };
-  const out = { esito: p.esito, mainSha: String(p.mainSha || '') };
+  const storia = campoStoria(p.storia);
+  if (p.errore) return { esito: 'non_provata', motivo: String(p.errore).slice(0, 300), ...storia };
+  const out = { esito: p.esito, mainSha: String(p.mainSha || ''), ...storia };
   if (p.esito === 'rosso_sulla_fusione') {
     const rossi = Array.isArray(p.rossi) ? p.rossi : [];
     out.rossi = rossi.slice(0, TETTO_ROSSI).map((r) => String(r).slice(0, 300));
@@ -84,6 +87,13 @@ export function campoPerIlServer(prova) {
   }
   if (p.esito === 'conflitto' && Array.isArray(p.file)) out.file = p.file.slice(0, TETTO_ROSSI).map((f) => String(f).slice(0, 300));
   return out;
+}
+
+/** Quanto era profondo il clone, per il registro del server (#958). PURA. */
+function campoStoria(s) {
+  if (!s || typeof s !== 'object') return {};
+  if (!s.superficiale) return { storia: { superficiale: false } };
+  return { storia: { superficiale: true, approfondito: Math.max(0, Math.floor(Number(s.approfondito) || 0)), intera: s.intera === true } };
 }
 
 /** Cosa si stampa dopo la prova. PURA. */
@@ -285,7 +295,9 @@ export function lanciaUnit(dir, base, nome, { timeoutMs = TETTO_UNIT_MS, file = 
  * La prova. { esito, mainSha, rossi?, rossiMain?, file?, coda? } | { saltata, motivo } | { errore, mainSha? }.
  * `lancia` è iniettabile solo per i test.
  */
-export function provaUnitSullaFusione({ root, punta, git = gitIn(root), lancia = lanciaUnit, scrivi = (s) => console.log(s), timeoutMs = TETTO_UNIT_MS } = {}) {
+export function provaUnitSullaFusione({
+  root, punta, git = gitIn(root), gitStoria = gitIn(root, TETTO_STORIA_MS), lancia = lanciaUnit, scrivi = (s) => console.log(s), timeoutMs = TETTO_UNIT_MS,
+} = {}) {
   const remoti = git(['remote']);
   if (!remoti.ok) return { errore: `git non risponde (${primaRiga(remoti.out)})` };
   // I resti delle prove interrotte si tolgono a ogni richiesta, anche quando la prova poi non serve.
@@ -297,6 +309,53 @@ export function provaUnitSullaFusione({ root, punta, git = gitIn(root), lancia =
   const mainSha = m.ok ? m.out.trim() : '';
   if (!/^[0-9a-f]{40}$/i.test(mainSha)) return { errore: 'non riesco a leggere lo sha di main' };
   if (!/^[0-9a-f]{40}$/i.test(String(punta || ''))) return { errore: 'punta del ramo non valida', mainSha };
+  const storia = assicuraStoria({ git: gitStoria, mainSha, punta });
+  if (storia.errore) return { errore: storia.errore, mainSha, storia: storia.storia };
+  if (storia.storia.superficiale) scrivi(testoStoria(storia.storia));
+  return { ...provaSullaStoria({ root, punta, git, lancia, scrivi, timeoutMs, mainSha }), storia: storia.storia };
+}
+
+/** Quanta storia scaricare a ogni passo prima di prenderla tutta. */
+export const PASSI_STORIA = Object.freeze([50, 200, 1000]);
+
+/**
+ * Su un clone poco profondo (le routine in cloud) ramo e main non hanno una base comune in locale e la fusione di
+ * prova fallisce con «unrelated histories» (#958): si scarica storia a passi finché la base compare, poi tutta.
+ * `storia` va al server, che la registra: è la misura della profondità dei cloni veri.
+ */
+export function assicuraStoria({ git, mainSha, punta, passi = PASSI_STORIA } = {}) {
+  const superficiale = () => { const r = git(['rev-parse', '--is-shallow-repository']); return r.ok && r.out.trim() === 'true'; };
+  if (!superficiale()) return { storia: { superficiale: false } };
+  const base = () => git(['merge-base', mainSha, punta]).ok;
+  const storia = { superficiale: true, approfondito: 0, intera: false };
+  if (base()) return { storia };
+  // --deepen sposta TUTTI i confini del clone, anche quello del ramo, che è il lato tagliato.
+  const prendi = (extra) => git(['fetch', '--quiet', ...extra, 'origin', `+refs/heads/${MAIN}:refs/remotes/origin/${MAIN}`]);
+  for (const n of passi) {
+    const f = prendi([`--deepen=${n}`]);
+    if (!f.ok) return { errore: `non riesco a scaricare la storia che manca (${primaRiga(f.out)})`, storia };
+    storia.approfondito += n;
+    if (base()) return { storia };
+    if (!superficiale()) break;
+  }
+  if (superficiale()) {
+    const f = prendi(['--unshallow']);
+    if (!f.ok) return { errore: `non riesco a scaricare la storia intera (${primaRiga(f.out)})`, storia };
+    storia.intera = true;
+    if (base()) return { storia };
+  }
+  return { errore: 'ramo e main non hanno una base comune nemmeno con la storia intera', storia };
+}
+
+/** La riga che dice quanta storia è servita. PURA. */
+export function testoStoria(s) {
+  if (!s || !s.superficiale) return '';
+  if (s.intera) return '▸ Clone poco profondo: per trovare la base comune con main ho scaricato la storia intera.';
+  if (s.approfondito) return `▸ Clone poco profondo: per trovare la base comune con main ho scaricato ${s.approfondito} commit di storia in più.`;
+  return '▸ Clone poco profondo, ma la base comune con main c\'era già.';
+}
+
+function provaSullaStoria({ root, punta, git, lancia, scrivi, timeoutMs, mainSha }) {
   if (git(['merge-base', '--is-ancestor', mainSha, punta]).ok) return { esito: 'main_contenuto', mainSha };
 
   const base = realpathSync.native(mkdtempSync(join(tmpdir(), 'filo-fusione-')));
