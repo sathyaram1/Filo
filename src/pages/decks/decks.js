@@ -1306,7 +1306,7 @@
     const skipped = m.importCommanderId && !commanderSet && current.commander !== m.importCommanderId
       ? ` ${(cardsById[m.importCommanderId] && cardsById[m.importCommanderId].name) || 'Il commander della lista'} non è diventato commander: il mazzo ha già il suo.`
       : '';
-    showToast((total ? `Aggiunte ${total} cart${total === 1 ? 'a' : 'e'} al mazzo.` : 'Nessuna carta nuova da aggiungere.') + skipped);
+    showToast((total ? `${total === 1 ? 'Aggiunta 1 carta' : `Aggiunte ${total} carte`} al mazzo.` : 'Nessuna carta nuova da aggiungere.') + skipped);
   }
 
   // Toast discreto in basso a destra (conferme di import/export non
@@ -1457,7 +1457,7 @@
         closeIoOverlay();
         await renderBuilder();
         const total = res.addedCount + res.updatedCount;
-        showToast(`Importate ${total} cart${total === 1 ? 'a' : 'e'}${res.updatedCount ? ` (${res.updatedCount} aggiornate)` : ''}.`);
+        showToast(`${total === 1 ? 'Importata 1 carta' : `Importate ${total} carte`}${res.updatedCount ? ` (${res.updatedCount} aggiornat${res.updatedCount === 1 ? 'a' : 'e'})` : ''}.`);
       } else {
         showToast('Import non riuscito.');
         applyBtn.disabled = false;

@@ -44,7 +44,9 @@ async function mockProvider(app) {
     });
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
       const last = String(messages[messages.length - 1].content || '');
-      const text = /^is:commander/.test(last)
+      const text = /lista nuova/i.test(last)
+        ? JSON.stringify({ reply: 'Ok.', commander: 'Niv-Mizzet, Parun', replaceCommander: true, import: [{ name: 'Llanowar Elves', qty: 1 }] })
+        : /^is:commander/.test(last)
         ? JSON.stringify({ query: 'is:commander' })
         : /consigliami/i.test(last)
           ? JSON.stringify({ reply: 'Prova [[Niv-Mizzet, Parun]].' })
@@ -231,7 +233,7 @@ test('lista incollata col suo commander su un mazzo che ne ha già uno: la rispo
   const bubble = page.locator('.dk-msg-bot').last();
   await expect(bubble).toContainText('La lista indica Niv-Mizzet, Parun come commander, ma il mazzo ha già Lightning Bolt');
   await bubble.locator('[data-import-all]').click();
-  await expect(page.locator('#dkToast')).toContainText('Niv-Mizzet, Parun non è diventato commander');
+  await expect(page.locator('#dkToast')).toContainText('Aggiunta 1 carta al mazzo. Niv-Mizzet, Parun non è diventato commander');
   const deck = await getDeck(page, deckId);
   expect(deck.commander).toBe('bolt-1');
   expect(deck.carte.map((c) => c.scryfall_id)).toEqual(['elf-1']);
@@ -240,6 +242,28 @@ test('lista incollata col suo commander su un mazzo che ne ha già uno: la rispo
   await menu(page).filter({ hasText: 'Imposta come commander' }).click();
   await expect(page.locator('#commanderLine')).toContainText('Niv-Mizzet, Parun');
   await expect(page.locator('#deckList .dk-row[data-card-id="bolt-1"]')).toHaveCount(1);
+});
+
+test('lista incollata con la richiesta esplicita di sostituire il commander: lo sostituisce, e il vecchio torna nel mazzo', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  const deckId = await newDeck(page);
+  await seed(page, deckId, { commander: 'bolt-1' });
+
+  await page.fill('#chatInput', 'ecco la mia lista nuova, sostituisci il commander con Niv: 1 Llanowar Elves');
+  await page.press('#chatInput', 'Enter');
+  const bubble = page.locator('.dk-msg-bot').last();
+  await expect(page.locator('#commanderLine')).toContainText('Niv-Mizzet, Parun');
+  await expect(bubble).toContainText('Lightning Bolt torna nel mazzo come carta normale');
+  await expect(bubble).not.toContainText('resta quello');
+  await bubble.locator('[data-import-all]').click();
+  await expect(page.locator('#dkToast')).toHaveText('Aggiunta 1 carta al mazzo.');
+  const deck = await getDeck(page, deckId);
+  expect(deck.commander).toBe('niv-1');
+  expect(deck.carte.map((c) => c.scryfall_id).sort()).toEqual(['bolt-1', 'elf-1']);
 });
 
 test('tasto destro sulla carta grande del carosello: le azioni della carta, e il tasto del carosello le segue', async ({ app, openTab }) => {

@@ -224,8 +224,9 @@ module.exports = function register(on, ctx) {
 
       // Commander a parole (#337, #789): su un mazzo senza commander basta il nome (build-around); uno già impostato
       // cambia solo col segnale esplicito di sostituzione, e il vecchio rientra nel mazzo. Va PRIMA della ricerca,
-      // che così resta nei colori del commander appena scelto. Il commander di una lista incollata è l'import, sotto.
-      if (parsed.commanderName && !parsed.import.length) {
+      // che così resta nei colori del commander appena scelto. La sostituzione esplicita vale anche accanto a una
+      // lista incollata; senza segnale il commander della lista è solo un candidato dell'import, sotto.
+      if (parsed.commanderName && (!parsed.import.length || parsed.replaceCommander)) {
         // Riletto adesso: mentre il modello rispondeva l'utente può aver cambiato il mazzo da un'altra strada.
         const base = (await Store.get(deck.id)) || deck;
         if (base.commander && !parsed.replaceCommander) {
@@ -424,8 +425,9 @@ module.exports = function register(on, ctx) {
       // conferma della ricerca: l'aggiunta al mazzo resta un'azione esplicita
       // dell'utente (toggle riga o "Aggiungi tutte"), mai automatica.
       let importPending = null;
-      // Il commander senza lista l'ha già gestito il ramo sopra: qui resta solo il CANDIDATO di una lista incollata.
-      const importCommanderName = parsed.import.length ? parsed.commanderName : '';
+      // Il commander senza lista o sostituito su richiesta l'ha già gestito il ramo sopra: qui resta solo il CANDIDATO
+      // di una lista incollata.
+      const importCommanderName = parsed.import.length && !parsed.replaceCommander ? parsed.commanderName : '';
       if (parsed.import.length || importCommanderName) {
         const qtyById = {};
         const notFound = [];
