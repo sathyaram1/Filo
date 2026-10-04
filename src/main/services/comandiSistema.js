@@ -1351,6 +1351,20 @@ function comanda(richiesta) {
   return q.elenca ? inLettura(q.cosa, esegui) : inFila(esegui);
 }
 
+// Il nome vero di una rete o di un dispositivo detto a parole, letto prima di chiedere conferma: { nome } se ce n'è
+// uno solo, { esito } (l'errore con l'elenco) se nessuno o più d'uno, {} se l'elenco non si legge.
+async function risolviNome(richiesta) {
+  const q = normalizzaRichiesta(richiesta);
+  if (q.errore || !q.nome || (q.cosa !== 'wifi' && q.cosa !== 'bluetooth')) return {};
+  const r = await comanda({ cosa: q.cosa, elenca: true });
+  if (!r.ok || !Array.isArray(r.elenco)) return {};
+  const nomi = r.elenco.map((x) => x.nome);
+  const s = scegliNome(q.nome, nomi);
+  if (s.scelto) return { nome: s.scelto };
+  const errore = s.candidati ? 'ambiguo' : q.cosa === 'wifi' ? 'nessuna-rete' : 'nessun-dispositivo';
+  return { esito: { ...fallito(errore, q), candidati: s.candidati || nomi } };
+}
+
 function uriImpostazioni(chiave) {
   return Object.prototype.hasOwnProperty.call(IMPOSTAZIONI, chiave) ? IMPOSTAZIONI[chiave] : null;
 }
@@ -1360,7 +1374,7 @@ const _perProve = {
   usaComputer(finto) { computerFinto = finto && typeof finto === 'object' ? finto : null; },
 };
 
-const api = { comanda, normalizzaRichiesta, uriImpostazioni, _perProve };
+const api = { comanda, normalizzaRichiesta, risolviNome, uriImpostazioni, _perProve };
 globalThis.SN_COMANDI_SISTEMA = api;
 
 module.exports = {

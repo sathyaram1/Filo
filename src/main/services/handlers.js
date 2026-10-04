@@ -1189,7 +1189,7 @@ function recordPendingConfirm(sender, action) {
   for (const [k, rec] of pendingConfirms) if (rec.scade <= now) pendingConfirms.delete(k);
   pendingConfirms.set(pendingConfirmKey(sender, action), {
     scade: now + PENDING_CONFIRM_TTL,
-    mostrati: { righe: action._righe, targetIds: action._targetIds, proposte: action._proposte },
+    mostrati: { righe: action._righe, targetIds: action._targetIds, proposte: action._proposte, nome: action._nomeSistema },
   });
 }
 function consumePendingConfirm(sender, action) {
@@ -1207,7 +1207,7 @@ function daPaginaDiFilo(sender) {
 // Una pagina di Filo rimanda l'azione col popup che ha mostrato; per le altre
 // vale quello registrato alla richiesta di conferma.
 function bersagliMostrati(sender, action) {
-  if (daPaginaDiFilo(sender)) return { righe: action._righe, targetIds: action._targetIds, proposte: action._proposte };
+  if (daPaginaDiFilo(sender)) return { righe: action._righe, targetIds: action._targetIds, proposte: action._proposte, nome: action._nomeSistema };
   const rec = pendingConfirms.get(pendingConfirmKey(sender, action));
   return rec && rec.scade > Date.now() ? rec.mostrati : null;
 }
@@ -1416,6 +1416,15 @@ async function primaVoltaDelTerminale() {
 function richiestaDiSistema(type, action) {
   const { _richiestaSistema, _nomeSistema, ...resto } = action || {};
   return { ...resto, cosa: type === 'VOLUME' ? 'volume' : type === 'WIFI' ? 'wifi' : 'bluetooth' };
+}
+
+// Parte la rete o il dispositivo che la conferma ha nominato: il nome vero, non le parole del modello.
+function richiestaDaEseguire(type, action) {
+  const r = richiestaDiSistema(type, action);
+  const nome = action && action._nomeSistema;
+  if (nome && type === 'WIFI') return { ...r, rete: nome };
+  if (nome && type === 'BLUETOOTH') return { ...r, dispositivo: nome };
+  return r;
 }
 
 // L'esito col numero e i nomi VERI. I nomi di reti e dispositivi li sceglie chi li gestisce: tornano in busta, e la
@@ -1751,9 +1760,24 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
   // #874 — il livello di un comando del sistema lo decide la stessa lettura della richiesta che poi la esegue:
   // scritta qui sempre, sopra qualunque valore arrivato col modello.
   if (type === 'VOLUME' || type === 'BLUETOOTH' || type === 'WIFI') {
-    action._richiestaSistema = require('./comandiSistema').normalizzaRichiesta(richiestaDiSistema(type, action));
+    const C = require('./comandiSistema');
+    const q = C.normalizzaRichiesta(richiestaDiSistema(type, action));
+    let nome = q.nome || '';
+    // Rete e dispositivo da confermare: il popup nomina quello che partirà, trovato prima di chiedere; all'OK parte
+    // quello mostrato. Un nome che non ne trova uno solo torna al modello con l'elenco, senza una conferma a vuoto.
+    if (nome && (type === 'WIFI' || q.collega === false)) {
+      if (confirmed) {
+        const visti = bersagliMostrati(sender, action);
+        if (visti && typeof visti.nome === 'string' && visti.nome) nome = visti.nome;
+      } else {
+        const trovato = await C.risolviNome(q);
+        if (trovato.esito) return { executed: false, kept: false, output: trovato.esito };
+        if (trovato.nome) nome = trovato.nome;
+      }
+    }
+    action._richiestaSistema = nome ? { ...q, nome } : q;
     // Il nome sta anche fuori, dove il recinto dei testi salvati lo trova (CAMPI_SALVATI).
-    if (action._richiestaSistema.nome) action._nomeSistema = action._richiestaSistema.nome;
+    if (nome) action._nomeSistema = nome;
     else delete action._nomeSistema;
   }
 
@@ -2476,7 +2500,7 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
       case 'BLUETOOTH':
       case 'WIFI': {
         // #874 — la stessa porta dei tasti della home (MSG.SISTEMA_COMANDA): due cammini, un risultato.
-        const r = await require('./comandiSistema').comanda(richiestaDiSistema(type, action));
+        const r = await require('./comandiSistema').comanda(richiestaDaEseguire(type, action));
         return { executed: !!r.ok, kept: false, output: r };
       }
       case 'ZOOM_PAGINA': {

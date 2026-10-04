@@ -388,6 +388,20 @@ test('collegare le cuffie col Bluetooth spento lo accende prima; un nome che non
   } finally { C._perProve.usaComputer(null); }
 });
 
+test('prima della conferma il nome detto si risolve nel nome vero, senza cambiare niente; due simili o nessuno danno l\'elenco', async () => {
+  const pc = finto({ reti: [{ nome: 'Cava', attiva: false }, { nome: 'Ufficio 5G', attiva: false }, { nome: 'Ufficio Ospiti', attiva: false }] });
+  C._perProve.usaComputer(pc);
+  try {
+    assert.deepEqual(await C.risolviNome({ cosa: 'wifi', rete: 'casa' }), { nome: 'Cava' });
+    const due = await C.risolviNome({ cosa: 'wifi', rete: 'ufficio' });
+    assert.equal(due.esito.errore, 'ambiguo');
+    assert.deepEqual(due.esito.candidati, ['Ufficio 5G', 'Ufficio Ospiti']);
+    assert.equal((await C.risolviNome({ cosa: 'wifi', rete: 'frigorifero' })).esito.errore, 'nessuna-rete');
+    assert.deepEqual(await C.risolviNome({ cosa: 'wifi', acceso: false }), {});
+    assert.ok(pc.s.chiamate.every((c) => c[0] === 'wifiElenco'));
+  } finally { C._perProve.usaComputer(null); }
+});
+
 test('collegarsi a una rete col Wi-Fi spento lo riaccende e riprova una volta; il permesso negato si dice', async () => {
   const pc = finto({ wifi: false, reti: [{ nome: 'Casa "5G"', attiva: false }] });
   C._perProve.usaComputer(pc);

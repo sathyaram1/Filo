@@ -325,9 +325,14 @@
     return null;
   }
 
+  // L'elenco è una foto della radio: accesa o spenta da qui, dalla chat o dal sistema, si rilegge.
+  const firmaRadio = (voce, x) => (voce === 'bluetooth' ? String(!!(x && x.spento)) : String(x ? x.wifi : null));
+  const elencoDaLeggere = (voce, x) => voce === 'bluetooth' || !!etichettaRadioWifi(x);
+
   // Gli elenchi (dispositivi abbinati, reti conosciute) si chiedono all'apertura: il primo che l'utente cerca è lì.
   async function caricaElenco(questo) {
     const cosa = questo.voce === 'rete' ? 'wifi' : 'bluetooth';
+    questo.firma = firmaRadio(questo.voce, descrizione()[questo.voce]);
     // Le letture non aspettano i comandi e possono incrociarsi: vale l'ultima chiesta, non quella che arriva per ultima.
     const giro = (questo.letture = (questo.letture || 0) + 1);
     const lista = questo.elenco;
@@ -362,7 +367,7 @@
 
   function voceElenco(questo, cosa, v) {
     if (cosa === 'wifi') {
-      if (v.attiva) {
+      if (v.attiva && !(questo.ultimo && questo.ultimo.wifi === false)) {
         const opt = creaOpzione(`Collegato a ${v.nome}`, () => {}, 'dash-sis-attuale');
         opt.setAttribute('aria-disabled', 'true');
         return opt;
@@ -371,7 +376,8 @@
       opt.title = v.nome;
       return opt;
     }
-    const collegato = v.collegato === true;
+    // Col Bluetooth spento niente è collegato, anche se la lettura è arrivata un attimo prima che si spegnesse.
+    const collegato = v.collegato === true && !(questo.ultimo && questo.ultimo.spento);
     const opt = creaOpzione(`${collegato ? 'Scollega' : 'Collega'} ${v.nome}`, (o) => esegui(o, { cosa: 'bluetooth', dispositivo: v.nome, collega: !collegato }, () => caricaElenco(questo)));
     opt.title = v.nome;
     if (collegato) opt.classList.add('dash-sis-attuale');
@@ -435,6 +441,7 @@
       if (!box.muto.classList.contains('dash-sis-occupato')) box.muto.textContent = x.muto ? 'Togli il muto' : 'Metti muto';
       return;
     }
+    if (box.firma !== undefined && box.firma !== firmaRadio(box.voce, x) && elencoDaLeggere(box.voce, x)) caricaElenco(box);
     if (box.radio.classList.contains('dash-sis-occupato')) return;
     if (box.voce === 'bluetooth') {
       box.radio.textContent = x.spento ? 'Accendi il Bluetooth' : 'Spegni il Bluetooth';
@@ -490,7 +497,7 @@
     box = questo;
     aggiornaComandi(x);
     posiziona(el, ancora, punto);
-    if (questo.elenco && (v === 'bluetooth' || etichettaRadioWifi(x))) caricaElenco(questo);
+    if (questo.elenco && elencoDaLeggere(v, x)) caricaElenco(questo);
     setTimeout(() => {
       document.addEventListener('mousedown', fuori, true);
       document.addEventListener('keydown', tasto, true);

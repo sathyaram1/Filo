@@ -3,7 +3,7 @@
 // stesso oggetto): sopra c'è la strada vera, chat, livelli, conferma, home. Senza il lavoro le azioni non esistono.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { home, modelloFinto, ripristina, chiedi } from './helpers/chatFinta.mjs';
+import { home, modelloFinto, ripristina, chiedi, chiamateAlModello } from './helpers/chatFinta.mjs';
 import { clickConfirm, confirmText } from './helpers/confirm.mjs';
 
 const PARTENZA = {
@@ -208,7 +208,7 @@ test('le cuffie abbinate si collegano dal riquadro del Bluetooth, e una rete con
   expect((await chiamate(app)).filter((c) => c[0] === 'wifiCollega')).toEqual([['wifiCollega', { rete: 'Bar <img src=x onerror=alert(1)>' }]]);
 });
 
-test('in chat: una rete detta a metà si trova, e cambiare rete chiede conferma prima di partire', async ({ app }) => {
+test('in chat: una rete detta a metà si trova, e cambiare rete chiede conferma col nome vero prima di partire', async ({ app }) => {
   await computerFinto(app, { reti: ['Casa', 'Ufficio 5G'] });
   const page = await home(app);
   await modelloFinto(app, [
@@ -216,11 +216,62 @@ test('in chat: una rete detta a metà si trova, e cambiare rete chiede conferma 
     { text: 'Ti chiedo conferma.' },
   ]);
   await chiedi(page, 'collegati alla rete dell\'ufficio');
-  await expect.poll(() => confirmText(page)).toContain('Collegare il computer alla rete Wi-Fi «ufficio»');
+  await expect.poll(() => confirmText(page)).toContain('Collegare il computer alla rete Wi-Fi «Ufficio 5G»');
   expect((await chiamate(app)).some((c) => c[0] === 'wifiCollega')).toBe(false);
   await clickConfirm(page, 'ok');
   await expect.poll(async () => (await computer(app)).rete.nome).toBe('Ufficio 5G');
   await expect(voce(page, 'rete')).toHaveText('Ufficio 5G', { timeout: 5_000 });
+});
+
+test('in chat: la conferma nomina la rete che partirà anche trovata per somiglianza; un nome che non ne trova una sola non chiede conferma', async ({ app }) => {
+  await computerFinto(app, { reti: ['Cava', 'Ufficio 5G', 'Ufficio Ospiti'] });
+  const page = await home(app);
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'w1', name: 'WIFI', arguments: JSON.stringify({ rete: 'Casa' }) }] },
+    { text: 'Ti chiedo conferma.' },
+  ]);
+  await chiedi(page, 'collegati a Casa');
+  await expect.poll(() => confirmText(page)).toContain('alla rete Wi-Fi «Cava»');
+  await clickConfirm(page, 'ok');
+  await expect.poll(async () => (await computer(app)).rete.nome).toBe('Cava');
+  await ripristina(app);
+
+  // «ufficio» somiglia a due reti: nessuna conferma a vuoto, il modello riceve i due nomi e niente cambia.
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'w2', name: 'WIFI', arguments: JSON.stringify({ rete: 'ufficio' }) }] },
+    { text: 'Quale delle due?' },
+  ]);
+  await chiedi(page, 'collegati alla rete dell\'ufficio');
+  await expect.poll(async () => JSON.stringify(await chiamateAlModello(app))).toContain('Ufficio Ospiti');
+  expect(await confirmText(page).catch(() => '')).not.toContain('Collegare il computer');
+  expect((await chiamate(app)).filter((c) => c[0] === 'wifiCollega').length).toBe(1);
+  expect((await computer(app)).rete.nome).toBe('Cava');
+});
+
+test('acceso o spento dal riquadro o da fuori, l\'elenco del riquadro aperto si rilegge e non dice il contrario della radio', async ({ app }) => {
+  const cuffie = { indirizzo: '00:11:22:33:44:55', nome: 'Cuffie', collegato: true };
+  await computerFinto(app, { dispositivi: [cuffie], reti: ['Casa', 'Ufficio'], stato: { ...PARTENZA, bluetooth: { acceso: true, dispositivi: ['Cuffie'] } } });
+  const page = await home(app);
+  await expect(voce(page, 'bluetooth')).toBeVisible({ timeout: 8_000 });
+  await voce(page, 'bluetooth').click();
+  await expect(opzione(page, 'Scollega Cuffie')).toBeVisible({ timeout: 5_000 });
+  await opzione(page, 'Spegni il Bluetooth').click();
+  await expect(opzione(page, 'Accendi il Bluetooth')).toBeVisible({ timeout: 5_000 });
+  await expect(opzione(page, 'Collega Cuffie')).toBeVisible({ timeout: 5_000 });
+  await expect(opzione(page, 'Scollega Cuffie')).toHaveCount(0);
+  const letture = (await chiamate(app)).filter((c) => c[0] === 'btElenco').length;
+  // Riacceso da fuori (la chat, il sistema) col riquadro aperto: l'elenco si rilegge da solo.
+  await app.evaluate(() => globalThis.SN_COMANDI_SISTEMA.comanda({ cosa: 'bluetooth', acceso: true }));
+  await expect(opzione(page, 'Spegni il Bluetooth')).toBeVisible({ timeout: 5_000 });
+  await expect.poll(async () => (await chiamate(app)).filter((c) => c[0] === 'btElenco').length).toBeGreaterThan(letture);
+  await page.keyboard.press('Escape');
+
+  await voce(page, 'rete').click();
+  await expect(opzione(page, 'Collegato a Casa')).toBeVisible({ timeout: 5_000 });
+  await opzione(page, 'Spegni il Wi-Fi').click();
+  await expect(opzione(page, 'Accendi il Wi-Fi')).toBeVisible({ timeout: 5_000 });
+  await expect(opzione(page, 'Collegati a Casa')).toBeVisible({ timeout: 5_000 });
+  await expect(opzione(page, 'Collegato a Casa')).toHaveCount(0);
 });
 
 test('con tante reti conosciute il riquadro scorre, con la rotella e con le frecce, e si arriva all\'ultima', async ({ app }) => {
@@ -262,12 +313,14 @@ test('aperto il riquadro del Bluetooth, il tasto spegne subito: non aspetta l\'e
     await page.keyboard.press('Escape');
   }
   await voce(page, 'bluetooth').click();
+  // Tre aperture con la lettura ancora in volo sono una lettura sola.
+  expect((await chiamate(app)).filter((c) => c[0] === 'btElenco').length).toBe(1);
   await opzione(page, 'Spegni il Bluetooth').click();
   await expect.poll(async () => (await computer(app)).bluetooth.acceso, { timeout: 2_000 }).toBe(false);
   await expect(opzione(page, 'Accendi il Bluetooth')).toBeVisible({ timeout: 2_000 });
-  // Tre aperture con la lettura ancora in volo sono una lettura sola, e il suo elenco arriva nel riquadro aperto.
+  // Spento il Bluetooth l'elenco si rilegge una volta, e arriva nel riquadro aperto.
   await expect(opzione(page, 'Collega Cuffie')).toBeVisible({ timeout: 10_000 });
-  expect((await chiamate(app)).filter((c) => c[0] === 'btElenco').length).toBe(1);
+  expect((await chiamate(app)).filter((c) => c[0] === 'btElenco').length).toBe(2);
 });
 
 test('un sito non comanda il computer: le due porte rispondono «rifiutato» fuori da Filo', async ({ app, shell }) => {
