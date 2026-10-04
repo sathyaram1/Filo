@@ -438,3 +438,24 @@ test('i tempi sono dell\'utente: la pausa più lunga non chiude chi si ferma a p
   expect(await mic.evaluate((b) => b.style.getPropertyValue('--sn-voce-attesa'))).toBe('500ms');
   await expect(page.locator('.dash-bubble-user', { hasText: DETTO })).toBeVisible({ timeout: 3_000 });
 });
+
+test('editor: col microfono accanto, la casella della chat mostra tutto il suggerimento e cresce col testo invece di scorrere', async ({ shell, openTab }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const ed = await openTab('filo://editor/editor.html');
+  await ed.waitForSelector('.ed-module[data-type="switch"]');
+  await ed.locator('.ed-switch-icon').nth(1).click();
+  const chat = ed.locator('.ed-module[data-type="chat"]');
+  await expect(chat.locator('.sn-voce-btn')).toBeVisible();
+  const casella = chat.locator('[data-chat="input"]');
+  const misura = () => casella.evaluate((i) => ({ sh: i.scrollHeight, ch: i.clientHeight, h: i.offsetHeight, barra: i.offsetWidth - i.clientWidth }));
+  const vuota = await misura();
+  expect(vuota.sh).toBeLessThanOrEqual(vuota.ch);
+  expect(vuota.barra).toBeLessThan(6);
+  await casella.fill('riassumi il secondo paragrafo e dimmi se il tono è adatto a una lettera');
+  const piena = await misura();
+  expect(piena.sh).toBeLessThanOrEqual(piena.ch);
+  expect(piena.h).toBeGreaterThan(vuota.h);
+  mkdirSync(SHOTS, { recursive: true });
+  await chat.screenshot({ path: `${SHOTS}/voce-chat-editor-casella.png` });
+});

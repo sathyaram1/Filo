@@ -366,7 +366,7 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 .ed-chat-input { display: flex; gap: 4px; align-items: flex-end; --sn-voce-size: 30px; --sn-voce-ink: var(--sn-muted); }
 .ed-chat-input .sn-voce-btn { margin-bottom: 2px; }
 /* La casella cresce con quello che contiene (anche il suggerimento, che col microfono accanto va a capo):
-   una barra di scorrimento compare solo oltre le cinque righe. */
+   la barra di scorrimento (sottile) compare solo oltre il tetto di altezza. */
 .ed-chat-input textarea {
   flex: 1 1 auto; resize: none; field-sizing: content; min-height: 34px; max-height: 84px;
   overflow-y: auto; scrollbar-width: thin; padding: 7px 8px; line-height: 1.4;
