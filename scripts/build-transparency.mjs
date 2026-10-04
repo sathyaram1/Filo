@@ -43,8 +43,9 @@ const CSS_FILE = join(ROOT, 'src', 'styles', 'transparency.css');
 
 // ── Markdown minimale ────────────────────────────────────────────────────────
 // Volutamente NON un parser generale: l'input è markdown che scriviamo noi, con
-// un sottoinsieme fisso (titoli h2, paragrafi, liste, grassetto, link, riga
-// orizzontale). Un parser generale qui aggiungerebbe superficie di bug senza
+// un sottoinsieme fisso (titoli h2, paragrafi, liste, grassetto, link, `comandi`,
+// riga orizzontale). Ogni voce di lista sta su UNA riga: la riga dopo apre un
+// paragrafo. Un parser generale qui aggiungerebbe superficie di bug senza
 // servire nessun caso reale.
 
 function escapeHtml(s) {
