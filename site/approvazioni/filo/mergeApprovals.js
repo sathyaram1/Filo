@@ -173,7 +173,7 @@
   function originLabel(req) {
     var num = feedbackNum(req);
     // Da #908 anche il lavoro locale porta la sua pratica.
-    if (originOf(req) !== 'routine') return num ? 'lavoro locale · feedback #' + num : 'lavoro tuo, da questo computer';
+    if (originOf(req) !== 'routine') return num ? 'lavoro locale · feedback #' + num : 'lavoro tuo, in locale';
     return num ? 'automazione · feedback #' + num : 'automazione';
   }
 
@@ -181,7 +181,7 @@
   function originHint(req) {
     return originOf(req) === 'routine'
       ? 'Questo ramo l’ha scritto un’automazione partendo da una segnalazione: guarda cosa è stato bloccato prima di approvarlo.'
-      : 'Questo ramo l’hai scritto tu su questo computer.';
+      : 'Questo ramo l’hai scritto tu, in locale.';
   }
 
   /**
