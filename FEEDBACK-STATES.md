@@ -233,8 +233,11 @@ scritta dal server o dall'admin, mai per il solo nome (`functions/src/nascita.js
 
   Chi è fermo con l'origine (`design`, `origine_bloccata`) la segue anche quando l'owner la libera:
   torna ad aspettarla (`design → unlabeled`) se il lavoro riparte, entra in coda (`design → todo`) se
-  si fonde, va in `aligned` se si chiude senza fusione. Sono le sole uscite da `design` della
-  pipeline, e solo per quel motivo; un derivato che l'owner ha già spostato non si tocca. Chi entra in
+  si fonde, va in `aligned` se si chiude senza fusione. Allo stesso modo chi è tornato nei Ricevuti
+  con l'origine chiusa (`aligned`, `origine_chiusa`) la aspetta di nuovo (`aligned → unlabeled`)
+  se l'owner la ripristina, ed entra in coda (`aligned → todo`) quando si fonde. Sono le sole uscite
+  della pipeline da `design` e da `aligned`, e solo per quei motivi; un derivato che l'owner ha già
+  spostato non si tocca. Chi entra in
   coda dopo l'attesa passa dal giudice di priorità come alla nascita.
 
 Il prompt dei giudici dice che a loro arriva solo un utente: un linguaggio da sviluppatore o

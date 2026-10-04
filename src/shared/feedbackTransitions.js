@@ -73,8 +73,10 @@
       aligned:   ['pipeline'],
     },
     aligned: {
-      todo:     ['owner'],  // approvazione manuale (anche bulk)
-      archived: ['owner'],  // un doppione, o una cosa che non si farà: si chiude qui, senza approvarla prima
+      // 'pipeline': solo un derivato tornato qui con l'origine chiusa (origine_chiusa), che la segue quando l'owner la ripristina.
+      todo:      ['owner', 'pipeline'],  // approvazione manuale (anche bulk)
+      archived:  ['owner'],  // un doppione, o una cosa che non si farà: si chiude qui, senza approvarla prima
+      unlabeled: ['pipeline'],
     },
     todo: {
       working: ['routine'], // presa in carico (il semaforo lo tiene il server)
