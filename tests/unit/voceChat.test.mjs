@@ -51,6 +51,25 @@ test('«invia da solo» e «lascia il testo da correggere» si chiedono anche a 
   assert.equal(frase, 'invio di quello che detti nelle chat: da solo → a mano, dopo averlo corretto');
 });
 
+test('la pausa che chiude e l\'attimo per annullare sono dell\'utente: si chiedono a Filo, restano nei limiti e hanno un nome', () => {
+  const C = globalThis.SN_CONST;
+  const P = globalThis.SN_PREF;
+  assert.deepEqual(C.dictationTimes(C.DEFAULT_SETTINGS.dictation), { silenceSec: 2, cancelSec: 2.5 });
+  assert.deepEqual(C.dictationTimes(undefined), { silenceSec: 2, cancelSec: 2.5 });
+  assert.deepEqual(C.dictationTimes({ silenceSec: 0.2, cancelSec: 99 }), { silenceSec: 1, cancelSec: 10 });
+  assert.deepEqual(C.dictationTimes({ silenceSec: 'boh', cancelSec: 0 }), { silenceSec: 2, cancelSec: 0 });
+  assert.equal(P.buildPreferencePartial('pausa_microfono', '4 secondi').partial.dictation.silenceSec, 4);
+  assert.equal(P.buildPreferencePartial('attesa_invio_vocale', '0').partial.dictation.cancelSec, 0);
+  assert.equal(P.buildPreferencePartial('attesa_invio_vocale', '3,5').partial.dictation.cancelSec, 3.5);
+  assert.equal(P.buildPreferencePartial('pausa_microfono', 'boh'), null);
+  const desc = globalThis.SN_ACTION_TOOLS.definitions({ sistema: 'linux' })
+    .find((d) => d.function.name === 'IMPOSTA_PREFERENZA').function.description;
+  assert.match(desc, /pausa_microfono/);
+  assert.match(desc, /attesa_invio_vocale/);
+  assert.equal(globalThis.SN_CAMBI.fraseCambio({ chiave: 'dictation.silenceSec', prima: 2, dopo: 4 }),
+    'pausa che chiude il microfono delle chat: 2 s → 4 s');
+});
+
 test('un microfono negato, assente o occupato dice cosa fare, col posto giusto del sistema', () => {
   const negato = A.fraseMicrofono({ name: 'NotAllowedError' });
   assert.match(negato, /permesso/);

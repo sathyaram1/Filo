@@ -8,13 +8,13 @@
   if (global.SN_VOCE_CHAT) return;
 
   const TASTO = 'Ctrl+Shift+Spazio';
-  // L'attimo per annullare: il testo è nella casella, la richiesta non è ancora partita.
-  const ATTESA_MS = 2500;
-  // Chi ha detto qualcosa e tace da due secondi ha finito; chi in otto non ha detto niente non parlerà.
-  const FINE = { silenceMs: 2000, waitMs: 8000 };
+  // Chi in otto secondi non ha detto niente non parlerà. La pausa che chiude e l'attimo per annullare
+  // sono dell'utente (settings.dictation, limiti in SN_CONST.dictationTimes).
+  const MUTO_MS = 8000;
 
   const controlli = new Set();
   let invioDaSolo = true;
+  let tempi = { silenceSec: 2, cancelSec: 2.5 };
   let ascoltaImpostazioni = false;
 
   function t(k, ...a) {
@@ -31,7 +31,11 @@
   }
 
   function leggiInvio(settings) {
-    if (settings && typeof settings === 'object') invioDaSolo = !(settings.dictation && settings.dictation.autoSend === false);
+    if (settings && typeof settings === 'object') {
+      invioDaSolo = !(settings.dictation && settings.dictation.autoSend === false);
+      const C = global.SN_CONST;
+      if (C && C.dictationTimes) tempi = C.dictationTimes(settings.dictation);
+    }
     return invioDaSolo;
   }
   async function impostazioneFresca() {
@@ -94,12 +98,11 @@
     b.className = 'sn-voce-btn';
     b.innerHTML = `<span class="sn-voce-mic">${svg(MIC)}</span><span class="sn-voce-x">${svg(X)}</span>`
       + '<svg class="sn-voce-anello" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="18" pathLength="100"/></svg>';
-    b.style.setProperty('--sn-voce-attesa', `${ATTESA_MS}ms`);
     contenitore.insertBefore(b, prima && prima.parentNode === contenitore ? prima : null);
     // Un sito che ospita la chat non accende il microfono di Filo con un clic fabbricato.
     try { global.SN_FILO_UI && global.SN_FILO_UI.soloGestiVeri(b); } catch (_) {}
 
-    const c = { campo, bottone: b, stato: 'pronto', giro: 0, sessione: null, toccato: false, daSolo: true, timer: 0, atteso: '', dal: 0 };
+    const c = { campo, bottone: b, stato: 'pronto', giro: 0, sessione: null, toccato: false, daSolo: true, timer: 0, atteso: '', dal: 0, attesaMs: 0 };
 
     function imposta(stato) {
       c.stato = stato;
@@ -142,7 +145,7 @@
       c.daSolo = await impostazioneFresca();
       if (giro !== c.giro) return;
       const sessione = await Ascolto.avvia({
-        fineDaSola: FINE,
+        fineDaSola: { silenceMs: tempi.silenceSec * 1000, waitMs: MUTO_MS },
         suLivello: (v) => {
           if (giro !== c.giro) return;
           // La chat è sparita (l'Aiuto chiuso, il modulo tolto): il microfono non resta acceso per nessuno.
@@ -170,6 +173,8 @@
     }
 
     function attendi() {
+      c.attesaMs = tempi.cancelSec * 1000;
+      b.style.setProperty('--sn-voce-attesa', `${c.attesaMs}ms`);
       imposta('attesa');
       caretInFondo(campo);
       c.atteso = campo.value;
@@ -180,7 +185,7 @@
     function controlla() {
       if (c.stato !== 'attesa') { smetti(); return; }
       if (!campo.isConnected || campo.value !== c.atteso || !campo.value.trim()) { smetti(); imposta('pronto'); return; }
-      if (Date.now() - c.dal < ATTESA_MS) return;
+      if (Date.now() - c.dal < c.attesaMs) return;
       if (typeof occupato === 'function' && occupato()) { b.dataset.occupato = '1'; return; }
       smetti();
       imposta('pronto');
@@ -287,6 +292,6 @@
     gestisce: (el) => Boolean(el && perCampo(el)),
     premi: (el) => { const c = perCampo(el); if (c) c.premi(); },
     etichettaTasto,
-    TASTO, ATTESA_MS,
+    TASTO,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -998,6 +998,28 @@
         };
       },
     },
+    {
+      scrive: ['dictation.silenceSec'],
+      aiuto: 'secondi 1-8 (quanto silenzio chiude l\'ascolto del microfono delle chat; di più per chi si ferma a pensare)',
+      keys: ['pausa_microfono', 'pausa microfono', 'pausa del microfono', 'silenzio microfono', 'dictation.silencesec'],
+      build(v) {
+        const n = parseItalianNumber(v);
+        if (!Number.isFinite(n)) return null;
+        const { silenceSec } = global.SN_CONST.dictationTimes({ silenceSec: n });
+        return { partial: { dictation: { silenceSec } }, label: `Pausa che chiude il microfono → ${String(silenceSec).replace('.', ',')} s` };
+      },
+    },
+    {
+      scrive: ['dictation.cancelSec'],
+      aiuto: 'secondi 0-10 (l\'attimo per annullare prima che la richiesta detta parta da sola; 0 = parte subito)',
+      keys: ['attesa_invio_vocale', 'attesa invio vocale', 'tempo per annullare', 'annulla invio vocale', 'dictation.cancelsec'],
+      build(v) {
+        const n = parseItalianNumber(v);
+        if (!Number.isFinite(n)) return null;
+        const { cancelSec } = global.SN_CONST.dictationTimes({ cancelSec: n });
+        return { partial: { dictation: { cancelSec } }, label: `Tempo per annullare l'invio vocale → ${String(cancelSec).replace('.', ',')} s` };
+      },
+    },
   ];
 
   // Le righe «chiave: valori» della descrizione di IMPOSTA_PREFERENZA: escono da qui, dove sta il setter,

@@ -6,7 +6,7 @@
   'use strict';
 
   const { MSG } = window.SN_MSG;
-  const { AGENT_STYLE_PRESETS, AGENT_STYLE_MAX, agentStyleLength, testoLeggibile } = window.SN_CONST;
+  const { AGENT_STYLE_PRESETS, AGENT_STYLE_MAX, agentStyleLength, testoLeggibile, dictationTimes } = window.SN_CONST;
   const Storage = window.SN_STORAGE;
   const Bootstrap = window.SN_PAGE_BOOTSTRAP;
   const Tokens = window.SN_THEME_TOKENS;
@@ -844,6 +844,8 @@
       case 'notifications.soundEnabled': return $('notifSoundEnabled').checked;
       case 'notifications.sound': return $('notifSound').value || 'default';
       case 'dictation.autoSend': return $('dictationAutoSend').value !== 'no';
+      case 'dictation.silenceSec': return dictationTimes({ silenceSec: $('dictationSilence').value }).silenceSec;
+      case 'dictation.cancelSec': return dictationTimes({ cancelSec: $('dictationCancel').value }).cancelSec;
       default: return undefined;
     }
   }
@@ -880,8 +882,16 @@
       case 'notifications.soundEnabled': return notif.soundEnabled === true;
       case 'notifications.sound': return notif.sound || 'default';
       case 'dictation.autoSend': return !(s.dictation && s.dictation.autoSend === false);
+      case 'dictation.silenceSec': return dictationTimes(s.dictation).silenceSec;
+      case 'dictation.cancelSec': return dictationTimes(s.dictation).cancelSec;
       default: return undefined;
     }
+  }
+
+  function scriviTempiVoce() {
+    const sec = (n) => `${String(n).replace('.', ',')} s`;
+    $('dictationSilenceVal').textContent = sec(parseFloat($('dictationSilence').value) || 0);
+    $('dictationCancelVal').textContent = sec(parseFloat($('dictationCancel').value) || 0);
   }
 
   function misuraAnteprima(v) {
@@ -986,6 +996,10 @@
     if (vuole('dictation.autoSend')) {
       $('dictationAutoSend').value = settings.dictation && settings.dictation.autoSend === false ? 'no' : 'si';
     }
+    const tempiVoce = dictationTimes(settings.dictation);
+    if (vuole('dictation.silenceSec')) $('dictationSilence').value = String(tempiVoce.silenceSec);
+    if (vuole('dictation.cancelSec')) $('dictationCancel').value = String(tempiVoce.cancelSec);
+    scriviTempiVoce();
 
     if (vuole('timerRingtone')) {
       const ringtone = settings.timerRingtone || 'default';
@@ -1227,6 +1241,9 @@
     $('notifSoundEnabled').addEventListener('change', persist);
     $('notifSound').addEventListener('change', persist);
     $('dictationAutoSend').addEventListener('change', persist);
+    for (const id of ['dictationSilence', 'dictationCancel']) {
+      $(id).addEventListener('input', (e) => { scriviTempiVoce(); caselle.cambiato('pref', e); });
+    }
     $('notifSoundPreview').addEventListener('click', previewNotifSound);
 
     // Suoneria timer: salva al cambio + anteprima.

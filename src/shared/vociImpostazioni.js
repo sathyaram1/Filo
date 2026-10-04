@@ -37,6 +37,8 @@
         notifSoundEnabled: 'notifications.soundEnabled',
         notifSound: 'notifications.sound',
         dictationAutoSend: 'dictation.autoSend',
+        dictationSilence: 'dictation.silenceSec',
+        dictationCancel: 'dictation.cancelSec',
         timerRingtone: 'timerRingtone',
         terminalEnabled: 'terminal.enabled',
         terminalShell: 'terminal.shell',

@@ -20,7 +20,7 @@ const CAMPI_WEB = Object.freeze({
   // Quanto restano gli avvisi di Filo dentro la pagina: la durata delle Preferenze vale anche lì.
   notifications: Object.freeze({ durationSec: true }),
   // Il microfono dell'Aiuto su una pagina: finito di parlare, la richiesta parte da sola o resta da correggere.
-  dictation: Object.freeze({ autoSend: true }),
+  dictation: Object.freeze({ autoSend: true, silenceSec: true, cancelSec: true }),
   models: Object.freeze({ transcribe_audio: true }),
   // Voci aperte (le scrive anche l'owner dalla config condivisa): di ognuna
   // passa solo quanto serve al menu della dettatura per scegliere il modello.

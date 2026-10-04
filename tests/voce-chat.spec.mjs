@@ -5,6 +5,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { mkdirSync } from 'node:fs';
+import { createServer } from 'node:http';
 
 const SHOTS = 'tests/.shots';
 const DETTO = 'che tempo fa domani a Lisbona';
@@ -377,4 +378,63 @@ test('la scelta si chiede a Filo in chat e si vede in Preferenze, dove si cambia
   mkdirSync(SHOTS, { recursive: true });
   await prefs.locator('#dictationAutoSend').scrollIntoViewIfNeeded();
   await prefs.screenshot({ path: `${SHOTS}/voce-chat-preferenze.png` });
+});
+
+test('Aiuto su un sito che vieta i fogli di stile esterni: il microfono ha il suo aspetto', async ({ app, shell, openTab }) => {
+  test.setTimeout(60_000);
+  const csp = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'";
+  const server = createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': csp });
+    res.end('<!doctype html><title>Sito CSP</title><h1>Sito con CSP</h1>');
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  try {
+    await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+    const page = await openTab(`http://127.0.0.1:${server.address().port}/`);
+    await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8_000 });
+    await app.evaluate(({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+      const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
+      t.view.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'H', modifiers: ['alt'] });
+      t.view.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'H', modifiers: ['alt'] });
+    });
+    const mic = page.locator('.sn-sidebar .sn-voce-btn');
+    await expect(mic).toBeVisible({ timeout: 8_000 });
+    // Tondo grande quanto l'invio, col solo microfono: niente croce, niente anello.
+    await expect.poll(async () => { const b = await mic.boundingBox(); return [Math.round(b.width), Math.round(b.height)]; }).toEqual([32, 32]);
+    await expect(mic.locator('.sn-voce-x')).toBeHidden();
+    await expect(mic.locator('.sn-voce-anello')).toBeHidden();
+  } finally {
+    await new Promise((r) => server.close(r));
+  }
+});
+
+test('i tempi sono dell\'utente: la pausa più lunga non chiude chi si ferma a pensare, l\'attimo per annullare segue le Preferenze', async ({ app, shell, openTab }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await prepara(app);
+  const page = await home(app);
+  // Dalle Preferenze: pausa di 4 secondi, mezzo secondo per annullare.
+  const prefs = await openTab('filo://preferences/preferences.html');
+  await expect(prefs.locator('#dictationSilenceVal')).toHaveText('2 s');
+  await expect(prefs.locator('#dictationCancelVal')).toHaveText('2,5 s');
+  await prefs.locator('#dictationSilence').fill('4');
+  await prefs.locator('#dictationCancel').fill('0.5');
+  await expect(prefs.locator('#dictationCancelVal')).toHaveText('0,5 s');
+  await expect.poll(() => app.evaluate(async () => {
+    const d = (await globalThis.SN_STORAGE.getSettings()).dictation;
+    return [d.silenceSec, d.cancelSec, d.autoSend];
+  }), { timeout: 8_000 }).toEqual([4, 0.5, true]);
+
+  await page.bringToFront();
+  const mic = page.locator('.dash-input-wrap .sn-voce-btn');
+  await mic.click();
+  await parla(page);
+  // Tre secondi di silenzio: con la pausa a quattro sta ancora ascoltando.
+  await page.waitForTimeout(3000);
+  await expect(mic).toHaveAttribute('data-stato', 'ascolta');
+  await expect(page.locator('#input')).toHaveValue(DETTO, { timeout: 5_000 });
+  await expect(mic).toHaveAttribute('data-stato', 'attesa', { timeout: 5_000 });
+  expect(await mic.evaluate((b) => b.style.getPropertyValue('--sn-voce-attesa'))).toBe('500ms');
+  await expect(page.locator('.dash-bubble-user', { hasText: DETTO })).toBeVisible({ timeout: 3_000 });
 });

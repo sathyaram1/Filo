@@ -643,6 +643,18 @@
     return '';
   }
 
+  // I tempi del microfono delle chat (settings.dictation), dentro limiti che lo lasciano usabile: sotto un
+  // secondo di pausa ogni respiro chiude la frase, oltre otto (dieci per annullare) sembra rotto. PURA.
+  const DICTATION_LIMITS = Object.freeze({ silenceSec: [1, 8, 2], cancelSec: [0, 10, 2.5] });
+  function dictationTimes(d) {
+    const out = {};
+    for (const [k, [min, max, def]] of Object.entries(DICTATION_LIMITS)) {
+      const n = Number(d && d[k]);
+      out[k] = d && d[k] !== '' && d[k] != null && Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : def;
+    }
+    return out;
+  }
+
   // Forme base di `base` che `list` NON copre. PURA.
   // Serve dove una lista scritta a mano SOSTITUISCE quella di build (la lista
   // remota in config/models): senza questo confronto, un'esclusione aggiunta al
@@ -2355,7 +2367,8 @@
     },
     // Il tasto microfono delle chat (src/shared/voceChat.js): finito di parlare, la richiesta parte da sola
     // dopo un attimo per annullare (true) o il testo resta nella casella da correggere (false).
-    dictation: { autoSend: true },
+    // silenceSec: quanto silenzio vuol dire «ho finito»; cancelSec: l'attimo per annullare. Limiti in dictationTimes.
+    dictation: { autoSend: true, silenceSec: 2, cancelSec: 2.5 },
     // Notifiche/toast in basso a destra della shell (spec #170.1). È la base
     // riusata dai blocchi (#170.2/#170.3) per segnalare gli eventi.
     // - durationSec: secondi prima dell'auto-dismiss. 0 = infinita: la notifica
@@ -2737,6 +2750,8 @@
     producerOnlyRule,
     servedPolicyViolation,
     hostPolicyViolation,
+    DICTATION_LIMITS,
+    dictationTimes,
     missingExcludedProviders,
     providerIgnoreList,
     excludedProviderReasons,

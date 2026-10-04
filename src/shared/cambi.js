@@ -49,6 +49,8 @@
     'tts.pitch': { nome: 'tono di lettura', valore: numero, livello: 1 },
     'tts.modelVoice': { nome: 'voce naturale', valore: (v) => v || 'automatica', livello: 1 },
     'dictation.autoSend': { nome: 'invio di quello che detti nelle chat', valore: sino('da solo', 'a mano, dopo averlo corretto'), livello: 1 },
+    'dictation.silenceSec': { nome: 'pausa che chiude il microfono delle chat', valore: (v) => `${numero(v)} s`, livello: 1 },
+    'dictation.cancelSec': { nome: 'tempo per annullare l\'invio vocale', valore: (v) => `${numero(v)} s`, livello: 1 },
     'autoArchive.enabled': { nome: 'riordino automatico delle schede', valore: ATTIVO, livello: 1 },
     'autoArchive.onIdle': { nome: 'archiviazione quando Filo è inattivo', valore: ATTIVA, livello: 1 },
     'autoArchive.idleHours': { nome: 'ore di inattività prima di archiviare', valore: numero, livello: 1 },
