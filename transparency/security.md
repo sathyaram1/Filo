@@ -104,7 +104,7 @@ Un chiarimento su cosa dimostra una tabella verde: dieci modelli che non trovano
 
 **La tabella.** Una riga per modello per corsa: la data, il modello (e chi lo serve), l'area controllata, l'esito. In testa, due numeri: da quanti giorni nessun modello trova niente, e quanti problemi sono stati trovati e risolti in totale. Il secondo numero che cresce non è una cattiva notizia: è il registro che lavora.
 
-**Se un problema lo trovi tu.** Segnalalo dall'app, dal canale dei feedback. Il testo viaggia cifrato e lo leggono i giudici, gli agenti che lo lavorano e io. Vale la regola che applico a me stesso: sulla bacheca pubblica il problema compare solo a correzione fatta, con un titolo breve e senza i dettagli.
+**Se un problema lo trovi tu.** Segnalalo dall'app, dal canale dei feedback. Il testo viaggia cifrato e lo leggono i giudici, gli agenti che lo lavorano e io. Sulla bacheca pubblica il problema compare solo a correzione fatta, con un titolo breve e senza i dettagli. La correzione però si scrive in pubblico: appena un agente comincia, sul repository di Filo su GitHub compaiono il numero del feedback, una descrizione del lavoro, le modifiche e le prove che riproducono il problema. Gli utenti la ricevono solo con l'aggiornamento che la contiene, di regola qualche ora dopo, e in quella finestra chi legge il repository può ricavare il problema dalla correzione. Contraddice la regola che applico alla tabella, e lo trovi fra i punti deboli.
 
 ## I punti deboli
 
@@ -114,7 +114,8 @@ Un chiarimento su cosa dimostra una tabella verde: dieci modelli che non trovano
 4. **Le difese che imparano non imparano ancora.** L'archivio degli attacchi si riempie ma nessun giudice ci si allena, l'arresto automatico non c'è e il red team è in pausa. Oggi il sistema si difende con i cinque livelli e con il mio interruttore.
 5. **Chi scrive il codice e chi lo controlla sono entrambi LLM.** Li tengo decorrelati (modelli diversi, ruoli separati, nessuno approva sé stesso), ma una classe di errori condivisa da tutti i modelli di una generazione passerebbe. È una versione nuova di un problema vecchio: anche i revisori umani condividono i punti ciechi della loro epoca.
 6. **Due strade saltano il mio clic.** Il lavoro locale e il segno «fondi senza chiedermelo» portano su main modifiche alle aree sensibili senza la mia approvazione nell'app, e si comandano anche dal terminale, dove un LLM ha le mie credenziali. Quello che saltano resta registrato, ma lo leggo dopo la fusione, non prima.
-7. **Il codice del server non è pubblico.** Quello che dico del server, dai giudici al cancello che fonde il codice, va preso sulla parola: è il prezzo di tenere nascosto il bersaglio.
+7. **La correzione di un problema si vede prima che arrivi a te.** Il lavoro sui feedback si fa sul repository pubblico: per un problema di sicurezza segnalato dall'app, la correzione e le prove che lo riproducono si leggono su GitHub mentre gli utenti hanno ancora la versione da correggere.
+8. **Il codice del server non è pubblico.** Quello che dico del server, dai giudici al cancello che fonde il codice, va preso sulla parola: è il prezzo di tenere nascosto il bersaglio.
 
 ---
 

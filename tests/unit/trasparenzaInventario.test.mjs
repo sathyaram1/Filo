@@ -1,6 +1,6 @@
-// L'inventario di dove vanno i dati: ogni file nella cartella dei dati, ogni collezione del server in cui scrive l'app
-// e ogni indirizzo esterno nel codice deve avere la sua frase nel documento sulla privacy (#951). Una voce nuova nel
-// codice fa rosso finché non entra qui CON la frase; «perche» al posto della frase solo per ciò che non porta dati tuoi.
+// L'inventario di dove vanno i dati: ogni file nella cartella dei dati, ogni collezione del database del server (anche
+// quelle in cui scrive solo il server) e ogni indirizzo esterno nel codice ha la sua frase nel documento sulla privacy
+// (#951). Una voce nuova fa rosso finché non entra qui CON la frase; «perche» solo per ciò che non porta dati tuoi.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -58,13 +58,37 @@ test('ogni file nella cartella dei dati è nel documento sulla privacy', () => {
   confronta(trovati, CARTELLA_DATI, 'cartella dei dati');
 });
 
-// Le collezioni in cui scrive chi non è l'owner né il server; per quelle che chiunque legge, anche i campi.
-const COLLEZIONI_SCRITTE = {
+// Tutte le collezioni delle regole: quelle che scrive il server tengono dati quanto quelle che scrive l'app (#951,
+// quinto giro: il codice dell'installazione in chiaro fra i mittenti). Per quelle che l'app scrive e chiunque legge, anche i campi.
+const CONFIGURAZIONE = { perche: 'configurazione del servizio scritta dall\'owner: niente di chi usa l\'app' };
+const COLLEZIONI = {
   '/feedback/{doc}': { frase: 'Quando mandi un feedback' },
   '/feedback-public/{doc}': { frase: 'Pubblici sono anche i voti' },
   '/counters/{name}': { perche: 'il numero progressivo dei feedback: quanti ne sono arrivati, niente di chi scrive' },
   '/credits/{uid}': { frase: 'Con il login Google c\'è un secondo documento' },
   '/wallet-usage/{id}': { frase: 'Filo scrive anche un registro d\'uso' },
+  '/wallet-accounts/{uid}': { frase: 'tiene un documento con il tuo pseudonimo' },
+  '/wallet-invites/{code}': { frase: 'il codice d\'invito con cui sei entrato' },
+  '/wallet-state/{doc}': { perche: 'l\'esito dell\'ultimo confronto fra registro d\'uso e consumo di OpenRouter' },
+  '/identities/{doc}': { frase: 'nell\'elenco dei mittenti del filtro all\'ingresso' },
+  '/attacks/{doc}': { frase: 'con il testo ci sono il codice dell\'installazione, browser e sistema' },
+  '/judge-verdicts/{doc}': { perche: 'un registro dei giudizi previsto dalle regole, in cui oggi il server non scrive' },
+  '/paths/{domain}': { frase: 'conserva i percorsi dell\'Aiuto' },
+  '/entries/{doc}': { frase: 'conserva i percorsi dell\'Aiuto' },
+  '/redteam-users/{uid}': { frase: 'Con il tuo account restano il nome in classifica' },
+  '/redteam-attempts/{id}': { frase: 'i punteggi e i tentativi' },
+  '/redteam-handles/{h}': { frase: 'il nome in classifica, che scegli tu' },
+  '/redteam-codes/{code}': { frase: 'Servono il login e un codice' },
+  '/config/models': { frase: 'tiene la configurazione condivisa' },
+  '/config/secrets': CONFIGURAZIONE,
+  '/config/judgeSecrets': CONFIGURAZIONE,
+  '/config/automation': CONFIGURAZIONE,
+  '/config/routines': CONFIGURAZIONE,
+  '/config/redteam': CONFIGURAZIONE,
+  '/config/supportModels': CONFIGURAZIONE,
+  '/config/credits': CONFIGURAZIONE,
+  '/admins/{email}': { perche: 'gli indirizzi di chi amministra il server' },
+  '/routines/{email}': { perche: 'le identità delle routine che lavorano i feedback' },
 };
 const CAMPI_PUBBLICI_SCRITTI = {
   'feedback-public.votes': { frase: 'Pubblici sono anche i voti' },
@@ -93,13 +117,13 @@ function blocchiRegole() {
 }
 const soloOwnerOServer = (c) => /^(\(\s*)?(isAdmin\(\)(\s*\|\|\s*isRoutine\(\))?|isRoutine\(\)|false)(\s*\))?(\s*&&|$)/.test(c);
 
-test('ogni collezione del server in cui scrive l\'app è nel documento sulla privacy, coi campi pubblici', () => {
+test('ogni collezione del database del server è nel documento sulla privacy, coi campi pubblici scritti dall\'app', () => {
   const collezioni = new Map();
   const campi = new Map();
   for (const b of blocchiRegole()) {
+    collezioni.set(b.path, 'firestore.rules');
     const scrive = b.allow.filter((a) => /create|update|write/.test(a.ops) && !soloOwnerOServer(a.cond));
     if (!scrive.length) continue;
-    collezioni.set(b.path, 'firestore.rules');
     if (!b.allow.some((a) => /read|get|list/.test(a.ops) && a.cond === 'true')) continue;
     const nome = b.path.split('/')[1];
     for (const a of scrive) {
@@ -108,7 +132,7 @@ test('ogni collezione del server in cui scrive l\'app è nel documento sulla pri
       }
     }
   }
-  confronta(collezioni, COLLEZIONI_SCRITTE, 'collezione scritta dall\'app');
+  confronta(collezioni, COLLEZIONI, 'collezione del server');
   confronta(campi, CAMPI_PUBBLICI_SCRITTI, 'campo pubblico scritto dall\'app');
 });
 

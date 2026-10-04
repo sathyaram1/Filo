@@ -111,3 +111,12 @@ test('il tasto destro su un link chiede da solo titolo e descrizione al sito e s
   legame(false, privacy, 'Quando chiedi cos\'è un link', 'il sito del link contattato solo a richiesta');
   legame(/EXPLAIN_LINK/.test(azioni), privacy, '**I link.** Quando fai tasto destro su un link', 'il link spiegato da un modello');
 });
+
+test('il lavoro sui feedback va sul repository pubblico mentre si fa, e i due documenti lo dicono', () => {
+  const pubblico = /git push origin "refs\/heads\/\$ramo:refs\/heads\/\$ramo"/.test(leggi('.claude', 'hooks', 'auto-commit-merge.sh'));
+  legame(pubblico, privacy, 'il lavoro che lo corregge si fa in pubblico', 'lavoro sui feedback in pubblico');
+  legame(pubblico, privacy, '**Il lavoro sui feedback è pubblico.**', 'lavoro sui feedback fra i punti deboli della privacy');
+  legame(pubblico, sicurezza, 'La correzione però si scrive in pubblico', 'correzione scritta in pubblico');
+  legame(pubblico, sicurezza, '**La correzione di un problema si vede prima che arrivi a te.**', 'correzione pubblica fra i punti deboli');
+  legame(false, sicurezza, 'Vale la regola che applico a me stesso: sulla bacheca', 'la regola della divulgazione vale anche per la bacheca');
+});
