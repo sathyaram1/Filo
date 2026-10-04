@@ -1701,6 +1701,12 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
     action._fraseCambio = bersaglio ? bersaglio.frase : '';
   }
 
+  // #874 — il livello di un comando del sistema lo decide la stessa lettura della richiesta che poi la esegue:
+  // scritta qui sempre, sopra qualunque valore arrivato col modello.
+  if (type === 'VOLUME' || type === 'BLUETOOTH' || type === 'WIFI') {
+    action._richiestaSistema = require('./comandiSistema').normalizzaRichiesta(richiestaDiSistema(type, action));
+  }
+
   // ── gate dei livelli di sicurezza (#146.2) ────────────────────────────────
   // Il livello è assegnato STATICAMENTE nel registro (src/shared/actionLevels.js),
   // mai deciso dall'LLM. Azione non registrata → rifiutata (ogni nuovo potere
