@@ -292,12 +292,20 @@
   // nei refresh dopo una modifica si rispetta invece la posizione dell'utente.
   async function renderBuilder(stickChat) {
     $('deckNameText').textContent = current.nome;
-    const commander = (current.commanderMeta && current.commanderMeta.name)
-      ? `Commander: ${current.commanderMeta.name}`
-      : 'Nessun commander — impostalo col tasto destro su una carta del mazzo.';
-    const budget = (current.budget !== null && current.budget !== undefined)
-      ? ` · Budget: ${fmtBudgetShort(current.budget)} €` : '';
-    $('commanderLine').textContent = commander + budget;
+    const line = $('commanderLine');
+    const commanderName = current.commander && current.commanderMeta && current.commanderMeta.name;
+    line.textContent = commanderName ? 'Commander: ' : 'Nessun commander — impostalo col tasto destro su una carta.';
+    if (commanderName) {
+      // Il nome del commander è un nome di carta come gli altri (§5.1): anteprima al passaggio, carosello al clic.
+      const name = document.createElement('span');
+      name.className = 'dk-prose-card';
+      name.dataset.cardId = current.commander;
+      name.textContent = commanderName;
+      line.appendChild(name);
+    }
+    if (current.budget !== null && current.budget !== undefined) {
+      line.appendChild(document.createTextNode(` · Budget: ${fmtBudgetShort(current.budget)} €`));
+    }
     // Suggerisce, senza ingombrare, come tornare indietro (feedback #302).
     $('commanderLine').title = current.commander
       ? 'Tasto destro per rimuovere il commander' : '';
@@ -773,30 +781,38 @@
     })));
   }
 
-  // "Imposta come commander" (§8.4): il commander è un PARAMETRO del mazzo,
-  // non una carta dell'elenco — la riga esce dall'elenco.
-  async function makeCommander(cardId) {
+  // Imposta, cambia o toglie (id vuoto) il commander (§8.4): chi esce dall'elenco e chi ci rientra lo decide il main
+  // (Decks.replaceCommander); qui la riga che dice quale carta è tornata nel mazzo, per poterla togliere (#789).
+  async function setCommanderTo(cardId) {
     const r = await send({ type: MSG.DECKS_SET_COMMANDER, id: current.id, scryfallId: cardId });
-    if (!r || !r.ok) return;
+    if (!r || !r.ok) {
+      showToast('Commander non cambiato: il mazzo non è stato aggiornato.');
+      return;
+    }
+    if (!current || r.deck.id !== current.id) return;
     current = r.deck;
-    const { deck, removed } = Decks.removeCard(current, cardId);
-    if (removed) await saveDeck(deck);
-    else await renderBuilder();
+    await renderBuilder();
+    if (r.previous) showToast(`${r.previous.name || 'Il commander di prima'} torna nel mazzo come carta normale.`);
   }
+  function makeCommander(cardId) { return setCommanderTo(cardId); }
+  function removeCommander() { return current.commander ? setCommanderTo('') : Promise.resolve(); }
 
-  // Inverso di makeCommander (feedback #302): torna a "nessun commander". Poiché
-  // impostare un commander ne toglie la carta dall'elenco, rimuoverlo la RIMETTE
-  // nel mazzo come carta normale — così non si perde la carta scelta per sbaglio
-  // (il software deve reggere gli errori, non costringere a rifare il mazzo).
-  async function removeCommander() {
-    const prevId = current.commander;
-    if (!prevId) return;
-    const r = await send({ type: MSG.DECKS_SET_COMMANDER, id: current.id, scryfallId: '' });
-    if (!r || !r.ok) return;
-    current = r.deck;
-    const { deck, added } = Decks.addCard(current, prevId);
-    if (added) await saveDeck(deck);
-    else await renderBuilder();
+  // Le azioni su una carta fuori dall'elenco del mazzo (risultati, nomi citati, intestazione), le stesse della riga
+  // del mazzo dove hanno senso (§8.3): il commander offre di toglierlo, le altre carte di entrare, uscire o diventarlo.
+  function cardMenuItems(id, qty = 1) {
+    const card = cardsById[id];
+    const items = id === current.commander
+      ? [{ label: 'Rimuovi commander', run: () => removeCommander() }]
+      : [
+          inDeck(id)
+            ? { label: 'Rimuovi dal mazzo', run: () => { if (inDeck(id)) toggleCard(id); } }
+            : { label: 'Aggiungi al mazzo', run: () => { if (!inDeck(id)) toggleCard(id, qty); } },
+          { label: 'Imposta come commander', run: () => makeCommander(id) },
+        ];
+    if (card && card.scryfallUri) {
+      items.push({ label: 'Apri su Scryfall', run: () => send({ type: MSG.OPEN_URL, url: card.scryfallUri }) });
+    }
+    return items;
   }
 
   // ── Colonna Chat / Risultati (§3): la ricerca È la chat ────────────────────
@@ -947,11 +963,15 @@
     const added = inDeck(id);
     const q = Number(qty) > 1 ? Number(qty) : 0;
     const flag = unchecked ? '<span class="dk-row-flag" title="Non controllata: potrebbe non c\'entrare">?</span>' : '';
+    const addBtn = id === current.commander
+      ? `<button class="dk-add" data-add="${esc(id)}" data-in="cmd" aria-disabled="true"
+                title="È il commander del mazzo" aria-label="${esc(name)} è il commander del mazzo">✓</button>`
+      : `<button class="dk-add" data-add="${esc(id)}" data-qty="${q || 1}" data-in="${added ? 1 : 0}"
+                title="${added ? 'Rimuovi dal mazzo' : 'Aggiungi al mazzo'}"
+                aria-label="${added ? `Rimuovi ${esc(name)} dal mazzo` : `Aggiungi ${esc(name)} al mazzo`}">${added ? '✓' : '+'}</button>`;
     return `
       <div class="dk-row${unchecked ? ' dk-row-unchecked' : ''}" data-card-id="${esc(id)}">
-        <button class="dk-add" data-add="${esc(id)}" data-qty="${q || 1}" data-in="${added ? 1 : 0}"
-                title="${added ? 'Rimuovi dal mazzo' : 'Aggiungi al mazzo'}"
-                aria-label="${added ? `Rimuovi ${esc(name)} dal mazzo` : `Aggiungi ${esc(name)} al mazzo`}">${added ? '✓' : '+'}</button>
+        ${addBtn}
         <span class="dk-row-name">${q ? `<span class="dk-row-qty">${q}×</span> ` : ''}${esc(name)}</span>${flag}
         <span class="dk-row-mana">${mana}</span>
       </div>`;
@@ -1235,6 +1255,8 @@
   // dall'import via chat (§11.2, es. basics con "×37"): default 1 per le
   // ricerche normali.
   async function toggleCard(cardId, qty = 1) {
+    // Il commander sta nell'intestazione, non anche fra le 99 (§8.4): nessuna strada lo duplica nell'elenco.
+    if (cardId === current.commander) return;
     const adding = !inDeck(cardId);
     const { deck, added } = adding
       ? Decks.addCard(current, cardId, { qty })
@@ -1804,10 +1826,12 @@
     paintCardImage($('carouselImg'), card || null);
     $('carouselPos').textContent = `${carousel.i + 1}/${carousel.ids.length}`;
     const added = inDeck(id);
+    const isCommander = id === current.commander;
     const btn = $('carouselToggle');
-    btn.dataset.in = added ? '1' : '0';
-    btn.textContent = added ? '✓ nel mazzo' : '+ aggiungi';
-    btn.title = added ? 'Rimuovi dal mazzo (Invio)' : 'Aggiungi al mazzo (Invio)';
+    btn.dataset.in = isCommander ? 'cmd' : (added ? '1' : '0');
+    btn.setAttribute('aria-disabled', isCommander ? 'true' : 'false');
+    btn.textContent = isCommander ? '✓ commander' : (added ? '✓ nel mazzo' : '+ aggiungi');
+    btn.title = isCommander ? 'È il commander del mazzo' : (added ? 'Rimuovi dal mazzo (Invio)' : 'Aggiungi al mazzo (Invio)');
     // Prefetch di precedente e successiva (§5.1): la navigazione non aspetta.
     // Stesso warm-up (dedup) del precarico delle righe visibili.
     preloadCardImages([carousel.ids[carousel.i - 1], carousel.ids[carousel.i + 1]].filter(Boolean));
@@ -2114,9 +2138,10 @@
     $('commanderLine').addEventListener('contextmenu', (e) => {
       if (!current || !current.commander) return;
       e.preventDefault();
-      openCtx(e.clientX, e.clientY, [
-        { label: 'Rimuovi commander', run: () => removeCommander() },
-      ]);
+      openCtx(e.clientX, e.clientY, cardMenuItems(current.commander));
+    });
+    $('commanderLine').addEventListener('click', (e) => {
+      if (current && current.commander && e.target.closest('.dk-prose-card')) openCarousel([current.commander], 0);
     });
     wireDividers();
     wireDetailPanel();
@@ -2175,6 +2200,22 @@
     log.addEventListener('mouseover', (e) => {
       const span = e.target.closest('.dk-prose-card');
       if (span) resolveProseCard(span);
+    });
+    // Tasto destro su un risultato o su un nome citato (§8.3): le stesse azioni della carta, compreso il commander.
+    log.addEventListener('contextmenu', async (e) => {
+      const row = e.target.closest('.dk-row[data-card-id]');
+      if (row) {
+        e.preventDefault();
+        const btn = row.querySelector('[data-add]');
+        openCtx(e.clientX, e.clientY, cardMenuItems(row.dataset.cardId, Number(btn && btn.dataset.qty) || 1));
+        return;
+      }
+      const span = e.target.closest('.dk-prose-card');
+      if (!span) return;
+      e.preventDefault();
+      const deckId = current && current.id;
+      const id = await resolveProseCard(span).catch(() => null);
+      if (id && current && current.id === deckId) openCtx(e.clientX, e.clientY, cardMenuItems(id));
     });
 
     // Colonna mazzo: collassa/espandi i gruppi al click sul divisore.

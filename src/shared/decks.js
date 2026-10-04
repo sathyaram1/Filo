@@ -557,6 +557,7 @@
     importCards,
     renameDeck,
     setCommander,
+    replaceCommander,
     parseBudgetInput,
     setBudget,
     deckCount,
