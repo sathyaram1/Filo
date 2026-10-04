@@ -1022,6 +1022,8 @@
       },
     },
     {
+      scrive: ['schedeAperte.leggere'],
+      aiuto: 'true | false (Filo legge e guida le schede aperte, la posta di Gmail compresa)',
       keys: ['leggere_schede', 'leggere le schede', 'leggere le schede aperte', 'leggi le schede', 'lettura delle schede',
         'lettura schede', 'schede aperte', 'filo può leggere le schede aperte', 'leggere la posta dalla scheda'],
       // Da acceso Filo legge le pagine aperte e ci scrive dentro (bozze comprese): conferma in entrambi i versi.
