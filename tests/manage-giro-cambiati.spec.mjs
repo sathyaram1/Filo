@@ -1,20 +1,13 @@
-// Spec Playwright: quanto costa tenere aperta la dashboard di gestione (#676).
-//
-// Prima, ogni pagina di Gestione chiedeva a Firestore i nomi di TUTTA la
-// collezione ogni sessanta secondi: centinaia di letture al minuto a database
-// fermo. Adesso il giro è uno solo (nel main) e chiede i soli feedback scritti
-// dall'ultimo giro: a vuoto è una richiesta che non torna nessun documento.
-//
-// Lo spec CONTA — richieste e documenti restituiti — su tre giri senza
-// cambiamenti e su un giro con un feedback cambiato, e poi asserisce la cosa
-// che conta davvero: il feedback cambiato COMPARE aggiornato nella lista
-// entro il giro. Firestore è sostituito nel main (le due letture del giro),
-// così il conteggio è quello vero del cammino di produzione.
+// Quanto costa tenere aperta la Gestione (#676), contato sul cammino vero:
+// Firestore è sostituito NEL MAIN (le letture di SN_FEEDBACK e il registro dei
+// worker), la pagina è quella vera, coi tempi del giro accorciati.
+// Si asserisce quello che vede l'owner: tutti i feedback all'apertura, il
+// cambiato aggiornato entro il giro, niente letture con la Gestione non in vista.
 
 import { test, expect } from './fixtures/electron.mjs';
 
 const URL = 'filo://manage/manage.html';
-const RITMO = 200; // il giro, accorciato per lo spec
+const TEMPI = { pollMs: 400, rientroMs: 200, clockMs: 100 };
 
 function fakeFb(id, name, extra = {}) {
   return {
@@ -27,209 +20,150 @@ function fakeFb(id, name, extra = {}) {
     subSeq: 0,
     clientId: 'tester@example.com',
     createdAt: extra.createdAt || '2026-09-01T10:00:00Z',
-    images: [],
     ...extra,
   };
 }
 
-// Firestore finto NEL MAIN: conta le richieste e i documenti che tornano.
-async function fingiFirestore(app, docs) {
-  await app.evaluate(async (_electron, { docs, ritmo }) => {
-    // Dentro `evaluate` il `require` del modulo non c'è: il main espone i suoi
-    // moduli su globalThis quando gira sotto test (src/main/main.js).
+// Firestore finto nel main: conta richieste e documenti per ogni lettura.
+async function fingiFirestore(app, docs, { registro = [], numeri = {} } = {}) {
+  await app.evaluate(async (_electron, { docs, registro, numeri, ritmo }) => {
     const auth = globalThis.__filoAuth;
     auth.isAdmin = () => true;
     auth.getIdToken = async () => 'token-finto';
-
     globalThis.__docs = docs;
-    globalThis.__invii = 2;
-    globalThis.__conta = { richieste: 0, documenti: 0, versioni: 0, schede: 0, seguiti: 0, contatori: 0 };
+    globalThis.__registro = registro;
+    globalThis.__conta = { tutti: 0, tuttiDoc: 0, cambiati: 0, cambiatiDoc: 0, seguiti: [], getMany: 0, getManyDoc: 0, numeri: [], registro: 0, contatori: 0 };
+    const C = globalThis.__conta;
     const FB = globalThis.SN_FEEDBACK;
-    FB.listVersions = async () => {
-      globalThis.__conta.richieste += 1;
-      globalThis.__conta.versioni += 1;
-      globalThis.__conta.documenti += globalThis.__docs.length;
-      return globalThis.__docs.map((d) => ({ _id: d._id, _updateTime: d._updateTime, createdAt: d.createdAt }));
-    };
+    const copia = (d) => JSON.parse(JSON.stringify(d));
+    FB.listAllPaged = async () => { C.tutti += 1; C.tuttiDoc += globalThis.__docs.length; return { rows: globalThis.__docs.map(copia), complete: true }; };
     FB.listChangedSince = async ({ since }) => {
-      globalThis.__conta.richieste += 1;
-      const rows = globalThis.__docs.filter((d) => d.updatedAt > since);
-      globalThis.__conta.documenti += rows.length;
+      C.cambiati += 1;
+      const rows = globalThis.__docs.filter((d) => d.updatedAt > since).map(copia);
+      C.cambiatiDoc += rows.length;
       return { rows, complete: true };
     };
-    // Le schede pubbliche: il giro non deve toccarle quando non cambia niente.
-    FB.getManyPublic = async (ids) => { globalThis.__conta.schede += ids.length; return []; };
-    // I due segni senza orologio (#676, giro 1): l'ora che tiene Firestore per
-    // i feedback seguiti, e il contatore degli invii.
     FB.versionsOf = async (ids) => {
-      globalThis.__conta.richieste += 1;
-      globalThis.__conta.seguiti += 1;
-      const trovati = globalThis.__docs.filter((d) => ids.includes(d._id));
-      globalThis.__conta.documenti += trovati.length;
-      return trovati.map((d) => ({ _id: d._id, _updateTime: d._updateTime, createdAt: d.createdAt }));
+      C.seguiti.push(ids.slice());
+      return globalThis.__docs.filter((d) => ids.includes(d._id)).map((d) => ({ _id: d._id, _updateTime: d._updateTime }));
     };
     FB.getMany = async (ids) => {
-      globalThis.__conta.richieste += 1;
-      const trovati = globalThis.__docs.filter((d) => ids.includes(d._id));
-      globalThis.__conta.documenti += trovati.length;
-      return trovati;
+      C.getMany += 1;
+      const rows = globalThis.__docs.filter((d) => ids.includes(d._id)).map(copia);
+      C.getManyDoc += rows.length;
+      return rows;
     };
-    // Una lettura per giro, contata a parte: è un documento solo e non è un
-    // feedback, e i conti sotto parlano di feedback.
-    FB.submissionCount = async () => {
-      globalThis.__conta.richieste += 1;
-      globalThis.__conta.contatori += 1;
-      return globalThis.__invii;
-    };
-    // Il ritmo del giro lo legge chi accende il timer: accorciarlo qui basta.
+    FB.submissionCount = async () => { C.contatori += 1; return 1000; };
+    FB.idDelNumero = async (num) => { C.numeri.push(num); return numeri[num] || null; };
+    FB.getManyPublic = async () => [];
+    FB.listAllPublic = async () => [];
+    FB.listResolved = async () => [];
+    globalThis.__filoDefaults.getWorkerLog = async () => { C.registro += 1; return globalThis.__registro.slice(); };
     globalThis.SN_FEEDBACK_LIVE.POLL_MS = ritmo;
-  }, { docs, ritmo: RITMO });
+  }, { docs, registro, numeri, ritmo: TEMPI.pollMs });
 }
 
-const conta = (app) => app.evaluate(() => globalThis.__conta);
+const conta = (app) => app.evaluate(() => JSON.parse(JSON.stringify(globalThis.__conta)));
 
-test('il giro al minuto chiede solo i cambiati, e il cambiato compare in lista', async ({ app, openTab }) => {
-  const A = fakeFb('giro-a', 'Primo', { seq: 21 });
-  const B = fakeFb('giro-b', 'Secondo', { seq: 22, createdAt: '2026-09-02T10:00:00Z' });
-  await fingiFirestore(app, [A, B]);
-
+async function apriGestione(openTab) {
   const page = await openTab(URL);
-  await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
   await page.evaluate(() => window.__mgTest.whenReady());
+  await page.evaluate((t) => { window.__mgTest.setAdmin(true); window.__mgTest.setLiveTiming(t); }, TEMPI);
+  return page;
+}
 
-  // La lista in pagina (il caricamento vero non ha Firestore) e il canale del
-  // giro riaperto sopra i dati finti.
-  await page.evaluate(({ A, B }) => {
-    window.__mgTest.setAdmin(true);
-    window.__mgTest.setData([B, A]);
-    window.__mgTest.setTab('inbox');
-    window.__mgTest.resumeLive();
-  }, { A, B });
-  await expect(page.locator('.mg-item-title')).toHaveText(['Secondo', 'Primo']);
+test('apertura: tutti i feedback; poi ogni giro chiede solo i cambiati, e il cambiato compare', async ({ app, openTab }) => {
+  // 520 feedback: il vecchio sta oltre i primi 500 per data, col createdAt
+  // scritto come TESTO (i sotto-feedback creati dal server).
+  const docs = [];
+  for (let i = 0; i < 519; i += 1) {
+    docs.push(fakeFb(`f${i}`, `Feedback ${i}`, { seq: 1000 + i, createdAt: new Date(Date.UTC(2026, 8, 1) + i * 60_000).toISOString() }));
+  }
+  const vecchio = fakeFb('vecchio', 'Tornato nei ricevuti', { seq: 530, createdAt: '2025-09-03T10:00:00.000Z' });
+  docs.push(vecchio);
+  await fingiFirestore(app, docs);
 
-  // Il giro riparte col ritmo corto: spento e riacceso, così il main rifà il
-  // timer leggendo il ritmo nuovo.
-  await page.evaluate(async () => {
-    await window.filo.message({ type: 'feedback_live_subscribe', off: true });
-    await window.filo.message({ type: 'feedback_live_subscribe' });
-  });
+  const page = await apriGestione(openTab);
+  await page.evaluate(() => window.__mgTest.setTab('inbox'));
+  await expect.poll(() => page.evaluate(() => window.__mgTest.currentOrder().length), { timeout: 15000 }).toBe(520);
+  const ordine = await page.evaluate(() => window.__mgTest.currentOrder());
+  expect(ordine).toContain('vecchio');
+  // Nessun «(500+)»: il tetto non c'è più.
+  await expect(page.locator('body')).not.toContainText('500+');
 
-  // Primo giro: il riallineamento d'apertura — l'unico che legge tutta la
-  // pagina, e per questo raro (mezz'ora).
-  await expect.poll(() => conta(app).then((c) => c.versioni), { timeout: 5000 }).toBe(1);
   const dopoApertura = await conta(app);
-  expect(dopoApertura.documenti).toBe(2);
+  expect(dopoApertura.tutti).toBe(1);
 
-  // TRE GIRI SENZA CAMBIAMENTI: tre richieste, zero documenti, zero schede.
-  await expect.poll(() => conta(app).then((c) => c.richieste), { timeout: 5000 })
-    .toBeGreaterThanOrEqual(dopoApertura.richieste + 3);
+  // Tre giri a database fermo: tre domande, zero documenti, niente riletture.
+  await expect.poll(() => conta(app).then((c) => c.cambiati), { timeout: 10000 }).toBeGreaterThanOrEqual(3);
   const fermo = await conta(app);
-  expect(fermo.versioni).toBe(1);
-  expect(fermo.documenti).toBe(dopoApertura.documenti);
-  expect(fermo.schede).toBe(0);
-  // Il contatore degli invii: una lettura per giro, e niente di più. È quello
-  // che fa vedere una segnalazione mandata da una macchina con l'ora indietro,
-  // che la domanda per data non troverebbe.
-  expect(fermo.contatori).toBeGreaterThanOrEqual(3);
-  expect(fermo.contatori).toBeLessThanOrEqual(fermo.richieste - 3);
+  expect(fermo.tutti).toBe(1, 'nessuna rilettura completa');
+  expect(fermo.cambiatiDoc).toBe(0, 'un giro a vuoto non porta documenti');
+  expect(fermo.getManyDoc).toBe(0);
 
-  // UN GIRO CON UN FEEDBACK CAMBIATO.
+  // Un feedback cambia: compare aggiornato entro il giro, e costa UN documento.
   await app.evaluate(() => {
-    const d = globalThis.__docs.find((x) => x._id === 'giro-a');
-    d.name = 'Primo, riscritto';
+    const d = globalThis.__docs.find((x) => x._id === 'f3');
+    d.name = 'Riscritto adesso';
     d._updateTime = 't2';
     d.updatedAt = new Date().toISOString();
   });
-
-  // Il successo è questo: l'owner VEDE il cambiamento, entro il giro.
-  await expect(page.locator('.mg-item-title')).toHaveText(['Secondo', 'Primo, riscritto'], { timeout: 5000 });
-
+  await expect(page.locator('.mg-item-title', { hasText: 'Riscritto adesso' })).toHaveCount(1, { timeout: 5000 });
   const dopo = await conta(app);
-  expect(dopo.documenti - fermo.documenti).toBe(1);
-  expect(dopo.versioni).toBe(1, 'un cambiamento non fa rileggere tutta la collezione');
-  expect(dopo.schede).toBe(1, 'le schede si rileggono per il solo id cambiato');
+  expect(dopo.tutti).toBe(1);
+  // Il margine per gli orologi rimanda la stessa riga per qualche giro: al più una per giro.
+  expect(dopo.cambiatiDoc).toBeGreaterThanOrEqual(1);
+  expect(dopo.cambiatiDoc).toBeLessThanOrEqual(dopo.cambiati - fermo.cambiati);
 
-  // Gestione chiusa: il giro si ferma. Nessuno che guarda, niente da pagare —
-  // ed è anche la prova che una scheda andata altrove non resta iscritta.
-  await page.goto('about:blank');
-  await new Promise((r) => setTimeout(r, RITMO * 4));
-  const chiuso = await conta(app);
-  await new Promise((r) => setTimeout(r, RITMO * 4));
-  expect((await conta(app)).richieste).toBe(chiuso.richieste);
+  // La Gestione esce di vista (un'altra scheda davanti): il giro si ferma.
+  await openTab('filo://newtab/');
+  await new Promise((r) => setTimeout(r, TEMPI.pollMs * 2));
+  const nascosta = await conta(app);
+  await new Promise((r) => setTimeout(r, TEMPI.pollMs * 5));
+  const ancora = await conta(app);
+  expect(ancora.cambiati).toBe(nascosta.cambiati);
+  expect(ancora.registro).toBe(nascosta.registro);
+  expect(ancora.contatori).toBe(nascosta.contatori);
 });
 
-// Il giro non si fida della data che firma chi scrive (#676, giro 1). Il server
-// delle routine non la firma affatto: quello che scrive lui (presa in carico,
-// stato, battiti) è proprio ciò che l'owner guarda mentre tiene aperta la
-// dashboard. Per i feedback in mano alle routine il giro chiede a Firestore
-// l'ora che tiene LUI, e il cambiamento arriva entro il giro come ogni altro.
-test('quello che le routine scrivono senza firmare l\'ora arriva lo stesso entro il giro', async ({ app, openTab }) => {
-  const A = fakeFb('coda-a', 'Presa in carico', { seq: 31, status: 'working' });
-  const B = fakeFb('coda-b', 'In attesa', { seq: 32, status: 'todo', createdAt: '2026-09-02T10:00:00Z' });
-  await fingiFirestore(app, [A, B]);
+// #676.1: chi le routine hanno preso lo dice il registro, col numero. Il giro
+// rilegge quel feedback, e poi lo segue con l'ora di Firestore anche se il
+// server lo riscrive senza firmare `updatedAt`. Niente campione della coda.
+test('il registro dei worker porta il nome: quel feedback si rilegge e si segue, gli altri no', async ({ app, openTab }) => {
+  const A = fakeFb('coda-a', 'Primo in coda', { seq: 31, status: 'todo' });
+  const B = fakeFb('coda-b', 'Secondo in coda', { seq: 32, status: 'todo', createdAt: '2026-09-02T10:00:00Z' });
+  const voce = { startedAt: '2026-10-04T08:00:00Z', num: '5', role: 'verifier' };
+  await fingiFirestore(app, [A, B], { registro: [voce], numeri: { 32: 'coda-b' } });
 
-  const page = await openTab(URL);
-  await page.waitForLoadState('domcontentloaded');
-  await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
-  await page.evaluate(() => window.__mgTest.whenReady());
-  await page.evaluate(({ A, B }) => {
-    window.__mgTest.setAdmin(true);
-    window.__mgTest.setData([B, A]);
-    window.__mgTest.setTab('queue');
-    window.__mgTest.resumeLive();
-  }, { A, B });
-  await expect(page.locator('.mg-item-title')).toHaveText(['Presa in carico', 'In attesa']);
+  const page = await apriGestione(openTab);
+  await page.evaluate(() => window.__mgTest.setTab('queue'));
+  await expect.poll(() => page.evaluate(() => window.__mgTest.currentOrder().length), { timeout: 15000 }).toBe(2);
+  await expect.poll(() => conta(app).then((c) => c.registro), { timeout: 10000 }).toBeGreaterThanOrEqual(2);
+  const prima = await conta(app);
+  expect(prima.seguiti.flat()).toEqual([], 'nessuno in mano alle routine: nessuna lettura di versioni');
 
-  // La pagina dice al giro chi seguire da vicino: prima chi è in mano alle
-  // routine, poi la testa della coda, da cui esce la prossima presa in carico.
-  expect(await page.evaluate(() => window.__mgTest.idsDaSeguire())).toEqual(['coda-a', 'coda-b']);
-
-  await page.evaluate(async () => {
-    await window.filo.message({ type: 'feedback_live_subscribe', off: true });
-    await window.filo.message({ type: 'feedback_live_subscribe', watch: window.__mgTest.idsDaSeguire() });
-  });
-  await expect.poll(() => conta(app).then((c) => c.seguiti), { timeout: 5000 }).toBeGreaterThanOrEqual(1);
-
-  // Il server riscrive il feedback e NON tocca la data firmata: solo l'ora di
-  // Firestore cambia. Il successo è che l'owner lo vede lo stesso.
+  // Il server prende #32 e lo riscrive senza firmare l'ora.
   await app.evaluate(() => {
-    const d = globalThis.__docs.find((x) => x._id === 'coda-a');
-    d.name = 'Lavorazione finita';
+    globalThis.__registro.unshift({ startedAt: '2026-10-04T09:00:00Z', num: '32', role: 'new-work' });
+    const d = globalThis.__docs.find((x) => x._id === 'coda-b');
+    d.status = 'working';
+    d.name = 'Preso dalle routine';
     d._updateTime = 't2';
   });
-  await expect(page.locator('.mg-item-title')).toHaveText(['Lavorazione finita', 'In attesa'], { timeout: 5000 });
-});
+  await expect(page.locator('.mg-item-title', { hasText: 'Preso dalle routine' })).toHaveCount(1, { timeout: 5000 });
+  const preso = await conta(app);
+  expect(preso.numeri).toEqual(['32']);
+  expect(preso.tutti).toBe(1, 'il registro non fa rileggere tutto');
 
-// Il campione della coda non deve spingere fuori le segnalazioni IN MANO alle
-// routine (#676): sono quelle che si muovono davvero, e una lasciata fuori
-// resta ferma in dashboard fino al riallineamento, cioè mezz'ora.
-test('con molti lavori aperti insieme, nessuno di quelli in mano resta fuori dal giro', async ({ app, openTab }) => {
-  const quanti = 14;
-  const docs = [];
-  for (let i = 1; i <= quanti; i += 1) {
-    docs.push(fakeFb(`mano-${String(i).padStart(2, '0')}`, `Lavoro ${i}`, {
-      seq: 300 + i, status: 'working',
-      createdAt: `2026-09-${String(28 - i).padStart(2, '0')}T10:00:00Z`,
-    }));
-  }
-  // E una in coda, che il campione può anche non prendere.
-  docs.push(fakeFb('mano-coda', 'In attesa', { seq: 999, status: 'todo', createdAt: '2026-08-01T10:00:00Z' }));
-  await fingiFirestore(app, docs);
-
-  const page = await openTab(URL);
-  await page.waitForLoadState('domcontentloaded');
-  await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
-  await page.evaluate(() => window.__mgTest.whenReady());
-  await page.evaluate(({ docs }) => {
-    window.__mgTest.setAdmin(true);
-    window.__mgTest.setData(docs);
-    window.__mgTest.setTab('queue');
-    window.__mgTest.resumeLive();
-  }, { docs });
-
-  const seguiti = await page.evaluate(() => window.__mgTest.idsDaSeguire());
-  for (let i = 1; i <= quanti; i += 1) {
-    expect(seguiti).toContain(`mano-${String(i).padStart(2, '0')}`);
-  }
+  // Riscritto ancora senza firma: arriva lo stesso, e si legge solo lui.
+  await app.evaluate(() => {
+    const d = globalThis.__docs.find((x) => x._id === 'coda-b');
+    d.name = 'Lavoro a metà';
+    d._updateTime = 't3';
+  });
+  await expect(page.locator('.mg-item-title', { hasText: 'Lavoro a metà' })).toHaveCount(1, { timeout: 5000 });
+  const fine = await conta(app);
+  expect(fine.seguiti.every((ids) => ids.length === 1 && ids[0] === 'coda-b')).toBe(true);
+  expect(fine.tutti).toBe(1);
 });
