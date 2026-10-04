@@ -248,7 +248,7 @@
   }
   // Le parole della ricerca che possono essere un sito («facebook», «facebook.com», «münchen.de»).
   function paroleSito(cerca) {
-    return String(cerca || '').toLowerCase().split(/[\s,;«»"'’?!()]+/)
+    return senzaElisioni(cerca).toLowerCase().split(/[\s,;«»"'’?!()]+/)
       .map((w) => w.replace(/^(?:[a-z]+:\/\/)?(?:www\.)?/, '').replace(/[/.:]+$/, ''))
       .filter((w) => w.length >= 3 && !NON_CERCARE.has(w));
   }
