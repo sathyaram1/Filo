@@ -112,7 +112,8 @@ module.exports = function register(on, ctx) {
       const { buildExportZip } = require('../exportData');
 
       const allData = await DiskStorage.get(null);
-      const zip = buildExportZip(allData);
+      const filo = await require('../ilFilo').esporta();
+      const zip = buildExportZip(allData, { filo });
 
       const win = winOf(sender);
       const stamp = new Date().toISOString().slice(0, 10);
@@ -141,6 +142,15 @@ module.exports = function register(on, ctx) {
   // facciamo attraversare l'IPC a un dump completo dei dati utente — chiavi
   // API comprese — solo per mostrarne il conteggio.
   let PENDING_IMPORT = null;
+  // Le chat e le pagine visitate non stanno in data.json ma nel filo (#866); un export di prima porta le chat qui.
+  const FILO_CHATS_KEY = SN_CONST.STORAGE_KEYS.FILO_CHATS;
+  function contaFilo(parsed) {
+    const E = globalThis.SN_FILO_EVENTI;
+    const stato = E.nuovoStato();
+    if (parsed.filo) for (const ev of E.analizza(parsed.filo.toString('utf8')).eventi) E.applica(stato, ev);
+    const vecchie = Array.isArray(parsed.data[FILO_CHATS_KEY]) ? parsed.data[FILO_CHATS_KEY].filter((c) => c && c.id && !stato.chat.has(c.id)) : [];
+    return { chats: stato.chat.size + vecchie.length, pagine: stato.pagine.size };
+  }
 
   on(MSG.IMPORT_DATA_PREVIEW, async (msg, sender, origin) => {
     if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
@@ -163,14 +173,17 @@ module.exports = function register(on, ctx) {
       const parsed = readExportZip(buf); // lancia se non è un export di Filo
 
       const token = `imp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-      PENDING_IMPORT = { token, data: parsed.data, at: Date.now() };
+      PENDING_IMPORT = { token, data: parsed.data, filo: parsed.filo, at: Date.now() };
+      const filo = contaFilo(parsed);
       return {
         ok: true,
         token,
         fileName: path.basename(filePath),
         exportedAt: parsed.exportedAt || '',
-        sections: parsed.sectionCount,
+        sections: parsed.sectionCount - (Array.isArray(parsed.data[FILO_CHATS_KEY]) ? 1 : 0),
         images: parsed.imageCount,
+        chats: filo.chats,
+        pagine: filo.pagine,
       };
     } catch (e) {
       // File non riconosciuto: distinguiamo il caso "non è un archivio di Filo"
@@ -199,8 +212,16 @@ module.exports = function register(on, ctx) {
       const DiskStorage = require('../../shim/storage');
       const { mergeImportedData } = require('../exportData');
 
+      const IlFilo = require('../ilFilo');
+      const dati = { ...pending.data };
+      const chatVecchie = dati[FILO_CHATS_KEY];
+      delete dati[FILO_CHATS_KEY];
+      if (pending.filo) await IlFilo.importa(pending.filo);
+      if (Array.isArray(chatVecchie) && chatVecchie.length) await IlFilo.importaChatSalvate(chatVecchie);
+      try { ctx.broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED }); } catch (_) {}
+
       const current = await DiskStorage.get(null);
-      const { merged, stats } = mergeImportedData(current, pending.data);
+      const { merged, stats } = mergeImportedData(current, dati);
 
       // Le impostazioni passano da applySettingsUpdate come qualsiasi altra
       // modifica: così tema, sicurezza, cookie, fingerprint e adblock del

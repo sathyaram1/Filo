@@ -1457,6 +1457,21 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
     action._righe = righeDaDimenticare.map((r) => r.testo);
   }
 
+  // CANCELLA_PAGINE (#866): periodo e numero di pagine li calcola il main, così il popup dice il conto vero.
+  if (type === 'CANCELLA_PAGINE') {
+    const sito = globalThis.SN_FILO_EVENTI.normaSito(action.sito ?? action.dominio ?? action.site ?? '');
+    // Un sito senza periodo («cancella le pagine di YouTube») vuol dire tutte le sue pagine.
+    const limiti = { ore: action.ore, giorni: action.giorni, da: action.da, a: action.a };
+    const senzaLimiti = Object.values(limiti).every((v) => v == null || v === '');
+    const nome = action.periodo || (sito && senzaLimiti ? 'tutto' : 'ultima_ora');
+    action._periodo = globalThis.SN_FILO_EVENTI.periodo(nome, limiti);
+    if (!action._periodo) {
+      return { executed: false, kept: false, output: { errore: 'periodo non capito: usa ultima_ora, oggi, ieri, tutto, oppure ore, giorni, o da/a (istanti ISO o giorni AAAA-MM-GG)' } };
+    }
+    if (sito) { action._periodo.sito = sito; action._sito = sito; action._nomePeriodo = nome; }
+    try { action._n = (await globalThis.SN_IL_FILO.pagine(action._periodo)).length; } catch (_) {}
+  }
+
   // ── modalità terminale: gate hard, indipendente dal livello (#146.6) ──────
   // Con la modalità terminale spenta nelle impostazioni Filo non esegue ALCUN
   // comando. Controllo PRIMA del gate dei livelli: così un terminale spento
@@ -2018,6 +2033,10 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         return confirmed
           ? { executed: false, kept: true }
           : { executed: false, kept: true, needsConfirm: level, describe: Levels ? Levels.describe(action) : '' };
+      case 'CANCELLA_PAGINE': {
+        const cancellate = await globalThis.SN_IL_FILO.cancellaPagine(action._periodo);
+        return { executed: true, kept: false, output: { cancellate } };
+      }
       case 'CANCELLA_MEMORIA': {
         // Livello 3: a questo punto l'utente ha già digitato "conferma" (gate sopra).
         // Azzera tutti i moduli di memoria (PROFILO, PREFERENZE, espansioni) e il

@@ -44,6 +44,7 @@
     CANCELLA_ARCHIVIO: 'trash',
     CANCELLA_MEMORIA: 'eraser',
     DIMENTICA: 'eraser',
+    CANCELLA_PAGINE: 'eraser',
     IMPOSTA_PREFERENZA: 'options',
     IMPOSTA_ESTETICA: 'palette',
     ESEGUI_COMANDO: 'terminal',

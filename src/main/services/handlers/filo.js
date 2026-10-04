@@ -307,6 +307,20 @@ module.exports = function register(on, ctx) {
     return { ok: true, chats, termini, allargata };
   });
 
+  // #866 — le pagine visitate del filo: quante sono in un periodo, e cancellarle (pagina Sicurezza).
+  const periodoDa = (msg) => globalThis.SN_FILO_EVENTI.periodo(msg && msg.periodo);
+  on(MSG.FILO_PAGINE_CONTA, soloFilo(async (msg) => {
+    const periodo = periodoDa(msg);
+    if (!periodo) return { ok: false, error: 'periodo sconosciuto' };
+    return { ok: true, n: (await globalThis.SN_IL_FILO.pagine(periodo)).length };
+  }));
+
+  on(MSG.FILO_PAGINE_CANCELLA, soloFilo(async (msg) => {
+    const periodo = periodoDa(msg);
+    if (!periodo) return { ok: false, error: 'periodo sconosciuto' };
+    return { ok: true, n: await globalThis.SN_IL_FILO.cancellaPagine(periodo) };
+  }));
+
   // ── Micro-intervista di benvenuto (#524) ─────────────────────────────────
   //
   // La dashboard chiede lo stato all'apertura: se l'intervista è aperta e non è

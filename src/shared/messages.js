@@ -695,6 +695,10 @@
     // cancellata: la scheda che quella conversazione la sta ancora vivendo
     // smette di scriverci dentro, invece di farla rinascere al messaggio dopo.
     FILO_CHATS_UPDATED: 'filo_chats_updated',
+    // #866 — le pagine visitate che il filo ricorda, dalla pagina Sicurezza. Solo pagine filo://: è la cronologia
+    // dell'utente. { periodo: 'ultima_ora'|'oggi'|'tutto' } → { ok, n } (quante sono / quante ne ha tolte).
+    FILO_PAGINE_CONTA: 'filo_pagine_conta',
+    FILO_PAGINE_CANCELLA: 'filo_pagine_cancella',
     // Una riga scritta in chat senza passare da un modello: la risposta a un
     // comando con lo slash (l'elenco dei comandi, la conferma di un timer, il
     // resoconto del riordino), il comando di terminale che l'utente ha digitato

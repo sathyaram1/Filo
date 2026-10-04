@@ -84,6 +84,11 @@
     $('fp-mode-privacy-desc').textContent = I18n.t('options_fp_mode_privacy_desc');
     $('sec-auto-feedback-label').textContent = I18n.t('options_security_auto_feedback');
     $('sec-auto-feedback-desc').textContent = I18n.t('options_security_auto_feedback_desc');
+    $('sec-visite-title').textContent = I18n.t('security_visite_title');
+    $('sec-visite-desc').textContent = I18n.t('security_visite_desc');
+    $('sec-visite-ora').textContent = I18n.t('security_visite_ora');
+    $('sec-visite-oggi').textContent = I18n.t('security_visite_oggi');
+    $('sec-visite-tutto').textContent = I18n.t('security_visite_tutto');
     $('sec-export-btn').textContent = I18n.t('security_export_btn');
     $('sec-export-desc').textContent = I18n.t('security_export_desc');
     $('sec-import-btn').textContent = I18n.t('security_import_btn');
@@ -114,6 +119,41 @@
       btn.disabled = false;
       clearTimeout(exportData._t);
       exportData._t = setTimeout(() => hint.classList.remove('sn-show'), 2500);
+    }
+  }
+
+  // #866 — le pagine visitate che il filo ricorda: si cancellano per periodo, e il popup dice quante prima del sì.
+  const PERIODO_DETTO = { ultima_ora: 'nell’ultima ora', oggi: 'oggi', tutto: 'da sempre' };
+  function showVisiteHint(text, isError) {
+    const hint = $('sec-visite-hint');
+    hint.textContent = text;
+    hint.classList.toggle('sn-error', !!isError);
+    hint.classList.add('sn-show');
+    clearTimeout(showVisiteHint._t);
+    showVisiteHint._t = setTimeout(() => hint.classList.remove('sn-show'), 4000);
+  }
+
+  async function cancellaVisite(btn) {
+    const periodo = btn.dataset.periodo;
+    btn.disabled = true;
+    try {
+      const conta = await chrome.runtime.sendMessage({ type: MSG.FILO_PAGINE_CONTA, periodo });
+      if (!conta || !conta.ok) { showVisiteHint(I18n.t('security_visite_fail'), true); return; }
+      if (!conta.n) { showVisiteHint(I18n.t('security_visite_nessuna'), false); return; }
+      const quali = conta.n === 1 ? 'la pagina visitata' : `le ${conta.n} pagine visitate`;
+      const ok = await window.SN_CONFIRM_UI.confirm({
+        title: I18n.t('security_visite_confirm_title'),
+        text: I18n.t('security_visite_confirm_text').replace('%1', quali).replace('%2', PERIODO_DETTO[periodo] || ''),
+        okLabel: I18n.t('security_visite_confirm_ok'),
+      });
+      if (!ok) return;
+      const r = await chrome.runtime.sendMessage({ type: MSG.FILO_PAGINE_CANCELLA, periodo });
+      if (!r || !r.ok) { showVisiteHint(I18n.t('security_visite_fail'), true); return; }
+      showVisiteHint(r.n === 1 ? '1 pagina cancellata' : `${r.n} pagine cancellate`, false);
+    } catch (_) {
+      showVisiteHint(I18n.t('security_visite_fail'), true);
+    } finally {
+      btn.disabled = false;
     }
   }
 
@@ -154,11 +194,17 @@
       const immagini = prev.images === 0
         ? 'nessuna immagine'
         : (prev.images === 1 ? '1 immagine' : `${prev.images} immagini`);
+      const conta = (n, uno, molti) => (n === 1 ? `1 ${uno}` : `${n} ${molti}`);
+      const delFilo = [
+        prev.chats ? conta(prev.chats, 'chat con Filo', 'chat con Filo') : '',
+        prev.pagine ? conta(prev.pagine, 'pagina visitata', 'pagine visitate') : '',
+      ].filter(Boolean).join(' e ');
       const text = I18n.t('security_import_confirm_text')
         .replace('%1', prev.fileName || '')
         .replace('%2', when)
         .replace('%3', sezioni)
-        .replace('%4', immagini);
+        .replace('%4', immagini)
+        .replace('%5', delFilo ? `, più ${delFilo}` : '');
 
       const ok = window.SN_CONFIRM_UI
         ? await window.SN_CONFIRM_UI.confirm({
@@ -753,6 +799,9 @@
     // Mentre si corregge l'avviso sparisce, e il testo parte come quello delle due liste.
     $('cookie-wl-input').addEventListener('input', (e) => { setWhitelistError(''); caselle.cambiato('fidato', e); });
     $('cookie-wl-input').addEventListener('change', () => spedisciFidato(true));
+    for (const id of ['sec-visite-ora', 'sec-visite-oggi', 'sec-visite-tutto']) {
+      $(id).addEventListener('click', (e) => cancellaVisite(e.currentTarget));
+    }
     $('sec-export-btn').addEventListener('click', exportData);
     $('sec-import-btn').addEventListener('click', importData);
   });

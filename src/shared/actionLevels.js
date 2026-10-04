@@ -85,6 +85,27 @@
     if (v === true) return true;
     return /^(true|1|si|sì|yes|tutte|tutti)$/i.test(String(v ?? ''));
   }
+  function periodoDetto(action) {
+    const vuoto = (v) => v == null || v === '';
+    if (action && (!vuoto(action.da) || !vuoto(action.a)) && action._periodo) {
+      const quando = (iso) => new Date(iso).toLocaleString('it-IT', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+      const { da, a } = action._periodo;
+      return da ? `dal ${quando(da)} al ${quando(a)}` : `fino al ${quando(a)}`;
+    }
+    const ore = Number(action && action.ore);
+    if (Number.isFinite(ore) && ore > 0) return ore === 1 ? 'dell’ultima ora' : `delle ultime ${ore} ore`;
+    const giorni = Number(action && action.giorni);
+    if (Number.isFinite(giorni) && giorni > 0) return giorni === 1 ? 'dell’ultimo giorno' : `degli ultimi ${giorni} giorni`;
+    const p = String((action && (action.periodo || action._nomePeriodo)) || '').toLowerCase();
+    if (p === 'oggi') return 'di oggi';
+    if (p === 'ieri') return 'di ieri';
+    if (p === 'tutto') return 'di sempre';
+    return 'dell’ultima ora';
+  }
+  function sitoDetto(action) {
+    const s = String((action && (action._sito || action.sito)) || '').trim();
+    return s ? ` su ${s}` : '';
+  }
   function timerRefLabel(action) {
     const kind = String((action && (action.tipo ?? action.kind)) || '').toLowerCase();
     const cosa = /timer/.test(kind) ? 'i timer' : (/svegli|alarm/.test(kind) ? 'le sveglie' : 'sveglie e timer');
@@ -336,6 +357,19 @@
       describeDone: (a) => {
         const n = Number(a && a._output && a._output.eliminate) || 0;
         return `Eliminate DEFINITIVAMENTE dall'archivio ${n} ${n === 1 ? 'scheda' : 'schede'} su “${a.query || a.testo || ''}”`;
+      },
+    },
+    // #866 — come in ogni browser: il popup dice quante pagine e di quale periodo, il conto lo fa il main (`_n`).
+    CANCELLA_PAGINE: {
+      level: 2,
+      describe: (a) => {
+        const n = Number(a && a._n);
+        const quali = Number.isFinite(n) ? (n === 1 ? 'la pagina visitata' : `le ${n} pagine visitate`) : 'le pagine visitate';
+        return `Cancellare ${quali}${sitoDetto(a)} ${periodoDetto(a)}.\nFilo non le ricorderà più. Chat e schede chiuse restano.`;
+      },
+      describeDone: (a) => {
+        const n = Number(a && a._output && a._output.cancellate) || 0;
+        return n ? `Cancellate ${n === 1 ? '1 pagina visitata' : `${n} pagine visitate`}${sitoDetto(a)} ${periodoDetto(a)}` : `Nessuna pagina visitata${sitoDetto(a)} ${periodoDetto(a)}`;
       },
     },
     CANCELLA_MEMORIA: {
