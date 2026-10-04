@@ -126,7 +126,7 @@ Il tuo indirizzo IP il server lo vede passare, come ogni server, e il mio codice
 
 ## Il login
 
-Non serve per usare Filo. Serve per votare i feedback sulla bacheca, per il red team e, se vuoi, per legare i crediti al tuo account Google oltre che all'installazione. L'accesso Google si apre nel browser; Filo riceve un codice di accesso e lo salva cifrato con il portachiavi del sistema. Il servizio di accesso di Firebase conserva l'email e il nome del tuo account Google, come qualunque servizio con «Accedi con Google». Anche Filo, con il login, scrive email e nome sul server, nel documento dei consumi descritto fra i crediti. Il portafoglio dei crediti, i feedback e il red team invece ti conoscono solo per un codice interno.
+Non serve per usare Filo. Serve per votare i feedback sulla bacheca, per il red team e, se vuoi, per legare i crediti al tuo account Google oltre che all'installazione. L'accesso Google si apre nel browser; Filo riceve un codice di accesso e lo salva cifrato con il portachiavi del sistema. Il servizio di accesso di Firebase conserva l'email e il nome del tuo account Google, come qualunque servizio con «Accedi con Google». Anche Filo, con il login, scrive email e nome sul server, nel documento dei consumi descritto fra i crediti. Il portafoglio dei crediti, i feedback e il red team invece ti identificano con un codice interno, senza email né nome.
 
 ## Perché Google
 
