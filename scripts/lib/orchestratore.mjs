@@ -59,6 +59,30 @@ export function rilieviSospesi(v) {
   return f.length ? ROUND.formatFindings(f) : '(i rilievi li ristampa node scripts/verify-local.mjs status)';
 }
 
+/** Un verdetto registrato, riconoscibile fra un giro e l'altro: '' se il giro non ne ha. PURA. */
+export function chiaveVerdetto(e) {
+  if (!e || !e.verdict) return '';
+  return [e.verdict, e.at || '', e.sha || '', String(e.critique || '').slice(0, 200)].join('|');
+}
+
+/**
+ * Il passo che il verdetto già scritto sul ramo impone, prima di quello che direbbe la fase registrata. PURA.
+ * Vale a ogni passo di lavoro e verifica: ripresa, riavvio dell'orchestratore, istanza caduta. null = decide la fase.
+ */
+export function passoDalRamo(v, p) {
+  if (!['lavoro', 'verifica'].includes(p.fase) || p.compito === 'riallinea') return null;
+  const e = (v && v.entry) || {};
+  // Una risposta dell'owner si applica prima: il verdetto si rilegge appena il lavoratore ha finito.
+  if (p.fase === 'lavoro' && p.compito === 'decisione') return null;
+  if (v && v.ok) return { fase: 'chiusura' };
+  if (e.verdict === 'fix-pending') return p.fase === 'lavoro' && p.compito === 'correzione' ? null : { correzione: true };
+  if (e.verdict === 'fail' && chiaveVerdetto(e) !== (p.verdettoVisto || '')) {
+    return { ferma: 'la verifica ha fermato il lavoro: serve una decisione dell’owner', domanda: String(e.critique || '') };
+  }
+  if (e.verdict === 'pass' && v.dirty && p.fase === 'verifica') return { ferma: 'modifiche non salvate nel worktree dopo il verdetto' };
+  return null;
+}
+
 /** Le ultime righe di un'uscita, per il motivo di una fermata. PURA. */
 export function coda(testo, righe = 12) {
   return String(testo || '').trim().split('\n').slice(-righe).join('\n');
@@ -261,9 +285,10 @@ export function rigaStato(p) {
 export function riprendi(p, risposta) {
   if (!p) throw new Error('pratica non in coda');
   if (p.fase !== 'fermo') throw new Error(`#${p.num} non è ferma (fase ${p.fase})`);
-  const q = { ...p, fermoPrima: p.fermo, fermo: null, ripreso: true, tentativi: {} };
-  const r = String(risposta || '').trim();
   const f = p.fermo || {};
+  // L'owner ha visto la fermata: il verdetto che la accompagnava non la ripropone.
+  const q = { ...p, fermoPrima: p.fermo, fermo: null, ripreso: true, tentativi: {}, verdettoVisto: f.verdetto || p.verdettoVisto || '' };
+  const r = String(risposta || '').trim();
   // Si riparte dal passo che si era fermato: una fusione in attesa d'approvazione non rifà la verifica (l'approvazione vale per quel commit).
   // Una risposta data lì vale solo se l'approvazione non c'è: la chiusura prova prima a fondere.
   if (f.attesaApprovazione) { q.fase = 'chiusura'; q.risposta = r; return q; }
@@ -271,9 +296,29 @@ export function riprendi(p, risposta) {
   if (f.dove === 'chiusura' && !r) { q.fase = 'chiusura'; return q; }
   if (f.correzione) { q.compito = 'correzione'; q.risposta = r; q.fase = 'lavoro'; return q; }
   if (r) { q.compito = 'decisione'; q.risposta = r; q.fase = 'lavoro'; return q; }
-  if (!q.giriTotali) { q.fase = 'lavoro'; return q; }
+  if (!q.giriTotali || f.dove === 'lavoro') { q.fase = 'lavoro'; return q; }
   q.fase = 'verifica';
   return q;
+}
+
+/**
+ * Toglie i worktree di un lavoro (app e server), il collegamento a node_modules per primo: un worktree remove che lo
+ * attraversa svuota il node_modules di tutti. Mai --force: un worktree con modifiche resta. → gli avvisi.
+ */
+export async function togliWorktree(dep, p) {
+  const P = dep.percorsi;
+  const avvisi = [];
+  const coppie = [[P.wt(p.slug), P.radice, 'node_modules']];
+  const ws = P.serverRadice ? P.wtServer(p.slug) : '';
+  if (ws && dep.fs.esiste(ws)) coppie.push([ws, P.serverRadice, 'functions/node_modules']);
+  for (const [wt, repo, nm] of coppie) {
+    if (!dep.fs.esiste(wt)) continue;
+    if (dep.fs.esiste(`${wt}/${nm}`)) dep.fs.scollega(`${wt}/${nm}`);
+    if (dep.fs.esiste(`${wt}/${nm}`)) { avvisi.push(`worktree ${wt} lasciato: il collegamento a ${nm} non si è tolto`); continue; }
+    const r = await dep.esegui('git', ['worktree', 'remove', wt], { cwd: repo });
+    if (r.code !== 0) avvisi.push(`worktree ${wt} lasciato: ${coda(r.out, 1)}`);
+  }
+  return avvisi;
 }
 
 /**
@@ -299,8 +344,9 @@ export function creaMotore(dep, opzioni = {}) {
 
   function ferma(p, motivo, domanda = '', altro = {}) {
     const dove = p.fase;
+    const verdetto = chiaveVerdetto(((dep.verifica(P.wt(p.slug)) || {}).entry) || null);
     p.fase = 'fermo';
-    p.fermo = { motivo, ...(domanda ? { domanda } : {}), dove, ...altro, at: dep.ora() };
+    p.fermo = { motivo, ...(domanda ? { domanda } : {}), dove, ...(verdetto ? { verdetto } : {}), ...altro, at: dep.ora() };
     dep.log(`#${p.num} fermo: ${primaRiga(motivo)}`);
     if (p.feedbackId && dep.annota) {
       const nota = `Orchestratore locale: lavoro fermo, ${primaRiga(motivo)}${domanda ? '. Serve la risposta dell’owner (npm run orchestra -- riprendi).' : '.'}`;
@@ -321,6 +367,8 @@ export function creaMotore(dep, opzioni = {}) {
 
   async function prepara(p) {
     const wt = P.wt(p.slug);
+    if (!p.richiesta) p.richiesta = await dep.richiestaDi(p.num);
+    if (!p.richiesta) return ferma(p, `richiesta del feedback #${p.num} non letta (npm run feedback:leggi): niente worktree né ramo creati`);
     await git(P.radice, 'fetch', 'origin', 'main');
     if (!dep.fs.esiste(wt)) {
       const c = await git(P.radice, 'rev-parse', '--verify', '--quiet', `refs/heads/${ramoDi(p)}`);
@@ -330,20 +378,30 @@ export function creaMotore(dep, opzioni = {}) {
       if (r.code !== 0) return ferma(p, `worktree non creato:\n${coda(r.out)}`);
     }
     if (!dep.fs.esiste(`${wt}/node_modules`)) dep.fs.collega(`${P.radice}/node_modules`, `${wt}/node_modules`);
-    if (!p.richiesta) p.richiesta = await dep.richiestaDi(p.num);
-    if (!p.richiesta) return ferma(p, `richiesta del feedback #${p.num} non letta (npm run feedback:leggi)`);
     p.fase = 'lavoro';
     return 'ok';
   }
 
+  // Il passo dell'istanza risulta già sul ramo: critica registrata (verificatore), correzione consegnata (lavoratore).
+  function passoFatto(p, ruolo, prima) {
+    const e = ((dep.verifica(P.wt(p.slug)) || {}).entry) || {};
+    if (ruolo === 'verificatore') return !!e.verdict;
+    return prima === 'fix-pending' && e.verdict === 'fixed';
+  }
+
   async function istanza(p, ruolo, prompt, nome) {
     let atteso = 0;
+    const prima = (((dep.verifica(P.wt(p.slug)) || {}).entry) || {}).verdict || '';
     for (let t = 0; ; t += 1) {
       const r = await dep.claude({ ruolo, prompt, cwd: P.wt(p.slug), addDirs: [P.note, P.serverRadice].filter(Boolean), nome });
       const costo = Number(r.costo) || 0;
       p.costo += costo;
       p.istanze.push({ ruolo, giro: p.giriTotali, at: dep.ora(), ok: !!r.ok, costo, riga: primaRiga(r.testo || r.errore).slice(0, 300) });
       salva(p);
+      if (!r.ok && passoFatto(p, ruolo, prima)) {
+        dep.log(`#${p.num} ${ruolo}: uscito con errore dopo aver fatto il suo passo, non lo rilancio`);
+        return r;
+      }
       const attesa = r.ok ? 0 : attesaLimite(`${r.errore || ''}\n${r.testo || ''}`, Date.parse(dep.ora()) || Date.now(), opz);
       if (attesa && atteso + attesa <= opz.oreLimite * 60 * 60_000) {
         atteso += attesa;
@@ -368,7 +426,8 @@ export function creaMotore(dep, opzioni = {}) {
     const crit = sospesi || (['decisione', 'correzione'].includes(p.compito) ? (fp.correzione || fp.domanda || fp.motivo || '') : '');
     dep.log(`#${p.num} lavoratore (${p.compito})`);
     const r = await istanza(p, 'lavoratore', promptLavoratore({ p, regole: P.regole, wtApp, wtServer: wtServerSeC(p), cartellaNote: P.note, crit }), `filo #${p.num} lavoratore`);
-    if (!r.ok) return ferma(p, `il lavoratore non ha finito: ${primaRiga(r.errore)}`);
+    const consegnata = p.compito === 'correzione' && ((dep.verifica(wtApp) || {}).entry || {}).verdict === 'fixed';
+    if (!r.ok && !consegnata) return ferma(p, `il lavoratore non ha finito: ${primaRiga(r.errore)}`);
     const st = await git(wtApp, 'status', '--porcelain');
     if (String(st.out).trim()) return ferma(p, `il lavoratore ha lasciato modifiche non salvate:\n${coda(st.out)}`);
     if (p.compito === 'lavoro' && !(await avanti(wtApp)) && !(await serverAvanti(p))) {
@@ -409,8 +468,6 @@ export function creaMotore(dep, opzioni = {}) {
   async function giro(p) {
     if (p.giri >= opz.tetto) return ferma(p, `tetto dei giri raggiunto (${opz.tetto}) senza un esito superato`);
     const wt = P.wt(p.slug);
-    // verify-local start rifiuta un ramo con una correzione in sospeso: prima la si consegna.
-    if (rilieviSospesi(dep.verifica(wt))) { p.compito = 'correzione'; p.fase = 'lavoro'; return 'ok'; }
     if ((await preStart(p, wt)) === 'riallinea') return riallinea(p, 'il merge di origin/main va in conflitto');
     const primo = !((dep.verifica(wt) || {}).entry || {}).request;
     const args = ['scripts/verify-local.mjs', 'start', ...(primo ? [richiestaArg(p.richiesta), '--feedback', String(p.num)] : [])];
@@ -439,6 +496,12 @@ export function creaMotore(dep, opzioni = {}) {
     else p.tentativi.critica = 0;
     if (d.azione === 'chiudi') { p.fase = 'chiusura'; return 'ok'; }
     if (d.azione === 'giro') return 'ok';
+    if (d.correzione && !r.ok) {
+      dep.log(`#${p.num} il verificatore è caduto dopo la critica: la correzione la fa un lavoratore`);
+      p.compito = 'correzione';
+      p.fase = 'lavoro';
+      return 'ok';
+    }
     return ferma(p, d.motivo, d.domanda, d.correzione ? { correzione: d.correzione } : {});
   }
 
@@ -543,23 +606,18 @@ export function creaMotore(dep, opzioni = {}) {
   }
 
   async function pulisci(p) {
-    const coppie = [[P.wt(p.slug), P.radice, 'node_modules']];
-    const ws = wtServerSeC(p);
-    if (ws) coppie.push([ws, P.serverRadice, 'functions/node_modules']);
-    for (const [wt, repo, nm] of coppie) {
-      // Il collegamento prima: un worktree remove che lo attraversa svuota il node_modules di tutti.
-      if (dep.fs.esiste(`${wt}/${nm}`)) dep.fs.scollega(`${wt}/${nm}`);
-      if (dep.fs.esiste(`${wt}/${nm}`)) { p.avvisi.push(`worktree ${wt} lasciato: il collegamento a ${nm} non si è tolto`); continue; }
-      const r = await git(repo, 'worktree', 'remove', wt);
-      if (r.code !== 0) p.avvisi.push(`worktree ${wt} lasciato: ${coda(r.out, 1)}`);
-    }
+    p.avvisi.push(...await togliWorktree(dep, p));
   }
 
   async function guida(p) {
     for (;;) {
       let esito;
       try {
-        if (p.fase === 'in-coda') esito = await prepara(p);
+        const passo = passoDalRamo(dep.verifica(P.wt(p.slug)), p);
+        if (passo && passo.ferma) esito = ferma(p, passo.ferma, passo.domanda || '');
+        else if (passo && passo.fase) { p.fase = passo.fase; p.compito = 'lavoro'; esito = 'ok'; }
+        else if (passo && passo.correzione) { p.compito = 'correzione'; p.fase = 'lavoro'; esito = 'ok'; }
+        else if (p.fase === 'in-coda') esito = await prepara(p);
         else if (p.fase === 'lavoro') esito = await lavora(p);
         else if (p.fase === 'verifica') esito = await giro(p);
         else if (p.fase === 'chiusura') esito = await chiudi(p);

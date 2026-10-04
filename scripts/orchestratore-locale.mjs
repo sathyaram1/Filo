@@ -10,7 +10,7 @@ import { cpus, freemem, homedir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  OPZIONI_BASE, coda, creaMotore, nuovaPratica, rigaStato, riprendi,
+  OPZIONI_BASE, coda, creaMotore, nuovaPratica, rigaStato, riprendi, togliWorktree,
 } from './lib/orchestratore.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
 
@@ -375,7 +375,9 @@ async function main(argv) {
     delete s.pratiche[n];
     s.coda = (s.coda || []).filter((x) => x !== n);
     store.scrivi(s);
-    console.log(`#${n} tolta dalla coda (worktree e ramo restano).`);
+    const avvisi = await togliWorktree({ esegui, fs: sistemaFs, percorsi: P }, p);
+    console.log(`#${n} tolta dalla coda; worktree tolti${avvisi.length ? ' salvo questi' : ''}, il ramo resta.`);
+    for (const a of avvisi) console.log(`  ${a}`);
     return 0;
   }
 
