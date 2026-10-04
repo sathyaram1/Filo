@@ -354,13 +354,20 @@ export async function askServerMerge({ branch, sha = '', feedbackId = '', pendin
 
 /** Lo stato della richiesta riletto dal deposito. Mai un'eccezione: un controllo fallito è `state: ''`. */
 async function statoDalDeposito({ id, idToken, fetchImpl, listUrl }) {
+  const lettura = () => fetchImpl(listUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ data: { op: 'list' } }),
+    ...(typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? { signal: AbortSignal.timeout(30000) } : {}),
+  });
   try {
-    const res = await fetchImpl(listUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-      body: JSON.stringify({ data: { op: 'list' } }),
-      ...(typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? { signal: AbortSignal.timeout(30000) } : {}),
-    });
+    let res;
+    try {
+      res = await lettura();
+    } catch (e) {
+      if (!erroreDiConnessione(e)) throw e;
+      res = await lettura();
+    }
     const text = await res.text();
     let body = {};
     try { body = text ? JSON.parse(text) : {}; } catch (_) { body = {}; }
