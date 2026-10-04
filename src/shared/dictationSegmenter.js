@@ -120,6 +120,11 @@
     // margine fisso, così un ventilatore non diventa "parlato".
     let noise = 0.004;
     const emitted = { interim: 0, final: 0 };
+    // Su tutta la registrazione, non sullo spezzone: dicono quando chi parla ha finito.
+    let heardMs = 0;
+    let quietMs = 0;
+    let elapsedMs = 0;
+    let lastEnergy = 0;
 
     function threshold() { return Math.max(0.012, noise * 3.5); }
 
@@ -167,15 +172,20 @@
     function analyze(frame) {
       const e = rms(frame);
       const speech = e > threshold();
+      lastEnergy = e;
+      elapsedMs += o.frameMs;
       chunks.push(frame);
       total += frame.length;
       if (speech) {
+        heardMs += o.frameMs;
+        quietMs = 0;
         hadSpeech = true;
         speechMs += o.frameMs;
         silenceRun = 0;
         sinceInterim += o.frameMs;
         interimDirty = true;
       } else {
+        quietMs += o.frameMs;
         // Il rumore di fondo si aggiorna solo fuori dal parlato.
         noise = noise * 0.95 + e * 0.05;
         silenceRun += o.frameMs;
@@ -207,14 +217,27 @@
       emitFinal();
     }
 
+    // `level` va da 0 (rumore di fondo) a 1 (voce piena): basta a un'animazione che segue chi parla.
     function state() {
-      return { hadSpeech, speechMs, silenceRun, segmentMs: Math.round(total / o.sampleRate * 1000), noise, emitted: { ...emitted } };
+      return {
+        hadSpeech, speechMs, silenceRun, segmentMs: Math.round(total / o.sampleRate * 1000), noise, emitted: { ...emitted },
+        heardMs, quietMs, elapsedMs, level: Math.max(0, Math.min(1, (lastEnergy - noise) / (threshold() * 4))),
+      };
     }
 
     return { push, flush, state, options: o };
   }
 
+  // Chi ha parlato e poi tace da `silenceMs` ha finito ('done'); chi in `waitMs` non ha detto niente
+  // non parlerà ('nothing'); altrimenti ''. Sotto `minSpeechMs` di voce (un colpo di tosse) non ha parlato. PURA.
+  function endOfSpeech(st, opts) {
+    const o = Object.assign({ silenceMs: 2000, waitMs: 8000, minSpeechMs: 400 }, opts || {});
+    if (!st) return '';
+    if (st.heardMs >= o.minSpeechMs) return st.quietMs >= o.silenceMs ? 'done' : '';
+    return st.elapsedMs >= o.waitMs ? 'nothing' : '';
+  }
+
   global.SN_DICTATION_SEGMENTER = {
-    createSegmenter, downsample, floatToInt16, pcm16ToWav, bytesToBase64, rms,
+    createSegmenter, endOfSpeech, downsample, floatToInt16, pcm16ToWav, bytesToBase64, rms,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
