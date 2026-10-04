@@ -33,27 +33,25 @@ test('il lettore di Windows che riparte lento non consegna la lettura di prima d
   expect(letta && letta.batteria ? letta.batteria.livello : null, 'la lettura di prima del sonno').not.toBe(80);
 });
 
-test('la chat non riceve come «letto adesso» lo stato di prima quando la lettura nuova tarda', async ({ app }) => {
+test('la chat non riceve come «letto adesso» lo stato di prima quando la lettura nuova tarda', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
   await app.evaluate(async () => {
     globalThis.__sf = { batteria: { livello: 80, inCarica: true, collegata: true }, rete: null, bluetooth: null };
     await globalThis.SN_SISTEMA_MAIN._perProve.usaLettore(async () => globalThis.__sf);
   });
-  // Nessuno guarda per un po'; intanto il caricatore si stacca, e il computer risponde lento.
+  // La home va dietro un sito e il lettore si ferma: nessuno guarda. Intanto il caricatore si stacca.
+  await openTab(testServer.html('<h1>un sito qualunque</h1>'));
+  await app.evaluate(() => globalThis.SN_SISTEMA_MAIN.ferma());
   await new Promise((r) => setTimeout(r, 7_000));
   const letta = await app.evaluate(async () => {
     globalThis.__sf = { batteria: { livello: 30, inCarica: false, collegata: false }, rete: null, bluetooth: null };
-    await globalThis.SN_SISTEMA_MAIN._perProve.usaLettore(async () => {
+    // Il computer risponde in cinque secondi, come un PowerShell che riparte lento.
+    globalThis.SN_SISTEMA_MAIN._perProve.usaLettore(async () => {
       await new Promise((r) => setTimeout(r, 5_000));
       return globalThis.__sf;
-    }).catch(() => {});
-    return null;
-  }).then(() => app.evaluate(async () => {
-    const s = await globalThis.SN_SISTEMA_FINTO_CHAT();
-    return s;
-  })).catch(async () => app.evaluate(async () => {
+    });
     const s = await globalThis.SN_SISTEMA_MAIN.statoPerChat();
     return s && s.batteria ? s.batteria.livello : null;
-  }));
+  });
   expect(letta, 'alla chat arriva il livello di prima del sonno come se fosse di adesso').not.toBe(80);
 });
