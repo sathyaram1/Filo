@@ -14,7 +14,8 @@
 //  (F) l'opacità della trama è un token estetico che arriva fino alla chat;
 //  (G) il tasto destro sul blocco ferma, riprende e riavvolge come i tasti;
 //  (H) con meno movimento il filo sta fermo e il gomitolo compare già fatto;
-//  (I) chi ferma insistendo (doppio clic, Invio ripetuto o tenuto) non fa ripartire il lavoro.
+//  (I) chi ferma insistendo (doppio clic, Invio ripetuto o tenuto) non fa ripartire il lavoro;
+//  (J) un gomitolo grosso (lavoro lungo) lascia al riassunto la stessa aria di uno piccolo.
 
 import { test, expect } from './fixtures/electron.mjs';
 
