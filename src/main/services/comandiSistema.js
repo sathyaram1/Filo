@@ -100,7 +100,7 @@ namespace FiloSistema {
 const CS_CUFFIE = String.raw`using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
-namespace FiloSistema {
+namespace FiloCuffie {
   [ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")] class EnumeratoreDispositivi { }
   [Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
   interface IMMDeviceEnumerator {
@@ -190,7 +190,7 @@ const CS_WLAN = String.raw`using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Threading;
-namespace FiloSistema {
+namespace FiloWlan {
   public class EsitoWlan {
     public int Codice;
     public int Interfacce;
@@ -424,7 +424,7 @@ try {
 if ($indirizzo -notmatch '^[0-9a-f]{12}$') { Dice 'errore' 'indirizzo'; exit 0 }
 $collega = ($env:FILO_SIS_COLLEGA -eq '1')
 ` + psCompila(CS_CUFFIE) + String.raw`try {
-  $n = [FiloSistema.Cuffie]::Comanda($indirizzo, $collega)
+  $n = [FiloCuffie.Cuffie]::Comanda($indirizzo, $collega)
 } catch { Dice 'errore' 'eccezione'; Dice 'dettaglio' $_.Exception.Message; exit 0 }
 if ($n -lt 0) { Dice 'errore' 'non-audio'; exit 0 }
 if ($n -eq 0) { Dice 'errore' 'rifiutato'; exit 0 }
@@ -446,7 +446,7 @@ try {
 } catch { Dice 'collegato' '' }
 `,
     'wifi-elenco': PS_INIZIO + psCompila(CS_WLAN) + String.raw`try {
-  $e = [FiloSistema.Wlan]::Elenco()
+  $e = [FiloWlan.Wlan]::Elenco()
   Dice 'codice' $e.Codice
   Dice 'interfacce' $e.Interfacce
   foreach ($n in $e.Reti) { Dice 'rete' $n }
@@ -454,7 +454,7 @@ try {
 } catch { Dice 'errore' 'eccezione'; Dice 'dettaglio' $_.Exception.Message }
 `,
     'wifi-collega': PS_INIZIO + psCompila(CS_WLAN) + String.raw`try {
-  $e = [FiloSistema.Wlan]::Collega([string]$env:FILO_SIS_RETE, 15000)
+  $e = [FiloWlan.Wlan]::Collega([string]$env:FILO_SIS_RETE, 15000)
   Dice 'codice' $e.Codice
   Dice 'interfacce' $e.Interfacce
   Dice 'confermato' ([int]$e.Confermato)
@@ -512,10 +512,10 @@ if [ -n "$T" ]; then
   imposta "$T" || dice errore comando
 fi
 if [ -n "$M" ]; then silenzia "$M" || dice errore comando
-elif [ -n "$T" ] && [ "$T" -gt 0 ] && { [ -n "$L" ] || [ "\${P#-}" = "$P" ]; }; then silenzia 0; fi
+elif [ -n "$T" ] && [ "$T" -gt 0 ] && { [ -n "$L" ] || [ "$P" -gt 0 ]; }; then silenzia 0; fi
 dice volume "$(leggi)"
 dice muto "$(muto)"
-`.replace('\\${P#-}', '${P#-}'),
+`,
     radio: SH_INIZIO + String.raw`A="$FILO_SIS_ACCESO"
 case "$A" in 0|1) ;; *) dice errore parametro; exit 0 ;; esac
 hard() {
@@ -634,8 +634,9 @@ else
     if [ -n "$c" ] && [ -x "$c" ]; then B=$c; break; fi
   done
   [ -n "$B" ] || { dice errore manca-blueutil; exit 0; }
-  "$B" --power "$A" 2>&1 | grezzo
-  dice uscita "$?"
+  OUT=$("$B" --power "$A" 2>&1); RC=$?
+  printf '%s\n' "$OUT" | grezzo
+  dice uscita "$RC"
   dice acceso "$("$B" --power 2>/dev/null)"
 fi
 `,
@@ -644,7 +645,9 @@ for c in "$(command -v blueutil 2>/dev/null)" /opt/homebrew/bin/blueutil /usr/lo
   if [ -n "$c" ] && [ -x "$c" ]; then B=$c; break; fi
 done
 [ -n "$B" ] || { dice errore manca-blueutil; exit 0; }
-dice acceso "$("$B" --power 2>/dev/null)"
+OUT=$("$B" --power 2>&1); RC=$?
+dice uscita "$RC"
+dice acceso "$OUT"
 dice blocco dispositivi
 "$B" --paired --format json 2>/dev/null | grezzo
 `,
@@ -655,7 +658,9 @@ for c in "$(command -v blueutil 2>/dev/null)" /opt/homebrew/bin/blueutil /usr/lo
   if [ -n "$c" ] && [ -x "$c" ]; then B=$c; break; fi
 done
 [ -n "$B" ] || { dice errore manca-blueutil; exit 0; }
-if [ "$FILO_SIS_COLLEGA" = 1 ]; then "$B" --connect "$I" 2>&1 | grezzo; else "$B" --disconnect "$I" 2>&1 | grezzo; fi
+if [ "$FILO_SIS_COLLEGA" = 1 ]; then OUT=$("$B" --connect "$I" 2>&1); RC=$?; else OUT=$("$B" --disconnect "$I" 2>&1); RC=$?; fi
+printf '%s\n' "$OUT" | grezzo
+dice uscita "$RC"
 dice collegato "$("$B" --is-connected "$I" 2>/dev/null)"
 `,
     'wifi-elenco': SH_INIZIO + String.raw`D=$(networksetup -listallhardwareports 2>/dev/null | awk '/^Hardware Port: (Wi-Fi|AirPort)$/ { getline; print $2; exit }')
@@ -666,7 +671,10 @@ networksetup -listpreferredwirelessnetworks "$D" 2>&1 | grezzo
 `,
     'wifi-collega': SH_INIZIO + String.raw`D=$(networksetup -listallhardwareports 2>/dev/null | awk '/^Hardware Port: (Wi-Fi|AirPort)$/ { getline; print $2; exit }')
 [ -n "$D" ] || { dice errore nessuna-radio; exit 0; }
+dice blocco esito
 networksetup -setairportnetwork "$D" "$FILO_SIS_RETE" 2>&1 | grezzo
+dice blocco attuale
+networksetup -getairportnetwork "$D" 2>&1 | grezzo
 `,
   },
 };
@@ -753,64 +761,575 @@ function costruisci(comando, p, piattaforma = process.platform) {
   return { shell: piattaforma === 'win32' ? 'powershell' : 'sh', script, env };
 }
 
+
 // ── Uscita → dati ────────────────────────────────────────────────────────────
 
 const decodifica = (v) => String(v).replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
 
-// Le righe «FILO:chiave=valore» in ordine; le righe «| …» (quello che il programma ha stampato) nel blocco aperto.
+// Le righe «FILO:chiave=valore» in ordine; ognuna si porta dietro le righe «| …» stampate dal programma dopo di lei.
 function leggiUscita(testo) {
   const voci = [];
-  const blocchi = {};
   const grezze = [];
-  let blocco = null;
+  let ultima = null;
   for (const riga of String(testo || '').split(/\r?\n/)) {
     const m = /^FILO:([a-z][a-z0-9-]*)=(.*)$/.exec(riga);
     if (m) {
-      const valore = decodifica(m[2]);
-      voci.push([m[1], valore]);
-      if (m[1] === 'blocco') { blocco = valore; blocchi[blocco] = blocchi[blocco] || []; }
-      continue;
-    }
-    if (riga.startsWith('| ')) {
+      ultima = { k: m[1], v: decodifica(m[2]), righe: [] };
+      voci.push(ultima);
+    } else if (riga.startsWith('| ')) {
       grezze.push(riga.slice(2));
-      if (blocco) blocchi[blocco].push(riga.slice(2));
+      if (ultima) ultima.righe.push(riga.slice(2));
     }
   }
-  const primo = (k) => { const v = voci.find(([c]) => c === k); return v ? v[1] : null; };
-  return { voci, blocchi, grezze, primo };
+  const primo = (k) => { const x = voci.find((v) => v.k === k); return x ? x.v : null; };
+  const blocco = (nome) => { const x = voci.find((v) => v.k === 'blocco' && v.v === nome); return x ? x.righe : []; };
+  return { voci, grezze, primo, blocco };
 }
 
 const intero = (v) => (v != null && /^-?\d+$/.test(String(v).trim()) ? Number(String(v).trim()) : null);
-const bit = (v) => (String(v).trim() === '1' ? true : String(v).trim() === '0' ? false : null);
+const bit = (v) => (v == null ? null : String(v).trim() === '1' ? true : String(v).trim() === '0' ? false : null);
 
-function dispositiviDaVoci(voci) {
+function interpretaVolume(u) {
+  const errore = u.primo('errore');
+  const volume = intero(u.primo('volume'));
+  if (volume == null) return { ok: false, errore: errore || 'sconosciuto' };
+  return { ok: true, volume: Math.max(0, Math.min(150, volume)), muto: bit(u.primo('muto')) === true, prima: intero(u.primo('prima')) };
+}
+
+function interpretaRadio(u, piattaforma, radio, voluto) {
+  const errore = u.primo('errore');
+  if (errore) return { ok: false, errore };
+  const acceso = bit(u.primo('acceso'));
+  const testo = u.grezze.join('\n');
+  if (piattaforma === 'linux' && /not authorized|non autorizzat/i.test(testo)) return { ok: false, errore: 'polkit' };
+  if (piattaforma === 'darwin' && radio === 'wifi' && /root|administrator|amministrator/i.test(testo)) return { ok: false, errore: 'admin-wifi' };
+  if (acceso === null) {
+    if (piattaforma === 'darwin' && radio === 'bluetooth') return { ok: false, errore: 'permesso-bluetooth' };
+    return { ok: false, errore: 'sconosciuto' };
+  }
+  if (acceso !== voluto) {
+    const bloccata = bit(u.primo('bloccata')) === true || /disabled/i.test(String(u.primo('stato') || '')) || /blocked/i.test(testo);
+    if (voluto && bloccata) return { ok: false, errore: 'bloccata' };
+    if (piattaforma === 'darwin' && radio === 'bluetooth') return { ok: false, errore: 'permesso-bluetooth' };
+    return { ok: false, errore: 'non-cambiato' };
+  }
+  return { ok: true, acceso };
+}
+
+// bluetoothctl info: «Alias:» è il nome che l'utente vede (rinominato o no); «Name:» il ripiego.
+function dispositiviDaVoci(u, piattaforma) {
   const out = [];
   let cur = null;
-  for (const [k, v] of voci) {
-    if (k === 'dispositivo') { cur = { indirizzo: v, nome: '', collegato: null }; out.push(cur); } else if (cur && k === 'nome') cur.nome = v;
+  for (const { k, v, righe } of u.voci) {
+    if (k === 'dispositivo') {
+      cur = { indirizzo: v, nome: '', collegato: null };
+      out.push(cur);
+      if (piattaforma === 'linux') {
+        const campo = (nome) => { const r = righe.find((x) => new RegExp(`^\\s*${nome}:`).test(x)); return r ? r.replace(/^\s*\w+:\s?/, '') : ''; };
+        cur.nome = campo('Alias') || campo('Name') || v;
+        cur.collegato = /yes/.test(campo('Connected')) ? true : (campo('Connected') ? false : null);
+      }
+    } else if (cur && k === 'nome') cur.nome = v;
     else if (cur && k === 'collegato') cur.collegato = bit(v);
   }
   return out;
 }
 
-// bluetoothctl info: «Alias:» è il nome che l'utente vede (rinominato o no); «Name:» il ripiego.
-function dispositiviLinux(u) {
-  const out = [];
-  let cur = null;
-  const righe = [];
-  for (const [k, v] of u.voci) if (k === 'dispositivo') righe.push({ ind: v });
-  // Le righe grezze seguono il loro «dispositivo»: le si riattacca in ordine.
-  const testo = u.grezze;
-  let i = -1;
-  for (const r of testo) {
-    if (/^\s*Name:/.test(r) && i + 1 < righe.length && (!righe[i + 1].visto)) { /* fallthrough below */ }
-  }
-  void testo; void i;
-  return out.concat(righe.length ? [] : []), out;
+function dispositiviMac(righe) {
+  let j;
+  try { j = JSON.parse(righe.join('\n')); } catch (_) { return null; }
+  if (!Array.isArray(j)) return null;
+  return j.filter((d) => d && typeof d.address === 'string').map((d) => ({
+    indirizzo: d.address.toLowerCase().replace(/:/g, '-'),
+    nome: typeof d.name === 'string' && d.name ? d.name : d.address,
+    collegato: typeof d.connected === 'boolean' ? d.connected : null,
+  }));
 }
 
+function interpretaBtElenco(u, piattaforma) {
+  const errore = u.primo('errore');
+  if (errore) return { ok: false, errore };
+  let dispositivi;
+  if (piattaforma === 'darwin') {
+    if (intero(u.primo('uscita')) > 0) return { ok: false, errore: 'permesso-bluetooth' };
+    dispositivi = dispositiviMac(u.blocco('dispositivi'));
+    if (!dispositivi) return { ok: false, errore: 'sconosciuto' };
+  } else dispositivi = dispositiviDaVoci(u, piattaforma);
+  const valide = dispositivi.filter((d) => d.indirizzo && INDIRIZZO[piattaforma].test(normalizzaIndirizzo(d.indirizzo, piattaforma)));
+  for (const d of valide) d.indirizzo = normalizzaIndirizzo(d.indirizzo, piattaforma);
+  return { ok: true, acceso: bit(u.primo('acceso')), dispositivi: valide };
+}
+
+function normalizzaIndirizzo(ind, piattaforma) {
+  const s = String(ind || '').trim();
+  if (piattaforma === 'linux') return s.toUpperCase();
+  if (piattaforma === 'darwin') return s.toLowerCase().replace(/:/g, '-');
+  return s.toLowerCase();
+}
+
+function interpretaBtCollega(u, piattaforma, collega) {
+  const errore = u.primo('errore');
+  if (errore) return { ok: false, errore };
+  const collegato = bit(u.primo('collegato'));
+  if (piattaforma === 'darwin' && intero(u.primo('uscita')) > 128) return { ok: false, errore: 'permesso-bluetooth' };
+  if (collegato === null) return piattaforma === 'win32' ? { ok: true, collegato: null } : { ok: false, errore: 'sconosciuto' };
+  if (collegato !== collega) return { ok: false, errore: collega ? 'bt-non-collegato' : 'bt-non-scollegato' };
+  return { ok: true, collegato };
+}
+
+// nmcli -t: i campi sono separati da «:», e «:» e «\» dentro un valore arrivano come «\:» e «\\».
+function campiNmcli(riga, quanti) {
+  const campi = [];
+  let cur = '';
+  for (let i = 0; i < riga.length; i++) {
+    const c = riga[i];
+    if (c === '\\' && i + 1 < riga.length) { cur += riga[++i]; continue; }
+    if (c === ':' && campi.length < quanti - 1) { campi.push(cur); cur = ''; continue; }
+    cur += c;
+  }
+  campi.push(cur);
+  return campi;
+}
+
+function interpretaWifiElenco(u, piattaforma) {
+  const errore = u.primo('errore');
+  if (errore) return { ok: false, errore };
+  if (piattaforma === 'win32') {
+    const codice = intero(u.primo('codice'));
+    if (codice) return { ok: false, errore: erroreWlan(codice) };
+    if (intero(u.primo('interfacce')) === 0) return { ok: false, errore: 'nessuna-radio' };
+    const attuale = u.primo('attuale');
+    const reti = u.voci.filter((v) => v.k === 'rete' && v.v).map((v) => ({ nome: v.v, attiva: v.v === attuale }));
+    return { ok: true, acceso: null, reti, attuale: attuale || null };
+  }
+  const righe = u.blocco('reti');
+  let reti = [];
+  if (piattaforma === 'linux') {
+    if (righe.some((r) => /not authorized|non autorizzat/i.test(r))) return { ok: false, errore: 'polkit' };
+    for (const r of righe) {
+      const [tipo, uuid, attiva, nome] = campiNmcli(r, 4);
+      if (tipo !== '802-11-wireless' || !nome) continue;
+      reti.push({ nome, id: uuid, attiva: attiva === 'yes' });
+    }
+  } else {
+    reti = righe.filter((r) => /^\s/.test(r) && r.trim()).map((r) => ({ nome: r.replace(/^\t/, '').replace(/^\s+/, ''), attiva: false }));
+  }
+  const attiva = reti.find((r) => r.attiva);
+  return { ok: true, acceso: bit(u.primo('acceso')), reti, attuale: attiva ? attiva.nome : null };
+}
+
+// I codici di wlanapi che l'utente può fare qualcosa per togliere.
+function erroreWlan(codice) {
+  if (codice === 5) return 'posizione';
+  if (codice === 1062) return 'servizio-wlan';
+  if (codice === 1168 || codice === 87) return 'non-trovata';
+  if (codice === -2144067582) return 'radio-spenta';
+  if (codice === -1) return 'tempo';
+  return 'sconosciuto';
+}
+
+function interpretaWifiCollega(u, piattaforma, nome) {
+  const errore = u.primo('errore');
+  if (errore) return { ok: false, errore };
+  if (piattaforma === 'win32') {
+    const codice = intero(u.primo('codice'));
+    if (codice) return { ok: false, errore: erroreWlan(codice) };
+    if (intero(u.primo('interfacce')) === 0) return { ok: false, errore: 'nessuna-radio' };
+    return { ok: true, confermato: bit(u.primo('confermato')) === true };
+  }
+  const testo = u.grezze.join('\n');
+  if (piattaforma === 'linux') {
+    if (/not authorized|non autorizzat/i.test(testo)) return { ok: false, errore: 'polkit' };
+    if (intero(u.primo('uscita')) === 0) return { ok: true, confermato: true };
+    if (/wi-?fi is disabled|radio.*disabled|wireless is disabled/i.test(testo)) return { ok: false, errore: 'radio-spenta' };
+    return { ok: false, errore: 'non-collegato' };
+  }
+  const esito = u.blocco('esito').join('\n');
+  if (/could not find|failed|error|unable/i.test(esito)) {
+    if (/power|off/i.test(esito)) return { ok: false, errore: 'radio-spenta' };
+    return { ok: false, errore: /could not find/i.test(esito) ? 'non-collegato' : 'non-collegato' };
+  }
+  const attuale = u.blocco('attuale').join('\n');
+  const m = /:\s(.+)$/m.exec(attuale);
+  return { ok: true, confermato: !!(m && m[1].trim() === nome) };
+}
+
+// ── Cosa dire quando non riesce: una frase, e dove si concede quello che manca ──
+
+const IMPOSTAZIONI = {
+  'win-radio': 'ms-settings:privacy-radios',
+  'win-aereo': 'ms-settings:network-airplanemode',
+  'win-posizione': 'ms-settings:privacy-location',
+  'win-bluetooth': 'ms-settings:bluetooth',
+  'mac-bluetooth': 'x-apple.systempreferences:com.apple.preference.security?Privacy_Bluetooth',
+  'mac-wifi': 'x-apple.systempreferences:com.apple.wifi-settings-extension',
+};
+
+function spiega(errore, { cosa, piattaforma = process.platform, nome = '' } = {}) {
+  const radio = cosa === 'wifi' ? 'il Wi-Fi' : 'il Bluetooth';
+  const Radio = cosa === 'wifi' ? 'Il Wi-Fi' : 'Il Bluetooth';
+  const chi = nome ? `«${nome}»` : 'il dispositivo';
+  const T = {
+    'accesso-DeniedByUser': {
+      frase: 'Windows non lascia a Filo accendere e spegnere le radio.',
+      dove: 'Si concede in Impostazioni → Privacy e sicurezza → Radio, con «Consenti alle app di controllare le radio del dispositivo».',
+      apri: 'win-radio',
+    },
+    'accesso-Unspecified': {
+      frase: 'Windows non ha detto se Filo può accendere e spegnere le radio.',
+      dove: 'Si controlla in Impostazioni → Privacy e sicurezza → Radio, con «Consenti alle app di controllare le radio del dispositivo».',
+      apri: 'win-radio',
+    },
+    'accesso-DeniedBySystem': {
+      frase: `Windows adesso non permette di cambiare ${radio}: può essere la modalità aereo o una regola dell'azienda.`,
+      dove: 'Si controlla in Impostazioni → Rete e Internet → Modalità aereo.',
+      apri: 'win-aereo',
+    },
+    bloccata: {
+      frase: `${Radio} è spento da un interruttore, da un tasto del computer o dalla modalità aereo: si riaccende da lì.`,
+      apri: piattaforma === 'win32' ? 'win-aereo' : undefined,
+    },
+    'nessuna-radio': {
+      frase: cosa === 'wifi'
+        ? 'Il sistema non vede un Wi-Fi su questo computer.'
+        : 'Il sistema non vede un Bluetooth su questo computer (può anche essere fermo il servizio Bluetooth).',
+    },
+    'non-cambiato': { frase: `${Radio} non ha cambiato stato: il sistema non ha detto perché.` },
+    polkit: {
+      frase: 'Linux non dà a questo utente il permesso di cambiare la rete.',
+      dove: 'Lo concede chi amministra il computer, nelle regole di polkit per NetworkManager; intanto il Wi-Fi si cambia dal menu di rete del desktop.',
+    },
+    'manca-nmcli': {
+      frase: 'Su questo Linux la rete non la gestisce NetworkManager, e Filo comanda il Wi-Fi con nmcli.',
+      dove: 'nmcli arriva col pacchetto di NetworkManager della distribuzione (network-manager o NetworkManager).',
+    },
+    'manca-bluetoothctl': {
+      frase: 'Su questo Linux manca bluetoothctl, il comando di BlueZ con cui Filo comanda il Bluetooth.',
+      dove: 'Arriva col pacchetto bluez (su alcune distribuzioni bluez-utils).',
+    },
+    'manca-audio': {
+      frase: 'Su questo Linux Filo non trova un modo di cambiare il volume.',
+      dove: 'Serve uno fra wpctl, pactl e amixer: arrivano con PipeWire, PulseAudio o alsa-utils.',
+    },
+    'nessuna-uscita': { frase: 'Il computer non ha un\'uscita audio di cui cambiare il volume, o il sistema non la dice.' },
+    'manca-blueutil': {
+      frase: 'Su Mac il Bluetooth si comanda con un piccolo programma che qui non c\'è: blueutil.',
+      dove: 'Si installa con Homebrew, scrivendo nel Terminale: brew install blueutil.',
+    },
+    'permesso-bluetooth': {
+      frase: 'macOS non permette a Filo di usare il Bluetooth.',
+      dove: 'Si concede in Impostazioni di Sistema → Privacy e sicurezza → Bluetooth, accendendo Filo.',
+      apri: 'mac-bluetooth',
+    },
+    'admin-wifi': {
+      frase: 'macOS chiede un amministratore per accendere o spegnere il Wi-Fi.',
+      dove: 'Si toglie in Impostazioni di Sistema → Wi-Fi → Avanzate: «Richiedi l\'autorizzazione dell\'amministratore per attivare o disattivare il Wi-Fi».',
+      apri: 'mac-wifi',
+    },
+    posizione: {
+      frase: 'Da Windows 11, per leggere le reti Wi-Fi conosciute e collegarsi Filo deve poter usare la posizione.',
+      dove: 'Si concede in Impostazioni → Privacy e sicurezza → Posizione: «Servizi di localizzazione» e «Consenti alle app desktop di accedere alla posizione».',
+      apri: 'win-posizione',
+    },
+    'servizio-wlan': {
+      frase: 'È fermo il servizio di Windows che gestisce il Wi-Fi (Configurazione automatica WLAN).',
+      dove: 'Riparte riavviando il computer, o da services.msc.',
+    },
+    'non-trovata': { frase: `${nome ? `La rete «${nome}»` : 'Quella rete'} non è fra quelle che il computer conosce: la prima volta ci si collega dalle impostazioni del sistema, con la password.` },
+    'radio-spenta': { frase: 'Il Wi-Fi è spento.' },
+    tempo: { frase: `Il computer non è riuscito a collegarsi a ${nome ? `«${nome}»` : 'quella rete'}: può essere fuori portata, o la password è cambiata.` },
+    'non-collegato': { frase: `Il computer non è riuscito a collegarsi a ${nome ? `«${nome}»` : 'quella rete'}: può essere fuori portata, o la password è cambiata.` },
+    'non-audio': {
+      frase: 'Su Windows Filo collega da qui cuffie, casse e auricolari. Gli altri dispositivi Windows li collega da sé quando li accendi.',
+      dove: 'Altrimenti si collegano da Impostazioni → Bluetooth e dispositivi.',
+      apri: 'win-bluetooth',
+    },
+    rifiutato: { frase: `${chi[0].toUpperCase()}${chi.slice(1)} non ha accettato il collegamento: dev'essere acceso e vicino.` },
+    'bt-non-collegato': { frase: `${chi[0].toUpperCase()}${chi.slice(1)} non si è collegato: dev'essere acceso, vicino e non già collegato a un altro telefono o computer.` },
+    'bt-non-scollegato': { frase: `${chi[0].toUpperCase()}${chi.slice(1)} risulta ancora collegato.` },
+    'nessun-dispositivo': { frase: nome ? `Fra i dispositivi abbinati non ce n'è uno che si chiami «${nome}».` : 'Non ci sono dispositivi Bluetooth abbinati.' },
+    'nessuna-rete': { frase: nome ? `Fra le reti conosciute non ce n'è una che si chiami «${nome}».` : 'Il computer non conosce nessuna rete Wi-Fi.' },
+    ambiguo: { frase: `Più di un nome somiglia a «${nome}»: quale?` },
+    occupato: { frase: 'Il sistema sta ancora eseguendo il comando di prima.' },
+    'non-supportato': { frase: 'Su questo sistema Filo non sa ancora comandarlo.' },
+  };
+  const voce = T[errore] || { frase: 'Il sistema non ha eseguito il comando.' };
+  const fuori = { errore, frase: voce.frase };
+  if (voce.dove) fuori.dove = voce.dove;
+  if (voce.apri && IMPOSTAZIONI[voce.apri]) fuori.apri = voce.apri;
+  return fuori;
+}
+
+// ── I nomi come li dice l'utente: maiuscole, accenti, spazi e qualche errore di battitura non contano ──
+
+function piega(s) {
+  return String(s || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+}
+
+function distanza(a, b) {
+  if (a === b) return 0;
+  const m = a.length;
+  const n = b.length;
+  if (Math.abs(m - n) > 3) return 99;
+  let prima = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) {
+    const riga = [i];
+    for (let j = 1; j <= n; j++) {
+      riga[j] = Math.min(prima[j] + 1, riga[j - 1] + 1, prima[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prima = riga;
+  }
+  return prima[n];
+}
+
+// { scelto } se un nome solo corrisponde; { candidati } se più d'uno; {} se nessuno.
+function scegliNome(chiesto, nomi) {
+  const elenco = [...new Set((nomi || []).filter((n) => typeof n === 'string' && n))];
+  const esatto = elenco.filter((n) => n === chiesto);
+  if (esatto.length === 1) return { scelto: esatto[0] };
+  const c = piega(chiesto);
+  if (!c) return {};
+  const uguali = elenco.filter((n) => piega(n) === c);
+  if (uguali.length === 1) return { scelto: uguali[0] };
+  if (uguali.length > 1) return { candidati: uguali };
+  const parole = c.split(' ');
+  const dentro = elenco.filter((n) => { const p = piega(n); return p.includes(c) || parole.every((w) => p.split(' ').some((x) => x.startsWith(w))); });
+  if (dentro.length === 1) return { scelto: dentro[0] };
+  if (dentro.length > 1) return { candidati: dentro };
+  const tolleranza = c.length <= 4 ? 1 : 2;
+  const vicini = elenco.map((n) => ({ n, d: distanza(piega(n), c) })).filter((x) => x.d <= tolleranza);
+  if (!vicini.length) return {};
+  const migliore = Math.min(...vicini.map((x) => x.d));
+  const primi = vicini.filter((x) => x.d === migliore).map((x) => x.n);
+  return primi.length === 1 ? { scelto: primi[0] } : { candidati: primi };
+}
+
+// ── Eseguire: uno alla volta, dalla via del terminale ───────────────────────
+
+const TEMPI_MS = {
+  volume: 30000, radio: 30000, 'bt-elenco': 40000, 'bt-collega': 60000, 'wifi-elenco': 30000, 'wifi-collega': 60000,
+};
+
+let computerFinto = null;
+let coda = Promise.resolve();
+
+function inFila(fn) {
+  const giro = coda.then(fn, fn);
+  coda = giro.catch(() => {});
+  return giro;
+}
+
+async function eseguiScript(comando, p) {
+  const piattaforma = process.platform;
+  const { shell, script, env } = costruisci(comando, p, piattaforma);
+  // Fuori da Windows i messaggi dei programmi si leggono in inglese; i nomi restano in UTF-8.
+  const lingua = piattaforma === 'linux' ? { LC_ALL: 'C.UTF-8' } : {};
+  const r = await terminale.runCommand(script, {
+    shell: terminale.resolveShell(shell),
+    env: { ...process.env, ...lingua, ...env },
+    timeoutMs: TEMPI_MS[comando],
+  });
+  const u = leggiUscita(r.stdout);
+  if (r.timedOut && !u.voci.length) u.voci.push({ k: 'errore', v: 'tempo-comando', righe: [] });
+  if (r.truncated) u.troncato = true;
+  return u;
+}
+
+// Il computer vero, oppure quello delle prove: stessa forma, dati già interpretati.
+const COMPUTER = {
+  async volume(p) { return interpretaVolume(await eseguiScript('volume', p)); },
+  async radio(p) { return interpretaRadio(await eseguiScript('radio', p), process.platform, p.radio, p.acceso); },
+  async btElenco() { return interpretaBtElenco(await eseguiScript('bt-elenco', {}), process.platform); },
+  async btCollega(p) { return interpretaBtCollega(await eseguiScript('bt-collega', p), process.platform, p.collega); },
+  async wifiElenco() { return interpretaWifiElenco(await eseguiScript('wifi-elenco', {}), process.platform); },
+  async wifiCollega(p) { return interpretaWifiCollega(await eseguiScript('wifi-collega', p), process.platform, p.rete); },
+};
+const computer = () => computerFinto || COMPUTER;
+
+const sistemaMain = () => globalThis.SN_SISTEMA_MAIN || null;
+
+// Quello che il comando ha appena cambiato si vede subito nella home, senza aspettare il giro del lettore.
+function annunciaCambio(parziale) {
+  const M = sistemaMain();
+  try { if (M && typeof M.dopoComando === 'function') M.dopoComando(parziale); } catch (_) {}
+}
+
+function fallito(errore, contesto) {
+  return { ok: false, cosa: contesto.cosa, ...spiega(errore, contesto) };
+}
+
+const vero = (v) => v === true || v === 1 || /^(true|1|si|sì|yes|on|acceso|accendi)$/i.test(String(v ?? '').trim());
+const falso = (v) => v === false || v === 0 || /^(false|0|no|off|spento|spegni)$/i.test(String(v ?? '').trim());
+const booleano = (v) => (vero(v) ? true : falso(v) ? false : null);
+
+// Una richiesta (dalla chat o da un tasto) nella forma unica che i due cammini condividono.
+function normalizzaRichiesta(r) {
+  const q = r && typeof r === 'object' ? r : {};
+  const cosa = String(q.cosa || '').toLowerCase();
+  const testo = (v) => (typeof v === 'string' ? v.trim() : v == null ? '' : String(v).trim());
+  if (cosa === 'volume') {
+    const out = { cosa };
+    const livello = q.livello ?? q.percentuale ?? q.valore;
+    if (livello != null && livello !== '') {
+      const n = Number(String(livello).replace('%', '').trim());
+      if (!Number.isFinite(n)) return { errore: 'livello del volume non capito: un numero da 0 a 100' };
+      out.livello = Math.round(Math.max(0, Math.min(100, n)));
+      out.limitato = n < 0 || n > 100;
+    }
+    const verso = testo(q.verso ?? q.direzione).toLowerCase();
+    if (verso) {
+      if (!['su', 'giu', 'giù', 'alza', 'abbassa'].includes(verso)) return { errore: 'verso del volume non capito: su o giu' };
+      out.passo = /^(su|alza)$/.test(verso) ? PASSO_VOLUME : -PASSO_VOLUME;
+    }
+    if (q.passo != null && out.passo == null) {
+      const n = Number(q.passo);
+      if (Number.isInteger(n) && n !== 0 && Math.abs(n) <= 100) out.passo = n;
+    }
+    if (q.muto != null && q.muto !== '') {
+      const b = booleano(q.muto);
+      if (b === null) return { errore: 'muto non capito: true o false' };
+      out.muto = b;
+    }
+    if (out.livello == null && out.passo == null && out.muto == null) return { errore: 'niente da cambiare: passa livello, verso o muto' };
+    if (out.livello != null) delete out.passo;
+    return out;
+  }
+  if (cosa === 'bluetooth' || cosa === 'wifi') {
+    const out = { cosa };
+    if (vero(q.elenca)) { out.elenca = true; return out; }
+    const nome = testo(cosa === 'wifi' ? (q.rete ?? q.nome ?? q.ssid) : (q.dispositivo ?? q.nome));
+    if (nome) {
+      const errore = nomeValido(nome);
+      if (errore) return { errore: `nome ${errore}` };
+      out.nome = nome;
+      if (cosa === 'bluetooth') {
+        const c = q.collega == null || q.collega === '' ? true : booleano(q.collega);
+        if (c === null) return { errore: 'collega non capito: true o false' };
+        out.collega = c;
+      }
+      return out;
+    }
+    if (q.acceso != null && q.acceso !== '') {
+      const b = booleano(q.acceso);
+      if (b === null) return { errore: 'acceso non capito: true o false' };
+      out.acceso = b;
+      return out;
+    }
+    return { errore: cosa === 'wifi' ? 'niente da fare: passa acceso, rete o elenca' : 'niente da fare: passa acceso, dispositivo o elenca' };
+  }
+  return { errore: 'comando del sistema sconosciuto' };
+}
+
+async function volume(q) {
+  const r = await computer().volume({ livello: q.livello, passo: q.passo, muto: q.muto });
+  if (!r.ok) return fallito(r.errore, q);
+  annunciaCambio({ volume: { livello: r.volume, muto: r.muto } });
+  return { ok: true, cosa: 'volume', volume: r.volume, muto: r.muto, prima: r.prima, limitato: !!q.limitato };
+}
+
+async function radio(q) {
+  const r = await computer().radio({ radio: q.cosa, acceso: q.acceso });
+  if (!r.ok) return fallito(r.errore, q);
+  annunciaCambio(q.cosa === 'wifi' ? { wifi: { acceso: r.acceso } } : { bluetooth: { acceso: r.acceso } });
+  return { ok: true, cosa: q.cosa, acceso: r.acceso };
+}
+
+async function bluetooth(q) {
+  if (q.acceso != null) return radio(q);
+  const elenco = await computer().btElenco();
+  if (!elenco.ok) return fallito(elenco.errore, q);
+  if (q.elenca) return { ok: true, cosa: 'bluetooth', elenco: elenco.dispositivi, acceso: elenco.acceso };
+  const nomi = elenco.dispositivi.map((d) => d.nome);
+  const s = scegliNome(q.nome, nomi);
+  if (!s.scelto) {
+    const f = fallito(s.candidati ? 'ambiguo' : 'nessun-dispositivo', { ...q, nome: q.nome });
+    return { ...f, candidati: s.candidati || nomi };
+  }
+  const d = elenco.dispositivi.find((x) => x.nome === s.scelto);
+  if (d.collegato === q.collega) return { ok: true, cosa: 'bluetooth', dispositivo: d.nome, collegato: q.collega, gia: true };
+  // Per collegare serve il Bluetooth acceso: chi chiede le cuffie lo vuole acceso, e lo si accende prima.
+  let acceso = false;
+  if (q.collega && elenco.acceso === false) {
+    const on = await computer().radio({ radio: 'bluetooth', acceso: true });
+    if (!on.ok) return fallito(on.errore, { ...q, cosa: 'bluetooth' });
+    annunciaCambio({ bluetooth: { acceso: true } });
+    acceso = true;
+  }
+  const r = await computer().btCollega({ indirizzo: d.indirizzo, collega: q.collega });
+  if (!r.ok) return { ...fallito(r.errore, { ...q, nome: d.nome }), dispositivo: d.nome, accesoPrima: acceso };
+  annunciaCambio({ bluetooth: {} });
+  return { ok: true, cosa: 'bluetooth', dispositivo: d.nome, collegato: r.collegato, accesoPrima: acceso };
+}
+
+async function wifi(q) {
+  if (q.acceso != null) return radio(q);
+  const elenco = await computer().wifiElenco();
+  if (!elenco.ok) return fallito(elenco.errore, q);
+  if (q.elenca) return { ok: true, cosa: 'wifi', elenco: elenco.reti, acceso: elenco.acceso, attuale: elenco.attuale };
+  const nomi = elenco.reti.map((x) => x.nome);
+  const s = scegliNome(q.nome, nomi);
+  if (!s.scelto) {
+    const f = fallito(s.candidati ? 'ambiguo' : 'nessuna-rete', q);
+    return { ...f, candidati: s.candidati || nomi };
+  }
+  const rete = elenco.reti.find((x) => x.nome === s.scelto);
+  if (rete.attiva) return { ok: true, cosa: 'wifi', rete: rete.nome, confermato: true, gia: true };
+  let acceso = false;
+  if (elenco.acceso === false) {
+    const on = await computer().radio({ radio: 'wifi', acceso: true });
+    if (!on.ok) return fallito(on.errore, q);
+    annunciaCambio({ wifi: { acceso: true } });
+    acceso = true;
+  }
+  let r = await computer().wifiCollega({ rete: rete.nome, uuid: rete.id });
+  // Windows dice «radio spenta» solo provando: si accende e si riprova una volta.
+  if (!r.ok && r.errore === 'radio-spenta' && !acceso) {
+    const on = await computer().radio({ radio: 'wifi', acceso: true });
+    if (!on.ok) return fallito(on.errore, q);
+    annunciaCambio({ wifi: { acceso: true } });
+    acceso = true;
+    r = await computer().wifiCollega({ rete: rete.nome, uuid: rete.id });
+  }
+  if (!r.ok) return { ...fallito(r.errore, { ...q, nome: rete.nome }), rete: rete.nome, accesoPrima: acceso };
+  annunciaCambio({ wifi: { acceso: true } });
+  return { ok: true, cosa: 'wifi', rete: rete.nome, confermato: r.confermato, accesoPrima: acceso };
+}
+
+// La porta unica dei due cammini (chat e tasti): stessa richiesta, stesso risultato.
+function comanda(richiesta) {
+  const q = normalizzaRichiesta(richiesta);
+  if (q.errore) return Promise.resolve({ ok: false, cosa: String((richiesta && richiesta.cosa) || ''), errore: 'richiesta', frase: q.errore });
+  return inFila(async () => {
+    try {
+      if (!computerFinto && !PIATTAFORME.includes(process.platform)) return fallito('non-supportato', q);
+      if (q.cosa === 'volume') return await volume(q);
+      if (q.cosa === 'bluetooth') return await bluetooth(q);
+      return await wifi(q);
+    } catch (e) {
+      console.warn('[Filo] comando del sistema non riuscito', q.cosa, e && e.message ? e.message : e);
+      return fallito('sconosciuto', q);
+    }
+  });
+}
+
+function uriImpostazioni(chiave) {
+  return Object.prototype.hasOwnProperty.call(IMPOSTAZIONI, chiave) ? IMPOSTAZIONI[chiave] : null;
+}
+
+const _perProve = {
+  // Un computer finto con la forma di COMPUTER: le prove vedono chat, tasti e home veri sopra un sistema inventato.
+  usaComputer(finto) { computerFinto = finto && typeof finto === 'object' ? finto : null; },
+};
+
+const api = { comanda, normalizzaRichiesta, uriImpostazioni, _perProve };
+globalThis.SN_COMANDI_SISTEMA = api;
+
 module.exports = {
-  PIATTAFORME, PASSO_VOLUME, NOME_MAX, SCRIPT, AMBIENTE,
-  costruisci, parametri, nomeValido, leggiUscita, decodifica, dispositiviDaVoci,
-  _interni: { CS_VOLUME, CS_CUFFIE, CS_WLAN, PS_INIZIO, PS_ATTESA, PS_RADIO_TIPI, SH_INIZIO, intero, bit, dispositiviLinux },
+  ...api,
+  PIATTAFORME, PASSO_VOLUME, NOME_MAX, SCRIPT, AMBIENTE, IMPOSTAZIONI, INDIRIZZO,
+  costruisci, parametri, nomeValido, leggiUscita, decodifica, spiega, scegliNome, piega,
+  interpretaVolume, interpretaRadio, interpretaBtElenco, interpretaBtCollega, interpretaWifiElenco, interpretaWifiCollega,
+  campiNmcli, erroreWlan,
+  _interni: { CS_VOLUME, CS_CUFFIE, CS_WLAN, PS_INIZIO, PS_ATTESA, PS_RADIO_TIPI, SH_INIZIO },
 };
