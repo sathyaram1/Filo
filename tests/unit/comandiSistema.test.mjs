@@ -60,8 +60,7 @@ test('un nome di rete con virgolette o caratteri speciali arriva intero nel suo 
   for (const nome of NOMI_CATTIVI) {
     for (const piattaforma of ['win32', 'darwin']) {
       const b = C.costruisci('wifi-collega', { rete: nome }, piattaforma);
-      assert.equal(b.script, C.SCRIPT[piattaforma]['wifi-collega']);
-      assert.ok(!b.script.includes(nome.trim()), `${piattaforma}: il nome è finito nel testo dello script`);
+      assert.equal(b.script, C.SCRIPT[piattaforma]['wifi-collega'], `${piattaforma}: il nome ha cambiato lo script`);
       assert.deepEqual(b.env, { FILO_SIS_RETE: nome });
     }
     // Su Linux il nome non raggiunge nemmeno la shell: si passa l'identificativo che NetworkManager ha dato alla rete.
@@ -203,7 +202,7 @@ test('Linux: un dispositivo abbinato si collega col suo indirizzo, che è l\'uni
     bluetoothctl: `case "$1" in
   show) echo "Controller AA:AA:AA:AA:AA:AA"; echo "	Powered: yes" ;;
   devices) echo "Device 00:11:22:33:44:55 x"; echo "Device 66:77:88:99:AA:BB y" ;;
-  info) if [ "$2" = 00:11:22:33:44:55 ]; then printf '	Name: x\\n	Alias: ${nome.replace(/"/g, '\\"')}\\n	Paired: yes\\n	Connected: no\\n'; else printf '	Name: y\\n	Paired: no\\n'; fi ;;
+  info) if [ "$2" = 00:11:22:33:44:55 ]; then printf '	Name: x\\n	Alias: ${nome}\\n	Paired: yes\\n	Connected: no\\n'; else printf '	Name: y\\n	Paired: no\\n'; fi ;;
   connect) echo "Connection successful" ;;
 esac`,
   });

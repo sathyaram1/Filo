@@ -640,6 +640,60 @@
         return f ? `Rimesso com'era prima di: ${f}` : 'Cambio annullato';
       },
     },
+    // ── volume, Bluetooth e Wi-Fi del computer (#874) ───────────────────────
+    // Spegnere o staccare quello che sta servendo (le cuffie, la tastiera, la rete della chat stessa) è 2; il resto
+    // 1. Il livello legge `_richiestaSistema`, che il main scrive sempre prima del cancello con la stessa funzione che
+    // poi esegue (src/main/services/comandiSistema.js): quello che si conferma è quello che parte.
+    VOLUME: {
+      level: 1,
+      describe: (a) => {
+        const r = (a && a._richiestaSistema) || {};
+        if (r.livello != null) return `Portare il volume del computer al ${r.livello}%`;
+        if (r.passo != null) return r.passo > 0 ? 'Alzare il volume del computer' : 'Abbassare il volume del computer';
+        if (r.muto === true) return 'Mettere muto il computer';
+        if (r.muto === false) return 'Togliere il muto al computer';
+        return 'Cambiare il volume del computer';
+      },
+    },
+    BLUETOOTH: {
+      level: (a) => {
+        const r = a && a._richiestaSistema;
+        if (!r || r.errore) return 2;
+        return r.acceso === false || (r.nome && r.collega === false) ? 2 : 1;
+      },
+      describe: (a) => {
+        const r = (a && a._richiestaSistema) || {};
+        if (r.elenca) return 'Leggere i dispositivi Bluetooth abbinati';
+        if (r.nome && r.collega === false) {
+          return `Scollegare «${r.nome}» dal Bluetooth.\n\nSe è una tastiera, un mouse o le cuffie che stai usando, smette di funzionare finché non lo ricolleghi.`;
+        }
+        if (r.nome) return `Collegare «${r.nome}» col Bluetooth`;
+        if (r.acceso === true) return 'Accendere il Bluetooth';
+        if (r.acceso === false) {
+          return 'Spegnere il Bluetooth.\n\nCuffie, casse, tastiere e mouse Bluetooth si scollegano finché non lo riaccendi, dal tasto nella home o chiedendolo a Filo.';
+        }
+        return 'Cambiare il Bluetooth del computer';
+      },
+    },
+    WIFI: {
+      level: (a) => {
+        const r = a && a._richiestaSistema;
+        if (!r || r.errore) return 2;
+        return r.acceso === false || !!r.nome ? 2 : 1;
+      },
+      describe: (a) => {
+        const r = (a && a._richiestaSistema) || {};
+        if (r.elenca) return 'Leggere le reti Wi-Fi che il computer conosce';
+        if (r.nome) {
+          return `Collegare il computer alla rete Wi-Fi «${r.nome}».\n\nPer qualche secondo la connessione di adesso cade: scaricamenti e chiamate in corso possono interrompersi.`;
+        }
+        if (r.acceso === true) return 'Accendere il Wi-Fi';
+        if (r.acceso === false) {
+          return 'Spegnere il Wi-Fi.\n\nSenza un cavo il computer resta senza rete, e a parole non potrai riaccenderlo: senza rete Filo non ti sente. Si riaccende dal tasto nella home o dal sistema.';
+        }
+        return 'Cambiare il Wi-Fi del computer';
+      },
+    },
     // ── zoom della pagina via chat (#686) ────────────────────────────────────
     // Livello 1: è la stessa cosa che fanno Ctrl +/- e Ctrl 0, visibile e
     // reversibile in un tasto.
