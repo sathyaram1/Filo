@@ -158,6 +158,9 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     FILO_CHAT_NOTE: 'chat-archive',
     FILO_CHAT_UPDATE: 'chat-archive',
     FILO_CHAT_FOCUS: 'chat-archive',
+    // #866 — le pagine visitate che il filo ricorda: contarle e cancellarle dalla pagina Sicurezza.
+    FILO_PAGINE_CONTA: 'visited-pages',
+    FILO_PAGINE_CANCELLA: 'visited-pages',
     // Gli appunti non hanno handler propri: la capacità "filo-notes" è servita
     // dall'azione SALVA_APPUNTO (FILO_RUN_ACTION), che scrive nei file dell'editor.
     FILO_GET_TIMERS: 'filo-timers',
@@ -418,6 +421,8 @@ function menuVoiceLabels() {
   }
   // E il menu del tasto destro sulle schede, che sta nella cornice.
   pages += '\n' + readFileSync(join(ROOT, 'src', 'renderer', 'shell.js'), 'utf8');
+  // E la voce «Dai un nome sensato», che più pagine prendono dallo stesso modulo condiviso.
+  pages += '\n' + readFileSync(join(ROOT, 'src', 'shared', 'rinominaUi.js'), 'utf8');
   const labels = new Set();
   for (const m of i18n.matchAll(/^ {4}(menu_[a-z0-9_]+):\s*'([^']+)'/gm)) {
     if (new RegExp(`'${m[1]}'`).test(content)) labels.add(m[2]);

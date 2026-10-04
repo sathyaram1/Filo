@@ -1,116 +1,29 @@
-// #525 — persistenza delle chat con Filo.
-//
-// «Ogni chat si salva per intero sul disco dell'utente, sempre, in locale.
-// Niente si butta in automatico.» Questo file è l'unico posto che scrive
-// l'archivio; la logica pura (titoli, tipi, ricerca) sta in
-// src/shared/chatArchive.js.
-//
-// Due scelte che vale la pena sapere:
-//
-//  • **Si scrive turno per turno, non alla chiusura.** Una chat salvata solo
-//    quando la si chiude è una chat persa ogni volta che l'app muore a metà
-//    discussione — cioè proprio nel caso in cui il salvataggio serviva. Ogni
-//    messaggio (dell'utente e di Filo) finisce su disco appena esiste.
-//  • **Passa da chrome.storage.local**, come l'archivio delle schede. Non è
-//    un dettaglio di comodità: è lì che vive la garanzia dell'incognito (vedi
-//    src/main/shim/storage.js, allowlist fail-closed). Scrivendo file per
-//    conto nostro, una chat fatta in una finestra incognito resterebbe su
-//    disco.
-//
-// Niente cap sul numero di chat: il cap È la cancellazione automatica che il
-// feedback esclude. Una chat pesa qualche KB; la pulizia in blocco, se mai
-// servirà, la chiederà l'utente.
+// Le chat con Filo (#525) lette e scritte come segmenti del filo (#866): qui le regole della chat, il disco lo tocca
+// solo src/main/services/ilFilo.js. Logica pura di titoli, tipi e ricerca: src/shared/chatArchive.js.
+// Niente cap sul numero di chat: il cap È la cancellazione automatica che il #525 esclude.
 
 (function (global) {
   'use strict';
 
-  const KEY = global.SN_CONST.STORAGE_KEYS.FILO_CHATS;
   const CA = () => global.SN_CHAT_ARCHIVE;
+  const F = () => global.SN_IL_FILO;
+  const T = () => global.SN_FILO_EVENTI.TIPI;
 
   function uuid() {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
     return Date.now().toString(36) + Math.random().toString(36).slice(2);
   }
 
-  // ── Una scrittura alla volta ──────────────────────────────────────────────
-  //
-  // Ogni scrittura qui dentro è "rileggi tutto, cambia una cosa, riscrivi
-  // tutto". Due che partono insieme leggono la stessa lista e la seconda
-  // riscrive sopra la prima: il messaggio della prima sparisce. Succede quando
-  // due chat vanno avanti nello stesso istante (due schede di Filo aperte), e
-  // buttare via un messaggio è esattamente ciò che questo archivio esiste per
-  // non fare.
-  //
-  // Le scritture si mettono quindi in fila: una parte solo quando la
-  // precedente ha finito di salvare. È la stessa medicina che il salvataggio
-  // su disco usa già per il suo guasto gemello (src/main/shim/storage.js,
-  // `flushChain`). Le letture restano libere: non riscrivono niente.
-  let coda = Promise.resolve();
-  function inCoda(fn) {
-    const risultato = coda.then(fn, fn);
-    // La coda non si deve fermare su un errore di chi sta davanti.
-    coda = risultato.then(() => {}, () => {});
-    return risultato;
-  }
+  const list = () => F().chats();
+  const get = (id) => (id ? F().chat(String(id)) : Promise.resolve(null));
 
-  async function list() {
-    try {
-      const res = await chrome.storage.local.get(KEY);
-      const arr = res[KEY];
-      return Array.isArray(arr) ? arr : [];
-    } catch (_) { return []; }
-  }
-
-  async function save(items) {
-    await chrome.storage.local.set({ [KEY]: items });
-  }
-
-  async function get(id) {
-    if (!id) return null;
-    const items = await list();
-    return items.find((c) => c && c.id === id) || null;
-  }
-
-  // L'elenco per la pagina Cronologia: senza i messaggi. Un utente con anni di
-  // chat alle spalle spedirebbe megabyte via IPC ad ogni apertura della pagina
-  // per mostrare una lista di titoli.
+  // Per la Cronologia: senza i messaggi, che con anni di chat sarebbero megabyte a ogni apertura della pagina.
   async function listIndex() {
-    const items = await list();
-    return items.map((c) => CA().toIndexEntry(c)).filter(Boolean);
+    return (await list()).map((c) => CA().toIndexEntry(c)).filter(Boolean);
   }
 
-  // Apre una chat nuova. `id` lo decide il chiamante (la dashboard) così il
-  // primo messaggio arriva già con la sua targa e non serve un giro in più.
-  async function open({ id, onboarding = false, startedAt = null } = {}) {
-    const chatId = id || uuid();
-    const items = await list();
-    const existing = items.find((c) => c && c.id === chatId);
-    if (existing) return existing;
-    const now = new Date().toISOString();
-    const entry = {
-      id: chatId,
-      startedAt: startedAt || now,
-      updatedAt: now,
-      closedAt: null,
-      title: '',
-      kind: null,
-      onboarding: !!onboarding,
-      messages: [],
-    };
-    items.unshift(entry);
-    await save(items);
-    return entry;
-  }
-
-  // Un turno che fallisce (rete assente, provider giù) lascia nell'archivio la
-  // domanda senza risposta. Chi preme «Riprova» rimanda la STESSA domanda, e
-  // senza questo controllo si ritrova scritta due volte di fila, con una sola
-  // risposta in fondo: rileggendo la chat sembra di aver balbettato.
-  //
-  // Il controllo è stretto apposta: scatta solo se l'ultimo messaggio salvato
-  // è dell'utente ed è identico a quello che arriva. Se Filo aveva risposto,
-  // in mezzo c'è la sua risposta e la ripetizione è voluta («continua»,
-  // «continua»): quella si conserva.
+  // «Riprova» dopo un turno fallito rimanda la STESSA domanda: senza questo controllo resterebbe scritta due volte.
+  // Scatta solo se l'ultimo messaggio è dell'utente ed è identico: dopo una risposta la ripetizione è voluta.
   function senzaRiprova(prima, msgs) {
     const ultimo = prima[prima.length - 1];
     const primo = msgs[0];
@@ -120,195 +33,168 @@
     return msgs.slice(1);
   }
 
-  // Aggiunge messaggi a una chat, creandola se non c'è ancora (la dashboard
-  // manda il suo id col primo messaggio: non serve aprirla prima).
-  // `meta` può portare { onboarding: true } per marcare l'intervista.
-  async function append(id, turns, meta) {
-    const chatId = id || uuid();
+  function open({ id, onboarding = false, startedAt = null } = {}) {
+    const chatId = id ? String(id) : uuid();
+    return F().transazione(async (t) => {
+      const c = t.chat(chatId);
+      if (c) return global.SN_FILO_EVENTI.copiaChat(c);
+      await t.scrivi([t.evento(T().CHAT_APERTA, { chat: chatId, onboarding: onboarding ? true : undefined },
+        { autore: 'utente', ts: startedAt || undefined })]);
+      return global.SN_FILO_EVENTI.copiaChat(t.chat(chatId));
+    });
+  }
+
+  // Ogni messaggio è un evento del filo, su disco appena esiste. `meta.onboarding` marca l'intervista di benvenuto.
+  function append(id, turns, meta) {
+    const chatId = id ? String(id) : uuid();
     const list0 = Array.isArray(turns) ? turns : [turns];
-    const msgs = list0.map((t) => CA().toStoredMessage(t)).filter(Boolean);
-    if (!msgs.length) return null;
-    const items = await list();
-    let idx = items.findIndex((c) => c && c.id === chatId);
-    if (idx < 0) {
-      const now = new Date().toISOString();
-      items.unshift({
-        id: chatId,
-        startedAt: msgs[0].ts || now,
-        updatedAt: now,
-        closedAt: null,
-        title: '',
-        kind: null,
-        onboarding: !!(meta && meta.onboarding),
-        messages: [],
+    const msgs = list0.map((tt) => CA().toStoredMessage(tt)).filter(Boolean);
+    if (!msgs.length) return Promise.resolve(null);
+    return F().transazione(async (t) => {
+      const c = t.chat(chatId);
+      const daAggiungere = senzaRiprova(c ? c.messages : [], msgs);
+      const eventi = daAggiungere.map((m) => {
+        const { ts, ...msg } = m;
+        return t.evento(T().MESSAGGIO, {
+          chat: chatId, msg, onboarding: meta && meta.onboarding ? true : undefined,
+        }, { autore: m.role === 'user' ? 'utente' : 'filo', ts });
       });
-      idx = 0;
-    }
-    const chat = items[idx];
-    const prima = Array.isArray(chat.messages) ? chat.messages : [];
-    const daAggiungere = senzaRiprova(prima, msgs);
-    chat.messages = prima.concat(daAggiungere);
-    chat.updatedAt = (daAggiungere.length && daAggiungere[daAggiungere.length - 1].ts)
-      || new Date().toISOString();
-    // Riaprire una chat chiusa e continuare a scrivere la rimette in vita: non
-    // resta «chiusa ieri» con dentro un messaggio di oggi. La riclassificazione
-    // avverrà alla prossima chiusura.
-    //
-    // A rimetterla in vita è però SOLO l'utente. Una risposta di Filo che
-    // arriva dopo la chiusura (l'utente ha chiesto qualcosa e se n'è andato
-    // prima che Filo finisse) non è una conversazione ripresa: è la coda di
-    // quella di prima. Riaprendo la chat anche per lei, la chat restava «in
-    // corso» per sempre — senza titolo generato, e invisibile a Filo, che
-    // quando gli si chiede «riprendi la discussione di ieri» guarda solo le
-    // chat finite.
-    if (daAggiungere.some((m) => m && m.role === 'user')) chat.closedAt = null;
-    // L'intervista di benvenuto è SEMPRE una conversazione: lo dice il
-    // feedback, e non dipende da come è andata. Il marchio si può solo
-    // accendere (un turno normale dopo l'intervista non la declassa).
-    if (meta && meta.onboarding) chat.onboarding = true;
-    // La chat più mossa torna in testa: l'elenco è per recenza.
-    if (idx > 0) { items.splice(idx, 1); items.unshift(chat); }
-    await save(items);
-    return chat;
+      if (eventi.length) await t.scrivi(eventi);
+      return global.SN_FILO_EVENTI.copiaChat(t.chat(chatId));
+    });
   }
 
-  // Chiude una chat: fissa la data di chiusura. Titolo e tipo li scrive
-  // `classify` subito dopo, e possono arrivare con qualche secondo di ritardo
-  // (una chiamata al modello): la chat esiste già, intera, da prima.
-  // Ritorna la chat chiusa, o null se non c'è niente da chiudere (chat
-  // inesistente o senza nemmeno un messaggio — una home aperta e mai usata non
-  // è una conversazione).
-  async function close(id) {
-    if (!id) return null;
-    const items = await list();
-    const idx = items.findIndex((c) => c && c.id === id);
-    if (idx < 0) return null;
-    const chat = items[idx];
-    if (!Array.isArray(chat.messages) || !chat.messages.length) {
-      // Chat vuota: si toglie del tutto invece di restare un guscio senza
-      // titolo in cronologia.
-      items.splice(idx, 1);
-      await save(items);
-      return null;
-    }
-    if (!chat.closedAt) {
-      chat.closedAt = new Date().toISOString();
-      await save(items);
-    }
-    return chat;
+  // Ritorna la chat chiusa, o null se non c'è niente da chiudere: una home aperta e mai usata non è una conversazione.
+  function close(id) {
+    if (!id) return Promise.resolve(null);
+    id = String(id);
+    return F().transazione(async (t) => {
+      const c = t.chat(id);
+      if (!c) return null;
+      if (!c.messages.length) {
+        await t.scrivi([t.evento(T().CANCELLAZIONE, { chat: id }, { autore: 'utente' })]);
+        return null;
+      }
+      if (!c.closedAt) await t.scrivi([t.evento(T().CHAT_CHIUSA, { chat: id }, { autore: 'utente' })]);
+      return global.SN_FILO_EVENTI.copiaChat(t.chat(id));
+    });
   }
 
-  // Titolo e tipo scelti DALL'UTENTE. Un titolo generato può essere sbagliato o
-  // non dire niente, e in elenco il titolo è l'unica cosa per cui una chat si
-  // riconosce; una discussione finita fra i comandi, allo stesso modo, la
-  // rimette dove va chi l'ha fatta. Quello che sceglie l'utente vince e non
-  // viene più riscritto: senza il marchio, la prima riclassificazione (una chat
-  // riaperta e continuata) rimetterebbe il titolo del modello al suo posto.
-  async function setUserTriage(id, { title, kind } = {}) {
-    if (!id) return null;
-    const items = await list();
-    const idx = items.findIndex((c) => c && c.id === id);
-    if (idx < 0) return null;
-    const chat = items[idx];
-    if (title != null) {
-      const pulito = String(title).replace(/\s+/g, ' ').trim();
-      if (pulito) { chat.title = CA().clampTitle(pulito); chat.titleByUser = true; }
-    }
-    if (kind != null) {
-      chat.kind = CA().normalizeKind(kind);
-      chat.kindByUser = true;
-      // Un tipo scelto a mano vale anche sull'intervista di benvenuto: è
-      // l'utente, non il modello, a dire dove va la sua conversazione.
-    }
-    chat.triagedCount = Array.isArray(chat.messages) ? chat.messages.length : 0;
-    await save(items);
-    return chat;
+  function scriviTitolo(t, c, campi, autore) {
+    return t.scrivi([t.evento(T().CHAT_TITOLO, {
+      chat: c.id,
+      title: campi.title,
+      kind: campi.kind,
+      titleByUser: campi.titleByUser ? true : undefined,
+      kindByUser: campi.kindByUser ? true : undefined,
+      triagedCount: c.messages.length,
+    }, { autore })]);
   }
 
-  // Scrive titolo e tipo (li calcola chi ha il modello: handlers.js).
-  async function setTriage(id, { title, kind } = {}) {
-    if (!id) return null;
-    const items = await list();
-    const idx = items.findIndex((c) => c && c.id === id);
-    if (idx < 0) return null;
-    const chat = items[idx];
-    if (title && !chat.titleByUser) chat.title = CA().clampTitle(title);
-    if (chat.kindByUser) {
-      // L'utente ha già detto dove va questa chat: il modello non lo smentisce.
-    } else if (chat.onboarding) {
-      // L'intervista di benvenuto resta una conversazione qualunque cosa dica
-      // il modello: lo dice il feedback, e non dipende da come è andata.
-      chat.kind = CA().KIND_TALK;
-    } else if (kind == null) {
-      // Il classificatore non ha risposto (niente chiave, limite di spesa,
-      // rete assente): il tipo resta IGNOTO, non «conversazione». Sono due
-      // cose diverse — ignoto significa «riprova alla partenza dopo»
-      // (listUntriaged), e intanto la chat si vede lo stesso.
-      chat.kind = null;
-    } else {
-      chat.kind = CA().normalizeKind(kind);
-    }
-    // Quanti messaggi c'erano quando titolo e tipo sono stati decisi. Serve a
-    // `needsTriage`: una chat riaperta e continuata per mezz'ora non può
-    // restare col titolo (e soprattutto col TIPO) di quando era due battute —
-    // un «comando» diventato discussione resterebbe nascosto sotto il filtro.
-    chat.triagedCount = Array.isArray(chat.messages) ? chat.messages.length : 0;
-    await save(items);
-    return chat;
+  // Titolo e tipo scelti DALL'UTENTE vincono e non vengono più riscritti dal classificatore.
+  function setUserTriage(id, { title, kind } = {}) {
+    if (!id) return Promise.resolve(null);
+    id = String(id);
+    return F().transazione(async (t) => {
+      const c = t.chat(id);
+      if (!c) return null;
+      const campi = { title: c.title, kind: c.kind, titleByUser: !!c.titleByUser, kindByUser: !!c.kindByUser };
+      if (title != null) {
+        const pulito = String(title).replace(/\s+/g, ' ').trim();
+        if (pulito) { campi.title = CA().clampTitle(pulito); campi.titleByUser = true; }
+      }
+      if (kind != null) { campi.kind = CA().normalizeKind(kind); campi.kindByUser = true; }
+      await scriviTitolo(t, c, campi, 'utente');
+      return global.SN_FILO_EVENTI.copiaChat(t.chat(id));
+    });
   }
 
-  // Va (ri)classificata? Sì se non lo è mai stata, e sì se da allora la
-  // conversazione è andata avanti.
+  // Titolo e tipo del classificatore (li calcola chi ha il modello: handlers.js).
+  function setTriage(id, { title, kind } = {}) {
+    if (!id) return Promise.resolve(null);
+    id = String(id);
+    return F().transazione(async (t) => {
+      const c = t.chat(id);
+      if (!c) return null;
+      const campi = { title: c.title, kind: c.kind };
+      if (title && !c.titleByUser) campi.title = CA().clampTitle(title);
+      if (c.kindByUser) {
+        // L'utente ha già detto dove va questa chat: il modello non lo smentisce.
+      } else if (c.onboarding) {
+        // L'intervista di benvenuto resta una conversazione qualunque cosa dica il modello.
+        campi.kind = CA().KIND_TALK;
+      } else if (kind == null) {
+        // Classificatore senza risposta: il tipo resta IGNOTO (si riprova alla partenza dopo), non «conversazione».
+        campi.kind = null;
+      } else {
+        campi.kind = CA().normalizeKind(kind);
+      }
+      await scriviTitolo(t, c, campi, 'filo');
+      return global.SN_FILO_EVENTI.copiaChat(t.chat(id));
+    });
+  }
+
+  // Va (ri)classificata se non lo è mai stata o se da allora la conversazione è andata avanti: un «comando»
+  // diventato discussione resterebbe nascosto sotto il filtro.
   function needsTriage(chat) {
     if (!chat) return true;
-    // Titolo e tipo li ha scelti l'utente: non c'è niente da chiedere a un
-    // modello, e chiederglielo lo stesso sarebbe pagare per un esito buttato.
     if (chat.titleByUser && chat.kindByUser) return false;
     if (!chat.kind || !chat.title) return true;
     const n = Array.isArray(chat.messages) ? chat.messages.length : 0;
     return Number(chat.triagedCount) !== n;
   }
 
+  // Il testo di una chat cancellata se ne va anche dalle sue copie: registro grezzo, cache e richieste ai modelli.
+  async function dimenticaCopie(chat) {
+    const forme = CA().formeDaDimenticare((chat.messages || []).map((m) => m && m.text));
+    if (!forme.length) return;
+    const M = global.SN_FILO_MEMORY;
+    const C = global.SN_AI_CACHE;
+    const H = global.SN_HISTORY;
+    if (M && M.togliRaw) await M.togliRaw((e) => !!e && /^chat_/.test(String(e.type)) && CA().riguardaChat(e.summary, forme));
+    if (C && C.togli) await C.togli((e) => CA().riguardaChat(e, forme));
+    if (H && H.redigi) {
+      await H.redigi((it) => (CA().riguardaChat([it.input, it.output], forme)
+        ? { ...it, input: CA().redigiChat(it.input, forme), output: CA().redigiChat(it.output, forme) }
+        : it));
+    }
+  }
+
+  // Cancellare è un evento in coda, e il contenuto della chat sparisce anche dal file.
   async function remove(id) {
-    const items = await list();
-    const filtered = items.filter((c) => c && c.id !== id);
-    await save(filtered);
-    return filtered;
+    if (id) {
+      id = String(id);
+      const tolta = await F().transazione(async (t) => {
+        const c = t.chat(id);
+        if (!c) return null;
+        await t.scrivi([t.evento(T().CANCELLAZIONE, { chat: id }, { autore: 'utente' })]);
+        return c;
+      });
+      if (tolta) await dimenticaCopie(tolta).catch((e) => console.warn('[Filo] copie della chat cancellata:', e?.message || e));
+    }
+    return list();
   }
 
-  // Le chat rimaste aperte perché l'app è stata chiusa di colpo. Alla partenza
-  // successiva vanno chiuse e classificate: senza questo giro resterebbero
-  // senza titolo e senza tipo per sempre, ed è il caso più comune di tutti
-  // (chiudere Filo È il modo normale di finire una chat).
+  // Le chat rimaste aperte perché l'app è stata chiusa di colpo: alla partenza dopo si chiudono e si classificano.
   async function listDangling() {
-    const items = await list();
-    return items.filter((c) => c && !c.closedAt && Array.isArray(c.messages) && c.messages.length);
+    return (await list()).filter((c) => !c.closedAt && c.messages.length);
   }
 
-  // Le chat chiuse che aspettano ancora titolo e tipo: la classificazione non
-  // è riuscita (niente chiave, limite di spesa, rete assente) oppure la
-  // conversazione è andata avanti dopo. Si ritenta alla partenza dopo; intanto
-  // restano visibili fra le conversazioni.
+  // Le chat chiuse ancora senza titolo e tipo (classificazione non riuscita, o conversazione andata avanti).
   async function listUntriaged() {
-    const items = await list();
-    return items.filter((c) => c && c.closedAt && needsTriage(c));
+    return (await list()).filter((c) => c.closedAt && needsTriage(c));
   }
 
   async function clear() {
-    await save([]);
+    const ids = (await list()).map((c) => c.id);
+    if (ids.length) {
+      await F().transazione((t) => t.scrivi(ids.map((id) => t.evento(T().CANCELLAZIONE, { chat: id }, { autore: 'utente' }))));
+    }
     return [];
   }
 
-  // Fuori escono le letture così come sono e le scritture MESSE IN FILA (vedi
-  // `inCoda` in cima): chi chiama non deve sapere niente di tutto questo.
   global.SN_FILO_CHATS = {
-    list, listIndex, get, needsTriage, listDangling, listUntriaged, uuid,
-    open: (...a) => inCoda(() => open(...a)),
-    append: (...a) => inCoda(() => append(...a)),
-    close: (...a) => inCoda(() => close(...a)),
-    setTriage: (...a) => inCoda(() => setTriage(...a)),
-    setUserTriage: (...a) => inCoda(() => setUserTriage(...a)),
-    remove: (...a) => inCoda(() => remove(...a)),
-    clear: (...a) => inCoda(() => clear(...a)),
+    list, listIndex, get, needsTriage, listDangling, listUntriaged, uuid, open, append, close, setTriage, setUserTriage,
+    remove, clear,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

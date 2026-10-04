@@ -221,10 +221,30 @@ scritta dal server o dall'admin, mai per il solo nome (`functions/src/nascita.js
   --non-locale`): L0, poi `todo` In coda (`pipeline.skipped: 'session_proven'`); la priorità
   scelta con `--priorita` nasce col documento (`priorityManual`), senza scelta la decide il giudice;
 - routine (`routine:`/`agent:` + `senderProof: 'server'`: ritrovamenti, derivati, allarmi della
-  costruzione): L0, poi dove dice `config/automation.routineBirth` (`pipeline.skipped:
-  'routine_proven'`). `ricevuti`, o campo assente o ignoto → `aligned`; `interruttori` → `todo`
-  se l'automatica e l'interruttore del gruppo lo ammettono, come un allineato dei giudici,
-  altrimenti `aligned`; `coda` → `todo` con l'automatica accesa. Si cambia dalla console.
+  costruzione): L0, poi dove dice l'**origine** (`pipeline.skipped: 'routine_proven'`, decisione
+  dell'owner del 04/10). L'origine è il lavoro del biglietto (`origineId`, lo scrive il server,
+  mai la routine; `parentId` resta un collegamento) e conta il genitore diretto:
+  - origine dell'owner, di una sessione o del server (mittente provato, anche un derivato già in
+    coda) → `todo`;
+  - origine d'utente non ancora fusa → resta `unlabeled` (`statusReason: attesa_origine`); quando
+    l'origine arriva a `done` → `todo`; se si blocca (`attack`, `spam`, `suspicious_file`, i
+    confermati, `design` per `secaudit` o `l5`) → `design` (`statusReason: origine_bloccata`,
+    rosso, L1 pericoloso sul triangolo, mittente non segnato); se si chiude senza fusione
+    (`archived`) → `aligned` (`statusReason: origine_chiusa`). Lo fa il trigger
+    `onFeedbackOrigineCambiata` (functions/src/origine.js), e alla nascita si rilegge l'origine
+    dopo la scrittura perché un passo appena avvenuto non vada perso;
+  - origine sparita → `aligned` (`statusReason: origine_mancante`);
+  - senza origine (allarmi della costruzione, esplorazioni) → come un allineato dei giudici: `todo`
+    se l'automatica e l'interruttore del gruppo lo ammettono, altrimenti `aligned`.
+
+  Chi è fermo con l'origine (`design`, `origine_bloccata`) la segue anche quando l'owner la libera:
+  torna ad aspettarla (`design → unlabeled`) se il lavoro riparte, entra in coda (`design → todo`) se
+  si fonde, va in `aligned` se si chiude senza fusione. Allo stesso modo chi è tornato nei Ricevuti
+  con l'origine chiusa (`aligned`, `origine_chiusa`) la aspetta di nuovo (`aligned → unlabeled`)
+  se l'owner la ripristina, ed entra in coda (`aligned → todo`) quando si fonde. Sono le sole uscite
+  della pipeline da `design` e da `aligned`, e solo per quei motivi; un derivato che l'owner ha già
+  spostato non si tocca. Chi entra in
+  coda dopo l'attesa passa dal giudice di priorità come alla nascita.
 
 Il prompt dei giudici dice che a loro arriva solo un utente: un linguaggio da sviluppatore o
 da agente è un segnale sospetto. Non a un mittente provato (l'owner dall'app, la ri-valutazione

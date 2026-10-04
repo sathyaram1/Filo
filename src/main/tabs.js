@@ -29,6 +29,7 @@ const { indiceSaltoScheda, comandoNavigazione } = globalThis.SN_TASTI;
 const { collegaScorciatoie } = require('./shortcuts');
 const { AvvisiSopraPagina } = require('./avvisiSopraPagina');
 const { AnteprimeSchede } = require('./tabs/anteprime');
+const { VisiteSchede } = require('./tabs/visite');
 const CartaAnteprima = require('./popup-anteprima');
 const { AvvisoSito } = require('./avvisoSito');
 
@@ -131,6 +132,14 @@ function schedaPerPermessi(wc) {
 // pagina filo:// NON singleton è la nuova scheda (`filo://newtab/`): di quella
 // se ne vogliono quante se ne aprono. La chiave d'identità è host+path (query
 // e hash esclusi: un ?highlight non rende la pagina "un'altra pagina").
+// Chromium tiene lo zoom per sito: la chiave del suo evento è l'host, e per le pagine di Filo il loro indirizzo.
+function ospiteDelloZoom(url) {
+  try {
+    const u = new URL(String(url || ''));
+    return u.protocol === 'filo:' ? `filo://${u.hostname}` : u.hostname.replace(/^www\./, '');
+  } catch (_) { return ''; }
+}
+
 function filoSingletonKey(url) {
   const s = String(url || '');
   if (!s.startsWith('filo://')) return null;
@@ -242,9 +251,12 @@ const NATIVE_MENU_PAGES = [
 // creato nel DOM ma senza stile (position:static, niente sfondo/z-index) →
 // invisibile, e l'utente percepiva "il tasto destro non funziona". Lo iniettiamo
 // quindi anche via wc.insertCSS dal main, che ignora la CSP (come già facciamo
-// per il colore della selezione). Stessa lista di page-preload.js.
+// per il colore della selezione). Stessa lista di page-preload.js (sentinella: contentScriptPreload.test.mjs).
 const fs = require('node:fs');
-const CONTENT_STYLE_FILES = ['theme.css', 'menu.css', 'popup.css', 'sidebar.css', 'highlight.css', 'spellcheck.css', 'feedback.css'];
+const CONTENT_STYLE_FILES = [
+  'theme.css', 'menu.css', 'popup.css', 'sidebar.css', 'voce.css',
+  'highlight.css', 'spellcheck.css', 'feedback.css', 'redteam-attack.css',
+];
 let CONTENT_SCRIPT_CSS = null;
 function getContentScriptCss() {
   if (CONTENT_SCRIPT_CSS !== null) return CONTENT_SCRIPT_CSS;
@@ -300,6 +312,7 @@ class TabManager {
     this.partition = partition || null;
     this.tabs = []; // [{ id, view, title, url, favicon, loading, canBack, canFwd }]
     this.activeId = null;
+    this.visite = new VisiteSchede({ incognito: this.incognito });
     this.anteprime = new AnteprimeSchede(this, {
       suNuova: (id, dato) => CartaAnteprima.precarica(window, id, dato),
       suTolte: (ids) => CartaAnteprima.dimentica(window, ids),
@@ -423,6 +436,8 @@ class TabManager {
       if (t._inVista === ora) continue;
       t._inVista = ora;
       const wc = t.view?.webContents;
+      // Una home che torna in vista (scheda o finestra) rivede subito batteria e rete (#873).
+      if (ora) { try { globalThis.SN_SISTEMA_MAIN?.schedaDavanti?.(wc); } catch (_) {} }
       try {
         if (!wc || wc.isDestroyed?.() || !String(wc.getURL() || '').startsWith('filo://')) continue;
         wc.send('filo:broadcast', { type: 'tab_in_vista', inVista: ora });
@@ -1890,8 +1905,31 @@ class TabManager {
   // delle pagine che zoomano da sé restano di chi già li tiene. Il preload
   // risponde con la percentuale che ha davvero applicato: chi chiede un valore
   // fuori scala deve poterlo dire all'utente invece di tacere il taglio.
-  applicaZoom(spec) {
-    const active = this.tabs.find((t) => t.id === this.activeId);
+  // Il cambio applicato diventa un evento del filo nel contesto di chi l'ha chiesto (#867).
+  async applicaZoom(spec, bersaglio = null) {
+    const tab = bersaglio || this.tabs.find((t) => t.id === this.activeId);
+    const esito = await this._chiediZoom(tab, spec);
+    if (esito && typeof esito.prima === 'number' && typeof esito.percentuale === 'number') {
+      try {
+        require('./services/registroCambi').registraZoom(
+          { host: ospiteDelloZoom(tab.url), prima: esito.prima, dopo: esito.percentuale },
+          { incognito: !!this.incognito },
+        );
+      } catch (_) {}
+    }
+    return esito;
+  }
+
+  // «Rimetti com'era» uno zoom: sulla scheda di quel sito che si vede, o su un'altra dello stesso sito.
+  async zoomSulSito(host, percentuale) {
+    const stessi = this.tabs.filter((t) => t.view && ospiteDelloZoom(t.url) === host);
+    if (!stessi.length) return false;
+    const tab = stessi.find((t) => t.id === this.activeId) || stessi[0];
+    const esito = await this.applicaZoom({ percentuale }, tab);
+    return !!(esito && !esito.muto);
+  }
+
+  _chiediZoom(active, spec) {
     if (!active || !active.view) return Promise.resolve(null);
     const wc = active.view.webContents;
     const rid = `zoom-${randomUUID()}`;
@@ -1925,6 +1963,7 @@ class TabManager {
   _wireEvents(tab) {
     const wc = tab.view.webContents;
     this._registraPermessoRichieste(tab);
+    try { wc.once('destroyed', () => this.visite.chiusa(wc)); } catch (_) {}
     const update = (patch) => {
       Object.assign(tab, patch);
       this._broadcast();
@@ -1937,6 +1976,21 @@ class TabManager {
       wc.ipc.on('filo:zoom-proprio', (_e, perc) => {
         const n = Math.round(Number(perc));
         tab.zoomProprio = Number.isFinite(n) && n > 0 ? n : null;
+      });
+    } catch (_) {}
+    // Una raffica di tasti o di rotella finita: un evento del filo (#867). Solo dal frame principale,
+    // e solo numeri dentro i limiti dello zoom.
+    try {
+      wc.ipc.on('filo:zoom-registra', (e, d) => {
+        if (e.senderFrame && wc.mainFrame && e.senderFrame !== wc.mainFrame) return;
+        const Z = globalThis.SN_ZOOM;
+        const dentro = (x) => Number.isFinite(Number(x)) && (!Z || (Number(x) >= Z.MIN_PERCENTUALE - 1 && Number(x) <= Z.MAX_PERCENTUALE + 1));
+        if (!d || !dentro(d.prima) || !dentro(d.dopo)) return;
+        const R = require('./services/registroCambi');
+        R.con({ via: 'interfaccia', dove: 'zoom' }, () => R.registraZoom(
+          { host: ospiteDelloZoom(tab.url), prima: d.prima, dopo: d.dopo },
+          { incognito: !!this.incognito },
+        ));
       });
     } catch (_) {}
     // In modalità "contenuto a tutto schermo" la pagina copre la barra, quindi
@@ -2256,6 +2310,7 @@ class TabManager {
         canFwd: canGoFwd(wc),
       });
       if (tab.view && tab.view.webContents === wc) this.anteprime.caricata(tab);
+      this.visite.caricata(wc);
       // §3.2 — cattura un estratto del contenuto (best-effort) da usare per la
       // ricerca semantica dell'archivio e per il triage. Solo pagine web.
       if (!tab.isInternal && /^https?:\/\//i.test(wc.getURL() || '')) {
@@ -2267,7 +2322,10 @@ class TabManager {
         } catch (_) {}
       }
     });
-    wc.on('page-title-updated', (_e, title) => update({ title: title || tab.title }));
+    wc.on('page-title-updated', (_e, title) => {
+      update({ title: title || tab.title });
+      this.visite.titolo(wc, title);
+    });
     wc.on('page-favicon-updated', (_e, favicons) => update({ favicon: favicons?.[0] || '' }));
     wc.on('did-navigate', (_e, url, httpResponseCode) => {
       // #412 — questa scheda ha committato una vera navigazione main-frame:
@@ -2287,6 +2345,7 @@ class TabManager {
         return;
       }
       this._assestaEsito(tab);
+      this.visite.navigata(wc, tab.id, url);
       // Documento nuovo: lo zoom che la pagina vecchia dichiarava di sé non
       // vale più (#686).
       tab.zoomProprio = null;
@@ -2343,6 +2402,7 @@ class TabManager {
     wc.on('did-navigate-in-page', (_e, url, isMainFrame) => {
       update({ url: userUrl(url), canBack: canGoBack(wc), canFwd: canGoFwd(wc) });
       if (isMainFrame === true && tab.view && tab.view.webContents === wc) this.anteprime.navigata(tab, { inPagina: true });
+      if (isMainFrame === true) this.visite.navigata(wc, tab.id, url, { inPagina: true });
     });
     // #441 — l'utente ha toccato DAVVERO questa scheda? Serve a non chiudere
     // come "pagina-ponte" una scheda con cui ha interagito. Il segnale arriva
@@ -3119,6 +3179,8 @@ class TabManager {
         // Una scheda su un sito della lista torna sulla pagina «Sito bloccato»:
         // non sparisce dalla sessione e il sito non si riapre da solo (#590).
         const id = this.openTab(url, { activate: false, suppressAutoplay: true, bloccoInPagina: true });
+        const nata = id && this.tabs.find((t) => t.id === id);
+        if (nata) this.visite.giaVista(nata.view.webContents, url);
         // §1.2/§1.3 — ripristina subito il colore identità salvato: la barra
         // riparte già tinta e il riordino cromatico alla riapertura ha i dati
         // pronti senza attendere il ricalcolo dei content script. Seeda anche la

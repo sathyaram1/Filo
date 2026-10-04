@@ -101,6 +101,10 @@
     user('editor-summary', 'Editor — riassunto del documento', 'Editor', A.EDITOR_SUMMARY),
     user('editor-chat', 'Editor — chat col documento', 'Editor', A.EDITOR_CHAT),
 
+    // File dell'utente
+    user('file-name', 'Nome sensato a un file', 'File', A.FILE_NAME,
+      'Legge l\'inizio del testo o una miniatura del file e propone un nome che dice cosa contiene. Serve un modello che veda le immagini.'),
+
     // Mazzi
     user('decks-chat', 'Mazzi — ricerca carte in chat', 'Mazzi', A.DECKS_CHAT),
     user('decks-opinion', 'Mazzi — parere su una carta', 'Mazzi', A.DECKS_OPINION),

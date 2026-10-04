@@ -34,6 +34,8 @@
     // come la bocciatura di sicurezza, e per lo stesso motivo: è un allarme di
     // sicurezza che aspetta una persona, non una questione di gusto.
     l5:         { label: 'Fusione ferma', color: '#c0392b', severity: 3 },
+    // Il lavoro di una routine fermo perché il feedback d'utente da cui nasce è stato bloccato (#914): rosso come lui.
+    origine_bloccata: { label: 'Bloccato con l’origine', color: '#c0392b', severity: 3 },
     attack:     { label: 'Attacco',      color: '#c0392b', severity: 3 },
     spam:       { label: 'Spam',         color: '#e08e0b', severity: 2 },
     design:     { label: 'Design',       color: '#2e9e5b', severity: 1 },
@@ -111,11 +113,23 @@
     session_proven: 'Aperto da una sessione per le routine, con la prova del mittente. I giudici non servono.',
     routine_proven: 'Aperto da una routine, con la prova del server. I giudici non servono.',
   });
+  // Il feedback da cui nasce un lavoro di routine (#914): il numero lo scrive il server nel pipeline alla decisione.
+  function origineText(fb) {
+    const o = fb && fb.pipeline && fb.pipeline.origine;
+    const num = o && typeof o === 'object' ? String(o.num || '').trim() : '';
+    return num ? `il feedback da cui nasce (${num})` : 'il feedback da cui nasce';
+  }
   function judgesSkippedText(fb) {
     const p = fb && fb.pipeline;
     const k = p && typeof p === 'object' ? String(p.skipped || '') : '';
     if (!Object.prototype.hasOwnProperty.call(GIUDICI_SALTATI, k)) return '';
     return isTrustedClient(fb.clientId, fb.senderProof) ? GIUDICI_SALTATI[k] : '';
+  }
+  // Un lavoro di routine che aspetta la fusione del feedback d'utente da cui nasce (#914): non è un «non filtrato»,
+  // il server non lo ri-giudica; entra in coda da solo.
+  function inAttesaOrigine(fb) {
+    const { status, statusReason } = normalizeStatus(fb);
+    return status === 'unlabeled' && statusReason === 'attesa_origine' && !!judgesSkippedText(fb);
   }
   // Prefisso dell'owner o di una sessione senza prova: solo l'owner può dire che è suo, e dargliela (#908).
   function mittenteDaRiconoscere(fb) {
@@ -451,6 +465,7 @@
     const fs = FS();
     const { status, statusReason } = normalizeStatus(fb);
     if (status === 'aligned') return worstVerdictBlock(fb);
+    if (inAttesaOrigine(fb)) return null;
     const info = fs.STATUSES[status];
     if (!info || info.tab !== 'inbox') return null;
     // Bocciatura di sicurezza sul fix: lo stato è `design` (torna all'owner),
@@ -461,6 +476,9 @@
     // Ferma al cancello di fusione: c'è una richiesta che aspetta l'owner.
     if (status === 'design' && statusReason === 'l5') {
       return { reason: 'l5', ...REASONS.l5 };
+    }
+    if (status === 'design' && statusReason === 'origine_bloccata') {
+      return { reason: 'origine_bloccata', ...REASONS.origine_bloccata };
     }
     // Panel COMPLETO su un feedback rimasto `unlabeled`: succede ai mittenti
     // fidati che i giudici hanno segnalato (la pipeline non li marchia mai
@@ -511,6 +529,9 @@
       if (statusReason === 'l5') {
         return { text: 'Il ramo è fermo al cancello di fusione: aspetta il tuo via libera.', color: REASONS.l5.color };
       }
+      if (statusReason === 'origine_bloccata') {
+        return { text: `Fermo perché ${origineText(fb)} è stato bloccato: decidi tu.`, color: REASONS.origine_bloccata.color };
+      }
       if (statusReason === 'clarify') {
         return { text: 'La routine ha domande: rispondi qui sotto.', color: S.design.color };
       }
@@ -534,6 +555,11 @@
       return { text: 'Per i giudici è una questione di design: decidi tu.', color: S.design.color };
     }
     if (status === 'aligned') {
+      if (statusReason === 'origine_chiusa' || statusReason === 'origine_mancante') {
+        const come = statusReason === 'origine_chiusa' ? 'si è chiuso senza fusione' : 'non c’è più';
+        const t = `${origineText(fb)} ${come}: decidi tu.`;
+        return { text: t.charAt(0).toUpperCase() + t.slice(1), color: S.aligned.color };
+      }
       const saltati = judgesSkippedText(fb);
       if (saltati) return { text: `${saltati} Aspetta la tua approvazione.`, color: S.aligned.color };
       const worst = worstVerdictBlock(fb);
@@ -545,6 +571,12 @@
     if (status === 'attack') return { text: 'Segnalato come attacco.', color: S.attack.color };
     if (status === 'spam') return { text: 'Segnalato come spam.', color: S.spam.color };
     if (status === 'unlabeled') {
+      // Un lavoro di routine nato da un feedback d'utente entra in coda quando quello si fonde (#914).
+      if (statusReason === 'attesa_origine' && judgesSkippedText(fb)) {
+        const o = fb.pipeline && fb.pipeline.origine;
+        const num = o && typeof o === 'object' ? String(o.num || '').trim() : '';
+        return { text: `Aspetta la fusione di ${num || 'il feedback da cui nasce'}, poi entra in coda da solo.`, color: null };
+      }
       if (panelComplete(fb)) {
         const worst = worstVerdictBlock(fb);
         if (worst) {
@@ -568,6 +600,10 @@
   const REASON_TEXTS = {
     secaudit: 'bloccato dalla sicurezza',
     l5: 'fermo al cancello di fusione',
+    attesa_origine: 'aspetta la fusione del feedback da cui nasce',
+    origine_bloccata: 'bloccato con il feedback da cui nasce',
+    origine_chiusa: 'il feedback da cui nasce si è chiuso senza fusione',
+    origine_mancante: 'il feedback da cui nasce non c’è più',
     clarify: 'domande per te',
     loop: 'difetto non più correggibile da soli',
     decisione: 'fermo: aspetta una tua scelta',
@@ -861,6 +897,9 @@
     if (!info) return null;
     // Il motivo si SCRIVE solo se ha una traduzione umana: un codice grezzo
     // ('legacy-ignored') in mezzo alla riga non dice niente. Resta nell'hover.
+    if (inAttesaOrigine(fb)) {
+      return { label: 'In attesa', color: null, hint: `Stato: In attesa (${reasonText(statusReason)})`, reason: statusReason, reasonText: reasonText(statusReason), showReason: true, encrypted: false };
+    }
     const txt = statusReason ? reasonText(statusReason) : '';
     return {
       label: info.label,
@@ -1170,6 +1209,7 @@
     link_spam: 'pieno di link',
     gibberish: 'testo senza senso',
     suspicious_file: 'allegato sospetto',
+    origine_bloccata: 'il feedback da cui nasce è stato bloccato',
   };
   function l1MotivoText(code) {
     const k = String(code == null ? '' : code).trim();

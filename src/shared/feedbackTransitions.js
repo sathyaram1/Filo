@@ -66,12 +66,17 @@
       unlabeled:      ['pipeline'],
     },
     design: {
-      todo:     ['owner'],  // l'owner risponde in chat e rimette in coda
-      archived: ['owner'],  // oppure decide che non si fa
+      // 'pipeline': solo un derivato fermo con la sua origine (origine_bloccata), che la segue quando l'owner la libera.
+      todo:      ['owner', 'pipeline'],  // l'owner risponde in chat e rimette in coda
+      archived:  ['owner'],  // oppure decide che non si fa
+      unlabeled: ['pipeline'],
+      aligned:   ['pipeline'],
     },
     aligned: {
-      todo:     ['owner'],  // approvazione manuale (anche bulk)
-      archived: ['owner'],  // un doppione, o una cosa che non si farà: si chiude qui, senza approvarla prima
+      // 'pipeline': solo un derivato tornato qui con l'origine chiusa (origine_chiusa), che la segue quando l'owner la ripristina.
+      todo:      ['owner', 'pipeline'],  // approvazione manuale (anche bulk)
+      archived:  ['owner'],  // un doppione, o una cosa che non si farà: si chiude qui, senza approvarla prima
+      unlabeled: ['pipeline'],
     },
     todo: {
       working: ['routine'], // presa in carico (il semaforo lo tiene il server)

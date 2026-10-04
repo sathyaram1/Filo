@@ -29,6 +29,7 @@
 //     spedizione di una voce dell'owner, MAI salvato nella coda.
 //     onAttesaOwner(item, perche) -> boolean: la voce dell'owner aspetta il suo accesso (#912: mai da anonima);
 //     perche 'assente' | 'rifiutato'; `false` = non detto. Un tokenOwner che lancia è la rete: si riprova zitti.
+//     onScaduta(item): la voce esce dopo MAX_AGE_MS di soli fallimenti (#986).
 //   enqueue(payload, { dallOwner }) -> { id, queued:true }  — accoda + prova subito
 //   flush() -> Promise<boolean>                             — tenta tutta la coda una volta (true se svuotata)
 //   accessoCambiato()                                       — l'owner è rientrato: riprova le voci col token rifiutato
@@ -59,6 +60,7 @@
   let onGiveUpFn = null;
   let tokenOwnerFn = null;
   let onAttesaOwnerFn = null;
+  let onScadutaFn = null;
   let logFn = function () { try { console.log.apply(console, ['[feedback-outbox]'].concat([].slice.call(arguments))); } catch (_) {} };
   let backoffMin = 3000;
   let backoffMax = 30000;
@@ -112,6 +114,7 @@
     if (typeof opts.onGiveUp === 'function') onGiveUpFn = opts.onGiveUp;
     if (typeof opts.tokenOwner === 'function') tokenOwnerFn = opts.tokenOwner;
     if (typeof opts.onAttesaOwner === 'function') onAttesaOwnerFn = opts.onAttesaOwner;
+    if (typeof opts.onScaduta === 'function') onScadutaFn = opts.onScaduta;
     if (typeof opts.log === 'function') logFn = opts.log;
     if (Number.isFinite(opts.backoffMin)) { backoffMin = opts.backoffMin; backoff = opts.backoffMin; }
     if (Number.isFinite(opts.backoffMax)) backoffMax = opts.backoffMax;
@@ -201,6 +204,7 @@
         if (!it.attesaAccesso && Date.now() - it.queuedAt > MAX_AGE_MS) {
           logFn('voce scaduta dopo troppi tentativi, rinuncio:', it.id);
           remove(it.id);
+          try { onScadutaFn && onScadutaFn(it); } catch (_) {}
           continue;
         }
         if (it.tokenRifiutato) continue;
@@ -283,7 +287,7 @@
     _setAuto: (v) => { auto = !!v; if (!auto && timer) { clearTimeout(timer); timer = null; } },
     _reset: () => {
       queue = []; loaded = false; flushing = false; auto = true;
-      prepareFn = null; onDoneFn = null; onGiveUpFn = null; tokenOwnerFn = null; backoff = backoffMin;
+      prepareFn = null; onDoneFn = null; onGiveUpFn = null; tokenOwnerFn = null; onAttesaOwnerFn = null; onScadutaFn = null; backoff = backoffMin;
       if (timer) { clearTimeout(timer); timer = null; }
     },
   };

@@ -227,7 +227,8 @@ test('C — un\'impostazione confermata entra nel diario e il modello lo sa al t
   // La conferma lascia la sua riga nel diario (prima: niente).
   const activity = page.locator('.dash-activity');
   await activity.locator('.dash-activity-head').click();
-  await expect(activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'modalita_terminale' }))
+  // #867 — col nome che l'impostazione ha nelle Preferenze, non con la chiave della chat.
+  await expect(activity.locator('.dash-activity-body .dash-activity-row', { hasText: /(Impostato|Già così) · .*modalità terminale/i }))
     .toHaveCount(1, { timeout: 5_000 });
 
   // E al turno dopo il modello SA che è stata confermata.

@@ -110,6 +110,16 @@ self.SN_ICONS_UTIL = { isSvgIcon, wrap };
 | `globe` | Globo con equatore e meridiano: scheda da un altro paese |
 | `globeOff` | Globo barrato: connessione diretta |
 | `globePinned` | Globo con segnalibro nell'angolo: regola "sempre da un altro paese" |
+| `battery` | Pila con il polo a destra; con un livello (0-100) la carica è una barra dentro il corpo |
+| `batteryCharging` | La stessa pila con un fulmine dentro: in carica |
+| `batteryPlugged` | La stessa pila con una spina dentro: alla corrente ma ferma (piena o al limite di carica) |
+| `wifi` | Tre archi e un punto: collegato al Wi-Fi |
+| `wifiOff` | Gli stessi archi barrati: nessuna rete |
+| `ethernet` | Presa di rete vista di fronte, coi contatti: collegato via cavo |
+| `bluetooth` | La runa del Bluetooth: acceso |
+| `bluetoothOff` | La runa barrata: Bluetooth spento |
+| `volume` | Altoparlante a cono con due onde: il volume del computer |
+| `volumeMute` | Lo stesso altoparlante con una croce al posto delle onde: muto |
 | `windowFrame` | Cornice con barra del titolo e due pallini: comando della finestra |
 | `brush` | Pennello: stile della pagina |
 | `undo` | Freccia che torna indietro: ripristina |

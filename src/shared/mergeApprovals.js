@@ -17,6 +17,8 @@
 //   sta lì, prima dei feedback, non su una superficie a parte. Prima l'avviso
 //   viveva anche sulla prima schermata del browser: due posti per la stessa
 //   decisione erano rumore per la home di tutti i giorni.
+//   Dal #489 le stesse card si disegnano anche nella pagina da browser (site/approvazioni): è la via
+//   d'uscita per il giorno in cui Filo non parte, non un secondo posto da guardare.
 //
 //   Il modulo resta separato dalla pagina perché tiene insieme le due rese —
 //   l'avviso da decidere (Ricevuti) e la traccia delle decisioni passate
@@ -172,7 +174,7 @@
   function originLabel(req) {
     var num = feedbackNum(req);
     // Da #908 anche il lavoro locale porta la sua pratica.
-    if (originOf(req) !== 'routine') return num ? 'lavoro locale · feedback #' + num : 'lavoro tuo, da questo computer';
+    if (originOf(req) !== 'routine') return num ? 'lavoro locale · feedback #' + num : 'lavoro tuo, in locale';
     return num ? 'automazione · feedback #' + num : 'automazione';
   }
 
@@ -180,7 +182,7 @@
   function originHint(req) {
     return originOf(req) === 'routine'
       ? 'Questo ramo l’ha scritto un’automazione partendo da una segnalazione: guarda cosa è stato bloccato prima di approvarlo.'
-      : 'Questo ramo l’hai scritto tu su questo computer.';
+      : 'Questo ramo l’hai scritto tu, in locale.';
   }
 
   /**
@@ -296,6 +298,25 @@
   }
 
   /**
+   * Gli unit sul risultato della fusione (#929): su quale main sono girati, e quando. Al clic non si rifanno, quindi
+   * chi approva giorni dopo deve sapere quanto è vecchia la prova. PURA: null per una richiesta senza prova.
+   */
+  function provaNote(req, nowMs) {
+    var p = req && req.provaUnit;
+    if (!p || typeof p !== 'object') return null;
+    var t = timeAgo(p.atMs, nowMs);
+    var quando = t ? (t === 'adesso' ? ' di adesso' : ' di ' + t) : '';
+    var titolo = 'Gli unit test sono girati sul risultato della fusione con main com’era allora (' + shortSha(p.mainSha)
+      + '). Approvando non si rifanno, quindi se main nel frattempo è andato avanti la combinazione che fondi non l’ha provata nessuno.';
+    if (p.esito === 'verde' || p.esito === 'main_contenuto') return { testo: 'Unit verdi sulla fusione con main' + quando, titolo: titolo };
+    if (p.esito === 'rosso_anche_su_main') {
+      return { testo: 'Unit già rossi su main da solo' + (t ? ' ' + t : '') + ', la fusione non ne rompeva altri', titolo: titolo };
+    }
+    if (p.esito === 'conflitto') return { testo: 'Unit non provati, la fusione con main' + quando + ' andava in conflitto', titolo: titolo };
+    return null;
+  }
+
+  /**
    * L'esito di una decisione passata, in due parole. PURA.
    *
    * `stale` con `used: true` è una richiesta CONSUMATA senza fusione: dirla
@@ -374,6 +395,34 @@
     return n;
   }
 
+  // Una conferma a metà (tasto armato, o richiesta in volo) blocca ogni ridisegno automatico
+  // di `root`: rifatta sotto il cursore, la card perdeva la conferma e spostava i tasti (#550).
+  var LIBERA = 'sn-mac-libera';
+  function occupata(root) {
+    return !!(root && root.querySelector
+      && root.querySelector('.sn-mac-btn-go.is-armed, .sn-mac-card.is-busy:not(.is-done)'));
+  }
+  // Rimanda `fn` a quando `root` si libera; vale l'ultima chiesta, perché ognuna ridisegna lo stato di quel momento.
+  function quandoLibera(root, fn) {
+    if (!root) return;
+    if (!occupata(root)) { root.__snMacDopo = null; fn(); return; }
+    root.__snMacDopo = fn;
+    if (root.__snMacAscolta) return;
+    root.__snMacAscolta = true;
+    root.addEventListener(LIBERA, function () {
+      Promise.resolve().then(function () {
+        var f = root.__snMacDopo;
+        if (!f || occupata(root)) return;
+        root.__snMacDopo = null;
+        f();
+      });
+    });
+  }
+  function liberata(card) {
+    var Ev = global.CustomEvent;
+    if (typeof Ev === 'function') card.dispatchEvent(new Ev(LIBERA, { bubbles: true }));
+  }
+
   /**
    * Una richiesta = una card.
    *
@@ -443,6 +492,13 @@
       card.appendChild(ria);
     }
 
+    var prova = provaNote(req, now);
+    if (prova) {
+      var pr = el('p', 'sn-mac-prova', prova.testo);
+      pr.title = prova.titolo;
+      card.appendChild(pr);
+    }
+
     var blocks = Array.isArray(req.blocks) ? req.blocks : [];
     if (blocks.length) {
       card.appendChild(el('p', 'sn-mac-why', nota ? 'Bloccata perché (solo il nuovo):' : 'Bloccata perché:'));
@@ -475,12 +531,20 @@
       armed = false;
       approveBtn.textContent = 'Approva e fondi';
       approveBtn.classList.remove('is-armed');
+      approveBtn.style.minWidth = '';
       if (armTimer) { clearTimeout(armTimer); armTimer = null; }
+      liberata(card);
     }
     function setBusy(on) {
       approveBtn.disabled = !!on;
       discardBtn.disabled = !!on;
       card.classList.toggle('is-busy', !!on);
+      if (!on) liberata(card);
+    }
+    // Esito definitivo: i tasti restano spenti, ma la rilettura che toglie la card può passare.
+    function finita() {
+      card.classList.add('is-done');
+      liberata(card);
     }
     function say(msg) {
       if (!msg) { status.hidden = true; status.textContent = ''; return; }
@@ -489,10 +553,14 @@
       status.dataset.kind = msg.kind;
     }
 
-    approveBtn.addEventListener('click', function () {
+    approveBtn.addEventListener('click', function (e) {
+      // La coda di un doppio clic (`detail > 1`) non è la conferma: fonderebbe in un gesto solo.
+      if (armed && e && e.detail > 1) return;
       if (!armed) {
-        // Conferma sul posto: un click solo non manda niente su main.
+        // Conferma sul posto: un click solo non manda niente su main. Il secondo
+        // clic cade dove è caduto il primo: il tasto armato non si accorcia, o Scarta gli scivola sotto (#550).
         armed = true;
+        approveBtn.style.minWidth = approveBtn.getBoundingClientRect().width + 'px';
         approveBtn.textContent = 'Confermi?';
         approveBtn.classList.add('is-armed');
         armTimer = setTimeout(disarm, 5000);
@@ -505,7 +573,7 @@
         .then(function (reply) {
           var msg = outcomeMessage(reply, req);
           say(msg);
-          if ((msg.kind === 'ok' || msg.reload) && o.onDone) o.onDone();
+          if ((msg.kind === 'ok' || msg.reload) && o.onDone) { finita(); o.onDone(); }
           else setBusy(false);
         })
         .catch(function (e) {
@@ -520,7 +588,7 @@
       Promise.resolve(o.onDiscard ? o.onDiscard(req) : null)
         .then(function (reply) {
           var msg = outcomeMessage(reply, req);
-          if (msg.kind === 'ok' && o.onDone) { o.onDone(); return; }
+          if (msg.kind === 'ok' && o.onDone) { finita(); o.onDone(); return; }
           say(msg);
           setBusy(false);
         })
@@ -532,8 +600,9 @@
 
     actions.appendChild(discardBtn);
     actions.appendChild(approveBtn);
-    card.appendChild(status);
+    // L'esito sotto i tasti: comparendo sopra li spingeva giù, e il clic per riprovare cadeva fuori.
     card.appendChild(actions);
+    card.appendChild(status);
     // Un tentativo già fatto — e non riuscito — resta scritto sulla card: un
     // avviso che passa lo legge solo chi è davanti allo schermo in quel momento.
     var prima = o.esitoIniziale ? o.esitoIniziale(req) : null;
@@ -616,8 +685,8 @@
         });
     });
     actions.appendChild(okBtn);
-    card.appendChild(status);
     card.appendChild(actions);
+    card.appendChild(status);
     return card;
   }
 
@@ -626,6 +695,11 @@
     var o = opts || {};
     var list = Array.isArray(o.requests) ? o.requests : [];
     var failed = Array.isArray(o.failed) ? o.failed : [];
+    if (occupata(host)) {
+      quandoLibera(host, function () { render(host, o); });
+      return list.length + failed.length;
+    }
+    host.__snMacDopo = null;
     host.replaceChildren();
     host.hidden = list.length === 0 && failed.length === 0;
     if (!list.length && !failed.length) return 0;
@@ -908,6 +982,7 @@
     realignReasonText: realignReasonText,
     realignFailureText: realignFailureText,
     realignedNote: realignedNote,
+    provaNote: provaNote,
     recentOutcome: recentOutcome,
     timeAgo: timeAgo,
     expiresIn: expiresIn,
@@ -925,6 +1000,8 @@
     outcomeMessage: outcomeMessage,
     richiesteCoperte: richiesteCoperte,
     render: render,
+    occupata: occupata,
+    quandoLibera: quandoLibera,
     renderRecent: renderRecent,
     preapprovedBy: preapprovedBy,
     segnoPreapprovazione: segnoPreapprovazione,

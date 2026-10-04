@@ -67,6 +67,7 @@ if (process.env.NODE_ENV === 'test') {
     globalThis.__filoCookies = require('./services/cookies');
     globalThis.__filoAdblock = require('./services/adblock');
     globalThis.__filoCookieBanners = require('./services/cookieBanners');
+    globalThis.__filoFirmatariC2pa = require('./services/firmatariC2pa');
     globalThis.__filoFingerprint = require('./services/fingerprint');
     globalThis.__filoProxyTab = require('./services/proxyTab');
     globalThis.__filoShortcuts = require('./shortcuts');
@@ -218,6 +219,9 @@ app.whenReady().then(async () => {
     require('./services/cookieBanners').init(s).catch(() => {});
     // Cosa Filo ha fatto coi banner dei singoli siti: il menu della scheda lo mostra anche alla visita dopo.
     try { await require('./tabs/tabCookies').loadRemembered(); } catch (_) {}
+    // #711 — l'elenco ufficiale dei firmatari C2PA: rilegge la copia su disco e
+    // la rinfresca in sottofondo quando è vecchia. Non blocca l'avvio.
+    try { await require('./services/firmatariC2pa').init(); } catch (_) {}
     // Blocco apertura siti in blacklist (#170.3): legge la config dalle
     // impostazioni (riusa le liste dell'ad-blocker + la blacklist dell'utente).
     try { require('./services/siteBlock').configureFromSettings(s); } catch (_) {}
@@ -268,6 +272,8 @@ app.whenReady().then(async () => {
   // di finire una conversazione, quindi senza questo giro la chat più comune
   // di tutte resterebbe senza nome in cronologia. In sottofondo: non blocca
   // l'avvio, e se il modello non c'è si riprova alla partenza dopo.
+  // #866 — il filo si legge adesso, e alla prima partenza dopo l'aggiornamento le chat salvate diventano segmenti.
+  try { require('./services/ilFilo').carica().catch(() => {}); } catch (_) {}
   try { require('./services/handlers').sweepPendingChats().catch(() => {}); } catch (_) {}
 
   // Sveglie e timer (#322): controlla nel main le scadenze arrivate, mostra la

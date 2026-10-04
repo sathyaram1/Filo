@@ -4,6 +4,7 @@
 // (setLiveSources), l'orologio della pagina e il segnale «in vista» sono veri.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { riduciAIcona, rialza } from './helpers/riduzione.mjs';
 
 const URL = 'filo://manage/manage.html';
 
@@ -110,8 +111,8 @@ test('arrivata In coda: il punto sta nella riga del titolo, che resta all\'altez
 
 // Fuori vista niente letture anche col ritmo stretto; al rientro il cambio arriva
 // in pochi secondi col ritmo a minuti, quindi l'ha portato il rientro.
-async function fuoriVistaERitorno(page, app, { esci, rientra, cambia, attesi }) {
-  const come = await app.evaluate(esci);
+async function fuoriVistaERitorno(page, { esci, rientra, cambia, attesi }) {
+  const come = await esci();
   await page.waitForTimeout(600);
   const fuori = await page.evaluate(() => window.__srv.letture);
   await page.evaluate(() => window.__mgTest.setLiveTiming({ pollMs: 800 }));
@@ -119,9 +120,8 @@ async function fuoriVistaERitorno(page, app, { esci, rientra, cambia, attesi }) 
   expect(await page.evaluate(() => window.__srv.letture)).toBe(fuori);
   await page.evaluate(() => window.__mgTest.setLiveTiming({ pollMs: 10 * 60 * 1000 }));
   await cambia();
-  await app.evaluate(rientra, come);
+  await rientra(come);
   await expect.poll(() => ids(page), { timeout: 4000 }).toEqual(attesi);
-  return come;
 }
 
 test('in secondo piano, ridotta a icona o nascosta non legge; tornando in vista si allinea subito', async ({ openTab, shell, app }) => {
@@ -145,32 +145,17 @@ test('in secondo piano, ridotta a icona o nascosta non legge; tornando in vista 
   await shell.evaluate((id) => window.filoShell.tabs.activate(id), gestione);
   await expect.poll(() => ids(page), { timeout: 4000 }).toEqual(['f515', 'f716']);
 
-  // Senza gestore di finestre (xvfb: il contenitore delle routine e la suite in
-  // GitHub) la riduzione non avviene: lì si finge quello che il sistema direbbe dopo.
-  const riduzione = await fuoriVistaERitorno(page, app, {
-    esci: async ({ BrowserWindow }) => {
-      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
-      w.minimize();
-      for (let i = 0; i < 20 && !w.isMinimized(); i++) await new Promise((r) => setTimeout(r, 50));
-      if (w.isMinimized()) return 'vera';
-      w.isMinimized = () => true;
-      w.emit('minimize');
-      return 'simulata';
-    },
-    rientra: ({ BrowserWindow }, come) => {
-      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
-      if (come === 'simulata') delete w.isMinimized;
-      if (w.isMinimized()) w.restore(); else w.emit('restore');
-    },
+  await fuoriVistaERitorno(page, {
+    esci: () => riduciAIcona(app),
+    rientra: (come) => rialza(app, come),
     cambia: () => ilServerScrive(page, 'f716', { status: 'todo' }),
     attesi: ['f515'],
   });
-  test.info().annotations.push({ type: 'riduzione a icona', description: riduzione });
 
-  await fuoriVistaERitorno(page, app, {
-    esci: ({ BrowserWindow }) => { BrowserWindow.getAllWindows().find((x) => x._filoTabs).hide(); },
+  await fuoriVistaERitorno(page, {
+    esci: () => app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows().find((x) => x._filoTabs).hide(); }),
     // Senza rubare il fuoco a chi lancia i test sulla sua macchina.
-    rientra: ({ BrowserWindow }) => { BrowserWindow.getAllWindows().find((x) => x._filoTabs).showInactive(); },
+    rientra: () => app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows().find((x) => x._filoTabs).showInactive(); }),
     cambia: async () => {
       await ilServerScrive(page, 'f515', { status: 'todo', statusReason: null });
       await ilServerScrive(page, 'f600', { status: 'design' });

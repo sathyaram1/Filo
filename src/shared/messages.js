@@ -162,6 +162,13 @@
     // non ha creato lui (ramo admin delle regole), quindi quel passo resta al
     // triage. { id, text } → { ok, feedbackId, balance } | { ok:false, error }.
     BOARD_REOPEN: 'board_reopen',
+    // #986 — la copia locale delle segnalazioni mandate da questo computer. Testi scritti dall'utente: solo dalle
+    // superfici di Filo (soloFilo), mai da un sito. {} → { ok, voci } (in incognito { ok, voci: [], incognito: true })
+    SEGNALAZIONI_MIE_LIST: 'segnalazioni_mie_list',
+    // { id } → { ok, voci }: la voce esce dall'elenco e dal disco; la segnalazione mandata resta dov'è.
+    SEGNALAZIONI_MIE_TOGLI: 'segnalazioni_mie_togli',
+    // Segnale BROADCAST main→pagine filo:// (mai incognito): l'elenco è cambiato. Senza dati: si rilegge con LIST.
+    SEGNALAZIONI_MIE_CAMBIATE: 'segnalazioni_mie_cambiate',
     // Broadcast main→renderer: l'utente corrente ha ricevuto crediti in regalo
     // (#210.4). { amount } → la home mostra un popup una volta sola.
     GIFT_NOTICE: 'gift_notice',
@@ -236,6 +243,23 @@
     // (#274). { url } → { ok, path?, filename? } | { ok:false, cancelled?, error? }
     // (la risposta arriva a download concluso/annullato).
     DOWNLOAD_IMAGE: 'download_image',
+    // #711 — che cosa DICHIARA un'immagine sulla propria origine (credenziali
+    // C2PA firmate, etichetta IPTC/XMP, parametri di generazione nei PNG).
+    // Letto in locale, niente modelli; la sola rete è l'elenco ufficiale dei
+    // firmatari, che il main rinfresca per conto suo. Aperto anche ai content
+    // script: la risposta parla SOLO dei byte che la pagina ha appena mandato.
+    // { dataUrl } → { ok, frase, forte, origine, prova, dichiarante, firmatario, avvisi }
+    IMAGE_PROVENANCE: 'image_provenance',
+    // #946 — i byte originali di un'immagine di un'altra origine (le foto stanno quasi
+    // sempre su un CDN), che lo script di pagina non può leggere. Scaricati nel main
+    // come «Salva immagine come…», con Referer e cookie della scheda. Restituisce solo immagini.
+    // { url } → { ok, dataUrl } | { ok:false, error, tooBig?, notImage? }
+    IMAGE_BYTES: 'image_bytes',
+    // #946 — «Copia immagine» appena scritta negli appunti: gli appunti la ricodificano
+    // e ne perdono le etichette, quindi il main ricorda l'esito letto sull'originale
+    // per i pixel della copia, e la chat lo ritrova quando la si incolla.
+    // { originale, copia } (data URL) → { ok, ricordata }
+    IMAGE_COPIED: 'image_copied',
     // "Salva video/audio come…" dal menu contestuale su <video>/<audio>.
     // Stesso identico cammino di DOWNLOAD_IMAGE (il download avviene nel main
     // con Referer + cookie della scheda): cambia solo il tipo di file, che
@@ -281,6 +305,18 @@
     DOWNLOAD_CANCEL: 'download_cancel',
     DOWNLOAD_PAUSE: 'download_pause',
     DOWNLOAD_RESUME: 'download_resume',
+    // #950 — rimette il nome con cui lo scaricamento era arrivato. { id } → { ok, nome } | { ok:false, frase }
+    DOWNLOAD_RIMETTI_NOME: 'download_rimetti_nome',
+    // #950 — nome sensato a un file dell'utente. Toccano il disco e rispondono con percorsi assoluti: solo dalle
+    // superfici di Filo (soloFilo), mai da un sito. Il percorso arriva intero, o come { downloadId }.
+    // {} → { disponibile } (c'è un modello: la voce del menu compare solo allora)
+    FILE_NOME_STATO: 'file_nome_stato',
+    // { percorso | downloadId } → { ok, percorso, nome, base, ext, proposta } | { ok:false, errore, frase, nome, base, ext }
+    FILE_NOME_PROPONI: 'file_nome_proponi',
+    // { percorso | downloadId, nome } → { ok, da, a, nome, prima } | { ok:false, errore, frase }
+    FILE_RINOMINA: 'file_rinomina',
+    // { coppie: [{ attuale, prima }] } → { ok, esiti }
+    FILE_RIMETTI_NOMI: 'file_rimetti_nomi',
     // Segnale BROADCAST main→superfici: "la cronologia scaricamenti è cambiata"
     // (parte/avanza/finisce un download). VOLUTAMENTE contentless (nessun nome
     // file né percorso): la pagina filo://downloads lo riceve e ri-legge la
@@ -377,6 +413,7 @@
     // Le risposte ai permessi dei siti che restano fra un avvio e l'altro: la pagina Sicurezza le elenca e le toglie.
     PERMESSI_SITI_GET: 'permessi_siti_get',          // {} → { ok, scelte: [{ origine, parte, si, sotto, dominio }] }
     PERMESSI_SITI_TOGLI: 'permessi_siti_togli',      // { origine, parte } → { ok }
+    PERMESSI_SITI_CAMBIATI: 'permessi_siti_cambiati', // main → pagine di Filo: la chat ha tolto una risposta ricordata
 
     // §2.1 — segnali di attività della tab riportati dal content script, per la
     // decisione di auto-archiviazione. Throttled. { lastInteractionAt?, scrollPct?, formDirty? }
@@ -665,6 +702,19 @@
     // Filo State: assembla stato programmatico (tab aperte, tempo, processi).
     // Risposta: { ok, state: {...}, stateText: "..." }
     FILO_GET_STATE: 'filo_get_state',
+    // Batteria, rete (col nome del Wi-Fi) e Bluetooth (coi nomi dei dispositivi): dati del computer, solo alle
+    // pagine di Filo. La richiesta tiene sveglio il lettore per 90 s: la home la ripete mentre è in vista.
+    // → { ok, stato: { batteria, rete, bluetooth, letto } | null }
+    SISTEMA_STATO: 'sistema_stato',
+    // main → pagine filo:// quando una lettura cambia. { stato }
+    SISTEMA_AGGIORNATO: 'sistema_aggiornato',
+    // Volume, Bluetooth e Wi-Fi a comando (#874), solo dalle pagine di Filo: aziona il sistema operativo, e a un sito
+    // non si dà. La stessa porta dell'azione della chat. { richiesta: { cosa: 'volume'|'bluetooth'|'wifi', … } }
+    // → { ok, cosa, … } oppure { ok: false, errore, frase, dove?, apri? }
+    SISTEMA_COMANDA: 'sistema_comanda',
+    // Apre la pagina delle impostazioni del sistema dove si concede un permesso mancante. { chiave } (una di
+    // IMPOSTAZIONI in src/main/services/comandiSistema.js: l'indirizzo non arriva mai da chi chiede) → { ok }
+    SISTEMA_APRI_IMPOSTAZIONI: 'sistema_apri_impostazioni',
     // Genera dashboard (messaggio centro + suggerimenti). Usa cache con cooldown.
     // { force?: boolean }
     // Risposta: { ok, message, suggestions, cached, ts }
@@ -695,6 +745,10 @@
     // cancellata: la scheda che quella conversazione la sta ancora vivendo
     // smette di scriverci dentro, invece di farla rinascere al messaggio dopo.
     FILO_CHATS_UPDATED: 'filo_chats_updated',
+    // #866 — le pagine visitate che il filo ricorda, dalla pagina Sicurezza. Solo pagine filo://: è la cronologia
+    // dell'utente. { periodo: 'ultima_ora'|'oggi'|'tutto' } → { ok, n } (quante sono / quante ne ha tolte).
+    FILO_PAGINE_CONTA: 'filo_pagine_conta',
+    FILO_PAGINE_CANCELLA: 'filo_pagine_cancella',
     // Una riga scritta in chat senza passare da un modello: la risposta a un
     // comando con lo slash (l'elenco dei comandi, la conferma di un timer, il
     // resoconto del riordino), il comando di terminale che l'utente ha digitato
@@ -758,9 +812,24 @@
     FILO_STOP_TIMER_ALARM: 'filo_stop_timer_alarm', // { id } — silenzia/rimuove un timer che sta suonando
     FILO_GET_NOTIFICATIONS: 'filo_get_notifications',
     FILO_DISMISS_NOTIFICATION: 'filo_dismiss_notification', // { id }
+    // Le carte della home (#870), solo pagine filo://. La mossa è quella di SN_CARTE_HOME.applica: la pagina
+    // manda il cambio, non la disposizione intera. CAMBIATE va alle pagine di Filo quando la disposizione cambia.
+    CARTE_HOME_GET: 'carte_home_get',             // {} → { ok, layout }
+    CARTE_HOME_MODIFICA: 'carte_home_modifica',   // { mossa } → { ok, layout } | { ok:false, error, layout }
+    CARTE_HOME_CAMBIATE: 'carte_home_cambiate',   // broadcast { layout }
+    // I lavori lunghi in corso (una risposta di Filo, un comando del terminale): la home li mostra a sinistra.
+    LAVORI_IN_CORSO: 'lavori_in_corso',           // {} → { ok, lavori: [{ id, tipo, chat, testo, iniziato }] }
+    LAVORI_CAMBIATI: 'lavori_cambiati',           // broadcast { lavori }
+    // I documenti dell'Editor dal più recente, per la sua carta nella home. Solo pagine filo://.
+    EDITOR_RECENTI: 'editor_recenti',             // {} → { ok, totale, file: [{ id, titolo, modificato }] }
     // L'utente ha confermato (popup livello 2 / digitato "conferma" livello 3)
     // un'azione di Filo rimasta in sospeso: ora va eseguita davvero. { action }
     FILO_CONFIRM_ACTION: 'filo_confirm_action',
+    // I cambi di stato come eventi del filo (#867). Solo dalle pagine di Filo: leggono e riscrivono le
+    // impostazioni dell'utente. LEGGI { ids } → { eventi }; ANNULLA { id } → { ok, eventi }.
+    CAMBI_LEGGI: 'cambi_leggi',
+    CAMBI_ANNULLA: 'cambi_annulla',
+    CAMBI_AGGIORNATI: 'cambi_aggiornati',           // main → pagine di Filo { ids }: un cambio è nato o è stato annullato
 
     // Primo dispatch (non ancora confermato) di UNA singola azione di Filo,
     // usato dall'agente "Aiuto" (sidebar) per attivare le azioni tipizzate di

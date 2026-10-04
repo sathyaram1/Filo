@@ -19,6 +19,11 @@
     // Traduzione finita, ma il sito ha aggiunto altro testo dopo (scorrimento
     // infinito, schermate che cambiano senza ricaricare).
     menu_translate_new_content: 'Traduci il testo nuovo',
+    // #711 — l'hover della riga di origine: dice il CONFINE della lettura, cioè
+    // perché l'assenza di quella riga non vuol dire niente.
+    menu_origin_hint: 'Filo legge solo le etichette che il file si porta dietro. Uno screenshot le cancella, un social pure, e molti generatori non le scrivono affatto.',
+    menu_image_unreadable: 'Filo non è riuscito a scaricare questa immagine.',
+    menu_origin_hint_unverified: 'Filo non ha ancora scaricato l’elenco ufficiale dei firmatari riconosciuti, quindi per ora sa solo che la firma è valida. Appena lo scarica, lo verifica.',
     menu_explain_deep: 'Approfondisci',
     menu_paste_history: 'Cronologia incolla',
     menu_paste_search: 'Cerca…',
@@ -88,6 +93,10 @@
     err_tts_voice_required: 'Il modello di lettura «%s» vuole il nome di una voce, e Filo non ne conosce nessuna per questo modello: scrivilo in Preferenze → Lettura ad alta voce.',
     // %s = id del modello, %s = nome scritto a mano che il modello ha rifiutato.
     err_tts_voice_unknown: 'Il modello di lettura «%s» non conosce la voce «%s»: controlla il nome in Preferenze → Lettura ad alta voce.',
+    // %s = id del modello, %s = chi lo serve («OpenAI», «OpenAI e Azure»).
+    // Voce e dettatura: nessun host ammesso, la richiesta non parte (#713).
+    err_audio_no_allowed_host: 'Il modello «%s» lo serve solo %s, che Filo esclude. Non ho mandato niente: scegli un altro modello.',
+    err_audio_no_allowed_host_many: 'Il modello «%s» lo servono solo %s, che Filo esclude. Non ho mandato niente: scegli un altro modello.',
     menu_dictate: 'Detta',
     menu_screenshot: 'Screenshot',
     menu_screenshot_crop: 'Screenshot di una parte',
@@ -121,10 +130,26 @@
     menu_dictate_partial: 'Ti ascolto…',
     menu_dictate_model_select: 'Modello per dettatura',
     menu_dictate_not_supported: 'Dettatura non supportata in questo browser',
-    menu_dictate_no_mic: 'Microfono non disponibile o negato',
     menu_dictate_model_set: 'Modello dettatura aggiornato',
     menu_dictate_transcribing: 'Trascrivo l\'audio…',
-    menu_dictate_empty: 'Nessun audio comprensibile',
+
+    // Il microfono (src/shared/ascolto.js) e il suo tasto nelle chat (voceChat.js). Ogni guasto dice cosa fare.
+    voce_parla: 'Parla',
+    voce_ferma: 'Ferma',
+    voce_trascrivo: 'Trascrivo…',
+    voce_annulla_invio: 'Annulla l\'invio',
+    voce_invia_da_solo: 'Invia da solo',
+    voce_lascia_testo: 'Lascia il testo da correggere',
+    voce_err_mic_negato: 'Filo non ha il permesso di usare il microfono: consentilo %s, poi riprova.',
+    voce_dove_mac: 'in Impostazioni di Sistema → Privacy e sicurezza → Microfono',
+    voce_dove_windows: 'in Impostazioni → Privacy e sicurezza → Microfono',
+    voce_dove_linux: 'nelle impostazioni audio del sistema',
+    voce_err_mic_assente: 'Non trovo un microfono: collegane uno e riprova.',
+    voce_err_mic_occupato: 'Il microfono non risponde: forse lo sta usando un\'altra app. Chiudila e riprova.',
+    voce_err_trascrizione: 'Non sono riuscito a trascrivere quello che hai detto: %s',
+    voce_riprova: 'riprova tra poco.',
+    voce_vuoto: 'Non ho capito quello che hai detto: riprova parlando un po\' più vicino al microfono.',
+    voce_err_muto: 'Non ho sentito niente: premi il microfono e parla, o controlla che sia acceso quello giusto.',
     menu_overflow_soon: 'Pannello completo in arrivo',
     menu_link_loading: 'Analizzo il link…',
 
@@ -348,6 +373,7 @@
     options_action_editor_chat: 'Editor — chat col documento',
     options_action_archive_embed: 'Indicizzazione delle schede archiviate',
     options_action_provider_test: 'Prova di un fornitore (pulsante «Prova»)',
+    options_action_file_name: 'Nome sensato ai file (legge l\'inizio del file o una miniatura)',
     // Elenco (di sola lettura) degli altri punti in cui Filo usa un modello:
     // quelli che girano sui server di Filo e quelli che un modello non lo usano.
     options_h_model_usage: 'Dove altro Filo usa un modello',
@@ -586,24 +612,37 @@
     security_export_title: 'Esporta dati Filo',
     security_export_label: 'Esporta dati',
     security_export_desc:
-      'Salva tutti i tuoi dati di Filo (memorie degli agenti, pagine salvate, ' +
-      'cronologia incolla, costi e impostazioni) in un file .zip che contiene un ' +
-      'data.json e le immagini copiate come file separati. Utile come backup o per ' +
-      'trasferire i dati su un altro computer.',
+      'Salva tutti i tuoi dati di Filo (memorie degli agenti, chat con Filo, pagine ' +
+      'visitate, pagine salvate, cronologia incolla, costi e impostazioni) in un file ' +
+      '.zip che contiene un data.json, il filo delle chat e delle pagine visitate e le ' +
+      'immagini copiate come file separati. Utile come backup o per trasferire i dati ' +
+      'su un altro computer.',
     security_export_btn: 'Esporta dati (.zip)',
     security_export_done: 'Dati esportati',
     security_export_fail: 'Esportazione non riuscita',
     security_import_title: 'Importa dati Filo',
     security_import_btn: 'Importa dati (.zip)',
     security_import_desc:
-      'Ricarica un .zip esportato da Filo: rimette al loro posto memorie, pagine ' +
-      'salvate, cronologia, immagini e impostazioni. Quello che hai già non viene ' +
+      'Ricarica un .zip esportato da Filo: rimette al loro posto memorie, chat con ' +
+      'Filo, pagine visitate, pagine salvate, cronologia, immagini e impostazioni. ' +
+      'Quello che hai già non viene ' +
       'cancellato — le liste si uniscono e, dove c\'è un conflitto, vince il backup.',
+    security_visite_title: 'Pagine visitate',
+    security_visite_desc: 'Filo ricorda le pagine che apri nelle schede, sul tuo computer. Quelle aperte in incognito no.',
+    security_visite_ora: 'Cancella l’ultima ora',
+    security_visite_oggi: 'Cancella oggi',
+    security_visite_tutto: 'Cancella tutto',
+    security_visite_confirm_title: 'Cancellare le pagine visitate?',
+    // %1 = "la pagina visitata" / "le N pagine visitate", %2 = "nell’ultima ora" / "oggi" / "da sempre"
+    security_visite_confirm_text: 'Filo dimentica %1 %2. Le chat e le schede chiuse restano.',
+    security_visite_confirm_ok: 'Cancella',
+    security_visite_nessuna: 'Nessuna pagina da cancellare',
+    security_visite_fail: 'Cancellazione non riuscita',
     security_import_confirm_title: 'Importa dati da backup',
-    // %1 = nome file, %2 = " (del …)" o vuoto, %3/%4 = conteggi già declinati
+    // %1 = nome file, %2 = " (del …)" o vuoto, %3/%4 = conteggi già declinati, %5 = chat e pagine del filo o vuoto
     security_import_confirm_text:
-      'Da "%1"%2: %3 e %4.\n\n' +
-      'Nulla di ciò che hai ora viene cancellato: le liste (pagine salvate, ' +
+      'Da "%1"%2: %3 e %4%5.\n\n' +
+      'Nulla di ciò che hai ora viene cancellato: le liste (chat, pagine visitate, pagine salvate, ' +
       'cronologia, appunti) si uniscono senza duplicati e le sezioni che qui non ' +
       'esistono vengono aggiunte. Dove lo stesso dato esiste in entrambi, vince ' +
       'quello del backup. Le impostazioni del backup diventano attive subito.',

@@ -50,7 +50,10 @@ cade nel vuoto e la finestra resta com'era. La prova chiede `isMinimized()`; se 
 sistema non l'ha ridotta, finge la sua risposta (`isMinimized` vero ed evento
 `minimize`, poi il contrario) e prova lo stesso cammino del codice. Sostituire la
 riduzione con un'altra uscita dalla vista lascerebbe la riduzione provata solo sul
-Windows dell'owner. Riferimento: `tests/manage-ricevuti-vivi.spec.mjs`.
+Windows dell'owner. Lo fa `riduciAIcona`/`rialza` (`tests/helpers/riduzione.mjs`), e
+nessuno spec chiama `minimize()` da solo: la home (#873) era nata due giorni dopo questa
+regola nascondendo la finestra al posto di ridurla (#810.10). Sentinella:
+`tests/unit/riduzioneNeiTest.test.mjs`.
 
 ## Il contenitore che disegna adagio (#592.11)
 
@@ -97,3 +100,34 @@ il rosso ferma le versioni per tutti:
   con EPERM. Si copia.
 
 Sentinella delle due forme: `tests/unit/cartelleTemporanee.test.mjs`.
+
+## La macchina carica (#943)
+
+Gli unit girano in parallelo, e spesso più verifiche girano insieme sulla stessa
+macchina. «Due milioni di caratteri in meno di un secondo e mezzo» passava sempre da
+solo e cadeva in quasi ogni corsa completa: a macchina carica la stessa valutazione
+arriva a tre secondi senza che il codice sia cambiato, e un rosso degli unit rende
+rosso `finish:check` (che con `--check` corre lo stesso gli spec, #874.1).
+
+Un tempo non si confronta con millisecondi fissi. Si confronta con un lavoro di
+riferimento misurato accanto, nello stesso processo: il carico rallenta tutti e due e il
+rapporto resta (con ottanta processi occupati su quattro core la valutazione durava fino
+a tre secondi e il rapporto restava fra otto e undici, come a macchina ferma). `costoInUnita`
+(`tests/helpers/tempoRelativo.mjs`) misura l'operazione fra due unità di riferimento,
+ripete solo se il giro sfora e tiene il giro migliore: una regressione vera sfora a ogni
+giro, un carico passeggero no. Il tetto si sceglie una decina di volte sopra il costo
+visto: quello che la prova deve fermare, un algoritmo quadratico o un'espressione che
+torna indietro, costa centinaia di unità.
+
+Un timer atteso (`await` di qualcosa che scade da sé) misura il timer e non il lavoro, e
+resta in millisecondi. Sentinella: `tests/unit/tempiSottoCarico.test.mjs`.
+
+## Il verso opposto (#937)
+
+Una prova nata su Windows che asserisce un percorso `C:\…` cade su Linux se la
+funzione chiede la forma al sistema che la esegue: `isAbsolute('C:\\x')` lì risponde
+falso. Quando il risultato deve essere lo stesso su ogni macchina (la chiave di un test
+rosso confrontata fra due cartelle), si riconoscono entrambe le forme:
+`isAbsolute(p) || win32.isAbsolute(p)`. Un rosso solo su Linux non ferma né le fusioni
+né le versioni, quindi nessun allarme lo segnala: resta finché una routine non lo trova.
+Riferimento: `chiaveTest` in `scripts/lib/unit-sulla-fusione.mjs`.

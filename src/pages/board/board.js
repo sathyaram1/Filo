@@ -1001,6 +1001,8 @@
   }
 
   async function init() {
+    // «Le tue segnalazioni» (#986) vive in board-segnalazioni.js e non aspetta la rete dei miglioramenti.
+    try { window.SN_BOARD_SEGNALAZIONI?.init(); } catch (e) { console.warn('[bacheca] segnalazioni:', e); }
     await refreshAuth();
     await loadData();
   }

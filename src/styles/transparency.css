@@ -103,6 +103,17 @@
 
 .sn-doc strong { font-weight: 600; }
 
+/* I comandi da copiare: si devono distinguere dalla prosa e andare a capo senza allargare la pagina. */
+.sn-doc code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 0.86em;
+  padding: 0.05em 0.35em;
+  background: var(--sn-hover, #ffffff);
+  border: 1px solid var(--sn-border, #e0dcd4);
+  border-radius: var(--sn-radius, 6px);
+  overflow-wrap: anywhere;
+}
+
 .sn-doc hr {
   border: 0;
   border-top: 1px solid var(--sn-border, #e0dcd4);

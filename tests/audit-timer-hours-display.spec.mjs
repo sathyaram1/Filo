@@ -17,7 +17,7 @@ test('timer di 2 ore: la card mostra H:MM:SS, non 120:00', async ({ app, openTab
     globalThis.SN_EXECUTE_FILO_ACTION(action, {}), { type: 'TIMER', seconds: 7200, label: 'Forno' });
   expect(r.executed).toBe(true);
 
-  const card = page.locator('.dash-live-card', { hasText: 'Forno' });
+  const card = page.locator('#accade .dash-carta', { hasText: 'Forno' });
   await expect(card).toBeVisible({ timeout: 10_000 });
   const txt = await card.innerText();
   // Corretto: ore:minuti:secondi (una cifra di ore, due di minuti/secondi).

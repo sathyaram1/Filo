@@ -9,10 +9,12 @@
 // I moduli SN_* sono stati caricati dal loader.js — qui assumiamo siano su global.
 
 const { BrowserWindow } = require('electron');
+const Disco = require('../shim/storage');
 const Defaults = require('./defaultsStore');
 const { settingsForOwnerAction, fillMovedSlots, ownerSlotFor } = require('./resolveSupportModel');
 const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra } = require('./impostazioniPerOrigine');
 const SegretiLetti = require('./segretiLetti');
+const Registro = require('./registroCambi');
 
 const { SN_CONST, SN_MSG } = globalThis;
 const { ACTIONS, PROMPTS } = SN_CONST;
@@ -79,6 +81,50 @@ function winOf(sender) {
 // prompt dichiara «contenuto esterno». Il perché sta lì in testa (#585).
 function formatKnownPathsForPrompt(rawPaths) {
   return globalThis.SN_PATHS_SAFETY.formatKnownPathsForPrompt(rawPaths);
+}
+
+// L'esito del controllo locale delle etichette di origine delle immagini allegate (#711).
+// La nota è voce di Filo, la frase del file viaggia imbustata: i nomi li scrive chi ha fatto l'immagine.
+async function noteProvenienzaImmagini(dataUrls) {
+  const P = globalThis.SN_PROVENIENZA;
+  const E = globalThis.SN_ESTERNO;
+  if (!P || !E || !Array.isArray(dataUrls) || !dataUrls.length) return '';
+  const { analizzaImmagine, origineDellaCopia } = require('./firmatariC2pa');
+  const blocchi = [];
+  for (let i = 0; i < dataUrls.length; i++) {
+    const m = /^data:[^,]*;base64,(.*)$/s.exec(String(dataUrls[i] || ''));
+    if (!m) continue;
+    let nota;
+    try {
+      const byte = Buffer.from(m[1], 'base64');
+      const res = await analizzaImmagine(byte);
+      const copia = res.trovato ? null : origineDellaCopia(byte);
+      nota = P.notaPerModello(copia || res, { daCopia: !!copia });
+    } catch (_) { continue; }
+    const quale = dataUrls.length > 1 ? ` (immagine ${i + 1})` : '';
+    const testa = `(Sistema${quale}: ${E.perCanaleSistema(nota.sistema)}.)`;
+    blocchi.push(nota.etichetta
+      ? `${testa}\n${E.imbusta({ tipo: 'ETICHETTA_FILE', testo: nota.etichetta, conIntestazione: true, unaRiga: true })}`
+      : testa);
+  }
+  return blocchi.join('\n\n');
+}
+
+// Le immagini non tornano nei turni dopo: senza, «ed è fatta con l'AI?» al messaggio seguente non aveva più l'esito (#946).
+const MAX_CHAT_CON_ORIGINE = 200;
+const MAX_ESITI_PER_CHAT = 20;
+const origineDelleChat = new Map();
+function ricordaOrigineInChat(chatId, blocco) {
+  if (!chatId || !blocco) return;
+  const lista = origineDelleChat.get(chatId) || [];
+  lista.push(blocco);
+  if (lista.length > MAX_ESITI_PER_CHAT) lista.shift();
+  origineDelleChat.delete(chatId);
+  origineDelleChat.set(chatId, lista);
+  while (origineDelleChat.size > MAX_CHAT_CON_ORIGINE) origineDelleChat.delete(origineDelleChat.keys().next().value);
+}
+function origineGiaLettaInChat(chatId) {
+  return chatId ? PROMPTS.origineGiaLettaInChat(origineDelleChat.get(chatId)) : '';
 }
 
 // #593 — IL TURNO AUTOMATICO DELL'AGENTE AIUTO, E LE DUE COSE CHE CI STANNO
@@ -153,6 +199,8 @@ async function buildMessages(action, payload) {
     const parts = [];
     const userText = payload.userMessage || testoDelTurnoAutomatico(payload);
     if (userText) parts.push({ type: 'text', text: userText });
+    const origine = PROMPTS.origineImmaginiAiuto(payload.origineImmagini);
+    if (origine) parts.push({ type: 'text', text: origine });
     if (payload.screenshot) parts.push({ type: 'image_url', image_url: { url: payload.screenshot } });
     const userMsg = parts.length === 1 && parts[0].type === 'text'
       ? { role: 'user', content: parts[0].text }
@@ -1141,7 +1189,7 @@ function recordPendingConfirm(sender, action) {
   for (const [k, rec] of pendingConfirms) if (rec.scade <= now) pendingConfirms.delete(k);
   pendingConfirms.set(pendingConfirmKey(sender, action), {
     scade: now + PENDING_CONFIRM_TTL,
-    mostrati: { righe: action._righe, targetIds: action._targetIds },
+    mostrati: { righe: action._righe, targetIds: action._targetIds, proposte: action._proposte, nome: action._nomeSistema },
   });
 }
 function consumePendingConfirm(sender, action) {
@@ -1159,7 +1207,7 @@ function daPaginaDiFilo(sender) {
 // Una pagina di Filo rimanda l'azione col popup che ha mostrato; per le altre
 // vale quello registrato alla richiesta di conferma.
 function bersagliMostrati(sender, action) {
-  if (daPaginaDiFilo(sender)) return { righe: action._righe, targetIds: action._targetIds };
+  if (daPaginaDiFilo(sender)) return { righe: action._righe, targetIds: action._targetIds, proposte: action._proposte, nome: action._nomeSistema };
   const rec = pendingConfirms.get(pendingConfirmKey(sender, action));
   return rec && rec.scade > Date.now() ? rec.mostrati : null;
 }
@@ -1364,8 +1412,190 @@ async function primaVoltaDelTerminale() {
   try { return (await Storage.getRaw(SN_CONST.STORAGE_KEYS.FILO_TERMINALE_SPIEGATO, false)) !== true; } catch (_) { return false; }
 }
 
+// #874 — l'azione della chat nella forma che capiscono i tasti della home: il tipo dice cosa, il resto passa.
+function richiestaDiSistema(type, action) {
+  const { _richiestaSistema, _nomeSistema, ...resto } = action || {};
+  return { ...resto, cosa: type === 'VOLUME' ? 'volume' : type === 'WIFI' ? 'wifi' : 'bluetooth' };
+}
+
+// Parte la rete o il dispositivo che la conferma ha nominato: il nome vero, non le parole del modello.
+function richiestaDaEseguire(type, action) {
+  const r = richiestaDiSistema(type, action);
+  const nome = action && action._nomeSistema;
+  if (nome && type === 'WIFI') return { ...r, rete: nome };
+  if (nome && type === 'BLUETOOTH') return { ...r, dispositivo: nome };
+  return r;
+}
+
+// L'esito col numero e i nomi VERI. I nomi di reti e dispositivi li sceglie chi li gestisce: tornano in busta, e la
+// frase per un errore si compone senza nomi.
+function esitoSistemaPerModello(o) {
+  const E = globalThis.SN_ESTERNO;
+  const busta = (righe) => E.imbusta({ tipo: 'NOMI_DISPOSITIVI', testo: righe.map((r) => `- ${E.neutralizza(r, { unaRiga: true })}`).join('\n') });
+  const C = require('./comandiSistema');
+  if (!o.ok) {
+    if (o.errore === 'richiesta') return `Non fatto: ${o.frase}. Correggi i parametri e riprova.`;
+    const s = C.spiega(o.errore, { cosa: o.cosa });
+    const apri = s.apri ? ' Sotto la tua risposta l\'utente trova il tasto che apre quelle impostazioni: diglielo.' : '';
+    const nomi = Array.isArray(o.candidati) && o.candidati.length
+      ? `\nI nomi che il sistema conosce:\n${busta(o.candidati)}\nSe uno è quello che l'utente intende, richiama con quel nome; altrimenti chiediglielo.`
+      : '';
+    const quale = o.dispositivo || o.rete ? `\nRiguarda:\n${busta([o.dispositivo || o.rete])}` : '';
+    const acceso = o.accesoPrima ? ` Prima ho acceso ${o.cosa === 'wifi' ? 'il Wi-Fi' : 'il Bluetooth'}, che era spento.` : '';
+    return `Non fatto: ${s.frase}${s.dove ? ` ${s.dove}` : ''}${acceso}${apri} Riporta all'utente queste parole; non riprovare uguale.${quale}${nomi}`;
+  }
+  if (o.cosa === 'volume') {
+    const prima = typeof o.prima === 'number' ? ` (prima era al ${o.prima}%)` : '';
+    const limite = o.limitato ? ' Il numero chiesto era fuori da 0-100: si è fermato al limite, dillo all\'utente.' : '';
+    return `Volume del computer ora al ${o.volume}%${o.muto ? ', in muto' : ''}${prima}.${limite}`;
+  }
+  const radio = o.cosa === 'wifi' ? 'Wi-Fi' : 'Bluetooth';
+  if (Array.isArray(o.elenco)) {
+    const stato = o.acceso === true ? ` (${radio} acceso)` : o.acceso === false ? ` (${radio} spento)` : '';
+    if (!o.elenco.length) return o.cosa === 'wifi' ? `Il computer non conosce nessuna rete Wi-Fi${stato}.` : `Nessun dispositivo Bluetooth abbinato${stato}.`;
+    const righe = o.elenco.map((x) => `${x.nome}${x.collegato === true || x.attiva ? ' (collegato)' : ''}`);
+    return `${o.cosa === 'wifi' ? 'Reti Wi-Fi conosciute' : 'Dispositivi Bluetooth abbinati'}${stato}:\n${busta(righe)}`;
+  }
+  if (typeof o.acceso === 'boolean') return `${radio} ${o.acceso ? 'acceso' : 'spento'}.`;
+  const nome = o.dispositivo || o.rete;
+  const acceso = o.accesoPrima ? ` ${radio} era spento: acceso prima.` : '';
+  if (o.gia) return `Era già così, niente da cambiare:\n${busta([nome])}`;
+  if (o.cosa === 'bluetooth') {
+    if (o.collegato === null) return `Collegamento chiesto, ma Windows non l'ha ancora confermato: lo vedi nella home fra poco.${acceso}\n${busta([nome])}`;
+    return `${o.collegato ? 'Collegato' : 'Scollegato'}:${acceso}\n${busta([nome])}`;
+  }
+  if (!o.confermato) return `Collegamento alla rete chiesto: il sistema non dice ancora a quale rete è collegato, lo vedi nella home fra poco.${acceso}\n${busta([nome])}`;
+  return `Collegato alla rete Wi-Fi:${acceso}\n${busta([nome])}`;
+}
+
 // `parole` = ciò che l'utente ha scritto in chat: un codice scritto da lui può uscire.
-async function executeFiloAction(action, { confirmed = false, sender = null, contesto = null, assistente = false, parole = '' } = {}) {
+function idDelCambio(action) {
+  const id = String(action.id ?? action.cambio ?? action.evento ?? '').trim();
+  return id || null;
+}
+
+// Ogni stato che l'azione scrive diventa un evento del filo nel salvataggio (registroCambi.js):
+// qui si dichiara solo che li ha chiesti la chat, e si raccolgono per il segno sulla bolla.
+// #950 — quanti file per volta: ognuno costa una lettura e una chiamata al modello, e l'elenco va letto prima
+// dell'OK. Oltre, il popup dice quanti ne restano.
+const LOTTO_RINOMINA = 40;
+async function preparaRinomina(action, sender, avanzamento = null) {
+  const NF = globalThis.SN_NOMI_FILE;
+  const Nomi = require('./nomiFile');
+  const DR = require('./documentRead');
+  const fsp = require('node:fs/promises');
+  const fs = require('node:fs');
+  const nodePath = require('node:path');
+  const C = globalThis.SN_CMD_CLASSIFY;
+  const perimetro = perimetroLettura(sender);
+  const cwd = cartellaDelComando(getAssistantCwd(sender));
+  const saltati = [];
+  const vero = (v) => v === true || /^(true|1|si|sì|yes)$/i.test(String(v ?? ''));
+  const elenco = [].concat(action.percorsi ?? action.file ?? action.files ?? action.percorso ?? action.path ?? [])
+    .map((x) => (x && typeof x === 'object' ? (x.percorso ?? x.path) : x))
+    .filter((x) => typeof x === 'string' && x.trim());
+  let candidati = [];
+  for (const x of elenco) {
+    let full = DR.normalizePath(x, cwd);
+    try { await fsp.stat(full); } catch (_) {
+      try { const alt = await DR.risolviTollerante(full); if (alt && alt.path) full = alt.path; } catch (_) {}
+    }
+    candidati.push(full);
+  }
+  const cartella = action.cartella ?? action.folder ?? action.directory;
+  if (typeof cartella === 'string' && cartella.trim()) {
+    const dir = DR.normalizePath(cartella, cwd);
+    let voci = null;
+    try { voci = await fsp.readdir(dir, { withFileTypes: true }); } catch (_) { voci = null; }
+    if (!voci) {
+      if (!candidati.length) return { proposte: [], saltati, oltre: 0, errore: `la cartella ${dir} non si apre (non c'è, o non è una cartella)` };
+    } else {
+      const tutti = vero(action.tutti ?? action.all);
+      const scelti = voci.filter((d) => d.isFile() && !d.name.startsWith('.') && NF.tipoDi(d.name)
+        && (tutti || NF.nomeSenzaSenso(d.name))).map((d) => nodePath.join(dir, d.name));
+      const conData = await Promise.all(scelti.map(async (p) => {
+        try { return { p, t: (await fsp.stat(p)).mtimeMs }; } catch (_) { return { p, t: 0 }; }
+      }));
+      conData.sort((a, b) => b.t - a.t);
+      candidati.push(...conData.map((x) => x.p));
+    }
+  }
+  candidati = [...new Set(candidati)];
+  if (!candidati.length) {
+    const errore = !elenco.length && !cartella ? 'indica i file o una cartella'
+      : (!elenco.length && !vero(action.tutti ?? action.all)
+        ? 'nella cartella non c\'è un PDF, un\'immagine o un documento col nome che non dice niente: se vuoi rinominare anche gli altri, chiedilo' : '');
+    return { proposte: [], saltati, oltre: 0, errore };
+  }
+  const oltre = Math.max(0, candidati.length - LOTTO_RINOMINA);
+  candidati = candidati.slice(0, LOTTO_RINOMINA);
+  const dettato = typeof action.nome === 'string' && action.nome.trim() && candidati.length === 1 ? action.nome : '';
+
+  async function unaProposta(full) {
+    const nome = nodePath.basename(full);
+    if (C && C.fuoriPerimetro(full, perimetro)) return { saltato: { nome, perche: 'sta fuori dalla tua cartella personale' } };
+    let st = null;
+    try { st = await fsp.stat(full); } catch (_) { st = null; }
+    if (!st) return { saltato: { nome, perche: 'non c\'è' } };
+    if (!st.isFile()) return { saltato: { nome, perche: 'non è un file' } };
+    const { ext } = NF.scomponi(nome);
+    if (dettato) {
+      const base = NF.pulisci(dettato, { ext });
+      return base ? { proposta: { da: full, prima: nome, nome: base + ext } } : { saltato: { nome, perche: 'il nome chiesto è vuoto' } };
+    }
+    const p = await Nomi.proponi(full);
+    if (!p.ok) return { saltato: { nome, perche: p.frase } };
+    const nuovo = p.proposta + p.ext;
+    if (nuovo === nome) return { saltato: { nome, perche: 'ha già un nome che dice cos\'è' } };
+    return { proposta: { da: full, prima: nome, nome: nuovo } };
+  }
+  // In parallelo, ma pochi alla volta: una cartella di scansioni non deve diventare quaranta chiamate insieme.
+  const esiti = new Array(candidati.length);
+  let prossimo = 0;
+  let letti = 0;
+  const segna = () => { try { if (avanzamento) avanzamento(letti, candidati.length); } catch (_) {} };
+  segna();
+  const lavora = async () => {
+    while (prossimo < candidati.length) {
+      const k = prossimo++;
+      try { esiti[k] = await unaProposta(candidati[k]); } catch (_) {
+        esiti[k] = { saltato: { nome: nodePath.basename(candidati[k]), perche: 'non sono riuscito a leggerlo' } };
+      }
+      letti += 1;
+      segna();
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(4, candidati.length) }, lavora));
+
+  // Il popup promette nomi veri: due file dello stesso lotto, o un file già sul disco, non finiscono sullo stesso.
+  const presi = new Map();
+  const proposte = [];
+  for (const e of esiti) {
+    if (!e) continue;
+    if (e.saltato) { saltati.push(e.saltato); continue; }
+    const p = e.proposta;
+    const dir = nodePath.dirname(p.da);
+    if (!presi.has(dir)) presi.set(dir, new Set());
+    const set = presi.get(dir);
+    const occupato = (n) => set.has(n.toLowerCase())
+      || (n.toLowerCase() !== p.prima.toLowerCase() && fs.existsSync(nodePath.join(dir, n)));
+    const libero = NF.nomeLibero(p.nome, occupato);
+    if (!libero) { saltati.push({ nome: p.prima, perche: 'non c\'è un nome libero' }); continue; }
+    set.add(libero.toLowerCase());
+    proposte.push({ ...p, nome: libero });
+  }
+  return { proposte, saltati, oltre };
+}
+
+async function executeFiloAction(action, opzioni = {}) {
+  const raccolti = [];
+  const via = opzioni.assistente ? 'assistente' : 'chat';
+  const res = await Registro.con({ via, raccolti }, () => eseguiAzioneFilo(action, opzioni));
+  if (raccolti.length && res && typeof res === 'object') return { ...res, cambi: raccolti };
+  return res;
+}
+
+async function eseguiAzioneFilo(action, { confirmed = false, sender = null, contesto = null, assistente = false, parole = '', avanzamento = null, chatId = null } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
   // Da un sito (anche via una chat aperta da lì) passano solo le azioni della
@@ -1385,6 +1615,22 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
       if (T && T.validate(token, valore)) {
         const settings = await Storage.getSettings();
         action._illegible = T.illegibleAfter(token, valore, settings.themeTokens || {}, resolveTheme(settings));
+      }
+    } catch (_) {}
+  }
+
+  // Un elenco di siti che resterebbe com'è (aggiungere un sito che c'è già, toglierne uno che non c'è)
+  // non chiede conferma per poi non fare niente: lo si sa prima del gate, mai dall'LLM (#949).
+  if (type === 'IMPOSTA_PREFERENZA') {
+    delete action._invariato;
+    try {
+      const built = global.SN_PREF.buildPreferencePartial(
+        action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza,
+        action.valore ?? action.value ?? action.valoreNuovo ?? action.val,
+      );
+      if (built && built.elenco) {
+        const r = global.SN_PREF.applicaElenco(built.elenco, await Storage.getSettings());
+        if (r.invariato) action._invariato = r.invariato;
       }
     } catch (_) {}
   }
@@ -1441,6 +1687,21 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
     action._righe = righeDaDimenticare.map((r) => r.testo);
   }
 
+  // CANCELLA_PAGINE (#866): periodo e numero di pagine li calcola il main, così il popup dice il conto vero.
+  if (type === 'CANCELLA_PAGINE') {
+    const sito = globalThis.SN_FILO_EVENTI.normaSito(action.sito ?? action.dominio ?? action.site ?? '');
+    // Un sito senza periodo («cancella le pagine di YouTube») vuol dire tutte le sue pagine.
+    const limiti = { ore: action.ore, giorni: action.giorni, da: action.da, a: action.a };
+    const senzaLimiti = Object.values(limiti).every((v) => v == null || v === '');
+    const nome = action.periodo || (sito && senzaLimiti ? 'tutto' : 'ultima_ora');
+    action._periodo = globalThis.SN_FILO_EVENTI.periodo(nome, limiti);
+    if (!action._periodo) {
+      return { executed: false, kept: false, output: { errore: 'periodo non capito: usa ultima_ora, oggi, ieri, tutto, oppure ore, giorni, o da/a (istanti ISO o giorni AAAA-MM-GG)' } };
+    }
+    if (sito) { action._periodo.sito = sito; action._sito = sito; action._nomePeriodo = nome; }
+    try { action._n = (await globalThis.SN_IL_FILO.pagine(action._periodo)).length; } catch (_) {}
+  }
+
   // ── modalità terminale: gate hard, indipendente dal livello (#146.6) ──────
   // Con la modalità terminale spenta nelle impostazioni Filo non esegue ALCUN
   // comando. Controllo PRIMA del gate dei livelli: così un terminale spento
@@ -1474,6 +1735,58 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
   }
 
   if (type === 'ESEGUI_COMANDO' || type === 'LEGGI_DOCUMENTO') action._perimetro = perimetroLettura(sender);
+
+  // #950 — l'elenco vecchio → nuovo lo prepara il main leggendo i file, prima della conferma: il popup mostra
+  // i nomi veri, e all'OK si rinomina quello che il popup ha mostrato (bersagliMostrati).
+  if (type === 'RINOMINA_FILE' && !confirmed) {
+    const prep = await preparaRinomina(action, sender, avanzamento);
+    action._proposte = prep.proposte;
+    action._saltati = prep.saltati;
+    action._oltre = prep.oltre;
+    if (!prep.proposte.length) {
+      const errore = prep.errore || (prep.saltati.length ? 'nessuno dei file si può rinominare' : 'nessun file da rinominare');
+      return { executed: false, kept: false, output: { error: errore, saltati: prep.saltati } };
+    }
+  }
+
+  // Il livello di un annullo è quello del cambio che rimette: lo legge il main dal registro, sempre,
+  // sopra qualunque valore arrivato con l'azione.
+  if (type === 'ANNULLA_CAMBIO') {
+    const bersaglio = await Registro.livelloDi(idDelCambio(action));
+    action._livelloCambio = bersaglio ? bersaglio.livello : 1;
+    action._fraseCambio = bersaglio ? bersaglio.frase : '';
+  }
+
+  // #874 — il livello di un comando del sistema lo decide la stessa lettura della richiesta che poi la esegue:
+  // scritta qui sempre, sopra qualunque valore arrivato col modello.
+  if (type === 'VOLUME' || type === 'BLUETOOTH' || type === 'WIFI') {
+    const C = require('./comandiSistema');
+    const q = C.normalizzaRichiesta(richiestaDiSistema(type, action));
+    let nome = q.nome || '';
+    // Già com'è chiesto (la rete è quella, le cuffie sono staccate, la radio è spenta): niente da confermare.
+    let gia = false;
+    // Rete e dispositivo da confermare: il popup nomina quello che partirà, trovato prima di chiedere; all'OK parte
+    // quello mostrato. Un nome che non ne trova uno solo torna al modello con l'elenco, senza una conferma a vuoto.
+    if (nome && (type === 'WIFI' || q.collega === false)) {
+      if (confirmed) {
+        const visti = bersagliMostrati(sender, action);
+        if (visti && typeof visti.nome === 'string' && visti.nome) nome = visti.nome;
+      } else {
+        const trovato = await C.risolviNome(q);
+        if (trovato.esito) return { executed: false, kept: false, output: trovato.esito };
+        if (trovato.nome) nome = trovato.nome;
+        gia = trovato.gia === true;
+      }
+    } else if (!nome && q.acceso === false && !confirmed) {
+      const letto = globalThis.SN_SISTEMA_MAIN && typeof globalThis.SN_SISTEMA_MAIN.stato === 'function' ? globalThis.SN_SISTEMA_MAIN.stato() : null;
+      const radio = letto && (type === 'WIFI' ? letto.wifi : letto.bluetooth);
+      gia = !!radio && radio.acceso === false;
+    }
+    action._richiestaSistema = { ...q, ...(nome ? { nome } : {}), ...(gia ? { gia: true } : {}) };
+    // Il nome sta anche fuori, dove il recinto dei testi salvati lo trova (CAMPI_SALVATI).
+    if (nome) action._nomeSistema = nome;
+    else delete action._nomeSistema;
+  }
 
   // ── gate dei livelli di sicurezza (#146.2) ────────────────────────────────
   // Il livello è assegnato STATICAMENTE nel registro (src/shared/actionLevels.js),
@@ -1601,7 +1914,8 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
         // Niente caratteri di controllo (byte nullo compreso) in un'etichetta
         // che poi va nel diario e nella colonna dei timer.
         const label = cleanLabel(action.label || action.etichetta) || 'Timer';
-        const entry = await FiloMem.addTimer({ label, seconds });
+        // La conversazione che l'ha chiesto: la carta del timer nella home la riapre (#870).
+        const entry = await FiloMem.addTimer({ label, seconds, chat: chatId });
         if (entry) broadcastLiveUpdate();
         return { executed: !!entry, kept: !!entry };
       }
@@ -1614,6 +1928,7 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
           label: cleanLabel(action.label ?? action.etichetta),
           time: action.time ?? action.orario ?? action.at ?? '',
           repeat: action.ripeti ?? action.repeat ?? action.giorni ?? action.days,
+          chat: chatId,
         });
         if (entry) broadcastLiveUpdate();
         return { executed: !!entry, kept: !!entry };
@@ -1732,6 +2047,15 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
         try { const { app } = require('electron'); userAgent = `Filo desktop ${app.getVersion()}`; } catch (_) {}
         try {
           const r = await FB.submit({ text: testo, name: titolo, clientId: 'filo:chat', userAgent });
+          // #986 — scritta da Filo ma confermata dall'utente: è sua, e la ritrova con le altre.
+          if (r && r.id) {
+            try {
+              await globalThis.SN_SEGNALAZIONI_MIE?.registra?.({
+                id: r.id, feedbackId: r.id, testo, titolo, stato: 'inviata',
+                num: FB.formatNum ? FB.formatNum(r.seq, 0) : '',
+              });
+            } catch (_) {}
+          }
           return { executed: !!(r && r.id), kept: false };
         } catch (e) {
           console.warn('[Filo] invio feedback fallito', e?.message || e);
@@ -1746,12 +2070,22 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
         const chiave = action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza;
         const valore = action.valore ?? action.value ?? action.valoreNuovo ?? action.val;
         const built = global.SN_PREF.buildPreferencePartial(chiave, valore);
-        if (!built) return { executed: false, kept: false };
         // Un rifiuto spiegato resta nel diario col suo perché: non è successo
         // niente, ma l'utente deve saperlo anche se il modello non lo dice.
-        if (built.rifiuto) return { executed: false, kept: false, output: { error: built.rifiuto, rifiuto: true } };
-        await applySettingsUpdate(built.partial);
-        return { executed: true, kept: true };
+        // `perModello` (le chiavi, i valori ammessi) va solo al modello.
+        const no = built ? (built.rifiuto ? built : null) : global.SN_PREF.spiegaNonValida(chiave, valore);
+        if (no) return { executed: false, kept: false, output: { error: no.rifiuto, rifiuto: true, ...(no.perModello ? { perModello: no.perModello } : {}) } };
+        if (action._invariato) return { executed: false, kept: false, output: { error: action._invariato, invariato: true } };
+        // Un elenco (siti bloccati, fidati…) si cambia a voci sull'elenco di adesso (#949).
+        let partial = built.partial;
+        if (built.elenco) {
+          const r = global.SN_PREF.applicaElenco(built.elenco, await Storage.getSettings());
+          if (r.invariato) return { executed: false, kept: false, output: { error: r.invariato, invariato: true } };
+          partial = r.partial;
+        }
+        await applySettingsUpdate(partial);
+        // Il nome leggibile serve alla riga della chat quando il valore era già quello (niente evento).
+        return { executed: true, kept: true, output: { etichetta: built.label } };
       }
       case 'IMPOSTA_ESTETICA': {
         // Filo cambia un token estetico (colore/font/raggio/opacità) su
@@ -1763,6 +2097,17 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
         const T = globalThis.SN_THEME_TOKENS;
         const token = action.token ?? action.nome ?? action.name ?? action.chiave ?? action.elemento;
         const valore = action.valore ?? action.value ?? action.val ?? action.colore;
+        // Il ↺ della riga nelle Preferenze, chiesto a parole (#949): il token torna al suo valore di serie.
+        if (T && T.get(token) && /^(predefinit[oa]|default|di serie|originale|ripristina(lo|la)?)$/i.test(String(valore ?? '').trim())) {
+          const correnti = await Storage.getSettings();
+          const restanti = { ...(correnti.themeTokens || {}) };
+          if (!Object.prototype.hasOwnProperty.call(restanti, token)) {
+            return { executed: false, kept: false, output: { error: `${T.get(token).label} è già al suo valore predefinito`, invariato: true } };
+          }
+          delete restanti[token];
+          await applySettingsUpdate({ themeTokens: restanti });
+          return { executed: true, kept: true };
+        }
         if (!T || !T.validate(token, valore)) return { executed: false, kept: false };
         const settings = await Storage.getSettings();
         const overrides = { ...(settings.themeTokens || {}) };
@@ -1813,6 +2158,28 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
         // «riletto la trasparenza» per una cosa che nessuno ha letto (#515).
         const trovato = !!(T && (!doc || T.get(doc)));
         return { executed: trovato, kept: true, output: { doc: doc || null, text, missing: !trovato } };
+      }
+      case 'LEGGI_IMPOSTAZIONI': {
+        // #949 — com'è impostato Filo adesso, per «com'è impostato X?». Sola lettura, senza le chiavi.
+        const V = globalThis.SN_VOCI_IMPOSTAZIONI;
+        const cerca = String(action.cerca ?? action.query ?? action.chiave ?? action.testo ?? '').replace(/\s+/g, ' ').trim().slice(0, 200);
+        if (!V) return { executed: false, kept: true, output: { error: 'lettura non disponibile' } };
+        const settings = await Storage.getSettings();
+        let permessiSiti = null;
+        try { permessiSiti = require('./permessiPagine').righeRicordate(); } catch (_) {}
+        const r = V.righePerModello(settings, { cerca, tema: resolveTheme(settings), sistema: process.platform, altrove: { permessiSiti } });
+        return { executed: true, kept: true, output: { cerca, righe: r.righe, trovate: r.trovate, totale: r.totale } };
+      }
+      case 'TOGLI_PERMESSO_SITO': {
+        // #949 — la stessa cosa del «Togli» nella pagina Sicurezza: una risposta ricordata se ne va, il sito tornerà a chiedere.
+        const r = require('./permessiPagine').togliPerChat(action.sito ?? action.dominio ?? action.site, action.permesso ?? action.parte);
+        if (r.errore) return { executed: false, kept: false, output: { error: r.errore, rifiuto: true } };
+        if (!r.tolte.length) {
+          const ci = r.restano.length ? `ci sono: ${r.restano.join('; ')}` : 'non ce n\'è nessuna';
+          return { executed: false, kept: false, output: { error: `nessuna risposta ricordata per ${r.host}${action.permesso ? ` (${action.permesso})` : ''}: ${ci}`, invariato: true } };
+        }
+        broadcastToFiloPages({ type: MSG.PERMESSI_SITI_CAMBIATI });
+        return { executed: true, kept: false, output: { tolte: r.tolte } };
       }
       case 'EVENTO_CALENDARIO':
         return { executed: false, kept: true };
@@ -1993,6 +2360,10 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
         return confirmed
           ? { executed: false, kept: true }
           : { executed: false, kept: true, needsConfirm: level, describe: Levels ? Levels.describe(action) : '' };
+      case 'CANCELLA_PAGINE': {
+        const cancellate = await globalThis.SN_IL_FILO.cancellaPagine(action._periodo);
+        return { executed: true, kept: false, output: { cancellate } };
+      }
       case 'CANCELLA_MEMORIA': {
         // Livello 3: a questo punto l'utente ha già digitato "conferma" (gate sopra).
         // Azzera tutti i moduli di memoria (PROFILO, PREFERENZE, espansioni) e il
@@ -2019,6 +2390,25 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
       }
       case 'APRI_FILE':
         return { executed: true, kept: true };
+      case 'RINOMINA_FILE': {
+        const visti = bersagliMostrati(sender, action);
+        const proposte = (visti && Array.isArray(visti.proposte) ? visti.proposte : []).slice(0, LOTTO_RINOMINA);
+        const Nomi = require('./nomiFile');
+        const nodePath = require('node:path');
+        const rinominati = [];
+        const falliti = [];
+        for (const p of proposte) {
+          if (!p || typeof p.da !== 'string' || !nodePath.isAbsolute(p.da) || typeof p.nome !== 'string') continue;
+          const r = await Nomi.rinomina(p.da, p.nome);
+          if (r.ok && !r.invariato) rinominati.push({ da: r.da, a: r.a, prima: r.prima, nome: r.nome });
+          else if (!r.ok) falliti.push({ nome: nodePath.basename(p.da), perche: r.frase });
+        }
+        return {
+          executed: rinominati.length > 0,
+          kept: true,
+          output: { rinominati, falliti, saltati: Array.isArray(action._saltati) ? action._saltati : [] },
+        };
+      }
       case 'ESEGUI_COMANDO': {
         // A questo punto: modalità terminale attiva (gate sopra) e livello
         // soddisfatto (1 = passa diretto; 2/3 = già confermato). Eseguiamo il
@@ -2116,6 +2506,19 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
         const r = await tm.clearPageStyle(tab);
         return { executed: !!(r && r.ok), kept: false };
       }
+      case 'ANNULLA_CAMBIO': {
+        // «Rimetti come prima»: vale per i cambi chiesti in chat e per quelli fatti dalle pagine.
+        const r = await Registro.annulla(idDelCambio(action), { via: assistente ? 'assistente' : 'chat' });
+        if (!r.ok) return { executed: false, kept: false, output: { error: r.motivo, ...(r.id ? { id: r.id } : {}) } };
+        return { executed: true, kept: false, output: { annullato: r.id, frase: r.frase, saltati: r.saltati || [] } };
+      }
+      case 'VOLUME':
+      case 'BLUETOOTH':
+      case 'WIFI': {
+        // #874 — la stessa porta dei tasti della home (MSG.SISTEMA_COMANDA): due cammini, un risultato.
+        const r = await require('./comandiSistema').comanda(richiestaDaEseguire(type, action));
+        return { executed: !!r.ok, kept: false, output: r };
+      }
       case 'ZOOM_PAGINA': {
         // #686 — lo zoom della pagina si chiede anche a parole, non solo con
         // Ctrl +/-/0. Non zooma da qui: gira la richiesta alla scheda attiva
@@ -2148,6 +2551,33 @@ async function executeFiloAction(action, { confirmed = false, sender = null, con
             max: esito.max,
           },
         };
+      }
+      case 'CARTA_HOME': {
+        const op = String(action.operazione ?? action.op ?? '').trim().toLowerCase();
+        const tipo = { togli: 'togli', rimetti: 'aggiungi', aggiungi: 'aggiungi', sposta: 'sposta', ripristina: 'ripristina' }[op];
+        if (!tipo) return { executed: false, kept: false, output: { error: 'operazione sconosciuta' } };
+        const verso = String(action.verso ?? '').trim().toLowerCase().replace('giù', 'giu') || undefined;
+        const CH = globalThis.SN_CARTE_HOME;
+        // Una carta di sinistra si cerca prima per chiave, poi un nome esatto di destra, poi per nome a sinistra:
+        // «lo scaricamento del file» non deve finire sull'Editor, che fra i suoi nomi ha «file».
+        // «Rimetti» una carta di sinistra tolta (uno scaricamento, un lavoro): torna lei sola, la disposizione resta.
+        if (tipo === 'aggiungi' && !CH.risolvi(action.carta, { esatto: true })) {
+          const rimessa = await rimettiSinistraDaChat({ action, sender, chatId });
+          if (rimessa) return rimessa;
+        }
+        if (tipo !== 'ripristina') {
+          const sx = await carteSinistraPerChat(sender, chatId);
+          const perChiave = sx.find((v) => v.chiave === String(action.carta ?? '').trim());
+          if (perChiave || !CH.risolvi(action.carta, { esatto: true })) {
+            const trovate = perChiave ? { voci: [perChiave], perTipo: false, tipo: perChiave.tipo } : CH.trovaSinistra(action.carta, sx);
+            if (trovate.voci.length || trovate.tipo || !CH.risolvi(action.carta)) return cartaSinistraDaChat({ tipo, verso, action, sx, trovate, sender });
+          }
+        }
+        const esito = await require('./carteHome').modifica({ tipo, carta: action.carta, verso, prima: action.prima_di ?? null });
+        const dove = CH.descrivi(esito.layout);
+        if (esito.errore) return { executed: false, kept: false, output: { error: esito.errore, ...dove } };
+        if (esito.cambiato) annunciaCarteHome(esito.layout, sender);
+        return { executed: true, kept: true, output: dove };
       }
       case 'COMANDO_FINESTRA': {
         // #419 — l'agente della home aziona i controlli del browser Filo (schermo
@@ -2311,6 +2741,26 @@ function commandOutputsForPrompt(actions) {
 // un turno precedente (F2): l'agente vede i dati esatti (cosa fa / come si attiva
 // / limiti) e risponde all'utente senza indovinare l'invocazione a memoria.
 // Sono DATI affidabili di sistema, non istruzioni.
+// Le impostazioni lette con LEGGI_IMPOSTAZIONI (#949), anche nei turni dopo. I valori li può aver scritti
+// un modello (lo stile, i nomi delle voci, i siti in elenco): stanno nel recinto dei testi salvati.
+function impostazioniLetteForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const E = globalThis.SN_ESTERNO;
+  const blocchi = [];
+  for (const a of actions) {
+    if (!a || String(a.type || '').toUpperCase() !== 'LEGGI_IMPOSTAZIONI') continue;
+    const o = a._output;
+    if (!o || !Array.isArray(o.righe)) continue;
+    const cerca = o.cerca ? E.neutralizza(o.cerca, { unaRiga: true }) : '';
+    const testa = !cerca ? 'tutte le voci'
+      : (o.trovate ? `le voci che c'entrano con «${cerca}»` : `nessuna voce c'entra con «${cerca}», quindi tutte`);
+    blocchi.push(`[Impostazioni di Filo lette con LEGGI_IMPOSTAZIONI (${testa}): sono i valori veri di quel momento, `
+      + 'rispondi con questi; se nel frattempo ne hai cambiata una, rileggila. Per cambiarne una usa la chiave fra parentesi quadre.]\n'
+      + E.imbusta({ tipo: 'TESTO_SALVATO', conIntestazione: true, testo: o.righe.map((r) => E.neutralizza(r, { unaRiga: true })).join('\n') }));
+  }
+  return blocchi.join('\n\n').trim();
+}
+
 function capabilityDetailsForPrompt(actions) {
   if (!Array.isArray(actions)) return '';
   const blocks = [];
@@ -2621,7 +3071,7 @@ function documentReadsForPrompt(actions) {
 // dell'editor compresi, arriva imbustato (#593, #592.4).
 function observationsForPrompt(actions) {
   return [
-    commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), webSearchResultsForPrompt(actions),
+    commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), impostazioniLetteForPrompt(actions), webSearchResultsForPrompt(actions),
     fileReadsForPrompt(actions), documentReadsForPrompt(actions), transparencyDocsForPrompt(actions),
     chatSearchesForPrompt(actions), confirmedActionsForPrompt(actions), proxyUnavailableForPrompt(actions),
     apertureFermateDopoForPrompt(actions),
@@ -2655,6 +3105,9 @@ const CAMPI_SALVATI = {
   SVEGLIA: ['label', 'etichetta'],
   SALVA_LEZIONE: ['testo', 'text', 'lezione'],
   DIMENTICA: ['_righe'],
+  ANNULLA_CAMBIO: ['_fraseCambio'],
+  BLUETOOTH: ['_nomeSistema'],
+  WIFI: ['_nomeSistema'],
 };
 
 // I testi salvati che una descrizione ripete (#592.4): nella frase di Filo
@@ -2776,6 +3229,26 @@ function toolResultText({ action, res, rendered }) {
   }
   const obs = observationsForPrompt([rendered]);
   if (obs) return obs;
+  // #950 — i nomi vengono dal disco e da un modello che ha letto i file: tornano recintati.
+  if (type === 'RINOMINA_FILE') {
+    const E = globalThis.SN_ESTERNO;
+    const busta = (righe) => E.imbusta({ tipo: 'TESTO_SALVATO', testo: righe.map((r) => `- ${E.neutralizza(r, { unaRiga: true })}`).join('\n') });
+    const o = res.output || {};
+    const saltati = Array.isArray(o.saltati) ? o.saltati : (Array.isArray(action._saltati) ? action._saltati : []);
+    const restano = saltati.length ? `\nRestano come sono:\n${busta(saltati.map((x) => `${x.nome}: ${x.perche}`))}` : '';
+    if (res.needsConfirm) {
+      const p = Array.isArray(action._proposte) ? action._proposte : [];
+      const oltre = action._oltre > 0 ? `\nNe restano altri ${action._oltre} oltre a questi: si fanno con un'altra richiesta.` : '';
+      return `In attesa della conferma dell'utente: il sistema gli mostra i nomi nuovi, che ha preparato leggendo i file:\n${busta(p.map((x) => `${x.prima} → ${x.nome}`))}${restano}${oltre}\n`
+        + 'NON richiamare questa azione: la conferma è già in corso. Rispondi in una riga, senza dire di aver già rinominato.';
+    }
+    if (res.executed) {
+      const r = Array.isArray(o.rinominati) ? o.rinominati : [];
+      const f = Array.isArray(o.falliti) && o.falliti.length ? `\nNon riusciti:\n${busta(o.falliti.map((x) => `${x.nome}: ${x.perche}`))}` : '';
+      return `Rinominati ${r.length} file:\n${busta(r.map((x) => `${x.prima} → ${x.nome}`))}${f}${restano}\nSotto c'è «Annulla» per rimettere i nomi di prima.`;
+    }
+    return `Nessun file rinominato: ${o.error || 'niente da rinominare'}.${restano}\nDillo all'utente in una riga; non ripetere l'azione uguale.`;
+  }
   if (type === 'NAVIGA' && res.output && res.output.blocked === 'site') {
     const sito = res.output.host || 'quel sito';
     // Le liste pubbliche non sono la lista dell'utente: se il modello dice «la tua lista», lui lo cerca in Preferenze e non lo trova.
@@ -2808,9 +3281,14 @@ function toolResultText({ action, res, rendered }) {
       ? `Dimenticate:\n${nomiSalvati(res.output.dimenticate)}`
       : 'Nella memoria nessuna riga corrispondeva: niente da togliere. Non ripetere uguale: copia la riga com\'è nella memoria, o chiedi all\'utente quale intende.';
   }
+  if (type === 'TOGLI_PERMESSO_SITO' && res.executed && res.output && Array.isArray(res.output.tolte)) {
+    return `Tolte le risposte ricordate (il sito tornerà a chiedere):\n${nomiSalvati(res.output.tolte)}\n`
+      + 'Nella risposta di\' in una frase cosa hai tolto e che per ridarlo basta rispondere «Consenti» quando il sito lo richiede.';
+  }
   if (type === 'MODIFICA_SVEGLIA' && res.output && Array.isArray(res.output.updated)) {
     return res.output.updated.length ? `Spostate:\n${nomiSalvati(res.output.updated)}` : 'Nessuna sveglia o timer corrispondeva: niente da spostare. Non ripetere uguale: chiedi all\'utente quale intende.';
   }
+  if ((type === 'VOLUME' || type === 'BLUETOOTH' || type === 'WIFI') && res.output) return esitoSistemaPerModello(res.output);
   // #686 — lo zoom lo riferisce il numero VERO, non quello chiesto: un «al
   // 900%» finisce al massimo, e l'utente deve sentirselo dire.
   if (type === 'ZOOM_PAGINA' && res.executed && res.output) {
@@ -2832,6 +3310,15 @@ function toolResultText({ action, res, rendered }) {
   if (type === 'ZOOM_PAGINA' && !res.executed && res.output && res.output.zoom === 'muto') {
     return 'Zoom non cambiato: la pagina davanti non risponde ai comandi di zoom (può essere una pagina di sistema, o non aver finito di caricare). Dillo all\'utente, e non ripetere l\'azione uguale.';
   }
+  if (type === 'ANNULLA_CAMBIO' && res.output) {
+    const o = res.output;
+    if (!res.executed) {
+      return `Niente annullato: ${o.error || 'cambio non trovato'}. Rileggi i CAMBI RECENTI nello STATO e, se non è chiaro quale intende, chiediglielo.`;
+    }
+    const saltati = Array.isArray(o.saltati) && o.saltati.length
+      ? `\nNon rimessi, perché nel frattempo sarebbero già scaduti:\n${nomiSalvati(o.saltati)}` : '';
+    return `Annullato il cambio ${o.annullato}: è tornato com'era prima di questo:\n${nomiSalvati([o.frase || ''])}${saltati}`;
+  }
   if (res.executed) {
     // La descrizione «a cosa fatta» (per un'impostazione: «Impostazione
     // applicata: Tema → Scuro»), non quella del popup di conferma («Filo vuole
@@ -2840,19 +3327,34 @@ function toolResultText({ action, res, rendered }) {
     let done = '';
     try { done = descriviPerModello(action, { fatto: true }); } catch (_) {}
     done = String(done || describe()).replace(/\.+\s*$/, '');
+    // #949 — un cambio fatto da Filo dice cosa ha cambiato e come si torna indietro.
+    if (type === 'IMPOSTA_PREFERENZA' || type === 'IMPOSTA_ESTETICA') {
+      return `Eseguita: ${done}. Nella risposta di' in una frase cosa hai cambiato e che si rimette com'era con «annulla» `
+        + 'sul segno accanto al messaggio dell\'utente, o chiedendolo a te.';
+    }
     return `Eseguita: ${done}.`;
   }
+  if (res.output && res.output.invariato && res.output.error) {
+    return `Niente da cambiare: ${res.output.error}. Dillo all'utente in una riga; non ripetere l'azione uguale.`;
+  }
   if (res.output && res.output.rifiuto && res.output.error) {
-    const cosa = type === 'SALVA_LEZIONE' ? 'Lezione NON salvata' : 'Impostazione NON applicata';
-    return `${cosa}: ${res.output.error}. Non è stato salvato niente, nemmeno accorciato: `
-      + 'dillo all\'utente e, se vuole, riprova con un testo che stia nel limite.';
+    if (type === 'SALVA_LEZIONE') {
+      return `Lezione NON salvata: ${res.output.error}. Non è stato salvato niente, nemmeno accorciato: `
+        + 'dillo all\'utente e, se vuole, riprova con un testo che stia nel limite.';
+    }
+    const come = res.output.perModello || 'Dillo all\'utente e, se vuole, riprova con un valore ammesso.';
+    if (type === 'IMPOSTA_PREFERENZA') return `Impostazione NON applicata: ${res.output.error}. Non è stato salvato niente, nemmeno in parte. ${come}`;
+    return `Azione ${type} NON eseguita: ${res.output.error}. Non è cambiato niente: dillo all'utente in una riga.`;
   }
   // Tenuta ma non eseguita dal main: è un bottone in chat (evento, file,
   // pulizia schede, cancellazione archivio) che l'utente aziona da sé.
   if (res.kept) return `Proposta all'utente come bottone in chat: ${describe()}. Non serve altro da parte tua.`;
   // Non eseguita e senza niente da mostrare: mancava qualcosa (nessuna scheda
   // web attiva, un riferimento che non trova niente, un dato vuoto).
-  const detail = res.output ? ` (${JSON.stringify(res.output).slice(0, 200)})` : '';
+  // Il dettaglio è quello che serve a riprovare (l'elenco delle carte con le chiavi): tetto largo, e un taglio si dice.
+  const TETTO_DETTAGLIO = 8000;
+  const json = res.output ? JSON.stringify(res.output) : '';
+  const detail = json ? ` (${json.length > TETTO_DETTAGLIO ? `${json.slice(0, TETTO_DETTAGLIO)}… [tagliato: ${json.length} caratteri in tutto]` : json})` : '';
   // Le azioni sulla scheda web (proxy, stile della pagina) falliscono quasi
   // sempre per lo stesso motivo: non c'è una scheda web attiva.
   const PAGE_ACTIONS = ['PROXY_TAB', 'RIMUOVI_PROXY', 'RIMUOVI_PROXY_TUTTE', 'REGOLA_PROXY_DOMINIO', 'RIMUOVI_REGOLA_PROXY', 'STILE_PAGINA', 'RIPRISTINA_STILE_PAGINA'];
@@ -3118,13 +3620,21 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     threadMessages.push(msg);
   }
   const imageList = (Array.isArray(images) && images.length) ? images : (image ? [image] : []);
+  const giaLetta = origineGiaLettaInChat(chatId);
   if (imageList.length) {
     const parts = [];
     if (userMessage) parts.push({ type: 'text', text: String(userMessage) });
     for (const im of imageList) parts.push({ type: 'image_url', image_url: { url: im } });
+    // #711 — «questa foto è fatta con l'AI?» deve avere in chat la stessa
+    // risposta del tasto destro, quindi il controllo si fa SEMPRE: capire
+    // dall'intento quando serve sarebbe una promessa affidata al modello.
+    const origine = await noteProvenienzaImmagini(imageList);
+    if (origine) parts.push({ type: 'text', text: origine });
+    if (giaLetta) parts.push({ type: 'text', text: giaLetta });
     threadMessages.push({ role: 'user', content: parts });
+    ricordaOrigineInChat(chatId, origine);
   } else {
-    threadMessages.push({ role: 'user', content: String(userMessage || '') });
+    threadMessages.push({ role: 'user', content: giaLetta ? `${String(userMessage || '')}\n\n${giaLetta}` : String(userMessage || '') });
   }
 
   // Reasoning "vero" in diretta: se il client ha aperto un canale (reasoningReqId)
@@ -3240,7 +3750,13 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       const esiti = new Map();
       const avvia = (a) => (a._argsError
         ? Promise.resolve({ executed: false, kept: false, rejected: true, error: a._argsError })
-        : executeFiloAction(a, { sender, contesto: azioniViste, parole: paroleUtente }));
+        : executeFiloAction(a, {
+          sender, contesto: azioniViste, parole: paroleUtente, chatId,
+          // Le azioni lunghe dicono a che punto sono: la riga d'attesa le conta.
+          avanzamento: canPush ? (fatti, totali) => push('filo:action', {
+            kind: 'progress', type: String(a.type || '').toUpperCase(), callId: a._callId || '', fatti, totali,
+          }) : null,
+        }));
       const apertura = (a) => !!a && !a._argsError && String(a.type || '').toUpperCase() === 'NAVIGA';
       for (let i = 0; i < actions.length; i++) {
         const a = actions[i];
@@ -3262,6 +3778,8 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         // Output di un comando eseguito subito (livello 1) o esito bloccato
         // (terminale spento): il client lo mostra in chat (#146.6).
         if (res.output) rendered._output = res.output;
+        // I cambi di stato che l'azione ha lasciato: il segno sulla bolla dell'utente (#867).
+        if (Array.isArray(res.cambi) && res.cambi.length) rendered._cambi = res.cambi;
         // L'esito viaggia con l'azione: il diario del lavoro deve poter dire
         // «fatto» o «non riuscito», non solo «l'ha chiamata».
         rendered._executed = !!res.executed;
@@ -3370,9 +3888,14 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     // Nell'archivio solo ciò che è successo, più le azioni fermate (#810) che riaperta racconta come tali.
     // Una conferma data dopo la aggiunge la scheda (FILO_CHAT_NOTE).
     const successe = renderedActions.filter((x) => x && ((x._executed && !x._confirm) || (x._output && x._output.blocked === 'segreto')));
+    const cambi = renderedActions.flatMap((x) => (x && Array.isArray(x._cambi) ? x._cambi.map((c) => c.id) : []));
     const dopo = await appendToChatArchive(
       chatId,
-      { role: 'filo', text: textReply, actions: successe, ...(lettiRisposta.length ? { letti: lettiRisposta } : {}) },
+      {
+        role: 'filo', text: textReply, actions: successe,
+        ...(lettiRisposta.length ? { letti: lettiRisposta } : {}),
+        ...(cambi.length ? { cambi } : {}),
+      },
       { onboarding: onbActive },
     );
     // La chat può essere finita mentre Filo stava ancora rispondendo: l'utente
@@ -3434,7 +3957,7 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
   const memory = await FiloMem.getMemory();
   const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(memory);
   const lezioni = await lessonsBufferText();
-  const { stateText } = await FiloState.assemble();
+  const { stateText } = await FiloState.assemble({ sistema: false });
   // #379.5 — i "file" dell'editor (appunti inclusi: sono file come gli altri)
   // entrano nel contesto come riassunti, non come testo integrale. Sostituisce
   // la vecchia iniezione degli appunti dall'archivio (silo ormai vuoto dopo la
@@ -3527,15 +4050,112 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
 }
 
 // Messaggio "senza chiave API": istantaneo, dalle pagine salvate. Niente LLM.
+// ===== Le carte di sinistra della home dalla chat (#870) =====
+// La chat vede la colonna come la home: stesse carte, stesso ordine (SN_CARTE_HOME.sinistra). Senza chiave la
+// chat non risponde, quindi la carta dei Crediti qui non c'è. `chatId`: la conversazione che chiede.
+async function carteSinistraPerChat(sender, chatId = null, { tolte = false } = {}) {
+  const CH = globalThis.SN_CARTE_HOME;
+  const ambito = ambitoDellaFinestra(sender && sender.win);
+  let downloads = [];
+  try { downloads = require('./downloads').list(ambito) || []; } catch (_) {}
+  const [timers, notifiche, layout] = await Promise.all([
+    FiloMem.gcTimers().catch(() => []),
+    FiloMem.listNotifications().catch(() => []),
+    require('./carteHome').leggi(),
+  ]);
+  const lavori = require('./lavoriInCorso').elenco(ambito);
+  return (tolte ? CH.nascosteSinistra : CH.sinistra)({ timers, notifiche, downloads, lavori, chat: chatId }, layout);
+}
+
+// null se il nome non è di una carta di sinistra tolta: allora decide il resto di CARTA_HOME.
+async function rimettiSinistraDaChat({ action, sender, chatId }) {
+  const CH = globalThis.SN_CARTE_HOME;
+  const tolte = await carteSinistraPerChat(sender, chatId, { tolte: true });
+  const trovate = CH.trovaSinistra(action.carta, tolte);
+  if (!trovate.voci.length) return null;
+  const elenco = (voci) => voci.map((v) => ({ carta: v.chiave, tipo: v.tipo, titolo: v.titolo }));
+  if (trovate.voci.length > 1 && !trovate.perTipo) {
+    return { executed: false, kept: false, output: { error: 'più carte tolte con quel nome: quale?', candidate: elenco(trovate.voci) } };
+  }
+  let ultimo = null;
+  for (const v of trovate.voci) {
+    const esito = await require('./carteHome').modifica({ tipo: 'mostra', chiave: v.chiave });
+    if (esito.cambiato) ultimo = esito.layout;
+  }
+  if (ultimo) annunciaCarteHome(ultimo, sender);
+  return { executed: true, kept: true, output: { rimesse: elenco(trovate.voci) } };
+}
+
+async function cartaSinistraDaChat({ tipo, verso, action, sx, trovate, sender }) {
+  const CH = globalThis.SN_CARTE_HOME;
+  const Carte = require('./carteHome');
+  const elenco = (voci) => voci.map((v) => ({ carta: v.chiave, tipo: v.tipo, titolo: v.titolo }));
+  const destra = CH.descrivi(await Carte.leggi());
+  const no = (error) => ({ executed: false, kept: false, output: { error, sinistra: elenco(sx), ...destra } });
+  const voci = trovate.voci;
+  if (!voci.length) return no('carta sconosciuta: scegli fra queste (carta = la chiave)');
+  if (voci.length > 1 && !(trovate.perTipo && tipo === 'togli')) {
+    return { executed: false, kept: false, output: { error: 'più carte con quel nome: quale?', candidate: elenco(voci) } };
+  }
+  if (tipo === 'aggiungi') return no('la carta è già nella home');
+  if (tipo === 'togli') {
+    if (voci.some((v) => v.tipo === 'timer' || v.tipo === 'sveglia')) {
+      return no('un timer o una sveglia si tolgono con CANCELLA_SVEGLIA');
+    }
+    let avvisi = 0;
+    for (const v of voci) {
+      if (v.tipo === 'avviso') { await FiloMem.dismissNotification(v.ref.id); avvisi++; }
+      else {
+        const esito = await Carte.modifica({ tipo: 'nascondi', chiave: v.chiave });
+        if (esito.cambiato) annunciaCarteHome(esito.layout, sender);
+      }
+    }
+    if (avvisi) broadcastLiveUpdate();
+    return { executed: true, kept: true, output: { tolte: elenco(voci) } };
+  }
+  // sposta: la nuova posizione nell'ordine che l'utente vede, fra le carte che non stanno in cima per regola.
+  const v = voci[0];
+  const FISSA = 'sta in cima finché suona: non si sposta e non si scavalca';
+  if (v.fissa) return no(`la carta «${v.titolo}» ${FISSA}`);
+  const mobili = sx.filter((x) => !x.fissa);
+  const ordine = mobili.map((x) => x.chiave).filter((k) => k !== v.chiave);
+  const at = mobili.findIndex((x) => x.chiave === v.chiave);
+  let dove;
+  if (action.prima_di != null) {
+    const rif = sx.find((x) => x.chiave === String(action.prima_di)) || CH.trovaSinistra(action.prima_di, sx).voci[0];
+    if (!rif || rif.chiave === v.chiave) return no('la carta di riferimento non è a sinistra');
+    if (rif.fissa) return no(`la carta «${rif.titolo}» ${FISSA}`);
+    dove = ordine.indexOf(rif.chiave);
+  } else if (verso === 'cima') dove = 0;
+  else if (verso === 'fondo') dove = ordine.length;
+  else if (verso === 'su') dove = Math.max(0, at - 1);
+  else if (verso === 'giu') dove = Math.min(ordine.length, at + 1);
+  else return no('verso sconosciuto');
+  ordine.splice(dove, 0, v.chiave);
+  const esito = await Carte.modifica({ tipo: 'ordina-sinistra', ordine });
+  if (esito.errore) return no(esito.errore);
+  if (esito.cambiato) annunciaCarteHome(esito.layout, sender);
+  return { executed: true, kept: true, output: { spostata: v.titolo, sinistra: elenco(ordinaCome(sx, esito.layout)) } };
+}
+
+function ordinaCome(sx, layout) {
+  const CH = globalThis.SN_CARTE_HOME;
+  const per = (t) => sx.filter((x) => x.tipo === t).map((x) => x.ref);
+  return CH.sinistra({
+    timers: [...per('timer'), ...per('sveglia')], notifiche: per('avviso'), downloads: per('download'), lavori: per('lavoro'),
+  }, layout);
+}
+
 function buildNoKeyDashboard(settings, saved) {
   const suggestions = saved.slice(0, 5).map((p) => ({
     icon: 'link', text: p.title || p.url,
     action: { type: 'NAVIGA', url: p.url, label: p.title || p.url },
     importance: 2,
   }));
-  // La prima cosa che un utente nuovo deve fare sta a un clic, non in un menu.
+  // La prima cosa che un utente nuovo deve fare sta a un clic, non in un menu: nella home è la prima carta (#870).
   if (!settings.apiKeys?.openrouter) {
     suggestions.unshift({
+      carta: 'crediti',
       icon: 'credits', text: 'Apri Crediti e riscatta l\'invito',
       action: { type: 'NAVIGA', url: 'filo://credits/credits.html', label: 'Crediti' },
       importance: 3,
@@ -3543,7 +4163,7 @@ function buildNoKeyDashboard(settings, saved) {
   }
   const message = settings.apiKeys?.openrouter
     ? 'Buongiorno. Filo è qui.'
-    : 'Per attivare Filo serve un codice d\'invito: riscattalo nella pagina Crediti e ricevi i crediti per usare i modelli. Se preferisci, lì puoi mettere una tua chiave OpenRouter. Intanto, le tue pagine salvate sono qui.';
+    : `Per attivare Filo serve un codice d'invito: riscattalo nella pagina Crediti e ricevi i crediti per usare i modelli. Se preferisci, lì puoi mettere una tua chiave OpenRouter.${saved.length ? ' Intanto, le tue pagine salvate sono fra i suggerimenti.' : ''}`;
   return { message, suggestions };
 }
 
@@ -3699,6 +4319,8 @@ const handlerCtx = {
   filoWin,
   broadcastToTabs,
   broadcastToFiloPages,
+  annunciaCarteHome,
+  ambitoDellaFinestra,
   broadcastLiveUpdate,
   getEffectiveSettings,
   fillMovedSlots,
@@ -3757,6 +4379,7 @@ require('./handlers/safebrowse')(on, handlerCtx);
 require('./handlers/adSkip')(on, handlerCtx);     // #737 — pubblicità dei video da saltare
 require('./handlers/redteam')(on, handlerCtx);
 require('./handlers/misc')(on, handlerCtx);
+require('./handlers/file')(on, handlerCtx);       // #950 — nome sensato ai file dell'utente
 
 // ─── handler centrale richiamato dall'IPC ───────────────────────────────────
 
@@ -4174,35 +4797,93 @@ async function embedTexts(texts, settingsIn) {
   return { vectors: r.vectors || [], model: a.model };
 }
 
-// Reindicizza in background le schede i cui vettori vengono da un altro modello
-// (o mancano): a blocchi, le più recenti prima, una sola corsa alla volta. Il
-// costo è irrisorio (poche decine di parole a scheda) e senza questo, dopo un
-// cambio di modello di indicizzazione, la ricerca semantica troverebbe solo le
-// schede chiuse da quel momento in poi.
-let reindexRunning = false;
-async function reindexArchivedEmbeddings(settings, items) {
-  if (reindexRunning || !items.length) return;
-  reindexRunning = true;
-  try {
-    const todo = items.slice(0, 200);
-    for (let i = 0; i < todo.length; i += 50) {
-      const batch = todo.slice(i, i + 50);
-      const texts = batch.map((it) =>
-        `${it.title || ''}\n${it.summary || it.snippet || ''}`.replace(/\s+/g, ' ').trim().slice(0, 4000));
-      const emb = await embedTexts(texts, settings);
-      if (!emb) return;
-      for (let k = 0; k < batch.length; k++) {
-        const v = emb.vectors[k];
-        if (v && v.length) {
-          await ArchivedTabs.update(batch[k].id, { embedding: quantizeEmbedding(v), embedModel: emb.model });
+// Indicizza le schede senza un vettore del modello in uso: tutte, a blocchi, più blocchi insieme, una corsa alla volta
+// (chi arriva mentre gira aspetta la stessa). Un vettore salvato resta finché resta la scheda: si paga una volta per modello.
+const REINDEX_BLOCCO = 50;
+const REINDEX_IN_PARALLELO = 4;
+let reindexInCorso = null;
+function reindexArchivedEmbeddings(settings, items) {
+  if (reindexInCorso) return reindexInCorso;
+  if (!items.length) return Promise.resolve();
+  reindexInCorso = (async () => {
+    const blocchi = [];
+    for (let i = 0; i < items.length; i += REINDEX_BLOCCO) blocchi.push(items.slice(i, i + REINDEX_BLOCCO));
+    let prossimo = 0;
+    let fermo = false;
+    const lavora = async () => {
+      while (!fermo && prossimo < blocchi.length) {
+        const batch = blocchi[prossimo++];
+        const texts = batch.map((it) =>
+          `${it.title || ''}\n${it.summary || it.snippet || ''}`.replace(/\s+/g, ' ').trim().slice(0, 4000));
+        let emb = null;
+        try { emb = await embedTexts(texts, settings); } catch (e) {
+          console.warn('[SN] reindicizzazione archivio fallita:', e.message || e);
+        }
+        if (!emb) { fermo = true; return; }
+        for (let k = 0; k < batch.length; k++) {
+          const v = emb.vectors[k];
+          if (v && v.length) {
+            await ArchivedTabs.update(batch[k].id, { embedding: quantizeEmbedding(v), embedModel: emb.model });
+          }
         }
       }
-    }
-  } catch (e) {
-    console.warn('[SN] reindicizzazione archivio fallita:', e.message || e);
-  } finally {
-    reindexRunning = false;
+    };
+    await Promise.all(Array.from({ length: Math.min(REINDEX_IN_PARALLELO, blocchi.length) }, lavora));
+  })().finally(() => { reindexInCorso = null; });
+  return reindexInCorso;
+}
+
+const conVettoreDi = (it, modello) => Array.isArray(it.embedding) && it.embedding.length && it.embedModel === modello;
+
+// Una pagina della rete di casa non va al modello (#591): vale solo per testo.
+function daIndicizzare(items, modello) {
+  return items.filter((it) => !conVettoreDi(it, modello) && (it.title || it.summary || it.snippet)
+    && !(it.casa || isHomeNetworkUrl(it.url)));
+}
+
+// Le schede senza un vettore del modello in uso si indicizzano in sottofondo quando entrano in archivio (da qualunque
+// strada), all'avvio e a ogni cambio di modello: la prima ricerca trova l'indice già fatto invece di aspettarlo (#825).
+// Una scheda appena chiusa il vettore lo riceve dal suo arricchimento: finché è in corso l'indice non la paga due volte.
+let indiceTimer = null;
+let indiceModello = null;
+const inArricchimento = new Set();
+function programmaIndiceArchivio(ritardo) {
+  if (Disco.inIncognito()) return;
+  clearTimeout(indiceTimer);
+  indiceTimer = setTimeout(() => { indiceTimer = null; indicizzaArchivio().catch(() => {}); }, ritardo);
+  indiceTimer.unref?.();
+}
+
+async function indicizzaArchivio() {
+  // Una corsa già in giro può essere del modello di prima: finita quella, si guarda una volta ancora.
+  for (let giro = 0; giro < 2; giro++) {
+    const settings = await getEffectiveSettings();
+    const a = embedAttempt(settings);
+    indiceModello = a ? a.model : null;
+    if (!a) return;
+    const stale = daIndicizzare(await ArchivedTabs.list(), a.model).filter((it) => !inArricchimento.has(it.id));
+    if (!stale.length) return;
+    const unaNuova = !reindexInCorso;
+    await reindexArchivedEmbeddings(settings, stale);
+    if (unaNuova) return;
   }
+}
+
+try {
+  chrome.storage.onChanged.addListener((changes) => {
+    if (!changes || !changes.settings) return;
+    getEffectiveSettings().then((s) => {
+      const a = embedAttempt(s);
+      if (a && a.model !== indiceModello) programmaIndiceArchivio(2000);
+    }).catch(() => {});
+  });
+  programmaIndiceArchivio(10_000);
+  ArchivedTabs.suEntrate(() => programmaIndiceArchivio(2000));
+} catch (_) {}
+
+// Testo senza accenti e minuscolo, per confrontare una ricerca con le schede che un vettore non ce l'hanno ancora.
+function testoPiano(testo) {
+  return String(testo || '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 }
 
 // §3.1/§3.2 — arricchisce una tab archiviata: genera un riassunto LLM, lo
@@ -4211,8 +4892,9 @@ async function reindexArchivedEmbeddings(settings, items) {
 // { title, content } oppure una stringa (trattata come contenuto). Best-effort:
 // se manca la chiave o il testo, fa il possibile (anche solo snippet) e non rompe.
 async function enrichArchivedTab(id, payload) {
+  if (!id) return;
+  inArricchimento.add(id);
   try {
-    if (!id) return;
     // Riassunto e indice passano dal modello: una pagina della rete di casa resta in casa (#591). Il segno resta sulla
     // voce, perché dopo un riavvio Filo non sa più da dove aveva risposto un nome come tplinkwifi.net.
     if (payload && typeof payload === 'object' && await isHomeNetworkUrlSettled(payload.url)) {
@@ -4239,7 +4921,9 @@ async function enrichArchivedTab(id, payload) {
       patch.embedModel = emb.model;
     }
     if (Object.keys(patch).length) await ArchivedTabs.update(id, patch);
-  } catch (_) { /* l'arricchimento non deve mai disturbare */ }
+  } catch (_) { /* l'arricchimento non deve mai disturbare */ } finally {
+    inArricchimento.delete(id);
+  }
 }
 globalThis.SN_TAB_ENRICH = enrichArchivedTab;
 
@@ -4273,6 +4957,9 @@ async function rerankResults(query, items) {
 // Ricerca semantica: embeddizza la query, ordina le tab per similarità coseno.
 // Ritorna { results } (metadati senza embedding) oppure { results:null } se non
 // è possibile (niente chiave) così la pagina ripiega sul filtro per sottostringa.
+// Se l'indice in sottofondo non ha ancora finito, la ricerca lo aspetta un poco; chi non arriva entro l'attesa, o non va
+// al modello (rete di casa), vale per testo.
+const ATTESA_INDICE_MS = 15_000;
 async function searchArchivedTabs(query, { topK = 40 } = {}) {
   const q = String(query == null ? '' : query).trim();
   if (!q) return { ok: true, results: null };
@@ -4281,24 +4968,35 @@ async function searchArchivedTabs(query, { topK = 40 } = {}) {
   try { emb = await embedTexts([q], settings); } catch (_) { emb = null; }
   if (!emb || !emb.vectors[0] || !emb.vectors[0].length) return { ok: true, results: null, noEmbed: true };
   const qv = quantizeEmbedding(emb.vectors[0]);
-  const items = await ArchivedTabs.list();
-  const scored = [];
-  // Si confrontano solo i vettori fatti dal modello in uso: quelli di un altro
-  // modello (o le schede senza vettore) si rifanno in background, e dalla
-  // ricerca successiva contano anche loro.
-  const stale = [];
-  for (const it of items) {
-    const usable = Array.isArray(it.embedding) && it.embedding.length && it.embedModel === emb.model;
-    if (usable) { scored.push({ score: cosineInt(qv, it.embedding), it }); continue; }
-    const casa = it.casa || isHomeNetworkUrl(it.url);
-    if ((it.title || it.summary || it.snippet) && !casa && stale.length < SN_CONST.ARCHIVED_EMBED_LIMIT) stale.push(it);
+  // Si confrontano solo i vettori fatti dal modello in uso: vettori di modelli diversi non sono confrontabili.
+  const usabile = (it) => conVettoreDi(it, emb.model);
+  let items = await ArchivedTabs.list();
+  const stale = daIndicizzare(items, emb.model);
+  if (stale.length) {
+    let timer = null;
+    await Promise.race([
+      reindexArchivedEmbeddings(settings, stale).catch(() => {}),
+      new Promise((ok) => { timer = setTimeout(ok, ATTESA_INDICE_MS); }),
+    ]);
+    clearTimeout(timer);
+    items = await ArchivedTabs.list();
   }
-  if (stale.length) reindexArchivedEmbeddings(settings, stale).catch(() => {});
+  const parole = testoPiano(q).split(/[^\p{L}\p{N}]+/u).filter((p) => p.length > 1);
+  const scored = [];
+  const perTesto = [];
+  for (const it of items) {
+    if (usabile(it)) { scored.push({ score: cosineInt(qv, it.embedding), it }); continue; }
+    if (!parole.length) continue;
+    const testo = testoPiano(`${it.title || ''} ${it.summary || ''} ${it.snippet || ''} ${it.url || ''}`);
+    if (parole.every((p) => testo.includes(p))) perTesto.push(it);
+  }
   scored.sort((a, b) => b.score - a.score);
-  let results = scored.slice(0, topK).map(({ score, it }) => {
-    const { embedding, ...meta } = it;
-    return { ...meta, score };
-  });
+  const senzaVettore = ({ embedding, ...meta }) => meta;
+  // Chi vale per testo contiene tutte le parole cercate: va davanti, senza un punteggio che non ha.
+  let results = [
+    ...perTesto.slice(0, topK).map(senzaVettore),
+    ...scored.slice(0, topK).map(({ score, it }) => ({ ...senzaVettore(it), score })),
+  ].slice(0, topK);
 
   // §3.2 step 4 — re-rank LLM dei primi risultati (best-effort): legge i riassunti
   // e li riordina per pertinenza alla query. Se non disponibile, resta l'ordine
@@ -4448,6 +5146,25 @@ function casaPertinente(parole, it) {
 
 // Ogni destinatario riceve il messaggio ritagliato sul PROPRIO indirizzo (frame
 // per frame): a un sito arrivano solo i tipi che il codice di Filo lì ascolta.
+// Quello che serve al registro dei cambi per rimettere le cose com'erano, e per dirlo alle pagine.
+Registro.collega({
+  applicaImpostazioni: (parziale) => applySettingsUpdate(parziale),
+  aggiornaVivo: () => broadcastLiveUpdate(),
+  aggiornaRegoleProxy: () => refreshProxyRulesAllWindows(),
+  // Lo zoom di un sito vale per la sua sessione: un annullo dell'incognito non tocca le finestre normali.
+  zoomSu: async (host, percentuale) => {
+    const incognito = require('../shim/storage').inIncognito();
+    for (const w of BrowserWindow.getAllWindows()) {
+      const tm = w._filoTabs;
+      if (!tm || typeof tm.zoomSulSito !== 'function' || !!w._filoIncognito !== incognito) continue;
+      if (await tm.zoomSulSito(host, percentuale)) return true;
+    }
+    return false;
+  },
+  annuncia: (ids) => broadcastToFiloPages({ type: MSG.CAMBI_AGGIORNATI, ids }),
+});
+Registro.avvia();
+
 function broadcastToTabs(message) {
   try {
     for (const win of BrowserWindow.getAllWindows()) {
@@ -4472,18 +5189,32 @@ function broadcastToTabs(message) {
 // Il frame principale basta: qui non ci sono destinatari nei riquadri
 // incorporati (le pagine filo:// non ne ospitano di privilegiati). Anche fra le
 // finestre solo quelle di Filo: un popup di accesso è la pagina di un sito.
+//
+// `message` può essere una funzione dell'ambito della finestra (quello degli scaricamenti: '' o la partizione
+// incognito) che dà il messaggio per quella finestra, o null per saltarla: così l'incognito resta separato.
 function broadcastToFiloPages(message) {
-  const aFilo = (wc) => {
+  const aFilo = (wc, m) => {
     try {
-      if (wc && !wc.isDestroyed?.() && isFilo(wc.getURL())) wc.send('filo:broadcast', message);
+      if (wc && !wc.isDestroyed?.() && isFilo(wc.getURL())) wc.send('filo:broadcast', m);
     } catch (_) {}
   };
   try {
     for (const win of BrowserWindow.getAllWindows()) {
-      if (win._filoTabs) for (const t of win._filoTabs.tabs) aFilo(t.view?.webContents);
-      aFilo(win.webContents);
+      const m = typeof message === 'function' ? message(ambitoDellaFinestra(win)) : message;
+      if (m == null) continue;
+      if (win._filoTabs) for (const t of win._filoTabs.tabs) aFilo(t.view?.webContents, m);
+      aFilo(win.webContents, m);
     }
   } catch (_) {}
+}
+function ambitoDellaFinestra(win) {
+  try { return require('./downloads').scopeOfWindow(win); } catch (_) { return ''; }
+}
+// Le carte della home si annunciano solo alle finestre dell'ambito di chi le ha mosse: in incognito la
+// disposizione vive in memoria, e la finestra normale non deve vederla cambiare.
+function annunciaCarteHome(layout, sender) {
+  const ambito = ambitoDellaFinestra(sender && sender.win);
+  broadcastToFiloPages((a) => (a === ambito ? { type: MSG.CARTE_HOME_CAMBIATE, layout } : null));
 }
 
 // Configura il rilevatore di siti pericolosi (services/safebrowse) dalle

@@ -467,6 +467,31 @@ muro non era un muro.
   se il codice è arrivato su `main`. Lavorare direttamente su `main` non ha più
   senso e viene fermato subito.
 
+### Il sì si dà anche da browser (2026-10-04, #489)
+
+L'unica superficie di approvazione stava dentro l'app: se il lavoro bloccato
+fosse proprio quello che impedisce a Filo di partire, non ci sarebbe stato
+nessun modo di approvarlo. La seconda superficie è una pagina statica,
+`site/approvazioni`, pubblicata su Firebase Hosting del progetto
+(`https://filo-8b9cb.web.app`) e raggiungibile da qualunque browser.
+
+- **Stessa identità, stessi controlli**: accesso Google con l'account del
+  proprietario, poi la stessa `ownerMergeApprovals` dell'app (`list`,
+  `approve`, `discard`). Il server non distingue le due superfici e non
+  concede niente di più: niente scorciatoie da riga di comando.
+- **Le credenziali restano in memoria** (persistenza `none`): chiusa la scheda
+  non resta niente su disco che un programma sul computer possa riusare, e la
+  scelta dell'account si rivede a ogni accesso.
+- **Non si lascia incorniciare** (`frame-ancestors 'none'`, `X-Frame-Options`,
+  e la pagina stessa non si disegna dentro un riquadro): un'altra pagina non
+  può far cliccare «Approva» a chi non la vede.
+- **Le card sono quelle dell'app**: `scripts/build-approvazioni.mjs` copia
+  modulo, icone e tema; una sentinella negli unit pretende le copie allineate e
+  il predeploy rifiuta una copia vecchia.
+- **Si pubblica solo ciò che è fuso**: `npm run regole:pubblica` porta su
+  Firebase regole, indici e la pagina insieme, da `main` allineato a
+  `origin/main`. Il terminale del finish, a ogni blocco, nomina l'indirizzo.
+
 ### Si esamina e si fonde LO STESSO commit (2026-08-21, verifica avversariale)
 
 La prima versione del cancello scaricava il diff di `main...<ramo>` e poi
@@ -560,7 +585,13 @@ La regola, uguale per tutti e due:
   fusione se nella directory c'è qualcosa fuori dai commit (il salvataggio
   automatico lo committerebbe e lo spedirebbe, e il server fonderebbe la punta
   NUOVA), e non la chiede se il verdetto del controllo di sicurezza registrato
-  su questa macchina parla di un altro commit. Se la verifica ha dato l'ok su
+  su questa macchina parla di un altro commit. Dal #929 `routineMerge` e
+  `ownerMerge` portano anche `provaUnit`: gli unit girati da chi chiede sul
+  risultato della fusione con origin/main (`scripts/lib/unit-sulla-fusione.mjs`).
+  Il server fonde solo se main è ancora lo sha provato (`main_moved`
+  altrimenti, e chi chiede rifà la prova, al massimo tre volte); rossi solo
+  sulla fusione → riallineamento con l'elenco dei test (`unit_rossi`); senza il
+  campo fonde come prima e lo scrive nel log (`src/routine/provaUnit.js`). Se la verifica ha dato l'ok su
   un altro commit lo **dice** in una nota e chiede lo stesso: quella mossa la
   giudica il server (punto sopra). Se su questa macchina non risulta su quale
   commit sono stati dati i via libera, lo **dice** e prosegue: astenersi in

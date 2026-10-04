@@ -166,6 +166,73 @@
   cursor: not-allowed;
 }
 
+/* Menu e riquadro «Dai un nome sensato» (#950, src/shared/rinominaUi.js): posati sopra la pagina, alle
+   coordinate del clic o sotto l'elemento. */
+.sn-select-pop.sn-rinomina-menu { position: fixed; right: auto; top: auto; min-width: 180px; }
+.sn-rinomina {
+  position: fixed;
+  z-index: 2147483646;
+  box-sizing: border-box;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--sn-overlay-bg);
+  color: var(--sn-fg);
+  border: 1px solid var(--sn-border);
+  border-radius: var(--sn-radius);
+  box-shadow: var(--sn-shadow);
+  font-family: var(--sn-font);
+  font-size: 13px;
+  backdrop-filter: blur(4px);
+}
+.sn-rinomina [hidden] { display: none; }
+.sn-rinomina-riga,
+.sn-rinomina-esito { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.sn-rinomina-campo {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 7px 9px;
+  background: var(--sn-bg);
+  color: var(--sn-fg);
+  border: 1px solid var(--sn-border);
+  border-radius: var(--sn-radius);
+  font: inherit;
+  outline: none;
+  transition: border-color 0.12s ease;
+}
+.sn-rinomina-campo:focus { border-color: var(--sn-accent); }
+.sn-rinomina-campo:disabled { opacity: 0.6; }
+.sn-rinomina-ext { flex: 0 0 auto; color: var(--sn-muted); white-space: nowrap; }
+.sn-rinomina-ok,
+.sn-rinomina-annulla {
+  flex: 0 0 auto;
+  padding: 7px 12px;
+  border-radius: var(--sn-radius);
+  font: inherit;
+  cursor: pointer;
+  transition: opacity 0.12s ease, background 0.12s ease;
+}
+.sn-rinomina-ok { background: var(--sn-btn-bg); color: var(--sn-btn-fg); border: 1px solid transparent; }
+.sn-rinomina-ok:hover:not(:disabled) { opacity: 0.85; }
+.sn-rinomina-annulla { background: transparent; color: var(--sn-fg); border: 1px solid var(--sn-border); }
+.sn-rinomina-annulla:hover:not(:disabled) { background: var(--sn-hover); }
+.sn-rinomina-ok:disabled,
+.sn-rinomina-annulla:disabled { opacity: 0.45; cursor: default; }
+.sn-rinomina-esito-testo { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sn-rinomina-stato { display: flex; align-items: center; gap: 7px; color: var(--sn-muted); font-size: 12px; }
+.sn-rinomina-stato.sn-rinomina-errore { color: var(--sn-error); }
+.sn-rinomina-rotella {
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--sn-border);
+  border-top-color: var(--sn-accent);
+  border-radius: 50%;
+  animation: sn-rinomina-gira 0.8s linear infinite;
+}
+@keyframes sn-rinomina-gira { to { transform: rotate(360deg); } }
+
 [data-sn-theme] {
   scrollbar-width: thin;
   scrollbar-color: var(--sn-border) transparent;

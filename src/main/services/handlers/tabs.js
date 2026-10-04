@@ -132,7 +132,11 @@ module.exports = function register(on, ctx) {
     return { ok: true, removed: r.removed, remaining: r.remaining };
   }));
 
-  on(MSG.REMOVE_ARCHIVED_TAB, soloFilo(async (msg) => ({ ok: true, tabs: await ArchivedTabs.remove(msg.id) })));
+  // Come GET_ARCHIVED_TABS, l'elenco torna senza vettori: con migliaia di schede sarebbero megabyte a ogni cancellazione.
+  on(MSG.REMOVE_ARCHIVED_TAB, soloFilo(async (msg) => {
+    await ArchivedTabs.remove(msg.id);
+    return { ok: true, tabs: await ArchivedTabs.listMeta() };
+  }));
 
   on(MSG.CLEAR_ARCHIVED_TABS, soloFilo(async () => ({ ok: true, tabs: await ArchivedTabs.clear() })));
 

@@ -502,7 +502,8 @@
         return;
       }
       const dataUrl = await blobToDataUrl(blob);
-      images.push({ dataUrl });
+      // Il nome resta sul computer: lo leggono l'avviso degli allegati non partiti e l'elenco delle segnalazioni.
+      images.push({ dataUrl, name: String(blob.name || '') });
       bumpSubmissionId();
       renderThumbs();
     }
@@ -742,10 +743,10 @@
           if (shot) {
             const annotated = await composeAnnotated(shot);
             const full = await stackTopbar(annotated, topbarShot);
-            if (outImages.length < MAX_IMAGES) outImages.push({ dataUrl: full });
+            if (outImages.length < MAX_IMAGES) outImages.push({ dataUrl: full, name: 'schermata annotata' });
           } else if (topbarShot) {
             // La pagina non si lascia catturare ma la barra sì: allega almeno quella.
-            if (outImages.length < MAX_IMAGES) outImages.push({ dataUrl: topbarShot });
+            if (outImages.length < MAX_IMAGES) outImages.push({ dataUrl: topbarShot, name: 'schermata annotata' });
           } else {
             statusEl.textContent = 'Screenshot non disponibile su questa pagina.';
           }

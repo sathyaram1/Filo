@@ -1180,10 +1180,25 @@
     return Object.assign({
       onDone: () => { setTimeout(loadMergeApprovals, 1200); },
       esitoIniziale: (req) => esitiTentati.get(req.id) || null,
-      onApprove: (req) => sendToMain({ type: MERGE_APPROVAL_APPROVE, id: req.id }),
-      onDiscard: (req) => sendToMain({ type: MERGE_APPROVAL_DISCARD, id: req.id }),
+      // L'esito resta scritto anche se la card si ridisegna appena la conferma è finita.
+      onApprove: (req) => decidiFusione(MERGE_APPROVAL_APPROVE, req),
+      onDiscard: (req) => decidiFusione(MERGE_APPROVAL_DISCARD, req),
       onFeedback: (req) => openFeedbackByNum(UI ? UI.feedbackNum(req) : ''),
     }, extra || {});
+  }
+
+  async function decidiFusione(type, req) {
+    const UI = window.SN_MERGE_APPROVALS;
+    const reply = await sendToMain({ type, id: req.id });
+    if (UI) esitiTentati.set(req.id, UI.outcomeMessage(reply, req));
+    return reply;
+  }
+
+  // I ridisegni automatici del pannello aspettano che una conferma a metà finisca (#550).
+  function quandoPannelloLibero(fn) {
+    const UI = window.SN_MERGE_APPROVALS;
+    if (UI && mgSideBody) UI.quandoLibera(mgSideBody, fn);
+    else fn();
   }
 
   // Il segno «fondi senza chiedermelo» messo DOPO il blocco: il server la
@@ -1353,7 +1368,10 @@
       renderLivelliRow(fb);
       // Il pannello aperto su un livello si riempie di nuovo: se era il
       // quadrato, dentro c'è una richiesta che potrebbe non esistere più.
-      if (livelloAperto) openSidebarLivello(fb, livelloAperto);
+      if (livelloAperto) quandoPannelloLibero(() => {
+        const ora = selectedId && allFeedbacks.find((f) => f._id === selectedId);
+        if (ora && livelloAperto) openSidebarLivello(ora, livelloAperto);
+      });
     }
     if (dataLoaded) ridisegnaListaAlSuoPosto();
   }
@@ -2856,8 +2874,12 @@
     // di nuovo, come già fa quando cambia l'elenco delle fusioni; a chiuderlo
     // era ogni ridisegno, e con una segnalazione lunga si perdeva il punto.
     // Cambiando pratica si chiude, come sempre.
-    if (ridisegno && livelloAperto) riapriPannelloLivello(fb);
-    else closeSidebar();
+    if (ridisegno && livelloAperto) {
+      quandoPannelloLibero(() => {
+        if (selectedId !== fb._id || !livelloAperto) return;
+        riapriPannelloLivello(allFeedbacks.find((f) => f._id === fb._id) || fb);
+      });
+    } else closeSidebar();
   }
 
   // Riapre il pannello sulla forma già scelta, tenendo il punto di scorrimento.

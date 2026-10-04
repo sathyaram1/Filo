@@ -1432,6 +1432,17 @@
             const id = a.revealDownloadId;
             return { label: a.label, onClick: () => openDownloadFolder(id) };
           }
+          // #950 — il nome dato da solo a uno scaricamento: «Annulla» rimette quello con cui era arrivato.
+          if (a && a.rimettiNomeDownloadId && !a.onClick && api.downloads && api.downloads.rimettiNome) {
+            const id = a.rimettiNomeDownloadId;
+            return {
+              label: a.label,
+              onClick: () => api.downloads.rimettiNome(id).then((r) => {
+                if (r && r.ok) NOTIFS.show(r.cambiato ? `Il nome di prima era occupato: ora è «${r.nome}»` : `Nome di prima rimesso: ${r.nome}`);
+                else NOTIFS.show((r && r.frase) || 'Non sono riuscito a rimettere il nome di prima');
+              }).catch(() => {}),
+            };
+          }
           return a;
         }),
       };
@@ -1737,8 +1748,83 @@
         addBtn('Rimuovi', () => api.downloads.remove(r.id).then((res) => syncFromList(res && res.items)).catch(() => {}));
       }
       row.appendChild(actions);
+      if (r.state === 'completed' && !apri) {
+        row.addEventListener('contextmenu', (e) => { e.preventDefault(); apriMenuRiga(r); });
+        if (menuRiga.id === r.id && menuRiga.voci.length) {
+          row.classList.add('dl-row-con-menu');
+          row.appendChild(costruisciMenuRiga(r));
+        }
+      }
       return row;
     }
+
+    // #950 — il tasto destro su un file del pannello: le azioni della pagina Scaricamenti, compreso il nome
+    // sensato. Il menu si apre DENTRO la riga: fuori dal pannello lo coprirebbe la pagina, che sta sopra la barra.
+    // «Dai un nome sensato» porta alla pagina col riquadro aperto: nel pannello non c'è posto per casella ed esito.
+    const menuRiga = { id: '', voci: [] };
+    function chiudiMenuRiga() {
+      if (!menuRiga.id) return;
+      menuRiga.id = '';
+      menuRiga.voci = [];
+      if (panelOpen) renderPanel();
+    }
+    async function apriMenuRiga(riga) {
+      // La riga resta in pagina mentre il record cambia (nome nuovo, file sparito): conta quello di adesso.
+      const r = dls.get(riga.id) || riga;
+      const voci = [];
+      if (!r.missing) voci.push(['Apri file', () => openDownloadFile(r.id)]);
+      voci.push(['Apri cartella', () => openDownloadFolder(r.id)]);
+      const N = window.SN_NOMI_FILE;
+      if (!r.missing && !r.exe && N && N.tipoDi(r.filename)) {
+        let disp = false;
+        try { disp = !!((await api.message({ type: 'file_nome_stato' })) || {}).disponibile; } catch (_) { disp = false; }
+        if (disp) {
+          voci.push(['Dai un nome sensato', () => {
+            api.tabs.open(`filo://downloads/downloads.html?rinomina=${encodeURIComponent(r.id)}`);
+            closePanel();
+          }]);
+        }
+      }
+      if (!r.missing && r.nomeOriginale) {
+        voci.push(['Rimetti il nome di prima', () => api.downloads.rimettiNome(r.id).then((res) => {
+          avvisiRiga.set(r.id, res && res.ok
+            ? (res.cambiato ? `Il nome di prima era occupato: ora è «${res.nome}»` : `Nome di prima rimesso: ${res.nome}`)
+            : ((res && res.frase) || 'Non sono riuscito a rimettere il nome di prima'));
+          if (panelOpen) renderPanel();
+        }).catch(() => {})]);
+      }
+      voci.push(['Rimuovi', () => api.downloads.remove(r.id).then((res) => syncFromList(res && res.items)).catch(() => {})]);
+      menuRiga.id = r.id;
+      menuRiga.voci = voci;
+      if (panelOpen) renderPanel();
+      const primo = panel && panel.querySelector('.dl-row-menu-voce');
+      if (primo) try { primo.focus({ preventScroll: false }); } catch (_) {}
+    }
+    function costruisciMenuRiga() {
+      const m = document.createElement('div');
+      m.className = 'dl-row-menu';
+      m.setAttribute('role', 'menu');
+      for (const [label, fn] of menuRiga.voci) {
+        const v = document.createElement('div');
+        v.className = 'dl-row-menu-voce';
+        v.setAttribute('role', 'menuitem');
+        v.tabIndex = 0;
+        v.textContent = label;
+        const scegli = () => { chiudiMenuRiga(); fn(); };
+        v.addEventListener('click', (e) => { e.stopPropagation(); scegli(); });
+        v.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scegli(); }
+        });
+        m.appendChild(v);
+      }
+      return m;
+    }
+    document.addEventListener('mousedown', (e) => {
+      if (menuRiga.id && !(e.target.closest && e.target.closest('.dl-row-menu'))) chiudiMenuRiga();
+    }, true);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && menuRiga.id) { e.stopImmediatePropagation(); chiudiMenuRiga(); }
+    }, true);
 
     // reserveTop = altezza del pannello (capped) così la view della pagina
     // scende e il pannello non finisce sotto di essa. Vedi setTopInset in tabs.js.
