@@ -433,8 +433,8 @@ describe('richiesteCoperte: quali richieste ferme copre il segno «fondi senza c
 describe('i lavori locali (#908)', () => {
   test('la provenienza locale porta la sua pratica, quando c’è', () => {
     assert.equal(UI.originLabel({ origin: 'locale', num: '#908' }), 'lavoro locale · feedback #908');
-    assert.equal(UI.originLabel({ origin: 'locale' }), 'lavoro tuo, da questo computer');
-    assert.equal(UI.originLabel({}), 'lavoro tuo, da questo computer');
+    assert.equal(UI.originLabel({ origin: 'locale' }), 'lavoro tuo, in locale');
+    assert.equal(UI.originLabel({}), 'lavoro tuo, in locale');
   });
 
   test('una fusione che ha saltato L5 si legge come tale nella traccia', () => {

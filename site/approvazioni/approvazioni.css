@@ -1,0 +1,98 @@
+/* Pagina delle approvazioni da browser: colori e card vengono dai fogli di filo/ (gli stessi dell'app),
+   qui c'è solo l'impaginazione della pagina intorno alle card. */
+
+html, body {
+  margin: 0;
+  background: var(--sn-bg);
+  color: var(--sn-fg);
+  font-family: var(--sn-font);
+}
+body { min-height: 100vh; }
+
+.ap {
+  box-sizing: border-box;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 28px 24px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ap-testa {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+.ap-marchio {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--sn-accent);
+}
+.ap-titolo {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.ap-account {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--sn-muted);
+}
+.ap-email { overflow-wrap: anywhere; }
+
+.ap-icona {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sn-muted);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+.ap-icona:hover { background: color-mix(in srgb, var(--sn-fg) 7%, transparent); color: var(--sn-fg); }
+.ap-icona:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 2px; }
+.ap-icona svg { display: block; }
+/* Gira solo mentre la lettura è in corso: l'aggiornamento automatico si vede senza disturbare. */
+.ap-icona.is-lettura svg { animation: ap-gira 0.9s linear infinite; }
+@keyframes ap-gira { to { transform: rotate(360deg); } }
+
+.ap-accesso {
+  display: flex;
+  justify-content: center;
+  padding-top: 18vh;
+}
+.ap-accedi { font-size: 14px; padding: 10px 20px; }
+
+.ap-fusioni {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ap-stato { font-size: 13px; }
+.ap-vuoto {
+  margin: 0;
+  font-size: 13px;
+  color: var(--sn-muted);
+}
+
+.ap-account[hidden], .ap-accesso[hidden], .ap-fusioni[hidden] { display: none; }
+
+@media (max-width: 520px) {
+  .ap { padding: 18px 16px 48px; }
+  .ap-account { width: 100%; }
+  .ap-email { flex: 1 1 auto; }
+}
