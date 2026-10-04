@@ -8,11 +8,11 @@ order: 2
 
 Filo legge molto: le pagine che visiti, quello che scrivi, le tue memorie, i file che gli chiedi di aprire, quello che stampa il terminale. Un programma così deve dire con precisione dove va a finire tutto questo. Questo documento lo fa, per intero, e descrive Filo com'è oggi: dove la realtà è peggio di come la vorrei, lo trovi scritto in fondo, fra i punti deboli. Se qui manca qualcosa che Filo fa, è un errore del documento, e puoi segnalarlo come qualunque altro difetto.
 
-**In breve.** Quasi tutto resta sul tuo computer. Esce quello che serve a un modello per rispondere, quello che scegli di mandare tu (i feedback, cifrati) e i dati di servizio dei crediti, che non contengono testi. Se fai il login con Google, al server arrivano anche la tua email, il tuo nome e quanto usi ogni funzione. Alcuni servizi esterni ricevono pezzi della tua navigazione: il più importante è Google Safe Browsing, che oggi riceve l'indirizzo delle pagine che apri. Non uso servizi di analisi o di pubblicità. Il resto del documento è il dettaglio.
+**In breve.** Quasi tutto resta sul tuo computer. Esce quello che serve a un modello per rispondere, quello che scegli di mandare tu (i feedback, cifrati) e i dati di servizio dei crediti, che non contengono testi. Se fai il login con Google, al server arrivano anche la tua email, il tuo nome e quanto usi ogni funzione. Quando usi l'Aiuto, il server riceve il nome del sito su cui sei. Alcuni servizi esterni ricevono pezzi della tua navigazione: il più importante è Google Safe Browsing, che oggi riceve l'indirizzo delle pagine che apri. Non uso servizi di analisi o di pubblicità. Il resto del documento è il dettaglio.
 
 ## Due regole
 
-La prima: **per capire cosa non funziona non guardo quello che fai, leggo quello che mi scrivi.** Al server di Filo arriva quello che decidi di mandare tu, cioè i feedback (più le segnalazioni generiche che Filo manda da solo, descritte sotto), e quello che serve ai servizi che usi, cioè i crediti e il red team. La tua navigazione, le tue chat e i tuoi file non ci arrivano.
+La prima: **per capire cosa non funziona non guardo quello che fai, leggo quello che mi scrivi.** Al server di Filo arriva quello che decidi di mandare tu, cioè i feedback (più le segnalazioni generiche che Filo manda da solo, descritte sotto), e quello che serve ai servizi che usi, cioè i crediti e il red team. Le tue chat e i tuoi file non ci arrivano, e della tua navigazione solo il nome del sito su cui apri l'Aiuto, descritto sotto.
 
 La seconda: **se qualcosa può stare sul tuo computer, sta sul tuo computer.** Le conversazioni, le memorie, gli appunti, le pagine salvate non hanno una copia da nessun'altra parte. Se cambi computer, te li porti con l'esportazione.
 
@@ -54,7 +54,7 @@ A ogni risposta Filo registra chi l'ha servita davvero, e lo vedi nella Cronolog
 
 ## Il server di Filo
 
-Filo ha un server, su Firebase, cioè su infrastruttura Google (ne parlo più sotto). Il suo codice gira in Europa, nella regione europe-west1, in Belgio. Per chi usa l'app fa quattro cose: tiene la configurazione condivisa (quale modello usa ogni funzione), riceve i feedback, gestisce i crediti e ospita il red team.
+Filo ha un server, su Firebase, cioè su infrastruttura Google (ne parlo più sotto). Il suo codice gira in Europa, nella regione europe-west1, in Belgio. Per chi usa l'app fa cinque cose: tiene la configurazione condivisa (quale modello usa ogni funzione), riceve i feedback, gestisce i crediti, ospita il red team e conserva i percorsi dell'Aiuto, cioè i passi che hanno funzionato su un sito.
 
 All'avvio Filo si presenta al server con la sua identità anonima, legge la configurazione condivisa e lo stato dei suoi crediti; il primo giorno chiede anche se c'è un invito che lo aspetta. Queste richieste non contengono niente di tuo, oltre all'indirizzo IP che ogni richiesta in rete porta con sé.
 
@@ -90,7 +90,9 @@ Per i crediti non serve il login: l'identità è quella dell'installazione, un a
 
 Senza login Filo non manda al server contatori d'uso: quante volte usi una funzione, quanto aspetti una risposta, cosa rispondi alle conferme non escono dal tuo computer. Con il login Google escono i totali per funzione del documento descritto fra i crediti, legati alla tua email; i tempi di attesa e le risposte alle conferme no. La raccolta che vorrei fare è un'altra: numeri senza contenuto e uno pseudonimo diverso da quello dei crediti, che cambia ogni mese: servirebbe a distinguere un utente che rifiuta tutto quello che Filo propone da cento utenti che rifiutano ogni tanto. Prima che parta, questo documento cambierà.
 
-Lo stesso vale per i percorsi dell'Aiuto: Filo sa già ripulire e condividere i passi di una guida riuscita su un sito, perché chi lo visita dopo ne approfitti, ma la raccolta è spenta. I percorsi non escono dal tuo computer, e Filo non te lo chiede nemmeno.
+Lo stesso vale per i percorsi dell'Aiuto: Filo sa già ripulire e condividere i passi di una guida riuscita su un sito, perché chi lo visita dopo ne approfitti, ma la raccolta è spenta. I tuoi percorsi non escono dal tuo computer, e Filo non te lo chiede nemmeno.
+
+Leggerli invece sì. Quando apri l'Aiuto su una pagina, o gli fai una domanda, Filo chiede al server i percorsi già noti per quel sito, e la richiesta porta il nome del sito, per esempio posta.esempio.it, senza il resto dell'indirizzo e senza il tuo account. Gli indirizzi numerici e le pagine della rete di casa restano fuori. La richiesta legge e basta: nel database non resta niente.
 
 ## Il red team
 
@@ -116,7 +118,7 @@ Se trovi Filo che contatta qualcosa che non è in questa lista, è un errore di 
 
 Detto in negativo, perché in negativo si controlla meglio. Sul mio server non arrivano:
 
-- gli indirizzi delle pagine che visiti e i titoli delle schede, salvo quelli che metti in un feedback;
+- gli indirizzi delle pagine che visiti e i titoli delle schede, salvo quelli che metti in un feedback e il nome del sito su cui apri l'Aiuto;
 - il contenuto delle pagine, delle chat, delle memorie, degli appunti;
 - screenshot, salvo quelli che alleghi a un feedback;
 - dati sul dispositivo oltre a browser e sistema operativo, che arrivano solo dentro un feedback;

@@ -72,3 +72,21 @@ test('le ricerche su Google dal tasto destro sono fra gli altri servizi', () => 
   legame(/lens\.google\.com/.test(azioni), privacy, 'apre Google Lens', 'ricerca per immagine con Google Lens');
   legame(/google\.com\/search/.test(azioni), privacy, 'apre la ricerca di Google', 'ricerca del testo selezionato');
 });
+
+test('l\'Aiuto chiede al server i percorsi del sito, e il documento sulla privacy lo dice', () => {
+  const chiede = /ACTIONS\.HELP[\s\S]{0,600}Paths\.listByDomain\(/.test(leggi('src', 'main', 'services', 'handlers.js'));
+  legame(chiede, privacy, 'Filo chiede al server i percorsi già noti per quel sito', 'lettura dei percorsi dal server');
+  legame(chiede, privacy, 'il nome del sito su cui apri l\'Aiuto', 'nome del sito fra le cose che arrivano al server');
+  legame(chiede, privacy, 'Per chi usa l\'app fa cinque cose', 'i percorsi fra i compiti del server');
+});
+
+test('cancellare le pagine visitate chiede solo un OK, e il documento sulla sicurezza lo dice', () => {
+  const soloOk = /CANCELLA_PAGINE:\s*\{\s*level:\s*2\b/.test(leggi('src', 'shared', 'actionLevels.js'));
+  legame(soloOk, sicurezza, 'Le pagine visitate si cancellano con un OK', 'cronologia cancellata con un OK');
+});
+
+test('i pacchetti Mac e Linux ricostruiti dopo hanno la loro esecuzione, e il documento sulla sicurezza lo dice', () => {
+  const rel = leggi('.github', 'workflows', 'release.yml');
+  const aParte = /ripubblica_mac/.test(rel) && /Aggiunto il pacchetto Mac a/.test(rel);
+  legame(aParte, sicurezza, '«Aggiunto il pacchetto Mac a v0.2.231»', 'esecuzione a parte per i pacchetti ricostruiti');
+});
