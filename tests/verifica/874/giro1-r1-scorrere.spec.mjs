@@ -59,11 +59,12 @@ test('con le frecce si arriva all\'ultima rete conosciuta senza che il riquadro 
   await expect(voce(page, 'rete')).toHaveText('Casa', { timeout: 8_000 });
   await voce(page, 'rete').click();
   await expect(riquadro(page).locator('.sn-select-option', { hasText: 'Collegati a Rete numero 40' })).toBeAttached({ timeout: 5_000 });
-  // Dalla prima voce, freccia su gira all'ultima, che sta sotto il bordo del riquadro.
+  // Dalla prima voce, freccia su gira in fondo (Nascondi, Copia, poi l'ultima rete), sotto il bordo del riquadro.
   await riquadro(page).locator('.sn-select-option').first().focus();
-  await page.keyboard.press('ArrowUp');
+  for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowUp');
   await page.waitForTimeout(300);
   await expect(riquadro(page)).toBeVisible();
+  await expect(page.locator(':focus')).toHaveText('Collegati a Rete numero 40');
   await page.keyboard.press('Enter');
-  await expect.poll(() => app.evaluate(() => globalThis.__pcCollegate)).toEqual(['Nascondi la rete'].length ? [] : []);
+  await expect.poll(() => app.evaluate(() => globalThis.__pcCollegate)).toEqual(['Rete numero 40']);
 });
