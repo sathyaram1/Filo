@@ -125,6 +125,12 @@
     if (!Object.prototype.hasOwnProperty.call(GIUDICI_SALTATI, k)) return '';
     return isTrustedClient(fb.clientId, fb.senderProof) ? GIUDICI_SALTATI[k] : '';
   }
+  // Un lavoro di routine che aspetta la fusione del feedback d'utente da cui nasce (#914): non è un «non filtrato»,
+  // il server non lo ri-giudica; entra in coda da solo.
+  function inAttesaOrigine(fb) {
+    const { status, statusReason } = normalizeStatus(fb);
+    return status === 'unlabeled' && statusReason === 'attesa_origine' && !!judgesSkippedText(fb);
+  }
   // Prefisso dell'owner o di una sessione senza prova: solo l'owner può dire che è suo, e dargliela (#908).
   function mittenteDaRiconoscere(fb) {
     return isUnprovenSender(fb) && LOCAL_SENDER_RE.test(String(fb.clientId || ''));
@@ -459,6 +465,7 @@
     const fs = FS();
     const { status, statusReason } = normalizeStatus(fb);
     if (status === 'aligned') return worstVerdictBlock(fb);
+    if (inAttesaOrigine(fb)) return null;
     const info = fs.STATUSES[status];
     if (!info || info.tab !== 'inbox') return null;
     // Bocciatura di sicurezza sul fix: lo stato è `design` (torna all'owner),
@@ -890,6 +897,9 @@
     if (!info) return null;
     // Il motivo si SCRIVE solo se ha una traduzione umana: un codice grezzo
     // ('legacy-ignored') in mezzo alla riga non dice niente. Resta nell'hover.
+    if (inAttesaOrigine(fb)) {
+      return { label: 'In attesa', color: null, hint: `Stato: In attesa (${reasonText(statusReason)})`, reason: statusReason, reasonText: reasonText(statusReason), showReason: true, encrypted: false };
+    }
     const txt = statusReason ? reasonText(statusReason) : '';
     return {
       label: info.label,

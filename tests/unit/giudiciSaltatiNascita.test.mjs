@@ -96,6 +96,10 @@ test('chi aspetta l’origine lo dice col numero, nei Ricevuti, senza «da ri-gi
   assert.equal(MR.manageTabFor(fb), 'inbox');
   assert.equal(MR.judgesNote(fb).text, 'Aspetta la fusione di #700, poi entra in coda da solo.');
   assert.equal(MR.reasonText('attesa_origine'), 'aspetta la fusione del feedback da cui nasce');
+  // Non è un «non filtrato»: niente bordo bianco né «Ri-valuta», che il server su di lui non rifà.
+  assert.equal(MR.classifyBlock(fb), null);
+  assert.equal(MR.stateBadge(fb).label, 'In attesa');
+  assert.equal(MR.classifyBlock(conOrigine('unlabeled', '')).reason, 'unfiltered');
 });
 
 test('bloccato con l’origine: rosso come un blocco di sicurezza, e il triangolo dice perché', () => {
