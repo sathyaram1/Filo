@@ -8,11 +8,10 @@
 // voci del sistema operativo). La voce/velocità/tono del fallback arrivano da
 // settings.tts (Preferenze).
 //
-// Dettatura — il microfono viene ascoltato a blocchi e spezzato in frasi
-// (SN_DICTATION_SEGMENTER): ogni frase chiusa da una pausa va al modello di
-// trascrizione e il testo entra nel campo; nel frattempo la frase in corso si
-// vede, provvisoria, nel riquadro rosso. Nessuna registrazione da fermare e
-// aspettare: si parla, e il testo arriva.
+// Dettatura — l'ascolto è di SN_ASCOLTO (src/shared/ascolto.js): ogni frase
+// chiusa da una pausa entra nel campo; nel frattempo la frase in corso si vede,
+// provvisoria, nel riquadro rosso. Nella casella di una chat di Filo «Detta» è
+// il tasto microfono della chat (SN_VOCE_CHAT).
 //
 // Estratto da content.js — viene caricato prima di lui dai preload. content.js
 // chiama init() passando le dipendenze che restano sue (settings correnti,
@@ -456,21 +455,21 @@
   }
 
   function dictationSupported() {
-    return typeof window !== 'undefined'
-      && Boolean(navigator?.mediaDevices?.getUserMedia)
-      && Boolean(window.AudioContext || window.webkitAudioContext)
-      && Boolean(global.SN_DICTATION_SEGMENTER);
+    return Boolean(global.SN_ASCOLTO && global.SN_ASCOLTO.supportato());
   }
 
   // Item "Detta": ascolto del microfono + trascrizione in diretta con un
   // modello di dettatura. La freccetta apre la scelta modello, popolata dai
   // modelli del registro che dichiarano di ascoltare un audio.
-  function buildDictateItem() {
+  // Nella casella di una chat di Filo «Detta» è il suo tasto microfono: ne mostra anche la scorciatoia.
+  function buildDictateItem(target) {
     const supported = dictationSupported();
+    const Voce = global.SN_VOCE_CHAT;
     return {
       type: 'split',
       icon: '🎤',
       label: I18n.t('menu_dictate'),
+      shortcut: Voce && Voce.gestisce(target) ? Voce.etichettaTasto() : undefined,
       onClick: () => startDictation(),
       disabled: !supported,
       arrowTitle: I18n.t('menu_dictate_model_select'),
@@ -537,28 +536,10 @@
     }
   }
 
-  // Stato modulo per la dettatura in corso (al più una alla volta).
+  // La dettatura in corso col suo riquadro (al più una alla volta): l'ascolto vero è di SN_ASCOLTO.
   let _dictateState = null;
-  // Sicurezza: il microfono non resta aperto oltre questo tempo.
-  const DICTATE_MAX_MS = 5 * 60 * 1000;
-  // Frequenza a cui si manda l'audio al modello: per la voce basta e tiene
-  // gli spezzoni piccoli (~32 KB al secondo).
-  const DICTATE_RATE = 16000;
-  // Quanti caratteri della frase provvisoria si vedono nel riquadro (la coda:
-  // è quella che cambia mentre si parla).
+  // Quanti caratteri della frase provvisoria si vedono nel riquadro (la coda: è quella che cambia mentre si parla).
   const DICTATE_LIVE_CHARS = 140;
-
-  // Perché la dettatura non è partita, detto all'utente. Un errore di
-  // CONFIGURAZIONE dei modelli (nessun modello per questa funzione, «solo pesi
-  // aperti» senza un modello che ascolti, nessun fornitore ammesso) arriva già
-  // spiegato e va mostrato com'è: dice cosa fare per rimetterla in piedi.
-  const dictationConfigError = (res) => Boolean(res && !res.ok && res.error
-    && ['NO_MODEL_FOR_ACTION', 'NO_OPEN_WEIGHTS_MODEL', 'NO_ALLOWED_HOST'].includes(res.code));
-
-  function explainDictationFailure(res) {
-    if (dictationConfigError(res)) Popup.showToast(res.error, { duration: 9000 });
-    else Popup.showToast(I18n.t('err_provider_failed'));
-  }
 
   async function startDictation() {
     if (_dictateState) { stopDictation(); return; }
@@ -570,38 +551,11 @@
       Popup.showToast(I18n.t('err_provider_failed'));
       return;
     }
-    let stream;
-    try {
-      // Il microfono lo chiede Filo, non il sito: senza lasciapassare la domanda uscirebbe col nome del sito.
-      try { await chrome.runtime.sendMessage({ type: MSG.PERMESSO_FILO, tipo: 'media' }); } catch (_) {}
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch (_) {
-      Popup.showToast(I18n.t('menu_dictate_no_mic'));
-      return;
-    }
-    const Seg = global.SN_DICTATION_SEGMENTER;
-    const Ctx = window.AudioContext || window.webkitAudioContext;
-    let ctx; let source; let proc;
-    try {
-      ctx = new Ctx();
-      source = ctx.createMediaStreamSource(stream);
-      // ScriptProcessor: deprecato ma disponibile ovunque e senza file esterni
-      // (un AudioWorklet vorrebbe un modulo caricato da un URL, che un content
-      // script non ha). 4096 campioni ≈ 85 ms a 48 kHz: latenza trascurabile.
-      proc = ctx.createScriptProcessor(4096, 1, 1);
-      // Un contesto audio può nascere "sospeso" (politica di autoplay): senza
-      // resume non arriverebbe nessun campione.
-      try { if (ctx.state === 'suspended' && ctx.resume) ctx.resume(); } catch (_) {}
-    } catch (_) {
-      try { stream.getTracks().forEach((t) => t.stop()); } catch (_) {}
-      try { if (ctx) ctx.close(); } catch (_) {}
-      Popup.showToast(I18n.t('err_provider_failed'));
-      return;
-    }
-    const lang = navigator.language || 'it-IT';
+    // Nella casella di una chat di Filo dettare è parlare a Filo: stessa strada del tasto microfono, stesso invio.
+    const Voce = global.SN_VOCE_CHAT;
+    if (Voce && Voce.gestisce(document.activeElement)) { Voce.premi(document.activeElement); return; }
 
-    // Riquadro cliccabile: dice che ascolta, mostra la frase in corso, e al
-    // click ferma (il toast non è cliccabile).
+    // Riquadro cliccabile: dice che ascolta, mostra la frase in corso, e al click ferma (il toast non è cliccabile).
     const pill = document.createElement('button');
     pill.type = 'button';
     pill.className = 'sn-dictate-pill';
@@ -612,22 +566,9 @@
     live.className = 'sn-dictate-pill-live';
     live.hidden = true;
     pill.append(label, live);
-    // Non rubare il focus/caret al campo quando l'utente clicca la pill per
-    // fermare: così il cursore resta dove l'utente stava scrivendo e il testo
-    // dettato ci atterra sopra (vale soprattutto per gli editor contenteditable,
-    // dove la selezione viva va persa se il focus passa a un bottone).
+    // Il fuoco resta al campo anche cliccando la pill: il testo dettato atterra dove stava il cursore
+    // (negli editor contenteditable la selezione viva si perde se il fuoco passa a un bottone).
     pill.addEventListener('mousedown', (e) => e.preventDefault());
-    // Nello stack degli avvisi in pagina (#409), così non finisce sotto o sopra
-    // un toast che arriva nel frattempo. `sticky`: è l'unico comando per
-    // fermare la dettatura, il tetto dello stack non deve poterlo sfrattare.
-    // Chiuderla è fermare la dettatura: un microfono acceso senza la pill non si fermerebbe più.
-    Popup.mountToast(pill, { sticky: true, chiudi: () => stopDictation() });
-
-    const state = {
-      stream, ctx, pill, stopped: false, interimBusy: false, finals: 0, failed: false,
-      queue: Promise.resolve(),
-    };
-    _dictateState = state;
 
     const showLive = (text) => {
       const t = String(text || '').trim();
@@ -635,96 +576,32 @@
       live.textContent = t.length > DICTATE_LIVE_CHARS ? '…' + t.slice(-DICTATE_LIVE_CHARS) : t;
       live.hidden = false;
     };
-
-    const toWavBase64 = (seg) =>
-      Seg.bytesToBase64(Seg.pcm16ToWav(Seg.floatToInt16(seg.samples), seg.sampleRate));
-
-    const transcribe = (seg, interim) => chrome.runtime.sendMessage({
-      type: MSG.AI_REQUEST,
-      action: ACTIONS.TRANSCRIBE_AUDIO,
-      payload: { audioBase64: toWavBase64(seg), format: 'wav', lang, interim },
-    });
-
-    const segmenter = Seg.createSegmenter({
-      sampleRate: DICTATE_RATE,
-      // Frase in corso: trascrizione provvisoria, solo nel riquadro. Una alla
-      // volta: se la precedente è ancora in volo, si salta questo giro.
-      onInterim: (seg) => {
-        if (state.interimBusy || state.stopped || state.failed) return;
-        state.interimBusy = true;
-        transcribe(seg, true)
-          .then((res) => {
-            if (res?.ok && !state.stopped) showLive(res.text);
-            // Un errore di configurazione non passa da sé: si dice subito, non a fine frase.
-            else if (dictationConfigError(res) && !state.stopped && !state.failed) {
-              state.failed = true;
-              explainDictationFailure(res);
-              stopDictation();
-            }
-          })
-          .catch(() => {})
-          .finally(() => { state.interimBusy = false; });
-      },
-      // Frase chiusa da una pausa: trascrizione definitiva, nel campo. In
-      // coda, una alla volta, così il testo entra nell'ordine in cui è stato
-      // detto anche se una risposta è più lenta dell'altra.
-      onFinal: (seg) => {
-        state.queue = state.queue.then(async () => {
-          if (state.failed) return;
-          let res = null;
-          try { res = await transcribe(seg, false); } catch (_) { res = null; }
-          if (!res?.ok) {
-            state.failed = true;
-            explainDictationFailure(res);
-            stopDictation();
-            return;
-          }
-          const text = (res.text || '').trim();
-          if (!text) return;
-          state.finals++;
-          showLive('');
-          // Inserisci dove il cursore si trova ADESSO, non dove era all'apertura
-          // del menu: mentre si detta l'utente può aver continuato a scrivere
-          // o spostato il cursore nello stesso campo.
-          deps.insertDictatedText(text + ' ');
-        });
-      },
-    });
-
-    proc.onaudioprocess = (e) => {
-      if (state.stopped) return;
-      try {
-        const input = e.inputBuffer.getChannelData(0);
-        segmenter.push(Seg.downsample(input, ctx.sampleRate, DICTATE_RATE));
-      } catch (_) {}
-    };
-    source.connect(proc);
-    // Lo ScriptProcessor lavora solo se è collegato all'uscita; non scrivendo
-    // nulla nel buffer di uscita, dalle casse non esce niente.
-    proc.connect(ctx.destination);
-
-    state.stop = async () => {
-      if (state.stopped) return;
-      state.stopped = true;
-      try { proc.disconnect(); source.disconnect(); } catch (_) {}
-      try { stream.getTracks().forEach((t) => t.stop()); } catch (_) {}
-      try { await ctx.close(); } catch (_) {}
-      // L'ultima frase, se c'è, è definitiva anche senza pausa.
-      try { segmenter.flush(); } catch (_) {}
-      label.textContent = I18n.t('menu_dictate_transcribing');
-      await state.queue;
+    const state = { pill, sessione: null };
+    _dictateState = state;
+    const chiudi = () => {
       if (pill.parentNode) Popup.unmountToast(pill);
-      if (!state.finals && !state.failed) Popup.showToast(I18n.t('menu_dictate_empty'));
       if (_dictateState === state) _dictateState = null;
     };
-
+    const sessione = await global.SN_ASCOLTO.avvia({
+      provvisorie: true,
+      suProvvisoria: showLive,
+      // Dove il cursore si trova ADESSO: mentre si detta si può continuare a scrivere o spostarsi nel campo.
+      suFrase: (text) => deps.insertDictatedText(text + ' '),
+      suStato: (st) => { if (st === 'trascrive') label.textContent = I18n.t('menu_dictate_transcribing'); },
+      suFine: chiudi,
+    });
+    if (!sessione) { chiudi(); return; }
+    state.sessione = sessione;
+    // Nello stack degli avvisi in pagina (#409), `sticky` perché è l'unico comando per fermare: il tetto
+    // dello stack non deve sfrattarlo. Chiuderla è fermare: un microfono acceso senza pill non si fermerebbe più.
+    if (_dictateState === state) Popup.mountToast(pill, { sticky: true, chiudi: () => stopDictation() });
     pill.addEventListener('click', () => stopDictation());
-    setTimeout(() => { if (_dictateState === state) stopDictation(); }, DICTATE_MAX_MS);
   }
 
   function stopDictation() {
-    if (!_dictateState || typeof _dictateState.stop !== 'function') return;
-    _dictateState.stop().catch(() => {});
+    const st = _dictateState;
+    if (!st || !st.sessione) return;
+    st.sessione.ferma('utente');
   }
 
   function init(d) {
