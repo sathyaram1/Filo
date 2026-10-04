@@ -1,4 +1,4 @@
-// Verifica #737.1 giro 3, rilievo 4: una pagina non apre da sola il programma di posta (o telefono, sms) senza un clic.
+// Verifica #737.1 giro 3, rilievo 5: una pagina non apre da sola il programma di posta (o telefono, sms) senza un clic.
 import { test, expect } from '../../fixtures/electron.mjs';
 
 test('senza clic una pagina non apre il programma di posta, né con una finestra né andandoci', async ({ app, openTab, testServer }) => {

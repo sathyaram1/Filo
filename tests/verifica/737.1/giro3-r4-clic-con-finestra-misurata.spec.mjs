@@ -1,4 +1,4 @@
-// Verifica #737.1 giro 3, rilievo 3: col blocco acceso il clic dell'utente apre anche la finestra con le misure e il Maiuscolo+clic.
+// Verifica #737.1 giro 3, rilievo 4: col blocco acceso il clic dell'utente apre anche la finestra con le misure e il Maiuscolo+clic.
 import { test, expect } from '../../fixtures/electron.mjs';
 
 const aperteSu = (app, u) => app.evaluate(({ BrowserWindow }, x) => {
