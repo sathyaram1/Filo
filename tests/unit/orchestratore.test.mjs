@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -676,4 +676,82 @@ test('togli toglie i worktree col collegamento staccato prima, mai --force; un n
   const p = (await b.motore.avvia()).pratiche[8];
   assert.equal(p.fase, 'fermo');
   assert.equal(indice(b.righe(), /worktree add|^collega /), -1);
+});
+
+// ─── Giro 4: chiusura e ripresa dallo stato del ramo (già su main, già con lavoro) ───
+
+test('fusione approvata in Filo, che fonde da sé: riprendi chiude col deploy senza rifondere; un ramo senza lavoro resta «niente da fondere»', async () => {
+  let fusa = false;
+  const b = banco({ server: false, risposte: [
+    [/rev-list --count origin\/main\.\.HEAD/, () => (fusa ? { code: 0, out: '0' } : null)],
+    [/diff --name-only/, () => (fusa ? { code: 0, out: '' } : null)],
+    [/finish-local/, () => ({ code: 10, out: 'bloccato dai controlli' })],
+  ] });
+  let p = (await b.motore.avvia()).pratiche[7];
+  assert.ok(p.fermo && p.fermo.attesaApprovazione, JSON.stringify(p.fermo));
+  fusa = true;
+  const finish = () => b.righe().filter((x) => /finish-local/.test(x)).length;
+  const prima = finish();
+  b.stato.pratiche[7] = riprendi(p, '');
+  p = (await b.motore.avvia()).pratiche[7];
+  assert.equal(p.fase, 'fuso', JSON.stringify(p.fermo));
+  assert.equal(finish(), prima);
+  assert.ok(b.righe().includes('server:pubblica'), 'il lavoro tocca un file che il server incorpora: il deploy parte');
+
+  const vuoto = banco({
+    server: false,
+    pratiche: [{ ...nuovaPratica({ num: 7, slug: 'sette', richiesta: 'x' }), fase: 'chiusura' }],
+    risposte: [[/rev-list --count origin\/main\.\.HEAD/, { code: 0, out: '0' }], [/diff --name-only/, { code: 0, out: '' }]],
+  });
+  assert.match((await vuoto.motore.avvia()).pratiche[7].fermo.motivo, /niente da fondere/);
+});
+
+test('lavoratore che finisce lasciando solo file: tolti quelli, riprendi passa alla verifica senza un altro lavoratore, anche da una fermata scritta prima del segno', async () => {
+  let sporco = true;
+  const b = banco({ server: false, risposte: [[/status --porcelain/, () => (sporco ? { code: 0, out: '?? appunti.txt' } : null)]] });
+  let p = (await b.motore.avvia()).pratiche[7];
+  assert.equal(p.fermo.lavoroFinito, true);
+  sporco = false;
+  b.stato.pratiche[7] = riprendi(p, '');
+  p = (await b.motore.avvia()).pratiche[7];
+  assert.deepEqual(b.prompt.map((x) => x.ruolo), ['lavoratore', 'verificatore']);
+  assert.equal(p.fase, 'fuso');
+
+  const vecchia = { ...nuovaPratica({ num: 9 }), fase: 'fermo', compito: 'correzione', fermo: { motivo: 'il lavoratore ha lasciato modifiche non salvate:\n M x.js', dove: 'lavoro' } };
+  const q = riprendi(vecchia, '');
+  assert.deepEqual([q.fase, q.compito], ['verifica', 'lavoro']);
+  assert.equal(riprendi({ ...vecchia, fermo: { motivo: 'il lavoratore non ha finito: x', dove: 'lavoro' } }, '').fase, 'lavoro');
+  assert.equal(riprendi(vecchia, 'ho pulito io').compito, 'decisione');
+});
+
+test('il lavoratore che riparte su un ramo con commit lo sa dal ramo, anche al primo giro', async () => {
+  const base = { p: nuovaPratica({ num: 7, slug: 'sette' }), regole: '', wtApp: '/w', wtServer: '', cartellaNote: '/n' };
+  assert.doesNotMatch(promptLavoratore(base), /già del lavoro/);
+  assert.match(promptLavoratore({ ...base, giaLavoro: true }), /già del lavoro/);
+
+  let commit = '0';
+  const cade = () => { commit = '3'; return { ok: false, testo: '', costo: 1, errore: 'tempo scaduto (240 min): processo fermato' }; };
+  const b = banco({ server: false, errori: [cade], risposte: [[/rev-list --count origin\/main\.\.HEAD/, () => ({ code: 0, out: commit })]] });
+  const p = (await b.motore.avvia()).pratiche[7];
+  assert.doesNotMatch(b.prompt[0].testo, /già del lavoro/);
+  assert.match(p.fermo.motivo, /non ha finito/);
+  b.stato.pratiche[7] = riprendi(p, '');
+  assert.equal((await b.motore.avvia()).pratiche[7].fase, 'fuso');
+  assert.equal(b.prompt[1].ruolo, 'lavoratore');
+  assert.match(b.prompt[1].testo, /già del lavoro/);
+});
+
+test('aggiungi: un ramo di un altro lavoro aperto si rifiuta se scelto con --slug, si evita da sé se è quello di default', () => {
+  const d = cartellaTemporanea('orch-rami-');
+  const agg = (...a) => spawnSync(process.execPath, ['scripts/orchestratore-locale.mjs', 'aggiungi', ...a], {
+    cwd: ROOT, encoding: 'utf8', env: { ...process.env, FILO_ORCH_DIR: d }, timeout: 60_000,
+  });
+  assert.equal(agg('5', '--slug', 'doppio').status, 0);
+  const r = agg('6', '--slug', 'doppio');
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /già del lavoro #5/);
+  assert.equal(agg('7', '--slug', 'lavoro-8').status, 0);
+  assert.match(agg('8').stdout, /claude\/lavoro-8-2/);
+  const s = JSON.parse(readFileSync(join(d, 'stato.json'), 'utf8'));
+  assert.deepEqual(Object.values(s.pratiche).map((p) => p.slug).sort(), ['doppio', 'lavoro-8', 'lavoro-8-2']);
 });

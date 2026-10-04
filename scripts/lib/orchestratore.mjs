@@ -549,6 +549,7 @@ export function creaMotore(dep, opzioni = {}) {
     if (P.serverRadice) await git(P.serverRadice, 'fetch', 'origin');
     const nApp = await avanti(wt);
     const nSrv = await serverAvanti(p);
+    const visti = (p.fileApp || []).length;
     const fileApp = String((await git(wt, 'diff', '--name-only', 'origin/main...HEAD')).out || '').split('\n').map((x) => x.trim()).filter(Boolean);
     if (fileApp.length) p.fileApp = fileApp;
     if (nSrv) p.serverDaFondere = true;
@@ -556,7 +557,7 @@ export function creaMotore(dep, opzioni = {}) {
     // Commit che c'erano e ora stanno dentro origin/main senza una fusione registrata: li ha fusi il server
     // (approvazione in Filo, risposta persa, orchestratore chiuso a metà). Si riparte da lì, deploy compreso.
     const dentroMain = async (cwd, ref) => (await git(cwd, 'merge-base', '--is-ancestor', ref, 'origin/main')).code === 0;
-    if (!nApp && !p.fusa.app && (p.fileApp || []).length && await dentroMain(wt, 'HEAD')) {
+    if (!nApp && !fileApp.length && visti && !p.fusa.app && await dentroMain(wt, 'HEAD')) {
       dep.log(`#${p.num} l'app è già su main`);
       p.fusa.app = true;
     }
