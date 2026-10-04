@@ -16,14 +16,12 @@ const chiaveDisco = () => (globalThis.SN_CONST && globalThis.SN_CONST.STORAGE_KE
 
 function carica() {
   if (!caricati) {
-    caricati = (async () => {
-      try {
-        const lista = await globalThis.SN_STORAGE.getRaw(chiaveDisco(), []);
-        for (const k of Array.isArray(lista) ? lista : []) {
-          if (typeof k === 'string' && k) { conCampi.add(k); salvati.add(k); }
-        }
-      } catch (_) { caricati = null; }
-    })();
+    caricati = Promise.resolve().then(async () => {
+      const lista = await globalThis.SN_STORAGE.getRaw(chiaveDisco(), []);
+      for (const k of Array.isArray(lista) ? lista : []) {
+        if (typeof k === 'string' && k) { conCampi.add(k); salvati.add(k); }
+      }
+    }).catch(() => { caricati = null; });
   }
   return caricati;
 }
