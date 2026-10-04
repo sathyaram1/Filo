@@ -105,6 +105,23 @@ test('mandata dal riquadro compare in Bacheca, diventa «inviata» col numero e 
   await bacheca.screenshot({ path: 'tests/.shots/segnalazioni-mie-risolta.png' });
 });
 
+test('anche quella che Filo scrive in chat e l\'utente conferma finisce nell\'elenco, già inviata', async ({ app, openTab }) => {
+  await reteFinta(app, { seq: 77 });
+  const home = await openTab('filo://newtab/');
+  await home.evaluate(() => window.SN_SIDEBAR.open());
+  await home.evaluate(() => {
+    window.__filoSidebarTest.runFiloAction({ type: 'INVIA_FEEDBACK', testo: 'Lo schermo intero lascia la barra in alto', titolo: 'Schermo intero' });
+  });
+  await expect(home.locator(CONFIRM_HOST)).toBeVisible();
+  await clickConfirm(home, 'ok');
+  await expect.poll(() => app.evaluate(() => globalThis.__invii.length)).toBe(1);
+
+  const bacheca = await openTab(BACHECA);
+  await expect(righe(bacheca)).toHaveCount(1);
+  await expect(righe(bacheca).first().locator('.bd-mia-titolo')).toHaveText('#77 Schermo intero');
+  await expect(righe(bacheca).first().locator('.bd-mia-stato')).toHaveText('inviata');
+});
+
 test('con più di tre segnalazioni la sezione mostra le ultime e si apre su tutte; il cestino chiede conferma', async ({ app, openTab }) => {
   await app.evaluate(async () => {
     const M = globalThis.SN_SEGNALAZIONI_MIE;
