@@ -46,6 +46,11 @@
   // tasto d'invio offre di riprenderlo finché l'utente non scrive altro.
   let turnoVivo = null;
   let ripresa = null;
+  // Chi ferma lo fa di fretta e insiste (doppio clic, Invio ripetuto): per un attimo il secondo colpo trova ancora il
+  // quadrato spento, non «riprendi».
+  const PAUSA_RIPRESA = 700;
+  let fermatoAlle = 0;
+  const appenaFermato = () => Date.now() - fermatoAlle < PAUSA_RIPRESA;
   let liveTickHandle = null;
   let pendingImages = []; // dataUrl delle immagini incollate (multiple)
   // #950 — file trascinati dal disco: { percorso, nome }. Il percorso parte col messaggio, come se l'utente
@@ -1084,16 +1089,17 @@
   // stesso posto offre di riprendere finché l'utente non scrive altro. Racconto: patterns/il-filo-dell-attesa.md.
   function aggiornaTasto() {
     const vuoto = !inputEl.value.trim() && !pendingImages.length && !pendingFiles.length;
-    const modo = ripresa && vuoto && !sending ? 'riprendi' : 'invia';
+    const quadrato = sending || (ripresa && vuoto && appenaFermato());
+    const modo = ripresa && vuoto && !quadrato ? 'riprendi' : 'invia';
     if (sendBtn.dataset.modo !== modo) {
       sendBtn.dataset.modo = modo;
       sendBtn.innerHTML = modo === 'riprendi' ? GLIFO_RIPRENDI : GLIFO_INVIO;
       sendBtn.setAttribute('aria-label', modo === 'riprendi' ? 'Riprendi' : 'Invia');
       sendBtn.title = modo === 'riprendi' ? 'Riprendi da dove si era fermato' : '';
     }
-    sendBtn.disabled = sending;
-    sendBtn.hidden = sending;
-    stopBtn.hidden = !sending;
+    sendBtn.disabled = quadrato;
+    sendBtn.hidden = quadrato;
+    stopBtn.hidden = !quadrato;
     stopBtn.disabled = !turnoVivo || turnoVivo.fermato;
   }
   // Il filo si taglia SUBITO, senza aspettare il main: chi ferma ha visto qualcosa che non gli torna.
@@ -1101,6 +1107,8 @@
     const t = turnoVivo;
     if (!t || t.fermato) return;
     t.fermato = true;
+    fermatoAlle = Date.now();
+    setTimeout(aggiornaTasto, PAUSA_RIPRESA + 20);
     t.attivita.taglia();
     aggiornaTasto();
     send({ type: MSG.FILO_CHAT_STOP, reqId: t.reqId }).catch(() => {});
@@ -1378,7 +1386,8 @@
     e.preventDefault();
     if (sending) return;
     const text = inputEl.value.trim();
-    if (!text && pendingImages.length === 0 && pendingFiles.length === 0) { riprendi(); return; }
+    // Il secondo colpo di chi ha appena fermato (clic o Invio) non riprende: il menu, scelta deliberata, sì.
+    if (!text && pendingImages.length === 0 && pendingFiles.length === 0) { if (!appenaFermato()) riprendi(); return; }
     // "/dominio.tld": non navigare DI SLANCIO verso un sito inesistente
     // (porterebbe a una pagina bianca). Verifica il DNS (await se non già in
     // cache) e, se il dominio non esiste, dillo e offri di aprire lo stesso —
@@ -1398,6 +1407,8 @@
   inputEl.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
+      // Invio tenuto premuto è un colpo solo: la ripetizione non ferma e poi riprende, né rimanda.
+      if (e.repeat) return;
       // Mentre Filo lavora Invio è il quadrato: stesso posto per «fai» e per «smetti».
       if (sending) { fermaTurno(); return; }
       inputForm.requestSubmit ? inputForm.requestSubmit() : inputForm.dispatchEvent(new Event('submit'));

@@ -69,6 +69,10 @@ filo, i nodi, il gomitolo e i titoli); cosa succede lo decide il blocco
   azioni fatte (`interrotto`, `fermato`), il modello le vede come già fatte e
   riparte con un turno interno. Rimandare una mail già mandata è un danno, non
   uno spreco.
+- **Il secondo colpo non riprende.** Chi ferma insiste (doppio clic, Invio due
+  volte o tenuto): per un attimo dopo lo stop il posto resta un quadrato spento
+  e Invio a vuoto non riprende; la ripetizione del tasto non conta mai. Il
+  «Riprendi» del tasto destro è una scelta deliberata e vale subito.
 - **Preferenze.** Con `prefers-reduced-motion` il filo non ondeggia, niente si
   anima e il gomitolo compare già fatto. Opacità della trama e durate del
   cappio e dell'avvolgimento sono token estetici (`filo.trama.opacity`,

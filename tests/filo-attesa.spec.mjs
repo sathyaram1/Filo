@@ -13,7 +13,8 @@
 //  (E) Invio da tastiera ferma come il quadrato, e un'azione nominata dopo lo stop non parte;
 //  (F) l'opacità della trama è un token estetico che arriva fino alla chat;
 //  (G) il tasto destro sul blocco ferma, riprende e riavvolge come i tasti;
-//  (H) con meno movimento il filo sta fermo e il gomitolo compare già fatto.
+//  (H) con meno movimento il filo sta fermo e il gomitolo compare già fatto;
+//  (I) chi ferma insistendo (doppio clic, Invio ripetuto o tenuto) non fa ripartire il lavoro.
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -444,5 +445,62 @@ test('H — con meno movimento il filo non ondeggia e il gomitolo compare già f
   // Niente avvolgimento animato: il gomitolo c'è già, e le righe sono già chiuse.
   await expect(blocco).toHaveAttribute('data-filo', 'gomitolo');
   expect(await blocco.locator('.dash-activity-body').evaluate((el) => el.hidden)).toBe(true);
+  await ripristina(app);
+});
+
+test('I — chi ferma insistendo (doppio clic, Invio ripetuto o tenuto) ferma e basta: riprendere resta un gesto nuovo', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await configureModel(app);
+  await senzaAccoglienza(app, page);
+  const lungo = { pensa: ['Penso a lungo. ', 'Ancora. ', 'Ancora. ', 'Ancora. ', 'Ancora. '], ogni: 900, testo: 'Mai.' };
+  await copione(app, [lungo, lungo, lungo, { pensa: ['Riprendo. '], ogni: 200, testo: 'Ripreso apposta.' }]);
+  const trama = page.locator('.dash-activity-seg[data-stato="pensa"] .dash-activity-trama');
+  const chiamate = () => app.evaluate(() => globalThis.__messaggi.length);
+  const invio = page.locator('#sendBtn');
+
+  // Doppio clic sul quadrato: due clic nello stesso punto a un quinto di secondo.
+  await page.locator('#input').fill('pensa');
+  await invio.click();
+  await expect(trama).toContainText('lungo', { timeout: 5_000 });
+  const b = await page.locator('#stopBtn').boundingBox();
+  await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
+  await page.waitForTimeout(200);
+  await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
+  await expect(page.locator('.dash-bubble-fermato')).toBeVisible({ timeout: 5_000 });
+  await expect(invio).toHaveAttribute('aria-label', 'Riprendi');
+  expect(await chiamate()).toBe(1);
+
+  // Invio due volte di fila.
+  await page.locator('#input').fill('pensa ancora');
+  await page.locator('#input').press('Enter');
+  await expect(trama).toContainText('lungo', { timeout: 5_000 });
+  await page.locator('#input').press('Enter');
+  await page.waitForTimeout(250);
+  await page.locator('#input').press('Enter');
+  await expect(page.locator('.dash-bubble-fermato')).toHaveCount(2, { timeout: 5_000 });
+  await expect(invio).toHaveAttribute('aria-label', 'Riprendi');
+  expect(await chiamate()).toBe(2);
+
+  // Invio tenuto premuto: la ripetizione del tasto non riprende.
+  await page.locator('#input').fill('e ancora');
+  await page.locator('#input').press('Enter');
+  await expect(trama).toContainText('lungo', { timeout: 5_000 });
+  await page.keyboard.down('Enter');
+  for (let i = 0; i < 30; i++) {
+    await page.locator('#input').dispatchEvent('keydown', { key: 'Enter', code: 'Enter', repeat: true, bubbles: true, cancelable: true });
+    await page.waitForTimeout(33);
+  }
+  await page.keyboard.up('Enter');
+  await expect(page.locator('.dash-bubble-fermato')).toHaveCount(3, { timeout: 5_000 });
+  await page.waitForTimeout(800);
+  expect(await chiamate()).toBe(3);
+
+  // Riprendere, con un gesto nuovo, funziona.
+  await expect(invio).toHaveAttribute('aria-label', 'Riprendi');
+  await invio.click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Ripreso apposta.' })).toBeVisible({ timeout: 10_000 });
+  expect(await chiamate()).toBe(4);
   await ripristina(app);
 });
