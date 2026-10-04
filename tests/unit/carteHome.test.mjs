@@ -102,6 +102,22 @@ test('nascondere e ripristinare: «come all’inizio» rimette anche le carte di
   assert.deepEqual(r.layout, C.predefinita());
 });
 
+test('una carta di sinistra tolta si rimette da sola: la destra dell’utente non cambia', () => {
+  let l = C.applica(C.predefinita(), { tipo: 'togli', carta: 'mazzi' }).layout;
+  l = C.applica(l, { tipo: 'nascondi', chiave: 'crediti' }).layout;
+  l = C.applica(l, { tipo: 'nascondi', chiave: 'download:7' }).layout;
+  const dati = { crediti: true, downloads: [{ id: '7', filename: 'tetto.pdf', state: 'completed', endedAt: new Date().toISOString() }] };
+  assert.deepEqual(C.sinistra(dati, l).map((v) => v.chiave), []);
+  assert.deepEqual(C.nascosteSinistra(dati, l).map((v) => v.chiave), ['crediti', 'download:7']);
+  const r = C.applica(l, { tipo: 'mostra', chiave: 'crediti' });
+  assert.equal(r.cambiato, true);
+  assert.deepEqual(r.layout.nascoste, ['download:7']);
+  assert.deepEqual(r.layout.destra, l.destra);
+  assert.deepEqual(r.layout.tolte, ['mazzi']);
+  assert.deepEqual(C.sinistra(dati, r.layout).map((v) => v.chiave), ['crediti']);
+  assert.equal(C.applica(r.layout, { tipo: 'mostra' }).errore, 'chiave della carta mancante');
+});
+
 test('i promemoria di sinistra hanno un tetto e cade il più vecchio', () => {
   const tante = Array.from({ length: C.TETTO_NASCOSTE + 20 }, (_, i) => `download:${i}`);
   const l = C.normalizza({ nascoste: tante });

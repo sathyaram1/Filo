@@ -125,6 +125,13 @@
     return [...cima, ...ordinaSinistra(resto.map((v) => v.chiave), layout).map((k) => perChiave.get(k))];
   }
 
+  // Le carte di sinistra che l'utente ha tolto e che ci sarebbero ancora: stanno in «altro», da cui si rimettono una per una.
+  function nascosteSinistra(dati, layout, ora = Date.now()) {
+    const l = normalizza(layout);
+    const nascoste = new Set(l.nascoste);
+    return sinistra(dati, { ...l, nascoste: [] }, ora).filter((v) => nascoste.has(v.chiave));
+  }
+
   const TIPI_SINISTRA = {
     timer: ['timer'], sveglia: ['sveglia', 'sveglie'], download: ['scaricamento', 'scaricamenti', 'download', 'file scaricato'],
     avviso: ['avviso', 'avvisi', 'notifica', 'notifiche'], lavoro: ['lavoro', 'lavori', 'comando'], crediti: ['crediti'],
@@ -194,6 +201,10 @@
       if (!chiaveValida(m.chiave)) return fine(prima, 'chiave della carta mancante');
       return fine({ ...prima, nascoste: [...prima.nascoste.filter((k) => k !== m.chiave), m.chiave] });
     }
+    if (tipo === 'mostra') {
+      if (!chiaveValida(m.chiave)) return fine(prima, 'chiave della carta mancante');
+      return fine({ ...prima, nascoste: prima.nascoste.filter((k) => k !== m.chiave) });
+    }
     if (tipo === 'ordina-sinistra') {
       const ordine = lista(m.ordine).filter(chiaveValida);
       if (!ordine.length) return fine(prima, 'ordine vuoto');
@@ -239,6 +250,6 @@
   global.SN_CARTE_HOME = {
     CARTE, APP, IDS, VERSIONE, TETTO_ORDINE, TETTO_NASCOSTE, DOWNLOAD_RECENTE_MS, LAVORO_LUNGO_MS,
     carta, predefinita, normalizza, risolvi, applica, ordinaSinistra, descrivi,
-    downloadVisibile, lavoriAltrove, sinistra, trovaSinistra,
+    downloadVisibile, lavoriAltrove, sinistra, nascosteSinistra, trovaSinistra,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

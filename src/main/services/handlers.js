@@ -2353,6 +2353,11 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         const CH = globalThis.SN_CARTE_HOME;
         // Una carta di sinistra si cerca prima per chiave, poi un nome esatto di destra, poi per nome a sinistra:
         // «lo scaricamento del file» non deve finire sull'Editor, che fra i suoi nomi ha «file».
+        // «Rimetti» una carta di sinistra tolta (uno scaricamento, un lavoro): torna lei sola, la disposizione resta.
+        if (tipo === 'aggiungi' && !CH.risolvi(action.carta, { esatto: true })) {
+          const rimessa = await rimettiSinistraDaChat({ action, sender, chatId });
+          if (rimessa) return rimessa;
+        }
         if (tipo !== 'ripristina') {
           const sx = await carteSinistraPerChat(sender, chatId);
           const perChiave = sx.find((v) => v.chiave === String(action.carta ?? '').trim());
@@ -3794,7 +3799,7 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
 // ===== Le carte di sinistra della home dalla chat (#870) =====
 // La chat vede la colonna come la home: stesse carte, stesso ordine (SN_CARTE_HOME.sinistra). Senza chiave la
 // chat non risponde, quindi la carta dei Crediti qui non c'è. `chatId`: la conversazione che chiede.
-async function carteSinistraPerChat(sender, chatId = null) {
+async function carteSinistraPerChat(sender, chatId = null, { tolte = false } = {}) {
   const CH = globalThis.SN_CARTE_HOME;
   const ambito = ambitoDellaFinestra(sender && sender.win);
   let downloads = [];
@@ -3805,7 +3810,26 @@ async function carteSinistraPerChat(sender, chatId = null) {
     require('./carteHome').leggi(),
   ]);
   const lavori = require('./lavoriInCorso').elenco(ambito);
-  return CH.sinistra({ timers, notifiche, downloads, lavori, chat: chatId }, layout);
+  return (tolte ? CH.nascosteSinistra : CH.sinistra)({ timers, notifiche, downloads, lavori, chat: chatId }, layout);
+}
+
+// null se il nome non è di una carta di sinistra tolta: allora decide il resto di CARTA_HOME.
+async function rimettiSinistraDaChat({ action, sender, chatId }) {
+  const CH = globalThis.SN_CARTE_HOME;
+  const tolte = await carteSinistraPerChat(sender, chatId, { tolte: true });
+  const trovate = CH.trovaSinistra(action.carta, tolte);
+  if (!trovate.voci.length) return null;
+  const elenco = (voci) => voci.map((v) => ({ carta: v.chiave, tipo: v.tipo, titolo: v.titolo }));
+  if (trovate.voci.length > 1 && !trovate.perTipo) {
+    return { executed: false, kept: false, output: { error: 'più carte tolte con quel nome: quale?', candidate: elenco(trovate.voci) } };
+  }
+  let ultimo = null;
+  for (const v of trovate.voci) {
+    const esito = await require('./carteHome').modifica({ tipo: 'mostra', chiave: v.chiave });
+    if (esito.cambiato) ultimo = esito.layout;
+  }
+  if (ultimo) annunciaCarteHome(ultimo, sender);
+  return { executed: true, kept: true, output: { rimesse: elenco(trovate.voci) } };
 }
 
 async function cartaSinistraDaChat({ tipo, verso, action, sx, trovate, sender }) {
@@ -3819,7 +3843,7 @@ async function cartaSinistraDaChat({ tipo, verso, action, sx, trovate, sender })
   if (voci.length > 1 && !(trovate.perTipo && tipo === 'togli')) {
     return { executed: false, kept: false, output: { error: 'più carte con quel nome: quale?', candidate: elenco(voci) } };
   }
-  if (tipo === 'aggiungi') return no('le carte di sinistra non si rimettono: «ripristina» fa tornare quelle nascoste');
+  if (tipo === 'aggiungi') return no('la carta è già nella home');
   if (tipo === 'togli') {
     if (voci.some((v) => v.tipo === 'timer' || v.tipo === 'sveglia')) {
       return no('un timer o una sveglia si tolgono con CANCELLA_SVEGLIA');

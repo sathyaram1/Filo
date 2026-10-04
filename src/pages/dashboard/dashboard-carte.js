@@ -276,13 +276,15 @@
     crediti: () => cartaCrediti(), timer: cartaTimer, sveglia: cartaTimer, download: cartaDownload,
     avviso: cartaAvviso, lavoro: cartaLavoro,
   };
-  function carteSinistra() {
-    programmaLavori();
-    const voci = C.sinistra({
+  function datiSinistra() {
+    return {
       timers: dati.timers, notifiche: dati.notifiche, downloads: dati.downloads, lavori: dati.lavori,
       crediti: !!suggerimentoCrediti(), chat: d.chatCorrente(),
-    }, layout);
-    return voci.map((v) => PER_TIPO[v.tipo](v.ref));
+    };
+  }
+  function carteSinistra() {
+    programmaLavori();
+    return C.sinistra(datiSinistra(), layout).map((v) => PER_TIPO[v.tipo](v.ref));
   }
 
   // ===== Le carte di destra =====
@@ -608,11 +610,17 @@
 
   // ===== «altro»: le app senza carta, e le carte tolte =====
   // Si rifà solo quando cambiano le carte tolte: il conto alla rovescia ridisegna la home ogni secondo.
+  // Una carta di sinistra tolta (i Crediti, uno scaricamento) sta qui come quelle di destra: si rimette da sola.
+  const ICONA_SINISTRA = { crediti: 'credits', download: 'download', lavoro: 'sparkles', timer: 'timer', sveglia: 'alarm', avviso: 'bell' };
   let formaAltro = '';
   function disegnaAltro() {
     const tolte = ((layout && layout.tolte) || []).map((id) => ({ ...C.carta(id), tolta: true }));
-    const voci = [...tolte, ...C.APP];
-    const f = voci.map((v) => `${v.id}:${v.tolta ? 1 : 0}`).join(',');
+    const sinistre = C.nascosteSinistra(datiSinistra(), layout).map((v) => ({
+      id: v.chiave, titolo: v.tipo === 'crediti' ? 'Crediti' : v.titolo, icona: ICONA_SINISTRA[v.tipo] || 'bell',
+      url: v.tipo === 'crediti' ? URL_CREDITI : null, tolta: true, sinistra: true,
+    }));
+    const voci = [...sinistre, ...tolte, ...C.APP];
+    const f = voci.map((v) => `${v.id}:${v.tolta ? 1 : 0}:${v.titolo}`).join(',');
     if (f === formaAltro && altroEl.childElementCount) return;
     formaAltro = f;
     altroEl.replaceChildren();
@@ -628,7 +636,7 @@
       b.appendChild(icona(v.icona, 20));
       b.appendChild(el('span', 'dash-altro-nome', v.titolo));
       b.title = v.tolta ? (v.url ? `Apri ${v.titolo}` : 'Rimetti nella home') : `Apri ${v.titolo}`;
-      const rimetti = () => muovi({ tipo: 'aggiungi', carta: v.id });
+      const rimetti = () => muovi(v.sinistra ? { tipo: 'mostra', chiave: v.id } : { tipo: 'aggiungi', carta: v.id });
       b.addEventListener('click', () => { if (v.url) apri(v.url); else rimetti(); });
       b.addEventListener('contextmenu', (e) => {
         e.preventDefault();
@@ -641,7 +649,7 @@
       if (v.tolta) {
         b.draggable = true;
         b.addEventListener('dragstart', (e) => {
-          presa = { chiave: v.id, colonna: 'altro', el: b };
+          presa = { chiave: v.id, colonna: 'altro', sinistra: !!v.sinistra, el: b };
           trascinando = true;
           e.dataTransfer.effectAllowed = 'move';
           e.dataTransfer.setData('application/x-filo-carta', v.id);
@@ -803,8 +811,9 @@
   }
   function ammessa(host) {
     if (!presa) return false;
-    if (host === tieniEl) return presa.colonna === 'destra' || presa.colonna === 'altro';
-    return host === accadeEl && presa.colonna === 'sinistra';
+    const daAltro = presa.colonna === 'altro';
+    if (host === tieniEl) return presa.colonna === 'destra' || (daAltro && !presa.sinistra);
+    return host === accadeEl && (presa.colonna === 'sinistra' || (daAltro && presa.sinistra));
   }
   function agganciaColonna(host) {
     host.addEventListener('dragover', (e) => {
@@ -823,11 +832,12 @@
     host.addEventListener('drop', (e) => {
       if (!ammessa(host)) return;
       e.preventDefault();
-      const { chiave, colonna } = presa;
+      const { chiave, colonna, sinistra } = presa;
       const b = bersaglio(host, e);
       const prima = b.prima ? b.prima.dataset.chiave : null;
       fineTrascinamento();
-      if (colonna === 'altro') muovi({ tipo: 'aggiungi', carta: chiave, prima });
+      if (colonna === 'altro' && sinistra) muovi({ tipo: 'mostra', chiave });
+      else if (colonna === 'altro') muovi({ tipo: 'aggiungi', carta: chiave, prima });
       else ordinaColonna(colonna, chiave, prima);
     });
   }

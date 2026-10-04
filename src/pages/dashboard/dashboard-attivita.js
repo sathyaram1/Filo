@@ -452,7 +452,8 @@
       const o = a._output || {};
       const corto = (t) => { const x = String(t || '').replace(/\s+/g, ' ').trim(); return x.length > 60 ? `${x.slice(0, 59)}…` : x; };
       let nome = '';
-      if (Array.isArray(o.tolte) && o.tolte.length) nome = o.tolte.length === 1 ? corto(o.tolte[0].titolo) : `${o.tolte.length} carte`;
+      const toccate = Array.isArray(o.tolte) && o.tolte.length ? o.tolte : (Array.isArray(o.rimesse) && o.rimesse.length ? o.rimesse : null);
+      if (toccate) nome = toccate.length === 1 ? corto(toccate[0].titolo) : `${toccate.length} carte`;
       else if (o.spostata) nome = corto(o.spostata);
       else if (Array.isArray(o.destra) && !o.error && C) { const id = C.risolvi(a.carta); nome = id ? C.carta(id).titolo : ''; }
       const op = String(a.operazione || '').toLowerCase();
