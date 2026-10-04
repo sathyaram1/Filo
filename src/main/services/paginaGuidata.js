@@ -228,12 +228,16 @@ function paginaGuidata() {
     }
     const q = norm(s.replace(/^[«"'“]+|[»"'”]+$/g, ''));
     if (!q) return null;
+    // Una parola intera vale più di un pezzo: «Invia» è il pulsante Invia, non la cartella Inviati.
+    const qq = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const testa = new RegExp(`^${qq}(?:$|[^\\p{L}\\p{N}])`, 'u');
+    const parola = new RegExp(`(?:^|[^\\p{L}\\p{N}])${qq}(?:$|[^\\p{L}\\p{N}])`, 'u');
     const cand = [];
     for (const el of interattivi()) {
       if (soloCampi && !campo(el)) continue;
       const nm = norm(nomeDi(el));
       if (!nm) continue;
-      const p = nm === q ? 4 : nm.startsWith(q) ? 3 : nm.split(' ').includes(q) ? 2 : nm.includes(q) ? 1 : 0;
+      const p = nm === q ? 5 : testa.test(nm) ? 4 : parola.test(nm) ? 3 : nm.startsWith(q) ? 2 : nm.includes(q) ? 1 : 0;
       if (p) cand.push({ el, p, l: nm.length });
     }
     cand.sort((a, b) => b.p - a.p || a.l - b.l);
@@ -345,7 +349,12 @@ function paginaGuidata() {
 
   function scrivi(rif, testo) {
     const el = trova(rif, { soloCampi: true }) || trova(rif);
-    if (!el) return { ok: false, motivo: 'non-trovato' };
+    if (!el) {
+      // Le password non sono fra gli elementi che Filo vede: chi le nomina si sente dire perché.
+      const q = norm(rif);
+      const pw = q && tutti('input[type=password]').find((x) => inVista(x) && norm(nomeDi(x)).includes(q));
+      return { ok: false, motivo: pw ? 'riservato' : 'non-trovato', nome: pw ? nomeDi(pw) : '' };
+    }
     if (riservato(el)) return { ok: false, motivo: 'riservato', nome: nomeDi(el) };
     if (!campo(el)) return { ok: false, motivo: 'non-campo', nome: nomeDi(el) };
     const valore = scriviIn(el, String(testo == null ? '' : testo));
