@@ -209,6 +209,7 @@ function _dimentica() {
   ancore = null;
   ultimoTentativo = 0;
   ultimoErrore = '';
+  copie.clear();
 }
 
-module.exports = { FONTE, init, aggiorna, analizzaImmagine, stato, carica, _dimentica };
+module.exports = { FONTE, init, aggiorna, analizzaImmagine, ricordaCopia, origineDellaCopia, stato, carica, _dimentica };
