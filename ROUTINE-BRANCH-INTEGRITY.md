@@ -197,7 +197,7 @@ dichiara un guasto, non "niente da fare".)*
 ### Il controllo di prontezza gira per primo
 
 L'orchestratore (`ROUTINES.md` § Avvio) spende parecchio in preparazione
-dell'ambiente (`npm install`, binario Electron ~102MB, `scrot`) **prima** di
+dell'ambiente (`npm install`, binario Electron ~102MB) **prima** di
 chiedere se c'è lavoro. Se deve fermarsi, deve scoprirlo prima di aver pagato il
 setup: sposta la verifica di prontezza in cima.
 

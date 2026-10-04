@@ -1386,7 +1386,7 @@ async function recordSecaudit(id, verdict, testo = '') {
 
 /**
  * Prontezza del giro, da eseguire PRIMA del setup dell'ambiente (npm install,
- * binario Electron ~102MB, scrot): se il giro non è in grado di lavorare, va
+ * binario Electron ~102MB): se il giro non è in grado di lavorare, va
  * scoperto prima di aver pagato il setup.
  *
  * Non è un dispatch a vuoto: NON claima, NON emette un bucket, NON consegna
@@ -2170,7 +2170,7 @@ if (isMainModule) {
       process.exit(0);
     } else if (flag === '--preflight') {
       // Prontezza: gira PRIMA del setup dell'ambiente (npm install, binario
-      // Electron ~102MB, scrot). Se il giro deve fermarsi, deve scoprirlo prima
+      // Electron ~102MB). Se il giro deve fermarsi, deve scoprirlo prima
       // di aver pagato il setup.
       //
       // Su "si può lavorare" l'output CONSEGNA le istruzioni dell'orchestratore
