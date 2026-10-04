@@ -164,3 +164,64 @@ test('il documento rientra nel prompt intero, fonti comprese', async ({ app, she
   expect(tool.content.length).toBeGreaterThanOrEqual(intero.length);
   expect(tool.content).toContain('Fonti:');
 });
+
+// #951 — «quali dati condividi?»: il modello trova il documento sulla privacy fra gli strumenti, lo chiede e lo riceve intero.
+test('a «quali dati condividi?» il documento sulla privacy arriva al modello, intero', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 10_000 });
+  const page = await (async () => {
+    const deadline = Date.now() + 15_000;
+    while (Date.now() < deadline) {
+      const win = app.windows().find((w) => w.url().startsWith('filo://newtab'));
+      if (win) { await win.waitForLoadState('domcontentloaded'); return win; }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    throw new Error('newtab non trovata');
+  })();
+  await expect(page.locator('#input')).toBeVisible();
+
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+  });
+  await app.evaluate(() => {
+    globalThis.__calls = [];
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, tools, onDelta, onToolCall }) => {
+      const n = globalThis.__calls.push({ messages: JSON.parse(JSON.stringify(messages)), tools: JSON.parse(JSON.stringify(tools || [])) });
+      const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+      if (n === 1) {
+        try { onToolCall && onToolCall({ id: 't1', name: 'LEGGI_TRASPARENZA' }); } catch (_) {}
+        return {
+          ...base, text: '',
+          toolCalls: [{ id: 't1', name: 'LEGGI_TRASPARENZA', arguments: '{"doc":"privacy"}' }],
+          reasoningDetails: [], finishReason: 'tool_calls',
+        };
+      }
+      try { onDelta && onDelta('Te lo dice il documento sulla privacy.'); } catch (_) {}
+      return { ...base, text: 'Te lo dice il documento sulla privacy.', toolCalls: [], reasoningDetails: [], finishReason: 'stop' };
+    };
+  });
+
+  await page.locator('#input').fill('quali dati condividi?');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'documento sulla privacy' })).toBeVisible({ timeout: 20_000 });
+
+  const calls = await app.evaluate(() => globalThis.__calls);
+  const strumento = calls[0].tools.find((t) => t && t.function && t.function.name === 'LEGGI_TRASPARENZA');
+  expect(strumento, 'LEGGI_TRASPARENZA non arriva al modello').toBeTruthy();
+  expect(strumento.function.parameters.properties.doc.enum).toEqual(expect.arrayContaining(['privacy', 'security']));
+  expect(strumento.function.description).toContain('Cosa resta sul tuo computer');
+
+  const tool = calls[1].messages.filter((x) => x.role === 'tool').pop();
+  const intero = await app.evaluate(() => globalThis.SN_TRANSPARENCY.asText('privacy'));
+  expect(tool.content).toContain('Privacy');
+  expect(tool.content).toContain('Safe Browsing');
+  expect(tool.content).toContain('I punti deboli');
+  expect(tool.content).not.toContain('NON esiste');
+  expect(tool.content.length).toBeGreaterThanOrEqual(intero.length);
+});

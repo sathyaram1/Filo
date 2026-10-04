@@ -54,7 +54,7 @@ A ogni risposta Filo registra chi l'ha servita davvero, e lo vedi nella Cronolog
 
 ## Il server di Filo
 
-Filo ha un server, su Firebase, cioè su infrastruttura Google (ne parlo più sotto). Il suo codice gira in Europa, nella regione europe-west1, in Belgio. Fa quattro cose: tiene la configurazione condivisa (quale modello usa ogni funzione), riceve i feedback, gestisce i crediti e ospita il red team.
+Filo ha un server, su Firebase, cioè su infrastruttura Google (ne parlo più sotto). Il suo codice gira in Europa, nella regione europe-west1, in Belgio. Per chi usa l'app fa quattro cose: tiene la configurazione condivisa (quale modello usa ogni funzione), riceve i feedback, gestisce i crediti e ospita il red team.
 
 All'avvio Filo si presenta al server con la sua identità anonima, legge la configurazione condivisa e lo stato dei suoi crediti; il primo giorno chiede anche se c'è un invito che lo aspetta. Queste richieste non contengono niente di tuo, oltre all'indirizzo IP che ogni richiesta in rete porta con sé.
 
@@ -66,7 +66,7 @@ Prima di lasciare il tuo computer vengono cifrati verso di me il testo, l'indiri
 
 Il testo e gli screenshot passano da più modelli giudici, che decidono se il feedback è legittimo, spam o un tentativo di attacco. I giudici sono modelli diversi tra loro per costruzione (è una difesa, spiegata nel documento sulla sicurezza) e ricevono i tuoi dati con la stessa lista di fornitori esclusi delle chiamate dall'app. Poi il feedback arriva agli agenti che scrivono e controllano la correzione, e questi girano su Claude di Anthropic.
 
-Sulla bacheca pubblica dentro l'app un feedback compare solo quando è chiuso, e solo con il titolo breve, il numero, le date, lo stato, i voti, il premio e la frase di risposta per chi l'ha segnalato. Quella frase è scritta per essere letta da chiunque.
+Sulla bacheca pubblica dentro l'app un feedback compare solo quando è chiuso, e solo con il titolo breve, il numero, le date, lo stato, la versione che l'ha risolto, i voti, il premio e la frase di risposta per chi l'ha segnalato. Quella frase è scritta per essere letta da chiunque.
 
 Filo stesso, quando si accorge che non sa fare una cosa che gli chiedi o che qualcosa non ha funzionato, può mandare da solo una segnalazione generica: senza le tue parole e senza l'indirizzo della pagina, con un avviso che ti lascia annullarla. È acceso di serie e si spegne nelle impostazioni di Sicurezza.
 
@@ -105,7 +105,7 @@ Oltre ai modelli e al server di Filo, alcune funzioni parlano con altri servizi.
 - **Il sito di un link.** Quando chiedi cos'è un link, Filo gli chiede titolo e descrizione della pagina.
 - **Il servizio di icone di Google.** Nella home, per mostrare l'icona dei siti che Filo ti suggerisce, riceve il nome di quei siti.
 - **Google, come motore di ricerca.** Quando scrivi nella barra qualcosa che non è un indirizzo, la ricerca si apre sulla pagina dei risultati di Google.
-- **GitHub ed EasyList.** All'avvio GitHub riceve la richiesta della versione più recente; da GitHub ed EasyList Filo scarica anche le liste per bloccare la pubblicità e i banner dei cookie.
+- **GitHub, EasyList e Fanboy.** All'avvio GitHub riceve la richiesta della versione più recente; da questi tre Filo scarica anche le liste per bloccare la pubblicità e i banner dei cookie.
 - **Cambi valuta e carte Magic** (Frankfurter e Scryfall). Per le funzioni corrispondenti, e non ricevono niente di tuo, salvo il nome della carta che cerchi.
 
 Se trovi Filo che contatta qualcosa che non è in questa lista, è un errore di questo documento.
