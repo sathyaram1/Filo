@@ -41,6 +41,7 @@
     const voci = new Map();
     const fila = [];
     let inCorso = 0;
+    let inPausa = 0;
     let fermata = '';
     let spenta = false;
     let attese = [];
@@ -53,7 +54,7 @@
         else if (v.stato === 'fallita') { fallite++; nonLette.push({ id: v.id, mail: v.mail, errore: v.errore, tentativi: v.tentativi }); }
         else daLeggere++;
       }
-      const finito = inCorso === 0 && (fila.length === 0 || !!fermata || spenta);
+      const finito = inCorso === 0 && (fermata || spenta ? true : inPausa === 0 && fila.length === 0);
       return { lette, daLeggere, fallite, inCorso, parallelo: limite, fermata, finito, nonLette };
     }
 
@@ -64,6 +65,18 @@
         const chi = attese; attese = [];
         for (const r of chi) r(s);
       }
+    }
+
+    async function pausa(v, ms) {
+      v.stato = 'pausa';
+      inCorso--;
+      inPausa++;
+      avvisa();
+      try { await attendi(ms); } catch (_) {}
+      inPausa--;
+      v.stato = 'attesa';
+      fila.unshift(v.id);
+      pompa();
     }
 
     async function lavora(v) {
@@ -87,22 +100,10 @@
           v.tentativi--;
           v.troppe++;
           limite = Math.max(1, limite - 1);
-          v.stato = 'pausa';
-          inCorso--;
-          avvisa();
-          await attendi(ATTESA_TROPPE_MS * v.troppe);
-          v.stato = 'attesa';
-          fila.unshift(v.id);
-          pompa();
+          await pausa(v, ATTESA_TROPPE_MS * v.troppe);
           return;
         } else if (v.tentativi < massimo) {
-          v.stato = 'pausa';
-          inCorso--;
-          avvisa();
-          await attendi(ATTESE_MS[Math.min(v.tentativi - 1, ATTESE_MS.length - 1)]);
-          v.stato = 'attesa';
-          fila.unshift(v.id);
-          pompa();
+          await pausa(v, ATTESE_MS[Math.min(v.tentativi - 1, ATTESE_MS.length - 1)]);
           return;
         } else {
           v.stato = 'fallita';
