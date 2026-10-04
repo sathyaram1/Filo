@@ -1,5 +1,5 @@
 // #948 — Il tasto microfono delle chat: si preme, si parla, il testo compare nella casella e la richiesta parte
-// da sola dopo un attimo per annullare; con «Lascia il testo da correggere» resta nella casella.
+// da sola dopo un attimo per annullare; con «Lascia il testo da correggere» resta nella casella. Home, Aiuto, Editor.
 // Microfono finto (un tono: per il segmentatore è voce, spento è silenzio), trascrizione e chat finte nel main:
 // tutto il resto (ascolto, fine del parlato, WAV, inserimento, invio) è il codice di produzione.
 
@@ -341,4 +341,40 @@ test('home: Esc mentre ascolta smette, tiene quello che hai detto e non invia', 
   await expect(mic).toHaveAttribute('data-stato', 'pronto');
   await page.waitForTimeout(3500);
   await expect(page.locator('.dash-bubble-user')).toHaveCount(0);
+});
+
+test('la scelta si chiede a Filo in chat e si vede in Preferenze, dove si cambia', async ({ app, shell, openTab }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await prepara(app);
+  const page = await home(app);
+  const prefs = await openTab('filo://preferences/preferences.html');
+  const scelta = prefs.locator('#dictationAutoSend');
+  await expect(scelta).toHaveValue('si');
+
+  await app.evaluate(() => {
+    let n = 0;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts }) => {
+      n += 1;
+      const calls = n === 1
+        ? [{ id: 'p1', name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave: 'invio_vocale', valore: 'lascia il testo da correggere' }) }]
+        : [];
+      return {
+        model: attempts[0].model, provider: attempts[0].provider, usage: {},
+        text: calls.length ? '' : 'Fatto.', toolCalls: calls, reasoningDetails: [], finishReason: calls.length ? 'tool_calls' : 'stop',
+      };
+    };
+  });
+  await page.bringToFront();
+  await page.locator('#input').fill('quando parlo lascia il testo da correggere');
+  await page.locator('#sendBtn').click();
+  await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).dictation.autoSend), { timeout: 10_000 }).toBe(false);
+  // La pagina aperta segue il cambio fatto altrove.
+  await expect(scelta).toHaveValue('no', { timeout: 5_000 });
+
+  await scelta.selectOption('si');
+  await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).dictation.autoSend)).toBe(true);
+  mkdirSync(SHOTS, { recursive: true });
+  await prefs.locator('#dictationAutoSend').scrollIntoViewIfNeeded();
+  await prefs.screenshot({ path: `${SHOTS}/voce-chat-preferenze.png` });
 });
