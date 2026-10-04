@@ -359,7 +359,6 @@
           // L'esito è arrivato: un ultimo strappo, il raggio cresce di un terzo e torna.
           tiene() { quando(() => { nd.strappo = Date.now(); sveglia(); }); },
           cede() { quando(() => { nd.riaperto = Date.now(); sveglia(); }); },
-          get fallito() { return !!nd.riaperto || nd.dopo === null && false; },
         };
       },
       // Il filo si avvolge: gli stessi punti, mandati sulla spirale per lunghezza. Srotolare è il contrario.
