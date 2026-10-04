@@ -146,6 +146,20 @@
         return { partial: { showHomeMessage: b }, label: `Commento nella home → ${b ? 'mostrato' : 'nascosto'}` };
       },
     },
+    // Ora, batteria, rete e Bluetooth nella home (#873): una voce per chiave, le altre restano come sono.
+    ...[
+      ['ora', "l'ora", ['orologio']],
+      ['batteria', 'la batteria', []],
+      ['rete', 'la rete', ['wifi', 'wi-fi', 'connessione']],
+      ['bluetooth', 'il Bluetooth', []],
+    ].map(([voce, nome, sinonimi]) => ({
+      keys: [`${voce}_home`, `${voce} nella home`, `${voce} home`, ...sinonimi.map((x) => `${x}_home`)],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { homeSistema: { [voce]: b } }, label: `Home → ${b ? 'mostra' : 'nascondi'} ${nome}` };
+      },
+    })),
     {
       keys: ['stile_agente', 'stile agente', "stile dell'agente", 'agentstyle', 'stile'],
       // Entra in ogni prompt conversazionale e ci resta: proposto dal modello,

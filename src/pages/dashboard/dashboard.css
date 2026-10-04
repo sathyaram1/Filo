@@ -1100,6 +1100,95 @@ html, body {
 /* A destra scorre la colonna intera: le carte non si schiacciano sotto «altro» quando la finestra è bassa. */
 .dash-right > .dash-carte { flex: none; padding: 2px; }
 
+/* Ora, batteria, rete e Bluetooth (#873) dove sul desktop sta l'orologio, allineate al testo delle carte; restano
+   appoggiate al bordo basso anche quando gli avvisi allungano la colonna. Colore solo per ciò che chiede attenzione. */
+.dash-sistema {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 0 4px 14px;
+  background: var(--dash-paper);
+}
+.dash-sis-icone {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  max-width: 100%;
+}
+.dash-sis-voce {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0 8px;
+  border-radius: 10px;
+  color: var(--dash-ink-soft);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s, color 0.12s;
+}
+.dash-sis-voce:hover,
+.dash-sis-voce:focus-visible {
+  background: var(--dash-card);
+  color: var(--dash-ink);
+  outline: none;
+}
+.dash-sis-voce:active { transform: translateY(0.5px); }
+.dash-sis-voce[data-voce="ora"] {
+  height: 38px;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--dash-ink);
+}
+.dash-sis-icona { display: inline-flex; flex: none; }
+.dash-sis-icona:empty { display: none; }
+.dash-sis-icona svg { display: block; }
+.dash-sis-testo {
+  min-width: 0;
+  max-width: 104px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.dash-sis-voce[data-stato="bassa"],
+.dash-sis-voce[data-stato="offline"] { color: var(--dash-accent); }
+.dash-sis-voce[data-stato="spento"] .dash-sis-icona { opacity: 0.55; }
+
+.dash-sis-box {
+  position: fixed;
+  right: auto;
+  top: auto;
+  min-width: 190px;
+  max-width: 280px;
+}
+.dash-sis-box .dash-sis-info {
+  padding: 8px 12px 8px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--sn-fg);
+  overflow-wrap: anywhere;
+}
+.dash-sis-box .dash-sis-info > div:first-child { font-weight: 600; }
+.dash-sis-box .dash-sis-info > div + div { color: var(--sn-muted); }
+.dash-sis-box .dash-sis-info + .sn-select-option { border-top: 1px solid var(--sn-border); }
+.dash-sis-box .sn-select-option:hover,
+.dash-sis-box .sn-select-option:focus-visible {
+  background-color: rgba(var(--sn-accent-rgb), 0.18);
+  outline: none;
+}
+
 .dash-input-wrap {
   grid-column: 2;
   grid-row: 2;

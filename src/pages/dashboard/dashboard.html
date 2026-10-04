@@ -27,6 +27,7 @@
   <script src="filo://shared/filoMemory.js"></script>
   <script src="filo://shared/filoState.js"></script>
   <script src="filo://shared/carteHome.js"></script>
+  <script src="filo://shared/sistema.js"></script>
 </head>
 <body data-state="home">
   <!-- I controlli del browser stanno dentro la home, non in una barra in alto: ogni icona aziona il comando
@@ -56,6 +57,7 @@
     <aside class="dash-right" id="right" aria-label="Quello che tieni">
       <div class="dash-carte" id="tieni"></div>
       <section class="dash-altro" id="altro" aria-label="Altro"></section>
+      <div class="dash-sistema" id="sistema" role="group" aria-label="Ora, batteria, rete e Bluetooth" hidden></div>
     </aside>
 
     <form class="dash-input-wrap" id="inputForm" autocomplete="off">
@@ -85,6 +87,7 @@
   <script src="dashboard-comandi.js"></script>
   <script src="dashboard-terminale.js"></script>
   <script src="dashboard-carte.js"></script>
+  <script src="dashboard-sistema.js"></script>
   <script src="dashboard.js"></script>
 </body>
 </html>

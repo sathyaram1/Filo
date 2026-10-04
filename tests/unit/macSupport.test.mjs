@@ -862,3 +862,17 @@ test('un filo:// che arriva da fuori si legge cercando il prefisso, mai per posi
   // pagina interna messa in un link da un sito qualsiasi non deve aprirsi.
   assert.equal(W.inviteCodeFromDeepLink('filo://credits/credits.html'), null);
 });
+
+// ── Batteria, rete e Bluetooth (#873) ────────────────────────────────────────
+
+test('su Mac batteria, rete e Bluetooth si leggono senza chiedere permessi', async () => {
+  const L = require(join(ROOT, 'src', 'main', 'services', 'statoSistema.js'));
+  const sorgente = readFileSync(join(ROOT, 'src', 'main', 'services', 'statoSistema.js'), 'utf8');
+  const mac = sorgente.slice(sorgente.indexOf('async function leggiMac'), sorgente.indexOf('// ── Windows'));
+  // system_profiler e CoreBluetooth toccano il Bluetooth, che su macOS chiede il permesso a chi li lancia.
+  assert.ok(!/system_profiler|blueutil|CoreBluetooth|airport\b/.test(mac));
+  const chiesti = [];
+  await L.leggiMac(async (file) => { chiesti.push(file); return null; });
+  assert.deepEqual(chiesti.filter((f) => /powershell|cmd|bash|sh$/i.test(f)), [], 'su Mac non si lancia una shell');
+  assert.deepEqual(new Set(chiesti), new Set(['pmset', 'route', 'defaults']));
+});

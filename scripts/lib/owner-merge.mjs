@@ -44,6 +44,30 @@ const BASE = process.env.FILO_ROUTINE_API
   || 'https://europe-west1-filo-8b9cb.cloudfunctions.net';
 
 export const OWNER_MERGE_URL = `${BASE}/ownerMerge`;
+export const OWNER_MERGE_APPROVALS_URL = `${BASE}/ownerMergeApprovals`;
+
+/**
+ * In che stato è la richiesta `id` secondo l'elenco del deposito (`ownerMergeApprovals`, op list). PURA.
+ * Il server dà il nome della richiesta anche quando il deposito ha rifiutato di riaprirla perché già decisa (#486):
+ * una richiesta rinfrescata adesso è la più nuova, quindi se non sta fra quelle in attesa è stata decisa.
+ * @returns {{ state: 'pending'|'discarded'|'used'|'decided'|'', outcome?: string, motivo?: string }} '' = elenco illeggibile
+ */
+export function statoDellaRichiesta(id, elenco) {
+  const e = (elenco && typeof elenco === 'object') ? elenco : null;
+  if (!id || !e || e.ok !== true || !Array.isArray(e.pending)) return { state: '', motivo: 'l’elenco delle richieste non si legge' };
+  const trova = (k) => (Array.isArray(e[k]) ? e[k] : []).find((v) => v && v.id === id);
+  if (trova('pending')) return { state: 'pending' };
+  const v = trova('failed') || trova('recent') || trova('preapproved');
+  if (v && v.discarded === true) return { state: 'discarded' };
+  if (v && v.used === true) return { state: 'used', outcome: String(v.outcome || '').slice(0, 40) };
+  return { state: 'decided' };
+}
+
+/** La richiesta potrebbe aspettare l'owner: in attesa, o non controllata. PURA. Decide se suonare il campanello. */
+export function richiestaForseInAttesa(reply) {
+  const r = reply || {};
+  return r.outcome === 'blocked' && !!r.requestId && !['discarded', 'used', 'decided'].includes(r.requestState);
+}
 
 /**
  * Dalla risposta grezza del server a un esito con un nome. PURA.
@@ -150,6 +174,37 @@ function righeDelleParti(r, pratica, num) {
   return righe;
 }
 
+const RIPROPONI = '  Per riproporla serve un commit nuovo, anche vuoto, poi rilancia npm run finish:\n'
+  + '    git commit --allow-empty -m "riproposta"';
+
+/** Il seguito di un blocco: dove sta la richiesta, o perché in Filo non c'è niente da approvare (#486). PURA. */
+function righeDellaRichiesta(r) {
+  if (!r.requestId) {
+    return '  Non sono riuscito a metterla in attesa: nell\'app non comparirà niente da\n'
+      + '  approvare. Riprova, e se non torna vanno rideployate le funzioni di sicurezza.';
+  }
+  const giaDecisa = (perche) => `  NON l'ho messa in attesa: ${perche}\n  In Filo non c'è niente da approvare.\n${RIPROPONI}`;
+  switch (r.requestState) {
+    case 'pending':
+      return '  L\'ho messa IN ATTESA: approvala da Filo, nella dashboard di gestione\n'
+        + '  (l\'avviso in cima ai Ricevuti). Da lì puoi anche scartarla.\n'
+        + '  Se la pagina è già aperta l\'avviso compare da solo, non serve riaprirla.\n'
+        + '  Vale per il commit appena controllato e per 7 giorni: se scade, o se il\n'
+        + '  ramo si muove, rilancia npm run finish.';
+    case 'discarded':
+      return giaDecisa('questa versione era già stata SCARTATA, e una richiesta\n  decisa non si riapre.');
+    case 'used':
+      return giaDecisa(`questa versione era già stata APPROVATA${r.requestOutcome === 'conflict' ? ', e la fusione\n  era finita in conflitto' : ''}. Un'approvazione vale una volta sola.`);
+    case 'decided':
+      return giaDecisa('questa versione era già stata decisa (approvata o\n  scartata), e una richiesta decisa non si riapre.');
+    default:
+      return `  Il server dice di averla messa in attesa, ma non sono riuscito a\n  controllarlo${r.requestCheck ? ` (${r.requestCheck})` : ''}.\n`
+        + '  Se in cima ai Ricevuti della dashboard di gestione non c\'è l\'avviso,\n'
+        + '  questa versione era già stata decisa e non si riapre.\n'
+        + RIPROPONI;
+  }
+}
+
 /**
  * Cosa legge l'owner. PURA. Una riga di esito e, quando serve, la riga che
  * dice cosa fare adesso — mai un motivo tecnico lasciato lì da interpretare.
@@ -186,20 +241,13 @@ export function messageForOwnerMerge(reply, branch = 'il ramo', ctx = {}) {
       // regola del server, non un muro di questa macchina.
       return `✗ Fusione BLOCCATA dai controlli di sicurezza del server: ${r.reason || 'motivo non riportato'}\n`
         + '  Sono controlli automatici sul contenuto delle modifiche (aree protette,\n'
-        + '  dipendenze nuove, segreti). La fusione aspetta il tuo sì.\n'
+        + `  dipendenze nuove, segreti).${richiestaForseInAttesa(r) ? ' La fusione aspetta il tuo sì.' : ''}\n`
         + (r.localDetail || r.localReason
           ? `  L5 non è stato saltato: ${r.localDetail || r.localReason}.\n`
           : (ctx.feedbackId ? '' : '  Nessuna pratica collegata: con npm run finish -- --feedback <N> il lavoro locale\n'
             + '  di un feedback tuo o di una sessione con la prova del mittente, o che hai approvato\n'
             + '  come lavoro locale, non aspetta.\n'))
-        + (r.requestId
-          ? '\n  L\'ho messa IN ATTESA: approvala da Filo, nella dashboard di gestione\n'
-            + '  (l\'avviso in cima ai Ricevuti). Da lì puoi anche scartarla.\n'
-            + '  Se la pagina è già aperta l\'avviso compare da solo, non serve riaprirla.\n'
-            + '  Vale per il commit appena controllato e per 7 giorni: se scade, o se il\n'
-            + '  ramo si muove, rilancia npm run finish.'
-          : '\n  Non sono riuscito a metterla in attesa: nell\'app non comparirà niente da\n'
-            + '  approvare. Riprova, e se non torna vanno rideployate le funzioni di sicurezza.');
+        + `\n${righeDellaRichiesta(r)}`;
     case 'conflict':
       return `✗ Conflitto: main è andato avanti e le modifiche non si incastrano da sole.\n`
         + '  Fai: git pull --rebase origin main, risolvi, e rilancia npm run finish.';
@@ -261,7 +309,7 @@ export function exitCodeForOwnerMerge(reply) {
  * La domanda al server: "fondi questo ramo, che alla mia ultima verifica era
  * questo commit". Ritorna sempre un esito classificato, mai un'eccezione.
  */
-export async function askServerMerge({ branch, sha = '', feedbackId = '', pendingParts = [], provaUnit = null, fetchImpl = fetch, url = OWNER_MERGE_URL } = {}) {
+export async function askServerMerge({ branch, sha = '', feedbackId = '', pendingParts = [], provaUnit = null, fetchImpl = fetch, url = OWNER_MERGE_URL, listUrl = OWNER_MERGE_APPROVALS_URL } = {}) {
   const refresh = findAdminRefreshToken();
   if (!refresh) return { outcome: 'no_owner_credential' };
 
@@ -294,9 +342,41 @@ export async function askServerMerge({ branch, sha = '', feedbackId = '', pendin
     const text = await res.text();
     let body = {};
     try { body = text ? JSON.parse(text) : {}; } catch (_) { body = {}; }
-    return classifyOwnerMerge(res.status, body);
+    const reply = classifyOwnerMerge(res.status, body);
+    if (reply.outcome !== 'blocked' || !reply.requestId) return reply;
+    const stato = await statoDalDeposito({ id: reply.requestId, idToken, fetchImpl, listUrl });
+    return Object.assign(reply, { requestState: stato.state },
+      stato.outcome ? { requestOutcome: stato.outcome } : {}, stato.motivo ? { requestCheck: stato.motivo } : {});
   } catch (e) {
     return { outcome: 'unreachable', reason: String((e && e.message) || e).slice(0, 200) };
+  }
+}
+
+/** Lo stato della richiesta riletto dal deposito. Mai un'eccezione: un controllo fallito è `state: ''`. */
+async function statoDalDeposito({ id, idToken, fetchImpl, listUrl }) {
+  const lettura = () => fetchImpl(listUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ data: { op: 'list' } }),
+    ...(typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? { signal: AbortSignal.timeout(30000) } : {}),
+  });
+  try {
+    let res;
+    try {
+      res = await lettura();
+    } catch (e) {
+      if (!erroreDiConnessione(e)) throw e;
+      res = await lettura();
+    }
+    const text = await res.text();
+    let body = {};
+    try { body = text ? JSON.parse(text) : {}; } catch (_) { body = {}; }
+    if (res.status !== 200) {
+      return { state: '', motivo: `elenco delle richieste: ${String((body.error && body.error.message) || `http_${res.status}`).slice(0, 120)}` };
+    }
+    return statoDellaRichiesta(id, body.result);
+  } catch (e) {
+    return { state: '', motivo: `elenco delle richieste: ${String((e && e.message) || e).slice(0, 120)}` };
   }
 }
 

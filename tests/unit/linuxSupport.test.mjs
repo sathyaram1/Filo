@@ -549,3 +549,14 @@ test('su Linux le scorciatoie si chiamano e funzionano come su Windows', () => {
   assert.equal(T.riservato('Ctrl+0', 'linux'), false,
     'su Linux lo zoom arriva alla pagina: quel tasto non è riservato');
 });
+
+// ── Batteria, rete e Bluetooth (#873) ────────────────────────────────────────
+
+test('su Linux batteria, rete e Bluetooth si leggono dal sistema, senza PowerShell né permessi', async () => {
+  const L = require(join(ROOT, 'src', 'main', 'services', 'statoSistema.js'));
+  const chiesti = [];
+  const letto = await L.leggiLinux(join(ROOT, 'non-esiste'), async (file, args) => { chiesti.push([file, ...args].join(' ')); return null; });
+  assert.deepEqual(letto, { batteria: null, rete: null, bluetooth: null }, 'senza sysfs non si inventa niente');
+  assert.ok(chiesti.every((c) => /^busctl --system /.test(c)), `comandi inattesi: ${chiesti.join(' | ')}`);
+  assert.ok(!chiesti.some((c) => /sudo|pkexec|powershell/i.test(c)));
+});

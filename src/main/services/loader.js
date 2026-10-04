@@ -55,6 +55,8 @@ require(path.join(SHARED, 'paths.js'));
 // PRIMA di filoMemory (che ci passa lo stato letto dallo storage).
 require(path.join(SHARED, 'onboarding.js'));
 require(path.join(SHARED, 'filoMemory.js'));
+// Ora, batteria, rete e Bluetooth a parole: lo legge filoState per lo STATO, e la home per le sue voci.
+require(path.join(SHARED, 'sistema.js'));
 require(path.join(SHARED, 'filoState.js'));
 require(path.join(SHARED, 'carteHome.js')); // #870 — carte della home: catalogo e mosse (logica pura)
 // #525 — archivio delle chat con Filo: titoli, tipi, ricerca (logica pura).
@@ -85,6 +87,9 @@ require(path.join(SHARED, 'campoNumero.js'));
 // Come partono le sessioni delle routine: stesse regole in pagina e nel main.
 require(path.join(SHARED, 'routineSessioni.js'));
 require(path.join(SHARED, 'calcMarkers.js'));  // #724.1 — calcolatrice dei marker [[calc:]]: la chat li risolve nel main
+// #711 — cosa dichiara un'immagine sulla propria origine, letto dai suoi byte.
+// Usa node:crypto per verificare le firme: vive solo dove Node c'è (main).
+require(path.join(SHARED, 'provenienzaImmagine.js'));
 require(path.join(SHARED, 'streamingJson.js'));  // #420 — estrae il campo "text" mentre il JSON di risposta arriva in streaming
 require(path.join(SHARED, 'actionLevels.js'));
 require(path.join(SHARED, 'actionTools.js'));  // le azioni come strumenti del modello (tool calling nativo)
@@ -143,6 +148,7 @@ require(path.join(SVC, 'pathsCollector.js'));
 require(path.join(SVC, 'llmsTxt.js'));
 require(path.join(SVC, 'webSearch.js'));
 require(path.join(SVC, 'fxRates.js'));
+require(path.join(SVC, 'statoSistema.js')); // batteria, rete, Bluetooth del computer: SN_SISTEMA_MAIN per lo STATO
 require(path.join(SVC, 'safebrowse', 'index.js'));
 require(path.join(SVC, 'geoBlock.js'));
 require(path.join(SVC, 'geoBlockClassifier.js'));
