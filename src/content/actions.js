@@ -673,6 +673,13 @@
     el.appendChild(w);
   }
 
+  // Quello che Filo dice di un'immagine viene da byte che il sito non può leggere (altro dominio,
+  // cookie dell'utente): la ricerca nel testo del sito attraversa lo shadow chiuso, quindi glifi, non testo (#946).
+  function testoChiuso(el, s) {
+    el.textContent = '';
+    global.SN_MENU.testoNascosto(el, el, s);
+  }
+
   // Le etichette di origine di un'immagine già scaricata (#711): le legge il main
   // dai byte, sul computer e senza crediti. Il menu e l'Aiuto passano entrambi da qui.
   function leggiOrigine(dataUrl) {
