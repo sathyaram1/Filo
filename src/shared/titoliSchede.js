@@ -94,9 +94,9 @@
     { famiglia: 'azione', re: R`(?:user'?s|dell'utente|del usuario|de l'utilisateur|des nutzers)\s+{{SEGRETI}}\b.{0,60}?\b(?:send|invia|forward|inoltra|manda|envia|envoie|sende|schicke|post|upload|carica)\b.{0,40}?(?:\bto|\ba|\bal|\bpara|\ban|\bzu|\bvers|\bsu|\bon)\s+(?:\S*@\S+|(?:https?:\/\/|www\.)\S+)` },
     { famiglia: 'azione', re: R`\b(?:disattiva|disabilita|spegni|togli|disable|turn off|switch off|remove|desactiva|apaga|desactive|deaktiviere|schalte)\s+(?:(?:la|le|il|i|gli|the|los|las|les|die|den)\s+)?(?:(?:protezion[ei]|protection|sicurezza|security|safety|controll[io]|checks?|filtr[io]|filters?|guardiano|guardian|proteccion|seguridad|securite|schutz|sicherheit)\s+(?:\w+\s+)?(?:di|of|de|del|von)\s+filo|filo'?s\s+(?:\w+\s+)?(?:protection|security|safety|checks?|filters?|guardian))\b` },
     // Cambi di comportamento senza un destinatario esplicito.
-    { famiglia: 'comportamento', re: R`\b(?:ignor\w*|disregard\w*|forget|dimentica\w*|olvida\w*|oublie\w*|vergiss\w*|override|bypass|salta|ometti)\s+(?:(?:the|le|i|gli|las|los|les|die|der|any|ogni)\s+)*{{PRIMA}}\s+(?:(?:the|le|i|gli|las|los|les|die|{{PRIMA}})\s+)*{{ISTRUZIONI}}\b` },
-    { famiglia: 'comportamento', re: R`\b(?:ignor\w*|disregard\w*|forget|dimentica\w*|olvida\w*|oublie\w*|vergiss\w*|override|bypass)\s+(?:(?:the|le|i|gli|las|los|les|die|der|any|ogni|{{PRIMA}})\s+)*{{PRIMA_FORTE}}\s+(?:(?:the|le|i|gli|las|los|les|die|{{PRIMA}})\s+)*{{REGOLE}}\b` },
-    { famiglia: 'comportamento', re: R`\b(?:ignor\w*|disregard\w*|forget|dimentica\w*|olvida\w*|oublie\w*|vergiss\w*)\s+(?:(?:the|le|i|gli|las|los|les|die|der|{{PRIMA}})\s+)*(?:{{ISTRUZIONI}}|{{REGOLE}})\s+(?:precedenti|di prima|anteriores|precedentes|previous|above|earlier|vorherigen|ricevute|originali|originales|bisherigen)\b` },
+    { famiglia: 'comportamento', re: R`\b(?:ignor\w*|disregard\w*|forget|dimentica\w*|olvida\w*|oublie\w*|vergiss\w*|override|bypass|salta|ometti)\s+(?=(?:(?:the|le|i|gli|las|los|les|die|der|den)\s+){0,2}{{PRIMA}}\s)(?:(?:the|le|i|gli|las|los|les|die|der|den|{{PRIMA}})\s+){1,5}{{ISTRUZIONI}}\b` },
+    { famiglia: 'comportamento', re: R`\b(?:ignor\w*|disregard\w*|forget|dimentica\w*|olvida\w*|oublie\w*|vergiss\w*|override|bypass)\s+(?=(?:(?:the|le|i|gli|las|los|les|die|der|den|{{PRIMA}})\s+){0,3}{{PRIMA_FORTE}}\s)(?:(?:the|le|i|gli|las|los|les|die|der|den|{{PRIMA}})\s+){1,5}{{REGOLE}}\b` },
+    { famiglia: 'comportamento', re: R`\b(?:ignor\w*|disregard\w*|forget|dimentica\w*|olvida\w*|oublie\w*|vergiss\w*)\s+(?:(?:the|le|i|gli|las|los|les|die|der|den|{{PRIMA}})\s+){0,4}(?:{{ISTRUZIONI}}|{{REGOLE}})\s+(?:precedenti|di prima|anteriores|precedentes|previous|above|earlier|vorherigen|ricevute|originali|originales|bisherigen)\b` },
     { famiglia: 'comportamento', re: R`\b(?:ignor\w*|disregard\w*|forget|dimentica\w*|olvida\w*|oublie\w*|vergiss\w*|override|bypass)\s+(?:the |il |lo |la |le |i |gli |el |los |les |die |den )?(?:system prompt|prompt di sistema|prompt de sistema|system instructions|istruzioni di sistema|safety (?:rules|guidelines|filters)|guardrails|(?:your|il tuo|tu|ton|dein) (?:training|addestramento|entrenamiento|entrainement|training))\b` },
     { famiglia: 'comportamento', re: R`\b(?:forget|ignore|disregard|dimentica|ignora|olvida|oublie|vergiss|ignoriere)\s+(?:(?:everything|anything|all|tutto|todo|tout|alles|the|quanto|cio|lo|ce qui est|das)\s+)?(?:above|before|previous|prior|you(?:'ve| have| were)? (?:been )?told|sopra|prima|precedente|detto prima|que te dijeron|anterior|ci-dessus|precedent|davor|bisher|oben)\b` },
     { famiglia: 'comportamento', re: R`\b(?:d'ora in (?:poi|avanti)|da (?:ora|adesso|oggi) in (?:poi|avanti)|from now on|henceforth|going forward|a partir de ahora|de ahora en adelante|desde ahora|desormais|dorenavant|a partir de maintenant|ab jetzt|ab sofort|von nun an|fortan)\s*,?\s*(?:{{RIEMPI}}[\s,:;!.\-]+){0,3}(?:{{PARLA}}|you will|you must|you should|you are|devi|dovrai|debes|tu dois|du musst)\b` },
@@ -134,8 +134,10 @@
   const CONTATORE = /\s*[([{]\s*\d{1,3}(?:[., ]\d{3})*\+?\s*[)\]}]/g;
   const NUMERO = /(?<![\p{L}\p{N}])\d[\d.,:/]*(?![\p{L}\p{N}])/gu;
 
+  // Un titolo lo sceglie la pagina, anche lungo un mega: oltre questo nessuna lettura lo vede comunque.
+  const TETTO_CHIAVE = 2000;
   function chiave(titolo) {
-    let t = typeof titolo === 'string' ? titolo : '';
+    let t = typeof titolo === 'string' ? titolo.slice(0, TETTO_CHIAVE) : '';
     t = t.normalize('NFC').replace(INVISIBILI, '');
     // Gli spazi doppi restano: separano le parole di un titolo scritto a lettere spaziate.
     t = t.replace(/\s/g, ' ').replace(CONTATORE, '').replace(SEGNI_NON_LETTO, '').replace(NUMERO, '#');
