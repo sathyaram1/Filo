@@ -44,10 +44,13 @@ un file scaricato) viaggia con la sua provenienza, come l'esito di un comando.
 - **La colonna di sinistra ha un ordine solo.** `SN_CARTE_HOME.sinistra` decide quali carte ci sono e in che
   ordine, e `trovaSinistra` le riconosce dalle parole dell'utente: la home la disegna da lì e la chat
   (`CARTA_HOME`) la legge da lì, così «metti il forno in cima» sposta la carta che l'utente vede in cima.
-  Un nome di destra dalla chat vale solo esatto: «lo scaricamento del file» non è l'Editor.
+  Un nome di destra dalla chat vale solo esatto: «lo scaricamento del file» non è l'Editor. Quello che la chat
+  racconta (la riga di attività, l'esito per il modello) nomina la carta toccata davvero, dall'esito, mai dalle
+  parole del modello; e l'esito che serve a riprovare arriva intero, con le chiavi e la destra com'è.
 - **Un lavoro lungo è una carta finché dura.** Il main tiene i lavori in corso (`lavoriInCorso.js`: un turno
-  di Filo, un comando del terminale) e li annuncia; la home mostra quelli delle altre schede dopo qualche
-  secondo, e «Vai» porta alla conversazione che li fa.
+  di Filo, un comando del terminale) e li annuncia; `lavoriAltrove` decide quali sono carte (dopo qualche
+  secondo, mai quello della conversazione che guarda: per la chat la richiesta in corso non è una carta), e
+  «Vai» porta alla conversazione che li fa.
 - **Una carta nuova si aggiunge al catalogo.** `CARTE` e `APP` in `src/shared/carteHome.js`: chi aveva
   già salvato una disposizione la ritrova in fondo a destra, perché tolte sono solo quelle tolte da lui.
   Colori e misure passano dai token `--dash-*`

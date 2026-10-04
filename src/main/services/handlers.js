@@ -2354,7 +2354,7 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         // Una carta di sinistra si cerca prima per chiave, poi un nome esatto di destra, poi per nome a sinistra:
         // «lo scaricamento del file» non deve finire sull'Editor, che fra i suoi nomi ha «file».
         if (tipo !== 'ripristina') {
-          const sx = await carteSinistraPerChat(sender);
+          const sx = await carteSinistraPerChat(sender, chatId);
           const perChiave = sx.find((v) => v.chiave === String(action.carta ?? '').trim());
           if (perChiave || !CH.risolvi(action.carta, { esatto: true })) {
             const trovate = perChiave ? { voci: [perChiave], perTipo: false, tipo: perChiave.tipo } : CH.trovaSinistra(action.carta, sx);
@@ -3100,7 +3100,10 @@ function toolResultText({ action, res, rendered }) {
   if (res.kept) return `Proposta all'utente come bottone in chat: ${describe()}. Non serve altro da parte tua.`;
   // Non eseguita e senza niente da mostrare: mancava qualcosa (nessuna scheda
   // web attiva, un riferimento che non trova niente, un dato vuoto).
-  const detail = res.output ? ` (${JSON.stringify(res.output).slice(0, 200)})` : '';
+  // Il dettaglio è quello che serve a riprovare (l'elenco delle carte con le chiavi): tetto largo, e un taglio si dice.
+  const TETTO_DETTAGLIO = 8000;
+  const json = res.output ? JSON.stringify(res.output) : '';
+  const detail = json ? ` (${json.length > TETTO_DETTAGLIO ? `${json.slice(0, TETTO_DETTAGLIO)}… [tagliato: ${json.length} caratteri in tutto]` : json})` : '';
   // Le azioni sulla scheda web (proxy, stile della pagina) falliscono quasi
   // sempre per lo stesso motivo: non c'è una scheda web attiva.
   const PAGE_ACTIONS = ['PROXY_TAB', 'RIMUOVI_PROXY', 'RIMUOVI_PROXY_TUTTE', 'REGOLA_PROXY_DOMINIO', 'RIMUOVI_REGOLA_PROXY', 'STILE_PAGINA', 'RIPRISTINA_STILE_PAGINA'];
@@ -3790,8 +3793,8 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
 // Messaggio "senza chiave API": istantaneo, dalle pagine salvate. Niente LLM.
 // ===== Le carte di sinistra della home dalla chat (#870) =====
 // La chat vede la colonna come la home: stesse carte, stesso ordine (SN_CARTE_HOME.sinistra). Senza chiave la
-// chat non risponde, quindi la carta dei Crediti qui non c'è.
-async function carteSinistraPerChat(sender) {
+// chat non risponde, quindi la carta dei Crediti qui non c'è. `chatId`: la conversazione che chiede.
+async function carteSinistraPerChat(sender, chatId = null) {
   const CH = globalThis.SN_CARTE_HOME;
   let downloads = [];
   try {
@@ -3804,14 +3807,15 @@ async function carteSinistraPerChat(sender) {
     require('./carteHome').leggi(),
   ]);
   const lavori = require('./lavoriInCorso').elenco();
-  return CH.sinistra({ timers, notifiche, downloads, lavori }, layout);
+  return CH.sinistra({ timers, notifiche, downloads, lavori, chat: chatId }, layout);
 }
 
 async function cartaSinistraDaChat({ tipo, verso, action, sx, trovate }) {
   const CH = globalThis.SN_CARTE_HOME;
   const Carte = require('./carteHome');
   const elenco = (voci) => voci.map((v) => ({ carta: v.chiave, tipo: v.tipo, titolo: v.titolo }));
-  const no = (error) => ({ executed: false, kept: false, output: { error, sinistra: elenco(sx), ...CH.descrivi(null) } });
+  const destra = CH.descrivi(await Carte.leggi());
+  const no = (error) => ({ executed: false, kept: false, output: { error, sinistra: elenco(sx), ...destra } });
   const voci = trovate.voci;
   if (!voci.length) return no('carta sconosciuta: scegli fra queste (carta = la chiave)');
   if (voci.length > 1 && !(trovate.perTipo && tipo === 'togli')) {

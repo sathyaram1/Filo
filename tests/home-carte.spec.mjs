@@ -386,3 +386,75 @@ test('senza chiave la home non indica pagine salvate che non ci sono', async ({ 
   await expect(msg).toContainText('Crediti', { timeout: 10_000 });
   await expect(msg).not.toContainText('pagine salvate');
 });
+
+// Il modello finto che si ricorda cosa ha letto: le istruzioni e l'esito di ogni azione.
+async function modelloSpia(app, risposte) {
+  await modelloFinto(app, risposte);
+  await app.evaluate(() => {
+    const finto = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
+    globalThis.__letti = [];
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async (o) => { globalThis.__letti.push(o.messages); return finto(o); };
+  });
+}
+const esitiLetti = async (app) => (await app.evaluate(() => globalThis.__letti))
+  .map((ms) => ms.filter((m) => m.role === 'tool').map((m) => String(m.content)).join('\n'));
+
+test('chiesta a parole col solo nome, la carta di sinistra si trova: la richiesta in corso non è una carta', async ({ app }) => {
+  test.setTimeout(60_000);
+  const page = await home(app);
+  await app.evaluate(async () => {
+    await globalThis.SN_FILO_MEMORY.addNotification({ kind: 'info', text: 'Il backup delle foto è finito.' });
+    await globalThis.SN_FILO_MEMORY.addNotification({ kind: 'info', text: 'Il documento è stato salvato nel cloud.' });
+  });
+  await modelloSpia(app, [
+    { strumenti: [{ id: 'c1', name: 'CARTA_HOME', arguments: '{"operazione":"togli","carta":"backup"}' }] },
+    { strumenti: [{ id: 'c2', name: 'CARTA_HOME', arguments: '{"operazione":"togli","carta":"l\'avviso del documento"}' }] },
+    { testo: 'Chiusi.' },
+  ]);
+  await page.reload();
+  await home(app);
+  await page.locator('#input').fill('togli il backup e l’avviso del documento dalla home');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Chiusi' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('#accade .dash-carta[data-tipo="avviso"]')).toHaveCount(0);
+  await expect(page.locator('#tieni .dash-carta[data-tipo="editor"]')).toHaveCount(1);
+  // Le istruzioni generali mandano anche le carte di sinistra allo strumento delle carte.
+  const istruzioni = String((await app.evaluate(() => globalThis.__letti[0][0].content)) || '');
+  expect(istruzioni).toMatch(/CARTE DELLA HOME[^\n]*sinistra[^\n]*avvisi/);
+  expect(istruzioni).not.toMatch(/si tolgono togliendo la cosa/);
+  // La riga di attività nomina la carta tolta davvero, non l'Editor che ha «documento» fra i suoi nomi.
+  await page.getByText('Ha sistemato 2 carte della home').click();
+  await expect(page.locator('#bubbles')).toContainText('Carta tolta · Il documento è stato salvato nel cloud.');
+  await expect(page.locator('#bubbles')).toContainText('Carta tolta · Il backup delle foto è finito.');
+  await expect(page.locator('#bubbles')).not.toContainText('Carta tolta · Editor');
+});
+
+test('una carta di sinistra che non si trova: Filo riceve tutte le carte con la chiave, e la destra com’è davvero', async ({ app }) => {
+  test.setTimeout(60_000);
+  const page = await home(app);
+  await page.locator('#tieni .dash-carta[data-tipo="mazzi"]').click({ button: 'right' });
+  await page.locator('.dash-menu .dash-menu-voce', { hasText: 'Togli dalla home' }).click();
+  await expect(page.locator('#tieni .dash-carta[data-tipo="mazzi"]')).toHaveCount(0);
+  await app.evaluate(async () => {
+    const M = globalThis.SN_FILO_MEMORY;
+    await M.addNotification({ kind: 'info', text: 'Il backup delle foto è finito: 1.240 foto copiate sul disco esterno.' });
+    await M.addNotification({ kind: 'info', text: 'La lavatrice ha finito il programma cotone.' });
+    await M.addTimer({ label: 'Pasta', seconds: 600 });
+  });
+  await modelloSpia(app, [
+    { strumenti: [{ id: 'c1', name: 'CARTA_HOME', arguments: '{"operazione":"togli","carta":"l\'avviso del bucato"}' }] },
+    { testo: 'Quale?' },
+  ]);
+  await page.reload();
+  await home(app);
+  await page.locator('#input').fill('togli l’avviso del bucato');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Quale' })).toBeVisible({ timeout: 10_000 });
+  const esito = (await esitiLetti(app))[1];
+  const chiavi = await page.locator('#accade > .dash-carta').evaluateAll((ns) => ns.map((n) => n.dataset.chiave));
+  expect(chiavi).toHaveLength(3);
+  for (const k of chiavi) expect(esito).toContain(k);
+  expect(esito).not.toContain('"lavoro');
+  expect(esito).toContain('"altro":["Mazzi"]');
+  expect(esito).not.toMatch(/destra[^\]]*Mazzi/);
+});

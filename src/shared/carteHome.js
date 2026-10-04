@@ -92,13 +92,20 @@
     const fine = Date.parse(r.endedAt || r.startedAt || '');
     return Number.isFinite(fine) && ora - fine < DOWNLOAD_RECENTE_MS;
   }
+  // Un lavoro diventa carta dopo qualche secondo (una risposta di un attimo non fa lampeggiare la colonna), e mai
+  // nella conversazione che lo fa: lì si vede già al centro, e per la chat la richiesta in corso non è una carta.
+  const LAVORO_LUNGO_MS = 3000;
+  function lavoriAltrove(lavori, chat, ora = Date.now()) {
+    return lista(lavori).filter((l) => l && l.id && !(chat && l.chat === chat) && ora - (Number(l.iniziato) || 0) >= LAVORO_LUNGO_MS);
+  }
   const scadenza = (t) => { const v = Date.parse(t && t.endsAt); return Number.isFinite(v) ? v : Infinity; };
   const nomeTimer = (t) => t.label || (t.kind === 'alarm' ? 'Sveglia' : 'Timer');
 
   // Le carte di sinistra nell'ordine in cui si vedono, senza le nascoste: i Crediti e ciò che suona in cima, poi
   // le altre nell'ordine dell'utente (le nuove davanti, nell'ordine di Filo: lavori, scaricamenti in corso, timer
-  // per scadenza, avvisi, scaricamenti finiti). Ogni voce porta `ref`, la cosa da cui la carta nasce.
-  function sinistra({ timers = [], notifiche = [], downloads = [], lavori = [], crediti = false } = {}, layout, ora = Date.now()) {
+  // per scadenza, avvisi, scaricamenti finiti). Ogni voce porta `ref`, la cosa da cui la carta nasce. `chat`: la
+  // conversazione di chi guarda.
+  function sinistra({ timers = [], notifiche = [], downloads = [], lavori = [], crediti = false, chat = null } = {}, layout, ora = Date.now()) {
     const nascoste = new Set(normalizza(layout).nascoste);
     const voce = (chiave, tipo, titolo, ref) => ({ chiave, tipo, titolo, ref });
     const vT = (t) => voce(`timer:${t.id}`, t.kind === 'alarm' ? 'sveglia' : 'timer', nomeTimer(t), t);
@@ -108,7 +115,7 @@
     for (const t of lista(timers).filter((x) => x && x.ringing)) cima.push(vT(t));
     const vis = lista(downloads).filter((r) => downloadVisibile(r, ora));
     const resto = [
-      ...lista(lavori).filter((l) => l && l.id).map((l) => voce(`lavoro:${l.id}`, 'lavoro', l.testo || 'lavoro in corso', l)),
+      ...lavoriAltrove(lavori, chat, ora).map((l) => voce(`lavoro:${l.id}`, 'lavoro', l.testo || 'lavoro in corso', l)),
       ...vis.filter((r) => DOWNLOAD_ATTIVI.includes(r.state)).map(vD),
       ...lista(timers).filter((x) => x && !x.ringing).sort((a, b) => scadenza(a) - scadenza(b)).map(vT),
       ...lista(notifiche).filter((n) => n && n.id).map((n) => voce(`avviso:${n.id}`, 'avviso', String(n.text || ''), n)),
@@ -230,8 +237,8 @@
   }
 
   global.SN_CARTE_HOME = {
-    CARTE, APP, IDS, VERSIONE, TETTO_ORDINE, TETTO_NASCOSTE, DOWNLOAD_RECENTE_MS,
+    CARTE, APP, IDS, VERSIONE, TETTO_ORDINE, TETTO_NASCOSTE, DOWNLOAD_RECENTE_MS, LAVORO_LUNGO_MS,
     carta, predefinita, normalizza, risolvi, applica, ordinaSinistra, descrivi,
-    downloadVisibile, sinistra, trovaSinistra,
+    downloadVisibile, lavoriAltrove, sinistra, trovaSinistra,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

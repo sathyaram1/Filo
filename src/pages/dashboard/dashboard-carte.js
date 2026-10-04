@@ -26,8 +26,6 @@
   };
 
   const VOCI_IN_CARTA = 5;
-  // Un lavoro diventa carta solo se dura: una risposta di un attimo non deve far lampeggiare la colonna.
-  const LAVORO_LUNGO_MS = 3000;
   const SUGGERIMENTI_VISIBILI = 5;
   const URL_EDITOR = 'filo://editor/editor.html';
   const URL_MAZZI = 'filo://decks/decks.html';
@@ -250,16 +248,15 @@
   }
 
   // ===== Lavori lunghi in corso (una risposta di Filo, un comando del terminale) =====
-  // Quello di questa scheda si vede già al centro: a sinistra vanno quelli che stanno altrove.
+  // Quali entrano lo decide il modulo condiviso (la chat li vede uguali); qui si ridisegna quando uno diventa lungo.
   let lavoroTimer = null;
-  function lavoriLunghi() {
+  function programmaLavori() {
     const ora = Date.now();
     const mio = d.chatCorrente();
-    const altrove = dati.lavori.filter((l) => l && !(l.chat && l.chat === mio));
-    const prossimo = altrove.map((l) => l.iniziato + LAVORO_LUNGO_MS - ora).filter((x) => x > 0);
+    const prossimo = dati.lavori.filter((l) => l && !(l.chat && l.chat === mio))
+      .map((l) => l.iniziato + C.LAVORO_LUNGO_MS - ora).filter((x) => x > 0);
     clearTimeout(lavoroTimer);
     if (prossimo.length) lavoroTimer = setTimeout(disegna, Math.min(...prossimo) + 50);
-    return altrove.filter((l) => ora - l.iniziato >= LAVORO_LUNGO_MS);
   }
   function cartaLavoro(l) {
     const comando = l.tipo === 'comando';
@@ -280,9 +277,10 @@
     avviso: cartaAvviso, lavoro: cartaLavoro,
   };
   function carteSinistra() {
+    programmaLavori();
     const voci = C.sinistra({
-      timers: dati.timers, notifiche: dati.notifiche, downloads: dati.downloads, lavori: lavoriLunghi(),
-      crediti: !!suggerimentoCrediti(),
+      timers: dati.timers, notifiche: dati.notifiche, downloads: dati.downloads, lavori: dati.lavori,
+      crediti: !!suggerimentoCrediti(), chat: d.chatCorrente(),
     }, layout);
     return voci.map((v) => PER_TIPO[v.tipo](v.ref));
   }

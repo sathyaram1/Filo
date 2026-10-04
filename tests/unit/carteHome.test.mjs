@@ -136,7 +136,7 @@ test('la colonna di sinistra ha lo stesso ordine per la home e per la chat', () 
       { id: 'd2', state: 'progressing', filename: 'video.mp4' },
       { id: 'd3', state: 'completed', filename: 'vecchio.zip', endedAt: iso(-2 * 864e5) },
     ],
-    lavori: [{ id: 'risposta-1', tipo: 'risposta', chat: 'c1', testo: 'confronta i preventivi', iniziato: ora }],
+    lavori: [{ id: 'risposta-1', tipo: 'risposta', chat: 'c1', testo: 'confronta i preventivi', iniziato: ora - 5000 }],
     crediti: true,
   };
   const chiavi = (l) => C.sinistra(dati, l, ora).map((v) => v.chiave);
@@ -169,6 +169,20 @@ test('una carta di sinistra si trova dalle parole dell’utente, senza confonder
   // «lo scaricamento del file»: fra i nomi dell'Editor c'è «file», ma esatto non lo è.
   assert.equal(C.risolvi('lo scaricamento del file', { esatto: true }), null);
   assert.equal(C.risolvi('la carta dei mazzi', { esatto: true }), 'mazzi');
+});
+
+test('la richiesta in corso non è una carta fra cui scegliere: «il backup» trova solo l’avviso', () => {
+  const ora = Date.now();
+  const lavori = [
+    { id: 'mio', tipo: 'risposta', chat: 'c1', testo: 'togli il backup dalla home', iniziato: ora - 20e3 },
+    { id: 'altro', tipo: 'risposta', chat: 'c2', testo: 'confronta i preventivi', iniziato: ora - 20e3 },
+    { id: 'appena', tipo: 'comando', chat: 'c3', testo: 'npm install', iniziato: ora - 500 },
+  ];
+  const sx = C.sinistra({ notifiche: [{ id: 'n1', text: 'Il backup delle foto è finito.' }], lavori, chat: 'c1' }, null, ora);
+  assert.deepEqual(sx.map((v) => v.chiave), ['lavoro:altro', 'avviso:n1']);
+  assert.deepEqual(C.trovaSinistra('backup', sx).voci.map((v) => v.chiave), ['avviso:n1']);
+  // Chi guarda da un'altra conversazione vede anche quel lavoro, quando dura.
+  assert.deepEqual(C.lavoriAltrove(lavori, 'c9', ora).map((l) => l.id), ['mio', 'altro']);
 });
 
 test('l’azione è di livello 1 e la descrizione usa il nome che l’utente vede', () => {

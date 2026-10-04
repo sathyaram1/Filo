@@ -445,11 +445,16 @@
       const n = Number(a._output && a._output.eliminate) || 0;
       return { icon: '🗑', text: `Eliminate dall’archivio · ${n} ${n === 1 ? 'scheda' : 'schede'}` };
     },
-    // Il nome è quello che l'utente vede sulla carta, non l'id che ha mandato il modello (#870).
+    // Il nome è quello della carta toccata davvero (#870): a sinistra lo dice l'esito, a destra lo si risolve come il
+    // main. Le parole del modello da sole ingannano: «l'avviso del documento» contiene un nome dell'Editor.
     CARTA_HOME: (a) => {
       const C = self.SN_CARTE_HOME;
-      const id = C ? C.risolvi(a.carta) : null;
-      const nome = id ? C.carta(id).titolo : '';
+      const o = a._output || {};
+      const corto = (t) => { const x = String(t || '').replace(/\s+/g, ' ').trim(); return x.length > 60 ? `${x.slice(0, 59)}…` : x; };
+      let nome = '';
+      if (Array.isArray(o.tolte) && o.tolte.length) nome = o.tolte.length === 1 ? corto(o.tolte[0].titolo) : `${o.tolte.length} carte`;
+      else if (o.spostata) nome = corto(o.spostata);
+      else if (Array.isArray(o.destra) && !o.error && C) { const id = C.risolvi(a.carta); nome = id ? C.carta(id).titolo : ''; }
       const op = String(a.operazione || '').toLowerCase();
       const cosa = { togli: 'Carta tolta', rimetti: 'Carta rimessa', aggiungi: 'Carta rimessa', sposta: 'Carta spostata' }[op];
       if (op === 'ripristina') return { icon: '🏠', text: 'Carte della home rimesse com\'erano' };
@@ -481,7 +486,7 @@
     PROXY_TAB: 'Scheda non instradata', RIMUOVI_PROXY: 'Proxy non tolto',
     RIMUOVI_PROXY_TUTTE: 'Proxy non tolti', REGOLA_PROXY_DOMINIO: 'Regola non salvata',
     RIMUOVI_REGOLA_PROXY: 'Regola non tolta', COMANDO_FINESTRA: 'Comando non eseguito',
-    CARTA_HOME: 'Carta non spostata',
+    CARTA_HOME: 'Carta della home non cambiata',
     EVENTO_CALENDARIO: 'Evento non creato', ONBOARDING: 'Accoglienza non aggiornata',
   };
   function activityRowFor(a) {
