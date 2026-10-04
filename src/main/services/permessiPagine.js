@@ -39,6 +39,7 @@ const DOPO_UN_GESTO = new Set(['notifications']);
 const COL_GESTO_SENZA_DOMANDA = new Set(['local-fonts']);
 const GESTO_MS = 5000;
 const GESTI = new Set(['mouseDown', 'mouseUp', 'rawKeyDown', 'keyDown', 'char', 'touchStart', 'touchEnd', 'gestureTap']);
+const TASTI_SENZA_GESTO = new Set(['Escape', 'Control', 'Shift', 'Alt', 'AltGraph', 'Meta', 'OS', 'Super', 'Hyper', 'CapsLock', 'NumLock', 'ScrollLock', 'Fn', 'FnLock', 'Symbol', 'SymbolLock']);
 const LASCIAPASSARE_MS = 5000;
 // Il lasciapassare di Detta copre il microfono e basta: con la fotocamera la pagina avrebbe un sì mai dato (#591, giro 18).
 const PARTI_LASCIAPASSARE = { media: new Set(['audio']), appunti: new Set(['appunti']) };
@@ -144,6 +145,15 @@ function segnaMenu(wc, frame) {
   wc._filoMenuAperto = { alle: Date.now(), nodo, origine };
 }
 
+// Come in Chromium un modificatore da solo o una combinazione che il browser si tiene non attivano la pagina (#737.1).
+function tastoPerLaPagina(input) {
+  const key = String((input && input.key) || '');
+  if (!key) return true;
+  if (TASTI_SENZA_GESTO.has(key)) return false;
+  const T = globalThis.SN_TASTI;
+  try { return !(T && T.tastiRiservati().some((a) => T.combacia(input, a))); } catch (_) { return true; }
+}
+
 // Il gesto conta per il documento su cui è stato fatto: il clic che porta altrove non vale per la pagina d'arrivo.
 function seguiGesti(wc) {
   if (!wc || wc._filoGestiSeguiti) return;
@@ -151,7 +161,7 @@ function seguiGesti(wc) {
   try {
     wc.on('input-event', (_e, input) => {
       const type = (input && input.type) || '';
-      if (!GESTI.has(type) || String(input.key || '') === 'Escape') return;
+      if (!GESTI.has(type) || !tastoPerLaPagina(input)) return;
       wc._filoGestoAlle = Date.now();
       // Un sito che annulla il `contextmenu` spegne il `context-menu` qui sotto, non il tasto destro vero (#589.4 giro 2).
       if (tastoDelMenu(input)) segnaMenu(wc, wc.mainFrame);
@@ -165,7 +175,7 @@ function seguiGesti(wc) {
     // Un tasto che Filo tiene per sé (una scorciatoia) o premuto sull'avviso del sito non è arrivato alla pagina (#737.1):
     // chi lo ferma lo fa negli altri ascolti, quindi si guarda dopo che sono passati tutti.
     wc.on('before-input-event', (e, input) => {
-      if (!input || input.type !== 'keyDown' || String(input.key || '') === 'Escape' || (e && e.daAvvisoSito)) return;
+      if (!input || input.type !== 'keyDown' || !tastoPerLaPagina(input) || (e && e.daAvvisoSito)) return;
       queueMicrotask(() => { if (!(e && e.defaultPrevented)) wc._filoGestoAlle = Date.now(); });
     });
     wc.on('did-start-navigation', (e, _url, isInPlace, isMainFrame) => {
@@ -432,6 +442,6 @@ function statoNotifiche(ses, url) {
 module.exports = {
   installa, negaTutto, rispondi, lasciapassare, seguiGesti, scelteDi, dimentica, nomeDaMostrare, statoNotifiche,
   carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica, gestoNelRiquadro, gestoSullaScheda, gestoPerUnaFinestra,
-  TIPI, INNOCUI, NON_DISPONIBILI, COL_GESTO_SENZA_DOMANDA, GESTO_MS, _inAttesa: inAttesa,
+  TIPI, INNOCUI, NON_DISPONIBILI, COL_GESTO_SENZA_DOMANDA, GESTO_MS, TASTI_SENZA_GESTO, tastoPerLaPagina, _inAttesa: inAttesa,
   _usaDisco: (d) => { disco = () => d; },
 };

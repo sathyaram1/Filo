@@ -101,3 +101,34 @@ test('lo schermo intero lo prende solo il clic dell\'utente, anche dentro un riq
   await riquadro.click('#b');
   await expect.poll(() => riquadro.evaluate(() => !!document.fullscreenElement), { timeout: 6000 }).toBe(true);
 });
+
+test('una scorciatoia di Filo premuta sulla pagina non le regala la scheda che apre da sola', async ({ app, openTab, testServer }) => {
+  const bersaglio = testServer.html('<title>DA SOLA</title>');
+  await openTab(testServer.html(`<title>Sito</title><script>setTimeout(function(){window.open(${JSON.stringify(bersaglio)})},2000)</script>`));
+  // Dalla tastiera vera, come arriva al main: prima il Ctrl da solo, poi la T.
+  await app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    const wc = tm.tabs.find((t) => t.id === tm.activeId).view.webContents;
+    wc.sendInputEvent({ type: 'keyDown', keyCode: 'Control', modifiers: ['control'] });
+    wc.sendInputEvent({ type: 'keyDown', keyCode: 'T', modifiers: ['control'] });
+  });
+  await expect.poll(async () => (await schede(app)).filter((u) => u.startsWith('filo://newtab')).length, { timeout: 6000 }).toBeGreaterThan(0);
+  await new Promise((r) => setTimeout(r, 2500));
+  expect(await aperteSu(app, bersaglio)).toBe(0);
+});
+
+const finestreSu = (app, pezzo) => app.evaluate(({ BrowserWindow }, p) => BrowserWindow.getAllWindows()
+  .filter((w) => { try { return w.webContents.getURL().includes(p); } catch (_) { return false; } }).length, pezzo);
+
+test('una finestra di accesso la apre solo il clic: da sola la pagina non apre nemmeno quella', async ({ app, openTab, testServer, avvisi }) => {
+  const accesso = `${testServer.html('<title>ACCESSO</title>')}?client_id=a&response_type=code`;
+  const page = await openTab(testServer.html(`<button id="b" style="width:200px;height:60px"
+    onclick="window.open(${JSON.stringify(accesso).replace(/"/g, '&quot;')}, 'login', 'width=400,height=500')">Accedi</button>
+    <script>setTimeout(function(){window.open(${JSON.stringify(accesso)})},600)</script>`));
+  await expect((await avvisi()).locator('.shell-notif.show', { hasText: 'Bloccato popup' })).toBeVisible({ timeout: 8000 });
+  expect(await finestreSu(app, 'client_id=a')).toBe(0);
+  expect(await aperteSu(app, accesso)).toBe(0);
+
+  await page.click('#b');
+  await expect.poll(() => finestreSu(app, 'client_id=a'), { timeout: 8000 }).toBe(1);
+});

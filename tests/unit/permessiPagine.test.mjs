@@ -354,3 +354,33 @@ test('una finestra la apre solo un gesto vero di adesso, uno per finestra, anche
     assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'il gesto non passa alla pagina dove porta');
   } finally { orologio.mock.restore(); }
 });
+
+test('un modificatore da solo o una scorciatoia di Filo non sono un gesto dato alla pagina (#737.1)', async () => {
+  require('../../src/shared/tasti.js');
+  const tasto = (key, mods = {}) => ({ type: 'rawKeyDown', key, control: false, alt: false, shift: false, meta: false, ...mods });
+  for (const k of ['Control', 'Shift', 'Alt', 'Meta', 'Escape']) assert.equal(Permessi.tastoPerLaPagina(tasto(k)), false, k);
+  assert.equal(Permessi.tastoPerLaPagina(tasto('t', { control: true })), false, 'nuova scheda');
+  assert.equal(Permessi.tastoPerLaPagina(tasto('w', { control: true })), false, 'chiudi scheda');
+  assert.equal(Permessi.tastoPerLaPagina(tasto('a')), true, 'una lettera scritta nella pagina');
+  assert.equal(Permessi.tastoPerLaPagina(tasto('Enter')), true);
+  assert.equal(Permessi.tastoPerLaPagina({ type: 'mouseDown' }), true);
+
+  const wc = wcFinto('https://sito.test/');
+  Permessi.seguiGesti(wc);
+  wc.emetti('input-event', {}, tasto('Control', { control: true }));
+  wc.emetti('before-input-event', { defaultPrevented: false }, { ...tasto('Control', { control: true }), type: 'keyDown' });
+  wc.emetti('before-input-event', { defaultPrevented: true }, { ...tasto('k', { control: true }), type: 'keyDown' });
+  wc.emetti('before-input-event', { daAvvisoSito: true }, { ...tasto('x'), type: 'keyDown' });
+  await new Promise((r) => setImmediate(r));
+  assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'nessun tasto è arrivato alla pagina');
+  wc.emetti('before-input-event', { defaultPrevented: false }, { ...tasto('x'), type: 'keyDown' });
+  await new Promise((r) => setImmediate(r));
+  assert.equal(Permessi.gestoPerUnaFinestra(wc), true, 'il tasto scritto nella pagina sì');
+});
+
+test('il riquadro di un altro sito scarta gli stessi tasti della pagina', () => {
+  const preload = readFileSync(new URL('../../src/preload/page-preload.js', import.meta.url), 'utf8');
+  const m = /const SENZA_GESTO = new Set\((\[[^\]]*\])\)/.exec(preload);
+  assert.ok(m, 'la lista nel preload del riquadro');
+  assert.deepEqual(JSON.parse(m[1].replace(/'/g, '"')), [...Permessi.TASTI_SENZA_GESTO]);
+});

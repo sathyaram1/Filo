@@ -367,8 +367,10 @@ try {
 if (IS_SUBFRAME) {
   try {
     let ultimoGesto = 0;
+    // Gli stessi tasti che nella pagina non sono un gesto (TASTI_SENZA_GESTO in services/permessiPagine.js).
+    const SENZA_GESTO = new Set(['Escape', 'Control', 'Shift', 'Alt', 'AltGraph', 'Meta', 'OS', 'Super', 'Hyper', 'CapsLock', 'NumLock', 'ScrollLock', 'Fn', 'FnLock', 'Symbol', 'SymbolLock']);
     const gesto = (e) => {
-      if (!e.isTrusted || e.key === 'Escape') return;
+      if (!e.isTrusted || (e.type === 'keydown' && SENZA_GESTO.has(e.key))) return;
       const ora = Date.now();
       if (ora - ultimoGesto < 100) return;
       ultimoGesto = ora;
