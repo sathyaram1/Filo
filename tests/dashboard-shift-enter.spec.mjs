@@ -55,3 +55,28 @@ test('Shift+Invio va a capo (non invia), Invio invia', async ({ app, shell }) =>
   await expect(page.locator('.dash-bubble-user')).toContainText('riga due');
   await expect(page.locator('#input')).toHaveValue('');
 });
+
+// #948: l'altezza copiata da scrollHeight comprende il padding; in content-box la casella cresceva di una riga
+// vuota alla prima lettera e restava alta dopo l'invio.
+test('la casella resta su una riga per una parola corta, cresce con l\'a capo e torna bassa dopo l\'invio', async ({ app, shell }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  const input = page.locator('#input');
+  await expect(input).toBeVisible({ timeout: 8_000 });
+  const altezza = () => input.evaluate((el) => el.offsetHeight);
+  const vuota = await altezza();
+  await input.click();
+  await page.keyboard.type('ciao');
+  expect(await altezza()).toBe(vuota);
+  await page.keyboard.press('Shift+Enter');
+  await page.keyboard.type('seconda riga');
+  const dueRighe = await altezza();
+  expect(dueRighe).toBeGreaterThan(vuota);
+  // Due righe di testo, niente riga vuota in più né barra di scorrimento.
+  expect(await input.evaluate((el) => el.scrollHeight <= el.clientHeight)).toBe(true);
+  expect(dueRighe - vuota).toBeLessThan(30);
+  await input.press('Enter');
+  await expect(page.locator('.dash-bubble-user')).toHaveCount(1, { timeout: 8_000 });
+  await expect(input).toHaveValue('');
+  expect(await altezza()).toBe(vuota);
+});

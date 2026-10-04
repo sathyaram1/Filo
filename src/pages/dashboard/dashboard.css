@@ -1222,6 +1222,8 @@ html, body {
   resize: none;
   overflow-y: auto;
   max-height: 160px;
+  /* L'altezza che il JS copia da scrollHeight comprende il padding: in content-box la casella cresce di una riga vuota. */
+  box-sizing: border-box;
 }
 .dash-input::placeholder { color: var(--dash-ink-mute); }
 .dash-send {
@@ -1236,6 +1238,8 @@ html, body {
   align-items: center;
   justify-content: center;
 }
+/* Il microfono sta accanto all'invio, della sua misura, con l'inchiostro tenue: l'invio resta il gesto principale. */
+.dash-input-wrap { --sn-voce-size: 36px; --sn-voce-ink: var(--dash-ink-soft); }
 .dash-send:hover { opacity: 0.85; }
 .dash-send[disabled] { opacity: 0.4; cursor: not-allowed; }
 

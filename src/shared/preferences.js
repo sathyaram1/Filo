@@ -976,6 +976,50 @@
       risk: 'Cambia i siti dove Filo non interviene sulle pagine: lì non aggiunge niente alla pagina, '
         + 'né i suoi menu né i suoi aiuti.',
     }),
+
+    // ── Microfono delle chat — reversibile, innocuo → livello 1 ──
+    {
+      scrive: ['dictation.autoSend'],
+      aiuto: '"invia da solo" | "lascia il testo da correggere" (col tasto microfono delle chat: finito di parlare la richiesta parte da sola dopo un attimo per annullare, oppure il testo resta nella casella)',
+      keys: ['invio_vocale', 'invio vocale', 'invio della dettatura', 'invio dettatura', 'microfono delle chat',
+        'microfono chat', 'dictation.autosend'],
+      // Le parole delle due scelte di Preferenze valgono quanto un sì/no; un «non» le rovescia.
+      build(v) {
+        const s = String(v == null ? '' : v).trim().toLowerCase();
+        const nega = /\b(non|mai)\b/.test(s);
+        let b;
+        if (/(da sol|automatic|subito|appena finisco)/.test(s)) b = !nega;
+        else if (/(lascia|corregg|a mano|manual|rilegg|controll)/.test(s)) b = nega;
+        else b = parsePrefBool(v);
+        if (b === null) return null;
+        return {
+          partial: { dictation: { autoSend: b } },
+          label: `Microfono delle chat → ${b ? 'invia da solo' : 'lascia il testo da correggere'}`,
+        };
+      },
+    },
+    {
+      scrive: ['dictation.silenceSec'],
+      aiuto: 'secondi 1-8 (quanto silenzio chiude l\'ascolto del microfono delle chat; di più per chi si ferma a pensare)',
+      keys: ['pausa_microfono', 'pausa microfono', 'pausa del microfono', 'silenzio microfono', 'dictation.silencesec'],
+      build(v) {
+        const n = parseItalianNumber(v);
+        if (!Number.isFinite(n)) return null;
+        const { silenceSec } = global.SN_CONST.dictationTimes({ silenceSec: n });
+        return { partial: { dictation: { silenceSec } }, label: `Pausa che chiude il microfono → ${String(silenceSec).replace('.', ',')} s` };
+      },
+    },
+    {
+      scrive: ['dictation.cancelSec'],
+      aiuto: 'secondi 0-10 (l\'attimo per annullare prima che la richiesta detta parta da sola; 0 = parte subito)',
+      keys: ['attesa_invio_vocale', 'attesa invio vocale', 'tempo per annullare', 'annulla invio vocale', 'dictation.cancelsec'],
+      build(v) {
+        const n = parseItalianNumber(v);
+        if (!Number.isFinite(n)) return null;
+        const { cancelSec } = global.SN_CONST.dictationTimes({ cancelSec: n });
+        return { partial: { dictation: { cancelSec } }, label: `Tempo per annullare l'invio vocale → ${String(cancelSec).replace('.', ',')} s` };
+      },
+    },
   ];
 
   // Le righe «chiave: valori» della descrizione di IMPOSTA_PREFERENZA: escono da qui, dove sta il setter,

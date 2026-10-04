@@ -100,8 +100,11 @@ test('Voce e dettatura: un modello servito solo da un fornitore escluso non part
       return dest.stream;
     };
   });
-  await page.locator('#input').focus();
-  await page.locator('#input').click({ button: 'right' });
+  // Un campo qualunque: nella casella della chat «Detta» passa la mano al suo microfono (tests/voce-chat.spec.mjs).
+  await page.evaluate(() => document.body.insertAdjacentHTML('beforeend',
+    '<textarea id="campoDetta" style="position:fixed;top:60px;left:20px;width:320px;height:60px;z-index:9"></textarea>'));
+  await page.locator('#campoDetta').focus();
+  await page.locator('#campoDetta').click({ button: 'right' });
   await expect(page.locator('.sn-menu')).toBeVisible();
   await page.keyboard.press('Escape');
   await page.evaluate(() => window.SN_TTS.startDictation());
@@ -113,7 +116,7 @@ test('Voce e dettatura: un modello servito solo da un fornitore escluso non part
   await expect(avviso).toBeVisible({ timeout: 10_000 });
   await expect(avviso).toContainText('openai/gpt-4o-transcribe');
   await expect(page.locator('.sn-dictate-pill')).toHaveCount(0, { timeout: 10_000 });
-  expect(await page.evaluate(() => document.querySelector('#input').value)).toBe('');
+  expect(await page.evaluate(() => document.querySelector('#campoDetta').value)).toBe('');
   mkdirSync(SHOTS, { recursive: true });
   await page.screenshot({ path: `${SHOTS}/voce-dettatura-host-esclusi.png` });
 

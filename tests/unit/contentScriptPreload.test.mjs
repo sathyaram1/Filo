@@ -109,3 +109,12 @@ test('i fogli di stile dei content script sono gli stessi nei due preload', () =
   assert.deepEqual(stiliInterne, stiliWeb);
   for (const f of stiliWeb) assert.ok(existsSync(join(ROOT, 'src', 'styles', f)), `filo://style/${f} non esiste`);
 });
+
+// Sui siti con CSP il <link filo://style/…> è bloccato e resta solo il CSS iniettato dal main: un foglio
+// che manca lì perde lo stile proprio sui siti più comuni (#948: il microfono dell'Aiuto senza voce.css).
+test('il main inietta sui siti gli stessi fogli di stile del preload', () => {
+  const m = leggi('src', 'main', 'tabs.js').match(/CONTENT_STYLE_FILES\s*=\s*\[([^\]]*)\]/);
+  assert.ok(m, 'CONTENT_STYLE_FILES non trovato in tabs.js');
+  const dalMain = [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
+  assert.deepEqual(dalMain, elencoStili(pageSrc));
+});

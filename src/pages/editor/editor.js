@@ -3847,6 +3847,8 @@
     };
     sendBtn.addEventListener('click', (e) => { e.stopPropagation(); send(); });
     input.addEventListener('click', (e) => e.stopPropagation());
+    // Il tasto microfono: si parla, e la domanda parte come con l'invio (o resta da correggere).
+    window.SN_VOCE_CHAT?.collega({ campo: input, contenitore: input.parentNode, prima: sendBtn, invia: () => send() });
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
     });
