@@ -192,6 +192,9 @@ function isOsDelegatedScheme(rawUrl) {
   return OS_DELEGATED_SCHEMES.has(proto);
 }
 
+const RIAPERTURA_ACCESSO_MS = 5000;
+const MONDO_RIAPERTURA = 1003;
+
 // Consegna all'OS un link mailto:/tel:/sms: (best-effort). Da chiamare SOLO dopo
 // aver bloccato la navigazione in-app, e SOLO per gli schemi dell'allowlist.
 function openExternalScheme(rawUrl) {
