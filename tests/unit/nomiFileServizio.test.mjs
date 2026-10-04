@@ -7,7 +7,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { writeFileSync, readdirSync, mkdirSync, rmSync, readFileSync } from 'node:fs';
-import { deflateRawSync, crc32 } from 'node:zlib';
+import * as zlib from 'node:zlib';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
@@ -24,9 +24,9 @@ function zip(voci) {
   let pos = 0;
   for (const [nome, testo] of Object.entries(voci)) {
     const dati = Buffer.from(testo, 'utf8');
-    const compressi = deflateRawSync(dati);
+    const compressi = zlib.deflateRawSync(dati);
     const n = Buffer.from(nome, 'utf8');
-    const crc = crc32(dati);
+    const crc = typeof zlib.crc32 === 'function' ? zlib.crc32(dati) : 0;
     const l = Buffer.alloc(30);
     l.writeUInt32LE(0x04034b50, 0); l.writeUInt16LE(20, 4); l.writeUInt16LE(8, 8);
     l.writeUInt32LE(crc, 14); l.writeUInt32LE(compressi.length, 18); l.writeUInt32LE(dati.length, 22);
@@ -83,7 +83,7 @@ test('rinomina: vuoto, cartelle, file spariti, estensione cambiata o nome con un
     // Una barra scritta da un modello non porta il file in un'altra cartella.
     const r = await Nomi.rinomina(join(dir, 'a.pdf'), '../fuori');
     assert.equal(r.ok, true);
-    assert.equal(r.nome, '..-fuori.pdf'.replace(/^\.+-?/, ''));
+    assert.equal(r.nome, 'fuori.pdf');
     assert.equal(dirname(r.a), dir);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
