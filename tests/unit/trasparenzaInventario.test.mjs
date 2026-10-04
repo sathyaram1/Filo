@@ -43,6 +43,7 @@ const CARTELLA_DATI = {
   filo: { frase: 'le chat, l\'elenco delle richieste fatte ai modelli' },
   quarantena: { frase: 'i download' },
   adblock: { frase: 'le liste per bloccare la pubblicità' },
+  'firmatari-c2pa': { frase: 'l\'elenco dei firmatari riconosciuti delle credenziali sulle immagini' },
 };
 
 test('ogni file nella cartella dei dati è nel documento sulla privacy', () => {
@@ -169,6 +170,7 @@ const INDIRIZZI = {
   'www.youtube.com': { perche: 'un esempio in un commento' },
   'paypal.com': { perche: 'un marchio nell\'elenco dei siti imitati dai truffatori' },
   'www.w3.org': { perche: 'lo spazio dei nomi di SVG: nessuno lo contatta' },
+  'ns.adobe.com': { perche: 'lo spazio dei nomi dei metadati XMP letti dalle immagini: nessuno lo contatta' },
 };
 
 test('ogni indirizzo esterno scritto nel codice è nel documento sulla privacy', () => {

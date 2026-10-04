@@ -19,6 +19,11 @@
     // Traduzione finita, ma il sito ha aggiunto altro testo dopo (scorrimento
     // infinito, schermate che cambiano senza ricaricare).
     menu_translate_new_content: 'Traduci il testo nuovo',
+    // #711 — l'hover della riga di origine: dice il CONFINE della lettura, cioè
+    // perché l'assenza di quella riga non vuol dire niente.
+    menu_origin_hint: 'Filo legge solo le etichette che il file si porta dietro. Uno screenshot le cancella, un social pure, e molti generatori non le scrivono affatto.',
+    menu_image_unreadable: 'Filo non è riuscito a scaricare questa immagine.',
+    menu_origin_hint_unverified: 'Filo non ha ancora scaricato l’elenco ufficiale dei firmatari riconosciuti, quindi per ora sa solo che la firma è valida. Appena lo scarica, lo verifica.',
     menu_explain_deep: 'Approfondisci',
     menu_paste_history: 'Cronologia incolla',
     menu_paste_search: 'Cerca…',
