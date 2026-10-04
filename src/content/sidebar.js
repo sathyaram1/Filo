@@ -985,6 +985,50 @@
     };
   }
 
+  // #711 — «questa foto è fatta con l'AI?» chiesto qui deve avere la stessa lettura del
+  // tasto destro: si leggono le etichette delle immagini che l'utente ha davanti, dalle
+  // più grandi. Oltre il tetto il modello sa quante ne sono rimaste fuori.
+  const MAX_IMMAGINI_ORIGINE = 12;
+  function immaginiVisibili() {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const viste = new Set();
+    const out = [];
+    for (const im of Array.from(document.images || [])) {
+      if (root && root.contains(im)) continue;
+      const src = im.currentSrc || im.src;
+      if (!src || viste.has(src) || !im.complete || !im.naturalWidth) continue;
+      const r = im.getBoundingClientRect();
+      if (r.width < 48 || r.height < 48) continue;
+      if (r.bottom <= 0 || r.right <= 0 || r.top >= vh || r.left >= vw) continue;
+      viste.add(src);
+      out.push({ im, src, r, area: r.width * r.height });
+    }
+    return out.sort((a, b) => b.area - a.area);
+  }
+  async function origineImmaginiVisibili() {
+    const Actions = global.SN_ACTIONS;
+    if (!Actions?.leggiOrigine || !Actions?.blobToDataUrl) return null;
+    const tutte = immaginiVisibili();
+    if (!tutte.length) return null;
+    const esiti = await Promise.all(tutte.slice(0, MAX_IMMAGINI_ORIGINE).map(async ({ im, src, r }, i) => {
+      try {
+        const blob = await (await fetch(src)).blob();
+        const p = await Actions.leggiOrigine(await Actions.blobToDataUrl(blob));
+        if (!p || !p.ok) return null;
+        return {
+          n: i + 1,
+          alt: String(im.alt || im.title || '').slice(0, 120),
+          larghezza: Math.round(r.width),
+          altezza: Math.round(r.height),
+          frase: p.frase || '',
+        };
+      } catch (_) { return null; }
+    }));
+    const lette = esiti.filter(Boolean);
+    return { visibili: tutte.length, controllate: lette.length, esiti: lette.filter((e) => e.frase) };
+  }
+
   async function captureScreenshot() {
     try {
       const r = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB });
@@ -1066,9 +1110,13 @@
     if (userAction) {
       await waitForPageSettle({ initialUrl: preActionUrl || location.href });
     }
-    const screenshot = await captureScreenshot();
+    const [screenshot, origineImmagini] = await Promise.all([
+      captureScreenshot(),
+      userMessage ? origineImmaginiVisibili().catch(() => null) : Promise.resolve(null),
+    ]);
     const payload = buildPayload(userMessage, userAction, esterno);
     payload.screenshot = screenshot || undefined;
+    payload.origineImmagini = origineImmagini || undefined;
 
     try {
       const res = await chrome.runtime.sendMessage({

@@ -673,9 +673,16 @@
     el.appendChild(w);
   }
 
+  // Le etichette di origine di un'immagine già scaricata (#711): le legge il main
+  // dai byte, sul computer e senza crediti. Il menu e l'Aiuto passano entrambi da qui.
+  function leggiOrigine(dataUrl) {
+    return chrome.runtime.sendMessage({ type: MSG.IMAGE_PROVENANCE, dataUrl });
+  }
+
   // Sezione inline "Spiega immagine": stessa filosofia di buildInlineExplain ma con dataUrl.
   // `linkEl` è il collegamento che l'immagine apre: l'unica sezione del menu parla
   // dell'immagine, ma l'avviso sull'indirizzo non si perde (#725.1).
+  // I byte si scaricano UNA volta: descrizione e controllo dell'origine partono da quelli.
   function buildInlineExplainImage(imgEl, linkEl) {
     return {
       type: 'inline',
@@ -684,6 +691,10 @@
       onMount: (el) => {
         el.classList.add('sn-menu-inline-loading');
         el.textContent = '';
+        const origine = document.createElement('div');
+        origine.className = 'sn-menu-origine';
+        origine.hidden = true;
+        el.appendChild(origine);
         if (linkEl && linkEl.href) mostraAvvisoLink(el, linkEl.href);
         const body = document.createElement('div');
         body.className = 'sn-menu-link-body';
@@ -698,11 +709,29 @@
         }
         let cancelled = false;
         (async () => {
+          let dataUrl;
           try {
             const r = await fetch(src);
-            const blob = await r.blob();
-            const dataUrl = await blobToDataUrl(blob);
+            dataUrl = await blobToDataUrl(await r.blob());
+          } catch (_) {
             if (cancelled) return;
+            el.classList.remove('sn-menu-inline-loading');
+            el.classList.add('sn-menu-inline-error');
+            body.textContent = I18n.t('err_provider_failed');
+            return;
+          }
+          if (cancelled) return;
+
+          // Locale: arriva molto prima della descrizione, e si mostra appena c'è.
+          leggiOrigine(dataUrl).then((p) => {
+            if (cancelled || !p || !p.ok || !p.frase) return;
+            origine.textContent = p.frase;
+            origine.title = I18n.t(p.firmatario === 'non_verificato' ? 'menu_origin_hint_unverified' : 'menu_origin_hint');
+            origine.classList.toggle('sn-menu-origine-debole', !p.forte);
+            origine.hidden = false;
+          }).catch(() => {});
+
+          try {
             const res = await chrome.runtime.sendMessage({
               type: MSG.AI_REQUEST,
               action: ACTIONS.DESCRIBE_IMAGE,
@@ -1884,6 +1913,7 @@
     schedulePrefetchExplain,
     buildInlineExplain,
     buildInlineExplainImage,
+    leggiOrigine,
     buildInlineExplainLink,
     // salva / condividi / cerca / immagini
     buildSavePayload,

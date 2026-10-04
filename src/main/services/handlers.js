@@ -83,6 +83,28 @@ function formatKnownPathsForPrompt(rawPaths) {
   return globalThis.SN_PATHS_SAFETY.formatKnownPathsForPrompt(rawPaths);
 }
 
+// L'esito del controllo locale delle etichette di origine delle immagini allegate (#711).
+// La nota è voce di Filo, la frase del file viaggia imbustata: i nomi li scrive chi ha fatto l'immagine.
+async function noteProvenienzaImmagini(dataUrls) {
+  const P = globalThis.SN_PROVENIENZA;
+  const E = globalThis.SN_ESTERNO;
+  if (!P || !E || !Array.isArray(dataUrls) || !dataUrls.length) return '';
+  const { analizzaImmagine } = require('./firmatariC2pa');
+  const blocchi = [];
+  for (let i = 0; i < dataUrls.length; i++) {
+    const m = /^data:[^,]*;base64,(.*)$/s.exec(String(dataUrls[i] || ''));
+    if (!m) continue;
+    let nota;
+    try { nota = P.notaPerModello(await analizzaImmagine(Buffer.from(m[1], 'base64'))); } catch (_) { continue; }
+    const quale = dataUrls.length > 1 ? ` (immagine ${i + 1})` : '';
+    const testa = `(Sistema${quale}: ${E.perCanaleSistema(nota.sistema)}.)`;
+    blocchi.push(nota.etichetta
+      ? `${testa}\n${E.imbusta({ tipo: 'ETICHETTA_FILE', testo: nota.etichetta, conIntestazione: true, unaRiga: true })}`
+      : testa);
+  }
+  return blocchi.join('\n\n');
+}
+
 // #593 — IL TURNO AUTOMATICO DELL'AGENTE AIUTO, E LE DUE COSE CHE CI STANNO
 // DENTRO.
 //
@@ -155,6 +177,8 @@ async function buildMessages(action, payload) {
     const parts = [];
     const userText = payload.userMessage || testoDelTurnoAutomatico(payload);
     if (userText) parts.push({ type: 'text', text: userText });
+    const origine = PROMPTS.origineImmaginiAiuto(payload.origineImmagini);
+    if (origine) parts.push({ type: 'text', text: origine });
     if (payload.screenshot) parts.push({ type: 'image_url', image_url: { url: payload.screenshot } });
     const userMsg = parts.length === 1 && parts[0].type === 'text'
       ? { role: 'user', content: parts[0].text }
@@ -3378,6 +3402,11 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     const parts = [];
     if (userMessage) parts.push({ type: 'text', text: String(userMessage) });
     for (const im of imageList) parts.push({ type: 'image_url', image_url: { url: im } });
+    // #711 — «questa foto è fatta con l'AI?» deve avere in chat la stessa
+    // risposta del tasto destro, quindi il controllo si fa SEMPRE: capire
+    // dall'intento quando serve sarebbe una promessa affidata al modello.
+    const origine = await noteProvenienzaImmagini(imageList);
+    if (origine) parts.push({ type: 'text', text: origine });
     threadMessages.push({ role: 'user', content: parts });
   } else {
     threadMessages.push({ role: 'user', content: String(userMessage || '') });
