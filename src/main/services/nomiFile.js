@@ -285,20 +285,19 @@ function codiceDi(e) {
   return 'non_riuscito';
 }
 
-// Il collegamento fallisce da solo se il nome esiste (EEXIST): la promessa «mai sovrascrivere» non dipende da un
-// controllo fatto un attimo prima. Dove il disco non sa collegare (FAT, certe cartelle di rete) si controlla e
-// si rinomina.
+async function esiste(p) {
+  try { await fsp.lstat(p); return true; } catch (_) { return false; }
+}
+
+// Il collegamento fallisce da solo se il nome esiste (EEXIST): «mai sovrascrivere» non dipende da un controllo
+// fatto un attimo prima. Dove il disco non sa collegare (FAT, certe cartelle di rete) si controlla e si rinomina.
 async function sposta(da, a) {
   try {
     await fsp.link(da, a);
   } catch (e) {
-    if (e && e.code === 'EEXIST') {
-      if (!(await stessoFile(da, a))) throw e;
-      await fsp.rename(da, a);
-      return;
-    }
-    try { await fsp.lstat(a); const err = new Error('esiste'); err.code = 'EEXIST'; throw err; } catch (x) {
-      if (x && x.code === 'EEXIST') throw x;
+    if (e && e.code === 'EEXIST' && !(await stessoFile(da, a))) throw e;
+    if (!(e && e.code === 'EEXIST') && await esiste(a) && !(await stessoFile(da, a))) {
+      const x = new Error('esiste'); x.code = 'EEXIST'; throw x;
     }
     await fsp.rename(da, a);
     return;
@@ -322,7 +321,7 @@ async function rinomina(percorso, nome, { esatto = false } = {}) {
   let voluto;
   if (esatto) {
     voluto = String(nome || '');
-    const solo = path.basename(voluto) === voluto && !/[\\/]/.test(voluto) && voluto !== '.' && voluto !== '..';
+    const solo = !/[\\/\u0000]/.test(voluto) && voluto !== '.' && voluto !== '..';
     if (!voluto || !solo) return { ok: false, errore: 'non_riuscito', frase: frase('non_riuscito') };
     if (N().scomponi(voluto).ext !== ext) return { ok: false, errore: 'estensione', frase: frase('estensione') };
   } else {
@@ -332,25 +331,25 @@ async function rinomina(percorso, nome, { esatto = false } = {}) {
   }
   if (voluto === vecchio) return { ok: true, invariato: true, da, a: da, nome: vecchio, prima: vecchio };
   const dir = path.dirname(da);
-  let finale = voluto;
-  for (let n = 2; await occupato(dir, finale, da); n++) {
-    if (n > 9999) return { ok: false, errore: 'non_riuscito', frase: frase('non_riuscito') };
-    const { base, ext: e } = N().scomponi(voluto);
-    finale = `${base} (${n})${e}`;
-  }
-  const a = path.join(dir, finale);
-  for (let tentativo = 0; ; tentativo++) {
+  const { base: radice, ext: coda } = N().scomponi(voluto);
+  // Un altro file che prende il nome nell'istante in mezzo fa ripartire dal primo numero libero, poche volte.
+  for (let giro = 0; giro < 4; giro++) {
+    let finale = voluto;
+    for (let n = 2; await occupato(dir, finale, da); n++) {
+      if (n > 9999) return { ok: false, errore: 'non_riuscito', frase: frase('non_riuscito') };
+      finale = `${radice} (${n})${coda}`;
+    }
+    const a = path.join(dir, finale);
     try {
       await sposta(da, a);
-      break;
     } catch (e) {
-      // Un altro file ha preso quel nome nell'istante in mezzo: si riparte dal primo numero libero.
-      if (e && e.code === 'EEXIST' && tentativo < 3) return rinomina(da, voluto, { esatto: true });
+      if (e && e.code === 'EEXIST') continue;
       return { ok: false, errore: codiceDi(e), frase: frase(codiceDi(e)) };
     }
+    try { deps.dopoRinomina(da, a); } catch (_) {}
+    return { ok: true, da, a, nome: finale, prima: vecchio, cambiato: finale !== voluto };
   }
-  try { deps.dopoRinomina(da, a); } catch (_) {}
-  return { ok: true, da, a, nome: finale, prima: vecchio, cambiato: finale !== voluto };
+  return { ok: false, errore: 'non_riuscito', frase: frase('non_riuscito') };
 }
 
 // Rimette com'erano più file: `coppie` = [{ attuale, prima }] dove `prima` è il nome (non il percorso) di allora.
