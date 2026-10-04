@@ -191,6 +191,9 @@ test('l’azione è di livello 1 e la descrizione usa il nome che l’utente ved
   assert.equal(L.describe({ type: 'CARTA_HOME', operazione: 'togli', carta: 'mazzi' }), 'Togliere la carta «Mazzi» dalla home');
   assert.match(L.describeDone({ type: 'CARTA_HOME', operazione: 'togli', carta: 'mazzi' }), /«Mazzi» tolta.*«altro»/);
   assert.match(L.describeDone({ type: 'CARTA_HOME', operazione: 'rimetti', carta: 'suggerimenti' }), /«Filo ti suggerisce» rimessa/);
+  // Con la chiave di una carta di sinistra la frase resta senza nome, non «Carta una carta».
+  assert.equal(L.describeDone({ type: 'CARTA_HOME', operazione: 'togli', carta: 'avviso:n1' }), 'Carta tolta dalla home');
+  assert.equal(L.describe({ type: 'CARTA_HOME', operazione: 'sposta', carta: 'il timer della pasta' }), 'Spostare la carta «il timer della pasta» nella home');
 });
 
 test('due mosse quasi insieme non si cancellano: il main le mette in fila', async () => {
