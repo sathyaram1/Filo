@@ -56,7 +56,7 @@ A ogni risposta Filo registra chi l'ha servita davvero, e lo vedi nella Cronolog
 
 Filo ha un server, su Firebase, cioè su infrastruttura Google (ne parlo più sotto). Il suo codice gira in Europa, nella regione europe-west1, in Belgio. Fa quattro cose: tiene la configurazione condivisa (quale modello usa ogni funzione), riceve i feedback, gestisce i crediti e ospita il red team.
 
-All'avvio Filo si presenta al server con la sua identità anonima, legge la configurazione condivisa e lo stato dei suoi crediti; nei primi giorni chiede anche se c'è un invito che lo aspetta. Queste richieste non contengono niente di tuo, oltre all'indirizzo IP che ogni richiesta in rete porta con sé.
+All'avvio Filo si presenta al server con la sua identità anonima, legge la configurazione condivisa e lo stato dei suoi crediti; il primo giorno chiede anche se c'è un invito che lo aspetta. Queste richieste non contengono niente di tuo, oltre all'indirizzo IP che ogni richiesta in rete porta con sé.
 
 ## I feedback
 
