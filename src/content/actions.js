@@ -673,9 +673,37 @@
     el.appendChild(w);
   }
 
+  // Quello che Filo dice di un'immagine viene da byte che il sito non può leggere (altro dominio,
+  // cookie dell'utente): la ricerca nel testo del sito attraversa lo shadow chiuso, quindi glifi, non testo (#946).
+  function testoChiuso(el, s) {
+    el.textContent = '';
+    global.SN_MENU.testoNascosto(el, el, s);
+  }
+
+  // Le etichette di origine di un'immagine già scaricata (#711): le legge il main
+  // dai byte, sul computer e senza crediti. Il menu e l'Aiuto passano entrambi da qui.
+  function leggiOrigine(dataUrl) {
+    return chrome.runtime.sendMessage({ type: MSG.IMAGE_PROVENANCE, dataUrl });
+  }
+
+  // I byte originali di un'immagine della pagina, come data URL. Quella di un'altra
+  // origine (quasi sempre: le foto stanno su un CDN) lo script non la può leggere,
+  // e la scarica il main (#946): senza, descrizione e origine tacevano sulla maggior parte dei siti.
+  async function scaricaImmagine(src) {
+    try {
+      const r = await fetch(src);
+      if (r.ok) return await blobToDataUrl(await r.blob());
+    } catch (_) {}
+    if (!/^https?:/i.test(String(src || ''))) throw new Error('immagine non leggibile');
+    const res = await chrome.runtime.sendMessage({ type: MSG.IMAGE_BYTES, url: src });
+    if (!res || !res.ok || !res.dataUrl) throw new Error((res && res.error) || 'immagine non leggibile');
+    return res.dataUrl;
+  }
+
   // Sezione inline "Spiega immagine": stessa filosofia di buildInlineExplain ma con dataUrl.
   // `linkEl` è il collegamento che l'immagine apre: l'unica sezione del menu parla
   // dell'immagine, ma l'avviso sull'indirizzo non si perde (#725.1).
+  // I byte si scaricano UNA volta: descrizione e controllo dell'origine partono da quelli.
   function buildInlineExplainImage(imgEl, linkEl) {
     return {
       type: 'inline',
@@ -684,6 +712,10 @@
       onMount: (el) => {
         el.classList.add('sn-menu-inline-loading');
         el.textContent = '';
+        const origine = document.createElement('div');
+        origine.className = 'sn-menu-origine';
+        origine.hidden = true;
+        el.appendChild(origine);
         if (linkEl && linkEl.href) mostraAvvisoLink(el, linkEl.href);
         const body = document.createElement('div');
         body.className = 'sn-menu-link-body';
@@ -698,11 +730,28 @@
         }
         let cancelled = false;
         (async () => {
+          let dataUrl;
           try {
-            const r = await fetch(src);
-            const blob = await r.blob();
-            const dataUrl = await blobToDataUrl(blob);
+            dataUrl = await scaricaImmagine(src);
+          } catch (_) {
             if (cancelled) return;
+            el.classList.remove('sn-menu-inline-loading');
+            el.classList.add('sn-menu-inline-error');
+            body.textContent = I18n.t('menu_image_unreadable');
+            return;
+          }
+          if (cancelled) return;
+
+          // Locale: arriva molto prima della descrizione, e si mostra appena c'è.
+          leggiOrigine(dataUrl).then((p) => {
+            if (cancelled || !p || !p.ok || !p.frase) return;
+            testoChiuso(origine, p.frase);
+            origine.title = I18n.t(p.firmatario === 'non_verificato' ? 'menu_origin_hint_unverified' : 'menu_origin_hint');
+            origine.classList.toggle('sn-menu-origine-debole', !p.forte);
+            origine.hidden = false;
+          }).catch(() => {});
+
+          try {
             const res = await chrome.runtime.sendMessage({
               type: MSG.AI_REQUEST,
               action: ACTIONS.DESCRIBE_IMAGE,
@@ -715,7 +764,7 @@
               body.textContent = res?.error || I18n.t('err_provider_failed');
               return;
             }
-            body.textContent = res.text;
+            testoChiuso(body, res.text);
           } catch (e) {
             if (cancelled) return;
             el.classList.remove('sn-menu-inline-loading');
@@ -956,10 +1005,19 @@
     if (res?.ok) Popup.showToast(I18n.t('toast_link_saved'));
   }
 
+  function dataUrlToBlob(dataUrl) {
+    const m = /^data:([^;,]*)[^,]*;base64,(.*)$/s.exec(String(dataUrl || ''));
+    if (!m) throw new Error('immagine non leggibile');
+    const bin = atob(m[2]);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], { type: m[1] || 'application/octet-stream' });
+  }
+
   async function copyImage(imgEl) {
     try {
-      const r = await fetch(imgEl.currentSrc || imgEl.src);
-      const blob = await r.blob();
+      const originale = await scaricaImmagine(imgEl.currentSrc || imgEl.src);
+      const blob = dataUrlToBlob(originale);
       let pngBlob = blob;
       // Clipboard API supporta image/png; converte se serve
       if (blob.type !== 'image/png') {
@@ -975,6 +1033,8 @@
       }
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
       const dataUrl = await blobToDataUrl(pngBlob);
+      // Dopo la scrittura: il main legge gli appunti per riconoscere la copia quando torna incollata.
+      chrome.runtime.sendMessage({ type: MSG.IMAGE_COPIED, originale, copia: dataUrl }).catch(() => {});
       const description = await describeImage(pngBlob);
       pushClipboardEntry({ type: 'image', dataUrl, description });
       Popup.showToast(I18n.t('toast_copied'));
@@ -1884,6 +1944,8 @@
     schedulePrefetchExplain,
     buildInlineExplain,
     buildInlineExplainImage,
+    leggiOrigine,
+    scaricaImmagine,
     buildInlineExplainLink,
     // salva / condividi / cerca / immagini
     buildSavePayload,
