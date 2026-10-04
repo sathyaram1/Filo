@@ -139,14 +139,14 @@ test('nessuno strumento delle sessioni scrive il sì come lavoro locale', () => 
   const file = [];
   const giro = (dir) => {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
-      if (e.isDirectory()) { if (e.name !== 'node_modules') giro(join(dir, e.name)); } else if (/.(mjs|cjs|js)$/.test(e.name)) file.push(join(dir, e.name));
+      if (e.isDirectory()) { if (e.name !== 'node_modules') giro(join(dir, e.name)); } else if (/\.(mjs|cjs|js)$/.test(e.name)) file.push(join(dir, e.name));
     }
   };
   giro(join(ROOT, 'scripts'));
   assert.ok(file.length > 20, 'cartella degli strumenti non trovata');
   for (const f of file) {
     const testo = readFileSync(f, 'utf8');
-    assert.doesNotMatch(testo, /fieldPaths=localApproval|set(s*['"`]localApproval['"`]|localApprovals*:s*({s*mapValue|toFsValue|segno)/, `${f} scrive localApproval`);
+    assert.doesNotMatch(testo, /fieldPaths=localApproval|set\(\s*['"`]localApproval['"`]|localApproval\s*:\s*(\{\s*mapValue|toFsValue|segno)/, `${f} scrive localApproval`);
   }
 });
 
