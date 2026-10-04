@@ -3065,7 +3065,8 @@ function schedeForPrompt(actions) {
   const out = [];
   for (const a of actions) {
     const type = String((a && a.type) || '').toUpperCase();
-    if (!TIPI_SCHEDE.has(type) || !a._output || typeof a._output !== 'object' || a._confirm) continue;
+    // Una fermata (#810) la racconta fermateForPrompt.
+    if (!TIPI_SCHEDE.has(type) || !a._output || typeof a._output !== 'object' || a._confirm || a._output.blocked) continue;
     const t = schedaForPrompt(type, a, a._output);
     if (t) out.push(t);
   }
