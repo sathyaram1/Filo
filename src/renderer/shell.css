@@ -248,6 +248,7 @@ html[data-chrome-compact="1"] .addr {
   background-position: center;
 }
 .tab .spinner {
+  flex: 0 0 12px;
   width: 12px; height: 12px;
   border: 2px solid var(--border);
   border-top-color: var(--accent);
