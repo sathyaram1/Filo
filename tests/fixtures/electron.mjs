@@ -15,7 +15,7 @@
 //     vogliono il pixel-perfect.
 
 import { test as base, _electron as electron, expect } from '@playwright/test';
-import { rmSync } from 'node:fs';
+import { rmSync, writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
