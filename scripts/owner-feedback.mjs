@@ -98,6 +98,9 @@ import '../src/shared/feedback.js';
 import '../src/shared/feedbackStatus.js';
 import '../src/shared/manageReview.js';
 
+// Ogni scrittura di un feedback firma l'ora, o la Gestione non la vede fino al riallineamento (#676).
+const firmaOra = () => ({ timestampValue: new Date().toISOString() });
+
 const THREAD = globalThis.SN_FEEDBACK_THREAD;
 const FS = globalThis.SN_FB_STATUS;
 const CRYPTO = globalThis.SN_FEEDBACK_CRYPTO;
@@ -271,9 +274,9 @@ export async function segnaLocale(id, valore, opts = {}) {
   // Il feedback di un utente approvato tiene la scheda: è da lì che chi l'ha mandato vede la risoluzione.
   const tieneScheda = MR.isLocalApproved(fb);
   if (opts.dryRun) return { ok: true, dryRun: true, segno, chiusa, tieneScheda };
-  const fields = segno ? { localOnly: toFsValue(segno) } : {};
+  const fields = segno ? { localOnly: toFsValue(segno), updatedAt: firmaOra() } : { updatedAt: firmaOra() };
   // Il sì dell'owner (#913) resta anche col segno tolto: si dà solo dai Ricevuti, e senza il segno non si rimetterebbe.
-  const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?updateMask.fieldPaths=localOnly`, {
+  const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?updateMask.fieldPaths=localOnly&updateMask.fieldPaths=updatedAt`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
     body: JSON.stringify({ fields }),
@@ -312,10 +315,10 @@ export async function riconosciMittente(id, opts = {}) {
     return { ok: false, motivo: `${segnalato}: a un segnalato la prova la dà solo l’owner, in Gestione («È mio»), dopo averlo guardato` };
   }
   if (opts.dryRun) return { ok: true, dryRun: true };
-  const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?updateMask.fieldPaths=senderProof`, {
+  const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?updateMask.fieldPaths=senderProof&updateMask.fieldPaths=updatedAt`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
-    body: JSON.stringify({ fields: { senderProof: { stringValue: 'admin' } } }),
+    body: JSON.stringify({ fields: { senderProof: { stringValue: 'admin' }, updatedAt: firmaOra() } }),
   });
   if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
   return { ok: true };
@@ -372,6 +375,8 @@ export async function approvaLocale(id, opts = {}) {
   set('workingSince', '');
   if (!MR.isLocalOnly(fb)) set('localOnly', segno);
   set('localApproval', segno);
+  fields.updatedAt = firmaOra();
+  mask.push('updatedAt');
   if (opts.dryRun) return { ok: true, dryRun: true, from: fb.status, campi: mask };
   const q = mask.map((m) => `updateMask.fieldPaths=${m}`).join('&');
   const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?${q}`, {
@@ -461,9 +466,9 @@ export async function scriviFrase(id, frase, opts = {}) {
   if (!leggibile) return { ok: false, motivo: 'stato attuale non decifrabile: non so dove sta la pratica' };
   const vietata = partenzaVietata(from);
   if (vietata) return { ok: false, motivo: vietata };
-  const fields = { userNote: toFsValue(testo) };
+  const fields = { userNote: toFsValue(testo), updatedAt: firmaOra() };
   if (opts.dryRun) return { ok: true, dryRun: true };
-  const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?updateMask.fieldPaths=userNote`, {
+  const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?updateMask.fieldPaths=userNote&updateMask.fieldPaths=updatedAt`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
     body: JSON.stringify({ fields }),
@@ -500,8 +505,8 @@ export async function registraParte(id, parte, opts = {}) {
     ...(opts.solo ? { solo: { stringValue: parte } } : {}),
     ...(RAMO_RE.test(String(opts.ramo || '')) ? { ramo: { stringValue: opts.ramo } } : {}),
   };
-  const fields = { localMerges: { mapValue: { fields: campi } } };
-  const q = Object.keys(campi).map((k) => `updateMask.fieldPaths=localMerges.${k}`).join('&');
+  const fields = { localMerges: { mapValue: { fields: campi } }, updatedAt: firmaOra() };
+  const q = [...Object.keys(campi).map((k) => `updateMask.fieldPaths=localMerges.${k}`), 'updateMask.fieldPaths=updatedAt'].join('&');
   const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?${q}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },

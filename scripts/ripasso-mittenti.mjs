@@ -480,6 +480,9 @@ async function leggiSoglie(bearer, letture) {
   return v;
 }
 
+// Ogni scrittura di un feedback firma l'ora, o la Gestione non la vede fino al riallineamento (#676).
+const firmaOra = () => ({ timestampValue: new Date().toISOString() });
+
 const scrittoreFirestore = (bearer) => {
   const rete = (e) => ({ ok: false, status: 0, testo: String((e && e.message) || e) });
   return {
@@ -495,18 +498,18 @@ const scrittoreFirestore = (bearer) => {
     },
     async prova(d) {
       // Senza la precondizione un documento cancellato nel frattempo rinascerebbe con il solo campo della prova.
-      return fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(d.id)}?updateMask.fieldPaths=senderProof&currentDocument.exists=true`, {
+      return fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(d.id)}?updateMask.fieldPaths=senderProof&updateMask.fieldPaths=updatedAt&currentDocument.exists=true`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
-        body: JSON.stringify({ fields: { senderProof: { stringValue: d.prova } } }),
+        body: JSON.stringify({ fields: { senderProof: { stringValue: d.prova }, updatedAt: firmaOra() } }),
       }).catch(rete);
     },
     async locale(d) {
       const segno = { mapValue: { fields: { by: { stringValue: chiScrive(bearer) }, at: { integerValue: String(Date.now()) } } } };
-      const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(d.id)}?updateMask.fieldPaths=localOnly&currentDocument.exists=true`, {
+      const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(d.id)}?updateMask.fieldPaths=localOnly&updateMask.fieldPaths=updatedAt&currentDocument.exists=true`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
-        body: JSON.stringify({ fields: { localOnly: segno } }),
+        body: JSON.stringify({ fields: { localOnly: segno, updatedAt: firmaOra() } }),
       }).catch(rete);
       if (!res || !res.ok) return res;
       const via = await fetch(`${FIRESTORE_BASE}/feedback-public/${encodeURIComponent(d.id)}`, {
