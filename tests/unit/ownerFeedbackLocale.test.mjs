@@ -75,7 +75,7 @@ test('--non-locale toglie il segno: maschera sul campo, nessun valore', async ()
     const r = await mod.segnaLocale('abc', false, OPTS);
     assert.equal(r.ok, true, r.motivo);
     assert.equal(patch.length, 1);
-    assert.deepEqual(patch[0].body.fields, {});
+    assert.deepEqual(Object.keys(patch[0].body.fields), ['updatedAt']);
   });
 });
 
@@ -308,8 +308,9 @@ test('--riconosci: la prova la dà l’owner, solo sui prefissi suoi e delle ses
     const r = await mod.riconosciMittente('s1', OPTS);
     assert.equal(r.ok, true, r.motivo);
     assert.equal(scritte.length, 1);
-    assert.match(scritte[0].url, /updateMask\.fieldPaths=senderProof$/);
-    assert.deepEqual(scritte[0].body.fields, { senderProof: { stringValue: 'admin' } });
+    assert.match(scritte[0].url, /updateMask\.fieldPaths=senderProof&updateMask\.fieldPaths=updatedAt$/);
+    assert.deepEqual(scritte[0].body.fields.senderProof, { stringValue: 'admin' });
+    assert.ok(scritte[0].body.fields.updatedAt.timestampValue);
   });
   for (const [id, f] of [
     ['p1', { clientId: 'owner:me', senderProof: 'admin', status: 'todo' }],
@@ -433,7 +434,7 @@ test('--non-locale su un lavoro locale chiuso: toglie il segno, lo dice, e non c
     assert.equal(r.ok, true, r.motivo);
     assert.equal(r.chiusa, true);
     assert.equal(scritture.length, 1, scritture.join('\n'));
-    assert.match(scritture[0], /^PATCH .*\/feedback\/c1\?updateMask\.fieldPaths=localOnly$/);
+    assert.match(scritture[0], /^PATCH .*\/feedback\/c1\?updateMask\.fieldPaths=localOnly&updateMask\.fieldPaths=updatedAt$/);
   } finally { globalThis.fetch = vero; }
 });
 
