@@ -11,7 +11,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, collegaCartella } from '../helpers/percorsi.mjs';
 import {
-  decidiEsito, campoPerIlServer, chiaveTest, testoProva, togliCollegamento, chiudiAlbero, gitIn,
+  decidiEsito, campoPerIlServer, chiaveTest, fileDellaChiave, testoProva, togliCollegamento, chiudiAlbero, gitIn,
   provaUnitSullaFusione, chiediConProva, pulisciResti, TETTO_ROSSI,
 } from '../../scripts/lib/unit-sulla-fusione.mjs';
 
@@ -42,6 +42,11 @@ test('lo stesso test rosso ha la stessa chiave in due cartelle diverse', () => {
   assert.equal(a, b);
   // Fuori dalla cartella (forma corta e lunga di Windows): conta il pezzo da tests/.
   assert.equal(chiaveTest({ nome: 'n', file: 'C:\\ALTRO~1\\fusione\\tests\\unit\\a.test.mjs' }, 'C:\\altro nome\\fusione'), 'tests/unit/a.test.mjs › n');
+  // Su ogni sistema (#952.1): un percorso assoluto, di Windows o no, non torna mai come file da riprovare.
+  assert.equal(fileDellaChiave('C:\\ALTRO~1\\a.test.mjs › n'), '');
+  assert.equal(fileDellaChiave('\\\\server\\cond\\a.test.mjs › n'), '');
+  assert.equal(fileDellaChiave('/tmp/a.test.mjs › n'), '');
+  assert.equal(fileDellaChiave('tests/unit/a.test.mjs › n'), 'tests/unit/a.test.mjs');
 });
 
 test('il campo per il server: niente campo senza origin, «non_provata» col motivo, elenco dei rossi col tetto dichiarato', () => {

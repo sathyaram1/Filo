@@ -8,7 +8,7 @@ import {
   unlinkSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
+import { basename, dirname, join, posix, resolve, win32 } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { sommaRiepiloghi, perLaRiga, allaLettera, NODE_LEGGE_MODELLI } from '../run-unit-tests.mjs';
 
@@ -26,12 +26,14 @@ const MAIN = 'main';
 const IDENTITA = ['-c', 'user.name=filo-prova-fusione', '-c', 'user.email=prova-fusione@filo.invalid', '-c', 'commit.gpgsign=false'];
 
 const primaRiga = (s) => String(s || '').split(/\r?\n/).find((r) => r.trim()) || '';
+// Le funzioni PURE sui percorsi rispondono uguale su ogni sistema: un percorso di Windows resta assoluto anche su Linux.
+const assoluto = (f) => posix.isAbsolute(f) || win32.isAbsolute(f);
 
 /** Un test rosso in una riga che due cartelle diverse scrivono uguale. PURA. */
 export function chiaveTest(r, root) {
   let file = r && r.file ? perLaRiga(String(r.file), root) : '?';
   // Fuori dalla cartella (forma corta e lunga dello stesso percorso su Windows): conta il pezzo da tests/ in poi.
-  if (isAbsolute(file)) {
+  if (assoluto(file)) {
     const barre = file.replace(/\\/g, '/');
     const i = barre.lastIndexOf('/tests/');
     if (i >= 0) file = barre.slice(i + 1);
@@ -251,7 +253,7 @@ function leggiRighe(file) {
 /** Il file di un test rosso, dalla sua chiave. PURA. '' se non c'è. */
 export function fileDellaChiave(chiave) {
   const f = String(chiave || '').split(' › ')[0];
-  return f && f !== '?' && !isAbsolute(f) && !f.split('/').includes('..') ? f : '';
+  return f && f !== '?' && !assoluto(f) && !f.split('/').includes('..') ? f : '';
 }
 
 /**
