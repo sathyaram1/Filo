@@ -162,8 +162,11 @@ function seguiGesti(wc) {
       wc._filoGestoAlle = Date.now();
       segnaMenu(wc, params && params.frame);
     });
-    wc.on('before-input-event', (_e, input) => {
-      if (input && input.type === 'keyDown' && String(input.key || '') !== 'Escape') wc._filoGestoAlle = Date.now();
+    // Un tasto che Filo tiene per sé (una scorciatoia) o premuto sull'avviso del sito non è arrivato alla pagina (#737.1):
+    // chi lo ferma lo fa negli altri ascolti, quindi si guarda dopo che sono passati tutti.
+    wc.on('before-input-event', (e, input) => {
+      if (!input || input.type !== 'keyDown' || String(input.key || '') === 'Escape' || (e && e.daAvvisoSito)) return;
+      queueMicrotask(() => { if (!(e && e.defaultPrevented)) wc._filoGestoAlle = Date.now(); });
     });
     wc.on('did-start-navigation', (e, _url, isInPlace, isMainFrame) => {
       const principale = e && typeof e.isMainFrame === 'boolean' ? e.isMainFrame : isMainFrame;
