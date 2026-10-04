@@ -342,9 +342,34 @@ export async function askServerMerge({ branch, sha = '', feedbackId = '', pendin
     const text = await res.text();
     let body = {};
     try { body = text ? JSON.parse(text) : {}; } catch (_) { body = {}; }
-    return classifyOwnerMerge(res.status, body);
+    const reply = classifyOwnerMerge(res.status, body);
+    if (reply.outcome !== 'blocked' || !reply.requestId) return reply;
+    const stato = await statoDalDeposito({ id: reply.requestId, idToken, fetchImpl, listUrl });
+    return Object.assign(reply, { requestState: stato.state },
+      stato.outcome ? { requestOutcome: stato.outcome } : {}, stato.motivo ? { requestCheck: stato.motivo } : {});
   } catch (e) {
     return { outcome: 'unreachable', reason: String((e && e.message) || e).slice(0, 200) };
+  }
+}
+
+/** Lo stato della richiesta riletto dal deposito. Mai un'eccezione: un controllo fallito è `state: ''`. */
+async function statoDalDeposito({ id, idToken, fetchImpl, listUrl }) {
+  try {
+    const res = await fetchImpl(listUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ data: { op: 'list' } }),
+      ...(typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? { signal: AbortSignal.timeout(30000) } : {}),
+    });
+    const text = await res.text();
+    let body = {};
+    try { body = text ? JSON.parse(text) : {}; } catch (_) { body = {}; }
+    if (res.status !== 200) {
+      return { state: '', motivo: `elenco delle richieste: ${String((body.error && body.error.message) || `http_${res.status}`).slice(0, 120)}` };
+    }
+    return statoDellaRichiesta(id, body.result);
+  } catch (e) {
+    return { state: '', motivo: `elenco delle richieste: ${String((e && e.message) || e).slice(0, 120)}` };
   }
 }
 
