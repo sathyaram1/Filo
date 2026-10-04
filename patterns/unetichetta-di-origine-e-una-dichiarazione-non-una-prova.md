@@ -69,7 +69,10 @@ stessi byte che la descrizione ha già scaricato — mai un secondo download. Le
 dei siti veri stanno quasi sempre su un altro dominio, che lo script della pagina
 non può leggere: quei byte li scarica il main, come «Salva immagine come…»
 (#946; prima descrizione e origine tacevano proprio sui siti veri, e le prove
-servite dallo stesso host non se ne accorgevano). Una copia negli appunti perde
+servite dallo stesso host non se ne accorgevano). Quei byte il sito non li
+poteva leggere, quindi quello che Filo ne dice nel menu (riga d'origine e
+descrizione) va a schermo come glifi, non come testo: la ricerca nel testo del
+sito attraversa lo shadow chiuso. Una copia negli appunti perde
 le etichette (gli appunti ricodificano l'immagine): l'esito letto sull'originale
 al momento di «Copia immagine» si ricorda per i pixel della copia, e la chat lo
 ritrova quando l'immagine torna incollata. Nell'Aiuto della pagina si leggono le immagini che l'utente ha davanti, dalle
