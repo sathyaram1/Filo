@@ -378,7 +378,7 @@
         // Con la virgola: «1,5» è un'ora e mezza, non 15. La pagina tiene ore intere.
         // L'unità detta conta: «2 giorni» sono 48 ore, non 2; senza cifra «una settimana» è una.
         const s = String(v == null ? '' : v).trim().toLowerCase();
-        const per = /settiman/.test(s) ? 168 : /giorn|giornat/.test(s) ? 24 : /\bmin/.test(s) ? 1 / 60 : 1;
+        const per = /settiman/.test(s) ? 168 : /giorn/.test(s) ? 24 : /\bmin/.test(s) ? 1 / 60 : 1;
         let n = /\d/.test(s) ? parseItalianNumber(s) : (/mezz/.test(s) ? 0.5 : (per !== 1 || /\bor[ae]\b/.test(s) ? 1 : NaN));
         if (!Number.isFinite(n)) return null;
         n *= per;

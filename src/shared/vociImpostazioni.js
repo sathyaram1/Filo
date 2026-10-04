@@ -225,8 +225,12 @@
     'impostati', 'impostate', 'impostazione', 'impostazioni', 'attivo', 'attiva', 'attivi', 'acceso', 'accesa', 'spento',
     'spenta', 'adesso', 'filo', 'mio', 'mia', 'miei', 'mie', 'hai', 'dimmi', 'della', 'delle', 'dello', 'degli', 'dei',
     'del', 'nel', 'nella', 'una', 'uno', 'gli', 'le', 'il', 'la', 'di', 'da']);
+  // Il pezzo eliso non è una parola da cercare: «com'è», «dell'anteprima» cercherebbero «com» e «dell».
+  function senzaElisioni(s) {
+    return String(s || '').replace(/\p{L}+['’](?=\p{L})/gu, ' ');
+  }
   function piano(s) {
-    return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[_.\-'’«»"]/g, ' ');
+    return senzaElisioni(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[_.\-'’«»"]/g, ' ');
   }
   function radice(w) {
     return w.length > 5 ? w.slice(0, w.length - 2) : w;
