@@ -17,7 +17,7 @@
 //   Lo usano soprattutto le sessioni locali, che hanno le credenziali dell'owner
 //   e quindi tutti i suoi poteri. Per regola però non spostano feedback DAI
 //   Ricevuti (aspettano una decisione dell'owner, in Gestione) né dalle sue
-//   conferme, non lavorano feedback di utenti senza il sì dell'owner (--approva-locale, #913) e non stampano testo dei feedback:
+//   conferme, non lavorano feedback di utenti senza il sì dell'owner (solo da Gestione, #957) e non stampano testo dei feedback:
 //   qui si rifiuta prima di scrivere. Firestore lo permetterebbe; è una scelta.
 //
 // PERCHÉ IL CONTROLLO QUI FUNZIONA DAVVERO
@@ -40,7 +40,6 @@
 //   node scripts/owner-feedback.mjs <n|id> --solo-locale    (segno «solo in locale»)
 //   node scripts/owner-feedback.mjs <n|id> --non-locale
 //   node scripts/owner-feedback.mjs <n|id> --serve-locale ["perché"]
-//   node scripts/owner-feedback.mjs <n|id> --approva-locale (sì dell'owner: dai Ricevuti ai Lavori locali)
 //
 //   node scripts/owner-feedback.mjs <n|id> --riconosci     (prova del mittente data dall'owner)
 //
@@ -55,10 +54,9 @@
 //   `--non-locale` lo toglie. Su un feedback di un utente il segno si rifiuta:
 //   se richiede lavoro locale, `--serve-locale` lo riporta nei Ricevuti
 //   (stato design, nota «Richiede lavoro locale») e decide l'owner.
-//   `--approva-locale` è la decisione dell'owner (#913), il tasto «💻 Lavoro locale» dei Ricevuti in Gestione:
-//   il feedback di un utente o di una routine va nei Lavori locali col segno e col suo sì (`localApproval`), e
-//   alla fusione L5 si salta come per i suoi. La sessione lo lancia solo su parola dell'owner, che ha letto il
-//   testo; un feedback segnalato dai giudici lo approva solo lui, in Gestione.
+//   Il sì dell'owner a un feedback di un utente o di una routine (`localApproval`, #913) qui non si dà: solo il
+//   tasto «💻 Lavoro locale» dei Ricevuti in Gestione (#957). Salta L5, e una sessione ingannata da un testo
+//   d'utente, con le credenziali dell'owner, se lo darebbe da sola. `--approva-locale` si rifiuta.
 //
 //   `--preapprova`: «fondi senza chiedermelo» su QUESTA pratica. Se i controlli
 //   del server fermano il lavoro di una routine, il server fonde lo stesso e
@@ -336,49 +334,6 @@ export async function serveLocale(id, nota = '', opts = {}) {
   return scrivi(id, 'design', testo, { ...opts, bearer, attore: 'routine', reason: 'locale' });
 }
 
-/**
- * Il sì dell'owner (#913): il feedback di un utente o di una routine, nei Ricevuti, diventa lavoro locale.
- * Stessa scrittura del tasto in Gestione: `todo` approvato, segno locale e `localApproval`. La regola sta in
- * SN_MANAGE_REVIEW.localApprovalCheck; un segnalato da qui no, come per --riconosci.
- */
-export async function approvaLocale(id, opts = {}) {
-  const bearer = opts.bearer || await acquireBearer();
-  const doc = await getDoc(id, bearer, CAMPI_PRATICA);
-  if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
-  const fb = await praticaInChiaro(doc);
-  if (!fb) return { ok: false, motivo: 'mittente o stato non decifrabili: non so di chi è la pratica' };
-  const check = MR.localApprovalCheck(fb);
-  if (!check.ok) return { ok: false, motivo: check.motivo };
-  if (check.segnalato) {
-    return { ok: false, motivo: `${check.segnalato}: lo approva come lavoro locale solo l’owner, in Gestione, dopo averlo guardato` };
-  }
-  const passaggio = transizioneAmmessa(fb.status, 'todo', 'owner');
-  if (!passaggio.ok) return { ok: false, motivo: passaggio.motivo };
-  const segno = { by: chiScrive(bearer), at: Date.now() };
-  const cifra = async (v) => (CRYPTO?.isEnabled?.() ? CRYPTO.encryptForOwner(v) : v);
-  const fields = {};
-  const mask = [];
-  const set = (k, v) => { fields[k] = toFsValue(v); mask.push(k); };
-  try {
-    set('status', await cifra(CRYPTO?.isEnabled?.() ? FS.padForCipher('todo') : 'todo'));
-    set('reviewDecision', await cifra('accepted'));
-    set('reviewedAt', await cifra(new Date().toISOString()));
-  } catch (e) { return { ok: false, motivo: `cifratura fallita: ${e?.message || e}` }; }
-  set('statusPublic', statusToPublic ? statusToPublic('todo') : 'open');
-  set('workingSince', '');
-  if (!MR.isLocalOnly(fb)) set('localOnly', segno);
-  set('localApproval', segno);
-  if (opts.dryRun) return { ok: true, dryRun: true, from: fb.status, campi: mask };
-  const q = mask.map((m) => `updateMask.fieldPaths=${m}`).join('&');
-  const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?${q}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
-    body: JSON.stringify({ fields }),
-  });
-  if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
-  return { ok: true, from: fb.status, segno };
-}
-
 const STATI_DEL_LAVORO_LOCALE = Object.freeze(['todo', 'working', 'revision_capability', 'revision_security']);
 
 /**
@@ -528,14 +483,16 @@ export function rifiutoPratica(id, r) {
     righe.push('Altrimenti vale come un utente.');
   }
   if (r && (r.utente || r.routine) && r.ricevuti) {
-    righe.push('È già nei Ricevuti: se richiede lavoro locale, dillo all’owner. Decide lui, in Gestione («💻 Lavoro locale»), o su sua parola:');
-    righe.push(`  node scripts/owner-feedback.mjs ${id} --approva-locale`);
+    righe.push(`È già nei Ricevuti: se richiede lavoro locale, dillo all’owner. ${SOLO_DA_GESTIONE}`);
   } else if (r && (r.utente || r.routine)) {
     righe.push('Se richiede lavoro locale, riportalo nei Ricevuti e decide l’owner:');
     righe.push(`  node scripts/owner-feedback.mjs ${id} --serve-locale "perché"`);
   }
   return righe.join('\n');
 }
+
+/** Il sì come lavoro locale a un feedback non dell'owner (#957): nessuno strumento delle sessioni lo scrive. */
+export const SOLO_DA_GESTIONE = 'Come lavoro locale lo approva solo l’owner, in Gestione, col tasto «💻 Lavoro locale» dei Ricevuti dopo averlo letto: da riga di comando non si può.';
 
 /** «910», «#910», «22.1»: un numero di feedback, non un id. PURA. */
 export function numeroDiFeedback(riferimento) {
@@ -743,14 +700,18 @@ if (isMain) {
     console.error('     node scripts/owner-feedback.mjs <numero|id> --solo-locale | --non-locale    (segno «solo in locale», stato invariato)');
     console.error('     node scripts/owner-feedback.mjs <numero|id> --serve-locale ["perché"]       (feedback di un utente → Ricevuti, «richiede lavoro locale»)');
     console.error('     node scripts/owner-feedback.mjs <numero|id> --riconosci                      (prova del mittente su un feedback tuo o di una tua sessione: solo su tua parola)');
-    console.error('     node scripts/owner-feedback.mjs <numero|id> --approva-locale                 (dai Ricevuti ai Lavori locali col tuo sì: solo su tua parola)');
     console.error(`     status ∈ ${ALLOWED.join(' | ')}`);
   };
   if (argv.includes('--help') || argv.includes('-h')) { uso(); process.exit(0); }
+  // Prima delle credenziali e del controllo sulle opzioni, che la direbbe solo «sconosciuta»; npm se la mangia nell'ambiente.
+  if (argv.some((a) => /^--approva-locale(=|$)/.test(a)) || process.env.npm_config_approva_locale !== undefined) {
+    console.error(`RIFIUTATO: --approva-locale non c'è più. ${SOLO_DA_GESTIONE} Non ho toccato niente.`);
+    process.exit(1);
+  }
   const { controllaArgomenti, argomentiDaNpm, espandiUguali, opzioneStorpiata } = await import('./lib/argomenti.mjs');
   const OPZ = {
     opzioni: ['--branch', '--reason', '--frase', '--dry-run', '--come-routine', '--starred', '--unstar', '--preapprova', '--chiedi-prima',
-      '--solo-locale', '--non-locale', '--serve-locale', '--riconosci', '--approva-locale'],
+      '--solo-locale', '--non-locale', '--serve-locale', '--riconosci'],
     conValore: ['--branch', '--reason', '--frase'],
   };
   argv = espandiUguali(argv, OPZ.conValore);
@@ -806,7 +767,7 @@ if (isMain) {
   }
 
   // Il segno «solo in locale» e il ritorno nei Ricevuti: da soli, senza stato.
-  const locali = ['--solo-locale', '--non-locale', '--serve-locale', '--riconosci', '--approva-locale'].filter((o) => argv.includes(o));
+  const locali = ['--solo-locale', '--non-locale', '--serve-locale', '--riconosci'].filter((o) => argv.includes(o));
   if (locali.length > 1) { console.error(`RIFIUTATO: ${locali.join(' e ')} insieme — non ho toccato niente.`); process.exit(1); }
   if (locali.length === 1) {
     if (!id) { uso(); process.exit(1); }
@@ -819,14 +780,6 @@ if (isMain) {
       process.exit(0);
     }
     if (status) { console.error(`RIFIUTATO: ${locali[0]} va da solo, senza stato né nota — non ho toccato niente.`); process.exit(1); }
-    if (locali[0] === '--approva-locale') {
-      const r = await approvaLocale(id, { dryRun, bearer });
-      if (!r.ok) { console.error(`RIFIUTATO: ${r.motivo} — non ho toccato niente.`); process.exit(3); }
-      console.log(r.dryRun
-        ? `[dry-run] ${riferimento}: ${r.from} → todo, approvato come lavoro locale (${r.campi.join(', ')})`
-        : `${riferimento}: approvato come lavoro locale (sì di ${r.segno.by}). Sta nei Lavori locali, nessuna routine lo prende, e alla fusione L5 non chiede.`);
-      process.exit(0);
-    }
     if (locali[0] === '--riconosci') {
       const r = await riconosciMittente(id, { dryRun, bearer });
       if (!r.ok) { console.error(`RIFIUTATO: ${r.motivo} — non ho toccato niente.`); process.exit(3); }
