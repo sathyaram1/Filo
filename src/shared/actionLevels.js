@@ -471,14 +471,13 @@
     },
     IMPOSTA_PREFERENZA: {
       // Livello per-preferenza: lo dichiara il setter in preferences.js
-      // (default 1). Preferenza sconosciuta/non valida → 2 per prudenza
-      // (tanto il dispatch non la eseguirà comunque). Un `rifiuto` → 1: non
-      // c'è niente da confermare, il dispatch lo respinge spiegando perché.
+      // (default 1). Preferenza sconosciuta/non valida o `rifiuto` → 1: non c'è
+      // niente da confermare, il dispatch la respinge spiegando perché (un OK a vuoto no).
       level: (a) => {
         // Un elenco che resterebbe com'è: niente da confermare (`_invariato` lo mette il main, #949).
         if (a && a._invariato) return 1;
         const built = prefBuilt(a);
-        return (built && built.level) || (built ? 1 : 2);
+        return (built && built.level) || 1;
       },
       describe: (a) => {
         const built = prefBuilt(a);

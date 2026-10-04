@@ -96,8 +96,9 @@ test('IMPOSTA_PREFERENZA: livello per-preferenza, non unico', () => {
   // Modalità terminale → dà a Filo accesso alla shell: livello 2.
   assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'terminale', valore: 'on' }), 2);
   assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'shell', valore: 'bash' }), 2);
-  // Preferenza sconosciuta → 2 per prudenza.
-  assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'boh', valore: 'x' }), 2);
+  // Preferenza sconosciuta o valore non valido → 1: il dispatch la respinge col perché, niente OK a vuoto.
+  assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'boh', valore: 'x' }), 1);
+  assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'fingerprint', valore: false }), 1);
 });
 
 test('IMPOSTA_PREFERENZA: impostazioni sensibili (#146.5) → livello 2 (conferma)', () => {

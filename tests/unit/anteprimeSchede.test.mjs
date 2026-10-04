@@ -300,6 +300,6 @@ test('a parole: si spegne, si riaccende a una misura, e le chiavi vaghe non pass
   assert.deepEqual(P.buildPreferencePartial('anteprima_schede', 'piccola').partial, { tabPreview: { enabled: true, size: 'piccola' } });
   assert.equal(P.buildPreferencePartial('anteprima_schede', 'boh'), null);
   // «tab» e «schede» indicano più voci: Filo riceve un rifiuto con le chiavi, compresa quella di prima (#949).
-  assert.match(P.buildPreferencePartial('tab', 'vivaci').rifiuto, /colore_tab/);
-  assert.match(P.buildPreferencePartial('schede', 'sì').rifiuto, /archiviazione_automatica/);
+  assert.match(P.buildPreferencePartial('tab', 'vivaci').perModello, /colore_tab/);
+  assert.match(P.buildPreferencePartial('schede', 'sì').perModello, /archiviazione_automatica/);
 });

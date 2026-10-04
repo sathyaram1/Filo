@@ -295,3 +295,30 @@ test('G — annullare «blocca a.it» dal segno lascia bloccato b.it, aggiunto d
   await expect.poll(blacklist, { timeout: 5_000 }).toEqual(['b.it']);
   await ripristina(app);
 });
+
+test('H — un valore che non si applica non chiede un OK a vuoto, e il perché lo legge l\'utente coi nomi della pagina', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const chat = await homeDi(app);
+  await configura(app);
+  // Un sì/no a una voce con tre stati: nessun riquadro, la riga dice perché, il modello riceve i valori ammessi.
+  await modelloFinto(app, [imposta('fingerprint', false), { text: 'Ecco.' }]);
+  await scrivi(chat, 'spegni l\'anti-fingerprinting');
+  await expect(chat.locator('.dash-bubble-filo', { hasText: 'Ecco.' })).toBeVisible({ timeout: 10_000 });
+  expect(await confirmState(chat)).toBeNull();
+  expect((await impostazioni(app)).security.fingerprint.mode).toBe('default');
+  expect((await app.evaluate(() => globalThis.__imp_tool)).pop()).toMatch(/Valori ammessi per fingerprint: "off"/);
+
+  // Un nome vago: il diario parla all'utente coi nomi delle voci, le chiavi vanno solo al modello.
+  await modelloFinto(app, [imposta('pubblicità', false, 'i2'), { text: 'Quale?' }]);
+  await scrivi(chat, 'spegni la pubblicità');
+  await expect(chat.locator('.dash-bubble-filo', { hasText: 'Quale?' })).toBeVisible({ timeout: 10_000 });
+  await chat.locator('.dash-activity-head').last().click();
+  const riga = chat.locator('.dash-activity').last();
+  await expect(riga).toContainText('Impostazione non applicata · «pubblicità» può voler dire più impostazioni: «salta le pubblicità dei video», «blocco di pubblicità e tracker»');
+  expect(await riga.innerText()).not.toMatch(/salta_pubblicita|chiave esatta/);
+  const esito = (await app.evaluate(() => globalThis.__imp_tool)).pop();
+  expect(esito).toContain('salta_pubblicita, blocco_pubblicita');
+  expect(esito).not.toContain('stia nel limite');
+  await ripristina(app);
+});

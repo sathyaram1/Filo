@@ -1974,10 +1974,11 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         const chiave = action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza;
         const valore = action.valore ?? action.value ?? action.valoreNuovo ?? action.val;
         const built = global.SN_PREF.buildPreferencePartial(chiave, valore);
-        if (!built) return { executed: false, kept: false };
         // Un rifiuto spiegato resta nel diario col suo perché: non è successo
         // niente, ma l'utente deve saperlo anche se il modello non lo dice.
-        if (built.rifiuto) return { executed: false, kept: false, output: { error: built.rifiuto, rifiuto: true } };
+        // `perModello` (le chiavi, i valori ammessi) va solo al modello.
+        const no = built ? (built.rifiuto ? built : null) : global.SN_PREF.spiegaNonValida(chiave, valore);
+        if (no) return { executed: false, kept: false, output: { error: no.rifiuto, rifiuto: true, ...(no.perModello ? { perModello: no.perModello } : {}) } };
         if (action._invariato) return { executed: false, kept: false, output: { error: action._invariato, invariato: true } };
         // Un elenco (siti bloccati, fidati…) si cambia a voci sull'elenco di adesso (#949).
         let partial = built.partial;
@@ -3231,9 +3232,13 @@ function toolResultText({ action, res, rendered }) {
     return `Niente da cambiare: ${res.output.error}. Dillo all'utente in una riga; non ripetere l'azione uguale.`;
   }
   if (res.output && res.output.rifiuto && res.output.error) {
-    const cosa = type === 'SALVA_LEZIONE' ? 'Lezione NON salvata' : 'Impostazione NON applicata';
-    return `${cosa}: ${res.output.error}. Non è stato salvato niente, nemmeno accorciato: `
-      + 'dillo all\'utente e, se vuole, riprova con un testo che stia nel limite.';
+    if (type === 'SALVA_LEZIONE') {
+      return `Lezione NON salvata: ${res.output.error}. Non è stato salvato niente, nemmeno accorciato: `
+        + 'dillo all\'utente e, se vuole, riprova con un testo che stia nel limite.';
+    }
+    const come = res.output.perModello || 'Dillo all\'utente e, se vuole, riprova con un valore ammesso.';
+    if (type === 'IMPOSTA_PREFERENZA') return `Impostazione NON applicata: ${res.output.error}. Non è stato salvato niente, nemmeno in parte. ${come}`;
+    return `Azione ${type} NON eseguita: ${res.output.error}. Non è cambiato niente: dillo all'utente in una riga.`;
   }
   // Tenuta ma non eseguita dal main: è un bottone in chat (evento, file,
   // pulizia schede, cancellazione archivio) che l'utente aziona da sé.

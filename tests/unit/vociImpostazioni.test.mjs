@@ -322,8 +322,12 @@ test('il blocco della pubblicità è nel manifesto delle capacità, e si dice ch
 test('una chiave detta a metà che indica più voci è un rifiuto con le chiavi, mai la prima che somiglia', () => {
   const r = P.buildPreferencePartial('pubblicità', false);
   assert.ok(r && r.rifiuto, '«pubblicità» ha cambiato una voce a caso');
-  assert.match(r.rifiuto, /salta_pubblicita/);
-  assert.match(r.rifiuto, /blocco_pubblicita/);
+  // L'utente legge i nomi della pagina; le chiavi vanno solo al modello.
+  assert.match(r.rifiuto, /salta le pubblicità dei video/);
+  assert.match(r.rifiuto, /blocco di pubblicità e tracker/);
+  assert.doesNotMatch(r.rifiuto, /_|chiave esatta/);
+  assert.match(r.perModello, /salta_pubblicita/);
+  assert.match(r.perModello, /blocco_pubblicita/);
   assert.ok(P.buildPreferencePartial('siti', false).rifiuto);
   // Scritta con l'accento o il trattino basso, o contenendo per intero una chiave, resta quella voce.
   assert.deepEqual(P.buildPreferencePartial('blocco_pubblicità', false).partial, { security: { adblock: { enabled: false } } });
@@ -342,4 +346,31 @@ test('le voci di lettura tornano automatiche con «predefinita», «di serie» o
     assert.equal(P.buildPreferencePartial('voce', v).partial.tts.voice, '', `voce di riserva «${v}»`);
   }
   assert.equal(P.buildPreferencePartial('voce', 'Microsoft Elsa').partial.tts.voice, 'Microsoft Elsa');
+});
+
+test('un nome comune a più voci decide con le altre parole: «siti fidati per i download» sono i programmi, «siti fidati» da solo è ambiguo', () => {
+  const lista = (k) => { const b = P.buildPreferencePartial(k, 'aggiungi a.it'); return b && b.elenco ? b.elenco.percorso : (b && b.rifiuto ? 'ambigua' : null); };
+  assert.equal(lista('siti fidati per i download'), 'security.downloads.trustedSites');
+  assert.equal(lista('siti fidati dei programmi'), 'security.downloads.trustedSites');
+  assert.equal(lista('siti fidati per i cookie'), 'security.cookies.trustedSites');
+  assert.equal(lista('siti fidati'), 'ambigua');
+  assert.equal(lista('siti fidati per gli eseguibili'), 'ambigua');
+  // Il nome che la lettura mostra vale come la chiave.
+  assert.deepEqual(P.buildPreferencePartial('blocco di pubblicità e tracker', false).partial, { security: { adblock: { enabled: false } } });
+  assert.equal(P.buildPreferencePartial('voce di riserva della lettura', 'Alice').partial.tts.voice, 'Alice');
+});
+
+test('una chiave o un valore che non si applicano hanno il loro perché, per l\'utente e per il modello', () => {
+  assert.equal(P.buildPreferencePartial('fingerprint', false), null);
+  const v = P.spiegaNonValida('fingerprint', false);
+  assert.match(v.rifiuto, /«false» non è un valore che «protezione dal fingerprinting» accetta/);
+  assert.match(v.perModello, /"off" \| "default" \| "privacy"/);
+  const k = P.spiegaNonValida('boh', 1);
+  assert.match(k.rifiuto, /«boh» non è un'impostazione/);
+  assert.match(k.perModello, /LEGGI_IMPOSTAZIONI/);
+});
+
+test('un\'ora di inattività si scrive al singolare', () => {
+  assert.equal(P.buildPreferencePartial('ore_inattivita', '1').label, 'Archivia dopo 1 ora di inattività');
+  assert.equal(P.buildPreferencePartial('ore_inattivita', '3').label, 'Archivia dopo 3 ore di inattività');
 });

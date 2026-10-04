@@ -6,7 +6,7 @@
 // esposta dalla pagina Preferenze, e deve restare testabile senza Electron.
 //
 // Espone SN_PREF = { buildPreferencePartial, parsePrefBool, PREF_SETTERS, lezioneDaAzione, applicaElenco,
-// righeDescrizione, setterDi }. Ogni setter dichiara `scrive` (i percorsi di cui è la chiave) e `aiuto` (la riga
+// righeDescrizione, setterDi, spiegaNonValida }. Ogni setter dichiara `scrive` (i percorsi di cui è la chiave) e `aiuto` (la riga
 // che la chat legge nella descrizione dello strumento): sentinella in tests/unit/vociImpostazioni.test.mjs.
 // `buildPreferencePartial(chiave, valore)` → { partial, label, level, risk },
 // { rifiuto } col perché, oppure null se chiave/valore non sono validi. Solo le
@@ -380,7 +380,7 @@
         if (!Number.isFinite(n)) return null;
         if (n <= 0) return { rifiuto: `le ore di inattività vanno da 1 a 168, e ${String(v).trim()} è fuori` };
         n = Math.min(168, Math.max(1, Math.round(n)));
-        return { partial: { autoArchive: { idleHours: n } }, label: `Archivia dopo ${n} ore di inattività` };
+        return { partial: { autoArchive: { idleHours: n } }, label: `Archivia dopo ${n} ${n === 1 ? 'ora' : 'ore'} di inattività` };
       },
     },
     {
@@ -947,7 +947,7 @@
         + 'e si apre senza domande.',
     }),
     elenco({
-      keys: ['siti_fidati_cookie', 'siti fidati', 'siti fidati cookie', 'resta connesso', 'siti dove resto connesso'],
+      keys: ['siti_fidati_cookie', 'siti fidati cookie', 'siti fidati per i cookie', 'resta connesso', 'siti dove resto connesso'],
       percorso: 'security.cookies.trustedSites',
       nome: 'Siti fidati dove resti connesso',
       aiuto: 'siti dove si resta connessi anche con la privacy massima dei cookie',
@@ -981,44 +981,112 @@
     });
   }
 
-  // Trova il setter giusto per una chiave (match esatto, poi fuzzy) e costruisce
-  // il partial. Ritorna { partial, label, level, risk, testo? }, { rifiuto } se il
-  // valore va rifiutato spiegando perché, o null se chiave/valore non validi.
-  function buildPreferencePartial(rawKey, rawVal) {
+  // Il nome con cui la pagina mostra la voce di un setter: è quello che legge l'utente, la chiave è per il modello.
+  function nomeVoce(setter) {
+    const K = global.SN_CAMBI;
+    const v = K && K.voce && Array.isArray(setter.scrive) ? K.voce(setter.scrive[0]) : null;
+    return v && v.nome ? v.nome : setter.keys[0].replace(/_/g, ' ');
+  }
+  const PAROLE_VUOTE = new Set(['per', 'dei', 'del', 'della', 'delle', 'degli', 'gli', 'con', 'nei', 'nel', 'nella', 'sui', 'sul', 'che', 'una', 'uno']);
+  // Quante delle parole dette oltre la chiave che ha vinto («download» in «siti fidati per i download») toccano
+  // questa voce, fra le sue chiavi e il nome con cui la pagina la mostra.
+  function quanteNeTocca(setter, parole, tolta) {
+    const testi = setter.keys.map(pianoChiave).filter((pk) => pk !== tolta).concat(pianoChiave(nomeVoce(setter)));
+    return parole.filter((w) => {
+      const r = w.length > 5 ? w.slice(0, w.length - 2) : w;
+      return testi.some((t) => t.includes(r));
+    }).length;
+  }
+  // Le voci che le parole toccano di più: una sola, o le pari merito.
+  function piuToccate(setters, parole, tolta) {
+    let punti = 0;
+    let scelte = [];
+    for (const s of setters) {
+      const n = quanteNeTocca(s, parole, tolta);
+      if (n > punti) { punti = n; scelte = [s]; } else if (n === punti && n) scelte.push(s);
+    }
+    return { punti, scelte };
+  }
+
+  // La voce indicata da una chiave: { setter }, { ambigui: [setter…] } se ne indica più d'una, o null.
+  // Esatta prima; detta a metà vale solo se indica una voce sola: «pubblicità» è sia il blocco sia il salto dei
+  // video. Vince la chiave più lunga contenuta in quella detta («adblocker» → adblock), ma se è il nome comune di
+  // più voci («siti fidati»: programmi e cookie) decidono le altre parole dette; se non bastano, è ambigua.
+  function risolviChiave(rawKey) {
     const key = String(rawKey == null ? '' : rawKey).trim().toLowerCase();
     if (!key) return null;
-    const withLevel = (setter) => {
-      const r = setter.build(rawVal);
-      if (r && r.rifiuto) return { rifiuto: r.rifiuto };
-      return r ? { ...r, level: setter.level || 1, risk: setter.risk || '' } : null;
-    };
-    for (const setter of PREF_SETTERS) {
-      if (setter.keys.includes(key)) return withLevel(setter);
-    }
+    const diretto = PREF_SETTERS.find((s) => s.keys.includes(key));
+    if (diretto) return { setter: diretto };
     const nk = pianoChiave(key);
     const esatto = PREF_SETTERS.find((s) => s.keys.some((k) => pianoChiave(k) === nk));
-    if (esatto) return withLevel(esatto);
-    // Una chiave detta a metà vale solo se indica una voce sola: «pubblicità» è sia il blocco sia il salto
-    // dei video, e scegliere la prima cambierebbe quella sbagliata. Vince la chiave più lunga contenuta in quella
-    // detta («adblocker» → adblock); se nessuna è contenuta, la detta deve stare dentro le chiavi di una voce sola.
+    if (esatto) return { setter: esatto };
+    // Il nome che la lettura delle impostazioni mostra («blocco di pubblicità e tracker») vale come la chiave.
+    const perNome = PREF_SETTERS.filter((s) => pianoChiave(nomeVoce(s)) === nk);
+    if (perNome.length === 1) return { setter: perNome[0] };
     let migliore = null;
-    let lunga = 0;
+    let vinta = '';
     let pari = false;
     for (const setter of PREF_SETTERS) {
       for (const k of setter.keys) {
         const pk = pianoChiave(k);
         if (!pk || !nk.includes(pk)) continue;
-        if (pk.length > lunga) { migliore = setter; lunga = pk.length; pari = false; } else if (pk.length === lunga && setter !== migliore) pari = true;
+        if (pk.length > vinta.length) { migliore = setter; vinta = pk; pari = false; } else if (pk.length === vinta.length && setter !== migliore) pari = true;
       }
     }
-    const candidati = migliore && !pari ? [migliore]
-      : (migliore ? PREF_SETTERS.filter((s) => s.keys.some((k) => pianoChiave(k).length === lunga && nk.includes(pianoChiave(k))))
-        : PREF_SETTERS.filter((s) => s.keys.some((k) => pianoChiave(k).includes(nk))));
-    if (candidati.length === 1) return withLevel(candidati[0]);
-    if (candidati.length > 1) {
-      return { rifiuto: `«${String(rawKey).trim().slice(0, 60)}» può voler dire più impostazioni (${candidati.map((s) => s.keys[0]).join(', ')}): usa la chiave esatta di quella che l'utente ha chiesto` };
+    if (migliore && !pari) {
+      const fratelli = PREF_SETTERS.filter((s) => s !== migliore && s.keys.some((k) => { const pk = pianoChiave(k); return pk !== vinta && pk.includes(vinta); }));
+      if (!fratelli.length) return { setter: migliore };
+      const resto = nk.replace(vinta, ' ').split(' ').filter((w) => w.length >= 3 && !PAROLE_VUOTE.has(w));
+      const tutti = [migliore, ...fratelli];
+      const { scelte } = piuToccate(tutti, resto, vinta);
+      return scelte.length === 1 ? { setter: scelte[0] } : { ambigui: scelte.length ? scelte : tutti };
     }
-    return null;
+    const candidati = migliore
+      ? PREF_SETTERS.filter((s) => s.keys.some((k) => pianoChiave(k).length === vinta.length && nk.includes(pianoChiave(k))))
+      : PREF_SETTERS.filter((s) => s.keys.some((k) => pianoChiave(k).includes(nk)));
+    if (candidati.length === 1) return { setter: candidati[0] };
+    if (candidati.length) return { ambigui: candidati };
+    // Nessuna chiave combacia per intero: decidono le parole («siti fidati dei programmi»), almeno due, e una voce sola.
+    const parole = nk.split(' ').filter((w) => w.length >= 3 && !PAROLE_VUOTE.has(w));
+    const { punti, scelte } = piuToccate(PREF_SETTERS, parole, '');
+    if (punti < 2) return null;
+    return scelte.length === 1 ? { setter: scelte[0] } : { ambigui: scelte };
+  }
+
+  // Trova il setter giusto per una chiave e costruisce il partial. Ritorna { partial, label, level, risk, testo? },
+  // { rifiuto, perModello? } se va rifiutato spiegando perché (`rifiuto` lo legge l'utente, `perModello` dice al
+  // modello come rimediare), o null se chiave/valore non validi (il perché lo dà spiegaNonValida).
+  function buildPreferencePartial(rawKey, rawVal) {
+    const r = risolviChiave(rawKey);
+    if (!r) return null;
+    if (r.ambigui) {
+      return {
+        rifiuto: `«${String(rawKey).trim().slice(0, 60)}» può voler dire più impostazioni: ${[...new Set(r.ambigui.map(nomeVoce))].map((n) => `«${n}»`).join(', ')}`,
+        perModello: `Le chiavi sono ${r.ambigui.map((s) => s.keys[0]).join(', ')}: usa quella che l'utente ha chiesto, o chiedigli quale.`,
+      };
+    }
+    const setter = r.setter;
+    const b = setter.build(rawVal);
+    if (b && b.rifiuto) return { rifiuto: b.rifiuto };
+    return b ? { ...b, level: setter.level || 1, risk: setter.risk || '' } : null;
+  }
+
+  // Perché una chiave o un valore non si applicano (buildPreferencePartial ha reso null): { rifiuto, perModello }.
+  function spiegaNonValida(rawKey, rawVal) {
+    const r = risolviChiave(rawKey);
+    const detta = String(rawKey == null ? '' : rawKey).trim().slice(0, 60);
+    if (!r || !r.setter) {
+      return {
+        rifiuto: `«${detta}» non è un'impostazione che Filo conosce`,
+        perModello: 'Usa una chiave dell\'elenco di IMPOSTA_PREFERENZA; per cercarla c\'è LEGGI_IMPOSTAZIONI.',
+      };
+    }
+    const aiuto = typeof r.setter.aiuto === 'function' ? r.setter.aiuto({}) : r.setter.aiuto;
+    const valore = typeof rawVal === 'string' ? rawVal.trim().slice(0, 60) : String(rawVal);
+    return {
+      rifiuto: `«${valore}» non è un valore che «${nomeVoce(r.setter)}» accetta`,
+      perModello: `Valori ammessi per ${r.setter.keys[0]}: ${aiuto || 'vedi l\'elenco di IMPOSTA_PREFERENZA'}. Riprova con uno di questi se è chiaro quale vuole l'utente, altrimenti chiediglielo.`,
+    };
   }
   function pianoChiave(s) {
     return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[_\-]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -1042,6 +1110,6 @@
 
   global.SN_PREF = {
     buildPreferencePartial, parsePrefBool, parseItalianNumber, PREF_SETTERS, lezioneDaAzione,
-    applicaElenco, righeDescrizione, setterDi, PARAMETRI_COLORE_TAB,
+    applicaElenco, righeDescrizione, setterDi, spiegaNonValida, PARAMETRI_COLORE_TAB,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
