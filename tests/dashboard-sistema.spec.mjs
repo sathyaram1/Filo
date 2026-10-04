@@ -496,13 +496,10 @@ test('con batteria, rete e Bluetooth nascoste la home non sveglia il lettore, ne
   await app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.veglia(0));
 });
 
-test('con tanti avvisi nella colonna destra ora e batteria restano dentro la finestra', async ({ app }) => {
+test('con la colonna destra più alta della finestra ora e batteria restano dentro la finestra', async ({ app }) => {
   await finto(app, PIENO);
-  await app.evaluate(async () => {
-    const M = globalThis.SN_FILO_MEMORY;
-    await M.addTimer({ label: 'Pasta', seconds: 600 });
-    for (let i = 0; i < 15; i++) await M.addNotification({ kind: 'info', text: `Avviso numero ${i} scaduto` });
-  });
+  // Gli avvisi stanno nella colonna sinistra (#870): a destra la colonna si allunga solo se la finestra è bassa.
+  await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows()[0].setSize(1280, 520); });
   const page = await newtab(app);
   await expect(voce(page, 'batteria')).toHaveText('42%', { timeout: 8_000 });
   const dentro = () => page.evaluate(() => {
@@ -510,10 +507,10 @@ test('con tanti avvisi nella colonna destra ora e batteria restano dentro la fin
     return r.top >= 0 && r.bottom <= window.innerHeight;
   });
   await expect.poll(dentro).toBe(true);
-  // Scorrendo la colonna fino in fondo la riga resta lì, sopra gli avvisi e non dietro.
-  await page.mouse.move(1000, 300);
+  // Scorrendo la colonna fino in fondo la riga resta lì, sopra le carte e non dietro.
+  await page.mouse.move(1100, 200);
   await page.mouse.wheel(0, 3000);
-  await expect.poll(() => page.evaluate(() => Math.max(document.documentElement.scrollTop, document.body.scrollTop))).toBeGreaterThan(0);
+  await expect.poll(() => page.evaluate(() => Math.max(document.documentElement.scrollTop, document.body.scrollTop, document.getElementById('right').scrollTop))).toBeGreaterThan(0);
   await expect.poll(dentro).toBe(true);
   const sopra = await page.evaluate(() => {
     const r = document.querySelector('#sistema .dash-sis-voce[data-voce="batteria"]').getBoundingClientRect();
