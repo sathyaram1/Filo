@@ -332,6 +332,18 @@
         return `Verificare cosa sa fare Filo${ids.length ? ` (${ids.join(', ')})` : ''}`;
       },
     },
+    LEGGI_IMPOSTAZIONI: {
+      // #949 — rilegge le impostazioni dell'utente, senza le chiavi: sola lettura, niente esce.
+      level: 1,
+      describe: (a) => {
+        const cerca = String((a && (a.cerca ?? a.query ?? a.chiave)) || '').replace(/\s+/g, ' ').trim();
+        return cerca ? `Leggere com'è impostato «${cerca.slice(0, 60)}»` : 'Leggere le impostazioni';
+      },
+      describeDone: (a) => {
+        const cerca = String((a && (a.cerca ?? a.query ?? a.chiave)) || '').replace(/\s+/g, ' ').trim();
+        return cerca ? `Letto com'è impostato «${cerca.slice(0, 60)}»` : 'Lette le impostazioni';
+      },
+    },
     CERCA_CHAT: {
       // #525 — Filo rilegge le conversazioni passate con lo stesso utente per
       // riprendere un discorso di ieri. Sola lettura di dati che sono già
