@@ -745,7 +745,7 @@
           // Locale: arriva molto prima della descrizione, e si mostra appena c'è.
           leggiOrigine(dataUrl).then((p) => {
             if (cancelled || !p || !p.ok || !p.frase) return;
-            origine.textContent = p.frase;
+            testoChiuso(origine, p.frase);
             origine.title = I18n.t(p.firmatario === 'non_verificato' ? 'menu_origin_hint_unverified' : 'menu_origin_hint');
             origine.classList.toggle('sn-menu-origine-debole', !p.forte);
             origine.hidden = false;
