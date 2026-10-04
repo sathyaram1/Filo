@@ -31,7 +31,8 @@ const primaRiga = (s) => String(s || '').split(/\r?\n/).find((r) => r.trim()) ||
 export function chiaveTest(r, root) {
   let file = r && r.file ? perLaRiga(String(r.file), root) : '?';
   // Fuori dalla cartella (forma corta e lunga dello stesso percorso su Windows): conta il pezzo da tests/ in poi.
-  if (isAbsolute(file)) {
+  // win32: un percorso di Windows resta assoluto anche letto da Linux (lo prova lo unit, che gira ovunque).
+  if (isAbsolute(file) || win32.isAbsolute(file)) {
     const barre = file.replace(/\\/g, '/');
     const i = barre.lastIndexOf('/tests/');
     if (i >= 0) file = barre.slice(i + 1);
