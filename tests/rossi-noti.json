@@ -25,12 +25,6 @@
         "feedback": "#563"
       },
       {
-        "spec": "tests/net-error-page",
-        "caso": "renderer crashato: pagina d'errore \"scheda bloccata\" invece del bianco",
-        "perche": "la prova ammazza il renderer della scheda e aspetta la pagina d'errore interna, che sul runner di GitHub non compare entro 20 secondi. Solo lì: nel contenitore delle routine (Linux, xvfb, ELECTRON_DISABLE_SANDBOX=1) i tre casi dello spec sono VERDI, misurato il 2026-09-26 lavorando il #708, e su Windows la prova è verde. Dopo ognuno dei tre tentativi il worker non riesce a chiudere l'app entro 60 secondi («Worker teardown timeout», tre volte, sempre con questo caso come ultimo): l'app resta appesa dopo il crash forzato, ed è di questo strascico che parlano i tre errori fuori dai casi delle corse rosse. Ipotesi non confermata: senza sandbox la view ricreata dopo il crash (src/main/tabs.js, render-process-gone → _recreateView) muore di nuovo e l'anti-loop a 2 secondi ferma i tentativi, lasciando la scheda bianca. Non riproducibile fuori dal runner: serve leggere lo stderr dell'app lì, poi correggere e togliere la voce.",
-        "feedback": "#708"
-      },
-      {
         "spec": "tests/verifica/locale-pagina-owner-crediti/giro1-attriti",
         "caso": [
           "un numero scritto e non salvato si vede che non è in vigore",
