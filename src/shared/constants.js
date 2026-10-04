@@ -2333,6 +2333,8 @@
     // Carta con l'anteprima della scheda al passaggio del puntatore sulla barra (#430). size: 'piccola' |
     // 'media' | 'grande' (le larghezze stanno in src/main/popup-anteprima.js).
     tabPreview: { enabled: true, size: 'media' },
+    // #534 — Filo legge il testo delle schede aperte e le guida (posta compresa). Spento, quelle azioni non esistono.
+    schedeAperte: { leggere: true },
     // #950 — nome sensato da solo agli scaricamenti col nome che non dice niente. Spento: il contenuto del file
     // andrebbe a un modello senza che l'utente l'abbia chiesto per quel file.
     nomiSensati: { scaricamenti: false },

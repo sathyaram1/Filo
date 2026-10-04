@@ -1021,6 +1021,21 @@
         return { partial: { dictation: { cancelSec } }, label: `Tempo per annullare l'invio vocale → ${String(cancelSec).replace('.', ',')} s` };
       },
     },
+    {
+      keys: ['leggere_schede', 'leggere le schede', 'leggere le schede aperte', 'leggi le schede', 'lettura delle schede',
+        'lettura schede', 'schede aperte', 'filo può leggere le schede aperte', 'leggere la posta dalla scheda'],
+      // Da acceso Filo legge le pagine aperte e ci scrive dentro (bozze comprese): conferma in entrambi i versi.
+      level: 2,
+      risk: 'Da accesa, Filo può leggere il testo delle schede che hai aperto (la posta di Gmail compresa, dove sei '
+        + 'già entrato tu), aprirne gli elementi e scrivere nei campi, per esempio una bozza che poi invii tu. '
+        + 'Non preme mai Invia, Paga o Elimina. Quello che legge da una pagina lo tratta come scritto da altri. '
+        + 'Da spenta, Filo non legge nessuna scheda.',
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { schedeAperte: { leggere: b } }, label: `Lettura delle schede aperte → ${b ? 'attiva' : 'spenta'}` };
+      },
+    },
   ];
 
   // Le righe «chiave: valori» della descrizione di IMPOSTA_PREFERENZA: escono da qui, dove sta il setter,
