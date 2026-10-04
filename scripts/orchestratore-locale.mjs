@@ -227,6 +227,7 @@ function depVere(P, opz, log) {
     store: negozio(join(P.note, 'stato.json')),
     esegui,
     async claude({ ruolo, prompt, cwd, addDirs, nome }) {
+      for (const d of addDirs || []) mkdirSync(d, { recursive: true });
       const r = await esegui(bin, argomentiClaude({ ...ruoli[ruolo], nome, addDirs, budget: opz.budgetIstanza }), {
         cwd, input: prompt, env, timeoutMs: opz.oreIstanza * 60 * 60_000,
       });

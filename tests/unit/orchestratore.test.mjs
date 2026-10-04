@@ -471,6 +471,22 @@ test('prompt del verificatore: niente report del lavoratore, la parte server se 
   assert.match(l, /git merge origin\/main/);
 });
 
+test('il verificatore ha una cartella sua: non riceve quella delle note e delle risposte di chi ha lavorato', async () => {
+  const b = banco({ verdetti: ['pass'] });
+  const dirs = [];
+  const vera = b.dep.claude;
+  b.dep.claude = (a) => { dirs.push({ ruolo: a.ruolo, addDirs: a.addDirs }); return vera(a); };
+  await b.motore.avvia();
+  const lav = b.prompt.find((x) => x.ruolo === 'lavoratore').testo;
+  const ver = b.prompt.find((x) => x.ruolo === 'verificatore').testo;
+  const notaLavoratore = /`([^`]*note-7\.md)`/.exec(lav)[1];
+  assert.ok(!ver.includes(notaLavoratore), 'il verificatore non scrive nel file di note del lavoratore');
+  assert.match(ver, /Cartella temporanea[^\n]*`\/n\/verifica-7`/);
+  assert.match(ver, /Non leggere le note/);
+  assert.deepEqual(dirs.find((d) => d.ruolo === 'verificatore').addDirs, ['/n/verifica-7', '/s']);
+  assert.deepEqual(dirs.find((d) => d.ruolo === 'lavoratore').addDirs, ['/n', '/s']);
+});
+
 // ─── La riga di comando ─────────────────────────────────────────────────────
 
 test('modello e sforzo dei ruoli vengono dagli agenti delle routine', () => {

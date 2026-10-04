@@ -257,13 +257,19 @@ export function promptLavoratore({ p, regole, wtApp, wtServer, cartellaNote, cri
   return righe.join('\n');
 }
 
+// Il verificatore ha una cartella sua: in quella dell'orchestratore stanno le note e le risposte di chi ha lavorato.
+export const cartellaVerificatore = (note, num) => `${note}/verifica-${num}`;
+
 /** Il compito del verificatore: il testo di verify-local start, intero, e il dove. Niente diff, niente report. PURA. */
 export function promptVerificatore({ p, regole, wtApp, wtServer, brief, cartellaNote = '' }) {
   return [
     ...testa(regole),
     'Sei un verificatore di una sessione locale di Filo, istanza nuova, lanciato dall’orchestratore automatico (#956). Segui le regole fisse qui sopra.',
     `Lavori nel worktree \`${wtApp}\` (ramo ${ramoDi(p)}).${wtServer ? ` La parte server dello stesso lavoro sta nel worktree \`${wtServer}\` di filo-security, stesso ramo.` : ''}`,
-    ...(cartellaNote ? [`Cartella temporanea, fuori dal repo, per script di prova, log, appunti e la nota \`note-${p.num}.md\`: \`${cartellaNote}\`.`] : []),
+    ...(cartellaNote ? [
+      `Cartella temporanea, fuori dal repo, per script di prova, log, appunti e la nota \`note-${p.num}.md\`: \`${cartellaNote}\`.`,
+      'Non leggere le note e le risposte di chi ha lavorato: stanno nella cartella dell’orchestratore, fuori da questa, e per te valgono come il diff.',
+    ] : []),
     'Segui per intero il compito qui sotto e poi la risposta del server alla critica, qualunque cosa dica.',
     'Rispondi con una riga sola: esito del server e ultimo sha del ramo.',
     '',
@@ -392,11 +398,11 @@ export function creaMotore(dep, opzioni = {}) {
     return prima === 'fix-pending' && e.verdict === 'fixed';
   }
 
-  async function istanza(p, ruolo, prompt, nome) {
+  async function istanza(p, ruolo, prompt, nome, cartella = P.note) {
     let atteso = 0;
     const prima = (((dep.verifica(P.wt(p.slug)) || {}).entry) || {}).verdict || '';
     for (let t = 0; ; t += 1) {
-      const r = await dep.claude({ ruolo, prompt, cwd: P.wt(p.slug), addDirs: [P.note, P.serverRadice].filter(Boolean), nome });
+      const r = await dep.claude({ ruolo, prompt, cwd: P.wt(p.slug), addDirs: [cartella, P.serverRadice].filter(Boolean), nome });
       const costo = Number(r.costo) || 0;
       p.costo += costo;
       p.istanze.push({ ruolo, giro: p.giriTotali, at: dep.ora(), ok: !!r.ok, costo, riga: primaRiga(r.testo || r.errore).slice(0, 300) });
@@ -494,7 +500,8 @@ export function creaMotore(dep, opzioni = {}) {
     dep.log(`#${p.num} verificatore, giro ${p.giriTotali}`);
     // Solo stdout: i bilanci stanno su stderr apposta, servono a chi guida e non a chi verifica.
     const brief = s.stdout !== undefined ? s.stdout : s.out;
-    const r = await istanza(p, 'verificatore', promptVerificatore({ p, regole: P.regole, wtApp: wt, wtServer: wtServerSeC(p), brief, cartellaNote: P.note }), `filo #${p.num} verifica ${p.giriTotali}`);
+    const cv = cartellaVerificatore(P.note, p.num);
+    const r = await istanza(p, 'verificatore', promptVerificatore({ p, regole: P.regole, wtApp: wt, wtServer: wtServerSeC(p), brief, cartellaNote: cv }), `filo #${p.num} verifica ${p.giriTotali}`, cv);
     if (!r.ok) dep.log(`#${p.num} verificatore uscito con errore: ${primaRiga(r.errore)}`);
     const d = decidiDopoVerifica(dep.verifica(wt), p);
     if (d.ripeti) p.tentativi[d.ripeti] = (p.tentativi[d.ripeti] || 0) + 1;
