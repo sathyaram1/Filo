@@ -332,6 +332,43 @@ test('un file dell’SDK ufficiale cambiato dopo la firma lo dice', () => {
   }
 });
 
+// AVIF e HEIC: le credenziali stanno in un box uuid con intestazione propria, e il legame
+// coi byte nella forma «bmff», che dalla versione 2 conta anche le posizioni dei box (#946, giro 5).
+test('AVIF e HEIC firmati dall’SDK ufficiale: la riga c’è, completa, e un byte cambiato lo dice', () => {
+  for (const nome of ['c2pa-ufficiale-ai.avif', 'c2pa-ufficiale-ai.heic']) {
+    const res = P.analizza(ufficiale(nome));
+    assert.deepEqual(res.avvisi, [], nome);
+    assert.equal(P.frase(res),
+      'Generata con l’AI secondo credenziali firmate da C2PA Test Signing Cert. Firma valida, firmatario non verificato.', nome);
+    const b = Buffer.from(ufficiale(nome));
+    b[b.length - 5] ^= 0x5a;
+    assert.match(P.frase(P.analizza(b)), /cambiato dopo la firma/, nome);
+  }
+});
+
+test('nel legame «bmff» dalla versione 2 le posizioni dei box contano', () => {
+  const b = ufficiale('c2pa-ufficiale-ai.avif');
+  const cerca = (lista) => {
+    for (const x of lista) {
+      if (/^c2pa\.hash\.bmff/.test(x.etichetta)) return x;
+      const dentro = cerca(x.figli);
+      if (dentro) return dentro;
+    }
+    return null;
+  };
+  const box = cerca(P._interni.leggiContenitore(b).c2pa);
+  const dati = P._interni.cborDecode(box.figli.find((f) => f.tipo !== 'jumd').dati);
+  assert.equal(P._interni.fileIntattoBmff({ dati, versione: 3 }, b), true);
+  assert.equal(P._interni.fileIntattoBmff({ dati, versione: 1 }, b), false);
+});
+
+test('AVIF e HEIC con la sola etichetta XMP: dichiarazione del file', () => {
+  for (const nome of ['xmp-ai.avif', 'xmp-ai.heic']) {
+    assert.equal(P.frase(P.analizza(ufficiale(nome))),
+      'Generata con l’AI secondo il file stesso (Midjourney), senza firma che lo confermi.', nome);
+  }
+});
+
 test('generata con l’AI e poi ritagliata: l’origine si trova nel manifesto del passo prima', () => {
   const r = P.analizza(ufficiale('c2pa-ufficiale-ritagliata.jpg'));
   assert.equal(r.origine, 'ai');

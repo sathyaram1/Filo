@@ -959,7 +959,7 @@
       }
     }
     const store = perEtichetta(manifesto.figli, 'c2pa.assertions');
-    const out = { origine: null, generatore: '', coperte: 0, scoperte: 0, hashDati: null, ingredienti: [] };
+    const out = { origine: null, generatore: '', coperte: 0, scoperte: 0, hashDati: null, hashBmff: null, ingredienti: [] };
     if (!store) return out;
     for (const box of store.figli) {
       if (box.tipo !== 'jumb' || !box.etichetta) continue;
@@ -1141,7 +1141,7 @@
     }
 
     const letto = leggiManifesto(manifesto, claim);
-    const intatto = fileIntatto(letto.hashDati, byteFile);
+    const intatto = letto.hashDati ? fileIntatto(letto.hashDati, byteFile) : fileIntattoBmff(letto.hashBmff, byteFile);
     if (intatto === false) avvisi.push('file_cambiato');
     if (intatto === null) avvisi.push('legame_assente');
     if (letto.scoperte) avvisi.push('asserzioni_scoperte');
@@ -1299,6 +1299,6 @@
 
   global.SN_PROVENIENZA = {
     analizza, frase, notaPerModello, ancoreDaPem,
-    _interni: { chiavePubblica, leggiMarca, marcaValida, pulisci, nomeLeggibile, cborDecode: cborTesta, jumbfBoxes, leggiContenitore, leggiXmp, codiceSorgente, verificaCose, fileIntatto, statoFirmatario },
+    _interni: { chiavePubblica, leggiMarca, marcaValida, pulisci, nomeLeggibile, cborDecode: cborTesta, jumbfBoxes, leggiContenitore, leggiXmp, codiceSorgente, verificaCose, fileIntatto, fileIntattoBmff, statoFirmatario },
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
