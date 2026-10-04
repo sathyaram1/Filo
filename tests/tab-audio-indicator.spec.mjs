@@ -191,6 +191,19 @@ test('ogni controllo dentro la scheda ha il suo suggerimento di Filo, non il tit
       .toEqual({ carta: titoli[id], suggerimento: null });
   };
 
+  // La carta sparisce qualche fotogramma dopo la richiesta (si svuota prima): il suggerimento che compariva intanto le
+  // stava sopra, e il confronto dei riquadri lo vedeva solo a volte (#944). Il main lo dice nell'istante in cui lo mostra.
+  await app.evaluate(({ app: electronApp, BrowserWindow }) => {
+    globalThis.__sopraLaCarta = 0;
+    const segui = (w) => w.on('show', () => {
+      if (w.isDestroyed() || !w.webContents.getURL().startsWith('data:')) return;
+      if (BrowserWindow.getAllWindows().some((x) => !x.isDestroyed() && x.isVisible()
+        && x.webContents.getURL() === 'filo://shell/anteprima.html')) globalThis.__sopraLaCarta++;
+    });
+    BrowserWindow.getAllWindows().forEach(segui);
+    electronApp.on('browser-window-created', (_e, w) => segui(w));
+  });
+
   const ctrlW = await shell.evaluate(() => (window.SN_TASTI ? window.SN_TASTI.etichetta('Ctrl+W') : 'Ctrl+W'));
   const casi = [
     [suona, '.audio-ind', 'Silenzia'],
