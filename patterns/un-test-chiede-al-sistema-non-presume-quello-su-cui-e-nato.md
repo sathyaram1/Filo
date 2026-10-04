@@ -50,7 +50,10 @@ cade nel vuoto e la finestra resta com'era. La prova chiede `isMinimized()`; se 
 sistema non l'ha ridotta, finge la sua risposta (`isMinimized` vero ed evento
 `minimize`, poi il contrario) e prova lo stesso cammino del codice. Sostituire la
 riduzione con un'altra uscita dalla vista lascerebbe la riduzione provata solo sul
-Windows dell'owner. Riferimento: `tests/manage-ricevuti-vivi.spec.mjs`.
+Windows dell'owner. Lo fa `riduciAIcona`/`rialza` (`tests/helpers/riduzione.mjs`), e
+nessuno spec chiama `minimize()` da solo: la home (#873) era nata due giorni dopo questa
+regola nascondendo la finestra al posto di ridurla (#810.10). Sentinella:
+`tests/unit/riduzioneNeiTest.test.mjs`.
 
 ## Il contenitore che disegna adagio (#592.11)
 
