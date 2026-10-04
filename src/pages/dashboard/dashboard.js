@@ -833,9 +833,16 @@
     IMPOSTA_PREFERENZA: 'Cambio un\'impostazione…',
     IMPOSTA_ESTETICA: 'Cambio l\'aspetto…',
     INVIA_FEEDBACK: 'Preparo una segnalazione…',
+    RINOMINA_FILE: 'Leggo i file per dar loro un nome…',
   };
   function startLabelFor(type) {
     return START_LABELS[String(type || '').toUpperCase()] || 'Eseguo un\'azione…';
+  }
+  // Un'azione che lavora su più cose dice quante ne ha fatte: «3 di 40» al posto di un'attesa al buio.
+  function progressLabelFor(type, fatti, totali) {
+    const base = startLabelFor(type);
+    const n = Number(totali);
+    return n > 1 ? `${base} ${Math.min(Number(fatti) || 0, n)} di ${n}` : base;
   }
 
   // Un singolo turno del modello: bolla "sta pensando" + reasoning live, invio
@@ -924,6 +931,8 @@
         if (!data || data.reqId !== reasoningReqId) return;
         if (data.kind === 'start') {
           pending.working(startLabelFor(data.type));
+        } else if (data.kind === 'progress') {
+          pending.working(progressLabelFor(data.type, data.fatti, data.totali));
         } else if (data.kind === 'done') {
           const a = data.action;
           if (a && Array.isArray(a._cambi)) Cambi.segna(pending.el, a._cambi);

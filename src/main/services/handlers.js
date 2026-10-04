@@ -1377,7 +1377,7 @@ function idDelCambio(action) {
 // #950 — quanti file per volta: ognuno costa una lettura e una chiamata al modello, e l'elenco va letto prima
 // dell'OK. Oltre, il popup dice quanti ne restano.
 const LOTTO_RINOMINA = 40;
-async function preparaRinomina(action, sender) {
+async function preparaRinomina(action, sender, avanzamento = null) {
   const NF = globalThis.SN_NOMI_FILE;
   const Nomi = require('./nomiFile');
   const DR = require('./documentRead');
@@ -1450,12 +1450,17 @@ async function preparaRinomina(action, sender) {
   // In parallelo, ma pochi alla volta: una cartella di scansioni non deve diventare quaranta chiamate insieme.
   const esiti = new Array(candidati.length);
   let prossimo = 0;
+  let letti = 0;
+  const segna = () => { try { if (avanzamento) avanzamento(letti, candidati.length); } catch (_) {} };
+  segna();
   const lavora = async () => {
     while (prossimo < candidati.length) {
       const k = prossimo++;
       try { esiti[k] = await unaProposta(candidati[k]); } catch (_) {
         esiti[k] = { saltato: { nome: nodePath.basename(candidati[k]), perche: 'non sono riuscito a leggerlo' } };
       }
+      letti += 1;
+      segna();
     }
   };
   await Promise.all(Array.from({ length: Math.min(4, candidati.length) }, lavora));
@@ -1488,7 +1493,7 @@ async function executeFiloAction(action, opzioni = {}) {
   return res;
 }
 
-async function eseguiAzioneFilo(action, { confirmed = false, sender = null, contesto = null, assistente = false, parole = '' } = {}) {
+async function eseguiAzioneFilo(action, { confirmed = false, sender = null, contesto = null, assistente = false, parole = '', avanzamento = null } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
   // Da un sito (anche via una chat aperta da lì) passano solo le azioni della
@@ -1616,7 +1621,7 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
   // #950 — l'elenco vecchio → nuovo lo prepara il main leggendo i file, prima della conferma: il popup mostra
   // i nomi veri, e all'OK si rinomina quello che il popup ha mostrato (bersagliMostrati).
   if (type === 'RINOMINA_FILE' && !confirmed) {
-    const prep = await preparaRinomina(action, sender);
+    const prep = await preparaRinomina(action, sender, avanzamento);
     action._proposte = prep.proposte;
     action._saltati = prep.saltati;
     action._oltre = prep.oltre;
@@ -3459,7 +3464,13 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       const esiti = new Map();
       const avvia = (a) => (a._argsError
         ? Promise.resolve({ executed: false, kept: false, rejected: true, error: a._argsError })
-        : executeFiloAction(a, { sender, contesto: azioniViste, parole: paroleUtente }));
+        : executeFiloAction(a, {
+          sender, contesto: azioniViste, parole: paroleUtente,
+          // Le azioni lunghe dicono a che punto sono: la riga d'attesa le conta.
+          avanzamento: canPush ? (fatti, totali) => push('filo:action', {
+            kind: 'progress', type: String(a.type || '').toUpperCase(), callId: a._callId || '', fatti, totali,
+          }) : null,
+        }));
       const apertura = (a) => !!a && !a._argsError && String(a.type || '').toUpperCase() === 'NAVIGA';
       for (let i = 0; i < actions.length; i++) {
         const a = actions[i];

@@ -483,3 +483,51 @@ test('pannello degli scaricamenti in alto: tasto destro → «Dai un nome sensat
     await expect(shell.locator('#dl-panel .dl-row', { hasText: 'Nome di prima rimesso: scan_00231.pdf' })).toBeVisible({ timeout: 10000 });
   } finally { await chiudi(); }
 });
+
+test('in chat, mentre Filo legge un lotto di file: la riga d\'attesa dice che legge i file e quanti ne ha letti', async ({ app }) => {
+  test.setTimeout(90_000);
+  const dir = cartellaInCasa('filo-nomi-attesa-');
+  for (let i = 1; i <= 3; i++) writeFileSync(join(dir, `scan_0023${i}.pdf`), pdfConTesto([`Documento numero ${i}`, 'Prova attesa']));
+  try {
+    await modelloFinto(app, [
+      { toolCalls: [{ id: 'r1', name: 'RINOMINA_FILE', arguments: JSON.stringify({ cartella: dir }) }] },
+      { text: 'Ecco i nomi.' },
+    ]);
+    await modelloDeiNomi(app, { ritardoMs: 2500 });
+    const page = await home(app);
+    await chiedi(page, 'rinomina i file di quella cartella');
+    await expect(page.getByText(/Leggo i file per dar loro un nome… \d di 3/)).toBeVisible({ timeout: 10000 });
+    expect(await confirmText(page)).toBe('');
+    expect(await page.locator('body').innerText()).not.toMatch(/Eseguo un.azione/);
+    await expect.poll(() => confirmText(page), { timeout: 30000 }).toContain('Documento numero 1 Prova attesa.pdf');
+  } finally {
+    await ripristina(app);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('col nome automatico acceso, il nome dato a mano mentre Filo legge ancora il file resta quello scelto', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  await modelloDeiNomi(app, { ritardoMs: 4000 });
+  const pref = await openTab('filo://preferences/preferences.html');
+  await pref.locator('#nomiSensatiScaricamenti').check();
+  await expect.poll(() => app.evaluate(async () => {
+    const s = await globalThis.SN_STORAGE.getSettings();
+    return !!(s.nomiSensati && s.nomiSensati.scaricamenti);
+  })).toBe(true);
+  const { rec, chiudi } = await scarica('scan_00555.pdf', BOLLETTA, { shell, openTab, testServer });
+  try {
+    const dl = await openTab('filo://downloads/downloads.html');
+    const voce = dl.locator('.dl-item', { has: dl.locator('.dl-name', { hasText: 'scan_00555.pdf' }) });
+    await voce.click({ button: 'right' });
+    await dl.locator('.dl-ctxmenu .sn-select-option', { hasText: 'Dai un nome sensato' }).click();
+    const campo = dl.locator('.sn-rinomina-campo');
+    await campo.fill('Luce marzo scelto da me');
+    await campo.press('Enter');
+    await expect(dl.locator('.sn-rinomina-esito-testo')).toHaveText('Rinominato: Luce marzo scelto da me.pdf', { timeout: 15000 });
+    // Passato il tempo della lettura automatica, sul disco c'è ancora il nome scelto.
+    await dl.waitForTimeout(6000);
+    expect(existsSync(join(rec.savePath, '..', 'Luce marzo scelto da me.pdf'))).toBe(true);
+    expect(existsSync(join(rec.savePath, '..', NOME_NUOVO))).toBe(false);
+  } finally { await chiudi(); }
+});
