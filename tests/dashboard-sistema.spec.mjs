@@ -278,3 +278,47 @@ test('il lettore vero di Linux: quello che il contenitore non ha non compare', a
     else await expect(voce(page, v)).toBeHidden();
   }
 });
+
+test('staccando il caricatore a batteria piena, o ferma al limite di carica, la voce cambia icona', async ({ app }) => {
+  await finto(app, { ...PIENO, batteria: { livello: 100, inCarica: false, collegata: true } });
+  const page = await newtab(app);
+  const svg = () => voce(page, 'batteria').locator('.dash-sis-icona').innerHTML();
+  await expect(voce(page, 'batteria')).toHaveAttribute('title', 'Collegata', { timeout: 8_000 });
+  const collegata = await svg();
+  await cambia(app, { ...PIENO, batteria: { livello: 100, inCarica: false, collegata: false } });
+  await app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.leggiOra());
+  await expect(voce(page, 'batteria')).toHaveAttribute('title', 'A batteria');
+  expect(await svg()).not.toBe(collegata);
+  await cambia(app, { ...PIENO, batteria: { livello: 80, inCarica: false, collegata: true } });
+  await app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.leggiOra());
+  await expect(voce(page, 'batteria')).toHaveAttribute('title', 'Collegata');
+  expect(await svg()).toBe(collegata);
+});
+
+test('con la home dietro un\'altra scheda il lettore si addormenta, e riparte quando la home torna davanti', async ({ app, openTab, testServer }) => {
+  await finto(app, PIENO);
+  await app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.veglia(2_000));
+  const page = await newtab(app);
+  const attivo = () => app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.attivo());
+  const giro = await app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.GIRO_MS);
+  await expect.poll(attivo, { timeout: 8_000 }).toBe(true);
+  await openTab(testServer.html('<h1>un sito qualunque</h1>'));
+  // La home dietro continua a chiedere (per Chromium resta visibile), ma non tiene sveglio il lettore.
+  await page.evaluate(async () => {
+    for (let i = 0; i < 3; i++) {
+      await window.filo.message({ type: window.SN_MSG.MSG.SISTEMA_STATO });
+      await new Promise((r) => setTimeout(r, 1_000));
+    }
+  });
+  await expect.poll(attivo, { timeout: 2_000 + giro * 2 + 3_000 }).toBe(false);
+  // Il caricatore si stacca mentre la home è dietro: tornando davanti la vede senza aspettare il suo richiamo.
+  await cambia(app, { ...PIENO, batteria: { livello: 41, inCarica: false, collegata: false } });
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    const home = w._filoTabs.tabs.find((t) => t.view.webContents.getURL().startsWith('filo://newtab'));
+    w._filoTabs.activate(home.id);
+  });
+  await expect.poll(attivo, { timeout: 2_000 }).toBe(true);
+  await expect(voce(page, 'batteria')).toHaveText('41%', { timeout: 3_000 });
+  await app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.veglia(0));
+});
