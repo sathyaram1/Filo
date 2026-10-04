@@ -90,3 +90,21 @@ test('i pacchetti Mac e Linux ricostruiti dopo hanno la loro esecuzione, e il do
   const aParte = /ripubblica_mac/.test(rel) && /Aggiunto il pacchetto Mac a/.test(rel);
   legame(aParte, sicurezza, '«Aggiunto il pacchetto Mac a v0.2.231»', 'esecuzione a parte per i pacchetti ricostruiti');
 });
+
+test('lavoro locale e pre-approvazione fondono senza il clic e partono dal terminale, e il documento sulla sicurezza lo dice', () => {
+  const preapprova = /--preapprova/.test(leggi('scripts', 'owner-feedback.mjs'));
+  const localeSaltaL5 = /L5 saltato/.test(leggi('scripts', 'lib', 'owner-merge.mjs'));
+  legame(preapprova || localeSaltaL5, sicurezza, 'Due strade però non passano da quel clic', 'fusioni senza clic');
+  legame(preapprova || localeSaltaL5, sicurezza, 'Due strade saltano il mio clic', 'fusioni senza clic fra i punti deboli');
+  legame(false, sicurezza, 'Nessuno strumento da terminale lo fa', 'approvazione solo dall\'app');
+  legame(localeSaltaL5, sicurezza, '**Il lavoro locale.**', 'il lavoro locale salta i controlli deterministici');
+  legame(preapprova, sicurezza, '**Il segno «fondi senza chiedermelo».**', 'la pre-approvazione da terminale');
+});
+
+test('il tasto destro su un link chiede da solo titolo e descrizione al sito e spiega il link con un modello, e il documento sulla privacy lo dice', () => {
+  const azioni = leggi('src', 'content', 'actions.js');
+  const daSolo = /onMount[\s\S]{0,1500}fetch_link_meta/.test(azioni);
+  legame(daSolo, privacy, 'Quando fai tasto destro su un link, Filo chiede subito a quel sito', 'il sito del link contattato al tasto destro');
+  legame(false, privacy, 'Quando chiedi cos\'è un link', 'il sito del link contattato solo a richiesta');
+  legame(/EXPLAIN_LINK/.test(azioni), privacy, '**I link.** Quando fai tasto destro su un link', 'il link spiegato da un modello');
+});
