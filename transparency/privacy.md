@@ -8,7 +8,7 @@ order: 2
 
 Filo legge molto: le pagine che visiti, quello che scrivi, le tue memorie, i file che gli chiedi di aprire, quello che stampa il terminale. Un programma così deve dire con precisione dove va a finire tutto questo. Questo documento lo fa, per intero, e descrive Filo com'è oggi: dove la realtà è peggio di come la vorrei, lo trovi scritto in fondo, fra i punti deboli. Se qui manca qualcosa che Filo fa, è un errore del documento, e puoi segnalarlo come qualunque altro difetto.
 
-**In breve.** Quasi tutto resta sul tuo computer. Esce quello che serve a un modello per rispondere, quello che scegli di mandare tu (i feedback, cifrati) e i dati di servizio dei crediti, che non contengono testi. Alcuni servizi esterni ricevono pezzi della tua navigazione: il più importante è Google Safe Browsing, che oggi riceve l'indirizzo delle pagine che apri. Non uso servizi di analisi o di pubblicità. Il resto del documento è il dettaglio.
+**In breve.** Quasi tutto resta sul tuo computer. Esce quello che serve a un modello per rispondere, quello che scegli di mandare tu (i feedback, cifrati) e i dati di servizio dei crediti, che non contengono testi. Se fai il login con Google, al server arrivano anche la tua email, il tuo nome e quanto usi ogni funzione. Alcuni servizi esterni ricevono pezzi della tua navigazione: il più importante è Google Safe Browsing, che oggi riceve l'indirizzo delle pagine che apri. Non uso servizi di analisi o di pubblicità. Il resto del documento è il dettaglio.
 
 ## Due regole
 
@@ -82,11 +82,13 @@ Lo pseudonimo è stabile, lo stesso per sempre per la stessa installazione. Lo t
 
 Per i crediti non serve il login: l'identità è quella dell'installazione, un account anonimo che Filo crea da solo. Se poi fai il login con Google, Filo collega l'account a quella stessa identità, così crediti e chiave restano tuoi; se il tuo account Google è già legato a un altro computer, le due identità restano separate.
 
+**Con il login Google c'è un secondo documento.** Viene da un vecchio conteggio dei crediti, ancora acceso: è legato al tuo account Google e Filo lo aggiorna sul server a ogni chiamata ai modelli e quando apri la pagina Crediti. Dentro ci sono la tua email e il tuo nome, il saldo di quel conteggio, quante chiamate e quanti crediti per ogni funzione (chat, traduzione, correttore...), il costo in euro e quali tue segnalazioni sono state premiate. Il testo delle richieste non c'è. Si aggiorna anche se usi una tua chiave OpenRouter. Lo leggiamo solo tu e io; senza login non esiste. È un punto debole, e lo trovi in fondo.
+
 **Gli inviti dal sito.** Se apri un link d'invito sul sito di Filo, il server salva il codice insieme a un'impronta del tuo indirizzo IP, mescolato con un segreto che sta solo sul server. Se entro un'ora Filo si apre per la prima volta dallo stesso indirizzo, l'invito si attiva da solo, senza bisogno di copiarlo. L'impronta si cancella quando l'invito viene usato, e comunque entro due giorni.
 
 ## Contatori e percorsi
 
-Oggi Filo non manda al server contatori d'uso: quante volte usi una funzione, quanto aspetti una risposta, cosa rispondi alle conferme non escono dal tuo computer. È una raccolta che vorrei fare, con numeri senza contenuto e uno pseudonimo diverso da quello dei crediti, che cambia ogni mese: servirebbe a distinguere un utente che rifiuta tutto quello che Filo propone da cento utenti che rifiutano ogni tanto. Prima che parta, questo documento cambierà.
+Senza login Filo non manda al server contatori d'uso: quante volte usi una funzione, quanto aspetti una risposta, cosa rispondi alle conferme non escono dal tuo computer. Con il login Google escono i totali per funzione del documento descritto fra i crediti, legati alla tua email; i tempi di attesa e le risposte alle conferme no. La raccolta che vorrei fare è un'altra: numeri senza contenuto e uno pseudonimo diverso da quello dei crediti, che cambia ogni mese: servirebbe a distinguere un utente che rifiuta tutto quello che Filo propone da cento utenti che rifiutano ogni tanto. Prima che parta, questo documento cambierà.
 
 Lo stesso vale per i percorsi dell'Aiuto: Filo sa già ripulire e condividere i passi di una guida riuscita su un sito, perché chi lo visita dopo ne approfitti, ma la raccolta è spenta. I percorsi non escono dal tuo computer, e Filo non te lo chiede nemmeno.
 
@@ -104,7 +106,7 @@ Oltre ai modelli e al server di Filo, alcune funzioni parlano con altri servizi.
 - **Il sito che stai visitando.** Quando apri l'Aiuto, Filo gli chiede le sue istruzioni per agenti (il file llms.txt), se ne ha.
 - **Il sito di un link.** Quando chiedi cos'è un link, Filo gli chiede titolo e descrizione della pagina.
 - **Il servizio di icone di Google.** Nella home, per mostrare l'icona dei siti che Filo ti suggerisce, riceve il nome di quei siti.
-- **Google, come motore di ricerca.** Quando scrivi nella barra qualcosa che non è un indirizzo, la ricerca si apre sulla pagina dei risultati di Google.
+- **Google, come motore di ricerca.** Quando scrivi nella barra qualcosa che non è un indirizzo, la ricerca si apre sulla pagina dei risultati di Google. Lo stesso dal tasto destro: «cerca» su un testo selezionato apre la ricerca di Google, e la ricerca di un'immagine apre Google Lens, che riceve l'indirizzo dell'immagine.
 - **GitHub, EasyList e Fanboy.** All'avvio GitHub riceve la richiesta della versione più recente; da questi tre Filo scarica anche le liste per bloccare la pubblicità e i banner dei cookie.
 - **Cambi valuta e carte Magic** (Frankfurter e Scryfall). Per le funzioni corrispondenti, e non ricevono niente di tuo, salvo il nome della carta che cerchi.
 
@@ -124,17 +126,17 @@ Il tuo indirizzo IP il server lo vede passare, come ogni server, e il mio codice
 
 ## Il login
 
-Non serve per usare Filo. Serve per votare i feedback sulla bacheca, per il red team e, se vuoi, per legare i crediti al tuo account Google oltre che all'installazione. L'accesso Google si apre nel browser; Filo riceve un codice di accesso e lo salva cifrato con il portachiavi del sistema. Il servizio di accesso di Firebase conserva l'email e il nome del tuo account Google, come qualunque servizio con «Accedi con Google». I dati di Filo sul server (crediti, feedback, red team) ti conoscono solo per un codice interno.
+Non serve per usare Filo. Serve per votare i feedback sulla bacheca, per il red team e, se vuoi, per legare i crediti al tuo account Google oltre che all'installazione. L'accesso Google si apre nel browser; Filo riceve un codice di accesso e lo salva cifrato con il portachiavi del sistema. Il servizio di accesso di Firebase conserva l'email e il nome del tuo account Google, come qualunque servizio con «Accedi con Google». Anche Filo, con il login, scrive email e nome sul server, nel documento dei consumi descritto fra i crediti. Il portafoglio dei crediti, i feedback e il red team invece ti conoscono solo per un codice interno.
 
 ## Perché Google
 
 La politica sui modelli esclude Google come produttore di modelli, e questo documento dice che il server di Filo sta su infrastruttura Google, che Safe Browsing è di Google e che le ricerche dalla barra vanno su Google. Vale la pena spiegarlo, prima che qualcuno lo chieda.
 
-Sono due cose diverse. La politica sui modelli riguarda chi finanzio con l'inferenza, cioè il grosso della spesa e la parte che conta per il futuro di questa tecnologia. Firebase è un servizio di database e di accesso, Safe Browsing è la lista di siti pericolosi che usano quasi tutti i browser, compresi quelli che con Google non hanno niente a che fare. Resta vero che Google vede delle cose. Ospita i dati del server, dove i feedback arrivano cifrati e i crediti sono numeri legati a uno pseudonimo. E oggi Safe Browsing riceve gli indirizzi delle pagine che apri: questo è un punto debole, e va corretto. Il server su Google invece non è una scelta di principio: è la scelta di partenza di un progetto piccolo, e la rivedrò quando cambiare avrà un senso rispetto al costo.
+Sono due cose diverse. La politica sui modelli riguarda chi finanzio con l'inferenza, cioè il grosso della spesa e la parte che conta per il futuro di questa tecnologia. Firebase è un servizio di database e di accesso, Safe Browsing è la lista di siti pericolosi che usano quasi tutti i browser, compresi quelli che con Google non hanno niente a che fare. Resta vero che Google vede delle cose. Ospita i dati del server, dove i feedback arrivano cifrati e i crediti sono numeri legati a uno pseudonimo, salvo il documento dei consumi di chi fa il login, che porta email e nome. E oggi Safe Browsing riceve gli indirizzi delle pagine che apri: questo è un punto debole, e va corretto. Il server su Google invece non è una scelta di principio: è la scelta di partenza di un progetto piccolo, e la rivedrò quando cambiare avrà un senso rispetto al costo.
 
 ## Conservazione
 
-Quello che sta sul server non ha una scadenza automatica, con un'eccezione: l'impronta degli inviti aperti dal sito, che sparisce entro due giorni. I feedback, i documenti dei crediti, il registro d'uso e il red team restano finché esiste il servizio. Non lo nascondo dietro parole come «per il tempo necessario»: è per sempre, a meno che tu non chieda. Se chiedi, cancello a mano quello che è tuo: i feedback che hai mandato, il tuo documento dei crediti con il suo registro, il tuo account del red team.
+Quello che sta sul server non ha una scadenza automatica, con un'eccezione: l'impronta degli inviti aperti dal sito, che sparisce entro due giorni. I feedback, i documenti dei crediti (compreso quello dei consumi, con email e nome), il registro d'uso e il red team restano finché esiste il servizio. Non lo nascondo dietro parole come «per il tempo necessario»: è per sempre, a meno che tu non chieda. Se chiedi, cancello a mano quello che è tuo: i feedback che hai mandato, i tuoi documenti dei crediti con il loro registro, il tuo account del red team.
 
 ## I punti deboli
 
@@ -145,8 +147,9 @@ Quello che sta sul server non ha una scadenza automatica, con un'eccezione: l'im
 5. **L'archivio degli attacchi è in chiaro.** Quando un feedback viene classificato come attacco, il suo testo viene copiato in un archivio a parte già decifrato. Lo legge solo chi amministra il server, ma senza bisogno della chiave.
 6. **Il server può leggere i feedback.** La cifratura protegge da chi accede al database senza la chiave, non da me né da un errore nel codice del server che gira con la chiave. È il compromesso che permette di far lavorare i feedback a degli agenti.
 7. **Lo screenshot del feedback prende anche la barra in alto**, con i titoli delle schede aperte. Lo leggono i giudici e gli agenti. L'anteprima serve a questo.
-8. **Il codice del server non è pubblico.** Il codice dell'app è aperto e quello che dico di lei lo puoi controllare. Il server contiene anche le difese contro gli attacchi e per ora resta chiuso: quello che dico del server va preso sulla parola.
-9. **I file sul tuo computer sono in chiaro.** Chi ha accesso al tuo computer legge le tue conversazioni con Filo come legge i tuoi documenti. La cifratura del disco è compito del sistema operativo, non di Filo.
+8. **Con il login Google, email e nome finiscono accanto ai tuoi consumi.** Il documento del vecchio conteggio dei crediti tiene insieme chi sei, quanto usi ogni funzione e quali tue segnalazioni sono state premiate. Togliere email e nome da quel documento è una correzione già decisa, non ancora fatta. Fino ad allora l'unico modo di evitarlo è non fare il login.
+9. **Il codice del server non è pubblico.** Il codice dell'app è aperto e quello che dico di lei lo puoi controllare. Il server contiene anche le difese contro gli attacchi e per ora resta chiuso: quello che dico del server va preso sulla parola.
+10. **I file sul tuo computer sono in chiaro.** Chi ha accesso al tuo computer legge le tue conversazioni con Filo come legge i tuoi documenti. La cifratura del disco è compito del sistema operativo, non di Filo.
 
 ## Se stai forkando Filo
 

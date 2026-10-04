@@ -56,3 +56,19 @@ test('l\'installer non è firmato con un certificato, e il documento sulla sicur
     || (build.mac && build.mac.identity));
   legame(!firmato, sicurezza, 'l\'installer non è firmato con un certificato', 'installer senza firma');
 });
+
+test('col login Google l\'app scrive email, nome e consumi sul server, e il documento sulla privacy lo dice', () => {
+  const crediti = leggi('src', 'main', 'services', 'handlers', 'credits.js');
+  const email = /fields\.email\s*=/.test(crediti) && /fields\.name\s*=/.test(crediti);
+  const consumi = /SYNC_FIELDS\s*=\s*\[[^\]]*'byAction'/.test(crediti);
+  legame(email, privacy, 'al server arrivano anche la tua email, il tuo nome', 'email e nome sul server col login');
+  legame(email, privacy, 'email e nome finiscono accanto ai tuoi consumi', 'email e nome fra i punti deboli');
+  legame(!email, privacy, 'I dati di Filo sul server (crediti, feedback, red team) ti conoscono solo', 'il server conosce solo un codice');
+  legame(consumi, privacy, 'escono i totali per funzione', 'consumi per funzione sul server');
+});
+
+test('le ricerche su Google dal tasto destro sono fra gli altri servizi', () => {
+  const azioni = leggi('src', 'content', 'actions.js');
+  legame(/lens\.google\.com/.test(azioni), privacy, 'apre Google Lens', 'ricerca per immagine con Google Lens');
+  legame(/google\.com\/search/.test(azioni), privacy, 'apre la ricerca di Google', 'ricerca del testo selezionato');
+});
