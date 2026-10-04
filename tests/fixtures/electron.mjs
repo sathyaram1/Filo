@@ -46,7 +46,11 @@ export async function chiudiApp(app, { tetto = 5000 } = {}) {
   const scaduto = new Promise((r) => { timer = setTimeout(r, tetto); timer.unref?.(); });
   await Promise.race([app.close(), scaduto]).catch(() => {});
   clearTimeout(timer);
-  if (pid) { try { process.kill(pid, 'SIGKILL'); } catch (_) {} }
+  if (!pid) return;
+  // Fuori da Windows Playwright fa di Electron il capo di un gruppo di processi: si ammazza il gruppo,
+  // perché un figlio rimasto (un renderer) tiene aperte le pipe e Playwright aspetta che si chiudano.
+  if (process.platform === 'win32') { try { process.kill(pid, 'SIGKILL'); } catch (_) {} }
+  else { try { process.kill(-pid, 'SIGKILL'); } catch (_) { try { process.kill(pid, 'SIGKILL'); } catch (_) {} } }
 }
 
 // Quello che l'app scrive su stdout/stderr (in test le righe render-process-gone e did-fail-load)
