@@ -1,10 +1,12 @@
 // Un download che risponde 503 per un minuto durante `npm ci` fermava suite e pubblicazione (#952): qui le regole
-// dello script che ritenta, e che ogni workflow installi passando da lui.
+// dello script che ritenta, e che ogni workflow installi passando da lui (anche da un tag più vecchio dello script).
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { readFileSync, readdirSync, writeFileSync, copyFileSync, mkdirSync, rmSync } from 'node:fs';
+import { dirname, resolve, join } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { cartellaTemporanea, collegaCartella } from '../helpers/percorsi.mjs';
 import { fileURLToPath } from 'node:url';
 import { installa, daRitentare, esegui, ATTESE_S } from '../../scripts/npm-ci-ritenta.mjs';
 
@@ -74,6 +76,28 @@ describe('npm ci che ritenta', () => {
     assert.match(r.uscita, /ciao/);
   });
 
+  // I lavori Mac e Linux la lanciano da una copia nella temporanea del runner, che su Mac passa da un collegamento.
+  test('lanciato da un percorso con un collegamento, installa davvero (non esce verde senza far niente)', () => {
+    const base = cartellaTemporanea('npm-ci-ritenta-');
+    try {
+      const vera = join(base, 'vera');
+      mkdirSync(vera);
+      copyFileSync(resolve(ROOT, 'scripts', 'npm-ci-ritenta.mjs'), join(vera, 'npm-ci-ritenta.mjs'));
+      collegaCartella(vera, join(base, 'collegamento'));
+      const progetto = join(base, 'progetto');
+      mkdirSync(progetto);
+      writeFileSync(join(progetto, 'package.json'), JSON.stringify({ name: 'x', version: '1.0.0', dependencies: { 'left-pad': '1.3.0' } }));
+      writeFileSync(join(progetto, 'package-lock.json'), JSON.stringify({ name: 'x', version: '1.0.0', lockfileVersion: 3, requires: true, packages: { '': { name: 'x', version: '1.0.0' } } }));
+      const r = spawnSync(process.execPath, [join(base, 'collegamento', 'npm-ci-ritenta.mjs')], { cwd: progetto, encoding: 'utf8', timeout: 60_000 });
+      const uscita = `${r.stdout}${r.stderr}`;
+      assert.match(uscita, /EUSAGE/, `npm ci non è nemmeno partito:\n${uscita}`);
+      assert.equal(r.status, 1, 'il lockfile fuori sincrono deve arrivare rosso, al primo tentativo');
+      assert.match(uscita, /niente altri tentativi/);
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+
   test('un comando che non esiste è un rosso, non un\'eccezione', async () => {
     const r = await esegui('comando-che-non-esiste-filo-952', []);
     assert.notEqual(r.codice, 0);
@@ -90,7 +114,8 @@ describe('ogni workflow installa passando dallo script che ritenta', () => {
     let installazioni = 0;
     for (const f of files) {
       for (const passo of passiDi(readFileSync(resolve(WORKFLOWS, f), 'utf8'))) {
-        if (!/\bnpm ci\b|npm-ci-ritenta/.test(passo)) continue;
+        // Come comando, non come parola: l'avviso della suite nomina `npm ci` nel testo.
+        if (!/(?:^|run:|[;&|]|\bthen|\belse)\s*npm ci\b|npm-ci-ritenta/m.test(passo)) continue;
         installazioni++;
         assert.match(passo, /npm-ci-ritenta\.mjs/, `${f}: un passo lancia \`npm ci\` senza lo script che ritenta:\n${passo.slice(0, 200)}`);
       }

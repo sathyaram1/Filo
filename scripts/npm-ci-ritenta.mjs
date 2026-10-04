@@ -2,6 +2,7 @@
 // Solo moduli di Node: gira prima che node_modules esista. Sentinella: tests/unit/npmCiRitenta.test.mjs.
 
 import { spawn } from 'node:child_process';
+import { realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -61,6 +62,15 @@ export async function installa({ prova = npmCi, aspetta = (ms) => new Promise((r
   }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// Lanciato da una copia sotto la cartella temporanea del runner (un collegamento su Mac): senza realpath i due
+// percorsi non combacerebbero e lo script uscirebbe verde senza installare niente (stesso guasto di #733).
+const stessoFile = (a, b) => {
+  try {
+    return realpathSync(a) === realpathSync(b);
+  } catch {
+    return resolve(a) === resolve(b);
+  }
+};
+if (process.argv[1] && stessoFile(process.argv[1], fileURLToPath(import.meta.url))) {
   process.exitCode = await installa();
 }
