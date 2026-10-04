@@ -293,6 +293,9 @@
     const r = await comanda(richiesta);
     if (!questo || box !== questo) return;
     inAttesa(opt, false);
+    // L'annuncio del nuovo stato può arrivare mentre l'opzione aspettava: la si rietichetta adesso.
+    const x = descrizione()[questo.voce];
+    if (x) aggiornaComandi(x);
     mostraErrore(questo.errore, r.ok ? null : r);
     if (r.ok && dopo) dopo(r);
   }

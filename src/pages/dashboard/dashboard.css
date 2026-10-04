@@ -1100,8 +1100,9 @@ html, body {
 /* A destra scorre la colonna intera: le carte non si schiacciano sotto «altro» quando la finestra è bassa. */
 .dash-right > .dash-carte { flex: none; padding: 2px; }
 
-/* Ora, batteria, rete, Bluetooth e volume (#873, #874) dove sul desktop sta l'orologio, allineate al testo delle carte; restano
-   appoggiate al bordo basso anche quando gli avvisi allungano la colonna. Colore solo per ciò che chiede attenzione. */
+/* Ora, batteria, rete, Bluetooth e volume (#873, #874) dove sul desktop sta l'orologio, allineate al testo delle
+   carte; restano appoggiate al bordo basso anche quando gli avvisi allungano la colonna. Colore solo per ciò che
+   chiede attenzione. */
 .dash-sistema {
   position: sticky;
   bottom: 0;
@@ -1172,6 +1173,8 @@ html, body {
   top: auto;
   min-width: 190px;
   max-width: 280px;
+  /* Con l'elenco dei dispositivi e un errore da leggere il riquadro si allunga: scorre solo oltre lo schermo. */
+  max-height: calc(100vh - 16px);
 }
 .dash-sis-box .dash-sis-info {
   padding: 8px 12px 8px;

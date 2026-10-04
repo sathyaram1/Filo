@@ -97,6 +97,9 @@
       "category": "public.app-category.productivity",
       "identity": null,
       "darkModeSupport": true,
+      "extendInfo": {
+        "NSBluetoothAlwaysUsageDescription": "Filo usa il Bluetooth quando gli chiedi di accenderlo, di spegnerlo o di collegare un dispositivo."
+      },
       "publish": [
         {
           "provider": "github",
