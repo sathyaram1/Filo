@@ -464,6 +464,23 @@ module.exports = function register(on, ctx) {
     }
   });
 
+  on(MSG.IMAGE_COPIED, async (msg) => {
+    const originale = bytesDaDataUrl(msg && msg.originale);
+    const copia = bytesDaDataUrl(msg && msg.copia);
+    if (!originale || !copia) return { ok: false, error: 'immagine non leggibile' };
+    if (originale.length > MAX_BYTE_PROVENIENZA || copia.length > MAX_BYTE_PROVENIENZA) {
+      return { ok: false, error: 'immagine troppo grande per il controllo delle etichette', tooBig: true };
+    }
+    let negliAppunti = null;
+    try { negliAppunti = require('electron').clipboard.readImage(); } catch (_) {}
+    try {
+      const ricordata = await require('../firmatariC2pa').ricordaCopia(originale, [copia, negliAppunti]);
+      return { ok: true, ricordata };
+    } catch (e) {
+      return { ok: false, error: e?.message || 'controllo fallito' };
+    }
+  });
+
   on(MSG.IMAGE_BYTES, async (msg, sender) => {
     const url = String((msg && msg.url) || '').trim();
     if (!/^https?:\/\//i.test(url)) return { ok: false, error: 'URL non scaricabile' };
