@@ -683,9 +683,11 @@ html, body {
   max-height: 0;
   opacity: 0;
   overflow: hidden;
-  transition: max-height var(--dash-filo-gomitolo) cubic-bezier(.4, 0, .2, 1), opacity 300ms ease, color 160ms ease;
+  transition: max-height var(--dash-filo-gomitolo) cubic-bezier(.4, 0, .2, 1), opacity 300ms ease, color 160ms ease,
+    padding-left var(--dash-filo-gomitolo) cubic-bezier(.4, 0, .2, 1);
 }
 .dash-activity[data-testa] .dash-activity-head { max-height: 26px; opacity: 1; }
+.dash-activity[data-filo="gomitolo"] .dash-activity-head { padding-left: calc(26px + var(--dash-gomitolo-spazio, 0px)); }
 .dash-activity-head:hover { color: var(--dash-ink-soft); }
 .dash-activity-label {
   min-width: 0;
