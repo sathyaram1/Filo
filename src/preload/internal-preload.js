@@ -276,7 +276,7 @@ if (IS_FILO_ORIGIN) {
 const path = require('node:path');
 const shouldInjectContentScripts = () => true;
 function injectContentScriptStyles() {
-  const STYLES = ['theme.css', 'menu.css', 'popup.css', 'sidebar.css',
+  const STYLES = ['theme.css', 'menu.css', 'popup.css', 'sidebar.css', 'voce.css',
     'highlight.css', 'spellcheck.css', 'feedback.css', 'redteam-attack.css'];
   for (const f of STYLES) {
     if (document.querySelector(`link[href="filo://style/${f}"]`)) continue;
@@ -333,6 +333,8 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'modelCaps.js'));
   safe(path.join(SHARED, 'ttsVoices.js'));
   safe(path.join(SHARED, 'dictationSegmenter.js'));
+  safe(path.join(SHARED, 'ascolto.js')); // microfono e trascrizione: Detta e le chat
+  safe(path.join(SHARED, 'voceChat.js')); // tasto microfono delle chat, a cui «Detta» passa la mano
   // Solo nei test: modelli di prova (vedi loader.js).
   if (process.env.NODE_ENV === 'test') safe(path.join(SHARED, '..', '..', 'tests', 'fixtures', 'testModels.js'));
   safe(path.join(CONTENT, 'tts.js'));

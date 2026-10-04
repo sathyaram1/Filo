@@ -643,6 +643,18 @@
     return '';
   }
 
+  // I tempi del microfono delle chat (settings.dictation), dentro limiti che lo lasciano usabile: sotto un
+  // secondo di pausa ogni respiro chiude la frase, oltre otto (dieci per annullare) sembra rotto. PURA.
+  const DICTATION_LIMITS = Object.freeze({ silenceSec: [1, 8, 2], cancelSec: [0, 10, 2.5] });
+  function dictationTimes(d) {
+    const out = {};
+    for (const [k, [min, max, def]] of Object.entries(DICTATION_LIMITS)) {
+      const n = Number(d && d[k]);
+      out[k] = d && d[k] !== '' && d[k] != null && Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : def;
+    }
+    return out;
+  }
+
   // Forme base di `base` che `list` NON copre. PURA.
   // Serve dove una lista scritta a mano SOSTITUISCE quella di build (la lista
   // remota in config/models): senza questo confronto, un'esclusione aggiunta al
@@ -1969,7 +1981,8 @@
       `PAGINE VISITATE ("cancella le pagine dell'ultima ora", "togli la cronologia di oggi", "cancella tutta la cronologia", "cancella le pagine delle ultime 3 ore", "cancella le visite a YouTube", "togli le pagine di repubblica.it di oggi") → emetti CANCELLA_PAGINE con {periodo: "ultima_ora"|"oggi"|"tutto"} oppure {ore: N}, più {sito: "youtube.com"} se l'utente nomina un sito (senza periodo valgono tutte le sue pagine). Filo ricorda le pagine aperte nelle schede (non quelle in incognito); questa azione toglie solo quelle, non le chat né le schede chiuse. Il SISTEMA mostra quante sono e chiede l'OK: non chiederlo a parole e non dire di averlo fatto prima della conferma.\n` +
       `CANCELLAZIONE MEMORIA ("cancella le mie memorie", "dimentica tutto di me", "azzera quello che sai di me", "resetta la tua memoria") → emetti l'azione CANCELLA_MEMORIA (nessun parametro). È IRREVERSIBILE: cancella profilo, preferenze apprese e lezioni. NON cancellare nulla da solo e NON dichiarare di averlo già fatto: è il SISTEMA a mostrare un box in cui l'utente deve scrivere "conferma" prima di procedere. Tu emetti l'azione e basta; conferma a parole solo DOPO che è stata eseguita, in una frase.\n` +
       `DIMENTICARE UNA COSA SOLA ("dimentica che non bevo caffè", "togli dalla memoria che vivo a Lisbona", "non è più vero che lavoro in banca") → emetti DIMENTICA con {testo} = la riga com'è nella memoria (più sotto nel contesto). Il SISTEMA mostra all'utente le righe esatte e le toglie col suo OK. Per una cosa sola non usare mai CANCELLA_MEMORIA.\n` +
-      `MODIFICA IMPOSTAZIONI ("metti il tema scuro", "ingrandisci il testo", "attiva la modalità terminale", "imposta i cookie su privacy", "metti la chiave openrouter sk-or-...", "limite di spesa 10 euro") → emetti l'azione IMPOSTA_PREFERENZA con la chiave e il valore giusti (vedi l'elenco sotto). Puoi modificare QUALSIASI impostazione elencata. Per le impostazioni semplici (estetica, testo, archiviazione…) si applica subito: conferma in una frase ("Fatto, ora il tema è scuro."). Per le impostazioni sensibili (sicurezza, modelli, provider, chiavi API, limite di spesa) è il SISTEMA ad aprire da sé un popup di conferma all'utente prima di applicarle: tu emetti comunque l'azione e basta — NON chiedere conferma a parole, NON dire "vai nelle Opzioni". Se l'utente chiede un'impostazione che davvero non esiste nell'elenco, dillo.\n` +
+      `COM'È IMPOSTATO ("com'è impostato il blocco della pubblicità?", "blocchi la pubblicità?", "che tema ho?", "quali siti ho bloccato?", "le notifiche fanno suono?") → emetti LEGGI_IMPOSTAZIONI con {cerca} = la voce di cui parla, e rispondi col valore che ti torna: è quello vero di adesso. Non rispondere a memoria né dai valori di serie, e non dire che non lo sai senza averlo letto. Vale anche prima di un cambio relativo ("un po' più veloce", "rimetti com'era prima di ieri"). Anche "quali siti possono usare il microfono?" si legge così (i permessi dei siti); per toglierne uno c'è TOGLI_PERMESSO_SITO.\n` +
+      `MODIFICA IMPOSTAZIONI ("metti il tema scuro", "ingrandisci il testo", "attiva la modalità terminale", "imposta i cookie su privacy", "metti la chiave openrouter sk-or-...", "limite di spesa 10 euro") → emetti l'azione IMPOSTA_PREFERENZA con la chiave e il valore giusti (vedi l'elenco sotto). Puoi modificare QUALSIASI impostazione elencata. Per le impostazioni semplici (estetica, testo, archiviazione…) si applica subito: conferma in una frase cosa hai cambiato e che si annulla dal segno accanto al suo messaggio ("Fatto, ora il tema è scuro: se non ti piace, «annulla» sul segno accanto al tuo messaggio lo rimette com'era."). Per le impostazioni sensibili (sicurezza, modelli, provider, chiavi API, limite di spesa) è il SISTEMA ad aprire da sé un popup di conferma all'utente prima di applicarle: tu emetti comunque l'azione e basta — NON chiedere conferma a parole, NON dire "vai nelle Opzioni". Se l'utente chiede un'impostazione che davvero non esiste nell'elenco, dillo.\n` +
       `SEGNALA UN PROBLEMA / FEEDBACK ("manda un feedback agli sviluppatori", "segnala che X non funziona", "di' al team che vorrei Y") → scrivi un testo chiaro e completo della segnalazione ed emetti l'azione INVIA_FEEDBACK (testo + un titolo breve). È il sistema a chiedere conferma all'utente, con l'anteprima del testo, prima di inviare. Non inventare dettagli che l'utente non ha fornito; se la segnalazione è vaga, chiedi una precisazione prima di inviare.\n` +
       `QUANDO AMMETTI UNA MANCANZA (obbligatorio) → ogni volta che stai per dire che Filo non sa fare una cosa, che non hai accesso a un dato, che una funzione non esiste o che qualcosa non ha funzionato, emetti NELLO STESSO TURNO anche INVIA_FEEDBACK, con il testo già scritto: cosa aveva chiesto l'utente e cosa non è stato possibile. NON chiedere il permesso a parole ("vuoi che lo segnali?") e NON aspettare che te lo chieda: la conferma la chiede il sistema da sé mostrando l'anteprima, quindi il tuo compito è preparare la segnalazione, non domandare. L'unica eccezione è se una segnalazione sullo stesso punto è già stata proposta in questa conversazione.\n` +
       `PERSONALIZZAZIONE ESTETICA ("rendi i bottoni verdi", "cambia il colore d'accento", "voglio gli angoli più arrotondati", "usa un font serif", "i link in blu") → scegli SUBITO un valore ragionevole ed esegui l'azione IMPOSTA_ESTETICA col token giusto (vedi sotto). NON chiedere all'utente il valore esatto: applica una scelta sensata e basta — l'interfaccia mostrerà da sola un controllo (color picker / slider) per raffinarla. Conferma in una frase ("Fatto, ho reso i bottoni verdi — usa il controllo qui sotto per scegliere la tonatura esatta."). Una richiesta vaga ("rendi tutto più allegro") → scegli i token più pertinenti e cambiali.\n` +
@@ -2310,6 +2323,9 @@
     // Mostra il commento proattivo di Filo al centro della home (newtab).
     // Disattivabile da Preferenze per chi preferisce una home più sobria.
     showHomeMessage: true,
+    // Ora, batteria, rete e Bluetooth nella colonna destra della home (#873): ognuna si toglie da sé
+    // (Preferenze, chat, tasto destro). Una voce di cui il computer non dice niente non compare comunque.
+    homeSistema: { ora: true, batteria: true, rete: true, bluetooth: true },
     // Carta con l'anteprima della scheda al passaggio del puntatore sulla barra (#430). size: 'piccola' |
     // 'media' | 'grande' (le larghezze stanno in src/main/popup-anteprima.js).
     tabPreview: { enabled: true, size: 'media' },
@@ -2349,6 +2365,10 @@
       // testo). Gli id stanno in ttsVoices.js.
       modelVoice: '',
     },
+    // Il tasto microfono delle chat (src/shared/voceChat.js): finito di parlare, la richiesta parte da sola
+    // dopo un attimo per annullare (true) o il testo resta nella casella da correggere (false).
+    // silenceSec: quanto silenzio vuol dire «ho finito»; cancelSec: l'attimo per annullare. Limiti in dictationTimes.
+    dictation: { autoSend: true, silenceSec: 2, cancelSec: 2.5 },
     // Notifiche/toast in basso a destra della shell (spec #170.1). È la base
     // riusata dai blocchi (#170.2/#170.3) per segnalare gli eventi.
     // - durationSec: secondi prima dell'auto-dismiss. 0 = infinita: la notifica
@@ -2730,6 +2750,8 @@
     producerOnlyRule,
     servedPolicyViolation,
     hostPolicyViolation,
+    DICTATION_LIMITS,
+    dictationTimes,
     missingExcludedProviders,
     providerIgnoreList,
     excludedProviderReasons,

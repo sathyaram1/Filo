@@ -42,9 +42,27 @@
     return C && C.LESSON_MAX ? `${C.LESSON_MAX} caratteri` : 'qualche centinaio di caratteri';
   }
 
-  function tettoStile() {
-    const C = global.SN_CONST;
-    return C && C.AGENT_STYLE_MAX ? `al massimo ${C.AGENT_STYLE_MAX} caratteri` : 'con un tetto di lunghezza';
+  // Dove il nome del registro non basta a scegliere il token giusto, una parola in più.
+  const NOTE_TOKEN = {
+    accent: 'da cui ereditano link e selezione',
+    topbar: 'la fascia dietro le schede: è QUESTO per "colora la barra in alto/la barra delle schede", NON `background` né `colore_tab`',
+    hover: 'voci di menu, righe e bottoni secondari',
+    overlay: 'anche la barra laterale',
+    'button.bg': 'è questo per "rendi i bottoni di un colore"',
+  };
+  // Nel main i moduli sono già caricati dal loader; negli unit test che caricano solo questo, li porta require.
+  function modulo(nome, file) {
+    if (!global[nome] && typeof require === 'function') { try { require(file); } catch (_) {} }
+    return global[nome] || null;
+  }
+  function righeToken() {
+    const T = modulo('SN_THEME_TOKENS', './themeTokens.js');
+    if (!T || typeof T.names !== 'function') return '';
+    return T.names().map((n) => {
+      const t = T.get(n) || {};
+      const nota = NOTE_TOKEN[n] ? `; ${NOTE_TOKEN[n]}` : '';
+      return `• ${n} (${String(t.label || n).toLowerCase()}${nota})`;
+    }).join('\n');
   }
 
   // I documenti di trasparenza che ESISTONO davvero. L'elenco non si scrive a
@@ -194,6 +212,28 @@
       required: ['percorso'],
       risultato: true,
     },
+    LEGGI_IMPOSTAZIONI: {
+      description: 'Legge com\'è impostato Filo ADESSO: il valore vero di ogni voce delle pagine Preferenze, Sicurezza, Modelli e Altro (anche i permessi dati ai siti), con la chiave per cambiarla. '
+        + 'Usalo SEMPRE prima di rispondere a «com\'è impostato X?», «è attivo il blocco della pubblicità?», «che tema ho?», «quali siti ho bloccato?», '
+        + 'e prima di un cambio relativo («un po\' più veloce»): non rispondere a memoria né dai valori di serie. Sola lettura. '
+        + 'Le chiavi API non tornano mai: solo se ci sono.',
+      properties: {
+        cerca: S('Una o più parole della voce, o la sua chiave ("blocco pubblicità", "tema", "notifiche"); ometti per averle tutte.'),
+      },
+      required: [],
+      risultato: true,
+    },
+    TOGLI_PERMESSO_SITO: {
+      description: 'Toglie una risposta che Filo ricorda per un sito (microfono, fotocamera, appunti, posizione, notifiche, '
+        + 'schermi, presenza, strumenti), come «Togli» nella pagina Sicurezza: «togli il microfono a meet.google.com», '
+        + '«non ricordare più cosa ho risposto a example.com». Quali risposte ci sono lo dice LEGGI_IMPOSTAZIONI. '
+        + 'Toglierla non concede niente: alla prossima richiesta il sito torna a chiedere.',
+      properties: {
+        sito: S('Il sito, come meet.google.com; vale anche per i suoi sottodomini.'),
+        permesso: S('Quale permesso ("microfono", "fotocamera", "appunti", "posizione", "notifiche", "schermi", "presenza", "strumenti"); ometti per toglierle tutte.'),
+      },
+      required: ['sito'],
+    },
     LEGGI_TRASPARENZA: {
       description: () => {
         const docs = docsTrasparenza();
@@ -282,33 +322,17 @@
       required: ['testo'],
     },
     IMPOSTA_PREFERENZA: {
-      description: ({ sistema }) =>
-        'Modifica un\'impostazione dell\'app. Una sola chiave per chiamata (chiama più volte per più impostazioni). Le impostazioni segnate [conferma] sono di livello 2: il sistema chiede conferma all\'utente da sé, tu non chiederla a parole. Chiavi valide e valori ammessi:\n'
-        + '• tema: "sistema" | "chiaro" | "scuro"\n'
-        + '• dimensione_testo: "piccolo" | "normale" | "grande" | "molto grande" | "enorme"\n'
-        + '• commento_home: true | false (commento di Filo al centro della home)\n'
-        + '• anteprima_schede: true | false | "piccola" | "media" | "grande" (carta con l\'anteprima di una scheda al passaggio del mouse sulla barra)\n'
-        + `• stile_agente: testo libero, ${tettoStile()} (come deve scrivere Filo; "nessuno" lo toglie) [conferma]\n`
-        + '• correttore: true | false (correttore ortografico AI)\n'
-        + '• sidebar_aiuto: true | false ; categorizzazione: true | false\n'
-        + '• archiviazione_automatica: true | false ; archivia_alla_riapertura: true | false ; archivia_se_inattivo: true | false\n'
-        + '• ore_inattivita: numero 1-168 (dopo quante ore archiviare)\n'
-        + `• modalita_terminale: true | false [conferma] ; shell_terminale: ${sistemaInfo(sistema).shellPref} [conferma]\n`
-        + '• nomi_sensati_scaricamenti: true | false [conferma] (nome sensato da solo ai file scaricati col nome che non dice niente)\n'
-        + '• velocita_voce: numero 0.5-2 ; tono_voce: numero 0-2 (lettura ad alta voce)\n'
-        + '• durata_notifiche: secondi 0-120 (quanto restano gli avvisi in basso a destra, nella barra e nelle pagine; quelli brevi e quelli con un pulsante restano in proporzione; 0 = finché l\'utente non li chiude)\n'
-        + '• suono_notifiche: true | false | "standard" | "delicata" | "urgente" | "carillon" (suono degli avvisi della barra; un tono lo accende con quel tono)\n'
-        + '• protezione_ip: true | false [conferma] (anti-leak WebRTC)\n'
-        + '• blocco_popup: true | false [conferma]\n'
-        + '• salta_pubblicita: true | false (preme da solo il «Salta» delle pubblicità dei video, per esempio su YouTube)\n'
-        + '• navigazione_sicura: true | false [conferma] (rilevamento siti pericolosi)\n'
-        + '• gestione_cookie: "manuale" | "automatico" | "privacy" [conferma]\n'
-        + '• fingerprint: "off" | "default" | "privacy" [conferma] (anti-fingerprinting)\n'
-        + '• provider: "openrouter" [conferma] ; modelli_predefiniti: true | false [conferma]\n'
-        + '• solo_pesi_aperti: true | false [conferma] (spegne tutti i modelli proprietari, Anthropic compresa, e lascia solo modelli a pesi aperti serviti da fornitori indipendenti)\n'
-        + '• chiave_openrouter / chiave_tavily: la chiave API come testo [conferma]\n'
-        + '• limite_spesa: numero in euro (limite di spesa mensile) [conferma]\n'
-        + '• colore_tab: "più vivaci" | "più neutre" | "nessuno" | "più preciso" | "predefinito" (colore identità delle tab: "vivaci"=tinte accese, "neutre"=tinte spente, "nessuno"=tab senza colore, "più preciso"=estrai meglio quando la tab prende il colore sbagliato, "predefinito"=ripristina)',
+      // L'elenco delle chiavi esce dai setter (SN_PREF.righeDescrizione): una voce nuova arriva da sola (#949).
+      description: ({ sistema }) => {
+        const P = modulo('SN_PREF', './preferences.js');
+        const righe = P && typeof P.righeDescrizione === 'function'
+          ? P.righeDescrizione({ sistema, shellPref: sistemaInfo(sistema).shellPref }) : [];
+        return 'Modifica un\'impostazione dell\'app: ogni voce delle pagine Preferenze, Sicurezza, Modelli e Altro ha la sua chiave qui sotto. '
+          + 'Una sola chiave per chiamata (chiama più volte per più impostazioni). Le impostazioni segnate [conferma] sono di livello 2: '
+          + 'il sistema chiede conferma all\'utente da sé, tu non chiederla a parole. Per un cambio relativo («un po\' più veloce») '
+          + 'o per dire com\'era prima, leggi il valore attuale con LEGGI_IMPOSTAZIONI. Chiavi valide e valori ammessi:\n'
+          + righe.join('\n');
+      },
       properties: {
         chiave: S('La chiave dell\'impostazione, dall\'elenco.'),
         valore: { description: 'Il valore, del tipo indicato nell\'elenco.', anyOf: [{ type: 'string' }, { type: 'number' }, { type: 'boolean' }] },
@@ -316,10 +340,10 @@
       required: ['chiave', 'valore'],
     },
     IMPOSTA_ESTETICA: {
-      description: 'Cambia un singolo token estetico dell\'app, applicato live a tutte le superfici. Una sola coppia token/valore per chiamata. Scegli SEMPRE un valore concreto tu, non lasciarlo decidere all\'utente: l\'interfaccia mostra da sé un controllo per raffinarlo. Token disponibili:\n'
-        + '• accent (colore d\'accento, da cui ereditano link e selezione) · text (colore del testo) · background (sfondo) · topbar (barra in alto del browser: la fascia dietro le schede — è QUESTO per "colora la barra in alto/la barra delle schede", NON `background` né `colore_tab`) · muted (testo secondario) · border (bordi) · error (colore degli errori) · hover (sfondo al passaggio del mouse su voci di menu, righe e bottoni secondari) · overlay (sfondo di menu, popup e barra laterale)\n'
-        + '• button.bg (sfondo dei bottoni primari → è questo per "rendi i bottoni di un colore") · button.fg (testo dei bottoni) · link.color (colore dei link) · selection.color (colore della selezione del testo)\n'
-        + '• font (font della UI) · radius (raggio degli angoli, una misura) · selection.opacity (opacità della selezione, 0-1)',
+      // I token escono dal registro (SN_THEME_TOKENS): ogni riga della pagina ha la sua voce (#949).
+      description: () => 'Cambia un singolo token estetico dell\'app, applicato live a tutte le superfici. Una sola coppia token/valore per chiamata. '
+        + 'Scegli SEMPRE un valore concreto tu, non lasciarlo decidere all\'utente: l\'interfaccia mostra da sé un controllo per raffinarlo. '
+        + 'Con valore "predefinito" il token torna al suo valore di serie. Token disponibili:\n' + righeToken(),
       properties: {
         token: S('Il token, dall\'elenco.'),
         valore: S('Un valore CSS concreto: per i colori un esadecimale #rrggbb (NON nomi come "green"); per il raggio una misura con unità ("8px"); per l\'opacità un numero 0-1 ("0.4"); per il font una lista di famiglie ("Georgia, serif").'),

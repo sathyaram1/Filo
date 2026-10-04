@@ -23,6 +23,9 @@
 //   (senza marcatore di provider AI). Se la chat non interroga nient'altro,
 //   ometti l'opzione: l'errore diventa una frase generica.
 //
+//   `offline` (opzionale, bool) dice se il computer è senza rete; senza, lo si
+//   chiede al lettore del sistema nel main o al browser in una pagina.
+//
 //   SN_CHAT_ERRORS.isTransientNetwork(err) → bool
 //     Vero per i guasti di rete PASSEGGERI (connessione caduta, DNS, timeout,
 //     socket chiusa): quelli per cui vale la pena riprovare da soli.
@@ -65,6 +68,17 @@
     return TRANSIENT_NETWORK_RE.test(messageOf(e));
   }
 
+  // Offline davvero, non una chiamata andata storta (#873): nel main lo dice il lettore del sistema, in una
+  // pagina il browser. `opts.offline` vince su entrambi.
+  function pareOffline(o) {
+    if (typeof o.offline === 'boolean') return o.offline;
+    try {
+      const M = global.SN_SISTEMA_MAIN;
+      if (M && typeof M.offline === 'function') return M.offline() === true;
+    } catch (_) {}
+    try { return !!(global.navigator && global.navigator.onLine === false); } catch (_) { return false; }
+  }
+
   // Errore → proposizione per l'utente. Mai un codice HTTP nudo, mai un nome di
   // endpoint: gli errori con `code` applicativo (NO_API_KEY, LIMIT_REACHED,
   // NO_MODEL_FOR_ACTION) portano già un messaggio i18n scritto per l'utente —
@@ -80,6 +94,7 @@
     // Guasto di rete: la prima cosa da controllare è la connessione. Va PRIMA
     // dell'analisi HTTP perché qui non c'è nessuna risposta da interpretare.
     if (isTransientNetwork(e)) {
+      if (pareOffline(o)) return 'il computer è offline, non è collegato a nessuna rete. Riprova quando torna la connessione.';
       return 'problema di rete: non sono riuscito a raggiungere il servizio. Controlla la connessione e riprova.';
     }
 

@@ -731,6 +731,62 @@
     save._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
   }
 
+  // Un cambio arrivato da altrove (la chat, un'altra scheda): la pagina mostra il valore nuovo, tranne nei
+  // campi che l'utente ha toccato qui e non sono ancora partiti. Le voci le dà la fonte unica (#949).
+  function foglieDi(o, base = '', out = []) {
+    for (const k of Object.keys(o || {})) {
+      const p = base ? `${base}.${k}` : k;
+      if (o[k] && typeof o[k] === 'object' && !Array.isArray(o[k])) foglieDi(o[k], p, out);
+      else out.push(p);
+    }
+    return out;
+  }
+  function dentroDi(o, percorso) {
+    return percorso.split('.').reduce((x, k) => (x && typeof x === 'object' ? x[k] : undefined), o);
+  }
+  function mettiIn(o, percorso, v) {
+    const seg = percorso.split('.');
+    let n = o;
+    for (let i = 0; i < seg.length - 1; i++) { if (!n[seg[i]] || typeof n[seg[i]] !== 'object') n[seg[i]] = {}; n = n[seg[i]]; }
+    n[seg[seg.length - 1]] = v;
+  }
+  function riallinea(settings) {
+    if (!mostrata || !settings) return;
+    const Voci = window.SN_VOCI_IMPOSTAZIONI;
+    const pendenti = foglieDi(soloCambiati(leggiSicurezza(), mostrata));
+    // Le righe scartate sono la metà non valida della stessa casella.
+    const inSospeso = new Set(pendenti.map((p) => p.replace(/^siteBlock\.righeScartate$/, 'siteBlock.blacklist')
+      .replace(/^downloads\.righeScartate$/, 'downloads.trustedSites')));
+    const sec = settings.security || {};
+    const scartate = {
+      'sec-siteblock-blacklist': (sec.siteBlock || {}).righeScartate,
+      'sec-dl-trusted': (sec.downloads || {}).righeScartate,
+    };
+    const toccati = Voci.riallineaPagina('security', settings, {
+      // La casella dei siti fidati serve ad aggiungerne uno: l'elenco vero è sotto, e si riallinea qui dopo.
+      // Una casella che dice già lo stesso elenco, con altre righe vuote o a metà, non si riscrive: chi scrive
+      // perderebbe l'a capo appena battuto. Quello che non è ancora partito sta in `inSospeso`.
+      salta: (id, percorso, el) => id === 'cookie-wl-input' || inSospeso.has(percorso.replace(/^security\./, ''))
+        || (el.tagName === 'TEXTAREA'
+          && JSON.stringify(parseBlacklist(el.value).valid) === JSON.stringify(Voci.leggi(settings, percorso))),
+      elenco: (id, lista) => righe(lista, scartate[id]),
+    });
+    const fidati = Voci.leggi(settings, 'security.cookies.trustedSites');
+    if (Array.isArray(fidati) && fidati.join('\n') !== cookieWhitelist.join('\n')) {
+      cookieWhitelist = fidati.slice();
+      renderWhitelist();
+    }
+    if (toccati.includes('sec-siteblock-blacklist')) setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
+    if (toccati.includes('sec-dl-trusted')) setTrustedError(parseBlacklist($('sec-dl-trusted').value).invalid);
+    syncSiteBlockEnabled();
+    syncDownloadsEnabled();
+    syncSafebrowseEnabled();
+    syncCookieMode();
+    const ora = leggiSicurezza();
+    for (const p of pendenti) mettiIn(ora, p, dentroDi(mostrata, p));
+    mostrata = ora;
+  }
+
   // Un sito aggiunto dal menu della scheda mentre questa pagina è aperta deve comparire qui, e un
   // salvataggio da qui non deve riscrivere l'elenco com'era all'apertura.
   if (chrome.runtime && chrome.runtime.onMessage) {
@@ -738,6 +794,7 @@
       if (msg && msg.type === MSG.SETTINGS_UPDATED && msg.settings) {
         const p = JSON.stringify(msg.settings.proxy || {});
         if (p !== lastProxy) { lastProxy = p; renderProxyBox(); }
+        riallinea(msg.settings);
       }
       const c = msg && msg.type === MSG.SETTINGS_UPDATED && msg.settings && msg.settings.security && msg.settings.security.cookies;
       if (!c || !Array.isArray(c.bannerSites)) return;
@@ -756,6 +813,7 @@
   if (chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((msg) => {
       if (msg && msg.type === MSG.TAB_IN_VISTA && msg.inVista) loadCookieDone();
+      if (msg && msg.type === MSG.PERMESSI_SITI_CAMBIATI) renderSitePerms();
     });
   }
 

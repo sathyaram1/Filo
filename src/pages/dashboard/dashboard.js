@@ -56,6 +56,7 @@
   //   SN_DASH_COMANDI     i comandi con lo slash e la colorazione dell'input
   //   SN_DASH_TERMINALE   cartella corrente, colori ANSI, comandi di shell
   //   SN_DASH_CARTE       le carte ai lati e «altro» (#870)
+  //   SN_DASH_SISTEMA     ora, batteria, rete e Bluetooth in fondo alla colonna destra (#873)
   //
   // Lo stato che due parti condividono non si copia: si chiede a chi lo
   // possiede — la cartella del terminale al terminale, "sto inviando" a questo
@@ -65,6 +66,7 @@
   const Comandi = self.SN_DASH_COMANDI;
   const Term = self.SN_DASH_TERMINALE;
   const Carte = self.SN_DASH_CARTE;
+  const Sistema = self.SN_DASH_SISTEMA;
 
   Att.init({
     send,
@@ -113,6 +115,7 @@
   // basta: mostrarla riporterebbe l'utente dentro una chat che aveva chiuso.
   const inChatAperta = (chat) => !chat || chat === chatId;
 
+  Sistema.init({ send, MSG, host: $('sistema'), ICONS: self.SN_ICONS });
   Term.init({
     dashDir,
     inputEl,
@@ -672,6 +675,8 @@
     LEGGI_DOCUMENTO: 'Leggo il documento…',
     LEGGI_TRASPARENZA: 'Rileggo la pagina di trasparenza…',
     CAPACITA_DETTAGLIO: 'Verifico cosa so fare…',
+    LEGGI_IMPOSTAZIONI: 'Leggo come sei impostato…',
+    TOGLI_PERMESSO_SITO: 'Tolgo un permesso…',
     ESEGUI_COMANDO: 'Eseguo un comando…',
     TIMER: 'Avvio un timer…',
     SVEGLIA: 'Imposto una sveglia…',
@@ -1159,20 +1164,25 @@
     }
   });
   inputForm.addEventListener('dragover', (e) => { e.preventDefault(); });
+  // Un file diventa un allegato; un testo trascinato (una voce della colonna destra, una frase da
+  // un'altra scheda) entra nel campo dove sta il cursore. Il dragover qui sopra dice a Chromium che il
+  // trascinamento lo gestisce la pagina, e allora il campo non inserisce più niente da sé.
   inputForm.addEventListener('drop', (e) => {
     e.preventDefault();
     const files = e.dataTransfer?.files;
-    if (files && files.length) { for (const f of files) handleDroppedFile(f); return; }
-    // Una carta (o un testo) trascinata nel campo: arriva quello che dice, dove sta il cursore.
+    if (files && files.length) {
+      for (const f of files) handleDroppedFile(f);
+      return;
+    }
     const testo = e.dataTransfer?.getData('text/plain') || '';
     if (!testo) return;
-    const at = inputEl.selectionStart ?? inputEl.value.length;
-    const fine = inputEl.selectionEnd ?? at;
-    inputEl.value = `${inputEl.value.slice(0, at)}${testo}${inputEl.value.slice(fine)}`;
+    const prima = inputEl.value.slice(0, inputEl.selectionStart);
+    const dopo = inputEl.value.slice(inputEl.selectionEnd);
+    const pezzo = `${prima && !/\s$/.test(prima) ? ' ' : ''}${testo}${dopo && !/^\s/.test(dopo) ? ' ' : ''}`;
+    inputEl.setRangeText(pezzo, inputEl.selectionStart, inputEl.selectionEnd, 'end');
+    inputEl.focus();
     autoGrowInput();
     Comandi.updateInputClass();
-    inputEl.focus();
-    try { inputEl.setSelectionRange(at + testo.length, at + testo.length); } catch (_) {}
   });
 
   // ===== Lightbox: click su un'immagine per ingrandirla =====
@@ -1250,7 +1260,15 @@
 
   // Evidenziazione live mentre si scrive: arancione = comando Filo (o sito),
   // azzurro = comando shell (solo in modalità terminale).
-  inputEl.addEventListener('input', () => { Comandi.updateInputClass(); autoGrowInput(); });
+  inputEl.addEventListener('input', () => { Comandi.updateInputClass(); autoGrowInput(); Sistema.scrive(); });
+
+  // Il tasto microfono: si parla, e la richiesta parte come col tasto d'invio (o resta da correggere).
+  // La scorciatoia vale in tutta la home, che è la sua chat.
+  window.SN_VOCE_CHAT?.collega({
+    campo: inputEl, contenitore: inputForm, prima: sendBtn, ambito: document,
+    invia: () => (inputForm.requestSubmit ? inputForm.requestSubmit() : inputForm.dispatchEvent(new Event('submit'))),
+    occupato: () => sending,
+  });
 
   // ===== Bridge cambio stato live dal background =====
   chrome.runtime.onMessage.addListener((msg) => {
@@ -1259,6 +1277,8 @@
       notaFermata(String(msg.frase), vicino);
     } else if (msg?.type === MSG.FILO_LIVE_UPDATED) {
       refreshLive().catch(() => {});
+    } else if (msg?.type === MSG.SISTEMA_AGGIORNATO) {
+      Sistema.aggiornato(msg.stato);
     } else if (msg?.type === MSG.FILO_CHATS_UPDATED && msg.cancellata) {
       // #525 — qualcuno ha cancellato dalla Cronologia la conversazione che
       // sta ancora qui a schermo. Continuare a scriverci dentro la farebbe
@@ -1301,6 +1321,7 @@
       Accoglienza.maybeOpenOnboardingLater().catch(() => {});
     } else if (msg?.type === MSG.SETTINGS_UPDATED) {
       applySavedTheme().catch(() => {});
+      if (msg.settings) Sistema.applicaImpostazioni(msg.settings);
       if (msg.settings && typeof msg.settings.showHomeMessage === 'boolean') {
         showHomeMessage = msg.settings.showHomeMessage;
         applyHomeMessageVisibility();
@@ -1871,6 +1892,7 @@
     try {
       const settings = await self.SN_STORAGE?.getSettings?.();
       showHomeMessage = settings?.showHomeMessage !== false;
+      Sistema.applicaImpostazioni(settings);
       Term.setEnabled(!!settings?.terminal?.enabled);
       Term.setShell(settings?.terminal?.shell || 'powershell');
       // Suoneria timer: legge la preferenza; se non impostata o non valida usa 'default'.

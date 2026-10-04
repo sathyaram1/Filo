@@ -332,6 +332,31 @@
         return `Verificare cosa sa fare Filo${ids.length ? ` (${ids.join(', ')})` : ''}`;
       },
     },
+    // #949 — togliere una risposta ricordata non concede niente: il sito torna a chiedere.
+    TOGLI_PERMESSO_SITO: {
+      level: 1,
+      describe: (a) => {
+        const sito = String((a && (a.sito ?? a.dominio)) || '').trim().slice(0, 80) || 'un sito';
+        const p = String((a && a.permesso) || '').trim().slice(0, 40);
+        return `Togliere ${p ? `il permesso «${p}»` : 'i permessi ricordati'} di ${sito}`;
+      },
+      describeDone: (a) => {
+        const tolte = (a && a._output && Array.isArray(a._output.tolte)) ? a._output.tolte : [];
+        return tolte.length ? `Tolte le risposte ricordate: ${tolte.join('; ')} (il sito tornerà a chiedere)` : 'Nessuna risposta tolta';
+      },
+    },
+    LEGGI_IMPOSTAZIONI: {
+      // #949 — rilegge le impostazioni dell'utente, senza le chiavi: sola lettura, niente esce.
+      level: 1,
+      describe: (a) => {
+        const cerca = String((a && (a.cerca ?? a.query ?? a.chiave)) || '').replace(/\s+/g, ' ').trim();
+        return cerca ? `Leggere com'è impostato «${cerca.slice(0, 60)}»` : 'Leggere le impostazioni';
+      },
+      describeDone: (a) => {
+        const cerca = String((a && (a.cerca ?? a.query ?? a.chiave)) || '').replace(/\s+/g, ' ').trim();
+        return cerca ? `Letto com'è impostato «${cerca.slice(0, 60)}»` : 'Lette le impostazioni';
+      },
+    },
     CERCA_CHAT: {
       // #525 — Filo rilegge le conversazioni passate con lo stesso utente per
       // riprendere un discorso di ieri. Sola lettura di dati che sono già
@@ -446,12 +471,13 @@
     },
     IMPOSTA_PREFERENZA: {
       // Livello per-preferenza: lo dichiara il setter in preferences.js
-      // (default 1). Preferenza sconosciuta/non valida → 2 per prudenza
-      // (tanto il dispatch non la eseguirà comunque). Un `rifiuto` → 1: non
-      // c'è niente da confermare, il dispatch lo respinge spiegando perché.
+      // (default 1). Preferenza sconosciuta/non valida o `rifiuto` → 1: non c'è
+      // niente da confermare, il dispatch la respinge spiegando perché (un OK a vuoto no).
       level: (a) => {
+        // Un elenco che resterebbe com'è: niente da confermare (`_invariato` lo mette il main, #949).
+        if (a && a._invariato) return 1;
         const built = prefBuilt(a);
-        return (built && built.level) || (built ? 1 : 2);
+        return (built && built.level) || 1;
       },
       describe: (a) => {
         const built = prefBuilt(a);

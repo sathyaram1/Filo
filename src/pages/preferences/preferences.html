@@ -19,6 +19,7 @@
   <script src="filo://shared/confirmUi.js"></script>
   <script src="filo://shared/onboarding.js"></script>
   <script src="filo://shared/caselleAlSicuro.js"></script>
+  <script src="filo://shared/vociImpostazioni.js"></script>
   <style>
     /* Rifare un'intervista di benvenuto non cancella quella di prima: restano qui, rileggibili. */
     .onb-archive { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
@@ -91,6 +92,34 @@
         <label>
           <input type="checkbox" id="showHomeMessage" />
           <span>Mostra il commento di Filo al centro della home</span>
+        </label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Ora, batteria, rete e Bluetooth nella home</h2>
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="homeSisOra" />
+          <span>Ora</span>
+        </label>
+      </div>
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="homeSisBatteria" />
+          <span>Batteria</span>
+        </label>
+      </div>
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="homeSisRete" />
+          <span>Rete</span>
+        </label>
+      </div>
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="homeSisBluetooth" />
+          <span>Bluetooth</span>
         </label>
       </div>
     </section>
@@ -181,6 +210,19 @@
         <button type="button" class="sn-btn sn-btn-secondary" id="ttsPreview">Prova la voce</button>
         <span id="ttsUnsupported" class="sn-muted" hidden>La lettura ad alta voce non è supportata in questo ambiente.</span>
       </div>
+    </section>
+
+    <section>
+      <h2>Microfono delle chat</h2>
+      <label for="dictationAutoSend" class="sn-muted" style="display:block;margin-bottom:4px;">Finito di parlare</label>
+      <select id="dictationAutoSend">
+        <option value="si">Invia da solo</option>
+        <option value="no">Lascia il testo da correggere</option>
+      </select>
+      <label for="dictationSilence" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Pausa che chiude: <span id="dictationSilenceVal">2 s</span></label>
+      <input type="range" id="dictationSilence" min="1" max="8" step="0.5" value="2" style="width:100%;max-width:360px;display:block;" />
+      <label for="dictationCancel" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Tempo per annullare l'invio: <span id="dictationCancelVal">2,5 s</span></label>
+      <input type="range" id="dictationCancel" min="0" max="10" step="0.5" value="2.5" style="width:100%;max-width:360px;display:block;" />
     </section>
 
     <section>

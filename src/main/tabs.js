@@ -251,9 +251,12 @@ const NATIVE_MENU_PAGES = [
 // creato nel DOM ma senza stile (position:static, niente sfondo/z-index) →
 // invisibile, e l'utente percepiva "il tasto destro non funziona". Lo iniettiamo
 // quindi anche via wc.insertCSS dal main, che ignora la CSP (come già facciamo
-// per il colore della selezione). Stessa lista di page-preload.js.
+// per il colore della selezione). Stessa lista di page-preload.js (sentinella: contentScriptPreload.test.mjs).
 const fs = require('node:fs');
-const CONTENT_STYLE_FILES = ['theme.css', 'menu.css', 'popup.css', 'sidebar.css', 'highlight.css', 'spellcheck.css', 'feedback.css'];
+const CONTENT_STYLE_FILES = [
+  'theme.css', 'menu.css', 'popup.css', 'sidebar.css', 'voce.css',
+  'highlight.css', 'spellcheck.css', 'feedback.css', 'redteam-attack.css',
+];
 let CONTENT_SCRIPT_CSS = null;
 function getContentScriptCss() {
   if (CONTENT_SCRIPT_CSS !== null) return CONTENT_SCRIPT_CSS;
@@ -433,6 +436,8 @@ class TabManager {
       if (t._inVista === ora) continue;
       t._inVista = ora;
       const wc = t.view?.webContents;
+      // Una home che torna in vista (scheda o finestra) rivede subito batteria e rete (#873).
+      if (ora) { try { globalThis.SN_SISTEMA_MAIN?.schedaDavanti?.(wc); } catch (_) {} }
       try {
         if (!wc || wc.isDestroyed?.() || !String(wc.getURL() || '').startsWith('filo://')) continue;
         wc.send('filo:broadcast', { type: 'tab_in_vista', inVista: ora });
