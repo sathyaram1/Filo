@@ -86,3 +86,18 @@ test('main: una scheda archiviata porta il suo motivo, che vale finché l\'inter
   assert.equal(acceso.voce({ url: 'https://mail.google.com/' }), 'posta');
   assert.equal(acceso.voce({ url: 'https://it.wikipedia.org/' }), null);
 });
+
+test('a parole: si spegne il riassunto, si spegne la protezione con conferma, si aggiunge un sito delicato', () => {
+  for (const m of ['constants', 'contenutoEsterno', 'storage', 'nomiSito', 'preferences', 'cambi']) require(`../../src/shared/${m}.js`);
+  const P = globalThis.SN_PREF;
+  const r = P.buildPreferencePartial('riassunto_schede_chiuse', 'no');
+  assert.deepEqual(r.partial, { riassuntoSchede: { enabled: false } });
+  assert.equal(r.level, 1);
+  const p = P.buildPreferencePartial('pagine_delicate', 'spento');
+  assert.deepEqual(p.partial, { security: { pagineDelicate: { enabled: false } } });
+  assert.equal(p.level, 2);
+  assert.match(p.risk, /saldi, movimenti, mail e referti/);
+  const s = P.buildPreferencePartial('siti_delicati', 'aggiungi https://www.studiorossi.it/area-clienti');
+  assert.deepEqual(s.elenco.voci, ['studiorossi.it']);
+  assert.match(P.buildPreferencePartial('siti_delicati', 'aggiungi commercialista').rifiuto, /«commercialista» non è un dominio/);
+});

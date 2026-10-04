@@ -27,7 +27,7 @@ async function modelliFinti(app) {
 }
 
 const mandato = (app) => app.evaluate(() => globalThis.__mandato.slice());
-const voceDi = (app, titolo) => app.evaluate(async (t) => {
+const voceDi = (app, titolo) => app.evaluate(async ({}, t) => {
   const e = (await globalThis.SN_ARCHIVED_TABS.list()).find((x) => x.title === t);
   return e ? { delicata: e.delicata || null, summary: e.summary || '', snippet: e.snippet || '', embedding: Array.isArray(e.embedding) } : null;
 }, titolo);
@@ -86,6 +86,11 @@ test('con il riassunto delle schede chiuse spento non parte niente, e la scheda 
   const r = await page.evaluate(() => chrome.runtime.sendMessage({ type: 'search_archived_tabs', query: 'pane' }));
   expect(r.results.map((x) => x.title)).toContain('Ricetta del pane');
 
+  // Riacceso il riassunto, quello che si era chiuso da spento non parte nemmeno dopo, neanche verso l'indice.
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ riassuntoSchede: { enabled: true } }));
+  const r2 = await page.evaluate(() => chrome.runtime.sendMessage({ type: 'search_archived_tabs', query: 'pane' }));
+  expect(r2.results.map((x) => x.title)).toContain('Ricetta del pane');
+
   const partito = await mandato(app);
   expect(partito.filter((m) => m.tipo === 'riassunto')).toEqual([]);
   expect(partito.some((m) => /lievito|Ricetta del pane/.test(m.testo))).toBe(false);
@@ -115,8 +120,42 @@ test('nella chat una scheda delicata aperta entra solo col nome del sito', async
   await expect.poll(() => app.evaluate(() => globalThis.SN_DELICATE.haCampi('sito-pubblico.test')), { timeout: 8_000 }).toBe(true);
   const testo = await app.evaluate(async () => {
     const S = globalThis.SN_FILO_STATE;
-    return S.renderForPrompt(await S.assemble({ sistema: false }));
+    return (await S.assemble({ sistema: false })).stateText;
   });
   expect(testo).toContain('[pagina delicata] sito-pubblico.test');
   expect(testo).not.toContain('Movimenti di Mario Rossi');
+});
+
+const impostazioni = async (shell) => (await shell.evaluate(() => window.filoShell.message({ type: 'get_settings' }))).settings;
+
+test('in Sicurezza un sito aggiunto all\'elenco diventa delicato, e l\'interruttore si spegne da lì', async ({ app, shell, openTab, testServer }) => {
+  await modelliFinti(app);
+  const sicurezza = await openTab('filo://security/security.html');
+  await expect(sicurezza.locator('#sec-delicate')).toBeChecked({ timeout: 8000 });
+  await expect(sicurezza.locator('#sec-delicate-label')).toHaveText('Non mandare ai modelli le pagine delicate');
+  await sicurezza.locator('#sec-delicate-sites').fill('sito-pubblico.test\nstudio rossi');
+  await sicurezza.locator('#sec-delicate-sites').blur();
+  await expect.poll(async () => (await impostazioni(shell)).security.pagineDelicate.siti, { timeout: 4000 })
+    .toEqual(['sito-pubblico.test']);
+  await expect(sicurezza.locator('#sec-delicate-sites-error')).toContainText('studio rossi');
+
+  const t = await apriEChiudi({ app, shell, openTab, testServer }, 'Area clienti dello studio', `<p>${SEGRETO}</p>`);
+  await t.chiudi();
+  await expect.poll(() => voceDi(app, 'Area clienti dello studio'), { timeout: 8_000 })
+    .toEqual({ delicata: 'utente', summary: '', snippet: '', embedding: false });
+  expect((await mandato(app)).some((m) => m.testo.includes('Saldo'))).toBe(false);
+
+  await sicurezza.bringToFront();
+  await sicurezza.locator('#sec-delicate').uncheck();
+  await expect.poll(async () => (await impostazioni(shell)).security.pagineDelicate.enabled, { timeout: 4000 }).toBe(false);
+  await expect(sicurezza.locator('#sec-delicate-sites')).toBeDisabled();
+});
+
+test('in Preferenze il riassunto delle schede chiuse si spegne e si riaccende', async ({ shell, openTab }) => {
+  const pref = await openTab('filo://preferences/preferences.html');
+  await expect(pref.locator('#riassuntoSchede')).toBeChecked({ timeout: 8000 });
+  await pref.locator('#riassuntoSchede').uncheck();
+  await expect.poll(async () => (await impostazioni(shell)).riassuntoSchede.enabled, { timeout: 4000 }).toBe(false);
+  await pref.locator('#riassuntoSchede').check();
+  await expect.poll(async () => (await impostazioni(shell)).riassuntoSchede.enabled, { timeout: 4000 }).toBe(true);
 });

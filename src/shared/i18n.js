@@ -536,8 +536,8 @@
     // #1004 — pagine delicate
     options_security_delicate: 'Non mandare ai modelli le pagine delicate',
     options_security_delicate_desc:
-      'Posta, banca, sanità e le pagine dove hai visto un campo password o carta. Quando chiudi o ' +
-      'riordini queste schede, Filo ne tiene solo titolo e indirizzo e non manda il testo a nessun modello.',
+      'Posta, banca, sanità e le pagine dove hai visto un campo password o carta. Quando chiudi queste ' +
+      'schede o Filo le riordina, ne tiene solo titolo e indirizzo e non manda il testo a nessun modello.',
     options_security_delicate_sites_label:
       'Altri siti delicati, uno per riga',
     options_security_delicate_sites_invalid:

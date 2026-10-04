@@ -4414,6 +4414,9 @@ async function filtroDelicate(settings) {
 }
 // Il riassunto delle schede chiuse (#1004): spento, di una scheda che si chiude non parte niente verso i modelli.
 const riassuntoAcceso = (settings) => !(settings && settings.riassuntoSchede && settings.riassuntoSchede.enabled === false);
+// Una scheda archiviata che non va a nessun modello, nemmeno dopo: della rete di casa (#591), delicata, o chiusa col
+// riassunto spento (#1004), che resta fuori anche se il riassunto si riaccende.
+const restaQui = (it, fuori) => Boolean(it.casa || isHomeNetworkUrl(it.url) || it.senzaRiassunto || fuori.voce(it));
 
 // §2.1 — decisione LLM di triage tab. Riceve i metadati/segnali di TUTTE le tab
 // candidate + (opz.) un estratto del contenuto e la memoria a lungo termine, e
@@ -4858,10 +4861,9 @@ function reindexArchivedEmbeddings(settings, items) {
 
 const conVettoreDi = (it, modello) => Array.isArray(it.embedding) && it.embedding.length && it.embedModel === modello;
 
-// Una pagina della rete di casa (#591) o delicata (#1004) non va al modello: vale solo per testo.
+// Chi resta qui (restaQui) non va al modello: vale solo per testo.
 function daIndicizzare(items, modello, fuori) {
-  return items.filter((it) => !conVettoreDi(it, modello) && (it.title || it.summary || it.snippet)
-    && !(it.casa || isHomeNetworkUrl(it.url)) && !fuori.voce(it));
+  return items.filter((it) => !conVettoreDi(it, modello) && (it.title || it.summary || it.snippet) && !restaQui(it, fuori));
 }
 
 // Le schede senza un vettore del modello in uso si indicizzano in sottofondo quando entrano in archivio (da qualunque
@@ -4940,7 +4942,7 @@ async function enrichArchivedTab(id, payload) {
     if (!base) return;
     // Col riassunto spento resta l'inizio del testo, sul computer, per la ricerca a parole.
     if (!riassuntoAcceso(settings)) {
-      await ArchivedTabs.update(id, { snippet: (content || title).replace(/\s+/g, ' ').trim().slice(0, 240) });
+      await ArchivedTabs.update(id, { senzaRiassunto: true, snippet: (content || title).replace(/\s+/g, ' ').trim().slice(0, 240) });
       return;
     }
 
@@ -5038,10 +5040,10 @@ async function searchArchivedTabs(query, { topK = 40 } = {}) {
 
   // §3.2 step 4 — re-rank LLM dei primi risultati (best-effort): legge i riassunti
   // e li riordina per pertinenza alla query. Se non disponibile, resta l'ordine
-  // per similarità coseno. Le pagine delicate non vanno al modello: restano al loro posto (#1004).
+  // per similarità coseno. Chi resta qui non va al modello e tiene il suo posto (#1004).
   const rerankK = 25;
   const testa = results.slice(0, rerankK);
-  const head = testa.filter((it) => !fuori.voce(it));
+  const head = testa.filter((it) => !restaQui(it, fuori));
   if (head.length > 1) {
     const order = await rerankResults(q, head);
     if (order) {
@@ -5050,7 +5052,7 @@ async function searchArchivedTabs(query, { topK = 40 } = {}) {
       const dropped = head.filter((_, i) => !seen.has(i)); // scartati dall'LLM → in coda
       const riordinate = [...reranked, ...dropped];
       let k = 0;
-      results = [...testa.map((it) => (fuori.voce(it) ? it : riordinate[k++])), ...results.slice(rerankK)];
+      results = [...testa.map((it) => (restaQui(it, fuori) ? it : riordinate[k++])), ...results.slice(rerankK)];
     }
   }
   return { ok: true, results };
@@ -5126,9 +5128,8 @@ async function archivioDaCancellare(query, { avanzamento = () => {} } = {}) {
   const diCasa = [];
   const fuori = await filtroDelicate(settings);
   for (const it of await ArchivedTabs.list()) {
-    // Le pagine della rete di casa (#591) e quelle delicate (#1004) non vanno a nessun modello: per loro un confronto
-    // per parole, più sotto.
-    if (it.casa || isHomeNetworkUrl(it.url) || fuori.voce(it)) {
+    // Chi resta qui (rete di casa, pagine delicate, chiuse col riassunto spento) ha un confronto per parole, più sotto.
+    if (restaQui(it, fuori)) {
       diCasa.push(it);
       continue;
     }

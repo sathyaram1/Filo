@@ -33,15 +33,23 @@ Filo funziona con modelli linguistici, e un modello risponde solo a quello che g
 - **Spiega e traduci.** Il testo selezionato e la frase intorno; per tradurre una pagina intera, il suo testo, a blocchi.
 - **I link.** Quando fai tasto destro su un link, l'indirizzo, il testo del link e il titolo e la descrizione della pagina a cui porta, per spiegarti cosa trovi aprendolo.
 - **L'Aiuto sulla pagina.** Indirizzo e titolo della pagina, la sua struttura e uno screenshot della parte visibile, perché l'agente deve vedere dove cliccare.
-- **La chat con Filo e la home.** La conversazione, le tue memorie, i riassunti dei documenti dell'editor, timer, notifiche, pagine salvate, le azioni recenti e i titoli delle schede aperte (fino a dodici, senza i loro indirizzi).
+- **La chat con Filo e la home.** La conversazione, le tue memorie, i riassunti dei documenti dell'editor, timer, notifiche, pagine salvate, le azioni recenti e i titoli delle schede aperte (fino a dodici, senza i loro indirizzi). Di una pagina delicata, al posto del titolo, solo il nome del sito.
 - **Il terminale e i documenti.** Quando Filo lancia un comando o legge un file per risponderti, quello che il comando stampa o il file contiene. Il terminale è acceso di serie: i comandi che leggono soltanto partono senza chiedere, e così la lettura dei documenti nella tua cartella utente. Fuori da lì Filo chiede un OK. Il terminale si spegne dalle Preferenze.
-- **Le schede.** Per proporti quali archiviare, titolo, indirizzo e un estratto delle schede aperte. Quando una scheda finisce nell'archivio, il suo testo, per farne un riassunto e ritrovarla con la ricerca. Le pagine della rete di casa (router, stampanti, dischi di rete) restano fuori.
+- **Le schede.** Il riassunto delle schede chiuse e la pulizia automatica, descritti qui sotto.
 - **Correttore e riscrittura.** Il testo che stai scrivendo e il suo contesto. Il correttore è acceso di serie e guarda le aree di testo di ogni sito, mai i campi da una riga né le password.
 - **L'editor.** Il documento, quando gli fai una domanda o quando Filo ne scrive titolo e riassunto.
 - **Immagini, voce e lettura.** L'immagine da descrivere o trascrivere, l'audio della dettatura, il testo da leggere ad alta voce.
 - **I siti pericolosi.** Solo dati sul sito: il nome, l'età del dominio, lo stato del certificato, se la pagina chiede password o pagamenti. Mai il contenuto della pagina.
-- **I blocchi geografici.** Quando una pagina sembra bloccata per paese, il dominio, il titolo e poche righe della pagina d'errore.
+- **I blocchi geografici.** Quando una pagina d'errore non dice chiaramente perché è bloccata, il dominio, il titolo e poche righe della pagina d'errore.
 - **I feedback.** Il testo che scrivi, per farne un titolo breve.
+
+**Quello che parte senza che tu lo chieda.** Tre funzioni mandano a un modello pezzi delle pagine anche quando non stai chiedendo niente:
+
+- **Il riassunto delle schede chiuse.** Quando chiudi una scheda, il titolo e i primi 2.000 caratteri circa del suo testo, per farne un riassunto; poi titolo e riassunto vanno a un modello che ne fa l'indice, così la ritrovi nella Cronologia anche per significato. Si spegne da Preferenze («Riassumi le schede chiuse») o chiedendolo a Filo. Da spento non parte niente, e le schede chiuse si ritrovano per parole.
+- **La pulizia automatica delle schede.** Per proporti quali archiviare, titolo, indirizzo e i primi 500 caratteri delle schede aperte. Si spegne da Preferenze («Gestione automatica delle schede») o chiedendolo a Filo.
+- **Il riconoscimento dei blocchi geografici.** Il dominio, il titolo e poche righe di una pagina d'errore che non dice chiaramente perché è bloccata. Parte solo se hai configurato l'apertura da un altro paese, e solo su pagine d'errore.
+
+Le pagine delicate restano fuori dalle prime due: posta, banche, sanità, le pagine in cui Filo ha visto un campo password o di carta e i siti che aggiungi tu. Di queste Filo tiene sul computer solo titolo e indirizzo, e al modello che riordina le schede dice solo di che tipo sono («posta», «banca»). L'elenco di posta, banche e sanità lo aggiorno da remoto, senza un nuovo Filo. Il controllo è in Sicurezza, «Non mandare ai modelli le pagine delicate», acceso di serie, e lì aggiungi i tuoi siti, anche chiedendolo a Filo («studiorossi.it è un sito delicato»). Le pagine della rete di casa (router, stampanti, dischi di rete) restano sempre fuori. In incognito non parte niente di tutto questo.
 
 Niente di questo passa dal server di Filo, e lì non resta niente. La richiesta va dal tuo computer a OpenRouter, il modello risponde, la risposta torna a te e si salva sul tuo computer.
 
@@ -159,6 +167,7 @@ Quello che sta sul server non ha una scadenza automatica, con un'eccezione: l'im
 10. **Con il login Google, email e nome finiscono accanto ai tuoi consumi.** Il documento del vecchio conteggio dei crediti tiene insieme chi sei, quanto usi ogni funzione e quali tue segnalazioni sono state premiate. Togliere email e nome da quel documento è una correzione già decisa, non ancora fatta. Fino ad allora l'unico modo di evitarlo è non fare il login.
 11. **Il codice del server non è pubblico.** Il codice dell'app è aperto e quello che dico di lei lo puoi controllare. Il server contiene anche le difese contro gli attacchi e per ora resta chiuso: quello che dico del server va preso sulla parola.
 12. **I file sul tuo computer sono in chiaro.** Chi ha accesso al tuo computer legge le tue conversazioni con Filo come legge i tuoi documenti. La cifratura del disco è compito del sistema operativo, non di Filo.
+13. **Filo ricorda il campo password solo fino alla chiusura.** Un sito che non è negli elenchi delle pagine delicate lo diventa quando mostra un campo password o di carta, e resta tale finché non chiudi Filo. Alla riapertura, una scheda di quel sito già dentro l'area riservata, dove il campo non c'è, torna a mandare il suo testo al riassunto e alla pulizia delle schede, finché Filo non rivede il campo. Per un sito che conta, aggiungilo ai siti delicati: lì vale sempre.
 
 ## Se stai forkando Filo
 
