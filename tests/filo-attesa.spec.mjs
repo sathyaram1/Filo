@@ -2,7 +2,8 @@
 //
 // Prima: una rotella e «Sta ragionando · …» con l'ultima frase del ragionamento ancora incompleta, che cresceva a
 // strappi e troncava le parole; le azioni si vedevano solo aprendo la cronologia; nessun modo di fermare Filo.
-// Ogni test asserisce il successo visto dall'utente, e senza il lavoro di #578 sarebbe rosso:
+// Ogni test asserisce il successo visto dall'utente, e senza il lavoro di #578 sarebbe rosso
+// (regole: patterns/il-filo-dell-attesa.md):
 //  (A) un filo che ondeggia, nessuna scritta di stato, la trama del ragionamento; due strumenti chiamati insieme
 //      fanno UN nodo col titolo calcolato; alla risposta il gomitolo col riassunto, che si srotola con un clic;
 //  (B) un passo che non riesce: il cappio si riapre e il puntino non si forma;
@@ -10,7 +11,9 @@
 //      srotolato, la chiamata al modello si interrompe; poi lo stesso posto offre «riprendi»;
 //  (D) riprendere non riesegue le azioni già fatte, e il modello sa che erano fatte;
 //  (E) Invio da tastiera ferma come il quadrato, e un'azione nominata dopo lo stop non parte;
-//  (F) l'opacità della trama è un token estetico che arriva fino alla chat.
+//  (F) l'opacità della trama è un token estetico che arriva fino alla chat;
+//  (G) il tasto destro sul blocco ferma, riprende e riavvolge come i tasti;
+//  (H) con meno movimento il filo sta fermo e il gomitolo compare già fatto.
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -22,6 +25,16 @@ async function newtabPage(app) {
     await new Promise((r) => setTimeout(r, 100));
   }
   throw new Error('newtab non trovata');
+}
+
+// L'accoglienza di un profilo nuovo, a metà, ridisegna la conversazione quando la home si ricarica: qui serve chiusa.
+async function senzaAccoglienza(app, page) {
+  await app.evaluate(async () => {
+    const M = globalThis.SN_FILO_MEMORY;
+    await M.setOnboarding(globalThis.SN_ONBOARDING.close(await M.getOnboarding()));
+  });
+  await page.reload();
+  await expect(page.locator('#input')).toBeVisible();
 }
 
 async function configureModel(app) {
@@ -73,6 +86,13 @@ async function copione(app, passi) {
     };
   }, JSON.stringify(passi));
 }
+// Come le Preferenze: il cambio passa dal main e arriva a tutte le pagine aperte.
+async function impostazioni(app, settings) {
+  await app.evaluate(async (_, s) => globalThis.__filoHandlers.handleMessage(
+    { type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: s },
+    { url: 'filo://preferences/preferences.html' },
+  ), settings);
+}
 async function ripristina(app) {
   await app.evaluate(() => {
     if (globalThis.__origStream) globalThis.SN_PROVIDERS.streamCompleteWithFallback = globalThis.__origStream;
@@ -88,6 +108,7 @@ test('A — il filo, la trama, un nodo per due strumenti insieme, poi il gomitol
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible();
   await configureModel(app);
+  await senzaAccoglienza(app, page);
   await copione(app, [
     {
       pensa: PENSIERO_1, ogni: 450, dopoStrumenti: 1200,
@@ -147,7 +168,8 @@ test('A — il filo, la trama, un nodo per due strumenti insieme, poi il gomitol
   expect(box.w).toBeLessThan(26);
   expect(box.h).toBeLessThan(26);
   // L'ultimo pensiero non si vede prima di srotolare.
-  await expect(page.getByText('Rispondo in breve.')).toBeHidden();
+  const coda = blocco.locator('.dash-activity-reasoning', { hasText: 'Rispondo in breve.' });
+  await expect(coda).toBeHidden();
   await page.screenshot({ path: 'tests/.shots/filo-attesa-gomitolo.png' });
 
   // Un clic srotola: il nodo col suo titolo, e sotto la coda (l'ultimo pensiero) senza titolo.
@@ -156,7 +178,7 @@ test('A — il filo, la trama, un nodo per due strumenti insieme, poi il gomitol
   const body = blocco.locator('.dash-activity-body');
   await expect(body).toBeVisible();
   await expect(blocco.locator('.dash-activity-seg-head', { hasText: 'Avviati due timer' })).toBeVisible();
-  await expect(page.getByText('Rispondo in breve.')).toBeVisible();
+  await expect(coda).toBeVisible();
   await page.waitForTimeout(1_200);
   await page.screenshot({ path: 'tests/.shots/filo-attesa-srotolato.png' });
   // Aprire il nodo: il ragionamento che ci ha portato e gli esiti, uno alla volta.
@@ -187,7 +209,8 @@ test('A2 — tema scuro: il filo e il gomitolo restano nel colore d\'accento', a
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await configureModel(app);
-  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }));
+  await senzaAccoglienza(app, page);
+  await impostazioni(app, { theme: 'dark' });
   await expect(page.locator('html')).toHaveAttribute('data-sn-theme', 'dark', { timeout: 5_000 });
   await copione(app, [
     { pensa: ['Controllo cosa so fare. ', 'Poi rispondo. '], ogni: 500, strumenti: [{ id: 'c1', name: 'CAPACITA_DETTAGLIO', arguments: '{"ids":["save-for-later"]}' }], dopoStrumenti: 900 },
@@ -212,6 +235,7 @@ test('B — un passo che non riesce: il cappio si stringe e si riapre, il puntin
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await configureModel(app);
+  await senzaAccoglienza(app, page);
   await copione(app, [
     { pensa: ['Leggo il documento. '], ogni: 300, strumenti: [{ id: 'b1', name: 'LEGGI_DOCUMENTO', arguments: '{"percorso":"~/non-esiste-davvero-578.pdf"}' }] },
     { pensa: ['Non c\'è. '], ogni: 300, testo: 'Quel documento non c\'è.' },
@@ -237,10 +261,12 @@ test('C — il quadrato ferma subito: filo tagliato, ragionamento a metà aperto
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await configureModel(app);
+  await senzaAccoglienza(app, page);
   await copione(app, [
     { pensa: ['Cerco di capire cosa intende. ', 'Forse vuole un elenco lunghissimo, ', 'ci vorrà parecchio. ', 'Continuo a pensare. ', 'Ancora. ', 'Ancora un po\'. '], ogni: 900, testo: 'Non dovresti leggermi.' },
   ]);
   await page.locator('#input').fill('scrivimi un poema');
+  const posto = await page.locator('#sendBtn').boundingBox();
   await page.locator('#sendBtn').click();
   const blocco = page.locator('.dash-activity');
   await expect(blocco).toHaveAttribute('data-phase', 'reason', { timeout: 5_000 });
@@ -248,13 +274,10 @@ test('C — il quadrato ferma subito: filo tagliato, ragionamento a metà aperto
   const ferma = page.locator('#stopBtn');
   await expect(ferma).toBeVisible();
   await expect(page.locator('#sendBtn')).toBeHidden();
-  const posti = await page.evaluate(() => {
-    const s = document.getElementById('stopBtn').getBoundingClientRect();
-    return { w: s.width, h: s.height };
-  });
-  expect(posti.w).toBe(36);
+  const quadrato = await ferma.boundingBox();
+  for (const k of ['x', 'y', 'width', 'height']) expect(Math.abs(quadrato[k] - posto[k])).toBeLessThan(3);
   await page.screenshot({ path: 'tests/.shots/filo-attesa-quadrato.png' });
-  await expect(blocco.locator('.dash-activity-trama')).toContainText('elenco', { timeout: 4_000 });
+  await expect(blocco.locator('.dash-activity-seg[data-stato="pensa"] .dash-activity-trama')).toContainText('elenco', { timeout: 4_000 });
 
   await ferma.click();
   // Subito, senza aspettare il main: il filo si taglia e la riga in corso resta col ragionamento a metà, aperta.
@@ -294,6 +317,7 @@ test('D — riprendere non riesegue le azioni già fatte, e il modello sa che er
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await configureModel(app);
+  await senzaAccoglienza(app, page);
   await copione(app, [
     { pensa: ['Avvio il timer. '], ogni: 200, strumenti: [{ id: 'd1', name: 'TIMER', arguments: '{"secondi":120,"etichetta":"Tè"}' }] },
     { pensa: ['Ora penso a lungo a cosa dire. ', 'Molto a lungo. ', 'Ancora. ', 'Ancora. ', 'Ancora. '], ogni: 900, testo: 'Mai.' },
@@ -303,7 +327,7 @@ test('D — riprendere non riesegue le azioni già fatte, e il modello sa che er
   await page.locator('#sendBtn').click();
   const blocco = page.locator('.dash-activity').first();
   await expect(blocco.locator('.dash-activity-seg-head').first()).toHaveText(/Avviato un timer · Tè/, { timeout: 8_000 });
-  await expect(blocco.locator('.dash-activity-trama')).toContainText('lungo', { timeout: 5_000 });
+  await expect(blocco.locator('.dash-activity-seg[data-stato="pensa"] .dash-activity-trama')).toContainText('lungo', { timeout: 5_000 });
   await page.locator('#stopBtn').click();
   await expect(page.locator('.dash-bubble-fermato')).toBeVisible({ timeout: 5_000 });
   // Il nodo dell'azione fatta resta, col suo esito.
@@ -335,6 +359,7 @@ test('E — Invio ferma come il quadrato, e un\'azione nominata dopo lo stop non
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await configureModel(app);
+  await senzaAccoglienza(app, page);
   // Il modello finto non ascolta lo stop: la sua chiamata finisce lo stesso e chiede un timer. Non deve partire.
   await copione(app, [
     { pensa: ['Metto un timer. '], ogni: 200, strumenti: [{ id: 'e1', name: 'TIMER', arguments: '{"secondi":60,"etichetta":"Mai"}' }], dopoStrumenti: 2500, sordo: true },
@@ -355,7 +380,8 @@ test('F — l\'opacità della trama è un token estetico che arriva fino alla ch
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
   await configureModel(app);
-  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ themeTokens: { 'filo.trama.opacity': '0.25', 'filo.nodo.durata': '0ms' } }));
+  await senzaAccoglienza(app, page);
+  await impostazioni(app, { themeTokens: { 'filo.trama.opacity': '0.25' } });
   await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--dash-trama-opacity').trim()), { timeout: 5_000 })
     .toBe('0.25');
   await copione(app, [{ pensa: ['Un pensiero lungo ', 'che scorre ', 'per un po\'. ', 'Ancora. '], ogni: 700, testo: 'Ok.' }]);
@@ -365,6 +391,58 @@ test('F — l\'opacità della trama è un token estetico che arriva fino alla ch
   await expect(trama).toBeVisible({ timeout: 5_000 });
   expect(Number(await trama.evaluate((el) => getComputedStyle(el).opacity))).toBeCloseTo(0.25, 2);
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Ok.' })).toBeVisible({ timeout: 10_000 });
-  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ themeTokens: {} }));
+  await impostazioni(app, { themeTokens: {} });
+  await ripristina(app);
+});
+
+test('G — il tasto destro sul blocco che lavora offre «Ferma», poi «Riprendi» e «Riavvolgi»', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await configureModel(app);
+  await senzaAccoglienza(app, page);
+  await copione(app, [
+    { pensa: ['Ci penso a lungo. ', 'Ancora. ', 'Ancora. ', 'Ancora. ', 'Ancora. '], ogni: 900, testo: 'Mai.' },
+    { pensa: ['Riprendo. '], ogni: 200, testo: 'Eccomi di nuovo.' },
+  ]);
+  await page.locator('#input').fill('pensaci');
+  await page.locator('#sendBtn').click();
+  const blocco = page.locator('.dash-activity');
+  const trama = blocco.locator('.dash-activity-seg[data-stato="pensa"] .dash-activity-trama');
+  await expect(trama).toContainText('a lungo', { timeout: 5_000 });
+  const menu = page.locator('.sn-menu');
+  await trama.click({ button: 'right' });
+  await menu.getByText('Ferma', { exact: true }).click();
+  await expect(blocco).toHaveAttribute('data-fermato', '1', { timeout: 1_000 });
+  await expect(page.locator('.dash-bubble-fermato')).toBeVisible({ timeout: 5_000 });
+
+  await blocco.locator('.dash-activity-head').click({ button: 'right' });
+  await expect(menu.getByText('Riavvolgi', { exact: true })).toBeVisible();
+  await menu.getByText('Riprendi da dove si era fermato').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Eccomi di nuovo.' })).toBeVisible({ timeout: 10_000 });
+  await ripristina(app);
+});
+
+test('H — con meno movimento il filo non ondeggia e il gomitolo compare già fatto', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await configureModel(app);
+  await senzaAccoglienza(app, page);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await copione(app, [{ pensa: ['Ci penso con calma. ', 'Ancora un momento. ', 'Quasi. ', 'Ecco. '], ogni: 700, testo: 'Calmo.' }]);
+  await page.locator('#input').fill('ciao');
+  await page.locator('#sendBtn').click();
+  const blocco = page.locator('.dash-activity');
+  const tratto = blocco.locator('.dash-activity-filo-tratto');
+  await expect(blocco).toHaveAttribute('data-phase', 'reason', { timeout: 5_000 });
+  await page.waitForTimeout(300);
+  const d1 = await tratto.getAttribute('d');
+  await page.waitForTimeout(400);
+  expect(await tratto.getAttribute('d')).toBe(d1);
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Calmo.' })).toBeVisible({ timeout: 10_000 });
+  // Niente avvolgimento animato: il gomitolo c'è già, e le righe sono già chiuse.
+  await expect(blocco).toHaveAttribute('data-filo', 'gomitolo');
+  expect(await blocco.locator('.dash-activity-body').evaluate((el) => el.hidden)).toBe(true);
   await ripristina(app);
 });

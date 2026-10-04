@@ -91,7 +91,11 @@
     function apri(seg, forza = null) {
       if (seg.stato === 'coda') return;
       const v = forza === null ? aperta !== seg : forza;
+      // Un nodo che è solo un bottone sotto la risposta (un link aperto) non ha niente da mostrare dentro.
+      if (v && !seg.cot && !seg.corpo.querySelector('.dash-activity-note') && !seg.esiti.childElementCount) return;
       if (aperta && aperta !== seg) { aperta.corpo.hidden = true; aperta.el.classList.remove('dash-activity-seg-aperta'); aperta.testa.setAttribute('aria-expanded', 'false'); }
+      // A metà dello srotolamento la tendina ha l'altezza di prima: la sezione aperta ci finirebbe sotto, tagliata.
+      if (body.style.maxHeight && body.style.maxHeight !== '0px') body.style.maxHeight = '';
       aperta = v ? seg : null;
       seg.corpo.hidden = !v;
       seg.el.classList.toggle('dash-activity-seg-aperta', v);
@@ -113,6 +117,9 @@
       testa.append(eti);
       const trama = document.createElement('div');
       trama.className = 'dash-activity-trama';
+      trama.tabIndex = 0;
+      trama.setAttribute('role', 'button');
+      trama.setAttribute('aria-label', 'Il ragionamento in corso');
       const tramaTesto = document.createElement('span');
       trama.append(tramaTesto);
       const corpo = document.createElement('div');
@@ -128,6 +135,9 @@
       const seg = { el, testa, eti, trama, tramaTesto, corpo, esiti, cot: null, testo: '', voci: [], attese: new Set(), nodo: null, esito: null, stato: '' };
       testa.addEventListener('click', () => apri(seg));
       trama.addEventListener('click', () => apri(seg));
+      trama.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); apri(seg); }
+      });
       if (coda) segs.splice(segs.indexOf(coda), 0, seg); else segs.push(seg);
       statoSeg(seg, stato);
       return seg;
@@ -266,7 +276,6 @@
       }
       if (completa(seg) || !inDiretta || phase === 'done') chiudiNodo(seg);
       if (phase !== 'done' && !fermato && inDiretta) setPhase('act');
-      if (wrap.dataset.filo === 'gomitolo') filo.avvolgi(1, { subito: true });
       return seg;
     }
     function esitoDi(a, failed, tipo) {
@@ -431,7 +440,13 @@
       finish({ failed = false } = {}) {
         closeTurnReasoning();
         inDiretta = false;
-        for (const s of segs) if (s.stato === 'agisce') chiudiNodo(s);
+        for (const s of segs) {
+          if (s.stato !== 'agisce') continue;
+          if (s.voci.length) { chiudiNodo(s); continue; }
+          // Nominata ma mai partita (fermata prima, o persa per strada): il nodo non tiene e la riga lo dice.
+          scrivi(s, fermato ? 'Fermato qui' : 'Non partita');
+          if (s.nodo && !s.esito) { s.esito = 'cede'; s.nodo.cede(); }
+        }
         if (viva && viva.stato === 'pensa') statoSeg(viva, fermato ? 'fermato' : 'coda');
         viva = null;
         if (!haCose() && !fermato) { filo.distruggi(); wrap.remove(); setPhase('done'); return; }
@@ -444,7 +459,8 @@
         }
         filo.chiudi();
         wrap.classList.remove('dash-activity-vuoto');
-        avvolgi();
+        // Srotolato dall'utente mentre arrivava la risposta: la sua scelta resta.
+        if (wrap.dataset.filo === 'srotolato') mostraTesta(); else avvolgi();
         label.textContent = failed ? `Tentativo non riuscito · ${riassunto()}` : riassunto();
         if (failed) wrap.dataset.failed = '1';
       },

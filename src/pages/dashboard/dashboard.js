@@ -1045,7 +1045,8 @@
     activity.finish({ failed: !r?.ok });
 
     sending = false;
-    if (r?.ok && r.stopped) ripresa = { nota: r._notaFermato || null };
+    // Riprendere ha senso solo nella conversazione che è ancora a schermo.
+    if (r?.ok && r.stopped && activity.el.isConnected) ripresa = { nota: r._notaFermato || null, blocco: activity.el };
     aggiornaTasto();
     inputEl.focus();
 
@@ -1099,6 +1100,25 @@
   }
   stopBtn.addEventListener('click', () => { fermaTurno(); inputEl.focus(); });
   aggiornaTasto();
+  // Il tasto destro sul blocco che lavora e sul tasto d'invio (letto da src/content/content.js): le stesse cose dei
+  // tasti, negli stessi momenti. Su un blocco finito, srotolare e riavvolgere come col clic sul gomitolo.
+  function vociAttesa(target) {
+    const el = target && target.nodeType === 1 ? target : (target && target.parentElement) || null;
+    const blocco = el && el.closest('.dash-activity');
+    const tasto = el && el.closest('#stopBtn, #sendBtn');
+    if (!blocco && !tasto) return [];
+    const voci = [];
+    const t = turnoVivo;
+    if (t && !t.fermato && (tasto || t.attivita.el === blocco)) voci.push({ type: 'item', label: 'Ferma', onClick: () => fermaTurno() });
+    if (ripresa && !sending && (tasto || ripresa.blocco === blocco)) voci.push({ type: 'item', label: 'Riprendi da dove si era fermato', onClick: () => riprendi() });
+    const testa = blocco && blocco.querySelector('.dash-activity-head');
+    if (testa && !testa.hidden && blocco.dataset.phase === 'done') {
+      voci.push({ type: 'item', label: blocco.dataset.filo === 'gomitolo' ? 'Srotola' : 'Riavvolgi', onClick: () => testa.click() });
+    }
+    return voci;
+  }
+  self.SN_VOCI_PAGINA = Array.isArray(self.SN_VOCI_PAGINA) ? self.SN_VOCI_PAGINA : [];
+  if (!self.SN_VOCI_PAGINA.includes(vociAttesa)) self.SN_VOCI_PAGINA.push(vociAttesa);
   // Riprendere non riesegue niente: le azioni già fatte stanno nello storico come tali, e il modello le vede.
   async function riprendi() {
     if (sending || !ripresa) return;

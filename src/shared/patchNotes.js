@@ -24,7 +24,9 @@
     },
     {
       version: '0.2.233', date: '2026-10-05',
-      features: [],
+      features: [
+        'Mentre Filo lavora, al posto della rotella corre un filo. Accanto vedi scorrere il suo ragionamento, e ogni volta che fa qualcosa il filo fa un nodo col nome di quello che sta facendo, per esempio «Cercato sul web · orari treni». Quando risponde il filo si avvolge in un gomitolo con il riassunto, e un clic lo srotola. Il tasto d\'invio intanto diventa un quadrato che lo ferma subito, anche con Invio. Quello che aveva già fatto resta, e lo stesso tasto ti offre di riprendere senza rifarlo.',
+      ],
       fixes: [
         'Nelle Opzioni, se clicchi sul campo del modello prima che arrivi l\'elenco dei modelli, il menu a tendina si apre da solo appena l\'elenco c\'è. Prima restava chiuso e bisognava cliccare di nuovo.',
         'Nelle risposte di Filo un elenco numerato con le voci staccate da una riga vuota tiene i suoi numeri: prima ogni voce ripartiva da 1.',
