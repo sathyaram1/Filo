@@ -151,6 +151,14 @@ test('segnare fidato un sito dove scrivono in tanti: lo sconsiglia nel riquadro,
   expect(elenco).toContain('Siti fidati (1)');
   expect(elenco).toContain('- sito-pubblico.test (segnato in chat)');
   expect(elenco).toContain('Mittenti fidati: nessuno.');
+  // Anche chi passa dalle impostazioni li trova: gli elenchi sono voci come le altre, tenute fuori dalle impostazioni.
+  await modello(app, [
+    { toolCalls: [{ id: 'f4', name: 'LEGGI_IMPOSTAZIONI', arguments: { cerca: 'siti fidati' } }] },
+    { text: 'Letto.' },
+  ]);
+  await chiedi(page, 'quali siti fidati ho?');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Letto.' })).toBeVisible({ timeout: 60_000 });
+  expect((await ultimoEsito(app, 1)).join('\n')).toContain('sito-pubblico.test (segnato in chat)');
 
   await modello(app, [
     { toolCalls: [{ id: 'f2', name: 'TOGLI_FIDATO', arguments: { sito: 'sito-pubblico.test' } }] },

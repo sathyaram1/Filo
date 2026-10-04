@@ -122,6 +122,20 @@ test('i permessi dei siti si leggono (anche cercando il permesso o il sito) e la
   assert.match(riga(V.righePerModello(S, {})), /: non letto \[/);
 });
 
+// #534 — «di chi ti fidi?» passa anche da LEGGI_IMPOSTAZIONI: gli elenchi stanno fuori dalle impostazioni, come i permessi.
+test('mittenti e siti fidati si leggono fra le impostazioni, e la riga dice come cambiarli', () => {
+  const S = JSON.parse(JSON.stringify(C.DEFAULT_SETTINGS));
+  const altrove = { mittentiFidati: ['marco@uni.it (dagli Inviati)'], sitiFidati: ['bancaesempio.it (segnato in chat)'] };
+  const riga = (r, inizio) => r.righe.find((x) => x.startsWith(`- ${inizio}`)) || '';
+  for (const cerca of ['mittenti fidati', 'di quali mittenti ti fidi?', 'marco@uni.it']) {
+    assert.match(riga(V.righePerModello(S, { cerca, altrove }), 'mittenti fidati'), /marco@uni\.it \(dagli Inviati\).*SEGNA_FIDATO.*TOGLI_FIDATO/, cerca);
+  }
+  assert.match(riga(V.righePerModello(S, { cerca: 'siti fidati', altrove }), 'siti fidati (pagine'), /bancaesempio\.it/);
+  assert.match(riga(V.righePerModello(S, { altrove: { mittentiFidati: [] } }), 'mittenti fidati'), /: elenco vuoto \[/);
+  // L'interruttore della lettura delle schede è una voce come le altre, con la sua chiave.
+  assert.match(V.righePerModello(S, { cerca: 'leggere le schede' }).righe.join('\n'), /leggere_schede/);
+});
+
 test('togliere un permesso dalla chat: per sito e sottodomini, per permesso o tutti; un permesso sconosciuto è un rifiuto', async () => {
   const Perm = require('../../src/main/services/permessiPagine.js');
   let salvato = null;
