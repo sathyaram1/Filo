@@ -2680,13 +2680,13 @@ class TabManager {
         openExternalScheme(url);
         return { action: 'deny' };
       }
-      if (isAuthPopup(url)) {
-        if (this._maybeBlockNavigation(origine, url)) return { action: 'deny' };
-        return this._allowAuthPopup(url);
-      }
       if (this.security.blockPopups && !Permessi.gestoPerUnaFinestra(pwc)) {
         this._notifyPopupBlocked(origine ? origine.id : null, url);
         return { action: 'deny' };
+      }
+      if (isAuthPopup(url)) {
+        if (this._maybeBlockNavigation(origine, url)) return { action: 'deny' };
+        return this._allowAuthPopup(url);
       }
       this.openTab(url, {
         activate: true,
