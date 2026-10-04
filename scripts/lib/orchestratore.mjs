@@ -22,6 +22,9 @@ export const OPZIONI_BASE = Object.freeze({
   memMinGB: 2,
   ritenta: 2,
   pausaMs: 60_000,
+  // Il limite d'uso dell'abbonamento si aspetta (un quarto d'ora per volta, se non dice quando riparte); oltre il tetto il lavoro si ferma col motivo.
+  pausaLimiteMs: 15 * 60_000,
+  oreLimite: 12,
   derivati: 'non-locale',
   tieniWorktree: false,
 });
@@ -36,6 +39,17 @@ const TRANSITORIO = /usciteSegreti|2FA|EBUSY|Process failed to launch|0xC0000142
 
 /** Il rosso è di quelli che la macchina carica o la rete producono da soli, e si rilancia. PURA. */
 export function eTransitorio(testo) { return TRANSITORIO.test(String(testo || '')); }
+
+const LIMITE_USO = /usage limit|hit your (usage )?limit|(5-hour|weekly|session|opus|sonnet) limit|limit reached|limite di utilizzo/i;
+
+/** Quanto aspettare prima di rilanciare un'istanza fermata dal limite d'uso: 0 se l'errore è un altro. PURA. */
+export function attesaLimite(testo, adessoMs, opz = OPZIONI_BASE) {
+  const t = String(testo || '');
+  if (!LIMITE_USO.test(t)) return 0;
+  const epoca = /\|(\d{10})\b/.exec(t);
+  if (epoca) return Math.max(Number(epoca[1]) * 1000 - Number(adessoMs || 0) + 60_000, 60_000);
+  return opz.pausaLimiteMs;
+}
 
 /** Le ultime righe di un'uscita, per il motivo di una fermata. PURA. */
 export function coda(testo, righe = 12) {
@@ -112,7 +126,7 @@ export function decidiDopoVerifica(v, p) {
   if (e.verdict === 'fixed') return { azione: 'giro' };
   if (e.verdict === 'fix-pending') {
     const r = e.pending && Array.isArray(e.pending.findings) ? ROUND.formatFindings(e.pending.findings) : '';
-    return { azione: 'ferma', motivo: `il verificatore ha registrato la critica ma non ha consegnato la correzione${r ? `:\n${r}` : ''}` };
+    return { azione: 'ferma', motivo: `il verificatore ha registrato la critica ma non ha consegnato la correzione${r ? `:\n${r}` : ''}`, correzione: r || '(i rilievi li ristampa node scripts/verify-local.mjs status)' };
   }
   if (e.verdict === 'fail') {
     return { azione: 'ferma', motivo: 'la verifica ha fermato il lavoro: serve una decisione dell’owner', domanda: String(e.critique || '') };
@@ -169,10 +183,19 @@ export function promptLavoratore({ p, regole, wtApp, wtServer, cartellaNote, cri
       'risolvi i conflitti unendo i due lati (elenchi, campi ammessi: si tiene l’unione; se si contraddicono davvero scrivilo nelle note e fermati),',
       'lancia gli unit dei file toccati dal conflitto, committa e pusha. Non toccare altro.',
     );
+  } else if (p.compito === 'correzione') {
+    righe.push(
+      `Lavoro: feedback #${p.num} (\`npm run feedback:leggi -- ${p.num}\`). La verifica ha registrato questi rilievi e la correzione non è stata consegnata:`,
+      crit,
+      '',
+      ...(p.risposta ? ['L’owner ha risposto (è sua, vale come decisione):', p.risposta, ''] : []),
+      'Correggili sul ramo con le prove del giro (`node scripts/verify-local.mjs status` ristampa i rilievi),',
+      'e consegna con `node scripts/verify-local.mjs corretto "<report della correzione>"`. La verifica nuova la lancia l’orchestratore.',
+    );
   } else if (p.compito === 'decisione') {
     righe.push(
-      `Lavoro: feedback #${p.num} (\`npm run feedback:leggi -- ${p.num}\`). La verifica l’aveva fermato con questi rilievi:`,
-      crit || '(nessun testo registrato)',
+      `Lavoro: feedback #${p.num} (\`npm run feedback:leggi -- ${p.num}\`). Il lavoro si era fermato così:`,
+      crit || '(nessun motivo registrato)',
       '',
       'L’owner ha risposto (è sua, vale come decisione):',
       p.risposta,
@@ -191,7 +214,9 @@ export function promptLavoratore({ p, regole, wtApp, wtServer, cartellaNote, cri
       : '- se serve una parte server: worktree di filo-security con lo stesso nome di ramo (vedi regole fisse).',
     '- Niente deploy, fusioni o giudici veri durante le prove: dati finti, --dry-run.',
     `- Note per dopo (ordine di deploy, scelte che spettano all'owner, cose diverse dal chiesto): \`${cartellaNote}/note-${p.num}.md\`.`,
-    '- Non lanciare verify-local: la verifica la lancia l’orchestratore, con un’istanza nuova.',
+    p.compito === 'correzione'
+      ? '- Di verify-local usi solo status e corretto: start lo lancia l’orchestratore, con un’istanza nuova.'
+      : '- Non lanciare verify-local: la verifica la lancia l’orchestratore, con un’istanza nuova.',
     '',
     'Rispondi con una riga sola: esito e ultimi sha dei rami.',
   );
@@ -199,11 +224,12 @@ export function promptLavoratore({ p, regole, wtApp, wtServer, cartellaNote, cri
 }
 
 /** Il compito del verificatore: il testo di verify-local start, intero, e il dove. Niente diff, niente report. PURA. */
-export function promptVerificatore({ p, regole, wtApp, wtServer, brief }) {
+export function promptVerificatore({ p, regole, wtApp, wtServer, brief, cartellaNote = '' }) {
   return [
     ...testa(regole),
     'Sei un verificatore di una sessione locale di Filo, istanza nuova, lanciato dall’orchestratore automatico (#956). Segui le regole fisse qui sopra.',
     `Lavori nel worktree \`${wtApp}\` (ramo ${ramoDi(p)}).${wtServer ? ` La parte server dello stesso lavoro sta nel worktree \`${wtServer}\` di filo-security, stesso ramo.` : ''}`,
+    ...(cartellaNote ? [`Cartella temporanea, fuori dal repo, per script di prova, log, appunti e la nota \`note-${p.num}.md\`: \`${cartellaNote}\`.`] : []),
     'Segui per intero il compito qui sotto e poi la risposta del server alla critica, qualunque cosa dica.',
     'Rispondi con una riga sola: esito del server e ultimo sha del ramo.',
     '',
@@ -229,7 +255,11 @@ export function riprendi(p, risposta) {
   if (p.fase !== 'fermo') throw new Error(`#${p.num} non è ferma (fase ${p.fase})`);
   const q = { ...p, fermoPrima: p.fermo, fermo: null, ripreso: true, tentativi: {} };
   const r = String(risposta || '').trim();
+  const f = p.fermo || {};
+  // Si riparte dal passo che si era fermato: una fusione in attesa d'approvazione non rifà la verifica (l'approvazione vale per quel commit).
   if (q.fusa && (q.fusa.app || q.fusa.server)) { q.fase = 'chiusura'; return q; }
+  if (f.dove === 'chiusura' && !r) { q.fase = 'chiusura'; return q; }
+  if (f.correzione) { q.compito = 'correzione'; q.risposta = r; q.fase = 'lavoro'; return q; }
   if (r) { q.compito = 'decisione'; q.risposta = r; q.fase = 'lavoro'; return q; }
   if (!q.giriTotali) { q.fase = 'lavoro'; return q; }
   q.fase = 'verifica';
@@ -257,9 +287,10 @@ export function creaMotore(dep, opzioni = {}) {
   const node = (cwd, args, timeoutMs) => dep.esegui('node', args, { cwd, timeoutMs });
   const numero = (r) => (r.code === 0 ? Number(String(r.out).trim()) || 0 : 0);
 
-  function ferma(p, motivo, domanda = '') {
+  function ferma(p, motivo, domanda = '', altro = {}) {
+    const dove = p.fase;
     p.fase = 'fermo';
-    p.fermo = { motivo, ...(domanda ? { domanda } : {}), at: dep.ora() };
+    p.fermo = { motivo, ...(domanda ? { domanda } : {}), dove, ...altro, at: dep.ora() };
     dep.log(`#${p.num} fermo: ${primaRiga(motivo)}`);
     if (p.feedbackId && dep.annota) {
       const nota = `Orchestratore locale: lavoro fermo, ${primaRiga(motivo)}${domanda ? '. Serve la risposta dell’owner (npm run orchestra -- riprendi).' : '.'}`;
@@ -296,12 +327,22 @@ export function creaMotore(dep, opzioni = {}) {
   }
 
   async function istanza(p, ruolo, prompt, nome) {
+    let atteso = 0;
     for (let t = 0; ; t += 1) {
       const r = await dep.claude({ ruolo, prompt, cwd: P.wt(p.slug), addDirs: [P.note, P.serverRadice].filter(Boolean), nome });
       const costo = Number(r.costo) || 0;
       p.costo += costo;
       p.istanze.push({ ruolo, giro: p.giriTotali, at: dep.ora(), ok: !!r.ok, costo, riga: primaRiga(r.testo || r.errore).slice(0, 300) });
       salva(p);
+      const attesa = r.ok ? 0 : attesaLimite(`${r.errore || ''}\n${r.testo || ''}`, Date.parse(dep.ora()) || Date.now(), opz);
+      if (attesa && atteso + attesa <= opz.oreLimite * 60 * 60_000) {
+        atteso += attesa;
+        t -= 1;
+        dep.log(`#${p.num} ${ruolo}: limite d’uso raggiunto, riprovo fra ${Math.round(attesa / 60_000)} min`);
+        await dep.dormi(attesa);
+        continue;
+      }
+      if (attesa) return { ...r, errore: `limite d’uso ancora attivo dopo ${opz.oreLimite} ore di attesa: ${primaRiga(r.errore)}` };
       if (r.ok || t >= opz.ritenta || !eTransitorio(r.errore)) return r;
       dep.log(`#${p.num} ${ruolo}: errore transitorio, riprovo`);
       await dep.dormi(opz.pausaMs);
@@ -310,7 +351,8 @@ export function creaMotore(dep, opzioni = {}) {
 
   async function lavora(p) {
     const wtApp = P.wt(p.slug);
-    const crit = p.compito === 'decisione' && p.fermoPrima ? (p.fermoPrima.domanda || '') : '';
+    const fp = p.fermoPrima || {};
+    const crit = ['decisione', 'correzione'].includes(p.compito) ? (fp.correzione || fp.domanda || fp.motivo || '') : '';
     dep.log(`#${p.num} lavoratore (${p.compito})`);
     const r = await istanza(p, 'lavoratore', promptLavoratore({ p, regole: P.regole, wtApp, wtServer: wtServerSeC(p), cartellaNote: P.note, crit }), `filo #${p.num} lavoratore`);
     if (!r.ok) return ferma(p, `il lavoratore non ha finito: ${primaRiga(r.errore)}`);
@@ -318,6 +360,9 @@ export function creaMotore(dep, opzioni = {}) {
     if (String(st.out).trim()) return ferma(p, `il lavoratore ha lasciato modifiche non salvate:\n${coda(st.out)}`);
     if (p.compito === 'lavoro' && !(await avanti(wtApp)) && !(await serverAvanti(p))) {
       return ferma(p, `il lavoratore non ha lasciato commit sul ramo (sua riga: ${primaRiga(r.testo).slice(0, 200)})`);
+    }
+    if (p.compito === 'correzione' && ((dep.verifica(wtApp) || {}).entry || {}).verdict === 'fix-pending') {
+      return ferma(p, `la correzione non è stata consegnata (sua riga: ${primaRiga(r.testo).slice(0, 200)})`, '', { correzione: crit });
     }
     p.compito = 'lavoro';
     p.risposta = '';
@@ -372,14 +417,14 @@ export function creaMotore(dep, opzioni = {}) {
     dep.log(`#${p.num} verificatore, giro ${p.giriTotali}`);
     // Solo stdout: i bilanci stanno su stderr apposta, servono a chi guida e non a chi verifica.
     const brief = s.stdout !== undefined ? s.stdout : s.out;
-    const r = await istanza(p, 'verificatore', promptVerificatore({ p, regole: P.regole, wtApp: wt, wtServer: wtServerSeC(p), brief }), `filo #${p.num} verifica ${p.giriTotali}`);
+    const r = await istanza(p, 'verificatore', promptVerificatore({ p, regole: P.regole, wtApp: wt, wtServer: wtServerSeC(p), brief, cartellaNote: P.note }), `filo #${p.num} verifica ${p.giriTotali}`);
     if (!r.ok) dep.log(`#${p.num} verificatore uscito con errore: ${primaRiga(r.errore)}`);
     const d = decidiDopoVerifica(dep.verifica(wt), p);
     if (d.ripeti) p.tentativi[d.ripeti] = (p.tentativi[d.ripeti] || 0) + 1;
     else p.tentativi.critica = 0;
     if (d.azione === 'chiudi') { p.fase = 'chiusura'; return 'ok'; }
     if (d.azione === 'giro') return 'ok';
-    return ferma(p, d.motivo, d.domanda);
+    return ferma(p, d.motivo, d.domanda, d.correzione ? { correzione: d.correzione } : {});
   }
 
   async function conRitenta(p, fare, cosa) {
