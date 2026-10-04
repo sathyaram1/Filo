@@ -650,7 +650,11 @@ function paginaGuidata() {
   function campiBozza(radice) {
     const campi = tutti('input,textarea,[contenteditable=""],[contenteditable="true"],[role=textbox],[role=combobox]', radice)
       .filter((el) => inVista(el) && (campo(el) || el.getAttribute('role') === 'combobox'));
-    const a = campi.find((el) => R.a.test(norm(nomeDi(el))) || /^(destinatari|to\b)/.test(norm(nomeDi(el))));
+    // Gmail cambia l'etichetta del campo A fra versioni e lingue («Destinatari A», «A destinatari»): conta la parola, non Cc e Ccn.
+    const a = campi.find((el) => {
+      const n = norm(nomeDi(el));
+      return R.a.test(n) || /^(destinatari|to\b)/.test(n) || (/\b(destinatari|destinatario|recipients)\b/.test(n) && !/\b(cc|ccn|bcc)\b/.test(n));
+    });
     const oggetto = campi.find((el) => R.oggetto.test(norm(nomeDi(el))));
     const corpi = campi.filter((el) => el.isContentEditable);
     const corpo = corpi.find((el) => R.corpo.test(norm(nomeDi(el)))) || corpi.sort((x, y) => area(y) - area(x))[0] || null;
