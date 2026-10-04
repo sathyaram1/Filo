@@ -24,6 +24,10 @@
   }
   function send(msg) { return chrome.runtime.sendMessage(msg); }
 
+  // La Partita è uno stub (spec §12): finché il tavolo non c'è nessuna strada ci porta, né il
+  // pulsante né un #/game ripreso da cronologia, sessione o link, perché è un vicolo cieco (#391).
+  const PARTITA_PRONTA = false;
+
   let decks = [];        // cache della lista per la libreria
   let current = null;    // mazzo aperto nel builder
 
@@ -166,7 +170,10 @@
       await renderBuilder(true); // apertura: la chat parte dall'ultimo scambio
       return;
     }
-    if (r.screen === 'game') { show('game'); return; }
+    if (r.screen === 'game') {
+      if (PARTITA_PRONTA) { show('game'); return; }
+      history.replaceState(null, '', '#/');
+    }
     current = null;
     await loadLibrary();
     show('library');
@@ -2062,6 +2069,7 @@
       const res = await send({ type: MSG.DECKS_CREATE });
       if (res && res.ok) location.hash = `#/deck/${encodeURIComponent(res.deck.id)}`;
     });
+    $('openGame').hidden = !PARTITA_PRONTA;
     $('openGame').addEventListener('click', () => { location.hash = '#/game'; });
     $('backToLibrary').addEventListener('click', () => { location.hash = '#/'; });
     $('gameBack').addEventListener('click', () => { location.hash = '#/'; });
