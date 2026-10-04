@@ -257,6 +257,16 @@ test('un JPEG firmato dall’SDK ufficiale del C2PA fa comparire la riga', async
   );
 });
 
+// AVIF: le credenziali stanno in un box con un'intestazione sua, e il legame coi byte è in un'altra forma (#946, giro 5).
+test('un AVIF firmato dall’SDK ufficiale del C2PA fa comparire la riga, senza dirlo incompleto', async ({ openTab, testServer }) => {
+  const { page, riga } = await rigaSu(testServer, openTab, fixture('c2pa-ufficiale-ai.avif'), 'image/avif');
+  expect(await page.evaluate(() => document.getElementById('foto').naturalWidth)).toBeGreaterThan(0);
+  await expect(riga).toHaveAttribute('aria-label',
+    'Generata con l’AI secondo credenziali firmate da C2PA Test Signing Cert. Firma valida, firmatario non verificato.',
+    { timeout: 10000 },
+  );
+});
+
 test('lo stesso JPEG cambiato dopo la firma lo dice', async ({ openTab, testServer }) => {
   const b = Buffer.from(fixture('c2pa-ufficiale-ai.jpg'));
   b[b.length - 30] ^= 0x5a;
