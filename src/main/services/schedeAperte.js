@@ -95,7 +95,7 @@ async function attendi(prova, { tetto = 8000, passo = 200 } = {}) {
 }
 
 // Finito di caricare e fermo da `calma` millisecondi (il DOM non cambia): quello che si legge è quello che si vede.
-async function assesta(wc, { calma = 350, tetto = 6000 } = {}) {
+async function assesta(wc, { calma = 350, tetto = 2500 } = {}) {
   await attendi(async () => !wc.isDestroyed() && !wc.isLoading(), { tetto: Math.min(tetto, 15000) });
   await attendi(async () => (await chiama(wc, 'quiete')) >= calma, { tetto, passo: 120 });
 }
@@ -151,7 +151,7 @@ async function apri({ win, rif, elemento }) {
     const r = await chiama(wc, 'apri', [String(elemento == null ? '' : elemento)]);
     if (!r || !r.ok) return { ok: false, errore: (r && r.motivo) || 'non-trovato', nome: r && r.nome, url: r && r.url, scheda: descriviScheda(tab) };
     await pausa(150);
-    await assesta(wc);
+    await assesta(wc, { tetto: 6000 });
     if (vietata(wc.getURL())) return { ok: true, nome: r.nome, tipo: r.tipo, scheda: descriviScheda(tab), vietataDopo: true };
     return { ok: true, nome: r.nome, tipo: r.tipo, scheda: { ...descriviScheda(tab), titolo: wc.getTitle(), url: wc.getURL() } };
   });
