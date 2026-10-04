@@ -1040,6 +1040,27 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   width: 48px; height: 48px; border-radius: 8px; object-fit: cover; cursor: zoom-in;
 }
 .dash-img-previews .dash-img-remove { top: -6px; right: -6px; left: auto; }
+/* #950 — un file trascinato dal disco: il nome in una pastiglia, alta quanto le anteprime delle immagini. */
+.dash-file-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 260px;
+  height: 48px;
+  box-sizing: border-box;
+  padding: 0 14px;
+  border: 1px solid var(--dash-ink);
+  border-radius: 8px;
+  color: var(--dash-ink);
+  font-size: 13px;
+  cursor: default;
+  transition: background 0.12s ease;
+}
+.dash-file-chip:hover,
+.dash-file-chip:focus-visible { background: rgba(var(--sn-accent-rgb), 0.12); outline: none; }
+.dash-file-chip-nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-file-chip .dash-file-chip-togli { position: absolute; top: -6px; right: -6px; left: auto; }
 
 .dash-lightbox {
   position: fixed; inset: 0;

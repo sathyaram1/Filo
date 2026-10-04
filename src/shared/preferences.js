@@ -207,6 +207,20 @@
       },
     },
     {
+      keys: ['nomi_sensati_scaricamenti', 'nome sensato agli scaricamenti', 'nomi sensati', 'rinomina scaricamenti',
+        'rinomina i file scaricati', 'nomi dei file scaricati', 'nomisensati'],
+      // Da accesa il contenuto dei file scaricati va a un modello senza una richiesta per ciascuno: conferma.
+      level: 2,
+      risk: 'Da accesa, ogni file che scarichi con un nome che non dice niente («scan_00231.pdf», «IMG_2026…») '
+        + 'viene letto da un modello (l\'inizio del testo o una miniatura) e rinominato con un nome che dice cosa '
+        + 'contiene. L\'avviso che compare ha «Annulla». I nomi scelti da qualcuno restano com\'erano.',
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { nomiSensati: { scaricamenti: b } }, label: `Nome sensato ai file scaricati → ${b ? 'attivo' : 'spento'}` };
+      },
+    },
+    {
       keys: ['shell_terminale', 'shell terminale', 'shell'],
       level: 2,
       risk: 'Sceglie quale shell usa Filo per eseguire i comandi del terminale (su Windows '

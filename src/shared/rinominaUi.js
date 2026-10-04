@@ -9,6 +9,9 @@
   const MSG = () => (global.SN_MSG && global.SN_MSG.MSG) || {};
   const send = (msg) => global.chrome.runtime.sendMessage(msg);
 
+  // L'etichetta della voce: la stessa in ogni pagina che la offre (la sentinella del manifesto la legge qui).
+  const VOCE_MENU = { label: 'Dai un nome sensato' };
+
   let aperto = null;     // { el, chiudi }
   let menuAperto = null; // { el, chiudi }
 
@@ -282,5 +285,5 @@
     return el;
   }
 
-  global.SN_RINOMINA_UI = { apri, chiudi, menu, chiudiMenu, disponibile, tipoSupportato, VOCE: 'Dai un nome sensato' };
+  global.SN_RINOMINA_UI = { apri, chiudi, menu, chiudiMenu, disponibile, tipoSupportato, VOCE: VOCE_MENU.label };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

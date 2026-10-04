@@ -243,8 +243,9 @@
     },
     {
       id: 'screenshot', title: 'Cattura schermo', category: 'media',
-      desc: 'Cattura la pagina visibile come immagine. Puoi anche selezionare solo una porzione dello schermo.',
+      desc: 'Cattura la pagina visibile come immagine, oppure solo una porzione dello schermo. L’immagine finisce negli appunti e nella cartella Download con un nome che dice cosa mostra: Filo guarda l’immagine e lo scrive da sé. Se il nome non arriva, il file si chiama «screenshot» con data e ora.',
       invoke: 'Menu del tasto destro → "Screenshot" o "Screenshot di una parte".',
+      doesNot: 'Il nome automatico vale per le catture fatte in Filo; per i file che hai già sul computer c’è «Dai un nome sensato».',
     },
     {
       id: 'ocr', title: 'Trascrivi testo da una porzione', category: 'media',
@@ -344,7 +345,7 @@
     {
       id: 'downloads-list', title: 'Elenco degli scaricamenti', category: 'navigation',
       desc: 'La lista di tutti i file scaricati, dal più recente: per ciascuno vedi nome, dimensione, stato (completato, interrotto, annullato, in corso o in attesa della tua conferma), data e dove è stato salvato; gli scaricamenti in corso mostrano barra e percentuale dal vivo. Per ogni voce puoi aprire il file, aprire la cartella che lo contiene, copiarne il percorso, ri-scaricarlo o toglierlo dalla lista; «Svuota elenco» rimuove tutti quelli conclusi. Se un file scaricato non è più al suo posto (l’hai spostato, rinominato o cestinato) la voce si riconosce a colpo d’occhio — attenuata, col nome barrato — e al posto di «Apri file» ti offre di ri-scaricarlo. I programmi in attesa portano la scritta «Programma», dicono da quale sito arrivano e offrono «Scarica» e «Non scaricare» anche se hai già chiuso il pannello in alto. Puoi anche cercare tra gli scaricamenti.',
-      invoke: 'Menu «App» → «Scaricamenti», oppure il pulsante «Vedi tutti» sull’indicatore degli scaricamenti in alto; indirizzo filo://downloads/downloads.html. Clic su una voce completata per aprire il file, tasto destro per il menu con tutte le azioni.',
+      invoke: 'Menu «App» → «Scaricamenti», oppure il pulsante «Vedi tutti» sull’indicatore degli scaricamenti in alto; indirizzo filo://downloads/downloads.html. Clic su una voce completata per aprire il file, tasto destro per il menu con tutte le azioni, compreso «Dai un nome sensato» e, per un file a cui Filo ha cambiato nome, «Rimetti il nome di prima». La ricerca trova un file anche col nome con cui era arrivato.',
       doesNot: 'Non ti fa scegliere dove salvare ogni file (finiscono nella cartella Download di sistema) e non riguarda «Salva immagine/video come…» dal tasto destro. Togliere una voce dall’elenco non cancella il file dal disco, e Filo non va a cercare dove è finito un file che hai spostato: ti dice che lì non c’è più e ti apre la cartella dov’era.',
     },
 
@@ -381,7 +382,13 @@
       id: 'read-user-documents', title: 'Filo legge i tuoi documenti, anche PDF', category: 'assistant',
       desc: 'Indica a Filo un documento sul tuo computer e lui lo legge davvero: bollette, estratti conto, contratti, visure. Vale per i PDF, che prima erano illeggibili, e per i file di testo (txt, csv, md e simili). Puoi chiedergli cose sul contenuto: quant’è la giacenza media, quanto hai pagato di luce a marzo, cosa dice una clausola. Se non ricordi dove hai salvato il file, digli come si chiama più o meno e dove potrebbe essere: lo cerca e poi lo legge.',
       invoke: 'Chiedilo a parole all’assistente (nuova scheda): "leggi l’estratto conto nei Download", "riassumimi il contratto sul desktop", oppure incolla il percorso del file.',
-      doesNot: 'Legge e basta: non modifica né sposta i tuoi file. Su un PDF che è in realtà una scansione o una foto di un foglio non c’è testo da estrarre, e Filo te lo dice invece di inventarsi cosa c’è scritto. Non legge ancora i documenti Word ed Excel, né i file molto grandi; di un documento lunghissimo legge la prima parte e ti avverte che si è fermato lì. Un file fuori dalla tua cartella personale (un altro disco, una chiavetta, una cartella di sistema) o un file nascosto di configurazione non lo apre senza il tuo OK.',
+      doesNot: 'Leggere non modifica né sposta i tuoi file (cambiare nome a un file è una cosa a parte, che chiede il tuo OK: vedi «Nome sensato ai tuoi file»). Su un PDF che è in realtà una scansione o una foto di un foglio non c’è testo da estrarre, e Filo te lo dice invece di inventarsi cosa c’è scritto. Non legge ancora i documenti Word ed Excel, né i file molto grandi; di un documento lunghissimo legge la prima parte e ti avverte che si è fermato lì. Un file fuori dalla tua cartella personale (un altro disco, una chiavetta, una cartella di sistema) o un file nascosto di configurazione non lo apre senza il tuo OK.',
+    },
+    {
+      id: 'file-names', title: 'Nome sensato ai tuoi file', category: 'assistant',
+      desc: 'Filo legge l’inizio di un file (PDF, anche scansionato, immagini, documenti Word e LibreOffice, testo) e propone un nome che dice cosa contiene, nella lingua del computer: «Bolletta luce marzo 2026.pdf» al posto di «scan_00231.pdf». Il nome arriva già scritto in una casella che puoi correggere; «Rinomina» lo applica e «Annulla» rimette quello di prima. In chat puoi chiederlo per più file insieme («rinomina i file in Download con nomi che abbiano senso»): Filo ti mostra l’elenco vecchio → nuovo, rinomina solo dopo il tuo OK, e sotto lascia «Annulla» per rimettere tutto com’era. Di una cartella prende i file col nome che non dice niente (scan_…, IMG_…, documento (3)); se vuoi anche gli altri, diglielo. Un file trascinato nel campo dove scrivi a Filo entra nel messaggio col suo percorso, e dal suo tasto destro gli dai un nome prima di mandarlo. In Preferenze puoi far dare da solo un nome sensato ai file che scarichi.',
+      invoke: 'Tasto destro su un file → «Dai un nome sensato»: negli Scaricamenti, sui file che Filo ti trova in chat, su un file trascinato nel campo dove scrivi a Filo. Oppure chiedilo a parole all’assistente (nuova scheda). Il nome automatico degli scaricamenti si accende in Preferenze → «Nomi dei file scaricati» (spento di serie), o chiedendolo a Filo.',
+      doesNot: 'Non cambia mai l’estensione e non sovrascrive mai un file: se il nome è già preso aggiunge un numero. Non legge archivi, programmi, audio e video: la voce lì non compare. In chat rinomina al massimo 40 file per volta (ti dice quanti ne restano) e non tocca file fuori dalla tua cartella personale. Il nome automatico degli scaricamenti vale solo per i nomi che non dicono niente, non nelle finestre in incognito. Per leggere il file manda a un modello l’inizio del testo o una miniatura.',
     },
     {
       id: 'terminal-mode', title: 'Filo usa il terminale del computer', category: 'assistant',
@@ -397,7 +404,7 @@
     },
     {
       id: 'agent-actions', title: 'Filo agisce al posto tuo', category: 'assistant',
-      desc: 'Su tua richiesta Filo può compiere azioni per te: aprire pagine o file, cercare sul web, mettere timer e sveglie (e poi cancellarle o spostarle), salvare appunti, regolare preferenze e aspetto, archiviare schede, persino inviare un feedback a tuo nome.',
+      desc: 'Su tua richiesta Filo può compiere azioni per te: aprire pagine o file, dare un nome sensato ai tuoi file, cercare sul web, mettere timer e sveglie (e poi cancellarle o spostarle), salvare appunti, regolare preferenze e aspetto, archiviare schede, persino inviare un feedback a tuo nome.',
       invoke: 'Chiedile a parole all’assistente (nuova scheda) oppure all’assistente laterale di pagina (Alt+H, Ctrl+Alt+H su Mac).',
       doesNot: 'Le azioni delicate ti vengono prima descritte e partono solo dopo la tua conferma; le più rischiose (cancellazioni irreversibili) chiedono di digitare "conferma". Non esegue nulla di delicato di nascosto. Se un link che sta per aprire, o una ricerca sul web che sta per fare, contiene dati letti dal tuo computer, prima te lo mostra e aspetta il tuo OK. Non fa mai uscire un segreto: se un link, una ricerca, un comando, un feedback, un collegamento (anche di posta, anche nelle risposte dell’assistente di pagina) o un suggerimento che apri o scarichi con un clic o dal menu del tasto destro, o il testo che l’assistente di pagina propone per un campo, conterrebbe una chiave che Filo custodisce, oppure un codice monouso o di recupero, una password, una chiave, una carta o un IBAN letti da una pagina, un documento, una ricerca o un comando (e non scritti da te in chat), l’azione non parte a nessun livello, nemmeno col tuo OK, e in chat compare cosa è stato fermato. Se vuoi mandarlo davvero, lo fai tu a mano.',
     },

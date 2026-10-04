@@ -818,6 +818,7 @@
     tabPreviewEnabled: 'tabPreview.enabled', tabPreviewSize: 'tabPreview.size',
     agentStylePreset: 'agentStyle', agentStyleText: 'agentStyle', timerRingtone: 'timerRingtone',
     terminalEnabled: 'terminal.enabled', terminalShell: 'terminal.shell',
+    nomiSensatiScaricamenti: 'nomiSensati.scaricamenti',
     ttsVoice: 'tts.voice', ttsRate: 'tts.rate', ttsPitch: 'tts.pitch',
     ttsModelVoice: 'tts.modelVoice', ttsModelVoiceCustom: 'tts.modelVoice',
     autoArchiveEnabled: 'autoArchive.enabled', autoArchiveIdleHours: 'autoArchive.idleHours',
@@ -836,6 +837,7 @@
       case 'agentStyle': return currentStyleText();
       case 'timerRingtone': return $('timerRingtone').value || 'default';
       case 'terminal.enabled': return $('terminalEnabled').checked;
+      case 'nomiSensati.scaricamenti': return $('nomiSensatiScaricamenti').checked;
       case 'terminal.shell': return $('terminalShell').value;
       case 'tts.voice': return $('ttsVoice').value || '';
       case 'tts.rate': return parseFloat($('ttsRate').value) || 1;
@@ -866,6 +868,7 @@
       case 'agentStyle': return String(s.agentStyle || '').trim();
       case 'timerRingtone': return s.timerRingtone || 'default';
       case 'terminal.enabled': return !!(s.terminal && s.terminal.enabled === true);
+      case 'nomiSensati.scaricamenti': return !!(s.nomiSensati && s.nomiSensati.scaricamenti === true);
       case 'terminal.shell': return (s.terminal && s.terminal.shell) || '';
       case 'tts.voice': return tts.voice || '';
       case 'tts.rate': return Number(tts.rate) || 1;
@@ -953,6 +956,7 @@
 
     const terminal = settings.terminal || {};
     if (vuole('terminal.enabled')) $('terminalEnabled').checked = terminal.enabled === true;
+    if (vuole('nomiSensati.scaricamenti')) $('nomiSensatiScaricamenti').checked = !!(settings.nomiSensati && settings.nomiSensati.scaricamenti === true);
     if (vuole('terminal.shell')) {
       const sel = $('terminalShell');
       const suWindows = shellDiWindows();
@@ -1180,6 +1184,7 @@
     // un numero fuori scala non resta a schermo a mentire sul valore in uso.
     $('autoArchiveIdleHours').addEventListener('blur', canonAutoArchiveIdle);
     $('terminalEnabled').addEventListener('change', persist);
+    $('nomiSensatiScaricamenti').addEventListener('change', persist);
     $('terminalShell').addEventListener('change', persist);
 
     // Lettura ad alta voce: la lista voci può popolarsi in ritardo.

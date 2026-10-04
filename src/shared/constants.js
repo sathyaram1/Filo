@@ -2269,6 +2269,9 @@
     // Carta con l'anteprima della scheda al passaggio del puntatore sulla barra (#430). size: 'piccola' |
     // 'media' | 'grande' (le larghezze stanno in src/main/popup-anteprima.js).
     tabPreview: { enabled: true, size: 'media' },
+    // #950 — nome sensato da solo agli scaricamenti col nome che non dice niente. Spento: il contenuto del file
+    // andrebbe a un modello senza che l'utente l'abbia chiesto per quel file.
+    nomiSensati: { scaricamenti: false },
     // Colore identità delle tab (spec "Colore identità delle tab"): i sei
     // parametri che governano come si estrae il colore dal favicon e quanto
     // tinge la tab. La fonte di verità dei default/range/commenti è

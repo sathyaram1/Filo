@@ -1143,7 +1143,7 @@ function recordPendingConfirm(sender, action) {
   for (const [k, rec] of pendingConfirms) if (rec.scade <= now) pendingConfirms.delete(k);
   pendingConfirms.set(pendingConfirmKey(sender, action), {
     scade: now + PENDING_CONFIRM_TTL,
-    mostrati: { righe: action._righe, targetIds: action._targetIds },
+    mostrati: { righe: action._righe, targetIds: action._targetIds, proposte: action._proposte },
   });
 }
 function consumePendingConfirm(sender, action) {
@@ -1161,7 +1161,7 @@ function daPaginaDiFilo(sender) {
 // Una pagina di Filo rimanda l'azione col popup che ha mostrato; per le altre
 // vale quello registrato alla richiesta di conferma.
 function bersagliMostrati(sender, action) {
-  if (daPaginaDiFilo(sender)) return { righe: action._righe, targetIds: action._targetIds };
+  if (daPaginaDiFilo(sender)) return { righe: action._righe, targetIds: action._targetIds, proposte: action._proposte };
   const rec = pendingConfirms.get(pendingConfirmKey(sender, action));
   return rec && rec.scade > Date.now() ? rec.mostrati : null;
 }
@@ -1374,6 +1374,107 @@ function idDelCambio(action) {
 
 // Ogni stato che l'azione scrive diventa un evento del filo nel salvataggio (registroCambi.js):
 // qui si dichiara solo che li ha chiesti la chat, e si raccolgono per il segno sulla bolla.
+// #950 — quanti file per volta: ognuno costa una lettura e una chiamata al modello, e l'elenco va letto prima
+// dell'OK. Oltre, il popup dice quanti ne restano.
+const LOTTO_RINOMINA = 40;
+async function preparaRinomina(action, sender) {
+  const NF = globalThis.SN_NOMI_FILE;
+  const Nomi = require('./nomiFile');
+  const DR = require('./documentRead');
+  const fsp = require('node:fs/promises');
+  const fs = require('node:fs');
+  const nodePath = require('node:path');
+  const C = globalThis.SN_CMD_CLASSIFY;
+  const perimetro = perimetroLettura(sender);
+  const cwd = cartellaDelComando(getAssistantCwd(sender));
+  const saltati = [];
+  const vero = (v) => v === true || /^(true|1|si|sì|yes)$/i.test(String(v ?? ''));
+  const elenco = [].concat(action.percorsi ?? action.file ?? action.files ?? action.percorso ?? action.path ?? [])
+    .map((x) => (x && typeof x === 'object' ? (x.percorso ?? x.path) : x))
+    .filter((x) => typeof x === 'string' && x.trim());
+  let candidati = [];
+  for (const x of elenco) {
+    let full = DR.normalizePath(x, cwd);
+    try { await fsp.stat(full); } catch (_) {
+      try { const alt = await DR.risolviTollerante(full); if (alt && alt.path) full = alt.path; } catch (_) {}
+    }
+    candidati.push(full);
+  }
+  const cartella = action.cartella ?? action.folder ?? action.directory;
+  if (typeof cartella === 'string' && cartella.trim()) {
+    const dir = DR.normalizePath(cartella, cwd);
+    let voci = null;
+    try { voci = await fsp.readdir(dir, { withFileTypes: true }); } catch (_) { voci = null; }
+    if (!voci) {
+      if (!candidati.length) return { proposte: [], saltati, oltre: 0, errore: `la cartella ${dir} non si apre (non c'è, o non è una cartella)` };
+    } else {
+      const tutti = vero(action.tutti ?? action.all);
+      const scelti = voci.filter((d) => d.isFile() && !d.name.startsWith('.') && NF.tipoDi(d.name)
+        && (tutti || NF.nomeSenzaSenso(d.name))).map((d) => nodePath.join(dir, d.name));
+      const conData = await Promise.all(scelti.map(async (p) => {
+        try { return { p, t: (await fsp.stat(p)).mtimeMs }; } catch (_) { return { p, t: 0 }; }
+      }));
+      conData.sort((a, b) => b.t - a.t);
+      candidati.push(...conData.map((x) => x.p));
+    }
+  }
+  candidati = [...new Set(candidati)];
+  if (!candidati.length) return { proposte: [], saltati, oltre: 0, errore: elenco.length || cartella ? '' : 'indica i file o una cartella' };
+  const oltre = Math.max(0, candidati.length - LOTTO_RINOMINA);
+  candidati = candidati.slice(0, LOTTO_RINOMINA);
+  const dettato = typeof action.nome === 'string' && action.nome.trim() && candidati.length === 1 ? action.nome : '';
+
+  async function unaProposta(full) {
+    const nome = nodePath.basename(full);
+    if (C && C.fuoriPerimetro(full, perimetro)) return { saltato: { nome, perche: 'sta fuori dalla tua cartella personale' } };
+    let st = null;
+    try { st = await fsp.stat(full); } catch (_) { st = null; }
+    if (!st) return { saltato: { nome, perche: 'non c\'è' } };
+    if (!st.isFile()) return { saltato: { nome, perche: 'non è un file' } };
+    const { ext } = NF.scomponi(nome);
+    if (dettato) {
+      const base = NF.pulisci(dettato, { ext });
+      return base ? { proposta: { da: full, prima: nome, nome: base + ext } } : { saltato: { nome, perche: 'il nome chiesto è vuoto' } };
+    }
+    const p = await Nomi.proponi(full);
+    if (!p.ok) return { saltato: { nome, perche: p.frase } };
+    const nuovo = p.proposta + p.ext;
+    if (nuovo === nome) return { saltato: { nome, perche: 'ha già un nome che dice cos\'è' } };
+    return { proposta: { da: full, prima: nome, nome: nuovo } };
+  }
+  // In parallelo, ma pochi alla volta: una cartella di scansioni non deve diventare quaranta chiamate insieme.
+  const esiti = new Array(candidati.length);
+  let prossimo = 0;
+  const lavora = async () => {
+    while (prossimo < candidati.length) {
+      const k = prossimo++;
+      try { esiti[k] = await unaProposta(candidati[k]); } catch (_) {
+        esiti[k] = { saltato: { nome: nodePath.basename(candidati[k]), perche: 'non sono riuscito a leggerlo' } };
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(4, candidati.length) }, lavora));
+
+  // Il popup promette nomi veri: due file dello stesso lotto, o un file già sul disco, non finiscono sullo stesso.
+  const presi = new Map();
+  const proposte = [];
+  for (const e of esiti) {
+    if (!e) continue;
+    if (e.saltato) { saltati.push(e.saltato); continue; }
+    const p = e.proposta;
+    const dir = nodePath.dirname(p.da);
+    if (!presi.has(dir)) presi.set(dir, new Set());
+    const set = presi.get(dir);
+    const occupato = (n) => set.has(n.toLowerCase())
+      || (n.toLowerCase() !== p.prima.toLowerCase() && fs.existsSync(nodePath.join(dir, n)));
+    const libero = NF.nomeLibero(p.nome, occupato);
+    if (!libero) { saltati.push({ nome: p.prima, perche: 'non c\'è un nome libero' }); continue; }
+    set.add(libero.toLowerCase());
+    proposte.push({ ...p, nome: libero });
+  }
+  return { proposte, saltati, oltre };
+}
+
 async function executeFiloAction(action, opzioni = {}) {
   const raccolti = [];
   const via = opzioni.assistente ? 'assistente' : 'chat';
@@ -1506,6 +1607,19 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
   }
 
   if (type === 'ESEGUI_COMANDO' || type === 'LEGGI_DOCUMENTO') action._perimetro = perimetroLettura(sender);
+
+  // #950 — l'elenco vecchio → nuovo lo prepara il main leggendo i file, prima della conferma: il popup mostra
+  // i nomi veri, e all'OK si rinomina quello che il popup ha mostrato (bersagliMostrati).
+  if (type === 'RINOMINA_FILE' && !confirmed) {
+    const prep = await preparaRinomina(action, sender);
+    action._proposte = prep.proposte;
+    action._saltati = prep.saltati;
+    action._oltre = prep.oltre;
+    if (!prep.proposte.length) {
+      const errore = prep.errore || (prep.saltati.length ? 'nessuno dei file si può rinominare' : 'nessun file da rinominare');
+      return { executed: false, kept: false, output: { error: errore, saltati: prep.saltati } };
+    }
+  }
 
   // Il livello di un annullo è quello del cambio che rimette: lo legge il main dal registro, sempre,
   // sopra qualunque valore arrivato con l'azione.
@@ -2064,6 +2178,25 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
       }
       case 'APRI_FILE':
         return { executed: true, kept: true };
+      case 'RINOMINA_FILE': {
+        const visti = bersagliMostrati(sender, action);
+        const proposte = (visti && Array.isArray(visti.proposte) ? visti.proposte : []).slice(0, LOTTO_RINOMINA);
+        const Nomi = require('./nomiFile');
+        const nodePath = require('node:path');
+        const rinominati = [];
+        const falliti = [];
+        for (const p of proposte) {
+          if (!p || typeof p.da !== 'string' || !nodePath.isAbsolute(p.da) || typeof p.nome !== 'string') continue;
+          const r = await Nomi.rinomina(p.da, p.nome);
+          if (r.ok && !r.invariato) rinominati.push({ da: r.da, a: r.a, prima: r.prima, nome: r.nome });
+          else if (!r.ok) falliti.push({ nome: nodePath.basename(p.da), perche: r.frase });
+        }
+        return {
+          executed: rinominati.length > 0,
+          kept: true,
+          output: { rinominati, falliti, saltati: Array.isArray(action._saltati) ? action._saltati : [] },
+        };
+      }
       case 'ESEGUI_COMANDO': {
         // A questo punto: modalità terminale attiva (gate sopra) e livello
         // soddisfatto (1 = passa diretto; 2/3 = già confermato). Eseguiamo il
@@ -2828,6 +2961,26 @@ function toolResultText({ action, res, rendered }) {
   }
   const obs = observationsForPrompt([rendered]);
   if (obs) return obs;
+  // #950 — i nomi vengono dal disco e da un modello che ha letto i file: tornano recintati.
+  if (type === 'RINOMINA_FILE') {
+    const E = globalThis.SN_ESTERNO;
+    const busta = (righe) => E.imbusta({ tipo: 'TESTO_SALVATO', testo: righe.map((r) => `- ${E.neutralizza(r, { unaRiga: true })}`).join('\n') });
+    const o = res.output || {};
+    const saltati = Array.isArray(o.saltati) ? o.saltati : (Array.isArray(action._saltati) ? action._saltati : []);
+    const restano = saltati.length ? `\nRestano come sono:\n${busta(saltati.map((x) => `${x.nome}: ${x.perche}`))}` : '';
+    if (res.needsConfirm) {
+      const p = Array.isArray(action._proposte) ? action._proposte : [];
+      const oltre = action._oltre > 0 ? `\nNe restano altri ${action._oltre} oltre a questi: si fanno con un'altra richiesta.` : '';
+      return `In attesa della conferma dell'utente: il sistema gli mostra i nomi nuovi, che ha preparato leggendo i file:\n${busta(p.map((x) => `${x.prima} → ${x.nome}`))}${restano}${oltre}\n`
+        + 'NON richiamare questa azione: la conferma è già in corso. Rispondi in una riga, senza dire di aver già rinominato.';
+    }
+    if (res.executed) {
+      const r = Array.isArray(o.rinominati) ? o.rinominati : [];
+      const f = Array.isArray(o.falliti) && o.falliti.length ? `\nNon riusciti:\n${busta(o.falliti.map((x) => `${x.nome}: ${x.perche}`))}` : '';
+      return `Rinominati ${r.length} file:\n${busta(r.map((x) => `${x.prima} → ${x.nome}`))}${f}${restano}\nSotto c'è «Annulla» per rimettere i nomi di prima.`;
+    }
+    return `Nessun file rinominato: ${o.error || 'niente da rinominare'}.${restano}\nDillo all'utente in una riga; non ripetere l'azione uguale.`;
+  }
   if (type === 'NAVIGA' && res.output && res.output.blocked === 'site') {
     const sito = res.output.host || 'quel sito';
     // Le liste pubbliche non sono la lista dell'utente: se il modello dice «la tua lista», lui lo cerca in Preferenze e non lo trova.

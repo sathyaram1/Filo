@@ -38,11 +38,12 @@ module.exports = function register(on, ctx) {
   }
 
   const ambito = (sender) => DL().scopeOfWindow(sender && sender.win);
-  // Un percorso relativo si risolverebbe nella cartella del programma: chi chiama lo manda sempre intero.
+  // Un percorso relativo non ha una cartella a cui riferirsi: si accetta intero, o con ~ per la cartella personale.
   function percorsoDi(msg, sender) {
     if (msg && msg.downloadId) return DL().percorsoDi(msg.downloadId, ambito(sender));
-    const p = msg && typeof msg.percorso === 'string' ? msg.percorso : '';
-    return p && path.isAbsolute(p) ? p : '';
+    const p = msg && typeof msg.percorso === 'string' ? msg.percorso.trim() : '';
+    if (!p || (!path.isAbsolute(p) && !/^~([\\/]|$)/.test(p))) return '';
+    return require('../documentRead').normalizePath(p);
   }
   const nonTrovato = () => ({ ok: false, errore: 'non_trovato', frase: 'Il file non c’è più: forse è stato spostato o cancellato' });
 

@@ -23,6 +23,7 @@
   const AZIONI = {
     NAVIGA: 'openTab',
     APRI_FILE: 'folder',
+    RINOMINA_FILE: 'pencil',
     TIMER: 'timer',
     SVEGLIA: 'alarm',
     CANCELLA_SVEGLIA: 'alarmOff',

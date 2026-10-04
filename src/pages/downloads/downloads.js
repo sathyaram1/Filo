@@ -160,6 +160,26 @@
     reload();
   }
 
+  // #950 — nome sensato: la voce c'è solo se Filo sa leggere quel file e ha un modello per farlo.
+  const Rinomina = window.SN_RINOMINA_UI;
+  let nomiDisponibili = false;
+  function aggiornaDisponibilita() {
+    if (!Rinomina) return;
+    Rinomina.disponibile().then((v) => { nomiDisponibili = v; }).catch(() => {});
+  }
+  const rigaDi = (r) => Array.from(document.querySelectorAll('.dl-item')).find((x) => x.dataset.id === r.id);
+  function daiNome(r) {
+    const ancora = rigaDi(r);
+    if (!Rinomina || !ancora) return;
+    Rinomina.apri({ ancora: ancora.querySelector('.dl-name') || ancora, downloadId: r.id, nome: r.filename, suRinominato: reload, suRimesso: reload });
+  }
+  async function rimettiNome(r) {
+    const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_RIMETTI_NOME, id: r.id });
+    if (res && res.ok) flash(res.cambiato ? `Il nome di prima era preso: ora è ${res.nome}` : `Nome di prima rimesso: ${res.nome}`);
+    else flash((res && res.frase) || 'Non sono riuscito a rimettere il nome di prima');
+    reload();
+  }
+
   // ─── menu contestuale (tasto destro) — set completo di azioni ──────────────
   let openMenu = null;
   function closeCtxMenu() {
@@ -196,6 +216,10 @@
       // resta la cartella (e più sotto "Ri-scarica", che è la via per riaverlo).
       if (!r.missing) acts.push(['Apri file', () => openFile(r)]);
       acts.push(['Apri cartella', () => openFolder(r)]);
+      if (!r.missing && !r.exe && nomiDisponibili && Rinomina && Rinomina.tipoSupportato(r.filename)) {
+        acts.push([Rinomina.VOCE, () => daiNome(r)]);
+      }
+      if (!r.missing && r.nomeOriginale) acts.push(['Rimetti il nome di prima', () => rimettiNome(r)]);
     } else {
       // interrupted / cancelled: il file completo non c'è, ma la cartella e la
       // sorgente restano utili.
@@ -266,7 +290,7 @@
       name.appendChild(tag);
     }
     name.appendChild(document.createTextNode(r.filename || 'download'));
-    name.title = r.filename || '';
+    name.title = r.nomeOriginale ? `${r.filename || ''}\nArrivato come: ${r.nomeOriginale}` : (r.filename || '');
     row.appendChild(name);
 
     const meta = document.createElement('div');
@@ -372,7 +396,7 @@
     let filtered = items;
     if (q) {
       filtered = filtered.filter((r) => {
-        const hay = [r.filename, r.url, r.savePath].filter(Boolean).join(' ').toLowerCase();
+        const hay = [r.filename, r.nomeOriginale, r.url, r.savePath].filter(Boolean).join(' ').toLowerCase();
         return hay.includes(q);
       });
     }
@@ -409,6 +433,7 @@
     const settings = await Storage.getSettings();
     window.SN_PAGE_THEME = settings.theme;
     window.SN_PAGE_BOOTSTRAP.applyTheme(settings.theme);
+    aggiornaDisponibilita();
     await reload();
   }
 
@@ -435,9 +460,9 @@
     // cartella svuotata da fuori, e senza rilettura le voci resterebbero
     // "aperibili" pur non avendo più un file dietro.
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) scheduleReload();
+      if (!document.hidden) { scheduleReload(); aggiornaDisponibilita(); }
     });
-    window.addEventListener('focus', scheduleReload);
+    window.addEventListener('focus', () => { scheduleReload(); aggiornaDisponibilita(); });
 
     // Aggiornamenti live: il main pusha un segnale contentless quando parte/
     // avanza/finisce uno scaricamento. Ri-leggiamo la lista dal canale interno.
@@ -446,7 +471,7 @@
         if (msg && msg.type === MSG.DOWNLOADS_UPDATED) scheduleReload();
         // Il ritorno sulla scheda: in una scheda di Filo `visibilitychange`
         // non arriva, lo annuncia il main.
-        if (msg && msg.type === MSG.TAB_IN_VISTA && msg.inVista) scheduleReload();
+        if (msg && msg.type === MSG.TAB_IN_VISTA && msg.inVista) { scheduleReload(); aggiornaDisponibilita(); }
       });
     }
   });

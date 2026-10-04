@@ -421,6 +421,8 @@ function menuVoiceLabels() {
   }
   // E il menu del tasto destro sulle schede, che sta nella cornice.
   pages += '\n' + readFileSync(join(ROOT, 'src', 'renderer', 'shell.js'), 'utf8');
+  // E la voce «Dai un nome sensato», che più pagine prendono dallo stesso modulo condiviso.
+  pages += '\n' + readFileSync(join(ROOT, 'src', 'shared', 'rinominaUi.js'), 'utf8');
   const labels = new Set();
   for (const m of i18n.matchAll(/^ {4}(menu_[a-z0-9_]+):\s*'([^']+)'/gm)) {
     if (new RegExp(`'${m[1]}'`).test(content)) labels.add(m[2]);
