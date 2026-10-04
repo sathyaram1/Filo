@@ -1,12 +1,19 @@
-// Giro 6, rilievo 1: un rosso dei controlli di npm run finish su un ramo indietro rispetto a main non è un conflitto.
+// Giro 6, rilievo 1: un rosso dei controlli di npm run finish non è un conflitto con main.
 import { test, expect } from '@playwright/test';
 import { creaMotore, nuovaPratica } from '../../../scripts/lib/orchestratore.mjs';
 
-// Le righe che npm run finish stampa davvero: la nota sul ramo indietro esce prima dei controlli.
+// Righe che npm run finish stampa davvero: la nota sul ramo indietro esce prima dei controlli, e gli unit elencano anche le prove verdi.
 const NOTA = '▸ Il ramo è indietro di 4 commit rispetto alla linea principale, ma la fusione non va in conflitto: proseguo.';
-const ROSSO = `${NOTA}\n\n▸ Controlli di logica\nnot ok 12 - una prova di logica\n\n✗ Controlli di logica rossi: non pubblico. Sistema e rilancia.`;
+const CONTROLLI = [
+  '▸ Controlli di logica',
+  "ok 220 - nel mezzo di un conflitto l'hook si astiene",
+  'ok 503 - la sentinella dei collegamenti riconosce ogni forma di node, e non la prosa',
+  'not ok 3462 - Linux: senza «capacity» la carica si conta da energia o carica; un fisso non ha batteria',
+  '',
+  '✗ Controlli di logica rossi: non pubblico. Sistema e rilancia.',
+].join('\n');
 
-function finti() {
+function finti(rosso) {
   const p = { ...nuovaPratica({ num: 7, slug: 'lavoro-7', richiesta: 'x' }), fase: 'chiusura', giri: 1, giriTotali: 1 };
   const s = { coda: [7], pratiche: { 7: p } };
   const comandi = [];
@@ -20,7 +27,7 @@ function finti() {
       if (/rev-list --count/.test(a)) return { code: 0, out: '0', stdout: '0' };
       if (/diff --name-only/.test(a)) return { code: 0, out: 'scripts/x.mjs', stdout: 'scripts/x.mjs' };
       if (/merge-base/.test(a)) return { code: 1, out: '', stdout: '' };
-      if (/finish-local/.test(a)) return { code: 1, out: ROSSO, stdout: ROSSO };
+      if (/finish-local/.test(a)) return { code: 1, out: rosso, stdout: rosso };
       if (/verify-local\.mjs start/.test(a)) return { code: 0, out: 'compito', stdout: 'compito' };
       return { code: 0, out: '', stdout: '' };
     },
@@ -38,10 +45,17 @@ function finti() {
   };
 }
 
-test('finish rosso nei controlli su un ramo indietro: niente lavoratore di riallineamento, fermo coi controlli rossi', async () => {
-  const d = finti();
-  const fine = (await creaMotore(d, { pausaMs: 0 }).avvia()).pratiche[7];
-  expect(d.comandi.filter((c) => c.startsWith('claude '))).toEqual([]);
-  expect(fine.fase).toBe('fermo');
-  expect(fine.fermo.motivo).not.toMatch(/conflitto con main/);
-});
+for (const [caso, rosso] of [
+  ['ramo indietro rispetto a main', `${NOTA}\n\n${CONTROLLI}`],
+  ['ramo pari, con una prova verde che parla di conflitti', CONTROLLI],
+]) {
+  test(`finish rosso nei controlli, ${caso}: niente lavoratore di riallineamento, fermo coi controlli rossi`, async () => {
+    const d = finti(rosso);
+    const fine = (await creaMotore(d, { pausaMs: 0 }).avvia()).pratiche[7];
+    expect(d.comandi.filter((c) => c.startsWith('claude '))).toEqual([]);
+    // Il rosso è una prova di logica, non la rete né il carico: rilanciare finish non lo cambia.
+    expect(d.comandi.filter((c) => /finish-local/.test(c)).length).toBe(1);
+    expect(fine.fase).toBe('fermo');
+    expect(fine.fermo.motivo).not.toMatch(/conflitto con main/);
+  });
+}
