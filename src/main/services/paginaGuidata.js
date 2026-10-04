@@ -39,8 +39,10 @@ function paginaGuidata() {
     if (/^rect\(\s*0(?:px)?[\s,]+0(?:px)?[\s,]+0(?:px)?[\s,]+0(?:px)?\s*\)$/.test(cs.clip || '')) return true;
     if (/inset\(\s*50%/.test(cs.clipPath || '')) return true;
     const r = el.getBoundingClientRect();
-    if (r.width <= 1 && r.height <= 1) return true;
-    return r.right + window.scrollX <= 0 || r.bottom + window.scrollY <= 0;
+    // Un contenitore fisso grande zero che porta figli visibili (finestre, avvisi) non nasconde niente: conta il ritaglio.
+    const ritaglia = /(hidden|clip)/.test(`${cs.overflow} ${cs.overflowX} ${cs.overflowY}`);
+    if (r.width <= 1 && r.height <= 1) return ritaglia;
+    return (r.width > 1 && r.right + window.scrollX <= 0) || (r.height > 1 && r.bottom + window.scrollY <= 0);
   }
   function mostrato(el) {
     const cs = stile(el);
