@@ -11,6 +11,7 @@ test('la segnalazione mandata prima dell\'aggiornamento, annunciata risolta, com
     const fresh = globalThis.SN_CREDITS.freshState();
     fresh.lastAutoFeedbackBonusDate = globalThis.SN_CREDITS.dateKey();
     await globalThis.SN_CREDITS.writeState(fresh);
+    await globalThis.chrome.storage.local.set({ sn_feedback_client_id: 'cid-tester-di-settembre' });
     await globalThis.SN_FEEDBACK_MINE.ricordaId('fbDoc-vecchia');
   });
 
@@ -30,7 +31,8 @@ test('la segnalazione mandata prima dell\'aggiornamento, annunciata risolta, com
     globalThis.SN_FEEDBACK.getManyPublic = async (ids) => schede.filter((c) => (ids || []).includes(c._id));
     globalThis.SN_FEEDBACK.listPublic = async () => schede;
   });
-  const home = await openTab('filo://newtab/');
+  const home = app.windows().find((w) => w.url().startsWith('filo://newtab'));
+  await home.reload();
   await expect(home.locator('#thanksOverlay')).toBeVisible({ timeout: 15_000 });
 
   const riga = bacheca.locator('#bdMie .bd-mia');
