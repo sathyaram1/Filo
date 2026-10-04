@@ -11,6 +11,7 @@ import zlib from 'node:zlib';
 import {
   pngFirmato, pngSpoglio, pngConTesto, pngConTestoCompresso, pngConXmp, certificato, elencoPem, USO_MARCA,
 } from '../helpers/immagineFirmata.mjs';
+import { costoInUnita } from '../helpers/tempoRelativo.mjs';
 
 const require = createRequire(import.meta.url);
 require('../../src/shared/provenienzaImmagine.js');
@@ -441,11 +442,11 @@ test('senza elenco delle autorità di marcatura, un certificato scaduto resta sc
 
 test('un XMP ripetitivo da un megabyte si legge in tempo lineare', { timeout: 30_000 }, () => {
   for (const ago of ['DigitalSourceType>', 'DigitalSourceType="', 'DigitalSourceType ', 'xmp:CreatorTool>']) {
-    const t = Date.now();
-    const r = P.analizza(pngConXmp(pngSpoglio(), ago.repeat(60000)));
-    const ms = Date.now() - t;
+    const png = pngConXmp(pngSpoglio(), ago.repeat(60000));
+    let r;
+    const c = costoInUnita(() => { r = P.analizza(png); }, { tetto: 150 });
     assert.equal(r.trovato, false, ago);
-    assert.ok(ms < 1500, `${ago}: ${ms} ms (prima del tetto ai quantificatori: più di un minuto)`);
+    assert.ok(c.entro, `${ago}: ${c.come} (prima del tetto ai quantificatori: più di un minuto)`);
   }
 });
 
@@ -457,9 +458,9 @@ test('un XMP indentato con molti spazi dice ancora l’origine', () => {
 
 test('un testo compresso enorme non si decomprime oltre il tetto, e la sua chiave resta una prova', () => {
   const bomba = zlib.deflateSync(Buffer.alloc(256 * 1024 * 1024, 0x41), { level: 9 });
-  const t = Date.now();
-  const r = P.analizza(pngConTestoCompresso(pngSpoglio(), 'parameters', bomba));
-  const ms = Date.now() - t;
+  const png = pngConTestoCompresso(pngSpoglio(), 'parameters', bomba);
+  let r;
+  const c = costoInUnita(() => { r = P.analizza(png); }, { tetto: 8 });
   assert.equal(P.frase(r), 'Generata con l’AI secondo il file stesso (Stable Diffusion), senza firma che lo confermi.');
-  assert.ok(ms < 200, `${ms} ms (decompresso per intero: più di mezzo secondo e 256 MB di testo)`);
+  assert.ok(c.entro, `${c.come} (decompresso per intero: la sola decompressione costa più del doppio del tetto)`);
 });
