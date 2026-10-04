@@ -553,7 +553,7 @@
     // che qualcuno ha manipolato un lavoratore) e i CONFRONTI fra la scelta del
     // cammino su git e quella del server. Vivono in collezioni che nessun client
     // può leggere: si passa dalla callable owner-only del backend di sicurezza.
-    ROUTINE_LOG_GET: 'routine_log_get',            // → { ok, rejections:[…], comparisons:[…] } | { ok:false, error }
+    ROUTINE_LOG_GET: 'routine_log_get',            // → { ok, rejections:[…], comparisons:[…], proveFusione:{ righe, riepilogo }|null } | { ok:false, error }
     // Fusioni bloccate dai controlli di sicurezza del server, in attesa
     // dell'owner (SPEC-RIDISEGNO-MAX.md §10): il server apre una richiesta che
     // aspetta il suo sì in Gestione (un lavoro locale provato non la apre: #908).

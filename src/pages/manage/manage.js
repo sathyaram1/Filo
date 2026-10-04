@@ -1074,9 +1074,35 @@
     routines_off: 'routine spente',
   };
 
-  function renderChannelLog(rejections, comparisons) {
+  // Le richieste di fusione senza gli unit sul risultato (#958): una per una, e in cima un avviso quando il server
+  // le giudica frequenti. Una prova che manca sempre non protegge niente, e nessuno se ne accorgerebbe.
+  function righeSenzaProva(prove) {
+    const righe = Array.isArray(prove && prove.righe) ? prove.righe : [];
+    return righe.filter((p) => p && (p.esito === 'non_provata' || p.esito === 'assente')).map((p) => {
+      const s = p.storia || {};
+      const clone = s.superficiale ? (s.intera ? ' · clone poco profondo, storia scaricata tutta' : ' · clone poco profondo') : '';
+      return {
+        at: p.at,
+        kind: 'noprova',
+        label: 'Senza prova',
+        text: `${p.via === 'locale' ? 'fusione locale' : 'routine'}${p.slug ? ` ${p.slug}` : ''}${p.branch ? ` · ${p.branch}` : ''}`
+          + ` · ${p.esito === 'assente' ? 'strumenti senza la prova degli unit' : (p.motivo || 'prova non riuscita')}${clone}`,
+      };
+    });
+  }
+
+  function avvisoSenzaProva(prove) {
+    const r = prove && prove.riepilogo;
+    if (!r || !r.frequente) return '';
+    return `<li class="mg-log-row mg-log-row--avviso">`
+      + `<span class="mg-log-role mg-log-role--deny">Senza prova</span>`
+      + `<span class="mg-log-when">${esc(`${r.senzaProva} delle ultime ${r.ultime} richieste di fusione sono partite senza gli unit sul risultato`)}</span>`
+      + `</li>`;
+  }
+
+  function renderChannelLog(rejections, comparisons, prove = null) {
     if (!mgChannelSection || !mgChannelList) return;
-    const rows = [];
+    const rows = righeSenzaProva(prove);
     for (const r of (Array.isArray(rejections) ? rejections : [])) {
       rows.push({
         at: r && r.at,
@@ -1108,7 +1134,7 @@
       return;
     }
     rows.sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
-    mgChannelList.innerHTML = rows.slice(0, 60).map((row) => {
+    mgChannelList.innerHTML = avvisoSenzaProva(prove) + rows.slice(0, 60).map((row) => {
       const abs = formatDateTime(row.at);
       const cls = row.kind === 'deny' ? ' mg-log-role--deny' : '';
       return `<li class="mg-log-row" title="${esc(abs)}">`
@@ -1364,7 +1390,7 @@
     try {
       const r = await sendToMain({ type: ROUTINE_LOG_GET });
       if (!r || r.ok === false) { mgChannelSection.hidden = true; return; }
-      renderChannelLog(r.rejections, r.comparisons);
+      renderChannelLog(r.rejections, r.comparisons, r.proveFusione);
     } catch (err) {
       console.error('[manage] caricamento registri canale fallito:', err);
       mgChannelSection.hidden = true;
