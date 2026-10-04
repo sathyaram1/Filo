@@ -42,11 +42,12 @@ La regola, in tre pezzi:
   programma che tiene le credenziali dice «generata» nel manifesto del passo
   prima: si segue l'ingrediente, se la sua impronta è quella firmata dal passo
   dopo e se la sua firma regge, e a dichiarare è chi ha firmato quel manifesto.
-- **Dai pixel si legge solo un messaggio noto**, mai una stima: il marchio aperto
-  dei programmi di Stable Diffusion. E si legge dove l'immagine è già decodificata
-  per mostrarla (la pagina, la chat), mai nel processo principale: un decoder
-  d'immagini lì è una porta aperta a chiunque mandi un file. Il main accetta
-  l'esito solo come nome di un ente che il lettore conosce.
+- **Dai pixel non si stima niente.** Niente classificatori a percentuale, e il
+  modello che descrive l'immagine non parla della sua origine. Un marchio
+  invisibile (TrustMark, quello di Stable Diffusion) è un messaggio noto, non una
+  stima, e se arriverà (#889) si leggerà dove l'immagine è già decodificata per
+  mostrarla, mai nel processo principale: un decoder d'immagini lì è una porta
+  aperta a chiunque mandi un file.
 
 **I nomi dentro l'etichetta li scrive chi ha fatto il file.** Il soggetto di un
 certificato e il generatore dichiarato sono contenuto esterno a tutti gli
@@ -68,7 +69,7 @@ modello](una-promessa-fatta-allutente-non-puo-dipendere-dal-modello.md).
 
 Il codice: `src/shared/provenienzaImmagine.js` (lettura dei contenitori, JUMBF,
 COSE, catena fino all'elenco, ingredienti, verdetto e frase),
-`src/shared/marchioInvisibile.js` (il marchio nei pixel), `src/main/services/firmatariC2pa.js`
+`src/main/services/firmatariC2pa.js`
 (l'elenco: scaricarlo, tenerlo, e l'unica lettura che usano menu, chat e Aiuto),
 `tests/helpers/immagineFirmata.mjs` (immagini di prova firmate davvero: autorità,
 certificato, firma e legame duro, così la prova diventa rossa se il lettore

@@ -989,6 +989,10 @@
   // tasto destro: si leggono le etichette delle immagini che l'utente ha davanti, dalle
   // più grandi. Oltre il tetto il modello sa quante ne sono rimaste fuori.
   const MAX_IMMAGINI_ORIGINE = 12;
+  // Un'immagine che non arriva non deve tenere ferma la risposta: conta come non letta.
+  const ATTESA_ORIGINE_MS = 3000;
+  // Un'immagine letta resta letta: le domande dopo non la riscaricano.
+  const origineLetta = new Map();
   function immaginiVisibili() {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
@@ -1008,13 +1012,22 @@
   }
   async function origineImmaginiVisibili() {
     const Actions = global.SN_ACTIONS;
-    if (!Actions?.leggiOrigine || !Actions?.blobToDataUrl) return null;
+    if (!Actions?.leggiOrigine || !Actions?.scaricaImmagine) return null;
     const tutte = immaginiVisibili();
     if (!tutte.length) return null;
     const esiti = await Promise.all(tutte.slice(0, MAX_IMMAGINI_ORIGINE).map(async ({ im, src, r }, i) => {
       try {
-        const blob = await (await fetch(src)).blob();
-        const p = await Actions.leggiOrigine(await Actions.blobToDataUrl(blob));
+        let lettura = origineLetta.get(src);
+        if (!lettura) {
+          lettura = (async () => Actions.leggiOrigine(await Actions.scaricaImmagine(src)))();
+          lettura.then((p) => { if (!p || !p.ok || p.firmatario === 'non_verificato') origineLetta.delete(src); }, () => origineLetta.delete(src));
+          if (origineLetta.size >= 500) origineLetta.delete(origineLetta.keys().next().value);
+          origineLetta.set(src, lettura);
+        }
+        const p = await Promise.race([
+          lettura,
+          new Promise((ok) => setTimeout(() => ok(null), ATTESA_ORIGINE_MS)),
+        ]);
         if (!p || !p.ok) return null;
         return {
           n: i + 1,

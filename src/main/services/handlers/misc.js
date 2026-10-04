@@ -103,7 +103,7 @@ async function httpGetToFile(target, referrer, session, kind, hooks) {
       // voce nella barra e per decidere dove far crescere il file parziale.
       let partPath;
       try {
-        partPath = hooks.onHeaders({ filename, totalBytes: total });
+        partPath = hooks.onHeaders({ filename, totalBytes: total, contentType: String(res.headers['content-type'] || '') });
       } catch (e) {
         res.resume();
         try { req.destroy(); } catch (_) {}
@@ -196,6 +196,53 @@ function safeImageFilename(name) {
 // il decimo di secondo. Largo lo stesso (un PNG da 60 megapixel ci sta dentro), e
 // oltre il tetto il chiamante riceve un rifiuto col motivo, mai un silenzio.
 const MAX_BYTE_PROVENIENZA = 64 * 1024 * 1024;
+
+// Il tipo di un'immagine dai suoi primi byte: il modello che la descrive lo vuole
+// giusto, e l'intestazione del server a volte manca o dice «octet-stream».
+function tipoImmagine(b, dichiarato) {
+  const fourcc = (i) => b.toString('latin1', i, i + 4);
+  if (b[0] === 0x89 && fourcc(1) === 'PNG') return 'image/png';
+  if (b[0] === 0xff && b[1] === 0xd8) return 'image/jpeg';
+  if (fourcc(0) === 'RIFF' && fourcc(8) === 'WEBP') return 'image/webp';
+  if (fourcc(0) === 'GIF8') return 'image/gif';
+  if (fourcc(4) === 'ftyp') return /^avi[fs]$/.test(fourcc(8)) ? 'image/avif' : 'image/heic';
+  if (b[0] === 0x42 && b[1] === 0x4d) return 'image/bmp';
+  const t = String(dichiarato || '').split(';')[0].trim().toLowerCase();
+  return /^image\/[a-z0-9.+-]+$/.test(t) ? t : 'application/octet-stream';
+}
+
+// I byte di un'immagine che la pagina mostra ma che il suo script non può leggere
+// (altra origine): stessa strada di «Salva immagine come…», in un file temporaneo.
+async function byteImmagineRemota({ url, referrer, session }) {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const { app } = require('electron');
+  let tmp = '';
+  let tipo = '';
+  let troppo = false;
+  try {
+    await fetchToFile({
+      url, referrer, session, kind: 'image',
+      onHeaders: ({ totalBytes, contentType }) => {
+        if (totalBytes > MAX_BYTE_PROVENIENZA) { troppo = true; throw new Error('troppo grande'); }
+        tipo = contentType;
+        tmp = path.join(app.getPath('temp'), `filo-immagine-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        return tmp;
+      },
+      onProgress: (ricevuti) => { if (ricevuti > MAX_BYTE_PROVENIENZA) troppo = true; },
+      shouldStop: () => troppo,
+    });
+    const byte = await fs.promises.readFile(tmp);
+    if (byte.length > MAX_BYTE_PROVENIENZA) troppo = true;
+    if (troppo) throw new Error('troppo grande');
+    return { ok: true, dataUrl: `data:${tipoImmagine(byte, tipo)};base64,${byte.toString('base64')}` };
+  } catch (e) {
+    if (troppo) return { ok: false, tooBig: true, error: `immagine oltre ${MAX_BYTE_PROVENIENZA / (1024 * 1024)} MB` };
+    return { ok: false, error: e?.message || 'immagine non scaricabile' };
+  } finally {
+    if (tmp) fs.promises.unlink(tmp).catch(() => {});
+  }
+}
 
 function bytesDaDataUrl(dataUrl) {
   const m = /^data:[^,]*;base64,(.*)$/s.exec(String(dataUrl || ''));
@@ -415,6 +462,14 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, error: e?.message || 'controllo fallito' };
     }
+  });
+
+  on(MSG.IMAGE_BYTES, async (msg, sender) => {
+    const url = String((msg && msg.url) || '').trim();
+    if (!/^https?:\/\//i.test(url)) return { ok: false, error: 'URL non scaricabile' };
+    const wc = sender && sender.wc;
+    if (!wc || wc.isDestroyed?.()) return { ok: false, error: 'no sender' };
+    return byteImmagineRemota({ url, referrer: String(sender?.tab?.url || sender?.url || ''), session: wc.session });
   });
 
   // "Salva file" su un link a un file (#410.2). A differenza di

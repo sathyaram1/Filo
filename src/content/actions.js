@@ -679,6 +679,20 @@
     return chrome.runtime.sendMessage({ type: MSG.IMAGE_PROVENANCE, dataUrl });
   }
 
+  // I byte originali di un'immagine della pagina, come data URL. Quella di un'altra
+  // origine (quasi sempre: le foto stanno su un CDN) lo script non la può leggere,
+  // e la scarica il main (#946): senza, descrizione e origine tacevano sulla maggior parte dei siti.
+  async function scaricaImmagine(src) {
+    try {
+      const r = await fetch(src);
+      if (r.ok) return await blobToDataUrl(await r.blob());
+    } catch (_) {}
+    if (!/^https?:/i.test(String(src || ''))) throw new Error('immagine non leggibile');
+    const res = await chrome.runtime.sendMessage({ type: MSG.IMAGE_BYTES, url: src });
+    if (!res || !res.ok || !res.dataUrl) throw new Error((res && res.error) || 'immagine non leggibile');
+    return res.dataUrl;
+  }
+
   // Sezione inline "Spiega immagine": stessa filosofia di buildInlineExplain ma con dataUrl.
   // `linkEl` è il collegamento che l'immagine apre: l'unica sezione del menu parla
   // dell'immagine, ma l'avviso sull'indirizzo non si perde (#725.1).
@@ -711,13 +725,12 @@
         (async () => {
           let dataUrl;
           try {
-            const r = await fetch(src);
-            dataUrl = await blobToDataUrl(await r.blob());
+            dataUrl = await scaricaImmagine(src);
           } catch (_) {
             if (cancelled) return;
             el.classList.remove('sn-menu-inline-loading');
             el.classList.add('sn-menu-inline-error');
-            body.textContent = I18n.t('err_provider_failed');
+            body.textContent = I18n.t('menu_image_unreadable');
             return;
           }
           if (cancelled) return;
@@ -1914,6 +1927,7 @@
     buildInlineExplain,
     buildInlineExplainImage,
     leggiOrigine,
+    scaricaImmagine,
     buildInlineExplainLink,
     // salva / condividi / cerca / immagini
     buildSavePayload,

@@ -235,6 +235,7 @@
     // veniva ignorato e la scheda NAVIGAVA sull'immagine senza scaricare nulla
     // (#274). { url } → { ok, path?, filename? } | { ok:false, cancelled?, error? }
     // (la risposta arriva a download concluso/annullato).
+    DOWNLOAD_IMAGE: 'download_image',
     // #711 — che cosa DICHIARA un'immagine sulla propria origine (credenziali
     // C2PA firmate, etichetta IPTC/XMP, parametri di generazione nei PNG).
     // Letto in locale, niente modelli; la sola rete è l'elenco ufficiale dei
@@ -242,7 +243,11 @@
     // script: la risposta parla SOLO dei byte che la pagina ha appena mandato.
     // { dataUrl } → { ok, frase, forte, origine, prova, dichiarante, firmatario, avvisi }
     IMAGE_PROVENANCE: 'image_provenance',
-    DOWNLOAD_IMAGE: 'download_image',
+    // #946 — i byte originali di un'immagine di un'altra origine (le foto stanno quasi
+    // sempre su un CDN), che lo script di pagina non può leggere. Scaricati nel main
+    // come «Salva immagine come…», con Referer e cookie della scheda.
+    // { url } → { ok, dataUrl } | { ok:false, error, tooBig? }
+    IMAGE_BYTES: 'image_bytes',
     // "Salva video/audio come…" dal menu contestuale su <video>/<audio>.
     // Stesso identico cammino di DOWNLOAD_IMAGE (il download avviene nel main
     // con Referer + cookie della scheda): cambia solo il tipo di file, che

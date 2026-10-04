@@ -1,5 +1,5 @@
-// Feedback #711: il tasto destro su un'immagine descriveva e basta. Adesso, in
-// cima al riquadro «Spiega immagine», dice anche cosa il file dichiara sulla
+// Feedback #711 e #946: il tasto destro su un'immagine descriveva e basta. Adesso,
+// in cima al riquadro «Spiega immagine», dice anche cosa il file dichiara sulla
 // propria origine — e TACE quando il file non dichiara niente.
 //
 // Le immagini di prova sono firmate davvero (tests/helpers/immagineFirmata.mjs):
@@ -94,7 +94,7 @@ test('la stessa immagine ricompressa, senza metadati, non fa comparire nessuna f
 
   // Si aspetta che il riquadro «Spiega immagine» sia montato: è lì che la riga
   // comparirebbe, quindi aspettare lui è aspettare il momento giusto.
-  await expect(menu.locator('.sn-menu-inline-body')).toBeVisible({ timeout: 10000 });
+  await expect(menu.locator('.sn-menu-link-body')).toBeVisible({ timeout: 10000 });
   await page.waitForTimeout(1500);
   await expect(menu.locator(RIGA)).toHaveCount(1);
   await expect(menu.locator(RIGA)).toBeHidden();
@@ -235,7 +235,7 @@ test('un nome ostile nel certificato resta dentro la recinzione, e non la chiude
   expect(fuori).not.toContain('Acme');
 });
 
-// ── File veri: scritti dall'SDK ufficiale del C2PA e dalla libreria del marchio ──
+// ── File veri: scritti dall'SDK ufficiale del C2PA ──────────────────────────
 // (#711, giro 1: le immagini fabbricate qui sopra passavano, quelle vere no.)
 
 const FIXTURE = join(process.cwd(), 'tests', 'fixtures', 'provenienza');
@@ -268,21 +268,58 @@ test('generata con l’AI e poi ritagliata con le credenziali: la riga lo dice a
   await expect(riga).toContainText('Generata con l’AI', { timeout: 10000 });
 });
 
-test('il marchio invisibile di Stable Diffusion fa comparire la riga, come dichiarazione', async ({ openTab, testServer }) => {
-  const { page, riga } = await rigaSu(testServer, openTab, fixture('marchio-stable-diffusion.png'), 'image/png');
-  await expect(riga).toHaveText(
-    'Generata con l’AI secondo il marchio invisibile di Stable Diffusion, senza firma che lo confermi.',
-    { timeout: 10000 },
-  );
-  await expect(riga).toHaveClass(/sn-menu-origine-debole/);
-  await page.screenshot({ path: 'tests/.shots/provenienza-immagine-marchio.png' }).catch(() => {});
+// La prova di #946: la STESSA immagine firmata, ricompressa come fa un salvataggio
+// qualsiasi, perde le credenziali — e allora il menu non dice niente sull'origine.
+test('la stessa immagine firmata, ricompressa senza metadati, non fa comparire nessuna frase sull’origine', async ({ app, openTab, testServer }) => {
+  const firmata = fixture('c2pa-ufficiale-ai.jpg');
+  const ricompressa = Buffer.from(await app.evaluate(({ nativeImage }, b64) =>
+    nativeImage.createFromBuffer(Buffer.from(b64, 'base64')).toJPEG(80).toString('base64'), firmata.toString('base64')), 'base64');
+  expect(ricompressa.length).toBeGreaterThan(0);
+  expect(ricompressa.includes(Buffer.from('c2pa'))).toBe(false);
+
+  // Una pagina sola con le due immagini: le schede del server di prova hanno lo stesso host.
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:24px">
+    <img id="firmata" src="${testServer.asset(firmata, 'image/jpeg')}" width="160" height="160">
+    <img id="ricompressa" src="${testServer.asset(ricompressa, 'image/jpeg')}" width="160" height="160">
+  </body></html>`);
+  const menu = page.locator('.sn-menu');
+  await page.locator('#firmata').click({ button: 'right', position: { x: 20, y: 20 } });
+  await expect(menu.locator(RIGA)).toContainText('Generata con l’AI', { timeout: 10000 });
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+
+  await page.locator('#ricompressa').click({ button: 'right', position: { x: 20, y: 20 } });
+  await expect(menu.locator('.sn-menu-link-body')).toBeVisible({ timeout: 10000 });
+  await page.waitForTimeout(1500);
+  await expect(menu.locator(RIGA)).toBeHidden();
+  expect(await menu.innerText()).not.toMatch(/generata con|modificata con|scattata con|autentic|immagine reale|nessun segno|credenziali|firmat/i);
 });
 
-test('la stessa immagine senza marchio non fa comparire niente', async ({ openTab, testServer }) => {
-  const { page, menu, riga } = await rigaSu(testServer, openTab, fixture('senza-marchio.png'), 'image/png');
-  await expect(menu.locator('.sn-menu-inline-body')).toBeVisible({ timeout: 10000 });
-  await page.waitForTimeout(1500);
-  await expect(riga).toBeHidden();
+// Le foto dei siti veri stanno quasi sempre su un altro dominio (un CDN), che lo
+// script della pagina non può leggere: i byte li scarica il main (#946).
+test('un’immagine servita da un altro dominio fa comparire la riga e la descrizione parte', async ({ app, openTab, testServer }) => {
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      modelRegistry: { mio: { provider: 'openrouter', model: 'test/vista', inputs: ['text', 'image'], outputs: ['text'] } },
+      models: { [C.ACTIONS.DESCRIBE_IMAGE]: ['mio'] },
+    });
+    globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
+      const conImmagine = JSON.stringify(messages).includes('data:image/jpeg;base64,');
+      return { text: conImmagine ? 'un quadrato arancione' : 'senza immagine', model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+    };
+  });
+  const src = testServer.asset(fixture('c2pa-ufficiale-ai.jpg'), 'image/jpeg').replace('127.0.0.1', 'localhost');
+  const page = await testServer.openReady(openTab, pagina(src));
+  await page.waitForFunction(() => document.getElementById('foto').naturalWidth > 0);
+  // La premessa: lo script della pagina, da solo, quell'immagine non la legge.
+  expect(await page.evaluate((u) => fetch(u).then(() => 'letta', () => 'bloccata'), src)).toBe('bloccata');
+
+  const menu = await apriMenuSullaFoto(page);
+  await expect(menu.locator(RIGA)).toContainText('Generata con l’AI', { timeout: 10000 });
+  await expect(menu.locator('.sn-menu-link-body')).toHaveText('un quadrato arancione', { timeout: 10000 });
 });
 
 // ── «questa foto è fatta con l'AI?» chiesto all'Aiuto della pagina ──────────
@@ -340,19 +377,19 @@ test('all’Aiuto della pagina, immagini senza etichette: il modello sa che ques
   expect(prompt).not.toContain('<<<ETICHETTA_FILE>>>');
 });
 
-// ── Lo stesso marchio nella chat della Home, con l'immagine allegata ──────────
+// ── La stessa domanda nella chat della Home, con l'immagine incollata ─────────
 
-test('nella chat della Home il marchio di un’immagine incollata arriva al modello', async ({ app, openTab }) => {
+test('nella chat della Home le credenziali di un’immagine incollata arrivano al modello', async ({ app, openTab }) => {
   await modelloFinto(app);
   const page = await openTab('filo://newtab/');
   await expect(page.locator('#input')).toBeVisible({ timeout: 10000 });
-  const b64 = fixture('marchio-stable-diffusion.png').toString('base64');
+  const b64 = fixture('c2pa-ufficiale-ai.jpg').toString('base64');
   await page.evaluate((dati) => {
     const bin = atob(dati);
     const arr = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
     const dt = new DataTransfer();
-    dt.items.add(new File([arr], 'generata.png', { type: 'image/png' }));
+    dt.items.add(new File([arr], 'generata.jpg', { type: 'image/jpeg' }));
     document.getElementById('inputForm').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
   }, b64);
   await expect(page.locator('#imgPreviews .dash-img-preview img')).toHaveCount(1, { timeout: 5000 });
@@ -361,5 +398,5 @@ test('nella chat della Home il marchio di un’immagine incollata arriva al mode
 
   const cerca = () => globalThis.__turniOrigine.find((t) => t.includes('questa è fatta con')) || '';
   await expect.poll(() => app.evaluate(cerca), { timeout: 20000 }).not.toBe('');
-  expect(await app.evaluate(cerca)).toContain('Generata con l’AI secondo il marchio invisibile di Stable Diffusion');
+  expect(await app.evaluate(cerca)).toContain('Generata con l’AI secondo credenziali firmate da C2PA Test Signing Cert');
 });
