@@ -195,6 +195,24 @@ function nascondi(parent) {
   invia(s, 'anteprima:nascondi', {});
 }
 
+// Un suggerimento cade dove sta la carta: se lei sta sparendo (si svuota prima, qualche fotogramma) lui aspetta,
+// e non compare mai sopra di lei (#589.16). Col tetto: una carta che non risponde non lo tiene fermo.
+function quandoSparita(parent, fn) {
+  const s = parent && !parent.isDestroyed() ? stati.get(parent) : null;
+  const win = s && s.win;
+  if (!win || win.isDestroyed() || !win.isVisible() || s.voluta) { fn(); return; }
+  let fatto = false;
+  const via = () => {
+    if (fatto) return;
+    fatto = true;
+    clearTimeout(tetto);
+    if (!win.isDestroyed()) win.removeListener('hide', via);
+    fn();
+  };
+  const tetto = setTimeout(via, 300);
+  win.once('hide', via);
+}
+
 function indirizzoDi(url) {
   const u = testo(url);
   if (!/^https?:\/\//i.test(u)) return '';
