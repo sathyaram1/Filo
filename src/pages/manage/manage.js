@@ -4834,15 +4834,12 @@
 
   // «Ferma» si dice solo a chi guarda, e solo dopo più giri mancati.
   function aggiornaSegnoFerma() {
-    if (!mgListHead || !LIVE) return;
-    const ferma = LIVE.listaFerma({ ora: Date.now(), inVista: vistaOra(), ultimoRiuscito: liveOkAt });
+    if (!mgListHead) return;
+    const ferma = !!LIVE && LIVE.listaFerma({ ora: Date.now(), inVista: vistaOra(), ultimoRiuscito: liveOkAt });
     mgListHead.classList.toggle('mg-list-head--ferma', ferma);
-    if (ferma) {
-      mgListHead.title = `Lista ferma alle ${formatDateTime(new Date(liveOkAt).toISOString())}: `
-        + 'il server non risponde, riprovo da solo.';
-    } else if (mgListHead.title && mgListHead.title.startsWith('Lista ferma')) {
-      mgListHead.removeAttribute('title');
-    }
+    scriviTitoloTesta(ferma
+      ? `Lista ferma alle ${formatDateTime(new Date(liveOkAt).toISOString())}: il server non risponde, riprovo da solo.`
+      : '');
   }
 
   // L'owner sta scrivendo nel pannello (commento, risposta, nota)? Allora il
