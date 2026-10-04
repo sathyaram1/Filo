@@ -2111,7 +2111,7 @@ class TabManager {
       // fallire li consegniamo al sistema (apre posta/telefono), come un browser.
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
-        if (tab.isInternal === false) this._esternoDallaPagina(wc, tab.id, url);
+        if (tab.isInternal === false) this._esternoDallaPagina(wc, tab.id, url, undefined, { navigazione: true });
         else openExternalScheme(url);
         return;
       }
@@ -2142,7 +2142,7 @@ class TabManager {
     wc.on('will-redirect', (event, url) => {
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
-        if (tab.isInternal === false) this._esternoDallaPagina(wc, tab.id, url);
+        if (tab.isInternal === false) this._esternoDallaPagina(wc, tab.id, url, undefined, { navigazione: true });
         else openExternalScheme(url);
         return;
       }
@@ -2666,7 +2666,7 @@ class TabManager {
     pwc.on('will-navigate', (event, url) => {
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
-        this._esternoDallaPagina(pwc, origine ? origine.id : null, url);
+        this._esternoDallaPagina(pwc, origine ? origine.id : null, url, undefined, { navigazione: true });
         return;
       }
       if (this._maybeBlockNavigation(origine, url)) ferma(event);
@@ -2677,7 +2677,7 @@ class TabManager {
     pwc.on('will-redirect', (event, url) => {
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
-        this._esternoDallaPagina(pwc, origine ? origine.id : null, url);
+        this._esternoDallaPagina(pwc, origine ? origine.id : null, url, undefined, { navigazione: true });
         return;
       }
       if (event.isMainFrame === false) return;
@@ -2720,9 +2720,11 @@ class TabManager {
   }
 
   // Posta, telefono e SMS chiesti da una pagina: col blocco dei popup acceso partono solo da un gesto, come le finestre.
-  _esternoDallaPagina(wc, tabId, url, referrer) {
+  // `navigazione`: la navigazione è già partita, e il gesto che la porta Permessi l'ha messo da parte.
+  _esternoDallaPagina(wc, tabId, url, referrer, { navigazione = false } = {}) {
     if (!isOsDelegatedScheme(url)) return;
-    if (this.security.blockPopups && !Permessi.gestoPerUnaFinestra(wc, referrer)) {
+    const gesto = Permessi.gestoPerUnaFinestra(wc, referrer) || (navigazione && Permessi.gestoPerLaNavigazione(wc));
+    if (this.security.blockPopups && !gesto) {
       this._notifyPopupBlocked(tabId, url, wc);
       return;
     }

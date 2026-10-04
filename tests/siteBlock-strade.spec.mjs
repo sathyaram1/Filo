@@ -42,10 +42,9 @@ test('«Apri» sull\'avviso del popup non scavalca la lista dei siti bloccati', 
   await lista(shell, ['blocked.test']);
   const avvisi = await contaAvvisi(app);
   const bersaglio = rete.pagina('blocked.test', '/', '<h1>SITO DELLA LISTA</h1>');
-  const pagina = rete.pagina('sito.test', '/', `<button id="b" onclick="window.open('${bersaglio}', 'p', 'width=400,height=300')">pop</button>`);
+  // Da sola, senza clic: è la finestra che il blocco ferma (il clic dell'utente la aprirebbe).
+  const pagina = rete.pagina('sito.test', '/', `<script>setTimeout(function(){window.open('${bersaglio}', 'p', 'width=400,height=300')},800)</script>`);
   await apri(app, shell, pagina);
-  const tab = app.windows().find((w) => w.url().includes('sito.test'));
-  await tab.click('#b');
   const chip = (await vista()).locator('.shell-notif', { hasText: 'Bloccato popup' }).first();
   await expect(chip).toBeVisible({ timeout: 6000 });
   await chip.locator('.shell-notif-action', { hasText: 'Apri' }).click();
@@ -495,10 +494,9 @@ test('dentro un sito aperto con «Apri comunque» le sue finestrelle di accesso 
 test('dentro un sito aperto con «Apri comunque», «Apri» sull\'avviso del popup apre il popup di quel sito', async ({ app, shell, rete, avvisi: vista }) => {
   await lista(shell, ['blocked.test']);
   const pop = rete.pagina('blocked.test', '/pop', '<h1>POPUP DEL SITO</h1>');
-  const sito = rete.pagina('blocked.test', '/', `<h1>SITO</h1><button id="b" onclick="window.open('${pop}', 'p', 'width=400,height=300')">pop</button>`);
-  const tab = await apertoComunque(app, shell, sito);
+  const sito = rete.pagina('blocked.test', '/', `<h1>SITO</h1><script>setTimeout(function(){window.open('${pop}', 'p', 'width=400,height=300')},1500)</script>`);
+  await apertoComunque(app, shell, sito);
   const avvisi = await contaAvvisi(app);
-  await tab.click('#b');
   const chip = (await vista()).locator('.shell-notif', { hasText: 'Bloccato popup' }).first();
   await expect(chip).toBeVisible({ timeout: 6000 });
   await chip.locator('.shell-notif-action', { hasText: 'Apri' }).click();

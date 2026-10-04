@@ -25,7 +25,7 @@
         'Filo ricorda le pagine che apri nelle schede, sul tuo computer, accanto alle chat. Quelle aperte in incognito no. Le cancelli quando vuoi chiedendolo a Filo («cancella le pagine dell\'ultima ora», «di ieri sera», «di YouTube») o in Sicurezza, dove scegli fra l\'ultima ora, oggi e tutto, e spariscono anche dal disco. Esporta dati e Importa dati le portano con sé.',
       ],
       fixes: [
-        'Col blocco dei popup acceso, una pagina non ti apre più schede nuove da sola. Ne apre una per ogni tuo clic, e quelle fermate le apri dall\'avviso con «Apri». Anche lo schermo intero lo prende solo dopo un tuo clic.',
+        'Col blocco dei popup acceso, una pagina non ti apre più schede nuove da sola, né il programma di posta. Ne apre una per ogni tuo clic, anche le finestrelle di condivisione, e quelle fermate le apri dall\'avviso con «Apri». Anche lo schermo intero lo prende solo dopo un tuo clic.',
         'Le schede chiuse restano in Cronologia finché non le cancelli tu. Prima, passate le 5000, le più vecchie sparivano da sole, e dopo le 2000 la ricerca per contenuto non le trovava più. Adesso le trova tutte, anche le più vecchie, già alla prima ricerca.',
         '«Copia immagine» funziona anche sulle foto che i siti tengono su un altro dominio. Se la incolli in chat e chiedi se è fatta con l\'AI, Filo risponde come col tasto destro.',
         'Lettura ad alta voce e dettatura non partono più verso un fornitore che Filo esclude. Se il modello che hai scelto lo serve solo lui, Filo te lo dice e non manda niente.',

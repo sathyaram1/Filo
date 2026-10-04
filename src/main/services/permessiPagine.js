@@ -193,7 +193,12 @@ function seguiGesti(wc) {
     wc.on('did-start-navigation', (e, _url, isInPlace, isMainFrame) => {
       const principale = e && typeof e.isMainFrame === 'boolean' ? e.isMainFrame : isMainFrame;
       const stessa = e && typeof e.isSameDocument === 'boolean' ? e.isSameDocument : isInPlace;
-      if (principale && !stessa) { wc._filoGestoAlle = 0; wc._filoGestoFinestraAlle = 0; wc._filoMenuAperto = null; }
+      if (!principale || stessa) return;
+      // Il clic che fa partire la navigazione vale ancora per dove la portano will-navigate e i redirect (un «scrivici»
+      // che finisce in mailto:): qui arriva prima di loro.
+      const t = gestoSullaScheda(wc);
+      wc._filoGestoNavigazione = t && t > (wc._filoGestoUsatoAlle || 0) ? t : 0;
+      wc._filoGestoAlle = 0; wc._filoGestoFinestraAlle = 0; wc._filoMenuAperto = null;
     });
   } catch (_) {}
 }
@@ -257,6 +262,13 @@ function gestoPerUnaFinestra(wc, referrer) {
   const chi = origineDelReferrer(referrer);
   if (chi && wc._filoGestoOrigini && wc._filoGestoOrigini.size && !wc._filoGestoOrigini.has(chi)) return false;
   wc._filoGestoUsatoAlle = t;
+  return true;
+}
+
+function gestoPerLaNavigazione(wc) {
+  const t = (wc && wc._filoGestoNavigazione) || 0;
+  if (!t || Date.now() - t >= GESTO_MS) return false;
+  wc._filoGestoNavigazione = 0;
   return true;
 }
 
@@ -494,7 +506,7 @@ function statoNotifiche(ses, url) {
 
 module.exports = {
   installa, negaTutto, rispondi, lasciapassare, seguiGesti, scelteDi, dimentica, nomeDaMostrare, statoNotifiche,
-  carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica, gestoNelRiquadro, gestoSullaScheda, gestoPerUnaFinestra, clicDiFilo,
+  carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica, gestoNelRiquadro, gestoSullaScheda, gestoPerUnaFinestra, gestoPerLaNavigazione, clicDiFilo,
   TIPI, INNOCUI, NON_DISPONIBILI, COL_GESTO_SENZA_DOMANDA, GESTO_MS, TASTI_SENZA_GESTO, tastoPerLaPagina, _inAttesa: inAttesa,
   _usaDisco: (d) => { disco = () => d; },
 };

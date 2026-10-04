@@ -147,3 +147,65 @@ test('una finestra di accesso la apre solo il clic: da sola la pagina non apre n
   await page.click('#b');
   await expect.poll(() => finestreSu(app, 'client_id=a'), { timeout: 8000 }).toBe(1);
 });
+
+// Giro 3: il gesto è di chi l'ha ricevuto, l'avviso si chiude, «Apri» rifà l'accesso dalla pagina, la forma non conta.
+test('il clic sull\'articolo non vale per il riquadro pubblicitario di un altro sito che prova ad aprire schede', async ({ app, openTab, testServer }) => {
+  const bersaglio = testServer.html('<title>PUBBLICITA</title>');
+  const ad = testServer.html(`<p>ad</p><script>setInterval(function(){window.open(${JSON.stringify(bersaglio)})},300)</script>`, { pubblico: true });
+  const page = await openTab(testServer.html(`<title>Articolo</title><p style="height:200px">testo da leggere</p><iframe src="${ad}" width="300" height="100"></iframe>`));
+  await expect.poll(() => page.frames().some((f) => f.url() === ad), { timeout: 8000 }).toBe(true);
+  await page.waitForTimeout(1000);
+  await page.mouse.click(50, 50);
+  await page.keyboard.press('a');
+  await page.waitForTimeout(2000);
+  expect(await aperteSu(app, bersaglio)).toBe(0);
+});
+
+test('chiuso l\'avviso di una pagina che riprova di continuo, non torna finché si resta su quella pagina', async ({ openTab, testServer, avvisi }) => {
+  await openTab(testServer.html('<title>Catena</title><p>articolo</p><script>setInterval(function(){window.open(location.href)},700)</script>'));
+  const vista = await avvisi();
+  const carta = vista.locator('.shell-notif.show', { hasText: 'Bloccato popup' });
+  await expect(carta).toBeVisible({ timeout: 8000 });
+  await carta.locator('.shell-notif-close').click();
+  await new Promise((r) => setTimeout(r, 3000));
+  await expect(vista.locator('.shell-notif.show', { hasText: 'Bloccato popup' })).toHaveCount(0);
+});
+
+test('«Apri» su una finestra di accesso bloccata la fa aprire alla pagina, collegata a lei', async ({ app, openTab, testServer, avvisi }) => {
+  const accesso = `${testServer.html('<title>ACCESSO</title><script>document.title = window.opener ? "COLLEGATA" : "STACCATA"</script>')}?client_id=z&response_type=code`;
+  await openTab(testServer.html(`<title>Sito</title><script>setTimeout(function(){window.open(${JSON.stringify(accesso)}, 'login', 'width=400,height=500')},1500)</script>`));
+  const carta = (await avvisi()).locator('.shell-notif.show', { hasText: 'Bloccato popup' });
+  await expect(carta).toBeVisible({ timeout: 10000 });
+  await carta.locator('.shell-notif-action', { hasText: 'Apri' }).click();
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+    .filter((w) => { try { return w.webContents.getURL().includes('client_id=z'); } catch (_) { return false; } })
+    .map((w) => w.webContents.getTitle()).join()), { timeout: 8000 }).toBe('COLLEGATA');
+  expect(await aperteSu(app, accesso)).toBe(0);
+});
+
+test('il clic che chiede una finestra con le misure la apre', async ({ app, openTab, testServer }) => {
+  const condividi = testServer.html('<title>CONDIVIDI</title>');
+  const page = await openTab(testServer.html(`<button id="b" style="width:200px;height:60px"
+    onclick="window.open(${JSON.stringify(condividi).replace(/"/g, '&quot;')}, 'share', 'width=600,height=400')">Condividi</button>`));
+  await page.click('#b');
+  await expect.poll(() => aperteSu(app, condividi), { timeout: 8000 }).toBe(1);
+});
+
+test('Maiuscolo+clic su un link lo apre', async ({ app, openTab, testServer }) => {
+  const collegata = testServer.html('<title>LINK</title>');
+  const page = await openTab(testServer.html(`<a id="l" href="${collegata}" style="font-size:40px">link</a>`));
+  await page.click('#l', { modifiers: ['Shift'] });
+  await expect.poll(() => aperteSu(app, collegata), { timeout: 8000 }).toBe(1);
+});
+
+test('senza clic una pagina non apre il programma di posta; col clic sì', async ({ app, openTab, testServer, avvisi }) => {
+  await app.evaluate(({ shell }) => { globalThis.__esterni = []; shell.openExternal = async (u) => { globalThis.__esterni.push(u); }; });
+  const page = await openTab(testServer.html(`<a id="m" href="mailto:x@y.it" style="position:fixed;left:0;top:0;width:200px;height:60px;display:block">scrivici</a>
+    <script>setTimeout(function(){window.open('mailto:a@b.it')},500);setTimeout(function(){location.href='mailto:c@d.it'},1200)</script>`));
+  await expect((await avvisi()).locator('.shell-notif.show', { hasText: 'Bloccato popup' })).toBeVisible({ timeout: 8000 });
+  await page.waitForTimeout(1500);
+  expect(await app.evaluate(() => globalThis.__esterni)).toEqual([]);
+  // Col mouse su un punto noto: la navigazione verso mailto: fermata non finisce mai, e un locator la aspetterebbe.
+  await page.mouse.click(50, 30);
+  await expect.poll(() => app.evaluate(() => globalThis.__esterni), { timeout: 6000 }).toEqual(['mailto:x@y.it']);
+});

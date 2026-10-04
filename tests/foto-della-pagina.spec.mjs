@@ -81,6 +81,8 @@ test('la foto la ha solo la scheda in vista, ed è la sua: una scheda di sfondo 
 async function apriPopupDiAccesso(app, openTab, testServer) {
   const sito = await testServer.openReady(openTab, pagina('#ff0000', 'sito con «Accedi con…»'));
   const login = `${testServer.html(pagina('#00ff00', 'accedi'))}?client_id=filo5895&redirect_uri=http%3A%2F%2Fsito.example%2Fcb`;
+  // La finestra di accesso la apre il clic dell'utente (#737.1): un clic vero prima.
+  await sito.mouse.click(5, 5);
   await sito.evaluate((u) => { window.open(u, '_blank', 'width=480,height=600'); }, login);
   await expect.poll(() => app.evaluate(async ({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => !x._filoTabs && String(x.webContents.getURL()).includes('client_id=filo5895'));

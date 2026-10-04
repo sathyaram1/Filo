@@ -436,3 +436,36 @@ test('il riquadro di un altro sito scarta gli stessi tasti della pagina', () => 
   assert.ok(m, 'la lista nel preload del riquadro');
   assert.deepEqual(JSON.parse(m[1].replace(/'/g, '"')), [...Permessi.TASTI_SENZA_GESTO]);
 });
+
+// #737.1 giro 3 — il gesto vale per il frame che l'ha ricevuto e i suoi antenati, non per i riquadri di altri siti.
+test('il clic sulla pagina non apre la finestra che chiede un riquadro di un altro sito; il clic nel riquadro sì', () => {
+  let ora = 4_000_000;
+  const orologio = mock.method(Date, 'now', () => ora);
+  try {
+    const wc = wcFinto('https://notizie.example/articolo');
+    wc.mainFrame = { parent: null, origin: 'https://notizie.example', url: 'https://notizie.example/articolo' };
+    const pubblicita = { parent: wc.mainFrame, origin: 'https://pubblicita.example', url: 'https://pubblicita.example/b' };
+    Permessi.seguiGesti(wc);
+    wc.emetti('input-event', {}, { type: 'mouseDown' });
+    assert.equal(Permessi.gestoPerUnaFinestra(wc, { url: 'https://pubblicita.example/', policy: 'strict-origin-when-cross-origin' }), false, 'il riquadro non l\'ha avuto');
+    assert.equal(Permessi.gestoPerUnaFinestra(wc, { url: 'https://notizie.example/articolo' }), true, 'la pagina sì, una volta');
+
+    ora += 400;
+    Permessi.gestoNelRiquadro(wc, pubblicita);
+    assert.equal(Permessi.gestoPerUnaFinestra(wc, { url: 'https://pubblicita.example/' }), true, 'il clic dentro il riquadro');
+    ora += 400;
+    Permessi.gestoNelRiquadro(wc, pubblicita);
+    assert.equal(Permessi.gestoPerUnaFinestra(wc, { url: 'https://notizie.example/' }), true, 'come in Chromium il gesto sale alla pagina che lo contiene');
+
+    ora += 400;
+    wc.emetti('input-event', {}, { type: 'mouseDown' });
+    ora += 20;
+    Permessi.gestoNelRiquadro(wc, pubblicita);
+    assert.equal(Permessi.gestoPerUnaFinestra(wc, { url: 'https://pubblicita.example/' }), true, 'lo stesso clic visto da tutti e due è un gesto solo, del riquadro');
+    assert.equal(Permessi.gestoPerUnaFinestra(wc, { url: 'https://notizie.example/' }), false, 'e apre una finestra sola');
+
+    ora += 400;
+    wc.emetti('input-event', {}, { type: 'mouseDown' });
+    assert.equal(Permessi.gestoPerUnaFinestra(wc, { url: '' }), true, 'chi nasconde da dove chiede resta «la scheda»');
+  } finally { orologio.mock.restore(); }
+});

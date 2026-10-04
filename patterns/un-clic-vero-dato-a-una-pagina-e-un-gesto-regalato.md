@@ -61,6 +61,13 @@ voleva.
   non lo vede: lo segnala il preload del riquadro, solo se `isTrusted`. Il gesto lo apre il suo inizio (pressione,
   tasto, fine del tocco): il rilascio dello stesso clic non è una seconda finestra. Il clic vero che Filo dà da sé
   (`clicDiFilo`, il «Salta») non è un gesto di nessuno, nemmeno quando il riquadro lo riferisce (#737.1 giro 2).
+- **Il gesto è di chi l'ha ricevuto**, come in Chromium: del frame toccato e dei suoi antenati, non dei riquadri di
+  altri siti che contiene. Il main non sa quale frame chiede la finestra (Electron non lo dice, e la finestra aperta
+  da un riquadro senza gesto consuma lo stesso l'attivazione di tutta la scheda): lo riconosce dall'origine del
+  referrer. Chi la nasconde resta «la scheda»; chiuderle anche quella porta fermerebbe i link esterni con
+  `noreferrer` di ogni pagina con pubblicità (#737.1 giro 3). La forma non conta: una finestra con le misure o un
+  Maiuscolo+clic passano col gesto come una scheda. Posta, telefono e SMS chiesti dalla pagina seguono la stessa
+  regola; un redirect usa il gesto che ha fatto partire la navigazione.
 
 Prove: `tests/unit/gestoNonRegalato.test.mjs` (nessuno script di Filo nelle pagine porta il gesto),
 `tests/popup-senza-gesto.spec.mjs`, `tests/unit/adSkip.test.mjs`, `tests/ad-skip.spec.mjs` (il «Salta» finto

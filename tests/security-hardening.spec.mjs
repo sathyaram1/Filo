@@ -59,7 +59,11 @@ test('#1b i link mailto:/tel: vengono consegnati all\'OS, file:// no', async ({ 
   `);
   const startUrl = page.url();
 
+  // Posta e telefono partono da un gesto dell'utente (#737.1 giro 3): un clic vero prima di ognuno.
+  await page.mouse.click(5, 5);
   await page.evaluate(() => { try { window.location.href = 'mailto:mario@esempio.it?subject=ciao'; } catch (_) {} });
+  await page.waitForTimeout(150);
+  await page.mouse.click(5, 5);
   await page.evaluate(() => { try { window.open('tel:+39055123456'); } catch (_) {} });
   await page.evaluate(() => { try { window.open('file://attacker.example/share/x'); } catch (_) {} });
 
