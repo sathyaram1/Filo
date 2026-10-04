@@ -974,6 +974,9 @@ module.exports = function register(on, ctx) {
     if (!LIVE || !LIVE.makeWatcher || !FB) return null;
     const campi = Array.isArray(FB.CAMPI_LISTA) ? FB.CAMPI_LISTA : null;
     liveWatcher = LIVE.makeWatcher({
+      // Letti dal modulo, non dalle sue costanti: gli spec accorciano i tempi.
+      pollMs: LIVE.POLL_MS,
+      reconcileMs: LIVE.RECONCILE_MS,
       onWarn: (m) => console.warn('[feedback] giro:', m),
       seguiti: () => {
         const out = new Set();
