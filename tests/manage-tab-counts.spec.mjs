@@ -285,12 +285,12 @@ test('#495 — un risultato che punta a un feedback non più caricato non viene 
   await expect(page.locator('#mgListHead')).toHaveText('Ricerca (1)');
 });
 
-// ── Quando il caricamento tocca il tetto, il numero è un MINIMO e lo dice ──
-// La pagina carica i 500 feedback più recenti. Oltre quella soglia i più vecchi
-// restano fuori: "Archiviati (312)" quando ce ne sono 400 sembra una risposta e
-// non lo è. Il "+" toglie l'affermazione senza costare una lettura in più.
+// ── Il numero è un MINIMO solo se la lettura si è interrotta, e lo dice ──
+// La Gestione legge tutti i feedback (#676): 500 non è più un tetto, e un
+// conto pieno è un totale. Il "+" resta per il caso in cui il freno sulle
+// pagine abbia fermato la lettura prima della fine.
 
-test('#495 — caricamento al tetto: i numeri diventano "+" e l\'hover spiega perché', async ({ openTab }) => {
+test('#495/#676 — niente "+" da un tetto che non c\'è; "+" e spiegazione se la lettura si interrompe', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady && window.SN_FEEDBACK);
@@ -298,26 +298,7 @@ test('#495 — caricamento al tetto: i numeri diventano "+" e l\'hover spiega pe
   await page.evaluate(() => window.__mgTest.setAdmin(true));
 
   const CAP = await page.evaluate(() => window.SN_FEEDBACK.LIST_PAGE_SIZE);
-
-  // Una in meno del tetto: il caricamento ha visto tutto, i numeri sono totali.
-  await page.evaluate((cap) => {
-    const items = [];
-    for (let i = 0; i < cap - 1; i++) {
-      items.push({
-        _id: `p${i}`, text: `t${i}`, name: `t${i}`, seq: i + 1, subSeq: 0,
-        clientId: 'tester@example.com', createdAt: '2026-06-20T10:00:00Z', images: [],
-        status: i === 0 ? 'todo' : 'unlabeled',
-      });
-    }
-    window.__mgTest.setData(items);
-  }, CAP);
-  await expect(tab(page, 'inbox')).toHaveText(`Ricevuti (${CAP - 2})`);
-  await expect(tab(page, 'queue')).toHaveText('In coda (1)');
-  await expect(tab(page, 'archived')).toHaveText('Archiviati (0)');
-  await expect(tab(page, 'inbox')).not.toHaveAttribute('title', /./);
-
-  // Tetto toccato: gli stessi numeri smettono di affermare un totale.
-  await page.evaluate((cap) => {
+  const carica = (opts) => page.evaluate(({ cap, opts }) => {
     const items = [];
     for (let i = 0; i < cap; i++) {
       items.push({
@@ -326,23 +307,28 @@ test('#495 — caricamento al tetto: i numeri diventano "+" e l\'hover spiega pe
         status: i === 0 ? 'todo' : 'unlabeled',
       });
     }
-    window.__mgTest.setData(items);
-  }, CAP);
-  await expect(tab(page, 'inbox')).toHaveText(`Ricevuti (${CAP - 1}+)`);
-  await expect(tab(page, 'queue')).toHaveText('In coda (1+)');
-  // Una sezione "vuota" al tetto non è vuota davvero: nemmeno lo zero afferma.
-  await expect(tab(page, 'archived')).toHaveText('Archiviati (0+)');
-  await expect(page.locator('#mgListHead')).toHaveText(`Ricevuti (${CAP - 1}+)`);
+    window.__mgTest.setData(items, opts);
+  }, { cap: CAP + 20, opts });
 
-  // Il "+" non resta un enigma: l'hover dice quanti se ne sono caricati.
-  const hint = await page.evaluate(() => window.SN_FEEDBACK.COUNT_CAP_HINT);
-  expect(hint).toContain(String(CAP));
+  // Più dei vecchi 500, letti tutti: i numeri sono totali.
+  await carica(undefined);
+  await expect(tab(page, 'inbox')).toHaveText(`Ricevuti (${CAP + 19})`);
+  await expect(tab(page, 'queue')).toHaveText('In coda (1)');
+  await expect(tab(page, 'archived')).toHaveText('Archiviati (0)');
+  await expect(tab(page, 'inbox')).not.toHaveAttribute('title', /./);
+
+  // Lettura interrotta dal freno: gli stessi numeri smettono di affermare un totale.
+  await carica({ incompleto: true });
+  await expect(tab(page, 'inbox')).toHaveText(`Ricevuti (${CAP + 19}+)`);
+  await expect(tab(page, 'queue')).toHaveText('In coda (1+)');
+  await expect(tab(page, 'archived')).toHaveText('Archiviati (0+)');
+  await expect(page.locator('#mgListHead')).toHaveText(`Ricevuti (${CAP + 19}+)`);
+
+  const hint = await page.evaluate(() => window.SN_FEEDBACK.COUNT_INCOMPLETE_HINT);
   await expect(tab(page, 'inbox')).toHaveAttribute('title', hint);
   await expect(page.locator('#mgListHead')).toHaveAttribute('title', hint);
-
-  // E la sezione vuota lo dice a parole, invece di negare i feedback più vecchi.
   await page.evaluate(() => window.__mgTest.setTab('archived'));
-  await expect(page.locator('#mgListEmpty')).toContainText(String(CAP));
+  await expect(page.locator('#mgListEmpty')).toContainText('si è fermata prima della fine');
 });
 
 // ── Caricamento fallito: il riquadro vuoto non è una risposta ────────────────
