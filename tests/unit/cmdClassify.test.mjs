@@ -1012,6 +1012,12 @@ test('#516 — le letture composte del banco restano livello 1, non «conferma»
     'if ((Get-ChildItem Downloads).Count -gt 0) { "ci sono file" } else { "vuota" }',
     'if ((Test-Path Downloads) -and (Test-Path Documents)) { gci Downloads, Documents }',
     'if (Test-Path Downloads) { }',
+    // un ramo che restituisce un valore solo: numero, booleano, stringa
+    'if (Test-Path Downloads) { (Get-ChildItem Downloads).Count } else { 0 }',
+    'if (Test-Path Downloads) { (gci Downloads).Count } else { -1 }',
+    'if (Test-Path Downloads) { 1 } else { 0 }',
+    'if (Test-Path Downloads) { $true } else { $false }',
+    'if (Test-Path Downloads) { 1.5GB } else { $null }',
     'if (Test-Path Downloads) { gci Downloads }; Get-Date',
     'Test-Path (Join-Path $env:USERPROFILE "Downloads")',
     'Write-Output (Get-Date)',

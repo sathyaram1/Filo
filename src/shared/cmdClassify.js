@@ -1172,7 +1172,7 @@
   const MEMBRI_RE = /^(?:\.[A-Za-z_]\w*|\[-?\d+\])*/;
   const OPERATORE_RE = /^\s*(?:-[ci]?(?:eq|ne|gt|ge|lt|le|like|notlike|match|notmatch|contains|notcontains|in|notin|join|and|or|xor)(?![\w-])|[+*/%,]|-(?=\s))/i;
   const UNARIO_RE = /^\s*(?:!|-not(?![\w-]))/i;
-  const STRINGA_RE = /^(?:'[^']*'|"[^"]*")$/;
+  const VALORE_RE = new RegExp(`${TERMINE_RE.source}$`, 'i');
 
   const saltaSpazi = (s, k) => { while (k < s.length && /\s/.test(s[k])) k += 1; return k; };
 
@@ -1375,9 +1375,9 @@
       if (det.level === 3) break;
       const t = p.testo.trim();
       const cc = p.spostato ? ignota : c;
-      // Il corpo di un `if` può essere vuoto o una sola stringa, che PowerShell stampa.
+      // Il corpo di un `if` può essere vuoto o un valore solo (stringa, numero, variabile), che PowerShell stampa.
       if (p.corpo && !t) continue;
-      const sub = p.corpo && STRINGA_RE.test(t) ? `Write-Output ${t}` : t;
+      const sub = p.corpo && VALORE_RE.test(t) ? `Write-Output ${t}` : t;
       det = peggiore(det, classifica(sub, cc, prof + 1));
     }
     return det;
