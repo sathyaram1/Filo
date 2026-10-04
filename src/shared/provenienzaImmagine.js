@@ -564,6 +564,183 @@
     return out;
   }
 
+  // ───────────────────────── marca temporale (RFC 3161) ─────────────────────────
+  // Un certificato scaduto oggi non dice niente su una firma fatta quando valeva: lo
+  // dice la marca temporale, se la sua firma regge e la sua autorità sta nell'elenco
+  // delle autorità di marcatura (#946). Una marca che non regge non vale niente.
+
+  const OID_SIGNED_DATA = '1.2.840.113549.1.7.2';
+  const OID_TST_INFO = '1.2.840.113549.1.9.16.1.4';
+  const OID_MESSAGE_DIGEST = '1.2.840.113549.1.9.4';
+  const USO_MARCA = '1.3.6.1.5.5.7.3.8';
+  const HASH_OID = {
+    '2.16.840.1.101.3.4.2.1': 'sha256',
+    '2.16.840.1.101.3.4.2.2': 'sha384',
+    '2.16.840.1.101.3.4.2.3': 'sha512',
+  };
+  const FIRMA_OID = {
+    '1.2.840.113549.1.1.1': { tipo: 'pkcs1' },
+    '1.2.840.113549.1.1.11': { tipo: 'pkcs1', hash: 'sha256' },
+    '1.2.840.113549.1.1.12': { tipo: 'pkcs1', hash: 'sha384' },
+    '1.2.840.113549.1.1.13': { tipo: 'pkcs1', hash: 'sha512' },
+    '1.2.840.113549.1.1.10': { tipo: 'pss' },
+    '1.2.840.10045.4.3.2': { tipo: 'ec', hash: 'sha256' },
+    '1.2.840.10045.4.3.3': { tipo: 'ec', hash: 'sha384' },
+    '1.2.840.10045.4.3.4': { tipo: 'ec', hash: 'sha512' },
+    '1.3.101.112': { tipo: 'eddsa' },
+  };
+
+  function der(b, i) {
+    const tag = b[i];
+    let len = b[i + 1];
+    if (tag === undefined || len === undefined) throw new Error('der troncato');
+    let p = i + 2;
+    if (len & 0x80) {
+      const n = len & 0x7f;
+      if (n < 1 || n > 4) throw new Error('der: lunghezza non valida');
+      len = 0;
+      for (let k = 0; k < n; k++) len = len * 256 + b[p++];
+    }
+    if (p + len > b.length) throw new Error('der troncato');
+    return { tag, dentro: b.subarray(p, p + len), tutto: b.subarray(i, p + len), fine: p + len };
+  }
+  function derFigli(nodo) {
+    const out = [];
+    let i = 0;
+    while (i < nodo.dentro.length) {
+      const f = der(nodo.dentro, i);
+      out.push(f);
+      i = f.fine;
+    }
+    return out;
+  }
+  function derOid(nodo) {
+    const b = nodo.dentro;
+    if (nodo.tag !== 0x06 || !b.length) return '';
+    const parti = [Math.floor(b[0] / 40), b[0] % 40];
+    let v = 0;
+    for (let i = 1; i < b.length; i++) {
+      v = v * 128 + (b[i] & 0x7f);
+      if (!(b[i] & 0x80)) { parti.push(v); v = 0; }
+    }
+    return parti.join('.');
+  }
+  function derOra(nodo) {
+    const m = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(?:[.,](\d+))?Z$/.exec(latin1(nodo.dentro, 0, nodo.dentro.length));
+    if (nodo.tag !== 0x18 || !m) return NaN;
+    return Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]);
+  }
+
+  // Verifica la marca: firma della sua autorità sul contenuto, e impronta uguale a
+  // quella della firma del manifesto. Torna { ora, certificati } o null.
+  function leggiMarca(nonProtetto, protetto, claimBytes, firma) {
+    const crypto = nodeMod('node:crypto');
+    if (!crypto || !nonProtetto || typeof nonProtetto !== 'object') return null;
+    const v2 = nonProtetto.sigTst2 !== undefined;
+    const contenitore = v2 ? nonProtetto.sigTst2 : nonProtetto.sigTst;
+    const gettoni = contenitore && contenitore.tstTokens;
+    // Il lettore di riferimento ne ammette una sola.
+    if (!Array.isArray(gettoni) || gettoni.length !== 1 || !gettoni[0] || !gettoni[0].val) return null;
+    try {
+      const dati = v2 ? cborBstr(u8(firma)) : u8(claimBytes);
+      const daMarcare = concat([cborLen(4, 4), cborTstr('CounterSignature'), cborBstr(protetto), cborBstr(new Uint8Array(0)), cborBstr(dati)]);
+
+      const t = u8(gettoni[0].val);
+      let info = der(t, 0);
+      let figli = derFigli(info);
+      // Una risposta intera del servizio (stato + gettone) o il solo gettone.
+      if (figli[0] && figli[0].tag === 0x30 && figli[1]) { info = figli[1]; figli = derFigli(info); }
+      if (derOid(figli[0]) !== OID_SIGNED_DATA || !figli[1] || figli[1].tag !== 0xa0) return null;
+      const sd = derFigli(derFigli(figli[1])[0]);
+      const incapsulato = derFigli(sd[2]);
+      if (derOid(incapsulato[0]) !== OID_TST_INFO || !incapsulato[1]) return null;
+      const ottetti = derFigli(incapsulato[1])[0];
+      if (!ottetti || ottetti.tag !== 0x04) return null;
+      const eContent = ottetti.dentro;
+
+      const certificati = [];
+      for (const f of sd) {
+        if (f.tag !== 0xa0) continue;
+        for (const c of derFigli(f)) {
+          if (c.tag !== 0x30) continue;
+          try { certificati.push(new crypto.X509Certificate(Buffer.from(c.tutto))); } catch (_) {}
+        }
+      }
+      const firmatari = derFigli(sd[sd.length - 1]);
+      if (sd[sd.length - 1].tag !== 0x31 || firmatari.length !== 1) return null;
+      const si = derFigli(firmatari[0]);
+      const hashFirma = HASH_OID[derOid(derFigli(si[2])[0])];
+      if (!hashFirma) return null;
+      let k = 3;
+      let attributi = null;
+      if (si[k] && si[k].tag === 0xa0) attributi = si[k++];
+      const algFirma = FIRMA_OID[derOid(derFigli(si[k++])[0])];
+      const valoreFirma = si[k];
+      if (!algFirma || !valoreFirma || valoreFirma.tag !== 0x04) return null;
+
+      let firmato = eContent;
+      if (attributi) {
+        let impronta = null;
+        for (const a of derFigli(attributi)) {
+          const [oid, valori] = derFigli(a);
+          if (derOid(oid) === OID_MESSAGE_DIGEST) impronta = derFigli(valori)[0];
+        }
+        if (!impronta || !ugualiByte(impronta.dentro, sha(hashFirma, eContent))) return null;
+        firmato = concat([new Uint8Array([0x31]), attributi.tutto.subarray(1)]);
+      }
+
+      const verifica = (cert) => {
+        try {
+          const chiave = cert.publicKey;
+          const h = algFirma.hash || hashFirma;
+          if (algFirma.tipo === 'eddsa') return crypto.verify(null, Buffer.from(firmato), chiave, Buffer.from(valoreFirma.dentro));
+          if (algFirma.tipo === 'pss') {
+            return crypto.verify(h, Buffer.from(firmato), {
+              key: chiave, padding: crypto.constants.RSA_PKCS1_PSS_PADDING, saltLength: crypto.constants.RSA_PSS_SALTLEN_AUTO,
+            }, Buffer.from(valoreFirma.dentro));
+          }
+          return crypto.verify(h, Buffer.from(firmato), chiave, Buffer.from(valoreFirma.dentro));
+        } catch (_) { return false; }
+      };
+      const autorita = certificati.find(verifica);
+      if (!autorita) return null;
+
+      const tst = derFigli(der(eContent, 0));
+      const imprint = derFigli(tst[2]);
+      const hashImprint = HASH_OID[derOid(derFigli(imprint[0])[0])];
+      if (!hashImprint || !ugualiByte(imprint[1].dentro, sha(hashImprint, daMarcare))) return null;
+      const ora = derOra(tst[4]);
+      if (!Number.isFinite(ora)) return null;
+      return { ora, certificati: [autorita, ...certificati.filter((c) => c !== autorita)] };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // La marca vale se la sua autorità arriva all'elenco delle autorità di marcatura
+  // e se l'ora che certifica cade dentro la validità del certificato di chi ha firmato.
+  function marcaValida(marca, certFirmatario, ancoreTsa) {
+    if (!marca || !certFirmatario || !Array.isArray(ancoreTsa) || !ancoreTsa.length) return false;
+    const da = Date.parse(certFirmatario.validFrom);
+    const a = Date.parse(certFirmatario.validTo);
+    if (!(marca.ora >= da && marca.ora <= a)) return false;
+    const [foglia, ...borsa] = marca.certificati;
+    const usi = foglia.extKeyUsage || foglia.keyUsage;
+    if (foglia.ca || !Array.isArray(usi) || !usi.includes(USO_MARCA)) return false;
+    const elenco = new Set(ancoreTsa.map((x) => x && x.fingerprint256).filter(Boolean));
+    let cur = foglia;
+    const visti = new Set([foglia.fingerprint256]);
+    for (let d = 0; d < 8; d++) {
+      if (d > 0 && elenco.has(cur.fingerprint256)) return true;
+      if (ancoreTsa.some((x) => emessoDa(cur, x))) return true;
+      const padre = borsa.find((c) => !visti.has(c.fingerprint256) && emessoDa(cur, c));
+      if (!padre) return false;
+      visti.add(padre.fingerprint256);
+      cur = padre;
+    }
+    return false;
+  }
+
   // Ciò che il claim afferma, ma solo per le asserzioni la cui impronta combacia
   // con quella firmata: un'asserzione non coperta dalla firma non è firmata.
   const RELAZIONI = new Set(['parentOf', 'componentOf']);
