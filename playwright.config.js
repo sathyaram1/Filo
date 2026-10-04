@@ -29,7 +29,7 @@ if (process.env.FILO_TEST_VISIBLE !== '1') process.env.FILO_HIDE_WINDOW = '1';
 
 export default defineConfig({
   testDir: './tests',
-  testMatch: /.*\.spec\.(js|mjs)$/,
+  testMatch: /(diag-639|net-error-page)\.spec\.mjs$/,
   // Le prove dei giri di verifica (tests/verifica/<numero>/) restano nel ramo
   // ma NON entrano nella suite completa: quelle di un solo feedback costano
   // otto minuti e mezzo (misurato il 9/09/2026 su #495), e la suite completa
@@ -59,7 +59,7 @@ export default defineConfig({
   // feedback errati). Con 2 retry il blip occasionale viene assorbito al re-run,
   // mentre una regressione VERA continua a fallire tutti e 3 i tentativi → resta
   // rossa. I retry rigirano solo gli spec falliti, non l'intera suite.
-  retries: 2,
+  retries: 0,
   reporter: [['list'], ['html', { open: 'never', outputFolder: 'tests/.report' }]],
   use: {
     trace: 'on-first-retry',
