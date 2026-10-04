@@ -1,7 +1,8 @@
-// Verifica #874, giro 3: esplorazione (aspetto in chiaro e scuro, Wi-Fi spento dalla chat, conferme a vuoto).
+// Verifica #874, giro 3, rilievo 2: un comando che non cambierebbe niente (rete già collegata, dispositivo già
+// scollegato) non chiede conferma avvisando di un distacco che non avverrà.
 
 import { test, expect } from '../../fixtures/electron.mjs';
-import { home, modelloFinto, ripristina, chiedi, chiamateAlModello } from '../../helpers/chatFinta.mjs';
+import { home, modelloFinto, ripristina, chiedi } from '../../helpers/chatFinta.mjs';
 import { clickConfirm, confirmText } from '../../helpers/confirm.mjs';
 
 const PARTENZA = {
@@ -73,100 +74,29 @@ test.afterEach(async ({ app }) => {
   await ripristina(app).catch(() => {});
 });
 
-async function tema(app, page, t) {
-  await app.evaluate(async (_, t2) => globalThis.__filoHandlers.handleMessage(
-    { type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: t2 } },
-    { url: 'filo://preferences/preferences.html' },
-  ), t);
-  await expect(page.locator('html')).toHaveAttribute('data-sn-theme', t, { timeout: 5_000 });
-}
 
-test('aspetto: i tre riquadri in chiaro e in scuro, e un errore', async ({ app }) => {
-  await computerFinto(app, {
-    dispositivi: [
-      { indirizzo: '00:11:22:33:44:55', nome: 'Cuffie', collegato: true },
-      { indirizzo: '00:11:22:33:44:66', nome: 'Tastiera Logitech MX Keys con un nome lunghissimo', collegato: false },
-    ],
-    reti: ['Casa', 'Ufficio 5G', 'Bar Sport ospiti'],
-  });
-  const page = await home(app);
-  await expect(voce(page, 'volume')).toHaveText('25%', { timeout: 8_000 });
-  for (const t of ['light', 'dark']) {
-    await tema(app, page, t);
-    for (const v of ['volume', 'bluetooth', 'rete']) {
-      await voce(page, v).click();
-      await expect(riquadro(page)).toBeVisible();
-      await page.waitForTimeout(400);
-      await page.screenshot({ path: `tests/.shots/874-g3-${v}-${t}.png` });
-      await page.keyboard.press('Escape');
-    }
-  }
-});
-
-test('Wi-Fi spento dalla chat: cosa vede l\'utente dopo, quando il secondo giro del modello non ha rete', async ({ app }) => {
-  await computerFinto(app);
-  const page = await home(app);
-  await expect(voce(page, 'rete')).toHaveText('Casa', { timeout: 8_000 });
-  await modelloFinto(app, [
-    { toolCalls: [{ id: 'w1', name: 'WIFI', arguments: JSON.stringify({ acceso: false }) }] },
-    { text: 'Spento.' },
-  ]);
-  // Il secondo giro del modello, a Wi-Fi spento, non arriva al fornitore.
-  await app.evaluate(() => {
-    const prima = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
-    let n = 0;
-    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async (o) => {
-      n += 1;
-      if (n >= 2) { const e = new Error('fetch failed'); e.cause = { code: 'ENOTFOUND' }; throw e; }
-      return prima(o);
-    };
-  });
-  await chiedi(page, 'spegni il Wi-Fi');
-  await expect.poll(() => confirmText(page)).toContain('Spegnere il Wi-Fi');
-  await clickConfirm(page, 'ok');
-  await expect.poll(async () => (await computer(app)).wifi.acceso).toBe(false);
-  await page.waitForTimeout(4000);
-  await page.screenshot({ path: 'tests/.shots/874-g3-wifi-spento-chat.png' });
-  const testo = await page.locator('#messages, .dash-chat, main').first().innerText().catch(() => '');
-  console.log('CHAT DOPO:', testo.slice(-800));
-});
-
-test('«collegati a Casa» quando il computer è già su Casa: chiede conferma per niente?', async ({ app }) => {
+test('«collegati a Casa» quando il computer è già su Casa: nessuna conferma che promette una connessione che cade', async ({ app }) => {
   await computerFinto(app, { reti: ['Casa', 'Ufficio'] });
   const page = await home(app);
   await expect(voce(page, 'rete')).toHaveText('Casa', { timeout: 8_000 });
   await modelloFinto(app, [
     { toolCalls: [{ id: 'w1', name: 'WIFI', arguments: JSON.stringify({ rete: 'Casa' }) }] },
-    { text: 'Fatto.' },
+    { text: 'Sei già su Casa.' },
   ]);
   await chiedi(page, 'collegati a Casa');
   await page.waitForTimeout(3000);
-  const c = await confirmText(page).catch(() => '');
-  console.log('CONFERMA:', JSON.stringify(c));
-  await page.screenshot({ path: 'tests/.shots/874-g3-gia-collegato.png' });
+  expect(await confirmText(page).catch(() => '')).not.toContain('la connessione di adesso cade');
 });
 
-test('cuffie già scollegate: «scollega le cuffie» chiede conferma per niente?', async ({ app }) => {
+test('cuffie già scollegate: «scollega le cuffie» non chiede conferma per niente', async ({ app }) => {
   await computerFinto(app, { dispositivi: [{ indirizzo: '00:11:22:33:44:55', nome: 'Cuffie', collegato: false }], stato: { ...PARTENZA, bluetooth: { acceso: true, dispositivi: [] } } });
   const page = await home(app);
   await expect(voce(page, 'bluetooth')).toBeVisible({ timeout: 8_000 });
   await modelloFinto(app, [
-    { toolCalls: [{ id: 'b1', name: 'BLUETOOTH', arguments: JSON.stringify({ dispositivo: 'cuffie', collega: false }) }] },
-    { text: 'Fatto.' },
+    { toolCalls: [{ id: 'b1', name: 'BLUETOOTH', arguments: JSON.stringify({ dispositivo: 'Cuffie', collega: false }) }] },
+    { text: 'Erano già scollegate.' },
   ]);
   await chiedi(page, 'scollega le cuffie');
   await page.waitForTimeout(3000);
-  const c = await confirmText(page).catch(() => '');
-  console.log('CONFERMA BT:', JSON.stringify(c));
-});
-
-test('rete negata in chat: «collegati a Ufficio» con la posizione negata', async ({ app }) => {
-  await computerFinto(app, { reti: ['Casa', 'Ufficio'], negato: 'posizione' });
-  const page = await home(app);
-  await expect(voce(page, 'rete')).toHaveText('Casa', { timeout: 8_000 });
-  await voce(page, 'rete').click();
-  await opzione(page, 'Collegati a Ufficio').click();
-  await page.waitForTimeout(800);
-  await page.screenshot({ path: 'tests/.shots/874-g3-rete-negata-riquadro.png' });
-  console.log('ERRORE RIQUADRO:', await riquadro(page).innerText());
+  expect(await confirmText(page).catch(() => '')).not.toContain('Scollegare «Cuffie»');
 });
