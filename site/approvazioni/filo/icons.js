@@ -503,6 +503,48 @@
     globe +
     `<path d="M4 4l16 16"/>`;
 
+  // --- Il sistema (#873): batteria, rete, Bluetooth. La batteria è un corpo con il polo a destra;
+  //     la carica la dice una barra dentro, il fulmine quando è in carica.
+  const batteryBody =
+    `<rect x="2" y="7" width="17" height="10" rx="2.5"/>` +
+    `<path d="M21.5 10.5v3"/>`;
+  // Il livello è una riga spessa dentro il corpo: da 6.5 a 14.5 per 0-100%, niente sotto l'1%.
+  function batteryLevel(livello) {
+    const n = Number(livello);
+    if (!Number.isFinite(n) || n < 1) return '';
+    const fine = 6.5 + 8 * Math.min(100, n) / 100;
+    return `<path d="M6.5 12H${fine.toFixed(2)}" stroke-width="4.25"/>`;
+  }
+  const batteryCharging =
+    batteryBody +
+    `<path d="M11.6 8.6l-2.4 3.6h3.2l-2.4 3.6"/>`;
+  // Alla corrente ma ferma (piena, o al limite di carica): una spina dentro, così staccarla si vede.
+  const batteryPlugged =
+    batteryBody +
+    `<path d="M9.5 9.75h2.25a2.25 2.25 0 0 1 0 4.5H9.5z"/>` +
+    `<path d="M6.75 10.9H9.5"/><path d="M6.75 13.1H9.5"/><path d="M14 12h2.25"/>`;
+
+  // --- Wi-Fi: tre archi e un punto, il segnale che arriva.
+  const wifi =
+    `<path d="M2.5 9a14 14 0 0 1 19 0"/>` +
+    `<path d="M5.5 12.5a9.5 9.5 0 0 1 13 0"/>` +
+    `<path d="M8.75 15.75a4.75 4.75 0 0 1 6.5 0"/>` +
+    `<path d="M12 19.25h.01"/>`;
+  // --- Nessuna rete: gli stessi archi barrati.
+  const wifiOff =
+    wifi +
+    `<path d="M4 4l16 16"/>`;
+  // --- Rete via cavo: la presa di rete vista di fronte.
+  const ethernet =
+    `<path d="M4 5h16a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 20 16h-3v2.5H7V16H4a1.5 1.5 0 0 1-1.5-1.5v-8A1.5 1.5 0 0 1 4 5z"/>` +
+    `<path d="M7 9v2"/><path d="M10.33 9v2"/><path d="M13.67 9v2"/><path d="M17 9v2"/>`;
+  // --- Bluetooth: la runa, e barrata quando è spento.
+  const bluetooth =
+    `<path d="M7 7.5l10 9-5 4.5V3l5 4.5-10 9"/>`;
+  const bluetoothOff =
+    bluetooth +
+    `<path d="M4 4l16 16"/>`;
+
   // --- Regola "sempre da un altro paese": globo con un segnalibro nell'angolo.
   const globePinned =
     `<circle cx="11" cy="13" r="7.5"/>` +
@@ -727,6 +769,15 @@
     globe:        (size) => wrap(globe, { size }),
     globeOff:     (size) => wrap(globeOff, { size }),
     globePinned:  (size) => wrap(globePinned, { size }),
+    // `livello` (0-100) disegna la carica dentro il corpo; senza, la batteria è vuota.
+    battery:      (size, livello) => wrap(batteryBody + batteryLevel(livello), { size }),
+    batteryCharging: (size) => wrap(batteryCharging, { size }),
+    batteryPlugged: (size) => wrap(batteryPlugged, { size }),
+    wifi:         (size) => wrap(wifi, { size }),
+    wifiOff:      (size) => wrap(wifiOff, { size }),
+    ethernet:     (size) => wrap(ethernet, { size }),
+    bluetooth:    (size) => wrap(bluetooth, { size }),
+    bluetoothOff: (size) => wrap(bluetoothOff, { size }),
     windowFrame:  (size) => wrap(windowFrame, { size }),
     brush:        (size) => wrap(brush, { size }),
     undo:         (size) => wrap(undo, { size }),
