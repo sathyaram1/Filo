@@ -266,8 +266,8 @@
     const motivo = (e) => (e && e.message ? e.message : String(e));
 
     // Il confine non va mai oltre l'ultima ora del SERVER vista (commit, ora della lettura): col solo orologio del PC,
-    // avanti di tre minuti, il giro non vedeva più niente (#676). Il margine vale anche lì: chi firma col suo
-    // orologio, qualche secondo indietro, cadrebbe prima di quell'ora.
+    // avanti di tre minuti, il giro non vedeva più niente (#676). Il margine vale anche lì, per chi firma col suo
+    // orologio qualche secondo indietro; non per le righe della lettura completa, la cui ora è già passata.
     let oraServer = 0;
     function oraDi(r) {
       const t = Date.parse(r && r._updateTime);
@@ -275,15 +275,15 @@
       const u = Date.parse(r && r.updatedAt);
       return Number.isFinite(u) ? u : 0;
     }
-    function vedi(righe, readTime) {
-      for (const r of Array.isArray(righe) ? righe : []) oraServer = Math.max(oraServer, oraDi(r));
+    function vedi(righe, readTime, margine = overlapMs) {
+      for (const r of Array.isArray(righe) ? righe : []) oraServer = Math.max(oraServer, oraDi(r) - margine);
       const rt = Date.parse(readTime);
-      if (Number.isFinite(rt)) oraServer = Math.max(oraServer, rt);
+      if (Number.isFinite(rt)) oraServer = Math.max(oraServer, rt - margine);
     }
 
     function since() {
       const locale = (lastTickAt || (now() - overlapMs)) - overlapMs;
-      return new Date(Math.max(0, oraServer ? Math.min(locale, oraServer - overlapMs) : locale)).toISOString();
+      return new Date(Math.max(0, oraServer ? Math.min(locale, oraServer) : locale)).toISOString();
     }
 
     async function contaInvii(precedente) {
@@ -447,7 +447,7 @@
         lastReconcileAt = Math.max(lastReconcileAt, t);
         if (lastTickAt) return;
         lastTickAt = t;
-        vedi(righe);
+        vedi(righe, null, 0);
         for (const r of Array.isArray(righe) ? righe : []) {
           if (r && r._id && r._updateTime) versioniSeguite.set(String(r._id), r._updateTime);
         }

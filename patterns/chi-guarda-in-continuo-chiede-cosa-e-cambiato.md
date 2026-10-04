@@ -36,7 +36,10 @@ lasciava fuori per sempre un feedback vecchio tornato nei Ricevuti.
    il freno sulle pagine scatta, la pagina lo dice («N+» e l'hover).
 3. **La domanda incrementale.** Filtro `> ultimo visto` meno un margine per gli
    orologi scentrati, ordine (campo, nome), cursore oltre il tetto di pagina.
-   Un giro a vuoto costa una lettura.
+   «Ultimo visto» è l'ora del SERVER (lettura, commit), e il margine si toglie
+   anche a quella. Un giro a vuoto costa una lettura. Una riga riletta coi soli
+   campi della lista li sostituisce tutti: un campo della lista che manca è
+   stato tolto sul server, non si tiene quello vecchio.
 4. **La riconciliazione rara** (mezz'ora): le versioni di tutto, confrontate in
    pagina. Una lettura interrotta non fa uscire nessuno.
 5. **Un giro solo, e solo con qualcuno che guarda.** Vive nel main senza un
