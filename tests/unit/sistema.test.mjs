@@ -48,6 +48,8 @@ test('caricatore attaccato, staccato, batteria piena alla corrente: tre icone e 
   assert.equal(con({ livello: 50, inCarica: true }).hover, 'In carica');
   assert.equal(con({ livello: 50, inCarica: true }).icona, 'batteryCharging');
   assert.equal(con({ livello: 100, inCarica: false, collegata: true }).hover, 'Collegata');
+  assert.equal(con({ livello: 100, inCarica: false, collegata: true }).icona, 'batteryPlugged');
+  assert.equal(con({ livello: 80, inCarica: false, collegata: true }).icona, 'batteryPlugged');
   assert.equal(con({ livello: 50 }).hover, 'A batteria');
   assert.equal(con({ livello: 50 }).icona, 'battery');
   assert.equal(con({ livello: 12 }).bassa, true);

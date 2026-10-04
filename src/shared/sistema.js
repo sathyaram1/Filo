@@ -93,7 +93,8 @@
     return {
       testo: `${b.livello}%`,
       hover: stato,
-      icona: b.inCarica ? 'batteryCharging' : 'battery',
+      // Tre icone per tre stati: staccare il caricatore a batteria piena deve cambiare quello che si vede.
+      icona: b.inCarica ? 'batteryCharging' : b.collegata ? 'batteryPlugged' : 'battery',
       livello: b.livello,
       bassa: !b.collegata && b.livello <= 15,
       dettaglio: [`Batteria al ${b.livello}%`, `${frase.charAt(0).toUpperCase()}${frase.slice(1)}`],

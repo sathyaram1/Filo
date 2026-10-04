@@ -148,11 +148,13 @@ module.exports = function register(on, ctx) {
   });
 
   // Il nome della rete e dei dispositivi dicono dove sei e cosa hai addosso: a un sito non si danno.
-  on(MSG.SISTEMA_STATO, soloFilo(async (msg) => {
+  on(MSG.SISTEMA_STATO, soloFilo(async (msg, sender) => {
     const Sistema = require('../statoSistema');
-    Sistema.richiedi();
+    const schede = sender && sender.win && sender.win._filoTabs;
+    const davanti = !(schede && sender.tab) || schede.activeId === sender.tab.id;
+    Sistema.richiedi({ davanti, chi: sender && sender.wc });
     // La pagina che ha visto cadere o tornare la rete non aspetta il giro: la lettura nuova arriva con l'annuncio.
-    if (msg && msg.subito === true) Sistema.leggiAdesso();
+    if (davanti && msg && msg.subito === true) Sistema.leggiAdesso();
     return { ok: true, stato: Sistema.stato() };
   }));
 

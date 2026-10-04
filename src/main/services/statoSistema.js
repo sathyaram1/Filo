@@ -387,6 +387,8 @@ function datiDaWindows(riga) {
 function lettoreWindows({ avvia = spawn, pid = process.pid, quandoCambia = () => {} } = {}) {
   let figlio = null;
   let ultimo = null;
+  // Dopo un sonno l'ultima riga è di prima: resta per chi disegna, ma chi chiede aspetta quella nuova.
+  let fresco = false;
   let guasti = 0;
   let attese = [];
   const sveglia = () => { const a = attese; attese = []; for (const r of a) r(); };
@@ -406,19 +408,20 @@ function lettoreWindows({ avvia = spawn, pid = process.pid, quandoCambia = () =>
     const questo = figlio;
     questo.stdout.setEncoding('utf8');
     questo.stdout.on('data', (pezzo) => {
+      if (figlio !== questo) return;
       buffer += pezzo;
       if (buffer.length > 1024 * 1024) buffer = '';
       let a;
       while ((a = buffer.indexOf('\n')) >= 0) {
         const d = datiDaWindows(buffer.slice(0, a));
         buffer = buffer.slice(a + 1);
-        if (d) { ultimo = d; guasti = 0; sveglia(); quandoCambia(); }
+        if (d) { ultimo = d; fresco = true; guasti = 0; sveglia(); quandoCambia(); }
       }
     });
     // Un'uscita che non abbiamo chiesto è un guasto: dopo tre di fila il lettore si arrende, senza ripartire in loop.
     const finito = () => {
-      if (figlio === questo) figlio = null;
-      sveglia();
+      // Un processo vecchio che esce dopo la ripartenza non sveglia chi aspetta quello nuovo.
+      if (figlio === questo) { figlio = null; fresco = false; sveglia(); }
       if (!questo.fermatoDaNoi && !questo.contato) { questo.contato = true; guasti += 1; }
     };
     questo.on('error', finito);
@@ -426,7 +429,7 @@ function lettoreWindows({ avvia = spawn, pid = process.pid, quandoCambia = () =>
   }
 
   function pronto(ms) {
-    if (ultimo || !figlio) return Promise.resolve();
+    if (fresco || !figlio) return Promise.resolve();
     return new Promise((resolve) => {
       const t = setTimeout(resolve, ms);
       attese.push(() => { clearTimeout(t); resolve(); });
@@ -439,10 +442,12 @@ function lettoreWindows({ avvia = spawn, pid = process.pid, quandoCambia = () =>
       try { figlio.kill(); } catch (_) {}
     }
     figlio = null;
+    fresco = false;
     sveglia();
   }
 
-  return { assicura, pronto, ferma, ultimo: () => ultimo, attivo: () => !!figlio };
+  // Un lettore che si è arreso non ha più niente di vero da dire: meglio una voce che sparisce che una che mente.
+  return { assicura, pronto, ferma, ultimo: () => (fresco || figlio ? ultimo : null), attivo: () => !!figlio };
 }
 
 // ── Il monitor: chi guarda chiede, il lettore gira finché qualcuno guarda ────
@@ -473,6 +478,9 @@ function componi(parti, online) {
 let stato = null;
 let firma = null;
 let ultimaRichiesta = 0;
+let vegliaMs = VEGLIA_MS;
+// Le pagine che seguono il sistema: quando una torna davanti, il lettore riparte senza aspettare il suo richiamo.
+const osservatori = new Set();
 let giro = null;
 let letturaInCorso = null;
 let lettoreProve = null;
@@ -553,16 +561,29 @@ function ferma() {
   if (windows) windows.ferma();
 }
 
-function richiedi() {
+// Una scheda dietro le altre per Chromium resta «visibile» e continua a chiedere: `davanti: false` risponde
+// senza tenere sveglio il lettore, che legge solo finché qualcuno guarda.
+function richiedi({ davanti = true, chi = null } = {}) {
+  if (chi && typeof chi.id === 'number' && !osservatori.has(chi.id)) {
+    osservatori.add(chi.id);
+    const id = chi.id;
+    try { chi.once('destroyed', () => osservatori.delete(id)); } catch (_) {}
+  }
+  if (!davanti) return;
   ultimaRichiesta = Date.now();
   if (giro) return;
   aggancia();
   giro = setInterval(() => {
-    if (Date.now() - ultimaRichiesta > VEGLIA_MS) { ferma(); return; }
+    if (Date.now() - ultimaRichiesta > vegliaMs) { ferma(); return; }
     leggiAdesso();
   }, GIRO_MS);
   if (giro.unref) giro.unref();
   leggiAdesso();
+}
+
+// La finestra porta davanti una scheda: se è una pagina che segue il sistema, il lettore si sveglia subito.
+function schedaDavanti(wc) {
+  if (wc && osservatori.has(wc.id)) richiedi();
 }
 
 // Per la chat: lo stato di adesso, aspettando la prima lettura se nessuno guardava.
@@ -585,11 +606,13 @@ const _perProve = {
   usaLettore(fn) { lettoreProve = typeof fn === 'function' ? fn : null; firma = null; return leggiAdesso(); },
   leggiOra: () => leggiAdesso(),
   attivo: () => !!giro,
+  veglia(ms) { vegliaMs = Number(ms) > 0 ? Number(ms) : VEGLIA_MS; },
   GIRO_MS,
 };
 
 const api = {
   richiedi,
+  schedaDavanti,
   stato: () => stato,
   statoPerChat,
   leggiAdesso,

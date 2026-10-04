@@ -112,6 +112,7 @@ self.SN_ICONS_UTIL = { isSvgIcon, wrap };
 | `globePinned` | Globo con segnalibro nell'angolo: regola "sempre da un altro paese" |
 | `battery` | Pila con il polo a destra; con un livello (0-100) la carica è una barra dentro il corpo |
 | `batteryCharging` | La stessa pila con un fulmine dentro: in carica |
+| `batteryPlugged` | La stessa pila con una spina dentro: alla corrente ma ferma (piena o al limite di carica) |
 | `wifi` | Tre archi e un punto: collegato al Wi-Fi |
 | `wifiOff` | Gli stessi archi barrati: nessuna rete |
 | `ethernet` | Presa di rete vista di fronte, coi contatti: collegato via cavo |

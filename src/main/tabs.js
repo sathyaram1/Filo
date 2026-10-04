@@ -1593,6 +1593,8 @@ class TabManager {
     this.layout();
     this._tastieraAllaSchedaAttiva();
     if (tab._listaTimer) this._seguiLista(tab, { ora: true });
+    // Una home che torna davanti rivede subito batteria e rete (#873): dietro non teneva sveglio il lettore.
+    try { globalThis.SN_SISTEMA_MAIN?.schedaDavanti?.(tab.view.webContents); } catch (_) {}
     this._broadcast();
   }
 

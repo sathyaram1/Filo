@@ -517,6 +517,11 @@
   const batteryCharging =
     batteryBody +
     `<path d="M11.6 8.6l-2.4 3.6h3.2l-2.4 3.6"/>`;
+  // Alla corrente ma ferma (piena, o al limite di carica): una spina dentro, così staccarla si vede.
+  const batteryPlugged =
+    batteryBody +
+    `<path d="M9.5 9.75h2.25a2.25 2.25 0 0 1 0 4.5H9.5z"/>` +
+    `<path d="M6.75 10.9H9.5"/><path d="M6.75 13.1H9.5"/><path d="M14 12h2.25"/>`;
 
   // --- Wi-Fi: tre archi e un punto, il segnale che arriva.
   const wifi =
@@ -766,6 +771,7 @@
     // `livello` (0-100) disegna la carica dentro il corpo; senza, la batteria è vuota.
     battery:      (size, livello) => wrap(batteryBody + batteryLevel(livello), { size }),
     batteryCharging: (size) => wrap(batteryCharging, { size }),
+    batteryPlugged: (size) => wrap(batteryPlugged, { size }),
     wifi:         (size) => wrap(wifi, { size }),
     wifiOff:      (size) => wrap(wifiOff, { size }),
     ethernet:     (size) => wrap(ethernet, { size }),

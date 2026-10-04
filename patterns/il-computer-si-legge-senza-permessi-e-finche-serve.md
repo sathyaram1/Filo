@@ -38,6 +38,12 @@ giorno, è un costo vero. Quindi:
 
 - la home in vista chiede ogni 30 secondi, un turno di chat chiede una volta, e
   il lettore si ferma 90 secondi dopo l'ultima richiesta;
+- «in vista» lo decide il main, non la pagina: una scheda dietro le altre per
+  Chromium resta `visible`, quindi la sua richiesta riceve lo stato ma non tiene
+  sveglio il lettore; quando la finestra la riporta davanti, il lettore riparte
+  da sé;
+- un lettore che riparte non consegna la lettura di prima del sonno come
+  fresca: chi chiede aspetta la riga nuova;
 - su Windows il PowerShell parte alla prima richiesta, legge ogni due secondi
   con chiamate che non aprono altri processi, scrive solo quando la lettura
   cambia, ed esce da sé se Filo non c'è più (controlla il processo che l'ha

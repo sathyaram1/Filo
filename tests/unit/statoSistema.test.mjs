@@ -249,6 +249,30 @@ test('Windows: un processo solo, nascosto, che scrive a pezzi; il lettore aspett
   w.ferma();
 });
 
+test('Windows: dopo il sonno chi chiede aspetta la riga nuova, non riceve quella di prima come fresca', async () => {
+  let avvii = 0;
+  const w = L.lettoreWindows({
+    avvia: () => {
+      const f = figlioFinto();
+      avvii += 1;
+      const b = avvii === 1 ? { livello: 80, inCarica: true, collegata: true } : { livello: 30, inCarica: false, collegata: false };
+      setTimeout(() => f.stdout.write(`${JSON.stringify({ batteria: b })}\n`), 30);
+      return f;
+    },
+  });
+  w.assicura();
+  await w.pronto(2000);
+  assert.equal(w.ultimo().batteria.livello, 80);
+  w.ferma();
+  assert.equal(w.ultimo(), null, 'fermo, il lettore non ha niente di vero da dire');
+  // Il caricatore si stacca mentre il lettore dorme; poi qualcuno chiede.
+  w.assicura();
+  assert.equal(w.ultimo().batteria.livello, 80, 'mentre riparte chi disegna tiene l\'ultima lettura');
+  await w.pronto(2000);
+  assert.deepEqual(w.ultimo().batteria, { livello: 30, inCarica: false, collegata: false });
+  w.ferma();
+});
+
 test('Windows: un PowerShell che muore subito si riprova tre volte, poi il lettore si arrende senza girare a vuoto', async () => {
   const avviati = [];
   const w = L.lettoreWindows({ avvia: () => { const f = figlioFinto(); avviati.push(f); setImmediate(() => f.emit('exit', 1, null)); return f; } });
