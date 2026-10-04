@@ -122,8 +122,7 @@ export const SENZA_ACCESSO = [
   'Claude Code da riga di comando non ha un accesso suo, e le istanze figlie risponderebbero «Not logged in».',
   'Una volta sola, dall’owner, in un terminale: `claude auth login` (o `claude setup-token` e la variabile CLAUDE_CODE_OAUTH_TOKEN).',
   'Non ho lanciato niente.',
-].join('
-');
+].join('\n');
 
 /** La richiesta dell'owner dalle cornici di feedback:leggi: titolo e testo. PURA. */
 export function richiestaDaLettura(testo) {
