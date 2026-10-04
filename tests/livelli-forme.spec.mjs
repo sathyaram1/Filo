@@ -417,6 +417,28 @@ test('confermare la fusione: il secondo clic nello stesso punto approva, e Scart
   expect(Math.abs((await go.boundingBox()).y - prima.y)).toBeLessThan(0.5);
 });
 
+// Le riletture automatiche (un cambio di stato, una richiesta nuova) ridisegnavano il
+// pannello sotto il cursore e la conferma armata si perdeva: il secondo clic riarmava (#550).
+test('quadrato: una rilettura fra il primo clic e la conferma non si mangia la conferma', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page, [FB_COMPLETO], { pending: [richiesta()] });
+  await page.evaluate((id) => window.__mgTest.openDetail(id), FB_COMPLETO._id);
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l5"]').click();
+
+  const go = page.locator('#mgSideBody .sn-mac-btn-go');
+  await expect(go).toBeVisible();
+  const b = await go.boundingBox();
+  const punto = { x: b.x + 4, y: b.y + b.height / 2 };
+  await page.mouse.click(punto.x, punto.y);
+  await expect(go).toHaveText('Confermi?');
+  await page.evaluate(() => window.__mgTest.loadMergeApprovals());
+  await page.waitForTimeout(300);
+  await expect(go).toHaveText('Confermi?');
+
+  await page.mouse.click(punto.x, punto.y);
+  await expect.poll(() => page.evaluate(() => window.__chiamate.map((c) => c.type))).toEqual(['merge_approval_approve']);
+});
+
 test('quadrato verde quando il lavoro è uscito, con la versione', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   const fuso = { ...FB_COMPLETO, _id: 'fb-fuso', seq: 704, status: 'done', resolvedInVersion: '0.3.1' };

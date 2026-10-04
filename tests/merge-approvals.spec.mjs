@@ -492,6 +492,63 @@ test('dopo un guasto i tasti sono dove erano: ripremere nello stesso punto riarm
   expect(await page.evaluate(() => window.__macCalls)).toEqual([{ op: 'approve', id: 'ab12cd34ef56ab12cd34ef56' }]);
 });
 
+// Una rilettura che arriva mentre «Confermi?» è armato aspetta: rifatta sotto il
+// cursore, la card perdeva la conferma e un elenco cambiato spostava i tasti (#550).
+test('una rilettura mentre «Confermi?» è armato aspetta che la conferma finisca, poi arriva', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apriGestione(page, { pending: [richiesta()] });
+  const host = page.locator('#mgMergeApprovalsOrphans');
+  const go = host.locator('.sn-mac-btn-go');
+  await expect(go).toBeVisible({ timeout: 8_000 });
+  await go.click();
+  await expect(go).toHaveText('Confermi?');
+
+  const altra = richiesta({ id: 'ff12cd34ef56ab12cd34ef99', branch: 'claude/altro-ramo' });
+  await page.evaluate((lista) => window.__mgTest.loadMergeApprovals({ ok: true, pending: lista, failed: [], recent: [] }),
+    [altra, richiesta()]);
+  await page.waitForTimeout(300);
+  await expect(host.locator('.sn-mac-card')).toHaveCount(1);
+  await expect(go).toHaveText('Confermi?');
+
+  // Disarmata da sola, la card lascia passare l'elenco nuovo.
+  await expect(host.locator('.sn-mac-card')).toHaveCount(2, { timeout: 8_000 });
+  await expect(host).toContainText('claude/altro-ramo');
+});
+
+test('un guasto alla conferma resta scritto anche quando la rilettura rimandata ridisegna la card', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apriGestione(page, {
+    pending: [richiesta()],
+    approveReply: { ok: false, error: 'callable ownerMergeApprovals 500: github_unreachable' },
+  });
+  const host = page.locator('#mgMergeApprovalsOrphans');
+  const go = host.locator('.sn-mac-btn-go');
+  await expect(go).toBeVisible({ timeout: 8_000 });
+  await go.click();
+  await expect(go).toHaveText('Confermi?');
+  await page.evaluate(() => window.__mgTest.loadMergeApprovals());
+  await go.click();
+  await expect(host.locator('.sn-mac-status')).toContainText(/non raggiungibile/i, { timeout: 8_000 });
+  await page.waitForTimeout(500);
+  await expect(host.locator('.sn-mac-status')).toContainText(/non raggiungibile/i);
+  await expect(go).toBeEnabled();
+});
+
+// La coda di un doppio clic non è una conferma: «Approva e fondi» è irreversibile
+// (stessa guardia del cestino dell'editor, #415).
+test('un doppio clic su «Approva e fondi» arma soltanto; il clic voluto dopo fonde', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apriGestione(page, { pending: [richiesta()] });
+  const go = page.locator('#mgMergeApprovalsOrphans .sn-mac-btn-go');
+  await expect(go).toBeVisible({ timeout: 8_000 });
+  await go.dblclick();
+  await page.waitForTimeout(600);
+  expect(await page.evaluate(() => window.__macCalls)).toEqual([]);
+  await expect(go).toHaveText('Confermi?');
+  await go.click();
+  await expect.poll(() => page.evaluate(() => window.__macCalls)).toEqual([{ op: 'approve', id: 'ab12cd34ef56ab12cd34ef56' }]);
+});
+
 // ── La traccia delle decisioni passate (Automazioni) ────────────────────────
 
 test('Automazioni elenca le decisioni già prese: un’eccezione deve lasciare traccia', async ({ openTab }) => {

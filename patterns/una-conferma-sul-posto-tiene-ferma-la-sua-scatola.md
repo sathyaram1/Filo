@@ -15,6 +15,12 @@ conferma: una fusione voluta è finita scartata (#550).
 - **Un esito che compare non spinge i tasti.** La riga di stato («Chiedo al
   server…», un errore) sta sotto la fila dei tasti, non sopra: dopo un guasto il
   clic per riprovare cade di nuovo sul tasto giusto.
+- **Niente ridisegni sotto una conferma a metà.** Una rilettura automatica che
+  arriva mentre il tasto è armato o la richiesta è in volo aspetta che si
+  liberi (`occupata`/`quandoLibera` del modulo delle fusioni), poi ridisegna lo
+  stato di quel momento; l'esito già detto resta scritto sulla card rifatta.
+- **La coda di un doppio clic non conferma** (`detail > 1`), come nel cestino
+  dell'editor (#415).
 - **La prova clicca dove sbaglia l'utente**: col mouse sul bordo del tasto dalla
   parte del vicino, non al centro (dove `locator.click()` resta verde anche col
   difetto), e asserisce che la scatola del tasto armato coincide con quella di
