@@ -321,6 +321,7 @@
       }
       if (ids.length === 0 || typeof readRows !== 'function') return [];
       const rows = await readRows(ids);
+      vedi(rows);
       for (const r of Array.isArray(rows) ? rows : []) {
         if (r && r._id) versioniSeguite.set(String(r._id), r._updateTime || null);
       }
@@ -356,6 +357,7 @@
       }
       if (mossi.length === 0) return [];
       const rows = await readRows(mossi.map(([id]) => id));
+      vedi(rows);
       // Segnata dopo la rilettura: se fallisce, il giro dopo riprova.
       for (const [id, t] of mossi) versioniSeguite.set(id, t);
       return Array.isArray(rows) ? rows : [];
@@ -368,6 +370,7 @@
       if (!versions) throw new Error('versioni non lette');
       if (out.complete === false) avvisa('riallineamento: lettura interrotta dal freno sulle pagine');
       versioniSeguite = new Map(versions.map((v) => [String(v._id), v._updateTime || null]));
+      vedi(versions, out.readTime);
       inviiVisti = await contaInvii(inviiVisti);
       await nuoviAvvii();
       lastReconcileAt = startedAt;
@@ -379,6 +382,7 @@
       const startedAt = now();
       const out = await listChangedSince({ since: since() });
       const tutte = (out && Array.isArray(out.rows)) ? out.rows : [];
+      vedi(tutte, out && out.readTime);
       if (out && out.complete === false) {
         avvisa('cambiati: troppe pagine, riallineamento completo al giro dopo');
         lastReconcileAt = 0;
@@ -392,8 +396,15 @@
       }
       inviiVisti = invii;
 
+      // Il margine rilegge le righe dei giri prima: una versione già vista non è un cambiamento.
       const perId = new Map();
-      for (const r of tutte) if (r && r._id) perId.set(String(r._id), r);
+      for (const r of tutte) {
+        if (!r || !r._id) continue;
+        const id = String(r._id);
+        if (r._updateTime && versioniSeguite.get(id) === r._updateTime) continue;
+        versioniSeguite.set(id, r._updateTime || null);
+        perId.set(id, r);
+      }
       for (const r of await dalRegistro()) if (r && r._id) perId.set(String(r._id), r);
       for (const r of await daiSeguiti()) if (r && r._id) perId.set(String(r._id), r);
       lastTickAt = startedAt;
