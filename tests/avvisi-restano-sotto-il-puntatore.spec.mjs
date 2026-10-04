@@ -133,6 +133,49 @@ test('nella nuova scheda (dove è nata la segnalazione) l’avviso aspetta il pu
   await expect(avviso).toHaveCount(0, { timeout: 4000 });
 });
 
+// #954 — Nella home l'avviso di un errore della chat compare sopra il tasto Invia appena premuto, sotto un
+// puntatore che non si è mosso. Riceveva mouseenter, la pila si fermava per sempre e il clic seguente
+// chiudeva l'avviso invece di arrivare alla pagina.
+test('un avviso comparso sotto il puntatore fermo se ne va alla sua ora, e il clic dopo arriva alla pagina', async ({ openTab }) => {
+  const page = await openTab('filo://newtab/');
+  await page.waitForFunction(() => !!(globalThis.SN_POPUP && globalThis.SN_AVVISI), null, { timeout: 8000 });
+  const TESTO = 'La tua chiave OpenRouter non ha più credito: ricarica il tuo conto OpenRouter, oppure riscatta un invito nella pagina Crediti per usare i crediti di Filo.';
+  const mostra = (ms) => page.evaluate(([t, d]) => { globalThis.SN_POPUP.showToast(t, { duration: d }); }, [TESTO, ms]);
+  const avviso = page.locator('.sn-toast');
+
+  // Dove comparirà: lo si misura con un primo avviso uguale, poi il puntatore aspetta lì, fermo.
+  await mostra(0);
+  await expect(avviso).toHaveClass(/sn-toast-visible/);
+  await page.waitForTimeout(250);
+  const b = await avviso.boundingBox();
+  await avviso.evaluate((el) => el.click());
+  await expect(avviso).toHaveCount(0, { timeout: 1500 });
+  const x = b.x + b.width / 2;
+  const y = b.y + b.height / 2;
+  await page.mouse.move(x, y, { steps: 4 });
+  await page.evaluate(() => {
+    window.__clic954 = null;
+    document.addEventListener('click', (e) => { window.__clic954 = e.target.closest('.sn-toast') ? 'avviso' : 'pagina'; }, true);
+  });
+
+  await mostra(2000);
+  await expect(avviso).toHaveClass(/sn-toast-visible/);
+  expect(await page.evaluate(([px, py]) => !!document.elementFromPoint(px, py)?.closest('.sn-toast'), [x, y]),
+    'l’avviso non è comparso sotto il puntatore').toBe(true);
+  await shot(page, 'avviso-954-sotto-il-puntatore-fermo');
+  await expect(avviso, 'l’avviso comparso sotto il puntatore fermo non se ne va più').toHaveCount(0, { timeout: 4000 });
+
+  await page.mouse.down();
+  await page.mouse.up();
+  await expect.poll(() => page.evaluate(() => window.__clic954)).toBe('pagina');
+
+  // Il puntatore che si muove sopra l'avviso lo tiene, come prima.
+  await mostra(2000);
+  await puntatoreSopra(page, avviso);
+  await page.waitForTimeout(3000);
+  await expect(avviso).toBeVisible();
+});
+
 test('editor: l’avviso con «Annulla» aspetta il puntatore e segue la durata delle Preferenze', async ({ shell, openTab }) => {
   const page = await openTab('filo://editor/editor.html');
   await page.waitForSelector('#doc');
