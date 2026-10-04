@@ -2097,7 +2097,11 @@
       if (!info || !info.url) return;
       const { tabId } = info;
       const pagina = String(info.pagina || '');
-      const testo = `Bloccato popup da ${info.host || '?'}`;
+      const da = info.host || '?';
+      const testo = info.app === 'mailto' ? `Bloccata la posta aperta da ${da}`
+        : info.app === 'tel' ? `Bloccata la chiamata avviata da ${da}`
+          : info.app === 'sms' ? `Bloccato l'SMS aperto da ${da}`
+            : `Bloccato popup da ${da}`;
       const prima = popupAvvisati.get(tabId);
       if (prima && prima.pagina === pagina) {
         if (prima.carta && prima.carta.isConnected && prima.carta.dataset.closing !== '1') {
