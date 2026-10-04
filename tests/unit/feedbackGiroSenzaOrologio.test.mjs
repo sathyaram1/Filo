@@ -203,8 +203,19 @@ test('un feedback del registro esce dai seguiti quando la pagina lo segue da sé
   await w.tick();
   assert.deepEqual(w.seguitiDalRegistro(), ['b']);
   avanza(LIVE.REGISTRO_SEGUI_MS + 1);
+  await w.tick(); // questo è il riallineamento della mezz'ora
+  avanza(60_000);
   await w.tick();
-  assert.deepEqual(w.seguitiDalRegistro(), []);
+  assert.deepEqual(w.seguitiDalRegistro(), [], 'scaduto');
+
+  mondo.registro = [{ startedAt: 'y', num: '7', role: 'r' }, ...mondo.registro];
+  avanza(60_000);
+  await w.tick();
+  assert.deepEqual(w.seguitiDalRegistro(), ['b']);
+  mondo.seguiti = ['b'];
+  avanza(60_000);
+  await w.tick();
+  assert.deepEqual(w.seguitiDalRegistro(), [], 'ora lo segue la pagina');
 });
 
 test('un registro illeggibile non vale «registro svuotato»', async () => {
