@@ -694,6 +694,12 @@
     // Filo State: assembla stato programmatico (tab aperte, tempo, processi).
     // Risposta: { ok, state: {...}, stateText: "..." }
     FILO_GET_STATE: 'filo_get_state',
+    // Batteria, rete (col nome del Wi-Fi) e Bluetooth (coi nomi dei dispositivi): dati del computer, solo alle
+    // pagine di Filo. La richiesta tiene sveglio il lettore per 90 s: la home la ripete mentre è in vista.
+    // → { ok, stato: { batteria, rete, bluetooth, letto } | null }
+    SISTEMA_STATO: 'sistema_stato',
+    // main → pagine filo:// quando una lettura cambia. { stato }
+    SISTEMA_AGGIORNATO: 'sistema_aggiornato',
     // Genera dashboard (messaggio centro + suggerimenti). Usa cache con cooldown.
     // { force?: boolean }
     // Risposta: { ok, message, suggestions, cached, ts }

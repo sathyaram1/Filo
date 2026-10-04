@@ -433,6 +433,8 @@ class TabManager {
       if (t._inVista === ora) continue;
       t._inVista = ora;
       const wc = t.view?.webContents;
+      // Una home che torna in vista (scheda o finestra) rivede subito batteria e rete (#873).
+      if (ora) { try { globalThis.SN_SISTEMA_MAIN?.schedaDavanti?.(wc); } catch (_) {} }
       try {
         if (!wc || wc.isDestroyed?.() || !String(wc.getURL() || '').startsWith('filo://')) continue;
         wc.send('filo:broadcast', { type: 'tab_in_vista', inVista: ora });

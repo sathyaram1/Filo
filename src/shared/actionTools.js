@@ -287,6 +287,7 @@
         + '• tema: "sistema" | "chiaro" | "scuro"\n'
         + '• dimensione_testo: "piccolo" | "normale" | "grande" | "molto grande" | "enorme"\n'
         + '• commento_home: true | false (commento di Filo al centro della home)\n'
+        + '• ora_home / batteria_home / rete_home / bluetooth_home: true | false (ora, batteria, rete e Bluetooth nella colonna destra della home, una chiave per voce)\n'
         + '• anteprima_schede: true | false | "piccola" | "media" | "grande" (carta con l\'anteprima di una scheda al passaggio del mouse sulla barra)\n'
         + `• stile_agente: testo libero, ${tettoStile()} (come deve scrivere Filo; "nessuno" lo toglie) [conferma]\n`
         + '• correttore: true | false (correttore ortografico AI)\n'

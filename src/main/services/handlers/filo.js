@@ -147,6 +147,24 @@ module.exports = function register(on, ctx) {
     return { ok: true, state, stateText };
   });
 
+  // Il nome della rete e dei dispositivi dicono dove sei e cosa hai addosso: a un sito non si danno.
+  on(MSG.SISTEMA_STATO, soloFilo(async (msg, sender) => {
+    const Sistema = require('../statoSistema');
+    const schede = sender && sender.win && sender.win._filoTabs;
+    // Guarda chi può vederla: scheda attiva di una finestra né ridotta a icona né nascosta (la pagina resta «visible»).
+    const davanti = !(schede && sender.tab) || schede.inVista(sender.tab.id);
+    const segue = !(msg && msg.segue === false);
+    // Chi sta scrivendo in chat sveglia il lettore per il turno che arriva, senza diventare una pagina che lo segue.
+    if (msg && msg.perChat === true) {
+      if (davanti) Sistema.richiedi();
+      return { ok: true, stato: Sistema.stato() };
+    }
+    Sistema.richiedi({ davanti, chi: sender && sender.wc, segue });
+    // La pagina che ha visto cadere o tornare la rete non aspetta il giro: la lettura nuova arriva con l'annuncio.
+    if (davanti && segue && msg && msg.subito === true) Sistema.leggiUnaVolta();
+    return { ok: true, stato: Sistema.stato() };
+  }));
+
   on(MSG.FILO_GENERATE_DASHBOARD, async (msg, sender, origin) => {
     // Il messaggio della home mette in fila le pagine salvate: a un sito non si dà, come il loro elenco (#589.12).
     if (!isFilo(origin)) return { ok: false, code: 'forbidden', error: 'forbidden' };

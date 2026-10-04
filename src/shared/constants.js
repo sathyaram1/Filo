@@ -2310,6 +2310,9 @@
     // Mostra il commento proattivo di Filo al centro della home (newtab).
     // Disattivabile da Preferenze per chi preferisce una home più sobria.
     showHomeMessage: true,
+    // Ora, batteria, rete e Bluetooth nella colonna destra della home (#873): ognuna si toglie da sé
+    // (Preferenze, chat, tasto destro). Una voce di cui il computer non dice niente non compare comunque.
+    homeSistema: { ora: true, batteria: true, rete: true, bluetooth: true },
     // Carta con l'anteprima della scheda al passaggio del puntatore sulla barra (#430). size: 'piccola' |
     // 'media' | 'grande' (le larghezze stanno in src/main/popup-anteprima.js).
     tabPreview: { enabled: true, size: 'media' },
