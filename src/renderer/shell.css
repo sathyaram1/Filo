@@ -302,6 +302,21 @@ html[data-chrome-compact="1"] .addr {
   .tab > .tab-alert { margin: 0 auto; }
 }
 
+/* Scheda stretta senza avviso, stessa priorità e stesso conto (icona 16, X 18, paese ~26, gap 6): senza,
+   con tante schede la X usciva dalla sua e il clic sul suo centro cadeva sulla vicina (#945). */
+@container tab (width < 78px) {
+  .tab:not(:has(> .tab-alert)) > .proxy-ind { display: none; }
+}
+@container tab (width < 46px) {
+  .tab:not(:has(> .tab-alert)) > .title { display: none; }
+  .tab:not(:has(> .tab-alert)) > .close { margin-left: auto; }
+}
+@container tab (width < 40px) {
+  .tab:not(.active):not(:has(> .tab-alert)) > .close { display: none; }
+  .tab.active:not(:has(> .tab-alert)) > :is(.favicon, .spinner) { display: none; }
+  .tab:not(:has(> .tab-alert)) > :is(.favicon, .spinner, .close) { margin: 0 auto; }
+}
+
 .tab-new {
   flex: 0 0 28px;
   height: 28px;
