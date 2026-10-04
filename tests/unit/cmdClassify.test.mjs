@@ -1142,10 +1142,30 @@ test('#516 — dentro i gruppi vale il perimetro di lettura', () => {
     'if (Test-Path x) { cd C:\\Windows }; Get-Content win.ini',
     'cd (Join-Path C:\\ Windows); Get-Content win.ini',
     'Set-Location C:\\Windows; (Get-Content win.ini).Length',
+    // PowerShell esegue `c""d` come `cd`: le virgolette non nascondono lo spostamento.
+    '(c""d C:\\Windows); Get-Content win.ini', "(c''d C:\\Windows); Get-Content win.ini",
+    '(Set-Loc""ation C:\\Windows); gc win.ini', 'if (Test-Path x) { ch""dir C:\\Windows }; cat win.ini',
   ]) {
     assert.equal(det(cmd).level, 2, `"${cmd}" legge fuori dalla cartella personale`);
   }
   assert.equal(det('if (Test-Path Downloads) { cd Downloads; gci }').level, 1);
+});
+
+test('#516 SICUREZZA — un elenco fra parentesi arriva a un programma esterno come argomenti separati', () => {
+  // `git branch ("-D","x")` esegue `git branch -D x`: stesso livello della forma per esteso.
+  for (const [lista, esteso] of [
+    ['git branch ("-D","x")', 'git branch -D x'],
+    ['git checkout ("main","--",".")', 'git checkout main -- .'],
+    ['git push ("origin","--force")', 'git push origin --force'],
+    ['git checkout @("main",".")', 'git checkout main .'],
+    ['git branch $("-D","x")', 'git branch -D x'],
+  ]) {
+    assert.equal(lvl(esteso), 3, esteso);
+    assert.equal(lvl(lista), 3, lista);
+  }
+  // A un cmdlet lo stesso elenco resta un elenco di percorsi, ciascuno nel perimetro.
+  assert.equal(C.classifyDetail('Get-ChildItem -Path ("Downloads","Documents")', WIN).level, 1);
+  assert.equal(C.classifyDetail('Get-Content ("a.txt","~\\.ssh\\id_rsa")', WIN).level, 2);
 });
 
 test('#516 — virgolette che la shell legge diversamente non nascondono un comando', () => {

@@ -1277,7 +1277,8 @@
     let mosso = false;
     const aggiungi = (testo, corpo) => {
       pezzi.push({ testo, corpo, spostato });
-      if (CD_RE.test(testo)) { spostato = true; mosso = true; }
+      // Senza virgolette, come le legge la shell: `c""d` è `cd`.
+      if (CD_RE.test(unquote(testo))) { spostato = true; mosso = true; }
     };
     const gruppo = (a) => {
       const j = chiusura(s, a);
@@ -1321,8 +1322,9 @@
             j = chiusura(s, a);
             if (j < 0) return TRE;
             const dentro = s.slice(a + 1, j);
-            // Un gruppo di soli letterali (`@("a","b")`) vale quei letterali: il perimetro li legge.
-            if (LETTERALI_RE.test(dentro)) out += dentro.match(LETTERALE_G).join(',');
+            // Un gruppo di soli letterali (`@("a","b")`) vale quei letterali: un cmdlet li riceve come
+            // un elenco, un programma esterno come argomenti separati (`git branch ("-D","x")`).
+            if (LETTERALI_RE.test(dentro)) out += dentro.match(LETTERALE_G).join(PS_READ.has(prog) ? ',' : ' ');
             else { aggiungi(dentro, false); out += SEGNAPOSTO; }
           } else {
             out += ch;
