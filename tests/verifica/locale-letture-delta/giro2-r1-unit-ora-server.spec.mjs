@@ -8,10 +8,10 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
-test('gli unit dell\'ora del server passano in cinque corse di fila', async () => {
-  test.setTimeout(180000);
+test('gli unit dell\'ora del server passano in dodici corse di fila', async () => {
+  test.setTimeout(300000);
   const rossi = [];
-  for (let i = 0; i < 5; i += 1) {
+  for (let i = 0; i < 12; i += 1) {
     const r = spawnSync(process.execPath, ['--test', 'tests/unit/feedbackGiroOraServer.test.mjs'], { cwd: ROOT, encoding: 'utf8' });
     for (const riga of String(r.stdout || '').split('\n')) if (/^not ok/.test(riga)) rossi.push(`corsa ${i + 1}: ${riga}`);
   }
