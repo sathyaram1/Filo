@@ -384,6 +384,39 @@ test('quadrato rosso: dentro ci sono i blocchi, chi ha chiesto, ramo e commit, e
   expect(chiamata.id).toBe('ab12cd34ef56ab12cd34ef56');
 });
 
+// Il secondo clic cade dove è caduto il primo: «Confermi?» è più corto di
+// «Approva e fondi», e in una fila allineata a destra Scarta gli scivolava
+// sotto. Una fusione voluta finiva scartata (#550).
+test('confermare la fusione: il secondo clic nello stesso punto approva, e Scarta non ci arriva sotto', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page, [FB_COMPLETO], { pending: [richiesta()] });
+  await page.evaluate((id) => window.__mgTest.openDetail(id), FB_COMPLETO._id);
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l5"]').click();
+
+  const corpo = page.locator('#mgSideBody');
+  const go = corpo.locator('.sn-mac-btn-go');
+  const scarta = corpo.locator('.sn-mac-btn-quiet');
+  await expect(go).toBeVisible();
+  const prima = await go.boundingBox();
+  // Il bordo sinistro del tasto, il lato verso Scarta.
+  const punto = { x: prima.x + 3, y: prima.y + prima.height / 2 };
+
+  await page.mouse.click(punto.x, punto.y);
+  await expect(go).toHaveText('Confermi?');
+  expect(await page.evaluate(() => window.__chiamate)).toEqual([]);
+  const armato = await go.boundingBox();
+  for (const k of ['x', 'y', 'width', 'height']) expect(Math.abs(armato[k] - prima[k]), `Approva si è mosso (${k})`).toBeLessThan(0.5);
+  const s = await scarta.boundingBox();
+  const sotto = punto.x >= s.x && punto.x <= s.x + s.width && punto.y >= s.y && punto.y <= s.y + s.height;
+  expect(sotto, 'Scarta sotto il punto del primo clic').toBe(false);
+
+  await page.mouse.click(punto.x, punto.y);
+  await expect.poll(() => page.evaluate(() => window.__chiamate.map((c) => c.type))).toEqual(['merge_approval_approve']);
+  // L'esito compare sotto i tasti: non li spinge giù.
+  await expect(corpo.locator('.sn-mac-status')).toContainText(/su main/i);
+  expect(Math.abs((await go.boundingBox()).y - prima.y)).toBeLessThan(0.5);
+});
+
 test('quadrato verde quando il lavoro è uscito, con la versione', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   const fuso = { ...FB_COMPLETO, _id: 'fb-fuso', seq: 704, status: 'done', resolvedInVersion: '0.3.1' };

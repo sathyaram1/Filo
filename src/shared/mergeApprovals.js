@@ -503,6 +503,7 @@
       armed = false;
       approveBtn.textContent = 'Approva e fondi';
       approveBtn.classList.remove('is-armed');
+      approveBtn.style.minWidth = '';
       if (armTimer) { clearTimeout(armTimer); armTimer = null; }
     }
     function setBusy(on) {
@@ -519,8 +520,10 @@
 
     approveBtn.addEventListener('click', function () {
       if (!armed) {
-        // Conferma sul posto: un click solo non manda niente su main.
+        // Conferma sul posto: un click solo non manda niente su main. Il secondo
+        // clic cade dove è caduto il primo: il tasto armato non si accorcia, o Scarta gli scivola sotto (#550).
         armed = true;
+        approveBtn.style.minWidth = approveBtn.getBoundingClientRect().width + 'px';
         approveBtn.textContent = 'Confermi?';
         approveBtn.classList.add('is-armed');
         armTimer = setTimeout(disarm, 5000);
@@ -560,8 +563,9 @@
 
     actions.appendChild(discardBtn);
     actions.appendChild(approveBtn);
-    card.appendChild(status);
+    // L'esito sotto i tasti: comparendo sopra li spingeva giù, e il clic per riprovare cadeva fuori.
     card.appendChild(actions);
+    card.appendChild(status);
     // Un tentativo già fatto — e non riuscito — resta scritto sulla card: un
     // avviso che passa lo legge solo chi è davanti allo schermo in quel momento.
     var prima = o.esitoIniziale ? o.esitoIniziale(req) : null;
@@ -644,8 +648,8 @@
         });
     });
     actions.appendChild(okBtn);
-    card.appendChild(status);
     card.appendChild(actions);
+    card.appendChild(status);
     return card;
   }
 

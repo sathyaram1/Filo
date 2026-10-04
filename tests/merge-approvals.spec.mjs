@@ -470,6 +470,28 @@ test('un guasto del server non diventa un “fatto”: si dice, e la richiesta r
   await expect(btn).toBeEnabled();
 });
 
+test('dopo un guasto i tasti sono dove erano: ripremere nello stesso punto riarma Approva, non scarta', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apriGestione(page, {
+    pending: [richiesta()],
+    approveReply: { ok: false, error: 'callable ownerMergeApprovals 500: github_unreachable' },
+  });
+  const btn = page.locator('#mgMergeApprovalsOrphans .sn-mac-btn-go');
+  await expect(btn).toBeVisible({ timeout: 8_000 });
+  const prima = await btn.boundingBox();
+  const punto = { x: prima.x + 3, y: prima.y + prima.height / 2 };
+  await page.mouse.click(punto.x, punto.y);
+  await page.mouse.click(punto.x, punto.y);
+  await expect(page.locator('#mgMergeApprovalsOrphans .sn-mac-status')).toContainText(/non raggiungibile/i, { timeout: 8_000 });
+  await expect(btn).toBeEnabled();
+  const dopo = await btn.boundingBox();
+  for (const k of ['x', 'y', 'width', 'height']) expect(Math.abs(dopo[k] - prima[k]), `Approva si è mosso (${k})`).toBeLessThan(0.5);
+
+  await page.mouse.click(punto.x, punto.y);
+  await expect(btn).toHaveText('Confermi?');
+  expect(await page.evaluate(() => window.__macCalls)).toEqual([{ op: 'approve', id: 'ab12cd34ef56ab12cd34ef56' }]);
+});
+
 // ── La traccia delle decisioni passate (Automazioni) ────────────────────────
 
 test('Automazioni elenca le decisioni già prese: un’eccezione deve lasciare traccia', async ({ openTab }) => {
