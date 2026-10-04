@@ -12,7 +12,7 @@
 // campioni, stessi eventi — così è verificabile in un unit test.
 //
 // Qui c'è solo logica pura: niente microfono, niente rete. La cattura audio
-// sta nel content script (src/content/tts.js), la trascrizione nel main.
+// sta in src/shared/ascolto.js, la trascrizione nel main.
 //
 // Convenzione IIFE su globalThis come gli altri moduli shared/*.
 

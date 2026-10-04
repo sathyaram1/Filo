@@ -82,7 +82,7 @@
   }
 
   // `campo`: la casella; `invia()`: quello che fa la chat col tasto d'invio; `contenitore`/`prima`: dove va il tasto;
-  // `occupato()`: la chat sta ancora rispondendo (l'invio aspetta); `ambito`: dove vale la scorciatoia (la casella).
+  // `occupato()`: la chat sta ancora rispondendo (l'invio aspetta); `ambito`: dove vale la scorciatoia (di serie la casella).
   function collega({ campo, invia, contenitore, prima = null, occupato = null, ambito = null } = {}) {
     if (!campo || !contenitore || typeof invia !== 'function') return null;
     const gia = perCampo(campo);
@@ -143,7 +143,12 @@
       if (giro !== c.giro) return;
       const sessione = await Ascolto.avvia({
         fineDaSola: FINE,
-        suLivello: (v) => { if (giro === c.giro) b.style.setProperty('--sn-voce-livello', Number(v || 0).toFixed(2)); },
+        suLivello: (v) => {
+          if (giro !== c.giro) return;
+          // La chat è sparita (l'Aiuto chiuso, il modulo tolto): il microfono non resta acceso per nessuno.
+          if (!campo.isConnected) { if (c.sessione) c.sessione.ferma('annulla'); return; }
+          b.style.setProperty('--sn-voce-livello', Number(v || 0).toFixed(2));
+        },
         suFrase: (testo) => { if (giro === c.giro) inserisci(testo); },
         suStato: (st) => { if (giro === c.giro && st === 'trascrive' && c.stato === 'ascolta') imposta('trascrive'); },
         suFine: (esito) => finito(giro, esito),
@@ -206,7 +211,9 @@
     b.addEventListener('mousedown', (e) => e.preventDefault());
     b.addEventListener('click', (e) => {
       if (!e.isTrusted) return;
+      // Il clic è del microfono: il riquadro che lo contiene (un modulo dell'Editor) non lo prende per sé.
       e.preventDefault();
+      e.stopPropagation();
       premi();
     });
     const suInput = (e) => {
@@ -216,16 +223,20 @@
     };
     campo.addEventListener('input', suInput);
     const suTasto = (e) => {
-      if (!e.isTrusted || e.defaultPrevented) return;
+      if (!e.isTrusted) return;
+      // Invio a mano (la chat l'ha già preso): manda da sé quello che c'è, l'attesa finisce, e quello che si
+      // stava ancora dicendo resta nella casella invece di partire dopo come un secondo messaggio.
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.target === campo) {
+        if (c.stato === 'attesa') { smetti(); imposta('pronto'); }
+        if (c.stato === 'ascolta' && c.sessione) { c.toccato = true; c.sessione.ferma('utente'); }
+        return;
+      }
+      if (e.defaultPrevented) return;
       if (e.key === 'Escape') {
         if (esc()) { e.preventDefault(); e.stopPropagation(); }
         return;
       }
-      if (!global.SN_TASTI || !global.SN_TASTI.combacia(e, TASTO)) {
-        // Invio durante l'attesa: la chat invia da sé, l'attesa finisce lì.
-        if (e.key === 'Enter' && c.stato === 'attesa') { smetti(); imposta('pronto'); }
-        return;
-      }
+      if (!global.SN_TASTI || !global.SN_TASTI.combacia(e, TASTO)) return;
       // Nella pagina intera vale solo se il fuoco non sta scrivendo in un'altra casella.
       const dove = e.target;
       if (dove !== campo && dove && dove.nodeType === 1
