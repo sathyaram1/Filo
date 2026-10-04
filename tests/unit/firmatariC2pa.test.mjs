@@ -9,7 +9,7 @@ import { createServer } from 'node:http';
 import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
-import { pngFirmato, certificato, elencoPem } from '../helpers/immagineFirmata.mjs';
+import { pngFirmato, certificato, elencoPem, USO_MARCA } from '../helpers/immagineFirmata.mjs';
 
 process.env.NODE_ENV = 'test';
 const DATI = cartellaTemporanea('filo-firmatari-');
@@ -114,4 +114,34 @@ test('un aggiornamento non forzato con l’elenco fresco non scarica niente', as
   assert.equal((await F.aggiorna({ forza: true, url: `${base}/elenco.pem` })).ok, true);
   const esito = await F.aggiorna({ url: `${base}/non-chiamato.pem` });
   assert.equal(esito.saltato, true);
+});
+
+// #946 — l'elenco delle autorità di marcatura arriva insieme a quello dei firmatari:
+// senza, una firma fatta con un certificato oggi scaduto sembrerebbe incompleta.
+test('l’elenco delle autorità di marcatura si scarica col resto e resta su disco', async () => {
+  F._dimentica();
+  const RADICE_TSA = certificato({ organizzazione: 'Marcatura', ca: true });
+  const tsa = certificato({ organizzazione: 'Marcatura', emittente: RADICE_TSA, usi: [USO_MARCA], rsa: true });
+  const giorno = 86400000;
+  const scaduta = pngFirmato({
+    cert: certificato({ organizzazione: 'OpenAI, Inc.', emittente: RADICE, da: new Date(Date.now() - 10 * giorno), a: new Date(Date.now() - 2 * giorno) }),
+    marca: { tsa, ora: new Date(Date.now() - 5 * giorno) },
+  });
+  risposte.set('/elenco.pem', { corpo: elencoPem(RADICE) });
+  risposte.set('/marche.pem', { corpo: elencoPem(RADICE_TSA) });
+
+  assert.equal((await F.aggiorna({ forza: true, url: `${base}/elenco.pem` })).ok, true);
+  assert.match(P.frase(await F.analizzaImmagine(scaduta)), /incomplete/, 'senza l’elenco delle marche il certificato scaduto conta');
+
+  assert.equal((await F.aggiorna({ forza: true, url: `${base}/elenco.pem`, urlTsa: `${base}/marche.pem` })).ok, true);
+  assert.equal(F.stato().autoritaMarca, 1);
+  assert.equal(P.frase(await F.analizzaImmagine(scaduta)), 'Generata con l’AI, lo dichiara OpenAI nelle credenziali firmate.');
+
+  // Un elenco delle marche che non arriva non fa perdere quello buono, né quello dei firmatari.
+  const esito = await F.aggiorna({ forza: true, url: `${base}/elenco.pem`, urlTsa: `${base}/manca.pem` });
+  assert.equal(esito.ok, true);
+  F._dimentica();
+  assert.equal(await F.carica(), true);
+  assert.equal(F.stato().autoritaMarca, 1, 'anche su disco');
+  assert.equal(P.frase(await F.analizzaImmagine(scaduta)), 'Generata con l’AI, lo dichiara OpenAI nelle credenziali firmate.');
 });

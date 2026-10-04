@@ -59,22 +59,23 @@ function oidPunti(testo) {
 const estensione = (id, critica, valore) => seq(oid(id), ...(critica ? [der(0x01, Buffer.from([0xff]))] : []), der(0x04, valore));
 
 /**
- * Certificato P-256 valido da ieri a fra un anno. Senza `emittente` è
- * autofirmato; con `ca` è un'autorità che può emetterne altri. `usi` sono gli
- * usi estesi del certificato di chi firma (vuoto = estensione assente).
+ * Certificato P-256 (RSA con `rsa`) valido da ieri a fra un anno, o fra `da` e `a`.
+ * Senza `emittente` è autofirmato; con `ca` è un'autorità che può emetterne altri.
+ * `usi` sono gli usi estesi del certificato di chi firma (vuoto = estensione assente).
  */
 export function certificato({
   organizzazione = 'OpenAI, Inc.', nomeComune = 'Filo test signer',
   emittente = null, ca = false, usi = ca ? [] : [USO_FIRMA_C2PA],
+  da = new Date(Date.now() - 86400000), a = new Date(Date.now() + 365 * 86400000), rsa = false,
 } = {}) {
-  const { publicKey, privateKey } = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const { publicKey, privateKey } = rsa
+    ? crypto.generateKeyPairSync('rsa', { modulusLength: 2048 })
+    : crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
   const spki = publicKey.export({ type: 'spki', format: 'der' });
   const nome = seq(
     set(seq(oid(OID_O), utf8(organizzazione))),
     set(seq(oid(OID_CN), utf8(nomeComune))),
   );
-  const ieri = new Date(Date.now() - 86400000);
-  const fraUnAnno = new Date(Date.now() + 365 * 86400000);
   const algFirma = seq(oid(OID_ECDSA_SHA256));
   const estensioni = [
     estensione(OID_VINCOLI, true, ca ? seq(der(0x01, Buffer.from([0xff]))) : seq()),
@@ -86,7 +87,7 @@ export function certificato({
     intero(Math.floor(Math.random() * 0xffffff) + 1),
     algFirma,
     emittente ? emittente.nome : nome,
-    seq(utcTime(ieri), utcTime(fraUnAnno)),
+    seq(utcTime(da), utcTime(a)),
     nome,
     spki,
     der(0xa3, seq(...estensioni)),
@@ -94,6 +95,43 @@ export function certificato({
   const firma = crypto.sign('sha256', tbs, emittente ? emittente.privateKey : privateKey);
   const cert = seq(tbs, algFirma, der(0x03, Buffer.concat([Buffer.from([0]), firma])));
   return { der: cert, privateKey, organizzazione, nome };
+}
+
+/** L'uso dei certificati delle autorità di marcatura temporale. */
+export const USO_MARCA = '1.3.6.1.5.5.7.3.8';
+
+function generalizedTime(d) {
+  return der(0x18, Buffer.from(d.toISOString().replace(/[-:T]/g, '').replace(/\.\d+Z$/, 'Z'), 'ascii'));
+}
+
+/**
+ * Marca temporale RFC 3161 vera (CMS SignedData firmato dall'autorità `tsa`, che
+ * deve avere una chiave RSA: la firma ha misura fissa) sull'impronta di `dati`.
+ */
+export function marcaTemporale({ tsa, catena = [], ora = new Date(), dati }) {
+  const sha256 = (b) => crypto.createHash('sha256').update(b).digest();
+  const algSha = seq(oidPunti('2.16.840.1.101.3.4.2.1'), der(0x05, Buffer.alloc(0)));
+  const tstInfo = seq(
+    intero(1), oidPunti('1.2.3.4.5'),
+    seq(algSha, der(0x04, sha256(dati))),
+    intero(4242), generalizedTime(ora),
+  );
+  const attributi = Buffer.concat([
+    seq(oidPunti('1.2.840.113549.1.9.3'), set(oidPunti('1.2.840.113549.1.9.16.1.4'))),
+    seq(oidPunti('1.2.840.113549.1.9.4'), set(der(0x04, sha256(tstInfo)))),
+  ]);
+  const firma = crypto.sign('sha256', der(0x31, attributi), tsa.privateKey);
+  const firmatario = seq(
+    intero(1), seq(tsa.nome, intero(1)), algSha, der(0xa0, attributi),
+    seq(oidPunti('1.2.840.113549.1.1.11'), der(0x05, Buffer.alloc(0))), der(0x04, firma),
+  );
+  const signedData = seq(
+    intero(3), set(algSha),
+    seq(oidPunti('1.2.840.113549.1.9.16.1.4'), der(0xa0, der(0x04, tstInfo))),
+    der(0xa0, Buffer.concat([tsa.der, ...catena.map((c) => c.der)])),
+    set(firmatario),
+  );
+  return seq(oidPunti('1.2.840.113549.1.7.2'), der(0xa0, signedData));
 }
 
 /** L'elenco dei firmatari riconosciuti nella forma in cui lo pubblica il C2PA. */
@@ -222,6 +260,7 @@ export function pngFirmato({
   azione = 'c2pa.created',
   generatore = 'Filo test/1.0',
   guastaFirma = false,
+  marca = null,
 } = {}) {
   const dove = 8 + 25;
   const impronta = crypto.createHash('sha256').update(base).digest();
@@ -257,7 +296,14 @@ export function pngFirmato({
     ]);
     let firma = crypto.sign('sha256', daFirmare, { key: cert.privateKey, dsaEncoding: 'ieee-p1363' });
     if (guastaFirma) { firma = Buffer.from(firma); firma[0] ^= 0xff; }
-    const cose = cbor([protetto, {}, null, firma]);
+    let nonProtetto = {};
+    if (marca) {
+      // v1: la marca copre il claim; v2 (sigTst2): copre la firma stessa.
+      const dati = cbor(['CounterSignature', protetto, Buffer.alloc(0), marca.v2 ? cbor(firma) : claim]);
+      const token = marcaTemporale({ ...marca, dati });
+      nonProtetto = { [marca.v2 ? 'sigTst2' : 'sigTst']: { tstTokens: [{ val: token }] } };
+    }
+    const cose = cbor([protetto, nonProtetto, null, firma]);
     return superbox('store', 'c2pa',
       superbox('manifest', 'urn:uuid:00000000-0000-0000-0000-0000000000aa',
         store,

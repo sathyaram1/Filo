@@ -400,3 +400,50 @@ test('nella chat della Home le credenziali di un’immagine incollata arrivano a
   await expect.poll(() => app.evaluate(cerca), { timeout: 20000 }).not.toBe('');
   expect(await app.evaluate(cerca)).toContain('Generata con l’AI secondo credenziali firmate da C2PA Test Signing Cert');
 });
+
+// ── Copiata col tasto destro e incollata in chat (#946) ──────────────────────
+// Gli appunti ricodificano l'immagine e ne buttano le etichette: la chat deve dire
+// lo stesso del tasto destro, perché l'esito letto sull'originale viaggia con la copia.
+
+async function copiaEIncollaInChat(app, openTab, testServer, src, domanda) {
+  const page = await testServer.openReady(openTab, pagina(src));
+  await page.waitForFunction(() => document.getElementById('foto').naturalWidth > 0);
+  const menu = await apriMenuSullaFoto(page);
+  await expect(menu.locator('.sn-menu-link-body')).toBeVisible({ timeout: 10000 });
+  await app.evaluate(({ clipboard }) => clipboard.clear());
+  await menu.getByText('Copia immagine', { exact: true }).click();
+  await expect.poll(() => app.evaluate(({ clipboard }) => !clipboard.readImage().isEmpty()), { timeout: 8000 }).toBe(true);
+
+  const home = await openTab('filo://newtab/');
+  await expect(home.locator('#input')).toBeVisible({ timeout: 10000 });
+  await home.locator('#input').focus();
+  await home.keyboard.press('Control+v');
+  await expect(home.locator('#imgPreviews .dash-img-preview img')).toHaveCount(1, { timeout: 5000 });
+  await home.locator('#input').fill(domanda);
+  await home.locator('#sendBtn').click();
+  // Il turno della chat con l'immagine: il correttore e la spiegazione della parola fanno i loro, senza.
+  const cerca = (_e, d) => globalThis.__turniOrigine.find((t) => t.includes(d) && t.includes('image_url')) || '';
+  await expect.poll(() => app.evaluate(cerca, domanda), { timeout: 20000 }).not.toBe('');
+  return app.evaluate(cerca, domanda);
+}
+
+test('copiata dal tasto destro e incollata in chat, un’immagine firmata dice ancora chi la dichiara', async ({ app, openTab, testServer }) => {
+  await modelloFinto(app);
+  const png = await copiaEIncollaInChat(app, openTab, testServer,
+    testServer.asset(fixture('c2pa-ufficiale-ai.png'), 'image/png'), 'questa png è fatta con l’AI?');
+  expect(png).toContain('Generata con l’AI secondo credenziali firmate da C2PA Test Signing Cert');
+  expect(png).toContain('da cui l’utente ha copiato questa');
+
+  // Un JPEG su un altro dominio: la copia passa da un PNG ricodificato, e le etichette restano.
+  const jpg = await copiaEIncollaInChat(app, openTab, testServer,
+    testServer.asset(fixture('c2pa-ufficiale-ai.jpg'), 'image/jpeg').replace('127.0.0.1', 'localhost'), 'questo jpeg è fatto con l’AI?');
+  expect(jpg).toContain('Generata con l’AI secondo credenziali firmate da C2PA Test Signing Cert');
+});
+
+test('copiata e incollata in chat, un’immagine senza etichette resta senza', async ({ app, openTab, testServer }) => {
+  await modelloFinto(app);
+  const prompt = await copiaEIncollaInChat(app, openTab, testServer,
+    testServer.asset(pngSpoglio(32), 'image/png'), 'questa spoglia è fatta con l’AI?');
+  expect(prompt).toContain('non ne porta nessuna');
+  expect(prompt).not.toContain('<<<ETICHETTA_FILE>>>');
+});

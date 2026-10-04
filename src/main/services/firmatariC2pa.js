@@ -9,6 +9,8 @@ const path = require('node:path');
 
 // Lo pubblica chi gestisce lo standard (programma di conformità del C2PA).
 const FONTE = 'https://raw.githubusercontent.com/c2pa-org/conformance-public/main/trust-list/C2PA-TRUST-LIST.pem';
+// Le autorità di marcatura temporale: dicono se una firma fatta con un certificato oggi scaduto valeva quando è stata fatta.
+const FONTE_TSA = 'https://raw.githubusercontent.com/c2pa-org/conformance-public/main/trust-list/C2PA-TSA-TRUST-LIST.pem';
 const RINFRESCO_MS = 24 * 60 * 60 * 1000;
 const CONTROLLO_MS = 60 * 60 * 1000;
 // Dopo un fallimento non si riprova subito: il canale del menu lo può toccare anche una pagina web.
@@ -19,8 +21,9 @@ const ATTESA_PRIMA_VOLTA_MS = 3000;
 const MAX_BYTE = 8 * 1024 * 1024;
 const TIMEOUT_MS = 30_000;
 
-let salvato = { pem: '', scaricatoIl: 0, fonte: '' };
+let salvato = { pem: '', scaricatoIl: 0, fonte: '', pemTsa: '' };
 let ancore = null;
+let ancoreTsa = null;
 let inCorso = null;
 let ultimoTentativo = 0;
 let ultimoErrore = '';
@@ -49,8 +52,10 @@ async function carica() {
     const dati = JSON.parse(await fsp.readFile(file(), 'utf8'));
     const lette = leggiAncore(dati && dati.pem);
     if (lette.length) {
-      salvato = { pem: String(dati.pem), scaricatoIl: Number(dati.scaricatoIl) || 0, fonte: String(dati.fonte || '') };
+      salvato = { pem: String(dati.pem), scaricatoIl: Number(dati.scaricatoIl) || 0, fonte: String(dati.fonte || ''), pemTsa: String(dati.pemTsa || '') };
       ancore = lette;
+      const tsa = leggiAncore(salvato.pemTsa);
+      ancoreTsa = tsa.length ? tsa : null;
       return true;
     }
   } catch (_) {}
@@ -98,7 +103,8 @@ async function scarica(url) {
 
 // Un elenco che non si legge non prende il posto di quello buono: una risposta
 // sbagliata del server non deve far diventare «sconosciuto» chi era riconosciuto.
-function aggiorna({ forza = false, url = FONTE } = {}) {
+// `urlTsa` assente con un `url` di prova: nei test la rete vera non si tocca.
+function aggiorna({ forza = false, url = FONTE, urlTsa = url === FONTE ? FONTE_TSA : null } = {}) {
   if (inCorso) return inCorso;
   if (!forza && ancore && Date.now() - salvato.scaricatoIl < RINFRESCO_MS) {
     return Promise.resolve({ ok: true, saltato: true, certificati: ancore.length, scaricatoIl: salvato.scaricatoIl });
@@ -106,11 +112,19 @@ function aggiorna({ forza = false, url = FONTE } = {}) {
   ultimoTentativo = Date.now();
   inCorso = (async () => {
     try {
-      const pem = await scarica(url);
+      const [pem, pemTsa] = await Promise.all([
+        scarica(url),
+        urlTsa ? scarica(urlTsa).catch((e) => {
+          console.warn('[firmatari-c2pa] elenco delle marche temporali non aggiornato:', e && e.message);
+          return '';
+        }) : Promise.resolve(''),
+      ]);
       const lette = leggiAncore(pem);
       if (!lette.length) throw new Error('nessun certificato leggibile nell’elenco scaricato');
-      salvato = { pem, scaricatoIl: Date.now(), fonte: url };
+      const tsa = leggiAncore(pemTsa);
+      salvato = { pem, scaricatoIl: Date.now(), fonte: url, pemTsa: tsa.length ? pemTsa : salvato.pemTsa };
       ancore = lette;
+      if (tsa.length) ancoreTsa = tsa;
       ultimoErrore = '';
       try { await salva(); } catch (e) { console.warn('[firmatari-c2pa] elenco non salvato:', e && e.message); }
       return { ok: true, certificati: lette.length, scaricatoIl: salvato.scaricatoIl };
@@ -146,12 +160,12 @@ const attesa = (ms) => new Promise((r) => { const t = setTimeout(r, ms); if (t.u
 async function analizzaImmagine(byte) {
   const P = provenienza();
   if (!P) throw new Error('controllo non disponibile');
-  let res = P.analizza(byte, { ancore });
+  let res = P.analizza(byte, { ancore, ancoreTsa });
   if (!res.trovato || res.firmatario !== 'non_verificato') return res;
   const giro = inCorso || (automatico() && serveAggiornare() ? aggiorna() : null);
   if (!giro) return res;
   await Promise.race([giro, attesa(ATTESA_PRIMA_VOLTA_MS)]);
-  if (ancore) res = P.analizza(byte, { ancore });
+  if (ancore) res = P.analizza(byte, { ancore, ancoreTsa });
   return res;
 }
 
@@ -197,6 +211,7 @@ function stato() {
   return {
     scaricato: !!ancore,
     certificati: ancore ? ancore.length : 0,
+    autoritaMarca: ancoreTsa ? ancoreTsa.length : 0,
     scaricatoIl: salvato.scaricatoIl,
     fonte: salvato.fonte,
     ultimoErrore,
@@ -205,11 +220,12 @@ function stato() {
 
 // Solo per i test: si riparte come al primo avvio, senza elenco in memoria.
 function _dimentica() {
-  salvato = { pem: '', scaricatoIl: 0, fonte: '' };
+  salvato = { pem: '', scaricatoIl: 0, fonte: '', pemTsa: '' };
   ancore = null;
+  ancoreTsa = null;
   ultimoTentativo = 0;
   ultimoErrore = '';
   copie.clear();
 }
 
-module.exports = { FONTE, init, aggiorna, analizzaImmagine, ricordaCopia, origineDellaCopia, stato, carica, _dimentica };
+module.exports = { FONTE, FONTE_TSA, init, aggiorna, analizzaImmagine, ricordaCopia, origineDellaCopia, stato, carica, _dimentica };

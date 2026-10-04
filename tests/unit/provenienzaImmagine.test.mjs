@@ -8,7 +8,7 @@ import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  pngFirmato, pngSpoglio, pngConTesto, pngConXmp, certificato, elencoPem,
+  pngFirmato, pngSpoglio, pngConTesto, pngConXmp, certificato, elencoPem, USO_MARCA,
 } from '../helpers/immagineFirmata.mjs';
 
 const require = createRequire(import.meta.url);
@@ -294,4 +294,53 @@ test('un ingrediente la cui impronta non è quella firmata non racconta la stori
   b[i] ^= 0x01;
   const r = P.analizza(b);
   assert.notEqual(r.origine, 'ai');
+});
+
+// ── Certificato scaduto dopo la firma: decide la marca temporale (#946) ──────────
+// Chi firma con certificati di breve durata (le fotocamere dei telefoni) conta
+// sulla marca: dice che la firma è stata fatta quando il certificato valeva.
+
+const GIORNO = 86400000;
+const RADICE_TSA = certificato({ organizzazione: 'Marcatura di prova', nomeComune: 'Radice TSA', ca: true });
+const ANCORE_TSA = P.ancoreDaPem(elencoPem(RADICE_TSA));
+const tsa = (emittente = RADICE_TSA) => certificato({ organizzazione: 'Marcatura di prova', nomeComune: 'TSA', emittente, usi: [USO_MARCA], rsa: true });
+const scaduto = () => firmatario('OpenAI, Inc.', { da: new Date(Date.now() - 10 * GIORNO), a: new Date(Date.now() - 2 * GIORNO) });
+const conMarca = (byte) => P.analizza(byte, { ancore: ANCORE, ancoreTsa: ANCORE_TSA });
+
+test('certificato scaduto, firma marcata quando valeva da un’autorità riconosciuta: le credenziali sono in regola', () => {
+  for (const v2 of [false, true]) {
+    const r = conMarca(pngFirmato({ ...scaduto(), marca: { tsa: tsa(), ora: new Date(Date.now() - 5 * GIORNO), v2 } }));
+    assert.equal(r.firmatario, 'riconosciuto');
+    assert.deepEqual(r.avvisi, [], v2 ? 'sigTst2' : 'sigTst');
+    assert.equal(P.frase(r), 'Generata con l’AI, lo dichiara OpenAI nelle credenziali firmate.');
+  }
+});
+
+test('certificato scaduto senza marca, o con una marca che non regge: credenziali incomplete', () => {
+  const casi = {
+    'senza marca': pngFirmato(scaduto()),
+    'marca dopo la scadenza': pngFirmato({ ...scaduto(), marca: { tsa: tsa(), ora: new Date(Date.now() - GIORNO) } }),
+    'autorità di marcatura fuori elenco': pngFirmato({ ...scaduto(), marca: { tsa: tsa(certificato({ organizzazione: 'Marcatura di prova', ca: true })), ora: new Date(Date.now() - 5 * GIORNO) } }),
+    'certificato non fatto per marcare': pngFirmato({ ...scaduto(), marca: { tsa: certificato({ organizzazione: 'Marcatura di prova', emittente: RADICE_TSA, rsa: true }), ora: new Date(Date.now() - 5 * GIORNO) } }),
+  };
+  for (const [caso, byte] of Object.entries(casi)) {
+    const r = conMarca(byte);
+    assert.ok(r.avvisi.includes('certificato_scaduto'), caso);
+    assert.match(P.frase(r), /incomplete/, caso);
+  }
+});
+
+test('una marca riconosciuta non vale se la firma del manifesto non è quella marcata', () => {
+  const byte = Buffer.from(pngFirmato({ ...scaduto(), marca: { tsa: tsa(), ora: new Date(Date.now() - 5 * GIORNO) } }));
+  // Si guasta un byte dentro la firma dell'autorità di marcatura: la marca non regge più.
+  const i = byte.lastIndexOf(Buffer.from([0x04, 0x82, 0x01, 0x00]));
+  assert.ok(i > 0);
+  byte[i + 10] ^= 0x5a;
+  const r = conMarca(byte);
+  assert.ok(r.avvisi.includes('certificato_scaduto'));
+});
+
+test('senza elenco delle autorità di marcatura, un certificato scaduto resta scaduto', () => {
+  const r = P.analizza(pngFirmato({ ...scaduto(), marca: { tsa: tsa(), ora: new Date(Date.now() - 5 * GIORNO) } }), { ancore: ANCORE });
+  assert.ok(r.avvisi.includes('certificato_scaduto'));
 });

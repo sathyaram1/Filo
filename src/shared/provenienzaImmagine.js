@@ -832,6 +832,7 @@
   // (`ancoreDaPem`); assente se Filo non l'ha mai scaricato.
   function analizza(byte, opzioni) {
     const ancore = opzioni && Array.isArray(opzioni.ancore) ? opzioni.ancore : null;
+    const ancoreTsa = opzioni && Array.isArray(opzioni.ancoreTsa) ? opzioni.ancoreTsa : null;
     const b = u8(byte);
     const vuoto = { trovato: false, origine: null, prova: '', dichiarante: '', firmatario: '', avvisi: [], fonte: '' };
     if (b.length < 12) return vuoto;
@@ -841,7 +842,7 @@
 
     // 1. Credenziali firmate: l'unica cosa che può valere come attribuzione.
     if (cont.c2pa && cont.c2pa.length) {
-      const esito = daC2pa(cont.c2pa, b, ancore);
+      const esito = daC2pa(cont.c2pa, b, ancore, ancoreTsa);
       if (esito) return esito;
     }
 
@@ -910,7 +911,7 @@
     return meglio;
   }
 
-  function daC2pa(boxes, byteFile, ancore) {
+  function daC2pa(boxes, byteFile, ancore, ancoreTsa) {
     const store = boxes.find((x) => x.tipo === 'jumb') || boxes[0];
     if (!store || !store.figli) return null;
     // L'ultimo manifesto è quello attivo: i precedenti sono la storia del file.
@@ -947,7 +948,8 @@
       origine = storia.origine;
       chi = { firma: storia.firma, generatore: storia.generatore };
     }
-    if (chi.firma.scaduto) avvisi.push('certificato_scaduto');
+    const firmataInTempo = chi.firma.marca && marcaValida(chi.firma.marca, chi.firma.certificati[0], ancoreTsa);
+    if (chi.firma.scaduto && !firmataInTempo) avvisi.push('certificato_scaduto');
     if (chi.firma.catenaIntegra === false) avvisi.push('catena_rotta');
 
     // Un file cambiato dopo la firma chiama in causa chi ha firmato QUEI byte, cioè l'ultimo passo.
@@ -1087,6 +1089,6 @@
 
   global.SN_PROVENIENZA = {
     analizza, frase, notaPerModello, ancoreDaPem,
-    _interni: { pulisci, nomeLeggibile, cborDecode: cborTesta, jumbfBoxes, leggiContenitore, leggiXmp, codiceSorgente, verificaCose, fileIntatto, statoFirmatario },
+    _interni: { leggiMarca, marcaValida, pulisci, nomeLeggibile, cborDecode: cborTesta, jumbfBoxes, leggiContenitore, leggiXmp, codiceSorgente, verificaCose, fileIntatto, statoFirmatario },
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

@@ -20,6 +20,7 @@
       ],
       fixes: [
         'Le schede chiuse restano in Cronologia finché non le cancelli tu. Prima, passate le 5000, le più vecchie sparivano da sole, e dopo le 2000 la ricerca per contenuto non le trovava più. Adesso le trova tutte, anche le più vecchie, già alla prima ricerca.',
+        '«Copia immagine» funziona anche sulle foto che i siti tengono su un altro dominio. Se la incolli in chat e chiedi se è fatta con l\'AI, Filo risponde come col tasto destro.',
         'Lettura ad alta voce e dettatura non partono più verso un fornitore che Filo esclude. Se il modello che hai scelto lo serve solo lui, Filo te lo dice e non manda niente.',
         'Quando elimini una chat dalla Cronologia, il suo testo sparisce anche dall\'elenco delle richieste fatte ai modelli: lì restano solo i costi.',
         'Con tante schede aperte, la X non finisce più mezza sotto la scheda accanto, e il clic non apre la vicina al posto di chiudere. Sulle schede troppo strette resta solo l\'icona del sito, al centro, e le chiudi col clic centrale o col tasto destro. La scheda attiva ha sempre la sua X.',
