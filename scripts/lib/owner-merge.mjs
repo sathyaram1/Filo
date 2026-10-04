@@ -210,20 +210,13 @@ export function messageForOwnerMerge(reply, branch = 'il ramo', ctx = {}) {
       // regola del server, non un muro di questa macchina.
       return `✗ Fusione BLOCCATA dai controlli di sicurezza del server: ${r.reason || 'motivo non riportato'}\n`
         + '  Sono controlli automatici sul contenuto delle modifiche (aree protette,\n'
-        + '  dipendenze nuove, segreti). La fusione aspetta il tuo sì.\n'
+        + `  dipendenze nuove, segreti).${richiestaForseInAttesa(r) ? ' La fusione aspetta il tuo sì.' : ''}\n`
         + (r.localDetail || r.localReason
           ? `  L5 non è stato saltato: ${r.localDetail || r.localReason}.\n`
           : (ctx.feedbackId ? '' : '  Nessuna pratica collegata: con npm run finish -- --feedback <N> il lavoro locale\n'
             + '  di un feedback tuo o di una sessione con la prova del mittente, o che hai approvato\n'
             + '  come lavoro locale, non aspetta.\n'))
-        + (r.requestId
-          ? '\n  L\'ho messa IN ATTESA: approvala da Filo, nella dashboard di gestione\n'
-            + '  (l\'avviso in cima ai Ricevuti). Da lì puoi anche scartarla.\n'
-            + '  Se la pagina è già aperta l\'avviso compare da solo, non serve riaprirla.\n'
-            + '  Vale per il commit appena controllato e per 7 giorni: se scade, o se il\n'
-            + '  ramo si muove, rilancia npm run finish.'
-          : '\n  Non sono riuscito a metterla in attesa: nell\'app non comparirà niente da\n'
-            + '  approvare. Riprova, e se non torna vanno rideployate le funzioni di sicurezza.');
+        + `\n${righeDellaRichiesta(r)}`;
     case 'conflict':
       return `✗ Conflitto: main è andato avanti e le modifiche non si incastrano da sole.\n`
         + '  Fai: git pull --rebase origin main, risolvi, e rilancia npm run finish.';
