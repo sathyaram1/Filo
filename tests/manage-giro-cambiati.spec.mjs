@@ -183,6 +183,11 @@ test('un avviso del giro si vede sull\'intestazione della lista, e sparisce col 
   await page.evaluate(() => window.__mgTest.liveMessage({ kind: 'changed', rows: [], avvisi: ['cambiati: troppe pagine, riallineamento completo al giro dopo'] }));
   await expect(head).toHaveAttribute('title', /troppe pagine/);
   expect(await dopo()).toContain('!');
+  // Un giro che porta anche righe ridisegna il conteggio: la spiegazione dell'avviso resta.
+  await page.evaluate(() => window.__mgTest.liveMessage({ kind: 'changed', rows: [{ _id: 'a2', _updateTime: 't2', name: 'Due', text: 'x', seq: 2, subSeq: 0, status: 'design', createdAt: '2026-09-02T10:00:00Z' }], avvisi: ['seguiti: 600 sopra il tetto di 500'] }));
+  await expect(page.locator('.mg-item[data-id="a2"]')).toHaveCount(1);
+  await expect(head).toHaveAttribute('title', /Aggiornamento: seguiti: 600/);
   await page.evaluate(() => window.__mgTest.liveMessage({ kind: 'changed', rows: [] }));
   await expect.poll(dopo).toBe('none');
+  expect(await head.getAttribute('title') || '').not.toContain('Aggiornamento');
 });
