@@ -1222,6 +1222,8 @@ html, body {
   resize: none;
   overflow-y: auto;
   max-height: 160px;
+  /* L'altezza che il JS copia da scrollHeight comprende il padding: in content-box la casella cresce di una riga vuota. */
+  box-sizing: border-box;
 }
 .dash-input::placeholder { color: var(--dash-ink-mute); }
 .dash-send {
