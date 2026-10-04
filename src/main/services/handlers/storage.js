@@ -20,6 +20,7 @@ module.exports = function register(on, ctx) {
   // solo da origine filo://; ciò che i content script fanno davvero (leggere le
   // impostazioni, salvare dizionario/draft/layout) resta consentito.
   const SETTINGS_KEY = SN_CONST.STORAGE_KEYS.SETTINGS; // 'settings' → contiene apiKeys
+  const ARCHIVE_KEY = SN_CONST.STORAGE_KEYS.ARCHIVED_TABS;
   // Verso un'origine web passa solo ciò che è nelle liste di impostazioniPerOrigine
   // (campi letti e scritti, scomparti del magazzino): le stesse delle spinte.
   const {
@@ -112,6 +113,9 @@ module.exports = function register(on, ctx) {
       const { buildExportZip } = require('../exportData');
 
       const allData = await DiskStorage.get(null);
+      // L'archivio delle schede ha file suoi: nel backup torna sotto la chiave di sempre.
+      const archivio = await globalThis.SN_ARCHIVED_TABS.list();
+      if (archivio.length) allData[ARCHIVE_KEY] = archivio;
       const filo = await require('../ilFilo').esporta();
       const zip = buildExportZip(allData, { filo });
 
@@ -221,6 +225,9 @@ module.exports = function register(on, ctx) {
       try { ctx.broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED }); } catch (_) {}
 
       const current = await DiskStorage.get(null);
+      const ArchivedTabs = globalThis.SN_ARCHIVED_TABS;
+      const archivio = await ArchivedTabs.list();
+      if (archivio.length) current[ARCHIVE_KEY] = archivio;
       const { merged, stats } = mergeImportedData(current, dati);
 
       // Le impostazioni passano da applySettingsUpdate come qualsiasi altra
@@ -235,12 +242,13 @@ module.exports = function register(on, ctx) {
       const settings = merged[SETTINGS_KEY];
       const rest = {};
       for (const k of Object.keys(merged)) {
-        if (k === SETTINGS_KEY) continue;
+        if (k === SETTINGS_KEY || k === ARCHIVE_KEY) continue;
         if (JSON.stringify(merged[k]) !== JSON.stringify(current[k])) rest[k] = merged[k];
       }
       // I cambi che l'importazione porta entrano nel filo come suoi, e si annullano come gli altri (#867).
       await require('../registroCambi').con({ via: 'importazione' }, async () => {
         if (Object.keys(rest).length) await DiskStorage.set(rest);
+        await ArchivedTabs.importa(merged[ARCHIVE_KEY]);
         if (settings && typeof settings === 'object') await applySettingsUpdate(settings);
       });
       // Un backup di una versione vecchia porta le miniature a piena risoluzione (#839).

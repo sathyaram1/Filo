@@ -9,6 +9,7 @@
 // I moduli SN_* sono stati caricati dal loader.js — qui assumiamo siano su global.
 
 const { BrowserWindow } = require('electron');
+const Disco = require('../shim/storage');
 const Defaults = require('./defaultsStore');
 const { settingsForOwnerAction, fillMovedSlots, ownerSlotFor } = require('./resolveSupportModel');
 const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra } = require('./impostazioniPerOrigine');
@@ -4241,35 +4242,93 @@ async function embedTexts(texts, settingsIn) {
   return { vectors: r.vectors || [], model: a.model };
 }
 
-// Reindicizza in background le schede i cui vettori vengono da un altro modello
-// (o mancano): a blocchi, le più recenti prima, una sola corsa alla volta. Il
-// costo è irrisorio (poche decine di parole a scheda) e senza questo, dopo un
-// cambio di modello di indicizzazione, la ricerca semantica troverebbe solo le
-// schede chiuse da quel momento in poi.
-let reindexRunning = false;
-async function reindexArchivedEmbeddings(settings, items) {
-  if (reindexRunning || !items.length) return;
-  reindexRunning = true;
-  try {
-    const todo = items.slice(0, 200);
-    for (let i = 0; i < todo.length; i += 50) {
-      const batch = todo.slice(i, i + 50);
-      const texts = batch.map((it) =>
-        `${it.title || ''}\n${it.summary || it.snippet || ''}`.replace(/\s+/g, ' ').trim().slice(0, 4000));
-      const emb = await embedTexts(texts, settings);
-      if (!emb) return;
-      for (let k = 0; k < batch.length; k++) {
-        const v = emb.vectors[k];
-        if (v && v.length) {
-          await ArchivedTabs.update(batch[k].id, { embedding: quantizeEmbedding(v), embedModel: emb.model });
+// Indicizza le schede senza un vettore del modello in uso: tutte, a blocchi, più blocchi insieme, una corsa alla volta
+// (chi arriva mentre gira aspetta la stessa). Un vettore salvato resta finché resta la scheda: si paga una volta per modello.
+const REINDEX_BLOCCO = 50;
+const REINDEX_IN_PARALLELO = 4;
+let reindexInCorso = null;
+function reindexArchivedEmbeddings(settings, items) {
+  if (reindexInCorso) return reindexInCorso;
+  if (!items.length) return Promise.resolve();
+  reindexInCorso = (async () => {
+    const blocchi = [];
+    for (let i = 0; i < items.length; i += REINDEX_BLOCCO) blocchi.push(items.slice(i, i + REINDEX_BLOCCO));
+    let prossimo = 0;
+    let fermo = false;
+    const lavora = async () => {
+      while (!fermo && prossimo < blocchi.length) {
+        const batch = blocchi[prossimo++];
+        const texts = batch.map((it) =>
+          `${it.title || ''}\n${it.summary || it.snippet || ''}`.replace(/\s+/g, ' ').trim().slice(0, 4000));
+        let emb = null;
+        try { emb = await embedTexts(texts, settings); } catch (e) {
+          console.warn('[SN] reindicizzazione archivio fallita:', e.message || e);
+        }
+        if (!emb) { fermo = true; return; }
+        for (let k = 0; k < batch.length; k++) {
+          const v = emb.vectors[k];
+          if (v && v.length) {
+            await ArchivedTabs.update(batch[k].id, { embedding: quantizeEmbedding(v), embedModel: emb.model });
+          }
         }
       }
-    }
-  } catch (e) {
-    console.warn('[SN] reindicizzazione archivio fallita:', e.message || e);
-  } finally {
-    reindexRunning = false;
+    };
+    await Promise.all(Array.from({ length: Math.min(REINDEX_IN_PARALLELO, blocchi.length) }, lavora));
+  })().finally(() => { reindexInCorso = null; });
+  return reindexInCorso;
+}
+
+const conVettoreDi = (it, modello) => Array.isArray(it.embedding) && it.embedding.length && it.embedModel === modello;
+
+// Una pagina della rete di casa non va al modello (#591): vale solo per testo.
+function daIndicizzare(items, modello) {
+  return items.filter((it) => !conVettoreDi(it, modello) && (it.title || it.summary || it.snippet)
+    && !(it.casa || isHomeNetworkUrl(it.url)));
+}
+
+// Le schede senza un vettore del modello in uso si indicizzano in sottofondo quando entrano in archivio (da qualunque
+// strada), all'avvio e a ogni cambio di modello: la prima ricerca trova l'indice già fatto invece di aspettarlo (#825).
+// Una scheda appena chiusa il vettore lo riceve dal suo arricchimento: finché è in corso l'indice non la paga due volte.
+let indiceTimer = null;
+let indiceModello = null;
+const inArricchimento = new Set();
+function programmaIndiceArchivio(ritardo) {
+  if (Disco.inIncognito()) return;
+  clearTimeout(indiceTimer);
+  indiceTimer = setTimeout(() => { indiceTimer = null; indicizzaArchivio().catch(() => {}); }, ritardo);
+  indiceTimer.unref?.();
+}
+
+async function indicizzaArchivio() {
+  // Una corsa già in giro può essere del modello di prima: finita quella, si guarda una volta ancora.
+  for (let giro = 0; giro < 2; giro++) {
+    const settings = await getEffectiveSettings();
+    const a = embedAttempt(settings);
+    indiceModello = a ? a.model : null;
+    if (!a) return;
+    const stale = daIndicizzare(await ArchivedTabs.list(), a.model).filter((it) => !inArricchimento.has(it.id));
+    if (!stale.length) return;
+    const unaNuova = !reindexInCorso;
+    await reindexArchivedEmbeddings(settings, stale);
+    if (unaNuova) return;
   }
+}
+
+try {
+  chrome.storage.onChanged.addListener((changes) => {
+    if (!changes || !changes.settings) return;
+    getEffectiveSettings().then((s) => {
+      const a = embedAttempt(s);
+      if (a && a.model !== indiceModello) programmaIndiceArchivio(2000);
+    }).catch(() => {});
+  });
+  programmaIndiceArchivio(10_000);
+  ArchivedTabs.suEntrate(() => programmaIndiceArchivio(2000));
+} catch (_) {}
+
+// Testo senza accenti e minuscolo, per confrontare una ricerca con le schede che un vettore non ce l'hanno ancora.
+function testoPiano(testo) {
+  return String(testo || '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 }
 
 // §3.1/§3.2 — arricchisce una tab archiviata: genera un riassunto LLM, lo
@@ -4278,8 +4337,9 @@ async function reindexArchivedEmbeddings(settings, items) {
 // { title, content } oppure una stringa (trattata come contenuto). Best-effort:
 // se manca la chiave o il testo, fa il possibile (anche solo snippet) e non rompe.
 async function enrichArchivedTab(id, payload) {
+  if (!id) return;
+  inArricchimento.add(id);
   try {
-    if (!id) return;
     // Riassunto e indice passano dal modello: una pagina della rete di casa resta in casa (#591). Il segno resta sulla
     // voce, perché dopo un riavvio Filo non sa più da dove aveva risposto un nome come tplinkwifi.net.
     if (payload && typeof payload === 'object' && await isHomeNetworkUrlSettled(payload.url)) {
@@ -4306,7 +4366,9 @@ async function enrichArchivedTab(id, payload) {
       patch.embedModel = emb.model;
     }
     if (Object.keys(patch).length) await ArchivedTabs.update(id, patch);
-  } catch (_) { /* l'arricchimento non deve mai disturbare */ }
+  } catch (_) { /* l'arricchimento non deve mai disturbare */ } finally {
+    inArricchimento.delete(id);
+  }
 }
 globalThis.SN_TAB_ENRICH = enrichArchivedTab;
 
@@ -4340,6 +4402,9 @@ async function rerankResults(query, items) {
 // Ricerca semantica: embeddizza la query, ordina le tab per similarità coseno.
 // Ritorna { results } (metadati senza embedding) oppure { results:null } se non
 // è possibile (niente chiave) così la pagina ripiega sul filtro per sottostringa.
+// Se l'indice in sottofondo non ha ancora finito, la ricerca lo aspetta un poco; chi non arriva entro l'attesa, o non va
+// al modello (rete di casa), vale per testo.
+const ATTESA_INDICE_MS = 15_000;
 async function searchArchivedTabs(query, { topK = 40 } = {}) {
   const q = String(query == null ? '' : query).trim();
   if (!q) return { ok: true, results: null };
@@ -4348,24 +4413,35 @@ async function searchArchivedTabs(query, { topK = 40 } = {}) {
   try { emb = await embedTexts([q], settings); } catch (_) { emb = null; }
   if (!emb || !emb.vectors[0] || !emb.vectors[0].length) return { ok: true, results: null, noEmbed: true };
   const qv = quantizeEmbedding(emb.vectors[0]);
-  const items = await ArchivedTabs.list();
-  const scored = [];
-  // Si confrontano solo i vettori fatti dal modello in uso: quelli di un altro
-  // modello (o le schede senza vettore) si rifanno in background, e dalla
-  // ricerca successiva contano anche loro.
-  const stale = [];
-  for (const it of items) {
-    const usable = Array.isArray(it.embedding) && it.embedding.length && it.embedModel === emb.model;
-    if (usable) { scored.push({ score: cosineInt(qv, it.embedding), it }); continue; }
-    const casa = it.casa || isHomeNetworkUrl(it.url);
-    if ((it.title || it.summary || it.snippet) && !casa && stale.length < SN_CONST.ARCHIVED_EMBED_LIMIT) stale.push(it);
+  // Si confrontano solo i vettori fatti dal modello in uso: vettori di modelli diversi non sono confrontabili.
+  const usabile = (it) => conVettoreDi(it, emb.model);
+  let items = await ArchivedTabs.list();
+  const stale = daIndicizzare(items, emb.model);
+  if (stale.length) {
+    let timer = null;
+    await Promise.race([
+      reindexArchivedEmbeddings(settings, stale).catch(() => {}),
+      new Promise((ok) => { timer = setTimeout(ok, ATTESA_INDICE_MS); }),
+    ]);
+    clearTimeout(timer);
+    items = await ArchivedTabs.list();
   }
-  if (stale.length) reindexArchivedEmbeddings(settings, stale).catch(() => {});
+  const parole = testoPiano(q).split(/[^\p{L}\p{N}]+/u).filter((p) => p.length > 1);
+  const scored = [];
+  const perTesto = [];
+  for (const it of items) {
+    if (usabile(it)) { scored.push({ score: cosineInt(qv, it.embedding), it }); continue; }
+    if (!parole.length) continue;
+    const testo = testoPiano(`${it.title || ''} ${it.summary || ''} ${it.snippet || ''} ${it.url || ''}`);
+    if (parole.every((p) => testo.includes(p))) perTesto.push(it);
+  }
   scored.sort((a, b) => b.score - a.score);
-  let results = scored.slice(0, topK).map(({ score, it }) => {
-    const { embedding, ...meta } = it;
-    return { ...meta, score };
-  });
+  const senzaVettore = ({ embedding, ...meta }) => meta;
+  // Chi vale per testo contiene tutte le parole cercate: va davanti, senza un punteggio che non ha.
+  let results = [
+    ...perTesto.slice(0, topK).map(senzaVettore),
+    ...scored.slice(0, topK).map(({ score, it }) => ({ ...senzaVettore(it), score })),
+  ].slice(0, topK);
 
   // §3.2 step 4 — re-rank LLM dei primi risultati (best-effort): legge i riassunti
   // e li riordina per pertinenza alla query. Se non disponibile, resta l'ordine
