@@ -158,7 +158,7 @@ test('segnare fidato un sito dove scrivono in tanti: lo sconsiglia nel riquadro,
   ]);
   await chiedi(page, 'quali siti fidati ho?');
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Letto.' })).toBeVisible({ timeout: 60_000 });
-  expect((await ultimoEsito(app, 1)).join('\n')).toContain('sito-pubblico.test (segnato in chat)');
+  expect((await ultimoEsito(app, 1)).join('\n')).toMatch(/siti fidati \(pagine lette dalle schede aperte\)[^\n]*sito-pubblico\.test \(segnato in chat\)/);
 
   await modello(app, [
     { toolCalls: [{ id: 'f2', name: 'TOGLI_FIDATO', arguments: { sito: 'sito-pubblico.test' } }] },
