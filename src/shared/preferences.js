@@ -320,6 +320,8 @@
       ['rete', 'la rete', ['wifi', 'wi-fi', 'connessione']],
       ['bluetooth', 'il Bluetooth', []],
     ].map(([voce, nome, sinonimi]) => ({
+      scrive: [`homeSistema.${voce}`],
+      aiuto: `true | false (${nome} nella colonna destra della home)`,
       keys: [`${voce}_home`, `${voce} nella home`, `${voce} home`, ...sinonimi.map((x) => `${x}_home`)],
       build(v) {
         const b = parsePrefBool(v);

@@ -822,6 +822,10 @@
       case 'theme': return $('theme').value;
       case 'textScale': return parseFloat($('textScale').value) || 1;
       case 'showHomeMessage': return $('showHomeMessage').checked;
+      case 'homeSistema.ora': return $('homeSisOra').checked;
+      case 'homeSistema.batteria': return $('homeSisBatteria').checked;
+      case 'homeSistema.rete': return $('homeSisRete').checked;
+      case 'homeSistema.bluetooth': return $('homeSisBluetooth').checked;
       case 'tabPreview.enabled': return $('tabPreviewEnabled').checked;
       case 'tabPreview.size': return misuraAnteprima($('tabPreviewSize').value);
       case 'agentStyle': return currentStyleText();
@@ -853,6 +857,10 @@
       case 'theme': return s.theme || 'system';
       case 'textScale': return Number(s.textScale ?? 1);
       case 'showHomeMessage': return s.showHomeMessage !== false;
+      case 'homeSistema.ora': return !(s.homeSistema && s.homeSistema.ora === false);
+      case 'homeSistema.batteria': return !(s.homeSistema && s.homeSistema.batteria === false);
+      case 'homeSistema.rete': return !(s.homeSistema && s.homeSistema.rete === false);
+      case 'homeSistema.bluetooth': return !(s.homeSistema && s.homeSistema.bluetooth === false);
       case 'tabPreview.enabled': return !(s.tabPreview && s.tabPreview.enabled === false);
       case 'tabPreview.size': return misuraAnteprima(s.tabPreview && s.tabPreview.size);
       case 'agentStyle': return String(s.agentStyle || '').trim();
@@ -928,6 +936,11 @@
       $('textScale').value = opt ? scale : '1';
     }
     if (vuole('showHomeMessage')) $('showHomeMessage').checked = settings.showHomeMessage !== false;
+    const sis = settings.homeSistema || {};
+    if (vuole('homeSistema.ora')) $('homeSisOra').checked = sis.ora !== false;
+    if (vuole('homeSistema.batteria')) $('homeSisBatteria').checked = sis.batteria !== false;
+    if (vuole('homeSistema.rete')) $('homeSisRete').checked = sis.rete !== false;
+    if (vuole('homeSistema.bluetooth')) $('homeSisBluetooth').checked = sis.bluetooth !== false;
     const tp = settings.tabPreview || {};
     if (vuole('tabPreview.enabled')) $('tabPreviewEnabled').checked = tp.enabled !== false;
     if (vuole('tabPreview.size')) $('tabPreviewSize').value = misuraAnteprima(tp.size);
@@ -1161,6 +1174,7 @@
       persist();
     });
     $('showHomeMessage').addEventListener('change', persist);
+    for (const id of ['homeSisOra', 'homeSisBatteria', 'homeSisRete', 'homeSisBluetooth']) $(id).addEventListener('change', persist);
     $('tabPreviewEnabled').addEventListener('change', () => {
       $('tabPreviewSize').disabled = !$('tabPreviewEnabled').checked;
       persist();
