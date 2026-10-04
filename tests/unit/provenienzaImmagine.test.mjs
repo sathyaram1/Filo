@@ -7,8 +7,9 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import zlib from 'node:zlib';
 import {
-  pngFirmato, pngSpoglio, pngConTesto, pngConXmp, certificato, elencoPem, USO_MARCA,
+  pngFirmato, pngSpoglio, pngConTesto, pngConTestoCompresso, pngConXmp, certificato, elencoPem, USO_MARCA,
 } from '../helpers/immagineFirmata.mjs';
 
 const require = createRequire(import.meta.url);
@@ -343,4 +344,33 @@ test('una marca riconosciuta non vale se la firma del manifesto non è quella ma
 test('senza elenco delle autorità di marcatura, un certificato scaduto resta scaduto', () => {
   const r = P.analizza(pngFirmato({ ...scaduto(), marca: { tsa: tsa(), ora: new Date(Date.now() - 5 * GIORNO) } }), { ancore: ANCORE });
   assert.ok(r.avvisi.includes('certificato_scaduto'));
+});
+
+// ── Un file costruito apposta (#946) ──────────────────────────────────────────
+// I byte li sceglie chi ha fatto il file: la lettura deve costare quanto il file, non
+// il suo quadrato, e un testo compresso non può valere mille volte la sua dimensione.
+
+test('un XMP ripetitivo da un megabyte si legge in tempo lineare', { timeout: 30_000 }, () => {
+  for (const ago of ['DigitalSourceType>', 'DigitalSourceType="', 'DigitalSourceType ', 'xmp:CreatorTool>']) {
+    const t = Date.now();
+    const r = P.analizza(pngConXmp(pngSpoglio(), ago.repeat(60000)));
+    const ms = Date.now() - t;
+    assert.equal(r.trovato, false, ago);
+    assert.ok(ms < 1500, `${ago}: ${ms} ms (prima del tetto ai quantificatori: più di un minuto)`);
+  }
+});
+
+test('un XMP indentato con molti spazi dice ancora l’origine', () => {
+  const rientro = '\n' + ' '.repeat(120);
+  const xmp = `<x:xmpmeta><rdf:RDF><rdf:Description>${rientro}<Iptc4xmpExt:DigitalSourceType>${rientro}http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia${rientro}</Iptc4xmpExt:DigitalSourceType></rdf:Description></rdf:RDF></x:xmpmeta>`;
+  assert.equal(P.analizza(pngConXmp(pngSpoglio(), xmp)).origine, 'ai');
+});
+
+test('un testo compresso enorme non si decomprime oltre il tetto, e la sua chiave resta una prova', () => {
+  const bomba = zlib.deflateSync(Buffer.alloc(256 * 1024 * 1024, 0x41), { level: 9 });
+  const t = Date.now();
+  const r = P.analizza(pngConTestoCompresso(pngSpoglio(), 'parameters', bomba));
+  const ms = Date.now() - t;
+  assert.equal(P.frase(r), 'Generata con l’AI secondo il file stesso (Stable Diffusion), senza firma che lo confermi.');
+  assert.ok(ms < 200, `${ms} ms (decompresso per intero: più di mezzo secondo e 256 MB di testo)`);
 });

@@ -82,6 +82,17 @@ indovinare se l'utente stava chiedendo proprio quello: capirlo dall'intento
 sarebbe [una promessa affidata al
 modello](una-promessa-fatta-allutente-non-puo-dipendere-dal-modello.md).
 
+**I byte li sceglie chi ha fatto il file.** Un PNG di mezzo megabyte con un XMP
+ripetitivo fermava Filo per minuti, uno con testi compressi da centinaia di MB lo
+chiudeva, e bastava una domanda all'Aiuto con l'immagine visibile (#946). La
+lettura gira in un thread a parte con un tempo e una memoria massimi
+(`src/main/services/provenienzaIsolata.js`): oltre, quell'immagine resta senza
+riga e Filo va avanti. Dentro, i testi compressi hanno un tetto (la chiave da sola
+resta una prova) e le espressioni sull'XMP hanno quantificatori limitati, così il
+costo segue la dimensione del file e non il suo quadrato. Il download per conto
+della scheda, coi cookie dell'utente, restituisce solo byte che sono davvero
+un'immagine.
+
 Il codice: `src/shared/provenienzaImmagine.js` (lettura dei contenitori, JUMBF,
 COSE, catena fino all'elenco, ingredienti, verdetto e frase),
 `src/main/services/firmatariC2pa.js`

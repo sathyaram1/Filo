@@ -8,8 +8,9 @@
 // L'elenco ufficiale dei firmatari Filo lo scarica davvero, da un server di prova.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { pngFirmato, pngSpoglio, pngConTesto, certificato, elencoPem } from './helpers/immagineFirmata.mjs';
+import { pngFirmato, pngSpoglio, pngConTesto, pngConTestoCompresso, pngConXmp, certificato, elencoPem } from './helpers/immagineFirmata.mjs';
 import { readFileSync } from 'node:fs';
+import zlib from 'node:zlib';
 import { join } from 'node:path';
 
 const RIGA = '.sn-menu-origine';
@@ -452,4 +453,101 @@ test('copiata e incollata in chat, un’immagine senza etichette resta senza', a
     testServer.asset(pngSpoglio(32), 'image/png'), 'questa spoglia è fatta con l’AI?');
   expect(prompt).toContain('non ne porta nessuna');
   expect(prompt).not.toContain('<<<ETICHETTA_FILE>>>');
+});
+
+// ── Un file costruito apposta (#946) ─────────────────────────────────────────
+// I byte li sceglie chi ha fatto il file: leggerne le etichette non deve fermare né
+// chiudere Filo, che sia col tasto destro o con una domanda all'Aiuto.
+
+// Il processo principale tiene finestra, schede e scorciatoie: per otto secondi
+// deve rispondere sempre entro un secondo. Ritorna la risposta più lenta.
+async function rispostaPiuLenta(app, ms = 8000) {
+  let peggiore = 0;
+  const fine = Date.now() + ms;
+  while (Date.now() < fine) {
+    const t = Date.now();
+    try {
+      await app.evaluate(() => 1);
+    } catch (e) {
+      // Playwright perde la valutazione in volo quando un messaggio di decine di MB attraversa il processo: è suo, non di Filo.
+      if (!/Execution context was destroyed/.test(String(e && e.message))) throw e;
+    }
+    peggiore = Math.max(peggiore, Date.now() - t);
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  return peggiore;
+}
+
+// Diciassette MB di XMP ripetitivo: anche letti in tempo lineare sono secondi di lavoro, che non devono toccare Filo.
+const xmpRipetitivo = () => pngConXmp(pngSpoglio(), 'DigitalSourceType>'.repeat(1_000_000));
+
+test('tasto destro su un’immagine con un XMP enorme e ripetitivo: Filo resta reattivo', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const page = await testServer.openReady(openTab, pagina(testServer.asset(xmpRipetitivo(), 'image/png')));
+  await page.waitForFunction(() => document.getElementById('foto').naturalWidth > 0);
+  await page.locator('#foto').click({ button: 'right', position: { x: 20, y: 20 } });
+  expect(await rispostaPiuLenta(app)).toBeLessThan(1000);
+  await expect(page.locator('.sn-menu')).toBeVisible();
+});
+
+test('tasto destro su un’immagine con testi compressi enormi: Filo non si chiude, e la chiave basta per la riga', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const bomba = zlib.deflateSync(Buffer.alloc(300 * 1024 * 1024, 0x41), { level: 9 });
+  const png = pngConTestoCompresso(pngConTestoCompresso(pngSpoglio(), 'parameters', bomba), 'altro', bomba);
+  const page = await testServer.openReady(openTab, pagina(testServer.asset(png, 'image/png')));
+  await page.waitForFunction(() => document.getElementById('foto').naturalWidth > 0);
+  const menu = await apriMenuSullaFoto(page);
+  expect(await rispostaPiuLenta(app, 4000)).toBeLessThan(1000);
+  await expect(menu.locator(RIGA)).toHaveAttribute('aria-label', /secondo il file stesso \(Stable Diffusion\)/, { timeout: 10000 });
+});
+
+test('una domanda qualsiasi all’Aiuto, con l’immagine ripetitiva visibile: Filo resta reattivo', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  await modelloFinto(app);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:24px;min-height:600px">
+    <img id="foto" src="${testServer.asset(xmpRipetitivo(), 'image/png')}" width="160" height="160">
+    <p id="testo" style="margin-top:200px">Un paragrafo qualsiasi.</p></body></html>`);
+  await page.waitForFunction(() => document.getElementById('foto').naturalWidth > 0);
+  await page.locator('#testo').click({ button: 'right' });
+  await page.locator('.sn-menu').getByText('Aiuto', { exact: true }).click();
+  await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 8000 });
+  await page.fill('.sn-sidebar-input textarea', 'riassumi la pagina');
+  await page.press('.sn-sidebar-input textarea', 'Enter');
+  expect(await rispostaPiuLenta(app)).toBeLessThan(1000);
+});
+
+// Il download per conto della scheda usa i cookie dell'utente: restituisce solo immagini.
+test('un’immagine finta che punta a un documento di un altro sito non viene scaricata né descritta', async ({ app, openTab, testServer }) => {
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      modelRegistry: { mio: { provider: 'openrouter', model: 'test/vista', inputs: ['text', 'image'], outputs: ['text'] } },
+      models: { [C.ACTIONS.DESCRIBE_IMAGE]: ['mio'] },
+    });
+    globalThis.__descritte = [];
+    globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
+      globalThis.__descritte.push(JSON.stringify(messages).slice(0, 4000));
+      return { text: 'descritta', model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+    };
+  });
+  const altro = (corpo, tipo) => testServer.asset(Buffer.from(corpo), tipo).replace('127.0.0.1', 'localhost');
+  const documento = altro('{"saldo": 1234, "iban": "IT00X"}', 'application/json');
+  const svg = altro('<?xml version="1.0"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="#e07b39"/></svg>', 'image/svg+xml');
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:24px">
+    <img id="foto" src="${documento}" width="160" height="160" style="background:#e07b39">
+    <img id="disegno" src="${svg}" width="160" height="160"></body></html>`);
+
+  const menu = await apriMenuSullaFoto(page);
+  await expect(menu.locator('.sn-menu-link-body')).toContainText('non è riuscito a scaricare', { timeout: 10000 });
+  await page.keyboard.press('Escape');
+
+  // Un SVG vero di un altro dominio si scarica e si descrive come prima.
+  await page.waitForFunction(() => document.getElementById('disegno').naturalWidth > 0);
+  await page.locator('#disegno').click({ button: 'right', position: { x: 20, y: 20 } });
+  await expect(page.locator('.sn-menu .sn-menu-link-body')).toHaveAttribute('aria-label', 'descritta', { timeout: 10000 });
+  const descritte = await app.evaluate(() => globalThis.__descritte);
+  expect(descritte).toHaveLength(1);
+  expect(descritte.join('')).not.toContain('saldo');
 });
