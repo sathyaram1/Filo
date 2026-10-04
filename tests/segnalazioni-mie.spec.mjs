@@ -336,6 +336,25 @@ test('tasto destro su una riga: copia il testo, rimanda quella non partita già 
   expect(ids).toEqual(['ok']);
 });
 
+test('rimandata dal tasto destro, la segnalazione «non partita» lascia il posto a quella partita', async ({ app, openTab }) => {
+  await app.evaluate(async () => {
+    const M = globalThis.SN_SEGNALAZIONI_MIE;
+    await M.registra({ id: 'ferma', testo: 'Il video si blocca', creataIl: '2026-10-04T07:00:00Z' });
+    await M.nonPartita('ferma');
+  });
+  await reteFinta(app, { seq: 1000 });
+  const bacheca = await openTab(`${BACHECA}#segnalazioni`);
+  await expect(righe(bacheca)).toHaveCount(1);
+  await righe(bacheca).first().locator('.bd-mia-titolo').click({ button: 'right' });
+  await bacheca.locator('.bd-mia-menu').getByText('Rimanda').click();
+  await expect(bacheca.locator('.sn-fb-modal')).toBeVisible();
+  await bacheca.locator('.sn-fb-send').click();
+  await expect(bacheca.locator('.sn-fb-modal')).toHaveCount(0, { timeout: 6_000 });
+  await app.evaluate(() => globalThis.SN_FEEDBACK_OUTBOX.flush());
+  await expect(righe(bacheca).locator('.bd-mia-stato')).toHaveText(['inviata']);
+  await expect(righe(bacheca).first().locator('.bd-mia-titolo')).toHaveText(/^#1000 /);
+});
+
 // ── Riavvio: la stessa cartella dati in tre avvii ──────────────────────────────
 async function avvia(userData) {
   const app = await electron.launch({
