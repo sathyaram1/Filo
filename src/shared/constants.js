@@ -2492,6 +2492,13 @@
         trustedSites: [],
         righeScartate: [],
       },
+      // #1004 — le pagine delicate (posta, banche, sanità, quelle che hanno mostrato un campo password o carta, e
+      // `siti` scritti dall'utente) non mandano testo ai modelli nei lavori automatici. Regola: src/shared/pagineDelicate.js.
+      pagineDelicate: {
+        enabled: true,
+        siti: [],
+        righeScartate: [],
+      },
     },
     // Modalità terminale: Filo risponde con un comando a «quanto spazio ho sul
     // disco?», e nella home un `/comando` va alla shell. Accesa di serie (#892):
@@ -2531,6 +2538,9 @@
       idleHours: 6,
       onClose: true,
     },
+    // #1004 — riassunto e indice delle schede chiuse, per ritrovarle nella Cronologia per significato. Spento, di una
+    // scheda che si chiude non parte niente verso i modelli: la si ritrova per parole.
+    riassuntoSchede: { enabled: true },
     // Suoneria del timer: suono riprodotto alla scadenza finché l'utente non
     // preme "Ferma". Generato via WebAudio API (nessun file audio esterno).
     // Valori: 'default' | 'gentle' | 'urgent' | 'chime'

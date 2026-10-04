@@ -1338,14 +1338,20 @@ class TabManager {
   async _gatherTriageInput(cands) {
     const now = Date.now();
     const out = [];
+    let fuori = () => null;
+    try { fuori = await globalThis.SN_DELICATE.filtro(); } catch (_) {}
     for (const t of cands) {
+      // Di una pagina delicata il testo non si legge nemmeno: al modello arriva solo il tipo (#1004).
+      const delicata = fuori(t.url);
       let contentExtract = '';
-      try {
-        contentExtract = await t.view.webContents.executeJavaScript(
-          '(function(){try{return (document.body&&document.body.innerText||"").replace(/\\s+/g," ").slice(0,800);}catch(e){return "";}})()',
-          true,
-        );
-      } catch (_) {}
+      if (!delicata) {
+        try {
+          contentExtract = await t.view.webContents.executeJavaScript(
+            '(function(){try{return (document.body&&document.body.innerText||"").replace(/\\s+/g," ").slice(0,800);}catch(e){return "";}})()',
+            true,
+          );
+        } catch (_) {}
+      }
       out.push({
         url: t.url,
         title: t.title,
@@ -1358,6 +1364,7 @@ class TabManager {
           .filter((x) => x.id !== t.id && /^https?:\/\//i.test(x.url || ''))
           .map((x) => x.url).slice(0, 20),
         contentExtract,
+        delicata,
       });
     }
     return out;

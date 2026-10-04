@@ -13,7 +13,7 @@ module.exports = function register(on, ctx) {
     const tabId = sender?.tab?.id;
     if (!win || !win._filoTabs || !tabId) return { ok: true, level: 'safe', message: null };
     const ctxPage = { hasPassword: !!msg.hasPassword, hasPayment: !!msg.hasPayment };
-    // Il sito lo dice il main (l'indirizzo vero della scheda), non la pagina: segnarlo delicato toglie solo, mai aggiunge.
+    // Il sito lo dà il main, non la pagina; e una pagina che si dichiara delicata può solo mandare meno ai modelli (#1004).
     if (ctxPage.hasPassword || ctxPage.hasPayment) globalThis.SN_DELICATE?.segnaCampi(sender?.url || origin);
     return win._filoTabs.safebrowseGet(tabId, msg.url || origin, ctxPage);
   });

@@ -54,6 +54,11 @@
     setTimeout(() => { if (level === 'safe') requestVerdict(); }, 1600);
   }
 
+  // Il campo che compare dopo, in una finestrella di accesso aperta da un clic, si vede quando ci si entra.
+  document.addEventListener('focusin', (e) => {
+    if (e.target && e.target.tagName === 'INPUT') hintsGrew();
+  }, true);
+
   if (document.readyState === 'loading') {
     requestVerdict();
     watchLoading();

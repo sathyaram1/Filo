@@ -31,7 +31,7 @@ function elencoRemoto() {
   try { return require('./defaultsStore').get().sitiDelicati; } catch (_) { return null; }
 }
 
-// Un predicato sincrono (url → motivo | null) legato alle impostazioni di adesso: chi controlla molte pagine lo chiede una volta.
+// Un predicato sincrono (url → motivo | null) con le impostazioni di adesso: chi controlla molte pagine lo chiede una volta.
 async function filtro(settingsIn) {
   let settings = settingsIn;
   if (!settings) {
@@ -43,7 +43,11 @@ async function filtro(settingsIn) {
     elenco: PD.elenco(elencoRemoto()),
     campi: haCampi,
   };
-  return (url) => PD.classifica(url, opzioni);
+  const f = (url) => PD.classifica(url, opzioni);
+  f.attivo = opzioni.attivo;
+  // Una scheda archiviata porta il motivo di quando si è chiusa: la memoria dei campi visti non sopravvive al riavvio.
+  f.voce = (it) => (opzioni.attivo && it && it.delicata) || f(it && it.url);
+  return f;
 }
 
 globalThis.SN_DELICATE = { segnaCampi, haCampi, filtro };
