@@ -1,3 +1,4 @@
+/* Copia di src/shared/icons.js, scritta da scripts/build-approvazioni.mjs: si cambia la sorgente, non questa. */
 // Libreria di icone SVG.
 // Parametri di famiglia (vedi src/styles/ICONS.md per la guida completa):
 //   - viewBox 24x24, disegno entro ~20x20

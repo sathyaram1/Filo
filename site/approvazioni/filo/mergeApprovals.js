@@ -1,3 +1,4 @@
+/* Copia di src/shared/mergeApprovals.js, scritta da scripts/build-approvazioni.mjs: si cambia la sorgente, non questa. */
 // L'AVVISO DELLE FUSIONI IN ATTESA — superficie dell'owner, un pezzo solo.
 //
 // PERCHÉ ESISTE (SPEC-RIDISEGNO-MAX.md §10)

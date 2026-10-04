@@ -313,12 +313,13 @@
         return { partial: { showHomeMessage: b }, label: `Commento nella home → ${b ? 'mostrato' : 'nascosto'}` };
       },
     },
-    // Ora, batteria, rete e Bluetooth nella home (#873): una voce per chiave, le altre restano come sono.
+    // Ora, batteria, rete, Bluetooth e volume nella home (#873, #874): una voce per chiave, le altre restano come sono.
     ...[
       ['ora', "l'ora", ['orologio']],
       ['batteria', 'la batteria', []],
       ['rete', 'la rete', ['wifi', 'wi-fi', 'connessione']],
       ['bluetooth', 'il Bluetooth', []],
+      ['volume', 'il volume', ['audio']],
     ].map(([voce, nome, sinonimi]) => ({
       scrive: [`homeSistema.${voce}`],
       aiuto: `true | false (${nome} nella colonna destra della home)`,

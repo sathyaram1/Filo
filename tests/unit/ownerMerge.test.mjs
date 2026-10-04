@@ -144,6 +144,8 @@ describe('cosa legge l’owner', () => {
     // E che una pagina già aperta se ne accorge da sola: senza questa riga
     // l'owner chiude e riapre una scheda per far comparire l'avviso.
     assert.match(msg, /già apert/i);
+    // Il giorno che Filo non si apre, la strada che resta si legge qui (#489).
+    assert.ok(msg.includes('https://filo-8b9cb.web.app'), msg);
   });
 
   test('bloccato SENZA richiesta: non promette un avviso che non comparirà mai', () => {

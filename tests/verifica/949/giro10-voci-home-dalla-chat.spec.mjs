@@ -62,7 +62,7 @@ test('nascondi la batteria nella home dalla chat: Preferenze aperta la segue, la
   await chat.locator('#sendBtn').click();
   await expect(chat.locator('.dash-bubble-filo', { hasText: 'Fatto.' })).toBeVisible({ timeout: 10_000 });
   await expect.poll(async () => (await impostazioni()).homeSistema, { timeout: 5_000 })
-    .toEqual({ ora: true, batteria: false, rete: true, bluetooth: false });
+    .toEqual({ ora: true, batteria: false, rete: true, bluetooth: false, volume: true });
   const esito = (await app.evaluate(() => globalThis.__v_tool)).pop();
   expect(esito).toContain('Home → nascondi la batteria');
 
@@ -83,6 +83,6 @@ test('nascondi la batteria nella home dalla chat: Preferenze aperta la segue, la
   await prefs.bringToFront();
   await prefs.locator('#homeSisBatteria').check();
   await expect.poll(async () => (await impostazioni()).homeSistema, { timeout: 5_000 })
-    .toEqual({ ora: true, batteria: true, rete: true, bluetooth: false });
+    .toEqual({ ora: true, batteria: true, rete: true, bluetooth: false, volume: true });
   await app.evaluate(() => { try { globalThis.__v_restore?.(); } catch (_) {} });
 });

@@ -1,0 +1,311 @@
+/* Copia di src/styles/mergeApprovals.css, scritta da scripts/build-approvazioni.mjs: si cambia la sorgente, non questa. */
+/* Avviso delle fusioni in attesa di approvazione (src/shared/mergeApprovals.js).
+   Un foglio solo per le due rese — l'avviso in cima ai Ricevuti e la traccia in Automazioni — così non divergono.
+   Solo token `--sn-*`: gli override estetici valgono anche qui e il blocco regge il tema chiaro e quello scuro. */
+
+.sn-mac {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  /* Fondo d'accento a bassissima opacità più banda laterale: si vede che è un avviso senza urlare, e il
+     contrasto col testo resta quello del tema invece di un colore pieno illeggibile sullo scuro. */
+  background: color-mix(in srgb, var(--sn-accent) 8%, var(--sn-bg));
+  border: 1px solid color-mix(in srgb, var(--sn-accent) 34%, var(--sn-border));
+  border-left: 3px solid var(--sn-accent);
+  border-radius: var(--sn-radius, 6px);
+  color: var(--sn-fg);
+  font-family: var(--sn-font);
+}
+
+.sn-mac-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--sn-fg);
+}
+.sn-mac-ico {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--sn-accent);
+}
+.sn-mac-ico svg { display: block; }
+
+.sn-mac-intro {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--sn-muted);
+}
+
+
+.sn-mac-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--sn-bg);
+  border: 1px solid var(--sn-border);
+  border-radius: var(--sn-radius, 6px);
+}
+.sn-mac-card.is-busy { opacity: 0.72; }
+
+.sn-mac-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  font-size: 12.5px;
+  line-height: 1.3;
+}
+.sn-mac-branch {
+  font-weight: 600;
+  color: var(--sn-fg);
+  overflow-wrap: anywhere;
+}
+/* La provenienza apre la riga perché cambia con che occhio si legge tutto il resto, ed è una pastiglia
+   e non testo in sottotono: in un elenco che le mescola si devono distinguere a colpo d'occhio. */
+.sn-mac-origin {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--sn-border);
+  color: var(--sn-muted);
+  white-space: nowrap;
+}
+.sn-mac-card[data-origin='routine'] .sn-mac-origin {
+  border-color: color-mix(in srgb, var(--sn-accent) 45%, transparent);
+  background: color-mix(in srgb, var(--sn-accent) 12%, transparent);
+  color: color-mix(in srgb, var(--sn-fg) 80%, var(--sn-accent));
+}
+/* Quando la pastiglia sa aprire la segnalazione diventa un bottone: stessa
+   forma, ma risponde al puntatore — l'utente deve capire che si clicca. */
+button.sn-mac-origin-link {
+  font-family: var(--sn-font);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+button.sn-mac-origin-link:hover {
+  background: color-mix(in srgb, var(--sn-accent) 22%, transparent);
+  border-color: var(--sn-accent);
+}
+button.sn-mac-origin-link:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 2px; }
+.sn-mac-sha {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--sn-fg) 8%, transparent);
+  color: var(--sn-muted);
+}
+.sn-mac-when,
+.sn-mac-who,
+.sn-mac-expiry { color: var(--sn-muted); font-size: 11.5px; }
+/* Chi ha chiesto è il motivo per cui questa superficie esiste — chi chiede non è chi approva — quindi
+   non sparisce nel sottotono: resta accanto al commit, un filo più marcato degli altri metadati. */
+.sn-mac-who { color: color-mix(in srgb, var(--sn-fg) 72%, var(--sn-muted)); }
+/* La scadenza è l'unica cosa che scade: si distingue dal resto del sottotono. */
+.sn-mac-expiry { color: var(--sn-accent); }
+
+.sn-mac-why {
+  margin: 0;
+  font-size: 12px;
+  color: var(--sn-muted);
+}
+/* Richiesta nata da un riallineamento del server: l'owner l'aveva già approvata e sotto ci sono SOLO i
+   blocchi nuovi. In tinta d'accento, perché cambia come si leggono i blocchi. */
+.sn-mac-realigned {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: color-mix(in srgb, var(--sn-fg) 70%, var(--sn-accent));
+}
+/* Su quale main sono girati gli unit della fusione: sottotono, il dettaglio sta nel suggerimento. */
+.sn-mac-prova {
+  margin: 0;
+  font-size: 12px;
+  color: var(--sn-muted);
+  cursor: help;
+}
+.sn-mac-blocks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sn-mac-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 12px;
+  position: relative;
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+.sn-mac-block::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 7px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--sn-accent);
+}
+.sn-mac-block-label { color: var(--sn-fg); }
+.sn-mac-block-items {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: var(--sn-muted);
+  overflow-wrap: anywhere;
+}
+
+
+.sn-mac-status {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--sn-muted);
+}
+.sn-mac-status[data-kind='ok']   { color: var(--sn-accent); }
+.sn-mac-status[data-kind='warn'] { color: var(--sn-fg); }
+.sn-mac-status[data-kind='err']  { color: var(--sn-error); }
+
+
+.sn-mac-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.sn-mac-btn {
+  font-family: var(--sn-font);
+  font-size: 12.5px;
+  line-height: 1;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--sn-border);
+  background: transparent;
+  color: var(--sn-fg);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.sn-mac-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--sn-fg) 7%, transparent);
+  border-color: color-mix(in srgb, var(--sn-fg) 30%, var(--sn-border));
+}
+.sn-mac-btn:disabled { opacity: 0.5; cursor: default; }
+.sn-mac-btn:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 2px; }
+
+.sn-mac-btn-go {
+  border-color: var(--sn-accent);
+  color: var(--sn-accent);
+  font-weight: 600;
+}
+.sn-mac-btn-go:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--sn-accent) 14%, transparent);
+  border-color: var(--sn-accent);
+  color: var(--sn-accent);
+}
+/* Armato ("Confermi?"): pieno, perché il click successivo NON torna indietro. */
+.sn-mac-btn-go.is-armed {
+  background: var(--sn-accent);
+  border-color: var(--sn-accent);
+  color: #fff;
+}
+.sn-mac-btn-go.is-armed:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--sn-accent) 86%, #000);
+  color: #fff;
+}
+
+
+.sn-mac-recent-title {
+  margin: 14px 0 6px;
+  font-size: 12px;
+  color: var(--sn-muted);
+}
+.sn-mac-recent {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.sn-mac-recent-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  font-size: 12px;
+  color: var(--sn-muted);
+}
+.sn-mac-recent-branch { color: var(--sn-fg); overflow-wrap: anywhere; }
+.sn-mac-recent-who { overflow-wrap: anywhere; }
+.sn-mac-recent-origin { color: var(--sn-muted); white-space: nowrap; }
+.sn-mac-recent-row[data-outcome='approvata e fusa'] .sn-mac-recent-what,
+.sn-mac-recent-row[data-outcome='approvata, riallineata e fusa'] .sn-mac-recent-what { color: var(--sn-accent); }
+/* Consumata senza fondere: si legge come tale, non come un sì andato a buon fine. */
+.sn-mac-recent-row[data-outcome='riallineata, chiede di nuovo'] .sn-mac-recent-what,
+.sn-mac-recent-row[data-outcome='decaduta'] .sn-mac-recent-what { color: var(--sn-fg); }
+
+
+/* Stessa grammatica dell'avviso, ma in tinta d'errore: qui un sì già dato non
+   ha prodotto niente, e deve saltare all'occhio più di una richiesta nuova. */
+.sn-mac.sn-mac-failed {
+  background: color-mix(in srgb, var(--sn-error) 8%, var(--sn-bg));
+  border: 1px solid color-mix(in srgb, var(--sn-error) 34%, var(--sn-border));
+  border-left: 3px solid var(--sn-error);
+}
+.sn-mac.sn-mac-failed .sn-mac-title-text { color: var(--sn-error); }
+.sn-mac-card-failed .sn-mac-why { color: var(--sn-fg); }
+
+
+/* Il controllo a posteriori: l'elenco di ciò che era stato segnalato si legge per intero, una voce per
+   riga. Stessa grammatica della scheda ma senza tasti: non c'è più niente da decidere. */
+.sn-mac-preapproved-intro {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--sn-muted);
+}
+.sn-mac-preapproved {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sn-mac-preapproved-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--sn-border);
+  border-left: 3px solid var(--sn-accent);
+  border-radius: var(--sn-radius, 10px);
+  background: color-mix(in srgb, var(--sn-accent) 5%, var(--sn-bg));
+}
+.sn-mac-preapproved-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  font-size: 12px;
+  color: var(--sn-muted);
+}
+.sn-mac-block-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}

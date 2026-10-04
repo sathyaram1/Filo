@@ -21,6 +21,7 @@
         homeSisBatteria: 'homeSistema.batteria',
         homeSisRete: 'homeSistema.rete',
         homeSisBluetooth: 'homeSistema.bluetooth',
+        homeSisVolume: 'homeSistema.volume',
         tabPreviewEnabled: 'tabPreview.enabled',
         tabPreviewSize: 'tabPreview.size',
         autoArchiveEnabled: 'autoArchive.enabled',
