@@ -2422,6 +2422,13 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         if (!r.ok) return { executed: false, kept: false, output: { error: r.motivo, ...(r.id ? { id: r.id } : {}) } };
         return { executed: true, kept: false, output: { annullato: r.id, frase: r.frase, saltati: r.saltati || [] } };
       }
+      case 'VOLUME':
+      case 'BLUETOOTH':
+      case 'WIFI': {
+        // #874 — la stessa porta dei tasti della home (MSG.SISTEMA_COMANDA): due cammini, un risultato.
+        const r = await require('./comandiSistema').comanda(richiestaDiSistema(type, action));
+        return { executed: !!r.ok, kept: false, output: r };
+      }
       case 'ZOOM_PAGINA': {
         // #686 — lo zoom della pagina si chiede anche a parole, non solo con
         // Ctrl +/-/0. Non zooma da qui: gira la richiesta alla scheda attiva
