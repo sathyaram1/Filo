@@ -1026,6 +1026,8 @@
       }
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
       const dataUrl = await blobToDataUrl(pngBlob);
+      // Dopo la scrittura: il main legge gli appunti per riconoscere la copia quando torna incollata.
+      chrome.runtime.sendMessage({ type: MSG.IMAGE_COPIED, originale, copia: dataUrl }).catch(() => {});
       const description = await describeImage(pngBlob);
       pushClipboardEntry({ type: 'image', dataUrl, description });
       Popup.showToast(I18n.t('toast_copied'));
