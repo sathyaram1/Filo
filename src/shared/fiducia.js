@@ -64,9 +64,13 @@
     return { mittenti: [], siti: [], tolti: [], inviati: {} };
   }
 
+  // Uno stato già ripulito porta il segno e non si rifà a ogni domanda: l'elenco di una casella ne fa decine.
+  function norm(stato) { return stato && stato._norm === true ? stato : normalizza(stato); }
+
   function normalizza(stato) {
     const s = stato && typeof stato === 'object' ? stato : {};
     const out = vuoto();
+    Object.defineProperty(out, '_norm', { value: true });
     const visti = new Set();
     for (const m of Array.isArray(s.mittenti) ? s.mittenti : []) {
       const a = indirizzo(m && m.indirizzo);
@@ -92,12 +96,12 @@
 
   function fidatoMittente(stato, addr) {
     const a = indirizzo(addr);
-    return !!a && normalizza(stato).mittenti.some((m) => m.indirizzo === a);
+    return !!a && norm(stato).mittenti.some((m) => m.indirizzo === a);
   }
 
   function sitoFidato(stato, urlOHost) {
     const h = hostDi(urlOHost);
-    return normalizza(stato).siti.find((x) => sottoSito(h, x.sito)) || null;
+    return norm(stato).siti.find((x) => sottoSito(h, x.sito)) || null;
   }
 
   // La fonte nella forma di #530: { classe, campo, chiave, motivo }. Un mittente si riconosce dall'indirizzo,
@@ -169,7 +173,7 @@
   }
 
   function inviatiDaRileggere(stato, account, ora = Date.now()) {
-    const t = normalizza(stato).inviati[testo(account).toLowerCase() || '?'];
+    const t = norm(stato).inviati[testo(account).toLowerCase() || '?'];
     return !t || ora - t > RILEGGI_INVIATI_MS;
   }
 
