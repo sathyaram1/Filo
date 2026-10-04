@@ -4123,11 +4123,14 @@
   // Aprire e CHIUDERE un pannello sono entrambi cambi sotto il cursore: aperto,
   // il colpo di coda cade su un comando del pannello nuovo; chiuso, cade sul
   // foglio dietro (che apre "Aggiungi modulo"). Armano tutti e due.
-  function openOverlay(html) { staleClick.arm(); overlayBox.innerHTML = html; overlay.hidden = false; }
+  let overlayGen = 0;
+  function openOverlay(html) { staleClick.arm(); overlayGen++; overlayBox.innerHTML = html; overlay.hidden = false; }
   function closeOverlay() { staleClick.arm(); overlay.hidden = true; overlayBox.innerHTML = ''; }
+  // Allo scadere chiude solo sé stesso: chiudeva qualunque pannello ci fosse, compreso il commento aperto nel frattempo.
   function flashOverlayMsg(text, ms) {
     openOverlay(`<div style="text-align:center;padding:8px 4px">${escapeHtml(text)}</div>`);
-    setTimeout(closeOverlay, ms || 1400);
+    const mio = overlayGen;
+    setTimeout(() => { if (overlayGen === mio && !overlay.hidden) closeOverlay(); }, ms || 1400);
   }
   overlay.addEventListener('click', (e) => { if (e.target === overlay) closeOverlay(); });
 
