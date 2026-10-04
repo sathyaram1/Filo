@@ -144,6 +144,19 @@
     return t || 'Uso il terminale del computer';
   }
 
+  // Un testo del modello in un popup: una riga, senza invisibili, con un tetto che si vede (…).
+  function testoBreve(v, max = 120) {
+    const t = String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f-\u009f​-‏ -‮⁠-⁯﻿]+/g, ' ')
+      .replace(/\s+/g, ' ').trim();
+    const segni = Array.from(t);
+    return segni.length > max ? `${segni.slice(0, max - 1).join('').trimEnd()}…` : t;
+  }
+  function schedaDetta(a) {
+    const t = testoBreve(a && (a._titolo || a.scheda), 80);
+    if (!t) return 'davanti';
+    return /^\d+$/.test(t) ? `n. ${t}` : `«${t}»`;
+  }
+
   function nomeLeggibile(n) {
     const N = global.SN_NOMI_FILE;
     const s = N ? N.nomeVisibile(n) : String(n == null ? '' : n).replace(/[\u0000-\u001f\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/g, '');
