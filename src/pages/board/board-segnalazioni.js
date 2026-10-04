@@ -17,9 +17,9 @@
   const CONFERMA_MS = 3000;
   const STATI = {
     in_partenza: { testo: 'in partenza', hover: 'Parte da sola appena c’è la rete' },
-    inviata: { testo: 'inviata', hover: 'Arrivata: quando è risolta, Filo te lo dice all’avvio' },
-    non_partita: { testo: 'non partita', hover: 'Non è arrivata: per rimandarla, tasto destro → «Invia feedback»' },
-    risolta: { testo: 'risolta', hover: 'Risolta' },
+    inviata: { testo: 'inviata', hover: 'È arrivata. Quando sarà risolta, Filo te lo dice all’avvio' },
+    non_partita: { testo: 'non partita', hover: 'Non è arrivata. Per rimandarla usa «Invia feedback» dal tasto destro' },
+    risolta: { testo: 'risolta', hover: 'È stata sistemata' },
     chiusa: { testo: 'chiusa', hover: 'Chiusa senza modifiche' },
   };
 

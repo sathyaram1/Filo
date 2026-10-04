@@ -54,7 +54,7 @@
     // Filo in chat, e quella strada non cambia.
     '/feedback': (text, chat) => {
       if (!isOwner) {
-        showFiloLine('I feedback li vede chi li gestisce. Per mandarne uno: tasto destro → «Invia feedback», oppure scrivimi cosa non va e lo scrivo io.', chat);
+        showFiloLine('I feedback li vede chi li gestisce. Quelli che hai mandato tu li ritrovi in Bacheca, sotto «Le tue segnalazioni». Per mandarne uno: tasto destro → «Invia feedback», oppure scrivimi cosa non va e lo scrivo io.', chat);
         return;
       }
       send({ type: MSG.OPEN_URL, url: 'filo://feedback/feedback.html' });

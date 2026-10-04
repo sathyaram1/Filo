@@ -370,7 +370,7 @@
     },
     {
       id: 'feedback', title: 'Manda un feedback', category: 'assistant',
-      desc: 'Segnala un problema o una richiesta a chi sviluppa Filo, anche con immagini allegate. Quello che scrivi lo legge solo chi lavora i feedback; quando il tuo è risolto Filo te lo dice all’avvio, con una frase scritta per te e, se c’è, il premio in crediti, e il miglioramento compare in bacheca (filo://board/). L’invio è immediato: se sei senza connessione Filo tiene da parte il feedback e lo spedisce da solo appena la rete torna, anche dopo aver chiuso e riaperto l’app. Puoi anche chiederlo a Filo in chat ("segnala che X non funziona") e ci pensa lui a scriverlo; e quando è Filo a dirti che una cosa non sa farla, che non ha un dato che gli hai chiesto, oppure quando ti spiega come fare a mano qualcosa che Filo sa fare ma che l’assistente non riesce ad azionare, la segnalazione compare già scritta e ti viene mostrata subito per intero in un riquadro di conferma (una volta per conversazione, e niente parte senza il tuo OK).',
+      desc: 'Segnala un problema o una richiesta a chi sviluppa Filo, anche con immagini allegate. Quello che scrivi lo legge solo chi lavora i feedback; quando il tuo è risolto Filo te lo dice all’avvio, con una frase scritta per te e, se c’è, il premio in crediti, e il miglioramento compare in bacheca (filo://board/). Quello che hai mandato lo ritrovi in Bacheca, sotto «Le tue segnalazioni», con la data e lo stato. L’invio è immediato: se sei senza connessione Filo tiene da parte il feedback e lo spedisce da solo appena la rete torna, anche dopo aver chiuso e riaperto l’app. Puoi anche chiederlo a Filo in chat ("segnala che X non funziona") e ci pensa lui a scriverlo; e quando è Filo a dirti che una cosa non sa farla, che non ha un dato che gli hai chiesto, oppure quando ti spiega come fare a mano qualcosa che Filo sa fare ma che l’assistente non riesce ad azionare, la segnalazione compare già scritta e ti viene mostrata subito per intero in un riquadro di conferma (una volta per conversazione, e niente parte senza il tuo OK).',
       invoke: 'Menu del tasto destro → "Invia feedback"; in chat basta chiederlo a parole.',
     },
     {
@@ -480,6 +480,12 @@
       id: 'patch-notes', title: 'Recap degli aggiornamenti', category: 'pages',
       desc: 'All’avvio di una nuova versione, un riquadro riassume le novità e le correzioni in parole semplici.',
       invoke: 'Compare da solo all’avvio dopo un aggiornamento.',
+    },
+    {
+      id: 'segnalazioni-mie', title: 'Le tue segnalazioni', category: 'pages',
+      desc: 'In cima alla Bacheca ritrovi ogni segnalazione mandata da questo computer, la più recente prima: il testo, i nomi degli allegati, la data, il numero e lo stato. «In partenza» finché manca la rete, «inviata» quando è arrivata, «non partita» se non è arrivata, «risolta» o «chiusa» (senza modifiche) quando Filo te lo annuncia all’avvio, con la frase scritta per te. Ci sono quelle del riquadro «Invia feedback», quelle che Filo scrive in chat e tu confermi, e gli «Ancora rotto?» della Bacheca. Un clic su una riga mostra il testo intero; il cestino la toglie dall’elenco, con una conferma sul posto. La copia resta sul computer: dopo un riavvio c’è ancora, ed entra nel backup di «Esporta dati».',
+      invoke: 'Menu App → "Bacheca", oppure filo://board/board.html#segnalazioni (ci porta anche «Le tue segnalazioni» nella pagina dei feedback).',
+      doesNot: 'In una finestra in incognito non si scrive e non si vede. Non contiene le segnalazioni mandate prima di questa versione, né quelle che Filo manda da solo quando ammette una mancanza. Togliere una voce non ritira la segnalazione.',
     },
     {
       id: 'board', title: 'Bacheca dei miglioramenti', category: 'pages',
