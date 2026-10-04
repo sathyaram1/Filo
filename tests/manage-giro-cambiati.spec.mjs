@@ -182,7 +182,7 @@ test('un avviso del giro si vede sull\'intestazione della lista, e sparisce col 
   expect(await dopo()).toBe('none');
   await page.evaluate(() => window.__mgTest.liveMessage({ kind: 'changed', rows: [], avvisi: ['cambiati: troppe pagine, riallineamento completo al giro dopo'] }));
   await expect(head).toHaveAttribute('title', /troppe pagine/);
-  expect(await dopo()).toContain('da riallineare');
+  expect(await dopo()).toContain('!');
   await page.evaluate(() => window.__mgTest.liveMessage({ kind: 'changed', rows: [] }));
   await expect.poll(dopo).toBe('none');
 });

@@ -630,7 +630,7 @@
       background: var(--mg-arrivo-color, var(--sn-accent));
     }
     /* Il giro ha avvisato (lettura interrotta, tetto, registro): si vede, l'hover dice cosa. Prima di «ferma», che vince. */
-    #mgListHead.mg-list-head--avviso::after { content: ' · ' var(--mg-avviso-testo, 'da riallineare'); font-weight: 400; color: var(--mg-avviso-color, var(--sn-accent)); }
+    #mgListHead.mg-list-head--avviso::after { content: var(--mg-avviso-segno, ' !'); font-weight: 700; color: var(--mg-avviso-color, var(--sn-accent)); }
     /* Lista che non riesce più ad allinearsi: il titolo si spegne, l'hover dice da quando. */
     #mgListHead.mg-list-head--ferma { opacity: var(--mg-ferma-opacity, 0.55); }
     #mgListHead.mg-list-head--ferma::after { content: ' · ferma'; font-weight: 400; color: inherit; }
