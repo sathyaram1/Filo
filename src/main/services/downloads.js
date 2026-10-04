@@ -497,7 +497,7 @@ async function nominaDaSolo(rec) {
     }
     return;
   }
-  const r = await Nomi.rinomina(rec.savePath, p.proposta);
+  const r = await Nomi.rinomina(letto, p.proposta);
   if (!r.ok || r.invariato) return;
   shellToast(`Nome dato: ${shortName(r.nome)}`, {
     durationSec: 10,
