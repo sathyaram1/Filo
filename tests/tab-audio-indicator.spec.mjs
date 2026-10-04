@@ -61,8 +61,10 @@ test('la scheda che suona tiene la favicon, e l\'icona audio sta dopo il titolo 
     }));
     expect(colori.icona).toBe(colori.titolo);
   }
-  const glow = await shell.locator('.tab.audible').first().evaluate((el) => getComputedStyle(el).animationName);
-  expect(glow).toContain('tab-glow-pulse');
+  // Scheda e stile letti nello stesso istante: la barra ridisegna le schede, e una appena sostituita dà uno stile vuoto (#944).
+  await expect.poll(() => shell.evaluate(() => [...document.querySelectorAll('.tab.audible')]
+    .map((el) => getComputedStyle(el).animationName)), { timeout: 3000 })
+    .toEqual(['tab-glow-pulse', 'tab-glow-pulse']);
 });
 
 test('clic sull\'icona audio: silenzia e al suo posto compare il tasto per riattivare, che la riporta', async ({ app, shell, openTab, testServer }) => {
@@ -191,6 +193,19 @@ test('ogni controllo dentro la scheda ha il suo suggerimento di Filo, non il tit
       .toEqual({ carta: titoli[id], suggerimento: null });
   };
 
+  // La carta sparisce qualche fotogramma dopo la richiesta (si svuota prima): il suggerimento che compariva intanto le
+  // stava sopra, e il confronto dei riquadri lo vedeva solo a volte (#944). Il main lo dice nell'istante in cui lo mostra.
+  await app.evaluate(({ app: electronApp, BrowserWindow }) => {
+    globalThis.__sopraLaCarta = 0;
+    const segui = (w) => w.on('show', () => {
+      if (w.isDestroyed() || !w.webContents.getURL().startsWith('data:')) return;
+      if (BrowserWindow.getAllWindows().some((x) => !x.isDestroyed() && x.isVisible()
+        && x.webContents.getURL() === 'filo://shell/anteprima.html')) globalThis.__sopraLaCarta++;
+    });
+    BrowserWindow.getAllWindows().forEach(segui);
+    electronApp.on('browser-window-created', (_e, w) => segui(w));
+  });
+
   const ctrlW = await shell.evaluate(() => (window.SN_TASTI ? window.SN_TASTI.etichetta('Ctrl+W') : 'Ctrl+W'));
   const casi = [
     [suona, '.audio-ind', 'Silenzia'],
@@ -209,6 +224,7 @@ test('ogni controllo dentro la scheda ha il suo suggerimento di Filo, non il tit
     // Tornando sul titolo la carta torna e il suggerimento se ne va.
     await sulTitolo(id);
   }
+  expect(await app.evaluate(() => globalThis.__sopraLaCarta), 'suggerimenti comparsi con la carta ancora a schermo').toBe(0);
   // Oltre l'attesa del suggerimento: la carta non ha un doppione di testo sotto.
   await new Promise((r) => setTimeout(r, 600));
   expect(await scritte(app)).toEqual({ carta: titoli[casi.at(-1)[0]], suggerimento: null });

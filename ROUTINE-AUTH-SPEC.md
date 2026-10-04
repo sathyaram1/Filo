@@ -467,6 +467,31 @@ muro non era un muro.
   se il codice è arrivato su `main`. Lavorare direttamente su `main` non ha più
   senso e viene fermato subito.
 
+### Il sì si dà anche da browser (2026-10-04, #489)
+
+L'unica superficie di approvazione stava dentro l'app: se il lavoro bloccato
+fosse proprio quello che impedisce a Filo di partire, non ci sarebbe stato
+nessun modo di approvarlo. La seconda superficie è una pagina statica,
+`site/approvazioni`, pubblicata su Firebase Hosting del progetto
+(`https://filo-8b9cb.web.app`) e raggiungibile da qualunque browser.
+
+- **Stessa identità, stessi controlli**: accesso Google con l'account del
+  proprietario, poi la stessa `ownerMergeApprovals` dell'app (`list`,
+  `approve`, `discard`). Il server non distingue le due superfici e non
+  concede niente di più: niente scorciatoie da riga di comando.
+- **Le credenziali restano in memoria** (persistenza `none`): chiusa la scheda
+  non resta niente su disco che un programma sul computer possa riusare, e la
+  scelta dell'account si rivede a ogni accesso.
+- **Non si lascia incorniciare** (`frame-ancestors 'none'`, `X-Frame-Options`,
+  e la pagina stessa non si disegna dentro un riquadro): un'altra pagina non
+  può far cliccare «Approva» a chi non la vede.
+- **Le card sono quelle dell'app**: `scripts/build-approvazioni.mjs` copia
+  modulo, icone e tema; una sentinella negli unit pretende le copie allineate e
+  il predeploy rifiuta una copia vecchia.
+- **Si pubblica solo ciò che è fuso**: `npm run regole:pubblica` porta su
+  Firebase regole, indici e la pagina insieme, da `main` allineato a
+  `origin/main`. Il terminale del finish, a ogni blocco, nomina l'indirizzo.
+
 ### Si esamina e si fonde LO STESSO commit (2026-08-21, verifica avversariale)
 
 La prima versione del cancello scaricava il diff di `main...<ramo>` e poi

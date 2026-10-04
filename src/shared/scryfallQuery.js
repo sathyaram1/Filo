@@ -154,7 +154,7 @@
   function parseAgentReply(text) {
     const none = {
       reply: '', query: '', filter: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '', tagWith: [],
-      import: [], commanderName: '', clearChat: false,
+      import: [], commanderName: '', replaceCommander: false, clearChat: false,
     };
     const raw = String(text || '').trim();
     if (!raw) return none;
@@ -209,6 +209,8 @@
               })).filter((it) => it.name)
             : [],
           commanderName: typeof o.commander === 'string' ? o.commander.trim() : '',
+          // Sostituire un commander già impostato vuole questo segnale esplicito del modello: una menzione non basta.
+          replaceCommander: o.replaceCommander === true && typeof o.commander === 'string' && !!o.commander.trim(),
           // Svuotare la chat chiesto a parole: la pagina chiede conferma, qui solo l'intenzione.
           clearChat: o.clearChat === true,
         };

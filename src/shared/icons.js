@@ -544,6 +544,17 @@
     bluetooth +
     `<path d="M4 4l16 16"/>`;
 
+  // --- Il volume (#874): l'altoparlante a cono con le onde che escono; muto, le onde diventano una croce.
+  const speaker =
+    `<path d="M4 9.5h3l4.5-4v13L7 14.5H4z"/>`;
+  const volume =
+    speaker +
+    `<path d="M15.5 9a4.5 4.5 0 0 1 0 6"/>` +
+    `<path d="M18.25 6.5a8 8 0 0 1 0 11"/>`;
+  const volumeMute =
+    speaker +
+    `<path d="M15.5 10l4.5 4"/><path d="M20 10l-4.5 4"/>`;
+
   // --- Regola "sempre da un altro paese": globo con un segnalibro nell'angolo.
   const globePinned =
     `<circle cx="11" cy="13" r="7.5"/>` +
@@ -777,6 +788,8 @@
     ethernet:     (size) => wrap(ethernet, { size }),
     bluetooth:    (size) => wrap(bluetooth, { size }),
     bluetoothOff: (size) => wrap(bluetoothOff, { size }),
+    volume:       (size) => wrap(volume, { size }),
+    volumeMute:   (size) => wrap(volumeMute, { size }),
     windowFrame:  (size) => wrap(windowFrame, { size }),
     brush:        (size) => wrap(brush, { size }),
     undo:         (size) => wrap(undo, { size }),

@@ -332,6 +332,31 @@
         return `Verificare cosa sa fare Filo${ids.length ? ` (${ids.join(', ')})` : ''}`;
       },
     },
+    // #949 — togliere una risposta ricordata non concede niente: il sito torna a chiedere.
+    TOGLI_PERMESSO_SITO: {
+      level: 1,
+      describe: (a) => {
+        const sito = String((a && (a.sito ?? a.dominio)) || '').trim().slice(0, 80) || 'un sito';
+        const p = String((a && a.permesso) || '').trim().slice(0, 40);
+        return `Togliere ${p ? `il permesso «${p}»` : 'i permessi ricordati'} di ${sito}`;
+      },
+      describeDone: (a) => {
+        const tolte = (a && a._output && Array.isArray(a._output.tolte)) ? a._output.tolte : [];
+        return tolte.length ? `Tolte le risposte ricordate: ${tolte.join('; ')} (il sito tornerà a chiedere)` : 'Nessuna risposta tolta';
+      },
+    },
+    LEGGI_IMPOSTAZIONI: {
+      // #949 — rilegge le impostazioni dell'utente, senza le chiavi: sola lettura, niente esce.
+      level: 1,
+      describe: (a) => {
+        const cerca = String((a && (a.cerca ?? a.query ?? a.chiave)) || '').replace(/\s+/g, ' ').trim();
+        return cerca ? `Leggere com'è impostato «${cerca.slice(0, 60)}»` : 'Leggere le impostazioni';
+      },
+      describeDone: (a) => {
+        const cerca = String((a && (a.cerca ?? a.query ?? a.chiave)) || '').replace(/\s+/g, ' ').trim();
+        return cerca ? `Letto com'è impostato «${cerca.slice(0, 60)}»` : 'Lette le impostazioni';
+      },
+    },
     CERCA_CHAT: {
       // #525 — Filo rilegge le conversazioni passate con lo stesso utente per
       // riprendere un discorso di ieri. Sola lettura di dati che sono già
@@ -446,12 +471,13 @@
     },
     IMPOSTA_PREFERENZA: {
       // Livello per-preferenza: lo dichiara il setter in preferences.js
-      // (default 1). Preferenza sconosciuta/non valida → 2 per prudenza
-      // (tanto il dispatch non la eseguirà comunque). Un `rifiuto` → 1: non
-      // c'è niente da confermare, il dispatch lo respinge spiegando perché.
+      // (default 1). Preferenza sconosciuta/non valida o `rifiuto` → 1: non c'è
+      // niente da confermare, il dispatch la respinge spiegando perché (un OK a vuoto no).
       level: (a) => {
+        // Un elenco che resterebbe com'è: niente da confermare (`_invariato` lo mette il main, #949).
+        if (a && a._invariato) return 1;
         const built = prefBuilt(a);
-        return (built && built.level) || (built ? 1 : 2);
+        return (built && built.level) || 1;
       },
       describe: (a) => {
         const built = prefBuilt(a);
@@ -612,6 +638,77 @@
       describeDone: (a) => {
         const f = String((a && a._fraseCambio) || '').trim();
         return f ? `Rimesso com'era prima di: ${f}` : 'Cambio annullato';
+      },
+    },
+    // ── volume, Bluetooth e Wi-Fi del computer (#874) ───────────────────────
+    // Spegnere o staccare quello che sta servendo (le cuffie, la tastiera, la rete della chat stessa) è 2; il resto
+    // 1, e 1 anche ciò che è già com'è chiesto (`gia`: niente cade). Il livello legge `_richiestaSistema`, che il main scrive sempre prima del cancello con la stessa funzione che
+    // poi esegue (src/main/services/comandiSistema.js): quello che si conferma è quello che parte.
+    VOLUME: {
+      level: 1,
+      describe: (a) => {
+        const r = (a && a._richiestaSistema) || {};
+        if (r.livello != null) return `Portare il volume del computer al ${r.livello}%`;
+        if (r.passo != null) return r.passo > 0 ? 'Alzare il volume del computer' : 'Abbassare il volume del computer';
+        if (r.muto === true) return 'Mettere muto il computer';
+        if (r.muto === false) return 'Togliere il muto al computer';
+        return 'Cambiare il volume del computer';
+      },
+    },
+    BLUETOOTH: {
+      level: (a) => {
+        const r = a && a._richiestaSistema;
+        if (!r || r.errore) return 2;
+        if (r.gia === true) return 1;
+        return r.acceso === false || (r.nome && r.collega === false) ? 2 : 1;
+      },
+      describe: (a) => {
+        const r = (a && a._richiestaSistema) || {};
+        const nome = (a && a._nomeSistema) || r.nome;
+        if (r.elenca) return 'Leggere i dispositivi Bluetooth abbinati';
+        if (r.nome && r.collega === false) {
+          return `Scollegare «${nome}» dal Bluetooth.\n\nSe è una tastiera, un mouse o le cuffie che stai usando, smette di funzionare finché non lo ricolleghi.`;
+        }
+        if (r.nome) return `Collegare «${nome}» col Bluetooth`;
+        if (r.acceso === true) return 'Accendere il Bluetooth';
+        if (r.acceso === false) {
+          return 'Spegnere il Bluetooth.\n\nCuffie, casse, tastiere e mouse Bluetooth si scollegano finché non lo riaccendi, dal tasto nella home o chiedendolo a Filo.';
+        }
+        return 'Cambiare il Bluetooth del computer';
+      },
+      // Dopo una conferma: quello che è successo, senza i rischi che il popup ha già spiegato.
+      describeDone: (a) => {
+        const r = (a && a._richiestaSistema) || {};
+        const nome = (a && a._nomeSistema) || r.nome;
+        if (r.nome) return r.collega === false ? `Scollegato «${nome}» dal Bluetooth` : `Collegato «${nome}» col Bluetooth`;
+        return r.acceso === false ? 'Bluetooth spento' : r.acceso === true ? 'Bluetooth acceso' : 'Bluetooth cambiato';
+      },
+    },
+    WIFI: {
+      level: (a) => {
+        const r = a && a._richiestaSistema;
+        if (!r || r.errore) return 2;
+        if (r.gia === true) return 1;
+        return r.acceso === false || !!r.nome ? 2 : 1;
+      },
+      describe: (a) => {
+        const r = (a && a._richiestaSistema) || {};
+        const nome = (a && a._nomeSistema) || r.nome;
+        if (r.elenca) return 'Leggere le reti Wi-Fi che il computer conosce';
+        if (r.nome) {
+          return `Collegare il computer alla rete Wi-Fi «${nome}».\n\nPer qualche secondo la connessione di adesso cade: scaricamenti e chiamate in corso possono interrompersi.`;
+        }
+        if (r.acceso === true) return 'Accendere il Wi-Fi';
+        if (r.acceso === false) {
+          return 'Spegnere il Wi-Fi.\n\nSenza un cavo il computer resta senza rete, e a parole non potrai riaccenderlo: senza rete Filo non ti sente. Si riaccende dal tasto nella home o dal sistema.';
+        }
+        return 'Cambiare il Wi-Fi del computer';
+      },
+      describeDone: (a) => {
+        const r = (a && a._richiestaSistema) || {};
+        const nome = (a && a._nomeSistema) || r.nome;
+        if (r.nome) return `Collegato il computer alla rete Wi-Fi «${nome}»`;
+        return r.acceso === false ? 'Wi-Fi spento' : r.acceso === true ? 'Wi-Fi acceso' : 'Wi-Fi cambiato';
       },
     },
     // ── zoom della pagina via chat (#686) ────────────────────────────────────

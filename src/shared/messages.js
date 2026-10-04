@@ -162,6 +162,13 @@
     // non ha creato lui (ramo admin delle regole), quindi quel passo resta al
     // triage. { id, text } → { ok, feedbackId, balance } | { ok:false, error }.
     BOARD_REOPEN: 'board_reopen',
+    // #986 — la copia locale delle segnalazioni mandate da questo computer. Testi scritti dall'utente: solo dalle
+    // superfici di Filo (soloFilo), mai da un sito. {} → { ok, voci } (in incognito { ok, voci: [], incognito: true })
+    SEGNALAZIONI_MIE_LIST: 'segnalazioni_mie_list',
+    // { id } → { ok, voci }: la voce esce dall'elenco e dal disco; la segnalazione mandata resta dov'è.
+    SEGNALAZIONI_MIE_TOGLI: 'segnalazioni_mie_togli',
+    // Segnale BROADCAST main→pagine filo:// (mai incognito): l'elenco è cambiato. Senza dati: si rilegge con LIST.
+    SEGNALAZIONI_MIE_CAMBIATE: 'segnalazioni_mie_cambiate',
     // Broadcast main→renderer: l'utente corrente ha ricevuto crediti in regalo
     // (#210.4). { amount } → la home mostra un popup una volta sola.
     GIFT_NOTICE: 'gift_notice',
@@ -406,6 +413,7 @@
     // Le risposte ai permessi dei siti che restano fra un avvio e l'altro: la pagina Sicurezza le elenca e le toglie.
     PERMESSI_SITI_GET: 'permessi_siti_get',          // {} → { ok, scelte: [{ origine, parte, si, sotto, dominio }] }
     PERMESSI_SITI_TOGLI: 'permessi_siti_togli',      // { origine, parte } → { ok }
+    PERMESSI_SITI_CAMBIATI: 'permessi_siti_cambiati', // main → pagine di Filo: la chat ha tolto una risposta ricordata
 
     // §2.1 — segnali di attività della tab riportati dal content script, per la
     // decisione di auto-archiviazione. Throttled. { lastInteractionAt?, scrollPct?, formDirty? }
@@ -700,6 +708,13 @@
     SISTEMA_STATO: 'sistema_stato',
     // main → pagine filo:// quando una lettura cambia. { stato }
     SISTEMA_AGGIORNATO: 'sistema_aggiornato',
+    // Volume, Bluetooth e Wi-Fi a comando (#874), solo dalle pagine di Filo: aziona il sistema operativo, e a un sito
+    // non si dà. La stessa porta dell'azione della chat. { richiesta: { cosa: 'volume'|'bluetooth'|'wifi', … } }
+    // → { ok, cosa, … } oppure { ok: false, errore, frase, dove?, apri? }
+    SISTEMA_COMANDA: 'sistema_comanda',
+    // Apre la pagina delle impostazioni del sistema dove si concede un permesso mancante. { chiave } (una di
+    // IMPOSTAZIONI in src/main/services/comandiSistema.js: l'indirizzo non arriva mai da chi chiede) → { ok }
+    SISTEMA_APRI_IMPOSTAZIONI: 'sistema_apri_impostazioni',
     // Genera dashboard (messaggio centro + suggerimenti). Usa cache con cooldown.
     // { force?: boolean }
     // Risposta: { ok, message, suggestions, cached, ts }

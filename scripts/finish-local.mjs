@@ -418,6 +418,15 @@ export function esitoVerificaPerCheck({ checkOnly, ok, reason }) {
 }
 
 /**
+ * Unit rossi: con `--check` gli spec delle aree girano lo stesso e l'esito resta rosso alla fine. PURA.
+ * Fermarsi lì lasciava chi verifica senza gli spec, anche per un rosso che c'è uguale su main (#874.1).
+ */
+export function esitoUnitPerCheck({ checkOnly }) {
+  if (!checkOnly) return { ferma: true, messaggio: 'Controlli di logica rossi: non pubblico. Sistema e rilancia.' };
+  return { ferma: false, messaggio: 'Controlli di logica rossi: corro lo stesso gli spec delle aree toccate, l\'esito finale resta rosso.' };
+}
+
+/**
  * Gli spec delle aree toccate si rilanciano, o li ha già corsi chi ha
  * verificato sullo stesso contenuto? PURA.
  *
@@ -635,6 +644,7 @@ async function main() {
   // resta più sotto, dopo i controlli, dov'è sempre stato).
   const v = verdictForCurrentBranch(ROOT);
   const spec = specDaRilanciare({ checkOnly, ok: v.ok, sha: v.entry && v.entry.sha, tollerato: v.tollerato });
+  let unitRossi = false;
 
   {
     // Gli spec si scelgono PRIMA dei controlli di logica: se non potranno partire, ci si ferma
@@ -656,14 +666,17 @@ async function main() {
     }
     // 1. Logica pura — veloce, nessuna finestra che si apre.
     if (!run('npm', ['run', 'test:unit'], 'Controlli di logica')) {
-      console.error('\n✗ Controlli di logica rossi: non pubblico. Sistema e rilancia.');
-      process.exit(1);
+      const esito = esitoUnitPerCheck({ checkOnly });
+      console.error(`\n✗ ${esito.messaggio}`);
+      if (esito.ferma) process.exit(1);
+      unitRossi = true;
     }
     // 2. Spec mirati alle aree toccate. La suite completa gira SOLO in GitHub
     //    Actions, a ogni fusione su main: qui serve il segnale rapido.
     if (blocking.length) {
       if (!runSpecsALotti(blocking, `Spec delle aree toccate (${blocking.length})`)) {
         console.error('\n✗ Spec rossi: non pubblico. Sistema e rilancia.');
+        if (unitRossi) console.error('  Rossi anche i controlli di logica, più sopra.');
         process.exit(1);
       }
     }
@@ -712,6 +725,10 @@ async function main() {
     }
   }
 
+  if (unitRossi) {
+    console.error('\n✗ Controlli di logica rossi, più sopra: sistema e rilancia.');
+    process.exit(1);
+  }
   if (checkOnly) { console.log('\n✓ Controlli passati (--check: non chiedo la fusione).'); return; }
 
   // 4. Il ramo dev'essere SU ORIGIN: il server fonde ciò che vede lui, non ciò

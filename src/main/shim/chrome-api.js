@@ -23,10 +23,11 @@ const chromeShim = {
       get: (keys) => storage.get(keys ?? null),
       set: (obj) => storage.set(obj),
       remove: (keys) => storage.remove(keys),
-      // «Cancella tutti i dati» vale anche per l'archivio delle schede, che sta in file suoi.
+      // «Cancella tutti i dati» vale anche per gli archivi che stanno in file suoi.
       clear: async () => {
         await storage.clear();
         await globalThis.SN_ARCHIVED_TABS?.clear();
+        await globalThis.SN_SEGNALAZIONI_MIE?.svuota();
       },
     },
     onChanged: {

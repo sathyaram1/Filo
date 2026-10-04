@@ -96,6 +96,7 @@ require(path.join(SHARED, 'actionTools.js'));  // le azioni come strumenti del m
 require(path.join(SHARED, 'pageRestyle.js'));
 require(path.join(SHARED, 'zoomPagina.js'));  // zoom della pagina: passo, limiti, livello↔percentuale (una regola sola per tasti e chat)
 require(path.join(SHARED, 'cambi.js'));  // #867 — i cambi di stato come eventi del filo: frasi, confronto, annullo (logica pura)
+require(path.join(SHARED, 'vociImpostazioni.js'));  // #949 — le voci delle pagine delle impostazioni: cosa legge e cambia la chat
 require(path.join(SHARED, 'ttsChunk.js'));
 require(path.join(SHARED, 'ttsCache.js'));
 require(path.join(SHARED, 'ttsVoices.js'));          // voci del modello di lettura (Kokoro)
@@ -136,6 +137,7 @@ require(path.join(SVC, 'costTracker.js'));
 require(path.join(SVC, 'savedPages.js'));
 require(path.join(SVC, 'historyStore.js'));
 require(path.join(SVC, 'archivedTabs.js'));
+require(path.join(SVC, 'segnalazioniMie.js')); // #986 — la copia locale delle segnalazioni mandate da qui
 require(path.join(SVC, 'ilFilo.js'));     // #866 — la linea del tempo: l'unico che legge e scrive il suo file
 require(path.join(SVC, 'filoChats.js'));  // #525 — dipende da SN_CHAT_ARCHIVE e SN_IL_FILO
 require(path.join(SVC, 'deckStore.js'));   // dipende da SN_DECKS (shared/decks.js)
@@ -149,6 +151,7 @@ require(path.join(SVC, 'llmsTxt.js'));
 require(path.join(SVC, 'webSearch.js'));
 require(path.join(SVC, 'fxRates.js'));
 require(path.join(SVC, 'statoSistema.js')); // batteria, rete, Bluetooth del computer: SN_SISTEMA_MAIN per lo STATO
+require(path.join(SVC, 'comandiSistema.js')); // #874 volume, Bluetooth e Wi-Fi a comando: SN_COMANDI_SISTEMA
 require(path.join(SVC, 'safebrowse', 'index.js'));
 require(path.join(SVC, 'geoBlock.js'));
 require(path.join(SVC, 'geoBlockClassifier.js'));

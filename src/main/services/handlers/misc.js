@@ -641,6 +641,13 @@ module.exports = function register(on, ctx) {
         // per cercarsi dentro. Best-effort: un registro mancato costa una
         // ricompensa in ritardo, non un feedback perso.
         try { globalThis.SN_FEEDBACK_MINE?.ricordaId?.(result?.id); } catch (_) {}
+        try {
+          globalThis.SN_SEGNALAZIONI_MIE?.inviata?.(_item?.id, {
+            feedbackId: result?.id,
+            num: globalThis.SN_FEEDBACK?.formatNum?.(result?.seq, 0) || '',
+            titolo: _item?.name || '',
+          })?.catch?.(() => {});
+        } catch (_) {}
         const failed = Array.isArray(result?.failed) ? result.failed : [];
         if (!failed.length) return;
         const names = failed.map((f) => f?.name || 'allegato').join(', ');
@@ -663,9 +670,14 @@ module.exports = function register(on, ctx) {
       // secondo piano, su una pagina interna o appena avviato non li vedeva
       // nessuno, e la segnalazione spariva in silenzio lo stesso. Va nella
       // cornice della finestra, dove resta finché non la si chiude.
-      onGiveUp: (_item, motivo) => avvisoNellaFinestra(
-        String(motivo || 'La tua segnalazione non è partita.'),
-      ),
+      onGiveUp: (item, motivo) => {
+        try { globalThis.SN_SEGNALAZIONI_MIE?.nonPartita?.(item?.id)?.catch?.(() => {}); } catch (_) {}
+        return avvisoNellaFinestra(String(motivo || 'La tua segnalazione non è partita.'));
+      },
+      // Dopo un giorno di soli tentativi la coda rinuncia: nell'elenco locale non resta «in partenza».
+      onScaduta: (item) => {
+        try { globalThis.SN_SEGNALAZIONI_MIE?.nonPartita?.(item?.id)?.catch?.(() => {}); } catch (_) {}
+      },
       // Chiesto al momento della spedizione: fra l'accodamento e l'invio
       // possono passare ore (offline), e l'owner può aver chiuso la sessione.
       tokenOwner: async () => (auth.isAdmin() ? (await auth.getIdToken()) || '' : ''),
@@ -734,6 +746,13 @@ module.exports = function register(on, ctx) {
       // appena il feedback è al sicuro in coda (persistito). Il titolo lo genera
       // la coda al momento dell'invio (anche offline, col fallback).
       const r = await Outbox.enqueue(payload, { dallOwner });
+      // #986 — la copia per chi l'ha mandata nasce adesso, «in partenza»; dall'incognito non nasce.
+      try {
+        const Mie = globalThis.SN_SEGNALAZIONI_MIE;
+        if (Mie && r?.id) {
+          await Mie.registra({ id: r.id, testo: payload.text, allegati: Mie.nomiAllegati(payload) });
+        }
+      } catch (e) { console.warn('[Filo feedback] copia locale non scritta:', e?.message || e); }
       return { ok: true, queued: true, id: r?.id };
     } catch (e) {
       console.error('[Filo feedback] submit failed', e);

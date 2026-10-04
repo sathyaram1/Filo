@@ -1,14 +1,9 @@
-// AUDIT (prober): il suggerimento "Riordina e archivia le schede" cliccato dalla
-// colonna dei suggerimenti della home usa il window.confirm NATIVO del browser,
-// invece del popup di conferma in stile Filo (SN_CONFIRM_UI) che usa il bottone
-// equivalente nella chat. Asimmetria fra due cammini equivalenti (PULISCI_TAB):
-// il bottone chat -> Ui.confirm; il suggerimento -> window.confirm nativo.
-//
-// Assert di SUCCESSO: cliccando il suggerimento deve aprirsi il confirm di Filo
-// (SN_CONFIRM_UI.confirm invocato), NON il window.confirm nativo. Oggi fallisce
-// perche' src/pages/dashboard/dashboard.js:289 chiama window.confirm diretto.
+// Il suggerimento "Riordina e archivia le schede" della home chiede conferma col popup di Filo (SN_CONFIRM_UI),
+// come il bottone equivalente in chat, e mai col window.confirm nativo del browser.
 
 import { test, expect } from './fixtures/electron.mjs';
+
+const RIORDINA = 'Riordina e archivia le schede';
 
 async function newtabPage(app) {
   const deadline = Date.now() + 10_000;
@@ -23,49 +18,38 @@ async function newtabPage(app) {
   return win;
 }
 
-// test.fixme: repro del bug (oggi ROSSO). Documenta il comportamento atteso
-// senza rendere rossa la regressione completa. Il fixer che chiude il feedback
-// toglie `.fixme` per farlo diventare un assert vivo (deve passare col fix).
 test('il suggerimento "Riordina schede" usa il confirm di Filo, non quello nativo', async ({ app, shell }) => {
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
 
-  // Se scatta un dialog nativo (confirm) del browser, lo registriamo: e' il bug.
   let nativeDialogFired = false;
   page.on('dialog', async (d) => {
     nativeDialogFired = true;
     await d.dismiss().catch(() => {});
   });
 
-  // Inietta un suggerimento PULISCI_TAB via il bridge live del background
-  // (stesso cammino di #155): chiama i listener di chrome.runtime.onMessage con
-  // un FILO_DASHBOARD_UPDATED che porta il suggerimento, poi la home lo renderizza.
-  await page.evaluate(() => {
-    const listeners = chrome.runtime.onMessage._listeners;
+  // La prima risposta della home riscrive l'elenco dei suggerimenti: un suggerimento messo prima sparisce, e il
+  // clic finiva su quello arrivato dopo («Apri Crediti»), facendo fallire la prova a caso (#944).
+  await expect(page.locator('#homeMessage')).not.toHaveText('…', { timeout: 10_000 });
+
+  // Stesso cammino del ricalcolo in sottofondo (#155): un FILO_DASHBOARD_UPDATED che porta il suggerimento.
+  await page.evaluate((text) => {
     const msg = {
       type: 'filo_dashboard_updated',
       message: 'Filo e in ascolto.',
-      suggestions: [{
-        text: 'Riordina e archivia le schede',
-        importance: 5,
-        icon: '',
-        action: { type: 'PULISCI_TAB' },
-      }],
+      suggestions: [{ text, importance: 5, icon: '', action: { type: 'PULISCI_TAB' } }],
     };
-    for (const l of listeners) l(msg, { id: 'filo-desktop' }, () => {});
-  });
+    for (const l of chrome.runtime.onMessage._listeners) l(msg, { id: 'filo-desktop' }, () => {});
+  }, RIORDINA);
 
-  // Il suggerimento deve essere renderizzato.
-  const sug = page.locator('.dash-carta[data-tipo="suggerimenti"] .dash-carta-voce');
-  await expect(sug.first()).toBeVisible({ timeout: 5_000 });
+  const sug = page.locator('.dash-carta[data-tipo="suggerimenti"] .dash-carta-voce', { hasText: RIORDINA });
+  await expect(sug).toBeVisible({ timeout: 5_000 });
 
-  // Strumenta i due cammini di conferma per capire QUALE viene usato.
+  // Entrambe le conferme rispondono «no»: l'azione non deve partire, conta solo quale si apre.
   await page.evaluate(() => {
     window.__styledConfirmCalled = false;
     window.__nativeConfirmCalled = false;
-    // Confirm nativo: registra e rifiuta (l'azione non deve partire).
     window.confirm = () => { window.__nativeConfirmCalled = true; return false; };
-    // Confirm di Filo: registra e rifiuta.
     if (window.SN_CONFIRM_UI) {
       window.SN_CONFIRM_UI.confirm = () => {
         window.__styledConfirmCalled = true;
@@ -74,18 +58,16 @@ test('il suggerimento "Riordina schede" usa il confirm di Filo, non quello nativ
     }
   });
 
-  await sug.first().click();
-  // Da' tempo al ramo async di girare.
-  await page.waitForTimeout(300);
+  await sug.click();
+  await expect.poll(() => page.evaluate(() => window.__styledConfirmCalled || window.__nativeConfirmCalled), {
+    timeout: 3_000, message: 'cliccando il suggerimento non si è aperta nessuna conferma',
+  }).toBe(true);
 
   const { styled, native } = await page.evaluate(() => ({
     styled: !!window.__styledConfirmCalled,
     native: !!window.__nativeConfirmCalled,
   }));
-
-  // Assert di SUCCESSO: il popup di Filo deve essere usato.
   expect(styled, 'il suggerimento dovrebbe usare il confirm di Filo (SN_CONFIRM_UI)').toBe(true);
-  // E il nativo NON deve essere usato.
   expect(native, 'il suggerimento NON deve usare window.confirm nativo').toBe(false);
   expect(nativeDialogFired, 'non deve comparire un dialog nativo del browser').toBe(false);
 });

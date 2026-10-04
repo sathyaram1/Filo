@@ -72,7 +72,12 @@ module.exports = function register(on, ctx) {
   // un'azione fuori registro.
   on(MSG.FILO_CONFIRM_ACTION, async (msg, sender) => {
     const r = await executeFiloAction(msg.action, { confirmed: true, sender, assistente: msg.assistente === true, parole: paroleDa(msg) });
-    return { ok: true, ...r };
+    // Dopo l'OK il pulsante dice la cosa fatta, non quella proposta («Filo vuole…»): il testo lo dà il registro,
+    // col risultato vero davanti (quante pagine cancellate, quante schede archiviate), come la riga del diario.
+    const Levels = globalThis.SN_ACTION_LEVELS;
+    const fatto = r && r.executed && Levels && Levels.describeDone
+      ? String(Levels.describeDone({ ...msg.action, _output: r.output }) || '').split('\n')[0].trim() : '';
+    return { ok: true, ...r, ...(fatto ? { fatto } : {}) };
   });
 
   // #867 — il segno sulla bolla chiede come stanno i suoi cambi, e il suo «annulla» li rimette com'erano.
@@ -163,6 +168,23 @@ module.exports = function register(on, ctx) {
     // La pagina che ha visto cadere o tornare la rete non aspetta il giro: la lettura nuova arriva con l'annuncio.
     if (davanti && segue && msg && msg.subito === true) Sistema.leggiUnaVolta();
     return { ok: true, stato: Sistema.stato() };
+  }));
+
+  // #874 — i tasti della home comandano volume, Bluetooth e Wi-Fi dalla stessa porta dell'azione della chat. È un
+  // gesto dell'utente su una superficie di Filo: non passa dai livelli, che servono a ciò che decide il modello.
+  on(MSG.SISTEMA_COMANDA, require('./origine').soloFilo(async (msg) => {
+    const Comandi = require('../comandiSistema');
+    return Comandi.comanda(msg && msg.richiesta);
+  }));
+  on(MSG.SISTEMA_APRI_IMPOSTAZIONI, require('./origine').soloFilo(async (msg) => {
+    const uri = require('../comandiSistema').uriImpostazioni(String((msg && msg.chiave) || ''));
+    if (!uri) return { ok: false, error: 'impostazione sconosciuta' };
+    try {
+      await require('electron').shell.openExternal(uri);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: String((e && e.message) || e) };
+    }
   }));
 
   on(MSG.FILO_GENERATE_DASHBOARD, async (msg, sender, origin) => {

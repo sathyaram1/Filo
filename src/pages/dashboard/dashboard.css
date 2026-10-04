@@ -1100,8 +1100,8 @@ html, body {
 /* A destra scorre la colonna intera: le carte non si schiacciano sotto «altro» quando la finestra è bassa. */
 .dash-right > .dash-carte { flex: none; padding: 2px; }
 
-/* Ora, batteria, rete e Bluetooth (#873) dove sul desktop sta l'orologio, allineate al testo delle carte; restano
-   appoggiate al bordo basso anche quando gli avvisi allungano la colonna. Colore solo per ciò che chiede attenzione. */
+/* Le voci del computer (#873) dove sul desktop sta l'orologio, allineate al testo delle carte; restano appoggiate
+   al bordo basso anche quando gli avvisi allungano la colonna. Colore solo per ciò che chiede attenzione. */
 .dash-sistema {
   position: sticky;
   bottom: 0;
@@ -1172,6 +1172,8 @@ html, body {
   top: auto;
   min-width: 190px;
   max-width: 280px;
+  /* Con l'elenco dei dispositivi e un errore da leggere il riquadro si allunga: scorre solo oltre lo schermo. */
+  max-height: calc(100vh - 16px);
 }
 .dash-sis-box .dash-sis-info {
   padding: 8px 12px 8px;
@@ -1182,7 +1184,86 @@ html, body {
 }
 .dash-sis-box .dash-sis-info > div:first-child { font-weight: 600; }
 .dash-sis-box .dash-sis-info > div + div { color: var(--sn-muted); }
-.dash-sis-box .dash-sis-info + .sn-select-option { border-top: 1px solid var(--sn-border); }
+.dash-sis-box .dash-sis-comandi,
+.dash-sis-box .dash-sis-altre { border-top: 1px solid var(--sn-border); }
+/* I comandi del sistema (#874): il cursore del volume a tutta riga, gli elenchi coi nomi tagliati e interi al passaggio. */
+.dash-sis-cursore {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 4px;
+  color: var(--sn-fg);
+}
+.dash-sis-cursore input[type="range"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  accent-color: var(--sn-accent);
+  cursor: pointer;
+}
+.dash-sis-valore {
+  flex: none;
+  min-width: 3.6ch;
+  text-align: right;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--sn-muted);
+}
+.dash-sis-cursore.dash-sis-occupato .dash-sis-valore { color: var(--sn-accent); }
+.dash-sis-titolo {
+  padding: 8px 12px 2px;
+  font-size: 11px;
+  color: var(--sn-muted);
+}
+.dash-sis-attesa {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--sn-muted);
+}
+.dash-sis-rotella {
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  vertical-align: -1px;
+  border: 2px solid var(--sn-border);
+  border-top-color: var(--sn-accent);
+  border-radius: 50%;
+  animation: sn-rinomina-gira 0.8s linear infinite;
+}
+.dash-sis-attesa .dash-sis-rotella { margin-right: 0; }
+@media (prefers-reduced-motion: reduce) { .dash-sis-rotella { animation-duration: 2.4s; } }
+.dash-sis-box .sn-select-option.dash-sis-occupato { color: var(--sn-muted); cursor: progress; }
+.dash-sis-box .sn-select-option.dash-sis-attuale { font-weight: 600; }
+.dash-sis-box .sn-select-option.dash-sis-attuale[aria-disabled="true"] { color: var(--sn-fg); cursor: default; }
+.dash-sis-box .sn-select-option.dash-sis-attuale[aria-disabled="true"]:hover { background: none; }
+.dash-sis-errore {
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  color: var(--sn-fg);
+}
+.dash-sis-errore[hidden] { display: none; }
+.dash-sis-errore .dash-sis-come { margin-top: 2px; color: var(--sn-muted); }
+.dash-sis-apri {
+  margin-top: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--sn-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--sn-fg);
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.dash-sis-apri:hover,
+.dash-sis-apri:focus-visible { background: rgba(var(--sn-accent-rgb), 0.18); outline: none; }
 .dash-sis-box .sn-select-option:hover,
 .dash-sis-box .sn-select-option:focus-visible {
   background-color: rgba(var(--sn-accent-rgb), 0.18);
@@ -1222,6 +1303,8 @@ html, body {
   resize: none;
   overflow-y: auto;
   max-height: 160px;
+  /* L'altezza che il JS copia da scrollHeight comprende il padding: in content-box la casella cresce di una riga vuota. */
+  box-sizing: border-box;
 }
 .dash-input::placeholder { color: var(--dash-ink-mute); }
 .dash-send {
@@ -1236,6 +1319,8 @@ html, body {
   align-items: center;
   justify-content: center;
 }
+/* Il microfono sta accanto all'invio, della sua misura, con l'inchiostro tenue: l'invio resta il gesto principale. */
+.dash-input-wrap { --sn-voce-size: 36px; --sn-voce-ink: var(--dash-ink-soft); }
 .dash-send:hover { opacity: 0.85; }
 .dash-send[disabled] { opacity: 0.4; cursor: not-allowed; }
 

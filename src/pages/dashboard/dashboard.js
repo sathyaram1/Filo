@@ -675,6 +675,8 @@
     LEGGI_DOCUMENTO: 'Leggo il documento…',
     LEGGI_TRASPARENZA: 'Rileggo la pagina di trasparenza…',
     CAPACITA_DETTAGLIO: 'Verifico cosa so fare…',
+    LEGGI_IMPOSTAZIONI: 'Leggo come sei impostato…',
+    TOGLI_PERMESSO_SITO: 'Tolgo un permesso…',
     ESEGUI_COMANDO: 'Eseguo un comando…',
     TIMER: 'Avvio un timer…',
     SVEGLIA: 'Imposto una sveglia…',
@@ -687,6 +689,9 @@
     INVIA_FEEDBACK: 'Preparo una segnalazione…',
     RINOMINA_FILE: 'Leggo i file per dar loro un nome…',
     CARTA_HOME: 'Sistemo le carte della home…',
+    VOLUME: 'Cambio il volume…',
+    BLUETOOTH: 'Chiedo al Bluetooth…',
+    WIFI: 'Chiedo al Wi-Fi…',
   };
   function startLabelFor(type) {
     return START_LABELS[String(type || '').toUpperCase()] || 'Eseguo un\'azione…';
@@ -1259,6 +1264,14 @@
   // Evidenziazione live mentre si scrive: arancione = comando Filo (o sito),
   // azzurro = comando shell (solo in modalità terminale).
   inputEl.addEventListener('input', () => { Comandi.updateInputClass(); autoGrowInput(); Sistema.scrive(); });
+
+  // Il tasto microfono: si parla, e la richiesta parte come col tasto d'invio (o resta da correggere).
+  // La scorciatoia vale in tutta la home, che è la sua chat.
+  window.SN_VOCE_CHAT?.collega({
+    campo: inputEl, contenitore: inputForm, prima: sendBtn, ambito: document,
+    invia: () => (inputForm.requestSubmit ? inputForm.requestSubmit() : inputForm.dispatchEvent(new Event('submit'))),
+    occupato: () => sending,
+  });
 
   // ===== Bridge cambio stato live dal background =====
   chrome.runtime.onMessage.addListener((msg) => {
