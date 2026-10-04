@@ -442,26 +442,12 @@ test('Invio mentre Filo legge ancora il file: rinomina col nome che arriva, non 
   }
 });
 
-// Il menu del pannello è una finestra a sé che si chiude quando perde il fuoco: senza gestore di finestre il
-// fuoco a volte glielo porta via la scheda sotto, e si riprova. Il clic che chiude il menu può «fallire» proprio
-// perché è arrivato: l'esito lo dice il disco, dopo.
-async function sceltaDalPannello(app, riga, testo) {
-  for (let tentativo = 0; tentativo < 3; tentativo++) {
-    await riga.click({ button: 'right' });
-    const fine = Date.now() + 3000;
-    while (Date.now() < fine) {
-      for (const popup of app.windows().filter((w) => !w.isClosed() && w.url().startsWith('data:text/html')).reverse()) {
-        const voce = popup.locator('.menu .item', { hasText: testo });
-        let c = 0;
-        try { c = await voce.count(); } catch (_) { c = 0; }
-        if (!c) continue;
-        try { await voce.click({ timeout: 2000 }); } catch (_) {}
-        return true;
-      }
-      await new Promise((r) => setTimeout(r, 100));
-    }
-  }
-  return false;
+async function sceltaDalPannello(shell, riga, testo) {
+  await riga.click({ button: 'right' });
+  const voce = shell.locator('#dl-panel .dl-row-menu .dl-row-menu-voce', { hasText: testo });
+  await expect(voce).toBeVisible({ timeout: 5000 });
+  await voce.click();
+  await expect(shell.locator('#dl-panel .dl-row-menu')).toHaveCount(0);
 }
 
 test('pannello degli scaricamenti in alto: tasto destro → «Dai un nome sensato» porta al riquadro, poi «Rimetti il nome di prima»', async ({ app, shell, openTab, testServer }) => {
@@ -473,7 +459,14 @@ test('pannello degli scaricamenti in alto: tasto destro → «Dai un nome sensat
     await expect(shell.locator('#dl-panel')).toBeVisible({ timeout: 10000 });
     const riga = shell.locator('#dl-panel .dl-row', { hasText: 'scan_00231.pdf' });
     await expect(riga).toBeVisible();
-    expect(await sceltaDalPannello(app, riga, 'Dai un nome sensato')).toBe(true);
+    // Esc chiude il menu della riga, non il pannello.
+    await riga.click({ button: 'right' });
+    await expect(shell.locator('#dl-panel .dl-row-menu')).toBeVisible();
+    await shell.locator('#dl-panel').screenshot({ path: join(SHOTS, 'rinomina-pannello-menu.png') });
+    await shell.keyboard.press('Escape');
+    await expect(shell.locator('#dl-panel .dl-row-menu')).toHaveCount(0);
+    await expect(shell.locator('#dl-panel')).toBeVisible();
+    await sceltaDalPannello(shell, riga, 'Dai un nome sensato');
     await expect.poll(() => app.windows().some((w) => w.url().startsWith('filo://downloads/')), { timeout: 10000 }).toBe(true);
     const dl = app.windows().find((w) => w.url().startsWith('filo://downloads/'));
     await expect(dl.locator('.sn-rinomina-campo')).toHaveValue('Bolletta luce Enel Marzo 2026', { timeout: 15000 });
@@ -485,7 +478,7 @@ test('pannello degli scaricamenti in alto: tasto destro → «Dai un nome sensat
     if (!(await shell.locator('#dl-panel').isVisible())) await shell.locator('#dl-indicator').click();
     const rinominata = shell.locator('#dl-panel .dl-row', { hasText: NOME_NUOVO });
     await expect(rinominata).toBeVisible({ timeout: 10000 });
-    expect(await sceltaDalPannello(app, rinominata, 'Rimetti il nome di prima')).toBe(true);
+    await sceltaDalPannello(shell, rinominata, 'Rimetti il nome di prima');
     await expect.poll(() => existsSync(rec.savePath) && !existsSync(nuovo), { timeout: 10000 }).toBe(true);
     await expect(shell.locator('#dl-panel .dl-row', { hasText: 'Nome di prima rimesso: scan_00231.pdf' })).toBeVisible({ timeout: 10000 });
   } finally { await chiudi(); }
