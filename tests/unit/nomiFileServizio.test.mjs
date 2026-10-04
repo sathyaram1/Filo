@@ -160,3 +160,65 @@ test('l\'inizio del testo ha un tetto fisso: il costo della proposta non cresce 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// Un PDF minimo: testo su una pagina, oppure una pagina che è solo un'immagine (una scansione), più zavorra.
+function pdf({ righe = [], immagine = null, zavorra = 0 }) {
+  const corpo = righe.map((r, i) => `${i ? '0 -24 Td\n' : ''}(${r}) Tj`).join('\n');
+  const contenuto = immagine ? 'q 595 0 0 842 0 0 cm /Im1 Do Q' : `BT\n/F1 14 Tf\n40 700 Td\n${corpo}\nET\n`;
+  const oggetti = [
+    Buffer.from('<< /Type /Catalog /Pages 2 0 R >>'),
+    Buffer.from('<< /Type /Pages /Kids [3 0 R] /Count 1 >>'),
+    Buffer.from(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> /XObject << /Im1 6 0 R >> >> /Contents 5 0 R >>`),
+    Buffer.from('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'),
+    Buffer.from(`<< /Length ${contenuto.length} >>\nstream\n${contenuto}\nendstream`),
+    immagine
+      ? Buffer.concat([Buffer.from(`<< /Type /XObject /Subtype /Image /Width ${immagine.w} /Height ${immagine.h} ${immagine.dict} /Length ${immagine.dati.length} >>\nstream\n`), immagine.dati, Buffer.from('\nendstream')])
+      : Buffer.from('<< /Length 0 >>\nstream\n\nendstream'),
+  ];
+  if (zavorra) oggetti.push(Buffer.from(`<< /Length ${zavorra} >>\nstream\n${'A'.repeat(zavorra)}\nendstream`));
+  let out = Buffer.from('%PDF-1.4\n', 'latin1');
+  const pos = [];
+  oggetti.forEach((o, i) => { pos.push(out.length); out = Buffer.concat([out, Buffer.from(`${i + 1} 0 obj\n`), o, Buffer.from('\nendobj\n')]); });
+  const xref = out.length;
+  return Buffer.concat([out, Buffer.from(`xref\n0 ${oggetti.length + 1}\n0000000000 65535 f \n`
+    + pos.map((p) => `${String(p).padStart(10, '0')} 00000 n \n`).join('')
+    + `trailer\n<< /Size ${oggetti.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`)]);
+}
+
+// Una pagina a 1 bit: bianca, con una riga nera all'altezza 10. Nelle scansioni in bianco e nero è così.
+function unBit(dict) {
+  const w = 40, h = 20, riga = Math.ceil(w / 8);
+  const dati = Buffer.alloc(riga * h, 0xff);
+  dati.fill(0x00, 10 * riga, 11 * riga);
+  return { w, h, dict, dati };
+}
+
+test('un PDF oltre il tetto della lettura intera prende un nome lo stesso: per il nome basta l\'inizio', async () => {
+  const dir = cartella();
+  try {
+    const p = join(dir, 'scan_00999.pdf');
+    writeFileSync(p, pdf({ righe: ['Manuale lavatrice Bosch', 'Serie 6'], zavorra: 30 * 1024 * 1024 }));
+    const c = await Nomi.contenuto(p);
+    assert.match(c.testo || '', /Manuale lavatrice Bosch/);
+    const t = join(dir, 'export_0001.csv');
+    writeFileSync(t, `Estratto conto Banca Rossi;marzo 2026\n${'1;2;3\n'.repeat(5 * 1024 * 1024)}`);
+    assert.match((await Nomi.contenuto(t)).testo || '', /^Estratto conto Banca Rossi/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('una scansione in bianco e nero (1 bit, o maschera) arriva come immagine in grigi, non come pagina vuota', async () => {
+  const dir = cartella();
+  try {
+    for (const [nome, dict] of [['grigio1.pdf', '/ColorSpace /DeviceGray /BitsPerComponent 1'], ['maschera.pdf', '/ImageMask true /BitsPerComponent 1']]) {
+      const p = join(dir, nome);
+      writeFileSync(p, pdf({ immagine: unBit(dict) }));
+      const doc = await Nomi.apriPdf(p);
+      const img = await Nomi.immagineDellaPagina(doc, 1);
+      await doc.loadingTask.destroy();
+      assert.ok(img, nome);
+      assert.deepEqual([img.width, img.height, img.channels], [40, 20, 1], nome);
+      assert.equal(img.data[5 * 40 + 3], 255, `${nome}: il foglio è bianco`);
+      assert.equal(img.data[10 * 40 + 3], 0, `${nome}: la riga è nera`);
+    }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

@@ -17,7 +17,11 @@ const TESTO_MAX = 3000;
 const LATO_FOTO = 512;
 const LATO_PAGINA = 1024;
 const IMMAGINE_GREZZA_MAX = 4 * 1024 * 1024;
-const ZIP_MAX = 25 * 1024 * 1024;
+// Per il nome basta l'inizio, quindi il tetto della lettura intera (25 MB) qui non vale: una scansione di molte
+// pagine lo supera spesso. Questo tetto ferma solo un file che riempirebbe la memoria, e lo dice col peso.
+const LETTURA_MAX = 256 * 1024 * 1024;
+const TESTA_TESTO = 256 * 1024;
+const PAGINE_TESTO = 10;
 const XML_MAX = 16 * 1024 * 1024;
 
 const deps = {
@@ -95,8 +99,6 @@ function vociZip(buf, voluti) {
 }
 
 async function testoDocumento(percorso) {
-  const st = await fsp.stat(percorso);
-  if (st.size > ZIP_MAX) return '';
   const buf = await fsp.readFile(percorso);
   const ext = path.extname(percorso).toLowerCase();
   const titoloDi = (core) => {
@@ -152,14 +154,48 @@ async function miniatura(percorso) {
   return `data:${mime};base64,${(await fsp.readFile(percorso)).toString('base64')}`;
 }
 
+// L'immagine più grande della pagina, in pixel grezzi { width, height, channels, data }. Le scansioni in bianco
+// e nero (1 bit per punto, e le maschere) pdf.js le dà impacchettate a bit: si aprono in grigi, 1 = bianco.
+async function immagineDellaPagina(pdf, n = 1) {
+  const { getResolvedPDFJS } = require('unpdf');
+  const { OPS, ImageKind } = await getResolvedPDFJS();
+  const page = await pdf.getPage(n);
+  const ops = await page.getOperatorList();
+  let grande = null;
+  for (let i = 0; i < ops.fnArray.length; i++) {
+    const fn = ops.fnArray[i];
+    const arg = ops.argsArray[i] && ops.argsArray[i][0];
+    const oggetto = (k) => new Promise((r) => (k.startsWith('g_') ? page.commonObjs : page.objs).get(k, r));
+    let img = null;
+    if (fn === OPS.paintImageXObject && typeof arg === 'string') {
+      img = await oggetto(arg);
+    } else if (fn === OPS.paintInlineImageXObject && arg && typeof arg === 'object') {
+      img = arg;
+    } else if (fn === OPS.paintImageMaskXObject && arg && typeof arg === 'object') {
+      const m = typeof arg.data === 'string' ? await oggetto(arg.data) : arg;
+      img = m ? { ...m, kind: ImageKind.GRAYSCALE_1BPP } : null;
+    }
+    if (!img || !img.data || !(img.width > 0) || !(img.height > 0)) continue;
+    if (!grande || img.width * img.height > grande.width * grande.height) grande = img;
+  }
+  if (!grande) return null;
+  const { width, height, data } = grande;
+  if (grande.kind === ImageKind.GRAYSCALE_1BPP || data.length === Math.ceil(width / 8) * height) {
+    const riga = Math.ceil(width / 8);
+    const grigi = Buffer.alloc(width * height);
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) grigi[y * width + x] = (data[y * riga + (x >> 3)] >> (7 - (x & 7))) & 1 ? 255 : 0;
+    }
+    return { width, height, channels: 1, data: grigi };
+  }
+  const channels = data.length / (width * height);
+  return [1, 3, 4].includes(channels) ? { width, height, channels, data } : null;
+}
+
 // Un PDF senza testo è quasi sempre una scansione: la pagina è un'immagine, e si manda quella.
-async function primaPaginaScansionata(percorso) {
+async function primaPaginaScansionata(pdf) {
   try {
-    const { getDocumentProxy, extractImages } = require('unpdf');
-    const pdf = await getDocumentProxy(new Uint8Array(await fsp.readFile(percorso)));
-    const imgs = await extractImages(pdf, 1);
-    const grande = (imgs || []).filter((i) => i && i.width > 0 && i.height > 0 && i.data)
-      .sort((a, b) => (b.width * b.height) - (a.width * a.height))[0];
+    const grande = await immagineDellaPagina(pdf, 1);
     if (!grande) return '';
     const { width, height, channels } = grande;
     const sorgente = grande.data;
@@ -178,6 +214,58 @@ async function primaPaginaScansionata(percorso) {
   }
 }
 
+async function apriPdf(percorso) {
+  const { getDocumentProxy } = require('unpdf');
+  const buf = await fsp.readFile(percorso);
+  return getDocumentProxy(new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength));
+}
+
+async function testoDellePrimePagine(pdf) {
+  let t = '';
+  for (let n = 1; n <= Math.min(pdf.numPages, PAGINE_TESTO) && t.trim().length < TESTO_MAX; n++) {
+    const page = await pdf.getPage(n);
+    const c = await page.getTextContent();
+    t += `${c.items.map((it) => (it.str || '') + (it.hasEOL ? '\n' : '')).join('')}\n`;
+  }
+  return t.trim();
+}
+
+async function contenutoPdf(percorso) {
+  let pdf;
+  try { pdf = await apriPdf(percorso); } catch (_) {
+    return { errore: 'illeggibile', dettaglio: 'il PDF è danneggiato o protetto da password' };
+  }
+  try {
+    const t = await testoDellePrimePagine(pdf);
+    if (t) return { testo: inizioDelTesto(t) };
+    const immagine = await primaPaginaScansionata(pdf);
+    return immagine ? { immagine } : { errore: 'vuoto' };
+  } catch (_) {
+    return { errore: 'illeggibile', dettaglio: 'il PDF è danneggiato o protetto da password' };
+  } finally {
+    try { await pdf.loadingTask.destroy(); } catch (_) {}
+  }
+}
+
+// Un file di testo enorme (un registro, un'esportazione) si legge dalla testa: il nome lo dice l'intestazione.
+async function testaDelTesto(percorso) {
+  const DR = require('./documentRead');
+  const fh = await fsp.open(percorso, 'r');
+  let buf;
+  try {
+    buf = Buffer.alloc(TESTA_TESTO);
+    const { bytesRead } = await fh.read(buf, 0, buf.length, 0);
+    buf = buf.subarray(0, bytesRead);
+  } finally { await fh.close(); }
+  const letto = DR.decodeTextDettaglio(buf);
+  const pulito = DR.senzaRumore(letto.text);
+  if (pulito.persi > DR.RUMORE_TOLLERATO && DR.quotaNonTesto(letto.text) >= DR.QUOTA_NON_TESTO) {
+    return { errore: 'illeggibile', dettaglio: 'è scritto in una codifica che Filo non riconosce' };
+  }
+  const t = inizioDelTesto(pulito.text);
+  return t ? { testo: t } : { errore: 'vuoto' };
+}
+
 function inizioDelTesto(t) {
   const segni = Array.from(String(t || '').trim());
   return segni.length > TESTO_MAX ? `${segni.slice(0, TESTO_MAX).join('')}…` : segni.join('');
@@ -191,17 +279,21 @@ async function contenuto(percorso) {
     const immagine = await miniatura(percorso);
     return immagine ? { immagine } : { errore: 'tipo' };
   }
+  const DR = require('./documentRead');
+  const st = await fsp.stat(percorso);
+  if (tipo === 'testo' && st.size > DR.MAX_FILE_BYTES) return testaDelTesto(percorso);
+  if (st.size > LETTURA_MAX) {
+    const mb = Math.round(st.size / (1024 * 1024));
+    return { errore: 'grande', dettaglio: `pesa ${mb} MB: per dare un nome Filo apre file fino a ${LETTURA_MAX / (1024 * 1024)} MB, scrivilo tu` };
+  }
   if (tipo === 'documento') {
     let t = '';
     try { t = await testoDocumento(percorso); } catch (_) { t = ''; }
     return t ? { testo: inizioDelTesto(t) } : { errore: 'vuoto' };
   }
-  const r = await require('./documentRead').readDocument(percorso);
+  if (tipo === 'pdf') return contenutoPdf(percorso);
+  const r = await DR.readDocument(percorso);
   if (!r.ok) return { errore: r.error === 'not_found' ? 'non_trovato' : 'illeggibile', dettaglio: r.detail };
-  if (r.kind === 'pdf' && r.empty) {
-    const immagine = await primaPaginaScansionata(percorso);
-    return immagine ? { immagine } : { errore: 'vuoto' };
-  }
   const t = inizioDelTesto(r.text);
   return t ? { testo: t } : { errore: 'vuoto' };
 }
@@ -370,5 +462,5 @@ async function rimetti(coppie) {
 module.exports = {
   collega, proponi, rinomina, rimetti, contenuto, messaggi,
   // per gli unit test
-  vociZip, testoDaXml, TESTO_MAX,
+  vociZip, testoDaXml, TESTO_MAX, immagineDellaPagina, apriPdf, LETTURA_MAX,
 };
