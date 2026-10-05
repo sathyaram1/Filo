@@ -324,12 +324,11 @@ export function proveTolteDal(shaPrima, root, principale = riferimentoPrincipale
 // Le cartelle del giro di questo ramo: quelle cambiate dopo la critica e quelle che il ramo ha toccato rispetto a main.
 function cartelleDelRamo(nomi, root, principale) {
   const cartelle = new Set(percorsi(nomi).filter(nelGiro).map(cartellaDi));
-  if (principale) {
-    const mb = gitOut(['merge-base', 'HEAD', principale], root).trim();
-    for (const f of gitOut(['diff', '--name-only', '-z', '--no-renames', mb, 'HEAD', '--', PROVE_GIRO], root).split('\0')) {
-      if (nelGiro(f)) cartelle.add(cartellaDi(f));
-    }
-  }
+  // Senza main non so quali sono del ramo: tutte, che costa un rilancio più lungo e non lascia fuori niente.
+  const files = principale
+    ? gitOut(['diff', '--name-only', '-z', '--no-renames', gitOut(['merge-base', 'HEAD', principale], root).trim(), 'HEAD', '--', PROVE_GIRO], root)
+    : gitOut(['ls-tree', '-r', '-z', '--name-only', 'HEAD', '--', PROVE_GIRO], root);
+  for (const f of files.split('\0')) if (nelGiro(f)) cartelle.add(cartellaDi(f));
   return [...cartelle];
 }
 
