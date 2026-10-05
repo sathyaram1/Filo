@@ -439,19 +439,36 @@
     var Ev = global.CustomEvent;
     if (typeof Ev === 'function') card.dispatchEvent(new Ev(LIBERA, { bubbles: true }));
   }
-  // Il titolo segue le card: una che sta fondendo esce dal conto di quelle che aspettano.
+  // Titolo e frase seguono le card: una che sta fondendo, o già decisa, esce dal conto di quelle che aspettano.
   function rititola(box) {
     var t = box && box.querySelector ? box.querySelector('.sn-mac-title-text') : null;
     if (!t) return;
     var cards = box.querySelectorAll('.sn-mac-card');
-    var ferme = 0, inCorso = 0;
+    var ferme = 0, inCorso = 0, decise = 0;
     for (var i = 0; i < cards.length; i++) {
-      if (cards[i].classList.contains('is-done')) continue;
-      if (cards[i].classList.contains('is-merging')) inCorso++;
+      if (cards[i].classList.contains('is-done')) decise++;
+      else if (cards[i].classList.contains('is-merging')) inCorso++;
       else ferme++;
     }
-    var testo = headline(ferme, inCorso);
+    var testo = headline(ferme, inCorso, decise);
     if (testo) t.textContent = testo;
+    var intro = box.querySelector('.sn-mac-intro');
+    if (intro) {
+      intro.textContent = introText(ferme, inCorso);
+      intro.hidden = !intro.textContent;
+    }
+  }
+
+  // Un'approvazione partita da un'altra strada mentre la card è già sullo schermo (magari col
+  // tasto armato, che trattiene i ridisegni): la card la segue subito, senza aspettare (#702).
+  function seguiSulPosto(root, id, volo) {
+    if (!root || !root.querySelectorAll || !volo) return;
+    var cards = root.querySelectorAll('.sn-mac-card');
+    for (var i = 0; i < cards.length; i++) {
+      if (cards[i].dataset.requestId === String(id) && typeof cards[i].__snMacSegui === 'function') {
+        cards[i].__snMacSegui(volo.attesa || ATTESA_CLIC, volo.risposta);
+      }
+    }
   }
 
   /**
