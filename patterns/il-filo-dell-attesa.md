@@ -65,7 +65,9 @@ filo, i nodi, il gomitolo e i titoli); cosa succede lo decide il blocco
   gli torna. Nel main (`MSG.FILO_CHAT_STOP`, solo la scheda che ha avviato il
   turno) la chiamata in volo si interrompe e nessuna azione nuova parte; quelle
   già partite finiscono e restano raccontate. Una risposta già finita invece
-  arriva: fermare riguarda il lavoro che resta.
+  arriva: fermare riguarda il lavoro che resta. Uno stop arrivato mentre il
+  turno prepara ancora la richiesta (saldo, batteria, rete) si tiene da parte
+  e vale quando il turno si registra: il modello non parte (prova K).
 - **Riprendere non riesegue niente.** Finché l'utente non scrive altro, il
   tasto d'invio offre «riprendi»: il turno fermato sta nello storico con le
   azioni fatte (`interrotto`, `fermato`), il modello le vede come già fatte e

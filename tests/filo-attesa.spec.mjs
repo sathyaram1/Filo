@@ -15,7 +15,8 @@
 //  (G) il tasto destro sul blocco ferma, riprende e riavvolge come i tasti;
 //  (H) con meno movimento il filo sta fermo e il gomitolo compare già fatto;
 //  (I) chi ferma insistendo (doppio clic, Invio ripetuto o tenuto) non fa ripartire il lavoro;
-//  (J) un gomitolo grosso (lavoro lungo) lascia al riassunto la stessa aria di uno piccolo.
+//  (J) un gomitolo grosso (lavoro lungo) lascia al riassunto la stessa aria di uno piccolo;
+//  (K) fermato mentre Filo prepara ancora la richiesta, il modello non parte e nessuna azione con lui.
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -550,5 +551,36 @@ test('J — un gomitolo grosso lascia al riassunto la stessa aria di uno piccolo
     - b.querySelector('.dash-activity-seg-head').getBoundingClientRect().left,
   ));
   expect(allineati).toBeLessThan(1.5);
+  await ripristina(app);
+});
+
+test('K — fermato mentre Filo prepara ancora la richiesta: niente parte, e lo schermo non mente', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await configureModel(app);
+  await senzaAccoglienza(app, page);
+  // Prima del modello si leggono saldo, batteria e rete: su una macchina vera anche mezzo secondo. Qui 800 ms.
+  await app.evaluate(() => {
+    const S = globalThis.SN_SISTEMA_MAIN;
+    const orig = S && S.statoPerChat;
+    const lento = async (...a) => { await new Promise((ok) => setTimeout(ok, 800)); return orig ? orig.apply(S, a) : null; };
+    if (S) S.statoPerChat = lento; else globalThis.SN_SISTEMA_MAIN = { statoPerChat: lento };
+  });
+  await copione(app, [
+    { pensa: ['Avvio il timer. '], ogni: 100, dopoStrumenti: 100, strumenti: [{ id: 'k1', name: 'TIMER', arguments: '{"secondi":77,"etichetta":"Mai"}' }] },
+    { pensa: ['Fatto. '], ogni: 100, testo: 'Timer avviato.' },
+  ]);
+  await page.locator('#input').fill('metti un timer');
+  await page.locator('#sendBtn').click();
+  await page.waitForTimeout(300);
+  await page.locator('#stopBtn').click();
+  await expect(page.locator('.dash-bubble-fermato')).toHaveText('Fermato prima della risposta.', { timeout: 6_000 });
+  await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi', { timeout: 3_000 });
+  await page.waitForTimeout(1_000);
+  expect(await app.evaluate(() => globalThis.__messaggi.length)).toBe(0);
+  const timers = await app.evaluate(() => globalThis.SN_FILO_MEMORY.listTimers());
+  expect(timers.map((t) => t.label)).not.toContain('Mai');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Timer avviato.' })).toHaveCount(0);
   await ripristina(app);
 });
