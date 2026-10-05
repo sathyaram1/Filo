@@ -132,3 +132,52 @@ test('return e break fuori da un ciclo non fanno risultare fallito un comando ri
     }
   });
 });
+
+// Anche dopo un errore zittito (-ErrorAction SilentlyContinue) o gestito (try/catch): in $Error ci finiscono pure
+// quelli, e il comando che poi esce con return o break è riuscito.
+test('return e break dopo un errore zittito o gestito non fanno risultare fallito un comando riuscito', { skip: SALTA }, async () => {
+  const casi = [
+    ['if (-not (Get-Command programma-che-non-c-e -ErrorAction SilentlyContinue)) { Write-Output manca; return }; Write-Output c', ['manca']],
+    ['try { Get-Item "manca-qui" -ErrorAction Stop } catch { Write-Output gestito; return }; Write-Output c', ['gestito']],
+    ['1..3 | ForEach-Object { $null = Get-Item "manca-qui" -ErrorAction SilentlyContinue; if ($_ -eq 2) { break }; "n$_" }', ['n1']],
+    ['if (-not (Get-Command programma-che-non-c-e -ErrorAction SilentlyContinue)) { Write-Output città; return }', ['città']],
+  ];
+  await conDashboard(async (esegui) => {
+    for (const [comando, attese] of casi) {
+      await esegui(`Set-Location "${TMP}"`);
+      for (const [strada, r] of [['dashboard', await esegui(comando)], ['assistente', await assistente(comando)]]) {
+        assert.deepEqual(righe(r.stdout), attese, `${strada}, «${comando}»`);
+        assert.equal(r.code, 0, `${strada}, «${comando}»: riuscito ma risulta fallito`);
+      }
+    }
+  });
+});
+
+// Gli errori parlano del comando scritto, mai delle righe con cui Filo lo esegue. La vista d'errore di serie di
+// Windows PowerShell (NormalView) mostra la riga che ha causato l'errore: fuori da Windows la si chiede a pwsh.
+test('un errore di sintassi o che ferma mostra il comando scritto, non le righe interne di Filo', { skip: SALTA }, () => {
+  const pwsh = SU_WINDOWS ? 'powershell.exe' : spawnSync('sh', ['-c', 'command -v pwsh'], { encoding: 'utf8' }).stdout.trim();
+  const esegui = (args, stdin) => {
+    const r = spawnSync(pwsh, args, { cwd: TMP, input: (SU_WINDOWS ? '' : "$ErrorView='NormalView'\n") + stdin, encoding: 'utf8', timeout: ATTESA });
+    return { uscita: `${r.stderr}${r.stdout}`, codice: /FILO_PROVA:(\d+):/.exec(r.stdout)?.[1] };
+  };
+  const assistenteGrezzo = (comando) => {
+    const inv = comeSuWindows(() => T.invocazione('powershell', comando, { trackCwd: true, mark: 'FILO_PROVA' }));
+    return esegui(inv.args, inv.stdin);
+  };
+  const dashboardGrezza = (comando) => esegui(['-NoLogo', '-NoProfile', '-Command', '-'],
+    T.PREPARA_STDIN_POWERSHELL + T.righePowerShell(comando, 'FILO_PROVA', S.comandoPerPowerShell));
+  const casi = [
+    ['Write-Output "ciao', /ciao/],
+    ['Write-Output (', /Write-Output \(/],
+    ['Get-ChildItem | Where-Object { $_.Length -gt 1kb', /Where-Object/],
+    ["$ErrorActionPreference='Stop'; comandoinesistente; Write-Output dopo", /comandoinesistente/],
+  ];
+  for (const [comando, mostra] of casi) {
+    for (const [strada, r] of [['assistente', assistenteGrezzo(comando)], ['dashboard con un accento', dashboardGrezza(`${comando} # à`)]]) {
+      assert.equal(r.codice, '1', `${strada}, «${comando}»: deve risultare fallito`);
+      assert.match(r.uscita, mostra, `${strada}, «${comando}»: l'errore deve mostrare il comando`);
+      assert.doesNotMatch(r.uscita, /__filo|FromBase64String|ScriptBlock|Invoke-Expression/, `${strada}, «${comando}»: mostra le righe interne di Filo`);
+    }
+  }
+});

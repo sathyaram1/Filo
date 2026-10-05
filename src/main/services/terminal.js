@@ -196,10 +196,11 @@ function nuovoMarcatore() {
 // L'esito di un comando PowerShell, con $__filo_ok = il $? preso subito dopo. $LASTEXITCODE lo scrivono solo
 // i programmi esterni: un cmdlet fallito lo lascia a 0, e a dirlo resta $? (#714). Vale anche per shell.js.
 const ESITO_POWERSHELL = 'if ($__filo_ok) { 0 } elseif ($LASTEXITCODE) { $LASTEXITCODE } '
-  // $__filo_ok ancora $null = il comando è uscito prima della riga che lo scrive: un throw lascia un errore
-  // nuovo ($__filo_e = quello di prima), un return o un break fuori da un ciclo no, e sono riusciti.
-  + 'elseif (-not ($Error.Count -and -not [object]::ReferenceEquals($Error[0], $__filo_e))) '
-  + '{ if ($null -eq $__filo_ok) { 0 } else { 1 } } '
+  // $__filo_ok ancora $null = il comando è uscito prima della riga che lo scrive. A dire come basta il $? della riga
+  // che lo ha eseguito ($__filo_riga): falso dopo un errore che ferma, vero dopo un return o un break, anche se prima
+  // un errore era stato zittito o gestito (in $Error ci finiscono pure quelli, quindi da lì non si può dedurre).
+  + 'elseif ($null -eq $__filo_ok) { if ($__filo_riga) { 0 } else { 1 } } '
+  + 'elseif (-not ($Error.Count -and -not [object]::ReferenceEquals($Error[0], $__filo_e))) { 1 } '
   // Con lo stderr rediretto (2>&1, 2>$null) ogni riga di un programma riuscito diventa un errore e spegne $?:
   // se l'ultimo errore nuovo viene da lì, decide il codice del programma.
   + "elseif ($Error[0].FullyQualifiedErrorId -like 'NativeCommandError*') { 0 } else { 1 }";
@@ -210,18 +211,25 @@ const ERRORE_DI_PRIMA_POWERSHELL = '$__filo_e=if ($Error.Count) { $Error[0] } el
 const PREPARA_STDIN_POWERSHELL = 'Remove-Module PSReadLine -ErrorAction Ignore\n';
 
 // Il testo viaggia in base64 e lo ricompone PowerShell: sul filo solo ASCII (lo stdin lo decodifica nella
-// tabella OEM, #551) e su una riga sola. Invoke-Expression gira nello scope di chi chiama.
-function invocaCodificato(testo) {
+// tabella OEM, #551) e su una riga sola. Si esegue con `. scriptblock`, nello scope di chi chiama: con
+// Invoke-Expression gli errori che fermano (e quelli di sintassi) mostravano questa riga invece del comando. La
+// sintassi si controlla prima, sul solo testo; `coda` gira dopo ma resta fuori. In modalità ristretta il controllo salta.
+function invocaCodificato(testo, coda = '') {
   const b64 = Buffer.from(String(testo), 'utf8').toString('base64');
-  return `Invoke-Expression ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${b64}')))`;
+  return `$__filo_t=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${b64}')); $__filo_pe=$null; `
+    + 'try { $null=[Management.Automation.Language.Parser]::ParseInput($__filo_t, [ref]$null, [ref]$__filo_pe) } catch {}; '
+    + 'if ($__filo_pe) { [Console]::Error.WriteLine((New-Object Management.Automation.ParseException (,$__filo_pe)).Message); $__filo_ok=$false } '
+    + `else { . ([ScriptBlock]::Create($__filo_t${coda ? ` + [char]10 + '${coda}'` : ''})) }`;
 }
+
+const SEGNA_ESITO = '$__filo_ok=$?';
 
 // Le righe che una PowerShell letta da stdin esegue per un comando, chiuse da `<segno>:<esito>:<cartella>`; le
 // usano dashboard e assistente. Niente try attorno al comando: dentro un try un comando sconosciuto ferma tutto il
 // resto (#722). La riga del segno è una pipeline a parte: gira anche dopo un throw, non dopo un `exit`.
 function righePowerShell(command, segno, codifica = invocaCodificato) {
   return `$global:LASTEXITCODE=0\n$__filo_ok=$null\n${ERRORE_DI_PRIMA_POWERSHELL}\n`
-    + `${codifica(`${command}\n$__filo_ok=$?`)}\n`
+    + `${codifica(command, SEGNA_ESITO)}\n$__filo_riga=$?\n`
     + `"${segno}:$(${ESITO_POWERSHELL}):$((Get-Location).Path)"\n`;
 }
 

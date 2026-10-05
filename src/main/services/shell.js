@@ -56,14 +56,15 @@ function defaultCwd() {
 // passare da nessuna tabella. Si fa SOLO quando serve: un comando di soli
 // caratteri ASCII parte identico a prima, e `exit`, `cd`, le variabili e tutto
 // quello che un utente digita di solito si comportano come si sono sempre
-// comportati. `Invoke-Expression` gira nello scope di chi chiama, quindi anche
+// comportati. Il testo ricomposto gira nello scope di chi chiama, quindi anche
 // per un comando accentato le variabili e la cartella restano quelle della
 // sessione: continua a essere un terminale vero.
 const SOLO_ASCII = /^[\x00-\x7F]*$/;
 
-function comandoPerPowerShell(command) {
+function comandoPerPowerShell(command, coda = '') {
   const cmd = String(command == null ? '' : command);
-  return SOLO_ASCII.test(cmd) ? cmd : invocaCodificato(cmd);
+  if (!SOLO_ASCII.test(cmd)) return invocaCodificato(cmd, coda);
+  return coda ? `${cmd}\n${coda}` : cmd;
 }
 
 // Quella cartella c'è ancora, ed è una cartella? La domanda si fa qui per
