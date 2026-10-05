@@ -155,9 +155,11 @@ function conStatoAggiornamento(lista) {
   return (lista || []).map((n) => {
     if (!n || !n.action || n.action.tipo !== TIPO_DISPONIBILE) return n;
     const v = n.action.versione;
+    // Spenta a metà di uno scaricamento partito da solo, la versione non si installa: la carta chiede «Installa».
+    const siInstalla = stato.automatici || stato.chiesto;
     let aggiornamento = null;
-    if (stato.scaricamento && stato.scaricamento.versione === v) aggiornamento = { percento: stato.scaricamento.percento };
-    else if (stato.pronta === v && (stato.automatici || stato.chiesto)) aggiornamento = { pronta: true };
+    if (siInstalla && stato.scaricamento && stato.scaricamento.versione === v) aggiornamento = { percento: stato.scaricamento.percento };
+    else if (siInstalla && stato.pronta === v) aggiornamento = { pronta: true };
     else if (stato.errore) aggiornamento = { errore: stato.errore };
     return aggiornamento ? { ...n, aggiornamento } : n;
   });
