@@ -99,7 +99,8 @@ test('Modelli: se la lista arriva dopo il fuoco, la tendina rimasta vuota si apr
   await page.evaluate(() => window.__rilasciaCatalogo());
   await expect(pop).toBeVisible({ timeout: 6_000 });
   await expect(pop.locator('.sn-select-option', { hasText: 'vendor/arrivato-dopo' })).toBeVisible();
-  await expect(idInput).toBeFocused();
+  // `toBeFocused` chiede anche che la finestra abbia il fuoco, e quella parcheggiata della suite spesso non ce l'ha.
+  expect(await idInput.evaluate((el) => el.ownerDocument.activeElement === el)).toBe(true);
 });
 
 test('Modelli: un modello salvato compare nella tendina alla riapertura', async ({ openTab }) => {
