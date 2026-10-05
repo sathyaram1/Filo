@@ -173,7 +173,7 @@
           out.push(da === 1 ? '<ol>' : '<ol start="' + da + '">');
           listType = 'ol';
         }
-        out.push('<li>' + inlineMd(m[1]) + '</li>');
+        out.push('<li>' + inlineMd(m[2]) + '</li>');
       } else { flushList(); para.push(trimmed); }
     }
     if (inCode) out.push('<pre><code>' + codeBuf.join('\n') + '</code></pre>');
