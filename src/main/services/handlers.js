@@ -1004,6 +1004,7 @@ async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
     }
   } catch (_) {}
   try { require('./fingerprint').setMode(merged); } catch (_) {}
+  try { require('../updater').seguiImpostazioni(merged); } catch (_) {}
   wireSafebrowse(merged).catch(() => {});
   try {
     const Cookies = require('./cookies');
