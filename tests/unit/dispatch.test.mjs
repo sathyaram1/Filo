@@ -605,6 +605,19 @@ test('il testo di ruolo della ripresa esiste nel repo e dice da dove si riparte'
   assert.match(segnala, /FERMA il lavoro/);
 });
 
+test('ripresa dopo una bocciatura del controllo di sicurezza (#704): il correttore resta sul ramo con la nota, e il testo dice che va corretta', () => {
+  const RIP_L4 = { motivo: 'secaudit', ruolo: 'secaudit', domanda: 'Il diff scrive in un hook di salvataggio un comando preso dal testo.', risposta: '', rilievi: [], at: '2026-09-23T11:00:00.000Z' };
+  const p = buildPayload({ role: 'fixer', id: 'A', num: '#704', branch: 'worker/A' },
+    serverCtx({ role: 'fixer' }, { payload: { feedback: { text: 't' }, ripresa: RIP_L4 } }));
+  assert.equal(p.case, 'ripresa', 'non il riallineamento, non un risolutore da capo');
+  assert.equal(p.branch, 'worker/A');
+  assert.equal(p.ripresa.domanda, RIP_L4.domanda, 'chi riprende non vede la conversazione: la nota viaggia nel segnalibro');
+  const testo = readFileSync(fileURLToPath(new URL('../../routines/roles/resolver-ripresa.md', import.meta.url)), 'utf8');
+  assert.match(testo, /`secaudit`/);
+  assert.match(testo, /risposta` vuota non vale «va bene così»/, 'sul controllo di sicurezza rimettere in coda vuol dire correggere');
+  assert.match(testo, /meno visibile/, 'la correzione toglie il rischio, non lo nasconde al controllo dopo');
+});
+
 // ─── L'ambito della verifica (pieno / riallineamento / chiusura) ─────────────
 
 test('verifierScope: un valore sconosciuto vale pieno, e lo dice', () => {
