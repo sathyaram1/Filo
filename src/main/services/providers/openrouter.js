@@ -112,7 +112,7 @@
   // escluso. `sort` sceglie l'ordine fra gli ammessi (latency/throughput) invece
   // del prezzo. `allow_fallbacks` resta acceso: fra gli host AMMESSI il ripiego
   // serve. Un modello da comprare solo dal produttore (#904) porta `only` anche senza `routing`.
-  function providerBlock(routing, model) {
+  function providerBlock(routing, model, { tools = false } = {}) {
     const p = {};
     const r = routing && typeof routing === 'object' ? routing : {};
     const ignore = Array.isArray(r.ignore) ? r.ignore.filter(Boolean) : [];
@@ -121,10 +121,9 @@
       p.sort = r.sort;
     }
     if (r.allowFallbacks === false) p.allow_fallbacks = false;
-    // Con gli strumenti (tool calling) in richiesta, solo gli host che li
-    // supportano davvero: senza questo il router può passare a un host che
-    // ignora `tools` in silenzio, e il modello risponde a parole invece di agire.
-    if (r.requireParameters === true) p.require_parameters = true;
+    // Strumenti in richiesta → solo host che li supportano davvero (#700): un host che li ignora o
+    // ne rompe il JSON fa fallire il turno senza che si capisca perché. Vale per OGNI chiamata con strumenti.
+    if (tools) p.require_parameters = true;
     const C = global.SN_CONST;
     const rule = C && typeof C.producerOnlyRule === 'function' ? C.producerOnlyRule(model) : null;
     if (rule) p.only = rule.only.slice();
