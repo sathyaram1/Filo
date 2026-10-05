@@ -458,11 +458,366 @@
     };
   }
 
+  // ── Il giro di una pagina, uno per la Gestione e la pagina Feedback (#738) ─
+  // Orologio, vista, domanda al main, fusione dell'esito e arrivi; la pagina
+  // tiene la lista e la disegna. Le dipendenze:
+  //   send(msg) → Promise · ascolta(fn) i broadcast · doc/finestra: document e window
+  //   pronta() la prima lista è arrivata · ricarica() la rilegge
+  //   lista() / imposta(l) i feedback in mano · seguiti() → [id] in mano alle routine
+  //   righe(ids) → righe della lista · decifra(righe) → righe | null · sezioneDi(fb)
+  //   dopo({ ids, removed, righe, statiMossi }) la lista è cambiata · aVuoto({ letto }) no
+  //   stato() ridipinge «ferma» e l'avviso del giro
+  function makeGiroPagina({
+    send, ascolta = null, doc = null, finestra = null, tipi = null, nome = 'pagina',
+    pronta = () => false, ricarica = null, lista = () => [], imposta = () => {},
+    seguiti = () => [], righe = null, decifra = null, sezioneDi = () => null,
+    dopo = null, aVuoto = null, stato = null, ora = () => Date.now(), timer = null,
+  } = {}) {
+    const T = {
+      iscrivi: 'feedback_live_subscribe', cambiato: 'feedback_live_changed',
+      inVista: 'tab_in_vista', inVistaGet: 'tab_in_vista_get', ...(tipi || {}),
+    };
+    const tm = timer || { setInterval: (f, ms) => setInterval(f, ms), clearInterval: (h) => clearInterval(h) };
+    // Le soglie vengono dal modulo; gli spec le accorciano per non aspettare minuti.
+    const tempi = { pollMs: POLL_MS, rientroMs: RIENTRO_MIN_MS, clockMs: CLOCK_MS };
+    const manda = (m) => Promise.resolve().then(() => send(m));
+    const giroDalMain = ({ watch, force } = {}) => manda({ type: T.iscrivi, giro: true, watch, force: !!force });
+    // Sostituibili dagli spec, che non hanno Firestore.
+    const sorgenti = { giro: giroDalMain, getMany: (ids) => righe(ids) };
+    // Arrivate in una sezione a pagina aperta: con un ordine a scelta finiscono a metà lista, e senza un segno non si vedono.
+    const arrivate = new Set();
+    let acceso = false;
+    let bloccato = false;   // dati finti in pagina: il giro non riparte, nemmeno se l'avvio finisce dopo
+    let clock = null;
+    let tick = null;
+    let tickDa = 0;
+    let gen = 0;            // un giro abbandonato perché appeso non scrive più sulla lista
+    let lastAt = 0;         // ultimo giro tentato
+    let okAt = 0;           // ultimo giro riuscito
+    let inVista = true;     // lo dice il main: in una scheda `document.hidden` non cambia mai
+    let avviso = '';
+    let seguitiInviati = '';
+    let coda = Promise.resolve();
+
+    const avvisa = (testo) => { try { console.warn(`[${nome}] ${testo}`); } catch (_) { /* niente console */ } };
+    const motivo = (e) => (e && e.message ? e.message : String(e));
+    const ridipingi = () => { if (stato) stato(); };
+
+    function vistaOra() {
+      return inVista && !(doc && doc.hidden);
+    }
+
+    function conTempo(promessa, ms) {
+      let t = null;
+      return Promise.race([
+        promessa,
+        new Promise((_, rej) => { t = setTimeout(() => rej(new Error('nessuna risposta')), ms); }),
+      ]).finally(() => clearTimeout(t));
+    }
+
+    // Le fusioni del giro e degli avvisi passano in fila: due sulla stessa lista si pesterebbero.
+    function inCoda(fn) {
+      const p = coda.then(fn, fn);
+      coda = p.catch(() => {});
+      return p;
+    }
+
+    function fotografia() {
+      return new Map((lista() || []).filter((f) => f && f._id).map((f) => [String(f._id), sezioneDi(f)]));
+    }
+    function segnaArrivi(prima, fresh) {
+      for (const id of arrivi(prima, fresh, sezioneDi)) arrivate.add(id);
+    }
+    function ferma() {
+      return listaFerma({ ora: ora(), inVista: vistaOra(), ultimoRiuscito: okAt });
+    }
+
+    // `fresche`: solo le righe scritte dopo la copia in mano. La domanda per data torna indietro di qualche
+    // minuto e rimanda righe già viste: rifonderle ridisegnerebbe per niente.
+    async function fondiGiro(fresh, { removed = [], fresche = false, g = gen } = {}) {
+      const inMano = new Map((lista() || []).map((f) => [String(f && f._id), f && f._updateTime]));
+      let nuove = (Array.isArray(fresh) ? fresh : []).filter((r) => {
+        if (!r || !r._id) return false;
+        if (!fresche) return true;
+        const mio = inMano.get(String(r._id));
+        return !mio || !r._updateTime || r._updateTime > mio;
+      });
+      if (nuove.length === 0 && removed.length === 0) {
+        if (aVuoto) aVuoto({ letto: true });
+        return { changed: 0 };
+      }
+      if (decifra && nuove.length > 0) {
+        try {
+          const d = await conTempo(Promise.resolve().then(() => decifra(nuove)), 30000);
+          if (Array.isArray(d)) nuove = d;
+        } catch (_) { /* come al caricamento: valori cifrati piuttosto che niente */ }
+      }
+      if (g !== gen) return { changed: 0 };
+      const ids = nuove.map((f) => f && f._id).filter(Boolean);
+      const prima = fotografia();
+      const statiMossi = statoCambiato(lista(), nuove);
+      imposta(applyChanges(lista(), { fresh: nuove, removed }));
+      segnaArrivi(prima, nuove);
+      if (dopo) dopo({ ids, removed, righe: nuove, statiMossi });
+      aggiornaSeguiti();
+      return { changed: ids.length + removed.length };
+    }
+
+    // Lo fa la pagina perché solo lei sa quali documenti le mancano. Una lettura interrotta non fa uscire
+    // nessuno: «non l'ho visto» non vuol dire «non c'è».
+    async function riallinea(remote, { complete = true, g = gen } = {}) {
+      if (!Array.isArray(remote)) throw new Error('versioni non lette');
+      const { changed, added, removed } = diffVersions(lista(), remote);
+      const ids = changed.concat(added);
+      const fresh = ids.length > 0 ? await sorgenti.getMany(ids) : [];
+      if (g !== gen) return { changed: 0 };
+      return fondiGiro(fresh, { removed: complete ? removed : [], g });
+    }
+
+    // Freno sulle pagine, tetto dei seguiti, registro illeggibile: si dicono, non si tacciono.
+    function segnaAvviso(avvisi) {
+      const testo = (Array.isArray(avvisi) ? avvisi : []).filter(Boolean).join(' · ');
+      if (testo) avvisa(`giro: ${testo}`);
+      avviso = testo;
+      ridipingi();
+    }
+
+    function applicaEsito(esito, g = gen) {
+      return inCoda(async () => {
+        if (!esito || !pronta()) return { changed: 0 };
+        if (Array.isArray(esito.avvisi) || esito.kind === 'changed' || esito.kind === 'reconcile') {
+          segnaAvviso(esito.avvisi);
+        }
+        if (esito.kind === 'reconcile') return riallinea(esito.versions, { complete: esito.complete !== false, g });
+        if (esito.kind === 'changed') return fondiGiro(esito.rows, { fresche: true, g });
+        if (aVuoto) aVuoto({ letto: false });
+        return { changed: 0 };
+      });
+    }
+
+    function idsSeguiti() {
+      return (seguiti() || []).map(String).filter(Boolean);
+    }
+
+    // Un giro già in corso viene riusato, non raddoppiato. Ritorna { changed }.
+    function giro({ force = false } = {}) {
+      if (tick) return tick;
+      const g = ++gen;
+      tickDa = ora();
+      tick = (async () => {
+        const watch = idsSeguiti();
+        seguitiInviati = watch.join(',');
+        const r = await sorgenti.giro({ watch, force });
+        if (g !== gen) return { changed: 0 };
+        if (!r || r.ok !== true) throw new Error((r && r.error) || 'giro non riuscito');
+        if (r.scartati) avvisa(`giro: ${r.scartati} seguiti oltre il tetto`);
+        const out = await applicaEsito(r.giro || { kind: 'skipped' }, g);
+        okAt = ora();
+        return out;
+      })().finally(() => {
+        if (g === gen) { tick = null; tickDa = 0; }
+        lastAt = ora();
+        ridipingi();
+      });
+      return tick;
+    }
+
+    function inviaSeguiti() {
+      const watch = idsSeguiti();
+      seguitiInviati = watch.join(',');
+      return manda({ type: T.iscrivi, watch }).catch(() => {});
+    }
+
+    // Chi va seguito è cambiato: il main lo sa subito (costa un messaggio, non letture).
+    function aggiornaSeguiti() {
+      if (!acceso || bloccato || sorgenti.giro !== giroDalMain) return;
+      if (idsSeguiti().join(',') === seguitiInviati) return;
+      inviaSeguiti();
+    }
+
+    function orologio(perche) {
+      if (!acceso) return;
+      const adesso = ora();
+      if (tick && adesso - tickDa >= GIRO_BLOCCATO_MS) {
+        avvisa('aggiornamento: un giro non ha avuto risposta, ne parte un altro');
+        gen += 1;
+        tick = null;
+        tickDa = 0;
+      }
+      const scelta = decidiGiro({
+        ora: adesso, motivo: perche, inVista: vistaOra(), dataLoaded: pronta(),
+        ultimoGiro: lastAt, giroDa: tick ? tickDa : 0,
+        pollMs: tempi.pollMs, rientroMs: tempi.rientroMs,
+      });
+      ridipingi();
+      if (scelta === 'carica') {
+        // La prima lista non è arrivata: si ritenta da soli invece di lasciare l'errore finché non si ricarica.
+        lastAt = adesso;
+        if (ricarica) Promise.resolve().then(ricarica).catch(() => {});
+      } else if (scelta === 'giro') {
+        giro().catch((e) => avvisa(`aggiornamento: ${motivo(e)}`));
+      }
+    }
+
+    function impostaVista(v) {
+      const eraInVista = vistaOra();
+      inVista = v !== false;
+      if (!eraInVista && vistaOra()) orologio('rientro');
+      else ridipingi();
+    }
+
+    function armaOrologio() {
+      if (clock) tm.clearInterval(clock);
+      clock = tm.setInterval(() => orologio('battito'), tempi.clockMs);
+    }
+
+    function start() {
+      if (acceso || bloccato) return;
+      acceso = true;
+      armaOrologio();
+      manda({ type: T.inVistaGet })
+        .then((r) => { if (r && r.ok && typeof r.inVista === 'boolean') impostaVista(r.inVista); })
+        .catch(() => {});
+      if (sorgenti.giro === giroDalMain) inviaSeguiti();
+    }
+
+    function stop() {
+      const eraAcceso = acceso;
+      acceso = false;
+      if (clock) { tm.clearInterval(clock); clock = null; }
+      if (eraAcceso) manda({ type: T.iscrivi, off: true }).catch(() => {});
+    }
+
+    // L'esito di un giro chiesto da un'altra pagina.
+    function daAltri(m) {
+      if (!acceso || bloccato || !pronta()) return;
+      applicaEsito(m).catch((e) => avvisa(`aggiornamento: ${motivo(e)}`));
+    }
+
+    if (doc && typeof doc.addEventListener === 'function') {
+      doc.addEventListener('visibilitychange', () => orologio('rientro'));
+    }
+    if (typeof ascolta === 'function') {
+      ascolta((m) => {
+        if (!m) return;
+        if (m.type === T.inVista) impostaVista(m.inVista);
+        else if (m.type === T.cambiato) daAltri(m);
+      });
+    }
+    if (finestra && typeof finestra.addEventListener === 'function') {
+      finestra.addEventListener('pagehide', () => { manda({ type: T.iscrivi, off: true }).catch(() => {}); });
+    }
+
+    // Gli agganci degli spec, gli stessi sulle due pagine.
+    const prova = {
+      setLiveTiming(t) {
+        Object.assign(tempi, t || {});
+        if (acceso) armaOrologio();
+      },
+      // Chi passa solo `listVersions` ottiene un giro che riallinea su quelle versioni.
+      setLiveSources(src) {
+        Object.assign(sorgenti, src || {});
+        if (src && typeof src.listVersions === 'function' && typeof src.giro !== 'function') {
+          sorgenti.giro = async () => ({
+            ok: true,
+            giro: { kind: 'reconcile', versions: await src.listVersions({ timeoutMs: 20000 }) },
+          });
+        }
+      },
+      pollNow() { return giro({ force: true }); },
+      liveMessage(m) { return applicaEsito(m); },
+      // Dopo dati finti il giro resta chiuso: uno spec che vuole il giro INTERO (main → pagina) lo riapre da qui.
+      resumeLive() { bloccato = false; sorgenti.giro = giroDalMain; stop(); start(); },
+      isLiveOn() { return acceso; },
+      liveArrivate() { return Array.from(arrivate); },
+      avvisoGiro() { return avviso; },
+    };
+
+    return {
+      sorgenti, arrivate, prova,
+      start, stop, giro, applicaEsito, aggiornaSeguiti, segnaArrivi, fotografia, ferma,
+      blocca(v) { bloccato = v !== false; },
+      // Una lista appena letta per intero vale come un giro riuscito.
+      allineata() { lastAt = ora(); okAt = lastAt; },
+      acceso: () => acceso,
+      inVista: vistaOra,
+      okAt: () => okAt,
+      avviso: () => avviso,
+    };
+  }
+
+  // ── La lista che si ridisegna da sola (#738) ──────────────────────────────
+  // Il ridisegno aspetta la mano dell'owner (puntatore mosso o premuto da poco,
+  // o `trattieni()`) e tiene lo scorrimento sulla prima scheda visibile. Solo
+  // nelle pagine: tocca il DOM. `voce` è il selettore delle schede (data-id).
+  function makeListaViva({
+    el, voce, ridisegna, pronta = () => true, trattieni = null, scroller = null,
+    finestra = null, ora = () => Date.now(),
+  } = {}) {
+    let mossaAt = 0;
+    let premuta = false;
+    let rimandata = null;
+    let inAttesa = false;
+
+    function occupata() {
+      return listaInUso({ ora: ora(), ultimoMovimento: mossaAt, premuto: premuta }) || !!(trattieni && trattieni());
+    }
+    function scorre() {
+      if (typeof scroller === 'function') return scroller();
+      return [el, el && el.parentElement].find((x) => x && x.scrollHeight > x.clientHeight) || null;
+    }
+    // Le cime delle schede nel contenuto di chi scorre; il documento intero non ha una cima sua.
+    function righeDi(sc) {
+      const radice = sc.ownerDocument && sc === sc.ownerDocument.scrollingElement;
+      const base = radice ? -sc.scrollTop : sc.getBoundingClientRect().top - sc.scrollTop;
+      return Array.from(el.querySelectorAll(voce)).map((x) => {
+        const r = x.getBoundingClientRect();
+        return { id: x.dataset.id, top: r.top - base, height: r.height };
+      });
+    }
+    // Se ne esce una più su, la vista non salta.
+    function alSuoPosto() {
+      inAttesa = false;
+      if (!el) { ridisegna(); return; }
+      const sc = scorre();
+      const prima = sc ? sc.scrollTop : 0;
+      const ancora = sc ? ancoraScorrimento(righeDi(sc), prima) : null;
+      ridisegna();
+      const dopo = scorre();
+      if (dopo) dopo.scrollTop = scrollDaAncora(ancora, righeDi(dopo), prima);
+    }
+    function rimanda() {
+      if (rimandata) return;
+      rimandata = setTimeout(() => { rimandata = null; riprendi(); }, LISTA_IN_USO_MS);
+    }
+    function riprendi() {
+      if (!inAttesa || !pronta()) return;
+      if (occupata()) { rimanda(); return; }
+      if (rimandata) { clearTimeout(rimandata); rimandata = null; }
+      alSuoPosto();
+    }
+    if (el) {
+      el.addEventListener('pointermove', () => { mossaAt = ora(); });
+      el.addEventListener('pointerdown', () => { premuta = true; mossaAt = ora(); });
+      el.addEventListener('pointerleave', () => { mossaAt = 0; premuta = false; riprendi(); });
+    }
+    if (finestra) finestra.addEventListener('pointerup', () => { premuta = false; }, true);
+
+    return {
+      occupata,
+      alSuoPosto,
+      riprendi,
+      // C'è un ridisegno da fare: subito se la mano è libera, appena lo diventa altrimenti.
+      aggiorna() { inAttesa = true; riprendi(); },
+      inAttesa: () => inAttesa,
+    };
+  }
+
   global.SN_FEEDBACK_LIVE = {
     POLL_MS, CLOCK_MS, RIENTRO_MIN_MS, GIRO_BLOCCATO_MS, FERMA_DOPO_MS, LISTA_IN_USO_MS,
     RECONCILE_MS, OVERLAP_MS, SEGUITI_TETTO, REGISTRO_SEGUI_MS, createdMs,
     diffVersions, applyChanges, decidiGiro, listaFerma, arrivi, statoCambiato,
-    ancoraScorrimento, scrollDaAncora, listaInUso, makeWatcher,
+    ancoraScorrimento, scrollDaAncora, listaInUso, makeWatcher, makeGiroPagina, makeListaViva,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
 
