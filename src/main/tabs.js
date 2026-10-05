@@ -2690,6 +2690,7 @@ class TabManager {
       event.preventDefault();
       if (!mostrata) setImmediate(() => { try { win.close(); } catch (_) {} });
     };
+    pwc.on('will-frame-navigate', (event) => fermaInvitoNelRiquadro(event, { win: this.win, wc: pwc }));
     pwc.on('will-navigate', (event, url) => {
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
