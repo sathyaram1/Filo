@@ -8,8 +8,8 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, rmSync, symlinkSync } from 'node:fs';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { mkdirSync, rmSync } from 'node:fs';
+import { cartellaTemporanea, collegaFile } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -30,8 +30,8 @@ function preparaPowerShell() {
   if (!pwsh) return false;
   const bin = join(TMP, 'bin');
   mkdirSync(bin, { recursive: true });
-  symlinkSync(pwsh, join(bin, 'powershell.exe'));
-  process.env.PATH = `${bin}:${process.env.PATH}`;
+  collegaFile(pwsh, join(bin, 'powershell.exe'));
+  process.env.PATH = `${bin}${delimiter}${process.env.PATH}`;
   process.env.TERM = 'dumb';
   return true;
 }
