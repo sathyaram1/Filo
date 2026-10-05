@@ -42,16 +42,25 @@ function buildGuardSource(seed, level) {
     }
   }
 
+  // Un sostituto deve somigliare a un nativo anche a chi lo ispeziona: metodo senza prototype né new,
+  // nessuna proprietà propria in più, testo nativo anche da Function.prototype.toString.call (#799).
+  var masked = new WeakMap();
   function mask(fn, orig, name) {
+    var m = fn;
     try {
-      Object.defineProperty(fn, 'name', { value: name, configurable: true });
-      Object.defineProperty(fn, 'length', { value: orig.length, configurable: true });
-      var ts = function toString() { return 'function ' + name + '() { [native code] }'; };
-      Object.defineProperty(ts, 'name', { value: 'toString', configurable: true });
-      Object.defineProperty(fn, 'toString', { value: ts, configurable: true, writable: true });
+      var box = {}; box[name] = function () {};
+      m = ({ [name]() { return fn.apply(this, arguments); } })[name];
+      Object.defineProperty(m, 'length', { value: orig.length, configurable: true });
+      masked.set(m, 'function ' + name + '() { [native code] }');
     } catch (e) {}
-    return fn;
+    return m;
   }
+  try {
+    var FP = Function.prototype, oFnToString = FP.toString;
+    FP.toString = mask(function toString() {
+      return (typeof this === 'function' && masked.get(this)) || oFnToString.apply(this, arguments);
+    }, oFnToString, 'toString');
+  } catch (e) {}
 
   // ---- Canvas (elemento e OffscreenCanvas) ----
   // Il contesto di un canvas si annota quando la pagina lo crea: chiederlo alla guardia con
