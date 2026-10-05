@@ -90,25 +90,25 @@ export async function windowHandle(app) {
   });
 }
 
-// Cattura nativa composita (shell + WebContentsView).
+// Cattura composita (shell + WebContentsView + finestre figlie): l'immagine è
+// sempre l'area contenuto della finestra, col suo (0,0) in alto a sinistra.
 //
-// Su Windows usa Win32 PrintWindow(PW_RENDERFULLCONTENT): cattura il contenuto
-// reale della finestra anche se non è in primo piano/occlusa — robusto, niente
-// dipendenza dal focus.
-//
-// Su Linux (cloud/xvfb): usa `scrot` per catturare l'intero display virtuale X11.
-// Electron gira dentro xvfb, quindi il framebuffer X include già il composito
-// shell + WebContentsView. Richiede la variabile d'ambiente DISPLAY (impostata
-// automaticamente da xvfb-run) e il binario `scrot` installato (scrot 1.x+).
-// Fallback: se scrot non è disponibile, prova con xwd + ImageMagick convert.
+// Windows: Win32 PrintWindow(PW_RENDERFULLCONTENT), che vede la finestra anche
+// occlusa o fuori schermo. Linux con la finestra su uno schermo: `scrot` (o xwd
+// + convert) ritagliato sulla finestra. Altrove, e quando nessuno schermo la
+// mostra (parcheggiata dai test, src/main/test-window-mode.js), la compone
+// Electron dalle sue superfici: chiederla al sistema darebbe un'immagine nera.
 //
 // IMPORTANTE (Windows): NON portare la finestra in foreground qui. Farlo
 // ruberebbe il focus da tastiera alla WebContentsView attiva, rompendo la
 // digitazione tra uno step e l'altro.
 export async function captureComposite(app, outPath) {
   if (process.platform === 'linux') {
-    return captureCompositeLinux(app, outPath);
+    const dove = await finestraSulloSchermo(app);
+    if (dove) return captureCompositeLinux(app, outPath, dove);
+    return captureCompositeElectron(app, outPath);
   }
+  if (process.platform !== 'win32') return captureCompositeElectron(app, outPath);
   // Windows: Win32 PrintWindow
   const hwnd = await windowHandle(app);
   const safePath = outPath.replace(/\\/g, '\\\\');
