@@ -247,6 +247,27 @@ for (const metodo of ['streamComplete', 'complete']) {
     assert.match(CE.sentence({ ...err, message: err.message, keySource: 'personal' }), /privacy/);
   });
 
+  for (const [nome, testo, code, frase] of [
+    ['fornitori tutti esclusi dai filtri', 'No allowed providers are available for the selected model.', 'NO_PROVIDER_ALLOWED', /fra quelli ammessi/],
+    ['modello senza più host', 'No endpoints found for mistralai/mistral-small.', 'MODEL_UNAVAILABLE', /non è più disponibile/],
+  ]) {
+    test(`${metodo}: ${nome} non si legge come strumenti e non si ritenta`, async () => {
+      const bodies = [];
+      const err = await withFetch(async (url, opts) => {
+        bodies.push(JSON.parse(opts.body));
+        return noHost(testo);
+      }, () => call().then(() => null, (e) => e));
+      assert.equal(bodies.length, 1, 'togliere il ragionamento non cambia questo rifiuto');
+      assert.equal(err.code, code);
+      for (const keySource of ['own', 'personal']) {
+        const s = CE.sentence({ ...err, message: err.message, keySource });
+        assert.doesNotMatch(s, /strumenti/);
+        assert.match(s, frase);
+      }
+      assert.match(CE.sentence({ ...err, message: err.message, keySource: 'own' }), code === 'NO_PROVIDER_ALLOWED' ? /account OpenRouter/ : /Modelli predefiniti/);
+    });
+  }
+
   test(`${metodo}: senza ragionamento in richiesta il rifiuto non si ritenta`, async () => {
     const bodies = [];
     const err = await withFetch(async (url, opts) => {
