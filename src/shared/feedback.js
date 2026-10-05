@@ -1838,12 +1838,14 @@
     const arr = await res.json();
     const rows = [];
     let lastName = '';
+    let readTime = '';
     for (const row of arr) {
+      if (!readTime && row && row.readTime) readTime = String(row.readTime);
       if (!row.document) continue;
       lastName = row.document.name || lastName;
       rows.push(fsDocToObject(row.document));
     }
-    return { rows, lastName };
+    return { rows, lastName, readTime };
   }
 
   // UNA scheda pubblica (per id). Torna null se non c'è: un feedback che non è
