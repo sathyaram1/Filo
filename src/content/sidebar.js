@@ -289,6 +289,7 @@
     }
     conv.appendChild(msg);
     conv.scrollTop = conv.scrollHeight;
+    if (role === 'assistant') diciRipiego();
     return msg;
   }
 
