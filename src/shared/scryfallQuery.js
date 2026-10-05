@@ -47,6 +47,15 @@
     return t.length > 200 ? `${t.slice(0, 199)}…` : t;
   }
 
+  // Ordine della lista chiesto a parole (#788): il campo del modello, o l'order: che ha messo nella query.
+  const SORT_OF = { cmc: 'cmc', mana: 'cmc', name: 'name', nome: 'name', price: 'price', prezzo: 'price', eur: 'price', usd: 'price', tix: 'price' };
+  function listSort(raw, query) {
+    const own = SORT_OF[String(typeof raw === 'string' ? raw : '').trim().toLowerCase()];
+    if (own) return own;
+    const m = /(?:^|[\s(])order[:=](\w+)/i.exec(String(query || ''));
+    return (m && SORT_OF[m[1].toLowerCase()]) || '';
+  }
+
   // Una carta è DENTRO l'identità di colore del commander se OGNI colore della
   // sua color identity è tra i colori del commander (regola Commander §8.4, la
   // stessa del check di legalità). Le incolori (identity vuota) sono sempre
@@ -164,7 +173,7 @@
 
   function parseAgentReply(text) {
     const none = {
-      reply: '', query: '', filter: '', title: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '',
+      reply: '', query: '', filter: '', title: '', sort: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '',
       tagWith: [], import: [], commanderName: '', replaceCommander: false, clearChat: false,
     };
     const raw = String(text || '').trim();
@@ -199,6 +208,7 @@
           // usa un LLM economico per tenere solo le carte che lo rispettano.
           filter: typeof o.filter === 'string' ? o.filter.trim() : '',
           title: listTitle(o.title),
+          sort: listSort(o.sort, o.query),
           cards: Array.isArray(o.cards) ? o.cards.map(String).filter(Boolean) : [],
           hasBudget,
           budget,
@@ -254,7 +264,7 @@
   }
 
   global.SN_SCRYFALL_Q = {
-    WUBRG, identityCode, buildSearchQuery, isPureSyntax, listTitle, withinIdentity, parseManaCost, simplifyCard, isFresh,
+    WUBRG, identityCode, buildSearchQuery, isPureSyntax, listTitle, listSort, withinIdentity, parseManaCost, simplifyCard, isFresh,
     parseAgentReply, proseSegments,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

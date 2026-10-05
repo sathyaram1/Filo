@@ -1210,6 +1210,11 @@
         bot.cardIds = r.cardIds || [];
         bot.query = r.query || '';
         if (r.title) bot.title = r.title;
+        // L'ordine chiesto a parole vale per la lista di questa risposta, o senza carte nuove per quella di prima.
+        if (Chat.SORTS.includes(r.sort)) {
+          if (bot.cardIds.length) setListSort(deckId, bot, r.sort, false);
+          else if (lastList && msgs.includes(lastList)) setListSort(deckId, lastList, r.sort, true);
+        }
         if (Array.isArray(r.uncheckedIds) && r.uncheckedIds.length) bot.uncheckedIds = r.uncheckedIds;
         if (r.retryable) bot.retryable = true;
         // Import via chat (§11.2): quantità reali per riga (basics tipo
@@ -1278,10 +1283,15 @@
     const msgs = chatMsgs();
     const target = (m.turn && msgs.find((x) => x.who === 'bot' && x.turn === m.turn)) || m;
     if (!msgs.includes(target)) return;
-    if (sort === Chat.SORTS[0]) delete target.sort; else target.sort = sort;
-    target.expanded = true;
+    setListSort(current.id, target, sort, true);
     renderChat();
-    if (target.turn) editChat(current.id, { op: 'sort', turn: target.turn, sort });
+  }
+
+  // `save`: la lista è già scritta nella chat salvata. Quella di una risposta in arrivo si salva col suo turno.
+  function setListSort(deckId, m, sort, save) {
+    if (sort === Chat.SORTS[0]) delete m.sort; else m.sort = sort;
+    m.expanded = true;
+    if (save && m.turn) editChat(deckId, { op: 'sort', turn: m.turn, sort });
   }
 
   async function copyText(text, done) {

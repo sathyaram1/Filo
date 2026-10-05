@@ -572,3 +572,50 @@ test('tasto destro sulla riga di sintesi: ricerca esatta copiabile, ordine per p
     `https://scryfall.com/search?q=${encodeURIComponent('o:haste id<=UR')}&order=eur&dir=asc`,
   ]);
 });
+
+// #788 — l'ordine di una lista si chiede anche a parole: per la lista di prima, o insieme a una ricerca nuova.
+test('l\'ordine chiesto in chat riordina la lista di prima, e resta; con una ricerca vale per la lista nuova', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await modelloColTitolo(app, 'carte che danno rapidità');
+  await app.evaluate(() => {
+    const prev = globalThis.SN_PROVIDERS.completeWithFallback;
+    globalThis.SN_PROVIDERS.completeWithFallback = async (args) => {
+      const last = String(args.messages[args.messages.length - 1].content || '');
+      if (/CARTE CANDIDATE/.test(last)) return prev(args);
+      let o = null;
+      if (/ordinale per prezzo/i.test(last)) o = { reply: '', sort: 'price' };
+      else if (/economiche/i.test(last)) o = { reply: 'Eccole.', query: 'o:haste', title: 'carte economiche con rapidità', sort: 'price' };
+      if (!o) return prev(args);
+      return { text: JSON.stringify(o), model: args.attempts[0].model, provider: args.attempts[0].provider, usage: {} };
+    };
+  });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+  const names = (i) => page.locator('.dk-msg-bot').nth(i).locator('.dk-row-name');
+
+  await page.fill('#chatInput', 'carte che danno haste');
+  await page.press('#chatInput', 'Enter');
+  await expect(names(0)).toHaveText(['Lightning Bolt', 'Embercleave Crasher']);
+
+  await page.fill('#chatInput', 'ordinale per prezzo');
+  await page.press('#chatInput', 'Enter');
+  await expect(page.locator('.dk-msg-bot').nth(1)).toContainText('Ho riordinato la lista per prezzo.');
+  await expect(names(0)).toHaveText(['Embercleave Crasher', 'Lightning Bolt']);
+  await page.locator('.dk-list-summary').first().click({ button: 'right' });
+  await expect(page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Ordina per prezzo' })).toHaveText('Ordina per prezzo ✓');
+  await page.keyboard.press('Escape');
+
+  await page.fill('#chatInput', 'le più economiche con haste');
+  await page.press('#chatInput', 'Enter');
+  await expect(names(2)).toHaveText(['Embercleave Crasher', 'Lightning Bolt']);
+
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('.dk-msg-bot')).toHaveCount(3);
+  await expect(names(2)).toHaveText(['Embercleave Crasher', 'Lightning Bolt']);
+  await page.locator('.dk-list-summary').first().click();
+  await expect(names(0)).toHaveText(['Embercleave Crasher', 'Lightning Bolt']);
+});

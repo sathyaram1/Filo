@@ -13,6 +13,7 @@ module.exports = function register(on, ctx) {
   // Sei pagine di Scryfall per una ricerca che passa dal giudice: circa 20 lotti, meno di un centesimo col modello
   // economico. Una rete più larga di così la chat la dichiara col numero e chiede un vincolo in più.
   const JUDGE_MAX_CARDS = 1050;
+  const SORT_WORDS = { cmc: 'costo di mana', name: 'nome', price: 'prezzo' };
 
   // Identity del mazzo per il filtro automatico (§4): dai colori del
   // commander. Senza commander nessun vincolo (si cerca in tutto Scryfall).
@@ -223,6 +224,7 @@ module.exports = function register(on, ctx) {
       let deckOut = null;
       // La frase che il modello dà alla lista (#788); quella della query corretta al secondo tentativo, se c'è.
       let title = parsed.title;
+      let sort = parsed.sort;
 
       // Commander a parole (#337, #789): su un mazzo senza commander basta il nome (build-around); uno già impostato
       // cambia solo col segnale esplicito di sostituzione, e il vecchio rientra nel mazzo. Va PRIMA della ricerca,
@@ -324,6 +326,7 @@ module.exports = function register(on, ctx) {
                 // alla spiegazione generica qui sotto.
                 criterion = p2.filter || criterion;
                 title = p2.title || title;
+                sort = p2.sort || sort;
                 sr = await runSearch(p2.query, criterion);
               } else if (p2.reply) {
                 // Niente query: il modello ha SPIEGATO il problema — è la
@@ -539,9 +542,15 @@ module.exports = function register(on, ctx) {
       }
 
       const unchecked = uncheckedIds.filter((id) => cardIds.includes(id));
+      // Un ordine senza carte nuove è per la lista appena mostrata, che riordina la pagina (#788).
+      const hadList = Array.isArray(msg?.lastResults) && msg.lastResults.length > 0;
+      if (sort && !cardIds.length && !reply) {
+        reply = hadList ? `Ho riordinato la lista per ${SORT_WORDS[sort]}.` : 'Non ho una lista di carte da riordinare.';
+      }
       return {
         ok: true, reply, cardIds, cards, query,
         ...(title && cardIds.length ? { title } : {}),
+        ...(sort && (cardIds.length || hadList) ? { sort } : {}),
         ...(unchecked.length ? { uncheckedIds: unchecked } : {}),
         ...(retryable ? { retryable: true } : {}),
         ...(reasoning ? { reasoning } : {}),

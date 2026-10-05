@@ -174,4 +174,11 @@ test('la riga di sintesi dice il numero e la frase, mai la query', () => {
   assert.equal(C.listLabel(1, 'carte che danno rapidità'), '1 risultato: carte che danno rapidità');
   // Il numero lo mette il sistema: quello del modello (spesso sbagliato, conta prima del filtro) non si raddoppia.
   assert.equal(C.listLabel(7, '12 carte che danno rapidità'), '7 carte che danno rapidità');
+  // Si legge dopo il numero: niente maiuscola a metà frase né due numeri di fila; i nomi propri restano.
+  assert.equal(C.listLabel(3, 'Carte che danno rapidità'), '3 carte che danno rapidità');
+  assert.equal(C.listLabel(3, 'Rapidità: le migliori'), '3 rapidità: le migliori');
+  assert.equal(C.listLabel(3, '3 modi per vincere'), '3 modi per vincere');
+  assert.equal(C.listLabel(3, 'Sol Ring e simili'), '3 Sol Ring e simili');
+  assert.equal(C.listLabel(3, 'Niv-Mizzet e i suoi draghi'), '3 Niv-Mizzet e i suoi draghi');
+  assert.equal(C.listLabel(3, 'ETB per il mazzo'), '3 ETB per il mazzo');
 });

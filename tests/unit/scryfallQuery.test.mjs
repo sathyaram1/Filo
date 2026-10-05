@@ -192,7 +192,7 @@ test('isFresh: dentro il TTL sì, oltre no, timestamp rotto no', () => {
 // ── parseAgentReply (chat unificata §3): JSON tollerante ─────────────────────
 
 const NONE = {
-  reply: '', query: '', filter: '', title: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '',
+  reply: '', query: '', filter: '', title: '', sort: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '',
   tagWith: [], import: [], commanderName: '', replaceCommander: false, clearChat: false,
 };
 
@@ -205,6 +205,18 @@ test('parseAgentReply: title — frase leggibile tenuta, sintassi Scryfall scart
   assert.equal(Q.parseAgentReply('{"query":"o:haste","title":"rimozioni: istantanee"}').title, 'rimozioni: istantanee');
   assert.equal(Q.parseAgentReply('{"query":"o:haste","title":42}').title, '');
   assert.equal(Q.listTitle('x'.repeat(500)).length, 200);
+});
+
+// #788 — l'ordine di una lista si chiede anche a parole: il campo del modello, o l'order: che ha scritto nella query.
+test('parseAgentReply: sort — dal campo o dall\'order: della query, sconosciuto ignorato', () => {
+  assert.equal(Q.parseAgentReply('{"sort":"price"}').sort, 'price');
+  assert.equal(Q.parseAgentReply('{"sort":"Prezzo","query":"o:haste"}').sort, 'price');
+  assert.equal(Q.parseAgentReply('{"sort":"name"}').sort, 'name');
+  assert.equal(Q.parseAgentReply('{"query":"o:haste order:eur"}').sort, 'price');
+  assert.equal(Q.parseAgentReply('{"query":"(o:haste) order:name dir:desc"}').sort, 'name');
+  assert.equal(Q.parseAgentReply('{"query":"o:haste order:rarity"}').sort, '');
+  assert.equal(Q.parseAgentReply('{"query":"o:\\"border:black\\""}').sort, '');
+  assert.equal(Q.parseAgentReply('{"sort":"colore"}').sort, '');
 });
 
 test('parseAgentReply: JSON pulito → campi normalizzati', () => {
