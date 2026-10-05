@@ -1010,6 +1010,9 @@
 
   // La risposta l'hanno pagata i crediti di Filo perché OpenRouter ha rifiutato
   // la chiave dell'utente: la stessa riga che la chat mette sotto la risposta (#662).
+  function ripiegoMostrato() {
+    try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.KEY_FALLBACK_SHOWN })).catch(() => {}); } catch (_) {}
+  }
   function notaRipiego(parent, keyFallback) {
     if (!parent || !keyFallback || !keyFallback.line) return null;
     const el = document.createElement('div');
