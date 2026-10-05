@@ -452,13 +452,15 @@ function configureFromSettings(settings) {
   }
   const prev = _cached.bannerSites;
   const prevMode = _cached.mode;
-  const prevTrusted = _cached.trustedSites.join('\n');
+  const prevTrustedList = _cached.trustedSites;
+  const prevTrusted = prevTrustedList.join('\n');
   _cached = { mode: getMode(settings), trustedSites: getTrustedSites(settings), bannerSites: getBannerSites(settings) };
   configureForMode(_cached.mode);
   const changed = prevMode !== _cached.mode || prev.join('\n') !== _cached.bannerSites.join('\n');
   if (_configured) {
     wipeChanged(prev, _cached.bannerSites, [session.defaultSession, ...siteSessions.values(), ...(_incognito ? [] : incognitoSessions())],
       { normal: true, incognito: !_incognito });
+    fiduciaCambiata(prevTrustedList, _cached.trustedSites);
   }
   _configured = true;
   if (prevMode !== _cached.mode || prevTrusted !== _cached.trustedSites.join('\n')) {
