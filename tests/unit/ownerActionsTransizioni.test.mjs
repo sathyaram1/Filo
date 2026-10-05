@@ -76,6 +76,29 @@ test('npm run feedback: archivia dalla coda e accoda un non filtrato; l\'iter re
   assert.equal(mod.transizioneAmmessa('todo', 'done', 'routine').ok, true, 'la chiusura a mano passa ancora da --come-routine');
 });
 
+test('npm run feedback come owner ammette le sole righe owner: nessuna catena inventa un passaggio', () => {
+  for (const from of FS.CANONICAL) {
+    for (const to of FS.CANONICAL) {
+      if (from === to) continue;
+      assert.equal(mod.transizioneAmmessa(from, to).ok, FS.canTransition(from, to, 'owner'), `${from} → ${to}`);
+    }
+  }
+});
+
+test('un lavoro in corso o in revisione non torna in coda con un comando dell\'owner', async () => {
+  for (const status of ['working', 'revision_capability', 'revision_security']) {
+    const doc = {
+      name: 'projects/p/databases/(default)/documents/feedback/d1',
+      fields: { clientId: { stringValue: 'c-utente' }, status: { stringValue: status }, statusPublic: { stringValue: 'open' }, notes: { stringValue: '' } },
+    };
+    await conRete(doc, async (patch) => {
+      const r = await mod.scrivi('d1', 'todo', 'rimetto in coda', { bearer: 'tok-finto' });
+      assert.equal(r.ok, false, status);
+      assert.equal(patch.length, 0, status);
+    });
+  }
+});
+
 /** fetch finto: le GET rendono `doc`, le PATCH si registrano e rispondono ok. */
 async function conRete(doc, fn) {
   const patch = [];
