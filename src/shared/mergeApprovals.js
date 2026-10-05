@@ -1131,6 +1131,7 @@
     dateTimeText: dateTimeText,
     mergedWhenText: mergedWhenText,
     preapprovedMoreText: preapprovedMoreText,
+    preapprovedIntro: preapprovedIntro,
     renderPreapproved: renderPreapproved,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
