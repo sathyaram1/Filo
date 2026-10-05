@@ -85,7 +85,17 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
+  // La descrizione che parte da sola (screenshot, immagine copiata o incollata) non esce da una pagina delicata (#1004).
+  // Senza la regola non si sa: nel dubbio vale delicata.
+  async function automaticaDaDelicata(msg, sender) {
+    if (!msg || msg.action !== SN_CONST.ACTIONS.DESCRIBE_IMAGE || !msg.payload || !msg.payload.automatica) return false;
+    const url = String(sender?.tab?.url || sender?.url || '');
+    if (!/^https?:/i.test(url)) return false;
+    try { return Boolean((await globalThis.SN_DELICATE.filtro())(url)); } catch (_) { return true; }
+  }
+
   on(MSG.AI_REQUEST, async (msg, sender, origin) => {
+    if (await automaticaDaDelicata(msg, sender)) return { ok: false, code: 'PAGINA_DELICATA' };
     // Quello che l'assistente di pagina ha davanti resta noto alla porta delle uscite (#810),
     // anche se poi la pagina cambia. Si legge mentre il modello risponde.
     const lettura = msg && msg.action === SN_CONST.ACTIONS.HELP && /^https?:/i.test(String(sender?.tab?.url || sender?.url || ''))
