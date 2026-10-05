@@ -132,10 +132,8 @@ module.exports = function register(on, ctx) {
   // la chiama dentro `conRipiegoDetto`; ogni altra strada (dettatura, lettura,
   // trascrizione, correttore, lavori in sottofondo) la dice con un avviso, uno
   // per rifiuto e al massimo ogni 10 minuti, come per i crediti finiti (#662).
-  // Una riga scritta sotto una risposta vale come avviso, e viceversa: la frase
-  // si dice una volta sola. L'avviso aspetta un momento, e le richieste di chi
-  // scrive la riga ancora in volo, prima di partire: il lavoro in sottofondo
-  // che le accompagna (il correttore, Filo che impara dalla chat) non la ripete.
+  // La frase si dice una volta: la riga sotto una risposta vale come avviso, e l'avviso aspetta un
+  // momento (e le richieste con la riga in volo) perché i lavori che le accompagnano non la ripetano.
   const ripiegoDetto = new AsyncLocalStorage();
   const FINESTRA_RIPIEGO_MS = 10 * 60 * 1000;
   const ATTESA_AVVISO_RIPIEGO_MS = 4000;
