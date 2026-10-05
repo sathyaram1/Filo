@@ -626,7 +626,11 @@
 
     // Un'approvazione in volo, partita da qui o da un'altra strada (il segno «fondi senza
     // chiedermelo»): finché il server non risponde la card lo dice e non se ne manda un'altra (#702).
+    var seguita = null;
     function segui(attesa, risposta) {
+      // La stessa risposta arriva anche da seguiSulPosto: seguita due volte, l'esito si direbbe due volte.
+      if (risposta && seguita === risposta) return;
+      seguita = risposta;
       setBusy(true);
       card.classList.add('is-merging');
       rititola(card.closest ? card.closest('.sn-mac') : null);
