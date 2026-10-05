@@ -156,6 +156,9 @@
         quando = ` l'ultima volta il ${d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })} alle ${d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`;
       }
     } catch (_) { quando = ''; }
+    if (usedCredits === false) {
+      return `OpenRouter ha rifiutato la tua chiave${quando} (${keyRefusalReason(status)}). Finché resta qui, ogni chiamata prova prima lei; se la rifiuta, Filo usa i tuoi crediti.`;
+    }
     return `OpenRouter ha rifiutato la tua chiave${quando} (${keyRefusalReason(status)}) e Filo ha usato i tuoi crediti. Finché resta qui, ogni chiamata prova prima lei.`;
   }
 
