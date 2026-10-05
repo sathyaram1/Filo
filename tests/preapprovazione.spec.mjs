@@ -75,7 +75,7 @@ test('dal dettaglio: il segno si mette, la pagina dice chi, la lista lo mostra; 
 
   const btn = page.locator('#mgPreapproveBtn');
   await expect(btn).toBeVisible();
-  await expect(btn).toHaveText('Fondi senza chiedermelo');
+  await expect(btn).toHaveText('Senza chiedere');
   await expect(btn).toHaveAttribute('aria-pressed', 'false');
   // L'hover spiega in una riga cosa comporta.
   await expect(btn).toHaveAttribute('title', /senza aspettare il tuo click/);
@@ -84,7 +84,6 @@ test('dal dettaglio: il segno si mette, la pagina dice chi, la lista lo mostra; 
 
   // 1. metterlo
   await btn.click();
-  await expect(btn).toHaveText('Chiedimi prima di fondere');
   await expect(btn).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#mgPreapprovedInfo')).toBeVisible();
   await expect(page.locator('#mgPreapprovedInfo')).toContainText('owner@esempio');
@@ -98,7 +97,6 @@ test('dal dettaglio: il segno si mette, la pagina dice chi, la lista lo mostra; 
 
   // 2. toglierlo
   await btn.click();
-  await expect(btn).toHaveText('Fondi senza chiedermelo');
   await expect(btn).toHaveAttribute('aria-pressed', 'false');
   await expect(page.locator('#mgPreapprovedInfo')).toBeHidden();
   await expect(page.locator('.mg-item .mg-preapproved')).toHaveCount(0);
@@ -112,7 +110,7 @@ test('una pratica che arriva già col segno lo mostra, in lista e nel dettaglio'
   await apri(page, [fb]);
   await expect(page.locator('.mg-item .mg-preapproved')).toHaveCount(1);
   await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
-  await expect(page.locator('#mgPreapproveBtn')).toHaveText('Chiedimi prima di fondere');
+  await expect(page.locator('#mgPreapproveBtn')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#mgPreapprovedInfo')).toContainText('owner@esempio');
   await expect(page.locator('#mgPreapprovedInfo')).toContainText('13/09/2026');
 });
@@ -274,7 +272,7 @@ test('il segno nato da un sì a una richiesta si legge per quello che è, e un c
   const btn = page.locator('#mgPreapproveBtn');
   // Non è il segno pieno: l'interruttore è spento e lo si può accendere.
   await expect(btn).toHaveAttribute('aria-pressed', 'false');
-  await expect(btn).toHaveText('Fondi senza chiedermelo');
+  await expect(btn).toHaveText('Senza chiedere');
   await expect(page.locator('#mgPreapprovedInfo')).toContainText('dal tuo sì alla richiesta del 26/09/2026');
   await expect(page.locator('#mgPreapprovedInfo')).not.toContainText('ab12cd34');
 
@@ -310,7 +308,7 @@ test('il segno nato da un sì si toglie da solo, senza fondere la richiesta ferm
 
   const togli = page.locator('#mgPreapproveRevokeBtn');
   await expect(togli).toBeVisible();
-  await expect(togli).toHaveText('Chiedimi prima di fondere');
+  await expect(togli).toHaveText('Chiedimi prima');
   await togli.click();
   await expect.poll(() => page.evaluate(() => window.__updates.map((u) => u.mergePreapproved))).toEqual([false]);
   await page.waitForTimeout(1500);
@@ -318,7 +316,7 @@ test('il segno nato da un sì si toglie da solo, senza fondere la richiesta ferm
   await expect(page.locator(`.mg-item[data-id="${fb._id}"] .mg-preapproved`)).toHaveCount(0);
   await expect(page.locator('#mgPreapprovedInfo')).toBeHidden();
   await expect(togli).toBeHidden();
-  await expect(page.locator('#mgPreapproveBtn')).toHaveText('Fondi senza chiedermelo');
+  await expect(page.locator('#mgPreapproveBtn')).toHaveAttribute('aria-pressed', 'false');
 });
 
 test('col segno pieno o senza segno il tasto per togliere quello da un sì non c’è', async ({ openTab }) => {

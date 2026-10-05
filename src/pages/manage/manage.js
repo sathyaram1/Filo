@@ -156,7 +156,6 @@
   const mgPreapproveBtn = document.getElementById('mgPreapproveBtn');
   const mgPreapproveRevokeBtn = document.getElementById('mgPreapproveRevokeBtn');
   const mgPreapprovedInfo = document.getElementById('mgPreapprovedInfo');
-  const mgPreapproveLine = document.getElementById('mgPreapproveLine');
   const mgLocalBtn   = document.getElementById('mgLocalBtn');
   const mgSenderBtn  = document.getElementById('mgSenderBtn');
   const mgStarBtn    = document.getElementById('mgStarBtn');
@@ -3282,7 +3281,7 @@
     if (mgPreapproveRevokeBtn) {
       mgPreapproveRevokeBtn.disabled = false;
       mgPreapproveRevokeBtn.hidden = !(aperta && !locale && segno && segno.tipo === 'approvazione');
-      mgPreapproveRevokeBtn.title = 'Toglie il sì dato col clic: da ora anche i riallineamenti di questa pratica aspettano il tuo via libera.';
+      mgPreapproveRevokeBtn.title = 'Chiedimi prima di fondere: toglie il sì dato col clic, e da ora anche i riallineamenti di questa pratica aspettano il tuo via libera.';
     }
     if (mgPreapprovedInfo) {
       const UI = window.SN_MERGE_APPROVALS;

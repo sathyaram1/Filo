@@ -1983,6 +1983,78 @@ test('#497 — azioni di stato, ⭐ e frase: tutti i tasti sulla stessa riga', a
   expect(Math.abs(centri.frase - centri.azione)).toBeLessThan(6);
 });
 
+// ── #1034: anche «fondi senza chiedermelo» sta sulla riga dei tasti ────────
+// Aveva una riga sua sotto gli altri tasti, su ogni pratica aperta. Si guarda
+// alla misura della finestra di serie: i Ricevuti (il caso con più tasti fra
+// quelli di ogni giorno) e una pratica in coda col segno, dove accanto ai tasti
+// c'è anche chi l'ha messo.
+async function tastiDellOwner(page) {
+  return page.evaluate(() => {
+    const vis = (el) => el && !el.hidden && el.getClientRects().length > 0;
+    const tasti = [...document.querySelectorAll('#mgOwnerBar button')].filter(vis).map((b) => {
+      const r = b.getBoundingClientRect();
+      return { id: b.id || b.dataset.actionKey, centro: r.top + r.height / 2, basso: r.bottom };
+    });
+    const info = document.getElementById('mgPreapprovedInfo');
+    return { tasti, infoTop: vis(info) ? info.getBoundingClientRect().top : null };
+  });
+}
+
+test('#1034 — Ricevuti: anche «Senza chiedere» sta sulla riga degli altri tasti', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
+  await stubFeedbackUpdate(page);
+  const fb = { ...FB_PLAIN_TODO, _id: 'fb-una-riga-in', status: 'new', reviewDecision: undefined };
+  await page.evaluate((f) => {
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData([f]);
+    window.__mgTest.setTab('inbox');
+    window.__mgTest.openDetail(f._id);
+  }, fb);
+
+  await expect(page.locator('#mgPreapproveBtn')).toBeVisible();
+  await expect(page.locator('#mgPreapproveBtn')).toHaveText('Senza chiedere');
+  await expect(page.locator('#mgAcceptLocalBtn')).toBeVisible();
+  const { tasti } = await tastiDellOwner(page);
+  expect(tasti.map((t) => t.id)).toEqual(expect.arrayContaining(['mgAcceptBtn', 'mgArchiveBtn', 'mgStarBtn', 'mgUserNoteToggle', 'mgPreapproveBtn']));
+  for (const t of tasti) expect(Math.abs(t.centro - tasti[0].centro), t.id).toBeLessThan(6);
+});
+
+test('#1034 — In coda col segno: tasto acceso e chi l’ha messo, sulla stessa riga; il clic non sposta i vicini', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
+  await page.evaluate(() => {
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => (msg && msg.type === 'feedback_update')
+      ? { ok: true, by: 'owner@esempio' } : orig(msg);
+  });
+  const fb = { ...FB_PLAIN_TODO, _id: 'fb-una-riga-coda', mergePreapproved: { by: 'owner@esempio', at: '2026-09-13T07:30:00.000Z' } };
+  await page.evaluate((f) => {
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData([f]);
+    window.__mgTest.setTab('queue');
+    window.__mgTest.openDetail(f._id);
+  }, fb);
+
+  const tasto = page.locator('#mgPreapproveBtn');
+  await expect(tasto).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#mgPreapprovedInfo')).toContainText('owner@esempio');
+  const prima = await tastiDellOwner(page);
+  for (const t of prima.tasti) expect(Math.abs(t.centro - prima.tasti[0].centro), t.id).toBeLessThan(6);
+  // Chi l'ha messo sta accanto ai tasti, non sotto.
+  expect(prima.infoTop).toBeLessThan(prima.tasti[0].basso);
+
+  const box = await tasto.boundingBox();
+  await tasto.click();
+  await expect(tasto).toHaveAttribute('aria-pressed', 'false');
+  await expect(tasto).toHaveText('Senza chiedere');
+  const dopo = await tasto.boundingBox();
+  expect(Math.round(dopo.x)).toBe(Math.round(box.x));
+  expect(Math.round(dopo.width)).toBe(Math.round(box.width));
+});
+
 // ── Priorità visibile + modificabile dalla coda ─────────────────────────────
 // I feedback "In coda" mostrano i pallini priorità; per l'owner il click li
 // modifica (patch priority + priorityManual) e la coda si riordina (priorità

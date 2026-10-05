@@ -100,7 +100,7 @@ test('il segno messo con la richiesta già ferma la fonde subito, e lo dice', as
   expect(await approvazioni(page)).toEqual(['ab12cd34ef56ab12cd34ef56']);
   const updates = await page.evaluate(() => window.__updates);
   expect(updates).toEqual([{ type: 'feedback_update', id: fb._id, mergePreapproved: true }]);
-  await expect(page.locator('#mgPreapproveBtn')).toHaveText('Chiedimi prima di fondere');
+  await expect(page.locator('#mgPreapproveBtn')).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('una richiesta ferma su una pratica già segnata parte da sola all’apertura, una volta sola', async ({ openTab }) => {
@@ -162,7 +162,7 @@ test('se il server non fonde, la pagina lo dice e non ritenta da sola', async ({
 
   await expect(page.locator('#mgManageMsg')).toContainText('Il server non ha la credenziale con cui scrive: nessuna fusione è avvenuta.');
   await expect(page.locator('#mgManageMsg')).toHaveClass(/mg-err/);
-  await expect(page.locator('#mgPreapproveBtn')).toHaveText('Chiedimi prima di fondere');
+  await expect(page.locator('#mgPreapproveBtn')).toHaveAttribute('aria-pressed', 'true');
   await page.evaluate(() => window.__mgTest.loadMergeApprovals());
   await page.waitForTimeout(400);
   expect(await approvazioni(page)).toEqual(['ab12cd34ef56ab12cd34ef56']);
@@ -215,7 +215,7 @@ test('fusione non riuscita: rimettere il segno la ritenta', async ({ openTab }) 
   expect(await approvazioni(page)).toHaveLength(1);
 
   await btn.click();
-  await expect(btn).toHaveText('Fondi senza chiedermelo');
+  await expect(btn).toHaveAttribute('aria-pressed', 'false');
   await btn.click();
   await expect.poll(() => approvazioni(page).then((a) => a.length), { timeout: 8000 }).toBe(2);
   await expect(page.locator('#mgManageMsg')).toContainText('su main');
@@ -507,7 +507,7 @@ test('fusione in corso: il segno tolto e rimesso col tasto non ne manda una seco
   await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
   const btn = page.locator('#mgPreapproveBtn');
   await btn.click();
-  await expect(btn).toHaveText('Fondi senza chiedermelo');
+  await expect(btn).toHaveAttribute('aria-pressed', 'false');
   await btn.click();
   await expect(page.locator('#mgManageMsg')).toContainText('Fusione già in corso');
   expect(await approvazioni(page)).toEqual([req.id]);
@@ -584,7 +584,7 @@ test('«Approva e fondi» riuscito mentre mettevi il segno: una rilettura delle 
   await approva.click();
   await expect.poll(() => approvazioni(page), { timeout: 4000 }).toEqual([req.id]);
   await page.locator('#mgPreapproveBtn').click();
-  await expect(page.locator('#mgPreapproveBtn')).toHaveText('Chiedimi prima di fondere');
+  await expect(page.locator('#mgPreapproveBtn')).toHaveAttribute('aria-pressed', 'true');
   await expect.poll(() => page.evaluate(() => window.__fuse.length), { timeout: 6000 }).toBe(1);
   const at = await page.evaluate(() => window.__segnoAt);
   await daFuori(page, pratica({ _updateTime: 't2', starred: true, mergePreapproved: { by: 'owner@esempio', at } }));
