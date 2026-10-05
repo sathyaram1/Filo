@@ -975,37 +975,38 @@
     return segno && segno.tipo === 'approvazione' ? 'approvazione' : 'pieno';
   }
 
-  // Per specie: `solo` segue i due punti dell'intestazione, `misto` segue «Alcuni/altri».
+  // Per specie: `solo` è una frase intera, `misto` segue «Alcuni/altri».
   var PERCHE_SENZA_CHIEDERE = [
     ['pieno', {
-      solo: 'sulla pratica avevi messo «fondi senza chiedermelo».',
+      solo: 'Sulla pratica avevi messo «fondi senza chiedermelo».',
       misto: 'avevano sulla pratica il tuo «fondi senza chiedermelo»',
     }],
     ['approvazione', {
-      solo: 'i controlli avevano segnalato solo blocchi che avevi già approvato, con un sì a una richiesta precedente sulla stessa pratica.',
+      solo: 'Avevano solo blocchi che avevi già approvato, con un sì a una richiesta precedente sulla stessa pratica.',
       misto: 'avevano solo blocchi che avevi già approvato con un sì a una richiesta precedente',
     }],
     ['locale', {
-      solo: 'venivano da una pratica tua con la prova del mittente, o da un feedback che hai approvato come lavoro locale.',
+      solo: 'Venivano da una pratica tua con la prova del mittente, o da un feedback che hai approvato come lavoro locale.',
       misto: 'erano lavoro locale (una pratica tua con la prova del mittente, o un feedback che hai approvato come lavoro locale)',
     }],
   ];
 
   /**
    * L'introduzione delle «Fuse senza chiedere», detta solo per le specie che l'elenco contiene. PURA.
-   * Un'unica frase per tutte attribuiva il «fondi senza chiedermelo» anche alle fusioni nate da un sì (#743).
+   * Una frase sola per tutte dava il «fondi senza chiedermelo» anche alle fusioni nate da un sì (#743).
    */
   function preapprovedIntro(list) {
     var righe = Array.isArray(list) ? list : [];
     var presenti = {};
     for (var i = 0; i < righe.length; i++) presenti[specieFusaSenzaChiedere(righe[i])] = true;
     var frasi = PERCHE_SENZA_CHIEDERE.filter(function (p) { return presenti[p[0]]; });
+    var testa = 'Lavori fermati dai controlli e fusi lo stesso. ';
     var coda = ' Qui c’è tutto quello che era stato segnalato.';
-    if (!frasi.length) return 'Lavori fermati dai controlli e fusi lo stesso.' + coda;
-    if (frasi.length === 1) return 'Lavori fermati dai controlli e fusi lo stesso: ' + frasi[0][1].solo + coda;
+    if (!frasi.length) return testa.trim() + coda;
+    if (frasi.length === 1) return testa + frasi[0][1].solo + coda;
     var soggetti = ['Alcuni ', 'altri ', 'altri ancora '];
     var parti = frasi.map(function (p, k) { return soggetti[k] + p[1].misto; });
-    return 'Lavori fermati dai controlli e fusi lo stesso. ' + parti.join('; ') + '.' + coda;
+    return testa + parti.join('; ') + '.' + coda;
   }
 
   /**
