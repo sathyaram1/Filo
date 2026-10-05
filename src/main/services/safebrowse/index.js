@@ -93,13 +93,11 @@ function recordCert(host, status) {
 
 // Una pagina ospitata ha un verdetto suo: con la chiave del solo host un modulo segnalato colpirebbe tutti gli altri.
 function pageKey(norm, url) {
-  const hosted = url && whitelist.hostedPlatform(norm.host, pathOf(url));
-  return hosted ? norm.host + pathOf(url) : norm.host;
+  const hosted = url && whitelist.hostedPlatform(norm.host, pathOf(norm, url));
+  return hosted ? norm.host + pathOf(norm, url) : norm.host;
 }
 
-function pathOf(url) {
-  try { return new URL(String(url)).pathname; } catch (_) { return '/'; }
-}
+const pathOf = (norm, url) => whitelist.pagePath(norm.host, url);
 
 // Il freno conta le chiamate, il verdetto resta del sito (#591): su una piattaforma di hosting che Filo non conosce un
 // dominio è di migliaia di proprietari, e la risposta di uno non vale per un altro. Il conto è per proprietario
@@ -133,7 +131,7 @@ function networkOf(ip) {
 
 function ownerKey(norm, url) {
   if (norm.isIp) return networkOf(norm.host);
-  const owner = whitelist.hostedOwner(norm.host, pathOf(url));
+  const owner = whitelist.hostedOwner(norm.host, pathOf(norm, url));
   return owner !== null ? norm.host + owner : norm.registrable;
 }
 
@@ -221,7 +219,7 @@ const AGE_RETRY_MS = 5 * MIN;
 // Nessun registro ha l'età utile: un IP, il sito di un utente su una piattaforma, una pagina ospitata sotto un dominio
 // in whitelist (l'età sarebbe della piattaforma), un sito in whitelist.
 function ageUnknowable(norm, url) {
-  return norm.isIp || norm.ospitato || whitelist.isWhitelisted(norm.registrable) || !!whitelist.hostedPlatform(norm.host, pathOf(url));
+  return norm.isIp || norm.ospitato || whitelist.isWhitelisted(norm.registrable) || !!whitelist.hostedPlatform(norm.host, pathOf(norm, url));
 }
 
 // Un indizio non conclusivo, mai su un sito in whitelist: lì l'identità è certa e il giudizio non ha niente da aggiungere.
@@ -368,7 +366,7 @@ function verdictChanged(a, b) {
 function scopeOf(url) {
   const norm = normalizeMod.normalize(url);
   if (!norm || !norm.ok) return null;
-  return whitelist.hostedPlatform(norm.host, pathOf(url)) ? norm.host + pathOf(url) : norm.registrable;
+  return whitelist.hostedPlatform(norm.host, pathOf(norm, url)) ? norm.host + pathOf(norm, url) : norm.registrable;
 }
 
 const API = {

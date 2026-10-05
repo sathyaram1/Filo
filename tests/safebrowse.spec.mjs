@@ -247,28 +247,32 @@ test('popup "sospetto": è un popup di conferma e si chiude solo con "Continua" 
   await expect(page.locator('#pw')).toHaveValue('segreto');
 });
 
-test('pagina pubblicata da un utente: chiudere l\'avviso su un modulo non silenzia gli altri moduli nella scheda', async ({ app, openTab, testServer }) => {
-  await testServer.openReady(openTab, '<title>SB_HOSTED</title><p>contenuto</p>');
-  const r = await app.evaluate(({ BrowserWindow }) => {
-    const SB = globalThis.SN_SAFEBROWSE;
-    for (const w of BrowserWindow.getAllWindows()) {
-      const tm = w._filoTabs;
-      if (!tm) continue;
-      const tab = tm.tabs.find((t) => /^https?:/.test(t.view?.webContents?.getURL?.() || ''));
-      if (!tab) continue;
-      const a = 'https://docs.google.com/forms/d/e/MODULO-A/viewform';
-      const b = 'https://docs.google.com/forms/d/e/MODULO-B/viewform';
-      const sus = { llm: { suspicious: true, reason: null } };
-      tm.safebrowseDismiss(tab.id, a);
-      return {
-        a: tm._sbApplyState(tab, SB.evaluate(a, {}, sus)).level,
-        b: tm._sbApplyState(tab, SB.evaluate(b, {}, sus)).level,
-      };
-    }
-    return null;
+// Un questionario Microsoft aperto per esteso (/Pages/ResponsePage.aspx?id=…) ha lo stesso percorso di tutti gli altri.
+for (const [cosa, a, b] of [
+  ['un modulo Google', 'https://docs.google.com/forms/d/e/MODULO-A/viewform', 'https://docs.google.com/forms/d/e/MODULO-B/viewform'],
+  ['un questionario Microsoft', 'https://customervoice.microsoft.com/Pages/ResponsePage.aspx?id=QA', 'https://customervoice.microsoft.com/Pages/ResponsePage.aspx?id=QB'],
+]) {
+  test(`pagina pubblicata da un utente: chiudere l'avviso su ${cosa} non silenzia gli altri nella scheda`, async ({ app, openTab, testServer }) => {
+    await testServer.openReady(openTab, '<title>SB_HOSTED</title><p>contenuto</p>');
+    const r = await app.evaluate(({ BrowserWindow }, { a, b }) => {
+      const SB = globalThis.SN_SAFEBROWSE;
+      for (const w of BrowserWindow.getAllWindows()) {
+        const tm = w._filoTabs;
+        if (!tm) continue;
+        const tab = tm.tabs.find((t) => /^https?:/.test(t.view?.webContents?.getURL?.() || ''));
+        if (!tab) continue;
+        const sus = { llm: { suspicious: true, reason: null } };
+        tm.safebrowseDismiss(tab.id, a);
+        return {
+          a: tm._sbApplyState(tab, SB.evaluate(a, {}, sus)).level,
+          b: tm._sbApplyState(tab, SB.evaluate(b, {}, sus)).level,
+        };
+      }
+      return null;
+    }, { a, b });
+    expect(r).toEqual({ a: 'safe', b: 'sospetto' });
   });
-  expect(r).toEqual({ a: 'safe', b: 'sospetto' });
-});
+}
 
 // Le pagine ospitate come sono fatte davvero: il modulo di Google Sites e di Apps Script sta in un riquadro, e un
 // modulo Google chiede la password in un campo di testo. Pagine servite intercettando https; il giudice fa ciò che
@@ -365,6 +369,26 @@ test('Microsoft Forms: la password chiesta nella seconda sezione, dopo «Avanti�
   await page.click('#avanti');
   await expect(page.getByText('Password')).toBeVisible();
   expect(await livelloScheda(app, 'forms.cloud.microsoft')).toBe('sospetto');
+});
+
+test('Microsoft Customer Voice: la password chiesta nel questionario fa comparire l\'avviso', async ({ app, openTab }) => {
+  await servi(app, {
+    'customervoice.microsoft.com/Pages/ResponsePage.aspx': '<h1>Verifica della casella aziendale</h1><form>'
+      + '<span id="q1">Email aziendale</span><input data-automation-id="textInput" aria-labelledby="q1">'
+      + '<span id="q2">Password</span><input data-automation-id="textInput" aria-labelledby="q2"><button>Invia</button></form>',
+  });
+  await openTab('https://customervoice.microsoft.com/Pages/ResponsePage.aspx?id=QzVerifica1');
+  expect(await livelloScheda(app, 'customervoice.microsoft.com')).toBe('sospetto');
+});
+
+test('Hugging Face Spaces: un modulo d\'accesso nell\'app dell\'utente, nel suo riquadro, fa comparire l\'avviso', async ({ app, openTab }) => {
+  await servi(app, {
+    'huggingface.co/spaces/qualcuno/accesso-posta': '<h1>Accesso alla posta</h1>'
+      + '<iframe src="https://qualcuno-accesso-posta.hf.space/?__theme=light" width="600" height="400"></iframe>',
+    'qualcuno-accesso-posta.hf.space': ACCESSO,
+  });
+  await openTab('https://huggingface.co/spaces/qualcuno/accesso-posta');
+  expect(await livelloScheda(app, 'huggingface.co')).toBe('sospetto');
 });
 
 test('Google Sites: un modulo montato secondi dopo il caricamento del riquadro fa comparire l\'avviso', async ({ app, openTab }) => {
