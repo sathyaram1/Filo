@@ -54,6 +54,22 @@ test('la nota per la chat e la risposta stampata dicono che i sospesi restano da
   assert.match(perSegnalazione, /\[2i\] x/);
 });
 
+test('fermo da un rilievo con una segnalazione allegata: la risposta stampata dice che anche la segnalazione è arrivata all\'owner (#706)', () => {
+  const decision = decide('[3i] perde i dati\n[1i] bordo', { count3: 10 });
+  assert.equal(decision.stop, true);
+  for (const motivo of ['loop', 'decisione']) {
+    const reply = { outcome: 'stop', motivo, blocking: decision.blocking, sospesi: decision.sospesi, derived: [] };
+    const con = verifierReplyText(reply, 'X', { conSegnalazione: true });
+    assert.match(con, /segnalazione è consegnata all'owner/, motivo);
+    assert.match(con, /\[3i\] perde i dati/, motivo);
+    assert.match(con, /\[1i\] bordo/, motivo);
+    assert.doesNotMatch(verifierReplyText(reply, 'X'), /segnalazione/, motivo);
+  }
+  // Fermo per la sola segnalazione: la frase c'è una volta, non due.
+  const sola = verifierReplyText({ outcome: 'stop', motivo: 'segnalazione', blocking: [], sospesi: [], derived: [] }, 'X', { conSegnalazione: true });
+  assert.equal(sola.split('segnalazione è consegnata').length - 1, 1);
+});
+
 test('il compito della verifica locale insegna il formato che il lettore accetta', () => {
   const brief = buildVerifierBrief({ request: 'Prova.', branch: 'claude/prova', recipe: '', history: [], scope: 'pieno', perimetro: [] });
   const esempi = brief.split('\n').filter((l) => /^\s*\[\d/.test(l));

@@ -1155,7 +1155,7 @@ export function numeraRisposta(reply, critica) {
   return r;
 }
 
-export function verifierReplyText(reply, id = '<id>') {
+export function verifierReplyText(reply, id = '<id>', { conSegnalazione = false } = {}) {
   const r = reply && typeof reply === 'object' ? reply : {};
   const fmt = (list) => (Array.isArray(list) && list.length ? list.map((f) => rigaNumerata(f, VERIFIER_ROUND.formatFinding)).join('\n') : '  (nessuno)');
   const b = (r.phase2 && r.phase2.budgets) || r.budgets;
@@ -1209,6 +1209,8 @@ export function verifierReplyText(reply, id = '<id>') {
         ? 'La segnalazione è consegnata all\'owner: il lavoro aspetta la sua risposta, poi riprende da qui.'
         : 'Rilievi interni che non si possono correggere da soli (un 3 a bilancio esaurito, o un 3/2 che chiede una decisione): decide l\'owner.',
       perSegnalazione ? null : fmt(r.blocking),
+      // A fermare è stato un rilievo, ma la segnalazione mandata con la critica arriva lo stesso all'owner (#706).
+      !perSegnalazione && conSegnalazione ? 'Anche la segnalazione è consegnata all\'owner: risponde su quella e su questi rilievi insieme, poi il lavoro riprende da qui.' : null,
       sospesi.length ? `Rilievi interni che restano davanti a chi riprende dopo la risposta:\n${fmt(sospesi)}` : null,
       derivati.length ? `Feedback derivati aperti dal server (esterni: escono comunque):\n${derivatiRighe(derivati)}` : null,
       budgets ? `Bilanci: ${budgets}` : null,
@@ -2086,7 +2088,7 @@ if (isMainModule) {
       const s = await recordVerifier(id, critica, segnalazione.testo);
       if (s.rejected) esciRespinto(s);
       console.log(`stato ${id}: esito=${VERIFIER_OUTCOMES.includes(s.reply?.outcome) ? s.reply.outcome : 'non comunicato'}`);
-      console.log(verifierReplyText(s.reply, id));
+      console.log(verifierReplyText(s.reply, id, { conSegnalazione: !!segnalazione.testo }));
       process.exit(0);
     } else if (flag === '--record-fixed') {
       const seg = stripFileArg(conBiglietto(argv), 'segnala');
