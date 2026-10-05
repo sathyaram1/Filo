@@ -1425,7 +1425,7 @@
       feedbackId: fb._id,
       numero: FB && typeof FB.formatNum === 'function' ? FB.formatNum(fb.seq, fb.subSeq) : '',
       ancheNuovi: !!(opts && opts.ancheNuovi),
-    }).filter((req) => !fusioniTentate.has(req.id));
+    }).filter((req) => !fusioniTentate.has(req.id) && daDecidere(req));
     if (daFondere.length && opts && typeof opts.avvia === 'function') opts.avvia(daFondere.length);
     const esiti = [];
     for (const req of daFondere) {
