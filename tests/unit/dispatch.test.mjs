@@ -514,8 +514,8 @@ test('--ferma senza segnalazione non parte: è la segnalazione che ferma, e senz
 test('fixedReplyText: il fermo lo conferma il server; una segnalazione non fermata si dice, non si dà per fatta', () => {
   assert.match(fixedReplyText('A', { outcome: 'stop' }, true), /FERMATO/);
   assert.match(fixedReplyText('A', { outcome: 'stop' }, false), /FERMATO/, 'il server ha fermato: si dice anche se qui non lo si aspettava');
-  assert.match(fixedReplyText('A', {}, true), /ATTENZIONE/);
-  assert.match(fixedReplyText('A', {}, true), /segnalazione/);
+  assert.match(fixedReplyText('A', {}, true), /SEGNALAZIONE NON CONSEGNATA/);
+  assert.doesNotMatch(fixedReplyText('A', {}, true), /consegnata lo stesso/, 'senza il fermo non si dà per arrivata (#705)');
   assert.match(fixedReplyText('A', {}, false), /torna in coda/);
 });
 
