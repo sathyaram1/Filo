@@ -3594,6 +3594,8 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       Onboarding.appendTurn(onbBefore, { role: 'user', text: String(userMessage) }),
     );
   }
+  // «Riprendi» toglie il segno dello stop: da qui il turno è di nuovo in corso, e se la scheda muore riparte come gli altri.
+  if (onbActive && internal && onbBefore && onbBefore.fermato) onbBefore = await saveOnboarding(Onboarding.togliFermato(onbBefore));
   if (onbActive && !internal && Onboarding.isExitRequest(onbBefore, userMessage)) {
     // «basta così» chiude qui, senza chiedere niente a nessuno. Il congedo è un
     // testo fisso — l'unica risposta che si può garantire anche senza modello.
@@ -3906,6 +3908,8 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     if (reasoningReqId && turniInCorso.get(String(reasoningReqId)) === turno) turniInCorso.delete(String(reasoningReqId));
   }
   if (fermato) {
+    // Lo stop resta scritto nell'intervista: una scheda nuova o una pagina ricaricata non rifà il turno fermato.
+    if (onbActive) await saveOnboarding(Onboarding.segnaFermato(await FiloMem.getOnboarding()));
     if (onbActive && !internal) releaseOnboardingResume();
     // Nell'archivio della chat restano le azioni che sono successe davvero: riaperta, la chat racconta cosa era stato
     // fatto prima che l'utente fermasse.

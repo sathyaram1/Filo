@@ -173,11 +173,22 @@
     resetHistory: (onbState) => {
       threadHistory = [];
       ripresa = null;
+      aggiornaTasto();
       // #525 — l'intervista è UNA conversazione: la sua targa la dà lo stato
       // dell'intervista, non il sorteggio di questo caricamento di pagina.
       if (onbState) chatId = chatIdOnboarding(onbState);
     },
     pushHistory: (m) => { threadHistory.push(m); },
+    // Un turno dell'intervista fermato altrove (un'altra scheda, prima di ricaricare): come qui, la riga e «riprendi».
+    segnaFermato: () => {
+      threadHistory.push({ role: 'filo', text: '', actions: [], interrotto: true, fermato: true });
+      const nota = document.createElement('div');
+      nota.className = 'dash-bubble-note dash-bubble-fermato';
+      nota.textContent = 'Fermato prima della risposta.';
+      bubblesEl.appendChild(nota);
+      ripresa = { nota, blocco: null };
+      aggiornaTasto();
+    },
     isSending: () => sending || !!chiusuraInCorso,
     // La conversazione dell'intervista è già quella a schermo: stessi messaggi, nello stesso ordine.
     giaAschermo: (state) => {

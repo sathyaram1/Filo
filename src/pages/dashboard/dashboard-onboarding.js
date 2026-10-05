@@ -28,6 +28,7 @@
   let goThread = null;
   let resetHistory = null;
   let pushHistory = null;
+  let segnaFermato = null;
   let isSending = null;
   let giaAschermo = null;
   let beginSending = null;
@@ -75,6 +76,8 @@
       pushHistory({ role, text: m.text });
       bubblesEl.appendChild(makeBubble({ role, text: m.text, markdown: role === 'filo' }));
     }
+    const ultimo = thread[thread.length - 1];
+    if (state.fermato && ultimo && ultimo.role !== 'filo' && segnaFermato) segnaFermato();
     if (Cambi && segni.length) Cambi.rimetti(bubblesEl, segni);
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
   }
@@ -321,6 +324,7 @@
     goThread = deps.goThread;
     resetHistory = deps.resetHistory;
     pushHistory = deps.pushHistory;
+    segnaFermato = deps.segnaFermato || null;
     isSending = deps.isSending;
     giaAschermo = deps.giaAschermo || null;
     beginSending = deps.beginSending;

@@ -261,6 +261,22 @@ test('hasPendingTurn(): riparte solo il turno che è rimasto davvero a metà', (
     'un’intervista chiusa non ha turni da riprendere');
 });
 
+// #578 — il turno fermato col quadrato non riparte da solo in un'altra scheda o dopo un ricaricamento.
+test('un turno fermato dall’utente non è da riprendere finché non riprende lui o scrive altro', () => {
+  let s = O.appendTurn(O.emptyState(), { role: 'filo', text: O.WELCOME_MESSAGE });
+  assert.equal(O.segnaFermato(s).fermato, undefined, 'senza un turno a metà non c’è niente da segnare');
+  s = O.appendTurn(s, { role: 'user', text: 'sono Anna' });
+  const fermo = O.segnaFermato(s);
+  assert.equal(O.hasPendingTurn(fermo), false);
+  assert.equal(O.normalize(JSON.parse(JSON.stringify(fermo))).fermato, true, 'il segno sopravvive al salvataggio');
+  assert.equal(O.hasPendingTurn(O.togliFermato(fermo)), true, '«riprendi»: il turno è di nuovo in corso');
+  assert.equal(O.hasPendingTurn(O.appendTurn(fermo, { role: 'user', text: 'anzi, Annalisa' })), true);
+  assert.equal(O.hasPendingTurn(O.appendTurn(fermo, { role: 'user', text: 'sono Anna' })), true,
+    'lo stesso messaggio rimandato è una richiesta nuova');
+  assert.equal(O.appendTurn(fermo, { role: 'filo', text: 'Piacere.' }).fermato, undefined);
+  assert.equal(O.normalize(s).fermato, undefined, 'lo stato di sempre non cambia forma');
+});
+
 // ── RILIEVO 3: rifare l'intervista non cancella quella di prima ────────────
 // Rossa senza il fix: restart() sostituiva la conversazione e chi la rifaceva
 // perdeva la prima per sempre.
