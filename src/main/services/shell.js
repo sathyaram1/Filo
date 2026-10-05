@@ -24,6 +24,7 @@
 const { spawn } = require('node:child_process');
 const os = require('node:os');
 const fs = require('node:fs');
+const path = require('node:path');
 // Quale shell gira davvero, dato quella chiesta e il sistema: la regola è una
 // sola e sta in terminal.js. Erano due: i comandi dell'assistente onoravano
 // "bash" fuori da Windows, questa sessione ricadeva sempre su /bin/sh — cioè
