@@ -2,8 +2,8 @@
 //
 // Un solo interruttore a 3 stati (settings.security.cookies.mode):
 //   - 'manual'  → nessuna gestione automatica.
-//   - 'default' → "Automatico": GPC + rifiuto CMP + YouTube nocookie (content
-//                 script) + BLOCCO a monte dei tracker noti (Google Analytics,
+//   - 'default' → "Automatico": GPC + rifiuto CMP + YouTube nocookie (a monte,
+//                 vedi sotto) + BLOCCO a monte dei tracker noti (Google Analytics,
 //                 ad network, social pixel…). I cookie funzionali/di prima parte
 //                 (login, preferenze, le tue scelte) NON vengono cancellati: le
 //                 tue scelte restano. All'uscita ripulisce solo eventuali cookie
@@ -16,16 +16,18 @@
 //
 // Questo modulo si occupa SOLO della parte main-process:
 //   - emette l'header Sec-GPC: 1 sulle sessioni (onBeforeSendHeaders);
-//   - blocca le richieste ai tracker noti (onBeforeRequest);
+//   - blocca le richieste ai tracker noti e devia gli embed YouTube su
+//     youtube-nocookie.com prima che partano (onBeforeRequest);
 //   - risolve la sessione/partizione per ogni navigazione top-level;
 //   - ripulisce i cookie dei tracker (wipe mirato, modalità 'default').
-// Il rifiuto dei banner CMP e la riscrittura degli embed YouTube vivono nel
-// content script src/content/cookies.js. L'iniezione di
+// Il rifiuto dei banner CMP e il ripiego per gli embed YouTube (sessioni senza
+// questo filtro) vivono nel content script src/content/cookies.js. L'iniezione di
 // navigator.globalPrivacyControl avviene in tabs.js (mondo della pagina).
 
 'use strict';
 
 const { session } = require('electron');
+const YtNocookie = require('../../shared/youtubeNocookie.js');
 
 const MODES = { MANUAL: 'manual', DEFAULT: 'default', PRIVACY: 'privacy' };
 
@@ -227,11 +229,17 @@ function ensureRequestHook(ses) {
   // devono convivere qui dentro. I due hanno gate indipendenti: il tracker è
   // legato alla modalità cookie (s.enabled), l'ad-blocking ha il suo toggle.
   ses.webRequest.onBeforeRequest((details, callback) => {
+    const s = blockState.get(ses);
+    // Prima di tutto il resto: chi guarda dopo (anche le prove, da chiudiHost) vede solo ciò che uscirebbe davvero.
+    const nocookie = s && s.enabled && details.resourceType === 'subFrame' ? YtNocookie.url(details.url) : null;
+    if (nocookie) {
+      callback({ redirectURL: nocookie });
+      return;
+    }
     if (hostChiusoFn && hostChiusoFn(details.url)) {
       callback({ cancel: true });
       return;
     }
-    const s = blockState.get(ses);
     if (!s || !s.filtri || (permessoFn && permessoFn(details))) {
       callback({ cancel: false });
       return;
@@ -256,6 +264,12 @@ function applyTrackerBlocking(ses, enabled) {
   if (!state) return;
   state.filtri = true;
   state.enabled = !!enabled;
+}
+
+// Vero se questa sessione devia già in rete gli embed YouTube: allora la pagina non deve riscriverli (li caricherebbe due volte).
+function nocookieInRete(ses) {
+  const s = ses ? blockState.get(ses) : null;
+  return !!(s && s.enabled);
 }
 
 // ─── sessioni per-sito (modalità privacy) ─────────────────────────────────
@@ -488,6 +502,7 @@ module.exports = {
   ensureHeaderHook,
   applyGpc,
   applyTrackerBlocking,
+  nocookieInRete,
   ensureRequestHook,
   chiudiHost,
   permettiRichieste,

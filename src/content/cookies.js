@@ -1,4 +1,4 @@
-// Cookie e consenso, lato pagina: rifiuta i banner dei CMP, nasconde quelli senza «rifiuta», riscrive gli embed YouTube.
+// Cookie e consenso, lato pagina: rifiuta i banner dei CMP, nasconde quelli senza «rifiuta», riscrive gli embed YouTube se la rete non li devia già.
 // Gira in ogni frame http(s), riquadri compresi (lì solo rifiuto e YouTube: nascondere e sbloccare spetta alla pagina).
 // Modalità in settings.security.cookies (manuale = spento); GPC, blocco tracker e partizioni stanno in services/cookies.js.
 
@@ -683,22 +683,22 @@
     if (any) noteHidden();
   }
 
-  // ─── riscrittura embed YouTube → nocookie ──────────────────────────────────
+  // ─── embed YouTube → nocookie: ripiego per le sessioni che non lo deviano già in rete ──
+
+  const YT = global.SN_YT_NOCOOKIE || (() => { try { return require('../shared/youtubeNocookie.js'); } catch (_) { return null; } })();
 
   function nocookieUrl(src) {
-    try {
-      const u = new URL(src, location.href);
-      if (!/(^|\.)youtube\.com$/i.test(u.hostname)) return null;
-      if (!/^\/embed\//i.test(u.pathname)) return null;
-      u.hostname = u.hostname.replace(/(^|\.)youtube\.com$/i, (m) => m.replace('youtube.com', 'youtube-nocookie.com'));
-      return u.toString();
-    } catch (_) { return null; }
+    return YT ? YT.url(src, location.href) : null;
   }
 
+  // Con la rete che devia (cfg.rete) toccare src ricaricherebbe un riquadro già partito su nocookie.
   function rewriteYouTube(root) {
+    if (cfg && cfg.rete) return;
     let frames = [];
-    try { frames = root.querySelectorAll('iframe[src]'); } catch (_) { return; }
+    try { frames = root.querySelectorAll('iframe[src], iframe[data-src]'); } catch (_) { return; }
     for (const f of frames) {
+      const lazy = nocookieUrl(f.getAttribute('data-src') || '');
+      if (lazy) { try { f.setAttribute('data-src', lazy); } catch (_) {} }
       if (f.__filoNocookie) continue;
       const next = nocookieUrl(f.getAttribute('src') || '');
       if (next && next !== f.src) {

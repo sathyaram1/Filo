@@ -63,7 +63,9 @@ module.exports = function register(on, ctx) {
     const win = winOf(sender);
     const hold = !!(win && win._filoTabs && sender.tab && win._filoTabs.cookieHold(sender.tab.id));
     const off = hold || Cookies.isBannerSiteIn(Cookies.getBannerSites(settings), topUrl);
-    const res = { ok: true, mode, off, topUrl };
+    const wc = sender && sender.wc;
+    const rete = !!(wc && !wc.isDestroyed() && Cookies.nocookieInRete(wc.session));
+    const res = { ok: true, mode, off, topUrl, rete };
     if (off) return res;
     res.seen = win && win._filoTabs ? win._filoTabs.cookieSeen(topUrl) : null;
     res.index = require('../consentRules').detectIndex(topUrl);
