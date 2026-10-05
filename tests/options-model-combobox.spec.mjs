@@ -9,6 +9,7 @@
 // Questi test asseriscono il COMPORTAMENTO, senza dipendere dalla rete:
 //   1. Il campo è legato alla datalist del provider (niente popup nativo).
 //   2. Un modello salvato compare nella tendina alla riapertura.
+//   3. Una lista che arriva dopo il fuoco apre la tendina rimasta vuota.
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -19,6 +20,25 @@ const OPTIONS_URL = 'filo://options/options.html';
 // SEMPRE le query a #modelRegistryList per non prendere le righe sbagliate.
 const ROW = '#modelRegistryList .sn-model-row:not(.sn-model-row-head)';
 
+// Il catalogo del fornitore arriva dalla rete quando arriva e SOSTITUISCE la lista della tendina: una voce messa a mano
+// prima spariva sulla macchina che la rete ce l'ha (#687). La prova lo serve lei; con `trattieni` aspetta `rilascia`.
+async function serviCatalogo(app, ids, { trattieni = false } = {}) {
+  await app.context().addInitScript(({ ids, trattieni }) => {
+    let apri = () => {};
+    const via = trattieni ? new Promise((r) => { apri = r; }) : Promise.resolve();
+    window.__rilasciaCatalogo = () => apri();
+    const orig = window.fetch;
+    window.fetch = function (url) {
+      if (!/^https:\/\/openrouter\.ai\/api\/v1\/models/.test(String(url))) return orig.apply(this, arguments);
+      return via.then(() => new Response(JSON.stringify({ data: ids.map((id) => ({ id })) }),
+        { status: 200, headers: { 'content-type': 'application/json' } }));
+    };
+  }, { ids, trattieni });
+}
+
+const lista = (page) => page.evaluate(() =>
+  [...document.getElementById('models-list-openrouter').options].map((o) => o.value));
+
 async function revealAdvanced(page) {
   await page.waitForSelector('#useDefaultModels', { timeout: 8_000 });
   await page.uncheck('#useDefaultModels');
@@ -26,7 +46,8 @@ async function revealAdvanced(page) {
   await page.waitForSelector(ROW, { timeout: 8_000 });
 }
 
-test('Modelli: il campo è un combobox custom legato al provider della riga', async ({ openTab }) => {
+test('Modelli: il campo è un combobox custom legato al provider della riga', async ({ app, openTab }) => {
+  await serviCatalogo(app, ['vendor/modello-di-prova']);
   const page = await openTab(OPTIONS_URL);
   await revealAdvanced(page);
 
@@ -43,21 +64,41 @@ test('Modelli: il campo è un combobox custom legato al provider della riga', as
   // (senza il fix questo è rosso). Il dropdown ora è quello custom .sn-select-*.
   await expect(idInput).not.toHaveAttribute('list', /.*/);
 
-  // Semina la lista con un id riconoscibile.
-  await page.evaluate(() => {
-    const dl = document.getElementById('models-list-openrouter');
-    const o = document.createElement('option'); o.value = 'vendor/modello-di-prova';
-    dl.appendChild(o);
-  });
+  // Il catalogo del fornitore entra nella lista del combobox.
+  await expect.poll(() => lista(page), { timeout: 6_000 }).toContain('vendor/modello-di-prova');
 
-  // Mettendo a fuoco il campo, il dropdown custom mostra il modello seminato.
+  // Aprendo il campo, il dropdown custom mostra il modello del catalogo. Col clic, il gesto dell'utente: un `focus()`
+  // dato da fuori non genera l'evento in una finestra che il fuoco non ce l'ha.
   await row.locator('.sn-model-provider').selectOption('openrouter');
-  await idInput.focus();
+  await idInput.click();
   // Scope al wrapper del campo: anche il <select> del provider è un menu custom
   // di Filo con il suo .sn-select-pop, quindi nella riga ce n'è più d'uno.
   const pop = row.locator('.sn-model-id-wrap .sn-select-pop');
   await expect(pop).toBeVisible({ timeout: 4_000 });
   await expect(pop.locator('.sn-select-option', { hasText: 'vendor/modello-di-prova' })).toBeVisible();
+});
+
+test('Modelli: se la lista arriva dopo il fuoco, la tendina rimasta vuota si apre da sé', async ({ app, openTab }) => {
+  // Registro vuoto (il caso di chi spegne i modelli predefiniti): finché il catalogo non arriva non c'è niente da
+  // proporre, e la tendina restava chiusa sotto il campo a fuoco finché non si cliccava di nuovo.
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({ useDefaultModels: false, modelRegistry: {} });
+  });
+  await serviCatalogo(app, ['vendor/arrivato-dopo'], { trattieni: true });
+  const page = await openTab(OPTIONS_URL);
+  await page.waitForSelector(ROW, { timeout: 8_000 });
+
+  const row = page.locator(ROW).first();
+  const idInput = row.locator('.sn-model-id');
+  const pop = row.locator('.sn-model-id-wrap .sn-select-pop');
+  await idInput.click();
+  expect(await lista(page)).toEqual([]);
+  await expect(pop).toBeHidden();
+
+  await page.evaluate(() => window.__rilasciaCatalogo());
+  await expect(pop).toBeVisible({ timeout: 6_000 });
+  await expect(pop.locator('.sn-select-option', { hasText: 'vendor/arrivato-dopo' })).toBeVisible();
+  await expect(idInput).toBeFocused();
 });
 
 test('Modelli: un modello salvato compare nella tendina alla riapertura', async ({ openTab }) => {
