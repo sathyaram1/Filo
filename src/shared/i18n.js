@@ -563,7 +563,8 @@
     options_cookies_whitelist_title: 'Siti fidati: resta connesso',
     options_cookies_whitelist_desc:
       'In "Privacy massima" ogni sito è isolato e usa-e-getta. I siti che aggiungi qui fanno eccezione: vivono in ' +
-      'uno spazio isolato ma persistente, così resti connesso. Aggiungi il sito (es. gmail.com) e premi Invio.',
+      'uno spazio isolato ma persistente, così resti connesso. Aggiungi il sito (es. gmail.com) e premi Invio; ' +
+      'se poi lo togli, Filo butta via quello che aveva salvato.',
     options_cookies_whitelist_placeholder: 'es. gmail.com',
     options_cookies_whitelist_add: 'Aggiungi',
     options_cookies_whitelist_remove: 'Rimuovi',

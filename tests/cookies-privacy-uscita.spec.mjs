@@ -129,3 +129,49 @@ test('un sito fidato («resta connesso») conserva la sessione anche dopo il mar
   await attendi(2500);
   expect((await apri(app, shell, fidato('/riaperta'))).titolo).toBe(CONNESSO);
 });
+
+test('tolto dai «siti fidati», quello che il sito aveva salvato se ne va: non torna rimettendolo fra i fidati', async ({ app, shell }) => {
+  const host = await app.evaluate((_e, u) => globalThis.__filoCookies.registrableOf(u), fidato('/'));
+  await privacy(app, shell, { trustedSites: [host], margine: 800 });
+  const a = await apri(app, shell, fidato('/accedi'));
+  expect(a.partizione).toMatch(/^persist:filo-priv-/);
+  await chiudi(shell, a.id);
+  await attendi(1500);
+
+  await privacy(app, shell, { trustedSites: [], margine: 800 });
+  const b = await apri(app, shell, fidato('/dopo'));
+  expect(b.partizione).not.toMatch(/^persist:/);
+  expect(b.titolo).toBe(PULITO);
+  await chiudi(shell, b.id);
+  await attendi(2500);
+
+  await privacy(app, shell, { trustedSites: [host], margine: 800 });
+  expect((await apri(app, shell, fidato('/ritorno'))).titolo).toBe(PULITO);
+});
+
+test('il sito tolto dai fidati mentre è aperto non perde la sessione sotto le mani; rimesso prima di chiudere, resta connesso', async ({ app, shell }) => {
+  const host = await app.evaluate((_e, u) => globalThis.__filoCookies.registrableOf(u), fidato('/'));
+  await privacy(app, shell, { trustedSites: [host], margine: 800 });
+  const a = await apri(app, shell, fidato('/accedi'));
+
+  // Tolto dai fidati con la scheda aperta: la pagina che l'utente sta usando non viene svuotata.
+  await privacy(app, shell, { trustedSites: [], margine: 800 });
+  await attendi(2500);
+  expect(await nellaPagina(app, a.id, 'document.cookie')).toContain('sess=abc');
+
+  // Rimesso fra i fidati prima di chiudere: l'utente ha disdetto, e quello che il sito aveva salvato resta.
+  await privacy(app, shell, { trustedSites: [host], margine: 800 });
+  await chiudi(shell, a.id);
+  await attendi(2500);
+  expect((await apri(app, shell, fidato('/riaperta'))).titolo).toBe(CONNESSO);
+});
+
+async function nellaPagina(app, id, codice) {
+  return app.evaluate(({ BrowserWindow }, [tabId, js]) => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      const t = w._filoTabs && w._filoTabs.tabs.find((x) => x.id === tabId);
+      if (t) return t.view.webContents.executeJavaScript(js, true);
+    }
+    return null;
+  }, [id, codice]);
+}
