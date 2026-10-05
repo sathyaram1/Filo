@@ -9,6 +9,13 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.234', date: '2026-10-05',
+      features: [],
+      fixes: [
+        'Su Windows, se in un comando che Filo esegue per te una parte sbaglia, per esempio un programma che non esiste, il resto della riga gira lo stesso, come quando la scrivi tu nel terminale. Prima si fermava tutto lì.',
+      ],
+    },
+    {
       version: '0.2.233', date: '2026-10-05',
       features: [],
       fixes: [

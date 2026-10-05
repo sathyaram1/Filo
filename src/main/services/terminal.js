@@ -71,6 +71,20 @@ function shellInvocation(shell, command) {
   }
 }
 
+// Con la cartella tracciata PowerShell legge da stdin, come la dashboard: con `-Command <testo>` un throw
+// salterebbe la sonda, a meno di un try che però cambia gli errori (righePowerShell). Il resto va in argv.
+function invocazione(shell, command, { trackCwd = false, mark = '' } = {}) {
+  if (trackCwd && resolveShell(shell) === 'powershell') {
+    return {
+      file: 'powershell.exe',
+      args: ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', '-'],
+      stdin: PREPARA_STDIN_POWERSHELL + PRELUDI_CODIFICA.powershell + withCwdProbe(shell, command, mark),
+    };
+  }
+  const testo = encodingPrelude(shell) + (trackCwd ? withCwdProbe(shell, command, mark) : command);
+  return { ...shellInvocation(shell, testo), stdin: null };
+}
+
 function truncate(text) {
   const s = String(text || '');
   if (s.length <= MAX_OUTPUT_CHARS) return { text: s, truncated: false };
@@ -182,12 +196,60 @@ function nuovoMarcatore() {
 // L'esito di un comando PowerShell, con $__filo_ok = il $? preso subito dopo. $LASTEXITCODE lo scrivono solo
 // i programmi esterni: un cmdlet fallito lo lascia a 0, e a dirlo resta $? (#714). Vale anche per shell.js.
 const ESITO_POWERSHELL = 'if ($__filo_ok) { 0 } elseif ($LASTEXITCODE) { $LASTEXITCODE } '
+  // $__filo_ok ancora $null = il comando è uscito prima della riga che lo scrive. A dire come basta il $? della riga
+  // che lo ha eseguito ($__filo_riga): falso dopo un errore che ferma, vero dopo un return o un break, anche se prima
+  // un errore era stato zittito o gestito (in $Error ci finiscono pure quelli, quindi da lì non si può dedurre).
+  + 'elseif ($null -eq $__filo_ok) { if ($__filo_riga) { 0 } else { 1 } } '
+  + 'elseif (-not ($Error.Count -and -not [object]::ReferenceEquals($Error[0], $__filo_e))) { 1 } '
   // Con lo stderr rediretto (2>&1, 2>$null) ogni riga di un programma riuscito diventa un errore e spegne $?:
-  // se l'ultimo errore nuovo ($__filo_e = quello di prima) viene da lì, decide il codice del programma.
-  + 'elseif ($Error.Count -and -not [object]::ReferenceEquals($Error[0], $__filo_e) '
-  + "-and $Error[0].FullyQualifiedErrorId -like 'NativeCommandError*') { 0 } else { 1 }";
+  // se l'ultimo errore nuovo viene da lì, decide il codice del programma.
+  + "elseif ($Error[0].FullyQualifiedErrorId -like 'NativeCommandError*') { 0 } else { 1 }";
 // Da mettere prima del comando: l'errore più recente che c'era già, perché uno vecchio non decida l'esito.
 const ERRORE_DI_PRIMA_POWERSHELL = '$__filo_e=if ($Error.Count) { $Error[0] } else { $null }';
+
+// PSReadLine su una pipe non può leggere e lascia un errore in $Error a ogni riga, che falserebbe l'esito.
+const PREPARA_STDIN_POWERSHELL = 'Remove-Module PSReadLine -ErrorAction Ignore\n';
+
+// Il testo come espressione PowerShell di sole stringhe fra apici e [char]: sul filo solo ASCII (lo stdin lo
+// decodifica nella tabella OEM, #551), su una riga sola, e senza chiamate a metodi, vietate in modalità ristretta.
+function testoPowerShell(testo) {
+  const s = String(testo);
+  const pezzi = [];
+  let tratto = '';
+  for (let i = 0; i < s.length; i++) {
+    const n = s.charCodeAt(i);
+    if (n >= 0x20 && n < 0x7f) { tratto += n === 0x27 ? "''" : s[i]; continue; }
+    if (tratto) pezzi.push(`'${tratto}'`);
+    tratto = '';
+    pezzi.push(`[char]${n}`);
+  }
+  if (tratto || !pezzi.length) pezzi.push(`'${tratto}'`);
+  return `(-join @(${pezzi.join(',')}))`;
+}
+
+// Si esegue con `. scriptblock`, nello scope di chi chiama: con Invoke-Expression gli errori che fermano (e quelli
+// di sintassi) mostravano questa riga invece del comando. La sintassi si controlla prima, sul solo testo; `coda`
+// gira dopo ma resta fuori. In modalità ristretta (PC aziendali bloccati) quei metodi sono vietati: resta
+// Invoke-Expression, l'unica strada che lì il comando lo esegue.
+function invocaCodificato(testo, coda = '') {
+  const conCoda = coda ? ` + [char]10 + '${coda}'` : '';
+  return `$__filo_t=${testoPowerShell(testo)}; $__filo_pe=$null; `
+    + `if ($ExecutionContext.SessionState.LanguageMode -ne 'FullLanguage') { Invoke-Expression ($__filo_t${conCoda}) } else { `
+    + 'try { $null=[Management.Automation.Language.Parser]::ParseInput($__filo_t, [ref]$null, [ref]$__filo_pe) } catch {}; '
+    + 'if ($__filo_pe) { [Console]::Error.WriteLine((New-Object Management.Automation.ParseException (,$__filo_pe)).Message); $__filo_ok=$false } '
+    + `else { . ([ScriptBlock]::Create($__filo_t${conCoda})) } }`;
+}
+
+const SEGNA_ESITO = '$__filo_ok=$?';
+
+// Le righe che una PowerShell letta da stdin esegue per un comando, chiuse da `<segno>:<esito>:<cartella>`; le
+// usano dashboard e assistente. Niente try attorno al comando: dentro un try un comando sconosciuto ferma tutto il
+// resto (#722). La riga del segno è una pipeline a parte: gira anche dopo un throw, non dopo un `exit`.
+function righePowerShell(command, segno, codifica = invocaCodificato) {
+  return `$global:LASTEXITCODE=0\n$__filo_ok=$null\n${ERRORE_DI_PRIMA_POWERSHELL}\n`
+    + `${codifica(command, SEGNA_ESITO)}\n$__filo_riga=$?\n`
+    + `"${segno}:$(${ESITO_POWERSHELL}):$((Get-Location).Path)"\n`;
+}
 
 // Appende al comando una "sonda" che stampa <marcatore>:<exitcode>:<cwd>. La
 // sonda gira SEMPRE (anche se il comando fallisce) e cattura l'exit code reale
@@ -199,11 +261,9 @@ function withCwdProbe(shell, command, mark = nuovoMarcatore()) {
     return `${command}\r\necho ${mark}:%errorlevel%:%cd%`;
   }
   if (sh === 'powershell') {
-    // Il comando su righe sue: un commento in coda si mangiava la chiusura del try. Se non arriva in fondo
-    // (exit, errore che ferma tutto) l'esito resta vuoto e lo dà il codice del processo, l'unico che lo sa.
-    return `$global:LASTEXITCODE=0\n$__filo_c=''\n${ERRORE_DI_PRIMA_POWERSHELL}\n`
-      + `try {\n${command}\n$__filo_ok=$?\n$__filo_c=${ESITO_POWERSHELL}\n}`
-      + ` finally { Write-Output "${mark}:$($__filo_c):$((Get-Location).Path)" }`;
+    // Si legge da stdin (vedi invocazione). Il comando codificato è UNA pipeline: un throw o un
+    // -ErrorAction Stop fermano il resto del comando come in uno script, non solo la riga in cui stanno.
+    return righePowerShell(command, mark);
   }
   // bash / sh (incluse le routine cloud Linux): cattura $? subito dopo il
   // comando, poi stampa il marcatore (sempre eseguito, su riga propria).
@@ -223,7 +283,7 @@ function extractCwdMark(rawStdout, mark) {
   return {
     stdout: rawStdout.slice(0, cut),
     trovato: !!m,
-    // Vuoto = la sonda la cartella la sa, l'esito no: resta quello del processo.
+    // Un esito illeggibile non diventa un successo: resta quello del processo.
     code: m && m[1] !== '' ? (parseInt(m[1], 10) || 0) : null,
     cwd: m ? (m[2].trim() || undefined) : undefined,
   };
@@ -246,8 +306,7 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, 
     // preludio che mette la shell in UTF-8 (#551), altrimenti i nomi con
     // accenti e trattini lunghi tornano storpiati.
     const mark = trackCwd ? nuovoMarcatore() : '';
-    const toRun = encodingPrelude(usedShell) + (trackCwd ? withCwdProbe(usedShell, cmd, mark) : cmd);
-    const { file, args } = shellInvocation(usedShell, toRun);
+    const { file, args, stdin } = invocazione(usedShell, cmd, { trackCwd, mark });
     // La cartella può non esistere più: rinominata, cancellata, su una
     // chiavetta staccata (#551, quarto giro). Lì dentro non fallisce il
     // comando, fallisce la shell prima di leggerlo, e la cartella appuntata
@@ -280,6 +339,11 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, 
     } catch (e) {
       resolve({ command: cmd, stdout: '', stderr: `Impossibile avviare la shell: ${e && e.message ? e.message : e}`, code: 127, signal: null, truncated: false, timedOut: false, durationMs: Date.now() - startedAt });
       return;
+    }
+    if (stdin != null && child.stdin) {
+      // Se la shell muore prima di leggere, la scrittura fallisce: l'esito lo racconta già 'close'.
+      child.stdin.on('error', () => {});
+      child.stdin.end(stdin);
     }
 
     const timer = setTimeout(() => {
@@ -367,7 +431,9 @@ module.exports = {
   runCommand, shellInvocation, resolveShell, defaultShell, MAX_OUTPUT_CHARS, DEFAULT_TIMEOUT_MS,
   // esportati per gli unit test (il preludio UTF-8 e la sonda sono la parte
   // che si può verificare senza avviare una shell su ogni piattaforma).
-  encodingPrelude, withCwdProbe, PRELUDI_CODIFICA, ESITO_POWERSHELL, ERRORE_DI_PRIMA_POWERSHELL,
+  encodingPrelude, withCwdProbe, invocazione, PRELUDI_CODIFICA,
+  // le righe PowerShell da stdin: le usa anche il terminale della dashboard (shell.js), così non divergono.
+  righePowerShell, invocaCodificato, PREPARA_STDIN_POWERSHELL,
   // il marcatore della sonda: il prefisso è fisso, il resto è a caso a ogni
   // comando, ed è quello che impedisce all'uscita di scriverselo (#551, ottavo
   // giro di verifica).

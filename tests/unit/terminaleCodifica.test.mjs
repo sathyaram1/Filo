@@ -83,8 +83,24 @@ test('il preludio precede il comando dell\'utente, non lo segue', () => {
   // L'ORDINE si controlla sul codice, uguale su ogni sistema. Se il preludio
   // finisse dopo il comando, la console avrebbe già scritto l'output con la
   // codifica sbagliata e il nome sarebbe perso.
-  const src = readFileSync(join(ROOT, 'src', 'main', 'services', 'terminal.js'), 'utf8');
-  assert.match(src, /const toRun = encodingPrelude\(usedShell\) \+ \(/);
+  // Si guarda quello che parte davvero, fingendo Windows per vederne i rami anche altrove.
+  const prima = Object.getOwnPropertyDescriptor(process, 'platform');
+  Object.defineProperty(process, 'platform', { value: 'win32' });
+  try {
+    const comando = 'Write-Output ciao';
+    for (const shell of ['powershell', 'cmd']) {
+      for (const trackCwd of [false, true]) {
+        const inv = T.invocazione(shell, comando, { trackCwd, mark: 'SEGNO' });
+        const testo = inv.stdin != null ? inv.stdin : inv.args[inv.args.length - 1];
+        const preludio = T.encodingPrelude(shell);
+        const dove = testo.includes(comando) ? testo.indexOf(comando) : testo.indexOf('FromBase64String');
+        assert.ok(preludio && testo.includes(preludio), `${shell}, cartella tracciata ${trackCwd}: manca il preludio`);
+        assert.ok(dove > testo.indexOf(preludio), `${shell}, cartella tracciata ${trackCwd}: il preludio segue il comando`);
+      }
+    }
+  } finally {
+    Object.defineProperty(process, 'platform', prima);
+  }
 });
 
 test('il preludio è quello della shell che gira, non di quella chiesta', () => {
@@ -135,9 +151,12 @@ test('il comando digitato dall\'utente non arriva a PowerShell con byte fuori da
   // …e PowerShell lo rimette insieme IDENTICO a quello che l'utente ha
   // digitato. Qui si rifà il giro che farebbe lui: si ripesca il testo
   // codificato e lo si riporta a caratteri.
-  const b64 = (sulFilo.match(/FromBase64String\('([A-Za-z0-9+/=]+)'\)/) || [])[1];
-  assert.ok(b64, 'il comando deve viaggiare codificato, non interpolato');
-  assert.equal(Buffer.from(b64, 'base64').toString('utf8'), comando);
+  const espressione = (sulFilo.match(/\$__filo_t=\(-join @\(((?:'(?:[^']|'')*'|\[char\]\d+)(?:,(?:'(?:[^']|'')*'|\[char\]\d+))*)\)\);/) || [])[1];
+  assert.ok(espressione, 'il comando deve viaggiare codificato, non interpolato');
+  const ricomposto = espressione.match(/'(?:[^']|'')*'|\[char\]\d+/g)
+    .map((p) => (p[0] === "'" ? p.slice(1, -1).replace(/''/g, "'") : String.fromCharCode(Number(p.slice(6)))))
+    .join('');
+  assert.equal(ricomposto, comando);
   // Niente del comando dell'utente finisce dritto nella riga: se ci finisse,
   // una virgoletta basterebbe a uscire dalla stringa e a farsi eseguire altro.
   assert.ok(!sulFilo.includes('attività'));
