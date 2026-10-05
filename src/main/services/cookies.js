@@ -300,6 +300,8 @@ const sitoDelJar = new Map();      // base → eTLD+1
 const jarDellaSessione = new WeakMap();
 const uscite = new Map();          // partizione → timer
 const scaricamenti = new Map();    // partizione → Set<DownloadItem>
+const seguiti = new Set();         // partizioni già seguite: un secondo giro raddoppierebbe i listener
+const fidatiDaButtare = new Set(); // partizioni persist: di siti tolti dai fidati, in attesa che il sito si chiuda
 let seguendo = false;
 
 // Manopola dei test: senza argomento torna al margine vero.
