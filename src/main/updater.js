@@ -16,6 +16,7 @@ function nuovoStato() {
     versioneTrovata: null,
     scaricamento: null,   // { versione, percento } finché scarica
     pronta: null,         // la versione scaricata
+    agganciata: false,    // electron-updater la installerà alla chiusura (vedi regola)
     errore: null,
     annuncia: () => {},
   };
@@ -78,6 +79,8 @@ function avviaAggiornatore(aggiornatore, { automatici = true, annuncia = () => {
     if (!prima || prima.percento !== percento) stato.annuncia();
   });
   aggiornatore.on('update-downloaded', (info) => {
+    // electron-updater aggancia l'installazione alla chiusura subito dopo questo evento, solo se è accesa adesso.
+    if (aggiornatore.autoInstallOnAppQuit) stato.agganciata = true;
     stato.scaricamento = null;
     stato.pronta = info?.version || stato.versioneTrovata;
     console.log('[updater] update scaricato:', stato.pronta, stato.aggiornatore.autoInstallOnAppQuit ? '— sarà applicato alla chiusura' : '— aspetta «Installa»');
@@ -96,8 +99,13 @@ function regola(aggiornatore) {
   aggiornatore.autoInstallOnAppQuit = stato.automatici || stato.chiesto;
   // electron-updater aggancia l'installazione alla chiusura solo a scaricamento finito: una versione già pronta
   // quando l'installazione si riaccende (spenta a metà scaricamento, poi «Installa» o riaccesa) va riagganciata.
-  if (aggiornatore.autoInstallOnAppQuit && stato.pronta && typeof aggiornatore.addQuitHandler === 'function') {
-    aggiornatore.addQuitHandler();
+  // Richiedere lo scaricamento di una versione già scaricata la ritrova in cache e rifà l'aggancio, senza rete.
+  if (aggiornatore.autoInstallOnAppQuit && stato.pronta && !stato.agganciata) {
+    stato.agganciata = true;
+    Promise.resolve().then(() => aggiornatore.downloadUpdate()).catch((e) => {
+      stato.agganciata = false;
+      console.error('[updater] aggancio alla chiusura fallito:', e?.message || e);
+    });
   }
 }
 

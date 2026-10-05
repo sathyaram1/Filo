@@ -42,7 +42,6 @@ function aggiornatoreFinto({ versione = '0.3.0', scaricamentoRotto = false, lent
     quitAndInstallCalled: false,
     _logger: { info() {} },
     app: { onQuit: (f) => allaChiusura.push(f) },
-    addQuitHandler: BaseUpdater.prototype.addQuitHandler,
     install() { u.installata = true; return true; },
     chiudi() { for (const f of allaChiusura) f(0); },
     on(e, f) { (ascolta[e] ||= []).push(f); return u; },
@@ -57,6 +56,12 @@ function aggiornatoreFinto({ versione = '0.3.0', scaricamentoRotto = false, lent
     },
     checkForUpdatesAndNotify() { return u.checkForUpdates(); },
     async downloadUpdate() {
+      // Già scaricata, electron-updater la ritrova in cache: niente rete, ma rifà evento e aggancio.
+      if (u.scaricata) {
+        u.emit('update-downloaded', { version: versione });
+        BaseUpdater.prototype.addQuitHandler.call(u);
+        return ['Filo-Setup.exe'];
+      }
       u.scaricamenti += 1;
       u.emit('download-progress', { percent: 42.7 });
       if (scaricamentoRotto) {
@@ -66,8 +71,9 @@ function aggiornatoreFinto({ versione = '0.3.0', scaricamentoRotto = false, lent
       }
       if (lento) await new Promise((ok) => { u.finisci = ok; });
       // Come electron-updater: prima l'evento, poi l'aggancio alla chiusura.
+      u.scaricata = true;
       u.emit('update-downloaded', { version: versione });
-      u.addQuitHandler();
+      BaseUpdater.prototype.addQuitHandler.call(u);
       return ['Filo-Setup.exe'];
     },
   };
