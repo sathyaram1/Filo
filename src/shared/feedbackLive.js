@@ -1,5 +1,5 @@
-// Aggiornamento continuo della Gestione: la logica pura (confronto, fusione,
-// quando girare, cosa è arrivato, dove tenere lo scorrimento), senza rete.
+// Aggiornamento continuo di Gestione e Feedback: la logica pura (confronto, fusione,
+// quando girare, cosa è arrivato, dove tenere lo scorrimento), senza rete; il giro della pagina sta in feedbackLivePagina.js.
 // Le regole: patterns/dati-che-cambiano-altrove-cloud-si-chiede-la-versione.md
 // e patterns/chi-guarda-in-continuo-chiede-cosa-e-cambiato.md (#676).
 
