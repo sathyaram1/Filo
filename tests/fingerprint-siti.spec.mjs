@@ -27,13 +27,16 @@ const test = base.extend({
 });
 
 // Quello che fa uno script di fingerprinting: disegna una scena fissa e ne legge i pixel.
-const IMPRONTA = () => {
+const IMPRONTA = async () => {
   const c = document.createElement('canvas');
   c.width = 80; c.height = 40;
   const ctx = c.getContext('2d');
   ctx.fillStyle = '#1e90ff'; ctx.fillRect(0, 0, 80, 40);
   ctx.fillStyle = '#000'; ctx.font = '16px sans-serif'; ctx.fillText('filo', 4, 24);
-  return c.toDataURL();
+  const url = c.toDataURL();
+  if (!url.startsWith('data:image/png')) return url;
+  const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(url));
+  return [...new Uint8Array(h).slice(0, 8)].map((b) => b.toString(16).padStart(2, '0')).join('');
 };
 
 test('due siti diversi leggono impronte diverse, due pagine dello stesso sito la stessa', async ({ openTab, testServer }) => {
