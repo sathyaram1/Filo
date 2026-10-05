@@ -10,9 +10,9 @@ import { controllaProveTolte } from '../../../scripts/lib/prove-tolte.mjs';
 const preparaFinto = (cmd, args) => ({ ok: true, cmd, args, env: undefined, nota: '' });
 
 // Rossa se un import relativo della prova (con o senza estensione, come li risolve Playwright) dice «rotto».
-function lanciaFinto(root) {
-  return (_cmd, args) => {
-    const prova = resolve(root, args.find((a) => /\.spec\.mjs$/.test(a)));
+function lanciaFinto() {
+  return (_cmd, args, opz) => {
+    const prova = resolve(opz.cwd, args.find((a) => /\.spec\.mjs$/.test(a)));
     const testo = readFileSync(prova, 'utf8');
     const rossa = [...testo.matchAll(/from '(\.\.?\/[^']+)'/g)].some((m) => {
       const base = resolve(dirname(prova), m[1]);
@@ -36,7 +36,7 @@ test('un aiuto condiviso fuori dalla cartella del giro, indebolito da chi correg
     const critica = commit('critica');
     w('tests/helpers/zz-aiuto.mjs', 'export function controlla() {\n}\n');
     commit('correzione che indebolisce l\'aiuto');
-    const e = controllaProveTolte({ shaPrima: critica, root: dir, lancia: lanciaFinto(dir), prepara: preparaFinto, log: () => {} });
+    const e = controllaProveTolte({ shaPrima: critica, root: dir, lancia: lanciaFinto(), prepara: preparaFinto, log: () => {} });
     expect(e.ferma, 'la prova che usa l\'aiuto, rimessa com\'era, è ancora rossa: la consegna si ferma').toBe(true);
     expect(e.testo).toContain('giro1-r2-x.spec.mjs');
   } finally {

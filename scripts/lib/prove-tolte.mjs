@@ -60,7 +60,8 @@ export function proveCheDipendono(testi, cambiati) {
     const raggiunti = new Set([c]);
     for (let nuovi = [c]; nuovi.length;) {
       nuovi = elenco.filter((t) => !raggiunti.has(t.path) && vicino(t)
-        && nuovi.some((n) => nomina(t.testo, n))).map((t) => t.path);
+        // Una prova non la importa nessuno (Playwright lo vieta): il suo nome scritto altrove non è una dipendenza.
+        && nuovi.some((n) => !PROVA.test(n) && nomina(t.testo, n))).map((t) => t.path);
       for (const n of nuovi) raggiunti.add(n);
     }
     for (const p of proveTolte([...raggiunti])) (via[p] ||= []).push(c);
