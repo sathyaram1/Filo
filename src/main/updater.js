@@ -179,25 +179,33 @@ function testoDisponibile(v) {
 // nuova prende il posto di quella prima, perché «Installa» scarica comunque l'ultima.
 function avvisaVersioneNuova(versione) {
   if (!versione) return Promise.resolve();
+  togliCarte((n) => n.action.versione !== versione);
   return inFila(async () => {
-    try {
-      const FiloMem = globalThis.SN_FILO_MEMORY;
-      if (!FiloMem?.addNotification) return;
-      const gia = await FiloMem.listNotifications({ includeDismissed: true });
-      const nostre = gia.filter((n) => n.action?.tipo === TIPO_DISPONIBILE);
-      for (const n of nostre) {
-        if (!n.dismissed && n.action.versione !== versione) await FiloMem.dismissNotification(n.id);
-      }
-      if (nostre.some((n) => n.action.versione === versione)) return;
-      await FiloMem.addNotification({
-        kind: 'info',
-        action: { tipo: TIPO_DISPONIBILE, versione },
-        text: testoDisponibile(versione),
-      });
-      stato.annuncia();
-    } catch (e) {
-      console.error('[updater] avviso versione nuova non scritto:', e?.message || e);
+    const FiloMem = globalThis.SN_FILO_MEMORY;
+    if (!FiloMem?.addNotification) return;
+    const gia = await FiloMem.listNotifications({ includeDismissed: true });
+    if (gia.some((n) => n.action?.tipo === TIPO_DISPONIBILE && n.action.versione === versione)) return;
+    await FiloMem.addNotification({
+      kind: 'info',
+      action: { tipo: TIPO_DISPONIBILE, versione },
+      text: testoDisponibile(versione),
+    });
+    stato.annuncia();
+  });
+}
+
+// Chiude le carte della versione nuova ancora in home che `via` indica.
+function togliCarte(via, { acted = false } = {}) {
+  return inFila(async () => {
+    const FiloMem = globalThis.SN_FILO_MEMORY;
+    if (!FiloMem?.dismissNotification) return;
+    let tolte = 0;
+    for (const n of await FiloMem.listNotifications()) {
+      if (n.action?.tipo !== TIPO_DISPONIBILE || !via(n)) continue;
+      await FiloMem.dismissNotification(n.id, { acted });
+      tolte += 1;
     }
+    if (tolte) stato.annuncia();
   });
 }
 
