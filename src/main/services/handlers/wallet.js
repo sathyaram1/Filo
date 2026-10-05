@@ -798,8 +798,8 @@ module.exports = function register(on, ctx) {
     // rete): lo scrive chi manda un feedback, così il server sa a chi
     // accreditare il premio (#652). Vuoto se non c'è un portafoglio.
     pseudonym: () => { try { return walletStore.pseudonym() || ''; } catch (_) { return ''; } },
-    // L'invito che arriva da fuori (#651): lo chiama main.js per il
-    // collegamento filo://invito/<codice>, e l'avvio per l'invito in attesa.
+    // L'invito che arriva da fuori (#651): main.js porta dentro il
+    // collegamento filo://invito/<codice>, l'avvio l'invito in attesa.
     redeemFromInvite, tryPendingInvite, portaDentroInvito,
     // Ripiego dalla chiave propria (#629): li chiama il provider OpenRouter.
     keySourceOf, alternativeKeyFor, noteOwnKeyRefusal, noteOwnKeySuccess, lastOwnKeyRefusal, ownKeyChanged, usageLogStatus,
