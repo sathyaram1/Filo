@@ -105,7 +105,7 @@
     const pm = /^(OpenRouter|Gemini)(?:\s+\S+)?\s+(\d{3})\b/.exec(raw);
     if ((e && e.provider) || pm) {
       const st = Number(e && e.status) || (pm ? Number(pm[2]) : 0);
-      // #700: gli host che reggono gli strumenti per quel modello ci sono, ma nessuno fra gli ammessi.
+      // #700: fra gli host ammessi per quel modello nessuno regge gli strumenti, e riprovare non serve.
       if (e && e.code === 'NO_TOOL_HOST') {
         return 'per il modello scelto nessun fornitore ammesso sa usare gli strumenti (cercare, leggere, impostare), e la chat di Filo ne ha bisogno. Scegli un altro modello in Modelli predefiniti.';
       }
