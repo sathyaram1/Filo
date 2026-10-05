@@ -5,12 +5,13 @@
 import { test, expect, argomentiScala, chiudiApp } from './fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
 import { createServer } from 'node:http';
-import { rmSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { rmSync, mkdirSync } from 'node:fs';
+import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const SHOTS = join(ROOT, 'tests', '.shots');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Un sito con l'accesso vero: password giusta → cookie di sessione persistente e /home che saluta.
@@ -35,6 +36,22 @@ async function sitoConAccesso() {
         res.writeHead(302, { 'Set-Cookie': `sid=${nuovo}; Max-Age=86400; Path=/; HttpOnly`, Location: '/home' });
         res.end();
       });
+      return;
+    }
+    // «Continua con Google» finto: la finestrella d'accesso e il ritorno che apre la sessione.
+    if (u.pathname === '/pubblica') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Set-Cookie': 'visita=1; Path=/; HttpOnly' });
+      res.end(`<!doctype html><html><head><title>Benvenuto</title></head><body style="padding:30px">
+        <button id="google" onclick="window.open('/oauth/authorize?client_id=x&redirect_uri=y', 'accesso', 'width=420,height=420')">Continua con Google</button>
+        </body></html>`);
+      return;
+    }
+    if (u.pathname === '/oauth/authorize') { html('<!doctype html><title>Scegli un account</title><p>Account</p>'); return; }
+    if (u.pathname === '/oauth-ritorno') {
+      const nuovo = Math.random().toString(36).slice(2);
+      sessioni.add(nuovo);
+      res.writeHead(302, { 'Set-Cookie': `sid=${nuovo}; Max-Age=86400; Path=/; HttpOnly`, Location: '/home' });
+      res.end();
       return;
     }
     if (u.pathname === '/esci') {
@@ -210,6 +227,12 @@ test('la proposta non parte con la password sbagliata e, chiusa, non torna su qu
     await dentro(app, `${sito.a}/home`);
     const vista = await avvisi();
     const carta = await proposta(vista, '127.0.0.1');
+    mkdirSync(SHOTS, { recursive: true });
+    for (const tema of ['light', 'dark']) {
+      await shell.emulateMedia({ colorScheme: tema });
+      await sleep(300);
+      await vista.screenshot({ path: join(SHOTS, `resta-connesso-proposta-${tema}.png`) });
+    }
     await carta.locator('.shell-notif-close').click();
     await expect(shell.locator('.shell-notif', { hasText: 'Hai fatto l\'accesso' })).toHaveCount(0, { timeout: 4000 });
 
@@ -223,6 +246,55 @@ test('la proposta non parte con la password sbagliata e, chiusa, non torna su qu
     await proposta(vista, 'localhost');
     expect(await shell.locator('.shell-notif', { hasText: 'accesso a 127.0.0.1' }).count()).toBe(0);
     expect(await fidati(app)).toEqual([]);
+  } finally {
+    await sito.chiudi();
+  }
+});
+
+test('«Continua con Google»: la proposta arriva quando il sito reagisce all\'accesso, non se la finestrella si chiude e basta', async ({ app, shell, avvisi }) => {
+  test.setTimeout(120_000);
+  const sito = await sitoConAccesso();
+  try {
+    await privacy(app);
+    const page = await apri(app, shell, `${sito.a}/pubblica`);
+    const finestrella = async () => {
+      await page.locator('#google').click();
+      let w = null;
+      await expect.poll(() => {
+        w = app.windows().find((x) => { try { return x.url().includes('/oauth/authorize'); } catch (_) { return false; } });
+        return !!w;
+      }, { timeout: 10_000 }).toBe(true);
+      return w;
+    };
+    // Chiusa senza accedere: la pagina resta com'era, e niente proposta.
+    const prima = await finestrella();
+    await prima.evaluate(() => window.close());
+    await sleep(5000);
+    expect(await shell.locator('.shell-notif', { hasText: 'Hai fatto l\'accesso' }).count()).toBe(0);
+
+    // Accesso vero: la finestrella si chiude e il sito apre la sessione.
+    const seconda = await finestrella();
+    await seconda.evaluate(() => window.close());
+    await page.evaluate(() => { location.href = '/oauth-ritorno'; });
+    await dentro(app, `${sito.a}/home`);
+    await proposta(await avvisi(), '127.0.0.1');
+
+    // Nella scheda stessa: sito → fornitore d'identità → di nuovo il sito. Un fornitore vero non si raggiunge da
+    // qui (la sua porta è la 443), quindi i due passaggi di indirizzo si danno al gestore delle schede.
+    const altra = await apri(app, shell, `${sito.b}/pubblica`);
+    const passa = (prima, dopo) => app.evaluate(({ BrowserWindow }, { pre, prima, dopo }) => {
+      for (const w of BrowserWindow.getAllWindows()) {
+        const tm = w._filoTabs;
+        const t = tm && tm.tabs.find((x) => String(x.url || '').startsWith(pre));
+        if (t) { tm._accessoDaNavigazione(t, prima, dopo || t.url); return true; }
+      }
+      return false;
+    }, { pre: sito.b, prima, dopo });
+    expect(await passa(`${sito.b}/pubblica`, 'https://accounts.google.com/o/oauth2/v2/auth?client_id=x')).toBe(true);
+    await altra.evaluate(() => { location.href = '/oauth-ritorno'; });
+    await dentro(app, `${sito.b}/home`);
+    expect(await passa('https://accounts.google.com/signin/oauth/consent', null)).toBe(true);
+    await proposta(await avvisi(), 'localhost');
   } finally {
     await sito.chiudi();
   }
@@ -291,6 +363,20 @@ test('tasto destro sulla scheda: «Resta connesso qui» porta l\'accesso nel pos
     const vista = await avvisi();
     await proposta(vista, '127.0.0.1');
 
+    await rightClickTab(shell);
+    await expect.poll(async () => {
+      for (const w of app.windows()) {
+        try {
+          if (await w.evaluate(() => !!document.body && document.body.innerText.includes('Resta connesso qui'))) {
+            mkdirSync(SHOTS, { recursive: true });
+            await w.screenshot({ path: join(SHOTS, 'resta-connesso-menu-scheda.png') });
+            return true;
+          }
+        } catch (_) {}
+      }
+      return false;
+    }, { timeout: 10_000 }).toBe(true);
+    await shell.keyboard.press('Escape').catch(() => {});
     await scegliNelMenu(app, shell, 'Resta connesso qui', async () => (await fidati(app)).includes('127.0.0.1'));
     await expect.poll(() => partizioneDi(app, `${sito.a}/`)).toBe('persist:filo-priv-127.0.0.1');
     await dentro(app, `${sito.a}/home`);
@@ -317,31 +403,35 @@ const execAction = (app, action) => app.evaluate((_e, a) => globalThis.SN_EXECUT
 test('in chat «resta connesso su» aggiunge il sito con la conferma, e «togli dai siti connessi» lo toglie', async ({ app, shell, openTab }) => {
   test.setTimeout(120_000);
   const sito = await sitoConAccesso();
+  // In chat un sito si nomina col suo dominio: la fixture porta sito-pubblico.test sul server di prova.
+  const base = `http://sito-pubblico.test:${sito.port}`;
+  const nome = 'sito-pubblico.test';
   try {
     await privacy(app);
-    await accedi(await apri(app, shell, `${sito.a}/login`));
-    await dentro(app, `${sito.a}/home`);
+    await accedi(await apri(app, shell, `${base}/login`));
+    await dentro(app, `${base}/home`);
     const home = await openTab('filo://newtab/');
 
-    const aggiungi = { type: 'IMPOSTA_PREFERENZA', chiave: 'resta connesso su', valore: 'aggiungi 127.0.0.1' };
+    const aggiungi = { type: 'IMPOSTA_PREFERENZA', chiave: 'resta connesso su', valore: `aggiungi ${nome}` };
     const r = await execAction(app, aggiungi);
     expect(r.executed).toBe(false);
     expect(r.needsConfirm).toBe(2);
     expect(await fidati(app)).toEqual([]);
     const c = await home.evaluate((a) => chrome.runtime.sendMessage({ type: 'filo_confirm_action', action: a }), aggiungi);
     expect(c.executed).toBe(true);
-    await expect.poll(() => fidati(app)).toEqual(['127.0.0.1']);
-    await expect.poll(() => partizioneDi(app, `${sito.a}/`)).toBe('persist:filo-priv-127.0.0.1');
-    await dentro(app, `${sito.a}/home`);
-    expect(await cookieNelJar(app, 'persist:filo-priv-127.0.0.1')).toContain('sid');
+    await expect.poll(() => fidati(app)).toEqual([nome]);
+    await expect.poll(() => partizioneDi(app, `${base}/`)).toBe(`persist:filo-priv-${nome}`);
+    await dentro(app, `${base}/home`);
+    expect(await cookieNelJar(app, `persist:filo-priv-${nome}`)).toContain('sid');
 
-    const togli = { type: 'IMPOSTA_PREFERENZA', chiave: 'siti connessi', valore: 'togli 127.0.0.1' };
+    const togli = { type: 'IMPOSTA_PREFERENZA', chiave: 'siti connessi', valore: `togli ${nome}` };
     expect((await execAction(app, togli)).needsConfirm).toBe(2);
     const c2 = await home.evaluate((a) => chrome.runtime.sendMessage({ type: 'filo_confirm_action', action: a }), togli);
     expect(c2.executed).toBe(true);
     await expect.poll(() => fidati(app)).toEqual([]);
-    await expect.poll(() => cookieNelJar(app, 'persist:filo-priv-127.0.0.1')).toEqual([]);
-    await dentro(app, `${sito.a}/home`);
+    await expect.poll(() => cookieNelJar(app, `persist:filo-priv-${nome}`)).toEqual([]);
+    await expect.poll(() => partizioneDi(app, `${base}/`)).toBe(`filo-priv-${nome}`);
+    await dentro(app, `${base}/home`);
   } finally {
     await sito.chiudi();
   }

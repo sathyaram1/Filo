@@ -8,6 +8,8 @@ const { looksLikeLoginCookie } = require('../services/geoBlockRules');
 
 // Un secondo fattore può prendere un paio di minuti fra la password e la pagina d'arrivo.
 const ACCESSO_MS = 3 * 60 * 1000;
+// Chiusa la finestrella d'accesso, il sito che ha davvero ricevuto l'accesso reagisce subito: più tardi è un'altra pagina.
+const FINESTRELLA_MS = 30 * 1000;
 // Una pagina che cambia da sé dopo l'invio, senza caricarne un'altra, si riguarda a questi intervalli.
 const RIGUARDA_MS = [1500, 4000, 10000, 25000, 60000];
 // La memoria della pagina portata nel jar nuovo vale per il primo caricamento, non per sempre.
@@ -69,6 +71,8 @@ async function spostaAccesso(sito, fidato) {
     }
   }
   if (!fidato) await Cookies.dimenticaSito(sito);
+  // La voce del menu della scheda dice «Resta» o «Non restare»: la barra lo deve sapere anche senza spostamenti.
+  for (const tm of managersNormali()) { try { tm._broadcast(); } catch (_) {} }
 }
 
 const restaConnessoMethods = {
@@ -100,9 +104,11 @@ const restaConnessoMethods = {
     return { ok: true };
   },
 
-  _accessoSegna(tab, sito) {
+  // `dopoCarico`: l'esito si guarda solo dopo che la pagina ha reagito (una finestrella chiusa senza accedere
+  // lascia la pagina com'era, senza password in vista, e non deve sembrare un accesso).
+  _accessoSegna(tab, sito, { dopoCarico = false } = {}) {
     if (!tab || !sito || proposti.has(sito) || this._fidato(sito)) return;
-    const a = { sito, at: Date.now() };
+    const a = { sito, at: Date.now(), dopoCarico, caricata: false };
     tab._accesso = a;
     for (const ms of RIGUARDA_MS) {
       const t = setTimeout(() => { if (tab._accesso === a) this._accessoVerifica(tab).catch(() => {}); }, ms);
@@ -112,30 +118,42 @@ const restaConnessoMethods = {
 
   // Pagina caricata o cambiata nella scheda: se aspettava l'esito di un accesso, lo guarda.
   _accessoDopoCarico(tab) {
-    if (tab && tab._accesso) this._accessoVerifica(tab).catch(() => {});
+    if (!tab || !tab._accesso) return;
+    tab._accesso.caricata = true;
+    this._accessoVerifica(tab).catch(() => {});
   },
 
-  // Di ritorno da un fornitore d'identità («Continua con Google»): l'accesso è al sito su cui si arriva.
+  // «Continua con Google» nella scheda stessa: sito → fornitore d'identità → di nuovo lo stesso sito.
   _accessoDaNavigazione(tab, prima, url) {
     const AP = globalThis.SN_AUTH_POPUP;
-    if (!AP || !prima || prima === url || !AP.isIdentityAuthSurface(prima) || AP.isIdentityAuthSurface(url)) return;
+    if (!AP || !prima || prima === url) return;
+    const daIdentita = AP.isIdentityAuthSurface(prima);
+    const suIdentita = AP.isIdentityAuthSurface(url);
+    if (suIdentita && !daIdentita) {
+      tab._partitoPerAccesso = /^https?:/i.test(prima) ? Cookies.registrableOf(prima) : null;
+      return;
+    }
+    if (!daIdentita || suIdentita) return;
+    const partito = tab._partitoPerAccesso;
+    tab._partitoPerAccesso = null;
     const sito = this._connessoSito(tab);
-    if (sito && sito !== Cookies.registrableOf(prima)) this._accessoSegna(tab, sito);
+    if (sito && sito === partito) this._accessoSegna(tab, sito);
   },
 
   // Chiusa la finestrella d'accesso aperta dalla scheda: il sito della scheda potrebbe averla appena usata.
   _accessoDopoFinestrella(tab) {
     if (!tab || !this.tabs.includes(tab)) return;
     const sito = this._connessoSito(tab);
-    if (sito) this._accessoSegna(tab, sito);
+    if (sito) this._accessoSegna(tab, sito, { dopoCarico: true });
   },
 
   // Riuscito vuol dire: nessun campo password in vista sul sito, e il sito si è segnato un accesso.
   async _accessoVerifica(tab) {
     const a = tab && tab._accesso;
     if (!a || !this.tabs.includes(tab)) return;
-    if (Date.now() - a.at > ACCESSO_MS || proposti.has(a.sito) || this._fidato(a.sito)) { tab._accesso = null; return; }
-    if (this._connessoSito(tab) !== a.sito) return;
+    const scade = a.dopoCarico ? FINESTRELLA_MS : ACCESSO_MS;
+    if (Date.now() - a.at > scade || proposti.has(a.sito) || this._fidato(a.sito)) { tab._accesso = null; return; }
+    if (this._connessoSito(tab) !== a.sito || (a.dopoCarico && !a.caricata)) return;
     const wc = tab.view && tab.view.webContents;
     if (!wc || wc.isDestroyed()) return;
     let pagina = null;
@@ -154,7 +172,7 @@ const restaConnessoMethods = {
     proposti.add(sito);
     try {
       this.win.webContents.send('shell:toast', {
-        text: `Hai fatto l'accesso a ${nomeLeggibile(sito)}: vuoi restare connesso anche dopo aver chiuso Filo?`,
+        text: `Hai fatto l'accesso a ${nomeLeggibile(sito)}. Vuoi restare connesso anche quando riapri Filo?`,
         opts: {
           durationSec: 15,
           sound: false,

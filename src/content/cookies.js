@@ -833,8 +833,8 @@
 
   // ─── accesso a un sito (Privacy massima) ───────────────────────────────────
   //
-  // Solo il gesto: una password scritta dall'utente (evento vero, la pagina non lo fabbrica) che parte con
-  // invio, Invio o un pulsante. Se l'accesso è riuscito, e la proposta «Resta connesso», lo decide il main.
+  // Solo il gesto: una password scritta dall'utente (evento vero, la pagina non lo fabbrica) che parte col modulo,
+  // con Invio o con un pulsante. Se l'accesso è riuscito, e la proposta «Resta connesso», lo decide il main.
   let campoPassword = null;
   let accessoInviatoAt = 0;
   function bersaglio(e) {
