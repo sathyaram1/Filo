@@ -132,15 +132,49 @@ module.exports = function register(on, ctx) {
   // la chiama dentro `conRipiegoDetto`; ogni altra strada (dettatura, lettura,
   // trascrizione, correttore, lavori in sottofondo) la dice con un avviso, uno
   // per rifiuto e al massimo ogni 10 minuti, come per i crediti finiti (#662).
+  // Una riga scritta sotto una risposta vale come avviso, e viceversa: la frase
+  // si dice una volta sola. L'avviso aspetta un momento, e le richieste di chi
+  // scrive la riga ancora in volo, prima di partire: il lavoro in sottofondo
+  // che le accompagna (il correttore, Filo che impara dalla chat) non la ripete.
   const ripiegoDetto = new AsyncLocalStorage();
-  function conRipiegoDetto(fn) { return ripiegoDetto.run(true, fn); }
+  const FINESTRA_RIPIEGO_MS = 10 * 60 * 1000;
+  const ATTESA_AVVISO_RIPIEGO_MS = 4000;
+  let inVoloConRiga = 0;
   let ultimoAvvisoRipiego = 0;
-  function avvisaRipiegoMuto(status) {
-    if (ripiegoDetto.getStore()) return;
+  let avvisoSospeso = null; // { status, timer }
+  function conRipiegoDetto(fn) {
+    inVoloConRiga++;
+    let p;
+    try { p = Promise.resolve(ripiegoDetto.run(true, fn)); } catch (e) { p = Promise.reject(e); }
+    return p.finally(() => {
+      inVoloConRiga--;
+      if (!inVoloConRiga && avvisoSospeso && !avvisoSospeso.timer) mandaAvvisoSospeso();
+    });
+  }
+  function annullaAvvisoSospeso() {
+    if (avvisoSospeso && avvisoSospeso.timer) clearTimeout(avvisoSospeso.timer);
+    avvisoSospeso = null;
+  }
+  function mandaAvvisoSospeso() {
+    if (!avvisoSospeso) return;
+    avvisoSospeso.timer = null;
+    if (inVoloConRiga > 0) return;
+    const { status } = avvisoSospeso;
+    avvisoSospeso = null;
     const now = Date.now();
-    if (now - ultimoAvvisoRipiego < 10 * 60 * 1000) return;
+    if (now - ultimoAvvisoRipiego < FINESTRA_RIPIEGO_MS) return;
     ultimoAvvisoRipiego = now;
     try { broadcastToTabs({ type: MSG.SHOW_TOAST, text: W.ownKeyFallbackLine(status), duration: 8000 }); } catch (_) {}
+  }
+  function avvisaRipiegoMuto(status) {
+    const now = Date.now();
+    if (ripiegoDetto.getStore()) {
+      ultimoAvvisoRipiego = now;
+      annullaAvvisoSospeso();
+      return;
+    }
+    if (now - ultimoAvvisoRipiego < FINESTRA_RIPIEGO_MS || avvisoSospeso) return;
+    avvisoSospeso = { status, timer: setTimeout(mandaAvvisoSospeso, ATTESA_AVVISO_RIPIEGO_MS) };
   }
 
   // La riserva per la chiave con cui una chiamata è partita: la personale del

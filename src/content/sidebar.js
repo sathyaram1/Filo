@@ -1259,6 +1259,7 @@
         } else {
           expand({ ai: true });
         }
+        diciRipiego();
         return;
       }
 
@@ -1275,6 +1276,7 @@
         }
         await runFiloAction(parsed.filoAction);
         expand({ ai: true });
+        diciRipiego();
         return;
       }
 
@@ -1295,6 +1297,7 @@
         } else {
           expand({ ai: true });
         }
+        diciRipiego();
         return;
       }
 
