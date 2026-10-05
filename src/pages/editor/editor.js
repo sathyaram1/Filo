@@ -3835,7 +3835,10 @@
         if (raw == null) {
           thinking.content = 'Errore: ' + ((r && r.error) || 'nessuna risposta');
         } else {
-          if (r.keyFallback && r.keyFallback.line) noteRipiego.set(thinking, r.keyFallback.line);
+          if (r.keyFallback && r.keyFallback.line) {
+            noteRipiego.set(thinking, r.keyFallback.line);
+            sendMessage({ type: MSG.KEY_FALLBACK_SHOWN });
+          }
           // Se la risposta contiene azioni di formattazione, applicale al
           // documento e mostra in chat la conferma; altrimenti è testo normale.
           const parsed = parseFormatActions(raw);

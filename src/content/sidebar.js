@@ -1159,7 +1159,9 @@
       // riga della chat, una volta per serie, non a ogni passo che l'agente fa da solo.
       // Sotto la risposta, come in chat: la scrive il prossimo messaggio di Filo (o la fine del turno).
       if (res.keyFallback && res.keyFallback.line) {
+        // La riga è già nella conversazione, o la scrive questo turno: l'avviso non la ripete.
         if (!ripiegoDetto) ripiegoDaDire = res.keyFallback.line;
+        Popup?.ripiegoMostrato?.();
         ripiegoDetto = true;
       } else {
         ripiegoDetto = false;

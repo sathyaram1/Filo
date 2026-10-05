@@ -105,7 +105,7 @@
   // appena riportato indietro (#407).
   let runSeq = 0;
   // La riga del ripiego sui crediti di Filo (#662), se una parte del giro l'hanno pagata loro:
-  // la pagina tradotta non ha un riquadro sotto cui scriverla, la dice l'avviso.
+  // la pagina tradotta non ha un riquadro sotto cui scriverla, la dice l'avviso a fine giro.
   let ripiegoDelGiro = '';
   // L'avviso "sto traducendo" del giro in corso. Serve a chi lo FERMA: le
   // richieste già spedite tornano quando vogliono, e finché non tornano il
@@ -207,9 +207,10 @@
       }
       progress.close();
       showResultToast(result, newContentSeen, frames);
-      if (ripiegoDelGiro) Popup.showToast(ripiegoDelGiro, { duration: 7000 });
     } finally {
       progress.close();
+      // Anche un giro fermato a metà ha speso: la riga si dice comunque, una volta.
+      if (ripiegoDelGiro) { Popup.showToast(ripiegoDelGiro, { duration: 7000 }); ripiegoDelGiro = ''; }
       if (framesRunId) frameRuns.delete(framesRunId);
       // Un riquadro che si ferma per strada (l'utente ha chiesto l'originale,
       // un'eccezione) non deve lasciare la pagina ad aspettarlo fino al tetto.
@@ -739,7 +740,10 @@
       } catch (e) {
         res = { ok: false, error: (e && e.message) || '', code: (e && e.code) || '' };
       }
-      if (res?.ok && res.keyFallback && res.keyFallback.line) ripiegoDelGiro = res.keyFallback.line;
+      if (res?.ok && res.keyFallback && res.keyFallback.line && !ripiegoDelGiro) {
+        ripiegoDelGiro = res.keyFallback.line;
+        Popup.ripiegoMostrato();
+      }
       if (res?.ok && String(res.text || '').trim()) return { ok: true, text: res.text };
       answeredEmpty = !!(res && res.ok);
       if (attempt) return { ok: false, error: answeredEmpty ? null : errFrom(res) };

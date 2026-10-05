@@ -900,3 +900,48 @@ test('(R) l’Aiuto della pagina con la chiave propria rifiutata: la riga sta so
   await page.waitForTimeout(6000);
   expect(await avvisi()).not.toContain('crediti di Filo');
 });
+
+// La spiegazione anticipata parte appena si seleziona un testo: pagata col ripiego, conta come detta
+// solo se la riga arriva a schermo (il menu aperto), altrimenti la dice l'avviso.
+async function selezionaColMouse(page, sel) {
+  const box = await page.locator(sel).boundingBox();
+  await page.mouse.move(box.x + 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width - 2, box.y + box.height / 2, { steps: 8 });
+  await page.mouse.up();
+}
+
+test('(S) selezionare un testo con la chiave propria rifiutata, senza aprire il menu: la spiegazione anticipata la pagano i crediti di Filo, e un avviso lo dice', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  ownKeyStatus = 402;
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await redeemWallet(openTab);
+  await prepare(app);
+  const page = await testServer.openReady(openTab, '<!doctype html><meta charset="utf-8"><title>Selezione</title>'
+    + '<p id="t" style="font:28px sans-serif;margin:120px 40px">Un testo da spiegare</p>');
+  const avvisi = await osservaAvvisi(page);
+  const RIGA = 'OpenRouter ha rifiutato la tua chiave (il suo credito è finito): ho usato i crediti di Filo.';
+  const prima = seen.completions.length;
+  await selezionaColMouse(page, '#t');
+  await expect.poll(() => seen.completions.slice(prima).map((c) => c.key).join(','), { timeout: 15_000 })
+    .toContain(`${OWN_KEY},${PERSONAL_KEY}`);
+  await expect.poll(avvisi, { timeout: 15_000 }).toContain(RIGA);
+});
+
+test('(T) selezionare un testo e aprire subito il menu: la riga del ripiego sta sotto la spiegazione, e nessun avviso la ripete', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  ownKeyStatus = 402;
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await redeemWallet(openTab);
+  await prepare(app);
+  const page = await testServer.openReady(openTab, '<!doctype html><meta charset="utf-8"><title>Selezione</title>'
+    + '<p id="t" style="font:28px sans-serif;margin:120px 40px">Un testo da spiegare</p>');
+  const avvisi = await osservaAvvisi(page);
+  const RIGA = 'OpenRouter ha rifiutato la tua chiave (il suo credito è finito): ho usato i crediti di Filo.';
+  await selezionaColMouse(page, '#t');
+  const box = await page.locator('#t').boundingBox();
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, { button: 'right' });
+  await expect(page.locator('.sn-key-fallback')).toHaveText(RIGA, { timeout: 20_000 });
+  await page.waitForTimeout(6000);
+  expect(await avvisi()).not.toContain('crediti di Filo');
+});

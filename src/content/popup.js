@@ -1345,7 +1345,7 @@
 
   global.SN_POPUP = {
     openStreaming,
-    notaRipiego,
+    notaRipiego, ripiegoMostrato,
     close,
     closeTopmost,
     showToast,

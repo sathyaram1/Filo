@@ -934,6 +934,7 @@
         note.dataset.keyFallback = String(r.keyFallback.status || '');
         note.textContent = window.SN_WALLET.ownKeyFallbackLine(r.keyFallback.status);
         bubblesEl.appendChild(note);
+        send({ type: MSG.KEY_FALLBACK_SHOWN }).catch(() => {});
       }
       // Il ragionamento del turno entra nello storico del thread insieme al
       // messaggio. Il testo resta con la conversazione; i blocchi strutturati
