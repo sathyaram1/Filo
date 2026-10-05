@@ -436,7 +436,9 @@
   // finché una descrizione può davvero arrivare, altrimenti dice che manca il
   // modello (un'attesa che non finirà mai è una bugia).
   let imageDescNoModel = false;
-  function imagePlaceholderLabel() {
+  let ultimaDaDelicata = null;
+  function imagePlaceholderLabel(dataUrl) {
+    if (dataUrl && dataUrl === ultimaDaDelicata) return I18n.t('clipboard_image_delicata');
     return I18n.t(imageDescNoModel ? 'clipboard_image_no_model' : 'clipboard_image_pending');
   }
 
@@ -452,10 +454,20 @@
       res = await chrome.runtime.sendMessage({
         type: MSG.AI_REQUEST,
         action: ACTIONS.DESCRIBE_IMAGE,
-        payload: { dataUrl },
+        payload: { dataUrl, automatica: true },
       });
     } catch (e) {
       res = { ok: false, error: e.message || String(e) };
+    }
+    // Da una pagina delicata l'immagine non va al modello: lo screenshot prende data e ora (#1004).
+    if (res?.code === 'PAGINA_DELICATA') {
+      ultimaDaDelicata = dataUrl;
+      chrome.runtime.sendMessage({
+        type: MSG.UPDATE_CLIPBOARD_DESCRIPTION,
+        dataUrl,
+        description: I18n.t('clipboard_image_delicata'),
+      }).catch(() => {});
+      return null;
     }
     if (!res?.ok) {
       if (res?.code === 'NO_MODEL_FOR_ACTION' && res.error) {
@@ -559,7 +571,7 @@
   // il box inline lo mostra istantaneamente invece di aspettare il provider.
   // - Debounce 400ms (selectionchange spara molto durante il drag).
   // - Dedup per chiave selezione (no re-fetch sulla stessa selezione).
-  // - No prefetch se tab nascosto, dominio bloccato, selezione troppo corta.
+  // - No prefetch se tab nascosto, dominio bloccato, incognito, selezione troppo corta.
   // - Una sola entry attiva: la selezione cambia velocemente, non serve cache larga.
   let prefetchedExplain = null; // { key, sentence, promise<{text}|{error}> }
   let prefetchTimer = null;
@@ -573,6 +585,8 @@
 
   function prefetchExplainNow() {
     if (deps.isBlocked()) return;
+    // In incognito la spiegazione parte solo dal tasto destro (#591, #1004).
+    if (!deps.isIncognito || deps.isIncognito()) return;
     if (document.hidden) return;
     const sel = Extract.getSelectionWithSentence();
     if (!sel) return;
@@ -590,9 +604,10 @@
       type: MSG.AI_REQUEST,
       action: ACTIONS.EXPLAIN,
       payload: { selection: selInfo.selection, sentence: selInfo.sentence },
+      diceRipiego: true,
     }).then(
       (res) => (res?.ok && typeof res.text === 'string')
-        ? { text: res.text }
+        ? { text: res.text, keyFallback: res.keyFallback || null }
         : { error: res?.error || I18n.t('err_provider_failed') },
       (e) => ({ error: e?.message || I18n.t('err_provider_failed') }),
     );
@@ -656,6 +671,7 @@
             return;
           }
           body.innerHTML = Popup.renderMarkdown(daMostrare);
+          Popup.notaRipiego(body, res.keyFallback);
         });
         return () => { cancelled = true; };
       },
@@ -673,9 +689,37 @@
     el.appendChild(w);
   }
 
+  // Quello che Filo dice di un'immagine viene da byte che il sito non può leggere (altro dominio,
+  // cookie dell'utente): la ricerca nel testo del sito attraversa lo shadow chiuso, quindi glifi, non testo (#946).
+  function testoChiuso(el, s) {
+    el.textContent = '';
+    global.SN_MENU.testoNascosto(el, el, s);
+  }
+
+  // Le etichette di origine di un'immagine già scaricata (#711): le legge il main
+  // dai byte, sul computer e senza crediti. Il menu e l'Aiuto passano entrambi da qui.
+  function leggiOrigine(dataUrl) {
+    return chrome.runtime.sendMessage({ type: MSG.IMAGE_PROVENANCE, dataUrl });
+  }
+
+  // I byte originali di un'immagine della pagina, come data URL. Quella di un'altra
+  // origine (quasi sempre: le foto stanno su un CDN) lo script non la può leggere,
+  // e la scarica il main (#946): senza, descrizione e origine tacevano sulla maggior parte dei siti.
+  async function scaricaImmagine(src) {
+    try {
+      const r = await fetch(src);
+      if (r.ok) return await blobToDataUrl(await r.blob());
+    } catch (_) {}
+    if (!/^https?:/i.test(String(src || ''))) throw new Error('immagine non leggibile');
+    const res = await chrome.runtime.sendMessage({ type: MSG.IMAGE_BYTES, url: src });
+    if (!res || !res.ok || !res.dataUrl) throw new Error((res && res.error) || 'immagine non leggibile');
+    return res.dataUrl;
+  }
+
   // Sezione inline "Spiega immagine": stessa filosofia di buildInlineExplain ma con dataUrl.
   // `linkEl` è il collegamento che l'immagine apre: l'unica sezione del menu parla
   // dell'immagine, ma l'avviso sull'indirizzo non si perde (#725.1).
+  // I byte si scaricano UNA volta: descrizione e controllo dell'origine partono da quelli.
   function buildInlineExplainImage(imgEl, linkEl) {
     return {
       type: 'inline',
@@ -684,6 +728,10 @@
       onMount: (el) => {
         el.classList.add('sn-menu-inline-loading');
         el.textContent = '';
+        const origine = document.createElement('div');
+        origine.className = 'sn-menu-origine';
+        origine.hidden = true;
+        el.appendChild(origine);
         if (linkEl && linkEl.href) mostraAvvisoLink(el, linkEl.href);
         const body = document.createElement('div');
         body.className = 'sn-menu-link-body';
@@ -698,15 +746,33 @@
         }
         let cancelled = false;
         (async () => {
+          let dataUrl;
           try {
-            const r = await fetch(src);
-            const blob = await r.blob();
-            const dataUrl = await blobToDataUrl(blob);
+            dataUrl = await scaricaImmagine(src);
+          } catch (_) {
             if (cancelled) return;
+            el.classList.remove('sn-menu-inline-loading');
+            el.classList.add('sn-menu-inline-error');
+            body.textContent = I18n.t('menu_image_unreadable');
+            return;
+          }
+          if (cancelled) return;
+
+          // Locale: arriva molto prima della descrizione, e si mostra appena c'è.
+          leggiOrigine(dataUrl).then((p) => {
+            if (cancelled || !p || !p.ok || !p.frase) return;
+            testoChiuso(origine, p.frase);
+            origine.title = I18n.t(p.firmatario === 'non_verificato' ? 'menu_origin_hint_unverified' : 'menu_origin_hint');
+            origine.classList.toggle('sn-menu-origine-debole', !p.forte);
+            origine.hidden = false;
+          }).catch(() => {});
+
+          try {
             const res = await chrome.runtime.sendMessage({
               type: MSG.AI_REQUEST,
               action: ACTIONS.DESCRIBE_IMAGE,
               payload: { dataUrl },
+              diceRipiego: true,
             });
             if (cancelled) return;
             el.classList.remove('sn-menu-inline-loading');
@@ -715,7 +781,8 @@
               body.textContent = res?.error || I18n.t('err_provider_failed');
               return;
             }
-            body.textContent = res.text;
+            testoChiuso(body, res.text);
+            Popup.notaRipiego(el, res.keyFallback);
           } catch (e) {
             if (cancelled) return;
             el.classList.remove('sn-menu-inline-loading');
@@ -784,6 +851,8 @@
               // butta il testo parziale (l'avviso sicurezza resta).
               buf = '';
               body.textContent = '';
+            } else if (m.type === 'done') {
+              Popup.notaRipiego(el, m.keyFallback);
             } else if (m.type === 'error') {
               el.classList.remove('sn-menu-inline-loading');
               el.classList.add('sn-menu-inline-error');
@@ -918,14 +987,18 @@
     pill.appendChild(cta);
     // Nello stack degli avvisi in pagina (#409). `sticky`: porta l'unica strada
     // verso la lista "Aperti per dopo", un toast in arrivo non deve sfrattarla.
-    Popup.mountToast(pill, { sticky: true });
+    Popup.mountToast(pill, {
+      sticky: true,
+      chiudi: () => finish(false),
+      azioni: [{ label: I18n.t('toast_saved_open'), fn: () => finish(true) }],
+    });
     requestAnimationFrame(() => pill.classList.add('sn-save-confirm-visible'));
 
     const finish = (openList) => {
       if (done) return;
       done = true;
       if (chiudiScheda) salvataggioInCorso = false;
-      if (timer) { clearTimeout(timer); timer = null; }
+      if (timer) { timer.annulla(); timer = null; }
       pill.dataset.snClosing = '1';
       pill.classList.remove('sn-save-confirm-visible');
       setTimeout(() => { try { Popup.unmountToast(pill); } catch (_) {} }, 220);
@@ -939,7 +1012,8 @@
     pill.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); finish(true); }
     });
-    timer = setTimeout(() => finish(false), AUTO_CLOSE_MS);
+    // Nella pila: col puntatore sopra aspetta, come gli altri avvisi (la scheda si chiude dopo).
+    timer = Popup.tempoAvviso(AUTO_CLOSE_MS, () => finish(false), { deveScadere: true });
   }
 
   async function saveLink(linkEl) {
@@ -951,10 +1025,19 @@
     if (res?.ok) Popup.showToast(I18n.t('toast_link_saved'));
   }
 
+  function dataUrlToBlob(dataUrl) {
+    const m = /^data:([^;,]*)[^,]*;base64,(.*)$/s.exec(String(dataUrl || ''));
+    if (!m) throw new Error('immagine non leggibile');
+    const bin = atob(m[2]);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], { type: m[1] || 'application/octet-stream' });
+  }
+
   async function copyImage(imgEl) {
     try {
-      const r = await fetch(imgEl.currentSrc || imgEl.src);
-      const blob = await r.blob();
+      const originale = await scaricaImmagine(imgEl.currentSrc || imgEl.src);
+      const blob = dataUrlToBlob(originale);
       let pngBlob = blob;
       // Clipboard API supporta image/png; converte se serve
       if (blob.type !== 'image/png') {
@@ -970,6 +1053,8 @@
       }
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
       const dataUrl = await blobToDataUrl(pngBlob);
+      // Dopo la scrittura: il main legge gli appunti per riconoscere la copia quando torna incollata.
+      chrome.runtime.sendMessage({ type: MSG.IMAGE_COPIED, originale, copia: dataUrl }).catch(() => {});
       const description = await describeImage(pngBlob);
       pushClipboardEntry({ type: 'image', dataUrl, description });
       Popup.showToast(I18n.t('toast_copied'));
@@ -1093,9 +1178,12 @@
     copyToClipboard(href);
   }
 
+  function searchUrlFor(text) {
+    return `https://www.google.com/search?q=${encodeURIComponent((text || '').slice(0, 500))}`;
+  }
+
   function searchTextOnWeb(text) {
-    const q = encodeURIComponent((text || '').slice(0, 500));
-    window.open(`https://www.google.com/search?q=${q}`, '_blank', 'noopener');
+    window.open(searchUrlFor(text), '_blank', 'noopener');
   }
 
   // ------------------------------------------------------------
@@ -1320,12 +1408,15 @@
     return items;
   }
 
+  // Lens-style reverse search (più affidabile di searchbyimage)
+  function imageSearchUrlFor(imgEl) {
+    const src = imgEl && (imgEl.currentSrc || imgEl.src);
+    return src ? `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(src)}` : '';
+  }
+
   function searchImageOnWeb(imgEl) {
-    const src = imgEl.currentSrc || imgEl.src;
-    if (!src) return;
-    const q = encodeURIComponent(src);
-    // Lens-style reverse search (più affidabile di searchbyimage)
-    window.open(`https://lens.google.com/uploadbyurl?url=${q}`, '_blank', 'noopener');
+    const url = imageSearchUrlFor(imgEl);
+    if (url) window.open(url, '_blank', 'noopener');
   }
 
   // ------------------------------------------------------------
@@ -1352,7 +1443,7 @@
       try {
         chrome.runtime.sendMessage({
           type: MSG.PUSH_CLIPBOARD_ENTRY,
-          entry: { type: 'image', dataUrl: cap.dataUrl, description: desc || imagePlaceholderLabel() },
+          entry: { type: 'image', dataUrl: cap.dataUrl, description: desc || imagePlaceholderLabel(cap.dataUrl) },
         }).catch(() => {});
       } catch (_) {}
       const a = document.createElement('a');
@@ -1543,7 +1634,7 @@
       try {
         chrome.runtime.sendMessage({
           type: MSG.PUSH_CLIPBOARD_ENTRY,
-          entry: { type: 'image', dataUrl, description: desc || imagePlaceholderLabel() },
+          entry: { type: 'image', dataUrl, description: desc || imagePlaceholderLabel(dataUrl) },
         }).catch(() => {});
       } catch (_) {}
       const a = document.createElement('a');
@@ -1873,6 +1964,8 @@
     schedulePrefetchExplain,
     buildInlineExplain,
     buildInlineExplainImage,
+    leggiOrigine,
+    scaricaImmagine,
     buildInlineExplainLink,
     // salva / condividi / cerca / immagini
     buildSavePayload,
@@ -1887,7 +1980,9 @@
     shareCurrentPage,
     shareLink,
     searchTextOnWeb,
+    searchUrlFor,
     searchImageOnWeb,
+    imageSearchUrlFor,
     // video / audio
     buildMediaItems,
     buildMediaSpeedItem,

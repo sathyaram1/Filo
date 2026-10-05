@@ -207,6 +207,7 @@ function createIncognitoWindow() {
     const stillOpen = BrowserWindow.getAllWindows().some((w) => w !== win && w._filoIncognito);
     if (!stillOpen) {
       try { require('./shim/storage').resetIncognito(); } catch (_) {}
+      try { require('./services/ilFilo').resetIncognito(); } catch (_) {}
       try { require('./services/cookies').resetIncognito(); } catch (_) {}
     }
   });

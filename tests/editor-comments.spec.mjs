@@ -93,9 +93,8 @@ async function setupDocOnReviewPage(page, html) {
 // Crea un commento sul testo `phrase` (deve esistere nel documento): clicca il
 // modulo Commenta, seleziona la frase come farebbe l'utente col mouse (range +
 // mouseup) e salva dal prompt.
-async function addComment(page, phrase, commentText) {
-  await page.locator('.ed-module[data-type="comment"] .ed-mod-pad').click();
-  await page.evaluate((needle) => {
+function selectPhrase(page, phrase) {
+  return page.evaluate((needle) => {
     const doc = document.getElementById('doc');
     const walker = document.createTreeWalker(doc, NodeFilter.SHOW_TEXT);
     let n;
@@ -113,6 +112,11 @@ async function addComment(page, phrase, commentText) {
     }
     throw new Error(`testo non trovato: ${needle}`);
   }, phrase);
+}
+
+async function addComment(page, phrase, commentText) {
+  await page.locator('.ed-module[data-type="comment"] .ed-mod-pad').click();
+  await selectPhrase(page, phrase);
   await page.waitForSelector('#cmText');
   await page.fill('#cmText', commentText);
   await page.click('#cmSave');
@@ -280,24 +284,7 @@ test.describe('commenti: evidenziazione persistente', () => {
 
     // Da qui il flusso è identico alla creazione del primo: seleziona il testo e
     // salva dal prompt.
-    await page.evaluate(() => {
-      const doc = document.getElementById('doc');
-      const walker = document.createTreeWalker(doc, NodeFilter.SHOW_TEXT);
-      let n;
-      while ((n = walker.nextNode())) {
-        const i = n.nodeValue.indexOf('seconda frase');
-        if (i < 0) continue;
-        const range = document.createRange();
-        range.setStart(n, i);
-        range.setEnd(n, i + 'seconda frase'.length);
-        const sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(range);
-        doc.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-        return;
-      }
-      throw new Error('testo non trovato: seconda frase');
-    });
+    await selectPhrase(page, 'seconda frase');
     await page.waitForSelector('#cmText');
     await page.fill('#cmText', 'secondo commento');
     await page.click('#cmSave');
@@ -306,6 +293,24 @@ test.describe('commenti: evidenziazione persistente', () => {
     await expect(page.locator('.ed-module[data-type="comment"] .cm-count')).toHaveText('2');
     expect(await highlightTexts(page)).toEqual(['prima frase', 'seconda frase']);
     await page.screenshot({ path: 'tests/.shots/editor-comment-second.png' }).catch(() => {});
+  });
+
+  // L'invito «Seleziona il testo» scade da solo: chi lo chiude prima e seleziona subito si tiene il riquadro (#650).
+  test('il riquadro del commento resta aperto quando scade l\'invito a selezionare il testo', async () => {
+    const page = await openTab(EDITOR);
+    await setupDocOnReviewPage(page, '<p>una frase veloce da commentare</p>');
+    await page.locator('.ed-module[data-type="comment"] .ed-mod-pad').click();
+    await expect(page.locator('#overlayBox')).toContainText('Seleziona il testo');
+    await page.locator('#overlay').click({ position: { x: 4, y: 4 } });
+    await expect(page.locator('#overlay')).toBeHidden();
+    await selectPhrase(page, 'frase veloce');
+    await page.fill('#cmText', 'scritto in fretta');
+    // Oltre i 1200 ms dell'invito: prima il suo timer chiudeva il riquadro a metà.
+    await page.waitForTimeout(1600);
+    await expect(page.locator('#cmText')).toHaveValue('scritto in fretta');
+    await page.click('#cmSave');
+    await expect(page.locator('.ed-module[data-type="comment"] .cm-count')).toHaveText('1');
+    expect(await highlightTexts(page)).toEqual(['frase veloce']);
   });
 
   test('eliminare un commento rimuove l\'evidenziazione (anche dopo un reload)', async () => {

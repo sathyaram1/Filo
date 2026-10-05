@@ -29,6 +29,10 @@ const { indiceSaltoScheda, comandoNavigazione } = globalThis.SN_TASTI;
 const { collegaScorciatoie } = require('./shortcuts');
 const { AvvisiSopraPagina } = require('./avvisiSopraPagina');
 const { BarraLaterale } = require('./barraLaterale');
+const { AnteprimeSchede } = require('./tabs/anteprime');
+const { VisiteSchede } = require('./tabs/visite');
+const CartaAnteprima = require('./popup-anteprima');
+const { AvvisoSito } = require('./avvisoSito');
 
 // #441 — eventi di solo PUNTAMENTO: il cursore che attraversa la pagina non è
 // un'interazione dell'utente con quella scheda (tutto il resto — click, tasti,
@@ -129,6 +133,14 @@ function schedaPerPermessi(wc) {
 // pagina filo:// NON singleton è la nuova scheda (`filo://newtab/`): di quella
 // se ne vogliono quante se ne aprono. La chiave d'identità è host+path (query
 // e hash esclusi: un ?highlight non rende la pagina "un'altra pagina").
+// Chromium tiene lo zoom per sito: la chiave del suo evento è l'host, e per le pagine di Filo il loro indirizzo.
+function ospiteDelloZoom(url) {
+  try {
+    const u = new URL(String(url || ''));
+    return u.protocol === 'filo:' ? `filo://${u.hostname}` : u.hostname.replace(/^www\./, '');
+  } catch (_) { return ''; }
+}
+
 function filoSingletonKey(url) {
   const s = String(url || '');
   if (!s.startsWith('filo://')) return null;
@@ -139,6 +151,15 @@ function filoSingletonKey(url) {
 }
 
 const PAGE_PRELOAD = path.join(__dirname, '..', 'preload', 'page-preload.js');
+// Esito di una scheda aperta da NAVIGA (#590): quanto si aspetta, dopo l'arrivo della prima pagina,
+// che la pagina si sposti da sé su un sito della lista. Tetto e margine dopo il caricamento.
+const ASSESTAMENTO_MS = 1500;
+const DOPO_CARICAMENTO_MS = 300;
+// Dopo l'attesa, un blocco sulla stessa scheda arriva lo stesso alla chat che l'ha aperta,
+// finché l'utente non la tocca e per questo tempo al massimo.
+const SEGUI_APERTURA_MS = 60_000;
+// Il rinvio che la pagina dichiara di sé (meta refresh), in secondi, o -1.
+const RINVIO_DICHIARATO_JS = '(()=>{try{const m=document.querySelector(\'meta[http-equiv="refresh" i]\');const s=m?parseFloat(m.getAttribute("content")):NaN;return Number.isFinite(s)&&s>=0?s:-1;}catch(e){return -1;}})()';
 const INTERNAL_PRELOAD = path.join(__dirname, '..', 'preload', 'internal-preload.js');
 
 // SICUREZZA — schemi consentiti per le navigazioni ORIGINATE da contenuto web
@@ -155,7 +176,12 @@ function isWebUnsafeNav(rawUrl) {
   try { proto = new URL(String(rawUrl || '')).protocol.toLowerCase(); } catch (_) { return false; }
   // URL relativo/non parsabile → Electron lo risolve sull'origine corrente
   // (stessa pagina web): non è un cambio di schema, non bloccare.
-  return proto ? !WEB_NAV_SCHEMES.has(proto) : false;
+  if (!proto) return false;
+  // `filo://invito/…` non è una pagina (#664): in una scheda diventava un
+  // indirizzo interno che non esiste, e la pagina dell'invito spariva. Fermato
+  // qui, lo porta dentro `invitoFermato`.
+  if (globalThis.SN_WALLET?.isInviteDeepLink?.(rawUrl)) return true;
+  return !WEB_NAV_SCHEMES.has(proto);
 }
 
 // Schemi "azione del sistema operativo": NON sono pagine web (quindi bloccati da
@@ -178,6 +204,48 @@ function openExternalScheme(rawUrl) {
   if (!isOsDelegatedScheme(rawUrl)) return false;
   try { shell.openExternal(String(rawUrl)); } catch (_) {}
   return true;
+}
+
+// Un `filo://invito/…` fermato su una navigazione non si tace (#664): da qualunque porta (barra, «Apri in nuova tab», un
+// pulsante che naviga da script) riscatta e apre Crediti. Da una pagina solo dopo un gesto vero su quella pagina, contato
+// dal main (la pagina non lo può fingere); senza `wc` lo chiede Filo stesso. Prova: tests/link-invito.spec.mjs.
+function invitoFermato(rawUrl, { win = null, wc = null } = {}) {
+  const W = globalThis.SN_WALLET;
+  if (!W || !W.isInviteDeepLink(rawUrl)) return false;
+  if (wc && !Permessi.gestoRecente(wc) && !Permessi.navigazioneDaGesto(wc)) return true;
+  try { globalThis.SN_WALLET_MAIN?.portaDentroInvito?.(W.inviteCodeFromDeepLink(rawUrl), win); } catch (_) {}
+  return true;
+}
+function fermaNavigazione(rawUrl, ctx) {
+  if (!invitoFermato(rawUrl, ctx)) openExternalScheme(rawUrl);
+}
+// La pagina intera passa da will-navigate; qui solo i riquadri, e solo l'invito.
+function fermaInvitoNelRiquadro(event, ctx) {
+  if (!event || event.isMainFrame !== false || !globalThis.SN_WALLET?.isInviteDeepLink?.(event.url)) return;
+  event.preventDefault();
+  invitoFermato(event.url, ctx);
+}
+
+// La lista dei bloccati si salva mentre si scrive (#590.2): una riga a metà non sposta le schede aperte,
+// né verso la pagina «Sito bloccato» né fuori. La seguono quando la lista sta ferma per questo tempo, o quando l'utente le guarda.
+const LISTA_FERMA_MS = 3000;
+
+// webContents → sito di un «Apri comunque»: il sì vale anche per il blocco delle richieste.
+const permessiApriComunque = new Map();
+Cookies.permettiRichieste((d) => {
+  const sito = d && d.webContentsId != null ? permessiApriComunque.get(d.webContentsId) : null;
+  return !!sito && siteBlockSiteOf(d.url) === sito;
+});
+
+// Il sito su cui vale un «Apri comunque» (#590): dominio registrabile, solo web.
+function siteBlockSiteOf(url) {
+  const s = String(url || '');
+  return /^https?:\/\//i.test(s) ? (Cookies.registrableOf(s) || null) : null;
+}
+
+// L'indirizzo chiesto e quello che arriva a will-navigate differiscono per forma («Sito.it» / «sito.it/»).
+function indirizzoCanonico(url) {
+  try { return new URL(String(url)).href; } catch (_) { return String(url || ''); }
 }
 
 // Altezza della sola fila di tab (tab + nuova scheda + controlli finestra),
@@ -209,9 +277,12 @@ const NATIVE_MENU_PAGES = [
 // creato nel DOM ma senza stile (position:static, niente sfondo/z-index) →
 // invisibile, e l'utente percepiva "il tasto destro non funziona". Lo iniettiamo
 // quindi anche via wc.insertCSS dal main, che ignora la CSP (come già facciamo
-// per il colore della selezione). Stessa lista di page-preload.js.
+// per il colore della selezione). Stessa lista di page-preload.js (sentinella: contentScriptPreload.test.mjs).
 const fs = require('node:fs');
-const CONTENT_STYLE_FILES = ['theme.css', 'menu.css', 'popup.css', 'sidebar.css', 'highlight.css', 'spellcheck.css', 'feedback.css'];
+const CONTENT_STYLE_FILES = [
+  'theme.css', 'menu.css', 'popup.css', 'sidebar.css', 'voce.css',
+  'highlight.css', 'spellcheck.css', 'feedback.css', 'redteam-attack.css',
+];
 let CONTENT_SCRIPT_CSS = null;
 function getContentScriptCss() {
   if (CONTENT_SCRIPT_CSS !== null) return CONTENT_SCRIPT_CSS;
@@ -267,6 +338,12 @@ class TabManager {
     this.partition = partition || null;
     this.tabs = []; // [{ id, view, title, url, favicon, loading, canBack, canFwd }]
     this.activeId = null;
+    this.visite = new VisiteSchede({ incognito: this.incognito });
+    this.anteprime = new AnteprimeSchede(this, {
+      suNuova: (id, dato) => CartaAnteprima.precarica(window, id, dato),
+      suTolte: (ids) => CartaAnteprima.dimentica(window, ids),
+    });
+    if (window && typeof window.once === 'function') window.once('closed', () => this.anteprime.chiudi());
     this.avvisi = new AvvisiSopraPagina(window, {
       alto: () => this._altezzaCornice(),
       restituisciTastiera: () => this._tastieraAllaSchedaAttiva(),
@@ -276,6 +353,12 @@ class TabManager {
       },
     });
     this.barra = new BarraLaterale(window, this, { alto: () => this._altezzaCornice() });
+    this.avvisoSito = new AvvisoSito(window, {
+      schedaAttiva: () => this.tabs.find((x) => x.id === this.activeId) || null,
+      scegli: (tab, scelta, dati) => this._sbScelta(tab, scelta, dati),
+      menu: (tab) => this._sbVociMenu(tab),
+      restituisciTastiera: () => this._tastieraAllaSchedaAttiva(),
+    });
     // §1.2 — cache del colore identità per dominio (host → 'rgb(r,g,b)'). Così
     // una nuova tab su un dominio già visto mostra subito la sua tinta, senza
     // aspettare che il content script ricalcoli.
@@ -354,6 +437,11 @@ class TabManager {
     for (const ev of ['minimize', 'restore', 'hide', 'show']) {
       try { this.win.on?.(ev, () => this._annunciaVista()); } catch (_) {}
     }
+    // La finestra torna a disegnare: le anteprime rimaste da scattare ripartono (#430). Il fuoco copre la finestra
+    // che era solo coperta da un'altra, che non avvisa quando smette di disegnare.
+    for (const ev of ['restore', 'show', 'focus']) {
+      try { this.win.on?.(ev, () => this.anteprime.riprendi()); } catch (_) {}
+    }
   }
 
   // Chi guarda: la scheda attiva di una finestra né nascosta né ridotta a
@@ -375,6 +463,8 @@ class TabManager {
       if (t._inVista === ora) continue;
       t._inVista = ora;
       const wc = t.view?.webContents;
+      // Una home che torna in vista (scheda o finestra) rivede subito batteria e rete (#873).
+      if (ora) { try { globalThis.SN_SISTEMA_MAIN?.schedaDavanti?.(wc); } catch (_) {} }
       try {
         if (!wc || wc.isDestroyed?.() || !String(wc.getURL() || '').startsWith('filo://')) continue;
         wc.send('filo:broadcast', { type: 'tab_in_vista', inVista: ora });
@@ -737,12 +827,17 @@ class TabManager {
     return view;
   }
 
-  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false, allowDuplicate = false, openedByLink = false } = {}) {
+  // `apriComunque`: la scheda non passa dalla lista dei siti bloccati per quel sito.
+  // `permessoRichieste`: è un «Apri comunque» vero, e passa anche il blocco delle richieste.
+  // `bloccoInPagina`: se la lista la ferma, la scheda nasce sulla pagina «Sito bloccato» invece di non nascere.
+  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false, allowDuplicate = false, openedByLink = false, apriComunque = false, permessoRichieste = false, bloccoInPagina = false, daGesto = false } = {}) {
     // #252 — INDIRIZZO UNICO per le pagine interne: riporta l'eventuale forma
     // legacy `filo://src/pages/<page>/<file>` (dallo shim getURL) alla forma
     // canonica `filo://<page>/<file>` che usa il menu. Così tutti i punti di
     // ingresso convergono su un solo URL, qualunque chiamante li apra.
     if (typeof url === 'string' && url.startsWith('filo://')) url = canonicalizeFiloUrl(url);
+    // Un indirizzo nudo («sito.com/pagina», come a volte lo manda il modello) caricato così resta bianco.
+    else if (typeof url === 'string' && !/^[a-z][a-z0-9+.-]*:/i.test(url.trim())) url = normalizeUrl(url);
 
     // #252 — DEDUPLICA le pagine singleton: se la pagina interna è già aperta
     // in una scheda, riportaci l'utente invece di duplicarla. Solo per aperture
@@ -778,7 +873,12 @@ class TabManager {
     // dei merge automatici tra worktree (commit da660251) — se lo tocchi,
     // assicurati che il percorso IPC → openTab(file://) resti bloccato.
     if (isWebUnsafeNav(url)) {
-      openExternalScheme(url); // mailto:/tel:/sms: → consegnati all'OS, il resto bloccato
+      fermaNavigazione(url, { win: this.win }); // mailto:/tel:/sms: → consegnati all'OS, il resto bloccato
+      return null;
+    }
+    const bloccata = apriComunque ? null : this._decisioneBlocco(null, url);
+    if (bloccata && !bloccoInPagina) {
+      this._notifyBlocked(bloccata);
       return null;
     }
     const id = randomUUID();
@@ -827,6 +927,11 @@ class TabManager {
       // riconosciuta come pagina-ponte di uno scaricamento (vedi
       // handleDownloadStarted e src/shared/downloadTabs.js).
       _openedByLink: !!openedByLink,
+      // #590 — «Apri comunque» vale per quel sito dentro questa scheda: i suoi
+      // link e redirect interni non vanno ribloccati a ogni passo.
+      siteBlockAllowed: apriComunque ? siteBlockSiteOf(url) : null,
+      // Non per la sessione ripristinata né per un duplicato: toglierebbe il blocco pubblicità al loro sito.
+      _permessoRichieste: !!(apriComunque && permessoRichieste),
     };
 
     this._wireEvents(tab);
@@ -839,10 +944,12 @@ class TabManager {
     // Caricare con bounds 0x0 può far andare in fallimento le capturePage
     // successive con "Current display surface not available".
     if (activate) {
+      this.anteprime.congeda(this.tabs.find((t) => t.id === this.activeId));
       this.activeId = id;
       tab.activateSeq = this._nextActivationSeq();
       this.layout();
     } else {
+      this.anteprime.nataDietro(tab);
       // Scheda in SECONDO PIANO (#376): non ruba il primo piano. layout() le dà
       // bounds {0,0,0,0} — senza questa chiamata la view appena creata resta con
       // i bounds di default e può disegnarsi sopra la scheda attiva (stesso
@@ -853,15 +960,18 @@ class TabManager {
       // visibilità viene poi normalizzata al primo cambio di scheda (activate).
       this.layout();
     }
-    view.webContents.loadURL(url);
+    // Una scheda aperta da un clic vero eredita il gesto per la sua prima navigazione e i suoi rinvii (#664 giro 2).
+    if (daGesto) view.webContents._filoGestoAlle = Date.now();
+    if (bloccata) this._mostraPaginaBloccata(tab, url, bloccata);
+    else view.webContents.loadURL(url);
     if (activate) {
       // Riaffermo la visibilità su tutti i tab dopo loadURL.
-      for (const t of this.tabs) t.view.setVisible?.(t.id === id);
+      for (const t of this.tabs) t.view.setVisible?.(this._visibile(t));
       this._tastieraAllaSchedaAttiva();
     }
     // #152 — born proxied: se il dominio ha una regola persistente, la scheda
     // nasce instradata da quel paese (ricrea la view nella partition proxata).
-    this._maybeApplyDomainRule(tab, url);
+    if (!bloccata) this._maybeApplyDomainRule(tab, url);
     this._broadcast();
     return id;
   }
@@ -1257,14 +1367,20 @@ class TabManager {
   async _gatherTriageInput(cands) {
     const now = Date.now();
     const out = [];
+    let fuori = () => null;
+    try { fuori = await globalThis.SN_DELICATE.filtro(); } catch (_) {}
     for (const t of cands) {
+      // Di una pagina delicata il testo non si legge nemmeno: al modello arriva solo il tipo (#1004).
+      const delicata = fuori(t.url);
       let contentExtract = '';
-      try {
-        contentExtract = await t.view.webContents.executeJavaScript(
-          '(function(){try{return (document.body&&document.body.innerText||"").replace(/\\s+/g," ").slice(0,800);}catch(e){return "";}})()',
-          true,
-        );
-      } catch (_) {}
+      if (!delicata) {
+        try {
+          contentExtract = await t.view.webContents.executeJavaScript(
+            '(function(){try{return (document.body&&document.body.innerText||"").replace(/\\s+/g," ").slice(0,800);}catch(e){return "";}})()',
+            true,
+          );
+        } catch (_) {}
+      }
       out.push({
         url: t.url,
         title: t.title,
@@ -1277,6 +1393,7 @@ class TabManager {
           .filter((x) => x.id !== t.id && /^https?:\/\//i.test(x.url || ''))
           .map((x) => x.url).slice(0, 20),
         contentExtract,
+        delicata,
       });
     }
     return out;
@@ -1470,6 +1587,11 @@ class TabManager {
       // "Duplica" chiede ESPLICITAMENTE una copia: salta la deduplica #252 delle
       // pagine interne, altrimenti riporterebbe solo a fuoco l'originale.
       allowDuplicate: true,
+      // La copia eredita l'«Apri comunque» della scheda, non ne concede uno nuovo:
+      // la copia di una pagina «Sito bloccato» è ancora quella pagina (#590).
+      apriComunque: this._siteAllowedIn(tab, tab.url),
+      permessoRichieste: this._siteAllowedIn(tab, tab.url) && !!tab._permessoRichieste,
+      bloccoInPagina: true,
     });
   }
 
@@ -1483,6 +1605,7 @@ class TabManager {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
     if (this.activeId !== id) this.activate(id);
+    if (this.avvisoSito.coperta() === tab) { this._sbScelta(tab, 'chiedi'); return; }
     try {
       tab.view.webContents.send('shortcut:triggered', {
         command: 'open-help-sidebar',
@@ -1494,6 +1617,8 @@ class TabManager {
   activate(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
+    if (this.activeId !== id) this.anteprime.congeda(this.tabs.find((t) => t.id === this.activeId));
+    this.anteprime.mostrata(tab);
     this.activeId = id;
     // §2.1 segnale: quando una tab diventa attiva è "usata adesso". Aggiorna sia
     // il momento di ultima attivazione sia l'ultima interazione (proxy grossolano;
@@ -1504,10 +1629,11 @@ class TabManager {
     tab.activateSeq = this._nextActivationSeq(); // ordine MRU per la chiusura tab
     this._lastAppInteractionAt = now; // attivare una tab = usare Filo (§2.1)
     for (const t of this.tabs) {
-      t.view.setVisible?.(t.id === id);
+      t.view.setVisible?.(this._visibile(t));
     }
     this.layout();
     this._tastieraAllaSchedaAttiva();
+    if (tab._listaTimer) this._seguiLista(tab, { ora: true });
     this._broadcast();
   }
 
@@ -1515,12 +1641,15 @@ class TabManager {
   // vede più, o su niente perché la view chiusa se l'è portata via: senza, dopo
   // Ctrl+W, Alt+cifra o Alt+S i tasti non arrivano a nessuno finché non si
   // clicca (#838). La barra che ha la tastiera la tiene; Filo dietro non la ruba.
+  // Una scheda coperta dall'avviso del sito pericoloso dà la tastiera all'avviso, mai alla pagina (#813.5).
   _tastieraAllaSchedaAttiva() {
     const tab = this.tabs.find((t) => t.id === this.activeId);
     if (!tab || this.win.isDestroyed() || !this.win.isFocused()) return;
+    const avviso = this.avvisoSito.coperta() === tab ? this.avvisoSito.webContents() : null;
+    const dest = avviso || tab.view.webContents;
     const col = require('electron').webContents.getFocusedWebContents();
-    if (col === this.win.webContents || col === tab.view.webContents) return;
-    try { tab.view.webContents.focus(); } catch (_) {}
+    if (col === this.win.webContents || col === dest) return;
+    try { dest.focus(); } catch (_) {}
   }
 
   // §2.1 — segnali di attività riportati dal content script (input, scroll,
@@ -1559,9 +1688,10 @@ class TabManager {
     // prima che loadURL() possa toccarli. mailto:/tel:/sms: vengono consegnati
     // all'OS invece di caricare una scheda, come nel gate di will-navigate.
     if (isWebUnsafeNav(target)) {
-      openExternalScheme(target);
+      fermaNavigazione(target, { win: this.win });
       return;
     }
+    if (this._maybeBlockNavigation(tab, target)) return;
     // La WebContentsView va RICREATA (non basta un loadURL) quando cambia la
     // partizione (privacy, fra siti diversi) oppure quando si attraversa il
     // confine di fiducia interno↔esterno: il preload e contextIsolation sono
@@ -1617,10 +1747,14 @@ class TabManager {
   _recreateView(tab, url, opts = {}) {
     const wasActive = tab.id === this.activeId;
     const partition = this._partitionForTab(tab, url);
+    // La pagina che la vista vecchia mostrava: se il primo salto della nuova si ferma sulla lista, si torna lì.
+    let prima = '';
+    try { prima = opts.ritorno ? '' : (tab.view.webContents.getURL() || ''); } catch (_) {}
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
     try { tab.view.webContents.close(); } catch (_) {}
     const view = this._makeView(url, partition, { suppressAutoplay: tab.suppressAutoplay });
     tab.view = view;
+    tab._vistaNuova = { wc: view.webContents, prima: /^(https?|filo):/i.test(prima) ? prima : '' };
     tab.partition = partition;
     tab.isInternal = url.startsWith('filo://');
     tab.partitionSite = tab.isInternal ? null : Cookies.registrableOf(url);
@@ -1636,17 +1770,32 @@ class TabManager {
     // appena creata avrebbe altrimenti bounds di default e potrebbe disegnarsi
     // sopra la scheda attiva.
     this.layout();
-    view.webContents.loadURL(opts.loadUrl || url);
+    // Proxy e ritorno in Italia ricaricano l'indirizzo della scheda senza will-navigate (#590).
+    const bloccata = !opts.loadUrl && this._decisioneBlocco(tab, url);
+    if (bloccata) this._mostraPaginaBloccata(tab, url, bloccata);
+    else view.webContents.loadURL(opts.loadUrl || url);
     // Visibilità coerente con lo stato attivo: solo la scheda attiva è visibile,
     // le altre (inclusa la view appena ricreata se non attiva) restano nascoste.
-    for (const t of this.tabs) t.view.setVisible?.(t.id === this.activeId);
+    for (const t of this.tabs) t.view.setVisible?.(this._visibile(t));
     if (wasActive) this._tastieraAllaSchedaAttiva();
     this._broadcast();
+  }
+
+  // La voce della cronologia a `passo` da quella attuale: la storia della scheda
+  // è un cambio d'indirizzo come gli altri, e passa dalla lista (#590).
+  _vocePassoStoria(tab, passo) {
+    try {
+      const h = tab.view.webContents.navigationHistory;
+      const voce = h.getEntryAtIndex(h.getActiveIndex() + passo);
+      return (voce && voce.url) || '';
+    } catch (_) { return ''; }
   }
 
   goBack(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
+    const meta = this._vocePassoStoria(tab, -1);
+    if (meta && this._maybeBlockNavigation(tab, meta)) return;
     if (tab.view.webContents.navigationHistory?.canGoBack()) {
       tab.view.webContents.navigationHistory.goBack();
     } else if (tab.view.webContents.canGoBack?.()) {
@@ -1692,6 +1841,8 @@ class TabManager {
   goForward(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
+    const meta = this._vocePassoStoria(tab, 1);
+    if (meta && this._maybeBlockNavigation(tab, meta)) return;
     if (tab.view.webContents.navigationHistory?.canGoForward()) {
       tab.view.webContents.navigationHistory.goForward();
     } else if (tab.view.webContents.canGoForward?.()) {
@@ -1709,6 +1860,12 @@ class TabManager {
     let current = '';
     try { current = tab.view.webContents.getURL() || ''; } catch (_) {}
     const target = NE && NE.targetOf(current);
+    // La pagina «Sito bloccato» ricaricata resta sé stessa finché il sito è in lista (#590).
+    if (NE && NE.isBlockedPageUrl(current) && this._decisioneBlocco(tab, target)) {
+      try { tab.view.webContents.reload(); } catch (_) {}
+      return;
+    }
+    if (this._maybeBlockNavigation(tab, target || current)) return;
     if (target) {
       try { tab.view.webContents.loadURL(target); } catch (_) {}
       return;
@@ -1723,6 +1880,15 @@ class TabManager {
   setActiveVisible(visible) {
     const tab = this.tabs.find((t) => t.id === this.activeId);
     if (tab) tab.view.setVisible?.(visible);
+    // Con la scheda davanti nascosta, una di dietro allargata per la sua anteprima si vedrebbe.
+    this._attivaNascosta = !visible;
+    if (visible) this.anteprime.riprendi(); else this.anteprime.interrompi();
+    this.avvisoSito.nascondi(!visible);
+  }
+
+  // Solo la scheda davanti si vede; una aperta dietro resta «visibile» a 0×0 finché non ha l'anteprima (#430).
+  _visibile(t) {
+    return t.id === this.activeId || this.anteprime.tieneSveglia(t);
   }
 
   // ─── layout ─────────────────────────────────────────────────────────────
@@ -1745,10 +1911,15 @@ class TabManager {
         if (process.env.FILO_SMOKE) {
           console.log(`[layout] tab ${tab.id.slice(0, 6)} active bounds`, JSON.stringify(b), 'win', w, 'x', h);
         }
+      } else if (this.anteprime.inCattura(tab)) {
+        const top = this._altezzaCornice();
+        tab.view.setBounds({ x: 0, y: top, width: w, height: Math.max(0, h - top) });
       } else {
         tab.view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
       }
     }
+    // L'ordine conta: l'avviso del sito sta sopra la scheda, gli avvisi della barra sopra di lui.
+    this.avvisoSito.posa();
     this.avvisi.posa();
     this.barra.posa();
   }
@@ -1795,8 +1966,31 @@ class TabManager {
   // delle pagine che zoomano da sé restano di chi già li tiene. Il preload
   // risponde con la percentuale che ha davvero applicato: chi chiede un valore
   // fuori scala deve poterlo dire all'utente invece di tacere il taglio.
-  applicaZoom(spec) {
-    const active = this.tabs.find((t) => t.id === this.activeId);
+  // Il cambio applicato diventa un evento del filo nel contesto di chi l'ha chiesto (#867).
+  async applicaZoom(spec, bersaglio = null) {
+    const tab = bersaglio || this.tabs.find((t) => t.id === this.activeId);
+    const esito = await this._chiediZoom(tab, spec);
+    if (esito && typeof esito.prima === 'number' && typeof esito.percentuale === 'number') {
+      try {
+        require('./services/registroCambi').registraZoom(
+          { host: ospiteDelloZoom(tab.url), prima: esito.prima, dopo: esito.percentuale },
+          { incognito: !!this.incognito },
+        );
+      } catch (_) {}
+    }
+    return esito;
+  }
+
+  // «Rimetti com'era» uno zoom: sulla scheda di quel sito che si vede, o su un'altra dello stesso sito.
+  async zoomSulSito(host, percentuale) {
+    const stessi = this.tabs.filter((t) => t.view && ospiteDelloZoom(t.url) === host);
+    if (!stessi.length) return false;
+    const tab = stessi.find((t) => t.id === this.activeId) || stessi[0];
+    const esito = await this.applicaZoom({ percentuale }, tab);
+    return !!(esito && !esito.muto);
+  }
+
+  _chiediZoom(active, spec) {
     if (!active || !active.view) return Promise.resolve(null);
     const wc = active.view.webContents;
     const rid = `zoom-${randomUUID()}`;
@@ -1829,6 +2023,8 @@ class TabManager {
 
   _wireEvents(tab) {
     const wc = tab.view.webContents;
+    this._registraPermessoRichieste(tab);
+    try { wc.once('destroyed', () => this.visite.chiusa(wc)); } catch (_) {}
     const update = (patch) => {
       Object.assign(tab, patch);
       this._broadcast();
@@ -1841,6 +2037,21 @@ class TabManager {
       wc.ipc.on('filo:zoom-proprio', (_e, perc) => {
         const n = Math.round(Number(perc));
         tab.zoomProprio = Number.isFinite(n) && n > 0 ? n : null;
+      });
+    } catch (_) {}
+    // Una raffica di tasti o di rotella finita: un evento del filo (#867). Solo dal frame principale,
+    // e solo numeri dentro i limiti dello zoom.
+    try {
+      wc.ipc.on('filo:zoom-registra', (e, d) => {
+        if (e.senderFrame && wc.mainFrame && e.senderFrame !== wc.mainFrame) return;
+        const Z = globalThis.SN_ZOOM;
+        const dentro = (x) => Number.isFinite(Number(x)) && (!Z || (Number(x) >= Z.MIN_PERCENTUALE - 1 && Number(x) <= Z.MAX_PERCENTUALE + 1));
+        if (!d || !dentro(d.prima) || !dentro(d.dopo)) return;
+        const R = require('./services/registroCambi');
+        R.con({ via: 'interfaccia', dove: 'zoom' }, () => R.registraZoom(
+          { host: ospiteDelloZoom(tab.url), prima: d.prima, dopo: d.dopo },
+          { incognito: !!this.incognito },
+        ));
       });
     } catch (_) {}
     // In modalità "contenuto a tutto schermo" la pagina copre la barra, quindi
@@ -1870,6 +2081,7 @@ class TabManager {
       this.setContentFullscreen(false);
     });
     collegaScorciatoie(wc, () => this.win);
+    this._sbGuardiaTastiera(tab, wc);
     wc.on('before-input-event', (event, input) => {
       // #514 — l'ultimo tasto era l'Esc? Serve a `enter-html-full-screen`, che
       // da un Esc non fa passare nessuna richiesta di schermo pieno. Qui,
@@ -1954,6 +2166,8 @@ class TabManager {
     // Best-effort: i redirect lato server a metà caricamento possono sfuggire a
     // will-navigate; la rete di sicurezza è il gate d'origine in
     // internal-preload.js, che non espone le API se l'origine non è filo:.
+    // Un invito chiesto da un riquadro della pagina (un pulsante che lo apre in un iframe nascosto) segue la regola della pagina intera (#664).
+    wc.on('will-frame-navigate', (event) => fermaInvitoNelRiquadro(event, { win: this.win, wc }));
     wc.on('will-navigate', (event, url) => {
       // SICUREZZA: blocca le navigazioni top-level verso schemi non-web
       // (file:// → leak hash NTLM via SMB su Windows; data:/javascript: →
@@ -1962,13 +2176,13 @@ class TabManager {
       // fallire li consegniamo al sistema (apre posta/telefono), come un browser.
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
-        openExternalScheme(url);
+        fermaNavigazione(url, { win: this.win, wc });
         return;
       }
-      // #170.3 — Blocco apertura siti in blacklist. Click su un link generico
-      // (o window.location) verso un sito in blacklist: blocca, TRANNE se la
-      // pagina di partenza è un motore di ricerca (l'utente l'ha cercato).
-      if (this._maybeBlockNavigation(tab, url, { fromUrl: wc.getURL() })) {
+      // «Apri comunque» della pagina «Sito bloccato» che il main ha messo in questa scheda (#590).
+      if (this._apriComunqueDallaPagina(tab, url, event)) this._concediApriComunque(tab, url);
+      // #170.3 — link o window.location verso un sito della lista: fermato.
+      if (this._fermaSaltoDellaScheda(tab, url)) {
         event.preventDefault();
         return;
       }
@@ -1992,7 +2206,29 @@ class TabManager {
     wc.on('will-redirect', (event, url) => {
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
-        openExternalScheme(url);
+        fermaNavigazione(url, { win: this.win, wc });
+        // Una scheda nata per un collegamento che rimbalza sull'invito o sulla posta resterebbe bianca (#664 giro 2).
+        if (event.isMainFrame !== false && !tab._everNavigated && !tab.isInternal) setImmediate(() => this._dropTab(tab));
+        return;
+      }
+      // #590 — un redirect è un cambio d'indirizzo come gli altri: senza, un
+      // accorciatore o un redirect aperto porta a un sito della lista.
+      if (event.isMainFrame === false) return;
+      const fermata = this._fermaSaltoDellaScheda(tab, url);
+      if (!fermata) return;
+      event.preventDefault();
+      // Una scheda nata per quell'indirizzo resterebbe bianca e senza storia.
+      if (!tab._everNavigated && !tab.isInternal) {
+        setImmediate(() => this._dropTab(tab));
+      } else if (tab._vistaNuova && tab._vistaNuova.wc === wc) {
+        // Una vista appena ricreata (privacy fra siti, pagina di Filo → web) non ha niente dietro:
+        // torna la pagina di prima, com'è quando la vista resta la stessa.
+        const prima = tab._vistaNuova.prima;
+        setImmediate(() => {
+          if (!this.tabs.includes(tab) || tab.view.webContents !== wc) return;
+          if (prima) this._recreateView(tab, prima, { ritorno: true });
+          else this._mostraPaginaBloccata(tab, url, fermata);
+        });
       }
     });
     // Debug helper: in dev relay i log della pagina al main.
@@ -2095,6 +2331,8 @@ class TabManager {
       }
     });
 
+    // I riquadri si guardano da quando nascono: uno che non finisce mai di caricarsi mostra già il modulo (#813.1).
+    wc.on('did-frame-navigate', (_e, _url, _code, _text, isMainFrame) => this._sbOnFrameLoad(tab, isMainFrame));
     wc.on('did-frame-finish-load', (_e, isMainFrame) => this._sbOnFrameLoad(tab, isMainFrame));
 
     // §3.1 — ripristino scroll alla riapertura da archivio: a caricamento finito
@@ -2141,18 +2379,26 @@ class TabManager {
         canBack: canGoBack(wc),
         canFwd: canGoFwd(wc),
       });
+      if (tab.view && tab.view.webContents === wc) this.anteprime.caricata(tab);
+      this.visite.caricata(wc);
       // §3.2 — cattura un estratto del contenuto (best-effort) da usare per la
       // ricerca semantica dell'archivio e per il triage. Solo pagine web.
       if (!tab.isInternal && /^https?:\/\//i.test(wc.getURL() || '')) {
         try {
+          const letta = wc.getURL();
           wc.executeJavaScript(
             '(function(){try{return (document.body&&document.body.innerText||"").replace(/\\s+/g," ").slice(0,2000);}catch(e){return "";}})()',
             true,
-          ).then((txt) => { if (typeof txt === 'string' && txt) tab.contentExtract = txt; }).catch(() => {});
+          ).then((txt) => {
+            if (typeof txt === 'string' && txt && !wc.isDestroyed() && wc.getURL() === letta) tab.contentExtract = txt;
+          }).catch(() => {});
         } catch (_) {}
       }
     });
-    wc.on('page-title-updated', (_e, title) => update({ title: title || tab.title }));
+    wc.on('page-title-updated', (_e, title) => {
+      update({ title: title || tab.title });
+      this.visite.titolo(wc, title);
+    });
     wc.on('page-favicon-updated', (_e, favicons) => update({ favicon: favicons?.[0] || '' }));
     wc.on('did-navigate', (_e, url, httpResponseCode) => {
       // #412 — questa scheda ha committato una vera navigazione main-frame:
@@ -2161,6 +2407,26 @@ class TabManager {
       // MAI, quindi resta a about:blank). Il flag protegge dal chiuderla per
       // sbaglio se poi parte un download da una pagina che ha già contenuto.
       tab._everNavigated = true;
+      // Testo e titolo letti sono della pagina di prima: sotto l'indirizzo nuovo partirebbero col suo nome (#1004).
+      // Una pagina senza titolo non lo cambia mai: vale quello del documento nuovo, cioè l'indirizzo, come negli altri browser.
+      tab.contentExtract = '';
+      if (/^https?:\/\//i.test(url || '')) {
+        let nuovo = '';
+        try { nuovo = wc.getTitle() || ''; } catch (_) {}
+        tab.title = nuovo || userUrl(url);
+      }
+      if (tab.view && tab.view.webContents === wc) this.anteprime.navigata(tab);
+      if (tab._vistaNuova && tab._vistaNuova.wc === wc) tab._vistaNuova = null;
+      this._sostituisciVoceBloccata(wc, url);
+      // #590 — una navigazione già partita quando il suo sito è entrato in lista arriva lo stesso: si ferma qui.
+      const bloccata = /^https?:\/\//i.test(url) && this._decisioneBlocco(tab, url);
+      if (bloccata) {
+        this._esitoApertura(tab, bloccata);
+        this._mostraPaginaBloccata(tab, url, bloccata);
+        return;
+      }
+      this._assestaEsito(tab);
+      this.visite.navigata(wc, tab.id, url);
       // Documento nuovo: lo zoom che la pagina vecchia dichiarava di sé non
       // vale più (#686).
       tab.zoomProprio = null;
@@ -2214,7 +2480,11 @@ class TabManager {
         }
       }
     });
-    wc.on('did-navigate-in-page', (_e, url) => update({ url: userUrl(url), canBack: canGoBack(wc), canFwd: canGoFwd(wc) }));
+    wc.on('did-navigate-in-page', (_e, url, isMainFrame) => {
+      update({ url: userUrl(url), canBack: canGoBack(wc), canFwd: canGoFwd(wc) });
+      if (isMainFrame === true && tab.view && tab.view.webContents === wc) this.anteprime.navigata(tab, { inPagina: true });
+      if (isMainFrame === true) this.visite.navigata(wc, tab.id, url, { inPagina: true });
+    });
     // #441 — l'utente ha toccato DAVVERO questa scheda? Serve a non chiudere
     // come "pagina-ponte" una scheda con cui ha interagito. Il segnale arriva
     // dal main (non dal content script, che manda un campione di attività anche
@@ -2329,11 +2599,18 @@ class TabManager {
     // 'foreground-tab' e 'background-tab' sono link cliccati dall'utente.
     wc.setWindowOpenHandler((details) => {
       const { url, disposition } = details;
+      // Da una pagina di Filo l'indirizzo l'ha scelto quasi sempre un modello: passa dalla porta delle uscite (#810).
+      if (tab.isInternal && typeof globalThis.SN_USCITA_DA_FILO === 'function') {
+        globalThis.SN_USCITA_DA_FILO(url, wc, () => {
+          this.apriDaCollegamento(url, { sfondo: disposition === 'background-tab' });
+        }).catch(() => {});
+        return { action: 'deny' };
+      }
       // SICUREZZA: nega l'apertura (window.open / target=_blank) verso schemi
       // non-web — stessa difesa di will-navigate (file:// → leak NTLM, ecc.).
       // mailto:/tel:/sms: vengono consegnati all'OS invece di essere ignorati.
       if (isWebUnsafeNav(url)) {
-        openExternalScheme(url);
+        fermaNavigazione(url, { win: this.win, wc });
         return { action: 'deny' };
       }
       // #209 — i popup di login ("Continua con Google" e simili) NON sono
@@ -2354,28 +2631,36 @@ class TabManager {
       // avrebbe una scheda aperta su quella URL (Cookies.MODES.PRIVACY →
       // partizione per-sito; altrimenti null = sessione condivisa), per non
       // spezzare un eventuale login Google già presente in Filo.
-      if (tab.isInternal === false && isAuthPopup(url)) {
-        return this._allowAuthPopup(url);
+      const accesso = tab.isInternal === false && isAuthPopup(url);
+      if (accesso) {
+        if (this._maybeBlockNavigation(tab, url)) return { action: 'deny' };
+        // Una pagina sotto l'avviso del sito pericoloso non apre finestre, che starebbero fuori dall'avviso: la
+        // finestrella diventa una scheda, dove l'avviso c'è.
+        if (!tab.sbAvviso) return this._allowAuthPopup(url);
       }
       const isAdLikePopup = disposition === 'new-window';
-      if (tab.isInternal === false && this.security.blockPopups && isAdLikePopup) {
+      if (!accesso && tab.isInternal === false && this.security.blockPopups && isAdLikePopup) {
         this._notifyPopupBlocked(tab.id, url);
         return { action: 'deny' };
       }
-      // #170.3 — link verso un sito in blacklist aperto in una nuova scheda
-      // (target=_blank / window.open): stesso blocco di will-navigate. Il
-      // referrer è la pagina che ha originato l'apertura.
-      const fromUrl = (details.referrer && details.referrer.url) || wc.getURL();
-      if (this._maybeBlockNavigation(tab, url, { fromUrl })) {
-        return { action: 'deny' };
-      }
+      // #170.3 — la lista dei siti bloccati la applica openTab; un «Apri comunque»
+      // dato qui vale anche per le schede che apre sullo stesso sito.
       // #376 — parità con qualsiasi browser: Ctrl+click / click centrale su un
       // link ("aprilo dietro, io continuo a leggere qui") arriva con
       // disposition 'background-tab' e NON deve rubare il primo piano. Prima
       // ogni apertura veniva attivata, quindi l'utente veniva strappato dalla
       // pagina che stava leggendo — lo stesso attrito della musica che passava
       // davanti da sola.
-      this.openTab(url, { activate: disposition !== 'background-tab', openedByLink: true });
+      const aperta = this.openTab(url, {
+        activate: disposition !== 'background-tab',
+        openedByLink: true,
+        apriComunque: this._siteAllowedIn(tab, url),
+        permessoRichieste: this._siteAllowedIn(tab, url) && !!tab._permessoRichieste,
+        daGesto: Permessi.gestoRecente(wc),
+      });
+      // Un blob: aperto dalla pagina si giudica come lei (src/main/tabs/tabSafebrowse.js).
+      const nuova = this.tabs.find((t) => t.id === aperta);
+      if (nuova) nuova._sbApertaDa = tab._urlNavigato;
       return { action: 'deny' };
     });
 
@@ -2384,7 +2669,7 @@ class TabManager {
     // hook resterebbe senza le difese che ogni scheda ha. Qui arrivano SOLO i
     // popup di login (ogni altro percorso del handler qui sopra ritorna 'deny').
     wc.on('did-create-window', (child) => {
-      this._hardenAuthPopup(child);
+      this._hardenAuthPopup(child, tab);
     });
   }
 
@@ -2402,6 +2687,9 @@ class TabManager {
   // altrimenti null = sessione condivisa), per non spezzare un eventuale
   // login Google già presente in Filo.
   _allowAuthPopup(url) {
+    // #758 — l'accesso fatto nella finestrella conta come quello fatto in una scheda: i contenuti del provider
+    // incorporati altrove devono tenere i cookie.
+    try { require('./services/cookieIncorporati').paginaDiAccesso(url); } catch (_) {}
     const popupPartition = this._partitionFor(url);
     // Una partizione mai vista da una scheda non ha gestore, ed Electron concederebbe tutto al popup.
     if (popupPartition) installaPermessi(session.fromPartition(popupPartition));
@@ -2433,20 +2721,37 @@ class TabManager {
   //     di login concatenato (es. scelta account → verifica) resta una vera
   //     finestra (ricorsivamente hardened), tutto il resto torna dentro Filo
   //     come scheda normale — mai finestre libere non gestite.
-  _hardenAuthPopup(win) {
+  // `origine`: la scheda da cui nasce il popup. Il suo «Apri comunque» vale anche qui (#590).
+  _hardenAuthPopup(win, origine = null) {
     if (!win || !win.webContents) return;
     const pwc = win.webContents;
     installaPermessi(pwc.session);
+    Permessi.seguiGesti(pwc);
     try {
       pwc.setWebRTCIPHandlingPolicy(
         this.security.protectIpLeak ? 'default_public_interface_only' : 'default',
       );
     } catch (_) { /* policy non supportata in qualche build */ }
+    if (origine && origine.siteBlockAllowed && origine._permessoRichieste) {
+      const wcId = pwc.id;
+      permessiApriComunque.set(wcId, origine.siteBlockAllowed);
+      pwc.once('destroyed', () => permessiApriComunque.delete(wcId));
+    }
+    let mostrata = false;
+    pwc.on('did-navigate', () => { mostrata = true; });
+    // Una finestrella fermata prima di mostrare qualcosa resterebbe vuota a schermo.
+    const ferma = (event) => {
+      event.preventDefault();
+      if (!mostrata) setImmediate(() => { try { win.close(); } catch (_) {} });
+    };
+    pwc.on('will-frame-navigate', (event) => fermaInvitoNelRiquadro(event, { win: this.win, wc: pwc }));
     pwc.on('will-navigate', (event, url) => {
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
-        openExternalScheme(url);
+        fermaNavigazione(url, { win: this.win, wc: pwc });
+        return;
       }
+      if (this._maybeBlockNavigation(origine, url)) ferma(event);
     });
     // SICUREZZA (#309) — come per le tab: will-navigate non copre i redirect
     // lato server, e un IdP compromesso/ostile potrebbe rimbalzare il popup
@@ -2454,37 +2759,54 @@ class TabManager {
     pwc.on('will-redirect', (event, url) => {
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
-        openExternalScheme(url);
+        fermaNavigazione(url, { win: this.win, wc: pwc });
+        return;
       }
+      if (event.isMainFrame === false) return;
+      if (this._maybeBlockNavigation(origine, url)) ferma(event);
     });
     pwc.setWindowOpenHandler(({ url }) => {
       if (isWebUnsafeNav(url)) {
-        openExternalScheme(url);
+        fermaNavigazione(url, { win: this.win, wc: pwc });
         return { action: 'deny' };
       }
       if (isAuthPopup(url)) {
+        if (this._maybeBlockNavigation(origine, url)) return { action: 'deny' };
         return this._allowAuthPopup(url);
       }
-      this.openTab(url, { activate: true });
+      this.openTab(url, {
+        activate: true,
+        apriComunque: this._siteAllowedIn(origine, url),
+        permessoRichieste: this._siteAllowedIn(origine, url) && !!(origine && origine._permessoRichieste),
+      });
       return { action: 'deny' };
     });
-    pwc.on('did-create-window', (child) => this._hardenAuthPopup(child));
+    pwc.on('did-create-window', (child) => this._hardenAuthPopup(child, origine));
+    this._sbGuardaFinestrella(win, origine);
   }
 
   // Notifica la shell che un popup è stato bloccato sul tab `tabId`. La shell
   // mostra l'avviso "Bloccato popup da <host>" con «Apri» per aprirlo.
   _notifyPopupBlocked(tabId, url) {
     try {
-      let host = '';
-      try { host = new URL(url).host; } catch (_) { host = url; }
+      const host = globalThis.SN_NOMI_SITO.sitoDi(url) || url;
       this.win.webContents.send('tabs:popup-blocked', { tabId, url, host });
     } catch (_) {}
   }
 
   // Chiamato da IPC quando l'utente clicca "Apri" sull'avviso — il popup era
-  // legittimo (es. share dialog, OAuth) e va aperto bypassando il blocco.
-  openBlockedPopup(url) {
-    this.openTab(url, { activate: true });
+  // legittimo (es. share dialog, OAuth) e va aperto bypassando il blocco dei
+  // popup, NON la lista dei siti bloccati: quella la scavalca solo `apriComunque`,
+  // l'«Apri comunque» della notifica di sito bloccato.
+  // `daScheda`: la scheda che aveva chiesto il popup, il cui «Apri comunque» vale anche per lui.
+  openBlockedPopup(url, { apriComunque = false, daScheda = null } = {}) {
+    const origine = daScheda ? this.tabs.find((t) => t.id === daScheda) : null;
+    const eredita = this._siteAllowedIn(origine, url);
+    this.openTab(url, {
+      activate: true,
+      apriComunque: !!apriComunque || eredita,
+      permessoRichieste: !!apriComunque || (eredita && !!origine._permessoRichieste),
+    });
   }
 
   // #412 — un link "Scarica" con target=_blank (o window.open) apre una nuova
@@ -2518,14 +2840,21 @@ class TabManager {
       now: Date.now(),
     });
     if (!decision.close) return;
-    const idx = this.tabs.findIndex((t) => t.id === tab.id);
-    if (idx < 0) return;
     // La pagina-ponte aveva contenuto: l'utente deve poter tornare indietro se
     // quella scheda gli serviva davvero (chiudere da soli qualcosa di visibile
     // senza via di ritorno sarebbe peggio dell'attrito che togliamo).
     const undo = decision.reason === 'bridge'
       ? { title: tab.title, url: tab.url }
       : null;
+    if (this._dropTab(tab) && undo) this._notifyBridgeTabClosed(undo);
+  }
+
+  // Toglie una scheda che non ha mai mostrato niente di suo (ponte di un
+  // download, redirect bloccato): senza archiviarla, a differenza di closeTab.
+  _dropTab(tab) {
+    const idx = this.tabs.findIndex((t) => t.id === tab.id);
+    if (idx < 0) return false;
+    this._esitoApertura(tab, null);
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
     try { tab.view.webContents.close(); } catch (_) {}
     ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
@@ -2539,7 +2868,7 @@ class TabManager {
     } else {
       this._broadcast();
     }
-    if (undo) this._notifyBridgeTabClosed(undo);
+    return true;
   }
 
   // #441 — avviso discreto dopo aver chiuso una pagina-ponte, con "Riapri".
@@ -2558,41 +2887,264 @@ class TabManager {
     } catch (_) {}
   }
 
-  // #170.3 — decide se bloccare una navigazione top-level verso un sito in
-  // blacklist e, in caso, mostra la notifica. Ritorna true se ha bloccato.
-  // Le aperture originate da Filo (openTab dell'azione NAVIGA, navigazione
-  // interna filo://) non passano da qui (loadURL programmatico non emette
-  // will-navigate), quindi sono naturalmente consentite.
-  _maybeBlockNavigation(tab, url, { fromUrl = '' } = {}) {
-    let decision;
-    try {
-      decision = require('./services/siteBlock').shouldBlockNavigation(url, { fromUrl });
-    } catch (_) {
-      return false;
-    }
-    if (!decision || !decision.block) return false;
-    this._notifyBlocked(decision.host, url);
+  // Un collegamento che Filo apre per conto di una pagina, dopo la porta delle uscite (#810): la posta al sistema, i
+  // siti in blacklist fermati come un clic, il resto in una scheda nuova.
+  apriDaCollegamento(url, { sfondo = false } = {}) {
+    if (isWebUnsafeNav(url)) return invitoFermato(url, { win: this.win }) || openExternalScheme(url);
+    if (this._maybeBlockNavigation(null, url)) return false;
+    this.openTab(url, { activate: !sfondo, openedByLink: true });
     return true;
   }
 
-  // Notifica in basso a destra (#170.1): sito bloccato + azione "Apri comunque".
-  // L'azione riusa il percorso openBlockedPopup (apertura programmatica, che
-  // bypassa il blocco).
-  _notifyBlocked(host, url) {
+  // #590 — L'UNICO punto che applica la lista dei siti bloccati: ci passano
+  // openTab, navigate, will-navigate, will-redirect, la storia, le viste ricreate e il commit.
+  // Ritorna la decisione ({ host, reason, target }) se la lista ferma `url`, altrimenti
+  // null; non avvisa. `tab` è la scheda di partenza, che può avere un «Apri comunque».
+  _decisioneBlocco(tab, url) {
+    if (this._siteAllowedIn(tab, url)) return null;
+    // Un indirizzo nudo («sito.com», come lo manda a volte il modello) si
+    // giudica per quello che diventerà caricandolo.
+    const target = /^[a-z][a-z0-9+.-]*:/i.test(String(url || '')) ? url : normalizeUrl(url);
+    let decision;
     try {
-      const label = host || (() => { try { return new URL(url).host; } catch (_) { return url; } })();
+      decision = require('./services/siteBlock').shouldBlockNavigation(target);
+    } catch (_) {
+      return null;
+    }
+    if (!decision || !decision.block) return null;
+    return { ...decision, target };
+  }
+
+  // Come è finita la prima apertura di una scheda appena nata (#590): `bloccata` è la decisione
+  // della lista se l'ha fermata un rimbalzo del server o della pagina (rinvio, script), null se la
+  // pagina è arrivata e ci è rimasta o dopo `tetto` ms. Serve a chi l'ha aperta per conto
+  // dell'utente (NAVIGA) per non dire «aperta» a vuoto.
+  esitoApertura(id, { tetto = 5000 } = {}) {
+    const tab = this.tabs.find((t) => t.id === id);
+    if (!tab || tab._everNavigated) return Promise.resolve({ bloccata: null });
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => this._esitoApertura(tab, null), tetto);
+      if (!tab._attesaEsito) tab._attesaEsito = [];
+      tab._attesaEsito.push((bloccata) => { clearTimeout(timer); resolve({ bloccata }); });
+    });
+  }
+
+  // La chat che ha chiesto l'apertura di `id`, con l'id dell'azione: dopo l'attesa di esitoApertura,
+  // un blocco che la pagina provoca da sé le arriva lo stesso. `assistente`: l'assistente sulla pagina,
+  // che ascolta coi content script invece che sul canale della home.
+  seguiApertura(id, { wc, callId, assistente = false } = {}) {
+    const tab = this.tabs.find((t) => t.id === id);
+    if (!tab || !wc || !callId) return;
+    tab._aperturaChat = { wc, callId, assistente: !!assistente, da: Date.now() };
+  }
+
+  // «Apri comunque» dell'assistente sulla pagina: una pagina web lo può chiedere solo per un
+  // indirizzo che la lista ha fermato a un'apertura chiesta da lei stessa.
+  ricordaApribile(wc, url) {
+    if (!wc || !url) return;
+    if (!this._apribiliAssistente) this._apribiliAssistente = new WeakMap();
+    let set = this._apribiliAssistente.get(wc);
+    if (!set) { set = new Set(); this._apribiliAssistente.set(wc, set); }
+    set.add(String(url));
+  }
+
+  apribileDallAssistente(wc, url) {
+    const set = wc && this._apribiliAssistente && this._apribiliAssistente.get(wc);
+    return !!set && set.has(String(url || ''));
+  }
+
+  _bloccoDopoApertura(tab, bloccata) {
+    const c = tab._aperturaChat;
+    tab._aperturaChat = null;
+    if (!c || (tab._userInputAt || 0) >= c.da || Date.now() - c.da > SEGUI_APERTURA_MS) return;
+    const dati = { callId: c.callId, host: bloccata.host, reason: bloccata.reason || '', url: bloccata.target };
+    try {
+      if (c.wc.isDestroyed()) return;
+      if (c.assistente) {
+        this.ricordaApribile(c.wc, dati.url);
+        c.wc.send('filo:broadcast', { type: globalThis.SN_MSG?.MSG?.APERTURA_FERMATA || 'apertura_fermata', ...dati });
+      } else {
+        c.wc.send('filo:apertura-fermata', dati);
+      }
+    } catch (_) {}
+  }
+
+  _esitoApertura(tab, bloccata) {
+    const attese = tab._attesaEsito;
+    if (!attese) {
+      if (bloccata && tab._aperturaChat) this._bloccoDopoApertura(tab, bloccata);
+      return;
+    }
+    tab._attesaEsito = null;
+    // Detto adesso a chi aspettava: non va ridetto dopo.
+    if (bloccata) tab._aperturaChat = null;
+    clearTimeout(tab._assestamento);
+    tab._assestamento = null;
+    for (const a of attese) a(bloccata);
+  }
+
+  // Arrivata la prima pagina, l'esito aspetta che finisca di caricare e un attimo dopo: un rinvio
+  // scritto nella pagina parte a caricamento finito. Al massimo ASSESTAMENTO_MS dopo l'arrivo.
+  _assestaEsito(tab) {
+    if (!tab._attesaEsito || tab._assestamento) return;
+    const arrivata = () => this._esitoApertura(tab, null);
+    tab._assestamento = setTimeout(arrivata, ASSESTAMENTO_MS);
+    const wc = tab.view.webContents;
+    const riprogramma = (ms) => {
+      if (!tab._attesaEsito) return;
+      clearTimeout(tab._assestamento);
+      tab._assestamento = setTimeout(arrivata, ms);
+    };
+    try {
+      wc.once('did-stop-loading', () => {
+        if (!tab._attesaEsito) return;
+        // Una pagina che dichiara di spostarsi fra poco è un passaggio: si aspetta dove porta
+        // (dentro il tetto di esitoApertura). Quello che fa più tardi lo dice _bloccoDopoApertura.
+        wc.executeJavaScript(RINVIO_DICHIARATO_JS, false)
+          .then((sec) => riprogramma((Number(sec) >= 0 ? Number(sec) * 1000 : 0) + DOPO_CARICAMENTO_MS))
+          .catch(() => riprogramma(DOPO_CARICAMENTO_MS));
+      });
+    } catch (_) {}
+  }
+
+  // Come _decisioneBlocco, e se blocca lo dice con la notifica «Sito bloccato».
+  _maybeBlockNavigation(tab, url) {
+    const decision = this._decisioneBlocco(tab, url);
+    if (decision) this._notifyBlocked(decision);
+    return decision;
+  }
+
+  // Un salto della pagina della scheda (link, rinvio, rimbalzo del server) fermato dalla lista: oltre
+  // alla notifica, l'esito va a chi aveva chiesto di aprire la scheda, qualunque forma abbia il salto.
+  _fermaSaltoDellaScheda(tab, url) {
+    const fermata = this._maybeBlockNavigation(tab, url);
+    if (fermata) this._esitoApertura(tab, fermata);
+    return fermata;
+  }
+
+  // La scheda passa alla pagina «Sito bloccato» al posto di `url`, che per l'utente
+  // resta il suo indirizzo (sessione, ricarica, duplica).
+  _mostraPaginaBloccata(tab, url, decision) {
+    const NE = globalThis.SN_NET_ERROR;
+    if (!NE) return;
+    if (!tab._pagineBloccate) tab._pagineBloccate = new Set();
+    tab._pagineBloccate.add(indirizzoCanonico(url));
+    tab.url = url;
+    try { tab.view.webContents.loadURL(NE.buildUrl(url, NE.BLOCKED_CODE, decision.reason)); } catch (_) {}
+  }
+
+  // Il salto da una pagina «Sito bloccato» messa dal main al suo sito è il suo «Apri comunque»:
+  // la pagina lo fa solo al clic. Una pagina «Sito bloccato» aperta da altri non concede niente.
+  _apriComunqueDallaPagina(tab, url, event) {
+    const NE = globalThis.SN_NET_ERROR;
+    if (!NE || !tab._pagineBloccate) return false;
+    try {
+      const corrente = tab.view.webContents.getURL() || '';
+      const da = (event && event.initiator && event.initiator.url) || corrente;
+      if (!NE.isBlockedPageUrl(corrente) || da !== corrente) return false;
+      const bersaglio = indirizzoCanonico(NE.targetOf(corrente));
+      return bersaglio === indirizzoCanonico(url) && tab._pagineBloccate.has(bersaglio);
+    } catch (_) { return false; }
+  }
+
+  _concediApriComunque(tab, url) {
+    const sito = siteBlockSiteOf(url);
+    if (!sito) return;
+    tab.siteBlockAllowed = sito;
+    tab._permessoRichieste = true;
+    this._registraPermessoRichieste(tab);
+  }
+
+  // Il sì di un «Apri comunque» vale anche per il blocco delle richieste di quel webContents.
+  _registraPermessoRichieste(tab) {
+    if (!tab.siteBlockAllowed || !tab._permessoRichieste) return;
+    const wc = tab.view.webContents;
+    const wcId = wc.id;
+    const nuovo = !permessiApriComunque.has(wcId);
+    permessiApriComunque.set(wcId, tab.siteBlockAllowed);
+    if (nuovo) wc.once('destroyed', () => permessiApriComunque.delete(wcId));
+  }
+
+  // La pagina «Sito bloccato» prende nella storia il posto del suo sito, e viceversa:
+  // senza, indietro da lì riporta sul sito e si ferma di nuovo.
+  _sostituisciVoceBloccata(wc, url) {
+    const NE = globalThis.SN_NET_ERROR;
+    if (!NE) return;
+    try {
+      const h = wc.navigationHistory;
+      const i = h.getActiveIndex();
+      if (i < 1) return;
+      const prima = (h.getEntryAtIndex(i - 1) || {}).url || '';
+      const gemelle = (NE.isBlockedPageUrl(url) && NE.targetOf(url) === prima)
+        || (NE.isBlockedPageUrl(prima) && NE.targetOf(prima) === url);
+      if (gemelle) h.removeEntryAtIndex(i - 1);
+    } catch (_) {}
+  }
+
+  // #590 — la lista è cambiata: una scheda su un sito appena messo in lista passa
+  // alla pagina «Sito bloccato»; una ferma lì per un sito uscito dalla lista torna sul sito.
+  riapplicaListaBloccati(opts) {
+    if (opts && opts.mentreScrive) this._listaCambiaFino = Date.now() + LISTA_FERMA_MS;
+    for (const tab of this.tabs) this._seguiLista(tab);
+  }
+
+  // Con `ora` (la scheda viene guardata) la lista vale subito, anche se è a metà.
+  _seguiLista(tab, { ora = false } = {}) {
+    clearTimeout(tab._listaTimer);
+    tab._listaTimer = null;
+    const NE = globalThis.SN_NET_ERROR;
+    if (!NE || !this.tabs.includes(tab)) return;
+    let grezzo = '';
+    try { grezzo = tab.view.webContents.getURL() || ''; } catch (_) { return; }
+    let passo = null;
+    if (NE.isBlockedPageUrl(grezzo)) {
+      const target = this._daRiaprire(tab);
+      if (target) passo = () => { try { tab.view.webContents.loadURL(target); } catch (_) {} };
+    } else {
+      // Anche una pagina d'errore di rete: per l'utente la scheda sta sul sito che non si è aperto.
+      const sito = NE.targetOf(grezzo) || grezzo;
+      const decision = /^https?:\/\//i.test(sito) ? this._decisioneBlocco(tab, sito) : null;
+      if (decision) passo = () => this._mostraPaginaBloccata(tab, sito, decision);
+    }
+    if (!passo) return;
+    const attesa = (this._listaCambiaFino || 0) - Date.now();
+    if (ora || attesa <= 0) passo();
+    else tab._listaTimer = setTimeout(() => this._seguiLista(tab), attesa);
+  }
+
+  // Il sito della pagina «Sito bloccato» messa dal main, se adesso la lista lo lascia aprire.
+  _daRiaprire(tab) {
+    const NE = globalThis.SN_NET_ERROR;
+    if (!NE || !tab._pagineBloccate || !this.tabs.includes(tab)) return null;
+    let grezzo = '';
+    try { grezzo = tab.view.webContents.getURL() || ''; } catch (_) { return null; }
+    if (!NE.isBlockedPageUrl(grezzo)) return null;
+    const target = NE.targetOf(grezzo);
+    return target && !this._decisioneBlocco(tab, target) ? target : null;
+  }
+
+  _siteAllowedIn(tab, url) {
+    return !!(tab && tab.siteBlockAllowed && siteBlockSiteOf(url) === tab.siteBlockAllowed);
+  }
+
+  // Notifica in basso a destra (#170.1): sito bloccato + azione "Apri comunque", che riusa
+  // openBlockedPopup. `decision` viene da _decisioneBlocco: il motivo distingue le liste pubbliche.
+  _notifyBlocked({ host, target, reason }) {
+    try {
+      const label = host || globalThis.SN_NOMI_SITO.sitoDi(target) || target;
+      const perche = reason === 'lists' ? ' · pubblicità e tracciamento' : '';
       this.win.webContents.send('shell:toast', {
-        text: `Sito bloccato: ${label}`,
-        opts: { actions: [{ label: 'Apri comunque', openUrl: url }] },
+        text: `Sito bloccato: ${label}${perche}`,
+        // Una pagina che riprova in continuazione non impila notifiche: finché questa è a schermo resta una.
+        opts: { unica: `sito-bloccato:${label}`, actions: [{ label: 'Apri comunque', openUrl: target, apriComunque: true }] },
       });
     } catch (_) {}
   }
 
   // ─── rilevamento siti pericolosi ─────────────────────────────────────────
   // (vedi src/main/services/safebrowse/ e src/main/tabs/tabSafebrowse.js).
-  // I metodi safebrowse (_sbState, _sbApplyState, _sbBroadcast, safebrowseGet,
-  // _sbOnNavigate, safebrowseProceed, safebrowseDismiss) sono estratti in
-  // tabSafebrowse.js e installati sul prototype in fondo a questo file (mixin).
+  // I metodi safebrowse sono estratti in tabSafebrowse.js e installati sul
+  // prototype in fondo a questo file (mixin); l'avviso lo disegna avvisoSito.js.
 
   // ─── rilevamento geo-block (livello 1 deterministico) + regole d'azione ───
   // (vedi src/main/services/geoBlock.js, proxy-per-tab-spec.md §4-§5 e
@@ -2636,6 +3188,7 @@ class TabManager {
   }
 
   _broadcast() {
+    this.anteprime.pota(new Set(this.tabs.map((t) => t.id)));
     // La shell è il primary webContents della BrowserWindow.
     try {
       this.win.webContents.send('tabs:updated', this.snapshot());
@@ -2711,7 +3264,11 @@ class TabManager {
       // #145 — suppressAutoplay: i media delle tab ripristinate restano in pausa
       // al boot (niente più video YouTube che ripartono tutti insieme).
       urls.forEach((url, i) => {
-        const id = this.openTab(url, { activate: false, suppressAutoplay: true });
+        // Una scheda su un sito della lista torna sulla pagina «Sito bloccato»:
+        // non sparisce dalla sessione e il sito non si riapre da solo (#590).
+        const id = this.openTab(url, { activate: false, suppressAutoplay: true, bloccoInPagina: true });
+        const nata = id && this.tabs.find((t) => t.id === id);
+        if (nata) this.visite.giaVista(nata.view.webContents, url);
         // §1.2/§1.3 — ripristina subito il colore identità salvato: la barra
         // riparte già tinta e il riordino cromatico alla riapertura ha i dati
         // pronti senza attendere il ricalcolo dei content script. Seeda anche la
@@ -2745,7 +3302,7 @@ class TabManager {
 
 // Installa i blocchi estratti come metodi di TabManager (mixin). Le definizioni
 // vivono in moduli separati per leggibilità; qui li agganciamo al prototype così
-// `this._sbBroadcast(...)`, `this._geoTextCheck(...)`, ecc. restano metodi
+// `this._sbMostra(...)`, `this._geoTextCheck(...)`, ecc. restano metodi
 // d'istanza identici a prima del refactor.
 installSafebrowse(TabManager);
 installGeoBlock(TabManager);

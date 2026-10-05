@@ -63,6 +63,9 @@ function withFetch(fn) {
   };
   Collector._reset();
   Collector._setAuto(false);
+  // La pipeline si prova com'è a raccolta accesa: spenta, si ferma prima di
+  // tutto (#897, raccoltaPercorsiSpenta.test.mjs).
+  Collector._setAccesa(true);
   return fn(calls).finally(() => { globalThis.fetch = orig; Collector._reset(); });
 }
 

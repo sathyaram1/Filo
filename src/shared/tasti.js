@@ -75,8 +75,20 @@
 
   // "Ctrl+Shift+1" → ["Ctrl", "Shift", "1"]. Il tasto finale può essere un "+"
   // (Ctrl++ non esiste in Filo, ma la spaccatura non deve rovinarlo comunque).
+  // Senza nessun «+» si separa anche col trattino o con lo spazio («Ctrl-S», «Ctrl Shift 2»):
+  // si staccano i modificatori in testa e il resto è il tasto («Ctrl Freccia giù», «Ctrl--»).
   function pezzi(accel) {
-    return String(accel || '').split('+').map((p) => p.trim()).filter(Boolean);
+    const testo = String(accel || '').trim();
+    if (testo.includes('+')) return testo.split('+').map((p) => p.trim()).filter(Boolean);
+    const parti = [];
+    let resto = testo;
+    let m;
+    while ((m = /^([^\s-]+)(\s*-\s*|\s+)/.exec(resto)) && tipoModificatore(m[1])) {
+      parti.push(m[1]);
+      resto = resto.slice(m[0].length);
+    }
+    if (resto.trim()) parti.push(resto.trim());
+    return parti;
   }
 
   // Anche i nomi italiani e i simboli del Mac: un modificatore che non si
@@ -87,7 +99,13 @@
 
   // L'etichetta da MOSTRARE per un acceleratore scritto in forma Windows.
   // Su Windows e Linux torna identica: la forma canonica è quella.
-  function etichetta(accel, esplicita) {
+  function etichetta(accel, esplicita) { return nomeSulMac(accel, esplicita, false); }
+
+  // Il nome di una combinazione scritta dall'utente: su Mac Ctrl diventa Cmd e basta. Le riscritture
+  // di Alt qui sotto valgono per i tasti di Filo, e ripetere Alt+1 come «Cmd+1» nominava un altro tasto (#545).
+  function etichettaScritta(accel, esplicita) { return nomeSulMac(accel, esplicita, true); }
+
+  function nomeSulMac(accel, esplicita, scritta) {
     const testo = String(accel || '');
     if (!testo || !suMac(esplicita)) return testo;
 
@@ -105,7 +123,7 @@
     // di una parola dentro OGNI campo di testo: prendersela vorrebbe dire
     // togliere quel movimento in tutta l'app. Lì la convenzione dei browser è
     // Cmd+[ e Cmd+], che non scrivono e non muovono niente.
-    if (haAlt && !haCtrl && (tastoFinale === '\u2190' || tastoFinale === '\u2192')) {
+    if (!scritta && haAlt && !haCtrl && (tastoFinale === '\u2190' || tastoFinale === '\u2192')) {
       return `Cmd+${tastoFinale === '\u2190' ? '[' : ']'}`;
     }
 
@@ -113,13 +131,13 @@
     // la forma è Cmd+cifra — quella di ogni browser su Mac. Lo zero fa
     // eccezione: su Mac Cmd+0 è lo zoom al 100%, e la decima scheda si raggiunge
     // con Cmd+9 come "l'ultima" (vedi `indiceSaltoScheda`).
-    if (haAlt && !haCtrl && /^[0-9]$/.test(tastoFinale)) {
+    if (!scritta && haAlt && !haCtrl && /^[0-9]$/.test(tastoFinale)) {
       return `Cmd+${tastoFinale === '0' ? '9' : tastoFinale}`;
     }
 
     // Alt+lettera: Spiega, Traduci, Salva, Aiuto. Su Mac prende un Control davanti
     // (e qui "Ctrl" è davvero il tasto Control del Mac, non Cmd): vedi shortcuts.js.
-    if (haAlt && !haCtrl) return ['Ctrl', 'Alt', ...altri, tastoFinale].join('+');
+    if (!scritta && haAlt && !haCtrl) return ['Ctrl', 'Alt', ...altri, tastoFinale].join('+');
 
     // Tutto il resto passa da Ctrl, e su Mac Ctrl si preme Cmd.
     const out = [];
@@ -346,11 +364,12 @@
     ACCEL_BARRA,
   ];
   const PRESI_SU_MAC = [
-    // Le voci della barra dei menu (src/main/menu.js).
+    // Le voci della barra dei menu (src/main/menu.js), anche col tasto che un role di Electron
+    // si porta da sé: su Mac «Incolla senza formato» è Cmd+Alt+Shift+V, il menu Aiuto Cmd+?.
     'Ctrl+Z', 'Ctrl+Shift+Z',
     'Ctrl+Plus', 'Ctrl+=', 'Ctrl+-', 'Ctrl+0',
-    'Ctrl+X', 'Ctrl+C', 'Ctrl+V', 'Ctrl+Shift+V', 'Ctrl+A',
-    'Ctrl+Q', 'Ctrl+M', 'Ctrl+H', 'Ctrl+Alt+H',
+    'Ctrl+X', 'Ctrl+C', 'Ctrl+V', 'Ctrl+Alt+Shift+V', 'Ctrl+A',
+    'Ctrl+Q', 'Ctrl+M', 'Ctrl+H', 'Ctrl+Alt+H', 'Ctrl+?',
   ];
   // Spiega, Traduci, Salva, Aiuto (src/main/shortcuts.js): con Filo davanti se
   // li prende lui prima della pagina.
@@ -397,6 +416,12 @@
     return CTRL.test(n) ? 'ctrl' : ALT.test(n) ? 'alt' : SHIFT.test(n) ? 'shift' : '';
   }
 
+  // Solo modificatori, senza il tasto da premere con loro («Ctrl», «Ctrl+», «Ctrl-», «Ctrl+Shift»).
+  function soloModificatori(accel) {
+    const parti = pezzi(String(accel || '').trim().replace(/\+\s*\+$/, '+Plus'));
+    return parti.length > 0 && parti.every((p) => tipoModificatore(p));
+  }
+
   // Il primo pezzo scritto che alla pressione non si riconoscerebbe, o null:
   // un modificatore ignorato farebbe scattare la combinazione sbagliata.
   function pezzoSconosciuto(accel) {
@@ -421,6 +446,12 @@
     return out;
   }
 
+  // Un simbolo (non lettera, cifra, freccia o tasto con nome) con Shift diventa un
+  // altro simbolo, diverso per ogni tastiera: di lui conta il carattere, non Shift.
+  function simbolo(tasto) {
+    return [...tasto].length === 1 && !/^[a-z0-9←-↓]$/.test(tasto);
+  }
+
   // Il tasto premuto è quella scorciatoia? Cmd vale quanto Ctrl.
   function combacia(ev, accel) {
     const f = forma(accel);
@@ -429,15 +460,45 @@
     const a = modificatore(ev, 'alt') ? 'a' : '';
     const s = modificatore(ev, 'shift') ? 's' : '';
     const [mods, tasto] = [f.slice(0, f.indexOf('|')), f.slice(f.indexOf('|') + 1)];
-    return mods === `${c}${a}${s}` && tastiDaEvento(ev).has(tasto);
+    const premuti = simbolo(tasto) ? `${c}${a}${mods.includes('s') ? 's' : ''}` : `${c}${a}${s}`;
+    return mods === premuti && tastiDaEvento(ev).has(tasto);
   }
 
-  // Combinazioni che il sistema operativo intercetta prima di Filo: il menu
-  // Start, il cambio finestra, Spotlight e le istantanee dello schermo su Mac.
+  // Il modificatore scritto che alla pressione cambia il simbolo (o ''): Shift
+  // ovunque, Alt su Mac, Ctrl+Alt (AltGr) su Windows. Il nome scritto non
+  // combacerebbe mai col carattere che arriva.
+  function modificatoreCheCambiaSimbolo(accel, esplicita) {
+    const f = forma(accel);
+    if (!f || !simbolo(f.slice(f.indexOf('|') + 1))) return '';
+    const mods = f.slice(0, f.indexOf('|'));
+    const p = piattaforma(esplicita);
+    if (mods.includes('s')) return 'Shift';
+    if (p === 'darwin' && mods.includes('a')) return 'Alt';
+    if (p === 'win32' && mods.includes('c') && mods.includes('a')) return 'Ctrl+Alt';
+    return '';
+  }
+
+  // La pressione che una scorciatoia SCRITTA descrive (o null), letta con le
+  // regole di `combacia`: chi ascolta i tasti la usa per dire se la prenderebbe.
+  function pressioneScritta(accel) {
+    const f = forma(accel);
+    if (!f) return null;
+    const mods = f.slice(0, f.indexOf('|'));
+    return {
+      ctrlKey: mods.includes('c'), metaKey: false,
+      altKey: mods.includes('a'), shiftKey: mods.includes('s'),
+      key: f.slice(f.indexOf('|') + 1), code: '',
+    };
+  }
+
+  // Combinazioni che il sistema operativo intercetta prima di Filo: il menu Start, il cambio
+  // finestra o app, Spotlight, le istantanee dello schermo, l'uscita forzata, la sessione.
   const PRESI_DAL_SISTEMA = {
-    win32: ['Ctrl+Escape', 'Ctrl+Shift+Escape', 'Alt+Tab', 'Alt+Shift+Tab', 'Alt+Escape', 'Alt+F4'],
-    darwin: ['Ctrl+Space', 'Ctrl+Alt+Space', 'Ctrl+Shift+3', 'Ctrl+Shift+4', 'Ctrl+Shift+5'],
-    linux: ['Alt+Tab', 'Alt+Shift+Tab', 'Alt+F4'],
+    win32: ['Ctrl+Escape', 'Ctrl+Shift+Escape', 'Alt+Tab', 'Alt+Shift+Tab', 'Alt+Escape', 'Alt+F4',
+      'Ctrl+Alt+Delete'],
+    darwin: ['Ctrl+Space', 'Ctrl+Alt+Space', 'Ctrl+Shift+3', 'Ctrl+Shift+4', 'Ctrl+Shift+5',
+      'Ctrl+Tab', 'Ctrl+Shift+Tab', 'Ctrl+Alt+Escape', 'Ctrl+Shift+Q'],
+    linux: ['Alt+Tab', 'Alt+Shift+Tab', 'Alt+F4', 'Ctrl+Alt+Delete'],
   };
   function delSistema(accel, esplicita) {
     const f = forma(accel);
@@ -449,11 +510,12 @@
   }
 
   global.SN_TASTI = {
-    piattaforma, suMac, etichetta, frase, acceleratoreElectron,
+    piattaforma, suMac, etichetta, etichettaScritta, frase, acceleratoreElectron,
     indiceSaltoScheda, etichettaSaltoScheda, descrizioneSaltoScheda,
     comandoNavigazione, etichettaIndietro, etichettaAvanti,
     comandoBarra, etichettaBarra, ACCEL_BARRA,
     tastiRiservati, riservato,
-    tastoRiconosciuto, tipoModificatore, pezzoSconosciuto, combacia, delSistema,
+    tastoRiconosciuto, tipoModificatore, pezzoSconosciuto, soloModificatori, combacia, pressioneScritta, delSistema,
+    modificatoreCheCambiaSimbolo,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

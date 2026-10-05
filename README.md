@@ -117,7 +117,7 @@ main. Così le pagine girano quasi invariate.
 - [x] Hotkey globali (Alt+E/T/S/H; su Mac Ctrl+Alt, perché Alt da solo è il tasto degli accenti)
 - [x] Pagine: dashboard, options, history, feedback, spellcheck (HTML/CSS/JS portati 1:1)
 - [x] **Content script** in pagine web (menu tasto destro, popup, sidebar, highlight, spellcheck, feedback) iniettati via `page-preload.js`
-- [x] Test Playwright adattati a `_electron.launch` (~390 spec, ~1.450 casi)
+- [x] Test Playwright adattati a `_electron.launch` (~430 spec, ~1.450 casi)
 - [x] Auto-update (electron-builder/NSIS, vedi `src/main/updater.js`)
 - [x] Packaging Windows (NSIS) e Mac (dmg universale, Intel + Apple Silicon); Linux non previsto per ora
 
@@ -126,18 +126,17 @@ main. Così le pagine girano quasi invariate.
 ```bash
 npm run test:smoke     # smoke headless con screenshot (tests/.smoke/)
 npm run test:unit      # unit test Node (veloci)
-npm test               # suite Playwright completa (~390 spec, ~1.450 casi): non si lancia a mano, gira in GitHub prima di pubblicare
+npm test               # suite Playwright completa (~430 spec, ~1.450 casi): non si lancia a mano, gira in GitHub a ogni fusione su main
 npm run finish:check   # in locale: unit test + spec delle aree toccate dal ramo
 ```
 
 La suite completa non la lancia più nessuno a mano (decisione owner
-2026-09-15): gira in GitHub, nel lavoro di release, ogni sei ore prima di
-pubblicare — se è verde la patch esce, se ha un rosso nuovo la patch salta un
-giro e il rosso diventa un feedback. È il job `suite` di
-`.github/workflows/release.yml` (Linux senza schermo; `scripts/suite-verdict.mjs`
-toglie dal conto i rossi noti del contenitore, `tests/rossi-noti.json`). Per
-provare la suite su un ramo senza
-pubblicare: `gh workflow run release.yml --ref <ramo> -f solo_suite=true`.
+2026-09-15): gira in GitHub a ogni fusione su main, in
+`.github/workflows/suite.yml` (Linux senza schermo; `scripts/suite-verdict.mjs`
+toglie dal conto i rossi noti del contenitore, `tests/rossi-noti.json`), e un
+rosso nuovo diventa un feedback. Ogni sei ore `release.yml` pubblica il commit
+più nuovo di main con la suite verde. Per provare la suite su un ramo:
+`gh workflow run suite.yml --ref <ramo>`.
 Sulla macchina di chi sviluppa Filo
 durerebbe quasi sette ore con un solo worker. Si lancia `npm run finish:check`,
 più lo spec mirato della feature toccata (`npx playwright test

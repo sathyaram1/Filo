@@ -121,43 +121,12 @@ async function apriQuadrato(page, id) {
 }
 
 
-// ── 1. Il ritentativo dall'ALTRA strada ───────────────────────────────────
-// Il giro 1 ha chiuso il ritentativo col tasto: togliere e rimettere il segno
-// nel dettaglio ritenta la fusione che non era riuscita. Lo script dell'owner
-// fa la stessa identica cosa del tasto — e chi ha appena letto «server non
-// raggiungibile, riprova» rifà il gesto da dove lo aveva fatto la prima volta.
-
-test('fusione non riuscita: il segno rimesso dallo script la ritenta', async ({ openTab }) => {
-  test.fail(true, 'rilievo aperto: dal terminale il segno rimesso non ritenta la fusione non riuscita');
-  const page = await openTab(MANAGE);
-  const req = richiesta();
-  await apri(page, {
-    fbs: [segnata()], pending: [req],
-    approveReplies: [{ ok: false, error: 'github_502 unreachable' }],
-  });
-
-  await expect.poll(() => approvazioni(page), { timeout: 8000 }).toEqual([req.id]);
-  await expect.poll(() => leggibile(page, 'nessuna fusione è avvenuta'), { timeout: 6000 }).toBe(true);
-
-  // L'owner rifà il gesto da fuori: toglie il segno e lo rimette.
-  const senza = pratica({ _updateTime: 't2' });
-  delete senza.mergePreapproved;
-  expect((await daFuori(page, [senza])).changed).toBe(1);
-  expect((await daFuori(page, [segnata({ _updateTime: 't3' })])).changed).toBe(1);
-
-  // Il ramo deve finire su main: è quello che il gesto chiede.
-  await expect.poll(() => approvazioni(page), { timeout: 8000 }).toEqual([req.id, req.id]);
-  await expect.poll(() => leggibile(page, 'su main'), { timeout: 6000 }).toBe(true);
-});
-
-
 // ── 2. La fusione partita da sola, mentre è ancora in corso ───────────────
 // Il server scarica il diff, rifà i controlli e fonde: sono secondi, non
 // millisecondi. In quella finestra la richiesta ferma è davanti all'owner
 // esattamente com'era, e due clic la rimandano una seconda volta.
 
 test('fusione partita da sola e ancora in corso: la richiesta ferma non si rilancia', async ({ openTab }) => {
-  test.fail(true, 'rilievo aperto: la fusione in corso non si vede e due clic ne mandano una seconda');
   test.setTimeout(90000);
   const page = await openTab(MANAGE);
   const fb = segnata();

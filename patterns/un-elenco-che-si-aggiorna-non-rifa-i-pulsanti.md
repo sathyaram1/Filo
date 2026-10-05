@@ -26,7 +26,7 @@ solo i testi e la barra della nuova. Quando i pulsanti cambiano davvero (lo
 stato è un altro, un sì si arma) la riga si sostituisce, ed è giusto così:
 quello che c'era sotto il cursore non esiste più.
 
-Due dettagli fanno la differenza:
+Tre dettagli fanno la differenza:
 
 - **Un nodo che resta non si stacca mai**, nemmeno per un attimo: prima si
   tolgono i figli che se ne vanno, poi i nuovi si infilano davanti a quelli
@@ -34,6 +34,10 @@ Due dettagli fanno la differenza:
   sostituirlo.
 - La chiave guarda **ciò che un clic può colpire**, non i dati: i byte
   ricevuti cambiano a ogni evento e non toccano i pulsanti.
+- **Chi ascolta sulla riga rimasta legge la voce di adesso**, per `data-id`,
+  non quella con cui la riga è nata: la riga vecchia tiene i suoi ascoltatori.
+  Nella pagina Scaricamenti il menu del tasto destro, dopo una rinomina, offriva
+  le azioni della voce com'era prima (#950).
 
 ## Dove vive
 

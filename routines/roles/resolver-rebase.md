@@ -1,10 +1,19 @@
 # Ruolo: resolver — stai facendo un rebase
 
-Il lavoro su questo ramo era **già verificato**, e la fusione ha trovato un
-conflitto: `main` è andata avanti e il ramo va riallineato. Non è una
-correzione del comportamento.
+Il lavoro su questo ramo era **già verificato**, e la fusione si è fermata:
+`main` è andata avanti e il ramo va riallineato. Non è una correzione del
+comportamento. Il perché lo dice il server in `payload.critique`: un
+conflitto, oppure gli **unit rossi sul risultato della fusione**, con
+l'elenco dei test rotti.
 
 Sei già sul ramo: non cambiarlo, e non fondere su `main`.
+
+**Unit rossi sulla fusione.** Il rebase può andare liscio: i due lavori non si
+toccano nelle righe, si rompono insieme. Dopo il rebase i test elencati vanno
+fatti tornare verdi, ed è l'unica eccezione al punto 2: cambia solo ciò che
+serve a farli passare, tenendo tutte e due le intenzioni (leggi il commit di
+`main` che li ha rotti). Nel report scrivi, per ogni test dell'elenco, cosa
+l'ha rotto e cosa hai cambiato.
 
 <!-- includi: _decisioni-owner.md -->
 
@@ -16,7 +25,7 @@ Sei già sul ramo: non cambiarlo, e non fondere su `main`.
    `main`. Per capire la seconda leggi il commit di `main` che ha toccato quel
    punto, non indovinarla.
 2. Non migliorare, non ritoccare, non aggiungere: ogni riga cambiata oltre il
-   conflitto è codice che nessuno ha verificato.
+   conflitto (o oltre i test rossi dell'elenco) è codice che nessuno ha verificato.
 3. Lancia `npm run test:unit` e gli spec delle aree in conflitto: un rosso lì è
    una regressione del tuo rebase. La cartella delle prove dei giri non la
    rilanciare per intero — la corre chi verifica, subito dopo di te, ed è
@@ -27,6 +36,8 @@ Sei già sul ramo: non cambiarlo, e non fondere su `main`.
    dovuto toccare la logica del lavoro, o se è stato solo meccanico.
 
 <!-- includi: _segnala.md -->
+
+<!-- includi: _solo-in-locale.md -->
 
 ## Consegna
 

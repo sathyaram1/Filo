@@ -49,6 +49,7 @@
       if (s.theme) { window.SN_PAGE_THEME = s.theme; applyTheme(s.theme); }
       applyTextScale(s.textScale);
       applyThemeTokens(s.themeTokens);
+      window.SN_AVVISI?.imposta(s.notifications);
     } catch (_) {}
   })();
 
@@ -72,6 +73,7 @@
     if (s.theme) { window.SN_PAGE_THEME = s.theme; applyTheme(s.theme); }
     applyTextScale(s.textScale);
     applyThemeTokens(s.themeTokens);
+    window.SN_AVVISI?.imposta(s.notifications);
   }
   try {
     chrome.runtime.onMessage.addListener((msg) => {

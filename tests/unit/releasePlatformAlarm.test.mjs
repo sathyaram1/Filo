@@ -15,8 +15,17 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const require = createRequire(resolve(ROOT, 'package.json'));
 const PKG = require('./package.json');
 
-const { PIATTAFORME, PASSI, passoFallito, leggiEsiti, componiAllarme, mancantiNoti, casella } =
+const { PIATTAFORME, PASSI, passoFallito, leggiEsiti, componiAllarme, mancantiNoti, casella, chiaviAllarme } =
   await import('../../scripts/release-platform-alarm.mjs');
+
+// Senza chiavi il server tornerebbe al «un feedback aperto per mittente», che ha
+// inghiottito tre settimane di allarmi dietro a un feedback parcheggiato.
+test('la chiave dell\'allarme nomina la metà che si è rotta', () => {
+  assert.deepEqual(chiaviAllarme('Mac'), ['piattaforma:mac']);
+  assert.deepEqual(chiaviAllarme(' Linux '), ['piattaforma:linux']);
+  assert.deepEqual(chiaviAllarme(''), ['piattaforma'], 'anche senza nome parte con una chiave');
+  for (const nome of Object.keys(PIATTAFORME)) assert.match(chiaviAllarme(nome)[0], /^piattaforma:[a-z]+$/);
+});
 
 const ESITI_ESEMPIO = JSON.stringify({
   checkout: { outcome: 'success', conclusion: 'success' },

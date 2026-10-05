@@ -7,8 +7,7 @@
 //  · un portafoglio a zero crediti con la chiave propria che funziona: la
 //    chat va con la chiave, nessun «crediti finiti» a sbarrare la strada;
 //  · «spiega» su una pagina web con la chiave propria a secco: la risposta
-//    arriva coi crediti di Filo, e il riquadro lo dice? (in chat la riga c'è;
-//    nel riquadro no: rilievo di livello 1, prova rossa attesa);
+//    arriva coi crediti di Filo, e il riquadro lo dice come la chat (#662);
 //  · lo stesso «spiega», contate le richieste: con la chiave rifiutata non ne
 //    partono più che con la chiave buona, e ognuna è una coppia propria →
 //    personale (nessuna tempesta di tentativi);
@@ -123,11 +122,6 @@ test('portafoglio a zero crediti ma la chiave propria funziona: la chat va con l
 });
 
 test('«spiega» su una pagina web con la chiave propria a secco: la risposta arriva coi crediti di Filo, e il riquadro lo dice come lo dice la chat', async () => {
-  // Rilievo di livello 1 del quarto giro (parità fra le strade: la chat lo
-  // dice, il riquadro sulla pagina no), messo da parte dal server per il
-  // bilancio del livello 1 esaurito: resta rosso di proposito finché non
-  // viene corretto.
-  test.fail(true, 'rilievo messo da parte: il riquadro di «spiega» non dice che OpenRouter ha rifiutato la chiave e che Filo ha usato i crediti');
   test.setTimeout(180_000);
   const [code] = await server.codiciOwner(1);
   const filo = await avviaFilo({ env: server.env });

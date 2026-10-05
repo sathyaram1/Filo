@@ -62,9 +62,6 @@ const spiega = (app) => app.evaluate(async () => {
 });
 
 test('il «Prova» delle Impostazioni con la chiave propria che OpenRouter rifiuta: non può dire che la chiave funziona', async () => {
-  // Rilievo di livello 1 del terzo giro, messo da parte dal server (bilancio
-  // del livello 1 esaurito): resta rosso di proposito finché non viene corretto.
-  test.fail(true, 'rilievo messo da parte: il «Prova» risponde «TTFT … tok/s» anche con la chiave rifiutata, perché la risposta arriva col ripiego sui crediti di Filo');
   test.setTimeout(180_000);
   const [code] = await server.codiciOwner(1);
   const filo = await avviaFilo({ env: server.env });
@@ -90,9 +87,6 @@ test('il «Prova» delle Impostazioni con la chiave propria che OpenRouter rifiu
 });
 
 test('il ripiego che non produce niente (la personale risponde 500): la chat non parla della chiave, e Crediti non può dire che Filo ha usato i crediti', async () => {
-  // Rilievo di livello 0 del terzo giro, messo da parte dal server (bilancio
-  // del livello 0 a zero): resta rosso di proposito finché non viene corretto.
-  test.fail(true, 'rilievo messo da parte: col ripiego fallito per un 500 della personale, Crediti dice lo stesso «Filo ha usato i tuoi crediti»');
   test.setTimeout(180_000);
   const [code] = await server.codiciOwner(1);
   const filo = await avviaFilo({ env: server.env });
@@ -115,9 +109,6 @@ test('il ripiego che non produce niente (la personale risponde 500): la chat non
 });
 
 test('Crediti aperta con la riga «Spesi … · restano …»: quando OpenRouter comincia a rifiutare la chiave, la riga della spesa non può restare a dire che restano 8,77 $', async () => {
-  // Rilievo di livello 0 del terzo giro, messo da parte dal server (bilancio
-  // del livello 0 a zero): resta rosso di proposito finché non viene corretto.
-  test.fail(true, 'rilievo messo da parte: a pagina aperta la riga della spesa resta «restano 8,77 $» sotto la riga rossa del rifiuto, finché non si ricarica');
   test.setTimeout(180_000);
   const [code] = await server.codiciOwner(1);
   const filo = await avviaFilo({ env: server.env });

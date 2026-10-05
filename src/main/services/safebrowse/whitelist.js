@@ -24,11 +24,12 @@ const EXTRA = [
   'youtube.com', 'youtu.be', 'google.co.uk', 'google.de', 'google.fr',
   'google.es', 'android.com', 'chromium.org', 'gstatic.com',
   'googleusercontent.com', 'googleapis.com', 'googletagmanager.com',
-  'google-analytics.com', 'ggpht.com', 'doubleclick.net', 'withgoogle.com',
+  'google-analytics.com', 'youtube-nocookie.com', 'ggpht.com', 'doubleclick.net', 'withgoogle.com',
   'goo.gl', 'recaptcha.net',
   // CDN/infra di altri brand (contengono il token del brand ma sono ufficiali)
   'fbcdn.net', 'cdninstagram.com', 'licdn.com', 'twimg.com',
-  'paypalobjects.com', 'icloud-content.com',
+  'paypalobjects.com', 'icloud-content.com', 'amazon-adsystem.com',
+  'media-amazon.com', 'ssl-images-amazon.com', 'images-amazon.com',
   // Microsoft / Apple ecosistema
   'bing.net', 'msn.com', 'skype.com', 'xbox.com', 'windows.com',
   'sharepoint.com', 'onedrive.com', 'azure.com', 'visualstudio.com',
@@ -42,7 +43,7 @@ const EXTRA = [
   'gazzetta.it', 'lastampa.it',
   // Streaming / intrattenimento
   'spotify.com', 'twitch.tv', 'primevideo.com', 'disneyplus.com',
-  'soundcloud.com', 'vimeo.com',
+  'soundcloud.com', 'vimeo.com', 'fandom.com',
   // Servizi / produttività
   'notion.so', 'slack.com', 'zoom.us', 'trello.com', 'atlassian.com',
   'figma.com', 'canva.com', 'adobe.com', 'wordpress.com', 'wordpress.org',
@@ -72,7 +73,11 @@ const HOSTED = [
   { host: /^sites\.google\.com$/, owner: /^\/[^/]+\/[^/]+/, platform: 'Google Sites' },
   { host: /^docs\.google\.com$/, owner: /^(\/a\/[^/]+)?\/[^/]+\/d\/(e\/)?[^/]+/, platform: 'Google Documenti e Moduli' },
   { host: /^script\.google\.com$/, path: /^\/(a\/macros\/[^/]+\/|(a\/[^/]+\/)?macros\/)/, owner: /^.*?\/s\/[^/]+/, platform: 'Google Apps Script' },
-  { host: /^(forms|sway)\.(office\.com|cloud\.microsoft)$/, owner: /^\/[^/]+\/[^/]+/, platform: 'Microsoft Forms e Sway' },
+  // Il questionario aperto sta in `?id=` (/Pages/ResponsePage.aspx?id=…): vedi pagePath.
+  { host: /^(forms|sway)\.(office\.com|cloud\.microsoft)$/, query: 'id', owner: /^\/[^/]+\/[^/]+/, platform: 'Microsoft Forms e Sway' },
+  { host: /^customervoice\.microsoft\.com$/, query: 'id', owner: /^\/[^/]+\/[^/]+/, platform: 'Microsoft Customer Voice' },
+  // L'app dell'utente gira in un riquadro su <utente>-<app>.hf.space; le impostazioni le vede solo chi l'ha pubblicata.
+  { host: /^(www\.)?huggingface\.co$/, path: /^\/spaces\/[^/]+\/[^/]+(?=\/|$)(?!\/settings(\/|$))/, owner: /^\/spaces\/[^/]+\/[^/]+/, platform: 'Hugging Face Spaces' },
   { host: /^ia\d+\.us\.archive\.org$/, owner: /^\/[^/]+\/items\/[^/]+/, platform: 'archive.org' },
   { host: /^(www\.)?archive\.org$/, path: /^\/download\//, owner: /^\/download\/[^/]+/, platform: 'archive.org' },
   // Una pagina di Notion si apre con qualunque titolo davanti al suo codice: conta il codice, non il titolo.
@@ -84,9 +89,21 @@ const HOSTED = [
 ];
 
 function hostedEntry(host, path) {
-  const h = String(host || '').toLowerCase();
+  // `sites.google.com.` è lo stesso sito: col punto finale la pagina passava per la piattaforma in whitelist.
+  const h = String(host || '').toLowerCase().replace(/\.$/, '');
   const p = String(path || '/');
   return HOSTED.find((x) => x.host.test(h) && (!x.path || x.path.test(p))) || null;
+}
+
+// Il percorso che dice QUALE pagina è, per verdetto, conferme e conto: dove la pagina sta in un parametro, tutti i
+// questionari avrebbero lo stesso percorso e il giudizio su uno varrebbe per gli altri.
+function pagePath(host, url) {
+  let u;
+  try { u = new URL(String(url)); } catch (_) { return '/'; }
+  const r = hostedEntry(host, u.pathname);
+  if (!r || !r.query) return u.pathname;
+  const id = [...u.searchParams].filter(([k]) => k.toLowerCase() === r.query).map(([, v]) => r.query + '=' + encodeURIComponent(v));
+  return id.length ? u.pathname + '?' + id.join('&') : u.pathname;
 }
 
 function hostedPlatform(host, path) {
@@ -104,4 +121,4 @@ function hostedOwner(host, path) {
   return m ? m[0] : '';
 }
 
-module.exports = { WHITELIST, isWhitelisted, hostedPlatform, hostedOwner };
+module.exports = { WHITELIST, isWhitelisted, hostedPlatform, hostedOwner, pagePath };

@@ -171,6 +171,18 @@
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+  /* Col padding dentro il 100%: una riga lunga non fa scorrere il diario di lato. */
+  box-sizing: border-box;
+}
+/* Una riga che dice perché qualcosa non è successo va letta fino in fondo, non tagliata. */
+.sn-sidebar-log.sn-sidebar-log-intera {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+/* Un'azione fermata (#810): la riga dice anche da dove veniva il segreto, quindi va a capo. */
+.sn-sidebar-log.sn-sidebar-log-fermata {
+  white-space: normal;
+  opacity: 0.9;
 }
 
 /* Stato collassato: visibile solo la barra di input. Il pannello si rimpicciolisce
@@ -201,6 +213,8 @@
   gap: 8px;
   padding: 8px;
   border-top: 1px solid var(--sn-border);
+  /* Il microfono è grande quanto l'invio (src/styles/voce.css). */
+  --sn-voce-size: 32px;
 }
 
 .sn-sidebar-input textarea {
@@ -229,7 +243,7 @@
   box-shadow: none !important;
 }
 
-.sn-sidebar-input button {
+.sn-sidebar-input button[type="submit"] {
   all: unset;
   cursor: pointer;
   flex: 0 0 auto;
@@ -245,8 +259,8 @@
   line-height: 1;
   transition: transform 120ms ease, opacity 120ms ease;
 }
-.sn-sidebar-input button:hover { transform: translateY(-1px); }
-.sn-sidebar-input button:active { transform: translateY(0); opacity: 0.85; }
+.sn-sidebar-input button[type="submit"]:hover { transform: translateY(-1px); }
+.sn-sidebar-input button[type="submit"]:active { transform: translateY(0); opacity: 0.85; }
 
 /* Tre righe di ragionamento che scorrono: la prima quasi trasparente sta uscendo, l'ultima è piena.
    Le frasi cambiano ogni ~900ms con uno shift verso l'alto. */

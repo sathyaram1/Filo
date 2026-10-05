@@ -12,7 +12,7 @@
 //     ECDH col destinatario produce un segreto condiviso, da cui HKDF-SHA256
 //     deriva una chiave AES-256-GCM unica per quel messaggio.
 //   - Il ciphertext porta con sé la chiave pubblica effimera: chi ha la chiave
-//     PRIVATA (owner / backend / routine) rifà l'ECDH e decifra. Chi cifra NON
+//     PRIVATA (owner / server) rifà l'ECDH e decifra. Chi cifra NON
 //     può rileggere ciò che ha cifrato (non ha la privata). Questo è il punto.
 //
 //   Funziona sia in Node (app main / script con FILO_FEEDBACK_PRIVKEY) sia nel

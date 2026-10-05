@@ -1,5 +1,5 @@
-// Pagine che chiunque pubblica sotto un dominio in whitelist (Google Sites, Moduli, Microsoft Forms, archive.org,
-// Notion, Canva): non sono fidate per identità e ognuna ha il suo verdetto. Regola in safebrowse/whitelist.js.
+// Pagine che chiunque pubblica sotto un dominio in whitelist (Google Sites, Moduli, Microsoft Forms e Customer Voice,
+// archive.org, Notion, Canva, Hugging Face Spaces): non sono fidate per identità e ognuna ha il suo verdetto. Regola in safebrowse/whitelist.js.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -24,6 +24,10 @@ const OSPITATE = [
   'https://s3.eu-west-1.amazonaws.com/secchio/login.html',
   'https://storage.googleapis.com/secchio/login.html',
   'https://firebasestorage.googleapis.com/v0/b/x.appspot.com/o/login.html',
+  'https://customervoice.microsoft.com/Pages/ResponsePage.aspx?id=AbC123',
+  'https://forms.office.com/Pages/ResponsePage.aspx?id=AbC123',
+  'https://huggingface.co/spaces/qualcuno/accesso-posta',
+  'https://huggingface.co/spaces/qualcuno/accesso-posta/blob/main/app.py',
 ];
 
 test('una pagina pubblicata da un utente sotto un dominio fidato non è fidata e, se chiede la password, va giudicata', () => {
@@ -32,6 +36,9 @@ test('una pagina pubblicata da un utente sotto un dominio fidato non è fidata e
     assert.equal(v.whitelisted, false, url);
     assert.equal(v.needsLlm, true, url);
     assert.ok(v.hosted, url);
+    // Il punto finale dell'host (huggingface.co.) non cambia sito.
+    const conPunto = url.replace(/^(https:\/\/[^/]+)/, '$1.');
+    assert.equal(SB.evaluate(conPunto, { hasPassword: true }, {}).needsLlm, true, conPunto);
   }
 });
 
@@ -40,6 +47,8 @@ test('le pagine della piattaforma stessa restano fidate: home, accessi, archivio
     'https://www.google.com/', 'https://accounts.google.com/signin', 'https://www.notion.so/login',
     'https://www.notion.so/signup', 'https://www.canva.com/', 'https://archive.org/details/pacco',
     'https://script.google.com/home', 'https://outlook.office.com/mail/',
+    'https://huggingface.co/', 'https://huggingface.co/login', 'https://huggingface.co/spaces',
+    'https://huggingface.co/spaces/qualcuno/accesso-posta/settings', 'https://huggingface.co/qualcuno/modello',
   ]) {
     const v = SB.evaluate(url, { hasPassword: true }, {});
     assert.equal(v.whitelisted, true, url);
@@ -87,6 +96,50 @@ test('una pagina ospitata che chiede la password va giudicata anche quando l\'et
     assert.equal(SB.evaluate(url, { hasPassword: true }, { ageDays: 6000 }).needsLlm, true, url);
   }
   assert.equal(SB.scopeOf('https://s3.amazonaws.com/secchio-a/login.html'), 's3.amazonaws.com/secchio-a/login.html');
+});
+
+test('un questionario Microsoft aperto per esteso ha il suo verdetto: il giudizio e la chiusura dell\'avviso non valgono per gli altri', async () => {
+  for (const host of ['customervoice.microsoft.com', 'forms.office.com', 'forms.cloud.microsoft']) {
+    const a = `https://${host}/Pages/ResponsePage.aspx?id=QUESTIONARIO-A`;
+    const b = `https://${host}/Pages/ResponsePage.aspx?id=QUESTIONARIO-B`;
+    assert.notEqual(SB.scopeOf(a), SB.scopeOf(b), host);
+    assert.notEqual(SB.ownerOf(a), SB.ownerOf(b), host);
+    assert.equal(SB.evaluate(a, {}, { llm: { suspicious: true, reason: null } }).scope, SB.scopeOf(a), host);
+    // Lo stesso questionario con la lingua o il canale nell'indirizzo resta lo stesso questionario.
+    assert.equal(SB.scopeOf(a + '&lang=it-IT&embed=true'), SB.scopeOf(a), host);
+    assert.equal(SB.scopeOf(`https://${host}/Pages/ResponsePage.aspx?ID=QUESTIONARIO-A`), SB.scopeOf(a), host);
+  }
+  const a = 'https://customervoice.microsoft.com/Pages/ResponsePage.aspx?id=QUESTIONARIO-A';
+  const b = 'https://customervoice.microsoft.com/Pages/ResponsePage.aspx?id=QUESTIONARIO-B';
+  SB.setProviders({ gsb: null, rdap: null, ct: null, sandbox: null, llm: () => ({ suspicious: true, reason: 'x', reasonKey: 'hosted_credentials' }) });
+  try {
+    const next = await new Promise((resolve) => { SB.analyze(a, { hasPassword: true }, resolve); });
+    assert.equal(next.level, 'sospetto');
+    assert.match(next.message.body, /Microsoft Customer Voice/);
+    assert.equal(SB.checkSync(b, { hasPassword: true }).level, 'safe');
+  } finally {
+    SB.setProviders({ llm: null });
+    SB._caches.llmCache.m.clear();
+  }
+});
+
+test('un\'app di Hugging Face Spaces è dell\'utente che l\'ha pubblicata, anche aperta al suo indirizzo', async () => {
+  assert.equal(SB.scopeOf('https://huggingface.co/spaces/qualcuno/accesso-posta/tree/main'), 'huggingface.co/spaces/qualcuno/accesso-posta/tree/main');
+  assert.equal(SB.ownerOf('https://huggingface.co/spaces/qualcuno/accesso-posta/tree/main'), 'huggingface.co/spaces/qualcuno/accesso-posta');
+  assert.notEqual(SB.ownerOf('https://huggingface.co/spaces/altro/app'), SB.ownerOf('https://huggingface.co/spaces/qualcuno/app'));
+  // Il riquadro dell'app, aperto da solo: ogni app è un sito, come la separa il web.
+  assert.equal(SB.scopeOf('https://qualcuno-accesso-posta.hf.space/'), 'qualcuno-accesso-posta.hf.space');
+  assert.equal(SB.scopeOf('https://qualcuno-sito.static.hf.space/index.html'), 'qualcuno-sito.static.hf.space');
+  // L'età del dominio sarebbe quella di Hugging Face, non dell'app: non si chiede.
+  const chiesti = [];
+  SB.setProviders({ gsb: null, ct: null, sandbox: null, llm: null, rdap: (reg) => { chiesti.push(reg); return 6000; } });
+  try {
+    for (const url of ['https://qualcuno-accesso-posta.hf.space/', 'https://hf.space/']) SB.analyze(url, { hasPassword: true }, () => {});
+    await new Promise((r) => setTimeout(r, 50));
+    assert.deepEqual(chiesti, ['hf.space']);
+  } finally {
+    SB.setProviders({ rdap: null });
+  }
 });
 
 test('Microsoft Forms è riconosciuto anche all\'indirizzo dove oggi rimanda il vecchio', () => {

@@ -1,22 +1,24 @@
-// Feedback 1tsAuna tolse la barra in alto di Filo; #871 porta le sei icone che erano finite in alto
-// a destra nella home (red-team, home, cronologia, impostazioni, app, profilo) nella barra laterale.
-// Gli assert verificano il SUCCESSO: la home non ha più la fila, le voci stanno nella barra, il
-// profilo mostra l'avatar e App apre davvero il menu nativo accanto alla barra.
+// #871 porta le icone che stavano in alto a destra nella home nella barra laterale; in alto a destra
+// restano Impostazioni e Profilo, dove ogni app li mette. Gli assert verificano il SUCCESSO: le voci
+// stanno nella barra, il profilo mostra l'avatar e App apre davvero il menu nativo accanto alla barra.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { barraPage, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
 
-test('La home non ha più la fila di icone in alto: le voci stanno nella barra laterale', async ({ app, openTab }) => {
+test('In alto a destra nella home restano Impostazioni e Profilo; le altre voci stanno nella barra laterale', async ({ app, openTab }) => {
   const page = await openTab('filo://newtab/');
-  await page.waitForLoadState('domcontentloaded');
-  await expect(page.locator('#dashControls, .dash-ctrl')).toHaveCount(0);
+  await page.waitForSelector('#dashControls .dash-ctrl', { timeout: 8_000 });
+  const commands = await page.$$eval('#dashControls .dash-ctrl', (els) => els.map((e) => e.dataset.command));
+  expect(commands).toEqual(['settings', 'account']);
+  expect(await page.$$eval('#dashControls .dash-ctrl svg', (els) => els.length)).toBe(2);
   const barra = await barraPage(app);
   const nav = await barra.$$eval('#nav .ico', (els) => els.map((e) => e.dataset.id));
   expect(nav).toContain('home');
-  const fisse = await barra.$$eval('#fisse .ico', (els) => els.map((e) => e.dataset.comando));
-  expect(fisse).toEqual(['history', 'apps', 'redteam', 'account', 'settings']);
+  // Il Red Team in pausa (#896) non c'è per chi non è owner (lo prova redteam-pausa.spec.mjs).
+  const fisse = await barra.$$eval('#fisse .ico:not([hidden])', (els) => els.map((e) => e.dataset.comando));
+  expect(fisse).toEqual(['history', 'apps', 'account', 'settings']);
   // Ogni voce ha il suo disegno, non una lettera di ripiego.
-  expect(await barra.$$eval('#pannello .ico svg', (els) => els.length)).toBe(nav.length + fisse.length);
+  expect(await barra.$$eval('#nav .ico svg, #fisse .ico:not([hidden]) svg', (els) => els.length)).toBe(nav.length + fisse.length);
 });
 
 test('La barra in alto di Filo è sparita (chrome compatto, barra indirizzi nascosta)', async ({ shell, openTab }) => {

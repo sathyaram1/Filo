@@ -845,6 +845,7 @@ module.exports = {
   quotaNonTesto,
   senzaRumore,
   RUMORE_TOLLERATO,
+  QUOTA_NON_TESTO,
   capText,
   MAX_TEXT_CHARS,
   MAX_FILE_BYTES,

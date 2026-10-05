@@ -383,7 +383,7 @@ test('sentinella: ogni campo letto dai siti dentro una sezione elencata campo pe
 // Un campo nuovo in una di queste sezioni non arriva ai siti finché qualcuno non
 // sceglie: nella lista se il codice dei siti lo usa, qui se resta a casa. I modelli
 // per funzione restano fuori: se ne aggiungono spesso e ai siti ne serve uno solo.
-const RESTANO_A_CASA = { tts: ['modelVoice'], featureFlags: ['help', 'categorize'], tabColor: [] };
+const RESTANO_A_CASA = { tts: ['modelVoice'], featureFlags: ['help', 'categorize'], tabColor: [], notifications: ['soundEnabled', 'sound'], dictation: [] };
 test('sentinella: ogni campo delle sezioni elencate campo per campo è stato deciso', () => {
   for (const S of SEZIONI_A_CAMPI.filter((k) => k !== 'models')) {
     assert.ok(S in RESTANO_A_CASA, `sezione ${S} elencata campo per campo senza la sua decisione qui`);

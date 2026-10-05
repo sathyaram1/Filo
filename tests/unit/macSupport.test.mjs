@@ -299,6 +299,8 @@ const SORGENTI_DEI_NOMI = {
     'manifesto unico letto su tutti i sistemi: cita entrambe le forme, e il test qui sotto lo verifica voce per voce',
   'src/shared/patchNotes.js':
     'diario delle versioni già uscite: si scrive una volta e non si riscrive',
+  'src/shared/voceChat.js':
+    'il tasto del microfono delle chat in forma canonica, come la tabella di shortcuts.js: lo riconosce e lo nomina SN_TASTI',
 };
 
 // Le forme con cui si chiede il nome giusto invece di inventarlo.
@@ -733,8 +735,21 @@ test('la lista dei tasti già presi non si stacca dalla barra dei menu', () => {
   require(join(ROOT, 'src', 'shared', 'tasti.js'));
   const T = globalThis.SN_TASTI;
 
+  // Un role senza acceleratore scritto si porta quello di Electron (menu-item-roles), e su Mac
+  // il menu Aiuto si apre con Cmd+?: senza questa tabella quei tasti erano invisibili (#545).
+  const TASTO_DEL_ROLE_SU_MAC = {
+    cut: 'Ctrl+X', copy: 'Ctrl+C', paste: 'Ctrl+V', pasteandmatchstyle: 'Ctrl+Alt+Shift+V',
+    selectall: 'Ctrl+A', undo: 'Ctrl+Z', redo: 'Ctrl+Shift+Z', minimize: 'Ctrl+M', close: 'Ctrl+W',
+    quit: 'Ctrl+Q', hide: 'Ctrl+H', hideothers: 'Ctrl+Alt+H', help: 'Ctrl+?',
+    about: '', services: '', unhide: '', zoom: '', front: '', window: '',
+  };
+  const ignoti = vociDellaBarra('darwin')
+    .filter((v) => v.role && !v.accelerator && !(String(v.role).toLowerCase() in TASTO_DEL_ROLE_SU_MAC))
+    .map((v) => v.role);
+  assert.deepEqual(ignoti, [], 'role nuovo nella barra: scrivi qui sopra il tasto che Electron gli dà su Mac');
+
   const scoperti = vociDellaBarra('darwin')
-    .map((v) => v.accelerator)
+    .map((v) => v.accelerator || (v.role && TASTO_DEL_ROLE_SU_MAC[String(v.role).toLowerCase()]))
     .filter(Boolean)
     // "CommandOrControl" è come lo scrive Electron; la regola parla in Ctrl.
     .map((a) => a.replace(/CommandOrControl/g, 'Ctrl'))
@@ -849,4 +864,43 @@ test('un filo:// che arriva da fuori si legge cercando il prefisso, mai per posi
   // Registrato come gestore, il sistema consegna QUALUNQUE filo://: una
   // pagina interna messa in un link da un sito qualsiasi non deve aprirsi.
   assert.equal(W.inviteCodeFromDeepLink('filo://credits/credits.html'), null);
+});
+
+// ── Batteria, rete e Bluetooth (#873) ────────────────────────────────────────
+
+test('su Mac batteria, rete e Bluetooth si leggono senza chiedere permessi', async () => {
+  const L = require(join(ROOT, 'src', 'main', 'services', 'statoSistema.js'));
+  const sorgente = readFileSync(join(ROOT, 'src', 'main', 'services', 'statoSistema.js'), 'utf8');
+  const mac = sorgente.slice(sorgente.indexOf('async function leggiMac'), sorgente.indexOf('// ── Windows'));
+  // system_profiler e CoreBluetooth toccano il Bluetooth, che su macOS chiede il permesso a chi li lancia.
+  assert.ok(!/system_profiler|blueutil|CoreBluetooth|airport\b/.test(mac));
+  const chiesti = [];
+  await L.leggiMac(async (file) => { chiesti.push(file); return null; });
+  assert.deepEqual(chiesti.filter((f) => /powershell|cmd|bash|sh$/i.test(f)), [], 'su Mac non si lancia una shell');
+  // Il volume da osascript e la radio del Wi-Fi da networksetup (#874): leggono e basta, senza permessi.
+  assert.deepEqual(new Set(chiesti), new Set(['pmset', 'route', 'defaults', 'osascript', 'networksetup']));
+  assert.ok(!/set volume|-setairport/.test(mac), 'il lettore non cambia niente');
+});
+
+// ── Volume, Bluetooth e Wi-Fi a comando (#874) ───────────────────────────────
+
+test('su Mac il volume va con osascript, il Wi-Fi con networksetup, il Bluetooth con blueutil anche fuori dal PATH', () => {
+  const C = require(join(ROOT, 'src', 'main', 'services', 'comandiSistema.js'));
+  for (const [comando, script] of Object.entries(C.SCRIPT.darwin)) {
+    assert.ok(!/\bsudo\b|powershell|nmcli|bluetoothctl|wpctl|pactl/i.test(script), `darwin/${comando}: programma di un altro sistema o con privilegi`);
+  }
+  assert.match(C.SCRIPT.darwin.volume, /osascript <<'FINE_APPLESCRIPT'/, 'l\'AppleScript non passa dalla shell: niente espansioni');
+  assert.match(C.SCRIPT.darwin.volume, /system attribute "FILO_SIS_LIVELLO"/, 'il livello lo legge AppleScript dall\'ambiente');
+  // Un'app aperta dal Finder ha il PATH di sistema: Homebrew non c'è, e blueutil si cerca dove lo mette lui.
+  for (const c of ['radio', 'bt-elenco', 'bt-collega']) {
+    assert.match(C.SCRIPT.darwin[c], /\/opt\/homebrew\/bin\/blueutil/);
+    assert.match(C.SCRIPT.darwin[c], /\/usr\/local\/bin\/blueutil/);
+  }
+  assert.match(C.SCRIPT.darwin.radio, /networksetup -listallhardwareports/, 'il Wi-Fi non è sempre en0');
+});
+
+test('su Mac Filo dice perché usa il Bluetooth: senza la frase, macOS chiude blueutil al primo comando', () => {
+  const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
+  const frase = pkg.build && pkg.build.mac && pkg.build.mac.extendInfo && pkg.build.mac.extendInfo.NSBluetoothAlwaysUsageDescription;
+  assert.ok(typeof frase === 'string' && /Bluetooth/.test(frase), 'manca NSBluetoothAlwaysUsageDescription in build.mac.extendInfo');
 });

@@ -20,6 +20,7 @@ module.exports = function register(on, ctx) {
   // solo da origine filo://; ciò che i content script fanno davvero (leggere le
   // impostazioni, salvare dizionario/draft/layout) resta consentito.
   const SETTINGS_KEY = SN_CONST.STORAGE_KEYS.SETTINGS; // 'settings' → contiene apiKeys
+  const ARCHIVE_KEY = SN_CONST.STORAGE_KEYS.ARCHIVED_TABS;
   // Verso un'origine web passa solo ciò che è nelle liste di impostazioniPerOrigine
   // (campi letti e scritti, scomparti del magazzino): le stesse delle spinte.
   const {
@@ -27,6 +28,7 @@ module.exports = function register(on, ctx) {
     chiaviStoragePerOrigine, scritturaStorageAmmessa, scritturaImpostazioniAmmessa,
   } = require('../impostazioniPerOrigine');
   const vietato = { ok: false, code: 'forbidden', error: 'forbidden' };
+  const AppuntiDaiSiti = require('../appuntiDaiSiti');
 
   // ── canali interni per lo shim chrome.* nel renderer ──────────────────
   on('_storage:get', async (msg, sender, origin) => {
@@ -63,7 +65,11 @@ module.exports = function register(on, ctx) {
     // un'altra origine quell'indirizzo è illeggibile, e senza questo il menu
     // sarebbe ricomparso proprio nei siti esclusi.
     const pageUrl = String(sender?.tab?.url || '');
-    return { ok: true, pageUrl, settings: impostazioniPerOrigine(settings, origin, indirizziDelMittente(sender)) };
+    // In incognito il testo della pagina non parte da solo verso i modelli (#591): la pagina lo deve sapere per non
+    // preparare la spiegazione della selezione.
+    const win = winOf(sender);
+    const incognito = !!(win && (win._filoIncognito || (win._filoTabs && win._filoTabs.incognito)));
+    return { ok: true, pageUrl, incognito, settings: impostazioniPerOrigine(settings, origin, indirizziDelMittente(sender)) };
   });
 
   on(MSG.UPDATE_SETTINGS, async (msg, sender, origin) => {
@@ -74,7 +80,7 @@ module.exports = function register(on, ctx) {
     // Tutta la propagazione (broadcast, tema nativo, sicurezza, fingerprint,
     // safebrowse, cookie) vive in applySettingsUpdate: stesso percorso usato
     // quando Filo cambia una preferenza via chat.
-    const merged = await applySettingsUpdate(incoming);
+    const merged = await applySettingsUpdate(incoming, { mentreScrive: msg.mentreScrive === true });
     return { ok: true, settings: impostazioniPerOrigine(merged, origin, indirizziDelMittente(sender)) };
   });
 
@@ -111,7 +117,14 @@ module.exports = function register(on, ctx) {
       const { buildExportZip } = require('../exportData');
 
       const allData = await DiskStorage.get(null);
-      const zip = buildExportZip(allData);
+      // L'archivio delle schede ha file suoi: nel backup torna sotto la chiave di sempre.
+      const archivio = await globalThis.SN_ARCHIVED_TABS.list();
+      if (archivio.length) allData[ARCHIVE_KEY] = archivio;
+      const Mie = globalThis.SN_SEGNALAZIONI_MIE;
+      const mie = Mie ? await Mie.elenco() : null;
+      if (mie && mie.length) allData[Mie.CHIAVE_BACKUP] = mie;
+      const filo = await require('../ilFilo').esporta();
+      const zip = buildExportZip(allData, { filo });
 
       const win = winOf(sender);
       const stamp = new Date().toISOString().slice(0, 10);
@@ -140,6 +153,15 @@ module.exports = function register(on, ctx) {
   // facciamo attraversare l'IPC a un dump completo dei dati utente — chiavi
   // API comprese — solo per mostrarne il conteggio.
   let PENDING_IMPORT = null;
+  // Le chat e le pagine visitate non stanno in data.json ma nel filo (#866); un export di prima porta le chat qui.
+  const FILO_CHATS_KEY = SN_CONST.STORAGE_KEYS.FILO_CHATS;
+  function contaFilo(parsed) {
+    const E = globalThis.SN_FILO_EVENTI;
+    const stato = E.nuovoStato();
+    if (parsed.filo) for (const ev of E.analizza(parsed.filo.toString('utf8')).eventi) E.applica(stato, ev);
+    const vecchie = Array.isArray(parsed.data[FILO_CHATS_KEY]) ? parsed.data[FILO_CHATS_KEY].filter((c) => c && c.id && !stato.chat.has(c.id)) : [];
+    return { chats: stato.chat.size + vecchie.length, pagine: stato.pagine.size };
+  }
 
   on(MSG.IMPORT_DATA_PREVIEW, async (msg, sender, origin) => {
     if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
@@ -162,14 +184,17 @@ module.exports = function register(on, ctx) {
       const parsed = readExportZip(buf); // lancia se non è un export di Filo
 
       const token = `imp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-      PENDING_IMPORT = { token, data: parsed.data, at: Date.now() };
+      PENDING_IMPORT = { token, data: parsed.data, filo: parsed.filo, at: Date.now() };
+      const filo = contaFilo(parsed);
       return {
         ok: true,
         token,
         fileName: path.basename(filePath),
         exportedAt: parsed.exportedAt || '',
-        sections: parsed.sectionCount,
+        sections: parsed.sectionCount - (Array.isArray(parsed.data[FILO_CHATS_KEY]) ? 1 : 0),
         images: parsed.imageCount,
+        chats: filo.chats,
+        pagine: filo.pagine,
       };
     } catch (e) {
       // File non riconosciuto: distinguiamo il caso "non è un archivio di Filo"
@@ -198,8 +223,23 @@ module.exports = function register(on, ctx) {
       const DiskStorage = require('../../shim/storage');
       const { mergeImportedData } = require('../exportData');
 
+      const IlFilo = require('../ilFilo');
+      const dati = { ...pending.data };
+      const chatVecchie = dati[FILO_CHATS_KEY];
+      delete dati[FILO_CHATS_KEY];
+      if (pending.filo) await IlFilo.importa(pending.filo);
+      if (Array.isArray(chatVecchie) && chatVecchie.length) await IlFilo.importaChatSalvate(chatVecchie);
+      try { ctx.broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED }); } catch (_) {}
+
       const current = await DiskStorage.get(null);
-      const { merged, stats } = mergeImportedData(current, pending.data);
+      const ArchivedTabs = globalThis.SN_ARCHIVED_TABS;
+      const archivio = await ArchivedTabs.list();
+      if (archivio.length) current[ARCHIVE_KEY] = archivio;
+      const Mie = globalThis.SN_SEGNALAZIONI_MIE;
+      const MIE_KEY = Mie ? Mie.CHIAVE_BACKUP : null;
+      const mie = Mie ? await Mie.elenco() : null;
+      if (mie && mie.length) current[MIE_KEY] = mie;
+      const { merged, stats } = mergeImportedData(current, dati);
 
       // Le impostazioni passano da applySettingsUpdate come qualsiasi altra
       // modifica: così tema, sicurezza, cookie, fingerprint e adblock del
@@ -213,11 +253,16 @@ module.exports = function register(on, ctx) {
       const settings = merged[SETTINGS_KEY];
       const rest = {};
       for (const k of Object.keys(merged)) {
-        if (k === SETTINGS_KEY) continue;
+        if (k === SETTINGS_KEY || k === ARCHIVE_KEY || k === MIE_KEY) continue;
         if (JSON.stringify(merged[k]) !== JSON.stringify(current[k])) rest[k] = merged[k];
       }
-      if (Object.keys(rest).length) await DiskStorage.set(rest);
-      if (settings && typeof settings === 'object') await applySettingsUpdate(settings);
+      // I cambi che l'importazione porta entrano nel filo come suoi, e si annullano come gli altri (#867).
+      await require('../registroCambi').con({ via: 'importazione' }, async () => {
+        if (Object.keys(rest).length) await DiskStorage.set(rest);
+        await ArchivedTabs.importa(merged[ARCHIVE_KEY]);
+        if (Mie) await Mie.importa(merged[MIE_KEY]);
+        if (settings && typeof settings === 'object') await applySettingsUpdate(settings);
+      });
       // Un backup di una versione vecchia porta le miniature a piena risoluzione (#839).
       globalThis.SN_SAVED_PAGES?.rimpicciolisciMiniature?.().catch(() => {});
 
@@ -228,27 +273,22 @@ module.exports = function register(on, ctx) {
     }
   });
 
-  // ── Cronologia appunti: NON guardata per origine, di proposito ────────
-  // Questi tre canali (leggi/aggiungi/aggiorna-descrizione) sono usati dai
-  // content script di Filo sulle pagine web esterne — il menu "Incolla" con la
-  // cronologia funziona su QUALSIASI pagina, quindi arrivano con un'origine
-  // http(s):// legittima. Metterci un gate isFilo() spegnerebbe la cronologia
-  // appunti ovunque tranne le pagine interne: sarebbe una regressione, non una
-  // difesa. La barriera contro le pagine ostili resta l'isolamento di contesto
-  // (il main world delle pagine esterne non vede chrome.runtime — confermato dai
-  // test di audit). Le operazioni "tutto o niente" o riservate (svuota
-  // cronologia, cronologia AI, costi) sì che sono guardate: vedi sotto.
-  on(MSG.GET_CLIPBOARD_HISTORY, async () => {
+  // ── Cronologia appunti ────────────────────────────────────────────────
+  // Il menu «Incolla» vive dentro le pagine di qualunque sito: chi legge e chi scrive lo decide services/appuntiDaiSiti.js
+  // (#589.4). Descrivere resta aperto: la descrizione arriva da un modello quando vuole, e serve l'immagine esatta.
+  on(MSG.GET_CLIPBOARD_HISTORY, async (msg, sender, origin) => {
+    if (!(await AppuntiDaiSiti.elencoLeggibile(sender, origin))) return vietato;
     const list = await Storage.getRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
     return { ok: true, items: Array.isArray(list) ? list : [] };
   });
 
-  on(MSG.PUSH_CLIPBOARD_ENTRY, async (msg) => {
+  on(MSG.PUSH_CLIPBOARD_ENTRY, async (msg, sender, origin) => {
+    if (!AppuntiDaiSiti.scritturaAmmessa(sender, origin, msg.entry)) return vietato;
     const cap = SN_CONST.CLIPBOARD_HISTORY_MAX;
     const list = await Storage.getRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
     const arr = Array.isArray(list) ? list : [];
     const e = msg.entry;
-    if (!e) return { ok: true, items: arr };
+    if (!e) return { ok: true };
     const norm = (s) => (s || '').replace(/\s+/g, ' ').trim();
     const keyOf = (x) => {
       if (!x) return '';
@@ -268,7 +308,7 @@ module.exports = function register(on, ctx) {
     filtered.unshift({ ...e, ts: Date.now() });
     const trimmed = filtered.slice(0, cap);
     await Storage.setRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, trimmed);
-    return { ok: true, items: trimmed };
+    return { ok: true };
   });
 
   on(MSG.UPDATE_CLIPBOARD_DESCRIPTION, async (msg) => {
@@ -283,22 +323,16 @@ module.exports = function register(on, ctx) {
       }
     }
     if (updated) await Storage.setRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, arr);
-    return { ok: true, items: arr };
+    return { ok: true };
   });
 
-  // Rimuovi UNA voce dalla cronologia appunti. È l'operazione simmetrica a PUSH
-  // (aggiungi una voce): il menu "Incolla" con la cronologia vive su QUALSIASI
-  // pagina, quindi la rimozione di una singola voce — come la lettura e
-  // l'aggiunta — deve funzionare anche da origine web. Non è guardata per
-  // origine, esattamente come GET/PUSH/UPDATE_DESCRIPTION: la barriera resta
-  // l'isolamento di contesto (il main world delle pagine ostili non vede
-  // chrome.runtime). Il raggio d'azione è una sola voce (l'utente ha copiato una
-  // password e vuole toglierla subito dalla cronologia, senza cambiare pagina).
-  on(MSG.REMOVE_CLIPBOARD_ENTRY, async (msg) => {
+  // Una voce sola: l'utente ha copiato una password e la toglie dal menu Incolla, sulla pagina dov'è (#256).
+  on(MSG.REMOVE_CLIPBOARD_ENTRY, async (msg, sender, origin) => {
+    if (!AppuntiDaiSiti.scritturaAmmessa(sender, origin)) return vietato;
     const list = await Storage.getRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
     const arr = Array.isArray(list) ? list : [];
     const e = msg.entry;
-    if (!e) return { ok: true, items: arr };
+    if (!e) return { ok: true };
     const norm = (s) => (s || '').replace(/\s+/g, ' ').trim();
     const keyOf = (x) => {
       if (!x) return '';
@@ -311,22 +345,12 @@ module.exports = function register(on, ctx) {
     if (next.length !== arr.length) {
       await Storage.setRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, next);
     }
-    return { ok: true, items: next };
+    return { ok: true };
   });
 
-  // Svuota TUTTA la cronologia appunti. Storicamente era gated a filo:// come
-  // difesa-in-profondità (feedback #246: "nessun content script web ha motivo di
-  // azzerarla"). Quella premessa è caduta col menu cronologia (feedback #256):
-  // l'utente deve poter svuotare la cronologia dallo stesso menu "Incolla" che la
-  // mostra, che gira su qualunque pagina. E il gate non offre più protezione
-  // reale: la lettura (GET) è già consentita da origine web (l'operazione più
-  // sensibile — leggere ciò che hai copiato), e la rimozione per-voce
-  // (REMOVE_CLIPBOARD_ENTRY) pure; un attaccante che bucasse l'isolamento di
-  // contesto potrebbe già leggere tutto o svuotare in loop con REMOVE. Quindi lo
-  // svuotamento si allinea alle altre operazioni della cronologia appunti (non
-  // guardato per origine). Restano gated a filo:// i canali DAVVERO riservati che
-  // nessun content script web usa: cronologia AI e costi (vedi sotto).
-  on(MSG.CLEAR_CLIPBOARD_HISTORY, async () => {
+  // Svuotare sta nello stesso menu Incolla che mostra la cronologia, su qualunque pagina (#256).
+  on(MSG.CLEAR_CLIPBOARD_HISTORY, async (msg, sender, origin) => {
+    if (!AppuntiDaiSiti.scritturaAmmessa(sender, origin)) return vietato;
     await Storage.setRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
     return { ok: true };
   });

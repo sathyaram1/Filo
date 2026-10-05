@@ -1,51 +1,31 @@
-// Unit test del magazzino delle chat con Filo (#525,
-// src/main/services/filoChats.js): quello che scrive davvero su disco.
-//
-// Due cose che il magazzino deve garantire e che la logica pura non può:
-//   • due scritture che partono insieme non si mangiano a vicenda (ogni
-//     scrittura rilegge tutto e riscrive tutto: senza una fila, la seconda
-//     cancella la prima);
-//   • una domanda riprovata dopo un errore non finisce scritta due volte.
-//
-// Niente Electron: `chrome.storage.local` è un finto in memoria, con la
-// scrittura volutamente lenta per allargare la finestra in cui due scritture
-// si accavallano. Senza quel ritardo la prova passerebbe per fortuna.
+// Unit test del magazzino delle chat con Filo (#525, src/main/services/filoChats.js), che dal #866 scrive nel filo
+// (src/main/services/ilFilo.js): due scritture che partono insieme non si mangiano a vicenda, e una domanda
+// riprovata dopo un errore non finisce scritta due volte. Niente Electron: il filo scrive in una cartella temporanea.
 
-import { test } from 'node:test';
+import { test, after } from 'node:test';
+import { rmSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import '../../src/shared/chatArchive.js';
+import '../../src/shared/filoEventi.js';
 
 const require = createRequire(import.meta.url);
 
 globalThis.SN_CONST = { STORAGE_KEYS: { FILO_CHATS: 'filo_chats' } };
+globalThis.chrome = { storage: { local: { async get(k) { return { [k]: undefined }; }, async set() {}, async remove() {} } } };
 
-let disco = {};
-let ritardoScrittura = 0;
-globalThis.chrome = {
-  storage: {
-    local: {
-      // Lettura immediata, come il magazzino vero (i dati stanno già in
-      // memoria); la SCRITTURA invece ci mette un attimo. È in quell'attimo
-      // che una seconda scrittura rilegge una lista vecchia e poi ci scrive
-      // sopra: la finestra del guasto, resa larga abbastanza da vedersi.
-      async get(key) {
-        return { [key]: disco[key] };
-      },
-      async set(obj) {
-        if (ritardoScrittura) await new Promise((r) => setTimeout(r, ritardoScrittura));
-        Object.assign(disco, obj);
-      },
-    },
-  },
-};
-
+const { creaFilo } = require('../../src/main/services/ilFilo.js');
 require('../../src/main/services/filoChats.js');
 const Store = globalThis.SN_FILO_CHATS;
 
+const cartelle = [];
+after(() => { for (const c of cartelle) rmSync(c, { recursive: true, force: true }); });
+
 function azzera() {
-  disco = {};
-  ritardoScrittura = 0;
+  const cartella = cartellaTemporanea('filo-chat-');
+  cartelle.push(cartella);
+  globalThis.SN_IL_FILO = creaFilo({ cartella });
 }
 
 const turno = (role, text, ts) => ({ role, text, ts });
@@ -54,7 +34,6 @@ const turno = (role, text, ts) => ({ role, text, ts });
 
 test('tre chat che nascono insieme si salvano tutte e tre', async () => {
   azzera();
-  ritardoScrittura = 5; // la finestra in cui due scritture si accavallano
   // Archivio vuoto: è il caso di chi usa Filo da poco, e quello in cui la
   // scrittura non condivide nemmeno la lista con le altre.
   await Promise.all([
@@ -68,7 +47,6 @@ test('tre chat che nascono insieme si salvano tutte e tre', async () => {
 
 test('domanda e risposta che arrivano insieme nella stessa chat restano tutte e due', async () => {
   azzera();
-  ritardoScrittura = 5;
   await Store.append('x', turno('user', 'Apro la chat', '2026-09-20T10:00:00.000Z'));
   await Promise.all([
     Store.append('x', turno('user', 'Una domanda', '2026-09-20T10:00:01.000Z')),
@@ -80,7 +58,6 @@ test('domanda e risposta che arrivano insieme nella stessa chat restano tutte e 
 
 test('una cancellazione partita insieme a una scrittura non resuscita la chat cancellata', async () => {
   azzera();
-  ritardoScrittura = 5;
   await Store.append('viva', turno('user', 'Resto qui', '2026-09-20T10:00:00.000Z'));
   await Store.append('morta', turno('user', 'Vado via', '2026-09-20T10:00:01.000Z'));
   await Promise.all([
