@@ -337,6 +337,28 @@ function configureForMode(mode) {
     applyGpc(ses, on);
     applyTrackerBlocking(ses, on);
   }
+  for (const v of altreSessioni.values()) proteggi(v.ses, v.incognito);
+}
+
+// La modalità che vale per questa sessione: l'incognito può averne una sua (#754).
+function proteggi(ses, incognito) {
+  const on = currentMode(incognito) !== MODES.MANUAL;
+  applyGpc(ses, on);
+  applyTrackerBlocking(ses, on);
+}
+
+// Da chiamare appena Filo apre una sessione di navigazione fuori da quelle qui
+// sopra: la protegge subito e la fa seguire ai cambi di modalità (#755).
+function proteggiSessione(ses, { partition, incognito = false } = {}) {
+  if (!ses || !ses.webRequest) return ses;
+  altreSessioni.set(partition || ses, { ses, incognito });
+  proteggi(ses, incognito);
+  return ses;
+}
+
+// Modalità cambiata dentro una finestra incognito: vale solo per le sue sessioni.
+function riapplicaIncognito() {
+  for (const v of altreSessioni.values()) if (v.incognito) proteggi(v.ses, true);
 }
 
 // Ultima modalità/siti fidati visti, così before-quit (sincrono) può lanciare il
