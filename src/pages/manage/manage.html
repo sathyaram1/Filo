@@ -1058,12 +1058,13 @@
       border-color: var(--sn-accent); color: var(--sn-accent);
       background: color-mix(in srgb, var(--sn-accent) 12%, var(--sn-bg, transparent));
     }
-    .mg-preapprove-line { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
-    .mg-preapprove-line[hidden] { display: none; }
+    /* Prende lo spazio che i tasti lasciano e va a capo dentro di sé: la riga dei tasti resta una. */
     .mg-preapproved-info {
-      font-size: 12px;
+      flex: 1 1 14em; min-width: 0;
+      font-size: 12px; line-height: 1.35;
       color: var(--sn-muted);
     }
+    .mg-preapproved-info[hidden] { display: none; }
     /* Il segno in lista è piccolo e sta prima dei pallini di priorità, che si spingono a destra da soli. */
     .mg-preapproved {
       flex: none;
