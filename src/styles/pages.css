@@ -772,6 +772,7 @@ section:has(#dictList) .sn-spell-add-row {
 .sn-page #cookie-banners-list li,
 .sn-page #cookie-done-list li,
 .sn-page #sec-delicate-campi-list li,
+.sn-page #cookie-accessi-list li,
 .sn-page #sec-perm-list li {
   display: flex;
   align-items: center;
@@ -787,6 +788,7 @@ section:has(#dictList) .sn-spell-add-row {
 .sn-page #cookie-banners-list li button,
 .sn-page #cookie-done-list li button,
 .sn-page #sec-delicate-campi-list li button,
+.sn-page #cookie-accessi-list li button,
 .sn-page #sec-perm-list li button {
   font-size: 12px;
   padding: 2px 8px;

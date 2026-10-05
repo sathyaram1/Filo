@@ -41,9 +41,16 @@ function sitoDi(url) {
   try { return Cookies().registrableOf(url) || null; } catch (_) { return null; }
 }
 
+// Mentre si sta guardando un accesso a un sito (la sua pagina di accesso è aperta, o la finestrella «Continua
+// con…»), i suoi cookie non si toccano: declassare quelli del giro di accesso lo farebbe uscire al riavvio.
 function protetti() {
   const out = new Set(accessi);
   for (const d of fidati) out.add(d);
+  const ora = Date.now();
+  for (const [sito, v] of [...attesa]) {
+    if (ora - v.at > ATTESA_ACCESSO_MS) attesa.delete(sito);
+    else out.add(sito);
+  }
   return out;
 }
 
@@ -294,5 +301,4 @@ module.exports = {
   paginaDiAccesso,
   giroDiPulizia,
   margineTest,
-  _stato: () => ({ modo, accessi: [...accessi], siti: [...siti.keys()], attesa: [...attesa.keys()] }),
 };
