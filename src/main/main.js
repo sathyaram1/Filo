@@ -67,6 +67,7 @@ if (process.env.NODE_ENV === 'test') {
     globalThis.__filoCookies = require('./services/cookies');
     globalThis.__filoAdblock = require('./services/adblock');
     globalThis.__filoCookieBanners = require('./services/cookieBanners');
+    globalThis.__filoCookieIncorporati = require('./services/cookieIncorporati');
     globalThis.__filoFirmatariC2pa = require('./services/firmatariC2pa');
     globalThis.__filoFingerprint = require('./services/fingerprint');
     globalThis.__filoProxyTab = require('./services/proxyTab');
@@ -201,6 +202,9 @@ app.whenReady().then(async () => {
     // Gestione cookie: emetti GPC sulla sessione di default secondo la modalità.
     const Cookies = require('./services/cookies');
     Cookies.configureFromSettings(s);
+    // Cookie dei contenuti incorporati di terzi (#758): va agganciato prima della prima scheda, è lui che vede
+    // nascere i cookie dei riquadri.
+    try { require('./services/cookieIncorporati').init(s); } catch (_) {}
     // Anti-fingerprinting: carica/genera il master secret persistente e fissa
     // la modalità corrente (off/default/privacy) prima di aprire qualsiasi tab.
     try { await require('./services/fingerprint').init(s); } catch (_) {}

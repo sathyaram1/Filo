@@ -13,6 +13,13 @@ module.exports = function register(on, ctx) {
     const tabId = sender?.tab?.id;
     if (!win || !win._filoTabs || !tabId) return { ok: true, level: 'safe', message: null };
     const ctxPage = { hasPassword: !!msg.hasPassword, hasPayment: !!msg.hasPayment };
+    // #758 — un campo password nella PAGINA (non in un riquadro, che nominerebbe un sito non suo) è una pagina di
+    // accesso: il sito vale quello della scheda.
+    if (msg.hasPassword) {
+      const top = sender.wc && !sender.wc.isDestroyed() && sender.wc.mainFrame;
+      const suo = top && sender.frame && sender.frame.frameTreeNodeId === top.frameTreeNodeId;
+      if (suo) { try { require('../cookieIncorporati').paginaDiAccesso(sender.tab.url, { forte: true }); } catch (_) {} }
+    }
     return win._filoTabs.safebrowseGet(tabId, msg.url || origin, ctxPage);
   });
 

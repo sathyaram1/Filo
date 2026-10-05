@@ -6,6 +6,7 @@
 
 const { session } = require('electron');
 const R = require('./cookieIncorporatiRegole');
+require('../../shared/authPopup');
 
 // «Qualche minuto» dopo l'ultima scheda che ospitava il riquadro: chi riapre l'articolo un attimo dopo non perde
 // quello che il riquadro stava facendo (un video a metà, un commento scritto).
@@ -134,12 +135,15 @@ async function declassa(ses, c) {
 }
 
 // L'accesso osservato: pagina di accesso del sito, e dopo un cookie di sessione suo che prima non c'era.
-function paginaDiAccesso(url) {
+// `forte`: la pagina chiedeva una password (non solo un indirizzo che somiglia a un accesso).
+function paginaDiAccesso(url, { forte = false } = {}) {
   if (modo !== 'default') return;
   if (!/^https?:/i.test(String(url || ''))) return;
   const sito = sitoDi(url);
   if (!sito || accessi.has(sito)) return;
-  attesa.set(sito, { at: Date.now(), prima: new Map() });
+  const vecchia = attesa.get(sito);
+  attesa.set(sito, { at: Date.now(), prima: vecchia ? vecchia.prima : new Map(), forte: forte || !!(vecchia && vecchia.forte) });
+  if (vecchia) return;
   const ses = agganciata;
   if (!ses) return;
   // La foto dei cookie di adesso: senza, un cookie già lì che si rinfresca sembrerebbe un accesso appena fatto.
@@ -181,7 +185,7 @@ async function cookieCambiato(ses, c, removed) {
   const inAttesa = attesa.get(sito);
   if (inAttesa) {
     if (Date.now() - inAttesa.at > ATTESA_ACCESSO_MS) attesa.delete(sito);
-    else if (R.segnaleDiAccesso(c, inAttesa.prima)) { segnaAccesso(sito); return; }
+    else if (R.segnaleDiAccesso(c, inAttesa.prima, { forte: inAttesa.forte })) { segnaAccesso(sito); return; }
   }
   if (c.session || modo !== 'default') return;
   const prot = protetti();

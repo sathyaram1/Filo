@@ -13,14 +13,15 @@ function nomeDiAccesso(nome) {
   return !!n && !NON_ACCESSO.test(n) && NOME_ACCESSO.test(n);
 }
 
-// Il cookie arrivato dopo la pagina di accesso dice che l'utente è entrato: un nome da sessione con un valore nuovo,
-// o un cookie del server che prima non c'era. `prima`: nome → valore quando si è vista la pagina di accesso.
-function segnaleDiAccesso(cookie, prima) {
+// Il cookie arrivato dopo la pagina di accesso dice che l'utente è entrato: un nome da sessione con un valore nuovo.
+// `prima`: nome → valore quando si è vista la pagina di accesso. `forte` (la pagina aveva un campo password) ammette
+// anche un cookie del server dal nome qualunque: senza, un cookie da visitatore basterebbe a dichiarare un accesso.
+function segnaleDiAccesso(cookie, prima, { forte = false } = {}) {
   if (!cookie || !cookie.name || NON_ACCESSO.test(String(cookie.name))) return false;
   const vecchio = prima instanceof Map ? prima.get(cookie.name) : undefined;
   if (vecchio !== undefined && vecchio === cookie.value) return false;
   if (nomeDiAccesso(cookie.name)) return true;
-  return !!cookie.httpOnly && vecchio === undefined;
+  return forte && !!cookie.httpOnly && vecchio === undefined;
 }
 
 // `protetti`: siti con accesso e siti «resta connesso». Il sito principale di una scheda aperta non si tocca mai.
