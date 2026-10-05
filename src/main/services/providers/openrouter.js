@@ -65,8 +65,15 @@
       }
       if (alt && alt.key) {
         const refused = { status: res.status, detail };
-        try { await K.noteOwnKeyRefusal(refused); } catch (_) {}
-        res = await fetch(url, makeInit(alt.key));
+        // Il rifiuto si annota DOPO il ripiego: Crediti dice che Filo ha
+        // usato i crediti solo se la personale ha risposto davvero.
+        try {
+          res = await fetch(url, makeInit(alt.key));
+        } catch (e) {
+          try { await K.noteOwnKeyRefusal({ ...refused, served: false }); } catch (_) {}
+          throw e;
+        }
+        try { await K.noteOwnKeyRefusal({ ...refused, served: res.ok }); } catch (_) {}
         keyUsed = alt.key;
         keyFallback = { status: refused.status, from: 'own', to: alt.source || 'personal' };
         if (!res.ok) keyFallback.failed = res.status;

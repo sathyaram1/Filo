@@ -123,6 +123,11 @@ module.exports = function register(on, ctx) {
     return 'factory';
   }
 
+  // La prova di una chiave (il «Prova» delle Impostazioni) misura QUELLA
+  // chiave: dentro `senzaRipiego` un rifiuto risale com'è, senza riserva.
+  const provaDiChiave = new AsyncLocalStorage();
+  function senzaRipiego(fn) { return provaDiChiave.run(true, fn); }
+
   // La riserva per la chiave con cui una chiamata è partita: la personale del
   // portafoglio, solo se si era partiti con la chiave PROPRIA. Con la
   // personale già in uso non c'è riserva (un 402 lì sono i crediti finiti), e
@@ -135,11 +140,6 @@ module.exports = function register(on, ctx) {
     if (k !== (await ownKey())) return null;
     return { key: personal, source: 'personal' };
   }
-
-  // La prova di una chiave (il «Prova» delle Impostazioni) misura QUELLA
-  // chiave: dentro `senzaRipiego` un rifiuto risale com'è, senza riserva.
-  const provaDiChiave = new AsyncLocalStorage();
-  function senzaRipiego(fn) { return provaDiChiave.run(true, fn); }
 
   // L'ultimo rifiuto della chiave propria: { at, status, detail, usedCredits }.
   // Lo legge la pagina Crediti (readState); si cancella quando la chiave
