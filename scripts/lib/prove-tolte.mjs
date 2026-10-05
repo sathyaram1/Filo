@@ -349,7 +349,8 @@ function corriCome(prove, sha, root, { lancia = spawnSync, log = console.log, pr
         writeFileSync(dest, execFileSync('git', ['show', `${sha}:${f}`], { cwd: root, maxBuffer: 1 << 26, stdio: ['ignore', 'pipe', 'ignore'] }));
       }
     }
-    log(titolo || `Rilancio com'${prove.length === 1 ? 'era' : 'erano'} ${prove.length} ${prove.length === 1 ? 'prova' : 'prove'} del giro cancellate o cambiate dopo la critica, sul codice nuovo:`);
+    const una = prove.length === 1;
+    log(titolo || `Rilancio com'${una ? 'era' : 'erano'} ${una ? 'la prova' : `le ${prove.length} prove`} del giro ${una ? 'toccata' : 'toccate'} dopo la critica (cancellate, cambiate o che usano un file di supporto cambiato), sul codice nuovo:`);
     prove.forEach((p, i) => {
       const l = prepara('npx', ['playwright', 'test', percorsoRipristino(p, etichetta), '--retries=1', ...(perCaso ? ['--reporter=list,json'] : [])]);
       const rapporto = perCaso ? join(rapporti, `${i}.json`) : '';
