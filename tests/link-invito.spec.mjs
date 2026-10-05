@@ -512,3 +512,46 @@ test('la pagina d’arrivo di un clic non eredita il gesto per spingere l’invi
   await new Promise((r) => setTimeout(r, 3000));
   expect(seen.redeems, 'nessun riscatto senza un clic sulla pagina').toEqual([]);
 });
+
+// #664 giro 3: chi non ha crediti scrive l'invito alla chat della home, col messaggio com'è arrivato o col link.
+async function scriviAllaHome(home, testo) {
+  const prima = await home.locator('#bubbles .dash-bubble-filo').count();
+  await home.fill('#input', testo);
+  await home.press('#input', 'Enter');
+  await expect.poll(() => home.locator('#bubbles .dash-bubble-filo').count(), { timeout: 15000 }).toBeGreaterThan(prima);
+  return home.locator('#bubbles .dash-bubble-filo').last().innerText();
+}
+
+test('senza crediti, il messaggio dell’invito scritto nella chat della home lo riscatta; una frase qualsiasi no', async ({ openTab }) => {
+  test.setTimeout(120000);
+  const home = await openTab('filo://newtab/');
+  await home.waitForSelector('#input');
+  expect(await scriviAllaHome(home, 'Cara Sara, come va?')).toContain('serve un codice d\'invito');
+  expect(await scriviAllaHome(home, 'Cara Sara, ecco il codice: ABCD-EFGH')).toContain('Invito riscattato');
+  expect(seen.redeems).toContain('ABCDEFGH');
+});
+
+test('senza crediti, il link d’invito incollato nella chat della home lo riscatta', async ({ openTab }) => {
+  test.setTimeout(120000);
+  const home = await openTab('filo://newtab/');
+  await home.waitForSelector('#input');
+  expect(await scriviAllaHome(home, 'https://filo.red/i/ABCD-EFGH')).toContain('Invito riscattato');
+  expect(seen.redeems).toEqual(['ABCDEFGH']);
+});
+
+// Il modo classico delle pagine per aprire un'app: al clic un riquadro nascosto puntato sull'indirizzo dell'app.
+test('un pulsante che chiede l’invito con un riquadro nascosto riscatta; un riquadro messo dalla pagina da sola no', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  const daSola = await testServer.openReady(openTab, `<!doctype html><meta charset="utf-8"><body><h1>da sola</h1>
+    <script>setTimeout(function () { var f = document.createElement('iframe'); f.style.display = 'none'; f.src = 'filo://invito/ABCD-EFGH'; document.body.appendChild(f); }, 300);</script></body>`, { pubblico: true });
+  await new Promise((r) => setTimeout(r, 3000));
+  expect(seen.redeems, 'un riquadro senza clic non riscatta').toEqual([]);
+  expect(await daSola.evaluate(() => document.querySelector('h1').textContent)).toBe('da sola');
+
+  const pagina = await testServer.openReady(openTab, `<!doctype html><meta charset="utf-8"><body style="padding:40px"><h1>Hai un invito</h1>
+    <button id="b" style="padding:20px" onclick="var f=document.createElement('iframe');f.style.display='none';f.src='filo://invito/ABCD-EFGH';document.body.appendChild(f);">Apri in Filo</button></body>`);
+  const indirizzo = pagina.url();
+  await pagina.locator('#b').click();
+  await riscattaEApreCrediti(app);
+  expect(pagina.url(), 'la pagina dell’invito resta').toBe(indirizzo);
+});
