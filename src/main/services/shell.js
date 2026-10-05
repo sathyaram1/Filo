@@ -70,29 +70,39 @@ function comandoPerPowerShell(command, coda = '') {
 
 // cmd legge lo stdin di una pipe un byte per volta e decodifica ogni byte da solo con la tabella attiva: con 65001
 // i byte di «à» o «—» diventano rombi, con una tabella a un byte passa solo ciò che quella tabella contiene (#1044).
-// Sul filo vanno quindi solo caratteri ASCII: i pezzi non ASCII stanno in un file UTF-8 che `set /p` legge a righe
-// intere, e il comando li richiama come %variabili%, espanse prima che cmd guardi virgolette e redirezioni.
-// Un pezzo per riga al più 200 caratteri: `set /p` legge 1023 byte per riga e un carattere ne occupa fino a quattro.
+// Sul filo vanno quindi solo caratteri ASCII: i tratti con caratteri non ASCII stanno in file UTF-8 che `set /p`
+// legge a righe intere, e il comando li richiama come %variabili%, espanse prima che cmd guardi virgolette e
+// redirezioni. Un tratto non contiene `%`, così le variabili e i `%f` del `for` scritti dall'utente restano suoi.
+// Tetti: `set /p` legge 1023 byte per riga (200 caratteri da 4 byte ci stanno) e una riga di cmd ne tiene 8191
+// (100 letture per riga e per file).
 const PEZZO_CMD = 200;
+const LETTURE_PER_FILE = 100;
 const VALORI_CMD = 'FILO_VALORI_CMD';
 
 function comandoPerCmd(command) {
   const cmd = String(command == null ? '' : command);
-  if (SOLO_ASCII.test(cmd)) return { testo: cmd, valori: null };
+  if (SOLO_ASCII.test(cmd)) return { testo: cmd, file: [] };
   const valori = [];
   const nomi = new Map();
   const richiama = (pezzo) => {
     if (!nomi.has(pezzo)) { valori.push(pezzo); nomi.set(pezzo, `FILO_U${valori.length}`); }
     return `%${nomi.get(pezzo)}%`;
   };
-  const testo = cmd.replace(/[^\x00-\x7F]+/g, (corsa) => {
-    const caratteri = Array.from(corsa);
+  const testo = cmd.replace(/[^\x00-\x7F](?:[^%\r\n]*[^\x00-\x7F])?/g, (tratto) => {
+    const caratteri = Array.from(tratto);
     let s = '';
     for (let i = 0; i < caratteri.length; i += PEZZO_CMD) s += richiama(caratteri.slice(i, i + PEZZO_CMD).join(''));
     return s;
   });
-  const letture = valori.map((_, i) => `set /p "FILO_U${i + 1}="`).join('\r\n');
-  return { testo: `(\r\n${letture}\r\n)<"%${VALORI_CMD}%"\r\n${testo}`, valori: `${valori.join('\r\n')}\r\n` };
+  const file = [];
+  const letture = [];
+  for (let i = 0; i < valori.length; i += LETTURE_PER_FILE) {
+    const gruppo = valori.slice(i, i + LETTURE_PER_FILE);
+    file.push(`${gruppo.join('\r\n')}\r\n`);
+    const set = gruppo.map((_, j) => `set /p "FILO_U${i + j + 1}="`).join(' & ');
+    letture.push(`(${set})<"%${VALORI_CMD}%-${file.length}.txt"`);
+  }
+  return { testo: `${letture.join('\r\n')}\r\n${testo}`, file };
 }
 
 // Quella cartella c'è ancora, ed è una cartella? La domanda si fa qui per
