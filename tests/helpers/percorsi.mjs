@@ -19,7 +19,7 @@
 // riporta il nome lungo. Fuori da Windows fa il suo lavoro di sempre (risolve
 // `/tmp` → `/private/tmp` su macOS), quindi si usa ovunque.
 
-import { mkdtempSync, realpathSync, symlinkSync } from 'node:fs';
+import { mkdtempSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import path, { join } from 'node:path';
 
@@ -56,6 +56,27 @@ export const SPAZIO = 'con spazio-';
 // vecchia. Il prefisso resta in testa, così la cartella si riconosce a occhio.
 export function cartellaTemporanea(prefisso) {
   return percorsoCanonico(mkdtempSync(join(tmpdir(), `${prefisso}${SPAZIO}`)));
+}
+
+// La pulizia di un test non lo fa mai rosso: su Windows sotto carico un figlio appena ucciso o l'antivirus tengono
+// la cartella anche oltre i tentativi, e rmSync lancia EBUSY col codice giusto (#750). Quella rimasta si ritenta all'uscita.
+const OCCUPATA = new Set(['EBUSY', 'EPERM', 'ENOTEMPTY']);
+const rimaste = new Map();
+function ritentaRimaste() {
+  for (const [dir, rm] of rimaste) {
+    try { rm(dir, { recursive: true, force: true }); } catch (_) { /* resta nella temporanea di sistema */ }
+  }
+}
+export function togliCartella(dir, { tentativi = 5, attesa = 200, rm = rmSync } = {}) {
+  try {
+    rm(dir, { recursive: true, force: true, maxRetries: tentativi, retryDelay: attesa });
+    return true;
+  } catch (e) {
+    if (!OCCUPATA.has(e?.code)) throw e;
+    if (!rimaste.size) process.once('exit', ritentaRimaste);
+    rimaste.set(dir, rm);
+    return false;
+  }
 }
 
 // Una cartella nuova DENTRO la cartella personale: è lì che il perimetro di

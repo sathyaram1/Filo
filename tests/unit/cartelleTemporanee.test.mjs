@@ -18,11 +18,12 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { lstatSync, mkdirSync, readdirSync, readFileSync, statSync, rmSync, writeFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, statSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join, relative, posix, win32 } from 'node:path';
 import {
-  cartellaTemporanea, collegaCartella, collegaFile, COLLEGAMENTO_NEGATO, fuoriDa, percorsoCanonico,
+  cartellaTemporanea, collegaCartella, collegaFile, COLLEGAMENTO_NEGATO, fuoriDa, percorsoCanonico, togliCartella,
 } from '../helpers/percorsi.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -200,4 +201,60 @@ test('fuoriDa: un file su un altro disco sta fuori, uno dentro sta dentro, su Wi
   assert.equal(fuoriDa('/repo', '/tmp/01-diff.txt', posix), true);
   assert.equal(fuoriDa('/repo', '/repo/..cache/x', posix), false);
   assert.equal(fuoriDa('/repo', '/', posix), true);
+});
+
+// ── La pulizia non fa rosso un test giusto (#750) ──────────────────────────
+
+const RITENTA_A_MANO = /\brm(?:Sync)?\s*\([^;]*?maxRetries/;
+const occupata = (code) => () => { throw Object.assign(new Error(`${code}: resource busy or locked`), { code }); };
+
+test('nessun test ritenta la pulizia da sé: dopo i tentativi rmSync lancia ancora, e il test giusto diventa rosso', () => {
+  assert.ok(RITENTA_A_MANO.test('rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });'));
+  assert.ok(!RITENTA_A_MANO.test('rmSync(casa, { recursive: true, force: true });'));
+  const colpevoli = [];
+  for (const p of fileDiTest()) {
+    if (p === AMMESSO || p === fileURLToPath(import.meta.url)) continue;
+    if (RITENTA_A_MANO.test(readFileSync(p, 'utf8'))) colpevoli.push(relative(TESTS, p));
+  }
+  assert.deepEqual(colpevoli, [],
+    'questi file ritentano la pulizia a mano: usa `togliCartella(cartella)` da ./helpers/percorsi.mjs, '
+    + 'che oltre a ritentare non fa rosso il test quando Windows tiene ancora la cartella');
+});
+
+test('togliCartella toglie la cartella con quello che contiene', () => {
+  const dir = cartellaTemporanea('filo-togli-');
+  mkdirSync(join(dir, 'dentro'));
+  writeFileSync(join(dir, 'dentro', 'f.txt'), 'x');
+  assert.equal(togliCartella(dir), true);
+  assert.equal(existsSync(dir), false);
+  assert.equal(togliCartella(dir), true, 'una cartella che non c\'è più non è un errore');
+});
+
+test('togliCartella: una cartella che Windows tiene ancora non fa rosso il test, un altro guasto sì', () => {
+  for (const code of ['EBUSY', 'EPERM', 'ENOTEMPTY']) {
+    assert.equal(togliCartella(join('non', 'esiste', code), { rm: occupata(code) }), false, code);
+  }
+  assert.throws(() => togliCartella('x', { rm: occupata('EINVAL') }), /EINVAL/);
+});
+
+test('togliCartella: la cartella rimasta occupata sparisce quando il test esce', () => {
+  const dir = cartellaTemporanea('filo-togli-uscita-');
+  writeFileSync(join(dir, 'tenuto.txt'), 'x');
+  const helper = pathToFileURL(join(TESTS, 'helpers', 'percorsi.mjs')).href;
+  const codice = `
+    import { rmSync, existsSync } from 'node:fs';
+    import { togliCartella } from ${JSON.stringify(helper)};
+    let prima = true;
+    const rm = (d, o) => { if (prima) { prima = false; throw Object.assign(new Error('EBUSY'), { code: 'EBUSY' }); } rmSync(d, o); };
+    const dir = ${JSON.stringify(dir)};
+    console.log(JSON.stringify({ tolta: togliCartella(dir, { rm }), cePrimaDellUscita: existsSync(dir) }));
+  `;
+  try {
+    const r = spawnSync(process.execPath, ['--input-type=module', '-e', codice], { encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr);
+    assert.deepEqual(JSON.parse(r.stdout), { tolta: false, cePrimaDellUscita: true });
+    assert.equal(existsSync(dir), false, 'all\'uscita del processo la cartella rimasta va ritentata');
+  } finally {
+    togliCartella(dir);
+  }
 });
