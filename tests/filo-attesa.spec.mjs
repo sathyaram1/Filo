@@ -16,7 +16,9 @@
 //  (H) con meno movimento il filo sta fermo e il gomitolo compare già fatto;
 //  (I) chi ferma insistendo (doppio clic, Invio ripetuto o tenuto) non fa ripartire il lavoro;
 //  (J) un gomitolo grosso (lavoro lungo) lascia al riassunto la stessa aria di uno piccolo;
-//  (K) fermato mentre Filo prepara ancora la richiesta, il modello non parte e nessuna azione con lui.
+//  (K) fermato mentre Filo prepara ancora la richiesta, il modello non parte e nessuna azione con lui;
+//  (L) fermato durante un'azione lenta, la chat torna subito libera: il seguito e «riprendi» partono a azione finita
+//      e ne conoscono l'esito, che resta nel blocco fermato.
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -582,5 +584,82 @@ test('K — fermato mentre Filo prepara ancora la richiesta: niente parte, e lo 
   const timers = await app.evaluate(() => globalThis.SN_FILO_MEMORY.listTimers());
   expect(timers.map((t) => t.label)).not.toContain('Mai');
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Timer avviato.' })).toHaveCount(0);
+  await ripristina(app);
+});
+
+// Una ricerca sul web lenta (una rete che tarda): conta le chiamate.
+async function ricercaLenta(app, ms) {
+  await app.evaluate((_, durata) => {
+    globalThis.__ricerche = 0;
+    globalThis.SN_WEB_SEARCH = { search: async () => {
+      globalThis.__ricerche += 1;
+      await new Promise((r) => setTimeout(r, durata));
+      return { results: [{ title: 'Orari', url: 'https://example.com/orari', content: 'treni' }], provider: 'finto' };
+    } };
+  }, ms);
+}
+
+test('L — fermato durante un\'azione lenta: la chat torna subito libera, e il seguito parte sapendo cosa è stato fatto', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await configureModel(app);
+  await senzaAccoglienza(app, page);
+  await ricercaLenta(app, 5_000);
+  await copione(app, [
+    { pensa: ['Cerco gli orari. '], ogni: 100, dopoStrumenti: 100, strumenti: [{ id: 'l1', name: 'CERCA_WEB', arguments: '{"query":"orari treni"}' }] },
+    { pensa: ['Il tempo: rispondo. '], ogni: 100, testo: 'Oggi sole.' },
+  ]);
+  await page.locator('#input').fill('orari treni');
+  await page.locator('#sendBtn').click();
+  const blocco = page.locator('.dash-activity');
+  await expect(blocco.locator('.dash-activity-seg-head').first()).toHaveText(/Cerco sul web/, { timeout: 5_000 });
+  await page.waitForTimeout(500);
+  await page.locator('#stopBtn').click();
+  await expect(blocco).toHaveAttribute('data-fermato', '1', { timeout: 1_000 });
+  // La chat è di nuovo dell'utente subito, non a ricerca finita.
+  await expect(page.locator('.dash-bubble-fermato')).toHaveText('Fermato prima della risposta.', { timeout: 1_000 });
+  await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi', { timeout: 1_500 });
+  await page.locator('#input').fill('lascia stare, che tempo fa?');
+  await page.locator('#input').press('Enter');
+  await expect(page.locator('.dash-bubble-user')).toHaveCount(2, { timeout: 1_000 });
+  // Il seguito sta sotto la riga del fermo, e la risposta arriva dopo che la ricerca in volo è finita e raccontata.
+  const ordine = await page.evaluate(() => [...document.querySelectorAll('.dash-bubble-fermato, .dash-bubble-user')].map((e) => (e.classList.contains('dash-bubble-user') ? 'utente' : 'fermo')));
+  expect(ordine).toEqual(['utente', 'fermo', 'utente']);
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Oggi sole.' })).toBeVisible({ timeout: 10_000 });
+  await expect(blocco.first().locator('.dash-activity-seg-head').first()).toHaveText(/Cercato sul web/);
+  await expect(blocco.first().locator('.dash-activity-label')).toHaveText(/^Fermato · /);
+  expect(await app.evaluate(() => globalThis.__ricerche)).toBe(1);
+  const ultimi = await app.evaluate(() => globalThis.__messaggi[globalThis.__messaggi.length - 1]);
+  const testo = ultimi.map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n');
+  expect(testo).toContain('ERANO GIÀ STATE FATTE');
+  await page.waitForTimeout(1_200);
+  await page.screenshot({ path: 'tests/.shots/filo-attesa-fermato-in-volo.png' });
+  await ripristina(app);
+});
+
+test('L2 — «riprendi» premuto mentre l\'azione fermata è ancora in volo non la rifà', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await configureModel(app);
+  await senzaAccoglienza(app, page);
+  await ricercaLenta(app, 4_000);
+  await copione(app, [
+    { pensa: ['Cerco gli orari. '], ogni: 100, dopoStrumenti: 100, strumenti: [{ id: 'm1', name: 'CERCA_WEB', arguments: '{"query":"orari treni"}' }] },
+    { pensa: ['La ricerca c\'è già. '], ogni: 100, testo: 'Ecco gli orari.' },
+  ]);
+  await page.locator('#input').fill('orari treni');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-activity-seg-head').first()).toHaveText(/Cerco sul web/, { timeout: 5_000 });
+  await page.locator('#stopBtn').click();
+  await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi', { timeout: 1_500 });
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco gli orari.' })).toBeVisible({ timeout: 10_000 });
+  expect(await app.evaluate(() => globalThis.__ricerche)).toBe(1);
+  expect(await app.evaluate(() => globalThis.__messaggi.length)).toBe(2);
+  const ultimi = await app.evaluate(() => globalThis.__messaggi[1]);
+  const testo = ultimi.map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n');
+  expect(testo).toContain('ERANO GIÀ STATE FATTE');
   await ripristina(app);
 });

@@ -68,6 +68,14 @@ filo, i nodi, il gomitolo e i titoli); cosa succede lo decide il blocco
   arriva: fermare riguarda il lavoro che resta. Uno stop arrivato mentre il
   turno prepara ancora la richiesta (saldo, batteria, rete) si tiene da parte
   e vale quando il turno si registra: il modello non parte (prova K).
+- **Fermato vuol dire finito, per la scheda.** Al clic il turno chiude subito
+  la sua parte a schermo (voce nello storico, riga «fermato», posto per le
+  azioni ancora in volo) e la chat torna dell'utente: riprendi e seguito si
+  possono dare subito. L'azione già partita finisce nel main e il suo esito
+  arriva nel blocco, che si chiude allora; il turno dopo parte solo quando
+  quell'esito è nello storico, così non la rifà (prove L, L2). Lo stato «sta
+  lavorando» della scheda non deve mai sopravvivere al clic: è la regola su
+  cui sono caduti tre giri di verifica.
 - **Riprendere non riesegue niente.** Finché l'utente non scrive altro, il
   tasto d'invio offre «riprendi»: il turno fermato sta nello storico con le
   azioni fatte (`interrotto`, `fermato`), il modello le vede come già fatte e
