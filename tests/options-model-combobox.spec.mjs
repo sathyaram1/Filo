@@ -20,8 +20,9 @@ const OPTIONS_URL = 'filo://options/options.html';
 // SEMPRE le query a #modelRegistryList per non prendere le righe sbagliate.
 const ROW = '#modelRegistryList .sn-model-row:not(.sn-model-row-head)';
 
-// Il catalogo del fornitore arriva dalla rete quando arriva e SOSTITUISCE la lista della tendina: una voce messa a mano
-// prima spariva sulla macchina che la rete ce l'ha (#687). La prova lo serve lei; con `trattieni` aspetta `rilascia`.
+// Il catalogo del fornitore arriva dalla rete quando arriva e SOSTITUISCE la lista della tendina: una voce messa
+// a mano prima spariva sulla macchina che la rete ce l'ha (#687). Lo serve la prova; `trattieni` aspetta
+// `__rilasciaCatalogo()`.
 async function serviCatalogo(app, ids, { trattieni = false } = {}) {
   await app.context().addInitScript(({ ids, trattieni }) => {
     let apri = () => {};
