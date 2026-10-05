@@ -740,7 +740,7 @@
       }
       if (res?.ok && res.keyFallback && res.keyFallback.line && !ripiegoDelGiro) {
         ripiegoDelGiro = res.keyFallback.line;
-        Popup.ripiegoMostrato();
+        Popup.ripiegoMostrato(Popup.showToast(ripiegoDelGiro, { duration: 7000 }).el);
       }
       if (res?.ok && String(res.text || '').trim()) return { ok: true, text: res.text };
       answeredEmpty = !!(res && res.ok);
