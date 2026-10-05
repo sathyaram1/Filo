@@ -1904,6 +1904,8 @@
     const btn = e.target.closest('[data-tab]');
     if (!btn) return;
     selectTab(btn.dataset.tab);
+    // Come in Gestione: aprire Ricevuti rilegge le fusioni, o una richiesta nata in cloud a stato fermo non si vede.
+    if (btn.dataset.tab === 'inbox') caricaFusioni();
   });
 
   function closeLightbox() {
