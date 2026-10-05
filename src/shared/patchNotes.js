@@ -9,6 +9,13 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.233', date: '2026-10-05',
+      features: [],
+      fixes: [
+        'Nelle Opzioni, se clicchi sul campo del modello prima che arrivi l\'elenco dei modelli, il menu a tendina si apre da solo appena l\'elenco c\'è. Prima restava chiuso e bisognava cliccare di nuovo.',
+      ],
+    },
+    {
       version: '0.2.232', date: '2026-10-03',
       features: [
         'Nel deck builder cambi commander anche a parole («cambia commander, metti Atraxa») o col tasto destro su una carta trovata in chat, anche sulla carta grande del carosello. Quello di prima torna nel mazzo come carta normale, e Filo te lo dice. Passando sul nome del commander in alto vedi la carta, e con un clic la sfogli.',
@@ -26,7 +33,6 @@
       ],
       fixes: [
         'Se apri un link d\'invito dentro Filo, il pulsante «Apri in Filo» adesso riscatta l\'invito e ti porta ai Crediti. Prima la scheda finiva su una pagina vuota e il codice si perdeva. Col tasto destro su un link d\'invito trovi «Riscatta l’invito», e se non hai ancora crediti basta incollare il codice o il link nella chat della home. Il benvenuto coi crediti e l\'avviso dei crediti in regalo compaiono in una scheda sola anche se ne hai aperte diverse, un saluto davanti al codice incollato («Cara Sara, ecco il codice…») non lo nasconde più, e un testo lunghissimo incollato per sbaglio nel campo non blocca Filo.',
-        'Nelle Opzioni, se clicchi sul campo del modello prima che arrivi l\'elenco dei modelli, il menu a tendina si apre da solo appena l\'elenco c\'è. Prima restava chiuso e bisognava cliccare di nuovo.',
         'Nei campi dove scegli un modello dal menu a tendina, un clic sul campo riapre il menu anche subito dopo una scelta. Prima bisognava scrivere qualcosa o uscire dal campo e rientrare.',
         'Nell\'editor il riquadro di un nuovo commento non si chiude più da solo mentre scrivi, anche se hai selezionato il testo prima che sparisse l\'invito a farlo.',
         'Le schede chiuse restano in Cronologia finché non le cancelli tu. Prima, passate le 5000, le più vecchie sparivano da sole, e dopo le 2000 la ricerca per contenuto non le trovava più. Adesso le trova tutte, anche le più vecchie, già alla prima ricerca.',
