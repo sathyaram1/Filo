@@ -1,11 +1,11 @@
 // Le decisioni sui cookie dei contenuti incorporati (#758), senza Electron: chi si declassa a cookie di sessione,
-// quando si cancella, quando un cookie dice che l'utente è entrato con un account.
+// quando si cancella, quando un cookie nuovo dice che l'utente è entrato con un account.
 // Il cablaggio sta in cookieIncorporati.js; le regole le tiene tests/unit/cookieIncorporati.test.mjs.
 
 'use strict';
 
 // Nomi che dicono un accesso. I token anti-falsificazione e i cookie di consenso o statistica nascono anche senza entrare.
-const NOME_ACCESSO = /sess|auth|jwt|login|logged|oauth|passport|remember|user|account|token|(^|[^a-z])uid([^a-z]|$)|sid([^a-z]|$)|^sid/i;
+const NOME_ACCESSO = /sess|auth|jwt|login|logged|oauth|passport|remember|user|account|token|(^|[^a-z])uid([^a-z]|$)|(^|[^a-z])sid([^a-z]|$)/i;
 const NON_ACCESSO = /csrf|xsrf|consent|gdpr|^_ga|^_gid|^_gat|^_gcl|analytics|^__cf|cf_clearance|^_fbp$|^_hj|^__utm/i;
 
 function nomeDiAccesso(nome) {
@@ -16,10 +16,10 @@ function nomeDiAccesso(nome) {
 // Il cookie arrivato dopo la pagina di accesso dice che l'utente è entrato: un nome da sessione con un valore nuovo,
 // o un cookie del server che prima non c'era. `prima`: nome → valore quando si è vista la pagina di accesso.
 function segnaleDiAccesso(cookie, prima) {
-  if (!cookie || !cookie.name || NON_ACCESSO.test(cookie.name)) return false;
+  if (!cookie || !cookie.name || NON_ACCESSO.test(String(cookie.name))) return false;
   const vecchio = prima instanceof Map ? prima.get(cookie.name) : undefined;
   if (vecchio !== undefined && vecchio === cookie.value) return false;
-  if (NOME_ACCESSO.test(cookie.name)) return true;
+  if (nomeDiAccesso(cookie.name)) return true;
   return !!cookie.httpOnly && vecchio === undefined;
 }
 
@@ -39,34 +39,4 @@ function esitoVoce(voce, { aperti, protetti, ora, margine }) {
   return { azione: ora - chiusoDa >= margine ? 'cancella' : 'aspetta', chiusoDa };
 }
 
-// Una riga Set-Cookie con scadenza diventa di sessione. Una che cancella (scadenza passata, Max-Age non positivo) resta
-// com'è: senza scadenza diventerebbe un cookie vivo.
-function declassaSetCookie(riga, ora) {
-  const testo = String(riga || '');
-  const parti = testo.split(';');
-  const nome = String(parti[0] || '').split('=')[0].trim();
-  let scade = false;
-  let cancella = false;
-  const resto = [];
-  for (const p of parti.slice(1)) {
-    const i = p.indexOf('=');
-    const chiave = (i < 0 ? p : p.slice(0, i)).trim().toLowerCase();
-    const valore = i < 0 ? '' : p.slice(i + 1).trim();
-    if (chiave === 'max-age') {
-      scade = true;
-      if (!(Number(valore) > 0)) cancella = true;
-      continue;
-    }
-    if (chiave === 'expires') {
-      scade = true;
-      const t = Date.parse(valore);
-      if (!Number.isFinite(t) || t <= ora) cancella = true;
-      continue;
-    }
-    resto.push(p);
-  }
-  if (!nome || !scade || cancella) return { riga: testo, nome, declassato: false };
-  return { riga: [parti[0], ...resto].join(';'), nome, declassato: true };
-}
-
-module.exports = { nomeDiAccesso, segnaleDiAccesso, daDeclassare, esitoVoce, declassaSetCookie };
+module.exports = { nomeDiAccesso, segnaleDiAccesso, daDeclassare, esitoVoce };
