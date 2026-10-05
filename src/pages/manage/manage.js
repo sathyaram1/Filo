@@ -4905,8 +4905,10 @@
     const prima = esitiRiapri.get(fb._id);
     const inVolo = riapriInVolo.has(fb._id);
     const azioni = liv.pannello.azioni || [];
+    // Dopo un conflitto, un ramo sparito o una versione già decisa richiederla non serve: resta solo la coda.
+    const soloCoda = !azioni.includes('riapri_fusione') || !!(prima && prima.inCoda);
 
-    if (azioni.includes('riapri_fusione')) {
+    if (!soloCoda) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'sn-btn';
@@ -4918,10 +4920,10 @@
       box.appendChild(btn);
     }
     const coda = MR.ownerActionFor(fb, 'accept', { releasedVersion });
-    if (coda && (azioni.includes('in_coda') || (prima && prima.inCoda))) {
+    if (coda && soloCoda) {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'sn-btn sn-btn-secondary';
+      b.className = 'sn-btn';
       b.id = 'mgFusioneInCodaBtn';
       b.textContent = coda.label;
       b.title = ACTION_TITLE.accept;

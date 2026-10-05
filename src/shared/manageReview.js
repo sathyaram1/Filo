@@ -1575,7 +1575,7 @@
         titolo,
         righe: [],
         testo: lette
-          ? 'I controlli del server l’hanno fermata, ma sul server non c’è nessuna richiesta da approvare: da sola resta ferma qui. Chiedi di nuovo la fusione: il server rifà i controlli e la richiesta compare qui.'
+          ? 'I controlli del server l’hanno fermata, ma sul server non c’è nessuna richiesta da approvare: da sola resta ferma qui.'
           : 'I controlli del server l’hanno fermata: entra in main solo col tuo via libera. La richiesta non è (ancora) arrivata a questa pagina.',
         azioni: lette ? ['riapri_fusione'] : [],
       }, senza);

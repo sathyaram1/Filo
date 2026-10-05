@@ -130,6 +130,8 @@ test('il ramo non si fonde più con main: lo dice e propone di rimetterla in cod
   const coda = page.locator('#mgFusioneInCodaBtn');
   await expect(coda).toBeVisible();
   await expect(coda).toHaveText('→ In coda');
+  // Richiederla non servirebbe: il ramo va riallineato.
+  await expect(page.locator('#mgRiapriFusioneBtn')).toHaveCount(0);
   await coda.click();
   await expect.poll(() => page.evaluate(() => window.__chiamate.filter((c) => c.type === 'feedback_update').map((c) => [c.id, c.status])))
     .toEqual([[FERMA._id, 'todo']]);
