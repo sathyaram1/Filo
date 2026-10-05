@@ -1,6 +1,6 @@
-// Verifica #755 giro 2: la finestra incognito non riceve le protezioni della modalità cookie.
-// Gli embed YouTube ripartono verso youtube.com (il doppio caricamento della segnalazione),
-// i tracker non sono bloccati e il segnale di non-tracciamento non parte: una causa sola, tre porte.
+// #755 — una finestra incognito riceve le stesse protezioni dei cookie di quella normale.
+// Senza: embed YouTube verso youtube.com coi cookie, tracker liberi, nessun segnale di non-tracciamento.
+// La regola in logica pura sta in tests/unit/cookieSessioniProtette.test.mjs.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { createServer } from 'node:http';
@@ -90,9 +90,9 @@ test('in incognito gli embed YouTube, il blocco tracker e il segnale di non-trac
 
     const reg = await leggi(app);
     const dopo = reg.esiti.filter(([u]) => u.includes('google-analytics')).slice(1);
-    expect.soft(reg.usciti.filter(embedYT), 'in incognito un embed YouTube esce ancora verso youtube.com: parte coi cookie e il video si ricarica').toEqual([]);
-    expect.soft(dopo.map(([, e]) => e), 'in incognito il tracker non viene bloccato').toEqual(['net::ERR_BLOCKED_BY_CLIENT']);
-    expect.soft(srv.visti.find((v) => v.url === '/incognito')?.gpc, 'in incognito la pagina non riceve il segnale di non-tracciamento').toBe('1');
+    expect(reg.usciti.filter(embedYT), 'in incognito un embed YouTube esce ancora verso youtube.com: parte coi cookie e il video si ricarica').toEqual([]);
+    expect(dopo.map(([, e]) => e), 'in incognito il tracker non viene bloccato').toEqual(['net::ERR_BLOCKED_BY_CLIENT']);
+    expect(srv.visti.find((v) => v.url === '/incognito')?.gpc, 'in incognito la pagina non riceve il segnale di non-tracciamento').toBe('1');
   } finally {
     await srv.close();
   }
