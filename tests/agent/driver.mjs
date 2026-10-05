@@ -19,7 +19,7 @@
 // (con y-SHELL_HEIGHT nelle coordinate della pagina view).
 
 import { _electron as electron } from 'playwright';
-import { mkdirSync, rmSync, statSync } from 'node:fs';
+import { mkdirSync, rmSync, statSync, writeFileSync, unlinkSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync, execSync } from 'node:child_process';
@@ -148,15 +148,29 @@ public class WinCap {
   return outPath;
 }
 
-// Cattura X11 su Linux: usa scrot per catturare il display virtuale (xvfb).
-// Il composito shell + WebContentsView è già nel framebuffer X → nessun workaround.
-// Prima porta la finestra in primo piano (altrimenti potrebbe essere dietro un
-// altro client X, anche se xvfb di solito ha solo Electron).
-async function captureCompositeLinux(app, outPath) {
-  const display = process.env.DISPLAY || ':0';
+// Dove la finestra sta su uno schermo, in pixel dello schermo; null se nessuno
+// schermo la mostra per intero (fuori schermo, trasparente, nascosta).
+async function finestraSulloSchermo(app) {
+  return app.evaluate(({ BrowserWindow, screen }) => {
+    const all = BrowserWindow.getAllWindows();
+    const win = all.find((w) => w._filoTabs) || all[0];
+    if (!win || !win.isVisible() || win.isMinimized() || win.getOpacity() === 0) return null;
+    const c = win.getContentBounds();
+    const d = screen.getAllDisplays().find(({ bounds: s }) =>
+      c.x >= s.x && c.y >= s.y && c.x + c.width <= s.x + s.width && c.y + c.height <= s.y + s.height);
+    if (!d) return null;
+    const k = d.scaleFactor || 1;
+    return { x: Math.round(c.x * k), y: Math.round(c.y * k), width: Math.round(c.width * k), height: Math.round(c.height * k) };
+  });
+}
 
-  // Porta la finestra in primo piano nel display X (importante: in xvfb non c'è
-  // un window manager, quindi moveTop + show garantisce che sia visibile nel fb).
+// Cattura X11: il framebuffer contiene già il composito, si ritaglia la finestra.
+// Senza scrot né xwd + convert si ripiega sulla composizione di Electron.
+async function captureCompositeLinux(app, outPath, dove) {
+  const display = process.env.DISPLAY || ':0';
+  const xEnv = { ...process.env, DISPLAY: display };
+
+  // In xvfb non c'è un gestore di finestre: senza moveTop un altro client X potrebbe coprirla.
   try {
     await app.evaluate(async ({ BrowserWindow }) => {
       const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs) || BrowserWindow.getAllWindows()[0];
@@ -168,14 +182,14 @@ async function captureCompositeLinux(app, outPath) {
     await sleep(300); // attendi che X dispatchi gli eventi di layout
   } catch (_) {}
 
-  // Prova prima scrot (disponibile su Ubuntu/Debian dal pacchetto `scrot`).
+  const { x, y, width, height } = dove;
   const scrot = resolveExecutable('scrot');
   if (scrot) {
     try {
-      execFileSync(scrot, ['-D', display, '--overwrite', outPath], {
+      execFileSync(scrot, ['-D', display, '-a', `${x},${y},${width},${height}`, '--overwrite', outPath], {
         stdio: 'pipe',
         encoding: 'utf8',
-        env: { ...process.env, DISPLAY: display },
+        env: xEnv,
       });
       return outPath;
     } catch (e) {
@@ -183,30 +197,119 @@ async function captureCompositeLinux(app, outPath) {
     }
   }
 
-  // Fallback: xwd → ImageMagick convert (presente su quasi tutte le distro Linux).
   const xwd = resolveExecutable('xwd');
   const convert = resolveExecutable('convert');
   if (xwd && convert) {
+    const tmpXwd = outPath + '.xwd';
     try {
       const xwdData = execFileSync(xwd, ['-display', display, '-root', '-silent'], {
         stdio: ['ignore', 'pipe', 'pipe'],
-        env: { ...process.env, DISPLAY: display },
+        env: xEnv,
       });
-      // xwd emette un formato XWD (X Window Dump), ImageMagick lo converte in PNG.
-      const tmpXwd = outPath + '.xwd';
-      require('node:fs').writeFileSync(tmpXwd, xwdData);
-      execFileSync(convert, [tmpXwd, outPath], { stdio: 'pipe' });
-      try { require('node:fs').unlinkSync(tmpXwd); } catch (_) {}
+      writeFileSync(tmpXwd, xwdData);
+      execFileSync(convert, [tmpXwd, '-crop', `${width}x${height}+${x}+${y}`, '+repage', outPath], { stdio: 'pipe' });
       return outPath;
     } catch (e) {
       throw new Error('captureCompositeLinux xwd/convert fallita: ' + (e.stderr || e.message));
+    } finally {
+      try { unlinkSync(tmpXwd); } catch (_) {}
     }
   }
 
-  throw new Error(
-    'captureCompositeLinux: nessun tool di cattura disponibile. ' +
-    'Installa `scrot` (apt-get install -y scrot) oppure `xwd` + ImageMagick `convert`.'
-  );
+  return captureCompositeElectron(app, outPath);
+}
+
+// Composizione fatta da Electron, senza schermo: ogni superficie (la shell, le
+// viste nell'ordine in cui stanno, poi le finestre figlie come menu e fumetti)
+// fotografata con capturePage e sovrapposta col suo alfa. Non vede quello che
+// disegna il sistema (dialoghi nativi, cornici): per quello serve uno schermo.
+export async function captureCompositeElectron(app, outPath) {
+  const esito = await app.evaluate(async ({ BrowserWindow, nativeImage }) => {
+    const all = BrowserWindow.getAllWindows();
+    const win = all.find((w) => w._filoTabs) || all[0];
+    if (!win) throw new Error('captureCompositeElectron: nessuna finestra di Filo aperta');
+    const cb = win.getContentBounds();
+    const conTetto = (p, ms, riserva) => Promise.race([p, new Promise((r) => setTimeout(() => r(riserva), ms))]);
+
+    const strati = [];
+    const visti = new Set();
+    const interseca = (a, b) => {
+      const x = Math.max(a.x, b.x), y = Math.max(a.y, b.y);
+      const r = Math.min(a.x + a.w, b.x + b.w), g = Math.min(a.y + a.h, b.y + b.h);
+      return { x, y, w: Math.max(0, r - x), h: Math.max(0, g - y) };
+    };
+    const aggiungi = (wc, rect, clip) => {
+      if (!wc || wc.isDestroyed() || visti.has(wc.id)) return;
+      visti.add(wc.id);
+      strati.push({ wc, rect, clip });
+    };
+    // Una vista figlia si vede solo dentro la madre: il ritaglio scende con la discesa.
+    const discendi = (view, ox, oy, clip) => {
+      for (const c of view.children || []) {
+        const b = c.getBounds();
+        const rect = { x: ox + b.x, y: oy + b.y, w: b.width, h: b.height };
+        const dentro = interseca(rect, clip);
+        if (!dentro.w || !dentro.h) continue;
+        if (c.webContents) aggiungi(c.webContents, rect, dentro);
+        discendi(c, rect.x, rect.y, dentro);
+      }
+    };
+    const tutta = { x: 0, y: 0, w: cb.width, h: cb.height };
+    aggiungi(win.webContents, tutta, tutta);
+    discendi(win.contentView, 0, 0, tutta);
+    for (const f of win.getChildWindows()) {
+      if (f.isDestroyed() || !f.isVisible()) continue;
+      const fb = f.getContentBounds();
+      const rect = { x: fb.x - cb.x, y: fb.y - cb.y, w: fb.width, h: fb.height };
+      const dentro = interseca(rect, tutta);
+      if (!dentro.w || !dentro.h) continue;
+      aggiungi(f.webContents, rect, dentro);
+      discendi(f.contentView, rect.x, rect.y, dentro);
+    }
+
+    // Una vista nascosta con setVisible(false) conserva i suoi bounds: lo sa solo la pagina.
+    const saltate = [];
+    const immagini = [];
+    for (const s of strati) {
+      const stato = await conTetto(s.wc.executeJavaScript('document.visibilityState').catch(() => 'visible'), 1000, 'visible');
+      if (stato === 'hidden') continue;
+      const img = await conTetto(s.wc.capturePage().catch(() => null), 5000, null);
+      if (!img || img.isEmpty()) { saltate.push(s.wc.getURL()); continue; }
+      const k = Math.max(...(img.getScaleFactors?.() || [1]));
+      immagini.push({ ...s, k, size: img.getSize(k), bmp: img.toBitmap({ scaleFactor: k }) });
+    }
+    if (!immagini.length || immagini[0].wc !== win.webContents) {
+      throw new Error('captureCompositeElectron: la shell non si lascia fotografare');
+    }
+
+    const K = immagini[0].size.width / cb.width;
+    const W = Math.round(cb.width * K), H = Math.round(cb.height * K);
+    const tela = Buffer.alloc(W * H * 4);
+    for (const { rect, clip, size, bmp } of immagini) {
+      const px = Math.round(rect.x * K), py = Math.round(rect.y * K);
+      const x0 = Math.max(0, Math.round(clip.x * K)), y0 = Math.max(0, Math.round(clip.y * K));
+      const x1 = Math.min(W, Math.round((clip.x + clip.w) * K), px + size.width);
+      const y1 = Math.min(H, Math.round((clip.y + clip.h) * K), py + size.height);
+      for (let y = y0; y < y1; y++) {
+        let d = (y * W + x0) * 4;
+        let s = ((y - py) * size.width + (x0 - px)) * 4;
+        for (let x = x0; x < x1; x++, d += 4, s += 4) {
+          const a = bmp[s + 3];
+          if (a === 255) { tela[d] = bmp[s]; tela[d + 1] = bmp[s + 1]; tela[d + 2] = bmp[s + 2]; tela[d + 3] = 255; }
+          else if (a !== 0) {
+            // Pixel premoltiplicati (Skia): sopra = sorgente + sotto × (1 − alfa).
+            const resto = (255 - a) / 255;
+            for (let i = 0; i < 4; i++) tela[d + i] = Math.min(255, bmp[s + i] + Math.round(tela[d + i] * resto));
+          }
+        }
+      }
+    }
+    const png = nativeImage.createFromBitmap(tela, { width: W, height: H, scaleFactor: 1 }).toPNG();
+    return { png: png.toString('base64'), saltate };
+  });
+  writeFileSync(outPath, Buffer.from(esito.png, 'base64'));
+  if (esito.saltate.length) console.warn(`[captureComposite] superfici che non si sono lasciate fotografare: ${esito.saltate.join(', ')}`);
+  return outPath;
 }
 
 // Risolve il percorso di un eseguibile, restituisce null se non trovato.
