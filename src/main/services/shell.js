@@ -51,9 +51,9 @@ function defaultCwd() {
 // in avanti: la riga di «pronto» parte nello stesso pezzo del preludio, quindi
 // andrebbe persa e la sessione resterebbe muta per sempre.
 //
-// La cura è non far viaggiare caratteri non ASCII sul filo. Il comando parte in
-// base64 e lo rimette insieme PowerShell, che ricostruisce il testo da sé senza
-// passare da nessuna tabella. Si fa SOLO quando serve: un comando di soli
+// La cura è non far viaggiare caratteri non ASCII sul filo. Il comando parte con
+// i caratteri speciali scritti come numeri e lo rimette insieme PowerShell, che
+// ricostruisce il testo da sé senza passare da nessuna tabella. Si fa SOLO quando serve: un comando di soli
 // caratteri ASCII parte identico a prima, e `exit`, `cd`, le variabili e tutto
 // quello che un utente digita di solito si comportano come si sono sempre
 // comportati. Il testo ricomposto gira nello scope di chi chiama, quindi anche
