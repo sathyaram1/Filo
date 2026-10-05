@@ -88,6 +88,9 @@ describe('il titolo', () => {
     assert.match(UI.introText(1, 1), /Aspettano il tuo sì/);
     assert.doesNotMatch(UI.introText(0, 1), /Aspettano il tuo sì|via libera/);
     assert.equal(UI.introText(0, 0), '');
+    // Decisa: la frase resta (sparendo spostava i tasti) e non chiede più il sì.
+    assert.match(UI.introText(0, 0, 1), /Hai già deciso/);
+    assert.doesNotMatch(UI.introText(0, 0, 1), /Aspettano il tuo sì|via libera|sta fondendo/);
   });
 });
 

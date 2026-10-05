@@ -108,9 +108,12 @@
   /** La frase sotto il titolo, con lo stesso conto: «aspettano il tuo sì» solo se qualcuna aspetta. PURA. */
   var INTRO_FERME = 'I controlli di sicurezza del server le hanno fermate perché toccano parti protette. Aspettano il tuo sì.';
   var INTRO_IN_CORSO = 'I controlli di sicurezza del server l’hanno fermata perché tocca parti protette. È approvata: il server la sta fondendo.';
-  function introText(count, inCorso) {
+  // Anche a fusione decisa la frase resta: sparendo, tirava su i tasti sotto il cursore (#550).
+  var INTRO_DECISA = 'I controlli di sicurezza del server l’hanno fermata perché tocca parti protette. Hai già deciso: esce da qui alla prossima rilettura.';
+  function introText(count, inCorso, decise) {
     if (Math.floor(Number(count) || 0) > 0) return INTRO_FERME;
     if (Math.floor(Number(inCorso) || 0) > 0) return INTRO_IN_CORSO;
+    if (Math.floor(Number(decise) || 0) > 0) return INTRO_DECISA;
     return '';
   }
 
@@ -455,7 +458,7 @@
     if (testo) t.textContent = testo;
     var intro = box.querySelector('.sn-mac-intro');
     if (intro) {
-      intro.textContent = introText(ferme, inCorso);
+      intro.textContent = introText(ferme, inCorso, decise);
       intro.hidden = !intro.textContent;
     }
   }
