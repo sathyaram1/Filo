@@ -189,6 +189,27 @@ const ESITO_POWERSHELL = 'if ($__filo_ok) { 0 } elseif ($LASTEXITCODE) { $LASTEX
 // Da mettere prima del comando: l'errore più recente che c'era già, perché uno vecchio non decida l'esito.
 const ERRORE_DI_PRIMA_POWERSHELL = '$__filo_e=if ($Error.Count) { $Error[0] } else { $null }';
 
+// PSReadLine su una pipe non può leggere e lascia un errore in $Error a ogni riga, che falserebbe l'esito.
+const PREPARA_STDIN_POWERSHELL = 'Remove-Module PSReadLine -ErrorAction Ignore\n';
+
+// Il testo viaggia in base64 e lo ricompone PowerShell: sul filo solo ASCII (lo stdin lo decodifica nella
+// tabella OEM, #551) e su una riga sola. Invoke-Expression gira nello scope di chi chiama.
+function invocaCodificato(testo) {
+  const b64 = Buffer.from(String(testo), 'utf8').toString('base64');
+  return `Invoke-Expression ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${b64}')))`;
+}
+
+// Le righe che una PowerShell letta da stdin esegue per un comando, chiuse da `<segno>:<esito>:<cartella>`.
+// Le usano il terminale della dashboard e i comandi dell'assistente. Niente try attorno al comando (#722):
+// dentro un try, anche nelle funzioni che chiama, un errore come un comando sconosciuto ferma tutto il
+// resto, mentre in una shell ferma solo la sua istruzione. La riga del segno è una pipeline a parte e gira
+// anche dopo un throw; dopo un `exit` no, e l'esito lo dà il processo.
+function righePowerShell(command, segno, codifica = invocaCodificato) {
+  return `$global:LASTEXITCODE=0\n$__filo_ok=$false\n${ERRORE_DI_PRIMA_POWERSHELL}\n`
+    + `${codifica(`${command}\n$__filo_ok=$?`)}\n`
+    + `"${segno}:$(${ESITO_POWERSHELL}):$((Get-Location).Path)"\n`;
+}
+
 // Appende al comando una "sonda" che stampa <marcatore>:<exitcode>:<cwd>. La
 // sonda gira SEMPRE (anche se il comando fallisce) e cattura l'exit code reale
 // del comando, non quello della sonda. Specifica per shell.
@@ -199,11 +220,9 @@ function withCwdProbe(shell, command, mark = nuovoMarcatore()) {
     return `${command}\r\necho ${mark}:%errorlevel%:%cd%`;
   }
   if (sh === 'powershell') {
-    // Il comando su righe sue: un commento in coda si mangiava la chiusura del try. Se non arriva in fondo
-    // (exit, errore che ferma tutto) l'esito resta vuoto e lo dà il codice del processo, l'unico che lo sa.
-    return `$global:LASTEXITCODE=0\n$__filo_c=''\n${ERRORE_DI_PRIMA_POWERSHELL}\n`
-      + `try {\n${command}\n$__filo_ok=$?\n$__filo_c=${ESITO_POWERSHELL}\n}`
-      + ` finally { Write-Output "${mark}:$($__filo_c):$((Get-Location).Path)" }`;
+    // Si legge da stdin (vedi invocazione). Il comando codificato è UNA pipeline: un throw o un
+    // -ErrorAction Stop fermano il resto del comando come in uno script, non solo la riga in cui stanno.
+    return righePowerShell(command, mark);
   }
   // bash / sh (incluse le routine cloud Linux): cattura $? subito dopo il
   // comando, poi stampa il marcatore (sempre eseguito, su riga propria).
