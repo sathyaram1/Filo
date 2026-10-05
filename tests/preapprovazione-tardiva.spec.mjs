@@ -609,3 +609,52 @@ test('«Approva e fondi» in corso, poi il segno col tasto: tornato l’esito, l
   await expect(page.locator('#mgManageMsg')).not.toContainText('ci sta lavorando');
   expect(await approvazioni(page)).toEqual([req.id]);
 });
+
+// ── Il segno cambiato mentre un'altra pratica fonde (#701) ─────────────────
+// Il giro sulle pratiche aspetta la fusione di una prima di passare alla
+// seconda: quando ci arriva, conta il segno che la seconda ha ADESSO.
+
+async function daFuoriMolti(page, docs) {
+  await page.evaluate((list) => window.__mgTest.setLiveSources({
+    listVersions: async () => list.map((d) => ({ _id: d._id, _updateTime: d._updateTime })),
+    getMany: async () => list,
+  }), docs);
+  return page.evaluate(() => window.__mgTest.pollNow());
+}
+
+const SEGNO_A = { by: 'owner (script)', at: '2026-09-20T09:00:00.000Z' };
+const praticaA = (over) => pratica(Object.assign({ _id: 'fb-a', seq: 801, _updateTime: 'a1', mergePreapproved: SEGNO_A }, over));
+const praticaB = (over) => pratica(Object.assign({ _id: 'fb-b', seq: 802, _updateTime: 'b1', mergePreapproved: SEGNO_A }, over));
+const richiestaA = () => richiesta({ id: 'aaaaaaaaaaaaaaaaaaaaaaaa', feedbackId: 'fb-a', num: '#801', branch: 'worker/fb-a' });
+const richiestaB = () => richiesta({ id: 'bbbbbbbbbbbbbbbbbbbbbbbb', feedbackId: 'fb-b', num: '#802', branch: 'worker/fb-b' });
+
+test('segno rimesso su B mentre A fonde: un gesto, un solo nuovo tentativo su B', async ({ openTab }) => {
+  test.setTimeout(90000);
+  const page = await openTab(MANAGE);
+  const ra = richiestaA();
+  const rb = richiestaB();
+  await apri(page, [praticaA(), praticaB()], { pending: [ra, rb], tieniInAttesa: true, ritardoMs: 2500, approveReply: NON_RAGGIUNTO });
+  await expect.poll(() => approvazioni(page), { timeout: 15000 }).toEqual([ra.id, rb.id]);
+  await page.waitForTimeout(3500);
+  const a2 = praticaA({ _updateTime: 'a2', mergePreapproved: { by: 'owner (script)', at: '2026-09-20T10:00:00.000Z' } });
+  await daFuoriMolti(page, [a2, praticaB()]);
+  await expect.poll(() => approvazioni(page), { timeout: 8000 }).toEqual([ra.id, rb.id, ra.id]);
+  await daFuoriMolti(page, [a2, praticaB({ _updateTime: 'b2', mergePreapproved: { by: 'owner (script)', at: '2026-09-20T10:00:01.000Z' } })]);
+  await expect.poll(() => approvazioni(page), { timeout: 15000 }).toEqual([ra.id, rb.id, ra.id, rb.id]);
+  await page.waitForTimeout(9000);
+  expect(await approvazioni(page)).toEqual([ra.id, rb.id, ra.id, rb.id]);
+});
+
+test('segno tolto su B mentre A fonde: B non parte', async ({ openTab }) => {
+  test.setTimeout(60000);
+  const page = await openTab(MANAGE);
+  const ra = richiestaA();
+  const rb = richiestaB();
+  await apri(page, [praticaA(), praticaB()], { pending: [ra, rb], tieniInAttesa: true, ritardoMs: 2500, approveReply: NON_RAGGIUNTO });
+  await expect.poll(() => approvazioni(page), { timeout: 8000 }).toEqual([ra.id]);
+  const senza = praticaB({ _updateTime: 'b2' });
+  delete senza.mergePreapproved;
+  await daFuoriMolti(page, [praticaA(), senza]);
+  await page.waitForTimeout(6000);
+  expect(await approvazioni(page)).toEqual([ra.id]);
+});

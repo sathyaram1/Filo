@@ -1420,6 +1420,10 @@
   async function fondiCoperte(fb, opts) {
     const UI = window.SN_MERGE_APPROVALS;
     if (!UI || !fb || !isAdmin) return [];
+    // Decide la pratica com'è ADESSO: chi chiama può tenere una copia presa prima di
+    // un'attesa, e un segno tolto o rimesso intanto vale per quello che è (#701).
+    fb = allFeedbacks.find((f) => f._id === fb._id) || fb;
+    if (!segnoCheFonde(fb)) return [];
     dimenticaTentativiSuperati();
     const coperte = UI.richiesteCoperte(fusioni.pending, {
       feedbackId: fb._id,
