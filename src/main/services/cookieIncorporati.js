@@ -193,7 +193,7 @@ async function cookieCambiato(ses, c, removed) {
     v = voce(sito);
     for (const o of ospiti) v.ospiti.add(o);
   }
-  if (!R.daDeclassare({ modo, sito, ospite: [...v.ospiti][0], aperti: aperti(), protetti: prot })) return;
+  if (!R.daDeclassare({ modo, sito, ospiti: v.ospiti, aperti: aperti(), protetti: prot })) return;
   try { await declassa(ses, c); } catch (_) { return; }
   v.nomi.add(c.name);
   while (v.nomi.size > MAX_NOMI) v.nomi.delete(v.nomi.keys().next().value);
