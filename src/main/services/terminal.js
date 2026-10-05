@@ -71,6 +71,21 @@ function shellInvocation(shell, command) {
   }
 }
 
+// Come parte il comando. Con la cartella tracciata PowerShell legge da stdin, come il terminale della
+// dashboard: con `-Command <testo>` lo script è uno solo e la sonda dovrebbe stare in un try (vedi
+// righePowerShell). Tutto il resto viaggia in argv, come sempre.
+function invocazione(shell, command, { trackCwd = false, mark = '' } = {}) {
+  if (trackCwd && resolveShell(shell) === 'powershell') {
+    return {
+      file: 'powershell.exe',
+      args: ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', '-'],
+      stdin: PREPARA_STDIN_POWERSHELL + PRELUDI_CODIFICA.powershell + withCwdProbe(shell, command, mark),
+    };
+  }
+  const testo = encodingPrelude(shell) + (trackCwd ? withCwdProbe(shell, command, mark) : command);
+  return { ...shellInvocation(shell, testo), stdin: null };
+}
+
 function truncate(text) {
   const s = String(text || '');
   if (s.length <= MAX_OUTPUT_CHARS) return { text: s, truncated: false };
@@ -265,8 +280,7 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, 
     // preludio che mette la shell in UTF-8 (#551), altrimenti i nomi con
     // accenti e trattini lunghi tornano storpiati.
     const mark = trackCwd ? nuovoMarcatore() : '';
-    const toRun = encodingPrelude(usedShell) + (trackCwd ? withCwdProbe(usedShell, cmd, mark) : cmd);
-    const { file, args } = shellInvocation(usedShell, toRun);
+    const { file, args, stdin } = invocazione(usedShell, cmd, { trackCwd, mark });
     // La cartella può non esistere più: rinominata, cancellata, su una
     // chiavetta staccata (#551, quarto giro). Lì dentro non fallisce il
     // comando, fallisce la shell prima di leggerlo, e la cartella appuntata
@@ -299,6 +313,11 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, 
     } catch (e) {
       resolve({ command: cmd, stdout: '', stderr: `Impossibile avviare la shell: ${e && e.message ? e.message : e}`, code: 127, signal: null, truncated: false, timedOut: false, durationMs: Date.now() - startedAt });
       return;
+    }
+    if (stdin != null && child.stdin) {
+      // Se la shell muore prima di leggere, la scrittura fallisce: l'esito lo racconta già 'close'.
+      child.stdin.on('error', () => {});
+      child.stdin.end(stdin);
     }
 
     const timer = setTimeout(() => {
@@ -386,7 +405,9 @@ module.exports = {
   runCommand, shellInvocation, resolveShell, defaultShell, MAX_OUTPUT_CHARS, DEFAULT_TIMEOUT_MS,
   // esportati per gli unit test (il preludio UTF-8 e la sonda sono la parte
   // che si può verificare senza avviare una shell su ogni piattaforma).
-  encodingPrelude, withCwdProbe, PRELUDI_CODIFICA, ESITO_POWERSHELL, ERRORE_DI_PRIMA_POWERSHELL,
+  encodingPrelude, withCwdProbe, invocazione, PRELUDI_CODIFICA,
+  // le righe PowerShell da stdin: le usa anche il terminale della dashboard (shell.js), così non divergono.
+  righePowerShell, invocaCodificato, PREPARA_STDIN_POWERSHELL,
   // il marcatore della sonda: il prefisso è fisso, il resto è a caso a ogni
   // comando, ed è quello che impedisce all'uscita di scriverselo (#551, ottavo
   // giro di verifica).
