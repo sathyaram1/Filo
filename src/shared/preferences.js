@@ -205,7 +205,7 @@
         const label = o.op === 'aggiungi' ? `${nome} → aggiungi ${lista}`
           : o.op === 'togli' ? `${nome} → togli ${lista}`
             : (o.voci.length ? `${nome} → solo ${lista}` : `${nome} → svuota l'elenco`);
-        return { partial: nidifica(percorso, o.voci), label, elenco: { percorso, op: o.op, voci: o.voci, nome, riduci } };
+        return { partial: nidifica(percorso, o.voci), label, elenco: { percorso, op: o.op, voci: o.voci, nome, ...(riduci ? { riduci } : {}) } };
       },
     };
   }

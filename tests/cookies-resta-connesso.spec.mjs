@@ -466,3 +466,69 @@ test('in chat «resta connesso su» aggiunge il sito con la conferma, e «togli 
     await sito.chiudi();
   }
 });
+
+// ── un servizio su un sottodominio, un accesso in un riquadro ──────────────
+
+test('«resta connesso su» un sottodominio vale per il sito intero, da chat, da Sicurezza e per una voce già salvata', async ({ app, shell, openTab }) => {
+  test.setTimeout(120_000);
+  const sito = await sitoConAccesso();
+  const base = `http://sito-pubblico.test:${sito.port}`;
+  const nome = 'sito-pubblico.test';
+  try {
+    await privacy(app, 800);
+    await accedi(await apri(app, shell, `${base}/login`));
+    await dentro(app, `${base}/home`);
+    const home = await openTab('filo://newtab/');
+
+    // Chat: come web.whatsapp.com per whatsapp.com.
+    const aggiungi = { type: 'IMPOSTA_PREFERENZA', chiave: 'resta connesso su', valore: `aggiungi app.${nome}` };
+    await execAction(app, aggiungi);
+    expect((await home.evaluate((a) => chrome.runtime.sendMessage({ type: 'filo_confirm_action', action: a }), aggiungi)).executed).toBe(true);
+    await expect.poll(() => fidati(app)).toEqual([nome]);
+    await expect.poll(() => partizioneDi(app, `${base}/`)).toBe(`persist:filo-priv-${nome}`);
+    await chiudiScheda(app, shell, base);
+    await apri(app, shell, `${base}/home`);
+    await dentro(app, `${base}/home`);
+
+    const togli = { type: 'IMPOSTA_PREFERENZA', chiave: 'siti connessi', valore: `togli www.app.${nome}` };
+    await execAction(app, togli);
+    expect((await home.evaluate((a) => chrome.runtime.sendMessage({ type: 'filo_confirm_action', action: a }), togli)).executed).toBe(true);
+    await expect.poll(() => fidati(app)).toEqual([]);
+
+    // La lista in Sicurezza manda l'indirizzo com'è scritto.
+    await home.evaluate((n) => chrome.runtime.sendMessage({ type: 'update_settings', settings: { security: { cookies: { trustedSites: [`web.${n}`] } } } }), nome);
+    await expect.poll(() => fidati(app)).toEqual([nome]);
+
+    // Una voce salvata prima della correzione vale lo stesso, e il menu della scheda la vede.
+    await app.evaluate(async (_e, n) => {
+      await globalThis.SN_STORAGE.updateSettings({ security: { cookies: { trustedSites: [] } } });
+      await globalThis.__filoHandlers.applySettingsUpdate({});
+      await globalThis.SN_STORAGE.updateSettings({ security: { cookies: { trustedSites: [`mail.${n}`] } } });
+      await globalThis.__filoHandlers.applySettingsUpdate({});
+    }, nome);
+    await expect.poll(async () => {
+      const snap = await shell.evaluate(() => window.filoShell.tabs.snapshot());
+      const t = snap.tabs.find((x) => String(x.url).startsWith(base));
+      return t && t.connesso;
+    }).toEqual({ sito: nome, fidato: true });
+  } finally {
+    await sito.chiudi();
+  }
+});
+
+test('un accesso fatto in un riquadro della pagina fa partire la proposta', async ({ app, shell, avvisi }) => {
+  test.setTimeout(90_000);
+  const sito = await sitoConAccesso();
+  try {
+    await privacy(app);
+    const page = await apri(app, shell, `${sito.a}/cornice`);
+    const riquadro = page.frameLocator('#f');
+    await riquadro.locator('#pw').fill('giusta');
+    await riquadro.locator('#entra').click();
+    await expect(riquadro.locator('#dentro')).toBeVisible({ timeout: 15_000 });
+    await accetta(await proposta(await avvisi(), '127.0.0.1'));
+    await expect.poll(() => fidati(app)).toEqual(['127.0.0.1']);
+  } finally {
+    await sito.chiudi();
+  }
+});
