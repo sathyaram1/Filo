@@ -76,3 +76,18 @@ test('i nomi dei cookie di accesso dei siti veri sono riconosciuti, i tecnici no
     assert.equal(R.nomeDiAccesso(n), false, n);
   }
 });
+
+test('solo l\'invio di un accesso apre la finestra in cui un cookie nuovo vale come accesso, non la pagina vista', () => {
+  assert.equal(R.richiestaDiAccesso({ method: 'POST', url: 'https://x.it/login' }), true);
+  assert.equal(R.richiestaDiAccesso({ method: 'put', url: 'https://x.it/api/session' }), true);
+  // il ritorno da «Continua con…» e il link d'accesso via email.
+  assert.equal(R.richiestaDiAccesso({ method: 'GET', url: 'https://x.it/cb?code=1&state=2' }), true);
+  assert.equal(R.richiestaDiAccesso({ method: 'GET', url: 'https://x.it/auth/verify?token=abc' }), true);
+  // la pagina d'accesso aperta, o una richiesta della pagina, senza invio: nessun accesso.
+  assert.equal(R.richiestaDiAccesso({ method: 'GET', url: 'https://x.it/login' }), false);
+  assert.equal(R.richiestaDiAccesso({ method: 'GET', url: 'https://x.it/visita' }), false);
+  assert.equal(R.richiestaDiAccesso({ method: 'OPTIONS', url: 'https://x.it/login' }), false);
+  assert.equal(R.richiestaDiAccesso({ method: 'GET', url: 'https://x.it/?code=1' }), false);
+  assert.equal(R.richiestaDiAccesso({}), false);
+});
+

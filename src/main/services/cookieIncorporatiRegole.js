@@ -24,6 +24,18 @@ function segnaleDiAccesso(cookie, prima, { forte = false } = {}) {
   return forte && !!cookie.httpOnly && vecchio === undefined;
 }
 
+// La richiesta che porta un accesso: l'invio di un modulo o di credenziali (tutto ciò che non è una semplice lettura)
+// o il ritorno da un accesso fatto altrove (OAuth, link via email). Una pagina vista e basta non lo è (#758 r2).
+const PARAM_RITORNO = ['oauth_verifier', 'ticket', 'token', 'magic', 'otp', 'login_token'];
+function richiestaDiAccesso({ method, url } = {}) {
+  const m = String(method || 'GET').toUpperCase();
+  if (m !== 'GET' && m !== 'HEAD' && m !== 'OPTIONS') return true;
+  let q;
+  try { q = new URL(String(url || '')).searchParams; } catch (_) { return false; }
+  if (q.has('code') && q.has('state')) return true;
+  return PARAM_RITORNO.some((k) => q.has(k));
+}
+
 // `protetti`: siti con accesso e siti «resta connesso». Il sito principale di una scheda aperta non si tocca mai.
 function daDeclassare({ modo, sito, ospiti, aperti, protetti }) {
   if (modo !== 'default' || !sito || !ospiti || !ospiti.size || ospiti.has(sito)) return false;
@@ -40,4 +52,4 @@ function esitoVoce(voce, { aperti, protetti, ora, margine }) {
   return { azione: ora - chiusoDa >= margine ? 'cancella' : 'aspetta', chiusoDa };
 }
 
-module.exports = { nomeDiAccesso, segnaleDiAccesso, daDeclassare, esitoVoce };
+module.exports = { nomeDiAccesso, segnaleDiAccesso, richiestaDiAccesso, daDeclassare, esitoVoce };

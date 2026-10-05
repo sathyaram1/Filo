@@ -14,6 +14,26 @@ const MARGINE_TEST = 1200;
 async function serve() {
   const server = createServer((req, res) => {
     const porta = server.address().port;
+    if (req.url.startsWith('/riquadro-rinfresca')) {
+      // Il riquadro di un sito dove l'utente era già entrato rinfresca il suo cookie d'accesso.
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Set-Cookie': ['sessionid=abc; Max-Age=86400; Path=/; SameSite=None; Secure'],
+      });
+      res.end('<p>riquadro</p>');
+      return;
+    }
+    if (req.url.startsWith('/visita')) {
+      // Cookie da visitatore che il sito mette dopo il caricamento della pagina, senza nessun accesso.
+      res.writeHead(200, { 'Content-Type': 'text/plain', 'Set-Cookie': ['_session_id=v1; Max-Age=86400; Path=/; HttpOnly'] });
+      res.end('ok');
+      return;
+    }
+    if (req.url.startsWith('/home-con-login')) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end('<title>HOME</title><form><input type="password" id="pw"></form><script>setTimeout(() => fetch("/visita"), 1500)</script>');
+      return;
+    }
     if (req.url.startsWith('/riquadro')) {
       res.writeHead(200, {
         'Content-Type': 'text/html; charset=utf-8',
@@ -32,8 +52,9 @@ async function serve() {
       res.end('<title>ACCESSO</title><form><input type="password" id="pw" /><button type="button">Entra</button></form>');
       return;
     }
+    const riquadro = req.url.startsWith('/art-rinfresca') ? 'riquadro-rinfresca' : 'riquadro';
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    res.end(`<title>ARTICOLO</title><p>articolo</p><iframe id="ri" width="200" height="120" src="http://b.localhost:${porta}/riquadro"></iframe>`);
+    res.end(`<title>ARTICOLO</title><p>articolo</p><iframe id="ri" width="200" height="120" src="http://b.localhost:${porta}/${riquadro}"></iframe>`);
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const porta = server.address().port;
@@ -41,6 +62,8 @@ async function serve() {
     porta,
     articolo: `http://a.localhost:${porta}/`,
     login: `http://b.localhost:${porta}/login`,
+    articoloRinfresca: `http://a.localhost:${porta}/art-rinfresca`,
+    homeB: `http://b.localhost:${porta}/home-con-login`,
     async chiudi() {
       try { server.closeAllConnections?.(); } catch (_) {}
       await new Promise((r) => server.close(r));
@@ -116,7 +139,7 @@ test('dopo un accesso al sito, il suo riquadro in un\'altra pagina tiene i cooki
     // Accesso vero: pagina con il campo password, e il cookie di sessione che arriva quando si entra.
     const login = await openTab(srv.login);
     await login.waitForSelector('#pw', { timeout: 8_000 });
-    await login.evaluate(() => fetch('/accedi', { credentials: 'same-origin' }));
+    await login.evaluate(() => fetch('/accedi', { method: 'POST', credentials: 'same-origin' }));
 
     // Il sito compare fra quelli dove sei entrato, in Sicurezza, e da lì si può togliere.
     const sec = await openTab('filo://security/');
@@ -152,6 +175,40 @@ test('in Manuale i cookie del riquadro restano come li ha messi il sito (controp
     await chiudiSchede(app, 'a.localhost');
     await pulisci(app);
     expect((await cookieDiB(app)).map((c) => c.name)).toContain('mid');
+  } finally {
+    await srv.chiudi();
+  }
+});
+
+test('chi era già entrato prima (cookie d\'accesso già sul disco): il riquadro che lo rinfresca non lo fa uscire', async ({ app, openTab }) => {
+  const srv = await serve();
+  try {
+    // Un accesso che Filo non ha visto nascere: il cookie persistente c'è, il sito non è nell'elenco.
+    await app.evaluate(async ({ session }) => {
+      await session.defaultSession.cookies.set({ url: 'http://b.localhost/', name: 'sessionid', value: 'abc', path: '/', expirationDate: Date.now() / 1000 + 86400 * 30 });
+    });
+    await openTab(srv.articoloRinfresca);
+    await expect.poll(() => app.evaluate(async ({ session }) => (await session.defaultSession.cookies.get({ domain: 'b.localhost', name: 'sessionid' }))
+      .map((c) => c.value + (c.secure ? ':s' : ''))), { timeout: 10_000 }).toEqual(['abc:s']);
+    await new Promise((r) => setTimeout(r, 800));
+    expect((await cookieDiB(app)).find((c) => c.name === 'sessionid')).toEqual({ name: 'sessionid', session: false });
+    await chiudiSchede(app, 'a.localhost');
+    await pulisci(app);
+    expect((await cookieDiB(app)).map((c) => c.name)).toContain('sessionid');
+  } finally {
+    await srv.chiudi();
+  }
+});
+
+test('la home col modulo d\'accesso vista senza entrare non segna il sito fra quelli con accesso', async ({ app, openTab }) => {
+  const srv = await serve();
+  try {
+    const p = await openTab(srv.homeB);
+    await p.waitForSelector('#pw');
+    await expect.poll(() => cookieDiB(app).then((l) => l.map((c) => c.name)), { timeout: 10_000 }).toContain('_session_id');
+    await new Promise((r) => setTimeout(r, 1000));
+    const logged = await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).security.cookies.loggedSites);
+    expect(logged).not.toContain('b.localhost');
   } finally {
     await srv.chiudi();
   }

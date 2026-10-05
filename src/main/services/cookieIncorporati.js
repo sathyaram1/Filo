@@ -13,6 +13,9 @@ require('../../shared/authPopup');
 const MARGINE_MS = 3 * 60 * 1000;
 // Da quando si vede la pagina di accesso a quando il cookie di sessione deve arrivare: un accesso lento ci sta dentro.
 const ATTESA_ACCESSO_MS = 10 * 60 * 1000;
+// Da quando si invia l'accesso (modulo, codice, ritorno da «Continua con…») al cookie che lo conferma: i rimbalzi
+// dopo l'invio ci stanno dentro, un cookie da visitatore messo mentre si guarda la pagina no.
+const FINESTRA_INVIO_MS = 2 * 60 * 1000;
 const MAX_SITI = 500;
 const MAX_NOMI = 200;
 const GIRO_MS = 30 * 1000;
@@ -25,8 +28,11 @@ function margineTest(ms) {
 
 // sito incorporato → { ospiti: siti che lo ospitavano, nomi: cookie declassati, chiusoDa, at }
 const siti = new Map();
-// sito → { at, prima: nome → valore } dalla pagina di accesso: il cookie che arriva dopo dice che sei entrato.
+// sito → { at, prima: nome → valore, invio } dalla pagina di accesso: il cookie che arriva dopo l'invio dice che sei entrato.
 const attesa = new Map();
+// Cookie con scadenza appena sovrascritti (dominio|percorso|nome): c'erano già prima che un riquadro li riscrivesse,
+// quindi non sono nati da lui (un accesso fatto prima di #758, o che Filo non ha visto) e non si declassano.
+const preesistenti = new Map();
 
 let modo = 'default';
 let fidati = new Set();
@@ -149,7 +155,12 @@ function paginaDiAccesso(url, { forte = false } = {}) {
   const sito = sitoDi(url);
   if (!sito || accessi.has(sito)) return;
   const vecchia = attesa.get(sito);
-  attesa.set(sito, { at: Date.now(), prima: vecchia ? vecchia.prima : new Map(), forte: forte || !!(vecchia && vecchia.forte) });
+  attesa.set(sito, {
+    at: Date.now(),
+    prima: vecchia ? vecchia.prima : new Map(),
+    forte: forte || !!(vecchia && vecchia.forte),
+    invio: vecchia ? vecchia.invio : 0,
+  });
   if (vecchia) return;
   const ses = agganciata;
   if (!ses) return;
@@ -185,16 +196,22 @@ function segnaAccesso(sito) {
   }).catch(() => {});
 }
 
-async function cookieCambiato(ses, c, removed) {
+function chiaveCookie(c) {
+  return `${String(c.domain || '').toLowerCase()}|${c.path || '/'}|${c.name}`;
+}
+
+async function cookieCambiato(ses, c, removed, giaLi = false) {
   if (removed || !c || !c.name) return;
   const sito = sitoDi(urlDi(c));
   if (!sito) return;
   const inAttesa = attesa.get(sito);
   if (inAttesa) {
-    if (Date.now() - inAttesa.at > ATTESA_ACCESSO_MS) attesa.delete(sito);
-    else if (R.segnaleDiAccesso(c, inAttesa.prima, { forte: inAttesa.forte })) { segnaAccesso(sito); return; }
+    const ora = Date.now();
+    if (ora - inAttesa.at > ATTESA_ACCESSO_MS) attesa.delete(sito);
+    else if (inAttesa.invio && ora - inAttesa.invio <= FINESTRA_INVIO_MS
+      && R.segnaleDiAccesso(c, inAttesa.prima, { forte: inAttesa.forte })) { segnaAccesso(sito); return; }
   }
-  if (c.session || modo !== 'default') return;
+  if (c.session || giaLi || modo !== 'default') return;
   const prot = protetti();
   if (prot.has(sito)) return;
   let v = siti.get(sito);
@@ -258,14 +275,35 @@ function aggancia(ses) {
   try {
     ses.webRequest.onHeadersReceived((d, callback) => {
       callback({});
-      if (modo !== 'default' || !d || d.resourceType === 'mainFrame') return;
+      if (modo !== 'default' || !d) return;
+      if (attesa.size) {
+        try {
+          const v = attesa.get(sitoDi(d.url));
+          if (v && R.richiestaDiAccesso(d)) v.invio = Date.now();
+        } catch (_) {}
+      }
+      if (d.resourceType === 'mainFrame') return;
       let cima = '';
       try { cima = (d.frame && d.frame.top && d.frame.top.url) || ''; } catch (_) {}
       if (cima) { try { registraTerzaParte(d.url, cima); } catch (_) {} }
     });
   } catch (_) {}
   try {
-    ses.cookies.on('changed', (_e, c, _cause, removed) => { cookieCambiato(ses, c, removed).catch(() => {}); });
+    // Chromium avvisa prima della sovrascrittura del vecchio cookie e poi dell'arrivo del nuovo: il primo avviso
+    // si segna qui, subito, e il secondo lo consuma.
+    ses.cookies.on('changed', (_e, c, cause, removed) => {
+      if (!c || !c.name) return;
+      const k = chiaveCookie(c);
+      if (removed) {
+        if (cause === 'overwrite' && !c.session) {
+          preesistenti.set(k, Date.now());
+          while (preesistenti.size > MAX_NOMI) preesistenti.delete(preesistenti.keys().next().value);
+        }
+        return;
+      }
+      const giaLi = preesistenti.delete(k);
+      cookieCambiato(ses, c, false, giaLi).catch(() => {});
+    });
   } catch (_) {}
 }
 
