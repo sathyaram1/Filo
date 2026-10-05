@@ -29,9 +29,9 @@
   //   invia(msg) → Promise         pronta() → la prima lista è arrivata
   //   righe() / sostituisci(lista) la lista in mano     carica() → rilegge la prima lista
   //   decifra() → si decifrano le righe       sezioneDi(fb) → sezione o null (per gli arrivi)
-  //   seguiti() → id in mano alle routine     finestra() → createdAt (ms) del più vecchio, se la pagina ne tiene una
-  //   dopoFusione({ ids, righe, removed })    senzaNovita({ giro })     rileggiFusioni()
-  //   avvisi(testo)  segno()  quandoInVista()
+  //   seguiti() → id da seguire (di base: in mano alle routine)   finestra() → createdAt (ms) del più vecchio tenuto
+  //   dopoFusione() subito, senza letture     ridisegna({ ids, righe, removed }) solo in vista (può leggere)
+  //   senzaNovita({ giro })  rileggiFusioni()  avvisi(testo)  segno()  quandoInVista()
   function crea(opts) {
     const o = opts || {};
     const T = tipi();
@@ -101,7 +101,7 @@
 
     // Il ridisegno della pagina può leggere (il dettaglio aperto, le schede da completare): fuori vista si
     // accumula e parte al rientro.
-    function ridisegna(ids, righe, removed) {
+    function ridisegnaInVista(ids, righe, removed) {
       if (!vistaOra()) {
         const r = ridisegnoRimandato || { ids: new Set(), righe: [], removed: [] };
         for (const id of ids) r.ids.add(id);
@@ -110,7 +110,7 @@
         ridisegnoRimandato = r;
         return;
       }
-      chiama(o.dopoFusione, { ids, righe, removed });
+      chiama(o.ridisegna, { ids, righe, removed });
     }
 
     // Righe già lette. `fresche`: solo quelle scritte dopo la copia in mano (la domanda per data torna indietro
@@ -141,7 +141,8 @@
       o.sostituisci(L.applyChanges(attuali, { fresh: righe, removed }));
       segnaArrivi(prima, righe);
       if (statiMossi) rileggiFusioni();
-      ridisegna(new Set(ids), righe, removed);
+      chiama(o.dopoFusione);
+      ridisegnaInVista(new Set(ids), righe, removed);
       aggiornaSeguiti();
       return { changed: ids.length + removed.length };
     }
@@ -205,8 +206,12 @@
       return tick;
     }
 
+    // I feedback in mano alle routine: di loro il giro chiede l'ora di Firestore, perché chi li scrive può non
+    // firmare la sua. Tutti, senza campione della coda: il prossimo lo dice al main il registro dei worker (#676.1).
     function seguitiOra() {
-      const ids = chiama(o.seguiti);
+      const MR = global.SN_MANAGE_REVIEW;
+      const ids = typeof o.seguiti === 'function' ? o.seguiti()
+        : (o.righe() || []).filter((fb) => fb && fb._id && MR && MR.workProgress(fb)).map((fb) => fb._id);
       return Array.isArray(ids) ? ids.map(String).filter(Boolean) : [];
     }
 
@@ -259,7 +264,7 @@
       if (ridisegnoRimandato) {
         const r = ridisegnoRimandato;
         ridisegnoRimandato = null;
-        chiama(o.dopoFusione, r);
+        chiama(o.ridisegna, r);
       }
       chiama(o.quandoInVista);
     }
@@ -318,6 +323,7 @@
     return {
       start, stop, giro, applicaEsito, orologio, impostaVista, aggiornaSeguiti, fotoSezioni, segnaArrivi,
       arrivate, sorgenti, giroDalMain,
+      seguiti: seguitiOra,
       inVista: vistaOra,
       acceso: () => acceso,
       okAt: () => riuscitoAt,
@@ -381,7 +387,7 @@
     const prima = sc ? sc.scrollTop : 0;
     const ancora = sc ? L.ancoraScorrimento(righe(sc), prima) : null;
     ridisegna();
-    const dopo = sc ? scorre() : null;
+    const dopo = L && lista ? scorre() : null;
     if (dopo) dopo.scrollTop = L.scrollDaAncora(ancora, righe(dopo), prima);
   }
 

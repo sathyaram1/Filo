@@ -1631,6 +1631,12 @@
     return l5.esito === 'bloccato' || l5.esito === 'conflitto';
   }
 
+  /** Le pratiche con una fusione ferma davanti, le altre nell'ordine che avevano (`sort` è stabile). PURA. */
+  function fusioniFermeInCima(lista, opts) {
+    const ferma = (fb) => (fusioneInAttesa(fb, opts) ? 1 : 0);
+    return (Array.isArray(lista) ? lista : []).slice().sort((a, b) => ferma(b) - ferma(a));
+  }
+
   /**
    * Le richieste di fusione che NON hanno una segnalazione in questa lista:
    * non hanno una scheda dove vivere, e restano visibili in Automazioni.
@@ -1663,7 +1669,7 @@
     ownerActions, ownerActionFor, ownerActionAllowsStatus, stateBadge,
     classifyReevalResult, reevalErrorHint, REEVAL_WASTE_LIMIT,
     livelli, livelloPer, livelloL1, livelloL2, livelloL3, livelloL4, livelloL5, righeStato,
-    fusioneInAttesa, fusioniSenzaFeedback, richiestaDiQuesto, numeroOf,
+    fusioneInAttesa, fusioniFermeInCima, fusioniSenzaFeedback, richiestaDiQuesto, numeroOf,
     l1MotivoText, LIVELLO_COLORI, L1_MOTIVI,
     aspettaRisposta, ultimaDomanda, TESTO_CIFRATO,
     FRASE_SEGNO_ERRATO, fermatoDalSegno, motivoSegnoText,
