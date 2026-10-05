@@ -1035,7 +1035,8 @@
       return marcaProiezione(await readViaMain(bridge, { op, pageSize, timeoutMs, fields }), fields);
     }
     if (typeof afterName === 'string') {
-      const { rows } = await listByNameDirect(COLLECTION, { pageSize, timeoutMs, afterName, idToken, fields });
+      const { rows, readTime } = await listByNameDirect(COLLECTION, { pageSize, timeoutMs, afterName, idToken, fields });
+      if (readTime) Object.defineProperty(rows, 'readTime', { value: readTime, enumerable: false });
       return marcaProiezione(rows, fields);
     }
     return marcaProiezione(await listDirect(COLLECTION, { pageSize, timeoutMs, fields, idToken }), fields);
