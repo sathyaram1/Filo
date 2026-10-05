@@ -24,8 +24,8 @@ function segnaleDiAccesso(cookie, prima) {
 }
 
 // `protetti`: siti con accesso e siti «resta connesso». Il sito principale di una scheda aperta non si tocca mai.
-function daDeclassare({ modo, sito, ospite, aperti, protetti }) {
-  if (modo !== 'default' || !sito || !ospite || sito === ospite) return false;
+function daDeclassare({ modo, sito, ospiti, aperti, protetti }) {
+  if (modo !== 'default' || !sito || !ospiti || !ospiti.size || ospiti.has(sito)) return false;
   return !aperti.has(sito) && !protetti.has(sito);
 }
 
