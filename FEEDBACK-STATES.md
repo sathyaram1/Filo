@@ -127,7 +127,7 @@ e `revision_*→design(loop)`. Transizioni non elencate = illegali: il writer le
 scrivono l'admin (owner, sessioni, esploratore) e il server (routine). Senza, è un utente
 ovunque, e alla nascita il server lo rifiuta: sul documento resta `non-provato:<nome>`.
 Il ripasso non dà più la prova al solo nome; sui feedback nati prima, col nome ancora
-intero, l'owner può dire che è suo («È mio», `--riconosci`).
+intero, l'owner può dire che è suo con «🙋 È mio» in Gestione (da riga di comando no, #957).
 
 **Mittenti fidati** (`owner:`/`routine:`/`agent:`/`local:` con la prova): mai `attack`/`spam`; se un
 livello identità li flagga è un errore → `unlabeled` per ri-giudizio. Caso limite: se il
@@ -177,7 +177,9 @@ invece che «In coda». Negli stati dei Ricevuti resta nei Ricevuti (aspetta com
 l'owner), con l'approvazione che dice `→ Lavori locali`.
 
 - Il segno si mette solo su feedback dell'owner o di una sessione (`owner:`/`local:`)
-  **con la prova** `senderProof: 'admin'`, a pratica aperta, non segnalata come
+  **con la prova** `senderProof: 'admin'` (la dà il ripasso dai segni che un falso non ha, o
+  l'owner con «🙋 È mio» in Gestione; da riga di comando no, #957: salterebbe L5 come il sì
+  qui sotto), a pratica aperta, non segnalata come
   attacco/spam e non in mano a una routine (`localSignCheck`). Su un utente o una routine
   solo col sì dell'owner: un feedback che richiederebbe lavoro locale torna nei Ricevuti
   (`design`, motivo `locale`, nota «Richiede lavoro locale») con `owner-feedback.mjs
@@ -185,13 +187,16 @@ l'owner), con l'approvazione che dice `→ Lavori locali`.
 - **L'approvazione dell'owner (#913)**: `localApproval: { by, at }` (stessa forma di
   `localOnly`, scrive solo l'admin, `localApprovalValido` nelle regole). La scrive
   «💻 Lavoro locale» nei Ricevuti (dettaglio, tasto destro sulla scheda, pagina dei
-  feedback) o `owner-feedback.mjs --approva-locale`, insieme a `todo`, `reviewDecision:
-  accepted` e `localOnly`: il feedback va nei Lavori locali. Vale quanto la prova del
+  feedback), insieme a `todo`, `reviewDecision: accepted` e `localOnly`: il feedback va
+  nei Lavori locali. Solo da lì (#957): nessuno strumento delle sessioni lo scrive, perché
+  hanno le credenziali dell'owner e un testo d'utente potrebbe convincerle a darselo. Le regole non distinguono la
+  pagina da uno script con lo stesso token: il limite sta negli strumenti (sentinella in
+  `tests/unit/lavoroLocaleApprovato.test.mjs`). Vale quanto la prova del
   mittente (`isProvenLocalWork` nell'app, `localMergeEligibility` sul server), quindi la
   sessione lo lega a `start`/`finish --feedback` e alla fusione L5 registra senza
   fermare. Non cambia chi l'ha scritto: il lettore lo dice ancora utente, e il testo resta
   un dato. Si offre solo nei Ricevuti, su chi non è owner o sessione con la prova; su un
-  segnalato l'hover lo dice e lo script rifiuta (lo approva solo l'owner, in Gestione).
+  segnalato l'hover lo dice e serve guardarlo prima.
   Togliere il segno locale lascia l'approvazione, così il segno si rimette con un clic
   (il sì si dà solo dai Ricevuti, dove la pratica non torna). Risolto, il feedback di un
   utente approvato tiene la scheda pubblica (`isPrivateLocalWork`): è da lì che chi l'ha
@@ -252,7 +257,7 @@ di una routine o di una sessione): lì il tono tecnico è normale. Una ri-valuta
 sempre dai giudici.
 
 Le routine non aprono lavoro locale: il canale non scrive il segno, e dentro una routine
-`claude-feedback.mjs` e `owner-feedback.mjs --solo-locale | --approva-locale` si rifiutano. Un
+`claude-feedback.mjs` e `owner-feedback.mjs --solo-locale` si rifiutano. Un
 lavoro che si fa solo in locale torna nei Ricevuti dal canale (`deliver status --status design
 --reason locale`, nota «Richiede lavoro locale»): lo stesso motivo di `--serve-locale`, e lì
 l'owner lo approva come lavoro locale (§4b, #913).
