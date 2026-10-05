@@ -105,6 +105,7 @@
           type: MSG.AI_REQUEST,
           action: ACTIONS.EDIT_TEXT,
           payload: { original: originalText, instruction },
+          diceRipiego: true,
         });
         if (!res?.ok || !res.text) {
           $prop.textContent = res?.error || I18n.t('edit_box_error');

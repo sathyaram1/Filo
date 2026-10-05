@@ -3829,7 +3829,7 @@
       ];
       try {
         const r = await sendMessage({
-          type: MSG.AI_REQUEST, action: ACTIONS.EDITOR_CHAT || 'editor_chat', payload: { messages },
+          type: MSG.AI_REQUEST, action: ACTIONS.EDITOR_CHAT || 'editor_chat', payload: { messages }, diceRipiego: true,
         });
         const raw = (r && r.ok && typeof r.text === 'string') ? r.text : null;
         if (raw == null) {

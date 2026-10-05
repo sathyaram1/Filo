@@ -772,3 +772,73 @@ test('(N) la chat dell’Editor con la chiave propria rifiutata: sotto ogni risp
   await expect(page.locator('.ed-chat-msg.assistant')).toHaveCount(2, { timeout: 30_000 });
   await expect(nota).toHaveCount(2, { timeout: 30_000 });
 });
+
+test('(O) il «Prova» delle righe dei modelli predefiniti con la chiave propria rifiutata: dice che OpenRouter l’ha rifiutata e perché, senza ripiego', async ({ app, shell, openTab }) => {
+  test.setTimeout(120_000);
+  ownKeyStatus = 402;
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await redeemWallet(openTab);
+  await redirectHosts(app);
+  // «Usa i modelli predefiniti» resta acceso: è lo stato di partenza.
+  await app.evaluate(async (_, k) => { await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: k } }); }, OWN_KEY);
+  const options = await openTab('filo://options/options.html');
+  const row = options.locator('#defaultModelsList .sn-default-model-row:not(.sn-model-row-head)').first();
+  await expect(row).toBeVisible({ timeout: 15000 });
+  await row.locator('.sn-model-test').click();
+  await expect(row.locator('.sn-model-row-status')).toContainText('OpenRouter ha rifiutato questa chiave (il suo credito è finito)', { timeout: 30000 });
+  const prove = seen.completions.filter((c) => c.lastText.includes(CONTA)).map((c) => c.key);
+  expect(prove).toEqual([OWN_KEY]);
+});
+
+test('(P) le strade che non scrivono la riga del ripiego lo dicono con un avviso: «Trascrivi» una zona della pagina; «spiega», che la scrive nel riquadro, non ne aggiunge uno', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(150_000);
+  ownKeyStatus = 402;
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await redeemWallet(openTab);
+  await prepare(app);
+  const page = await testServer.openReady(openTab, '<!doctype html><meta charset="utf-8"><title>Scansione</title>'
+    + '<p id="t" style="font:28px sans-serif;margin:120px 40px">Un testo da trascrivere</p>');
+  await page.evaluate(() => {
+    window.__toasts = [];
+    new MutationObserver((muts) => {
+      for (const m of muts) for (const n of m.addedNodes) {
+        if (n.nodeType === 1 && n.classList && n.classList.contains('sn-toast')) window.__toasts.push(n.textContent || '');
+      }
+    }).observe(document.documentElement, { childList: true, subtree: true });
+  });
+  const avvisi = () => page.evaluate(() => window.__toasts.join(' | '));
+  const RIGA = 'OpenRouter ha rifiutato la tua chiave (il suo credito è finito): ho usato i crediti di Filo.';
+
+  // «spiega»: la riga sta nel riquadro, nessun avviso in più.
+  await page.evaluate(() => {
+    const r = document.createRange();
+    r.selectNodeContents(document.querySelector('#t'));
+    const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  });
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    globalThis.__filoShortcuts.dispatch('explain-selection', win);
+  });
+  const popup = page.locator('.sn-popup');
+  await expect(popup.locator('.sn-key-fallback')).toHaveText(RIGA, { timeout: 30000 });
+  await page.waitForTimeout(1500);
+  expect(await avvisi()).not.toContain('crediti di Filo');
+  await popup.locator('.sn-popup-close').click();
+  await page.evaluate(() => window.getSelection().removeAllRanges());
+
+  // «Trascrivi» (tasto destro, «Altro…»): il testo arriva coi crediti di Filo, e l'avviso lo dice.
+  const prima = seen.completions.length;
+  await page.locator('#t').click({ button: 'right', position: { x: 5, y: 5 } });
+  await page.locator('.sn-menu-row-overflow').hover();
+  await page.locator('.sn-menu-row-overflow').click().catch(() => {});
+  await page.locator('[data-sn-icon-id="transcribe"]').click();
+  await expect(page.locator('.sn-region-overlay')).toBeVisible({ timeout: 10000 });
+  await page.mouse.move(30, 100);
+  await page.mouse.down();
+  await page.mouse.move(300, 140, { steps: 5 });
+  await page.mouse.move(500, 180, { steps: 5 });
+  await page.mouse.up();
+  await expect.poll(avvisi, { timeout: 30_000 }).toContain('Testo trascritto e copiato');
+  await expect.poll(avvisi, { timeout: 10_000 }).toContain(RIGA);
+  expect(seen.completions.slice(prima).map((c) => c.key).slice(0, 2)).toEqual([OWN_KEY, PERSONAL_KEY]);
+});

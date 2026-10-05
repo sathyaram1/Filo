@@ -1143,6 +1143,7 @@
         type: MSG.AI_REQUEST,
         action: ACTIONS.HELP,
         payload,
+        diceRipiego: true,
       });
       if (!res?.ok) throw new Error(res?.error || I18n.t('err_provider_failed'));
       // Risposta pagata coi crediti di Filo perché OpenRouter ha rifiutato la chiave (#662): la

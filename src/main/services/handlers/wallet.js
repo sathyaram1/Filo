@@ -128,6 +128,21 @@ module.exports = function register(on, ctx) {
   const provaDiChiave = new AsyncLocalStorage();
   function senzaRipiego(fn) { return provaDiChiave.run(true, fn); }
 
+  // Chi mostra la risposta e scrive da sé la riga del ripiego (riquadri, chat)
+  // la chiama dentro `conRipiegoDetto`; ogni altra strada (dettatura, lettura,
+  // trascrizione, correttore, lavori in sottofondo) la dice con un avviso, uno
+  // per rifiuto e al massimo ogni 10 minuti, come per i crediti finiti (#662).
+  const ripiegoDetto = new AsyncLocalStorage();
+  function conRipiegoDetto(fn) { return ripiegoDetto.run(true, fn); }
+  let ultimoAvvisoRipiego = 0;
+  function avvisaRipiegoMuto(status) {
+    if (ripiegoDetto.getStore()) return;
+    const now = Date.now();
+    if (now - ultimoAvvisoRipiego < 10 * 60 * 1000) return;
+    ultimoAvvisoRipiego = now;
+    try { broadcastToTabs({ type: MSG.SHOW_TOAST, text: W.ownKeyFallbackLine(status), duration: 8000 }); } catch (_) {}
+  }
+
   // La riserva per la chiave con cui una chiamata è partita: la personale del
   // portafoglio, solo se si era partiti con la chiave PROPRIA. Con la
   // personale già in uso non c'è riserva (un 402 lì sono i crediti finiti), e
@@ -151,6 +166,7 @@ module.exports = function register(on, ctx) {
     const usedCredits = Boolean(served) || Boolean(prev && prev.usedCredits !== false);
     const rec = { at: new Date().toISOString(), status: Number(status) || 0, detail: String(detail || '').slice(0, 300), usedCredits };
     try { await globalThis.SN_STORAGE.setRaw(REFUSAL_KEY, rec); } catch (_) {}
+    if (served) avvisaRipiegoMuto(rec.status);
     console.warn(`[wallet] chiave propria rifiutata (${rec.status}): ${served ? 'ha risposto la chiave personale' : 'anche il ripiego sulla personale è caduto'}`);
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
   }
@@ -163,6 +179,7 @@ module.exports = function register(on, ctx) {
   // La chiave propria è cambiata (messa, tolta, sostituita): il rifiuto di
   // quella di prima non dice niente su questa.
   async function ownKeyChanged() {
+    ultimoAvvisoRipiego = 0;
     try { await globalThis.SN_STORAGE.setRaw(REFUSAL_KEY, null); } catch (_) {}
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
     rinfrescaHome();
@@ -176,6 +193,7 @@ module.exports = function register(on, ctx) {
   async function noteOwnKeySuccess() {
     const had = await lastOwnKeyRefusal();
     if (had) {
+      ultimoAvvisoRipiego = 0;
       try { await globalThis.SN_STORAGE.setRaw(REFUSAL_KEY, null); } catch (_) {}
       console.info('[wallet] la chiave propria risponde di nuovo: rifiuto dimenticato');
     }
@@ -815,7 +833,7 @@ module.exports = function register(on, ctx) {
     // Ripiego dalla chiave propria (#629): li chiama il provider OpenRouter.
     keySourceOf, alternativeKeyFor, noteOwnKeyRefusal, noteOwnKeySuccess, lastOwnKeyRefusal, ownKeyChanged, usageLogStatus,
     // La prova di una chiave dalle Impostazioni (handlers/ai.js): niente riserva.
-    senzaRipiego,
+    senzaRipiego, conRipiegoDetto,
     // Solo per i test (NODE_ENV=test): simula il riavvio senza rete.
     expireIdentityForTest: () => { if (process.env.NODE_ENV === 'test') identity._expireToken(); },
   };

@@ -734,6 +734,7 @@
           type: MSG.AI_REQUEST,
           action: ACTIONS.TRANSLATE_PAGE,
           payload: { chunk },
+          diceRipiego: true,
         });
       } catch (e) {
         res = { ok: false, error: (e && e.message) || '', code: (e && e.code) || '' };

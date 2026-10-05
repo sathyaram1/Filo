@@ -604,6 +604,7 @@
       type: MSG.AI_REQUEST,
       action: ACTIONS.EXPLAIN,
       payload: { selection: selInfo.selection, sentence: selInfo.sentence },
+      diceRipiego: true,
     }).then(
       (res) => (res?.ok && typeof res.text === 'string')
         ? { text: res.text, keyFallback: res.keyFallback || null }
@@ -771,6 +772,7 @@
               type: MSG.AI_REQUEST,
               action: ACTIONS.DESCRIBE_IMAGE,
               payload: { dataUrl },
+              diceRipiego: true,
             });
             if (cancelled) return;
             el.classList.remove('sn-menu-inline-loading');

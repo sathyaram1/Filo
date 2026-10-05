@@ -101,7 +101,10 @@ module.exports = function register(on, ctx) {
     const lettura = msg && msg.action === SN_CONST.ACTIONS.HELP && /^https?:/i.test(String(sender?.tab?.url || sender?.url || ''))
       ? ricordaLettoDallAiuto(sender, msg.payload).catch(() => {})
       : null;
-    const r = await handleAIRequest({ action: msg.action, payload: msg.payload, origin });
+    // `diceRipiego`: la superficie scrive da sé la riga del ripiego sotto la risposta (#662).
+    const chiedi = () => handleAIRequest({ action: msg.action, payload: msg.payload, origin });
+    const K = globalThis.SN_WALLET_MAIN;
+    const r = await (msg && msg.diceRipiego === true && K && K.conRipiegoDetto ? K.conRipiegoDetto(chiedi) : chiedi());
     if (lettura) await lettura;
     return { ok: true, ...r };
   });
@@ -587,7 +590,7 @@ module.exports = function register(on, ctx) {
         tokensPerSec: Math.round(tps * 10) / 10,
       };
     } catch (e) {
-      return { ok: false, error: e?.message || String(e) };
+      return { ok: false, error: provaFallita(e) };
     }
   });
 

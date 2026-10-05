@@ -3724,12 +3724,15 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   let exhausted = true;
   try {
     for (let round = 1; round <= MAX_ROUNDS; round++) {
-      r = await handleAIRequest({
+      // La scheda scrive la riga del ripiego sotto la risposta: niente avviso in più (#662).
+      const giro = () => handleAIRequest({
         action: ACTIONS.FILO_CHAT,
         payload: { ...payloadBase, threadMessages },
         origin: 'filo:chat',
         onReasoning, onText, onToolCall, tools,
       });
+      const KW = global.SN_WALLET_MAIN;
+      r = await (KW && KW.conRipiegoDetto ? KW.conRipiegoDetto(giro) : giro());
       if (r && r.keyFallback) keyFallback = r.keyFallback;
       costEur += Number(r.costEur) || 0;
       let text = String(r.text || '');
