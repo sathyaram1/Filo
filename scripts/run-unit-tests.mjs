@@ -2,10 +2,10 @@
 // `node --test` relativi alla root e, se la riga supera il tetto di Windows, a gruppi con un riepilogo unico (#765).
 // Zero file = uscita rossa. `--list` stampa i file; ogni altro argomento è un flag di `node --test` o un file in più. Sentinella: tests/unit/unitRunner.test.mjs.
 
-import { readdirSync, readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { resolve, dirname, join, relative, isAbsolute, sep } from 'node:path';
 import { tmpdir } from 'node:os';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawn } from 'node:child_process';
 import { lottiPerRigaDiComando, costoArgomentoWindows } from './lib/riga-di-comando.mjs';
 
@@ -285,6 +285,15 @@ function leggiRighe(file) {
   } catch (_) { return []; }
 }
 
+// Le cartelle delle corse uccise, che la loro uscita non ha tolto (#717): la regola sta col modulo che le crea. Importato
+// qui e non in testa, perché la copia di questo lanciatore che vive fuori dal repo non ha i test.
+async function togliResti() {
+  const modulo = join(REPO_ROOT, 'tests', 'helpers', 'percorsi.mjs');
+  if (!existsSync(modulo)) return;
+  const { togliCartelleOrfane } = await import(pathToFileURL(modulo).href);
+  togliCartelleOrfane({ annuncia: (n) => console.error(`[test:unit] tolgo ${n} cartelle temporanee lasciate da prove interrotte`) });
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   const listOnly = argv.includes('--list');
@@ -315,6 +324,8 @@ async function main() {
       return;
     }
   }
+
+  await togliResti();
 
   // I gruppi si contano coi flag del riepilogo già dentro: sono i più lunghi che la riga potrà portare.
   const cartella = mkdtempSync(join(tmpdir(), 'filo-unit-'));

@@ -19,7 +19,7 @@
 // riporta il nome lungo. Fuori da Windows fa il suo lavoro di sempre (risolve
 // `/tmp` → `/private/tmp` su macOS), quindi si usa ovunque.
 
-import { mkdtempSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
+import { lstatSync, mkdtempSync, readdirSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import path, { join } from 'node:path';
 
@@ -55,7 +55,7 @@ export const SPAZIO = 'con spazio-';
 // una sentinella negli unit test diventa rossa se qualcuno torna alla forma
 // vecchia. Il prefisso resta in testa, così la cartella si riconosce a occhio.
 export function cartellaTemporanea(prefisso) {
-  return percorsoCanonico(mkdtempSync(join(tmpdir(), `${prefisso}${SPAZIO}`)));
+  return togliAllUscita(percorsoCanonico(mkdtempSync(join(tmpdir(), `${prefisso}${SPAZIO}`))));
 }
 
 // La pulizia di un test non lo fa mai rosso: su Windows sotto carico un figlio appena ucciso o l'antivirus tengono
@@ -83,7 +83,50 @@ export function togliCartella(dir, { tentativi = 5, attesa = 200, rm = rmSync } 
 // lettura (#587) lascia leggere senza chiedere. La temporanea di sistema sta
 // fuori (`/tmp`) o in AppData, dove ogni lettura chiede un OK.
 export function cartellaInCasa(prefisso) {
-  return percorsoCanonico(mkdtempSync(join(homedir(), `${prefisso}${SPAZIO}`)));
+  return togliAllUscita(percorsoCanonico(mkdtempSync(join(homedir(), `${prefisso}${SPAZIO}`))));
+}
+
+// Le cartelle chieste qui se ne vanno col processo che le ha chieste, verde o rosso che finisca: lasciate a ogni
+// prova erano diventate 13.000 cartelle e 17 GB nella temporanea dell'owner, e col disco pieno cadevano prove sane (#717).
+const DA_TOGLIERE = new Set();
+function togliAllUscita(dir) {
+  if (!DA_TOGLIERE.size) process.once('exit', () => { for (const d of DA_TOGLIERE) togliSenzaErrori(d); });
+  DA_TOGLIERE.add(dir);
+  return dir;
+}
+
+// All'uscita e fra i resti un guasto non ferma il giro: vero se la cartella non c'è più.
+function togliSenzaErrori(dir) {
+  try { return togliCartella(dir, { tentativi: 2, attesa: 100 }); } catch (_) { return false; }
+}
+
+// Un processo ucciso (Ctrl+C, un timeout) non vede la sua uscita: i suoi resti li tolgono i lanciatori alla corsa dopo.
+// Si riconoscono dal nome che solo le due funzioni qui sopra danno, e dall'età: nessuna corsa di prove dura un giorno.
+const NOME_DEI_TEST = new RegExp(`${SPAZIO}[A-Za-z0-9]{6}$`);
+export const ORFANA_DOPO_MS = 24 * 60 * 60 * 1000;
+
+export function cartelleOrfane({ dove = [tmpdir(), homedir()], oraMs = Date.now(), etaMs = ORFANA_DOPO_MS } = {}) {
+  const orfane = [];
+  for (const base of dove) {
+    let nomi = [];
+    try { nomi = readdirSync(base); } catch (_) { continue; }
+    for (const nome of nomi) {
+      if (!NOME_DEI_TEST.test(nome)) continue;
+      const p = join(base, nome);
+      try {
+        const s = lstatSync(p);
+        if (s.isDirectory() && oraMs - s.mtimeMs >= etaMs) orfane.push(p);
+      } catch (_) { /* sparita nel frattempo */ }
+    }
+  }
+  return orfane;
+}
+
+// Mai un throw. `annuncia` riceve quante sono prima di cominciare: le prime volte possono essere migliaia.
+export function togliCartelleOrfane({ annuncia = () => {}, ...opzioni } = {}) {
+  const orfane = cartelleOrfane(opzioni);
+  if (orfane.length) annuncia(orfane.length);
+  return orfane.filter(togliSenzaErrori);
 }
 
 // Su Windows un symlink vuole l'amministratore o la modalità sviluppatore (EPERM, #742):
