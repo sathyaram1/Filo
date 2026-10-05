@@ -359,7 +359,8 @@ scritto approvando conta come risposta solo se è arrivato dopo lo stop; (4) fix
 dal **controllo di sicurezza** (`statusReason: secaudit`, con `livelli.l4.esito:
 fail`); (4b, dal 2026-09-13) fix fermato dal **cancello di fusione** L5 sul
 server (`statusReason: l5`): il controllo di sicurezza è passato, a fermare è
-stato il cancello, e c'è una richiesta di fusione in attesa; (5) lavorazione
+stato il cancello, e c'è una richiesta di fusione in attesa (se manca, in
+Gestione il quadrato la richiede di nuovo, #1038); (5) lavorazione
 arenata ripetutamente (`statusReason: arenato`). La risposta dell'owner appende
 alla chat e (se decide) muove a `todo`. Sul caso `secaudit` l'owner ha anche
 «Salta il controllo»: il server scrive `livelli.l4 = { esito: saltato, by:

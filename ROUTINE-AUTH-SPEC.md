@@ -724,7 +724,12 @@ fila delle forme della scheda):
   <file.md>`, obbligatoria; dispatch si ferma prima di consegnare.
 - `status` con `reason: l5`: il controllo di sicurezza chiude così il blocco del
   cancello (exit 10 del gate), distinto dal proprio `fail` (`reason:
-  secaudit`).
+  secaudit`). Una pratica sta in `design`/`l5` SOLO se esiste una richiesta di
+  fusione legata a lei (#1038): un blocco senza `approval` il gate lo dice
+  guasto (exit 1) e il controllo di sicurezza rilascia senza consegnare. Una
+  pratica già ferma così la sblocca l'owner dal quadrato in Gestione, che
+  richiede la fusione a `ownerMerge` col `feedbackId` (ramo del documento,
+  punta letta da GitHub).
 
 Il salto di L4 è un'azione dell'owner (callable `ownerSkipSecaudit
 { feedbackId }`, dal tasto «Salta il controllo» della dashboard): il server
