@@ -27,6 +27,8 @@ test('la pulizia che toglie intero un caso rosso di un rilievo da correggere vie
     g('init', '-q', '-b', 'worker/746');
     symlinkSync(resolve(ROOT, 'node_modules'), resolve(dir, 'node_modules'), 'junction');
     w('.gitignore', 'node_modules\ntests/verifica/_tolte-*/\ntest-results/\n');
+    // Come nel repo: senza un testDir esplicito Playwright salta i file in .gitignore, e le copie _tolte- non le trova.
+    w('playwright.config.mjs', "export default { testDir: './tests', testMatch: /.*\\.spec\\.(js|mjs)$/ };\n");
     const testa = "import { test, expect } from '@playwright/test';\n";
     const prova = 'tests/verifica/746/giro1-r1-r2-due-porte.spec.mjs';
     w(prova, testa + caso('r1 messo da parte') + caso('r2 prima porta') + caso('r2 seconda porta'));
