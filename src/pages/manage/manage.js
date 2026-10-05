@@ -769,10 +769,17 @@
   }
 
   let sessionsState = RS ? RS.leggiDoc({}) : null;
-  // Finché non si è letto dal server, quello che si vede non è quello che c'è:
-  // la pagina lo dice invece di far passare i valori di partenza per veri.
-  let sessionsLetto = false;
+  // Campi che vengono dal server: gli altri sono valori di partenza e non si
+  // mostrano per veri (campo vuoto, nessuna pillola, nessun avviso).
+  const sessionsNoti = new Set();
   const SESSIONS_NON_LETTO = 'Non ho potuto leggere dal server: quello che vedi qui non viene da lì.';
+  // Una richiesta alla volta, nell'ordine delle scelte: una risposta più vecchia
+  // non può arrivare dopo una più nuova, né sullo schermo né sul server (#675).
+  let sessionsCoda = Promise.resolve();
+  // Scelte partite e non ancora confermate: stanno sopra ogni risposta che le precede.
+  const sessionsInAttesa = [];
+  // Numero scritto e non ancora salvato: una risposta su un altro campo non lo cancella.
+  let maxInScrittura = false;
 
   function setSessionsMsg(el, text, kind) {
     if (!el) return;
@@ -781,83 +788,104 @@
     el.classList.toggle('mg-err', kind === 'err');
   }
 
-  function reflectSessions(raw, letto) {
-    if (!RS) return;
+  function inCodaSessions(fn) {
+    const giro = sessionsCoda.then(fn, fn);
+    sessionsCoda = giro.catch(() => {});
+    return giro;
+  }
+
+  /** Un documento intero dal server: da qui in poi niente sullo schermo è «non letto». */
+  function accogliSessions(raw) {
     sessionsState = RS.leggiDoc(raw);
-    sessionsLetto = letto !== false;
-    // Non letto = campo vuoto, come i bilanci qui sotto: un numero scritto lì
-    // dentro verrebbe preso per quello del server.
-    if (mgMaxSessions) mgMaxSessions.value = sessionsLetto ? String(sessionsState.maxSessions) : '';
-    for (const r of mgPriorityRadios) r.checked = sessionsLetto && r.value === sessionsState.priorityAccount;
-    if (mgAccountA) mgAccountA.checked = !sessionsState.accountAOff;
-    if (mgAccountB) mgAccountB.checked = !sessionsState.accountBOff;
+    for (const k of RS.CHIAVI) sessionsNoti.add(k);
+    for (const el of [mgMaxSessionsMsg, mgPriorityAccountMsg, mgAccountsMsg]) {
+      if (el && el.textContent === SESSIONS_NON_LETTO) setSessionsMsg(el, '', null);
+    }
+  }
+
+  function reflectSessions() {
+    if (!RS) return;
+    const scelte = Object.assign({}, ...sessionsInAttesa.map((s) => s.valori));
+    const vista = RS.leggiDoc(Object.assign({}, sessionsState, scelte));
+    const noto = (...chiavi) => chiavi.every((k) => sessionsNoti.has(k) || k in scelte);
+    if (mgMaxSessions && !maxInScrittura) mgMaxSessions.value = noto('maxSessions') ? String(vista.maxSessions) : '';
+    for (const r of mgPriorityRadios) r.checked = noto('priorityAccount') && r.value === vista.priorityAccount;
+    if (mgAccountA) mgAccountA.checked = !vista.accountAOff;
+    if (mgAccountB) mgAccountB.checked = !vista.accountBOff;
     // Esclusi tutti e due non parte niente; escluso il solo prioritario si
     // lavora sull'altro. Due stati che a guardare gli interruttori non si
     // capiscono, quindi si scrivono.
-    const resta = RS.prioritarioIgnorato(sessionsState);
-    if (mgAccountsWarn) mgAccountsWarn.hidden = !sessionsLetto || !RS.nessunAccount(sessionsState);
+    const resta = RS.prioritarioIgnorato(vista);
+    if (mgAccountsWarn) mgAccountsWarn.hidden = !noto('accountAOff', 'accountBOff') || !RS.nessunAccount(vista);
     if (mgPriorityWarn) {
-      mgPriorityWarn.hidden = !sessionsLetto || !resta;
-      if (resta) mgPriorityWarn.textContent = `L'account ${sessionsState.priorityAccount} è escluso: le sessioni partono da ${resta}.`;
+      mgPriorityWarn.hidden = !noto(...RS.CHIAVI) || !resta;
+      if (resta) mgPriorityWarn.textContent = `L'account ${vista.priorityAccount} è escluso: le sessioni partono da ${resta}.`;
     }
   }
 
   function sessionsNonLette() {
-    reflectSessions({}, false);
+    sessionsState = RS.leggiDoc({});
+    sessionsNoti.clear();
+    reflectSessions();
     for (const el of [mgMaxSessionsMsg, mgPriorityAccountMsg, mgAccountsMsg]) {
       setSessionsMsg(el, SESSIONS_NON_LETTO, 'err');
     }
   }
 
-  async function loadSessions() {
-    if (!RS) return;
-    try {
-      const r = await sendToMain({ type: SESSIONS_GET });
-      if (r && r.ok) {
-        reflectSessions(r);
-        // Una lettura riuscita smentisce l'avviso di una fallita prima (es. prima dell'accesso).
-        for (const el of [mgMaxSessionsMsg, mgPriorityAccountMsg, mgAccountsMsg]) {
-          if (el && el.textContent === SESSIONS_NON_LETTO) setSessionsMsg(el, '', null);
-        }
-      } else sessionsNonLette();
-    } catch (_) {
-      sessionsNonLette();
-    }
+  function loadSessions() {
+    if (!RS) return Promise.resolve();
+    return inCodaSessions(async () => {
+      let r = null;
+      try { r = await sendToMain({ type: SESSIONS_GET }); } catch (_) { /* come una lettura fallita */ }
+      if (!r || !r.ok) return sessionsNonLette();
+      accogliSessions(r);
+      reflectSessions();
+    });
   }
 
-  async function saveSessions(patch, msgEl) {
+  function saveSessions(patch, msgEl) {
     const esito = RS.valida(patch);
     if (!esito.ok) {
       setSessionsMsg(msgEl, esito.testo, 'err');
-      return false;
+      return Promise.resolve(false);
     }
-    try {
-      const r = await sendToMain(Object.assign({ type: SESSIONS_SET }, esito.valori));
+    if ('maxSessions' in esito.valori) maxInScrittura = false;
+    const scelta = { valori: esito.valori, msgEl };
+    sessionsInAttesa.push(scelta);
+    // In coda dietro un'altra richiesta può aspettare: si vede che è partita.
+    setSessionsMsg(msgEl, 'Salvo…', null);
+    // Una scelta più nuova sulla stessa riga è ancora per strada: «Salvato.» parlerebbe di lei.
+    const confermaSessions = (testo) => {
+      if (!sessionsInAttesa.some((s) => s.msgEl === msgEl)) setSessionsMsg(msgEl, testo, 'ok');
+    };
+    return inCodaSessions(async () => {
+      let r = null;
+      let errore = null;
+      try { r = await sendToMain(Object.assign({ type: SESSIONS_SET }, esito.valori)); } catch (err) { errore = err; }
+      sessionsInAttesa.splice(sessionsInAttesa.indexOf(scelta), 1);
       if (!r || !r.ok) {
         // Non scritto = non cambiato: la pagina rimette quello che c'è sul
         // server invece di mostrare una scelta che non è mai arrivata.
-        reflectSessions(sessionsState, sessionsLetto);
+        reflectSessions();
         setSessionsMsg(msgEl, 'Salvataggio fallito: l\'impostazione NON è cambiata.', 'err');
-        if (r?.error) console.error('[manage] salvataggio sessioni:', r.error);
+        const motivo = errore || r?.error;
+        if (motivo) console.error('[manage] salvataggio sessioni:', motivo);
         return false;
       }
       if (r.letto === false) {
-        // Scritto sì, riletto no: si tiene quello che è appena partito e si
-        // dice che il resto non si è potuto ricontrollare. Rimettere i valori
-        // di partenza qui spegnerebbe sullo schermo una scelta già salvata.
-        reflectSessions(Object.assign({}, sessionsState, esito.valori), sessionsLetto);
-        setSessionsMsg(msgEl, 'Salvato. Il resto non l\'ho potuto rileggere dal server.', 'ok');
+        // Scritto sì, riletto no: quello che è appena partito ora è noto, il
+        // resto no. Rimettere i valori di partenza spegnerebbe una scelta salvata.
+        Object.assign(sessionsState, esito.valori);
+        for (const k of Object.keys(esito.valori)) sessionsNoti.add(k);
+        reflectSessions();
+        confermaSessions('Salvato. Il resto non l\'ho potuto rileggere dal server.');
         return true;
       }
-      reflectSessions(r);
-      setSessionsMsg(msgEl, 'Salvato.', 'ok');
+      accogliSessions(r);
+      reflectSessions();
+      confermaSessions('Salvato.');
       return true;
-    } catch (err) {
-      reflectSessions(sessionsState, sessionsLetto);
-      setSessionsMsg(msgEl, 'Salvataggio fallito: l\'impostazione NON è cambiata.', 'err');
-      console.error('[manage] salvataggio sessioni fallito:', err);
-      return false;
-    }
+    });
   }
 
   if (mgMaxSessions) {
@@ -866,7 +894,10 @@
     const letto = () => (mgMaxSessions.validity && mgMaxSessions.validity.badInput ? 'NaN' : mgMaxSessions.value);
     const salva = () => saveSessions({ maxSessions: letto() }, mgMaxSessionsMsg);
     if (mgMaxSessionsSave) mgMaxSessionsSave.addEventListener('click', salva);
-    mgMaxSessions.addEventListener('input', () => setSessionsMsg(mgMaxSessionsMsg, '', null));
+    mgMaxSessions.addEventListener('input', () => {
+      maxInScrittura = true;
+      setSessionsMsg(mgMaxSessionsMsg, '', null);
+    });
     mgMaxSessions.addEventListener('keydown', (e) => {
       if (e.key !== 'Enter' || mgMaxSessions.disabled) return;
       e.preventDefault();

@@ -2,8 +2,9 @@
 // routine. Qui stanno le guardie che devono reggere per sempre; le prove del
 // giro di verifica che le ha fatte nascere vivono altrove e non le sostituiscono.
 //
-// Quello che difendono: la pagina non mostra MAI un valore che non ha letto, e
-// dice quale account resta quando il prioritario è escluso.
+// Quello che difendono: la pagina non mostra MAI un valore che non ha letto,
+// dice quale account resta quando il prioritario è escluso, e una risposta più
+// vecchia non riscrive sullo schermo una scelta più nuova.
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -94,4 +95,164 @@ test('priorità che vale ancora: nessun avviso di troppo', async ({ openTab }) =
   await expect(page.locator('#mgMaxSessions')).toHaveValue('3');
   await expect(page.locator('#mgPriorityWarn')).toBeHidden();
   await expect(page.locator('#mgAccountsWarn')).toBeHidden();
+});
+
+// ── Lo schermo e il server non si contraddicono (#675) ──────────────────────
+// Server finto che scrive quando riceve e fotografa il documento in quel
+// momento: è la sola RISPOSTA a viaggiare lenta, come su una rete vera.
+async function apriServer(openTab, doc, ritardi = {}) {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo && window.SN_ROUTINE_SESSIONI);
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+  await page.evaluate(([init, rit]) => {
+    window.__doc = Object.assign({}, init);
+    window.__ritardi = { get: rit.get || [], set: rit.set || [] };
+    window.__getGiu = !!rit.getGiu;
+    window.__rilettura = true;
+    window.__arrivate = 0;
+    const RS = window.SN_ROUTINE_SESSIONI;
+    const attesa = async (coda) => {
+      await new Promise((r) => setTimeout(r, coda.shift() || 0));
+      window.__arrivate += 1;
+    };
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'automation_sessions_get') {
+        const r = window.__getGiu ? { ok: false, error: 'rete giù' } : Object.assign({ ok: true }, RS.leggiDoc(window.__doc));
+        await attesa(window.__ritardi.get);
+        return r;
+      }
+      if (msg && msg.type === 'automation_sessions_set') {
+        const esito = RS.valida(msg);
+        if (!esito.ok) return { ok: false, error: esito.testo };
+        Object.assign(window.__doc, esito.valori);
+        const r = window.__rilettura
+          ? Object.assign({ ok: true }, RS.leggiDoc(window.__doc))
+          : Object.assign({ ok: true, letto: false }, esito.valori);
+        await attesa(window.__ritardi.set);
+        return r;
+      }
+      return orig(msg);
+    };
+  }, [doc, ritardi]);
+  await page.evaluate(() => window.__mgTest.setAdmin(true));
+  await page.evaluate(() => window.__mgTest.loadSessions());
+  return page;
+}
+
+// Le asserzioni si fanno a risposte TUTTE arrivate: è l'ultima, quella lenta, a fare il danno.
+const arrivate = (page, n) => expect.poll(() => page.evaluate(() => window.__arrivate)).toBe(n);
+
+const pillola = (page, valore) => page.locator('.mg-auto-choice-item')
+  .filter({ has: page.locator(`input[name="mgPriorityAccount"][value="${valore}"]`) });
+
+// La casella vera è nascosta sotto l'interruttore disegnato: si clicca quello, come l'owner.
+const interruttore = (page, account) => page.locator('label.mg-switch')
+  .filter({ has: page.locator(`#mgAccount${account}`) });
+
+const SERVER = { maxSessions: 4, priorityAccount: '', accountAOff: false, accountBOff: false };
+
+test('torna la rete e un salvataggio riempie il riquadro: nessuna riga dice più «non letto»', async ({ openTab }) => {
+  const page = await apriServer(openTab, { maxSessions: 9, accountAOff: true }, { getGiu: true });
+  await expect(page.locator('#mgAccountsMsg')).toContainText('Non ho potuto leggere');
+
+  await page.evaluate(() => { window.__getGiu = false; });
+  await pillola(page, 'A').click();
+
+  await arrivate(page, 2);
+  await expect(page.locator('#mgPriorityAccountMsg')).toHaveText('Salvato.');
+  await expect(page.locator('#mgMaxSessions')).toHaveValue('9');
+  await expect(page.locator('#mgAccountA')).not.toBeChecked();
+  await expect(page.locator('#mgMaxSessionsMsg')).toHaveText('');
+  await expect(page.locator('#mgAccountsMsg')).toHaveText('');
+  // Il documento ora è noto per intero: l'avviso sul prioritario escluso torna a parlare.
+  await expect(page.locator('#mgPriorityWarn')).toHaveText("L'account A è escluso: le sessioni partono da B.");
+});
+
+test('numero e poi interruttore, la prima risposta arriva per ultima: restano tutti e due', async ({ openTab }) => {
+  const page = await apriServer(openTab, SERVER, { set: [700, 0] });
+
+  await page.locator('#mgMaxSessions').fill('7');
+  await page.locator('#mgMaxSessionsSave').click();
+  await interruttore(page, 'A').click();
+  // In fila dietro il numero: si vede che è partita.
+  await expect(page.locator('#mgAccountsMsg')).toHaveText('Salvo…');
+
+  await arrivate(page, 3);
+  expect(await page.evaluate(() => window.__doc)).toMatchObject({ maxSessions: 7, accountAOff: true });
+  await expect(page.locator('#mgAccountsMsg')).toHaveText('Salvato.');
+  await expect(page.locator('#mgMaxSessionsMsg')).toHaveText('Salvato.');
+  await expect(page.locator('#mgAccountA')).not.toBeChecked();
+  await expect(page.locator('#mgMaxSessions')).toHaveValue('7');
+});
+
+test('interruttore e poi numero, al rovescio: non sparisce la scelta fatta per ultima', async ({ openTab }) => {
+  const page = await apriServer(openTab, SERVER, { set: [700, 0] });
+
+  await interruttore(page, 'B').click();
+  await page.locator('#mgMaxSessions').fill('3');
+  await page.locator('#mgMaxSessions').press('Enter');
+
+  await arrivate(page, 3);
+  expect(await page.evaluate(() => window.__doc)).toMatchObject({ maxSessions: 3, accountBOff: true });
+  await expect(page.locator('#mgMaxSessionsMsg')).toHaveText('Salvato.');
+  await expect(page.locator('#mgAccountsMsg')).toHaveText('Salvato.');
+  await expect(page.locator('#mgMaxSessions')).toHaveValue('3');
+  await expect(page.locator('#mgAccountB')).not.toBeChecked();
+});
+
+test('lo stesso numero salvato due volte di fila: vince l\'ultimo, sul server e sullo schermo', async ({ openTab }) => {
+  const page = await apriServer(openTab, SERVER, { set: [700, 0] });
+
+  await page.locator('#mgMaxSessions').fill('7');
+  await page.locator('#mgMaxSessionsSave').click();
+  await page.locator('#mgMaxSessions').fill('8');
+  await page.locator('#mgMaxSessionsSave').click();
+
+  await arrivate(page, 3);
+  expect(await page.evaluate(() => window.__doc.maxSessions)).toBe(8);
+  await expect(page.locator('#mgMaxSessionsMsg')).toHaveText('Salvato.');
+  await expect(page.locator('#mgMaxSessions')).toHaveValue('8');
+});
+
+test('una scelta fatta mentre la lettura è per strada non viene riscritta dalla lettura', async ({ openTab }) => {
+  const page = await apriServer(openTab, SERVER);
+  // La lettura fotografa il documento PRIMA della scelta e arriva dopo.
+  await page.evaluate(() => {
+    window.__ritardi.get.push(700);
+    window.__mgTest.loadSessions();
+  });
+  await interruttore(page, 'A').click();
+
+  await arrivate(page, 3);
+  expect(await page.evaluate(() => window.__doc.accountAOff)).toBe(true);
+  await expect(page.locator('#mgAccountsMsg')).toHaveText('Salvato.');
+  await expect(page.locator('#mgAccountA')).not.toBeChecked();
+});
+
+test('un numero scritto e non salvato resta lì quando si salva un altro campo', async ({ openTab }) => {
+  const page = await apriServer(openTab, SERVER);
+
+  await page.locator('#mgMaxSessions').fill('11');
+  await interruttore(page, 'B').click();
+
+  await arrivate(page, 2);
+  await expect(page.locator('#mgAccountsMsg')).toHaveText('Salvato.');
+  await expect(page.locator('#mgMaxSessions')).toHaveValue('11');
+  expect(await page.evaluate(() => window.__doc.maxSessions)).toBe(4);
+});
+
+test('mai letto, scritto ma non riletto: la pillola appena scelta resta accesa', async ({ openTab }) => {
+  const page = await apriServer(openTab, SERVER, { getGiu: true });
+  await page.evaluate(() => { window.__rilettura = false; });
+
+  await pillola(page, 'B').click();
+
+  await arrivate(page, 2);
+  await expect(page.locator('#mgPriorityAccountMsg')).toContainText('non l\'ho potuto rileggere');
+  await expect(page.locator('input[name="mgPriorityAccount"][value="B"]')).toBeChecked();
+  // Il resto non è stato letto: resta vuoto e lo dice.
+  await expect(page.locator('#mgMaxSessions')).toHaveValue('');
+  await expect(page.locator('#mgAccountsMsg')).toContainText('Non ho potuto leggere');
 });
