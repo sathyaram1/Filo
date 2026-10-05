@@ -376,3 +376,43 @@ test('in incognito la selezione non parte da sola verso un modello; in una fines
   await seleziona(false);
   await expect.poll(async () => (await spiegazioni()).length, { timeout: 8_000 }).toBe(1);
 });
+
+test('screenshot e immagini copiate da una pagina delicata non vanno al modello delle immagini; chiesta col tasto destro sì', async ({ app, openTab, testServer }) => {
+  await modelliFinti(app);
+  const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  // Nel mondo dei content script della scheda (quello del preload): come la chiama Filo dopo uno screenshot o una copia.
+  const nelContenuto = (titolo, codice) => app.evaluate(async ({ BrowserWindow }, { titolo, codice }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
+    const tab = tm.tabs.find((t) => t.title === titolo);
+    return tab.view.webContents.executeJavaScriptInIsolatedWorld(999, [{ code: codice }], true);
+  }, { titolo, codice });
+  // La voce entra negli appunti prima della descrizione; un sito non legge né scrive gli appunti, lo fa il main.
+  const voce = (u) => app.evaluate(async ({}, { u }) => {
+    const l = await globalThis.SN_STORAGE.getRaw(globalThis.SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
+    const v = l.find((x) => x.dataUrl === u);
+    return v ? v.description : null;
+  }, { u });
+  const descrivi = async (titolo, u) => {
+    await app.evaluate(({}, { u }) => globalThis.SN_STORAGE.setRaw(globalThis.SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY,
+      [{ type: 'image', dataUrl: u, description: 'Descrizione…', ts: Date.now() }]), { u });
+    return nelContenuto(titolo, `SN_ACTIONS.requestImageDescription(${JSON.stringify(u)})`);
+  };
+  const immagini = async () => (await mandato(app)).filter((m) => m.testo.includes('image_url'));
+
+  await testServer.openReady(openTab, '<!doctype html><title>Ricetta</title><body><p>Pane</p></body>');
+  expect(await descrivi('Ricetta', `${PNG}#a`)).toBe('Riassunto finto della pagina.');
+  expect((await immagini()).length).toBe(1);
+
+  await testServer.openReady(openTab,
+    `<!doctype html><html><head><title>Il mio conto</title></head><body>${CON_PASSWORD}</body></html>`, { pubblico: true });
+  await expect.poll(() => app.evaluate(() => globalThis.SN_DELICATE.haCampi('sito-pubblico.test')), { timeout: 8_000 }).toBe(true);
+  expect(await descrivi('Il mio conto', `${PNG}#b`)).toBe(null);
+  await expect.poll(() => voce(`${PNG}#b`), { timeout: 4_000 }).toBe('Immagine da una pagina delicata');
+  expect((await immagini()).length, 'nessuna immagine nuova al modello').toBe(1);
+
+  // La descrizione chiesta aprendo il tasto destro su un'immagine resta com'è.
+  const chiesta = await nelContenuto('Il mio conto', `chrome.runtime.sendMessage({ type: SN_MSG.MSG.AI_REQUEST,
+    action: SN_CONST.ACTIONS.DESCRIBE_IMAGE, payload: { dataUrl: ${JSON.stringify(`${PNG}#c`)} } })`);
+  expect(chiesta.ok).toBe(true);
+  expect((await immagini()).length).toBe(2);
+});

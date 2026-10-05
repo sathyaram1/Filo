@@ -436,7 +436,9 @@
   // finché una descrizione può davvero arrivare, altrimenti dice che manca il
   // modello (un'attesa che non finirà mai è una bugia).
   let imageDescNoModel = false;
-  function imagePlaceholderLabel() {
+  let ultimaDaDelicata = null;
+  function imagePlaceholderLabel(dataUrl) {
+    if (dataUrl && dataUrl === ultimaDaDelicata) return I18n.t('clipboard_image_delicata');
     return I18n.t(imageDescNoModel ? 'clipboard_image_no_model' : 'clipboard_image_pending');
   }
 
@@ -459,6 +461,7 @@
     }
     // Da una pagina delicata l'immagine non va al modello: lo screenshot prende data e ora (#1004).
     if (res?.code === 'PAGINA_DELICATA') {
+      ultimaDaDelicata = dataUrl;
       chrome.runtime.sendMessage({
         type: MSG.UPDATE_CLIPBOARD_DESCRIPTION,
         dataUrl,
@@ -1434,7 +1437,7 @@
       try {
         chrome.runtime.sendMessage({
           type: MSG.PUSH_CLIPBOARD_ENTRY,
-          entry: { type: 'image', dataUrl: cap.dataUrl, description: desc || imagePlaceholderLabel() },
+          entry: { type: 'image', dataUrl: cap.dataUrl, description: desc || imagePlaceholderLabel(cap.dataUrl) },
         }).catch(() => {});
       } catch (_) {}
       const a = document.createElement('a');
@@ -1625,7 +1628,7 @@
       try {
         chrome.runtime.sendMessage({
           type: MSG.PUSH_CLIPBOARD_ENTRY,
-          entry: { type: 'image', dataUrl, description: desc || imagePlaceholderLabel() },
+          entry: { type: 'image', dataUrl, description: desc || imagePlaceholderLabel(dataUrl) },
         }).catch(() => {});
       } catch (_) {}
       const a = document.createElement('a');
