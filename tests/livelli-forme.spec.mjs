@@ -359,6 +359,45 @@ test('fermo su una scelta dell’owner: sta fra i Ricevuti con la casella di ris
   await expect(page.locator('#mgSideBody')).toContainText('Due strade con costi diversi');
 });
 
+test('nel rombo e nel pentagono il grassetto e il codice in linea si leggono come tali, non come asterischi; l’HTML resta testo', async ({ openTab }) => {
+  // «**A.**» è la forma che il modello della segnalazione prescrive per le scelte (#703).
+  const SEGNALAZIONE = '## Problema\nIl nome del file salvato: dal sito o chiesto ogni volta?\n\n## Scelte\n- **A.** Dal sito: zero attrito.\n- **B.** Chiesto: un passaggio in più.\n\n## Cosa ho fatto nel frattempo\nHo preso la **A.** <b>finto</b> <img src=x onerror="window.__xss=1">';
+  const fb = {
+    _id: 'fb-livelli-grassetto', text: 'Il download non tiene il nome del file.', name: 'Nome del file',
+    seq: 704, subSeq: 0, status: 'design', statusReason: 'decisione', branch: 'worker/fb-livelli-grassetto',
+    clientId: 'user:abc', createdAt: '2026-09-22T10:00:00Z', images: [],
+    notes: `Ho fatto A.\n\nSegnalazione per l'owner (chi verifica):\n${SEGNALAZIONE}`,
+    livelli: {
+      l3: { esito: 'segnalato', ruolo: 'verifier', at: '2026-09-22T10:05:00Z', testo: SEGNALAZIONE },
+      l4: { esito: 'pass', at: '2026-09-22T11:00:00Z', testo: '## Problema\nNessuno: il controllo `salvaDownload` resta **dentro** la pagina.' },
+    },
+  };
+  const page = await openTab(MANAGE);
+  await apri(page, [fb]);
+  await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
+
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l3"]').click();
+  const corpo = page.locator('#mgSideBody');
+  await expect(corpo.locator('.mg-liv-elenco li')).toHaveText(['A. Dal sito: zero attrito.', 'B. Chiesto: un passaggio in più.']);
+  await expect(corpo.locator('.mg-liv-elenco li strong')).toHaveText(['A.', 'B.']);
+  expect(await corpo.locator('.mg-liv-elenco li strong').first().evaluate((e) => Number(getComputedStyle(e).fontWeight))).toBeGreaterThanOrEqual(600);
+  await expect(corpo).not.toContainText('**');
+  await expect(corpo.locator('.mg-liv-par strong')).toHaveText('A.');
+  await expect(corpo).toContainText('<b>finto</b> <img src=x');
+  expect(await corpo.locator('b, img').count()).toBe(0);
+  expect(await page.evaluate(() => window.__xss)).toBeUndefined();
+  for (const tema of ['dark', 'light']) {
+    await page.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), tema);
+    await page.locator('#mgSide').screenshot({ path: `tests/.shots/livelli-rombo-grassetto-${tema}.png` });
+  }
+
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l4"]').click();
+  await expect(corpo.locator('.mg-liv-testo code')).toHaveText('salvaDownload');
+  await expect(corpo.locator('.mg-liv-testo strong')).toHaveText('dentro');
+  await expect(corpo).not.toContainText('`');
+  await page.locator('#mgSide').screenshot({ path: 'tests/.shots/livelli-pentagono-codice-light.png' });
+});
+
 test('il pentagono verde dice cosa ha controllato l’audit, e non offre di saltarlo', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apri(page, [FB_COMPLETO]);

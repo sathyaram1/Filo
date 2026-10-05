@@ -1642,7 +1642,8 @@
    * «## Scelte», «## Cosa ho fatto nel frattempo») e voci a trattino: mostrati
    * grezzi, cancelletti e trattini compaiono come caratteri e l'owner legge un
    * blocco con simboli al posto di tre sezioni. Qui si riconoscono SOLO titoli
-   * e voci d'elenco: niente HTML dal testo, che resta testo. PURA.
+   * e voci d'elenco (grassetto e codice in linea: pezziInline): niente HTML
+   * dal testo, che resta testo. PURA.
    *   { tipo:'titolo', livello:1..6, testo } | { tipo:'voce', testo } |
    *   { tipo:'testo', testo }  (le righe di seguito si uniscono in un paragrafo)
    */
@@ -1720,7 +1721,7 @@
     classifyReevalResult, reevalErrorHint, REEVAL_WASTE_LIMIT,
     livelli, livelloPer, livelloL1, livelloL2, livelloL3, livelloL4, livelloL5, righeStato,
     fusioneInAttesa, fusioniSenzaFeedback, richiestaDiQuesto, numeroOf,
-    l1MotivoText, LIVELLO_COLORI, L1_MOTIVI, righeTesto,
+    l1MotivoText, LIVELLO_COLORI, L1_MOTIVI, righeTesto, pezziInline,
     aspettaRisposta, ultimaDomanda, TESTO_CIFRATO,
     FRASE_SEGNO_ERRATO, fermatoDalSegno, motivoSegnoText,
   };

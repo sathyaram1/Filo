@@ -57,3 +57,35 @@ test('righeTesto: HTML resta testo, e il vuoto dà zero righe', () => {
   assert.deepEqual(MR.righeTesto(null), []);
   assert.deepEqual(MR.righeTesto('   \n\n  '), []);
 });
+
+test('pezziInline: il grassetto delle scelte («**A.**», la forma del modello di segnalazione) diventa grassetto, non asterischi', () => {
+  assert.deepEqual(MR.pezziInline('**A.** Dal sito: zero attrito.'), [
+    { testo: 'A.', grassetto: true },
+    { testo: ' Dal sito: zero attrito.' },
+  ]);
+  assert.deepEqual(MR.pezziInline('prima **x** e **y**'), [
+    { testo: 'prima ' }, { testo: 'x', grassetto: true }, { testo: ' e ' }, { testo: 'y', grassetto: true },
+  ]);
+});
+
+test('pezziInline: il codice in linea si riconosce, e gli asterischi dentro i backtick restano asterischi', () => {
+  assert.deepEqual(MR.pezziInline('usa `a**b**c` qui'), [
+    { testo: 'usa ' }, { testo: 'a**b**c', codice: true }, { testo: ' qui' },
+  ]);
+  assert.deepEqual(MR.pezziInline('**il tasto `Salva`**'), [
+    { testo: 'il tasto ', grassetto: true }, { testo: 'Salva', grassetto: true, codice: true },
+  ]);
+});
+
+test('pezziInline: coppie mai chiuse, vuote o con spazi ai bordi restano testo; HTML resta testo', () => {
+  for (const t of ['**A. senza chiusura', '****', '** spazio **', '2 ** 3', '`aperto', '``']) {
+    assert.deepEqual(MR.pezziInline(t), [{ testo: t }], t);
+  }
+  assert.deepEqual(MR.pezziInline('**<b>x</b>**'), [{ testo: '<b>x</b>', grassetto: true }]);
+  assert.deepEqual(MR.pezziInline(''), []);
+  assert.deepEqual(MR.pezziInline(null), []);
+});
+
+test('pezziInline: il grassetto non attraversa un a capo del paragrafo', () => {
+  assert.deepEqual(MR.pezziInline('**prima\nseconda**'), [{ testo: '**prima\nseconda**' }]);
+});

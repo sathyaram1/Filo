@@ -4580,21 +4580,22 @@
       if (p.illeggibile) {
         t.textContent = MR.TESTO_CIFRATO;
       } else {
-        // Titoli e voci d'elenco del markdown resi come tali, il resto come
-        // testo: niente HTML dal testo (il modulo condiviso li riconosce).
+        // Titoli, voci d'elenco, grassetto e codice del markdown resi come
+        // tali, il resto come testo: niente HTML dal testo (il modulo
+        // condiviso li riconosce, qui diventano nodi).
         let lista = null;
         for (const r of MR.righeTesto(p.testo)) {
           if (r.tipo === 'voce') {
             if (!lista) { lista = document.createElement('ul'); lista.className = 'mg-liv-elenco'; t.appendChild(lista); }
             const li = document.createElement('li');
-            li.textContent = r.testo;
+            riempiInline(li, r.testo);
             lista.appendChild(li);
             continue;
           }
           lista = null;
           const el = document.createElement('div');
           el.className = r.tipo === 'titolo' ? 'mg-liv-titolo' : 'mg-liv-par';
-          el.textContent = r.testo;
+          riempiInline(el, r.testo);
           t.appendChild(el);
         }
       }
@@ -4606,6 +4607,19 @@
 
     openSidebar(p.titolo, '');
     mgSideBody.replaceChildren(body);
+  }
+
+  function riempiInline(el, testo) {
+    for (const pezzo of MR.pezziInline(testo)) {
+      let nodo = document.createTextNode(pezzo.testo);
+      for (const [flag, tag] of [['codice', 'code'], ['grassetto', 'strong']]) {
+        if (!pezzo[flag]) continue;
+        const involucro = document.createElement(tag);
+        involucro.appendChild(nodo);
+        nodo = involucro;
+      }
+      el.appendChild(nodo);
+    }
   }
 
   // Le card della fusione dentro il pannello del quadrato: stesso disegno e

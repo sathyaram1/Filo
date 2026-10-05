@@ -955,12 +955,17 @@
       word-break: break-word; color: var(--sn-text);
     }
     .mg-liv-testo em { color: var(--sn-muted); font-style: italic; }
-    /* Markdown in arrivo: titoli e voci a trattino si vedono come tali, il resto è testo. Niente HTML dal testo. */
+    /* Markdown in arrivo: titoli, voci, grassetto e codice si vedono come tali, il resto è testo. Niente HTML dal testo. */
     .mg-liv-titolo { font-weight: 600; margin: 10px 0 4px; }
     .mg-liv-titolo:first-child { margin-top: 0; }
     .mg-liv-par { margin: 0 0 6px; }
     .mg-liv-elenco { margin: 0 0 6px 18px; padding: 0; }
     .mg-liv-elenco li { margin: 2px 0; }
+    .mg-liv-testo strong { font-weight: 600; }
+    .mg-liv-testo code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.92em; background: var(--sn-border); padding: 1px 4px; border-radius: 3px;
+    }
     /* Il tasto che scavalca l'audit è un'eccezione, non un'azione di tutti i giorni: si arma con un secondo clic,
        come l'approvazione di una fusione, perché il primo non basti. */
     .mg-liv-azioni { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
