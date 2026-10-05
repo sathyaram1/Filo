@@ -161,6 +161,9 @@ function createIncognitoWindow() {
   // filo:// è registrato globalmente solo sulla sessione di default: i tab di
   // questa partizione non lo vedrebbero. Registriamolo qui.
   registerFiloProtocolForSession(ses);
+  // Chi apre l'incognito si aspetta più riservatezza, non meno: la sessione di
+  // questa finestra deve avere le stesse protezioni di quella normale (#755).
+  try { require('./services/cookies').proteggiSessione(ses, { partition, incognito: true }); } catch (_) {}
 
   const win = new BrowserWindow({
     width: 1180,
