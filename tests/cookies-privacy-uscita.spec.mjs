@@ -166,6 +166,24 @@ test('il sito tolto dai fidati mentre è aperto non perde la sessione sotto le m
   expect((await apri(app, shell, fidato('/riaperta'))).titolo).toBe(CONNESSO);
 });
 
+test('il jar rimasto da una sessione precedente di un sito non più fidato non torna a galla', async ({ app, shell }) => {
+  const host = await app.evaluate((_e, u) => globalThis.__filoCookies.registrableOf(u), fidato('/'));
+  await privacy(app, shell, { trustedSites: [], margine: 800 });
+  // Quello che resterebbe sul disco se Filo si fosse chiuso prima che la scheda del sito tolto dai fidati si chiudesse.
+  await app.evaluate(async ({ session }, [h, p]) => {
+    const ses = session.fromPartition('persist:filo-priv-' + h);
+    await ses.cookies.set({ url: `http://${h}:${p}/`, name: 'sess', value: 'abc', expirationDate: Date.now() / 1000 + 9999 });
+    await new Promise((r) => setTimeout(r, 1500));
+  }, [host, Number(new URL(fidato('/')).port)]);
+
+  // Un qualsiasi giro successivo sull'elenco dei fidati porta via quello che non è più fidato.
+  await privacy(app, shell, { trustedSites: ['esempio.test'], margine: 800 });
+  await attendi(1500);
+
+  await privacy(app, shell, { trustedSites: [host], margine: 800 });
+  expect((await apri(app, shell, fidato('/ritorno'))).titolo).toBe(PULITO);
+});
+
 async function nellaPagina(app, id, codice) {
   return app.evaluate(({ BrowserWindow }, [tabId, js]) => {
     for (const w of BrowserWindow.getAllWindows()) {
