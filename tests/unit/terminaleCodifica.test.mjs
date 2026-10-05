@@ -88,7 +88,9 @@ test('il preludio precede il comando dell\'utente, non lo segue', () => {
   Object.defineProperty(process, 'platform', { value: 'win32' });
   try {
     const comando = 'Write-Output ciao';
-    for (const shell of ['powershell', 'cmd']) {
+    // cmd non passa da qui ma dalla sessione (#719), dove il preludio è la riga di pronto: la prova sta in terminaleCmd.
+    assert.ok(T.viaSessione('cmd'));
+    for (const shell of ['powershell']) {
       for (const trackCwd of [false, true]) {
         const inv = T.invocazione(shell, comando, { trackCwd, mark: 'SEGNO' });
         const testo = inv.stdin != null ? inv.stdin : inv.args[inv.args.length - 1];
