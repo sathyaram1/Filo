@@ -1558,12 +1558,27 @@
     // richiesta ferma: è un sì già dato che non ha prodotto niente.
     const ferme = failed.concat(pending);
     if (!ferme.length && fermaDaStato) {
+      // #1038: con gli elenchi letti, nessuna richiesta vuol dire che sul server non c'è, e da sola la pratica
+      // non esce da qui. Senza elenchi (altro computer, lettura in corso) non si sa: si dice e basta.
+      const lette = !!(opts && opts.fusioniLette);
+      const scartata = lette && ultimaDecisa(lista('recent'));
+      const senza = { richiesta: null, richieste: [], conflitto: false, senzaRichiesta: lette };
+      if (scartata && scartata.discarded === true) {
+        return forma('l5', 'quadrato', titolo, 'attack', 'bloccato', {
+          titolo,
+          righe: scartata.branch ? [riga('Ramo', String(scartata.branch))] : [],
+          testo: 'I controlli del server l’hanno fermata e avevi scartato la richiesta di fusione: questa versione non si riapre. Rimettila in coda per rifare il lavoro, o archiviala.',
+          azioni: ['in_coda'],
+        }, senza);
+      }
       return forma('l5', 'quadrato', titolo, 'attack', 'bloccato', {
         titolo,
         righe: [],
-        testo: 'I controlli del server l’hanno fermata: entra in main solo col tuo via libera. La richiesta non è (ancora) arrivata a questa pagina.',
-        azioni: [],
-      }, { richiesta: null, richieste: [], conflitto: false });
+        testo: lette
+          ? 'I controlli del server l’hanno fermata, ma sul server non c’è nessuna richiesta da approvare: da sola resta ferma qui. Chiedi di nuovo la fusione: il server rifà i controlli e la richiesta compare qui.'
+          : 'I controlli del server l’hanno fermata: entra in main solo col tuo via libera. La richiesta non è (ancora) arrivata a questa pagina.',
+        azioni: lette ? ['riapri_fusione'] : [],
+      }, senza);
     }
     if (ferme.length) {
       const req = ferme[0];
@@ -1612,6 +1627,54 @@
       testo: 'Niente da fondere: nessun ramo è ancora arrivato al cancello.',
       azioni: [],
     }, { richiesta: null, richieste: [], conflitto: false });
+  }
+
+  /** La decisione più recente fra quelle passate. PURA. */
+  function ultimaDecisa(lista) {
+    const quando = (r) => Number(r && (r.decidedAtMs || r.expiresAtMs)) || 0;
+    return (Array.isArray(lista) ? lista : []).reduce((a, r) => (!a || quando(r) > quando(a) ? r : a), null);
+  }
+
+  // Gli esiti di «Chiedi di nuovo la fusione» (#1038). `inCoda`: la strada che resta è rimetterla in coda.
+  const RIAPRI_ESITI = {
+    senza_richiesta: { kind: 'err', text: 'I controlli l’hanno fermata di nuovo, ma il server non è riuscito a registrare la richiesta. Riprova fra poco; se si ripete, vanno controllate le funzioni di sicurezza.' },
+    conflitto: { kind: 'warn', inCoda: true, text: 'Il ramo non si fonde più con main: le modifiche non si incastrano da sole. Rimettila in coda e un giro nuovo lo riallinea.' },
+    unit_rossi: { kind: 'warn', inCoda: true, text: 'Sulla fusione con main gli unit sono rossi: rimettila in coda e un giro nuovo la riallinea.' },
+    ramo_assente: { kind: 'warn', inCoda: true, text: 'Il ramo di questa pratica non c’è più: non c’è niente da fondere. Rimettila in coda per rifare il lavoro.' },
+    ramo_mosso: { kind: 'warn', text: 'Il ramo si è mosso mentre chiedevo: riprova.' },
+    non_ferma: { kind: 'warn', text: 'La pratica non è più ferma al cancello: non ho chiesto niente.' },
+    feedback_assente: { kind: 'err', text: 'Il server non trova questa pratica.' },
+    non_pubblicata: { kind: 'err', text: 'Il server non espone (ancora) la fusione chiesta da te: vanno rideployate le funzioni di sicurezza.' },
+    negata: { kind: 'err', text: 'Il server non ti ha riconosciuto come proprietario: rifai l’accesso.' },
+    senza_credenziale: { kind: 'err', text: 'Il server non ha la credenziale con cui scrive su main: nessuna fusione è avvenuta.' },
+    server_giu: { kind: 'err', text: 'Server o GitHub non rispondono: non ho chiesto niente. Riprova fra poco.' },
+  };
+
+  /**
+   * L'esito di «Chiedi di nuovo la fusione», detto all'owner. PURA.
+   * `statoRichiesta`: dove sta la richiesta nominata dal server negli elenchi riletti dopo
+   * ('pending' | 'discarded' | 'used' | '' se non c'è): il server ridà il nome anche di una già decisa.
+   */
+  function esitoRiapriFusione(reply, statoRichiesta) {
+    const r = reply || {};
+    if (r.ok === false) return { kind: 'err', text: String(r.error || 'Non è riuscita: nessuna fusione chiesta.') };
+    if (r.esito === 'richiesta') {
+      if (statoRichiesta === 'pending') return { kind: 'ok', text: 'Richiesta aperta: la trovi qui, con quello che ha fermato i controlli.' };
+      if (statoRichiesta === 'discarded') return { kind: 'warn', inCoda: true, text: 'Questa versione l’avevi scartata, e una richiesta decisa non si riapre. Rimettila in coda per rifare il lavoro.' };
+      if (statoRichiesta === 'used') return { kind: 'warn', inCoda: true, text: 'Questa versione era già stata approvata, e un via libera vale una volta sola. Rimettila in coda per rifare il lavoro.' };
+      return { kind: 'warn', text: 'Il server dice di aver aperto la richiesta, ma qui non è ancora arrivata: riprova fra poco.' };
+    }
+    if (r.esito === 'fuso') {
+      const sha = String(r.sha || '').slice(0, 8);
+      return { kind: 'ok', text: `I controlli non l’hanno fermata e il server l’ha fusa: il lavoro è su main${sha ? ` (${sha})` : ''}.` };
+    }
+    const noto = RIAPRI_ESITI[r.esito];
+    if (noto) {
+      const motivo = (r.esito === 'senza_richiesta' || r.esito === 'server_giu') && r.reason ? ` (${String(r.reason).slice(0, 200)})` : '';
+      return { ...noto, text: noto.text + motivo };
+    }
+    if (r.esito === 'rifiutata') return { kind: 'err', text: `Il server ha rifiutato la richiesta${r.reason ? `: ${String(r.reason).slice(0, 200)}` : '.'}` };
+    return { kind: 'err', text: `Esito inatteso${r.esito ? ` («${String(r.esito).slice(0, 40)}»)` : ''}: nessuna fusione è avvenuta.` };
   }
 
   /**
@@ -1674,7 +1737,7 @@
     statusUnreadable, valueUnreadable, sectionsReliable, publicStateLabel, PUBLIC_STATE_HINT,
     ownerActions, ownerActionFor, ownerActionAllowsStatus, stateBadge,
     classifyReevalResult, reevalErrorHint, REEVAL_WASTE_LIMIT,
-    livelli, livelloPer, livelloL1, livelloL2, livelloL3, livelloL4, livelloL5, righeStato,
+    livelli, livelloPer, livelloL1, livelloL2, livelloL3, livelloL4, livelloL5, righeStato, esitoRiapriFusione,
     fusioneInAttesa, fusioniFermeInCima, fusioniSenzaFeedback, richiestaDiQuesto, numeroOf,
     l1MotivoText, LIVELLO_COLORI, L1_MOTIVI,
     aspettaRisposta, ultimaDomanda, TESTO_CIFRATO,

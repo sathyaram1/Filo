@@ -615,6 +615,7 @@
     MERGE_APPROVALS_GET: 'merge_approvals_get',        // → { ok, pending:[…], failed:[…], recent:[…], ttlMs } | { ok:false, error }
     MERGE_APPROVAL_APPROVE: 'merge_approval_approve',  // { id } → { ok, result:'merged'|'conflict'|'stale', sha?, headSha?, realigned?:{from,to,mainSha}, newRequest?, newBlocks?, realignReason?, reason? } | { ok:false, error }
     MERGE_APPROVAL_DISCARD: 'merge_approval_discard',  // { id } → { ok, result:'discarded' } | { ok:false, error }
+    MERGE_APPROVAL_REOPEN: 'merge_approval_reopen',    // { feedbackId } → { ok, esito, branch?, requestId?, sha?, reason? } | { ok:false, error } (#1038)
     // L'owner ha letto la bocciatura dell'audit di sicurezza (L4) e decide di
     // andare avanti lo stesso. Non è un via libera cieco: il cancello di
     // fusione (L5) resta, e parte subito dopo — l'esito dice se il ramo è

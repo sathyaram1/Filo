@@ -2,9 +2,13 @@
 // Non decide niente: chiede a `ownerMerge` (ramo del documento, punta letta da GitHub, id della pratica),
 // che rifà L5 sul diff e apre la richiesta legata alla pratica. Gli esiti li dice manageReview.esitoRiapriFusione.
 
-const { isValidBranch } = require('./nomeRamo');
-
 const SHA = /^[0-9a-f]{40}$/;
+
+// Il nome finisce in un URL di GitHub: niente flag, niente `..`, solo i caratteri di un ramo. Il server rivalida.
+function isValidBranch(name) {
+  return typeof name === 'string' && name.length > 0 && name.length <= 255 && !name.startsWith('-')
+    && /^[A-Za-z0-9._/-]+$/.test(name) && !name.includes('..');
+}
 
 /** Il repo da cui escono gli aggiornamenti è anche quello su cui si fonde: un posto solo, package.json. */
 function repoDelProgetto() {

@@ -1488,6 +1488,74 @@ test('livelli L5: lo stato del server basta da solo (design/l5), senza gli elenc
   assert.equal(l5.colore, MR.REASONS.attack.color);
 });
 
+// #1038: la pratica #952.1 restava in design/l5 col quadrato rosso e nessun tasto, senza nessuna richiesta sul server.
+test('livelli L5: ferma senza richiesta e con gli elenchi letti → il tasto per chiedere di nuovo la fusione', () => {
+  const fb = { _id: 'fb-952', seq: 952, subSeq: 1, status: 'design', statusReason: 'l5' };
+  const l5 = MR.livelloL5(fb, { fusioni: { pending: [], failed: [], recent: [] }, fusioniLette: true });
+  assert.equal(l5.esito, 'bloccato');
+  assert.equal(l5.colore, MR.REASONS.attack.color);
+  assert.equal(l5.senzaRichiesta, true);
+  assert.deepEqual(l5.pannello.azioni, ['riapri_fusione']);
+  assert.match(l5.pannello.testo, /non c’è nessuna richiesta/);
+  assert.doesNotMatch(l5.pannello.testo, /non è \(ancora\) arrivata/);
+  // Una richiesta di un'altra pratica non conta.
+  const altra = { id: 'r1', feedbackId: 'fb-altra', num: '#7' };
+  assert.deepEqual(MR.livelloL5(fb, { fusioni: { pending: [altra] }, fusioniLette: true }).pannello.azioni, ['riapri_fusione']);
+});
+
+test('livelli L5: senza elenchi letti non si sa se la richiesta c’è, quindi niente tasto', () => {
+  const l5 = MR.livelloL5({ status: 'design', statusReason: 'l5' }, { fusioni: {} });
+  assert.equal(l5.esito, 'bloccato');
+  assert.deepEqual(l5.pannello.azioni, []);
+  assert.equal(l5.senzaRichiesta, false);
+  assert.match(l5.pannello.testo, /non è \(ancora\) arrivata/);
+});
+
+test('livelli L5: con la richiesta in attesa il tasto per chiederla di nuovo non c’è', () => {
+  const fb = { _id: 'fb-952', status: 'design', statusReason: 'l5' };
+  const l5 = MR.livelloL5(fb, { fusioni: { pending: [{ id: 'r1', feedbackId: 'fb-952' }] }, fusioniLette: true });
+  assert.deepEqual(l5.pannello.azioni, []);
+  assert.ok(!l5.senzaRichiesta);
+});
+
+test('livelli L5: l’ultima richiesta della pratica l’hai scartata → si rimette in coda, non si richiede', () => {
+  const fb = { _id: 'fb-952', status: 'design', statusReason: 'l5' };
+  const recent = [
+    { id: 'vecchia', feedbackId: 'fb-952', expired: true, decidedAtMs: 1000 },
+    { id: 'scartata', feedbackId: 'fb-952', discarded: true, decidedAtMs: 2000, branch: 'worker/952' },
+  ];
+  const l5 = MR.livelloL5(fb, { fusioni: { recent }, fusioniLette: true });
+  assert.deepEqual(l5.pannello.azioni, ['in_coda']);
+  assert.match(l5.pannello.testo, /avevi scartato/);
+  // Scaduta dopo lo scarto: la richiesta si può rifare.
+  const dopo = recent.concat([{ id: 'scaduta', feedbackId: 'fb-952', decidedAtMs: 3000 }]);
+  assert.deepEqual(MR.livelloL5(fb, { fusioni: { recent: dopo }, fusioniLette: true }).pannello.azioni, ['riapri_fusione']);
+});
+
+test('esitoRiapriFusione: ogni esito detto in italiano, e la coda proposta dove resta solo quella', () => {
+  const E = MR.esitoRiapriFusione;
+  assert.equal(E({ ok: true, esito: 'richiesta', requestId: 'r' }, 'pending').kind, 'ok');
+  assert.equal(E({ ok: true, esito: 'richiesta', requestId: 'r' }, 'discarded').inCoda, true);
+  assert.equal(E({ ok: true, esito: 'richiesta', requestId: 'r' }, 'used').inCoda, true);
+  assert.match(E({ ok: true, esito: 'richiesta', requestId: 'r' }, '').text, /non è ancora arrivata/);
+  const senza = E({ ok: true, esito: 'senza_richiesta', reason: 'guard_the_guards' });
+  assert.equal(senza.kind, 'err');
+  assert.match(senza.text, /non è riuscito a registrare la richiesta/);
+  for (const esito of ['conflitto', 'ramo_assente', 'unit_rossi']) {
+    const m = E({ ok: true, esito });
+    assert.equal(m.inCoda, true, esito);
+    assert.match(m.text, /in coda/, esito);
+  }
+  assert.match(E({ ok: true, esito: 'conflitto' }).text, /non si fonde più con main/);
+  assert.match(E({ ok: true, esito: 'fuso', sha: 'deadbeefcafe' }).text, /su main \(deadbeef\)/);
+  assert.equal(E({ ok: false, error: 'Sessione scaduta' }).text, 'Sessione scaduta');
+  assert.match(E({ ok: true, esito: 'rifiutata', reason: 'branch_invalid' }).text, /branch_invalid/);
+  // Un esito sconosciuto non diventa mai un successo.
+  const ignoto = E({ ok: true, esito: 'boh' });
+  assert.equal(ignoto.kind, 'err');
+  assert.match(ignoto.text, /nessuna fusione/);
+});
+
 test('statusReason l5: blocco ROSSO in lista, non "questione di design"', () => {
   const fb = { status: 'design', statusReason: 'l5' };
   assert.equal(MR.classifyBlock(fb).reason, 'l5');

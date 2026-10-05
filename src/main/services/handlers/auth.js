@@ -1471,6 +1471,27 @@ module.exports = function register(on, ctx) {
     return { ok: true, result: 'discarded' };
   }));
 
+  // #1038: una pratica ferma al cancello senza nessuna richiesta da approvare. Ramo e stato si rileggono dal
+  // documento, non dalla pagina: si chiede la fusione solo del ramo di QUELLA pratica, e solo se è ferma lì.
+  on(MSG.MERGE_APPROVAL_REOPEN, ownerOnly(async (msg) => {
+    const { riapriFusione, puntaDaGitHub } = require('../riapriFusione');
+    return riapriFusione({
+      feedbackId: msg?.feedbackId,
+      leggiPratica: async (id) => {
+        const FB = FEEDBACK();
+        if (!FB) throw new Error('SN_FEEDBACK non caricato nel main process');
+        const idToken = await auth.getIdToken();
+        if (!idToken) throw new Error('Sessione scaduta: rifai l\'accesso.');
+        const rows = await FB.getMany([id], { idToken, timeoutMs: 15000, fields: ['branch', 'status', 'statusReason'] });
+        const row = Array.isArray(rows) ? rows.find((r) => r && r._id === id) : null;
+        return row ? decryptFeedbackObject(row) : null;
+      },
+      puntaDelRamo: (branch) => puntaDaGitHub(branch),
+      chiedi: (data) => callSecurityFunction('ownerMerge', data),
+      normalizeStatus: (fb) => globalThis.SN_MANAGE_REVIEW.normalizeStatus(fb),
+    });
+  }));
+
   // All'editor servono anche la catena in uso negli slot spostati mai salvati e
   // i nickname del registro condiviso, che il server dei giudici unisce al loro.
   async function perEditor(models) {

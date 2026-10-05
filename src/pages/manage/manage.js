@@ -1195,6 +1195,7 @@
   const MERGE_APPROVALS_GET = (window.SN_MSG?.MSG?.MERGE_APPROVALS_GET) || 'merge_approvals_get';
   const MERGE_APPROVAL_APPROVE = (window.SN_MSG?.MSG?.MERGE_APPROVAL_APPROVE) || 'merge_approval_approve';
   const MERGE_APPROVAL_DISCARD = (window.SN_MSG?.MSG?.MERGE_APPROVAL_DISCARD) || 'merge_approval_discard';
+  const MERGE_APPROVAL_REOPEN = (window.SN_MSG?.MSG?.MERGE_APPROVAL_REOPEN) || 'merge_approval_reopen';
   const MERGE_APPROVALS_CHANGED = (window.SN_MSG?.MSG?.MERGE_APPROVALS_CHANGED) || 'merge_approvals_changed';
   const LIVELLO4_SALTA = (window.SN_MSG?.MSG?.LIVELLO4_SALTA) || 'livello4_salta';
   const FEEDBACK_SENDER_FLAG = (window.SN_MSG?.MSG?.FEEDBACK_SENDER_FLAG) || 'feedback_sender_flag';
@@ -1312,6 +1313,8 @@
   // senza rileggere niente.
   let fusioni = { pending: [], failed: [], recent: [], preapproved: [] };
   let fusioniLette = false;
+  // L'ULTIMA lettura è riuscita: solo allora «nessuna richiesta» vuol dire che sul server non c'è (#1038).
+  let fusioniAttendibili = false;
   // Una richiesta si manda a fondere UNA volta per segno: un rifiuto o un
   // conflitto non si ritentano da soli a ogni rilettura. id → { fb, segno }.
   const fusioniTentate = new Map();
@@ -1351,7 +1354,7 @@
     return esito && (esito.kind === 'ok' || esito.reload) ? 'decisa' : null;
   }
   function opzioniLivelli(fb) {
-    return { fusioni, dettaglioLetto: !FB.soloLista(fb), statoRichiesta };
+    return { fusioni, fusioniLette: fusioniAttendibili && isAdmin, dettaglioLetto: !FB.soloLista(fb), statoRichiesta };
   }
   // Una richiesta che parte, arriva o viene decisa cambia le frasi della lista e del quadrato.
   function statoFusioniCambiato() {
@@ -1533,6 +1536,7 @@
     if (!UI) return 0;
     const spegni = () => {
       fusioni = { pending: [], failed: [], recent: [], preapproved: [] };
+      fusioniAttendibili = false;
       if (mgMergeApprovalsOrphans) {
         mgMergeApprovalsOrphans.replaceChildren();
         mgMergeApprovalsOrphans.hidden = true;
@@ -1562,6 +1566,7 @@
     const primaDelleFusioni = fusioniLette ? live.fotoSezioni() : null;
     fusioni = LIVE.fusioniDa(r, fusioni);
     fusioniLette = true;
+    fusioniAttendibili = true;
     if (primaDelleFusioni && dataLoaded) segnaArrivi(primaDelleFusioni, allFeedbacks);
     // Una richiesta che non c'è più non ha un esito da raccontare.
     const vive = new Set(fusioni.pending.concat(fusioni.failed).map((req) => req.id));
@@ -4748,6 +4753,7 @@
     }
 
     if (liv.key === 'l5') body.appendChild(pannelloFusione(fb, liv));
+    if (liv.key === 'l5' && isAdmin && liv.senzaRichiesta) body.appendChild(pannelloRiapriFusione(fb, liv));
     if (mostraSaltaAudit(fb, liv)) body.appendChild(pannelloSaltaAudit(fb));
     if (liv.key === 'l3' && rispostaOfferta(fb)) body.appendChild(pannelloRisposta(fb));
 
@@ -4883,6 +4889,93 @@
     box.appendChild(btn);
     box.appendChild(esito);
     return box;
+  }
+
+  // #1038: una pratica ferma al cancello senza richiesta da approvare. L'esito resta per pratica, così un
+  // ridisegno del pannello (rilettura delle fusioni) non lo cancella mentre l'owner lo legge.
+  const riapriInVolo = new Set();
+  const esitiRiapri = new Map();
+
+  function pannelloRiapriFusione(fb, liv) {
+    const box = document.createElement('div');
+    box.className = 'mg-liv-azioni';
+    const esito = document.createElement('span');
+    esito.className = 'mg-liv-esito';
+    esito.setAttribute('role', 'status');
+    const prima = esitiRiapri.get(fb._id);
+    const inVolo = riapriInVolo.has(fb._id);
+    const azioni = liv.pannello.azioni || [];
+
+    if (azioni.includes('riapri_fusione')) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sn-btn';
+      btn.id = 'mgRiapriFusioneBtn';
+      btn.textContent = 'Chiedi di nuovo la fusione';
+      btn.title = 'Il server rifà i controlli sul ramo di questa pratica e apre qui la richiesta di via libera.';
+      btn.disabled = inVolo;
+      btn.addEventListener('click', () => riapriFusione(fb));
+      box.appendChild(btn);
+    }
+    const coda = MR.ownerActionFor(fb, 'accept', { releasedVersion });
+    if (coda && (azioni.includes('in_coda') || (prima && prima.inCoda))) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'sn-btn sn-btn-secondary';
+      b.id = 'mgFusioneInCodaBtn';
+      b.textContent = coda.label;
+      b.title = ACTION_TITLE.accept;
+      b.disabled = inVolo;
+      b.addEventListener('click', () => applyAction(coda, null));
+      box.appendChild(b);
+    }
+    if (inVolo) {
+      esito.dataset.kind = 'wait';
+      esito.textContent = 'Chiedo al server di rifare i controlli…';
+    } else if (prima) {
+      esito.dataset.kind = prima.kind;
+      esito.textContent = prima.text;
+    }
+    box.appendChild(esito);
+    return box;
+  }
+
+  async function riapriFusione(fb) {
+    const id = fb._id;
+    if (riapriInVolo.has(id)) return;
+    riapriInVolo.add(id);
+    esitiRiapri.delete(id);
+    ridisegnaSeAperto(id);
+    let m;
+    try {
+      const r = await sendToMain({ type: MERGE_APPROVAL_REOPEN, feedbackId: id });
+      let stato = '';
+      if (r && r.ok !== false && r.esito === 'richiesta') {
+        await loadMergeApprovals();
+        const trova = (k) => (fusioni[k] || []).find((q) => q && q.id === r.requestId);
+        if (trova('pending')) stato = 'pending';
+        else {
+          const v = trova('failed') || trova('recent') || trova('preapproved');
+          stato = !v ? '' : v.discarded === true ? 'discarded' : 'used';
+        }
+      }
+      m = MR.esitoRiapriFusione(r, stato);
+      // Una fusione avvenuta, o una pratica che intanto si è mossa, cambia lo stato: si rilegge invece di indovinare.
+      if (r && (r.esito === 'fuso' || r.esito === 'non_ferma')) refreshFromRemote({ force: true }).catch(() => {});
+    } catch (e) {
+      m = { kind: 'err', text: e?.message || 'Non riuscita: nessuna fusione chiesta.' };
+    } finally {
+      riapriInVolo.delete(id);
+    }
+    esitiRiapri.set(id, m);
+    toast(m.text, m.kind === 'ok' ? 'ok' : 'err');
+    ridisegnaSeAperto(id);
+  }
+
+  function ridisegnaSeAperto(id) {
+    if (selectedId !== id || livelloAperto !== 'l5') return;
+    const fb = allFeedbacks.find((f) => f._id === id);
+    if (fb) openSidebarLivello(fb, 'l5');
   }
 
   mgSideClose.addEventListener('click', closeSidebar);
