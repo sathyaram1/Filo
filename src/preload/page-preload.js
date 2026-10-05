@@ -189,9 +189,10 @@ if (!IS_SUBFRAME) try {
       }
     }
     // «Resta connesso»: la scheda è passata in un altro jar e la memoria della pagina la segue.
-    if (w && Array.isArray(w.semina)) {
-      for (const voce of w.semina) {
-        try { if (Array.isArray(voce)) window.localStorage.setItem(String(voce[0]), String(voce[1])); } catch (_) {}
+    for (const [chiave, st] of [['semina', 'localStorage'], ['seminaSessione', 'sessionStorage']]) {
+      if (!w || !Array.isArray(w[chiave])) continue;
+      for (const voce of w[chiave]) {
+        try { if (Array.isArray(voce)) window[st].setItem(String(voce[0]), String(voce[1])); } catch (_) {}
       }
     }
   }

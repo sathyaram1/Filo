@@ -126,7 +126,7 @@ function registerIpcHandlers() {
             out = tm.takeCookieWipe(String(href || ''));
             // La memoria della pagina che «Resta connesso» ha portato nel jar nuovo (tabs/tabRestaConnesso.js).
             const semina = tm.takeSemina(wc, String(href || ''));
-            if (semina) out = { ...(out || {}), semina };
+            if (semina) out = { ...(out || {}), semina: semina.locale, seminaSessione: semina.sessione };
             break;
           }
         }

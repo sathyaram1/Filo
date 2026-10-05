@@ -19,36 +19,59 @@ const SEMINA_MS = 60 * 1000;
 // sul disco cosa sa dei siti non fidati (services/cookies.js, keepsSiteData), nemmeno dove accedi.
 const proposti = new Set();
 
-// Un campo password ancora in vista vuol dire che l'accesso non è finito (password sbagliata, secondo passo).
-const GUARDA_PAGINA = `(() => {
-  let pw = false;
+// L'accesso non è finito finché resta in vista un campo password (password sbagliata) o il campo del codice di un
+// secondo fattore: sulla pagina del codice il sito ha già messo i suoi cookie, ma l'utente non è ancora dentro.
+const STATO_MODULO = `
+  const vede = (el) => { const r = el.getBoundingClientRect(); const s = getComputedStyle(el);
+    return r.width > 1 && r.height > 1 && s.display !== 'none' && s.visibility !== 'hidden'; };
+  const NOMI = /one-?time|otp|totp|2fa|mfa|two-?factor|second-?factor|verification|verifica|passcode|sms-?code|auth-?code|security-?code|challenge/i;
+  const SOLO = /^(code|codice|otp|pin|token)$/i;
+  let pw = false, codice = false, caselle = 0;
   try {
-    for (const el of document.querySelectorAll('input[type="password"]')) {
-      const r = el.getBoundingClientRect();
-      const s = getComputedStyle(el);
-      if (r.width > 1 && r.height > 1 && s.display !== 'none' && s.visibility !== 'hidden') { pw = true; break; }
+    for (const el of document.querySelectorAll('input')) {
+      const t = String(el.type || 'text').toLowerCase();
+      if (t === 'password') { if (!pw && vede(el)) pw = true; continue; }
+      if (codice || !['text', 'tel', 'number'].includes(t) || !vede(el)) continue;
+      const nomi = [el.name, el.id, el.getAttribute('aria-label'), el.placeholder].join(' ');
+      if (/one-time-code/i.test(el.getAttribute('autocomplete') || '') || NOMI.test(nomi) || SOLO.test(el.name || '') || SOLO.test(el.id || '')) codice = true;
+      else if (el.maxLength === 1) caselle++;
     }
   } catch (_) {}
+  // Il codice a caselle da una cifra (da 4 a 8).
+  if (caselle >= 4 && caselle <= 8) codice = true;`;
+
+const GUARDA_PAGINA = `(() => {${STATO_MODULO}
   let chiave = false;
   try { chiave = Object.keys(localStorage).some((k) => /token|auth|sess|jwt|login|logged/i.test(k)); } catch (_) {}
-  return { pw, chiave };
+  return { pw, codice, chiave };
 })()`;
 
-// L'accesso fatto in un riquadro (src/content/cookies.js) non è finito finché lì resta una password in vista.
-const PW_RIQUADRO = `(() => { try { return [...document.querySelectorAll('input[type="password"]')].some((el) => {
-  const r = el.getBoundingClientRect(); const s = getComputedStyle(el);
-  return r.width > 1 && r.height > 1 && s.display !== 'none' && s.visibility !== 'hidden'; }); } catch (_) { return false; } })()`;
+// L'accesso fatto in un riquadro (src/content/cookies.js) segue la stessa regola nel riquadro.
+const MODULO_RIQUADRO = `(() => {${STATO_MODULO}
+  return pw || codice;
+})()`;
 
-async function passwordNeiRiquadri(wc) {
+// Un indirizzo da passo intermedio dell'accesso (codice, conferma sull'app): la pagina può non avere campi.
+const PASSO_INTERMEDIO = /(?:^|[/#._-])(?:2fa|mfa|otp|totp|challenge|two-?factor|second-?factor|verify|verification|verifica|sca|strong-?auth|step-?up)(?:$|[/#?._-])/i;
+
+function passoIntermedio(url) {
+  try { const u = new URL(url); return PASSO_INTERMEDIO.test(u.pathname + u.hash); } catch (_) { return false; }
+}
+
+async function moduloNeiRiquadri(wc) {
   let frames = [];
   try { frames = wc.mainFrame.framesInSubtree.filter((f) => f !== wc.mainFrame); } catch (_) { return false; }
   for (const f of frames) {
-    try { if (await f.executeJavaScript(PW_RIQUADRO) === true) return true; } catch (_) {}
+    try { if (await f.executeJavaScript(MODULO_RIQUADRO) === true) return true; } catch (_) {}
   }
   return false;
 }
 
-const LEGGI_MEMORIA = '(() => { try { return Object.entries(localStorage); } catch (_) { return null; } })()';
+// Anche la memoria della scheda (sessionStorage): c'è chi ci tiene l'accesso, e la pagina ricaricata è la stessa scheda.
+const LEGGI_MEMORIA = `(() => {
+  const voci = (st) => { try { return Object.entries(st); } catch (_) { return []; } };
+  return { locale: voci(localStorage), sessione: voci(sessionStorage) };
+})()`;
 
 function nomeLeggibile(sito) {
   const N = globalThis.SN_NOMI_SITO;
@@ -175,7 +198,7 @@ const restaConnessoMethods = {
     if (!wc || wc.isDestroyed()) return;
     let pagina = null;
     try { pagina = await wc.executeJavaScriptInIsolatedWorld(1001, [{ code: GUARDA_PAGINA }]); } catch (_) { return; }
-    if (!pagina || pagina.pw || await passwordNeiRiquadri(wc)) return;
+    if (!pagina || pagina.pw || pagina.codice || passoIntermedio(wc.getURL()) || await moduloNeiRiquadri(wc)) return;
     let cookies = [];
     try { cookies = await wc.session.cookies.get({ url: tab.url }); } catch (_) {}
     if (!pagina.chiave && !cookies.some(looksLikeLoginCookie)) return;
@@ -235,12 +258,14 @@ const restaConnessoMethods = {
       if (!wc || wc.isDestroyed()) continue;
       // Un ritorno da un altro sito con un redirect del server lascia la pagina nel jar di quel sito.
       if (!propri.has(tab.partition)) await Cookies.copiaBarattolo(wc.session, dest, sito);
-      let voci = null;
-      try { voci = await wc.executeJavaScriptInIsolatedWorld(1001, [{ code: LEGGI_MEMORIA }]); } catch (_) {}
+      let mem = null;
+      try { mem = await wc.executeJavaScriptInIsolatedWorld(1001, [{ code: LEGGI_MEMORIA }]); } catch (_) {}
       if (!this.tabs.includes(tab) || !tab.view || tab.view.webContents !== wc) continue;
       let origin = '';
       try { origin = new URL(wc.getURL()).origin; } catch (_) {}
-      tab._semina = Array.isArray(voci) && voci.length && origin ? { origin, voci, at: Date.now() } : null;
+      const locale = mem && Array.isArray(mem.locale) ? mem.locale : [];
+      const sessione = mem && Array.isArray(mem.sessione) ? mem.sessione : [];
+      tab._semina = (locale.length || sessione.length) && origin ? { origin, locale, sessione, at: Date.now() } : null;
       this._recreateView(tab, url);
     }
   },
@@ -255,7 +280,7 @@ const restaConnessoMethods = {
     try { origin = new URL(href).origin; } catch (_) { return null; }
     if (origin !== s.origin) return null;
     tab._semina = null;
-    return s.voci;
+    return { locale: s.locale, sessione: s.sessione };
   },
 };
 

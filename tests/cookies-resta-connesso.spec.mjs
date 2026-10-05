@@ -532,3 +532,135 @@ test('un accesso fatto in un riquadro della pagina fa partire la proposta', asyn
     await sito.chiudi();
   }
 });
+
+// ── accesso con secondo fattore, accesso tenuto nella memoria della scheda ──
+
+// Password, poi un passo intermedio: il codice in un campo, o la conferma sull'app senza campi (la pagina aspetta).
+async function sitoConSecondoFattore() {
+  const pre = new Set();
+  const sessioni = new Set();
+  let confermata = false;
+  const server = createServer((req, res) => {
+    const u = new URL(req.url, 'http://x');
+    const ck = req.headers.cookie || '';
+    const val = (n) => (ck.match(new RegExp(`(?:^|;\\s*)${n}=([^;]+)`)) || [])[1];
+    const html = (c) => { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(c); };
+    const entra = () => {
+      const n = Math.random().toString(36).slice(2);
+      sessioni.add(n);
+      res.writeHead(302, { 'Set-Cookie': `sid=${n}; Max-Age=86400; Path=/; HttpOnly`, Location: '/home' });
+      res.end();
+    };
+    if (req.method === 'POST' && u.pathname === '/login') {
+      req.resume();
+      req.on('end', () => {
+        const n = Math.random().toString(36).slice(2);
+        pre.add(n);
+        res.writeHead(302, { 'Set-Cookie': `pre=${n}; Path=/; HttpOnly`, Location: u.searchParams.get('poi') || '/codice' });
+        res.end();
+      });
+      return;
+    }
+    const aMetà = pre.has(val('pre'));
+    if (u.pathname === '/codice' && aMetà) {
+      if (req.method === 'POST') { req.resume(); req.on('end', entra); return; }
+      html(`<!doctype html><html><head><title>Codice</title></head><body style="padding:30px"><p>Ti abbiamo mandato un codice.</p>
+        <form method="post" action="/codice"><input id="codice" name="c" autocomplete="one-time-code" inputmode="numeric">
+        <button id="conferma">Conferma</button></form></body></html>`);
+      return;
+    }
+    if (u.pathname === '/accesso/mfa/attesa' && aMetà) {
+      html(`<!doctype html><html><head><title>Conferma</title></head><body style="padding:30px"><p>Conferma l'accesso sull'app.</p>
+        <script>setInterval(async () => { if ((await (await fetch('/stato')).text()) === 'si') location.href = '/accesso/mfa/fatto'; }, 300);</script></body></html>`);
+      return;
+    }
+    if (u.pathname === '/stato') { html(confermata ? 'si' : 'no'); return; }
+    if (u.pathname === '/accesso/mfa/fatto' && aMetà) { entra(); return; }
+    if (u.pathname === '/home' && sessioni.has(val('sid'))) {
+      html('<!doctype html><html><head><title>Conto</title></head><body style="padding:30px"><h1 id="dentro">Saldo</h1></body></html>');
+      return;
+    }
+    // Un'applicazione che tiene l'accesso nella memoria della scheda (sessionStorage), come quelle con l'accesso Microsoft.
+    if (u.pathname === '/app') {
+      html(`<!doctype html><html><head><title>App</title></head><body style="padding:30px"><div id="out"></div><script>
+        const out = document.getElementById('out');
+        if (sessionStorage.getItem('authToken')) out.innerHTML = '<h1 id="dentro">Dentro</h1>';
+        else {
+          out.innerHTML = '<input id="pw" type="password"> <button id="entra">Entra</button>';
+          document.getElementById('entra').onclick = () => { sessionStorage.setItem('authToken', 't'); location.reload(); };
+        }
+      </script></body></html>`);
+      return;
+    }
+    const poi = u.searchParams.get('poi');
+    html(`<!doctype html><html><head><title>Accedi</title></head><body style="padding:30px">
+      <form method="post" action="/login${poi ? `?poi=${encodeURIComponent(poi)}` : ''}"><input name="u" value="sara">
+      <input id="pw" type="password" name="p"><button id="entra">Entra</button></form></body></html>`);
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const port = server.address().port;
+  return {
+    a: `http://127.0.0.1:${port}`,
+    conferma: () => { confermata = true; },
+    chiudi: () => new Promise((r) => { try { server.closeAllConnections?.(); } catch (_) {} server.close(r); }),
+  };
+}
+
+// Le proposte in vista: la vista degli avvisi nasce col primo avviso, quindi senza vista sono zero.
+async function proposteInVista(app) {
+  for (const w of app.windows()) {
+    try {
+      if (w.url().startsWith('filo://shell/avvisi.html')) return await w.locator('.shell-notif.show', { hasText: 'Hai fatto l\'accesso' }).count();
+    } catch (_) {}
+  }
+  return 0;
+}
+
+test('secondo fattore: la proposta aspetta che l\'accesso finisca, col codice e con la conferma sull\'app', async ({ app, shell, avvisi }) => {
+  test.setTimeout(120_000);
+  const sito = await sitoConSecondoFattore();
+  try {
+    await privacy(app);
+
+    await accedi(await apri(app, shell, `${sito.a}/login`));
+    const codice = await pagina(app, `${sito.a}/codice`);
+    await sleep(5000);
+    expect(await proposteInVista(app)).toBe(0);
+    await codice.locator('#codice').fill('123456');
+    await codice.locator('#conferma').click();
+    await dentro(app, `${sito.a}/home`);
+    const vista = await avvisi();
+    const carte = vista.locator('.shell-notif.show', { hasText: 'Hai fatto l\'accesso' });
+    await proposta(vista, '127.0.0.1');
+    await carte.locator('.shell-notif-close').click();
+    await expect(carte).toHaveCount(0, { timeout: 4000 });
+
+    // Conferma sull'app: la pagina d'attesa non ha campi, ed è l'indirizzo a dire che l'accesso è a metà.
+    await accedi(await apri(app, shell, `${sito.a.replace('127.0.0.1', 'localhost')}/login?poi=/accesso/mfa/attesa`));
+    await pagina(app, `${sito.a.replace('127.0.0.1', 'localhost')}/accesso/mfa/attesa`);
+    await sleep(5000);
+    expect(await proposteInVista(app)).toBe(0);
+    sito.conferma();
+    await dentro(app, `${sito.a.replace('127.0.0.1', 'localhost')}/home`);
+    await proposta(vista, 'localhost');
+  } finally {
+    await sito.chiudi();
+  }
+});
+
+test('«Resta connesso qui» su un sito che tiene l\'accesso nella memoria della scheda: dopo il passaggio si è ancora dentro', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  const sito = await sitoConSecondoFattore();
+  try {
+    await privacy(app);
+    const page = await apri(app, shell, `${sito.a}/app`);
+    await page.locator('#pw').fill('x');
+    await page.locator('#entra').click();
+    await dentro(app, `${sito.a}/app`);
+    await scegliNelMenu(app, shell, 'Resta connesso qui', async () => (await fidati(app)).includes('127.0.0.1'));
+    await expect.poll(() => partizioneDi(app, `${sito.a}/`)).toBe('persist:filo-priv-127.0.0.1');
+    await dentro(app, `${sito.a}/app`);
+  } finally {
+    await sito.chiudi();
+  }
+});
