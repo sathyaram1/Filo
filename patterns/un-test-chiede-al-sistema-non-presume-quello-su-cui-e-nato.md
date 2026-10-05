@@ -80,7 +80,9 @@ nasceva rosso solo per l'owner, per settimane (undici spec così):
   lunga. La cartella temporanea di un test si chiede a `cartellaTemporanea()`
   (`tests/helpers/percorsi.mjs`), che la fa canonica e con uno spazio nel nome per tutti:
   una costruita con `mkdtempSync` prova su un percorso che sulla macchina dell'owner non
-  esiste, e una sentinella lo impedisce.
+  esiste, e una sentinella lo impedisce. La stessa funzione la toglie quando il processo
+  finisce, verde o rosso (lasciate lì erano diventate 17 GB, #717); quelle di un processo
+  ucciso le toglie il lanciatore della corsa dopo, passato un giorno.
 
 Gli ultimi quattro rossi di quella macchina (#650) presumevano altro:
 

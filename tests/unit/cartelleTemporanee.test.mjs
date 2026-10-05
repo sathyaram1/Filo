@@ -46,12 +46,14 @@ test('nessun test costruisce la cartella temporanea a mano', () => {
   const colpevoli = [];
   for (const p of fileDiTest()) {
     if (p === AMMESSO) continue;
-    // La CHIAMATA, non la parola: questo file la nomina per spiegarla.
-    if (/mkdtempSync\s*\(/.test(readFileSync(p, 'utf8'))) colpevoli.push(relative(TESTS, p));
+    // La CHIAMATA, non la parola: questo file la nomina per spiegarla. Anche la forma asincrona, che salterebbe la
+    // pulizia all'uscita (#717); il nome si compone, o la regola troverebbe sé stessa.
+    if (new RegExp(`\\b${'mk'}dtemp(?:Sync)?\\s*\\(`).test(readFileSync(p, 'utf8'))) colpevoli.push(relative(TESTS, p));
   }
   assert.deepEqual(colpevoli, [],
     'questi file si costruiscono la cartella temporanea da soli: usa '
-    + '`cartellaTemporanea(prefisso)` da ./helpers/percorsi.mjs, che la fa canonica e con uno spazio nel nome');
+    + '`cartellaTemporanea(prefisso)` da ./helpers/percorsi.mjs, che la fa canonica, con uno spazio nel nome, '
+    + 'e la toglie quando il processo finisce');
 });
 
 test('la cartella temporanea nasce con uno spazio nel nome e in forma canonica', () => {
