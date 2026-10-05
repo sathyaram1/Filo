@@ -209,8 +209,6 @@
       showResultToast(result, newContentSeen, frames);
     } finally {
       progress.close();
-      // Anche un giro fermato a metà ha speso: la riga si dice comunque, una volta.
-      if (ripiegoDelGiro) { Popup.showToast(ripiegoDelGiro, { duration: 7000 }); ripiegoDelGiro = ''; }
       if (framesRunId) frameRuns.delete(framesRunId);
       // Un riquadro che si ferma per strada (l'utente ha chiesto l'originale,
       // un'eccezione) non deve lasciare la pagina ad aspettarlo fino al tetto.
