@@ -302,25 +302,9 @@ test('un lavoro locale già chiuso si segna e la sua scheda esce dalla bacheca p
   });
 });
 
-test('--riconosci: la prova la dà l’owner, solo sui prefissi suoi e delle sessioni senza prova', async () => {
-  const senza = documento('s1', { clientId: 'local:claude', status: 'unlabeled', statusPublic: 'open' });
-  await conReteScritture(senza, async (scritte) => {
-    const r = await mod.riconosciMittente('s1', OPTS);
-    assert.equal(r.ok, true, r.motivo);
-    assert.equal(scritte.length, 1);
-    assert.match(scritte[0].url, /updateMask\.fieldPaths=senderProof$/);
-    assert.deepEqual(scritte[0].body.fields, { senderProof: { stringValue: 'admin' } });
-  });
-  for (const [id, f] of [
-    ['p1', { clientId: 'owner:me', senderProof: 'admin', status: 'todo' }],
-    ['u1', { clientId: 'c-utente', status: 'todo' }],
-    ['r1', { clientId: 'routine:residuo', status: 'unlabeled' }],
-  ]) {
-    await conReteScritture(documento(id, f), async (scritte) => {
-      assert.equal((await mod.riconosciMittente(id, OPTS)).ok, false, id);
-      assert.equal(scritte.length, 0, id);
-    });
-  }
+// #957: la prova data a mano salta L5 come il sì: solo «🙋 È mio» in Gestione. La riga di comando: lavoroLocaleApprovato.test.mjs.
+test('--riconosci non c’è più: lo script non sa dare la prova del mittente', () => {
+  assert.equal(mod.riconosciMittente, undefined);
 });
 
 // Giro 3 della verifica locale: la regola del lettore vale anche per chi dà fiducia (segno locale, prova del mittente).
@@ -331,12 +315,10 @@ test('segno locale e prova del mittente: rifiutati, senza scrivere, sui feedback
     ['segno, collegio con un attacco', 'segnaLocale', { clientId: 'local:claude', senderProof: 'admin', status: 'unlabeled', pipeline: attacco }],
     ['segno, fermato dal filtro', 'segnaLocale', { clientId: 'owner:me', senderProof: 'admin', status: 'unlabeled', pipeline: pericoloso }],
     ['segno, giudizio illeggibile', 'segnaLocale', { clientId: 'local:claude', senderProof: 'admin', status: 'unlabeled', pipeline: 'FENC1:non-si-apre' }],
-    ['prova, allineato con un attacco', 'riconosciMittente', { clientId: 'local:claude', status: 'aligned', pipeline: attacco }],
-    ['prova, design con un attacco', 'riconosciMittente', { clientId: 'owner:me', status: 'design', pipeline: attacco }],
   ];
   for (const [nome, fn, f] of casi) {
     await conReteScritture(documento('x1', { statusPublic: 'open', ...f }), async (scritte) => {
-      const r = fn === 'segnaLocale' ? await mod.segnaLocale('x1', true, OPTS) : await mod.riconosciMittente('x1', OPTS);
+      const r = await mod[fn]('x1', true, OPTS);
       assert.equal(r.ok, false, nome);
       assert.match(r.motivo, /attacco|giudizio/, nome);
       assert.equal(scritte.length, 0, nome);
@@ -346,9 +328,6 @@ test('segno locale e prova del mittente: rifiutati, senza scrivere, sui feedback
   const pulito = JSON.stringify({ verdicts: [{ judge: 'A', class: 'aligned' }] });
   await conReteScritture(documento('x2', { clientId: 'local:claude', senderProof: 'admin', status: 'unlabeled', statusPublic: 'open', pipeline: pulito }), async () => {
     assert.equal((await mod.segnaLocale('x2', true, OPTS)).ok, true);
-  });
-  await conReteScritture(documento('x3', { clientId: 'local:claude', status: 'aligned', statusPublic: 'open', pipeline: pulito }), async () => {
-    assert.equal((await mod.riconosciMittente('x3', OPTS)).ok, true);
   });
 });
 
@@ -372,12 +351,9 @@ test('le strade proposte dal rifiuto non rifiutano a loro volta: niente Ricevuti
         const s = await mod.serveLocale('h1', 'prova', { ...OPTS, dryRun: true });
         if (!s.ok) vicoli.push(`--serve-locale: ${s.motivo}`);
       }
-      if (testo.includes('--riconosci')) {
-        const s = await mod.riconosciMittente('h1', { ...OPTS, dryRun: true });
-        if (!s.ok) vicoli.push(`--riconosci: ${s.motivo}`);
-      }
       if (nome === 'utente in coda') assert.match(testo, /--serve-locale/, nome);
-      if (nome === 'sessione senza prova, pulita') assert.match(testo, /--riconosci/, nome);
+      assert.doesNotMatch(testo, /--riconosci/, nome);
+      if (nome === 'sessione senza prova, pulita') assert.match(testo, /in Gestione, col tasto «🙋 È mio»/, nome);
       if (/Ricevuti/.test(nome) || /segnalata/.test(nome)) assert.match(testo, /owner/, `${nome}: dice chi decide`);
     });
     assert.deepEqual(vicoli, [], nome);

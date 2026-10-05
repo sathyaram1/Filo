@@ -116,8 +116,9 @@ const mappa = (o) => ({ mapValue: { fields: { by: { stringValue: o.by }, at: { i
 
 // #957: il sì si dà solo col tasto in Gestione. Le regole non distinguono la pagina da uno script col token
 // dell'owner, quindi il limite sta negli strumenti delle sessioni: nessuno lo scrive, e la via tolta si rifiuta.
-test('--approva-locale non c’è più: la riga di comando rifiuta prima delle credenziali e rimanda a Gestione', () => {
+test('--approva-locale e --riconosci non ci sono più: la riga di comando rifiuta prima delle credenziali e rimanda a Gestione', () => {
   assert.equal(of.approvaLocale, undefined, 'lo script non deve più saper scrivere il sì');
+  assert.equal(of.riconosciMittente, undefined, 'né la prova del mittente');
   const lancia = (args, extra = {}) => {
     const env = { ...process.env, ...extra };
     for (const k of Object.keys(env)) if (k.startsWith('npm_config_') && !(k in extra)) delete env[k];
@@ -127,15 +128,20 @@ test('--approva-locale non c’è più: la riga di comando rifiuta prima delle c
     ['opzione', lancia(['feedback-finto-957', '--approva-locale', '--dry-run'])],
     ['con l’uguale', lancia(['feedback-finto-957', '--approva-locale=1', '--dry-run'])],
     ['mangiata da npm', lancia(['feedback-finto-957', '--dry-run'], { npm_config_approva_locale: 'true' })],
+    ['--riconosci', lancia(['feedback-finto-957', '--riconosci', '--dry-run'])],
+    ['--riconosci mangiata da npm', lancia(['feedback-finto-957', '--dry-run'], { npm_config_riconosci: 'true' })],
   ]) {
+    const mio = /riconosci/.test(nome);
     assert.equal(r.status, 1, `${nome}: ${r.stderr}`);
-    assert.match(r.stderr, /RIFIUTATO: --approva-locale non c'è più/, nome);
-    assert.match(r.stderr, /in Gestione, col tasto «💻 Lavoro locale»/, nome);
+    assert.match(r.stderr, mio ? /RIFIUTATO: --riconosci non c'è più/ : /RIFIUTATO: --approva-locale non c'è più/, nome);
+    assert.match(r.stderr, mio ? /in Gestione, col tasto «🙋 È mio»/ : /in Gestione, col tasto «💻 Lavoro locale»/, nome);
     assert.doesNotMatch(r.stdout, /^Auth:/m, `${nome}: non deve nemmeno prendere le credenziali`);
   }
 });
 
-test('nessuno strumento delle sessioni scrive il sì come lavoro locale', () => {
+// La prova del mittente la scrive solo il ripasso, che la deduce da segni che un falso non ha (regole: ripassoMittenti.test.mjs).
+const SCRIVE_LA_PROVA = new Set(['ripasso-mittenti.mjs']);
+test('nessuno strumento delle sessioni scrive il sì come lavoro locale, né la prova del mittente su un feedback esistente', () => {
   const file = [];
   const giro = (dir) => {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
@@ -147,6 +153,7 @@ test('nessuno strumento delle sessioni scrive il sì come lavoro locale', () => 
   for (const f of file) {
     const testo = readFileSync(f, 'utf8');
     assert.doesNotMatch(testo, /fieldPaths=localApproval|set\(\s*['"`]localApproval['"`]|localApproval\s*:\s*(\{\s*mapValue|toFsValue|segno)/, `${f} scrive localApproval`);
+    if (!SCRIVE_LA_PROVA.has(f.split(/[\\/]/).pop())) assert.doesNotMatch(testo, /fieldPaths=senderProof/, `${f} scrive senderProof su un feedback esistente`);
   }
 });
 

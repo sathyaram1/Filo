@@ -41,12 +41,8 @@
 //   node scripts/owner-feedback.mjs <n|id> --non-locale
 //   node scripts/owner-feedback.mjs <n|id> --serve-locale ["perché"]
 //
-//   node scripts/owner-feedback.mjs <n|id> --riconosci     (prova del mittente data dall'owner)
-//
 //   <n|id>: il numero del feedback (910, #910, 22.1) o il suo id.
-//   `--riconosci`: un feedback con prefisso dell'owner o di una sessione ma senza prova è suo; la sessione lo lancia
-//   solo su parola dell'owner, come il tasto «È mio» in Gestione. Un segno locale su una pratica chiusa ne toglie
-//   la scheda dalla bacheca pubblica: era un lavoro locale.
+//   Un segno locale su una pratica chiusa ne toglie la scheda dalla bacheca pubblica: era un lavoro locale.
 //
 //   `--solo-locale`: la pratica la lavora solo una sessione locale, nessuna
 //   routine la prende, e in Gestione sta nei Lavori locali. Solo sui feedback
@@ -56,7 +52,8 @@
 //   (stato design, nota «Richiede lavoro locale») e decide l'owner.
 //   Il sì dell'owner a un feedback di un utente o di una routine (`localApproval`, #913) qui non si dà: solo il
 //   tasto «💻 Lavoro locale» dei Ricevuti in Gestione (#957). Salta L5, e una sessione ingannata da un testo
-//   d'utente, con le credenziali dell'owner, se lo darebbe da sola. `--approva-locale` si rifiuta.
+//   d'utente, con le credenziali dell'owner, se lo darebbe da sola. `--approva-locale` si rifiuta. Per la
+//   stessa ragione `--riconosci`: la prova del mittente data a mano la dà solo «🙋 È mio» in Gestione.
 //
 //   `--preapprova`: «fondi senza chiedermelo» su QUESTA pratica. Se i controlli
 //   del server fermano il lavoro di una routine, il server fonde lo stesso e
@@ -289,33 +286,6 @@ async function togliScheda(id, bearer) {
 }
 
 /**
- * La prova del mittente data dall'owner (#908): «questo feedback l'ho aperto io, o una mia sessione».
- * Solo sul prefisso dell'owner o di una sessione senza prova; la sessione la dà solo su parola dell'owner.
- */
-export async function riconosciMittente(id, opts = {}) {
-  const bearer = opts.bearer || await acquireBearer();
-  const doc = await getDoc(id, bearer, CAMPI_PRATICA);
-  if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
-  const fb = await praticaInChiaro(doc);
-  if (!fb) return { ok: false, motivo: 'mittente o stato non decifrabili: non so di chi è' };
-  if (!MR.mittenteDaRiconoscere(fb)) {
-    return { ok: false, motivo: fb.senderProof ? 'la prova del mittente c’è già' : 'non porta il prefisso dell’owner né di una sessione' };
-  }
-  const segnalato = MR.segnalatoComeAttacco(fb);
-  if (segnalato) {
-    return { ok: false, motivo: `${segnalato}: a un segnalato la prova la dà solo l’owner, in Gestione («È mio»), dopo averlo guardato` };
-  }
-  if (opts.dryRun) return { ok: true, dryRun: true };
-  const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?updateMask.fieldPaths=senderProof`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
-    body: JSON.stringify({ fields: { senderProof: { stringValue: 'admin' } } }),
-  });
-  if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
-  return { ok: true };
-}
-
-/**
  * Un feedback di un utente che richiederebbe lavoro locale torna nei Ricevuti:
  * stato design, motivo 'locale', nota «Richiede lavoro locale». Decide l'owner.
  * È il passaggio che una routine fa quando ha domande, e si dichiara come tale.
@@ -478,8 +448,7 @@ export function rifiutoPratica(id, r) {
   } else if (r && r.senzaProva) {
     righe.push('Se l’hanno aperto l’owner o una sessione, il ripasso gliela dà (a vuoto con --dry-run):');
     righe.push('  npm run feedback:ripasso');
-    righe.push('Se il ripasso lo salta, solo l’owner può dire che è suo: in Gestione («È mio»), o chiedilo a lui e su sua parola');
-    righe.push(`  node scripts/owner-feedback.mjs ${id} --riconosci`);
+    righe.push(`Se il ripasso lo salta, da qui non c’è altra strada. ${SOLO_DA_GESTIONE_MIO}`);
     righe.push('Altrimenti vale come un utente.');
   }
   if (r && (r.utente || r.routine) && r.ricevuti) {
@@ -493,6 +462,8 @@ export function rifiutoPratica(id, r) {
 
 /** Il sì come lavoro locale a un feedback non dell'owner (#957): nessuno strumento delle sessioni lo scrive. */
 export const SOLO_DA_GESTIONE = 'Come lavoro locale lo approva solo l’owner, in Gestione, col tasto «💻 Lavoro locale» dei Ricevuti dopo averlo letto: da riga di comando non si può.';
+/** La prova del mittente data a mano (#957): stessa porta su L5, stesso tasto. */
+export const SOLO_DA_GESTIONE_MIO = 'La prova del mittente la dà solo l’owner, in Gestione, col tasto «🙋 È mio» dopo averlo guardato: da riga di comando non si può.';
 
 /** «910», «#910», «22.1»: un numero di feedback, non un id. PURA. */
 export function numeroDiFeedback(riferimento) {
@@ -699,19 +670,20 @@ if (isMain) {
     console.error('     node scripts/owner-feedback.mjs <numero|id> --frase "riga per chi ha segnalato"   (solo la frase, stato invariato)');
     console.error('     node scripts/owner-feedback.mjs <numero|id> --solo-locale | --non-locale    (segno «solo in locale», stato invariato)');
     console.error('     node scripts/owner-feedback.mjs <numero|id> --serve-locale ["perché"]       (feedback di un utente → Ricevuti, «richiede lavoro locale»)');
-    console.error('     node scripts/owner-feedback.mjs <numero|id> --riconosci                      (prova del mittente su un feedback tuo o di una tua sessione: solo su tua parola)');
     console.error(`     status ∈ ${ALLOWED.join(' | ')}`);
   };
   if (argv.includes('--help') || argv.includes('-h')) { uso(); process.exit(0); }
   // Prima delle credenziali e del controllo sulle opzioni, che la direbbe solo «sconosciuta»; npm se la mangia nell'ambiente.
-  if (argv.some((a) => /^--approva-locale(=|$)/.test(a)) || process.env.npm_config_approva_locale !== undefined) {
-    console.error(`RIFIUTATO: --approva-locale non c'è più. ${SOLO_DA_GESTIONE} Non ho toccato niente.`);
-    process.exit(1);
+  for (const [tolta, dove] of [['approva-locale', SOLO_DA_GESTIONE], ['riconosci', SOLO_DA_GESTIONE_MIO]]) {
+    if (argv.some((a) => new RegExp(`^--${tolta}(=|$)`).test(a)) || process.env[`npm_config_${tolta.replace(/-/g, '_')}`] !== undefined) {
+      console.error(`RIFIUTATO: --${tolta} non c'è più. ${dove} Non ho toccato niente.`);
+      process.exit(1);
+    }
   }
   const { controllaArgomenti, argomentiDaNpm, espandiUguali, opzioneStorpiata } = await import('./lib/argomenti.mjs');
   const OPZ = {
     opzioni: ['--branch', '--reason', '--frase', '--dry-run', '--come-routine', '--starred', '--unstar', '--preapprova', '--chiedi-prima',
-      '--solo-locale', '--non-locale', '--serve-locale', '--riconosci'],
+      '--solo-locale', '--non-locale', '--serve-locale'],
     conValore: ['--branch', '--reason', '--frase'],
   };
   argv = espandiUguali(argv, OPZ.conValore);
@@ -767,7 +739,7 @@ if (isMain) {
   }
 
   // Il segno «solo in locale» e il ritorno nei Ricevuti: da soli, senza stato.
-  const locali = ['--solo-locale', '--non-locale', '--serve-locale', '--riconosci'].filter((o) => argv.includes(o));
+  const locali = ['--solo-locale', '--non-locale', '--serve-locale'].filter((o) => argv.includes(o));
   if (locali.length > 1) { console.error(`RIFIUTATO: ${locali.join(' e ')} insieme — non ho toccato niente.`); process.exit(1); }
   if (locali.length === 1) {
     if (!id) { uso(); process.exit(1); }
@@ -780,14 +752,6 @@ if (isMain) {
       process.exit(0);
     }
     if (status) { console.error(`RIFIUTATO: ${locali[0]} va da solo, senza stato né nota — non ho toccato niente.`); process.exit(1); }
-    if (locali[0] === '--riconosci') {
-      const r = await riconosciMittente(id, { dryRun, bearer });
-      if (!r.ok) { console.error(`RIFIUTATO: ${r.motivo} — non ho toccato niente.`); process.exit(3); }
-      console.log(r.dryRun
-        ? `[dry-run] ${riferimento}: darei la prova del mittente (è dell'owner o di una sua sessione)`
-        : `${riferimento}: da ora vale come tuo o di una tua sessione (prova del mittente data dall'owner).`);
-      process.exit(0);
-    }
     const valore = locali[0] === '--solo-locale';
     const r = await segnaLocale(id, valore, { dryRun, bearer });
     if (!r.ok) {

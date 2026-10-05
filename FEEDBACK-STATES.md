@@ -171,7 +171,9 @@ invece che «In coda». Negli stati dei Ricevuti resta nei Ricevuti (aspetta com
 l'owner), con l'approvazione che dice `→ Lavori locali`.
 
 - Il segno si mette solo su feedback dell'owner o di una sessione (`owner:`/`local:`)
-  **con la prova** `senderProof: 'admin'`, a pratica aperta, non segnalata come
+  **con la prova** `senderProof: 'admin'` (la dà il ripasso dai segni che un falso non ha, o
+  l'owner con «🙋 È mio» in Gestione; da riga di comando no, #957: salterebbe L5 come il sì
+  qui sotto), a pratica aperta, non segnalata come
   attacco/spam e non in mano a una routine (`localSignCheck`). Su un utente o una routine
   solo col sì dell'owner: un feedback che richiederebbe lavoro locale torna nei Ricevuti
   (`design`, motivo `locale`, nota «Richiede lavoro locale») con `owner-feedback.mjs
