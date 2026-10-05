@@ -50,6 +50,9 @@ la cartella.
   le prove che lo nominano, anche passando per un altro aiuto, ne dipendono (#746). La
   consegna rilancia com'erano anche quelle che usano un file di supporto cambiato:
   indebolire l'aiuto che controlla un caso rosso è la stessa porta che cancellare la prova.
+  Vale anche importato senza estensione, e per gli aiuti comuni dei test fuori dal giro
+  (fixture, helpers): quelli si rimettono com'erano in una copia del ramo a parte, mai al
+  loro posto, perché un rilancio interrotto non lasci un aiuto vecchio da committare.
   Nella pulizia un file di supporto non conta fra le prove tolte.
 - **La pulizia non spegne un caso rosso.** Prima di registrarla si rilanciano, sul codice
   della critica, le prove a cui ha tolto un caso e quelle che usano un file di supporto a cui

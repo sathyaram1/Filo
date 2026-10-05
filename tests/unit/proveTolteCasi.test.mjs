@@ -9,7 +9,7 @@ import { delimiter, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import {
-  supportoDelGiro, proveCheDipendono, casiDalReport, casiSpenti, testoCasiSpenti, controllaCasiDellaPulizia,
+  supportoDelGiro, aiutiFuoriDalGiro, proveCheDipendono, casiDalReport, casiSpenti, testoCasiSpenti, controllaCasiDellaPulizia,
   controllaProveTolte, controllaPulizia, puliziaDelPass, PREFISSO_RIPRISTINO,
 } from '../../scripts/lib/prove-tolte.mjs';
 
@@ -149,6 +149,56 @@ test('la consegna rilancia le prove che usano un file di supporto cambiato, anch
     assert.match(e.testo, /giro1-r1-a\.spec\.mjs \(usa helpers\/dati\.mjs\)/);
     assert.match(e.testo, /file di supporto/);
     assert.deepEqual(nomi(t.visti), ['giro1-r1-a.spec.mjs'], 'la prova che non lo usa non si rilancia');
+    t.scrivi('stato-a.txt', 'corretto\n');
+    t.commit('correzione vera');
+    assert.deepEqual(controllaProveTolte({ shaPrima: t.critica, root: t.dir, lancia: t.lancia, prepara: preparaFinto, log: () => {} }), { ferma: false, testo: '' });
+  } finally {
+    rmSync(t.dir, { recursive: true, force: true });
+  }
+});
+
+test('un aiuto importato senza estensione è una dipendenza; il nome di una prova scritto altrove no', () => {
+  const testi = [
+    { path: 'tests/verifica/746/giro1-r1-a.spec.mjs', testo: "import { a } from './helpers/a';" },
+    { path: 'tests/verifica/746/giro1-r2-b.spec.mjs', testo: "import { b } from './helpers/ab';\nconst x = 'a';" },
+    { path: 'tests/verifica/746/giro1-r3-c.spec.mjs', testo: "scrivi('giro1-r1-a.spec.mjs', '');" },
+  ];
+  assert.deepEqual(proveCheDipendono(testi, ['tests/verifica/746/helpers/a.mjs']).prove, ['tests/verifica/746/giro1-r1-a.spec.mjs']);
+});
+
+test('gli aiuti comuni dei test fuori dal giro sono supporto, le fixture comprese; i test e le prove no', () => {
+  assert.deepEqual(aiutiFuoriDalGiro([
+    'tests/fixtures/electron.mjs', 'tests/helpers/percorsi.mjs', 'tests/unit/x.test.mjs', 'tests/tabs.spec.mjs',
+    'tests/verifica/746/helpers/banco.mjs', 'src/main/main.js', 'tests\\helpers\\dati.json',
+  ]), ['tests/fixtures/electron.mjs', 'tests/helpers/percorsi.mjs', 'tests/helpers/dati.json']);
+  const testi = [
+    { path: 'tests/verifica/746/giro1-r1-a.spec.mjs', testo: "import { test } from '../../fixtures/electron.mjs';" },
+    { path: 'tests/fixtures/electron.mjs', testo: "import { cartellaTemporanea } from '../helpers/percorsi.mjs';" },
+    { path: 'tests/verifica/746/giro1-r2-b.spec.mjs', testo: "import { test } from '@playwright/test';" },
+  ];
+  const r = proveCheDipendono(testi, ['tests/helpers/percorsi.mjs']);
+  assert.deepEqual(r, { prove: ['tests/verifica/746/giro1-r1-a.spec.mjs'], via: { 'tests/verifica/746/giro1-r1-a.spec.mjs': ['tests/helpers/percorsi.mjs'] } });
+});
+
+test('un aiuto comune fuori dal giro indebolito da chi corregge: la prova si rilancia con l\'aiuto com\'era, in una copia a parte', () => {
+  const COMUNE = 'tests/helpers/banco-comune.mjs';
+  const t = giro({
+    [`${CARTELLA}/giro1-r1-a.spec.mjs`]: `import { banco } from '../../helpers/banco-comune.mjs';\n${caso('caso a', 'a')}`,
+    [`${CARTELLA}/giro1-r2-b.spec.mjs`]: prova(caso('caso b', 'b')),
+    [AIUTO]: banco('b'),
+    [COMUNE]: banco('a'),
+    'stato-a.txt': 'rotto\n', 'stato-b.txt': 'corretto\n',
+  });
+  try {
+    t.scrivi(COMUNE, banco());
+    t.commit('correzione che indebolisce l\'aiuto comune invece del codice');
+    const e = controllaProveTolte({ shaPrima: t.critica, root: t.dir, lancia: t.lancia, prepara: preparaFinto, log: () => {} });
+    assert.equal(e.ferma, true, 'con l\'aiuto com\'era la prova di a è ancora rossa');
+    assert.match(e.testo, /giro1-r1-a\.spec\.mjs \(usa tests\/helpers\/banco-comune\.mjs\)/);
+    assert.deepEqual(nomi(t.visti), ['giro1-r1-a.spec.mjs'], 'la prova che non usa l\'aiuto comune non si rilancia');
+    assert.equal(readFileSync(resolve(t.dir, COMUNE), 'utf8'), banco(), 'il ramo resta com\'è: l\'aiuto vecchio vive solo nella copia');
+    assert.equal(t.g('worktree', 'list').split('\n').length, 1, 'la copia a parte se ne va');
+    assert.equal(t.g('status', '--porcelain'), '');
     t.scrivi('stato-a.txt', 'corretto\n');
     t.commit('correzione vera');
     assert.deepEqual(controllaProveTolte({ shaPrima: t.critica, root: t.dir, lancia: t.lancia, prepara: preparaFinto, log: () => {} }), { ferma: false, testo: '' });
