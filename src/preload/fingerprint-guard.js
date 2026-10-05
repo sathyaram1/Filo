@@ -5,6 +5,9 @@
 // `seed` (uint32) viene da HMAC(masterSecret, eTLD+1 + finestra temporale): stesso sito → stesso rumore in
 // ogni finestra e a ogni lettura, siti diversi → rumore scorrelato. Il rumore è legato alla posizione assoluta
 // del pixel, così un ritaglio letto con getImageData ha lo stesso rumore della lettura intera.
+//
+// Gli involucri girano DOPO gli script del sito: ogni funzione o getter che usano è preso alla posa e chiamato
+// con Reflect.apply, altrimenti la pagina, ridefinendo apply/call o un getter, riavrebbe in mano l'originale.
 
 function buildGuardPiece(seed, level) {
   const s = (seed >>> 0);
@@ -12,6 +15,13 @@ function buildGuardPiece(seed, level) {
   return `(function(){
   var SEED = ${s} >>> 0;
   var LEVEL = ${lvl};
+  var rApply = Reflect.apply;
+  var gopd = Object.getOwnPropertyDescriptor;
+  var defp = Object.defineProperty;
+  var TA = Object.getPrototypeOf(Uint8Array.prototype);
+  var taTag = gopd(TA, Symbol.toStringTag).get;
+  var taLen = gopd(TA, 'length').get;
+  var pThen = Promise.prototype.then;
 
   function ph(x, y) {
     var h = (SEED ^ Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263)) >>> 0;
@@ -36,33 +46,38 @@ function buildGuardPiece(seed, level) {
     }
   }
 
-  // Il nome del tipo letto dallo slot interno vale per gli array di qualunque finestra: instanceof no.
-  var tagArray = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Uint8Array.prototype), Symbol.toStringTag).get;
+  // Lo slot interno vale per gli array di qualunque finestra, e la pagina non lo ridefinisce: instanceof no.
   function isBytes(a) {
-    var t; try { t = tagArray.call(a); } catch (e) { return false; }
+    var t; try { t = rApply(taTag, a, []); } catch (e) { return false; }
     return t === 'Uint8Array' || t === 'Uint8ClampedArray';
   }
+
+  function getter(proto, name) { var d = proto && gopd(proto, name); return d && d.get; }
 
   return function guardiaImpronta(win, maschera) {
     if (!LEVEL || win.__filoFpGuard) return;
     // Non cancellabile: una seconda guardia sopra la prima annullerebbe il rumore (XOR due volte).
-    try { Object.defineProperty(win, '__filoFpGuard', { value: true, enumerable: false, configurable: false, writable: false }); } catch (e) {}
+    try { defp(win, '__filoFpGuard', { value: true, enumerable: false, configurable: false, writable: false }); } catch (e) {}
 
     // ---- Canvas 2D ----
     try {
       var CtxProto = (win.CanvasRenderingContext2D || {}).prototype;
       var CanProto = (win.HTMLCanvasElement || {}).prototype;
-      var ImgData = win.ImageData;
-      var Bytes = win.Uint8ClampedArray;
-      if (CtxProto && CanProto && CtxProto.getImageData) {
+      var IDProto = (win.ImageData || {}).prototype;
+      var ImgData = win.ImageData || ImageData;
+      var Bytes = win.Uint8ClampedArray || Uint8ClampedArray;
+      if (CtxProto && CanProto && IDProto && CtxProto.getImageData) {
         var oGet = CtxProto.getImageData;
         var oPut = CtxProto.putImageData;
         var oToData = CanProto.toDataURL;
         var oToBlob = CanProto.toBlob;
+        var oCtx = CanProto.getContext;
+        var gW = getter(CanProto, 'width'), gH = getter(CanProto, 'height');
+        var gData = getter(IDProto, 'data'), gIW = getter(IDProto, 'width'), gIH = getter(IDProto, 'height');
 
         var newGet = function getImageData(sx, sy) {
-          var img = oGet.apply(this, arguments);
-          try { perturb(img.data, img.width, img.height, sx | 0, sy | 0); } catch (e) {}
+          var img = rApply(oGet, this, arguments);
+          try { perturb(rApply(gData, img, []), rApply(gIW, img, []), rApply(gIH, img, []), sx | 0, sy | 0); } catch (e) {}
           return img;
         };
         CtxProto.getImageData = maschera(newGet, oGet, 'getImageData');
@@ -71,22 +86,22 @@ function buildGuardPiece(seed, level) {
         // paint nel mezzo). Sempre gli originali oGet/oPut, per non sommare il rumore a se stesso.
         var snapshotPerturb = function (canvas) {
           var ctx = null;
-          try { ctx = canvas.getContext('2d'); } catch (e) {}
+          try { ctx = rApply(oCtx, canvas, ['2d']); } catch (e) {}
           if (!ctx) return null; // canvas WebGL: niente contesto 2d -> salta
-          var w = canvas.width | 0, h = canvas.height | 0;
+          var w = rApply(gW, canvas, []) | 0, h = rApply(gH, canvas, []) | 0;
           if (w <= 0 || h <= 0 || (w * h) > 8000000) return null;
           var orig;
-          try { orig = oGet.call(ctx, 0, 0, w, h); } catch (e) { return null; }
-          var copy = new ImgData(new Bytes(orig.data), w, h);
-          perturb(copy.data, w, h, 0, 0);
-          try { oPut.call(ctx, copy, 0, 0); } catch (e) { return null; }
+          try { orig = rApply(oGet, ctx, [0, 0, w, h]); } catch (e) { return null; }
+          var copy = new ImgData(new Bytes(rApply(gData, orig, [])), w, h);
+          perturb(rApply(gData, copy, []), w, h, 0, 0);
+          try { rApply(oPut, ctx, [copy, 0, 0]); } catch (e) { return null; }
           return { ctx: ctx, orig: orig };
         };
-        var restore = function (snap) { if (snap) { try { oPut.call(snap.ctx, snap.orig, 0, 0); } catch (e) {} } };
+        var restore = function (snap) { if (snap) { try { rApply(oPut, snap.ctx, [snap.orig, 0, 0]); } catch (e) {} } };
 
         var newToData = function toDataURL() {
           var snap = snapshotPerturb(this);
-          try { return oToData.apply(this, arguments); }
+          try { return rApply(oToData, this, arguments); }
           finally { restore(snap); }
         };
         CanProto.toDataURL = maschera(newToData, oToData, 'toDataURL');
@@ -94,13 +109,14 @@ function buildGuardPiece(seed, level) {
         if (oToBlob) {
           var newToBlob = function toBlob(cb) {
             var snap = snapshotPerturb(this);
-            var args = Array.prototype.slice.call(arguments);
+            var args = [];
+            for (var i = 0; i < arguments.length; i++) args[i] = arguments[i];
             if (typeof cb === 'function') {
               args[0] = function (blob) { restore(snap); try { cb(blob); } catch (e) {} };
-              try { return oToBlob.apply(this, args); }
+              try { return rApply(oToBlob, this, args); }
               catch (e) { restore(snap); throw e; }
             }
-            try { return oToBlob.apply(this, args); }
+            try { return rApply(oToBlob, this, args); }
             finally { restore(snap); }
           };
           CanProto.toBlob = maschera(newToBlob, oToBlob, 'toBlob');
@@ -114,7 +130,7 @@ function buildGuardPiece(seed, level) {
         if (!proto || !proto.readPixels) return;
         var oRead = proto.readPixels;
         var nf = function readPixels(x, y, width, height, format, type, pixels) {
-          oRead.apply(this, arguments);
+          rApply(oRead, this, arguments);
           try { if (isBytes(pixels)) perturb(pixels, width | 0, height | 0, x | 0, y | 0); } catch (e) {}
         };
         proto.readPixels = maschera(nf, oRead, 'readPixels');
@@ -126,24 +142,27 @@ function buildGuardPiece(seed, level) {
     // ---- AudioContext (OfflineAudioContext.startRendering) ----
     try {
       var OAC = win.OfflineAudioContext || win.webkitOfflineAudioContext;
-      if (OAC && OAC.prototype && OAC.prototype.startRendering) {
+      var ABProto = (win.AudioBuffer || {}).prototype;
+      if (OAC && OAC.prototype && OAC.prototype.startRendering && ABProto) {
         var oStart = OAC.prototype.startRendering;
+        var oChannel = ABProto.getChannelData;
+        var gChannels = getter(ABProto, 'numberOfChannels');
+        var rumore = function (buf) {
+          try {
+            var n = rApply(gChannels, buf, []);
+            for (var ch = 0; ch < n; ch++) {
+              var d = rApply(oChannel, buf, [ch]);
+              var len = rApply(taLen, d, []);
+              for (var i = 0; i < len; i++) {
+                d[i] += ((ph(i, ch) / 4294967295) - 0.5) * 1e-7;
+              }
+            }
+          } catch (e) {}
+          return buf;
+        };
         var nf2 = function startRendering() {
-          var p = oStart.apply(this, arguments);
-          if (p && typeof p.then === 'function') {
-            return p.then(function (buf) {
-              try {
-                for (var ch = 0; ch < buf.numberOfChannels; ch++) {
-                  var d = buf.getChannelData(ch);
-                  for (var i = 0; i < d.length; i++) {
-                    d[i] += ((ph(i, ch) / 4294967295) - 0.5) * 1e-7;
-                  }
-                }
-              } catch (e) {}
-              return buf;
-            });
-          }
-          return p;
+          var p = rApply(oStart, this, arguments);
+          try { return rApply(pThen, p, [rumore]); } catch (e) { return p; }
         };
         OAC.prototype.startRendering = maschera(nf2, oStart, 'startRendering');
       }
