@@ -975,7 +975,7 @@
     return segno && segno.tipo === 'approvazione' ? 'approvazione' : 'pieno';
   }
 
-  // Per specie: `solo` regge da sé dopo i due punti (vale per una riga o cento), `misto` segue «Alcuni/altri».
+  // Per specie: `solo` segue i due punti dell'intestazione, `misto` segue «Alcuni/altri».
   var PERCHE_SENZA_CHIEDERE = [
     ['pieno', {
       solo: 'sulla pratica avevi messo «fondi senza chiedermelo».',
@@ -986,7 +986,7 @@
       misto: 'avevano solo blocchi che avevi già approvato con un sì a una richiesta precedente',
     }],
     ['locale', {
-      solo: 'era lavoro locale, da una pratica tua con la prova del mittente o da un feedback che hai approvato come lavoro locale.',
+      solo: 'venivano da una pratica tua con la prova del mittente, o da un feedback che hai approvato come lavoro locale.',
       misto: 'erano lavoro locale (una pratica tua con la prova del mittente, o un feedback che hai approvato come lavoro locale)',
     }],
   ];

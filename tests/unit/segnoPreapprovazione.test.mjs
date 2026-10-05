@@ -54,3 +54,27 @@ test('fra le fusioni fatte senza chiedere, il segno da approvazione non si stamp
   const s = UI.preapprovedBy({ preapprovedBy: daSi.by, preapprovedAt: AT });
   assert.equal(s, `pre-approvata dal tuo sì alla richiesta del ${UI.dateTimeText(Date.parse(AT))}`);
 });
+
+// #743: l'introduzione delle «Fuse senza chiedere» diceva «fondi senza chiedermelo» anche
+// per le fusioni nate da un sì, contraddicendo la riga sotto.
+test('fra le fuse senza chiedere, l’introduzione nomina solo i segni che l’elenco contiene', () => {
+  const daSiRiga = { preapprovedBy: daSi.by, preapprovedAt: AT };
+  const aManoRiga = { preapprovedBy: aMano.by, preapprovedAt: AT };
+  const locale = { skippedL5: true, preapprovedBy: aMano.by };
+
+  const soloSi = UI.preapprovedIntro([daSiRiga, daSiRiga]);
+  assert.ok(!soloSi.includes('fondi senza chiedermelo'), soloSi);
+  assert.match(soloSi, /solo blocchi che avevi già approvato, con un sì a una richiesta precedente/);
+  assert.ok(!soloSi.includes('lavoro locale'), soloSi);
+
+  const soloMano = UI.preapprovedIntro([aManoRiga]);
+  assert.match(soloMano, /sulla pratica avevi messo «fondi senza chiedermelo»/);
+  assert.ok(!soloMano.includes('già approvat'), soloMano);
+
+  const misto = UI.preapprovedIntro([daSiRiga, locale, aManoRiga]);
+  assert.match(misto, /^Lavori fermati dai controlli e fusi lo stesso\. Alcuni avevano sulla pratica il tuo «fondi senza chiedermelo»; altri avevano solo blocchi che avevi già approvato con un sì a una richiesta precedente; altri ancora erano lavoro locale \(/);
+
+  // Un segno vuoto o senza la forma del server resta quello a mano, come nella riga.
+  assert.match(UI.preapprovedIntro([{ preapprovedBy: '' }]), /«fondi senza chiedermelo»/);
+  assert.match(UI.preapprovedIntro([]), /^Lavori fermati dai controlli e fusi lo stesso\. Qui c’è/);
+});

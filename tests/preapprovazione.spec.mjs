@@ -217,6 +217,49 @@ test('senza fusioni pre-approvate l’elenco non compare', async ({ openTab }) =
   await expect(page.locator('#mgMergeApprovalsPreapproved')).toBeHidden();
 });
 
+// #743: la fusione nata dal segno di un sì non si presenta come «fondi senza chiedermelo».
+test('Automazioni: una fusa col segno di un sì non dice «fondi senza chiedermelo»', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const AT = '2026-09-26T10:26:00.000Z';
+  const riga = (i, over) => Object.assign({
+    id: String(i).padStart(24, 'b'), branch: `worker/lavoro-${i}`, sha: SHA, mergeSha: SHA,
+    who: 'secaudit · notturna', origin: 'routine', num: `#${700 + i}`, feedbackId: `f${i}`,
+    blocks: [{ gate: 'guard_the_guards', label: 'Tocca aree protette', items: ['firestore.rules'], more: 0 }],
+    createdAtMs: Date.now() - 60 * 60 * 1000, used: true, outcome: 'merged', decidedAtMs: Date.now() - 60 * 60 * 1000,
+    preapproved: true, preapprovedAt: AT,
+  }, over);
+  const daSi = riga(1, { preapprovedBy: 'owner@esempio · approvazione ab12cd34ef56ab12cd34ef56' });
+  await apri(page, [pratica()], { preapproved: [daSi] });
+  await page.evaluate(() => window.__mgTest.loadMergeApprovals());
+  await page.locator('.mg-tab[data-tab="automation"]').click();
+  const box = page.locator('#mgMergeApprovalsPreapproved');
+  await expect(box).toBeVisible({ timeout: 8_000 });
+  const intro = box.locator('.sn-mac-preapproved-intro');
+  await expect(intro).toContainText('solo blocchi che avevi già approvato, con un sì a una richiesta precedente');
+  await expect(intro).not.toContainText('fondi senza chiedermelo');
+  const who = box.locator('.sn-mac-recent-who');
+  await expect(who).toContainText('pre-approvata dal tuo sì alla richiesta del');
+  await expect(who).toHaveAttribute('title', /valeva solo per i blocchi già approvati/);
+  await page.screenshot({ path: 'tests/.shots/preapprovazione-743-da-si.png' });
+
+  // Con una fusa a mano accanto, l'introduzione dice le due cose e a chi vanno.
+  const aMano = riga(2, { preapprovedBy: 'owner@esempio' });
+  await page.evaluate((list) => {
+    const orig = window.filo.message;
+    window.filo.message = async (msg) => {
+      const r = await orig(msg);
+      if (msg && msg.type === 'merge_approvals_get' && r && r.ok) r.preapproved = list;
+      return r;
+    };
+  }, [aMano, daSi]);
+  await page.evaluate(() => window.__mgTest.loadMergeApprovals());
+  await expect(box.locator('.sn-mac-preapproved-row')).toHaveCount(2);
+  await expect(intro).toContainText('Alcuni avevano sulla pratica il tuo «fondi senza chiedermelo»; altri avevano solo blocchi che avevi già approvato');
+  await expect(who.first()).toContainText('pre-approvata da owner@esempio');
+  await expect(who.first()).toHaveAttribute('title', /^Segno messo il /);
+  await page.screenshot({ path: 'tests/.shots/preapprovazione-743-misto.png' });
+});
+
 test('il segno nato da un sì a una richiesta si legge per quello che è, e un clic lo fa pieno', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   const fb = pratica({
