@@ -983,6 +983,22 @@ test('npm run orchestra senza «--»: le opzioni che npm si è tenuto (anche sto
   assert.deepEqual([existsSync(join(d, 'avvia.lock')), existsSync(join(d, 'orchestratore.log'))], [false, false]);
 });
 
+test('le impostazioni di npm stesso (cafile nel .npmrc) non sono opzioni tenute da npm: col «--» giusto il comando parte', (t) => {
+  const npm = { npm_lifecycle_script: 'node scripts/orchestratore-locale.mjs', npm_config_cafile: '/certs/azienda.pem' };
+  assert.deepEqual(opzioniTenuteDaNpm(npm), []);
+  assert.deepEqual(opzioniTenuteDaNpm({ ...npm, npm_config_fiel: 'true' }), ['--fiel'], 'un refuso vero resta un refuso');
+
+  const dir = [process.env.npm_execpath, join(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+    join(dirname(process.execPath), '..', 'lib', 'node_modules', 'npm', 'bin', 'npm-cli.js')].find((f) => f && /npm-cli\.js$/.test(f) && existsSync(f));
+  let definizioni;
+  try { definizioni = createRequire(dir)('@npmcli/config/lib/definitions').definitions; } catch (_) { /* npm vecchio o altrove */ }
+  if (!definizioni) { t.skip('definizioni di npm non trovate'); return; }
+  const tutte = Object.fromEntries(Object.keys(definizioni).map((k) => [`npm_config_${k.replace(/-/g, '_')}`, 'x']));
+  const tenute = opzioniTenuteDaNpm({ npm_lifecycle_script: 'node scripts/orchestratore-locale.mjs', ...tutte });
+  const nostre = new Set(Object.values(OPZIONI_DI).flatMap((s) => Object.keys(s)));
+  assert.deepEqual(tenute.filter((o) => !nostre.has(o)), [], `impostazioni di npm prese per refusi: aggiungile a IMPOSTAZIONI_NPM_VICINE (${IMPOSTAZIONI_NPM_VICINE.join(', ')})`);
+});
+
 test('una richiesta di soli spazi rimasta nello stato vale come mancante: lavoratore e verifica ricevono quella del feedback', async () => {
   assert.equal(nuovaPratica({ num: 9, richiesta: ' \n ' }).richiesta, '');
   const b = banco({ pratiche: [{ ...nuovaPratica({ num: 9, slug: 'nove' }), richiesta: '   ' }] });

@@ -112,6 +112,10 @@ export function leggiArgomenti(cmd, args) {
   return { opz, posizionali };
 }
 
+// Impostazioni di npm stesso a un refuso da un'opzione nostra: arrivano anche dal suo file di configurazione, e un refuso non sono (#1027).
+// La sentinella in tests/unit/orchestratore.test.mjs le ricava dal npm installato.
+export const IMPOSTAZIONI_NPM_VICINE = Object.freeze(['cafile']);
+
 /**
  * Le opzioni (o i loro refusi) che npm si è tenuto perché manca il «--» dopo `npm run orchestra`: arrivano solo nell'ambiente,
  * e senza questo controllo `avvia --dry-run` farebbe un giro vero. PURA.
@@ -119,10 +123,11 @@ export function leggiArgomenti(cmd, args) {
 export function opzioniTenuteDaNpm(env = process.env) {
   if (!/orchestratore-locale/.test(env.npm_lifecycle_script || '')) return [];
   const note = [...new Set(Object.values(OPZIONI_DI).flatMap((s) => Object.keys(s)))];
+  const diNpm = (o) => IMPOSTAZIONI_NPM_VICINE.includes(o.slice(2));
   return Object.keys(env)
     .filter((k) => k.startsWith('npm_config_'))
     .map((k) => `--${k.slice('npm_config_'.length).replace(/_/g, '-')}`)
-    .filter((o) => note.some((n) => distanza(o, n) <= 2))
+    .filter((o) => note.includes(o) || (!diNpm(o) && note.some((n) => distanza(o, n) <= 2)))
     .sort();
 }
 
@@ -430,7 +435,7 @@ function vivo(pid) {
 async function main(argv) {
   const [cmd, ...rest] = argv;
   const tenute = opzioniTenuteDaNpm();
-  if (tenute.length) throw erroreDiUso(`npm si è tenuto ${tenute.join(' ')}: dopo «npm run orchestra» serve «--» (npm run orchestra -- ${cmd || 'avvia'} …)`);
+  if (tenute.length) throw erroreDiUso(`npm si è tenuto ${tenute.join(' ')}: dopo «npm run orchestra» serve «--» (npm run orchestra -- ${cmd || 'avvia'} …); se invece sta nella configurazione di npm, lancia node scripts/orchestratore-locale.mjs ${cmd || 'avvia'} …`);
   const P = percorsi();
   const store = negozio(join(P.note, 'stato.json'));
   const ora = () => new Date().toISOString();
