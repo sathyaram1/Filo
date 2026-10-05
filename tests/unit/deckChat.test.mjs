@@ -182,3 +182,17 @@ test('la riga di sintesi dice il numero e la frase, mai la query', () => {
   assert.equal(C.listLabel(3, 'Niv-Mizzet e i suoi draghi'), '3 Niv-Mizzet e i suoi draghi');
   assert.equal(C.listLabel(3, 'ETB per il mazzo'), '3 ETB per il mazzo');
 });
+
+test('una risposta fermata dall\'utente resta fermata, col ragionamento, e si può riprovare (#792)', () => {
+  const lista = C.applyEdit([], { op: 'append', messages: [
+    { who: 'user', text: 'draghi rossi' }, { who: 'bot', pending: true, turn: 't1' },
+  ] }).list;
+  const dopo = C.applyEdit(lista, { op: 'fill', turn: 't1', message: {
+    who: 'bot', stopped: true, reasoning: 'cerco', reply: 'mezza risposta', cotOpen: true,
+  } }).list;
+  assert.deepEqual(dopo[1], { who: 'bot', turn: 't1', reasoning: 'cerco', stopped: true });
+  assert.deepEqual(C.forReading(dopo, () => false)[1], dopo[1]);
+  // Fuori dallo storico per il modello, come una bolla d'errore; e «Riprova» la toglie con la sua domanda.
+  assert.deepEqual(C.historyFor(dopo), [{ role: 'user', content: 'draghi rossi' }]);
+  assert.deepEqual(C.applyEdit(dopo, { op: 'drop', turn: '', userText: 'draghi rossi' }).list, []);
+});

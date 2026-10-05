@@ -280,6 +280,7 @@
       okLabel: 'Elimina',
     });
     if (!ok) return;
+    stopTurnOf(chatByDeck.get(id));
     await send({ type: MSG.DECKS_DELETE, id });
     await loadLibrary();
   }
@@ -835,8 +836,18 @@
   const Chat = window.SN_DECK_CHAT;
   const chatByDeck = new Map(); // deckId → [{ who, text, reply, cardIds, query, error, pending, interrupted, expanded, … }]
   const chatLoading = new Map(); // deckId → lettura in corso
-  // Per conversazione, non globale: svuotata la chat mentre Filo risponde, la nuova è subito libera.
-  const busyChats = new WeakSet();
+  // Per conversazione, non globale: svuotata la chat mentre Filo risponde, la nuova è subito libera. Il turno resta
+  // qui finché la sua bolla non è scritta; arrivata o fermata la risposta, la chat è già dell'utente (chatTaken).
+  const busyChats = new WeakMap(); // conversazione → { bot, reqId, startedAt, stopped, stop }
+  function chatTaken(msgs) {
+    const t = msgs && busyChats.get(msgs);
+    return !!t && !!t.bot.pending;
+  }
+  // Una risposta che nessuno leggerà più (chat svuotata, mazzo eliminato) non si lascia lavorare a pagamento.
+  function stopTurnOf(msgs) {
+    const t = msgs && busyChats.get(msgs);
+    if (t && !t.stopped) t.stop();
+  }
   // Cambiata altrove mentre qui si aspettava Filo: si rilegge appena la risposta è scritta.
   const staleChats = new WeakSet();
   // Chi ha salvato: la scheda che scrive non si rilegge al proprio avviso (DECKS_CHAT_CHANGED).
@@ -937,6 +948,7 @@
       okLabel: 'Svuota',
     });
     if (!ok) return;
+    stopTurnOf(chatByDeck.get(deck.id));
     chatByDeck.set(deck.id, []);
     if (current && current.id === deck.id) renderChat(true);
     await send({ type: MSG.DECKS_CHAT_CLEAR, deckId: deck.id, clientId: chatClientId }).catch(() => {});
@@ -945,10 +957,10 @@
   // «Riprova» sull'ultima bolla fallita, interrotta o riuscita solo in parte: lo stesso turno rifatto, non una domanda in più.
   function retryLastTurn() {
     const msgs = chatMsgs();
-    if (busyChats.has(msgs)) return;
+    if (chatTaken(msgs)) return;
     const bot = msgs[msgs.length - 1];
     const user = msgs[msgs.length - 2];
-    if (!bot || bot.who !== 'bot' || !(bot.error || bot.interrupted || bot.retryable)) return;
+    if (!bot || bot.who !== 'bot' || !(bot.error || bot.interrupted || bot.stopped || bot.retryable)) return;
     if (!user || user.who !== 'user' || !user.text) return;
     msgs.splice(msgs.length - 2, 2);
     editChat(current.id, { op: 'drop', turn: bot.turn || '', userText: user.text });
@@ -1038,6 +1050,7 @@
     // Solo l'ultima bolla si riprova: rifarne una in mezzo metterebbe la risposta fuori posto.
     const retry = isLast ? '<button class="dk-retry" data-retry="1" title="Rimanda la stessa domanda">↻ Riprova</button>' : '';
     if (m.interrupted) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-pending">Risposta interrotta. La pagina si è chiusa prima che Filo finisse.</div>${retry}</div>`;
+    if (m.stopped) return `<div class="dk-msg dk-msg-bot dk-msg-stopped" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-pending">Risposta fermata.</div>${retry}</div>`;
     if (m.error) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-error">Non ha funzionato: ${esc(m.error)}</div>${retry}</div>`;
     const parts = [cotHtml(m)];
     if (m.reply) parts.push(`<p class="dk-msg-text">${proseHtml(m.reply)}</p>`);
@@ -1127,6 +1140,7 @@
     log.scrollTop = follow ? log.scrollHeight : prevTop;
     syncCarouselHighlight();
     preloadVisibleCards();
+    syncWait();
   }
 
   // Mentre il ragionamento scorre cambia solo la bolla che aspetta: si rifà quella, senza ricalcolare le altre.
@@ -1156,11 +1170,44 @@
     if (d) d.html = '';
   }
 
+  // L'attesa della chat del mazzo aperto (#792): da quanto dura e il tasto per fermarla, nel campo di scrittura, che
+  // non si ridisegna mai (le bolle sì, a ogni pezzo di ragionamento, e un clic a metà ridisegno andrebbe perso).
+  let waitTick = 0;
+  function syncWait() {
+    const msgs = current && !$('screenBuilder').hidden ? chatByDeck.get(current.id) : null;
+    const t = chatTaken(msgs) ? busyChats.get(msgs) : null;
+    const box = $('chatWait');
+    if (!box) return;
+    box.hidden = !t;
+    $('chatForm').classList.toggle('dk-busy', !!t);
+    if (t) $('chatWaitTime').textContent = window.SN_TIME.fmtCountdown((Date.now() - t.startedAt) / 1000);
+    if (t && !waitTick) waitTick = setInterval(syncWait, 1000);
+    else if (!t && waitTick) { clearInterval(waitTick); waitTick = 0; }
+  }
+
+  function stopChat() {
+    if (!current) return;
+    stopTurnOf(chatByDeck.get(current.id));
+    const input = $('chatInput');
+    if (input && !$('screenBuilder').hidden) input.focus();
+  }
+
+  // Invio con la chat occupata: il messaggio resta nel campo e il tasto Ferma si fa vedere, che è lui a tenerla.
+  let nudgeTimer = 0;
+  function nudgeStop() {
+    const btn = $('chatStop');
+    if (!btn) return;
+    btn.classList.remove('dk-nudge');
+    void btn.offsetWidth;
+    btn.classList.add('dk-nudge');
+    clearTimeout(nudgeTimer);
+    nudgeTimer = setTimeout(() => btn.classList.remove('dk-nudge'), 900);
+  }
+
   async function sendChat(text) {
     const deckId = current.id;
     const msgs = chatMsgs();
-    if (busyChats.has(msgs)) return;
-    busyChats.add(msgs);
+    if (chatTaken(msgs)) return;
     // Le bolle precedenti tornano collassate quando arriva un nuovo scambio (§3.3).
     for (const m of msgs) m.expanded = false;
     // La cronologia per l'agente si costruisce PRIMA di accodare il nuovo turno.
@@ -1171,15 +1218,17 @@
     const lastResults = lastList ? [...lastList.cardIds] : [];
     const user = { who: 'user', text };
     const bot = { who: 'bot', pending: true, turn: newTurnId() };
+    // Ragionamento in diretta (#331): mentre il modello pensa, i chunk di CoT
+    // arrivano sul canale filo:reasoning e riempiono la bolla "sta pensando"
+    // (render con throttle: i chunk possono essere fitti). Lo stesso id ferma il turno nel main (#792).
+    const reasoningReqId = `dk${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const turno = { bot, reqId: reasoningReqId, startedAt: Date.now(), stopped: false, stop: null };
+    busyChats.set(msgs, turno);
     msgs.push(user, bot);
     // Salvata subito: chi chiude la pagina adesso ritrova la domanda, con la risposta segnata come interrotta.
     // Oltre il tetto il main la rifiuta: la pagina lo dice (renderChat), la conversazione continua qui.
     editChat(deckId, { op: 'append', messages: [user, bot] });
     renderChat(true); // nuovo turno: porta la vista in fondo per mostrarlo
-    // Ragionamento in diretta (#331): mentre il modello pensa, i chunk di CoT
-    // arrivano sul canale filo:reasoning e riempiono la bolla "sta pensando"
-    // (render con throttle: i chunk possono essere fitti).
-    const reasoningReqId = `dk${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     let cotRenderTimer = 0;
     const offReasoning = (window.filo && window.filo.onReasoning)
       ? window.filo.onReasoning((data) => {
@@ -1195,67 +1244,101 @@
           }
         })
       : null;
+    const stopListening = () => {
+      if (offReasoning) offReasoning();
+      if (cotRenderTimer) { clearTimeout(cotRenderTimer); cotRenderTimer = 0; }
+    };
+    const onScreen = () => current && !$('screenBuilder').hidden;
+    // La risposta entra al posto del SUO turno nella chat salvata: svuotata nel frattempo (qui o altrove), non
+    // rientra. Solo dopo il turno lascia la conversazione, così un avviso arrivato intanto la fa rileggere dal salvato.
+    const saveAndRelease = async () => {
+      await editChat(deckId, { op: 'fill', turn: bot.turn, message: bot });
+      if (busyChats.get(msgs) !== turno) return;
+      busyChats.delete(msgs);
+      if (staleChats.has(msgs)) {
+        staleChats.delete(msgs);
+        await rereadChat(deckId, msgs);
+      }
+    };
+    // «Ferma» (#792): la chat torna subito dell'utente e il main spegne la chiamata al modello. Nessuna modifica al
+    // mazzo: il main la scrive solo a risposta arrivata.
+    turno.stop = () => {
+      if (turno.stopped || !bot.pending) return;
+      turno.stopped = true;
+      bot.pending = false;
+      bot.stopped = true;
+      // Chi ferma ha visto qualcosa che non gli torna: il ragionamento resta aperto dov'era.
+      if (bot.reasoning && bot.cotOpen === undefined) bot.cotOpen = true;
+      stopListening();
+      send({ type: MSG.DECKS_CHAT_STOP, reqId: reasoningReqId }).catch(() => {});
+      if (onScreen() && chatByDeck.get(current.id) === msgs) renderChat();
+      syncWait();
+      saveAndRelease();
+    };
+    syncWait();
     let deckChanged = false;
     let wantsClear = false;
+    let r = null;
+    let failure = null;
     try {
-      const r = await send({ type: MSG.DECKS_CHAT, deckId, text, history, lastResults, reasoningReqId });
-      bot.pending = false;
-      // Il testo completo del ragionamento torna con la risposta (anche in
-      // caso d'errore): è la versione autoritativa rispetto ai chunk live.
-      if (r && r.reasoning) bot.reasoning = r.reasoning;
-      if (!r || !r.ok) {
-        bot.error = (r && r.error) || 'nessuna risposta';
-      } else {
-        bot.reply = r.reply || '';
-        bot.cardIds = r.cardIds || [];
-        bot.query = r.query || '';
-        if (r.title) bot.title = r.title;
-        // L'ordine chiesto a parole vale per la lista di questa risposta, o senza carte nuove per quella di prima.
-        if (Chat.SORTS.includes(r.sort)) {
-          if (bot.cardIds.length) setListSort(deckId, bot, r.sort, false);
-          else if (lastList && msgs.includes(lastList)) setListSort(deckId, lastList, r.sort, true);
-        }
-        if (Array.isArray(r.uncheckedIds) && r.uncheckedIds.length) bot.uncheckedIds = r.uncheckedIds;
-        if (r.retryable) bot.retryable = true;
-        // Import via chat (§11.2): quantità reali per riga (basics tipo
-        // "37 Forest") + eventuale commander candidato, per il bottone
-        // "Aggiungi tutte" e per il toggle per riga.
-        if (r.importPending) {
-          bot.importQty = r.importPending.qtyById || {};
-          bot.importCommanderId = r.importPending.commanderId || '';
-        }
-        Object.assign(cardsById, r.cards || {});
-        // La chat può aver calcolato pareri nuovi ("valuta il mazzo", §6.1):
-        // la cache di pagina si svuota così il prossimo hover legge dal main
-        // i pareri freschi invece di mostrare quelli vecchi.
-        opinionsByCard.clear();
-        // La chat può aver modificato il mazzo (es. budget, §9.2): il mazzo
-        // aggiornato torna nella risposta → header e statistiche si rinfrescano.
-        if (r.deck && current && r.deck.id === current.id) { current = r.deck; deckChanged = true; }
-        // «Svuota la chat» chiesto a parole: stessa conferma della gomma, dopo aver mostrato la risposta. La bolla
-        // tiene il tasto: se la conferma non arriva adesso (Annulla, mazzo lasciato), la richiesta resta lì.
-        wantsClear = !!r.clearChat;
-        if (wantsClear) bot.clearChat = true;
-      }
+      r = await send({ type: MSG.DECKS_CHAT, deckId, text, history, lastResults, reasoningReqId });
     } catch (e) {
-      bot.pending = false;
-      bot.error = (e && e.message) || 'errore di rete';
+      failure = e;
     }
-    if (offReasoning) offReasoning();
-    if (cotRenderTimer) { clearTimeout(cotRenderTimer); cotRenderTimer = 0; }
-    const onScreen = () => current && !$('screenBuilder').hidden;
+    // Fermata: la bolla l'ha già detto e la chat è già libera. Una risposta che il main aveva già finito di scrivere
+    // nel mazzo arriva lo stesso, perché il mazzo è cambiato e la bolla deve dire come.
+    if (turno.stopped && !(r && r.ok)) return;
+    stopListening();
+    bot.pending = false;
+    bot.stopped = false;
+    // Il testo completo del ragionamento torna con la risposta (anche in
+    // caso d'errore): è la versione autoritativa rispetto ai chunk live.
+    if (r && r.reasoning) bot.reasoning = r.reasoning;
+    if (failure) {
+      bot.error = (failure && failure.message) || 'errore di rete';
+    } else if (r && r.stopped) {
+      bot.stopped = true;
+    } else if (!r || !r.ok) {
+      bot.error = (r && r.error) || 'nessuna risposta';
+    } else {
+      bot.reply = r.reply || '';
+      bot.cardIds = r.cardIds || [];
+      bot.query = r.query || '';
+      if (r.title) bot.title = r.title;
+      // L'ordine chiesto a parole vale per la lista di questa risposta, o senza carte nuove per quella di prima.
+      if (Chat.SORTS.includes(r.sort)) {
+        if (bot.cardIds.length) setListSort(deckId, bot, r.sort, false);
+        else if (lastList && msgs.includes(lastList)) setListSort(deckId, lastList, r.sort, true);
+      }
+      if (Array.isArray(r.uncheckedIds) && r.uncheckedIds.length) bot.uncheckedIds = r.uncheckedIds;
+      if (r.retryable) bot.retryable = true;
+      // Import via chat (§11.2): quantità reali per riga (basics tipo
+      // "37 Forest") + eventuale commander candidato, per il bottone
+      // "Aggiungi tutte" e per il toggle per riga.
+      if (r.importPending) {
+        bot.importQty = r.importPending.qtyById || {};
+        bot.importCommanderId = r.importPending.commanderId || '';
+      }
+      Object.assign(cardsById, r.cards || {});
+      // La chat può aver calcolato pareri nuovi ("valuta il mazzo", §6.1):
+      // la cache di pagina si svuota così il prossimo hover legge dal main
+      // i pareri freschi invece di mostrare quelli vecchi.
+      opinionsByCard.clear();
+      // La chat può aver modificato il mazzo (es. budget, §9.2): il mazzo
+      // aggiornato torna nella risposta → header e statistiche si rinfrescano.
+      if (r.deck && current && r.deck.id === current.id) { current = r.deck; deckChanged = true; }
+      // «Svuota la chat» chiesto a parole: stessa conferma della gomma, dopo aver mostrato la risposta. La bolla
+      // tiene il tasto: se la conferma non arriva adesso (Annulla, mazzo lasciato), la richiesta resta lì.
+      wantsClear = !!r.clearChat && !turno.stopped;
+      if (wantsClear) bot.clearChat = true;
+    }
+    turno.stopped = false;
     if (onScreen()) {
       if (deckChanged) await renderBuilder();
       else renderChat();
     }
-    // La risposta entra al posto del SUO turno nella chat salvata: svuotata nel frattempo (qui o altrove), non
-    // rientra. Solo dopo la scheda è libera, così un avviso arrivato intanto la fa rileggere dal salvato.
-    await editChat(deckId, { op: 'fill', turn: bot.turn, message: bot });
-    busyChats.delete(msgs);
-    if (staleChats.has(msgs)) {
-      staleChats.delete(msgs);
-      await rereadChat(deckId, msgs);
-    }
+    await saveAndRelease();
+    syncWait();
     if (wantsClear && onScreen() && current.id === deckId && chatByDeck.get(deckId) === msgs) clearChat();
   }
 
@@ -2133,6 +2216,7 @@
         okLabel: 'Elimina',
       });
       if (!ok) return;
+      stopTurnOf(chatByDeck.get(current.id));
       await send({ type: MSG.DECKS_DELETE, id: current.id });
       location.hash = '#/';
     });
@@ -2237,10 +2321,18 @@
       e.preventDefault();
       const input = $('chatInput');
       const text = input.value.trim();
-      if (!text || busyChats.has(chatMsgs())) return;
+      if (chatTaken(chatMsgs())) { nudgeStop(); return; }
+      if (!text) return;
       input.value = '';
       sendChat(text);
     });
+    // Esc nel campo ferma la risposta come il tasto: è il gesto di chi vuole uscire da un'attesa (#792).
+    $('chatInput').addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || !current || !chatTaken(chatByDeck.get(current.id))) return;
+      e.preventDefault();
+      stopChat();
+    });
+    $('chatStop').addEventListener('click', stopChat);
     const log = $('chatLog');
     // Toggle del blocco Ragionamento (#331): click (o Invio/Spazio) apre e
     // chiude. Vale per bolle normali, pending e d'errore.

@@ -13,6 +13,7 @@
   <script src="filo://shared/contenutoEsterno.js"></script>
   <script src="filo://shared/messages.js"></script>
   <script src="filo://shared/i18n.js"></script>
+  <script src="filo://shared/timeFormat.js"></script>
   <script src="filo://shared/storage.js"></script>
   <script src="filo://shared/confirmUi.js"></script>
   <script src="filo://shared/paneLayout.js"></script>
@@ -288,6 +289,29 @@
       padding: 7px 10px; outline: none;
     }
     #chatInput:focus { border-color: var(--sn-accent); }
+    /* L'attesa sta DENTRO il campo, a destra: il campo non cambia misura e si può già scrivere il messaggio dopo. */
+    .dk-chat-form { position: relative; }
+    .dk-chat-form.dk-busy #chatInput { padding-right: 104px; }
+    .dk-chat-wait {
+      position: absolute; right: 13px; top: 50%; transform: translateY(-50%);
+      display: flex; align-items: center; gap: 7px;
+    }
+    .dk-chat-wait[hidden] { display: none; }
+    .dk-wait-time { color: var(--sn-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+    .dk-stop {
+      padding: 2px 9px; font: inherit; font-size: 12px; line-height: 1.4; color: var(--sn-fg);
+      border: 1px solid var(--sn-border); border-radius: 6px;
+      background: var(--sn-bg); cursor: pointer;
+      transition: border-color .15s ease, background-color .15s ease, color .15s ease;
+    }
+    .dk-stop:hover, .dk-stop:focus-visible { border-color: var(--sn-accent); background: var(--sn-hover); outline: none; }
+    .dk-stop:active { color: var(--sn-accent); }
+    /* Invio a chat occupata: il tasto che la tiene si accende un attimo. */
+    .dk-stop.dk-nudge { animation: dk-stop-nudge .9s ease; }
+    @keyframes dk-stop-nudge {
+      0%, 100% { border-color: var(--sn-border); }
+      20%, 60% { border-color: var(--sn-accent); color: var(--sn-accent); background: var(--sn-hover); }
+    }
 
     /* Il pannello destro ha tre stati — statistiche, preview, carosello — e il contenuto cambia ma la GEOMETRIA no.
        La carta è portrait 63:88: l'aspect-ratio fissa evita salti di layout mentre l'immagine carica. */
@@ -544,6 +568,11 @@
             <input id="chatInput" type="text" autocomplete="off" spellcheck="false"
                    placeholder="Cerca carte o chiedi a Filo…"
                    aria-label="Cerca carte o chiedi a Filo" />
+            <div class="dk-chat-wait" id="chatWait" hidden>
+              <span class="dk-wait-time" id="chatWaitTime" title="Da quanto Filo sta preparando la risposta"></span>
+              <button type="button" class="dk-stop" id="chatStop"
+                      title="Ferma la risposta (Esc)" aria-label="Ferma la risposta">Ferma</button>
+            </div>
           </form>
         </div>
         <div class="dk-divider" id="dividerLeft" role="separator" aria-orientation="vertical"

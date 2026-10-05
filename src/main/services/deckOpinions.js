@@ -223,6 +223,9 @@
     const applied = P.applyTagMembership(deck, norm, membership);
     return {
       deck: applied.deck,
+      // Per riapplicare gli stessi giudizi a un mazzo riletto più tardi (la chat scrive il mazzo solo a fine turno).
+      tags: norm,
+      membership,
       changed: applied.changed,
       taggedCount: applied.taggedCount,
       judgedCount: plan.judgeIds.length,
