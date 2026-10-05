@@ -147,7 +147,14 @@
       }
       if (inCode) { codeBuf.push(raw); continue; }
       const trimmed = raw.trim();
-      if (trimmed === '') { flushPara(); flushList(); continue; }
+      if (trimmed === '') {
+        flushPara();
+        // Voci staccate da righe vuote restano un elenco solo: chiuso qui, «1.» «2.» «3.» ripartivano tutte da 1 (#703).
+        let j = i + 1;
+        while (j < lines.length && lines[j].trim() === '') j++;
+        if (!listType || j >= lines.length || tipoVoce(lines[j].trim()) !== listType) flushList();
+        continue;
+      }
       let m;
       if ((m = trimmed.match(/^(#{1,6})\s+(.+)$/))) {
         flushPara(); flushList();
