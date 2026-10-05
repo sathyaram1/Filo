@@ -25,8 +25,10 @@ test('gli embed di YouTube passano a youtube-nocookie con query e frammento inta
   assert.equal(YT.url('//www.youtube.com/embed/x?start=5', 'https://sito.test/pagina'), 'https://www.youtube-nocookie.com/embed/x?start=5');
 });
 
-test('il resto non si tocca: altre pagine di YouTube, sosia, nocookie già fatto, indirizzi rotti', () => {
+test('il resto non si tocca: lettori guidati dalla pagina, altre pagine di YouTube, sosia, nocookie già fatto, indirizzi rotti', () => {
   for (const u of [
+    'https://www.youtube.com/embed/abc?enablejsapi=1&origin=https%3A%2F%2Fsito.test&widgetid=1',
+    'https://www.youtube.com/embed/abc?start=4&enablejsapi=true',
     'https://www.youtube.com/watch?v=abc',
     'https://www.youtube.com/embedded/abc',
     'https://www.youtube.com/iframe_api',
@@ -59,6 +61,9 @@ test('la sessione protetta devia i riquadri verso nocookie prima che partano; in
     assert.deepEqual(visti, [], 'la richiesta a youtube.com non arriva a chi guarda cosa esce');
     assert.deepEqual(await ses.chiedi('https://www.youtube-nocookie.com/embed/abc?start=42'), { cancel: false },
       'la richiesta deviata ripassa dal filtro e parte');
+    assert.deepEqual(await ses.chiedi('https://www.youtube.com/embed/abc', 'object'),
+      { redirectURL: 'https://www.youtube-nocookie.com/embed/abc' }, 'anche un <object>/<embed> che carica il lettore');
+    assert.deepEqual(await ses.chiedi('https://www.youtube.com/embed/abc', 'script'), { cancel: false });
     assert.deepEqual(await ses.chiedi('https://www.youtube.com/embed/abc', 'mainFrame'), { cancel: false },
       'una scheda aperta sull\'embed resta com\'è: si devia solo dentro le pagine');
 

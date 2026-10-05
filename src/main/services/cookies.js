@@ -231,7 +231,8 @@ function ensureRequestHook(ses) {
   ses.webRequest.onBeforeRequest((details, callback) => {
     const s = blockState.get(ses);
     // Prima di tutto il resto: chi guarda dopo (anche le prove, da chiudiHost) vede solo ciò che uscirebbe davvero.
-    const nocookie = s && s.enabled && details.resourceType === 'subFrame' ? YtNocookie.url(details.url) : null;
+    const riquadro = details.resourceType === 'subFrame' || details.resourceType === 'object';
+    const nocookie = s && s.enabled && riquadro ? YtNocookie.url(details.url) : null;
     if (nocookie) {
       callback({ redirectURL: nocookie });
       return;

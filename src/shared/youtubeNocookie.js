@@ -15,6 +15,8 @@
     if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
     if (!HOSTS.has(u.hostname.toLowerCase().replace(/\.$/, ''))) return null;
     if (!/^\/embed(\/|$)/i.test(u.pathname)) return null;
+    // Un lettore guidato dalla pagina (API JS) parla con l'origine che conosce: deviato, i comandi della pagina (play, pausa) cadono nel vuoto.
+    if (/^(1|true)$/i.test(u.searchParams.get('enablejsapi') || '')) return null;
     u.protocol = 'https:';
     u.hostname = 'www.youtube-nocookie.com';
     u.port = '';

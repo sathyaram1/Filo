@@ -14,6 +14,7 @@
       fixes: [
         'Nelle Opzioni, se clicchi sul campo del modello prima che arrivi l\'elenco dei modelli, il menu a tendina si apre da solo appena l\'elenco c\'è. Prima restava chiuso e bisognava cliccare di nuovo.',
         'Nelle risposte di Filo un elenco numerato con le voci staccate da una riga vuota tiene i suoi numeri: prima ogni voce ripartiva da 1.',
+        'I video di YouTube dentro gli altri siti si caricano una volta sola e senza i cookie di YouTube, anche quelli che compaiono mentre scorri e quelli chiusi nel riquadro di un altro sito. Prima partivano coi cookie e poi si ricaricavano. Restano com\'erano solo i video che il sito comanda coi suoi pulsanti, che altrimenti smetterebbero di rispondere.',
       ],
     },
     {

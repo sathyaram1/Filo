@@ -6,7 +6,8 @@
 //     (controprova anti-falso-positivo).
 //   - Rifiuto CMP: un banner cookie con un pulsante "rifiuta tutto" viene
 //     premuto automaticamente (il banner sparisce); in "manuale" resta.
-//   - Embed YouTube riscritto in youtube-nocookie.com.
+//   - Embed YouTube deviati su youtube-nocookie.com prima che la richiesta parta
+//     (diretti, pigri, annidati); in manuale no; ripiego nella pagina altrove.
 //   - Blocco tracker (default): le richieste ai tracker noti (es. Google
 //     Analytics) vengono annullate (ERR_BLOCKED_BY_CLIENT); in manuale no.
 //   - Wipe all'uscita (default): vengono cancellati SOLO i cookie dei domini
@@ -107,20 +108,85 @@ test('CMP (manuale): il banner NON viene toccato (controprova)', async ({ openTa
   expect(await page.evaluate(() => !!document.getElementById('onetrust-banner-sdk'))).toBe(true);
 });
 
-test('YouTube (default): gli embed vengono riscritti in youtube-nocookie.com', async ({ openTab, testServer }) => {
-  const html = `
-    <title>YT_EMBED</title>
-    <iframe id="yt" width="320" height="180"
-      src="https://www.youtube.com/embed/dQw4w9WgXcQ"></iframe>`;
-  const page = await testServer.openReady(openTab, html);
-  await page.waitForFunction(
-    () => (document.getElementById('yt')?.src || '').includes('youtube-nocookie.com'),
-    null,
-    { timeout: 8_000 },
-  );
-  const src = await page.evaluate(() => document.getElementById('yt').src);
-  expect(src).toContain('youtube-nocookie.com');
-  expect(src).toContain('/embed/dQw4w9WgXcQ');
+// Registro di ciò che uscirebbe verso YouTube: l'ultimo controllo del filtro di rete prima della rete (chiudiHost,
+// dopo la deviazione nocookie). Nessuna richiesta a YouTube parte davvero: la prova non dipende dalla connessione.
+async function armaRegistroYouTube(app) {
+  await app.evaluate(() => {
+    globalThis.__filoYtLog = [];
+    globalThis.__filoCookies.chiudiHost((url) => {
+      let h = '';
+      try { h = new URL(url).hostname; } catch (_) {}
+      if (/(^|\.)youtube(-nocookie)?\.com$/i.test(h)) { globalThis.__filoYtLog.push(url); return true; }
+      return h === 'firestore.googleapis.com';
+    });
+  });
+}
+const registroYouTube = (app) => app.evaluate(() => globalThis.__filoYtLog.slice());
+
+const YT = {
+  diretto: 'https://www.youtube.com/embed/AAAAAAAAAAA?start=42&rel=0',
+  pigro: 'https://youtube.com/embed/BBBBBBBBBBB?start=7&autoplay=1',
+  annidato: 'https://www.youtube.com/embed/CCCCCCCCCCC?list=PL1&index=2',
+};
+const NOCOOKIE = {
+  diretto: 'https://www.youtube-nocookie.com/embed/AAAAAAAAAAA?start=42&rel=0',
+  pigro: 'https://www.youtube-nocookie.com/embed/BBBBBBBBBBB?start=7&autoplay=1',
+  annidato: 'https://www.youtube-nocookie.com/embed/CCCCCCCCCCC?list=PL1&index=2',
+};
+
+// Un embed diretto, uno pigro (data-src, parte quando lo si scorre in vista) e uno dentro il riquadro di un altro sito.
+async function apriPaginaYouTube(openTab, testServer) {
+  const dentro = testServer.html(`<title>YT_DENTRO</title><iframe width="320" height="180" src="${YT.annidato}"></iframe>`, { pubblico: true });
+  return testServer.openReady(openTab, `
+    <title>YT_RETE</title>
+    <iframe id="diretto" width="320" height="180" src="${YT.diretto}" allowfullscreen></iframe>
+    <iframe id="annidato" width="360" height="220" src="${dentro}"></iframe>
+    <div style="height:3000px"></div>
+    <iframe id="pigro" width="320" height="180" data-src="${YT.pigro}" allowfullscreen></iframe>
+    <script>
+      const f = document.getElementById('pigro');
+      new IntersectionObserver((es, o) => {
+        if (es.some((e) => e.isIntersecting)) { o.disconnect(); f.src = f.dataset.src; }
+      }).observe(f);
+    </script>`);
+}
+
+test('YouTube (default): gli embed partono già verso youtube-nocookie, anche pigri e annidati, una volta sola', async ({ app, openTab, testServer }) => {
+  await armaRegistroYouTube(app);
+  const page = await apriPaginaYouTube(openTab, testServer);
+  await expect.poll(() => registroYouTube(app), { timeout: 8_000 }).toEqual(expect.arrayContaining([NOCOOKIE.diretto, NOCOOKIE.annidato]));
+  expect((await registroYouTube(app)).some((u) => u.includes('BBBBBBBBBBB')), 'il riquadro pigro non parte prima di essere in vista').toBe(false);
+
+  await page.evaluate(() => document.getElementById('pigro').scrollIntoView());
+  await expect.poll(() => registroYouTube(app), { timeout: 8_000 }).toEqual(expect.arrayContaining([NOCOOKIE.pigro]));
+  // Il ripiego nella pagina passa per qualche secondo: se riscrivesse, il video ripartirebbe una seconda volta.
+  await new Promise((r) => setTimeout(r, 2_000));
+
+  const log = await registroYouTube(app);
+  expect(log.filter((u) => /^https?:\/\/([a-z]+\.)?youtube\.com\/embed/i.test(u)), 'nessuna richiesta a youtube.com/embed').toEqual([]);
+  expect(log.slice().sort()).toEqual([NOCOOKIE.diretto, NOCOOKIE.annidato, NOCOOKIE.pigro].sort());
+  expect(await page.evaluate(() => document.getElementById('diretto').getAttribute('src'))).toBe(YT.diretto);
+});
+
+test('YouTube (manuale): nessuna deviazione, gli embed vanno su youtube.com (controprova)', async ({ app, openTab, testServer }) => {
+  await setMode(openTab, 'manual');
+  await armaRegistroYouTube(app);
+  await apriPaginaYouTube(openTab, testServer);
+  await expect.poll(() => registroYouTube(app), { timeout: 8_000 }).toEqual(expect.arrayContaining([YT.diretto, YT.annidato]));
+  await new Promise((r) => setTimeout(r, 1_500));
+  expect((await registroYouTube(app)).filter((u) => u.includes('youtube-nocookie.com'))).toEqual([]);
+});
+
+test('YouTube (ripiego): in una sessione che non devia in rete la pagina riscrive gli embed, pigri compresi', async ({ app, openTab, testServer }) => {
+  await app.evaluate(({ session }) => { globalThis.__filoCookies.applyTrackerBlocking(session.defaultSession, false); });
+  await armaRegistroYouTube(app);
+  const page = await apriPaginaYouTube(openTab, testServer);
+  await page.waitForFunction(() => document.getElementById('diretto').getAttribute('src').includes('youtube-nocookie.com'), null, { timeout: 8_000 });
+  expect(await page.evaluate(() => document.getElementById('diretto').getAttribute('src'))).toBe(NOCOOKIE.diretto);
+  expect(await page.evaluate(() => document.getElementById('pigro').getAttribute('data-src'))).toBe(NOCOOKIE.pigro);
+  await page.evaluate(() => document.getElementById('pigro').scrollIntoView());
+  await expect.poll(() => registroYouTube(app), { timeout: 8_000 }).toEqual(expect.arrayContaining([NOCOOKIE.diretto, NOCOOKIE.pigro, NOCOOKIE.annidato]));
+  expect((await registroYouTube(app)).filter((u) => u.includes('BBBBBBBBBBB') && !u.includes('nocookie')), 'il pigro parte già su nocookie').toEqual([]);
 });
 
 // Arma un osservatore (nel main) sugli errori di rete verso google-analytics.com
