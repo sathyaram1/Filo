@@ -758,6 +758,7 @@
     // il blocco resta in attesa finché non parte il testo.
     const reasoningReqId = `r${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const turno = { reqId: reasoningReqId, fermato: false, attivita: pending };
+    turno.fermata = new Promise((ok) => { turno.ferma = ok; });
     turnoVivo = turno;
     aggiornaTasto();
     let offReasoning = null;
