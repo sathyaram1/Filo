@@ -38,6 +38,7 @@ const T_CLIC_DENTRO = 'dentro Filo il pulsante della pagina dell’invito riscat
 const T_TASTO_DESTRO = 'tasto destro su un link d’invito: «Riscatta l’invito» lo porta dentro Filo';
 const T_BENVENUTO_UNA_VOLTA = 'con più schede nuove aperte il benvenuto compare in una sola, quella che guardi';
 const T_SALUTO = 'un saluto che sembra un codice non si mangia il codice, nei Crediti e con /invito';
+const T_RIMBALZO = 'un collegamento cliccato che rimbalza su filo://invito riscatta, anche in una scheda nuova che poi non resta bianca';
 const T_ALTRE_PORTE = 'filo://invito fuori dal clic sul link non cade in silenzio: «Apri in nuova tab», pulsante da script, barra';
 
 let server;
@@ -84,6 +85,8 @@ test.beforeAll(async () => {
       if (url === '/token') {
         return json(res, 200, { id_token: 'anon-id-token', refresh_token: 'anon-refresh', expires_in: '3600', user_id: 'anon-uid-1' });
       }
+      // Un collegamento tracciato o una pagina che passa dal server prima di rimandare all'invito.
+      if (url === '/redir') { res.writeHead(302, { Location: 'filo://invito/ABCD-EFGH' }); return res.end(); }
       if ((req.headers.authorization || '') !== 'Bearer anon-id-token') return json(res, 401, { error: { message: 'no auth' } });
 
       if (url === '/walletState') {
@@ -471,4 +474,41 @@ test(T_ALTRE_PORTE, async ({ app, shell, openTab, testServer }) => {
   const id = await shell.evaluate(async () => (await window.filoShell.tabs.open('filo://newtab/')).id);
   await shell.evaluate(async (x) => { await window.filoShell.tabs.navigate(x, 'filo://invito/ABCD-EFGH'); }, id);
   await expect.poll(avviso, { timeout: 15000, message: 'la barra degli indirizzi porta l’invito dentro' }).toContain('Hai già i crediti');
+});
+
+// #664 giro 2: il clic vale per i rinvii della navigazione che ha fatto partire, anche in una scheda nuova.
+test(T_RIMBALZO, async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120000);
+  const rimbalzo = `${process.env.FILO_FUNCTIONS_BASE}/redir`;
+  const pagina = await testServer.openReady(openTab, `<!doctype html><meta charset="utf-8"><body style="padding:40px">
+    <p><a id="qui" href="${rimbalzo}">Apri in Filo</a></p>
+    <p><a id="nuova" href="${rimbalzo}" target="_blank" rel="noopener">Apri in Filo (scheda nuova)</a></p></body>`);
+  const indirizzo = pagina.url();
+  await pagina.locator('#qui').click();
+  await riscattaEApreCrediti(app);
+  expect(pagina.url(), 'la pagina resta').toBe(indirizzo);
+
+  const crediti = await attendiPagina(app, 'credits');
+  const avviso = () => crediti.evaluate(() => (document.getElementById('walletNote') || {}).textContent || '');
+  await crediti.evaluate(() => { document.getElementById('walletNote').textContent = ''; });
+  const idPagina = await shell.evaluate(async (u) => (await window.filoShell.tabs.snapshot()).tabs.find((t) => t.url === u).id, indirizzo);
+  await shell.evaluate((x) => window.filoShell.tabs.activate(x), idPagina);
+  await new Promise((r) => setTimeout(r, 500));
+  await pagina.locator('#nuova').click();
+  await expect.poll(avviso, { timeout: 15000, message: 'il collegamento in una scheda nuova porta l’invito dentro' }).toContain('Hai già i crediti');
+  await new Promise((r) => setTimeout(r, 1000));
+  const urls = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs.map((t) => t.url));
+  expect(urls, 'la scheda nata per il collegamento non resta bianca').not.toContain('');
+});
+
+// Il clic che porta a una pagina non vale per lei: quella che all'arrivo rimanda da sola all'invito resta ferma.
+test('la pagina d’arrivo di un clic non eredita il gesto per spingere l’invito', async ({ openTab, testServer }) => {
+  test.setTimeout(90000);
+  const arrivo = testServer.html(`<!doctype html><meta charset="utf-8"><body><h1>arrivata</h1>
+    <script>setTimeout(function () { location.href = 'filo://invito/ABCD-EFGH'; }, 300);</script></body>`);
+  const pagina = await testServer.openReady(openTab, `<!doctype html><meta charset="utf-8"><body><a id="vai" href="${arrivo}">vai</a></body>`);
+  await pagina.locator('#vai').click();
+  await expect.poll(() => pagina.evaluate(() => (document.querySelector('h1') || {}).textContent || '').catch(() => ''), { timeout: 15000 }).toBe('arrivata');
+  await new Promise((r) => setTimeout(r, 3000));
+  expect(seen.redeems, 'nessun riscatto senza un clic sulla pagina').toEqual([]);
 });

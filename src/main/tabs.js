@@ -822,7 +822,7 @@ class TabManager {
   // `apriComunque`: la scheda non passa dalla lista dei siti bloccati per quel sito.
   // `permessoRichieste`: è un «Apri comunque» vero, e passa anche il blocco delle richieste.
   // `bloccoInPagina`: se la lista la ferma, la scheda nasce sulla pagina «Sito bloccato» invece di non nascere.
-  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false, allowDuplicate = false, openedByLink = false, apriComunque = false, permessoRichieste = false, bloccoInPagina = false } = {}) {
+  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false, allowDuplicate = false, openedByLink = false, apriComunque = false, permessoRichieste = false, bloccoInPagina = false, daGesto = false } = {}) {
     // #252 — INDIRIZZO UNICO per le pagine interne: riporta l'eventuale forma
     // legacy `filo://src/pages/<page>/<file>` (dallo shim getURL) alla forma
     // canonica `filo://<page>/<file>` che usa il menu. Così tutti i punti di
@@ -952,6 +952,8 @@ class TabManager {
       // visibilità viene poi normalizzata al primo cambio di scheda (activate).
       this.layout();
     }
+    // Una scheda aperta da un clic vero eredita il gesto per la sua prima navigazione e i suoi rinvii (#664 giro 2).
+    if (daGesto) view.webContents._filoGestoAlle = Date.now();
     if (bloccata) this._mostraPaginaBloccata(tab, url, bloccata);
     else view.webContents.loadURL(url);
     if (activate) {
@@ -2158,6 +2160,8 @@ class TabManager {
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
         fermaNavigazione(url, { win: this.win, wc });
+        // Una scheda nata per un collegamento che rimbalza sull'invito o sulla posta resterebbe bianca (#664 giro 2).
+        if (event.isMainFrame !== false && !tab._everNavigated && !tab.isInternal) setImmediate(() => this._dropTab(tab));
         return;
       }
       // #590 — un redirect è un cambio d'indirizzo come gli altri: senza, un
@@ -2593,6 +2597,7 @@ class TabManager {
         openedByLink: true,
         apriComunque: this._siteAllowedIn(tab, url),
         permessoRichieste: this._siteAllowedIn(tab, url) && !!tab._permessoRichieste,
+        daGesto: Permessi.gestoRecente(wc),
       });
       // Un blob: aperto dalla pagina si giudica come lei (src/main/tabs/tabSafebrowse.js).
       const nuova = this.tabs.find((t) => t.id === aperta);
