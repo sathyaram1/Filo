@@ -1220,6 +1220,7 @@
     $('riassuntoSchede').addEventListener('change', persist);
     $('terminalEnabled').addEventListener('change', persist);
     $('nomiSensatiScaricamenti').addEventListener('change', persist);
+    $('aggiornamentiAutomatici').addEventListener('change', persist);
     $('terminalShell').addEventListener('change', persist);
 
     // Lettura ad alta voce: la lista voci può popolarsi in ritardo.
