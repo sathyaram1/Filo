@@ -1008,6 +1008,17 @@
     try { popup?.pose?.reflow(); } catch (_) {}
   }
 
+  // La risposta l'hanno pagata i crediti di Filo perché OpenRouter ha rifiutato
+  // la chiave dell'utente: la stessa riga che la chat mette sotto la risposta (#662).
+  function notaRipiego(parent, keyFallback) {
+    if (!parent || !keyFallback || !keyFallback.line) return null;
+    const el = document.createElement('div');
+    el.className = 'sn-key-fallback';
+    el.textContent = keyFallback.line;
+    parent.appendChild(el);
+    return el;
+  }
+
   // Scrive modello e costo nella riga in basso. Quando lo spazio è così poco
   // che quella riga deve sparire (dentro un riquadro incorporato basso, vedi la
   // posa), l'informazione resta comunque: passando sopra l'intestazione.
@@ -1094,6 +1105,7 @@
           } else {
             bubble.text.innerHTML = renderMarkdown(daMostrare);
           }
+          notaRipiego(bubble.text, m.keyFallback);
           setMeta(popup, `${I18n.t('popup_model')}: ${popup.model} • ${I18n.t('popup_estimated_cost')}: €${eur.toFixed(4)}`);
         });
         // Salva la versione risolta in conversazione: i follow-up vedono i numeri,
@@ -1329,6 +1341,7 @@
 
   global.SN_POPUP = {
     openStreaming,
+    notaRipiego,
     close,
     closeTopmost,
     showToast,

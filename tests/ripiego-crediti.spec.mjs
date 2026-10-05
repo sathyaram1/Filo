@@ -86,8 +86,12 @@ test.beforeAll(async () => {
         // Il 403 è quello della moderazione, come lo scrive OpenRouter: non è la chiave.
         if (status === 403) return json(res, 403, { error: { message: 'Your chosen model requires moderation and your input was flagged', code: 403, metadata: { reasons: ['x'], flagged_input: '…' } } });
         if (status !== 200) return json(res, status, { error: { message: status === 401 ? 'User not found.' : 'no', code: status } });
-        res.writeHead(200, { 'Content-Type': 'text/event-stream' });
         const who = bearer === PERSONAL_KEY ? 'RISPOSTA-DALLA-PERSONALE' : 'RISPOSTA-DALLA-PROPRIA';
+        // Le richieste senza streaming (la spiegazione nel menu, il riquadro di modifica) vogliono il JSON intero.
+        if (body.stream !== true) {
+          return json(res, 200, { id: 'gen-1', provider: 'Fake', choices: [{ message: { content: `Ciao: ${who}.` }, finish_reason: 'stop' }], usage: { prompt_tokens: 12, completion_tokens: 5, cost: 0.00021 } });
+        }
+        res.writeHead(200, { 'Content-Type': 'text/event-stream' });
         res.write(`data: ${JSON.stringify({ id: 'gen-1', provider: 'Fake', choices: [{ delta: { content: `Ciao: ${who}.` } }] })}\n\n`);
         res.write(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: 12, completion_tokens: 5, cost: 0.00021 } })}\n\n`);
         res.write('data: [DONE]\n\n');
@@ -499,4 +503,272 @@ test('(G) un 403 di moderazione non è la chiave: nessun ripiego, nessun rifiuto
   await expect(credits.locator('#ownKeyHave')).toBeVisible({ timeout: 15000 });
   await expect(credits.locator('#ownKeyRefusal')).toBeHidden();
   await expect(credits.locator('#ownKeyRule')).toContainText('prova prima lei');
+});
+
+// ── #662: le porte rimaste aperte dopo i giri di verifica del #629 ───────────
+//  (H) il «Prova» delle Impostazioni (accanto alla chiave e su ogni riga dei
+//      modelli) misura LA chiave: rifiutata, lo dice col perché, senza ripiego;
+//  (I) «spiega» su una pagina web, dal riquadro e dal tasto destro: la riga
+//      della chat sotto la risposta; e così il riquadro di modifica;
+//  (J) il ripiego che non produce niente non fa dire a Crediti che Filo ha
+//      usato i crediti; quando poi risponde, sì;
+//  (K) Crediti aperta: quando arriva il rifiuto anche spesa e residuo si
+//      aggiornano, senza ricaricare.
+const CONTA = 'Conta da 1 a 20';
+
+test('(H) il «Prova» delle Impostazioni con la chiave propria rifiutata: dice che OpenRouter l’ha rifiutata e perché, senza usare i crediti di Filo', async ({ app, shell, openTab }) => {
+  test.setTimeout(120_000);
+  ownKeyStatus = 402;
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const credits = await redeemWallet(openTab);
+  await prepare(app);
+  const options = await openTab('filo://options/options.html');
+  await expect(options.locator('#apiKey')).toBeVisible({ timeout: 15000 });
+  await expect.poll(() => options.locator('#apiKey').inputValue(), { timeout: 10000 }).toBe(OWN_KEY);
+
+  await options.click('#testOpenrouter');
+  const status = options.locator('#testOpenrouterStatus');
+  await expect(status).toContainText('OpenRouter ha rifiutato questa chiave (il suo credito è finito)', { timeout: 30000 });
+  await expect(status).not.toContainText('tok/s');
+  const prove = () => seen.completions.filter((c) => c.lastText.includes(CONTA)).map((c) => c.key);
+  expect(prove()).toEqual([OWN_KEY]);
+  await options.screenshot({ path: 'tests/.shots/662-prova-chiave-rifiutata.png' }).catch(() => {});
+
+  // Lo stesso «Prova» sulla riga di un modello: passa dalla stessa strada.
+  const row = options.locator('#modelRegistryList .sn-model-row:not(.sn-model-row-head)').first();
+  await row.locator('.sn-model-test').click();
+  await expect(row.locator('.sn-model-row-status')).toContainText('OpenRouter ha rifiutato questa chiave', { timeout: 30000 });
+  expect(prove()).toEqual([OWN_KEY, OWN_KEY]);
+
+  // Una prova non salva niente: Crediti non si è segnata un rifiuto (né un uso dei crediti).
+  await credits.reload();
+  await expect(credits.locator('#ownKeyHave')).toBeVisible({ timeout: 15000 });
+  await expect(credits.locator('#ownKeyRefusal')).toBeHidden();
+
+  // Ricaricato il conto, la stessa prova risponde coi tempi della chiave.
+  ownKeyStatus = 200;
+  await options.click('#testOpenrouter');
+  await expect(status).toContainText('tok/s', { timeout: 30000 });
+  expect(prove()).toEqual([OWN_KEY, OWN_KEY, OWN_KEY]);
+});
+
+test('(I) «spiega» su una pagina con la chiave propria rifiutata: il riquadro, il tasto destro e il riquadro di modifica dicono che hanno pagato i crediti di Filo', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(150_000);
+  ownKeyStatus = 402;
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await redeemWallet(openTab);
+  await prepare(app);
+  const page = await testServer.openReady(openTab, '<!doctype html><meta charset="utf-8"><title>Prova</title>'
+    + '<p id="t" style="font:18px sans-serif;margin:120px 40px">La fotosintesi trasforma la luce in zuccheri.</p>');
+  const seleziona = () => page.evaluate(() => {
+    const r = document.createRange();
+    r.selectNodeContents(document.querySelector('#t'));
+    const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  });
+
+  // La scorciatoia di «spiega»: il riquadro.
+  await seleziona();
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    globalThis.__filoShortcuts.dispatch('explain-selection', win);
+  });
+  const popup = page.locator('.sn-popup');
+  await expect(popup).toContainText('RISPOSTA-DALLA-PERSONALE', { timeout: 30000 });
+  const nota = popup.locator('.sn-key-fallback');
+  await expect(nota).toHaveText('OpenRouter ha rifiutato la tua chiave (il suo credito è finito): ho usato i crediti di Filo.');
+  await page.screenshot({ path: 'tests/.shots/662-spiega-riquadro.png' }).catch(() => {});
+  // Una domanda dopo, nello stesso riquadro: anche lei pagata così, anche lei lo dice.
+  await popup.locator('.sn-popup-input').fill('e poi?');
+  await popup.locator('.sn-popup-input').press('Enter');
+  await expect(popup.locator('.sn-key-fallback')).toHaveCount(2, { timeout: 30000 });
+  await popup.locator('.sn-popup-close').click();
+  await expect(popup).toHaveCount(0);
+
+  // Il tasto destro: la spiegazione nel menu (col tema scuro, da guardare nella foto).
+  await page.evaluate(() => { document.documentElement.dataset.snTheme = 'dark'; });
+  await seleziona();
+  await page.locator('#t').click({ button: 'right' });
+  const menu = page.locator('.sn-menu');
+  await expect(menu).toBeVisible({ timeout: 10000 });
+  const sezione = menu.locator('.sn-menu-inline-explain');
+  await expect(sezione).toContainText('RISPOSTA-DALLA-PERSONALE', { timeout: 30000 });
+  await expect(sezione.locator('.sn-key-fallback')).toContainText('ho usato i crediti di Filo');
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: 'tests/.shots/662-spiega-menu.png' }).catch(() => {});
+  await page.keyboard.press('Escape');
+
+  // Con la chiave che torna a rispondere nessuna riga: la risposta l'ha pagata lei.
+  ownKeyStatus = 200;
+  await page.evaluate(() => { document.querySelector('#t').textContent = 'Un’altra frase, da spiegare con la chiave buona.'; });
+  await seleziona();
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    globalThis.__filoShortcuts.dispatch('explain-selection', win);
+  });
+  await expect(popup).toContainText('RISPOSTA-DALLA-PROPRIA', { timeout: 30000 });
+  await expect(popup.locator('.sn-key-fallback')).toHaveCount(0);
+});
+
+test('(I2) il riquadro di modifica del testo: la proposta pagata coi crediti di Filo lo dice, e la riga sparisce con la proposta dopo', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  ownKeyStatus = 401;
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await redeemWallet(openTab);
+  await prepare(app);
+  const page = await testServer.openReady(openTab, '<!doctype html><meta charset="utf-8"><title>Modulo</title>'
+    + '<textarea id="campo" style="margin:120px 40px;width:400px;height:80px;font:16px sans-serif">Un testo con un erore.</textarea>');
+  // I passi dell'utente: seleziona il testo nella casella, tasto destro, «Modifica», «Correggi».
+  await page.locator('#campo').click();
+  await page.evaluate(() => { const t = document.querySelector('#campo'); t.focus(); t.select(); });
+  await page.locator('#campo').click({ button: 'right' });
+  const menu = page.locator('.sn-menu');
+  await expect(menu).toBeVisible({ timeout: 10000 });
+  await menu.locator('.sn-menu-item', { hasText: 'Modifica' }).click();
+  const box = page.locator('.sn-editbox');
+  await expect(box).toBeVisible({ timeout: 10000 });
+  await box.locator('button[data-sc="fix"]').click();
+  await expect(box.locator('.sn-editbox-proposed')).toContainText('RISPOSTA-DALLA-PERSONALE', { timeout: 30000 });
+  await expect(box.locator('.sn-key-fallback')).toHaveText('OpenRouter ha rifiutato la tua chiave (non la riconosce): ho usato i crediti di Filo.');
+  await page.screenshot({ path: 'tests/.shots/662-modifica.png' }).catch(() => {});
+  ownKeyStatus = 200;
+  await box.locator('button[data-sc="formal"]').click();
+  await expect(box.locator('.sn-editbox-proposed')).toContainText('RISPOSTA-DALLA-PROPRIA', { timeout: 30000 });
+  await expect(box.locator('.sn-key-fallback')).toHaveCount(0);
+});
+
+test('(J) il ripiego che non produce niente (la personale risponde 500): Crediti ricorda il rifiuto ma non dice che Filo ha usato i crediti; quando il ripiego risponde, sì', async ({ app, shell, openTab }) => {
+  test.setTimeout(120_000);
+  ownKeyStatus = 402;
+  personalKeyStatus = 500;
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const home = await newtabPage(app);
+  await expect(home.locator('#input')).toBeVisible();
+  const credits = await redeemWallet(openTab);
+  await prepare(app);
+
+  await home.bringToFront().catch(() => {});
+  await home.locator('#input').fill('ciao ripiego caduto');
+  await home.locator('#sendBtn').click();
+  const mine = () => seen.completions.filter((c) => c.tools && c.lastRole === 'user' && c.lastText.includes('ciao ripiego caduto')).map((c) => c.key);
+  await expect.poll(mine, { timeout: 30000 }).toEqual(expect.arrayContaining([OWN_KEY, PERSONAL_KEY]));
+  await expect(home.locator('.dash-bubble-note')).toHaveCount(0);
+  await credits.reload();
+  await expect(credits.locator('#ownKeyRefusal')).toBeVisible({ timeout: 15000 });
+  await expect(credits.locator('#ownKeyRefusal')).toContainText('il suo credito è finito');
+  await expect(credits.locator('#ownKeyRefusal')).not.toContainText('ha usato i tuoi crediti');
+  await expect(credits.locator('#ownKeyRefusal')).toContainText('se la rifiuta, Filo usa i tuoi crediti');
+  await credits.screenshot({ path: 'tests/.shots/662-crediti-ripiego-caduto.png' }).catch(() => {});
+  expect(seen.commits.length).toBe(0);
+
+  // Il servizio torna: il ripiego risponde, e adesso sì che i crediti sono stati usati.
+  personalKeyStatus = 200;
+  await home.bringToFront().catch(() => {});
+  await home.locator('#input').fill('ciao ripiego riuscito');
+  await home.locator('#sendBtn').click();
+  await expect(home.locator('.dash-bubble-filo').last()).toContainText('RISPOSTA-DALLA-PERSONALE', { timeout: 30000 });
+  await expect(credits.locator('#ownKeyRefusal')).toContainText('ha usato i tuoi crediti', { timeout: 15000 });
+});
+
+test('(K) Crediti aperta quando OpenRouter comincia a rifiutare la chiave: spesa e residuo si aggiornano insieme alla riga del rifiuto', async ({ app, shell, openTab }) => {
+  test.setTimeout(120_000);
+  ownKeyStatus = 200;
+  ownKeyUsage = 1.23;
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const home = await newtabPage(app);
+  await expect(home.locator('#input')).toBeVisible();
+  const credits = await redeemWallet(openTab);
+  await prepare(app);
+  await credits.reload();
+  await expect(credits.locator('#ownKeyBalance')).toHaveText('Spesi 1,23 $ · restano 8,77 $ su 10,00 $', { timeout: 15000 });
+
+  // Il credito finisce mentre la pagina è aperta.
+  ownKeyStatus = 402;
+  ownKeyUsage = 10;
+  await home.bringToFront().catch(() => {});
+  await home.locator('#input').fill('ciao credito finito');
+  await home.locator('#sendBtn').click();
+  await expect(home.locator('.dash-bubble-filo').last()).toContainText('RISPOSTA-DALLA-PERSONALE', { timeout: 30000 });
+  await expect(credits.locator('#ownKeyRefusal')).toBeVisible({ timeout: 15000 });
+  await expect(credits.locator('#ownKeyBalance')).toHaveText('Spesi 10,00 $ · restano 0,00 $ su 10,00 $', { timeout: 15000 });
+});
+
+test('(L) l’Aiuto della pagina con la chiave propria rifiutata: la riga del ripiego compare una volta, non a ogni risposta pagata così', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  ownKeyStatus = 401;
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await redeemWallet(openTab);
+  await prepare(app);
+  const page = await testServer.openReady(openTab, '<!doctype html><meta charset="utf-8"><title>Sito</title><p>Un sito qualunque.</p>');
+  const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
+  await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
+  await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
+  const chiedi = async (testo) => {
+    const prima = await page.locator('.sn-sidebar-msg-assistant').count();
+    await page.fill('.sn-sidebar-input textarea', testo);
+    await page.press('.sn-sidebar-input textarea', 'Enter');
+    await expect(page.locator('.sn-sidebar-msg-assistant')).toHaveCount(prima + 1, { timeout: 30_000 });
+  };
+  const righe = page.locator('.sn-sidebar-log', { hasText: 'ho usato i crediti di Filo' });
+
+  await chiedi('dove sono le impostazioni?');
+  await expect(page.locator('.sn-sidebar-msg-assistant').last()).toContainText('RISPOSTA-DALLA-PERSONALE');
+  await expect(righe).toHaveCount(1);
+  await expect(righe).toContainText('OpenRouter ha rifiutato la tua chiave (non la riconosce)');
+  await page.screenshot({ path: 'tests/.shots/662-aiuto.png' }).catch(() => {});
+  await chiedi('e il tema scuro?');
+  await expect(righe).toHaveCount(1);
+  // La chiave risponde di nuovo, poi torna a essere rifiutata: la riga torna.
+  ownKeyStatus = 200;
+  await chiedi('grazie');
+  await expect(page.locator('.sn-sidebar-msg-assistant').last()).toContainText('RISPOSTA-DALLA-PROPRIA');
+  ownKeyStatus = 401;
+  await chiedi('ancora una cosa');
+  await expect(righe).toHaveCount(2);
+});
+
+test('(M) «Traduci la pagina» con la chiave propria rifiutata: finito il giro, un avviso dice che hanno pagato i crediti di Filo', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  ownKeyStatus = 402;
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await redeemWallet(openTab);
+  await prepare(app);
+  const page = await testServer.openReady(openTab, '<!doctype html><html lang="en"><meta charset="utf-8"><title>Article</title>'
+    + '<p id="p1">The quick brown fox jumps over the lazy dog, again and again, in the morning light.</p>');
+  await page.evaluate(() => {
+    window.__toasts = [];
+    new MutationObserver((muts) => {
+      for (const m of muts) for (const n of m.addedNodes) {
+        if (n.nodeType === 1 && n.classList && n.classList.contains('sn-toast')) window.__toasts.push(n.textContent || '');
+      }
+    }).observe(document.documentElement, { childList: true, subtree: true });
+  });
+  await page.locator('#p1').click({ button: 'right', position: { x: 5, y: 5 } });
+  await page.locator('[data-sn-icon-id="translate"]').click();
+  await expect.poll(() => page.evaluate(() => window.__toasts.join(' | ')), { timeout: 30_000 })
+    .toContain('OpenRouter ha rifiutato la tua chiave (il suo credito è finito): ho usato i crediti di Filo.');
+});
+
+test('(N) la chat dell’Editor con la chiave propria rifiutata: sotto ogni risposta la stessa riga della chat di Filo', async ({ app, shell, openTab }) => {
+  test.setTimeout(120_000);
+  ownKeyStatus = 402;
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await redeemWallet(openTab);
+  await prepare(app);
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('.ed-module[data-type="switch"]');
+  await page.locator('.ed-switch-icon').nth(1).click();
+  await page.waitForSelector('.ed-module[data-type="chat"]');
+  const input = page.locator('.ed-module[data-type="chat"] [data-chat="input"]');
+  await input.click();
+  await input.fill('di cosa parla?');
+  await input.press('Enter');
+  await expect(page.locator('.ed-chat-msg.assistant').last()).toContainText('RISPOSTA-DALLA-PERSONALE', { timeout: 30_000 });
+  const nota = page.locator('.ed-chat-note');
+  await expect(nota).toHaveText('OpenRouter ha rifiutato la tua chiave (il suo credito è finito): ho usato i crediti di Filo.');
+  await page.screenshot({ path: 'tests/.shots/662-editor-chat.png' }).catch(() => {});
+  // Una seconda risposta pagata così ha la sua riga; la prima resta sotto la sua.
+  await input.fill('e poi?');
+  await input.press('Enter');
+  await expect(page.locator('.ed-chat-msg.assistant')).toHaveCount(2, { timeout: 30_000 });
+  await expect(nota).toHaveCount(2, { timeout: 30_000 });
 });

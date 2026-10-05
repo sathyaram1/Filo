@@ -408,7 +408,7 @@ module.exports = function register(on, ctx) {
         tokensPerSec: Math.round(tps * 10) / 10,
       };
     } catch (e) {
-      return { ok: false, error: e?.message || String(e) };
+      return { ok: false, error: provaFallita(e) };
     }
   });
 
@@ -438,11 +438,23 @@ module.exports = function register(on, ctx) {
   }
 
   // Le prove sono chiamate vere, pagate: passano dal cancello come le funzioni (limite, costo, chi ha servito).
+  // La prova misura la chiave che l'utente ha davanti: se OpenRouter la
+  // rifiuta lo deve dire, non rispondere coi crediti di Filo (#662).
   function probe({ settings, provider, apiKey, model, routing, method, args }) {
-    return modelGate.call({
+    const call = () => modelGate.call({
       action: SN_CONST.ACTIONS.PROVIDER_TEST, settings,
       attempt: { provider, apiKey, model, providerRouting: routing }, method, args,
     });
+    const K = globalThis.SN_WALLET_MAIN;
+    return K && typeof K.senzaRipiego === 'function' ? K.senzaRipiego(call) : call();
+  }
+
+  // L'errore di una prova, detto all'utente: un rifiuto della chiave col suo perché.
+  function provaFallita(e) {
+    const W = globalThis.SN_WALLET;
+    const st = W ? W.keyRefusalOf(e) : 0;
+    if (st) return `OpenRouter ha rifiutato questa chiave (${W.keyRefusalReason(st)}).`;
+    return e?.message || String(e);
   }
 
   async function probeNonText({ settings, kind, provider, apiKey, model, routing, nickname }) {

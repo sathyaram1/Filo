@@ -42,6 +42,7 @@
   // (o auto-action reveal/hover andate a buon fine), niente value di fill.
   // rawUserMessages serve solo al "judge" lato server come riferimento.
   let session = null;
+  let ripiegoDetto = false;
   function newSession() {
     return {
       initialUrl: '',
@@ -78,6 +79,7 @@
   function open(context) {
     if (root) return;
     history = [];
+    ripiegoDetto = false;
     collapsed = false;
     aiPrefersOpen = true;
     session = newSession();
@@ -1143,6 +1145,14 @@
         payload,
       });
       if (!res?.ok) throw new Error(res?.error || I18n.t('err_provider_failed'));
+      // Risposta pagata coi crediti di Filo perché OpenRouter ha rifiutato la chiave (#662): la
+      // riga della chat, una volta per serie, non a ogni passo che l'agente fa da solo.
+      if (res.keyFallback && res.keyFallback.line) {
+        if (!ripiegoDetto) appendActionLog(res.keyFallback.line)?.classList.add('sn-sidebar-log-intera');
+        ripiegoDetto = true;
+      } else {
+        ripiegoDetto = false;
+      }
       const parsed = parseAssistantOutput(res.text);
 
       // Caso speciale: l'AI ha chiesto una ricerca web. Esegui la ricerca,

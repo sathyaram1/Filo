@@ -821,8 +821,16 @@ async function handleAIRequest({ action, payload, origin, onReasoning = null, on
     model: concreteModel, provider: usedProvider, costEur, usage: result.usage, timing,
     // La chiave propria è stata rifiutata e ha risposto la personale (#629):
     // chi mostra la risposta lo dice all'utente.
-    keyFallback: result.keyFallback || null,
+    keyFallback: ripiegoDaDire(result.keyFallback),
   };
+}
+
+// Il ripiego dalla chiave propria ai crediti di Filo, con la riga già scritta:
+// ogni superficie che mostra una risposta la mette sotto, uguale a quella della chat (#662).
+function ripiegoDaDire(kf) {
+  if (!kf || kf.failed) return null;
+  const W = global.SN_WALLET;
+  return { ...kf, line: W ? W.ownKeyFallbackLine(kf.status) : '' };
 }
 
 // ─── Streaming via Electron IPC ─────────────────────────────────────────────
@@ -863,7 +871,7 @@ async function handleStream({ action, payload, origin, onDelta, onMeta, onReset,
   });
 
   AICache.set({ provider: settings.provider, model, messages, text: result.text, usage: result.usage }).catch(() => {});
-  return { costEur, usage: result.usage, provider: usedProvider, model: concreteModel };
+  return { costEur, usage: result.usage, provider: usedProvider, model: concreteModel, keyFallback: ripiegoDaDire(result.keyFallback) };
 }
 
 // ─── Filo agents ────────────────────────────────────────────────────────────

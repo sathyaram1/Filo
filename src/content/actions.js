@@ -606,7 +606,7 @@
       payload: { selection: selInfo.selection, sentence: selInfo.sentence },
     }).then(
       (res) => (res?.ok && typeof res.text === 'string')
-        ? { text: res.text }
+        ? { text: res.text, keyFallback: res.keyFallback || null }
         : { error: res?.error || I18n.t('err_provider_failed') },
       (e) => ({ error: e?.message || I18n.t('err_provider_failed') }),
     );
@@ -670,6 +670,7 @@
             return;
           }
           body.innerHTML = Popup.renderMarkdown(daMostrare);
+          Popup.notaRipiego(body, res.keyFallback);
         });
         return () => { cancelled = true; };
       },
@@ -779,6 +780,7 @@
               return;
             }
             testoChiuso(body, res.text);
+            Popup.notaRipiego(el, res.keyFallback);
           } catch (e) {
             if (cancelled) return;
             el.classList.remove('sn-menu-inline-loading');
@@ -847,6 +849,8 @@
               // butta il testo parziale (l'avviso sicurezza resta).
               buf = '';
               body.textContent = '';
+            } else if (m.type === 'done') {
+              Popup.notaRipiego(el, m.keyFallback);
             } else if (m.type === 'error') {
               el.classList.remove('sn-menu-inline-loading');
               el.classList.add('sn-menu-inline-error');

@@ -104,6 +104,9 @@
   // si buttano via, invece di scaricarsi addosso a una pagina che l'utente ha
   // appena riportato indietro (#407).
   let runSeq = 0;
+  // La riga del ripiego sui crediti di Filo (#662), se una parte del giro l'hanno pagata loro:
+  // la pagina tradotta non ha un riquadro sotto cui scriverla, la dice l'avviso.
+  let ripiegoDelGiro = '';
   // L'avviso "sto traducendo" del giro in corso. Serve a chi lo FERMA: le
   // richieste già spedite tornano quando vogliono, e finché non tornano il
   // riquadro "Traduzione pagina in corso…" resterebbe sullo schermo accanto a
@@ -153,6 +156,7 @@
       return;
     }
     pageTranslating = true;
+    ripiegoDelGiro = '';
     const myRun = ++runSeq;
     const aborted = () => myRun !== runSeq;
     // L'avviso "sto traducendo" dura quanto la traduzione e viene SOSTITUITO
@@ -203,6 +207,7 @@
       }
       progress.close();
       showResultToast(result, newContentSeen, frames);
+      if (ripiegoDelGiro) Popup.showToast(ripiegoDelGiro, { duration: 7000 });
     } finally {
       progress.close();
       if (framesRunId) frameRuns.delete(framesRunId);
@@ -733,6 +738,7 @@
       } catch (e) {
         res = { ok: false, error: (e && e.message) || '', code: (e && e.code) || '' };
       }
+      if (res?.ok && res.keyFallback && res.keyFallback.line) ripiegoDelGiro = res.keyFallback.line;
       if (res?.ok && String(res.text || '').trim()) return { ok: true, text: res.text };
       answeredEmpty = !!(res && res.ok);
       if (attempt) return { ok: false, error: answeredEmpty ? null : errFrom(res) };
