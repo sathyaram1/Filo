@@ -76,3 +76,12 @@ test('la sessione protetta devia i riquadri verso nocookie prima che partano; in
   assert.equal(Cookies.nocookieInRete(null), false);
   assert.equal(Cookies.nocookieInRete(sessioneFinta()), false, 'una sessione mai protetta lascia il lavoro al ripiego nella pagina');
 });
+
+test('il manifesto delle capacità racconta la deviazione e la sua eccezione: chiesto a Filo, lo sa', () => {
+  require(join(ROOT, 'src', 'shared', 'capabilities.js'));
+  const CAP = globalThis.SN_CAPABILITIES;
+  const voce = CAP.CAPABILITIES.find((c) => /youtube-nocookie/i.test(`${c.desc} ${c.invoke}`));
+  assert.ok(voce, 'nessuna capacità parla degli embed di YouTube deviati su youtube-nocookie');
+  assert.match(voce.doesNot || '', /comanda/i, 'manca l’eccezione dei lettori comandati dal sito');
+  assert.match(voce.doesNot || '', /Manuale/, 'manca il caso della modalità Manuale');
+});
