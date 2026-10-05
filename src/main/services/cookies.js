@@ -380,6 +380,32 @@ function dimenticaFidato(site) {
   buttaJar(partition, ses);
 }
 
+// Un sito tolto dai fidati mentre la sua scheda era aperta, e Filo chiuso prima che la chiudesse, lascerebbe
+// il suo jar sul disco per sempre: qui se ne vanno tutti quelli che non sono più fidati, da qualunque strada.
+function spazzaFidatiOrfani(trusted) {
+  let nomi = [];
+  try {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const dir = path.join(require('electron').app.getPath('userData'), 'Partitions');
+    nomi = fs.readdirSync(dir, { withFileTypes: true })
+      .filter((v) => v.isDirectory() && v.name.startsWith('filo-priv-'))
+      .map((v) => v.name);
+  } catch (_) { return; }
+  const vivi = new Set([...trusted].map((s) => baseDelSito(s)));
+  for (const nome of nomi) {
+    if (vivi.has(nome)) continue;
+    const partition = 'persist:' + nome;
+    try {
+      const ses = siteSessions.get(partition) || session.fromPartition(partition);
+      if (inUso(partition, ses)) continue;   // la scheda è ancora aperta: aspetta che la chiuda
+      siteSessions.set(partition, ses);
+      fidatiDaButtare.add(partition);
+      buttaJar(partition, ses);
+    } catch (_) {}
+  }
+}
+
 // Rimesso fra i fidati prima che il suo jar se ne andasse: resta dov'è, l'utente ha disdetto.
 function tieniFidato(site) {
   const partition = 'persist:' + baseDelSito(site);
