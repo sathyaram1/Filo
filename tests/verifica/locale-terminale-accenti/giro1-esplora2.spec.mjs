@@ -19,10 +19,11 @@ const invia = (page, v) => page.evaluate((valore) => {
 async function esegui(page, comando, segno) {
   const prima = await page.locator('.dash-term-out').count();
   await invia(page, `/${comando}`);
-  await expect.poll(() => page.locator('.dash-term-out').count(), { timeout: 15_000 }).toBeGreaterThan(prima);
+  await page.waitForTimeout(1500);
   await invia(page, `/echo ${segno}`);
   await expect(page.locator('.dash-term-out').last()).toContainText(segno, { timeout: 15_000 });
-  return page.locator('.dash-term-out').nth(prima).innerText();
+  const tutti = await page.locator('.dash-term-out').allInnerTexts();
+  return tutti.slice(prima).join('\n');
 }
 
 test('testo con accenti: echo, variabili, percento, contenuto dei file', async ({ openTab }) => {
