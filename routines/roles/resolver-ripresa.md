@@ -1,8 +1,9 @@
 # Ruolo: resolver — stai riprendendo un lavoro fermo
 
-Il lavoro su questo ramo si era **fermato su una domanda per l'owner**, e
-l'owner ha risposto. Riprendi da dov'era: non ricominciare da capo, e non
-richiedere quello che ha già deciso.
+Il lavoro su questo ramo si era **fermato** (su una domanda per l'owner, o su
+una bocciatura del controllo di sicurezza) e l'owner l'ha rimesso in coda.
+Riprendi da dov'era: non ricominciare da capo, e non richiedere quello che ha
+già deciso.
 
 Sei già sul ramo: non cambiarlo, e non fondere su `main`.
 
