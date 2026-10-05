@@ -236,3 +236,40 @@ test('il globalSetup di Playwright dà alla corsa una temporanea sua, e la togli
   await dopo();
   assert.deepEqual(readdirSync(b.tmp), [], 'rimasto nella temporanea dopo la corsa');
 });
+
+// Col disco pieno di resti la corsa nuova non nasce: se la pulizia viene dopo, non parte mai e il disco resta pieno.
+// Il disco pieno si finge: creare una cartella dice ENOSPC finché la cartella vecchia è lì.
+function discoPienoFinché(b, vecchia) {
+  const finto = join(b.base, 'disco-pieno.mjs');
+  writeFileSync(finto, "import fs from 'node:fs';\nimport { syncBuiltinESMExports } from 'node:module';\n"
+    + `const vecchia = ${JSON.stringify(vecchia)};\n`
+    + 'for (const n of ["mkdtempSync", "mkdirSync"]) { const vero = fs[n]; fs[n] = function (...a) {\n'
+    + '  if (fs.existsSync(vecchia)) throw Object.assign(new Error("ENOSPC: no space left on device"), { code: "ENOSPC" });\n'
+    + '  return vero.apply(this, a); }; }\nsyncBuiltinESMExports();\n');
+  return pathToFileURL(finto).href;
+}
+
+for (const come of ['npm run test:unit', 'un file di prova lanciato da solo']) {
+  test(`col disco pieno di resti, ${come} li toglie prima e poi gira`, () => {
+    const b = banco();
+    const vecchia = restoVecchio(b);
+    const unit = join(b.base, 'unit');
+    mkdirSync(unit);
+    const file = join(unit, 'ok.test.mjs');
+    writeFileSync(file, `import ${JSON.stringify(PERCORSI)};\nimport { test } from 'node:test';\ntest('ok', () => {});\n`);
+    const finto = discoPienoFinché(b, vecchia);
+    const args = come === 'npm run test:unit' ? [join(RADICE, 'scripts', 'run-unit-tests.mjs')] : ['--test', file];
+    const r = spawnSync(process.execPath, ['--import', finto, ...args],
+      { env: { ...b.env, FILO_UNIT_DIR: unit }, cwd: RADICE, encoding: 'utf8' });
+    assert.ok(!existsSync(vecchia), 'la cartella vecchia che riempie il disco è ancora lì');
+    assert.equal(r.status, 0, `${r.stdout}\n${r.stderr}`);
+    assert.match(r.stdout, /# pass 1/, 'la prova è girata davvero');
+  });
+}
+
+function restoVecchio(b) {
+  const d = join(b.tmp, `filo-vl-cli-${SPAZIO}Abc123`);
+  mkdirSync(d);
+  writeFileSync(join(d, 'pesante'), 'x');
+  return vecchia(d);
+}
