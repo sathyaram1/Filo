@@ -19,7 +19,7 @@ async function newtabPage(app) {
 // Il router finto nel main: registra ogni corpo e risponde secondo `modo`
 // ('ok' | 'senza-ragionamento' = nessun host regge `reasoning` | 'nessuno' = nessun host regge gli strumenti).
 async function preparaRouter(app, modo) {
-  await app.evaluate(async (_e, modo) => {
+  await app.evaluate(async (_e, { modo, rifiuto }) => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
@@ -31,6 +31,7 @@ async function preparaRouter(app, modo) {
       providerSort: 'latency',
     });
     globalThis.__routerModo = modo;
+    globalThis.__rifiuto = rifiuto;
     globalThis.__corpi = [];
     if (!globalThis.__fetchVero) {
       globalThis.__fetchVero = globalThis.fetch;
@@ -41,7 +42,7 @@ async function preparaRouter(app, modo) {
         const m = globalThis.__routerModo;
         const rifiuta = body.tools && (m === 'nessuno' || (m === 'senza-ragionamento' && body.reasoning));
         if (rifiuta) {
-          return new Response(JSON.stringify({ error: { code: 404, message: modo === 'x' ? '' : 'No endpoints found that can handle the requested parameters. To learn more about provider routing, visit: https://openrouter.ai/docs/provider-routing' } }), { status: 404, headers: { 'content-type': 'application/json' } });
+          return new Response(JSON.stringify({ error: { code: 404, message: globalThis.__rifiuto } }), { status: 404, headers: { 'content-type': 'application/json' } });
         }
         if (body.stream) {
           const sse = `data: ${JSON.stringify({ provider: 'DeepInfra', choices: [{ delta: { content: 'Ecco fatto.' } }] })}\n\ndata: [DONE]\n\n`;
@@ -50,7 +51,7 @@ async function preparaRouter(app, modo) {
         return new Response(JSON.stringify({ provider: 'DeepInfra', choices: [{ message: { content: 'Ecco fatto.' } }], usage: {} }), { status: 200, headers: { 'content-type': 'application/json' } });
       };
     }
-  }, modo);
+  }, { modo, rifiuto: NO_PARAMS });
 }
 
 const corpiConStrumenti = (app) => app.evaluate(() => globalThis.__corpi
