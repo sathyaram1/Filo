@@ -19,6 +19,7 @@
         'Se nelle Preferenze hai scelto il Prompt dei comandi, i comandi partono davvero, sia quelli che chiedi a Filo sia quelli che scrivi nel terminale, e un «cd» vale anche per quelli dopo.',
         'Se la tua chiave OpenRouter è a secco, il tasto «Prova» delle Impostazioni ti dice che OpenRouter la rifiuta e perché. Prima rispondeva coi crediti di Filo e sembrava che la chiave funzionasse.',
         'Quando OpenRouter rifiuta la tua chiave e una spiegazione, una traduzione o una modifica del testo sulle pagine la pagano i crediti di Filo, sotto la risposta c\'è scritto, come in chat; dettatura, lettura ad alta voce e trascrizione dello schermo lo dicono con un avviso. In Crediti spesa e residuo della chiave si aggiornano appena arriva il rifiuto, e la pagina dice che Filo ha usato i tuoi crediti solo se è successo.',
+        'Filo controlla anche i questionari di Microsoft Customer Voice e le app che chiunque pubblica su Hugging Face Spaces. Se ti chiedono una password o i dati della carta, Filo giudica la pagina invece di fidarsi del nome di Microsoft o di Hugging Face.',
       ],
     },
     {
