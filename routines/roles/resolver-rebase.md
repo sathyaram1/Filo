@@ -37,6 +37,8 @@ l'ha rotto e cosa hai cambiato.
 
 <!-- includi: _segnala.md -->
 
+<!-- includi: _solo-in-locale.md -->
+
 ## Consegna
 
 ```bash

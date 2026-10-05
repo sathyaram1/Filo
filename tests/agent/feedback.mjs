@@ -1,18 +1,6 @@
-// Push delle issue trovate dagli agenti nella collezione `feedback` di Firestore
-// (stesso DB dei feedback alpha), in una "categoria" dedicata.
-//
-// Le Firestore rules accettano in CREATE solo i campi:
-//   text, url, title, userAgent, clientId, images, createdAt
-// quindi NON possiamo aggiungere campi nuovi (source/model/…) senza toccare le
-// rules (che vivono nell'extension, congelata). Codifichiamo perciò la
-// provenienza dentro i campi consentiti:
-//   clientId = "agent:<model>"           → categoria + modello
-//   title    = "<severity>|<area>|<titolo>"
-//   text     = dettaglio
-//   url      = dove è stato trovato (filo://…)
-//   images   = [screenshot]
-// La pagina feedback riconosce il prefisso "agent:" e mostra tutto come categoria
-// dedicata con badge del modello. Vedi src/pages/feedback/feedback.js.
+// Le issue dell'agente esploratore diventano feedback `agent:<model>`, titolo «severità|area|titolo».
+// Si creano solo con la credenziale admin e la prova del mittente (#912): da anonimo l'esploratore sarebbe un utente,
+// quindi senza credenziale non parte niente. Testo, indirizzo e mittente viaggiano cifrati come dall'app (#602).
 
 import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
@@ -100,8 +88,35 @@ async function uploadImage(buffer, mime = 'image/png') {
   return `${STORAGE_BASE}/${encodeURIComponent(name)}?alt=media&token=${token}`;
 }
 
-// Crea un documento feedback per una issue d'agente.
-export async function pushIssue({ model, severity, area, title, detail, foundAt, screenshotPath }) {
+/**
+ * Il token admin dell'owner: { idToken } oppure { idToken: '', motivo }. Oggetto, non funzione: i test lo
+ * sostituiscono. Stessa strada di scripts/claude-feedback.mjs.
+ */
+export const credenziale = {
+  async ottieni() {
+    const { findAdminRefreshToken, mintIdToken } = await import('../../scripts/lib/firestore-auth.mjs');
+    const rt = findAdminRefreshToken();
+    if (!rt) return { idToken: '', motivo: 'nessuna credenziale admin su questa macchina (node scripts/admin-login.mjs)' };
+    try {
+      return { idToken: await mintIdToken(rt) };
+    } catch (e) {
+      return { idToken: '', motivo: String((e && e.message) || e) };
+    }
+  },
+};
+
+async function cifra(testo) {
+  if (!CRYPTO.isEnabled()) throw new Error('cifratura non disponibile: la segnalazione non parte in chiaro');
+  return CRYPTO.encryptForOwner(String(testo));
+}
+
+// Crea un documento feedback per una issue d'agente. `idToken` assente: lo chiede a `credenziale`.
+export async function pushIssue({ model, severity, area, title, detail, foundAt, screenshotPath, idToken = '' }) {
+  if (!idToken) {
+    const c = await credenziale.ottieni();
+    if (!c.idToken) throw new Error(`manca il token admin (${c.motivo}): senza la prova del mittente l'esploratore sarebbe un utente, non invio`);
+    idToken = c.idToken;
+  }
   let images = [];
   if (screenshotPath) {
     try {
@@ -113,17 +128,24 @@ export async function pushIssue({ model, severity, area, title, detail, foundAt,
   const encTitle = `${severity || 'low'}|${(area || '?').replace(/\|/g, '/')}|${(title || '(senza titolo)').replace(/\|/g, '/')}`.slice(0, 500);
   const doc = {
     fields: {
-      text: toFsValue((detail || '').slice(0, 10000)),
-      url: toFsValue((foundAt || '').slice(0, 2000)),
+      text: toFsValue(await cifra((detail || '').slice(0, 10000))),
+      url: toFsValue(await cifra((foundAt || '').slice(0, 2000))),
       title: toFsValue(encTitle),
       userAgent: toFsValue('filo-agent'),
-      clientId: toFsValue(`agent:${(model || 'unknown')}`.slice(0, 100)),
+      clientId: toFsValue(await cifra(`agent:${(model || 'unknown')}`.slice(0, 100))),
       images: toFsValue(images),
+      statusPublic: toFsValue('open'),
+      senderProof: toFsValue('admin'),
       createdAt: { timestampValue: new Date().toISOString() },
     },
   };
   const endpoint = `${FIRESTORE_BASE}/${COLLECTION}?key=${API_KEY}`;
-  const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(doc) });
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify(doc),
+  });
+  // Un token rifiutato non ripiega sull'anonimo: sarebbe di nuovo un utente che si firma esploratore.
   if (!res.ok) throw new Error(`firestore create ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`);
   const json = await res.json();
   return { id: json.name?.split('/').pop() || '', images };

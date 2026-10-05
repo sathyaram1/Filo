@@ -680,7 +680,17 @@ module.exports = function register(on, ctx) {
       },
       // Chiesto al momento della spedizione: fra l'accodamento e l'invio
       // possono passare ore (offline), e l'owner può aver chiuso la sessione.
-      tokenOwner: async () => (auth.isAdmin() ? (await auth.getIdToken()) || '' : ''),
+      // '' = l'accesso non c'è; un errore con la sessione ancora aperta è la rete, e la coda riprova senza dire niente.
+      tokenOwner: async () => {
+        if (!auth.isAdmin()) return '';
+        try { return (await auth.getIdToken()) || ''; } catch (e) { if (!auth.isAdmin()) return ''; throw e; }
+      },
+      onAttesaOwner: (_item, perche) => avvisoNellaFinestra(
+        perche === 'rifiutato'
+          ? 'Il tuo feedback aspetta la tua firma da owner: il server non accetta il tuo accesso. Riparte quando rientri, o al prossimo avvio di Filo.'
+          : 'Il tuo feedback aspetta il tuo accesso da owner: parte con la tua firma appena rientri.',
+        { chiave: 'feedback-attesa-accesso-owner' },
+      ),
       log: (...a) => { try { console.log('[Filo feedback]', ...a); } catch (_) {} },
     });
   }
@@ -732,7 +742,9 @@ module.exports = function register(on, ctx) {
       // `dallOwner` lo decide il main, non il payload: vale il token admin alla spedizione (#595).
       let dallOwner = false;
       try {
-        if (auth.isAdmin() && globalThis.SN_FEEDBACK_THREAD?.ownerize) {
+        // #912: anche l'owner appena buttato fuori da un rinnovo fallito: il suo feedback aspetta che rientri.
+        const owner = auth.isAdmin() || !!auth.accessoOwnerCaduto?.();
+        if (owner && globalThis.SN_FEEDBACK_THREAD?.ownerize) {
           payload.clientId = globalThis.SN_FEEDBACK_THREAD.ownerize(payload.clientId);
           dallOwner = String(payload.clientId || '').startsWith('owner:');
         }

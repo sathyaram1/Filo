@@ -97,20 +97,33 @@
   //            in chat con lui. È la provenienza di chi apre un feedback da lì.
   const MODEL_PREFIXES = ['agent:', 'routine:', 'local:'];
 
+  // Un nome riservato vale solo con la prova che scrivono l'admin o il server (#595, #912): senza, è un utente nello
+  // spazio `non-provato:`. Gemelli: effectiveClientId in manageReview.js e in filo-security (data/identities.js);
+  // la sentinella tests/unit/mittentiProvati.test.mjs li tiene uguali.
+  const RESERVED_SENDER_RE = /^(owner|routine|agent|local):/i;
+  const SENDER_PROOFS = ['admin', 'server'];
+  // Le funzioni di classificazione qui sotto prendono il FEEDBACK (si legge la prova) o una stringa che è già un
+  // mittente efficace o una firma scritta dall'admin; il `clientId` grezzo di un feedback non va passato.
+  function senderOf(x) {
+    if (!x || typeof x !== 'object') return String(x || '');
+    const c = String(x.clientId || '');
+    return RESERVED_SENDER_RE.test(c) && SENDER_PROOFS.indexOf(x.senderProof) === -1 ? 'non-provato:' + c : c;
+  }
+
   // true se il feedback è stato inviato da un modello (issue d'agente,
   // sub-feedback creato da una routine, ritrovamento di una sessione locale):
   // in quel caso anche la segnalazione originale è "lato Filo", non
   // "lato utente".
-  function isFromModel(clientId) {
-    const c = String(clientId || '');
+  function isFromModel(fb) {
+    const c = senderOf(fb);
     return MODEL_PREFIXES.some(function (p) { return c.indexOf(p) === 0; });
   }
 
   // true se il feedback è un invio MANUALE dell'owner (admin loggato). L'identità
   // owner viene applicata nel main process al momento dell'invio (vedi
   // ownerize): il content script non sa di esserlo.
-  function isFromOwner(clientId) {
-    return String(clientId || '').startsWith('owner:');
+  function isFromOwner(fb) {
+    return senderOf(fb).startsWith('owner:');
   }
 
   // Classifica l'ORIGINE di un feedback dal prefisso del clientId. Serve alla
@@ -120,8 +133,8 @@
   //   routine:<slug> → 'routine'  audit automatico delle routine cloud (blu)
   //   local:<slug>   → 'local'    sessione locale di Claude (viola)
   //   <altro>        → 'user'     alpha tester esterno (arancione)
-  function originOf(clientId) {
-    const c = String(clientId || '');
+  function originOf(fb) {
+    const c = senderOf(fb);
     if (c.startsWith('owner:')) return 'owner';
     if (c.startsWith('agent:')) return 'agent';
     if (c.startsWith('routine:')) return 'routine';
@@ -183,8 +196,8 @@
     secaudit: 'verifier',
     residuo: 'residuo',
   };
-  function authorKind(clientId) {
-    var c = String(clientId || '');
+  function authorKind(fb) {
+    var c = senderOf(fb);
     if (c.indexOf('auto:') === 0 || c.indexOf('filo:') === 0) return 'filo';
     if (c.indexOf('owner:') === 0) return 'owner';
     // La sessione locale prima del ramo agent/routine: non ha ruoli dopo i due
@@ -335,7 +348,7 @@
     const text = String(f.text || '').trim();
     if (text) {
       turns.push({
-        role: isFromModel(f.clientId) ? 'model' : 'user',
+        role: isFromModel(f) ? 'model' : 'user',
         kind: 'report',
         body: text,
         ts: f.createdAt || f._createTime || null,
@@ -612,6 +625,7 @@
     isFromOwner,
     originOf,
     authorKind,
+    senderOf,
     // Il clientId con cui si firma una sessione locale. Sta qui perché chi lo
     // SCRIVE (scripts/claude-feedback.mjs) e chi lo LEGGE (authorKind) non
     // possano divergere su una stringa copiata a mano.

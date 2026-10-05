@@ -247,12 +247,10 @@
     // altre girano da sole, questa nasce da una conversazione.
     local:    { icon: '💻', label: 'Claude (sessione locale)' },
     claude:   { icon: '🤖', label: 'Claude (ruolo non indicato)' },
-    // #595: si firma col prefisso dell'owner o di una sua istanza ma senza prova; per la pipeline è un utente.
-    unproven: { icon: '❔', label: 'Utente, prefisso riservato senza prova' },
   };
+  // Dal feedback, non dal clientId: un nome riservato senza prova è un utente come gli altri (#912).
   function authorKindOf(fb) {
-    if (MR && MR.isUnprovenSender && MR.isUnprovenSender(fb)) return 'unproven';
-    return (TH && TH.authorKind) ? TH.authorKind(fb && fb.clientId) : 'user';
+    return (TH && TH.authorKind) ? TH.authorKind(fb || {}) : 'user';
   }
   function authorMetaOf(fb) {
     return AUTHOR_META[authorKindOf(fb)] || AUTHOR_META.user;
@@ -267,8 +265,9 @@
   function senderLabel(fb) {
     const kind = authorKindOf(fb);
     const m = AUTHOR_META[kind] || AUTHOR_META.user;
-    if (kind !== 'user' && kind !== 'unproven') return `${m.icon} ${m.label}`;
-    const id = String((fb && fb.clientId) || '').trim();
+    if (kind !== 'user') return `${m.icon} ${m.label}`;
+    // Senza il nome riservato che si era dato: ne mostrerebbe la firma.
+    const id = String((fb && fb.clientId) || '').trim().replace(/^(non-provato:)?(owner|routine|agent|local):/i, '');
     const short = id.slice(0, 8);
     return short ? `${m.icon} ${m.label} · ${short}…` : `${m.icon} ${m.label}`;
   }
@@ -299,7 +298,7 @@
   // Ordine "per creatore": prima le persone (owner, utenti), poi le istanze di
   // Claude — la sessione locale in testa, perché è quella che lavora insieme
   // all'owner — e in fondo Filo che scrive per conto di un utente.
-  const AUTHOR_RANK = { owner: 0, user: 1, unproven: 2, local: 3, worker: 4, verifier: 5, residuo: 6, prober: 7, claude: 8, filo: 9 };
+  const AUTHOR_RANK = { owner: 0, user: 1, local: 2, worker: 3, verifier: 4, residuo: 5, prober: 6, claude: 7, filo: 8 };
   // Applica l'override di ordinamento scelto dall'owner. `list` arriva GIÀ
   // ordinata col criterio predefinito della tab: in 'smart' la lasciamo intatta.
   // `sort` è stabile → a parità di chiave si conserva l'ordine predefinito.
@@ -315,7 +314,7 @@
         const ra = AUTHOR_RANK[authorKindOf(a)] ?? 99;
         const rb = AUTHOR_RANK[authorKindOf(b)] ?? 99;
         if (ra !== rb) return ra - rb;
-        return String(a.clientId || '').localeCompare(String(b.clientId || ''));
+        return senderKeyOf(a).localeCompare(senderKeyOf(b));
       });
     }
     return arr;
@@ -1074,9 +1073,35 @@
     routines_off: 'routine spente',
   };
 
-  function renderChannelLog(rejections, comparisons) {
+  // Le richieste di fusione senza gli unit sul risultato (#958): una per una, e in cima un avviso quando il server
+  // le giudica frequenti. Una prova che manca sempre non protegge niente, e nessuno se ne accorgerebbe.
+  function righeSenzaProva(prove) {
+    const righe = Array.isArray(prove && prove.righe) ? prove.righe : [];
+    return righe.filter((p) => p && (p.esito === 'non_provata' || p.esito === 'assente')).map((p) => {
+      const s = p.storia || {};
+      const clone = s.superficiale ? (s.intera ? ' · clone poco profondo, storia scaricata tutta' : ' · clone poco profondo') : '';
+      return {
+        at: p.at,
+        kind: 'noprova',
+        label: 'Senza prova',
+        text: `${p.via === 'locale' ? 'fusione locale' : 'routine'}${p.slug ? ` ${p.slug}` : ''}${p.branch ? ` · ${p.branch}` : ''}`
+          + ` · ${p.esito === 'assente' ? 'strumenti senza la prova degli unit' : (p.motivo || 'prova non riuscita')}${clone}`,
+      };
+    });
+  }
+
+  function avvisoSenzaProva(prove) {
+    const r = prove && prove.riepilogo;
+    if (!r || !r.frequente) return '';
+    return `<li class="mg-log-row mg-log-row--avviso">`
+      + `<span class="mg-log-role mg-log-role--deny">Senza prova</span>`
+      + `<span class="mg-log-when">${esc(`${r.senzaProva} delle ultime ${r.ultime} richieste di fusione sono partite senza gli unit sul risultato`)}</span>`
+      + `</li>`;
+  }
+
+  function renderChannelLog(rejections, comparisons, prove = null) {
     if (!mgChannelSection || !mgChannelList) return;
-    const rows = [];
+    const rows = righeSenzaProva(prove);
     for (const r of (Array.isArray(rejections) ? rejections : [])) {
       rows.push({
         at: r && r.at,
@@ -1108,7 +1133,7 @@
       return;
     }
     rows.sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
-    mgChannelList.innerHTML = rows.slice(0, 60).map((row) => {
+    mgChannelList.innerHTML = avvisoSenzaProva(prove) + rows.slice(0, 60).map((row) => {
       const abs = formatDateTime(row.at);
       const cls = row.kind === 'deny' ? ' mg-log-role--deny' : '';
       return `<li class="mg-log-row" title="${esc(abs)}">`
@@ -1382,7 +1407,7 @@
     try {
       const r = await sendToMain({ type: ROUTINE_LOG_GET });
       if (!r || r.ok === false) { mgChannelSection.hidden = true; return; }
-      renderChannelLog(r.rejections, r.comparisons);
+      renderChannelLog(r.rejections, r.comparisons, r.proveFusione);
     } catch (err) {
       console.error('[manage] caricamento registri canale fallito:', err);
       mgChannelSection.hidden = true;
@@ -4164,7 +4189,7 @@
     // vivono nel campo piatto files[] ({ name, url, type }): senza mapparli qui
     // l'allegato del tester era invisibile nella dashboard unificata (la vecchia
     // pagina feedback li mostra — parità tra superfici equivalenti).
-    const fromModel = TH ? TH.isFromModel(MR.effectiveClientId(fb)) : false;
+    const fromModel = TH ? TH.isFromModel(fb) : false;
     const imgs = (Array.isArray(fb.images) ? fb.images : []).map((url) => ({ kind: 'img', url }));
     const files = (Array.isArray(fb.files) ? fb.files : [])
       .filter((f) => f && typeof f.url === 'string' && f.url)
@@ -4186,10 +4211,8 @@
       const fromVerdicts = filoOpinionFromVerdicts(fb);
       if (fromVerdicts) opinionHtml = fromVerdicts;         // parere completo dai giudici
       else if (summary) opinionHtml = esc(summary);          // troncato ma è l'unica cosa che c'è
-      // #908: un lavoro locale col mittente provato i giudici li salta di proposito.
-      else if (fb.pipeline && fb.pipeline.skipped === 'local_proven') {
-        opinionHtml = '<em>Lavoro locale aperto da te o da una sessione, con la prova del mittente. I giudici non servono.</em>';
-      }
+      // #908, #914: lavoro locale, sessione per le routine e routine, col mittente provato, i giudici li saltano.
+      else if (MR.judgesSkippedText(fb)) opinionHtml = `<em>${esc(MR.judgesSkippedText(fb))}</em>`;
       // "non ha ANCORA un parere" si legge come "sta arrivando": vero solo
       // finché la segnalazione aspetta una decisione. Su una già decisa (un
       // attacco confermato, un fix chiuso) quella parola diceva il falso — e su
@@ -4561,10 +4584,11 @@
     // livelli grigi: un buco si spiega, non si tace.
     if (!v) {
       const nota = MR.judgesNote ? MR.judgesNote(fb) : null;
+      const saltati = MR.judgesSkippedText(fb);
       openSidebar(anonLabel, `
         <div class="mg-judge-detail">
-          <div class="mg-liv-testo">Nessun verdetto in questa valutazione: il giudice non ha risposto — scaduto il tempo, credito esaurito o modello non configurato.</div>
-          ${nota && nota.text ? `<div class="mg-judge-model">${esc(nota.text)}</div>` : ''}
+          <div class="mg-liv-testo">${saltati ? esc(saltati) : 'Nessun verdetto in questa valutazione: il giudice non ha risposto — scaduto il tempo, credito esaurito o modello non configurato.'}</div>
+          ${nota && nota.text && !saltati ? `<div class="mg-judge-model">${esc(nota.text)}</div>` : ''}
         </div>
       `);
       return;
