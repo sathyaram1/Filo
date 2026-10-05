@@ -1066,11 +1066,8 @@
     // e la scheda la racconta in diretta dentro il blocco (runFiloTurn).
     const r = await runFiloTurn({ ...args, activity });
     if (r && r._chiusura) {
-      const fine = r._chiusura.catch(() => {}).then(() => {
-        activity.finish();
-        if (chiusuraInCorso === fine) chiusuraInCorso = null;
-        refreshLive().catch(() => {});
-      });
+      const propria = r._chiusura.catch(() => {}).then(() => { activity.finish(); refreshLive().catch(() => {}); });
+      const fine = Promise.all([chiusuraInCorso, propria]).then(() => { if (chiusuraInCorso === fine) chiusuraInCorso = null; });
       chiusuraInCorso = fine;
     } else {
       activity.finish({ failed: !r?.ok });
