@@ -9,7 +9,6 @@ const schede = (app) => app.evaluate(({ BrowserWindow }) => {
 const aperteSu = async (app, u) => (await schede(app)).filter((x) => x.replace(/\?$/, '') === u).length;
 
 test('scegliere «Copia URL» nel menu di Filo non lascia alla pagina andare a schermo intero', async ({ openTab, testServer }) => {
-  test.fail(true, '#737.1: Il menu di Filo disegnato sulla pagina vale ancora come gesto della pagina: sempre per lo schermo intero, e per le schede quando la pagina le chiede di continuo.');
   const page = await testServer.openReady(openTab, `<!doctype html><body style="padding:24px"><a id="l" href="https://example.com/x">collegamento</a>
     <script>window.__fs=[];document.addEventListener('click',function(){document.documentElement.requestFullscreen().then(function(){__fs.push('si')},function(){__fs.push('no')})},true)</script></body>`);
   await page.locator('#l').click({ button: 'right', position: { x: 8, y: 8 } });
@@ -19,4 +18,23 @@ test('scegliere «Copia URL» nel menu di Filo non lascia alla pagina andare a s
   await menu.locator('button', { hasText: 'Copia URL' }).first().click();
   await page.waitForTimeout(1500);
   expect(await page.evaluate(() => [window.__fs, !!document.fullscreenElement]), 'il clic sul menu di Filo non è della pagina').toEqual([['no'], false]);
+});
+
+test('raffica: una pagina che chiede di continuo non passa col clic sul menu di Filo', async ({ app, openTab, testServer }) => {
+  const ad = testServer.html('<title>AD</title>');
+  const page = await testServer.openReady(openTab, `<!doctype html><body style="padding:24px"><a id="l" href="https://example.com/x">collegamento</a>
+    <script>var AD=${JSON.stringify(ad)};setInterval(function(){window.open(AD)},3)</script></body>`);
+  await page.waitForTimeout(5600);
+  const passate = [];
+  for (let i = 0; i < 4; i++) {
+    await page.locator('#l').click({ button: 'right', position: { x: 8, y: 8 } });
+    const menu = page.locator('.sn-menu');
+    await expect(menu).toBeVisible();
+    await page.waitForTimeout(5600);
+    const prima = await aperteSu(app, ad);
+    await menu.locator('button', { hasText: 'Copia URL' }).first().click();
+    await page.waitForTimeout(800);
+    passate.push((await aperteSu(app, ad)) - prima);
+  }
+  expect(passate).toEqual([0, 0, 0, 0]);
 });
