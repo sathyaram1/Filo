@@ -1063,7 +1063,7 @@
       var who = el('span', 'sn-mac-recent-who', isSkippedL5(r) ? 'lavoro locale: L5 saltato' : preapprovedBy(r));
       var specie = specieFusaSenzaChiedere(r);
       if (specie === 'locale') who.title = skippedL5Hint(r);
-      else if (specie === 'approvazione') who.title = 'Il segno l’aveva lasciato il tuo sì: valeva solo per i blocchi già approvati, e con blocchi nuovi ti avrebbe chiesto.';
+      else if (specie === 'approvazione') who.title = 'Il segno l’aveva lasciato il tuo sì e valeva solo per i blocchi già approvati. Con blocchi nuovi ti avrebbe chiesto.';
       else if (r.preapprovedAt) who.title = preapprovedWhenText(r.preapprovedAt);
       head.appendChild(who);
       head.appendChild(el('span', 'sn-mac-recent-when', mergedWhenText(r.decidedAtMs || r.createdAtMs, now)));
