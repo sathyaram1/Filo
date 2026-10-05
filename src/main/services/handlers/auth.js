@@ -924,14 +924,14 @@ module.exports = function register(on, ctx) {
     if (op === 'listAll') {
       const fields = (Array.isArray(msg.fields) && msg.fields.length) ? msg.fields : null;
       const startedAt = Date.now();
-      const { rows, complete } = await FB.listAllPaged({ timeoutMs, idToken, fields });
+      const { rows, complete, readTime } = await FB.listAllPaged({ timeoutMs, idToken, fields });
       // `lista`: è il caricamento della Gestione (#676), che ora legge tutto: le
       // schede si riuniscono, la vista si rimette in pari e il giro riparte da qui.
-      if (msg.lista !== true) return { ok: true, rows, complete };
+      if (msg.lista !== true) return { ok: true, rows, complete, readTime };
       scheduleViewSync({ rows });
       const w = liveWatcherDi();
-      if (w && complete) w.allineato(startedAt, rows);
-      return { ok: true, rows: await mergeCardFields(rows), complete };
+      if (w && complete) w.allineato(startedAt, rows, readTime);
+      return { ok: true, rows: await mergeCardFields(rows), complete, readTime };
     }
     if (op !== 'list' && op !== 'versions') return { ok: false, error: `lettura non prevista: ${op}` };
 
