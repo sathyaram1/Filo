@@ -95,3 +95,19 @@ test('un Microsoft Form su cloud.microsoft resta una pagina ospitata da giudicar
   assert.equal(v.whitelisted, false);
   assert.equal(v.needsLlm, true, JSON.stringify(v.reasons));
 });
+
+test('le pagine GitHub dei marchi sono del marchio, il sosia accanto no (#732)', () => {
+  for (const url of [
+    'https://google.github.io/', 'https://microsoft.github.io/vscode/', 'https://googlechromelabs.github.io/squoosh/',
+    'https://www.google.github.io/', 'https://Facebook.GitHub.io/react/', 'https://krakenjs.github.io/zoid/',
+    'https://github.github.io/', 'https://gitlab-org.gitlab.io/',
+  ]) assert.equal(livello(url), 'safe', url);
+  for (const url of [
+    'https://google-login.github.io/', 'https://microsoft-account.github.io/', 'https://google.github.io.esempio.com/',
+  ]) assert.notEqual(livello(url), 'safe', url);
+});
+
+test('ogni indirizzo ufficiale di un marchio è un sito intero, o il confronto esatto non lo trova mai', () => {
+  const { BRANDS } = require('../../src/main/services/safebrowse/brands.js');
+  for (const b of BRANDS) for (const d of b.domains) assert.equal(dominio(d), d, b.display + ': ' + d);
+});

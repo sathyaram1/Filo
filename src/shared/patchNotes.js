@@ -14,6 +14,7 @@
       fixes: [
         'Nelle Opzioni, se clicchi sul campo del modello prima che arrivi l\'elenco dei modelli, il menu a tendina si apre da solo appena l\'elenco c\'è. Prima restava chiuso e bisognava cliccare di nuovo.',
         'Nelle risposte di Filo un elenco numerato con le voci staccate da una riga vuota tiene i suoi numeri: prima ogni voce ripartiva da 1.',
+        'I siti che Google, Microsoft, Facebook e gli altri grandi marchi pubblicano su GitHub, come google.github.io, non mostrano più l\'avviso «Controlla l\'indirizzo». Un sito che usa il loro nome senza essere loro lo mostra ancora.',
       ],
     },
     {

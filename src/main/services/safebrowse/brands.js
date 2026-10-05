@@ -16,14 +16,17 @@
 
 'use strict';
 
+// Le pagine degli account del marchio su GitHub Pages: lì un nome utente appartiene a uno solo, quindi sono sue (#732).
+const gh = (...account) => account.map((a) => a + '.github.io');
+
 const BRANDS = [
   // Pagamenti / finanza
-  { token: 'paypal', display: 'PayPal', domains: ['paypal.com', 'paypal.me', 'paypal.it', 'paypal.de', 'paypal.fr', 'paypal.es', 'paypal.co.uk', 'paypal-community.com'] },
-  { token: 'stripe', display: 'Stripe', domains: ['stripe.com'] },
+  { token: 'paypal', display: 'PayPal', domains: ['paypal.com', 'paypal.me', 'paypal.it', 'paypal.de', 'paypal.fr', 'paypal.es', 'paypal.co.uk', 'paypal-community.com', ...gh('paypal', 'krakenjs')] },
+  { token: 'stripe', display: 'Stripe', domains: ['stripe.com', ...gh('stripe')] },
   { token: 'venmo', display: 'Venmo', domains: ['venmo.com'] },
-  { token: 'wise', display: 'Wise', domains: ['wise.com'] },
+  { token: 'wise', display: 'Wise', domains: ['wise.com', ...gh('transferwise')] },
   { token: 'revolut', display: 'Revolut', domains: ['revolut.com'] },
-  { token: 'chase', display: 'Chase', domains: ['chase.com'] },
+  { token: 'chase', display: 'Chase', domains: ['chase.com', ...gh('jpmorganchase')] },
   { token: 'wellsfargo', display: 'Wells Fargo', domains: ['wellsfargo.com'] },
   { token: 'bankofamerica', display: 'Bank of America', domains: ['bankofamerica.com'] },
   { token: 'unicredit', display: 'UniCredit', domains: ['unicredit.it', 'unicreditgroup.eu'] },
@@ -33,45 +36,48 @@ const BRANDS = [
   { token: 'nexi', display: 'Nexi', domains: ['nexi.it'] },
 
   // Crypto
-  { token: 'coinbase', display: 'Coinbase', domains: ['coinbase.com'] },
+  { token: 'coinbase', display: 'Coinbase', domains: ['coinbase.com', ...gh('coinbase')] },
   { token: 'binance', display: 'Binance', domains: ['binance.com'] },
-  { token: 'metamask', display: 'MetaMask', domains: ['metamask.io'] },
+  { token: 'metamask', display: 'MetaMask', domains: ['metamask.io', ...gh('metamask')] },
   { token: 'kraken', display: 'Kraken', domains: ['kraken.com'] },
-  { token: 'ledger', display: 'Ledger', domains: ['ledger.com'] },
+  { token: 'ledger', display: 'Ledger', domains: ['ledger.com', ...gh('ledgerhq')] },
 
   // Email / account / cloud
-  { token: 'google', display: 'Google', domains: ['google.com', 'google.it', 'gmail.com', 'googlemail.com', 'googleblog.blogspot.com', 'google.ch', 'google.at', 'google.nl', 'google.be', 'google.pl', 'google.pt', 'google.ca', 'google.com.au', 'google.co.jp', 'google.com.br', 'google.co.in', 'google-research.github.io', 'google-deepmind.github.io', 'google-developers.appspot.com'] },
+  { token: 'google', display: 'Google', domains: ['google.com', 'google.it', 'gmail.com', 'googlemail.com', 'googleblog.blogspot.com', 'google.ch', 'google.at', 'google.nl', 'google.be', 'google.pl', 'google.pt', 'google.ca', 'google.com.au', 'google.co.jp', 'google.com.br', 'google.co.in', 'google-developers.appspot.com',
+    ...gh('google', 'google-research', 'google-deepmind', 'googlechromelabs', 'googlechrome', 'googlecloudplatform', 'googleapis',
+      'googlesamples', 'googlefonts', 'googlemaps', 'googlecodelabs', 'googlecreativelab', 'googleworkspace', 'googlearchive')] },
   { token: 'gmail', display: 'Gmail', domains: ['gmail.com', 'google.com'] },
-  { token: 'microsoft', display: 'Microsoft', domains: ['microsoft.com', 'live.com', 'office.com', 'office365.com', 'microsoft.sharepoint.com', 'microsoftonline.com', 'microsoft365.com', 'cloud.microsoft'] },
+  { token: 'microsoft', display: 'Microsoft', domains: ['microsoft.com', 'live.com', 'office.com', 'office365.com', 'microsoft.sharepoint.com', 'microsoftonline.com', 'microsoft365.com', 'cloud.microsoft',
+    ...gh('microsoft', 'microsoftdocs', 'microsoftedge', 'microsoftgraph', 'microsoftlearning')] },
   { token: 'outlook', display: 'Outlook', domains: ['outlook.com', 'live.com', 'microsoft.com'] },
   { token: 'office365', display: 'Microsoft 365', domains: ['office.com', 'office365.com', 'microsoft.com', 'microsoft365.com'] },
-  { token: 'apple', display: 'Apple', domains: ['apple.com', 'icloud.com', 'me.com'] },
+  { token: 'apple', display: 'Apple', domains: ['apple.com', 'icloud.com', 'me.com', ...gh('apple')] },
   { token: 'icloud', display: 'iCloud', domains: ['icloud.com', 'apple.com'] },
-  { token: 'dropbox', display: 'Dropbox', domains: ['dropbox.com', 'dropboxusercontent.com'] },
-  { token: 'yahoo', display: 'Yahoo', domains: ['yahoo.com', 'yahoo.it'] },
-  { token: 'proton', display: 'Proton', domains: ['proton.me', 'protonmail.com'] },
+  { token: 'dropbox', display: 'Dropbox', domains: ['dropbox.com', 'dropboxusercontent.com', ...gh('dropbox')] },
+  { token: 'yahoo', display: 'Yahoo', domains: ['yahoo.com', 'yahoo.it', ...gh('yahoo')] },
+  { token: 'proton', display: 'Proton', domains: ['proton.me', 'protonmail.com', ...gh('protonmail')] },
 
   // Social / comunicazione
-  { token: 'facebook', display: 'Facebook', domains: ['facebook.com', 'fb.com'] },
-  { token: 'instagram', display: 'Instagram', domains: ['instagram.com', 'instagram-engineering.com'] },
-  { token: 'whatsapp', display: 'WhatsApp', domains: ['whatsapp.com'] },
-  { token: 'twitter', display: 'X (Twitter)', domains: ['twitter.com', 'x.com'] },
-  { token: 'linkedin', display: 'LinkedIn', domains: ['linkedin.com'] },
+  { token: 'facebook', display: 'Facebook', domains: ['facebook.com', 'fb.com', ...gh('facebook', 'facebookresearch', 'facebookincubator', 'facebookexperimental', 'facebookarchive')] },
+  { token: 'instagram', display: 'Instagram', domains: ['instagram.com', 'instagram-engineering.com', ...gh('instagram')] },
+  { token: 'whatsapp', display: 'WhatsApp', domains: ['whatsapp.com', ...gh('whatsapp')] },
+  { token: 'twitter', display: 'X (Twitter)', domains: ['twitter.com', 'x.com', ...gh('twitter', 'twitterdev')] },
+  { token: 'linkedin', display: 'LinkedIn', domains: ['linkedin.com', ...gh('linkedin')] },
   { token: 'tiktok', display: 'TikTok', domains: ['tiktok.com'] },
   { token: 'telegram', display: 'Telegram', domains: ['telegram.org', 't.me'] },
-  { token: 'discord', display: 'Discord', domains: ['discord.com', 'discord.gg'] },
-  { token: 'netflix', display: 'Netflix', domains: ['netflix.com'] },
+  { token: 'discord', display: 'Discord', domains: ['discord.com', 'discord.gg', ...gh('discord')] },
+  { token: 'netflix', display: 'Netflix', domains: ['netflix.com', ...gh('netflix')] },
   { token: 'steam', display: 'Steam', domains: ['steampowered.com', 'steamcommunity.com'] },
 
   // Shopping
-  { token: 'amazon', display: 'Amazon', domains: ['amazon.com', 'amazon.it', 'amazon.co.uk', 'amazon.de', 'amazon.fr', 'amazon.es', 'amazon.nl', 'amazon.ca', 'amazon.se', 'amazon.pl', 'amazon.ae', 'amazon.sg', 'amazon.in', 'amazon.co.jp', 'amazon.com.au', 'amazon.com.br', 'amazoncognito.com', 'amazon-science.github.io'] },
-  { token: 'ebay', display: 'eBay', domains: ['ebay.com', 'ebay.it', 'ebay.de', 'ebay.co.uk', 'ebay.fr', 'ebay.es', 'ebay.ca', 'ebay.com.au', 'ebay.at', 'ebay.ch', 'ebay.nl', 'ebay.be', 'ebay.ie', 'ebay.pl'] },
+  { token: 'amazon', display: 'Amazon', domains: ['amazon.com', 'amazon.it', 'amazon.co.uk', 'amazon.de', 'amazon.fr', 'amazon.es', 'amazon.nl', 'amazon.ca', 'amazon.se', 'amazon.pl', 'amazon.ae', 'amazon.sg', 'amazon.in', 'amazon.co.jp', 'amazon.com.au', 'amazon.com.br', 'amazoncognito.com', ...gh('amazon-science')] },
+  { token: 'ebay', display: 'eBay', domains: ['ebay.com', 'ebay.it', 'ebay.de', 'ebay.co.uk', 'ebay.fr', 'ebay.es', 'ebay.ca', 'ebay.com.au', 'ebay.at', 'ebay.ch', 'ebay.nl', 'ebay.be', 'ebay.ie', 'ebay.pl', ...gh('ebay')] },
   { token: 'aliexpress', display: 'AliExpress', domains: ['aliexpress.com'] },
-  { token: 'shopify', display: 'Shopify', domains: ['shopify.com', 'myshopify.com'] },
+  { token: 'shopify', display: 'Shopify', domains: ['shopify.com', 'myshopify.com', ...gh('shopify')] },
 
   // Dev / lavoro
-  { token: 'github', display: 'GitHub', domains: ['github.com', 'github.io', 'github.dev'] },
-  { token: 'gitlab', display: 'GitLab', domains: ['gitlab.com', 'gitlab.io'] },
+  { token: 'github', display: 'GitHub', domains: ['github.com', 'github.io', 'github.dev', ...gh('github', 'githubnext')] },
+  { token: 'gitlab', display: 'GitLab', domains: ['gitlab.com', 'gitlab.io', 'gitlab-org.gitlab.io', 'gitlab-com.gitlab.io'] },
 ];
 
 // Indice per lookup veloce: eTLD+1 legittimo → brand (per non flaggare il vero).
