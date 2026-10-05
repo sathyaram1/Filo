@@ -55,13 +55,18 @@ function avviaAggiornatore(aggiornatore, { automatici = true, annuncia = () => {
 
   aggiornatore.on('error', (err) => {
     console.error('[updater] errore', err ? (err.stack || err).toString() : 'sconosciuto');
-    scaricamentoFallito();
+    // Dove l'installazione si ferma da sé l'avviso di Mac e Linux, che dice cosa fare, prende il posto della carta.
+    if (AGGIORNAMENTO_BLOCCATO[process.platform] && stato.versioneTrovata) {
+      stato.scaricamento = null;
+      togliCarte(() => true);
+    } else scaricamentoFallito();
     avvisaSeAggiornamentoBloccato(stato.versioneTrovata);
   });
   aggiornatore.on('update-available', (info) => {
     stato.versioneTrovata = info?.version || null;
     console.log('[updater] update disponibile:', info?.version);
     if (!stato.automatici) avvisaVersioneNuova(stato.versioneTrovata);
+    else togliCarte((n) => n.action.versione !== stato.versioneTrovata);
   });
   aggiornatore.on('update-not-available', () => {
     console.log('[updater] già aggiornato');
