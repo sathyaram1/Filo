@@ -230,6 +230,74 @@ test('chiusa la carta, chiedendolo (a Filo) la versione si installa lo stesso', 
   assert.equal(u.installata, true);
 });
 
+// La richiesta di «Installa» sta nel disco: un riavvio a metà scaricamento non la perde.
+async function conDiscoFinto(fn) {
+  require(join(ROOT, 'src', 'shared', 'constants.js'));
+  const disco = {};
+  globalThis.SN_STORAGE = {
+    getRaw: async (k, f) => (disco[k] === undefined ? f : disco[k]),
+    setRaw: async (k, v) => { disco[k] = v; },
+  };
+  try { await fn(disco); } finally { delete globalThis.SN_STORAGE; }
+}
+async function riavvia(versioneInUso, { automatici = false, versione = '0.3.0' } = {}) {
+  await U.togliAvvisiSuperati(versioneInUso);
+  const u = aggiornatoreFinto({ versione, lento: true });
+  await U.avviaAggiornatore(u, { automatici, chiesta: await U.richiestaValida(versioneInUso) });
+  await calma();
+  await calma();
+  return u;
+}
+
+test('spento, «Installa» e Filo chiuso a metà scaricamento: al riavvio la versione chiesta riprende e si installa', async () => {
+  for (const via of ['carta', 'chat']) {
+    await conDiscoFinto(async () => {
+      memoriaFinta();
+      const prima = aggiornatoreFinto({ lento: true });
+      await avvia(prima, false);
+      if (via === 'chat') vive()[0].dismissed = true;
+      await U.installaAggiornamento();
+      await calma();
+      assert.equal(prima.scaricamenti, 1);
+      prima.chiudi();
+      assert.equal(prima.installata, false);
+
+      const dopo = await riavvia('0.2.0');
+      assert.equal(dopo.scaricamenti, 1, `${via}: al riavvio la versione chiesta non riprende a scaricare`);
+      if (via === 'carta') {
+        const [carta] = U.conStatoAggiornamento(vive());
+        assert.ok(carta.aggiornamento && carta.aggiornamento.percento != null, `la carta chiede di nuovo «Installa»: ${JSON.stringify(carta)}`);
+      }
+      dopo.finisci();
+      await calma();
+      dopo.chiudi();
+      assert.equal(dopo.installata, true, `${via}: dopo il riavvio la versione chiesta non si installa alla chiusura`);
+    });
+  }
+});
+
+test('la richiesta si scorda quando la versione è installata o il feed ne offre un\'altra', async () => {
+  await conDiscoFinto(async (disco) => {
+    const chiave = globalThis.SN_CONST.STORAGE_KEYS.AGGIORNAMENTO_CHIESTO;
+    const prima = aggiornatoreFinto({ lento: true });
+    await avvia(prima, false);
+    await U.installaAggiornamento();
+    await calma();
+    assert.deepEqual(disco[chiave], { versione: '0.3.0' });
+    // Installata: al riavvio non scarica niente da sé.
+    const installata = await riavvia('0.3.0', { versione: '0.3.0' });
+    assert.equal(disco[chiave], null);
+    assert.equal(installata.scaricamenti, 0);
+
+    disco[chiave] = { versione: '0.3.0' };
+    // Il feed offre una versione più nuova di quella chiesta: torna la carta con «Installa», senza scaricare.
+    const altra = await riavvia('0.2.0', { versione: '0.4.0' });
+    assert.equal(altra.scaricamenti, 0);
+    assert.equal(disco[chiave], null);
+    assert.ok(vive().some((n) => n.action.versione === '0.4.0'));
+  });
+});
+
 test('chiesto quando non c\'è niente di nuovo, l\'esito lo dice e non scarica niente', async () => {
   const u = aggiornatoreFinto({ versione: null });
   await avvia(u, false);

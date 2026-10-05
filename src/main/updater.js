@@ -13,6 +13,7 @@ function nuovoStato() {
     aggiornatore: null,
     automatici: true,
     chiesto: false,       // l'utente ha premuto «Installa»: si installa alla chiusura anche da spento
+    chiesta: null,        // la versione di quel «Installa», ricordata fra un avvio e l'altro
     versioneTrovata: null,
     scaricamento: null,   // { versione, percento } finché scarica
     pronta: null,         // la versione scaricata
@@ -51,8 +52,8 @@ function initAutoUpdater() {
 }
 
 // La decisione, separata da Electron perché la prova la fa girare su un aggiornatore finto.
-function avviaAggiornatore(aggiornatore, { automatici = true, annuncia = () => {} } = {}) {
-  Object.assign(stato, nuovoStato(), { aggiornatore, automatici, annuncia });
+function avviaAggiornatore(aggiornatore, { automatici = true, chiesta = null, annuncia = () => {} } = {}) {
+  Object.assign(stato, nuovoStato(), { aggiornatore, automatici, chiesta, annuncia });
   regola(aggiornatore);
 
   aggiornatore.on('error', (err) => {
@@ -60,6 +61,7 @@ function avviaAggiornatore(aggiornatore, { automatici = true, annuncia = () => {
     // Dove l'installazione si ferma da sé l'avviso di Mac e Linux, che dice cosa fare, prende il posto della carta.
     if (AGGIORNAMENTO_BLOCCATO[process.platform] && stato.versioneTrovata) {
       stato.scaricamento = null;
+      dimenticaRichiesta();
       togliCarte(() => true);
     } else scaricamentoFallito();
     avvisaSeAggiornamentoBloccato(stato.versioneTrovata);
@@ -67,11 +69,19 @@ function avviaAggiornatore(aggiornatore, { automatici = true, annuncia = () => {
   aggiornatore.on('update-available', (info) => {
     stato.versioneTrovata = info?.version || null;
     console.log('[updater] update disponibile:', info?.version);
+    if (stato.chiesta && stato.chiesta !== stato.versioneTrovata) dimenticaRichiesta();
+    // Un «Installa» di un avvio precedente, interrotto dalla chiusura, riprende da solo: l'utente l'aveva già chiesto.
+    else if (stato.chiesta && !stato.automatici && !stato.chiesto) {
+      stato.chiesto = true;
+      regola(aggiornatore);
+      Promise.resolve().then(scarica);
+    }
     if (!stato.automatici) avvisaVersioneNuova(stato.versioneTrovata);
     else togliCarte((n) => n.action.versione !== stato.versioneTrovata);
   });
   aggiornatore.on('update-not-available', () => {
     console.log('[updater] già aggiornato');
+    if (stato.chiesta) dimenticaRichiesta();
   });
   aggiornatore.on('download-progress', (p) => {
     const percento = Math.max(0, Math.min(100, Math.floor(Number(p?.percent) || 0)));
@@ -134,7 +144,10 @@ async function installaAggiornamento() {
   stato.errore = null;
   regola(stato.aggiornatore);
   const trovata = await trova();
-  if (trovata) scarica();
+  if (trovata) {
+    ricordaRichiesta(stato.versioneTrovata);
+    scarica();
+  }
   const versione = stato.pronta || stato.versioneTrovata;
   if (!trovata) {
     if (stato.errore) return { ok: true, versione: null, stato: 'errore', errore: stato.errore };
@@ -176,6 +189,36 @@ async function scarica() {
     console.error('[updater] scaricamento fallito:', e?.message || e);
     scaricamentoFallito();
   }
+}
+
+// La richiesta vive fra gli avvii finché quella versione non è installata o il feed non ne offre un'altra.
+const chiaveRichiesta = () => globalThis.SN_CONST?.STORAGE_KEYS?.AGGIORNAMENTO_CHIESTO;
+function scriviRichiesta(valore) {
+  const S = globalThis.SN_STORAGE;
+  if (!S?.setRaw || !chiaveRichiesta()) return Promise.resolve();
+  return Promise.resolve().then(() => S.setRaw(chiaveRichiesta(), valore))
+    .catch((e) => console.error('[updater] richiesta non salvata:', e?.message || e));
+}
+function ricordaRichiesta(versione) {
+  if (!versione || stato.chiesta === versione) return Promise.resolve();
+  stato.chiesta = versione;
+  return scriviRichiesta({ versione });
+}
+function dimenticaRichiesta() {
+  stato.chiesta = null;
+  return scriviRichiesta(null);
+}
+async function richiestaValida(versioneInUso) {
+  const S = globalThis.SN_STORAGE;
+  if (!S?.getRaw || !chiaveRichiesta()) return null;
+  let r = null;
+  try { r = await S.getRaw(chiaveRichiesta(), null); } catch (_) { return null; }
+  if (!r || !r.versione) return null;
+  if (nonPiuNuova(r.versione, versioneInUso)) {
+    await scriviRichiesta(null);
+    return null;
+  }
+  return String(r.versione);
 }
 
 function scaricamentoFallito() {
@@ -305,5 +348,5 @@ async function avvisaSeAggiornamentoBloccato(versione) {
 
 module.exports = {
   initAutoUpdater, avviaAggiornatore, seguiImpostazioni, installaAggiornamento, conStatoAggiornamento,
-  avvisaVersioneNuova, togliAvvisiSuperati, avvisaSeAggiornamentoBloccato, TIPO_DISPONIBILE,
+  avvisaVersioneNuova, togliAvvisiSuperati, richiestaValida, avvisaSeAggiornamentoBloccato, TIPO_DISPONIBILE,
 };
