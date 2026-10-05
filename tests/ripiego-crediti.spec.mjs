@@ -842,3 +842,62 @@ test('(P) le strade che non scrivono la riga del ripiego lo dicono con un avviso
   await expect.poll(avvisi, { timeout: 10_000 }).toContain(RIGA);
   expect(seen.completions.slice(prima).map((c) => c.key).slice(0, 2)).toEqual([OWN_KEY, PERSONAL_KEY]);
 });
+
+// La riga sotto la risposta e l'avviso sono la stessa frase: le chiamate che accompagnano la
+// richiesta (Filo che impara dalla chat, i lavori sulla pagina) non la ripetono in un avviso.
+async function osservaAvvisi(page) {
+  await page.evaluate(() => {
+    window.__toasts = [];
+    new MutationObserver((muts) => {
+      for (const m of muts) for (const n of m.addedNodes) {
+        if (n.nodeType === 1 && n.classList && n.classList.contains('sn-toast')) window.__toasts.push(n.textContent || '');
+      }
+    }).observe(document.documentElement, { childList: true, subtree: true });
+  });
+  return () => page.evaluate(() => window.__toasts.join(' | '));
+}
+
+test('(Q) la chat della home con la chiave propria rifiutata: la riga sotto la risposta, e nessun avviso che la ripete', async ({ app, shell, openTab }) => {
+  test.setTimeout(90_000);
+  ownKeyStatus = 402;
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const home = await newtabPage(app);
+  await expect(home.locator('#input')).toBeVisible();
+  await redeemWallet(openTab);
+  await prepare(app);
+  await home.bringToFront().catch(() => {});
+  const avvisi = await osservaAvvisi(home);
+  await home.locator('#input').fill('ciao ripiego');
+  await home.locator('#sendBtn').click();
+  await expect(home.locator('.dash-bubble-filo').last()).toContainText('RISPOSTA-DALLA-PERSONALE', { timeout: 30000 });
+  await expect(home.locator('.dash-bubble-note')).toContainText('ho usato i crediti di Filo');
+  // Dopo la risposta Filo rilegge la conversazione per imparare: anche quella chiamata ripiega.
+  await expect.poll(() => seen.completions.filter((c) => !c.tools && c.key === PERSONAL_KEY).length, { timeout: 15000 }).toBeGreaterThan(0);
+  await home.waitForTimeout(6000);
+  expect(await avvisi()).not.toContain('crediti di Filo');
+});
+
+test('(R) l’Aiuto della pagina con la chiave propria rifiutata: la riga sta sotto la risposta, e nessun avviso la ripete', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  ownKeyStatus = 402;
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await redeemWallet(openTab);
+  await prepare(app);
+  const page = await testServer.openReady(openTab, '<!doctype html><meta charset="utf-8"><title>Sito</title><p>Un sito qualunque.</p>');
+  const avvisi = await osservaAvvisi(page);
+  const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
+  await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
+  await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
+  await page.fill('.sn-sidebar-input textarea', 'dove sono le impostazioni?');
+  await page.press('.sn-sidebar-input textarea', 'Enter');
+  await expect(page.locator('.sn-sidebar-msg-assistant').last()).toContainText('RISPOSTA-DALLA-PERSONALE', { timeout: 30_000 });
+  const riga = page.locator('.sn-sidebar-log', { hasText: 'ho usato i crediti di Filo' });
+  await expect(riga).toHaveCount(1);
+  const dopoLaRisposta = await riga.evaluate((el) => {
+    const risposta = [...document.querySelectorAll('.sn-sidebar-msg-assistant')].pop();
+    return Boolean(risposta && (risposta.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING));
+  });
+  expect(dopoLaRisposta).toBe(true);
+  await page.waitForTimeout(6000);
+  expect(await avvisi()).not.toContain('crediti di Filo');
+});
