@@ -541,14 +541,15 @@ export async function statoAttuale(doc) {
 /**
  * La transizione è ammessa? PURA rispetto ai suoi ingressi.
  *
- * `canReach` e non `canTransition`: chiudendo una pratica a mano si saltano i
- * passi intermedi (todo → done senza passare da working), e quei passi sono
- * comunque legali. Vale la catena.
+ * L'owner fa un passo solo: le sue righe sono le azioni delle pagine, e una catena
+ * (archivia poi ripristina) inventerebbe un passaggio che nessuna pagina offre (#776).
+ * Come routine vale la catena: chiudendo a mano si salta da todo a done.
  */
 export function transizioneAmmessa(from, to, attore = 'owner') {
   if (!FS.isCanonical(from)) return { ok: false, motivo: `stato di partenza non riconosciuto ("${from}")` };
   if (from === to) return { ok: true };
-  if (!FS.canReach(from, to, attore)) return { ok: false, motivo: `${from} → ${to} non è un passaggio permesso` };
+  const ammessa = attore === 'owner' ? FS.canTransition(from, to, 'owner') : FS.canReach(from, to, attore);
+  if (!ammessa) return { ok: false, motivo: `${from} → ${to} non è un passaggio permesso` };
   return { ok: true };
 }
 

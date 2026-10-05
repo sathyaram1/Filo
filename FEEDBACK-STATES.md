@@ -1,10 +1,11 @@
-# FEEDBACK-STATES — Macchina a stati dei feedback (spec + piano di lavoro)
+# FEEDBACK-STATES — Macchina a stati dei feedback
 
 **Origine:** sessione di progettazione owner + Claude, 2026-07-02. Le decisioni della spec
-sono già prese dall'owner. Questo file è la copia in-repo della spec (l'originale era solo
-in chat, troncato a metà §7a.3) + il **piano a fasi con checklist** per implementarla su
-più sessioni. **Chi continua il lavoro riparte da qui**: leggi la checklist in fondo,
-prendi la prima fase non spuntata.
+sono già prese dall'owner. Questo file è il riferimento della macchina a stati: il racconto
+e il perché. Le tabelle stanno nel codice e vincono su questo testo: stati e transizioni in
+`src/shared/feedbackTransitions.js`, presentazione in `src/shared/feedbackStatus.js`, azioni
+dell'owner in `src/shared/manageReview.js` (`ownerActions`). Il piano a fasi in fondo è
+tutto spuntato: è la storia dell'implementazione, non lavoro da riprendere.
 
 ---
 
@@ -14,8 +15,8 @@ Lo *stato* di un feedback oggi è spalmato su più campi ricalcolati a display-t
 `status` (povero), `pipeline.*` (verdetti giudici), `reviewDecision`, `blockReason`, più
 la modalità automatica letta al volo. Conseguenza dimostrata: la dashboard
 (`manageReview.js → manageTabFor/isApproved`) mostrava 20 feedback "In coda" (autoMode ON
-+ aligned), ma `next-feedback.mjs` seleziona solo `status === 'todo'` → coda vuota per le
-routine. Due criteri diversi per "questo è lavorabile?" = bug strutturale.
++ aligned), ma `next-feedback.mjs` (oggi ritirato) selezionava solo `status === 'todo'` →
+coda vuota per le routine. Due criteri diversi per "questo è lavorabile?" = bug strutturale.
 
 **Obiettivo:** un unico campo `status` persistito su Firestore è la SOLA fonte di verità.
 Ogni evento SCRIVE lo status; dashboard, routine e agente leggono SOLO lo status. Nessun
@@ -44,8 +45,11 @@ consumer ricalcola lo stato dai campi grezzi.
 DB3 esistente), poi "Risolti".
 
 **Campi ortogonali (NON stati):** `starred` (bool), `priority` (0–3), `statusReason`
-(string breve opzionale per il sottotesto in dashboard, MAI per la logica: `judges`,
-`clarify`, `loop`, `l1-identity`, `file-gate`, `legacy-ignored`…), `workingSince`
+(string breve opzionale per il sottotesto in dashboard, MAI per la logica: `clarify`,
+`loop`, `decisione`, `secaudit`, `l5`, `arenato`, `locale` (§5, §4b), `attesa_origine`,
+`origine_bloccata`, `origine_chiusa`, `origine_mancante` (§4c), `legacy-ignored` (§8);
+il giudizio dei giudici non ne scrive: `judges` lo ricava solo la normalizzazione dello
+storico, e la frase «Panel incompleto…» la dashboard dai verdetti, `judgesNote`), `workingSince`
 (ISO, solo con `working`), `branch` (da `revision_*` in poi), `beatAt` (ISO:
 l'ultimo battito arrivato al server per quel lavoro, che lo specchia qui perché
 la dashboard i semafori non li vede — è l'unica cosa che le permette di dire il
@@ -64,16 +68,42 @@ il rombo e il pentagono della fila delle forme).
 
 ## 3. Transizioni legali (chi scrive cosa)
 
-- ingresso → gate file (filo-security, prima dei giudici): flag → `suspicious_file`;
-  pulito → `unlabeled`.
-- `unlabeled` —pipeline (panel completo)→ `attack` | `spam` | `design` | (sicuro:
-  automatica ON **e mittente ammesso** → `todo`, altrimenti → `aligned`).
-- `suspicious_file` —owner→ `todo` | `attack_confirmed` | `spam_confirmed` | `archived`.
-- `attack` —owner→ `attack_confirmed` | `todo` (falso positivo).
-- `spam` —owner→ `spam_confirmed` | `todo`.
-- `design` —owner (risponde in chat)→ `todo` | `archived`.
-- `aligned` —owner→ `todo` (anche bulk dalla dashboard) | `archived` (doppione, o non si fa).
-- `todo` —routine (claim §6)→ `working`.
+La tabella è codice: `TRANSITIONS` in `src/shared/feedbackTransitions.js`, da → a con gli
+attori (`owner`, `pipeline`, `routine`). Una coppia che non c'è è illegale e il writer la
+rifiuta. Il server la incorpora al deploy: una riga cambiata vale per lui dal rideploy delle
+functions. Qui sotto il perché dei passaggi, per attore.
+
+**Pipeline** (filo-security):
+- ingresso → gate file (prima dei giudici): flag → `suspicious_file`; pulito → `unlabeled`.
+- `unlabeled` —panel completo→ `attack` | `spam` | `design` | (sicuro: automatica ON **e
+  mittente ammesso** → `todo`, altrimenti → `aligned`).
+- `attack`/`spam` → `unlabeled`: un mittente fidato segnalato per errore torna al ri-giudizio
+  (sotto, «Mittenti fidati»). `design` → `unlabeled` | `todo` | `aligned` e `aligned` →
+  `unlabeled` | `todo`: solo i derivati che seguono la loro origine (§4c).
+
+**Owner**: le sue righe sono le azioni di §4a, una per azione e nessuna in più (sentinella
+`tests/unit/ownerActionsTransizioni.test.mjs`). La tabella ammette all'owner gli stessi
+passaggi che Gestione e la pagina dei feedback offrono con un clic; `npm run feedback`
+(`scripts/owner-feedback.mjs`) la applica un passo alla volta, senza catene (una catena
+«archivia, poi ripristina» rimetterebbe in coda un lavoro in corso, che nessuna pagina
+offre; le catene valgono solo con `--come-routine`), e per regola non parte dai Ricevuti né
+dalle conferme (§4b). Resta fuori un caso: una richiesta di fusione in attesa porta nei Ricevuti
+anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In coda» da
+`working` o `revision_*` non ha una riga owner.
+- dai Ricevuti (`unlabeled`, `suspicious_file`, `attack`, `spam`, `design`, `aligned`) →
+  `todo` (approvazione; su `attack`/`spam` è il falso positivo, su `design` la risposta in
+  chat) | `archived` (doppione, o non si fa); da `attack` e `suspicious_file` →
+  `attack_confirmed`, da `spam` e `suspicious_file` → `spam_confirmed`. Il verdetto
+  (`attack`, `spam`, `design`, `aligned`) su un `unlabeled` resta dei giudici.
+- dall'iter (`todo`, `working`, `revision_capability`, `revision_security`) → `archived`, e
+  basta. «✓ Risolto» non è una riga owner → `done`: è la catena dell'iter delle routine, e da
+  riga di comando si scrive con `--come-routine` (aggiornamento 2026-08-19, sotto).
+- `done` → `archived` (verifica umana ok) | `todo` (riapertura: «manca qualcosa»).
+- `archived` → `todo` (ripristino); `attack_confirmed`/`spam_confirmed` → `todo` («era
+  legittimo»).
+
+**Routine** (canale autenticato: il server valida ogni mossa con la tabella incorporata):
+- `todo` —claim (§6)→ `working`.
 - `working` —routine→ `revision_capability`; —arenato (ramo fermo da un'ora)→ `todo`;
   —arenato per la 3ª volta consecutiva→ `design` (`statusReason: arenato`, nota
   in chat: istanza che muore sempre, es. crediti esauriti — vedi §6a).
@@ -112,16 +142,15 @@ il rombo e il pentagono della fila delle forme).
   dell'owner (il click di approvazione è la sua decisione) e il rientro
   `todo → revision_capability` della routine (#523: senza il primo passo il
   rientro veniva rifiutato e la pratica restava ferma nei Ricevuti).
-- `done` —owner verifica→ `archived`; —owner "manca qualcosa"→ `todo` (riapertura).
-- `archived` —owner ripristina→ `todo`.
-- `attack_confirmed`/`spam_confirmed` —owner "era legittimo"→ `todo`.
 - da todo/working/revision_* la routine con domande → `design` (+ domande nella chat,
   `statusReason: clarify`).
 
-**Regole dure:** solo l'owner fa uscire da `suspicious_file`, `attack`, `spam`, `design`,
-`aligned`, `done`, `archived`, `*_confirmed`. Solo la pipeline (filo-security) fa uscire
-da `unlabeled`. Solo le routine (via coda triage) muovono `todo→working→revision_*→done`
-e `revision_*→design(loop)`. Transizioni non elencate = illegali: il writer le rifiuta.
+**Regole dure:** da `unlabeled` il verdetto lo scrive solo la pipeline; l'owner lo mette in
+coda o lo archivia. Da `suspicious_file`, `done`, `archived` e `*_confirmed` esce solo
+l'owner; da `attack`, `spam`, `design`, `aligned` l'owner, e la pipeline nei soli casi dei
+mittenti fidati e dei derivati. L'iter `todo→working→revision_*→done` e `revision_*→design`
+lo muovono solo le routine; l'owner dall'iter può solo archiviare. Nessuna riga owner →
+`done`. Transizioni non elencate = illegali: il writer le rifiuta.
 
 **La prova del mittente** (#595, #912): un nome riservato vale solo con `senderProof`, che
 scrivono l'admin (owner, sessioni, esploratore) e il server (routine). Senza, è un utente
@@ -144,8 +173,8 @@ a dire.
 
 **Aggiornamento 2026-08-19 (smontaggio sotto-feedback, SPEC-RIDISEGNO-MAX.md §1).**
 L'estensione `todo→done` / `working→done` (attore routine), introdotta in F3 per il
-pianificatore che spezzava le spec in sub-feedback, è RITIRATA da entrambe le copie
-della macchina a stati: il pianificatore non esiste più. Le chiusure manuali senza
+pianificatore che spezzava le spec in sub-feedback, è RITIRATA dalla macchina a stati: il
+pianificatore non esiste più. Le chiusure manuali senza
 branch (`npm run feedback -- <id> done "…" --come-routine`) restano legali come
 CATENA di passi (`canReach` attraversa l'iter todo→working→revision_*→done). I
 sub-feedback storici (#N.x) restano visibili e lavorabili; è sparita solo la
@@ -269,13 +298,12 @@ esistono, e la tabella sta in `src/shared/manageReview.js` (`ownerActions`), non
 nelle pagine. Fino al #509 le due superfici se la costruivano ognuna a mano e
 divergevano sulla STESSA segnalazione.
 
-- Ricevuti: `→ In coda` (`todo`, con `reviewDecision: accepted`) · `💻 Lavoro locale` (lo
-  stesso più `localOnly` e `localApproval`, #913; principale se il motivo è `locale`) · `Conferma attacco`
-  (`attack_confirmed`) su `attack` e `suspicious_file` · `Conferma spam`
-  (`spam_confirmed`) su `spam` e `suspicious_file` · `Archivia`.
-- In coda e Lavori locali: `✓ Risolto` (`done`, non offerto se è già `done` non rilasciato) · `Archivia`.
-- Risolti: `Archivia` · `Riapri` (chiede cosa manca, poi `todo`).
-- Archiviati: `↩ Ripristina` (`todo`) e basta. **Nessun cammino riscrive uno stato
+L'elenco per sezione sta lì (e nei suoi test in `tests/unit/manageReview.test.mjs`); ogni
+azione è una riga owner della tabella di §3, tranne «✓ Risolto», che è la catena
+dell'iter delle routine (`tests/unit/ownerActionsTransizioni.test.mjs`). Le regole che
+la tabella incarna:
+
+- Negli Archiviati c'è solo `↩ Ripristina`. **Nessun cammino riscrive uno stato
   terminale**: su `attack_confirmed`/`spam_confirmed` un `Archivia` cancellerebbe la
   conferma, e la segnalazione sparirebbe dal filtro "Bloccati confermati".
 - Stato illeggibile (nessuna chiave privata): nessuna azione, su nessuna superficie.
@@ -286,7 +314,7 @@ mentre lo stato cambiava non deposita una decisione che la pagina non offre più
 
 La modalità automatica agisce UNA volta, al giudizio (sicuro + ON → `todo`; sicuro + OFF
 → `aligned`). Attivarla dopo NON ri-tocca i vecchi `aligned`: l'owner li approva in blocco
-dalla dashboard (azione bulk `aligned→todo`, da aggiungere alla UI).
+dai Ricevuti con «Approva tutti gli allineati» (`aligned→todo`).
 
 **Per mittente (#446).** "ON" non è più un sì/no per tutti: l'interruttore master
 (`config/automation.enabled`) abilita l'auto-approvazione, e la mappa
@@ -419,8 +447,10 @@ dashboard scriveva "in attesa di ripresa". Adesso:
 ### 7a. filo-security (repo `C:/Users/agenti AI/Desktop/Filo/filo-security`)
 1. La pipeline dei giudici scrive lo status nativamente: al completamento del panel UNO
    di `attack|spam|design|todo|aligned` (per todo/aligned legge la modalità automatica in
-   quel momento). Panel incompleto/degradato → `unlabeled` + `statusReason` col motivo.
-   I `pipeline.*` grezzi restano per audit, ma nessun consumer li legge più per lo stato.
+   quel momento). Panel incompleto/degradato → resta `unlabeled`, senza `statusReason`:
+   la frase «Panel incompleto…» la ricava la dashboard dai verdetti (`judgesNote`). I
+   `pipeline.*` grezzi restano per audit, pallini e frase, ma nessun consumer li legge per lo
+   stato.
 2. Mittenti fidati: mai attack/spam (come oggi in classifyBlock); flag identità su fidato
    → `unlabeled` per ri-giudizio.
 2b. **`updatedAt` su OGNI scrittura di un feedback** (#676), timestamp e mai testo,
@@ -439,26 +469,28 @@ dashboard scriveva "in attesa di ripresa". Adesso:
    ⚠️ *La spec originale si troncava qui: i dettagli sotto (7b, 8) sono ricostruiti in
    questa sessione dai principi §1–§6 e dal codice esistente; decisioni marcate.*
 
-### 7b. Repo Filo (consumer) — ricostruito
-- **`src/shared/feedbackStatus.js`** (nuovo, IIFE `SN_FB_STATUS`): vocabolario unico —
-  lista stati, colori, `tabFor(status)`, tabella transizioni legali +
-  `canTransition(from,to,actor)`, normalizzazione legacy (`normalizeStatus(fb)` che
-  applica §8 in lettura durante la transizione). Unit test.
+### 7b. Repo Filo (consumer)
+- **`src/shared/feedbackTransitions.js`** (IIFE `SN_FB_TRANSITIONS`): le tabelle come
+  DATI (`STATUSES`, `TRANSITIONS`, `PUBLIC_MAP`). Fonte unica: la dashboard le legge, il
+  server le incorpora al deploy (`filo-security/functions/tools/bake-shared.js`), quindi
+  una riga cambiata vale per il server solo dopo il rideploy delle functions.
+- **`src/shared/feedbackStatus.js`** (IIFE `SN_FB_STATUS`): presentazione (colori,
+  etichette, `tabFor(status)`) e API sopra i dati (`canTransition`, `canReach`,
+  `transitionsFrom`), legacy semplice (§8). `normalizeStatus(fb)` sta in manageReview.js.
 - **`src/shared/manageReview.js`**: `manageTabFor` → lookup pura su status normalizzato;
   `classifyBlock`/`isAligned`/`isApproved` restano solo per (a) colore/label da status,
   (b) normalizzazione dello storico. Nessuna lettura di `pipeline` per decidere la tab.
-- **`src/shared/feedback.js`**: `STATUS_PUBLIC_MAP` esteso ai nuovi stati (tutti gli
-  aperti → `open`; `done|archived|*_confirmed` → `closed`; nota sicurezza: i confermati
-  DEVONO collassare su `closed` come i done, mai un valore distinto).
+- **`src/shared/feedback.js`**: `statusToPublic` legge `PUBLIC_MAP` di
+  feedbackTransitions.js per i canonici; la sua `STATUS_PUBLIC_MAP` resta solo per i
+  legacy. Nota sicurezza: i "beccati" collassano su valori dei feedback normali, mai uno
+  distinto, e i confermati su `open`, non su `closed` (#476): `closed` fa scattare premio e
+  annuncio «risolto» a chi ha mandato l'attacco.
 - **`src/pages/manage/*`**: colori per status, azione bulk `aligned→todo`, filtro
   "Bloccati confermati" in Archiviati, sottotesto da `statusReason`.
-- **`scripts/queue-triage.mjs` + `apply-triage.mjs`**: ALLOWED = nuovi stati; l'Action
-  valida le transizioni con `canTransition` (rifiuta le illegali); riconciliazione
-  `working` scaduti; scrittura `workingSince`/`statusReason`.
-- **`scripts/next-feedback.mjs`**: seleziona `todo` (invariato) ma ora la pipeline
-  scrive `todo` → la coda si riempie davvero; ignora `working` freschi.
-  *(Ritirato il 2026-08-19: la selezione vive solo nel server,
-  `filo-security/functions/src/routine/select.js`.)*
+- **Le mosse delle routine**: le valida il server, con le tabelle di
+  feedbackTransitions.js incorporate al deploy (`stateMachine.js`); la scelta del lavoro
+  vive in `filo-security/functions/src/routine/select.js`. La coda su git
+  (`queue-triage.mjs`, `apply-triage.mjs`) e `next-feedback.mjs` non esistono più (§6b).
 - **`scripts/dispatch.mjs` + ruoli**: il fixer muove `todo→working→revision_*`;
   loop 3× → `design`+`statusReason: loop`. *(Dal 2026-09-05, feedback #561: la
   critica si registra coi livelli e l'esito lo calcola il server; le regole
@@ -470,8 +502,8 @@ dashboard scriveva "in attesa di ripresa". Adesso:
   bloccato: solo `new`→ ora `unlabeled`), `hasOnly` esteso con `statusReason`,
   `workingSince`. Deploy manuale (`npm run regole:pubblica`).
 
-### 8. Migrazione legacy → nuovi stati — ricostruito, [CONFERMARE con owner]
-Script one-shot (o normalizzazione in lettura + riscrittura al primo write):
+### 8. Migrazione legacy → nuovi stati (confermata dall'owner ed eseguita il 2026-07-03, F5)
+Script one-shot, più la normalizzazione in lettura per lo storico:
 - `new` → derivare dal pipeline con la STESSA logica di oggi (classifyBlock/isAligned):
   nessun pipeline o parziale → `unlabeled`; attacco → `attack`; spam → `spam`; design →
   `design`; aligned+`candidate_change` → `todo`; aligned senza → `aligned`.
@@ -486,10 +518,10 @@ Script one-shot (o normalizzazione in lettura + riscrittura al primo write):
 
 ---
 
-## PIANO A FASI (checklist di continuazione)
+## PIANO A FASI (storia)
 
-Aggiorna QUESTO file spuntando le fasi man mano. Worktree:
-`.claude/worktrees/feedback-status-machine` (branch `claude/feedback-status-machine`).
+Tutte le fasi sono fatte; i dettagli sono quelli del giorno in cui si sono chiuse, e dove
+oggi il codice dice altro vale il codice (le sezioni sopra).
 
 - [x] **F1 — Vocabolario condiviso** (fatto 2026-07-02): `src/shared/feedbackStatus.js`
       (SN_FB_STATUS: stati, colori, tabFor, transizioni+canTransition, LEGACY_SIMPLE,
@@ -530,7 +562,8 @@ Aggiorna QUESTO file spuntando le fasi man mano. Worktree:
       --record-* riflettono lo status (pass→revision_security, fix→revision_
       capability), loop 3× → design/loop. Ruoli + ROUTINES.md aggiornati.
       Estensione documentata: todo/working→done (routine) per lavori senza branch
-      (es. pianificatore). Attore owner delegato: routine:auto-archive.
+      (es. pianificatore), ritirata il 2026-08-19 (§3). Attore owner delegato:
+      routine:auto-archive.
 - [x] **F4 — firestore.rules** (editate 2026-07-03): enum esteso ai canonici (legacy
       mantenuti per lo storico), statusReason/workingSince in hasOnly (admin e ramo
       routine, con size check); ramo routine: iter completo todo/working/revision_*/
@@ -561,7 +594,7 @@ Aggiorna QUESTO file spuntando le fasi man mano. Worktree:
       nessuna capacità utente cambiata (il gate file è moderazione, non un confine
       promesso) → non toccato.
 
-**Punti [DECIDERE/CONFERMARE] per l'owner:**
-1. Mappatura `ignored` → `archived` (con statusReason) vs `spam_confirmed`.
+**Punti confermati dall'owner il 2026-07-03 (F5):**
+1. Mappatura `ignored` → `archived` (con statusReason), non `spam_confirmed`.
 2. Mappatura `review` → `revision_capability`.
-3. `*_confirmed` in Archiviati sotto filtro (proposta della spec, adottata qui).
+3. `*_confirmed` in Archiviati sotto filtro.

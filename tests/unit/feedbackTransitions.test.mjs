@@ -45,7 +45,8 @@ test("l'API sopra i dati funziona come prima (nessun cambiamento per i chiamanti
   assert.equal(S.canTransition('todo', 'working', 'routine'), true);
   assert.equal(S.canTransition('todo', 'done', 'routine'), false, 'il salto diretto resta illegale');
   assert.equal(S.canReach('todo', 'done', 'routine'), true, 'ma la catena dell\'iter resta legale');
-  assert.equal(S.canTransition('unlabeled', 'todo', 'owner'), false, 'da unlabeled esce solo la pipeline');
+  assert.equal(S.canTransition('unlabeled', 'todo', 'owner'), true, '«→ In coda» dei Ricevuti vale anche per un non filtrato');
+  assert.equal(S.canTransition('unlabeled', 'attack', 'owner'), false, 'il verdetto dei giudici resta della pipeline');
   assert.equal(S.padForCipher('todo').length, DATA.CIPHER_PAD);
 });
 
