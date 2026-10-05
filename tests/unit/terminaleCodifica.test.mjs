@@ -151,9 +151,12 @@ test('il comando digitato dall\'utente non arriva a PowerShell con byte fuori da
   // …e PowerShell lo rimette insieme IDENTICO a quello che l'utente ha
   // digitato. Qui si rifà il giro che farebbe lui: si ripesca il testo
   // codificato e lo si riporta a caratteri.
-  const b64 = (sulFilo.match(/FromBase64String\('([A-Za-z0-9+/=]+)'\)/) || [])[1];
-  assert.ok(b64, 'il comando deve viaggiare codificato, non interpolato');
-  assert.equal(Buffer.from(b64, 'base64').toString('utf8'), comando);
+  const espressione = (sulFilo.match(/\$__filo_t=\(-join @\(((?:'(?:[^']|'')*'|\[char\]\d+)(?:,(?:'(?:[^']|'')*'|\[char\]\d+))*)\)\);/) || [])[1];
+  assert.ok(espressione, 'il comando deve viaggiare codificato, non interpolato');
+  const ricomposto = espressione.match(/'(?:[^']|'')*'|\[char\]\d+/g)
+    .map((p) => (p[0] === "'" ? p.slice(1, -1).replace(/''/g, "'") : String.fromCharCode(Number(p.slice(6)))))
+    .join('');
+  assert.equal(ricomposto, comando);
   // Niente del comando dell'utente finisce dritto nella riga: se ci finisse,
   // una virgoletta basterebbe a uscire dalla stringa e a farsi eseguire altro.
   assert.ok(!sulFilo.includes('attività'));
