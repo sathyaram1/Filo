@@ -419,7 +419,13 @@ test('#914 una routine si riconosce dalla dichiarazione, dal biglietto o dal ruo
 
 test('#914 dentro una routine owner-feedback rifiuta il segno locale e il sì dell’owner (#913) prima di scrivere', async () => {
   const { spawnSync } = await import('node:child_process');
-  for (const opzione of ['--solo-locale', '--approva-locale']) {
+  // #957: --approva-locale non c'è più per nessuno, routine compresa.
+  const tolta = spawnSync(process.execPath, [resolve(ROOT, 'scripts', 'owner-feedback.mjs'), '123', '--approva-locale'], {
+    env: { ...process.env, FILO_ROUTINE: '1' }, encoding: 'utf8', timeout: 30000,
+  });
+  assert.equal(tolta.status, 1, tolta.stderr);
+  assert.match(tolta.stderr, /--approva-locale non c'è più/);
+  for (const opzione of ['--solo-locale']) {
     const r = spawnSync(process.execPath, [resolve(ROOT, 'scripts', 'owner-feedback.mjs'), '123', opzione], {
       env: { ...process.env, FILO_ROUTINE: '1' }, encoding: 'utf8', timeout: 30000,
     });

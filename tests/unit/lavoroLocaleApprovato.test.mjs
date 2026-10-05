@@ -7,6 +7,8 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { readFileSync, readdirSync } from 'node:fs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -112,37 +114,46 @@ async function conRete(doc, fn) {
 const OPTS = { bearer: 'tok-finto' };
 const mappa = (o) => ({ mapValue: { fields: { by: { stringValue: o.by }, at: { integerValue: String(o.at) } } } });
 
-test('--approva-locale: dai Ricevuti a todo approvato, col segno e col sì nella stessa scrittura', async () => {
-  const doc = documento('u1', { clientId: 'utente-7', status: 'design', statusReason: 'locale', statusPublic: 'open' });
-  await conRete(doc, async (patch) => {
-    const r = await of.approvaLocale('u1', OPTS);
-    assert.equal(r.ok, true, r.motivo);
-    assert.equal(r.from, 'design');
-    assert.equal(patch.length, 1);
-    for (const c of ['status', 'statusPublic', 'reviewDecision', 'reviewedAt', 'localOnly', 'localApproval']) {
-      assert.match(patch[0].url, new RegExp(`updateMask\\.fieldPaths=${c}(&|$)`), c);
-    }
-    const f = patch[0].body.fields;
-    assert.equal(f.statusPublic.stringValue, 'open');
-    assert.ok(f.localApproval.mapValue.fields.by.stringValue);
-    assert.match(f.localApproval.mapValue.fields.at.integerValue, /^\d{13}$/);
-  });
+// #957: il sì si dà solo col tasto in Gestione. Le regole non distinguono la pagina da uno script col token
+// dell'owner, quindi il limite sta negli strumenti delle sessioni: nessuno lo scrive, e la via tolta si rifiuta.
+test('--approva-locale e --riconosci non ci sono più: la riga di comando rifiuta prima delle credenziali e rimanda a Gestione', () => {
+  assert.equal(of.approvaLocale, undefined, 'lo script non deve più saper scrivere il sì');
+  assert.equal(of.riconosciMittente, undefined, 'né la prova del mittente');
+  const lancia = (args, extra = {}) => {
+    const env = { ...process.env, ...extra };
+    for (const k of Object.keys(env)) if (k.startsWith('npm_config_') && !(k in extra)) delete env[k];
+    return spawnSync(process.execPath, [join(ROOT, 'scripts', 'owner-feedback.mjs'), ...args], { cwd: ROOT, env, encoding: 'utf8', timeout: 60000 });
+  };
+  for (const [nome, r] of [
+    ['opzione', lancia(['feedback-finto-957', '--approva-locale', '--dry-run'])],
+    ['con l’uguale', lancia(['feedback-finto-957', '--approva-locale=1', '--dry-run'])],
+    ['mangiata da npm', lancia(['feedback-finto-957', '--dry-run'], { npm_config_approva_locale: 'true' })],
+    ['--riconosci', lancia(['feedback-finto-957', '--riconosci', '--dry-run'])],
+    ['--riconosci mangiata da npm', lancia(['feedback-finto-957', '--dry-run'], { npm_config_riconosci: 'true' })],
+  ]) {
+    const mio = /riconosci/.test(nome);
+    assert.equal(r.status, 1, `${nome}: ${r.stderr}`);
+    assert.match(r.stderr, mio ? /RIFIUTATO: --riconosci non c'è più/ : /RIFIUTATO: --approva-locale non c'è più/, nome);
+    assert.match(r.stderr, mio ? /in Gestione, col tasto «🙋 È mio»/ : /in Gestione, col tasto «💻 Lavoro locale»/, nome);
+    assert.doesNotMatch(r.stdout, /^Auth:/m, `${nome}: non deve nemmeno prendere le credenziali`);
+  }
 });
 
-test('--approva-locale rifiuta senza scrivere: segnalato, fuori dai Ricevuti, già approvato, sessione con la prova', async () => {
-  const casi = [
-    [{ clientId: 'utente-7', status: 'attack', statusPublic: 'open' }, /solo l’owner, in Gestione/],
-    [{ clientId: 'utente-7', status: 'todo', statusPublic: 'open' }, /dai Ricevuti/],
-    [{ clientId: 'utente-7', status: 'design', statusPublic: 'open', localApproval: mappa(SI) }, /già approvato/],
-    [{ clientId: 'local:claude', senderProof: 'admin', status: 'design', statusPublic: 'open' }, /basta il segno/],
-  ];
-  for (const [campi, motivo] of casi) {
-    await conRete(documento('x', campi), async (patch) => {
-      const r = await of.approvaLocale('x', OPTS);
-      assert.equal(r.ok, false, JSON.stringify(campi));
-      assert.match(r.motivo, motivo);
-      assert.equal(patch.length, 0);
-    });
+// La prova del mittente la scrive solo il ripasso, che la deduce da segni che un falso non ha (regole: ripassoMittenti.test.mjs).
+const SCRIVE_LA_PROVA = new Set(['ripasso-mittenti.mjs']);
+test('nessuno strumento delle sessioni scrive il sì come lavoro locale, né la prova del mittente su un feedback esistente', () => {
+  const file = [];
+  const giro = (dir) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (e.isDirectory()) { if (e.name !== 'node_modules') giro(join(dir, e.name)); } else if (/\.(mjs|cjs|js)$/.test(e.name)) file.push(join(dir, e.name));
+    }
+  };
+  giro(join(ROOT, 'scripts'));
+  assert.ok(file.length > 20, 'cartella degli strumenti non trovata');
+  for (const f of file) {
+    const testo = readFileSync(f, 'utf8');
+    assert.doesNotMatch(testo, /fieldPaths=localApproval|set\(\s*['"`]localApproval['"`]|localApproval\s*:\s*(\{\s*mapValue|toFsValue|segno)/, `${f} scrive localApproval`);
+    if (!SCRIVE_LA_PROVA.has(f.split(/[\\/]/).pop())) assert.doesNotMatch(testo, /fieldPaths=senderProof/, `${f} scrive senderProof su un feedback esistente`);
   }
 });
 
@@ -166,13 +177,16 @@ test('approvato: start/finish --feedback e i passaggi del lavoro lo accettano; s
     const r = await of.praticaPerLaSessione('n1', OPTS);
     assert.equal(r.ok, false);
     assert.equal(r.utente, true);
-    assert.match(of.rifiutoPratica('913', r), /--approva-locale/);
+    const rifiuto = of.rifiutoPratica('913', r);
+    assert.doesNotMatch(rifiuto, /--approva-locale/);
+    assert.match(rifiuto, /in Gestione, col tasto «💻 Lavoro locale».*da riga di comando non si può/);
   });
   const routine = documento('r1', { clientId: 'routine:worker', senderProof: 'server', status: 'design', statusPublic: 'open' });
   await conRete(routine, async () => {
     const r = await of.praticaPerLaSessione('r1', OPTS);
     assert.equal(r.ok, false);
-    assert.match(of.rifiutoPratica('914', r), /--approva-locale/);
+    assert.doesNotMatch(of.rifiutoPratica('914', r), /--approva-locale/);
+    assert.match(of.rifiutoPratica('914', r), /solo l’owner, in Gestione/);
   });
 });
 
