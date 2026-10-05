@@ -13,7 +13,7 @@ async function fornitore() {
     res.writeHead(200, { 'content-type': 'image/gif' });
     res.end();
   });
-  proxy.on('connect', (req, sock) => { connessi.push(req.url); sock.end('HTTP/1.1 502 No\r\n\r\n'); });
+  proxy.on('connect', (req, sock) => { if (/youtube|google-analytics/.test(req.url)) connessi.push(req.url); sock.end('HTTP/1.1 502 No\r\n\r\n'); });
   await new Promise((r) => proxy.listen(0, '127.0.0.1', r));
   return { connessi, chiari, porta: proxy.address().port, chiudi: () => proxy.close() };
 }

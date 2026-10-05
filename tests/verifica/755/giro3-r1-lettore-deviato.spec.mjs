@@ -1,5 +1,5 @@
-// Verifica #755 giro 3: il codice d'incorporamento che YouTube dà ai siti (allow="autoplay; encrypted-media; …")
-// concede quei permessi all'origine scritta nell'attributo src; deviato in rete, il lettore nocookie li perde?
+// Verifica #755 giro 3, rilievo 1: deviato in rete, il lettore nocookie perde ciò che il sito dava a youtube.com:
+// la provenienza (YouTube senza Referer risponde con l'errore 153) e i permessi del codice d'incorporamento.
 // youtube-nocookie è finto: un proxy locale lo serve da un server TLS di prova, la deviazione di Filo resta quella vera.
 
 import { test, expect } from '../../fixtures/electron.mjs';
@@ -49,13 +49,14 @@ async function finto() {
   return { visti, connessi, porta: proxy.address().port, chiudi: () => { tls.close(); proxy.close(); } };
 }
 
-const CODICE = (src) => `<iframe width="560" height="315" src="${src}" title="YouTube video player" frameborder="0"
-  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-  referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`;
+const CODICE = (src, allow) => `<iframe width="560" height="315" src="${src}" title="YouTube video player" frameborder="0"
+  allow="${allow}" referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
+
+const STANDARD = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen';
 
 for (const [nome, src] of [
   ['codice di YouTube su youtube.com (deviato in rete)', 'https://www.youtube.com/embed/AAA111?start=30'],
-  ['stesso codice già su youtube-nocookie (controllo)', 'https://www.youtube-nocookie.com/embed/AAA111?start=30'],
+  ['stesso codice già su youtube-nocookie (controllo, verde anche senza correzione)', 'https://www.youtube-nocookie.com/embed/AAA111?start=30'],
 ]) {
   test(nome, async ({ app, openTab, testServer }) => {
     const f = await finto();
@@ -65,20 +66,17 @@ for (const [nome, src] of [
         s.setCertificateVerifyProc((_req, cb) => cb(0));
         await s.setProxy({ proxyRules: `http://127.0.0.1:${porta}`, proxyBypassRules: '<-loopback>;127.0.0.1' });
       }, f.porta);
-      const url = testServer.html(`<title>EMB</title>${CODICE(src)}
+      const url = testServer.html(`<title>EMB</title>${CODICE(src, STANDARD)}
         <script>window.__esiti = []; addEventListener('message', (e) => { if (e.data && e.data.nc) window.__esiti.push(e.data); });</script>`);
       const page = await openTab(url);
-      await expect.poll(() => page.evaluate(() => window.__esiti.length), { timeout: 15_000 }).toBeGreaterThan(0).catch((e) => {
-        console.log('DEBUG', JSON.stringify({ visti: f.visti, connessi: f.connessi })); throw e;
-      });
+      await expect.poll(() => page.evaluate(() => window.__esiti.length), { timeout: 15_000 }).toBeGreaterThan(0);
       const esito = (await page.evaluate(() => window.__esiti))[0];
-      console.log(nome, JSON.stringify({ esito, visti: f.visti, connessi: f.connessi }));
       expect(f.connessi.filter((c) => /youtube\.com:/.test(c))).toEqual([]);
-      expect(esito.nc.autoplay, 'il lettore non può partire da solo').toBe(true);
-      expect(esito.nc['encrypted-media'], 'il lettore non ha i contenuti protetti').toBe(true);
-      expect(esito.nc['picture-in-picture'], 'il lettore non ha il riquadro sempre in vista').toBe(true);
-      expect(esito.nc.fullscreen).toBe(true);
-      expect(f.visti[0].referer, 'la richiesta arriva a YouTube senza il sito di provenienza').toBeTruthy();
+      expect.soft(f.visti[0].referer, 'la richiesta arriva a YouTube senza il sito di provenienza: errore 153, il video non parte').toBeTruthy();
+      expect.soft(esito.nc.fullscreen, 'schermo intero negato (codice con allow="fullscreen")').toBe(true);
+      expect.soft(esito.nc.autoplay, 'avvio automatico negato').toBe(true);
+      expect.soft(esito.nc['picture-in-picture'], 'riquadro sempre in vista negato').toBe(true);
+      expect.soft(esito.nc['encrypted-media'], 'contenuti protetti negati').toBe(true);
     } finally {
       f.chiudi();
     }
