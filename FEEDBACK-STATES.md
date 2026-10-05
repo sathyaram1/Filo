@@ -205,6 +205,52 @@ l'owner), con l'approvazione che dice `→ Lavori locali`.
   (`skippedL5: true`), fonde senza chiedere e chiude la pratica. Manca una condizione →
   la richiesta aspetta il sì dell'owner in Gestione, col motivo.
 
+### 4c. Chi nasce senza giudici (#914)
+
+Alla nascita (solo il trigger di creazione) L1 e L2 non girano per chi porta la prova
+scritta dal server o dall'admin, mai per il solo nome (`functions/src/nascita.js`):
+
+- lavoro locale (§4b): `todo` nei Lavori locali, senza nemmeno L0;
+- sessione per le routine (`local:` + `senderProof: 'admin'`, senza segno: `claude-feedback.mjs
+  --non-locale`): L0, poi `todo` In coda (`pipeline.skipped: 'session_proven'`); la priorità
+  scelta con `--priorita` nasce col documento (`priorityManual`), senza scelta la decide il giudice;
+- routine (`routine:`/`agent:` + `senderProof: 'server'`: ritrovamenti, derivati, allarmi della
+  costruzione): L0, poi dove dice l'**origine** (`pipeline.skipped: 'routine_proven'`, decisione
+  dell'owner del 04/10). L'origine è il lavoro del biglietto (`origineId`, lo scrive il server,
+  mai la routine; `parentId` resta un collegamento) e conta il genitore diretto:
+  - origine dell'owner, di una sessione o del server (mittente provato, anche un derivato già in
+    coda) → `todo`;
+  - origine d'utente non ancora fusa → resta `unlabeled` (`statusReason: attesa_origine`); quando
+    l'origine arriva a `done` → `todo`; se si blocca (`attack`, `spam`, `suspicious_file`, i
+    confermati, `design` per `secaudit` o `l5`) → `design` (`statusReason: origine_bloccata`,
+    rosso, L1 pericoloso sul triangolo, mittente non segnato); se si chiude senza fusione
+    (`archived`) → `aligned` (`statusReason: origine_chiusa`). Lo fa il trigger
+    `onFeedbackOrigineCambiata` (functions/src/origine.js), e alla nascita si rilegge l'origine
+    dopo la scrittura perché un passo appena avvenuto non vada perso;
+  - origine sparita → `aligned` (`statusReason: origine_mancante`);
+  - senza origine (allarmi della costruzione, esplorazioni) → come un allineato dei giudici: `todo`
+    se l'automatica e l'interruttore del gruppo lo ammettono, altrimenti `aligned`.
+
+  Chi è fermo con l'origine (`design`, `origine_bloccata`) la segue anche quando l'owner la libera:
+  torna ad aspettarla (`design → unlabeled`) se il lavoro riparte, entra in coda (`design → todo`) se
+  si fonde, va in `aligned` se si chiude senza fusione. Allo stesso modo chi è tornato nei Ricevuti
+  con l'origine chiusa (`aligned`, `origine_chiusa`) la aspetta di nuovo (`aligned → unlabeled`)
+  se l'owner la ripristina, ed entra in coda (`aligned → todo`) quando si fonde. Sono le sole uscite
+  della pipeline da `design` e da `aligned`, e solo per quei motivi; un derivato che l'owner ha già
+  spostato non si tocca. Chi entra in
+  coda dopo l'attesa passa dal giudice di priorità come alla nascita.
+
+Il prompt dei giudici dice che a loro arriva solo un utente: un linguaggio da sviluppatore o
+da agente è un segnale sospetto. Non a un mittente provato (l'owner dall'app, la ri-valutazione
+di una routine o di una sessione): lì il tono tecnico è normale. Una ri-valutazione passa
+sempre dai giudici.
+
+Le routine non aprono lavoro locale: il canale non scrive il segno, e dentro una routine
+`claude-feedback.mjs` e `owner-feedback.mjs --solo-locale | --approva-locale` si rifiutano. Un
+lavoro che si fa solo in locale torna nei Ricevuti dal canale (`deliver status --status design
+--reason locale`, nota «Richiede lavoro locale»): lo stesso motivo di `--serve-locale`, e lì
+l'owner lo approva come lavoro locale (§4b, #913).
+
 ### 4a. Le AZIONI dell'owner per sezione (`ownerActions`)
 
 Stessa regola delle tab, un gradino più in dentro: la sezione dice quali azioni

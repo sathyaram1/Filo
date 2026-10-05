@@ -4212,10 +4212,8 @@
       const fromVerdicts = filoOpinionFromVerdicts(fb);
       if (fromVerdicts) opinionHtml = fromVerdicts;         // parere completo dai giudici
       else if (summary) opinionHtml = esc(summary);          // troncato ma è l'unica cosa che c'è
-      // #908: un lavoro locale col mittente provato i giudici li salta di proposito.
-      else if (fb.pipeline && fb.pipeline.skipped === 'local_proven') {
-        opinionHtml = '<em>Lavoro locale aperto da te o da una sessione, con la prova del mittente. I giudici non servono.</em>';
-      }
+      // #908, #914: lavoro locale, sessione per le routine e routine, col mittente provato, i giudici li saltano.
+      else if (MR.judgesSkippedText(fb)) opinionHtml = `<em>${esc(MR.judgesSkippedText(fb))}</em>`;
       // "non ha ANCORA un parere" si legge come "sta arrivando": vero solo
       // finché la segnalazione aspetta una decisione. Su una già decisa (un
       // attacco confermato, un fix chiuso) quella parola diceva il falso — e su
@@ -4587,10 +4585,11 @@
     // livelli grigi: un buco si spiega, non si tace.
     if (!v) {
       const nota = MR.judgesNote ? MR.judgesNote(fb) : null;
+      const saltati = MR.judgesSkippedText(fb);
       openSidebar(anonLabel, `
         <div class="mg-judge-detail">
-          <div class="mg-liv-testo">Nessun verdetto in questa valutazione: il giudice non ha risposto — scaduto il tempo, credito esaurito o modello non configurato.</div>
-          ${nota && nota.text ? `<div class="mg-judge-model">${esc(nota.text)}</div>` : ''}
+          <div class="mg-liv-testo">${saltati ? esc(saltati) : 'Nessun verdetto in questa valutazione: il giudice non ha risposto — scaduto il tempo, credito esaurito o modello non configurato.'}</div>
+          ${nota && nota.text && !saltati ? `<div class="mg-judge-model">${esc(nota.text)}</div>` : ''}
         </div>
       `);
       return;

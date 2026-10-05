@@ -85,6 +85,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { acquireBearer, FIRESTORE_BASE } from './lib/firestore-auth.mjs';
+import { isRoutineInstance } from './lib/routine-role.mjs';
 import { avvisoDaCampi, parseRiferimento, risolviFeedback } from './lib/pratica-locale.mjs';
 import { PARTI, RAMO_RE, partiDaCampi } from './lib/parti-lavoro.mjs';
 // Moduli IIFE: importarli li registra su globalThis.
@@ -795,6 +796,13 @@ if (isMain) {
     posizionali.push(a);
   }
   const [riferimento, status, ...nota] = posizionali;
+
+  // #914: le routine non aprono lavoro locale; quello che si fa solo in locale lo rimandano dal canale.
+  // Il sì dell'owner (--approva-locale, #913) è suo: una routine non lo dà.
+  if ((argv.includes('--solo-locale') || argv.includes('--approva-locale')) && isRoutineInstance(ROOT)) {
+    console.error('RIFIUTATO: una routine non segna lavoro locale. Rimandalo nei Ricevuti: node scripts/routine-channel.mjs deliver status --status design --reason locale --notes "perché" — non ho toccato niente.');
+    process.exit(3);
+  }
 
   let id = riferimento;
   let bearer;
