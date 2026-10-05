@@ -76,10 +76,12 @@ async function sitoConAccesso() {
   };
 }
 
-async function privacy(app) {
-  await app.evaluate(async () => {
+// `margine`: quanto aspetta Filo prima di buttare il jar di un sito che nessuna scheda usa più (#756).
+async function privacy(app, margine) {
+  await app.evaluate(async (_e, ms) => {
     await globalThis.__filoHandlers.applySettingsUpdate({ security: { cookies: { mode: 'privacy' } } });
-  });
+    if (ms != null) globalThis.__filoCookies.impostaMargineUscita(ms);
+  }, margine);
 }
 
 async function apri(app, shell, url) {
@@ -356,7 +358,7 @@ test('tasto destro sulla scheda: «Resta connesso qui» porta l\'accesso nel pos
   test.setTimeout(120_000);
   const sito = await sitoConAccesso();
   try {
-    await privacy(app);
+    await privacy(app, 800);
     await accedi(await apri(app, shell, `${sito.a}/login`));
     await dentro(app, `${sito.a}/home`);
     // La proposta c'è, ma l'utente passa dal menu.
@@ -384,11 +386,11 @@ test('tasto destro sulla scheda: «Resta connesso qui» porta l\'accesso nel pos
     await expect(vista.locator('.shell-notif.show', { hasText: 'Resti connesso a 127.0.0.1' })).toBeVisible({ timeout: 10_000 });
 
     await scegliNelMenu(app, shell, 'Non restare connesso', async () => (await fidati(app)).length === 0);
-    await expect.poll(() => partizioneDi(app, `${sito.a}/`)).toBe('filo-priv-127.0.0.1');
+    await expect.poll(() => partizioneDi(app, `${sito.a}/`)).toMatch(/^filo-priv-127\.0\.0\.1(~\d+)?$/);
     // Fino alla chiusura l'utente resta dentro; sul disco non resta niente.
     await dentro(app, `${sito.a}/home`);
     await expect.poll(() => cookieNelJar(app, 'persist:filo-priv-127.0.0.1')).toEqual([]);
-    await expect(vista.locator('.shell-notif.show', { hasText: 'l\'accesso vale fino alla chiusura di Filo' })).toBeVisible({ timeout: 10_000 });
+    await expect(vista.locator('.shell-notif.show', { hasText: 'l\'accesso finisce qualche minuto dopo' })).toBeVisible({ timeout: 10_000 });
     const { tabs } = await shell.evaluate(() => window.filoShell.tabs.snapshot());
     expect(tabs.find((t) => String(t.url).startsWith(sito.a)).connesso).toEqual({ sito: '127.0.0.1', fidato: false });
   } finally {
@@ -407,7 +409,7 @@ test('in chat «resta connesso su» aggiunge il sito con la conferma, e «togli 
   const base = `http://sito-pubblico.test:${sito.port}`;
   const nome = 'sito-pubblico.test';
   try {
-    await privacy(app);
+    await privacy(app, 800);
     await accedi(await apri(app, shell, `${base}/login`));
     await dentro(app, `${base}/home`);
     const home = await openTab('filo://newtab/');
@@ -430,7 +432,7 @@ test('in chat «resta connesso su» aggiunge il sito con la conferma, e «togli 
     expect(c2.executed).toBe(true);
     await expect.poll(() => fidati(app)).toEqual([]);
     await expect.poll(() => cookieNelJar(app, `persist:filo-priv-${nome}`)).toEqual([]);
-    await expect.poll(() => partizioneDi(app, `${base}/`)).toBe(`filo-priv-${nome}`);
+    await expect.poll(() => partizioneDi(app, `${base}/`)).toMatch(/^filo-priv-sito-pubblico\.test(~\d+)?$/);
     await dentro(app, `${base}/home`);
   } finally {
     await sito.chiudi();

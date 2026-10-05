@@ -59,20 +59,24 @@ function onTrustChange(sito, fidato) {
 }
 Cookies.setTrustChangeHandler(onTrustChange);
 
-// Il sito diventa fidato: l'accesso fatto nel jar effimero passa in quello persistente, e le schede aperte lo
-// seguono. Esce dai fidati: l'accesso resta fino alla chiusura (jar effimero) e il disco si svuota.
+// Il sito diventa fidato: l'accesso fatto nel jar effimero (anche a scheda appena chiusa) passa in quello
+// persistente. Esce dai fidati: le schede aperte portano l'accesso nel jar effimero, che si butta all'uscita dal
+// sito; quello persistente lo svuota services/cookies.js (dimenticaFidato) quando nessuna scheda lo usa più.
 async function spostaAccesso(sito, fidato) {
+  const managers = managersNormali();
   if (Cookies.currentMode(false) === Cookies.MODES.PRIVACY) {
-    const dest = Cookies.ensureSiteSession(Cookies.partitionForSite(sito, fidato), { gpc: true });
-    const orig = fidato ? Cookies.sessioneEffimera(sito) : Cookies.ensureSiteSession(Cookies.partitionForSite(sito, true), { gpc: true });
-    if (orig) await Cookies.copiaBarattolo(orig, dest);
-    for (const tm of managersNormali()) {
-      try { await tm._spostaSchede(sito, dest); } catch (_) {}
+    const aperto = managers.some((tm) => tm.tabs.some((t) => tm._connessoSito(t) === sito));
+    let orig = null;
+    if (fidato) orig = Cookies.sessioneEffimera(sito);
+    else if (aperto) orig = Cookies.ensureSiteSession(Cookies.partitionForSite(sito, true), { gpc: true });
+    const dest = orig || aperto ? Cookies.ensureSiteSession(Cookies.partitionForSite(sito, fidato), { gpc: true }) : null;
+    if (orig && dest) await Cookies.copiaBarattolo(orig, dest);
+    for (const tm of managers) {
+      try { if (dest) await tm._spostaSchede(sito, dest); } catch (_) {}
     }
   }
-  if (!fidato) await Cookies.dimenticaSito(sito);
   // La voce del menu della scheda dice «Resta» o «Non restare»: la barra lo deve sapere anche senza spostamenti.
-  for (const tm of managersNormali()) { try { tm._broadcast(); } catch (_) {} }
+  for (const tm of managers) { try { tm._broadcast(); } catch (_) {} }
 }
 
 const restaConnessoMethods = {
@@ -172,7 +176,7 @@ const restaConnessoMethods = {
     proposti.add(sito);
     try {
       this.win.webContents.send('shell:toast', {
-        text: `Hai fatto l'accesso a ${nomeLeggibile(sito)}. Vuoi restare connesso anche quando riapri Filo?`,
+        text: `Hai fatto l'accesso a ${nomeLeggibile(sito)}. Vuoi restare connesso anche quando chiudi la scheda o riapri Filo?`,
         opts: {
           durationSec: 15,
           sound: false,

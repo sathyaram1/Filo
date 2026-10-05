@@ -11,11 +11,13 @@
     {
       version: '0.2.233', date: '2026-10-05',
       features: [
-        'Con i cookie su «Privacy massima» puoi restare connesso ai siti che scegli. Dopo un accesso Filo ti chiede una volta se vuoi restare connesso, e con un clic il sito ti riconosce anche quando riapri Filo. Lo stesso dal tasto destro sulla scheda («Resta connesso qui», «Non restare connesso») o in chat («resta connesso su example.com»).',
+        'Con i cookie su «Privacy massima» puoi restare connesso ai siti che scegli. Dopo un accesso Filo ti chiede una volta se vuoi restare connesso, e con un clic il sito ti riconosce anche quando chiudi la scheda o riapri Filo. Lo stesso dal tasto destro sulla scheda («Resta connesso qui», «Non restare connesso») o in chat («resta connesso su example.com»).',
       ],
       fixes: [
         'Nelle Opzioni, se clicchi sul campo del modello prima che arrivi l\'elenco dei modelli, il menu a tendina si apre da solo appena l\'elenco c\'è. Prima restava chiuso e bisognava cliccare di nuovo.',
         'Nelle risposte di Filo un elenco numerato con le voci staccate da una riga vuota tiene i suoi numeri: prima ogni voce ripartiva da 1.',
+        'In Privacy massima Filo cancella i cookie e gli accessi di un sito qualche minuto dopo che ne chiudi l\'ultima scheda. Prima li teneva finché non chiudevi Filo. Se chiudi una scheda per sbaglio e la riapri subito resti connesso, e i siti fidati non cambiano.',
+        'Sempre in Privacy massima, togliere un sito dai "siti fidati" butta via quello che quel sito aveva salvato, invece di lasciarlo sul computer. Se la scheda è aperta, Filo aspetta che la chiudi.',
       ],
     },
     {

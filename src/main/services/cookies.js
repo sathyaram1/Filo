@@ -151,17 +151,26 @@ function registrableOf(url) {
 // partizione Electron (solo [a-z0-9.-]). Se il sito è "fidato" la partizione è
 // PERSISTENTE ('persist:'): resta isolata per-sito ma sopravvive alla sessione,
 // così l'utente resta connesso. Altrimenti è effimera (in RAM).
+function baseDelSito(reg) {
+  return 'filo-priv-' + String(reg || '').replace(/[^a-z0-9.-]/gi, '_');
+}
+
 function partitionForUrl(url, trusted) {
   const reg = registrableOf(url);
   if (!reg) return null;
   return partitionForSite(reg, trusted instanceof Set && trusted.has(reg));
 }
 
-// 'persist:' → jar isolato per-sito ma persistente (resta connesso). Senza prefisso → effimero.
+// 'persist:' → jar isolato per-sito ma persistente (resta connesso).
+// Senza prefisso → jar isolato ed effimero, buttato all'uscita dal sito (vedi «uscita dal sito»).
 function partitionForSite(site, persistent) {
-  const slug = String(site || '').toLowerCase().replace(/[^a-z0-9.-]/gi, '_');
-  if (!slug) return null;
-  return (persistent ? 'persist:' : '') + 'filo-priv-' + slug;
+  const reg = String(site || '').toLowerCase();
+  if (!reg) return null;
+  const base = baseDelSito(reg);
+  if (persistent) return 'persist:' + base;
+  sitoDelJar.set(base, reg);
+  const g = jarGen.get(base);
+  return g && g.n ? `${base}~${g.n}` : base;
 }
 
 // I cookie di un jar ricopiati in un altro, così l'accesso segue il sito quando passa fra jar effimero e
@@ -204,19 +213,9 @@ async function copiaBarattolo(da, a, sito) {
   return copiati;
 }
 
-// La sessione già viva del jar effimero del sito, senza crearla: un jar mai aperto non ha niente da dare.
+// La sessione ancora viva del jar effimero del sito (generazione in uso), senza crearla.
 function sessioneEffimera(site) {
   return siteSessions.get(partitionForSite(site, false)) || null;
-}
-
-// Un sito tolto dai fidati non tiene niente sul disco: il suo jar persistente si svuota.
-async function dimenticaSito(site) {
-  const nome = partitionForSite(site, true);
-  if (!nome) return;
-  const ses = siteSessions.get(nome) || session.fromPartition(nome);
-  try { await ses.clearStorageData(); } catch (_) {}
-  try { await ses.clearCache(); } catch (_) {}
-  try { await ses.cookies.flushStore(); } catch (_) {}
 }
 
 // ─── GPC: header Sec-GPC: 1 ───────────────────────────────────────────────
@@ -328,6 +327,7 @@ function ensureSiteSession(partition, { gpc } = {}) {
     ses = session.fromPartition(partition);
     try { registerFiloProtocolForSession(ses); } catch (_) {}
     siteSessions.set(partition, ses);
+    if (!partition.startsWith('persist:')) seguiUscite(partition, ses);
   }
   const on = gpc !== false;
   applyGpc(ses, on);
@@ -338,6 +338,159 @@ function ensureSiteSession(partition, { gpc } = {}) {
   applyTrackerBlocking(ses, on);
   return ses;
 }
+
+// ─── uscita dal sito (modalità privacy) ───────────────────────────────────
+//
+// Un jar effimero si butta quando nessun webContents lo usa più (schede di ogni finestra, popup) e nessuno
+// scaricamento ci passa, dopo un margine: chiudere per sbaglio e riaprire subito non fa uscire dal sito (#756).
+const MARGINE_USCITA_MS = 5 * 60 * 1000;
+let margineUscita = MARGINE_USCITA_MS;
+const jarGen = new Map();          // base → { n: generazione in uso, svuota: generazioni che si stanno svuotando }
+const sitoDelJar = new Map();      // base → eTLD+1
+const jarDellaSessione = new WeakMap();
+const uscite = new Map();          // partizione → timer
+const scaricamenti = new Map();    // partizione → Set<DownloadItem>
+const seguiti = new Set();         // partizioni già seguite: un secondo giro raddoppierebbe i listener
+const fidatiDaButtare = new Set(); // partizioni persist: di siti tolti dai fidati, in attesa che il sito si chiuda
+let seguendo = false;
+
+// Manopola dei test: senza argomento torna al margine vero.
+function impostaMargineUscita(ms) {
+  margineUscita = Number.isFinite(ms) && ms >= 0 ? ms : MARGINE_USCITA_MS;
+}
+
+function seguiUscite(partition, ses) {
+  if (seguiti.has(partition)) return;
+  seguiti.add(partition);
+  jarDellaSessione.set(ses, partition);
+  try {
+    ses.on('will-download', (_e, item) => {
+      let set = scaricamenti.get(partition);
+      if (!set) scaricamenti.set(partition, (set = new Set()));
+      set.add(item);
+      item.on('updated', (_ev, state) => { if (state === 'interrupted') armaUscita(partition); });
+      item.once('done', () => { set.delete(item); armaUscita(partition); });
+    });
+  } catch (_) {}
+  if (seguendo) return;
+  seguendo = true;
+  require('electron').app.on('web-contents-created', (_e, wc) => {
+    let p = null;
+    try { p = jarDellaSessione.get(wc.session); } catch (_) {}
+    if (p) wc.once('destroyed', () => armaUscita(p));
+  });
+}
+
+// Un jar persistente si butta solo se il sito è stato tolto dai fidati: finché è fidato resta, è la sua eccezione.
+function daButtare(partition) {
+  return !partition.startsWith('persist:') || fidatiDaButtare.has(partition);
+}
+
+function armaUscita(partition) {
+  if (!daButtare(partition)) return;
+  clearTimeout(uscite.get(partition));
+  const t = setTimeout(() => { uscite.delete(partition); controllaUscita(partition); }, margineUscita);
+  uscite.set(partition, t);
+}
+
+function inUso(partition, ses) {
+  try {
+    const { webContents } = require('electron');
+    if (webContents.getAllWebContents().some((wc) => !wc.isDestroyed() && wc.session === ses)) return true;
+  } catch (_) { return true; }
+  for (const item of scaricamenti.get(partition) || []) {
+    try { if (item.getState() === 'progressing') return true; } catch (_) {}
+  }
+  return false;
+}
+
+function controllaUscita(partition) {
+  if (!daButtare(partition)) return;
+  const ses = siteSessions.get(partition);
+  if (ses && !inUso(partition, ses)) buttaJar(partition, ses);
+}
+
+// Il sito non è più un'eccezione: quello che aveva salvato se ne va come per gli altri siti, ma mai mentre
+// è aperto in una scheda (lo butterebbe fuori a metà sessione): lì aspetta che la chiuda, come un jar normale.
+function dimenticaFidato(site) {
+  const partition = 'persist:' + baseDelSito(site);
+  let ses = siteSessions.get(partition);
+  try { if (!ses) ses = session.fromPartition(partition); } catch (_) { return; }
+  siteSessions.set(partition, ses);
+  sitoDelJar.set(partition, site);
+  fidatiDaButtare.add(partition);
+  seguiUscite(partition, ses);
+  // Le schede già aperte sono nate prima che seguissimo questo jar: la loro chiusura va agganciata adesso.
+  try {
+    for (const wc of require('electron').webContents.getAllWebContents()) {
+      if (!wc.isDestroyed() && wc.session === ses) wc.once('destroyed', () => armaUscita(partition));
+    }
+  } catch (_) {}
+  if (inUso(partition, ses)) return;
+  buttaJar(partition, ses);
+}
+
+// Un sito tolto dai fidati mentre la sua scheda era aperta, e Filo chiuso prima che la chiudesse, lascerebbe
+// il suo jar sul disco per sempre: qui se ne vanno tutti quelli che non sono più fidati, da qualunque strada.
+function spazzaFidatiOrfani(trusted) {
+  let nomi = [];
+  try {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const dir = path.join(require('electron').app.getPath('userData'), 'Partitions');
+    nomi = fs.readdirSync(dir, { withFileTypes: true })
+      .filter((v) => v.isDirectory() && v.name.startsWith('filo-priv-'))
+      .map((v) => v.name);
+  } catch (_) { return; }
+  const vivi = new Set([...trusted].map((s) => baseDelSito(s)));
+  for (const nome of nomi) {
+    if (vivi.has(nome)) continue;
+    const partition = 'persist:' + nome;
+    try {
+      const ses = siteSessions.get(partition) || session.fromPartition(partition);
+      if (inUso(partition, ses)) continue;   // la scheda è ancora aperta: aspetta che la chiuda
+      siteSessions.set(partition, ses);
+      fidatiDaButtare.add(partition);
+      buttaJar(partition, ses);
+    } catch (_) {}
+  }
+}
+
+// Rimesso fra i fidati prima che il suo jar se ne andasse: resta dov'è, l'utente ha disdetto.
+function tieniFidato(site) {
+  const partition = 'persist:' + baseDelSito(site);
+  if (!fidatiDaButtare.delete(partition)) return;
+  clearTimeout(uscite.get(partition));
+  uscite.delete(partition);
+}
+
+// Il sito riparte subito in un'altra generazione: chi lo riapre mentre il vecchio jar si svuota non perde i cookie a metà.
+function buttaJar(partition, ses) {
+  const [base, gen] = partition.split('~');
+  const idx = Number(gen) || 0;
+  let g = jarGen.get(base);
+  if (!g) jarGen.set(base, (g = { n: 0, svuota: new Set() }));
+  g.svuota.add(idx);
+  if (g.n === idx) {
+    let i = 0;
+    while (g.svuota.has(i)) i++;
+    g.n = i;
+  }
+  scaricamenti.delete(partition);
+  fidatiDaButtare.delete(partition);
+  try { require('./permessiPagine').dimenticaSessione(ses); } catch (_) {}
+  const pulisci = (fn) => Promise.resolve().then(fn).catch(() => {});
+  Promise.all([
+    pulisci(() => (typeof ses.clearData === 'function' ? ses.clearData() : Promise.all([ses.clearStorageData(), ses.clearCache()]))),
+    pulisci(() => ses.clearAuthCache()),
+    pulisci(() => typeof ses.closeAllConnections === 'function' && ses.closeAllConnections()),
+  ]).then(() => g.svuota.delete(idx));
+  const site = sitoDelJar.get(base);
+  try { if (site && jarWipe) jarWipe(site); } catch (_) {}
+}
+
+let jarWipe = null;
+function setJarWipeHandler(fn) { jarWipe = typeof fn === 'function' ? fn : null; }
 
 // Decide quale partizione deve usare una WebContentsView per `url` nella
 // modalità corrente. Ritorna:
@@ -466,10 +619,20 @@ function configureFromSettings(settings) {
   if (_configured) {
     wipeChanged(prev, _cached.bannerSites, [session.defaultSession, ...siteSessions.values(), ...(_incognito ? [] : incognitoSessions())],
       { normal: true, incognito: !_incognito });
-    fiduciaCambiata(prevTrustedList, _cached.trustedSites);
+  }
+  const trustedOra = _cached.trustedSites.join('\n');
+  if (!_configured || prevTrusted !== trustedOra) {
+    const prima = new Set(prevTrusted.split('\n').map((d) => d.toLowerCase()).filter(Boolean));
+    const adesso = trustedSetOf(settings);
+    if (_configured) {
+      for (const site of prima) if (!adesso.has(site)) dimenticaFidato(site);
+      for (const site of adesso) if (!prima.has(site)) tieniFidato(site);
+    }
+    spazzaFidatiOrfani(adesso);
+    if (_configured) fiduciaCambiata(prevTrustedList, _cached.trustedSites);
   }
   _configured = true;
-  if (prevMode !== _cached.mode || prevTrusted !== _cached.trustedSites.join('\n')) {
+  if (prevMode !== _cached.mode || prevTrusted !== trustedOra) {
     try { if (configChange) configChange(); } catch (_) {}
   }
   return changed;
@@ -559,7 +722,8 @@ module.exports = {
   cookieDaCopiare,
   copiaBarattolo,
   sessioneEffimera,
-  dimenticaSito,
+  setJarWipeHandler,
+  impostaMargineUscita,
   keepsSiteData,
   setAnswerLookup,
   resetIncognito,

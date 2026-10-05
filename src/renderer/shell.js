@@ -862,8 +862,8 @@
     try { r = await api.tabs.restaConnesso(id, on, sito); } catch (_) { r = null; }
     if (!r || !r.ok) return;
     showToast(r.fidato
-      ? `Resti connesso a ${r.nome} anche dopo aver chiuso Filo.`
-      : `Su ${r.nome} l'accesso vale fino alla chiusura di Filo.`);
+      ? `Resti connesso a ${r.nome} anche quando chiudi la scheda o riapri Filo.`
+      : `Su ${r.nome} l'accesso finisce qualche minuto dopo che ne chiudi l'ultima scheda.`);
   }
 
   async function azzeraPermessi(id) {
