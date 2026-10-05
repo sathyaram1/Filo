@@ -2400,7 +2400,15 @@
         return;
       }
       const span = e.target.closest('.dk-prose-card');
-      if (!span) return;
+      if (!span) {
+        const bubble = e.target.closest('[data-msg-i]');
+        const msgs = current && chatByDeck.get(current.id);
+        const m = bubble && msgs && msgs[Number(bubble.dataset.msgI)];
+        if (!m || !m.pending || !chatTaken(msgs)) return;
+        e.preventDefault();
+        openCtx(e.clientX, e.clientY, [stopItem]);
+        return;
+      }
       e.preventDefault();
       const deckId = current && current.id;
       const id = await resolveProseCard(span).catch(() => null);
