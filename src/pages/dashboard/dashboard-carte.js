@@ -249,7 +249,7 @@
       }
       d.refreshLive();
     };
-    const base = { ...carta, icona: 'download', titolo: 'Aggiornamento', etichettaTogli: 'Chiudi, per questa versione' };
+    const base = { ...carta, icona: 'download', titolo: 'Aggiornamento' };
     if (a.percento != null) {
       return {
         ...base, stato: `Scarico la versione ${v}: ${a.percento}%`, avanza: a.percento, principale: null,
