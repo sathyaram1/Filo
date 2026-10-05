@@ -47,20 +47,19 @@ la cartella.
   escono non bastava, perché un rilievo messo da parte senza prova sua lasciava uscire la
   prova rossa di uno da correggere.
 - **Un file di supporto della cartella** (un aiuto, una pagina, dei dati) non è una prova, ma
-  le prove che lo nominano, anche passando per un altro aiuto, ne dipendono (#746). La
-  consegna rilancia com'erano anche quelle che usano un file di supporto cambiato:
-  indebolire l'aiuto che controlla un caso rosso è la stessa porta che cancellare la prova.
-  Vale anche importato senza estensione, e per gli aiuti comuni dei test fuori dal giro
-  (fixture, helpers): quelli si rimettono com'erano in una copia del ramo a parte, mai al
-  loro posto, perché un rilancio interrotto non lasci un aiuto vecchio da committare.
-  Un file AGGIUNTO nella cartella dopo la critica rilancia tutte le sue prove: accanto a un aiuto
-  importato senza estensione ne prende il posto (decide Playwright, non il nome scritto), e per
-  correggere non serve. Un aiuto comune aggiunto si toglie dalla copia a parte. Nella pulizia un
-  file di supporto non conta fra le prove tolte.
+  le prove ne dipendono (#746): quale file carica una prova lo decide Playwright (un import
+  senza estensione, una cartella col suo indice, un file nuovo che fa ombra), non il nome
+  scritto. Quindi un file di supporto aggiunto, cambiato o tolto nella cartella rilancia, com'erano,
+  TUTTE le prove di quella cartella: indebolire l'aiuto che controlla un caso rosso è la stessa
+  porta che cancellare la prova. Gli aiuti comuni dei test fuori dal giro (fixture, helpers)
+  rilanciano le prove che li nominano; la configurazione di Playwright, che le usa tutte, le
+  rilancia tutte. Quelli si rimettono com'erano in una copia del ramo a parte, mai al loro posto,
+  perché un rilancio interrotto non lasci un file vecchio da committare; uno aggiunto si toglie
+  dalla copia. Nella pulizia un file di supporto non conta fra le prove tolte.
 - **La pulizia non spegne un caso rosso.** Prima di registrarla si rilanciano, sul codice
-  della critica, le prove a cui ha tolto un caso e quelle che usano un file di supporto a cui
-  ha tolto righe: ogni caso rosso prima deve restare rosso dopo (il confronto è per titolo del
-  caso, dal rapporto JSON di Playwright), e la prova deve avere ancora un rosso. Togliere col
+  della critica, le prove a cui ha tolto un caso e quelle della cartella di un file di supporto
+  a cui ha tolto righe: ogni caso rosso prima deve restare rosso dopo (il confronto è per titolo del
+  caso, dal rapporto JSON di Playwright, e regge le righe tolte di un describe intorno), e la prova deve avere ancora un rosso. Togliere col
   caso del rilievo messo da parte anche la riga che controlla quello da correggere la fa
   respingere, e così togliere per intero il caso rosso di un rilievo da correggere: in una prova
   che copre più rilievi il titolo di ogni caso porta il numero del suo (`r2 …`), ed esce solo un

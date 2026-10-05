@@ -16,6 +16,7 @@ const SHA = /^[0-9a-f]{7,40}$/i;
 export const PREFISSO_RIPRISTINO = '_tolte-';
 
 const PROVA = /\.spec\.m?js$/;
+const CONFIG_PLAYWRIGHT = /^playwright\.config\.[cm]?[jt]s$/;
 const nelGiro = (f) => f.startsWith(PROVE_GIRO) && f.split('/').length >= 4
   && !f.split('/').includes('..') && !f.split('/')[2].startsWith(PREFISSO_RIPRISTINO);
 const percorsi = (l) => (Array.isArray(l) ? l : []).map((f) => String(f || '').replace(/\\/g, '/'));
@@ -297,39 +298,39 @@ function testiAl(rev, cartelle, root) {
   return testi;
 }
 
-function dipendentiAl(rev, supporto, root) {
-  return supporto.length ? proveCheDipendono(testiAl(rev, supporto.map(cartellaDi), root), supporto) : { prove: [], via: {} };
-}
-
-// Un file aggiunto in una cartella del giro rilancia tutte le sue prove a `rev`: quale file carica una prova lo decide
-// Playwright (un `aiuto.js` nuovo fa ombra ad `aiuto.mjs`), non il nome scritto, e aggiungerne uno lì non serve a correggere.
-function proveDelleCartelle(rev, supporto, root) {
+// Un file di supporto aggiunto, cambiato o tolto in una cartella del giro rilancia tutte le sue prove a `rev`: quale file
+// carica una prova lo decide Playwright (senza estensione, una cartella col suo indice, un file nuovo che fa ombra), non il nome scritto.
+// Un file fuori dal giro (la configurazione) vale per tutte le `cartelle`.
+function proveDelleCartelle(rev, supporto, root, cartelle = supporto.map(cartellaDi)) {
   const via = {};
-  for (const c of new Set(supporto.map(cartellaDi))) {
+  for (const c of new Set(cartelle)) {
     const lista = gitOut(['ls-tree', '-r', '-z', '--name-only', rev, '--', `${c}/`], root).split('\0').filter(Boolean);
-    for (const p of proveTolte(lista)) via[p] = supporto.filter((s) => cartellaDi(s) === c);
+    for (const p of proveTolte(lista)) via[p] = supporto.filter((s) => !nelGiro(s) || cartellaDi(s) === c);
   }
   return { prove: Object.keys(via), via };
 }
 
 // Le prove del giro da rilanciare fra `shaPrima` e HEAD, `{ prove, via }` (null se git non risponde): togliere il caso
 // rosso, o indebolire il file di supporto che lo controlla, è la stessa porta aperta che cancellare la prova.
-// `fuori`: gli aiuti comuni cambiati che una prova del giro usa; il rilancio li rimette com'erano in una copia a parte.
+// `fuori`: gli aiuti comuni cambiati che una prova del giro usa, e la configurazione; il rilancio li rimette com'erano in una copia a parte.
 export function proveTolteDal(shaPrima, root, principale = riferimentoPrincipale(root)) {
   try {
     const cambiati = (dove, filtro) => gitOut(['diff', '--name-only', '-z', '--no-renames', `--diff-filter=${filtro}`, shaPrima, 'HEAD', '--', dove], root).split('\0').filter(Boolean);
     const nomi = cambiati(PROVE_GIRO, 'DM');
     const prove = toccateDalRamo(proveTolte(nomi), shaPrima, root, principale);
-    const dip = dipendentiAl(shaPrima, toccateDalRamo(supportoDelGiro(nomi), shaPrima, root, principale), root);
-    const nuovi = proveDelleCartelle(shaPrima, toccateDalRamo(supportoDelGiro(cambiati(PROVE_GIRO, 'A')), shaPrima, root, principale), root);
+    const nellaCartella = proveDelleCartelle(shaPrima, toccateDalRamo(supportoDelGiro([...nomi, ...cambiati(PROVE_GIRO, 'A')]), shaPrima, root, principale), root);
     const aiuti = toccateDalRamo(aiutiFuoriDalGiro(cambiati('tests/', 'ADM')), shaPrima, root, principale);
+    // La configurazione di Playwright la usano tutte: un filtro aggiunto lì spegne un caso rosso come un aiuto svuotato.
+    const config = toccateDalRamo(cambiati('playwright.config.*', 'ADM').filter((f) => CONFIG_PLAYWRIGHT.test(f)), shaPrima, root, principale);
+    const cartelle = aiuti.length || config.length ? cartelleDelRamo(nomi, root, principale) : [];
     const dipFuori = aiuti.length
-      ? proveCheDipendono([...testiAl(shaPrima, cartelleDelRamo(nomi, root, principale), root), ...testiAiuti(shaPrima, root)], aiuti)
+      ? proveCheDipendono([...testiAl(shaPrima, cartelle, root), ...testiAiuti(shaPrima, root)], aiuti)
       : { prove: [], via: {} };
-    const tutte = { ...dip.via };
-    for (const [p, l] of [...Object.entries(nuovi.via), ...Object.entries(dipFuori.via)]) tutte[p] = [...new Set([...(tutte[p] || []), ...l])];
+    const conConfig = config.length ? proveDelleCartelle(shaPrima, config, root, cartelle) : { via: {} };
+    const tutte = { ...nellaCartella.via };
+    for (const [p, l] of [...Object.entries(dipFuori.via), ...Object.entries(conConfig.via)]) tutte[p] = [...new Set([...(tutte[p] || []), ...l])];
     const via = Object.fromEntries(Object.entries(tutte).filter(([p]) => !prove.includes(p)));
-    const fuori = aiuti.filter((a) => Object.values(dipFuori.via).some((l) => l.includes(a)));
+    const fuori = [...aiuti.filter((a) => Object.values(dipFuori.via).some((l) => l.includes(a))), ...config];
     return { prove: [...prove, ...Object.keys(via)], via, fuori };
   } catch (_) { return null; }
 }
@@ -476,6 +477,8 @@ export function casiDalReport(rapporto) {
   return casi;
 }
 
+const ultimo = (t) => String(t).split(' › ').pop();
+
 /**
  * Sullo stesso codice, cosa ha spento la pulizia: `spenti` i casi rossi prima e verdi dopo, `vuota` se prima c'era un
  * rosso e dopo non ce n'è più nessuno (anche: il file non carica). Senza l'esito per caso decide quello del file. PURA.
@@ -486,11 +489,12 @@ export function casiSpenti(prima, dopo) {
   if (!p.casi || !d.casi) return { spenti: [], vuota: !!p.rossa && !d.rossa };
   const rossi = Object.keys(p.casi).filter((t) => p.casi[t] === false);
   if (!rossi.length) return { spenti: [], vuota: false };
-  return { spenti: rossi.filter((t) => d.casi[t] === true), vuota: !Object.values(d.casi).includes(false) };
+  // Togliere le righe di un describe cambia il titolo intero, non quello del caso: lo si ritrova da quello.
+  const dopoDi = (t) => (t in d.casi ? [d.casi[t]] : Object.keys(d.casi).filter((k) => ultimo(k) === ultimo(t)).map((k) => d.casi[k]));
+  return { spenti: rossi.filter((t) => dopoDi(t).includes(true)), vuota: !Object.values(d.casi).includes(false) };
 }
 
 const NUMERO_NEL_TITOLO = /(?<![\p{L}\p{N}_])r([1-9]\d*)(?![\p{L}\p{N}_])/giu;
-const ultimo = (t) => String(t).split(' › ').pop();
 
 /** I numeri dei rilievi che il titolo di un caso cita (`r2 prima porta` → [2]). PURA. */
 export function numeriDelTitolo(titolo) {
@@ -550,7 +554,7 @@ function toccateDallaPulizia(shaCritica, shaPulizia, root) {
     const voci = vociNameStatus(gitOut(['diff', '--name-status', '-z', '--no-renames', critica, String(shaPulizia), '--', PROVE_GIRO], root));
     const uscite = new Set(voci.filter((v) => v.stato === 'D').map((v) => v.path));
     const dirette = proveTolte(voci.filter((v) => v.stato === 'M').map((v) => v.path));
-    const dip = dipendentiAl(critica, supportoDelGiro(voci.map((v) => v.path)), root);
+    const dip = proveDelleCartelle(critica, supportoDelGiro(voci.map((v) => v.path)), root);
     const via = Object.fromEntries(Object.entries(dip.via).filter(([p]) => !uscite.has(p) && !dirette.includes(p)));
     return { prove: [...dirette, ...Object.keys(via)], via, dirette };
   } catch (_) { return null; }

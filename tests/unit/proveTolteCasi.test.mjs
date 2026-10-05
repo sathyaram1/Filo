@@ -121,6 +121,8 @@ test('sullo stesso codice, la pulizia spegne un caso rosso o toglie l\'ultimo ro
   assert.deepEqual(casiSpenti(rossa({ b: false, c: false }), rossa({ c: true })), { spenti: ['c'], vuota: true });
   assert.deepEqual(casiSpenti(rossa({ b: false, c: false, d: false }), rossa({ c: true, d: false })), { spenti: ['c'], vuota: false });
   assert.deepEqual(casiSpenti(rossa({ b: false, c: false }), rossa({})), { spenti: [], vuota: true }, 'il file non carica più');
+  assert.deepEqual(casiSpenti(rossa({ 'gruppo › c': false, d: false }), rossa({ c: true, d: false })), { spenti: ['gruppo › c'], vuota: false },
+    'tolte le righe del describe, il caso si ritrova dal suo titolo');
   assert.deepEqual(casiSpenti(rossa({ g: true }), rossa({})), { spenti: [], vuota: false }, 'era tutta verde: niente da tenere rosso');
   assert.deepEqual(casiSpenti({ rossa: true, casi: null }, { rossa: false, casi: null }), { spenti: [], vuota: true }, 'senza i casi decide il file');
   assert.deepEqual(casiSpenti({ rossa: true, casi: null }, { rossa: true, casi: null }), { spenti: [], vuota: false });
@@ -132,7 +134,7 @@ test('sullo stesso codice, la pulizia spegne un caso rosso o toglie l\'ultimo ro
 
 // ─── Prima porta: chi corregge cambia un file di supporto della cartella del giro ───
 
-test('la consegna rilancia le prove che usano un file di supporto cambiato, anche per un altro aiuto, e la respinge se sono rosse', () => {
+test('un file di supporto cambiato rilancia tutte le prove della sua cartella, anche quelle che non lo nominano, e le rosse respingono', () => {
   const t = giro({
     [`${CARTELLA}/giro1-r1-a.spec.mjs`]: prova(caso('caso a', 'a')),
     [`${CARTELLA}/giro1-r2-b.spec.mjs`]: "import { dati } from './helpers/altro.mjs';\n" + caso('caso b', 'b'),
@@ -148,8 +150,10 @@ test('la consegna rilancia le prove che usano un file di supporto cambiato, anch
     assert.equal(e.ferma, true, 'com\'era, sul codice di adesso, la prova di a è ancora rossa');
     assert.match(e.testo, /giro1-r1-a\.spec\.mjs \(usa helpers\/dati\.mjs\)/);
     assert.match(e.testo, /file di supporto/);
-    assert.deepEqual(nomi(t.visti), ['giro1-r1-a.spec.mjs'], 'la prova che non lo usa non si rilancia');
+    // Quale file carica una prova lo decide Playwright (una cartella col suo indice, un import senza estensione): non il nome scritto.
+    assert.deepEqual(nomi(t.visti).sort(), ['giro1-r1-a.spec.mjs', 'giro1-r2-b.spec.mjs']);
     t.scrivi('stato-a.txt', 'corretto\n');
+    t.scrivi('stato-b.txt', 'corretto\n');
     t.commit('correzione vera');
     assert.deepEqual(controllaProveTolte({ shaPrima: t.critica, root: t.dir, lancia: t.lancia, prepara: preparaFinto, log: () => {} }), { ferma: false, testo: '' });
   } finally {
@@ -244,6 +248,29 @@ test('un aiuto comune fuori dal giro indebolito da chi corregge: la prova si ril
   }
 });
 
+test('la configurazione di Playwright cambiata da chi corregge: tutte le prove del giro si rilanciano con quella di prima', () => {
+  const CONFIG = 'playwright.config.js';
+  const t = giro({
+    [`${CARTELLA}/giro1-r1-a.spec.mjs`]: prova(caso('caso a', 'a')),
+    [AIUTO]: banco('a'), [CONFIG]: 'export default {};\n', 'stato-a.txt': 'rotto\n',
+  });
+  const log = [];
+  try {
+    t.scrivi(CONFIG, "export default { grepInvert: /caso a/ };\n");
+    t.commit('correzione che filtra il caso rosso');
+    const e = controllaProveTolte({ shaPrima: t.critica, root: t.dir, lancia: t.lancia, prepara: preparaFinto, log: (m) => log.push(m) });
+    assert.equal(e.ferma, true, 'con la configurazione di prima la prova di a è ancora rossa');
+    assert.match(e.testo, /giro1-r1-a\.spec\.mjs \(usa playwright\.config\.js\)/);
+    assert.match(log.join('\n'), /in una copia del ramo a parte: playwright\.config\.js/);
+    assert.equal(readFileSync(resolve(t.dir, CONFIG), 'utf8'), "export default { grepInvert: /caso a/ };\n", 'il ramo resta com\'è');
+    t.scrivi('stato-a.txt', 'corretto\n');
+    t.commit('correzione vera');
+    assert.deepEqual(controllaProveTolte({ shaPrima: t.critica, root: t.dir, lancia: t.lancia, prepara: preparaFinto, log: () => {} }), { ferma: false, testo: '' });
+  } finally {
+    rmSync(t.dir, { recursive: true, force: true });
+  }
+});
+
 // ─── Seconda porta: la pulizia toglie righe da un file di supporto condiviso ───
 
 const DUE_RILIEVI = () => ({
@@ -267,6 +294,19 @@ test('un file di supporto non conta come prova tolta nella pulizia', () => {
     const c = controllaPulizia({ shaCritica: t.critica, root: t.dir });
     assert.equal(c.ok, true, c.motivo);
     assert.deepEqual(c.files, [`${CARTELLA}/giro1-r2-b.spec.mjs`]);
+  } finally {
+    rmSync(t.dir, { recursive: true, force: true });
+  }
+});
+
+test('la pulizia che toglie righe di un aiuto rilancia tutte le prove della sua cartella, anche quelle che non lo nominano', () => {
+  const t = giro({ ...DUE_RILIEVI(), [`${CARTELLA}/giro1-r3-c.spec.mjs`]: "import { x } from './lib';\n" + caso('caso c') });
+  try {
+    t.g('rm', '-q', `${CARTELLA}/giro1-r2-b.spec.mjs`);
+    t.togli(AIUTO, "b: 'stato-b.txt'");
+    const sha = t.commit('pulizia');
+    controllaCasiDellaPulizia({ shaCritica: t.critica, sha, root: t.dir, lancia: t.lancia, prepara: preparaFinto, log: () => {} });
+    assert.deepEqual([...new Set(nomi(t.visti))].sort(), ['giro1-r1-a.spec.mjs', 'giro1-r3-c.spec.mjs']);
   } finally {
     rmSync(t.dir, { recursive: true, force: true });
   }
