@@ -3744,7 +3744,12 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // Fermato dall'utente (#578): la chiamata in volo si interrompe e nessuna azione nuova parte; quelle già partite
   // finiscono e restano raccontate. Una risposta già finita invece arriva: fermare riguarda il lavoro che resta.
   const turno = { wcId: wc && wc.id, ctrl: new AbortController(), fermato: false };
-  if (reasoningReqId) turniInCorso.set(String(reasoningReqId), turno);
+  if (reasoningReqId) {
+    turniInCorso.set(String(reasoningReqId), turno);
+    const prima = stopPrimaDelTurno.get(String(reasoningReqId));
+    stopPrimaDelTurno.delete(String(reasoningReqId));
+    if (prima && prima.wcId === turno.wcId) turno.fermato = true;
+  }
   let fermato = false;
   try {
     for (let round = 1; round <= MAX_ROUNDS; round++) {
