@@ -105,6 +105,13 @@
     const pm = /^(OpenRouter|Gemini)(?:\s+\S+)?\s+(\d{3})\b/.exec(raw);
     if ((e && e.provider) || pm) {
       const st = Number(e && e.status) || (pm ? Number(pm[2]) : 0);
+      // #700: gli host li ha scartati la politica sui dati dell'account OpenRouter, non gli strumenti.
+      // Con la chiave dell'utente la rimedia lui; con quella di Filo resta solo un altro modello.
+      if ((e && e.code === 'DATA_POLICY') || (st === 404 && /data policy/i.test(raw))) {
+        return e && e.keySource === 'own'
+          ? 'nessun fornitore di questo modello rispetta le impostazioni sulla privacy del tuo account OpenRouter: allentale su openrouter.ai/settings/privacy, o scegli un altro modello in Modelli predefiniti.'
+          : 'nessun fornitore di questo modello rispetta le regole sulla privacy dei dati: scegli un altro modello in Modelli predefiniti.';
+      }
       // #700: fra gli host ammessi per quel modello nessuno regge gli strumenti, e riprovare non serve.
       if (e && e.code === 'NO_TOOL_HOST') {
         return 'per il modello scelto nessun fornitore ammesso sa usare gli strumenti (cercare, leggere, impostare), e la chat di Filo ne ha bisogno. Scegli un altro modello in Modelli predefiniti.';
