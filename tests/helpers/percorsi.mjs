@@ -19,7 +19,7 @@
 // riporta il nome lungo. Fuori da Windows fa il suo lavoro di sempre (risolve
 // `/tmp` → `/private/tmp` su macOS), quindi si usa ovunque.
 
-import { mkdtempSync, realpathSync, symlinkSync } from 'node:fs';
+import { mkdtempSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import path, { join } from 'node:path';
 
