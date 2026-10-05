@@ -253,13 +253,13 @@
     if (a.percento != null) {
       return {
         ...base, stato: `Scarico la versione ${v}: ${a.percento}%`, avanza: a.percento, principale: null,
-        filo: `Sto scaricando la versione ${v} di Filo (${a.percento}%): si installa quando mi chiudi.`,
+        filo: `Sto scaricando la versione ${v} di Filo (${a.percento}%). Si installa quando mi chiudi.`,
       };
     }
     if (a.pronta) {
       return {
-        ...base, stato: `La versione ${v} è pronta: si installa quando chiudi Filo.`,
-        filo: `La versione ${v} di Filo è scaricata: si installa quando mi chiudi.`,
+        ...base, stato: `La versione ${v} è pronta. Si installa quando chiudi Filo.`,
+        filo: `La versione ${v} di Filo è scaricata. Si installa quando mi chiudi.`,
       };
     }
     return {
