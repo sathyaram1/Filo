@@ -172,7 +172,7 @@
     const first = await send(body, apiKey);
     if (first.res.ok || first.res.status !== 404 || !refusalKey) return first;
     const detail = await first.res.clone().text().catch(() => '');
-    if (!NO_HOST_FOR_PARAMS_RE.test(detail)) return first;
+    if (!isParamsRefusal(detail)) return first;
     const second = await send(senzaRagionamento, first.keyUsed);
     if (second.res.ok) reasoningRefused.set(refusalKey, Date.now() + REASONING_REFUSED_MS);
     if (!second.keyFallback && first.keyFallback) {
