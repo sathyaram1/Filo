@@ -148,7 +148,6 @@ function paginaDiAccesso(url) {
     if (!v) return;
     for (const c of lista || []) v.prima.set(c.name, c.value);
   }).catch(() => {});
-  if (AP) return;
 }
 
 // La pagina di accesso riconosciuta dall'indirizzo (#209): il resto lo dice il campo password che la pagina segnala.
