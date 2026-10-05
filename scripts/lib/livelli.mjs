@@ -1,7 +1,8 @@
 // Il testo di un livello (L3 la segnalazione, L4 la nota del controllo di
-// sicurezza) letto da file, per le consegne. Sta qui perché lo usano due
-// strumenti — dispatch (--record-*) e il canale (deliver status --segnala) —
-// e dispatch importa il canale: una copia sola, senza cicli.
+// sicurezza) letto da file, e cosa dire quando una segnalazione non ha fermato
+// il lavoro. Sta qui perché lo usano due strumenti — dispatch (--record-*) e
+// il canale (deliver … --segnala) — e dispatch importa il canale: una copia
+// sola, senza cicli.
 //
 // Il file si legge INTERO, mai tosato: un testo oltre il tetto viene rifiutato
 // col numero, e chi scrive accorcia lui (CLAUDE.md § Limiti).
