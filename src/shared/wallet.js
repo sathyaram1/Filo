@@ -147,7 +147,8 @@
 
   // Lo stato nella pagina Crediti: l'ultimo rifiuto, e cosa succede finché la
   // chiave resta lì. `at` è ISO.
-  function ownKeyRefusalNote({ at, status } = {}) {
+  // `usedCredits === false`: il ripiego non ha risposto, niente è stato speso.
+  function ownKeyRefusalNote({ at, status, usedCredits } = {}) {
     let quando = '';
     try {
       const d = new Date(at);
