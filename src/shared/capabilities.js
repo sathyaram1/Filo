@@ -548,6 +548,12 @@
       doesNot: 'In modalità Manuale non tocca nessun banner. Non avvisa da solo quando rifiuta o nasconde qualcosa. Non nasconde i messaggi che non parlano di cookie (avviso sull\'adblocker, limite di articoli gratuiti). Una scelta fatta in una finestra incognito resta lì. In Privacy non tiene sul disco cosa ha fatto sui siti non fidati. «Mostra il banner» toglie solo la risposta che il clic sul banner ha creato, non l\'accesso o le preferenze del sito.',
     },
     {
+      id: 'youtube-nocookie', title: 'Video di YouTube negli altri siti senza cookie', category: 'settings',
+      desc: 'In modalità Automatico e Privacy i video di YouTube incorporati in un altro sito si caricano da youtube-nocookie.com, il dominio di YouTube che non lascia cookie finché non premi play. La richiesta viene deviata prima di partire, quindi il video si carica una volta sola e YouTube non vede i tuoi cookie: vale anche per i video che compaiono mentre scorri e per quelli dentro il riquadro di un altro sito. Play, schermo intero e il punto di partenza scelto dal sito restano com\'erano.',
+      invoke: 'Da solo, a ogni pagina. Si spegne passando i cookie su Manuale in Impostazioni → Sicurezza, o chiedendolo a Filo.',
+      doesNot: 'Non devia i video che il sito comanda con i suoi pulsanti (play, pausa, salti dal sito stesso): deviati smetterebbero di rispondere, e restano su youtube.com. Non c\'è un dominio equivalente per Instagram, Vimeo e gli altri. In modalità Manuale non devia niente.',
+    },
+    {
       id: 'ad-block', title: 'Blocco di pubblicità e tracker', category: 'settings',
       desc: 'Filo blocca da sé pubblicità e tracker: le richieste verso i domini delle liste pubbliche e gratuite (StevenBlack, EasyList) si fermano prima di partire, così annunci e script che seguono cosa fai da un sito all’altro non si caricano nemmeno. Le liste restano sul tuo computer e si aggiornano da sole una volta a settimana; un elenco di siti legittimi non viene bloccato anche se finisce per errore in una lista.',
       invoke: 'Attivo di serie. Si spegne in Impostazioni → Sicurezza → «Blocca pubblicità e tracker», o chiedendolo a Filo («spegni il blocco della pubblicità»), che chiede prima un OK. A «blocchi la pubblicità?» Filo risponde con lo stato vero.',
