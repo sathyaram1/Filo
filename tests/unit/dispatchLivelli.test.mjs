@@ -253,7 +253,8 @@ test('CLI: pass senza --nota si ferma prima del server; --segnala su un file ass
 // al primo passaggio. Server finto come in dueTesti.test.mjs: si guarda cosa
 // arriva davvero nel corpo della richiesta.
 
-function fintoServer() {
+// Con la segnalazione il server vero risponde col fermo: senza, lo strumento dice che non è arrivata (#705).
+function fintoServer(risposta = { ok: true, reply: { outcome: 'stop', status: 'design' } }) {
   const ricevuti = [];
   const srv = createServer((req, res) => {
     let body = '';
@@ -263,7 +264,7 @@ function fintoServer() {
       try { j = body ? JSON.parse(body) : {}; } catch (_) {}
       ricevuti.push({ url: req.url, body: j });
       res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ ok: true }));
+      res.end(JSON.stringify(risposta));
     });
   });
   return new Promise((r) => srv.listen(0, '127.0.0.1', () => r({ srv, ricevuti, port: srv.address().port })));

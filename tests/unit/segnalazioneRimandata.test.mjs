@@ -111,7 +111,7 @@ test('dispatch: la critica «passa» rimandata con la segnalazione non dà più 
   });
 });
 
-test('dispatch: la stessa critica rimandata che il server ferma per la segnalazione esce 0 e lo dice', async () => {
+test('dispatch: una critica con la segnalazione che il server ferma esce 0 e lo dice', async () => {
   await scena([
     { ok: true, reply: { outcome: 'stop', motivo: 'segnalazione', blocking: [], sospesi: [], derived: [] } },
   ], async ({ lancia, SEG }) => {
