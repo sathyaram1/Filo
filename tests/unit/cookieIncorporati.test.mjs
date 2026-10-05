@@ -78,16 +78,22 @@ test('i nomi dei cookie di accesso dei siti veri sono riconosciuti, i tecnici no
 });
 
 test('solo l\'invio di un accesso apre la finestra in cui un cookie nuovo vale come accesso, non la pagina vista', () => {
-  assert.equal(R.richiestaDiAccesso({ method: 'POST', url: 'https://x.it/login' }), true);
-  assert.equal(R.richiestaDiAccesso({ method: 'put', url: 'https://x.it/api/session' }), true);
-  // il ritorno da «Continua con…» e il link d'accesso via email.
-  assert.equal(R.richiestaDiAccesso({ method: 'GET', url: 'https://x.it/cb?code=1&state=2' }), true);
-  assert.equal(R.richiestaDiAccesso({ method: 'GET', url: 'https://x.it/auth/verify?token=abc' }), true);
+  const scritte = { credenziali: true };
+  // una scrittura verso il sito dopo una password scritta dall'utente.
+  assert.equal(R.richiestaDiAccesso({ method: 'POST', url: 'https://x.it/login', resourceType: 'mainFrame' }, scritte), true);
+  assert.equal(R.richiestaDiAccesso({ method: 'put', url: 'https://x.it/api/session', resourceType: 'xhr' }, scritte), true);
+  // la stessa scrittura senza password scritta: le statistiche in POST di una home col modulo d'accesso.
+  assert.equal(R.richiestaDiAccesso({ method: 'POST', url: 'https://x.it/log', resourceType: 'xhr' }), false);
+  assert.equal(R.richiestaDiAccesso({ method: 'POST', url: 'https://x.it/log', resourceType: 'ping' }, { credenziali: false }), false);
+  // il ritorno da «Continua con…» e il link d'accesso via email: pagine aperte, non richieste della pagina.
+  assert.equal(R.richiestaDiAccesso({ method: 'GET', url: 'https://x.it/cb?code=1&state=2', resourceType: 'mainFrame' }), true);
+  assert.equal(R.richiestaDiAccesso({ method: 'GET', url: 'https://x.it/auth/verify?token=abc', resourceType: 'mainFrame' }), true);
+  assert.equal(R.richiestaDiAccesso({ method: 'GET', url: 'https://x.it/api/feed?token=abc', resourceType: 'xhr' }), false);
   // la pagina d'accesso aperta, o una richiesta della pagina, senza invio: nessun accesso.
-  assert.equal(R.richiestaDiAccesso({ method: 'GET', url: 'https://x.it/login' }), false);
-  assert.equal(R.richiestaDiAccesso({ method: 'GET', url: 'https://x.it/visita' }), false);
-  assert.equal(R.richiestaDiAccesso({ method: 'OPTIONS', url: 'https://x.it/login' }), false);
-  assert.equal(R.richiestaDiAccesso({ method: 'GET', url: 'https://x.it/?code=1' }), false);
+  assert.equal(R.richiestaDiAccesso({ method: 'GET', url: 'https://x.it/login', resourceType: 'mainFrame' }, scritte), false);
+  assert.equal(R.richiestaDiAccesso({ method: 'GET', url: 'https://x.it/visita', resourceType: 'xhr' }), false);
+  assert.equal(R.richiestaDiAccesso({ method: 'OPTIONS', url: 'https://x.it/login' }, scritte), false);
+  assert.equal(R.richiestaDiAccesso({ method: 'GET', url: 'https://x.it/?code=1', resourceType: 'mainFrame' }), false);
   assert.equal(R.richiestaDiAccesso({}), false);
 });
 

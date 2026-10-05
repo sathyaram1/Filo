@@ -24,12 +24,14 @@ function segnaleDiAccesso(cookie, prima, { forte = false } = {}) {
   return forte && !!cookie.httpOnly && vecchio === undefined;
 }
 
-// La richiesta che porta un accesso: l'invio di un modulo o di credenziali (tutto ciò che non è una semplice lettura)
-// o il ritorno da un accesso fatto altrove (OAuth, link via email). Una pagina vista e basta non lo è (#758 r2).
+// La richiesta che porta un accesso: una scrittura verso il sito dopo che l'utente ha compilato una password nella
+// pagina (`credenziali`), o la pagina di ritorno da un accesso fatto altrove (OAuth, link via email). Le richieste che
+// la pagina fa da sola (statistiche in POST, chiamate con un `token`) non lo sono (#758).
 const PARAM_RITORNO = ['oauth_verifier', 'ticket', 'token', 'magic', 'otp', 'login_token'];
-function richiestaDiAccesso({ method, url } = {}) {
+function richiestaDiAccesso({ method, url, resourceType } = {}, { credenziali = false } = {}) {
   const m = String(method || 'GET').toUpperCase();
-  if (m !== 'GET' && m !== 'HEAD' && m !== 'OPTIONS') return true;
+  if (m !== 'GET' && m !== 'HEAD' && m !== 'OPTIONS') return !!credenziali;
+  if (resourceType !== 'mainFrame') return false;
   let q;
   try { q = new URL(String(url || '')).searchParams; } catch (_) { return false; }
   if (q.has('code') && q.has('state')) return true;

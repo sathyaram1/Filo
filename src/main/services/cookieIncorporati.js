@@ -28,7 +28,8 @@ function margineTest(ms) {
 
 // sito incorporato → { ospiti: siti che lo ospitavano, nomi: cookie declassati, chiusoDa, at }
 const siti = new Map();
-// sito → { at, prima: nome → valore, invio } dalla pagina di accesso: il cookie che arriva dopo l'invio dice che sei entrato.
+// sito → { at, prima: nome → valore, credenziali, invio } dalla pagina di accesso: il cookie che arriva dopo l'invio
+// dice che sei entrato.
 const attesa = new Map();
 // Cookie con scadenza appena sovrascritti (dominio|percorso|nome): c'erano già prima che un riquadro li riscrivesse,
 // quindi non sono nati da lui (un accesso fatto prima di #758, o che Filo non ha visto) e non si declassano.
@@ -133,7 +134,13 @@ function urlDi(c) {
 }
 
 // Il cookie torna identico ma senza scadenza: vale per la visita e non oltre. La pagina continua a leggerlo.
-async function declassa(ses, c) {
+// Si riscrive il cookie di adesso, non quello dell'avviso: il riquadro può averlo già aggiornato, e il valore vecchio
+// gli rimetterebbe uno stato che aveva sostituito.
+async function declassa(ses, c0) {
+  const percorso = c0.path || '/';
+  const c = (await ses.cookies.get({ url: urlDi(c0), name: c0.name }))
+    .find((x) => x.domain === c0.domain && (x.path || '/') === percorso);
+  if (!c || c.session) return false;
   const dominio = String(c.domain || '').replace(/^\./, '');
   await ses.cookies.set({
     url: urlDi(c),
@@ -145,6 +152,7 @@ async function declassa(ses, c) {
     sameSite: c.sameSite,
     ...(c.hostOnly ? {} : { domain: dominio }),
   });
+  return true;
 }
 
 // L'accesso osservato: pagina di accesso del sito, e dopo un cookie di sessione suo che prima non c'era.
@@ -156,10 +164,12 @@ function paginaDiAccesso(url, { forte = false } = {}) {
   if (!sito || accessi.has(sito)) return;
   const vecchia = attesa.get(sito);
   attesa.set(sito, {
+    credenziali: 0,
+    invio: 0,
+    ...vecchia,
     at: Date.now(),
     prima: vecchia ? vecchia.prima : new Map(),
     forte: forte || !!(vecchia && vecchia.forte),
-    invio: vecchia ? vecchia.invio : 0,
   });
   if (vecchia) return;
   const ses = agganciata;
@@ -170,6 +180,15 @@ function paginaDiAccesso(url, { forte = false } = {}) {
     if (!v) return;
     for (const c of lista || []) v.prima.set(c.name, c.value);
   }).catch(() => {});
+}
+
+// L'utente ha scritto una password nella pagina principale della scheda: da qui una scrittura verso il sito è l'invio
+// dell'accesso. Senza, una richiesta che la pagina fa da sola lo sembrerebbe.
+function credenziali(url) {
+  if (modo !== 'default') return;
+  paginaDiAccesso(url, { forte: true });
+  const v = attesa.get(sitoDi(url));
+  if (v) v.credenziali = Date.now();
 }
 
 // La pagina di accesso riconosciuta dall'indirizzo (#209): il resto lo dice il campo password che la pagina segnala.
@@ -222,7 +241,7 @@ async function cookieCambiato(ses, c, removed, giaLi = false) {
     for (const o of ospiti) v.ospiti.add(o);
   }
   if (!R.daDeclassare({ modo, sito, ospiti: v.ospiti, aperti: aperti(), protetti: prot })) return;
-  try { await declassa(ses, c); } catch (_) { return; }
+  try { if (!(await declassa(ses, c))) return; } catch (_) { return; }
   v.nomi.add(c.name);
   while (v.nomi.size > MAX_NOMI) v.nomi.delete(v.nomi.keys().next().value);
   v.chiusoDa = 0;
@@ -279,7 +298,8 @@ function aggancia(ses) {
       if (attesa.size) {
         try {
           const v = attesa.get(sitoDi(d.url));
-          if (v && R.richiestaDiAccesso(d)) v.invio = Date.now();
+          const scritte = !!v && !!v.credenziali && Date.now() - v.credenziali <= FINESTRA_INVIO_MS;
+          if (v && R.richiestaDiAccesso(d, { credenziali: scritte })) v.invio = Date.now();
         } catch (_) {}
       }
       if (d.resourceType === 'mainFrame') return;
@@ -337,6 +357,7 @@ module.exports = {
   configureFromSettings,
   navigazione,
   paginaDiAccesso,
+  credenziali,
   giroDiPulizia,
   margineTest,
 };

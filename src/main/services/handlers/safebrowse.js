@@ -42,6 +42,15 @@ module.exports = function register(on, ctx) {
     return { ok: true, siti };
   }));
 
+  // Il sito è quello della scheda, non uno detto dalla pagina; un riquadro non conta (l'accesso vale nella scheda sua).
+  on(MSG.ACCESSO_CREDENZIALI, async (msg, sender) => {
+    const top = sender && sender.wc && !sender.wc.isDestroyed() && sender.wc.mainFrame;
+    const suo = top && sender.frame && sender.frame.frameTreeNodeId === top.frameTreeNodeId;
+    if (!suo || !sender.tab || !sender.tab.url) return { ok: false };
+    try { require('../cookieIncorporati').credenziali(sender.tab.url); } catch (_) {}
+    return { ok: true };
+  });
+
   // La home aperta dal tasto destro sull'avviso del sito pericoloso prende la domanda o la segnalazione che il main le
   // ha lasciato (#813.5). Solo pagine di Filo: un sito non deve poter leggere né consumare la richiesta.
   on(MSG.CASA_RICHIESTA, soloFilo(async (msg, sender) => {

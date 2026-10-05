@@ -29,6 +29,42 @@ async function serve() {
       res.end('ok');
       return;
     }
+    if (req.url.startsWith('/statistiche')) {
+      // Le statistiche che una home manda in POST appena caricata, con una chiamata che porta un `token`.
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+    if (req.url.startsWith('/home-post')) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end('<title>HOME</title><form><input type="password" id="pw"></form><script>'
+        + 'setTimeout(() => { fetch("/statistiche", { method: "POST", body: "x" }); fetch("/statistiche?token=abc"); }, 600);'
+        + 'setTimeout(() => fetch("/visita"), 1500);</script>');
+      return;
+    }
+    if (req.url.startsWith('/entra-modulo')) {
+      res.writeHead(302, { Location: '/dentro', 'Set-Cookie': ['sessionid=m1; Max-Age=86400; Path=/; HttpOnly'] });
+      res.end();
+      return;
+    }
+    if (req.url.startsWith('/dentro')) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end('<title>DENTRO</title><p>dentro</p>');
+      return;
+    }
+    if (req.url.startsWith('/modulo')) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end('<title>ACCESSO</title><form method="post" action="/entra-modulo"><input name="u" id="u">'
+        + '<input type="password" name="p" id="pw"><button id="vai">Entra</button></form>');
+      return;
+    }
+    if (req.url.startsWith('/riquadro-doppio')) {
+      // Il riquadro aggiorna il suo cookie due volte di fila: deve restare il valore più nuovo.
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end('<p>riquadro</p><script>document.cookie = "stato=1; max-age=3600; path=/; SameSite=None; Secure";'
+        + 'document.cookie = "stato=2; max-age=3600; path=/; SameSite=None; Secure";</script>');
+      return;
+    }
     if (req.url.startsWith('/home-con-login')) {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end('<title>HOME</title><form><input type="password" id="pw"></form><script>setTimeout(() => fetch("/visita"), 1500)</script>');
@@ -52,7 +88,8 @@ async function serve() {
       res.end('<title>ACCESSO</title><form><input type="password" id="pw" /><button type="button">Entra</button></form>');
       return;
     }
-    const riquadro = req.url.startsWith('/art-rinfresca') ? 'riquadro-rinfresca' : 'riquadro';
+    const riquadro = req.url.startsWith('/art-rinfresca') ? 'riquadro-rinfresca'
+      : req.url.startsWith('/art-doppio') ? 'riquadro-doppio' : 'riquadro';
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(`<title>ARTICOLO</title><p>articolo</p><iframe id="ri" width="200" height="120" src="http://b.localhost:${porta}/${riquadro}"></iframe>`);
   });
@@ -64,6 +101,9 @@ async function serve() {
     login: `http://b.localhost:${porta}/login`,
     articoloRinfresca: `http://a.localhost:${porta}/art-rinfresca`,
     homeB: `http://b.localhost:${porta}/home-con-login`,
+    homePost: `http://b.localhost:${porta}/home-post`,
+    modulo: `http://b.localhost:${porta}/modulo`,
+    articoloDoppio: `http://a.localhost:${porta}/art-doppio`,
     async chiudi() {
       try { server.closeAllConnections?.(); } catch (_) {}
       await new Promise((r) => server.close(r));
@@ -116,8 +156,10 @@ test('il riquadro di un sito dove non sei entrato: i cookie durano la visita e p
   try {
     const page = await openTab(srv.articolo);
     await page.waitForLoadState('domcontentloaded').catch(() => {});
-    await expect.poll(() => cookieDiB(app).then((l) => l.length), { timeout: 10_000 }).toBeGreaterThanOrEqual(2);
     // Quello messo dall'intestazione e quello messo da uno script del riquadro: nessuno dei due ha più una scadenza.
+    // Il declassamento arriva un attimo dopo il cookie: si aspetta lui, non il primo avviso.
+    await expect.poll(() => cookieDiB(app).then((l) => l.filter((c) => c.session).map((c) => c.name).sort()), { timeout: 10_000 })
+      .toEqual(['js', 'mid']);
     const durante = await cookieDiB(app);
     expect(durante.find((c) => c.name === 'mid')).toEqual({ name: 'mid', session: true });
     expect(durante.find((c) => c.name === 'js')).toEqual({ name: 'js', session: true });
@@ -139,6 +181,8 @@ test('dopo un accesso al sito, il suo riquadro in un\'altra pagina tiene i cooki
     // Accesso vero: pagina con il campo password, e il cookie di sessione che arriva quando si entra.
     const login = await openTab(srv.login);
     await login.waitForSelector('#pw', { timeout: 8_000 });
+    await login.fill('#pw', 'segreta');
+    await new Promise((r) => setTimeout(r, 300));
     await login.evaluate(() => fetch('/accedi', { method: 'POST', credentials: 'same-origin' }));
 
     // Il sito compare fra quelli dove sei entrato, in Sicurezza, e da lì si può togliere.
@@ -209,6 +253,51 @@ test('la home col modulo d\'accesso vista senza entrare non segna il sito fra qu
     await new Promise((r) => setTimeout(r, 1000));
     const logged = await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).security.cookies.loggedSites);
     expect(logged).not.toContain('b.localhost');
+  } finally {
+    await srv.chiudi();
+  }
+});
+
+test('la home col modulo d\'accesso che manda statistiche in POST, senza che tu scriva la password, non segna il sito', async ({ app, openTab }) => {
+  const srv = await serve();
+  try {
+    const p = await openTab(srv.homePost);
+    await p.waitForSelector('#pw');
+    await expect.poll(() => cookieDiB(app).then((l) => l.map((c) => c.name)), { timeout: 10_000 }).toContain('_session_id');
+    await new Promise((r) => setTimeout(r, 1000));
+    const logged = await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).security.cookies.loggedSites || []);
+    expect(logged).not.toContain('b.localhost');
+  } finally {
+    await srv.chiudi();
+  }
+});
+
+test('un accesso col modulo compilato e inviato segna il sito fra quelli dove sei entrato', async ({ app, openTab }) => {
+  const srv = await serve();
+  try {
+    const p = await openTab(srv.modulo);
+    await p.waitForSelector('#pw');
+    await p.fill('#u', 'io');
+    await p.fill('#pw', 'segreta');
+    await p.click('#vai');
+    await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).security.cookies.loggedSites || []),
+      { timeout: 10_000 }).toContain('b.localhost');
+  } finally {
+    await srv.chiudi();
+  }
+});
+
+test('il riquadro che aggiorna due volte di fila il suo cookie tiene il valore più nuovo, di sessione', async ({ app, openTab }) => {
+  const srv = await serve();
+  try {
+    const page = await openTab(srv.articoloDoppio);
+    const valore = () => app.evaluate(async ({ session }) => (await session.defaultSession.cookies.get({ domain: 'b.localhost', name: 'stato' }))
+      .map((c) => `${c.value}:${c.session ? 'sessione' : 'scadenza'}`));
+    await expect.poll(valore, { timeout: 10_000 }).toEqual(['2:sessione']);
+    await new Promise((r) => setTimeout(r, 800));
+    expect(await valore()).toEqual(['2:sessione']);
+    const riquadro = page.frames().find((f) => f.url().includes('b.localhost'));
+    expect(await riquadro.evaluate(() => document.cookie)).toContain('stato=2');
   } finally {
     await srv.chiudi();
   }

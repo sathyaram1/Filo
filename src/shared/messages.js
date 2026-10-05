@@ -642,6 +642,9 @@
     CAMPI_DELICATI: 'campi_delicati', // { hasPassword, hasPayment } (campi a schermo) → { ok }
     // Solo pagine filo:// (Sicurezza): i siti segnati per un campo password o carta, e quelli che l'utente ne ha tolto.
     PAGINE_DELICATE_CAMPI: 'pagine_delicate_campi', // {} → { ok, siti: [{ sito, tolto }] }
+    // La pagina principale di una scheda ha una password scritta dall'utente (#758): una scrittura verso il sito che
+    // segue è l'invio di un accesso, e il sito entra fra quelli dove sei entrato.
+    ACCESSO_CREDENZIALI: 'accesso_credenziali',    // {} → { ok }
     // La home aperta dal tasto destro sull'avviso chiede cosa le ha lasciato il main: la domanda a Filo sul sito o la
     // segnalazione del falso allarme, una volta sola. Solo pagine filo://. → { ok, richiesta: { tipo, testo } | null }
     CASA_RICHIESTA: 'casa_richiesta',
