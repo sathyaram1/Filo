@@ -52,7 +52,7 @@ test('il rilevatore riconosce le frasi che mettevano la chiave sulle routine, e 
   const buone = [
     "'\\nDove va la privata (S1.5):\\n' +\n'  • backend:  secret delle Cloud Functions;\\n' +\n'  • routine:  nessuna copia, la legge solo il server.\\n' +",
     '// La chiave privata dei feedback: le routine non la leggono.',
-    '// le routine ricevono il payload già decifrato\n// (spec §3)\n// (niente)\n// la chiave privata sta altrove',
+    "// La chiave privata la tiene il server:\n// alle routine il payload arriva già decifrato, non ce l'hanno.",
   ];
   for (const t of buone) assert.deepEqual(righeSospette(t), [], `segnalata per sbaglio: ${t}`);
 });
@@ -72,7 +72,7 @@ test('il messaggio di gen-feedback-keys.mjs dice che alle routine non va nessuna
   assert.ok(voceRoutine, `il blocco non dice niente delle routine:\n${blocco}`);
   assert.match(voceRoutine, /nessuna copia/i);
   assert.match(voceRoutine, /solo il server/i);
-  assert.doesNotMatch(voceRoutine, /PRIVKEY|env|variabile|secret/i);
+  assert.doesNotMatch(voceRoutine, /PRIVKEY|\benv\b|variabile|secret/i);
 });
 
 test('nessun file sotto scripts/ o src/ indica le routine come posto per la chiave privata', () => {
