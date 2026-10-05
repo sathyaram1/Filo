@@ -13,7 +13,9 @@
 //     volta che Filo è il gestore del protocollo) non fa niente;
 //   - dentro Filo (#664) il pulsante della pagina dell'invito e il tasto
 //     destro sul link fanno lo stesso; il benvenuto lo racconta una scheda
-//     sola; un saluto davanti al codice non lo nasconde.
+//     sola; un saluto davanti al codice non lo nasconde; anche le altre porte
+//     (tasto destro «Apri in nuova tab», un pulsante che naviga da script, la
+//     barra degli indirizzi) riscattano invece di tacere.
 //
 // Server e identità Firebase sono simulati da un HTTP locale, come in
 // tests/wallet-credits.spec.mjs: gli endpoint si spostano con
@@ -36,6 +38,7 @@ const T_CLIC_DENTRO = 'dentro Filo il pulsante della pagina dell’invito riscat
 const T_TASTO_DESTRO = 'tasto destro su un link d’invito: «Riscatta l’invito» lo porta dentro Filo';
 const T_BENVENUTO_UNA_VOLTA = 'con più schede nuove aperte il benvenuto compare in una sola, quella che guardi';
 const T_SALUTO = 'un saluto che sembra un codice non si mangia il codice, nei Crediti e con /invito';
+const T_ALTRE_PORTE = 'filo://invito fuori dal clic sul link non cade in silenzio: «Apri in nuova tab», pulsante da script, barra';
 
 let server;
 const seen = { redeems: [], pendings: 0 };
@@ -417,4 +420,55 @@ test(T_SALUTO, async ({ openTab }) => {
   await home.press('#input', 'Enter');
   await expect(home.locator('#bubbles .dash-bubble-filo').last()).toContainText('Invito riscattato', { timeout: 15000 });
   expect(seen.redeems).toEqual(['ABCDEFGH']);
+});
+
+// Le altre porte dello stesso invito (#664, giro 1 di verifica): prima il
+// collegamento veniva fermato in silenzio. Il pulsante da script si preme con
+// un clic che passa dal renderer della scheda, come quello di una persona: il
+// main conta solo quei gesti, e una pagina che naviga da sola resta ferma
+// (T_CLIC_DENTRO).
+const PAGINA_INVITO_SCRIPT = `<!doctype html><html><head><meta charset="utf-8"><title>Il tuo invito</title></head>
+<body style="font-family:sans-serif;padding:40px"><h1>Hai un invito</h1>
+<p><a id="apri" href="filo://invito/ABCD-EFGH">Apri in Filo</a></p>
+<p><button id="js" onclick="location.href='filo://invito/ABCD-EFGH'">Apri in Filo</button></p>
+</body></html>`;
+
+async function riscattaEApreCrediti(app) {
+  await expect.poll(() => seen.redeems, { timeout: 15000, message: 'il codice arriva al server' }).toEqual(['ABCDEFGH']);
+  const credits = await attendiPagina(app, 'credits');
+  expect(credits, 'si apre la pagina Crediti').toBeTruthy();
+  await expect(credits.locator('#walletNote')).toContainText('Sei entrato con un invito', { timeout: 15000 });
+}
+
+test(T_ALTRE_PORTE, async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(150000);
+  const pagina = await testServer.openReady(openTab, PAGINA_INVITO_SCRIPT);
+  const indirizzo = pagina.url();
+
+  await pagina.locator('#apri').click({ button: 'right' });
+  const menu = pagina.locator('.sn-menu');
+  await expect(menu).toBeVisible({ timeout: 20000 });
+  await menu.locator('.sn-menu-item', { hasText: 'nuova tab' }).first().click({ noWaitAfter: true });
+  await riscattaEApreCrediti(app);
+
+  // Il secondo e il terzo arrivano a un portafoglio già fatto: conta che il codice arrivi a Filo.
+  const p = await pagina.evaluate(() => { const b = document.querySelector('#js').getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) }; });
+  const idPagina = await shell.evaluate(async (u) => (await window.filoShell.tabs.snapshot()).tabs.find((t) => t.url === u).id, indirizzo);
+  await shell.evaluate((x) => window.filoShell.tabs.activate(x), idPagina);
+  await new Promise((r) => setTimeout(r, 500));
+  const crediti = await attendiPagina(app, 'credits');
+  const avviso = () => crediti.evaluate(() => (document.getElementById('walletNote') || {}).textContent || '');
+  await app.evaluate(({ BrowserWindow }, q) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    const wc = tm.tabs.find((t) => t.id === tm.activeId).view.webContents;
+    wc.sendInputEvent({ type: 'mouseDown', x: q.x, y: q.y, button: 'left', clickCount: 1 });
+    wc.sendInputEvent({ type: 'mouseUp', x: q.x, y: q.y, button: 'left', clickCount: 1 });
+  }, p);
+  await expect.poll(avviso, { timeout: 15000, message: 'il pulsante da script porta l’invito dentro' }).toContain('Hai già i crediti');
+  expect(pagina.url(), 'la pagina dell’invito resta').toBe(indirizzo);
+
+  await crediti.evaluate(() => { document.getElementById('walletNote').textContent = ''; });
+  const id = await shell.evaluate(async () => (await window.filoShell.tabs.open('filo://newtab/')).id);
+  await shell.evaluate(async (x) => { await window.filoShell.tabs.navigate(x, 'filo://invito/ABCD-EFGH'); }, id);
+  await expect.poll(avviso, { timeout: 15000, message: 'la barra degli indirizzi porta l’invito dentro' }).toContain('Hai già i crediti');
 });

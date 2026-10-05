@@ -172,6 +172,9 @@
     // Broadcast main→renderer: l'utente corrente ha ricevuto crediti in regalo
     // (#210.4). { amount } → la home mostra un popup una volta sola.
     GIFT_NOTICE: 'gift_notice',
+    // La home che vuole raccontare il regalo lo prende (#664): alla domanda
+    //   dopo non c'è più, così una home sola lo mostra. { } → { ok, amount }
+    GIFT_NOTICE_CLAIM: 'gift_notice_claim',
     // === Crediti sul server e chiave personale (#598) =======================
     // ORIGINE: tutti i WALLET_* sono riservati alle pagine filo:// e alla
     // shell (leggono saldo e codici, riscattano, fanno emettere una chiave):

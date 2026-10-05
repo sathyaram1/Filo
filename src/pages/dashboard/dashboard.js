@@ -1352,15 +1352,8 @@
       // avvio. La spinta arriva a tutte le home: lo racconta chi lo prende.
       inCodaPopup(chiediBenvenuto);
     } else if (msg?.type === MSG.GIFT_NOTICE) {
-      // L'owner ci ha regalato dei crediti (#210.4): avviso una volta sola.
-      const n = Math.round(Number(msg.amount) || 0);
-      if (n > 0 && window.SN_CONFIRM_UI?.notify) {
-        window.SN_CONFIRM_UI.notify({
-          title: 'Crediti in regalo 🎁',
-          text: `Ti sono stati regalati ${n} crediti! Sono già sul tuo saldo.`,
-          okLabel: 'Evviva!',
-        });
-      }
+      // L'owner ci ha regalato dei crediti (#210.4): la spinta arriva a ogni home, lo racconta chi lo prende (#664).
+      inCodaPopup(chiediRegalo);
     }
   });
 
@@ -1683,6 +1676,18 @@
         ok();
       };
       document.addEventListener('visibilitychange', guarda);
+    });
+  }
+  async function chiediRegalo() {
+    await quandoVisibile();
+    let r = null;
+    try { r = await send({ type: MSG.GIFT_NOTICE_CLAIM }); } catch (_) { r = null; }
+    const n = Math.round(Number(r && r.amount) || 0);
+    if (n <= 0 || !window.SN_CONFIRM_UI?.notify) return;
+    await window.SN_CONFIRM_UI.notify({
+      title: 'Crediti in regalo 🎁',
+      text: `Ti sono stati regalati ${n} crediti! Sono già sul tuo saldo.`,
+      okLabel: 'Evviva!',
     });
   }
   async function chiediBenvenuto() {
