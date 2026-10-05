@@ -175,9 +175,14 @@
   }
 
   // La riga di sintesi di una lista: il numero e la frase del modello, o il ripiego. Mai la query (#788).
+  // Il titolo si legge dopo il numero: il suo numero davanti si toglie, e la maiuscola di un titolo («Carte che…»)
+  // scende, salvo una parola che non è tutta minuscola dopo l'iniziale o un nome di due parole maiuscole (Sol Ring).
   function listLabel(n, title) {
     const count = Math.max(0, Math.floor(Number(n)) || 0);
-    const what = str(title).replace(/^\d+\s+(?=(carte|carta|risultat)\b)/i, '').trim();
+    let what = str(title).replace(/^\d+\s+(?=\S)/, '').trim();
+    if (/^\p{Lu}\p{Ll}*(?=[\s,:;.!?]|$)/u.test(what) && !/^\S+\s+\p{Lu}/u.test(what)) {
+      what = what.charAt(0).toLowerCase() + what.slice(1);
+    }
     if (!what) return `${count} risultat${count === 1 ? 'o' : 'i'}`;
     return count === 1 ? `1 risultato: ${what}` : `${count} ${what}`;
   }
