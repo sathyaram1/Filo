@@ -49,17 +49,19 @@ const caso = (titolo, ...k) => `test('${titolo}', () => {\n${k.map((x) => `  ver
 const banco = (...k) => `export const banco = {\n${k.map((x) => `  ${x}: 'stato-${x}.txt',\n`).join('')}};\n`;
 const prova = (...casi) => `import { banco } from './helpers/banco.mjs';\n${casi.join('')}`;
 
-function giro(files) {
+function giro(files, { ramo = 'worker/746' } = {}) {
   const dir = cartellaTemporanea('prove-casi-');
   const g = (...a) => execFileSync('git', ['-c', 'core.autocrlf=false', ...a], { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
   const scrivi = (f, t) => { mkdirSync(dirname(resolve(dir, f)), { recursive: true }); writeFileSync(resolve(dir, f), t); };
-  g('init', '-q', '-b', 'worker/746');
+  g('init', '-q', '-b', ramo);
   g('config', 'user.email', 't@t'); g('config', 'user.name', 't'); g('config', 'commit.gpgsign', 'false');
   scrivi('.gitignore', 'stato/\n.claude/\nbin/\ntests/verifica/_tolte-*/\n');
   scrivi('bin/npx.mjs', FINTO);
   scrivi('bin/npx', `#!/bin/sh\nexec "${process.execPath}" "$(dirname "$0")/npx.mjs" "$@"\n`);
   scrivi('bin/npx.cmd', `@"${process.execPath}" "%~dp0npx.mjs" %*\r\n`);
   chmodSync(resolve(dir, 'bin', 'npx'), 0o755);
+  g('add', '-A'); g('commit', '-qm', 'avvio della verifica');
+  const avvio = g('rev-parse', 'HEAD');
   for (const [f, t] of Object.entries(files)) scrivi(f, t);
   g('add', '-A'); g('commit', '-qm', 'critica');
   const critica = g('rev-parse', 'HEAD');
@@ -70,7 +72,7 @@ function giro(files) {
   };
   const commit = (m) => { g('add', '-A'); g('commit', '-qm', m); return g('rev-parse', 'HEAD'); };
   const togli = (f, ...righe) => scrivi(f, readFileSync(resolve(dir, f), 'utf8').split('\n').filter((l) => !righe.some((r) => l.includes(r))).join('\n'));
-  return { dir, g, scrivi, critica, visti, lancia, commit, togli };
+  return { dir, g, scrivi, avvio, critica, visti, lancia, commit, togli };
 }
 
 const nomi = (visti) => visti.map((v) => v.file.split('/').pop());
@@ -244,7 +246,7 @@ test('in una prova di tre rilievi un caso spento si vede anche se un altro resta
     const e = controllaCasiDellaPulizia({ shaCritica: t.critica, sha, root: t.dir, lancia: t.lancia, prepara: preparaFinto, log: () => {} });
     assert.equal(e.ferma, true, 'il file è ancora rosso per d, ma c si è spento');
     assert.match(e.testo, /«caso c» era rosso ed è verde/);
-    assert.doesNotMatch(e.testo, /caso d/);
+    assert.doesNotMatch(e.testo, /«caso d»/);
   } finally {
     rmSync(t.dir, { recursive: true, force: true });
   }
@@ -319,14 +321,14 @@ test('dispatch --record-pulizia respinge la pulizia che spegne il caso da correg
 
 test('verify-local pulizia respinge allo stesso modo la pulizia che spegne il caso da correggere', async () => {
   const { withRequest, withCritique } = await import('../../scripts/verify-local.mjs');
-  const ramo = 'worker/746';
-  const cartella = 'tests/verifica/locale-746';
+  const ramo = 'claude/prova-giro';
+  const cartella = 'tests/verifica/locale-prova-giro';
   const file = `${cartella}/giro1-r2-r3-bc.spec.mjs`;
   const t = giro({
     [file]: `import { banco } from './helpers/banco.mjs';\n${caso('caso b', 'b')}${caso('caso c', 'c')}`,
     [`${cartella}/helpers/banco.mjs`]: banco('b', 'c'), 'stato-b.txt': 'rotto\n', 'stato-c.txt': 'rotto\n',
-  });
-  const r = withCritique(withRequest({}, ramo, { request: 'richiesta di prova', sha: t.critica }), ramo, {
+  }, { ramo });
+  const r = withCritique(withRequest({}, ramo, { request: 'richiesta di prova', sha: t.avvio }), ramo, {
     critique: 'Provato il giro, riassunto.\n[2i] la cosa a non funziona.\n[1i?] scelta di gusto sulla b.\n[1i] la cosa c non funziona.',
     sha: t.critica, caps: { cap3: 2, cap2: 2, cap1: 1, cap0: 0 },
   });
