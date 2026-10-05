@@ -9,6 +9,13 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.233', date: '2026-10-05',
+      features: [],
+      fixes: [
+        'Nelle Opzioni, se clicchi sul campo del modello prima che arrivi l\'elenco dei modelli, il menu a tendina si apre da solo appena l\'elenco c\'è. Prima restava chiuso e bisognava cliccare di nuovo.',
+      ],
+    },
+    {
       version: '0.2.232', date: '2026-10-03',
       features: [
         'Nel deck builder cambi commander anche a parole («cambia commander, metti Atraxa») o col tasto destro su una carta trovata in chat, anche sulla carta grande del carosello. Quello di prima torna nel mazzo come carta normale, e Filo te lo dice. Passando sul nome del commander in alto vedi la carta, e con un clic la sfogli.',

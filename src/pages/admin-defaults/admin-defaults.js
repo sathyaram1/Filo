@@ -60,6 +60,7 @@
       if (it && it.label) opt.label = it.label;
       dl.appendChild(opt);
     }
+    if (window.SN_COMBOBOX) window.SN_COMBOBOX.opzioniArrivate();
   }
 
   // Carica (una sola volta) il catalogo di un provider chiedendolo al main.
