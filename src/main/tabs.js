@@ -2121,6 +2121,8 @@ class TabManager {
     // Best-effort: i redirect lato server a metà caricamento possono sfuggire a
     // will-navigate; la rete di sicurezza è il gate d'origine in
     // internal-preload.js, che non espone le API se l'origine non è filo:.
+    // Un invito chiesto da un riquadro della pagina (un pulsante che lo apre in un iframe nascosto) segue la regola della pagina intera (#664).
+    wc.on('will-frame-navigate', (event) => fermaInvitoNelRiquadro(event, { win: this.win, wc }));
     wc.on('will-navigate', (event, url) => {
       // SICUREZZA: blocca le navigazioni top-level verso schemi non-web
       // (file:// → leak hash NTLM via SMB su Windows; data:/javascript: →
