@@ -112,6 +112,20 @@ export function leggiArgomenti(cmd, args) {
   return { opz, posizionali };
 }
 
+/**
+ * Le opzioni (o i loro refusi) che npm si è tenuto perché manca il «--» dopo `npm run orchestra`: arrivano solo nell'ambiente,
+ * e senza questo controllo `avvia --dry-run` farebbe un giro vero. PURA.
+ */
+export function opzioniTenuteDaNpm(env = process.env) {
+  if (!/orchestratore-locale/.test(env.npm_lifecycle_script || '')) return [];
+  const note = [...new Set(Object.values(OPZIONI_DI).flatMap((s) => Object.keys(s)))];
+  return Object.keys(env)
+    .filter((k) => k.startsWith('npm_config_'))
+    .map((k) => `--${k.slice('npm_config_'.length).replace(/_/g, '-')}`)
+    .filter((o) => note.some((n) => distanza(o, n) <= 2))
+    .sort();
+}
+
 /** Il numero di un feedback («41» o «#41»), o un errore che dice quale argomento non lo è. PURA. */
 export function numeroDiFeedback(cmd, a) {
   const m = /^#?(\d+)$/.exec(String(a).trim());
