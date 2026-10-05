@@ -1161,7 +1161,7 @@
       if (res.keyFallback && res.keyFallback.line) {
         // La riga è già nella conversazione, o la scrive questo turno: l'avviso non la ripete.
         if (!ripiegoDetto) ripiegoDaDire = res.keyFallback.line;
-        Popup?.ripiegoMostrato?.();
+        Popup?.ripiegoMostrato?.(convEl());
         ripiegoDetto = true;
       } else {
         ripiegoDetto = false;
