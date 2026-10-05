@@ -200,7 +200,7 @@ test('senza aggiornatore (Filo avviato dal codice) «Installa» dice dove prende
 
 test('dalla chat: la preferenza cambia solo dopo una conferma che spiega il rischio', () => {
   globalThis.self = globalThis;
-  for (const m of ['constants', 'contenutoEsterno', 'preferences']) require(join(ROOT, 'src', 'shared', `${m}.js`));
+  for (const m of ['tabColor', 'constants', 'contenutoEsterno', 'preferences']) require(join(ROOT, 'src', 'shared', `${m}.js`));
   const P = globalThis.SN_PREF;
   for (const chiave of ['aggiornamenti_automatici', 'installa gli aggiornamenti da solo', 'aggiornamenti automatici']) {
     const r = P.buildPreferencePartial(chiave, 'no');
