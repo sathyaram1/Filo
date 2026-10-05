@@ -150,7 +150,7 @@ test('la voce del tasto destro della carta porta alla preferenza, anche in fondo
   const carta = home.locator('#accade .dash-carta[data-tipo="avviso"]', { hasText: 'versione 9.9.9' });
   await expect(carta).toBeVisible({ timeout: 8_000 });
   await carta.click({ button: 'right', position: { x: 30, y: 12 } });
-  await home.locator('.sn-menu').getByText('Preferenze sugli aggiornamenti', { exact: true }).click();
+  await home.locator('.dash-menu .dash-menu-voce', { hasText: 'Preferenze sugli aggiornamenti' }).click();
   const pref = await trovaPagina(app, (u) => u.startsWith('filo://preferences/'));
   const casella = pref.locator('#aggiornamentiAutomatici');
   await expect(casella).not.toBeChecked({ timeout: 8_000 });
