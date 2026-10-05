@@ -10,13 +10,15 @@
 // ragionamento strutturato ricomposto per indice; corpo della richiesta con
 // gli strumenti e il vincolo sugli host che li supportano.
 
-import { test } from 'node:test';
+import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 require('../../src/main/services/providers/openrouter.js');
 const OR = globalThis.SN_PROVIDER_OPENROUTER;
+// Il rifiuto del ragionamento si ricorda fra le chiamate: ogni prova parte senza memoria.
+beforeEach(() => OR.forgetReasoningRefusals());
 
 function sse(events) {
   const lines = events.map((e) => `data: ${typeof e === 'string' ? e : JSON.stringify(e)}\n\n`);
@@ -171,6 +173,50 @@ for (const metodo of ['streamComplete', 'complete']) {
       assert.equal(b.provider.sort, 'latency');
       assert.equal(b.tools[0].function.name, 'CERCA_WEB');
     }
+  });
+
+  test(`${metodo}: il rifiuto del ragionamento si paga una volta, poi si chiede subito senza; scaduto, si riprova`, async () => {
+    const bodies = [];
+    const fetchRifiuta = async (url, opts) => {
+      const b = JSON.parse(opts.body);
+      bodies.push(b);
+      return b.reasoning ? noHost(NO_PARAMS) : ok();
+    };
+    await withFetch(fetchRifiuta, async () => {
+      assert.equal((await call()).text, 'Fatto');
+      assert.equal((await call()).text, 'Fatto');
+      assert.equal((await call()).text, 'Fatto');
+    });
+    assert.deepEqual(bodies.map((b) => 'reasoning' in b), [true, false, false, false]);
+    assert.ok(bodies.every((b) => b.provider.require_parameters === true && b.provider.ignore.includes('Mistral')));
+
+    // Altri vincoli sugli host sono un'altra domanda al router: il ricordo non vale.
+    bodies.length = 0;
+    await withFetch(fetchRifiuta, () => call({ providerRouting: { ignore: ['Mistral'], sort: 'throughput' } }));
+    assert.deepEqual(bodies.map((b) => 'reasoning' in b), [true, false]);
+
+    const now = Date.now;
+    bodies.length = 0;
+    try {
+      Date.now = () => now() + 2 * 60 * 60 * 1000;
+      await withFetch(fetchRifiuta, () => call());
+    } finally { Date.now = now; }
+    assert.deepEqual(bodies.map((b) => 'reasoning' in b), [true, false]);
+  });
+
+  test(`${metodo}: un rifiuto per gli strumenti non fa dimenticare il ragionamento alle chiamate dopo`, async () => {
+    const bodies = [];
+    await withFetch(async (url, opts) => {
+      bodies.push(JSON.parse(opts.body));
+      return noHost(NO_PARAMS);
+    }, () => call().catch(() => null));
+    bodies.length = 0;
+    await withFetch(async (url, opts) => {
+      bodies.push(JSON.parse(opts.body));
+      return ok();
+    }, () => call());
+    assert.equal(bodies.length, 1);
+    assert.ok(bodies[0].reasoning, 'il ragionamento torna nella richiesta');
   });
 
   test(`${metodo}: nessun host ammesso regge gli strumenti → errore dichiarato, mai una richiesta senza vincolo`, async () => {

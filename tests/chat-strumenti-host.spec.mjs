@@ -98,6 +98,23 @@ test('un modello che non ragiona non perde la chat: si rifà senza ragionamento,
   expect(corpi.map((b) => b.reasoning)).toEqual([true, false]);
 });
 
+test('il rifiuto del ragionamento si paga al primo messaggio: il secondo va dritto', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await preparaRouter(app, 'senza-ragionamento');
+
+  const risposte = page.locator('.dash-bubble-filo', { hasText: 'Ecco fatto.' });
+  await scrivi(page, 'che ore sono a Tokyo?');
+  await expect(risposte).toHaveCount(1, { timeout: 15_000 });
+  await scrivi(page, 'e a Lima?');
+  await expect(risposte).toHaveCount(2, { timeout: 15_000 });
+  const corpi = await corpiConStrumenti(app);
+  vincoliIntatti(corpi);
+  expect(corpi.map((b) => b.reasoning)).toEqual([true, false, false]);
+});
+
 test('nessun host ammesso regge gli strumenti: la chat lo dice, e niente parte senza vincolo', async ({ app, shell }) => {
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
