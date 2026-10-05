@@ -170,7 +170,8 @@ after(async () => {
 function riapri(msg, origine = 'filo://manage/manage.html') {
   const h = handlers.get(MSG.MERGE_APPROVAL_REOPEN);
   assert.ok(h, 'il main non registra il gestore');
-  return h({ type: MSG.MERGE_APPROVAL_REOPEN, ...msg }, { isShell: true }, origine);
+  const mittente = origine.startsWith('filo://') ? { isShell: true } : { url: origine };
+  return h({ type: MSG.MERGE_APPROVAL_REOPEN, ...msg }, mittente, origine);
 }
 
 test('gestore: il ramo viene dal documento, non dalla pagina; al server arrivano ramo, punta e pratica', async () => {

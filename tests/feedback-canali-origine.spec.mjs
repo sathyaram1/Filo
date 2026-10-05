@@ -137,6 +137,7 @@ test('anche le altre porte del proprietario rifiutano per provenienza', async ({
       fusioniElenco: { type: MSG.MERGE_APPROVALS_GET },
       fusioniApprova: { type: MSG.MERGE_APPROVAL_APPROVE, id: 'ab12cd34ef56ab12cd34ef56' },
       fusioniScarta: { type: MSG.MERGE_APPROVAL_DISCARD, id: 'ab12cd34ef56ab12cd34ef56' },
+      fusioniRiapri: { type: MSG.MERGE_APPROVAL_REOPEN, feedbackId: 'fb-uno' },
     });
     const esegui = async (mittente) => {
       const res = {};
