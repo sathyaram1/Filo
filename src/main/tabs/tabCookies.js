@@ -211,6 +211,8 @@ const cookieMethods = {
   // Una pagina nuova dello stesso sito tiene l'esito (il sito ricorda il rifiuto e il banner non torna); un altro sito no.
   _cookieOnNavigate(tab, url) {
     tab._cookieHold = false;
+    // #758 — una pagina di accesso aperta come sito principale: il cookie che arriva dopo dice che l'utente è entrato.
+    if (!tab.isInternal) { try { require('../services/cookieIncorporati').navigazione(url); } catch (_) {} }
     if (!tab.cookieOutcome) return;
     if (!isWeb(url) || Cookies.registrableOf(url) !== tab.cookieOutcome.site) tab.cookieOutcome = null;
   },

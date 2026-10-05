@@ -80,6 +80,7 @@
     'security.cookies.mode': { nome: 'gestione dei cookie', valori: { manual: 'manuale', default: 'automatica', privacy: 'privacy massima' }, livello: 2 },
     'security.cookies.trustedSites': { nome: 'siti fidati dove resti connesso', elenco: true, livello: 2 },
     'security.cookies.bannerSites': { nome: 'siti dove vedi i banner dei cookie', elenco: true, livello: 2 },
+    'security.cookies.loggedSites': { nome: 'siti dove sei entrato', elenco: true, livello: 2 },
     'security.fingerprint.mode': { nome: 'protezione dal fingerprinting', valori: { off: 'spenta', default: 'automatica', privacy: 'privacy massima' }, livello: 2 },
     'security.adblock.enabled': { nome: 'blocco di pubblicità e tracker', valore: ATTIVO, livello: 2 },
     'security.adSkip.enabled': { nome: 'salta le pubblicità dei video', valore: ATTIVO, livello: 1 },

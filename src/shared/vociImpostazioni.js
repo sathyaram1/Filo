@@ -86,7 +86,7 @@
         'fp-mode-default': 'security.fingerprint.mode',
         'fp-mode-privacy': 'security.fingerprint.mode',
       },
-      gruppi: { 'sec-cookies-banners': 'security.cookies.bannerSites', 'sec-delicate-campi': 'security.pagineDelicate.nonDelicati' },
+      gruppi: { 'sec-cookies-banners': 'security.cookies.bannerSites', 'sec-delicate-campi': 'security.pagineDelicate.nonDelicati', 'sec-cookies-accessi': 'security.cookies.loggedSites' },
       altrove: { 'sec-perm-list': 'permessiSiti' },
       fuori: {},
       messaggi: {

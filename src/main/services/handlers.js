@@ -1008,6 +1008,7 @@ async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
   try {
     const Cookies = require('./cookies');
     const cookiesChanged = Cookies.configureFromSettings(merged);
+    require('./cookieIncorporati').configureFromSettings(merged);
     require('./cookieBanners').configureFromSettings(merged);
     // Ogni frame di ogni scheda rilegge la sua config: solo se la modalità o i siti coi banner sono cambiati.
     if (cookiesChanged) {

@@ -76,6 +76,8 @@
     $('sec-cookies-trusted-note').textContent = I18n.t('options_cookies_trusted_note_other');
     $('cookie-wl-input').placeholder = I18n.t('options_cookies_whitelist_placeholder');
     $('cookie-wl-add-btn').textContent = I18n.t('options_cookies_whitelist_add');
+    $('sec-cookies-accessi-title').textContent = I18n.t('options_cookies_accessi_title');
+    $('sec-cookies-accessi-desc').textContent = I18n.t('options_cookies_accessi_desc');
     $('sec-cookies-banners-title').textContent = I18n.t('options_cookies_banners_title');
     $('sec-cookies-done-title').textContent = I18n.t('options_cookies_done_title');
     $('sec-fp-title').textContent = I18n.t('options_fp_title');
@@ -328,8 +330,10 @@
     const trusted = cookies.trustedSites || cookies.loginWhitelist;
     cookieWhitelist = Array.isArray(trusted) ? trusted.slice() : [];
     cookieBannerSites = Array.isArray(cookies.bannerSites) ? cookies.bannerSites.slice() : [];
+    cookieLoggedSites = Array.isArray(cookies.loggedSites) ? cookies.loggedSites.slice() : [];
     renderWhitelist();
     renderBannerSites();
+    renderLoggedSites();
     // Il testo lasciato nella casella dei fidati torna lì: un sito valido è già nell'elenco, il resto con l'avviso.
     const bozza = typeof cookies.bozza === 'string' ? cookies.bozza : '';
     $('cookie-wl-input').value = bozza;
@@ -368,23 +372,26 @@
   let cookieWhitelist = [];
   // #754 — siti dove l'utente ha chiesto di rivedere i banner (dal menu della scheda): qui si vedono e si tolgono.
   let cookieBannerSites = [];
+  // #758 — siti dove Filo ha visto un tuo accesso: i loro contenuti incorporati tengono i cookie. Li scrive Filo,
+  // qui si vedono e si tolgono.
+  let cookieLoggedSites = [];
 
   function currentMode() {
     const checked = document.querySelector('input[name="cookie-mode"]:checked');
     return checked ? checked.value : 'default';
   }
 
-  // I "siti fidati" hanno effetto SOLO in "Privacy massima" (dove ogni sito è
-  // isolato/effimero): lì la lista è attiva. In "Automatico"/"Manuale" i login
-  // restano comunque, quindi la lista è informativa (disabilitata + nota).
+  // I "siti fidati" contano in "Privacy massima" (jar isolato ma persistente) e in "Automatico" (#758: i loro
+  // contenuti incorporati altrove tengono i cookie): lì la lista si usa. In "Manuale" Filo non gestisce niente.
   function syncCookieMode() {
-    const privacy = currentMode() === 'privacy';
-    $('sec-cookies-trusted-note').style.display = privacy ? 'none' : 'block';
+    const modo = currentMode();
+    const conta = modo !== 'manual';
+    $('sec-cookies-trusted-note').style.display = modo === 'default' ? 'block' : 'none';
     const wl = $('sec-cookies-whitelist');
-    wl.style.opacity = privacy ? '1' : '0.45';
-    $('cookie-wl-input').disabled = !privacy;
-    $('cookie-wl-add-btn').disabled = !privacy;
-    for (const btn of $('cookie-wl-list').querySelectorAll('button')) btn.disabled = !privacy;
+    wl.style.opacity = conta ? '1' : '0.45';
+    $('cookie-wl-input').disabled = !conta;
+    $('cookie-wl-add-btn').disabled = !conta;
+    for (const btn of $('cookie-wl-list').querySelectorAll('button')) btn.disabled = !conta;
   }
 
   // Pulisce l'input utente in un dominio confrontabile: toglie schema, path,
@@ -451,6 +458,32 @@
       btn.addEventListener('click', () => {
         cookieBannerSites = cookieBannerSites.filter((d) => d !== domain);
         renderBannerSites();
+        saveCookies();
+      });
+      li.appendChild(span);
+      li.appendChild(btn);
+      list.appendChild(li);
+    }
+  }
+
+  function renderLoggedSites() {
+    const box = $('sec-cookies-accessi');
+    const list = $('cookie-accessi-list');
+    list.innerHTML = '';
+    // L'elenco si vede in tutte le modalità: è roba che Filo ha segnato su di te, e si toglie da qui anche quando
+    // la modalità di adesso non lo usa.
+    box.hidden = !cookieLoggedSites.length;
+    for (const domain of cookieLoggedSites) {
+      const li = document.createElement('li');
+      const span = document.createElement('span');
+      span.textContent = leggibile(domain);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sn-btn-secondary';
+      btn.textContent = I18n.t('options_cookies_accessi_remove');
+      btn.addEventListener('click', () => {
+        cookieLoggedSites = cookieLoggedSites.filter((d) => d !== domain);
+        renderLoggedSites();
         saveCookies();
       });
       li.appendChild(span);
@@ -551,7 +584,13 @@
     const fidati = dominio && !cookieWhitelist.includes(dominio) ? [...cookieWhitelist, dominio].sort() : cookieWhitelist.slice();
     const partial = {
       security: {
-        cookies: { mode: currentMode(), trustedSites: fidati, bannerSites: cookieBannerSites.slice(), bozza: dominio ? '' : bozza },
+        cookies: {
+          mode: currentMode(),
+          trustedSites: fidati,
+          bannerSites: cookieBannerSites.slice(),
+          loggedSites: cookieLoggedSites.slice(),
+          bozza: dominio ? '' : bozza,
+        },
       },
     };
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
@@ -891,7 +930,13 @@
         loadDelicateCampi();
       }
       const c = msg && msg.type === MSG.SETTINGS_UPDATED && msg.settings && msg.settings.security && msg.settings.security.cookies;
-      if (!c || !Array.isArray(c.bannerSites)) return;
+      if (!c) return;
+      // Un accesso visto da Filo entra nell'elenco mentre la pagina è aperta.
+      if (Array.isArray(c.loggedSites) && c.loggedSites.join('\n') !== cookieLoggedSites.join('\n')) {
+        cookieLoggedSites = c.loggedSites.slice();
+        renderLoggedSites();
+      }
+      if (!Array.isArray(c.bannerSites)) return;
       if (c.bannerSites.join('\n') === cookieBannerSites.join('\n')) return;
       cookieBannerSites = c.bannerSites.slice();
       renderBannerSites();

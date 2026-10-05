@@ -10,7 +10,9 @@
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
       version: '0.2.234', date: '2026-10-05',
-      features: [],
+      features: [
+        'I post, i video e le mappe che vedi dentro le pagine di altri siti non lasciano più cookie per sempre: durano finché leggi la pagina e per qualche minuto dopo che l\'hai chiusa. Dai siti dove sei entrato con il tuo account resti connesso lo stesso, e quali sono lo vedi (e lo correggi) in Impostazioni → Sicurezza.',
+      ],
       fixes: [
         'Su Windows, se in un comando che Filo esegue per te una parte sbaglia, per esempio un programma che non esiste, il resto della riga gira lo stesso, come quando la scrivi tu nel terminale. Prima si fermava tutto lì.',
         'La chat di Filo chiede le risposte solo ai fornitori che sanno usare i suoi strumenti, come cercare sul web o cambiare un\'impostazione. Prima uno che li ignorava faceva fallire la risposta senza spiegazione. Se per il modello che hai scelto non ce n\'è nessuno, Filo te lo dice.',

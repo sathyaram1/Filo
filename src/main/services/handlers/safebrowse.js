@@ -13,6 +13,13 @@ module.exports = function register(on, ctx) {
     const tabId = sender?.tab?.id;
     if (!win || !win._filoTabs || !tabId) return { ok: true, level: 'safe', message: null };
     const ctxPage = { hasPassword: !!msg.hasPassword, hasPayment: !!msg.hasPayment };
+    // #758 — un campo password nella PAGINA (non in un riquadro, che nominerebbe un sito non suo) è una pagina di
+    // accesso: il sito vale quello della scheda.
+    if (msg.hasPassword) {
+      const top = sender.wc && !sender.wc.isDestroyed() && sender.wc.mainFrame;
+      const suo = top && sender.frame && sender.frame.frameTreeNodeId === top.frameTreeNodeId;
+      if (suo) { try { require('../cookieIncorporati').paginaDiAccesso(sender.tab.url, { forte: true }); } catch (_) {} }
+    }
     return win._filoTabs.safebrowseGet(tabId, msg.url || origin, ctxPage);
   });
 
@@ -34,6 +41,15 @@ module.exports = function register(on, ctx) {
     const siti = [...new Set([...segnati, ...tolti])].sort().map((sito) => ({ sito, tolto: tolti.includes(sito) }));
     return { ok: true, siti };
   }));
+
+  // Il sito è quello della scheda, non uno detto dalla pagina; un riquadro non conta (l'accesso vale nella scheda sua).
+  on(MSG.ACCESSO_CREDENZIALI, async (msg, sender) => {
+    const top = sender && sender.wc && !sender.wc.isDestroyed() && sender.wc.mainFrame;
+    const suo = top && sender.frame && sender.frame.frameTreeNodeId === top.frameTreeNodeId;
+    if (!suo || !sender.tab || !sender.tab.url) return { ok: false };
+    try { require('../cookieIncorporati').credenziali(sender.tab.url); } catch (_) {}
+    return { ok: true };
+  });
 
   // La home aperta dal tasto destro sull'avviso del sito pericoloso prende la domanda o la segnalazione che il main le
   // ha lasciato (#813.5). Solo pagine di Filo: un sito non deve poter leggere né consumare la richiesta.

@@ -1,6 +1,6 @@
-// Rilevamento siti pericolosi, lato pagina: manda al main l'indirizzo e gli indizi (campi password o di pagamento),
-// all'apertura del documento e quando i campi compaiono. Non disegna niente: l'avviso sta in una vista sopra la
-// scheda (src/main/avvisoSito.js), dove la pagina non lo sente, non lo copre e non lo cancella.
+// Rilevamento siti pericolosi, lato pagina: manda al main l'indirizzo e gli indizi (campi password o di pagamento)
+// quando compaiono, e avvisa quando l'utente scrive una password (accessi, #758). Non disegna niente: l'avviso sta in
+// una vista sopra la scheda (src/main/avvisoSito.js), dove la pagina non lo sente, non lo copre e non lo cancella.
 
 (function (global) {
   'use strict';
@@ -69,6 +69,28 @@
   document.addEventListener('focusin', (e) => {
     if (e.target && e.target.tagName === 'INPUT') hintsGrew();
   }, true);
+
+  // #758 — un accesso vale solo dopo una password scritta dall'utente: gli eventi creati da uno script della pagina
+  // (isTrusted falso) non contano. Il main lega l'avviso alla richiesta che segue.
+  const T_CRED = MSG.ACCESSO_CREDENZIALI || 'accesso_credenziali';
+  let credenzialiAt = 0;
+  function passwordScritta(e) {
+    const t = e.composedPath ? e.composedPath()[0] : e.target;
+    if (t && t.type === 'password' && t.value) return true;
+    if (e.type === 'input') return false;
+    try { for (const el of document.querySelectorAll('input[type="password"]')) if (el.value) return true; } catch (_) {}
+    return false;
+  }
+  function forseCredenziali(e) {
+    if (!e || !e.isTrusted) return;
+    if (e.type === 'keydown' && e.key !== 'Enter') return;
+    if (Date.now() - credenzialiAt < 5000 || !passwordScritta(e)) return;
+    credenzialiAt = Date.now();
+    send({ type: T_CRED });
+  }
+  for (const t of ['input', 'submit', 'click', 'keydown']) {
+    try { document.addEventListener(t, forseCredenziali, true); } catch (_) {}
+  }
 
   if (document.readyState === 'loading') {
     requestVerdict();

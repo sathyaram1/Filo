@@ -2434,10 +2434,15 @@
       //   non hanno effetto.
       // bannerSites: domini (eTLD+1) dove l'utente ha chiesto di rivedere i
       //   banner dei cookie (menu della scheda): lì Filo non rifiuta e non nasconde.
+      // loggedSites: domini (eTLD+1) dove Filo ha VISTO un accesso (pagina di
+      //   accesso del dominio + un cookie di sessione nuovo suo): in 'default' i
+      //   cookie di questi domini restano anche quando compaiono incorporati in
+      //   un'altra pagina (#758). Lo scrive Filo, l'utente lo corregge in Sicurezza.
       cookies: {
         mode: 'default',
         trustedSites: [],
         bannerSites: [],
+        loggedSites: [],
         // Il testo lasciato nella casella dei siti fidati che non è un dominio: torna lì con l'avviso.
         bozza: '',
       },

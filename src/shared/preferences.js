@@ -970,6 +970,14 @@
         + 'sbagliata sul banner fa accettare i cookie di tracciamento.',
     }),
     elenco({
+      keys: ['siti_con_accesso', 'siti con accesso', 'siti dove sono entrato', 'siti dove ho un account', 'siti con account'],
+      percorso: 'security.cookies.loggedSites',
+      nome: 'Siti dove sei entrato',
+      aiuto: 'siti dove Filo ha visto un tuo accesso: i loro cookie restano anche nei contenuti incorporati altrove',
+      risk: 'Cambia i siti i cui contenuti incorporati in altre pagine tengono i loro cookie: togliere un sito da qui '
+        + 'fa durare i suoi cookie solo per la visita, aggiungerlo glieli fa tenere come a un sito dove sei entrato.',
+    }),
+    elenco({
       keys: ['domini_esclusi', 'domini esclusi', 'siti esclusi', 'blocklist', 'siti dove filo non interviene'],
       percorso: 'blocklist',
       nome: 'Domini dove Filo non interviene',
