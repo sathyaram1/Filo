@@ -296,8 +296,10 @@
   // il blocco di otto caratteri può cadere sul posto sbagliato: «Ciao Anna» è
   // quattro più quattro, e vince sul link perché viene prima (terzo giro di
   // verifica del #651). L'indirizzo è il segno più forte che ci sia, quindi si
-  // cerca per primo.
-  const LINK_NEL_TESTO = /(?:https?:\/\/)?(?:[a-z0-9-]+\.)*filo\.red\/i\/([a-z0-9-]+)/i;
+  // cerca per primo. Senza il prefisso dello schema e dei sottodomini: non
+  // cambiava il codice catturato, e su un incollaggio lungo faceva crescere la
+  // ricerca col quadrato della lunghezza, nel main (#664).
+  const LINK_NEL_TESTO = /filo\.red\/i\/([a-z0-9-]+)/i;
   const INVITO_NEL_TESTO = /filo:\/*invito\/([a-z0-9-]+)/i;
   function codeFromLinkInText(raw) {
     const s = String(raw == null ? '' : raw);
