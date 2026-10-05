@@ -441,7 +441,6 @@ function copiaConAiutiDi(sha, fuori, root) {
 function togliCopia(dir, root) {
   try { gitOut(['worktree', 'remove', '--force', join(dir, 'albero')], root); } catch (_) { /* la cartella si toglie sotto */ }
   rmSync(dir, { recursive: true, force: true });
-  try { gitOut(['worktree', 'prune'], root); } catch (_) { /* resta una voce orfana, innocua */ }
 }
 
 function leggiJson(file) {
