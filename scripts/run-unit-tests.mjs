@@ -345,7 +345,8 @@ async function main() {
   const temp = await temporaneaDellaCorsa();
 
   // I gruppi si contano coi flag del riepilogo già dentro: sono i più lunghi che la riga potrà portare.
-  const cartella = mkdtempSync(join(tmpdir(), 'filo-unit-'));
+  // Dentro la temporanea della corsa: interrotta, il suo nome è l'unico che la pulizia del giorno dopo riconosce.
+  const cartella = mkdtempSync(join(temp || tmpdir(), 'filo-unit-'));
   const destinazione = (i) => join(cartella, `gruppo-${String(i + 1).padStart(4, '0')}.jsonl`);
   const copia = (i) => (k) => join(cartella, `rapporto-${k + 1}-gruppo-${String(i + 1).padStart(4, '0')}`);
   const { opzioni: date, posizionali } = separaArgomenti(flags);
