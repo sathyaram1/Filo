@@ -102,8 +102,8 @@ il rombo e il pentagono della fila delle forme).
   feedback) la RESPINGONO, mai ignorata in silenzio. Il segnalibro di ripresa porta,
   con quello che ha fermato, anche gli altri rilievi interni della stessa critica
   (`sospesi`): chi riprende li chiude, il giro dopo non li riscopre.
-- `revision_security` —routine PASS secaudit+merge→ `done`; —FAIL fixer-loop→ `design`
-  (`statusReason: loop`); —conflitto di fusione→ `revision_capability`
+- `revision_security` —routine PASS secaudit+merge→ `done`; —FAIL→ `design`
+  (`statusReason: secaudit`, col segnalibro di ripresa: §5); —conflitto di fusione→ `revision_capability`
   (riallineamento: main è avanzato e il merge non passa più da solo — non è una
   bocciatura di qualità, il contatore M non si muove; il ramo viene ribasato e
   ripassa verifica e sicurezza sul contenuto nuovo).
