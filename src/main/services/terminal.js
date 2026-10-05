@@ -436,8 +436,8 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, 
 }
 
 // Un comando nella sessione del terminale (shell.js), che porta già preludio UTF-8, marcatore a caso, esito e
-// cartella: stessa forma di runCommand. Si risolve al marcatore; poi la shell esce chiudendo lo stdin, senza
-// uccidere l'albero, perché un `start notepad` deve sopravvivere al comando che l'ha aperto.
+// cartella: stessa forma di runCommand. Dopo il marcatore la shell esce chiudendo lo stdin, senza uccidere
+// l'albero: un `start notepad` deve sopravvivere al comando che l'ha aperto.
 function eseguiInSessione(cmd, { shell, cwd, env, timeoutMs = DEFAULT_TIMEOUT_MS, trackCwd = false } = {}) {
   return new Promise((resolve) => {
     let stdout = '';
@@ -461,14 +461,21 @@ function eseguiInSessione(cmd, { shell, cwd, env, timeoutMs = DEFAULT_TIMEOUT_MS
         timedOut,
       });
     };
+    const aggiungiErr = (testo) => {
+      if (stderr.length < MAX_OUTPUT_CHARS * 2) stderr += String(testo).replace(/\r\n/g, '\n');
+    };
     let sessione;
     try {
       sessione = require('./shell').createSession({ shell, cwd, env, autoRun: false });
     } catch (e) {
-      stderr = `Impossibile avviare la shell: ${e && e.message ? e.message : e}`;
+      aggiungiErr(`Impossibile avviare la shell: ${e && e.message ? e.message : e}`);
       fine(127);
       return;
     }
+    // Lo stderr si legge dal processo e non dalla sessione: quella lo gira solo fino al marcatore, e un messaggio
+    // d'errore che arriva un attimo dopo (due tubi, nessun ordine fra loro) andava perso.
+    const proc = sessione.proc;
+    if (proc && proc.stderr) proc.stderr.on('data', aggiungiErr);
     timer = setTimeout(() => {
       timedOut = true;
       try { sessione.kill(); } catch (_) {}
@@ -477,16 +484,20 @@ function eseguiInSessione(cmd, { shell, cwd, env, timeoutMs = DEFAULT_TIMEOUT_MS
     }, Math.max(1000, timeoutMs));
     sessione.exec(cmd, {
       onData: ({ chunk, stream }) => {
-        if (stream === 'stderr') { if (stderr.length < MAX_OUTPUT_CHARS * 2) stderr += chunk; } else if (stdout.length < MAX_OUTPUT_CHARS * 2) stdout += chunk;
+        if (stream !== 'stderr' && stdout.length < MAX_OUTPUT_CHARS * 2) stdout += chunk;
       },
       onExit: ({ code, cwd: dove, chiusa, uscita }) => {
         // Chiusa senza marcatore (un `exit 3`): dove sia finita non si sa, l'esito lo dà il processo.
         if (chiusa) { fine(typeof uscita === 'number' ? uscita : 1); return; }
         try { sessione.chiudi(); } catch (_) {}
-        fine(code, dove);
+        // Si aspetta la chiusura per gli ultimi byte di stderr; un programma avviato che tiene aperti i tubi
+        // non deve però tenere fermo l'esito.
+        if (!proc || sessione.dead) { fine(code, dove); return; }
+        const attesa = setTimeout(() => fine(code, dove), 1000);
+        proc.once('close', () => { clearTimeout(attesa); fine(code, dove); });
       },
       onError: ({ message }) => {
-        stderr += (stderr ? '\n' : '') + `Impossibile avviare la shell: ${message}`;
+        aggiungiErr(`${stderr ? '\n' : ''}Impossibile avviare la shell: ${message}`);
         fine(127);
       },
     });

@@ -136,7 +136,7 @@ test('un nome con accenti e trattino lungo si crea e torna identico', async () =
 test('un output enorme non fa perdere esito e cartella', async () => {
   const righe = Math.ceil((T.MAX_OUTPUT_CHARS * 3) / 15);
   const out = await esegui(WIN
-    ? `for /l %i in (1,1,${righe}) do @echo riga-di-elenco\nexit /b 3`
+    ? `for /l %i in (1,1,${righe}) do @echo riga-di-elenco\ncmd /c exit 3`
     : `for i in $(seq 1 ${righe}); do echo riga-di-elenco; done; false`);
   assert.equal(out.truncated, true);
   assert.notEqual(out.code, 0, 'l\'esito si è perso dietro all\'output');
@@ -145,7 +145,8 @@ test('un output enorme non fa perdere esito e cartella', async () => {
 
 test('un comando che non finisce scade, e lo dice', async () => {
   const inizio = Date.now();
-  const out = await esegui(WIN ? 'ping -n 60 127.0.0.1 >nul' : 'sleep 60', { timeoutMs: 1500 });
+  // Fuori da Windows la sessione uccide solo sh: un `sleep` lungo terrebbe aperti i tubi e fermo il test.
+  const out = await esegui(WIN ? 'ping -n 60 127.0.0.1 >nul' : 'sleep 5', { timeoutMs: 1500 });
   assert.equal(out.timedOut, true);
   assert.equal(out.code, 124);
   assert.ok(Date.now() - inizio < 30_000, 'il tempo scaduto non ha fermato il comando');
