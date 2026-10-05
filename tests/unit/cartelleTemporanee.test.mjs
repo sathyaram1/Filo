@@ -18,10 +18,12 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync, statSync, rmSync } from 'node:fs';
+import { lstatSync, mkdirSync, readdirSync, readFileSync, statSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, relative, posix, win32 } from 'node:path';
-import { cartellaTemporanea, fuoriDa, percorsoCanonico } from '../helpers/percorsi.mjs';
+import {
+  cartellaTemporanea, collegaCartella, collegaFile, COLLEGAMENTO_NEGATO, fuoriDa, percorsoCanonico,
+} from '../helpers/percorsi.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TESTS = join(__dirname, '..');
@@ -79,8 +81,8 @@ test('nessun test o script ricava un percorso dal pathname di un URL di file', (
     + '`fileURLToPath(new URL(..., import.meta.url))` da node:url');
 });
 
-// Un symlink su Windows vuole l'amministratore o la modalità sviluppatore: senza,
-// EPERM, e la prova è rossa solo dall'owner e ferma ogni chiusura locale (#742).
+// Un symlink su Windows vuole l'amministratore o la modalità sviluppatore: senza, EPERM, e la prova (o lo
+// script di chiusura) è rossa solo dall'owner e ferma ogni chiusura locale (#742).
 // Si guarda ogni volta che il nome compare, non la forma della chiamata: alias, promisify e accessi per stringa
 // sfuggivano. Passano solo il nome importato così com'è e la chiamata diretta con 'junction'.
 // Il nome si compone: scritto intero, questo file troverebbe sé stesso.
@@ -92,9 +94,6 @@ function creaCollegamentoNegato(sorgente) {
     return !new RegExp(`^${NOME}\\s*[,}]`).test(c);
   });
 }
-
-// Riletti a mano: ogni chiamata sta in un caso saltato su win32. Una guardia nel file non basta a esentarlo.
-const COLLEGAMENTI_GUARDATI = new Set([join('unit', 'copiaSuFile.test.mjs')]);
 
 test('la sentinella dei collegamenti riconosce ogni forma di node, e non la prosa', () => {
   // Spezzati, o la sentinella qui sotto li troverebbe in questo file.
@@ -113,16 +112,60 @@ test('la sentinella dei collegamenti riconosce ogni forma di node, e non la pros
   assert.equal(creaCollegamentoNegato(`// os.tmpdir() è un ${S} (es. /tmp)`), false);
 });
 
-test('nessun test crea un collegamento che Windows nega a chi non è amministratore', () => {
+test('nessun test o script crea un collegamento che Windows nega a chi non è amministratore', () => {
+  const RADICE = join(TESTS, '..');
   const colpevoli = [];
-  for (const p of fileDiTest()) {
-    if (p === AMMESSO || COLLEGAMENTI_GUARDATI.has(relative(TESTS, p))) continue;
-    if (creaCollegamentoNegato(readFileSync(p, 'utf8'))) colpevoli.push(relative(TESTS, p));
+  for (const cartella of ['tests', 'scripts']) {
+    for (const p of fileDiTest(join(RADICE, cartella), [], /\.(mjs|cjs|js)$/)) {
+      if (p === AMMESSO) continue;
+      if (creaCollegamentoNegato(readFileSync(p, 'utf8'))) colpevoli.push(relative(RADICE, p));
+    }
   }
-  assert.deepEqual([...new Set(colpevoli)], [],
-    'questi file creano un collegamento simbolico, che su Windows senza privilegi dà EPERM: per una cartella usa '
-    + '`collegaCartella(verso, collegamento)` da ./helpers/percorsi.mjs; per un file salta il caso su win32 e '
-    + 'aggiungi il file a COLLEGAMENTI_GUARDATI');
+  assert.deepEqual(colpevoli, [],
+    'questi file creano un collegamento simbolico, che su Windows senza privilegi dà EPERM: da ./helpers/percorsi.mjs '
+    + 'usa `collegaCartella(verso, collegamento)` per una cartella e `collegaFile` per un file (col motivo che '
+    + 'restituisce a `t.skip`); uno script passa \'junction\' a mano');
+});
+
+// Il ripiego si prova sul sistema finto: chi lavora qui non ha un Windows senza privilegi su cui vederlo.
+test('su Windows la cartella si collega con una junction, altrove con un collegamento simbolico', () => {
+  const tipi = {};
+  for (const sistema of ['win32', 'darwin', 'linux']) {
+    collegaCartella('verso', 'qui', { sistema, collega: (_v, _c, tipo) => { tipi[sistema] = tipo; } });
+  }
+  assert.deepEqual(tipi, { win32: 'junction', darwin: 'dir', linux: 'dir' });
+});
+
+test('un file che Windows non lascia collegare salta il caso col motivo, e solo lì', () => {
+  const negato = () => { throw Object.assign(new Error('operation not permitted'), { code: 'EPERM' }); };
+  assert.equal(collegaFile('verso', 'qui', { sistema: 'win32', collega: negato }), COLLEGAMENTO_NEGATO);
+  assert.match(COLLEGAMENTO_NEGATO, /Windows.*EPERM/);
+  for (const sistema of ['darwin', 'linux']) {
+    assert.throws(() => collegaFile('verso', 'qui', { sistema, collega: negato }), { code: 'EPERM' },
+      `su ${sistema} un EPERM è un guasto vero: saltare il caso lo nasconderebbe`);
+  }
+  const altro = () => { throw Object.assign(new Error('no such file'), { code: 'ENOENT' }); };
+  assert.throws(() => collegaFile('verso', 'qui', { sistema: 'win32', collega: altro }), { code: 'ENOENT' });
+});
+
+test('dove il sistema lo permette, i due collegamenti portano davvero al loro contenuto', () => {
+  const dir = cartellaTemporanea('filo-collegamenti-');
+  try {
+    const cartella = join(dir, 'vera');
+    mkdirSync(cartella);
+    writeFileSync(join(cartella, 'dentro.txt'), 'cartella', 'utf8');
+    collegaCartella(cartella, join(dir, 'alla cartella'));
+    assert.equal(readFileSync(join(dir, 'alla cartella', 'dentro.txt'), 'utf8'), 'cartella');
+
+    const file = join(dir, 'vero.txt');
+    writeFileSync(file, 'file', 'utf8');
+    const negato = collegaFile(file, join(dir, 'al file.txt'));
+    if (negato) return;
+    assert.ok(lstatSync(join(dir, 'al file.txt')).isSymbolicLink());
+    assert.equal(readFileSync(join(dir, 'al file.txt'), 'utf8'), 'file');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 // Sul cancello Windows il repo sta su D: e la temporanea su C:. Fra due dischi `relative` dà un percorso assoluto,

@@ -67,8 +67,21 @@ export function cartellaInCasa(prefisso) {
 
 // Su Windows un symlink vuole l'amministratore o la modalità sviluppatore (EPERM, #742):
 // una junction no, e Node la risolve allo stesso modo. Altrove resta un symlink.
-export function collegaCartella(verso, collegamento) {
-  symlinkSync(verso, collegamento, process.platform === 'win32' ? 'junction' : 'dir');
+export function collegaCartella(verso, collegamento, { sistema = process.platform, collega = symlinkSync } = {}) {
+  collega(verso, collegamento, sistema === 'win32' ? 'junction' : 'dir');
+}
+
+// Un file non ha junction: dove Windows nega il symlink torna il motivo, da passare a `t.skip`
+// (altrimenti null). Altrove l'errore resta un errore: lì il caso deve girare.
+export const COLLEGAMENTO_NEGATO = 'Windows nega il collegamento simbolico senza amministratore né modalità sviluppatore (EPERM)';
+export function collegaFile(verso, collegamento, { sistema = process.platform, collega = symlinkSync } = {}) {
+  try {
+    collega(verso, collegamento, 'file');
+    return null;
+  } catch (e) {
+    if (sistema === 'win32' && e && e.code === 'EPERM') return COLLEGAMENTO_NEGATO;
+    throw e;
+  }
 }
 
 // Un nome che Windows non scrive su disco («:» di un sysfs Linux, #961): lì nasce codificato con `nomeSuDisco`,
