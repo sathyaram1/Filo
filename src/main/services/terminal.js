@@ -242,7 +242,7 @@ function extractCwdMark(rawStdout, mark) {
   return {
     stdout: rawStdout.slice(0, cut),
     trovato: !!m,
-    // Vuoto = la sonda la cartella la sa, l'esito no: resta quello del processo.
+    // Un esito illeggibile non diventa un successo: resta quello del processo.
     code: m && m[1] !== '' ? (parseInt(m[1], 10) || 0) : null,
     cwd: m ? (m[2].trim() || undefined) : undefined,
   };
