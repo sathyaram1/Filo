@@ -662,6 +662,7 @@
     CLAUDE_GROUPS,
     ownerize,
     userTurnMarker,
+    istanteDelMarcatore,
     appendUserTurn,
     modelTurnMarker,
     appendModelTurn,
