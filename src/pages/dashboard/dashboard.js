@@ -843,7 +843,7 @@
       });
     }
     // Un turno fermato può avere ancora un'azione in volo: il seguito parte quando è finita, così ne conosce l'esito.
-    while (chiusuraInCorso) await chiusuraInCorso;
+    while (chiusuraInCorso && !turno.fermato) await Promise.race([chiusuraInCorso, turno.fermata]);
     const msg = {
       type: MSG.FILO_CHAT,
       userMessage,
