@@ -1665,6 +1665,39 @@
     return out;
   }
 
+  /**
+   * Il grassetto e il codice in linea di una riga di righeTesto, in pezzi da
+   * disegnare come nodi: «**A.**» è la forma che il modello della segnalazione
+   * prescrive per le scelte. Una coppia mai chiusa resta testo. PURA.
+   *   [{ testo, grassetto?: true, codice?: true }]
+   */
+  function pezziInline(testo) {
+    const s = String(testo == null ? '' : testo);
+    const out = [];
+    const testoSemplice = (t, extra) => { if (t) out.push(Object.assign({ testo: t }, extra)); };
+    const conCodice = (t, extra) => {
+      const re = /`([^`\n]+)`/g;
+      let da = 0;
+      for (let m; (m = re.exec(t));) {
+        testoSemplice(t.slice(da, m.index), extra);
+        out.push(Object.assign({ testo: m[1] }, extra, { codice: true }));
+        da = re.lastIndex;
+      }
+      testoSemplice(t.slice(da), extra);
+    };
+    // Il codice si prende per primo: gli asterischi dentro i backtick restano asterischi.
+    const re = /(`[^`\n]+`)|\*\*(?=[^*\s])([^*\n]*?[^*\s])\*\*/g;
+    let da = 0;
+    for (let m; (m = re.exec(s));) {
+      conCodice(s.slice(da, m.index));
+      if (m[1]) conCodice(m[1]);
+      else conCodice(m[2], { grassetto: true });
+      da = re.lastIndex;
+    }
+    conCodice(s.slice(da));
+    return out;
+  }
+
   global.SN_MANAGE_REVIEW = {
     normalizeStatus,
     // Il guard "questo è passato dalle mani della sicurezza" letto dai campi
