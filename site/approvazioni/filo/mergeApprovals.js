@@ -90,12 +90,31 @@
   /**
    * Il titolo dell'avviso. PURA.
    * Zero richieste → stringa vuota: chi non ne ha non deve vedere niente.
+   * Una richiesta già mandata a fondere, o già decisa, non aspetta più il sì di nessuno: conta a parte (#702).
    */
-  function headline(count) {
+  function headline(count, inCorso, decise) {
     var n = Math.max(0, Math.floor(Number(count) || 0));
-    if (!n) return '';
+    var v = Math.max(0, Math.floor(Number(inCorso) || 0));
+    var d = Math.max(0, Math.floor(Number(decise) || 0));
     if (n === 1) return 'Una fusione aspetta il tuo via libera';
-    return n + ' fusioni aspettano il tuo via libera';
+    if (n > 1) return n + ' fusioni aspettano il tuo via libera';
+    if (v === 1) return 'Una fusione in corso';
+    if (v > 1) return v + ' fusioni in corso';
+    if (d === 1) return 'Una fusione decisa';
+    if (d > 1) return d + ' fusioni decise';
+    return '';
+  }
+
+  /** La frase sotto il titolo, con lo stesso conto: «aspettano il tuo sì» solo se qualcuna aspetta. PURA. */
+  var INTRO_FERME = 'I controlli di sicurezza del server le hanno fermate perché toccano parti protette. Aspettano il tuo sì.';
+  var INTRO_IN_CORSO = 'I controlli di sicurezza del server l’hanno fermata perché tocca parti protette. È approvata: il server la sta fondendo.';
+  // Anche a fusione decisa la frase resta: sparendo, tirava su i tasti sotto il cursore (#550).
+  var INTRO_DECISA = 'I controlli di sicurezza del server l’hanno fermata perché tocca parti protette. Hai già deciso: esce da qui alla prossima rilettura.';
+  function introText(count, inCorso, decise) {
+    if (Math.floor(Number(count) || 0) > 0) return INTRO_FERME;
+    if (Math.floor(Number(inCorso) || 0) > 0) return INTRO_IN_CORSO;
+    if (Math.floor(Number(decise) || 0) > 0) return INTRO_DECISA;
+    return '';
   }
 
   /**
@@ -399,6 +418,7 @@
   // Una conferma a metà (tasto armato, o richiesta in volo) blocca ogni ridisegno automatico
   // di `root`: rifatta sotto il cursore, la card perdeva la conferma e spostava i tasti (#550).
   var LIBERA = 'sn-mac-libera';
+  var ATTESA_CLIC = { kind: 'wait', text: 'Chiedo al server di fondere…' };
   function occupata(root) {
     return !!(root && root.querySelector
       && root.querySelector('.sn-mac-btn-go.is-armed, .sn-mac-card.is-busy:not(.is-done)'));
@@ -422,6 +442,37 @@
   function liberata(card) {
     var Ev = global.CustomEvent;
     if (typeof Ev === 'function') card.dispatchEvent(new Ev(LIBERA, { bubbles: true }));
+  }
+  // Titolo e frase seguono le card: una che sta fondendo, o già decisa, esce dal conto di quelle che aspettano.
+  function rititola(box) {
+    var t = box && box.querySelector ? box.querySelector('.sn-mac-title-text') : null;
+    if (!t) return;
+    var cards = box.querySelectorAll('.sn-mac-card');
+    var ferme = 0, inCorso = 0, decise = 0;
+    for (var i = 0; i < cards.length; i++) {
+      if (cards[i].classList.contains('is-done')) decise++;
+      else if (cards[i].classList.contains('is-merging')) inCorso++;
+      else ferme++;
+    }
+    var testo = headline(ferme, inCorso, decise);
+    if (testo) t.textContent = testo;
+    var intro = box.querySelector('.sn-mac-intro');
+    if (intro) {
+      intro.textContent = introText(ferme, inCorso, decise);
+      intro.hidden = !intro.textContent;
+    }
+  }
+
+  // Un'approvazione partita da un'altra strada mentre la card è già sullo schermo (magari col
+  // tasto armato, che trattiene i ridisegni): la card la segue subito, senza aspettare (#702).
+  function seguiSulPosto(root, id, volo) {
+    if (!root || !root.querySelectorAll || !volo) return;
+    var cards = root.querySelectorAll('.sn-mac-card');
+    for (var i = 0; i < cards.length; i++) {
+      if (cards[i].dataset.requestId === String(id) && typeof cards[i].__snMacSegui === 'function') {
+        cards[i].__snMacSegui(volo.attesa || ATTESA_CLIC, volo.risposta);
+      }
+    }
   }
 
   /**
@@ -540,11 +591,17 @@
       approveBtn.disabled = !!on;
       discardBtn.disabled = !!on;
       card.classList.toggle('is-busy', !!on);
-      if (!on) liberata(card);
+      if (!on) {
+        card.classList.remove('is-merging');
+        rititola(card.closest ? card.closest('.sn-mac') : null);
+        liberata(card);
+      }
     }
     // Esito definitivo: i tasti restano spenti, ma la rilettura che toglie la card può passare.
     function finita() {
       card.classList.add('is-done');
+      card.classList.remove('is-merging');
+      rititola(card.closest ? card.closest('.sn-mac') : null);
       liberata(card);
     }
     function say(msg) {
@@ -568,9 +625,21 @@
         return;
       }
       disarm();
+      segui(ATTESA_CLIC, o.onApprove ? o.onApprove(req) : null);
+    });
+
+    // Un'approvazione in volo, partita da qui o da un'altra strada (il segno «fondi senza
+    // chiedermelo»): finché il server non risponde la card lo dice e non se ne manda un'altra (#702).
+    var seguita = null;
+    function segui(attesa, risposta) {
+      // La stessa risposta arriva anche da seguiSulPosto: seguita due volte, l'esito si direbbe due volte.
+      if (risposta && seguita === risposta) return;
+      seguita = risposta;
       setBusy(true);
-      say({ kind: 'wait', text: 'Chiedo al server di fondere…' });
-      Promise.resolve(o.onApprove ? o.onApprove(req) : null)
+      card.classList.add('is-merging');
+      rititola(card.closest ? card.closest('.sn-mac') : null);
+      say(attesa);
+      Promise.resolve(risposta)
         .then(function (reply) {
           var msg = outcomeMessage(reply, req);
           say(msg);
@@ -581,7 +650,12 @@
           say(outcomeMessage({ ok: false, error: (e && e.message) || String(e) }, req));
           setBusy(false);
         });
-    });
+    }
+    card.__snMacSegui = function (attesa, risposta) {
+      if (card.classList.contains('is-done')) return;
+      if (armed) disarm();
+      segui(attesa, risposta);
+    };
 
     discardBtn.addEventListener('click', function () {
       disarm();
@@ -606,8 +680,14 @@
     card.appendChild(status);
     // Un tentativo già fatto — e non riuscito — resta scritto sulla card: un
     // avviso che passa lo legge solo chi è davanti allo schermo in quel momento.
-    var prima = o.esitoIniziale ? o.esitoIniziale(req) : null;
-    if (prima) say(prima);
+    var volo = o.inVolo ? o.inVolo(req) : null;
+    var prima = volo ? null : (o.esitoIniziale ? o.esitoIniziale(req) : null);
+    if (volo) segui(volo.attesa || ATTESA_CLIC, volo.risposta);
+    else if (prima) {
+      say(prima);
+      // Già fusa, scartata o sostituita: non c'è più niente da approvare finché la rilettura non la toglie.
+      if (prima.kind === 'ok' || prima.reload) { setBusy(true); finita(); }
+    }
     return card;
   }
 
@@ -737,11 +817,11 @@
       title.appendChild(el('span', 'sn-mac-title-text', headline(list.length)));
       box.appendChild(title);
 
-      var intro = el('p', 'sn-mac-intro',
-        'I controlli di sicurezza del server le hanno fermate perché toccano parti protette. Aspettano il tuo sì.');
+      var intro = el('p', 'sn-mac-intro', INTRO_FERME);
       box.appendChild(intro);
 
       for (var i = 0; i < list.length; i++) box.appendChild(buildCard(list[i], o));
+      rititola(box);
       host.appendChild(box);
     }
     return list.length + failed.length;
@@ -988,6 +1068,7 @@
     timeAgo: timeAgo,
     expiresIn: expiresIn,
     headline: headline,
+    introText: introText,
     requestedBy: requestedBy,
     originOf: originOf,
     feedbackNum: feedbackNum,
@@ -1003,6 +1084,7 @@
     render: render,
     occupata: occupata,
     quandoLibera: quandoLibera,
+    seguiSulPosto: seguiSulPosto,
     renderRecent: renderRecent,
     preapprovedBy: preapprovedBy,
     segnoPreapprovazione: segnoPreapprovazione,

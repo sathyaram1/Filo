@@ -76,6 +76,22 @@ describe('il titolo', () => {
     assert.match(UI.headline(1), /^Una fusione/);
     assert.match(UI.headline(3), /^3 fusioni/);
   });
+
+  test('una richiesta già mandata a fondere non aspetta il via libera di nessuno (#702)', () => {
+    assert.equal(UI.headline(0, 1), 'Una fusione in corso');
+    assert.equal(UI.headline(0, 2), '2 fusioni in corso');
+    assert.equal(UI.headline(1, 1), 'Una fusione aspetta il tuo via libera');
+    assert.equal(UI.headline(0, 0), '');
+    // Fusa, scartata o sostituita, in attesa della rilettura: non aspetta più, e non è in corso (#702).
+    assert.equal(UI.headline(0, 0, 1), 'Una fusione decisa');
+    assert.equal(UI.headline(0, 1, 1), 'Una fusione in corso');
+    assert.match(UI.introText(1, 1), /Aspettano il tuo sì/);
+    assert.doesNotMatch(UI.introText(0, 1), /Aspettano il tuo sì|via libera/);
+    assert.equal(UI.introText(0, 0), '');
+    // Decisa: la frase resta (sparendo spostava i tasti) e non chiede più il sì.
+    assert.match(UI.introText(0, 0, 1), /Hai già deciso/);
+    assert.doesNotMatch(UI.introText(0, 0, 1), /Aspettano il tuo sì|via libera|sta fondendo/);
+  });
 });
 
 describe('la scadenza, detta prima', () => {

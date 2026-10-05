@@ -1441,6 +1441,24 @@ test('livelli L5: la richiesta si lega alla segnalazione per numero o per id', (
   assert.equal(altrui.esito, 'attesa');
 });
 
+test('livelli L5: una richiesta già mandata a fondere, o già decisa, non dice più che aspetta il via libera (#702)', () => {
+  const fusioni = { pending: [RICHIESTA] };
+  const ferma = MR.livelloL5(FB_412, { fusioni, statoRichiesta: () => null });
+  assert.match(ferma.pannello.testo, /via libera/);
+  assert.equal(ferma.fusione, null);
+  const volo = MR.livelloL5(FB_412, { fusioni, statoRichiesta: () => 'volo' });
+  assert.equal(volo.esito, 'bloccato');
+  assert.equal(volo.fusione, 'volo');
+  assert.doesNotMatch(volo.pannello.testo, /via libera/);
+  assert.equal(volo.richieste.length, 1);
+  assert.equal(MR.livelloL5(FB_412, { fusioni, statoRichiesta: () => 'decisa' }).fusione, 'decisa');
+  // Una in volo e una che aspetta: la frase resta quella dell'attesa.
+  const due = { pending: [RICHIESTA, { id: 'z', feedbackId: 'fb-412' }] };
+  const misto = MR.livelloL5(FB_412, { fusioni: due, statoRichiesta: (r) => (r.id === 'z' ? null : 'volo') });
+  assert.equal(misto.fusione, null);
+  assert.match(misto.pannello.testo, /via libera/);
+});
+
 test('livelli L5: giallo in lavorazione, verde fuso con la versione, grigio se non ci è arrivato', () => {
   assert.equal(MR.livelloL5({ status: 'working' }, {}).esito, 'attesa');
   assert.equal(MR.livelloL5({ status: 'working' }, {}).colore, MR.REASONS.spam.color);

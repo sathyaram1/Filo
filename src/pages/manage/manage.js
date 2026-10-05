@@ -1316,6 +1316,45 @@
   // L'esito di quel tentativo, per richiesta: il riquadro in basso e la riga
   // del dettaglio sono un posto solo, e chi arriva dopo cancella chi c'era.
   const esitiTentati = new Map();
+  // Al più un'approvazione in volo per richiesta: tasto, segno e segno da fuori aspettano la
+  // stessa, e una card disegnata nel frattempo la mostra coi tasti spenti (#702).
+  const approvazioniInVolo = new Map();
+  const ATTESA_SEGNO = { kind: 'wait', text: 'Pratica segnata «fondi senza chiedermelo»: chiedo al server di fondere…' };
+  function approvaUnaVolta(req, attesa) {
+    const gia = approvazioniInVolo.get(req.id);
+    if (gia) return gia.risposta;
+    const UI = window.SN_MERGE_APPROVALS;
+    const risposta = Promise.resolve()
+      .then(() => sendToMain({ type: MERGE_APPROVAL_APPROVE, id: req.id }))
+      .catch((e) => ({ ok: false, error: e?.message || String(e) }));
+    approvazioniInVolo.set(req.id, { risposta, attesa });
+    // Registrata per prima: chi aspetta la stessa risposta trova già l'esito al suo posto.
+    risposta.then((reply) => {
+      approvazioniInVolo.delete(req.id);
+      if (UI) esitiTentati.set(req.id, UI.outcomeMessage(reply, req));
+      statoFusioniCambiato();
+    });
+    if (UI) UI.seguiSulPosto(document, req.id, { risposta, attesa });
+    statoFusioniCambiato();
+    return risposta;
+  }
+
+  // Dove sta una richiesta ferma, per le frasi che dicono se aspetta l'owner: in volo, già
+  // decisa (fusa, scartata, sostituita) in attesa della rilettura, o ferma davvero (null).
+  function statoRichiesta(req) {
+    if (!req) return null;
+    if (approvazioniInVolo.has(req.id)) return 'volo';
+    const esito = esitiTentati.get(req.id);
+    return esito && (esito.kind === 'ok' || esito.reload) ? 'decisa' : null;
+  }
+  function opzioniLivelli(fb) {
+    return { fusioni, dettaglioLetto: !FB.soloLista(fb), statoRichiesta };
+  }
+  // Una richiesta che parte, arriva o viene decisa cambia le frasi della lista e del quadrato.
+  function statoFusioniCambiato() {
+    if (dataLoaded) ridisegnaListaAlSuoPosto();
+    aggiornaTestoQuadrato();
+  }
 
   // Dal numero della segnalazione (l'etichetta "automazione · feedback #N"
   // sulla scheda) al feedback vero: la scheda sta già dentro la dashboard dei
@@ -1343,18 +1382,30 @@
     return Object.assign({
       onDone: () => { setTimeout(loadMergeApprovals, 1200); },
       esitoIniziale: (req) => esitiTentati.get(req.id) || null,
+      inVolo: (req) => approvazioniInVolo.get(req.id) || null,
       // L'esito resta scritto anche se la card si ridisegna appena la conferma è finita.
-      onApprove: (req) => decidiFusione(MERGE_APPROVAL_APPROVE, req),
+      onApprove: (req) => approvaUnaVolta(req, null),
       onDiscard: (req) => decidiFusione(MERGE_APPROVAL_DISCARD, req),
       onFeedback: (req) => openFeedbackByNum(UI ? UI.feedbackNum(req) : ''),
     }, extra || {});
   }
 
+  // Uno scarto in volo è una decisione già presa: il segno arrivato intanto non la fonde.
+  const scartiInVolo = new Set();
   async function decidiFusione(type, req) {
     const UI = window.SN_MERGE_APPROVALS;
-    const reply = await sendToMain({ type, id: req.id });
+    scartiInVolo.add(req.id);
+    let reply;
+    try { reply = await sendToMain({ type, id: req.id }); } finally { scartiInVolo.delete(req.id); }
     if (UI) esitiTentati.set(req.id, UI.outcomeMessage(reply, req));
+    statoFusioniCambiato();
     return reply;
+  }
+
+  // Il segno manda a fondere solo ciò che aspetta davvero: in volo o già decisa da qui, il
+  // server la rifiuterebbe e la pagina direbbe un esito falso (#702).
+  function daDecidere(req) {
+    return !scartiInVolo.has(req.id) && statoRichiesta(req) !== 'decisa';
   }
 
   // I ridisegni automatici del pannello aspettano che una conferma a metà finisca (#550).
@@ -1374,14 +1425,14 @@
       feedbackId: fb._id,
       numero: FB && typeof FB.formatNum === 'function' ? FB.formatNum(fb.seq, fb.subSeq) : '',
       ancheNuovi: !!(opts && opts.ancheNuovi),
-    }).filter((req) => !fusioniTentate.has(req.id));
+    }).filter((req) => !fusioniTentate.has(req.id) && daDecidere(req));
     if (daFondere.length && opts && typeof opts.avvia === 'function') opts.avvia(daFondere.length);
     const esiti = [];
     for (const req of daFondere) {
       fusioniTentate.add(req.id);
-      let reply;
-      try { reply = await sendToMain({ type: MERGE_APPROVAL_APPROVE, id: req.id }); }
-      catch (e) { reply = { ok: false, error: e?.message || String(e) }; }
+      const risposta = approvaUnaVolta(req, ATTESA_SEGNO);
+      if (livelloAperto === 'l5') ridisegnaPannelloAperto();
+      const reply = await risposta;
       const msg = UI.outcomeMessage(reply, req);
       esitiTentati.set(req.id, msg);
       esiti.push({ req, msg });
@@ -1400,7 +1451,7 @@
       feedbackId: fb._id,
       numero: FB && typeof FB.formatNum === 'function' ? FB.formatNum(fb.seq, fb.subSeq) : '',
       ancheNuovi: true,
-    })) { fusioniTentate.delete(req.id); esitiTentati.delete(req.id); }
+    }).filter(daDecidere)) { fusioniTentate.delete(req.id); esitiTentati.delete(req.id); }
   }
 
   // Le richieste ferme sulle pratiche già segnate si fondono appena la pagina
@@ -1529,14 +1580,19 @@
     if (selectedId && allFeedbacks.some((f) => f._id === selectedId)) {
       const fb = allFeedbacks.find((f) => f._id === selectedId);
       renderLivelliRow(fb);
-      // Il pannello aperto su un livello si riempie di nuovo: se era il
-      // quadrato, dentro c'è una richiesta che potrebbe non esistere più.
-      if (livelloAperto) quandoPannelloLibero(() => {
-        const ora = selectedId && allFeedbacks.find((f) => f._id === selectedId);
-        if (ora && livelloAperto) openSidebarLivello(ora, livelloAperto);
-      });
+      ridisegnaPannelloAperto();
     }
     if (dataLoaded) ridisegnaListaAlSuoPosto();
+  }
+
+  // Il pannello aperto su un livello si riempie di nuovo: se era il quadrato,
+  // dentro c'è una richiesta che potrebbe non esistere più, o che sta fondendo.
+  function ridisegnaPannelloAperto() {
+    if (!livelloAperto) return;
+    quandoPannelloLibero(() => {
+      const ora = selectedId && allFeedbacks.find((f) => f._id === selectedId);
+      if (ora && livelloAperto) openSidebarLivello(ora, livelloAperto);
+    });
   }
 
   async function loadChannelLog() {
@@ -2208,6 +2264,12 @@
   }
 
   // Questa segnalazione ha una fusione ferma che aspetta l'owner?
+  // Etichetta e suggerimento della pratica in lista: «aspetta il tuo via libera» solo se aspetta davvero (#702).
+  const TESTI_FUSIONE_LISTA = {
+    ferma: { etichetta: 'fusione ferma', titolo: 'Una fusione aspetta il tuo via libera', tooltip: 'una fusione aspetta il tuo via libera' },
+    volo: { etichetta: 'in fusione', titolo: 'Approvata: il server sta fondendo il ramo', tooltip: 'il server sta fondendo il ramo' },
+    decisa: { etichetta: 'fusione decisa', titolo: 'Hai già deciso: esce da qui alla prossima rilettura', tooltip: 'fusione già decisa' },
+  };
   function fusioneFerma(fb) {
     return MR.fusioneInAttesa(fb, { fusioni });
   }
@@ -2292,6 +2354,7 @@
       // e stesso peso, così si riconosce scorrendo la lista.
       const ferma = fusioneFerma(fb);
       if (ferma) item.classList.add('mg-item--fusione');
+      const fusioneTesti = TESTI_FUSIONE_LISTA[(ferma && MR.livelloL5(fb, opzioniLivelli(fb)).fusione) || 'ferma'];
       const arrivata = arrivate.has(String(fb._id));
       if (arrivata) item.classList.add('mg-item--arrivata');
       item.style.borderLeftColor = ferma
@@ -2313,14 +2376,14 @@
       ));
       item.title = (num ? `#${num} · ` : '') + title
         + (norm.statusReason ? ` — ${MR.reasonText(norm.statusReason)}` : '')
-        + (ferma ? ' — una fusione aspetta il tuo via libera' : '')
+        + (ferma ? ` — ${fusioneTesti.tooltip}` : '')
         + (arrivata ? ' — arrivata qui mentre la pagina era aperta' : '')
         + (ripartenze ? ` · rientrato in coda ${ripartenze} volt${ripartenze === 1 ? 'a' : 'e'}` : '');
       const rowHtml = `
         ${authorIconHtml(fb)}
         ${num ? `<span class="mg-item-num">#${esc(num)}</span>` : ''}
         <span class="mg-item-title">${esc(title)}</span>
-        ${ferma ? '<span class="mg-fusione-badge" title="Una fusione aspetta il tuo via libera">fusione ferma</span>' : ''}
+        ${ferma ? `<span class="mg-fusione-badge" title="${esc(fusioneTesti.titolo)}">${esc(fusioneTesti.etichetta)}</span>` : ''}
         ${leggibile ? '' : statePublicHtml(fb)}
         ${preapprovedHtml(fb)}
         ${localBadgeHtml(fb)}
@@ -4227,7 +4290,7 @@
     }
 
     mgLivelliRow.hidden = false;
-    for (const liv of MR.livelli(fb, { fusioni, dettaglioLetto: !FB.soloLista(fb) })) {
+    for (const liv of MR.livelli(fb, opzioniLivelli(fb))) {
       if (liv.key !== 'l2') { mgForme.appendChild(formaEl(liv, fb)); continue; }
       // I giudici: un cerchio per giudice ATTESO, non per verdetto. Un panel
       // parziale mostra i mancanti tratteggiati, non un panel accorciato — e
@@ -4545,7 +4608,7 @@
   // fusioni) e «Salta il controllo» dell'audit.
   function openSidebarLivello(fb, key) {
     if (!fb) return;
-    const liv = MR.livelloPer(fb, key, { fusioni, dettaglioLetto: !FB.soloLista(fb) });
+    const liv = MR.livelloPer(fb, key, opzioniLivelli(fb));
     if (!liv) return;
     segnaForma(key);
     giudiceAperto = null;
@@ -4576,13 +4639,7 @@
     if (p.testo) {
       const t = document.createElement('div');
       t.className = 'mg-liv-testo';
-      // Testo cifrato che questo computer non sa leggere: si dice, non si
-      // mostra il blob.
-      if (p.illeggibile) {
-        t.textContent = MR.TESTO_CIFRATO;
-      } else {
-        t.innerHTML = markdownHtml(p.testo);
-      }
+      riempiTestoLivello(t, p);
       body.appendChild(t);
     }
 
@@ -4599,6 +4656,26 @@
     return window.SN_MARKDOWN ? `<div class="filo-md">${window.SN_MARKDOWN.render(testo)}</div>` : esc(testo);
   }
 
+  function riempiTestoLivello(t, p) {
+    // Testo cifrato che questo computer non sa leggere: si dice, non si
+    // mostra il blob.
+    if (p.illeggibile) {
+      t.textContent = MR.TESTO_CIFRATO;
+      return;
+    }
+    t.innerHTML = markdownHtml(p.testo);
+  }
+
+  // La frase del quadrato aperto segue le fusioni in volo e decise anche quando il pannello
+  // non si può ridisegnare (conferma a metà, richiesta in volo): è un testo, non tocca le card.
+  function aggiornaTestoQuadrato() {
+    if (livelloAperto !== 'l5' || !mgSideBody) return;
+    const fb = selectedId && allFeedbacks.find((f) => f._id === selectedId);
+    const t = mgSideBody.querySelector('.mg-liv-testo');
+    if (!fb || !t) return;
+    const liv = MR.livelloPer(fb, 'l5', opzioniLivelli(fb));
+    if (liv && liv.pannello && liv.pannello.testo) riempiTestoLivello(t, liv.pannello);
+  }
 
   // Le card della fusione dentro il pannello del quadrato: stesso disegno e
   // stessi tasti dell'elenco in Automazioni, perché è la stessa cosa.

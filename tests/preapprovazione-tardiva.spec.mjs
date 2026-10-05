@@ -38,7 +38,7 @@ function richiesta(over = {}) {
 }
 
 /** Il canale verso il main: proprietario; scritture e approvazioni registrate. */
-async function stubMain(page, { pending = [], approveReply = null, updateReply = null, tieniInAttesa = false } = {}) {
+async function stubMain(page, { pending = [], approveReply = null, updateReply = null, tieniInAttesa = false, ritardoMs = 0 } = {}) {
   await page.evaluate((cfg) => {
     window.__updates = [];
     window.__approvals = [];
@@ -60,11 +60,13 @@ async function stubMain(page, { pending = [], approveReply = null, updateReply =
       }
       if (t === 'merge_approval_approve') {
         window.__approvals.push(msg);
+        // Il server scarica il diff, rifà i controlli e fonde: secondi, non millisecondi.
+        if (cfg.ritardoMs) await new Promise((r) => setTimeout(r, cfg.ritardoMs));
         return cfg.approveReply || { ok: true, result: 'merged', sha: cfg.sha };
       }
       return orig(msg);
     };
-  }, { pending, approveReply, updateReply, tieniInAttesa, sha: SHA, ttl: 7 * GIORNO });
+  }, { pending, approveReply, updateReply, tieniInAttesa, ritardoMs, sha: SHA, ttl: 7 * GIORNO });
 }
 
 async function apri(page, fbs, opts) {
@@ -266,4 +268,159 @@ test('un tentativo non riuscito resta scritto sulla fusione ferma, dopo che l’
   const stato = page.locator('.sn-mac-card .sn-mac-status').first();
   await expect(stato).toBeVisible();
   await expect(stato).toContainText('riprova');
+});
+
+// ── La fusione mentre è in volo (#702) ─────────────────────────────────────
+
+async function apriQuadrato(page, id) {
+  await page.evaluate((fid) => window.__mgTest.openDetail(fid), id);
+  await page.locator('.mg-forma[data-livello="l5"]').click();
+}
+
+test('fusione partita da sola e ancora in corso: la card lo dice, il tasto resta spento, l’esito arriva lì', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const fb = pratica({ mergePreapproved: { by: 'owner@esempio', at: '2026-09-20T09:00:00.000Z' } });
+  const req = richiesta();
+  await apri(page, [fb], { pending: [req], ritardoMs: 5000 });
+  await expect.poll(() => approvazioni(page), { timeout: 8000 }).toEqual([req.id]);
+
+  await apriQuadrato(page, fb._id);
+  const card = page.locator('#mgSideBody .sn-mac-card');
+  const approva = card.locator('.sn-mac-btn-go');
+  await expect(card.locator('.sn-mac-status')).toHaveText('Pratica segnata «fondi senza chiedermelo»: chiedo al server di fondere…');
+  await expect(page.locator('#mgSideBody .sn-mac-title-text')).toHaveText('Una fusione in corso');
+  await expect(approva).toBeDisabled();
+  await expect(card.locator('.sn-mac-btn-quiet')).toBeDisabled();
+  await page.screenshot({ path: 'tests/.shots/702-fusione-in-volo.png' });
+
+  // Chiudere e riaprire il pannello non rimette in mano un tasto acceso.
+  await page.locator('#mgSideClose').click();
+  await page.locator('.mg-forma[data-livello="l5"]').click();
+  await expect(approva).toBeDisabled();
+  await expect(card.locator('.sn-mac-status')).toContainText('chiedo al server di fondere');
+
+  await expect(card.locator('.sn-mac-status')).toContainText('Fatto: il lavoro è su main', { timeout: 10000 });
+  expect(await approvazioni(page)).toEqual([req.id]);
+});
+
+test('«Approva e fondi» ancora in volo: il pannello riaperto non lo rilancia, e nemmeno il segno', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const fb = pratica();
+  const req = richiesta();
+  await apri(page, [fb], { pending: [req], ritardoMs: 5000 });
+  await apriQuadrato(page, fb._id);
+
+  const card = page.locator('#mgSideBody .sn-mac-card');
+  const approva = card.locator('.sn-mac-btn-go');
+  await approva.click();
+  await expect(approva).toHaveText('Confermi?');
+  await approva.click();
+  await expect(card.locator('.sn-mac-status')).toHaveText('Chiedo al server di fondere…');
+  expect(await approvazioni(page)).toEqual([req.id]);
+
+  await page.locator('#mgSideClose').click();
+  await page.locator('.mg-forma[data-livello="l5"]').click();
+  await expect(approva).toBeDisabled();
+  await expect(card.locator('.sn-mac-status')).toHaveText('Chiedo al server di fondere…');
+
+  // Il segno messo adesso copre la stessa richiesta: aspetta la risposta già in volo.
+  await page.locator('#mgPreapproveBtn').click();
+  await expect(page.locator('#mgManageMsg')).toContainText('Fusione ferma su questa pratica: Fatto: il lavoro è su main', { timeout: 10000 });
+  expect(await approvazioni(page)).toEqual([req.id]);
+});
+
+test('una fusione in volo non toglie dal titolo quella che aspetta ancora il sì', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const fb = pratica({ mergePreapproved: { by: 'owner@esempio', at: '2026-09-20T09:00:00.000Z' } });
+  const coperta = richiesta();
+  // Una seconda richiesta della stessa pratica nata da blocchi nuovi: il segno pieno messo prima non la copre.
+  const nuova = richiesta({ id: 'ff12cd34ef56ab12cd34ef99', branch: 'worker/fb-tardiva-1-bis', supersedes: coperta.id });
+  await apri(page, [fb], { pending: [coperta, nuova], ritardoMs: 5000 });
+  await expect.poll(() => approvazioni(page), { timeout: 8000 }).toEqual([coperta.id]);
+
+  await apriQuadrato(page, fb._id);
+  await expect(page.locator('#mgSideBody .sn-mac-title-text')).toHaveText('Una fusione aspetta il tuo via libera');
+  const ferma = page.locator(`#mgSideBody .sn-mac-card[data-request-id="${nuova.id}"]`);
+  await expect(ferma.locator('.sn-mac-btn-go')).toBeEnabled();
+  await expect(page.locator(`#mgSideBody .sn-mac-card[data-request-id="${coperta.id}"] .sn-mac-btn-go`)).toBeDisabled();
+});
+
+test('fusione in volo: nessuna frase del pannello o della lista dice ancora che aspetta il tuo sì, nemmeno appena fusa', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const fb = pratica({ mergePreapproved: { by: 'owner@esempio', at: '2026-09-20T09:00:00.000Z' } });
+  const req = richiesta();
+  // Una fusione ferma porta la pratica fra le cose da decidere: la riga in lista sta nei Ricevuti.
+  await apri(page, [fb], { pending: [req], ritardoMs: 5000, tab: 'inbox' });
+  await expect.poll(() => approvazioni(page), { timeout: 8000 }).toEqual([req.id]);
+  await apriQuadrato(page, fb._id);
+
+  const lato = page.locator('#mgSideBody');
+  await expect(lato.locator('.mg-liv-testo')).toHaveText('Approvata: il server sta fondendo il ramo.');
+  await expect(lato.locator('.sn-mac-intro')).toContainText('il server la sta fondendo');
+  expect(await lato.innerText()).not.toMatch(/via libera|Aspettano il tuo sì/);
+  const riga = page.locator(`.mg-item[data-id="${fb._id}"]`);
+  await expect(riga.locator('.mg-fusione-badge')).toHaveText('in fusione');
+  expect(await riga.getAttribute('title')).not.toContain('aspetta il tuo via libera');
+
+  // Appena fusa, prima che la pagina rilegga le richieste: niente «in corso» né «aspetta».
+  await expect(lato.locator('.sn-mac-status')).toContainText('Fatto: il lavoro è su main', { timeout: 10000 });
+  expect(await lato.locator('.sn-mac-title-text').textContent()).toBe('Una fusione decisa');
+  expect(await lato.locator('.mg-liv-testo').textContent()).not.toMatch(/via libera|sta fondendo/);
+});
+
+test('«Approva e fondi» armato quando la fusione parte da sola: la card passa subito al tentativo in corso', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const fb = pratica({ _updateTime: 't1' });
+  const req = richiesta();
+  await apri(page, [fb], { pending: [req], ritardoMs: 5000 });
+  await apriQuadrato(page, fb._id);
+  const card = page.locator('#mgSideBody .sn-mac-card');
+  const approva = card.locator('.sn-mac-btn-go');
+  await approva.click();
+  await expect(approva).toHaveText('Confermi?');
+
+  const conSegno = pratica({ _updateTime: 't2', mergePreapproved: { by: 'owner (script)', at: '2026-09-20T10:00:00.000Z' } });
+  await page.evaluate((doc) => window.__mgTest.setLiveSources({
+    listVersions: async () => [{ _id: doc._id, _updateTime: 't2' }],
+    getMany: async () => [doc],
+  }), conSegno);
+  await page.evaluate(() => window.__mgTest.pollNow());
+  await expect.poll(() => approvazioni(page), { timeout: 8000 }).toEqual([req.id]);
+
+  await expect(approva).toBeDisabled();
+  await expect(approva).toHaveText('Approva e fondi');
+  await expect(card.locator('.sn-mac-status')).toContainText('chiedo al server di fondere');
+  await expect(page.locator('#mgSideBody .sn-mac-title-text')).toHaveText('Una fusione in corso');
+  await expect(page.locator('#mgSideBody .mg-liv-testo')).toHaveText('Approvata: il server sta fondendo il ramo.');
+  await expect(card.locator('.sn-mac-status')).toContainText('Fatto: il lavoro è su main', { timeout: 10000 });
+  expect(await approvazioni(page)).toEqual([req.id]);
+});
+
+test('fusa col tasto, poi il segno (dal tasto o da fuori) prima della rilettura: nessuna seconda approvazione', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const fb = pratica({ _updateTime: 't1' });
+  const req = richiesta();
+  // L'elenco del server la tiene ancora: è la finestra fra la riuscita e la rilettura.
+  await apri(page, [fb], { pending: [req], tieniInAttesa: true });
+  await apriQuadrato(page, fb._id);
+  const card = page.locator('#mgSideBody .sn-mac-card');
+  const approva = card.locator('.sn-mac-btn-go');
+  await approva.click();
+  await approva.click();
+  await expect(card.locator('.sn-mac-status')).toContainText('Fatto: il lavoro è su main');
+
+  await page.locator('#mgPreapproveBtn').click();
+  await expect(page.locator('#mgManageMsg')).toHaveText('Da ora si fonde senza chiedere.');
+  // Il segno tolto e rimesso da fuori: la pratica segnata e la richiesta ancora in elenco.
+  const conSegno = pratica({ _updateTime: 't2', mergePreapproved: { by: 'owner (script)', at: '2026-09-20T10:00:00.000Z' } });
+  await page.evaluate((doc) => window.__mgTest.setLiveSources({
+    listVersions: async () => [{ _id: doc._id, _updateTime: 't2' }],
+    getMany: async () => [doc],
+  }), conSegno);
+  await page.evaluate(() => window.__mgTest.pollNow());
+  await page.evaluate(() => window.__mgTest.loadMergeApprovals());
+  await page.waitForTimeout(1500);
+  expect(await approvazioni(page)).toEqual([req.id]);
+  await expect(card.locator('.sn-mac-status')).toContainText('Fatto: il lavoro è su main');
+  await expect(approva).toBeDisabled();
 });
