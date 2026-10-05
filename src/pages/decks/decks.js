@@ -2290,13 +2290,16 @@
 
     $('deckName').addEventListener('click', (e) => { e.stopPropagation(); openSwitcher(); });
     // Svuota la chat del mazzo: icona nell'intestazione della chat, tasto destro sulla stessa intestazione e voce
-    // del menu del mazzo fanno la stessa cosa (clearChat, con conferma).
+    // del menu del mazzo fanno la stessa cosa (clearChat, con conferma). Mentre Filo risponde, il tasto destro su
+    // intestazione e bolla in attesa ferma come «Ferma» ed Esc (#792).
     $('chatClear').innerHTML = (window.SN_ICONS && window.SN_ICONS.eraser && window.SN_ICONS.eraser(15)) || '⌫';
     $('chatClear').addEventListener('click', () => clearChat());
+    const stopItem = { label: 'Ferma la risposta', run: () => stopChat() };
     $('chatHead').addEventListener('contextmenu', (e) => {
-      if (!current || !(chatByDeck.get(current.id) || []).length) return;
+      const msgs = current && chatByDeck.get(current.id);
+      if (!msgs || !msgs.length) return;
       e.preventDefault();
-      openCtx(e.clientX, e.clientY, [{ label: 'Svuota la chat…', run: () => clearChat() }]);
+      openCtx(e.clientX, e.clientY, [...(chatTaken(msgs) ? [stopItem] : []), { label: 'Svuota la chat…', run: () => clearChat() }]);
     });
     if (chrome.runtime.onMessage && chrome.runtime.onMessage.addListener) {
       chrome.runtime.onMessage.addListener(onChatChangedElsewhere);
