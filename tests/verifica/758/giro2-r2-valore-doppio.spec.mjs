@@ -1,4 +1,4 @@
-// Verifica #758 giro 2: porte rimaste sull'accesso riconosciuto e sui cookie riscritti dal riquadro.
+// Verifica #758 giro 2, rilievo 2: il declassamento riscrive il valore vecchio di un cookie aggiornato due volte.
 import { test, expect } from '../../fixtures/electron.mjs';
 import { createServer } from 'node:http';
 
@@ -32,7 +32,7 @@ async function serve() {
       res.end('<title>DENTRO</title><p>dentro</p>');
       return;
     }
-    if (req.url.startsWith('/login-form')) {
+    if (req.url.startsWith('/form-accesso')) {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end('<title>ACCESSO</title><form method="post" action="/accedi-form"><input name="u" id="u"><input type="password" name="p" id="pw"><button id="go">Entra</button></form>');
       return;
@@ -55,7 +55,7 @@ async function serve() {
   const porta = server.address().port;
   return {
     homePost: `http://b.localhost:${porta}/home-post`,
-    loginForm: `http://b.localhost:${porta}/login-form`,
+    loginForm: `http://b.localhost:${porta}/form-accesso`,
     artTraccia: `http://a.localhost:${porta}/art-traccia`,
     artDoppio: `http://a.localhost:${porta}/art-doppio`,
     async chiudi() { try { server.closeAllConnections?.(); } catch (_) {} await new Promise((r) => server.close(r)); },
@@ -82,45 +82,6 @@ async function pulisci(app) {
     for (let i = 0; i < 20; i++) { await S.giroDiPulizia(); await new Promise((r) => setTimeout(r, 150)); }
   });
 }
-
-test('home col modulo d\'accesso che manda una statistica in POST: senza entrare non diventa un sito con accesso', async ({ app, openTab }) => {
-  const srv = await serve();
-  try {
-    const p = await openTab(srv.homePost);
-    await p.waitForSelector('#pw');
-    await expect.poll(() => cookieDiB(app).then((l) => l.map((c) => c.name)), { timeout: 10_000 }).toContain('_session_id');
-    await new Promise((r) => setTimeout(r, 1000));
-    expect(await loggati(app)).not.toContain('b.localhost');
-  } finally { await srv.chiudi(); }
-});
-
-test('controprova: un accesso col modulo inviato davvero segna il sito', async ({ app, openTab }) => {
-  const srv = await serve();
-  try {
-    const p = await openTab(srv.loginForm);
-    await p.waitForSelector('#pw');
-    await new Promise((r) => setTimeout(r, 800));
-    await p.fill('#u', 'io');
-    await p.fill('#pw', 'segreta');
-    await p.click('#go');
-    await expect.poll(() => loggati(app), { timeout: 10_000 }).toContain('b.localhost');
-  } finally { await srv.chiudi(); }
-});
-
-test('un cookie da traccia già sul disco, riscritto dal riquadro, dura la visita e poi se ne va', async ({ app, openTab }) => {
-  const srv = await serve();
-  try {
-    await app.evaluate(async ({ session }) => {
-      await session.defaultSession.cookies.set({ url: 'https://b.localhost/', name: 'mid', value: 'vecchio', path: '/', secure: true, sameSite: 'no_restriction', expirationDate: Date.now() / 1000 + 86400 * 300 });
-    });
-    await openTab(srv.artTraccia);
-    await expect.poll(() => cookieDiB(app).then((l) => l.find((c) => c.name === 'mid')?.value), { timeout: 10_000 }).toBe('nuovo');
-    await new Promise((r) => setTimeout(r, 800));
-    await chiudiSchede(app, 'a.localhost');
-    await pulisci(app);
-    expect((await cookieDiB(app)).map((c) => c.name)).not.toContain('mid');
-  } finally { await srv.chiudi(); }
-});
 
 test('il riquadro che aggiorna due volte il suo cookie tiene il valore più nuovo', async ({ app, openTab }) => {
   const srv = await serve();
