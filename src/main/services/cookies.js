@@ -310,6 +310,8 @@ function impostaMargineUscita(ms) {
 }
 
 function seguiUscite(partition, ses) {
+  if (seguiti.has(partition)) return;
+  seguiti.add(partition);
   jarDellaSessione.set(ses, partition);
   try {
     ses.on('will-download', (_e, item) => {
