@@ -50,3 +50,14 @@ test('fuori dall\'incognito il seme non cambia (ambito vuoto)', () => {
   modo('default');
   assert.equal(FP.configForHref(PAGINA, '').seed, FP.configForHref(PAGINA).seed);
 });
+
+test('il livello scelto da una finestra in incognito vale solo lì, e alla chiusura torna quello normale', () => {
+  modo('default');
+  FP.setMode({ security: { fingerprint: { mode: 'off' } } }, true);
+  assert.deepEqual(FP.configForHref(PAGINA, INCOGNITO_A), { level: 0, seed: 0 });
+  assert.equal(FP.configForHref(PAGINA).level, 1, 'la finestra normale resta protetta');
+  modo('privacy');
+  assert.equal(FP.configForHref(PAGINA, INCOGNITO_A).level, 0, 'un cambio fuori non scavalca la scelta dell\'incognito');
+  FP.resetIncognito();
+  assert.equal(FP.configForHref(PAGINA, INCOGNITO_A).level, 2);
+});

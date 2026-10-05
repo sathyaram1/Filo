@@ -28,6 +28,8 @@ const SECRET_KEY = '__fpMasterSecret';
 let _secret = null; // Buffer (32 byte)
 let _sessionId = crypto.randomUUID();
 let _mode = MODES.DEFAULT;
+// Il livello scelto da una finestra in incognito vale solo per l'incognito, come i suoi cookie (#754); null = segue _mode.
+let _modeIncognito = null;
 
 function _storage() {
   // Lo stesso store su disco usato dallo shim chrome.storage.local.
@@ -65,9 +67,16 @@ async function init(settings) {
   return _secret;
 }
 
-function setMode(settings) {
-  _mode = getMode(settings);
+function inIncognito() {
+  try { return !!require('../shim/storage').inIncognito(); } catch (_) { return false; }
 }
+
+function setMode(settings, incognito = inIncognito()) {
+  if (incognito) _modeIncognito = getMode(settings);
+  else _mode = getMode(settings);
+}
+
+function resetIncognito() { _modeIncognito = null; }
 
 // eTLD+1 con una piccola lista di suffissi multi-parte comuni. Non è un Public
 // Suffix List completo (sarebbe pesante da bundlare nel preload e qui non
@@ -197,7 +206,7 @@ function isGoogleAppSurface(href) {
 // Config { level, seed } per la pagina identificata da href. Solo http/https
 // vengono protette (filo://, file://, about: → off). `ambito` come in seedForOrigin.
 function configForHref(href, ambito = '') {
-  const level = levelNum(_mode);
+  const level = levelNum((ambito && _modeIncognito) || _mode);
   if (!level) return { level: 0, seed: 0 };
   let host = '';
   try {
@@ -219,6 +228,7 @@ module.exports = {
   levelNum,
   init,
   setMode,
+  resetIncognito,
   etld1,
   isoWeekId,
   seedForOrigin,
