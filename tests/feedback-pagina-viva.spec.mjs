@@ -177,6 +177,20 @@ test('la richiesta arrivata mentre la pagina è aperta si rilegge al giro che ca
   await expect(linguetta(page, 'inbox')).toHaveClass(/fb-tab--arrivi/);
 });
 
+test('una richiesta nata in cloud a stato fermo compare aprendo Ricevuti, come in Gestione', async ({ openTab }) => {
+  const page = await apri(openTab, [
+    fb('f515', 515, 'working', { workingSince: new Date().toISOString() }),
+    fb('f716', 716, 'design'),
+  ]);
+  await page.evaluate(() => window.__fbTest.setLiveSources({ giro: async () => ({ ok: true, giro: { kind: 'skipped' } }) }));
+  await expect(linguetta(page, 'queue')).toHaveText('In coda (1)');
+  await page.evaluate((r) => { window.__srv.pending = [r]; }, richiesta('f515', 515));
+  await linguetta(page, 'inbox').click();
+  await expect(linguetta(page, 'inbox')).toHaveText('Ricevuti (2)', { timeout: 5000 });
+  await expect(linguetta(page, 'queue')).toHaveText('In coda (0)');
+  await expect(scheda(page, 'f515').locator('.fb-fusione')).toHaveText('fusione ferma');
+});
+
 test('in secondo piano non legge, nemmeno per l\'esito di un\'altra pagina; tornando in vista si allinea subito', async ({ openTab, shell }) => {
   const page = await apri(openTab, [
     fb('f716', 716, 'design'),
