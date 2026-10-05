@@ -203,7 +203,8 @@ test('in secondo piano non legge, nemmeno per l\'esito di un\'altra pagina; torn
   expect(await page.evaluate(() => window.__srv.letture)).toBe(fuori);
   expect(await page.evaluate(() => window.__srv.dettagli)).toBe(0);
 
-  // Col ritmo a minuti, il cambio visto in pochi secondi l'ha portato il rientro.
+  // Al rientro il giro della pagina non porta niente: il cambio può venire solo dall'esito messo da parte.
+  await page.evaluate(() => window.__fbTest.setLiveSources({ giro: async () => ({ ok: true, giro: { kind: 'skipped' } }) }));
   await shell.evaluate((id) => window.filoShell.tabs.activate(id), feedback);
   await expect(linguetta(page, 'inbox')).toHaveText('Ricevuti (2)', { timeout: 4000 });
   await expect(linguetta(page, 'queue')).toHaveText('In coda (0)');
