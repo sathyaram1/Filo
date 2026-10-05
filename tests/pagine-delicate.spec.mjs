@@ -134,6 +134,10 @@ test('in Sicurezza un sito aggiunto all\'elenco diventa delicato, e l\'interrutt
   const sicurezza = await openTab('filo://security/security.html');
   await expect(sicurezza.locator('#sec-delicate')).toBeChecked({ timeout: 8000 });
   await expect(sicurezza.locator('#sec-delicate-label')).toHaveText('Non mandare ai modelli le pagine delicate');
+  // La casella dei siti è figlia dell'interruttore: rientra come la sua descrizione, non sta allineata alle voci sorelle.
+  const sinistra = (sel) => sicurezza.locator(sel).evaluate((e) => Math.round(e.getBoundingClientRect().left));
+  expect(await sinistra('#sec-delicate-sites')).toBe(await sinistra('#sec-delicate-desc'));
+  expect(await sinistra('#sec-delicate-sites')).toBeGreaterThan(await sinistra('#sec-delicate'));
   await sicurezza.locator('#sec-delicate-sites').fill('sito-pubblico.test\nstudio rossi');
   await sicurezza.locator('#sec-delicate-sites').blur();
   await expect.poll(async () => (await impostazioni(shell)).security.pagineDelicate.siti, { timeout: 4000 })

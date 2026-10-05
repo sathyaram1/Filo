@@ -167,3 +167,16 @@ test('un sito tolto dai segnati per il campo password non è più delicato per q
   assert.equal(c('https://www.studiorossi.it/', ['studiorossi.it']), 'utente', 'un sito aggiunto dall\'utente resta delicato');
   assert.deepEqual(PD.nonDelicati({ security: { pagineDelicate: { nonDelicati: ['www.Google.com', '', 3] } } }), ['google.com']);
 });
+
+test('la pagina Privacy, fra quello che parte senza che lo si chieda, nomina anche la spiegazione preparata alla selezione', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const testo = await readFile(new URL('../../transparency/privacy.md', import.meta.url), 'utf8');
+  const da = testo.indexOf('**Quello che parte senza che tu lo chieda.**');
+  assert.ok(da >= 0);
+  const sezione = testo.slice(da, testo.indexOf('\n\n', testo.indexOf('\n- ', da) + 1) + 1 || undefined);
+  const voci = sezione.split('\n').filter((r) => r.startsWith('- **'));
+  assert.ok(voci.some((r) => /selezion/i.test(r)), 'manca la spiegazione preparata quando si seleziona del testo');
+  const numeri = { tre: 3, quattro: 4, cinque: 5, sei: 6 };
+  const detto = /\*\* (\p{L}+) funzioni/u.exec(sezione);
+  assert.equal(numeri[(detto && detto[1] || '').toLowerCase()], voci.length, 'il numero detto e le voci elencate coincidono');
+});

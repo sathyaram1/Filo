@@ -43,11 +43,12 @@ Filo funziona con modelli linguistici, e un modello risponde solo a quello che g
 - **I blocchi geografici.** Quando una pagina d'errore non dice chiaramente perché è bloccata, il dominio, il titolo e poche righe della pagina d'errore.
 - **I feedback.** Il testo che scrivi, per farne un titolo breve.
 
-**Quello che parte senza che tu lo chieda.** Tre funzioni mandano a un modello pezzi delle pagine anche quando non stai chiedendo niente:
+**Quello che parte senza che tu lo chieda.** Quattro funzioni mandano a un modello pezzi delle pagine anche quando non stai chiedendo niente:
 
 - **Il riassunto delle schede chiuse.** Quando chiudi una scheda, il titolo e i primi 2.000 caratteri circa del suo testo, per farne un riassunto; poi titolo e riassunto vanno a un modello che ne fa l'indice, così la ritrovi nella Cronologia anche per significato. Si spegne da Preferenze («Riassumi le schede chiuse») o chiedendolo a Filo. Da spento non parte niente, e le schede chiuse si ritrovano per parole.
 - **La pulizia automatica delle schede.** Per proporti quali archiviare, titolo, indirizzo e i primi 500 caratteri delle schede aperte. Si spegne da Preferenze («Gestione automatica delle schede») o chiedendolo a Filo.
 - **Il riconoscimento dei blocchi geografici.** Il dominio, il titolo e poche righe di una pagina d'errore che non dice chiaramente perché è bloccata. Parte solo se hai configurato l'apertura da un altro paese, e solo su pagine d'errore.
+- **La spiegazione della selezione.** Quando selezioni del testo, anche solo per copiarlo, il testo selezionato e la frase intorno, così la spiegazione è già pronta se poi apri il tasto destro. Non ha un interruttore suo: non parte sui siti che escludi da Filo (Impostazioni → Altro, «Domini esclusi»).
 
 Le pagine delicate restano fuori dalle prime due: posta, banche, sanità, le pagine in cui Filo ha visto un campo password o di carta (anche nel riquadro di un altro sito, come il modulo di un servizio di pagamento: vale per tutto il sito che lo mostra) e i siti che aggiungi tu. Di queste Filo tiene sul computer solo titolo e indirizzo, e al modello che riordina le schede dice solo di che tipo sono («posta», «banca»). L'elenco di posta, banche e sanità lo aggiorno da remoto, senza un nuovo Filo. Il controllo è in Sicurezza, «Non mandare ai modelli le pagine delicate», acceso di serie, e lì aggiungi i tuoi siti, anche chiedendolo a Filo («studiorossi.it è un sito delicato», o «questo sito è delicato» con la scheda aperta). Le pagine della rete di casa (router, stampanti, dischi di rete) restano sempre fuori. In incognito non parte niente di tutto questo.
 
