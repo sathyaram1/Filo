@@ -124,6 +124,7 @@ async function apriServer(openTab, doc, ritardi = {}) {
         return r;
       }
       if (msg && msg.type === 'automation_sessions_set') {
+        if (window.__setGiu) return { ok: false, error: 'rete giù' };
         const esito = RS.valida(msg);
         if (!esito.ok) return { ok: false, error: esito.testo };
         Object.assign(window.__doc, esito.valori);
@@ -168,6 +169,34 @@ test('torna la rete e un salvataggio riempie il riquadro: nessuna riga dice più
   await expect(page.locator('#mgAccountsMsg')).toHaveText('');
   // Il documento ora è noto per intero: l'avviso sul prioritario escluso torna a parlare.
   await expect(page.locator('#mgPriorityWarn')).toHaveText("L'account A è escluso: le sessioni partono da B.");
+});
+
+test('mai letto e salvataggio fallito: la riga dice ancora che non sa, finché una lettura piena non arriva', async ({ openTab }) => {
+  // Sul server tutti e due gli account sono esclusi; gli interruttori, non letti, partono accesi.
+  const page = await apriServer(openTab, { accountAOff: true, accountBOff: true }, { getGiu: true });
+  await expect(page.locator('#mgAccountsMsg')).toContainText('Non ho potuto leggere');
+
+  await page.evaluate(() => { window.__setGiu = true; });
+  await interruttore(page, 'B').click();
+  await expect(page.locator('#mgAccountsMsg')).toContainText('NON è cambiata');
+  // Senza l'avviso la riga direbbe «tutti e due in uso, e niente è cambiato».
+  await expect(page.locator('#mgAccountsMsg')).toContainText('Non ho potuto leggere');
+
+  // Lo stesso vale per il numero, che resta vuoto e non letto.
+  await page.locator('#mgMaxSessions').fill('5');
+  await page.locator('#mgMaxSessionsSave').click();
+  await expect(page.locator('#mgMaxSessionsMsg')).toContainText('NON è cambiata');
+  await expect(page.locator('#mgMaxSessionsMsg')).toContainText('Non ho potuto leggere');
+
+  // Torna la rete: la prima risposta piena toglie ogni «non letto», anche accanto ai fallimenti.
+  await page.evaluate(() => { window.__setGiu = false; window.__getGiu = false; });
+  await pillola(page, 'A').click();
+  await expect(page.locator('#mgPriorityAccountMsg')).toHaveText('Salvato.');
+  await expect(page.locator('#mgAccountA')).not.toBeChecked();
+  await expect(page.locator('#mgAccountB')).not.toBeChecked();
+  for (const id of ['#mgMaxSessionsMsg', '#mgAccountsMsg']) {
+    await expect(page.locator(id)).not.toContainText('Non ho potuto leggere');
+  }
 });
 
 test('numero e poi interruttore, la prima risposta arriva per ultima: restano tutti e due', async ({ openTab }) => {

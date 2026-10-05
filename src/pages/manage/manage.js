@@ -842,17 +842,35 @@
   // Numero scritto e non ancora salvato: una risposta su un altro campo non lo cancella.
   let maxInScrittura = false;
 
-  // Righe che dicono di non aver letto dal server, col testo che resta quando
+  // Righe che dicono di non aver riletto il resto, col testo che resta quando
   // un documento intero arriva: da lì in poi l'avviso sarebbe falso (#675).
   const avvisiLettura = new Map();
+  const righeSessions = [[mgMaxSessionsMsg, ['maxSessions']], [mgPriorityAccountMsg, ['priorityAccount']], [mgAccountsMsg, ['accountAOff', 'accountBOff']]];
+  // Ultimo esito di ogni riga; l'avviso «non letto» non è un esito: lo decide mostraSessionsMsg.
+  const esitiSessions = new Map();
+  const sceltePendenti = () => Object.assign({}, ...sessionsInAttesa.map((s) => s.valori));
+  const notoSessions = (...chiavi) => {
+    const scelte = sceltePendenti();
+    return chiavi.every((k) => sessionsNoti.has(k) || k in scelte);
+  };
+
+  // Regola unica (#675): una riga con un campo mai letto dal server lo dice
+  // sempre, anche accanto a un fallimento; tace solo davanti a un esito riuscito o in corso.
+  function mostraSessionsMsg(el) {
+    const riga = righeSessions.find(([e]) => e === el);
+    const esito = esitiSessions.get(el) || { testo: '', kind: null };
+    const avvisa = Boolean(riga) && !notoSessions(...riga[1]) && (!esito.testo || esito.kind === 'err');
+    el.textContent = avvisa ? [esito.testo, SESSIONS_NON_LETTO].filter(Boolean).join(' ') : esito.testo;
+    el.classList.toggle('mg-ok', !avvisa && esito.kind === 'ok');
+    el.classList.toggle('mg-err', avvisa || esito.kind === 'err');
+  }
 
   function setSessionsMsg(el, text, kind, dopoLettura) {
     if (!el) return;
     if (dopoLettura === undefined) avvisiLettura.delete(el);
     else avvisiLettura.set(el, dopoLettura);
-    el.textContent = text || '';
-    el.classList.toggle('mg-ok', kind === 'ok');
-    el.classList.toggle('mg-err', kind === 'err');
+    esitiSessions.set(el, { testo: text || '', kind: kind || null });
+    mostraSessionsMsg(el);
   }
 
   /** Solo i campi scritti da una richiesta: sono veri anche se il resto della risposta non lo è più. */
@@ -876,14 +894,13 @@
     sessionsState = doc;
     for (const k of RS.CHIAVI) sessionsNoti.add(k);
     accogliCampiSessions(doc, scritti);
-    for (const [el, resta] of [...avvisiLettura]) setSessionsMsg(el, resta, resta ? 'ok' : null);
+    for (const [el, resta] of [...avvisiLettura]) setSessionsMsg(el, resta, 'ok');
   }
 
   function reflectSessions() {
     if (!RS) return;
-    const scelte = Object.assign({}, ...sessionsInAttesa.map((s) => s.valori));
-    const vista = RS.leggiDoc(Object.assign({}, sessionsState, scelte));
-    const noto = (...chiavi) => chiavi.every((k) => sessionsNoti.has(k) || k in scelte);
+    const vista = RS.leggiDoc(Object.assign({}, sessionsState, sceltePendenti()));
+    const noto = notoSessions;
     if (mgMaxSessions && !maxInScrittura) mgMaxSessions.value = noto('maxSessions') ? String(vista.maxSessions) : '';
     for (const r of mgPriorityRadios) r.checked = noto('priorityAccount') && r.value === vista.priorityAccount;
     if (mgAccountA) mgAccountA.checked = !vista.accountAOff;
@@ -897,6 +914,7 @@
       mgPriorityWarn.hidden = !noto(...RS.CHIAVI) || !resta;
       if (resta) mgPriorityWarn.textContent = `L'account ${vista.priorityAccount} è escluso: le sessioni partono da ${resta}.`;
     }
+    for (const [el] of righeSessions) if (el) mostraSessionsMsg(el);
   }
 
   function sessionsNonLette(nato) {
@@ -906,10 +924,9 @@
     sessionsState = RS.leggiDoc(tenuti);
     sessionsNoti.clear();
     for (const k of fermi) sessionsNoti.add(k);
+    // L'esito di prima parlava di valori che adesso non sono più letti.
+    for (const [el, chiavi] of righeSessions) if (el && !notoSessions(...chiavi)) setSessionsMsg(el, '', null);
     reflectSessions();
-    for (const [el, chiavi] of [[mgMaxSessionsMsg, ['maxSessions']], [mgPriorityAccountMsg, ['priorityAccount']], [mgAccountsMsg, ['accountAOff', 'accountBOff']]]) {
-      if (!chiavi.every((k) => fermi.includes(k))) setSessionsMsg(el, SESSIONS_NON_LETTO, 'err', '');
-    }
   }
 
   function loadSessions() {
