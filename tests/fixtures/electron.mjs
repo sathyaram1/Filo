@@ -15,7 +15,7 @@
 //     vogliono il pixel-perfect.
 
 import { test as base, _electron as electron, expect } from '@playwright/test';
-import { rmSync } from 'node:fs';
+import { rmSync, writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
@@ -46,11 +46,44 @@ export async function chiudiApp(app, { tetto = 5000 } = {}) {
   const scaduto = new Promise((r) => { timer = setTimeout(r, tetto); timer.unref?.(); });
   await Promise.race([app.close(), scaduto]).catch(() => {});
   clearTimeout(timer);
-  if (pid) { try { process.kill(pid, 'SIGKILL'); } catch (_) {} }
+  if (!pid) return;
+  // Fuori da Windows Playwright fa di Electron il capo di un gruppo di processi: si ammazza il gruppo,
+  // perché un figlio rimasto (un renderer) tiene aperte le pipe e Playwright aspetta che si chiudano.
+  if (process.platform === 'win32') { try { process.kill(pid, 'SIGKILL'); } catch (_) {} }
+  else { try { process.kill(-pid, 'SIGKILL'); } catch (_) { try { process.kill(pid, 'SIGKILL'); } catch (_) {} } }
+}
+
+// Quello che l'app scrive su stdout/stderr (in test le righe render-process-gone e did-fail-load)
+// Playwright non lo mostra: senza, un rosso che c'è solo in GitHub non si spiega (#639).
+const TETTO_RIGHE_APP = 20_000;
+function registraUsciteApp(app) {
+  const righe = [];
+  let perse = 0;
+  const t0 = Date.now();
+  const resti = { out: '', err: '' };
+  const prendi = (canale) => (pezzo) => {
+    const parti = (resti[canale] + pezzo.toString('utf8')).split('\n');
+    resti[canale] = parti.pop();
+    for (const r of parti) {
+      righe.push(`+${Date.now() - t0}ms [${canale}] ${r}`);
+      if (righe.length > TETTO_RIGHE_APP) { righe.shift(); perse++; }
+    }
+  };
+  try {
+    const proc = app.process();
+    proc.stdout?.on('data', prendi('out'));
+    proc.stderr?.on('data', prendi('err'));
+  } catch (_) {}
+  return () => [
+    'Uscita dell\'app (stdout e stderr dal momento in cui Playwright l\'ha agganciata):',
+    ...(perse ? [`… ${perse} righe più vecchie non tenute: il tetto è ${TETTO_RIGHE_APP}`] : []),
+    ...righe,
+    ...Object.entries(resti).filter(([, r]) => r).map(([c, r]) => `[${c}, senza a capo] ${r}`),
+  ].join('\n');
 }
 
 export const test = base.extend({
-  app: async ({}, use) => {
+  app: async ({}, use, testInfo) => {
     // Canonica, non abbreviata: vedi tests/helpers/percorsi.mjs. Da qui esce
     // anche FILO_DOWNLOAD_DIR, che gli spec degli scaricamenti confrontano con
     // il percorso che l'app riporta.
@@ -91,8 +124,17 @@ export const test = base.extend({
         NODE_ENV: 'test',
       },
     });
+    const usciteApp = registraUsciteApp(app);
     await use(app);
     await chiudiApp(app);
+    // Dopo la chiusura, così ci sono anche le righe di un'app che muore male uscendo.
+    if (testInfo.status !== testInfo.expectedStatus) {
+      try {
+        const file = testInfo.outputPath('uscita-app.txt');
+        writeFileSync(file, usciteApp());
+        await testInfo.attach('uscita-app', { path: file, contentType: 'text/plain' });
+      } catch (_) {}
+    }
     try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
   },
 
