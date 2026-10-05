@@ -3,10 +3,11 @@
 // Regola: patterns/le-prove-di-un-giro-stanno-nel-ramo-e-la-cartella-si-svuota.md.
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { preparaLancioElectron } from './schermo-virtuale.mjs';
-import { diffDopoLaVerifica, soloProveTolte } from './solo-tolte.mjs';
+import { diffDopoLaVerifica, soloProveTolte, vociNameStatus } from './solo-tolte.mjs';
 
 const PROVE_GIRO = 'tests/verifica/';
 const SHA = /^[0-9a-f]{7,40}$/i;
@@ -14,12 +15,43 @@ const SHA = /^[0-9a-f]{7,40}$/i;
 // Gitignorata: il salvataggio automatico non deve mai committarla.
 export const PREFISSO_RIPRISTINO = '_tolte-';
 
+const PROVA = /\.spec\.m?js$/;
+const nelGiro = (f) => f.startsWith(PROVE_GIRO) && f.split('/').length >= 4
+  && !f.split('/').includes('..') && !f.split('/')[2].startsWith(PREFISSO_RIPRISTINO);
+const percorsi = (l) => (Array.isArray(l) ? l : []).map((f) => String(f || '').replace(/\\/g, '/'));
+const cartellaDi = (f) => String(f).split('/').slice(0, 3).join('/');
+
 /** Dai file cancellati, le prove che Playwright raccoglierebbe dentro tests/verifica/<cartella>/. PURA. */
 export function proveTolte(cancellati) {
-  return (Array.isArray(cancellati) ? cancellati : [])
-    .map((f) => String(f || '').replace(/\\/g, '/'))
-    .filter((f) => f.startsWith(PROVE_GIRO) && f.split('/').length >= 4 && /\.spec\.m?js$/.test(f)
-      && !f.split('/').includes('..') && !f.split('/')[2].startsWith(PREFISSO_RIPRISTINO));
+  return percorsi(cancellati).filter((f) => nelGiro(f) && PROVA.test(f));
+}
+
+/** I file di supporto di una cartella del giro (aiuti, pagine, dati): non sono prove, ma le prove li usano. PURA. */
+export function supportoDelGiro(files) {
+  return percorsi(files).filter((f) => nelGiro(f) && !PROVA.test(f));
+}
+
+const comeTesto = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const nomina = (testo, f) => new RegExp(`(?:^|[^\\w.-])${comeTesto(f.split('/').pop())}(?![\\w-])`).test(testo);
+
+/**
+ * Le prove che usano i file di supporto `cambiati`, anche passando per un altro aiuto: chi nomina il file, nella
+ * stessa cartella del giro. `testi`: `[{ path, testo }]`. `via`: per ogni prova, i file da cui dipende. PURA.
+ */
+export function proveCheDipendono(testi, cambiati) {
+  const elenco = (Array.isArray(testi) ? testi : []).filter((t) => t && t.path)
+    .map((t) => ({ path: String(t.path).replace(/\\/g, '/'), testo: String(t.testo || '') }));
+  const via = {};
+  for (const c of supportoDelGiro(cambiati)) {
+    const raggiunti = new Set([c]);
+    for (let nuovi = [c]; nuovi.length;) {
+      nuovi = elenco.filter((t) => !raggiunti.has(t.path) && cartellaDi(t.path) === cartellaDi(c)
+        && nuovi.some((n) => nomina(t.testo, n))).map((t) => t.path);
+      for (const n of nuovi) raggiunti.add(n);
+    }
+    for (const p of proveTolte([...raggiunti])) (via[p] ||= []).push(c);
+  }
+  return { prove: Object.keys(via), via };
 }
 
 /** Dove una prova tolta torna a vivere per il rilancio. PURA. */
@@ -32,18 +64,22 @@ export function percorsoRipristino(prova, etichetta) {
 /**
  * Cosa fare dopo il rilancio. PURA. Le prove dei rilievi messi da parte se ne sono andate prima, nel
  * commit della pulizia, che è la base del confronto: qui ogni rossa riproduce un rilievo da chiudere.
+ * `via`: le prove rilanciate perché è cambiato un file di supporto che usano, con quei file.
  */
-export function esitoProveTolte({ rosse = [], dallaPulizia = [], shaPrima = '', conPulizia = true, messi = 0 } = {}) {
+export function esitoProveTolte({ rosse = [], dallaPulizia = [], shaPrima = '', conPulizia = true, messi = 0, via = {} } = {}) {
   if (!rosse.length && !dallaPulizia.length) return { ferma: false, testo: '' };
+  const dove = via && typeof via === 'object' ? via : {};
+  const riga = (f) => `  · ${f}${Array.isArray(dove[f]) && dove[f].length ? ` (usa ${dove[f].map((x) => x.split('/').slice(3).join('/')).join(', ')})` : ''}`;
   // Un file che copriva anche un rilievo messo da parte: la pulizia gli ha tolto un caso, e quello che resta è da correggere.
   const casi = dallaPulizia.length ? [
-    'Consegna respinta: a queste prove la pulizia ha tolto il caso di un rilievo messo da parte, e il caso che resta',
-    'riproduce un rilievo da correggere. Sul codice nuovo è ancora rosso:',
-    dallaPulizia.map((f) => `  · ${f}`).join('\n'),
+    'Consegna respinta: a queste prove la pulizia ha tolto il caso di un rilievo messo da parte (o righe di un file di',
+    'supporto che usano), e il caso che resta riproduce un rilievo da correggere. Sul codice nuovo è ancora rosso:',
+    dallaPulizia.map(riga).join('\n'),
     'Correggi finché è verde, e consegna di nuovo.',
   ] : [];
   if (!rosse.length) return { ferma: true, testo: casi.join('\n') };
   const rimetti = `git checkout ${String(shaPrima).slice(0, 12) || '<commit della critica>'} -- <file>`;
+  const supporto = rosse.some((f) => Array.isArray(dove[f]) && dove[f].length);
   // Senza pulizia registrata una rossa può essere di un rilievo messo da parte: quello aspetta l'owner, non si corregge qui.
   const perche = conPulizia ? [
     'Le prove dei rilievi messi da parte sono uscite prima, nel commit della pulizia: ognuna di queste riproduce',
@@ -61,9 +97,12 @@ export function esitoProveTolte({ rosse = [], dallaPulizia = [], shaPrima = '', 
   return {
     ferma: true,
     testo: [
-      'Consegna respinta: hai cancellato o cambiato prove del giro che, com\'erano, sul codice nuovo sono ancora rosse.',
-      rosse.map((f) => `  · ${f}`).join('\n'),
+      supporto
+        ? 'Consegna respinta: hai cancellato o cambiato prove del giro, o file di supporto che usano, e com\'erano sul codice nuovo sono ancora rosse.'
+        : 'Consegna respinta: hai cancellato o cambiato prove del giro che, com\'erano, sul codice nuovo sono ancora rosse.',
+      rosse.map(riga).join('\n'),
       ...perche,
+      ...(supporto ? ['Un file di supporto della cartella del giro si rimette com\'era allo stesso modo: indebolirlo spegne le prove che lo usano.'] : []),
       'Una prova, o un suo caso, si toglie solo verde, insieme alla prova durevole che la sostituisce.',
       ...casi,
     ].join('\n'),
@@ -100,7 +139,7 @@ export function puliziaDelPass(shaCritica, punti, root) {
   for (const sha of [...new Set(shas.reverse())]) {
     try { execFileSync('git', ['merge-base', '--is-ancestor', critica, sha], { cwd: root, stdio: 'ignore' }); } catch (_) { continue; }
     const tol = soloProveTolte(diffDopoLaVerifica(critica, sha, root));
-    if (tol.ok && tol.files.length) return sha;
+    if (tol.ok && proveTolte(tol.files).length) return sha;
   }
   return '';
 }
@@ -109,7 +148,8 @@ export function puliziaDelPass(shaCritica, punti, root) {
  * Il commit della pulizia, fra la critica e HEAD: solo prove o casi TOLTI, tutti da una cartella del
  * giro (`cartella`, o una sola se non la si sa). Stessa regola di «dopo un verdetto si può solo togliere».
  * `{ ok, motivo, sha, files, cancellate, cambiate, vecchie }`: `motivo` è già la frase per chi l'ha lanciata;
- * `vecchie` (null senza `avvio`) sono le prove tolte che la verifica non ha né scritto né rinominato.
+ * `files` sono solo le prove (un file di supporto non lo è); `vecchie` (null senza `avvio`) sono le prove
+ * tolte che la verifica non ha né scritto né rinominato. Cosa resta rosso lo dice controllaCasiDellaPulizia.
  */
 export function controllaPulizia({ shaCritica, root, cartella = '', avvio = '' } = {}) {
   const critica = String(shaCritica || '');
@@ -123,7 +163,10 @@ export function controllaPulizia({ shaCritica, root, cartella = '', avvio = '' }
   const voci = diffDopoLaVerifica(critica, head, root);
   const tol = soloProveTolte(voci);
   if (!tol.ok) return { ok: false, motivo: `il commit della pulizia deve solo togliere prove del giro, e qui ${tol.motivo}.` };
-  if (!tol.files.length) return { ok: false, motivo: 'dopo la critica non è stata tolta nessuna prova del giro.' };
+  const prove = proveTolte(tol.files);
+  if (!prove.length) {
+    return { ok: false, motivo: `dopo la critica non è stata tolta nessuna prova del giro${tol.files.length ? ' (un file di supporto non è una prova)' : ''}.` };
+  }
   const cartelle = [...new Set(tol.files.map((f) => f.replace(/\\/g, '/').split('/').slice(0, 3).join('/')))];
   const attesa = String(cartella || '').replace(/\\/g, '/').replace(/\/+$/, '');
   const fuori = attesa ? cartelle.filter((c) => c !== attesa) : (cartelle.length > 1 ? cartelle : []);
@@ -132,10 +175,10 @@ export function controllaPulizia({ shaCritica, root, cartella = '', avvio = '' }
   }
   const cancellata = (v) => String(v.stato || '').toUpperCase().startsWith('D');
   return {
-    ok: true, motivo: '', sha: head, files: tol.files,
+    ok: true, motivo: '', sha: head, files: prove,
     cancellate: voci.filter(cancellata).map((v) => v.path),
     cambiate: voci.filter((v) => !cancellata(v)).map((v) => v.path),
-    vecchie: proveVecchie(proveTolte(tol.files), avvio, critica, root),
+    vecchie: proveVecchie(prove, avvio, critica, root),
   };
 }
 
@@ -226,12 +269,30 @@ function gitOut(args, root) {
   return execFileSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 1 << 26, stdio: ['ignore', 'pipe', 'ignore'] });
 }
 
-// Le prove del giro cancellate o cambiate fra `shaPrima` e HEAD (null se git non risponde): togliere il
-// caso rosso e tenere il file è la stessa porta aperta che cancellarlo.
+// I testi dei file di codice di quelle cartelle a `rev`: da lì si legge chi usa un file di supporto.
+function testiAl(rev, cartelle, root) {
+  const testi = [];
+  for (const c of new Set(cartelle)) {
+    for (const f of gitOut(['ls-tree', '-r', '-z', '--name-only', rev, '--', `${c}/`], root).split('\0').filter(Boolean)) {
+      if (/\.(?:[cm]?[jt]sx?|json|html?)$/i.test(f)) testi.push({ path: f, testo: gitOut(['show', `${rev}:${f}`], root) });
+    }
+  }
+  return testi;
+}
+
+function dipendentiAl(rev, supporto, root) {
+  return supporto.length ? proveCheDipendono(testiAl(rev, supporto.map(cartellaDi), root), supporto) : { prove: [], via: {} };
+}
+
+// Le prove del giro da rilanciare fra `shaPrima` e HEAD, `{ prove, via }` (null se git non risponde): togliere il caso
+// rosso, o indebolire il file di supporto che lo controlla, è la stessa porta aperta che cancellare la prova.
 export function proveTolteDal(shaPrima, root, principale = riferimentoPrincipale(root)) {
   try {
-    const out = gitOut(['diff', '--name-only', '-z', '--no-renames', '--diff-filter=DM', shaPrima, 'HEAD', '--', PROVE_GIRO], root);
-    return toccateDalRamo(proveTolte(out.split('\0').filter(Boolean)), shaPrima, root, principale);
+    const nomi = gitOut(['diff', '--name-only', '-z', '--no-renames', '--diff-filter=DM', shaPrima, 'HEAD', '--', PROVE_GIRO], root).split('\0').filter(Boolean);
+    const prove = toccateDalRamo(proveTolte(nomi), shaPrima, root, principale);
+    const dip = dipendentiAl(shaPrima, toccateDalRamo(supportoDelGiro(nomi), shaPrima, root, principale), root);
+    const via = Object.fromEntries(Object.entries(dip.via).filter(([p]) => !prove.includes(p)));
+    return { prove: [...prove, ...Object.keys(via)], via };
   } catch (_) { return null; }
 }
 
@@ -265,62 +326,162 @@ export function toccateDalRamo(prove, shaPrima, root, principale = riferimentoPr
  * Rilancia le prove tolte, ciascuna nella sua cartella com'era a `shaPrima` e col codice di adesso.
  * `{ rosse, motivo }`: `motivo` non vuoto = non si è potuto rilanciare, e non è un via libera.
  */
-export function rilanciaProveTolte(prove, shaPrima, root, { lancia = spawnSync, log = console.log, prepara = preparaLancioElectron } = {}) {
+export function rilanciaProveTolte(prove, shaPrima, root, opzioni = {}) {
+  const r = corriCome(prove, shaPrima, root, opzioni);
+  return { rosse: prove.filter((p) => r.esiti.get(p)?.rossa), motivo: r.motivo };
+}
+
+// Ogni prova nella sua cartella com'era a `sha`, col codice di adesso: `{ esiti: Map<prova, { rossa, casi }>, motivo }`.
+// Con `perCaso` anche l'esito di ogni caso (casiDalReport), null se Playwright non l'ha scritto.
+function corriCome(prove, sha, root, { lancia = spawnSync, log = console.log, prepara = preparaLancioElectron, titolo = '', perCaso = false, etichetta = `${process.pid}` } = {}) {
+  const esiti = new Map();
   const schermo = prepara('npx', []);
-  if (!schermo.ok) return { rosse: [], motivo: schermo.motivo };
-  const etichetta = `${process.pid}`;
-  const cartelle = [...new Set(prove.map((p) => p.split('/').slice(0, 3).join('/')))];
-  const rosse = [];
+  if (!schermo.ok) return { esiti, motivo: schermo.motivo };
+  const cartelle = [...new Set(prove.map(cartellaDi))];
+  let rapporti = '';
   try {
+    if (perCaso) rapporti = mkdtempSync(join(tmpdir(), 'filo-casi-'));
     for (const c of cartelle) {
-      const files = gitOut(['ls-tree', '-r', '-z', '--name-only', shaPrima, '--', `${c}/`], root).split('\0').filter(Boolean);
+      const files = gitOut(['ls-tree', '-r', '-z', '--name-only', sha, '--', `${c}/`], root).split('\0').filter(Boolean);
       for (const f of files) {
         const dest = resolve(root, percorsoRipristino(f, etichetta));
         mkdirSync(dirname(dest), { recursive: true });
-        writeFileSync(dest, execFileSync('git', ['show', `${shaPrima}:${f}`], { cwd: root, maxBuffer: 1 << 26, stdio: ['ignore', 'pipe', 'ignore'] }));
+        writeFileSync(dest, execFileSync('git', ['show', `${sha}:${f}`], { cwd: root, maxBuffer: 1 << 26, stdio: ['ignore', 'pipe', 'ignore'] }));
       }
     }
-    log(`Rilancio com'${prove.length === 1 ? 'era' : 'erano'} ${prove.length} ${prove.length === 1 ? 'prova' : 'prove'} del giro cancellate o cambiate dopo la critica, sul codice nuovo:`);
-    for (const p of prove) {
-      const l = prepara('npx', ['playwright', 'test', percorsoRipristino(p, etichetta), '--retries=1']);
-      const r = lancia(l.cmd, l.args, { cwd: root, stdio: 'inherit', shell: process.platform === 'win32', ...(l.env ? { env: l.env } : {}) });
-      if (!r || r.status !== 0) rosse.push(p);
-    }
-    return { rosse, motivo: '' };
+    log(titolo || `Rilancio com'${prove.length === 1 ? 'era' : 'erano'} ${prove.length} ${prove.length === 1 ? 'prova' : 'prove'} del giro cancellate o cambiate dopo la critica, sul codice nuovo:`);
+    prove.forEach((p, i) => {
+      const l = prepara('npx', ['playwright', 'test', percorsoRipristino(p, etichetta), '--retries=1', ...(perCaso ? ['--reporter=list,json'] : [])]);
+      const rapporto = perCaso ? join(rapporti, `${i}.json`) : '';
+      const env = perCaso ? { ...(l.env || process.env), PLAYWRIGHT_JSON_OUTPUT_FILE: rapporto } : l.env;
+      const r = lancia(l.cmd, l.args, { cwd: root, stdio: 'inherit', shell: process.platform === 'win32', ...(env ? { env } : {}) });
+      esiti.set(p, { rossa: !r || r.status !== 0, casi: perCaso ? casiDalReport(leggiJson(rapporto)) : null });
+    });
+    return { esiti, motivo: '' };
   } catch (e) {
-    return { rosse, motivo: `non sono riuscito a rimettere le prove tolte com'erano a ${String(shaPrima).slice(0, 8)}: ${e.message}` };
+    return { esiti, motivo: `non sono riuscito a rimettere le prove com'erano a ${String(sha).slice(0, 8)}: ${e.message}` };
   } finally {
     for (const c of cartelle) rmSync(resolve(root, percorsoRipristino(`${c}/x`, etichetta), '..'), { recursive: true, force: true });
+    if (rapporti) rmSync(rapporti, { recursive: true, force: true });
   }
+}
+
+function leggiJson(file) {
+  try { return JSON.parse(readFileSync(file, 'utf8')); } catch (_) { return null; }
+}
+
+/** Dal rapporto JSON di Playwright, `{ titolo: ok }` per ogni caso (describe compresi, il file no); null senza. PURA. */
+export function casiDalReport(rapporto) {
+  if (!rapporto || typeof rapporto !== 'object' || !Array.isArray(rapporto.suites)) return null;
+  const casi = {};
+  const visita = (suite, sopra) => {
+    for (const s of Array.isArray(suite?.specs) ? suite.specs : []) {
+      const t = [...sopra, String(s?.title ?? '')].join(' › ');
+      casi[t] = casi[t] !== false && s?.ok !== false;
+    }
+    for (const figlia of Array.isArray(suite?.suites) ? suite.suites : []) visita(figlia, [...sopra, String(figlia?.title ?? '')]);
+  };
+  for (const file of rapporto.suites) visita(file, []);
+  return casi;
+}
+
+/**
+ * Sullo stesso codice, cosa ha spento la pulizia: `spenti` i casi rossi prima e verdi dopo, `vuota` se prima c'era un
+ * rosso e dopo non ce n'è più nessuno (anche: il file non carica). Senza l'esito per caso decide quello del file. PURA.
+ */
+export function casiSpenti(prima, dopo) {
+  const p = prima || {};
+  const d = dopo || {};
+  if (!p.casi || !d.casi) return { spenti: [], vuota: !!p.rossa && !d.rossa };
+  const rossi = Object.keys(p.casi).filter((t) => p.casi[t] === false);
+  if (!rossi.length) return { spenti: [], vuota: false };
+  return { spenti: rossi.filter((t) => d.casi[t] === true), vuota: !Object.values(d.casi).includes(false) };
+}
+
+/** Il rifiuto della pulizia che ha spento un caso rosso, o '' se non ne ha spenti. PURA. */
+export function testoCasiSpenti(fuori, via = {}, shaCritica = '') {
+  const elenco = (Array.isArray(fuori) ? fuori : []).filter((x) => x && (x.vuota || (x.spenti && x.spenti.length)));
+  if (!elenco.length) return '';
+  const dove = via && typeof via === 'object' ? via : {};
+  const righe = elenco.map(({ f, spenti = [] }) => {
+    const usa = Array.isArray(dove[f]) && dove[f].length ? ` (usa ${dove[f].map((x) => x.split('/').slice(3).join('/')).join(', ')})` : '';
+    const cosa = spenti.length
+      ? `${spenti.map((t) => `«${t}»`).join(', ')} ${spenti.length === 1 ? 'era rosso ed è verde' : 'erano rossi e sono verdi'}`
+      : 'non ha più un caso rosso';
+    return `  · ${f}${usa}: ${cosa}`;
+  });
+  return [
+    'pulizia non registrata: il codice è ancora quello della critica, e la pulizia ha spento dei casi rossi.',
+    ...righe,
+    'Esce solo il caso del rilievo messo da parte: quello di un rilievo da correggere resta rosso finché il codice non lo',
+    `fa diventare verde. Rimetti com'erano (git checkout ${String(shaCritica).slice(0, 12) || '<commit della critica>'} -- <file>), togli solo le righe`,
+    'del rilievo messo da parte, `git add -A && git commit`, e rilancia la pulizia.',
+  ].join('\n');
+}
+
+// Le prove toccate dalla pulizia, `{ prove, via }`: quelle a cui ha tolto un caso, e quelle che usano un file di
+// supporto che ha cambiato (lette alla critica, dove c'era ancora). null se git non risponde.
+function toccateDallaPulizia(shaCritica, shaPulizia, root) {
+  const critica = String(shaCritica || '');
+  if (!SHA.test(critica) || !SHA.test(String(shaPulizia || '')) || critica === String(shaPulizia)) return null;
+  try {
+    const voci = vociNameStatus(gitOut(['diff', '--name-status', '-z', '--no-renames', critica, String(shaPulizia), '--', PROVE_GIRO], root));
+    const uscite = new Set(voci.filter((v) => v.stato === 'D').map((v) => v.path));
+    const dirette = proveTolte(voci.filter((v) => v.stato === 'M').map((v) => v.path));
+    const dip = dipendentiAl(critica, supportoDelGiro(voci.map((v) => v.path)), root);
+    const via = Object.fromEntries(Object.entries(dip.via).filter(([p]) => !uscite.has(p) && !dirette.includes(p)));
+    return { prove: [...dirette, ...Object.keys(via)], via };
+  } catch (_) { return null; }
+}
+
+/**
+ * Prima di registrare la pulizia: ogni caso rosso di una prova che ha toccato resta rosso, perché il codice è ancora
+ * quello della critica. Si rilancia com'è dopo; com'era alla critica solo dove dopo c'è un verde da spiegare.
+ */
+export function controllaCasiDellaPulizia({ shaCritica, sha, root, log = console.log, lancia, prepara } = {}) {
+  const toccate = toccateDallaPulizia(shaCritica, sha, root);
+  if (!toccate) return { ferma: true, testo: 'pulizia non registrata: git non mi dice quali prove del giro ha toccato.' };
+  const n = toccate.prove.length;
+  if (!n) return { ferma: false, testo: '' };
+  const opz = { log, perCaso: true, ...(lancia ? { lancia } : {}), ...(prepara ? { prepara } : {}) };
+  const dopo = corriCome(toccate.prove, sha, root, {
+    ...opz, etichetta: `${process.pid}-dopo`,
+    titolo: `Rilancio ${n === 1 ? 'la prova toccata' : `le ${n} prove toccate`} dalla pulizia, sul codice della critica: ogni caso rosso deve restare rosso.`,
+  });
+  if (dopo.motivo) return { ferma: true, testo: `pulizia non registrata: ${dopo.motivo}` };
+  const conUnVerde = toccate.prove.filter((p) => {
+    const e = dopo.esiti.get(p) || {};
+    return e.casi ? Object.values(e.casi).some(Boolean) || !Object.values(e.casi).includes(false) : !e.rossa;
+  });
+  if (!conUnVerde.length) return { ferma: false, testo: '' };
+  const prima = corriCome(conUnVerde, shaCritica, root, {
+    ...opz, etichetta: `${process.pid}-prima`, titolo: 'E com\'erano alla critica, per vedere se quei verdi erano rossi:',
+  });
+  if (prima.motivo) return { ferma: true, testo: `pulizia non registrata: ${prima.motivo}` };
+  const testo = testoCasiSpenti(conUnVerde.map((f) => ({ f, ...casiSpenti(prima.esiti.get(f), dopo.esiti.get(f)) })), toccate.via, shaCritica);
+  return { ferma: !!testo, testo };
 }
 
 /**
  * Tutto il controllo, per chi consegna: `{ ferma, testo }`. `shaPrima` è la base (baseDelConfronto).
  * Senza non si sa cosa è stato tolto: lo si dice e non si ferma (la verifica dopo rilancia la cartella).
- * Con `shaCritica` si rilanciano anche le prove a cui la pulizia ha tolto un caso, com'erano dopo di lei.
+ * Con `shaCritica` si rilanciano anche le prove che la pulizia ha toccato, com'erano dopo di lei.
  */
 export function controllaProveTolte({ shaPrima, root, log = console.log, lancia, prepara, conPulizia = true, messi = 0, shaCritica = '' } = {}) {
   if (!SHA.test(String(shaPrima || ''))) {
     return { ferma: false, testo: 'Non so da che commit è partita la correzione: le prove del giro cancellate o cambiate non le rilancio.' };
   }
-  const prove = proveTolteDal(shaPrima, root);
-  if (prove === null) return { ferma: false, testo: 'Git non mi dice quali prove del giro sono state cancellate o cambiate: non le rilancio.' };
-  const accorciate = conPulizia ? (proveAccorciateDallaPulizia(shaCritica, shaPrima, root) || []).filter((f) => !prove.includes(f)) : [];
+  const dal = proveTolteDal(shaPrima, root);
+  if (dal === null) return { ferma: false, testo: 'Git non mi dice quali prove del giro sono state cancellate o cambiate: non le rilancio.' };
+  const { prove } = dal;
+  // Chi corregge può non toccarle mai: senza rilanciarle, un caso da correggere uscito al posto di uno messo da parte non si vedrebbe.
+  const pulite = conPulizia ? toccateDallaPulizia(shaCritica, shaPrima, root) : null;
+  const accorciate = pulite ? pulite.prove.filter((f) => !prove.includes(f)) : [];
   if (!prove.length && !accorciate.length) return { ferma: false, testo: '' };
   const r = rilanciaProveTolte([...prove, ...accorciate], shaPrima, root, { log, ...(lancia ? { lancia } : {}), ...(prepara ? { prepara } : {}) });
   if (r.motivo) return { ferma: true, testo: `Consegna respinta: ${r.motivo}` };
   return esitoProveTolte({
-    rosse: r.rosse.filter((f) => prove.includes(f)), dallaPulizia: r.rosse.filter((f) => accorciate.includes(f)), shaPrima, conPulizia, messi,
+    rosse: r.rosse.filter((f) => prove.includes(f)), dallaPulizia: r.rosse.filter((f) => accorciate.includes(f)),
+    shaPrima, conPulizia, messi, via: { ...(pulite ? pulite.via : {}), ...dal.via },
   });
-}
-
-// I file a cui la pulizia ha tolto un caso: quello che resta copre un rilievo da correggere, e chi corregge può
-// non toccarli mai. Senza rilanciarli, un caso da correggere uscito al posto di uno messo da parte non si vedrebbe.
-function proveAccorciateDallaPulizia(shaCritica, shaPulizia, root) {
-  const critica = String(shaCritica || '');
-  if (!SHA.test(critica) || critica === String(shaPulizia)) return null;
-  try {
-    const out = gitOut(['diff', '--name-only', '-z', '--no-renames', '--diff-filter=M', critica, String(shaPulizia), '--', PROVE_GIRO], root);
-    return proveTolte(out.split('\0').filter(Boolean));
-  } catch (_) { return null; }
 }
