@@ -45,8 +45,7 @@ async function privacy(app, shell, { trustedSites = [], margine }) {
 }
 
 async function scheda(app, id) {
-  return app.evaluate((_e, tabId) => {
-    const { BrowserWindow } = require('electron');
+  return app.evaluate(({ BrowserWindow }, tabId) => {
     for (const w of BrowserWindow.getAllWindows()) {
       const t = w._filoTabs && w._filoTabs.tabs.find((x) => x.id === tabId);
       if (!t) continue;

@@ -557,9 +557,9 @@
       'restano: non perdi quello che hai impostato.',
     options_cookies_mode_privacy: 'Privacy massima',
     options_cookies_mode_privacy_desc:
-      'Come l\'Automatico, ma ogni sito vive in uno spazio separato e usa-e-getta: i siti non possono mettersi ' +
-      'd\'accordo per riconoscerti e niente sopravvive alla chiusura di Filo, nemmeno i tuoi accessi — tranne i ' +
-      '"siti fidati" qui sotto. Massima riservatezza.',
+      'Come l\'Automatico, ma ogni sito vive in uno spazio separato e usa-e-getta, così i siti non possono mettersi ' +
+      'd\'accordo per riconoscerti. Qualche minuto dopo che chiudi l\'ultima scheda di un sito, Filo butta via tutto ' +
+      'quello che il sito aveva salvato, accessi compresi. Fanno eccezione i "siti fidati" qui sotto.',
     options_cookies_whitelist_title: 'Siti fidati: resta connesso',
     options_cookies_whitelist_desc:
       'In "Privacy massima" ogni sito è isolato e usa-e-getta. I siti che aggiungi qui fanno eccezione: vivono in ' +
@@ -567,7 +567,7 @@
     options_cookies_whitelist_placeholder: 'es. gmail.com',
     options_cookies_whitelist_add: 'Aggiungi',
     options_cookies_whitelist_remove: 'Rimuovi',
-    options_cookies_whitelist_empty: 'Nessun sito fidato: in "Privacy massima" dovrai rifare il login a ogni avvio.',
+    options_cookies_whitelist_empty: 'Nessun sito fidato. In "Privacy massima" rifai l\'accesso ogni volta che torni su un sito che avevi chiuso.',
     options_cookies_whitelist_invalid: 'Non sembra un dominio valido. Usa un dominio con estensione, es. gmail.com (niente IP o nomi senza punto).',
     options_cookies_whitelist_dup: '"%s" è già nell\'elenco dei siti fidati.',
     options_cookies_trusted_note_other:
