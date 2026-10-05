@@ -409,6 +409,24 @@ function setListChangeHandler(fn) { listChange = typeof fn === 'function' ? fn :
 let configChange = null;
 function setConfigChangeHandler(fn) { configChange = typeof fn === 'function' ? fn : null; }
 
+// Un sito entra o esce dai fidati, da qualunque strada (proposta, menu della scheda, chat, Sicurezza, import,
+// annulla): chi tiene le schede (tabs/tabRestaConnesso.js) sposta l'accesso nel jar giusto.
+let trustChange = null;
+function setTrustChangeHandler(fn) { trustChange = typeof fn === 'function' ? fn : null; }
+function fiduciaCambiata(prev, next) {
+  if (!trustChange) return;
+  const norma = (l) => new Set(l.map((d) => String(d || '').toLowerCase()).filter(Boolean));
+  const prima = norma(prev);
+  const dopo = norma(next);
+  for (const s of dopo) if (!prima.has(s)) { try { trustChange(s, true); } catch (_) {} }
+  for (const s of prima) if (!dopo.has(s)) { try { trustChange(s, false); } catch (_) {} }
+}
+
+function sitoFidato(url) {
+  const reg = /^https?:/i.test(String(url || '')) ? registrableOf(url) : null;
+  return !!reg && trustedSetOf({ security: { cookies: _cached } }).has(reg);
+}
+
 // In Privacy un sito non fidato non tiene niente oltre la sessione, nemmeno quello che Filo sa di lui.
 function keepsSiteData(site) {
   if (_cached.mode !== MODES.PRIVACY) return true;
