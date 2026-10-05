@@ -12,6 +12,7 @@
       version: '0.2.234', date: '2026-10-05',
       features: [
         'I post, i video e le mappe che vedi dentro le pagine di altri siti non lasciano più cookie per sempre: durano finché leggi la pagina e per qualche minuto dopo che l\'hai chiusa. Dai siti dove sei entrato con il tuo account resti connesso lo stesso, e quali sono lo vedi (e lo correggi) in Impostazioni → Sicurezza.',
+        'Mentre Filo lavora, al posto della rotella corre un filo. Accanto vedi scorrere il suo ragionamento, e ogni volta che fa qualcosa il filo fa un nodo col nome di quello che sta facendo, per esempio «Cercato sul web · orari treni». Quando risponde il filo si avvolge in un gomitolo con il riassunto, e un clic lo srotola. Il tasto d\'invio intanto diventa un quadrato che lo ferma subito, anche con Invio. Quello che aveva già fatto resta, e lo stesso tasto ti offre di riprendere senza rifarlo.',
       ],
       fixes: [
         'Su Windows, se in un comando che Filo esegue per te una parte sbaglia, per esempio un programma che non esiste, il resto della riga gira lo stesso, come quando la scrivi tu nel terminale. Prima si fermava tutto lì.',
@@ -24,9 +25,7 @@
     },
     {
       version: '0.2.233', date: '2026-10-05',
-      features: [
-        'Mentre Filo lavora, al posto della rotella corre un filo. Accanto vedi scorrere il suo ragionamento, e ogni volta che fa qualcosa il filo fa un nodo col nome di quello che sta facendo, per esempio «Cercato sul web · orari treni». Quando risponde il filo si avvolge in un gomitolo con il riassunto, e un clic lo srotola. Il tasto d\'invio intanto diventa un quadrato che lo ferma subito, anche con Invio. Quello che aveva già fatto resta, e lo stesso tasto ti offre di riprendere senza rifarlo.',
-      ],
+      features: [],
       fixes: [
         'Nelle Opzioni, se clicchi sul campo del modello prima che arrivi l\'elenco dei modelli, il menu a tendina si apre da solo appena l\'elenco c\'è. Prima restava chiuso e bisognava cliccare di nuovo.',
         'Nelle risposte di Filo un elenco numerato con le voci staccate da una riga vuota tiene i suoi numeri: prima ogni voce ripartiva da 1.',
