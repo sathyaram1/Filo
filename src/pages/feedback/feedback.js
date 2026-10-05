@@ -1021,7 +1021,9 @@
       // che sceglieva così cosa si leggeva e dove si finiva (#582, giro 3).
       const safeUrl = safeHref(url);
       const ua = (f.userAgent || '').slice(0, 80);
-      const cid = (f.clientId || '').slice(0, 12);
+      // #912: un utente che si era dato un nome riservato si legge senza quella firma, come in Gestione.
+      const cidGrezzo = String(f.clientId || '');
+      const cid = (originOf(f) === 'user' ? cidGrezzo.replace(/^(non-provato:)?(owner|routine|agent|local):/i, '') : cidGrezzo).slice(0, 12);
       const text = escapeHtml(f.text || '(senza testo)');
       // Allegati della SEGNALAZIONE originale: vivono nei campi piatti images/files.
       const imgsHtml = imagesGridHtml(Array.isArray(f.images) ? f.images : []);

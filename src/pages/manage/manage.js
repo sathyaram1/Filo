@@ -247,12 +247,10 @@
     // altre girano da sole, questa nasce da una conversazione.
     local:    { icon: '💻', label: 'Claude (sessione locale)' },
     claude:   { icon: '🤖', label: 'Claude (ruolo non indicato)' },
-    // #595: si firma col prefisso dell'owner o di una sua istanza ma senza prova; per la pipeline è un utente.
-    unproven: { icon: '❔', label: 'Utente, prefisso riservato senza prova' },
   };
+  // Dal feedback, non dal clientId: un nome riservato senza prova è un utente come gli altri (#912).
   function authorKindOf(fb) {
-    if (MR && MR.isUnprovenSender && MR.isUnprovenSender(fb)) return 'unproven';
-    return (TH && TH.authorKind) ? TH.authorKind(fb && fb.clientId) : 'user';
+    return (TH && TH.authorKind) ? TH.authorKind(fb || {}) : 'user';
   }
   function authorMetaOf(fb) {
     return AUTHOR_META[authorKindOf(fb)] || AUTHOR_META.user;
@@ -267,8 +265,9 @@
   function senderLabel(fb) {
     const kind = authorKindOf(fb);
     const m = AUTHOR_META[kind] || AUTHOR_META.user;
-    if (kind !== 'user' && kind !== 'unproven') return `${m.icon} ${m.label}`;
-    const id = String((fb && fb.clientId) || '').trim();
+    if (kind !== 'user') return `${m.icon} ${m.label}`;
+    // Senza il nome riservato che si era dato: ne mostrerebbe la firma.
+    const id = String((fb && fb.clientId) || '').trim().replace(/^(non-provato:)?(owner|routine|agent|local):/i, '');
     const short = id.slice(0, 8);
     return short ? `${m.icon} ${m.label} · ${short}…` : `${m.icon} ${m.label}`;
   }
@@ -299,7 +298,7 @@
   // Ordine "per creatore": prima le persone (owner, utenti), poi le istanze di
   // Claude — la sessione locale in testa, perché è quella che lavora insieme
   // all'owner — e in fondo Filo che scrive per conto di un utente.
-  const AUTHOR_RANK = { owner: 0, user: 1, unproven: 2, local: 3, worker: 4, verifier: 5, residuo: 6, prober: 7, claude: 8, filo: 9 };
+  const AUTHOR_RANK = { owner: 0, user: 1, local: 2, worker: 3, verifier: 4, residuo: 5, prober: 6, claude: 7, filo: 8 };
   // Applica l'override di ordinamento scelto dall'owner. `list` arriva GIÀ
   // ordinata col criterio predefinito della tab: in 'smart' la lasciamo intatta.
   // `sort` è stabile → a parità di chiave si conserva l'ordine predefinito.
@@ -315,7 +314,7 @@
         const ra = AUTHOR_RANK[authorKindOf(a)] ?? 99;
         const rb = AUTHOR_RANK[authorKindOf(b)] ?? 99;
         if (ra !== rb) return ra - rb;
-        return String(a.clientId || '').localeCompare(String(b.clientId || ''));
+        return senderKeyOf(a).localeCompare(senderKeyOf(b));
       });
     }
     return arr;
@@ -4190,7 +4189,7 @@
     // vivono nel campo piatto files[] ({ name, url, type }): senza mapparli qui
     // l'allegato del tester era invisibile nella dashboard unificata (la vecchia
     // pagina feedback li mostra — parità tra superfici equivalenti).
-    const fromModel = TH ? TH.isFromModel(MR.effectiveClientId(fb)) : false;
+    const fromModel = TH ? TH.isFromModel(fb) : false;
     const imgs = (Array.isArray(fb.images) ? fb.images : []).map((url) => ({ kind: 'img', url }));
     const files = (Array.isArray(fb.files) ? fb.files : [])
       .filter((f) => f && typeof f.url === 'string' && f.url)

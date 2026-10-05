@@ -123,7 +123,13 @@ il rombo e il pentagono della fila delle forme).
 da `unlabeled`. Solo le routine (via coda triage) muovono `todo→working→revision_*→done`
 e `revision_*→design(loop)`. Transizioni non elencate = illegali: il writer le rifiuta.
 
-**Mittenti fidati** (`owner:`/`routine:`/`agent:`/`local:`): mai `attack`/`spam`; se un
+**La prova del mittente** (#595, #912): un nome riservato vale solo con `senderProof`, che
+scrivono l'admin (owner, sessioni, esploratore) e il server (routine). Senza, è un utente
+ovunque, e alla nascita il server lo rifiuta: sul documento resta `non-provato:<nome>`.
+Il ripasso non dà più la prova al solo nome; sui feedback nati prima, col nome ancora
+intero, l'owner può dire che è suo («È mio», `--riconosci`).
+
+**Mittenti fidati** (`owner:`/`routine:`/`agent:`/`local:` con la prova): mai `attack`/`spam`; se un
 livello identità li flagga è un errore → `unlabeled` per ri-giudizio. Caso limite: se il
 PANEL COMPLETO segnala un fidato (L2 dice attack/spam a verdetti pieni), lo status resta
 `unlabeled` ma non c'è niente da ri-giudicare — la dashboard lo mostra con la categoria

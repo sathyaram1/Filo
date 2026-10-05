@@ -522,9 +522,8 @@ export function rifiutoPratica(id, r) {
   if (r && r.senzaProva && r.segnalato) {
     righe.push('È segnalato dai giudici: la prova del mittente la può dare solo l’owner, in Gestione («È mio»), dopo averlo guardato.');
   } else if (r && r.senzaProva) {
-    righe.push('Se l’hanno aperto l’owner o una sessione, il ripasso gliela dà (a vuoto con --dry-run):');
-    righe.push('  npm run feedback:ripasso');
-    righe.push('Se il ripasso lo salta, solo l’owner può dire che è suo: in Gestione («È mio»), o chiedilo a lui e su sua parola');
+    // #912: il ripasso non dà più la prova al solo nome.
+    righe.push('Solo l’owner può dire che è suo: in Gestione («È mio»), o chiedilo a lui e su sua parola');
     righe.push(`  node scripts/owner-feedback.mjs ${id} --riconosci`);
     righe.push('Altrimenti vale come un utente.');
   }
