@@ -166,7 +166,8 @@ function conStatoAggiornamento(lista) {
 // Le scritture degli avvisi passano in fila: leggere e poi aggiungere, in due, scriverebbe due carte uguali.
 let fila = Promise.resolve();
 function inFila(fn) {
-  fila = fila.then(fn, fn);
+  const passo = () => Promise.resolve().then(fn).catch((e) => console.error('[updater] avviso non scritto:', e?.message || e));
+  fila = fila.then(passo, passo);
   return fila;
 }
 
