@@ -171,6 +171,7 @@
     input.addEventListener('keydown', (e) => {
       if (pop.hidden) {
         if (e.key === 'ArrowDown') { e.preventDefault(); open(); }
+        else if (e.key === 'Escape') aVuoto = false;
         return;
       }
       if (e.key === 'ArrowDown') { e.preventDefault(); moveHover(1); }
