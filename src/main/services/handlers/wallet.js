@@ -814,6 +814,8 @@ module.exports = function register(on, ctx) {
     redeemFromInvite, tryPendingInvite, portaDentroInvito,
     // Ripiego dalla chiave propria (#629): li chiama il provider OpenRouter.
     keySourceOf, alternativeKeyFor, noteOwnKeyRefusal, noteOwnKeySuccess, lastOwnKeyRefusal, ownKeyChanged, usageLogStatus,
+    // La prova di una chiave dalle Impostazioni (handlers/ai.js): niente riserva.
+    senzaRipiego,
     // Solo per i test (NODE_ENV=test): simula il riavvio senza rete.
     expireIdentityForTest: () => { if (process.env.NODE_ENV === 'test') identity._expireToken(); },
   };
