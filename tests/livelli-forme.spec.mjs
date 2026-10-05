@@ -412,6 +412,34 @@ test('nel rombo, nel pentagono e nella conversazione il markdown della segnalazi
   expect(await page.evaluate(() => window.__xss)).toBeUndefined();
 });
 
+test('le scelte numerate staccate da righe vuote tengono 1, 2, 3 nel rombo e nella pratica; un blocco di codice non fa scorrere di lato la conversazione', async ({ openTab }) => {
+  const SCELTE = '## Scelte\n1. **Dal sito**: zero attrito.\n\n2. **Chiesto**: un passaggio in più.\n\n3. **Misto**: chiesto solo la prima volta.';
+  const fb = {
+    _id: 'fb-livelli-numeri', text: 'Il download non tiene il nome del file.', name: 'Nome del file',
+    seq: 705, subSeq: 0, status: 'design', statusReason: 'decisione', branch: 'worker/fb-livelli-numeri',
+    clientId: 'user:abc', createdAt: '2026-09-22T10:00:00Z', images: [],
+    notes: `Ho fatto A.\n\nSegnalazione per l'owner (chi verifica):\n${SCELTE}\n\n\`\`\`\nconst nome = "${'x'.repeat(200)}";\n\`\`\``,
+    livelli: { l3: { esito: 'segnalato', ruolo: 'verifier', at: '2026-09-22T10:05:00Z', testo: SCELTE } },
+  };
+  // Il numero che il lettore vede davanti a ogni voce.
+  const numeri = (loc) => loc.evaluateAll((els) => els.map((li) => (li.parentElement.start || 1) + [...li.parentElement.children].indexOf(li)));
+  const page = await openTab(MANAGE);
+  await apri(page, [fb]);
+  await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
+
+  const turno = page.locator('#mgThread .mg-bubble--model', { hasText: 'Segnalazione per l' });
+  await expect(turno.locator('ol li')).toHaveCount(3);
+  expect(await numeri(turno.locator('ol li'))).toEqual([1, 2, 3]);
+  await expect(turno.locator('pre')).toHaveCount(1);
+  const [largo, visibile] = await page.locator('#mgThread').evaluate((t) => [t.scrollWidth, t.clientWidth]);
+  expect(largo).toBeLessThanOrEqual(visibile);
+
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l3"]').click();
+  const voci = page.locator('#mgSideBody .mg-liv-testo ol li');
+  await expect(voci).toHaveCount(3);
+  expect(await numeri(voci)).toEqual([1, 2, 3]);
+});
+
 test('il pentagono verde dice cosa ha controllato l’audit, e non offre di saltarlo', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apri(page, [FB_COMPLETO]);
