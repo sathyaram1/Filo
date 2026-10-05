@@ -1,24 +1,10 @@
-// #1004 giro 7 — esplorazione: aspetto di Sicurezza e immagine incollata col menu di Filo.
+// #1004 giro 7 r1 — lo screenshot di una pagina delicata, incollato col menu di Filo su un altro sito, non va al modello.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
 const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 
-test('Sicurezza chiara e scura', async ({ app, shell, openTab, testServer }) => {
-  await testServer.openReady(openTab, '<!doctype html><title>Accesso</title><body><form><input type="password"></form></body>', { pubblico: true });
-  await expect.poll(() => app.evaluate(() => globalThis.SN_DELICATE.haCampi('sito-pubblico.test')), { timeout: 8_000 }).toBe(true);
-  const s = await openTab('filo://security/security.html');
-  await expect(s.locator('#sec-delicate')).toBeChecked({ timeout: 8000 });
-  await expect(s.locator('#sec-delicate-campi-list li').first()).toBeVisible({ timeout: 8000 });
-  await s.locator('#sec-delicate').scrollIntoViewIfNeeded();
-  await s.screenshot({ path: 'tests/.shots/1004-g7-sicurezza-chiara.png' });
-  await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { theme: 'dark' } }));
-  await s.waitForTimeout(800);
-  await s.locator('#sec-delicate').scrollIntoViewIfNeeded();
-  await s.screenshot({ path: 'tests/.shots/1004-g7-sicurezza-scura.png' });
-});
-
-test('un\'immagine incollata col menu di Filo su un altro sito parte verso il modello delle immagini', async ({ app, openTab, testServer }) => {
+test('lo screenshot della banca incollato col menu di Filo in un altro sito non parte verso il modello delle immagini', async ({ app, openTab, testServer }) => {
   await app.evaluate(async () => {
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
@@ -32,7 +18,16 @@ test('un\'immagine incollata col menu di Filo su un altro sito parte verso il mo
       return { text: 'Contabile del bonifico', provider: 'openrouter', model: 'stub', usage: {} };
     };
   });
-  // L'immagine copiata (uno screenshot della banca) è negli appunti.
+  // Lo screenshot della pagina della banca: Filo non lo descrive, ed è negli appunti.
+  await testServer.openReady(openTab, '<!doctype html><title>Il mio conto</title><body><p>Saldo 12.345</p><form><input type="password"></form></body>', { pubblico: true });
+  await expect.poll(() => app.evaluate(() => globalThis.SN_DELICATE.haCampi('sito-pubblico.test')), { timeout: 8_000 }).toBe(true);
+  const daBanca = await app.evaluate(async ({ BrowserWindow }, u) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
+    const tab = tm.tabs.find((t) => t.title === 'Il mio conto');
+    return tab.view.webContents.executeJavaScriptInIsolatedWorld(999, [{ code: `SN_ACTIONS.requestImageDescription(${JSON.stringify(u)})` }], true);
+  }, PNG);
+  expect(daBanca).toBe(null);
+  expect(await app.evaluate(() => globalThis.__img)).toBe(0);
   await app.evaluate(({ clipboard, nativeImage }, u) => clipboard.writeImage(nativeImage.createFromDataURL(u)), PNG);
   await testServer.openReady(openTab, '<!doctype html><title>Chat</title><body><div id="m" contenteditable="true">x</div></body>');
   const r = await app.evaluate(async ({ BrowserWindow }) => {
@@ -46,6 +41,8 @@ test('un\'immagine incollata col menu di Filo su un altro sito parte verso il mo
       return document.querySelectorAll('#m img').length;
     })()` }], true);
   });
-  console.log('immagini incollate', r);
-  await expect.poll(() => app.evaluate(() => globalThis.__img), { timeout: 6000 }).toBeGreaterThan(0);
+  expect(r, 'l\'immagine è incollata').toBe(1);
+  // Incollata nella chat di un altro sito, la stessa immagine della banca non deve partire verso il modello.
+  await new Promise((ok) => setTimeout(ok, 3000));
+  expect(await app.evaluate(() => globalThis.__img)).toBe(0);
 });
