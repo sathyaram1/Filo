@@ -45,7 +45,8 @@ function initAutoUpdater() {
     let settings = null;
     try { settings = await globalThis.SN_STORAGE.getSettings(); } catch (_) {}
     await togliAvvisiSuperati(app.getVersion());
-    await avviaAggiornatore(autoUpdater, { automatici: automaticiDa(settings), annuncia: annunciaAlleHome });
+    const chiesta = await richiestaValida(app.getVersion());
+    await avviaAggiornatore(autoUpdater, { automatici: automaticiDa(settings), chiesta, annuncia: annunciaAlleHome });
   })().catch((e) => console.error('[updater] avvio fallito:', e?.message || e));
 }
 
