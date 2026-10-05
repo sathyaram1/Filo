@@ -100,7 +100,7 @@ test('spenta: la versione nuova non parte da sola; «Installa» sulla carta la s
   await home.screenshot({ path: `${SHOTS}/aggiornamenti-carta-scarica.png` });
 
   await app.evaluate(() => globalThis.__aggFinto.finisci());
-  await expect(carta.locator('.dash-carta-stato')).toHaveText('La versione 9.9.9 è pronta: si installa quando chiudi Filo.', { timeout: 5_000 });
+  await expect(carta.locator('.dash-carta-stato')).toHaveText('La versione 9.9.9 è pronta. Si installa quando chiudi Filo.', { timeout: 5_000 });
   await home.screenshot({ path: `${SHOTS}/aggiornamenti-carta-pronta.png` });
   // Chiusa, la carta di questa versione non torna a un nuovo controllo.
   await carta.hover();
