@@ -457,7 +457,7 @@
     if (testo) t.textContent = testo;
     var intro = box.querySelector('.sn-mac-intro');
     if (intro) {
-      intro.textContent = introText(ferme, inCorso);
+      intro.textContent = introText(ferme, inCorso, decise);
       intro.hidden = !intro.textContent;
     }
   }
