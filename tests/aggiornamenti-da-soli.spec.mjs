@@ -208,7 +208,9 @@ test('«non aggiornarti da solo» in chat: la conferma spiega il rischio, e solo
   await expect.poll(async () => (await impostazioni(app)).aggiornamenti.automatici, { timeout: 5_000 }).toBe(false);
   expect((await finto(app)).autoInstallOnAppQuit).toBe(false);
   // La versione trovata all'avvio, che non si installerà più da sola, diventa la carta con «Installa».
-  await expect(chat.locator('#accade .dash-carta[data-tipo="avviso"]', { hasText: 'versione 9.9.9' })).toBeVisible({ timeout: 5_000 });
+  const carta = chat.locator('#accade .dash-carta[data-tipo="avviso"]', { hasText: 'versione 9.9.9' });
+  await expect(carta).toBeVisible({ timeout: 5_000 });
+  await expect(carta.locator('.dash-carta-az.principale')).toHaveText('Installa');
   // Le Preferenze già aperte seguono il cambio.
   await expect(pref.locator('#aggiornamentiAutomatici')).not.toBeChecked({ timeout: 5_000 });
 });
