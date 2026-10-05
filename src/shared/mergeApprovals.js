@@ -968,6 +968,46 @@
     return by ? 'pre-approvata da ' + by : 'pre-approvata sulla pratica';
   }
 
+  /** Perché una fusione non ha chiesto: 'pieno' (segno a mano), 'approvazione' (segno da un sì), 'locale'. PURA. */
+  function specieFusaSenzaChiedere(r) {
+    if (isSkippedL5(r)) return 'locale';
+    var segno = segnoPreapprovazione({ by: r && r.preapprovedBy, at: r && r.preapprovedAt });
+    return segno && segno.tipo === 'approvazione' ? 'approvazione' : 'pieno';
+  }
+
+  // Per specie: `solo` regge da sé dopo i due punti (vale per una riga o cento), `misto` segue «Alcuni/altri».
+  var PERCHE_SENZA_CHIEDERE = [
+    ['pieno', {
+      solo: 'sulla pratica avevi messo «fondi senza chiedermelo».',
+      misto: 'avevano sulla pratica il tuo «fondi senza chiedermelo»',
+    }],
+    ['approvazione', {
+      solo: 'i controlli avevano segnalato solo blocchi che avevi già approvato, con un sì a una richiesta precedente sulla stessa pratica.',
+      misto: 'avevano solo blocchi che avevi già approvato con un sì a una richiesta precedente',
+    }],
+    ['locale', {
+      solo: 'era lavoro locale, da una pratica tua con la prova del mittente o da un feedback che hai approvato come lavoro locale.',
+      misto: 'erano lavoro locale (una pratica tua con la prova del mittente, o un feedback che hai approvato come lavoro locale)',
+    }],
+  ];
+
+  /**
+   * L'introduzione delle «Fuse senza chiedere», detta solo per le specie che l'elenco contiene. PURA.
+   * Un'unica frase per tutte attribuiva il «fondi senza chiedermelo» anche alle fusioni nate da un sì (#743).
+   */
+  function preapprovedIntro(list) {
+    var righe = Array.isArray(list) ? list : [];
+    var presenti = {};
+    for (var i = 0; i < righe.length; i++) presenti[specieFusaSenzaChiedere(righe[i])] = true;
+    var frasi = PERCHE_SENZA_CHIEDERE.filter(function (p) { return presenti[p[0]]; });
+    var coda = ' Qui c’è tutto quello che era stato segnalato.';
+    if (!frasi.length) return 'Lavori fermati dai controlli e fusi lo stesso.' + coda;
+    if (frasi.length === 1) return 'Lavori fermati dai controlli e fusi lo stesso: ' + frasi[0][1].solo + coda;
+    var soggetti = ['Alcuni ', 'altri ', 'altri ancora '];
+    var parti = frasi.map(function (p, k) { return soggetti[k] + p[1].misto; });
+    return 'Lavori fermati dai controlli e fusi lo stesso. ' + parti.join('; ') + '.' + coda;
+  }
+
   /**
    * Quando era stato messo il segno, per esteso e in ora locale. PURA.
    * Il momento viaggia come testo ISO (in ora universale): mostrarlo grezzo
