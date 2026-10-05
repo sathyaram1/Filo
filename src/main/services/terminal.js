@@ -210,16 +210,34 @@ const ERRORE_DI_PRIMA_POWERSHELL = '$__filo_e=if ($Error.Count) { $Error[0] } el
 // PSReadLine su una pipe non può leggere e lascia un errore in $Error a ogni riga, che falserebbe l'esito.
 const PREPARA_STDIN_POWERSHELL = 'Remove-Module PSReadLine -ErrorAction Ignore\n';
 
-// Il testo viaggia in base64 e lo ricompone PowerShell: sul filo solo ASCII (lo stdin lo decodifica nella
-// tabella OEM, #551) e su una riga sola. Si esegue con `. scriptblock`, nello scope di chi chiama: con
-// Invoke-Expression gli errori che fermano (e quelli di sintassi) mostravano questa riga invece del comando. La
-// sintassi si controlla prima, sul solo testo; `coda` gira dopo ma resta fuori. In modalità ristretta il controllo salta.
+// Il testo come espressione PowerShell di sole stringhe fra apici e [char]: sul filo solo ASCII (lo stdin lo
+// decodifica nella tabella OEM, #551), su una riga sola, e senza chiamate a metodi, vietate in modalità ristretta.
+function testoPowerShell(testo) {
+  const s = String(testo);
+  const pezzi = [];
+  let tratto = '';
+  for (let i = 0; i < s.length; i++) {
+    const n = s.charCodeAt(i);
+    if (n >= 0x20 && n < 0x7f) { tratto += n === 0x27 ? "''" : s[i]; continue; }
+    if (tratto) pezzi.push(`'${tratto}'`);
+    tratto = '';
+    pezzi.push(`[char]${n}`);
+  }
+  if (tratto || !pezzi.length) pezzi.push(`'${tratto}'`);
+  return `(-join @(${pezzi.join(',')}))`;
+}
+
+// Si esegue con `. scriptblock`, nello scope di chi chiama: con Invoke-Expression gli errori che fermano (e quelli
+// di sintassi) mostravano questa riga invece del comando. La sintassi si controlla prima, sul solo testo; `coda`
+// gira dopo ma resta fuori. In modalità ristretta (PC aziendali bloccati) quei metodi sono vietati: resta
+// Invoke-Expression, l'unica strada che lì il comando lo esegue.
 function invocaCodificato(testo, coda = '') {
-  const b64 = Buffer.from(String(testo), 'utf8').toString('base64');
-  return `$__filo_t=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${b64}')); $__filo_pe=$null; `
+  const conCoda = coda ? ` + [char]10 + '${coda}'` : '';
+  return `$__filo_t=${testoPowerShell(testo)}; $__filo_pe=$null; `
+    + `if ($ExecutionContext.SessionState.LanguageMode -ne 'FullLanguage') { Invoke-Expression ($__filo_t${conCoda}) } else { `
     + 'try { $null=[Management.Automation.Language.Parser]::ParseInput($__filo_t, [ref]$null, [ref]$__filo_pe) } catch {}; '
     + 'if ($__filo_pe) { [Console]::Error.WriteLine((New-Object Management.Automation.ParseException (,$__filo_pe)).Message); $__filo_ok=$false } '
-    + `else { . ([ScriptBlock]::Create($__filo_t${coda ? ` + [char]10 + '${coda}'` : ''})) }`;
+    + `else { . ([ScriptBlock]::Create($__filo_t${conCoda})) } }`;
 }
 
 const SEGNA_ESITO = '$__filo_ok=$?';
