@@ -1010,10 +1010,15 @@
 
   // La risposta l'hanno pagata i crediti di Filo perché OpenRouter ha rifiutato
   // la chiave dell'utente: la stessa riga che la chat mette sotto la risposta (#662).
-  // Vale come detta solo se `el`, dove sta la frase, è a schermo: un riquadro chiuso prima lascia partire l'avviso.
+  // Vale come detta solo se `el`, dove sta la frase, resta a schermo il tempo di leggerla: un riquadro
+  // chiuso prima, o appena compare, lascia partire l'avviso (che il main tiene fermo 4 s).
+  const RIPIEGO_LETTO_MS = 1500;
   function ripiegoMostrato(el) {
     if (!el || !el.isConnected) return;
-    try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.KEY_FALLBACK_SHOWN })).catch(() => {}); } catch (_) {}
+    setTimeout(() => {
+      if (!el.isConnected) return;
+      try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.KEY_FALLBACK_SHOWN })).catch(() => {}); } catch (_) {}
+    }, RIPIEGO_LETTO_MS);
   }
   function notaRipiego(parent, keyFallback) {
     if (!parent || !keyFallback || !keyFallback.line) return null;
