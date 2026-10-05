@@ -4431,7 +4431,7 @@
       // Testo cifrato che questo computer non sa leggere: si dice, non si
       // mostra il blob.
       if (p.illeggibile) {
-        t.textContent = 'Il testo è cifrato e questo computer non ha la chiave privata per leggerlo.';
+        t.textContent = MR.TESTO_CIFRATO;
       } else {
         // Titoli e voci d'elenco del markdown resi come tali, il resto come
         // testo: niente HTML dal testo (il modulo condiviso li riconosce).

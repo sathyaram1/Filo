@@ -300,8 +300,36 @@ test('domande nelle sole note: rombo verde, e dentro ci sono le domande', async 
   const rombo = page.locator('#mgLivelliRow .mg-forma[data-livello="l3"]');
   await expect(rombo).toHaveClass(/mg-forma--design/);
   await expect(rombo).not.toHaveClass(/mg-forma--vuota/);
+  // Nessuna segnalazione registrata: il verde qui vuol dire solo «domande per te».
+  expect(await rombo.getAttribute('title')).toBe('Domande di Claude');
+  expect(await rombo.getAttribute('aria-label')).toBe('Domande di Claude');
   await rombo.click();
+  await expect(page.locator('#mgSideTitle')).toHaveText('Domande di Claude');
   await expect(page.locator('#mgSideBody')).toContainText('decisi voce per voce');
+});
+
+test('domande in attesa e segnalazione che qui non si decifra: il titolo copre le due parti, e niente blob', async ({ openTab }) => {
+  const BLOB = 'FENCv1:8f3a2b91c7d4e6a0b5f2';
+  const fb = {
+    _id: 'fb-livelli-cifrata', text: 'Fiducia nei mittenti.', name: 'Fiducia nei mittenti',
+    seq: 703, subSeq: 0, status: 'design', statusReason: 'clarify',
+    clientId: 'local:claude', createdAt: '2026-09-08T10:00:00Z', images: [],
+    notes: 'Prima di procedere: i prefissi riservati vanno decisi voce per voce?',
+    livelli: { l3: { esito: 'segnalato', ruolo: 'resolver', at: '2026-09-08T11:00:00Z', testo: BLOB } },
+  };
+  const page = await openTab(MANAGE);
+  await apri(page, [fb]);
+  await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
+
+  const rombo = page.locator('#mgLivelliRow .mg-forma[data-livello="l3"]');
+  await expect(rombo).toHaveClass(/mg-forma--design/);
+  expect(await rombo.getAttribute('title')).toBe('Domande e segnalazione di Claude');
+  await rombo.click();
+  await expect(page.locator('#mgSideTitle')).toHaveText('Domande e segnalazione di Claude');
+  const corpo = page.locator('#mgSideBody');
+  await expect(corpo).toContainText('decisi voce per voce');
+  await expect(corpo).toContainText('non ha la chiave privata per leggerlo');
+  await expect(corpo).not.toContainText('FENC');
 });
 
 test('fermo su una scelta dell’owner: sta fra i Ricevuti con la casella di risposta, e il rombo apre la segnalazione', async ({ openTab }) => {
@@ -326,6 +354,7 @@ test('fermo su una scelta dell’owner: sta fra i Ricevuti con la casella di ris
   await expect(page.locator('#mgClarify')).toBeVisible();
   const rombo = page.locator('#mgLivelliRow .mg-forma[data-livello="l3"]');
   await expect(rombo).not.toHaveClass(/mg-forma--vuota/);
+  expect(await rombo.getAttribute('title')).toBe('Domande e segnalazione di Claude');
   await rombo.click();
   await expect(page.locator('#mgSideBody')).toContainText('Due strade con costi diversi');
 });

@@ -96,6 +96,40 @@ describe('rombo verde e casella delle risposte vanno insieme', () => {
       'le domande a cui rispondere adesso vanno prima della segnalazione già registrata');
   });
 
+  test('il nome del rombo verde dice che ci sono domande, e copre tutte le parti del pannello', () => {
+    for (const [nome, fb] of ASPETTANO) {
+      const r = rombo(fb);
+      assert.match(r.titolo, /^Domande/, `${nome}: il nome doveva parlare di domande`);
+      assert.equal(r.pannello.titolo, r.titolo, `${nome}: titolo del pannello diverso dal nome`);
+      if (fb.livelli && fb.livelli.l3) assert.match(r.titolo, /segnalazione/, `${nome}: la segnalazione manca dal titolo`);
+    }
+    assert.equal(rombo({ livelli: { l3: { esito: 'segnalato', testo: 'Due strade.' } } }).titolo, 'Segnalazione di Claude');
+    assert.equal(rombo({ status: 'todo' }).titolo, 'Segnalazione di Claude');
+    assert.equal(MR.livelloL3({ status: 'design', statusReason: 'clarify' }, { dettaglioLetto: false }).titolo, 'Domande di Claude');
+  });
+
+  test('una parte cifrata del pannello si dice con la frase, mai col blob', () => {
+    const BLOB = 'FENCv1:8f3a2b91c7d4e6a0b5f2';
+    const segn = (testo) => ({ l3: { esito: 'segnalato', ruolo: 'resolver', testo } });
+    // Segnalazione cifrata, conversazione leggibile: la domanda resta, la segnalazione diventa la frase.
+    const a = rombo({ status: 'design', statusReason: 'clarify', notes: domande, livelli: segn(BLOB) }).pannello;
+    assert.doesNotMatch(a.testo, /FENC/);
+    assert.match(a.testo, /sfondo/);
+    assert.ok(a.testo.includes(MR.TESTO_CIFRATO));
+    // Fermo su una scelta, segnalazione cifrata: idem.
+    const b = rombo({ status: 'design', statusReason: 'decisione', notes: domande, livelli: segn(BLOB) }).pannello;
+    assert.doesNotMatch(b.testo, /FENC/);
+    assert.ok(b.testo.includes(MR.TESTO_CIFRATO));
+    // Conversazione cifrata, segnalazione leggibile: la segnalazione resta, le domande non spariscono.
+    const c = rombo({ status: 'design', statusReason: 'clarify', notes: BLOB, livelli: segn('Due strade possibili.') }).pannello;
+    assert.doesNotMatch(c.testo, /FENC/);
+    assert.match(c.testo, /Due strade possibili/);
+    assert.match(c.testo, /Domande in attesa/);
+    assert.ok(c.testo.includes(MR.TESTO_CIFRATO));
+    // Tutte e due cifrate: una frase sola.
+    assert.equal(rombo({ status: 'design', statusReason: 'clarify', notes: BLOB, livelli: segn(BLOB) }).pannello.illeggibile, true);
+  });
+
   test('risposto, il rombo si spegne', () => {
     const prima = { status: 'design', statusReason: 'clarify', notes: domande };
     assert.equal(verde(prima), true);
