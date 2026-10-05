@@ -67,6 +67,8 @@ function saveSoon() {
   if (saveTimer.unref) saveTimer.unref();
 }
 Cookies.setConfigChangeHandler(saveSoon);
+// Il jar Privacy del sito è stato buttato: il sito non si ricorda più niente, e nemmeno Filo di lui.
+Cookies.setJarWipeHandler((site) => { if (!Cookies.keepsSiteData(site)) remembered.delete(site); });
 
 function siteMemory(tm) {
   if (!tm.incognito) return remembered;

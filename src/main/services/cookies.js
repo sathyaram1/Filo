@@ -158,9 +158,11 @@ function partitionForUrl(url, trusted) {
   const base = 'filo-priv-' + slug;
   const isTrusted = trusted instanceof Set && trusted.has(reg);
   // 'persist:' → jar isolato per-sito ma persistente (resta connesso).
-  // Senza prefisso → jar isolato ed effimero: niente correlazione cross-site e
-  // niente sopravvive alla sessione.
-  return (isTrusted ? 'persist:' : '') + base;
+  // Senza prefisso → jar isolato ed effimero, buttato all'uscita dal sito (vedi «uscita dal sito»).
+  if (isTrusted) return 'persist:' + base;
+  sitoDelJar.set(base, reg);
+  const g = jarGen.get(base);
+  return g && g.n ? `${base}~${g.n}` : base;
 }
 
 // ─── GPC: header Sec-GPC: 1 ───────────────────────────────────────────────
@@ -272,6 +274,7 @@ function ensureSiteSession(partition, { gpc } = {}) {
     ses = session.fromPartition(partition);
     try { registerFiloProtocolForSession(ses); } catch (_) {}
     siteSessions.set(partition, ses);
+    if (!partition.startsWith('persist:')) seguiUscite(partition, ses);
   }
   const on = gpc !== false;
   applyGpc(ses, on);
@@ -282,6 +285,93 @@ function ensureSiteSession(partition, { gpc } = {}) {
   applyTrackerBlocking(ses, on);
   return ses;
 }
+
+// ─── uscita dal sito (modalità privacy) ───────────────────────────────────
+//
+// Un jar effimero si butta quando nessun webContents lo usa più (schede di ogni finestra, popup) e nessuno
+// scaricamento ci passa, dopo un margine: chiudere per sbaglio e riaprire subito non fa uscire dal sito (#756).
+const MARGINE_USCITA_MS = 5 * 60 * 1000;
+let margineUscita = MARGINE_USCITA_MS;
+const jarGen = new Map();          // base → { n: generazione in uso, svuota: generazioni che si stanno svuotando }
+const sitoDelJar = new Map();      // base → eTLD+1
+const jarDellaSessione = new WeakMap();
+const uscite = new Map();          // partizione → timer
+const scaricamenti = new Map();    // partizione → Set<DownloadItem>
+let seguendo = false;
+
+// Manopola dei test: senza argomento torna al margine vero.
+function impostaMargineUscita(ms) {
+  margineUscita = Number.isFinite(ms) && ms >= 0 ? ms : MARGINE_USCITA_MS;
+}
+
+function seguiUscite(partition, ses) {
+  jarDellaSessione.set(ses, partition);
+  try {
+    ses.on('will-download', (_e, item) => {
+      let set = scaricamenti.get(partition);
+      if (!set) scaricamenti.set(partition, (set = new Set()));
+      set.add(item);
+      item.on('updated', (_ev, state) => { if (state === 'interrupted') armaUscita(partition); });
+      item.once('done', () => { set.delete(item); armaUscita(partition); });
+    });
+  } catch (_) {}
+  if (seguendo) return;
+  seguendo = true;
+  require('electron').app.on('web-contents-created', (_e, wc) => {
+    let p = null;
+    try { p = jarDellaSessione.get(wc.session); } catch (_) {}
+    if (p) wc.once('destroyed', () => armaUscita(p));
+  });
+}
+
+function armaUscita(partition) {
+  clearTimeout(uscite.get(partition));
+  const t = setTimeout(() => { uscite.delete(partition); controllaUscita(partition); }, margineUscita);
+  uscite.set(partition, t);
+}
+
+function inUso(partition, ses) {
+  try {
+    const { webContents } = require('electron');
+    if (webContents.getAllWebContents().some((wc) => !wc.isDestroyed() && wc.session === ses)) return true;
+  } catch (_) { return true; }
+  for (const item of scaricamenti.get(partition) || []) {
+    try { if (item.getState() === 'progressing') return true; } catch (_) {}
+  }
+  return false;
+}
+
+function controllaUscita(partition) {
+  const ses = siteSessions.get(partition);
+  if (ses && !inUso(partition, ses)) buttaJar(partition, ses);
+}
+
+// Il sito riparte subito in un'altra generazione: chi lo riapre mentre il vecchio jar si svuota non perde i cookie a metà.
+function buttaJar(partition, ses) {
+  const [base, gen] = partition.split('~');
+  const idx = Number(gen) || 0;
+  let g = jarGen.get(base);
+  if (!g) jarGen.set(base, (g = { n: 0, svuota: new Set() }));
+  g.svuota.add(idx);
+  if (g.n === idx) {
+    let i = 0;
+    while (g.svuota.has(i)) i++;
+    g.n = i;
+  }
+  scaricamenti.delete(partition);
+  try { require('./permessiPagine').dimenticaSessione(ses); } catch (_) {}
+  const pulisci = (fn) => Promise.resolve().then(fn).catch(() => {});
+  Promise.all([
+    pulisci(() => (typeof ses.clearData === 'function' ? ses.clearData() : Promise.all([ses.clearStorageData(), ses.clearCache()]))),
+    pulisci(() => ses.clearAuthCache()),
+    pulisci(() => typeof ses.closeAllConnections === 'function' && ses.closeAllConnections()),
+  ]).then(() => g.svuota.delete(idx));
+  const site = sitoDelJar.get(base);
+  try { if (site && jarWipe) jarWipe(site); } catch (_) {}
+}
+
+let jarWipe = null;
+function setJarWipeHandler(fn) { jarWipe = typeof fn === 'function' ? fn : null; }
 
 // Decide quale partizione deve usare una WebContentsView per `url` nella
 // modalità corrente. Ritorna:
@@ -477,6 +567,8 @@ module.exports = {
   wipeConsentCookies,
   setListChangeHandler,
   setConfigChangeHandler,
+  setJarWipeHandler,
+  impostaMargineUscita,
   keepsSiteData,
   setAnswerLookup,
   resetIncognito,
