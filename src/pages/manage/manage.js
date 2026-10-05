@@ -842,8 +842,14 @@
   // Numero scritto e non ancora salvato: una risposta su un altro campo non lo cancella.
   let maxInScrittura = false;
 
-  function setSessionsMsg(el, text, kind) {
+  // Righe che dicono di non aver letto dal server, col testo che resta quando
+  // un documento intero arriva: da lì in poi l'avviso sarebbe falso (#675).
+  const avvisiLettura = new Map();
+
+  function setSessionsMsg(el, text, kind, dopoLettura) {
     if (!el) return;
+    if (dopoLettura === undefined) avvisiLettura.delete(el);
+    else avvisiLettura.set(el, dopoLettura);
     el.textContent = text || '';
     el.classList.toggle('mg-ok', kind === 'ok');
     el.classList.toggle('mg-err', kind === 'err');
@@ -870,9 +876,7 @@
     sessionsState = doc;
     for (const k of RS.CHIAVI) sessionsNoti.add(k);
     accogliCampiSessions(doc, scritti);
-    for (const el of [mgMaxSessionsMsg, mgPriorityAccountMsg, mgAccountsMsg]) {
-      if (el && el.textContent === SESSIONS_NON_LETTO) setSessionsMsg(el, '', null);
-    }
+    for (const [el, resta] of [...avvisiLettura]) setSessionsMsg(el, resta, resta ? 'ok' : null);
   }
 
   function reflectSessions() {
@@ -904,7 +908,7 @@
     for (const k of fermi) sessionsNoti.add(k);
     reflectSessions();
     for (const [el, chiavi] of [[mgMaxSessionsMsg, ['maxSessions']], [mgPriorityAccountMsg, ['priorityAccount']], [mgAccountsMsg, ['accountAOff', 'accountBOff']]]) {
-      if (!chiavi.every((k) => fermi.includes(k))) setSessionsMsg(el, SESSIONS_NON_LETTO, 'err');
+      if (!chiavi.every((k) => fermi.includes(k))) setSessionsMsg(el, SESSIONS_NON_LETTO, 'err', '');
     }
   }
 
@@ -935,10 +939,10 @@
     setSessionsMsg(msgEl, 'Salvo…', null);
     // «Salvato.» parla del valore che si vede: non se una scelta più nuova sulla
     // stessa riga è ancora per strada, né accanto a un numero riscritto dopo Salva.
-    const confermaSessions = (testo) => {
+    const confermaSessions = (testo, dopoLettura) => {
       if (sessionsInAttesa.some((s) => s.msgEl === msgEl)) return;
       if ('maxSessions' in esito.valori && mgMaxSessions && mgMaxSessions.value !== String(esito.valori.maxSessions)) return;
-      setSessionsMsg(msgEl, testo, 'ok');
+      setSessionsMsg(msgEl, testo, 'ok', dopoLettura);
     };
     const scritti = Object.keys(esito.valori);
     return inFila(`sessioni:${scritti.join(',')}`, async () => {
@@ -961,7 +965,9 @@
         // resto no. Rimettere i valori di partenza spegnerebbe una scelta salvata.
         accogliCampiSessions(esito.valori, scritti);
         reflectSessions();
-        confermaSessions('Salvato. Il resto non l\'ho potuto rileggere dal server.');
+        // Un documento partito dopo questa richiesta è già sullo schermo: il resto è letto.
+        if (nato < sessionsAccolto) confermaSessions('Salvato.');
+        else confermaSessions('Salvato. Il resto non l\'ho potuto rileggere dal server.', 'Salvato.');
         return true;
       }
       accogliSessions(r, nato, scritti);

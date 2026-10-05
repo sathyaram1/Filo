@@ -291,3 +291,57 @@ test('un numero riscritto dopo Salva non si trova accanto «Salvato.»', async (
   await expect(page.locator('#mgMaxSessionsMsg')).toHaveText('Salvato.');
   await expect(page.locator('#mgMaxSessions')).toHaveValue('9');
 });
+
+test('scritto e non riletto, poi un salvataggio pieno su un\'altra riga: sparisce anche «il resto non l\'ho potuto rileggere»', async ({ openTab }) => {
+  const page = await apriServer(openTab, SERVER);
+  await arrivate(page, 1);
+
+  await page.evaluate(() => { window.__rilettura = false; });
+  await interruttore(page, 'A').click();
+  await arrivate(page, 2);
+  await expect(page.locator('#mgAccountsMsg')).toContainText('non l\'ho potuto rileggere');
+
+  await page.evaluate(() => { window.__rilettura = true; });
+  await page.locator('#mgMaxSessions').fill('5');
+  await page.locator('#mgMaxSessionsSave').click();
+  await arrivate(page, 3);
+  await expect(page.locator('#mgMaxSessionsMsg')).toHaveText('Salvato.');
+  await expect(page.locator('#mgAccountA')).not.toBeChecked();
+  // La scrittura dell'account è avvenuta e ora anche il resto è letto: resta la sola conferma.
+  await expect(page.locator('#mgAccountsMsg')).toHaveText('Salvato.');
+});
+
+test('scritto e non riletto, poi una lettura piena: l\'avviso sulla riga del numero se ne va', async ({ openTab }) => {
+  const page = await apriServer(openTab, SERVER);
+  await arrivate(page, 1);
+
+  await page.evaluate(() => { window.__rilettura = false; });
+  await page.locator('#mgMaxSessions').fill('6');
+  await page.locator('#mgMaxSessionsSave').click();
+  await arrivate(page, 2);
+  await expect(page.locator('#mgMaxSessionsMsg')).toContainText('non l\'ho potuto rileggere');
+
+  await page.evaluate(() => { window.__rilettura = true; });
+  await page.evaluate(() => window.__mgTest.loadSessions());
+  await arrivate(page, 3);
+  await expect(page.locator('#mgMaxSessions')).toHaveValue('6');
+  await expect(page.locator('#mgMaxSessionsMsg')).toHaveText('Salvato.');
+});
+
+test('una risposta non riletta che arriva dopo un documento pieno più nuovo non dice che il resto manca', async ({ openTab }) => {
+  // Il numero viaggia lento e senza rilettura; l'interruttore parte dopo e torna pieno prima.
+  const page = await apriServer(openTab, SERVER, { set: [700, 0] });
+  await arrivate(page, 1);
+
+  await page.evaluate(() => { window.__rilettura = false; });
+  await page.locator('#mgMaxSessions').fill('7');
+  await page.locator('#mgMaxSessionsSave').click();
+  await page.evaluate(() => { window.__rilettura = true; });
+  await interruttore(page, 'B').click();
+
+  await arrivate(page, 3);
+  await expect(page.locator('#mgMaxSessions')).toHaveValue('7');
+  await expect(page.locator('#mgAccountB')).not.toBeChecked();
+  await expect(page.locator('#mgAccountsMsg')).toHaveText('Salvato.');
+  await expect(page.locator('#mgMaxSessionsMsg')).toHaveText('Salvato.');
+});
