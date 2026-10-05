@@ -462,7 +462,8 @@
     err.provider = 'openrouter';
     // Con gli strumenti il router cerca solo host che li reggono: il suo 404 vuol dire che fra gli
     // ammessi non ce n'è, e chi lo racconta deve dire questo, non «riprova».
-    if (tools && res.status === 404 && NO_HOST_FOR_PARAMS_RE.test(errText)) err.code = 'NO_TOOL_HOST';
+    if (res.status === 404 && DATA_POLICY_RE.test(errText)) err.code = 'DATA_POLICY';
+    else if (tools && res.status === 404 && isParamsRefusal(errText)) err.code = 'NO_TOOL_HOST';
     if (res.keySource) err.keySource = res.keySource;
     if (res.keyFallback) err.keyFallback = res.keyFallback;
     return err;
