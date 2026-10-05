@@ -83,8 +83,24 @@ test('il preludio precede il comando dell\'utente, non lo segue', () => {
   // L'ORDINE si controlla sul codice, uguale su ogni sistema. Se il preludio
   // finisse dopo il comando, la console avrebbe già scritto l'output con la
   // codifica sbagliata e il nome sarebbe perso.
-  const src = readFileSync(join(ROOT, 'src', 'main', 'services', 'terminal.js'), 'utf8');
-  assert.match(src, /const toRun = encodingPrelude\(usedShell\) \+ \(/);
+  // Si guarda quello che parte davvero, fingendo Windows per vederne i rami anche altrove.
+  const prima = Object.getOwnPropertyDescriptor(process, 'platform');
+  Object.defineProperty(process, 'platform', { value: 'win32' });
+  try {
+    const comando = 'Write-Output ciao';
+    for (const shell of ['powershell', 'cmd']) {
+      for (const trackCwd of [false, true]) {
+        const inv = T.invocazione(shell, comando, { trackCwd, mark: 'SEGNO' });
+        const testo = inv.stdin != null ? inv.stdin : inv.args[inv.args.length - 1];
+        const preludio = T.encodingPrelude(shell);
+        const dove = testo.includes(comando) ? testo.indexOf(comando) : testo.indexOf('FromBase64String');
+        assert.ok(preludio && testo.includes(preludio), `${shell}, cartella tracciata ${trackCwd}: manca il preludio`);
+        assert.ok(dove > testo.indexOf(preludio), `${shell}, cartella tracciata ${trackCwd}: il preludio segue il comando`);
+      }
+    }
+  } finally {
+    Object.defineProperty(process, 'platform', prima);
+  }
 });
 
 test('il preludio è quello della shell che gira, non di quella chiesta', () => {

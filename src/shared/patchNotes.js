@@ -16,6 +16,7 @@
         'Nelle risposte di Filo un elenco numerato con le voci staccate da una riga vuota tiene i suoi numeri: prima ogni voce ripartiva da 1.',
         'In Privacy massima Filo cancella i cookie e gli accessi di un sito qualche minuto dopo che ne chiudi l\'ultima scheda. Prima li teneva finché non chiudevi Filo. Se chiudi una scheda per sbaglio e la riapri subito resti connesso, e i siti fidati non cambiano.',
         'Sempre in Privacy massima, togliere un sito dai "siti fidati" butta via quello che quel sito aveva salvato, invece di lasciarlo sul computer. Se la scheda è aperta, Filo aspetta che la chiudi.',
+        'Su Windows, se in un comando che Filo esegue per te una parte sbaglia, per esempio un programma che non esiste, il resto della riga gira lo stesso, come quando la scrivi tu nel terminale. Prima si fermava tutto lì.',
       ],
     },
     {

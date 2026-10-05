@@ -71,9 +71,8 @@ function shellInvocation(shell, command) {
   }
 }
 
-// Come parte il comando. Con la cartella tracciata PowerShell legge da stdin, come il terminale della
-// dashboard: con `-Command <testo>` lo script è uno solo e la sonda dovrebbe stare in un try (vedi
-// righePowerShell). Tutto il resto viaggia in argv, come sempre.
+// Con la cartella tracciata PowerShell legge da stdin, come la dashboard: con `-Command <testo>` un throw
+// salterebbe la sonda, a meno di un try che però cambia gli errori (righePowerShell). Il resto va in argv.
 function invocazione(shell, command, { trackCwd = false, mark = '' } = {}) {
   if (trackCwd && resolveShell(shell) === 'powershell') {
     return {
@@ -214,11 +213,9 @@ function invocaCodificato(testo) {
   return `Invoke-Expression ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${b64}')))`;
 }
 
-// Le righe che una PowerShell letta da stdin esegue per un comando, chiuse da `<segno>:<esito>:<cartella>`.
-// Le usano il terminale della dashboard e i comandi dell'assistente. Niente try attorno al comando (#722):
-// dentro un try, anche nelle funzioni che chiama, un errore come un comando sconosciuto ferma tutto il
-// resto, mentre in una shell ferma solo la sua istruzione. La riga del segno è una pipeline a parte e gira
-// anche dopo un throw; dopo un `exit` no, e l'esito lo dà il processo.
+// Le righe che una PowerShell letta da stdin esegue per un comando, chiuse da `<segno>:<esito>:<cartella>`; le
+// usano dashboard e assistente. Niente try attorno al comando: dentro un try un comando sconosciuto ferma tutto il
+// resto (#722). La riga del segno è una pipeline a parte: gira anche dopo un throw, non dopo un `exit`.
 function righePowerShell(command, segno, codifica = invocaCodificato) {
   return `$global:LASTEXITCODE=0\n$__filo_ok=$false\n${ERRORE_DI_PRIMA_POWERSHELL}\n`
     + `${codifica(`${command}\n$__filo_ok=$?`)}\n`
