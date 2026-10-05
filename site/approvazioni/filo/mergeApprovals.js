@@ -960,6 +960,18 @@
     return !(segno && segno.tipo === 'pieno');
   }
 
+  /**
+   * Quale segno è, fra una lettura e l'altra. PURA. '' = nessun segno. Chi lo
+   * rimette (Gestione, lo script, un'altra finestra) scrive un `at` nuovo: la
+   * chiave cambia anche se fra le due letture il segno non si è visto sparire.
+   */
+  function chiaveSegno(segno) {
+    if (!segno) return '';
+    var at = String(segno.at || '').trim();
+    var ms = Date.parse(at);
+    return isFinite(ms) ? String(ms) : (at || String(segno.by || '').trim());
+  }
+
   /** Chi aveva messo il segno sulla pratica, in una frase. PURA. */
   function preapprovedBy(r) {
     var by = String((r && r.preapprovedBy) || '').trim();
@@ -1129,6 +1141,7 @@
     segnoPreapprovazione: segnoPreapprovazione,
     segnoTesti: segnoTesti,
     segnoAlClic: segnoAlClic,
+    chiaveSegno: chiaveSegno,
     preapprovedWhenText: preapprovedWhenText,
     dateTimeText: dateTimeText,
     mergedWhenText: mergedWhenText,

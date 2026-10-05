@@ -78,3 +78,13 @@ test('fra le fuse senza chiedere, l’introduzione nomina solo i segni che l’e
   assert.match(UI.preapprovedIntro([{ preapprovedBy: '' }]), /«fondi senza chiedermelo»/);
   assert.match(UI.preapprovedIntro([]), /^Lavori fermati dai controlli e fusi lo stesso\. Qui c’è/);
 });
+
+test('la chiave del segno: rimesso è un altro segno, riletto è lo stesso (#701)', () => {
+  const k = UI.chiaveSegno(UI.segnoPreapprovazione(aMano));
+  assert.equal(k, UI.chiaveSegno(UI.segnoPreapprovazione({ ...aMano })));
+  // Lo stesso istante scritto con più cifre resta lo stesso segno.
+  assert.equal(k, UI.chiaveSegno({ by: aMano.by, at: '2026-09-26T10:26:00Z' }));
+  assert.notEqual(k, UI.chiaveSegno(UI.segnoPreapprovazione({ by: aMano.by, at: '2026-09-26T10:27:00.000Z' })));
+  assert.equal(UI.chiaveSegno(null), '');
+  assert.notEqual(UI.chiaveSegno({ by: 'owner', at: '' }), '');
+});

@@ -478,6 +478,9 @@ export const SOLO_DA_GESTIONE_MIO = 'La prova del mittente la dà solo l’owner
 /** «Fondi senza chiedermelo» su una pratica non dell'owner né di una sessione: stessa porta su L5. */
 export const SOLO_DA_GESTIONE_PREAPPROVA = 'il segno «fondi senza chiedermelo» salta il sì dell’owner alla fusione: su un feedback non suo né di una sua sessione lo mette solo lui, in Gestione, dal dettaglio della pratica. Da riga di comando non si può';
 
+/** Il segno messo da qui non manda la fusione già ferma: la manda Gestione (#701). */
+export const FUSIONE_FERMA_DA_GESTIONE = 'Una fusione già ferma su questa pratica non parte da qui: la manda Gestione appena vede il segno (subito, se è aperta) e lì ne leggi l’esito. Se è ferma per blocchi nuovi, aspetta il tuo sì.';
+
 /** «910», «#910», «22.1»: un numero di feedback, non un id. PURA. */
 export function numeroDiFeedback(riferimento) {
   return !!parseRiferimento(riferimento).seq;
@@ -823,6 +826,7 @@ if (isMain) {
     console.log(r.dryRun
       ? `[dry-run] ${riferimento}: ${preapprova ? 'metterei' : 'toglierei'} il segno «fondi senza chiedermelo» (${r.campi.join(', ')})`
       : `${riferimento}: ${preapprova ? `da ora si fonde senza chiedere (segno di ${r.segno.by})` : 'da ora ti chiede prima di fondere'}`);
+    if (preapprova && !r.dryRun) console.log(FUSIONE_FERMA_DA_GESTIONE);
     process.exit(0);
   }
 
@@ -843,6 +847,7 @@ if (isMain) {
   console.log(r.dryRun
     ? `(prova a vuoto) ${r.from} → ${r.to}; campi che scriverei: ${r.campi.join(', ')}`
     : `OK: ${riferimento} da "${r.from}" a "${r.to}".`);
+  if (preapprova === true && !r.dryRun) console.log(FUSIONE_FERMA_DA_GESTIONE);
   // Come la chiusura di finish e di server:fondi (#913): la chiusura a mano è quella di un lavoro senza fusione.
   if (!r.dryRun && r.to === 'done' && !(typeof frase === 'string' && frase.trim())) {
     const promemoria = await fraseDaScrivere(id, riferimento, { bearer });
