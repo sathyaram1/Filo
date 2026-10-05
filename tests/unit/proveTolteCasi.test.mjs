@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import {
   supportoDelGiro, aiutiFuoriDalGiro, proveCheDipendono, casiDalReport, casiSpenti, testoCasiSpenti, controllaCasiDellaPulizia,
-  controllaProveTolte, controllaPulizia, puliziaDelPass, PREFISSO_RIPRISTINO,
+  controllaProveTolte, controllaPulizia, puliziaDelPass, PREFISSO_RIPRISTINO, numeriDelTitolo, casiToltiNonMessi,
 } from '../../scripts/lib/prove-tolte.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -152,6 +152,43 @@ test('la consegna rilancia le prove che usano un file di supporto cambiato, anch
     t.scrivi('stato-a.txt', 'corretto\n');
     t.commit('correzione vera');
     assert.deepEqual(controllaProveTolte({ shaPrima: t.critica, root: t.dir, lancia: t.lancia, prepara: preparaFinto, log: () => {} }), { ferma: false, testo: '' });
+  } finally {
+    rmSync(t.dir, { recursive: true, force: true });
+  }
+});
+
+test('un file aggiunto nella cartella del giro rilancia tutte le sue prove: accanto a un aiuto può prenderne il posto', () => {
+  const t = giro({
+    [`${CARTELLA}/giro1-r1-a.spec.mjs`]: prova(caso('caso a', 'a')),
+    [`${CARTELLA}/giro1-r2-b.spec.mjs`]: "import { banco } from './helpers/altro.mjs';\n" + caso('caso b', 'b'),
+    [AIUTO]: banco('a'), [`${CARTELLA}/helpers/altro.mjs`]: banco('b'), 'stato-a.txt': 'rotto\n', 'stato-b.txt': 'corretto\n',
+  });
+  try {
+    t.scrivi(`${CARTELLA}/helpers/banco.js`, 'exports.banco = {};\n');
+    t.commit('correzione che aggiunge un aiuto vuoto accanto a quello vero');
+    const e = controllaProveTolte({ shaPrima: t.critica, root: t.dir, lancia: t.lancia, prepara: preparaFinto, log: () => {} });
+    assert.equal(e.ferma, true, 'com\'era, senza il file nuovo, la prova di a è ancora rossa');
+    assert.match(e.testo, /giro1-r1-a\.spec\.mjs \(usa helpers\/banco\.js\)/);
+    assert.deepEqual(nomi(t.visti).sort(), ['giro1-r1-a.spec.mjs', 'giro1-r2-b.spec.mjs']);
+  } finally {
+    rmSync(t.dir, { recursive: true, force: true });
+  }
+});
+
+test('un aiuto comune aggiunto che fa ombra a uno importato senza estensione: la prova si rilancia senza di lui', () => {
+  const t = giro({
+    [`${CARTELLA}/giro1-r1-a.spec.mjs`]: "import { x } from '../../helpers/zz-ombra';\n" + prova(caso('caso a', 'a')),
+    [AIUTO]: banco('a'), 'tests/helpers/zz-ombra.mjs': 'export const x = 1;\n', 'stato-a.txt': 'rotto\n',
+  });
+  const log = [];
+  try {
+    t.scrivi('tests/helpers/zz-ombra.js', 'exports.x = 2;\n');
+    t.commit('correzione che aggiunge un aiuto comune');
+    const e = controllaProveTolte({ shaPrima: t.critica, root: t.dir, lancia: t.lancia, prepara: preparaFinto, log: (m) => log.push(m) });
+    assert.equal(e.ferma, true);
+    assert.match(e.testo, /giro1-r1-a\.spec\.mjs \(usa tests\/helpers\/zz-ombra\.js\)/);
+    assert.match(log.join('\n'), /in una copia del ramo a parte: tests\/helpers\/zz-ombra\.js/);
+    assert.equal(t.g('worktree', 'list').split('\n').length, 1, 'la copia a parte se ne va');
   } finally {
     rmSync(t.dir, { recursive: true, force: true });
   }
@@ -302,6 +339,48 @@ test('in una prova di tre rilievi un caso spento si vede anche se un altro resta
   }
 });
 
+test('un caso rosso tolto per intero dalla pulizia è di un rilievo messo da parte solo se il titolo, o il file, lo dice', () => {
+  assert.deepEqual(numeriDelTitolo('r2 prima porta'), [2]);
+  assert.deepEqual(numeriDelTitolo('r1-r3 insieme'), [1, 3]);
+  assert.deepEqual(numeriDelTitolo('caso r2d2, br2'), []);
+  const rossa = (casi) => ({ rossa: true, casi });
+  const prima = rossa({ 'r1 a': false, 'r2 prima porta': false, 'r2 seconda porta': false, 'r2 già verde': true });
+  const f = `${CARTELLA}/giro1-r1-r2-x.spec.mjs`;
+  assert.deepEqual(casiToltiNonMessi(f, prima, rossa({ 'r2 prima porta': false, 'r2 seconda porta': false }), [1]), [],
+    'tolto il caso di r1, messo da parte, e uno verde, che non conta');
+  assert.deepEqual(casiToltiNonMessi(f, prima, rossa({ 'r1 a': false, 'r2 seconda porta': false }), [1]), ['r2 prima porta']);
+  assert.deepEqual(casiToltiNonMessi(f, prima, rossa({ 'gruppo › r2 prima porta': false, 'r2 seconda porta': false }), [1]), [],
+    'un caso finito dentro un describe non è tolto');
+  const senza = rossa({ a: false, b: false });
+  assert.deepEqual(casiToltiNonMessi(`${CARTELLA}/giro1-r1-r2-x.spec.mjs`, senza, rossa({ b: false }), [1]), ['a'], 'senza numero nel titolo decide il file, e copre anche r2');
+  assert.deepEqual(casiToltiNonMessi(`${CARTELLA}/giro1-r1-x.spec.mjs`, senza, rossa({ b: false }), [1]), [], 'il file è solo di r1, messo da parte');
+  assert.deepEqual(casiToltiNonMessi(f, prima, rossa({}), undefined), [], 'senza i numeri dei messi da parte non si giudica');
+  assert.deepEqual(casiToltiNonMessi(f, { rossa: true, casi: null }, rossa({}), [1]), []);
+  const t = testoCasiSpenti([{ f, spenti: [], tolti: ['r2 prima porta'], vuota: false }], {}, 'abcdef1234567890');
+  assert.match(t, /giro1-r1-r2-x\.spec\.mjs: «r2 prima porta» era rosso ed è stato tolto, ma non è di un rilievo messo da parte/);
+  assert.match(t, /titolo ne porta il numero \(r<n>\)/);
+});
+
+test('la pulizia che toglie per intero il caso rosso di un rilievo da correggere non si registra, anche se un altro resta rosso', () => {
+  const file = `${CARTELLA}/giro1-r1-r2-due-porte.spec.mjs`;
+  const t = giro({
+    [file]: prova(caso('r1 messo da parte', 'a'), caso('r2 prima porta', 'b'), caso('r2 seconda porta', 'c')), [AIUTO]: banco('a', 'b', 'c'),
+    'stato-a.txt': 'rotto\n', 'stato-b.txt': 'rotto\n', 'stato-c.txt': 'rotto\n',
+  });
+  const opz = { shaCritica: t.critica, root: t.dir, lancia: t.lancia, prepara: preparaFinto, log: () => {}, messi: [1] };
+  try {
+    t.scrivi(file, prova(caso('r2 seconda porta', 'c')));
+    const e = controllaCasiDellaPulizia({ ...opz, sha: t.commit('pulizia: tolti r1 e la prima porta di r2') });
+    assert.equal(e.ferma, true, 'la prima porta di r2 era rossa e la pulizia l\'ha tolta');
+    assert.match(e.testo, /«r2 prima porta» era rosso ed è stato tolto/);
+    assert.doesNotMatch(e.testo, /«r1 messo da parte»/);
+    t.scrivi(file, prova(caso('r2 prima porta', 'b'), caso('r2 seconda porta', 'c')));
+    assert.deepEqual(controllaCasiDellaPulizia({ ...opz, sha: t.commit('pulizia: tolto solo r1') }), { ferma: false, testo: '' });
+  } finally {
+    rmSync(t.dir, { recursive: true, force: true });
+  }
+});
+
 test('dopo una pulizia che toglie righe da un aiuto, la consegna rilancia le prove che lo usano com\'erano dopo di lei', () => {
   const t = giro(DUE_RILIEVI());
   try {
@@ -340,7 +419,7 @@ function esegui(script, argv, env, cwd) {
 
 test('dispatch --record-pulizia respinge la pulizia che spegne il caso da correggere, e registra quella giusta', async () => {
   const file = `${CARTELLA}/giro1-r1-r2-ab.spec.mjs`;
-  const t = giro({ [file]: prova(caso('caso a', 'a'), caso('caso b', 'b')), [AIUTO]: banco('a', 'b'), 'stato-a.txt': 'rotto\n', 'stato-b.txt': 'rotto\n' });
+  const t = giro({ [file]: prova(caso('r1 caso a', 'a'), caso('r2 caso b', 'b')), [AIUTO]: banco('a', 'b'), 'stato-a.txt': 'rotto\n', 'stato-b.txt': 'rotto\n' });
   const stato = resolve(t.dir, 'stato', 'fid-746.json');
   mkdirSync(dirname(stato), { recursive: true });
   writeFileSync(stato, JSON.stringify({
@@ -353,13 +432,13 @@ test('dispatch --record-pulizia respinge la pulizia che spegne il caso da correg
     PATH: `${resolve(t.dir, 'bin')}${delimiter}${process.env.PATH}`,
   };
   try {
-    t.scrivi(file, prova(`test('caso a', () => {\n});\n`));
+    t.scrivi(file, prova(`test('r1 caso a', () => {\n});\n`));
     t.commit('pulizia: tolto b e la verifica di a');
     const no = await esegui('dispatch.mjs', ['--record-pulizia', 'fid-746'], env, t.dir);
     assert.notEqual(no.code, 0, no.testo);
-    assert.match(no.testo, /«caso a» era rosso ed è verde/);
+    assert.match(no.testo, /«r1 caso a» era rosso ed è verde/);
     assert.equal(JSON.parse(readFileSync(stato, 'utf8')).puliziaSha || '', '', 'la pulizia non è registrata');
-    t.scrivi(file, prova(caso('caso a', 'a')));
+    t.scrivi(file, prova(caso('r1 caso a', 'a')));
     const giusta = t.commit('pulizia: tolto solo il caso b');
     const si = await esegui('dispatch.mjs', ['--record-pulizia', 'fid-746'], env, t.dir);
     assert.equal(si.code, 0, si.testo);
@@ -375,7 +454,7 @@ test('verify-local pulizia respinge allo stesso modo la pulizia che spegne il ca
   const cartella = 'tests/verifica/locale-prova-giro';
   const file = `${cartella}/giro1-r2-r3-bc.spec.mjs`;
   const t = giro({
-    [file]: `import { banco } from './helpers/banco.mjs';\n${caso('caso b', 'b')}${caso('caso c', 'c')}`,
+    [file]: `import { banco } from './helpers/banco.mjs';\n${caso('r2 caso b', 'b')}${caso('r3 caso c', 'c')}`,
     [`${cartella}/helpers/banco.mjs`]: banco('b', 'c'), 'stato-b.txt': 'rotto\n', 'stato-c.txt': 'rotto\n',
   }, { ramo });
   const r = withCritique(withRequest({}, ramo, { request: 'richiesta di prova', sha: t.avvio }), ramo, {
@@ -388,13 +467,13 @@ test('verify-local pulizia respinge allo stesso modo la pulizia che spegne il ca
   const env = { FILO_REPO_ROOT: t.dir, DISPLAY: process.env.DISPLAY || ':0', PATH: `${resolve(t.dir, 'bin')}${delimiter}${process.env.PATH}` };
   const entry = () => JSON.parse(readFileSync(resolve(t.dir, '.claude', 'verify-local.json'), 'utf8'))[ramo];
   try {
-    t.scrivi(file, `import { banco } from './helpers/banco.mjs';\ntest('caso c', () => {\n});\n`);
+    t.scrivi(file, `import { banco } from './helpers/banco.mjs';\ntest('r3 caso c', () => {\n});\n`);
     t.commit('pulizia: tolto b e la verifica di c');
     const no = await esegui('verify-local.mjs', ['pulizia'], env, t.dir);
     assert.notEqual(no.code, 0, no.testo);
-    assert.match(no.testo, /«caso c» era rosso ed è verde/);
+    assert.match(no.testo, /«r3 caso c» era rosso ed è verde/);
     assert.equal(entry().pending.shaPulizia, undefined);
-    t.scrivi(file, `import { banco } from './helpers/banco.mjs';\n${caso('caso c', 'c')}`);
+    t.scrivi(file, `import { banco } from './helpers/banco.mjs';\n${caso('r3 caso c', 'c')}`);
     const giusta = t.commit('pulizia: tolto solo il caso b');
     const si = await esegui('verify-local.mjs', ['pulizia'], env, t.dir);
     assert.equal(si.code, 0, si.testo);

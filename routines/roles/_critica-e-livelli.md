@@ -144,7 +144,9 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
 - **`r<n>` è il numero del rilievo che la prova riproduce**: il suo posto nella
   critica che registri, contando da 1 le righe con livello e sede, interne ed
   esterne, nell'ordine in cui le scrivi. Una prova che ne copre più d'uno li
-  porta tutti (`giro2-r1-r3-salva.spec.mjs`); una che non ne riproduce nessuno
+  porta tutti (`giro2-r1-r3-salva.spec.mjs`), e il titolo di ogni suo caso comincia
+  col numero del suo rilievo (`test('r3 …')`): la pulizia lascia uscire per intero
+  solo un caso rosso che porta il numero di un messo da parte. Una che non ne riproduce nessuno
   (una porta di un giro passato ri-provata e chiusa) non ha numero. Una prova di
   un giro passato che riporti di nuovo come rilievo la rinomini (`git mv`) col
   giro e il numero di adesso: il numero che porta è di una critica vecchia.

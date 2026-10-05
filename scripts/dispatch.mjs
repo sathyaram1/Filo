@@ -1328,7 +1328,8 @@ async function recordPulizia(id) {
   const avvio = st.messiDaParteGiro && st.messiDaParteGiro.sha === st.verifierSha ? st.messiDaParteGiro.avvio : '';
   const r = applyPulizia(st, st.verifierSha ? controllaPulizia({ shaCritica: st.verifierSha, root: ROOT, avvio }) : null);
   if (!r.ok) return { rejected: true, formatRejected: true, message: r.message };
-  const casi = controllaCasiDellaPulizia({ shaCritica: st.verifierSha, sha: r.state.puliziaSha, root: ROOT, log: (m) => process.stderr.write(`${m}\n`) });
+  const numeri = Array.isArray(st.messiDaParteGiro?.numeri) ? st.messiDaParteGiro.numeri : undefined;
+  const casi = controllaCasiDellaPulizia({ shaCritica: st.verifierSha, sha: r.state.puliziaSha, root: ROOT, messi: numeri, log: (m) => process.stderr.write(`${m}\n`) });
   if (casi.ferma) return { rejected: true, formatRejected: true, message: casi.testo };
   // Un punto fermo sul commit della pulizia: un ripristino non deve riportare il ramo alla critica.
   sealTransition(r.state, 'pulizia');

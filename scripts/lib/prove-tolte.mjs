@@ -301,21 +301,33 @@ function dipendentiAl(rev, supporto, root) {
   return supporto.length ? proveCheDipendono(testiAl(rev, supporto.map(cartellaDi), root), supporto) : { prove: [], via: {} };
 }
 
+// Un file aggiunto in una cartella del giro rilancia tutte le sue prove a `rev`: quale file carica una prova lo decide
+// Playwright (un `aiuto.js` nuovo fa ombra ad `aiuto.mjs`), non il nome scritto, e aggiungerne uno lì non serve a correggere.
+function proveDelleCartelle(rev, supporto, root) {
+  const via = {};
+  for (const c of new Set(supporto.map(cartellaDi))) {
+    const lista = gitOut(['ls-tree', '-r', '-z', '--name-only', rev, '--', `${c}/`], root).split('\0').filter(Boolean);
+    for (const p of proveTolte(lista)) via[p] = supporto.filter((s) => cartellaDi(s) === c);
+  }
+  return { prove: Object.keys(via), via };
+}
+
 // Le prove del giro da rilanciare fra `shaPrima` e HEAD, `{ prove, via }` (null se git non risponde): togliere il caso
 // rosso, o indebolire il file di supporto che lo controlla, è la stessa porta aperta che cancellare la prova.
 // `fuori`: gli aiuti comuni cambiati che una prova del giro usa; il rilancio li rimette com'erano in una copia a parte.
 export function proveTolteDal(shaPrima, root, principale = riferimentoPrincipale(root)) {
   try {
-    const cambiati = (dove) => gitOut(['diff', '--name-only', '-z', '--no-renames', '--diff-filter=DM', shaPrima, 'HEAD', '--', dove], root).split('\0').filter(Boolean);
-    const nomi = cambiati(PROVE_GIRO);
+    const cambiati = (dove, filtro) => gitOut(['diff', '--name-only', '-z', '--no-renames', `--diff-filter=${filtro}`, shaPrima, 'HEAD', '--', dove], root).split('\0').filter(Boolean);
+    const nomi = cambiati(PROVE_GIRO, 'DM');
     const prove = toccateDalRamo(proveTolte(nomi), shaPrima, root, principale);
     const dip = dipendentiAl(shaPrima, toccateDalRamo(supportoDelGiro(nomi), shaPrima, root, principale), root);
-    const aiuti = toccateDalRamo(aiutiFuoriDalGiro(cambiati('tests/')), shaPrima, root, principale);
+    const nuovi = proveDelleCartelle(shaPrima, toccateDalRamo(supportoDelGiro(cambiati(PROVE_GIRO, 'A')), shaPrima, root, principale), root);
+    const aiuti = toccateDalRamo(aiutiFuoriDalGiro(cambiati('tests/', 'ADM')), shaPrima, root, principale);
     const dipFuori = aiuti.length
       ? proveCheDipendono([...testiAl(shaPrima, cartelleDelRamo(nomi, root, principale), root), ...testiAiuti(shaPrima, root)], aiuti)
       : { prove: [], via: {} };
     const tutte = { ...dip.via };
-    for (const [p, l] of Object.entries(dipFuori.via)) tutte[p] = [...(tutte[p] || []), ...l];
+    for (const [p, l] of [...Object.entries(nuovi.via), ...Object.entries(dipFuori.via)]) tutte[p] = [...new Set([...(tutte[p] || []), ...l])];
     const via = Object.fromEntries(Object.entries(tutte).filter(([p]) => !prove.includes(p)));
     const fuori = aiuti.filter((a) => Object.values(dipFuori.via).some((l) => l.includes(a)));
     return { prove: [...prove, ...Object.keys(via)], via, fuori };
@@ -432,6 +444,8 @@ function copiaConAiutiDi(sha, fuori, root) {
     copyFileSync(resolve(root, f), join(albero, f));
   }
   for (const f of fuori) {
+    // Un aiuto aggiunto dopo la critica nella copia non c'è, com'era allora.
+    if (!oggetto(sha, f, root)) { rmSync(join(albero, f), { force: true }); continue; }
     mkdirSync(dirname(join(albero, f)), { recursive: true });
     writeFileSync(join(albero, f), execFileSync('git', ['show', `${sha}:${f}`], { cwd: root, maxBuffer: 1 << 26, stdio: ['ignore', 'pipe', 'ignore'] }));
   }
@@ -475,24 +489,55 @@ export function casiSpenti(prima, dopo) {
   return { spenti: rossi.filter((t) => d.casi[t] === true), vuota: !Object.values(d.casi).includes(false) };
 }
 
-/** Il rifiuto della pulizia che ha spento un caso rosso, o '' se non ne ha spenti. PURA. */
+const NUMERO_NEL_TITOLO = /(?<![\p{L}\p{N}_])r([1-9]\d*)(?![\p{L}\p{N}_])/giu;
+const ultimo = (t) => String(t).split(' › ').pop();
+
+/** I numeri dei rilievi che il titolo di un caso cita (`r2 prima porta` → [2]). PURA. */
+export function numeriDelTitolo(titolo) {
+  return [...new Set([...String(titolo || '').matchAll(NUMERO_NEL_TITOLO)].map((m) => Number(m[1])))];
+}
+
+/**
+ * I casi rossi alla critica che la pulizia ha tolto per intero senza che siano di un rilievo messo da parte: il titolo
+ * deve citarne solo di messi da parte, o, se non ne cita, il nome del file. `messi`: i loro numeri nella critica. PURA.
+ */
+export function casiToltiNonMessi(prova, prima, dopo, messi) {
+  const p = prima && prima.casi;
+  const d = dopo && dopo.casi;
+  if (!p || !d || !Array.isArray(messi)) return [];
+  const m = new Set(messi.filter((n) => Number.isInteger(n)));
+  const daParte = (n) => n.length > 0 && n.every((x) => m.has(x));
+  const restano = new Set(Object.keys(d).map(ultimo));
+  return Object.keys(p).filter((t) => p[t] === false && !(t in d) && !restano.has(ultimo(t))).filter((t) => {
+    const n = numeriDelTitolo(ultimo(t));
+    return !daParte(n.length ? n : numeriDelNome(prova));
+  });
+}
+
+/** Il rifiuto della pulizia che ha spento o tolto un caso rosso da correggere, o '' se non l'ha fatto. PURA. */
 export function testoCasiSpenti(fuori, via = {}, shaCritica = '') {
-  const elenco = (Array.isArray(fuori) ? fuori : []).filter((x) => x && (x.vuota || (x.spenti && x.spenti.length)));
+  const elenco = (Array.isArray(fuori) ? fuori : []).filter((x) => x && (x.vuota || (x.spenti && x.spenti.length) || (x.tolti && x.tolti.length)));
   if (!elenco.length) return '';
   const dove = via && typeof via === 'object' ? via : {};
-  const righe = elenco.map(({ f, spenti = [] }) => {
+  const casi = (l) => l.map((t) => `«${t}»`).join(', ');
+  const righe = elenco.map(({ f, spenti = [], tolti = [], vuota }) => {
     const usa = Array.isArray(dove[f]) && dove[f].length ? ` (usa ${dove[f].map(nomeAiuto).join(', ')})` : '';
-    const cosa = spenti.length
-      ? `${spenti.map((t) => `«${t}»`).join(', ')} ${spenti.length === 1 ? 'era rosso ed è verde' : 'erano rossi e sono verdi'}`
-      : 'non ha più un caso rosso';
+    const cosa = [
+      spenti.length ? `${casi(spenti)} ${spenti.length === 1 ? 'era rosso ed è verde' : 'erano rossi e sono verdi'}` : '',
+      tolti.length ? `${casi(tolti)} ${tolti.length === 1 ? 'era rosso ed è stato tolto, ma non è' : 'erano rossi e sono stati tolti, ma non sono'} di un rilievo messo da parte` : '',
+      !spenti.length && !tolti.length && vuota ? 'non ha più un caso rosso' : '',
+    ].filter(Boolean).join('; ');
     return `  · ${f}${usa}: ${cosa}`;
   });
   return [
-    'pulizia non registrata: il codice è ancora quello della critica, e la pulizia ha spento dei casi rossi.',
+    'pulizia non registrata: il codice è ancora quello della critica, e la pulizia ha spento o tolto casi rossi da correggere.',
     ...righe,
     'Esce solo il caso del rilievo messo da parte: quello di un rilievo da correggere resta rosso finché il codice non lo',
     `fa diventare verde. Rimetti com'erano (git checkout ${String(shaCritica).slice(0, 12) || '<commit della critica>'} -- <file>), togli solo le righe`,
     'del rilievo messo da parte, `git add -A && git commit`, e rilancia la pulizia.',
+    ...(elenco.some((x) => x.tolti && x.tolti.length)
+      ? ['In una prova che copre più rilievi un caso tolto è di un rilievo messo da parte solo se il suo titolo ne porta il numero (r<n>).']
+      : []),
   ].join('\n');
 }
 
@@ -507,7 +552,7 @@ function toccateDallaPulizia(shaCritica, shaPulizia, root) {
     const dirette = proveTolte(voci.filter((v) => v.stato === 'M').map((v) => v.path));
     const dip = dipendentiAl(critica, supportoDelGiro(voci.map((v) => v.path)), root);
     const via = Object.fromEntries(Object.entries(dip.via).filter(([p]) => !uscite.has(p) && !dirette.includes(p)));
-    return { prove: [...dirette, ...Object.keys(via)], via };
+    return { prove: [...dirette, ...Object.keys(via)], via, dirette };
   } catch (_) { return null; }
 }
 
@@ -515,7 +560,7 @@ function toccateDallaPulizia(shaCritica, shaPulizia, root) {
  * Prima di registrare la pulizia: ogni caso rosso di una prova che ha toccato resta rosso, perché il codice è ancora
  * quello della critica. Si rilancia com'è dopo; com'era alla critica solo dove dopo c'è un verde da spiegare.
  */
-export function controllaCasiDellaPulizia({ shaCritica, sha, root, log = console.log, lancia, prepara } = {}) {
+export function controllaCasiDellaPulizia({ shaCritica, sha, root, log = console.log, lancia, prepara, messi } = {}) {
   const toccate = toccateDallaPulizia(shaCritica, sha, root);
   if (!toccate) return { ferma: true, testo: 'pulizia non registrata: git non mi dice quali prove del giro ha toccato.' };
   const n = toccate.prove.length;
@@ -530,12 +575,16 @@ export function controllaCasiDellaPulizia({ shaCritica, sha, root, log = console
     const e = dopo.esiti.get(p) || {};
     return e.casi ? Object.values(e.casi).some(Boolean) || !Object.values(e.casi).includes(false) : !e.rossa;
   });
-  if (!conUnVerde.length) return { ferma: false, testo: '' };
-  const prima = corriCome(conUnVerde, shaCritica, root, {
-    ...opz, etichetta: `${process.pid}-prima`, titolo: 'E com\'erano alla critica, per vedere se quei verdi erano rossi:',
+  // Con i numeri dei messi da parte si guarda anche quali casi rossi la pulizia ha tolto per intero.
+  const confronta = [...new Set([...conUnVerde, ...(Array.isArray(messi) ? toccate.dirette : [])])];
+  if (!confronta.length) return { ferma: false, testo: '' };
+  const prima = corriCome(confronta, shaCritica, root, {
+    ...opz, etichetta: `${process.pid}-prima`, titolo: 'E com\'erano alla critica, per vedere quali casi erano rossi:',
   });
   if (prima.motivo) return { ferma: true, testo: `pulizia non registrata: ${prima.motivo}` };
-  const testo = testoCasiSpenti(conUnVerde.map((f) => ({ f, ...casiSpenti(prima.esiti.get(f), dopo.esiti.get(f)) })), toccate.via, shaCritica);
+  const testo = testoCasiSpenti(confronta.map((f) => ({
+    f, ...casiSpenti(prima.esiti.get(f), dopo.esiti.get(f)), tolti: casiToltiNonMessi(f, prima.esiti.get(f), dopo.esiti.get(f), messi),
+  })), toccate.via, shaCritica);
   return { ferma: !!testo, testo };
 }
 

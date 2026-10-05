@@ -567,7 +567,7 @@ export function withPulizia(state, branch, { controllo, dirtyFiles = [] } = {}) 
   const fuori = testoPuliziaFuoriNumero(controllo, numeri);
   if (fuori) return { ok: false, reason: fuori };
   s[branch] = { ...prev, pending: { ...prev.pending, shaPulizia: controllo.sha } };
-  return { ok: true, state: s, files: controllo.files };
+  return { ok: true, state: s, files: controllo.files, numeri };
 }
 
 /**
@@ -1270,7 +1270,7 @@ if (isMain) {
       : null;
     const r = withPulizia(readState(), branch, { controllo, dirtyFiles: statoP.lines });
     if (!r.ok) { console.error(r.reason); process.exit(1); }
-    const casi = controllaCasiDellaPulizia({ shaCritica: aperto.pending.sha, sha: controllo.sha, root: ROOT });
+    const casi = controllaCasiDellaPulizia({ shaCritica: aperto.pending.sha, sha: controllo.sha, root: ROOT, messi: r.numeri });
     if (casi.ferma) { console.error(casi.testo); process.exit(1); }
     writeState(r.state);
     console.log(`Pulizia registrata su ${sha.slice(0, 8)}: ${r.files.length === 1 ? 'tolta 1 prova' : `tolte ${r.files.length} prove`} dei rilievi messi da parte.`);

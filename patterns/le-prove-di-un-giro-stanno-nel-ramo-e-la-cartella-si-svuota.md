@@ -53,13 +53,19 @@ la cartella.
   Vale anche importato senza estensione, e per gli aiuti comuni dei test fuori dal giro
   (fixture, helpers): quelli si rimettono com'erano in una copia del ramo a parte, mai al
   loro posto, perché un rilancio interrotto non lasci un aiuto vecchio da committare.
-  Nella pulizia un file di supporto non conta fra le prove tolte.
+  Un file AGGIUNTO nella cartella dopo la critica rilancia tutte le sue prove: accanto a un aiuto
+  importato senza estensione ne prende il posto (decide Playwright, non il nome scritto), e per
+  correggere non serve. Un aiuto comune aggiunto si toglie dalla copia a parte. Nella pulizia un
+  file di supporto non conta fra le prove tolte.
 - **La pulizia non spegne un caso rosso.** Prima di registrarla si rilanciano, sul codice
   della critica, le prove a cui ha tolto un caso e quelle che usano un file di supporto a cui
   ha tolto righe: ogni caso rosso prima deve restare rosso dopo (il confronto è per titolo del
   caso, dal rapporto JSON di Playwright), e la prova deve avere ancora un rosso. Togliere col
   caso del rilievo messo da parte anche la riga che controlla quello da correggere la fa
-  respingere. Quelle stesse prove la consegna le rilancia com'erano dopo la pulizia.
+  respingere, e così togliere per intero il caso rosso di un rilievo da correggere: in una prova
+  che copre più rilievi il titolo di ogni caso porta il numero del suo (`r2 …`), ed esce solo un
+  caso rosso che porta quello di un messo da parte. Quelle stesse prove la consegna le rilancia
+  com'erano dopo la pulizia.
 
 ## Il rosso atteso
 
