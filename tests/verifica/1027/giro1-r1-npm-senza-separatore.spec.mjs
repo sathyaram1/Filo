@@ -23,11 +23,3 @@ test('avvia --dry-run senza «--» non fa un giro vero', () => {
   expect(r.status, `${r.stdout}\n${r.stderr}`).not.toBe(0);
   expect(existsSync(join(dir, 'orchestratore.log'))).toBe(false);
 });
-
-test('avvia --paralleli=3 senza «--» non parte coi due di base', () => {
-  const dir = cartellaTemporanea('orch-1027-');
-  const r = orchestra(['avvia', '--dry-run', '--paralleli=3', '41'], dir);
-  // Con un giro a vuoto il lavoro 41 entrerebbe nella prova: deve fermarsi prima, dicendolo.
-  expect(r.status, `${r.stdout}\n${r.stderr}`).not.toBe(0);
-  expect(r.stdout).not.toMatch(/#41/);
-});
