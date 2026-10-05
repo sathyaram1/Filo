@@ -75,3 +75,73 @@ test('orologio del PC avanti: una scrittura firmata da un orologio dieci secondi
   ora += 55000;
   assert.deepEqual(ids(await w.tick({ force: true })), ['d1']);
 });
+
+// Una lettura completa va a pagine lette in momenti diversi: una scrittura su un feedback già letto, seguita da una
+// su uno letto dopo, non deve restare fuori dal giro (verifica locale, giro 3). Vale l'ora della prima pagina.
+function letturaAPagine({ conReadTime, pausaMs }) {
+  let reale = Date.parse('2026-10-05T10:00:00Z');
+  const iso = (ms) => new Date(ms).toISOString();
+  const docs = new Map();
+  for (let i = 0; i < 30; i += 1) {
+    const id = `d${String(i).padStart(2, '0')}`;
+    docs.set(id, { _id: id, _updateTime: iso(reale - 3600e3), updatedAt: iso(reale - 3600e3) });
+  }
+  const scrivi = (id) => { reale += 1; docs.set(id, { _id: id, _updateTime: iso(reale), updatedAt: iso(reale) }); };
+  const w = LIVE.makeWatcher({
+    now: () => reale + 10 * 60e3,
+    listVersions: async () => ({ versions: [...docs.values()], complete: true, readTime: iso(reale) }),
+    listChangedSince: async ({ since }) => {
+      reale += 50;
+      return { rows: [...docs.values()].filter((d) => Date.parse(d.updatedAt) > Date.parse(since)).map((d) => ({ ...d })), complete: true, readTime: iso(reale) };
+    },
+  });
+  const inizio = reale + 10 * 60e3;
+  const primaPagina = iso(reale);
+  const nomi = [...docs.keys()].sort();
+  const righe = [];
+  for (let p = 0; p < 3; p += 1) {
+    for (const id of nomi.slice(p * 10, p * 10 + 10)) righe.push({ ...docs.get(id) });
+    reale += pausaMs;
+    if (p === 0) scrivi('d03');
+    if (p === 1) scrivi('d25');
+  }
+  w.allineato(inizio, righe, conReadTime ? primaPagina : undefined);
+  return async () => {
+    const arrivati = new Set();
+    for (let k = 0; k < 2; k += 1) {
+      reale += 60e3;
+      // eslint-disable-next-line no-await-in-loop
+      for (const r of (await w.tick({ force: true })).rows || []) arrivati.add(r._id);
+    }
+    return arrivati;
+  };
+}
+
+test('orologio del PC avanti: una scrittura durante la lettura completa, su un feedback già letto, arriva al giro dopo', async () => {
+  const arrivati = await letturaAPagine({ conReadTime: false, pausaMs: 4000 })();
+  assert.ok(arrivati.has('d03'), `arrivati: ${[...arrivati]}`);
+});
+
+test('una lettura completa più lunga del margine: il confine parte dall\'ora della prima pagina', async () => {
+  const arrivati = await letturaAPagine({ conReadTime: true, pausaMs: 150e3 })();
+  assert.ok(arrivati.has('d03'), `arrivati: ${[...arrivati]}`);
+});
+
+test('la lettura completa porta l\'ora della prima pagina', async () => {
+  require(join(SRC, 'feedback.js'));
+  const FB = globalThis.SN_FEEDBACK;
+  const vera = FB.list;
+  const pagine = [['a', 'b'], ['c']];
+  const ore = ['2026-10-05T10:00:00.000001Z', '2026-10-05T10:01:30.000001Z'];
+  let n = 0;
+  FB.list = async () => {
+    const i = n; n += 1;
+    const righe = pagine[i].map((id) => ({ _id: id }));
+    Object.defineProperty(righe, 'readTime', { value: ore[i], enumerable: false });
+    return righe;
+  };
+  try {
+    const out = await FB.listAllPaged({ pageSize: 2 });
+    assert.equal(out.readTime, ore[0]);
+  } finally { FB.list = vera; }
+});

@@ -36,8 +36,11 @@ lasciava fuori per sempre un feedback vecchio tornato nei Ricevuti.
    il freno sulle pagine scatta, la pagina lo dice («N+» e l'hover).
 3. **La domanda incrementale.** Filtro `> ultimo visto` meno un margine per gli
    orologi scentrati, ordine (campo, nome), cursore oltre il tetto di pagina.
-   «Ultimo visto» è l'ora del SERVER (lettura, commit), e il margine si toglie
-   anche a quella. Un giro a vuoto costa una lettura. Una riga riletta coi soli
+   «Ultimo visto» è l'ora del SERVER, e il margine si toglie anche a quella.
+   Di una lettura a pagine vale l'ora della PRIMA pagina: le pagine dopo
+   portano scritture più nuove di quelle che una pagina già passata non ha
+   visto; l'ora dei documenti serve solo dove la lettura non ne ha una, e
+   sempre col margine. Un giro a vuoto costa una lettura. Una riga riletta coi soli
    campi della lista li sostituisce tutti: un campo della lista che manca è
    stato tolto sul server, non si tiene quello vecchio.
 4. **La riconciliazione rara** (mezz'ora): le versioni di tutto, confrontate in
