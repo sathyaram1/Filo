@@ -211,7 +211,7 @@ function openExternalScheme(rawUrl) {
 function invitoFermato(rawUrl, { win = null, wc = null } = {}) {
   const W = globalThis.SN_WALLET;
   if (!W || !W.isInviteDeepLink(rawUrl)) return false;
-  if (wc && !Permessi.gestoRecente(wc)) return true;
+  if (wc && !Permessi.gestoRecente(wc) && !Permessi.navigazioneDaGesto(wc)) return true;
   try { globalThis.SN_WALLET_MAIN?.portaDentroInvito?.(W.inviteCodeFromDeepLink(rawUrl), win); } catch (_) {}
   return true;
 }
