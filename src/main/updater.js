@@ -268,4 +268,5 @@ async function avvisaSeAggiornamentoBloccato(versione) {
 module.exports = {
   initAutoUpdater, avviaAggiornatore, seguiImpostazioni, installaAggiornamento, conStatoAggiornamento,
   avvisaVersioneNuova, togliAvvisiSuperati, avvisaSeAggiornamentoBloccato, TIPO_DISPONIBILE,
+  avvisiScritti: () => fila,
 };
