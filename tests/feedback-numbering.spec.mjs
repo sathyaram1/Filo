@@ -37,7 +37,7 @@ const FAKE = [
 async function loadFakes(page) {
   await page.waitForFunction(() => typeof SN_FEEDBACK !== 'undefined');
   await page.evaluate((items) => {
-    SN_FEEDBACK.list = async () => items;
+    SN_FEEDBACK.listAllPaged = async (o) => ({ rows: await SN_FEEDBACK.list(o), complete: true }); SN_FEEDBACK.list = async () => items;
   }, FAKE);
   await page.click('#refresh');
   await expect(page.locator('.fb-card')).toHaveCount(3);

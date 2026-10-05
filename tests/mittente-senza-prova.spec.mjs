@@ -44,7 +44,7 @@ test('nella pagina Feedback un nome riservato senza prova non ha il colore dellâ
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => typeof SN_FEEDBACK !== 'undefined' && window.__fbTest);
   const lista = FBS.map((f) => ({ ...f, status: 'unlabeled' }));
-  await page.evaluate((items) => { SN_FEEDBACK.list = async () => items; }, lista);
+  await page.evaluate((items) => { SN_FEEDBACK.listAllPaged = async (o) => ({ rows: await SN_FEEDBACK.list(o), complete: true }); SN_FEEDBACK.list = async () => items; }, lista);
   await page.click('#refresh');
   await expect(page.locator('.fb-card')).toHaveCount(FBS.length);
   await expect(page.locator('.fb-card[data-id="VERO_OWNER"]')).toHaveClass(/fb-card--origin-owner/);

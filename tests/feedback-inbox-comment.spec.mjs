@@ -33,7 +33,7 @@ const SAMPLE = {
 async function setupAdmin(app, page, feedback, capture = false) {
   await expect(page.locator('#adminBanner')).toBeVisible({ timeout: 8_000 });
   await page.evaluate(({ fb, cap }) => {
-    window.SN_FEEDBACK.list = async () => [fb];
+    window.SN_FEEDBACK.listAllPaged = async (o) => ({ rows: await window.SN_FEEDBACK.list(o), complete: true }); window.SN_FEEDBACK.list = async () => [fb];
     if (cap) window.__updates = [];
     const orig = window.filo.message.bind(window.filo);
     window.filo.message = async (msg) => {
@@ -100,7 +100,7 @@ test('Ricevuti: il commento viaggia con lo spostamento in "In coda"', async ({ a
 
 test('senza admin la casella commento NON compare sui Ricevuti (sola lettura)', async ({ openTab }) => {
   const page = await openTab(FEEDBACK_URL);
-  await page.evaluate((fb) => { window.SN_FEEDBACK.list = async () => [fb]; }, SAMPLE);
+  await page.evaluate((fb) => { window.SN_FEEDBACK.listAllPaged = async (o) => ({ rows: await window.SN_FEEDBACK.list(o), complete: true }); window.SN_FEEDBACK.list = async () => [fb]; }, SAMPLE);
   await page.locator('#refresh').click();
   await page.waitForFunction(() => {
     const e = document.querySelector('.fb-empty');

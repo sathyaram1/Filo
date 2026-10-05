@@ -28,7 +28,7 @@ test('con finestra stretta le schede vanno a capo, la pagina non scorre di lato'
 
   const page = await openTab(FEEDBACK_URL);
   await page.waitForFunction(() => typeof SN_FEEDBACK !== 'undefined' && window.__fbTest);
-  await page.evaluate(() => { SN_FEEDBACK.list = async () => []; });
+  await page.evaluate(() => { SN_FEEDBACK.listAllPaged = async (o) => ({ rows: await SN_FEEDBACK.list(o), complete: true }); SN_FEEDBACK.list = async () => []; });
   // Dati veri (vuoti) → le schede portano il loro numero: è la larghezza da
   // misurare, non quella dei soli nomi.
   await page.evaluate(() => window.__fbTest.setData([]));

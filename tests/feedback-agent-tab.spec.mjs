@@ -76,7 +76,7 @@ const FAKE = [
 test('audit routine: filtro "Solo automatici", sub-feedback in coda, card colorate per origine', async ({ openTab }) => {
   const page = await openTab(FEEDBACK_URL);
   await page.waitForFunction(() => typeof SN_FEEDBACK !== 'undefined' && window.__fbTest);
-  await page.evaluate((items) => { SN_FEEDBACK.list = async () => items; }, FAKE);
+  await page.evaluate((items) => { SN_FEEDBACK.listAllPaged = async (o) => ({ rows: await SN_FEEDBACK.list(o), complete: true }); SN_FEEDBACK.list = async () => items; }, FAKE);
   await page.click('#refresh');
 
   // --- "Ricevuti" (default): i tre non ancora triagiati, audit compreso —

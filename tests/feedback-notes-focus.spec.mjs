@@ -29,7 +29,7 @@ test('feedback: la casella note resta a fuoco dopo il salvataggio in debounce', 
   // 1) Mock dei feedback + intercetta feedback_update (così patch va a buon
   //    fine senza alert/rollback, che a sua volta re-renderizza).
   await page.evaluate(() => {
-    window.SN_FEEDBACK.list = async () => ([{
+    window.SN_FEEDBACK.listAllPaged = async (o) => ({ rows: await window.SN_FEEDBACK.list(o), complete: true }); window.SN_FEEDBACK.list = async () => ([{
       _id: 'mock-focus-1',
       status: 'todo',
       text: 'Feedback di prova per il test del fuoco note.',

@@ -25,7 +25,7 @@ async function setupAdmin(app, page, feedback, captureUpdates = false) {
   await expect(page.locator('#adminBanner')).toBeVisible({ timeout: 8_000 });
 
   await page.evaluate(({ fb, capture }) => {
-    window.SN_FEEDBACK.list = async () => [fb];
+    window.SN_FEEDBACK.listAllPaged = async (o) => ({ rows: await window.SN_FEEDBACK.list(o), complete: true }); window.SN_FEEDBACK.list = async () => [fb];
     // Il caricamento VERO, messo da parte: la prova della cifratura (#602) lo
     // rimette al suo posto, perche' quello che deve guardare e' proprio cosa
     // finisce nel deposito.
@@ -416,7 +416,7 @@ test('#602 — un allegato di commento sale cifrato e la dashboard lo riapre', a
   expect(upd.notes).toContain(encodeURIComponent(depositato.nome));
 
   await page.evaluate((note) => {
-    window.SN_FEEDBACK.list = async () => [{
+    window.SN_FEEDBACK.listAllPaged = async (o) => ({ rows: await window.SN_FEEDBACK.list(o), complete: true }); window.SN_FEEDBACK.list = async () => [{
       _id: 'mock-att-cifrato',
       status: 'todo',
       text: 'il pulsante non risponde',

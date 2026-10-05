@@ -44,7 +44,7 @@ const FAKE = [
 test('gli stati dell\'iter stanno "In coda", il fix bocciato torna nei "Ricevuti"', async ({ openTab }) => {
   const page = await openTab('filo://feedback/feedback.html');
   await page.waitForFunction(() => typeof SN_FEEDBACK !== 'undefined');
-  await page.evaluate((items) => { SN_FEEDBACK.list = async () => items; }, FAKE);
+  await page.evaluate((items) => { SN_FEEDBACK.listAllPaged = async (o) => ({ rows: await SN_FEEDBACK.list(o), complete: true }); SN_FEEDBACK.list = async () => items; }, FAKE);
   await page.click('#refresh');
 
   // Le sezioni sono quelle della macchina a stati, col conteggio giusto.

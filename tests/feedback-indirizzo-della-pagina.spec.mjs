@@ -27,7 +27,7 @@ const NORMALE = 'https://esempio.it/pagina-che-non-va';
 
 async function scheda(page, url) {
   await page.evaluate((u) => {
-    window.SN_FEEDBACK.list = async () => [{
+    window.SN_FEEDBACK.listAllPaged = async (o) => ({ rows: await window.SN_FEEDBACK.list(o), complete: true }); window.SN_FEEDBACK.list = async () => [{
       _id: 'indirizzo-582',
       status: 'open',
       text: 'la pagina non si apre',

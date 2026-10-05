@@ -38,7 +38,7 @@ test('il mittente vede che il suo screenshot è partito, non un errore di permes
   const page = await openTab(FEEDBACK_URL);
 
   await page.evaluate((url) => {
-    window.SN_FEEDBACK.list = async () => [{
+    window.SN_FEEDBACK.listAllPaged = async (o) => ({ rows: await window.SN_FEEDBACK.list(o), complete: true }); window.SN_FEEDBACK.list = async () => [{
       _id: 'mittente-582',
       status: 'open',
       text: 'il tasto salva non risponde',
@@ -69,7 +69,7 @@ const ESCA = 'https://sito-di-un-estraneo.invalid/accedi';
 /** Mette in elenco una sola segnalazione con l'allegato dato. */
 async function elencoCon(page, allegato) {
   await page.evaluate(({ f }) => {
-    window.SN_FEEDBACK.list = async () => [{
+    window.SN_FEEDBACK.listAllPaged = async (o) => ({ rows: await window.SN_FEEDBACK.list(o), complete: true }); window.SN_FEEDBACK.list = async () => [{
       _id: 'allegato-582',
       status: 'open',
       text: 'guarda l’allegato',
@@ -178,7 +178,7 @@ test('un «allegato» che punta fuori dal deposito di Filo non si dichiara conse
 test('uno screenshot che punta fuori dal deposito di Filo non si dichiara consegnato', async ({ openTab }) => {
   const page = await openTab(FEEDBACK_URL);
   await page.evaluate((url) => {
-    window.SN_FEEDBACK.list = async () => [{
+    window.SN_FEEDBACK.listAllPaged = async (o) => ({ rows: await window.SN_FEEDBACK.list(o), complete: true }); window.SN_FEEDBACK.list = async () => [{
       _id: 'esca-img-582',
       status: 'open',
       text: 'guarda la schermata',

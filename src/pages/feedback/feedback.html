@@ -22,6 +22,7 @@
      rifiutano le stesse cose con le stesse parole. -->
   <script src="filo://shared/feedbackAttachTypes.js"></script>
   <script src="filo://shared/manageReview.js"></script>
+  <script src="filo://shared/feedbackLive.js"></script>
   <script src="filo://shared/filoMarkdown.js"></script>
   <script src="filo://shared/chatErrors.js"></script>
   <style>
@@ -230,6 +231,26 @@
       white-space: nowrap;
     }
     .fb-tab--active { color: var(--sn-text, inherit); border-bottom-color: currentColor; }
+    /* Arrivata a pagina aperta: un punto caldo sulla scheda e sulla sua sezione finché non la si tocca, come in Gestione. */
+    .fb-arrivo {
+      flex: 0 0 auto; align-self: center;
+      width: var(--fb-arrivo-size, 7px); height: var(--fb-arrivo-size, 7px); border-radius: 50%;
+      background: var(--fb-arrivo-color, var(--sn-accent));
+    }
+    .fb-tab--arrivi::after {
+      content: ''; display: inline-block; vertical-align: super;
+      width: 5px; height: 5px; margin-left: 3px; border-radius: 50%;
+      background: var(--fb-arrivo-color, var(--sn-accent));
+    }
+    /* Il giro ha avvisato: si vede, l'hover dice cosa. Una lista che non si allinea più si spegne e lo dice. */
+    .fb-count--avviso::after { content: ' !'; font-weight: 700; color: var(--sn-accent); }
+    .fb-count--ferma { opacity: var(--fb-ferma-opacity, 0.55); }
+    .fb-count--ferma::after { content: ' · ferma'; }
+    /* Una fusione ferma aspetta il via libera dell'owner: la stessa pillola rossa della Gestione. */
+    .fb-fusione {
+      font-size: 11px; padding: 1px 8px; border-radius: 999px; white-space: nowrap;
+      border: 1px solid color-mix(in srgb, #c0392b 55%, transparent); color: #c0392b;
+    }
     .fb-title { font-weight: 600; font-size: 14px; margin-bottom: 6px; }
     .fb-num { color: var(--sn-muted); font-weight: 600; }
     .fb-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }

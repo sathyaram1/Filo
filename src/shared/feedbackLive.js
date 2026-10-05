@@ -462,14 +462,14 @@
   // tiene la lista e la disegna. Le dipendenze:
   //   send(msg) → Promise · ascolta(fn) i broadcast · doc/finestra: document e window
   //   pronta() la prima lista è arrivata · ricarica() la rilegge
-  //   lista() / imposta(l) i feedback in mano · seguiti() → [id] in mano alle routine
+  //   lista() / imposta(l) i feedback in mano
   //   righe(ids) → righe della lista · decifra(righe) → righe | null · sezioneDi(fb)
   //   dopo({ ids, removed, righe, statiMossi }) la lista è cambiata · aVuoto({ letto }) no
   //   stato() ridipinge «ferma» e l'avviso del giro
   function makeGiroPagina({
     send, ascolta = null, doc = null, finestra = null, tipi = null, nome = 'pagina',
     pronta = () => false, ricarica = null, lista = () => [], imposta = () => {},
-    seguiti = () => [], righe = null, decifra = null, sezioneDi = () => null,
+    righe = null, decifra = null, sezioneDi = () => null,
     dopo = null, aVuoto = null, stato = null, ora = () => Date.now(), timer = null,
   } = {}) {
     const T = {
@@ -594,8 +594,12 @@
       });
     }
 
+    // I feedback in mano alle routine: di loro il giro chiede l'ora di Firestore, perché chi li scrive può non
+    // firmare la sua. Tutti, senza campione della coda: il prossimo lo dice il registro dei worker al main (#676.1).
     function idsSeguiti() {
-      return (seguiti() || []).map(String).filter(Boolean);
+      const MR = global.SN_MANAGE_REVIEW;
+      if (!MR || typeof MR.workProgress !== 'function') return [];
+      return (lista() || []).filter((f) => f && f._id && MR.workProgress(f)).map((f) => String(f._id));
     }
 
     // Un giro già in corso viene riusato, non raddoppiato. Ritorna { changed }.
@@ -734,7 +738,7 @@
 
     return {
       sorgenti, arrivate, prova,
-      start, stop, giro, applicaEsito, aggiornaSeguiti, segnaArrivi, fotografia, ferma,
+      start, stop, giro, applicaEsito, aggiornaSeguiti, segnaArrivi, fotografia, ferma, seguiti: idsSeguiti,
       blocca(v) { bloccato = v !== false; },
       // Una lista appena letta per intero vale come un giro riuscito.
       allineata() { lastAt = ora(); okAt = lastAt; },

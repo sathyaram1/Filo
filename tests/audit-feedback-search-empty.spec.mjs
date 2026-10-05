@@ -25,7 +25,7 @@ const FAKE = [
 test('dashboard: ricerca senza risultati dice "Nessun risultato", non "Nessun feedback"', async ({ openTab }) => {
   const page = await openTab('filo://feedback/feedback.html');
   await page.waitForFunction(() => typeof SN_FEEDBACK !== 'undefined');
-  await page.evaluate((items) => { SN_FEEDBACK.list = async () => items; }, FAKE);
+  await page.evaluate((items) => { SN_FEEDBACK.listAllPaged = async (o) => ({ rows: await SN_FEEDBACK.list(o), complete: true }); SN_FEEDBACK.list = async () => items; }, FAKE);
   await page.click('#refresh');
 
   // Siamo su "Ricevuti" con 2 feedback: il tab lo conferma.

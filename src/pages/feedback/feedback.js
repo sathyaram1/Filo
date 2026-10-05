@@ -106,6 +106,8 @@
   // Finché è false la pagina non conosce nessun numero: le sezioni restano col
   // solo nome — stessa cautela della dashboard di gestione (#495).
   let dataLoaded = false;
+  // Il freno sulle pagine ha interrotto la lettura: i numeri sono minimi («N+»).
+  let caricoIncompleto = false;
   // Ultimo caricamento fallito: la frase d'errore + "Riprova" da rimettere in
   // pagina se un re-render (un click su una sezione) svuota il riquadro.
   let loadError = null;
@@ -126,9 +128,19 @@
     return MR.normalizeStatus(f).statusReason;
   }
 
+  // Le richieste di fusione ferme, lette come in Gestione: una che aspetta l'owner porta la pratica nei
+  // Ricevuti anche se lo stato è rimasto indietro. Senza, le due pagine la mettevano in sezioni diverse (#738).
+  let fusioni = { pending: [], failed: [] };
+  let fusioniLette = false;
+
+  // Gli ingredienti delle sezioni, gli stessi della dashboard di gestione.
+  function opzioniSezioni() {
+    return { releasedVersion, fusioni };
+  }
+
   // Sezione di un feedback: la STESSA funzione della dashboard di gestione.
   function tabOf(f) {
-    return MR.manageTabFor(f, { releasedVersion });
+    return MR.manageTabFor(f, opzioniSezioni());
   }
 
   // ── Quando lo stato non si legge, le sezioni non si disegnano ─────────────
@@ -225,6 +237,19 @@
     const b = String(f.branch || '').trim();
     if (!b) return '';
     return `<span class="fb-branch" title="Branch del fix: ${escapeHtml(b)}">⎇ ${escapeHtml(b)}</span>`;
+  }
+
+  // Una fusione ferma aspetta il via libera dell'owner: è il motivo per cui la pratica sta nei Ricevuti anche
+  // con uno stato da coda. Le stesse parole della scheda in Gestione, dove la si decide.
+  function fusioneBadgeHtml(f) {
+    if (!isAdmin || !MR.fusioneInAttesa(f, { fusioni })) return '';
+    return '<span class="fb-fusione" title="Una fusione aspetta il tuo via libera: la decidi in Gestione">fusione ferma</span>';
+  }
+
+  // Arrivata in questa sezione a pagina aperta: il punto resta finché non la si tocca, come in Gestione.
+  function arrivoHtml(f) {
+    if (!giroPagina.arrivate.has(String(f && f._id))) return '';
+    return '<span class="fb-arrivo" title="Arrivata qui mentre la pagina era aperta"></span>';
   }
 
   // Etichetta dello stato sulla card. Le sezioni sono quattro, ma dentro
@@ -853,7 +878,7 @@
   // troverà davvero.
   function esitoDi(item, optimistic) {
     const dopo = Object.assign({}, item, optimistic);
-    const dest = MR.manageTabFor(dopo, { releasedVersion });
+    const dest = MR.manageTabFor(dopo, opzioniSezioni());
     const nome = TAB_LABELS[dest];
     if (!nome || dest === currentTab) return 'Fatto';
     return `Spostata in «${nome}»`;
@@ -1002,10 +1027,10 @@
       emptyEl.textContent = sezioniAttendibili()
         ? (TAB_EMPTY[currentTab] || 'Nessun feedback.')
         : 'Nessun feedback ricevuto.';
-      // Col caricamento al tetto una sezione "vuota" può non esserlo davvero: i
+      // Con la lettura interrotta una sezione "vuota" può non esserlo davvero: i
       // feedback più vecchi non sono in pagina. Il vuoto lo dice, come la gemella.
-      if (dataLoaded && SN_FEEDBACK.listHitCap(all, SN_FEEDBACK.LIST_PAGE_SIZE)) {
-        emptyEl.textContent = `${emptyEl.textContent} ${SN_FEEDBACK.COUNT_CAP_HINT}`;
+      if (dataLoaded && caricoIncompleto) {
+        emptyEl.textContent = `${emptyEl.textContent} ${SN_FEEDBACK.COUNT_INCOMPLETE_HINT}`;
       }
       return;
     }
@@ -1179,8 +1204,10 @@
       return `
         <article class="fb-card fb-card--${escapeHtml(statusOf(f))} fb-card--tab-${escapeHtml(tabOf(f) || 'inbox')} fb-card--origin-${origin}${agent ? ' fb-card--agent' : ''}" data-id="${escapeHtml(f._id)}">
           <div class="fb-meta">
+            ${arrivoHtml(f)}
             <span>${escapeHtml(when)}</span>
             ${stateBadgeHtml(f)}
+            ${fusioneBadgeHtml(f)}
             ${safeUrl ? `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener" title="${escapeHtml(safeUrl)}">${escapeHtml(SN_FEEDBACK.linkLabel(safeUrl) || url.slice(0, 80))}</a>` : (url ? `<span title="${escapeHtml(url)}">${escapeHtml(url.slice(0, 80))}</span>` : '')}
             ${!agent && cid ? `<span>client: ${escapeHtml(cid)}</span>` : ''}
             ${!agent && ua ? `<span title="${escapeHtml(ua)}">UA</span>` : ''}
@@ -1528,7 +1555,7 @@
     // costruisce listArchiveTab, esattamente come nella gemella.
     return t === 'archived'
       ? MR.listArchiveTab(all, { releasedVersion })
-      : MR.listForManageTab(all, t, { releasedVersion });
+      : MR.listForManageTab(all, t, opzioniSezioni());
   }
 
   function sectionItems(tab) {
@@ -1543,6 +1570,7 @@
   // apertura. Li chiede per la SEZIONE che si sta guardando, una volta sola
   // (chi è già completo non si ridomanda), e lo dice mentre lo fa.
   const DETTAGLI_PER_VOLTA = 200;
+  const CAMPI_LISTA = new Set(SN_FEEDBACK.CAMPI_LISTA || []);
 
   // Le richieste già partite, per id. Ogni gesto fatto durante l'attesa (una
   // lettera nella ricerca, un cambio di sezione, la casella «Solo automatici»)
@@ -1575,9 +1603,15 @@
   function segnaMancate(chiesti, motivo) {
     all = all.map((f) => {
       if (!chiesti.has(f._id)) return f;
-      const { _proiezione, ...resto } = f;
+      const { _proiezione, _dettaglioVecchio, ...resto } = f;
       return { ...resto, _dettaglioMancato: motivo };
     });
+  }
+
+  // Da leggere prima di disegnarla: solo la riga della lista, o una scheda intera che un giro ha segnato vecchia
+  // (la conversazione può essere cambiata insieme allo stato).
+  function daCompletare(f) {
+    return SN_FEEDBACK.soloLista(f) || !!(f && f._dettaglioVecchio);
   }
 
   // Riprova la lettura di UNA segnalazione, su richiesta di chi guarda.
@@ -1633,12 +1667,16 @@
         // eterno, un giro di caricamento dopo l'altro. Ma la scheda lo disegna
         // senza conversazione, e su una conversazione mai letta un salvataggio
         // scrive al posto del report: chi scrive deve saperlo.
-        if (!pieno) { const { _proiezione, ...resto } = f; return { ...resto, _dettaglioMancato: 'sparito' }; }
-        const { _proiezione, ...resto } = f;
+        if (!pieno) { const { _proiezione, _dettaglioVecchio, ...resto } = f; return { ...resto, _dettaglioMancato: 'sparito' }; }
+        const { _proiezione, _dettaglioVecchio, ...resto } = f;
+        // Del documento intero vale quello appena letto; i campi della lista e i
+        // marchi restano quelli in mano, che il giro e le scritture tengono
+        // aggiornati. Una conversazione già in mano non vince: era vecchia.
+        const fuso = { ...pieno };
+        for (const [k, v] of Object.entries(resto)) if (k.startsWith('_') || CAMPI_LISTA.has(k)) fuso[k] = v;
         // `pieno` porta con sé il marchio della proiezione quando abbiamo
         // chiesto i soli allegati: toglierlo qui, o la riga resterebbe per
         // sempre «da completare» e la pagina la richiederebbe a ogni disegno.
-        const fuso = { ...pieno, ...resto };
         delete fuso._proiezione;
         if (campiDettaglio()) {
           // Senza la chiave il report non si legge comunque: al suo posto va
@@ -1655,7 +1693,7 @@
   // Torna true se la sezione non è ancora completa: allora disegna l'attesa e
   // ridisegnerà da sé. `applyFilter` si ferma qui.
   function inAttesaDiDettagli(items) {
-    const mancanti = items.filter((f) => SN_FEEDBACK.soloLista(f)).map((f) => f._id).filter(Boolean);
+    const mancanti = items.filter(daCompletare).map((f) => f._id).filter(Boolean);
     if (!mancanti.length) return false;
     listEl.innerHTML = '<div class="fb-empty">Caricamento…</div>';
     emptyEl.hidden = true;
@@ -1733,22 +1771,25 @@
     // gestione: manageTabCounts è la funzione che conta anche là (#509).
     const counts = agentOnly
       ? TABS.reduce((acc, t) => { acc[t] = sectionItems(t).length; return acc; }, {})
-      : MR.manageTabCounts(all, { releasedVersion });
-    // Il caricamento si ferma ai più recenti: quando li ha presi tutti fino al
-    // tetto, questi numeri sono minimi e lo dicono con un "+" (#495). Restare
-    // su "(312)" quando ce ne sono 400 sembra una risposta, e non lo è.
-    // E finché i feedback non sono arrivati (caricamento in corso, o fallito)
-    // non si scrive nessun numero: "(0)" direbbe "qui non c'è niente" mentre la
-    // verità è che non lo sappiamo ancora.
-    const capped = dataLoaded && SN_FEEDBACK.listHitCap(all, SN_FEEDBACK.LIST_PAGE_SIZE);
+      : MR.manageTabCounts(all, opzioniSezioni());
+    // La pagina legge tutti i feedback, come la gemella: se il freno sulle
+    // pagine ha interrotto la lettura questi numeri sono minimi e lo dicono con
+    // un "+" (#495). E finché i feedback non sono arrivati (caricamento in
+    // corso, o fallito) non si scrive nessun numero: "(0)" direbbe "qui non
+    // c'è niente" mentre la verità è che non lo sappiamo ancora.
+    const capped = dataLoaded && caricoIncompleto;
+    // Una sezione che ha ricevuto schede a pagina aperta lo dice, come in Gestione.
+    const conArrivi = new Set();
+    for (const f of all) if (giroPagina.arrivate.has(String(f._id))) conArrivi.add(tabOf(f));
     for (const tab of TABS) {
       const btn = tabsEl.querySelector(`[data-tab="${tab}"]`);
       if (!btn) continue;
       const label = TAB_LABELS[tab];
+      btn.classList.toggle('fb-tab--arrivi', conArrivi.has(tab));
       btn.textContent = dataLoaded
         ? `${label} ${SN_FEEDBACK.countLabel(counts[tab] || 0, capped)}`
         : label;
-      if (capped) btn.title = SN_FEEDBACK.COUNT_CAP_HINT;
+      if (capped) btn.title = SN_FEEDBACK.COUNT_INCOMPLETE_HINT;
       else btn.removeAttribute('title');
     }
   }
@@ -1806,15 +1847,20 @@
         if (r && r.current) releasedVersion = r.current;
       } catch (_) { /* gate inattivo: senza versione, done→Risolti come prima */ }
     }
+    // Le richieste di fusione si rileggono insieme alla lista: si disegnano da sé quando arrivano.
+    leggiFusioni();
     try {
       // timeoutMs: offline la fetch resta muta ~13 s prima che il sistema la
       // lasci cadere. Ci arrendiamo prima e mostriamo l'errore (con Riprova).
       // La PROIEZIONE della lista: titoli, stati, numeri e tutto ciò su cui
       // le sezioni contano e la ricerca filtra. Conversazione e allegati — la
       // parte che pesa — arrivano per la sezione che si guarda davvero.
-      let list = await SN_FEEDBACK.list({
-        pageSize: SN_FEEDBACK.LIST_PAGE_SIZE, timeoutMs: 8000, fields: SN_FEEDBACK.CAMPI_LISTA,
+      // TUTTI i feedback, a pagine, come la Gestione (#676): un feedback vecchio
+      // che torna nei Ricevuti deve esserci, e il giro riparte da questa lettura.
+      const letti = await SN_FEEDBACK.listAllPaged({
+        timeoutMs: 8000, fields: SN_FEEDBACK.CAMPI_LISTA, lista: true,
       });
+      let list = Array.isArray(letti && letti.rows) ? letti.rows : [];
       // S1.3: decifratura batch dei campi FENC1: — una sola IPC per tutta la lista.
       // Graceful fallback: se l'utente non è admin o l'IPC fallisce, i valori
       // restano invariati (la dashboard non si rompe, mostra il ciphertext).
@@ -1832,10 +1878,13 @@
       // illeggibile mostriamo la frase scritta per chi ha segnalato — e se non
       // c'è, niente: una bolla vuota è meglio di una bolla di ciphertext.
       all = list.map(sanitizeReportForReader);
+      caricoIncompleto = !!letti && letti.complete === false;
       // Da qui in poi i numeri delle sezioni sono veri e si possono scrivere.
       dataLoaded = true;
       loadError = null;
       applyFilter();
+      giroPagina.aggiornaSeguiti();
+      giroPagina.allineata();
     } catch (e) {
       if (gen !== loadGen) return;
       // Errore di caricamento: frase per l'utente (mai il "Failed to fetch"
@@ -1848,6 +1897,129 @@
       showLoadError(loadError);
     }
   }
+
+  // ── Aggiornamento continuo (#738) ─────────────────────────────────────────
+  // Lo stesso giro della Gestione (SN_FEEDBACK_LIVE.makeGiroPagina), e come là solo mentre la pagina è in
+  // vista: patterns/dati-che-cambiano-altrove-cloud-si-chiede-la-versione.md. Qui restano schede e disegno.
+  const LIVE = window.SN_FEEDBACK_LIVE;
+
+  function sezioneDi(f) {
+    if (!sezioniAttendibili() || statoCifrato(f)) return null;
+    return tabOf(f);
+  }
+
+  const giroPagina = LIVE.makeGiroPagina({
+    nome: 'feedback',
+    send: sendToMain,
+    ascolta: window.filo?.onBroadcast ? (fn) => window.filo.onBroadcast(fn) : null,
+    doc: document,
+    finestra: window,
+    pronta: () => dataLoaded,
+    // Chi non gestisce i feedback non ha una lista da rileggere: niente tentativi a vuoto ogni minuto.
+    ricarica: () => (isAdmin ? load() : null),
+    lista: () => all,
+    imposta: (nuova) => { all = nuova; },
+    righe: (ids) => SN_FEEDBACK.getMany(ids, { fields: SN_FEEDBACK.CAMPI_LISTA, timeoutMs: 20000 }),
+    decifra: async (righe) => {
+      let out = righe;
+      if (isAdmin) {
+        const r = await sendToMain({ type: 'feedback_decrypt_fields', list: righe });
+        if (r && r.ok && Array.isArray(r.list)) out = r.list;
+      }
+      return out.map(sanitizeReportForReader);
+    },
+    sezioneDi,
+    // Un giro che sposta uno stato rilegge le fusioni, come in Gestione: la richiesta può essere nata con lui.
+    dopo: ({ statiMossi }) => {
+      if (statiMossi && isAdmin) leggiFusioni();
+      ridisegnaDalVivo();
+    },
+    stato: () => segnoFerma(),
+  });
+
+  // Una bozza nelle schede (cursore in una casella, testo non ancora salvato, riapertura aperta, risposta
+  // iniziata) o la mano su un pulsante: il ridisegno aspetta, o porterebbe via la bozza o sposterebbe il
+  // pulsante da sotto il dito (patterns/un-clic-una-scheda-nessuna-azione-ricompone-la-lista.md).
+  function manoSullaLista() {
+    const el = document.activeElement;
+    if (el && listEl.contains(el) && (/^(textarea|input|select)$/i.test(el.tagName) || el.isContentEditable)) return true;
+    if (listEl.querySelector('.fb-reopen-form')) return true;
+    for (const ta of listEl.querySelectorAll('.fb-reply-text')) if (ta.value.trim()) return true;
+    if (listEl.querySelector('.fb-attach-mount[data-kind="reply"] .fb-attach-thumbs > *')) return true;
+    const trova = (id) => all.find((f) => f._id === id);
+    for (const ta of listEl.querySelectorAll('.fb-notes')) {
+      const item = trova(ta.dataset.id);
+      if (item && ta.value !== ta.defaultValue && notesValueOf(ta) !== (item.notes || '')) return true;
+    }
+    for (const inp of listEl.querySelectorAll('.fb-usernote')) {
+      const item = trova(inp.dataset.id);
+      if (item && inp.value !== inp.defaultValue && inp.value.slice(0, 500) !== String(item.userNote || '')) return true;
+    }
+    return !!listEl.querySelector('button:hover, a:hover, .fb-dot:hover, .fb-imgs img:hover');
+  }
+
+  const listaViva = LIVE.makeListaViva({
+    el: listEl,
+    voce: '.fb-card',
+    finestra: window,
+    scroller: () => document.scrollingElement,
+    pronta: () => dataLoaded,
+    trattieni: manoSullaLista,
+    ridisegna: () => applyFilter(),
+  });
+
+  // Il giro (o un cambio nelle fusioni) ha mosso la lista. I numeri si scrivono subito; le schede della
+  // sezione aperta prima si completano, poi la lista si ridisegna: niente «Caricamento…» a ogni giro.
+  function ridisegnaDalVivo() {
+    if (!dataLoaded) return;
+    updateTabCounts();
+    const gen = loadGen;
+    const ids = sectionItems().filter(daCompletare).map((f) => f._id).filter(Boolean);
+    const pronte = ids.length ? completaDettagli(ids).catch(() => {}) : Promise.resolve();
+    pronte.then(() => { if (gen === loadGen) listaViva.aggiorna(); });
+  }
+
+  // Le richieste di fusione ferme, dal main (`gia`: quelle che il campanello ha già portato). Come in
+  // Gestione: un elenco che non si legge vale vuoto, e il cambio di sezione che ne viene è un arrivo.
+  async function leggiFusioni(gia) {
+    let r = null;
+    if (isAdmin) {
+      try { r = gia || await sendToMain({ type: 'merge_approvals_get' }); } catch (_) { r = null; }
+    }
+    const letto = !!r && r.ok !== false;
+    const prima = fusioniLette && letto && dataLoaded ? giroPagina.fotografia() : null;
+    const vecchie = JSON.stringify(fusioni);
+    fusioni = letto
+      ? { pending: Array.isArray(r.pending) ? r.pending : [], failed: Array.isArray(r.failed) ? r.failed : [] }
+      : { pending: [], failed: [] };
+    fusioniLette = letto;
+    if (JSON.stringify(fusioni) === vecchie) return;
+    if (prima) giroPagina.segnaArrivi(prima, all);
+    ridisegnaDalVivo();
+  }
+
+  // «Ferma» si dice solo a chi guarda, dopo più giri mancati; un avviso del giro si vede finché dura.
+  function segnoFerma() {
+    const ferma = giroPagina.ferma();
+    const avviso = giroPagina.avviso();
+    countEl.classList.toggle('fb-count--ferma', ferma);
+    countEl.classList.toggle('fb-count--avviso', !!avviso && !ferma);
+    const parti = [
+      ferma ? `Lista ferma alle ${fmtTs(giroPagina.okAt())}: il server non risponde, riprovo da solo.` : '',
+      avviso ? `Aggiornamento: ${avviso}` : '',
+    ].filter(Boolean);
+    if (parti.length) countEl.title = parti.join('\n');
+    else countEl.removeAttribute('title');
+  }
+
+  // Toccata, l'arrivo è visto: il punto se ne va, e con lui quello della sezione se era l'ultimo.
+  listEl.addEventListener('pointerdown', (e) => {
+    const card = e.target && e.target.closest ? e.target.closest('.fb-card') : null;
+    if (!card || !giroPagina.arrivate.delete(String(card.dataset.id))) return;
+    const punto = card.querySelector('.fb-arrivo');
+    if (punto) punto.remove();
+    updateTabCounts();
+  });
 
   function selectTab(tab) {
     if (!TABS.includes(tab)) return;
@@ -1990,7 +2162,10 @@
         setIsAdmin(m.isAdmin);
         renderAuthState(m.profile);
         applyFilter();
+        leggiFusioni();
       }
+      // Una fusione fermata (o decisa) altrove: il main avvisa le pagine aperte con l'elenco nuovo.
+      if (m?.type === 'merge_approvals_changed') leggiFusioni(m);
     });
   }
 
@@ -2000,19 +2175,33 @@
   // così il risultato vero — che arriva secondi dopo — viene buttato invece di
   // sovrascrivere i dati finti. È lo stesso rimedio che tiene stabile manage.
   window.__fbTest = {
+    // Gli agganci del giro (tempi, sorgenti finte, un giro subito, l'esito dal main, arrivi): quelli della Gestione.
+    ...giroPagina.prova,
     setAdmin(v, profile) {
       setIsAdmin(v);
       renderAuthState(profile || null);
       applyFilter();
     },
-    setData(fbs) {
+    // Dati finti al posto di quelli veri: il giro si ferma, o li rimpiazzerebbe con Firestore. Con
+    // `{ dalVivo: true }`, dopo aver sostituito le sorgenti, l'orologio vero resta acceso su quelle finte;
+    // `incompleto`: come se il freno sulle pagine avesse interrotto la lettura.
+    setData(fbs, opts) {
+      giroPagina.stop();
+      giroPagina.blocca(!(opts && opts.dalVivo));
+      giroPagina.arrivate.clear();
       loadGen++; // il caricamento reale in volo, se c'è, viene scartato
       all = (Array.isArray(fbs) ? fbs : []).map(sanitizeReportForReader);
+      caricoIncompleto = !!(opts && opts.incompleto);
       // Dati iniettati = dati arrivati: da qui i numeri delle sezioni si scrivono.
       dataLoaded = true;
       loadError = null;
       applyFilter();
+      if (opts && opts.dalVivo) {
+        giroPagina.allineata();
+        giroPagina.start();
+      }
     },
+    riga(id) { const f = all.find((x) => x._id === id); return f ? { ...f } : null; },
     setTab(tab) { selectTab(tab); },
     // DB3: negli spec non c'è un aggiornamento da interrogare, e il gate di
     // "Risolti" dipende dalla versione rilasciata: iniettabile, come in manage.
@@ -2025,6 +2214,6 @@
   };
 
   // Carica prima lo stato admin, poi i feedback: così il primo render già
-  // mostra (o nasconde) i controlli di gestione in modo coerente.
-  refreshAuth().finally(load);
+  // mostra (o nasconde) i controlli di gestione in modo coerente. Il giro parte dopo la prima lista.
+  refreshAuth().finally(() => load().finally(() => giroPagina.start()));
 })();

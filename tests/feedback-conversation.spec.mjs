@@ -22,7 +22,7 @@ async function setupAdmin(app, page, feedback, captureUpdates = false) {
   await expect(page.locator('#adminBanner')).toBeVisible({ timeout: 8_000 });
 
   await page.evaluate(({ fb, capture }) => {
-    window.SN_FEEDBACK.list = async () => [fb];
+    window.SN_FEEDBACK.listAllPaged = async (o) => ({ rows: await window.SN_FEEDBACK.list(o), complete: true }); window.SN_FEEDBACK.list = async () => [fb];
     if (capture) window.__updates = [];
     const orig = window.filo.message.bind(window.filo);
     window.filo.message = async (msg) => {
