@@ -308,6 +308,25 @@ test('domande nelle sole note: rombo verde, e dentro ci sono le domande', async 
   await expect(page.locator('#mgSideBody')).toContainText('decisi voce per voce');
 });
 
+test('domande nelle sole note: «Quando» è il giorno dell’ultimo turno di Filo, anche dopo il 12 e prima del 13', async ({ openTab }) => {
+  const conv = (marcatore) => ['Quale immagine intendi?', '--- La tua risposta del 01/09/26, 09:00 ---', 'Quelle dentro.',
+    `--- Filo ha risposto il ${marcatore} ---`, 'Anche quelle di sfondo?'].join('\n');
+  const base = { text: 'Salva immagine.', name: 'Salva immagine', subSeq: 0, status: 'design', statusReason: 'clarify',
+    clientId: 'local:claude', createdAt: '2026-09-01T08:00:00Z', images: [] };
+  const fbs = [
+    { ...base, _id: 'fb-quando-27', seq: 764, notes: conv('27/09/26, 11:00') },
+    { ...base, _id: 'fb-quando-05', seq: 765, notes: conv('05/09/26, 11:00') },
+  ];
+  const page = await openTab(MANAGE);
+  await apri(page, fbs);
+  for (const [id, atteso] of [['fb-quando-27', '27/09/2026 11:00'], ['fb-quando-05', '05/09/2026 11:00']]) {
+    await page.evaluate((i) => window.__mgTest.openDetail(i), id);
+    await page.locator('#mgLivelliRow .mg-forma[data-livello="l3"]').click();
+    await expect(page.locator('#mgSideTitle')).toHaveText('Domande di Claude');
+    await expect(page.locator('#mgSideBody .mg-liv-riga', { hasText: 'Quando' })).toHaveText(`Quando:${atteso}`);
+  }
+});
+
 test('domande in attesa e segnalazione che qui non si decifra: il titolo copre le due parti, e niente blob', async ({ openTab }) => {
   const BLOB = 'FENCv1:8f3a2b91c7d4e6a0b5f2';
   const fb = {
