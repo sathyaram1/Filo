@@ -67,12 +67,12 @@ test('richiesta nata in cloud a pagina aperta, stato fermo: aprire Ricevuti la p
   await page.evaluate((x) => { window.__pending = [x]; }, r);
   await gestione.evaluate((x) => { window.__pending = [x]; }, r);
 
+  // In Gestione aprire Ricevuti rilegge le richieste: la pratica passa lì.
+  await gestione.locator('.mg-tab[data-tab="inbox"]').click();
+  await expect(gestione.locator('.mg-tab[data-tab="inbox"] .mg-tab-count')).toHaveText('(2)', { timeout: 5000 });
+
+  // La stessa strada nella pagina Feedback.
   await page.locator('#tabs [data-tab="inbox"]').click();
   await expect(page.locator('#tabs [data-tab="inbox"]')).toHaveText('Ricevuti (2)', { timeout: 5000 });
   await expect(page.locator('#list .fb-card[data-id="f515"]')).toBeVisible();
-
-  // La stessa strada in Gestione, per confronto.
-  await gestione.bringToFront();
-  await gestione.locator('.mg-tab[data-tab="inbox"]').click();
-  await expect(gestione.locator('.mg-tab[data-tab="inbox"] .mg-tab-count')).toHaveText('(2)', { timeout: 5000 });
 });
