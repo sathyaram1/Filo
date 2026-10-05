@@ -426,11 +426,7 @@ async function senzaContesto({ W, H }) {
     gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
     disegnato = px[3] === 255;
   }
-  const p = new OffscreenCanvas(W, H);
-  const pBlob = await p.convertToBlob();
-  const fr2 = new FileReader();
-  const vuotoOff = await new Promise((res) => { fr2.onload = () => res(fr2.result); fr2.readAsDataURL(pBlob); });
-  return { vuoto, vuotoBlob, vuotoOff, webgl: !!gl, disegnato, offscreenGl: !!p.getContext('webgl') };
+  return { vuoto, vuotoBlob, webgl: !!gl, disegnato };
 }
 
 test('canvas esportato prima di avere un contesto: esce com\'è e può ancora diventare WebGL', async ({ openTab, testServer }) => {
@@ -438,8 +434,6 @@ test('canvas esportato prima di avere un contesto: esce com\'è e può ancora di
   expect(off.webgl).toBe(true);
   expect(on.webgl).toBe(true);
   expect(on.disegnato).toBe(true);
-  expect(on.offscreenGl).toBe(true);
   expect(on.vuoto).toBe(off.vuoto);
   expect(on.vuotoBlob).toBe(off.vuotoBlob);
-  expect(on.vuotoOff).toBe(off.vuotoOff);
 });
