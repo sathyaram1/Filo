@@ -1994,7 +1994,8 @@ export function emit(bucket, ctx) {
       misura: (p) => JSON.stringify(stampaCon(p), null, 2).length + 1,
     });
   } catch (e) {
-    // Meglio una stampa lunga che un pezzo perso: il payload resta intero, e si dice perché.
+    // Meglio una stampa lunga che un pezzo perso: il payload resta intero, e si dice perché. Le immagini
+    // no: megabyte di base64 in stampa non li legge nessuno, la voce porta il motivo.
     process.stderr.write(`[dispatch] non riesco a scrivere i pezzi grossi del payload in file (${e.message}): restano nella stampa\n`);
     payload = immaginiSenzaByte(pieno, e.message);
   }
