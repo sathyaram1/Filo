@@ -329,7 +329,10 @@ ramo, riprende un risolutore con la stessa `ripresa` nel payload. Un `→ In cod
 senza testo vale «va bene quello che è stato fatto nel frattempo»; un commento
 scritto approvando conta come risposta solo se è arrivato dopo lo stop; (4) fix bocciato
 dal **controllo di sicurezza** (`statusReason: secaudit`, con `livelli.l4.esito:
-fail`); (4b, dal 2026-09-13) fix fermato dal **cancello di fusione** L5 sul
+fail`): anche qui il server lascia il segnalibro (`ruolo: secaudit`, la nota di chi
+ha controllato come `domanda`), e un `→ In coda` manda il correttore sul ramo come
+sopra, non un risolutore da capo (#704). Qui la risposta vuota vuol dire «correggi
+quello che ha trovato»: per andare avanti così com'è c'è «Salta il controllo»; (4b, dal 2026-09-13) fix fermato dal **cancello di fusione** L5 sul
 server (`statusReason: l5`): il controllo di sicurezza è passato, a fermare è
 stato il cancello, e c'è una richiesta di fusione in attesa; (5) lavorazione
 arenata ripetutamente (`statusReason: arenato`). La risposta dell'owner appende
