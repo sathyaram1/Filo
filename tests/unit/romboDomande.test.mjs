@@ -137,3 +137,46 @@ describe('rombo verde e casella delle risposte vanno insieme', () => {
     assert.equal(verde(dopo), false);
   });
 });
+
+// #764: la data di un marcatore è scritta giorno/mese; letta da `new Date()` diventava mese/giorno.
+describe('la riga «Quando» del rombo verde è l’ultimo turno di Filo, in ogni giorno del mese', () => {
+  const FT = globalThis.SN_FEEDBACK_THREAD;
+  const quando = (fb) => (rombo(fb).pannello.righe.find((r) => r.etichetta === 'Quando') || {}).valore;
+  const inAttesa = (marcatore) => ({
+    status: 'design', statusReason: 'clarify',
+    notes: ['Quale immagine intendi?', '--- La tua risposta del 01/09/26, 09:00 ---', 'Quelle dentro.',
+      `--- Filo ha risposto il ${marcatore} ---`, 'Anche quelle di sfondo?'].join('\n'),
+  });
+
+  test('ogni giorno di settembre, anno a due o a quattro cifre, è il giorno giusto', () => {
+    for (let g = 1; g <= 30; g++) {
+      const gg = String(g).padStart(2, '0');
+      for (const anno of ['26', '2026']) {
+        const v = quando(inAttesa(`${gg}/09/${anno}, 11:05`));
+        const d = new Date(v);
+        assert.ok(!Number.isNaN(d.getTime()), `${gg}/09/${anno}: «${v}» non è una data`);
+        assert.deepEqual([d.getFullYear(), d.getMonth() + 1, d.getDate(), d.getHours(), d.getMinutes()],
+          [2026, 9, g, 11, 5], `${gg}/09/${anno}: data sbagliata`);
+      }
+    }
+  });
+
+  test('il 5 settembre resta il 5 settembre, non il 9 maggio', () => {
+    const d = new Date(quando(inAttesa('05/09/26, 11:00')));
+    assert.equal(d.getMonth() + 1, 9);
+    assert.equal(d.getDate(), 5);
+  });
+
+  test('l’ISO passa com’è; una data che non esiste o che non si legge non diventa un’altra data', () => {
+    assert.equal(FT.istanteDelMarcatore('2026-09-27T09:00:00.000Z'), '2026-09-27T09:00:00.000Z');
+    for (const s of ['31/02/26, 10:00', '27/13/26, 10:00', '27/09/26, 25:00', 'ieri sera', '', null, undefined]) {
+      assert.equal(FT.istanteDelMarcatore(s), null, `«${s}» doveva restare senza data`);
+    }
+    // Il pannello lo mostra com'è scritto invece di una riga vuota.
+    assert.equal(quando(inAttesa('ieri sera')), 'ieri sera');
+  });
+
+  test('senza marcatore la data non si inventa', () => {
+    assert.equal(quando({ status: 'design', statusReason: 'clarify', notes: domande }), undefined);
+  });
+});

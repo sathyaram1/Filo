@@ -4627,9 +4627,9 @@
         const et = document.createElement('strong');
         et.textContent = `${r.etichetta}:`;
         const va = document.createElement('span');
-        // Le date arrivano in ISO dal server: qui si scrivono come le scrive
-        // il resto della pagina.
-        va.textContent = /^Quando$/i.test(r.etichetta) ? formatDateTime(r.valore) : r.valore;
+        // Le date arrivano in ISO: qui si scrivono come le scrive il resto della
+        // pagina. Una che non si legge resta com'è, mai una riga vuota.
+        va.textContent = (/^Quando$/i.test(r.etichetta) && formatDateTime(r.valore)) || r.valore;
         el.appendChild(et); el.appendChild(va);
         righe.appendChild(el);
       }
