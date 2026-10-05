@@ -176,8 +176,9 @@ test('numero e poi interruttore, la prima risposta arriva per ultima: restano tu
   await page.locator('#mgMaxSessions').fill('7');
   await page.locator('#mgMaxSessionsSave').click();
   await interruttore(page, 'A').click();
-  // In fila dietro il numero: si vede che è partita.
-  await expect(page.locator('#mgAccountsMsg')).toHaveText('Salvo…');
+  // Campi diversi non si aspettano: l'account è confermato mentre il numero è per strada.
+  await expect(page.locator('#mgAccountsMsg')).toHaveText('Salvato.');
+  await expect(page.locator('#mgMaxSessionsMsg')).toHaveText('Salvo…');
 
   await arrivate(page, 3);
   expect(await page.evaluate(() => window.__doc)).toMatchObject({ maxSessions: 7, accountAOff: true });
