@@ -177,8 +177,8 @@ function isWebUnsafeNav(rawUrl) {
   // (stessa pagina web): non è un cambio di schema, non bloccare.
   if (!proto) return false;
   // `filo://invito/…` non è una pagina (#664): in una scheda diventava un
-  // indirizzo interno che non esiste, e la pagina dell'invito spariva. Lo
-  // portano dentro il sistema e il clic vero (page-preload.js); il resto si ferma.
+  // indirizzo interno che non esiste, e la pagina dell'invito spariva. Fermato
+  // qui, lo porta dentro `invitoFermato`.
   if (globalThis.SN_WALLET?.isInviteDeepLink?.(rawUrl)) return true;
   return !WEB_NAV_SCHEMES.has(proto);
 }
@@ -870,7 +870,7 @@ class TabManager {
     // dei merge automatici tra worktree (commit da660251) — se lo tocchi,
     // assicurati che il percorso IPC → openTab(file://) resti bloccato.
     if (isWebUnsafeNav(url)) {
-      openExternalScheme(url); // mailto:/tel:/sms: → consegnati all'OS, il resto bloccato
+      fermaNavigazione(url, { win: this.win }); // mailto:/tel:/sms: → consegnati all'OS, il resto bloccato
       return null;
     }
     const bloccata = apriComunque ? null : this._decisioneBlocco(null, url);
@@ -1676,7 +1676,7 @@ class TabManager {
     // prima che loadURL() possa toccarli. mailto:/tel:/sms: vengono consegnati
     // all'OS invece di caricare una scheda, come nel gate di will-navigate.
     if (isWebUnsafeNav(target)) {
-      openExternalScheme(target);
+      fermaNavigazione(target, { win: this.win });
       return;
     }
     if (this._maybeBlockNavigation(tab, target)) return;
@@ -2132,7 +2132,7 @@ class TabManager {
       // fallire li consegniamo al sistema (apre posta/telefono), come un browser.
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
-        openExternalScheme(url);
+        fermaNavigazione(url, { win: this.win, wc });
         return;
       }
       // «Apri comunque» della pagina «Sito bloccato» che il main ha messo in questa scheda (#590).
@@ -2162,7 +2162,7 @@ class TabManager {
     wc.on('will-redirect', (event, url) => {
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
-        openExternalScheme(url);
+        fermaNavigazione(url, { win: this.win, wc });
         return;
       }
       // #590 — un redirect è un cambio d'indirizzo come gli altri: senza, un
@@ -2552,7 +2552,7 @@ class TabManager {
       // non-web — stessa difesa di will-navigate (file:// → leak NTLM, ecc.).
       // mailto:/tel:/sms: vengono consegnati all'OS invece di essere ignorati.
       if (isWebUnsafeNav(url)) {
-        openExternalScheme(url);
+        fermaNavigazione(url, { win: this.win, wc });
         return { action: 'deny' };
       }
       // #209 — i popup di login ("Continua con Google" e simili) NON sono
@@ -2685,7 +2685,7 @@ class TabManager {
     pwc.on('will-navigate', (event, url) => {
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
-        openExternalScheme(url);
+        fermaNavigazione(url, { win: this.win, wc: pwc });
         return;
       }
       if (this._maybeBlockNavigation(origine, url)) ferma(event);
@@ -2696,7 +2696,7 @@ class TabManager {
     pwc.on('will-redirect', (event, url) => {
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
-        openExternalScheme(url);
+        fermaNavigazione(url, { win: this.win, wc: pwc });
         return;
       }
       if (event.isMainFrame === false) return;
@@ -2704,7 +2704,7 @@ class TabManager {
     });
     pwc.setWindowOpenHandler(({ url }) => {
       if (isWebUnsafeNav(url)) {
-        openExternalScheme(url);
+        fermaNavigazione(url, { win: this.win, wc: pwc });
         return { action: 'deny' };
       }
       if (isAuthPopup(url)) {
@@ -2827,7 +2827,7 @@ class TabManager {
   // Un collegamento che Filo apre per conto di una pagina, dopo la porta delle uscite (#810): la posta al sistema, i
   // siti in blacklist fermati come un clic, il resto in una scheda nuova.
   apriDaCollegamento(url, { sfondo = false } = {}) {
-    if (isWebUnsafeNav(url)) return openExternalScheme(url);
+    if (isWebUnsafeNav(url)) return invitoFermato(url, { win: this.win }) || openExternalScheme(url);
     if (this._maybeBlockNavigation(null, url)) return false;
     this.openTab(url, { activate: !sfondo, openedByLink: true });
     return true;
