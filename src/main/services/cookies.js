@@ -539,6 +539,7 @@ module.exports = {
   chiudiHost,
   permettiRichieste,
   ensureSiteSession,
+  proteggiSessione,
   configureForMode,
   configureFromSettings,
   wipeTrackerCookies,
