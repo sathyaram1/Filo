@@ -363,6 +363,10 @@ module.exports = function register(on, ctx) {
 
   on(MSG.WALLET_STATE, filoOnly(async () => readState()));
 
+  // Anche dai siti: la riga sta nei riquadri sulle pagine web. Il peggio che un mittente può fare è
+  // zittire per dieci minuti un avviso che ripete una frase.
+  on(MSG.KEY_FALLBACK_SHOWN, async () => { ripiegoMostrato(); return { ok: true }; });
+
   // Nuova chiave: il portafoglio esiste sul server, la chiave non è qui.
   on(MSG.WALLET_REISSUE, filoOnly(async () => {
     const idErr = await identityProblem();
