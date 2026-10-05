@@ -430,7 +430,7 @@
       // Spento lascia aperti i problemi di sicurezza già corretti: chi lo spegne lo sa prima.
       level: 2,
       risk: 'Decide se Filo scarica e installa da solo le versioni nuove. Da spento, a ogni avvio controlla '
-        + 'comunque e ti avvisa nella home, ma non scarica niente finché non premi «Installa»: fino ad allora '
+        + 'comunque e ti avvisa nella home, ma non scarica niente finché non premi «Installa». Fino ad allora '
         + 'restano aperti anche i problemi di sicurezza già corretti nelle versioni nuove.',
       build(v) {
         const b = parsePrefBool(v);
