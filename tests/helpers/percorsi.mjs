@@ -93,6 +93,8 @@ export const PREFISSO_CORSA = 'filo-corsa-';
 const dentroUnaCorsa = (dir) => basename(dir).startsWith(PREFISSO_CORSA);
 export function temporaneaDellaCorsa() {
   if (dentroUnaCorsa(tmpdir())) return tmpdir();
+  // Prima i resti, poi la corsa: col disco pieno di resti la corsa non nascerebbe, e nessuno li toglierebbe più (#717).
+  togliCartelleOrfane({ annuncia: (n) => console.error(`[test] tolgo ${n} cartelle temporanee lasciate da prove interrotte`) });
   const temp = togliAllUscita(mkdtempSync(join(tmpdir(), PREFISSO_CORSA)));
   Object.assign(process.env, { TMPDIR: temp, TEMP: temp, TMP: temp });
   return temp;
