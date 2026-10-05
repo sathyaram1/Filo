@@ -97,3 +97,17 @@ test('solo l\'invio di un accesso apre la finestra in cui un cookie nuovo vale c
   assert.equal(R.richiestaDiAccesso({}), false);
 });
 
+
+test('un Set-Cookie partizionato con scadenza futura si riconosce; una cancellazione o un cookie già di sessione no', () => {
+  const ora = Date.parse('2026-10-05T12:00:00Z');
+  assert.equal(R.nomePartizionatoConScadenza('chips=1; Max-Age=3600; Path=/; SameSite=None; Secure; Partitioned', ora), 'chips');
+  assert.equal(R.nomePartizionatoConScadenza('id=a=b; Secure; partitioned; Expires=Wed, 21 Oct 2027 07:28:00 GMT', ora), 'id');
+  // una scadenza passata o un Max-Age a zero cancellano il cookie: toglierla lo farebbe rinascere.
+  assert.equal(R.nomePartizionatoConScadenza('chips=; Max-Age=0; Secure; Partitioned', ora), null);
+  assert.equal(R.nomePartizionatoConScadenza('chips=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Secure; Partitioned', ora), null);
+  assert.equal(R.nomePartizionatoConScadenza('chips=1; Secure; Partitioned', ora), null);
+  // non partizionato: lo declassa l'ascolto dei cookie, non l'intestazione.
+  assert.equal(R.nomePartizionatoConScadenza('mid=1; Max-Age=3600; Secure; SameSite=None', ora), null);
+  assert.equal(R.nomePartizionatoConScadenza('partitioned=1; Max-Age=3600', ora), null);
+  assert.equal(R.nomePartizionatoConScadenza('', ora), null);
+});

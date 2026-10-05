@@ -14,6 +14,21 @@ const MARGINE_TEST = 1200;
 async function serve() {
   const server = createServer((req, res) => {
     const porta = server.address().port;
+    if (req.url.startsWith('/home-pref')) {
+      // La home di B aperta come sito principale mette un suo cookie al primo caricamento.
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Set-Cookie': ['pref=scuro; Max-Age=86400; Path=/'] });
+      res.end('<title>HOME B</title><p>home di B</p>');
+      return;
+    }
+    if (req.url.startsWith('/riquadro-partizionato')) {
+      // Un cookie partizionato (legato al sito che ospita il riquadro), dall'intestazione e da uno script.
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Set-Cookie': ['chips=1; Max-Age=3600; Path=/; SameSite=None; Secure; Partitioned', 'mid=1; Max-Age=3600; Path=/; SameSite=None; Secure'],
+      });
+      res.end('<p>riquadro</p><script>document.cookie = "jschips=1; max-age=3600; path=/; SameSite=None; Secure; Partitioned";</script>');
+      return;
+    }
     if (req.url.startsWith('/riquadro-rinfresca')) {
       // Il riquadro di un sito dove l'utente era già entrato rinfresca il suo cookie d'accesso.
       res.writeHead(200, {
@@ -89,9 +104,12 @@ async function serve() {
       return;
     }
     const riquadro = req.url.startsWith('/art-rinfresca') ? 'riquadro-rinfresca'
-      : req.url.startsWith('/art-doppio') ? 'riquadro-doppio' : 'riquadro';
+      : req.url.startsWith('/art-doppio') ? 'riquadro-doppio'
+        : req.url.startsWith('/art-partizionato') ? 'riquadro-partizionato' : 'riquadro';
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    res.end(`<title>ARTICOLO</title><p>articolo</p><iframe id="ri" width="200" height="120" src="http://b.localhost:${porta}/${riquadro}"></iframe>`);
+    res.end(`<title>ARTICOLO</title><p>articolo</p><a id="vai" href="http://b.localhost:${porta}/home-pref">vai a B</a>`
+      + `<a id="nuova" target="_blank" href="http://b.localhost:${porta}/home-pref?n=1">B in una scheda nuova</a>`
+      + `<iframe id="ri" width="200" height="120" src="http://b.localhost:${porta}/${riquadro}"></iframe>`);
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const porta = server.address().port;
@@ -104,6 +122,8 @@ async function serve() {
     homePost: `http://b.localhost:${porta}/home-post`,
     modulo: `http://b.localhost:${porta}/modulo`,
     articoloDoppio: `http://a.localhost:${porta}/art-doppio`,
+    articoloPartizionato: `http://a.localhost:${porta}/art-partizionato`,
+    homePref: `http://b.localhost:${porta}/home-pref`,
     async chiudi() {
       try { server.closeAllConnections?.(); } catch (_) {}
       await new Promise((r) => server.close(r));
@@ -298,6 +318,110 @@ test('il riquadro che aggiorna due volte di fila il suo cookie tiene il valore p
     expect(await valore()).toEqual(['2:sessione']);
     const riquadro = page.frames().find((f) => f.url().includes('b.localhost'));
     expect(await riquadro.evaluate(() => document.cookie)).toContain('stato=2');
+  } finally {
+    await srv.chiudi();
+  }
+});
+
+const pref = (app) => app.evaluate(async ({ session }) => (await session.defaultSession.cookies.get({ domain: 'b.localhost', name: 'pref' }))
+  .map((c) => (c.session ? 'sessione' : 'scadenza')));
+const midDiSessione = (app) => cookieDiB(app).then((l) => l.filter((c) => c.name === 'mid').map((c) => c.session));
+
+// Il sito visto prima incorporato e poi aperto come sito principale nella stessa scheda: i cookie della sua risposta
+// arrivano prima che la scheda cambi indirizzo, e restano suoi.
+test('dal link dell\'articolo al sito del riquadro, nella stessa scheda: il cookie della sua home resta', async ({ app, openTab }) => {
+  const srv = await serve();
+  try {
+    const page = await openTab(srv.articolo);
+    await expect.poll(() => midDiSessione(app), { timeout: 10_000 }).toEqual([true]);
+    await page.click('#vai');
+    await expect.poll(() => pref(app), { timeout: 10_000 }).not.toEqual([]);
+    await new Promise((r) => setTimeout(r, 1000));
+    const durante = await pref(app);
+    await chiudiSchede(app, 'b.localhost');
+    await pulisci(app);
+    expect({ durante, dopo: await pref(app) }).toEqual({ durante: ['scadenza'], dopo: ['scadenza'] });
+  } finally {
+    await srv.chiudi();
+  }
+});
+
+test('il sito del riquadro scritto nella barra di una scheda già aperta: il cookie della sua home resta', async ({ app, openTab }) => {
+  const srv = await serve();
+  try {
+    await openTab(srv.articolo);
+    await expect.poll(() => midDiSessione(app), { timeout: 10_000 }).toEqual([true]);
+    await chiudiSchede(app, 'a.localhost');
+    await openTab('filo://security/');
+    await app.evaluate(({ BrowserWindow }, u) => {
+      for (const w of BrowserWindow.getAllWindows()) {
+        const tm = w._filoTabs;
+        if (!tm) continue;
+        const t = tm.tabs.find((x) => String(x.url || '').startsWith('filo://security'));
+        if (t) tm.navigate(t.id, u);
+      }
+    }, srv.homePref);
+    await expect.poll(() => pref(app), { timeout: 10_000 }).not.toEqual([]);
+    await new Promise((r) => setTimeout(r, 1000));
+    const durante = await pref(app);
+    await chiudiSchede(app, 'b.localhost');
+    await pulisci(app);
+    expect({ durante, dopo: await pref(app) }).toEqual({ durante: ['scadenza'], dopo: ['scadenza'] });
+  } finally {
+    await srv.chiudi();
+  }
+});
+
+test('dal link dell\'articolo che apre il sito del riquadro in una scheda nuova: il cookie della sua home resta', async ({ app, openTab }) => {
+  const srv = await serve();
+  try {
+    const page = await openTab(srv.articolo);
+    await expect.poll(() => midDiSessione(app), { timeout: 10_000 }).toEqual([true]);
+    await page.click('#nuova');
+    await expect.poll(() => pref(app), { timeout: 10_000 }).not.toEqual([]);
+    await new Promise((r) => setTimeout(r, 1000));
+    expect(await pref(app)).toEqual(['scadenza']);
+  } finally {
+    await srv.chiudi();
+  }
+});
+
+// Electron non sa riscrivere un cookie partizionato senza scadenza: resta per la visita e se ne va con lei.
+test('il cookie partizionato di un riquadro se ne va con la visita, come gli altri', async ({ app, openTab }) => {
+  const srv = await serve();
+  const tuttiDiB = () => app.evaluate(async ({ session }) => (await session.defaultSession.cookies.get({ domain: 'b.localhost' }))
+    .map((c) => c.name).sort());
+  try {
+    await app.evaluate(async ({ session }) => {
+      // Un cookie normale di B con lo stesso nome, suo da prima: la pulizia del partizionato non lo porta via.
+      await session.defaultSession.cookies.set({ url: 'https://b.localhost/', name: 'chips', value: 'mio', path: '/', secure: true,
+        sameSite: 'no_restriction', expirationDate: Date.now() / 1000 + 86400 * 30 });
+    });
+    await openTab(srv.articoloPartizionato);
+    await expect.poll(tuttiDiB, { timeout: 10_000 }).toEqual(['chips', 'chips', 'jschips', 'mid']);
+    await new Promise((r) => setTimeout(r, 800));
+    // Quello dell'intestazione nasce già di sessione; quello dello script resta com'è fino alla fine della visita.
+    const durante = await app.evaluate(async ({ session }) => (await session.defaultSession.cookies.get({ domain: 'b.localhost' }))
+      .map((c) => `${c.name}=${c.value}:${c.session ? 'sessione' : 'scadenza'}`).sort());
+    expect(durante).toEqual(['chips=1:sessione', 'chips=mio:scadenza', 'jschips=1:scadenza', 'mid=1:sessione']);
+    await chiudiSchede(app, 'a.localhost');
+    await pulisci(app);
+    const resta = await app.evaluate(async ({ session }) => (await session.defaultSession.cookies.get({ domain: 'b.localhost' }))
+      .map((c) => `${c.name}=${c.value}:${c.session ? 'sessione' : 'scadenza'}`));
+    expect(resta).toEqual(['chips=mio:scadenza']);
+  } finally {
+    await srv.chiudi();
+  }
+});
+
+test('all\'uscita da Filo il cookie partizionato di un riquadro ancora aperto non resta', async ({ app, openTab }) => {
+  const srv = await serve();
+  try {
+    await openTab(srv.articoloPartizionato);
+    await expect.poll(() => cookieDiB(app).then((l) => l.map((c) => c.name).sort()), { timeout: 10_000 }).toEqual(['chips', 'jschips', 'mid']);
+    await new Promise((r) => setTimeout(r, 800));
+    await app.evaluate(async () => { await globalThis.__filoCookieIncorporati.allUscita(); });
+    expect((await cookieDiB(app)).filter((c) => !c.session).map((c) => c.name)).toEqual([]);
   } finally {
     await srv.chiudi();
   }

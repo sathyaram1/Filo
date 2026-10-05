@@ -475,6 +475,8 @@ app.on('before-quit', (e) => {
   if (cookieWipeDone) return;
   let pending;
   try { pending = require('./services/cookies').wipeOnExit(); } catch (_) { return; }
+  // #758 — i cookie partizionati dei riquadri non si possono declassare: quelli ancora in attesa escono qui.
+  try { pending = Promise.all([pending, require('./services/cookieIncorporati').allUscita()]); } catch (_) {}
   if (!pending || typeof pending.then !== 'function') return;
   e.preventDefault();
   const finish = () => { cookieWipeDone = true; app.quit(); };

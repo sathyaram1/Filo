@@ -38,6 +38,17 @@ function richiestaDiAccesso({ method, url, resourceType } = {}, { credenziali = 
   return PARAM_RITORNO.some((k) => q.has(k));
 }
 
+// Un Set-Cookie partizionato con una scadenza futura: il suo nome, o null. Una scadenza passata è una cancellazione,
+// e senza scadenza è già di sessione.
+function nomePartizionatoConScadenza(riga, ora = Date.now()) {
+  const r = String(riga || '');
+  if (!/;\s*partitioned\s*(;|$)/i.test(r)) return null;
+  const maxAge = /;\s*max-age\s*=\s*([^;]*)/i.exec(r);
+  const scade = /;\s*expires\s*=\s*([^;]*)/i.exec(r);
+  if (maxAge ? !(Number(maxAge[1]) > 0) : !(scade && Date.parse(scade[1]) > ora)) return null;
+  return r.split(';')[0].split('=')[0].trim() || null;
+}
+
 // `protetti`: siti con accesso e siti «resta connesso». Il sito principale di una scheda aperta non si tocca mai.
 function daDeclassare({ modo, sito, ospiti, aperti, protetti }) {
   if (modo !== 'default' || !sito || !ospiti || !ospiti.size || ospiti.has(sito)) return false;
@@ -54,4 +65,4 @@ function esitoVoce(voce, { aperti, protetti, ora, margine }) {
   return { azione: ora - chiusoDa >= margine ? 'cancella' : 'aspetta', chiusoDa };
 }
 
-module.exports = { nomeDiAccesso, segnaleDiAccesso, richiestaDiAccesso, daDeclassare, esitoVoce };
+module.exports = { nomeDiAccesso, segnaleDiAccesso, richiestaDiAccesso, nomePartizionatoConScadenza, daDeclassare, esitoVoce };

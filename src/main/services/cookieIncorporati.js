@@ -19,6 +19,8 @@ const FINESTRA_INVIO_MS = 2 * 60 * 1000;
 const MAX_SITI = 500;
 const MAX_NOMI = 200;
 const GIRO_MS = 30 * 1000;
+// Fra la risposta della pagina principale e il suo arrivo nella scheda passa un attimo; questo è il tetto largo.
+const ARRIVO_MS = 60 * 1000;
 
 let margine = MARGINE_MS;
 // Solo i test accorciano il margine: nell'app lo decide MARGINE_MS.
@@ -34,6 +36,12 @@ const attesa = new Map();
 // Cookie con scadenza appena sovrascritti (dominio|percorso|nome): c'erano già prima che un riquadro li riscrivesse,
 // quindi non sono nati da lui (un accesso fatto prima di #758, o che Filo non ha visto) e non si declassano.
 const preesistenti = new Map();
+// webContents → sito della pagina principale che sta arrivando: i cookie della sua risposta nascono prima che la
+// scheda cambi indirizzo, e sono del sito principale, non di un riquadro.
+const inArrivo = new Map();
+// sito → nomi dei cookie partizionati dei suoi riquadri: Electron non sa riscriverli senza scadenza, quindi si
+// tolgono a fine visita (o all'uscita da Filo).
+const partizionati = new Map();
 
 let modo = 'default';
 let fidati = new Set();
@@ -77,6 +85,13 @@ function aperti() {
       }
     }
   } catch (_) {}
+  const ora = Date.now();
+  for (const [id, v] of [...inArrivo]) {
+    let wc = null;
+    try { wc = require('electron').webContents.fromId(id); } catch (_) {}
+    if (!wc || wc.isDestroyed() || ora - v.at > ARRIVO_MS) inArrivo.delete(id);
+    else out.add(v.sito);
+  }
   return out;
 }
 
@@ -133,13 +148,17 @@ function urlDi(c) {
   return (c.secure ? 'https://' : 'http://') + dominio + (c.path || '/');
 }
 
-// Il cookie torna identico ma senza scadenza: vale per la visita e non oltre. La pagina continua a leggerlo.
-// Si riscrive il cookie di adesso, non quello dell'avviso: il riquadro può averlo già aggiornato, e il valore vecchio
-// gli rimetterebbe uno stato che aveva sostituito.
+// Il cookie torna identico ma senza scadenza: vale per la visita e non oltre. Si riscrive il valore di adesso (un
+// avviso superato da uno più nuovo rimetterebbe uno stato che il riquadro aveva sostituito). Un partizionato si vede
+// solo per dominio, accanto all'eventuale cookie normale con lo stesso nome: torna 'partizionato' e quello non si tocca.
 async function declassa(ses, c0) {
   const percorso = c0.path || '/';
-  const c = (await ses.cookies.get({ url: urlDi(c0), name: c0.name }))
-    .find((x) => x.domain === c0.domain && (x.path || '/') === percorso);
+  const stesso = (x) => x.name === c0.name && x.domain === c0.domain && (x.path || '/') === percorso;
+  const c = (await ses.cookies.get({ url: urlDi(c0), name: c0.name })).find(stesso);
+  if (!c || c.value !== c0.value) {
+    const lista = await ses.cookies.get({ domain: String(c0.domain || '').replace(/^\./, '') });
+    if (lista.some((x) => stesso(x) && !x.session && (!c || x.value !== c.value))) return 'partizionato';
+  }
   if (!c || c.session) return false;
   const dominio = String(c.domain || '').replace(/^\./, '');
   await ses.cookies.set({
@@ -199,11 +218,46 @@ function navigazione(url) {
   paginaDiAccesso(url);
 }
 
+// La rimozione per indirizzo toglie anche il cookie normale con lo stesso nome: quello con scadenza si rimette.
+async function togliPartizionati(ses, sito, nomi) {
+  let lista = [];
+  try { lista = await ses.cookies.get({ domain: sito }); } catch (_) { return; }
+  for (const nome of nomi) {
+    for (const url of new Set(lista.filter((c) => c.name === nome).map(urlDi))) {
+      let normali = [];
+      try { normali = (await ses.cookies.get({ url, name: nome })).filter((c) => !c.session); } catch (_) {}
+      try { await ses.cookies.remove(url, nome); } catch (_) {}
+      for (const c of normali) {
+        preesistenti.set(chiaveCookie(c), Date.now());
+        try {
+          await ses.cookies.set({
+            url: urlDi(c), name: c.name, value: c.value, path: c.path || '/', secure: !!c.secure, httpOnly: !!c.httpOnly,
+            sameSite: c.sameSite, expirationDate: c.expirationDate,
+            ...(c.hostOnly ? {} : { domain: String(c.domain || '').replace(/^\./, '') }),
+          });
+        } catch (_) {}
+      }
+    }
+  }
+}
+
+// All'uscita da Filo i cookie di sessione se ne vanno da soli; i partizionati ancora in attesa si tolgono qui.
+async function allUscita() {
+  const ses = agganciata;
+  if (!ses || !partizionati.size) return;
+  const prot = protetti();
+  for (const [sito, nomi] of [...partizionati]) {
+    partizionati.delete(sito);
+    if (!prot.has(sito)) await togliPartizionati(ses, sito, nomi);
+  }
+}
+
 function segnaAccesso(sito) {
   if (!sito || accessi.has(sito)) return;
   accessi.add(sito);
   attesa.delete(sito);
   siti.delete(sito);
+  partizionati.delete(sito);
   scrittura = scrittura.then(async () => {
     const Storage = globalThis.SN_STORAGE;
     const { applySettingsUpdate } = require('./handlers');
@@ -241,7 +295,10 @@ async function cookieCambiato(ses, c, removed, giaLi = false) {
     for (const o of ospiti) v.ospiti.add(o);
   }
   if (!R.daDeclassare({ modo, sito, ospiti: v.ospiti, aperti: aperti(), protetti: prot })) return;
-  try { if (!(await declassa(ses, c))) return; } catch (_) { return; }
+  let esito;
+  try { esito = await declassa(ses, c); } catch (_) { return; }
+  if (!esito) return;
+  if (esito === 'partizionato') marcaPartizionato(sito, c.name);
   v.nomi.add(c.name);
   while (v.nomi.size > MAX_NOMI) v.nomi.delete(v.nomi.keys().next().value);
   v.chiusoDa = 0;
@@ -262,16 +319,19 @@ async function giroDiPulizia() {
     const esito = R.esitoVoce(v, stato);
     v.chiusoDa = esito.chiusoDa;
     if (esito.azione === 'aspetta') continue;
-    if (esito.azione === 'dimentica') { siti.delete(sito); continue; }
+    if (esito.azione === 'dimentica') { siti.delete(sito); partizionati.delete(sito); continue; }
     siti.delete(sito);
     let lista = [];
     try { lista = await ses.cookies.get({ domain: sito }); } catch (_) { continue; }
+    const nomiP = partizionati.get(sito) || new Set();
+    partizionati.delete(sito);
     for (const c of lista) {
       // Solo quelli che abbiamo declassato noi e che sono ancora di sessione: se un tuo accesso ne ha riscritto
       // uno con scadenza, quello è tuo e non si tocca.
-      if (!c.session || !v.nomi.has(c.name)) continue;
+      if (!c.session || !v.nomi.has(c.name) || nomiP.has(c.name)) continue;
       try { await ses.cookies.remove(urlDi(c), c.name); } catch (_) {}
     }
+    if (nomiP.size) await togliPartizionati(ses, sito, nomiP);
   }
   if (![...siti.values()].some((v) => v.nomi.size)) fermaGiro();
 }
@@ -286,26 +346,77 @@ function fermaGiro() {
   giro = null;
 }
 
-// Unico ascolto onHeadersReceived della sessione (Electron ne tiene uno solo per evento): qui si registra solo
-// chi ospita chi, le intestazioni non si toccano.
+function marcaPartizionato(sito, nome) {
+  if (!partizionati.has(sito)) partizionati.set(sito, new Set());
+  partizionati.get(sito).add(nome);
+  while (partizionati.size > MAX_SITI) partizionati.delete(partizionati.keys().next().value);
+}
+
+// Electron non sa riscrivere un cookie partizionato senza scadenza: quello che arriva da un'intestazione nasce già di
+// sessione, togliendogli la scadenza qui; quello scritto da uno script si toglie a fine visita.
+function partizionatiDiSessione(d, sito, ospite) {
+  const h = d.responseHeaders;
+  if (!h) return null;
+  const chiavi = Object.keys(h).filter((k) => k.toLowerCase() === 'set-cookie' && Array.isArray(h[k]));
+  if (!chiavi.some((k) => h[k].some((r) => R.nomePartizionatoConScadenza(r)))) return null;
+  const v = siti.get(sito);
+  const ospiti = v && v.ospiti.size ? v.ospiti : new Set([ospite]);
+  if (!R.daDeclassare({ modo, sito, ospiti, aperti: aperti(), protetti: protetti() })) return null;
+  const nuove = { ...h };
+  const voceSito = voce(sito);
+  voceSito.ospiti.add(ospite);
+  for (const k of chiavi) {
+    nuove[k] = h[k].map((r) => {
+      const nome = R.nomePartizionatoConScadenza(r);
+      if (!nome) return r;
+      voceSito.nomi.add(nome);
+      marcaPartizionato(sito, nome);
+      return String(r).replace(/;\s*(max-age|expires)\s*=[^;]*/gi, '');
+    });
+  }
+  voceSito.chiusoDa = 0;
+  avviaGiro();
+  return { responseHeaders: nuove };
+}
+
+function esitoIntestazioni(d) {
+  if (modo !== 'default' || !d) return null;
+  if (attesa.size) {
+    try {
+      const v = attesa.get(sitoDi(d.url));
+      const scritte = !!v && !!v.credenziali && Date.now() - v.credenziali <= FINESTRA_INVIO_MS;
+      if (v && R.richiestaDiAccesso(d, { credenziali: scritte })) v.invio = Date.now();
+    } catch (_) {}
+  }
+  if (d.resourceType === 'mainFrame') {
+    const s = sitoDi(d.url);
+    if (s && d.webContentsId != null) {
+      inArrivo.delete(d.webContentsId);
+      inArrivo.set(d.webContentsId, { sito: s, at: Date.now() });
+      while (inArrivo.size > MAX_SITI) inArrivo.delete(inArrivo.keys().next().value);
+    }
+    return null;
+  }
+  let cima = '';
+  try { cima = (d.frame && d.frame.top && d.frame.top.url) || ''; } catch (_) {}
+  if (!cima) return null;
+  try { registraTerzaParte(d.url, cima); } catch (_) {}
+  const sito = sitoDi(d.url);
+  const ospite = sitoDi(cima);
+  if (!sito || !ospite || sito === ospite) return null;
+  return partizionatiDiSessione(d, sito, ospite);
+}
+
+// Unico ascolto onHeadersReceived della sessione (Electron ne tiene uno solo per evento): registra chi ospita chi e
+// la pagina principale in arrivo; delle intestazioni tocca solo la scadenza dei cookie partizionati dei riquadri.
 function aggancia(ses) {
   if (!ses || agganciata === ses) return;
   agganciata = ses;
   try {
     ses.webRequest.onHeadersReceived((d, callback) => {
-      callback({});
-      if (modo !== 'default' || !d) return;
-      if (attesa.size) {
-        try {
-          const v = attesa.get(sitoDi(d.url));
-          const scritte = !!v && !!v.credenziali && Date.now() - v.credenziali <= FINESTRA_INVIO_MS;
-          if (v && R.richiestaDiAccesso(d, { credenziali: scritte })) v.invio = Date.now();
-        } catch (_) {}
-      }
-      if (d.resourceType === 'mainFrame') return;
-      let cima = '';
-      try { cima = (d.frame && d.frame.top && d.frame.top.url) || ''; } catch (_) {}
-      if (cima) { try { registraTerzaParte(d.url, cima); } catch (_) {} }
+      let risposta = {};
+      try { risposta = esitoIntestazioni(d) || {}; } catch (_) {}
+      callback(risposta);
     });
   } catch (_) {}
   try {
@@ -340,8 +451,7 @@ function configureFromSettings(settings) {
   modo = C.getMode(settings);
   fidati = new Set(C.getTrustedSites(settings).map((d) => String(d || '').toLowerCase()).filter(Boolean));
   accessi = new Set((Array.isArray(c.loggedSites) ? c.loggedSites : []).map((d) => String(d || '').toLowerCase()).filter(Boolean));
-  for (const s of accessi) siti.delete(s);
-  for (const s of fidati) siti.delete(s);
+  for (const s of [...accessi, ...fidati]) { siti.delete(s); partizionati.delete(s); }
   // Fuori dall'Automatico Filo non tocca più niente: i cookie già declassati valgono per la visita e muoiono con lei.
   if (modo !== 'default') { attesa.clear(); siti.clear(); fermaGiro(); }
 }
@@ -359,5 +469,6 @@ module.exports = {
   paginaDiAccesso,
   credenziali,
   giroDiPulizia,
+  allUscita,
   margineTest,
 };
