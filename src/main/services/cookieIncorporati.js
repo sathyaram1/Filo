@@ -262,7 +262,14 @@ function aggancia(ses) {
   } catch (_) {}
 }
 
+// Le impostazioni cambiate da una finestra incognito valgono solo lì, e l'incognito ha la sua sessione: questi
+// cookie non sono suoi (#754).
+function inIncognito() {
+  try { return !!require('../shim/storage').inIncognito(); } catch (_) { return false; }
+}
+
 function configureFromSettings(settings) {
+  if (inIncognito()) return;
   const C = Cookies();
   const c = (settings && settings.security && settings.security.cookies) || {};
   modo = C.getMode(settings);
@@ -270,7 +277,8 @@ function configureFromSettings(settings) {
   accessi = new Set((Array.isArray(c.loggedSites) ? c.loggedSites : []).map((d) => String(d || '').toLowerCase()).filter(Boolean));
   for (const s of accessi) siti.delete(s);
   for (const s of fidati) siti.delete(s);
-  if (modo !== 'default') { attesa.clear(); }
+  // Fuori dall'Automatico Filo non tocca più niente: i cookie già declassati valgono per la visita e muoiono con lei.
+  if (modo !== 'default') { attesa.clear(); siti.clear(); fermaGiro(); }
 }
 
 function init(settings) {

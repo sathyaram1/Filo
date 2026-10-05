@@ -18,7 +18,9 @@
     },
     {
       version: '0.2.233', date: '2026-10-05',
-      features: [],
+      features: [
+        'I post, i video e le mappe che gli altri siti incastrano nelle loro pagine non ti seguono più: i loro cookie durano finché leggi quella pagina e poi se ne vanno. Dai siti dove sei entrato con il tuo account resti connesso, e li trovi elencati in Impostazioni → Sicurezza, dove puoi togliere quelli che non ti convincono.',
+      ],
       fixes: [
         'Nelle Opzioni, se clicchi sul campo del modello prima che arrivi l\'elenco dei modelli, il menu a tendina si apre da solo appena l\'elenco c\'è. Prima restava chiuso e bisognava cliccare di nuovo.',
         'Nelle risposte di Filo un elenco numerato con le voci staccate da una riga vuota tiene i suoi numeri: prima ogni voce ripartiva da 1.',
