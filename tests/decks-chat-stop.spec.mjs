@@ -162,6 +162,34 @@ test('Esc col cursore nel campo ferma come il tasto, e «Riprova» rifà la doma
   await expect(page.locator('.dk-msg-bot').last().locator('.dk-msg-text')).toContainText('Risposta a: carte blu');
 });
 
+test('tasto destro sulla bolla in attesa o sull\'intestazione della chat: «Ferma la risposta» ferma come il tasto', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  const { page } = await openBuilder(app, openTab);
+  await app.evaluate(() => { globalThis.__modelloMuto = true; });
+  const voce = page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Ferma la risposta' });
+
+  await scrivi(page, 'draghi rossi');
+  const bot = page.locator('.dk-msg-bot').last();
+  await expect(bot.locator('.dk-msg-pending', { hasText: 'sta pensando' })).toBeVisible();
+  await bot.click({ button: 'right' });
+  await voce.click();
+  await expect(bot.locator('.dk-msg-pending')).toHaveText('Risposta fermata.');
+  await expect.poll(() => app.evaluate(() => globalThis.__annullate)).toBe(1);
+  // A chat libera la voce non c'è più, nemmeno sulla bolla fermata.
+  await bot.click({ button: 'right' });
+  await expect(voce).toHaveCount(0);
+
+  await scrivi(page, 'carte blu');
+  await expect(page.locator('#chatStop')).toBeVisible();
+  await page.locator('#chatHead').click({ button: 'right' });
+  await expect(page.locator('.dk-ctxmenu .sn-select-option')).toHaveText(['Ferma la risposta', 'Svuota la chat…']);
+  await voce.click();
+  await expect(page.locator('.dk-msg-bot').last().locator('.dk-msg-pending')).toHaveText('Risposta fermata.');
+  await expect.poll(() => app.evaluate(() => globalThis.__annullate)).toBe(2);
+  await page.locator('#chatHead').click({ button: 'right' });
+  await expect(page.locator('.dk-ctxmenu .sn-select-option')).toHaveText(['Svuota la chat…']);
+});
+
 test('fermata a metà, il mazzo non cambia: commander e budget chiesti nel turno non si applicano', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   const { page, deckId } = await openBuilder(app, openTab);
