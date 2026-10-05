@@ -16,7 +16,25 @@ Sei già sul ramo: non cambiarlo, e non fondere su `main`.
   della domanda);
 - `rilievi`: i rilievi che erano rimasti aperti quando il lavoro si è fermato,
   col loro livello e la sede. Vanno chiusi adesso, alla luce della risposta;
-- `ruolo`: chi si è fermato (chi risolveva, o chi verificava e correggeva).
+- `ruolo`: chi si è fermato (chi risolveva, chi verificava e correggeva, o
+  `secaudit`: il controllo di sicurezza, sotto).
+
+### Se a fermarlo è stato il controllo di sicurezza
+
+`ripresa.ruolo` è `secaudit`: il fix aveva passato la verifica ed è stato
+bocciato da chi controlla il diff senza vedere il feedback. `domanda` è la sua
+nota: cosa ha trovato, dove nel diff, perché è pericoloso. L'owner l'ha letta e
+ha rimesso in coda invece di saltare il controllo, quindi **va corretto**: qui
+una `risposta` vuota non vale «va bene così». Se ha scritto, la sua risposta
+prevale sulla nota.
+
+- Togli dal ramo quello che è stato trovato, o arriva al risultato per una
+  strada che non ne ha bisogno, senza perdere quello che il feedback chiede.
+- Non renderlo solo meno visibile: il prossimo controllo rilegge tutto il diff,
+  cieco come il primo, e un rischio nascosto meglio è peggio di uno trovato.
+- Se la cosa bocciata è proprio quella che il feedback chiede, o la nota ti
+  sembra un falso positivo, non cercare un'altra forma per farla passare:
+  segnalalo (`--segnala`, qui sotto) e decide l'owner.
 
 `payload.feedback` è la richiesta originale; `payload.history` le critiche dei
 giri passati, dalla più vecchia: le porte già trovate si tengono chiuse.
