@@ -435,7 +435,7 @@
       build(v) {
         const b = parsePrefBool(v);
         if (b === null) return null;
-        return { partial: { aggiornamenti: { automatici: b } }, label: `Installa gli aggiornamenti da solo → ${b ? 'sì' : 'no, aspetta il tuo «Installa»'}` };
+        return { partial: { aggiornamenti: { automatici: b } }, label: `Installa gli aggiornamenti da solo → ${b ? 'acceso' : 'spento'}` };
       },
     },
     {
