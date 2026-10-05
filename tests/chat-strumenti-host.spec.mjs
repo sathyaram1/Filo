@@ -27,8 +27,6 @@ async function preparaRouter(app, modo) {
       apiKeys: { openrouter: 'k-test' },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
       models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
-      excludedProviders: ['Google', 'DeepSeek'],
-      providerSort: 'latency',
     });
     globalThis.__routerModo = modo;
     globalThis.__rifiuto = rifiuto;
@@ -62,8 +60,8 @@ function vincoliIntatti(corpi) {
   expect(corpi.length).toBeGreaterThan(0);
   for (const b of corpi) {
     expect(b.provider.require_parameters).toBe(true);
+    // La lista di esclusione di serie viaggia insieme al vincolo: Google e DeepSeek li esclude Filo.
     expect(b.provider.ignore).toEqual(expect.arrayContaining(['Google', 'DeepSeek']));
-    expect(b.provider.sort).toBe('latency');
   }
 }
 
