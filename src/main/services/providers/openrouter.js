@@ -141,6 +141,31 @@
     return out;
   }
 
+  // Il 404 del router quando, fra gli host ammessi, nessuno regge i parametri chiesti (o nessuno resta).
+  const NO_HOST_FOR_PARAMS_RE = /no endpoints found|no allowed providers|parameter|tool/i;
+
+  // Una chiamata di chat (con o senza streaming). `require_parameters` scarta anche gli host che non
+  // conoscono `reasoning`, e per un modello che non ragiona non ne resterebbe nessuno: il ragionamento
+  // è facoltativo, gli strumenti no, quindi a quel rifiuto si rifà la richiesta senza.
+  async function postChat(body, apiKey, signal) {
+    const send = (b, key) => {
+      const payload = JSON.stringify(b);
+      return fetchWithKey(ENDPOINT, key, (k) => ({ method: 'POST', headers: buildHeaders(k), body: payload, signal }));
+    };
+    const first = await send(body, apiKey);
+    const needsParams = !!(body.provider && body.provider.require_parameters);
+    if (first.res.ok || first.res.status !== 404 || !needsParams || !body.reasoning) return first;
+    const detail = await first.res.clone().text().catch(() => '');
+    if (!NO_HOST_FOR_PARAMS_RE.test(detail)) return first;
+    const { reasoning: _omesso, ...senzaRagionamento } = body;
+    const second = await send(senzaRagionamento, first.keyUsed);
+    if (!second.keyFallback && first.keyFallback) {
+      second.keyFallback = first.keyFallback;
+      try { second.res.keyFallback = first.keyFallback; } catch (_) {}
+    }
+    return second;
+  }
+
   // Le chiamate agli strumenti di una risposta NON in streaming, nella forma
   // piatta che usa il resto di Filo: { id, name, arguments (stringa JSON) }.
   function flatToolCalls(list) {
