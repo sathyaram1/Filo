@@ -1065,7 +1065,16 @@
     // Un turno solo: la sequenza «azione → esito → modello» la guida il main,
     // e la scheda la racconta in diretta dentro il blocco (runFiloTurn).
     const r = await runFiloTurn({ ...args, activity });
-    activity.finish({ failed: !r?.ok });
+    if (r && r._chiusura) {
+      const fine = r._chiusura.catch(() => {}).then(() => {
+        activity.finish();
+        if (chiusuraInCorso === fine) chiusuraInCorso = null;
+        refreshLive().catch(() => {});
+      });
+      chiusuraInCorso = fine;
+    } else {
+      activity.finish({ failed: !r?.ok });
+    }
 
     sending = false;
     // Riprendere ha senso solo nella conversazione che è ancora a schermo.
