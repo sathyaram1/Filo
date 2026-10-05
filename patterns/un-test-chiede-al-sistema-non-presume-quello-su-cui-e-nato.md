@@ -116,6 +116,17 @@ il rosso ferma le versioni per tutti:
 
 Sentinella delle due forme: `tests/unit/cartelleTemporanee.test.mjs`.
 
+## Il collegamento simbolico (#742)
+
+Su Windows un collegamento simbolico lo crea solo l'amministratore o chi ha la
+modalità sviluppatore: per tutti gli altri è EPERM. Il cancello di GitHub gira da
+amministratore e lì passa, quindi l'unico posto dove si vede è la macchina
+dell'owner, dove ferma ogni chiusura locale. Una cartella si collega con
+`collegaCartella` (una junction su Windows, che non chiede privilegi); un file non ha
+junction, e `collegaFile` restituisce il motivo da passare a `t.skip` solo su Windows
+e solo per EPERM: altrove il caso gira e un errore resta un errore. Gli script che la
+chiusura esegue passano `'junction'` da sé. Sentinella nello stesso file.
+
 ## La macchina carica (#943)
 
 Gli unit girano in parallelo, e spesso più verifiche girano insieme sulla stessa
