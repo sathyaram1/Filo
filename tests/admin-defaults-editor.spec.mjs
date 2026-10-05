@@ -333,6 +333,33 @@ test('scelto dal catalogo il nome di una voce del codice, l\'avviso lo conta e i
   await expect(page.locator('#excludedDrift')).toBeHidden();
 });
 
+// #1004.2: il blur chiude il menu in ritardo; un campo tornato a fuoco nel frattempo
+// deve tenerlo aperto, e un campo già a fuoco lo riapre al clic.
+test('il menu del catalogo resta sceglibile se il campo torna a fuoco subito, e si riapre al clic', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab);
+  await page.click('#addExcludedRow');
+  const row = page.locator('#excludedList .sn-excluded-row').last();
+  const name = row.locator('.sn-excluded-name');
+  const pop = row.locator('.sn-model-id-wrap .sn-select-pop');
+  await name.click();
+  await expect(pop).toBeVisible();
+
+  await name.evaluate((el) => { el.blur(); el.focus(); });
+  await page.waitForTimeout(300);
+  await expect(pop).toBeVisible();
+  await pop.locator('.sn-select-option', { hasText: 'NovitaAI' }).click();
+  await expect(name).toHaveValue('NovitaAI');
+  await expect(row.locator('.sn-excluded-kind')).toHaveValue('unreliable');
+  await expect(pop).toBeHidden();
+
+  // Dopo la scelta il campo resta a fuoco: cambiarla passa di nuovo dal menu.
+  await expect(name).toBeFocused();
+  await name.click();
+  await expect(pop).toBeVisible();
+  await pop.locator('.sn-select-option', { hasText: 'Google Vertex' }).click();
+  await expect(name).toHaveValue('Google Vertex');
+});
+
 test('il main rifiuta test espliciti e catalogo ai non admin (gate reale, senza stub)', async ({ openTab }) => {
   const page = await openTab(ADMIN_URL);
   await page.waitForSelector('#title', { timeout: 8_000 });

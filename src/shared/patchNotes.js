@@ -25,6 +25,7 @@
         'Filo ricorda le pagine che apri nelle schede, sul tuo computer, accanto alle chat. Quelle aperte in incognito no. Le cancelli quando vuoi chiedendolo a Filo («cancella le pagine dell\'ultima ora», «di ieri sera», «di YouTube») o in Sicurezza, dove scegli fra l\'ultima ora, oggi e tutto, e spariscono anche dal disco. Esporta dati e Importa dati le portano con sé.',
       ],
       fixes: [
+        'Nei campi dove scegli un modello dal menu a tendina, un clic sul campo riapre il menu anche subito dopo una scelta. Prima bisognava scrivere qualcosa o uscire dal campo e rientrare.',
         'Nell\'editor il riquadro di un nuovo commento non si chiude più da solo mentre scrivi, anche se hai selezionato il testo prima che sparisse l\'invito a farlo.',
         'Le schede chiuse restano in Cronologia finché non le cancelli tu. Prima, passate le 5000, le più vecchie sparivano da sole, e dopo le 2000 la ricerca per contenuto non le trovava più. Adesso le trova tutte, anche le più vecchie, già alla prima ricerca.',
         '«Copia immagine» funziona anche sulle foto che i siti tengono su un altro dominio. Se la incolli in chat e chiedi se è fatta con l\'AI, Filo risponde come col tasto destro.',

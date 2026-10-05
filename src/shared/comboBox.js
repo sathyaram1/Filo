@@ -149,7 +149,17 @@
       hoverEl = null;
     }
 
-    input.addEventListener('focus', () => { filterText = ''; open(); });
+    // Un ritorno a fuoco entro il ritardo del blur annulla la chiusura: altrimenti il menu
+    // appena riaperto si chiude sotto un campo a fuoco (#1004.2).
+    let blurTimer = null;
+    input.addEventListener('focus', () => {
+      clearTimeout(blurTimer);
+      filterText = '';
+      close();
+      open();
+    });
+    // Campo già a fuoco col menu chiuso (dopo una scelta, Esc): il clic lo riapre.
+    input.addEventListener('click', () => { if (pop.hidden) { filterText = ''; open(); } });
     input.addEventListener('input', () => {
       filterText = input.value || '';
       if (pop.hidden) open(); else build();
@@ -165,7 +175,7 @@
         if (hoverEl) { e.preventDefault(); pick(hoverEl.dataset.value); }
       } else if (e.key === 'Escape') { e.preventDefault(); close(); }
     });
-    input.addEventListener('blur', () => { setTimeout(close, 120); });
+    input.addEventListener('blur', () => { clearTimeout(blurTimer); blurTimer = setTimeout(close, 120); });
 
     return close;
   }
