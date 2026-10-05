@@ -1,7 +1,6 @@
-// Aggiornamento continuo della Gestione: la logica pura (confronto, fusione,
-// quando girare, cosa è arrivato, dove tenere lo scorrimento), senza rete.
+// Aggiornamento continuo della Gestione e della pagina Feedback: la logica pura, e i giri col loro I/O iniettato.
 // Le regole: patterns/dati-che-cambiano-altrove-cloud-si-chiede-la-versione.md
-// e patterns/chi-guarda-in-continuo-chiede-cosa-e-cambiato.md (#676).
+// e patterns/chi-guarda-in-continuo-chiede-cosa-e-cambiato.md (#676, #738).
 
 (function (global) {
   'use strict';
