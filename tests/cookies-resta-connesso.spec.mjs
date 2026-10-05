@@ -39,6 +39,11 @@ async function sitoConAccesso() {
       return;
     }
     // «Continua con Google» finto: la finestrella d'accesso e il ritorno che apre la sessione.
+    // Il modulo d'accesso in un riquadro, come su icloud.com.
+    if (u.pathname === '/cornice') {
+      html('<!doctype html><html><head><title>Servizio</title></head><body><iframe id="f" src="/login" style="width:500px;height:240px"></iframe></body></html>');
+      return;
+    }
     if (u.pathname === '/pubblica') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Set-Cookie': 'visita=1; Path=/; HttpOnly' });
       res.end(`<!doctype html><html><head><title>Benvenuto</title></head><body style="padding:30px">

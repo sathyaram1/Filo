@@ -858,12 +858,11 @@
     accessoInviatoAt = ora;
     send({ type: T_ACCESSO });
   }
-  if (IS_TOP) {
-    try {
-      document.addEventListener('input', onPasswordInput, true);
-      for (const ev of ['submit', 'keydown', 'click']) document.addEventListener(ev, forseAccesso, true);
-    } catch (_) {}
-  }
+  // Anche nei riquadri: c'è chi mette il modulo d'accesso in un iframe (icloud.com, banche). Vale il sito della scheda.
+  try {
+    document.addEventListener('input', onPasswordInput, true);
+    for (const ev of ['submit', 'keydown', 'click']) document.addEventListener(ev, forseAccesso, true);
+  } catch (_) {}
 
   // ─── bootstrap ───────────────────────────────────────────────────────────
 

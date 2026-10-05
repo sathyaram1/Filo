@@ -129,6 +129,8 @@ function sitoDellaVoce(voce) {
   return s;
 }
 
+globalThis.SN_COOKIES_SITO_FIDATO = sitoDellaVoce;
+
 function riduciFidati(list) {
   const out = [];
   for (const v of Array.isArray(list) ? list : []) {

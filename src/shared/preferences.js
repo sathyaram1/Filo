@@ -189,7 +189,8 @@
     }
     return { op, voci };
   }
-  function elenco({ keys, percorso, nome, risk, aiuto }) {
+  // `riduci`: la forma con cui l'elenco confronta le voci (per i siti connessi il sito intero, #759).
+  function elenco({ keys, percorso, nome, risk, aiuto, riduci }) {
     return {
       keys,
       scrive: [percorso],
@@ -199,13 +200,28 @@
       build(v) {
         const o = opElenco(v);
         if (!o || o.rifiuto) return o;
+        if (riduci) o.voci = ridotte(o.voci, riduci);
         const lista = o.voci.map(sitoLeggibile).join(', ');
         const label = o.op === 'aggiungi' ? `${nome} → aggiungi ${lista}`
           : o.op === 'togli' ? `${nome} → togli ${lista}`
             : (o.voci.length ? `${nome} → solo ${lista}` : `${nome} → svuota l'elenco`);
-        return { partial: nidifica(percorso, o.voci), label, elenco: { percorso, op: o.op, voci: o.voci, nome } };
+        return { partial: nidifica(percorso, o.voci), label, elenco: { percorso, op: o.op, voci: o.voci, nome, riduci } };
       },
     };
+  }
+  function ridotte(voci, riduci) {
+    const out = [];
+    for (const x of voci) {
+      let r = x;
+      try { r = riduci(x) || x; } catch (_) {}
+      if (!out.includes(r)) out.push(r);
+    }
+    return out;
+  }
+  // Il main sa ridurre un indirizzo al sito intero (services/cookies.js); dove manca, la voce resta com'è.
+  function sitoConnesso(x) {
+    const f = globalThis.SN_COOKIES_SITO_FIDATO;
+    return typeof f === 'function' ? f(x) : x;
   }
   // Si salva la forma «xn--» con cui il sito si confronta; a una persona si mostra münchen.de, come fa la pagina.
   function sitoLeggibile(x) {
@@ -214,8 +230,9 @@
   }
   // L'elenco nuovo a partire da quello di adesso: { partial } da salvare, o { invariato } col perché.
   function applicaElenco(e, correnti) {
-    const attuale = (Array.isArray(dentro(correnti, e.percorso)) ? dentro(correnti, e.percorso) : [])
+    let attuale = (Array.isArray(dentro(correnti, e.percorso)) ? dentro(correnti, e.percorso) : [])
       .filter((x) => typeof x === 'string' && x.trim());
+    if (e.riduci) attuale = ridotte(attuale, e.riduci);
     let nuovo;
     if (e.op === 'aggiungi') nuovo = attuale.concat(e.voci.filter((x) => !attuale.includes(x)));
     else if (e.op === 'togli') nuovo = attuale.filter((x) => !e.voci.includes(x));
@@ -960,6 +977,7 @@
       nome: 'Siti fidati dove resti connesso',
       aiuto: 'siti dove si resta connessi anche con la privacy massima dei cookie: «resta connesso su X» è aggiungi X, '
         + '«togli X dai siti connessi» è togli X',
+      riduci: sitoConnesso,
       risk: 'Cambia i siti che fanno eccezione alla privacy massima dei cookie: lì i dati restano fra una visita e '
         + 'l’altra, così resti connesso, e il sito ti riconosce.',
     }),

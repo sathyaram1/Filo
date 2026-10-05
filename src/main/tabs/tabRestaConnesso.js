@@ -34,6 +34,20 @@ const GUARDA_PAGINA = `(() => {
   return { pw, chiave };
 })()`;
 
+// L'accesso fatto in un riquadro (src/content/cookies.js) non è finito finché lì resta una password in vista.
+const PW_RIQUADRO = `(() => { try { return [...document.querySelectorAll('input[type="password"]')].some((el) => {
+  const r = el.getBoundingClientRect(); const s = getComputedStyle(el);
+  return r.width > 1 && r.height > 1 && s.display !== 'none' && s.visibility !== 'hidden'; }); } catch (_) { return false; } })()`;
+
+async function passwordNeiRiquadri(wc) {
+  let frames = [];
+  try { frames = wc.mainFrame.framesInSubtree.filter((f) => f !== wc.mainFrame); } catch (_) { return false; }
+  for (const f of frames) {
+    try { if (await f.executeJavaScript(PW_RIQUADRO) === true) return true; } catch (_) {}
+  }
+  return false;
+}
+
 const LEGGI_MEMORIA = '(() => { try { return Object.entries(localStorage); } catch (_) { return null; } })()';
 
 function nomeLeggibile(sito) {
@@ -161,7 +175,7 @@ const restaConnessoMethods = {
     if (!wc || wc.isDestroyed()) return;
     let pagina = null;
     try { pagina = await wc.executeJavaScriptInIsolatedWorld(1001, [{ code: GUARDA_PAGINA }]); } catch (_) { return; }
-    if (!pagina || pagina.pw) return;
+    if (!pagina || pagina.pw || await passwordNeiRiquadri(wc)) return;
     let cookies = [];
     try { cookies = await wc.session.cookies.get({ url: tab.url }); } catch (_) {}
     if (!pagina.chiave && !cookies.some(looksLikeLoginCookie)) return;
