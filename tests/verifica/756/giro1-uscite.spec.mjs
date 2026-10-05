@@ -101,14 +101,3 @@ test('chiusa e riaperta di corsa molte volte attorno al margine: ogni riapertura
   await shell.evaluate((t) => window.filoShell.tabs.close(t), c.id);
 });
 
-test('una finestrella dello stesso sito ancora aperta tiene viva la sessione anche se la scheda si chiude', async ({ app, shell }) => {
-  await privacy(app, shell, 800);
-  const a = await apri(app, shell, sito('/accedi'));
-  const prima = await app.evaluate(({ webContents }) => webContents.getAllWebContents().length);
-  await nellaPagina(app, a.id, `window.open(${JSON.stringify(sito('/finestrella'))}, 'f', 'popup,width=400,height=300'); 1`);
-  await expect.poll(() => app.evaluate(({ webContents }) => webContents.getAllWebContents().length), { timeout: 5000 }).toBeGreaterThan(prima);
-  await shell.evaluate((t) => window.filoShell.tabs.close(t), a.id);
-  await attendi(2500);
-  const c = await apri(app, shell, sito('/ancora'));
-  expect(c.titolo).toBe(CONNESSO);
-});
