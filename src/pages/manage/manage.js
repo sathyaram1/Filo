@@ -143,6 +143,11 @@
   const mgClarifyText = document.getElementById('mgClarifyText');
   const mgClarifyBtn  = document.getElementById('mgClarifyBtn');
   const mgClarifyMsg  = document.getElementById('mgClarifyMsg');
+  // La casella sotto la conversazione e quella nel pannello del rombo verde
+  // (#1033) sono la stessa risposta: una bozza per pratica, fuori dai nodi che
+  // i ridisegni ricostruiscono, e un solo invio per volta.
+  const bozzeRisposta = new Map();
+  const rispostaInVolo = new Set();
   // Frase per chi ha segnalato: il modulo (`mgUserNote`) sta chiuso finché non
   // lo si apre col tasto della barra (`mgUserNoteToggle`).
   const mgUserNote       = document.getElementById('mgUserNote');
@@ -3071,13 +3076,12 @@
     // pulsanti nascono dallo stato, e su una segnalazione cifrata la macchina
     // lo inventa (`unlabeled`): offrire "→ In coda" o "Conferma attacco" su una
     // pratica che potrebbe essere già chiusa è peggio che non offrire niente.
-    // La casella e il rombo verde della fila nascono dalla stessa domanda.
-    const isClarify = leggibile && MR.aspettaRisposta(fb);
     renderActions(fb);
     disegnaSegnoTestata(fb);
-    mgClarify.hidden = !(isAdmin && isClarify);
-    mgClarifyText.value = '';
-    setClarifyMsg('', '');
+    mgClarify.hidden = !rispostaOfferta(fb);
+    mgClarifyText.value = bozzeRisposta.get(fb._id) || '';
+    if (!ridisegno) setClarifyMsg('', '');
+    mgClarifyBtn.disabled = rispostaInVolo.has(fb._id);
 
     // Gestione (⭐ + archivia/ripristina): visibile per l'owner su QUALUNQUE
     // feedback selezionato, accanto alle azioni contestuali.
@@ -3928,19 +3932,45 @@
 
   mgStarBtn.addEventListener('click', toggleStarred);
 
+  // Le due caselle e il rombo verde della fila nascono dalla stessa domanda.
+  function rispostaOfferta(fb) {
+    return !!(isAdmin && fb && statoLeggibile(fb) && MR.aspettaRisposta(fb));
+  }
+  function caselleRisposta() {
+    return [mgClarifyText, document.getElementById('mgSideRispostaText')].filter(Boolean);
+  }
+  function scriviBozzaRisposta(origine) {
+    if (!selectedId) return;
+    const v = origine.value || '';
+    if (v) bozzeRisposta.set(selectedId, v); else bozzeRisposta.delete(selectedId);
+    for (const c of caselleRisposta()) if (c !== origine) c.value = v;
+  }
+  function bottoniRisposta(disabled) {
+    for (const b of [mgClarifyBtn, document.getElementById('mgSideRispostaBtn')]) if (b) b.disabled = disabled;
+  }
+  function tastiRisposta(e) {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); sendClarifyReply(e.currentTarget); }
+  }
+
   function setClarifyMsg(text, kind) {
-    mgClarifyMsg.textContent = text || '';
-    mgClarifyMsg.className = 'mg-action-msg' + (kind ? ` mg-${kind}` : '');
+    const side = document.getElementById('mgSideRispostaMsg');
+    for (const el of [mgClarifyMsg, side]) {
+      if (!el) continue;
+      el.textContent = text || '';
+      el.className = 'mg-action-msg' + (kind ? ` mg-${kind}` : '');
+    }
   }
 
   // Risposta dell'owner a un feedback in `clarify`: la risposta si appende alle
   // note (come turno utente, preservando lo storico) e il feedback rientra in
   // coda (todo) per la prossima passata.
-  async function sendClarifyReply() {
+  async function sendClarifyReply(origine) {
     if (!selectedId) return;
     const id = selectedId;
-    const reply = (mgClarifyText.value || '').trim();
-    if (!reply) { mgClarifyText.focus(); return; }
+    if (rispostaInVolo.has(id)) return;
+    const casella = (origine && origine.tagName === 'TEXTAREA') ? origine : mgClarifyText;
+    const reply = (bozzeRisposta.get(id) || '').trim();
+    if (!reply) { casella.focus(); return; }
     // Come la riapertura: la conversazione si legge intera prima di
     // appenderci la risposta, o al suo posto resterebbe la sola risposta.
     const fb = await feedbackCompleto(id);
@@ -3966,12 +3996,14 @@
       ? T.appendUserTurn(oldNotes, reply, {})
       : (oldNotes ? `${oldNotes}\n\n${reply}` : reply);
 
-    mgClarifyBtn.disabled = true;
+    rispostaInVolo.add(id);
+    bottoniRisposta(true);
     setClarifyMsg('Invio in corso…', '');
     try {
       const r = await sendToMain({ type: 'feedback_update', id, status: 'todo', notes: newNotes });
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
       if (fb) { fb.status = 'todo'; fb.notes = newNotes; }
+      bozzeRisposta.delete(id);
       // Nell'attesa l'owner può aver aperto un ALTRO feedback. Il dato è
       // salvato lo stesso e la lista si ridisegna, ma il pannello NON si tocca:
       // chiuderlo adesso chiuderebbe il dettaglio dell'altro feedback, che
@@ -3990,11 +4022,47 @@
       if (selectedId !== id) return;
       setClarifyMsg(e.message || 'Errore nell\'invio', 'err');
     } finally {
-      mgClarifyBtn.disabled = false;
+      rispostaInVolo.delete(id);
+      bottoniRisposta(false);
     }
   }
 
-  mgClarifyBtn.addEventListener('click', sendClarifyReply);
+  mgClarifyBtn.addEventListener('click', () => sendClarifyReply(mgClarifyText));
+  mgClarifyText.addEventListener('input', () => scriviBozzaRisposta(mgClarifyText));
+  mgClarifyText.addEventListener('keydown', tastiRisposta);
+
+  // La stessa casella dentro il pannello del rombo verde, sotto le domande.
+  function pannelloRisposta(fb) {
+    const box = document.createElement('div');
+    box.className = 'mg-liv-risposta';
+    const t = document.createElement('textarea');
+    t.id = 'mgSideRispostaText';
+    t.className = 'mg-accept-comment';
+    t.rows = 3;
+    t.placeholder = 'Rispondi a Claude…';
+    t.value = bozzeRisposta.get(fb._id) || '';
+    t.addEventListener('input', () => scriviBozzaRisposta(t));
+    t.addEventListener('keydown', tastiRisposta);
+    const riga = document.createElement('div');
+    riga.className = 'mg-actions-row';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-btn';
+    btn.id = 'mgSideRispostaBtn';
+    btn.textContent = 'Invia risposta';
+    btn.title = 'La risposta entra nella conversazione e la segnalazione torna in coda.';
+    btn.disabled = rispostaInVolo.has(fb._id);
+    btn.addEventListener('click', () => sendClarifyReply(t));
+    const msg = document.createElement('span');
+    msg.id = 'mgSideRispostaMsg';
+    msg.setAttribute('role', 'status');
+    // Un esito solo per le due caselle: il pannello lo riprende da quella sotto la conversazione.
+    msg.className = mgClarifyMsg.className;
+    msg.textContent = mgClarifyMsg.textContent;
+    riga.appendChild(btn); riga.appendChild(msg);
+    box.appendChild(t); box.appendChild(riga);
+    return box;
+  }
 
   // La casella della frase ha due cose da ricordare: se l'owner ci ha messo
   // mano dopo l'ultimo invio (allora comanda quello che ha scritto lui), e
@@ -4673,9 +4741,16 @@
 
     if (liv.key === 'l5') body.appendChild(pannelloFusione(fb, liv));
     if (mostraSaltaAudit(fb, liv)) body.appendChild(pannelloSaltaAudit(fb));
+    if (liv.key === 'l3' && rispostaOfferta(fb)) body.appendChild(pannelloRisposta(fb));
 
+    // Un ridisegno a metà risposta non porta via il cursore a chi sta scrivendo.
+    const prima = document.getElementById('mgSideRispostaText');
+    const cursore = (prima && document.activeElement === prima)
+      ? [prima.selectionStart, prima.selectionEnd] : null;
     openSidebar(p.titolo, '');
     mgSideBody.replaceChildren(body);
+    const dopo = cursore && document.getElementById('mgSideRispostaText');
+    if (dopo) { dopo.focus(); dopo.setSelectionRange(cursore[0], cursore[1]); }
   }
 
   // La segnalazione e i report sono il markdown di un modello: lo stesso formattatore delle risposte di Filo in
@@ -5125,6 +5200,9 @@
     if (mgUserNote && mgUserNoteText) {
       if (String(mgUserNoteText.value || '') !== String(mgUserNoteText.dataset.saved || '')) return true;
     }
+    // La risposta scritta nel pannello del rombo (#1033) sta fuori dal dettaglio, ma è sua.
+    const rispostaLaterale = document.getElementById('mgSideRispostaText');
+    if (rispostaLaterale && (el === rispostaLaterale || String(rispostaLaterale.value || '').trim())) return true;
     // Una conferma del segno aperta (#922): ridisegnare la chiuderebbe mentre l'owner la legge.
     if (mgSegnoConferma && !mgSegnoConferma.hidden && mgSegnoConferma.offsetParent !== null) return true;
     if (document.querySelector('#mgSideSegno .mg-segno-conferma:not([hidden])')) return true;
