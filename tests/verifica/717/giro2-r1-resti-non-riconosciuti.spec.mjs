@@ -42,11 +42,13 @@ test('i controlli di logica interrotti non lasciano resti che nessuno toglierà'
   mkdirSync(unit);
   writeFileSync(join(unit, 'appesa.test.mjs'), "import { test } from 'node:test';\ntest('appesa', () => new Promise(() => setInterval(() => {}, 1000)));\n");
   const figlio = spawn(process.execPath, [join(RADICE, 'scripts', 'run-unit-tests.mjs')],
-    { cwd: RADICE, env: { ...b.env, FILO_UNIT_DIR: unit }, stdio: 'ignore' });
+    { cwd: RADICE, env: { ...b.env, FILO_UNIT_DIR: unit }, stdio: 'ignore', detached: process.platform !== 'win32' });
   const fine = Date.now() + 30_000;
   while (Date.now() < fine && !readdirSync(b.tmp).some((n) => n.startsWith('filo-unit-'))) await new Promise((ok) => setTimeout(ok, 100));
   await new Promise((ok) => setTimeout(ok, 1000));
-  figlio.kill('SIGINT');
+  // Come un Ctrl+C: arriva a tutto il gruppo, lanciatore e prove.
+  if (process.platform === 'win32') spawnSync('taskkill', ['/pid', String(figlio.pid), '/T', '/F']);
+  else process.kill(-figlio.pid, 'SIGINT');
   await once(figlio, 'exit');
   expect(existsSync(b.tmp)).toBe(true);
   expect(nonRiconosciuti(b.tmp)).toEqual([]);
