@@ -16,10 +16,10 @@
 // I comandi vengono serializzati in coda: ne parte uno alla volta e l'output
 // in arrivo è instradato alle callback del comando corrente fino al suo META.
 //
-// SICUREZZA: esegue comandi arbitrari sulla macchina. È raggiungibile SOLO
-// dalle pagine interne filo:// (vedi ipc.js, che rifiuta i sender esterni),
-// SOLO con la modalità terminale attiva e SOLO con comandi digitati a mano
-// dall'utente — mai output dell'LLM, mai contenuto di pagine web.
+// SICUREZZA: esegue comandi arbitrari sulla macchina. Via ipc.js è raggiungibile
+// SOLO dalle pagine interne filo://, con la modalità terminale attiva e con
+// comandi digitati a mano dall'utente. L'altro chiamante è il comando one-shot
+// dell'assistente con cmd (terminal.js), che arriva già passato dal gate dei livelli.
 
 const { spawn } = require('node:child_process');
 const os = require('node:os');
@@ -120,7 +120,8 @@ function randSid() {
 // Config per shell: come avviare il processo persistente, la riga di "pronto"
 // da inviare all'avvio, e come "incartare" un comando utente perché stampi il
 // marcatore di fine (exit code + cwd) su una riga propria.
-function shellConfig(shell, sid, startCwd) {
+function shellConfig(shell, sid, startCwd, { env, autoRun = true } = {}) {
+  const ambiente = env ? { env } : {};
   // Fuori da Windows (Linux, macOS): shell POSIX persistente, letta da pipe →
   // non-interattiva, nessun prompt da ripulire. `bash` se l'utente l'ha scelto
   // nelle Preferenze, altrimenti la shell di sistema. I marcatori sono gli
@@ -129,7 +130,7 @@ function shellConfig(shell, sid, startCwd) {
     return {
       file: shell === 'bash' ? 'bash' : '/bin/sh',
       args: [],
-      options: { cwd: startCwd || undefined, windowsHide: true },
+      options: { cwd: startCwd || undefined, windowsHide: true, ...ambiente },
       ready: `printf 'FILO_RDY_${sid}\\n'\n`,
       wrap: (command) =>
         `${command}\nprintf 'FILO_META_${sid}:%s:%s\\n' "$?" "$PWD"\n`,
@@ -144,8 +145,9 @@ function shellConfig(shell, sid, startCwd) {
     // lunghi arrivano storpiati anche qui, nel terminale che l'utente guarda.
     return {
       file: process.env.ComSpec || 'cmd.exe',
-      args: ['/q', '/k'],
-      options: { cwd: startCwd || undefined, windowsHide: true },
+      // /d salta l'AutoRun del registro: un suo `cd` porterebbe il comando dell'assistente fuori dalla sua cartella.
+      args: autoRun ? ['/q', '/k'] : ['/d', '/q', '/k'],
+      options: { cwd: startCwd || undefined, windowsHide: true, ...ambiente },
       ready: `${PRELUDI_CODIFICA.cmd}prompt FILO_RDY_${sid}$_\r\n`,
       wrap: (command) =>
         `${command}\r\necho FILO_META_${sid}:%errorlevel%:%cd%\r\n`,
@@ -158,7 +160,7 @@ function shellConfig(shell, sid, startCwd) {
     return {
       file: 'wsl.exe',
       args,
-      options: { windowsHide: true },
+      options: { windowsHide: true, ...ambiente },
       ready: `printf 'FILO_RDY_${sid}\\n'\n`,
       wrap: (command) =>
         `${command}\nprintf 'FILO_META_${sid}:%s:%s\\n' "$?" "$PWD"\n`,
@@ -174,7 +176,7 @@ function shellConfig(shell, sid, startCwd) {
   return {
     file: 'powershell.exe',
     args: ['-NoLogo', '-NoProfile', '-Command', '-'],
-    options: { cwd: startCwd || undefined, windowsHide: true },
+    options: { cwd: startCwd || undefined, windowsHide: true, ...ambiente },
     ready: `${PREPARA_STDIN_POWERSHELL}${PRELUDI_CODIFICA.powershell}"FILO_RDY_${sid}"\n`,
     wrap: (command) => righePowerShell(command, `FILO_META_${sid}`, comandoPerPowerShell),
   };
@@ -183,16 +185,18 @@ function shellConfig(shell, sid, startCwd) {
 // Crea una sessione persistente. Ritorna un oggetto con:
 //   exec(command, { onData, onExit, onError })  accoda ed esegue un comando
 //   write(text)                                 invia testo grezzo allo stdin
+//   chiudi()                                    chiude lo stdin: la shell esce da sola, i programmi avviati restano
 //   kill()                                      termina l'albero di processi
 //   shell, cwd, dead                            stato osservabile
 //
 // Le callback sono PER COMANDO: onData({chunk, stream}), onExit({code, cwd}),
-// onError({message}).
-function createSession({ shell, cwd } = {}) {
+// onError({message}). Se la shell si chiude prima del marcatore (un `exit 3`),
+// onExit porta anche { chiusa: true, uscita: <codice del processo> }.
+function createSession({ shell, cwd, env, autoRun } = {}) {
   const sid = randSid();
   const wantShell = resolveShell(shell);
   const startCwd = usableCwd(cwd);
-  const cfg = shellConfig(wantShell, sid, startCwd);
+  const cfg = shellConfig(wantShell, sid, startCwd, { env, autoRun });
 
   const session = {
     // La shell VERA, non quella chiesta: chi confronta per decidere se
@@ -208,7 +212,7 @@ function createSession({ shell, cwd } = {}) {
     current: null,    // comando in esecuzione: { cb }
     _buf: '',         // buffer di linea per stdout
     _pendingBlank: 0, // righe vuote in attesa (separatori prompt/marcatore)
-    exec, write, kill,
+    exec, write, chiudi, kill,
   };
 
   const META_PREFIX = `FILO_META_${sid}:`;
@@ -235,11 +239,11 @@ function createSession({ shell, cwd } = {}) {
     }
   });
   proc.on('error', (err) => fatal(err.message || String(err)));
-  proc.on('close', () => {
+  proc.on('close', (uscita) => {
     session.dead = true;
     const cur = session.current;
     session.current = null;
-    if (cur && cur.cb.onExit) cur.cb.onExit({ code: 0, cwd: session.cwd });
+    if (cur && cur.cb.onExit) cur.cb.onExit({ code: 0, cwd: session.cwd, chiusa: true, uscita });
     drainQueueErr('shell terminata');
   });
 
@@ -337,6 +341,10 @@ function createSession({ shell, cwd } = {}) {
 
   function write(text) {
     try { proc.stdin && proc.stdin.write(String(text == null ? '' : text)); } catch (_) {}
+  }
+
+  function chiudi() {
+    try { proc.stdin && proc.stdin.end(); } catch (_) {}
   }
 
   function kill() {

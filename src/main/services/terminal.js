@@ -55,12 +55,18 @@ function resolveShell(shell) {
   return s === 'bash' ? 'bash' : 'sh';
 }
 
+// cmd non si lancia con `/c`: lì gira solo la PRIMA riga della stringa, e il preludio UTF-8 prendeva il posto
+// del comando, che risultava riuscito senza essere partito (#719). Va per righe sullo stdin, come il terminale.
+function viaSessione(shell) {
+  return resolveShell(shell) === 'cmd';
+}
+
 // (programma, argv) per lanciare la shell EFFETTIVA con un'unica stringa di
 // comando. `shell` qui è già risolto da resolveShell().
 function shellInvocation(shell, command) {
   switch (resolveShell(shell)) {
     case 'cmd':
-      return { file: 'cmd.exe', args: ['/d', '/s', '/c', command] };
+      throw new Error('cmd non parte con /c: passa da eseguiInSessione');
     case 'bash':
       return { file: 'bash', args: ['-c', command] };
     case 'sh':
@@ -256,10 +262,6 @@ function righePowerShell(command, segno, codifica = invocaCodificato) {
 // del comando, non quello della sonda. Specifica per shell.
 function withCwdProbe(shell, command, mark = nuovoMarcatore()) {
   const sh = resolveShell(shell);
-  if (sh === 'cmd') {
-    // echo gira comunque; %errorlevel% = esito del comando, %cd% = directory.
-    return `${command}\r\necho ${mark}:%errorlevel%:%cd%`;
-  }
   if (sh === 'powershell') {
     // Si legge da stdin (vedi invocazione). Il comando codificato è UNA pipeline: un throw o un
     // -ErrorAction Stop fermano il resto del comando come in uno script, non solo la riga in cui stanno.
@@ -301,12 +303,6 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, 
       resolve({ command: cmd, stdout: '', stderr: 'Comando vuoto.', code: 1, signal: null, cwd: cwd || undefined, truncated: false, timedOut: false, durationMs: 0 });
       return;
     }
-    // Con trackCwd appendiamo la sonda che riporta exit code + cwd risultante,
-    // così un `cd` persiste tra i comandi dell'assistente. Davanti a tutto il
-    // preludio che mette la shell in UTF-8 (#551), altrimenti i nomi con
-    // accenti e trattini lunghi tornano storpiati.
-    const mark = trackCwd ? nuovoMarcatore() : '';
-    const { file, args, stdin } = invocazione(usedShell, cmd, { trackCwd, mark });
     // La cartella può non esistere più: rinominata, cancellata, su una
     // chiavetta staccata (#551, quarto giro). Lì dentro non fallisce il
     // comando, fallisce la shell prima di leggerlo, e la cartella appuntata
@@ -324,6 +320,18 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, 
         cartellaPersa = scelta.persa;
       } catch (_) {}
     }
+    if (viaSessione(usedShell)) {
+      eseguiInSessione(cmd, { shell: usedShell, cwd: cartella, env, timeoutMs, trackCwd }).then((r) => resolve({
+        command: cmd, ...r, cwdPersa: cartellaPersa || undefined, durationMs: Date.now() - startedAt,
+      }));
+      return;
+    }
+    // Con trackCwd appendiamo la sonda che riporta exit code + cwd risultante,
+    // così un `cd` persiste tra i comandi dell'assistente. Davanti a tutto il
+    // preludio che mette la shell in UTF-8 (#551), altrimenti i nomi con
+    // accenti e trattini lunghi tornano storpiati.
+    const mark = trackCwd ? nuovoMarcatore() : '';
+    const { file, args, stdin } = invocazione(usedShell, cmd, { trackCwd, mark });
     let stdout = '';
     let codaOut = ''; // ultimi caratteri dello stdout, anche oltre il tetto
     let stderr = '';
@@ -427,6 +435,64 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env, 
   });
 }
 
+// Un comando nella sessione del terminale (shell.js), che porta già preludio UTF-8, marcatore a caso, esito e
+// cartella: stessa forma di runCommand. Si risolve al marcatore; poi la shell esce chiudendo lo stdin, senza
+// uccidere l'albero, perché un `start notepad` deve sopravvivere al comando che l'ha aperto.
+function eseguiInSessione(cmd, { shell, cwd, env, timeoutMs = DEFAULT_TIMEOUT_MS, trackCwd = false } = {}) {
+  return new Promise((resolve) => {
+    let stdout = '';
+    let stderr = '';
+    let timedOut = false;
+    let finito = false;
+    let timer = null;
+    const fine = (code, cwdFinale) => {
+      if (finito) return;
+      finito = true;
+      clearTimeout(timer);
+      const out = truncate(stdout);
+      const err = truncate(stderr);
+      resolve({
+        stdout: out.text,
+        stderr: err.text,
+        code: timedOut ? 124 : code,
+        signal: null,
+        cwd: trackCwd ? (cwdFinale || cwd || undefined) : undefined,
+        truncated: out.truncated || err.truncated,
+        timedOut,
+      });
+    };
+    let sessione;
+    try {
+      sessione = require('./shell').createSession({ shell, cwd, env, autoRun: false });
+    } catch (e) {
+      stderr = `Impossibile avviare la shell: ${e && e.message ? e.message : e}`;
+      fine(127);
+      return;
+    }
+    timer = setTimeout(() => {
+      timedOut = true;
+      try { sessione.kill(); } catch (_) {}
+      // Se la chiusura non arriva, l'esito c'è comunque: il tempo è scaduto.
+      setTimeout(() => fine(124), 5000);
+    }, Math.max(1000, timeoutMs));
+    sessione.exec(cmd, {
+      onData: ({ chunk, stream }) => {
+        if (stream === 'stderr') { if (stderr.length < MAX_OUTPUT_CHARS * 2) stderr += chunk; } else if (stdout.length < MAX_OUTPUT_CHARS * 2) stdout += chunk;
+      },
+      onExit: ({ code, cwd: dove, chiusa, uscita }) => {
+        // Chiusa senza marcatore (un `exit 3`): dove sia finita non si sa, l'esito lo dà il processo.
+        if (chiusa) { fine(typeof uscita === 'number' ? uscita : 1); return; }
+        try { sessione.chiudi(); } catch (_) {}
+        fine(code, dove);
+      },
+      onError: ({ message }) => {
+        stderr += (stderr ? '\n' : '') + `Impossibile avviare la shell: ${message}`;
+        fine(127);
+      },
+    });
+  });
+}
+
 module.exports = {
   runCommand, shellInvocation, resolveShell, defaultShell, MAX_OUTPUT_CHARS, DEFAULT_TIMEOUT_MS,
   // esportati per gli unit test (il preludio UTF-8 e la sonda sono la parte
@@ -434,6 +500,8 @@ module.exports = {
   encodingPrelude, withCwdProbe, invocazione, PRELUDI_CODIFICA,
   // le righe PowerShell da stdin: le usa anche il terminale della dashboard (shell.js), così non divergono.
   righePowerShell, invocaCodificato, PREPARA_STDIN_POWERSHELL,
+  // la strada di cmd (#719): su Linux la sessione gira con sh, e la si prova da lì.
+  viaSessione, eseguiInSessione,
   // il marcatore della sonda: il prefisso è fisso, il resto è a caso a ogni
   // comando, ed è quello che impedisce all'uscita di scriverselo (#551, ottavo
   // giro di verifica).
