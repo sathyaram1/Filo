@@ -191,8 +191,8 @@
   }
 
   // Chi riempie una lista dopo il fuoco lo dice qui: lo sente solo il campo che ha il fuoco.
-  function opzioniArrivate(doc) {
-    const el = (doc || global.document).activeElement;
+  function opzioniArrivate() {
+    const el = global.document.activeElement;
     if (el) el.dispatchEvent(new CustomEvent(OPZIONI_ARRIVATE));
   }
 
