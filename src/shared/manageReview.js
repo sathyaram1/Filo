@@ -1359,6 +1359,9 @@
 
   const L3_ATTESA = 'Claude aspetta una tua risposta: le domande sono nella conversazione.';
 
+  // Al posto di un testo che questo computer non sa decifrare: il blob non va mai a schermo.
+  const TESTO_CIFRATO = 'Il testo è cifrato e questo computer non ha la chiave privata per leggerlo.';
+
   // I motivi di `design` che aspettano una RISPOSTA scritta dell'owner: le
   // domande di chi risolve, e una segnalazione o un rilievo che chiedono una
   // sua scelta. La risposta va nella conversazione ed è quello che chi riprende
@@ -1402,12 +1405,17 @@
   }
 
   function livelloL3(fb, opts) {
-    const titolo = 'Segnalazione di Claude';
-    if (opts && opts.dettaglioLetto === false) return nonLetto('l3', 'rombo', titolo);
-    const l = livelliOf(fb).l3;
     const attesa = aspettaRisposta(fb);
+    // Il verde vuol dire anche «Claude aspetta una tua risposta»: il nome lo dice, e copre tutte le parti del pannello.
+    if (opts && opts.dettaglioLetto === false) {
+      return nonLetto('l3', 'rombo', attesa ? 'Domande di Claude' : 'Segnalazione di Claude');
+    }
+    const l = livelliOf(fb).l3;
+    const segnalato = !!(l && String(l.esito || '').trim());
+    const titolo = !attesa ? 'Segnalazione di Claude'
+      : segnalato ? 'Domande e segnalazione di Claude' : 'Domande di Claude';
     const domanda = attesa ? ultimaDomanda(fb) : null;
-    if (!l || !String(l.esito || '').trim()) {
+    if (!segnalato) {
       // Le domande possono arrivare nelle sole note: chi aspetta una risposta ha comunque una segnalazione.
       if (attesa) {
         return forma('l3', 'rombo', titolo, 'design', 'domande', {
@@ -1437,12 +1445,18 @@
     if (attesa) {
       const corpo = (domanda && domanda.body) || '';
       const motivo = String(normalizeStatus(fb).statusReason || '');
-      const soloSegnalazione = !valueUnreadable(l.testo) && (motivo === 'decisione' || !corpo || corpo.includes(testo));
+      // Una parte che qui non si decifra si dice con la frase, come quando è sola: mai il blob, mai sparita.
+      const cifrata = valueUnreadable(l.testo);
+      const conversazioneCifrata = valueUnreadable(fb && fb.notes);
+      const soloSegnalazione = !cifrata
+        && (motivo === 'decisione' || (!corpo && !conversazioneCifrata) || corpo.includes(testo));
+      const domande = conversazioneCifrata ? TESTO_CIFRATO : (corpo || L3_ATTESA);
       return forma('l3', 'rombo', titolo, 'design', 'domande', {
         titolo,
         righe,
-        testo: soloSegnalazione ? testo : `## Domande in attesa di risposta\n${corpo || L3_ATTESA}\n\n## Segnalazione\n${testo}`,
-        illeggibile: valueUnreadable(l.testo) && valueUnreadable(fb && fb.notes),
+        testo: soloSegnalazione ? testo
+          : `## Domande in attesa di risposta\n${domande}\n\n## Segnalazione\n${cifrata ? TESTO_CIFRATO : testo}`,
+        illeggibile: cifrata && conversazioneCifrata,
         azioni: [],
       });
     }
@@ -1674,7 +1688,7 @@
     livelli, livelloPer, livelloL1, livelloL2, livelloL3, livelloL4, livelloL5, righeStato,
     fusioneInAttesa, fusioniSenzaFeedback, richiestaDiQuesto, numeroOf,
     l1MotivoText, LIVELLO_COLORI, L1_MOTIVI, righeTesto,
-    aspettaRisposta, ultimaDomanda,
+    aspettaRisposta, ultimaDomanda, TESTO_CIFRATO,
     FRASE_SEGNO_ERRATO, fermatoDalSegno, motivoSegnoText,
   };
 
