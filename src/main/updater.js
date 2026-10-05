@@ -51,8 +51,9 @@ function initAutoUpdater() {
   })().catch((e) => console.error('[updater] avvio fallito:', e?.message || e));
 }
 
-// La decisione, separata da Electron perché la prova la fa girare su un aggiornatore finto.
-function avviaAggiornatore(aggiornatore, { automatici = true, chiesta = null, annuncia = () => {} } = {}) {
+// La decisione, separata da Electron perché la prova la fa girare su un aggiornatore finto. Senza `chiesta` vale
+// quella di questo processo: un aggiornatore riavviato non scorda l'«Installa» dell'utente.
+function avviaAggiornatore(aggiornatore, { automatici = true, chiesta = stato.chiesta, annuncia = () => {} } = {}) {
   Object.assign(stato, nuovoStato(), { aggiornatore, automatici, chiesta, annuncia });
   regola(aggiornatore);
 

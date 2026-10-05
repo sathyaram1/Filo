@@ -84,7 +84,8 @@ function aggiornatoreFinto({ versione = '0.3.0', scaricamentoRotto = false, lent
 const calma = () => new Promise((r) => setImmediate(r));
 
 async function avvia(u, automatici) {
-  await U.avviaAggiornatore(u, { automatici });
+  // Ogni prova parte senza un «Installa» lasciato da quella prima.
+  await U.avviaAggiornatore(u, { automatici, chiesta: null });
   await calma();
 }
 
