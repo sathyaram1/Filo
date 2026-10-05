@@ -1060,7 +1060,9 @@
       sha.title = 'Il commit esaminato: ' + String(r.sha || '') + (r.mergeSha ? '\nIl commit di fusione: ' + String(r.mergeSha) : '');
       head.appendChild(sha);
       var who = el('span', 'sn-mac-recent-who', isSkippedL5(r) ? 'lavoro locale: L5 saltato' : preapprovedBy(r));
-      if (isSkippedL5(r)) who.title = skippedL5Hint(r);
+      var specie = specieFusaSenzaChiedere(r);
+      if (specie === 'locale') who.title = skippedL5Hint(r);
+      else if (specie === 'approvazione') who.title = 'Il segno l’aveva lasciato il tuo sì: valeva solo per i blocchi già approvati, e con blocchi nuovi ti avrebbe chiesto.';
       else if (r.preapprovedAt) who.title = preapprovedWhenText(r.preapprovedAt);
       head.appendChild(who);
       head.appendChild(el('span', 'sn-mac-recent-when', mergedWhenText(r.decidedAtMs || r.createdAtMs, now)));
