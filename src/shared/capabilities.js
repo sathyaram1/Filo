@@ -499,7 +499,7 @@
     {
       id: 'auto-update', title: 'Aggiornamenti di Filo', category: 'settings',
       desc: 'A ogni avvio Filo controlla se c’è una versione nuova, la scarica e la installa quando lo chiudi. Puoi impedirgli di installarla da solo. In quel caso controlla lo stesso, ma non scarica niente e mette nella home una carta «C’è la versione …» con «Installa». Premuto «Installa», la carta mostra lo scaricamento e la versione si installa quando chiudi Filo; «Chiudi» la toglie per quella versione. Chi la spegne resta senza le correzioni di sicurezza delle versioni nuove finché non installa.',
-      invoke: 'Preferenze → Impostazioni avanzate → «Installa gli aggiornamenti da solo» (acceso di serie), oppure chiedendolo a Filo («non aggiornarti da solo»), che chiede conferma.',
+      invoke: 'Preferenze → Impostazioni avanzate → «Installa gli aggiornamenti da solo» (acceso di serie), oppure chiedendolo a Filo («non aggiornarti da solo»), che chiede conferma. La versione nuova si installa anche chiedendola a Filo («aggiornati»), pure dopo aver chiuso la sua carta.',
       doesNot: 'Non ti fa saltare una sola versione né scegliere un canale di prova. Su Mac e su Linux l’installazione può fermarsi da sé: in quel caso un avviso dice dove scaricare la versione nuova a mano. Una copia di Filo avviata dal codice, non installata, non si aggiorna da qui.',
     },
     {

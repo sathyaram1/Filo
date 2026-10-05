@@ -94,6 +94,11 @@ function avviaAggiornatore(aggiornatore, { automatici = true, annuncia = () => {
 function regola(aggiornatore) {
   aggiornatore.autoDownload = stato.automatici;
   aggiornatore.autoInstallOnAppQuit = stato.automatici || stato.chiesto;
+  // electron-updater aggancia l'installazione alla chiusura solo a scaricamento finito: una versione già pronta
+  // quando l'installazione si riaccende (spenta a metà scaricamento, poi «Installa» o riaccesa) va riagganciata.
+  if (aggiornatore.autoInstallOnAppQuit && stato.pronta && typeof aggiornatore.addQuitHandler === 'function') {
+    aggiornatore.addQuitHandler();
+  }
 }
 
 // Una preferenza cambiata a sessione aperta vale subito: chi spegne dopo lo scaricamento dell'avvio non se lo
@@ -111,6 +116,7 @@ function seguiImpostazioni(settings) {
   stato.annuncia();
 }
 
+// La carta e la chat passano di qui: l'esito dice cosa succede alla versione nuova, lo scaricamento non lo aspetta.
 async function installaAggiornamento() {
   if (!stato.aggiornatore) {
     return { ok: false, error: 'Questa copia di Filo non si aggiorna da sé: la versione nuova si scarica da filo.red.' };
@@ -118,15 +124,36 @@ async function installaAggiornamento() {
   stato.chiesto = true;
   stato.errore = null;
   regola(stato.aggiornatore);
-  scarica();
-  return { ok: true };
+  const trovata = await trova();
+  if (trovata) scarica();
+  const versione = stato.pronta || stato.versioneTrovata;
+  if (!trovata) {
+    if (stato.errore) return { ok: true, versione: null, stato: 'errore', errore: stato.errore };
+    // La carta di una versione che il controllo non trova più dice perché «Installa» non parte.
+    stato.errore = 'Adesso non trovo la versione nuova. Riprova fra poco.';
+    stato.annuncia();
+    return { ok: true, versione: null, stato: 'aggiornato' };
+  }
+  return { ok: true, versione, stato: stato.pronta ? 'pronta' : 'scarica' };
+}
+
+// Dopo un riavvio la carta c'è ancora ma il controllo di questa sessione può non essere finito.
+async function trova() {
+  const u = stato.aggiornatore;
+  if (stato.versioneTrovata || stato.pronta) return true;
+  try { await u.checkForUpdates(); } catch (e) {
+    console.error('[updater] controllo update fallito:', e?.message || e);
+    stato.errore = 'Adesso non riesco a controllare se c\'è una versione nuova. Riprova fra poco.';
+    stato.annuncia();
+    return false;
+  }
+  return !!stato.versioneTrovata;
 }
 
 async function scarica() {
   const u = stato.aggiornatore;
   if (!u || stato.scaricamento || stato.pronta) return;
   try {
-    // Dopo un riavvio la carta c'è ancora ma il controllo di questa sessione può non essere finito.
     if (!stato.versioneTrovata) await u.checkForUpdates();
     if (!stato.versioneTrovata) {
       stato.errore = 'Adesso non trovo la versione nuova. Riprova fra poco.';

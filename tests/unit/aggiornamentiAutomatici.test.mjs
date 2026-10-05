@@ -10,6 +10,8 @@ import { dirname, join } from 'node:path';
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const U = require(join(ROOT, 'src', 'main', 'updater.js'));
+// L'aggancio vero di electron-updater all'installazione alla chiusura: la sua regola decide l'esito.
+const { BaseUpdater } = require(join(ROOT, 'node_modules', 'electron-updater', 'out', 'BaseUpdater.js'));
 
 let carte;
 function memoriaFinta() {
@@ -27,15 +29,29 @@ function memoriaFinta() {
 }
 const vive = () => carte.filter((n) => !n.dismissed && n.action?.tipo === U.TIPO_DISPONIBILE);
 
-function aggiornatoreFinto({ versione = '0.3.0', scaricamentoRotto = false } = {}) {
+// `versione: null`: il feed non ha niente di nuovo. `lento`: lo scaricamento finisce quando la prova chiama `finisci()`.
+function aggiornatoreFinto({ versione = '0.3.0', scaricamentoRotto = false, lento = false } = {}) {
   const ascolta = {};
+  const allaChiusura = [];
   const u = {
     autoDownload: true,
     autoInstallOnAppQuit: true,
     scaricamenti: 0,
+    installata: false,
+    quitHandlerAdded: false,
+    quitAndInstallCalled: false,
+    _logger: { info() {} },
+    app: { onQuit: (f) => allaChiusura.push(f) },
+    addQuitHandler: BaseUpdater.prototype.addQuitHandler,
+    install() { u.installata = true; return true; },
+    chiudi() { for (const f of allaChiusura) f(0); },
     on(e, f) { (ascolta[e] ||= []).push(f); return u; },
     emit(e, ...a) { for (const f of ascolta[e] || []) f(...a); },
     async checkForUpdates() {
+      if (!versione) {
+        u.emit('update-not-available', {});
+        return { isUpdateAvailable: false };
+      }
       u.emit('update-available', { version: versione });
       return { updateInfo: { version: versione }, downloadPromise: u.autoDownload ? u.downloadUpdate() : null };
     },
@@ -48,7 +64,10 @@ function aggiornatoreFinto({ versione = '0.3.0', scaricamentoRotto = false } = {
         u.emit('error', e);
         throw e;
       }
+      if (lento) await new Promise((ok) => { u.finisci = ok; });
+      // Come electron-updater: prima l'evento, poi l'aggancio alla chiusura.
       u.emit('update-downloaded', { version: versione });
+      u.addQuitHandler();
       return ['Filo-Setup.exe'];
     },
   };
@@ -104,10 +123,14 @@ test('«Installa» scarica, la carta mostra a che punto è e poi che si installa
   });
   await calma();
   stati = [];
-  assert.deepEqual(await U.installaAggiornamento(), { ok: true });
+  const r = await U.installaAggiornamento();
+  assert.equal(r.ok, true);
+  assert.equal(r.versione, '0.3.0');
   await calma();
   assert.equal(u.scaricamenti, 1);
   assert.equal(u.autoInstallOnAppQuit, true, 'premuto «Installa», alla chiusura non si installerebbe');
+  u.chiudi();
+  assert.equal(u.installata, true, 'premuto «Installa», alla chiusura non si è installata');
   assert.ok(stati.some((s) => s && s.percento === 42), `la carta non ha mai mostrato lo scaricamento: ${JSON.stringify(stati)}`);
   assert.deepEqual(U.conStatoAggiornamento(vive())[0].aggiornamento, { pronta: true });
   // Premere due volte non scarica due volte.
@@ -146,6 +169,70 @@ test('spento a sessione aperta: quello già scaricato non si installa alla chius
   assert.equal(u.autoInstallOnAppQuit, true);
   assert.equal(u.scaricamenti, 1, 'una versione già scaricata non si riscarica');
   assert.deepEqual(U.conStatoAggiornamento(vive())[0].aggiornamento, { pronta: true });
+});
+
+test('spento a metà dello scaricamento dell\'avvio, «Installa» la installa davvero alla chiusura', async () => {
+  const u = aggiornatoreFinto({ lento: true });
+  await avvia(u, true);
+  U.seguiImpostazioni({ aggiornamenti: { automatici: false } });
+  await calma();
+  u.finisci();
+  await calma();
+  assert.deepEqual(U.conStatoAggiornamento(vive())[0].aggiornamento, undefined, 'spenta, la carta chiede ancora «Installa»');
+  await U.installaAggiornamento();
+  await calma();
+  assert.deepEqual(U.conStatoAggiornamento(vive())[0].aggiornamento, { pronta: true });
+  u.chiudi();
+  assert.equal(u.installata, true, 'la carta dice «pronta», ma alla chiusura non si è installata');
+  assert.equal(u.scaricamenti, 1, 'una versione già scaricata non si riscarica');
+});
+
+test('spento a metà dello scaricamento e poi riacceso: si installa alla chiusura', async () => {
+  const u = aggiornatoreFinto({ lento: true });
+  await avvia(u, true);
+  U.seguiImpostazioni({ aggiornamenti: { automatici: false } });
+  await calma();
+  u.finisci();
+  await calma();
+  U.seguiImpostazioni({ aggiornamenti: { automatici: true } });
+  await calma();
+  u.chiudi();
+  assert.equal(u.installata, true);
+});
+
+test('spento a metà dello scaricamento e lasciato spento: alla chiusura non si installa', async () => {
+  const u = aggiornatoreFinto({ lento: true });
+  await avvia(u, true);
+  U.seguiImpostazioni({ aggiornamenti: { automatici: false } });
+  await calma();
+  u.finisci();
+  await calma();
+  u.chiudi();
+  assert.equal(u.installata, false);
+});
+
+test('chiusa la carta, chiedendolo (a Filo) la versione si installa lo stesso', async () => {
+  const u = aggiornatoreFinto();
+  await avvia(u, false);
+  vive()[0].dismissed = true;
+  const r = await U.installaAggiornamento();
+  await calma();
+  assert.equal(r.ok, true);
+  assert.equal(r.versione, '0.3.0');
+  assert.equal(u.scaricamenti, 1);
+  u.chiudi();
+  assert.equal(u.installata, true);
+});
+
+test('chiesto quando non c\'è niente di nuovo, l\'esito lo dice e non scarica niente', async () => {
+  const u = aggiornatoreFinto({ versione: null });
+  await avvia(u, false);
+  const r = await U.installaAggiornamento();
+  await calma();
+  assert.equal(r.ok, true);
+  assert.equal(r.stato, 'aggiornato');
+  assert.equal(r.versione, null);
+  assert.equal(u.scaricamenti, 0);
 });
 
 test('riacceso a sessione aperta: scarica come all\'avvio e si installa alla chiusura', async () => {

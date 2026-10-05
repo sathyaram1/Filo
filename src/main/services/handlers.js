@@ -2537,6 +2537,12 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         if (!r.ok) return { executed: false, kept: false, output: { error: r.motivo, ...(r.id ? { id: r.id } : {}) } };
         return { executed: true, kept: false, output: { annullato: r.id, frase: r.frase, saltati: r.saltati || [] } };
       }
+      case 'INSTALLA_AGGIORNAMENTO': {
+        // #786 — la stessa porta di «Installa» sulla carta della home.
+        const r = await require('../updater').installaAggiornamento();
+        if (!r.ok) return { executed: false, kept: false, output: { error: r.error } };
+        return { executed: true, kept: false, output: { aggiornamento: r.stato, versione: r.versione, ...(r.errore ? { error: r.errore } : {}) } };
+      }
       case 'VOLUME':
       case 'BLUETOOTH':
       case 'WIFI': {

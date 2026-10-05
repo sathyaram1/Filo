@@ -217,3 +217,27 @@ test('«non aggiornarti da solo» in chat: la conferma spiega il rischio, e solo
   // Le Preferenze già aperte seguono il cambio.
   await expect(pref.locator('#aggiornamentiAutomatici')).not.toBeChecked({ timeout: 5_000 });
 });
+
+test('«aggiornati» in chat, anche con la carta chiusa: la versione nuova si scarica e si installerà alla chiusura', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const chat = await homeDi(app);
+  await aggiornatoreFinto(app, { automatici: false });
+  const carta = chat.locator('#accade .dash-carta[data-tipo="avviso"]', { hasText: 'versione 9.9.9' });
+  await expect(carta).toBeVisible({ timeout: 8_000 });
+  await carta.locator('.dash-carta-az.secondaria').click();
+  await expect(carta).toHaveCount(0);
+
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'i1', name: 'INSTALLA_AGGIORNAMENTO', arguments: '{}' }] },
+    { text: 'La scarico: si installa quando chiudi Filo.' },
+  ]);
+  await chat.bringToFront();
+  await chat.locator('#input').fill('installa la versione nuova');
+  await chat.locator('#sendBtn').click();
+  await expect(chat.locator('.dash-bubble-filo', { hasText: 'si installa quando chiudi Filo' })).toBeVisible({ timeout: 10_000 });
+  expect(await finto(app)).toEqual({ scaricamenti: 1, autoDownload: false, autoInstallOnAppQuit: true });
+  // La riga del diario, nella parte compressa «Come ha lavorato», dice la versione.
+  await expect(chat.getByText('Scarico la versione 9.9.9', { exact: false }).first()).toBeAttached({ timeout: 5_000 });
+  expect((await impostazioni(app)).aggiornamenti.automatici, 'installare una versione non riaccende l\'opzione').toBe(false);
+});
