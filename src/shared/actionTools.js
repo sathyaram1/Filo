@@ -346,7 +346,7 @@
         + 'Con valore "predefinito" il token torna al suo valore di serie. Token disponibili:\n' + righeToken(),
       properties: {
         token: S('Il token, dall\'elenco.'),
-        valore: S('Un valore CSS concreto: per i colori un esadecimale #rrggbb (NON nomi come "green"); per il raggio una misura con unità ("8px"); per l\'opacità un numero 0-1 ("0.4"); per il font una lista di famiglie ("Georgia, serif").'),
+        valore: S('Un valore CSS concreto: per i colori un esadecimale #rrggbb (NON nomi come "green"); per il raggio una misura con unità ("8px"); per l\'opacità un numero 0-1 ("0.4"); per una durata i millisecondi ("450ms"); per il font una lista di famiglie ("Georgia, serif").'),
       },
       required: ['token', 'valore'],
     },

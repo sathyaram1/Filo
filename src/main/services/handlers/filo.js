@@ -3,7 +3,7 @@
 
 module.exports = function register(on, ctx) {
   const {
-    MSG, winOf, broadcastLiveUpdate, handleFiloChat, handleFiloGenerateDashboard,
+    MSG, winOf, broadcastLiveUpdate, handleFiloChat, fermaFiloChat, handleFiloGenerateDashboard,
     executeFiloAction, controllaUscita, apriDaFilo, SCHEMI_USCITA, ricordaLettoInChat, maybeRunCompactor, closeAndTriageChat,
     archiviaCongedoAccoglienza,
     saveOnboarding, finishOnboarding, claimOnboardingResume,
@@ -64,6 +64,9 @@ module.exports = function register(on, ctx) {
       fineLavoro();
     }
   }));
+
+  // Il quadrato al posto dell'invio (#578): ferma il turno di questa scheda, non quello di un'altra.
+  on(MSG.FILO_CHAT_STOP, soloFilo(async (msg, sender) => ({ ok: true, fermato: fermaFiloChat(msg && msg.reqId, sender && sender.wc) })));
 
   // L'utente ha confermato dal client (popup livello 2 / "conferma" digitata
   // livello 3) un'azione rimasta in sospeso: la eseguiamo ora. Il livello

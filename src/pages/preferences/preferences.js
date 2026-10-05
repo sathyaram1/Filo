@@ -74,6 +74,7 @@
       case 'color': return 'Colore non valido: usa #rrggbb (o #rgb) oppure rgb(…)/rgba(…).';
       case 'size': return 'Misura non valida: usa un numero con unità, es. 6px, 0.5rem, 50%.';
       case 'opacity': return 'Opacità non valida: un numero fra 0 e 1, es. 0.3.';
+      case 'time': return 'Durata non valida: millisecondi o secondi fino a 10 s, es. 450ms o 0.8s.';
       case 'font': return 'Font non valido: solo nomi di famiglie separati da virgola.';
       default: return 'Valore non valido.';
     }
