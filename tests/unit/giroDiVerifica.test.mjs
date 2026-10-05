@@ -15,7 +15,7 @@ import { execFile, execFileSync } from 'node:child_process';
 import { delimiter, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chmodSync, rmSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -143,7 +143,7 @@ test('la critica parte strutturata, la risposta del server viene stampata intera
     const dopo = JSON.parse(readFileSync(resolve(casa, 'stato', 'fid-901.json'), 'utf8'));
     assert.equal(dopo.verifierVerdict, null, 'torna in verifica sul commit nuovo');
     assert.match(JSON.stringify(dopo), /verifier:consegna/, 'la consegna resta sigillata da chi la manda');
-  } finally { srv.close(); rmSync(casa, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
+  } finally { srv.close(); togliCartella(casa); }
 });
 
 test('la parola del vecchio verdetto è RIFIUTATA (ignorarla faceva promuovere chi voleva bocciare); senza rilievi la risposta "pass" si stampa e lo stato dice verificato', async () => {
@@ -167,7 +167,7 @@ test('la parola del vecchio verdetto è RIFIUTATA (ignorarla faceva promuovere c
     assert.match(r.so, /verifica superata/);
     const stato = JSON.parse(readFileSync(resolve(casa, 'stato', 'fid-901.json'), 'utf8'));
     assert.equal(stato.verifierVerdict, 'pass');
-  } finally { srv.close(); rmSync(casa, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
+  } finally { srv.close(); togliCartella(casa); }
 });
 
 test('#561 giro 4: una critica scritta male è respinta col messaggio del formato, non con quello della guardia d\'identità; il motivo del server arriva a schermo', async () => {
@@ -203,7 +203,7 @@ test('#561 giro 4: una critica scritta male è respinta col messaggio del format
       'Provato ad aprire la pagina, a salvare col titolo vuoto e a trascinare: non ho trovato niente da segnalare.'], ENV(casa, port));
     assert.equal(respinta.code, 4);
     assert.match(respinta.se, /malformed: la critica non corrisponde/, 'la frase del server arriva a chi ha consegnato');
-  } finally { srv.close(); rmSync(casa, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
+  } finally { srv.close(); togliCartella(casa); }
 });
 
 test('#561 giro 6: una critica lunga parte INTERA, coi rilievi in coda oltre i 4000 caratteri, così il server la legge come lo strumento', async () => {
@@ -216,7 +216,7 @@ test('#561 giro 6: una critica lunga parte INTERA, coi rilievi in coda oltre i 4
     const inviato = ricevuti.find((x) => x.url.includes('routineDeliver')).body.data;
     assert.ok(inviato.critique.endsWith('[2i] in fondo\n[0i] raro'), 'il testo arriva intero');
     assert.deepEqual(inviato.findings.map((f) => f.level), [2, 0]);
-  } finally { srv.close(); rmSync(casa, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
+  } finally { srv.close(); togliCartella(casa); }
 });
 
 // #880 (#591): verifica superata, pulizia delle prove dei rilievi diventati feedback sigillata dal rilascio, poi
@@ -273,7 +273,7 @@ test('#880: il riallineamento dopo un pass con pulizia si consegna; una prova ro
     assert.match(r.se, new RegExp(`tolte in ${pulizia.slice(0, 8)} sono la pulizia`));
     assert.doesNotMatch(r.se, /Rilancio/, 'niente da rilanciare: la prova del rilievo diventato feedback è uscita nella pulizia');
     assert.equal(consegne(), 1, 'la consegna arriva al server');
-  } finally { srv.close(); rmSync(casa, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
+  } finally { srv.close(); togliCartella(casa); }
 });
 
 // #880: il rilascio sigilla la punta col ruolo di chi rilascia, e dopo un pass vale come pulizia solo quello del verificatore.
@@ -305,5 +305,5 @@ test('#880: il rilascio firma il punto fermo col ruolo; il commit sigillato da c
     assert.equal(stato().checkpoints.at(-1).by, 'release:fixer');
     const { puliziaDelPass } = await import('../../scripts/lib/prove-tolte.mjs');
     assert.equal(puliziaDelPass(critica, stato().checkpoints, casa), pulizia, 'la base resta la pulizia del verificatore');
-  } finally { srv.close(); rmSync(casa, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
+  } finally { srv.close(); togliCartella(casa); }
 });
