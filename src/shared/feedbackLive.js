@@ -265,9 +265,9 @@
     }
     const motivo = (e) => (e && e.message ? e.message : String(e));
 
-    // Il confine non va mai oltre l'ultima ora del SERVER vista (commit, ora della lettura): col solo orologio del PC,
-    // avanti di tre minuti, il giro non vedeva più niente (#676). Il margine vale anche lì, per chi firma col suo
-    // orologio qualche secondo indietro; non per le righe della lettura completa, la cui ora è già passata.
+    // Il confine non va mai oltre l'ora del SERVER vista, meno il margine (col solo orologio del PC avanti di tre
+    // minuti il giro non vedeva più niente, #676). Di una lettura vale l'ora della PRIMA pagina: le pagine dopo
+    // portano scritture più nuove di quelle che una pagina già passata non ha visto. Le ore dei documenti solo senza.
     let oraServer = 0;
     function oraDi(r) {
       const t = Date.parse(r && r._updateTime);
@@ -275,10 +275,10 @@
       const u = Date.parse(r && r.updatedAt);
       return Number.isFinite(u) ? u : 0;
     }
-    function vedi(righe, readTime, margine = overlapMs) {
-      for (const r of Array.isArray(righe) ? righe : []) oraServer = Math.max(oraServer, oraDi(r) - margine);
+    function vedi(righe, readTime) {
       const rt = Date.parse(readTime);
-      if (Number.isFinite(rt)) oraServer = Math.max(oraServer, rt - margine);
+      if (Number.isFinite(rt)) { oraServer = Math.max(oraServer, rt - overlapMs); return; }
+      for (const r of Array.isArray(righe) ? righe : []) oraServer = Math.max(oraServer, oraDi(r) - overlapMs);
     }
 
     function since() {
