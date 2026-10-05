@@ -57,17 +57,20 @@ test('livello 2 (mkdir) non esegue senza conferma; la conferma crea la cartella'
   const dir = path.join(tempCanonico(), `filo-cmd-${Date.now()}`);
   const action = { type: 'ESEGUI_COMANDO', comando: `mkdir "${dir}"` };
 
-  // Senza conferma: livello 2, non esegue, la cartella non esiste.
-  const r = await execAction(app, action);
-  expect(r.executed).toBe(false);
-  expect(r.needsConfirm).toBe(2);
-  expect(fs.existsSync(dir)).toBe(false);
+  try {
+    // Senza conferma: livello 2, non esegue, la cartella non esiste.
+    const r = await execAction(app, action);
+    expect(r.executed).toBe(false);
+    expect(r.needsConfirm).toBe(2);
+    expect(fs.existsSync(dir)).toBe(false);
 
-  // Con la conferma dell'utente: esegue davvero.
-  const c = await confirmAction(page, action);
-  expect(c.executed).toBe(true);
-  expect(fs.existsSync(dir)).toBe(true);
-  try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+    // Con la conferma dell'utente: esegue davvero.
+    const c = await confirmAction(page, action);
+    expect(c.executed).toBe(true);
+    expect(fs.existsSync(dir)).toBe(true);
+  } finally {
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+  }
 });
 
 test('git push è livello 2 (popup), ma senza conferma non parte', async ({ app, openTab }) => {
