@@ -1658,8 +1658,10 @@
         // senza conversazione, e su una conversazione mai letta un salvataggio
         // scrive al posto del report: chi scrive deve saperlo.
         if (!pieno) { const { _proiezione, _dettaglioVecchio, ...resto } = f; return { ...resto, _dettaglioMancato: 'sparito' }; }
-        // `_dettaglioVecchio`: la riga riletta dal giro su un documento intero; adesso il documento è di nuovo questo.
         const { _proiezione, _dettaglioVecchio, ...resto } = f;
+        // Della riga vale quello che sa un elenco; i campi del dettaglio sono la copia di prima del giro, e sopra il
+        // documento appena letto cancellerebbero proprio il turno nuovo. Stessa regola della Gestione.
+        for (const campo of (SN_FEEDBACK.CAMPI_DETTAGLIO || [])) delete resto[campo];
         // `pieno` porta con sé il marchio della proiezione quando abbiamo
         // chiesto i soli allegati: toglierlo qui, o la riga resterebbe per
         // sempre «da completare» e la pagina la richiederebbe a ogni disegno.
