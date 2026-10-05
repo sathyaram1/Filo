@@ -104,13 +104,12 @@ window.__lettura = __leggi(window).then(function (r) { r.guardia = window.__filo
 </script><p>riquadro</p>`;
 
 async function letturaDelRiquadro(page, nome) {
-  const h = await page.waitForFunction((n) => {
-    const f = document.getElementById(n);
-    try { return !!(f && f.contentWindow.__lettura); } catch (_) { return true; }
-  }, nome, { timeout: 8_000 });
-  await h.dispose();
-  const frame = page.frames().find((fr) => fr.name() === nome);
-  expect(frame, `riquadro ${nome}`).toBeTruthy();
+  let frame = null;
+  await expect.poll(() => {
+    frame = page.frames().find((fr) => fr.name() === nome && /lettore/.test(fr.url() + ' ') !== null);
+    return !!frame;
+  }, { timeout: 8_000 }).toBe(true);
+  await frame.waitForFunction(() => !!window.__lettura, null, { timeout: 8_000 });
   return frame.evaluate(() => window.__lettura);
 }
 
