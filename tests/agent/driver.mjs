@@ -269,7 +269,7 @@ export async function captureCompositeElectron(app, outPath) {
       const img = await conTetto(s.wc.capturePage().catch(() => null), 5000, null);
       if (!img || img.isEmpty()) { saltate.push(s.wc.getURL()); continue; }
       const k = Math.max(...(img.getScaleFactors?.() || [1]));
-      immagini.push({ ...s, k, size: img.getSize(k), bmp: img.toBitmap({ scaleFactor: k }) });
+      immagini.push({ ...s, size: img.getSize(k), bmp: img.toBitmap({ scaleFactor: k }) });
     }
     if (!immagini.length || immagini[0].wc !== win.webContents) {
       throw new Error('captureCompositeElectron: la shell non si lascia fotografare');
