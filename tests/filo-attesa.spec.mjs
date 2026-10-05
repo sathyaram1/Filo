@@ -19,6 +19,7 @@
 //  (K) fermato mentre Filo prepara ancora la richiesta, il modello non parte e nessuna azione con lui;
 //  (L) fermato durante un'azione lenta, la chat torna subito libera: il seguito e «riprendi» partono a azione finita
 //      e ne conoscono l'esito, che resta nel blocco fermato.
+//  (M) nell'accoglienza un turno fermato non riparte da solo in un'altra scheda o ricaricando, e «riprendi» c'è anche lì.
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -661,5 +662,49 @@ test('L2 — «riprendi» premuto mentre l\'azione fermata è ancora in volo non
   const ultimi = await app.evaluate(() => globalThis.__messaggi[1]);
   const testo = ultimi.map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n');
   expect(testo).toContain('ERANO GIÀ STATE FATTE');
+  await ripristina(app);
+});
+
+test('M — accoglienza fermata: una scheda nuova o la pagina ricaricata non rifà il turno, e «riprendi» c\'è anche lì', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await configureModel(app);
+  await copione(app, [
+    { pensa: ['Penso a lungo a come presentarmi. ', 'Ancora. ', 'Ancora. ', 'Ancora. ', 'Ancora. ', 'Ancora. '], ogni: 900, testo: 'Mai.' },
+    { pensa: ['Riprendo. '], ogni: 200, testo: 'Piacere Luca, ripreso apposta.' },
+  ]);
+  // Profilo nuovo: la prima conversazione è l'accoglienza.
+  await page.reload();
+  await expect(page.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 15_000 });
+  await expect(page.locator('#input')).toBeVisible();
+  await page.locator('#input').fill('mi chiamo Luca');
+  await page.locator('#input').press('Enter');
+  await expect(page.locator('.dash-activity-trama').last()).toContainText('lungo', { timeout: 6_000 });
+  await page.locator('#stopBtn').click();
+  await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi', { timeout: 3_000 });
+
+  await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/'));
+  await expect.poll(() => app.windows().filter((w) => w.url().startsWith('filo://newtab')).length, { timeout: 10_000 }).toBe(2);
+  const nuova = app.windows().find((w) => w.url().startsWith('filo://newtab') && w !== page);
+  await expect(nuova.locator('.dash-bubble-fermato')).toHaveText('Fermato prima della risposta.', { timeout: 8_000 });
+  await expect(nuova.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi');
+  await page.waitForTimeout(2_000);
+  expect(await app.evaluate(() => globalThis.__messaggi.length)).toBe(1);
+  await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi');
+
+  await page.reload();
+  await expect(page.locator('.dash-bubble-fermato')).toHaveText('Fermato prima della risposta.', { timeout: 15_000 });
+  await page.waitForTimeout(1_500);
+  expect(await app.evaluate(() => globalThis.__messaggi.length)).toBe(1);
+  // Riprendere resta la scelta dell'utente, e funziona anche dopo il ricaricamento.
+  await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'ripreso apposta' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('.dash-bubble-fermato')).toHaveCount(0);
+  expect(await app.evaluate(() => globalThis.__messaggi.length)).toBe(2);
+  // L'altra scheda si riallinea: la risposta c'è, e il tasto non offre più di riprendere.
+  await expect(nuova.locator('.dash-bubble-filo', { hasText: 'ripreso apposta' })).toBeVisible({ timeout: 8_000 });
+  await expect(nuova.locator('#sendBtn')).toHaveAttribute('aria-label', 'Invia');
   await ripristina(app);
 });

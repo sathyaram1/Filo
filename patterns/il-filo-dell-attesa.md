@@ -81,6 +81,12 @@ filo, i nodi, il gomitolo e i titoli); cosa succede lo decide il blocco
   azioni fatte (`interrotto`, `fermato`), il modello le vede come già fatte e
   riparte con un turno interno. Rimandare una mail già mandata è un danno, non
   uno spreco.
+- **Lo stop resta scritto dove si decide di riprendere.** Ogni meccanismo che
+  ricostruisce il lavoro in sospeso deve sapere che è stato fermato, o lo rifà
+  da solo. L'accoglienza riparte da sé quando trova in fondo un messaggio
+  dell'utente senza risposta: lo stop si segna nel suo stato (`fermato`), una
+  scheda nuova o la pagina ricaricata mostrano «fermato» e «riprendi» invece di
+  ripartire, e il segno cade con «riprendi» o con un messaggio nuovo (prova M).
 - **Il secondo colpo non riprende.** Chi ferma insiste (doppio clic, Invio due
   volte o tenuto): per un attimo dopo lo stop il posto resta un quadrato spento
   e Invio a vuoto non riprende; la ripetizione del tasto non conta mai. Il
