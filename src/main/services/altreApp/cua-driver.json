@@ -1,0 +1,50 @@
+{
+  "nome": "Cua Driver",
+  "versione": "0.33.4",
+  "licenza": "MIT",
+  "fonte": "https://github.com/trycua/cua/tree/main/libs/cua-driver",
+  "pacchetti": {
+    "win32-x64": {
+      "url": "https://github.com/trycua/cua/releases/download/cua-driver-rs-v0.33.4/cua-driver-rs-0.33.4-windows-x86_64.zip",
+      "sha256": "e8be645de41d53d46c56b5baea67bd22b374703c7c9ef50a5bd3134ecc2d97d8",
+      "byte": 31015690,
+      "cartella": "cua-driver-rs-0.33.4-windows-x86_64",
+      "eseguibile": "cua-driver.exe"
+    },
+    "win32-arm64": {
+      "url": "https://github.com/trycua/cua/releases/download/cua-driver-rs-v0.33.4/cua-driver-rs-0.33.4-windows-arm64.zip",
+      "sha256": "8c459fb1f3508c3256c62c09b2cc2d5be000431ed7b4e386d151127bd186cbd7",
+      "byte": 29166542,
+      "cartella": "cua-driver-rs-0.33.4-windows-arm64",
+      "eseguibile": "cua-driver.exe"
+    },
+    "darwin-arm64": {
+      "url": "https://github.com/trycua/cua/releases/download/cua-driver-rs-v0.33.4/cua-driver-rs-0.33.4-darwin-universal.tar.gz",
+      "sha256": "bf90ac5db76f44baff47e256cb7355959be3e8df3706b9d178505720f02d74c1",
+      "byte": 75198002,
+      "cartella": "cua-driver-rs-0.33.4-darwin-universal",
+      "eseguibile": "cua-driver"
+    },
+    "darwin-x64": {
+      "url": "https://github.com/trycua/cua/releases/download/cua-driver-rs-v0.33.4/cua-driver-rs-0.33.4-darwin-universal.tar.gz",
+      "sha256": "bf90ac5db76f44baff47e256cb7355959be3e8df3706b9d178505720f02d74c1",
+      "byte": 75198002,
+      "cartella": "cua-driver-rs-0.33.4-darwin-universal",
+      "eseguibile": "cua-driver"
+    },
+    "linux-x64": {
+      "url": "https://github.com/trycua/cua/releases/download/cua-driver-rs-v0.33.4/cua-driver-rs-0.33.4-linux-x86_64.tar.gz",
+      "sha256": "a4759cc41c00691a345f08abfc28ece79aef41447d27a463ddd8662939fa3378",
+      "byte": 34520874,
+      "cartella": "cua-driver-rs-0.33.4-linux-x86_64",
+      "eseguibile": "cua-driver"
+    },
+    "linux-arm64": {
+      "url": "https://github.com/trycua/cua/releases/download/cua-driver-rs-v0.33.4/cua-driver-rs-0.33.4-linux-arm64.tar.gz",
+      "sha256": "63a1e858a1a407c44ceb407ad133909b8cddedd713aea3b56d7ccb6db784eb48",
+      "byte": 34346075,
+      "cartella": "cua-driver-rs-0.33.4-linux-arm64",
+      "eseguibile": "cua-driver"
+    }
+  }
+}
