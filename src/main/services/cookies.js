@@ -443,7 +443,10 @@ function configureFromSettings(settings) {
 }
 
 // Chiusa l'ultima finestra incognito: la prossima riparte dalle impostazioni del profilo normale.
-function resetIncognito() { _incognito = null; }
+function resetIncognito() {
+  _incognito = null;
+  for (const [k, v] of altreSessioni) if (v.incognito) altreSessioni.delete(k);
+}
 
 function profile(incognito) { return (incognito && _incognito) || _cached; }
 
