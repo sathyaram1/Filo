@@ -952,9 +952,9 @@ test('(T) selezionare un testo e aprire subito il menu: la riga del ripiego sta 
   expect(await avvisi()).not.toContain('crediti di Filo');
 });
 
-// Vale come detta solo la riga a schermo: un riquadro chiuso prima della risposta la scrive dove
-// nessuno la vede, e allora la frase la dice l'avviso.
-test('(U) «spiega» e il riquadro di modifica chiusi prima della risposta pagata coi crediti di Filo: un avviso lo dice', async ({ app, shell, openTab, testServer }) => {
+// Vale come detta solo la riga rimasta a schermo: un riquadro chiuso prima della risposta, o appena
+// arriva, la scrive dove nessuno la legge, e allora la frase la dice l'avviso.
+test('(U) «spiega» e il riquadro di modifica chiusi prima della risposta pagata coi crediti di Filo, o appena arriva: un avviso lo dice', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(150_000);
   ownKeyStatus = 402;
   personalDelayMs = 3000;
@@ -1004,5 +1004,23 @@ test('(U) «spiega» e il riquadro di modifica chiusi prima della risposta pagat
   await allaPersonale(prima);
   await page.keyboard.press('Escape');
   await expect(box).toHaveCount(0);
+  await expect.poll(avvisi, { timeout: 30_000 }).toContain(RIGA);
+
+  // «spiega» chiuso appena compare la risposta: la riga è stata a schermo un istante, non letta.
+  await app.evaluate(async () => { await globalThis.SN_WALLET_MAIN.ownKeyChanged(); });
+  await page.evaluate(() => { window.__toasts = []; });
+  personalDelayMs = 0;
+  await page.evaluate(() => {
+    const r = document.createRange();
+    r.selectNodeContents(document.querySelector('#t'));
+    const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  });
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    globalThis.__filoShortcuts.dispatch('explain-selection', win);
+  });
+  await expect(popup.locator('.sn-key-fallback')).toHaveText(RIGA, { timeout: 30_000 });
+  await popup.locator('.sn-popup-close').click();
+  await expect(popup).toHaveCount(0);
   await expect.poll(avvisi, { timeout: 30_000 }).toContain(RIGA);
 });
