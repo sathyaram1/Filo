@@ -1040,11 +1040,7 @@
     host.hidden = list.length === 0;
     if (!list.length) return 0;
     host.appendChild(el('p', 'sn-mac-recent-title', 'Fuse senza chiedere'));
-    var intro = el('p', 'sn-mac-preapproved-intro',
-      'Lavori fermati dai controlli e fusi lo stesso. Quelli delle automazioni avevano sulla pratica il tuo «fondi senza chiedermelo»; '
-      + 'quelli locali venivano da una pratica tua con la prova del mittente, o da un feedback che hai approvato come lavoro locale. '
-      + 'Qui c’è tutto quello che era stato segnalato.');
-    host.appendChild(intro);
+    host.appendChild(el('p', 'sn-mac-preapproved-intro', preapprovedIntro(list)));
     var ul = el('ul', 'sn-mac-preapproved');
     for (var i = 0; i < list.length; i++) {
       var r = list[i];
