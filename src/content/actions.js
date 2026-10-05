@@ -452,10 +452,19 @@
       res = await chrome.runtime.sendMessage({
         type: MSG.AI_REQUEST,
         action: ACTIONS.DESCRIBE_IMAGE,
-        payload: { dataUrl },
+        payload: { dataUrl, automatica: true },
       });
     } catch (e) {
       res = { ok: false, error: e.message || String(e) };
+    }
+    // Da una pagina delicata l'immagine non va al modello: lo screenshot prende data e ora (#1004).
+    if (res?.code === 'PAGINA_DELICATA') {
+      chrome.runtime.sendMessage({
+        type: MSG.UPDATE_CLIPBOARD_DESCRIPTION,
+        dataUrl,
+        description: I18n.t('clipboard_image_delicata'),
+      }).catch(() => {});
+      return null;
     }
     if (!res?.ok) {
       if (res?.code === 'NO_MODEL_FOR_ACTION' && res.error) {
