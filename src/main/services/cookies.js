@@ -404,10 +404,25 @@ function inUso(partition, ses) {
   return false;
 }
 
+// Un sito tolto dai fidati con le schede aperte le vede passare nel jar effimero (tabs/tabRestaConnesso.js): finché
+// quelle restano, il sito è ancora aperto e il jar persistente aspetta, così rimetterlo fra i fidati non perde niente.
+function sitoAperto(partition, ses) {
+  if (inUso(partition, ses)) return true;
+  if (!partition.startsWith('persist:')) return false;
+  const site = sitoDelJar.get(partition);
+  const effimera = site ? partitionForSite(site, false) : null;
+  const eff = effimera && siteSessions.get(effimera);
+  return !!eff && inUso(effimera, eff);
+}
+
 function controllaUscita(partition) {
   if (!daButtare(partition)) return;
   const ses = siteSessions.get(partition);
-  if (ses && !inUso(partition, ses)) buttaJar(partition, ses);
+  if (ses && !sitoAperto(partition, ses)) buttaJar(partition, ses);
+  if (partition.startsWith('persist:')) return;
+  const site = sitoDelJar.get(partition.split('~')[0]);
+  const persistente = site ? 'persist:' + baseDelSito(site) : null;
+  if (persistente && fidatiDaButtare.has(persistente)) controllaUscita(persistente);
 }
 
 // Il sito non è più un'eccezione: quello che aveva salvato se ne va come per gli altri siti, ma mai mentre
@@ -426,7 +441,7 @@ function dimenticaFidato(site) {
       if (!wc.isDestroyed() && wc.session === ses) wc.once('destroyed', () => armaUscita(partition));
     }
   } catch (_) {}
-  if (inUso(partition, ses)) return;
+  if (sitoAperto(partition, ses)) return;
   buttaJar(partition, ses);
 }
 
@@ -448,7 +463,8 @@ function spazzaFidatiOrfani(trusted) {
     const partition = 'persist:' + nome;
     try {
       const ses = siteSessions.get(partition) || session.fromPartition(partition);
-      if (inUso(partition, ses)) continue;   // la scheda è ancora aperta: aspetta che la chiuda
+      sitoDelJar.set(partition, nome.slice('filo-priv-'.length));
+      if (sitoAperto(partition, ses)) continue;   // la scheda è ancora aperta: aspetta che la chiuda
       siteSessions.set(partition, ses);
       fidatiDaButtare.add(partition);
       buttaJar(partition, ses);

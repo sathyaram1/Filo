@@ -59,9 +59,8 @@ function onTrustChange(sito, fidato) {
 }
 Cookies.setTrustChangeHandler(onTrustChange);
 
-// Il sito diventa fidato: l'accesso fatto nel jar effimero (anche a scheda appena chiusa) passa in quello
-// persistente. Esce dai fidati: le schede aperte portano l'accesso nel jar effimero, che si butta all'uscita dal
-// sito; quello persistente lo svuota services/cookies.js (dimenticaFidato) quando nessuna scheda lo usa più.
+// Fidato: l'accesso del jar effimero (anche a scheda appena chiusa) passa nel persistente. Tolto: le schede aperte
+// lo portano nel jar effimero; il persistente si svuota all'uscita dal sito (services/cookies.js, dimenticaFidato).
 async function spostaAccesso(sito, fidato) {
   const managers = managersNormali();
   if (Cookies.currentMode(false) === Cookies.MODES.PRIVACY) {

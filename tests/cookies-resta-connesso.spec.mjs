@@ -105,6 +105,19 @@ async function pagina(app, prefisso, { timeout = 15_000 } = {}) {
   throw new Error(`nessuna scheda su ${prefisso}`);
 }
 
+async function chiudiScheda(app, shell, prefisso) {
+  const { tabs } = await shell.evaluate(() => window.filoShell.tabs.snapshot());
+  const scheda = tabs.find((t) => String(t.url).startsWith(prefisso));
+  await shell.evaluate((id) => window.filoShell.tabs.close(id), scheda.id);
+  await expect.poll(() => partizioneDi(app, prefisso)).toBe(undefined);
+}
+
+// Un clic su un link del sito dopo il cambio: la scheda non deve uscire dal sito (#756.2).
+async function cliccaNelSito(app, prefisso) {
+  await (await pagina(app, prefisso)).evaluate(() => { location.href = '/home?dopo=' + Date.now(); });
+  await dentro(app, `${prefisso}/home?dopo=`);
+}
+
 async function accedi(page, password = 'giusta') {
   await page.locator('#pw').fill(password);
   await page.locator('#entra').click();
@@ -354,7 +367,7 @@ async function scegliNelMenu(app, shell, label, finito) {
   }, { timeout: 25_000, intervals: [200, 400, 800, 1200] }).toBe(true);
 }
 
-test('tasto destro sulla scheda: «Resta connesso qui» porta l\'accesso nel posto che resta, «Non restare connesso» lo lascia fino alla chiusura e svuota il disco', async ({ app, shell, avvisi }) => {
+test('tasto destro sulla scheda: «Resta connesso qui» porta l\'accesso nel posto che resta, «Non restare connesso» lo lascia finché il sito è aperto, poi svuota il disco', async ({ app, shell, avvisi }) => {
   test.setTimeout(120_000);
   const sito = await sitoConAccesso();
   try {
@@ -384,15 +397,24 @@ test('tasto destro sulla scheda: «Resta connesso qui» porta l\'accesso nel pos
     await dentro(app, `${sito.a}/home`);
     expect(await cookieNelJar(app, 'persist:filo-priv-127.0.0.1')).toContain('sid');
     await expect(vista.locator('.shell-notif.show', { hasText: 'Resti connesso a 127.0.0.1' })).toBeVisible({ timeout: 10_000 });
+    await cliccaNelSito(app, sito.a);
 
     await scegliNelMenu(app, shell, 'Non restare connesso', async () => (await fidati(app)).length === 0);
     await expect.poll(() => partizioneDi(app, `${sito.a}/`)).toMatch(/^filo-priv-127\.0\.0\.1(~\d+)?$/);
-    // Fino alla chiusura l'utente resta dentro; sul disco non resta niente.
-    await dentro(app, `${sito.a}/home`);
-    await expect.poll(() => cookieNelJar(app, 'persist:filo-priv-127.0.0.1')).toEqual([]);
     await expect(vista.locator('.shell-notif.show', { hasText: 'l\'accesso finisce qualche minuto dopo' })).toBeVisible({ timeout: 10_000 });
-    const { tabs } = await shell.evaluate(() => window.filoShell.tabs.snapshot());
-    expect(tabs.find((t) => String(t.url).startsWith(sito.a)).connesso).toEqual({ sito: '127.0.0.1', fidato: false });
+    let snap = await shell.evaluate(() => window.filoShell.tabs.snapshot());
+    expect(snap.tabs.find((t) => String(t.url).startsWith(sito.a)).connesso).toEqual({ sito: '127.0.0.1', fidato: false });
+    // Finché il sito è aperto l'utente resta dentro, anche cliccando; chiuso, sul disco non resta niente.
+    await dentro(app, `${sito.a}/home`);
+    await cliccaNelSito(app, sito.a);
+    await sleep(1500);
+    expect(await cookieNelJar(app, 'persist:filo-priv-127.0.0.1')).toContain('sid');
+    await chiudiScheda(app, shell, sito.a);
+    await expect.poll(() => cookieNelJar(app, 'persist:filo-priv-127.0.0.1'), { timeout: 10_000 }).toEqual([]);
+    const riaperta = await apri(app, shell, `${sito.a}/home`);
+    await expect(riaperta.locator('#pw')).toBeVisible();
+    snap = await shell.evaluate(() => window.filoShell.tabs.snapshot());
+    expect(snap.tabs.find((t) => String(t.url).startsWith(sito.a)).connesso).toEqual({ sito: '127.0.0.1', fidato: false });
   } finally {
     await sito.chiudi();
   }
@@ -431,9 +453,10 @@ test('in chat «resta connesso su» aggiunge il sito con la conferma, e «togli 
     const c2 = await home.evaluate((a) => chrome.runtime.sendMessage({ type: 'filo_confirm_action', action: a }), togli);
     expect(c2.executed).toBe(true);
     await expect.poll(() => fidati(app)).toEqual([]);
-    await expect.poll(() => cookieNelJar(app, `persist:filo-priv-${nome}`)).toEqual([]);
     await expect.poll(() => partizioneDi(app, `${base}/`)).toMatch(/^filo-priv-sito-pubblico\.test(~\d+)?$/);
     await dentro(app, `${base}/home`);
+    await chiudiScheda(app, shell, base);
+    await expect.poll(() => cookieNelJar(app, `persist:filo-priv-${nome}`), { timeout: 10_000 }).toEqual([]);
   } finally {
     await sito.chiudi();
   }
