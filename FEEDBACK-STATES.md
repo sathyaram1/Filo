@@ -469,7 +469,7 @@ dashboard scriveva "in attesa di ripresa". Adesso:
 
 ### 7b. Repo Filo (consumer)
 - **`src/shared/feedbackTransitions.js`** (IIFE `SN_FB_TRANSITIONS`): le tabelle come
-  DATI — `STATUSES`, `TRANSITIONS`, `PUBLIC_MAP`. Fonte unica: la dashboard le legge, il
+  DATI (`STATUSES`, `TRANSITIONS`, `PUBLIC_MAP`). Fonte unica: la dashboard le legge, il
   server le incorpora al deploy (`filo-security/functions/tools/bake-shared.js`), quindi
   una riga cambiata vale per il server solo dopo il rideploy delle functions.
 - **`src/shared/feedbackStatus.js`** (IIFE `SN_FB_STATUS`): presentazione (colori,
