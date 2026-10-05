@@ -2098,7 +2098,6 @@ for (const larghezza of [1280, 960]) {
         return { sinistraRiga: riga.left, destraRiga: riga.right, destraScatola: scatola.getBoundingClientRect().right, tasti, infoLarga: vis(info) ? info.getBoundingClientRect().width : null };
       });
       expect(m.tasti.length).toBeGreaterThanOrEqual(5);
-      if (process.env.DBG1034) { console.log('DBG', JSON.stringify(m)); await page.locator('#mgOwnerBar').screenshot({ path: `tests/.shots/1034-dbg-${larghezza}-${tab}-${fb._id}.png` }); }
       expect(m.destraScatola).toBeLessThanOrEqual(m.destraRiga + 1);
       for (const t of m.tasti) {
         expect(Math.abs(t.centro - m.tasti[0].centro), t.id).toBeLessThan(6);
@@ -2110,6 +2109,38 @@ for (const larghezza of [1280, 960]) {
     });
   }
 }
+
+test('#1034 — riga stretta: la rotella la fa scorrere fino all’ultimo tasto', async ({ openTab, app }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
+  await app.evaluate(({ BrowserWindow }) => { const win = BrowserWindow.getAllWindows()[0]; win.setSize(960, win.getSize()[1]); });
+  await page.waitForFunction(() => Math.abs(window.outerWidth - 960) < 40);
+  await page.evaluate(() => {
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => (msg && msg.type === 'feedback_update') ? { ok: true, by: 'owner@esempio' } : orig(msg);
+  });
+  const fb = RIGA_CASI[2][2];
+  await page.evaluate((f) => {
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData([f]);
+    window.__mgTest.setTab('inbox');
+    window.__mgTest.openDetail(f._id);
+  }, fb);
+  const ultimo = page.locator('#mgPreapproveBtn');
+  await expect(ultimo).toBeVisible();
+  const dentro = () => page.evaluate(() => {
+    const s = document.querySelector('#mgOwnerBar .mg-owner-tasti').getBoundingClientRect();
+    const b = document.getElementById('mgPreapproveBtn').getBoundingClientRect();
+    return b.right <= s.right + 2;
+  });
+  expect(await dentro()).toBe(false);
+  await page.locator('#mgOwnerBar .mg-owner-tasti').hover();
+  await page.mouse.wheel(0, 600);
+  await expect.poll(dentro).toBe(true);
+  await ultimo.click();
+  await expect(ultimo).toHaveAttribute('aria-pressed', 'true');
+});
 
 // ── Priorità visibile + modificabile dalla coda ─────────────────────────────
 // I feedback "In coda" mostrano i pallini priorità; per l'owner il click li

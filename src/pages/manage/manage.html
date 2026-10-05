@@ -1012,9 +1012,8 @@
        barra. `[hidden]` va riaffermato o `display:flex` se lo mangia. */
     .mg-actions-group { display: flex; align-items: center; min-width: 0; }
     .mg-actions-group[hidden] { display: none; }
-    /* I tasti dell'owner stanno su UNA riga a ogni larghezza (#1034): andando a capo spezzavano i gruppi e spingevano
-       giù la conversazione. Se non entrano cedono gli spazi, poi la riga scorre di lato: nessun tasto sparisce né perde il
-       nome (accorciati coi puntini erano illeggibili tutti insieme). Chi ha messo il segno resta fuori e va sotto da solo. */
+    /* Tasti dell'owner su UNA riga a ogni larghezza (#1034): se non entrano cedono gli spazi, poi la riga scorre di lato
+       e nessun tasto sparisce o perde il nome. Chi ha messo il segno resta fuori e va sotto da solo. */
     .mg-owner { container-type: inline-size; }
     .mg-owner-tasti {
       --mg-tasti-gap: 10px; --mg-tasti-pad: 12px;
