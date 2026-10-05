@@ -64,11 +64,11 @@ test('fra le fuse senza chiedere, l’introduzione nomina solo i segni che l’e
 
   const soloSi = UI.preapprovedIntro([daSiRiga, daSiRiga]);
   assert.ok(!soloSi.includes('fondi senza chiedermelo'), soloSi);
-  assert.match(soloSi, /solo blocchi che avevi già approvato, con un sì a una richiesta precedente/);
+  assert.match(soloSi, /fusi lo stesso\. Avevano solo blocchi che avevi già approvato, con un sì a una richiesta precedente/);
   assert.ok(!soloSi.includes('lavoro locale'), soloSi);
 
   const soloMano = UI.preapprovedIntro([aManoRiga]);
-  assert.match(soloMano, /sulla pratica avevi messo «fondi senza chiedermelo»/);
+  assert.match(soloMano, /fusi lo stesso\. Sulla pratica avevi messo «fondi senza chiedermelo»\./);
   assert.ok(!soloMano.includes('già approvat'), soloMano);
 
   const misto = UI.preapprovedIntro([daSiRiga, locale, aManoRiga]);

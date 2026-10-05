@@ -235,7 +235,7 @@ test('Automazioni: una fusa col segno di un sì non dice «fondi senza chiederme
   const box = page.locator('#mgMergeApprovalsPreapproved');
   await expect(box).toBeVisible({ timeout: 8_000 });
   const intro = box.locator('.sn-mac-preapproved-intro');
-  await expect(intro).toContainText('solo blocchi che avevi già approvato, con un sì a una richiesta precedente');
+  await expect(intro).toContainText('Avevano solo blocchi che avevi già approvato, con un sì a una richiesta precedente');
   await expect(intro).not.toContainText('fondi senza chiedermelo');
   const who = box.locator('.sn-mac-recent-who');
   await expect(who).toContainText('pre-approvata dal tuo sì alla richiesta del');
