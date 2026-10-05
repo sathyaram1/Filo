@@ -47,6 +47,8 @@ async function aggiornatoreFinto(app, { automatici, versione = '9.9.9' }) {
       },
     };
     globalThis.__aggFinto = u;
+    // Come all'avvio vero, l'aggiornatore parte dalla preferenza salvata: un cambio di tema non la ribalta.
+    await globalThis.SN_STORAGE.updateSettings({ aggiornamenti: { automatici: auto } });
     await globalThis.__filoUpdater.avviaAggiornatore(u, {
       automatici: auto, annuncia: () => globalThis.__filoHandlers.broadcastLiveUpdate(),
     });
