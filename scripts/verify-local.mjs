@@ -38,7 +38,8 @@
 //   node scripts/verify-local.mjs pulizia
 //     Lo lancia chi ha registrato una critica che manda a correggere e mette
 //     rilievi da parte, SUBITO dopo: registra il commit che toglie SOLO le
-//     loro prove del giro. Da lì la consegna blocca ogni prova tolta rossa.
+//     loro prove del giro, se nessun caso rosso si è spento. Da lì la consegna
+//     blocca ogni prova tolta rossa.
 //
 //   node scripts/verify-local.mjs corretto "<report della correzione>"
 //     Lo lancia chi ha corretto: chiude il giro e chiede un'altra verifica
@@ -711,7 +712,8 @@ export function codaText({ findings, derived, external, budgets, branch, instruc
       'che toglie SOLO quelle, e registra la pulizia:',
       '  git add -A && git commit -m "pulizia del giro"',
       '  node scripts/verify-local.mjs pulizia',
-      'Una prova che copre anche un caso ancora aperto non si cancella: le si toglie il caso che se ne va.',
+      'Una prova che copre anche un caso ancora aperto non si cancella: le si toglie il caso che se ne va, e quello aperto',
+      'resta rosso (la registrazione la rilancia, e anche quelle che usano un aiuto a cui hai tolto righe).',
     ] : []),
     'Chi corregge toglie da quella cartella solo le prove dei rilievi corretti, verdi, nel commit della prova durevole che',
     'li tiene chiusi (se non ne scrive una, la prova del giro resta). Una prova del giro ancora rossa non si toglie e non si',
@@ -1273,7 +1275,7 @@ if (isMain) {
     writeState(r.state);
     console.log(`Pulizia registrata su ${sha.slice(0, 8)}: ${r.files.length === 1 ? 'tolta 1 prova' : `tolte ${r.files.length} prove`} dei rilievi messi da parte.`);
     console.log(r.files.map((f) => `  · ${f}`).join('\n'));
-    console.log('Da qui parte il confronto della consegna: ogni prova del giro tolta o cambiata dopo, se com\'era è ancora rossa, la ferma.');
+    console.log('Da qui parte il confronto della consegna: ogni prova del giro tolta o cambiata dopo, o che usa un file di supporto cambiato, se com\'era è ancora rossa, la ferma.');
     process.exit(0);
   }
 
