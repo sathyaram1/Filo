@@ -106,7 +106,7 @@ window.__lettura = __leggi(window).then(function (r) { r.guardia = window.__filo
 async function letturaDelRiquadro(page, nome) {
   let frame = null;
   await expect.poll(() => {
-    frame = page.frames().find((fr) => fr.name() === nome && /lettore/.test(fr.url() + ' ') !== null);
+    frame = page.frames().find((fr) => fr.name() === nome);
     return !!frame;
   }, { timeout: 8_000 }).toBe(true);
   await frame.waitForFunction(() => !!window.__lettura, null, { timeout: 8_000 });
