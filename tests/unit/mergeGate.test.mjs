@@ -11,7 +11,7 @@
 //      contratto — biglietto + branch nel corpo, NIENT'ALTRO (nessun verdetto
 //      raccontato) — e la mappa risposta → exit code, che è il contratto CLI
 //      su cui il ruolo secaudit decide le chiusure:
-//        0 fuso · 10 bloccato (L5) · 20 conflitto · 1 errore/rifiuto.
+//        0 fuso · 10 bloccato (L5) con richiesta · 20 conflitto · 1 errore/rifiuto/blocco senza richiesta.
 //      Server finto via FILO_ROUTINE_API, come in routineChain.test.mjs.
 
 import { test } from 'node:test';
@@ -50,7 +50,11 @@ test('isValidBranch: accetta nomi tipici, rifiuta injection', () => {
 
 test('exitCodeFor: il contratto CLI su cui il ruolo secaudit decide le chiusure', () => {
   assert.equal(exitCodeFor({ ok: true, result: 'merged', sha: 'abc' }), 0);
-  assert.equal(exitCodeFor({ ok: true, result: 'blocked', reason: 'guard_the_guards: firestore.rules' }), 10);
+  assert.equal(exitCodeFor({ ok: true, result: 'blocked', reason: 'guard_the_guards: firestore.rules', approval: 'req-1' }), 10);
+  // #1038: un blocco senza la richiesta per l'owner non è un blocco da consegnare in `design`/`l5`:
+  // la pratica si fermerebbe senza niente da approvare. È un guasto.
+  assert.equal(exitCodeFor({ ok: true, result: 'blocked', reason: 'guard_the_guards: firestore.rules' }), 1);
+  assert.equal(exitCodeFor({ ok: true, result: 'blocked', reason: 'l5', approval: '  ' }), 1);
   assert.equal(exitCodeFor({ ok: true, result: 'conflict' }), 20);
   // Un RIFIUTO del server (verdetti non registrati, ramo che non combacia,
   // biglietto morto) è 1, non 10: non è un blocco di sicurezza da spiegare
@@ -236,13 +240,28 @@ test('una prova degli unit più lunga della finestra di silenzio non fa arrivare
   }
 });
 
-test('blocked (L5 sul server) → exit 10, col motivo del blocco', async () => {
-  const { srv, port } = await fintoServer({ ok: true, result: 'blocked', reason: 'guard_the_guards: firestore.rules' });
+test('blocked (L5 sul server) con la richiesta per l’owner → exit 10, col motivo del blocco', async () => {
+  const { srv, port } = await fintoServer({ ok: true, result: 'blocked', reason: 'guard_the_guards: firestore.rules', approval: 'req-13' });
   try {
     const r = await gate(port, ['worker/13']);
     assert.equal(r.status, 10, `exit 10 atteso (stdout: ${r.stdout} stderr: ${r.stderr})`);
     assert.match(r.stderr, /BLOCKED/);
     assert.match(r.stderr, /firestore\.rules/);
+    assert.match(r.stderr, /aspetta il via libera/);
+  } finally { srv.close(); }
+});
+
+// #952.1: il cancello ferma, la richiesta non si registra, e la pratica consegnata in `design`/`l5` resta
+// ferma per sempre col quadrato rosso e niente da approvare. Senza richiesta il gate deve dire guasto.
+test('blocked SENZA la richiesta per l’owner → exit 1, e la frase dice di non consegnare design/l5', async () => {
+  const { srv, port } = await fintoServer({ ok: true, result: 'blocked', reason: 'guard_the_guards: scripts/merge-gate.mjs' });
+  try {
+    const r = await gate(port, ['worker/14']);
+    assert.equal(r.status, 1, `exit 1 atteso (stdout: ${r.stdout} stderr: ${r.stderr})`);
+    assert.match(r.stderr, /la richiesta per l'owner non si è registrata/);
+    assert.match(r.stderr, /Non consegnare design\/l5/);
+    assert.match(r.stderr, /scripts\/merge-gate\.mjs/, 'il motivo del blocco resta leggibile');
+    assert.doesNotMatch(r.stderr, /aspetta il via libera/);
   } finally { srv.close(); }
 });
 

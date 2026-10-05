@@ -828,6 +828,17 @@ test('secaudit: la richiesta di fusione fa girare gli unit sulla fusione per min
   assert.ok(!/Qui non gira nessun git/.test(t), 'qui adesso girano git e gli unit');
 });
 
+test('secaudit: un blocco senza la richiesta per l’owner non si consegna in design/l5 (#1038)', () => {
+  // La pratica ferma in `design`/`l5` senza richiesta resta lì per sempre, con niente da approvare.
+  const t = readFileSync(fileURLToPath(new URL('../../routines/roles/secaudit.md', import.meta.url)), 'utf8').replace(/\s+/g, ' ');
+  const dieci = t.match(/`10` → BLOCCATO[^]*?(?=- `20`)/);
+  assert.ok(dieci, 'la ricetta dell’exit 10 deve esistere');
+  assert.match(dieci[0], /SOLO se il server ha registrato quella richiesta/);
+  assert.match(dieci[0], /NON consegnare `design`\/`l5`/);
+  assert.match(dieci[0], /--guasto/);
+  assert.ok(!/il server apre una richiesta in attesa/.test(t), 'la richiesta non si dà più per certa');
+});
+
 // ─── Il biglietto perso non deve più poter succedere (incidente #444) ─────────
 //
 // Il 25 agosto un `--help` battuto a metà lavoro è finito nella porta "giro

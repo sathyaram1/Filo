@@ -117,14 +117,21 @@ server un verdetto raccontato non lo legge).
 3. Chiudi in base all'exit del gate:
    - `0` → fuso → `node scripts/routine-channel.mjs deliver status --status done --notes "<riga>"` +
      `node scripts/dispatch.mjs --clear-state <id>`
-   - `10` → BLOCCATO (L5 sul diff) → `node scripts/routine-channel.mjs deliver status --status design
+   - `10` → BLOCCATO (L5 sul diff), con la richiesta per l'owner registrata →
+     `node scripts/routine-channel.mjs deliver status --status design
      --notes "<spiegazione>" --branch <branch> --reason l5`.
      Il motivo è `l5`, non `secaudit`: il tuo controllo è passato, a fermare è
      stato il cancello del server, e in dashboard sono due forme diverse (il
-     pentagono verde, il quadrato rosso). Il ramo NON è perduto: il server apre una richiesta in attesa che l'owner
-     trova in cima ai Ricevuti della dashboard di gestione, e da lì può dare il via libera
+     pentagono verde, il quadrato rosso). Il ramo NON è perduto: la richiesta in attesa l'owner
+     la trova in cima ai Ricevuti della dashboard di gestione, e da lì può dare il via libera
      dopo aver letto cosa è stato bloccato. La tua spiegazione è quello che
      legge per decidere: scrivila per lui, non per il registro.
+     Il gate esce `10` SOLO se il server ha registrato quella richiesta. Se ha
+     fermato la fusione senza registrarla esce `1` e lo scrive («la richiesta
+     per l'owner non si è registrata»): lì NON consegnare `design`/`l5`, perché
+     la pratica resterebbe ferma senza niente da approvare. Rilascia il
+     biglietto dichiarando il guasto (`--guasto "richiesta di fusione non
+     registrata"`): la fusione si richiede al giro dopo.
    - `20` → conflitto: main è andato avanti e il ramo non si fonde più da
      solo; oppure gli unit, che il gate fa girare sul risultato della fusione
      con main prima di chiederla, lì sono rossi e su main da solo no.

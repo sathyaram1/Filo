@@ -31,18 +31,19 @@
 //   sta la directory, perché è da lì che si leggono i file fuori dai commit,
 //   la punta e gli esiti registrati (#485).
 //
-//   Exit code (contratto invariato):
+//   Exit code:
 //     0  → fuso su main (dal server)
-//     10 → BLOCCATO dal cancello di sicurezza (L5 sul diff): il feedback va
-//          messo in stato `design`, decide l'utente. Nessuna fusione — ma il
-//          ramo non è perduto: il server apre una richiesta di approvazione
-//          che l'owner trova in cima alla dashboard di gestione.
+//     10 → BLOCCATO dal cancello di sicurezza (L5 sul diff) E la richiesta di
+//          approvazione per l'owner è registrata: il feedback va in `design`,
+//          decide lui dalla dashboard di gestione. Nessuna fusione.
+//          Un blocco SENZA richiesta esce 1 (#1038): fermare lì la pratica la
+//          lascerebbe in un punto da cui non esce, con niente da approvare.
 //     20 → conflitto di merge, o unit rossi sul risultato della fusione con main
 //          (#929): il server ha già instradato il riallineamento. Nessuna fusione.
 //     1  → errore tecnico (argomenti, biglietto assente, server/GitHub giù) o
 //          richiesta RIFIUTATA dal server (verdetti non registrati, ramo che
 //          non combacia col biglietto, via libera che non copre la punta): il
-//          server l'ha già messa a registro.
+//          server l'ha già messa a registro. E il blocco senza richiesta.
 
 import { execFileSync, spawn } from 'node:child_process';
 import { resolve, dirname } from 'node:path';
@@ -335,9 +336,22 @@ export async function tieniVivo(ticket, { batti = heartbeat, avvia = spawn, scri
   return { ferma, figlio };
 }
 
+/** Il cancello ha fermato la fusione ma la richiesta per l'owner non si è registrata (#1038). PURA. */
+export function bloccoSenzaRichiesta(reply) {
+  const r = reply || {};
+  return r.ok === true && r.result === 'blocked' && !String(r.approval || '').trim();
+}
+
+export function testoBloccoSenzaRichiesta(reply) {
+  return `[merge-gate] GUASTO: il cancello ha fermato la fusione (${(reply && reply.reason) || 'L5'}) ma la richiesta per l'owner non si è registrata. `
+    + 'Non consegnare design/l5: la pratica si fermerebbe senza niente da approvare. '
+    + 'Rilascia il biglietto dichiarando il guasto; la fusione si richiede al giro dopo.';
+}
+
 export function exitCodeFor(reply) {
   const r = reply || {};
   if (r.ok === true && r.result === 'merged') return 0;
+  if (bloccoSenzaRichiesta(r)) return 1;
   if (r.ok === true && r.result === 'blocked') return 10;
   // Unit rossi sul risultato della fusione (#929): come un conflitto, il server ha già instradato il riallineamento.
   if (r.ok === true && (r.result === 'conflict' || r.result === 'unit_rossi')) return 20;
@@ -355,11 +369,11 @@ const USO = [
   '  La richiesta dichiara il COMMIT: se il ramo si è mosso dopo il controllo di sicurezza,',
   '  se nella directory c\'è qualcosa fuori dai commit, o se in cima al ramo su',
   '  origin (da dove il server lo prende) non c\'è il contenuto esaminato, non parte.',
-  '  Exit: 0 fuso · 10 fermato dal cancello di sicurezza (decide l’owner)',
+  '  Exit: 0 fuso · 10 fermato dal cancello di sicurezza, con la richiesta per l’owner registrata',
   '  Prima di chiedere fa girare gli unit sul risultato della fusione con origin/main.',
   '        20 conflitto o unit rossi sulla fusione · 1 uso sbagliato, ramo diverso da quello della directory,',
   '           ramo mosso dopo il controllo di sicurezza, contenuto che non è quello in cima',
-  '           su origin, main mosso a ogni prova, o rifiuto del server',
+  '           su origin, main mosso a ogni prova, rifiuto del server, o blocco senza richiesta per l’owner',
 ].join('\n');
 
 async function main() {
@@ -490,11 +504,9 @@ async function main() {
   if (code === 0) console.log(`[merge-gate] OK: ${source} fuso su main dal server${reply.sha ? ` (${reply.sha.slice(0, 12)})` : ''}`);
   else if (code === 10) {
     console.error(`[merge-gate] BLOCKED: ${reply.reason || 'cancello di sicurezza'}`);
-    // Il blocco non è più un vicolo cieco: il server apre una richiesta che
-    // l'owner trova in cima alla dashboard di gestione. Dirlo qui evita che
-    // chi legge il registro creda che il ramo sia perduto.
-    if (reply.approval) console.error('[merge-gate] il ramo aspetta il via libera dell’owner nella dashboard di gestione');
+    console.error('[merge-gate] il ramo aspetta il via libera dell’owner nella dashboard di gestione');
   }
+  else if (bloccoSenzaRichiesta(reply)) console.error(testoBloccoSenzaRichiesta(reply));
   else if (code === 20 && reply.result === 'unit_rossi') {
     console.error('[merge-gate] UNIT ROSSI SULLA FUSIONE: niente fusione. Il server ha rimandato il lavoro al riallineamento con l\'elenco dei test rotti.');
   }
