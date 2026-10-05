@@ -139,9 +139,11 @@ test('a parole: le regolazioni della barra si scrivono, e un tempo fuori dai lim
   assert.deepEqual(P.buildPreferencePartial('barra_uscita', '800 ms').partial, { barraLaterale: { uscitaMs: 800 } });
   assert.match(P.buildPreferencePartial('barra_attesa', '10 secondi').rifiuto, /10000 ms.*100 a 3000/);
   assert.match(P.buildPreferencePartial('barra_uscita', '20').rifiuto, /20 ms/);
+  // Un numero piccolo senza unità sono secondi: «metti l'attesa a 1» è un secondo, non un millisecondo.
+  assert.deepEqual(P.buildPreferencePartial('barra_attesa', '1').partial, { barraLaterale: { attesaMs: 1000 } });
   // L'elenco che legge il modello le nomina tutte.
-  const strumenti = readFileSync(join(ROOT, 'src', 'shared', 'actionTools.js'), 'utf8');
-  for (const k of ['barra_spinta', 'barra_striscia', 'barra_attesa', 'barra_uscita']) assert.ok(strumenti.includes(k), k);
+  const righe = P.righeDescrizione({ sistema: 'win32', shellPref: '' }).join('\n');
+  for (const k of ['barra_spinta', 'barra_striscia', 'barra_attesa', 'barra_uscita']) assert.ok(righe.includes(`• ${k}: `), k);
 });
 
 test('il manifesto non manda più l\'utente dove le voci della barra non ci sono più', () => {

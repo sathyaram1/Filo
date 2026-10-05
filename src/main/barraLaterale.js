@@ -6,6 +6,7 @@ const path = require('node:path');
 const { collegaScorciatoie } = require('./shortcuts');
 const { VuotoDellaVista } = require('./vuotoDellaVista');
 const Layout = require('./services/layoutIcone');
+const RedteamGate = require('./services/redteamGate');
 
 const STRISCIA = 4;
 const PANNELLO = 56;
@@ -85,7 +86,9 @@ class BarraLaterale {
       // Un clic arrivato alla pagina chiude la barra come ogni clic sulla pagina, e la tastiera torna a lei.
       primaDelClic: (tasto) => { if (tasto === 'left') this.chiudi(); this._restituisciTastiera(); },
     });
-    if (win && typeof win.once === 'function') win.once('closed', () => this._butta());
+    // Il Red Team in pausa (#896) compare in fondo alla barra solo a chi lo vede, e sparisce senza riavviare.
+    this._smettiRedteam = RedteamGate.suCambio(() => this._invia());
+    if (win && typeof win.once === 'function') win.once('closed', () => { this._smettiRedteam(); this._butta(); });
     if (win && typeof win.on === 'function') {
       const quiete = () => { this.quieteFino = Date.now() + QUIETE_MS; this.puntoFermo = this._punto(); this._segnaBordo(false); this._guarda(); };
       for (const ev of ['will-resize', 'resize', 'move']) win.on(ev, quiete);
@@ -115,6 +118,7 @@ class BarraLaterale {
 
   // motivo: 'spinta' | 'clic' | 'tasto' | 'chat' | 'trascina'. Da tastiera la barra prende il fuoco.
   apri(motivo = 'clic') {
+    RedteamGate.aggiorna();
     this._ferma('stringi');
     this._ferma('uscita');
     this._segnaBordo(false);
@@ -363,18 +367,24 @@ class BarraLaterale {
     return fascia ? BORDO + STRISCIA : STRISCIA;
   }
 
-  // Ogni scheda nuova entra in cima alle viste della finestra: la barra deve tornarle sopra, ma sotto
-  // gli avvisi, che restano l'ultima vista (tests/avvisi-sopra-pagina.spec.mjs).
+  // Ogni scheda nuova entra in cima alle viste della finestra: la barra deve tornarle sopra, e sopra
+  // l'avviso del sito pericoloso che copre la scheda (Indietro serve proprio lì), ma sotto gli avvisi,
+  // che restano l'ultima vista (tests/avvisi-sopra-pagina.spec.mjs).
   _inCima() {
+    if (!this.vista || !this.win || this.win.isDestroyed()) return;
     const cv = this.win.contentView;
     const figli = () => cv.children || [];
-    const schede = new Set(this.tabs.tabs.map((t) => t.view));
+    const daCoprire = new Set(this.tabs.tabs.map((t) => t.view));
+    const sito = this.tabs.avvisoSito && this.tabs.avvisoSito.vista;
+    if (sito) daCoprire.add(sito);
     const mia = figli().indexOf(this.vista);
-    if (mia >= 0 && !figli().slice(mia + 1).some((v) => schede.has(v))) return;
+    if (mia >= 0 && !figli().slice(mia + 1).some((v) => daCoprire.has(v))) return;
     if (mia >= 0) cv.removeChildView(this.vista);
     const avvisi = this.tabs.avvisi && this.tabs.avvisi.vista;
+    const ultimaCoperta = figli().reduce((m, v, i) => (daCoprire.has(v) ? i : m), -1);
     const sotto = avvisi ? figli().indexOf(avvisi) : -1;
-    if (sotto >= 0) cv.addChildView(this.vista, sotto);
+    if (sotto > ultimaCoperta) cv.addChildView(this.vista, sotto);
+    else if (ultimaCoperta >= 0 && ultimaCoperta < figli().length - 1) cv.addChildView(this.vista, ultimaCoperta + 1);
     else cv.addChildView(this.vista);
   }
 
@@ -501,6 +511,7 @@ class BarraLaterale {
       incognito: this._incognito(),
       icone: this._icone(),
       owner: this._owner(),
+      redteam: RedteamGate.visibile(),
       account: this.account,
       tema: this.tema,
       mira: this.mira,
@@ -558,6 +569,7 @@ class BarraLaterale {
 
   sistema(comando, dati) {
     if (!FISSE.has(comando)) return;
+    if (comando === 'redteam' && !RedteamGate.visibile()) return;
     if (PAGINE_FISSE[comando]) {
       this.tabs.openTab(PAGINE_FISSE[comando]);
       if (this.motivo === 'tasto') this.chiudi();
@@ -580,6 +592,7 @@ class BarraLaterale {
     } else if (d.ora) {
       ({ voci, scegli } = this._vociDellOra());
     } else if (FISSE.has(testo(d.comando))) {
+      if (testo(d.comando) === 'redteam' && !RedteamGate.visibile()) return;
       ({ voci, scegli } = this._vociFisse(testo(d.comando), d));
     } else {
       const id = testo(d.id);

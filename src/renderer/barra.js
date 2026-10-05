@@ -197,6 +197,7 @@
   for (const f of FISSE) {
     const b = bottone('ico piccola');
     b.dataset.comando = f.comando;
+    if (f.comando === 'redteam') b.hidden = true;
     b.setAttribute('aria-label', f.etichetta);
     b.innerHTML = svg(f.icona, 16);
     b.addEventListener('click', (e) => {
@@ -243,7 +244,7 @@
   scriviOra();
 
   // ── tastiera ─────────────────────────────────────────────────────────────
-  const tuttiIBottoni = () => [...pannello.querySelectorAll('.ico')];
+  const tuttiIBottoni = () => [...pannello.querySelectorAll('.ico:not([hidden])')];
   pannello.addEventListener('keydown', (e) => {
     const lista = tuttiIBottoni();
     const i = lista.indexOf(document.activeElement);
@@ -376,6 +377,7 @@
     striscia.style.width = `${Number(stato.strisciaPx) || LINEA}px`;
     disegnaIcone(Array.isArray(stato.icone) ? stato.icone : [], eraAperta);
     disegnaAccount(stato.account || null);
+    fissi.redteam.hidden = stato.redteam !== true;
     disegnaMira(stato.mira, stato.trascinamento);
     if (stato.fuoco) {
       const primo = tuttiIBottoni().find((b) => b.getAttribute('aria-disabled') !== 'true');

@@ -266,12 +266,13 @@
   // #183) è la spiegazione in chiaro mostrata nel popup: cosa controlla
   // l'impostazione e quali rischi comporta toccarla.
   // Un tempo della barra laterale in millisecondi ("300", "300 ms", "0,5 secondi"); fuori dai limiti è un
-  // rifiuto col numero, mai un taglio.
+  // rifiuto col numero, mai un taglio. Un numero sotto 10 senza unità sono secondi: nessuno chiede 1 ms.
   function msBarra(v, campo, etichetta) {
     const s = String(v == null ? '' : v).trim().toLowerCase();
     let n = parseItalianNumber(s.replace(/[^0-9.,-]/g, ''));
     if (!Number.isFinite(n)) return null;
-    if (/\bs(ec|econd[oi])?\b/.test(s) && !/\bms\b|millisecond/.test(s)) n *= 1000;
+    const ms = /\bms\b|millisecond/.test(s);
+    if ((/\bs(ec|econd[oi])?\b/.test(s) && !ms) || (!ms && !/[a-z]/.test(s) && n > 0 && n < 10)) n *= 1000;
     n = Math.round(n);
     const [min, max] = global.SN_CONST.BARRA_LATERALE_LIMITI[campo];
     if (n < min || n > max) return { rifiuto: `${n} ms è fuori dai limiti: da ${min} a ${max} ms` };

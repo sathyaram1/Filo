@@ -13,8 +13,10 @@ const coord = (v) => Math.max(-10000, Math.min(10000, Math.round(Number(v) || 0)
 class AvvisoSito {
   // schedaAttiva: la scheda del TabManager in primo piano (o null). scegli(tab, scelta, dati): un pulsante o una voce
   // del tasto destro. restituisciTastiera: tolto l'avviso, i tasti tornano alla scheda attiva.
-  constructor(win, { schedaAttiva = () => null, scegli = () => {}, menu = () => [], restituisciTastiera = () => {} } = {}) {
+  // inCima: dopo che l'avviso è salito, chi deve restargli sopra (la barra laterale) ci risale.
+  constructor(win, { schedaAttiva = () => null, scegli = () => {}, menu = () => [], restituisciTastiera = () => {}, inCima = () => {} } = {}) {
     this.win = win;
+    this.dopoInCima = inCima;
     this.schedaAttiva = schedaAttiva;
     this.scegli = scegli;
     this.vociMenu = menu;
@@ -95,6 +97,7 @@ class AvvisoSito {
     const cv = this.win.contentView;
     const figli = cv.children || [];
     if (figli[figli.length - 1] !== this.vista) cv.addChildView(this.vista);
+    try { this.dopoInCima(); } catch (_) {}
   }
 
   _stato() {

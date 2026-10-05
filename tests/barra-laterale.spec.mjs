@@ -10,6 +10,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { barraPage, statoBarra, comandaBarra, pannelloFermo, premi } from './helpers/barra.mjs';
+import { apriRedteamATutti } from './helpers/redteam.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -240,15 +241,16 @@ test('a schermo intero la barra resta raggiungibile, e il primo Esc chiude lei, 
   await expect.poll(async () => (await statoBarra(app)).schermoIntero).toBe(false);
 });
 
-test('le voci che stavano in alto nella home sono in fondo alla barra, e la home non ha più la fila', async ({ app, openTab }) => {
+test('le voci che stavano in alto nella home sono in fondo alla barra; in alto a destra restano Impostazioni e Profilo', async ({ app, openTab }) => {
+  await apriRedteamATutti(app);
   const home = await openTab('filo://newtab/');
-  await home.waitForLoadState('domcontentloaded');
-  await expect(home.locator('#dashControls')).toHaveCount(0);
+  await expect.poll(() => home.$$eval('#dashControls .dash-ctrl', (els) => els.map((e) => e.dataset.command)), { timeout: 8_000 })
+    .toEqual(['settings', 'account']);
   const barra = await barraPage(app);
   await comandaBarra(app, 'clic');
   await pannelloFermo(barra);
-  const fisse = await barra.$$eval('#fisse .ico', (els) => els.map((e) => e.dataset.comando));
-  expect(fisse).toEqual(['history', 'apps', 'redteam', 'account', 'settings']);
+  await expect.poll(() => barra.$$eval('#fisse .ico:not([hidden])', (els) => els.map((e) => e.dataset.comando)))
+    .toEqual(['history', 'apps', 'redteam', 'account', 'settings']);
   await expect(barra.locator('#ora')).toHaveText(/^\d{2}:\d{2}$/);
 
   await barra.locator('#fisse [data-comando="history"]').click();
