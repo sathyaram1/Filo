@@ -22,6 +22,8 @@ function banco() {
   mkdirSync(tmp);
   mkdirSync(casa);
   const env = { ...process.env, TMPDIR: tmp, TEMP: tmp, TMP: tmp, HOME: casa, USERPROFILE: casa };
+  // Con questa il figlio si crede una sotto-prova di chi lo lancia, ed esce verde anche da rosso.
+  delete env.NODE_TEST_CONTEXT;
   return { base, tmp, casa, env, rapporto: join(base, 'fatte.json') };
 }
 
