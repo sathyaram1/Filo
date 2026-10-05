@@ -10,8 +10,8 @@
 //     pulita (comportamento atteso da chi usa un terminale; persistere sarebbe
 //     complessità inutile e un rischio di sicurezza in più).
 //
-// PROTOCOLLO marcatori (validato empiricamente su powershell/cmd/sh):
-//   - FILO_RDY_<sid>            riga di "pronto" + prompt da rimuovere (cmd);
+// PROTOCOLLO marcatori (powershell/cmd/sh):
+//   - FILO_RDY_<sid>            riga di "pronto" (e prompt da rimuovere, con cmd);
 //   - FILO_META_<sid>:<code>:<cwd>  fine comando, con exit code e directory.
 // I comandi vengono serializzati in coda: ne parte uno alla volta e l'output
 // in arrivo è instradato alle callback del comando corrente fino al suo META.
@@ -138,8 +138,8 @@ function shellConfig(shell, sid, startCwd, { env, autoRun = true } = {}) {
   }
   if (shell === 'cmd') {
     // /q = niente echo dei comandi; /k = resta aperto leggendo da stdin.
-    // Cambiamo il prompt nel marcatore RDY ($_ = CRLF): così ogni prompt
-    // diventa una riga FILO_RDY_<sid> che rimuoviamo dall'output.
+    // Con l'eco spento cmd non mostra nemmeno il prompt: la riga di pronto la stampa un `echo`, se no non
+    // arriva mai e la sessione resta muta (#719). Il prompt diventa comunque RDY, per chi riaccende l'eco.
     // Davanti a tutto il preludio che porta la tabella codici a UTF-8 (#551,
     // gemello di quello in terminal.js): senza, i nomi con accenti e trattini
     // lunghi arrivano storpiati anche qui, nel terminale che l'utente guarda.
@@ -148,7 +148,7 @@ function shellConfig(shell, sid, startCwd, { env, autoRun = true } = {}) {
       // /d salta l'AutoRun del registro: un suo `cd` porterebbe il comando dell'assistente fuori dalla sua cartella.
       args: autoRun ? ['/q', '/k'] : ['/d', '/q', '/k'],
       options: { cwd: startCwd || undefined, windowsHide: true, ...ambiente },
-      ready: `${PRELUDI_CODIFICA.cmd}prompt FILO_RDY_${sid}$_\r\n`,
+      ready: `${PRELUDI_CODIFICA.cmd}prompt FILO_RDY_${sid}$_\r\necho FILO_RDY_${sid}\r\n`,
       wrap: (command) =>
         `${command}\r\necho FILO_META_${sid}:%errorlevel%:%cd%\r\n`,
     };

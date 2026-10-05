@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
@@ -77,6 +77,88 @@ test('le altre shell restano sulla loro strada', () => {
   assert.equal(T.viaSessione('powershell'), false);
   assert.equal(T.viaSessione('sh'), false);
   assert.equal(T.viaSessione('bash'), false);
+});
+
+// ─────────── con /q cmd non mostra il prompt: la sessione non può aspettarlo ───────────
+// Fuori da Windows un cmd finto con la regola documentata: eco spento, niente prompt e niente eco dei comandi.
+
+const CMD_FINTO = `#!/usr/bin/env node
+const fs = require('fs'); const path = require('path');
+let eco = !process.argv.slice(2).some((a) => a.toLowerCase() === '/q');
+let prompt = '$P$G'; let livello = 0; let resto = '';
+const mostraPrompt = () => { if (eco) process.stdout.write('\\r\\n' + prompt.replace(/\\$_/g, '\\r\\n').replace(/\\$P/g, process.cwd()).replace(/\\$G/g, '>')); };
+function esegui(riga) {
+  if (eco) process.stdout.write(riga + '\\r\\n');
+  const r = riga.trim();
+  if (!r) return;
+  if (/^chcp\\b/i.test(r)) { livello = 0; return; }
+  if (/^prompt\\s/i.test(r)) { prompt = r.slice(7); return; }
+  if (/^echo[\\s.]/i.test(r)) {
+    const testo = r.slice(5).replace(/%errorlevel%/gi, String(livello)).replace(/%cd%/gi, process.cwd());
+    const i = testo.indexOf('>');
+    if (i === -1) process.stdout.write(testo + '\\r\\n');
+    else fs.writeFileSync(path.resolve(testo.slice(i + 1).trim()), testo.slice(0, i) + '\\r\\n');
+    livello = 0; return;
+  }
+  process.stderr.write("'" + r.split(/\\s/)[0] + "' non è riconosciuto come comando interno o esterno.\\r\\n");
+  livello = 9009;
+}
+mostraPrompt();
+process.stdin.setEncoding('utf8');
+process.stdin.on('data', (c) => {
+  resto += c; let n;
+  while ((n = resto.indexOf('\\n')) !== -1) { const riga = resto.slice(0, n).replace(/\\r$/, ''); resto = resto.slice(n + 1); esegui(riga); mostraPrompt(); }
+});
+process.stdin.on('end', () => process.exit(livello));
+`;
+
+async function conCmdFinto(fn) {
+  const dir = join(TMP, 'cmd-finto');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'cmd.js'), CMD_FINTO);
+  chmodSync(join(dir, 'cmd.js'), 0o755);
+  // Allo scadere la sessione chiude l'albero con taskkill: qui ne fa le veci un kill.
+  writeFileSync(join(dir, 'taskkill'), '#!/bin/sh\nkill -9 "$2" 2>/dev/null\nexit 0\n');
+  chmodSync(join(dir, 'taskkill'), 0o755);
+  const piattaforma = Object.getOwnPropertyDescriptor(process, 'platform');
+  const prima = { PATH: process.env.PATH, ComSpec: process.env.ComSpec };
+  process.env.PATH = `${dir}:${prima.PATH}`;
+  process.env.ComSpec = join(dir, 'cmd.js');
+  Object.defineProperty(process, 'platform', { ...piattaforma, value: 'win32' });
+  try {
+    return await fn();
+  } finally {
+    Object.defineProperty(process, 'platform', piattaforma);
+    process.env.PATH = prima.PATH;
+    if (prima.ComSpec === undefined) delete process.env.ComSpec; else process.env.ComSpec = prima.ComSpec;
+  }
+}
+
+const SOLO_FUORI = { skip: process.platform === 'win32' && 'su Windows lo provano le prove con cmd vero, qui sotto' };
+
+test('con l\'eco spento cmd non mostra il prompt: il comando dell\'assistente parte lo stesso', SOLO_FUORI, async () => {
+  const qui = join(TMP, 'senza-prompt');
+  mkdirSync(qui, { recursive: true });
+  const out = await conCmdFinto(() => T.runCommand('echo x> prova.txt', { shell: 'cmd', cwd: qui, trackCwd: true, timeoutMs: 15_000 }));
+  assert.equal(out.timedOut, false, 'la sessione di cmd non è mai partita: il comando è scaduto');
+  assert.equal(out.code, 0, out.stderr);
+  assert.equal(readFileSync(join(qui, 'prova.txt'), 'utf8').trim(), 'x');
+  assert.equal(out.cwd, qui);
+});
+
+test('con l\'eco spento cmd non mostra il prompt: il terminale della dashboard risponde', SOLO_FUORI, async () => {
+  const uscita = await conCmdFinto(() => new Promise((resolve, reject) => {
+    const sessione = S.createSession({ shell: 'cmd', cwd: TMP });
+    let testo = '';
+    const scade = setTimeout(() => { sessione.kill(); reject(new Error('il terminale con cmd non ha mai risposto')); }, 15_000);
+    sessione.exec('echo ciao', {
+      onData: ({ chunk }) => { testo += chunk; },
+      onExit: ({ code }) => { clearTimeout(scade); sessione.kill(); resolve({ testo, code }); },
+      onError: ({ message }) => { clearTimeout(scade); reject(new Error(message)); },
+    });
+  }));
+  assert.equal(uscita.code, 0);
+  assert.equal(uscita.testo.trim(), 'ciao');
 });
 
 // ─────────── il giro vero: cmd su Windows, la stessa sessione con sh altrove ───────────
