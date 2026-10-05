@@ -437,3 +437,38 @@ test('canvas esportato prima di avere un contesto: esce com\'è e può ancora di
   expect(on.vuoto).toBe(off.vuoto);
   expect(on.vuotoBlob).toBe(off.vuotoBlob);
 });
+
+// Uno script può cercare la guardia ispezionando le funzioni sostituite: con la protezione accesa
+// devono rispondere come le native di Off, a ogni domanda (#799).
+async function profiloFunzioni() {
+  const fnTs = Function.prototype.toString;
+  const voci = {
+    getContext: HTMLCanvasElement.prototype.getContext,
+    toDataURL: HTMLCanvasElement.prototype.toDataURL,
+    toBlob: HTMLCanvasElement.prototype.toBlob,
+    getImageData: CanvasRenderingContext2D.prototype.getImageData,
+    offGetContext: OffscreenCanvas.prototype.getContext,
+    offGetImageData: OffscreenCanvasRenderingContext2D.prototype.getImageData,
+    convertToBlob: OffscreenCanvas.prototype.convertToBlob,
+    readPixels: WebGLRenderingContext.prototype.readPixels,
+    readPixels2: WebGL2RenderingContext.prototype.readPixels,
+    startRendering: OfflineAudioContext.prototype.startRendering,
+    fnToString: Function.prototype.toString,
+  };
+  const out = {};
+  for (const [k, f] of Object.entries(voci)) {
+    let nuovo;
+    try { new f(); nuovo = 'ok'; } catch (e) { nuovo = e.constructor.name; }
+    out[k] = {
+      testo: fnTs.call(f), testoDiretto: String(f), nome: f.name, lunghezza: f.length,
+      proprie: Object.getOwnPropertyNames(f).sort().join(','), prototype: 'prototype' in f, nuovo,
+    };
+  }
+  out.fnTsSuSeStesso = fnTs.call(fnTs);
+  return out;
+}
+
+test('le funzioni sostituite dalla guardia sono indistinguibili dalle native', async ({ openTab, testServer }) => {
+  const { on, off } = await protettaPoiOff(openTab, testServer, profiloFunzioni);
+  expect(on).toEqual(off);
+});
