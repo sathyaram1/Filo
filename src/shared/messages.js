@@ -212,9 +212,16 @@
     //   riscatto è andato, ma al primo avvio quella spinta parte mentre la
     //   home si sta ancora aprendo e non la sente nessuno: chi apre chiede
     //   anche se c'era qualcosa da dire. Si legge da quello che è scritto in
-    //   locale, senza toccare il server. { where: 'home'|'credits' } →
-    //   { ok, notice: { kind, text } | null }
+    //   locale, senza toccare il server. Con `claim` chi chiede lo prende, e
+    //   alla domanda dopo non c'è più (#664: una home sola lo racconta).
+    //   { where: 'home'|'credits', claim? } → { ok, notice: { kind, text } | null }
     WALLET_NOTICE_PENDING: 'wallet_notice_pending',
+    // WALLET_INVITE_OPEN (#664): un collegamento d'invito portato dentro Filo
+    //   da un gesto vero dell'utente in una pagina (clic, tasto destro). Si
+    //   riscatta e si apre Crediti, come dal collegamento arrivato da fuori.
+    //   Il preload delle pagine lo manda col valore letterale.
+    //   { link } → { ok }
+    WALLET_INVITE_OPEN: 'wallet_invite_open',
     // Riservati all'owner (auth.isAdmin()), col token dell'account Google.
     // WALLET_OWNER_OVERVIEW: { } → { ok, overview } (per utente: pseudonimo,
     //   saldo, consumo per giorno/azione, chi l'ha invitato; totale vs tetto).

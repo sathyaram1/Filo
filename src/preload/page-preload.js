@@ -211,6 +211,24 @@ let streamCounter = 0;
 
 const filoMessage = (msg) => ipcRenderer.invoke('filo:message', msg);
 
+// ─── #664 — il collegamento d'invito cliccato dentro Filo ──────────────────
+// `filo://invito/<codice>` non è una pagina: da fuori lo consegna il sistema e
+// Filo riscatta. Dentro Filo lo stesso clic deve fare lo stesso, ma solo un
+// clic VERO: una pagina che lo spinge da sé non riscatta niente (il main la
+// ferma). Il tipo è letterale: qui SN_MSG non c'è ancora.
+try {
+  const INVITO = /^filo:\/*invito(?:[/?#]|$)/i;
+  const suInvito = (e) => {
+    if (!e.isTrusted || (e.type === 'click' ? e.button !== 0 : e.button !== 1)) return;
+    const a = (e.composedPath ? e.composedPath() : []).find((n) => n && typeof n.href === 'string' && /^(A|AREA)$/.test(n.tagName));
+    if (!a || !INVITO.test(a.href)) return;
+    e.preventDefault();
+    filoMessage({ type: 'wallet_invite_open', link: a.href }).catch(() => {});
+  };
+  window.addEventListener('click', suInvito, true);
+  window.addEventListener('auxclick', suInvito, true);
+} catch (_) { /* mai bloccare il caricamento della pagina */ }
+
 const broadcastListeners = new Set();
 // #407 — messaggi che devono SVEGLIARE un riquadro incorporato. Dentro un
 // riquadro i content script si montano solo quando l'utente lo tocca; ma
