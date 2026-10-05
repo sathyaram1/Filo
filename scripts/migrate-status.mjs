@@ -18,6 +18,7 @@
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { acquireBearer, FIRESTORE_BASE } from './lib/firestore-auth.mjs';
+import { firmaOra, patchFirmato } from './lib/firma-ora.mjs';
 import { contatoreLetture } from './lib/letture.mjs';
 import { scansione, dopoApplicazione, copiaChiesta } from './lib/scansione-secco.mjs';
 // IIFE su globalThis, nell'ordine giusto: crypto → feedback → vocabolario → normalize.
@@ -148,12 +149,10 @@ async function main() {
     const fields = { status: toFsValue(fine), statusPublic: toFsValue(publicStatus) };
     const mask = ['status', 'statusPublic'];
     if (statusReason) { fields.statusReason = toFsValue(statusReason); mask.push('statusReason'); }
-    // #676: ogni scrittura firma l'ora, o la dashboard non vede il cambiamento
-    // fino al riallineamento (che è raro per scelta).
-    fields.updatedAt = { timestampValue: new Date().toISOString() };
+    fields.updatedAt = firmaOra();
     mask.push('updatedAt');
     const qs = mask.map((f) => `updateMask.fieldPaths=${encodeURIComponent(f)}`).join('&');
-    const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(fb._id)}?${qs}`, {
+    const res = await patchFirmato(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(fb._id)}?${qs}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
       body: JSON.stringify({ fields }),

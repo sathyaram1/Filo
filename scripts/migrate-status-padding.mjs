@@ -37,6 +37,7 @@ import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { acquireBearer, FIRESTORE_BASE } from './lib/firestore-auth.mjs';
+import { firmaOra, patchFirmato } from './lib/firma-ora.mjs';
 import { contatoreLetture } from './lib/letture.mjs';
 import { scansione, dopoApplicazione, copiaChiesta } from './lib/scansione-secco.mjs';
 
@@ -142,11 +143,10 @@ async function main() {
         campi[k] = { stringValue: await C.encryptForOwner(doc.fields[k].stringValue) };
         mask.push(k);
       }
-      // #676: ogni scrittura firma l'ora (vedi src/shared/feedback.js).
-      campi.updatedAt = { timestampValue: new Date().toISOString() };
+      campi.updatedAt = firmaOra();
       mask.push('updatedAt');
       const qs = mask.map((m) => `updateMask.fieldPaths=${m}`).join('&');
-      const res = await fetch(`${FIRESTORE_BASE}/feedback/${doc.id}?${qs}`, {
+      const res = await patchFirmato(`${FIRESTORE_BASE}/feedback/${doc.id}?${qs}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
         body: JSON.stringify({ fields: campi }),
@@ -195,11 +195,10 @@ async function main() {
     // regole la riservano al backend, e giustamente. A smontare la vetrina di un
     // feedback che smette di essere "chiuso" ci pensa il backend di sicurezza,
     // che se ne accorge da questa stessa scrittura.
-    // #676: ogni scrittura firma l'ora (vedi src/shared/feedback.js).
-    campi.updatedAt = { timestampValue: new Date().toISOString() };
+    campi.updatedAt = firmaOra();
     mask.push('updatedAt');
     const qs = mask.map((m) => `updateMask.fieldPaths=${m}`).join('&');
-    const res = await fetch(`${FIRESTORE_BASE}/feedback/${doc.id}?${qs}`, {
+    const res = await patchFirmato(`${FIRESTORE_BASE}/feedback/${doc.id}?${qs}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
       body: JSON.stringify({ fields: campi }),
