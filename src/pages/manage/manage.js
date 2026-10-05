@@ -1390,12 +1390,22 @@
     }, extra || {});
   }
 
+  // Uno scarto in volo è una decisione già presa: il segno arrivato intanto non la fonde.
+  const scartiInVolo = new Set();
   async function decidiFusione(type, req) {
     const UI = window.SN_MERGE_APPROVALS;
-    const reply = await sendToMain({ type, id: req.id });
+    scartiInVolo.add(req.id);
+    let reply;
+    try { reply = await sendToMain({ type, id: req.id }); } finally { scartiInVolo.delete(req.id); }
     if (UI) esitiTentati.set(req.id, UI.outcomeMessage(reply, req));
     statoFusioniCambiato();
     return reply;
+  }
+
+  // Il segno manda a fondere solo ciò che aspetta davvero: in volo o già decisa da qui, il
+  // server la rifiuterebbe e la pagina direbbe un esito falso (#702).
+  function daDecidere(req) {
+    return !scartiInVolo.has(req.id) && statoRichiesta(req) !== 'decisa';
   }
 
   // I ridisegni automatici del pannello aspettano che una conferma a metà finisca (#550).
