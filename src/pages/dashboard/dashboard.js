@@ -1166,12 +1166,12 @@
     threadHistory.push({ role: 'user', text: RIPRENDI, interno: true });
     await runTurnAndContinue({ userMessage: RIPRENDI, internal: true });
   }
-  // Il turno è tornato fermato: le azioni fatte restano (righe e bottoni), lo storico lo sa, e al posto della
-  // risposta resta una riga che dice che è stato fermato.
-  function chiudiTurnoFermato(r, { pending, streamBubble, streamedText, shown }) {
+  // Fermato, subito: lo storico ha la sua voce e al posto della risposta resta una riga che lo dice. Il posto delle
+  // azioni ancora in volo è tenuto, prima della riga: un seguito scritto intanto finisce sotto, non in mezzo.
+  function apriTurnoFermato({ pending, streamBubble, streamedText }) {
     const turn = pending.endTurn();
     const parziale = String(streamedText || '').trim();
-    const entry = { role: 'filo', text: parziale, actions: r.actions || [], interrotto: true, fermato: true };
+    const entry = { role: 'filo', text: parziale, actions: [], interrotto: true, fermato: true };
     if (turn.text) { entry.reasoning = turn.text; entry.reasoningMs = turn.ms; }
     threadHistory.push(entry);
     let host = streamBubble;
@@ -1180,17 +1180,35 @@
       if (parziale) setBubbleText(host, parziale, true);
     } else {
       host = makeBubble({ role: 'filo', text: '' });
+      host.hidden = true;
       bubblesEl.appendChild(host);
     }
-    // Nessun popup di conferma che si apre da solo: l'utente ha appena detto di smettere.
-    Att.renderActions(host, r.actions || [], { onAck: goHome, autoConfirm: false, activity: pending, shown });
-    if (!parziale && !host.querySelector('.dash-bubble-actions')) host.remove();
     const nota = document.createElement('div');
     nota.className = 'dash-bubble-note dash-bubble-fermato';
     nota.textContent = parziale ? 'Fermato a metà della risposta.' : 'Fermato prima della risposta.';
     bubblesEl.appendChild(nota);
-    r._notaFermato = nota;
-    Term.applyCommandCwd(r.actions);
+    return { entry, host, nota, parziale };
+  }
+  // Il main ha finito il turno fermato: le azioni fatte restano (righe e bottoni) e lo storico le sa.
+  function chiudiTurnoFermato(r, { entry, host, nota, parziale }, { pending, shown }) {
+    const azioni = Array.isArray(r?.actions) ? r.actions : [];
+    entry.actions = azioni;
+    // La risposta era già finita quando è arrivato lo stop: c'è, e lo schermo non dice il contrario.
+    if (r?.ok && !r.stopped && String(r.text || '').trim()) {
+      entry.text = r.text;
+      delete entry.interrotto;
+      delete entry.fermato;
+      if (Array.isArray(r.notes) && r.notes.length) entry.notes = r.notes;
+      host.hidden = false;
+      setBubbleText(host, r.text, true);
+      nota.remove();
+      if (ripresa && ripresa.nota === nota) { ripresa = null; aggiornaTasto(); }
+    }
+    // Nessun popup di conferma che si apre da solo: l'utente ha appena detto di smettere.
+    Att.renderActions(host, azioni, { onAck: goHome, autoConfirm: false, activity: pending, shown });
+    if (host.querySelector('.dash-bubble-actions')) host.hidden = false;
+    else if (!parziale && host.hidden) host.remove();
+    Term.applyCommandCwd(azioni);
   }
 
   // ===== Image paste / drop (multi-immagine) =====
