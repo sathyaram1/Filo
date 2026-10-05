@@ -215,6 +215,31 @@ test('un nome con accenti e trattino lungo si crea e torna identico', async () =
   assert.ok(elenco.stdout.includes(nome), `nome storpiato: ${JSON.stringify(elenco.stdout)}`);
 });
 
+// cmd decodifica lo stdin di una pipe un byte per volta (#1044): qualunque sia la tabella codici, un byte fuori
+// dall'ASCII sul filo è un carattere perso. Il comando ricomposto da cmd deve però essere quello scritto.
+test('a cmd il comando arriva in soli caratteri ASCII, e ricomposto è quello scritto', () => {
+  const lungo = Array.from({ length: 150 }, (_, i) => `parola${i} è`).join(' ');
+  const righe = Array.from({ length: 130 }, (_, i) => `echo r${i} %USERNAME% è${i}`).join('\n');
+  for (const comando of [
+    'echo ciao> "RELAZIONE — attività finale.txt"',
+    'for %f in (*attività*) do @echo %f & echo 50% più %CD%',
+    `echo ${lungo}`,
+    righe,
+    'echo 中文😀 Привет',
+  ]) {
+    const { testo, file } = S.comandoPerCmd(comando);
+    assert.match(testo, /^[\x00-\x7F]*$/, 'sul filo verso cmd è passato un byte fuori dall\'ASCII');
+    const valori = file.flatMap((f) => f.split('\r\n').slice(0, -1));
+    for (const v of valori) assert.ok(Buffer.byteLength(v) <= 1023, 'una riga oltre quello che `set /p` legge');
+    for (const f of file) assert.ok(f.split('\r\n').length - 1 <= 100);
+    const ultimaRiga = testo.split('\r\n').slice(file.length).join('\r\n');
+    const ricomposto = ultimaRiga.replace(/%FILO_U(\d+)%/g, (_, n) => valori[Number(n) - 1]);
+    assert.equal(ricomposto, comando);
+    assert.ok(!valori.some((v) => v.includes('%')), 'una variabile dell\'utente è finita dentro un valore e non si espande più');
+  }
+  assert.deepEqual(S.comandoPerCmd('dir /b'), { testo: 'dir /b', file: [] }, 'un comando ASCII deve partire identico a prima');
+});
+
 test('un output enorme non fa perdere esito e cartella', async () => {
   const righe = Math.ceil((T.MAX_OUTPUT_CHARS * 3) / 15);
   const out = await esegui(WIN

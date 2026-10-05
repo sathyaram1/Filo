@@ -24,6 +24,7 @@
 const { spawn } = require('node:child_process');
 const os = require('node:os');
 const fs = require('node:fs');
+const path = require('node:path');
 // Quale shell gira davvero, dato quella chiesta e il sistema: la regola è una
 // sola e sta in terminal.js. Erano due: i comandi dell'assistente onoravano
 // "bash" fuori da Windows, questa sessione ricadeva sempre su /bin/sh — cioè
@@ -43,8 +44,8 @@ function defaultCwd() {
 // decodifica lo stdin con la tabella di codici della console (quella OEM),
 // mentre Node gli scrive UTF-8. Un comando che contiene «attività» arriva alla
 // shell con un nome diverso da quello digitato, e lei risponde che il file non
-// esiste. È il guasto della segnalazione, dalla parte opposta. Con cmd non
-// succede: lì il passaggio alla tabella 65001 vale in tutti e due i versi.
+// esiste. È il guasto della segnalazione, dalla parte opposta. Con cmd succede
+// lo stesso, per un'altra via: vedi comandoPerCmd.
 //
 // Toccare `[Console]::InputEncoding` sarebbe peggio del male. Il setter di .NET
 // butta via il lettore dello stdin, e con lui tutto quello che aveva già letto
@@ -65,6 +66,43 @@ function comandoPerPowerShell(command, coda = '') {
   const cmd = String(command == null ? '' : command);
   if (!SOLO_ASCII.test(cmd)) return invocaCodificato(cmd, coda);
   return coda ? `${cmd}\n${coda}` : cmd;
+}
+
+// cmd legge lo stdin di una pipe un byte per volta e decodifica ogni byte da solo con la tabella attiva: con 65001
+// i byte di «à» o «—» diventano rombi, con una tabella a un byte passa solo ciò che quella tabella contiene (#1044).
+// Sul filo vanno quindi solo caratteri ASCII: i tratti con caratteri non ASCII stanno in file UTF-8 che `set /p`
+// legge a righe intere, e il comando li richiama come %variabili%, espanse prima che cmd guardi virgolette e
+// redirezioni. Un tratto non contiene `%`, così le variabili e i `%f` del `for` scritti dall'utente restano suoi.
+// Tetti: `set /p` legge 1023 byte per riga (200 caratteri da 4 byte ci stanno) e una riga di cmd ne tiene 8191
+// (100 letture per riga e per file).
+const PEZZO_CMD = 200;
+const LETTURE_PER_FILE = 100;
+const VALORI_CMD = 'FILO_VALORI_CMD';
+
+function comandoPerCmd(command) {
+  const cmd = String(command == null ? '' : command);
+  if (SOLO_ASCII.test(cmd)) return { testo: cmd, file: [] };
+  const valori = [];
+  const nomi = new Map();
+  const richiama = (pezzo) => {
+    if (!nomi.has(pezzo)) { valori.push(pezzo); nomi.set(pezzo, `FILO_U${valori.length}`); }
+    return `%${nomi.get(pezzo)}%`;
+  };
+  const testo = cmd.replace(/[^\x00-\x7F](?:[^%\r\n]*[^\x00-\x7F])?/g, (tratto) => {
+    const caratteri = Array.from(tratto);
+    let s = '';
+    for (let i = 0; i < caratteri.length; i += PEZZO_CMD) s += richiama(caratteri.slice(i, i + PEZZO_CMD).join(''));
+    return s;
+  });
+  const file = [];
+  const letture = [];
+  for (let i = 0; i < valori.length; i += LETTURE_PER_FILE) {
+    const gruppo = valori.slice(i, i + LETTURE_PER_FILE);
+    file.push(`${gruppo.join('\r\n')}\r\n`);
+    const set = gruppo.map((_, j) => `set /p "FILO_U${i + j + 1}="`).join(' & ');
+    letture.push(`(${set})<"%${VALORI_CMD}%-${file.length}.txt"`);
+  }
+  return { testo: `${letture.join('\r\n')}\r\n${testo}`, file };
 }
 
 // Quella cartella c'è ancora, ed è una cartella? La domanda si fa qui per
@@ -143,14 +181,27 @@ function shellConfig(shell, sid, startCwd, { env, autoRun = true } = {}) {
     // Davanti a tutto il preludio che porta la tabella codici a UTF-8 (#551,
     // gemello di quello in terminal.js): senza, i nomi con accenti e trattini
     // lunghi arrivano storpiati anche qui, nel terminale che l'utente guarda.
+    // Il percorso del file dei pezzi non ASCII arriva per variabile d'ambiente: la cartella temporanea può avere
+    // accenti nel nome utente, e scritta sullo stdin si storpierebbe come il resto (comandoPerCmd).
+    const fileValori = path.join(os.tmpdir(), `filo-cmd-${sid}`);
+    let scritti = 0;
     return {
       file: process.env.ComSpec || 'cmd.exe',
       // /d salta l'AutoRun del registro: un suo `cd` porterebbe il comando dell'assistente fuori dalla sua cartella.
       args: autoRun ? ['/q', '/k'] : ['/d', '/q', '/k'],
-      options: { cwd: startCwd || undefined, windowsHide: true, ...ambiente },
+      options: { cwd: startCwd || undefined, windowsHide: true, env: { ...(env || process.env), [VALORI_CMD]: fileValori } },
       ready: `${PRELUDI_CODIFICA.cmd}prompt FILO_RDY_${sid}$_\r\necho FILO_RDY_${sid}\r\n`,
-      wrap: (command) =>
-        `${command}\r\necho FILO_META_${sid}:%errorlevel%:%cd%\r\n`,
+      wrap: (command) => {
+        let { testo, file } = comandoPerCmd(command);
+        try {
+          file.forEach((contenuto, i) => fs.writeFileSync(`${fileValori}-${i + 1}.txt`, contenuto, 'utf8'));
+          scritti = Math.max(scritti, file.length);
+        } catch (_) { testo = String(command); }
+        return `${testo}\r\necho FILO_META_${sid}:%errorlevel%:%cd%\r\n`;
+      },
+      pulisci: () => {
+        for (let i = 1; i <= scritti; i++) { try { fs.rmSync(`${fileValori}-${i}.txt`, { force: true }); } catch (_) {} }
+      },
     };
   }
   if (shell === 'bash') {
@@ -241,6 +292,7 @@ function createSession({ shell, cwd, env, autoRun } = {}) {
   proc.on('error', (err) => fatal(err.message || String(err)));
   proc.on('close', (uscita) => {
     session.dead = true;
+    if (cfg.pulisci) cfg.pulisci();
     const cur = session.current;
     session.current = null;
     if (cur && cur.cb.onExit) cur.cb.onExit({ code: 0, cwd: session.cwd, chiusa: true, uscita });
@@ -487,4 +539,6 @@ module.exports = {
   // esportata per la guardia di regressione di #551: il comando che l'utente
   // digita non deve mai arrivare a PowerShell con byte fuori dall'ASCII.
   comandoPerPowerShell,
+  // e a cmd non arrivano byte fuori dall'ASCII nemmeno lui (#1044).
+  comandoPerCmd,
 };
