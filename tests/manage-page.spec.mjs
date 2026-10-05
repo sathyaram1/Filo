@@ -2055,6 +2055,62 @@ test('#1034 — In coda col segno: tasto acceso e chi l’ha messo, sulla stessa
   expect(Math.round(dopo.width)).toBe(Math.round(box.width));
 });
 
+// La riga non va mai a capo: con tanti tasti (spam, file sospetto, «È mio») o con la colonna stretta i tasti
+// si stringono e restano dentro la riga; chi ha messo il segno va sotto, leggibile.
+const RIGA_BASE = { text: 'Testo.', name: 'Prova', seq: 12, subSeq: 0, createdAt: '2026-06-22T10:00:00Z', images: [] };
+const RIGA_CASI = [
+  ['spam', 'inbox', { ...RIGA_BASE, _id: 'riga-spam', status: 'spam', clientId: 'tester@example.com' }],
+  ['mittente da riconoscere', 'inbox', { ...RIGA_BASE, _id: 'riga-mio', status: 'new', clientId: 'owner:abc' }],
+  ['file sospetto da riconoscere', 'inbox', { ...RIGA_BASE, _id: 'riga-file', status: 'suspicious_file', clientId: 'owner:abc' }],
+  ['in coda col segno da approvazione', 'queue', { ...RIGA_BASE, _id: 'riga-coda', status: 'todo', reviewDecision: 'accepted', clientId: 'tester@example.com',
+    mergePreapproved: { by: 'owner@esempio.it · approvazione 0123456789abcdef01234567', at: '2026-09-13T07:30:00.000Z' } }],
+];
+for (const larghezza of [1280, 960]) {
+  for (const [nome, tab, fb] of RIGA_CASI) {
+    test(`#1034 — finestra ${larghezza}, ${nome}: i tasti restano su una riga e dentro la colonna`, async ({ openTab, app }) => {
+      const page = await openTab(URL);
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
+      await app.evaluate(({ BrowserWindow }, w) => {
+        const win = BrowserWindow.getAllWindows()[0];
+        win.setSize(w, win.getSize()[1]);
+      }, larghezza);
+      await page.waitForFunction((w) => Math.abs(window.outerWidth - w) < 40, larghezza);
+      await page.evaluate(([f, t]) => {
+        window.__mgTest.setAdmin(true);
+        window.__mgTest.setData([f]);
+        window.__mgTest.setTab(t);
+        window.__mgTest.openDetail(f._id);
+      }, [fb, tab]);
+      await expect(page.locator('#mgPreapproveBtn')).toBeVisible();
+      const m = await page.evaluate(() => {
+        const vis = (el) => el && !el.hidden && el.getClientRects().length > 0;
+        const riga = document.querySelector('#mgOwnerBar .mg-owner-row').getBoundingClientRect();
+        const scatola = document.querySelector('#mgOwnerBar .mg-owner-tasti');
+        const tasti = [...document.querySelectorAll('#mgOwnerBar .mg-owner-row button')].filter(vis).map((b) => {
+          const r = b.getBoundingClientRect();
+          // Raggiungibile = portato in vista (la riga stretta scorre), sta dentro la colonna.
+          b.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+          const v = b.getBoundingClientRect();
+          return { id: b.id || b.dataset.actionKey, centro: r.top + r.height / 2, destra: v.right, sinistra: v.left, largo: r.width };
+        });
+        const info = document.getElementById('mgPreapprovedInfo');
+        return { sinistraRiga: riga.left, destraRiga: riga.right, destraScatola: scatola.getBoundingClientRect().right, tasti, infoLarga: vis(info) ? info.getBoundingClientRect().width : null };
+      });
+      expect(m.tasti.length).toBeGreaterThanOrEqual(5);
+      if (process.env.DBG1034) { console.log('DBG', JSON.stringify(m)); await page.locator('#mgOwnerBar').screenshot({ path: `tests/.shots/1034-dbg-${larghezza}-${tab}-${fb._id}.png` }); }
+      expect(m.destraScatola).toBeLessThanOrEqual(m.destraRiga + 1);
+      for (const t of m.tasti) {
+        expect(Math.abs(t.centro - m.tasti[0].centro), t.id).toBeLessThan(6);
+        expect(t.destra, t.id).toBeLessThanOrEqual(m.destraRiga + 2);
+        expect(t.sinistra, t.id).toBeGreaterThanOrEqual(m.sinistraRiga - 2);
+        expect(t.largo, t.id).toBeGreaterThan(24);
+      }
+      if (m.infoLarga !== null) expect(m.infoLarga).toBeGreaterThan(150);
+    });
+  }
+}
+
 // ── Priorità visibile + modificabile dalla coda ─────────────────────────────
 // I feedback "In coda" mostrano i pallini priorità; per l'owner il click li
 // modifica (patch priority + priorityManual) e la coda si riordina (priorità

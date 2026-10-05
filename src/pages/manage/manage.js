@@ -3363,6 +3363,16 @@
   if (mgPreapproveBtn) mgPreapproveBtn.addEventListener('click', () => togglePreapproved());
   if (mgPreapproveRevokeBtn) mgPreapproveRevokeBtn.addEventListener('click', () => togglePreapproved(false));
 
+  // La riga dei tasti, quando non entra, scorre di lato (#1034): la rotella normale deve bastare a raggiungerli.
+  const mgOwnerTasti = mgOwnerBar && mgOwnerBar.querySelector('.mg-owner-tasti');
+  if (mgOwnerTasti) {
+    mgOwnerTasti.addEventListener('wheel', (e) => {
+      if (mgOwnerTasti.scrollWidth <= mgOwnerTasti.clientWidth || Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return;
+      e.preventDefault();
+      mgOwnerTasti.scrollLeft += e.deltaY;
+    }, { passive: false });
+  }
+
   // L'etichetta di stato NON si scrive più nel dettaglio (scelta owner
   // 2026-09-13): lo stato lo dicono il colore della scheda in lista e le
   // forme, e la decisione già presa — attacco confermato, bocciatura della

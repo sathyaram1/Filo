@@ -1012,6 +1012,25 @@
        barra. `[hidden]` va riaffermato o `display:flex` se lo mangia. */
     .mg-actions-group { display: flex; align-items: center; min-width: 0; }
     .mg-actions-group[hidden] { display: none; }
+    /* I tasti dell'owner stanno su UNA riga a ogni larghezza (#1034): andando a capo spezzavano i gruppi e spingevano
+       giù la conversazione. Se non entrano cedono gli spazi, poi la riga scorre di lato: nessun tasto sparisce né perde il
+       nome (accorciati coi puntini erano illeggibili tutti insieme). Chi ha messo il segno resta fuori e va sotto da solo. */
+    .mg-owner { container-type: inline-size; }
+    .mg-owner-tasti {
+      --mg-tasti-gap: 10px; --mg-tasti-pad: 12px;
+      display: flex; align-items: center; gap: var(--mg-tasti-gap);
+      flex: 0 1 auto; min-width: 0;
+      overflow-x: auto; scrollbar-width: thin;
+    }
+    .mg-owner-tasti .mg-actions-group,
+    .mg-owner-tasti .mg-actions-row { flex: none; flex-wrap: nowrap; gap: var(--mg-tasti-gap); }
+    #mgOwnerBar .mg-owner-tasti button {
+      flex: none; white-space: nowrap;
+      padding-left: var(--mg-tasti-pad); padding-right: var(--mg-tasti-pad);
+    }
+    @container (max-width: 860px) { .mg-owner-tasti { --mg-tasti-gap: 8px; --mg-tasti-pad: 10px; } }
+    @container (max-width: 720px) { .mg-owner-tasti { --mg-tasti-gap: 6px; --mg-tasti-pad: 8px; } }
+    @container (max-width: 580px) { .mg-owner-tasti { --mg-tasti-gap: 4px; --mg-tasti-pad: 6px; } }
     /* Il tasto della frase è acceso quando una frase c'è già: da chiusa, la sezione non direbbe da nessuna parte
        che è stata scritta. */
     .mg-usernote-toggle::after {
@@ -1378,6 +1397,8 @@
                 placeholder="Commento (opzionale): perché lo sblocchi…" hidden></textarea>
 
               <div class="mg-owner-row">
+                <!-- I tasti non vanno mai a capo (#1034): quando non entrano si stringono, vedi `.mg-owner-tasti`. -->
+                <div class="mg-owner-tasti">
                 <!-- Quali siano le azioni di stato lo dice la tabella condivisa MR.ownerActions, non questa pagina. Il gruppo
                    sparisce quando lo stato non si legge: su una segnalazione cifrata la macchina se lo inventerebbe. -->
                 <div class="mg-actions-group" id="mgActions" hidden>
@@ -1406,6 +1427,7 @@
                     <button type="button" class="mg-star-btn mg-preapprove-btn" id="mgPreapproveRevokeBtn"
                       hidden>Chiedimi prima</button>
                   </div>
+                </div>
                 </div>
 
                 <!-- Chi ha messo il segno: in fondo alla riga, accanto al tasto che lo dice acceso. -->
