@@ -25,7 +25,7 @@ for (const [larghezza, nome, fb] of CASI) {
       window.__mgTest.setTab('inbox');
       window.__mgTest.openDetail(f._id);
     }, fb);
-    await expect(page.locator('#mgArchiveBtn, [data-action-key="archive"]').first()).toBeVisible();
+    await expect(page.locator('#mgPreapproveBtn')).toBeVisible();
     const nascosti = await page.evaluate(() => {
       const riga = document.querySelector('#mgOwnerBar .mg-owner-row');
       const vis = (el) => el && !el.hidden && el.getClientRects().length > 0;
