@@ -76,11 +76,14 @@
     // Scryfall e scrive commander + commanderMeta (nome, identity, art crop).
     DECKS_SET_COMMANDER: 'decks_set_commander', // { id, scryfallId }
     // Chat unificata del Builder (§3-§4): NL → query Scryfall / carte
-    // cross-mazzo via LLM. { deckId, text, history?, lastResults? } →
-    // { ok, reply, cardIds, cards, query, deck?, clearChat? }. `lastResults` sono gli id
+    // cross-mazzo via LLM. { deckId, text, history?, lastResults?, reasoningReqId? } →
+    // { ok, reply, cardIds, cards, query, deck?, clearChat? } | { ok:false, stopped:true }. `lastResults` sono gli id
     // dell'ultima CardList mostrata (per "valuta questi risultati", §6.1); `clearChat`: l'utente ha
     // chiesto a parole di svuotare la chat, la pagina chiede conferma.
     DECKS_CHAT: 'decks_chat',
+    // «Ferma» sulla chat dei mazzi (#792): { reqId } (il reasoningReqId del turno) → { ok, fermato }. Solo dalle
+    // superfici di Filo e solo dalla scheda che ha avviato il turno.
+    DECKS_CHAT_STOP: 'decks_chat_stop',
     // La chat salvata di un mazzo (§3.2), solo dalle pagine filo://. EDIT applica UNA modifica alla chat salvata
     // (SN_DECK_CHAT.applyEdit: op 'append' | 'fill' | 'drop' | 'names') e rifiuta un mazzo che non esiste più, una
     // chat oltre il tetto (error 'too_many', max) o un turno che non c'è più (error 'gone').

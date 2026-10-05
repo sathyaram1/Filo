@@ -16,6 +16,7 @@
         'Mentre Filo lavora, al posto della rotella corre un filo. Accanto vedi scorrere il suo ragionamento, e ogni volta che fa qualcosa il filo fa un nodo col nome di quello che sta facendo, per esempio «Cercato sul web · orari treni». Quando risponde il filo si avvolge in un gomitolo con il riassunto, e un clic lo srotola. Il tasto d\'invio intanto diventa un quadrato che lo ferma subito, anche con Invio. Quello che aveva già fatto resta, e lo stesso tasto ti offre di riprendere senza rifarlo.',
       ],
       fixes: [
+        'Nella chat del deck builder vedi da quanto aspetti la risposta, e «Ferma» la interrompe, come Esc nel campo. La chat torna subito libera e il mazzo resta com\'era. Se Scryfall non risponde, dopo 30 secondi la chat te lo dice, e intanto anteprime e prezzi non restano bloccati.',
         'Su Windows, se in un comando che Filo esegue per te una parte sbaglia, per esempio un programma che non esiste, il resto della riga gira lo stesso, come quando la scrivi tu nel terminale. Prima si fermava tutto lì.',
         'La chat di Filo chiede le risposte solo ai fornitori che sanno usare i suoi strumenti, come cercare sul web o cambiare un\'impostazione. Prima uno che li ignorava faceva fallire la risposta senza spiegazione. Se per il modello che hai scelto non ce n\'è nessuno, Filo te lo dice.',
         'Se nelle Preferenze hai scelto il Prompt dei comandi, i comandi partono davvero, sia quelli che chiedi a Filo sia quelli che scrivi nel terminale, e un «cd» vale anche per quelli dopo.',

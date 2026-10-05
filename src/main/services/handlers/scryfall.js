@@ -2,6 +2,8 @@
 // La pagina non parla mai con Scryfall direttamente: passa da qui, così rate
 // limit e cache sono condivisi fra tutte le superfici.
 
+const { soloFilo } = require('./origine');
+
 module.exports = function register(on, ctx) {
   const { MSG, handleAIRequest } = ctx;
   const Scry = globalThis.SN_SCRYFALL;
@@ -127,10 +129,51 @@ module.exports = function register(on, ctx) {
   // provider viene attribuito a lui.
   const SCRYFALL_SOURCE = 'Scryfall (l\'archivio delle carte)';
   function friendlyChatError(e) {
+    if (Scry.isTimeout && Scry.isTimeout(e)) return `${e.userText}. Riprova tra poco.`;
     const CE = globalThis.SN_CHAT_ERRORS;
     if (!CE) return 'qualcosa è andato storto. Riprova.';
     return CE.friendly(e, { dataSource: SCRYFALL_SOURCE });
   }
+
+  // Scryfall che non risponde non è una carta che non esiste, né una query sbagliata: la frase dice quale dei due.
+  function scryfallDownText(e) {
+    if (Scry.isTimeout && Scry.isTimeout(e)) return e.userText;
+    const status = Number(e && e.status);
+    if (status >= 500 || status === 429) return 'Scryfall, l\'archivio delle carte, al momento non risponde';
+    return 'non sono riuscito a raggiungere Scryfall, l\'archivio delle carte';
+  }
+
+  // Turni della chat in volo, per fermarli davvero (#792): reqId → { ac, wcId, committing }.
+  const chatInVolo = new Map();
+  // Un «Ferma» arrivato prima che il suo turno si registri si tiene da parte, e vale quando il turno parte.
+  const fermatiPrima = new Map(); // reqId → { wcId, at }
+  const FERMATI_PRIMA_TTL_MS = 60_000;
+
+  function stoppedError() {
+    const e = new Error('risposta fermata dall\'utente');
+    e.name = 'AbortError';
+    e.code = 'ABORT_ERR';
+    return e;
+  }
+
+  // Ferma solo la scheda che ha avviato il turno. Mentre il mazzo si sta scrivendo la risposta è già arrivata, e
+  // arriva anche alla pagina (`fermato: false`): fermarla lì lascerebbe il mazzo cambiato senza dire perché.
+  on(MSG.DECKS_CHAT_STOP, soloFilo(async (msg, sender) => {
+    const reqId = String(msg?.reqId || '');
+    if (!reqId) return { ok: false, error: 'missing' };
+    const wcId = sender && sender.wc ? sender.wc.id : null;
+    const t = chatInVolo.get(reqId);
+    if (!t) {
+      const ora = Date.now();
+      for (const [k, v] of fermatiPrima) if (ora - v.at > FERMATI_PRIMA_TTL_MS) fermatiPrima.delete(k);
+      fermatiPrima.set(reqId, { wcId, at: ora });
+      return { ok: true, fermato: true };
+    }
+    if (t.wcId !== wcId) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    if (t.committing) return { ok: true, fermato: false };
+    t.ac.abort();
+    return { ok: true, fermato: true };
+  }));
 
   on(MSG.DECKS_CHAT, async (msg, sender) => {
     // Ragionamento del modello (CoT, #331): accumulato qui e ritornato alla
@@ -139,6 +182,26 @@ module.exports = function register(on, ctx) {
     // così si vede "pensare" in diretta. Dichiarato fuori dal try: anche un
     // turno fallito ritorna il ragionamento raccolto fin lì.
     let reasoning = '';
+    // Fermabile da subito, prima di qualunque attesa: un «Ferma» arrivato mentre si legge il mazzo spegne lo stesso
+    // la chiamata al modello prima che parta. Pagina chiusa o ricaricata: la risposta non la leggerebbe nessuno.
+    const wc = sender && sender.wc;
+    const reasoningReqId = msg?.reasoningReqId ? String(msg.reasoningReqId) : '';
+    const ac = new AbortController();
+    const { signal } = ac;
+    const turno = { ac, wcId: wc ? wc.id : null, committing: false };
+    if (reasoningReqId) {
+      chatInVolo.set(reasoningReqId, turno);
+      const prima = fermatiPrima.get(reasoningReqId);
+      if (prima) {
+        fermatiPrima.delete(reasoningReqId);
+        if (prima.wcId === turno.wcId) ac.abort();
+      }
+    }
+    const Chats = globalThis.SN_DECK_CHATS_SVC;
+    const smettiDiGuardare = Chats && Chats.onLeave ? Chats.onLeave(wc, () => ac.abort()) : () => {};
+    const fermata = () => ({ ok: false, stopped: true, error: 'fermata', ...(reasoning ? { reasoning } : {}) });
+    // Ogni chiamata al modello del turno porta il segnale, compresi giudice, tag e pareri: fermato, non ne parte un'altra.
+    const ai = (args) => (signal.aborted ? Promise.reject(stoppedError()) : handleAIRequest({ ...args, signal }));
     try {
       const text = String(msg?.text || '').trim();
       if (!text) return { ok: false, error: 'empty' };
@@ -153,7 +216,7 @@ module.exports = function register(on, ctx) {
       const others = all.filter((d) => d.id !== deck.id);
       const allIds = [];
       for (const d of [deck, ...others]) for (const c of d.carte) allIds.push(c.scryfall_id);
-      const known = await Scry.cards(allIds).catch(() => ({}));
+      const known = await Scry.cards(allIds, { signal }).catch(() => ({}));
 
       // `let`, non `const`: se in questo stesso turno l'utente stabilisce il
       // commander (build-around, sotto), va ricalcolato PRIMA della ricerca, così
@@ -179,8 +242,6 @@ module.exports = function register(on, ctx) {
 
       // Canale del ragionamento: accumulo sempre (torna nella risposta) +
       // inoltro live alla scheda che ha chiesto il turno, se c'è un reqId.
-      const wc = sender && sender.wc;
-      const reasoningReqId = msg?.reasoningReqId ? String(msg.reasoningReqId) : '';
       const onReasoning = (t) => {
         reasoning += t;
         if (reasoningReqId && wc && !wc.isDestroyed?.()) {
@@ -194,12 +255,13 @@ module.exports = function register(on, ctx) {
         }
       };
 
-      const r = await handleAIRequest({
+      const r = await ai({
         action: ACTIONS.DECKS_CHAT,
         payload: { messages },
         origin: 'filo://decks',
         onReasoning,
       });
+      if (signal.aborted) return fermata();
       const parsed = Q.parseAgentReply(r.text);
       // Svuotare la chat è della pagina, con la sua conferma: qui niente ricerche né modifiche al mazzo. Il testo è
       // di Filo, non del modello: resta vero anche se la conferma non arriva (Annulla, mazzo lasciato) o se il
@@ -225,6 +287,10 @@ module.exports = function register(on, ctx) {
       // La frase che il modello dà alla lista (#788); quella della query corretta al secondo tentativo, se c'è.
       let title = parsed.title;
       let sort = parsed.sort;
+      // Le modifiche al mazzo chieste nel turno (commander, budget, tag) si scrivono insieme alla fine, sul mazzo
+      // riletto: un turno fermato o caduto a metà non ne lascia nessuna (#792). `draft` è il mazzo come sarà.
+      const edits = [];
+      let draft = null;
 
       // Commander a parole (#337, #789): su un mazzo senza commander basta il nome (build-around); uno già impostato
       // cambia solo col segnale esplicito di sostituzione, e il vecchio rientra nel mazzo. Va PRIMA della ricerca,
@@ -232,7 +298,7 @@ module.exports = function register(on, ctx) {
       // lista incollata; senza segnale il commander della lista è solo un candidato dell'import, sotto.
       if (parsed.commanderName && (!parsed.import.length || parsed.replaceCommander)) {
         // Riletto adesso: mentre il modello rispondeva l'utente può aver cambiato il mazzo da un'altra strada.
-        const base = (await Store.get(deck.id)) || deck;
+        const base = draft || (await Store.get(deck.id)) || deck;
         if (base.commander && !parsed.replaceCommander) {
           const same = String(parsed.commanderName).toLowerCase() === String((base.commanderMeta && base.commanderMeta.name) || '').toLowerCase();
           if (!same) {
@@ -240,26 +306,34 @@ module.exports = function register(on, ctx) {
               .filter(Boolean).join('\n');
           }
         } else {
-          const found = await Scry.named(parsed.commanderName).catch(() => null);
-          if (!found) {
+          let found = null;
+          let down = null;
+          try {
+            found = await Scry.named(parsed.commanderName, { signal });
+          } catch (e) {
+            if (signal.aborted) throw e;
+            down = e;
+          }
+          if (down) {
+            retryable = true;
+            reply = [reply, `Il commander non è ${base.commander ? 'cambiato' : 'stato impostato'}: ${scryfallDownText(down)}. Riprova tra poco.`]
+              .filter(Boolean).join('\n');
+          } else if (!found) {
             reply = [reply, `Non ho trovato su Scryfall il commander «${parsed.commanderName}», quindi non l'ho ${base.commander ? 'cambiato' : 'impostato'}.`]
               .filter(Boolean).join('\n');
           } else if (found.id === base.commander) {
             reply = [reply, `[[${found.name}]] è già il commander di questo mazzo.`].filter(Boolean).join('\n');
           } else {
-            const swap = Decks.replaceCommander(base, found.id, {
-              name: found.name, colors: found.colorIdentity, artCrop: found.artCrop,
-            });
-            const saved = await Store.put(swap.deck);
-            if (saved) {
-              deckOut = saved;
-              identityColors = (saved.commanderMeta && Array.isArray(saved.commanderMeta.colors))
-                ? saved.commanderMeta.colors : identityColors;
-              reply = [reply, swap.previousId
-                ? `Ora il commander è [[${found.name}]] e le ricerche restano nei suoi colori. ${swap.previousName ? `[[${swap.previousName}]]` : 'Quello di prima'} torna nel mazzo come carta normale.`
-                : `Ho impostato [[${found.name}]] come commander: le ricerche ora restano nei suoi colori.`]
-                .filter(Boolean).join('\n');
-            }
+            const meta = { name: found.name, colors: found.colorIdentity, artCrop: found.artCrop };
+            const swap = Decks.replaceCommander(base, found.id, meta);
+            draft = swap.deck;
+            edits.push((d) => Decks.replaceCommander(d, found.id, meta).deck);
+            identityColors = (draft.commanderMeta && Array.isArray(draft.commanderMeta.colors))
+              ? draft.commanderMeta.colors : identityColors;
+            reply = [reply, swap.previousId
+              ? `Ora il commander è [[${found.name}]] e le ricerche restano nei suoi colori. ${swap.previousName ? `[[${swap.previousName}]]` : 'Quello di prima'} torna nel mazzo come carta normale.`
+              : `Ho impostato [[${found.name}]] come commander: le ricerche ora restano nei suoi colori.`]
+              .filter(Boolean).join('\n');
           }
         }
       }
@@ -278,13 +352,14 @@ module.exports = function register(on, ctx) {
         // Chi passa dal giudice segue le pagine di Scryfall fino al tetto: la query larga le riempie in fretta, e
         // fermarsi alla prima vedeva solo le 175 più economiche (#382). Oltre il tetto la chat lo dice.
         const runSearch = (q, c) => (critOf(c)
-          ? Scry.search(q, { identity: identityColors, maxCards: JUDGE_MAX_CARDS, remember: false,
+          ? Scry.search(q, { identity: identityColors, maxCards: JUDGE_MAX_CARDS, remember: false, signal,
             onPage: ({ found, total }) => onProgress({ fase: 'cerco', done: found, total: Math.min(total, JUDGE_MAX_CARDS) }) })
-          : Scry.search(q, { identity: identityColors }));
+          : Scry.search(q, { identity: identityColors, signal }));
         let sr = null;
         try {
           sr = await runSearch(parsed.query, criterion);
         } catch (e1) {
+          if (signal.aborted) throw e1;
           const status = Number(e1 && e1.status);
           const detail = String((e1 && e1.details) || '');
           let explained = false;
@@ -309,7 +384,7 @@ module.exports = function register(on, ctx) {
                   'Se la richiesta non è esprimibile in sintassi Scryfall, spiega il problema all\'utente in "reply" (in italiano, senza codici tecnici) e ometti "query".' +
                   (detail ? `\n\n${E.imbusta({ tipo: 'ESITO_SERVIZIO', testo: detail, conIntestazione: true, max: 2000 })}` : '') },
               ];
-              const r2 = await handleAIRequest({
+              const r2 = await ai({
                 action: ACTIONS.DECKS_CHAT,
                 payload: { messages: retryMessages },
                 origin: 'filo://decks',
@@ -333,12 +408,17 @@ module.exports = function register(on, ctx) {
                 // risposta per l'utente, il messaggio generico non serve.
                 explained = true;
               }
-            } catch (_) { sr = null; }
+            } catch (e2) {
+              if (signal.aborted) throw e2;
+              sr = null;
+            }
           }
           if (!sr && !explained) {
             retryable = true;
-            reply = [reply,
-              `Ho provato a cercare su Scryfall ma la ricerca non è andata a buon fine (la query «${parsed.query}» non è stata accettata${Number.isFinite(status) && (status >= 500 || status === 429) ? ' perché il servizio al momento non risponde' : ''}). Prova a riformulare la richiesta con parole diverse, o riprova tra poco.`,
+            const rejected = Number.isFinite(status) && status >= 400 && status < 500 && status !== 429;
+            reply = [reply, rejected
+              ? `Ho provato a cercare su Scryfall ma la ricerca non è andata a buon fine (la query «${parsed.query}» non è stata accettata). Prova a riformulare la richiesta con parole diverse, o riprova tra poco.`
+              : `La ricerca non è arrivata: ${scryfallDownText(e1)}. Riprova tra poco.`,
             ].filter(Boolean).join('\n');
           }
         }
@@ -361,10 +441,10 @@ module.exports = function register(on, ctx) {
               const previousAsks = criterion ? [] : history.filter((m) => m.role === 'user').slice(-3)
                 .map((m) => (m.content.length > 300 ? `${m.content.slice(0, 299)}…` : m.content));
               fr = await globalThis.SN_DECK_OPINIONS_SVC.filterSearch({
-                criterion: crit, cardIds, cards, handleAIRequest,
+                criterion: crit, cardIds, cards, handleAIRequest: ai,
                 context: await judgeContext({
-                  deck: deckOut || deck, criterion: crit, previousAsks,
-                  deckNames: (deckOut || deck).carte.map((c) => known[c.scryfall_id] && known[c.scryfall_id].name).filter(Boolean),
+                  deck: draft || deck, criterion: crit, previousAsks,
+                  deckNames: (draft || deck).carte.map((c) => known[c.scryfall_id] && known[c.scryfall_id].name).filter(Boolean),
                 }),
                 judgeModel: await judgeModelNow(),
                 onProgress: ({ done, total }) => onProgress({ fase: 'controllo', done, total }),
@@ -372,6 +452,7 @@ module.exports = function register(on, ctx) {
             } catch (e) {
               fr = { keepIds: cardIds, unverifiedIds: cardIds, error: e };
             }
+            if (signal.aborted) return fermata();
             cardIds = fr.keepIds;
             // Segnate in lista solo se sono una parte: se non l'ha controllata nessuna, lo dice già la nota.
             if (fr.unverifiedIds.length < found) uncheckedIds = fr.unverifiedIds;
@@ -392,7 +473,7 @@ module.exports = function register(on, ctx) {
       } else if (parsed.cards.length) {
         // Cross-mazzo: gli id vengono dal contesto (mai inventati) → risolti
         // dalla cache; quelli ignoti si scartano.
-        cards = await Scry.cards(parsed.cards).catch(() => ({}));
+        cards = await Scry.cards(parsed.cards, { signal }).catch(() => ({}));
         cardIds = parsed.cards.filter((id) => cards[id]);
       }
 
@@ -437,33 +518,46 @@ module.exports = function register(on, ctx) {
       if (parsed.import.length || importCommanderName) {
         const qtyById = {};
         const notFound = [];
+        // Al primo nome a cui Scryfall non risponde ci si ferma: gli altri aspetterebbero lo stesso servizio fermo, e
+        // non sono carte che non esistono.
+        let down = null;
+        const lookup = async (name) => {
+          try { return await Scry.named(name, { signal }); } catch (e) {
+            if (signal.aborted) throw e;
+            down = e;
+            return null;
+          }
+        };
         for (const entry of parsed.import) {
-          const found = await Scry.named(entry.name).catch(() => null);
+          const found = await lookup(entry.name);
+          if (down) break;
           if (found) { cardIds.push(found.id); cards[found.id] = found; qtyById[found.id] = entry.qty; }
           else notFound.push(entry.name);
         }
         let commanderId = '';
-        if (importCommanderName) {
-          const found = await Scry.named(importCommanderName).catch(() => null);
+        if (importCommanderName && !down) {
+          const found = await lookup(importCommanderName);
           if (found) {
             commanderId = found.id;
             cardIds.unshift(found.id);
             cards[found.id] = found;
             qtyById[found.id] = 1;
-          } else notFound.push(importCommanderName);
+          } else if (!down) notFound.push(importCommanderName);
         }
         importPending = { qtyById, commanderId };
         const n = cardIds.length;
         // Il commander della lista non scavalca quello del mazzo (lo cambia solo un'azione dedicata), ma va detto:
         // come nell'import dal selettore, una scelta dell'utente non sparisce in silenzio.
-        const onDeck = deckOut || deck;
+        const onDeck = draft || deck;
         const keptName = onDeck.commanderMeta && onDeck.commanderMeta.name;
         const kept = commanderId && onDeck.commander && commanderId !== onDeck.commander
           ? `La lista indica [[${cards[commanderId].name}]] come commander, ma il mazzo ha già ${keptName ? `[[${keptName}]]` : 'il suo'}: resta quello. Per cambiarlo, tasto destro su [[${cards[commanderId].name}]] → «Imposta come commander».`
           : '';
+        if (down) retryable = true;
         reply = [reply, n ? `Ho riconosciuto ${n} cart${n === 1 ? 'a' : 'e'}: conferma qui sotto quali aggiungere.` : '',
           kept,
-          notFound.length ? `Non ho trovato su Scryfall: ${notFound.join(', ')}.` : '']
+          notFound.length ? `Non ho trovato su Scryfall: ${notFound.join(', ')}.` : '',
+          down ? `${n ? 'Le altre carte della lista non le ho potute riconoscere' : 'Non ho potuto riconoscere le carte della lista'}: ${scryfallDownText(down)}. Riprova tra poco.` : '']
           .filter(Boolean).join('\n');
       }
 
@@ -471,21 +565,19 @@ module.exports = function register(on, ctx) {
       // SISTEMA (mai fidarsi che il modello "abbia già fatto"). Il mazzo
       // aggiornato torna alla pagina, che rinfresca header e statistiche.
       if (parsed.hasBudget) {
-        const saved = await Store.put(Decks.setBudget(deckOut || (await Store.get(deck.id)) || deck, parsed.budget));
-        if (saved) {
-          deckOut = saved;
-          reply = [reply, parsed.budget === null
-            ? 'Budget rimosso.'
-            // Formato italiano come il resto dei prezzi («40,50 €»).
-            : `Budget impostato a ${String(parsed.budget).replace('.', ',')} €.`].filter(Boolean).join('\n');
-        }
+        draft = Decks.setBudget(draft || (await Store.get(deck.id)) || deck, parsed.budget);
+        edits.push((d) => Decks.setBudget(d, parsed.budget));
+        reply = [reply, parsed.budget === null
+          ? 'Budget rimosso.'
+          // Formato italiano come il resto dei prezzi («40,50 €»).
+          : `Budget impostato a ${String(parsed.budget).replace('.', ',')} €.`].filter(Boolean).join('\n');
       }
 
       // Calcolatore di probabilità via chat (§9.3): la simulazione Monte Carlo
       // gira QUI, locale e gratis; il risultato si accoda alla reply.
       if (parsed.prob) {
         const Stats = globalThis.SN_DECK_STATS;
-        const library = Stats.buildLibrary(deckOut || deck, known);
+        const library = Stats.buildLibrary(draft || deck, known);
         const r2 = Stats.simulate({ library, want: parsed.prob.needs, turn: parsed.prob.turn });
         const pct = (r2.probability * 100).toFixed(1).replace('.', ',');
         const wantsTxt = parsed.prob.needs.map((w) => `${w.n} ${w.tag}`).join(' + ');
@@ -499,13 +591,13 @@ module.exports = function register(on, ctx) {
       // pagina, che rinfresca elenco (gruppi per tag) e statistiche.
       if (parsed.tagWith.length) {
         const Opinions = globalThis.SN_DECK_OPINIONS_SVC;
-        const base = deckOut || deck;
+        const base = draft || deck;
         const rt = await Opinions.autoTag({
-          deck: base, cards: known, tags: parsed.tagWith, handleAIRequest,
+          deck: base, cards: known, tags: parsed.tagWith, handleAIRequest: ai,
         });
         if (rt.changed) {
-          const saved = await Store.put(rt.deck);
-          if (saved) deckOut = saved;
+          draft = rt.deck;
+          edits.push((d) => globalThis.SN_DECK_OPINIONS.applyTagMembership(d, rt.tags, rt.membership).deck);
         }
         reply = [reply, rt.taggedCount
           ? `Ho taggato ${rt.taggedCount} cart${rt.taggedCount === 1 ? 'a' : 'e'} con: ${parsed.tagWith.join(', ')}. Raggruppa "per tag" per vederle divise.`
@@ -519,7 +611,7 @@ module.exports = function register(on, ctx) {
       // complessiva va nella reply della chat.
       if (parsed.evaluate) {
         const Opinions = globalThis.SN_DECK_OPINIONS_SVC;
-        const base = deckOut || deck;
+        const base = draft || deck;
         const targetIds = parsed.evaluate === 'results'
           ? (Array.isArray(msg?.lastResults) ? msg.lastResults.map(String).filter(Boolean) : [])
           : base.carte.map((c) => c.scryfall_id);
@@ -529,15 +621,26 @@ module.exports = function register(on, ctx) {
             : 'Il mazzo è vuoto: non c\'è ancora nulla da valutare.']
             .filter(Boolean).join('\n');
         } else {
-          const targetCards = await Scry.cards(targetIds).catch(() => ({}));
+          const targetCards = await Scry.cards(targetIds, { signal }).catch(() => ({}));
           const re = await Opinions.computeOpinions({
             deck: base, cards: targetCards, cardIds: targetIds,
-            mode: 'stale', wantSintesi: true, handleAIRequest,
+            mode: 'stale', wantSintesi: true, handleAIRequest: ai,
           });
           const n = Object.keys(re.opinions).length;
           reply = [reply, re.sintesi,
             n ? `Parere pronto su ${n} cart${n === 1 ? 'a' : 'e'}: lo leggi passando il mouse su una carta, col modulo «Parere di Filo» attivo nel riquadro del dettaglio (tasto destro sul riquadro per sceglierlo).` : '']
             .filter(Boolean).join('\n');
+        }
+      }
+
+      if (signal.aborted) return fermata();
+      if (edits.length) {
+        // Da qui la risposta è arrivata: un «Ferma» non la toglie più (DECKS_CHAT_STOP risponde `fermato: false`).
+        turno.committing = true;
+        const fresh = await Store.get(deck.id);
+        if (fresh) {
+          const saved = await Store.put(edits.reduce((d, fn) => fn(d), fresh));
+          if (saved) deckOut = saved;
         }
       }
 
@@ -558,6 +661,7 @@ module.exports = function register(on, ctx) {
         ...(importPending ? { importPending } : {}),
       };
     } catch (e) {
+      if (signal.aborted) return fermata();
       // Mai il codice grezzo in chat (#331): l'errore diventa una frase per
       // l'utente, e il ragionamento raccolto fin lì resta comunque visibile.
       // Il dettaglio tecnico resta nei log per la diagnosi.
@@ -567,6 +671,9 @@ module.exports = function register(on, ctx) {
         error: friendlyChatError(e) || 'chat fallita',
         ...(reasoning ? { reasoning } : {}),
       };
+    } finally {
+      smettiDiGuardare();
+      if (reasoningReqId && chatInVolo.get(reasoningReqId) === turno) chatInVolo.delete(reasoningReqId);
     }
   });
 

@@ -56,6 +56,8 @@
     if (names) out.nameIds = names;
     if (m.pending && turn) { out.pending = true; return out; }
     if (m.pending || m.interrupted) { out.interrupted = true; return out; }
+    // Fermata dall'utente (#792): resta detta così, col suo Riprova, anche riaprendo la chat.
+    if (m.stopped === true) { out.stopped = true; return out; }
     if (m.error) { out.error = str(m.error) || 'nessuna risposta'; return out; }
     const reply = str(m.reply);
     if (reply) out.reply = reply;
@@ -129,7 +131,7 @@
       if (i < 0 && !c.turn) {
         const last = cur.length - 1;
         const m = cur[last];
-        if (m && m.who === 'bot' && (m.error || m.interrupted || m.pending)) i = last;
+        if (m && m.who === 'bot' && (m.error || m.interrupted || m.stopped || m.pending)) i = last;
       }
       if (i < 0) return { error: 'gone' };
       const from = i > 0 && cur[i - 1].who === 'user' && (!text || cur[i - 1].text === text) ? i - 1 : i;
