@@ -4,10 +4,9 @@
 //   launchFilo()           → { app, shell }   (userData isolato in temp)
 //   bringToFront(app)
 //   contentBounds(app)     → { x, y, width, height, scale }
-//   captureComposite(...)  → cattura OS-level della finestra composita (shell
-//                            + WebContentsView native). Gli screenshot Playwright
-//                            per-pagina NON mostrano la composizione nativa, per
-//                            questo serve una cattura a livello di sistema.
+//   captureComposite(...)  → cattura della finestra composita (shell
+//                            + WebContentsView + finestre figlie). Gli screenshot
+//                            Playwright per-pagina NON mostrano la composizione.
 //   activeView(app, shell) → la Page Playwright della tab attiva
 //   markInteractables(...) → disegna badge numerati sugli elementi cliccabili e
 //                            ritorna la mappa indice→{page,x,y,...}
@@ -148,13 +147,16 @@ public class WinCap {
   return outPath;
 }
 
-// Dove la finestra sta su uno schermo, in pixel dello schermo; null se nessuno
-// schermo la mostra per intero (fuori schermo, trasparente, nascosta).
+// Dove la finestra sta su uno schermo, in pixel dello schermo; null se lo
+// schermo potrebbe non mostrarla: fuori schermo, trasparente, nascosta, o con
+// un'altra applicazione in primo piano che potrebbe coprirla.
 async function finestraSulloSchermo(app) {
   return app.evaluate(({ BrowserWindow, screen }) => {
     const all = BrowserWindow.getAllWindows();
     const win = all.find((w) => w._filoTabs) || all[0];
     if (!win || !win.isVisible() || win.isMinimized() || win.getOpacity() === 0) return null;
+    const attiva = BrowserWindow.getFocusedWindow();
+    if (!attiva || (attiva !== win && attiva.getParentWindow() !== win)) return null;
     const c = win.getContentBounds();
     const d = screen.getAllDisplays().find(({ bounds: s }) =>
       c.x >= s.x && c.y >= s.y && c.x + c.width <= s.x + s.width && c.y + c.height <= s.y + s.height);
@@ -166,22 +168,11 @@ async function finestraSulloSchermo(app) {
 
 // Cattura X11: il framebuffer contiene già il composito, si ritaglia la finestra.
 // Senza scrot né xwd + convert si ripiega sulla composizione di Electron.
+// Niente moveTop né focus: chiuderebbero il menu aperto (si chiude quando perde il
+// fuoco) e in xvfb, senza gestore di finestre, la madre finirebbe sopra le figlie.
 async function captureCompositeLinux(app, outPath, dove) {
   const display = process.env.DISPLAY || ':0';
   const xEnv = { ...process.env, DISPLAY: display };
-
-  // In xvfb non c'è un gestore di finestre: senza moveTop un altro client X potrebbe coprirla.
-  try {
-    await app.evaluate(async ({ BrowserWindow }) => {
-      const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs) || BrowserWindow.getAllWindows()[0];
-      if (!win) return;
-      win.show();
-      win.moveTop();
-      win.focus();
-    });
-    await sleep(300); // attendi che X dispatchi gli eventi di layout
-  } catch (_) {}
-
   const { x, y, width, height } = dove;
   const scrot = resolveExecutable('scrot');
   if (scrot) {
@@ -268,11 +259,13 @@ export async function captureCompositeElectron(app, outPath) {
     }
 
     // Una vista nascosta con setVisible(false) conserva i suoi bounds: lo sa solo la pagina.
+    // Se è «hidden» anche la shell, il sistema crede coperta la finestra intera e la pagina non dice niente.
+    const visibilita = (wc) => conTetto(wc.executeJavaScript('document.visibilityState').catch(() => 'visible'), 1000, 'visible');
+    const pagineAttendibili = (await visibilita(win.webContents)) !== 'hidden';
     const saltate = [];
     const immagini = [];
     for (const s of strati) {
-      const stato = await conTetto(s.wc.executeJavaScript('document.visibilityState').catch(() => 'visible'), 1000, 'visible');
-      if (stato === 'hidden') continue;
+      if (s.wc !== win.webContents && pagineAttendibili && (await visibilita(s.wc)) === 'hidden') continue;
       const img = await conTetto(s.wc.capturePage().catch(() => null), 5000, null);
       if (!img || img.isEmpty()) { saltate.push(s.wc.getURL()); continue; }
       const k = Math.max(...(img.getScaleFactors?.() || [1]));
