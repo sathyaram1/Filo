@@ -1635,70 +1635,6 @@
       .filter((r) => !list.some((fb) => richiestaDiQuesto(r, fb)));
   }
 
-  /**
-   * Il testo di un livello (la segnalazione del rombo, la nota del pentagono)
-   * spezzato in righe tipizzate, per disegnarlo senza HTML. I file di `--segnala`
-   * e `--nota` sono markdown con tre titoli obbligatori («## Problema»,
-   * «## Scelte», «## Cosa ho fatto nel frattempo») e voci a trattino: mostrati
-   * grezzi, cancelletti e trattini compaiono come caratteri e l'owner legge un
-   * blocco con simboli al posto di tre sezioni. Qui si riconoscono SOLO titoli
-   * e voci d'elenco (grassetto e codice in linea: pezziInline): niente HTML
-   * dal testo, che resta testo. PURA.
-   *   { tipo:'titolo', livello:1..6, testo } | { tipo:'voce', testo } |
-   *   { tipo:'testo', testo }  (le righe di seguito si uniscono in un paragrafo)
-   */
-  function righeTesto(testo) {
-    const out = [];
-    const righe = String(testo == null ? '' : testo).replace(/\r\n?/g, '\n').split('\n');
-    let paragrafo = null;
-    const chiudi = () => { paragrafo = null; };
-    for (const raw of righe) {
-      const line = raw.replace(/\s+$/, '');
-      if (!line.trim()) { chiudi(); continue; }
-      const h = /^\s{0,3}(#{1,6})\s+(.*?)\s*#*$/.exec(line);
-      if (h && h[2].trim()) { chiudi(); out.push({ tipo: 'titolo', livello: h[1].length, testo: h[2].trim() }); continue; }
-      const li = /^\s*(?:[-*+•]|\d{1,3}[.)])\s+(.*)$/.exec(line);
-      if (li && li[1].trim()) { chiudi(); out.push({ tipo: 'voce', testo: li[1].trim() }); continue; }
-      if (paragrafo) { paragrafo.testo += '\n' + line.trim(); continue; }
-      paragrafo = { tipo: 'testo', testo: line.trim() };
-      out.push(paragrafo);
-    }
-    return out;
-  }
-
-  /**
-   * Il grassetto e il codice in linea di una riga di righeTesto, in pezzi da
-   * disegnare come nodi: «**A.**» è la forma che il modello della segnalazione
-   * prescrive per le scelte. Una coppia mai chiusa resta testo. PURA.
-   *   [{ testo, grassetto?: true, codice?: true }]
-   */
-  function pezziInline(testo) {
-    const s = String(testo == null ? '' : testo);
-    const out = [];
-    const testoSemplice = (t, extra) => { if (t) out.push(Object.assign({ testo: t }, extra)); };
-    const conCodice = (t, extra) => {
-      const re = /`([^`\n]+)`/g;
-      let da = 0;
-      for (let m; (m = re.exec(t));) {
-        testoSemplice(t.slice(da, m.index), extra);
-        out.push(Object.assign({ testo: m[1] }, extra, { codice: true }));
-        da = re.lastIndex;
-      }
-      testoSemplice(t.slice(da), extra);
-    };
-    // Il codice si prende per primo: gli asterischi dentro i backtick restano asterischi.
-    const re = /(`[^`\n]+`)|\*\*(?=[^*\s])([^*\n]*?[^*\s])\*\*/g;
-    let da = 0;
-    for (let m; (m = re.exec(s));) {
-      conCodice(s.slice(da, m.index));
-      if (m[1]) conCodice(m[1]);
-      else conCodice(m[2], { grassetto: true });
-      da = re.lastIndex;
-    }
-    conCodice(s.slice(da));
-    return out;
-  }
-
   global.SN_MANAGE_REVIEW = {
     normalizeStatus,
     // Il guard "questo è passato dalle mani della sicurezza" letto dai campi
@@ -1721,7 +1657,7 @@
     classifyReevalResult, reevalErrorHint, REEVAL_WASTE_LIMIT,
     livelli, livelloPer, livelloL1, livelloL2, livelloL3, livelloL4, livelloL5, righeStato,
     fusioneInAttesa, fusioniSenzaFeedback, richiestaDiQuesto, numeroOf,
-    l1MotivoText, LIVELLO_COLORI, L1_MOTIVI, righeTesto, pezziInline,
+    l1MotivoText, LIVELLO_COLORI, L1_MOTIVI,
     aspettaRisposta, ultimaDomanda, TESTO_CIFRATO,
     FRASE_SEGNO_ERRATO, fermatoDalSegno, motivoSegnoText,
   };

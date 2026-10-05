@@ -359,9 +359,9 @@ test('fermo su una scelta dell’owner: sta fra i Ricevuti con la casella di ris
   await expect(page.locator('#mgSideBody')).toContainText('Due strade con costi diversi');
 });
 
-test('nel rombo e nel pentagono il grassetto e il codice in linea si leggono come tali, non come asterischi; l’HTML resta testo', async ({ openTab }) => {
+test('nel rombo, nel pentagono e nella conversazione il markdown della segnalazione si legge formattato, non come simboli; l’HTML resta testo', async ({ openTab }) => {
   // «**A.**» è la forma che il modello della segnalazione prescrive per le scelte (#703).
-  const SEGNALAZIONE = '## Problema\nIl nome del file salvato: dal sito o chiesto ogni volta?\n\n## Scelte\n- **A.** Dal sito: zero attrito.\n- **B.** Chiesto: un passaggio in più.\n\n## Cosa ho fatto nel frattempo\nHo preso la **A.** <b>finto</b> <img src=x onerror="window.__xss=1">';
+  const SEGNALAZIONE = '## Problema\nIl nome del file salvato: dal sito o chiesto ogni volta?\n\n## Scelte\n- **A.** Dal sito: zero attrito.\n- **B.** Chiesto: un passaggio in più.\n\n## Cosa ho fatto nel frattempo\nHo preso la **A.**, la *meno* invasiva. <b>finto</b> <img src=x onerror="window.__xss=1">\n1. Primo passo.\n2. Secondo passo.';
   const fb = {
     _id: 'fb-livelli-grassetto', text: 'Il download non tiene il nome del file.', name: 'Nome del file',
     seq: 704, subSeq: 0, status: 'design', statusReason: 'decisione', branch: 'worker/fb-livelli-grassetto',
@@ -378,11 +378,15 @@ test('nel rombo e nel pentagono il grassetto e il codice in linea si leggono com
 
   await page.locator('#mgLivelliRow .mg-forma[data-livello="l3"]').click();
   const corpo = page.locator('#mgSideBody');
-  await expect(corpo.locator('.mg-liv-elenco li')).toHaveText(['A. Dal sito: zero attrito.', 'B. Chiesto: un passaggio in più.']);
-  await expect(corpo.locator('.mg-liv-elenco li strong')).toHaveText(['A.', 'B.']);
-  expect(await corpo.locator('.mg-liv-elenco li strong').first().evaluate((e) => Number(getComputedStyle(e).fontWeight))).toBeGreaterThanOrEqual(600);
+  await expect(corpo.locator('.mg-liv-testo ul li')).toHaveText(['A. Dal sito: zero attrito.', 'B. Chiesto: un passaggio in più.']);
+  await expect(corpo.locator('.mg-liv-testo ul li strong')).toHaveText(['A.', 'B.']);
+  expect(await corpo.locator('.mg-liv-testo ul li strong').first().evaluate((e) => Number(getComputedStyle(e).fontWeight))).toBeGreaterThanOrEqual(600);
   await expect(corpo).not.toContainText('**');
-  await expect(corpo.locator('.mg-liv-par strong')).toHaveText('A.');
+  await expect(corpo.locator('.mg-liv-testo p strong')).toHaveText('A.');
+  await expect(corpo.locator('.mg-liv-testo em')).toHaveText('meno');
+  await expect(corpo).not.toContainText('*meno*');
+  // Un elenco numerato tiene i numeri: una scelta citata per numero si ritrova.
+  await expect(corpo.locator('.mg-liv-testo ol li')).toHaveText(['Primo passo.', 'Secondo passo.']);
   await expect(corpo).toContainText('<b>finto</b> <img src=x');
   expect(await corpo.locator('b, img').count()).toBe(0);
   expect(await page.evaluate(() => window.__xss)).toBeUndefined();
@@ -396,6 +400,16 @@ test('nel rombo e nel pentagono il grassetto e il codice in linea si leggono com
   await expect(corpo.locator('.mg-liv-testo strong')).toHaveText('dentro');
   await expect(corpo).not.toContainText('`');
   await page.locator('#mgSide').screenshot({ path: 'tests/.shots/livelli-pentagono-codice-light.png' });
+
+  // La stessa segnalazione nella conversazione della pratica, il primo testo che l'owner legge.
+  const turno = page.locator('#mgThread .mg-bubble--model', { hasText: 'Segnalazione per l' });
+  await expect(turno.locator('ul li strong')).toHaveText(['A.', 'B.']);
+  await expect(turno.locator('h4')).toHaveText(['Problema', 'Scelte', 'Cosa ho fatto nel frattempo']);
+  await expect(turno).not.toContainText('**A.**');
+  await expect(turno).not.toContainText('## ');
+  await expect(turno).toContainText('<b>finto</b>');
+  expect(await page.locator('#mgThread').locator('b, img:not(.mg-img-loading)').count()).toBe(0);
+  expect(await page.evaluate(() => window.__xss)).toBeUndefined();
 });
 
 test('il pentagono verde dice cosa ha controllato l’audit, e non offre di saltarlo', async ({ openTab }) => {

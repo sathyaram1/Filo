@@ -1082,7 +1082,11 @@
         const atts = Array.isArray(t.attachments) ? t.attachments : [];
         const tImgs = atts.filter((a) => a && a.kind === 'img').map((a) => a.url);
         const tFiles = atts.filter((a) => a && a.kind === 'file');
-        const bodyHtml = t.body ? `<div class="fb-bubble-body">${escapeHtml(t.body)}</div>` : '';
+        // Il turno di Filo è il markdown di un modello: lo stesso formattatore della chat, come in Gestione.
+        const corpo = who === 'Filo' && window.SN_MARKDOWN
+          ? `<div class="filo-md">${window.SN_MARKDOWN.render(t.body)}</div>`
+          : escapeHtml(t.body);
+        const bodyHtml = t.body ? `<div class="fb-bubble-body">${corpo}</div>` : '';
         return `
           <div class="fb-bubble fb-bubble--${t.role}">
             <div class="fb-bubble-head"><span class="fb-bubble-who">${who}</span>${tsLabel}</div>
