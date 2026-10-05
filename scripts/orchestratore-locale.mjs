@@ -435,7 +435,7 @@ function vivo(pid) {
 async function main(argv) {
   const [cmd, ...rest] = argv;
   const tenute = opzioniTenuteDaNpm();
-  if (tenute.length) throw erroreDiUso(`npm si è tenuto ${tenute.join(' ')}: dopo «npm run orchestra» serve «--» (npm run orchestra -- ${cmd || 'avvia'} …); se invece sta nella configurazione di npm, lancia node scripts/orchestratore-locale.mjs ${cmd || 'avvia'} …`);
+  if (tenute.length) throw erroreDiUso(`npm si è tenuto ${tenute.join(' ')}: dopo «npm run orchestra» serve «--» (npm run orchestra -- ${cmd || 'avvia'} …); se invece sta nella configurazione di npm, lancia «node scripts/orchestratore-locale.mjs ${cmd || 'avvia'} …»`);
   const P = percorsi();
   const store = negozio(join(P.note, 'stato.json'));
   const ora = () => new Date().toISOString();

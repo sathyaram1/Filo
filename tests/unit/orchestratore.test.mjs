@@ -5,14 +5,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { createRequire } from 'node:module';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   apriDerivatiDi, modoDerivati, attesaLimite, caricoBasta, chiaveVerdetto, classificaFinish, creaMotore, decidiDopoVerifica, derivatiDaAprire, nuovaPratica, passoDalRamo,
   promptLavoratore, promptVerificatore, regolaFile, richiestaArg, riprendi, rigaStato, serveDeploy, siSovrappongono, toccaRegole, togliWorktree,
 } from '../../scripts/lib/orchestratore.mjs';
 import {
-  accessoDaStatus, argomentiClaude, envFiglio, frontmatter, leggiArgomenti, leggiUscitaClaude, modelloDelRuolo, opzioniDa, opzioniTenuteDaNpm, richiestaDaLettura, trovaClaude,
+  IMPOSTAZIONI_NPM_VICINE, OPZIONI_DI, accessoDaStatus, argomentiClaude, envFiglio, frontmatter, leggiArgomenti, leggiUscitaClaude, modelloDelRuolo, opzioniDa, opzioniTenuteDaNpm, richiestaDaLettura, trovaClaude,
 } from '../../scripts/orchestratore-locale.mjs';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
