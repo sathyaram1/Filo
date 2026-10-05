@@ -979,8 +979,9 @@ module.exports = function register(on, ctx) {
       avviiRoutine: async () => Defaults.getWorkerLog(await liveToken(), { severo: true }),
       idDelNumero: async (num) => FB.idDelNumero(num, { timeoutMs: 20000, idToken: await liveToken() }),
       listVersions: async () => {
-        const { rows, complete, readTime } = await FB.listAllPaged({ timeoutMs: 20000, idToken: await liveToken(), fields: ['__name__'] });
-        return { versions: rows.map((r) => ({ _id: r._id, _updateTime: r._updateTime })), complete, readTime };
+        // La data d'invio costa pochi byte e serve a chi tiene solo i più recenti (nellaFinestra).
+        const { rows, complete, readTime } = await FB.listAllPaged({ timeoutMs: 20000, idToken: await liveToken(), fields: ['createdAt'] });
+        return { versions: rows.map((r) => ({ _id: r._id, _updateTime: r._updateTime, createdAt: r.createdAt })), complete, readTime };
       },
       listChangedSince: async ({ since }) => {
         const out = await FB.listChangedSince({ since, timeoutMs: 20000, idToken: await liveToken(), fields: campi });

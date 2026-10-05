@@ -1,5 +1,5 @@
-// Aggiornamento continuo della Gestione: la logica pura (confronto, fusione,
-// quando girare, cosa è arrivato, dove tenere lo scorrimento), senza rete.
+// Aggiornamento continuo di Gestione e Feedback: la logica pura (confronto, fusione,
+// quando girare, cosa è arrivato, dove tenere lo scorrimento), senza rete; il giro della pagina sta in feedbackLivePagina.js.
 // Le regole: patterns/dati-che-cambiano-altrove-cloud-si-chiede-la-versione.md
 // e patterns/chi-guarda-in-continuo-chiede-cosa-e-cambiato.md (#676).
 
@@ -194,6 +194,32 @@
       if (String(v.statusReason || '') !== String(fb.statusReason || '')) return true;
     }
     return false;
+  }
+
+  // Le richieste di fusione come le tengono le pagine. Il campanello del main manda solo ciò che è cambiato:
+  // le pre-approvate che non porta restano quelle di prima.
+  function fusioniDa(risposta, prima) {
+    const r = risposta && typeof risposta === 'object' ? risposta : {};
+    const p = prima && typeof prima === 'object' ? prima : {};
+    const elenco = (v) => (Array.isArray(v) ? v : []);
+    return {
+      pending: elenco(r.pending),
+      failed: elenco(r.failed),
+      recent: elenco(r.recent),
+      preapproved: Array.isArray(r.preapproved) ? r.preapproved : elenco(p.preapproved),
+    };
+  }
+
+  // Una pagina che tiene solo i più recenti (la pagina Feedback) non fa entrare dal riallineamento i feedback
+  // più vecchi della sua finestra: un ricaricamento non li mostrerebbe. `soglia` = createdAt del più vecchio
+  // caricato (ms), null = nessuna finestra. Una versione senza data entra: meglio una riga in più che una persa.
+  function nellaFinestra(added, remote, soglia) {
+    if (!soglia) return Array.isArray(added) ? added.slice() : [];
+    const perId = new Map((Array.isArray(remote) ? remote : []).filter((v) => v && v._id).map((v) => [String(v._id), v]));
+    return (Array.isArray(added) ? added : []).filter((id) => {
+      const v = perId.get(String(id));
+      return !v || !v.createdAt || createdMs(v) >= soglia;
+    });
   }
 
   // Lo scorrimento si tiene sulla prima scheda visibile, non in pixel: se una
@@ -461,7 +487,7 @@
   global.SN_FEEDBACK_LIVE = {
     POLL_MS, CLOCK_MS, RIENTRO_MIN_MS, GIRO_BLOCCATO_MS, FERMA_DOPO_MS, LISTA_IN_USO_MS,
     RECONCILE_MS, OVERLAP_MS, SEGUITI_TETTO, REGISTRO_SEGUI_MS, createdMs,
-    diffVersions, applyChanges, decidiGiro, listaFerma, arrivi, statoCambiato,
+    diffVersions, applyChanges, decidiGiro, listaFerma, arrivi, statoCambiato, fusioniDa, nellaFinestra,
     ancoraScorrimento, scrollDaAncora, listaInUso, makeWatcher,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
