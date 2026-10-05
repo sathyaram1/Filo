@@ -1572,7 +1572,7 @@
         righe: [],
         testo: inConflitto
           ? 'Avevi detto sì, ma la fusione non è avvenuta: il ramo non entra in main finché non si sistema.'
-          : fusione === 'volo' ? 'Il via libera è partito: il server sta fondendo il ramo.'
+          : fusione === 'volo' ? 'Approvata: il server sta fondendo il ramo.'
             : fusione === 'decisa' ? 'Hai già deciso: la richiesta esce da qui appena la pagina rilegge le fusioni.'
               : 'I controlli del server l’hanno fermata: entra in main solo col tuo via libera.',
         azioni: [],

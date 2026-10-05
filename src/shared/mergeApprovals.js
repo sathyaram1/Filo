@@ -106,7 +106,7 @@
 
   /** La frase sotto il titolo, con lo stesso conto: «aspettano il tuo sì» solo se qualcuna aspetta. PURA. */
   var INTRO_FERME = 'I controlli di sicurezza del server le hanno fermate perché toccano parti protette. Aspettano il tuo sì.';
-  var INTRO_IN_CORSO = 'I controlli di sicurezza del server l’hanno fermata perché tocca parti protette. Il via libera è partito: il server la sta fondendo.';
+  var INTRO_IN_CORSO = 'I controlli di sicurezza del server l’hanno fermata perché tocca parti protette. È approvata: il server la sta fondendo.';
   function introText(count, inCorso) {
     if (Math.floor(Number(count) || 0) > 0) return INTRO_FERME;
     if (Math.floor(Number(inCorso) || 0) > 0) return INTRO_IN_CORSO;

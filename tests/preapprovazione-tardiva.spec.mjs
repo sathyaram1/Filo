@@ -344,3 +344,54 @@ test('una fusione in volo non toglie dal titolo quella che aspetta ancora il sì
   await expect(ferma.locator('.sn-mac-btn-go')).toBeEnabled();
   await expect(page.locator(`#mgSideBody .sn-mac-card[data-request-id="${coperta.id}"] .sn-mac-btn-go`)).toBeDisabled();
 });
+
+test('fusione in volo: nessuna frase del pannello o della lista dice ancora che aspetta il tuo sì, nemmeno appena fusa', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const fb = pratica({ mergePreapproved: { by: 'owner@esempio', at: '2026-09-20T09:00:00.000Z' } });
+  const req = richiesta();
+  // Una fusione ferma porta la pratica fra le cose da decidere: la riga in lista sta nei Ricevuti.
+  await apri(page, [fb], { pending: [req], ritardoMs: 5000, tab: 'inbox' });
+  await expect.poll(() => approvazioni(page), { timeout: 8000 }).toEqual([req.id]);
+  await apriQuadrato(page, fb._id);
+
+  const lato = page.locator('#mgSideBody');
+  await expect(lato.locator('.mg-liv-testo')).toHaveText('Approvata: il server sta fondendo il ramo.');
+  await expect(lato.locator('.sn-mac-intro')).toContainText('il server la sta fondendo');
+  expect(await lato.innerText()).not.toMatch(/via libera|Aspettano il tuo sì/);
+  const riga = page.locator(`.mg-item[data-id="${fb._id}"]`);
+  await expect(riga.locator('.mg-fusione-badge')).toHaveText('in fusione');
+  expect(await riga.getAttribute('title')).not.toContain('aspetta il tuo via libera');
+
+  // Appena fusa, prima che la pagina rilegga le richieste: niente «in corso» né «aspetta».
+  await expect(lato.locator('.sn-mac-status')).toContainText('Fatto: il lavoro è su main', { timeout: 10000 });
+  expect(await lato.locator('.sn-mac-title-text').textContent()).toBe('Una fusione decisa');
+  expect(await lato.locator('.mg-liv-testo').textContent()).not.toMatch(/via libera|sta fondendo/);
+});
+
+test('«Approva e fondi» armato quando la fusione parte da sola: la card passa subito al tentativo in corso', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const fb = pratica({ _updateTime: 't1' });
+  const req = richiesta();
+  await apri(page, [fb], { pending: [req], ritardoMs: 5000 });
+  await apriQuadrato(page, fb._id);
+  const card = page.locator('#mgSideBody .sn-mac-card');
+  const approva = card.locator('.sn-mac-btn-go');
+  await approva.click();
+  await expect(approva).toHaveText('Confermi?');
+
+  const conSegno = pratica({ _updateTime: 't2', mergePreapproved: { by: 'owner (script)', at: '2026-09-20T10:00:00.000Z' } });
+  await page.evaluate((doc) => window.__mgTest.setLiveSources({
+    listVersions: async () => [{ _id: doc._id, _updateTime: 't2' }],
+    getMany: async () => [doc],
+  }), conSegno);
+  await page.evaluate(() => window.__mgTest.pollNow());
+  await expect.poll(() => approvazioni(page), { timeout: 8000 }).toEqual([req.id]);
+
+  await expect(approva).toBeDisabled();
+  await expect(approva).toHaveText('Approva e fondi');
+  await expect(card.locator('.sn-mac-status')).toContainText('chiedo al server di fondere');
+  await expect(page.locator('#mgSideBody .sn-mac-title-text')).toHaveText('Una fusione in corso');
+  await expect(page.locator('#mgSideBody .mg-liv-testo')).toHaveText('Approvata: il server sta fondendo il ramo.');
+  await expect(card.locator('.sn-mac-status')).toContainText('Fatto: il lavoro è su main', { timeout: 10000 });
+  expect(await approvazioni(page)).toEqual([req.id]);
+});

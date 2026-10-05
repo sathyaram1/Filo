@@ -82,6 +82,12 @@ describe('il titolo', () => {
     assert.equal(UI.headline(0, 2), '2 fusioni in corso');
     assert.equal(UI.headline(1, 1), 'Una fusione aspetta il tuo via libera');
     assert.equal(UI.headline(0, 0), '');
+    // Fusa, scartata o sostituita, in attesa della rilettura: non aspetta più, e non è in corso (#702).
+    assert.equal(UI.headline(0, 0, 1), 'Una fusione decisa');
+    assert.equal(UI.headline(0, 1, 1), 'Una fusione in corso');
+    assert.match(UI.introText(1, 1), /Aspettano il tuo sì/);
+    assert.doesNotMatch(UI.introText(0, 1), /Aspettano il tuo sì|via libera/);
+    assert.equal(UI.introText(0, 0), '');
   });
 });
 

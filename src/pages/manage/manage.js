@@ -1332,8 +1332,28 @@
     risposta.then((reply) => {
       approvazioniInVolo.delete(req.id);
       if (UI) esitiTentati.set(req.id, UI.outcomeMessage(reply, req));
+      statoFusioniCambiato();
     });
+    if (UI) UI.seguiSulPosto(document, req.id, { risposta, attesa });
+    statoFusioniCambiato();
     return risposta;
+  }
+
+  // Dove sta una richiesta ferma, per le frasi che dicono se aspetta l'owner: in volo, già
+  // decisa (fusa, scartata, sostituita) in attesa della rilettura, o ferma davvero (null).
+  function statoRichiesta(req) {
+    if (!req) return null;
+    if (approvazioniInVolo.has(req.id)) return 'volo';
+    const esito = esitiTentati.get(req.id);
+    return esito && (esito.kind === 'ok' || esito.reload) ? 'decisa' : null;
+  }
+  function opzioniLivelli(fb) {
+    return { fusioni, dettaglioLetto: !FB.soloLista(fb), statoRichiesta };
+  }
+  // Una richiesta che parte, arriva o viene decisa cambia le frasi della lista e del quadrato.
+  function statoFusioniCambiato() {
+    if (dataLoaded) ridisegnaListaAlSuoPosto();
+    aggiornaTestoQuadrato();
   }
 
   // Dal numero della segnalazione (l'etichetta "automazione · feedback #N"
@@ -1374,6 +1394,7 @@
     const UI = window.SN_MERGE_APPROVALS;
     const reply = await sendToMain({ type, id: req.id });
     if (UI) esitiTentati.set(req.id, UI.outcomeMessage(reply, req));
+    statoFusioniCambiato();
     return reply;
   }
 
@@ -2233,6 +2254,12 @@
   }
 
   // Questa segnalazione ha una fusione ferma che aspetta l'owner?
+  // Etichetta e suggerimento della pratica in lista: «aspetta il tuo via libera» solo se aspetta davvero (#702).
+  const TESTI_FUSIONE_LISTA = {
+    ferma: { etichetta: 'fusione ferma', titolo: 'Una fusione aspetta il tuo via libera', tooltip: 'una fusione aspetta il tuo via libera' },
+    volo: { etichetta: 'in fusione', titolo: 'Approvata: il server sta fondendo il ramo', tooltip: 'il server sta fondendo il ramo' },
+    decisa: { etichetta: 'fusione decisa', titolo: 'Hai già deciso: esce da qui alla prossima rilettura', tooltip: 'fusione già decisa' },
+  };
   function fusioneFerma(fb) {
     return MR.fusioneInAttesa(fb, { fusioni });
   }
@@ -2317,6 +2344,7 @@
       // e stesso peso, così si riconosce scorrendo la lista.
       const ferma = fusioneFerma(fb);
       if (ferma) item.classList.add('mg-item--fusione');
+      const fusioneTesti = TESTI_FUSIONE_LISTA[(ferma && MR.livelloL5(fb, opzioniLivelli(fb)).fusione) || 'ferma'];
       const arrivata = arrivate.has(String(fb._id));
       if (arrivata) item.classList.add('mg-item--arrivata');
       item.style.borderLeftColor = ferma
@@ -2338,14 +2366,14 @@
       ));
       item.title = (num ? `#${num} · ` : '') + title
         + (norm.statusReason ? ` — ${MR.reasonText(norm.statusReason)}` : '')
-        + (ferma ? ' — una fusione aspetta il tuo via libera' : '')
+        + (ferma ? ` — ${fusioneTesti.tooltip}` : '')
         + (arrivata ? ' — arrivata qui mentre la pagina era aperta' : '')
         + (ripartenze ? ` · rientrato in coda ${ripartenze} volt${ripartenze === 1 ? 'a' : 'e'}` : '');
       const rowHtml = `
         ${authorIconHtml(fb)}
         ${num ? `<span class="mg-item-num">#${esc(num)}</span>` : ''}
         <span class="mg-item-title">${esc(title)}</span>
-        ${ferma ? '<span class="mg-fusione-badge" title="Una fusione aspetta il tuo via libera">fusione ferma</span>' : ''}
+        ${ferma ? `<span class="mg-fusione-badge" title="${esc(fusioneTesti.titolo)}">${esc(fusioneTesti.etichetta)}</span>` : ''}
         ${leggibile ? '' : statePublicHtml(fb)}
         ${preapprovedHtml(fb)}
         ${localBadgeHtml(fb)}
@@ -4252,7 +4280,7 @@
     }
 
     mgLivelliRow.hidden = false;
-    for (const liv of MR.livelli(fb, { fusioni, dettaglioLetto: !FB.soloLista(fb) })) {
+    for (const liv of MR.livelli(fb, opzioniLivelli(fb))) {
       if (liv.key !== 'l2') { mgForme.appendChild(formaEl(liv, fb)); continue; }
       // I giudici: un cerchio per giudice ATTESO, non per verdetto. Un panel
       // parziale mostra i mancanti tratteggiati, non un panel accorciato — e
@@ -4570,7 +4598,7 @@
   // fusioni) e «Salta il controllo» dell'audit.
   function openSidebarLivello(fb, key) {
     if (!fb) return;
-    const liv = MR.livelloPer(fb, key, { fusioni, dettaglioLetto: !FB.soloLista(fb) });
+    const liv = MR.livelloPer(fb, key, opzioniLivelli(fb));
     if (!liv) return;
     segnaForma(key);
     giudiceAperto = null;
@@ -4601,13 +4629,7 @@
     if (p.testo) {
       const t = document.createElement('div');
       t.className = 'mg-liv-testo';
-      // Testo cifrato che questo computer non sa leggere: si dice, non si
-      // mostra il blob.
-      if (p.illeggibile) {
-        t.textContent = MR.TESTO_CIFRATO;
-      } else {
-        t.innerHTML = markdownHtml(p.testo);
-      }
+      riempiTestoLivello(t, p);
       body.appendChild(t);
     }
 
@@ -4624,6 +4646,26 @@
     return window.SN_MARKDOWN ? `<div class="filo-md">${window.SN_MARKDOWN.render(testo)}</div>` : esc(testo);
   }
 
+  function riempiTestoLivello(t, p) {
+    // Testo cifrato che questo computer non sa leggere: si dice, non si
+    // mostra il blob.
+    if (p.illeggibile) {
+      t.textContent = MR.TESTO_CIFRATO;
+      return;
+    }
+    t.innerHTML = markdownHtml(p.testo);
+  }
+
+  // La frase del quadrato aperto segue le fusioni in volo e decise anche quando il pannello
+  // non si può ridisegnare (conferma a metà, richiesta in volo): è un testo, non tocca le card.
+  function aggiornaTestoQuadrato() {
+    if (livelloAperto !== 'l5' || !mgSideBody) return;
+    const fb = selectedId && allFeedbacks.find((f) => f._id === selectedId);
+    const t = mgSideBody.querySelector('.mg-liv-testo');
+    if (!fb || !t) return;
+    const liv = MR.livelloPer(fb, 'l5', opzioniLivelli(fb));
+    if (liv && liv.pannello && liv.pannello.testo) riempiTestoLivello(t, liv.pannello);
+  }
 
   // Le card della fusione dentro il pannello del quadrato: stesso disegno e
   // stessi tasti dell'elenco in Automazioni, perché è la stessa cosa.
