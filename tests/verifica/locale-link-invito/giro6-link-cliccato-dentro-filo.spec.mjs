@@ -81,7 +81,6 @@ const CHAT = `<!doctype html><html><head><meta charset="utf-8"><title>chat</titl
 </body></html>`;
 
 test('il pulsante della pagina dell’invito, cliccato da una persona dentro Filo, porta il codice dentro', async ({ app, openTab, testServer }) => {
-  test.fail(true, 'dentro Filo il pulsante porta la scheda su un indirizzo interno che non esiste, e non riscatta niente');
   test.setTimeout(180000);
   redeems = [];
 
@@ -100,7 +99,6 @@ test('il pulsante della pagina dell’invito, cliccato da una persona dentro Fil
 });
 
 test('il tasto destro su un collegamento d’invito offre di portarlo dentro Filo', async ({ openTab, testServer }) => {
-  test.fail(true, 'il menu offre apri, copia, salva e condividi, e niente che porti l’invito dentro');
   test.setTimeout(120000);
 
   const pagina = await testServer.openReady(openTab, CHAT);

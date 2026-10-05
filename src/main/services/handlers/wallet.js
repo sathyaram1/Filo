@@ -534,7 +534,15 @@ module.exports = function register(on, ctx) {
 
   // Il codice arrivato da `filo://invito/<codice>`. Chi ha già un portafoglio
   // non ha niente da riscattare, e sentirselo dire è meglio di un silenzio.
-  async function redeemFromInvite(code) {
+  // Un doppio clic sul pulsante dell'invito porta qui due volte (#664): il
+  // secondo riscatto direbbe «hai già i crediti» sopra il benvenuto, quindi
+  // finché il primo è in corso chi arriva aspetta quello.
+  let invitoInCorso = null;
+  function redeemFromInvite(code) {
+    if (!invitoInCorso) invitoInCorso = riscattaInvito(code).finally(() => { invitoInCorso = null; });
+    return invitoInCorso;
+  }
+  async function riscattaInvito(code) {
     if (walletStore.personalKey()) {
       const rec = await setNotice('already_in', 'Hai già i crediti di Filo su questo computer. Questo invito puoi darlo a qualcun altro.');
       return { ok: false, status: 'already_in', message: rec.text };
