@@ -218,6 +218,12 @@ function invitoFermato(rawUrl, { win = null, wc = null } = {}) {
 function fermaNavigazione(rawUrl, ctx) {
   if (!invitoFermato(rawUrl, ctx)) openExternalScheme(rawUrl);
 }
+// La pagina intera passa da will-navigate; qui solo i riquadri, e solo l'invito.
+function fermaInvitoNelRiquadro(event, ctx) {
+  if (!event || event.isMainFrame !== false || !globalThis.SN_WALLET?.isInviteDeepLink?.(event.url)) return;
+  event.preventDefault();
+  invitoFermato(event.url, ctx);
+}
 
 // La lista dei bloccati si salva mentre si scrive (#590.2): una riga a metà non sposta le schede aperte,
 // né verso la pagina «Sito bloccato» né fuori. La seguono quando la lista sta ferma per questo tempo, o quando l'utente le guarda.
