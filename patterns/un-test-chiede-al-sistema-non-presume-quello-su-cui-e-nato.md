@@ -84,8 +84,9 @@ nasceva rosso solo per l'owner, per settimane (undici spec così):
   finisce, verde o rosso (lasciate lì erano diventate 17 GB, #717); quelle di un processo
   ucciso le toglie il lanciatore della corsa dopo, passato un giorno. Quello che nessuna
   prova chiede (i file che il codice provato o Chromium scrivono nella temporanea per
-  conto loro) finisce nella temporanea della corsa, che i due lanciatori danno ai figli e
-  tolgono alla fine.
+  conto loro) finisce nella temporanea della corsa: la crea chi carica quel modulo (i due
+  lanciatori, ma anche un file di prova lanciato da solo), i figli la ereditano e se ne va
+  con lui.
 
 Gli ultimi quattro rossi di quella macchina (#650) presumevano altro:
 

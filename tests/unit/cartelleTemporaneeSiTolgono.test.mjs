@@ -87,8 +87,9 @@ test('le cartelle di un processo ucciso restano finché sono giovani, e la corsa
 
   assert.deepEqual(togliCartelleOrfane({ dove: [b.tmp, b.casa] }), [], 'una cartella di oggi può essere di una corsa viva');
   const tolte = togliCartelleOrfane({ dove: [b.tmp, b.casa], oraMs: Date.now() + ORFANA_DOPO_MS + 60_000 });
-  assert.deepEqual(tolte.sort(), [...dirs].sort());
+  assert.ok(tolte.length, 'la pulizia del giorno dopo non ha tolto niente');
   for (const d of dirs) assert.ok(!existsSync(d), `rimasta dopo la pulizia: ${d}`);
+  assert.deepEqual(readdirSync(b.tmp), [], 'nella temporanea resta qualcosa che la pulizia non riconosce');
 });
 
 test('la pulizia tocca solo le cartelle col nome dei test, e lo dice prima', () => {
@@ -177,6 +178,38 @@ for (const rosso of [false, true]) {
     assert.deepEqual(readdirSync(b.tmp), [], 'rimasto nella temporanea dopo la corsa');
   });
 }
+
+// Lanciato da solo, senza il lanciatore: è caricare le regole delle cartelle che dà al file la sua corsa.
+test('un file di prova lanciato da solo non lascia nella temporanea quello che il codice provato ci scrive', () => {
+  const b = banco();
+  const file = join(b.base, 'scrive.test.mjs');
+  writeFileSync(file, `import ${JSON.stringify(PERCORSI)};\n${scriveDaSolo(true)}`);
+  const r = spawnSync(process.execPath, ['--test', file], { env: b.env, encoding: 'utf8' });
+  assert.equal(r.status, 1, `${r.stdout}\n${r.stderr}`);
+  assert.match(r.stdout, /# fail 1/, 'la prova è girata davvero');
+  assert.deepEqual(readdirSync(b.tmp), [], 'rimasto nella temporanea dopo la prova');
+});
+
+test('npm run test:unit interrotto lascia solo quello che la pulizia del giorno dopo riconosce', async () => {
+  const b = banco();
+  const unit = join(b.base, 'unit');
+  mkdirSync(unit);
+  writeFileSync(join(unit, 'appesa.test.mjs'), "import { test } from 'node:test';\ntest('appesa', () => new Promise(() => setInterval(() => {}, 1000)));\n");
+  const figlio = spawn(process.execPath, [join(RADICE, 'scripts', 'run-unit-tests.mjs')],
+    { env: { ...b.env, FILO_UNIT_DIR: unit }, cwd: RADICE, stdio: ['ignore', 'pipe', 'ignore'], detached: process.platform !== 'win32' });
+  let uscita = '';
+  figlio.stdout.on('data', (d) => { uscita += d; });
+  const fine = Date.now() + 30_000;
+  while (!/appesa|Subtest|gruppo/.test(uscita) && Date.now() < fine) await new Promise((ok) => setTimeout(ok, 50));
+  await new Promise((ok) => setTimeout(ok, 500));
+  // Come un Ctrl+C: arriva a tutto il gruppo, lanciatore e prove.
+  if (process.platform === 'win32') spawnSync('taskkill', ['/pid', String(figlio.pid), '/T', '/F']);
+  else process.kill(-figlio.pid, 'SIGINT');
+  await once(figlio, 'exit');
+  assert.notDeepEqual(readdirSync(b.tmp), [], 'la corsa non ha lasciato niente: la prova non prova l\'interruzione');
+  togliCartelleOrfane({ dove: [b.tmp], oraMs: Date.now() + ORFANA_DOPO_MS + 60_000 });
+  assert.deepEqual(readdirSync(b.tmp), [], 'resta qualcosa che la pulizia del giorno dopo non riconosce');
+});
 
 test('il globalSetup di Playwright dà alla corsa una temporanea sua, e la toglie con quello che c\'è dentro', async () => {
   const config = readFileSync(join(RADICE, 'playwright.config.js'), 'utf8');
