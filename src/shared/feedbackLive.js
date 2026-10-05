@@ -441,13 +441,13 @@
       // Una pagina ha appena letto tutto: vale come riallineamento. Il cursore
       // però non torna avanti se c'era già: una Gestione nascosta da ore deve
       // ricevere al rientro quello che è cambiato mentre non guardava.
-      // `righe`: quelle appena lette; al primo allineamento danno l'ora del server e le versioni già in mano.
-      allineato(at, righe) {
+      // `righe` e `readTime` (della prima pagina): al primo allineamento danno l'ora del server e le versioni in mano.
+      allineato(at, righe, readTime) {
         const t = Number(at) || now();
         lastReconcileAt = Math.max(lastReconcileAt, t);
         if (lastTickAt) return;
         lastTickAt = t;
-        vedi(righe, null, 0);
+        vedi(righe, readTime);
         for (const r of Array.isArray(righe) ? righe : []) {
           if (r && r._id && r._updateTime) versioniSeguite.set(String(r._id), r._updateTime);
         }
