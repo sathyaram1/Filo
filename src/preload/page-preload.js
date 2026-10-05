@@ -211,6 +211,24 @@ let streamCounter = 0;
 
 const filoMessage = (msg) => ipcRenderer.invoke('filo:message', msg);
 
+// ─── #664 — il collegamento d'invito cliccato dentro Filo ──────────────────
+// `filo://invito/<codice>` non è una pagina: da fuori lo consegna il sistema e
+// Filo riscatta. Dentro Filo lo stesso clic deve fare lo stesso, ma solo un
+// clic VERO: una pagina che lo spinge da sé non riscatta niente (il main la
+// ferma). Il tipo è letterale: qui SN_MSG non c'è ancora.
+try {
+  const INVITO = /^filo:\/*invito(?:[/?#]|$)/i;
+  const suInvito = (e) => {
+    if (!e.isTrusted || (e.type === 'click' ? e.button !== 0 : e.button !== 1)) return;
+    const a = (e.composedPath ? e.composedPath() : []).find((n) => n && typeof n.href === 'string' && /^(A|AREA)$/.test(n.tagName));
+    if (!a || !INVITO.test(a.href)) return;
+    e.preventDefault();
+    filoMessage({ type: 'wallet_invite_open', link: a.href }).catch(() => {});
+  };
+  window.addEventListener('click', suInvito, true);
+  window.addEventListener('auxclick', suInvito, true);
+} catch (_) { /* mai bloccare il caricamento della pagina */ }
+
 const broadcastListeners = new Set();
 // #407 — messaggi che devono SVEGLIARE un riquadro incorporato. Dentro un
 // riquadro i content script si montano solo quando l'utente lo tocca; ma
@@ -436,6 +454,7 @@ function loadScripts() {
   try { require(path.join(SHARED_DIR, 'tasti.js')); } catch (e) { console.error('[Filo CS] tasti', e); } // nomi delle scorciatoie per il sistema di chi legge: PRIMA di menu/actions/content
   try { require(path.join(SHARED_DIR, 'campoTesto.js')); } catch (e) { console.error('[Filo CS] campoTesto', e); } // "si sta scrivendo qui?": PRIMA di content.js, che ci decide Ctrl+Z
   try { require(path.join(SHARED_DIR, 'urlNav.js')); } catch (e) { console.error('[Filo CS] urlNav', e); } // #437 — "è davvero un indirizzo?" per Copia URL/Condividi
+  try { require(path.join(SHARED_DIR, 'wallet.js')); } catch (e) { console.error('[Filo CS] wallet', e); } // #664 — «è un link d'invito?» per il tasto destro
   try { require(path.join(SHARED_DIR, 'filoMarkdown.js')); } catch (e) { console.error('[Filo CS] filoMarkdown', e); }
   try { require(path.join(SHARED_DIR, 'linkSospetto.js')); } catch (e) { console.error('[Filo CS] linkSospetto', e); } // #725 — link sospetti: euristica e frasi, PRIMA di actions.js
   try { require(path.join(SHARED_DIR, 'themeTokens.js')); } catch (e) { console.error('[Filo CS] themeTokens', e); }

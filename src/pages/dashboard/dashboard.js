@@ -845,7 +845,14 @@
       // Un turno fallito non deve lasciare a schermo il testo parziale di un
       // tentativo andato male: scartiamo la bolla in streaming e mostriamo l'errore.
       if (streamBubble) { streamBubble.remove(); streamBubble = null; }
-      const err = makeBubble({ role: 'filo', text: r?.error || 'Errore.' });
+      // Chi non ha crediti scrive alla chat l'invito che ha ricevuto: lo riscatta lei, invece di mandarlo a ricopiarlo (#664).
+      const invito = r?.code === 'NO_API_KEY' && !internal && !daModello ? await riscattaDallaChat(userMessage) : null;
+      if (invito && invito.ok) {
+        bubblesEl.appendChild(makeBubble({ role: 'filo', text: invito.message }));
+        bubblesEl.scrollTop = bubblesEl.scrollHeight;
+        return r;
+      }
+      const err = makeBubble({ role: 'filo', text: (invito && invito.message) || r?.error || 'Errore.' });
       // #360 — la bolla d'errore dice "riprova": darglielo da fare a mano
       // (riscrivere la domanda) è attrito inutile. Il tasto rimanda LO STESSO
       // messaggio, come il "Riprova" della pagina d'errore di una scheda.
@@ -947,6 +954,18 @@
     }
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
     return r;
+  }
+
+  // L'esito del riscatto da dire in chat, o `null` se il messaggio non portava un invito: «non esiste» su una frase
+  // qualsiasi («Cara Sara, come va?») vuol dire solo che non era un codice, e resta la risposta senza crediti.
+  const NON_ERA_UN_INVITO = new Set(['invalid_code', 'bad_code', 'not_reachable', 'no_identity', 'internal']);
+  async function riscattaDallaChat(testo) {
+    const W = window.SN_WALLET;
+    if (!W || !W.codesFromInput(testo).length) return null;
+    let rr = null;
+    try { rr = await send({ type: MSG.WALLET_REDEEM, code: testo }); } catch (_) { return null; }
+    if (!rr || !rr.message || (!rr.ok && NON_ERA_UN_INVITO.has(rr.status))) return null;
+    return rr;
   }
 
   // `daModello`: il testo viene da un suggerimento della home, non dalle dita dell'utente (#810).
@@ -1349,18 +1368,11 @@
     } else if (msg?.type === MSG.CREDITS_CHANGED && msg.walletNotice) {
       // Un invito riscattato da fuori (#651): il link aperto da un'altra
       // applicazione, o l'invito che aspettava questa installazione al primo
-      // avvio. Il main lo spinge una volta sola.
-      inCodaPopup(() => showInviteWelcome(msg.walletNotice));
+      // avvio. La spinta arriva a tutte le home: lo racconta chi lo prende.
+      inCodaPopup(chiediBenvenuto);
     } else if (msg?.type === MSG.GIFT_NOTICE) {
-      // L'owner ci ha regalato dei crediti (#210.4): avviso una volta sola.
-      const n = Math.round(Number(msg.amount) || 0);
-      if (n > 0 && window.SN_CONFIRM_UI?.notify) {
-        window.SN_CONFIRM_UI.notify({
-          title: 'Crediti in regalo 🎁',
-          text: `Ti sono stati regalati ${n} crediti! Sono già sul tuo saldo.`,
-          okLabel: 'Evviva!',
-        });
-      }
+      // L'owner ci ha regalato dei crediti (#210.4): la spinta arriva a ogni home, lo racconta chi lo prende (#664).
+      inCodaPopup(chiediRegalo);
     }
   });
 
@@ -1659,15 +1671,8 @@
   // crediti arrivano senza che tu chieda niente, e mentre guardi la home: il
   // main spinge l'avviso appena il riscatto è andato, e la home lo racconta
   // una volta sola (il segno «già visto» lo tiene il main).
-  // Lo stesso avviso non si racconta due volte: adesso arriva da due strade
-  // (la spinta del main e la domanda all'apertura) e possono incrociarsi.
-  let avvisoInvitoMostrato = '';
   async function showInviteWelcome(n) {
     if (!n || !n.text || !window.SN_CONFIRM_UI?.notify) return false;
-    const firma = `${n.kind || ''}|${n.text}`;
-    if (firma === avvisoInvitoMostrato) return false;
-    avvisoInvitoMostrato = firma;
-    try { await send({ type: MSG.WALLET_NOTICE_SEEN, where: 'home' }); } catch (_) {}
     const entrato = n.kind === 'entry';
     await window.SN_CONFIRM_UI.notify({
       title: entrato ? 'Benvenuto in Filo' : 'Il tuo invito',
@@ -1675,6 +1680,41 @@
       okLabel: entrato ? 'Evviva!' : 'Va bene',
     });
     return true;
+  }
+
+  // Lo stesso avviso arriva da due strade (la spinta del main e la domanda
+  // all'apertura) e a ogni home aperta: lo racconta una scheda sola (#664),
+  // la prima che l'utente ha davanti. Una home dietro aspetta di tornare
+  // visibile, poi lo chiede al main, che lo dà a una sola.
+  function quandoVisibile() {
+    if (document.visibilityState !== 'hidden') return Promise.resolve();
+    return new Promise((ok) => {
+      const guarda = () => {
+        if (document.visibilityState === 'hidden') return;
+        document.removeEventListener('visibilitychange', guarda);
+        ok();
+      };
+      document.addEventListener('visibilitychange', guarda);
+    });
+  }
+  async function chiediRegalo() {
+    await quandoVisibile();
+    let r = null;
+    try { r = await send({ type: MSG.GIFT_NOTICE_CLAIM }); } catch (_) { r = null; }
+    const n = Math.round(Number(r && r.amount) || 0);
+    if (n <= 0 || !window.SN_CONFIRM_UI?.notify) return;
+    await window.SN_CONFIRM_UI.notify({
+      title: 'Crediti in regalo 🎁',
+      text: `Ti sono stati regalati ${n} crediti! Sono già sul tuo saldo.`,
+      okLabel: 'Evviva!',
+    });
+  }
+  async function chiediBenvenuto() {
+    await quandoVisibile();
+    try {
+      const r = await send({ type: MSG.WALLET_NOTICE_PENDING, where: 'home', claim: true });
+      if (r && r.ok && r.notice) await showInviteWelcome(r.notice);
+    } catch (_) {}
   }
 
   // I popup dell'avvio si incatenano, mai sovrapposti: l'avviso dell'invito
@@ -1943,12 +1983,7 @@
     // mentre la home si sta ancora aprendo, e la spinta del main non trova
     // nessuno. Chiederlo all'apertura non costa un giro dal server (l'avviso
     // è scritto in locale) e non dipende più da chi arriva prima.
-    inCodaPopup(async () => {
-      try {
-        const r = await send({ type: MSG.WALLET_NOTICE_PENDING, where: 'home' });
-        if (r && r.ok && r.notice) await showInviteWelcome(r.notice);
-      } catch (_) {}
-    });
+    inCodaPopup(chiediBenvenuto);
     if (onbState) return;
     inCodaPopup(async () => {
       try {

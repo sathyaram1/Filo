@@ -79,6 +79,7 @@
     toast_media_loop_off: 'Ripetizione disattivata',
     toast_pip_failed: 'Finestra mobile non disponibile per questo video',
     menu_share_link: 'Condividi link',
+    menu_redeem_invite: 'Riscatta l’invito',
     menu_edit_selection: 'Modifica',
     menu_read_aloud: 'Leggi',
     menu_stop_reading: 'Interrompi lettura',

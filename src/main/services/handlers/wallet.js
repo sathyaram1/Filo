@@ -25,6 +25,7 @@ const auth = require('../../auth/google-auth');
 const identity = require('../../auth/anon-auth');
 const walletStore = require('../../auth/wallet-store');
 const Defaults = require('../defaultsStore');
+const Disco = require('../../shim/storage');
 
 const FUNCTIONS_BASE = process.env.FILO_FUNCTIONS_BASE
   || 'https://europe-west1-filo-8b9cb.cloudfunctions.net';
@@ -342,9 +343,11 @@ module.exports = function register(on, ctx) {
   // `code` è quello che l'utente ha incollato: il codice nudo, la riga intera
   // del messaggio in cui è arrivato, o il link di filo.red. Niente tetto di
   // caratteri sul campo, niente taglio: o dentro c'è un codice, o si dice.
+  // La lettura è lineare (#664): qui gira nel main, e un conto lento ferma
+  // tutte le schede.
   async function doRedeem(rawCode) {
-    const code = W.codeFromInput(rawCode || '');
-    if (!code) return { ok: false, status: 'bad_code', message: W.redeemMessage('bad_code') };
+    const codes = W.codesFromInput(rawCode || '');
+    if (!codes.length) return { ok: false, status: 'bad_code', message: W.redeemMessage('bad_code') };
     const idErr = await identityProblem();
     if (idErr) return { ok: false, status: 'no_identity', message: idErr };
     // I crediti del vecchio conteggio locale si portano sul server: chi li
@@ -361,13 +364,23 @@ module.exports = function register(on, ctx) {
       const declared = Number(await globalThis.SN_STORAGE.getRaw(DECLARED_KEY, 0)) || 0;
       localCredits = Math.max(0, Math.floor(balanceNow - declared));
     } catch (_) { localCredits = 0; }
-    let r;
-    try {
-      r = await callable('walletRedeem', { code, localCredits });
-    } catch (e) {
-      return { ok: false, status: 'not_reachable', message: W.redeemMessage('not_reachable') };
+    // Un saluto di otto lettere buone («Cara Sara») può stare davanti al
+    // codice vero (#664): a «non esiste» si prova il blocco dopo. Ogni altra
+    // risposta è del codice giusto (pieno, tuo, già dentro) e ferma la fila.
+    const daProvare = codes.slice(0, W.CODE_TRIES);
+    let r = null;
+    for (const code of daProvare) {
+      try {
+        r = await callable('walletRedeem', { code, localCredits });
+      } catch (e) {
+        return { ok: false, status: 'not_reachable', message: W.redeemMessage('not_reachable') };
+      }
+      if (!r || r.status !== 'invalid_code') break;
     }
     const status = (r && r.status) || 'internal';
+    if (status === 'invalid_code' && codes.length > daProvare.length) {
+      return { ok: false, status, message: W.tooManyCodesMessage(codes.length, daProvare.length) };
+    }
     if (status !== 'ok') return { ok: false, status, message: W.redeemMessage(status) };
     walletStore.save({ key: r.key, pseudonym: r.pseudonym, redeemedAt: new Date().toISOString() });
     if (localCredits > 0) { try { await globalThis.SN_STORAGE.setRaw(DECLARED_KEY, Math.floor(balanceNow)); } catch (_) {} }
@@ -397,6 +410,16 @@ module.exports = function register(on, ctx) {
   const NOTICE_KEY = 'walletNotice';
   const NOTICE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
+  // Ogni lettura e scrittura dell'avviso passa da qui, una alla volta: la
+  // spinta arriva a tutte le home insieme, e il benvenuto lo deve prendere una
+  // sola (#664).
+  let filaAvviso = Promise.resolve();
+  function inFilaAvviso(fn) {
+    const turno = filaAvviso.then(fn);
+    filaAvviso = turno.catch(() => {});
+    return turno;
+  }
+
   // L'avviso si SPINGE appena il riscatto è andato. Non basta: al PRIMO
   // avvio il riscatto si chiude in pochi secondi, mentre la home si sta
   // ancora aprendo, e la spinta non trova nessuno in ascolto — l'invitato si
@@ -408,7 +431,7 @@ module.exports = function register(on, ctx) {
   // portafoglio.
   async function setNotice(kind, text) {
     const rec = { kind, text: String(text || ''), at: new Date().toISOString(), seenHome: false, seenCredits: false };
-    try { await globalThis.SN_STORAGE.setRaw(NOTICE_KEY, rec); } catch (_) {}
+    await inFilaAvviso(async () => { try { await globalThis.SN_STORAGE.setRaw(NOTICE_KEY, rec); } catch (_) {} });
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED, walletNotice: { kind: rec.kind, text: rec.text } }); } catch (_) {}
     return rec;
   }
@@ -429,28 +452,38 @@ module.exports = function register(on, ctx) {
     return r;
   }
 
+  async function segnaVisto(where) {
+    let r = null;
+    try { r = await globalThis.SN_STORAGE.getRaw(NOTICE_KEY, null); } catch (_) {}
+    if (!r) return;
+    if (where === 'home') r.seenHome = true;
+    else r.seenCredits = true;
+    try {
+      await globalThis.SN_STORAGE.setRaw(NOTICE_KEY, r.seenHome && r.seenCredits ? null : r);
+    } catch (_) {}
+  }
+
   // Quale superficie non l'ha ancora visto. `where` è la stessa parola di
   // WALLET_NOTICE_SEEN: chi l'ha già mostrato non se lo ritrova addosso alla
-  // prossima apertura.
+  // prossima apertura. Con `claim` chi chiede lo prende: alla prossima
+  // domanda, anche da un'altra home, non c'è più.
   on(MSG.WALLET_NOTICE_PENDING, filoOnly(async (msg) => {
     const where = String((msg && msg.where) || '');
     if (where !== 'home' && where !== 'credits') return { ok: false, error: 'bad_where' };
-    const r = await readNotice();
-    const visto = where === 'home' ? r && r.seenHome : r && r.seenCredits;
-    return { ok: true, notice: r && !visto ? { kind: r.kind, text: r.text } : null };
+    const notice = await inFilaAvviso(async () => {
+      const r = await readNotice();
+      const visto = where === 'home' ? r && r.seenHome : r && r.seenCredits;
+      if (!r || visto) return null;
+      if (msg && msg.claim) await segnaVisto(where);
+      return { kind: r.kind, text: r.text };
+    });
+    return { ok: true, notice };
   }));
 
   on(MSG.WALLET_NOTICE_SEEN, filoOnly(async (msg) => {
     const where = String((msg && msg.where) || '');
-    let r = null;
-    try { r = await globalThis.SN_STORAGE.getRaw(NOTICE_KEY, null); } catch (_) {}
-    if (!r) return { ok: true };
-    if (where === 'home') r.seenHome = true;
-    else if (where === 'credits') r.seenCredits = true;
-    else return { ok: false, error: 'bad_where' };
-    try {
-      await globalThis.SN_STORAGE.setRaw(NOTICE_KEY, r.seenHome && r.seenCredits ? null : r);
-    } catch (_) {}
+    if (where !== 'home' && where !== 'credits') return { ok: false, error: 'bad_where' };
+    await inFilaAvviso(() => segnaVisto(where));
     return { ok: true };
   }));
 
@@ -501,7 +534,15 @@ module.exports = function register(on, ctx) {
 
   // Il codice arrivato da `filo://invito/<codice>`. Chi ha già un portafoglio
   // non ha niente da riscattare, e sentirselo dire è meglio di un silenzio.
-  async function redeemFromInvite(code) {
+  // Un doppio clic sul pulsante dell'invito porta qui due volte (#664): il
+  // secondo riscatto direbbe «hai già i crediti» sopra il benvenuto, quindi
+  // finché il primo è in corso chi arriva aspetta quello.
+  let invitoInCorso = null;
+  function redeemFromInvite(code) {
+    if (!invitoInCorso) invitoInCorso = riscattaInvito(code).finally(() => { invitoInCorso = null; });
+    return invitoInCorso;
+  }
+  async function riscattaInvito(code) {
     if (walletStore.personalKey()) {
       const rec = await setNotice('already_in', 'Hai già i crediti di Filo su questo computer. Questo invito puoi darlo a qualcun altro.');
       return { ok: false, status: 'already_in', message: rec.text };
@@ -515,6 +556,26 @@ module.exports = function register(on, ctx) {
     }
     return out;
   }
+
+  // L'invito portato dentro Filo: si riscatta e si apre la pagina Crediti, dove
+  // l'esito si legge. Stessa strada per il collegamento arrivato da fuori
+  // (main.js) e per quello cliccato dentro Filo (#664).
+  function portaDentroInvito(code, win) {
+    // Il portafoglio è dell'installazione: da una finestra incognito si scrive sul disco lo stesso.
+    Disco.runNormale(() => redeemFromInvite(code)).catch(() => {});
+    try { win?._filoTabs?.openTab('filo://credits/credits.html', { activate: true }); } catch (_) {}
+  }
+
+  // Un collegamento d'invito cliccato davvero in una pagina, o «Riscatta
+  // l'invito» dal tasto destro. Arriva anche dalle pagine web: lo manda il
+  // mondo isolato del preload, e solo su un gesto vero dell'utente.
+  on(MSG.WALLET_INVITE_OPEN, async (msg, sender) => {
+    const link = String((msg && msg.link) || '');
+    const code = W.inviteCodeFromLink(link);
+    if (!code && !W.isInviteDeepLink(link)) return { ok: false, error: 'not_invite' };
+    portaDentroInvito(code, ctx.winOf(sender));
+    return { ok: true };
+  });
 
   // ── Owner ─────────────────────────────────────────────────────────────────
   const ownerOnly = (fn) => filoOnly(async (msg) => {
@@ -737,9 +798,9 @@ module.exports = function register(on, ctx) {
     // rete): lo scrive chi manda un feedback, così il server sa a chi
     // accreditare il premio (#652). Vuoto se non c'è un portafoglio.
     pseudonym: () => { try { return walletStore.pseudonym() || ''; } catch (_) { return ''; } },
-    // L'invito che arriva da fuori (#651): lo chiama main.js per il
-    // collegamento filo://invito/<codice>, e l'avvio per l'invito in attesa.
-    redeemFromInvite, tryPendingInvite,
+    // L'invito che arriva da fuori (#651): main.js porta dentro il
+    // collegamento filo://invito/<codice>, l'avvio l'invito in attesa.
+    redeemFromInvite, tryPendingInvite, portaDentroInvito,
     // Ripiego dalla chiave propria (#629): li chiama il provider OpenRouter.
     keySourceOf, alternativeKeyFor, noteOwnKeyRefusal, noteOwnKeySuccess, lastOwnKeyRefusal, ownKeyChanged, usageLogStatus,
     // Solo per i test (NODE_ENV=test): simula il riavvio senza rete.

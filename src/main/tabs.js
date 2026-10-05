@@ -175,7 +175,12 @@ function isWebUnsafeNav(rawUrl) {
   try { proto = new URL(String(rawUrl || '')).protocol.toLowerCase(); } catch (_) { return false; }
   // URL relativo/non parsabile → Electron lo risolve sull'origine corrente
   // (stessa pagina web): non è un cambio di schema, non bloccare.
-  return proto ? !WEB_NAV_SCHEMES.has(proto) : false;
+  if (!proto) return false;
+  // `filo://invito/…` non è una pagina (#664): in una scheda diventava un
+  // indirizzo interno che non esiste, e la pagina dell'invito spariva. Fermato
+  // qui, lo porta dentro `invitoFermato`.
+  if (globalThis.SN_WALLET?.isInviteDeepLink?.(rawUrl)) return true;
+  return !WEB_NAV_SCHEMES.has(proto);
 }
 
 // Schemi "azione del sistema operativo": NON sono pagine web (quindi bloccati da
@@ -198,6 +203,26 @@ function openExternalScheme(rawUrl) {
   if (!isOsDelegatedScheme(rawUrl)) return false;
   try { shell.openExternal(String(rawUrl)); } catch (_) {}
   return true;
+}
+
+// Un `filo://invito/…` fermato su una navigazione non si tace (#664): da qualunque porta (barra, «Apri in nuova tab», un
+// pulsante che naviga da script) riscatta e apre Crediti. Da una pagina solo dopo un gesto vero su quella pagina, contato
+// dal main (la pagina non lo può fingere); senza `wc` lo chiede Filo stesso. Prova: tests/link-invito.spec.mjs.
+function invitoFermato(rawUrl, { win = null, wc = null } = {}) {
+  const W = globalThis.SN_WALLET;
+  if (!W || !W.isInviteDeepLink(rawUrl)) return false;
+  if (wc && !Permessi.gestoRecente(wc) && !Permessi.navigazioneDaGesto(wc)) return true;
+  try { globalThis.SN_WALLET_MAIN?.portaDentroInvito?.(W.inviteCodeFromDeepLink(rawUrl), win); } catch (_) {}
+  return true;
+}
+function fermaNavigazione(rawUrl, ctx) {
+  if (!invitoFermato(rawUrl, ctx)) openExternalScheme(rawUrl);
+}
+// La pagina intera passa da will-navigate; qui solo i riquadri, e solo l'invito.
+function fermaInvitoNelRiquadro(event, ctx) {
+  if (!event || event.isMainFrame !== false || !globalThis.SN_WALLET?.isInviteDeepLink?.(event.url)) return;
+  event.preventDefault();
+  invitoFermato(event.url, ctx);
 }
 
 // La lista dei bloccati si salva mentre si scrive (#590.2): una riga a metà non sposta le schede aperte,
@@ -803,7 +828,7 @@ class TabManager {
   // `apriComunque`: la scheda non passa dalla lista dei siti bloccati per quel sito.
   // `permessoRichieste`: è un «Apri comunque» vero, e passa anche il blocco delle richieste.
   // `bloccoInPagina`: se la lista la ferma, la scheda nasce sulla pagina «Sito bloccato» invece di non nascere.
-  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false, allowDuplicate = false, openedByLink = false, apriComunque = false, permessoRichieste = false, bloccoInPagina = false } = {}) {
+  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false, allowDuplicate = false, openedByLink = false, apriComunque = false, permessoRichieste = false, bloccoInPagina = false, daGesto = false } = {}) {
     // #252 — INDIRIZZO UNICO per le pagine interne: riporta l'eventuale forma
     // legacy `filo://src/pages/<page>/<file>` (dallo shim getURL) alla forma
     // canonica `filo://<page>/<file>` che usa il menu. Così tutti i punti di
@@ -846,7 +871,7 @@ class TabManager {
     // dei merge automatici tra worktree (commit da660251) — se lo tocchi,
     // assicurati che il percorso IPC → openTab(file://) resti bloccato.
     if (isWebUnsafeNav(url)) {
-      openExternalScheme(url); // mailto:/tel:/sms: → consegnati all'OS, il resto bloccato
+      fermaNavigazione(url, { win: this.win }); // mailto:/tel:/sms: → consegnati all'OS, il resto bloccato
       return null;
     }
     const bloccata = apriComunque ? null : this._decisioneBlocco(null, url);
@@ -933,6 +958,8 @@ class TabManager {
       // visibilità viene poi normalizzata al primo cambio di scheda (activate).
       this.layout();
     }
+    // Una scheda aperta da un clic vero eredita il gesto per la sua prima navigazione e i suoi rinvii (#664 giro 2).
+    if (daGesto) view.webContents._filoGestoAlle = Date.now();
     if (bloccata) this._mostraPaginaBloccata(tab, url, bloccata);
     else view.webContents.loadURL(url);
     if (activate) {
@@ -1652,7 +1679,7 @@ class TabManager {
     // prima che loadURL() possa toccarli. mailto:/tel:/sms: vengono consegnati
     // all'OS invece di caricare una scheda, come nel gate di will-navigate.
     if (isWebUnsafeNav(target)) {
-      openExternalScheme(target);
+      fermaNavigazione(target, { win: this.win });
       return;
     }
     if (this._maybeBlockNavigation(tab, target)) return;
@@ -2100,6 +2127,8 @@ class TabManager {
     // Best-effort: i redirect lato server a metà caricamento possono sfuggire a
     // will-navigate; la rete di sicurezza è il gate d'origine in
     // internal-preload.js, che non espone le API se l'origine non è filo:.
+    // Un invito chiesto da un riquadro della pagina (un pulsante che lo apre in un iframe nascosto) segue la regola della pagina intera (#664).
+    wc.on('will-frame-navigate', (event) => fermaInvitoNelRiquadro(event, { win: this.win, wc }));
     wc.on('will-navigate', (event, url) => {
       // SICUREZZA: blocca le navigazioni top-level verso schemi non-web
       // (file:// → leak hash NTLM via SMB su Windows; data:/javascript: →
@@ -2108,7 +2137,7 @@ class TabManager {
       // fallire li consegniamo al sistema (apre posta/telefono), come un browser.
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
-        openExternalScheme(url);
+        fermaNavigazione(url, { win: this.win, wc });
         return;
       }
       // «Apri comunque» della pagina «Sito bloccato» che il main ha messo in questa scheda (#590).
@@ -2138,7 +2167,9 @@ class TabManager {
     wc.on('will-redirect', (event, url) => {
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
-        openExternalScheme(url);
+        fermaNavigazione(url, { win: this.win, wc });
+        // Una scheda nata per un collegamento che rimbalza sull'invito o sulla posta resterebbe bianca (#664 giro 2).
+        if (event.isMainFrame !== false && !tab._everNavigated && !tab.isInternal) setImmediate(() => this._dropTab(tab));
         return;
       }
       // #590 — un redirect è un cambio d'indirizzo come gli altri: senza, un
@@ -2528,7 +2559,7 @@ class TabManager {
       // non-web — stessa difesa di will-navigate (file:// → leak NTLM, ecc.).
       // mailto:/tel:/sms: vengono consegnati all'OS invece di essere ignorati.
       if (isWebUnsafeNav(url)) {
-        openExternalScheme(url);
+        fermaNavigazione(url, { win: this.win, wc });
         return { action: 'deny' };
       }
       // #209 — i popup di login ("Continua con Google" e simili) NON sono
@@ -2574,6 +2605,7 @@ class TabManager {
         openedByLink: true,
         apriComunque: this._siteAllowedIn(tab, url),
         permessoRichieste: this._siteAllowedIn(tab, url) && !!tab._permessoRichieste,
+        daGesto: Permessi.gestoRecente(wc),
       });
       // Un blob: aperto dalla pagina si giudica come lei (src/main/tabs/tabSafebrowse.js).
       const nuova = this.tabs.find((t) => t.id === aperta);
@@ -2658,10 +2690,11 @@ class TabManager {
       event.preventDefault();
       if (!mostrata) setImmediate(() => { try { win.close(); } catch (_) {} });
     };
+    pwc.on('will-frame-navigate', (event) => fermaInvitoNelRiquadro(event, { win: this.win, wc: pwc }));
     pwc.on('will-navigate', (event, url) => {
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
-        openExternalScheme(url);
+        fermaNavigazione(url, { win: this.win, wc: pwc });
         return;
       }
       if (this._maybeBlockNavigation(origine, url)) ferma(event);
@@ -2672,7 +2705,7 @@ class TabManager {
     pwc.on('will-redirect', (event, url) => {
       if (isWebUnsafeNav(url)) {
         event.preventDefault();
-        openExternalScheme(url);
+        fermaNavigazione(url, { win: this.win, wc: pwc });
         return;
       }
       if (event.isMainFrame === false) return;
@@ -2680,7 +2713,7 @@ class TabManager {
     });
     pwc.setWindowOpenHandler(({ url }) => {
       if (isWebUnsafeNav(url)) {
-        openExternalScheme(url);
+        fermaNavigazione(url, { win: this.win, wc: pwc });
         return { action: 'deny' };
       }
       if (isAuthPopup(url)) {
@@ -2803,7 +2836,7 @@ class TabManager {
   // Un collegamento che Filo apre per conto di una pagina, dopo la porta delle uscite (#810): la posta al sistema, i
   // siti in blacklist fermati come un clic, il resto in una scheda nuova.
   apriDaCollegamento(url, { sfondo = false } = {}) {
-    if (isWebUnsafeNav(url)) return openExternalScheme(url);
+    if (isWebUnsafeNav(url)) return invitoFermato(url, { win: this.win }) || openExternalScheme(url);
     if (this._maybeBlockNavigation(null, url)) return false;
     this.openTab(url, { activate: !sfondo, openedByLink: true });
     return true;

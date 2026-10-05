@@ -117,11 +117,9 @@ function apriInvito(code) {
   // aspetta lì e parte appena la finestra c'è.
   if (!mainWindow) { invitoInAttesa = { code }; return true; }
   try { revealWindow(mainWindow); } catch (_) {}
-  // La pagina Crediti è dove l'esito si legge: il riscatto e l'apertura
-  // partono insieme, e la pagina si aggiorna da sé all'avviso di saldo
-  // cambiato.
-  try { globalThis.SN_WALLET_MAIN?.redeemFromInvite?.(code)?.catch?.(() => {}); } catch (_) {}
-  try { mainWindow._filoTabs?.openTab('filo://credits/credits.html', { activate: true }); } catch (_) {}
+  // Riscatto e pagina Crediti partono insieme, e la pagina si aggiorna da sé
+  // all'avviso di saldo cambiato. È la stessa strada del clic dentro Filo.
+  try { globalThis.SN_WALLET_MAIN?.portaDentroInvito?.(code, mainWindow); } catch (_) {}
   return true;
 }
 
