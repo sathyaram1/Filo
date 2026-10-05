@@ -13,6 +13,7 @@ let base = '';
 let redeemed = false;
 let personalDelayMs = 0;
 const chiamate = [];
+let interrotte = 0;
 
 function json(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
@@ -42,6 +43,7 @@ test.beforeAll(async () => {
         const conStrumenti = Array.isArray(body.tools) && body.tools.length > 0;
         chiamate.push({ key: bearer, tools: conStrumenti, at: Date.now() });
         if (bearer !== PERSONAL_KEY) return json(res, 401, { error: { message: 'User not found.', code: 401 } });
+        res.on('close', () => { if (!res.writableEnded) interrotte += 1; });
         if (conStrumenti && personalDelayMs) await new Promise((r) => setTimeout(r, personalDelayMs));
         if (res.destroyed || req.destroyed) return;
         if (body.stream !== true) return json(res, 200, { id: 'gen-1', provider: 'Fake', choices: [{ message: { content: 'Ciao: RISPOSTA-DALLA-PERSONALE.' }, finish_reason: 'stop' }], usage: { prompt_tokens: 12, completion_tokens: 5, cost: 0.00021 } });
@@ -73,7 +75,7 @@ test.afterAll(async () => {
   await new Promise((r) => server.close(r));
 });
 
-test.beforeEach(() => { redeemed = false; personalDelayMs = 0; chiamate.length = 0; });
+test.beforeEach(() => { interrotte = 0; redeemed = false; personalDelayMs = 0; chiamate.length = 0; });
 
 async function newtabPage(app) {
   const deadline = Date.now() + 10_000;
@@ -134,6 +136,8 @@ test('chiave propria rifiutata, risposta dai crediti di Filo lenta: il quadrato 
   await expect(home.locator('.dash-bubble-fermato')).toHaveText('Fermato prima della risposta.', { timeout: 4_000 });
   await expect(home.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi', { timeout: 4_000 });
   expect(Date.now() - t0).toBeLessThan(5_000);
+  // La chiamata in volo sulla chiave personale si interrompe davvero: lo stop arriva attraverso il ripiego.
+  await expect.poll(() => interrotte, { timeout: 3_000 }).toBeGreaterThan(0);
   // La chat è libera subito: un seguito parte senza aspettare la risposta lenta.
   personalDelayMs = 0;
   await home.locator('#input').fill('lascia stare, ciao');
