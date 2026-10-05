@@ -31,6 +31,7 @@
   const URL_MAZZI = 'filo://decks/decks.html';
   const URL_SCARICAMENTI = 'filo://downloads/downloads.html';
   const URL_PREFERENZE = 'filo://preferences/preferences.html';
+  const URL_PREFERENZE_AGGIORNAMENTI = `${URL_PREFERENZE}#sec-aggiornamenti`;
   const URL_CREDITI = 'filo://credits/credits.html';
 
   // ===== Piccoli attrezzi =====
