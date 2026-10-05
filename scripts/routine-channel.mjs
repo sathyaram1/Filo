@@ -70,7 +70,8 @@
 //   node scripts/routine-channel.mjs deliver <biglietto> <intento> [--campo valore …]
 //       → consegna una decisione. Intenti: verdict, fixed, secaudit, status,
 //         note, feedback. Exit 0 = accettata, 4 = RIFIUTATA dal server (non
-//         ripiegare: il server ha guardato e ha detto no), 3 = guasto.
+//         ripiegare: il server ha guardato e ha detto no), 3 = guasto, 1 =
+//         registrata ma con una segnalazione che non ha fermato il lavoro.
 //         `--notes "…"` è il report per l'owner (il server lo cifra: nessuno
 //         tranne lui lo rilegge). `--frase "…"` è la riga in chiaro per chi ha
 //         mandato il feedback, che la vede nella sua bacheca. `--segnala
@@ -102,7 +103,7 @@ import { randomUUID } from 'node:crypto';
 import { pinnedRepoRoot } from './lib/tools-pin.mjs';
 import { isProtectedBranch, headSha } from './lib/branch-integrity.mjs';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
-import { leggiTestoLivello } from './lib/livelli.mjs';
+import { leggiTestoLivello, segnalazioneNonFermata } from './lib/livelli.mjs';
 import { haFormaDiBigliettoVero, leggiBigliettoAMano } from './lib/routine-ticket.mjs';
 
 // La radice del checkout, con lo stesso ripiego di dispatch: i marcatori del
@@ -1337,10 +1338,14 @@ if (isMain) {
       // Una consegna con segnalazione ferma il lavoro: chi consegna deve saperlo
       // adesso, o crede di averlo mandato in verifica.
       const fermo = r.reply && r.reply.outcome === 'stop';
-      const conSegnalazione = typeof data.segnalazione === 'string' && data.segnalazione.trim();
+      const conSegnalazione = typeof data.segnalazione === 'string' && !!data.segnalazione.trim();
+      const persa = segnalazioneNonFermata(intento, r.reply, conSegnalazione, r.id ? String(r.id) : '<id>');
       if (fermo) console.log(`${r.num ? `OK: ${r.num}` : 'OK'}: il lavoro è FERMO e aspetta l'owner (la segnalazione è consegnata). Rilascia il biglietto.`);
-      else if (conSegnalazione) console.log(`${r.num ? `OK: ${r.num}` : 'OK: consegnato'}. ATTENZIONE: la consegna portava una segnalazione ma il server non ha fermato il lavoro (server vecchio?).`);
-      else console.log(r.num ? `OK: ${r.num}` : 'OK: consegnato.');
+      else if (persa) {
+        console.log(`${r.num ? `OK: ${r.num}` : 'OK'}: la consegna è registrata, la segnalazione no.`);
+        console.error(persa);
+        process.exit(1);
+      } else console.log(r.num ? `OK: ${r.num}` : 'OK: consegnato.');
       process.exit(0);
     }
     if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}${r.detail ? `: ${r.detail}` : ''}`); process.exit(4); }

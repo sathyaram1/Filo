@@ -93,7 +93,7 @@ import { startBeat, stopBeat } from './lib/routine-beat.mjs';
 import { TOOLS_ROOT, pinTools, pinnedRepoRoot, pinnedOrigin, absolutizeRecipe } from './lib/tools-pin.mjs';
 import { dirtyTreeLines, dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { codiceCambiatoDallAvvio, testoCodiceCambiato } from './lib/codice-fermo.mjs';
-import { MAX_LIVELLO_CHARS, leggiTestoLivello } from './lib/livelli.mjs';
+import { MAX_LIVELLO_CHARS, leggiTestoLivello, segnalazioneNonFermata } from './lib/livelli.mjs';
 import { scaricaPayload, STAMPA_MAX } from './lib/consegna-file.mjs';
 import { sembraOpzioneNelReport } from './lib/argomenti.mjs';
 
@@ -396,7 +396,7 @@ export function secauditPassato(verdict) {
 // La lettura del file (intera, mai tosata, col tetto del server) sta in
 // lib/livelli.mjs, perché la usa anche il canale (`deliver status --segnala`).
 // Ri-esportata da qui per chi la importava da dispatch.
-export { MAX_LIVELLO_CHARS, leggiTestoLivello };
+export { MAX_LIVELLO_CHARS, leggiTestoLivello, segnalazioneNonFermata };
 export const SECAUDIT_VERDICTS = ['pass', 'fail'];
 
 /**
@@ -1248,8 +1248,8 @@ export function verifierReplyText(reply, id = '<id>') {
 export function fixedReplyText(id, reply, conSegnalazione = false) {
   const fermato = reply && reply.outcome === 'stop';
   if (fermato) return `stato ${id}: lavoro FERMATO, in attesa dell'owner (la segnalazione è consegnata). Rilascia il biglietto.`;
-  // Un server vecchio, che non ferma su una segnalazione, rimette in coda: dirlo, o chi ha segnalato crede di essersi fermato.
-  if (conSegnalazione) return `stato ${id}: ATTENZIONE, la consegna portava una segnalazione ma il server non ha fermato il lavoro: è tornato in coda per la verifica. La segnalazione è consegnata lo stesso.`;
+  const persa = segnalazioneNonFermata('fixed', reply, conSegnalazione, id);
+  if (persa) return `stato ${id}: la correzione è registrata e il lavoro è in coda per la verifica.\n${persa}`;
   return `stato ${id}: consegnato, torna in coda per la verifica`;
 }
 async function recordFixed(id, report = '', frase = '', segnalazione = '', ferma = false) {
@@ -2087,6 +2087,9 @@ if (isMainModule) {
       if (s.rejected) esciRespinto(s);
       console.log(`stato ${id}: esito=${VERIFIER_OUTCOMES.includes(s.reply?.outcome) ? s.reply.outcome : 'non comunicato'}`);
       console.log(verifierReplyText(s.reply, id));
+      // Dopo la risposta, e con un'uscita che non è 0: è l'ultima cosa che legge chi stava per rilasciare.
+      const persa = segnalazioneNonFermata('verdict', s.reply, !!segnalazione.testo.trim(), id);
+      if (persa) { console.error(persa); process.exit(1); }
       process.exit(0);
     } else if (flag === '--record-fixed') {
       const seg = stripFileArg(conBiglietto(argv), 'segnala');
@@ -2127,8 +2130,9 @@ if (isMainModule) {
       if (!segnalazione.ok) { console.error(segnalazione.message); process.exit(1); }
       const s = await recordFixed(id, report, frase, segnalazione.testo, ferma);
       if (s.rejected) esciRespinto(s);
-      console.log(fixedReplyText(id, s.reply, ferma || !!segnalazione.testo.trim()));
-      process.exit(0);
+      const conSegnalazione = ferma || !!segnalazione.testo.trim();
+      console.log(fixedReplyText(id, s.reply, conSegnalazione));
+      process.exit(segnalazioneNonFermata('fixed', s.reply, conSegnalazione, id) ? 1 : 0);
     } else if (flag === '--record-pulizia') {
       const [, id, ...avanzo] = conBiglietto(argv);
       if (!id || SEMBRA_OPZIONE(id)) { console.error('Uso: --record-pulizia <id>'); process.exit(1); }

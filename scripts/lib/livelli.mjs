@@ -39,3 +39,28 @@ export function leggiTestoLivello(file, nome) {
   }
   return { ok: true, testo };
 }
+
+/**
+ * Una consegna con la segnalazione che il server NON ha fermato (di solito quella già registrata e rimandata, che
+ * il server riconosce e ripete senza leggerla, #705): la frase che lo dice, e da dove mandarla. '' se si è fermato. PURA.
+ * @param {'verdict'|'fixed'|'status'} intento
+ */
+export function segnalazioneNonFermata(intento, reply, conSegnalazione, id = '<id>') {
+  if (!conSegnalazione) return '';
+  const r = reply && typeof reply === 'object' ? reply : {};
+  if (r.outcome === 'stop') return '';
+  const cosa = intento === 'verdict' ? 'La critica di questo commit era già registrata'
+    : intento === 'fixed' ? 'La correzione era già consegnata' : 'La consegna era già registrata';
+  const perche = r.replayed === true
+    ? `${cosa}: il server l'ha riconosciuta come la stessa consegna e ha ridato la risposta di prima, senza leggere la segnalazione.`
+    : 'Il server ha registrato la consegna senza fermare il lavoro, e non ha detto perché: la segnalazione non si dà per arrivata.';
+  let strada = 'Non dare il lavoro per fermo.';
+  if (intento === 'verdict' && r.outcome === 'fix') {
+    strada = `Mandala con la consegna della correzione, che è dove ferma il lavoro: \`--record-fixed ${id} "<report>" --segnala <file.md>\` (o \`routine-channel.mjs deliver fixed --report "<report>" --segnala <file.md>\`).`;
+  } else if (intento === 'verdict' || intento === 'fixed') {
+    const dove = intento === 'fixed' ? 'il lavoro resta in coda per un\'altra verifica'
+      : r.outcome === 'pass' ? 'il lavoro prosegue verso il controllo di sicurezza' : 'il lavoro non è fermo';
+    strada = `Da questo biglietto nessuna consegna può più portarla: ${dove}. Perché l'owner la legga almeno nella chat del feedback, mandala come nota (\`routine-channel.mjs deliver note --notes "<il testo della segnalazione>"\`), che però non ferma niente; poi rilascia il biglietto.`;
+  }
+  return ['SEGNALAZIONE NON CONSEGNATA: il lavoro non si è fermato e l\'owner non la vede.', perche, strada].join('\n');
+}
