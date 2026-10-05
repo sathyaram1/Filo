@@ -11,7 +11,8 @@ const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const U = require(join(ROOT, 'src', 'main', 'updater.js'));
 // L'aggancio vero di electron-updater all'installazione alla chiusura: la sua regola decide l'esito.
-const { BaseUpdater } = require(join(ROOT, 'node_modules', 'electron-updater', 'out', 'BaseUpdater.js'));
+// Per nome, non per percorso: nella prova sulla fusione node_modules sta nella cartella sopra la radice.
+const { BaseUpdater } = require('electron-updater/out/BaseUpdater.js');
 
 let carte;
 function memoriaFinta() {
