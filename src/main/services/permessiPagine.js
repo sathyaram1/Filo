@@ -176,7 +176,6 @@ function seguiGesti(wc) {
       if (avvio) wc._filoGestoDiFilo = false;
       else if (wc._filoGestoDiFilo) return;
       wc._filoGestoAlle = Date.now();
-      if (avvio) segnaGestoPerFinestra(wc, originiDelFrame(wc.mainFrame, wc));
       // Un sito che annulla il `contextmenu` spegne il `context-menu` qui sotto, non il tasto destro vero (#589.4 giro 2).
       if (tastoDelMenu(input)) segnaMenu(wc, wc.mainFrame);
     });
@@ -191,7 +190,7 @@ function seguiGesti(wc) {
     wc.on('before-input-event', (e, input) => {
       if (!input || input.type !== 'keyDown' || !tastoPerLaPagina(input) || (e && e.daAvvisoSito)) return;
       queueMicrotask(() => {
-        if (!(e && e.defaultPrevented)) { wc._filoGestoDiFilo = false; wc._filoGestoAlle = Date.now(); segnaGestoPerFinestra(wc, originiDelFrame(wc.mainFrame, wc)); }
+        if (!(e && e.defaultPrevented)) { wc._filoGestoDiFilo = false; wc._filoGestoAlle = Date.now(); }
       });
     });
     wc.on('did-start-navigation', (e, _url, isInPlace, isMainFrame) => {
@@ -212,12 +211,15 @@ function gestoRecente(wc) {
   return Boolean(t && Date.now() - t < GESTO_MS);
 }
 
-// Il clic in un riquadro di un altro sito non passa da `input-event`: lo segnala il preload del riquadro, solo se vero.
-// Vale per le finestre, non per le domande dei permessi della pagina, che vogliono un gesto sulla pagina.
-function gestoNelRiquadro(wc, frame) {
+// Il gesto per le finestre lo dice solo il preload del frame toccato, prima della pagina: il main vede
+// l'input prima di sapere se è caduto sull'interfaccia di Filo, e una pagina che chiede di continuo passerebbe in
+// mezzo (#737.1 giro 7). Un tasto che Filo si tiene non arriva al preload; uno riservato che ci arriva non conta.
+function gestoDellaPagina(wc, frame, tasto) {
   try {
-    if (!wc || !frame || !frame.parent || clicDiFiloInCorso(wc)) return;
-    segnaGestoPerFinestra(wc, originiDelFrame(frame, wc));
+    const daTastiera = Boolean(tasto && typeof tasto === 'object');
+    // Il clic di Filo arriva al preload come quello del mouse; un tasto premuto intanto è dell'utente.
+    if (!wc || (!daTastiera && clicDiFiloInCorso(wc)) || (daTastiera && !tastoPerLaPagina(tasto))) return;
+    segnaGestoPerFinestra(wc, originiDelFrame(frame || wc.mainFrame, wc));
   } catch (_) {}
 }
 
@@ -549,7 +551,7 @@ function statoNotifiche(ses, url) {
 
 module.exports = {
   installa, negaTutto, rispondi, lasciapassare, seguiGesti, scelteDi, dimentica, nomeDaMostrare, statoNotifiche,
-  carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica, gestoNelRiquadro, gestoSullaScheda, gestoPerUnaFinestra, gestoPerLaNavigazione, clicDiFilo,
+  carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica, gestoDellaPagina, gestoSullaScheda, gestoPerUnaFinestra, gestoPerLaNavigazione, clicDiFilo,
   gestoDiFilo, aperturaScelta, perUnaFinestra,
   TIPI, INNOCUI, NON_DISPONIBILI, COL_GESTO_SENZA_DOMANDA, GESTO_MS, TASTI_SENZA_GESTO, tastoPerLaPagina, _inAttesa: inAttesa,
   _usaDisco: (d) => { disco = () => d; },

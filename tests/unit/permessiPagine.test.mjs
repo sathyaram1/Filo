@@ -334,22 +334,22 @@ test('una finestra la apre solo un gesto vero di adesso, uno per finestra, anche
     wc.emetti('input-event', {}, { type: 'mouseMove' });
     assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'il puntatore che passa non è un gesto');
     wc.emetti('input-event', {}, { type: 'mouseDown' });
+    assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'l\'input visto dal main non sa ancora se è caduto su Filo');
+    Permessi.gestoDellaPagina(wc, wc.mainFrame);
     ora += 50;
     assert.equal(Permessi.gestoPerUnaFinestra(wc), true);
     assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'la seconda finestra dello stesso clic');
 
     ora += 300;
-    Permessi.gestoNelRiquadro(wc, wc.mainFrame);
-    assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'dal frame principale vale solo l\'input che vede il main');
-    Permessi.gestoNelRiquadro(wc, { parent: wc.mainFrame });
+    Permessi.gestoDellaPagina(wc, { parent: wc.mainFrame });
     assert.equal(Permessi.gestoPerUnaFinestra(wc), true, 'il clic vero nel riquadro di un altro sito');
 
     ora += 300;
-    Permessi.gestoNelRiquadro(wc, { parent: wc.mainFrame });
+    Permessi.gestoDellaPagina(wc, { parent: wc.mainFrame });
     ora += Permessi.GESTO_MS + 1;
     assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'un gesto di cinque secondi fa non vale più');
 
-    wc.emetti('input-event', {}, { type: 'keyDown', key: 'Enter' });
+    Permessi.gestoDellaPagina(wc, wc.mainFrame, { key: 'Enter' });
     wc.emetti('did-start-navigation', { isMainFrame: true, isSameDocument: false });
     assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'il gesto non passa alla pagina dove porta');
   } finally { orologio.mock.restore(); }
@@ -364,6 +364,7 @@ test('un gesto apre una finestra sola: la pressione la apre, il rilascio dello s
     wc.mainFrame = { parent: null };
     Permessi.seguiGesti(wc);
     wc.emetti('input-event', {}, { type: 'mouseDown' });
+    Permessi.gestoDellaPagina(wc, wc.mainFrame);
     assert.equal(Permessi.gestoPerUnaFinestra(wc), true, 'alla pressione');
     ora += 150;
     wc.emetti('input-event', {}, { type: 'mouseUp' });
@@ -373,14 +374,15 @@ test('un gesto apre una finestra sola: la pressione la apre, il rilascio dello s
     wc.emetti('input-event', {}, { type: 'rawKeyDown', key: 'a' });
     wc.emetti('before-input-event', { defaultPrevented: false }, { type: 'keyDown', key: 'a' });
     await new Promise((r) => setImmediate(r));
+    Permessi.gestoDellaPagina(wc, wc.mainFrame, { key: 'a' });
     assert.equal(Permessi.gestoPerUnaFinestra(wc), true, 'al tasto');
     ora += 80;
     wc.emetti('input-event', {}, { type: 'char', key: 'a' });
     assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'il carattere dello stesso tasto');
     ora += 20;
-    Permessi.gestoNelRiquadro(wc, { parent: wc.mainFrame });
+    Permessi.gestoDellaPagina(wc, { parent: wc.mainFrame });
     ora += 300;
-    wc.emetti('input-event', {}, { type: 'mouseDown' });
+    Permessi.gestoDellaPagina(wc, wc.mainFrame);
     assert.equal(Permessi.gestoPerUnaFinestra(wc), true, 'un clic nuovo è un gesto nuovo');
   } finally { orologio.mock.restore(); }
 });
@@ -394,15 +396,15 @@ test('il clic che Filo dà da sé a una pagina non è un gesto, nemmeno riferito
     Permessi.seguiGesti(wc);
     Permessi.clicDiFilo(wc);
     wc.emetti('input-event', {}, { type: 'mouseDown' });
+    Permessi.gestoDellaPagina(wc, wc.mainFrame);
     wc.emetti('input-event', {}, { type: 'mouseUp' });
     ora += 300;
-    Permessi.gestoNelRiquadro(wc, { parent: wc.mainFrame });
+    Permessi.gestoDellaPagina(wc, { parent: wc.mainFrame });
     assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'nessuna finestra dal clic di Filo');
-    wc.emetti('before-input-event', { defaultPrevented: false }, { type: 'keyDown', key: 'x' });
-    await new Promise((r) => setImmediate(r));
+    Permessi.gestoDellaPagina(wc, wc.mainFrame, { key: 'x' });
     assert.equal(Permessi.gestoPerUnaFinestra(wc), true, 'il tasto premuto intanto dall\'utente');
     ora += 2000;
-    wc.emetti('input-event', {}, { type: 'mouseDown' });
+    Permessi.gestoDellaPagina(wc, wc.mainFrame);
     assert.equal(Permessi.gestoPerUnaFinestra(wc), true, 'passato il clic di Filo, il clic dell\'utente torna a valere');
   } finally { orologio.mock.restore(); }
 });
@@ -420,13 +422,14 @@ test('un modificatore da solo o una scorciatoia di Filo non sono un gesto dato a
   const wc = wcFinto('https://sito.test/');
   Permessi.seguiGesti(wc);
   wc.emetti('input-event', {}, tasto('Control', { control: true }));
-  wc.emetti('before-input-event', { defaultPrevented: false }, { ...tasto('Control', { control: true }), type: 'keyDown' });
-  wc.emetti('before-input-event', { defaultPrevented: true }, { ...tasto('k', { control: true }), type: 'keyDown' });
-  wc.emetti('before-input-event', { daAvvisoSito: true }, { ...tasto('x'), type: 'keyDown' });
-  await new Promise((r) => setImmediate(r));
-  assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'nessun tasto è arrivato alla pagina');
   wc.emetti('before-input-event', { defaultPrevented: false }, { ...tasto('x'), type: 'keyDown' });
   await new Promise((r) => setImmediate(r));
+  assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'il main da solo non dà finestre: lo dice il preload');
+  // Dal preload, con i nomi del DOM: un tasto riservato che arriva alla pagina non è suo.
+  Permessi.gestoDellaPagina(wc, null, { key: 'Control', ctrlKey: true });
+  Permessi.gestoDellaPagina(wc, null, { key: 't', code: 'KeyT', ctrlKey: true });
+  assert.equal(Permessi.gestoPerUnaFinestra(wc), false, 'nessun tasto è della pagina');
+  Permessi.gestoDellaPagina(wc, null, { key: 'x', code: 'KeyX' });
   assert.equal(Permessi.gestoPerUnaFinestra(wc), true, 'il tasto scritto nella pagina sì');
 });
 
@@ -446,26 +449,26 @@ test('il clic sulla pagina non apre la finestra che chiede un riquadro di un alt
     wc.mainFrame = { parent: null, origin: 'https://notizie.example', url: 'https://notizie.example/articolo' };
     const pubblicita = { parent: wc.mainFrame, origin: 'https://pubblicita.example', url: 'https://pubblicita.example/b' };
     Permessi.seguiGesti(wc);
-    wc.emetti('input-event', {}, { type: 'mouseDown' });
+    Permessi.gestoDellaPagina(wc, wc.mainFrame);
     assert.equal(Permessi.gestoPerUnaFinestra(wc, { url: 'https://pubblicita.example/', policy: 'strict-origin-when-cross-origin' }), false, 'il riquadro non l\'ha avuto');
     assert.equal(Permessi.gestoPerUnaFinestra(wc, { url: 'https://notizie.example/articolo' }), true, 'la pagina sì, una volta');
 
     ora += 400;
-    Permessi.gestoNelRiquadro(wc, pubblicita);
+    Permessi.gestoDellaPagina(wc, pubblicita);
     assert.equal(Permessi.gestoPerUnaFinestra(wc, { url: 'https://pubblicita.example/' }), true, 'il clic dentro il riquadro');
     ora += 400;
-    Permessi.gestoNelRiquadro(wc, pubblicita);
+    Permessi.gestoDellaPagina(wc, pubblicita);
     assert.equal(Permessi.gestoPerUnaFinestra(wc, { url: 'https://notizie.example/' }), true, 'come in Chromium il gesto sale alla pagina che lo contiene');
 
     ora += 400;
-    wc.emetti('input-event', {}, { type: 'mouseDown' });
+    Permessi.gestoDellaPagina(wc, wc.mainFrame);
     ora += 20;
-    Permessi.gestoNelRiquadro(wc, pubblicita);
+    Permessi.gestoDellaPagina(wc, pubblicita);
     assert.equal(Permessi.gestoPerUnaFinestra(wc, { url: 'https://pubblicita.example/' }), true, 'lo stesso clic visto da tutti e due è un gesto solo, del riquadro');
     assert.equal(Permessi.gestoPerUnaFinestra(wc, { url: 'https://notizie.example/' }), false, 'e apre una finestra sola');
 
     ora += 400;
-    wc.emetti('input-event', {}, { type: 'mouseDown' });
+    Permessi.gestoDellaPagina(wc, wc.mainFrame);
     assert.equal(Permessi.gestoPerUnaFinestra(wc, { url: '' }), true, 'chi nasconde da dove chiede resta «la scheda»');
   } finally { orologio.mock.restore(); }
 });
@@ -476,6 +479,7 @@ test('il gesto dato all\'interfaccia di Filo non apre finestre alla pagina; l\'a
   const wc = wcFinto('https://sito.example/');
   Permessi.seguiGesti(wc);
   wc.emetti('input-event', {}, { type: 'mouseDown' });
+  assert.equal(Permessi.perUnaFinestra(wc, 'https://pubblicita.example/', 'https://sito.example/'), false, 'la pagina che chiede prima che il preload dica di chi è il clic');
   Permessi.gestoDiFilo(wc);
   wc.emetti('input-event', {}, { type: 'mouseUp' });
   assert.equal(Permessi.perUnaFinestra(wc, 'https://pubblicita.example/', 'https://sito.example/'), false, 'il clic sul menu di Filo non è della pagina');
@@ -485,15 +489,16 @@ test('il gesto dato all\'interfaccia di Filo non apre finestre alla pagina; l\'a
   assert.equal(Permessi.perUnaFinestra(wc, 'https://sito.example/articolo', 'https://sito.example/'), false, 'una volta sola');
 
   ora += 1000;
-  wc.emetti('input-event', {}, { type: 'mouseDown' });
+  Permessi.gestoDellaPagina(wc, null);
   assert.equal(Permessi.perUnaFinestra(wc, 'https://pubblicita.example/', 'https://sito.example/'), true, 'la pubblicità spende il clic sul link');
   Permessi.aperturaScelta(wc, 'https://sito.example/link');
   assert.equal(Permessi.perUnaFinestra(wc, 'https://sito.example/link', 'https://sito.example/'), true, 'il link cliccato si apre lo stesso');
 
   ora += 1000;
-  wc.emetti('input-event', {}, { type: 'mouseDown' });
+  Permessi.gestoDellaPagina(wc, null);
   Permessi.aperturaScelta(wc, 'https://sito.example/altro');
   assert.equal(Permessi.perUnaFinestra(wc, 'https://sito.example/altro', 'https://sito.example/'), true);
   assert.equal(Permessi.perUnaFinestra(wc, 'https://pubblicita.example/', 'https://sito.example/'), false, 'il link spende anche il gesto: niente pubblicità dopo');
   orologio.mock.restore();
 });
+

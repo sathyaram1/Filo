@@ -147,10 +147,11 @@ function registerIpcHandlers() {
     try { event.sender._filoActiveFrame = event.senderFrame || null; } catch (_) {}
   });
 
-  ipcMain.on('filo:gesto-riquadro', (event) => {
-    require('./services/permessiPagine').gestoNelRiquadro(event.sender, event.senderFrame);
+  // Sincroni: devono arrivare prima della finestra che la pagina chiede nello stesso clic (#737.1 giri 6 e 7).
+  ipcMain.on('filo:gesto-pagina', (event, tasto) => {
+    require('./services/permessiPagine').gestoDellaPagina(event.sender, event.senderFrame, tasto);
+    event.returnValue = true;
   });
-  // Sincroni: devono arrivare prima della finestra che la pagina chiede nello stesso clic (#737.1 giro 6).
   ipcMain.on('filo:gesto-di-filo', (event) => {
     require('./services/permessiPagine').gestoDiFilo(event.sender);
     event.returnValue = true;

@@ -289,3 +289,23 @@ test('il pulsante di un modulo che apre una scheda la apre anche se la pagina ap
   await page.locator('#b').click();
   await expect.poll(async () => (await schede(app)).filter((x) => x.startsWith(`${dest}?q=ciao`)).length, { timeout: 6000 }).toBe(1);
 });
+
+// Giro 7: il gesto lo dice il preload, che sa se l'input è caduto sul menu di Filo; il main da solo arriva prima di lui.
+test('raffica: una pagina che chiede di continuo non passa col clic sul menu di Filo', async ({ app, openTab, testServer }) => {
+  const ad = testServer.html('<title>AD</title>');
+  const page = await testServer.openReady(openTab, `<!doctype html><body style="padding:24px"><a id="l" href="https://example.com/x">collegamento</a>
+    <script>var AD=${JSON.stringify(ad)};setInterval(function(){window.open(AD)},3)</script></body>`);
+  await page.waitForTimeout(5600);
+  const passate = [];
+  for (let i = 0; i < 4; i++) {
+    await page.locator('#l').click({ button: 'right', position: { x: 8, y: 8 } });
+    const menu = page.locator('.sn-menu');
+    await expect(menu).toBeVisible();
+    await page.waitForTimeout(5600);
+    const prima = await aperteSu(app, ad);
+    await menu.locator('button', { hasText: 'Copia URL' }).first().click();
+    await page.waitForTimeout(800);
+    passate.push((await aperteSu(app, ad)) - prima);
+  }
+  expect(passate).toEqual([0, 0, 0, 0]);
+});

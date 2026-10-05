@@ -57,8 +57,7 @@ voleva.
   schermo pieno lo rifiuta Chromium da solo, e la pagina riceve il rifiuto invece di restare in sospeso.
 - **Le finestre le decide il main sul gesto vero**, perché Electron non ha il blocco dei popup di Chrome: col blocco
   acceso una scheda nuova passa solo entro cinque secondi da un input vero sulla scheda, una per gesto
-  (`gestoPerUnaFinestra` in `src/main/services/permessiPagine.js`). Il clic in un riquadro di un altro sito il main
-  non lo vede: lo segnala il preload del riquadro, solo se `isTrusted`. Il gesto lo apre il suo inizio (pressione,
+  (`gestoPerUnaFinestra` in `src/main/services/permessiPagine.js`). Il gesto lo apre il suo inizio (pressione,
   tasto, fine del tocco): il rilascio dello stesso clic non è una seconda finestra. Il clic vero che Filo dà da sé
   (`clicDiFilo`, il «Salta») non è un gesto di nessuno, nemmeno quando il riquadro lo riferisce (#737.1 giro 2).
 - **Il gesto è di chi l'ha ricevuto**, come in Chromium: del frame toccato e dei suoi antenati, non dei riquadri di
@@ -68,11 +67,15 @@ voleva.
   `noreferrer` di ogni pagina con pubblicità (#737.1 giro 3). La forma non conta: una finestra con le misure o un
   Maiuscolo+clic passano col gesto come una scheda. Posta, telefono e SMS chiesti dalla pagina seguono la stessa
   regola; un redirect usa il gesto che ha fatto partire la navigazione.
-- **Il gesto è di chi l'utente ha toccato, e il preload lo dice prima della pagina** (#737.1 giro 6): i suoi ascolti
-  sulla finestra, in cattura, nascono prima di ogni script del sito e parlano al main in modo sincrono, quindi arrivano
-  prima della finestra che la pagina chiede con lo stesso input. Un input sull'interfaccia di Filo disegnata nella
-  pagina (menu, risposte, assistente: le radici di `SN_FILO_UI`, non l'attributo) è di Filo e spende il gesto, come
-  una scorciatoia. Il collegamento o il pulsante d'invio cliccato e la voce del menu di Filo che apre un indirizzo
+- **Il gesto della pagina lo dice solo il preload del frame toccato** (#737.1 giri 6 e 7), mai `input-event` del
+  main: il main vede l'input prima di sapere se è caduto sull'interfaccia di Filo, e una pagina che chiede di continuo
+  passava in quel mezzo. Gli ascolti del preload sulla finestra, in cattura, nascono prima di ogni script del sito e
+  parlano al main in modo sincrono (`filo:gesto-pagina`), solo se `isTrusted`; un tasto che Filo si tiene non ci
+  arriva, uno riservato che ci arriva il main lo scarta. Un input sull'interfaccia di Filo disegnata nella pagina
+  (menu, risposte, assistente: le radici di `SN_FILO_UI`, non l'attributo) è di Filo e spende il gesto, come una
+  scorciatoia. Lo schermo pieno invece lo decide Chromium sull'attivazione del frame, che il clic sul menu di Filo dà
+  lo stesso: negarlo dal gestore dei permessi lascia la richiesta in sospeso, e la pagina non ci va più nemmeno col
+  clic dopo, fino al ricaricamento. Il collegamento o il pulsante d'invio cliccato e la voce del menu di Filo che apre un indirizzo
   dichiarano quell'indirizzo (`aperturaScelta`): si apre una volta anche se la pagina ha già speso il gesto per una
   sua pubblicità, e spende il gesto rimasto. Il main non sa chi ha chiesto la finestra; il preload sa che cosa l'utente ha toccato.
 

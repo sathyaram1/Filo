@@ -362,10 +362,9 @@ try {
   }
 } catch (_) { /* mai bloccare il caricamento della pagina */ }
 
-// Il main vede l'input della pagina, non quello di un riquadro di un altro sito: senza questo, col blocco dei popup, il
-// clic dentro il riquadro non aprirebbe la scheda che chiede (#737.1). Solo l'input vero: la pagina non lo fabbrica.
-// In ogni frame, prima degli ascolti della pagina: il gesto dato all'interfaccia di Filo è di Filo, e il collegamento
-// cliccato si apre anche se la pagina ha speso il gesto per sé (#737.1 giro 6). Regole: services/permessiPagine.js.
+// Il gesto che vale per finestre e schermo pieno lo dice solo questo ascolto, in ogni frame, prima della pagina: è
+// l'unico a sapere se l'input è caduto sull'interfaccia di Filo (#737.1 giri 6 e 7). Solo l'input vero: la pagina non
+// lo fabbrica. Il collegamento cliccato si apre anche se la pagina ha speso il gesto per sé. Regole: services/permessiPagine.js.
 try {
   let ultimoGesto = 0;
   let ultimoDiFilo = 0;
@@ -396,10 +395,12 @@ try {
       try { ipcRenderer.sendSync('filo:gesto-di-filo'); } catch (_) {}
       return;
     }
-    if (!IS_SUBFRAME || (e.type === 'pointerdown' && e.pointerType === 'touch')) return;
-    if (ora - ultimoGesto < 100) return;
-    ultimoGesto = ora;
-    try { ipcRenderer.send('filo:gesto-riquadro'); } catch (_) {}
+    if (e.type === 'pointerdown' && e.pointerType === 'touch') return;
+    if (e.type === 'mousedown' && ora - ultimoGesto < 100) return;
+    if (e.type === 'pointerdown') ultimoGesto = ora;
+    const tasto = e.type === 'keydown'
+      ? { key: e.key, code: e.code, ctrlKey: e.ctrlKey, metaKey: e.metaKey, altKey: e.altKey, shiftKey: e.shiftKey } : null;
+    try { ipcRenderer.sendSync('filo:gesto-pagina', tasto); } catch (_) {}
   };
   // Solo l'inizio di un gesto, come nella pagina: il rilascio dello stesso clic non è un gesto nuovo (il tocco finisce).
   for (const ev of ['pointerdown', 'mousedown', 'keydown', 'touchend']) {
