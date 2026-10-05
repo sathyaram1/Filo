@@ -181,10 +181,12 @@ async function prova(eseguibile, cartellaVersione) {
     ]);
   } catch (e) {
     if (impl === istanza) chiudiDriver();
+    if (!acceso) return false;
     console.warn('[Filo altre app] prova d\'avvio fallita', e && e.message, e && e.dettaglio && e.dettaglio.stderr ? e.dettaglio.stderr.slice(-800) : '');
     imposta({ fase: 'errore', codice: 'avvio', frase: 'Il componente per le altre applicazioni è installato ma non parte. Reinstallarlo di solito lo rimette a posto.' });
     return false;
   }
+  if (!acceso || impl !== istanza) { if (impl === istanza) chiudiDriver(); return false; }
   provatoInSessione = true;
   if (esito.mancano.length) {
     chiudiDriver();
@@ -236,19 +238,28 @@ async function installa() {
 }
 
 // Chiamata da chi vuole il componente pronto: scarica se manca, prova se non l'ha mai fatto in questa sessione.
-async function assicura({ forza = false, verifica = false } = {}) {
-  if (!acceso) return;
-  if (lavoro) return lavoro.promessa;
-  const inst = installatore();
-  if (!inst.pacchetto) { imposta({ fase: 'non-supportato', frase: `Il componente per le altre applicazioni non esiste ancora per questo computer (${process.platform} ${process.arch}).` }); return; }
-  const i = await inst.installato();
-  if (forza || i.stato === 'assente' || i.stato === 'vecchio') return installa();
-  if (i.stato === 'mancante') {
-    imposta({ fase: 'errore', codice: 'mancante', frase: 'Il componente per le altre applicazioni non c\'è più sul computer, o è stato cambiato. Reinstallalo.' });
-    return;
-  }
-  if (verifica && !provatoInSessione && !(impl && impl.vivo())) { await prova(i.eseguibile, i.cartellaVersione); return; }
-  if (fase.fase !== 'errore' && fase.fase !== 'pronto') imposta({ fase: 'pronto' });
+// Una sola alla volta: due richieste vicine (l'avvio e la pagina che si apre) non scaricano due volte.
+let assicurando = null;
+function assicura(opzioni = {}) {
+  if (!acceso) return Promise.resolve();
+  if (assicurando) return assicurando;
+  assicurando = (async () => {
+    if (lavoro) return lavoro.promessa;
+    const inst = installatore();
+    if (!inst.pacchetto) { imposta({ fase: 'non-supportato', frase: `Il componente per le altre applicazioni non esiste ancora per questo computer (${process.platform} ${process.arch}).` }); return undefined; }
+    const i = await inst.installato();
+    if (!acceso) return undefined;
+    if (opzioni.forza || i.stato === 'assente' || i.stato === 'vecchio') return installa();
+    if (i.stato === 'mancante') {
+      imposta({ fase: 'errore', codice: 'mancante', frase: 'Il componente per le altre applicazioni non c\'è più sul computer, o è stato cambiato. Reinstallalo.' });
+      return undefined;
+    }
+    if (opzioni.verifica && !provatoInSessione && !(impl && impl.vivo())) return prova(i.eseguibile, i.cartellaVersione);
+    if (fase.fase !== 'errore' && fase.fase !== 'pronto') imposta({ fase: 'pronto' });
+    return undefined;
+  })();
+  const questa = assicurando;
+  return questa.finally(() => { if (assicurando === questa) assicurando = null; });
 }
 
 function configura(settings) {
@@ -298,6 +309,7 @@ async function reinstalla() {
   if (!acceso) return { ok: false, motivo: 'Prima accendi «Filo può usare le altre applicazioni».' };
   annullaLavoro();
   if (lavoro) { try { await lavoro.promessa; } catch (_) {} }
+  if (assicurando) { try { await assicurando; } catch (_) {} }
   provatoInSessione = false;
   assicura({ forza: true }).catch(() => {});
   return { ok: true };
@@ -308,12 +320,11 @@ const driver = creaComputerDriver({
   apri: async () => {
     if (!acceso) return { motivo: 'L\'uso delle altre applicazioni è spento: si accende in Preferenze.' };
     if (lavoro) return { motivo: 'Il componente per le altre applicazioni si sta ancora installando.' };
-    if (fase.fase === 'errore') return { motivo: fase.frase };
     if (!impl || !impl.vivo()) {
       const i = await installatore().installato();
       if (i.stato !== 'ok') {
         assicura().catch(() => {});
-        return { motivo: 'Il componente per le altre applicazioni non è installato.' };
+        return { motivo: fase.fase === 'errore' ? fase.frase : 'Il componente per le altre applicazioni non è installato.' };
       }
       impl = nuovoDriver(i.eseguibile, i.cartellaVersione);
     }
