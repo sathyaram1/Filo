@@ -134,7 +134,10 @@
     const flushList = () => {
       if (listType) { out.push('</' + listType + '>'); listType = null; }
     };
-    for (const raw of lines) {
+    // Il tipo di voce d'elenco di una riga, o null.
+    const tipoVoce = (s) => (/^[-*]\s+\S/.test(s) ? 'ul' : /^\d+\.\s+\S/.test(s) ? 'ol' : null);
+    for (let i = 0; i < lines.length; i++) {
+      const raw = lines[i];
       if (raw.trim().startsWith('```')) {
         if (inCode) {
           out.push('<pre><code>' + codeBuf.join('\n') + '</code></pre>');
