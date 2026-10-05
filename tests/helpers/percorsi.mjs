@@ -86,6 +86,14 @@ export function cartellaInCasa(prefisso) {
   return togliAllUscita(percorsoCanonico(mkdtempSync(join(homedir(), `${prefisso}${SPAZIO}`))));
 }
 
+// La temporanea di una corsa intera, ereditata dai figli: ci finisce anche quello che il codice provato e Chromium
+// scrivono lì per conto loro (#717). Corta e non canonica di proposito: su Mac Chromium ci mette il suo socket, che
+// oltre 104 caratteri di percorso non nasce, e /private davanti ne costerebbe otto.
+export const PREFISSO_CORSA = 'filo-corsa-';
+export function temporaneaDellaCorsa() {
+  return togliAllUscita(mkdtempSync(join(tmpdir(), PREFISSO_CORSA)));
+}
+
 // Le cartelle chieste qui se ne vanno col processo che le ha chieste, verde o rosso che finisca: lasciate a ogni
 // prova erano diventate 13.000 cartelle e 17 GB nella temporanea dell'owner, e col disco pieno cadevano prove sane (#717).
 const DA_TOGLIERE = new Set();
@@ -101,8 +109,8 @@ function togliSenzaErrori(dir) {
 }
 
 // Un processo ucciso (Ctrl+C, un timeout) non vede la sua uscita: i suoi resti li tolgono i lanciatori alla corsa dopo.
-// Si riconoscono dal nome che solo le due funzioni qui sopra danno, e dall'età: nessuna corsa di prove dura un giorno.
-const NOME_DEI_TEST = new RegExp(`${SPAZIO}[A-Za-z0-9]{6}$`);
+// Si riconoscono dal nome che solo le funzioni qui sopra danno, e dall'età: nessuna corsa di prove dura un giorno.
+const NOME_DEI_TEST = new RegExp(`(${SPAZIO}|^${PREFISSO_CORSA})[A-Za-z0-9]{6}$`);
 export const ORFANA_DOPO_MS = 24 * 60 * 60 * 1000;
 
 export function cartelleOrfane({ dove = [tmpdir(), homedir()], oraMs = Date.now(), etaMs = ORFANA_DOPO_MS } = {}) {

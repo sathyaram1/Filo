@@ -10,7 +10,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, utimesSync, writeFile
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { SPAZIO, ORFANA_DOPO_MS, cartellaTemporanea, togliCartelleOrfane } from '../helpers/percorsi.mjs';
+import { SPAZIO, ORFANA_DOPO_MS, PREFISSO_CORSA, cartellaTemporanea, togliCartelleOrfane } from '../helpers/percorsi.mjs';
 
 const RADICE = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PERCORSI = pathToFileURL(join(RADICE, 'tests', 'helpers', 'percorsi.mjs')).href;
@@ -96,17 +96,20 @@ test('la pulizia tocca solo le cartelle col nome dei test, e lo dice prima', () 
   const nostra = join(b.tmp, `filo-x-${SPAZIO}AbC123`);
   mkdirSync(join(nostra, 'Default', 'Cache'), { recursive: true });
   writeFileSync(join(nostra, 'Default', 'Cache', 'dati'), 'x'.repeat(1000));
-  const altre = [join(b.tmp, 'filo-x-AbC123'), join(b.tmp, `filo-x-${SPAZIO}AbC12`), join(b.casa, 'Documenti con spazio')];
+  const corsa = join(b.tmp, `${PREFISSO_CORSA}Q1w2E3`);
+  mkdirSync(join(corsa, 'scoped_dirAbC123'), { recursive: true });
+  const altre = [join(b.tmp, 'filo-x-AbC123'), join(b.tmp, `filo-x-${SPAZIO}AbC12`), join(b.casa, 'Documenti con spazio'),
+    join(b.tmp, `mia-${PREFISSO_CORSA}AbC123`)];
   for (const d of altre) mkdirSync(d);
   const file = join(b.tmp, `filo-y-${SPAZIO}ZzZ999`);
   writeFileSync(file, 'non è una cartella');
-  for (const p of [nostra, ...altre, file]) vecchia(p);
+  for (const p of [nostra, corsa, ...altre, file]) vecchia(p);
 
   const annunci = [];
   const tolte = togliCartelleOrfane({ dove: [b.tmp, b.casa], annuncia: (n) => annunci.push(n) });
-  assert.deepEqual(tolte, [nostra]);
-  assert.deepEqual(annunci, [1]);
-  assert.ok(!existsSync(nostra));
+  assert.deepEqual(tolte.sort(), [nostra, corsa].sort());
+  assert.deepEqual(annunci, [2]);
+  assert.ok(!existsSync(nostra) && !existsSync(corsa));
   for (const p of [...altre, file]) assert.ok(existsSync(p), `non era dei test: ${p}`);
 });
 
@@ -193,6 +196,8 @@ test('il globalSetup di Playwright dà alla corsa una temporanea sua, e la togli
   }
   assert.notEqual(temp, b.tmp, 'i lavoratori ereditano ancora la temporanea di sistema');
   assert.ok(temp.startsWith(b.tmp), `la temporanea della corsa sta fuori da quella di sistema: ${temp}`);
+  // Su Mac Chromium mette il suo socket lì sotto, e oltre 104 caratteri di percorso Electron non parte.
+  assert.ok(temp.length <= join(b.tmp, `${PREFISSO_CORSA}AbC123`).length, `temporanea della corsa troppo lunga: ${temp}`);
   mkdirSync(join(temp, 'scoped_dirAbC123'));
   assert.equal(typeof dopo, 'function', 'nessuno toglie la temporanea a fine corsa');
   await dopo();

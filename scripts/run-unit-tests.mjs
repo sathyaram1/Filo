@@ -299,7 +299,7 @@ async function temporaneaDellaCorsa() {
   const percorsi = await percorsiDeiTest();
   if (!percorsi) return null;
   percorsi.togliCartelleOrfane({ annuncia: (n) => console.error(`[test:unit] tolgo ${n} cartelle temporanee lasciate da prove interrotte`) });
-  return percorsi.cartellaTemporanea('filo-corsa-');
+  return percorsi.temporaneaDellaCorsa();
 }
 
 // Un file appeso (col disco pieno, #717) non deve tenere ferma la corsa per sempre: dopo il tetto è un rosso col suo nome.
