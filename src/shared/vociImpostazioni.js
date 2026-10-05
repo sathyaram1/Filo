@@ -45,6 +45,7 @@
         terminalEnabled: 'terminal.enabled',
         terminalShell: 'terminal.shell',
         nomiSensatiScaricamenti: 'nomiSensati.scaricamenti',
+        aggiornamentiAutomatici: 'aggiornamenti.automatici',
       },
       gruppi: { tokenCode: 'themeTokens.*', tabColorCode: 'tabColor.*' },
       fuori: {},
