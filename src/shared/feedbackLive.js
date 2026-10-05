@@ -487,7 +487,7 @@
   global.SN_FEEDBACK_LIVE = {
     POLL_MS, CLOCK_MS, RIENTRO_MIN_MS, GIRO_BLOCCATO_MS, FERMA_DOPO_MS, LISTA_IN_USO_MS,
     RECONCILE_MS, OVERLAP_MS, SEGUITI_TETTO, REGISTRO_SEGUI_MS, createdMs,
-    diffVersions, applyChanges, decidiGiro, listaFerma, arrivi, statoCambiato,
+    diffVersions, applyChanges, decidiGiro, listaFerma, arrivi, statoCambiato, fusioniDa, nellaFinestra,
     ancoraScorrimento, scrollDaAncora, listaInUso, makeWatcher,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
