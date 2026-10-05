@@ -95,9 +95,14 @@ test('seed per-origine: deterministico, coerente fra sottodomini, scorrelato fra
   const r = await app.evaluate(() => {
     const F = globalThis.__filoFingerprint;
     return {
-      etld_google: F.etld1('accounts.google.com'),
-      etld_bbc: F.etld1('news.bbc.co.uk'),
-      etld_plain: F.etld1('example.com'),
+      googleLogin: F.seedForHref('https://accounts.google.com/'),
+      googleSearch: F.seedForHref('https://www.google.com/'),
+      bbcNews: F.seedForHref('https://news.bbc.co.uk/'),
+      bbcWww: F.seedForHref('https://www.bbc.co.uk/'),
+      bbcAltro: F.seedForHref('https://bbc.com/'),
+      plain: F.seedForHref('https://example.com/'),
+      githubAlice: F.configForHref('https://alice.github.io/').seed,
+      githubBob: F.configForHref('https://bob.github.io/').seed,
       levelHttps: F.configForHref('https://x.example.com/').level,
       levelInternal: F.configForHref('filo://newtab/').level,
       levelFile: F.configForHref('file:///tmp/x.html').level,
@@ -106,10 +111,12 @@ test('seed per-origine: deterministico, coerente fra sottodomini, scorrelato fra
       seedB: F.configForHref('https://other-site.org/').seed,
     };
   });
-  // eTLD+1 corretto (sottodomini collassati, suffisso multi-parte gestito).
-  expect(r.etld_google).toBe('google.com');
-  expect(r.etld_bbc).toBe('bbc.co.uk');
-  expect(r.etld_plain).toBe('example.com');
+  // Il sito è quello dei cookie: sottodomini insieme, suffisso nazionale a due livelli, due pagine su github.io separate.
+  expect(r.googleLogin).toBe(r.googleSearch);
+  expect(r.bbcNews).toBe(r.bbcWww);
+  expect(r.bbcNews).not.toBe(r.bbcAltro);
+  expect(r.plain).toBe(r.seedA1);
+  expect(r.githubAlice).not.toBe(r.githubBob);
   // Solo http/https sono protette; pagine interne e file:// no.
   expect(r.levelHttps).toBe(1);
   expect(r.levelInternal).toBe(0);

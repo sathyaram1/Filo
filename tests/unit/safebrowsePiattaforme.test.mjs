@@ -86,8 +86,8 @@ test('i cookie della modalità privacy seguono solo le piattaforme che il web gi
   // Per il giudizio invece il blog è un sito a sé.
   assert.equal(normalize('https://myblog.wordpress.com/').registrable, 'myblog.wordpress.com');
   const { readFileSync } = await import('node:fs');
-  const cookies = readFileSync(new URL('../../src/main/services/cookies.js', import.meta.url), 'utf8');
-  assert.match(cookies, /SB\.normalize\(url, \{ soloPsl: true \}\)/);
+  const sito = readFileSync(new URL('../../src/main/services/stessoSito.js', import.meta.url), 'utf8');
+  assert.match(sito, /normalize\(url, \{ soloPsl: true \}\)/);
 });
 
 test('un Microsoft Form su cloud.microsoft resta una pagina ospitata da giudicare', () => {
