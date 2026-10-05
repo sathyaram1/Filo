@@ -1308,9 +1308,9 @@
   // senza rileggere niente.
   let fusioni = { pending: [], failed: [], recent: [], preapproved: [] };
   let fusioniLette = false;
-  // Una richiesta si manda a fondere per il segno UNA volta per pagina: un
-  // rifiuto o un conflitto non si ritentano da soli a ogni rilettura.
-  const fusioniTentate = new Set();
+  // Una richiesta si manda a fondere UNA volta per segno: un rifiuto o un
+  // conflitto non si ritentano da soli a ogni rilettura. id → { fb, segno }.
+  const fusioniTentate = new Map();
   // L'esito di quel tentativo, per richiesta: il riquadro in basso e la riga
   // del dettaglio sono un posto solo, e chi arriva dopo cancella chi c'era.
   const esitiTentati = new Map();
@@ -1318,6 +1318,7 @@
   // stessa, e una card disegnata nel frattempo la mostra coi tasti spenti (#702).
   const approvazioniInVolo = new Map();
   const ATTESA_SEGNO = { kind: 'wait', text: 'Pratica segnata «fondi senza chiedermelo»: chiedo al server di fondere…' };
+  const IN_VOLO = { kind: 'wait', text: 'Fusione già in corso: il server ci sta lavorando…' };
   function approvaUnaVolta(req, attesa) {
     const gia = approvazioniInVolo.get(req.id);
     if (gia) return gia.risposta;
@@ -1419,15 +1420,23 @@
   async function fondiCoperte(fb, opts) {
     const UI = window.SN_MERGE_APPROVALS;
     if (!UI || !fb || !isAdmin) return [];
-    const daFondere = UI.richiesteCoperte(fusioni.pending, {
+    dimenticaTentativiSuperati();
+    const coperte = UI.richiesteCoperte(fusioni.pending, {
       feedbackId: fb._id,
       numero: FB && typeof FB.formatNum === 'function' ? FB.formatNum(fb.seq, fb.subSeq) : '',
       ancheNuovi: !!(opts && opts.ancheNuovi),
     }).filter((req) => !fusioniTentate.has(req.id) && daDecidere(req));
+    // Una già in viaggio non riparte: la rilettura dopo l'esito la ritenta se il segno è cambiato (#701).
+    const occupate = coperte.filter((req) => approvazioniInVolo.has(req.id));
+    const daFondere = coperte.filter((req) => !approvazioniInVolo.has(req.id));
     if (daFondere.length && opts && typeof opts.avvia === 'function') opts.avvia(daFondere.length);
-    const esiti = [];
+    const esiti = opts && opts.ancheInVolo ? occupate.map((req) => ({
+      req,
+      msg: IN_VOLO,
+      attesa: approvazioniInVolo.get(req.id).risposta,
+    })) : [];
     for (const req of daFondere) {
-      fusioniTentate.add(req.id);
+      fusioniTentate.set(req.id, { fb: fb._id, segno: segnoCheFonde(fb) });
       const risposta = approvaUnaVolta(req, ATTESA_SEGNO);
       if (livelloAperto === 'l5') ridisegnaPannelloAperto();
       const reply = await risposta;
@@ -1435,21 +1444,25 @@
       esitiTentati.set(req.id, msg);
       esiti.push({ req, msg });
     }
-    if (esiti.length) setTimeout(loadMergeApprovals, 1200);
+    if (daFondere.length) setTimeout(loadMergeApprovals, 1200);
     return esiti;
   }
 
-  // Il segno rimesso a mano è una decisione nuova, non una rilettura: quello che
-  // non era riuscito si ritenta. Senza, dopo un server irraggiungibile il ramo
-  // restava fermo e la pagina rispondeva lo stesso «da ora si fonde senza chiedere».
-  function dimenticaTentativi(fb) {
+  // Il segno che può fondere, come chiave: '' se non c'è, o se la pratica è chiusa.
+  function segnoCheFonde(fb) {
     const UI = window.SN_MERGE_APPROVALS;
-    if (!UI || !fb) return;
-    for (const req of UI.richiesteCoperte(fusioni.pending, {
-      feedbackId: fb._id,
-      numero: FB && typeof FB.formatNum === 'function' ? FB.formatNum(fb.seq, fb.subSeq) : '',
-      ancheNuovi: true,
-    }).filter(daDecidere)) { fusioniTentate.delete(req.id); esitiTentati.delete(req.id); }
+    if (!UI || !preapprovatoPieno(fb) || !isOpenPublic(fb)) return '';
+    return UI.chiaveSegno(preapprovedOf(fb));
+  }
+
+  // Un tentativo vale per il segno che l'ha fatto partire: visto sparire o
+  // cambiare, da qui, dallo script o da un'altra finestra, il segno dopo è una
+  // decisione nuova e ritenta (#701). Una pratica che manca dalla lista non dice niente.
+  function dimenticaTentativiSuperati() {
+    for (const [id, t] of Array.from(fusioniTentate)) {
+      const fb = allFeedbacks.find((f) => f._id === t.fb);
+      if (fb && segnoCheFonde(fb) !== t.segno) fusioniTentate.delete(id);
+    }
   }
 
   // Le richieste ferme sulle pratiche già segnate si fondono appena la pagina
@@ -1457,6 +1470,8 @@
   // diverse, in un ordine qualunque.
   let fusioniInCorso = false;
   async function fondiPreapprovateInAttesa() {
+    // Prima della guardia: un segno tolto mentre una fusione è in volo va visto lo stesso.
+    if (dataLoaded) dimenticaTentativiSuperati();
     if (fusioniInCorso || !isAdmin || !dataLoaded) return;
     fusioniInCorso = true;
     const righe = [];
@@ -3292,9 +3307,9 @@
     try {
       const r = await sendToMain({ type: 'feedback_update', id, mergePreapproved: next });
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
-      // Il documento vero porta l'email della sessione; qui basta che il segno
-      // ci sia, e l'aggiornamento continuo porterà il resto.
-      fb.mergePreapproved = next ? { by: (r && r.by) || 'te', at: new Date().toISOString() } : undefined;
+      // Chi e quando come li ha scritti il main: tornato dal server il segno
+      // dev'essere lo stesso, o la fusione ferma si ritenterebbe da sola.
+      fb.mergePreapproved = next ? { by: (r && r.by) || 'te', at: (r && r.at) || new Date().toISOString() } : undefined;
       if (selectedId !== id) { renderList(); return; }
       reflectPreapproved(fb);
       renderList();
@@ -3304,10 +3319,27 @@
         // Il segno messo con una richiesta già ferma davanti: si fonde adesso,
         // anche quella aperta per i soli blocchi nuovi, che l'owner ha sotto gli occhi.
         const avvia = () => setManageMsg(testo + ' Chiedo al server di fondere la richiesta ferma…', '');
-        dimenticaTentativi(fb);
-        for (const { msg } of await fondiCoperte(fb, { ancheNuovi: true, avvia })) {
-          testo += ` Fusione ferma su questa pratica: ${msg.text}`;
-          if (msg.kind !== 'ok') kind = 'err';
+        const esiti = await fondiCoperte(fb, { ancheNuovi: true, ancheInVolo: true, avvia });
+        const base = testo;
+        const riga = (lista) => {
+          let t = base;
+          let k = 'ok';
+          for (const { msg } of lista) {
+            t += ` Fusione ferma su questa pratica: ${msg.text}`;
+            if (msg.kind === 'wait') { if (k === 'ok') k = ''; } else if (msg.kind !== 'ok') k = 'err';
+          }
+          return { t, k };
+        };
+        ({ t: testo, k: kind } = riga(esiti));
+        // La fusione già in viaggio, partita da un altro gesto: tornato l'esito
+        // la riga lo dice, se nessuno l'ha riscritta nel frattempo.
+        if (esiti.some((e) => e.attesa)) {
+          const detto = testo;
+          Promise.all(esiti.map((e) => e.attesa || null)).then((risposte) => {
+            if (selectedId !== id || mgManageMsg.textContent !== detto) return;
+            const fine = riga(esiti.map((e, i) => (e.attesa ? { req: e.req, msg: UI.outcomeMessage(risposte[i], e.req) } : e)));
+            setManageMsg(fine.t, fine.k);
+          });
         }
       }
       if (selectedId !== id) return;

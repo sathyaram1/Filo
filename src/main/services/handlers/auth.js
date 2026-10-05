@@ -403,9 +403,10 @@ module.exports = function register(on, ctx) {
       await syncOneCard(id, idToken);
       scheduleViewSync({ delayMs: 1500, force: true });
       // La pagina mostra subito chi ha messo il segno «fondi senza chiedermelo»:
-      // glielo dice il main, che è l'unico a saperlo.
+      // glielo dice il main, che è l'unico a saperlo. Anche il quando, che per
+      // la pagina è l'identità del segno (#701).
       if (localOnly) return { ok: true, by: localOnly.by, at: localOnly.at };
-      return mergePreapproved ? { ok: true, by: mergePreapproved.by } : { ok: true };
+      return mergePreapproved ? { ok: true, by: mergePreapproved.by, at: mergePreapproved.at } : { ok: true };
     } catch (e) {
       const raw = e?.message || String(e);
       // Nel registro, non solo nella risposta: la pagina può aver cambiato
