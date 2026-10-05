@@ -47,6 +47,7 @@
   // Se anche la riserva rifiuta, l'errore che risale è il SUO (con la
   // personale un 402 sono i crediti finiti), e il rifiuto della chiave
   // propria resta comunque registrato: la pagina Crediti lo mostra.
+  // La prova di una chiave non ripiega (SN_WALLET_MAIN.senzaRipiego).
   async function fetchWithKey(url, apiKey, makeInit) {
     let res = await fetch(url, makeInit(apiKey));
     let keyUsed = apiKey;
