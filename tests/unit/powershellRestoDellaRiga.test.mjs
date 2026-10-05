@@ -181,3 +181,35 @@ test('un errore di sintassi o che ferma mostra il comando scritto, non le righe 
     }
   }
 });
+
+// Nei PC aziendali bloccati PowerShell gira in modalità ristretta, dove le chiamate a metodi .NET sono vietate:
+// i comandi dell'assistente, e quelli accentati della dashboard, devono girare lo stesso.
+test('in modalità ristretta i comandi girano su tutte e due le strade', { skip: SALTA }, () => {
+  const pwsh = SU_WINDOWS ? 'powershell.exe' : spawnSync('sh', ['-c', 'command -v pwsh'], { encoding: 'utf8' }).stdout.trim();
+  const esegui = (args, stdin) => {
+    const r = spawnSync(pwsh, args, { cwd: TMP, input: "$ExecutionContext.SessionState.LanguageMode='ConstrainedLanguage'\n" + stdin, encoding: 'utf8', timeout: ATTESA });
+    const uscita = String(r.stdout);
+    const i = uscita.lastIndexOf('FILO_PROVA:');
+    return { righe: righe(i < 0 ? uscita : uscita.slice(0, i)), codice: /FILO_PROVA:(\d+):/.exec(uscita)?.[1], errori: String(r.stderr) };
+  };
+  const assistenteGrezzo = (comando) => {
+    const inv = comeSuWindows(() => T.invocazione('powershell', comando, { trackCwd: true, mark: 'FILO_PROVA' }));
+    return esegui(inv.args, inv.stdin);
+  };
+  const dashboardGrezza = (comando) => esegui(['-NoLogo', '-NoProfile', '-Command', '-'],
+    T.PREPARA_STDIN_POWERSHELL + T.righePowerShell(comando, 'FILO_PROVA', S.comandoPerPowerShell));
+  const casi = [
+    ['Write-Output ciao', ['ciao'], '0'],
+    ['Write-Output "città — è"', ['città — è'], '0'],
+    ['comandoinesistente; Write-Output dopo', ['dopo'], '0'],
+    ['Write-Output a; return; Write-Output b', ['a'], '0'],
+    ['throw "fermo"; Write-Output dopo', [], '1'],
+    ['Write-Output "rotto', [], '1'],
+  ];
+  for (const [comando, attese, codice] of casi) {
+    for (const [strada, r] of [['assistente', assistenteGrezzo(comando)], ['dashboard con un accento', dashboardGrezza(`${comando} # à`)]]) {
+      assert.deepEqual(r.righe, attese, `${strada}, «${comando}»: ${r.errori.slice(0, 300)}`);
+      assert.equal(r.codice, codice, `${strada}, «${comando}»: ${r.errori.slice(0, 300)}`);
+    }
+  }
+});
