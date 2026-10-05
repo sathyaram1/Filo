@@ -187,6 +187,11 @@ function gestoRecente(wc) {
   return Boolean(t && Date.now() - t < GESTO_MS);
 }
 
+// Il gesto vale anche per la navigazione che ha fatto partire, finché non arriva: un rinvio del sito resta del clic.
+function navigazioneDaGesto(wc) {
+  return Boolean(wc && wc._filoNavDaGesto);
+}
+
 // Il dominio registrato va sempre letto: con un indirizzo lungo la parte che sceglie chi attacca è quella davanti.
 function nomeDaMostrare(origine) {
   let u;
