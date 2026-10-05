@@ -88,27 +88,13 @@ function aIso(v) {
 }
 
 // ---- Slot chiave privata feedback (S1.3) ----------------------------------------
-// La chiave privata non deve MAI uscire dal main process né essere passata al
-// renderer. Il main la legge da env FILO_FEEDBACK_PRIVKEY oppure da
-// storage.json (campo `feedbackPrivateKey`), in quest'ordine.
-//
-// DOVE L'OWNER LA METTE
-//   - Locale: `FILO_FEEDBACK_PRIVKEY=<base64>` nel file `tests/agent/.env`
-//     (gitignorato) oppure come variabile d'ambiente prima di lanciare Filo.
-//   - Cloud/routine: passata come env `FILO_FEEDBACK_PRIVKEY` nella config
-//     del runner (secrets della routine — NON in chiaro nel prompt).
-//   - Alternativa: impostare il campo `feedbackPrivateKey` in storage.json
-//     (il file di storage locale, mai nel repo) con il valore base64 della chiave.
-//     Lo storage si trova in %APPDATA%/Filo/storage.json (produzione) o nel
-//     percorso in $FILO_USER_DATA/storage.json (test).
-//
-// La chiave viene letta a ogni chiamata (non cachata) per restare aggiornata
-// se l'utente la cambia a runtime.
+// La privata non esce mai dal main process: il renderer non la vede. Si rilegge a ogni chiamata, così
+// un cambio a runtime vale subito.
 async function getPrivateKey() {
-  // 1. Variabile d'ambiente (priorità massima: setting esplicito del runner).
+  // Prima l'ambiente: è la scelta esplicita di chi lancia Filo.
   if (process.env.FILO_FEEDBACK_PRIVKEY) return process.env.FILO_FEEDBACK_PRIVKEY.trim();
 
-  // 2. File .env locale (per comodità in sviluppo; gitignorato).
+  // Poi tests/agent/.env (gitignorato) e infine il campo `feedbackPrivateKey` di storage.json.
   try {
     const fs = require('node:fs');
     // __dirname = src/main/services/handlers → root = ../../../../
@@ -122,7 +108,6 @@ async function getPrivateKey() {
     }
   } catch (_) {}
 
-  // 3. Storage.json locale (campo feedbackPrivateKey).
   try {
     if (globalThis.SN_STORAGE) {
       const v = await globalThis.SN_STORAGE.getRaw('feedbackPrivateKey', null);
