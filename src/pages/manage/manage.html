@@ -1398,8 +1398,17 @@
                     <button type="button" class="mg-star-btn mg-local-btn" id="mgLocalBtn" aria-pressed="false" hidden>Locale</button>
                     <!-- «È mio» (#908): sul prefisso dell'owner o di una sessione senza prova; solo l'owner la può dare. -->
                     <button type="button" class="mg-star-btn mg-sender-btn" id="mgSenderBtn" hidden>🙋 È mio</button>
+                    <!-- «Fondi senza chiedermelo» (#1034): sulla riga col nome corto, lo stesso della lista; il nome intero sta
+                       nell'hover. Acceso = aria-pressed; testi e visibilità dal JS, sulle pratiche chiuse sparisce. -->
+                    <button type="button" class="mg-star-btn mg-preapprove-btn" id="mgPreapproveBtn"
+                      aria-pressed="false" hidden>Senza chiedere</button>
+                    <button type="button" class="mg-star-btn mg-preapprove-btn" id="mgPreapproveRevokeBtn"
+                      hidden>Chiedimi prima</button>
                   </div>
                 </div>
+
+                <!-- Chi ha messo il segno: in fondo alla riga, accanto al tasto che lo dice acceso. -->
+                <span class="mg-preapproved-info" id="mgPreapprovedInfo" hidden></span>
               </div>
 
               <!-- «Il segno era un errore» (#922): la conferma dice cosa cambia, subito sotto il tasto. Testi dal JS. -->
