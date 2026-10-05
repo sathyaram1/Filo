@@ -388,6 +388,30 @@
     sendToMain({ type: 'auth_signin' }).then(() => refreshAuth()).catch(() => {});
   });
 
+  // Una fila per impostazione: due scelte sulla stessa arrivano al server
+  // nell'ordine in cui sono state fatte, senza trattenere le altre (#675).
+  const fileSalvataggi = new Map();
+  function inFila(chiave, fn) {
+    const giro = (fileSalvataggi.get(chiave) || Promise.resolve()).then(fn, fn);
+    fileSalvataggi.set(chiave, giro.catch(() => {}));
+    return giro;
+  }
+
+  // Interruttori dell'automazione: una lettura vale per un interruttore solo se
+  // nessun suo salvataggio era per strada né è partito o arrivato nel frattempo.
+  const mosseAuto = { enabled: 0, routinesEnabled: 0, proberWhenIdle: 0, autoApprove: 0 };
+  const inVoloAuto = { enabled: 0, routinesEnabled: 0, proberWhenIdle: 0, autoApprove: 0 };
+  function salvaAuto(chiave, fn) {
+    mosseAuto[chiave] += 1;
+    inVoloAuto[chiave] += 1;
+    return inFila(chiave, fn).finally(() => {
+      mosseAuto[chiave] += 1;
+      inVoloAuto[chiave] -= 1;
+    });
+  }
+  const fotoAuto = () => Object.fromEntries(Object.keys(mosseAuto).map((k) => [k, inVoloAuto[k] ? -1 : mosseAuto[k]]));
+  const ancoraVera = (foto, k) => foto[k] !== -1 && foto[k] === mosseAuto[k];
+
   // ── Switch "Routine autonome" (interruttore master) ───────────────────────
   // Vive nel doc Firestore config/routines, che le routine leggono SENZA
   // credenziali: è l'unico modo perché "spento" arrivi davvero alle loro
@@ -408,24 +432,31 @@
     mgRoutinesMsg.classList.toggle('mg-err', kind === 'err');
   }
 
+  let routinesScelte = 0;
   if (mgRoutinesToggle) {
-    mgRoutinesToggle.addEventListener('change', async () => {
+    mgRoutinesToggle.addEventListener('change', () => {
       const on = mgRoutinesToggle.checked;
+      const mia = ++routinesScelte;
       reflectRoutines(on);
       setRoutinesMsg('', null);
-      try {
-        const r = await sendToMain({ type: AUTOMATION_SET, routinesEnabled: on });
-        if (!r || r.ok === false) throw new Error(r?.error || 'errore sconosciuto');
-        reflectRoutines(r.routinesEnabled !== false);
-        // Spegnere vale dal prossimo giro: chi sta già lavorando finisce il suo
-        // compito. Senza dirlo, sembrerebbe non aver fatto niente.
-        setRoutinesMsg(on ? 'Salvato.' : 'Salvato. Un lavoro già in corso arriva in fondo, poi non ne parte nessun altro.', 'ok');
-      } catch (err) {
-        // Non scritto = non cambiato: lo switch non deve dire il contrario.
-        reflectRoutines(!on);
-        setRoutinesMsg('Salvataggio fallito: le routine NON sono cambiate.', 'err');
-        console.error('[manage] salvataggio interruttore routine fallito:', err);
-      }
+      return salvaAuto('routinesEnabled', async () => {
+        try {
+          const r = await sendToMain({ type: AUTOMATION_SET, routinesEnabled: on });
+          if (!r || r.ok === false) throw new Error(r?.error || 'errore sconosciuto');
+          // Un clic più nuovo è in fila: lo schermo lo dice già, e parlerà lui.
+          if (mia !== routinesScelte) return;
+          reflectRoutines(r.routinesEnabled !== false);
+          // Spegnere vale dal prossimo giro: chi sta già lavorando finisce il suo
+          // compito. Senza dirlo, sembrerebbe non aver fatto niente.
+          setRoutinesMsg(on ? 'Salvato.' : 'Salvato. Un lavoro già in corso arriva in fondo, poi non ne parte nessun altro.', 'ok');
+        } catch (err) {
+          console.error('[manage] salvataggio interruttore routine fallito:', err);
+          if (mia !== routinesScelte) return;
+          // Non scritto = non cambiato: lo switch non deve dire il contrario.
+          reflectRoutines(!on);
+          setRoutinesMsg('Salvataggio fallito: le routine NON sono cambiate.', 'err');
+        }
+      });
     });
   }
 
@@ -460,57 +491,74 @@
     // 2. Valore vero da Firestore (owner-gated). Se non siamo admin o siamo
     //    offline resta quello della cache.
     try {
+      const foto = fotoAuto();
       const r = await sendToMain({ type: AUTOMATION_GET });
       if (r && r.ok) {
-        reflectAutoMode(Boolean(r.enabled));
-        reflectAutoApprove(r.autoApprove);
-        reflectRoutines(r.routinesEnabled !== false);
-        if (mgProberIdle) mgProberIdle.checked = r.proberWhenIdle !== false;
-        chrome.storage.local.set({ [AUTO_MODE_KEY]: Boolean(r.enabled) }).catch(() => {});
+        if (ancoraVera(foto, 'enabled')) {
+          reflectAutoMode(Boolean(r.enabled));
+          chrome.storage.local.set({ [AUTO_MODE_KEY]: Boolean(r.enabled) }).catch(() => {});
+        }
+        if (ancoraVera(foto, 'autoApprove')) reflectAutoApprove(r.autoApprove);
+        if (ancoraVera(foto, 'routinesEnabled')) reflectRoutines(r.routinesEnabled !== false);
+        if (mgProberIdle && ancoraVera(foto, 'proberWhenIdle')) mgProberIdle.checked = r.proberWhenIdle !== false;
       }
     } catch (_) { /* resta la cache */ }
   }
 
-  mgAutoToggle.addEventListener('change', async () => {
+  let autoScelte = 0;
+  mgAutoToggle.addEventListener('change', () => {
     const on = mgAutoToggle.checked;
+    const mia = ++autoScelte;
     reflectAutoMode(on);
     setAutoModeMsg('', null);
-    try {
-      const r = await sendToMain({ type: AUTOMATION_SET, enabled: on });
-      if (!r || r.ok === false) throw new Error(r?.error || 'errore sconosciuto');
-      reflectAutoMode(Boolean(r.enabled));
-      reflectAutoApprove(r.autoApprove);
-      chrome.storage.local.set({ [AUTO_MODE_KEY]: Boolean(r.enabled) }).catch(() => {});
-      // Accendere l'automatica vale da ORA in avanti: agisce al momento del
-      // giudizio, quindi i feedback già in attesa restano dove sono. Senza
-      // dirlo, accendere lo switch sembra di nuovo non fare niente — e i già in
-      // attesa hanno il loro pulsante, due righe più in là.
-      const pending = r.enabled ? alignedFeedbacks().length : 0;
-      setAutoModeMsg(
-        pending
-          ? `Salvato. I ${pending} già in attesa restano nei Ricevuti: usa «Approva tutti gli allineati».`
-          : 'Salvato.',
-        'ok',
-      );
-    } catch (err) {
-      // Ripristina lo stato precedente: se non è stato scritto su Firestore, non
-      // è attivo — e lo switch non deve dire il contrario.
-      reflectAutoMode(!on);
-      setAutoModeMsg('Salvataggio fallito: la modalità automatica NON è cambiata.', 'err');
-      console.error('[manage] salvataggio modalità automatica fallito:', err);
-    }
+    return salvaAuto('enabled', async () => {
+      try {
+        const foto = fotoAuto();
+        const r = await sendToMain({ type: AUTOMATION_SET, enabled: on });
+        if (!r || r.ok === false) throw new Error(r?.error || 'errore sconosciuto');
+        if (ancoraVera(foto, 'autoApprove')) reflectAutoApprove(r.autoApprove);
+        if (mia !== autoScelte) return;
+        reflectAutoMode(Boolean(r.enabled));
+        chrome.storage.local.set({ [AUTO_MODE_KEY]: Boolean(r.enabled) }).catch(() => {});
+        // Accendere l'automatica vale da ORA in avanti: agisce al momento del
+        // giudizio, quindi i feedback già in attesa restano dove sono. Senza
+        // dirlo, accendere lo switch sembra di nuovo non fare niente — e i già in
+        // attesa hanno il loro pulsante, due righe più in là.
+        const pending = r.enabled ? alignedFeedbacks().length : 0;
+        setAutoModeMsg(
+          pending
+            ? `Salvato. I ${pending} già in attesa restano nei Ricevuti: usa «Approva tutti gli allineati».`
+            : 'Salvato.',
+          'ok',
+        );
+      } catch (err) {
+        console.error('[manage] salvataggio modalità automatica fallito:', err);
+        if (mia !== autoScelte) return;
+        // Ripristina lo stato precedente: se non è stato scritto su Firestore, non
+        // è attivo — e lo switch non deve dire il contrario.
+        reflectAutoMode(!on);
+        setAutoModeMsg('Salvataggio fallito: la modalità automatica NON è cambiata.', 'err');
+      }
+    });
   });
 
   // ── Auto-approvazione per mittente (#446) ─────────────────────────────────
   // Con l'automatica accesa, questi decidono DI CHI ci si fida abbastanza da
   // farlo entrare in coda senza passare dall'owner. Spenta non contano, ma si
   // possono preparare: valgono solo al giudizio, scriverli non muove niente.
+  // Il main rilegge e riscrive la mappa intera: i salvataggi stanno in una fila
+  // sola, e le scelte ancora in fila stanno sopra ogni mappa che arriva prima.
+  let autoApproveServer = null;
+  const autoApproveInAttesa = [];
   function reflectAutoApprove(map) {
+    if (map !== undefined) autoApproveServer = map;
     // Il ripiego sul vecchio interruttore unico di Claude vive nel modulo
     // condiviso: una mappa salvata prima che si sdoppiassero non deve mostrare
     // acceso ciò che l'owner aveva spento.
-    const resolved = (TH && TH.resolveAutoApprove) ? TH.resolveAutoApprove(map) : null;
-    const m = resolved || ((map && typeof map === 'object') ? map : {});
+    const base = autoApproveServer;
+    const resolved = (TH && TH.resolveAutoApprove) ? TH.resolveAutoApprove(base) : null;
+    const m = Object.assign({}, resolved || ((base && typeof base === 'object') ? base : {}));
+    for (const s of autoApproveInAttesa) m[s.group] = s.want;
     for (const [group, el] of Object.entries(mgAutoApprove)) {
       if (el) el.checked = m[group] !== false;
     }
@@ -518,40 +566,50 @@
 
   for (const [group, el] of Object.entries(mgAutoApprove)) {
     if (!el) continue;
-    el.addEventListener('change', async () => {
-      const want = el.checked;
+    el.addEventListener('change', () => {
+      const scelta = { group, want: el.checked };
+      autoApproveInAttesa.push(scelta);
       setAutoModeMsg('', null);
-      try {
-        const r = await sendToMain({ type: AUTOMATION_SET, autoApprove: { [group]: want } });
-        if (!r || r.ok === false) throw new Error(r?.error || 'errore sconosciuto');
-        reflectAutoApprove(r.autoApprove);
-      } catch (err) {
-        el.checked = !want;
+      return salvaAuto('autoApprove', async () => {
+        let r = null;
+        let errore = null;
+        try { r = await sendToMain({ type: AUTOMATION_SET, autoApprove: { [group]: scelta.want } }); } catch (err) { errore = err; }
+        autoApproveInAttesa.splice(autoApproveInAttesa.indexOf(scelta), 1);
+        if (r && r.ok !== false) return reflectAutoApprove(r.autoApprove);
+        // Non scritto = non cambiato. Mai letta la mappa: l'unico stato noto è quello di prima del clic.
+        if (autoApproveServer !== null) reflectAutoApprove();
+        else if (!autoApproveInAttesa.some((s) => s.group === group)) el.checked = !scelta.want;
         setAutoModeMsg('Salvataggio fallito: l\'impostazione NON è cambiata.', 'err');
-        console.error('[manage] salvataggio auto-approvazione fallito:', err);
-      }
+        console.error('[manage] salvataggio auto-approvazione fallito:', errore || r?.error);
+      });
     });
   }
 
   // ── Esplorazione automatica a coda vuota (#448) ───────────────────────────
   // Indipendente dall'automatica: riguarda cosa fanno le routine quando NON c'è
   // più niente in coda, non chi entra in coda.
+  let proberScelte = 0;
   if (mgProberIdle) {
-    mgProberIdle.addEventListener('change', async () => {
+    mgProberIdle.addEventListener('change', () => {
       const want = mgProberIdle.checked;
+      const mia = ++proberScelte;
       if (mgProberIdleMsg) mgProberIdleMsg.textContent = '';
-      try {
-        const r = await sendToMain({ type: AUTOMATION_SET, proberWhenIdle: want });
-        if (!r || r.ok === false) throw new Error(r?.error || 'errore sconosciuto');
-        mgProberIdle.checked = r.proberWhenIdle !== false;
-      } catch (err) {
-        mgProberIdle.checked = !want;
-        if (mgProberIdleMsg) {
-          mgProberIdleMsg.textContent = 'Salvataggio fallito: l\'impostazione NON è cambiata.';
-          mgProberIdleMsg.classList.add('mg-err');
+      return salvaAuto('proberWhenIdle', async () => {
+        try {
+          const r = await sendToMain({ type: AUTOMATION_SET, proberWhenIdle: want });
+          if (!r || r.ok === false) throw new Error(r?.error || 'errore sconosciuto');
+          if (mia !== proberScelte) return;
+          mgProberIdle.checked = r.proberWhenIdle !== false;
+        } catch (err) {
+          console.error('[manage] salvataggio esplorazione automatica fallito:', err);
+          if (mia !== proberScelte) return;
+          mgProberIdle.checked = !want;
+          if (mgProberIdleMsg) {
+            mgProberIdleMsg.textContent = 'Salvataggio fallito: l\'impostazione NON è cambiata.';
+            mgProberIdleMsg.classList.add('mg-err');
+          }
         }
-        console.error('[manage] salvataggio esplorazione automatica fallito:', err);
-      }
+      });
     });
   }
 
@@ -773,9 +831,12 @@
   // mostrano per veri (campo vuoto, nessuna pillola, nessun avviso).
   const sessionsNoti = new Set();
   const SESSIONS_NON_LETTO = 'Non ho potuto leggere dal server: quello che vedi qui non viene da lì.';
-  // Una richiesta alla volta, nell'ordine delle scelte: una risposta più vecchia
-  // non può arrivare dopo una più nuova, né sullo schermo né sul server (#675).
-  let sessionsCoda = Promise.resolve();
+  // Orologio delle richieste: un documento intero vale solo se è partito dopo
+  // l'ultimo accolto, e mai sopra un campo confermato da una scrittura arrivata
+  // dopo la sua partenza (può averlo letto prima di quella scrittura).
+  let sessionsTick = 0;
+  let sessionsAccolto = 0;
+  const sessionsFermo = {};
   // Scelte partite e non ancora confermate: stanno sopra ogni risposta che le precede.
   const sessionsInAttesa = [];
   // Numero scritto e non ancora salvato: una risposta su un altro campo non lo cancella.
@@ -788,16 +849,27 @@
     el.classList.toggle('mg-err', kind === 'err');
   }
 
-  function inCodaSessions(fn) {
-    const giro = sessionsCoda.then(fn, fn);
-    sessionsCoda = giro.catch(() => {});
-    return giro;
+  /** Solo i campi scritti da una richiesta: sono veri anche se il resto della risposta non lo è più. */
+  function accogliCampiSessions(valori, scritti) {
+    for (const k of scritti) {
+      sessionsState[k] = valori[k];
+      sessionsNoti.add(k);
+      sessionsFermo[k] = ++sessionsTick;
+    }
   }
 
+  // Campi confermati da una scrittura arrivata dopo la partenza della richiesta `nato`.
+  const fermiDopo = (nato) => RS.CHIAVI.filter((k) => (sessionsFermo[k] || 0) > nato);
+
   /** Un documento intero dal server: da qui in poi niente sullo schermo è «non letto». */
-  function accogliSessions(raw) {
-    sessionsState = RS.leggiDoc(raw);
+  function accogliSessions(raw, nato, scritti = []) {
+    const doc = RS.leggiDoc(raw);
+    if (nato < sessionsAccolto) return accogliCampiSessions(doc, scritti);
+    sessionsAccolto = nato;
+    for (const k of fermiDopo(nato)) doc[k] = sessionsState[k];
+    sessionsState = doc;
     for (const k of RS.CHIAVI) sessionsNoti.add(k);
+    accogliCampiSessions(doc, scritti);
     for (const el of [mgMaxSessionsMsg, mgPriorityAccountMsg, mgAccountsMsg]) {
       if (el && el.textContent === SESSIONS_NON_LETTO) setSessionsMsg(el, '', null);
     }
@@ -823,24 +895,31 @@
     }
   }
 
-  function sessionsNonLette() {
-    sessionsState = RS.leggiDoc({});
+  function sessionsNonLette(nato) {
+    const fermi = fermiDopo(nato);
+    const tenuti = {};
+    for (const k of fermi) tenuti[k] = sessionsState[k];
+    sessionsState = RS.leggiDoc(tenuti);
     sessionsNoti.clear();
+    for (const k of fermi) sessionsNoti.add(k);
     reflectSessions();
-    for (const el of [mgMaxSessionsMsg, mgPriorityAccountMsg, mgAccountsMsg]) {
-      setSessionsMsg(el, SESSIONS_NON_LETTO, 'err');
+    for (const [el, chiavi] of [[mgMaxSessionsMsg, ['maxSessions']], [mgPriorityAccountMsg, ['priorityAccount']], [mgAccountsMsg, ['accountAOff', 'accountBOff']]]) {
+      if (!chiavi.every((k) => fermi.includes(k))) setSessionsMsg(el, SESSIONS_NON_LETTO, 'err');
     }
   }
 
   function loadSessions() {
     if (!RS) return Promise.resolve();
-    return inCodaSessions(async () => {
+    const nato = ++sessionsTick;
+    return (async () => {
       let r = null;
       try { r = await sendToMain({ type: SESSIONS_GET }); } catch (_) { /* come una lettura fallita */ }
-      if (!r || !r.ok) return sessionsNonLette();
-      accogliSessions(r);
+      // Un documento più nuovo è già sullo schermo: questa lettura non ha niente da aggiungere.
+      if (nato < sessionsAccolto) return;
+      if (!r || !r.ok) return sessionsNonLette(nato);
+      accogliSessions(r, nato);
       reflectSessions();
-    });
+    })();
   }
 
   function saveSessions(patch, msgEl) {
@@ -854,11 +933,16 @@
     sessionsInAttesa.push(scelta);
     // In coda dietro un'altra richiesta può aspettare: si vede che è partita.
     setSessionsMsg(msgEl, 'Salvo…', null);
-    // Una scelta più nuova sulla stessa riga è ancora per strada: «Salvato.» parlerebbe di lei.
+    // «Salvato.» parla del valore che si vede: non se una scelta più nuova sulla
+    // stessa riga è ancora per strada, né accanto a un numero riscritto dopo Salva.
     const confermaSessions = (testo) => {
-      if (!sessionsInAttesa.some((s) => s.msgEl === msgEl)) setSessionsMsg(msgEl, testo, 'ok');
+      if (sessionsInAttesa.some((s) => s.msgEl === msgEl)) return;
+      if ('maxSessions' in esito.valori && mgMaxSessions && mgMaxSessions.value !== String(esito.valori.maxSessions)) return;
+      setSessionsMsg(msgEl, testo, 'ok');
     };
-    return inCodaSessions(async () => {
+    const scritti = Object.keys(esito.valori);
+    return inFila(`sessioni:${scritti.join(',')}`, async () => {
+      const nato = ++sessionsTick;
       let r = null;
       let errore = null;
       try { r = await sendToMain(Object.assign({ type: SESSIONS_SET }, esito.valori)); } catch (err) { errore = err; }
@@ -875,13 +959,12 @@
       if (r.letto === false) {
         // Scritto sì, riletto no: quello che è appena partito ora è noto, il
         // resto no. Rimettere i valori di partenza spegnerebbe una scelta salvata.
-        Object.assign(sessionsState, esito.valori);
-        for (const k of Object.keys(esito.valori)) sessionsNoti.add(k);
+        accogliCampiSessions(esito.valori, scritti);
         reflectSessions();
         confermaSessions('Salvato. Il resto non l\'ho potuto rileggere dal server.');
         return true;
       }
-      accogliSessions(r);
+      accogliSessions(r, nato, scritti);
       reflectSessions();
       confermaSessions('Salvato.');
       return true;

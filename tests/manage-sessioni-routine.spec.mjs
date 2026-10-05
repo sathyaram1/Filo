@@ -256,3 +256,37 @@ test('mai letto, scritto ma non riletto: la pillola appena scelta resta accesa',
   await expect(page.locator('#mgMaxSessions')).toHaveValue('');
   await expect(page.locator('#mgAccountsMsg')).toContainText('Non ho potuto leggere');
 });
+
+test('una richiesta appesa sul numero non trattiene l\'esclusione di un account', async ({ openTab }) => {
+  const page = await apriServer(openTab, SERVER, { set: [20000, 0] });
+
+  await page.locator('#mgMaxSessions').fill('7');
+  await page.locator('#mgMaxSessionsSave').click();
+  await interruttore(page, 'A').click();
+
+  await expect.poll(() => page.evaluate(() => window.__doc.accountAOff), { timeout: 3000 }).toBe(true);
+  await expect(page.locator('#mgAccountsMsg')).toHaveText('Salvato.', { timeout: 3000 });
+  await expect(page.locator('#mgAccountA')).not.toBeChecked();
+  // Il numero è ancora per strada: lo schermo tiene la scelta, senza dirla salvata.
+  await expect(page.locator('#mgMaxSessions')).toHaveValue('7');
+  await expect(page.locator('#mgMaxSessionsMsg')).toHaveText('Salvo…');
+});
+
+test('un numero riscritto dopo Salva non si trova accanto «Salvato.»', async ({ openTab }) => {
+  const page = await apriServer(openTab, SERVER, { set: [700] });
+
+  await page.locator('#mgMaxSessions').fill('7');
+  await page.locator('#mgMaxSessionsSave').click();
+  await page.locator('#mgMaxSessions').fill('9');
+
+  await arrivate(page, 2);
+  expect(await page.evaluate(() => window.__doc.maxSessions)).toBe(7);
+  await expect(page.locator('#mgMaxSessions')).toHaveValue('9');
+  await expect(page.locator('#mgMaxSessionsMsg')).not.toHaveText('Salvato.');
+
+  // Salvato davvero il 9, la conferma torna.
+  await page.locator('#mgMaxSessionsSave').click();
+  await arrivate(page, 3);
+  await expect(page.locator('#mgMaxSessionsMsg')).toHaveText('Salvato.');
+  await expect(page.locator('#mgMaxSessions')).toHaveValue('9');
+});
