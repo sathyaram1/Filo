@@ -421,6 +421,7 @@ function configureFromSettings(settings) {
   if (inIncognito()) {
     const prev = _incognito || _cached;
     _incognito = { mode: getMode(settings), bannerSites: getBannerSites(settings) };
+    riapplicaIncognito();
     wipeChanged(prev.bannerSites, _incognito.bannerSites, incognitoSessions(), { normal: false, incognito: true });
     return prev.mode !== _incognito.mode || prev.bannerSites.join('\n') !== _incognito.bannerSites.join('\n');
   }
