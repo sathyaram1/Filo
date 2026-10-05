@@ -6,7 +6,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
-import { existsSync, mkdirSync, readFileSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, utimesSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { SPAZIO, ORFANA_DOPO_MS, cartellaTemporanea, togliCartelleOrfane } from '../helpers/percorsi.mjs';
@@ -144,10 +145,56 @@ test('il globalSetup di Playwright toglie i resti delle corse uccise', async () 
   const prima = Object.fromEntries(chiavi.map((k) => [k, process.env[k]]));
   try {
     for (const k of chiavi) process.env[k] = b.env[k];
-    await primaDellaCorsa();
+    const dopo = await primaDellaCorsa();
+    if (typeof dopo === 'function') await dopo();
   } finally {
     for (const k of chiavi) { if (prima[k] === undefined) delete process.env[k]; else process.env[k] = prima[k]; }
   }
   assert.ok(!existsSync(orfana), 'la cartella di una corsa di ieri è rimasta');
   assert.ok(existsSync(giovane), 'una cartella di oggi può essere di una corsa viva');
+});
+
+// Il codice provato scrive nella temporanea per conto suo (i file di consegna di dispatch, le cartelle di Chromium):
+// nessuna prova la chiede, quindi nessuna la toglie. Ogni corsa ne ha una sua, e se ne va con lei.
+const scriveDaSolo = (rosso) => "import { test } from 'node:test';\nimport { mkdirSync, writeFileSync } from 'node:fs';\n"
+  + "import { tmpdir } from 'node:os';\nimport { join } from 'node:path';\n"
+  + "test('scrive', () => { const d = join(tmpdir(), 'filo-consegna-' + Math.random().toString(16).slice(2));\n"
+  + `  mkdirSync(d); writeFileSync(join(d, 'pezzo.txt'), 'x'); ${rosso ? "throw new Error('rosso');" : ''} });\n`;
+
+for (const rosso of [false, true]) {
+  test(`npm run test:unit non lascia nella temporanea quello che il codice provato ci scrive da solo${rosso ? ', anche da rosso' : ''}`, () => {
+    const b = banco();
+    const unit = join(b.base, 'unit');
+    mkdirSync(unit);
+    writeFileSync(join(unit, 'scrive.test.mjs'), scriveDaSolo(rosso));
+    const r = spawnSync(process.execPath, [join(RADICE, 'scripts', 'run-unit-tests.mjs')],
+      { env: { ...b.env, FILO_UNIT_DIR: unit }, cwd: RADICE, encoding: 'utf8' });
+    assert.equal(r.status, rosso ? 1 : 0, `${r.stdout}\n${r.stderr}`);
+    assert.match(r.stdout, /# pass [01]/, 'la prova è girata davvero');
+    assert.deepEqual(readdirSync(b.tmp), [], 'rimasto nella temporanea dopo la corsa');
+  });
+}
+
+test('il globalSetup di Playwright dà alla corsa una temporanea sua, e la toglie con quello che c\'è dentro', async () => {
+  const config = readFileSync(join(RADICE, 'playwright.config.js'), 'utf8');
+  const nome = (config.match(/globalSetup:\s*['"]([^'"]+)['"]/) || [])[1];
+  const { default: primaDellaCorsa } = await import(pathToFileURL(join(RADICE, nome)).href);
+  const b = banco();
+  const chiavi = ['TMPDIR', 'TEMP', 'TMP'];
+  const prima = Object.fromEntries(chiavi.map((k) => [k, process.env[k]]));
+  let temp;
+  let dopo;
+  try {
+    for (const k of chiavi) process.env[k] = b.env[k];
+    dopo = await primaDellaCorsa();
+    temp = tmpdir();
+  } finally {
+    for (const k of chiavi) { if (prima[k] === undefined) delete process.env[k]; else process.env[k] = prima[k]; }
+  }
+  assert.notEqual(temp, b.tmp, 'i lavoratori ereditano ancora la temporanea di sistema');
+  assert.ok(temp.startsWith(b.tmp), `la temporanea della corsa sta fuori da quella di sistema: ${temp}`);
+  mkdirSync(join(temp, 'scoped_dirAbC123'));
+  assert.equal(typeof dopo, 'function', 'nessuno toglie la temporanea a fine corsa');
+  await dopo();
+  assert.deepEqual(readdirSync(b.tmp), [], 'rimasto nella temporanea dopo la corsa');
 });
