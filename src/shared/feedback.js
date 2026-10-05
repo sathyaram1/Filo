@@ -1168,7 +1168,7 @@
       if (arr.length < limit || nuove === 0 || !ultimo || ultimo === cursor) { complete = true; break; }
       cursor = ultimo;
     }
-    return { rows, complete };
+    return { rows, complete, readTime };
   }
 
   async function listAll(opts = {}) {
