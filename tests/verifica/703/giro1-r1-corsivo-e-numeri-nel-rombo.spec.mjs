@@ -1,5 +1,5 @@
-// Verifica #703 giro 1: il grassetto della segnalazione nel rombo, e le altre
-// strade da cui l'owner legge lo stesso testo.
+// Verifica #703 giro 1, rilievo 1: nel rombo la formattazione in linea oltre al
+// grassetto (corsivo, elenchi numerati) si legge come simboli.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
@@ -36,41 +36,16 @@ async function apri(page, fbs) {
   await page.evaluate(() => window.__mgTest.setTab('inbox'));
 }
 
-test('nel rombo le scelte **A.** e **B.** si leggono in grassetto, senza asterischi', async ({ openTab }) => {
+test('nel rombo il corsivo si legge come corsivo e un elenco numerato tiene i suoi numeri', async ({ openTab }) => {
+  const testo = '## Scelte\n1. Dal sito, la *meno* invasiva.\n2. Chiesto ogni volta.';
   const page = await openTab(MANAGE);
-  const fb = pratica();
+  const fb = pratica({ livelli: { l3: { esito: 'segnalato', ruolo: 'verifier', at: '2026-09-23T09:15:00.000Z', testo } } });
   await apri(page, [fb]);
   await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
   await page.locator('#mgForme .mg-forma[data-livello="l3"]').click();
   const body = page.locator('#mgSideBody');
-  await expect(body).toContainText('Dal sito: zero attrito');
-  await expect(body).not.toContainText('**');
-  await expect(body.locator('strong', { hasText: 'A.' }).first()).toBeVisible();
-  for (const tema of ['dark', 'light']) {
-    await page.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), tema);
-    await page.locator('#mgSide').screenshot({ path: `${SHOTS}/rombo-${tema}.png` });
-  }
-});
-
-test('stress dei pezzi in linea', async ({ openTab }) => {
-  const page = await openTab(MANAGE);
-  await apri(page, [pratica()]);
-  const casi = ['**A.** e **B.**', '**non chiuso', '** spazi **', '`a **b** c`', '***A.***', '__A.__', '*corsivo*', '**😀 emoji**', '<b>x</b> **y**', 'a**b**c', '**a*b**', '****'];
-  const out = await page.evaluate((cs) => cs.map((c) => [c, window.SN_MANAGE_REVIEW.pezziInline(c)]), casi);
-  console.log(JSON.stringify(out, null, 1));
-  const lungo = '**x** '.repeat(5000) + '**' + 'a '.repeat(20000);
-  const t0 = Date.now();
-  await page.evaluate((s) => window.SN_MANAGE_REVIEW.pezziInline(s).length, lungo);
-  console.log('ms lungo', Date.now() - t0);
-});
-
-test('nella conversazione della pratica la stessa segnalazione', async ({ openTab }) => {
-  const page = await openTab(MANAGE);
-  const fb = pratica();
-  await apri(page, [fb]);
-  await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
-  const thread = page.locator('#mgThread');
-  await page.waitForTimeout(500);
-  console.log('THREAD', await thread.innerText().catch(() => 'n/a'), await thread.isVisible());
-  await page.screenshot({ path: `${SHOTS}/dettaglio.png` });
+  await expect(body).toContainText('invasiva');
+  await expect(body).not.toContainText('*meno*');
+  await expect(body.locator('em', { hasText: 'meno' })).toHaveCount(1);
+  await expect(body.locator('ol li')).toHaveCount(2);
 });
