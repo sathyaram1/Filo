@@ -370,7 +370,8 @@
   }
 
   // Ridisegna tenendo lo scorrimento sulla prima voce visibile (non sui pixel: se ne esce una più su, la vista
-  // non salta). `voci`: selettore delle voci con `data-id`; `scorre()`: l'elemento che scorre, o null.
+  // non salta); chi è in cima resta in cima, o una voce arrivata lassù finirebbe fuori vista.
+  // `voci`: selettore delle voci con `data-id`; `scorre()`: l'elemento che scorre, o null.
   function alSuoPosto({ lista, voci, scorre }, ridisegna) {
     const L = LIVE();
     const doc = global.document;
@@ -385,7 +386,7 @@
     };
     const sc = L && lista ? scorre() : null;
     const prima = sc ? sc.scrollTop : 0;
-    const ancora = sc ? L.ancoraScorrimento(righe(sc), prima) : null;
+    const ancora = sc && prima > 0 ? L.ancoraScorrimento(righe(sc), prima) : null;
     ridisegna();
     const dopo = L && lista ? scorre() : null;
     if (dopo) dopo.scrollTop = L.scrollDaAncora(ancora, righe(dopo), prima);
