@@ -29,11 +29,11 @@ function buildPreamboloSource(cfg) {
 
   function maschera(fn, orig, name) {
     try {
-      defp(fn, 'name', { value: name, configurable: true });
-      defp(fn, 'length', { value: orig.length, configurable: true });
+      defp(fn, 'name', { __proto__: null, value: name, configurable: true });
+      defp(fn, 'length', { __proto__: null, value: orig.length, configurable: true });
       var ts = function toString() { return 'function ' + name + '() { [native code] }'; };
-      defp(ts, 'name', { value: 'toString', configurable: true });
-      defp(fn, 'toString', { value: ts, configurable: true, writable: true });
+      defp(ts, 'name', { __proto__: null, value: 'toString', configurable: true });
+      defp(fn, 'toString', { __proto__: null, value: ts, configurable: true, writable: true });
       spo(fn, gpo(orig));
     } catch (e) {}
     return fn;
@@ -80,7 +80,7 @@ function buildPreamboloSource(cfg) {
       if (dd && dd.get && !docDi[CORNICI[c][1]]) docDi[CORNICI[c][1]] = dd.get;
       for (var k = 0; k < PORTE.length; k++) agganciaGetter(P, PORTE[k], function (self) { daElemento(self); });
     }
-    var dl = gopd(w, 'length'), quanti = dl && dl.get;
+    var dl = trova(w, 'length'), quanti = dl && dl.d.get;
     if (quanti) {
       agganciaGetter(w, 'frames', function () { figli(w, quanti); });
       agganciaGetter(w, 'length', function () { figli(w, quanti); });
@@ -88,12 +88,17 @@ function buildPreamboloSource(cfg) {
     try { rApply(ascolta, w.document, ['load', alCarico, true]); } catch (e) {}
   }
 
+  function trova(obj, prop) {
+    for (var o = obj; o; o = gpo(o)) { var d = gopd(o, prop); if (d) return { __proto__: null, su: o, d: d }; }
+    return null;
+  }
+
   function agganciaGetter(obj, prop, prima) {
-    var d = gopd(obj, prop);
-    if (!d || !d.get) return;
-    var og = d.get;
+    var t = trova(obj, prop);
+    if (!t || !t.d.get || !t.d.configurable) return;
+    var og = t.d.get;
     var ng = function () { prima(this); return rApply(og, this, []); };
-    defp(obj, prop, { get: maschera(ng, og, 'get ' + prop), set: d.set, enumerable: d.enumerable, configurable: true });
+    defp(t.su, prop, { __proto__: null, get: maschera(ng, og, 'get ' + prop), set: t.d.set, enumerable: t.d.enumerable, configurable: true });
   }
 
   try { rApply(wsAdd, fatte, [window.location]); } catch (e) {}

@@ -57,7 +57,7 @@ function buildGuardPiece(seed, level) {
   return function guardiaImpronta(win, maschera) {
     if (!LEVEL || win.__filoFpGuard) return;
     // Non cancellabile: una seconda guardia sopra la prima annullerebbe il rumore (XOR due volte).
-    try { defp(win, '__filoFpGuard', { value: true, enumerable: false, configurable: false, writable: false }); } catch (e) {}
+    try { defp(win, '__filoFpGuard', { __proto__: null, value: true, enumerable: false, configurable: false, writable: false }); } catch (e) {}
 
     // ---- Canvas 2D ----
     try {
