@@ -18,10 +18,10 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const L = require(join(ROOT, 'src', 'main', 'services', 'statoSistema.js'));
 const SORGENTE = readFileSync(join(ROOT, 'src', 'main', 'services', 'statoSistema.js'), 'utf8');
 
-function albero(file) {
+function albero(file, sistema) {
   const radice = cartellaTemporanea('filo-sysfs-');
   for (const [p, contenuto] of Object.entries(file)) {
-    const pieno = join(radice, ...p.split('/').map((s) => nomeSuDisco(s)));
+    const pieno = join(radice, ...p.split('/').map((s) => nomeSuDisco(s, sistema)));
     mkdirSync(dirname(pieno), { recursive: true });
     if (contenuto === null) mkdirSync(pieno, { recursive: true });
     else writeFileSync(pieno, contenuto);
@@ -56,18 +56,29 @@ test('Linux: senza «capacity» la carica si conta da energia o carica; un fisso
     'sys/class/power_supply/BAT0/type': 'Battery\n', 'sys/class/power_supply/BAT0/charge_now': '1500\n',
     'sys/class/power_supply/BAT0/charge_full': '3000\n', 'sys/class/power_supply/BAT0/status': 'Full\n',
   });
-  const fisso = albero({ 'sys/class/power_supply/ucsi-source-psy-USBC000:001/type': 'USB\n', 'sys/class/power_supply/ucsi-source-psy-USBC000:001/online': '1\n' });
-  const ripristina = nomiVeri(fs, fisso);
   try {
     assert.deepEqual(L.batteriaLinux(r), { livello: 50, inCarica: false, collegata: true });
-    assert.deepEqual(fs.readdirSync(join(fisso, 'sys', 'class', 'power_supply')), ['ucsi-source-psy-USBC000:001']);
-    assert.equal(fs.readFileSync(join(fisso, 'sys', 'class', 'power_supply', 'ucsi-source-psy-USBC000:001', 'online'), 'utf8'), '1\n');
-    assert.equal(L.batteriaLinux(fisso), null);
-    assert.equal(L.batteriaLinux(join(fisso, 'non-esiste')), null);
-  } finally {
-    ripristina();
-    rmSync(r, { recursive: true, force: true });
-    rmSync(fisso, { recursive: true, force: true });
+  } finally { rmSync(r, { recursive: true, force: true }); }
+  // I «:» di un sysfs vero Windows non li scrive (#961): la strada codificata gira anche qui, o si rompe e lo vede solo il cancello di pubblicazione (#1000).
+  const USBC = 'sys/class/power_supply/ucsi-source-psy-USBC000:001';
+  for (const sistema of new Set([process.platform, 'win32'])) {
+    const fisso = albero({ [`${USBC}/type`]: 'USB\n', [`${USBC}/online`]: '1\n' }, sistema);
+    const portatile = albero({
+      'sys/class/power_supply/BAT0/type': 'Battery\n', 'sys/class/power_supply/BAT0/capacity': '40\n',
+      'sys/class/power_supply/BAT0/status': 'Unknown\n', [`${USBC}/type`]: 'USB\n', [`${USBC}/online`]: '1\n',
+    }, sistema);
+    const ripristina = [nomiVeri(fs, fisso, sistema), nomiVeri(fs, portatile, sistema)];
+    try {
+      assert.deepEqual(fs.readdirSync(join(fisso, 'sys', 'class', 'power_supply')), ['ucsi-source-psy-USBC000:001'], sistema);
+      assert.equal(fs.readFileSync(join(fisso, ...USBC.split('/'), 'online'), 'utf8'), '1\n', sistema);
+      assert.equal(L.batteriaLinux(fisso), null, sistema);
+      assert.equal(L.batteriaLinux(join(fisso, 'non-esiste')), null, sistema);
+      assert.deepEqual(L.batteriaLinux(portatile), { livello: 40, inCarica: false, collegata: true }, `${sistema}: «collegata» lo dice solo l'alimentatore coi «:»`);
+    } finally {
+      ripristina.reverse().forEach((f) => f());
+      rmSync(fisso, { recursive: true, force: true });
+      rmSync(portatile, { recursive: true, force: true });
+    }
   }
 });
 

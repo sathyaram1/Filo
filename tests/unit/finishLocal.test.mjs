@@ -578,6 +578,19 @@ test('l\'elenco dei rossi noti non marcisce: ogni voce è uno spec che esiste', 
   for (const s of j.specs) assert.ok(existsSync(resolve(ROOT, `${s}.spec.mjs`)), `${s} non esiste più: toglilo dall'elenco`);
 });
 
+// Una voce senza motivo non la toglie nessuno, e un motivo rimasto senza voce racconta un rosso che non c'è più (#650).
+test('ogni rosso noto della macchina dell\'owner ha il suo motivo, e nessun motivo resta senza voce', () => {
+  const j = JSON.parse(readFileSync(resolve(ROOT, 'tests', 'rossi-noti.json'), 'utf8'));
+  assert.ok(Array.isArray(j.specsMotivi), 'rossi-noti.json deve avere `specsMotivi` (anche vuoto)');
+  const motivi = new Map(j.specsMotivi.map((m) => [m.spec, m]));
+  for (const s of j.specs) {
+    const m = motivi.get(s);
+    assert.ok(m && m.perche && m.perche.length > 20, `${s}: manca il motivo in specsMotivi`);
+    assert.match(String(m.feedback || ''), /#\d+/, `${s}: manca il feedback che lo farà togliere`);
+  }
+  for (const m of j.specsMotivi) assert.ok(j.specs.includes(m.spec), `${m.spec}: motivo senza voce in specs, toglilo`);
+});
+
 // I rossi dei contenitori senza schermo delle routine. Vivevano nella memoria di
 // chi verificava, elencati a voce nelle sue istruzioni: nessun nome preciso,
 // nessun motivo scritto, nessuna scadenza. Da lì a lasciar passare una
