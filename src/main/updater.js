@@ -223,20 +223,7 @@ function nonPiuNuova(v, inUso) {
 
 // Una versione già installata (da «Installa», o riaccendendo l'opzione) non resta in home a chiedere «Installa».
 function togliAvvisiSuperati(versioneInUso) {
-  return inFila(async () => {
-    try {
-      const FiloMem = globalThis.SN_FILO_MEMORY;
-      if (!FiloMem?.dismissNotification) return;
-      const vive = await FiloMem.listNotifications();
-      for (const n of vive) {
-        if (n.action?.tipo === TIPO_DISPONIBILE && nonPiuNuova(n.action.versione, versioneInUso)) {
-          await FiloMem.dismissNotification(n.id, { acted: true });
-        }
-      }
-    } catch (e) {
-      console.error('[updater] avvisi superati non tolti:', e?.message || e);
-    }
-  });
+  return togliCarte((n) => nonPiuNuova(n.action.versione, versioneInUso), { acted: true });
 }
 
 // I sistemi dove l'installazione automatica può fermarsi, col marcatore che riconosce l'avviso già scritto.
