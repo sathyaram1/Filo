@@ -48,7 +48,6 @@ function buildGuardSource(seed, level) {
   function mask(fn, orig, name) {
     var m = fn;
     try {
-      var box = {}; box[name] = function () {};
       m = ({ [name]() { return fn.apply(this, arguments); } })[name];
       Object.defineProperty(m, 'length', { value: orig.length, configurable: true });
       masked.set(m, 'function ' + name + '() { [native code] }');
