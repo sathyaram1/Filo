@@ -226,12 +226,46 @@
   function cartaAvviso(n) {
     const allarme = n.kind === 'alert';
     const chiudi = () => d.send({ type: MSG.FILO_DISMISS_NOTIFICATION, id: n.id }).then(() => d.refreshLive());
-    return {
+    const carta = {
       chiave: `avviso:${n.id}`, tipo: 'avviso', icona: allarme ? 'warning' : 'bell',
       titolo: allarme ? 'Avviso' : 'Filo', stato: n.text, lungo: true,
       principale: { etichetta: 'Chiudi', fai: chiudi },
       togli: chiudi, etichettaTogli: 'Chiudi l’avviso',
       filo: n.text,
+    };
+    return n.action && n.action.tipo === 'aggiornamento-disponibile' ? cartaAggiornamento(n, carta, chiudi) : carta;
+  }
+  // #786 — la versione nuova che aspetta il «Installa» dell'utente; cosa le sta succedendo lo dice il main.
+  function cartaAggiornamento(n, carta, chiudi) {
+    const v = String(n.action.versione || '');
+    const a = n.aggiornamento || {};
+    const installa = async (b) => {
+      if (b) b.disabled = true;
+      const r = await d.send({ type: MSG.FILO_INSTALLA_AGGIORNAMENTO });
+      if (!r || r.ok === false) {
+        if (b) b.disabled = false;
+        avviso((r && r.error) || 'L’aggiornamento non parte');
+      }
+      d.refreshLive();
+    };
+    const base = { ...carta, icona: 'download', titolo: 'Aggiornamento', etichettaTogli: 'Chiudi, per questa versione' };
+    if (a.percento != null) {
+      return {
+        ...base, stato: `Scarico la versione ${v}: ${a.percento}%`, avanza: a.percento, principale: null,
+        filo: `Sto scaricando la versione ${v} di Filo (${a.percento}%): si installa quando mi chiudi.`,
+      };
+    }
+    if (a.pronta) {
+      return {
+        ...base, stato: `La versione ${v} è pronta: si installa quando chiudi Filo.`,
+        filo: `La versione ${v} di Filo è scaricata: si installa quando mi chiudi.`,
+      };
+    }
+    return {
+      ...base, stato: a.errore ? `C'è la versione ${v} di Filo. ${a.errore}` : n.text,
+      principale: { etichetta: 'Installa', forte: true, fai: installa },
+      secondaria: { etichetta: 'Chiudi', fai: chiudi },
+      altreVoci: [{ etichetta: 'Preferenze sugli aggiornamenti', fai: () => apri(URL_PREFERENZE_AGGIORNAMENTI) }],
     };
   }
   function suggerimentoCrediti() {
