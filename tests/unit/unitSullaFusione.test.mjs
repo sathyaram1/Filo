@@ -12,8 +12,9 @@ import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, collegaCartella } from '../helpers/percorsi.mjs';
 import {
   decidiEsito, campoPerIlServer, chiaveTest, fileDellaChiave, testoProva, togliCollegamento, chiudiAlbero, gitIn,
-  provaUnitSullaFusione, chiediConProva, pulisciResti, TETTO_ROSSI,
+  provaUnitSullaFusione, chiediConProva, pulisciResti, TETTO_ROSSI, assicuraStoria, testoStoria,
 } from '../../scripts/lib/unit-sulla-fusione.mjs';
+import { pathToFileURL } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SHA = 'a'.repeat(40);
@@ -439,4 +440,143 @@ test('i resti di una prova interrotta li toglie la prova dopo, senza attraversar
     rmSync(r.casa, { recursive: true, force: true });
     rmSync(tmp, { recursive: true, force: true });
   }
+});
+
+// ─── Clone poco profondo (#958): le routine in cloud lavorano su cloni tagliati ─
+
+test('clone poco profondo: la prova scarica la storia che manca e gira davvero sulla fusione', () => {
+  const r = repoFinto();
+  const clone = join(r.casa, 'clone');
+  try {
+    r.ramo('claude/lungo', () => r.scrivi('ramo-1.txt', '1\n'));
+    for (let i = 2; i <= 4; i++) { r.scrivi(`ramo-${i}.txt`, `${i}\n`); r.ok(['add', '-A']); r.ok(['commit', '-qm', `ramo ${i}`]); }
+    r.ok(['push', '-q', 'origin', 'claude/lungo']);
+    r.suMain(() => r.scrivi('altro.txt', 'y\n'));
+    // Il clone di una routine: un commit solo, il ramo e nient'altro.
+    execFileSync('git', ['clone', '-q', '--depth', '1', '--branch', 'claude/lungo', pathToFileURL(join(r.casa, 'origin.git')).href, clone]);
+    const g = gitIn(clone);
+    assert.equal(g(['rev-parse', '--is-shallow-repository']).out, 'true');
+    const punta = g(['rev-parse', 'HEAD']).out;
+    const p = provaUnitSullaFusione({ root: clone, punta, scrivi: () => {} });
+    assert.equal(p.esito, 'verde', `la prova deve girare, non fallire per la storia tagliata: ${JSON.stringify(p)}`);
+    assert.equal(p.mainSha, g(['rev-parse', 'origin/main']).out);
+    assert.equal(p.storia.superficiale, true);
+    assert.ok(p.storia.approfondito > 0, 'la storia scaricata si misura');
+    const campo = campoPerIlServer(p);
+    assert.equal(campo.storia.superficiale, true, 'la profondità del clone arriva al server');
+    assert.equal(campo.storia.approfondito, p.storia.approfondito);
+  } finally {
+    rmSync(r.casa, { recursive: true, force: true });
+  }
+});
+
+test('clone poco profondo: un ramo che contiene già main si riconosce solo dopo aver scaricato la storia', () => {
+  const r = repoFinto();
+  const clone = join(r.casa, 'clone');
+  try {
+    r.ramo('claude/dentro', () => r.scrivi('ramo-1.txt', '1\n'));
+    for (let i = 2; i <= 3; i++) { r.scrivi(`ramo-${i}.txt`, `${i}\n`); r.ok(['add', '-A']); r.ok(['commit', '-qm', `ramo ${i}`]); }
+    r.ok(['push', '-q', 'origin', 'claude/dentro']);
+    execFileSync('git', ['clone', '-q', '--depth', '1', '--branch', 'claude/dentro', pathToFileURL(join(r.casa, 'origin.git')).href, clone]);
+    const punta = gitIn(clone)(['rev-parse', 'HEAD']).out;
+    const p = provaUnitSullaFusione({ root: clone, punta, scrivi: () => {}, lancia: () => assert.fail('main è già dentro: niente unit') });
+    assert.equal(p.esito, 'main_contenuto', JSON.stringify(p));
+  } finally {
+    rmSync(r.casa, { recursive: true, force: true });
+  }
+});
+
+test('storia: si scarica a passi, poi tutta; un clone intero non si tocca; senza base comune è un errore col motivo', () => {
+  const finto = ({ superficiale = true, baseDopo = Infinity, fetchRotto = false } = {}) => {
+    const fatti = [];
+    let sup = superficiale;
+    let passi = 0;
+    const git = (args) => {
+      fatti.push(args.join(' '));
+      if (args[0] === 'rev-parse') return { ok: true, out: String(sup) };
+      if (args[0] === 'merge-base') return { ok: passi >= baseDopo, out: '' };
+      if (args[0] === 'fetch') {
+        if (fetchRotto) return { ok: false, out: 'fatal: rete giù' };
+        passi += 1;
+        if (args.includes('--unshallow')) sup = false;
+        return { ok: true, out: '' };
+      }
+      return { ok: false, out: '?' };
+    };
+    return { git, fatti };
+  };
+  const intero = finto({ superficiale: false });
+  assert.deepEqual(assicuraStoria({ git: intero.git, mainSha: SHA, punta: SHA }), { storia: { superficiale: false } });
+  assert.ok(!intero.fatti.some((f) => f.startsWith('fetch')), 'un clone intero non scarica niente');
+
+  const giaBase = finto({ baseDopo: 0 });
+  assert.deepEqual(assicuraStoria({ git: giaBase.git, mainSha: SHA, punta: SHA }).storia, { superficiale: true, approfondito: 0, intera: false });
+
+  const secondo = finto({ baseDopo: 2 });
+  const s2 = assicuraStoria({ git: secondo.git, mainSha: SHA, punta: SHA, passi: [5, 20, 100] });
+  assert.deepEqual(s2.storia, { superficiale: true, approfondito: 25, intera: false });
+  assert.ok(secondo.fatti.includes('fetch --quiet --deepen=20 origin +refs/heads/main:refs/remotes/origin/main'));
+
+  const tutta = finto({ baseDopo: 4 });
+  const s3 = assicuraStoria({ git: tutta.git, mainSha: SHA, punta: SHA, passi: [5, 20, 100] });
+  assert.equal(s3.storia.intera, true);
+  assert.ok(!s3.errore);
+  assert.match(testoStoria(s3.storia), /storia intera/);
+
+  const mai = finto({ baseDopo: Infinity });
+  assert.match(assicuraStoria({ git: mai.git, mainSha: SHA, punta: SHA, passi: [5] }).errore, /nessuna base comune|non hanno una base comune/);
+
+  const rotto = finto({ fetchRotto: true });
+  assert.match(assicuraStoria({ git: rotto.git, mainSha: SHA, punta: SHA }).errore, /storia che manca \(fatal: rete giù\)/);
+  assert.deepEqual(campoPerIlServer({ errore: 'x', storia: { superficiale: true, approfondito: 50, intera: false } }),
+    { esito: 'non_provata', motivo: 'x', storia: { superficiale: true, approfondito: 50, intera: false } });
+});
+
+test('clone del solo ramo: il primo download di main ha il tetto della storia, e se fallisce la misura arriva lo stesso', () => {
+  const r = repoFinto();
+  const clone = join(r.casa, 'clone');
+  try {
+    r.ramo('claude/corto', () => r.scrivi('ramo-1.txt', '1\n'));
+    r.ok(['push', '-q', 'origin', 'claude/corto']);
+    r.suMain(() => r.scrivi('altro.txt', 'y\n'));
+    execFileSync('git', ['clone', '-q', '--depth', '1', '--branch', 'claude/corto', pathToFileURL(join(r.casa, 'origin.git')).href, clone]);
+    const vero = gitIn(clone);
+    const punta = vero(['rev-parse', 'HEAD']).out;
+    // Il git col tetto corto «scade» su ogni download senza limite di profondità da un clone tagliato: è il caso
+    // del repo vero con una rete lenta, dove la storia di main arriva tutta col primo download.
+    const corto = (args) => {
+      const limitato = args.some((a) => /^--(depth|deepen|shallow-)/.test(a));
+      if (args[0] === 'fetch' && !limitato && vero(['rev-parse', '--is-shallow-repository']).out === 'true') return { ok: false, out: 'spawnSync git ETIMEDOUT' };
+      return vero(args);
+    };
+    const p = provaUnitSullaFusione({ root: clone, punta, git: corto, gitStoria: vero, scrivi: () => {} });
+    assert.equal(p.esito, 'verde', JSON.stringify(p));
+
+    // Un clone nuovo: il primo, approfondito, non è più tagliato.
+    const clone2 = join(r.casa, 'clone2');
+    execFileSync('git', ['clone', '-q', '--depth', '1', '--branch', 'claude/corto', pathToFileURL(join(r.casa, 'origin.git')).href, clone2]);
+    const vero2 = gitIn(clone2);
+    const senzaRete = provaUnitSullaFusione({ root: clone2, punta, gitStoria: (args) => (args[0] === 'fetch' ? { ok: false, out: 'fatal: rete giù' } : vero2(args)), scrivi: () => {} });
+    assert.match(senzaRete.errore, /non riesco a scaricare main/);
+    assert.equal(campoPerIlServer(senzaRete).storia.superficiale, true, 'il registro sa che il clone era poco profondo');
+  } finally {
+    rmSync(r.casa, { recursive: true, force: true });
+  }
+});
+
+test('storia: un approfondimento arrivato alla radice si registra come storia intera', () => {
+  let sup = true;
+  let passi = 0;
+  const fatti = [];
+  const git = (args) => {
+    fatti.push(args.join(' '));
+    if (args[0] === 'rev-parse') return { ok: true, out: String(sup) };
+    if (args[0] === 'merge-base') return { ok: passi >= 2, out: '' };
+    if (args[0] === 'fetch') { passi += 1; if (passi === 2) sup = false; return { ok: true, out: '' }; }
+    return { ok: false, out: '?' };
+  };
+  const s = assicuraStoria({ git, mainSha: SHA, punta: SHA, passi: [5, 20, 100] });
+  assert.deepEqual(s.storia, { superficiale: true, approfondito: 25, intera: true });
+  assert.ok(!fatti.some((f) => f.includes('--unshallow')), 'la storia è già tutta: niente altri download');
+  assert.match(testoStoria(s.storia), /storia intera/);
 });
