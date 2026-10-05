@@ -170,14 +170,23 @@ function shellConfig(shell, sid, startCwd, { env, autoRun = true } = {}) {
     // Davanti a tutto il preludio che porta la tabella codici a UTF-8 (#551,
     // gemello di quello in terminal.js): senza, i nomi con accenti e trattini
     // lunghi arrivano storpiati anche qui, nel terminale che l'utente guarda.
+    // Il percorso del file dei pezzi non ASCII arriva per variabile d'ambiente: la cartella temporanea può avere
+    // accenti nel nome utente, e scritta sullo stdin si storpierebbe come il resto (comandoPerCmd).
+    const fileValori = path.join(os.tmpdir(), `filo-cmd-${sid}.txt`);
     return {
       file: process.env.ComSpec || 'cmd.exe',
       // /d salta l'AutoRun del registro: un suo `cd` porterebbe il comando dell'assistente fuori dalla sua cartella.
       args: autoRun ? ['/q', '/k'] : ['/d', '/q', '/k'],
-      options: { cwd: startCwd || undefined, windowsHide: true, ...ambiente },
+      options: { cwd: startCwd || undefined, windowsHide: true, env: { ...(env || process.env), [VALORI_CMD]: fileValori } },
       ready: `${PRELUDI_CODIFICA.cmd}prompt FILO_RDY_${sid}$_\r\necho FILO_RDY_${sid}\r\n`,
-      wrap: (command) =>
-        `${command}\r\necho FILO_META_${sid}:%errorlevel%:%cd%\r\n`,
+      wrap: (command) => {
+        let { testo, valori } = comandoPerCmd(command);
+        if (valori) {
+          try { fs.writeFileSync(fileValori, valori, 'utf8'); } catch (_) { testo = String(command); }
+        }
+        return `${testo}\r\necho FILO_META_${sid}:%errorlevel%:%cd%\r\n`;
+      },
+      pulisci: () => { try { fs.rmSync(fileValori, { force: true }); } catch (_) {} },
     };
   }
   if (shell === 'bash') {
