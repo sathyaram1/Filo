@@ -43,8 +43,8 @@ function defaultCwd() {
 // decodifica lo stdin con la tabella di codici della console (quella OEM),
 // mentre Node gli scrive UTF-8. Un comando che contiene «attività» arriva alla
 // shell con un nome diverso da quello digitato, e lei risponde che il file non
-// esiste. È il guasto della segnalazione, dalla parte opposta. Con cmd non
-// succede: lì il passaggio alla tabella 65001 vale in tutti e due i versi.
+// esiste. È il guasto della segnalazione, dalla parte opposta. Con cmd succede
+// lo stesso, per un'altra via: vedi comandoPerCmd.
 //
 // Toccare `[Console]::InputEncoding` sarebbe peggio del male. Il setter di .NET
 // butta via il lettore dello stdin, e con lui tutto quello che aveva già letto
