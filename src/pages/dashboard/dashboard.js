@@ -178,7 +178,7 @@
       if (onbState) chatId = chatIdOnboarding(onbState);
     },
     pushHistory: (m) => { threadHistory.push(m); },
-    isSending: () => sending,
+    isSending: () => sending || !!chiusuraInCorso,
     // La conversazione dell'intervista è già quella a schermo: stessi messaggi, nello stesso ordine.
     giaAschermo: (state) => {
       const riga = (m) => `${m.role === 'filo' ? 'filo' : 'user'}\n${String(m.text || '').trim()}`;
