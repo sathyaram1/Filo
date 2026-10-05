@@ -154,13 +154,63 @@ function registrableOf(url) {
 function partitionForUrl(url, trusted) {
   const reg = registrableOf(url);
   if (!reg) return null;
-  const slug = reg.replace(/[^a-z0-9.-]/gi, '_');
-  const base = 'filo-priv-' + slug;
-  const isTrusted = trusted instanceof Set && trusted.has(reg);
-  // 'persist:' → jar isolato per-sito ma persistente (resta connesso).
-  // Senza prefisso → jar isolato ed effimero: niente correlazione cross-site e
-  // niente sopravvive alla sessione.
-  return (isTrusted ? 'persist:' : '') + base;
+  return partitionForSite(reg, trusted instanceof Set && trusted.has(reg));
+}
+
+// 'persist:' → jar isolato per-sito ma persistente (resta connesso). Senza prefisso → effimero.
+function partitionForSite(site, persistent) {
+  const slug = String(site || '').toLowerCase().replace(/[^a-z0-9.-]/gi, '_');
+  if (!slug) return null;
+  return (persistent ? 'persist:' : '') + 'filo-priv-' + slug;
+}
+
+// I cookie di un jar ricopiati in un altro, così l'accesso segue il sito quando passa fra jar effimero e
+// persistente («Resta connesso»). Le scadenze restano quelle del sito: un cookie di sessione resta di sessione.
+function cookieDaCopiare(c) {
+  const host = String((c && c.domain) || '').replace(/^\./, '');
+  if (!host || !c.name) return null;
+  const d = {
+    url: (c.secure ? 'https://' : 'http://') + host + (c.path || '/'),
+    name: c.name,
+    value: String(c.value == null ? '' : c.value),
+    path: c.path || '/',
+    secure: !!c.secure,
+    httpOnly: !!c.httpOnly,
+  };
+  if (!c.hostOnly) d.domain = c.domain;
+  if (!c.session && Number(c.expirationDate) > 0) d.expirationDate = Number(c.expirationDate);
+  if (c.sameSite && c.sameSite !== 'unspecified') d.sameSite = c.sameSite;
+  return d;
+}
+
+async function copiaBarattolo(da, a) {
+  if (!da || !a || da === a || !da.cookies || !a.cookies) return 0;
+  let tutti = [];
+  try { tutti = await da.cookies.get({}); } catch (_) { return 0; }
+  let copiati = 0;
+  await Promise.all(tutti.map(async (c) => {
+    const d = cookieDaCopiare(c);
+    if (!d) return;
+    try { await a.cookies.set(d); copiati++; } catch (_) {}
+  }));
+  // Sul disco subito: un'uscita brusca subito dopo il sì non deve perdere l'accesso.
+  try { await a.cookies.flushStore(); } catch (_) {}
+  return copiati;
+}
+
+// La sessione già viva del jar effimero del sito, senza crearla: un jar mai aperto non ha niente da dare.
+function sessioneEffimera(site) {
+  return siteSessions.get(partitionForSite(site, false)) || null;
+}
+
+// Un sito tolto dai fidati non tiene niente sul disco: il suo jar persistente si svuota.
+async function dimenticaSito(site) {
+  const nome = partitionForSite(site, true);
+  if (!nome) return;
+  const ses = siteSessions.get(nome) || session.fromPartition(nome);
+  try { await ses.clearStorageData(); } catch (_) {}
+  try { await ses.clearCache(); } catch (_) {}
+  try { await ses.cookies.flushStore(); } catch (_) {}
 }
 
 // ─── GPC: header Sec-GPC: 1 ───────────────────────────────────────────────
