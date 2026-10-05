@@ -1349,8 +1349,8 @@
     } else if (msg?.type === MSG.CREDITS_CHANGED && msg.walletNotice) {
       // Un invito riscattato da fuori (#651): il link aperto da un'altra
       // applicazione, o l'invito che aspettava questa installazione al primo
-      // avvio. Il main lo spinge una volta sola.
-      inCodaPopup(() => showInviteWelcome(msg.walletNotice));
+      // avvio. La spinta arriva a tutte le home: lo racconta chi lo prende.
+      inCodaPopup(chiediBenvenuto);
     } else if (msg?.type === MSG.GIFT_NOTICE) {
       // L'owner ci ha regalato dei crediti (#210.4): avviso una volta sola.
       const n = Math.round(Number(msg.amount) || 0);
@@ -1659,15 +1659,8 @@
   // crediti arrivano senza che tu chieda niente, e mentre guardi la home: il
   // main spinge l'avviso appena il riscatto è andato, e la home lo racconta
   // una volta sola (il segno «già visto» lo tiene il main).
-  // Lo stesso avviso non si racconta due volte: adesso arriva da due strade
-  // (la spinta del main e la domanda all'apertura) e possono incrociarsi.
-  let avvisoInvitoMostrato = '';
   async function showInviteWelcome(n) {
     if (!n || !n.text || !window.SN_CONFIRM_UI?.notify) return false;
-    const firma = `${n.kind || ''}|${n.text}`;
-    if (firma === avvisoInvitoMostrato) return false;
-    avvisoInvitoMostrato = firma;
-    try { await send({ type: MSG.WALLET_NOTICE_SEEN, where: 'home' }); } catch (_) {}
     const entrato = n.kind === 'entry';
     await window.SN_CONFIRM_UI.notify({
       title: entrato ? 'Benvenuto in Filo' : 'Il tuo invito',
@@ -1675,6 +1668,29 @@
       okLabel: entrato ? 'Evviva!' : 'Va bene',
     });
     return true;
+  }
+
+  // Lo stesso avviso arriva da due strade (la spinta del main e la domanda
+  // all'apertura) e a ogni home aperta: lo racconta una scheda sola (#664),
+  // la prima che l'utente ha davanti. Una home dietro aspetta di tornare
+  // visibile, poi lo chiede al main, che lo dà a una sola.
+  function quandoVisibile() {
+    if (document.visibilityState !== 'hidden') return Promise.resolve();
+    return new Promise((ok) => {
+      const guarda = () => {
+        if (document.visibilityState === 'hidden') return;
+        document.removeEventListener('visibilitychange', guarda);
+        ok();
+      };
+      document.addEventListener('visibilitychange', guarda);
+    });
+  }
+  async function chiediBenvenuto() {
+    await quandoVisibile();
+    try {
+      const r = await send({ type: MSG.WALLET_NOTICE_PENDING, where: 'home', claim: true });
+      if (r && r.ok && r.notice) await showInviteWelcome(r.notice);
+    } catch (_) {}
   }
 
   // I popup dell'avvio si incatenano, mai sovrapposti: l'avviso dell'invito
@@ -1943,12 +1959,7 @@
     // mentre la home si sta ancora aprendo, e la spinta del main non trova
     // nessuno. Chiederlo all'apertura non costa un giro dal server (l'avviso
     // è scritto in locale) e non dipende più da chi arriva prima.
-    inCodaPopup(async () => {
-      try {
-        const r = await send({ type: MSG.WALLET_NOTICE_PENDING, where: 'home' });
-        if (r && r.ok && r.notice) await showInviteWelcome(r.notice);
-      } catch (_) {}
-    });
+    inCodaPopup(chiediBenvenuto);
     if (onbState) return;
     inCodaPopup(async () => {
       try {

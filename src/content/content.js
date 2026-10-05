@@ -1868,7 +1868,7 @@
     const diFilo = !!(linkEl.classList && linkEl.classList.contains('filo-md-link') && Popup && Popup.apriCollegamento);
     const out = [];
     // Un link d'invito esiste per portare l'invito dentro Filo: è la sua prima voce (#664).
-    if (global.SN_WALLET && global.SN_WALLET.inviteCodeFromLink(linkEl.href)) {
+    if (self.SN_WALLET && self.SN_WALLET.inviteCodeFromLink(linkEl.href)) {
       out.push({
         type: 'item',
         label: I18n.t('menu_redeem_invite'),
@@ -1881,7 +1881,7 @@
         label: I18n.t('menu_open_in_new_tab'),
         onClick: () => (diFilo ? Popup.apriCollegamento(linkEl) : window.open(linkEl.href, '_blank', 'noopener')),
       },
-    ];
+    );
     // "Salva file" — gemello di "Salva immagine come" per i link a un file
     // (PDF, ZIP, allegato). Compare SOLO quando il link punta davvero a un
     // file (vedi isDownloadableLink): su un link a un'altra pagina scaricare
