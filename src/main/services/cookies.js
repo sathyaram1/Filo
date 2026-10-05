@@ -26,6 +26,7 @@
 'use strict';
 
 const { session } = require('electron');
+const Sito = require('./stessoSito');
 
 const MODES = { MANUAL: 'manual', DEFAULT: 'default', PRIVACY: 'privacy' };
 
@@ -141,17 +142,9 @@ function trustedSetOf(settings) {
   return new Set(getTrustedSites(settings).map((d) => String(d || '').toLowerCase()).filter(Boolean));
 }
 
-// eTLD+1 per i cookie: solo le piattaforme che il web già separa (un blog su wordpress.com resta con wordpress.com).
-// Ripiego sull'hostname grezzo se il normalizzatore manca o l'URL non ha dominio (IP, localhost).
+// Il sito dei cookie è quello di services/stessoSito.js: un blog su wordpress.com resta con wordpress.com.
 function registrableOf(url) {
-  try {
-    const SB = globalThis.SN_SAFEBROWSE;
-    if (SB && typeof SB.normalize === 'function') {
-      const norm = SB.normalize(url, { soloPsl: true });
-      if (norm && norm.registrable) return norm.registrable;
-    }
-  } catch (_) {}
-  try { return new URL(url).hostname.toLowerCase() || null; } catch (_) { return null; }
+  return Sito.sitoDi(url);
 }
 
 // Chiave di partizione per-sito in modalità privacy. Slug sicuro per il nome di
