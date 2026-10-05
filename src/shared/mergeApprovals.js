@@ -89,15 +89,27 @@
   /**
    * Il titolo dell'avviso. PURA.
    * Zero richieste → stringa vuota: chi non ne ha non deve vedere niente.
-   * Una richiesta già mandata a fondere non aspetta più il sì di nessuno: conta a parte (#702).
+   * Una richiesta già mandata a fondere, o già decisa, non aspetta più il sì di nessuno: conta a parte (#702).
    */
-  function headline(count, inCorso) {
+  function headline(count, inCorso, decise) {
     var n = Math.max(0, Math.floor(Number(count) || 0));
     var v = Math.max(0, Math.floor(Number(inCorso) || 0));
+    var d = Math.max(0, Math.floor(Number(decise) || 0));
     if (n === 1) return 'Una fusione aspetta il tuo via libera';
     if (n > 1) return n + ' fusioni aspettano il tuo via libera';
     if (v === 1) return 'Una fusione in corso';
     if (v > 1) return v + ' fusioni in corso';
+    if (d === 1) return 'Una fusione decisa';
+    if (d > 1) return d + ' fusioni decise';
+    return '';
+  }
+
+  /** La frase sotto il titolo, con lo stesso conto: «aspettano il tuo sì» solo se qualcuna aspetta. PURA. */
+  var INTRO_FERME = 'I controlli di sicurezza del server le hanno fermate perché toccano parti protette. Aspettano il tuo sì.';
+  var INTRO_IN_CORSO = 'I controlli di sicurezza del server l’hanno fermata perché tocca parti protette. Il via libera è partito: il server la sta fondendo.';
+  function introText(count, inCorso) {
+    if (Math.floor(Number(count) || 0) > 0) return INTRO_FERME;
+    if (Math.floor(Number(inCorso) || 0) > 0) return INTRO_IN_CORSO;
     return '';
   }
 
