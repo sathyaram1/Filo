@@ -559,7 +559,7 @@
   // il box inline lo mostra istantaneamente invece di aspettare il provider.
   // - Debounce 400ms (selectionchange spara molto durante il drag).
   // - Dedup per chiave selezione (no re-fetch sulla stessa selezione).
-  // - No prefetch se tab nascosto, dominio bloccato, selezione troppo corta.
+  // - No prefetch se tab nascosto, dominio bloccato, incognito, selezione troppo corta.
   // - Una sola entry attiva: la selezione cambia velocemente, non serve cache larga.
   let prefetchedExplain = null; // { key, sentence, promise<{text}|{error}> }
   let prefetchTimer = null;
@@ -573,6 +573,8 @@
 
   function prefetchExplainNow() {
     if (deps.isBlocked()) return;
+    // In incognito la spiegazione parte solo dal tasto destro (#591, #1004).
+    if (!deps.isIncognito || deps.isIncognito()) return;
     if (document.hidden) return;
     const sel = Extract.getSelectionWithSentence();
     if (!sel) return;

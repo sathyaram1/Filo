@@ -316,3 +316,63 @@ test('un campo carta nel riquadro di un servizio di pagamento rende delicata la 
   await expect.poll(() => app.evaluate(() => globalThis.SN_DELICATE.haCampi('sito-pubblico.test')), { timeout: 8_000 }).toBe(true);
   expect(await app.evaluate(() => globalThis.SN_DELICATE.haCampi('blocked.test')), 'il riquadro non segna sé stesso').toBe(false);
 });
+
+test('un modulo di accesso nascosto non rende delicato il sito; aperto e usato, sì', async ({ app, shell, openTab, testServer }) => {
+  await modelliFinti(app);
+  const page = await testServer.openReady(openTab,
+    '<!doctype html><html><head><title>Ricetta del pane</title></head><body><p>Farina, acqua e lievito madre.</p>'
+    + '<button id="apri" onclick="document.getElementById(\'accesso\').style.display=\'block\'">Accedi</button>'
+    + '<div id="accesso" style="display:none"><input type="password" name="pw"></div></body></html>',
+    { pubblico: true });
+  const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
+  await page.locator('#apri').waitFor();
+  // Il nascosto si guarda a pagina caricata e di nuovo dopo un attimo: oltre quell'attimo nessuno l'ha segnato.
+  await page.waitForTimeout(2500);
+  expect(await app.evaluate(() => globalThis.SN_DELICATE.haCampi('sito-pubblico.test'))).toBe(false);
+  await shell.evaluate(async (i) => window.filoShell.tabs.close(i), id);
+  await expect.poll(() => voceDi(app, 'Ricetta del pane'), { timeout: 8_000 })
+    .toEqual(expect.objectContaining({ delicata: null, summary: 'Riassunto finto della pagina.' }));
+
+  const di = await testServer.openReady(openTab,
+    '<!doctype html><html><head><title>Accesso</title></head><body>'
+    + '<button id="apri" onclick="document.getElementById(\'accesso\').style.display=\'block\'">Accedi</button>'
+    + '<div id="accesso" style="display:none"><input type="password" name="pw"></div></body></html>',
+    { pubblico: true });
+  await di.locator('#apri').click();
+  await di.locator('input[name=pw]').click();
+  await expect.poll(() => app.evaluate(() => globalThis.SN_DELICATE.haCampi('sito-pubblico.test')), { timeout: 8_000 }).toBe(true);
+});
+
+test('in incognito la selezione non parte da sola verso un modello; in una finestra normale la spiegazione si prepara', async ({ app, shell, testServer }) => {
+  await modelliFinti(app);
+  await shell.evaluate(() => window.filoShell.openIncognito());
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) =>
+    !!BrowserWindow.getAllWindows().find((w) => w._filoIncognito && w._filoTabs)), { timeout: 15_000 }).toBe(true);
+  const IBAN = 'IT60X0542811101000000123456';
+  const url = testServer.html(`<!doctype html><title>Bonifico</title><body><p id="p">Il mio IBAN è ${IBAN} per il bonifico.</p></body>`, { pubblico: true });
+  const seleziona = (incognito) => app.evaluate(async ({ BrowserWindow }, { url, incognito }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => !!w._filoIncognito === incognito && w._filoTabs);
+    const tm = win._filoTabs;
+    const id = tm.openTab(url);
+    const t0 = Date.now();
+    let tab = null;
+    while (Date.now() - t0 < 10_000) {
+      tab = tm.tabs.find((t) => t.id === id);
+      const pronta = tab && tab.view && await tab.view.webContents.executeJavaScript(
+        'document.documentElement.dataset.filoReady === "1"').catch(() => false);
+      if (pronta) break;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    await tab.view.webContents.executeJavaScript(`(function(){const t=document.getElementById('p').firstChild;
+      const r=document.createRange();r.setStart(t,13);r.setEnd(t,40);const s=getSelection();s.removeAllRanges();s.addRange(r);})()`);
+  }, { url, incognito });
+  const spiegazioni = async () => (await mandato(app)).filter((m) => m.testo.includes(IBAN));
+
+  await seleziona(true);
+  // La preparazione parte dopo 400 ms dalla selezione: oltre il secondo e mezzo non è partita.
+  await new Promise((r) => setTimeout(r, 1500));
+  expect(await spiegazioni()).toEqual([]);
+
+  await seleziona(false);
+  await expect.poll(async () => (await spiegazioni()).length, { timeout: 8_000 }).toBe(1);
+});

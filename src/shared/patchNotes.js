@@ -28,6 +28,7 @@
       fixes: [
         'Nei campi dove scegli un modello dal menu a tendina, un clic sul campo riapre il menu anche subito dopo una scelta. Prima bisognava scrivere qualcosa o uscire dal campo e rientrare.',
         'Nell\'editor il riquadro di un nuovo commento non si chiude più da solo mentre scrivi, anche se hai selezionato il testo prima che sparisse l\'invito a farlo.',
+        'In incognito il testo che selezioni non parte più da solo verso un modello: la spiegazione arriva quando apri il tasto destro.',
         'Se da una scheda passi a una pagina senza titolo, la scheda mostra il suo indirizzo e non più il titolo della pagina di prima.',
         'Le schede chiuse restano in Cronologia finché non le cancelli tu. Prima, passate le 5000, le più vecchie sparivano da sole, e dopo le 2000 la ricerca per contenuto non le trovava più. Adesso le trova tutte, anche le più vecchie, già alla prima ricerca.',
         '«Copia immagine» funziona anche sulle foto che i siti tengono su un altro dominio. Se la incolli in chat e chiedi se è fatta con l\'AI, Filo risponde come col tasto destro.',

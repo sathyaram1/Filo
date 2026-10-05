@@ -545,9 +545,9 @@ function vediCampiDelicati() {
     if (detto) return;
     let h = null;
     try { h = require(path.join(CONTENT_DIR, 'safebrowseHints.js')).pageHints(document); } catch (_) { return; }
-    if (!h || !(h.hasPassword || h.hasPayment)) return;
+    if (!h || !(h.shownPassword || h.shownPayment)) return;
     detto = true;
-    filoMessage({ type: 'campi_delicati_riquadro', hasPassword: !!h.hasPassword, hasPayment: !!h.hasPayment }).catch(() => {});
+    filoMessage({ type: 'campi_delicati', hasPassword: !!h.shownPassword, hasPayment: !!h.shownPayment }).catch(() => {});
   };
   try {
     window.addEventListener('load', guarda, { once: true });

@@ -180,3 +180,35 @@ test('la pagina Privacy, fra quello che parte senza che lo si chieda, nomina anc
   const detto = /\*\* (\p{L}+) funzioni/u.exec(sezione);
   assert.equal(numeri[(detto && detto[1] || '').toLowerCase()], voci.length, 'il numero detto e le voci elencate coincidono');
 });
+
+// Un campo password o carta conta per le pagine delicate solo se la pagina lo mostra: il modulo di accesso tenuto
+// pronto e nascosto no. Il finto documento dice dove sta ogni campo; per il sito pericoloso conta anche il nascosto.
+test('un campo password nascosto non è un campo mostrato; a schermo, sotto la piega, sì', () => {
+  const { pageHints } = require('../../src/content/safebrowseHints.js');
+  const campo = ({ rect = { left: 10, top: 10, right: 210, bottom: 40, width: 200, height: 30 }, stile = {}, attr = {} } = {}) => ({
+    getAttribute: (k) => (k in attr ? attr[k] : null),
+    labels: [],
+    getClientRects: () => (rect ? [rect] : []),
+    getBoundingClientRect: () => rect || { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 },
+    stile: { visibility: 'visible', opacity: '1', ...stile },
+  });
+  const documento = (pw = [], testo = []) => ({
+    defaultView: { scrollX: 0, scrollY: 0, getComputedStyle: (el) => el.stile },
+    querySelector: (sel) => (sel === 'input[type="password"]' ? pw[0] || null : null),
+    querySelectorAll: (sel) => (sel === 'input[type="password"]' ? pw : sel.startsWith('input:not') ? testo : []),
+    getElementById: () => null,
+  });
+  const nascosto = campo({ rect: null });
+  const h1 = pageHints(documento([nascosto]));
+  assert.equal(h1.hasPassword, true);
+  assert.equal(h1.shownPassword, false);
+  assert.equal(pageHints(documento([campo({ stile: { visibility: 'hidden' } })])).shownPassword, false);
+  assert.equal(pageHints(documento([campo({ stile: { opacity: '0' } })])).shownPassword, false);
+  assert.equal(pageHints(documento([campo({ rect: { left: -10000, top: 10, right: -9800, bottom: 40, width: 200, height: 30 } })])).shownPassword, false);
+  assert.equal(pageHints(documento([nascosto, campo({ rect: { left: 10, top: 3000, right: 210, bottom: 3030, width: 200, height: 30 } })])).shownPassword, true);
+  // La carta chiesta in un campo di testo: conta la sua etichetta, e se si vede.
+  const carta = (rect) => campo({ rect, attr: { placeholder: 'Numero della carta' } });
+  assert.equal(pageHints(documento([], [carta(null)])).hasPayment, true);
+  assert.equal(pageHints(documento([], [carta(null)])).shownPayment, false);
+  assert.equal(pageHints(documento([], [carta(undefined)])).shownPayment, true);
+});

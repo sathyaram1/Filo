@@ -7,6 +7,7 @@
 
   const MSG = (global.SN_MSG && global.SN_MSG.MSG) || {};
   const T_GET = MSG.SAFEBROWSE_GET || 'safebrowse_get';
+  const T_CAMPI = MSG.CAMPI_DELICATI || 'campi_delicati';
 
   const chrome = global.chrome;
   function send(msg, cb) {
@@ -17,7 +18,15 @@
   try { hintsOf = require('./safebrowseHints.js').pageHints; } catch (_) {}
   function pageHints() {
     try { if (hintsOf) return hintsOf(document); } catch (_) {}
-    return { hasPassword: false, hasPayment: false };
+    return { hasPassword: false, hasPayment: false, shownPassword: false, shownPayment: false };
+  }
+
+  // Un campo password o carta a schermo rende delicato il sito (#1004): uno solo nascosto nel codice no. Si dice una volta.
+  let campiDetti = false;
+  function campiMostrati(h) {
+    if (campiDetti || !h || !(h.shownPassword || h.shownPayment)) return;
+    campiDetti = true;
+    send({ type: T_CAMPI, hasPassword: !!h.shownPassword, hasPayment: !!h.shownPayment });
   }
 
   let level = 'safe';
@@ -25,6 +34,7 @@
   function requestVerdict() {
     const hints = pageHints();
     sentHints = hints;
+    campiMostrati(hints);
     send({ type: T_GET, url: location.href, hasPassword: hints.hasPassword, hasPayment: hints.hasPayment }, (r) => {
       if (r && r.ok) level = r.level || 'safe';
     });
@@ -32,8 +42,9 @@
 
   // Un campo password o di carta alza la gravità: va chiesto appena compare, non quando la pagina dice di aver finito.
   function hintsGrew() {
-    if (sentHints.hasPassword && sentHints.hasPayment) return;
+    if (sentHints.hasPassword && sentHints.hasPayment && campiDetti) return;
     const h = pageHints();
+    campiMostrati(h);
     if ((h.hasPassword && !sentHints.hasPassword) || (h.hasPayment && !sentHints.hasPayment)) requestVerdict();
   }
 

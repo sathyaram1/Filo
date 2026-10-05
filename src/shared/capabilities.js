@@ -137,7 +137,7 @@
       id: 'explain-selection', title: 'Spiega il testo selezionato', category: 'selection',
       desc: 'Dà una spiegazione del testo che hai selezionato, direttamente sopra la selezione. Se la selezione contiene un importo in valuta straniera o una misura non metrica, accanto trovi l’equivalente in euro — col cambio del giorno della Banca centrale europea, per tutte le valute che pubblica — o in metri, chili e gradi centigradi. I conti li fa Filo, non il modello.',
       invoke: 'Seleziona il testo e apri il menu del tasto destro: la spiegazione arriva da sola dentro il menu, non c’è una voce da cliccare. Con Alt+E (Ctrl+Alt+E su Mac), o con la freccia accanto alla spiegazione, ne apri una più estesa in un riquadro sopra la selezione.',
-      doesNot: 'Non spiega il testo selezionato in altri programmi: la scorciatoia vale solo con Filo in primo piano, e fuori da Filo il tasto resta al programma che stai usando.',
+      doesNot: 'Non spiega il testo selezionato in altri programmi: la scorciatoia vale solo con Filo in primo piano, e fuori da Filo il tasto resta al programma che stai usando. In incognito non prepara la spiegazione mentre selezioni: parte quando apri il tasto destro.',
     },
     {
       id: 'translate-selection', title: 'Traduci il testo selezionato', category: 'selection',
@@ -574,7 +574,7 @@
     },
     {
       id: 'pagine-delicate', title: 'Le pagine delicate non vanno ai modelli', category: 'settings',
-      desc: 'Il riassunto delle schede chiuse e la pulizia automatica delle schede non mandano a nessun modello il testo delle pagine delicate: posta, banche, sanità, le pagine dove Filo ha visto un campo password o di carta (anche dentro il riquadro di un altro sito; vale per tutto quel sito, anche dopo un riavvio: in Sicurezza vedi questi siti e togli quelli che per te non sono delicati, anche chiedendolo a Filo) e i siti che aggiungi tu. Di queste Filo tiene solo titolo e indirizzo, e nella chat una scheda delicata aperta compare solo col nome del sito. L’elenco di posta, banche e sanità si aggiorna da remoto.',
+      desc: 'Il riassunto delle schede chiuse e la pulizia automatica delle schede non mandano a nessun modello il testo delle pagine delicate: posta, banche, sanità, le pagine che hanno mostrato un campo password o di carta (uno nascosto nel codice della pagina non conta; anche dentro il riquadro di un altro sito; vale per tutto quel sito, anche dopo un riavvio: in Sicurezza vedi questi siti e togli quelli che per te non sono delicati, anche chiedendolo a Filo) e i siti che aggiungi tu. Di queste Filo tiene solo titolo e indirizzo, e nella chat una scheda delicata aperta compare solo col nome del sito. L’elenco di posta, banche e sanità si aggiorna da remoto.',
       invoke: 'Impostazioni → Sicurezza → «Non mandare ai modelli le pagine delicate» (acceso di serie), e sotto i tuoi siti, uno per riga. Oppure chiedendolo a Filo: «questo sito è delicato», «la pagina del mio commercialista è delicata» con la sua scheda aperta, «studiorossi.it è delicato», «quali siti delicati ho?», «manda anche le pagine delicate».',
       doesNot: 'Non tocca quello che chiedi tu su una pagina (spiegazioni, traduzioni, l’Aiuto): lì il testo va al modello perché l’hai chiesto. Il riconoscimento dei blocchi geografici resta com’è, perché guarda solo pagine d’errore. Non decide quali siti sono delicati con un modello: valgono gli elenchi e il campo password visto.',
     },

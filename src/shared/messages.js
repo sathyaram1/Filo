@@ -619,9 +619,9 @@
     // vista sopra la scheda, i cui pulsanti non passano da questo canale, che i siti raggiungono (#813.5).
     // → { ok, level:'safe'|'sospetto'|'pericoloso', message:{title,body}|null, registrable }
     SAFEBROWSE_GET: 'safebrowse_get',              // { url, hasPassword?, hasPayment? }
-    // #1004 — un riquadro incorporato ha un campo password o carta (il modulo di pagamento di un altro sito): la pagina
-    // che lo contiene diventa delicata. Il sito lo dà il main, dalla scheda.
-    CAMPI_DELICATI_RIQUADRO: 'campi_delicati_riquadro', // (riquadro) { hasPassword, hasPayment } → { ok }
+    // #1004 — la pagina, o un suo riquadro (il modulo di pagamento di un altro sito), mostra un campo password o carta:
+    // il sito della scheda diventa delicato. Il sito lo dà il main, dalla scheda.
+    CAMPI_DELICATI: 'campi_delicati', // { hasPassword, hasPayment } (campi a schermo) → { ok }
     // Solo pagine filo:// (Sicurezza): i siti segnati per un campo password o carta, e quelli che l'utente ne ha tolto.
     PAGINE_DELICATE_CAMPI: 'pagine_delicate_campi', // {} → { ok, siti: [{ sito, tolto }] }
     // La home aperta dal tasto destro sull'avviso chiede cosa le ha lasciato il main: la domanda a Filo sul sito o la

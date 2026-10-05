@@ -13,16 +13,12 @@ module.exports = function register(on, ctx) {
     const tabId = sender?.tab?.id;
     if (!win || !win._filoTabs || !tabId) return { ok: true, level: 'safe', message: null };
     const ctxPage = { hasPassword: !!msg.hasPassword, hasPayment: !!msg.hasPayment };
-    // Il sito lo dà il main, non la pagina; e una pagina che si dichiara delicata può solo mandare meno ai modelli (#1004).
-    if (ctxPage.hasPassword || ctxPage.hasPayment) {
-      globalThis.SN_DELICATE?.segnaCampi(sender?.url || origin, { incognito: !!win._filoTabs.incognito })?.catch?.(() => {});
-    }
     return win._filoTabs.safebrowseGet(tabId, msg.url || origin, ctxPage);
   });
 
-  // Il campo sta in un riquadro di un altro sito: vale per la pagina della scheda, che dà il main (sender.url), mai il
-  // riquadro. Come sopra, chi si dichiara delicato può solo mandare meno ai modelli (#1004).
-  on(MSG.CAMPI_DELICATI_RIQUADRO, async (msg, sender) => {
+  // Un campo password o carta a schermo, nella pagina o in un suo riquadro: vale per la pagina della scheda, che dà il
+  // main (sender.url), mai il riquadro. Chi si dichiara delicato può solo mandare meno ai modelli (#1004).
+  on(MSG.CAMPI_DELICATI, async (msg, sender) => {
     const win = winOf(sender);
     if (!win || !win._filoTabs || !sender?.tab?.id || !sender.url) return { ok: false };
     if (!msg || !(msg.hasPassword || msg.hasPayment)) return { ok: true };
