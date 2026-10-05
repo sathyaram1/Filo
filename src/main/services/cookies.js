@@ -331,7 +331,13 @@ function seguiUscite(partition, ses) {
   });
 }
 
+// Un jar persistente si butta solo se il sito è stato tolto dai fidati: finché è fidato resta, è la sua eccezione.
+function daButtare(partition) {
+  return !partition.startsWith('persist:') || fidatiDaButtare.has(partition);
+}
+
 function armaUscita(partition) {
+  if (!daButtare(partition)) return;
   clearTimeout(uscite.get(partition));
   const t = setTimeout(() => { uscite.delete(partition); controllaUscita(partition); }, margineUscita);
   uscite.set(partition, t);
