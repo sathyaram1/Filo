@@ -278,6 +278,7 @@ function createSession({ shell, cwd, env, autoRun } = {}) {
   proc.on('error', (err) => fatal(err.message || String(err)));
   proc.on('close', (uscita) => {
     session.dead = true;
+    if (cfg.pulisci) cfg.pulisci();
     const cur = session.current;
     session.current = null;
     if (cur && cur.cb.onExit) cur.cb.onExit({ code: 0, cwd: session.cwd, chiusa: true, uscita });
