@@ -1,19 +1,6 @@
-// Costruisce il sorgente JS (stringa) della "guardia anti-fingerprint" da
-// iniettare nel MAIN WORLD di una pagina web esterna.
-//
-// Gira PRIMA degli script della pagina (lo inietta page-preload.js via
-// webFrame.executeJavaScript, che valuta nel main world e ignora la CSP),
-// quindi gli override dei prototipi sono in piedi prima di qualsiasi lettura di
-// canvas/audio/webgl da parte di uno script di fingerprinting.
-//
-// `seed` (uint32) è derivato in main da HMAC(masterSecret, eTLD+1 + finestra
-// temporale): stesso sito → stesso rumore (nessun flicker tra letture diverse),
-// siti diversi → rumore scorrelato. Il rumore è legato alla posizione assoluta
-// del pixel, così una lettura parziale (getImageData su un ritaglio) ottiene lo
-// stesso rumore della lettura intera.
-//
-// `level` 1/2 serve solo a sapere se siamo accesi: la rotazione (settimanale vs
-// per-sessione) è già codificata nel seed a monte.
+// Sorgente della guardia anti-fingerprint, iniettata dal page-preload nel main world prima degli
+// script della pagina. Non legge mai il master secret: riceve solo il seed per sito (HMAC in main).
+// Il rumore è legato alla posizione del pixel nell'immagine: stesso pixel, stesso rumore, da ogni porta.
 
 function buildGuardSource(seed, level) {
   const s = (seed >>> 0);
@@ -26,7 +13,6 @@ function buildGuardSource(seed, level) {
   if (!LEVEL) return;
   try { Object.defineProperty(window, '__filoFpGuard', { value: true, enumerable: false, configurable: true }); } catch(e) {}
 
-  // Hash deterministico per pixel (SEED, x, y) -> uint32.
   function ph(x, y) {
     var h = (SEED ^ Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263)) >>> 0;
     h = Math.imul(h ^ (h >>> 15), 2246822519) >>> 0;
@@ -34,16 +20,20 @@ function buildGuardSource(seed, level) {
     return (h ^ (h >>> 16)) >>> 0;
   }
 
-  // Perturba ~10% dei pixel flippando 1 LSB su R/G/B (mai alpha). Rumore legato
-  // alla posizione assoluta (ox+col, oy+row): identico tra lettura intera e
-  // ritaglio. Impercettibile a occhio (1 LSB su 255), cambia l'hash.
-  function perturb(data, w, h, ox, oy) {
+  // ~10% dei pixel, 1 LSB su R/G/B, mai alpha. (ox, oy) è la posizione nell'immagine della prima
+  // riga del buffer, dy il verso delle righe (-1 per readPixels, che parte dal basso). Un pixel con
+  // alpha 0 non si tocca: un canvas vero lo restituisce sempre nero, il rumore tradirebbe la guardia.
+  function perturb(data, w, h, ox, oy, base, stride, dy) {
     if (!data || w <= 0 || h <= 0) return;
+    base = base | 0; stride = stride || w * 4; dy = dy || 1;
+    if (data.length < base + (h - 1) * stride + w * 4) return;
     for (var row = 0; row < h; row++) {
+      var py = oy + row * dy, i0 = base + row * stride;
       for (var col = 0; col < w; col++) {
-        var r = ph(ox + col, oy + row);
+        var i = i0 + col * 4;
+        if (!data[i + 3]) continue;
+        var r = ph(ox + col, py);
         if ((r % 100) < 10) {
-          var i = (row * w + col) * 4;
           data[i]     ^= (r & 1);
           data[i + 1] ^= ((r >>> 1) & 1);
           data[i + 2] ^= ((r >>> 2) & 1);
@@ -52,8 +42,6 @@ function buildGuardSource(seed, level) {
     }
   }
 
-  // Maschera l'override così uno script che ispeziona fn.toString() vede ancora
-  // "function name() { [native code] }".
   function mask(fn, orig, name) {
     try {
       Object.defineProperty(fn, 'name', { value: name, configurable: true });
@@ -65,82 +53,131 @@ function buildGuardSource(seed, level) {
     return fn;
   }
 
-  // ---- Canvas 2D ----
+  // ---- Canvas (elemento e OffscreenCanvas) ----
+  // Il contesto di un canvas si annota quando la pagina lo crea: chiederlo alla guardia con
+  // getContext('2d') ne creerebbe uno, e il canvas non potrebbe più diventare WebGL.
+  var ctxOf = new WeakMap();
+  var MAXPX = 8000000;
+
+  function track(proto) {
+    var o = proto && proto.getContext;
+    if (!o) return null;
+    proto.getContext = mask(function getContext() {
+      var ctx = o.apply(this, arguments);
+      if (ctx && !ctxOf.has(this)) ctxOf.set(this, ctx);
+      return ctx;
+    }, o, 'getContext');
+    return o;
+  }
+
+  function patchGet(proto) {
+    var o = proto && proto.getImageData;
+    if (!o) return null;
+    proto.getImageData = mask(function getImageData(sx, sy, sw, sh) {
+      var img = o.apply(this, arguments);
+      try {
+        var x0 = (sx | 0) + ((sw | 0) < 0 ? (sw | 0) : 0);
+        var y0 = (sy | 0) + ((sh | 0) < 0 ? (sh | 0) : 0);
+        perturb(img.data, img.width, img.height, x0, y0);
+      } catch (e) {}
+      return img;
+    }, o, 'getImageData');
+    return o;
+  }
+
+  function family(CanvasCtor, CtxCtor, make) {
+    var cp = CanvasCtor && CanvasCtor.prototype, xp = CtxCtor && CtxCtor.prototype;
+    if (!cp || !xp || !xp.getImageData) return null;
+    var F = { put: xp.putImageData, draw: xp.drawImage, make: make };
+    F.getCtx = track(cp);
+    F.get = patchGet(xp);
+    return F.getCtx ? F : null;
+  }
+
+  // Si esporta una copia rumorosa, mai il canvas della pagina: i suoi pixel non cambiano nemmeno per
+  // un istante, e toBlob/convertToBlob, che finiscono dopo, non ripristinano sopra un disegno nuovo.
+  // Senza contesto il canvas è vuoto, uguale per tutti: null, e si esporta com'è.
+  function noisyCopy(src, F) {
+    var ctx = ctxOf.get(src);
+    if (!ctx || !F) return null;
+    var w = src.width | 0, h = src.height | 0;
+    if (w <= 0 || h <= 0 || (w * h) > MAXPX) return null;
+    var img = null, cs;
+    try { img = F.get.call(ctx, 0, 0, w, h); cs = img.colorSpace; }
+    catch (e) { img = null; try { cs = ctx.drawingBufferColorSpace; } catch (e2) {} }
+    var tmp = F.make(w, h);
+    var t = F.getCtx.call(tmp, '2d', { colorSpace: cs || 'srgb', willReadFrequently: true });
+    if (!img) { F.draw.call(t, src, 0, 0); img = F.get.call(t, 0, 0, w, h); }
+    perturb(img.data, w, h, 0, 0);
+    F.put.call(t, img, 0, 0);
+    return tmp;
+  }
+  function copyOrNull(src, F) { try { return noisyCopy(src, F); } catch (e) { return null; } }
+
   try {
-    var CtxProto = (window.CanvasRenderingContext2D || {}).prototype;
-    var CanProto = (window.HTMLCanvasElement || {}).prototype;
-    if (CtxProto && CanProto && CtxProto.getImageData) {
-      var oGet = CtxProto.getImageData;
-      var oPut = CtxProto.putImageData;
+    var oCreate = Document.prototype.createElement;
+    var HTML = family(window.HTMLCanvasElement, window.CanvasRenderingContext2D, function (w, h) {
+      var c = oCreate.call(document, 'canvas'); c.width = w; c.height = h; return c;
+    });
+    var CanProto = HTML && window.HTMLCanvasElement.prototype;
+    if (CanProto && CanProto.toDataURL) {
       var oToData = CanProto.toDataURL;
+      CanProto.toDataURL = mask(function toDataURL() {
+        return oToData.apply(copyOrNull(this, HTML) || this, arguments);
+      }, oToData, 'toDataURL');
+    }
+    if (CanProto && CanProto.toBlob) {
       var oToBlob = CanProto.toBlob;
+      CanProto.toBlob = mask(function toBlob(cb) {
+        var tmp = typeof cb === 'function' ? copyOrNull(this, HTML) : null;
+        return oToBlob.apply(tmp || this, arguments);
+      }, oToBlob, 'toBlob');
+    }
+  } catch (e) {}
 
-      var newGet = function getImageData(sx, sy) {
-        var img = oGet.apply(this, arguments);
-        try { perturb(img.data, img.width, img.height, sx | 0, sy | 0); } catch (e) {}
-        return img;
-      };
-      CtxProto.getImageData = mask(newGet, oGet, 'getImageData');
-
-      // Per toDataURL/toBlob perturbiamo i pixel veri un istante, leggiamo, e
-      // ripristiniamo subito: è sincrono, niente paint nel mezzo, niente
-      // flicker. Usiamo SEMPRE gli originali oGet/oPut per non auto-rumoreggiare.
-      function snapshotPerturb(canvas) {
-        var ctx = null;
-        try { ctx = canvas.getContext('2d'); } catch (e) {}
-        if (!ctx) return null; // canvas WebGL: niente contesto 2d -> salta
-        var w = canvas.width | 0, h = canvas.height | 0;
-        if (w <= 0 || h <= 0 || (w * h) > 8000000) return null;
-        var orig;
-        try { orig = oGet.call(ctx, 0, 0, w, h); } catch (e) { return null; }
-        var copy = new ImageData(new Uint8ClampedArray(orig.data), w, h);
-        perturb(copy.data, w, h, 0, 0);
-        try { oPut.call(ctx, copy, 0, 0); } catch (e) { return null; }
-        return { ctx: ctx, orig: orig };
-      }
-      function restore(snap) { if (snap) { try { oPut.call(snap.ctx, snap.orig, 0, 0); } catch (e) {} } }
-
-      var newToData = function toDataURL() {
-        var snap = snapshotPerturb(this);
-        try { return oToData.apply(this, arguments); }
-        finally { restore(snap); }
-      };
-      CanProto.toDataURL = mask(newToData, oToData, 'toDataURL');
-
-      if (oToBlob) {
-        var newToBlob = function toBlob(cb) {
-          var snap = snapshotPerturb(this);
-          var args = Array.prototype.slice.call(arguments);
-          if (typeof cb === 'function') {
-            args[0] = function (blob) { restore(snap); try { cb(blob); } catch (e) {} };
-            try { return oToBlob.apply(this, args); }
-            catch (e) { restore(snap); throw e; }
-          }
-          try { return oToBlob.apply(this, args); }
-          finally { restore(snap); }
-        };
-        CanProto.toBlob = mask(newToBlob, oToBlob, 'toBlob');
-      }
+  try {
+    var OC = window.OffscreenCanvas;
+    var OFF = family(OC, window.OffscreenCanvasRenderingContext2D, function (w, h) { return new OC(w, h); });
+    var OffProto = OFF && OC.prototype;
+    if (OffProto && OffProto.convertToBlob) {
+      var oConvert = OffProto.convertToBlob;
+      OffProto.convertToBlob = mask(function convertToBlob() {
+        return oConvert.apply(copyOrNull(this, OFF) || this, arguments);
+      }, oConvert, 'convertToBlob');
     }
   } catch (e) {}
 
   // ---- WebGL readPixels ----
+  // Righe e posizioni come le vede toDataURL dello stesso canvas: le due letture devono coincidere.
   try {
-    var patchGL = function (proto) {
+    var patchGL = function (proto, gl2) {
       if (!proto || !proto.readPixels) return;
-      var oRead = proto.readPixels;
-      var nf = function readPixels(x, y, width, height, format, type, pixels) {
+      var oRead = proto.readPixels, oParam = proto.getParameter;
+      var dbh = Object.getOwnPropertyDescriptor(proto, 'drawingBufferHeight');
+      var dbhGet = dbh && dbh.get;
+      var nf = function readPixels(x, y, width, height, format, type, pixels, dstOffset) {
         oRead.apply(this, arguments);
         try {
-          if (pixels && pixels.length && (pixels instanceof Uint8Array || pixels instanceof Uint8ClampedArray)) {
-            perturb(pixels, width | 0, height | 0, x | 0, y | 0);
+          if (format !== 0x1908 || type !== 0x1401) return;
+          if (!(pixels instanceof Uint8Array || pixels instanceof Uint8ClampedArray)) return;
+          var w = width | 0, h = height | 0;
+          var align = (oParam.call(this, 0x0D05) | 0) || 4;
+          var rowLen = 0, skipR = 0, skipP = 0;
+          if (gl2) {
+            rowLen = oParam.call(this, 0x0D02) | 0;
+            skipR = oParam.call(this, 0x0D03) | 0;
+            skipP = oParam.call(this, 0x0D04) | 0;
           }
+          var stride = Math.ceil((rowLen > 0 ? rowLen : w) * 4 / align) * align;
+          var base = (gl2 ? (dstOffset | 0) : 0) + skipR * stride + skipP * 4;
+          var H = dbhGet ? (dbhGet.call(this) | 0) : 0;
+          perturb(pixels, w, h, x | 0, H - 1 - (y | 0), base, stride, -1);
         } catch (e) {}
       };
       proto.readPixels = mask(nf, oRead, 'readPixels');
     };
-    patchGL((window.WebGLRenderingContext || {}).prototype);
-    patchGL((window.WebGL2RenderingContext || {}).prototype);
+    patchGL((window.WebGLRenderingContext || {}).prototype, false);
+    patchGL((window.WebGL2RenderingContext || {}).prototype, true);
   } catch (e) {}
 
   // ---- AudioContext (OfflineAudioContext.startRendering) ----
