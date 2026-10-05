@@ -147,18 +147,30 @@
   // Una chiamata di chat (con o senza streaming). `require_parameters` scarta anche gli host che non
   // conoscono `reasoning`, e per un modello che non ragiona non ne resterebbe nessuno: il ragionamento
   // è facoltativo, gli strumenti no, quindi a quel rifiuto si rifà la richiesta senza.
+  // Il rifiuto si ricorda per modello e vincoli: senza, ogni messaggio e ogni giro di strumenti lo ripaga in attesa.
+  // Scade perché gli host di un modello cambiano, e uno nuovo che regge il ragionamento va ritrovato.
+  const REASONING_REFUSED_MS = 60 * 60 * 1000;
+  const reasoningRefused = new Map();
+  function forgetReasoningRefusals() { reasoningRefused.clear(); }
+
   async function postChat(body, apiKey, signal) {
     const send = (b, key) => {
       const payload = JSON.stringify(b);
       return fetchWithKey(ENDPOINT, key, (k) => ({ method: 'POST', headers: buildHeaders(k), body: payload, signal }));
     };
-    const first = await send(body, apiKey);
     const needsParams = !!(body.provider && body.provider.require_parameters);
-    if (first.res.ok || first.res.status !== 404 || !needsParams || !body.reasoning) return first;
+    const { reasoning: _omesso, ...senzaRagionamento } = body;
+    const refusalKey = needsParams && body.reasoning ? JSON.stringify([body.model, body.provider]) : null;
+    if (refusalKey) {
+      if ((reasoningRefused.get(refusalKey) || 0) > Date.now()) return send(senzaRagionamento, apiKey);
+      reasoningRefused.delete(refusalKey);
+    }
+    const first = await send(body, apiKey);
+    if (first.res.ok || first.res.status !== 404 || !refusalKey) return first;
     const detail = await first.res.clone().text().catch(() => '');
     if (!NO_HOST_FOR_PARAMS_RE.test(detail)) return first;
-    const { reasoning: _omesso, ...senzaRagionamento } = body;
     const second = await send(senzaRagionamento, first.keyUsed);
+    if (second.res.ok) reasoningRefused.set(refusalKey, Date.now() + REASONING_REFUSED_MS);
     if (!second.keyFallback && first.keyFallback) {
       second.keyFallback = first.keyFallback;
       try { second.res.keyFallback = first.keyFallback; } catch (_) {}
