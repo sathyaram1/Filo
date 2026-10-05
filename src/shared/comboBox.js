@@ -180,10 +180,20 @@
         if (hoverEl) { e.preventDefault(); pick(hoverEl.dataset.value); }
       } else if (e.key === 'Escape') { e.preventDefault(); close(); }
     });
-    input.addEventListener('blur', () => { clearTimeout(blurTimer); blurTimer = setTimeout(close, 120); });
+    input.addEventListener('blur', () => { aVuoto = false; clearTimeout(blurTimer); blurTimer = setTimeout(close, 120); });
+    input.addEventListener(OPZIONI_ARRIVATE, () => {
+      if (aVuoto && pop.hidden && input.ownerDocument.activeElement === input) open();
+    });
 
     return close;
   }
 
-  global.SN_COMBOBOX = { attach };
+  const OPZIONI_ARRIVATE = 'sn-combo-opzioni-arrivate';
+  // Chi riempie una lista dopo il fuoco lo dice qui: lo sente solo il campo che ha il fuoco.
+  function opzioniArrivate(doc) {
+    const el = (doc || global.document).activeElement;
+    if (el) el.dispatchEvent(new CustomEvent(OPZIONI_ARRIVATE));
+  }
+
+  global.SN_COMBOBOX = { attach, opzioniArrivate };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
