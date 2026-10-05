@@ -128,13 +128,11 @@ module.exports = function register(on, ctx) {
   const provaDiChiave = new AsyncLocalStorage();
   function senzaRipiego(fn) { return provaDiChiave.run(true, fn); }
 
-  // Chi mostra la risposta e scrive da sé la riga del ripiego (riquadri, chat)
-  // la chiama dentro `conRipiegoDetto`; ogni altra strada (dettatura, lettura,
-  // trascrizione, correttore, lavori in sottofondo) la dice con un avviso, uno
-  // per rifiuto e al massimo ogni 10 minuti, come per i crediti finiti (#662).
-  // La frase si dice una volta: la riga sotto una risposta vale come avviso, e l'avviso aspetta un
-  // momento (e le richieste con la riga in volo) perché i lavori che le accompagnano non la ripetano.
-  const ripiegoDetto = new AsyncLocalStorage();
+  // Ogni risposta pagata col ripiego lo dice: la riga sotto la risposta, o un avviso, uno per
+  // rifiuto e al massimo ogni 10 minuti (#662). Vale come detta solo la riga arrivata a schermo
+  // (KEY_FALLBACK_SHOWN), non la richiesta di chi potrebbe mostrarla: una spiegazione anticipata
+  // mai aperta, o un riquadro chiuso prima, lascia partire l'avviso. Le richieste con la riga in
+  // volo (`conRipiegoDetto`) tengono fermo l'avviso finché la loro riga ha il tempo di comparire.
   const FINESTRA_RIPIEGO_MS = 10 * 60 * 1000;
   const ATTESA_AVVISO_RIPIEGO_MS = 4000;
   let inVoloConRiga = 0;
@@ -143,10 +141,12 @@ module.exports = function register(on, ctx) {
   function conRipiegoDetto(fn) {
     inVoloConRiga++;
     let p;
-    try { p = Promise.resolve(ripiegoDetto.run(true, fn)); } catch (e) { p = Promise.reject(e); }
+    try { p = Promise.resolve(fn()); } catch (e) { p = Promise.reject(e); }
     return p.finally(() => {
       inVoloConRiga--;
-      if (!inVoloConRiga && avvisoSospeso && !avvisoSospeso.timer) mandaAvvisoSospeso();
+      if (!inVoloConRiga && avvisoSospeso && !avvisoSospeso.timer) {
+        avvisoSospeso.timer = setTimeout(mandaAvvisoSospeso, ATTESA_AVVISO_RIPIEGO_MS);
+      }
     });
   }
   function annullaAvvisoSospeso() {
@@ -164,13 +164,12 @@ module.exports = function register(on, ctx) {
     ultimoAvvisoRipiego = now;
     try { broadcastToTabs({ type: MSG.SHOW_TOAST, text: W.ownKeyFallbackLine(status), duration: 8000 }); } catch (_) {}
   }
+  function ripiegoMostrato() {
+    ultimoAvvisoRipiego = Date.now();
+    annullaAvvisoSospeso();
+  }
   function avvisaRipiegoMuto(status) {
     const now = Date.now();
-    if (ripiegoDetto.getStore()) {
-      ultimoAvvisoRipiego = now;
-      annullaAvvisoSospeso();
-      return;
-    }
     if (now - ultimoAvvisoRipiego < FINESTRA_RIPIEGO_MS || avvisoSospeso) return;
     avvisoSospeso = { status, timer: setTimeout(mandaAvvisoSospeso, ATTESA_AVVISO_RIPIEGO_MS) };
   }
