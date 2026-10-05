@@ -859,21 +859,27 @@
       msg.image = images[0]; // retrocompatibilità (provider mono-immagine)
       msg.images = images;
     }
-    const r = await send(msg);
-    if (turnoVivo === turno) turnoVivo = null;
-    pending.fineDiretta();
-    // Anche quelle arrivate senza evento in diretta (o con un guasto dopo): il segno non dipende dalla diretta.
-    for (const a of (Array.isArray(r?.actions) ? r.actions : [])) {
-      if (a && Array.isArray(a._cambi)) Cambi.segna(pending.el, a._cambi);
+    const inviato = turno.fermato ? Promise.resolve({ ok: true, stopped: true, actions: [] }) : send(msg);
+    const fineDiretta = (r) => {
+      if (turnoVivo === turno) turnoVivo = null;
+      pending.fineDiretta();
+      // Anche quelle arrivate senza evento in diretta (o con un guasto dopo): il segno non dipende dalla diretta.
+      for (const a of (Array.isArray(r?.actions) ? r.actions : [])) {
+        if (a && Array.isArray(a._cambi)) Cambi.segna(pending.el, a._cambi);
+      }
+      if (offReasoning) { try { offReasoning(); } catch (_) {} }
+      if (offAnswer) { try { offAnswer(); } catch (_) {} }
+      if (offAction) { try { offAction(); } catch (_) {} }
+    };
+    // Fermato: la chat torna dell'utente adesso, non quando l'azione in volo finisce. Il main la lascia finire e il
+    // suo esito arriva nel blocco, che si chiude allora (patterns/il-filo-dell-attesa.md).
+    const r = await Promise.race([inviato, turno.fermata]);
+    if (turno.fermato) {
+      const chiusa = apriTurnoFermato({ pending, streamBubble, streamedText });
+      const chiusura = inviato.then((rr) => { fineDiretta(rr); chiudiTurnoFermato(rr, chiusa, { pending, shown }); });
+      return { ok: true, stopped: true, actions: [], _notaFermato: chiusa.nota, _chiusura: chiusura };
     }
-
-    if (offReasoning) { try { offReasoning(); } catch (_) {} }
-    if (offAnswer) { try { offAnswer(); } catch (_) {} }
-    if (offAction) { try { offAction(); } catch (_) {} }
-    if (r?.ok && r.stopped) {
-      chiudiTurnoFermato(r, { pending, streamBubble, streamedText, shown });
-      return r;
-    }
+    fineDiretta(r);
     if (!r?.ok) {
       // Il ragionamento già arrivato resta leggibile anche sotto un errore:
       // aiuta a capire cosa stava tentando. Senza niente dentro, il blocco sparisce.
