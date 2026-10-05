@@ -84,8 +84,10 @@ functions. Qui sotto il perché dei passaggi, per attore.
 **Owner**: le sue righe sono le azioni di §4a, una per azione e nessuna in più (sentinella
 `tests/unit/ownerActionsTransizioni.test.mjs`). La tabella ammette all'owner gli stessi
 passaggi che Gestione e la pagina dei feedback offrono con un clic; `npm run feedback`
-(`scripts/owner-feedback.mjs`) la applica, e per regola non parte dai Ricevuti né dalle
-conferme (§4b). Resta fuori un caso: una richiesta di fusione in attesa porta nei Ricevuti
+(`scripts/owner-feedback.mjs`) la applica un passo alla volta, senza catene (una catena
+«archivia, poi ripristina» rimetterebbe in coda un lavoro in corso, che nessuna pagina
+offre; le catene valgono solo con `--come-routine`), e per regola non parte dai Ricevuti né
+dalle conferme (§4b). Resta fuori un caso: una richiesta di fusione in attesa porta nei Ricevuti
 anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In coda» da
 `working` o `revision_*` non ha una riga owner.
 - dai Ricevuti (`unlabeled`, `suspicious_file`, `attack`, `spam`, `design`, `aligned`) →
