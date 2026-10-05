@@ -48,7 +48,7 @@ test('due siti diversi leggono impronte diverse, due pagine dello stesso sito la
     const page = await openTab(`http://${nome}:${porta}${id}`);
     await page.waitForFunction(() => window.__filoFpGuard === true, null, { timeout: 8_000 });
     impronte[nome] = await page.evaluate(IMPRONTA);
-    expect(impronte[nome]).toMatch(/^data:image\/png/);
+    expect(impronte[nome]).toMatch(/^[0-9a-f]{16}$/);
   }
   expect(impronte['www.shop.com.tw']).toBe(impronte['shop.com.tw']);
   expect(impronte['altro.com.tw']).not.toBe(impronte['shop.com.tw']);
