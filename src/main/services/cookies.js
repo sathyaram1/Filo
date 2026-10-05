@@ -151,11 +151,14 @@ function registrableOf(url) {
 // partizione Electron (solo [a-z0-9.-]). Se il sito è "fidato" la partizione è
 // PERSISTENTE ('persist:'): resta isolata per-sito ma sopravvive alla sessione,
 // così l'utente resta connesso. Altrimenti è effimera (in RAM).
+function baseDelSito(reg) {
+  return 'filo-priv-' + String(reg || '').replace(/[^a-z0-9.-]/gi, '_');
+}
+
 function partitionForUrl(url, trusted) {
   const reg = registrableOf(url);
   if (!reg) return null;
-  const slug = reg.replace(/[^a-z0-9.-]/gi, '_');
-  const base = 'filo-priv-' + slug;
+  const base = baseDelSito(reg);
   const isTrusted = trusted instanceof Set && trusted.has(reg);
   // 'persist:' → jar isolato per-sito ma persistente (resta connesso).
   // Senza prefisso → jar isolato ed effimero, buttato all'uscita dal sito (vedi «uscita dal sito»).
