@@ -114,7 +114,29 @@ function getMode(settings) {
 function getTrustedSites(settings) {
   const c = settings && settings.security && settings.security.cookies;
   const list = (c && (c.trustedSites || c.loginWhitelist)) || [];
-  return Array.isArray(list) ? list : [];
+  return Array.isArray(list) ? riduciFidati(list) : [];
+}
+
+// Un fidato vale per il sito intero, l'unità con cui si sceglie il jar: web.whatsapp.com scritto in chat o in
+// Sicurezza è whatsapp.com, altrimenti la riga c'è e non vale mai (#759). Sentinella: tests/cookies-resta-connesso.spec.mjs.
+function sitoDellaVoce(voce) {
+  const s = String(voce == null ? '' : voce).trim().toLowerCase();
+  if (!s) return '';
+  try {
+    const norm = require('./safebrowse/normalize').normalize('http://' + s, { soloPsl: true });
+    if (norm && norm.registrable) return norm.registrable;
+  } catch (_) {}
+  return s;
+}
+
+function riduciFidati(list) {
+  const out = [];
+  for (const v of Array.isArray(list) ? list : []) {
+    if (typeof v !== 'string') continue;
+    const s = sitoDellaVoce(v);
+    if (s && !out.includes(s)) out.push(s);
+  }
+  return out;
 }
 
 // Siti (eTLD+1) dove l'utente ha chiesto di rivedere i banner dei cookie: lì Filo non rifiuta e non nasconde.
@@ -724,6 +746,8 @@ module.exports = {
   MODES,
   getMode,
   getTrustedSites,
+  sitoDellaVoce,
+  riduciFidati,
   getBannerSites,
   isBannerSiteIn,
   isBannerSite,

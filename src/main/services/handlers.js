@@ -974,6 +974,12 @@ async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
   // per quella di prima non vale più, e la pagina Crediti aperta accanto si
   // aggiorna da sé. Si guarda il valore, non il campo: le Impostazioni
   // rimandano la stessa chiave a ogni salvataggio automatico.
+  // I siti dove si resta connessi si salvano come sito intero, da qualunque strada arrivino (#759).
+  const ck = partial && partial.security && partial.security.cookies;
+  if (ck && Array.isArray(ck.trustedSites)) {
+    const ridotti = require('./cookies').riduciFidati(ck.trustedSites);
+    partial = { ...partial, security: { ...partial.security, cookies: { ...ck, trustedSites: ridotti } } };
+  }
   let ownKeyBefore = null;
   if (partial && partial.apiKeys && Object.prototype.hasOwnProperty.call(partial.apiKeys, 'openrouter')) {
     try { ownKeyBefore = String((await Storage.getSettings())?.apiKeys?.openrouter || '').trim(); } catch (_) { ownKeyBefore = null; }
