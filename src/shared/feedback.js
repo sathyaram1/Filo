@@ -1141,17 +1141,20 @@
     const bridge = pageBridge();
     if (bridge) {
       const r = await replyViaMain(bridge, { op: 'listAll', timeoutMs, ...(fields ? { fields } : {}), ...(lista ? { lista: true } : {}) });
-      return { rows: marcaProiezione(Array.isArray(r.rows) ? r.rows : [], fields), complete: r.complete !== false };
+      return { rows: marcaProiezione(Array.isArray(r.rows) ? r.rows : [], fields), complete: r.complete !== false, readTime: String(r.readTime || '') };
     }
     const limit = Math.max(1, Math.min(LIST_PAGE_SIZE, Number(pageSize) || LIST_PAGE_SIZE));
     const rows = [];
     const visti = new Set();
     let cursor = '';
     let complete = false;
+    let readTime = '';
     for (let page = 0; page < Math.max(1, Number(maxPages) || ALL_PAGES_MAX); page += 1) {
       const porta = (global.SN_FEEDBACK && global.SN_FEEDBACK.list) || list;
       // eslint-disable-next-line no-await-in-loop
       const batch = await porta({ pageSize: limit, timeoutMs, idToken, afterName: cursor, fields });
+      // Le pagine si leggono in momenti diversi: il giro della Gestione riparte dalla PRIMA (#676).
+      if (page === 0 && batch && batch.readTime) readTime = String(batch.readTime);
       const arr = Array.isArray(batch) ? batch : [];
       let nuove = 0;
       for (const r of arr) {
