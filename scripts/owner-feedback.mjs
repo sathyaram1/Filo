@@ -59,8 +59,8 @@
 //   del server fermano il lavoro di una routine, il server fonde lo stesso e
 //   registra cosa era stato fermato (Gestione → Automazioni, «Fuse senza
 //   chiedere»). `--chiedi-prima` toglie il segno. Vale finché la pratica è
-//   aperta; il lavoro locale (npm run finish) non lo guarda. È la stessa cosa
-//   del tasto nel dettaglio della pratica in Gestione.
+//   aperta; il lavoro locale (npm run finish) non lo guarda. Salta il sì alla fusione come il lavoro locale: da qui
+//   solo sulle pratiche dell'owner o di una sessione (#957); sulle altre lo mette l'owner, in Gestione.
 //
 //   `--come-routine`: la macchina a stati distingue chi scrive. L'owner decide
 //   sui feedback che aspettano lui (approvare, riaprire, archiviare); i passaggi
@@ -148,11 +148,13 @@ export function chiScrive(bearer) {
  */
 export async function segnaPreapprovazione(id, valore, opts = {}) {
   const bearer = opts.bearer || await acquireBearer();
-  const doc = await getDoc(id, bearer, ['statusPublic']);
+  const doc = await getDoc(id, bearer, valore ? CAMPI_PRATICA : ['statusPublic']);
   if (opts.letture) opts.letture.aggiungi(1, 'segnalazioni riscritte');
   if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
   const pub = doc.fields?.statusPublic?.stringValue || 'open';
   if (valore && pub === 'closed') return { ok: false, motivo: 'pratica chiusa: il segno non conterebbe' };
+  const vietata = valore ? preapprovaVietata(await praticaInChiaro(doc)) : '';
+  if (vietata) return { ok: false, motivo: vietata };
   const fields = {};
   const mask = ['mergePreapproved'];
   const segno = valore ? { by: chiScrive(bearer), at: new Date().toISOString() } : null;
@@ -165,6 +167,12 @@ export async function segnaPreapprovazione(id, valore, opts = {}) {
   });
   if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
   return { ok: true, segno };
+}
+
+/** Togliere il segno si può sempre; metterlo, solo dove una sessione lavora già (MR.localSenderCheck). '' = si può. */
+function preapprovaVietata(fb) {
+  if (!fb) return 'mittente o stato non decifrabili: non so di chi è la pratica';
+  return MR.localSenderCheck(fb).ok ? '' : SOLO_DA_GESTIONE_PREAPPROVA;
 }
 
 /**
@@ -464,6 +472,8 @@ export function rifiutoPratica(id, r) {
 export const SOLO_DA_GESTIONE = 'Come lavoro locale lo approva solo l’owner, in Gestione, col tasto «💻 Lavoro locale» dei Ricevuti dopo averlo letto: da riga di comando non si può.';
 /** La prova del mittente data a mano (#957): stessa porta su L5, stesso tasto. */
 export const SOLO_DA_GESTIONE_MIO = 'La prova del mittente la dà solo l’owner, in Gestione, col tasto «🙋 È mio» dopo averlo guardato: da riga di comando non si può.';
+/** «Fondi senza chiedermelo» su una pratica non dell'owner né di una sessione: stessa porta su L5. */
+export const SOLO_DA_GESTIONE_PREAPPROVA = 'il segno «fondi senza chiedermelo» salta il sì dell’owner alla fusione: su un feedback non suo né di una sua sessione lo mette solo lui, in Gestione, dal dettaglio della pratica. Da riga di comando non si può';
 
 /** «910», «#910», «22.1»: un numero di feedback, non un id. PURA. */
 export function numeroDiFeedback(riferimento) {
@@ -588,6 +598,10 @@ export async function scrivi(id, to, nota, opts = {}) {
   if (vietata) return { ok: false, motivo: vietata, from };
   const lavoro = from === to ? null : await lavoroVietato(doc, to);
   if (lavoro) return { ok: false, motivo: lavoro.motivo, utente: lavoro.utente, routine: lavoro.routine, senzaProva: lavoro.senzaProva, senzaSegno: lavoro.senzaSegno, from };
+  if (opts.preapprova === true) {
+    const segno = preapprovaVietata(await praticaInChiaro(doc));
+    if (segno) return { ok: false, motivo: segno, from };
+  }
   const check = transizioneAmmessa(from, to, opts.attore || 'owner');
   if (!check.ok) return { ok: false, motivo: check.motivo, from };
 
