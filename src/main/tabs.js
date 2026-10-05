@@ -206,18 +206,13 @@ function openExternalScheme(rawUrl) {
 }
 
 // Un `filo://invito/…` fermato su una navigazione non si tace (#664): da qualunque porta (barra, «Apri in nuova tab», un
-// pulsante che naviga da script) riscatta e apre Crediti. Da una pagina web solo col gesto vero dell'utente ancora attivo,
-// letto in un mondo isolato che la pagina non può falsare; senza `wc` lo chiede Filo stesso. Prova: tests/link-invito.spec.mjs.
-const MONDO_GESTO = 1431;
+// pulsante che naviga da script) riscatta e apre Crediti. Da una pagina solo dopo un gesto vero su quella pagina, contato
+// dal main (la pagina non lo può fingere); senza `wc` lo chiede Filo stesso. Prova: tests/link-invito.spec.mjs.
 function invitoFermato(rawUrl, { win = null, wc = null } = {}) {
   const W = globalThis.SN_WALLET;
   if (!W || !W.isInviteDeepLink(rawUrl)) return false;
-  const porta = () => { try { globalThis.SN_WALLET_MAIN?.portaDentroInvito?.(W.inviteCodeFromDeepLink(rawUrl), win); } catch (_) {} };
-  if (!wc) { porta(); return true; }
-  Promise.resolve()
-    .then(() => wc.executeJavaScriptInIsolatedWorld(MONDO_GESTO, [{ code: 'Boolean(navigator.userActivation && navigator.userActivation.isActive)' }]))
-    .then((gesto) => { if (gesto === true) porta(); })
-    .catch(() => {});
+  if (wc && !Permessi.gestoRecente(wc)) return true;
+  try { globalThis.SN_WALLET_MAIN?.portaDentroInvito?.(W.inviteCodeFromDeepLink(rawUrl), win); } catch (_) {}
   return true;
 }
 function fermaNavigazione(rawUrl, ctx) {

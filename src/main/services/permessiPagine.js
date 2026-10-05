@@ -165,10 +165,12 @@ function seguiGesti(wc) {
     wc.on('before-input-event', (_e, input) => {
       if (input && input.type === 'keyDown' && String(input.key || '') !== 'Escape') wc._filoGestoAlle = Date.now();
     });
-    wc.on('did-start-navigation', (e, _url, isInPlace, isMainFrame) => {
+    wc.on('did-start-navigation', (e, url, isInPlace, isMainFrame) => {
       const principale = e && typeof e.isMainFrame === 'boolean' ? e.isMainFrame : isMainFrame;
       const stessa = e && typeof e.isSameDocument === 'boolean' ? e.isSameDocument : isInPlace;
-      if (principale && !stessa) { wc._filoGestoAlle = 0; wc._filoMenuAperto = null; }
+      // Un invito non si carica mai (#664): la pagina resta, e il gesto che l'ha chiesto deve arrivare a chi lo porta dentro.
+      const invito = Boolean(globalThis.SN_WALLET?.isInviteDeepLink?.((e && e.url) || url));
+      if (principale && !stessa && !invito) { wc._filoGestoAlle = 0; wc._filoMenuAperto = null; }
     });
   } catch (_) {}
 }
@@ -405,7 +407,7 @@ function statoNotifiche(ses, url) {
 }
 
 module.exports = {
-  installa, negaTutto, rispondi, lasciapassare, seguiGesti, scelteDi, dimentica, nomeDaMostrare, statoNotifiche,
+  installa, negaTutto, rispondi, lasciapassare, seguiGesti, gestoRecente, scelteDi, dimentica, nomeDaMostrare, statoNotifiche,
   carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica,
   TIPI, INNOCUI, NON_DISPONIBILI, COL_GESTO_SENZA_DOMANDA, GESTO_MS, _inAttesa: inAttesa,
   _usaDisco: (d) => { disco = () => d; },

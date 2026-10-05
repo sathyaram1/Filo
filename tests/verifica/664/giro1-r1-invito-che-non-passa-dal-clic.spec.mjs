@@ -82,7 +82,16 @@ test('tasto destro sul pulsante dell’invito, «Apri in nuova tab»', async ({ 
 test('pulsante che porta l’invito da script, premuto davvero', async ({ app, openTab, testServer }) => {
   test.setTimeout(90000);
   const pagina = await testServer.openReady(openTab, PAGINA);
-  await pagina.locator('#js').click({ noWaitAfter: true });
+  // Un clic vero passa dal renderer della scheda come quello di una persona: il main lo conta come gesto.
+  const r = await pagina.evaluate(() => { const b = document.querySelector('#js').getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) }; });
+  await app.evaluate(({ BrowserWindow }, p) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    const wc = tm.tabs.find((t) => t.id === tm.activeId).view.webContents;
+    wc.sendInputEvent({ type: 'mouseDown', x: p.x, y: p.y, button: 'left', clickCount: 1 });
+    wc.sendInputEvent({ type: 'mouseUp', x: p.x, y: p.y, button: 'left', clickCount: 1 });
+  }, r);
+  await new Promise((q) => setTimeout(q, 500));
+  console.log('DBG', r, await app.evaluate(({ BrowserWindow }) => { const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs; const wc = tm.tabs.find((t) => t.id === tm.activeId).view.webContents; return [wc._filoGestoAlle, Date.now(), wc.getURL()]; }));
   await rispondeInvito(app);
 });
 
