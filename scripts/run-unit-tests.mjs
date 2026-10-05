@@ -286,20 +286,13 @@ function leggiRighe(file) {
   } catch (_) { return []; }
 }
 
-// Le cartelle delle corse uccise, che la loro uscita non ha tolto (#717): la regola sta col modulo che le crea. Importato
-// qui e non in testa, perché la copia di questo lanciatore che vive fuori dal repo non ha i test.
-async function percorsiDeiTest() {
-  const modulo = join(REPO_ROOT, 'tests', 'helpers', 'percorsi.mjs');
-  return existsSync(modulo) ? import(pathToFileURL(modulo).href) : null;
-}
-
 // Il codice provato scrive nella temporanea anche senza chiederla ai test (#717): ogni corsa gliene dà una sua, che se ne
-// va con la corsa, e da uccisa la toglie la pulizia delle orfane. Sentinella: tests/unit/cartelleTemporaneeSiTolgono.test.mjs.
+// va con la corsa, e i resti delle corse uccise li toglie chi la crea. Le regole stanno col modulo che le crea, importato
+// qui e non in testa perché la copia di questo lanciatore che vive fuori dal repo non ha i test.
+// Sentinella: tests/unit/cartelleTemporaneeSiTolgono.test.mjs.
 async function temporaneaDellaCorsa() {
-  const percorsi = await percorsiDeiTest();
-  if (!percorsi) return null;
-  percorsi.togliCartelleOrfane({ annuncia: (n) => console.error(`[test:unit] tolgo ${n} cartelle temporanee lasciate da prove interrotte`) });
-  return percorsi.temporaneaDellaCorsa();
+  const modulo = join(REPO_ROOT, 'tests', 'helpers', 'percorsi.mjs');
+  return existsSync(modulo) ? (await import(pathToFileURL(modulo).href)).temporaneaDellaCorsa() : null;
 }
 
 // Un file appeso (col disco pieno, #717) non deve tenere ferma la corsa per sempre: dopo il tetto è un rosso col suo nome.
