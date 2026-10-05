@@ -809,23 +809,6 @@ test('(P) le strade che non scrivono la riga del ripiego lo dicono con un avviso
   const avvisi = () => page.evaluate(() => window.__toasts.join(' | '));
   const RIGA = 'OpenRouter ha rifiutato la tua chiave (il suo credito è finito): ho usato i crediti di Filo.';
 
-  // «spiega»: la riga sta nel riquadro, nessun avviso in più.
-  await page.evaluate(() => {
-    const r = document.createRange();
-    r.selectNodeContents(document.querySelector('#t'));
-    const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
-  });
-  await app.evaluate(({ BrowserWindow }) => {
-    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
-    globalThis.__filoShortcuts.dispatch('explain-selection', win);
-  });
-  const popup = page.locator('.sn-popup');
-  await expect(popup.locator('.sn-key-fallback')).toHaveText(RIGA, { timeout: 30000 });
-  await page.waitForTimeout(1500);
-  expect(await avvisi()).not.toContain('crediti di Filo');
-  await popup.locator('.sn-popup-close').click();
-  await page.evaluate(() => window.getSelection().removeAllRanges());
-
   // «Trascrivi» (tasto destro, «Altro…»): il testo arriva coi crediti di Filo, e l'avviso lo dice.
   const prima = seen.completions.length;
   await page.locator('#t').click({ button: 'right', position: { x: 5, y: 5 } });
@@ -841,6 +824,22 @@ test('(P) le strade che non scrivono la riga del ripiego lo dicono con un avviso
   await expect.poll(avvisi, { timeout: 30_000 }).toContain('Testo trascritto e copiato');
   await expect.poll(avvisi, { timeout: 10_000 }).toContain(RIGA);
   expect(seen.completions.slice(prima).map((c) => c.key).slice(0, 2)).toEqual([OWN_KEY, PERSONAL_KEY]);
+
+  // «spiega» dopo: la riga sta nel riquadro, e la frase non torna in un secondo avviso.
+  await page.evaluate(() => {
+    const r = document.createRange();
+    r.selectNodeContents(document.querySelector('#t'));
+    const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  });
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    globalThis.__filoShortcuts.dispatch('explain-selection', win);
+  });
+  const popup = page.locator('.sn-popup');
+  await expect(popup.locator('.sn-key-fallback')).toHaveText(RIGA, { timeout: 30000 });
+  await page.waitForTimeout(1500);
+  expect((await avvisi()).split(RIGA).length - 1).toBe(1);
+  await popup.locator('.sn-popup-close').click();
 });
 
 // La riga sotto la risposta e l'avviso sono la stessa frase: le chiamate che accompagnano la
