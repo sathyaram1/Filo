@@ -104,8 +104,8 @@
   // si buttano via, invece di scaricarsi addosso a una pagina che l'utente ha
   // appena riportato indietro (#407).
   let runSeq = 0;
-  // La riga del ripiego sui crediti di Filo (#662), se una parte del giro l'hanno pagata loro:
-  // la pagina tradotta non ha un riquadro sotto cui scriverla, la dice l'avviso a fine giro.
+  // La riga del ripiego sui crediti di Filo (#662): la pagina tradotta non ha un riquadro sotto cui
+  // scriverla, la dice un avviso al primo pezzo pagato così (a fine giro si perde chi lascia la pagina prima).
   let ripiegoDelGiro = '';
   // L'avviso "sto traducendo" del giro in corso. Serve a chi lo FERMA: le
   // richieste già spedite tornano quando vogliono, e finché non tornano il
