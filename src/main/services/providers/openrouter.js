@@ -47,6 +47,7 @@
   // Se anche la riserva rifiuta, l'errore che risale è il SUO (con la
   // personale un 402 sono i crediti finiti), e il rifiuto della chiave
   // propria resta comunque registrato: la pagina Crediti lo mostra.
+  // La prova di una chiave non ripiega (SN_WALLET_MAIN.senzaRipiego).
   async function fetchWithKey(url, apiKey, makeInit) {
     let res = await fetch(url, makeInit(apiKey));
     let keyUsed = apiKey;
@@ -65,8 +66,15 @@
       }
       if (alt && alt.key) {
         const refused = { status: res.status, detail };
-        try { await K.noteOwnKeyRefusal(refused); } catch (_) {}
-        res = await fetch(url, makeInit(alt.key));
+        // Il rifiuto si annota DOPO il ripiego: Crediti dice che Filo ha
+        // usato i crediti solo se la personale ha risposto davvero.
+        try {
+          res = await fetch(url, makeInit(alt.key));
+        } catch (e) {
+          try { await K.noteOwnKeyRefusal({ ...refused, served: false }); } catch (_) {}
+          throw e;
+        }
+        try { await K.noteOwnKeyRefusal({ ...refused, served: res.ok }); } catch (_) {}
         keyUsed = alt.key;
         keyFallback = { status: refused.status, from: 'own', to: alt.source || 'personal' };
         if (!res.ok) keyFallback.failed = res.status;

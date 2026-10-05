@@ -185,7 +185,10 @@ function registerIpcHandlers() {
     const work = async () => {
       try {
         const meta = {};
-        const result = await handleStream({
+        // Chi legge lo stream (il riquadro di «spiega») scrive da sé la riga del ripiego (#662).
+        const K = globalThis.SN_WALLET_MAIN;
+        const conDetto = (fn) => (K && K.conRipiegoDetto ? K.conRipiegoDetto(fn) : fn());
+        const result = await conDetto(() => handleStream({
           action, payload, origin: event.sender.getURL(),
           signal: ac.signal,
           onMeta: (m) => { Object.assign(meta, m); send('meta', m); },
@@ -193,7 +196,7 @@ function registerIpcHandlers() {
           // Fallback dopo delta già streamati: il renderer deve azzerare il
           // testo parziale del tentativo fallito (#273).
           onReset: () => send('reset', {}),
-        });
+        }));
         send('done', { ...result });
       } catch (err) {
         console.warn('[Filo IPC] stream error', requestId, err);

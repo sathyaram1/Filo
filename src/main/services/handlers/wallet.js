@@ -21,6 +21,7 @@
 // Il saldo NON lo calcola nessuno qui: lo dice il server, che lo legge da
 // OpenRouter (tetto della chiave meno consumo).
 
+const { AsyncLocalStorage } = require('node:async_hooks');
 const auth = require('../../auth/google-auth');
 const identity = require('../../auth/anon-auth');
 const walletStore = require('../../auth/wallet-store');
@@ -122,11 +123,63 @@ module.exports = function register(on, ctx) {
     return 'factory';
   }
 
+  // La prova di una chiave (il «Prova» delle Impostazioni) misura QUELLA
+  // chiave: dentro `senzaRipiego` un rifiuto risale com'è, senza riserva.
+  const provaDiChiave = new AsyncLocalStorage();
+  function senzaRipiego(fn) { return provaDiChiave.run(true, fn); }
+
+  // Ogni risposta pagata col ripiego lo dice: la riga sotto la risposta, o un avviso, uno per
+  // rifiuto e al massimo ogni 10 minuti (#662). Vale come detta solo la riga arrivata a schermo
+  // (KEY_FALLBACK_SHOWN), non la richiesta di chi potrebbe mostrarla: una spiegazione anticipata
+  // mai aperta, o un riquadro chiuso prima, lascia partire l'avviso. Le richieste con la riga in
+  // volo (`conRipiegoDetto`) tengono fermo l'avviso finché la loro riga ha il tempo di comparire.
+  const FINESTRA_RIPIEGO_MS = 10 * 60 * 1000;
+  const ATTESA_AVVISO_RIPIEGO_MS = 4000;
+  let inVoloConRiga = 0;
+  let ultimoAvvisoRipiego = 0;
+  let avvisoSospeso = null; // { status, timer }
+  function conRipiegoDetto(fn) {
+    inVoloConRiga++;
+    let p;
+    try { p = Promise.resolve(fn()); } catch (e) { p = Promise.reject(e); }
+    return p.finally(() => {
+      inVoloConRiga--;
+      if (!inVoloConRiga && avvisoSospeso && !avvisoSospeso.timer) {
+        avvisoSospeso.timer = setTimeout(mandaAvvisoSospeso, ATTESA_AVVISO_RIPIEGO_MS);
+      }
+    });
+  }
+  function annullaAvvisoSospeso() {
+    if (avvisoSospeso && avvisoSospeso.timer) clearTimeout(avvisoSospeso.timer);
+    avvisoSospeso = null;
+  }
+  function mandaAvvisoSospeso() {
+    if (!avvisoSospeso) return;
+    avvisoSospeso.timer = null;
+    if (inVoloConRiga > 0) return;
+    const { status } = avvisoSospeso;
+    avvisoSospeso = null;
+    const now = Date.now();
+    if (now - ultimoAvvisoRipiego < FINESTRA_RIPIEGO_MS) return;
+    ultimoAvvisoRipiego = now;
+    try { broadcastToTabs({ type: MSG.SHOW_TOAST, text: W.ownKeyFallbackLine(status), duration: 8000 }); } catch (_) {}
+  }
+  function ripiegoMostrato() {
+    ultimoAvvisoRipiego = Date.now();
+    annullaAvvisoSospeso();
+  }
+  function avvisaRipiegoMuto(status) {
+    const now = Date.now();
+    if (now - ultimoAvvisoRipiego < FINESTRA_RIPIEGO_MS || avvisoSospeso) return;
+    avvisoSospeso = { status, timer: setTimeout(mandaAvvisoSospeso, ATTESA_AVVISO_RIPIEGO_MS) };
+  }
+
   // La riserva per la chiave con cui una chiamata è partita: la personale del
   // portafoglio, solo se si era partiti con la chiave PROPRIA. Con la
   // personale già in uso non c'è riserva (un 402 lì sono i crediti finiti), e
   // con la chiave di fabbrica nemmeno.
   async function alternativeKeyFor(apiKey) {
+    if (provaDiChiave.getStore()) return null;
     const k = String(apiKey || '').trim();
     const personal = walletStore.personalKey();
     if (!k || !personal || k === personal) return null;
@@ -134,13 +187,18 @@ module.exports = function register(on, ctx) {
     return { key: personal, source: 'personal' };
   }
 
-  // L'ultimo rifiuto della chiave propria: { at, status, detail }. Lo legge
-  // la pagina Crediti (readState); si cancella quando la chiave cambia.
+  // L'ultimo rifiuto della chiave propria: { at, status, detail, usedCredits }.
+  // Lo legge la pagina Crediti (readState); si cancella quando la chiave
+  // cambia. `usedCredits`: da quando la chiave è rifiutata, un ripiego ha
+  // risposto almeno una volta (un ripiego caduto non ha speso niente).
   const REFUSAL_KEY = 'walletOwnKeyRefusal';
-  async function noteOwnKeyRefusal({ status, detail } = {}) {
-    const rec = { at: new Date().toISOString(), status: Number(status) || 0, detail: String(detail || '').slice(0, 300) };
+  async function noteOwnKeyRefusal({ status, detail, served = true } = {}) {
+    const prev = await lastOwnKeyRefusal();
+    const usedCredits = Boolean(served) || Boolean(prev && prev.usedCredits !== false);
+    const rec = { at: new Date().toISOString(), status: Number(status) || 0, detail: String(detail || '').slice(0, 300), usedCredits };
     try { await globalThis.SN_STORAGE.setRaw(REFUSAL_KEY, rec); } catch (_) {}
-    console.warn(`[wallet] chiave propria rifiutata (${rec.status}): ripiego sulla chiave personale`);
+    if (served) avvisaRipiegoMuto(rec.status);
+    console.warn(`[wallet] chiave propria rifiutata (${rec.status}): ${served ? 'ha risposto la chiave personale' : 'anche il ripiego sulla personale è caduto'}`);
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
   }
   async function lastOwnKeyRefusal() {
@@ -152,6 +210,8 @@ module.exports = function register(on, ctx) {
   // La chiave propria è cambiata (messa, tolta, sostituita): il rifiuto di
   // quella di prima non dice niente su questa.
   async function ownKeyChanged() {
+    ultimoAvvisoRipiego = 0;
+    annullaAvvisoSospeso();
     try { await globalThis.SN_STORAGE.setRaw(REFUSAL_KEY, null); } catch (_) {}
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
     rinfrescaHome();
@@ -165,6 +225,7 @@ module.exports = function register(on, ctx) {
   async function noteOwnKeySuccess() {
     const had = await lastOwnKeyRefusal();
     if (had) {
+      ultimoAvvisoRipiego = 0;
       try { await globalThis.SN_STORAGE.setRaw(REFUSAL_KEY, null); } catch (_) {}
       console.info('[wallet] la chiave propria risponde di nuovo: rifiuto dimenticato');
     }
@@ -301,6 +362,10 @@ module.exports = function register(on, ctx) {
   };
 
   on(MSG.WALLET_STATE, filoOnly(async () => readState()));
+
+  // Anche dai siti: la riga sta nei riquadri sulle pagine web. Il peggio che un mittente può fare è
+  // zittire per dieci minuti un avviso che ripete una frase.
+  on(MSG.KEY_FALLBACK_SHOWN, async () => { ripiegoMostrato(); return { ok: true }; });
 
   // Nuova chiave: il portafoglio esiste sul server, la chiave non è qui.
   on(MSG.WALLET_REISSUE, filoOnly(async () => {
@@ -803,6 +868,8 @@ module.exports = function register(on, ctx) {
     redeemFromInvite, tryPendingInvite, portaDentroInvito,
     // Ripiego dalla chiave propria (#629): li chiama il provider OpenRouter.
     keySourceOf, alternativeKeyFor, noteOwnKeyRefusal, noteOwnKeySuccess, lastOwnKeyRefusal, ownKeyChanged, usageLogStatus,
+    // La prova di una chiave dalle Impostazioni (handlers/ai.js): niente riserva.
+    senzaRipiego, conRipiegoDetto,
     // Solo per i test (NODE_ENV=test): simula il riavvio senza rete.
     expireIdentityForTest: () => { if (process.env.NODE_ENV === 'test') identity._expireToken(); },
   };

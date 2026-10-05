@@ -42,6 +42,14 @@
   // (o auto-action reveal/hover andate a buon fine), niente value di fill.
   // rawUserMessages serve solo al "judge" lato server come riferimento.
   let session = null;
+  let ripiegoDetto = false;
+  let ripiegoDaDire = '';
+  function diciRipiego() {
+    if (!ripiegoDaDire) return;
+    const riga = ripiegoDaDire;
+    ripiegoDaDire = '';
+    appendActionLog(riga)?.classList.add('sn-sidebar-log-intera');
+  }
   function newSession() {
     return {
       initialUrl: '',
@@ -78,6 +86,8 @@
   function open(context) {
     if (root) return;
     history = [];
+    ripiegoDetto = false;
+    ripiegoDaDire = '';
     collapsed = false;
     aiPrefersOpen = true;
     session = newSession();
@@ -279,6 +289,7 @@
     }
     conv.appendChild(msg);
     conv.scrollTop = conv.scrollHeight;
+    if (role === 'assistant') diciRipiego();
     return msg;
   }
 
@@ -1141,8 +1152,20 @@
         type: MSG.AI_REQUEST,
         action: ACTIONS.HELP,
         payload,
+        diceRipiego: true,
       });
       if (!res?.ok) throw new Error(res?.error || I18n.t('err_provider_failed'));
+      // Risposta pagata coi crediti di Filo perché OpenRouter ha rifiutato la chiave (#662): la
+      // riga della chat, una volta per serie, non a ogni passo che l'agente fa da solo.
+      // Sotto la risposta, come in chat: la scrive il prossimo messaggio di Filo (o la fine del turno).
+      if (res.keyFallback && res.keyFallback.line) {
+        // La riga è già nella conversazione, o la scrive questo turno: l'avviso non la ripete.
+        if (!ripiegoDetto) ripiegoDaDire = res.keyFallback.line;
+        Popup?.ripiegoMostrato?.(convEl());
+        ripiegoDetto = true;
+      } else {
+        ripiegoDetto = false;
+      }
       const parsed = parseAssistantOutput(res.text);
 
       // Caso speciale: l'AI ha chiesto una ricerca web. Esegui la ricerca,
@@ -1238,6 +1261,7 @@
         } else {
           expand({ ai: true });
         }
+        diciRipiego();
         return;
       }
 
@@ -1254,6 +1278,7 @@
         }
         await runFiloAction(parsed.filoAction);
         expand({ ai: true });
+        diciRipiego();
         return;
       }
 
@@ -1274,6 +1299,7 @@
         } else {
           expand({ ai: true });
         }
+        diciRipiego();
         return;
       }
 
