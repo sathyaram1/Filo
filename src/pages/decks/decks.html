@@ -51,7 +51,22 @@
     .dk-pip[data-c="R"] { background: #d4644a; }
     .dk-pip[data-c="G"] { background: #5f9663; }
     /* Stesse classi .sn-select-pop del resto di Filo, ma fixed alle coordinate del click, come in archivio. */
-    .dk-ctxmenu { position: fixed; right: auto; top: auto; min-width: 140px; }
+    .dk-ctxmenu {
+      position: fixed; right: auto; top: auto; min-width: 140px;
+      max-width: min(420px, calc(100vw - 16px)); max-height: min(480px, calc(100vh - 16px));
+    }
+    .dk-ctxmenu .sn-select-option { transition: background-color 120ms ease; }
+    .dk-ctxmenu .sn-select-option:hover,
+    .dk-ctxmenu .sn-select-option:focus-visible {
+      background-color: rgba(var(--sn-accent-rgb), 0.18);
+      outline: none;
+    }
+    .dk-ctxmenu .dk-ctx-has-detail { white-space: normal; }
+    .dk-ctx-detail {
+      display: block; margin-top: 4px; max-height: 9.5em; overflow-y: auto;
+      font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: var(--sn-muted);
+      overflow-wrap: anywhere; user-select: text;
+    }
 
     /* Il builder è un'area di lavoro, non una pagina di impostazioni: esce dal max-width di .sn-page e ne azzera
        il padding, così usa tutta la finestra. La classe la mette il JS sul body solo mentre è a schermo. */
@@ -252,6 +267,7 @@
       border-radius: 5px;
     }
     .dk-list-summary:hover { background: var(--sn-hover); }
+    .dk-list-title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .dk-add {
       flex: 0 0 auto; width: 20px; height: 20px;
       display: inline-flex; align-items: center; justify-content: center;

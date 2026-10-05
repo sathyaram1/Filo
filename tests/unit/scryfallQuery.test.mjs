@@ -192,9 +192,20 @@ test('isFresh: dentro il TTL sì, oltre no, timestamp rotto no', () => {
 // ── parseAgentReply (chat unificata §3): JSON tollerante ─────────────────────
 
 const NONE = {
-  reply: '', query: '', filter: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '', tagWith: [],
-  import: [], commanderName: '', replaceCommander: false, clearChat: false,
+  reply: '', query: '', filter: '', title: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '',
+  tagWith: [], import: [], commanderName: '', replaceCommander: false, clearChat: false,
 };
+
+// #788 — il titolo della lista è una riga d'italiano: con dentro la sintassi della query vale il ripiego.
+test('parseAgentReply: title — frase leggibile tenuta, sintassi Scryfall scartata', () => {
+  assert.equal(Q.parseAgentReply('{"query":"o:haste","title":"carte che danno rapidità"}').title, 'carte che danno rapidità');
+  assert.equal(Q.parseAgentReply('{"query":"o:haste","title":"  «carte\\nche danno rapidità»  "}').title, 'carte che danno rapidità');
+  assert.equal(Q.parseAgentReply('{"query":"o:haste","title":"risultati per o:haste"}').title, '');
+  assert.equal(Q.parseAgentReply('{"query":"o:haste","title":"haste (id<=UR)"}').title, '');
+  assert.equal(Q.parseAgentReply('{"query":"o:haste","title":"rimozioni: istantanee"}').title, 'rimozioni: istantanee');
+  assert.equal(Q.parseAgentReply('{"query":"o:haste","title":42}').title, '');
+  assert.equal(Q.listTitle('x'.repeat(500)).length, 200);
+});
 
 test('parseAgentReply: JSON pulito → campi normalizzati', () => {
   const r = Q.parseAgentReply('{"reply":"Ecco","query":"o:haste","cards":["a","b"]}');

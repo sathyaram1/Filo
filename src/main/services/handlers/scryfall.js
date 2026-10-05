@@ -221,6 +221,8 @@ module.exports = function register(on, ctx) {
       // perché sia la ricerca sia l'import possono accodare testo alla reply.
       let reply = parsed.reply;
       let deckOut = null;
+      // La frase che il modello dà alla lista (#788); quella della query corretta al secondo tentativo, se c'è.
+      let title = parsed.title;
 
       // Commander a parole (#337, #789): su un mazzo senza commander basta il nome (build-around); uno già impostato
       // cambia solo col segnale esplicito di sostituzione, e il vecchio rientra nel mazzo. Va PRIMA della ricerca,
@@ -301,7 +303,7 @@ module.exports = function register(on, ctx) {
                 { role: 'user', content:
                   `(Sistema) La ricerca Scryfall con la query «${E.perCanaleSistema(parsed.query)}» è stata rifiutata` +
                   `${detail ? ' e il servizio ha spiegato perché qui sotto' : ' (sintassi non valida)'}. ` +
-                  'Correggi la sintassi e rispondi di nuovo con il SOLO JSON {"reply": "...", "query": "<query corretta>"}. ' +
+                  'Correggi la sintassi e rispondi di nuovo con il SOLO JSON {"reply": "...", "query": "<query corretta>", "title": "..."}. ' +
                   'Se la richiesta non è esprimibile in sintassi Scryfall, spiega il problema all\'utente in "reply" (in italiano, senza codici tecnici) e ometti "query".' +
                   (detail ? `\n\n${E.imbusta({ tipo: 'ESITO_SERVIZIO', testo: detail, conIntestazione: true, max: 2000 })}` : '') },
               ];
@@ -321,6 +323,7 @@ module.exports = function register(on, ctx) {
                 // Il modello ha riprovato: se anche questa fallisce si passa
                 // alla spiegazione generica qui sotto.
                 criterion = p2.filter || criterion;
+                title = p2.title || title;
                 sr = await runSearch(p2.query, criterion);
               } else if (p2.reply) {
                 // Niente query: il modello ha SPIEGATO il problema — è la
@@ -538,6 +541,7 @@ module.exports = function register(on, ctx) {
       const unchecked = uncheckedIds.filter((id) => cardIds.includes(id));
       return {
         ok: true, reply, cardIds, cards, query,
+        ...(title && cardIds.length ? { title } : {}),
         ...(unchecked.length ? { uncheckedIds: unchecked } : {}),
         ...(retryable ? { retryable: true } : {}),
         ...(reasoning ? { reasoning } : {}),

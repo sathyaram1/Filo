@@ -36,6 +36,17 @@
     return terms.length > 0 && terms.every((t) => SYNTAX_TERM.test(t));
   }
 
+  // Titolo della lista che il modello scrive per la riga di sintesi (#788): una riga di italiano, mai la query.
+  // Con anche un solo termine di sintassi Scryfall dentro non dice niente a chi legge: vale il ripiego.
+  function listTitle(raw) {
+    const t = String(typeof raw === 'string' ? raw : '').replace(/\s+/g, ' ').trim()
+      .replace(/^["'«“]+|["'»”]+$/g, '').trim();
+    if (!t) return '';
+    const tokens = t.replace(/[()"«»“”,;.!?]/g, ' ').split(/\s+/).filter(Boolean);
+    if (tokens.some((x) => SYNTAX_TERM.test(x))) return '';
+    return t.length > 200 ? `${t.slice(0, 199)}…` : t;
+  }
+
   // Una carta è DENTRO l'identità di colore del commander se OGNI colore della
   // sua color identity è tra i colori del commander (regola Commander §8.4, la
   // stessa del check di legalità). Le incolori (identity vuota) sono sempre
@@ -153,8 +164,8 @@
 
   function parseAgentReply(text) {
     const none = {
-      reply: '', query: '', filter: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '', tagWith: [],
-      import: [], commanderName: '', replaceCommander: false, clearChat: false,
+      reply: '', query: '', filter: '', title: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '',
+      tagWith: [], import: [], commanderName: '', replaceCommander: false, clearChat: false,
     };
     const raw = String(text || '').trim();
     if (!raw) return none;
@@ -187,6 +198,7 @@
           // Criterio del filtro semantico (§4.1): quando presente, il sistema
           // usa un LLM economico per tenere solo le carte che lo rispettano.
           filter: typeof o.filter === 'string' ? o.filter.trim() : '',
+          title: listTitle(o.title),
           cards: Array.isArray(o.cards) ? o.cards.map(String).filter(Boolean) : [],
           hasBudget,
           budget,
@@ -242,7 +254,7 @@
   }
 
   global.SN_SCRYFALL_Q = {
-    WUBRG, identityCode, buildSearchQuery, isPureSyntax, withinIdentity, parseManaCost, simplifyCard, isFresh,
+    WUBRG, identityCode, buildSearchQuery, isPureSyntax, listTitle, withinIdentity, parseManaCost, simplifyCard, isFresh,
     parseAgentReply, proseSegments,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

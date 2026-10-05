@@ -245,6 +245,14 @@
       const row = document.createElement('div');
       row.className = 'sn-select-option';
       row.textContent = it.label;
+      // Un dato da leggere sotto la voce (la ricerca esatta di una lista, #788): va a capo, non si taglia.
+      if (it.detail) {
+        row.classList.add('dk-ctx-has-detail');
+        const d = document.createElement('code');
+        d.className = 'dk-ctx-detail';
+        d.textContent = it.detail;
+        row.appendChild(d);
+      }
       row.addEventListener('click', (e) => { e.stopPropagation(); closeCtx(); it.run(); });
       pop.appendChild(row);
     }
@@ -1038,17 +1046,11 @@
     if (m.clearChat) {
       parts.push('<button class="dk-retry" data-clear-chat="1" title="Chiede conferma, poi svuota la chat di questo mazzo">Svuota la chat…</button>');
     } else if (m.cardIds && m.cardIds.length) {
-      const n = m.cardIds.length;
-      const label = m.query ? `per "${m.query}"` : '';
+      const label = Chat.listLabel(m.cardIds.length, m.title);
       // Le righe di una lista chiusa non si disegnano: una chat salvata cresce di sessione in sessione, e
-      // renderChat gira a ogni pezzo di ragionamento.
-      const open = isLast || m.expanded;
-      // CMC crescente, il default di ordinamento delle liste (§3.4).
-      const ids = !open ? [] : [...m.cardIds].sort((a, b) => {
-        const ca = Number(cardsById[a] && cardsById[a].cmc) || 0;
-        const cb = Number(cardsById[b] && cardsById[b].cmc) || 0;
-        return ca - cb;
-      });
+      // renderChat gira a ogni pezzo di ragionamento. Senza una scelta dell'utente è aperta solo l'ultima (§3.3).
+      const open = m.expanded === undefined ? isLast : !!m.expanded;
+      const ids = open ? Chat.sortIds(m.cardIds, cardsById, m.sort) : [];
       // Import via chat (§11.2): oltre al toggle per riga, un bottone che
       // aggiunge/aggiorna TUTTE le carte riconosciute in un colpo solo — con
       // 100 carte di una lista incollata, cliccare riga per riga è attrito
@@ -1059,13 +1061,13 @@
         ? `<button class="dk-import-all" data-import-all="1" ${importDone ? 'disabled' : ''}>${importDone ? 'Aggiunte ✓' : 'Aggiungi tutte al mazzo'}</button>`
         : '';
       parts.push(`
-        <button class="dk-list-summary" data-toggle-list="1" aria-expanded="${open ? 'true' : 'false'}">
+        <button class="dk-list-summary" data-toggle-list="1" aria-expanded="${open ? 'true' : 'false'}" title="${esc(label)}">
           <span>${open ? '▾' : '▸'}</span>
-          <span>${n} risultat${n === 1 ? 'o' : 'i'} ${esc(label)}</span>
+          <span class="dk-list-title">${esc(label)}</span>
         </button>
         <div class="dk-cardlist" ${open ? '' : 'hidden'}>${open ? importAllHtml + ids.map((id) => chatRowHtml(id, m.importQty && m.importQty[id], unchecked.has(id))).join('') : ''}</div>`);
     } else if (!m.reply) {
-      parts.push(`<p class="dk-msg-text dk-msg-pending">Nessun risultato${m.query ? ` per "${esc(m.query)}"` : ''}.</p>`);
+      parts.push('<p class="dk-msg-text dk-msg-pending">Nessun risultato.</p>');
     }
     return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${parts.join('')}</div>`;
   }
@@ -1207,6 +1209,7 @@
         bot.reply = r.reply || '';
         bot.cardIds = r.cardIds || [];
         bot.query = r.query || '';
+        if (r.title) bot.title = r.title;
         if (Array.isArray(r.uncheckedIds) && r.uncheckedIds.length) bot.uncheckedIds = r.uncheckedIds;
         if (r.retryable) bot.retryable = true;
         // Import via chat (§11.2): quantità reali per riga (basics tipo
@@ -1249,6 +1252,53 @@
       await rereadChat(deckId, msgs);
     }
     if (wantsClear && onScreen() && current.id === deckId && chatByDeck.get(deckId) === msgs) clearChat();
+  }
+
+  // Tasto destro sulla riga di sintesi di una lista (#788): la ricerca esatta, l'ordinamento, la stessa ricerca su
+  // Scryfall. Una lista senza ricerca (import, carte da un altro mazzo) ha solo l'ordinamento.
+  const LIST_SORT_LABELS = { cmc: 'Ordina per costo di mana', name: 'Ordina per nome', price: 'Ordina per prezzo' };
+  const SCRYFALL_ORDER = { cmc: 'cmc', name: 'name', price: 'eur' };
+  function listMenuItems(m) {
+    const cur = m.sort || Chat.SORTS[0];
+    const items = [];
+    if (m.query) items.push({ label: 'Copia la ricerca', detail: m.query, run: () => copyText(m.query, 'Ricerca copiata.') });
+    for (const key of Chat.SORTS) {
+      items.push({ label: LIST_SORT_LABELS[key] + (key === cur ? ' ✓' : ''), run: () => sortList(m, key) });
+    }
+    if (m.query) {
+      const url = `https://scryfall.com/search?q=${encodeURIComponent(m.query)}&order=${SCRYFALL_ORDER[cur]}&dir=asc`;
+      items.push({ label: 'Apri la ricerca su Scryfall', run: () => send({ type: MSG.OPEN_URL, url }) });
+    }
+    return items;
+  }
+
+  // L'ordine scelto è della lista, e si salva con lei. Una lista chiusa si apre: chi la riordina la vuole vedere.
+  function sortList(m, sort) {
+    if (!current) return;
+    const msgs = chatMsgs();
+    const target = (m.turn && msgs.find((x) => x.who === 'bot' && x.turn === m.turn)) || m;
+    if (!msgs.includes(target)) return;
+    if (sort === Chat.SORTS[0]) delete target.sort; else target.sort = sort;
+    target.expanded = true;
+    renderChat();
+    if (target.turn) editChat(current.id, { op: 'sort', turn: target.turn, sort });
+  }
+
+  async function copyText(text, done) {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (_) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
+      document.body.appendChild(ta);
+      ta.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (_) { /* resta il messaggio sotto */ }
+      ta.remove();
+      if (!ok) { showToast('Non sono riuscito a copiare.'); return; }
+    }
+    showToast(done);
   }
 
   // Toggle aggiungi/rimuovi dalla riga della CardList (§3.4): la carta entra
@@ -2204,7 +2254,7 @@
       if (sum) {
         const bubble = sum.closest('[data-msg-i]');
         const m = chatMsgs()[Number(bubble.dataset.msgI)];
-        if (m) { m.expanded = !(m.expanded || sum.getAttribute('aria-expanded') === 'true'); renderChat(); }
+        if (m) { m.expanded = sum.getAttribute('aria-expanded') !== 'true'; renderChat(); }
         return;
       }
       // Click su una riga risultato → carosello sulla lista di QUELLA bolla (§5.3).
@@ -2228,6 +2278,15 @@
     });
     // Tasto destro su un risultato o su un nome citato (§8.3): le stesse azioni della carta, compreso il commander.
     log.addEventListener('contextmenu', async (e) => {
+      const sum = e.target.closest('[data-toggle-list]');
+      if (sum) {
+        const bubble = sum.closest('[data-msg-i]');
+        const m = bubble && chatMsgs()[Number(bubble.dataset.msgI)];
+        if (!m || !m.cardIds || !m.cardIds.length) return;
+        e.preventDefault();
+        openCtx(e.clientX, e.clientY, listMenuItems(m));
+        return;
+      }
       const row = e.target.closest('.dk-row[data-card-id]');
       if (row) {
         e.preventDefault();
