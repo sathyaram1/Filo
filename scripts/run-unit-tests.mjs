@@ -264,10 +264,11 @@ export function testoRiepilogo({ somma, gruppi, file, esiti, interrotto = false,
 // titoli dei gruppi finirebbero sotto l'uscita del gruppo stesso.
 let canale = process.stdout;
 const scrivi = (s) => new Promise((ok) => canale.write(`${s}\n`, ok));
-const lancia = (args) => new Promise((ok) => {
+const lancia = (args, temp) => new Promise((ok) => {
   // I test si aspettano la root come cartella corrente, come quando li lanciava npm.
   // Le manopole di questo lanciatore non arrivano ai test: la sua sentinella guarda i valori veri.
   const { FILO_UNIT_DIR: _d, FILO_UNIT_TETTO_RIGA: _t, ...env } = process.env;
+  if (temp) Object.assign(env, { TMPDIR: temp, TEMP: temp, TMP: temp });
   const c = spawn(process.execPath, args, { stdio: 'inherit', cwd: REPO_ROOT, env });
   c.on('error', (error) => ok({ error }));
   c.on('close', (status, signal) => ok({ status, signal }));
@@ -287,11 +288,27 @@ function leggiRighe(file) {
 
 // Le cartelle delle corse uccise, che la loro uscita non ha tolto (#717): la regola sta col modulo che le crea. Importato
 // qui e non in testa, perché la copia di questo lanciatore che vive fuori dal repo non ha i test.
-async function togliResti() {
+async function percorsiDeiTest() {
   const modulo = join(REPO_ROOT, 'tests', 'helpers', 'percorsi.mjs');
-  if (!existsSync(modulo)) return;
-  const { togliCartelleOrfane } = await import(pathToFileURL(modulo).href);
-  togliCartelleOrfane({ annuncia: (n) => console.error(`[test:unit] tolgo ${n} cartelle temporanee lasciate da prove interrotte`) });
+  return existsSync(modulo) ? import(pathToFileURL(modulo).href) : null;
+}
+
+// Il codice provato scrive nella temporanea anche senza chiederla ai test (#717): ogni corsa gliene dà una sua, che se ne
+// va con la corsa, e da uccisa la toglie la pulizia delle orfane. Sentinella: tests/unit/cartelleTemporaneeSiTolgono.test.mjs.
+async function temporaneaDellaCorsa() {
+  const percorsi = await percorsiDeiTest();
+  if (!percorsi) return null;
+  percorsi.togliCartelleOrfane({ annuncia: (n) => console.error(`[test:unit] tolgo ${n} cartelle temporanee lasciate da prove interrotte`) });
+  return percorsi.cartellaTemporanea('filo-corsa-');
+}
+
+// Un file appeso (col disco pieno, #717) non deve tenere ferma la corsa per sempre: dopo il tetto è un rosso col suo nome.
+// In `node --test` il tetto vale per il file intero, non per la singola prova: largo apposta, per i Windows lenti.
+export const TETTO_FILE_MS = 20 * 60 * 1000;
+/** Le opzioni col tetto di tempo, se chi lancia non ne ha dato uno suo. PURA. */
+export function conTettoDiTempo(opzioni) {
+  return opzioni.some((a) => a === '--test-timeout' || String(a).startsWith('--test-timeout='))
+    ? opzioni : [`--test-timeout=${TETTO_FILE_MS}`, ...opzioni];
 }
 
 async function main() {
@@ -325,13 +342,14 @@ async function main() {
     }
   }
 
-  await togliResti();
+  const temp = await temporaneaDellaCorsa();
 
   // I gruppi si contano coi flag del riepilogo già dentro: sono i più lunghi che la riga potrà portare.
   const cartella = mkdtempSync(join(tmpdir(), 'filo-unit-'));
   const destinazione = (i) => join(cartella, `gruppo-${String(i + 1).padStart(4, '0')}.jsonl`);
   const copia = (i) => (k) => join(cartella, `rapporto-${k + 1}-gruppo-${String(i + 1).padStart(4, '0')}`);
-  const { opzioni, posizionali } = separaArgomenti(flags);
+  const { opzioni: date, posizionali } = separaArgomenti(flags);
+  const opzioni = conTettoDiTempo(date);
   // Un file dato a mano che è già fra i trovati girerebbe due volte.
   const trovati = new Set(files.map((f) => resolve(f)));
   const extra = posizionali.filter((p) => !trovati.has(resolve(REPO_ROOT, p)));
@@ -347,7 +365,7 @@ async function main() {
   try {
     if (!tanti) {
       // Un gruppo solo: l'uscita è quella di un `node --test` qualunque, riepilogo compreso.
-      const r = await lancia(['--test', ...opzioni, ...gruppi[0]]);
+      const r = await lancia(['--test', ...opzioni, ...gruppi[0]], temp);
       if (r.error) console.error(`[test:unit] non sono riuscito a lanciare node: ${r.error.message}`);
       // Ucciso da un segnale: non è un successo, e `status` in quel caso è null.
       process.exitCode = r.error || r.status === null ? 1 : r.status;
@@ -365,7 +383,7 @@ async function main() {
     let interrotto = false;
     for (const [i, gruppo] of gruppi.entries()) {
       await scrivi(`\n[test:unit] gruppo ${i + 1} di ${gruppi.length} (${gruppo.length} file)`);
-      const r = await lancia(['--test', ...flagsDi(i), ...gruppo]);
+      const r = await lancia(['--test', ...flagsDi(i), ...gruppo], temp);
       if (r.error) {
         console.error(`[test:unit] non sono riuscito a lanciare node per il gruppo ${i + 1}: ${r.error.message}`);
         esiti.push(1);
