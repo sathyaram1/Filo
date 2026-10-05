@@ -311,34 +311,71 @@
     return null;
   }
 
-  // Il blocco di otto caratteri dentro una riga incollata («Codice:
-  // ABCD-EFGH»). Si guardano TUTTI i blocchi, non solo il primo: un messaggio
-  // comincia con un saluto, e «Ciao Anna» è quattro più quattro: fermarsi lì
-  // vuol dire rifiutare un incollaggio giusto perché davanti al codice c'erano
-  // due parole corte (quarto giro di verifica del #651). Il primo blocco che è
-  // davvero un codice vince; se nessuno lo è, `null`.
-  const BLOCCO_OTTO = /(?<![A-Z0-9])([A-Z0-9]{4})[\s-]*([A-Z0-9]{4})(?![A-Z0-9])/g;
-  function codeBlockInText(raw) {
-    const s = String(raw == null ? '' : raw).toUpperCase();
-    BLOCCO_OTTO.lastIndex = 0;
+  // I blocchi di otto caratteri dentro una riga incollata («Codice:
+  // ABCD-EFGH»), TUTTI, dal più simile a un codice: un messaggio comincia con
+  // un saluto, e «Cara Sara» è otto lettere che un codice può avere (#664).
+  // Pesano il trattino (un codice si mostra ABCD-EFGH), una cifra (le parole
+  // non ne hanno) e le sole maiuscole; a pari peso vince chi viene prima.
+  const BLOCCO_OTTO = /(?<![A-Za-z0-9])([A-Za-z0-9]{4})([\s-]*)([A-Za-z0-9]{4})(?![A-Za-z0-9])/g;
+  function codeBlocksInText(raw) {
+    const s = String(raw == null ? '' : raw);
+    const re = new RegExp(BLOCCO_OTTO.source, 'g');
+    const trovati = [];
     let m;
-    while ((m = BLOCCO_OTTO.exec(s))) {
-      const c = normalizeCode(m[1] + m[2]);
-      if (c) { BLOCCO_OTTO.lastIndex = 0; return c; }
-      // Il blocco scartato può aver mangiato metà di quello buono: «ecco ABCD
-      // EFGH» si legge prima come «ECCO ABCD», e «ABCD EFGH» non verrebbe più
-      // guardato. Si riparte dal carattere dopo, non dalla fine del blocco.
-      BLOCCO_OTTO.lastIndex = m.index + 1;
+    while ((m = re.exec(s))) {
+      const otto = m[1] + m[3];
+      const c = normalizeCode(otto);
+      if (c) {
+        const lettere = otto.replace(/[^A-Za-z]/g, '');
+        const peso = (m[2].includes('-') ? 4 : 0) + (/[0-9]/.test(otto) ? 2 : 0) + (lettere === lettere.toUpperCase() ? 1 : 0);
+        trovati.push({ c, peso, ordine: trovati.length });
+      }
+      // Il blocco appena letto può aver mangiato metà di quello buono: «ecco
+      // ABCD EFGH» si legge prima come «ECCO ABCD». Si riparte dal carattere dopo.
+      re.lastIndex = m.index + 1;
     }
-    return null;
+    return trovati.sort((a, b) => (b.peso - a.peso) || (a.ordine - b.ordine)).map((t) => t.c);
   }
 
-  // Quello che l'utente ha messo nel campo dell'invito → il codice, o `null`.
-  // Prima si prova a leggerlo com'è (codice o link); poi si cerca un link
-  // d'invito dentro il testo; da ultimo un blocco di otto caratteri lungo la
-  // riga incollata.
+  // Quello che l'utente ha messo nel campo dell'invito → i codici possibili,
+  // dal più probabile: il testo com'è (codice o link), un link d'invito dentro
+  // il testo, poi i blocchi di otto caratteri. Chi riscatta prova il secondo
+  // quando il server dice che il primo non esiste.
+  function codesFromInput(raw) {
+    const visti = new Set();
+    for (const c of [normalizeCode(raw), codeFromLinkInText(raw), ...codeBlocksInText(raw)]) {
+      if (c) visti.add(c);
+    }
+    return [...visti];
+  }
+
   function codeFromInput(raw) {
-    return normalizeCode(raw) || codeFromLinkInText(raw) || codeBlockInText(raw);
+    return codesFromInput(raw)[0] || null;
+  }
+
+  // Quanti codici di una riga incollata si provano col server, al massimo. Un
+  // messaggio vero ne ha uno o due (saluto, codice); il tetto ferma un testo
+  // lungo incollato per sbaglio, e chi riscatta lo dice col numero.
+  const CODE_TRIES = 5;
+  function tooManyCodesMessage(found, tried) {
+    return `Nel testo ci sono ${fmtInt(found)} blocchi che sembrano codici, e i primi ${fmtInt(tried)} non esistono. Incolla solo il codice, o il link.`;
+  }
+
+  // Un collegamento che porta un invito: il link di filo.red o `filo://invito/…`.
+  // Torna il codice, o `null` se non è un invito o il codice è storto.
+  function inviteCodeFromLink(raw) {
+    const s = String(raw == null ? '' : raw).trim();
+    if (isInviteDeepLink(s)) return inviteCodeFromDeepLink(s);
+    let u;
+    try { u = new URL(s); } catch (_) { return null; }
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
+    const host = u.hostname.toLowerCase();
+    if (host !== 'filo.red' && host !== 'www.filo.red') return null;
+    const m = /^\/i\/([^/]+)\/?$/.exec(u.pathname);
+    if (!m) return null;
+    let pezzo = m[1];
+    try { pezzo = decodeURIComponent(pezzo); } catch (_) { /* resta com'è */ }
+    return normalizeCode(pezzo);
   }
 
   // `filo://invito/<codice>` — il collegamento che porta un invito dentro
@@ -501,7 +538,8 @@
     isKeyRefusalStatus, isKeyRefusal, isModerationBlock, keyRefusalOf, keyRefusalReason, ownKeyFallbackLine, ownKeyRefusalNote, keyTail, ownKeyBalanceLine,
     // Inviti e link d'invito (#651)
     CODE_ALPHABET, CODE_LEN, INVITE_LINK_BASE,
-    normalizeCode, formatCode, inviteLink, codeFromInput, isInviteDeepLink, inviteCodeFromDeepLink, filoUrlFromArgv,
+    normalizeCode, formatCode, inviteLink, codeFromInput, codesFromInput, CODE_TRIES, tooManyCodesMessage, inviteCodeFromLink,
+    isInviteDeepLink, inviteCodeFromDeepLink, filoUrlFromArgv,
     inviteView, inviteStateLine, entryNoticeText,
     // Manopole e movimenti della pagina dell'owner (#652)
     OWNER_KNOBS, OWNER_KNOB_KEYS, knobOf, GRANT_LABELS, grantLabel,
