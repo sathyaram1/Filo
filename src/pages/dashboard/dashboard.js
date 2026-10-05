@@ -845,7 +845,14 @@
       // Un turno fallito non deve lasciare a schermo il testo parziale di un
       // tentativo andato male: scartiamo la bolla in streaming e mostriamo l'errore.
       if (streamBubble) { streamBubble.remove(); streamBubble = null; }
-      const err = makeBubble({ role: 'filo', text: r?.error || 'Errore.' });
+      // Chi non ha crediti scrive alla chat l'invito che ha ricevuto: lo riscatta lei, invece di mandarlo a ricopiarlo (#664).
+      const invito = r?.code === 'NO_API_KEY' && !internal && !daModello ? await riscattaDallaChat(userMessage) : null;
+      if (invito && invito.ok) {
+        bubblesEl.appendChild(makeBubble({ role: 'filo', text: invito.message }));
+        bubblesEl.scrollTop = bubblesEl.scrollHeight;
+        return r;
+      }
+      const err = makeBubble({ role: 'filo', text: (invito && invito.message) || r?.error || 'Errore.' });
       // #360 — la bolla d'errore dice "riprova": darglielo da fare a mano
       // (riscrivere la domanda) è attrito inutile. Il tasto rimanda LO STESSO
       // messaggio, come il "Riprova" della pagina d'errore di una scheda.
