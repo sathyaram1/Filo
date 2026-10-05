@@ -144,6 +144,7 @@ require('../../src/shared/chatErrors.js');
 const CE = globalThis.SN_CHAT_ERRORS;
 const TOOL = [{ type: 'function', function: { name: 'CERCA_WEB', parameters: { type: 'object', properties: {} } } }];
 const noHost = (msg) => new Response(JSON.stringify({ error: { code: 404, message: msg } }), { status: 404, headers: { 'content-type': 'application/json' } });
+const DATA_POLICY = 'No endpoints found matching your data policy (Paid model training). Configure: https://openrouter.ai/settings/privacy';
 const NO_PARAMS = 'No endpoints found that can handle the requested parameters. To learn more about provider routing, visit: https://openrouter.ai/docs/provider-routing';
 
 for (const metodo of ['streamComplete', 'complete']) {
@@ -231,6 +232,19 @@ for (const metodo of ['streamComplete', 'complete']) {
     assert.equal(bodies.length, 2);
     assert.ok(bodies.every((b) => b.provider.require_parameters === true && b.provider.ignore.includes('Mistral')));
     assert.match(CE.sentence(err), /^Per il modello scelto nessun fornitore ammesso sa usare gli strumenti/);
+  });
+
+  test(`${metodo}: un rifiuto per la privacy dell'account non si legge come strumenti e non si ritenta`, async () => {
+    const bodies = [];
+    const err = await withFetch(async (url, opts) => {
+      bodies.push(JSON.parse(opts.body));
+      return noHost(DATA_POLICY);
+    }, () => call().then(() => null, (e) => e));
+    assert.equal(bodies.length, 1, 'togliere il ragionamento non cambia la politica sui dati');
+    assert.equal(err.code, 'DATA_POLICY');
+    assert.doesNotMatch(CE.sentence(err), /strumenti/);
+    assert.match(CE.sentence({ ...err, message: err.message, keySource: 'own' }), /privacy del tuo account OpenRouter/);
+    assert.match(CE.sentence({ ...err, message: err.message, keySource: 'personal' }), /privacy/);
   });
 
   test(`${metodo}: senza ragionamento in richiesta il rifiuto non si ritenta`, async () => {

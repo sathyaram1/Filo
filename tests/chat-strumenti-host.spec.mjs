@@ -17,8 +17,8 @@ async function newtabPage(app) {
 }
 
 // Il router finto nel main: registra ogni corpo e risponde secondo `modo`
-// ('ok' | 'senza-ragionamento' = nessun host regge `reasoning` | 'nessuno' = nessun host regge gli strumenti).
-async function preparaRouter(app, modo) {
+// ('ok' | 'senza-ragionamento' = nessun host regge `reasoning` | 'nessuno' = ogni richiesta con strumenti riceve `rifiuto`).
+async function preparaRouter(app, modo, rifiuto = NO_PARAMS) {
   await app.evaluate(async (_e, { modo, rifiuto }) => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
@@ -49,7 +49,7 @@ async function preparaRouter(app, modo) {
         return new Response(JSON.stringify({ provider: 'DeepInfra', choices: [{ message: { content: 'Ecco fatto.' } }], usage: {} }), { status: 200, headers: { 'content-type': 'application/json' } });
       };
     }
-  }, { modo, rifiuto: NO_PARAMS });
+  }, { modo, rifiuto });
 }
 
 const corpiConStrumenti = (app) => app.evaluate(() => globalThis.__corpi
@@ -131,6 +131,23 @@ test('nessun host ammesso regge gli strumenti: la chat lo dice, e niente parte s
   vincoliIntatti(corpi);
   expect(corpi).toHaveLength(2);
   await page.screenshot({ path: 'tests/.shots/700-chat-nessun-host-strumenti.png' });
+});
+
+test('un rifiuto per la privacy dell\'account non viene raccontato come mancanza di strumenti', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await preparaRouter(app, 'nessuno', 'No endpoints found matching your data policy (Paid model training). Configure: https://openrouter.ai/settings/privacy');
+
+  await scrivi(page, 'che ore sono a Tokyo?');
+  const bolla = page.locator('.dash-bubble-filo', { hasText: 'privacy' });
+  await expect(bolla).toBeVisible({ timeout: 15_000 });
+  await expect(bolla).toContainText('openrouter.ai/settings/privacy');
+  await expect(bolla).not.toContainText('strumenti');
+  const corpi = await corpiConStrumenti(app);
+  vincoliIntatti(corpi);
+  expect(corpi).toHaveLength(1);
 });
 
 test('la chat senza diretta (chiamata normale) porta lo stesso vincolo e lo stesso errore', async ({ app, shell }) => {
