@@ -55,6 +55,11 @@ async function conCmd(fn) {
   const finto = join(dir, 'cmd-finto.js');
   writeFileSync(finto, CMD_FINTO);
   chmodSync(finto, 0o755);
+  // Allo scadere la sessione chiude l'albero con taskkill: qui ne fa le veci un kill.
+  writeFileSync(join(dir, 'taskkill'), '#!/bin/sh\nkill -9 "$2" 2>/dev/null\nexit 0\n');
+  chmodSync(join(dir, 'taskkill'), 0o755);
+  const percorso = process.env.PATH;
+  process.env.PATH = dir + ':' + percorso;
   const piattaforma = Object.getOwnPropertyDescriptor(process, 'platform');
   const comSpec = process.env.ComSpec;
   process.env.ComSpec = finto;
@@ -63,6 +68,7 @@ async function conCmd(fn) {
     return await fn();
   } finally {
     Object.defineProperty(process, 'platform', piattaforma);
+    process.env.PATH = percorso;
     if (comSpec === undefined) delete process.env.ComSpec; else process.env.ComSpec = comSpec;
   }
 }
