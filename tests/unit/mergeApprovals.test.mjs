@@ -76,6 +76,13 @@ describe('il titolo', () => {
     assert.match(UI.headline(1), /^Una fusione/);
     assert.match(UI.headline(3), /^3 fusioni/);
   });
+
+  test('una richiesta già mandata a fondere non aspetta il via libera di nessuno (#702)', () => {
+    assert.equal(UI.headline(0, 1), 'Una fusione in corso');
+    assert.equal(UI.headline(0, 2), '2 fusioni in corso');
+    assert.equal(UI.headline(1, 1), 'Una fusione aspetta il tuo via libera');
+    assert.equal(UI.headline(0, 0), '');
+  });
 });
 
 describe('la scadenza, detta prima', () => {

@@ -1316,6 +1316,25 @@
   // L'esito di quel tentativo, per richiesta: il riquadro in basso e la riga
   // del dettaglio sono un posto solo, e chi arriva dopo cancella chi c'era.
   const esitiTentati = new Map();
+  // Al più un'approvazione in volo per richiesta: tasto, segno e segno da fuori aspettano la
+  // stessa, e una card disegnata nel frattempo la mostra coi tasti spenti (#702).
+  const approvazioniInVolo = new Map();
+  const ATTESA_SEGNO = { kind: 'wait', text: 'Pratica segnata «fondi senza chiedermelo»: chiedo al server di fondere…' };
+  function approvaUnaVolta(req, attesa) {
+    const gia = approvazioniInVolo.get(req.id);
+    if (gia) return gia.risposta;
+    const UI = window.SN_MERGE_APPROVALS;
+    const risposta = Promise.resolve()
+      .then(() => sendToMain({ type: MERGE_APPROVAL_APPROVE, id: req.id }))
+      .catch((e) => ({ ok: false, error: e?.message || String(e) }));
+    approvazioniInVolo.set(req.id, { risposta, attesa });
+    // Registrata per prima: chi aspetta la stessa risposta trova già l'esito al suo posto.
+    risposta.then((reply) => {
+      approvazioniInVolo.delete(req.id);
+      if (UI) esitiTentati.set(req.id, UI.outcomeMessage(reply, req));
+    });
+    return risposta;
+  }
 
   // Dal numero della segnalazione (l'etichetta "automazione · feedback #N"
   // sulla scheda) al feedback vero: la scheda sta già dentro la dashboard dei
@@ -1343,8 +1362,9 @@
     return Object.assign({
       onDone: () => { setTimeout(loadMergeApprovals, 1200); },
       esitoIniziale: (req) => esitiTentati.get(req.id) || null,
+      inVolo: (req) => approvazioniInVolo.get(req.id) || null,
       // L'esito resta scritto anche se la card si ridisegna appena la conferma è finita.
-      onApprove: (req) => decidiFusione(MERGE_APPROVAL_APPROVE, req),
+      onApprove: (req) => approvaUnaVolta(req, null),
       onDiscard: (req) => decidiFusione(MERGE_APPROVAL_DISCARD, req),
       onFeedback: (req) => openFeedbackByNum(UI ? UI.feedbackNum(req) : ''),
     }, extra || {});
@@ -1379,9 +1399,9 @@
     const esiti = [];
     for (const req of daFondere) {
       fusioniTentate.add(req.id);
-      let reply;
-      try { reply = await sendToMain({ type: MERGE_APPROVAL_APPROVE, id: req.id }); }
-      catch (e) { reply = { ok: false, error: e?.message || String(e) }; }
+      const risposta = approvaUnaVolta(req, ATTESA_SEGNO);
+      if (livelloAperto === 'l5') ridisegnaPannelloAperto();
+      const reply = await risposta;
       const msg = UI.outcomeMessage(reply, req);
       esitiTentati.set(req.id, msg);
       esiti.push({ req, msg });
@@ -1529,14 +1549,19 @@
     if (selectedId && allFeedbacks.some((f) => f._id === selectedId)) {
       const fb = allFeedbacks.find((f) => f._id === selectedId);
       renderLivelliRow(fb);
-      // Il pannello aperto su un livello si riempie di nuovo: se era il
-      // quadrato, dentro c'è una richiesta che potrebbe non esistere più.
-      if (livelloAperto) quandoPannelloLibero(() => {
-        const ora = selectedId && allFeedbacks.find((f) => f._id === selectedId);
-        if (ora && livelloAperto) openSidebarLivello(ora, livelloAperto);
-      });
+      ridisegnaPannelloAperto();
     }
     if (dataLoaded) ridisegnaListaAlSuoPosto();
+  }
+
+  // Il pannello aperto su un livello si riempie di nuovo: se era il quadrato,
+  // dentro c'è una richiesta che potrebbe non esistere più, o che sta fondendo.
+  function ridisegnaPannelloAperto() {
+    if (!livelloAperto) return;
+    quandoPannelloLibero(() => {
+      const ora = selectedId && allFeedbacks.find((f) => f._id === selectedId);
+      if (ora && livelloAperto) openSidebarLivello(ora, livelloAperto);
+    });
   }
 
   async function loadChannelLog() {
