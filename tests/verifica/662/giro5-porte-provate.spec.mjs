@@ -33,7 +33,6 @@ test.beforeAll(async () => {
       try { body = raw ? JSON.parse(raw) : {}; } catch (_) { body = {}; }
       if (url === '/api/v1/chat/completions' && bearer === PERSONAL_KEY) {
         if (personalDrop) { req.socket.destroy(); return; }
-        if (personalDelayMs) await new Promise((r) => setTimeout(r, personalDelayMs));
       }
 
       // ── Identità anonima e funzioni wallet* ──
@@ -67,6 +66,7 @@ test.beforeAll(async () => {
         const last = msgs[msgs.length - 1] || {};
         seen.completions.push({ key: bearer, model: body.model, tools: Array.isArray(body.tools) && body.tools.length > 0, lastRole: last.role || '', lastText: JSON.stringify(last.content || '') });
         const status = bearer === OWN_KEY ? ownKeyStatus : (bearer === PERSONAL_KEY ? personalKeyStatus : 401);
+        if (personalDelayMs && bearer === PERSONAL_KEY) await new Promise((r) => setTimeout(r, personalDelayMs));
         // Il 403 è quello della moderazione, come lo scrive OpenRouter: non è la chiave.
         if (status === 403) return json(res, 403, { error: { message: 'Your chosen model requires moderation and your input was flagged', code: 403, metadata: { reasons: ['x'], flagged_input: '…' } } });
         if (status !== 200) return json(res, status, { error: { message: status === 401 ? 'User not found.' : 'no', code: status } });

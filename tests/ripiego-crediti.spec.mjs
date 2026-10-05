@@ -34,6 +34,7 @@ let ownKeyStatus = 401; // cosa risponde OpenRouter alla chiave propria
 let personalKeyStatus = 200; // …e alla personale (402 = anche i crediti di Filo finiti)
 let ownKeyLimit = 10;   // il tetto della chiave propria; null = nessun tetto
 let ownKeyUsage = 1.5;  // quanto la chiave propria ha speso, secondo OpenRouter
+let personalDelayMs = 0; // la personale risponde in ritardo: il riquadro si chiude prima
 let redeemed = false;   // il portafoglio esiste solo dopo il riscatto (ogni test riparte da zero)
 
 function json(res, status, body) {
@@ -45,7 +46,7 @@ test.beforeAll(async () => {
   server = createServer((req, res) => {
     let raw = '';
     req.on('data', (c) => { raw += c; });
-    req.on('end', () => {
+    req.on('end', async () => {
       const url = req.url.split('?')[0];
       const auth = String(req.headers.authorization || '');
       const bearer = auth.replace(/^Bearer\s+/i, '');
@@ -83,6 +84,7 @@ test.beforeAll(async () => {
         const last = msgs[msgs.length - 1] || {};
         seen.completions.push({ key: bearer, model: body.model, tools: Array.isArray(body.tools) && body.tools.length > 0, lastRole: last.role || '', lastText: JSON.stringify(last.content || '') });
         const status = bearer === OWN_KEY ? ownKeyStatus : (bearer === PERSONAL_KEY ? personalKeyStatus : 401);
+        if (personalDelayMs && bearer === PERSONAL_KEY) await new Promise((r) => setTimeout(r, personalDelayMs));
         // Il 403 è quello della moderazione, come lo scrive OpenRouter: non è la chiave.
         if (status === 403) return json(res, 403, { error: { message: 'Your chosen model requires moderation and your input was flagged', code: 403, metadata: { reasons: ['x'], flagged_input: '…' } } });
         if (status !== 200) return json(res, status, { error: { message: status === 401 ? 'User not found.' : 'no', code: status } });
@@ -142,6 +144,7 @@ test.beforeEach(() => {
   ownKeyLimit = 10;
   ownKeyUsage = 1.5;
   redeemed = false;
+  personalDelayMs = 0;
 });
 
 // OpenRouter e Firestore hanno l'indirizzo scritto nel codice: nel main il
@@ -726,7 +729,7 @@ test('(L) l’Aiuto della pagina con la chiave propria rifiutata: la riga del ri
   await expect(righe).toHaveCount(2);
 });
 
-test('(M) «Traduci la pagina» con la chiave propria rifiutata: finito il giro, un avviso dice che hanno pagato i crediti di Filo', async ({ app, shell, openTab, testServer }) => {
+test('(M) «Traduci la pagina» con la chiave propria rifiutata: al primo pezzo pagato così un avviso lo dice, una volta sola', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(120_000);
   ownKeyStatus = 402;
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
@@ -744,8 +747,11 @@ test('(M) «Traduci la pagina» con la chiave propria rifiutata: finito il giro,
   });
   await page.locator('#p1').click({ button: 'right', position: { x: 5, y: 5 } });
   await page.locator('[data-sn-icon-id="translate"]').click();
-  await expect.poll(() => page.evaluate(() => window.__toasts.join(' | ')), { timeout: 30_000 })
-    .toContain('OpenRouter ha rifiutato la tua chiave (il suo credito è finito): ho usato i crediti di Filo.');
+  const RIGA = 'OpenRouter ha rifiutato la tua chiave (il suo credito è finito): ho usato i crediti di Filo.';
+  const avvisi = () => page.evaluate(() => window.__toasts.join(' | '));
+  await expect.poll(avvisi, { timeout: 30_000 }).toContain(RIGA);
+  await page.waitForTimeout(6000);
+  expect((await avvisi()).split(RIGA).length - 1).toBe(1);
 });
 
 test('(N) la chat dell’Editor con la chiave propria rifiutata: sotto ogni risposta la stessa riga della chat di Filo', async ({ app, shell, openTab }) => {
@@ -944,4 +950,59 @@ test('(T) selezionare un testo e aprire subito il menu: la riga del ripiego sta 
   await expect(page.locator('.sn-key-fallback')).toHaveText(RIGA, { timeout: 20_000 });
   await page.waitForTimeout(6000);
   expect(await avvisi()).not.toContain('crediti di Filo');
+});
+
+// Vale come detta solo la riga a schermo: un riquadro chiuso prima della risposta la scrive dove
+// nessuno la vede, e allora la frase la dice l'avviso.
+test('(U) «spiega» e il riquadro di modifica chiusi prima della risposta pagata coi crediti di Filo: un avviso lo dice', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(150_000);
+  ownKeyStatus = 402;
+  personalDelayMs = 3000;
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await redeemWallet(openTab);
+  await prepare(app);
+  const page = await testServer.openReady(openTab, '<!doctype html><meta charset="utf-8"><title>Chiuso prima</title>'
+    + '<p id="t" style="font:28px sans-serif;margin:120px 40px">Una frase da chiudere presto.</p>'
+    + '<textarea id="campo" style="margin:40px;width:400px;height:80px;font:16px sans-serif">Un testo con un erore.</textarea>');
+  const avvisi = await osservaAvvisi(page);
+  const RIGA = 'OpenRouter ha rifiutato la tua chiave (il suo credito è finito): ho usato i crediti di Filo.';
+  const allaPersonale = async (prima) => {
+    await expect.poll(() => seen.completions.slice(prima).map((c) => c.key).join(','), { timeout: 10_000 }).toContain(PERSONAL_KEY);
+  };
+
+  await page.evaluate(() => {
+    const r = document.createRange();
+    r.selectNodeContents(document.querySelector('#t'));
+    const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  });
+  let prima = seen.completions.length;
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    globalThis.__filoShortcuts.dispatch('explain-selection', win);
+  });
+  const popup = page.locator('.sn-popup');
+  await expect(popup).toBeVisible({ timeout: 10000 });
+  await allaPersonale(prima);
+  await popup.locator('.sn-popup-close').click();
+  await expect(popup).toHaveCount(0);
+  await expect.poll(avvisi, { timeout: 30_000 }).toContain(RIGA);
+
+  // Il riquadro di modifica, chiuso con Esc prima della proposta. L'avviso sopra ha già parlato:
+  // si riparte da una chiave nuova, come chi la cambia, per sentirlo di nuovo.
+  await app.evaluate(async () => { await globalThis.SN_WALLET_MAIN.ownKeyChanged(); });
+  await page.evaluate(() => { window.__toasts = []; });
+  await page.locator('#campo').click();
+  await page.evaluate(() => { const t = document.querySelector('#campo'); t.focus(); t.select(); });
+  await page.locator('#campo').click({ button: 'right' });
+  const menu = page.locator('.sn-menu');
+  await expect(menu).toBeVisible({ timeout: 10000 });
+  await menu.locator('.sn-menu-item', { hasText: 'Modifica' }).click();
+  const box = page.locator('.sn-editbox');
+  await expect(box).toBeVisible({ timeout: 10000 });
+  prima = seen.completions.length;
+  await box.locator('button[data-sc="fix"]').click();
+  await allaPersonale(prima);
+  await page.keyboard.press('Escape');
+  await expect(box).toHaveCount(0);
+  await expect.poll(avvisi, { timeout: 30_000 }).toContain(RIGA);
 });
