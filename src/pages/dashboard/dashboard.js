@@ -46,6 +46,8 @@
   // tasto d'invio offre di riprenderlo finché l'utente non scrive altro.
   let turnoVivo = null;
   let ripresa = null;
+  // Un turno fermato la cui azione in volo non è ancora tornata dal main: finché c'è, il turno dopo aspetta lei.
+  let chiusuraInCorso = null;
   // Chi ferma lo fa di fretta e insiste (doppio clic, Invio ripetuto): per un attimo il secondo colpo trova ancora il
   // quadrato spento, non «riprendi».
   const PAUSA_RIPRESA = 700;
