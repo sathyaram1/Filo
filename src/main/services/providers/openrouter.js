@@ -141,12 +141,17 @@
     return out;
   }
 
-  // Il 404 del router quando, fra gli host ammessi, nessuno regge i parametri chiesti (o nessuno resta).
-  const NO_HOST_FOR_PARAMS_RE = /no endpoints found|no allowed providers|parameter|tool/i;
-  // Lo stesso 404 quando a scartare gli host è la politica sui dati dell'account OpenRouter: né strumenti
-  // né ragionamento c'entrano, e chi lo racconta deve mandare alla privacy, non a cambiare modello.
-  const DATA_POLICY_RE = /data policy|settings\/privacy/i;
-  const isParamsRefusal = (text) => NO_HOST_FOR_PARAMS_RE.test(text) && !DATA_POLICY_RE.test(text);
+  // Il 404 «nessun host» del router ha più cause, e solo quella sui parametri chiesti riguarda strumenti e
+  // ragionamento: le altre hanno un rimedio diverso e non si ritentano. Prove: tests/unit/openrouterTools.test.mjs.
+  function routerRefusal(text) {
+    const t = String(text || '');
+    if (/data policy|settings\/privacy/i.test(t)) return 'DATA_POLICY';
+    if (/requested parameters|tool/i.test(t)) return 'PARAMS';
+    if (/no endpoints found for\b/i.test(t)) return 'MODEL_UNAVAILABLE';
+    if (/no allowed providers|no endpoints (found|available)/i.test(t)) return 'NO_PROVIDER_ALLOWED';
+    return null;
+  }
+  const isParamsRefusal = (text) => routerRefusal(text) === 'PARAMS';
 
   // Una chiamata di chat (con o senza streaming). `require_parameters` scarta anche gli host che non
   // conoscono `reasoning`, e per un modello che non ragiona non ne resterebbe nessuno: il ragionamento
@@ -462,8 +467,8 @@
     err.provider = 'openrouter';
     // Con gli strumenti il router cerca solo host che li reggono: il suo 404 vuol dire che fra gli
     // ammessi non ce n'è, e chi lo racconta deve dire questo, non «riprova».
-    if (res.status === 404 && DATA_POLICY_RE.test(errText)) err.code = 'DATA_POLICY';
-    else if (tools && res.status === 404 && isParamsRefusal(errText)) err.code = 'NO_TOOL_HOST';
+    const refusal = res.status === 404 ? routerRefusal(errText) : null;
+    if (refusal === 'PARAMS') { if (tools) err.code = 'NO_TOOL_HOST'; } else if (refusal) err.code = refusal;
     if (res.keySource) err.keySource = res.keySource;
     if (res.keyFallback) err.keyFallback = res.keyFallback;
     return err;
