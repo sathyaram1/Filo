@@ -315,15 +315,12 @@
     const body = { model, messages, stream: false, usage: { include: true }, ...toolsFields(tools, toolChoice) };
     const r = reasoningField(reasoning, false);
     if (r) body.reasoning = r;
-    const pb = providerBlock(providerRouting, model);
+    const pb = providerBlock(providerRouting, model, { tools: !!body.tools });
     if (pb) body.provider = pb;
-    const payload = JSON.stringify(body);
-    const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(ENDPOINT, apiKey, (key) => ({
-      method: 'POST', headers: buildHeaders(key), body: payload, signal,
-    }));
+    const { res, keyUsed, keySource, keyFallback } = await postChat(body, apiKey, signal);
     // status/provider strutturati sull'errore: chi lo mostra all'utente può
     // tradurlo in una frase comprensibile invece del codice HTTP nudo (#331).
-    if (!res.ok) throw await httpError(res);
+    if (!res.ok) throw await httpError(res, { tools: !!body.tools });
     const data = await res.json();
     const message = data.choices?.[0]?.message || {};
     const text = message.content || '';
@@ -357,15 +354,12 @@
     // non ragionano semplicemente non ne emettono — best-effort.
     const r = reasoningField(reasoning, !!onReasoning);
     if (r) reqBody.reasoning = r;
-    const pb = providerBlock(providerRouting, model);
+    const pb = providerBlock(providerRouting, model, { tools: !!reqBody.tools });
     if (pb) reqBody.provider = pb;
-    const payload = JSON.stringify(reqBody);
     // Il rifiuto della chiave arriva con lo status, prima di qualunque delta:
     // il ripiego qui non ha ancora niente da azzerare nel chiamante.
-    const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(ENDPOINT, apiKey, (key) => ({
-      method: 'POST', headers: buildHeaders(key), body: payload, signal,
-    }));
-    if (!res.ok || !res.body) throw await httpError(res);
+    const { res, keyUsed, keySource, keyFallback } = await postChat(reqBody, apiKey, signal);
+    if (!res.ok || !res.body) throw await httpError(res, { tools: !!reqBody.tools });
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder('utf-8');
@@ -445,11 +439,14 @@
   // personale c'è stato e ha fallito (fetchWithKey li lascia sulla risposta):
   // un 402 «la tua chiave» e un 402 «anche i crediti di Filo» sono due frasi
   // diverse per l'utente.
-  async function httpError(res) {
+  async function httpError(res, { tools = false } = {}) {
     const errText = await res.text().catch(() => '');
     const err = new Error(`OpenRouter ${res.status}: ${errText.slice(0, 300)}`);
     err.status = res.status;
     err.provider = 'openrouter';
+    // Con gli strumenti il router cerca solo host che li reggono: il suo 404 vuol dire che fra gli
+    // ammessi non ce n'è, e chi lo racconta deve dire questo, non «riprova».
+    if (tools && res.status === 404 && NO_HOST_FOR_PARAMS_RE.test(errText)) err.code = 'NO_TOOL_HOST';
     if (res.keySource) err.keySource = res.keySource;
     if (res.keyFallback) err.keyFallback = res.keyFallback;
     return err;
