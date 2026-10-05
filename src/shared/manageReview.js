@@ -1562,14 +1562,21 @@
     if (ferme.length) {
       const req = ferme[0];
       const inConflitto = failed.length > 0;
+      // Una richiesta già mandata a fondere (tasto o segno), o già decisa, non aspetta più il via libera (#702).
+      const statoDi = (opts && typeof opts.statoRichiesta === 'function') ? opts.statoRichiesta : () => null;
+      const stati = pending.map((r) => statoDi(r));
+      const fusione = inConflitto || stati.some((s) => s !== 'volo' && s !== 'decisa') ? null
+        : (stati.includes('volo') ? 'volo' : 'decisa');
       return forma('l5', 'quadrato', titolo, 'attack', inConflitto ? 'conflitto' : 'bloccato', {
         titolo,
         righe: [],
         testo: inConflitto
           ? 'Avevi detto sì, ma la fusione non è avvenuta: il ramo non entra in main finché non si sistema.'
-          : 'I controlli del server l’hanno fermata: entra in main solo col tuo via libera.',
+          : fusione === 'volo' ? 'Il via libera è partito: il server sta fondendo il ramo.'
+            : fusione === 'decisa' ? 'Hai già deciso: la richiesta esce da qui appena la pagina rilegge le fusioni.'
+              : 'I controlli del server l’hanno fermata: entra in main solo col tuo via libera.',
         azioni: [],
-      }, { richiesta: req, richieste: ferme, conflitto: inConflitto });
+      }, { richiesta: req, richieste: ferme, conflitto: inConflitto, fusione });
     }
 
     const versione = String((fb && fb.resolvedInVersion) || '').trim();

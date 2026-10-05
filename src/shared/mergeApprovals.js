@@ -813,8 +813,7 @@
       title.appendChild(el('span', 'sn-mac-title-text', headline(list.length)));
       box.appendChild(title);
 
-      var intro = el('p', 'sn-mac-intro',
-        'I controlli di sicurezza del server le hanno fermate perché toccano parti protette. Aspettano il tuo sì.');
+      var intro = el('p', 'sn-mac-intro', INTRO_FERME);
       box.appendChild(intro);
 
       for (var i = 0; i < list.length; i++) box.appendChild(buildCard(list[i], o));
@@ -1065,6 +1064,7 @@
     timeAgo: timeAgo,
     expiresIn: expiresIn,
     headline: headline,
+    introText: introText,
     requestedBy: requestedBy,
     originOf: originOf,
     feedbackNum: feedbackNum,
@@ -1080,6 +1080,7 @@
     render: render,
     occupata: occupata,
     quandoLibera: quandoLibera,
+    seguiSulPosto: seguiSulPosto,
     renderRecent: renderRecent,
     preapprovedBy: preapprovedBy,
     segnoPreapprovazione: segnoPreapprovazione,
