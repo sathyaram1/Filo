@@ -43,6 +43,13 @@
   // rawUserMessages serve solo al "judge" lato server come riferimento.
   let session = null;
   let ripiegoDetto = false;
+  let ripiegoDaDire = '';
+  function diciRipiego() {
+    if (!ripiegoDaDire) return;
+    const riga = ripiegoDaDire;
+    ripiegoDaDire = '';
+    appendActionLog(riga)?.classList.add('sn-sidebar-log-intera');
+  }
   function newSession() {
     return {
       initialUrl: '',
