@@ -61,6 +61,9 @@ test('da un sito visitato ogni canale dei feedback rifiuta per provenienza', asy
       decifraTesto: { type: MSG.FEEDBACK_DECRYPT_FIELDS, fields: { text: 'FENC1:qualcosa' } },
       decifraAllegato: { type: MSG.FEEDBACK_DECRYPT_IMAGE, url: 'https://storage.googleapis.com/altro/allegato' },
       rivaluta: { type: MSG.FEEDBACK_REEVALUATE, feedbackIds: ['fb-uno'] },
+      // Iscriversi al giro è farsi mandare i feedback dell'owner a ogni
+      // cambiamento: la porta più golosa di tutte per un sito visitato.
+      giroIscrizione: { type: MSG.FEEDBACK_LIVE_SUBSCRIBE },
       _mittente: mittente,
     });
     const esegui = async (mittente) => {

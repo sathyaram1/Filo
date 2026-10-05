@@ -7,6 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { acquireBearer, FIRESTORE_BASE } from './lib/firestore-auth.mjs';
+import { firmaOra, patchFirmato } from './lib/firma-ora.mjs';
 import { contatoreLetture } from './lib/letture.mjs';
 import { chiScrive } from './owner-feedback.mjs';
 import '../src/shared/feedbackThread.js';
@@ -396,18 +397,18 @@ const scrittoreFirestore = (bearer) => {
   return {
     async prova(d) {
       // Senza la precondizione un documento cancellato nel frattempo rinascerebbe con il solo campo della prova.
-      return fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(d.id)}?updateMask.fieldPaths=senderProof&currentDocument.exists=true`, {
+      return patchFirmato(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(d.id)}?updateMask.fieldPaths=senderProof&updateMask.fieldPaths=updatedAt&currentDocument.exists=true`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
-        body: JSON.stringify({ fields: { senderProof: { stringValue: d.prova } } }),
+        body: JSON.stringify({ fields: { senderProof: { stringValue: d.prova }, updatedAt: firmaOra() } }),
       }).catch(rete);
     },
     async locale(d) {
       const segno = { mapValue: { fields: { by: { stringValue: chiScrive(bearer) }, at: { integerValue: String(Date.now()) } } } };
-      const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(d.id)}?updateMask.fieldPaths=localOnly&currentDocument.exists=true`, {
+      const res = await patchFirmato(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(d.id)}?updateMask.fieldPaths=localOnly&updateMask.fieldPaths=updatedAt&currentDocument.exists=true`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
-        body: JSON.stringify({ fields: { localOnly: segno } }),
+        body: JSON.stringify({ fields: { localOnly: segno, updatedAt: firmaOra() } }),
       }).catch(rete);
       if (!res || !res.ok) return res;
       const via = await fetch(`${FIRESTORE_BASE}/feedback-public/${encodeURIComponent(d.id)}`, {

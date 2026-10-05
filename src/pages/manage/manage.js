@@ -1897,7 +1897,7 @@
   // Il caricamento si ferma ai 500 più recenti: quando li tocca tutti, i numeri
   // diventano "(24+)" — sono minimi, non totali — e l'hover dice perché.
   function loadHitCap() {
-    return FB.listHitCap(allFeedbacks, FB.LIST_PAGE_SIZE);
+    return caricoIncompleto;
   }
 
   // ── Quando lo stato non si legge, le sezioni non si disegnano ─────────────
@@ -1961,9 +1961,19 @@
     mgListHead.textContent = (n === null || n === undefined)
       ? label
       : `${label} ${countText(n)}`;
-    if (n !== null && n !== undefined && loadHitCap()) mgListHead.title = FB.COUNT_CAP_HINT;
-    else mgListHead.removeAttribute('title');
+    testaIncompleta = n !== null && n !== undefined && loadHitCap();
     aggiornaSegnoFerma();
+  }
+
+  // Il suggerimento dell'intestazione lo scrive solo questa: ridisegnando il conteggio si perdeva l'avviso del giro
+  // appena messo (#676).
+  let testaIncompleta = false;
+  let avvisoGiro = '';
+  function scriviTitoloTesta(ferma) {
+    if (!mgListHead) return;
+    const parti = [ferma || (testaIncompleta ? FB.COUNT_INCOMPLETE_HINT : ''), avvisoGiro ? `Aggiornamento: ${avvisoGiro}` : ''].filter(Boolean);
+    if (parti.length) mgListHead.title = parti.join('\n');
+    else mgListHead.removeAttribute('title');
   }
 
   function updateTabCounts() {
@@ -1985,7 +1995,7 @@
       if (!btn) continue;
       btn.classList.toggle('mg-tab--arrivi', conArrivi.has(tab));
       btn.textContent = counts ? `${TAB_LABELS[tab] || tab} ` : (TAB_LABELS[tab] || tab);
-      if (capped) btn.title = FB.COUNT_CAP_HINT;
+      if (capped) btn.title = FB.COUNT_INCOMPLETE_HINT;
       else btn.removeAttribute('title');
       if (!counts) continue;
       const badge = document.createElement('span');
@@ -2078,7 +2088,7 @@
     // Col caricamento al tetto una sezione "vuota" può non esserlo davvero: i
     // feedback più vecchi non sono qui. Il vuoto lo dice, invece di negarli.
     if (loadHitCap() && dataLoaded) {
-      mgListEmpty.textContent = `${mgListEmpty.textContent} ${FB.COUNT_CAP_HINT}`;
+      mgListEmpty.textContent = `${mgListEmpty.textContent} ${FB.COUNT_INCOMPLETE_HINT}`;
     }
 
     // Barra "Ri-valuta i non filtrati": compare solo nei Ricevuti quando c'è
@@ -2551,7 +2561,7 @@
       mgList.hidden = true;
       mgListEmpty.hidden = false;
       mgListEmpty.textContent = 'Nessun feedback pertinente.'
-        + (loadHitCap() ? ` ${FB.COUNT_CAP_HINT}` : '');
+        + (loadHitCap() ? ` ${FB.COUNT_INCOMPLETE_HINT}` : '');
     };
 
     if (!results.length) {
@@ -4544,7 +4554,7 @@
         toast(m.text, m.kind === 'ok' ? 'ok' : 'err');
         // L'esito cambia il pentagono e (se si è aperta una richiesta) il
         // quadrato: si rilegge tutto invece di indovinare.
-        setTimeout(() => { loadMergeApprovals(); refreshFromRemote(); }, 800);
+        setTimeout(() => { loadMergeApprovals(); refreshFromRemote({ force: true }).catch(() => {}); }, 800);
       } catch (e) {
         esito.dataset.kind = 'err';
         esito.textContent = e.message || 'Non riuscito.';
@@ -4700,6 +4710,12 @@
   }
 
   // ── Caricamento dati ──────────────────────────────────────────────────────
+  // Se il freno sulle pagine scatta, la pagina lo dice (loadHitCap → «N+»).
+  let caricoIncompleto = false;
+  function leggiTutti() {
+    return FB.listAllPaged({ fields: FB.CAMPI_LISTA, lista: true });
+  }
+
   async function loadData() {
     mgListLoading.hidden = false;
     mgList.hidden = true;
@@ -4717,14 +4733,14 @@
     if (testDataInjected) return;
 
     try {
-      // Il tetto viene dal modulo condiviso: `loadHitCap()` confronta contro
-      // QUELLO, e due numeri scritti a mano prima o poi divergono.
-      // La prima lettura parte all'apertura della pagina (init), PRIMA delle
-      // altre letture di avvio: qui la si aspetta soltanto. Le volte dopo
-      // (ricaricamento dopo un errore) si legge da capo.
+      // TUTTI i feedback, a pagine, solo i campi della lista (#676): un
+      // feedback vecchio che torna nei Ricevuti deve esserci. La prima lettura
+      // parte all'apertura (init) e qui la si aspetta soltanto.
       const pending = firstListPromise;
       firstListPromise = null;
-      const fresh = await (pending || FB.list({ pageSize: FB.LIST_PAGE_SIZE, fields: FB.CAMPI_LISTA }));
+      const letti = await (pending || leggiTutti());
+      const fresh = letti.rows;
+      if (!testDataInjected) caricoIncompleto = !letti.complete;
       // Nel frattempo uno spec ha iniettato dati finti? Quelli vincono: la
       // lista vera arrivata dopo non li sovrascrive (era una gara persa a caso,
       // e più il caricamento è veloce più spesso la si perdeva).
@@ -4765,6 +4781,7 @@
 
     reindexByClient();
     renderList();
+    aggiornaSeguiti();
     liveLastAt = Date.now();
     liveOkAt = liveLastAt;
   }
@@ -4785,12 +4802,15 @@
   }
 
   // ── Aggiornamento continuo ────────────────────────────────────────────────
-  // Versioni → soli documenti cambiati → fusione, e solo mentre qualcuno
-  // guarda: patterns/dati-che-cambiano-altrove-cloud-si-chiede-la-versione.md.
+  // Solo mentre qualcuno guarda: patterns/dati-che-cambiano-altrove-cloud-si-chiede-la-versione.md.
   const LIVE = window.SN_FEEDBACK_LIVE;
+  const LIVE_SUBSCRIBE = (window.SN_MSG?.MSG?.FEEDBACK_LIVE_SUBSCRIBE) || 'feedback_live_subscribe';
+  const LIVE_CHANGED = (window.SN_MSG?.MSG?.FEEDBACK_LIVE_CHANGED) || 'feedback_live_changed';
+  // Il giro vero: lo chiede al main, che ne tiene uno per tutte le Gestioni.
+  const giroDalMain = ({ watch, force } = {}) => sendToMain({ type: LIVE_SUBSCRIBE, giro: true, watch, force: !!force });
   // Sorgenti sostituibili dagli spec (che non hanno Firestore).
   const liveSources = {
-    listVersions: (o) => FB.listVersions(o),
+    giro: giroDalMain,
     // Il giro dal vivo rilegge le RIGHE: stessa proiezione del caricamento.
     getMany: (ids) => FB.getMany(ids, { fields: FB.CAMPI_LISTA, timeoutMs: 20000 }),
     // Il documento intero, per il feedback che l'owner ha aperto. Col tempo
@@ -4838,15 +4858,12 @@
 
   // «Ferma» si dice solo a chi guarda, e solo dopo più giri mancati.
   function aggiornaSegnoFerma() {
-    if (!mgListHead || !LIVE) return;
-    const ferma = LIVE.listaFerma({ ora: Date.now(), inVista: vistaOra(), ultimoRiuscito: liveOkAt });
+    if (!mgListHead) return;
+    const ferma = !!LIVE && LIVE.listaFerma({ ora: Date.now(), inVista: vistaOra(), ultimoRiuscito: liveOkAt });
     mgListHead.classList.toggle('mg-list-head--ferma', ferma);
-    if (ferma) {
-      mgListHead.title = `Lista ferma alle ${formatDateTime(new Date(liveOkAt).toISOString())}: `
-        + 'il server non risponde, riprovo da solo.';
-    } else if (mgListHead.title && mgListHead.title.startsWith('Lista ferma')) {
-      mgListHead.removeAttribute('title');
-    }
+    scriviTitoloTesta(ferma
+      ? `Lista ferma alle ${formatDateTime(new Date(liveOkAt).toISOString())}: il server non risponde, riprovo da solo.`
+      : '');
   }
 
   // L'owner sta scrivendo nel pannello (commento, risposta, nota)? Allora il
@@ -4985,63 +5002,149 @@
     return false;
   }
 
-  // Un giro: versioni → differenze → documenti cambiati → decifratura → fusione.
-  // Ritorna { changed } (quanti feedback sono stati toccati). Un giro già in
-  // corso viene riusato, non raddoppiato.
-  async function refreshFromRemote() {
+  // ── Il giro dei cambiati (#676) ───────────────────────────────────────────
+  // Il giro vive nel main, uno per tutte le Gestioni: la pagina in vista lo
+  // chiede (orologio → decidiGiro), riceve le righe cambiate o, ogni mezz'ora,
+  // le versioni di tutta la collezione; le altre Gestioni aperte ricevono lo
+  // stesso esito per avviso. Regola: patterns/chi-guarda-in-continuo-chiede-cosa-e-cambiato.md.
+
+  // Le fusioni del giro e degli avvisi passano in fila: due sulla stessa lista
+  // si pesterebbero.
+  let codaFusioni = Promise.resolve();
+  function inCoda(fn) {
+    const p = codaFusioni.then(fn, fn);
+    codaFusioni = p.catch(() => {});
+    return p;
+  }
+
+  // Fonde righe già lette. `fresche`: solo quelle scritte dopo la copia in
+  // mano (la domanda per data torna indietro di qualche minuto e rimanda righe
+  // già viste: rifonderle ridisegnerebbe il pannello per niente).
+  async function mergeLive(fresh, { removed = [], fresche = false, gen = liveGen } = {}) {
+    const inMano = new Map(allFeedbacks.map((f) => [String(f && f._id), f && f._updateTime]));
+    let righe = (Array.isArray(fresh) ? fresh : []).filter((r) => {
+      if (!r || !r._id) return false;
+      if (!fresche) return true;
+      const mio = inMano.get(String(r._id));
+      return !mio || !r._updateTime || r._updateTime > mio;
+    });
+    if (righe.length === 0 && removed.length === 0) {
+      // Niente di nuovo, ma una scheda sparita in un giro precedente (tenuta
+      // aperta per una bozza) può chiudersi ora che la bozza non c'è più.
+      closeDetailIfGone();
+      // Il registro delle routine può essere cresciuto lo stesso: le
+      // statistiche seguono anche questo giro (feedback #496).
+      fsSegueLive([], []).catch(() => {});
+      return { changed: 0 };
+    }
+    if (isAdmin && righe.length > 0) {
+      try {
+        const r = await conTempo(sendToMain({ type: 'feedback_decrypt_fields', list: righe }), 30000);
+        if (r && r.ok && Array.isArray(r.list)) righe = r.list;
+      } catch (_) { /* come al caricamento: valori cifrati piuttosto che niente */ }
+    }
+    if (gen !== liveGen) return { changed: 0 };
+    const ids = righe.map((f) => f && f._id).filter(Boolean);
+    const primaDelGiro = new Map(allFeedbacks.map((f) => [String(f._id), sezioneDi(f)]));
+    const statiMossi = LIVE.statoCambiato(allFeedbacks, righe);
+    allFeedbacks = LIVE.applyChanges(allFeedbacks, { fresh: righe, removed });
+    reindexByClient();
+    segnaArrivi(primaDelGiro, righe);
+    if (statiMossi && isAdmin) loadMergeApprovals();
+    // Il segno «fondi senza chiedermelo» può arrivare da fuori (script
+    // dell'owner, altra finestra): senza questo giro il ramo resta fermo.
+    fondiPreapprovateInAttesa();
+    rerenderAfterLive(new Set(ids));
+    fsSegueLive(righe, removed).catch(() => {});
+    aggiornaSeguiti();
+    return { changed: ids.length + removed.length };
+  }
+
+  // Il riallineamento: versioni → differenze → rilettura dei soli cambiati.
+  // Lo fa la pagina perché solo lei sa quali documenti le mancano. Una lettura
+  // interrotta non fa uscire nessuno: «non l'ho visto» non vuol dire «non c'è».
+  async function reconcileFrom(remote, { complete = true, gen = liveGen } = {}) {
+    if (!Array.isArray(remote)) throw new Error('versioni non lette');
+    const { changed, added, removed } = LIVE.diffVersions(allFeedbacks, remote);
+    const ids = changed.concat(added);
+    const fresh = ids.length > 0 ? await liveSources.getMany(ids) : [];
+    if (gen !== liveGen) return { changed: 0 };
+    return mergeLive(fresh, { removed: complete ? removed : [], gen });
+  }
+
+  // Avvisi del giro (freno sulle pagine, tetto dei seguiti, registro
+  // illeggibile): si dicono sull'intestazione della lista, non si tacciono.
+  function segnaAvvisoGiro(avvisi) {
+    const testo = (Array.isArray(avvisi) ? avvisi : []).filter(Boolean).join(' · ');
+    if (testo) console.warn('[manage] giro:', testo);
+    avvisoGiro = testo;
+    if (!mgListHead) return;
+    mgListHead.classList.toggle('mg-list-head--avviso', !!testo);
+    aggiornaSegnoFerma();
+  }
+
+  function applicaEsito(esito, gen = liveGen) {
+    return inCoda(async () => {
+      if (!esito || !dataLoaded) return { changed: 0 };
+      if (Array.isArray(esito.avvisi) || esito.kind === 'changed' || esito.kind === 'reconcile') {
+        segnaAvvisoGiro(esito.avvisi);
+      }
+      if (esito.kind === 'reconcile') return reconcileFrom(esito.versions, { complete: esito.complete !== false, gen });
+      if (esito.kind === 'changed') return mergeLive(esito.rows, { fresche: true, gen });
+      closeDetailIfGone();
+      return { changed: 0 };
+    });
+  }
+
+  // L'avviso di un giro chiesto da un'altra Gestione.
+  function onLiveBroadcast(m) {
+    if (!liveEnabled || liveBlocked || !dataLoaded) return;
+    applicaEsito(m).catch((e) => console.warn('[manage] aggiornamento:', e?.message || e));
+  }
+
+  // Un giro: si chiede al main, si fonde l'esito. Ritorna { changed }. Un giro
+  // già in corso viene riusato, non raddoppiato.
+  function refreshFromRemote({ force = false } = {}) {
     if (liveTick) return liveTick;
     const gen = ++liveGen;
     liveTickDa = Date.now();
     liveTick = (async () => {
-      const remote = await liveSources.listVersions({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 20000 });
+      const watch = idsDaSeguire();
+      seguitiInviati = watch.join(',');
+      const r = await liveSources.giro({ watch, force });
       if (gen !== liveGen) return { changed: 0 };
-      // Una risposta che non è un elenco non è "tutto sparito": è un guasto,
-      // e un guasto lascia la lista com'è.
-      if (!Array.isArray(remote)) throw new Error('versioni non lette');
-      const { changed, added, removed } = LIVE.diffVersions(allFeedbacks, remote);
-      const ids = changed.concat(added);
-      if (ids.length === 0 && removed.length === 0) {
-        // Niente di nuovo, ma una scheda sparita in un giro precedente (tenuta
-        // aperta per una bozza) può chiudersi ora che la bozza non c'è più.
-        closeDetailIfGone();
-        // Nessuna segnalazione è cambiata, ma il registro delle routine può
-        // essere cresciuto lo stesso (un'esplorazione che non trova niente):
-        // le statistiche seguono anche questo giro (feedback #496).
-        fsSegueLive([], []).catch(() => {});
-        liveOkAt = Date.now();
-        return { changed: 0 };
-      }
-      let fresh = ids.length > 0 ? await liveSources.getMany(ids) : [];
-      if (isAdmin && fresh.length > 0) {
-        try {
-          const r = await conTempo(sendToMain({ type: 'feedback_decrypt_fields', list: fresh }), 30000);
-          if (r && r.ok && Array.isArray(r.list)) fresh = r.list;
-        } catch (_) { /* come al caricamento: valori cifrati piuttosto che niente */ }
-      }
-      if (gen !== liveGen) return { changed: 0 };
-      const primaDelGiro = new Map(allFeedbacks.map((f) => [String(f._id), sezioneDi(f)]));
-      const statiMossi = LIVE.statoCambiato(allFeedbacks, fresh);
-      allFeedbacks = LIVE.applyChanges(allFeedbacks, { fresh, removed });
-      reindexByClient();
-      segnaArrivi(primaDelGiro, fresh);
-      if (statiMossi && isAdmin) loadMergeApprovals();
-      // Il segno «fondi senza chiedermelo» può arrivare da fuori — dallo script
-      // dell'owner o da un'altra finestra — e allora la richiesta ferma è la
-      // stessa di prima: nessuno avvisa, e senza questo giro il ramo resta fermo
-      // finché la pagina non viene riaperta.
-      fondiPreapprovateInAttesa();
-      rerenderAfterLive(new Set(ids));
-      // Anche le statistiche seguono il giro: quello che la pagina ha appena
-      // imparato vale per i numeri quanto per la lista (feedback #496).
-      fsSegueLive(fresh, removed).catch(() => {});
+      if (!r || r.ok !== true) throw new Error((r && r.error) || 'giro non riuscito');
+      if (r.scartati) console.warn(`[manage] giro: ${r.scartati} seguiti oltre il tetto`);
+      const out = await applicaEsito(r.giro || { kind: 'skipped' }, gen);
       liveOkAt = Date.now();
-      return { changed: ids.length + removed.length };
+      return out;
     })().finally(() => {
       if (gen === liveGen) { liveTick = null; liveTickDa = 0; }
       liveLastAt = Date.now();
       aggiornaSegnoFerma();
     });
     return liveTick;
+  }
+
+  // I feedback in mano alle routine: di loro il giro chiede l'ora di Firestore,
+  // perché chi li scrive può non firmare la sua. Tutti, senza campione della
+  // coda: quale sarà il prossimo lo dice il registro dei worker al main (#676.1).
+  function idsDaSeguire() {
+    return (allFeedbacks || []).filter((fb) => fb && fb._id && MR.workProgress(fb)).map((fb) => String(fb._id));
+  }
+
+  let seguitiInviati = '';
+  function inviaSeguiti(extra = {}) {
+    const watch = idsDaSeguire();
+    seguitiInviati = watch.join(',');
+    return sendToMain({ type: LIVE_SUBSCRIBE, watch, ...extra }).catch(() => {});
+  }
+
+  // Chi va seguito è cambiato: il main lo sa subito (costa un messaggio, non letture).
+  function aggiornaSeguiti() {
+    if (!liveEnabled || liveBlocked || liveSources.giro !== giroDalMain) return;
+    if (idsDaSeguire().join(',') === seguitiInviati) return;
+    inviaSeguiti();
   }
 
   function orologio(motivo) {
@@ -5096,12 +5199,16 @@
     sendToMain({ type: TAB_IN_VISTA_GET })
       .then((r) => { if (r && r.ok && typeof r.inVista === 'boolean') impostaVista(r.inVista); })
       .catch(() => {});
+    if (liveSources.giro === giroDalMain) inviaSeguiti();
   }
 
   function stopLive() {
+    const eraAcceso = liveEnabled;
     liveEnabled = false;
     if (liveClock) { clearInterval(liveClock); liveClock = null; }
+    if (eraAcceso) sendToMain({ type: LIVE_SUBSCRIBE, off: true }).catch(() => {});
   }
+  window.addEventListener('pagehide', () => { sendToMain({ type: LIVE_SUBSCRIBE, off: true }).catch(() => {}); });
 
   // ── Hook di test ────────────────────────────────────────────────────────
   // Solo per gli spec Playwright: inietta feedback e apre il dettaglio
@@ -5121,6 +5228,8 @@
       testDataInjected = true;
       arrivate.clear();
       allFeedbacks = Array.isArray(fbs) ? fbs : [];
+      // `incompleto`: come se il freno sulle pagine avesse interrotto la lettura.
+      caricoIncompleto = !!(opts && opts.incompleto);
       dataLoaded = true;
       loadFailed = false;
       reindexByClient();
@@ -5154,13 +5263,35 @@
       reindexByClient();
       renderList();
     },
+    // Chi la pagina chiede al giro di seguire con l'ora vera di Firestore.
+    idsDaSeguire,
+    // Una riga della lista com'è in mano alla pagina, qualunque sezione la mostri.
+    riga(id) { const f = allFeedbacks.find((x) => x._id === id); return f ? { name: f.name, status: f.status } : null; },
     // Aggiornamento continuo: un giro subito (ritorna { changed }), e le
     // sorgenti finte { listVersions(opts), getMany(ids) } con cui farlo.
-    pollNow() { return refreshFromRemote(); },
+    pollNow() { return refreshFromRemote({ force: true }); },
+    // L'avviso del giro del main, come se fosse arrivato dal canale: gli spec
+    // provano le due forme senza dover fingere anche l'IPC.
+    liveMessage(m) { return applicaEsito(m); },
+    // Dopo `setData` il canale resta chiuso, o il giro vero rimpiazzerebbe i
+    // dati finti. Uno spec che vuole provare il giro INTERO (main → pagina)
+    // lo riapre da qui, coi dati finti già in pagina.
+    resumeLive() { liveBlocked = false; liveSources.giro = giroDalMain; stopLive(); startLive(); },
+    avvisoGiro() { return avvisoGiro; },
     // Un giro di ridisegno da aggiornamento remoto, su richiesta: i test lo
     // usano per verificare che una bozza in corso lo trattenga (ritorna false).
     rerenderIfIdle(id) { return rerenderAfterLive(new Set([id])); },
-    setLiveSources(src) { Object.assign(liveSources, src || {}); },
+    // Sorgenti finte. Chi passa solo `listVersions` ottiene un giro che fa il
+    // riallineamento su quelle versioni (com'era prima del giro nel main).
+    setLiveSources(src) {
+      Object.assign(liveSources, src || {});
+      if (src && typeof src.listVersions === 'function' && typeof src.giro !== 'function') {
+        liveSources.giro = async () => ({
+          ok: true,
+          giro: { kind: 'reconcile', versions: await src.listVersions({ timeoutMs: 20000 }) },
+        });
+      }
+    },
     isLiveOn() { return liveEnabled; },
     setAdmin(v) { setIsAdmin(!!v); applyAutoModeGate(); },
     // Ri-legge i contatori del verificatore dalla fonte (IPC) — per i test.
@@ -5846,7 +5977,7 @@
     if (fsRipiego) {
       righe.push(fsErrore
         ? fsErrore
-        : `Non è riuscita la lettura di tutte le segnalazioni: qui sotto ci sono solo le ${FB.LIST_PAGE_SIZE} più recenti già in pagina, quindi i numeri sono minimi, non totali.`);
+        : `Non è riuscita la lettura di tutte le segnalazioni: i numeri vengono dalla lista già in pagina${caricoIncompleto ? ", che è incompleta: sono minimi, non totali" : ", senza i campi di dettaglio"}.`);
     } else if (!fsCompleto) {
       righe.push('La lettura delle segnalazioni si è fermata prima della fine: i numeri sulle segnalazioni sono minimi, non totali.');
     }
@@ -6988,6 +7119,7 @@
   if (window.filo?.onBroadcast) {
     window.filo.onBroadcast((m) => {
       if (m && m.type === MERGE_APPROVALS_CHANGED) loadMergeApprovals(m);
+      if (m && m.type === LIVE_CHANGED) onLiveBroadcast(m);
     });
   }
 
@@ -7167,7 +7299,7 @@
     // La lista è la cosa più lenta (secondi di rete): parte SUBITO, e le altre
     // letture di avvio girano mentre viaggia, invece di metterlesi davanti in
     // fila. loadData la aspetta; un errore lo raccoglie lì, non qui.
-    firstListPromise = FB.list({ pageSize: FB.LIST_PAGE_SIZE, fields: FB.CAMPI_LISTA });
+    firstListPromise = leggiTutti();
     firstListPromise.catch(() => {});
     injectSearchIcons();
     await loadLayout();

@@ -83,6 +83,7 @@ import { acquireBearer, FIRESTORE_BASE } from './lib/firestore-auth.mjs';
 import { isRoutineInstance } from './lib/routine-role.mjs';
 import { avvisoDaCampi, parseRiferimento, risolviFeedback } from './lib/pratica-locale.mjs';
 import { PARTI, RAMO_RE, partiDaCampi } from './lib/parti-lavoro.mjs';
+import { firmaOra, patchFirmato } from './lib/firma-ora.mjs';
 // Moduli IIFE: importarli li registra su globalThis.
 import '../src/shared/feedbackThread.js';
 // La PUBBLICA va caricata PRIMA della cifratura: senza, il gate risulta spento e
@@ -157,11 +158,13 @@ export async function segnaPreapprovazione(id, valore, opts = {}) {
   const vietata = valore ? preapprovaVietata(await praticaInChiaro(doc)) : '';
   if (vietata) return { ok: false, motivo: vietata };
   const fields = {};
-  const mask = ['mergePreapproved'];
+  const mask = ['mergePreapproved', 'updatedAt'];
+  fields.updatedAt = firmaOra();
   const segno = valore ? { by: chiScrive(bearer), at: new Date().toISOString() } : null;
   if (segno) fields.mergePreapproved = toFsValue(segno);
   if (opts.dryRun) return { ok: true, dryRun: true, campi: mask, segno };
-  const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?updateMask.fieldPaths=mergePreapproved`, {
+  const qsSegno = mask.map((m) => `updateMask.fieldPaths=${m}`).join('&');
+  const res = await patchFirmato(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?${qsSegno}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
     body: JSON.stringify({ fields }),
@@ -271,9 +274,9 @@ export async function segnaLocale(id, valore, opts = {}) {
   // Il feedback di un utente approvato tiene la scheda: è da lì che chi l'ha mandato vede la risoluzione.
   const tieneScheda = MR.isLocalApproved(fb);
   if (opts.dryRun) return { ok: true, dryRun: true, segno, chiusa, tieneScheda };
-  const fields = segno ? { localOnly: toFsValue(segno) } : {};
+  const fields = segno ? { localOnly: toFsValue(segno), updatedAt: firmaOra() } : { updatedAt: firmaOra() };
   // Il sì dell'owner (#913) resta anche col segno tolto: si dà solo dai Ricevuti, e senza il segno non si rimetterebbe.
-  const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?updateMask.fieldPaths=localOnly`, {
+  const res = await patchFirmato(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?updateMask.fieldPaths=localOnly&updateMask.fieldPaths=updatedAt`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
     body: JSON.stringify({ fields }),
@@ -391,9 +394,9 @@ export async function scriviFrase(id, frase, opts = {}) {
   if (!leggibile) return { ok: false, motivo: 'stato attuale non decifrabile: non so dove sta la pratica' };
   const vietata = partenzaVietata(from);
   if (vietata) return { ok: false, motivo: vietata };
-  const fields = { userNote: toFsValue(testo) };
+  const fields = { userNote: toFsValue(testo), updatedAt: firmaOra() };
   if (opts.dryRun) return { ok: true, dryRun: true };
-  const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?updateMask.fieldPaths=userNote`, {
+  const res = await patchFirmato(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?updateMask.fieldPaths=userNote&updateMask.fieldPaths=updatedAt`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
     body: JSON.stringify({ fields }),
@@ -430,9 +433,9 @@ export async function registraParte(id, parte, opts = {}) {
     ...(opts.solo ? { solo: { stringValue: parte } } : {}),
     ...(RAMO_RE.test(String(opts.ramo || '')) ? { ramo: { stringValue: opts.ramo } } : {}),
   };
-  const fields = { localMerges: { mapValue: { fields: campi } } };
-  const q = Object.keys(campi).map((k) => `updateMask.fieldPaths=localMerges.${k}`).join('&');
-  const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?${q}`, {
+  const fields = { localMerges: { mapValue: { fields: campi } }, updatedAt: firmaOra() };
+  const q = [...Object.keys(campi).map((k) => `updateMask.fieldPaths=localMerges.${k}`), 'updateMask.fieldPaths=updatedAt'].join('&');
+  const res = await patchFirmato(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?${q}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
     body: JSON.stringify({ fields }),
@@ -654,10 +657,13 @@ export async function scrivi(id, to, nota, opts = {}) {
   // Una consegna reale azzera il contatore delle interruzioni.
   if (to !== 'working' && to !== 'todo') set('workingResets', 0);
 
+  mask.push('updatedAt');
+  fields.updatedAt = firmaOra();
+
   if (opts.dryRun) return { ok: true, from, to, dryRun: true, campi: mask };
 
   const q = mask.map((m) => `updateMask.fieldPaths=${m}`).join('&');
-  const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?${q}`, {
+  const res = await patchFirmato(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?${q}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
     body: JSON.stringify({ fields }),
