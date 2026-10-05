@@ -36,7 +36,8 @@ async function fingiFirestore(app, docs, { registro = [], numeri = {} } = {}) {
     const C = globalThis.__conta;
     const FB = globalThis.SN_FEEDBACK;
     const copia = (d) => JSON.parse(JSON.stringify(d));
-    FB.listAllPaged = async () => { C.tutti += 1; C.tuttiDoc += globalThis.__docs.length; return { rows: globalThis.__docs.map(copia), complete: true }; };
+    // Come Firestore: la lettura completa porta l'ora della sua prima pagina.
+    FB.listAllPaged = async () => { C.tutti += 1; C.tuttiDoc += globalThis.__docs.length; return { rows: globalThis.__docs.map(copia), complete: true, readTime: new Date().toISOString() }; };
     FB.listChangedSince = async ({ since }) => {
       C.cambiati += 1;
       const rows = globalThis.__docs.filter((d) => d.updatedAt > since).map(copia);
