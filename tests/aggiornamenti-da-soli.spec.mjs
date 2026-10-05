@@ -74,10 +74,10 @@ test('spenta: la versione nuova non parte da sola; «Installa» sulla carta la s
 
   // Il tasto destro offre le stesse azioni dei pulsanti, e la strada per la preferenza.
   await carta.click({ button: 'right', position: { x: 30, y: 12 } });
-  const menu = home.locator('.sn-menu');
+  const menu = home.locator('.dash-menu');
   await expect(menu).toBeVisible();
-  await expect(menu.getByText('Installa', { exact: true })).toBeVisible();
-  await expect(menu.getByText('Preferenze sugli aggiornamenti', { exact: true })).toBeVisible();
+  await expect(menu.locator('.dash-menu-voce', { hasText: 'Installa' })).toHaveCount(1);
+  await expect(menu.locator('.dash-menu-voce', { hasText: 'Preferenze sugli aggiornamenti' })).toHaveCount(1);
   mkdirSync(SHOTS, { recursive: true });
   await home.screenshot({ path: `${SHOTS}/aggiornamenti-carta-menu.png` });
   await home.keyboard.press('Escape');
