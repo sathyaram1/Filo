@@ -834,6 +834,7 @@
       case 'timerRingtone': return $('timerRingtone').value || 'default';
       case 'terminal.enabled': return $('terminalEnabled').checked;
       case 'nomiSensati.scaricamenti': return $('nomiSensatiScaricamenti').checked;
+      case 'aggiornamenti.automatici': return $('aggiornamentiAutomatici').checked;
       case 'terminal.shell': return $('terminalShell').value;
       case 'tts.voice': return $('ttsVoice').value || '';
       case 'tts.rate': return parseFloat($('ttsRate').value) || 1;
