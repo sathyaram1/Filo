@@ -2201,7 +2201,6 @@
         giroPagina.start();
       }
     },
-    riga(id) { const f = all.find((x) => x._id === id); return f ? { ...f } : null; },
     setTab(tab) { selectTab(tab); },
     // DB3: negli spec non c'è un aggiornamento da interrogare, e il gate di
     // "Risolti" dipende dalla versione rilasciata: iniettabile, come in manage.

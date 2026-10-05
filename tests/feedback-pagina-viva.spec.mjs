@@ -181,6 +181,30 @@ test('una richiesta di fusione in attesa porta la pratica nei Ricevuti anche con
   await expect(scheda(page, 'f515').locator('.fb-fusione')).toHaveText('fusione ferma');
 });
 
+test('con la stessa richiesta in attesa la Gestione mette la pratica nella stessa sezione', async ({ openTab }) => {
+  const docs = [fb('f515', 515, 'working', { workingSince: new Date().toISOString() }), fb('f600', 600, 'unlabeled')];
+  const pending = [richiesta('f515', 515)];
+  const pagina = await apri(openTab, docs, { pending });
+  await pagina.locator('#refresh').click();
+  await expect(tab(pagina, 'inbox')).toHaveText('Ricevuti (2)');
+
+  const mg = await openTab('filo://manage/manage.html');
+  await mg.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady && window.filo);
+  await mg.evaluate(() => window.__mgTest.whenReady());
+  await mg.evaluate(({ docs, pending }) => {
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (m) => {
+      if (m && m.type === 'merge_approvals_get') return { ok: true, pending, failed: [], recent: [], preapproved: [] };
+      return orig(m);
+    };
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData(docs);
+  }, { docs, pending });
+  await mg.evaluate(() => window.__mgTest.loadMergeApprovals());
+  await expect(mg.locator('.mg-tab[data-tab="inbox"] .mg-tab-count')).toHaveText('(2)');
+  await expect(mg.locator('.mg-tab[data-tab="queue"] .mg-tab-count')).toHaveText('(0)');
+});
+
 test('la richiesta che arriva (o se ne va) a pagina aperta sposta la pratica, e un giro che muove lo stato rilegge le fusioni', async ({ app, openTab }) => {
   const page = await apri(openTab, [fb('f515', 515, 'revision_security'), fb('f600', 600, 'unlabeled')]);
   // L'apertura da owner: lista e fusioni lette (nessuna in attesa).

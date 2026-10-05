@@ -107,6 +107,7 @@ test('un giro in corso si riusa; dati finti in pagina fermano il giro', async ()
   giro.blocca(true);
   giro.start();
   assert.equal(giro.acceso(), false);
+  await attendi();
   assert.ok(st.mandati.some((m) => m.off === true), 'fermandosi lo dice al main');
 });
 
