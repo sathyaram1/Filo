@@ -1021,7 +1021,7 @@
     el.className = 'sn-key-fallback';
     el.textContent = keyFallback.line;
     parent.appendChild(el);
-    ripiegoMostrato();
+    ripiegoMostrato(el);
     return el;
   }
 
