@@ -3314,6 +3314,9 @@
       // Chi e quando come li ha scritti il main: tornato dal server il segno
       // dev'essere lo stesso, o la fusione ferma si ritenterebbe da sola.
       fb.mergePreapproved = next ? { by: (r && r.by) || 'te', at: (r && r.at) || new Date().toISOString() } : undefined;
+      // Una rilettura arrivata durante l'attesa ha sostituito la pratica: il segno va su quella che conta.
+      const ora = allFeedbacks.find((f) => f._id === id);
+      if (ora && ora !== fb) ora.mergePreapproved = fb.mergePreapproved;
       if (selectedId !== id) { renderList(); return; }
       reflectPreapproved(fb);
       renderList();
