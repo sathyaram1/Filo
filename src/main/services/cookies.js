@@ -279,6 +279,11 @@ const { registerFiloProtocolForSession } = require('../protocol');
 
 const siteSessions = new Map(); // partition name → session
 
+// Le altre sessioni di navigazione che Filo apre a parte (finestra incognito,
+// scheda col paese cambiato): senza registrarle qui restano SENZA GPC, senza
+// blocco tracker e con gli embed YouTube che ripartono coi cookie (#755).
+const altreSessioni = new Map(); // partition name → { ses, incognito }
+
 // Ritorna (creando se serve) la sessione effimera/persistente per la partizione
 // data, registrandovi il protocollo filo:// e applicando GPC + blocco tracker.
 function ensureSiteSession(partition, { gpc } = {}) {
