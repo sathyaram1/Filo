@@ -84,7 +84,10 @@ test('la bozza è una sola: scritta sotto la conversazione si ritrova nel pannel
   // Un ridisegno del pannello (una fusione che cambia) non porta via testo né cursore.
   await casella.focus();
   await casella.press('End');
-  await page.evaluate(() => window.__mgTest.loadMergeApprovals && window.__mgTest.loadMergeApprovals());
+  await casella.evaluate((el) => { el.dataset.prima = '1'; });
+  await page.evaluate(() => window.__mgTest.loadMergeApprovals());
+  await expect(page.locator('#mgSideRispostaText:not([data-prima])')).toHaveCount(1);
+  await expect(page.locator('#mgSideRispostaText')).toBeFocused();
   await page.keyboard.type(' grazie');
   await expect(page.locator('#mgSideRispostaText')).toHaveValue('<b>Quello rosso</b> 🔴 grazie');
 
