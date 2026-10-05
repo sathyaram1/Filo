@@ -113,6 +113,9 @@
     // Broadcast main→renderer quando il saldo crediti cambia (consumo, refill,
     // ricompensa): la shell aggiorna l'icona/animazione, la pagina il grafico.
     CREDITS_CHANGED: 'credits_changed',
+    // La riga «ho usato i crediti di Filo» è a schermo (#662): l'avviso che la
+    // ripeterebbe non parte. Da ogni superficie, siti compresi. { } → { ok }.
+    KEY_FALLBACK_SHOWN: 'key_fallback_shown',
     // Ricompensa crediti per un feedback inviato (+5 subito). { } → { ok, credits, balance }.
     // Con un portafoglio (#816) non accredita: { ok, wallet: true, credits: 0, inArrivo }.
     CREDITS_AWARD_FEEDBACK: 'credits_award_feedback',
