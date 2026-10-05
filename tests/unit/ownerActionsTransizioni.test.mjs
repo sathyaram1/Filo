@@ -90,7 +90,7 @@ async function conRete(doc, fn) {
   try { return await fn(patch); } finally { globalThis.fetch = vero; }
 }
 
-test('un doppione in coda si archiviа con una scrittura sola, senza fingersi routine', async () => {
+test('un doppione in coda si archivia con una scrittura sola, senza fingersi routine', async () => {
   for (const status of ['todo', 'working']) {
     const doc = {
       name: 'projects/p/databases/(default)/documents/feedback/d1',
