@@ -647,6 +647,11 @@
           setBusy(false);
         });
     }
+    card.__snMacSegui = function (attesa, risposta) {
+      if (card.classList.contains('is-done')) return;
+      if (armed) disarm();
+      segui(attesa, risposta);
+    };
 
     discardBtn.addEventListener('click', function () {
       disarm();
