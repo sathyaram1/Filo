@@ -133,9 +133,13 @@
       setHover(optionEls[i]);
     }
 
+    // Il catalogo si chiede al primo fuoco: un menu rimasto chiuso perché la lista era ancora vuota si apre quando
+    // arriva, se il campo ha ancora il fuoco. Uno già aperto non si ricompone sotto il puntatore.
+    let aVuoto = false;
     function open() {
       if (!pop.hidden) return;
-      if (!build()) return; // niente opzioni → niente popup
+      aVuoto = !build();
+      if (aVuoto) return;
       pop.hidden = false;
       host.classList.add('sn-combo-open');
       const sel = optionEls.find((el) => el.classList.contains('sn-selected'));
