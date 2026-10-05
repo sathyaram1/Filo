@@ -192,13 +192,16 @@ function shellConfig(shell, sid, startCwd, { env, autoRun = true } = {}) {
       options: { cwd: startCwd || undefined, windowsHide: true, env: { ...(env || process.env), [VALORI_CMD]: fileValori } },
       ready: `${PRELUDI_CODIFICA.cmd}prompt FILO_RDY_${sid}$_\r\necho FILO_RDY_${sid}\r\n`,
       wrap: (command) => {
-        let { testo, valori } = comandoPerCmd(command);
-        if (valori) {
-          try { fs.writeFileSync(fileValori, valori, 'utf8'); } catch (_) { testo = String(command); }
-        }
+        let { testo, file } = comandoPerCmd(command);
+        try {
+          file.forEach((contenuto, i) => fs.writeFileSync(`${fileValori}-${i + 1}.txt`, contenuto, 'utf8'));
+          scritti = Math.max(scritti, file.length);
+        } catch (_) { testo = String(command); }
         return `${testo}\r\necho FILO_META_${sid}:%errorlevel%:%cd%\r\n`;
       },
-      pulisci: () => { try { fs.rmSync(fileValori, { force: true }); } catch (_) {} },
+      pulisci: () => {
+        for (let i = 1; i <= scritti; i++) { try { fs.rmSync(`${fileValori}-${i}.txt`, { force: true }); } catch (_) {} }
+      },
     };
   }
   if (shell === 'bash') {
