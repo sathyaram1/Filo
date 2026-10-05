@@ -713,6 +713,7 @@
       if (Caps) opt.label = Caps.categoryLabel(provider, it.id, it.meta);
       dl.appendChild(opt);
     }
+    if (window.SN_COMBOBOX) window.SN_COMBOBOX.opzioniArrivate();
   }
 
   // Semina i combobox con gli id già presenti nel registry (divisi per provider)

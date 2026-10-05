@@ -5530,7 +5530,11 @@
     const type = (window.SN_MSG && window.SN_MSG.MSG && window.SN_MSG.MSG.DEFAULT_MODELS_LIST) || 'default_models_list';
     smCatalogPending = Promise.resolve()
       .then(() => sendToMain({ type, provider: 'openrouter' }))
-      .then((r) => { if (r && r.ok && Array.isArray(r.items) && r.items.length) smCatalog = r.items; })
+      .then((r) => {
+        if (!(r && r.ok && Array.isArray(r.items) && r.items.length)) return;
+        smCatalog = r.items;
+        if (window.SN_COMBOBOX) window.SN_COMBOBOX.opzioniArrivate();
+      })
       .catch(() => {})
       .finally(() => { smCatalogPending = null; });
     return smCatalogPending;

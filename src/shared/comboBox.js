@@ -15,6 +15,8 @@
 (function (global) {
   'use strict';
 
+  const OPZIONI_ARRIVATE = 'sn-combo-opzioni-arrivate';
+
   // Attacca un dropdown custom a `input`, ancorato dentro `host` (che deve
   // essere position:relative). L'input resta editabile: si può scrivere a mano
   // o scegliere dalla lista; digitando, la lista si filtra. Ritorna close().
@@ -188,7 +190,6 @@
     return close;
   }
 
-  const OPZIONI_ARRIVATE = 'sn-combo-opzioni-arrivate';
   // Chi riempie una lista dopo il fuoco lo dice qui: lo sente solo il campo che ha il fuoco.
   function opzioniArrivate(doc) {
     const el = (doc || global.document).activeElement;
