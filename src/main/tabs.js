@@ -205,6 +205,25 @@ function openExternalScheme(rawUrl) {
   return true;
 }
 
+// Un `filo://invito/…` fermato su una navigazione non si tace (#664): da qualunque porta (barra, «Apri in nuova tab», un
+// pulsante che naviga da script) riscatta e apre Crediti. Da una pagina web solo col gesto vero dell'utente ancora attivo,
+// letto in un mondo isolato che la pagina non può falsare; senza `wc` lo chiede Filo stesso. Prova: tests/link-invito.spec.mjs.
+const MONDO_GESTO = 1431;
+function invitoFermato(rawUrl, { win = null, wc = null } = {}) {
+  const W = globalThis.SN_WALLET;
+  if (!W || !W.isInviteDeepLink(rawUrl)) return false;
+  const porta = () => { try { globalThis.SN_WALLET_MAIN?.portaDentroInvito?.(W.inviteCodeFromDeepLink(rawUrl), win); } catch (_) {} };
+  if (!wc) { porta(); return true; }
+  Promise.resolve()
+    .then(() => wc.executeJavaScriptInIsolatedWorld(MONDO_GESTO, [{ code: 'Boolean(navigator.userActivation && navigator.userActivation.isActive)' }]))
+    .then((gesto) => { if (gesto === true) porta(); })
+    .catch(() => {});
+  return true;
+}
+function fermaNavigazione(rawUrl, ctx) {
+  if (!invitoFermato(rawUrl, ctx)) openExternalScheme(rawUrl);
+}
+
 // La lista dei bloccati si salva mentre si scrive (#590.2): una riga a metà non sposta le schede aperte,
 // né verso la pagina «Sito bloccato» né fuori. La seguono quando la lista sta ferma per questo tempo, o quando l'utente le guarda.
 const LISTA_FERMA_MS = 3000;
