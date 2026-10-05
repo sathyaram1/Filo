@@ -1021,6 +1021,48 @@
         return { partial: { dictation: { cancelSec } }, label: `Tempo per annullare l'invio vocale → ${String(cancelSec).replace('.', ',')} s` };
       },
     },
+    // ── #1004: cosa delle pagine va ai modelli senza che l'utente lo chieda ──
+    {
+      scrive: ['riassuntoSchede.enabled'],
+      aiuto: 'true | false (riassunto e indice delle schede chiuse per ritrovarle nella Cronologia; spento, di una scheda chiusa non va niente ai modelli e la si ritrova per parole)',
+      keys: ['riassunto_schede_chiuse', 'riassunto delle schede chiuse', 'riassunto schede chiuse', 'riassunti delle schede chiuse',
+        'riassunto delle schede', 'riassunto schede', 'riassuntoschede'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { riassuntoSchede: { enabled: b } }, label: `Riassunto delle schede chiuse → ${b ? 'attivo' : 'spento'}` };
+      },
+    },
+    interruttore({
+      keys: ['pagine_delicate', 'pagine delicate', 'non mandare ai modelli le pagine delicate', 'proteggi le pagine delicate',
+        'pagine riservate'],
+      percorso: 'security.pagineDelicate.enabled',
+      nome: 'Pagine delicate tenute lontane dai modelli',
+      stati: ['sì', 'no'],
+      aiuto: 'true | false (posta, banche, sanità, pagine con un campo password o carta e i siti delicati scelti dall\'utente: riassunto e pulizia automatica delle schede non ne mandano il testo ai modelli; acceso di serie)',
+      risk: 'Decide se il riassunto delle schede chiuse e la pulizia automatica delle schede mandano ai modelli anche il '
+        + 'testo delle pagine delicate: posta, banca, sanità, pagine dove hai visto un campo password o carta. Spegnerlo '
+        + 'fa arrivare al modello saldi, movimenti, mail e referti delle schede che chiudi.',
+    }),
+    elenco({
+      keys: ['siti_delicati', 'siti delicati', 'elenco dei siti delicati', 'pagine delicate aggiunte', 'sito delicato'],
+      percorso: 'security.pagineDelicate.siti',
+      nome: 'Siti delicati aggiunti da te',
+      aiuto: 'siti che Filo tratta come delicati oltre a posta, banche e sanità: il loro testo non va ai modelli nei lavori automatici. '
+        + 'Per un sito aperto di cui non vedi l\'indirizzo: «questo sito» (la scheda web davanti) o «scheda: <titolo come in TAB APERTE>»',
+      risk: 'Cambia i siti che Filo tratta come delicati oltre a quelli di serie: delle loro pagine il riassunto e la '
+        + 'pulizia automatica delle schede non mandano il testo ai modelli. Un sito tolto torna a mandarlo.',
+    }),
+    elenco({
+      keys: ['siti_non_delicati', 'siti non delicati', 'sito non delicato', 'non delicati'],
+      percorso: 'security.pagineDelicate.nonDelicati',
+      nome: 'Siti non delicati per te',
+      aiuto: 'siti che Filo aveva segnato come delicati perché ci ha visto un campo password o carta, e che per l\'utente non lo '
+        + 'sono (es. google.com dopo un accesso): tornano a mandare il testo al riassunto e alla pulizia. Non toglie posta, '
+        + 'banche, sanità né i siti delicati aggiunti dall\'utente',
+      risk: 'Toglie un sito da quelli che Filo tratta come delicati perché ci ha visto un campo password o carta: delle sue '
+        + 'pagine il riassunto e la pulizia automatica delle schede tornano a mandare il testo ai modelli.',
+    }),
   ];
 
   // Le righe «chiave: valori» della descrizione di IMPOSTA_PREFERENZA: escono da qui, dove sta il setter,
@@ -1159,8 +1201,14 @@
     return PREF_SETTERS.find((s) => Array.isArray(s.scrive) && s.scrive.includes(percorso)) || null;
   }
 
+  // Il setter che una chiave detta in chat sceglie, o null (anche quando è ambigua).
+  function setterDellaChiave(rawKey) {
+    const r = risolviChiave(rawKey);
+    return (r && r.setter) || null;
+  }
+
   global.SN_PREF = {
     buildPreferencePartial, parsePrefBool, parseItalianNumber, PREF_SETTERS, lezioneDaAzione,
-    applicaElenco, righeDescrizione, setterDi, spiegaNonValida, PARAMETRI_COLORE_TAB,
+    applicaElenco, righeDescrizione, setterDi, setterDellaChiave, spiegaNonValida, PARAMETRI_COLORE_TAB,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

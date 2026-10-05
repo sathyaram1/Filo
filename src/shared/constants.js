@@ -127,6 +127,9 @@
     // true dopo il primo comando che Filo propone o esegue in chat: la frase che
     // spiega il terminale si dice una volta sola, anche dopo un riavvio (#892).
     FILO_TERMINALE_SPIEGATO: 'filo_terminale_spiegato',
+    // I siti (dominio registrabile) dove Filo ha visto un campo password o carta: restano delicati anche dopo un
+    // riavvio, quando la scheda riaperta è già dentro l'area riservata e il campo non c'è più (#1004).
+    SITI_CON_CAMPI: 'filo_siti_con_campi',
     // Ultima versione di cui l'utente ha visto il recap aggiornamento (popup
     // all'avvio). All'avvio si confronta con app.getVersion(): se è più vecchia
     // e ci sono note (src/shared/patchNotes.js), mostra il recap. Vedi C4.
@@ -2492,6 +2495,15 @@
         trustedSites: [],
         righeScartate: [],
       },
+      // #1004 — le pagine delicate (posta, banche, sanità, quelle che hanno mostrato un campo password o carta, e
+      // `siti` scritti dall'utente) non mandano testo ai modelli nei lavori automatici. Regola: src/shared/pagineDelicate.js.
+      pagineDelicate: {
+        enabled: true,
+        siti: [],
+        righeScartate: [],
+        // Tolti in Sicurezza fra i siti che Filo ha segnato per un campo password o carta: valgono solo per quel motivo.
+        nonDelicati: [],
+      },
     },
     // Modalità terminale: Filo risponde con un comando a «quanto spazio ho sul
     // disco?», e nella home un `/comando` va alla shell. Accesa di serie (#892):
@@ -2531,6 +2543,9 @@
       idleHours: 6,
       onClose: true,
     },
+    // #1004 — riassunto e indice delle schede chiuse, per ritrovarle nella Cronologia per significato. Spento, di una
+    // scheda che si chiude non parte niente verso i modelli: la si ritrova per parole.
+    riassuntoSchede: { enabled: true },
     // Suoneria del timer: suono riprodotto alla scadenza finché l'utente non
     // preme "Ferma". Generato via WebAudio API (nessun file audio esterno).
     // Valori: 'default' | 'gentle' | 'urgent' | 'chime'

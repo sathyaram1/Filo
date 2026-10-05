@@ -1365,14 +1365,20 @@ class TabManager {
   async _gatherTriageInput(cands) {
     const now = Date.now();
     const out = [];
+    let fuori = () => null;
+    try { fuori = await globalThis.SN_DELICATE.filtro(); } catch (_) {}
     for (const t of cands) {
+      // Di una pagina delicata il testo non si legge nemmeno: al modello arriva solo il tipo (#1004).
+      const delicata = fuori(t.url);
       let contentExtract = '';
-      try {
-        contentExtract = await t.view.webContents.executeJavaScript(
-          '(function(){try{return (document.body&&document.body.innerText||"").replace(/\\s+/g," ").slice(0,800);}catch(e){return "";}})()',
-          true,
-        );
-      } catch (_) {}
+      if (!delicata) {
+        try {
+          contentExtract = await t.view.webContents.executeJavaScript(
+            '(function(){try{return (document.body&&document.body.innerText||"").replace(/\\s+/g," ").slice(0,800);}catch(e){return "";}})()',
+            true,
+          );
+        } catch (_) {}
+      }
       out.push({
         url: t.url,
         title: t.title,
@@ -1385,6 +1391,7 @@ class TabManager {
           .filter((x) => x.id !== t.id && /^https?:\/\//i.test(x.url || ''))
           .map((x) => x.url).slice(0, 20),
         contentExtract,
+        delicata,
       });
     }
     return out;
@@ -2346,10 +2353,13 @@ class TabManager {
       // ricerca semantica dell'archivio e per il triage. Solo pagine web.
       if (!tab.isInternal && /^https?:\/\//i.test(wc.getURL() || '')) {
         try {
+          const letta = wc.getURL();
           wc.executeJavaScript(
             '(function(){try{return (document.body&&document.body.innerText||"").replace(/\\s+/g," ").slice(0,2000);}catch(e){return "";}})()',
             true,
-          ).then((txt) => { if (typeof txt === 'string' && txt) tab.contentExtract = txt; }).catch(() => {});
+          ).then((txt) => {
+            if (typeof txt === 'string' && txt && !wc.isDestroyed() && wc.getURL() === letta) tab.contentExtract = txt;
+          }).catch(() => {});
         } catch (_) {}
       }
     });
@@ -2365,6 +2375,14 @@ class TabManager {
       // MAI, quindi resta a about:blank). Il flag protegge dal chiuderla per
       // sbaglio se poi parte un download da una pagina che ha già contenuto.
       tab._everNavigated = true;
+      // Testo e titolo letti sono della pagina di prima: sotto l'indirizzo nuovo partirebbero col suo nome (#1004).
+      // Una pagina senza titolo non lo cambia mai: vale quello del documento nuovo, cioè l'indirizzo, come negli altri browser.
+      tab.contentExtract = '';
+      if (/^https?:\/\//i.test(url || '')) {
+        let nuovo = '';
+        try { nuovo = wc.getTitle() || ''; } catch (_) {}
+        tab.title = nuovo || userUrl(url);
+      }
       if (tab.view && tab.view.webContents === wc) this.anteprime.navigata(tab);
       if (tab._vistaNuova && tab._vistaNuova.wc === wc) tab._vistaNuova = null;
       this._sostituisciVoceBloccata(wc, url);

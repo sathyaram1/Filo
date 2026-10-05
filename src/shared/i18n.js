@@ -264,6 +264,7 @@
     toast_paste_failed: 'Non riesco a incollare qui (rifocalizza il campo e riprova)',
     clipboard_image_pending: 'Descrizione…',
     clipboard_image_no_model: 'Immagine (nessun modello per la descrizione)',
+    clipboard_image_delicata: 'Immagine da una pagina delicata',
 
     // Categorie default
     category_default: 'Da vedere',
@@ -430,6 +431,13 @@
     admin_defaults_excluded_kind_producer: 'Produce i modelli',
     admin_defaults_excluded_kind_unreliable: 'Serve male',
     admin_defaults_excluded_note: 'Nota (quando, cosa è successo)',
+    // Pagine delicate (#1004)
+    admin_defaults_delicate: 'Pagine delicate',
+    admin_defaults_delicate_desc:
+      'I siti di posta, banche e sanità di cui il riassunto delle schede chiuse e la pulizia automatica non mandano il testo ai modelli. Uno per riga; un dominio vale anche per i suoi sottodomini. Vale per tutti gli utenti: una categoria salvata qui sostituisce quella scritta nel codice, una lasciata com\'è segue il codice.',
+    admin_defaults_delicate_posta: 'Posta',
+    admin_defaults_delicate_banche: 'Banche',
+    admin_defaults_delicate_sanita: 'Sanità',
     admin_defaults_excluded_unknown: 'Nessun fornitore di OpenRouter si chiama così: questa voce non esclude nessuno.',
     admin_defaults_excluded_guess: 'Forse «%s»?',
     admin_defaults_excluded_drift_title: 'Esclusioni del codice che questa lista non copre',
@@ -534,6 +542,20 @@
       'Il controllo della blacklist ufficiale di Google (phishing e malware) usa una chiave condivisa, ' +
       'gestita centralmente dall\'amministratore in "Modelli predefiniti": è già attiva per tutti gli ' +
       'account, non devi configurare nulla qui.',
+    // #1004 — pagine delicate
+    options_security_delicate: 'Non mandare ai modelli le pagine delicate',
+    options_security_delicate_desc:
+      'Posta, banca, sanità e le pagine dove hai visto un campo password o carta. Quando chiudi queste ' +
+      'schede o Filo le riordina, ne tiene solo titolo e indirizzo e non manda il testo a nessun modello.',
+    options_security_delicate_sites_label:
+      'Altri siti delicati, uno per riga',
+    options_security_delicate_sites_invalid:
+      'Queste righe non sono domini validi e verranno ignorate (usa un dominio ' +
+      'con estensione, es. studiorossi.it): %s',
+    options_security_delicate_campi_title: 'Siti dove Filo ha visto un campo password o carta',
+    options_security_delicate_campi_togli: 'Non è delicato',
+    options_security_delicate_campi_tolto: 'non delicato per te',
+    options_security_delicate_campi_rimetti: 'Torna delicato',
     // F4 — Feedback autonomo
     options_security_auto_feedback: 'Segnalazione automatica dei problemi',
     options_security_auto_feedback_desc:

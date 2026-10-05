@@ -111,7 +111,7 @@
       id: 'auto-archive', title: 'Archiviazione automatica delle schede', category: 'navigation',
       desc: 'Le schede lasciate inattive a lungo vengono archiviate da sole; il riordino collassa anche le schede «Nuova scheda»/home aperte più volte in una sola e chiude le pagine di impostazioni che non stai più usando (restano sempre raggiungibili), per tenere pulita la barra.',
       invoke: 'Automatico (soglia e attivazione in Preferenze); a richiesta con il comando /pulisci o il pulsante «Riordina e archivia le schede» nella home.',
-      doesNot: 'Non tocca le finestre in incognito, la scheda attiva, le schede con audio in riproduzione o con un modulo compilato non inviato, né le pagine di lavoro interne di Filo (Editor, Bacheca, Mazzi, Cronologia). Delle pagine della rete di casa (router, NAS, stampanti) al modello non arrivano titolo, indirizzo e testo.',
+      doesNot: 'Non tocca le finestre in incognito, la scheda attiva, le schede con audio in riproduzione o con un modulo compilato non inviato, né le pagine di lavoro interne di Filo (Editor, Bacheca, Mazzi, Cronologia). Delle pagine della rete di casa (router, NAS, stampanti) al modello non arrivano titolo, indirizzo e testo; delle pagine delicate (posta, banca, sanità, quelle con un campo password o carta, i siti delicati aggiunti da te) arriva solo il tipo, per esempio «posta».',
     },
     {
       id: 'reorder-tabs', title: 'Riordina le schede per colore', category: 'navigation',
@@ -137,7 +137,7 @@
       id: 'explain-selection', title: 'Spiega il testo selezionato', category: 'selection',
       desc: 'Dà una spiegazione del testo che hai selezionato, direttamente sopra la selezione. Se la selezione contiene un importo in valuta straniera o una misura non metrica, accanto trovi l’equivalente in euro — col cambio del giorno della Banca centrale europea, per tutte le valute che pubblica — o in metri, chili e gradi centigradi. I conti li fa Filo, non il modello.',
       invoke: 'Seleziona il testo e apri il menu del tasto destro: la spiegazione arriva da sola dentro il menu, non c’è una voce da cliccare. Con Alt+E (Ctrl+Alt+E su Mac), o con la freccia accanto alla spiegazione, ne apri una più estesa in un riquadro sopra la selezione.',
-      doesNot: 'Non spiega il testo selezionato in altri programmi: la scorciatoia vale solo con Filo in primo piano, e fuori da Filo il tasto resta al programma che stai usando.',
+      doesNot: 'Non spiega il testo selezionato in altri programmi: la scorciatoia vale solo con Filo in primo piano, e fuori da Filo il tasto resta al programma che stai usando. In incognito non prepara la spiegazione mentre selezioni: parte quando apri il tasto destro.',
     },
     {
       id: 'translate-selection', title: 'Traduci il testo selezionato', category: 'selection',
@@ -244,7 +244,7 @@
     },
     {
       id: 'screenshot', title: 'Cattura schermo', category: 'media',
-      desc: 'Cattura la pagina visibile come immagine, oppure solo una porzione dello schermo. L’immagine finisce negli appunti e nella cartella Download con un nome che dice cosa mostra: Filo guarda l’immagine e lo scrive da sé. Se il nome non arriva, il file si chiama «screenshot» con data e ora.',
+      desc: 'Cattura la pagina visibile come immagine, oppure solo una porzione dello schermo. L’immagine finisce negli appunti e nella cartella Download con un nome che dice cosa mostra: Filo guarda l’immagine e lo scrive da sé. Se il nome non arriva, o la pagina è delicata (posta, banca, sanità, con un campo password o carta: l’immagine non va al modello), il file si chiama «screenshot» con data e ora.',
       invoke: 'Menu del tasto destro → "Screenshot" o "Screenshot di una parte".',
       doesNot: 'Il nome automatico vale per le catture fatte in Filo; per i file che hai già sul computer c’è «Dai un nome sensato».',
     },
@@ -312,7 +312,8 @@
     {
       id: 'archive', title: 'Cronologia delle schede', category: 'save',
       desc: 'La cronologia principale: le schede chiuse raggruppate per giorno, una riga per giorno, colorate come le tab in alto; puoi cercarle anche per contenuto e riaprirle. Restano tutte finché non le cancelli tu. Una scheda cancellata esce dall\'archivio sul disco; la copia della pagina nella cache di navigazione resta finché il motore non la scarta.',
-      invoke: 'Icona «Cronologia» in alto a destra nella home (o dalla home → "Cronologia"), pagina filo://archive/archive.html. Clicca una scheda per riaprirla; tasto destro per il menu: «Riapri» o «Elimina».',
+      invoke: 'Icona «Cronologia» in alto a destra nella home (o dalla home → "Cronologia"), pagina filo://archive/archive.html. Clicca una scheda per riaprirla; tasto destro per il menu: «Riapri» o «Elimina». La ricerca per contenuto nasce da un riassunto che un modello scrive quando chiudi la scheda: lo spegni in Preferenze → «Riassumi le schede chiuse» o chiedendolo a Filo («spegni il riassunto delle schede chiuse»), e da spento le schede si ritrovano per parole.',
+      doesNot: 'Delle pagine delicate (posta, banca, sanità, quelle con un campo password o carta, i siti delicati aggiunti da te) non fa il riassunto e non tiene il testo: restano titolo e indirizzo, e la ricerca le trova per parole. Le finestre in incognito e le pagine interne di Filo non entrano.',
     },
     {
       id: 'chat-archive', title: 'Ritrova le chat con Filo', category: 'save',
@@ -570,6 +571,12 @@
       desc: 'Salva tutto quello che Filo sa di te (memorie degli agenti, pagine salvate, cronologia, appunti copiati, costi e impostazioni) in un unico file .zip, e lo ricarica quando vuoi — sullo stesso computer come backup, o su un altro per portarti dietro il tuo Filo. Le immagini copiate finiscono nell\'archivio come file veri, sfogliabili, e al ritorno tornano al loro posto. Prima di scrivere qualsiasi cosa, l\'importazione ti dice cosa contiene il file scelto (di quando è il backup, quante sezioni e quante immagini) e chiede conferma: quello che hai già non viene cancellato, le liste si uniscono senza duplicati e, dove lo stesso dato esiste da entrambe le parti, vince quello del backup. Le impostazioni ripristinate (tema, sicurezza, cookie) diventano attive subito, senza riavviare.',
       invoke: 'Impostazioni → Sicurezza, in fondo: "Esporta dati (.zip)" e "Importa dati (.zip)".',
       doesNot: 'Non è un backup automatico né in cloud: il file lo salvi tu, dove vuoi. Importando non si cancella nulla di quello che c\'è già, quindi non è un modo per riportare Filo a uno stato passato esatto. Legge solo archivi esportati da Filo, non backup di altri browser.',
+    },
+    {
+      id: 'pagine-delicate', title: 'Le pagine delicate non vanno ai modelli', category: 'settings',
+      desc: 'Il riassunto delle schede chiuse e la pulizia automatica delle schede non mandano a nessun modello il testo delle pagine delicate: posta, banche, sanità, le pagine che hanno mostrato un campo password o di carta (uno nascosto nel codice della pagina non conta; anche dentro il riquadro di un altro sito; vale per tutto quel sito, anche dopo un riavvio: in Sicurezza vedi questi siti e togli quelli che per te non sono delicati, anche chiedendolo a Filo) e i siti che aggiungi tu. Di queste Filo tiene solo titolo e indirizzo, e nella chat una scheda delicata aperta compare solo col nome del sito. Uno screenshot o un’immagine copiata da una pagina delicata non va al modello che ne scrive il nome. L’elenco di posta, banche e sanità si aggiorna da remoto.',
+      invoke: 'Impostazioni → Sicurezza → «Non mandare ai modelli le pagine delicate» (acceso di serie), e sotto i tuoi siti, uno per riga. Oppure chiedendolo a Filo: «questo sito è delicato», «la pagina del mio commercialista è delicata» con la sua scheda aperta, «studiorossi.it è delicato», «quali siti delicati ho?», «manda anche le pagine delicate».',
+      doesNot: 'Non tocca quello che chiedi tu su una pagina (spiegazioni, traduzioni, l’Aiuto): lì il testo va al modello perché l’hai chiesto. Il riconoscimento dei blocchi geografici resta com’è, perché guarda solo pagine d’errore. Non decide quali siti sono delicati con un modello: valgono gli elenchi e il campo password visto.',
     },
     {
       id: 'auto-feedback', title: 'Segnalazione automatica dei problemi', category: 'settings',

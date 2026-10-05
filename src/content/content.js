@@ -29,6 +29,7 @@
     getPasteContext: () => pasteContext,
     restorePasteContext: () => restorePasteContext(),
     isBlocked: () => isBlocked(),
+    isIncognito: () => inIncognito,
     getLastMouseEvent: () => lastMouseEvent,
   });
   MenuIcons.init({
@@ -571,11 +572,14 @@
   // frame principale). Arriva dal main insieme alle impostazioni: da dentro un
   // riquadro di un'altra origine non è leggibile.
   let pageUrl = '';
+  // Finché il main non l'ha detto non si sa: vale incognito, e la selezione non parte da sola verso un modello.
+  let inIncognito = true;
 
   async function fetchSettings() {
     try {
       const res = await chrome.runtime.sendMessage({ type: MSG.GET_SETTINGS });
       if (res && typeof res.pageUrl === 'string') pageUrl = res.pageUrl;
+      if (res && typeof res.incognito === 'boolean') inIncognito = res.incognito;
       return res?.settings || self.SN_CONST.DEFAULT_SETTINGS;
     } catch (_) {
       return self.SN_CONST.DEFAULT_SETTINGS;
