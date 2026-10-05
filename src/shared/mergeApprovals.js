@@ -968,6 +968,47 @@
     return by ? 'pre-approvata da ' + by : 'pre-approvata sulla pratica';
   }
 
+  /** Perché una fusione non ha chiesto: 'pieno' (segno a mano), 'approvazione' (segno da un sì), 'locale'. PURA. */
+  function specieFusaSenzaChiedere(r) {
+    if (isSkippedL5(r)) return 'locale';
+    var segno = segnoPreapprovazione({ by: r && r.preapprovedBy, at: r && r.preapprovedAt });
+    return segno && segno.tipo === 'approvazione' ? 'approvazione' : 'pieno';
+  }
+
+  // Per specie: `solo` è una frase intera, `misto` segue «Alcuni/altri».
+  var PERCHE_SENZA_CHIEDERE = [
+    ['pieno', {
+      solo: 'Sulla pratica avevi messo «fondi senza chiedermelo».',
+      misto: 'avevano sulla pratica il tuo «fondi senza chiedermelo»',
+    }],
+    ['approvazione', {
+      solo: 'Avevano solo blocchi che avevi già approvato, con un sì a una richiesta precedente sulla stessa pratica.',
+      misto: 'avevano solo blocchi che avevi già approvato con un sì a una richiesta precedente',
+    }],
+    ['locale', {
+      solo: 'Venivano da una pratica tua con la prova del mittente, o da un feedback che hai approvato come lavoro locale.',
+      misto: 'erano lavoro locale (una pratica tua con la prova del mittente, o un feedback che hai approvato come lavoro locale)',
+    }],
+  ];
+
+  /**
+   * L'introduzione delle «Fuse senza chiedere», detta solo per le specie che l'elenco contiene. PURA.
+   * Una frase sola per tutte dava il «fondi senza chiedermelo» anche alle fusioni nate da un sì (#743).
+   */
+  function preapprovedIntro(list) {
+    var righe = Array.isArray(list) ? list : [];
+    var presenti = {};
+    for (var i = 0; i < righe.length; i++) presenti[specieFusaSenzaChiedere(righe[i])] = true;
+    var frasi = PERCHE_SENZA_CHIEDERE.filter(function (p) { return presenti[p[0]]; });
+    var testa = 'Lavori fermati dai controlli e fusi lo stesso. ';
+    var coda = ' Qui c’è tutto quello che era stato segnalato.';
+    if (!frasi.length) return testa.trim() + coda;
+    if (frasi.length === 1) return testa + frasi[0][1].solo + coda;
+    var soggetti = ['Alcuni ', 'altri ', 'altri ancora '];
+    var parti = frasi.map(function (p, k) { return soggetti[k] + p[1].misto; });
+    return testa + parti.join('; ') + '.' + coda;
+  }
+
   /**
    * Quando era stato messo il segno, per esteso e in ora locale. PURA.
    * Il momento viaggia come testo ISO (in ora universale): mostrarlo grezzo
@@ -1000,11 +1041,7 @@
     host.hidden = list.length === 0;
     if (!list.length) return 0;
     host.appendChild(el('p', 'sn-mac-recent-title', 'Fuse senza chiedere'));
-    var intro = el('p', 'sn-mac-preapproved-intro',
-      'Lavori fermati dai controlli e fusi lo stesso. Quelli delle automazioni avevano sulla pratica il tuo «fondi senza chiedermelo»; '
-      + 'quelli locali venivano da una pratica tua con la prova del mittente, o da un feedback che hai approvato come lavoro locale. '
-      + 'Qui c’è tutto quello che era stato segnalato.');
-    host.appendChild(intro);
+    host.appendChild(el('p', 'sn-mac-preapproved-intro', preapprovedIntro(list)));
     var ul = el('ul', 'sn-mac-preapproved');
     for (var i = 0; i < list.length; i++) {
       var r = list[i];
@@ -1024,7 +1061,9 @@
       sha.title = 'Il commit esaminato: ' + String(r.sha || '') + (r.mergeSha ? '\nIl commit di fusione: ' + String(r.mergeSha) : '');
       head.appendChild(sha);
       var who = el('span', 'sn-mac-recent-who', isSkippedL5(r) ? 'lavoro locale: L5 saltato' : preapprovedBy(r));
-      if (isSkippedL5(r)) who.title = skippedL5Hint(r);
+      var specie = specieFusaSenzaChiedere(r);
+      if (specie === 'locale') who.title = skippedL5Hint(r);
+      else if (specie === 'approvazione') who.title = 'Il segno l’aveva lasciato il tuo sì e valeva solo per i blocchi già approvati. Con blocchi nuovi ti avrebbe chiesto.';
       else if (r.preapprovedAt) who.title = preapprovedWhenText(r.preapprovedAt);
       head.appendChild(who);
       head.appendChild(el('span', 'sn-mac-recent-when', mergedWhenText(r.decidedAtMs || r.createdAtMs, now)));
@@ -1093,6 +1132,7 @@
     dateTimeText: dateTimeText,
     mergedWhenText: mergedWhenText,
     preapprovedMoreText: preapprovedMoreText,
+    preapprovedIntro: preapprovedIntro,
     renderPreapproved: renderPreapproved,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
