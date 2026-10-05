@@ -596,12 +596,12 @@
     options_cookies_whitelist_invalid: 'Non sembra un dominio valido. Usa un dominio con estensione, es. gmail.com (niente IP o nomi senza punto).',
     options_cookies_whitelist_dup: '"%s" è già nell\'elenco dei siti fidati.',
     options_cookies_trusted_note_other:
-      'In "Automatico" i tuoi accessi restano comunque salvati: qui serve solo per i siti di cui vedi i contenuti ' +
-      'incorporati in altre pagine e dove vuoi restare connesso prima di esserci entrato da Filo.',
+      'In "Automatico" i tuoi accessi restano salvati comunque. Qui serve aggiungere un sito solo se ne vedi i ' +
+      'contenuti dentro altre pagine e vuoi che restino connessi prima che tu ci sia entrato da Filo.',
     options_cookies_accessi_title: 'Siti dove sei entrato',
     options_cookies_accessi_desc:
       'Quando un contenuto di questi siti compare dentro un\'altra pagina (un post, un video, una mappa), i suoi '
-      + 'cookie restano: così non esci dai siti dove hai fatto l\'accesso. Degli altri, i cookie messi da un '
+      + 'cookie restano, così non esci dai siti dove hai fatto l\'accesso. Degli altri siti, i cookie messi da un '
       + 'contenuto incorporato durano solo la visita.',
     options_cookies_accessi_remove: 'Togli',
     options_cookies_banners_title: 'Qui i banner dei cookie li vedi',

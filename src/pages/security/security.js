@@ -392,7 +392,6 @@
     $('cookie-wl-input').disabled = !conta;
     $('cookie-wl-add-btn').disabled = !conta;
     for (const btn of $('cookie-wl-list').querySelectorAll('button')) btn.disabled = !conta;
-    $('sec-cookies-accessi').hidden = !cookieLoggedSites.length || modo !== 'default';
   }
 
   // Pulisce l'input utente in un dominio confrontabile: toglie schema, path,
@@ -471,7 +470,9 @@
     const box = $('sec-cookies-accessi');
     const list = $('cookie-accessi-list');
     list.innerHTML = '';
-    box.hidden = !cookieLoggedSites.length || currentMode() !== 'default';
+    // L'elenco si vede in tutte le modalità: è roba che Filo ha segnato su di te, e si toglie da qui anche quando
+    // la modalità di adesso non lo usa.
+    box.hidden = !cookieLoggedSites.length;
     for (const domain of cookieLoggedSites) {
       const li = document.createElement('li');
       const span = document.createElement('span');
