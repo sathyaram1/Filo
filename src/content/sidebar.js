@@ -1148,8 +1148,9 @@
       if (!res?.ok) throw new Error(res?.error || I18n.t('err_provider_failed'));
       // Risposta pagata coi crediti di Filo perché OpenRouter ha rifiutato la chiave (#662): la
       // riga della chat, una volta per serie, non a ogni passo che l'agente fa da solo.
+      // Sotto la risposta, come in chat: la scrive il prossimo messaggio di Filo (o la fine del turno).
       if (res.keyFallback && res.keyFallback.line) {
-        if (!ripiegoDetto) appendActionLog(res.keyFallback.line)?.classList.add('sn-sidebar-log-intera');
+        if (!ripiegoDetto) ripiegoDaDire = res.keyFallback.line;
         ripiegoDetto = true;
       } else {
         ripiegoDetto = false;
