@@ -164,9 +164,15 @@
         flushPara();
         if (listType !== 'ul') { flushList(); out.push('<ul>'); listType = 'ul'; }
         out.push('<li>' + inlineMd(m[1]) + '</li>');
-      } else if ((m = trimmed.match(/^\d+\.\s+(.+)$/))) {
+      } else if ((m = trimmed.match(/^(\d+)\.\s+(.+)$/))) {
         flushPara();
-        if (listType !== 'ol') { flushList(); out.push('<ol>'); listType = 'ol'; }
+        if (listType !== 'ol') {
+          flushList();
+          // Il numero scritto vale: un elenco spezzato da un paragrafo riprende da dove era, non da 1.
+          const da = Math.min(Number(m[1]), 1e6);
+          out.push(da === 1 ? '<ol>' : '<ol start="' + da + '">');
+          listType = 'ol';
+        }
         out.push('<li>' + inlineMd(m[1]) + '</li>');
       } else { flushList(); para.push(trimmed); }
     }
