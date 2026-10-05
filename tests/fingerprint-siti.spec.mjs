@@ -27,7 +27,7 @@ const test = base.extend({
 });
 
 // Quello che fa uno script di fingerprinting: disegna una scena fissa e ne legge i pixel.
-const IMPRONTA = async () => {
+const IMPRONTA = () => {
   const c = document.createElement('canvas');
   c.width = 80; c.height = 40;
   const ctx = c.getContext('2d');
@@ -35,8 +35,9 @@ const IMPRONTA = async () => {
   ctx.fillStyle = '#000'; ctx.font = '16px sans-serif'; ctx.fillText('filo', 4, 24);
   const url = c.toDataURL();
   if (!url.startsWith('data:image/png')) return url;
-  const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(url));
-  return [...new Uint8Array(h).slice(0, 8)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  // Su http non c'è crypto.subtle: basta un FNV-1a a 32 bit, preso due volte con semi diversi.
+  const fnv = (s, h) => { for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619) >>> 0; return h; };
+  return [fnv(url, 2166136261), fnv(url, 33554467)].map((h) => h.toString(16).padStart(8, '0')).join('');
 };
 
 test('due siti diversi leggono impronte diverse, due pagine dello stesso sito la stessa', async ({ openTab, testServer }) => {
