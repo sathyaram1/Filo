@@ -47,7 +47,9 @@ lasciava fuori per sempre un feedback vecchio tornato nei Ricevuti.
    pagina. Una lettura interrotta non fa uscire nessuno.
 5. **Un giro solo, e solo con qualcuno che guarda.** Vive nel main senza un
    orologio suo: lo chiede la pagina in vista, e la porta ricontrolla la vista.
-   L'esito va anche alle altre pagine iscritte.
+   L'esito va anche alle altre pagine iscritte. Dal lato della pagina il giro è
+   uno solo anche nel codice (`makeGiroPagina`): Gestione e pagina Feedback lo
+   usano entrambe e leggono tutto all'apertura allo stesso modo (#738).
 6. **I segni senza orologio coprono chi non firma**: l'ora di Firestore dei
    feedback in mano alle routine (una lettura ciascuno), il contatore degli
    invii CONTATO contro le righe arrivate, e il registro dei worker, che dice

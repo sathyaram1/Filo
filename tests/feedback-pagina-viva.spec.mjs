@@ -72,7 +72,7 @@ async function ilServerScrive(app, id, campi) {
   }, { id, campi });
 }
 
-test('un cambio di stato fatto altrove sposta la scheda di sezione senza ricaricare, e l\'arrivo si vede', async ({ app, openTab }) => {
+test('un cambio di stato fatto altrove sposta la scheda di sezione senza ricaricare, e l\'arrivo si vede', async ({ app, openTab, shell }) => {
   await fingiFirestore(app, [fb('fA', 101, 'todo'), fb('fB', 102, 'unlabeled')]);
   const page = await openTab(URL);
   await page.waitForFunction(() => window.__fbTest && window.filo);
@@ -95,25 +95,21 @@ test('un cambio di stato fatto altrove sposta la scheda di sezione senza ricaric
   await expect(scheda(page, 'fA').locator('.fb-arrivo')).toHaveCount(0);
   await expect(tab(page, 'inbox')).not.toHaveClass(/fb-tab--arrivi/);
 
-  // Un'altra scheda davanti: il giro si ferma. Tornando, il cambio fatto nel frattempo arriva subito.
-  const snap = await openTab('filo://newtab/');
-  void snap;
+  // Un'altra scheda davanti: il giro si ferma.
+  const snap = await shell.evaluate(() => window.filoShell.tabs.snapshot());
+  const feedback = snap.tabs.find((t) => String(t.url || '').startsWith('filo://feedback')).id;
+  await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/'));
   await page.waitForTimeout(TEMPI.pollMs * 2);
   const nascosta = await app.evaluate(() => globalThis.__conta.cambiati);
   await page.waitForTimeout(TEMPI.pollMs * 5);
   expect(await app.evaluate(() => globalThis.__conta.cambiati)).toBe(nascosta);
-  await ilServerScrive(app, 'fB', { status: 'todo' });
+
+  // Da qui il ritmo è di minuti: se il cambio si vede in pochi secondi, l'ha portato il rientro.
   await page.evaluate(() => window.__fbTest.setLiveTiming({ pollMs: 10 * 60 * 1000 }));
-  await page.bringToFront();
-  await page.evaluate(() => window.filo.message({ type: 'tab_in_vista_get' }));
-  const shellTabs = await app.evaluate(({ BrowserWindow }) => {
-    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
-    const t = w._filoTabs.tabs.find((x) => String(x.view.webContents.getURL()).startsWith('filo://feedback'));
-    w._filoTabs.activate(t.id);
-    return t.id;
-  });
-  expect(shellTabs).toBeTruthy();
+  await ilServerScrive(app, 'fB', { status: 'todo' });
+  await shell.evaluate((id) => window.filoShell.tabs.activate(id), feedback);
   await expect(tab(page, 'inbox')).toHaveText('Ricevuti (1)', { timeout: 4_000 });
+  await expect(tab(page, 'queue')).toHaveText('In coda (1)');
   expect(await app.evaluate(() => globalThis.__conta.tutti)).toBe(1);
 });
 
@@ -187,6 +183,8 @@ test('una richiesta di fusione in attesa porta la pratica nei Ricevuti anche con
 
 test('la richiesta che arriva (o se ne va) a pagina aperta sposta la pratica, e un giro che muove lo stato rilegge le fusioni', async ({ app, openTab }) => {
   const page = await apri(openTab, [fb('f515', 515, 'revision_security'), fb('f600', 600, 'unlabeled')]);
+  // L'apertura da owner: lista e fusioni lette (nessuna in attesa).
+  await page.locator('#refresh').click();
   await expect(tab(page, 'queue')).toHaveText('In coda (1)');
 
   await page.evaluate((r) => { window.__srv.pending = [r]; }, richiesta('f515', 515));
@@ -233,6 +231,7 @@ test('una conversazione cambiata insieme allo stato arriva intera, senza «Caric
     fb('f801', 801, 'todo', { notes: 'Prima nota' }),
   ]);
   await expect(scheda(page, 'f800')).toBeVisible();
+  await expect(scheda(page, 'f801')).toHaveCount(0);
   await page.evaluate(() => {
     window.__vistoCaricamento = false;
     new MutationObserver(() => {
@@ -240,13 +239,12 @@ test('una conversazione cambiata insieme allo stato arriva intera, senza «Caric
     }).observe(document.getElementById('list'), { childList: true, subtree: true, characterData: true });
   });
 
-  // Una routine chiede chiarimenti su #801: torna nei Ricevuti con la domanda nella conversazione.
-  await scrive(page, 'f801', {
-    status: 'design', statusReason: 'clarify',
-    notes: 'Prima nota\n\n--- Filo · 05/10/2026 ---\nDomanda nuova: quale pagina?',
-  });
-  await expect(scheda(page, 'f801')).toBeVisible({ timeout: 8_000 });
-  await expect(scheda(page, 'f801')).toContainText('Domanda nuova: quale pagina?');
+  // Una routine chiede chiarimenti su #801 (mai aperta: arriva nei Ricevuti) e su #800, già a schermo intera:
+  // tutte e due mostrano la domanda nuova, non la conversazione di prima.
+  await scrive(page, 'f801', { status: 'design', statusReason: 'clarify', notes: 'Domanda nuova su 801' });
+  await scrive(page, 'f800', { status: 'design', statusReason: 'clarify', notes: 'Domanda nuova su 800' });
+  await expect(scheda(page, 'f801')).toContainText('Domanda nuova su 801', { timeout: 8_000 });
+  await expect(scheda(page, 'f800')).toContainText('Domanda nuova su 800', { timeout: 8_000 });
   expect(await page.evaluate(() => window.__vistoCaricamento)).toBe(false);
 });
 

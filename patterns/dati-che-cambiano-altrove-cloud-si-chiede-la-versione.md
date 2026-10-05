@@ -56,14 +56,25 @@ secondi e nessuno la ricaricava.
   l'aggiornamento continuo, altrimenti il primo giro la rimpiazzerebbe con
   Firestore a metà spec; chi vuole provare il giro sostituisce le sorgenti
   (e con `setData(…, { dalVivo: true })` tiene acceso l'orologio vero).
+- **Una pagina che mostra le stesse sezioni usa lo stesso giro, non una
+  copia** (#738): la pagina Feedback aveva le sezioni della Gestione ma restava
+  ferma all'apertura, e senza le richieste di fusione metteva «In coda» quello
+  che la Gestione teneva nei Ricevuti. Orologio, vista, esiti, arrivi e
+  riallineamento stanno in `makeGiroPagina`; l'attesa della mano e l'ancora
+  dello scorrimento in `makeListaViva`. La pagina tiene solo lista e disegno.
+  Dove la scheda È il dettaglio, una riga riletta su una scheda intera la segna
+  vecchia: il resto si rilegge PRIMA del ridisegno, e una bozza nella scheda
+  (o la mano su un pulsante) lo trattiene. Chi sta in cima resta in cima.
 - **Dove:** `src/shared/feedbackLive.js` (confronto, fusione, decisione del
-  giro, arrivi, ancora dello scorrimento: tutto puro), `listVersions`/`getMany`
+  giro, arrivi, ancora dello scorrimento: puri; `makeGiroPagina` e
+  `makeListaViva` con l'I/O iniettato), `listVersions`/`getMany`
   /`getManyPublic` in `src/shared/feedback.js`, `inVista`/`_annunciaVista` in
   `src/main/tabs.js`, la sezione "Aggiornamento continuo" di
-  `src/pages/manage/manage.js`. Test: `tests/unit/feedbackLive.test.mjs`,
-  `tests/unit/feedbackLiveGiro.test.mjs`, `tests/unit/feedbackListLight.test.mjs`,
+  `src/pages/manage/manage.js` e di `src/pages/feedback/feedback.js`. Test:
+  `tests/unit/feedbackLive.test.mjs`, `tests/unit/feedbackLiveGiro.test.mjs`,
+  `tests/unit/feedbackGiroPagina.test.mjs`, `tests/unit/feedbackListLight.test.mjs`,
   `tests/unit/feedbackCryptoKeyCache.test.mjs`, `tests/manage-live-update.spec.mjs`,
-  `tests/manage-ricevuti-vivi.spec.mjs`.
+  `tests/manage-ricevuti-vivi.spec.mjs`, `tests/feedback-pagina-viva.spec.mjs`.
 - **Il limite che resta** è il costo del giro in vista: una lettura per
   feedback in pagina al minuto. Chiedere solo i cambiati dopo un istante
   vuole un campo che OGNI scrittura firmi (server compreso): l'`updateTime`

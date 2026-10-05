@@ -778,13 +778,14 @@
         return { id: x.dataset.id, top: r.top - base, height: r.height };
       });
     }
-    // Se ne esce una più su, la vista non salta.
+    // Se ne esce una più su, la vista non salta. Chi sta in cima resta in cima: lì l'ancora porterebbe
+    // fuori vista la scheda appena arrivata (e, sulla pagina che scorre intera, l'intestazione).
     function alSuoPosto() {
       inAttesa = false;
       if (!el) { ridisegna(); return; }
       const sc = scorre();
       const prima = sc ? sc.scrollTop : 0;
-      const ancora = sc ? ancoraScorrimento(righeDi(sc), prima) : null;
+      const ancora = sc && prima > 0 ? ancoraScorrimento(righeDi(sc), prima) : null;
       ridisegna();
       const dopo = scorre();
       if (dopo) dopo.scrollTop = scrollDaAncora(ancora, righeDi(dopo), prima);
