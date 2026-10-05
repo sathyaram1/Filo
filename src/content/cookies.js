@@ -13,6 +13,7 @@
   const T_TOKENS = MSG.COOKIES_BANNER_TOKENS || 'cookies_banner_tokens';
   const T_FRAME = MSG.COOKIES_FRAME_BANNER || 'cookies_frame_banner';
   const T_HIDE_FRAME = MSG.COOKIES_HIDE_FRAME || 'cookies_hide_frame';
+  const T_ACCESSO = MSG.COOKIES_ACCESSO || 'cookies_accesso';
 
   const IS_TOP = (() => { try { return window.top === window.self; } catch (_) { return false; } })();
 
@@ -828,6 +829,40 @@
 
   function applyMode(m) {
     apply({ ...(cfg || {}), mode: m });
+  }
+
+  // ─── accesso a un sito (Privacy massima) ───────────────────────────────────
+  //
+  // Solo il gesto: una password scritta dall'utente (evento vero, la pagina non lo fabbrica) che parte con
+  // invio, Invio o un pulsante. Se l'accesso è riuscito, e la proposta «Resta connesso», lo decide il main.
+  let campoPassword = null;
+  let accessoInviatoAt = 0;
+  function bersaglio(e) {
+    try { const p = e.composedPath && e.composedPath(); if (p && p[0]) return p[0]; } catch (_) {}
+    return e.target;
+  }
+  function onPasswordInput(e) {
+    if (!e.isTrusted) return;
+    const t = bersaglio(e);
+    if (t && t.tagName === 'INPUT' && String(t.type).toLowerCase() === 'password') campoPassword = t;
+  }
+  function forseAccesso(e) {
+    if (!e.isTrusted || mode !== 'privacy' || !campoPassword || !campoPassword.value) return;
+    if (e.type === 'keydown' && e.key !== 'Enter') return;
+    if (e.type === 'click') {
+      const t = bersaglio(e);
+      if (!t || !t.closest || !t.closest('button, input[type="submit"], input[type="image"], input[type="button"], [role="button"], a')) return;
+    }
+    const ora = Date.now();
+    if (ora - accessoInviatoAt < 3000) return;
+    accessoInviatoAt = ora;
+    send({ type: T_ACCESSO });
+  }
+  if (IS_TOP) {
+    try {
+      document.addEventListener('input', onPasswordInput, true);
+      for (const ev of ['submit', 'keydown', 'click']) document.addEventListener(ev, forseAccesso, true);
+    } catch (_) {}
   }
 
   // ─── bootstrap ───────────────────────────────────────────────────────────

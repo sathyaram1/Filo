@@ -15,6 +15,7 @@ const GeoBlockRules = require('./services/geoBlockRules');
 const { installSafebrowse } = require('./tabs/tabSafebrowse');
 const { installGeoBlock } = require('./tabs/tabGeoBlock');
 const { installCookies } = require('./tabs/tabCookies');
+const { installRestaConnesso } = require('./tabs/tabRestaConnesso');
 const Permessi = require('./services/permessiPagine');
 require('../shared/audioState');
 const { audibleFromEvent } = globalThis.SN_AUDIO_STATE;
@@ -2322,6 +2323,7 @@ class TabManager {
     wc.on('did-finish-load', () => {
       this._geoTextCheck(tab);
       setTimeout(() => this._geoTextCheck(tab), 2000);
+      this._accessoDopoCarico(tab);
     });
 
     // #327 — URL "per l'utente" della scheda: se il webContents mostra la
@@ -2359,6 +2361,7 @@ class TabManager {
     });
     wc.on('page-favicon-updated', (_e, favicons) => update({ favicon: favicons?.[0] || '' }));
     wc.on('did-navigate', (_e, url, httpResponseCode) => {
+      const urlPrima = tab.url;
       // #412 — questa scheda ha committato una vera navigazione main-frame:
       // NON è più il "contenitore vuoto" di un download (una scheda aperta da un
       // link Scarica target=_blank che diventa subito scaricamento non committa
@@ -2413,6 +2416,7 @@ class TabManager {
       // interattiva. Best-effort, non blocca mai (vedi _sbOnNavigate).
       this._sbOnNavigate(tab, url);
       this._cookieOnNavigate(tab, url);
+      this._accessoDaNavigazione(tab, urlPrima, url);
       // Geo-block livello 1 (deterministico): nuova navigazione → il segnale
       // precedente decade; HTTP 451 è conclusivo, altrimenti vale l'eventuale
       // redirect "di blocco" memorizzato durante questa navigazione.
@@ -2434,6 +2438,7 @@ class TabManager {
       update({ url: userUrl(url), canBack: canGoBack(wc), canFwd: canGoFwd(wc) });
       if (isMainFrame === true && tab.view && tab.view.webContents === wc) this.anteprime.navigata(tab, { inPagina: true });
       if (isMainFrame === true) this.visite.navigata(wc, tab.id, url, { inPagina: true });
+      if (isMainFrame === true) this._accessoDopoCarico(tab);
     });
     // #441 — l'utente ha toccato DAVVERO questa scheda? Serve a non chiudere
     // come "pagina-ponte" una scheda con cui ha interagito. Il segnale arriva
@@ -2685,6 +2690,7 @@ class TabManager {
     }
     let mostrata = false;
     pwc.on('did-navigate', () => { mostrata = true; });
+    if (origine) win.once('closed', () => this._accessoDopoFinestrella(origine));
     // Una finestrella fermata prima di mostrare qualcosa resterebbe vuota a schermo.
     const ferma = (event) => {
       event.preventDefault();
@@ -3129,6 +3135,8 @@ class TabManager {
         proxy: t.proxy ? { country: t.proxy.country, tier: t.proxy.tier } : null,
         // Banner dei cookie del sito, per il menu della scheda: null se Filo non li gestisce qui.
         cookies: this._cookieState(t),
+        // «Resta connesso qui» (Privacy massima): null se la voce non va mostrata.
+        connesso: this._connessoState(t),
       })),
     };
   }
@@ -3252,6 +3260,7 @@ class TabManager {
 installSafebrowse(TabManager);
 installGeoBlock(TabManager);
 installCookies(TabManager);
+installRestaConnesso(TabManager);
 
 // Host di un URL (chiave della cache colore identità §1.2). Solo schemi web:
 // le pagine filo:// interne non hanno identità di sito da tinteggiare.

@@ -954,10 +954,12 @@
         + 'e si apre senza domande.',
     }),
     elenco({
-      keys: ['siti_fidati_cookie', 'siti fidati cookie', 'siti fidati per i cookie', 'resta connesso', 'siti dove resto connesso'],
+      keys: ['siti_fidati_cookie', 'siti fidati cookie', 'siti fidati per i cookie', 'resta connesso', 'siti dove resto connesso',
+        'siti connessi', 'resta connesso su', 'resta connesso qui'],
       percorso: 'security.cookies.trustedSites',
       nome: 'Siti fidati dove resti connesso',
-      aiuto: 'siti dove si resta connessi anche con la privacy massima dei cookie',
+      aiuto: 'siti dove si resta connessi anche con la privacy massima dei cookie: «resta connesso su X» è aggiungi X, '
+        + '«togli X dai siti connessi» è togli X',
       risk: 'Cambia i siti che fanno eccezione alla privacy massima dei cookie: lì i dati restano fra una visita e '
         + 'l’altra, così resti connesso, e il sito ti riconosce.',
     }),

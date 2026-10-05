@@ -183,12 +183,18 @@ function cookieDaCopiare(c) {
   return d;
 }
 
-async function copiaBarattolo(da, a) {
+// `sito`: da un jar che non è quello del sito si prendono solo i cookie del sito.
+async function copiaBarattolo(da, a, sito) {
   if (!da || !a || da === a || !da.cookies || !a.cookies) return 0;
   let tutti = [];
   try { tutti = await da.cookies.get({}); } catch (_) { return 0; }
+  const suo = (c) => {
+    const dom = String(c.domain || '').replace(/^\./, '').toLowerCase();
+    return dom === sito || dom.endsWith('.' + sito);
+  };
   let copiati = 0;
   await Promise.all(tutti.map(async (c) => {
+    if (sito && !suo(c)) return;
     const d = cookieDaCopiare(c);
     if (!d) return;
     try { await a.cookies.set(d); copiati++; } catch (_) {}

@@ -111,6 +111,14 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
+  on(MSG.COOKIES_ACCESSO, async (msg, sender) => {
+    const win = winOf(sender);
+    const tabId = sender && sender.tab && sender.tab.id;
+    const top = sender && sender.wc && !sender.wc.isDestroyed() && sender.wc.mainFrame;
+    if (!win || !win._filoTabs || !tabId || !top || !sender.frame || sender.frame.frameTreeNodeId !== top.frameTreeNodeId) return { ok: false };
+    return win._filoTabs.accessoTentato(tabId);
+  });
+
   on(MSG.COOKIES_OUTCOME, async (msg, sender) => {
     const win = winOf(sender);
     const tabId = sender && sender.tab && sender.tab.id;

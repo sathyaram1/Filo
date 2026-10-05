@@ -665,6 +665,9 @@
     COOKIES_RULE: 'cookies_rule',                   // { name } → { ok, rule }
     COOKIES_OUTCOME: 'cookies_outcome',             // { outcome: 'rejected'|'hidden'|'unconfirmed'|'answer', cookies?, storage? } → { ok }
     COOKIES_BANNER_TOKENS: 'cookies_banner_tokens', // { ids, classes } → { ok, selectors } (quelli della lista)
+    // Solo dal frame principale: l'utente ha mandato una password scritta da lui. Decide il main se l'accesso è
+    // riuscito e se proporre «Resta connesso» (tabs/tabRestaConnesso.js); vale per il sito della scheda.
+    COOKIES_ACCESSO: 'cookies_accesso',             // {} → { ok }
     // Un riquadro con un banner che non ha «rifiuta» lo dice al main, che passa alla pagina l'indirizzo del riquadro
     // suo figlio da nascondere: fra frame si passa dal main, una postMessage la saprebbe scrivere anche il sito.
     COOKIES_FRAME_BANNER: 'cookies_frame_banner',   // (riquadro) {} → { ok }

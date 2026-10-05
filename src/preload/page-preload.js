@@ -188,6 +188,12 @@ if (!IS_SUBFRAME) try {
         try { for (const k of Object.keys(st)) if (re.test(k) || extra.has(k)) st.removeItem(k); } catch (_) {}
       }
     }
+    // «Resta connesso»: la scheda è passata in un altro jar e la memoria della pagina la segue.
+    if (w && Array.isArray(w.semina)) {
+      for (const voce of w.semina) {
+        try { if (Array.isArray(voce)) window.localStorage.setItem(String(voce[0]), String(voce[1])); } catch (_) {}
+      }
+    }
   }
 } catch (e) { /* come sopra: mai bloccare il caricamento */ }
 

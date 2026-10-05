@@ -122,7 +122,13 @@ function registerIpcHandlers() {
       if (top) {
         for (const w of BrowserWindow.getAllWindows()) {
           const tm = w._filoTabs;
-          if (tm && tm.tabs && tm.tabs.some((t) => t.view && t.view.webContents === wc)) { out = tm.takeCookieWipe(String(href || '')); break; }
+          if (tm && tm.tabs && tm.tabs.some((t) => t.view && t.view.webContents === wc)) {
+            out = tm.takeCookieWipe(String(href || ''));
+            // La memoria della pagina che «Resta connesso» ha portato nel jar nuovo (tabs/tabRestaConnesso.js).
+            const semina = tm.takeSemina(wc, String(href || ''));
+            if (semina) out = { ...(out || {}), semina };
+            break;
+          }
         }
       }
     } catch (_) { out = null; }
@@ -462,6 +468,15 @@ function registerIpcHandlers() {
     const win = winFor(event);
     if (!win?._filoTabs) return { ok: false, error: 'no_tab' };
     return win._filoTabs.clearTabProxy(id);
+  });
+  // #759 — «Resta connesso qui» dal menu della scheda (id) o dalla proposta dopo un accesso (sito). Solo dalla
+  // shell e solo nel profilo normale: l'incognito non ha jar persistenti.
+  ipcMain.handle('tabs:resta-connesso', async (event, { id, on, sito } = {}) => {
+    const win = finestraDellaBarra(event.sender);
+    if (!win || win._filoIncognito || !win._filoTabs) return { ok: false, error: 'forbidden' };
+    const dove = sito ? 'proposta-accesso' : 'menu-scheda';
+    return require('./services/registroCambi').con({ via: 'interfaccia', dove },
+      () => win._filoTabs.restaConnesso({ tabId: id, sito: typeof sito === 'string' ? sito : null, on: !!on }));
   });
   // #754 — dal menu della scheda: rivedere i banner dei cookie su questo sito (show) o ridarli a Filo.
   // Solo dalla shell: scrive le impostazioni.

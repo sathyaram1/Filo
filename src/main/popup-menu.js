@@ -57,6 +57,11 @@ const ICON_PATHS = {
     '<path d="M12 3a9 9 0 1 0 9 9 3 3 0 0 1-3.6-3.4A3 3 0 0 1 14.4 5 3 3 0 0 1 12 3z"/>' +
     '<path d="M8.5 9.5h.01"/><path d="M15.5 15h.01"/><path d="M9.5 15.5h.01"/><path d="M12.5 12h.01"/>',
 
+  // Chiave — «Resta connesso qui» / «Non restare connesso» (#759).
+  key:
+    '<circle cx="8" cy="15" r="4"/>' +
+    '<path d="M10.8 12.2L20 3"/><path d="M16.5 6.5l2.5 2.5"/><path d="M14 9l2 2"/>',
+
   // Occhio — «Mostra il banner dei cookie».
   eye:
     '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/>' +

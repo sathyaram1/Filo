@@ -58,6 +58,8 @@ contextBridge.exposeInMainWorld('filoShell', {
     proxyStatus: () => ipcRenderer.invoke('tabs:proxy-status'),
     // Banner dei cookie del sito della scheda: true = mostrali, false = Filo li gestisce di nuovo.
     cookieBanners: (id, show) => ipcRenderer.invoke('tabs:cookie-banners', { id, show }),
+    // «Resta connesso qui»: dalla scheda (id) o dalla proposta dopo un accesso (sito).
+    restaConnesso: (id, on, sito) => ipcRenderer.invoke('tabs:resta-connesso', { id, on, sito }),
   },
   // Scaricamenti della navigazione (#410.1): la shell legge la cronologia,
   // comanda i singoli download e riceve gli aggiornamenti di avanzamento dal
