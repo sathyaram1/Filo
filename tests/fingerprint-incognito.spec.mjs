@@ -99,6 +99,23 @@ test('la stessa pagina mostra un\'impronta diversa in ogni finestra in incognito
   expect(popup.prima).toBe(a1.prima);
 });
 
+test('il livello scelto da una finestra in incognito vale solo lì, come gli altri suoi cambi di Sicurezza', async ({ app, shell, testServer }) => {
+  test.setTimeout(90_000);
+  const inc = await apriIncognito(app, shell);
+  const sec = await apriInIncognito(app, inc, 'filo://security/');
+  await sec.waitForSelector('input[name="fp-mode"]', { timeout: 8_000 });
+  await sec.locator('input[name="fp-mode"][value="off"]').check();
+  await expect(sec.locator('#savedHint')).toHaveClass(/sn-show/, { timeout: 4_000 });
+
+  const url = testServer.html('<title>FP_LIVELLO_INC</title><p>ok</p>');
+  const dentro = await leggi(await apriInIncognito(app, inc, `${url}?w=incognito`), { protetta: false });
+  expect(dentro.guard).toBe(false);
+  expect(dentro.deviating).toBe(0);
+  const fuori = await leggi(await apriNellaNormale(app, shell, `${url}?w=normale`));
+  expect(fuori.guard).toBe(true);
+  expect(fuori.deviating).toBeGreaterThan(0);
+});
+
 test('con la protezione su Off, in incognito i pixel del canvas tornano esatti', async ({ app, shell, openTab, testServer }) => {
   const sec = await openTab('filo://security/');
   await sec.waitForSelector('input[name="fp-mode"]', { timeout: 8_000 });
