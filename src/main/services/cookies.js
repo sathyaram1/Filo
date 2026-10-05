@@ -355,8 +355,37 @@ function inUso(partition, ses) {
 }
 
 function controllaUscita(partition) {
+  if (!daButtare(partition)) return;
   const ses = siteSessions.get(partition);
   if (ses && !inUso(partition, ses)) buttaJar(partition, ses);
+}
+
+// Il sito non è più un'eccezione: quello che aveva salvato se ne va come per gli altri siti, ma mai mentre
+// è aperto in una scheda (lo butterebbe fuori a metà sessione): lì aspetta che la chiuda, come un jar normale.
+function dimenticaFidato(site) {
+  const partition = 'persist:' + baseDelSito(site);
+  let ses = siteSessions.get(partition);
+  try { if (!ses) ses = session.fromPartition(partition); } catch (_) { return; }
+  siteSessions.set(partition, ses);
+  sitoDelJar.set(partition, site);
+  fidatiDaButtare.add(partition);
+  seguiUscite(partition, ses);
+  // Le schede già aperte sono nate prima che seguissimo questo jar: la loro chiusura va agganciata adesso.
+  try {
+    for (const wc of require('electron').webContents.getAllWebContents()) {
+      if (!wc.isDestroyed() && wc.session === ses) wc.once('destroyed', () => armaUscita(partition));
+    }
+  } catch (_) {}
+  if (inUso(partition, ses)) return;
+  buttaJar(partition, ses);
+}
+
+// Rimesso fra i fidati prima che il suo jar se ne andasse: resta dov'è, l'utente ha disdetto.
+function tieniFidato(site) {
+  const partition = 'persist:' + baseDelSito(site);
+  if (!fidatiDaButtare.delete(partition)) return;
+  clearTimeout(uscite.get(partition));
+  uscite.delete(partition);
 }
 
 // Il sito riparte subito in un'altra generazione: chi lo riapre mentre il vecchio jar si svuota non perde i cookie a metà.
