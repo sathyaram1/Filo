@@ -87,6 +87,7 @@
     if (root) return;
     history = [];
     ripiegoDetto = false;
+    ripiegoDaDire = '';
     collapsed = false;
     aiPrefersOpen = true;
     session = newSession();
