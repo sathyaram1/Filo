@@ -143,6 +143,10 @@
 
   // Il 404 del router quando, fra gli host ammessi, nessuno regge i parametri chiesti (o nessuno resta).
   const NO_HOST_FOR_PARAMS_RE = /no endpoints found|no allowed providers|parameter|tool/i;
+  // Lo stesso 404 quando a scartare gli host è la politica sui dati dell'account OpenRouter: né strumenti
+  // né ragionamento c'entrano, e chi lo racconta deve mandare alla privacy, non a cambiare modello.
+  const DATA_POLICY_RE = /data policy|settings\/privacy/i;
+  const isParamsRefusal = (text) => NO_HOST_FOR_PARAMS_RE.test(text) && !DATA_POLICY_RE.test(text);
 
   // Una chiamata di chat (con o senza streaming). `require_parameters` scarta anche gli host che non
   // conoscono `reasoning`, e per un modello che non ragiona non ne resterebbe nessuno: il ragionamento
