@@ -85,7 +85,7 @@
     },
     {
       id: 'incognito', title: 'Finestra in incognito', category: 'navigation',
-      desc: 'Apre una nuova finestra privata e isolata: la sessione è effimera e non viene archiviata.',
+      desc: 'Apre una nuova finestra privata e isolata: la sessione è effimera e non viene archiviata. Dentro valgono le stesse protezioni della finestra normale: pubblicità e tracker bloccati, il «non profilarmi» detto ai siti, i banner dei cookie rifiutati e i video di YouTube degli altri siti caricati senza cookie. La modalità dei cookie si può cambiare lì dentro senza toccare la finestra normale.',
       invoke: 'Menu del tasto destro → "Nuova finestra incognito".',
       doesNot: 'Non sospende il limite di spesa del mese: quello che si spende lì conta come fuori e resta nel conto. Il testo delle pagine non va al modello per riconoscere i blocchi geografici.',
     },
