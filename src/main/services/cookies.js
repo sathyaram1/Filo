@@ -174,6 +174,15 @@ function partitionForUrl(url, trusted) {
 
 const gpcState = new WeakMap(); // session → { enabled }
 
+// Il salto verso youtube-nocookie fatto in rete fa cadere la provenienza, e senza YouTube non fa partire
+// il video (errore 153): si riporta quella che la richiesta originale aveva, già tagliata dalla politica del sito.
+const provenienzaDeviati = new Map(); // id richiesta → referrer
+function ricordaProvenienza(id, referrer) {
+  if (!referrer) return;
+  provenienzaDeviati.set(id, referrer);
+  if (provenienzaDeviati.size > 500) provenienzaDeviati.delete(provenienzaDeviati.keys().next().value);
+}
+
 // Registra (se manca) l'unico listener onBeforeSendHeaders della sessione,
 // SENZA toccare lo stato GPC.
 function ensureHeaderHook(ses) {
@@ -186,6 +195,11 @@ function ensureHeaderHook(ses) {
       const s = gpcState.get(ses);
       let headers = details.requestHeaders;
       if (s && s.enabled) headers = { ...headers, 'Sec-GPC': '1' };
+      const ref = provenienzaDeviati.get(details.id);
+      if (ref !== undefined) {
+        provenienzaDeviati.delete(details.id);
+        if (!Object.keys(headers).some((k) => k.toLowerCase() === 'referer')) headers = { ...headers, Referer: ref };
+      }
       callback({ requestHeaders: headers });
     });
   }
@@ -234,6 +248,7 @@ function ensureRequestHook(ses) {
     const riquadro = details.resourceType === 'subFrame' || details.resourceType === 'object';
     const nocookie = s && s.enabled && riquadro ? YtNocookie.url(details.url) : null;
     if (nocookie) {
+      ricordaProvenienza(details.id, details.referrer);
       callback({ redirectURL: nocookie });
       return;
     }

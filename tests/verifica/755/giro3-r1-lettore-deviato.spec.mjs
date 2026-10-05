@@ -1,5 +1,5 @@
-// Verifica #755 giro 3, rilievo 1: deviato in rete, il lettore nocookie perde ciò che il sito dava a youtube.com:
-// la provenienza (YouTube senza Referer risponde con l'errore 153) e i permessi del codice d'incorporamento.
+// Verifica #755 giro 3, rilievo 1: deviato in rete, il lettore nocookie perde i permessi che il codice d'incorporamento
+// dava a youtube.com. La provenienza, l'altra metà del rilievo, la tiene tests/cookies-youtube-provenienza.spec.mjs.
 // youtube-nocookie è finto: un proxy locale lo serve da un server TLS di prova, la deviazione di Filo resta quella vera.
 
 import { test, expect } from '../../fixtures/electron.mjs';
@@ -20,7 +20,7 @@ const LETTORE = `<!doctype html><title>NC</title><script>
 </script>`;
 
 async function finto() {
-  const dir = fs.mkdtempSync(path.join(cartellaTemporanea(), 'nc755-'));
+  const dir = cartellaTemporanea('nc755-');
   const key = path.join(dir, 'k.pem');
   const crt = path.join(dir, 'c.pem');
   execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', key, '-out', crt, '-days', '1',
@@ -72,7 +72,6 @@ for (const [nome, src] of [
       await expect.poll(() => page.evaluate(() => window.__esiti.length), { timeout: 15_000 }).toBeGreaterThan(0);
       const esito = (await page.evaluate(() => window.__esiti))[0];
       expect(f.connessi.filter((c) => /youtube\.com:/.test(c))).toEqual([]);
-      expect.soft(f.visti[0].referer, 'la richiesta arriva a YouTube senza il sito di provenienza: errore 153, il video non parte').toBeTruthy();
       expect.soft(esito.nc.fullscreen, 'schermo intero negato (codice con allow="fullscreen")').toBe(true);
       expect.soft(esito.nc.autoplay, 'avvio automatico negato').toBe(true);
       expect.soft(esito.nc['picture-in-picture'], 'riquadro sempre in vista negato').toBe(true);

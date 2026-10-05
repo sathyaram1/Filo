@@ -549,9 +549,9 @@
     },
     {
       id: 'youtube-nocookie', title: 'Video di YouTube negli altri siti senza cookie', category: 'settings',
-      desc: 'In modalità Automatico e Privacy i video di YouTube incorporati in un altro sito si caricano da youtube-nocookie.com, il dominio di YouTube che non lascia cookie finché non premi play. La richiesta viene deviata prima di partire, quindi il video si carica una volta sola e YouTube non vede i tuoi cookie: vale anche per i video che compaiono mentre scorri e per quelli dentro il riquadro di un altro sito. Play, schermo intero e il punto di partenza scelto dal sito restano com\'erano.',
+      desc: 'In modalità Automatico e Privacy i video di YouTube incorporati in un altro sito si caricano da youtube-nocookie.com, il dominio di YouTube che non lascia cookie finché non premi play. La richiesta viene deviata prima di partire, quindi il video si carica una volta sola e YouTube non vede i tuoi cookie: vale anche per i video che compaiono mentre scorri e per quelli dentro il riquadro di un altro sito. Play e il punto di partenza scelto dal sito restano com\'erano, e YouTube vede da che sito arriva il video, come prima.',
       invoke: 'Da solo, a ogni pagina. Si spegne passando i cookie su Manuale in Impostazioni → Sicurezza, o chiedendolo a Filo.',
-      doesNot: 'Non devia i video che il sito comanda con i suoi pulsanti (play, pausa, salti dal sito stesso): deviati smetterebbero di rispondere, e restano su youtube.com. Non c\'è un dominio equivalente per Instagram, Vimeo e gli altri. In modalità Manuale non devia niente.',
+      doesNot: 'Non devia i video che il sito comanda con i suoi pulsanti (play, pausa, salti dal sito stesso): deviati smetterebbero di rispondere, e restano su youtube.com. Non c\'è un dominio equivalente per Instagram, Vimeo e gli altri. In modalità Manuale non devia niente. Un video già scritto nella pagina e deviato non parte da solo e non si apre nel riquadro sempre in vista anche se il sito lo permetteva; lo schermo intero resta quando il sito lo concede nel modo classico, come fa il codice che YouTube dà ai siti.',
     },
     {
       id: 'ad-block', title: 'Blocco di pubblicità e tracker', category: 'settings',
