@@ -1119,6 +1119,7 @@
     fermatoAlle = Date.now();
     setTimeout(aggiornaTasto, PAUSA_RIPRESA + 20);
     t.attivita.taglia();
+    t.ferma();
     aggiornaTasto();
     send({ type: MSG.FILO_CHAT_STOP, reqId: t.reqId }).catch(() => {});
   }
