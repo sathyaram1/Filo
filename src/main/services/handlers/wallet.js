@@ -128,6 +128,7 @@ module.exports = function register(on, ctx) {
   // personale già in uso non c'è riserva (un 402 lì sono i crediti finiti), e
   // con la chiave di fabbrica nemmeno.
   async function alternativeKeyFor(apiKey) {
+    if (provaDiChiave.getStore()) return null;
     const k = String(apiKey || '').trim();
     const personal = walletStore.personalKey();
     if (!k || !personal || k === personal) return null;
@@ -135,13 +136,22 @@ module.exports = function register(on, ctx) {
     return { key: personal, source: 'personal' };
   }
 
-  // L'ultimo rifiuto della chiave propria: { at, status, detail }. Lo legge
-  // la pagina Crediti (readState); si cancella quando la chiave cambia.
+  // La prova di una chiave (il «Prova» delle Impostazioni) misura QUELLA
+  // chiave: dentro `senzaRipiego` un rifiuto risale com'è, senza riserva.
+  const provaDiChiave = new AsyncLocalStorage();
+  function senzaRipiego(fn) { return provaDiChiave.run(true, fn); }
+
+  // L'ultimo rifiuto della chiave propria: { at, status, detail, usedCredits }.
+  // Lo legge la pagina Crediti (readState); si cancella quando la chiave
+  // cambia. `usedCredits`: da quando la chiave è rifiutata, un ripiego ha
+  // risposto almeno una volta (un ripiego caduto non ha speso niente).
   const REFUSAL_KEY = 'walletOwnKeyRefusal';
-  async function noteOwnKeyRefusal({ status, detail } = {}) {
-    const rec = { at: new Date().toISOString(), status: Number(status) || 0, detail: String(detail || '').slice(0, 300) };
+  async function noteOwnKeyRefusal({ status, detail, served = true } = {}) {
+    const prev = await lastOwnKeyRefusal();
+    const usedCredits = Boolean(served) || Boolean(prev && prev.usedCredits !== false);
+    const rec = { at: new Date().toISOString(), status: Number(status) || 0, detail: String(detail || '').slice(0, 300), usedCredits };
     try { await globalThis.SN_STORAGE.setRaw(REFUSAL_KEY, rec); } catch (_) {}
-    console.warn(`[wallet] chiave propria rifiutata (${rec.status}): ripiego sulla chiave personale`);
+    console.warn(`[wallet] chiave propria rifiutata (${rec.status}): ${served ? 'ha risposto la chiave personale' : 'anche il ripiego sulla personale è caduto'}`);
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
   }
   async function lastOwnKeyRefusal() {
