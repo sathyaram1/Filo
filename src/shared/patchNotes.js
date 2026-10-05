@@ -13,6 +13,7 @@
       features: [],
       fixes: [
         'Su Windows, se in un comando che Filo esegue per te una parte sbaglia, per esempio un programma che non esiste, il resto della riga gira lo stesso, come quando la scrivi tu nel terminale. Prima si fermava tutto lì.',
+        'La chat di Filo chiede le risposte solo ai fornitori che sanno usare i suoi strumenti, come cercare sul web o cambiare un\'impostazione. Prima uno che li ignorava faceva fallire la risposta senza spiegazione. Se per il modello che hai scelto non ce n\'è nessuno, Filo te lo dice.',
       ],
     },
     {

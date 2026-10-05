@@ -105,6 +105,26 @@
     const pm = /^(OpenRouter|Gemini)(?:\s+\S+)?\s+(\d{3})\b/.exec(raw);
     if ((e && e.provider) || pm) {
       const st = Number(e && e.status) || (pm ? Number(pm[2]) : 0);
+      // #700: gli host li ha scartati la politica sui dati dell'account OpenRouter, non gli strumenti.
+      // Con la chiave dell'utente la rimedia lui; con quella di Filo resta solo un altro modello.
+      if ((e && e.code === 'DATA_POLICY') || (st === 404 && /data policy/i.test(raw))) {
+        return e && e.keySource === 'own'
+          ? 'nessun fornitore di questo modello rispetta le impostazioni sulla privacy del tuo account OpenRouter: allentale su openrouter.ai/settings/privacy, o scegli un altro modello in Modelli predefiniti.'
+          : 'nessun fornitore di questo modello rispetta le regole sulla privacy dei dati: scegli un altro modello in Modelli predefiniti.';
+      }
+      // #700: gli altri «nessun host» del router hanno ciascuno il suo rimedio, e nessuno riguarda gli strumenti.
+      if (e && e.code === 'NO_PROVIDER_ALLOWED') {
+        return e.keySource === 'own'
+          ? 'nessun fornitore di questo modello è fra quelli ammessi, dalle regole sui fornitori di Filo o dalle impostazioni del tuo account OpenRouter: allarga i fornitori ammessi nel tuo account, o scegli un altro modello in Modelli predefiniti.'
+          : 'nessun fornitore di questo modello è fra quelli ammessi dalle regole sui fornitori: scegli un altro modello in Modelli predefiniti.';
+      }
+      if (e && e.code === 'MODEL_UNAVAILABLE') {
+        return 'il modello scelto non è più disponibile sul servizio AI: scegli un altro modello in Modelli predefiniti.';
+      }
+      // #700: fra gli host ammessi per quel modello nessuno regge gli strumenti, e riprovare non serve.
+      if (e && e.code === 'NO_TOOL_HOST') {
+        return 'per il modello scelto nessun fornitore ammesso sa usare gli strumenti (cercare, leggere, impostare), e la chat di Filo ne ha bisogno. Scegli un altro modello in Modelli predefiniti.';
+      }
       // Il router non ha trovato un host che accetti gli strumenti (tool
       // calling) per il modello scelto: la chat della home non funziona senza.
       // Non è un guasto passeggero, è una scelta di modello da cambiare.
