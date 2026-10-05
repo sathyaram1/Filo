@@ -1162,6 +1162,12 @@
       : { ...(settings.tabColor || {}) };
     buildTabColorSection();
     caricato = true;
+    // La sezione chiesta dall'indirizzo (la carta dell'aggiornamento manda a #sec-aggiornamenti) si raggiunge solo
+    // adesso: le sezioni costruite qui sopra l'hanno spostata in giù dopo lo scorrimento del browser.
+    try {
+      const sezione = location.hash && document.getElementById(decodeURIComponent(location.hash.slice(1)));
+      if (sezione) sezione.scrollIntoView();
+    } catch (_) {}
   }
 
   // Un cambio arrivato da altrove: si riscrive solo quello che è davvero
