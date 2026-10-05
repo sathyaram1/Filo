@@ -401,6 +401,7 @@ function buttaJar(partition, ses) {
     g.n = i;
   }
   scaricamenti.delete(partition);
+  fidatiDaButtare.delete(partition);
   try { require('./permessiPagine').dimenticaSessione(ses); } catch (_) {}
   const pulisci = (fn) => Promise.resolve().then(fn).catch(() => {});
   Promise.all([
