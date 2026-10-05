@@ -128,7 +128,11 @@ async function scarica() {
   try {
     // Dopo un riavvio la carta c'è ancora ma il controllo di questa sessione può non essere finito.
     if (!stato.versioneTrovata) await u.checkForUpdates();
-    if (!stato.versioneTrovata) return;
+    if (!stato.versioneTrovata) {
+      stato.errore = 'Adesso non trovo la versione nuova. Riprova fra poco.';
+      stato.annuncia();
+      return;
+    }
     stato.scaricamento = { versione: stato.versioneTrovata, percento: 0 };
     stato.annuncia();
     await u.downloadUpdate();
