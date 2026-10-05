@@ -552,11 +552,14 @@ function configureFromSettings(settings) {
       { normal: true, incognito: !_incognito });
   }
   const trustedOra = _cached.trustedSites.join('\n');
-  if (_configured && prevTrusted !== trustedOra) {
+  if (!_configured || prevTrusted !== trustedOra) {
     const prima = new Set(prevTrusted.split('\n').map((d) => d.toLowerCase()).filter(Boolean));
     const adesso = trustedSetOf(settings);
-    for (const site of prima) if (!adesso.has(site)) dimenticaFidato(site);
-    for (const site of adesso) if (!prima.has(site)) tieniFidato(site);
+    if (_configured) {
+      for (const site of prima) if (!adesso.has(site)) dimenticaFidato(site);
+      for (const site of adesso) if (!prima.has(site)) tieniFidato(site);
+    }
+    spazzaFidatiOrfani(adesso);
   }
   _configured = true;
   if (prevMode !== _cached.mode || prevTrusted !== trustedOra) {
