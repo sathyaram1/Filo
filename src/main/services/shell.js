@@ -67,6 +67,33 @@ function comandoPerPowerShell(command, coda = '') {
   return coda ? `${cmd}\n${coda}` : cmd;
 }
 
+// cmd legge lo stdin di una pipe un byte per volta e decodifica ogni byte da solo con la tabella attiva: con 65001
+// i byte di «à» o «—» diventano rombi, con una tabella a un byte passa solo ciò che quella tabella contiene (#1044).
+// Sul filo vanno quindi solo caratteri ASCII: i pezzi non ASCII stanno in un file UTF-8 che `set /p` legge a righe
+// intere, e il comando li richiama come %variabili%, espanse prima che cmd guardi virgolette e redirezioni.
+// Un pezzo per riga al più 200 caratteri: `set /p` legge 1023 byte per riga e un carattere ne occupa fino a quattro.
+const PEZZO_CMD = 200;
+const VALORI_CMD = 'FILO_VALORI_CMD';
+
+function comandoPerCmd(command) {
+  const cmd = String(command == null ? '' : command);
+  if (SOLO_ASCII.test(cmd)) return { testo: cmd, valori: null };
+  const valori = [];
+  const nomi = new Map();
+  const richiama = (pezzo) => {
+    if (!nomi.has(pezzo)) { valori.push(pezzo); nomi.set(pezzo, `FILO_U${valori.length}`); }
+    return `%${nomi.get(pezzo)}%`;
+  };
+  const testo = cmd.replace(/[^\x00-\x7F]+/g, (corsa) => {
+    const caratteri = Array.from(corsa);
+    let s = '';
+    for (let i = 0; i < caratteri.length; i += PEZZO_CMD) s += richiama(caratteri.slice(i, i + PEZZO_CMD).join(''));
+    return s;
+  });
+  const letture = valori.map((_, i) => `set /p "FILO_U${i + 1}="`).join('\r\n');
+  return { testo: `(\r\n${letture}\r\n)<"%${VALORI_CMD}%"\r\n${testo}`, valori: `${valori.join('\r\n')}\r\n` };
+}
+
 // Quella cartella c'è ancora, ed è una cartella? La domanda si fa qui per
 // tutti, perché la risposta sia la stessa nei tre punti che la fanno: la shell
 // persistente quando nasce, il comando one-shot dell'assistente quando parte, e
