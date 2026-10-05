@@ -170,8 +170,15 @@ function seguiGesti(wc) {
       const stessa = e && typeof e.isSameDocument === 'boolean' ? e.isSameDocument : isInPlace;
       // Un invito non si carica mai (#664): la pagina resta, e il gesto che l'ha chiesto deve arrivare a chi lo porta dentro.
       const invito = Boolean(globalThis.SN_WALLET?.isInviteDeepLink?.((e && e.url) || url));
-      if (principale && !stessa && !invito) { wc._filoGestoAlle = 0; wc._filoMenuAperto = null; }
+      if (principale && !stessa && !invito) {
+        // Il clic che ha fatto partire la navigazione vale per i suoi rinvii, non per la pagina d'arrivo (#664 giro 2).
+        wc._filoNavDaGesto = gestoRecente(wc);
+        wc._filoGestoAlle = 0; wc._filoMenuAperto = null;
+      }
     });
+    const finita = (_e, _u, _c, _t, principale) => { if (principale !== false) wc._filoNavDaGesto = false; };
+    wc.on('did-navigate', () => { wc._filoNavDaGesto = false; });
+    wc.on('did-fail-load', (e, c, d, u, principale) => finita(e, u, c, d, principale));
   } catch (_) {}
 }
 
