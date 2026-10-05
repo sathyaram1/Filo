@@ -401,6 +401,27 @@
     return `--- ${label || "Aggiornamento dell'agente del"} ${when} ---`;
   }
 
+  // L'istante scritto in un marcatore, in ISO, o null. I marcatori sono scritti in italiano (giorno/mese, anno a due
+  // o quattro cifre, ora locale di chi scrive): `new Date()` li legge mese/giorno e sbaglia o li scarta (#764).
+  const DATA_MARCATORE_RE = /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})(?:,?\s+(\d{1,2})[:.](\d{2})(?:[:.](\d{2}))?)?$/;
+  function istanteDelMarcatore(ts) {
+    const s = String(ts == null ? '' : ts).trim();
+    if (!s) return null;
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+      const t = Date.parse(s);
+      return Number.isNaN(t) ? null : new Date(t).toISOString();
+    }
+    const m = DATA_MARCATORE_RE.exec(s);
+    if (!m) return null;
+    const [g, me, a, h, mi, se] = [m[1], m[2], m[3], m[4] || 0, m[5] || 0, m[6] || 0].map(Number);
+    const anno = m[3].length === 2 ? 2000 + a : a;
+    const d = new Date(anno, me - 1, g, h, mi, se);
+    // Un 31/02 o un 25:00 non è una data: Date li farebbe scivolare in avanti in silenzio.
+    if (d.getFullYear() !== anno || d.getMonth() !== me - 1 || d.getDate() !== g
+      || d.getHours() !== h || d.getMinutes() !== mi) return null;
+    return d.toISOString();
+  }
+
   // Appende un turno dell'agente al blob note esistente, conservando lo storico.
   // opts.attachments come in appendUserTurn (simmetria tra i due cammini).
   function appendModelTurn(oldNotes, reportText, opts) {
@@ -641,6 +662,7 @@
     CLAUDE_GROUPS,
     ownerize,
     userTurnMarker,
+    istanteDelMarcatore,
     appendUserTurn,
     modelTurnMarker,
     appendModelTurn,

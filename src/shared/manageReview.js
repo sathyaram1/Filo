@@ -1382,6 +1382,11 @@
     return MOTIVI_RISPOSTA.includes(String(norm.statusReason || '')) || String(fb.status || '') === 'clarify';
   }
 
+  function istanteDelTurno(ts) {
+    const FT = global.SN_FEEDBACK_THREAD;
+    return (FT && FT.istanteDelMarcatore && FT.istanteDelMarcatore(ts)) || String(ts);
+  }
+
   /** L'ultimo turno di Filo nella conversazione, o null. PURA. */
   function ultimaDomanda(fb) {
     const note = fb && fb.notes;
@@ -1420,7 +1425,8 @@
       if (attesa) {
         return forma('l3', 'rombo', titolo, 'design', 'domande', {
           titolo,
-          righe: (domanda && domanda.ts) ? [riga('Quando', String(domanda.ts))] : [],
+          // Il pannello vuole l'ISO; un marcatore che non si legge passa com'è scritto, piuttosto che sparire.
+          righe: (domanda && domanda.ts) ? [riga('Quando', istanteDelTurno(domanda.ts))] : [],
           testo: (domanda && domanda.body) || L3_ATTESA,
           illeggibile: valueUnreadable(fb && fb.notes),
           azioni: [],
