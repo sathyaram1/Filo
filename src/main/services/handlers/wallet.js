@@ -21,6 +21,7 @@
 // Il saldo NON lo calcola nessuno qui: lo dice il server, che lo legge da
 // OpenRouter (tetto della chiave meno consumo).
 
+const { AsyncLocalStorage } = require('node:async_hooks');
 const auth = require('../../auth/google-auth');
 const identity = require('../../auth/anon-auth');
 const walletStore = require('../../auth/wallet-store');
