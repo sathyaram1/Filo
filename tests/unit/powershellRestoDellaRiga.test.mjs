@@ -112,3 +112,23 @@ test('throw e -ErrorAction Stop fermano ancora il resto, e la cartella raggiunta
     assert.equal((await assistente(comando)).code, atteso, `«${comando}»`);
   }
 });
+
+// Un return o un break fuori da un ciclo saltano la riga che scrive l'esito, ma il comando è riuscito: anche
+// con gli accenti, che nella dashboard prendono la stessa strada dell'assistente.
+test('return e break fuori da un ciclo non fanno risultare fallito un comando riuscito, su tutte e due le strade', { skip: SALTA }, async () => {
+  const casi = [
+    ['1..5 | ForEach-Object { if ($_ -eq 3) { break }; $_ }', ['1', '2']],
+    ['if (Test-Path "manca-qui") { Write-Output si } else { return }', []],
+    ['Write-Output a; return; Write-Output b', ['a']],
+    ['Write-Output città; return', ['città']],
+  ];
+  await conDashboard(async (esegui) => {
+    for (const [comando, attese] of casi) {
+      await esegui(`Set-Location "${TMP}"`);
+      for (const [strada, r] of [['dashboard', await esegui(comando)], ['assistente', await assistente(comando)]]) {
+        assert.deepEqual(righe(r.stdout), attese, `${strada}, «${comando}»`);
+        assert.equal(r.code, 0, `${strada}, «${comando}»: riuscito ma risulta fallito`);
+      }
+    }
+  });
+});

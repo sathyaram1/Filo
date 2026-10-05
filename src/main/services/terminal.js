@@ -196,10 +196,13 @@ function nuovoMarcatore() {
 // L'esito di un comando PowerShell, con $__filo_ok = il $? preso subito dopo. $LASTEXITCODE lo scrivono solo
 // i programmi esterni: un cmdlet fallito lo lascia a 0, e a dirlo resta $? (#714). Vale anche per shell.js.
 const ESITO_POWERSHELL = 'if ($__filo_ok) { 0 } elseif ($LASTEXITCODE) { $LASTEXITCODE } '
+  // $__filo_ok ancora $null = il comando è uscito prima della riga che lo scrive: un throw lascia un errore
+  // nuovo ($__filo_e = quello di prima), un return o un break fuori da un ciclo no, e sono riusciti.
+  + 'elseif (-not ($Error.Count -and -not [object]::ReferenceEquals($Error[0], $__filo_e))) '
+  + '{ if ($null -eq $__filo_ok) { 0 } else { 1 } } '
   // Con lo stderr rediretto (2>&1, 2>$null) ogni riga di un programma riuscito diventa un errore e spegne $?:
-  // se l'ultimo errore nuovo ($__filo_e = quello di prima) viene da lì, decide il codice del programma.
-  + 'elseif ($Error.Count -and -not [object]::ReferenceEquals($Error[0], $__filo_e) '
-  + "-and $Error[0].FullyQualifiedErrorId -like 'NativeCommandError*') { 0 } else { 1 }";
+  // se l'ultimo errore nuovo viene da lì, decide il codice del programma.
+  + "elseif ($Error[0].FullyQualifiedErrorId -like 'NativeCommandError*') { 0 } else { 1 }";
 // Da mettere prima del comando: l'errore più recente che c'era già, perché uno vecchio non decida l'esito.
 const ERRORE_DI_PRIMA_POWERSHELL = '$__filo_e=if ($Error.Count) { $Error[0] } else { $null }';
 
@@ -217,7 +220,7 @@ function invocaCodificato(testo) {
 // usano dashboard e assistente. Niente try attorno al comando: dentro un try un comando sconosciuto ferma tutto il
 // resto (#722). La riga del segno è una pipeline a parte: gira anche dopo un throw, non dopo un `exit`.
 function righePowerShell(command, segno, codifica = invocaCodificato) {
-  return `$global:LASTEXITCODE=0\n$__filo_ok=$false\n${ERRORE_DI_PRIMA_POWERSHELL}\n`
+  return `$global:LASTEXITCODE=0\n$__filo_ok=$null\n${ERRORE_DI_PRIMA_POWERSHELL}\n`
     + `${codifica(`${command}\n$__filo_ok=$?`)}\n`
     + `"${segno}:$(${ESITO_POWERSHELL}):$((Get-Location).Path)"\n`;
 }
