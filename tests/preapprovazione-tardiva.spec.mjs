@@ -395,3 +395,32 @@ test('«Approva e fondi» armato quando la fusione parte da sola: la card passa 
   await expect(card.locator('.sn-mac-status')).toContainText('Fatto: il lavoro è su main', { timeout: 10000 });
   expect(await approvazioni(page)).toEqual([req.id]);
 });
+
+test('fusa col tasto, poi il segno (dal tasto o da fuori) prima della rilettura: nessuna seconda approvazione', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const fb = pratica({ _updateTime: 't1' });
+  const req = richiesta();
+  // L'elenco del server la tiene ancora: è la finestra fra la riuscita e la rilettura.
+  await apri(page, [fb], { pending: [req], tieniInAttesa: true });
+  await apriQuadrato(page, fb._id);
+  const card = page.locator('#mgSideBody .sn-mac-card');
+  const approva = card.locator('.sn-mac-btn-go');
+  await approva.click();
+  await approva.click();
+  await expect(card.locator('.sn-mac-status')).toContainText('Fatto: il lavoro è su main');
+
+  await page.locator('#mgPreapproveBtn').click();
+  await expect(page.locator('#mgManageMsg')).toHaveText('Da ora si fonde senza chiedere.');
+  // Il segno tolto e rimesso da fuori: la pratica segnata e la richiesta ancora in elenco.
+  const conSegno = pratica({ _updateTime: 't2', mergePreapproved: { by: 'owner (script)', at: '2026-09-20T10:00:00.000Z' } });
+  await page.evaluate((doc) => window.__mgTest.setLiveSources({
+    listVersions: async () => [{ _id: doc._id, _updateTime: 't2' }],
+    getMany: async () => [doc],
+  }), conSegno);
+  await page.evaluate(() => window.__mgTest.pollNow());
+  await page.evaluate(() => window.__mgTest.loadMergeApprovals());
+  await page.waitForTimeout(1500);
+  expect(await approvazioni(page)).toEqual([req.id]);
+  await expect(card.locator('.sn-mac-status')).toContainText('Fatto: il lavoro è su main');
+  await expect(approva).toBeDisabled();
+});
