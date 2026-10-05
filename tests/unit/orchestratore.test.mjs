@@ -12,7 +12,7 @@ import {
   promptLavoratore, promptVerificatore, regolaFile, richiestaArg, riprendi, rigaStato, serveDeploy, siSovrappongono, toccaRegole, togliWorktree,
 } from '../../scripts/lib/orchestratore.mjs';
 import {
-  accessoDaStatus, argomentiClaude, envFiglio, frontmatter, leggiArgomenti, leggiUscitaClaude, modelloDelRuolo, opzioniDa, richiestaDaLettura, trovaClaude,
+  accessoDaStatus, argomentiClaude, envFiglio, frontmatter, leggiArgomenti, leggiUscitaClaude, modelloDelRuolo, opzioniDa, opzioniTenuteDaNpm, richiestaDaLettura, trovaClaude,
 } from '../../scripts/orchestratore-locale.mjs';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
@@ -965,6 +965,22 @@ test('aggiungi e avvia dalla riga di comando: col refuso o col valore mancante n
   const v = orch('avvia', '--dry-run', '--budget-istanza', '2,5');
   assert.equal(v.status, 0, v.stderr);
   assert.match(v.stdout, /verify-local\.mjs start "solo il bottone" --feedback 41/);
+});
+
+test('npm run orchestra senza «--»: le opzioni che npm si è tenuto (anche storpiate) fermano il comando invece di sparire', () => {
+  const npm = { npm_lifecycle_script: 'node scripts/orchestratore-locale.mjs', npm_config_cache: '/c', npm_config_user_agent: 'npm/10', npm_config_prefix: '/p' };
+  assert.deepEqual(opzioniTenuteDaNpm(npm), []);
+  assert.deepEqual(opzioniTenuteDaNpm({ ...npm, npm_config_dry_run: 'true', npm_config_paralleli: '3', npm_config_richeista: 'true' }), ['--dry-run', '--paralleli', '--richeista']);
+  assert.deepEqual(opzioniTenuteDaNpm({ npm_lifecycle_script: 'node --test tests/unit', npm_config_dry_run: 'true' }), [], 'un altro script npm non è affar suo');
+
+  const d = cartellaTemporanea('orch-npm-');
+  const r = spawnSync(process.execPath, ['scripts/orchestratore-locale.mjs', 'avvia'], {
+    cwd: ROOT, encoding: 'utf8', timeout: 60_000, env: { ...process.env, ...npm, npm_config_dry_run: 'true', FILO_ORCH_DIR: d },
+  });
+  assert.equal(r.status, 1, r.stdout);
+  assert.match(r.stderr, /npm si è tenuto --dry-run: .*npm run orchestra -- avvia.*Non ho fatto niente/);
+  assert.equal(r.stdout, '');
+  assert.deepEqual([existsSync(join(d, 'avvia.lock')), existsSync(join(d, 'orchestratore.log'))], [false, false]);
 });
 
 test('una richiesta di soli spazi rimasta nello stato vale come mancante: lavoratore e verifica ricevono quella del feedback', async () => {
