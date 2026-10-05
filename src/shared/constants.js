@@ -2338,6 +2338,8 @@
     // #950 — nome sensato da solo agli scaricamenti col nome che non dice niente. Spento: il contenuto del file
     // andrebbe a un modello senza che l'utente l'abbia chiesto per quel file.
     nomiSensati: { scaricamenti: false },
+    // #786 — spento, Filo controlla ma non scarica né installa: avvisa in home e aspetta «Installa».
+    aggiornamenti: { automatici: true },
     // Colore identità delle tab (spec "Colore identità delle tab"): i sei
     // parametri che governano come si estrae il colore dal favicon e quanto
     // tinge la tab. La fonte di verità dei default/range/commenti è
