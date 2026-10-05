@@ -91,6 +91,11 @@
     return /^[a-z0-9.-]+$/i.test(s) ? s.toLowerCase().replace(/^www\./, '') : '';
   }
 
+  // Nel main e nei test lo porta require; nelle pagine lo carica prima un <script>.
+  function nomiSito() {
+    return global.SN_NOMI_SITO || require('./nomiSito.js');
+  }
+
   // Righe scritte a mano nelle impostazioni → elenco di domini confrontabili.
   // Tollera l'indirizzo intero incollato (`https://sito.it/percorso` → `sito.it`).
   function normalizzaSiti(righe) {
@@ -101,7 +106,7 @@
       if (!s) continue;
       if (s.includes('/') || s.includes(':')) s = sito(s.includes('://') ? s : `https://${s}`);
       s = s.replace(/^www\./, '').replace(/^\.+|\.+$/g, '');
-      if (!s || !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(s)) continue;
+      if (!s || !nomiSito().valido(s)) continue;
       if (!out.includes(s)) out.push(s);
     }
     return out;

@@ -89,7 +89,7 @@
       id: 'privacy',
       kind: 'dire',
       label: 'La privacy è protetta già così',
-      detail: 'Cookie rifiutati, pubblicità bloccate, siti pericolosi bloccati. Una frase, e che se ne può parlare o cambiare qualcosa.',
+      detail: 'Cookie rifiutati, pubblicità bloccate, siti pericolosi bloccati. Una frase, e che se ne può parlare o cambiare qualcosa. Se ti chiede quali dati escono dal suo computer e verso chi, leggi il documento con LEGGI_TRASPARENZA doc "privacy" prima di rispondere.',
     },
     {
       id: 'modelli',
@@ -101,7 +101,7 @@
       id: 'crediti',
       kind: 'dire',
       label: 'I crediti, in due righe',
-      detail: 'Cosa sono, che si entra con un codice d’invito dalla pagina Crediti, che ogni giorno ne arrivano altri e si accumulano, e che le segnalazioni li fanno guadagnare. Stanno su questa installazione: non promettere che sopravvivano a una reinstallazione. L’accesso Google serve per votare e per il red team, non per i crediti.',
+      detail: 'Cosa sono, che si entra con un codice d’invito dalla pagina Crediti, che ogni giorno ne arrivano altri e si accumulano, e che le segnalazioni li fanno guadagnare. Stanno su questa installazione: non promettere che sopravvivano a una reinstallazione. L’accesso Google serve per votare, non per i crediti.',
     },
   ];
 
@@ -273,6 +273,7 @@
       // 'early' = chiusa prima di aver finito: la home lo dice, con la strada
       // per rifarla. Si spegne appena l'utente l'ha letto.
       notice: s.notice === 'early' ? 'early' : '',
+      ...(s.fermato ? { fermato: true } : {}),
     };
   }
 
@@ -392,10 +393,10 @@
   }
 
   function appendTurn(state, turn) {
-    const cur = normalize(state);
     const role = turn && turn.role === 'filo' ? 'filo' : 'user';
     const text = String((turn && turn.text) || '');
-    if (!text) return cur;
+    if (!text) return normalize(state);
+    const cur = togliFermato(state);
     const last = cur.thread[cur.thread.length - 1];
     if (last && last.role === role && last.text.trim() === text.trim()) {
       return { ...cur, startedAt: cur.startedAt || new Date().toISOString() };
@@ -415,7 +416,19 @@
   function hasPendingTurn(state) {
     const cur = normalize(state);
     const last = cur.thread[cur.thread.length - 1];
-    return !cur.done && !!last && last.role === 'user';
+    return !cur.done && !cur.fermato && !!last && last.role === 'user';
+  }
+
+  // Il turno a metà l'ha fermato l'utente col quadrato (#578): non riparte da solo, aspetta «riprendi» o un messaggio
+  // nuovo (appendTurn lo toglie). Sentinella: tests/unit/onboarding.test.mjs.
+  function segnaFermato(state) {
+    const cur = normalize(state);
+    const last = cur.thread[cur.thread.length - 1];
+    return !cur.done && last && last.role === 'user' ? { ...cur, fermato: true } : cur;
+  }
+  function togliFermato(state) {
+    const { fermato: _fermato, ...cur } = normalize(state);
+    return cur;
   }
 
   // Oltre il tetto duro l'intervista si chiude da sé, qualunque cosa faccia il
@@ -444,7 +457,7 @@
     MAX_EXCHANGES, HARD_MAX_EXCHANGES, THREAD_CAP, PAST_CAP,
     ITEMS, ITEM_IDS, STOP_PHRASES, DECLINE_PHRASES,
     emptyState, normalize, isActive, isTicked, tick, close, restart, conversations,
-    remaining, isComplete, appendTurn, userTurns, hasPendingTurn, shouldForceClose,
+    remaining, isComplete, appendTurn, userTurns, hasPendingTurn, segnaFermato, togliFermato, shouldForceClose,
     isStopRequest, isDecline, isExitRequest, dismissNotice, renderChecklistForPrompt,
     chatId,
   };

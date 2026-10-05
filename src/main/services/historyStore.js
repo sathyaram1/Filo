@@ -99,6 +99,15 @@
     await chrome.storage.local.set({ [STORAGE_KEYS.HISTORY]: [] });
   }
 
+  // Riscrive le voci che `fn` cambia (una chat cancellata toglie il suo testo, #866): costi e tempi restano.
+  async function redigi(fn) {
+    const items = await list();
+    let cambiate = 0;
+    const next = items.map((it) => { const n = it ? fn(it) : it; if (n !== it) cambiate++; return n; });
+    if (cambiate) await chrome.storage.local.set({ [STORAGE_KEYS.HISTORY]: next });
+    return cambiate;
+  }
+
   // Migrazione one-shot: ripulisce le entry esistenti dagli screenshot
   // (data URL pesanti salvati in input prima del fix). Idempotente: se non
   // trova nulla da ripulire e la dimensione è entro soglia, non scrive.
@@ -153,5 +162,5 @@
     return { changed: false };
   }
 
-  global.SN_HISTORY = { list, append, patch, remove, clear, cleanupScreenshots };
+  global.SN_HISTORY = { list, append, patch, remove, clear, redigi, cleanupScreenshots };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

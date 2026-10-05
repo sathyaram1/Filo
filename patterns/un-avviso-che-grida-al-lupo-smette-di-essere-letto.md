@@ -38,6 +38,16 @@ nuovo: le lettere che a occhio ne valgono un'altra (`paypa1`, `micros0ft`,
 `arnazon`) si riconoscono normalizzandole, e lì la prova è l'uguaglianza, non
 una distanza.
 
+**Il nome c'è, ma chi comanda è un altro.** Le imitazioni più comuni non
+sbagliano una lettera: portano il nome vero intero davanti a un altro dominio
+(`paypal.com.accesso-sicuro.net`, `paypal.com@altro.net`), lo legano col
+trattino a un'altra parola (`secure-paypal.com`), o lo scrivono con lettere di
+un altro alfabeto (`раураl`, che nel link viaggia come `xn--…`). Il confronto
+va fatto sul nome come lo legge chi guarda (punycode decodificato, lettere
+confondibili ricondotte alle latine), e la frase dice dove il link porta
+davvero. Un nome corto o di tutti i giorni (`x`, `apple`) da solo, come
+sottodominio o accanto a un trattino, non prova niente (`apple.stackexchange.com`).
+
 **Ogni frase ipotizza, nessuna afferma.** Il controllo guarda l'indirizzo, non
 il sito: «potrebbe essere un'imitazione» si può dire, «chi lo riceve entra al
 posto tuo» no.

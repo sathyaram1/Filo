@@ -89,7 +89,7 @@ Appena cominci lancia `npm run finish:check` **in sottofondo** (unit test più
 gli spec delle aree toccate dal ramo: da quindici a quarantacinque minuti) e
 lavora mentre gira: aspettarlo alla fine vorrebbe dire ripagare tutto il
 contesto. L'esito lo leggi prima di registrare. La suite intera (`npm test`)
-non la lancia nessuno: gira in GitHub prima di ogni pubblicazione.
+non la lancia nessuno: gira in GitHub a ogni fusione su main.
 
 - Un rosso **fuori dai rossi noti** è un rilievo di livello 2, interno se
   l'ha rotto il ramo (il confronto con `main` lo dice), con l'elenco esatto
@@ -144,7 +144,9 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
 - **`r<n>` è il numero del rilievo che la prova riproduce**: il suo posto nella
   critica che registri, contando da 1 le righe con livello e sede, interne ed
   esterne, nell'ordine in cui le scrivi. Una prova che ne copre più d'uno li
-  porta tutti (`giro2-r1-r3-salva.spec.mjs`); una che non ne riproduce nessuno
+  porta tutti (`giro2-r1-r3-salva.spec.mjs`), e il titolo di ogni suo caso comincia
+  col numero del suo rilievo (`test('r3 …')`): la pulizia lascia uscire per intero
+  solo un caso rosso che porta il numero di un messo da parte. Una che non ne riproduce nessuno
   (una porta di un giro passato ri-provata e chiusa) non ha numero. Una prova di
   un giro passato che riporti di nuovo come rilievo la rinomini (`git mv`) col
   giro e il numero di adesso: il numero che porta è di una critica vecchia.
@@ -154,9 +156,14 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
   comando e ripete il numero davanti a ogni rilievo). Esce solo una prova che nel
   nome porta soli numeri di rilievi messi da parte, scritta o rinominata in
   questa verifica; a una che copre anche un rilievo da correggere togli solo il
-  caso dei messi da parte. Da quel commit una prova rossa tolta ferma la
-  consegna, e una a cui hai tolto un caso si rilancia: quello che resta, se è
-  rosso, la ferma. Se la risposta dice che il lavoro passa, le togli seguendola.
+  caso dei messi da parte. Un file di supporto (un aiuto, una pagina) non è una
+  prova: se ne togli righe, la registrazione rilancia le prove che lo usano.
+  Prima di registrare `--record-pulizia` rilancia le prove a cui hai tolto un
+  caso o un aiuto, sul codice della critica: un caso rosso diventato verde, o
+  una prova senza più un rosso, la respinge (può durare qualche minuto: lanciala
+  in sottofondo). Da quel commit una prova rossa tolta ferma la consegna, e una
+  a cui hai tolto un caso si rilancia: quello che resta, se è rosso, la ferma.
+  Se la risposta dice che il lavoro passa, le togli seguendola.
 - **Prima di registrare porta la directory a un commit**
   (`git add -A && git commit -m "verifica #<numero> giro <k>: prove"`): il
   salvataggio automatico parte solo da un Edit o da un Write, non da un `rm` o

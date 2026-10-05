@@ -89,6 +89,12 @@ async function mockProvider(app) {
     });
     globalThis.__chatCalls = [];
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
+      // Il giudice dei risultati (#382) le tiene tutte: qui si prova la chat, non il filtro.
+      const prompt = String(messages[messages.length - 1].content || '');
+      if (/CARTE CANDIDATE/.test(prompt)) {
+        const keep = (prompt.match(/^\d+(?=\. )/gm) || []).map(Number);
+        return { text: JSON.stringify({ keep }), model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+      }
       globalThis.__chatCalls.push(messages);
       const last = String(messages[messages.length - 1].content || '');
       const text = /haste/i.test(last)
@@ -439,4 +445,177 @@ test('doppio fallimento Scryfall → spiegazione chiara, niente codice 400', asy
   await page.screenshot({ path: 'tests/.shots/decks-chat-scryfall-fallito.png' });
   // Il retry è stato tentato (2 chiamate LLM), poi il sistema ha spiegato.
   expect(await app.evaluate(() => globalThis.__chatCalls.length)).toBe(2);
+});
+
+// #788 — la riga di sintesi di una lista. Il modello dà il titolo nella stessa risposta della query.
+async function modelloColTitolo(app, title) {
+  await app.evaluate((_e, title) => {
+    const prev = globalThis.SN_PROVIDERS.completeWithFallback;
+    globalThis.SN_PROVIDERS.completeWithFallback = async (args) => {
+      const last = String(args.messages[args.messages.length - 1].content || '');
+      if (!/haste/i.test(last) || /CARTE CANDIDATE/.test(last)) return prev(args);
+      globalThis.__chatCalls.push(args.messages);
+      const text = JSON.stringify({ reply: 'Eccole.', query: 'o:haste', filter: 'dà haste alle creature', title });
+      return { text, model: args.attempts[0].model, provider: args.attempts[0].provider, usage: {} };
+    };
+  }, title);
+}
+
+test('il triangolino apre e chiude anche l\'ultima lista, col titolo in italiano del modello', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await modelloColTitolo(app, 'carte che danno rapidità');
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+
+  await page.fill('#chatInput', 'carte che danno haste');
+  await page.press('#chatInput', 'Enter');
+  const bubble = page.locator('.dk-msg-bot').last();
+  await expect(bubble.locator('.dk-cardlist .dk-row')).toHaveCount(2);
+  const summary = bubble.locator('.dk-list-summary');
+  await expect(summary).toHaveText(/^\s*▾\s*2 carte che danno rapidità\s*$/);
+  await expect(summary).not.toContainText('o:haste');
+
+  await summary.click();
+  await expect(summary).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.locator('.dk-msg-bot').last().locator('.dk-cardlist')).toBeHidden();
+  await page.locator('.dk-msg-bot').last().locator('.dk-list-summary').click();
+  await expect(page.locator('.dk-msg-bot').last().locator('.dk-cardlist .dk-row')).toHaveCount(2);
+
+  // Un titolo lunghissimo resta su una riga, con l'ellissi.
+  await modelloColTitolo(app, 'carte che danno rapidità alle creature appena entrate e che costano poco mana in un mazzo izzet di draghi e magie');
+  await page.fill('#chatInput', 'altre carte con haste');
+  await page.press('#chatInput', 'Enter');
+  await expect(page.locator('.dk-msg-bot')).toHaveCount(2);
+  const lungo = page.locator('.dk-msg-bot').last().locator('.dk-list-title');
+  await expect(lungo).toContainText('2 carte che danno rapidità alle creature');
+  const misure = await lungo.evaluate((el) => ({ h: el.getBoundingClientRect().height, sw: el.scrollWidth, cw: el.clientWidth, lh: parseFloat(getComputedStyle(el).lineHeight) || 20 }));
+  expect(misure.sw).toBeGreaterThan(misure.cw);
+  expect(misure.h).toBeLessThan(misure.lh * 1.5);
+  // La lista di prima si è chiusa all'arrivo della nuova (§3.3).
+  await expect(page.locator('.dk-msg-bot').first().locator('.dk-cardlist')).toBeHidden();
+});
+
+test('tasto destro sulla riga di sintesi: ricerca esatta copiabile, ordine per prezzo che resta, Scryfall', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await modelloColTitolo(app, 'carte che danno rapidità');
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+  await page.fill('#chatInput', 'carte che danno haste');
+  await page.press('#chatInput', 'Enter');
+  const names = () => page.locator('.dk-msg-bot').first().locator('.dk-row-name');
+  await expect(names()).toHaveText(['Lightning Bolt', 'Embercleave Crasher']);
+
+  const menu = page.locator('.dk-ctxmenu .sn-select-option');
+  await page.locator('.dk-list-summary').first().click({ button: 'right' });
+  await expect(menu).toHaveText([
+    /^Copia la ricerca\s*o:haste id<=UR$/, 'Ordina per costo di mana ✓', 'Ordina per nome', 'Ordina per prezzo',
+    'Apri la ricerca su Scryfall',
+  ]);
+  await expect(page.locator('.dk-ctx-detail')).toHaveText('o:haste id<=UR');
+
+  // Le voci rispondono al passaggio del mouse come gli altri menu.
+  const prezzo = menu.filter({ hasText: 'Ordina per prezzo' });
+  const fondo = () => prezzo.evaluate((el) => getComputedStyle(el).backgroundColor);
+  const prima = await fondo();
+  await prezzo.hover();
+  await expect.poll(fondo).not.toBe(prima);
+  await page.screenshot({ path: 'tests/.shots/decks-chat-lista-menu.png' });
+
+  await menu.filter({ hasText: 'Copia la ricerca' }).click();
+  await expect(page.locator('#dkToast')).toContainText('Ricerca copiata');
+  await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('o:haste id<=UR');
+
+  await page.locator('.dk-list-summary').first().click({ button: 'right' });
+  await menu.filter({ hasText: 'Ordina per prezzo' }).click();
+  await expect(names()).toHaveText(['Embercleave Crasher', 'Lightning Bolt']);
+  await page.locator('.dk-list-summary').first().click({ button: 'right' });
+  await expect(menu.filter({ hasText: 'Ordina per prezzo' })).toHaveText('Ordina per prezzo ✓');
+  await page.keyboard.press('Escape');
+
+  // Al ridisegno della chat (nuovo scambio, lista riaperta) e alla ricarica l'ordine resta.
+  await page.fill('#chatInput', 'che ne pensi del mazzo?');
+  await page.press('#chatInput', 'Enter');
+  await expect(page.locator('.dk-msg-bot')).toHaveCount(2);
+  await expect(page.locator('.dk-msg-bot').first().locator('.dk-cardlist')).toBeHidden();
+  await page.locator('.dk-list-summary').first().click();
+  await expect(names()).toHaveText(['Embercleave Crasher', 'Lightning Bolt']);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('#screenBuilder')).toBeVisible();
+  await expect(page.locator('.dk-msg-bot')).toHaveCount(2);
+  await expect(page.locator('.dk-list-summary').first()).toContainText('2 carte che danno rapidità');
+  await page.locator('.dk-list-summary').first().click();
+  await expect(names()).toHaveText(['Embercleave Crasher', 'Lightning Bolt']);
+
+  // «Apri su Scryfall» apre la stessa ricerca, nello stesso ordine, passando dalla porta delle uscite.
+  await app.evaluate(({ BrowserWindow }) => {
+    globalThis.__aperti = [];
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w._filoTabs || w._filoTabs.__spiato) continue;
+      const orig = w._filoTabs.openTab.bind(w._filoTabs);
+      w._filoTabs.openTab = (url, ...rest) => {
+        if (/scryfall\.com\/search/.test(String(url))) { globalThis.__aperti.push(String(url)); return null; }
+        return orig(url, ...rest);
+      };
+      w._filoTabs.__spiato = true;
+    }
+  });
+  await page.locator('.dk-list-summary').first().click({ button: 'right' });
+  await menu.filter({ hasText: 'Apri la ricerca su Scryfall' }).click();
+  await expect.poll(() => app.evaluate(() => globalThis.__aperti)).toEqual([
+    `https://scryfall.com/search?q=${encodeURIComponent('o:haste id<=UR')}&order=eur&dir=asc`,
+  ]);
+});
+
+// #788 — l'ordine di una lista si chiede anche a parole: per la lista di prima, o insieme a una ricerca nuova.
+test('l\'ordine chiesto in chat riordina la lista di prima, e resta; con una ricerca vale per la lista nuova', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  await modelloColTitolo(app, 'carte che danno rapidità');
+  await app.evaluate(() => {
+    const prev = globalThis.SN_PROVIDERS.completeWithFallback;
+    globalThis.SN_PROVIDERS.completeWithFallback = async (args) => {
+      const last = String(args.messages[args.messages.length - 1].content || '');
+      if (/CARTE CANDIDATE/.test(last)) return prev(args);
+      let o = null;
+      if (/ordinale per prezzo/i.test(last)) o = { reply: '', sort: 'price' };
+      else if (/economiche/i.test(last)) o = { reply: 'Eccole.', query: 'o:haste', title: 'carte economiche con rapidità', sort: 'price' };
+      if (!o) return prev(args);
+      return { text: JSON.stringify(o), model: args.attempts[0].model, provider: args.attempts[0].provider, usage: {} };
+    };
+  });
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+  await deckWithCommander(page);
+  const names = (i) => page.locator('.dk-msg-bot').nth(i).locator('.dk-row-name');
+
+  await page.fill('#chatInput', 'carte che danno haste');
+  await page.press('#chatInput', 'Enter');
+  await expect(names(0)).toHaveText(['Lightning Bolt', 'Embercleave Crasher']);
+
+  await page.fill('#chatInput', 'ordinale per prezzo');
+  await page.press('#chatInput', 'Enter');
+  await expect(page.locator('.dk-msg-bot').nth(1)).toContainText('Ho riordinato la lista per prezzo.');
+  await expect(names(0)).toHaveText(['Embercleave Crasher', 'Lightning Bolt']);
+  await page.locator('.dk-list-summary').first().click({ button: 'right' });
+  await expect(page.locator('.dk-ctxmenu .sn-select-option', { hasText: 'Ordina per prezzo' })).toHaveText('Ordina per prezzo ✓');
+  await page.keyboard.press('Escape');
+
+  await page.fill('#chatInput', 'le più economiche con haste');
+  await page.press('#chatInput', 'Enter');
+  await expect(names(2)).toHaveText(['Embercleave Crasher', 'Lightning Bolt']);
+
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('.dk-msg-bot')).toHaveCount(3);
+  await expect(names(2)).toHaveText(['Embercleave Crasher', 'Lightning Bolt']);
+  await page.locator('.dk-list-summary').first().click();
+  await expect(names(0)).toHaveText(['Embercleave Crasher', 'Lightning Bolt']);
 });

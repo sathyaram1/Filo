@@ -5,6 +5,7 @@
 const { BrowserWindow, nativeTheme } = require('electron');
 const path = require('node:path');
 const { hideForTests } = require('./test-window-mode');
+const { collegaScorciatoie } = require('./shortcuts');
 
 let activePopup = null;
 
@@ -45,6 +46,11 @@ const ICON_PATHS = {
 
   close:
     '<path d="M6 6l12 12"/><path d="M18 6L6 18"/>',
+
+  // Freccia indietro: COPIA di `back` in src/shared/icons.js. Voce «Torna indietro» del menu dell'avviso del sito.
+  back:
+    '<path d="M19 12H5"/>' +
+    '<path d="M11 6l-6 6 6 6"/>',
 
   // Biscotto morsicato — righe del banner dei cookie nel menu della scheda (#754).
   cookie:
@@ -203,6 +209,10 @@ function showPopupMenu(parentWin, entries, x, y, onSelect) {
   if (popX + WIN_W > cb.x + cb.width) {
     popX = cb.x + cb.width - WIN_W;
   }
+  // Sotto non c'è posto (un tasto destro in fondo alla finestra, sugli avvisi): si apre sopra il punto.
+  if (popY + WIN_H - MARGIN > cb.y + cb.height) {
+    popY = Math.max(cb.y - MARGIN, cb.y + y - 6 - contentH - MARGIN);
+  }
 
   const popup = new BrowserWindow({
     parent: parentWin,
@@ -227,6 +237,8 @@ function showPopupMenu(parentWin, entries, x, y, onSelect) {
   });
 
   activePopup = popup;
+  // Il menu prende il fuoco: senza, le scorciatoie di Filo lì dentro morirebbero.
+  collegaScorciatoie(popup.webContents, parentWin);
 
   const html = buildHTML(entries, isDark, MARGIN);
   popup.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
@@ -249,8 +261,41 @@ function showPopupMenu(parentWin, entries, x, y, onSelect) {
       onSelect(url);
       if (!popup.isDestroyed()) popup.close();
     }
+    if (channel === 'popup-menu:close' && !popup.isDestroyed()) popup.close();
   });
 }
+
+// Il menu prende la tastiera appena si apre: Esc lo chiude, le frecce scelgono
+// la voce e Invio la esegue, come in un menu del sistema.
+const TASTIERA_MENU = `(() => {
+  const voci = () => [...document.querySelectorAll('button.item')];
+  let i = -1;
+  const segna = (n) => {
+    const v = voci();
+    if (!v.length) return;
+    i = n < 0 ? -1 : n % v.length;
+    v.forEach((b, k) => b.classList.toggle('attiva', k === i));
+    if (i >= 0) v[i].focus();
+    else if (document.activeElement) document.activeElement.blur();
+  };
+  document.addEventListener('mousemove', (e) => {
+    const b = e.target.closest && e.target.closest('button.item');
+    const k = b ? voci().indexOf(b) : -1;
+    if (k !== i) segna(k);
+  });
+  document.addEventListener('keydown', (e) => {
+    const n = voci().length;
+    const passo = { ArrowDown: i + 1, ArrowUp: (i < 0 ? n : i) - 1 + n, Home: 0, End: n - 1 }[e.key];
+    if (e.key === 'Escape') popupApi.close();
+    else if (passo !== undefined) segna(passo);
+    else if (e.key === 'ArrowRight' && i >= 0) {
+      const sotto = voci()[i].parentElement.querySelector('.subarrow');
+      if (!sotto) return;
+      sotto.click();
+    } else return;
+    e.preventDefault();
+  });
+})();`;
 
 // ── Genera l'HTML inline ──────────────────────────────────────────────────
 function buildHTML(entries, isDark, margin = 26) {
@@ -334,7 +379,7 @@ html,body{background:transparent;overflow:hidden;height:100%}
   cursor:pointer;color:${c.fg};
   font-family:inherit;font-size:13px;line-height:1.2;
 }
-.item:hover{background:rgba(${c.ar},0.12)}
+.item:hover,.item.attiva{background:rgba(${c.ar},0.12)}
 .item.disabled{color:${c.muted};cursor:default;font-size:12px}
 .item.disabled:hover{background:transparent}
 .item.centered{justify-content:center;text-align:center}
@@ -354,7 +399,13 @@ html,body{background:transparent;overflow:hidden;height:100%}
   flex:0 0 30px;cursor:pointer;color:${c.muted};
 }
 .subarrow:hover{background:rgba(${c.ar},0.12);color:rgba(${c.ar},0.95)}
-</style></head><body><div class="menu">${items}</div></body></html>`;
+</style></head><body><div class="menu">${items}</div><script>${TASTIERA_MENU}</script></body></html>`;
 }
 
-module.exports = { showPopupMenu, buildHTML, computeMenuWidth };
+// Il menu aperto sopra questa finestra, se c'è: la carta di anteprima delle schede non gli si apre sotto.
+function menuAperto(parentWin) {
+  if (!activePopup || activePopup.isDestroyed()) return null;
+  try { return activePopup.getParentWindow() === parentWin ? activePopup : null; } catch (_) { return null; }
+}
+
+module.exports = { showPopupMenu, buildHTML, computeMenuWidth, menuAperto };

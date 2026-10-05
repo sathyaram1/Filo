@@ -9,7 +9,7 @@
 //
 // In aggiunta gestiamo qui anche due store legati alla dashboard:
 //   - timers: countdown attivi (azione TIMER).
-//   - notifications: voci della colonna destra.
+//   - notifications: avvisi, carte della colonna sinistra della home.
 //
 // Gli appunti NON stanno più qui: l'azione SALVA_APPUNTO li scrive nei file
 // dell'editor (src/main/services/editorFiles.js), che è anche l'unico posto che
@@ -101,6 +101,14 @@
       out = out.filter((e) => new Date(e.ts).getTime() >= cutoff);
     }
     return out.slice(0, limit);
+  }
+
+  // Toglie le voci che `pred` riconosce (i messaggi di una chat cancellata, #866).
+  async function togliRaw(pred) {
+    const list = await getRaw(KEYS.FILO_RAW_LOG, []);
+    const next = list.filter((e) => !pred(e));
+    if (next.length !== list.length) await setRaw(KEYS.FILO_RAW_LOG, next);
+    return list.length - next.length;
   }
 
   // ===== Lessons buffer =====
@@ -309,7 +317,10 @@
     return getRaw(KEYS.FILO_TIMERS, []);
   }
 
-  async function addTimer({ label, seconds }) {
+  // `chat`: la conversazione che l'ha chiesto, se c'è; la carta nella home ci riporta lì (#870).
+  const chatValida = (c) => (typeof c === 'string' && c.length > 0 && c.length <= 200 ? c : null);
+
+  async function addTimer({ label, seconds, chat }) {
     // Una durata non interpretabile o non positiva (0, negativa, NaN) NON crea un
     // timer: torniamo null e i chiamanti non lo trasmettono né lo segnano eseguito
     // (`if (t) broadcastLiveUpdate()`, `executed: !!entry`). Stessa filosofia di
@@ -326,6 +337,7 @@
       endsAt: new Date(Date.now() + sec * 1000).toISOString(),
       paused: false,
     };
+    if (chatValida(chat)) entry.chat = chat;
     list.unshift(entry);
     await setRaw(KEYS.FILO_TIMERS, list);
     return entry;
@@ -538,7 +550,7 @@
 
   // Dicitura leggibile della ricorrenza: "ogni giorno", "feriali", "weekend"
   // oppure l'elenco dei giorni ("lun+mer"). Unica per stato dell'agente e
-  // colonna destra: se cambia, cambia in un posto solo.
+  // carte della home: se cambia, cambia in un posto solo.
   function formatRepeat(days) {
     const d = normalizeRepeat(days);
     if (!d.length) return '';
@@ -548,7 +560,7 @@
     return d.join('+');
   }
 
-  async function addAlarm({ label, time, repeat, nowMs }) {
+  async function addAlarm({ label, time, repeat, nowMs, chat }) {
     const now = Number.isFinite(nowMs) ? nowMs : Date.now();
     const days = normalizeRepeat(repeat);
     const clock = days.length ? parseClock(time) : null;
@@ -567,6 +579,7 @@
       entry.repeat = days;
       entry.atTime = fmtClock(clock);
     }
+    if (chatValida(chat)) entry.chat = chat;
     list.unshift(entry);
     await setRaw(KEYS.FILO_TIMERS, list);
     return entry;
@@ -896,7 +909,7 @@
 
   global.SN_FILO_MEMORY = {
     // raw log
-    appendRaw, listRaw,
+    appendRaw, listRaw, togliRaw,
     // lessons
     getLessonsBuffer, appendLesson, lessonsBufferShouldCompact, clearLessonsBuffer, forgetLesson,
     LESSONS_BUFFER_TRIGGER_CHARS,

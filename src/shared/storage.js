@@ -30,9 +30,10 @@
     return out;
   }
 
-  async function getSettings() {
-    const res = await chrome.storage.local.get(STORAGE_KEYS.SETTINGS);
-    const stored = res[STORAGE_KEYS.SETTINGS] || {};
+  // Il valore salvato come lo legge chi lo usa (default fusi, registro seminato): chi confronta due
+  // scritture (src/main/services/registroCambi.js) deve vedere lo stesso oggetto di getSettings.
+  function normalizza(salvato) {
+    const stored = { ...(salvato && typeof salvato === 'object' ? salvato : {}) };
     // Seed di prima esecuzione: se non c'è proprio una chiave modelRegistry
     // nello storage (utente pre-refactor), partiamo dai default. Un oggetto
     // vuoto salvato esplicitamente dall'utente viene rispettato (registry vuoto).
@@ -49,6 +50,11 @@
       stored.models = { ...global.SN_TEST_MODELS.models };
     }
     return deepMerge(DEFAULT_SETTINGS, stored);
+  }
+
+  async function getSettings() {
+    const res = await chrome.storage.local.get(STORAGE_KEYS.SETTINGS);
+    return normalizza(res[STORAGE_KEYS.SETTINGS]);
   }
 
   async function setSettings(settings) {
@@ -77,5 +83,7 @@
     getRaw,
     setRaw,
     deepMerge,
+    normalizza,
+    REPLACE_KEYS,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

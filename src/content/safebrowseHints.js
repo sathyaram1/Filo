@@ -23,20 +23,44 @@ function pageHints(doc) {
     }
     return parti.filter(Boolean).join(' ');
   };
+  // Mostrato = a schermo, anche sotto la piega: un modulo di accesso tenuto pronto e nascosto non rende delicato un
+  // sito (#1004). Senza motore di disegno (un documento finto) non si sa, e vale mostrato.
+  const mostrato = (el) => {
+    try {
+      if (!el || typeof el.getClientRects !== 'function') return true;
+      if (!el.getClientRects().length) return false;
+      const r = el.getBoundingClientRect();
+      if (r.width < 2 || r.height < 2) return false;
+      const w = doc.defaultView;
+      const st = w && w.getComputedStyle ? w.getComputedStyle(el) : null;
+      if (st && (st.visibility === 'hidden' || st.visibility === 'collapse' || Number(st.opacity) === 0)) return false;
+      return r.right + ((w && w.scrollX) || 0) > 0 && r.bottom + ((w && w.scrollY) || 0) > 0;
+    } catch (_) { return true; }
+  };
+  const tutti = (sel) => { try { return Array.from(doc.querySelectorAll(sel)); } catch (_) { return []; } };
   let hasPassword = false, hasPayment = false;
   try { hasPassword = !!doc.querySelector('input[type="password"]'); } catch (_) {}
   try { hasPayment = !!doc.querySelector(PAGAMENTO); } catch (_) {}
-  if (!hasPassword || !hasPayment) {
+  let shownPassword = hasPassword && tutti('input[type="password"]').some(mostrato);
+  let shownPayment = hasPayment && tutti(PAGAMENTO).some(mostrato);
+  if (!shownPassword || !shownPayment) {
     try {
-      for (const el of doc.querySelectorAll(CAMPI)) {
+      for (const el of tutti(CAMPI)) {
         const testo = etichetta(el);
-        if (!hasPassword && PASSWORD.test(testo)) hasPassword = true;
-        if (!hasPayment && CARTA.test(testo)) hasPayment = true;
-        if (hasPassword && hasPayment) break;
+        const pw = PASSWORD.test(testo);
+        const carta = CARTA.test(testo);
+        if (pw) hasPassword = true;
+        if (carta) hasPayment = true;
+        if ((pw && !shownPassword) || (carta && !shownPayment)) {
+          const si = mostrato(el);
+          if (pw && si) shownPassword = true;
+          if (carta && si) shownPayment = true;
+        }
+        if (shownPassword && shownPayment) break;
       }
     } catch (_) {}
   }
-  return { hasPassword, hasPayment };
+  return { hasPassword, hasPayment, shownPassword, shownPayment };
 }
 
 module.exports = { pageHints };

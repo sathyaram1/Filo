@@ -43,8 +43,9 @@ const CSS_FILE = join(ROOT, 'src', 'styles', 'transparency.css');
 
 // ── Markdown minimale ────────────────────────────────────────────────────────
 // Volutamente NON un parser generale: l'input è markdown che scriviamo noi, con
-// un sottoinsieme fisso (titoli h2, paragrafi, liste, grassetto, link, riga
-// orizzontale). Un parser generale qui aggiungerebbe superficie di bug senza
+// un sottoinsieme fisso (titoli h2, paragrafi, liste, grassetto, link, `comandi`,
+// riga orizzontale). Ogni voce di lista sta su UNA riga: la riga dopo apre un
+// paragrafo. Un parser generale qui aggiungerebbe superficie di bug senza
 // servire nessun caso reale.
 
 function escapeHtml(s) {
@@ -92,6 +93,10 @@ function parseFrontMatter(raw) {
 function renderInline(text, sources) {
   let out = escapeHtml(text);
 
+  // Un comando da copiare (`…`) si mette da parte prima di link e grassetto: dentro non vale nessun altro segno.
+  const codici = [];
+  out = out.replace(/`([^`]+)`/g, (_all, c) => `${codici.push(c) - 1}`);
+
   out = out.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_all, label, url) => {
     const clean = url.replace(/&amp;/g, '&');
     let idx = sources.findIndex((s) => s.url === clean);
@@ -107,7 +112,7 @@ function renderInline(text, sources) {
   });
 
   out = out.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-  return out;
+  return out.replace(/(\d+)/g, (_all, i) => `<code>${codici[Number(i)]}</code>`);
 }
 
 function renderBody(body, sources) {
@@ -180,6 +185,7 @@ function renderPlain(body, sources) {
       return `${label} [${idx + 1}]`;
     })
     .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
     .replace(/^##\s+/gm, '\n')
     .replace(/^---$/gm, '')
     .replace(/\n{3,}/g, '\n\n')
@@ -223,7 +229,7 @@ const UI_RUNTIME = `
         var p = node.parentElement;
         while (p && p !== root) {
           var tag = p.tagName;
-          if (tag === 'A' || tag === 'SUP' || tag === 'H1' || tag === 'H2' || tag === 'I') {
+          if (tag === 'A' || tag === 'SUP' || tag === 'H1' || tag === 'H2' || tag === 'I' || tag === 'CODE') {
             return NodeFilter.FILTER_REJECT;
           }
           p = p.parentElement;

@@ -90,9 +90,12 @@ async function mockProvider(app) {
     });
     globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
       const last = String(messages[messages.length - 1].content || '');
-      const text = /costru|mazzo con|niv/i.test(last)
-        ? JSON.stringify({ reply: 'Ottima scelta, partiamo da qui.', commander: 'Niv-Mizzet, Parun', query: 'o:draw' })
-        : JSON.stringify({ reply: 'Ok.' });
+      // La sostituzione esplicita porta il suo segnale (#789); la menzione no.
+      const text = /sostituisci|cambia commander/i.test(last)
+        ? JSON.stringify({ reply: 'Fatto.', commander: 'Niv-Mizzet, Parun', replaceCommander: true, query: 'o:draw' })
+        : /costru|mazzo con|niv/i.test(last)
+          ? JSON.stringify({ reply: 'Ottima scelta, partiamo da qui.', commander: 'Niv-Mizzet, Parun', query: 'o:draw' })
+          : JSON.stringify({ reply: 'Ok.' });
       return { text, model: attempts[0].model, provider: attempts[0].provider, usage: {} };
     };
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, onDelta }) => {
@@ -171,4 +174,52 @@ test('mazzo con commander già impostato: un nome in chat non lo sovrascrive', a
     return r && r.ok ? r.deck.commander : null;
   }, deckId);
   expect(still).toBe('bolt-1');
+  // Niente lista «conferma qui sotto» con un commander che non si potrebbe applicare: la risposta dice cosa fare.
+  const bubble = page.locator('.dk-msg-bot').last();
+  await expect(bubble).toContainText('Il commander resta Lightning Bolt');
+  await expect(bubble.locator('[data-import-all]')).toHaveCount(0);
+  await expect(bubble).not.toContainText('conferma qui sotto');
+});
+
+test('sostituzione esplicita in chat: il commander cambia, le ricerche seguono il nuovo, il vecchio torna nel mazzo (#789)', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await mockScryfall(app);
+  await mockProvider(app);
+  const page = await openTab('filo://decks/decks.html');
+  await page.waitForLoadState('domcontentloaded');
+
+  await page.click('#newDeck');
+  await expect(page.locator('#screenBuilder')).toBeVisible();
+  const deckId = await page.evaluate(() => decodeURIComponent(location.hash.replace('#/deck/', '')));
+  await page.evaluate(async (id) => {
+    const { MSG } = window.SN_MSG;
+    await chrome.runtime.sendMessage({ type: MSG.DECKS_SET_COMMANDER, id, scryfallId: 'bolt-1' });
+  }, deckId);
+  await page.evaluate(() => location.reload());
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('#commanderLine')).toContainText('Lightning Bolt');
+
+  await page.fill('#chatInput', 'sostituisci il commander con Niv-Mizzet, Parun');
+  await page.press('#chatInput', 'Enter');
+
+  await expect(page.locator('#commanderLine')).toContainText('Niv-Mizzet, Parun');
+  await expect(page.locator('#deckNameText')).toHaveText('Niv-Mizzet, Parun');
+  const deck = await page.evaluate(async (id) => {
+    const r = await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.DECKS_GET, id });
+    return r.deck;
+  }, deckId);
+  expect(deck.commander).toBe('niv-1');
+  expect(deck.commanderMeta.colors).toEqual(['U', 'R']);
+  expect(deck.carte.map((c) => c.scryfall_id)).toEqual(['bolt-1']);
+  await expect(page.locator('#deckList .dk-row[data-card-id="bolt-1"]')).toHaveCount(1);
+
+  const bubble = page.locator('.dk-msg-bot').last();
+  await expect(bubble).toContainText('Ora il commander è Niv-Mizzet, Parun');
+  await expect(bubble).toContainText('Lightning Bolt torna nel mazzo come carta normale');
+  await expect(bubble.locator('[data-import-all]')).toHaveCount(0);
+  // La ricerca dello stesso turno è già nei colori del nuovo commander, e la carta verde non passa.
+  const searchReq = await app.evaluate(() =>
+    (globalThis.__scryRequests || []).filter((u) => u.includes('/cards/search')).pop());
+  expect(decodeURIComponent(searchReq)).toContain('id<=UR');
+  await expect(bubble.locator('.dk-cardlist .dk-row[data-card-id="elf-1"]')).toHaveCount(0);
 });

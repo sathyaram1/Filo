@@ -249,3 +249,13 @@ test('applyConsumptionIfAffordable: diversa da applyConsumption — qui un saldo
   assert.equal(affordable.ok, false);
   assert.equal(affordable.balance, 2);
 });
+
+// #816 — con un portafoglio il premio di risoluzione lo dà il server: il
+// riquadro va segnato come mostrato senza che il conteggio locale si muova.
+test('applyAnnounced: segna la segnalazione come annunciata e non tocca saldo né movimenti', () => {
+  const s0 = C.freshState('2026-09-28');
+  const { state } = C.applyAnnounced(s0, 'fbWallet');
+  assert.equal(state.balance, CREDIT.INITIAL);
+  assert.equal(state.rewards.length, 0);
+  assert.equal(state.rewardedFeedback.fbWallet, true);
+});

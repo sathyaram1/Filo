@@ -2,7 +2,7 @@
 //
 // PERCHÉ QUESTI TEST
 //   Da questo script dipende se una versione esce o no: la suite completa gira
-//   solo in GitHub prima di pubblicare, e nel contenitore senza schermo ha
+//   solo in GitHub, a ogni fusione su main, e nel contenitore senza schermo ha
 //   rossi d'ambiente scritti in tests/rossi-noti.json. Le cose che possono
 //   andare male in modo costoso sono opposte:
 //
@@ -32,6 +32,8 @@ import {
   leggiArgomenti,
   primaRiga,
   classificaErroriGlobali,
+  chiaviDelVerdetto,
+  FUORI_DAI_CASI,
 } from '../../scripts/suite-verdict.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -148,9 +150,26 @@ describe('le funzioni pure', () => {
   });
 
   test('gli argomenti: file, --out, --rossi; un\'opzione ignota è un errore', () => {
-    assert.deepEqual(leggiArgomenti(['r.json', '--out', 'n.txt', '--rossi', 'k.json']), { file: 'r.json', out: 'n.txt', rossi: 'k.json' });
+    assert.deepEqual(leggiArgomenti(['r.json', '--out', 'n.txt', '--rossi', 'k.json', '--chiavi', 'c.txt']),
+      { file: 'r.json', out: 'n.txt', rossi: 'k.json', chiavi: 'c.txt' });
+    assert.equal(leggiArgomenti(['r.json']).chiavi, '');
+    assert.throws(() => leggiArgomenti(['r.json', '--chiavi']), /vuole un percorso/);
     assert.throws(() => leggiArgomenti(['r.json', '--boh']), /non capita/);
     assert.throws(() => leggiArgomenti(['r.json', '--out']), /vuole un percorso/);
+  });
+
+  // Una chiave per spec, non per caso: dieci casi rotti dalla stessa modifica
+  // sono un guasto, e il server non deve aprire dieci feedback.
+  test('le chiavi dell\'allarme: una per spec con rossi nuovi, e una per gli errori fuori dai casi', () => {
+    const v = verdetto(jsonSintetico(), NOTI.contenitore.specs);
+    assert.deepEqual(chiaviDelVerdetto(v), ['suite:tests/delta.spec.mjs'], 'i rossi noti coperti non sono chiavi');
+    const due = { nuovi: [
+      { spec: 'delta', titolo: 'a' }, { spec: 'delta', titolo: 'b' }, { spec: 'tests\\wallet-credits.spec.mjs', titolo: 'c' },
+      { spec: FUORI_DAI_CASI, titolo: 'Error: Cannot find module' }, { spec: FUORI_DAI_CASI, titolo: 'altro' },
+    ] };
+    assert.deepEqual(chiaviDelVerdetto(due), ['suite:tests/delta.spec.mjs', 'suite:tests/wallet-credits.spec.mjs', 'suite:fuori-dai-casi']);
+    assert.deepEqual(chiaviDelVerdetto(verdetto(jsonSintetico({ conNuovo: false }), NOTI.contenitore.specs)), []);
+    assert.deepEqual(chiaviDelVerdetto(undefined), []);
   });
 });
 
@@ -256,6 +275,35 @@ describe('lo script da riga di comando', () => {
     const r = lancia(jsonFile, out);
     assert.equal(r.status, 1, r.stdout + r.stderr);
     assert.match(r.stdout, /Rossi NUOVI: 2/);
+  });
+
+  const conChiavi = (jsonFile, chiavi) => spawnSync(process.execPath,
+    [CLI, jsonFile, '--out', join(dir, 'n-chiavi.txt'), '--rossi', fileNoti, '--chiavi', chiavi], { encoding: 'utf8' });
+
+  test('--chiavi: un rosso nuovo scrive la chiave del suo spec, un verde un file vuoto', () => {
+    const rosso = join(dir, 'chiavi-rosso.json');
+    const errore = join(dir, 'chiavi-errore.json');
+    const verde = join(dir, 'chiavi-verde.json');
+    writeFileSync(rosso, JSON.stringify(jsonSintetico()), 'utf8');
+    const j = jsonSintetico();
+    j.errors = [{ message: 'Error: Cannot find module x' }];
+    writeFileSync(errore, JSON.stringify(j), 'utf8');
+    writeFileSync(verde, JSON.stringify(jsonSintetico({ conNuovo: false })), 'utf8');
+    assert.equal(conChiavi(rosso, join(dir, 'k1.txt')).status, 1);
+    assert.equal(readFileSync(join(dir, 'k1.txt'), 'utf8'), 'suite:tests/delta.spec.mjs\n');
+    assert.equal(conChiavi(errore, join(dir, 'k2.txt')).status, 1);
+    assert.equal(readFileSync(join(dir, 'k2.txt'), 'utf8'), 'suite:tests/delta.spec.mjs\nsuite:fuori-dai-casi\n');
+    assert.equal(conChiavi(verde, join(dir, 'k3.txt')).status, 0);
+    assert.equal(readFileSync(join(dir, 'k3.txt'), 'utf8'), '');
+  });
+
+  test('--chiavi: una suite che non è partita scrive `suite:non-partita`', () => {
+    assert.equal(conChiavi(join(dir, 'non-esiste.json'), join(dir, 'k4.txt')).status, 2);
+    assert.equal(readFileSync(join(dir, 'k4.txt'), 'utf8'), 'suite:non-partita\n');
+    const vuoto = join(dir, 'chiavi-vuoto.json');
+    writeFileSync(vuoto, JSON.stringify({ suites: [], errors: [] }), 'utf8');
+    assert.equal(conChiavi(vuoto, join(dir, 'k5.txt')).status, 2);
+    assert.equal(readFileSync(join(dir, 'k5.txt'), 'utf8'), 'suite:non-partita\n');
   });
 
   test.after(() => { try { rmSync(dir, { recursive: true, force: true }); } catch (_) { /* best effort */ } });

@@ -34,7 +34,9 @@ const enableTerminal = (page) =>
   confirmAction(page, { type: 'IMPOSTA_PREFERENZA', chiave: 'terminale', valore: 'on' });
 
 test('modalità terminale spenta → il comando NON viene eseguito', async ({ app, openTab }) => {
-  await openTab(NEWTAB);
+  const page = await openTab(NEWTAB);
+  // Accesa di serie (#892): chi l'ha spenta resta protetto dal blocco rigido.
+  await confirmAction(page, { type: 'IMPOSTA_PREFERENZA', chiave: 'terminale', valore: 'off' });
   const r = await execAction(app, { type: 'ESEGUI_COMANDO', comando: 'echo ciao' });
   expect(r.executed).toBe(false);
   expect(r.output?.blocked).toBe('disabled');
@@ -55,17 +57,20 @@ test('livello 2 (mkdir) non esegue senza conferma; la conferma crea la cartella'
   const dir = path.join(tempCanonico(), `filo-cmd-${Date.now()}`);
   const action = { type: 'ESEGUI_COMANDO', comando: `mkdir "${dir}"` };
 
-  // Senza conferma: livello 2, non esegue, la cartella non esiste.
-  const r = await execAction(app, action);
-  expect(r.executed).toBe(false);
-  expect(r.needsConfirm).toBe(2);
-  expect(fs.existsSync(dir)).toBe(false);
+  try {
+    // Senza conferma: livello 2, non esegue, la cartella non esiste.
+    const r = await execAction(app, action);
+    expect(r.executed).toBe(false);
+    expect(r.needsConfirm).toBe(2);
+    expect(fs.existsSync(dir)).toBe(false);
 
-  // Con la conferma dell'utente: esegue davvero.
-  const c = await confirmAction(page, action);
-  expect(c.executed).toBe(true);
-  expect(fs.existsSync(dir)).toBe(true);
-  try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+    // Con la conferma dell'utente: esegue davvero.
+    const c = await confirmAction(page, action);
+    expect(c.executed).toBe(true);
+    expect(fs.existsSync(dir)).toBe(true);
+  } finally {
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+  }
 });
 
 test('git push è livello 2 (popup), ma senza conferma non parte', async ({ app, openTab }) => {

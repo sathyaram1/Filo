@@ -1,7 +1,7 @@
 // Unit test per src/shared/capabilities.js — il manifesto delle capacità di
 // Filo (F1). Verifica due cose:
 //   1. integrità strutturale del manifesto e della sua API;
-//   2. anti-stale: incrocia alcune voci col CODICE REALE (shortcut globali,
+//   2. anti-stale: incrocia alcune voci col CODICE REALE (scorciatoie,
 //      icone del menu, pagine filo://) così che, se una capacità sparisce o
 //      cambia invocazione senza aggiornare il manifesto, il test diventi rosso.
 // Pura logica → niente Electron, gira in millisecondi.
@@ -49,26 +49,49 @@ test('gli id sono unici e stabili (kebab-case)', () => {
 });
 
 test('index() è compatto, get()/byCategory()/all() coerenti', () => {
-  const idx = CAP.index();
+  const tutti = { redteam: true };
+  const idx = CAP.index(tutti);
   assert.equal(idx.length, CAP.CAPABILITIES.length);
   for (const e of idx) {
     assert.deepEqual(Object.keys(e).sort(), ['category', 'id', 'title']);
-    assert.ok(CAP.get(e.id), `get(${e.id}) deve risolvere`);
+    assert.ok(CAP.get(e.id, tutti), `get(${e.id}) deve risolvere`);
   }
-  assert.equal(CAP.get('id-inesistente'), undefined);
-  assert.equal(CAP.all().length, CAP.CAPABILITIES.length);
+  assert.equal(CAP.get('id-inesistente', tutti), undefined);
+  assert.equal(CAP.all(tutti).length, CAP.CAPABILITIES.length);
   // all() torna una copia: mutarla non tocca l'originale.
-  CAP.all().pop();
-  assert.equal(CAP.all().length, CAP.CAPABILITIES.length);
+  CAP.all(tutti).pop();
+  assert.equal(CAP.all(tutti).length, CAP.CAPABILITIES.length);
+});
+
+test('#896 — il Red Team in pausa non esiste per l’agente: né voce, né accenno nelle altre', () => {
+  const chiuso = { redteam: false };
+  for (const aperti of [undefined, chiuso]) {
+    assert.equal(CAP.get('red-team', aperti), undefined);
+    assert.ok(!CAP.index(aperti).some((c) => c.id === 'red-team'));
+    assert.ok(!CAP.all(aperti).some((c) => c.id === 'red-team'));
+    assert.ok(!CAP.byCategory('pages', aperti).some((c) => c.id === 'red-team'));
+    const idx = CAP.renderIndexForPrompt(aperti);
+    assert.doesNotMatch(idx, /red.?team/i, 'l’indice per il prompt parla ancora del Red Team');
+    assert.match(CAP.renderDetailForPrompt(['red-team'], aperti), /nessuna capacità con questo id/i);
+    // Le voci che restano non lo nominano: l'agente lo racconterebbe lo stesso.
+    for (const c of CAP.all(aperti)) {
+      assert.doesNotMatch(`${c.title} ${c.desc} ${c.invoke} ${c.doesNot || ''}`, /red.?team|filo:\/\/redteam/i,
+        `la voce "${c.id}" nomina il Red Team anche a chi non lo vede`);
+    }
+  }
+  const aperto = { redteam: true };
+  assert.ok(CAP.get('red-team', aperto));
+  assert.match(CAP.renderIndexForPrompt(aperto), /Red Team \[red-team\]/);
+  assert.match(CAP.renderDetailForPrompt(['red-team'], aperto), /filo:\/\/redteam\/redteam\.html/);
 });
 
 // ── Anti-stale: incrocio col codice reale ────────────────────────────────────
 
-test('ogni comando degli shortcut globali è coperto dal manifesto', () => {
-  // shortcuts.js definisce i 4 comandi OS; ognuno deve esistere come capacità.
+test('ogni comando delle scorciatoie di Filo è coperto dal manifesto', () => {
+  // shortcuts.js definisce i 4 comandi; ognuno deve esistere come capacità.
   const src = readFileSync(join(ROOT, 'src', 'main', 'shortcuts.js'), 'utf8');
   const commands = [...src.matchAll(/'(Alt\+[A-Z])':\s*'([a-z-]+)'/g)].map((m) => ({ accel: m[1], cmd: m[2] }));
-  assert.ok(commands.length >= 4, 'mi aspetto almeno 4 shortcut globali');
+  assert.ok(commands.length >= 4, 'mi aspetto almeno 4 scorciatoie');
   // Mappa comando-shortcut → id capacità che lo descrive.
   const cmdToCap = {
     'explain-selection': 'explain-selection',
@@ -111,9 +134,12 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
   // della stessa feature (es. add/get/delete) puntano alla stessa voce.
   const FILO_MSG_TO_CAP = {
     FILO_CHAT: 'filo-assistant',
+    FILO_CHAT_STOP: 'filo-assistant',
     FILO_GENERATE_DASHBOARD: 'generate-dashboard',
     FILO_RUN_ACTION: 'agent-actions',
     FILO_CONFIRM_ACTION: 'agent-actions',
+    // #810 — un indirizzo proposto da un modello si apre col clic solo dopo la porta delle uscite.
+    FILO_APRI_PROPOSTA: 'agent-actions',
     FILO_GET_MEMORY: 'filo-memory',
     // #592 — la memoria riga per riga nelle Preferenze: rileggerla e toglierne una.
     FILO_MEMORY_VIEW: 'filo-memory',
@@ -133,6 +159,9 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     FILO_CHAT_NOTE: 'chat-archive',
     FILO_CHAT_UPDATE: 'chat-archive',
     FILO_CHAT_FOCUS: 'chat-archive',
+    // #866 — le pagine visitate che il filo ricorda: contarle e cancellarle dalla pagina Sicurezza.
+    FILO_PAGINE_CONTA: 'visited-pages',
+    FILO_PAGINE_CANCELLA: 'visited-pages',
     // Gli appunti non hanno handler propri: la capacità "filo-notes" è servita
     // dall'azione SALVA_APPUNTO (FILO_RUN_ACTION), che scrive nei file dell'editor.
     FILO_GET_TIMERS: 'filo-timers',
@@ -393,6 +422,8 @@ function menuVoiceLabels() {
   }
   // E il menu del tasto destro sulle schede, che sta nella cornice.
   pages += '\n' + readFileSync(join(ROOT, 'src', 'renderer', 'shell.js'), 'utf8');
+  // E la voce «Dai un nome sensato», che più pagine prendono dallo stesso modulo condiviso.
+  pages += '\n' + readFileSync(join(ROOT, 'src', 'shared', 'rinominaUi.js'), 'utf8');
   const labels = new Set();
   for (const m of i18n.matchAll(/^ {4}(menu_[a-z0-9_]+):\s*'([^']+)'/gm)) {
     if (new RegExp(`'${m[1]}'`).test(content)) labels.add(m[2]);
@@ -458,5 +489,28 @@ test('nessuna capacità descrive come voce da cliccare una spiegazione che arriv
       `la capacità "${id}" promette una voce del tasto destro, ma la spiegazione compare da sola`);
     assert.match(cap.invoke, /da sola|automaticamente/i,
       `la capacità "${id}" deve dire che la spiegazione arriva da sola, senza niente da cliccare`);
+  }
+});
+
+// #545: la chat deve sapere quali moduli dell'Editor prendono una scorciatoia;
+// l'elenco vero è la tabella delle azioni dell'Editor, il manifesto la segue.
+test('il manifesto nomina ogni modulo dell\'Editor che prende una scorciatoia, e solo quelli', () => {
+  const src = readFileSync(join(ROOT, 'src', 'pages', 'editor', 'editor.js'), 'utf8');
+  const blocco = /const AZIONE_SCORCIATOIA = \{([\s\S]*?)\n  \};/.exec(src);
+  assert.ok(blocco, 'tabella delle azioni delle scorciatoie non trovata nell\'Editor');
+  const tipi = [...blocco[1].matchAll(/^\s+'?([a-z-]+)'?:/gm)].map((m) => m[1]);
+  const etichetta = (tipo) => {
+    const m = new RegExp(`^\\s+'?${tipo}'?:\\s*\\{\\s*label: '([^']+)'`, 'm').exec(src);
+    assert.ok(m, `etichetta del modulo ${tipo} non trovata`);
+    return m[1];
+  };
+  const frase = /[^.]*prendono una scorciatoia[^.]*\./.exec(CAP.get('editor').desc);
+  assert.ok(frase, 'la voce «editor» non dice quali moduli prendono una scorciatoia');
+  for (const tipo of tipi) {
+    assert.ok(frase[0].includes(etichetta(tipo)), `il manifesto non dice che «${etichetta(tipo)}» prende una scorciatoia`);
+  }
+  const tutti = [...src.matchAll(/^\s+'?([a-z-]+)'?:\s*\{\s*label: '([^']+)'/gm)].map((m) => m[2]);
+  for (const altro of tutti.filter((l) => !tipi.map(etichetta).includes(l))) {
+    assert.ok(!frase[0].includes(altro), `il manifesto promette una scorciatoia a «${altro}», che non la prende`);
   }
 });

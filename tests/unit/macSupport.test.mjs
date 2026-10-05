@@ -218,21 +218,20 @@ test('nessuna scorciatoia guarda solo il tasto di Windows', () => {
     'queste righe reagiscono a Ctrl ma non a Cmd: su Mac la scorciatoia non risponde.\n' + colpevoli.join('\n'));
 });
 
-test('le scorciatoie globali non rubano il tasto degli accenti su Mac', () => {
-  // Alt+E/T/S/H sono scorciatoie di SISTEMA: valgono ovunque, non solo dentro
-  // Filo. Su Mac Alt è il tasto Opzione, che serve a comporre gli accenti
-  // (Opzione+E → é): registrarlo così toglierebbe l'accento acuto a chi scrive
-  // in italiano, in qualunque programma, finché Filo è acceso.
+test('le scorciatoie di Filo non rubano il tasto degli accenti su Mac', () => {
+  // Alt+E/T/S/H valgono con Filo davanti (#838). Su Mac Alt è il tasto Opzione,
+  // che compone gli accenti (Opzione+E → é) anche dentro le pagine di Filo:
+  // prenderselo toglierebbe l'accento acuto a chi scrive in italiano.
   const src = stripComments(readFileSync(join(ROOT, 'src', 'main', 'shortcuts.js'), 'utf8'));
   assert.match(src, /darwin/,
-    'shortcuts.js non distingue più il Mac: le scorciatoie globali tornerebbero a essere Opzione+lettera');
+    'shortcuts.js non distingue più il Mac: le scorciatoie tornerebbero a essere Opzione+lettera');
   const { acceleratorePerPiattaforma, COMMANDS } = require(join(ROOT, 'src', 'main', 'shortcuts.js'));
   const vero = process.platform;
   try {
     Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true });
     for (const accel of Object.keys(COMMANDS)) {
       assert.notEqual(acceleratorePerPiattaforma(accel), accel,
-        `su Mac ${accel} resta Opzione+lettera: mangia gli accenti in tutto il sistema`);
+        `su Mac ${accel} resta Opzione+lettera: mangia gli accenti a chi scrive in Filo`);
     }
     Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
     for (const accel of Object.keys(COMMANDS)) {
@@ -300,6 +299,8 @@ const SORGENTI_DEI_NOMI = {
     'manifesto unico letto su tutti i sistemi: cita entrambe le forme, e il test qui sotto lo verifica voce per voce',
   'src/shared/patchNotes.js':
     'diario delle versioni già uscite: si scrive una volta e non si riscrive',
+  'src/shared/voceChat.js':
+    'il tasto del microfono delle chat in forma canonica, come la tabella di shortcuts.js: lo riconosce e lo nomina SN_TASTI',
 };
 
 // Le forme con cui si chiede il nome giusto invece di inventarlo.
@@ -355,8 +356,8 @@ test('la regola dà il nome giusto su ogni sistema', () => {
   assert.equal(T.etichetta('Ctrl+\\', 'darwin'), 'Cmd+\\');
   assert.equal(T.etichetta('Ctrl+Shift+1', 'darwin'), 'Cmd+Shift+1');
   assert.equal(T.etichetta('Ctrl', 'darwin'), 'Cmd');
-  // …le scorciatoie globali prendono il Control del Mac davanti (Opzione da
-  // sola è il tasto degli accenti: vedi shortcuts.js)…
+  // …Spiega, Traduci, Salva e Aiuto prendono il Control del Mac davanti
+  // (Opzione da sola è il tasto degli accenti: vedi shortcuts.js)…
   assert.equal(T.etichetta('Alt+E', 'darwin'), 'Ctrl+Alt+E');
   assert.equal(T.etichetta('Alt+H', 'darwin'), 'Ctrl+Alt+H');
   // …e il salto di scheda passa a Cmd, perché Opzione+cifra su Mac SCRIVE.
@@ -733,8 +734,21 @@ test('la lista dei tasti già presi non si stacca dalla barra dei menu', () => {
   require(join(ROOT, 'src', 'shared', 'tasti.js'));
   const T = globalThis.SN_TASTI;
 
+  // Un role senza acceleratore scritto si porta quello di Electron (menu-item-roles), e su Mac
+  // il menu Aiuto si apre con Cmd+?: senza questa tabella quei tasti erano invisibili (#545).
+  const TASTO_DEL_ROLE_SU_MAC = {
+    cut: 'Ctrl+X', copy: 'Ctrl+C', paste: 'Ctrl+V', pasteandmatchstyle: 'Ctrl+Alt+Shift+V',
+    selectall: 'Ctrl+A', undo: 'Ctrl+Z', redo: 'Ctrl+Shift+Z', minimize: 'Ctrl+M', close: 'Ctrl+W',
+    quit: 'Ctrl+Q', hide: 'Ctrl+H', hideothers: 'Ctrl+Alt+H', help: 'Ctrl+?',
+    about: '', services: '', unhide: '', zoom: '', front: '', window: '',
+  };
+  const ignoti = vociDellaBarra('darwin')
+    .filter((v) => v.role && !v.accelerator && !(String(v.role).toLowerCase() in TASTO_DEL_ROLE_SU_MAC))
+    .map((v) => v.role);
+  assert.deepEqual(ignoti, [], 'role nuovo nella barra: scrivi qui sopra il tasto che Electron gli dà su Mac');
+
   const scoperti = vociDellaBarra('darwin')
-    .map((v) => v.accelerator)
+    .map((v) => v.accelerator || (v.role && TASTO_DEL_ROLE_SU_MAC[String(v.role).toLowerCase()]))
     .filter(Boolean)
     // "CommandOrControl" è come lo scrive Electron; la regola parla in Ctrl.
     .map((a) => a.replace(/CommandOrControl/g, 'Ctrl'))
@@ -761,7 +775,7 @@ test('nessuno può assegnarsi un tasto che Filo si prende prima', () => {
   assert.equal(T.riservato('Cmd+Shift+Z', 'darwin'), true);
   // Su Windows lo zoom NON passa dalla barra: quel tasto arriva alla pagina.
   assert.equal(T.riservato('Ctrl+0', 'win32'), false);
-  // Le scorciatoie globali sono registrate a livello di sistema.
+  // Spiega, Traduci, Salva e Aiuto: Filo se li prende prima della pagina.
   assert.equal(T.riservato('Alt+E', 'win32'), true);
   assert.equal(T.riservato('Ctrl+Alt+E', 'darwin'), true);
   // E una combinazione libera resta libera, altrimenti non se ne può usare più
@@ -849,4 +863,43 @@ test('un filo:// che arriva da fuori si legge cercando il prefisso, mai per posi
   // Registrato come gestore, il sistema consegna QUALUNQUE filo://: una
   // pagina interna messa in un link da un sito qualsiasi non deve aprirsi.
   assert.equal(W.inviteCodeFromDeepLink('filo://credits/credits.html'), null);
+});
+
+// ── Batteria, rete e Bluetooth (#873) ────────────────────────────────────────
+
+test('su Mac batteria, rete e Bluetooth si leggono senza chiedere permessi', async () => {
+  const L = require(join(ROOT, 'src', 'main', 'services', 'statoSistema.js'));
+  const sorgente = readFileSync(join(ROOT, 'src', 'main', 'services', 'statoSistema.js'), 'utf8');
+  const mac = sorgente.slice(sorgente.indexOf('async function leggiMac'), sorgente.indexOf('// ── Windows'));
+  // system_profiler e CoreBluetooth toccano il Bluetooth, che su macOS chiede il permesso a chi li lancia.
+  assert.ok(!/system_profiler|blueutil|CoreBluetooth|airport\b/.test(mac));
+  const chiesti = [];
+  await L.leggiMac(async (file) => { chiesti.push(file); return null; });
+  assert.deepEqual(chiesti.filter((f) => /powershell|cmd|bash|sh$/i.test(f)), [], 'su Mac non si lancia una shell');
+  // Il volume da osascript e la radio del Wi-Fi da networksetup (#874): leggono e basta, senza permessi.
+  assert.deepEqual(new Set(chiesti), new Set(['pmset', 'route', 'defaults', 'osascript', 'networksetup']));
+  assert.ok(!/set volume|-setairport/.test(mac), 'il lettore non cambia niente');
+});
+
+// ── Volume, Bluetooth e Wi-Fi a comando (#874) ───────────────────────────────
+
+test('su Mac il volume va con osascript, il Wi-Fi con networksetup, il Bluetooth con blueutil anche fuori dal PATH', () => {
+  const C = require(join(ROOT, 'src', 'main', 'services', 'comandiSistema.js'));
+  for (const [comando, script] of Object.entries(C.SCRIPT.darwin)) {
+    assert.ok(!/\bsudo\b|powershell|nmcli|bluetoothctl|wpctl|pactl/i.test(script), `darwin/${comando}: programma di un altro sistema o con privilegi`);
+  }
+  assert.match(C.SCRIPT.darwin.volume, /osascript <<'FINE_APPLESCRIPT'/, 'l\'AppleScript non passa dalla shell: niente espansioni');
+  assert.match(C.SCRIPT.darwin.volume, /system attribute "FILO_SIS_LIVELLO"/, 'il livello lo legge AppleScript dall\'ambiente');
+  // Un'app aperta dal Finder ha il PATH di sistema: Homebrew non c'è, e blueutil si cerca dove lo mette lui.
+  for (const c of ['radio', 'bt-elenco', 'bt-collega']) {
+    assert.match(C.SCRIPT.darwin[c], /\/opt\/homebrew\/bin\/blueutil/);
+    assert.match(C.SCRIPT.darwin[c], /\/usr\/local\/bin\/blueutil/);
+  }
+  assert.match(C.SCRIPT.darwin.radio, /networksetup -listallhardwareports/, 'il Wi-Fi non è sempre en0');
+});
+
+test('su Mac Filo dice perché usa il Bluetooth: senza la frase, macOS chiude blueutil al primo comando', () => {
+  const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
+  const frase = pkg.build && pkg.build.mac && pkg.build.mac.extendInfo && pkg.build.mac.extendInfo.NSBluetoothAlwaysUsageDescription;
+  assert.ok(typeof frase === 'string' && /Bluetooth/.test(frase), 'manca NSBluetoothAlwaysUsageDescription in build.mac.extendInfo');
 });

@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { readFileSync } from 'node:fs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -345,4 +346,64 @@ test('#592: una lezione oltre il tetto è rifiutata col perché; il testo è que
   // I caratteri che girano la direzione del testo non arrivano al popup né in memoria.
   assert.equal(P.lezioneDaAzione({ testo: 'Sii breve.‮ ,atsop' }).testo, 'Sii breve. ,atsop');
   assert.equal(P.lezioneDaAzione({ lezione: '  ' }).testo, '');
+});
+
+// #630 — durata e suono degli avvisi si cambiano anche a parole, con gli stessi limiti del campo nelle Preferenze.
+test('durata_notifiche: secondi, minuti, «restano», e oltre il tetto un rifiuto col numero', () => {
+  assert.deepEqual(build('durata_notifiche', 10), { partial: { notifications: { durationSec: 10 } }, label: 'Durata degli avvisi → 10 s', level: 1, risk: '' });
+  assert.deepEqual(build('durata_notifiche', '8 secondi').partial, { notifications: { durationSec: 8 } });
+  assert.deepEqual(build('durata delle notifiche', '2 minuti').partial, { notifications: { durationSec: 120 } });
+  assert.deepEqual(build('durata_notifiche', 0).partial, { notifications: { durationSec: 0 } });
+  assert.deepEqual(build('durata_notifiche', 'finché non le chiudo').partial, { notifications: { durationSec: 0 } });
+  assert.match(build('durata_notifiche', 'resta sempre').label, /finché non li chiudi/);
+  const troppo = build('durata_notifiche', '5 minuti');
+  assert.ok(troppo.rifiuto && /120/.test(troppo.rifiuto), 'oltre il tetto va detto, non tagliato in silenzio');
+  assert.equal(build('durata_notifiche', 'boh'), null);
+  assert.equal(build('durata_notifiche', -3), null);
+});
+
+test('suono_notifiche: sì/no lo accende o spegne, un tono lo accende con quel tono', () => {
+  assert.deepEqual(build('suono_notifiche', true).partial, { notifications: { soundEnabled: true } });
+  assert.deepEqual(build('suono_notifiche', 'no').partial, { notifications: { soundEnabled: false } });
+  assert.deepEqual(build('suono_notifiche', 'carillon'), {
+    partial: { notifications: { soundEnabled: true, sound: 'chime' } }, label: 'Suono degli avvisi → Carillon', level: 1, risk: '',
+  });
+  assert.deepEqual(build('suono delle notifiche', 'Delicata').partial, { notifications: { soundEnabled: true, sound: 'gentle' } });
+  assert.equal(build('suono_notifiche', 'tromba'), null);
+  // La suoneria del timer resta sua: stesso elenco di toni, chiave diversa.
+  assert.deepEqual(build('suoneria_timer', 'urgente').partial, { timerRingtone: 'urgent' });
+});
+
+test('i toni che la chat sa scegliere sono quelli che Filo sa suonare', () => {
+  require(join(__dirname, '..', '..', 'src', 'shared', 'sounds.js'));
+  for (const id of globalThis.SN_SOUNDS.TONE_IDS) {
+    const etichetta = globalThis.SN_SOUNDS.TONE_LABELS[id];
+    assert.equal(build('suono_notifiche', etichetta).partial.notifications.sound, id, `tono ${etichetta} non riconosciuto`);
+  }
+  // E il modello li legge nell'elenco delle chiavi, insieme alla durata.
+  require(join(__dirname, '..', '..', 'src', 'shared', 'actionTools.js'));
+  const desc = globalThis.SN_ACTION_TOOLS.definitions({ sistema: 'linux' })
+    .find((d) => d.function.name === 'IMPOSTA_PREFERENZA').function.description;
+  assert.match(desc, /durata_notifiche/);
+  assert.match(desc, /suono_notifiche/);
+  for (const etichetta of Object.values(globalThis.SN_SOUNDS.TONE_LABELS)) {
+    assert.ok(desc.toLowerCase().includes(`"${etichetta.toLowerCase()}"`), `il tono ${etichetta} manca nell'elenco della chat`);
+  }
+});
+
+test('durata degli avvisi a parole: una cifra vince sulle parole del «per sempre», e «non restano» non li rende eterni', () => {
+  const P = globalThis.SN_PREF;
+  const sec = (v) => P.buildPreferencePartial('durata_notifiche', v)?.partial?.notifications?.durationSec;
+  assert.equal(sec('resta 8 secondi'), 8);
+  assert.equal(sec('restano 2 minuti'), 120);
+  assert.equal(sec('sempre'), 0);
+  assert.equal(sec('finché non li chiudo'), 0);
+  assert.notEqual(sec('non restano'), 0);
+});
+
+test('Preferenze, Notifiche: l’etichetta del suono non spiega l’interfaccia', () => {
+  const html = readFileSync(join(__dirname, '..', '..', 'src', 'pages', 'preferences', 'preferences.html'), 'utf8');
+  const m = html.match(/id="notifSoundEnabled"[^]*?<span>([^<]*)<\/span>/);
+  assert.ok(m, 'casella del suono degli avvisi non trovata');
+  assert.equal(m[1].trim(), 'Suono quando arriva un avviso');
 });

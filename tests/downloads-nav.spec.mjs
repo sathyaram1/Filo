@@ -19,7 +19,7 @@ import { join } from 'node:path';
 // Un finto "PDF": basta che sia un file con byte noti servito come allegato.
 const FILE = Buffer.from('%PDF-1.4\n% finto pdf di prova\n' + 'x'.repeat(2048));
 
-test('cliccando un link a un file, Filo lo scarica, lo registra come "completato" e avvisa', async ({ app, shell, openTab, testServer }) => {
+test('cliccando un link a un file, Filo lo scarica, lo registra come "completato" e avvisa', async ({ app, shell, openTab, testServer, avvisi }) => {
   // Server del file: risponde con Content-Disposition:attachment ⇒ il browser
   // avvia un download invece di navigare. Porta diversa dal testServer.
   const fileServer = createServer((req, res) => {
@@ -66,7 +66,7 @@ test('cliccando un link a un file, Filo lo scarica, lo registra come "completato
     //    con le azioni "Apri file"/"Apri cartella".
     await expect(shell.locator('#dl-indicator')).toBeVisible();
     await expect(shell.locator('.shell-notif-msg')).toContainText('Scaricato', { timeout: 8000 });
-    await expect(shell.locator('.shell-notif-action', { hasText: 'Apri file' })).toBeVisible();
+    await expect((await avvisi()).locator('.shell-notif-action', { hasText: 'Apri file' })).toBeVisible();
 
     // 4) SOPRAVVIVE AL RIAVVIO: la voce è scritta su disco (storage.json, che è
     //    ciò che l'app rilegge all'avvio). Verifica deterministica della

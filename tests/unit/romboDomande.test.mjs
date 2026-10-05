@@ -96,10 +96,87 @@ describe('rombo verde e casella delle risposte vanno insieme', () => {
       'le domande a cui rispondere adesso vanno prima della segnalazione già registrata');
   });
 
+  test('il nome del rombo verde dice che ci sono domande, e copre tutte le parti del pannello', () => {
+    for (const [nome, fb] of ASPETTANO) {
+      const r = rombo(fb);
+      assert.match(r.titolo, /^Domande/, `${nome}: il nome doveva parlare di domande`);
+      assert.equal(r.pannello.titolo, r.titolo, `${nome}: titolo del pannello diverso dal nome`);
+      if (fb.livelli && fb.livelli.l3) assert.match(r.titolo, /segnalazione/, `${nome}: la segnalazione manca dal titolo`);
+    }
+    assert.equal(rombo({ livelli: { l3: { esito: 'segnalato', testo: 'Due strade.' } } }).titolo, 'Segnalazione di Claude');
+    assert.equal(rombo({ status: 'todo' }).titolo, 'Segnalazione di Claude');
+    assert.equal(MR.livelloL3({ status: 'design', statusReason: 'clarify' }, { dettaglioLetto: false }).titolo, 'Domande di Claude');
+  });
+
+  test('una parte cifrata del pannello si dice con la frase, mai col blob', () => {
+    const BLOB = 'FENCv1:8f3a2b91c7d4e6a0b5f2';
+    const segn = (testo) => ({ l3: { esito: 'segnalato', ruolo: 'resolver', testo } });
+    // Segnalazione cifrata, conversazione leggibile: la domanda resta, la segnalazione diventa la frase.
+    const a = rombo({ status: 'design', statusReason: 'clarify', notes: domande, livelli: segn(BLOB) }).pannello;
+    assert.doesNotMatch(a.testo, /FENC/);
+    assert.match(a.testo, /sfondo/);
+    assert.ok(a.testo.includes(MR.TESTO_CIFRATO));
+    // Fermo su una scelta, segnalazione cifrata: idem.
+    const b = rombo({ status: 'design', statusReason: 'decisione', notes: domande, livelli: segn(BLOB) }).pannello;
+    assert.doesNotMatch(b.testo, /FENC/);
+    assert.ok(b.testo.includes(MR.TESTO_CIFRATO));
+    // Conversazione cifrata, segnalazione leggibile: la segnalazione resta, le domande non spariscono.
+    const c = rombo({ status: 'design', statusReason: 'clarify', notes: BLOB, livelli: segn('Due strade possibili.') }).pannello;
+    assert.doesNotMatch(c.testo, /FENC/);
+    assert.match(c.testo, /Due strade possibili/);
+    assert.match(c.testo, /Domande in attesa/);
+    assert.ok(c.testo.includes(MR.TESTO_CIFRATO));
+    // Tutte e due cifrate: una frase sola.
+    assert.equal(rombo({ status: 'design', statusReason: 'clarify', notes: BLOB, livelli: segn(BLOB) }).pannello.illeggibile, true);
+  });
+
   test('risposto, il rombo si spegne', () => {
     const prima = { status: 'design', statusReason: 'clarify', notes: domande };
     assert.equal(verde(prima), true);
     const dopo = { status: 'todo', statusReason: null, notes: `${domande}\n--- La tua risposta del 19/09/2026, 10:00 ---\nQuelle dentro.` };
     assert.equal(verde(dopo), false);
+  });
+});
+
+// #764: la data di un marcatore è scritta giorno/mese; letta da `new Date()` diventava mese/giorno.
+describe('la riga «Quando» del rombo verde è l’ultimo turno di Filo, in ogni giorno del mese', () => {
+  const FT = globalThis.SN_FEEDBACK_THREAD;
+  const quando = (fb) => (rombo(fb).pannello.righe.find((r) => r.etichetta === 'Quando') || {}).valore;
+  const inAttesa = (marcatore) => ({
+    status: 'design', statusReason: 'clarify',
+    notes: ['Quale immagine intendi?', '--- La tua risposta del 01/09/26, 09:00 ---', 'Quelle dentro.',
+      `--- Filo ha risposto il ${marcatore} ---`, 'Anche quelle di sfondo?'].join('\n'),
+  });
+
+  test('ogni giorno di settembre, anno a due o a quattro cifre, è il giorno giusto', () => {
+    for (let g = 1; g <= 30; g++) {
+      const gg = String(g).padStart(2, '0');
+      for (const anno of ['26', '2026']) {
+        const v = quando(inAttesa(`${gg}/09/${anno}, 11:05`));
+        const d = new Date(v);
+        assert.ok(!Number.isNaN(d.getTime()), `${gg}/09/${anno}: «${v}» non è una data`);
+        assert.deepEqual([d.getFullYear(), d.getMonth() + 1, d.getDate(), d.getHours(), d.getMinutes()],
+          [2026, 9, g, 11, 5], `${gg}/09/${anno}: data sbagliata`);
+      }
+    }
+  });
+
+  test('il 5 settembre resta il 5 settembre, non il 9 maggio', () => {
+    const d = new Date(quando(inAttesa('05/09/26, 11:00')));
+    assert.equal(d.getMonth() + 1, 9);
+    assert.equal(d.getDate(), 5);
+  });
+
+  test('l’ISO passa com’è; una data che non esiste o che non si legge non diventa un’altra data', () => {
+    assert.equal(FT.istanteDelMarcatore('2026-09-27T09:00:00.000Z'), '2026-09-27T09:00:00.000Z');
+    for (const s of ['31/02/26, 10:00', '27/13/26, 10:00', '27/09/26, 25:00', 'ieri sera', '', null, undefined]) {
+      assert.equal(FT.istanteDelMarcatore(s), null, `«${s}» doveva restare senza data`);
+    }
+    // Il pannello lo mostra com'è scritto invece di una riga vuota.
+    assert.equal(quando(inAttesa('ieri sera')), 'ieri sera');
+  });
+
+  test('senza marcatore la data non si inventa', () => {
+    assert.equal(quando({ status: 'design', statusReason: 'clarify', notes: domande }), undefined);
   });
 });

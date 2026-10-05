@@ -38,7 +38,8 @@
 //   node scripts/verify-local.mjs pulizia
 //     Lo lancia chi ha registrato una critica che manda a correggere e mette
 //     rilievi da parte, SUBITO dopo: registra il commit che toglie SOLO le
-//     loro prove del giro. Da lì la consegna blocca ogni prova tolta rossa.
+//     loro prove del giro, se nessun caso rosso si è spento. Da lì la consegna
+//     blocca ogni prova tolta rossa.
 //
 //   node scripts/verify-local.mjs corretto "<report della correzione>"
 //     Lo lancia chi ha corretto: chiude il giro e chiede un'altra verifica
@@ -300,7 +301,7 @@ const senzaNumero = (l) => l.map(({ n: _n, ...f }) => f);
  * I bilanci consumati e i rilievi messi da parte nei giri precedenti dello
  * stesso lavoro sopravvivono: sono del lavoro, non della singola verifica.
  */
-export function withRequest(state, branch, { request, sha, at }) {
+export function withRequest(state, branch, { request, sha, at, feedbackId, feedbackNum }) {
   const s = (state && typeof state === 'object') ? { ...state } : {};
   const prev = s[branch] || {};
   s[branch] = {
@@ -311,6 +312,13 @@ export function withRequest(state, branch, { request, sha, at }) {
     derived: Array.isArray(prev.derived) ? prev.derived : [],
     rounds: Array.isArray(prev.rounds) ? prev.rounds : [],
   };
+  // La pratica del lavoro (#908) la legge npm run finish: resta finché non se ne indica un'altra.
+  const id = String(feedbackId || prev.feedbackId || '');
+  if (id) {
+    s[branch].feedbackId = id;
+    const num = feedbackId ? feedbackNum : prev.feedbackNum;
+    if (num) s[branch].feedbackNum = Number(num) || String(num);
+  }
   // Il perimetro della chiusura vale per la verifica subito dopo una
   // correzione (anche rilanciata), e per nessun'altra.
   if (prev.chiusura && (prev.verdict === 'fixed' || !prev.verdict)) s[branch].chiusura = prev.chiusura;
@@ -447,6 +455,24 @@ export function withCritique(state, branch, { critique, sha, at, caps, dirtyFile
 }
 
 /**
+ * La riga che la pratica del lavoro riceve a ogni avvio della verifica (#908, log per l'owner): il giro che parte
+ * e com'è andato quello prima, coi rilievi in una frase. Il livello a parole: le quadre sono dei rilievi. PURA.
+ */
+export function notaDelGiro(entry, { branch, sha }) {
+  const rounds = Array.isArray(entry && entry.rounds) ? entry.rounds : [];
+  const righe = [`Verifica locale, giro ${rounds.length + 1}: avviata sul ramo ${branch} (${String(sha || '').slice(0, 8)}).`];
+  const prima = rounds[rounds.length - 1];
+  if (prima) {
+    const rilievi = ROUND.parseFindings(String(prima.critique || '')).findings;
+    righe.push(`Giro ${rounds.length}: ${prima.outcome || 'esito non registrato'}, ${rilievi.length === 1 ? '1 rilievo' : `${rilievi.length} rilievi`}.`);
+    for (const f of rilievi) {
+      righe.push(`· livello ${f.level}${f.sede === 'e' ? ', di un altro lavoro' : ''}: ${ROUND.primaFrase(f.text, 160)}`);
+    }
+  }
+  return righe.join('\n');
+}
+
+/**
  * La storia delle critiche per il verificatore dopo: il testo di ogni giro con
  * rilievi (mai il report di chi ha corretto), e come è andato. PURA.
  */
@@ -541,7 +567,7 @@ export function withPulizia(state, branch, { controllo, dirtyFiles = [] } = {}) 
   const fuori = testoPuliziaFuoriNumero(controllo, numeri);
   if (fuori) return { ok: false, reason: fuori };
   s[branch] = { ...prev, pending: { ...prev.pending, shaPulizia: controllo.sha } };
-  return { ok: true, state: s, files: controllo.files };
+  return { ok: true, state: s, files: controllo.files, numeri };
 }
 
 /**
@@ -686,7 +712,8 @@ export function codaText({ findings, derived, external, budgets, branch, instruc
       'che toglie SOLO quelle, e registra la pulizia:',
       '  git add -A && git commit -m "pulizia del giro"',
       '  node scripts/verify-local.mjs pulizia',
-      'Una prova che copre anche un caso ancora aperto non si cancella: le si toglie il caso che se ne va.',
+      'Una prova che copre anche un caso ancora aperto non si cancella: le si toglie il caso che se ne va, e quello aperto',
+      'resta rosso (la registrazione la rilancia, e anche quelle che usano un aiuto a cui hai tolto righe).',
     ] : []),
     'Chi corregge toglie da quella cartella solo le prove dei rilievi corretti, verdi, nel commit della prova durevole che',
     'li tiene chiusi (se non ne scrive una, la prova del giro resta). Una prova del giro ancora rossa non si toglie e non si',
@@ -975,7 +1002,7 @@ const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.m
 if (isMain) {
   const [cmd, ...rest] = process.argv.slice(2);
 
-  const USO = 'Comandi: start ["<richiesta>"] | critica "<rilievi coi livelli>" | pulizia | corretto "<report>" | status';
+  const USO = 'Comandi: start ["<richiesta>"] [--feedback <N>] | critica "<rilievi coi livelli>" | pulizia | corretto "<report>" | status';
   // L’aiuto si stampa e basta, DOVUNQUE stia nella riga. Chiedere aiuto a uno
   // strumento è il primo gesto di chi verifica, e qui era l’unico posto dove
   // al posto dell’aiuto partiva l’azione: `start --help` apriva il giro per
@@ -989,16 +1016,28 @@ if (isMain) {
   };
   if ([cmd, ...rest].some(chiedeAiuto)) {
     console.log(USO);
-    console.log('Non ho toccato niente. Nessun comando accetta opzioni: il testo va fra virgolette, tutto in un pezzo solo.');
+    console.log('Non ho toccato niente. L’unica opzione è --feedback <N> di start (la pratica del lavoro, per npm run finish); il testo va fra virgolette, tutto in un pezzo solo.');
     process.exit(0);
   }
 
-  // Qui nessun comando accetta opzioni: una parola con due trattini in coda
+  // Qui nessun comando accetta opzioni (salvo --feedback di start, che si toglie subito sotto): una parola con due trattini in coda
   // finiva DENTRO al testo della critica (o del report) e l'esito veniva
   // registrato lo stesso — un testo che non si modifica più, e che l'owner
   // legge nella chat del feedback (feedback #565).
   // STA PRIMA DI TUTTI E TRE I COMANDI, e non è un dettaglio: quando stava
   // dopo, `start` aveva già aperto il giro e per lui non scattava mai.
+  let feedbackRif = null;
+  if (cmd === 'start') {
+    const { estraiOpzioneFeedback, parseRiferimento } = await import('./lib/pratica-locale.mjs');
+    const o = estraiOpzioneFeedback(rest);
+    if (o.errore) { console.error(`${o.errore} — non ho toccato niente.`); process.exit(1); }
+    if (o.valore !== null) {
+      const r = parseRiferimento(o.valore);
+      if (!r.ok) { console.error(`${r.motivo} — non ho toccato niente.`); process.exit(1); }
+      feedbackRif = o.valore;
+    }
+    rest.splice(0, rest.length, ...o.resto);
+  }
   if (['critica', 'corretto', 'start'].includes(cmd)) {
     const { sembraOpzione, sembraOpzioneNelReport } = await import('./lib/argomenti.mjs');
     const opzione = rest.find((a) => (cmd === 'corretto' ? sembraOpzioneNelReport(a) : sembraOpzione(a)));
@@ -1035,6 +1074,30 @@ if (isMain) {
   const sha = headSha();
 
   // I bilanci veri, o ci si ferma qui: un errore evidente, nessun ripiego.
+  // La pratica, o ci si ferma: legare il lavoro al feedback sbagliato è peggio che non legarlo.
+  const praticaOStop = async (rif) => {
+    const { risolviFeedback } = await import('./lib/pratica-locale.mjs');
+    const { acquireBearer, FIRESTORE_BASE } = await import('./lib/firestore-auth.mjs');
+    let r;
+    let lavorabile;
+    try {
+      const bearer = await acquireBearer();
+      r = await risolviFeedback(rif, { bearer, base: FIRESTORE_BASE });
+      if (!r.ok) throw new Error(r.motivo);
+      const { praticaPerLaSessione } = await import('./owner-feedback.mjs');
+      lavorabile = await praticaPerLaSessione(r.id, { bearer });
+    } catch (e) {
+      console.error(`PRATICA NON TROVATA — mi fermo, non ho toccato niente. ${String((e && e.message) || e)}`);
+      process.exit(1);
+    }
+    if (!lavorabile.ok) {
+      const { rifiutoPratica } = await import('./owner-feedback.mjs');
+      console.error(`${rifiutoPratica(r.id, lavorabile)}\nNon ho legato il lavoro a questa pratica e non ho toccato niente.`);
+      process.exit(1);
+    }
+    return { ...r, avviso: lavorabile.avviso };
+  };
+
   const bilanciOStop = async () => {
     try {
       return await leggiBilanciDalServer();
@@ -1063,6 +1126,8 @@ if (isMain) {
     // I bilanci si leggono già qui, PRIMA del lavoro: se il token manca o il
     // documento è incompleto, meglio saperlo adesso che dopo la verifica.
     const capsStart = await bilanciOStop();
+    // La pratica si risolve qui, prima del riallineamento: un numero sbagliato non tocca niente.
+    const pratica = feedbackRif !== null ? await praticaOStop(feedbackRif) : null;
     // Prima di consegnare il compito il ramo si riallinea alla linea
     // principale (caso #500): la verifica deve giudicare il contenuto che
     // verrà pubblicato. Sul conflitto ci si ferma qui, col ramo intatto.
@@ -1070,7 +1135,9 @@ if (isMain) {
     // Ramo e sha si rileggono: il riallineamento può averli riscritti, e il
     // verdetto deve legarsi al contenuto vero.
     const b = currentBranch();
-    const state = withRequest(readState(), b, { request, sha: headSha() });
+    const state = withRequest(readState(), b, {
+      request, sha: headSha(), feedbackId: pratica ? pratica.id : '', feedbackNum: pratica ? pratica.seq : '',
+    });
     const partenza = state[b].chiusura && state[b].chiusura.shaPrima;
     if (partenza) {
       const adesso = shaPrimaAllineato(partenza);
@@ -1082,6 +1149,16 @@ if (isMain) {
       }
     }
     writeState(state);
+    // La pratica racconta il lavoro: presa in carico al primo giro, e a ogni giro com'è andato quello prima.
+    if (state[b].feedbackId) {
+      const { annotaPratica } = await import('./owner-feedback.mjs');
+      const nota = notaDelGiro(state[b], { branch: b, sha: state[b].requestedSha || headSha() });
+      const a = await annotaPratica(state[b].feedbackId, nota).catch((e) => ({ ok: false, motivo: String((e && e.message) || e) }));
+      const chi = state[b].feedbackNum ? `#${state[b].feedbackNum}` : state[b].feedbackId;
+      console.error(a.ok
+        ? `Pratica ${chi}: ${a.from === a.to ? 'giro annotato' : 'presa in carico («In lavorazione») e giro annotato'}.`
+        : `Pratica ${chi} non aggiornata (${a.motivo}): in Gestione questo giro non compare.`);
+    }
     const scope = ambitoLocale(capsStart, state[b]);
     console.log(buildVerifierBrief({
       request, branch: b, recipe: readRecipe(ROOT, scope), history: historyFromRounds(state[b].rounds),
@@ -1092,6 +1169,10 @@ if (isMain) {
     // sull'altro canale, fuori dal compito che si consegna.
     console.error(bilanciText(capsStart));
     console.error('Ambito della verifica: ' + (scope === 'chiusura' ? 'chiusura (giro stretto acceso, e il giro prima è stato corretto)' : 'pieno'));
+    console.error(state[b].feedbackId
+      ? `Pratica del lavoro: ${state[b].feedbackNum ? '#' + state[b].feedbackNum : state[b].feedbackId} (la porta npm run finish).`
+      : 'Nessuna pratica collegata. Ogni lavoro locale ha il suo feedback, e senza npm run finish non chiede la fusione: aprilo (npm run feedback:apri -- "<titolo>" "<cosa fa il lavoro>" --locale) e rilancia start --feedback <N>.');
+    if (pratica && pratica.avviso) console.error(pratica.avviso);
     process.exit(0);
   }
 
@@ -1183,16 +1264,18 @@ if (isMain) {
     const aperto = readState()[branch];
     const statoP = statoDirectory(ROOT);
     if (!statoP.ok) { console.error(statoIllegibileText(statoP.motivo)); process.exit(1); }
-    const { controllaPulizia } = await import('./lib/prove-tolte.mjs');
+    const { controllaPulizia, controllaCasiDellaPulizia } = await import('./lib/prove-tolte.mjs');
     const controllo = aperto && aperto.pending && !statoP.lines.length
       ? controllaPulizia({ shaCritica: aperto.pending.sha, root: ROOT, cartella: cartellaProveGiro(branch), avvio: aperto.requestedSha })
       : null;
     const r = withPulizia(readState(), branch, { controllo, dirtyFiles: statoP.lines });
     if (!r.ok) { console.error(r.reason); process.exit(1); }
+    const casi = controllaCasiDellaPulizia({ shaCritica: aperto.pending.sha, sha: controllo.sha, root: ROOT, messi: r.numeri });
+    if (casi.ferma) { console.error(casi.testo); process.exit(1); }
     writeState(r.state);
     console.log(`Pulizia registrata su ${sha.slice(0, 8)}: ${r.files.length === 1 ? 'tolta 1 prova' : `tolte ${r.files.length} prove`} dei rilievi messi da parte.`);
     console.log(r.files.map((f) => `  · ${f}`).join('\n'));
-    console.log('Da qui parte il confronto della consegna: ogni prova del giro tolta o cambiata dopo, se com\'era è ancora rossa, la ferma.');
+    console.log('Da qui parte il confronto della consegna: ogni prova del giro tolta o cambiata dopo, o che usa un file di supporto cambiato, se com\'era è ancora rossa, la ferma.');
     process.exit(0);
   }
 

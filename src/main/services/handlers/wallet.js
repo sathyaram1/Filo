@@ -21,10 +21,12 @@
 // Il saldo NON lo calcola nessuno qui: lo dice il server, che lo legge da
 // OpenRouter (tetto della chiave meno consumo).
 
+const { AsyncLocalStorage } = require('node:async_hooks');
 const auth = require('../../auth/google-auth');
 const identity = require('../../auth/anon-auth');
 const walletStore = require('../../auth/wallet-store');
 const Defaults = require('../defaultsStore');
+const Disco = require('../../shim/storage');
 
 const FUNCTIONS_BASE = process.env.FILO_FUNCTIONS_BASE
   || 'https://europe-west1-filo-8b9cb.cloudfunctions.net';
@@ -121,11 +123,63 @@ module.exports = function register(on, ctx) {
     return 'factory';
   }
 
+  // La prova di una chiave (il «Prova» delle Impostazioni) misura QUELLA
+  // chiave: dentro `senzaRipiego` un rifiuto risale com'è, senza riserva.
+  const provaDiChiave = new AsyncLocalStorage();
+  function senzaRipiego(fn) { return provaDiChiave.run(true, fn); }
+
+  // Ogni risposta pagata col ripiego lo dice: la riga sotto la risposta, o un avviso, uno per
+  // rifiuto e al massimo ogni 10 minuti (#662). Vale come detta solo la riga arrivata a schermo
+  // (KEY_FALLBACK_SHOWN), non la richiesta di chi potrebbe mostrarla: una spiegazione anticipata
+  // mai aperta, o un riquadro chiuso prima, lascia partire l'avviso. Le richieste con la riga in
+  // volo (`conRipiegoDetto`) tengono fermo l'avviso finché la loro riga ha il tempo di comparire.
+  const FINESTRA_RIPIEGO_MS = 10 * 60 * 1000;
+  const ATTESA_AVVISO_RIPIEGO_MS = 4000;
+  let inVoloConRiga = 0;
+  let ultimoAvvisoRipiego = 0;
+  let avvisoSospeso = null; // { status, timer }
+  function conRipiegoDetto(fn) {
+    inVoloConRiga++;
+    let p;
+    try { p = Promise.resolve(fn()); } catch (e) { p = Promise.reject(e); }
+    return p.finally(() => {
+      inVoloConRiga--;
+      if (!inVoloConRiga && avvisoSospeso && !avvisoSospeso.timer) {
+        avvisoSospeso.timer = setTimeout(mandaAvvisoSospeso, ATTESA_AVVISO_RIPIEGO_MS);
+      }
+    });
+  }
+  function annullaAvvisoSospeso() {
+    if (avvisoSospeso && avvisoSospeso.timer) clearTimeout(avvisoSospeso.timer);
+    avvisoSospeso = null;
+  }
+  function mandaAvvisoSospeso() {
+    if (!avvisoSospeso) return;
+    avvisoSospeso.timer = null;
+    if (inVoloConRiga > 0) return;
+    const { status } = avvisoSospeso;
+    avvisoSospeso = null;
+    const now = Date.now();
+    if (now - ultimoAvvisoRipiego < FINESTRA_RIPIEGO_MS) return;
+    ultimoAvvisoRipiego = now;
+    try { broadcastToTabs({ type: MSG.SHOW_TOAST, text: W.ownKeyFallbackLine(status), duration: 8000 }); } catch (_) {}
+  }
+  function ripiegoMostrato() {
+    ultimoAvvisoRipiego = Date.now();
+    annullaAvvisoSospeso();
+  }
+  function avvisaRipiegoMuto(status) {
+    const now = Date.now();
+    if (now - ultimoAvvisoRipiego < FINESTRA_RIPIEGO_MS || avvisoSospeso) return;
+    avvisoSospeso = { status, timer: setTimeout(mandaAvvisoSospeso, ATTESA_AVVISO_RIPIEGO_MS) };
+  }
+
   // La riserva per la chiave con cui una chiamata è partita: la personale del
   // portafoglio, solo se si era partiti con la chiave PROPRIA. Con la
   // personale già in uso non c'è riserva (un 402 lì sono i crediti finiti), e
   // con la chiave di fabbrica nemmeno.
   async function alternativeKeyFor(apiKey) {
+    if (provaDiChiave.getStore()) return null;
     const k = String(apiKey || '').trim();
     const personal = walletStore.personalKey();
     if (!k || !personal || k === personal) return null;
@@ -133,13 +187,18 @@ module.exports = function register(on, ctx) {
     return { key: personal, source: 'personal' };
   }
 
-  // L'ultimo rifiuto della chiave propria: { at, status, detail }. Lo legge
-  // la pagina Crediti (readState); si cancella quando la chiave cambia.
+  // L'ultimo rifiuto della chiave propria: { at, status, detail, usedCredits }.
+  // Lo legge la pagina Crediti (readState); si cancella quando la chiave
+  // cambia. `usedCredits`: da quando la chiave è rifiutata, un ripiego ha
+  // risposto almeno una volta (un ripiego caduto non ha speso niente).
   const REFUSAL_KEY = 'walletOwnKeyRefusal';
-  async function noteOwnKeyRefusal({ status, detail } = {}) {
-    const rec = { at: new Date().toISOString(), status: Number(status) || 0, detail: String(detail || '').slice(0, 300) };
+  async function noteOwnKeyRefusal({ status, detail, served = true } = {}) {
+    const prev = await lastOwnKeyRefusal();
+    const usedCredits = Boolean(served) || Boolean(prev && prev.usedCredits !== false);
+    const rec = { at: new Date().toISOString(), status: Number(status) || 0, detail: String(detail || '').slice(0, 300), usedCredits };
     try { await globalThis.SN_STORAGE.setRaw(REFUSAL_KEY, rec); } catch (_) {}
-    console.warn(`[wallet] chiave propria rifiutata (${rec.status}): ripiego sulla chiave personale`);
+    if (served) avvisaRipiegoMuto(rec.status);
+    console.warn(`[wallet] chiave propria rifiutata (${rec.status}): ${served ? 'ha risposto la chiave personale' : 'anche il ripiego sulla personale è caduto'}`);
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
   }
   async function lastOwnKeyRefusal() {
@@ -151,6 +210,8 @@ module.exports = function register(on, ctx) {
   // La chiave propria è cambiata (messa, tolta, sostituita): il rifiuto di
   // quella di prima non dice niente su questa.
   async function ownKeyChanged() {
+    ultimoAvvisoRipiego = 0;
+    annullaAvvisoSospeso();
     try { await globalThis.SN_STORAGE.setRaw(REFUSAL_KEY, null); } catch (_) {}
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
     rinfrescaHome();
@@ -164,6 +225,7 @@ module.exports = function register(on, ctx) {
   async function noteOwnKeySuccess() {
     const had = await lastOwnKeyRefusal();
     if (had) {
+      ultimoAvvisoRipiego = 0;
       try { await globalThis.SN_STORAGE.setRaw(REFUSAL_KEY, null); } catch (_) {}
       console.info('[wallet] la chiave propria risponde di nuovo: rifiuto dimenticato');
     }
@@ -176,7 +238,15 @@ module.exports = function register(on, ctx) {
   // ── Stato per la pagina Crediti ───────────────────────────────────────────
   // { ok, identity:{ ok, error? }, hasPersonalKey, pseudonym, usingOwnKey,
   //   server: <walletState> | null, error? }
+  // L'ultima lettura resta a chi deve DIRE il saldo fuori da quella pagina
+  // (la chat, #816): lo stesso numero, senza un giro dal server a ogni turno.
+  let ultimaLettura = null; // { at, state }
   async function readState() {
+    const state = await leggiStato();
+    ultimaLettura = { at: Date.now(), state };
+    return state;
+  }
+  async function leggiStato() {
     const own = await ownKey();
     const out = {
       ok: true, identity: { ok: false }, hasPersonalKey: Boolean(walletStore.personalKey()), pseudonym: walletStore.pseudonym(),
@@ -228,6 +298,60 @@ module.exports = function register(on, ctx) {
     return out;
   }
 
+  // Questa installazione ha un portafoglio (#816): i crediti veri li tiene il
+  // server, e il conteggio locale non riceve premi né si racconta in chat.
+  function haPortafoglio() {
+    try {
+      return Boolean(walletStore.personalKey() || walletStore.pseudonym() || (lastServer && lastServer.hasWallet));
+    } catch (_) { return false; }
+  }
+
+  // Il saldo che la chat dice (#816): quello della pagina Crediti. `null` =
+  // nessun portafoglio, e vale il conteggio locale. `fresco`: la domanda viene
+  // da un turno di chat, e una lettura più vecchia di un minuto si rifà
+  // (aspettandola al più poco: poi vale l'ultima nota, dichiarata tale).
+  const CHAT_VALIDO_MS = 60 * 1000;
+  const CHAT_ATTESA_MS = 2500;
+  async function saldoPerChat({ fresco = false } = {}) {
+    if (!haPortafoglio()) return null;
+    let st = ultimaLettura ? ultimaLettura.state : null;
+    let lettaIl = ultimaLettura ? ultimaLettura.at : null;
+    let muto = false; // la lettura di adesso non è arrivata in tempo
+    if (fresco && (!ultimaLettura || Date.now() - ultimaLettura.at > CHAT_VALIDO_MS)) {
+      const letta = await Promise.race([
+        readState().catch(() => null),
+        new Promise((r) => setTimeout(() => r(null), CHAT_ATTESA_MS)),
+      ]);
+      if (letta) { st = letta; lettaIl = Date.now(); } else muto = true;
+    }
+    if (st && st.identity && st.identity.lost) return null;
+    if (st && st.server && st.server.hasWallet === false) return null;
+    let server = st && st.server && st.server.hasWallet ? st.server : null;
+    if (!server) {
+      const disco = walletStore.lastServer() || lastServer;
+      if (!disco || !disco.hasWallet) return { balance: null };
+      server = { ...disco, cached: muto || Boolean(st) };
+      lettaIl = Date.parse(String(disco.readAt || '')) || null;
+    }
+    const b = server.balance || {};
+    // Perché non è il saldo di adesso: il server dei crediti muto, il servizio
+    // dei modelli che non ha detto il consumo (come la pagina), o una lettura
+    // solo vecchia, che la home usa senza chiederne un'altra.
+    const lastKnown = server.cached || muto ? 'server'
+      : server.stale ? 'models'
+        : !lettaIl || Date.now() - lettaIl > CHAT_VALIDO_MS ? 'old' : '';
+    const readAt = server.cached ? server.readAt
+      : server.stale ? server.usageReadAt
+        : lastKnown && lettaIl ? new Date(lettaIl).toISOString() : null;
+    return {
+      balance: b.credits != null && Number.isFinite(Number(b.credits)) ? Number(b.credits) : null,
+      dailyCredits: server.dailyCredits != null && Number.isFinite(Number(server.dailyCredits)) ? Number(server.dailyCredits) : null,
+      lastKnown, readAt: readAt || null,
+      usingOwnKey: Boolean(st && st.usingOwnKey),
+      keyMissing: Boolean(st && st.hasPersonalKey === false),
+    };
+  }
+
   // Cancello sull'origine (pattern «nuovo tipo di messaggio»): saldo, codici
   // d'invito, riscatto e nuova chiave leggono e muovono dati dell'utente.
   // Solo le pagine filo:// e la shell; una pagina web riceve `forbidden`.
@@ -238,6 +362,10 @@ module.exports = function register(on, ctx) {
   };
 
   on(MSG.WALLET_STATE, filoOnly(async () => readState()));
+
+  // Anche dai siti: la riga sta nei riquadri sulle pagine web. Il peggio che un mittente può fare è
+  // zittire per dieci minuti un avviso che ripete una frase.
+  on(MSG.KEY_FALLBACK_SHOWN, async () => { ripiegoMostrato(); return { ok: true }; });
 
   // Nuova chiave: il portafoglio esiste sul server, la chiave non è qui.
   on(MSG.WALLET_REISSUE, filoOnly(async () => {
@@ -261,6 +389,7 @@ module.exports = function register(on, ctx) {
     identity.resetIdentity();
     walletStore.clear();
     lastServer = null;
+    ultimaLettura = null;
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
     rinfrescaHome();
     return { ok: true, state: await readState() };
@@ -279,9 +408,11 @@ module.exports = function register(on, ctx) {
   // `code` è quello che l'utente ha incollato: il codice nudo, la riga intera
   // del messaggio in cui è arrivato, o il link di filo.red. Niente tetto di
   // caratteri sul campo, niente taglio: o dentro c'è un codice, o si dice.
+  // La lettura è lineare (#664): qui gira nel main, e un conto lento ferma
+  // tutte le schede.
   async function doRedeem(rawCode) {
-    const code = W.codeFromInput(rawCode || '');
-    if (!code) return { ok: false, status: 'bad_code', message: W.redeemMessage('bad_code') };
+    const codes = W.codesFromInput(rawCode || '');
+    if (!codes.length) return { ok: false, status: 'bad_code', message: W.redeemMessage('bad_code') };
     const idErr = await identityProblem();
     if (idErr) return { ok: false, status: 'no_identity', message: idErr };
     // I crediti del vecchio conteggio locale si portano sul server: chi li
@@ -298,13 +429,23 @@ module.exports = function register(on, ctx) {
       const declared = Number(await globalThis.SN_STORAGE.getRaw(DECLARED_KEY, 0)) || 0;
       localCredits = Math.max(0, Math.floor(balanceNow - declared));
     } catch (_) { localCredits = 0; }
-    let r;
-    try {
-      r = await callable('walletRedeem', { code, localCredits });
-    } catch (e) {
-      return { ok: false, status: 'not_reachable', message: W.redeemMessage('not_reachable') };
+    // Un saluto di otto lettere buone («Cara Sara») può stare davanti al
+    // codice vero (#664): a «non esiste» si prova il blocco dopo. Ogni altra
+    // risposta è del codice giusto (pieno, tuo, già dentro) e ferma la fila.
+    const daProvare = codes.slice(0, W.CODE_TRIES);
+    let r = null;
+    for (const code of daProvare) {
+      try {
+        r = await callable('walletRedeem', { code, localCredits });
+      } catch (e) {
+        return { ok: false, status: 'not_reachable', message: W.redeemMessage('not_reachable') };
+      }
+      if (!r || r.status !== 'invalid_code') break;
     }
     const status = (r && r.status) || 'internal';
+    if (status === 'invalid_code' && codes.length > daProvare.length) {
+      return { ok: false, status, message: W.tooManyCodesMessage(codes.length, daProvare.length) };
+    }
     if (status !== 'ok') return { ok: false, status, message: W.redeemMessage(status) };
     walletStore.save({ key: r.key, pseudonym: r.pseudonym, redeemedAt: new Date().toISOString() });
     if (localCredits > 0) { try { await globalThis.SN_STORAGE.setRaw(DECLARED_KEY, Math.floor(balanceNow)); } catch (_) {} }
@@ -334,6 +475,16 @@ module.exports = function register(on, ctx) {
   const NOTICE_KEY = 'walletNotice';
   const NOTICE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
+  // Ogni lettura e scrittura dell'avviso passa da qui, una alla volta: la
+  // spinta arriva a tutte le home insieme, e il benvenuto lo deve prendere una
+  // sola (#664).
+  let filaAvviso = Promise.resolve();
+  function inFilaAvviso(fn) {
+    const turno = filaAvviso.then(fn);
+    filaAvviso = turno.catch(() => {});
+    return turno;
+  }
+
   // L'avviso si SPINGE appena il riscatto è andato. Non basta: al PRIMO
   // avvio il riscatto si chiude in pochi secondi, mentre la home si sta
   // ancora aprendo, e la spinta non trova nessuno in ascolto — l'invitato si
@@ -345,7 +496,7 @@ module.exports = function register(on, ctx) {
   // portafoglio.
   async function setNotice(kind, text) {
     const rec = { kind, text: String(text || ''), at: new Date().toISOString(), seenHome: false, seenCredits: false };
-    try { await globalThis.SN_STORAGE.setRaw(NOTICE_KEY, rec); } catch (_) {}
+    await inFilaAvviso(async () => { try { await globalThis.SN_STORAGE.setRaw(NOTICE_KEY, rec); } catch (_) {} });
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED, walletNotice: { kind: rec.kind, text: rec.text } }); } catch (_) {}
     return rec;
   }
@@ -366,28 +517,38 @@ module.exports = function register(on, ctx) {
     return r;
   }
 
+  async function segnaVisto(where) {
+    let r = null;
+    try { r = await globalThis.SN_STORAGE.getRaw(NOTICE_KEY, null); } catch (_) {}
+    if (!r) return;
+    if (where === 'home') r.seenHome = true;
+    else r.seenCredits = true;
+    try {
+      await globalThis.SN_STORAGE.setRaw(NOTICE_KEY, r.seenHome && r.seenCredits ? null : r);
+    } catch (_) {}
+  }
+
   // Quale superficie non l'ha ancora visto. `where` è la stessa parola di
   // WALLET_NOTICE_SEEN: chi l'ha già mostrato non se lo ritrova addosso alla
-  // prossima apertura.
+  // prossima apertura. Con `claim` chi chiede lo prende: alla prossima
+  // domanda, anche da un'altra home, non c'è più.
   on(MSG.WALLET_NOTICE_PENDING, filoOnly(async (msg) => {
     const where = String((msg && msg.where) || '');
     if (where !== 'home' && where !== 'credits') return { ok: false, error: 'bad_where' };
-    const r = await readNotice();
-    const visto = where === 'home' ? r && r.seenHome : r && r.seenCredits;
-    return { ok: true, notice: r && !visto ? { kind: r.kind, text: r.text } : null };
+    const notice = await inFilaAvviso(async () => {
+      const r = await readNotice();
+      const visto = where === 'home' ? r && r.seenHome : r && r.seenCredits;
+      if (!r || visto) return null;
+      if (msg && msg.claim) await segnaVisto(where);
+      return { kind: r.kind, text: r.text };
+    });
+    return { ok: true, notice };
   }));
 
   on(MSG.WALLET_NOTICE_SEEN, filoOnly(async (msg) => {
     const where = String((msg && msg.where) || '');
-    let r = null;
-    try { r = await globalThis.SN_STORAGE.getRaw(NOTICE_KEY, null); } catch (_) {}
-    if (!r) return { ok: true };
-    if (where === 'home') r.seenHome = true;
-    else if (where === 'credits') r.seenCredits = true;
-    else return { ok: false, error: 'bad_where' };
-    try {
-      await globalThis.SN_STORAGE.setRaw(NOTICE_KEY, r.seenHome && r.seenCredits ? null : r);
-    } catch (_) {}
+    if (where !== 'home' && where !== 'credits') return { ok: false, error: 'bad_where' };
+    await inFilaAvviso(() => segnaVisto(where));
     return { ok: true };
   }));
 
@@ -438,7 +599,15 @@ module.exports = function register(on, ctx) {
 
   // Il codice arrivato da `filo://invito/<codice>`. Chi ha già un portafoglio
   // non ha niente da riscattare, e sentirselo dire è meglio di un silenzio.
-  async function redeemFromInvite(code) {
+  // Un doppio clic sul pulsante dell'invito porta qui due volte (#664): il
+  // secondo riscatto direbbe «hai già i crediti» sopra il benvenuto, quindi
+  // finché il primo è in corso chi arriva aspetta quello.
+  let invitoInCorso = null;
+  function redeemFromInvite(code) {
+    if (!invitoInCorso) invitoInCorso = riscattaInvito(code).finally(() => { invitoInCorso = null; });
+    return invitoInCorso;
+  }
+  async function riscattaInvito(code) {
     if (walletStore.personalKey()) {
       const rec = await setNotice('already_in', 'Hai già i crediti di Filo su questo computer. Questo invito puoi darlo a qualcun altro.');
       return { ok: false, status: 'already_in', message: rec.text };
@@ -453,6 +622,26 @@ module.exports = function register(on, ctx) {
     return out;
   }
 
+  // L'invito portato dentro Filo: si riscatta e si apre la pagina Crediti, dove
+  // l'esito si legge. Stessa strada per il collegamento arrivato da fuori
+  // (main.js) e per quello cliccato dentro Filo (#664).
+  function portaDentroInvito(code, win) {
+    // Il portafoglio è dell'installazione: da una finestra incognito si scrive sul disco lo stesso.
+    Disco.runNormale(() => redeemFromInvite(code)).catch(() => {});
+    try { win?._filoTabs?.openTab('filo://credits/credits.html', { activate: true }); } catch (_) {}
+  }
+
+  // Un collegamento d'invito cliccato davvero in una pagina, o «Riscatta
+  // l'invito» dal tasto destro. Arriva anche dalle pagine web: lo manda il
+  // mondo isolato del preload, e solo su un gesto vero dell'utente.
+  on(MSG.WALLET_INVITE_OPEN, async (msg, sender) => {
+    const link = String((msg && msg.link) || '');
+    const code = W.inviteCodeFromLink(link);
+    if (!code && !W.isInviteDeepLink(link)) return { ok: false, error: 'not_invite' };
+    portaDentroInvito(code, ctx.winOf(sender));
+    return { ok: true };
+  });
+
   // ── Owner ─────────────────────────────────────────────────────────────────
   const ownerOnly = (fn) => filoOnly(async (msg) => {
     if (!ctx.isAdmin()) return { ok: false, error: 'not_admin' };
@@ -463,7 +652,10 @@ module.exports = function register(on, ctx) {
     const result = await callable('walletGrant', { pseudonym: msg.pseudonym, credits: msg.credits, why: msg.why || 'owner' }, { asOwner: true });
     // Se il regalo è alla propria installazione, la pagina Crediti aperta
     // accanto deve muoversi: si avvisano le pagine, come a ogni cambio di saldo.
-    if (result && result.ok) { try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {} }
+    if (result && result.ok) {
+      ultimaLettura = null;
+      try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
+    }
     return { result };
   }));
   on(MSG.WALLET_OWNER_INVITES, ownerOnly(async (msg) => ({
@@ -486,7 +678,8 @@ module.exports = function register(on, ctx) {
     if (!idToken) throw new Error('Sessione scaduta: rifai l’accesso.');
     const knobs = await Defaults.setCreditsKnobs((msg && msg.patch) || {}, idToken);
     // Le manopole cambiano quota e premi: chi guarda i crediti in un'altra
-    // pagina deve rileggere.
+    // pagina deve rileggere, e la chat anche.
+    ultimaLettura = null;
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
     return { knobs };
   }));
@@ -662,15 +855,21 @@ module.exports = function register(on, ctx) {
 
   globalThis.SN_WALLET_MAIN = {
     recordUsage, outOfCreditsNotice, flush, readState, keySource,
+    // Le cifre dette fuori dalla pagina Crediti (#816): chat, premi delle
+    // segnalazioni. `redeemedAt`: da quando le segnalazioni portano lo pseudonimo.
+    haPortafoglio, saldoPerChat,
+    redeemedAt: () => { try { return (walletStore.load() || {}).redeemedAt || null; } catch (_) { return null; } },
     // Lo pseudonimo di questa installazione, letto dal deposito locale (niente
     // rete): lo scrive chi manda un feedback, così il server sa a chi
     // accreditare il premio (#652). Vuoto se non c'è un portafoglio.
     pseudonym: () => { try { return walletStore.pseudonym() || ''; } catch (_) { return ''; } },
-    // L'invito che arriva da fuori (#651): lo chiama main.js per il
-    // collegamento filo://invito/<codice>, e l'avvio per l'invito in attesa.
-    redeemFromInvite, tryPendingInvite,
+    // L'invito che arriva da fuori (#651): main.js porta dentro il
+    // collegamento filo://invito/<codice>, l'avvio l'invito in attesa.
+    redeemFromInvite, tryPendingInvite, portaDentroInvito,
     // Ripiego dalla chiave propria (#629): li chiama il provider OpenRouter.
     keySourceOf, alternativeKeyFor, noteOwnKeyRefusal, noteOwnKeySuccess, lastOwnKeyRefusal, ownKeyChanged, usageLogStatus,
+    // La prova di una chiave dalle Impostazioni (handlers/ai.js): niente riserva.
+    senzaRipiego, conRipiegoDetto,
     // Solo per i test (NODE_ENV=test): simula il riavvio senza rete.
     expireIdentityForTest: () => { if (process.env.NODE_ENV === 'test') identity._expireToken(); },
   };

@@ -24,7 +24,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 // La cartella temporanea si chiede sempre a questo aiuto (CLAUDE.md § Run/test).
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
-import { spiegaChiaviMancanti, descriviEsitoServer } from '../../scripts/bake-default-config.mjs';
+import { spiegaChiaviMancanti, descriviEsitoServer, chiaviAllarmeBake } from '../../scripts/bake-default-config.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const RADICE = resolve(__dirname, '..', '..');
@@ -278,7 +278,15 @@ test('l’allarme porta le stesse informazioni del registro', async () => {
     assert.match(testo, /FILO_DEFAULT_TAVILY_KEY/);
     assert.match(testo, /bad_passphrase/,
       'anche il perché il server non l\'ha data deve arrivare nel feedback');
+    // Una chiave per chiave mancante: il server non riapre un feedback per un guasto già in coda.
+    assert.deepEqual(allarme.corpo.keys, ['bake:tavily']);
   } finally {
     await srv.chiudi();
   }
+});
+
+test('le chiavi dell’allarme del bake: una per chiave mancante, mai nessuna', () => {
+  assert.deepEqual(chiaviAllarmeBake([{ nome: 'tavily' }, { nome: 'tavily' }, { nome: 'altra' }]), ['bake:tavily', 'bake:altra']);
+  assert.deepEqual(chiaviAllarmeBake([]), ['bake']);
+  assert.deepEqual(chiaviAllarmeBake(undefined), ['bake']);
 });

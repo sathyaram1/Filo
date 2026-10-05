@@ -102,7 +102,7 @@ regole valgono mentre scrivi.
   (`src/shared/tasti.js`), mai scritto a mano; nell'HTML non ci va. Un tasto
   nuovo si controlla con `SN_TASTI.riservato()`: su Mac la barra dei menu
   (`src/main/menu.js`) vede i tasti per prima. Su Mac Alt scrive: una
-  scorciatoia globale Alt+lettera lì prende un Ctrl davanti
+  scorciatoia Alt+lettera lì prende un Ctrl davanti
   (`src/main/shortcuts.js`), Alt+cifra diventa Cmd+cifra.
 - **Niente percorsi di Windows scritti a mano**, nemmeno nei prompt: `app.getPath`,
   `os.homedir()`, `path.join`.
@@ -167,10 +167,11 @@ osservato. Minimi per tipo di modifica:
 - **modifica visiva** → in più `npm run test:shoot -- "<scenario>"` e GUARDA lo
   screenshot (`tests/agent/.out/`);
 - **la suite completa non la lancia nessuno**, da nessuna parte: gira in GitHub
-  nel lavoro di release, ogni sei ore, e un rosso nuovo ferma la patch e
-  diventa un feedback. Al suo posto chi verifica lancia `npm run finish:check`
-  (unit più gli spec delle aree toccate). Le regressioni restano di chi le
-  introduce: se ne temi una precisa, lancia quello spec.
+  a ogni fusione su main (`suite.yml`), e un rosso nuovo diventa un feedback;
+  ogni sei ore si pubblica il commit più nuovo con la suite verde. Al suo
+  posto chi verifica lancia `npm run finish:check` (unit più gli spec delle
+  aree toccate). Le regressioni restano di chi le introduce: se ne temi una
+  precisa, lancia quello spec.
 
 **Prima di consegnare, la verifica te la fai tu**, con gli stessi criteri che
 userà chi ti verifica: **`routines/roles/_criteri-verifica.md`** (nelle routine
@@ -207,15 +208,19 @@ riscrive. Sono TRE testi distinti:
    stanno solo nel report. Se non cambia niente di visibile, non si scrive.
 3. **Riga di changelog** in `src/shared/patchNotes.js`: solo se un utente
    qualunque può usare la cosa (superfici owner e parti interne no); una
-   riga, orientata al beneficio.
+   riga, orientata al beneficio, nel blocco in cima (vedi § Fonti di verità
+   singole).
 
 Prima di consegnare un testo destinato a un umano applica
 **`.claude/skills/unslop/SKILL.md`**.
 
 ## Fonti di verità singole (aggiornale nello stesso commit)
 
-- **`src/shared/patchNotes.js`**: changelog per l'utente comune, allineato a
-  `package.json`.
+- **`src/shared/patchNotes.js`**: changelog per l'utente comune. Il blocco in
+  cima porta il numero della prossima versione (`package.json` + 1 patch); se
+  quel numero è già uscito se ne apre uno nuovo, perché una riga sotto una
+  versione uscita non la vede chi aggiorna. Sentinella:
+  `tests/unit/patchNotes.test.mjs`.
 - **`src/shared/capabilities.js`**: manifesto di cosa sa fare Filo. Capacità
   nuova, cambiata o rimossa = voce aggiornata; una sentinella la confronta col
   codice.
@@ -232,7 +237,7 @@ npm install                # se manca il binario Electron: node node_modules/ele
 npm start
 npm run test:unit          # logica pura, ms, senza Electron
 npm run test:smoke         # smoke headless con screenshot
-npm test                   # SUITE COMPLETA (~370 spec, ~1.450 casi): NON si lancia a mano (vedi § Verifica)
+npm test                   # SUITE COMPLETA (~430 spec, ~1.450 casi): NON si lancia a mano (vedi § Verifica)
 npm run finish:check       # in locale: unit + spec delle aree toccate dal ramo
 npm run test:shoot         # cattura visiva della finestra reale
 ```

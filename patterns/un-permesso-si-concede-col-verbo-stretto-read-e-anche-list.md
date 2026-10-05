@@ -62,8 +62,8 @@ Dove vive: `storage.rules`, con la sentinella
 millisecondi) e la prova col motore vero
 `tests/rules/storage-allegati-motore-vero.mjs` (emulatori ufficiali, si lancia
 a mano: ha in testa le istruzioni). E ricordati che **una regola cambia solo
-quando la pubblichi**: finché `firebase deploy --only storage:rules` non gira,
-la porta in produzione è quella di prima.
+quando la pubblichi**: finché `npm run regole:pubblica` (da main, dopo la
+fusione) non gira, la porta in produzione è quella di prima.
 
 Vicino: [«Sei loggato» non è un permesso](sei-loggato-non-e-un-permesso.md) —
 l'altra metà di come si legge una regola: il verbo dice *cosa*, la condizione

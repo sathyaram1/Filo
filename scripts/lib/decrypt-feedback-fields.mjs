@@ -1,29 +1,5 @@
-// Decifratura dei campi sensibili dei feedback (S1.3 — lettore routine).
-//
-// PERCHÉ ESISTE
-//   Le routine cloud ricevono feedback con campi cifrati (FENC1:...) da Firestore
-//   o dalla coda git. Questo helper è il passo deterministico NON-LLM che
-//   decifra i campi PRIMA che il plaintext entri nel contesto di un worker LLM.
-//   La chiave privata non deve mai essere passata direttamente a un LLM: viene
-//   letta qui, usata per decriptare, e il worker riceve solo plaintext.
-//
-// DOVE METTERE LA CHIAVE PRIVATA (owner)
-//   1. Env `FILO_FEEDBACK_PRIVKEY` — la chiave privata PKCS8 in base64 (quella
-//      stampata da `node scripts/gen-feedback-keys.mjs`). Impostarla nella
-//      configurazione della routine cloud (es. secrets del runner).
-//   2. Oppure, in locale: file `tests/agent/.env` nella root del repo Filo,
-//      come variabile `FILO_FEEDBACK_PRIVKEY=<base64>` (già gitignorato).
-//      Viene caricato automaticamente se il file esiste.
-//
-// USO
-//   import { decryptFeedbackFields } from './lib/decrypt-feedback-fields.mjs';
-//
-//   // Prima di passare il feedback a un worker LLM:
-//   const plain = await decryptFeedbackFields(feedbackObject);
-//   // plain.text, plain.name, plain.notes, plain.reviewComment sono in chiaro.
-//
-//   // Oppure decifra direttamente con una chiave esplicita:
-//   const plain = await decryptFeedbackFields(feedbackObject, myPrivKeyB64);
+// Decifra i campi FENC1: dei feedback e i loro allegati per gli script dell'owner (l'app ha la sua copia in auth.js).
+// La chiave privata la cerca in FILO_FEEDBACK_PRIVKEY e poi in tests/agent/.env (gitignorato); non la scrive mai.
 
 import { createRequire } from 'node:module';
 import { dirname, resolve, join } from 'node:path';
@@ -84,20 +60,14 @@ function privKeyFromEnvFile(envFile) {
   return null;
 }
 
-// Legge la chiave privata da FILO_FEEDBACK_PRIVKEY (env) oppure da
-// `tests/agent/.env` nella root del repo (in locale). Ritorna null se assente.
 function readPrivKey() {
-  // 1. Variabile d'ambiente (impostata nel cloud / dalla routine).
   if (process.env.FILO_FEEDBACK_PRIVKEY) return process.env.FILO_FEEDBACK_PRIVKEY.trim();
 
-  // 2. File .env locale (solo in locale, il file è gitignorato).
   const local = privKeyFromEnvFile(join(REPO_ROOT, 'tests', 'agent', '.env'));
   if (local) return local;
 
-  // 3. In un WORKTREE git il file .env (gitignorato) esiste solo nel checkout
-  //    principale: risali lì via git-common-dir. Senza questo passo, ogni run
-  //    da un worktree non decifrava nessuno status e la coda piena "sembrava
-  //    vuota" → il giro delle routine finiva in audit (i feedback #310+).
+  // Il .env è gitignorato, quindi un worktree non ce l'ha: senza risalire al checkout
+  // principale uno script lanciato da lì non decifra niente e la coda sembra vuota.
   try {
     const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'],
       { cwd: REPO_ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
@@ -192,6 +162,22 @@ export async function decryptFeedbackFields(fb, privKey) {
     }
   }
   return out;
+}
+
+/**
+ * I byte di un allegato, in chiaro: quelli cifrati si aprono con la stessa chiave dei campi, gli altri passano.
+ * Lancia se sono cifrati e la chiave manca o non li apre: un allegato illeggibile si dice, non si inventa.
+ * @param {Uint8Array} bytes
+ * @param {string} [privKey]
+ * @returns {Promise<Uint8Array>}
+ */
+export async function decryptAttachmentBytes(bytes, privKey) {
+  loadCrypto();
+  const C = globalThis.SN_FEEDBACK_CRYPTO;
+  if (!C || !C.isEncryptedBytes || !C.isEncryptedBytes(bytes)) return bytes;
+  const priv = privKey || readPrivKey();
+  if (!priv) throw new Error('allegato cifrato, ma la chiave privata non è configurata');
+  return C.decryptBytes(bytes, priv);
 }
 
 /**

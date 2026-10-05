@@ -22,6 +22,10 @@
   // allo stesso modo, quindi passa dalla stessa pagina.
   const CRASH_CODE = 'crash';
 
+  // La scheda sta su un sito della lista dei siti bloccati (#590): stessa pagina, con
+  // «Apri comunque» al posto di «Riprova». `desc` dice chi lo ferma: 'blacklist' o 'lists'.
+  const BLOCKED_CODE = 'blocked';
+
   // Schemi che la pagina d'errore può ri-tentare ("Riprova"). Mai altro:
   // l'URL bersaglio arriva da query string e NON va navigato alla cieca
   // (filo://error?url=javascript:… non deve poter eseguire nulla).
@@ -63,6 +67,11 @@
       desc: params.get('desc') || '',
       altroPaese: params.get('via') === 'paese',
     };
+  }
+
+  function isBlockedPageUrl(url) {
+    const p = parse(url);
+    return !!p && p.code === BLOCKED_CODE;
   }
 
   // L'URL bersaglio (fallito) di una pagina d'errore, o null. Comodo per
@@ -125,6 +134,14 @@
   // dettaglio tecnico che la pagina mostra in piccolo.
   function describe(code, desc, { altroPaese } = {}) {
     if (String(code) === CRASH_CODE) return { ...CRASH_INFO, offline: false };
+    if (String(code) === BLOCKED_CODE) {
+      return {
+        title: 'Sito bloccato',
+        hint: desc === 'lists' ? 'È fra i siti di pubblicità e tracciamento che Filo blocca.' : 'È nella tua lista dei siti bloccati.',
+        offline: false,
+        blocked: true,
+      };
+    }
     const known = KNOWN[String(code)];
     if (known) return { title: known.title, hint: (altroPaese && known.hintAltroPaese) || known.hint, offline: !!known.offline };
     // Ripiego sulla descrizione simbolica quando il codice non è mappato ma la
@@ -140,7 +157,9 @@
   global.SN_NET_ERROR = {
     ERROR_PAGE_URL,
     CRASH_CODE,
+    BLOCKED_CODE,
     isErrorPageUrl,
+    isBlockedPageUrl,
     isRetriableTarget,
     buildUrl,
     parse,

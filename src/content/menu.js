@@ -27,6 +27,12 @@
     return document.fullscreenElement || document.documentElement;
   }
 
+  // Ogni pezzo entra nel documento del sito già chiuso ai gesti finti, nodo per nodo (#589.8).
+  function monta(el) {
+    global.SN_FILO_UI?.soloGestiVeri(el);
+    return menuHost().appendChild(el);
+  }
+
   let activeMenu = null;
 
   function close() {
@@ -34,7 +40,7 @@
     clearSubCloseTimer();
     if (activeMenu) {
       activeMenu.root.remove();
-      try { activeMenu.subRoot?.remove(); } catch (_) {}
+      staccaSub();
       document.removeEventListener('mousedown', activeMenu.onDocClick, true);
       document.removeEventListener('keydown', activeMenu.onKey, true);
       window.removeEventListener('scroll', activeMenu.onScroll, true);
@@ -47,10 +53,23 @@
     dropZones.length = 0;
   }
 
+  // La cronologia degli appunti non sta nel documento ma dentro un host suo (`subHost`): si stacca quello.
+  function staccaSub() {
+    if (!activeMenu) return;
+    try { (activeMenu.subHost || activeMenu.subRoot)?.remove(); } catch (_) {}
+    activeMenu.subRoot = null;
+    activeMenu.subHost = null;
+  }
+
+  // Gli eventi di dentro uno shadow root arrivano al documento col suo host come bersaglio.
+  function nelSub(t) {
+    const s = activeMenu && (activeMenu.subHost || activeMenu.subRoot);
+    return !!(s && t && s.contains(t));
+  }
+
   function closeSubmenu() {
     if (!activeMenu?.subRoot) return;
-    activeMenu.subRoot.remove();
-    activeMenu.subRoot = null;
+    staccaSub();
     activeMenu.subAnchor = null;
     activeMenu.subMode = null;
     activeMenu.subLocked = false;
@@ -215,6 +234,7 @@
     // cammina sulla pagina (la traduzione) la salta senza doverla indovinare
     // dal nome. In pieno schermo il menu finisce DENTRO l'elemento del sito.
     global.SN_FILO_UI?.mark(root);
+    global.SN_FILO_UI?.soloGestiVeri(root);
     root.setAttribute('role', 'menu');
     root.dataset.snTheme = document.documentElement.dataset.snTheme || '';
 
@@ -449,7 +469,7 @@
       root.appendChild(el);
     }
 
-    menuHost().appendChild(root);
+    monta(root);
 
     // #405 — su una pagina con riquadri incorporati il menu può nascere dentro
     // il riquadro o fuori, e i clic non attraversano quel confine: chi ha un
@@ -495,7 +515,7 @@
 
     const onDocClick = (e) => {
       if (root.contains(e.target)) return;
-      if (activeMenu?.subRoot && activeMenu.subRoot.contains(e.target)) return;
+      if (nelSub(e.target)) return;
       close();
     };
     const onKey = (e) => {
@@ -524,7 +544,7 @@
           repositionSub();
           return;
         }
-        if (activeMenu?.subRoot && activeMenu.subRoot.contains(t)) return;
+        if (nelSub(t)) return;
       }
       if (keepOnScroll) return;
       close();
@@ -550,7 +570,7 @@
 
     activeMenu = {
       root, onDocClick, onKey, onScroll, onResize, cleanupZoom, cleanups,
-      subRoot: null, subAnchor: null, subMode: null,
+      subRoot: null, subHost: null, subAnchor: null, subMode: null,
     };
   }
 
@@ -601,18 +621,17 @@
       setupArrowSubmenu(arrow, () => openGenericSubmenu(arrow, props.subItems || []), cleanups);
       wrap.appendChild(arrow);
     }
+    global.SN_FILO_UI?.soloGestiVeri(wrap);
   }
 
   // Sotto-menu generico (lista di {label, onClick}). Si ancora a `anchorEl`.
   function openGenericSubmenu(anchorEl, items) {
     if (!activeMenu) return;
-    if (activeMenu.subRoot) {
-      activeMenu.subRoot.remove();
-      activeMenu.subRoot = null;
-    }
+    if (activeMenu.subRoot) staccaSub();
     const sub = document.createElement('div');
     sub.className = 'sn-menu sn-menu-sub';
     global.SN_FILO_UI?.mark(sub);
+    global.SN_FILO_UI?.soloGestiVeri(sub);
     sub.dataset.snTheme = document.documentElement.dataset.snTheme || '';
 
     if (!items || items.length === 0) {
@@ -657,7 +676,7 @@
       }
     }
 
-    menuHost().appendChild(sub);
+    monta(sub);
     const cleanupZoom = (global.SN_POPUP?.attachZoomCompensation || (() => () => {}))(sub);
     activeMenu.cleanups.push(cleanupZoom);
     activeMenu.subRoot = sub;
@@ -668,6 +687,63 @@
     attachSubmenuHover(sub);
   }
 
+  // La cronologia degli appunti arriva da altri siti e da altre app, password comprese: nel documento del sito
+  // entra solo un host vuoto, il pannello sta in uno shadow root chiuso che lo script della pagina non
+  // attraversa (#589.8). I fogli di stile del documento lì dentro non arrivano: si portano i nostri.
+  const HOST_CHIUSO = 'all:initial!important;display:block!important;position:fixed!important;'
+    + 'top:0!important;left:0!important;width:0!important;height:0!important;z-index:2147483646!important;';
+  // Un font chiamato per nome il sito lo ridefinisce col suo, e dai pezzi che il browser carica sa quali caratteri
+  // ha disegnato il pannello (#589.8): sui siti solo famiglie generiche, che nessun @font-face rimpiazza.
+  const PAGINA_DI_FILO = (() => { try { return location.protocol === 'filo:'; } catch (_) { return false; } })();
+  const FONT_SOLO_GENERICO = '\n.sn-menu, .sn-menu *, .sn-menu ::before, .sn-menu ::after, .sn-menu ::placeholder'
+    + ' { font-family: system-ui, sans-serif !important; }\n';
+  let fogli = null;
+  function fogliDelMenu() {
+    if (fogli) return fogli;
+    let testo = '';
+    try {
+      const fs = require('node:fs');
+      const path = require('node:path');
+      testo = ['theme.css', 'menu.css']
+        .map((f) => fs.readFileSync(path.join(__dirname, '..', 'styles', f), 'utf8')).join('\n');
+    } catch (_) {}
+    if (!PAGINA_DI_FILO) testo += FONT_SOLO_GENERICO;
+    const foglio = new CSSStyleSheet();
+    try { foglio.replaceSync(testo); } catch (_) {}
+    fogli = [foglio];
+    return fogli;
+  }
+  function pannelloChiuso(contenuto) {
+    const host = document.createElement('div');
+    global.SN_FILO_UI?.mark(host);
+    host.style.cssText = HOST_CHIUSO;
+    const ombra = host.attachShadow({ mode: 'closed' });
+    try { ombra.adoptedStyleSheets = fogliDelMenu(); } catch (_) {}
+    ombra.appendChild(contenuto);
+    return host;
+  }
+
+  // Il testo di una voce della cronologia (password e testi di altri siti) non diventa MAI un nodo di testo nel
+  // documento del sito: la ricerca del browser (window.find) attraversa anche lo shadow chiuso e leggerebbe un
+  // nodo lettera per lettera (#589.8). Lo rendiamo come contenuto generato da una proprietà posata sull'elemento
+  // dentro lo shadow chiuso — glifi, non testo cercabile — e il nome accessibile sta in un attributo, che la
+  // ricerca non trova e che il sito non legge oltre il confine dello shadow chiuso.
+  function cssString(s) {
+    let out = '"';
+    for (const ch of String(s)) {
+      const c = ch.codePointAt(0);
+      if (ch === '"' || ch === '\\') out += '\\' + ch;
+      else if (c < 0x20 || c === 0x7f) out += '\\' + c.toString(16) + ' ';
+      else out += ch;
+    }
+    return out + '"';
+  }
+  function testoNascosto(labelEl, btnEl, s) {
+    labelEl.classList.add('sn-menu-gentesto');
+    labelEl.style.setProperty('--sn-gentesto', cssString(s));
+    if (btnEl) btnEl.setAttribute('aria-label', s);
+  }
+
   // Sotto-menu cronologia incolla. Si ancora alla freccetta.
   // `handlers` può essere una funzione (retrocompat: solo onPick) o un oggetto
   // { onPick, onRemove, onClear }.
@@ -676,13 +752,10 @@
     const onRemove = handlers && typeof handlers === 'object' ? handlers.onRemove : null;
     const onClear = handlers && typeof handlers === 'object' ? handlers.onClear : null;
     if (!activeMenu) return;
-    if (activeMenu.subRoot) {
-      activeMenu.subRoot.remove();
-      activeMenu.subRoot = null;
-    }
+    if (activeMenu.subRoot) staccaSub();
     const sub = document.createElement('div');
     sub.className = 'sn-menu sn-menu-sub';
-    global.SN_FILO_UI?.mark(sub);
+    global.SN_FILO_UI?.soloGestiVeri(sub);
     sub.dataset.snTheme = document.documentElement.dataset.snTheme || '';
 
     if (!entries || entries.length === 0) {
@@ -781,14 +854,14 @@
           else icon.textContent = '🖼';
           const desc = document.createElement('span');
           desc.className = 'sn-menu-label';
-          desc.textContent = entry.description || 'Immagine';
+          testoNascosto(desc, b, entry.description || 'Immagine');
           b.appendChild(icon);
           b.appendChild(desc);
         } else {
           const lbl = document.createElement('span');
           lbl.className = 'sn-menu-label';
           const text = (entry.text || '').replace(/\s+/g, ' ').trim();
-          lbl.textContent = text.length > 40 ? text.slice(0, 40) + '…' : text;
+          testoNascosto(lbl, b, text.length > 40 ? text.slice(0, 40) + '…' : text);
           b.appendChild(lbl);
         }
         b.addEventListener('click', () => {
@@ -871,11 +944,13 @@
       setTimeout(() => { try { input.focus({ preventScroll: true }); } catch (_) {} }, 0);
     }
 
-    menuHost().appendChild(sub);
+    const host = pannelloChiuso(sub);
+    monta(host);
     // Compensazione zoom anche per il sub-menu
     const cleanupZoom = (global.SN_POPUP?.attachZoomCompensation || (() => () => {}))(sub);
     activeMenu.cleanups.push(cleanupZoom);
     activeMenu.subRoot = sub;
+    activeMenu.subHost = host;
 
     // Posizionamento: la cronologia incolla deve apparire ATTACCATA al box
     // principale (feedback alpha: "il sotto menu compare separato dal box
@@ -897,14 +972,14 @@
   function openIconGridSubmenu(anchorEl, items, opts = {}) {
     if (!activeMenu) return;
     if (activeMenu.subRoot) {
-      activeMenu.subRoot.remove();
-      activeMenu.subRoot = null;
+      staccaSub();
       return;
     }
     const cols = opts.cols || 4;
     const sub = document.createElement('div');
     sub.className = 'sn-menu sn-menu-sub sn-menu-icon-grid';
     global.SN_FILO_UI?.mark(sub);
+    global.SN_FILO_UI?.soloGestiVeri(sub);
     sub.dataset.snTheme = document.documentElement.dataset.snTheme || '';
     sub.style.setProperty('--sn-icon-cols', String(cols));
     if (opts.dropTarget) sub.dataset.snDropTarget = opts.dropTarget;
@@ -912,7 +987,7 @@
     populateGrid(sub, items, { dropTarget: opts.dropTarget });
     if (opts.dropTarget) attachDropZone(sub, { target: opts.dropTarget, onDrop: opts.onDrop });
 
-    menuHost().appendChild(sub);
+    monta(sub);
     const cleanupZoom = (global.SN_POPUP?.attachZoomCompensation || (() => () => {}))(sub);
     activeMenu.cleanups.push(cleanupZoom);
     activeMenu.subRoot = sub;
@@ -936,7 +1011,7 @@
     tooltipEl.className = 'sn-tooltip';
     global.SN_FILO_UI?.mark(tooltipEl);
     tooltipEl.style.display = 'none';
-    menuHost().appendChild(tooltipEl);
+    monta(tooltipEl);
     return tooltipEl;
   }
   function showTooltip(target, text) {
@@ -985,6 +1060,10 @@
   // Costruzione bottoni della riga icone / griglia secondaria (estratti per
   // poter rigenerare in-place dopo un drag senza chiudere il menu).
   // ============================================================================
+  // Chi apre un pannello sostando sopra durante un trascinamento: chiamato da qui, perché un clic
+  // fabbricato da codice non passerebbe da `soloGestiVeri`.
+  const apritori = new WeakMap();
+
   function makeRowButton(sub, opts = {}) {
     const b = document.createElement('button');
     b.type = 'button';
@@ -1027,8 +1106,7 @@
         clearSubCloseTimer();
         subCloseTimer = setTimeout(() => closeSubmenu(), 500);
       });
-      b.addEventListener('click', (e) => {
-        e.stopPropagation();
+      const apriFermo = () => {
         clearSubCloseTimer();
         if (activeMenu?.subRoot && activeMenu.subOwner === b) {
           activeMenu.subLocked = true;
@@ -1037,6 +1115,11 @@
           openOverflow();
           if (activeMenu) activeMenu.subLocked = true;
         }
+      };
+      apritori.set(b, apriFermo);
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        apriFermo();
       });
     } else {
       b.addEventListener('click', () => {
@@ -1054,6 +1137,7 @@
     row.innerHTML = '';
     row.__snRowOpts = opts;
     for (const sub of items) row.appendChild(makeRowButton(sub, opts));
+    global.SN_FILO_UI?.soloGestiVeri(row);
   }
 
   function makeGridButton(it, opts = {}) {
@@ -1087,6 +1171,7 @@
     } else {
       for (const it of items) sub.appendChild(makeGridButton(it, opts));
     }
+    global.SN_FILO_UI?.soloGestiVeri(sub);
   }
 
   // Aggiorna in-place i bottoni della riga primaria (senza chiudere il menu).
@@ -1104,7 +1189,7 @@
   }
 
   function isSubMenuOpen() {
-    return !!(activeMenu && activeMenu.subRoot && document.documentElement.contains(activeMenu.subRoot));
+    return !!(activeMenu && activeMenu.subRoot && activeMenu.subRoot.isConnected);
   }
 
   // ============================================================================
@@ -1155,7 +1240,7 @@
         const r = el.getBoundingClientRect();
         preview.style.width = r.width + 'px';
         preview.style.height = r.height + 'px';
-        menuHost().appendChild(preview);
+        monta(preview);
         updatePreview(x, y);
       };
 
@@ -1172,13 +1257,14 @@
         if (opener && !isSubMenuOpen()) {
           hoverOpenTimer = setTimeout(() => {
             if (lastHoverOpener === opener && !isSubMenuOpen()) {
-              try { opener.click(); } catch (_) {}
+              try { apritori.get(opener)?.(); } catch (_) {}
             }
           }, HOVER_OPEN_DELAY);
         }
       };
 
       const onMove = (e) => {
+        if (!e.isTrusted) return;
         if (!dragging) {
           if (Math.hypot(e.clientX - startX, e.clientY - startY) < THRESHOLD) return;
           startDrag(e.clientX, e.clientY);
@@ -1200,6 +1286,7 @@
       };
 
       const onUp = (e) => {
+        if (!e.isTrusted) return;
         if (!dragging) { cleanup(); return; }
         const zone = findZoneAt(e.clientX, e.clientY);
         cleanup();
@@ -1252,7 +1339,41 @@
     return null;
   }
 
+  // Per gli spec: lo shadow root chiuso della cronologia non lo attraversa nessun locator. Sui siti SN_MENU
+  // vive nel mondo isolato dei content script, quindi la pagina da qui non passa.
+  function statoCronologia() {
+    const sub = activeMenu && activeMenu.subHost ? activeMenu.subRoot : null;
+    if (!sub || !sub.isConnected) return null;
+    const visibile = (el) => !!el && el.getClientRects().length > 0;
+    const centro = (el) => {
+      if (!visibile(el)) return null;
+      const r = el.getBoundingClientRect();
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    };
+    const r = sub.getBoundingClientRect();
+    const lista = sub.querySelector('.sn-menu-history-list');
+    const cerca = sub.querySelector('.sn-menu-history-search-input');
+    return {
+      voci: [...sub.querySelectorAll('.sn-menu-history-item')].filter(visibile).map((riga) => ({
+        testo: riga.querySelector('.sn-menu-history-paste')?.getAttribute('aria-label') || '',
+        incolla: centro(riga.querySelector('.sn-menu-history-paste')),
+        rimuovi: centro(riga.querySelector('.sn-menu-history-remove')),
+      })),
+      vuoto: [...sub.querySelectorAll('.sn-menu-empty')].filter(visibile).map((e) => e.textContent).join(' '),
+      cerca: cerca ? {
+        centro: centro(cerca), valore: cerca.value, segnaposto: cerca.placeholder, fuoco: sub.getRootNode().activeElement === cerca,
+      } : null,
+      svuota: centro(sub.querySelector('.sn-menu-history-clear-btn')),
+      riquadro: { left: r.left, top: r.top, right: r.right, bottom: r.bottom },
+      lista: lista ? {
+        centro: centro(lista), scrollTop: lista.scrollTop, scrollHeight: lista.scrollHeight, clientHeight: lista.clientHeight,
+      } : null,
+      sfondo: getComputedStyle(sub).backgroundColor,
+    };
+  }
+
   global.SN_MENU = {
+    _test: { cronologia: statoCronologia },
     open,
     close,
     computeCap: Place.computeCap,
@@ -1263,6 +1384,7 @@
     refreshIconRow,
     refreshIconGrid,
     isSubMenuOpen,
+    testoNascosto,
     // C'è un menu aperto adesso? Lo chiede content.js per decidere di chi è
     // l'Esc quando si è a tutto schermo (#514).
     isOpen: () => !!activeMenu,

@@ -106,7 +106,8 @@ test('un’impostazione applicata subito torna al modello come applicata, non co
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Tema scuro attivo.' })).toBeVisible({ timeout: 20_000 });
   const tool = await app.evaluate(() => globalThis.__captured[1].messages.filter((m) => m.role === 'tool').pop());
   expect(tool.tool_call_id).toBe('p1');
-  expect(tool.content).toMatch(/^Eseguita: Impostazione applicata: Tema → Scuro\.$/);
+  // Dopo il fatto, come si torna indietro (#949).
+  expect(tool.content).toMatch(/^Eseguita: Impostazione applicata: Tema → Scuro\. .*«annulla»/);
   expect(tool.content).not.toMatch(/vuole/);
   expect(tool.content).not.toMatch(/\.\./);
 });
