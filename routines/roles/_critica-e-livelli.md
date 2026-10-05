@@ -154,9 +154,14 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
   comando e ripete il numero davanti a ogni rilievo). Esce solo una prova che nel
   nome porta soli numeri di rilievi messi da parte, scritta o rinominata in
   questa verifica; a una che copre anche un rilievo da correggere togli solo il
-  caso dei messi da parte. Da quel commit una prova rossa tolta ferma la
-  consegna, e una a cui hai tolto un caso si rilancia: quello che resta, se è
-  rosso, la ferma. Se la risposta dice che il lavoro passa, le togli seguendola.
+  caso dei messi da parte. Un file di supporto (un aiuto, una pagina) non è una
+  prova: se ne togli righe, la registrazione rilancia le prove che lo usano.
+  Prima di registrare `--record-pulizia` rilancia le prove a cui hai tolto un
+  caso o un aiuto, sul codice della critica: un caso rosso diventato verde, o
+  una prova senza più un rosso, la respinge (può durare qualche minuto: lanciala
+  in sottofondo). Da quel commit una prova rossa tolta ferma la consegna, e una
+  a cui hai tolto un caso si rilancia: quello che resta, se è rosso, la ferma.
+  Se la risposta dice che il lavoro passa, le togli seguendola.
 - **Prima di registrare porta la directory a un commit**
   (`git add -A && git commit -m "verifica #<numero> giro <k>: prove"`): il
   salvataggio automatico parte solo da un Edit o da un Write, non da un `rm` o
