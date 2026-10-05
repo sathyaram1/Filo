@@ -162,6 +162,7 @@ const INDIRIZZI = {
   'cards.scryfall.io': { frase: 'Cambi valuta e carte Magic' },
   'filo.red': { frase: 'Se apri un link d\'invito sul sito di Filo' },
   'app.tavily.com': { perche: 'un link nelle Opzioni, che apri tu' },
+  'scryfall.com': { perche: 'una scheda che apri tu dal tasto destro su una lista del deck builder, con la stessa ricerca che va già ad api.scryfall.com' },
   'filo.local': { perche: 'l\'intestazione con cui OpenRouter sa chi chiama: nessuno lo contatta' },
   'singolarita.com': { perche: 'il contatto scritto nell\'intestazione verso Scryfall: nessuno lo contatta' },
   'filo.app': { perche: 'un esempio in un commento' },

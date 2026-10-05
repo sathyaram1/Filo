@@ -10,6 +10,9 @@
 
   function str(v) { return typeof v === 'string' ? v : ''; }
 
+  // Ordinamenti di una lista della chat; il primo è il default (§3.4), e non si salva.
+  const SORTS = ['cmc', 'name', 'price'];
+
   function idList(v) {
     return Array.isArray(v) ? v.filter((x) => typeof x === 'string' && x) : [];
   }
@@ -67,6 +70,10 @@
     if (unchecked.length) out.uncheckedIds = unchecked;
     const query = str(m.query);
     if (query) out.query = query;
+    // Titolo e ordinamento della lista (#788) sono della lista come le sue carte: riaprendo la chat restano.
+    const title = str(m.title).replace(/\s+/g, ' ').trim();
+    if (title && cardIds.length) out.title = title;
+    if (cardIds.length && SORTS.includes(m.sort) && m.sort !== SORTS[0]) out.sort = m.sort;
     const qty = qtyMap(m.importQty);
     if (qty) out.importQty = qty;
     const cmd = str(m.importCommanderId);
@@ -129,6 +136,14 @@
       cur.splice(from, i - from + 1);
       return { list: cur };
     }
+    if (c.op === 'sort') {
+      const i = turnIndex(cur, str(c.turn));
+      if (i < 0) return { error: 'gone' };
+      if (!SORTS.includes(c.sort)) return { error: 'bad_sort' };
+      const { sort, ...rest } = cur[i];
+      cur[i] = cleanMessage({ ...rest, sort: c.sort });
+      return { list: cur };
+    }
     if (c.op === 'names') {
       const i = turnIndex(cur, str(c.turn));
       if (i < 0) return { error: 'gone' };
@@ -137,6 +152,39 @@
       return { list: cur };
     }
     return { error: 'bad_op' };
+  }
+
+  // Le carte di una lista nell'ordine scelto. Stabile: a pari valore resta l'ordine della ricerca; una carta senza
+  // prezzo va in fondo, non in testa come se fosse gratis.
+  function sortIds(ids, cardsById, sort) {
+    const by = cardsById || {};
+    const list = idList(ids);
+    if (sort === 'name') {
+      const name = (id) => str(by[id] && by[id].name) || id;
+      return list.sort((a, b) => name(a).localeCompare(name(b), 'it', { sensitivity: 'base' }));
+    }
+    if (sort === 'price') {
+      const price = (id) => {
+        const p = by[id] && by[id].priceEur;
+        return typeof p === 'number' && Number.isFinite(p) ? p : Infinity;
+      };
+      return list.sort((a, b) => (price(a) === price(b) ? 0 : price(a) - price(b)));
+    }
+    const cmc = (id) => Number(by[id] && by[id].cmc) || 0;
+    return list.sort((a, b) => cmc(a) - cmc(b));
+  }
+
+  // La riga di sintesi di una lista: il numero e la frase del modello, o il ripiego. Mai la query (#788).
+  // Il titolo si legge dopo il numero: il suo numero davanti si toglie, e la maiuscola di un titolo («Carte che…»)
+  // scende, salvo una parola che non è tutta minuscola dopo l'iniziale o un nome di due parole maiuscole (Sol Ring).
+  function listLabel(n, title) {
+    const count = Math.max(0, Math.floor(Number(n)) || 0);
+    let what = str(title).replace(/^\d+\s+(?=\S)/, '').trim();
+    if (/^\p{Lu}\p{Ll}*(?=[\s,:;.!?]|$)/u.test(what) && !/^\S+\s+\p{Lu}/u.test(what)) {
+      what = what.charAt(0).toLowerCase() + what.slice(1);
+    }
+    if (!what) return `${count} risultat${count === 1 ? 'o' : 'i'}`;
+    return count === 1 ? `1 risultato: ${what}` : `${count} ${what}`;
   }
 
   // Lo storico per il modello: domande e risposte scritte, niente bolle d'errore o interrotte.
@@ -163,5 +211,7 @@
     return [...seen];
   }
 
-  global.SN_DECK_CHAT = { MAX_MESSAGES, cleanMessage, cleanChat, fits, forReading, applyEdit, historyFor, cardIdsOf };
+  global.SN_DECK_CHAT = {
+    MAX_MESSAGES, SORTS, cleanMessage, cleanChat, fits, forReading, applyEdit, historyFor, cardIdsOf, sortIds, listLabel,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

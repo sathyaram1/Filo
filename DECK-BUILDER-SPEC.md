@@ -51,7 +51,8 @@ I messaggi non sono testo: sono **contenuto tipizzato**. Una bolla può contener
 ### 3.3 Gestione dello scroll
 
 - **Ultima bolla**: `CardList` mostra ~10 righe con scroll interno.
-- **Bolle precedenti**: elenchi carte **sempre collassati** a una riga di sintesi ("12 risultati per 'payoff self-mill'"), riespandibili al click. La cronologia resta scorrevole rapidamente.
+- **Bolle precedenti**: elenchi carte **collassati** a ogni domanda nuova, a una riga di sintesi riespandibile al click. La cronologia resta scorrevole rapidamente.
+- **Riga di sintesi** (#788): numero più titolo in italiano che il modello scrive nella stessa risposta ("12 carte che danno rapidità"); senza titolo "12 risultati", mai la query. Il triangolino apre e chiude ogni lista, anche l'ultima. Tasto destro: ricerca esatta copiabile, ordinamento della lista (CMC default, nome, prezzo; salvato con la lista), stessa ricerca su Scryfall.
 
 ### 3.4 Righe carta (in `CardList`)
 
