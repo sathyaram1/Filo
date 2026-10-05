@@ -2,7 +2,7 @@
 // Senza: embed YouTube verso youtube.com coi cookie, tracker liberi, nessun segnale di non-tracciamento.
 // La regola in logica pura sta in tests/unit/cookieSessioniProtette.test.mjs.
 
-import { test, expect } from '../../fixtures/electron.mjs';
+import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
