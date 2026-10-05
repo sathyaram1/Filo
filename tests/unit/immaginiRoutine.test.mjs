@@ -50,7 +50,9 @@ test('la consegna scrive ogni immagine aperta in un file, byte per byte, e nel p
     assert.ok(readFileSync(v.file).equals(byte), `${v.id}: byte uguali`);
     assert.equal(dirname(v.file), cartellaConsegna(ROOT, BASE), 'stessa cartella dei testi lunghi');
   }
-  assert.deepEqual({ ...s1, file: undefined }, { ...entrata.immagini[0], base64: undefined, file: undefined });
+  const { file: _f, ...s1SenzaFile } = s1;
+  const { base64: _b, ...s1Entrata } = entrata.immagini[0];
+  assert.deepEqual(s1SenzaFile, s1Entrata, 'gli altri campi restano');
   assert.equal(r11.risposta, 1);
   assert.deepEqual(s2, entrata.immagini[1], 'la fallita resta col suo motivo');
   assert.deepEqual(s3, entrata.immagini[2], 'la rinviata resta da chiedere');
