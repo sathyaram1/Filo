@@ -175,7 +175,12 @@ function isWebUnsafeNav(rawUrl) {
   try { proto = new URL(String(rawUrl || '')).protocol.toLowerCase(); } catch (_) { return false; }
   // URL relativo/non parsabile → Electron lo risolve sull'origine corrente
   // (stessa pagina web): non è un cambio di schema, non bloccare.
-  return proto ? !WEB_NAV_SCHEMES.has(proto) : false;
+  if (!proto) return false;
+  // `filo://invito/…` non è una pagina (#664): in una scheda diventava un
+  // indirizzo interno che non esiste, e la pagina dell'invito spariva. Lo
+  // portano dentro il sistema e il clic vero (page-preload.js); il resto si ferma.
+  if (globalThis.SN_WALLET?.isInviteDeepLink?.(rawUrl)) return true;
+  return !WEB_NAV_SCHEMES.has(proto);
 }
 
 // Schemi "azione del sistema operativo": NON sono pagine web (quindi bloccati da
