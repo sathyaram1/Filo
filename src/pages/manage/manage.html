@@ -27,6 +27,7 @@
   <script src="filo://shared/feedbackStatus.js"></script>
   <script src="filo://shared/feedbackThread.js"></script>
   <script src="filo://shared/manageReview.js"></script>
+  <script src="filo://shared/filoMarkdown.js"></script>
   <!-- #496 — va DOPO feedbackThread e manageReview: da lì prende la categoria d'autore e lo stato
        normalizzato, e se mancano si ferma dicendolo. -->
   <script src="filo://shared/feedbackStats.js"></script>
@@ -844,7 +845,8 @@
       padding: 10px 12px; border-radius: 12px;
       border: 1px solid var(--sn-border);
       background: var(--sn-bg, transparent);
-      max-width: 100%;
+      /* border-box: col margine interno fuori dal tetto, un blocco di codice largo faceva scorrere di lato la conversazione. */
+      max-width: 100%; box-sizing: border-box;
     }
     .mg-bubble--user { align-self: flex-end; border-bottom-right-radius: 4px; }
     .mg-bubble--model {
@@ -857,7 +859,7 @@
     .mg-bubble-body {
       font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word;
     }
-    .mg-bubble-body em { color: var(--sn-muted); font-style: italic; }
+    .mg-bubble-body > em { color: var(--sn-muted); font-style: italic; }
     .mg-bubble-imgs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
     .mg-bubble-imgs img {
       max-width: 200px; max-height: 200px; border-radius: 6px;
@@ -954,13 +956,6 @@
       font-size: 13px; line-height: 1.6; white-space: pre-wrap;
       word-break: break-word; color: var(--sn-text);
     }
-    .mg-liv-testo em { color: var(--sn-muted); font-style: italic; }
-    /* Markdown in arrivo: titoli e voci a trattino si vedono come tali, il resto è testo. Niente HTML dal testo. */
-    .mg-liv-titolo { font-weight: 600; margin: 10px 0 4px; }
-    .mg-liv-titolo:first-child { margin-top: 0; }
-    .mg-liv-par { margin: 0 0 6px; }
-    .mg-liv-elenco { margin: 0 0 6px 18px; padding: 0; }
-    .mg-liv-elenco li { margin: 2px 0; }
     /* Il tasto che scavalca l'audit è un'eccezione, non un'azione di tutti i giorni: si arma con un secondo clic,
        come l'approvazione di una fusione, perché il primo non basti. */
     .mg-liv-azioni { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }

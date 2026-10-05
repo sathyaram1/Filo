@@ -359,6 +359,87 @@ test('fermo su una scelta dell’owner: sta fra i Ricevuti con la casella di ris
   await expect(page.locator('#mgSideBody')).toContainText('Due strade con costi diversi');
 });
 
+test('nel rombo, nel pentagono e nella conversazione il markdown della segnalazione si legge formattato, non come simboli; l’HTML resta testo', async ({ openTab }) => {
+  // «**A.**» è la forma che il modello della segnalazione prescrive per le scelte (#703).
+  const SEGNALAZIONE = '## Problema\nIl nome del file salvato: dal sito o chiesto ogni volta?\n\n## Scelte\n- **A.** Dal sito: zero attrito.\n- **B.** Chiesto: un passaggio in più.\n\n## Cosa ho fatto nel frattempo\nHo preso la **A.**, la *meno* invasiva. <b>finto</b> <img src=x onerror="window.__xss=1">\n1. Primo passo.\n2. Secondo passo.';
+  const fb = {
+    _id: 'fb-livelli-grassetto', text: 'Il download non tiene il nome del file.', name: 'Nome del file',
+    seq: 704, subSeq: 0, status: 'design', statusReason: 'decisione', branch: 'worker/fb-livelli-grassetto',
+    clientId: 'user:abc', createdAt: '2026-09-22T10:00:00Z', images: [],
+    notes: `Ho fatto A.\n\nSegnalazione per l'owner (chi verifica):\n${SEGNALAZIONE}`,
+    livelli: {
+      l3: { esito: 'segnalato', ruolo: 'verifier', at: '2026-09-22T10:05:00Z', testo: SEGNALAZIONE },
+      l4: { esito: 'pass', at: '2026-09-22T11:00:00Z', testo: '## Problema\nNessuno: il controllo `salvaDownload` resta **dentro** la pagina.' },
+    },
+  };
+  const page = await openTab(MANAGE);
+  await apri(page, [fb]);
+  await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
+
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l3"]').click();
+  const corpo = page.locator('#mgSideBody');
+  await expect(corpo.locator('.mg-liv-testo ul li')).toHaveText(['A. Dal sito: zero attrito.', 'B. Chiesto: un passaggio in più.']);
+  await expect(corpo.locator('.mg-liv-testo ul li strong')).toHaveText(['A.', 'B.']);
+  expect(await corpo.locator('.mg-liv-testo ul li strong').first().evaluate((e) => Number(getComputedStyle(e).fontWeight))).toBeGreaterThanOrEqual(600);
+  await expect(corpo).not.toContainText('**');
+  await expect(corpo.locator('.mg-liv-testo p strong')).toHaveText('A.');
+  await expect(corpo.locator('.mg-liv-testo em')).toHaveText('meno');
+  await expect(corpo).not.toContainText('*meno*');
+  // Un elenco numerato tiene i numeri: una scelta citata per numero si ritrova.
+  await expect(corpo.locator('.mg-liv-testo ol li')).toHaveText(['Primo passo.', 'Secondo passo.']);
+  await expect(corpo).toContainText('<b>finto</b> <img src=x');
+  expect(await corpo.locator('b, img').count()).toBe(0);
+  expect(await page.evaluate(() => window.__xss)).toBeUndefined();
+  for (const tema of ['dark', 'light']) {
+    await page.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), tema);
+    await page.locator('#mgSide').screenshot({ path: `tests/.shots/livelli-rombo-grassetto-${tema}.png` });
+  }
+
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l4"]').click();
+  await expect(corpo.locator('.mg-liv-testo code')).toHaveText('salvaDownload');
+  await expect(corpo.locator('.mg-liv-testo strong')).toHaveText('dentro');
+  await expect(corpo).not.toContainText('`');
+  await page.locator('#mgSide').screenshot({ path: 'tests/.shots/livelli-pentagono-codice-light.png' });
+
+  // La stessa segnalazione nella conversazione della pratica, il primo testo che l'owner legge.
+  const turno = page.locator('#mgThread .mg-bubble--model', { hasText: 'Segnalazione per l' });
+  await expect(turno.locator('ul li strong')).toHaveText(['A.', 'B.']);
+  await expect(turno.locator('h4')).toHaveText(['Problema', 'Scelte', 'Cosa ho fatto nel frattempo']);
+  await expect(turno).not.toContainText('**A.**');
+  await expect(turno).not.toContainText('## ');
+  await expect(turno).toContainText('<b>finto</b>');
+  expect(await page.locator('#mgThread').locator('b, img:not(.mg-img-loading)').count()).toBe(0);
+  expect(await page.evaluate(() => window.__xss)).toBeUndefined();
+});
+
+test('le scelte numerate staccate da righe vuote tengono 1, 2, 3 nel rombo e nella pratica; un blocco di codice non fa scorrere di lato la conversazione', async ({ openTab }) => {
+  const SCELTE = '## Scelte\n1. **Dal sito**: zero attrito.\n\n2. **Chiesto**: un passaggio in più.\n\n3. **Misto**: chiesto solo la prima volta.';
+  const fb = {
+    _id: 'fb-livelli-numeri', text: 'Il download non tiene il nome del file.', name: 'Nome del file',
+    seq: 705, subSeq: 0, status: 'design', statusReason: 'decisione', branch: 'worker/fb-livelli-numeri',
+    clientId: 'user:abc', createdAt: '2026-09-22T10:00:00Z', images: [],
+    notes: `Ho fatto A.\n\nSegnalazione per l'owner (chi verifica):\n${SCELTE}\n\n\`\`\`\nconst nome = "${'x'.repeat(200)}";\n\`\`\``,
+    livelli: { l3: { esito: 'segnalato', ruolo: 'verifier', at: '2026-09-22T10:05:00Z', testo: SCELTE } },
+  };
+  // Il numero che il lettore vede davanti a ogni voce.
+  const numeri = (loc) => loc.evaluateAll((els) => els.map((li) => (li.parentElement.start || 1) + [...li.parentElement.children].indexOf(li)));
+  const page = await openTab(MANAGE);
+  await apri(page, [fb]);
+  await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
+
+  const turno = page.locator('#mgThread .mg-bubble--model', { hasText: 'Segnalazione per l' });
+  await expect(turno.locator('ol li')).toHaveCount(3);
+  expect(await numeri(turno.locator('ol li'))).toEqual([1, 2, 3]);
+  await expect(turno.locator('pre')).toHaveCount(1);
+  const [largo, visibile] = await page.locator('#mgThread').evaluate((t) => [t.scrollWidth, t.clientWidth]);
+  expect(largo).toBeLessThanOrEqual(visibile);
+
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l3"]').click();
+  const voci = page.locator('#mgSideBody .mg-liv-testo ol li');
+  await expect(voci).toHaveCount(3);
+  expect(await numeri(voci)).toEqual([1, 2, 3]);
+});
+
 test('il pentagono verde dice cosa ha controllato l’audit, e non offre di saltarlo', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apri(page, [FB_COMPLETO]);

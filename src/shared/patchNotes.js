@@ -13,6 +13,7 @@
       features: [],
       fixes: [
         'Nelle Opzioni, se clicchi sul campo del modello prima che arrivi l\'elenco dei modelli, il menu a tendina si apre da solo appena l\'elenco c\'è. Prima restava chiuso e bisognava cliccare di nuovo.',
+        'Nelle risposte di Filo un elenco numerato con le voci staccate da una riga vuota tiene i suoi numeri: prima ogni voce ripartiva da 1.',
       ],
     },
     {

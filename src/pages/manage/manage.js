@@ -4447,7 +4447,8 @@
     for (const seg of TH.splitNotes(notes)) {
       const when = seg.ts ? ` — ${seg.ts}` : '';
       const who = seg.role === 'user' ? `Tu${when}` : `Filo (lavorazione${when})`;
-      appendBubble(seg.role === 'user' ? 'user' : 'model', who, esc(seg.body), seg.attachments);
+      const corpo = seg.role === 'user' ? esc(seg.body) : markdownHtml(seg.body);
+      appendBubble(seg.role === 'user' ? 'user' : 'model', who, corpo, seg.attachments);
     }
     appendFraseBubble(fb);
     // La copia che si sta leggendo è rimasta indietro e il tentativo di
@@ -4580,23 +4581,7 @@
       if (p.illeggibile) {
         t.textContent = MR.TESTO_CIFRATO;
       } else {
-        // Titoli e voci d'elenco del markdown resi come tali, il resto come
-        // testo: niente HTML dal testo (il modulo condiviso li riconosce).
-        let lista = null;
-        for (const r of MR.righeTesto(p.testo)) {
-          if (r.tipo === 'voce') {
-            if (!lista) { lista = document.createElement('ul'); lista.className = 'mg-liv-elenco'; t.appendChild(lista); }
-            const li = document.createElement('li');
-            li.textContent = r.testo;
-            lista.appendChild(li);
-            continue;
-          }
-          lista = null;
-          const el = document.createElement('div');
-          el.className = r.tipo === 'titolo' ? 'mg-liv-titolo' : 'mg-liv-par';
-          el.textContent = r.testo;
-          t.appendChild(el);
-        }
+        t.innerHTML = markdownHtml(p.testo);
       }
       body.appendChild(t);
     }
@@ -4607,6 +4592,13 @@
     openSidebar(p.titolo, '');
     mgSideBody.replaceChildren(body);
   }
+
+  // La segnalazione e i report sono il markdown di un modello: lo stesso formattatore delle risposte di Filo in
+  // chat, che toglie l'HTML prima di formattare. Senza il modulo resta testo.
+  function markdownHtml(testo) {
+    return window.SN_MARKDOWN ? `<div class="filo-md">${window.SN_MARKDOWN.render(testo)}</div>` : esc(testo);
+  }
+
 
   // Le card della fusione dentro il pannello del quadrato: stesso disegno e
   // stessi tasti dell'elenco in Automazioni, perché è la stessa cosa.
