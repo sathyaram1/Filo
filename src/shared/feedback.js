@@ -698,13 +698,16 @@
   // dashboard e a far risalire chi triagia all'originale.
   // `opts.idToken` (#595): solo il token admin. Create autenticata con `senderProof: 'admin'`;
   // token rifiutato (401/403) → si riparte anonimi e il risultato lo dice (`authRefused`).
+  // I nomi che valgono solo con la prova (gemello di RESERVED_SENDER_RE in feedbackThread.js).
+  const NOME_RISERVATO_RE = /^(owner|routine|agent|local):/i;
   async function submit({ text, url, title, userAgent, clientId, clientIdHash, images, files, name, parentId, capabilityGapId, submissionId }, opts = {}) {
     const idToken = (opts && typeof opts.idToken === 'string') ? opts.idToken : '';
     // #908: un lavoro locale nasce solo con la prova; da anonimo diventerebbe un feedback d'utente.
     const localOnly = (opts && opts.localOnly && typeof opts.localOnly === 'object') ? opts.localOnly : null;
     // `soloAdmin`: chi chiama vuole la prova o niente (lo script delle sessioni locali).
     const soloAdmin = !!((opts && opts.soloAdmin) || localOnly);
-    if (soloAdmin && !idToken) throw new Error('create senza token admin (401): questo feedback non parte da anonimo');
+    // `accessoOwner`: chi chiama distingue l'accesso che manca dalla rete che manca (la coda d'invio aspetta, non rinuncia).
+    if (soloAdmin && !idToken) throw Object.assign(new Error('create senza token admin (401): questo feedback non parte da anonimo'), { accessoOwner: true });
     // NIENTE PARTE SE NON SI PUÒ CIFRARE (#602). Il controllo sta QUI, prima di
     // qualunque caricamento e prima di creare il documento: così «non è partito
     // niente» è vero alla lettera, e non «è partito tutto tranne il testo».
@@ -870,27 +873,44 @@
           at: Math.round(Number(localOnly.at) || Date.now()),
         });
       }
+      // La priorità scelta da chi apre nasce col documento (#914): il server decide alla nascita se giudicarla,
+      // e una scritta dopo arriverebbe quando il giudice ha già scelto. Solo admin: il create anonimo non la ammette.
+      const prioritaScelta = opts && opts.priority;
+      if (Number.isInteger(prioritaScelta) && prioritaScelta >= 0 && prioritaScelta <= 3) {
+        doc.fields.priority = { stringValue: await maybeEncrypt(String(prioritaScelta)) };
+        doc.fields.priorityManual = { booleanValue: true };
+      }
       res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
         body: JSON.stringify(doc),
       });
-      if (soloAdmin && (res.status === 401 || res.status === 403)) {
-        throw new Error(`firestore create fallito (${res.status}): token admin rifiutato, e questo feedback non parte da anonimo`);
+      // #912: un nome riservato col token rifiutato non riparte da anonimo: sarebbe un utente che nessuno può dire suo.
+      if ((soloAdmin || NOME_RISERVATO_RE.test(String(clientId || ''))) && (res.status === 401 || res.status === 403)) {
+        throw Object.assign(new Error(`firestore create fallito (${res.status}): token admin rifiutato, e questo feedback non parte da anonimo`), { accessoOwner: true });
       }
       if (res.status === 401 || res.status === 403) {
         authRefused = res.status;
         delete doc.fields.senderProof;
+        delete doc.fields.priority;
+        delete doc.fields.priorityManual;
         res = null;
       } else {
         senderProof = 'admin';
       }
     }
-    if (!res) res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(doc),
-    });
+    if (!res) {
+      // #912: un nome riservato senza token è un utente, nello stesso spazio in cui lo mette il server
+      // (senderOf in feedbackThread.js).
+      if (NOME_RISERVATO_RE.test(String(clientId || ''))) {
+        doc.fields.clientId = toFsValue(await maybeEncrypt('non-provato:' + String(clientId)));
+      }
+      res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(doc),
+      });
+    }
     const riprova = () => fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

@@ -1,5 +1,5 @@
-// Il ripasso dei feedback passati (#595, #908): la prova del mittente a chi l'ha creato davvero (owner e sessioni per
-// epoca, routine solo con un segno che un falso non ha), e il segno locale ai lavori fusi in locale, fuori dalla bacheca.
+// Il ripasso dei feedback passati (#595, #908, #912): la prova del server alle routine solo con un segno che un falso
+// non ha, mai al solo nome; e il segno locale ai lavori fusi in locale, fuori dalla bacheca.
 // Testo e titolo non si decifrano; la conversazione solo delle pratiche chiuse senza ramo, per trovarlo, e non si stampa.
 // Regole: tests/unit/ripassoMittenti.test.mjs. Uso: npm run feedback:ripasso [-- --dry-run]
 
@@ -21,7 +21,6 @@ const MR = globalThis.SN_MANAGE_REVIEW;
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 export const VIA = Object.freeze({
-  EPOCA: 'nati prima che la prova esistesse',
   CAMPI: 'campi che solo il server scrive alla nascita',
   CODA_ID: 'coda di triage in git, per id',
   CODA_TITOLO: 'coda di triage in git, per titolo',
@@ -29,7 +28,8 @@ export const VIA = Object.freeze({
 });
 
 export const MOTIVO = Object.freeze({
-  DOPO: 'nati quando la prova esisteva già',
+  // Decisione dell'owner del 02/10/2026: owner e sessioni firmano con la credenziale, e il suo Filo la scrive.
+  SOLO_NOME: 'solo il nome: senza la prova è un utente (#912)',
   ILLEGGIBILE: 'stato non decifrabile',
   SEGNALATI: 'segnalati come attacco, spam o file sospetto',
   RICEVUTI_SEGNALATI: 'segnalati dai giudici, fermi nei Ricevuti',
@@ -47,8 +47,8 @@ const FINESTRA_CODA_MS = { prima: 10 * 60e3, dopo: 24 * 3600e3 };
 const nellaFinestra = (nato, queuedAt) => Number.isFinite(nato) && Number.isFinite(queuedAt)
   && nato >= queuedAt - FINESTRA_CODA_MS.prima && nato <= queuedAt + FINESTRA_CODA_MS.dopo;
 const piuVecchio = (a, b) => (Number.isFinite(a) && Number.isFinite(b) ? Math.min(a, b) : (Number.isFinite(a) ? a : b));
-// Le famiglie che ricevono la prova per epoca: ognuna ha la sua soglia, i loro cammini di creazione partono in momenti diversi.
-export const FAMIGLIE_EPOCA = Object.freeze(['local', 'owner']);
+// Owner e sessioni: la prova la scrive chi crea con la credenziale admin, il ripasso non la dà mai (#912).
+const FAMIGLIE_LOCALI = Object.freeze(['local', 'owner']);
 
 /** La famiglia del mittente per i conteggi, '' se il prefisso non è riservato. PURA. */
 export function categoria(clientId) {
@@ -75,34 +75,6 @@ export function motivoSegnalato(d) {
   if (p === undefined || p === null || p === '') return '';
   if (typeof p !== 'object') return MOTIVO.GIUDIZIO_ILLEGGIBILE;
   return MR.segnalatoComeAttacco({ status: st, pipeline: p }) || MR.segnaliDeiGiudici(p).spam ? MOTIVO.RICEVUTI_SEGNALATI : '';
-}
-
-/**
- * La soglia di ogni famiglia (ms): quella salvata dal primo giro vero, se c'è; altrimenti il primo feedback della
- * famiglia nato con la prova, o adesso. PURA. Una salvata non si ricalcola: dopo un giro le prove scritte dal ripasso
- * la riporterebbero indietro. Una salvata illeggibile è un errore, non un ricalcolo.
- * @returns {{ [famiglia: string]: { ms: number, origine: 'salvata'|'documento'|'adesso', doc: string } }}
- */
-export function soglieDelRipasso(docs, salvate, adesso) {
-  const lista = Array.isArray(docs) ? docs : [];
-  const out = {};
-  for (const f of FAMIGLIE_EPOCA) {
-    const s = salvate && typeof salvate === 'object' ? salvate[f] : undefined;
-    if (s !== undefined && s !== null) {
-      if (!Number.isSafeInteger(s) || s <= 0) throw new Error(`la soglia salvata per ${f} non è un istante in millisecondi (${JSON.stringify(s)})`);
-      out[f] = { ms: s, origine: 'salvata', doc: '' };
-      continue;
-    }
-    let ms = Number(adesso);
-    let primo = null;
-    for (const d of lista) {
-      if (!d || d.senderProof !== 'admin' || categoria(d.clientId) !== f) continue;
-      const t = Date.parse(d.createTime || '');
-      if (Number.isFinite(t) && t < ms) { ms = t; primo = d; }
-    }
-    out[f] = { ms, origine: primo ? 'documento' : 'adesso', doc: primo ? (numeroDi(primo) || primo.id) : '' };
-  }
-  return out;
 }
 
 /** `git log --diff-filter=A --name-only --format=@%H -- feedback-triage` → ['sha:percorso'] delle voci della coda. PURA. */
@@ -201,11 +173,10 @@ function conta(lista, chiave) {
 /**
  * Chi riceve quale prova. PURA. `docs`: { id, seq, subSeq, createTime (del server), clientId e status decifrati,
  * senderProof, derived, generation, alarmKeys (bool), parentId, name (solo se in chiaro), pipeline }.
- * `soglie`: famiglia → ms. `coda` da vociDellaCoda, `derivatiDelPadre`: id del padre → Set dei numeri annotati dal server.
+ * `coda` da vociDellaCoda, `derivatiDelPadre`: id del padre → Set dei numeri annotati dal server.
  * @returns {{ promossi: object[], saltati: { categoria: string, motivo: string, n: number }[] }}
  */
-export function candidatiAlRipasso(docs, soglie, { coda = vociDellaCoda([]), derivatiDelPadre = new Map(), inizioProva = inizioDiDefault() } = {}) {
-  const sogliaVera = sogliaEffettiva(soglie, inizioProva);
+export function candidatiAlRipasso(docs, { coda = vociDellaCoda([]), derivatiDelPadre = new Map() } = {}) {
   const lista = Array.isArray(docs) ? docs.filter(Boolean) : [];
   const numeri = conta(lista, numeroDi);
   const titoli = conta(lista, (d) => (d.name ? `${d.clientId}\n${d.name}` : ''));
@@ -245,10 +216,8 @@ export function candidatiAlRipasso(docs, soglie, { coda = vociDellaCoda([]), der
     let esito;
     if (!FS.isCanonical(st)) esito = { motivo: MOTIVO.ILLEGGIBILE };
     else if (motivoSegnalato(d)) esito = { motivo: motivoSegnalato(d) };
-    else if (cat === 'owner' || cat === 'local') {
-      const nato = Date.parse(d.createTime || '');
-      esito = Number.isFinite(nato) && nato < sogliaVera(cat) ? { prova: 'admin', via: VIA.EPOCA } : { motivo: MOTIVO.DOPO };
-    } else if (cat === 'agent (esploratore)') esito = { motivo: MOTIVO.ESPLORATORE };
+    else if (FAMIGLIE_LOCALI.includes(cat)) esito = { motivo: MOTIVO.SOLO_NOME };
+    else if (cat === 'agent (esploratore)') esito = { motivo: MOTIVO.ESPLORATORE };
     else esito = provaRoutine(d, cat);
     if (esito.prova) promossi.push({ ...d, categoria: cat, prova: esito.prova, via: esito.via });
     else salta(cat, esito.motivo);
@@ -280,52 +249,10 @@ export function resoconto({ promossi, saltati }) {
   return righe;
 }
 
-/**
- * Da quando chi crea scrive DAVVERO la prova, per famiglia (ms; Infinity = non ancora). Da git, su origin/main.
- * Le sessioni: da quando main la scrive nello strumento che apre i feedback. L'owner: da quando esce una versione
- * di Filo che la scrive. Prima, un feedback senza prova non si distingue da un falso e vale l'epoca, qualunque
- * soglia sia stata salvata: il primo giro del 01/10 l'aveva fissata quando nessuno la scriveva ancora.
- * `git(args)` → stdout; iniettabile nei test.
- */
-export function inizioDellaProva(git = gitDelRepo) {
-  const quando = (args) => { try { return String(git(args) || '').trim(); } catch (_) { return ''; } };
-  // --first-parent: conta quando la prova è arrivata su main, non quando è nata sul ramo.
-  const primo = (file) => {
-    const riga = quando(['log', 'origin/main', '--first-parent', '--reverse', '--format=%H %cI', '-S', 'senderProof', '--', file]).split('\n')[0];
-    const [sha, data] = riga.split(' ');
-    return sha && Number.isFinite(Date.parse(data)) ? { sha, ms: Date.parse(data) } : null;
-  };
-  const sessioni = primo('scripts/claude-feedback.mjs');
-  const app = primo('src/shared/feedback.js');
-  let owner = Infinity;
-  if (app) {
-    const tag = quando(['tag', '--contains', app.sha, '--sort=creatordate', '--list', 'v*']).split('\n')[0];
-    const ms = tag ? Date.parse(quando(['for-each-ref', '--format=%(creatordate:iso-strict)', `refs/tags/${tag}`])) : NaN;
-    if (Number.isFinite(ms)) owner = ms;
-  }
-  return { local: sessioni ? sessioni.ms : Infinity, owner };
-}
-
 function gitDelRepo(args) {
   const env = { ...process.env };
   delete env.GIT_DIR; delete env.GIT_WORK_TREE; delete env.GIT_INDEX_FILE;
   return execFileSync('git', args, { cwd: ROOT, env, encoding: 'utf8', maxBuffer: 1 << 26, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
-}
-
-let inizioLetto = null;
-function inizioDiDefault() {
-  if (!inizioLetto) inizioLetto = inizioDellaProva();
-  return inizioLetto;
-}
-
-/** La soglia che decide: la salvata, ma mai prima che chi crea scriva la prova. Senza salvata, nessuno. PURA. */
-export function sogliaEffettiva(soglie, inizioProva) {
-  return (cat) => {
-    const s = Number(soglie && soglie[cat]);
-    if (!Number.isFinite(s)) return -Infinity;
-    const i = inizioProva ? Number(inizioProva[cat]) : NaN;
-    return Number.isNaN(i) ? s : Math.max(s, i);
-  };
 }
 
 function leggiCodaDiTriage() {
@@ -347,23 +274,22 @@ export function ramiFusiInLocale(log) {
 }
 
 /**
- * I lavori locali passati da segnare (#908): pratiche dell'owner o di una sessione con la prova (anche quella data
- * da questo giro) il cui ramo main ha fuso dalla strada locale, ancora senza segno. Col segno escono dalla bacheca. PURA.
+ * I lavori locali passati da segnare (#908): pratiche dell'owner o di una sessione con la prova il cui ramo main ha
+ * fuso dalla strada locale, ancora senza segno. Col segno escono dalla bacheca. PURA.
  */
-export function lavoriLocaliPassati(docs, rami, promossi = [], ramiDaNote = new Map()) {
+export function lavoriLocaliPassati(docs, rami, ramiDaNote = new Map()) {
   const daNote = (d) => !d.branch && STATI_CHIUSI.includes(String(d.status || ''))
     && [...(ramiDaNote.get(d.id) || [])].some((r) => rami && rami.has(r));
-  return candidatiLocali(docs, promossi).filter((d) => (rami && rami.has(d.branch)) || daNote(d));
+  return candidatiLocali(docs).filter((d) => (rami && rami.has(d.branch)) || daNote(d));
 }
 
 const STATI_CHIUSI = Object.freeze(['done', 'archived']);
 
-/** Owner o sessione con la prova (anche data da questo giro), senza segno, mai un segnalato. PURA. */
-function candidatiLocali(docs, promossi) {
-  const provati = new Set((promossi || []).filter((d) => d.prova === 'admin').map((d) => d.id));
+/** Owner o sessione con la prova, senza segno, mai un segnalato. PURA. */
+function candidatiLocali(docs) {
   return (Array.isArray(docs) ? docs : []).filter((d) => d && !d.localOnly
-    && FAMIGLIE_EPOCA.includes(categoria(d.clientId))
-    && (d.senderProof === 'admin' || provati.has(d.id))
+    && FAMIGLIE_LOCALI.includes(categoria(d.clientId))
+    && d.senderProof === 'admin'
     && FS.isCanonical(String(d.status || '')) && !STATI_SEGNALATI_RE.test(String(d.status || '')));
 }
 
@@ -371,8 +297,8 @@ function candidatiLocali(docs, promossi) {
  * Le pratiche chiuse di cui leggere la conversazione: senza ramo scritto, il lavoro locale lo dice solo lì
  * («risolto in locale sul ramo claude/<x>», #507 e #714). PURA.
  */
-export function noteDaLeggere(docs, promossi = []) {
-  return candidatiLocali(docs, promossi).filter((d) => !d.branch && STATI_CHIUSI.includes(String(d.status || ''))).map((d) => d.id);
+export function noteDaLeggere(docs) {
+  return candidatiLocali(docs).filter((d) => !d.branch && STATI_CHIUSI.includes(String(d.status || ''))).map((d) => d.id);
 }
 
 /** I rami di sessione nominati in una conversazione. PURA. */
@@ -465,37 +391,12 @@ async function leggiRamiNelleNote(ids, bearer, letture) {
 
 const num = (d) => numeroDi(d) || d.id;
 
-// Le soglie fissate dal primo giro vero: famiglia → ms, in un documento che solo l'admin legge e scrive.
-export const DOVE_SOGLIE = Object.freeze({ doc: 'config/automation', campo: 'senderProofSince' });
-
-async function leggiSoglie(bearer, letture) {
-  const res = await fetch(`${FIRESTORE_BASE}/${DOVE_SOGLIE.doc}?mask.fieldPaths=${DOVE_SOGLIE.campo}`, { headers: { Authorization: `Bearer ${bearer}` } });
-  if (res.status === 404) return {};
-  if (!res.ok) throw Object.assign(new Error(`lettura delle soglie salvate fallita (${res.status})`), { codice: res.status >= 500 ? 4 : 3 });
-  letture.aggiungi(1, 'soglie');
-  const f = ((await res.json()).fields || {})[DOVE_SOGLIE.campo];
-  if (!f) return {};
-  const v = globalThis.SN_FEEDBACK.fromFsValue(f);
-  if (!v || typeof v !== 'object' || Array.isArray(v)) throw Object.assign(new Error(`${DOVE_SOGLIE.doc}.${DOVE_SOGLIE.campo} non è una mappa`), { codice: 3 });
-  return v;
-}
-
 // Ogni scrittura di un feedback firma l'ora, o la Gestione non la vede fino al riallineamento (#676).
 const firmaOra = () => ({ timestampValue: new Date().toISOString() });
 
 const scrittoreFirestore = (bearer) => {
   const rete = (e) => ({ ok: false, status: 0, testo: String((e && e.message) || e) });
   return {
-    async soglie(nuove) {
-      const fam = Object.keys(nuove);
-      const mask = fam.map((f) => `updateMask.fieldPaths=${DOVE_SOGLIE.campo}.${f}`).join('&');
-      const fields = Object.fromEntries(fam.map((f) => [f, { integerValue: String(nuove[f]) }]));
-      return fetch(`${FIRESTORE_BASE}/${DOVE_SOGLIE.doc}?${mask}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
-        body: JSON.stringify({ fields: { [DOVE_SOGLIE.campo]: { mapValue: { fields } } } }),
-      }).catch(rete);
-    },
     async prova(d) {
       // Senza la precondizione un documento cancellato nel frattempo rinascerebbe con il solo campo della prova.
       return fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(d.id)}?updateMask.fieldPaths=senderProof&updateMask.fieldPaths=updatedAt&currentDocument.exists=true`, {
@@ -523,39 +424,16 @@ const scrittoreFirestore = (bearer) => {
 const codiceDi = (status) => (status === 0 || status >= 500 ? 4 : 3);
 
 /**
- * Il giro, dopo le letture. Le soglie nuove si salvano PRIMA di ogni prova: un giro fermo a metà lascerebbe al
- * prossimo prove del ripasso senza la soglia che le ha decise. `scrivi`: { soglie(nuove), prova(d) } → { ok, status }.
+ * Il giro, dopo le letture. `scrivi`: { prova(d), locale(d) } → { ok, status }.
  * @returns {Promise<number>} il codice d'uscita
  */
-export async function eseguiGiro({ docs, salvate, adesso, coda, derivatiDelPadre, dryRun, scrivi, inizioProva = inizioDiDefault(), rami = new Set(), leggiNote = async () => new Map(), log = console.log, err = console.error }) {
-  let soglie;
-  try {
-    soglie = soglieDelRipasso(docs, salvate, adesso);
-  } catch (e) {
-    err(`RIFIUTATO: ${e.message}. Va corretta a mano in ${DOVE_SOGLIE.doc}.${DOVE_SOGLIE.campo}: ricalcolata dai documenti cadrebbe sulle prove già scritte.`);
-    return 3;
-  }
-  const esito = candidatiAlRipasso(docs, Object.fromEntries(FAMIGLIE_EPOCA.map((f) => [f, soglie[f].ms])), { coda, derivatiDelPadre, inizioProva });
+export async function eseguiGiro({ docs, coda, derivatiDelPadre, dryRun, scrivi, rami = new Set(), leggiNote = async () => new Map(), log = console.log, err = console.error }) {
+  const esito = candidatiAlRipasso(docs, { coda, derivatiDelPadre });
   const promossi = esito.promossi.sort((a, b) => String(b.createTime).localeCompare(String(a.createTime)));
-  const nuove = FAMIGLIE_EPOCA.filter((f) => soglie[f].origine !== 'salvata');
-  const nonAncora = { local: 'le sessioni che lavorano da main non la scrivono ancora', owner: 'il Filo pubblicato non la scrive ancora' };
-  const daQuando = { local: 'le sessioni da main la scrivono', owner: 'il Filo pubblicato la scrive' };
-  for (const f of FAMIGLIE_EPOCA) {
-    const s = soglie[f];
-    const perche = s.origine === 'salvata' ? 'fissata dal primo giro'
-      : `${s.origine === 'documento' ? `il primo nato con la prova, ${s.doc}` : 'adesso: nessuno è ancora nato con la prova'}; ${dryRun ? 'la fisserà il primo giro vero' : 'la fissa questo giro'}`;
-    const i = inizioProva ? Number(inizioProva[f]) : NaN;
-    const vale = i === Infinity ? `; ${nonAncora[f]}: vale l'epoca per tutti`
-      : (Number.isFinite(i) && i > s.ms ? `; ${daQuando[f]} dal ${new Date(i).toISOString()}: vale da lì` : '');
-    log(`Soglia ${f}: ${new Date(s.ms).toISOString()} (${perche}${vale}).`);
-  }
   for (const r of resoconto(esito)) log(r);
-  for (const prova of ['admin', 'server']) {
-    const questi = promossi.filter((d) => d.prova === prova);
-    if (questi.length) log(`  ${prova}: ${questi.map(num).join(' ')}`);
-  }
+  if (promossi.length) log(`  server: ${promossi.map(num).join(' ')}`);
   let ramiDaNote = new Map();
-  const daLeggere = rami.size ? noteDaLeggere(docs, promossi) : [];
+  const daLeggere = rami.size ? noteDaLeggere(docs) : [];
   if (daLeggere.length) {
     try {
       ramiDaNote = await leggiNote(daLeggere);
@@ -563,20 +441,11 @@ export async function eseguiGiro({ docs, salvate, adesso, coda, derivatiDelPadre
       err(`Le conversazioni delle pratiche chiuse non si leggono (${String((e && e.message) || e)}): i lavori locali col ramo scritto solo lì restano come sono.`);
     }
   }
-  const locali = lavoriLocaliPassati(docs, rami, promossi, ramiDaNote);
+  const locali = lavoriLocaliPassati(docs, rami, ramiDaNote);
   log(`Lavori locali passati da segnare (escono dalla bacheca pubblica): ${locali.length}${locali.length ? ` (${locali.map(num).join(' ')})` : ''}`);
   if (dryRun) {
     log('(prova a vuoto: non ho scritto niente)');
     return 0;
-  }
-  if (nuove.length) {
-    const res = await scrivi.soglie(Object.fromEntries(nuove.map((f) => [f, soglie[f].ms])));
-    if (!res || !res.ok) {
-      const st = res ? res.status : 0;
-      err(`RIFIUTATO: le soglie non si salvano in ${DOVE_SOGLIE.doc} (${st}); senza, il prossimo giro le ricalcolerebbe sulle prove di questo. Non ho scritto niente.`);
-      return codiceDi(st);
-    }
-    log(`Soglie fissate (${nuove.join(', ')}): i giri dopo useranno queste.`);
   }
   if (!promossi.length && !locali.length) {
     log('Niente da ripassare.');
@@ -620,7 +489,6 @@ async function main(argv) {
   if (male) { console.error(`USO: npm run feedback:ripasso [-- --dry-run]. ${male}`); return 1; }
   const dryRun = args.includes('--dry-run');
   const letture = contatoreLetture();
-  const adesso = Date.now();
   let coda;
   try {
     coda = leggiCodaDiTriage();
@@ -631,12 +499,10 @@ async function main(argv) {
   let bearer;
   let docs;
   let derivatiDelPadre;
-  let salvate;
   try {
     bearer = await acquireBearer();
     docs = await leggiTutti(bearer, letture);
     derivatiDelPadre = await leggiNoteDeiPadri(padriDaLeggere(docs), bearer, letture);
-    salvate = await leggiSoglie(bearer, letture);
   } catch (e) {
     console.error(`RIFIUTATO: ${String((e && e.message) || e)}`);
     return e && e.codice === 3 ? 3 : 4;
@@ -648,7 +514,7 @@ async function main(argv) {
     console.warn(`I rami fusi in locale non si leggono da git (${String((e && e.message) || e).split('\n')[0]}): i lavori locali passati restano come sono.`);
   }
   const leggiNote = (ids) => leggiRamiNelleNote(ids, bearer, letture);
-  const codice = await eseguiGiro({ docs, salvate, adesso, coda, derivatiDelPadre, dryRun, rami, leggiNote, scrivi: scrittoreFirestore(bearer) });
+  const codice = await eseguiGiro({ docs, coda, derivatiDelPadre, dryRun, rami, leggiNote, scrivi: scrittoreFirestore(bearer) });
   console.log(letture.riga());
   return codice;
 }

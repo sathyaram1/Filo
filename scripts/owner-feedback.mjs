@@ -85,6 +85,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { acquireBearer, FIRESTORE_BASE } from './lib/firestore-auth.mjs';
+import { isRoutineInstance } from './lib/routine-role.mjs';
 import { avvisoDaCampi, parseRiferimento, risolviFeedback } from './lib/pratica-locale.mjs';
 import { PARTI, RAMO_RE, partiDaCampi } from './lib/parti-lavoro.mjs';
 // Moduli IIFE: importarli li registra su globalThis.
@@ -530,9 +531,8 @@ export function rifiutoPratica(id, r) {
   if (r && r.senzaProva && r.segnalato) {
     righe.push('È segnalato dai giudici: la prova del mittente la può dare solo l’owner, in Gestione («È mio»), dopo averlo guardato.');
   } else if (r && r.senzaProva) {
-    righe.push('Se l’hanno aperto l’owner o una sessione, il ripasso gliela dà (a vuoto con --dry-run):');
-    righe.push('  npm run feedback:ripasso');
-    righe.push('Se il ripasso lo salta, solo l’owner può dire che è suo: in Gestione («È mio»), o chiedilo a lui e su sua parola');
+    // #912: il ripasso non dà più la prova al solo nome.
+    righe.push('Solo l’owner può dire che è suo: in Gestione («È mio»), o chiedilo a lui e su sua parola');
     righe.push(`  node scripts/owner-feedback.mjs ${id} --riconosci`);
     righe.push('Altrimenti vale come un utente.');
   }
@@ -809,6 +809,13 @@ if (isMain) {
     posizionali.push(a);
   }
   const [riferimento, status, ...nota] = posizionali;
+
+  // #914: le routine non aprono lavoro locale; quello che si fa solo in locale lo rimandano dal canale.
+  // Il sì dell'owner (--approva-locale, #913) è suo: una routine non lo dà.
+  if ((argv.includes('--solo-locale') || argv.includes('--approva-locale')) && isRoutineInstance(ROOT)) {
+    console.error('RIFIUTATO: una routine non segna lavoro locale. Rimandalo nei Ricevuti: node scripts/routine-channel.mjs deliver status --status design --reason locale --notes "perché" — non ho toccato niente.');
+    process.exit(3);
+  }
 
   let id = riferimento;
   let bearer;

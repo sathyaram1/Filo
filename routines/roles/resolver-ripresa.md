@@ -41,6 +41,8 @@ porta solo l'ultima.
 
 <!-- includi: _segnala.md -->
 
+<!-- includi: _solo-in-locale.md -->
+
 ## Consegna
 
 ```bash

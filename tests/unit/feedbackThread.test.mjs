@@ -114,8 +114,10 @@ test('la sessione locale è "lato Filo", non "lato utente"', () => {
   // E ownerize non ci mette il cappello dell'owner sopra: non è un invio suo.
   assert.equal(TH.ownerize('local:claude'), 'local:claude');
   // La segnalazione originale finisce nel turno del modello.
-  const turni = TH.parse({ text: 'trovato un problema', clientId: 'local:claude' });
+  const turni = TH.parse({ text: 'trovato un problema', clientId: 'local:claude', senderProof: 'admin' });
   assert.equal(turni[0].role, 'model');
+  // #912: senza la prova il nome non basta: la segnalazione è di un utente.
+  assert.equal(TH.parse({ text: 'x', clientId: 'local:claude' })[0].role, 'user');
 });
 
 // SPEC-RIDISEGNO-MAX.md §13: i rilievi RESIDUI di una verifica (un lavoro
@@ -228,7 +230,7 @@ test('note che iniziano con un marcatore → nessun turno-Filo vuoto', () => {
 });
 
 test('feedback inviato da un AGENTE → segnalazione lato modello', () => {
-  const turns = TH.parse({ text: 'area vuota', clientId: 'agent:gemini-3.1-flash-lite' });
+  const turns = TH.parse({ text: 'area vuota', clientId: 'agent:gemini-3.1-flash-lite', senderProof: 'admin' });
   assert.equal(turns[0].role, 'model');
   assert.equal(turns[0].kind, 'report');
   assert.equal(TH.isFromModel('routine:notturna'), true);

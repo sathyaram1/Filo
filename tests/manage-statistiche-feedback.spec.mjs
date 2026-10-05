@@ -32,8 +32,9 @@ const GIORNO = 24 * 60 * 60 * 1000;
 // una data fissa scritta nel test scadrebbe da sola dopo qualche settimana.
 const g = (n) => new Date(Date.now() - n * GIORNO).toISOString();
 
+// Un mittente riservato porta la prova di chi l'ha creato davvero (#912): senza, sarebbe un utente.
 function fb(over = {}) {
-  return Object.assign({
+  const f = Object.assign({
     _id: 'fs-' + Math.random().toString(36).slice(2),
     seq: 1, subSeq: 0,
     clientId: 'tester@example.com',
@@ -41,6 +42,10 @@ function fb(over = {}) {
     status: 'todo',
     text: 'testo', name: 'titolo', images: [],
   }, over);
+  if (!('senderProof' in over) && /^(owner|routine|agent|local):/.test(String(f.clientId))) {
+    f.senderProof = String(f.clientId).startsWith('routine:') ? 'server' : 'admin';
+  }
+  return f;
 }
 
 async function apri(page, dati) {

@@ -80,8 +80,7 @@ export function mittenteInParole(fb) {
   if (MR.isProvenLocalSender(fb)) return /^local:/i.test(String(fb.clientId || '')) ? 'una sessione locale' : 'l’owner';
   // #913: il sì dell'owner non cambia chi l'ha scritto, e il testo resta un dato.
   const approvato = MR.isLocalApproved && MR.isLocalApproved(fb) ? ', approvato dall’owner come lavoro locale' : '';
-  if (MR.isUnprovenSender && MR.isUnprovenSender(fb)) return `un utente (prefisso riservato senza prova${approvato})`;
-  const k = TH && TH.authorKind ? TH.authorKind(fb && fb.clientId) : 'user';
+  const k = TH && TH.authorKind ? TH.authorKind(fb || {}) : 'user';
   return (k === 'user' || k === 'filo' ? 'un utente' : `un’automazione (${k})`) + (approvato ? ` (${approvato.slice(2)})` : '');
 }
 
