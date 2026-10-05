@@ -136,10 +136,9 @@ async function declassa(ses, c) {
 // L'accesso osservato: pagina di accesso del sito, e dopo un cookie di sessione suo che prima non c'era.
 function paginaDiAccesso(url) {
   if (modo !== 'default') return;
-  const sito = sitoDi(url);
-  const AP = globalThis.SN_AUTH_POPUP;
-  if (!sito || accessi.has(sito)) return;
   if (!/^https?:/i.test(String(url || ''))) return;
+  const sito = sitoDi(url);
+  if (!sito || accessi.has(sito)) return;
   attesa.set(sito, { at: Date.now(), prima: new Map() });
   const ses = agganciata;
   if (!ses) return;
