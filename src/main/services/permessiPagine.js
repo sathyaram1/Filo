@@ -176,9 +176,8 @@ function seguiGesti(wc) {
         wc._filoGestoAlle = 0; wc._filoMenuAperto = null;
       }
     });
-    const finita = (_e, _u, _c, _t, principale) => { if (principale !== false) wc._filoNavDaGesto = false; };
     wc.on('did-navigate', () => { wc._filoNavDaGesto = false; });
-    wc.on('did-fail-load', (e, c, d, u, principale) => finita(e, u, c, d, principale));
+    wc.on('did-fail-load', (_e, _c, _d, _u, principale) => { if (principale !== false) wc._filoNavDaGesto = false; });
   } catch (_) {}
 }
 
