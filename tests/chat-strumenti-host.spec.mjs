@@ -174,3 +174,26 @@ test('la chat senza diretta (chiamata normale) porta lo stesso vincolo e lo stes
   corpi = await corpiConStrumenti(app);
   vincoliIntatti(corpi);
 });
+
+// Gli altri «nessun host» del router (filtri sui fornitori, modello ritirato) hanno il loro rimedio: non sono strumenti.
+for (const [nome, rifiuto, frase] of [
+  ['fornitori tutti esclusi dai filtri', 'No allowed providers are available for the selected model.', 'fra quelli ammessi'],
+  ['modello senza più host sul router', 'No endpoints found for deepseek/deepseek-v4-flash.', 'non è più disponibile'],
+]) {
+  test(`${nome}: la chat dice il motivo vero, non gli strumenti, e non ritenta`, async ({ app, shell }) => {
+    test.setTimeout(60_000);
+    await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+    const page = await newtabPage(app);
+    await expect(page.locator('#input')).toBeVisible();
+    await preparaRouter(app, 'nessuno', rifiuto);
+
+    await scrivi(page, 'che ore sono a Tokyo?');
+    const bolla = page.locator('.dash-bubble-filo', { hasText: frase });
+    await expect(bolla).toBeVisible({ timeout: 15_000 });
+    await expect(bolla).toContainText('Modelli predefiniti');
+    await expect(bolla).not.toContainText('strumenti');
+    const corpi = await corpiConStrumenti(app);
+    vincoliIntatti(corpi);
+    expect(corpi).toHaveLength(1);
+  });
+}
