@@ -3527,18 +3527,29 @@ async function editorFileSummaries() {
   } catch (_) { return ''; }
 }
 
-// `daModello`: il messaggio l'ha scritto un modello (un suggerimento della home), anche se parte dalla casella dell'utente.
 // I turni di chat in corso, per chi li vuole fermare (#578): reqId → { wcId, ctrl, fermato }. Solo in memoria.
 const turniInCorso = new Map();
+// Uno stop arrivato mentre il turno prepara ancora la richiesta (saldo, batteria, rete: anche mezzo secondo) vale lo
+// stesso: lo si tiene da parte e il turno lo trova quando si registra. Scadono, per i turni che non arrivano mai.
+const stopPrimaDelTurno = new Map();
+const STOP_PRIMA_TTL_MS = 10 * 60 * 1000;
 function fermaFiloChat(reqId, wc) {
-  const t = reqId ? turniInCorso.get(String(reqId)) : null;
+  if (!reqId) return false;
+  const t = turniInCorso.get(String(reqId));
+  if (!t) {
+    const ora = Date.now();
+    for (const [k, v] of stopPrimaDelTurno) if (ora - v.at > STOP_PRIMA_TTL_MS) stopPrimaDelTurno.delete(k);
+    stopPrimaDelTurno.set(String(reqId), { wcId: wc && wc.id, at: ora });
+    return true;
+  }
   // Ferma solo la scheda che l'ha avviato: un'altra pagina di Filo non tocca il lavoro di questa.
-  if (!t || t.wcId !== (wc && wc.id)) return false;
+  if (t.wcId !== (wc && wc.id)) return false;
   t.fermato = true;
   try { t.ctrl.abort(); } catch (_) {}
   return true;
 }
 
+// `daModello`: il messaggio l'ha scritto un modello (un suggerimento della home), anche se parte dalla casella dell'utente.
 async function handleFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, daModello = false, chatId = null, sender = null }) {
   await FiloMem.touchSession();
   await FiloMem.appendRaw({ type: 'chat_user', summary: String(userMessage || '').slice(0, 200) });
