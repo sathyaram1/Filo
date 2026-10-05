@@ -23,6 +23,8 @@ giri passati, dalla più vecchia: le porte già trovate si tengono chiuse.
 ordine e con la loro domanda, anche quelle di fermate precedenti: `ripresa`
 porta solo l'ultima.
 
+<!-- includi: _immagini.md -->
+
 1. Applica la scelta dell'owner al codice del ramo, e chiudi i rilievi rimasti.
    Se il lavoro era appena cominciato (una domanda fatta prima di scrivere
    codice), è un lavoro intero: vale il ruolo di chi risolve, criteri
