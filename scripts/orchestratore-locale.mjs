@@ -327,6 +327,66 @@ function carico() {
   }, 2000));
 }
 
+/** Le cartelle dati in cui il Filo dell'owner tiene il blocco della sua istanza unica, dai sorgenti o installato. PURA. */
+export function cartelleDatiFilo(env = process.env, piattaforma = process.platform, casa = homedir()) {
+  if (piattaforma === 'win32') return [join(env.APPDATA || join(casa, 'AppData', 'Roaming'), 'Filo')];
+  const base = piattaforma === 'darwin' ? join(casa, 'Library', 'Application Support') : (env.XDG_CONFIG_HOME || join(casa, '.config'));
+  return [join(base, 'Filo'), join(base, 'filo')];
+}
+
+/**
+ * Il Filo dell'owner è aperto? Lo dice il blocco che Chromium tiene nella cartella dati finché l'app gira: le istanze dei
+ * test hanno cartelle loro e non contano. `sonda` serve alle prove.
+ */
+export function filoAperto(cartelle = cartelleDatiFilo(), piattaforma = process.platform, sonda = {}) {
+  const apri = sonda.apri || ((f) => closeSync(openSync(f, 'r+')));
+  const leggiLink = sonda.leggiLink || readlinkSync;
+  const eVivo = sonda.vivo || vivo;
+  for (const c of cartelle) {
+    if (piattaforma === 'win32') {
+      // «lockfile» resta aperto in scrittura dall'istanza viva: aprirlo in scrittura fallisce con EBUSY finché gira.
+      try { apri(join(c, 'lockfile')); } catch (e) { if (e && e.code === 'EBUSY') return true; }
+    } else {
+      // «SingletonLock» è un collegamento a «<macchina>-<pid>»: conta finché quel processo è vivo.
+      try {
+        const m = /-(\d+)$/.exec(String(leggiLink(join(c, 'SingletonLock'))));
+        if (m && eVivo(Number(m[1]))) return true;
+      } catch (_) { /* nessun blocco: chiuso */ }
+    }
+  }
+  return false;
+}
+
+/**
+ * I Ctrl-C del terminale di avvia: il primo vale «smetti», il secondo «subito», dal terzo si esce. Due segnali a meno di
+ * `finestraMs` sono un colpo solo: fuori da Windows npm rimanda al figlio il segnale che il terminale gli ha già dato. PURA.
+ */
+export function contaColpi(finestraMs = 1000) {
+  let colpi = 0;
+  let ultimo = -Infinity;
+  return (adessoMs) => {
+    if (adessoMs - ultimo < finestraMs) return null;
+    ultimo = adessoMs;
+    colpi += 1;
+    return colpi === 1 ? 'calma' : colpi === 2 ? 'subito' : 'esci';
+  };
+}
+
+// Il canale di «smetti» è un file accanto al blocco di avvia: i segnali POSIX non arrivano da un altro terminale su Windows.
+const fileRichiesta = (P) => join(P.note, 'smetti.json');
+function leggiRichiesta(P) {
+  try { return JSON.parse(readFileSync(fileRichiesta(P), 'utf8')); } catch (_) { return null; }
+}
+function scriviRichiesta(P, r) {
+  mkdirSync(P.note, { recursive: true });
+  const tmp = `${fileRichiesta(P)}.${process.pid}.tmp`;
+  writeFileSync(tmp, `${JSON.stringify(r)}\n`);
+  renameSync(tmp, fileRichiesta(P));
+}
+function togliRichiesta(P) {
+  try { unlinkSync(fileRichiesta(P)); } catch (_) { /* non c'era */ }
+}
+
 function negozio(file) {
   const vuoto = () => ({ coda: [], pratiche: {} });
   const leggi = () => {
