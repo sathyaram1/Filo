@@ -4,6 +4,28 @@
 
 const { pageHints } = require('../../content/safebrowseHints.js');
 
+// In un riquadro di un altro sito la pagina sopra non si legge: se è lei a nasconderlo (trasparente, ritagliato,
+// coperto) lo dice il motore, che vede tutta la catena dei riquadri. Senza risposta in tempo vale mostrato.
+const CODICE_RIQUADRO = `(async () => {
+  const mostrati = [];
+  const h = (${pageHints.toString()})(document, { mostrati });
+  let altroSito = false;
+  try { altroSito = window !== window.top && !window.frameElement; } catch (_) { altroSito = true; }
+  if (!altroSito || !mostrati.length || typeof IntersectionObserver !== 'function'
+    || !('isVisible' in IntersectionObserverEntry.prototype)) return h;
+  const visti = await new Promise((ok) => {
+    const t = setTimeout(() => ok(null), 600);
+    try {
+      const io = new IntersectionObserver((es) => { clearTimeout(t); io.disconnect(); ok(new Set(es.filter((e) => e.isVisible).map((e) => e.target))); },
+        { trackVisibility: true, delay: 100 });
+      for (const m of mostrati) io.observe(m.el);
+    } catch (_) { clearTimeout(t); ok(null); }
+  });
+  if (!visti) return h;
+  const vale = (tipo) => mostrati.some((m) => m.tipo === tipo && visti.has(m.el));
+  return { ...h, shownPassword: h.shownPassword && vale('pw'), shownPayment: h.shownPayment && vale('carta') };
+})()`;
+
 const safebrowseMethods = {
   _sbState(tab) {
     if (!tab.sbBypass) tab.sbBypass = new Set();      // domini confermati su "pericoloso"
@@ -158,12 +180,12 @@ const safebrowseMethods = {
     pwc.on('did-finish-load', async () => {
       let h = null;
       try { h = await pwc.executeJavaScript(`(${pageHints.toString()})(document)`); } catch (_) {}
-      if (h && (h.hasPassword || h.hasPayment)) giudica({ hasPassword: !!h.hasPassword, hasPayment: !!h.hasPayment });
+      if (h && (h.shownPassword || h.shownPayment)) giudica({ hasPassword: !!h.shownPassword, hasPayment: !!h.shownPayment });
     });
   },
 
-  // Sulle pagine ospitate il modulo sta spesso in un riquadro incorporato, che il content script della pagina non vede.
-  // Solo lì si guardano i riquadri: altrove il dominio parla già per la pagina.
+  // Il modulo sta spesso in un riquadro incorporato, che il content script della pagina non vede, o arriva dopo il
+  // caricamento: i riquadri si guardano dove un campo sensibile conta (vedi _sbScanFrames), altrove il dominio basta.
   _sbOnFrameLoad(tab, isMainFrame) {
     if (!tab) return;
     if (isMainFrame) tab._sbCampiUrl = null;
@@ -174,7 +196,8 @@ const safebrowseMethods = {
   },
 
   // I campi compaiono quando vuole il codice dell'utente: dopo un «Avanti» che non ricarica, dopo un avvio lento.
-  // Finché la pagina ospitata resta aperta la si riguarda, fino al primo campo sensibile.
+  // Finché la pagina resta aperta la si riguarda, fino al primo campo sensibile: sulle pagine ospitate, e dove un
+  // campo sensibile porterebbe al blocco (un sosia di un brand corto blocca solo se chiede la password, #728).
   async _sbScanFrames(tab, giro) {
     const SB = globalThis.SN_SAFEBROWSE;
     const wc = tab.view && tab.view.webContents;
@@ -182,21 +205,28 @@ const safebrowseMethods = {
     const url = wc.getURL();
     let ospitata = null;
     try { const u = new URL(url); ospitata = SB.whitelist.hostedPlatform(u.hostname, u.pathname); } catch (_) {}
-    if (!ospitata || tab._sbCampiUrl === url) return;
+    if (tab._sbCampiUrl === url || !(ospitata || this._sbCampiContano(SB, url))) return;
     const hints = { hasPassword: false, hasPayment: false, budgetUrl: tab._urlNavigato };
-    const codice = `(${pageHints.toString()})(document)`;
     let frames = [];
     try { frames = wc.mainFrame.framesInSubtree; } catch (_) {}
     await Promise.all(frames.map(async (f) => {
       try {
         // Un riquadro ostile non deve tenere ferma l'analisi.
         const scade = new Promise((ok) => setTimeout(() => ok(null), 1000));
-        const r = await Promise.race([f.executeJavaScript(codice), scade]);
-        if (r && r.hasPassword) hints.hasPassword = true;
-        if (r && r.hasPayment) hints.hasPayment = true;
+        const r = await Promise.race([f.executeJavaScript(CODICE_RIQUADRO), scade]);
+        // Conta il campo a schermo: un modulo nascosto dietro «Accedi» si vedrà al giro dopo, quando si apre.
+        if (r && r.shownPassword) hints.hasPassword = true;
+        if (r && r.shownPayment) hints.hasPayment = true;
       } catch (_) {}
     }));
     if (wc.isDestroyed() || tab._sbScanGiro !== giro) return;
+    tab._sbScanConta = (tab._sbScanConta || 0) + 1;
+    if (!hints.hasPassword && !hints.hasPayment && tab._sbScanConta % 2 === 1) {
+      const c = await this._sbCampiChiusi(wc);
+      if (wc.isDestroyed() || tab._sbScanGiro !== giro) return;
+      if (c.shownPassword) hints.hasPassword = true;
+      if (c.shownPayment) hints.hasPayment = true;
+    }
     if ((hints.hasPassword || hints.hasPayment) && wc.getURL() === url) {
       tab._sbCampiUrl = url;
       try {
@@ -206,6 +236,50 @@ const safebrowseMethods = {
       return;
     }
     tab._sbFrameTimer = setTimeout(() => this._sbScanFrames(tab, giro), 1500);
+  },
+
+  // I componenti chiusi nessuno script della pagina li apre: il protocollo di debug sì, senza toccare la pagina (#728).
+  // Solo i documenti del processo della scheda: un riquadro di un altro sito resta fuori.
+  async _sbCampiChiusi(wc) {
+    const out = { shownPassword: false, shownPayment: false };
+    const dbg = wc && wc.debugger;
+    if (!dbg) return out;
+    let mio = false;
+    try {
+      if (!dbg.isAttached()) { dbg.attach('1.3'); mio = true; }
+      const { root } = await dbg.sendCommand('DOM.getDocument', { depth: -1, pierce: true });
+      const chiuse = [];
+      const visita = (n) => {
+        if (!n || chiuse.length >= 500) return;
+        for (const s of n.shadowRoots || []) { if (s.shadowRootType === 'closed') chiuse.push(s.nodeId); visita(s); }
+        for (const c of n.children || []) visita(c);
+        if (n.contentDocument) visita(n.contentDocument);
+      };
+      visita(root);
+      for (const nodeId of chiuse) {
+        const { object } = await dbg.sendCommand('DOM.resolveNode', { nodeId });
+        if (!object || !object.objectId) continue;
+        const { result } = await dbg.sendCommand('Runtime.callFunctionOn', {
+          objectId: object.objectId, returnByValue: true,
+          functionDeclaration: `function () { return (${pageHints.toString()})(this.ownerDocument, { radici: [this] }); }`,
+        });
+        const h = result && result.value;
+        if (h && h.shownPassword) out.shownPassword = true;
+        if (h && h.shownPayment) out.shownPayment = true;
+        if (out.shownPassword && out.shownPayment) break;
+      }
+    } catch (_) {
+    } finally {
+      if (mio) { try { dbg.detach(); } catch (_) {} }
+    }
+    return out;
+  },
+
+  // Solo dove il campo porterebbe al blocco: un http con la password resta l'avviso che vede già il content script.
+  _sbCampiContano(SB, url) {
+    try {
+      return SB.checkSync(url, { hasPassword: true }).level === 'pericoloso' && SB.checkSync(url, {}).level !== 'pericoloso';
+    } catch (_) { return false; }
   },
 
   // L'utente ha scritto "confermo" sull'avviso "pericoloso": bypass per (scheda, dominio), l'avviso va via.

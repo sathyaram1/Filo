@@ -414,7 +414,7 @@
 
     // §1.2 — colore IDENTITÀ del sito (theme-color → manifest → favicon →
     // fallback), calcolato una volta dal content script e cachato per dominio dal
-    // main; la shell lo applica attenuato alle tab INATTIVE.
+    // main; la shell lo mescola col fondo della barra nelle tab INATTIVE.
     TAB_IDENTITY_COLOR: 'tab_identity_color',        // { color: 'rgb(r,g,b)' | null }
 
     // La scheda è sotto gli occhi di qualcuno (attiva, finestra né nascosta né
@@ -683,6 +683,16 @@
     // suo figlio da nascondere: fra frame si passa dal main, una postMessage la saprebbe scrivere anche il sito.
     COOKIES_FRAME_BANNER: 'cookies_frame_banner',   // (riquadro) {} → { ok }
     COOKIES_HIDE_FRAME: 'cookies_hide_frame',       // main → pagina { url, origin }
+    // #760 — riquadro di terzi rotto dai cookie che Filo rifiuta. Il riquadro dice cosa mostra; il servizio e la
+    // pagina li ricava il main dal mittente, mai dal messaggio. La proposta la disegna la pagina, la risposta la
+    // valida il main sul gettone che ha dato lui.
+    RIQUADRO_COOKIE_SEGNALA: 'riquadro_cookie_segnala', // (riquadro) { testo, parole, media, password, larghezza, altezza } → { ok }
+    RIQUADRO_COOKIE_STATO: 'riquadro_cookie_stato',     // (riquadro) {} → { ok, nome, consentito, proponibile }
+    RIQUADRO_COOKIE_CAMBIA: 'riquadro_cookie_cambia',   // (riquadro, tasto destro) { attiva } → { ok }
+    RIQUADRO_COOKIE_PROPONI: 'riquadro_cookie_proponi', // main → pagina { token, nome, url, origin }
+    RIQUADRO_COOKIE_RITIRA: 'riquadro_cookie_ritira',   // main → pagina { token }
+    RIQUADRO_COOKIE_AGGIORNA: 'riquadro_cookie_aggiorna', // main → riquadri: l'elenco o la modalità sono cambiati
+    RIQUADRO_COOKIE_RISPOSTA: 'riquadro_cookie_risposta', // (pagina) { token, si } → { ok }
     // Solo pagine filo:// (Sicurezza): cosa Filo ha fatto coi banner, sito per sito, nel profilo della finestra.
     COOKIES_SITES: 'cookies_sites',                 // {} → { ok, sites: [{ site, rejected, hidden, at }] }
     // Solo pagine filo:// (Sicurezza): «Apri da un altro paese» ha un fornitore? E con quale host.

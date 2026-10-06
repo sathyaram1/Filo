@@ -1010,6 +1010,7 @@ async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
     const Cookies = require('./cookies');
     const cookiesChanged = Cookies.configureFromSettings(merged);
     require('./cookieIncorporati').configureFromSettings(merged);
+    require('./riquadriRotti').configureFromSettings(merged);
     require('./cookieBanners').configureFromSettings(merged);
     // Ogni frame di ogni scheda rilegge la sua config: solo se la modalità o i siti coi banner sono cambiati.
     if (cookiesChanged) {
@@ -5407,6 +5408,9 @@ globalThis.SN_TAB_TRIAGE_DECIDE = runTabTriageDecision;
 // prompt del classificatore). Cache (dominio, path-pattern) condivisa con TTL.
 // Esposto su globalThis per evitare il ciclo di require tabs.js↔handlers.js.
 let geoClassifierCache = null;
+// #760 — il riquadro di terzi rotto che le regole non riconoscono: un modello con la vista guarda solo il riquadro.
+require('./riquadriRotti').usaModello((messages) => Gate.text({ action: ACTIONS.EMBED_COOKIE_CHECK, messages }));
+
 globalThis.SN_GEO_CLASSIFY = async function geoClassify(input) {
   const Classifier = globalThis.SN_GEOBLOCK_CLASSIFIER;
   if (!Classifier) return { class: null, route: { proxy: false }, skipped: true };

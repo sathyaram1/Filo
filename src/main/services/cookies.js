@@ -117,6 +117,13 @@ function getTrustedSites(settings) {
   return Array.isArray(list) ? list : [];
 }
 
+// Servizi (eTLD+1) dei contenuti incorporati a cui l'utente ha riattivato i cookie (#760).
+function getEmbedSites(settings) {
+  const c = settings && settings.security && settings.security.cookies;
+  const list = (c && c.embedSites) || [];
+  return Array.isArray(list) ? list.map((d) => String(d || '').toLowerCase()).filter(Boolean) : [];
+}
+
 // Siti (eTLD+1) dove l'utente ha chiesto di rivedere i banner dei cookie: lì Filo non rifiuta e non nasconde.
 function getBannerSites(settings) {
   const c = settings && settings.security && settings.security.cookies;
@@ -241,16 +248,16 @@ function ensureRequestHook(ses) {
       callback({ cancel: false });
       return;
     }
-    if (s.enabled && isTrackerUrl(details.url)) {
-      callback({ cancel: true });
-      return;
-    }
     let ad = null;
     try { ad = require('./adblock'); } catch (_) {}
-    if (ad && ad.shouldBlock && ad.shouldBlock(details.url)) {
+    // La pagina che l'utente apre non si ferma qui in silenzio: la decide il blocco dei siti, che avvisa con «Apri comunque» (#576).
+    const pagina = details.resourceType === 'mainFrame';
+    if ((s.enabled && isTrackerUrl(details.url)) || (!pagina && ad && ad.shouldBlock && ad.shouldBlock(details.url))) {
       callback({ cancel: true });
+      if (ad) ad.chiudiInPagina(details);
       return;
     }
+    if (ad && ad.ricordaRichiesta) ad.ricordaRichiesta(details);
     callback({ cancel: false });
   });
   return state;
@@ -261,6 +268,13 @@ function applyTrackerBlocking(ses, enabled) {
   if (!state) return;
   state.filtri = true;
   state.enabled = !!enabled;
+}
+
+// Finestra incognito e scheda col proxy hanno una sessione loro: senza, lì la pubblicità passava intera (#576).
+// Accende solo le liste della pubblicità; il blocco tracker resta com'era.
+function coverAdblock(ses) {
+  const state = ensureRequestHook(ses);
+  if (state) state.filtri = true;
 }
 
 // ─── sessioni per-sito (modalità privacy) ─────────────────────────────────
@@ -430,13 +444,43 @@ function buttaJar(partition, ses) {
   fidatiDaButtare.delete(partition);
   try { require('./permessiPagine').dimenticaSessione(ses); } catch (_) {}
   const pulisci = (fn) => Promise.resolve().then(fn).catch(() => {});
-  Promise.all([
+  const nuova = g.n ? `${base}~${g.n}` : base;
+  passaRiquadri(ses, nuova).then(() => Promise.all([
     pulisci(() => (typeof ses.clearData === 'function' ? ses.clearData() : Promise.all([ses.clearStorageData(), ses.clearCache()]))),
     pulisci(() => ses.clearAuthCache()),
     pulisci(() => typeof ses.closeAllConnections === 'function' && ses.closeAllConnections()),
-  ]).then(() => g.svuota.delete(idx));
+  ])).then(() => g.svuota.delete(idx));
   const site = sitoDelJar.get(base);
   try { if (site && jarWipe) jarWipe(site); } catch (_) {}
+}
+
+// I cookie dei servizi incorporati riattivati dall'utente (#760) passano dallo spazio del sito che se ne va a quello
+// che lo sostituirà: sopravvivono all'uscita dal sito, ma restano suoi (mai quelli dello spazio del servizio stesso).
+function cookieUrl(c) {
+  return (c.secure ? 'https://' : 'http://') + String(c.domain || '').replace(/^\./, '') + (c.path || '/');
+}
+function delServizio(c, servizi) {
+  const d = String(c.domain || '').replace(/^\./, '').toLowerCase();
+  return servizi.some((s) => d === s || d.endsWith('.' + s));
+}
+async function passaRiquadri(ses, nuova) {
+  const servizi = _cached.embedSites || [];
+  if (!servizi.length) return;
+  let lista = [];
+  try { lista = (await ses.cookies.get({})).filter((c) => delServizio(c, servizi)); } catch (_) { return; }
+  if (!lista.length) return;
+  const dest = ensureSiteSession(nuova, { gpc: _cached.mode !== MODES.MANUAL });
+  const ora = Date.now() / 1000;
+  for (const c of lista) {
+    if (c.expirationDate && c.expirationDate < ora) continue;
+    try {
+      await dest.cookies.set({
+        url: cookieUrl(c), name: c.name, value: c.value, path: c.path || '/', secure: !!c.secure, httpOnly: !!c.httpOnly,
+        sameSite: c.sameSite, ...(c.expirationDate ? { expirationDate: c.expirationDate } : {}),
+        ...(c.hostOnly ? {} : { domain: String(c.domain || '').replace(/^\./, '') }),
+      });
+    } catch (_) {}
+  }
 }
 
 let jarWipe = null;
@@ -480,7 +524,7 @@ function configureForMode(mode) {
 
 // Ultima modalità/siti fidati visti, così before-quit (sincrono) può lanciare il
 // wipe senza dover rileggere lo storage in modo asincrono.
-let _cached = { mode: MODES.DEFAULT, trustedSites: [], bannerSites: [] };
+let _cached = { mode: MODES.DEFAULT, trustedSites: [], bannerSites: [], embedSites: [] };
 let _configured = false;
 // Impostazioni cambiate da una finestra incognito: valgono solo lì, il profilo normale non le vede (#754).
 // null = l'incognito non ha cambiato niente e vede quelle del profilo normale.
@@ -544,7 +588,7 @@ function configureFromSettings(settings) {
   const prev = _cached.bannerSites;
   const prevMode = _cached.mode;
   const prevTrusted = _cached.trustedSites.join('\n');
-  _cached = { mode: getMode(settings), trustedSites: getTrustedSites(settings), bannerSites: getBannerSites(settings) };
+  _cached = { mode: getMode(settings), trustedSites: getTrustedSites(settings), bannerSites: getBannerSites(settings), embedSites: getEmbedSites(settings) };
   configureForMode(_cached.mode);
   const changed = prevMode !== _cached.mode || prev.join('\n') !== _cached.bannerSites.join('\n');
   if (_configured) {
@@ -639,6 +683,7 @@ module.exports = {
   getMode,
   getTrustedSites,
   getBannerSites,
+  getEmbedSites,
   isBannerSiteIn,
   isBannerSite,
   currentMode,
@@ -659,6 +704,7 @@ module.exports = {
   ensureHeaderHook,
   applyGpc,
   applyTrackerBlocking,
+  coverAdblock,
   ensureRequestHook,
   chiudiHost,
   permettiRichieste,

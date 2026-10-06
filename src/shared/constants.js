@@ -301,6 +301,8 @@
     PROVIDER_TEST: 'provider_test',
     // Nome sensato a un file dell'utente dal suo contenuto (#950): legge l'inizio del testo o una miniatura.
     FILE_NAME: 'file_name',
+    // Un riquadro di terzi rotto dai cookie che le regole non riconoscono (#760): un modello guarda la sua immagine.
+    EMBED_COOKIE_CHECK: 'embed_cookie_check',
   };
 
   // === Crediti (gamification) ===
@@ -395,6 +397,7 @@
     [ACTIONS.FILO_TAB_SEARCH]: 'Gestione schede',
     [ACTIONS.FILO_CHAT_TRIAGE]: 'Chat con Filo',
     [ACTIONS.FILE_NAME]: 'Nomi dei file',
+    [ACTIONS.EMBED_COOKIE_CHECK]: 'Contenuti incorporati',
   };
 
   function creditUsageGroup(action) {
@@ -446,6 +449,7 @@
     [ACTIONS.ARCHIVE_EMBED]: 'Archivio schede — indicizzazione',
     [ACTIONS.PROVIDER_TEST]: 'Prova di un fornitore',
     [ACTIONS.FILE_NAME]: 'Nome sensato a un file',
+    [ACTIONS.EMBED_COOKIE_CHECK]: 'Contenuti incorporati — cookie mancanti',
   };
 
   function actionLabel(action) {
@@ -518,6 +522,7 @@
     [ACTIONS.ARCHIVE_EMBED]: '',
     [ACTIONS.PROVIDER_TEST]: '',
     [ACTIONS.FILE_NAME]: '',
+    [ACTIONS.EMBED_COOKIE_CHECK]: '',
   };
 
   // ── Politica sui fornitori (host upstream) ───────────────────────────────────
@@ -2444,11 +2449,14 @@
       //   accesso del dominio + un cookie di sessione nuovo suo): in 'default' i
       //   cookie di questi domini restano anche quando compaiono incorporati in
       //   un'altra pagina (#758). Lo scrive Filo, l'utente lo corregge in Sicurezza.
+      // embedSites: domini (eTLD+1) dei contenuti incorporati a cui l'utente ha riattivato i cookie (#760): in
+      //   'default' non si declassano, in 'privacy' restano nello spazio del sito che li ospita anche dopo l'uscita.
       cookies: {
         mode: 'default',
         trustedSites: [],
         bannerSites: [],
         loggedSites: [],
+        embedSites: [],
         // Il testo lasciato nella casella dei siti fidati che non è un dominio: torna lì con l'avviso.
         bozza: '',
       },
@@ -2464,12 +2472,8 @@
       fingerprint: {
         mode: 'default',
       },
-      // Ad-blocking per-dominio basato su liste pubbliche e gratuite (StevenBlack
-      // hosts + EasyList). Le liste si scaricano dalla rete, si tengono in cache
-      // locale (userData/adblock/lists.json) e si aggiornano da sole una volta a
-      // settimana. Ogni richiesta verso un dominio in lista viene annullata a
-      // monte. Una whitelist di base protegge i domini legittimi. Vedi
-      // src/main/services/adblock.js. Default-on, disattivabile col toggle.
+      // Ad-blocking a liste pubbliche (blocco di rete e riquadri nascosti nelle
+      // pagine): src/main/services/adblock.js. Default-on, disattivabile col toggle.
       adblock: {
         enabled: true,
       },

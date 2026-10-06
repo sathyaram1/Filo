@@ -78,6 +78,8 @@
     $('cookie-wl-add-btn').textContent = I18n.t('options_cookies_whitelist_add');
     $('sec-cookies-accessi-title').textContent = I18n.t('options_cookies_accessi_title');
     $('sec-cookies-accessi-desc').textContent = I18n.t('options_cookies_accessi_desc');
+    $('sec-cookies-riquadri-title').textContent = I18n.t('options_cookies_riquadri_title');
+    $('sec-cookies-riquadri-desc').textContent = I18n.t('options_cookies_riquadri_desc');
     $('sec-cookies-banners-title').textContent = I18n.t('options_cookies_banners_title');
     $('sec-cookies-done-title').textContent = I18n.t('options_cookies_done_title');
     $('sec-fp-title').textContent = I18n.t('options_fp_title');
@@ -331,9 +333,11 @@
     cookieWhitelist = Array.isArray(trusted) ? trusted.slice() : [];
     cookieBannerSites = Array.isArray(cookies.bannerSites) ? cookies.bannerSites.slice() : [];
     cookieLoggedSites = Array.isArray(cookies.loggedSites) ? cookies.loggedSites.slice() : [];
+    cookieEmbedSites = Array.isArray(cookies.embedSites) ? cookies.embedSites.slice() : [];
     renderWhitelist();
     renderBannerSites();
     renderLoggedSites();
+    renderEmbedSites();
     // Il testo lasciato nella casella dei fidati torna lì: un sito valido è già nell'elenco, il resto con l'avviso.
     const bozza = typeof cookies.bozza === 'string' ? cookies.bozza : '';
     $('cookie-wl-input').value = bozza;
@@ -375,6 +379,7 @@
   // #758 — siti dove Filo ha visto un tuo accesso: i loro contenuti incorporati tengono i cookie. Li scrive Filo,
   // qui si vedono e si tolgono.
   let cookieLoggedSites = [];
+  let cookieEmbedSites = [];
 
   function currentMode() {
     const checked = document.querySelector('input[name="cookie-mode"]:checked');
@@ -492,6 +497,32 @@
     }
   }
 
+  // I servizi a cui hai riattivato i cookie dal riquadro rotto (#760): si vedono tutti e si tolgono da qui o dal
+  // tasto destro sul riquadro.
+  function renderEmbedSites() {
+    const box = $('sec-cookies-riquadri');
+    const list = $('cookie-riquadri-list');
+    list.innerHTML = '';
+    box.hidden = !cookieEmbedSites.length;
+    for (const domain of cookieEmbedSites) {
+      const li = document.createElement('li');
+      const span = document.createElement('span');
+      span.textContent = leggibile(domain);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sn-btn-secondary';
+      btn.textContent = I18n.t('options_cookies_riquadri_remove');
+      btn.addEventListener('click', () => {
+        cookieEmbedSites = cookieEmbedSites.filter((d) => d !== domain);
+        renderEmbedSites();
+        saveCookies();
+      });
+      li.appendChild(span);
+      li.appendChild(btn);
+      list.appendChild(li);
+    }
+  }
+
   // Cosa Filo ha fatto coi banner, sito per sito: la stessa memoria che il menu della scheda legge, tutta.
   // «Mostra il banner» qui fa quello che fa dal menu: il sito passa all'elenco sopra e dimentica la risposta.
   let cookieDoneSites = [];
@@ -589,6 +620,7 @@
           trustedSites: fidati,
           bannerSites: cookieBannerSites.slice(),
           loggedSites: cookieLoggedSites.slice(),
+          embedSites: cookieEmbedSites.slice(),
           bozza: dominio ? '' : bozza,
         },
       },
@@ -935,6 +967,11 @@
       if (Array.isArray(c.loggedSites) && c.loggedSites.join('\n') !== cookieLoggedSites.join('\n')) {
         cookieLoggedSites = c.loggedSites.slice();
         renderLoggedSites();
+      }
+      // Un servizio riattivato dalla proposta sul riquadro entra nell'elenco mentre la pagina è aperta.
+      if (Array.isArray(c.embedSites) && c.embedSites.join('\n') !== cookieEmbedSites.join('\n')) {
+        cookieEmbedSites = c.embedSites.slice();
+        renderEmbedSites();
       }
       if (!Array.isArray(c.bannerSites)) return;
       if (c.bannerSites.join('\n') === cookieBannerSites.join('\n')) return;

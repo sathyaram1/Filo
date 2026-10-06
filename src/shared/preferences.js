@@ -994,6 +994,14 @@
         + 'fa durare i suoi cookie solo per la visita, aggiungerlo glieli fa tenere come a un sito dove sei entrato.',
     }),
     elenco({
+      keys: ['contenuti_incorporati_cookie', 'cookie dei contenuti incorporati', 'cookie dei riquadri', 'riquadri con i cookie', 'cookie riattivati'],
+      percorso: 'security.cookies.embedSites',
+      nome: 'Contenuti incorporati con i cookie riattivati',
+      aiuto: 'servizi (post, video, mappe) a cui hai riattivato i cookie quando i loro contenuti dentro altri siti non si vedevano',
+      risk: 'Cambia i servizi i cui contenuti incorporati in altre pagine tengono i loro cookie: aggiungerne uno lo lascia '
+        + 'ricordare di te fra una visita e l’altra, toglierlo fa durare i suoi cookie solo per la visita.',
+    }),
+    elenco({
       keys: ['domini_esclusi', 'domini esclusi', 'siti esclusi', 'blocklist', 'siti dove filo non interviene'],
       percorso: 'blocklist',
       nome: 'Domini dove Filo non interviene',

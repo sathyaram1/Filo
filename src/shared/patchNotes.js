@@ -9,14 +9,27 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.235', date: '2026-10-06',
+      features: [
+        'Se un post, un video o una mappa dentro la pagina di un altro sito non si vede perché Filo ne ha bloccato i cookie, sopra compare la domanda «Attivo i cookie di Instagram per questo contenuto?». Con «Sì» il contenuto si ricarica e funziona. Li togli col tasto destro sul contenuto o in Impostazioni, Sicurezza.',
+      ],
+      fixes: [
+        'Un sito dal nome comune non passa pi\u00f9 per l\'imitazione di un marchio. team.com, email.com, apply.com, telegraph.co.uk e le altre parole vicine a Steam, Gmail, Apple o Telegram aprivano il blocco a tutta pagina, quello che si toglie solo scrivendo \u00abconfermo\u00bb. Adesso trovi un avviso che chiudi con un clic. Il blocco resta sui sosia scritti con lettere che si somigliano, come paypa1 o g00gle, e su ogni sito che oltre al nome somigliante \u00e8 stato registrato da poco, ha il certificato rotto o ti chiede la password, anche se il modulo compare dopo.',
+      ],
+    },
+    {
       version: '0.2.234', date: '2026-10-05',
       features: [
         'Nel deck builder ogni lista di carte in chat ha un titolo in italiano che dice cosa contiene, per esempio «12 carte che danno rapidità», e il triangolino la chiude e la riapre anche nell\'ultima risposta. Col tasto destro sul titolo copi la ricerca usata, riordini la lista per costo di mana, nome o prezzo, oppure apri la stessa ricerca su Scryfall. L\'ordine puoi chiederlo anche a Filo («ordinale per prezzo») e resta quando riapri la chat.',
         'I post, i video e le mappe che vedi dentro le pagine di altri siti non lasciano più cookie per sempre: durano finché leggi la pagina e per qualche minuto dopo che l\'hai chiusa. Dai siti dove sei entrato con il tuo account resti connesso lo stesso, e quali sono lo vedi (e lo correggi) in Impostazioni → Sicurezza.',
         'Mentre Filo lavora, al posto della rotella corre un filo. Accanto vedi scorrere il suo ragionamento, e ogni volta che fa qualcosa il filo fa un nodo col nome di quello che sta facendo, per esempio «Cercato sul web · orari treni». Quando risponde il filo si avvolge in un gomitolo con il riassunto, e un clic lo srotola. Il tasto d\'invio intanto diventa un quadrato che lo ferma subito, anche con Invio. Quello che aveva già fatto resta, e lo stesso tasto ti offre di riprendere senza rifarlo.',
+        'La pubblicità sparisce anche dove prima restava: i riquadri vuoti e le immagini rotte lasciati dagli annunci bloccati, e i banner che il sito mette da sé. Filo usa anche le liste per i siti italiani e francesi e blocca la pubblicità pure nella finestra in incognito. Il blocco si spegne e si riaccende anche chiedendolo a Filo, e vale subito anche nelle pagine già aperte.',
         'Puoi decidere tu quando aggiornare Filo. Togli la spunta a «Installa gli aggiornamenti da solo» in Preferenze, Impostazioni avanzate, oppure di\' a Filo «non aggiornarti da solo». Quando esce una versione nuova te lo dice nella home e la installa solo se premi «Installa», o se dici a Filo «aggiornati».',
       ],
       fixes: [
+        'I siti che le liste della pubblicità fermano solo quando compaiono dentro altri siti, come ClickMagick, finivano su «Sito bloccato»: adesso si aprono. E se in Sicurezza hai tolto le liste della pubblicità dal blocco dei siti, quei siti si aprono davvero invece di finire su «Pagina bloccata».',
+        'Alcuni siti come dev.to finivano sulla pagina «Sito bloccato», e le immagini di imgur sparivano dalle pagine che le mostrano: una regola delle liste della pubblicità valeva per un pezzo del sito e Filo la applicava al sito intero. Adesso i siti si aprono e le immagini tornano.',
+        'Le schede in secondo piano hanno il colore del loro sito, e si riconosce: YouTube è rossa, Poste gialla. Prima restavano grigiastre anche col colore al massimo. Se le vuoi più vivaci o più neutre chiedilo a Filo, o cambia l\'opacità nelle Preferenze avanzate. Il titolo resta leggibile su qualunque colore, e in Cronologia le schede chiuse hanno gli stessi colori.',
         'Nella chat del deck builder vedi da quanto aspetti la risposta, e «Ferma» la interrompe, come Esc nel campo. La chat torna subito libera e il mazzo resta com\'era. Se Scryfall non risponde, dopo 30 secondi la chat te lo dice, e intanto anteprime e prezzi non restano bloccati.',
         'Su Windows, se in un comando che Filo esegue per te una parte sbaglia, per esempio un programma che non esiste, il resto della riga gira lo stesso, come quando la scrivi tu nel terminale. Prima si fermava tutto lì.',
         'La chat di Filo chiede le risposte solo ai fornitori che sanno usare i suoi strumenti, come cercare sul web o cambiare un\'impostazione. Prima uno che li ignorava faceva fallire la risposta senza spiegazione. Se per il modello che hai scelto non ce n\'è nessuno, Filo te lo dice.',

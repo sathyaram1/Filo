@@ -198,7 +198,7 @@
 
       // Colore identità del sito (§1.2): calcolato una volta (theme-color →
       // manifest → favicon → fallback) e mandato al main, che lo cacha per dominio
-      // e lo applica attenuato alle tab inattive.
+      // e lo mescola col fondo della barra nelle tab inattive.
       try { PageColor.reportTabIdentityColor(() => settings && settings.tabColor); } catch (_) {}
 
       // Segnali di attività (§2.1): ultima interazione, % di scroll, form sporco.
@@ -1746,11 +1746,14 @@
     if (zoomItem) items.push(zoomItem);
 
     // 3. Zona contestuale — assente se non c'è contesto utile.
+    // #760 — il tasto destro dentro un riquadro di un altro sito riattiva o toglie i cookie del suo servizio.
+    const vociRiquadro = (self.SN_RIQUADRO_COOKIE && self.SN_RIQUADRO_COOKIE.voci()) || [];
     const contextItems = [
       ...vociDellaPagina(target),
       ...buildContextualItems({
         selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target,
       }),
+      ...vociRiquadro,
     ];
     if (contextItems.length > 0) {
       items.push({ type: 'separator' });

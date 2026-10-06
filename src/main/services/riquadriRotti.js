@@ -1,0 +1,369 @@
+// Il riquadro di terzi rotto dai cookie che Filo rifiuta (#760): lo riconosce (regole, poi un modello che guarda solo
+// il riquadro) e propone sul posto di riattivare i cookie di quel servizio. Non decide niente sui cookie: l'eccezione
+// la applicano cookieIncorporati.js (Automatico) e cookies.js (Privacy). Le regole: riquadriRottiRegole.js.
+
+'use strict';
+
+const crypto = require('node:crypto');
+const R = require('./riquadriRottiRegole');
+
+// Il modello guarda al massimo questi riquadri in un'ora: un sito pieno di riquadri strani non diventa una spesa.
+const VISIONI_ORA = 20;
+// Un riquadro che il modello ha visto non rotto non si riguarda per un giorno. Il suo «no» vale per quel contenuto
+// su quella pagina, non per il servizio: un video rimosso non dice niente degli altri riquadri dello stesso servizio.
+const FUNZIONA_MS = 24 * 60 * 60 * 1000;
+// Un riquadro che non si è lasciato fotografare (scorso via prima della foto) torna a farsi vedere, fino a qui.
+const FOTO_TENTATIVI = 3;
+const MAX_VOCI = 500;
+// Il lato lungo dell'immagine che parte: basta a leggere un segnaposto.
+const LATO_MAX = 768;
+
+let riattivati = new Set();
+let chiamaModello = null;
+const proposte = new Map();   // gettone → { wcId, ftn, servizio, ospite, nome, url, origin, segno }
+const visti = new Set();      // riquadri già proposti o già guardati: una volta per riquadro
+const rifiutate = new Set();  // servizio|ospite a cui l'utente ha detto no, per questa sessione di Filo
+const funziona = new Map();   // pagina|riquadro → quando il modello l'ha visto non rotto
+const fotoMancate = new Map(); // riquadro → foto non riuscite
+let visioni = [];
+
+function Cookies() { return require('./cookies'); }
+function MSG() { return (globalThis.SN_MSG && globalThis.SN_MSG.MSG) || {}; }
+
+function tieni(set, v) {
+  set.add(v);
+  while (set.size > MAX_VOCI) set.delete(set.values().next().value);
+}
+
+function sitoDi(url) {
+  if (!/^https?:/i.test(String(url || ''))) return null;
+  try { return Cookies().registrableOf(url) || null; } catch (_) { return null; }
+}
+
+function stesso(a, b) { return a === b || !!(a && b && a.frameTreeNodeId === b.frameTreeNodeId); }
+
+// Il riquadro che ha scritto, il suo antenato figlio della pagina (quello che la pagina vede), e i due siti.
+function contesto(sender) {
+  const wc = sender && sender.wc;
+  const frame = sender && sender.frame;
+  if (!wc || wc.isDestroyed() || !frame) return null;
+  const top = wc.mainFrame;
+  if (!top || stesso(frame, top)) return null;
+  let figlio = frame;
+  while (figlio.parent && !stesso(figlio.parent, top)) figlio = figlio.parent;
+  if (!figlio.parent) return null;
+  let urlFrame = '';
+  let urlTop = '';
+  try { urlFrame = frame.url || ''; urlTop = wc.getURL() || ''; } catch (_) { return null; }
+  const servizio = sitoDi(urlFrame);
+  const ospite = sitoDi(urlTop);
+  if (!servizio || !ospite || servizio === ospite) return null;
+  const incognito = !!(sender.win && sender.win._filoIncognito);
+  return { wc, top, frame, figlio, servizio, ospite, urlFrame, urlTop, incognito };
+}
+
+// I cookie di quel servizio, in quel riquadro, li sta rifiutando Filo adesso.
+function rifiutati(c) {
+  if (c.incognito || riattivati.has(c.servizio)) return false;
+  const C = Cookies();
+  const modo = C.currentMode(false);
+  if (modo === C.MODES.PRIVACY) return !C.keepsSiteData(c.ospite);
+  if (modo !== C.MODES.DEFAULT) return false;
+  try { return require('./cookieIncorporati').declassaQui(c.servizio, c.ospite); } catch (_) { return false; }
+}
+
+function pubblicita(url) {
+  try { if (Cookies().isTrackerUrl(url)) return true; } catch (_) {}
+  try { return !!require('./adblock').isBlockedUrl(url); } catch (_) { return false; }
+}
+
+function diCasa(url) {
+  const N = globalThis.SN_URL_NAV;
+  return !!(N && typeof N.isHomeNetworkUrl === 'function' && N.isHomeNetworkUrl(url));
+}
+
+function hostEPercorso(url) {
+  try { const u = new URL(url); return { host: u.hostname, percorso: u.pathname }; } catch (_) { return { host: '', percorso: '' }; }
+}
+
+function osservazione(msg) {
+  const m = msg || {};
+  const n = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+  return {
+    testo: typeof m.testo === 'string' ? m.testo.slice(0, 4000) : '',
+    parole: n(m.parole),
+    media: n(m.media),
+    password: !!m.password,
+    larghezza: n(m.larghezza),
+    altezza: n(m.altezza),
+  };
+}
+
+// Il segno con cui il riquadro si è presentato alla pagina (riquadroRotto.js): la pagina ritrova l'elemento anche
+// quando il riquadro è finito su un indirizzo diverso da quello che gli ha dato.
+function segnoDi(msg) {
+  const s = msg && msg.segno;
+  return typeof s === 'string' && /^[\w-]{8,64}$/.test(s) ? s : '';
+}
+
+// Codice per il mondo dei content script della pagina (quello di riquadroRotto.js), dove vive la mappa dei segni.
+const MONDO_SCRIPT = 999;
+function chiamaPagina(wc, metodo, ...args) {
+  const code = `(() => { const R = globalThis.SN_RIQUADRO_COOKIE; return R && typeof R.${metodo} === 'function' ? R.${metodo}(...${JSON.stringify(args)}) : null; })()`;
+  try { return wc.executeJavaScriptInIsolatedWorld(MONDO_SCRIPT, [{ code }]).catch(() => null); } catch (_) { return Promise.resolve(null); }
+}
+
+function proponi(c, nome, segno) {
+  const token = crypto.randomUUID();
+  let url = '';
+  let origin = '';
+  try { url = String(c.figlio.url || ''); origin = String(c.figlio.origin || ''); } catch (_) {}
+  proposte.set(token, { wcId: c.wc.id, ftn: c.figlio.frameTreeNodeId, servizio: c.servizio, ospite: c.ospite, nome, url, origin, segno });
+  while (proposte.size > MAX_VOCI) proposte.delete(proposte.keys().next().value);
+  try { c.top.send('filo:broadcast', { type: MSG().RIQUADRO_COOKIE_PROPONI, token, nome, url, origin, segno }); } catch (_) {}
+}
+
+// Ricaricare un riquadro vuol dire rimetterlo all'indirizzo che la pagina gli ha dato: ricaricato dov'è, un riquadro
+// rimandato alla pagina d'accesso resterebbe lì. Se la pagina non lo ritrova, si ricarica dov'è.
+async function ricarica(wcId, ftn, segno) {
+  let wc = null;
+  try { wc = require('electron').webContents.fromId(wcId); } catch (_) {}
+  if (!wc || wc.isDestroyed()) return false;
+  if (segno && (await chiamaPagina(wc, 'ricarica', segno)) === true) return true;
+  const f = frameDi(wcId, ftn);
+  if (!f) return false;
+  try { f.reload(); return true; } catch (_) { return false; }
+}
+
+// Il rettangolo del riquadro nella pagina, letto in un mondo isolato: la pagina non lo può falsare a suo piacere.
+const MONDO = 1760;
+function codiceMisura(url, origin) {
+  return `(() => {
+  const url = ${JSON.stringify(url)}, origin = ${JSON.stringify(origin)};
+  const orig = (u) => { try { return new URL(u, location.href).origin; } catch (_) { return ''; } };
+  const tutti = [...document.querySelectorAll('iframe')];
+  const esatti = tutti.filter((f) => f.src && new URL(f.src, location.href).href === url);
+  const scelti = esatti.length ? esatti : tutti.filter((f) => orig(f.src) === origin);
+  for (const f of scelti) {
+    const r = f.getBoundingClientRect();
+    const x = Math.max(0, r.left), y = Math.max(0, r.top);
+    const w = Math.min(innerWidth, r.right) - x, h = Math.min(innerHeight, r.bottom) - y;
+    if (w >= 40 && h >= 40) return { x, y, w, h };
+  }
+  return null;
+})()`;
+}
+
+async function foto(c, segno) {
+  let r = segno ? await chiamaPagina(c.wc, 'rettangolo', segno) : null;
+  if (!r) {
+    try { r = await c.wc.executeJavaScriptInIsolatedWorld(MONDO, [{ code: codiceMisura(c.figlio.url, c.figlio.origin) }]); } catch (_) { return null; }
+  }
+  if (!r || ![r.x, r.y, r.w, r.h].every(Number.isFinite)) return null;
+  let z = 1;
+  try { z = c.wc.getZoomFactor() || 1; } catch (_) {}
+  const rect = { x: Math.round(r.x * z), y: Math.round(r.y * z), width: Math.round(r.w * z), height: Math.round(r.h * z) };
+  let img = null;
+  try { img = await c.wc.capturePage(rect); } catch (_) { return null; }
+  if (!img || img.isEmpty()) return null;
+  const { width, height } = img.getSize();
+  const scala = Math.min(1, LATO_MAX / Math.max(width, height));
+  if (scala < 1) img = img.resize({ width: Math.round(width * scala), height: Math.round(height * scala) });
+  return 'data:image/jpeg;base64,' + img.toJPEG(80).toString('base64');
+}
+
+function restanoVisioni() {
+  const ora = Date.now();
+  visioni = visioni.filter((t) => ora - t < 60 * 60 * 1000);
+  return visioni.length < VISIONI_ORA;
+}
+
+function senzaFrammento(url) { return String(url || '').split('#')[0]; }
+function chiaveFunziona(c) { return `${senzaFrammento(c.urlTop)}|${senzaFrammento(c.urlFrame)}`; }
+
+// La foto non riuscita non è uno sguardo: il riquadro resta da guardare e il controllo dell'ora non si spende.
+const FOTO_MANCATA = { fotoMancata: true };
+
+async function guarda(c, segno) {
+  if (typeof chiamaModello !== 'function') return null;
+  const quando = funziona.get(chiaveFunziona(c));
+  if (quando && Date.now() - quando < FUNZIONA_MS) return null;
+  if (diCasa(c.urlFrame) || diCasa(c.urlTop)) return null;
+  // Una pagina delicata (password, carta: #1004) non va a un modello, nemmeno a pezzi.
+  try {
+    const delicata = await globalThis.SN_DELICATE.filtro();
+    if (delicata(c.urlTop) || delicata(c.urlFrame)) return null;
+  } catch (_) { return null; }
+  if (!restanoVisioni()) return null;
+  const immagine = await foto(c, segno);
+  if (!immagine) return FOTO_MANCATA;
+  visioni.push(Date.now());
+  let testo = '';
+  try { testo = await chiamaModello(R.messaggi({ immagine, sito: c.servizio })); } catch (e) {
+    console.warn('[Filo riquadri] riconoscimento non riuscito:', (e && e.message) || e);
+    return null;
+  }
+  const esito = R.leggiRisposta(testo, c.servizio);
+  if (esito && !esito.rotto) {
+    funziona.set(chiaveFunziona(c), Date.now());
+    while (funziona.size > MAX_VOCI) funziona.delete(funziona.keys().next().value);
+  }
+  return esito;
+}
+
+// Il riquadro racconta cosa mostra; da qui in poi decide il main.
+async function segnala(msg, sender) {
+  const c = contesto(sender);
+  if (!c) return { ok: false };
+  const chiave = `${c.wc.id}|${c.figlio.frameTreeNodeId}|${c.servizio}`;
+  if (visti.has(chiave) || rifiutate.has(`${c.servizio}|${c.ospite}`)) return { ok: true };
+  if (!rifiutati(c) || pubblicita(c.urlFrame)) return { ok: true };
+  const o = osservazione(msg);
+  const segno = segnoDi(msg);
+  const { host, percorso } = hostEPercorso(c.urlFrame);
+  const regola = R.riconosci({ host, percorso, testo: o.testo, parole: o.parole });
+  if (regola) {
+    tieni(visti, chiave);
+    proponi(c, regola.nome || R.nomeDi(c.servizio, host, percorso), segno);
+    return { ok: true, via: 'regola' };
+  }
+  if (!R.sembraRotto(o)) return { ok: true };
+  tieni(visti, chiave);
+  // Un modulo con la password è delicato (#1004): la sua immagine non va a un modello.
+  if (o.password) return { ok: true };
+  const esito = await guarda(c, segno);
+  if (esito === FOTO_MANCATA) {
+    const n = (fotoMancate.get(chiave) || 0) + 1;
+    fotoMancate.set(chiave, n);
+    while (fotoMancate.size > MAX_VOCI) fotoMancate.delete(fotoMancate.keys().next().value);
+    if (n >= FOTO_TENTATIVI) return { ok: true };
+    visti.delete(chiave);
+    return { ok: true, riprova: true };
+  }
+  if (!esito || !esito.rotto || c.wc.isDestroyed() || !rifiutati(c)) return { ok: true };
+  proponi(c, esito.nome, segno);
+  return { ok: true, via: 'modello' };
+}
+
+function stato(sender) {
+  const c = contesto(sender);
+  if (!c || c.incognito) return { ok: false };
+  const { host, percorso } = hostEPercorso(c.urlFrame);
+  return {
+    ok: true,
+    nome: R.nomeDi(c.servizio, host, percorso),
+    consentito: riattivati.has(c.servizio),
+    proponibile: rifiutati(c),
+  };
+}
+
+async function scrivi(sito, attiva) {
+  const Storage = globalThis.SN_STORAGE;
+  const { applySettingsUpdate } = require('./handlers');
+  const s = await Storage.getSettings();
+  const prima = Cookies().getEmbedSites(s);
+  if (prima.includes(sito) === attiva) return;
+  const lista = attiva ? [...new Set([...prima, sito])].sort() : prima.filter((d) => d !== sito);
+  await applySettingsUpdate({ security: { cookies: { embedSites: lista } } });
+}
+
+function frameDi(wcId, ftn) {
+  let wc = null;
+  try { wc = require('electron').webContents.fromId(wcId); } catch (_) {}
+  if (!wc || wc.isDestroyed()) return null;
+  try { return wc.mainFrame.framesInSubtree.find((f) => f.frameTreeNodeId === ftn) || null; } catch (_) { return null; }
+}
+
+function ritira(wc, token) {
+  try { wc.mainFrame.send('filo:broadcast', { type: MSG().RIQUADRO_COOKIE_RITIRA, token }); } catch (_) {}
+}
+
+// Il tasto destro sul riquadro: riattiva o toglie i cookie del suo servizio, e il riquadro si ricarica.
+async function cambia(msg, sender) {
+  const c = contesto(sender);
+  if (!c || c.incognito) return { ok: false };
+  const attiva = !!(msg && msg.attiva);
+  if (attiva && !riattivati.has(c.servizio) && !rifiutati(c)) return { ok: false };
+  await scrivi(c.servizio, attiva);
+  for (const [token, p] of [...proposte]) {
+    if (p.servizio !== c.servizio) continue;
+    proposte.delete(token);
+    let w = null;
+    try { w = require('electron').webContents.fromId(p.wcId); } catch (_) {}
+    if (w && !w.isDestroyed()) ritira(w, token);
+  }
+  await ricarica(c.wc.id, c.figlio.frameTreeNodeId, segnoDi(msg));
+  return { ok: true };
+}
+
+// La risposta alla proposta arriva dalla pagina che l'ha mostrata, col gettone che le ha dato il main.
+async function risposta(msg, sender) {
+  const token = String((msg && msg.token) || '');
+  const p = proposte.get(token);
+  const wc = sender && sender.wc;
+  if (!p || !wc || wc.isDestroyed() || wc.id !== p.wcId || !stesso(sender.frame, wc.mainFrame)) return { ok: false };
+  proposte.delete(token);
+  if (!(msg && msg.si === true)) {
+    tieni(rifiutate, `${p.servizio}|${p.ospite}`);
+    return { ok: true };
+  }
+  await scrivi(p.servizio, true);
+  // Gli altri riquadri dello stesso servizio erano rotti per la stessa ragione: si ricaricano anche loro.
+  const fratelli = [...proposte].filter(([, q]) => q.servizio === p.servizio);
+  for (const [altro, q] of fratelli) {
+    proposte.delete(altro);
+    let w = null;
+    try { w = require('electron').webContents.fromId(q.wcId); } catch (_) {}
+    if (w && !w.isDestroyed()) ritira(w, altro);
+  }
+  let ricaricato = false;
+  for (const q of [p, ...fratelli.map(([, x]) => x)]) {
+    if (await ricarica(q.wcId, q.ftn, q.segno)) ricaricato = true;
+  }
+  return { ok: true, ricaricato };
+}
+
+// I riquadri aperti tengono lo stato per il tasto destro: cambiato l'elenco o la modalità (da Sicurezza, da un altro
+// riquadro, dalla chat), lo rileggono, se no offrirebbero di togliere quello che non c'è più.
+function avvisaRiquadri() {
+  let finestre = [];
+  try { finestre = require('electron').BrowserWindow.getAllWindows(); } catch (_) { return; }
+  for (const w of finestre) {
+    if (w._filoIncognito || !w._filoTabs) continue;
+    for (const t of w._filoTabs.tabs || []) {
+      const wc = t.view && t.view.webContents;
+      if (!wc || wc.isDestroyed()) continue;
+      let frames = [];
+      try { frames = wc.mainFrame.framesInSubtree; } catch (_) { continue; }
+      for (const f of frames) {
+        if (f === wc.mainFrame) continue;
+        try { f.send('filo:broadcast', { type: MSG().RIQUADRO_COOKIE_AGGIORNA }); } catch (_) {}
+      }
+    }
+  }
+}
+
+let firma = '';
+function configureFromSettings(settings) {
+  try { if (require('../shim/storage').inIncognito()) return; } catch (_) {}
+  riattivati = new Set(Cookies().getEmbedSites(settings));
+  const ora = `${Cookies().getMode(settings)}|${[...riattivati].join(',')}`;
+  if (firma && ora !== firma) avvisaRiquadri();
+  firma = ora;
+}
+
+function init(settings) { configureFromSettings(settings); }
+
+// La chiamata al modello la dà handlers.js, che tiene il cancello dei modelli.
+function usaModello(fn) { chiamaModello = typeof fn === 'function' ? fn : null; }
+
+module.exports = {
+  init,
+  usaModello,
+  configureFromSettings,
+  segnala,
+  stato,
+  cambia,
+  risposta,
+  servizioTest: R.servizioTest,
+};
