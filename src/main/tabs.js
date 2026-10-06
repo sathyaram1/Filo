@@ -2504,7 +2504,7 @@ class TabManager {
     // NON conta: muovere il cursore sopra una scheda non è usarla.
     wc.on('input-event', (_e, input) => {
       const type = (input && input.type) || '';
-      if (tab.id === this.activeId) this.barra.inputAltrove(input);
+      this.barra.inputDa(wc, input);
       if (!type || HOVER_INPUT_TYPES.has(type)) return;
       tab._userInputAt = Date.now();
       // #514 — qui passa l'input VERO, quello che la pagina non può fabbricare:
