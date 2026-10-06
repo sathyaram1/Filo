@@ -98,7 +98,9 @@
     if (!SUL_WEB || !radice || radici.has(radice)) return;
     radice.dataset.snSulWeb = '1';
     // Nello strato più alto della pagina: sopra tutto quello che il sito disegna, e fuori dai filtri che mette a sé.
-    try { if (typeof radice.showPopover === 'function') { radice.popover = 'manual'; radice.showPopover(); } } catch (_) {}
+    // Un sotto-menu ci arriva già dentro il menu che lo apre.
+    const dentro = !!(radice.parentElement && radici.has(radice.parentElement));
+    try { if (!dentro && typeof radice.showPopover === 'function') { radice.popover = 'manual'; radice.showPopover(); } } catch (_) {}
     const st = { padre: radice.parentNode, visibile: undefined, io: null };
     radici.set(radice, st);
     try {
