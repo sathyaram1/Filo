@@ -609,7 +609,7 @@ test('listArchiveTab: filtro "Bloccati confermati" tiene solo attacchi/spam conf
   assert.equal(MR.listArchiveTab(items).length, 3);
 });
 
-test('manageTabCounts: conta le cinque schede-lista, e solo quelle', () => {
+test('manageTabCounts: conta le sei schede-lista, e solo quelle', () => {
   const items = [
     { _id: 'i1', status: 'unlabeled', createdAt: '2026-01-01' },
     { _id: 'i2', status: 'attack', createdAt: '2026-01-02' },
@@ -620,17 +620,17 @@ test('manageTabCounts: conta le cinque schede-lista, e solo quelle', () => {
     { _id: 'z1', status: 'archived', createdAt: '2026-04-01' },
   ];
   assert.deepEqual(MR.manageTabCounts(items), {
-    inbox: 3, queue: 2, local: 0, resolved: 1, archived: 1,
+    inbox: 3, queue: 2, local: 0, waiting: 0, resolved: 1, archived: 1,
   });
   // Nessuna chiave in più: le schede senza lista (statistiche, modelli,
   // automazioni, log) non hanno un numero da mostrare.
   assert.deepEqual(Object.keys(MR.manageTabCounts(items)).sort(),
-    ['archived', 'inbox', 'local', 'queue', 'resolved']);
+    ['archived', 'inbox', 'local', 'queue', 'resolved', 'waiting']);
 });
 
-test('manageTabCounts: liste vuote → cinque zeri (una scheda vuota lo dice)', () => {
-  assert.deepEqual(MR.manageTabCounts([]), { inbox: 0, queue: 0, local: 0, resolved: 0, archived: 0 });
-  assert.deepEqual(MR.manageTabCounts(null), { inbox: 0, queue: 0, local: 0, resolved: 0, archived: 0 });
+test('manageTabCounts: liste vuote → sei zeri (una scheda vuota lo dice)', () => {
+  assert.deepEqual(MR.manageTabCounts([]), { inbox: 0, queue: 0, local: 0, waiting: 0, resolved: 0, archived: 0 });
+  assert.deepEqual(MR.manageTabCounts(null), { inbox: 0, queue: 0, local: 0, waiting: 0, resolved: 0, archived: 0 });
 });
 
 test('manageTabCounts: ogni numero è la LUNGHEZZA della lista che la scheda mostra', () => {
@@ -672,9 +672,9 @@ test('manageTabCounts: gli Archiviati seguono i filtri della colonna (⭐, confe
 
 test('manageTabCounts: spostare un feedback sposta due numeri (approvazione)', () => {
   const items = [{ _id: 'a', status: 'unlabeled', createdAt: '2026-01-01' }];
-  assert.deepEqual(MR.manageTabCounts(items), { inbox: 1, queue: 0, local: 0, resolved: 0, archived: 0 });
+  assert.deepEqual(MR.manageTabCounts(items), { inbox: 1, queue: 0, local: 0, waiting: 0, resolved: 0, archived: 0 });
   items[0].status = 'todo';   // l'owner approva: Ricevuti → In coda
-  assert.deepEqual(MR.manageTabCounts(items), { inbox: 0, queue: 1, local: 0, resolved: 0, archived: 0 });
+  assert.deepEqual(MR.manageTabCounts(items), { inbox: 0, queue: 1, local: 0, waiting: 0, resolved: 0, archived: 0 });
 });
 
 // ── Lavori locali (#908) ────────────────────────────────────────────────────
@@ -689,7 +689,7 @@ test('Lavori locali: col segno la pratica esce da «In coda» e ha la sua sezion
   assert.equal(MR.manageTabFor(items[0]), 'local');
   assert.deepEqual(MR.listForManageTab(items, 'local').map((f) => f._id), ['l1']);
   assert.deepEqual(MR.listForManageTab(items, 'queue').map((f) => f._id), ['q1']);
-  assert.deepEqual(MR.manageTabCounts(items), { inbox: 0, queue: 1, local: 1, resolved: 0, archived: 0 });
+  assert.deepEqual(MR.manageTabCounts(items), { inbox: 0, queue: 1, local: 1, waiting: 0, resolved: 0, archived: 0 });
   // Il numero è la lunghezza della lista che la sezione mostra.
   assert.equal(MR.manageTabCounts(items).local, MR.listForManageTab(items, 'local').length);
 });
