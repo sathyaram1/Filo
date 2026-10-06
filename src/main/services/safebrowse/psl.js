@@ -57,6 +57,11 @@ const NORMAL = new Set([
   'com.pt', 'gov.pt', 'edu.pt',
   'co.at', 'or.at', 'gv.at', 'ac.at',
 ]);
+// Senza, due negozi sotto .com.co o due comuni sotto .bergamo.it sarebbero un sito solo per impronte e cookie (#796).
+for (const riga of require('./pslDueEtichette').trim().split('\n')) {
+  const [tld, ...sotto] = riga.trim().split(/\s+/);
+  for (const etichetta of sotto) NORMAL.add(`${etichetta}.${tld}`);
+}
 
 // Piattaforme dove ogni sottodominio è di un utente diverso: senza, `utente.github.io` diventa `github.io` («GitHub
 // su .io») e un dominio in whitelist copre ogni pagina ospitata. L'host uguale alla piattaforma resta suo.
