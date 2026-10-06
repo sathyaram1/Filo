@@ -457,6 +457,12 @@
       properties: { comando: S('Uno di: fullscreen, minimize (riduci a icona), home (apri la home di Filo), settings (menu Impostazioni), apps (menu App), account (menu Account).', { enum: ['fullscreen', 'minimize', 'home', 'settings', 'apps', 'account'] }) },
       required: ['comando'],
     },
+    INSTALLA_AGGIORNAMENTO: {
+      description: 'Installa la versione nuova di Filo quando l\'utente lo chiede ("aggiornati", "installa la versione nuova", "installa l\'aggiornamento"): la scarica e si installa quando l\'utente chiude Filo. Serve soprattutto a chi ha spento «Installa gli aggiornamenti da solo». L\'esito dice se c\'è una versione nuova, quale, e se sta scaricando o è già pronta: riporta quello, senza promettere di più. Per accendere o spegnere l\'installazione automatica si usa IMPOSTA_PREFERENZA.',
+      properties: {},
+      required: [],
+      risultato: true,
+    },
     CARTA_HOME: {
       description: 'Dispone le carte della home. A destra quelle che l\'utente tiene ("togli la carta dei mazzi", "rimetti l\'editor", "metti i suggerimenti in cima", "rimetti le carte com\'erano"): una carta tolta diventa un\'icona in «altro», sotto le carte, e da lì si rimette. A sinistra quello che sta succedendo (timer, sveglie, scaricamenti, avvisi, lavori in corso): si spostano ("metti il timer della pasta in cima") e si tolgono ("togli l\'avviso del backup": un avviso si chiude, uno scaricamento o un lavoro spariscono solo dalla home, e con rimetti tornano). Un timer o una sveglia si tolgono con CANCELLA_SVEGLIA. Se la carta di sinistra non si trova, l\'esito elenca quelle che ci sono con la loro chiave.',
       properties: {

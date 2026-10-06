@@ -414,7 +414,7 @@
 
     // §1.2 — colore IDENTITÀ del sito (theme-color → manifest → favicon →
     // fallback), calcolato una volta dal content script e cachato per dominio dal
-    // main; la shell lo applica attenuato alle tab INATTIVE.
+    // main; la shell lo mescola col fondo della barra nelle tab INATTIVE.
     TAB_IDENTITY_COLOR: 'tab_identity_color',        // { color: 'rgb(r,g,b)' | null }
 
     // La scheda è sotto gli occhi di qualcuno (attiva, finestra né nascosta né
@@ -847,6 +847,8 @@
     FILO_STOP_TIMER_ALARM: 'filo_stop_timer_alarm', // { id } — silenzia/rimuove un timer che sta suonando
     FILO_GET_NOTIFICATIONS: 'filo_get_notifications',
     FILO_DISMISS_NOTIFICATION: 'filo_dismiss_notification', // { id }
+    // «Installa» sulla carta della versione nuova (#786): scarica, e si installa alla chiusura. {} → { ok } | { ok:false, error }
+    FILO_INSTALLA_AGGIORNAMENTO: 'filo_installa_aggiornamento',
     // Le carte della home (#870), solo pagine filo://. La mossa è quella di SN_CARTE_HOME.applica: la pagina
     // manda il cambio, non la disposizione intera. CAMBIATE va alle pagine di Filo quando la disposizione cambia.
     CARTE_HOME_GET: 'carte_home_get',             // {} → { ok, layout }

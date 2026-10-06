@@ -16,8 +16,127 @@ import { cartellaDelServer } from './server-fondi-pratica.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const USO = 'Uso: npm run orchestra -- aggiungi <N> [<N>…] [--slug <nome>] [--file <regola,regola>] [--richiesta "<testo>"]\n'
-  + '                          avvia [--paralleli N] [--tetto N] [--derivati non-locale|locale|nessuno] [--tieni-worktree] [--budget-istanza <$>] [--dry-run [<N>…]]\n'
+  + '                          avvia [--paralleli N] [--tetto N] [--derivati non-locale|locale|nessuno] [--tieni-worktree] [--budget-istanza <$>]\n'
+  + '                                [--ore-istanza <ore>] [--cpu-max <%>] [--cpu-chiusura <%>] [--dry-run [<N>…]]\n'
   + '                          stato | riprendi <N> ["<risposta dell’owner>"] | togli <N>';
+
+// Un lettore solo per ogni comando (#1027): un argomento che non torna ferma tutto prima di qualsiasi lavoro, mai preso per buono o saltato.
+const TESTO = { atteso: 'un testo', leggi: (v) => v.trim() || undefined };
+const SI = { flag: true };
+const intero = (min) => ({ atteso: `un numero intero da ${min} in su`, leggi: (v) => (/^\d+$/.test(v.trim()) && Number(v) >= min ? Number(v) : undefined) });
+const numero = (atteso, ok) => ({
+  atteso,
+  leggi: (v) => { const n = /^\d+(?:[.,]\d+)?$/.test(v.trim()) ? Number(v.trim().replace(',', '.')) : NaN; return ok(n) ? n : undefined; },
+});
+const percentuale = numero('una percentuale da 1 a 100', (n) => n >= 1 && n <= 100);
+export const OPZIONI_DI = Object.freeze({
+  aggiungi: {
+    '--slug': TESTO,
+    '--richiesta': TESTO,
+    '--file': { atteso: 'una o più regole separate da virgole', leggi: (v) => { const l = v.split(',').map((x) => x.trim()).filter(Boolean); return l.length ? l : undefined; } },
+  },
+  avvia: {
+    '--paralleli': intero(1),
+    '--tetto': intero(1),
+    '--derivati': { atteso: 'non-locale, locale o nessuno', leggi: (v) => (['non-locale', 'locale', 'nessuno'].includes(v.trim()) ? v.trim() : undefined) },
+    '--tieni-worktree': SI,
+    '--budget-istanza': numero('un importo in dollari sopra zero', (n) => n > 0),
+    '--ore-istanza': numero('un numero di ore da 0.5 in su', (n) => n >= 0.5),
+    '--cpu-max': percentuale,
+    '--cpu-chiusura': percentuale,
+    '--dry-run': SI,
+  },
+  stato: {},
+  riprendi: {},
+  togli: {},
+});
+// Il trattino lungo è quello che un correttore automatico fa di «--».
+const TRATTINI = '\u2010-\u2015\u2212';
+const SEMBRA_OPZIONE = new RegExp(`^(?:--|[${TRATTINI}]\\p{L})`, 'u');
+
+function erroreDiUso(msg) {
+  const e = new Error(`${msg}. Non ho fatto niente.`);
+  e.uso = true;
+  return e;
+}
+
+// Distanza fra due nomi con lo scambio di due lettere vicine contato come uno: è il refuso più comune.
+function distanza(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j += 1) d[0][j] = j;
+  for (let i = 1; i <= a.length; i += 1) {
+    for (let j = 1; j <= b.length; j += 1) {
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+    }
+  }
+  return d[a.length][b.length];
+}
+
+function sconosciuta(cmd, nome) {
+  const norm = nome.replace(new RegExp(`^[-${TRATTINI}]+`), '--');
+  const [vicina] = Object.keys(OPZIONI_DI[cmd] || {}).map((k) => [k, distanza(norm, k)]).filter(([, n]) => n <= 2).sort((x, y) => x[1] - y[1]);
+  const altrove = Object.keys(OPZIONI_DI).find((c) => c !== cmd && OPZIONI_DI[c][norm]);
+  const consiglio = vicina ? ` (forse ${vicina[0]}?)` : altrove ? ` (${norm} vale per ${altrove})` : '';
+  return erroreDiUso(`${cmd}: opzione sconosciuta ${nome}${consiglio}`);
+}
+
+/** Opzioni e argomenti di un comando, con la regola di #1027: sconosciuta, senza valore, valore che è un'altra opzione o che non torna → errore. PURA. */
+export function leggiArgomenti(cmd, args) {
+  const spec = OPZIONI_DI[cmd] || {};
+  const opz = {};
+  const posizionali = [];
+  for (let i = 0; i < args.length; i += 1) {
+    const a = String(args[i]);
+    if (!SEMBRA_OPZIONE.test(a)) { posizionali.push(a); continue; }
+    const uguale = a.indexOf('=');
+    const nome = uguale > 0 ? a.slice(0, uguale) : a;
+    const s = spec[nome];
+    if (!s) throw sconosciuta(cmd, nome);
+    const chiave = nome.slice(2).replace(/-(\w)/g, (_, c) => c.toUpperCase());
+    if (chiave in opz) throw erroreDiUso(`${cmd}: ${nome} data due volte, tienine una`);
+    if (s.flag) {
+      if (uguale > 0) throw erroreDiUso(`${cmd}: ${nome} non vuole un valore`);
+      opz[chiave] = true;
+      continue;
+    }
+    let v = uguale > 0 ? a.slice(uguale + 1) : args[i + 1];
+    if (uguale < 0) i += 1;
+    v = v === undefined ? '' : String(v);
+    if (SEMBRA_OPZIONE.test(v)) throw erroreDiUso(`${cmd}: ${nome} vuole ${s.atteso}, e «${v}» è un’altra opzione`);
+    if (!v.trim()) throw erroreDiUso(`${cmd}: ${nome} vuole ${s.atteso}${v ? ', non solo spazi' : ''}`);
+    const letto = s.leggi(v);
+    if (letto === undefined) throw erroreDiUso(`${cmd}: ${nome} vuole ${s.atteso}, non «${v}»`);
+    opz[chiave] = letto;
+  }
+  return { opz, posizionali };
+}
+
+// Impostazioni di npm stesso a un refuso da un'opzione nostra: arrivano anche dal suo file di configurazione, e un refuso non sono (#1027).
+// La sentinella in tests/unit/orchestratore.test.mjs le ricava dal npm installato.
+export const IMPOSTAZIONI_NPM_VICINE = Object.freeze(['cafile']);
+
+/**
+ * Le opzioni (o i loro refusi) che npm si è tenuto perché manca il «--» dopo `npm run orchestra`: arrivano solo nell'ambiente,
+ * e senza questo controllo `avvia --dry-run` farebbe un giro vero. PURA.
+ */
+export function opzioniTenuteDaNpm(env = process.env) {
+  if (!/orchestratore-locale/.test(env.npm_lifecycle_script || '')) return [];
+  const note = [...new Set(Object.values(OPZIONI_DI).flatMap((s) => Object.keys(s)))];
+  const diNpm = (o) => IMPOSTAZIONI_NPM_VICINE.includes(o.slice(2));
+  return Object.keys(env)
+    .filter((k) => k.startsWith('npm_config_'))
+    .map((k) => `--${k.slice('npm_config_'.length).replace(/_/g, '-')}`)
+    .filter((o) => note.includes(o) || (!diNpm(o) && note.some((n) => distanza(o, n) <= 2)))
+    .sort();
+}
+
+/** Il numero di un feedback («41» o «#41»), o un errore che dice quale argomento non lo è. PURA. */
+export function numeroDiFeedback(cmd, a) {
+  const m = /^#?(\d+)$/.exec(String(a).trim());
+  if (!m || Number(m[1]) <= 0) throw erroreDiUso(`${cmd}: argomento non capito «${a}» (serve il numero di un feedback)`);
+  return Number(m[1]);
+}
 
 // I ruoli prendono modello e sforzo dagli agenti delle routine: una scelta sola per lo stesso lavoro, in locale e in cloud.
 export const AGENTE_DEL_RUOLO = Object.freeze({ lavoratore: 'routine-nuovo-lavoro', verificatore: 'routine-worker' });
@@ -302,24 +421,11 @@ function depAVuoto(P, stato, log) {
 
 let verifyLocal;
 
-function opzioniDa(args) {
-  const opz = { ...OPZIONI_BASE, budgetIstanza: '', oreIstanza: 4, dryRun: false, numeri: [] };
-  for (let i = 0; i < args.length; i += 1) {
-    const a = args[i];
-    const val = () => { const v = args[i + 1]; i += 1; if (v === undefined) throw new Error(`${a} vuole un valore`); return v; };
-    if (a === '--paralleli') opz.paralleli = Math.max(1, Number(val()) || 1);
-    else if (a === '--tetto') opz.tetto = Math.max(1, Number(val()) || 1);
-    else if (a === '--derivati') { opz.derivati = val(); if (!['non-locale', 'locale', 'nessuno'].includes(opz.derivati)) throw new Error('--derivati: non-locale, locale o nessuno'); }
-    else if (a === '--tieni-worktree') opz.tieniWorktree = true;
-    else if (a === '--budget-istanza') opz.budgetIstanza = val();
-    else if (a === '--ore-istanza') opz.oreIstanza = Math.max(0.5, Number(val()) || 4);
-    else if (a === '--cpu-max') opz.cpuMax = Number(val());
-    else if (a === '--cpu-chiusura') opz.cpuChiusura = Number(val());
-    else if (a === '--dry-run') opz.dryRun = true;
-    else if (/^\d+$/.test(a) && opz.dryRun) opz.numeri.push(Number(a));
-    else throw new Error(`argomento non capito: ${a}`);
-  }
-  return opz;
+export function opzioniDa(args) {
+  const { opz, posizionali } = leggiArgomenti('avvia', args);
+  const numeri = posizionali.map((a) => numeroDiFeedback('avvia', a));
+  if (numeri.length && !opz.dryRun) throw erroreDiUso(`avvia: i numeri valgono solo con --dry-run; per metterli in coda: aggiungi ${numeri.join(' ')}`);
+  return { ...OPZIONI_BASE, budgetIstanza: '', oreIstanza: 4, dryRun: false, ...opz, numeri };
 }
 
 function vivo(pid) {
@@ -328,24 +434,26 @@ function vivo(pid) {
 
 async function main(argv) {
   const [cmd, ...rest] = argv;
+  const tenute = opzioniTenuteDaNpm();
+  if (tenute.length) throw erroreDiUso(`npm si è tenuto ${tenute.join(' ')}: dopo «npm run orchestra» serve «--» (npm run orchestra -- ${cmd || 'avvia'} …); se invece sta nella configurazione di npm, lancia «node scripts/orchestratore-locale.mjs ${cmd || 'avvia'} …»`);
   const P = percorsi();
   const store = negozio(join(P.note, 'stato.json'));
   const ora = () => new Date().toISOString();
 
   if (cmd === 'aggiungi') {
-    const nums = rest.filter((a) => /^#?\d+$/.test(a)).map((a) => Number(a.replace('#', '')));
-    const val = (k) => { const i = rest.indexOf(k); return i >= 0 ? rest[i + 1] : undefined; };
-    if (!nums.length) throw new Error('aggiungi vuole almeno un numero di feedback');
-    if (nums.length > 1 && (val('--slug') || val('--richiesta'))) throw new Error('--slug e --richiesta valgono per un lavoro solo');
+    const { opz, posizionali } = leggiArgomenti('aggiungi', rest);
+    const nums = posizionali.map((a) => numeroDiFeedback('aggiungi', a));
+    if (!nums.length) throw erroreDiUso('aggiungi vuole almeno un numero di feedback');
+    if (nums.length > 1 && (opz.slug || opz.richiesta)) throw erroreDiUso('aggiungi: --slug e --richiesta valgono per un lavoro solo');
     const s = store.leggi();
     for (const n of nums) {
       if (s.pratiche[n] && !['fuso'].includes(s.pratiche[n].fase)) { console.log(`#${n} è già in coda (${s.pratiche[n].fase})`); continue; }
       // Due lavori aperti sullo stesso ramo dividerebbero worktree, verifica e fusione.
       const di = (slug) => Object.values(s.pratiche).find((q) => q && q.num !== n && q.fase !== 'fuso' && q.slug === slug);
-      let slug = String(val('--slug') || '').trim();
+      let slug = opz.slug || '';
       if (slug && di(slug)) throw new Error(`il ramo claude/${slug} è già del lavoro #${di(slug).num}: scegli un altro --slug`);
       if (!slug) for (let k = 1; !slug || di(slug); k += 1) slug = k === 1 ? slugDi(n) : `${slugDi(n)}-${k}`;
-      s.pratiche[n] = nuovaPratica({ num: n, slug, richiesta: val('--richiesta'), file: (val('--file') || '').split(',').map((x) => x.trim()).filter(Boolean), ora: ora() });
+      s.pratiche[n] = nuovaPratica({ num: n, slug, richiesta: opz.richiesta, file: opz.file, ora: ora() });
       s.coda = (s.coda || []).filter((x) => x !== n).concat([n]);
       console.log(`#${n} in coda: ramo claude/${s.pratiche[n].slug}`);
     }
@@ -362,6 +470,8 @@ async function main(argv) {
   const aMeta = (p) => p && !['in-coda', 'fermo', 'fuso'].includes(p.fase);
 
   if (cmd === 'stato' || !cmd) {
+    const { posizionali } = leggiArgomenti('stato', rest);
+    if (posizionali.length) throw erroreDiUso(`stato: argomento non capito «${posizionali[0]}»`);
     const s = store.leggi();
     const pid = inCorso();
     console.log(pid ? `Orchestratore in corso (pid ${pid}).` : 'Orchestratore fermo.');
@@ -371,25 +481,30 @@ async function main(argv) {
   }
 
   if (cmd === 'riprendi') {
-    const n = Number(String(rest[0] || '').replace('#', ''));
+    const { posizionali } = leggiArgomenti('riprendi', rest);
+    if (!posizionali.length) throw erroreDiUso('riprendi vuole il numero del lavoro');
+    const n = numeroDiFeedback('riprendi', posizionali[0]);
+    const risposta = posizionali.slice(1).join(' ');
     const s = store.leggi();
     if (aMeta(s.pratiche[n])) {
       const pid = inCorso();
       const fase = s.pratiche[n].fase;
       if (pid) throw new Error(`#${n} è in ${fase} e la sta guidando l’orchestratore in corso (pid ${pid}): si riprende da ferma`);
       const da = `#${n} è rimasta in ${fase} da un orchestratore che non gira più: riparte da sola col prossimo «avvia», dal punto in cui sta il ramo`;
-      if (rest.slice(1).join(' ').trim()) throw new Error(`${da}. Una risposta vale per un lavoro fermo: non l’ho registrata.`);
+      if (risposta.trim()) throw new Error(`${da}. Una risposta vale per un lavoro fermo: non l’ho registrata.`);
       console.log(`${da}.`);
       return 0;
     }
-    s.pratiche[n] = riprendi(s.pratiche[n], rest.slice(1).join(' '));
+    s.pratiche[n] = riprendi(s.pratiche[n], risposta);
     store.scrivi(s);
     console.log(`#${n} ripresa: ${s.pratiche[n].fase}${s.pratiche[n].compito === 'decisione' ? ' (con la tua risposta)' : ''}. Riparte col prossimo «avvia».`);
     return 0;
   }
 
   if (cmd === 'togli') {
-    const n = Number(String(rest[0] || '').replace('#', ''));
+    const { posizionali } = leggiArgomenti('togli', rest);
+    if (posizionali.length !== 1) throw erroreDiUso(`togli vuole un numero di lavoro, uno solo${posizionali.length ? `: ${posizionali.join(' ')}` : ''}`);
+    const n = numeroDiFeedback('togli', posizionali[0]);
     const s = store.leggi();
     const p = s.pratiche[n];
     if (!p) throw new Error(`#${n} non è in coda`);
@@ -455,5 +570,9 @@ async function main(argv) {
 
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
 if (isMain) {
-  main(process.argv.slice(2)).then((c) => process.exit(c), (e) => { console.error(`✗ ${(e && e.message) || e}`); process.exit(1); });
+  main(process.argv.slice(2)).then((c) => process.exit(c), (e) => {
+    console.error(`✗ ${(e && e.message) || e}`);
+    if (e && e.uso) console.error(USO);
+    process.exit(1);
+  });
 }

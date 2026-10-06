@@ -495,7 +495,10 @@ module.exports = function register(on, ctx) {
     return { ok: true, timers: list };
   }));
 
-  on(MSG.FILO_GET_NOTIFICATIONS, soloFilo(async () => ({ ok: true, notifications: await FiloMem.listNotifications() })));
+  on(MSG.FILO_GET_NOTIFICATIONS, soloFilo(async () => ({
+    ok: true, notifications: require('../../updater').conStatoAggiornamento(await FiloMem.listNotifications()),
+  })));
+  on(MSG.FILO_INSTALLA_AGGIORNAMENTO, soloFilo(async () => require('../../updater').installaAggiornamento()));
 
   on(MSG.FILO_DISMISS_NOTIFICATION, soloFilo(async (msg) => {
     const list = await FiloMem.dismissNotification(msg.id, { acted: !!msg.acted });

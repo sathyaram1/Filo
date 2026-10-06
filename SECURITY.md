@@ -452,12 +452,15 @@ pagina ostile.
 
 ## 9. Aggiornamenti automatici
 
-**Stato: 🔜**
+**Stato: ✅ (attivo)**
 
 Filo si aggiorna da solo: a ogni avvio controlla se c'è una versione più
 recente, la scarica e la applica alla chiusura. Gli aggiornamenti vengono
-pubblicati come release ufficiali del progetto. Potrai disattivare gli
-aggiornamenti automatici dalle impostazioni se preferisci controllarli a mano.
+pubblicati come release ufficiali del progetto. Puoi disattivare gli
+aggiornamenti automatici dalle impostazioni (Preferenze → Impostazioni
+avanzate → «Installa gli aggiornamenti da solo»), o chiedendolo a Filo, se
+preferisci controllarli a mano. Filo continua a controllare e ti avvisa
+quando c'è una versione nuova, che si installa solo quando premi «Installa».
 
 ---
 
