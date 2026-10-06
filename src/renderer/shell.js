@@ -727,10 +727,8 @@
     '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/>' +
     '<path d="M12 3a13.5 13.5 0 0 1 0 18"/><path d="M12 3a13.5 13.5 0 0 0 0 18"/></svg>';
 
-  // Un colore "ha identità" solo se ha croma sufficiente: bianco/nero/grigio
-  // (es. l'header bianco di YouTube campionato per il vetro smerigliato §1.1)
-  // non rappresentano il sito. Soglia allineata a SN_TAB_COLOR
-  // (src/shared/tabColor.js) e al campionatore favicon in pageColor.js.
+  // Per il bagliore audio una cima bianca/nera/grigia non è il sito e si ripiega sul suo colore
+  // (la scheda attiva invece resta della cima, D63). Soglia allineata a SN_TAB_COLOR.hasIdentity.
   function hasColorIdentity(rgbStr) {
     const m = /rgba?\(([^)]+)\)/.exec(rgbStr || '');
     if (!m) return false;

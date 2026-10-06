@@ -2,27 +2,29 @@
 
 [← Tutti i pattern](../PATTERNS.md)
 
-Il colore con cui si tingono le tab (attiva = "vetro smerigliato" §1.1; inattive
-= tinta del sito mescolata col fondo della barra) deve rappresentare il **brand del sito**, non la
-sua chrome neutra. Un `theme-color`/sfondo bianco, nero o grigio **non è
+Il colore identità di una tab (la tinta delle tab **non attive**, del bagliore
+audio e della Cronologia) deve rappresentare il **brand del sito**, non la sua
+chrome neutra. Un `theme-color`/sfondo bianco, nero o grigio **non è
 un'identità** e non va usato come tinta: in quel caso si ripiega sul **favicon**
 (il segnale di brand più affidabile). Es: YouTube dichiara `theme-color` bianco
-ma il suo brand è il rosso del favicon → la tab dev'essere rossa, non bianca.
+ma il suo brand è il rosso del favicon → la sua scheda non attiva è rossa.
 
+- **La scheda attiva non usa il marchio (D63, owner 04/10/2026):** prende
+  sempre il colore della cima della pagina (§1.1), anche bianco; niente ripiego
+  sul favicon. YouTube aperta ha la scheda bianca come la sua testata.
 - **Regola operativa:** un colore "conta" come identità solo se ha croma
   sufficiente (max−min dei canali RGB ≥ 24). La logica pura è in
   `src/shared/tabColor.js` (`SN_TAB_COLOR.hasIdentity`), unit-testata in
   `tests/unit/tabColor.test.mjs`. La catena di derivazione è
   `theme-color → manifest → favicon`, ma ogni anello neutro viene saltato.
 - **Perché:** una tinta bianca/grigia è indistinguibile dal tab bar (tinta
-  invisibile) o, per la tab attiva, dà un bianco senza significato. Il favicon
+  invisibile). Il favicon
   porta quasi sempre il colore vero del sito.
 - **Limite noto:** se il favicon è cross-origin senza header CORS, il canvas si
   "taint-a" e il colore non è estraibile → la tab resta neutra (meglio che
   sbagliata). I favicon same-origin (come YouTube) funzionano.
 - **Dove:** campionamento in `src/content/pageColor.js` (catena `compute()`);
-  applicazione/ripiego nella shell in `src/renderer/shell.js` (`render`,
-  `hasColorIdentity`). Prove: `tests/unit/tabColor.test.mjs`,
+  applicazione nella shell in `src/renderer/shell.js` (`render`). Prove: `tests/unit/tabColor.test.mjs`,
   `tests/tab-colors.spec.mjs`, `tests/tab-archive.spec.mjs`.
 - **Parametri regolabili (6):** l'estrazione e il blend sono governati da sei
   parametri (`soglia_saturazione`, `peso_centralita`, `bucket_tinta`,
@@ -35,7 +37,7 @@ ma il suo brand è il rosso del favicon → la tab dev'essere rossa, non bianca.
   `constants.js` deve restare allineato ai default del meta.
 - **Il colore salvato è la tinta piena (#821):** estrazione, cache per dominio,
   Cronologia e sessione tengono la tinta a saturazione 1 e luminosità 0,5; chi
-  la mostra (barra, scheda attiva, bagliore audio, Cronologia) passa da
+  la mostra (schede non attive, bagliore audio, Cronologia) passa da
   `adaptIdentity`. Salvarla già adattata la perdeva per sempre a saturazione 0.
   Sentinella in `tests/unit/preferences.test.mjs`.
 - **Tab inattive, nessuna attenuazione in più (#821):** fondo = adattato ×

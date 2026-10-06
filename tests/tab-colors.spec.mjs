@@ -341,12 +341,10 @@ test.describe('tinta viva delle schede non attive', () => {
     await expectFormula(0.6, false);
   });
 
-  // #821: la scheda attiva che ripiega sul colore del sito sceglie il testo con la stessa regola.
-  test('scheda attiva col rosso del sito (cima bianca): titolo a 4,5:1 e crocetta a 3:1, nei due temi', async () => {
-    await testServer.openReady(openTab, PAGE_RED.replace('Sito rosso', 'Rosso in primo piano')
-      .replace('margin:0;', 'margin:0;background:#fff;'));
-    const readActive = () => shell.evaluate(() => {
-      const el = document.querySelector('.tab.active[data-tip="Rosso in primo piano"]');
+  // D63: la scheda attiva prende sempre la cima della pagina, mai il marchio; il testo si sceglie per contrasto (#821).
+  test('scheda attiva: cima bianca resta bianca col favicon rosso, cima rossa è rossa; titolo a 4,5:1 e crocetta a 3:1, nei due temi', async () => {
+    const readActive = (titolo) => shell.evaluate((tt) => {
+      const el = document.querySelector(`.tab.active[data-tip="${tt}"]`);
       if (!el) return null;
       const nums = (c) => (/rgba?\(([^)]+)\)/.exec(c) || [, ''])[1].split(',').slice(0, 3).map(Number);
       return {
@@ -354,22 +352,35 @@ test.describe('tinta viva delle schede non attive', () => {
         title: nums(getComputedStyle(el.querySelector('.title')).color),
         close: nums(getComputedStyle(el.querySelector('.close')).color),
       };
-    });
-    for (const scheme of ['light', 'dark']) {
-      await shell.emulateMedia({ colorScheme: scheme });
-      let r = null;
-      await expect.poll(async () => {
-        r = await readActive();
-        return !!r && near(r.bg, [255, 0, 0]) && contrast(r.title, r.bg) >= 4.5;
-      }, { timeout: 9_000 }).toBe(true);
-      expect(contrast(r.close, r.bg), `${scheme}: crocetta ${r.close} su ${r.bg}`).toBeGreaterThanOrEqual(3);
+    }, titolo);
+    const casi = [
+      { titolo: 'Cima bianca', bg: [255, 255, 255], html: PAGE_RED.replace('Sito rosso', 'Cima bianca').replace('margin:0;', 'margin:0;background:#fff;') },
+      { titolo: 'Cima rossa', bg: [255, 0, 0], html: PAGE_RED.replace('Sito rosso', 'Cima rossa').replace('margin:0;', 'margin:0;background:rgb(255,0,0);') },
+    ];
+    for (const caso of casi) {
+      await testServer.openReady(openTab, caso.html);
+      await expect.poll(async () => shell.evaluate(async () => {
+        const snap = await window.filoShell.tabs.snapshot();
+        const a = snap.tabs.find((t) => t.id === snap.activeId);
+        return (a && a.identityColor) || null;
+      }), { timeout: 9_000 }).toBe('rgb(255, 0, 0)');
+      for (const scheme of ['light', 'dark']) {
+        await shell.emulateMedia({ colorScheme: scheme });
+        let r = null;
+        await expect.poll(async () => {
+          r = await readActive(caso.titolo);
+          return !!r && near(r.bg, caso.bg) && contrast(r.title, r.bg) >= 4.5;
+        }, { timeout: 9_000 }).toBe(true);
+        expect(contrast(r.close, r.bg), `${caso.titolo}, ${scheme}: crocetta ${r.close} su ${r.bg}`).toBeGreaterThanOrEqual(3);
+      }
+      await shell.emulateMedia({ colorScheme: 'light' });
     }
   });
 });
 
 // ──────────────────────────── tab-favicon-color ────────────────────────────
 test.describe('colore tab dal favicon', () => {
-  test('la tab attiva prende il colore dal favicon quando il theme-color è neutro (caso YouTube)', async () => {
+  test('la tab attiva resta del colore della cima anche se bianca, col favicon rosso (caso YouTube, D63)', async () => {
     const favSvg = encodeURIComponent(
       '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16">' +
       '<rect width="16" height="16" fill="rgb(220,20,20)"/></svg>',
@@ -381,39 +392,19 @@ test.describe('colore tab dal favicon', () => {
       '<title>theme bianco, favicon rosso</title>' +
       '</head><body style="background:#fff;height:1500px;margin:0">contenuto</body></html>';
 
-    // openReady garantisce che i content script (campionatori di colore) siano montati.
     await testServer.openReady(openTab, html);
-
-    // Il colore identità è asincrono (content script → main → broadcast → render),
-    // con qualche retry lato content. Facciamo polling sulla tab attiva nella shell.
-    const res = await shell.evaluate(async () => {
-      const parse = (s) => {
-        const m = /rgba?\(([^)]+)\)/.exec(s || '');
-        if (!m) return null;
-        const a = m[1].split(',').map((x) => parseFloat(x.trim()));
-        return a.length >= 3 && a.every((n) => !Number.isNaN(n)) ? a : null;
-      };
-      const reddish = (a) => a && a[0] > 120 && a[0] - a[1] > 40 && a[0] - a[2] > 40;
-      const read = () => {
-        const el = document.querySelector('.tab.active');
-        if (!el) return null;
-        return el.style.getPropertyValue('--tab-active') ||
-          getComputedStyle(el).getPropertyValue('--tab-active');
-      };
-      const deadline = Date.now() + 9000;
-      let last = null;
-      while (Date.now() < deadline) {
-        last = read();
-        if (reddish(parse(last))) return { ok: true, value: (last || '').trim() };
-        await new Promise((r) => setTimeout(r, 150));
-      }
-      return { ok: false, value: (last || '(nessuna tab attiva)').trim() };
+    // Prima arriva il colore del sito dal favicon: solo dopo un ripiego sul marchio si vedrebbe.
+    await expect.poll(async () => shell.evaluate(async () => {
+      const snap = await window.filoShell.tabs.snapshot();
+      const a = snap.tabs.find((t) => t.id === snap.activeId);
+      return (a && a.identityColor) || null;
+    }), { timeout: 9_000 }).toMatch(/^rgb\(255, 0, 0\)$/);
+    await shell.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    const tint = await shell.evaluate(() => {
+      const el = document.querySelector('.tab.active');
+      return el ? el.style.getPropertyValue('--tab-active').trim() : '(nessuna tab attiva)';
     });
-
-    expect(
-      res.ok,
-      `--tab-active atteso rossastro (preso dal favicon), ottenuto invece: "${res.value}"`,
-    ).toBe(true);
+    expect(tint, '--tab-active atteso bianco, la cima della pagina').toBe('rgb(255, 255, 255)');
   });
 });
 
