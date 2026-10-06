@@ -26,9 +26,23 @@ export const OPZIONI_BASE = Object.freeze({
   // Il limite d'uso dell'abbonamento si aspetta (un quarto d'ora per volta, se non dice quando riparte); oltre il tetto il lavoro si ferma col motivo.
   pausaLimiteMs: 15 * 60_000,
   oreLimite: 12,
-  derivati: 'non-locale',
+  // auto = ogni rilievo dove si può lavorare: in locale solo ciò che si fa solo qui, il resto alle routine.
+  derivati: 'auto',
   tieniWorktree: false,
 });
+
+export const MODI_DERIVATI = Object.freeze(['auto', 'non-locale', 'locale', 'nessuno']);
+
+/**
+ * Chi fa il passo di lavoro, come nelle routine: il primo lavoro ha il suo ruolo (sforzo più alto); correzione,
+ * riallineamento e ripresa di un lavoro fermo un altro. Modello e sforzo per ruolo li legge la riga di comando. PURA.
+ */
+export function ruoloDelLavoro(p) {
+  if (p.compito === 'correzione') return 'correttore';
+  if (p.compito === 'riallinea') return 'riallineatore';
+  if (p.compito === 'decisione' || p.fermoPrima) return 'ripresa';
+  return 'lavoratore';
+}
 
 // I file del repo pubblico che il server incorpora al deploy (filo-security/functions/tools/bake-shared.js).
 export const INCORPORATI_DAL_SERVER = Object.freeze([
