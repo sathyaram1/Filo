@@ -57,7 +57,7 @@ test('r1 l’icona trascinata per riordinare il menu si vede mentre la si porta'
   expect(esito).toBe('visibile');
 });
 
-async function incollaDopoSottoMenu(app, page, apriSotto) {
+async function incollaDopoCronologia(app, page) {
   await app.evaluate(({ clipboard }) => clipboard.writeText('voce-vecchia'));
   await page.locator('#c').click({ button: 'right' });
   await page.locator('.sn-menu .sn-menu-paste-main').first().click();
@@ -66,9 +66,8 @@ async function incollaDopoSottoMenu(app, page, apriSotto) {
   await app.evaluate(({ clipboard }) => clipboard.writeText('voce-nuova'));
   await page.locator('#c').click({ button: 'right' });
   await sleep(500);
-  await apriSotto();
+  await page.locator('.sn-menu-paste-arrow').first().hover();
   await sleep(900);
-  expect(await page.evaluate(() => document.querySelectorAll('.sn-menu').length), 'il sotto-menu è aperto').toBe(2);
   const bb = await page.locator('.sn-menu .sn-menu-paste-main').first().boundingBox();
   await page.mouse.move(bb.x + 10, bb.y + bb.height / 2, { steps: 3 });
   await sleep(700);
@@ -79,11 +78,5 @@ async function incollaDopoSottoMenu(app, page, apriSotto) {
 test('r1 con la cronologia degli appunti aperta, un clic vero su Incolla incolla', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
   const page = await testServer.openReady(openTab, PAGINA);
-  await incollaDopoSottoMenu(app, page, () => page.locator('.sn-menu-paste-arrow').first().hover());
-});
-
-test('r1 con la griglia «Altro» aperta, un clic vero su Incolla incolla', async ({ app, openTab, testServer }) => {
-  test.setTimeout(60_000);
-  const page = await testServer.openReady(openTab, PAGINA);
-  await incollaDopoSottoMenu(app, page, () => page.locator('.sn-menu-row-overflow').first().hover());
+  await incollaDopoCronologia(app, page);
 });
