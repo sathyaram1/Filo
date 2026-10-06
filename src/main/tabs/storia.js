@@ -17,6 +17,9 @@ function vociDellaVista(entries, attiva, utente = (u) => u, inArrivo = null) {
     voci.push({ url, titolo: String((e && e.title) || '') });
     if (i <= attiva) a = voci.length - 1;
   });
+  if (!voci.length && inArrivo && tornabile(inArrivo.url)) {
+    return { voci: [{ url: String(inArrivo.url), titolo: String(inArrivo.titolo || '') }], attiva: 0 };
+  }
   return { voci, attiva: Math.max(0, a) };
 }
 
