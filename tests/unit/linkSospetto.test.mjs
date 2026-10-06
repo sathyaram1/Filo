@@ -414,3 +414,24 @@ test('su una piattaforma che ospita altri il nome nudo di un marchio è suo solo
   assert.ok(LS.analizza('https://amazon.github.io/').some((c) => c.startsWith('nome_altrui:amazon.com|')));
   assert.deepEqual(LS.analizza('https://amazon.de/'), []);
 });
+
+test('i siti dei marchi stessi non sono imitazioni, né all’apertura né dal tasto destro (#732)', () => {
+  const { evaluate } = require(join(ROOT, 'src/main/services/safebrowse/engine.js'));
+  for (const h of ['www.postepay.it', 'protonvpn.com', 'account.protonvpn.com', 'transferwise.com', 'ebayinc.com', 'www.microsoftstore.com',
+    'www.amazontrust.com', 'gitlab-static.net', 'amazon.com.mx', 'ebay.com.my', 'yahoo.co.jp', 'github.blog', 'githubcopilot.com',
+    'stripe.dev', 'revolut.me', 'telegram.me', 'binance.us', 'aliexpress.ru', 'shopify.dev', 'dropbox.tech', 'apple.news']) {
+    const u = 'https://' + h + '/';
+    assert.equal(evaluate(u).level, 'safe', h + ' apertura');
+    assert.deepEqual(LS.analizza(u), [], h + ' tasto destro');
+  }
+});
+
+test('un sosia con «rn» per m o «vv» per w avvisa all’apertura come dal tasto destro: una lettura sola (#732)', () => {
+  const { evaluate } = require(join(ROOT, 'src/main/services/safebrowse/engine.js'));
+  for (const h of ['grnail.com', 'grnail-login.com', 'rnicrosoftlogin.com', 'vvhatsapp-login.com', 'arnazonlogin.com', 'tvvitterlogin.com', 'p4ypallogin.com']) {
+    const u = 'https://' + h + '/';
+    assert.ok(LS.analizza(u).some((c) => c.startsWith('nome_altrui:')), h + ' tasto destro: ' + LS.analizza(u));
+    assert.notEqual(evaluate(u).level, 'safe', h + ' apertura');
+  }
+  for (const h of ['improvvise.it', 'stearns.com', 'avviserai.it']) assert.equal(evaluate('https://' + h + '/').level, 'safe', h);
+});
