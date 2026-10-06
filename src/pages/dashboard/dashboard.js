@@ -197,7 +197,11 @@
       const riga = (m) => `${m.role === 'filo' ? 'filo' : 'user'}\n${String(m.text || '').trim()}`;
       const loro = (Array.isArray(state && state.thread) ? state.thread : []).map(riga);
       const nostri = threadHistory.filter((m) => !m.interno && (m.role !== 'filo' || String(m.text || '').trim())).map(riga);
-      return loro.length === nostri.length && loro.every((x, i) => x === nostri[i]);
+      // Un annuncio più vecchio di quello che è a schermo (l'intervista salvata a metà turno, consegnato dopo la
+      // risposta) è già superato: ridisegnare butterebbe via le righe e i bottoni delle azioni (#592.2).
+      // Un'intervista rifatta da capo ha un'altra targa: quella si ridisegna anche se comincia uguale.
+      if (loro.length < nostri.length && chatIdOnboarding(state) !== chatId) return false;
+      return loro.length <= nostri.length && loro.every((x, i) => x === nostri[i]);
     },
     beginSending: () => { sending = true; aggiornaTasto(); },
     runTurnAndContinue: (args) => runTurnAndContinue(args),
