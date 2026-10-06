@@ -2123,6 +2123,7 @@
     } else if (q.tipo === 'chiedi') {
       if (!inAccoglienza) { submitMessage(q.testo); return; }
       inputEl.value = q.testo;
+      testoDaFuori = true;
       autoGrowInput();
       inputEl.focus();
     }

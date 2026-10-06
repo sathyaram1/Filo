@@ -3663,7 +3663,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // #592.2 — nell'intervista di benvenuto lo stile proposto si imposta senza riquadro finché nella conversazione non
   // è entrato testo di altri; quello letto dalle azioni lo guarda executeFiloAction.
   const accoglienza = onbActive && !messaggioDaFuori && !Onboarding.haTestoDiAltri(onbBefore)
-    && !cleanHistory.some((m) => m && (m.daFuori === true || m.daModello === true));
+    && !cleanHistory.some((m) => m && (m.daFuori === true || m.daModello === true || (typeof m.esterno === 'string' && !!m.esterno)));
   // Re-immissione dell'output dei comandi nel contesto del modello: l'output di
   // un ESEGUI_COMANDO eseguito in un turno precedente viene accodato al
   // messaggio dell'assistente, così nei turni successivi il modello SA davvero
