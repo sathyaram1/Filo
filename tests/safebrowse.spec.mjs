@@ -16,6 +16,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { createRequire } from 'node:module';
+import { barraPage, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
 
 const require = createRequire(import.meta.url);
 
