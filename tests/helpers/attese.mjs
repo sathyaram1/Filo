@@ -3,12 +3,15 @@
 
 export const TETTO_ATTESA_MS = 5 * 60 * 1000;
 
-/** Aspetta che `condizione()` (anche asincrona) sia vera, guardando ogni `ogniMs`. Oltre il tetto lancia, col `cosa`. */
+/**
+ * Aspetta che `condizione()` (anche asincrona) sia vera, guardando ogni `ogniMs`. Oltre il tetto lancia, col `cosa`
+ * (un testo, o una funzione che lo scrive allora: può dire quello che si è visto fino a lì).
+ */
 export async function aspettaChe(condizione, { cosa = 'la condizione attesa', ogniMs = 50, oltreMs = TETTO_ATTESA_MS } = {}) {
   const fine = Date.now() + oltreMs;
   for (;;) {
     if (await condizione()) return;
-    if (Date.now() >= fine) throw new Error(`${cosa}: non è successo in ${Math.round(oltreMs / 1000)} s`);
+    if (Date.now() >= fine) throw new Error(`${typeof cosa === 'function' ? cosa() : cosa}: non è successo in ${Math.round(oltreMs / 1000)} s`);
     await new Promise((ok) => setTimeout(ok, ogniMs));
   }
 }
