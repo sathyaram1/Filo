@@ -73,6 +73,9 @@
     let viva = null;
     let aperta = null;
     let fermato = false;
+    // Un rifiuto della regola (#530) si legge senza cercarlo: a fine lavoro il blocco resta srotolato, sul suo nodo.
+    let tieniAperto = false;
+    let nodoDaAprire = null;
     let inDiretta = true;
     let fineLavoro = 0;
     let anonime = 0;
@@ -326,7 +329,7 @@
         fineLavoro = Date.now();
         setPhase('answer');
         filo.chiudi();
-        avvolgi();
+        if (tieniAperto) mostraTesta(); else avvolgi();
       },
       // Il modello ha nominato un'azione (`callId`) o ne dice l'avanzamento: la riga lo dice subito, il filo si
       // annoda e si tende. Le azioni chiamate insieme fanno un nodo solo.
@@ -460,13 +463,26 @@
         filo.chiudi();
         wrap.classList.remove('dash-activity-vuoto');
         // Srotolato dall'utente mentre arrivava la risposta: la sua scelta resta.
+        if (tieniAperto && wrap.dataset.filo === 'gomitolo') srotola();
+        else if (tieniAperto) {
+          wrap.dataset.filo = 'srotolato';
+          head.setAttribute('aria-expanded', 'true');
+          head.title = 'Riavvolgi';
+        }
         if (wrap.dataset.filo === 'srotolato') mostraTesta(); else avvolgi();
+        if (tieniAperto && nodoDaAprire) apri(nodoDaAprire, true);
         label.textContent = failed ? `Tentativo non riuscito · ${riassunto()}` : riassunto();
         if (failed) wrap.dataset.failed = '1';
       },
       remove() { filo.distruggi(); wrap.remove(); },
-      // Un rifiuto della regola si legge senza cercarlo: il blocco si apre.
-      mostra() { setOpen(true); },
+      mostra(a) {
+        tieniAperto = true;
+        const g = trova(a);
+        if (g) nodoDaAprire = g.seg;
+        if (phase !== 'done') return;
+        if (wrap.dataset.filo === 'gomitolo') srotola();
+        if (nodoDaAprire) apri(nodoDaAprire, true);
+      },
     };
 
     function closeTurnReasoning() {
@@ -877,7 +893,7 @@
     const row = activityRowFor(a);
     if (row) {
       activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed, row.cambi, a);
-      if (rifiutataDallaRegola(a) && activity.mostra) activity.mostra();
+      if (rifiutataDallaRegola(a) && activity.mostra) activity.mostra(a);
       return true;
     }
     // Un link aperto resta un bottone sotto la risposta, ma il nodo del filo lo conta e lo nomina.
@@ -1579,6 +1595,8 @@
     a._confirmed = true;
     a._executed = true;
     delete a._confirm;
+    delete a._domanda;
+    delete a._perche;
     if (output) a._output = output;
     const ids = Array.isArray(cambi) ? cambi : [];
     if (ids.length) {

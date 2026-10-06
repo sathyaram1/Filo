@@ -4,7 +4,8 @@
 // proponeva le prime 20 schede della ricerca invece delle pertinenti, tutte.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { clickConfirm, fillConfirmInput, CONFIRM_HOST } from './helpers/confirm.mjs';
+import { clickConfirm, CONFIRM_HOST } from './helpers/confirm.mjs';
+import { livelloAutonomia } from './helpers/autonomia.mjs';
 
 async function newtabPage(app) {
   const deadline = Date.now() + 10_000;
@@ -92,6 +93,7 @@ async function chiedi(page, testo) {
 }
 
 test('«fai pulizia delle schede»: il bottone del riordino c\'è, e confermato lo sa il diario e il modello', async ({ app, shell }) => {
+  await livelloAutonomia(app, 'conservativo'); // il popup di un costo 2 si prova a Conservativo (#530)
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
@@ -165,8 +167,8 @@ test('«cancella dall\'archivio le pagine sui gatti»: il pannello propone solo 
 
   await panel.locator('.dash-action-btn-danger', { hasText: 'Elimina definitivamente 3 schede' }).click();
   await expect(page.locator(CONFIRM_HOST)).toBeVisible();
-  await fillConfirmInput(page, 'conferma');
-  await clickConfirm(page, 'danger');
+  // A Normale, col compito pulito, costo 3 chiede un OK (#530).
+  await clickConfirm(page, 'ok');
   await expect(panel.locator('.dash-delete-note')).toHaveText('✓ Eliminate definitivamente 3 schede.', { timeout: 5_000 });
   const rimaste = await archiviate(app);
   expect(rimaste).toHaveLength(27);
@@ -200,8 +202,7 @@ test('più di 20 schede pertinenti: il pannello le propone e le elimina tutte', 
   await expect(panel.locator('.dash-delete-list li')).toHaveCount(gatti);
   await expect(panel.locator('.dash-action-btn', { hasText: 'Riprova' })).toHaveCount(0);
   await panel.locator('.dash-action-btn-danger', { hasText: `Elimina definitivamente ${gatti} schede` }).click();
-  await fillConfirmInput(page, 'conferma');
-  await clickConfirm(page, 'danger');
+  await clickConfirm(page, 'ok'); // a Normale, col compito pulito, costo 3 chiede un OK (#530)
   await expect(panel.locator('.dash-delete-note')).toHaveText(`✓ Eliminate definitivamente ${gatti} schede.`, { timeout: 5_000 });
   const rimaste = await archiviate(app);
   expect(rimaste).toHaveLength(70 - gatti);
@@ -235,6 +236,7 @@ test('titolo lungo nell\'elenco: il pannello di cancellazione resta dentro la bo
 // L'assistente sulla pagina conferma col popup generico: il riordino lì si
 // esegue davvero, la cancellazione (che vuole l'elenco davanti) non si propone.
 test('assistente sulla pagina: il riordino confermato parte, la cancellazione dall\'archivio non chiede un sì a vuoto', async ({ app, shell }) => {
+  await livelloAutonomia(app, 'conservativo'); // il popup di un costo 2 si prova a Conservativo (#530)
   test.setTimeout(30_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
@@ -324,13 +326,13 @@ test('una scheda proposta per sbaglio si toglie dall\'elenco e resta; senza spun
   await expect(del).toHaveText('🗑 Elimina definitivamente 1 scheda');
 
   await del.click();
-  await fillConfirmInput(page, 'conferma');
-  await clickConfirm(page, 'danger');
+  await clickConfirm(page, 'ok'); // a Normale, col compito pulito, costo 3 chiede un OK (#530)
   await expect(panel.locator('.dash-delete-note')).toHaveText('✓ Eliminata definitivamente 1 scheda.', { timeout: 5_000 });
   expect((await archiviate(app)).sort()).toEqual(['Il Gattopardo, recensione', 'Ricetta della torta']);
 });
 
 test('chat riaperta dall\'archivio: racconta la cancellazione confermata, non il riordino mai premuto', async ({ app, shell }) => {
+  await livelloAutonomia(app, 'conservativo'); // il popup di un costo 2 si prova a Conservativo (#530)
   test.setTimeout(60_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
@@ -352,8 +354,7 @@ test('chat riaperta dall\'archivio: racconta la cancellazione confermata, non il
   expect((await chat()).messages[1].actions || []).toEqual([]);
 
   await panel.locator('.dash-action-btn-danger').click();
-  await fillConfirmInput(page, 'conferma');
-  await clickConfirm(page, 'danger');
+  await clickConfirm(page, 'ok'); // a Normale, col compito pulito, costo 3 chiede un OK (#530)
   await expect(panel.locator('.dash-delete-note')).toHaveText('✓ Eliminata definitivamente 1 scheda.', { timeout: 5_000 });
   await expect.poll(async () => (await chat()).messages.flatMap((m) => m.actions || []), { timeout: 5_000 }).toEqual(['CANCELLA_ARCHIVIO']);
 
@@ -431,8 +432,7 @@ test('«svuota tutto l\'archivio»: il pannello propone anche le pagine di casa,
   await expect(panel.locator('.dash-delete-list li')).toHaveText(['Gatti persiani', 'Gattini in adozione', 'Pannello del router'], { timeout: 15_000 });
   expect(await app.evaluate(() => globalThis.__giudice.testi.join('\n'))).not.toContain('192.168');
   await panel.locator('.dash-action-btn-danger').click();
-  await fillConfirmInput(page, 'conferma');
-  await clickConfirm(page, 'danger');
+  await clickConfirm(page, 'ok'); // a Normale, col compito pulito, costo 3 chiede un OK (#530)
   await expect(panel.locator('.dash-delete-note')).toHaveText('✓ Eliminate definitivamente 3 schede.', { timeout: 5_000 });
   expect(await archiviate(app)).toEqual([]);
 });

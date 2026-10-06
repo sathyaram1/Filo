@@ -351,7 +351,16 @@ test('l\'Aiuto su una pagina di Filo ricorda la sua ricerca sul web: dopo, il co
   });
   const page = await openTab(PREFS);
   await page.waitForFunction(() => typeof window.__filoSidebarTest?.runPageAction === 'function', null, { timeout: 10000 });
-  await page.evaluate(() => { window.__opened = []; window.open = (u) => { window.__opened.push(u); return null; }; window.SN_SIDEBAR.open(); });
+  // La ricerca esce dal ponte NAVIGA del main (#810): si contano le aperture chieste lì.
+  await page.evaluate(() => {
+    window.__opened = [];
+    const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
+    chrome.runtime.sendMessage = (msg, ...resto) => {
+      if (msg && msg.type === 'filo_run_action' && msg.action && msg.action.type === 'NAVIGA') window.__opened.push(msg.action.url);
+      return orig(msg, ...resto);
+    };
+    window.SN_SIDEBAR.open();
+  });
   // Prima della ricerca la pagina di Filo non sporca niente: a Normale il costo 2 parte da solo.
   await page.evaluate(() => window.__filoSidebarTest.runPageAction({ op: 'search_text', text: 'prima' }));
   await expect.poll(() => page.evaluate(() => window.__opened.length)).toBe(1);
@@ -372,7 +381,16 @@ test('l\'Aiuto su una pagina di Filo ricorda la sua ricerca sul web: dopo, il co
   // Una pagina nuova è un compito nuovo.
   await page.reload();
   await page.waitForFunction(() => typeof window.__filoSidebarTest?.runPageAction === 'function', null, { timeout: 10000 });
-  await page.evaluate(() => { window.__opened = []; window.open = (u) => { window.__opened.push(u); return null; }; window.SN_SIDEBAR.open(); });
+  // La ricerca esce dal ponte NAVIGA del main (#810): si contano le aperture chieste lì.
+  await page.evaluate(() => {
+    window.__opened = [];
+    const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
+    chrome.runtime.sendMessage = (msg, ...resto) => {
+      if (msg && msg.type === 'filo_run_action' && msg.action && msg.action.type === 'NAVIGA') window.__opened.push(msg.action.url);
+      return orig(msg, ...resto);
+    };
+    window.SN_SIDEBAR.open();
+  });
   await page.evaluate(() => window.__filoSidebarTest.runPageAction({ op: 'search_text', text: 'di nuovo' }));
   await expect.poll(() => page.evaluate(() => window.__opened.length)).toBe(1);
 });
@@ -451,7 +469,7 @@ test('Normale dopo una ricerca: il riordino chiede, e il popup dice perché', as
     await page.screenshot({ path: join(SHOTS, 'autonomia-riordino-chiede.png') });
     await clickConfirm(page, 'cancel');
     expect(testo).toContain('Te lo chiedo perché in questo compito ho fatto una ricerca sul web.');
-    await expect(page.locator('body')).toContainText('Conferma chiesta · riordino delle schede');
+    await expect(page.locator('body')).toContainText('Conferma chiesta · Riordinare le schede');
   } finally {
     await ripristina(app);
   }
