@@ -273,6 +273,15 @@
     return `<span class="fb-fusione" title="${escapeHtml(titolo)}">${escapeHtml(testo)}</span>`;
   }
 
+  // «Aspetta #N» (#903): cosa aspetta e lo stato di ciascuno, come in Gestione (dove si mette e si toglie).
+  function attesaChipHtml(f) {
+    const ATT = window.SN_FB_ATTESE;
+    const stati = ATT ? ATT.statiDelleAttese(f, opzSezioni().trovaAtteso) : [];
+    if (!stati.length) return '';
+    const testo = stati.map((w) => `${ATT.etichetta(w)} ${ATT.ETICHETTA[w.stato] || w.stato}`).join(', ');
+    return `<span class="fb-attesa" title="Nessuna routine lo prende finché non sono tutti fusi. Si cambia in Gestione.">⏳ aspetta ${escapeHtml(testo)}</span>`;
+  }
+
   function fmtTs(ts) {
     if (!ts) return '';
     try {
