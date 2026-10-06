@@ -1643,6 +1643,64 @@
     return (Array.isArray(lista) ? lista : []).slice().sort((a, b) => ferma(b) - ferma(a));
   }
 
+  // Il motivo di design → il livello che ha fermato la pratica (D93). Il rombo è Claude che chiede.
+  const SEGNO_DESIGN = {
+    secaudit: { forma: 'pentagono', livello: 'l4', classe: 'attack', testo: 'Bloccato dalla sicurezza: l’audit ha bocciato il fix' },
+    l5:       { forma: 'quadrato',  livello: 'l5', classe: 'attack', testo: 'Fermo al cancello di fusione: aspetta il tuo via libera' },
+    clarify:  { forma: 'rombo', livello: 'l3', classe: 'design', testo: 'Claude ha domande: aspetta una tua risposta' },
+    decisione:{ forma: 'rombo', livello: 'l3', classe: 'design', testo: 'Fermo su una scelta che spetta a te: aspetta una tua risposta' },
+    loop:     { forma: 'rombo', livello: 'l3', classe: 'design', testo: 'La verifica ha trovato un difetto che non si corregge più da soli' },
+    arenato:  { forma: 'rombo', livello: 'l3', classe: 'design', testo: 'La lavorazione si è arenata troppe volte' },
+    locale:   { forma: 'rombo', livello: 'l3', classe: 'design', testo: 'Richiede lavoro locale' },
+  };
+
+  /**
+   * Il simbolo in lista che dice cosa ha fermato una pratica dei Ricevuti: la stessa forma del dettaglio
+   * (triangolo L1, cerchio giudici, rombo L3, pentagono L4, quadrato L5), il motivo in parole. null fuori
+   * dai Ricevuti o a stato illeggibile. PURA. Regole: patterns/il-motivo-in-lista-e-una-forma.md
+   */
+  function segnoFermata(fb, opts) {
+    if (!fb || statusUnreadable(fb)) return null;
+    const out = (forma, livello, classe, testo) => ({ forma, livello, classe: classe || null, testo });
+    if (fusioneInAttesa(fb, opts)) {
+      const l5 = livelloL5(fb, opts);
+      return out('quadrato', 'l5', 'attack', l5.esito === 'conflitto'
+        ? 'Fusione non avvenuta: avevi detto sì, ma il ramo non è entrato in main'
+        : 'Fermo al cancello di fusione: aspetta il tuo via libera');
+    }
+    const { status, statusReason } = normalizeStatus(fb);
+    if (!isRicevutiStatus(status)) return null;
+    if (status === 'design') {
+      const s = SEGNO_DESIGN[String(statusReason || '')];
+      if (s) return out(s.forma, s.livello, s.classe, s.testo);
+      if (aspettaRisposta(fb)) return out('rombo', 'l3', 'design', SEGNO_DESIGN.clarify.testo);
+      return out('cerchio', 'l2', 'design', 'Per i giudici è una questione di design');
+    }
+    const p = (fb.pipeline && typeof fb.pipeline === 'object') ? fb.pipeline : {};
+    if (status === 'suspicious_file') return out('triangolo', 'l1', 'attack', 'Il filtro d’ingresso ha trovato un file sospetto');
+    if (status === 'attack' || status === 'spam') {
+      const parola = status === 'attack' ? 'attacco' : 'spam';
+      const dalFiltro = status === 'attack'
+        ? (p.action === 'block_attack' || p.l1Category === 'dangerous')
+        : (p.action === 'block_spam' || p.l1Category === 'spam');
+      return dalFiltro
+        ? out('triangolo', 'l1', status, `Il filtro d’ingresso l’ha fermata come ${parola}`)
+        : out('cerchio', 'l2', status, `I giudici l’hanno segnalata come ${parola}`);
+    }
+    const worst = worstVerdictBlock(fb);
+    if (status === 'unlabeled') {
+      if (panelComplete(fb) && worst) return out('cerchio', 'l2', worst.reason, `Un giudice l’ha segnalata come ${worst.label.toLowerCase()}`);
+      const nota = judgesNote(fb);
+      return out('cerchio', 'l2', null, (nota && nota.text) ? nota.text.replace(/\.$/, '') : 'Non filtrato: manca il verdetto di un giudice');
+    }
+    if (status === 'aligned') {
+      return worst
+        ? out('cerchio', 'l2', worst.reason, `Un giudice l’ha segnalata come ${worst.label.toLowerCase()}: da esaminare`)
+        : out('cerchio', 'l2', 'aligned', 'Giudici d’accordo: aspetta la tua approvazione');
+    }
+    return null;
+  }
+
   /**
    * Le richieste di fusione che NON hanno una segnalazione in questa lista:
    * non hanno una scheda dove vivere, e restano visibili in Automazioni.
