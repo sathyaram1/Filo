@@ -270,18 +270,41 @@ export function richiestaDaLettura(testo) {
   return [pezzo('Titolo'), pezzo('Testo')].filter(Boolean).join('\n\n');
 }
 
+// I processi lanciati e ancora vivi: «smetti --subito» li ferma tutti, coi loro figli.
+const figli = new Set();
+
+/** Ferma un processo coi suoi figli (test, Electron, git lanciati da un'istanza). */
+function fermaAlbero(figlio) {
+  if (!figlio.pid || figlio.exitCode !== null || figlio.signalCode !== null) return;
+  if (process.platform === 'win32') {
+    // kill() su Windows chiude solo il processo diretto: i figli resterebbero vivi senza nessuno che li aspetta.
+    spawnSync('taskkill', ['/PID', String(figlio.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
+  } else {
+    // Lanciato in un gruppo suo (detached): il segnale al gruppo prende anche i figli.
+    try { process.kill(-figlio.pid, 'SIGTERM'); } catch (_) { try { figlio.kill('SIGTERM'); } catch (__) { /* già uscito */ } }
+  }
+}
+
+function fermaFigli() {
+  for (const f of figli) fermaAlbero(f);
+}
+
 function esegui(cmd, args, { cwd, input, timeoutMs, env } = {}) {
   return new Promise((ok) => {
     const bin = cmd === 'node' ? process.execPath : cmd;
     let stdout = '';
     let stderr = '';
     let scaduto = false;
-    const figlio = spawn(bin, args, { cwd, env: env || process.env, windowsHide: true });
-    const timer = timeoutMs ? setTimeout(() => { scaduto = true; figlio.kill(); }, timeoutMs) : null;
+    // Il primo Ctrl-C vale «smetti» e i passi in corso devono finire: fuori da Windows arriva a tutto il gruppo del terminale,
+    // e il figlio sta in un gruppo suo; su Windows windowsHide coi flussi in pipe gli dà già una console sua, che quel Ctrl-C non tocca.
+    const figlio = spawn(bin, args, { cwd, env: env || process.env, windowsHide: true, detached: process.platform !== 'win32' });
+    figli.add(figlio);
+    const timer = timeoutMs ? setTimeout(() => { scaduto = true; fermaAlbero(figlio); }, timeoutMs) : null;
     figlio.stdout.on('data', (d) => { stdout += d; });
     figlio.stderr.on('data', (d) => { stderr += d; });
     figlio.on('error', (e) => { stderr += String(e.message || e); });
     figlio.on('close', (code) => {
+      figli.delete(figlio);
       if (timer) clearTimeout(timer);
       if (scaduto) stderr += `\ntempo scaduto (${Math.round(timeoutMs / 60_000)} min): processo fermato`;
       ok({ code: code === null ? 1 : code, stdout, stderr, out: `${stdout}\n${stderr}`.trim() });
