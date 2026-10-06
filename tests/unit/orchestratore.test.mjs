@@ -9,11 +9,11 @@ import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  apriDerivatiDi, modoDerivati, attesaLimite, caricoBasta, chiaveVerdetto, classificaFinish, creaMotore, decidiDopoVerifica, derivatiDaAprire, nuovaPratica, passoDalRamo,
+  apriDerivatiDi, modoDerivati, attesaLimite, caricoBasta, chiaveVerdetto, classificaFinish, creaMotore, decidiDopoVerifica, decidiRegole, derivatiDaAprire, doveSiLavora, notaPerOwner, nuovaPratica, passoDalRamo, rigaChiusura, ruoloDelLavoro,
   promptLavoratore, promptVerificatore, regolaFile, richiestaArg, riprendi, rigaStato, serveDeploy, siSovrappongono, toccaRegole, togliWorktree,
 } from '../../scripts/lib/orchestratore.mjs';
 import {
-  IMPOSTAZIONI_NPM_VICINE, OPZIONI_DI, accessoDaStatus, argomentiClaude, envFiglio, frontmatter, leggiArgomenti, leggiUscitaClaude, modelloDelRuolo, opzioniDa, opzioniTenuteDaNpm, richiestaDaLettura, trovaClaude,
+  AGENTE_DEL_RUOLO, IMPOSTAZIONI_NPM_VICINE, OPZIONI_DI, accessoDaStatus, argomentiClaude, cartelleDatiFilo, contaColpi, envFiglio, filoAperto, frontmatter, leggiArgomenti, leggiUscitaClaude, modelloDelRuolo, opzioniDa, opzioniTenuteDaNpm, richiestaDaLettura, trovaClaude,
 } from '../../scripts/orchestratore-locale.mjs';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
@@ -542,7 +542,7 @@ test('togli apre i rilievi rimasti come li apriva avvia: l’opzione dei derivat
   const p = (await b.motore.avvia()).pratiche[7];
   assert.equal(p.derivati, 'nessuno');
   assert.equal(modoDerivati(p), 'nessuno');
-  assert.equal(modoDerivati(nuovaPratica({ num: 9 })), 'non-locale');
+  assert.equal(modoDerivati(nuovaPratica({ num: 9 })), 'auto');
 });
 
 test('riprendi e nuovaPratica', () => {
@@ -980,7 +980,7 @@ test('argomenti: opzione storpiata o di un altro comando, senza valore, che si m
   no('avvia', ['--budget-istanza'], /--budget-istanza vuole un importo/);
   no('avvia', ['--ore-istanza', 'tante'], /--ore-istanza vuole/);
   no('avvia', ['--cpu-max', '120'], /--cpu-max vuole una percentuale da 1 a 100/);
-  no('avvia', ['--derivati', 'tutti'], /--derivati vuole non-locale, locale o nessuno/);
+  no('avvia', ['--derivati', 'tutti'], /--derivati vuole auto, non-locale, locale o nessuno/);
   no('avvia', ['--dry-run=si'], /--dry-run non vuole un valore/);
   no('avvia', ['--paralleli=3', '--paralleli', '2'], /--paralleli data due volte/);
   no('avvia', ['41'], /i numeri valgono solo con --dry-run.*aggiungi 41/);
@@ -991,7 +991,7 @@ test('argomenti: opzione storpiata o di un altro comando, senza valore, che si m
 
   const o = opzioniDa(['--dry-run', '#4242', '--paralleli=3', '--budget-istanza', '2,5', '--tetto', '2', '--derivati', 'nessuno', '--ore-istanza', '1.5', '--cpu-max', '70']);
   assert.deepEqual([o.dryRun, o.numeri, o.paralleli, o.budgetIstanza, o.tetto, o.derivati, o.oreIstanza, o.cpuMax], [true, [4242], 3, 2.5, 2, 'nessuno', 1.5, 70]);
-  assert.equal(opzioniDa([]).paralleli, 2);
+  assert.deepEqual(['paralleli', 'tetto', 'budgetIstanza', 'oreIstanza', 'derivati'].map((k) => opzioniDa([])[k]), [0, 0, '', 0, 'auto'], 'di serie nessun tetto (#1036, #1041)');
   assert.deepEqual(leggiArgomenti('aggiungi', ['41', '--richiesta', '- punto uno\n- punto due', '--file', 'scripts/**, tests/']), {
     opz: { richiesta: '- punto uno\n- punto due', file: ['scripts/**', 'tests/'] }, posizionali: ['41'],
   });
