@@ -40,6 +40,22 @@ async function serve() {
       else html('<div style="padding:40px"><button>Accedi</button></div>', conCookie);
       return;
     }
+    // Senza cookie il riquadro viene rimandato all'accesso, su un altro sottodominio dello stesso servizio.
+    if (u.pathname === '/redir') {
+      if (/vista=1/.test(cookie)) { html('<p id="ok">Il contenuto dopo l\'accesso</p>', conCookie); return; }
+      const host = String(req.headers.host || '').split(':')[0];
+      res.writeHead(302, { Location: `http://accounts.${host}:${porta}/login` });
+      res.end();
+      return;
+    }
+    if (u.pathname === '/login') {
+      // Il cookie vale per tutto il servizio, come quelli di un accesso vero.
+      const host = String(req.headers.host || '').split(':')[0];
+      const delServizio = { 'Set-Cookie': [`vista=1; Max-Age=86400; Path=/; Domain=${host.replace(/^accounts\./, '')}; SameSite=None; Secure`] };
+      if (/^accounts\.b\./.test(host)) html('<p>Accedi per vedere il post</p>', delServizio);
+      else html('<div style="padding:40px"><button>Accedi</button></div>', delServizio);
+      return;
+    }
     if (u.pathname === '/funziona') {
       const testo = Array.from({ length: 140 }, (_, i) => `parola${i}`).join(' ');
       html(`<canvas width="200" height="120" style="background:#c45a3b"></canvas><p>${testo}</p>`);
@@ -250,6 +266,48 @@ test('in Privacy: «Sì» fa sopravvivere i cookie del servizio nello spazio del
     await expect(di.frameLocator('#ri').locator('#ok')).toHaveText('Il post: tramonto sul mare', { timeout: 10_000 });
     // E il servizio non ha ricevuto niente nello spazio suo: i cookie stanno solo in quello del sito che lo ospita.
     expect(await cookieVista(app)).toEqual([]);
+  } finally {
+    await srv.chiudi();
+  }
+});
+
+test('rimandato all\'accesso su un altro sottodominio: la proposta compare sopra il riquadro e «Sì» lo riporta al contenuto', async ({ app, openTab }) => {
+  const srv = await serve();
+  try {
+    await prepara(app);
+    const page = await openTab(srv.art('b', 'redir'));
+    await expect(page.frameLocator('#ri').getByText('Accedi per vedere il post')).toBeVisible();
+    const p = await aspettaProposta(app, 'a.localhost');
+    expect(p.visibile).toBe(true);
+    expect(p.si.y).toBeGreaterThan(p.riquadro.y - ALTO / 2);
+    expect(p.si.y).toBeLessThan(p.riquadro.y);
+    await page.mouse.click(p.si.x, p.si.y);
+    await expect(page.frameLocator('#ri').locator('#ok')).toHaveText('Il contenuto dopo l\'accesso', { timeout: 10_000 });
+    expect(await chiamate(app)).toEqual([]);
+  } finally {
+    await srv.chiudi();
+  }
+});
+
+test('sconosciuto rimandato all\'accesso: il modello guarda il solo riquadro, e il tasto destro lo riporta al contenuto', async ({ app, openTab }) => {
+  const srv = await serve();
+  try {
+    await prepara(app);
+    const page = await openTab(srv.art('cosmo', 'redir'));
+    const p = await aspettaProposta(app, 'a.localhost');
+    expect(p.testo).toBe('Attivo i cookie di Cosmo per questo contenuto?');
+    const c = await chiamate(app);
+    expect(c.length).toBe(1);
+    expect(Math.abs(c[0].misura.width - LARGO)).toBeLessThanOrEqual(2);
+    expect(Math.abs(c[0].misura.height - ALTO)).toBeLessThanOrEqual(2);
+    await page.mouse.click(p.no.x, p.no.y);
+    await expect.poll(() => proposte(app, 'a.localhost').then((l) => l.length), { timeout: 5_000 }).toBe(0);
+
+    const ri = page.frameLocator('#ri');
+    await ri.locator('html').click({ button: 'right', position: { x: 60, y: 60 } });
+    await ri.locator('.sn-menu').getByText('Attiva i cookie di cosmo.localhost qui', { exact: true }).click();
+    await expect(ri.locator('#ok')).toHaveText('Il contenuto dopo l\'accesso', { timeout: 10_000 });
+    expect(await impostazioni(app)).toEqual(['cosmo.localhost']);
   } finally {
     await srv.chiudi();
   }

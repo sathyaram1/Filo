@@ -79,3 +79,19 @@ test('la risposta del modello: solo il formato chiesto; il nome si mostra solo s
   assert.equal(R.leggiRisposta('{"rotto": "sì"}', 'esempio.io'), null);
   assert.equal(R.leggiRisposta('', 'esempio.io'), null);
 });
+
+test('un riquadro che mostra il suo contenuto non è rotto per una frase sui cookie o un segnaposto in mezzo al testo', () => {
+  const lungo = Array.from({ length: 120 }, (_, i) => `notizia${i}`).join(' ');
+  assert.equal(R.riconosci({ host: 'widget.esempio.org', testo: `${lungo} continue to accept cookies or change settings` }), null);
+  assert.equal(R.riconosci({ host: 'www.facebook.com', percorso: '/plugins/page.php', testo: `${lungo} This content isn't available right now` }), null);
+  // Le parole contate dal riquadro valgono anche quando il testo che arriva è tagliato.
+  assert.equal(R.riconosci({ host: 'widget.esempio.org', testo: 'Please enable cookies', parole: 300 }), null);
+  assert.ok(R.riconosci({ host: 'widget.esempio.org', testo: 'Please enable cookies to see this content', parole: 7 }));
+});
+
+test('il nome dato dal modello vale solo se è il nome del sito, non se il sito lo contiene', () => {
+  assert.equal(R.leggiRisposta('{"rotto": true, "servizio": "Instagram"}', 'instagram-accesso.xyz').nome, 'instagram-accesso.xyz');
+  assert.equal(R.leggiRisposta('{"rotto": true, "servizio": "Facebook"}', 'facebook-video-login.net').nome, 'facebook-video-login.net');
+  assert.equal(R.leggiRisposta('{"rotto": true, "servizio": "BBC"}', 'bbc.co.uk').nome, 'BBC');
+  assert.equal(R.leggiRisposta('{"rotto": true, "servizio": "Sound Cloud"}', 'soundcloud.com').nome, 'Sound Cloud');
+});

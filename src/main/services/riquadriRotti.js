@@ -17,7 +17,7 @@ const LATO_MAX = 768;
 
 let riattivati = new Set();
 let chiamaModello = null;
-const proposte = new Map();   // gettone → { wcId, ftn, servizio, ospite, nome, url, origin }
+const proposte = new Map();   // gettone → { wcId, ftn, servizio, ospite, nome, url, origin, segno }
 const visti = new Set();      // riquadri già proposti o già guardati: una volta per riquadro
 const rifiutate = new Set();  // servizio|ospite a cui l'utente ha detto no, per questa sessione di Filo
 const funziona = new Map();   // servizio → quando il modello l'ha visto funzionare
@@ -95,14 +95,40 @@ function osservazione(msg) {
   };
 }
 
-function proponi(c, nome) {
+// Il segno con cui il riquadro si è presentato alla pagina (riquadroRotto.js): la pagina ritrova l'elemento anche
+// quando il riquadro è finito su un indirizzo diverso da quello che gli ha dato.
+function segnoDi(msg) {
+  const s = msg && msg.segno;
+  return typeof s === 'string' && /^[\w-]{8,64}$/.test(s) ? s : '';
+}
+
+// Codice per il mondo dei content script della pagina (quello di riquadroRotto.js), dove vive la mappa dei segni.
+const MONDO_SCRIPT = 999;
+function chiamaPagina(wc, metodo, ...args) {
+  const code = `(() => { const R = globalThis.SN_RIQUADRO_COOKIE; return R && typeof R.${metodo} === 'function' ? R.${metodo}(...${JSON.stringify(args)}) : null; })()`;
+  try { return wc.executeJavaScriptInIsolatedWorld(MONDO_SCRIPT, [{ code }]).catch(() => null); } catch (_) { return Promise.resolve(null); }
+}
+
+function proponi(c, nome, segno) {
   const token = crypto.randomUUID();
   let url = '';
   let origin = '';
   try { url = String(c.figlio.url || ''); origin = String(c.figlio.origin || ''); } catch (_) {}
-  proposte.set(token, { wcId: c.wc.id, ftn: c.figlio.frameTreeNodeId, servizio: c.servizio, ospite: c.ospite, nome, url, origin });
+  proposte.set(token, { wcId: c.wc.id, ftn: c.figlio.frameTreeNodeId, servizio: c.servizio, ospite: c.ospite, nome, url, origin, segno });
   while (proposte.size > MAX_VOCI) proposte.delete(proposte.keys().next().value);
-  try { c.top.send('filo:broadcast', { type: MSG().RIQUADRO_COOKIE_PROPONI, token, nome, url, origin }); } catch (_) {}
+  try { c.top.send('filo:broadcast', { type: MSG().RIQUADRO_COOKIE_PROPONI, token, nome, url, origin, segno }); } catch (_) {}
+}
+
+// Ricaricare un riquadro vuol dire rimetterlo all'indirizzo che la pagina gli ha dato: ricaricato dov'è, un riquadro
+// rimandato alla pagina d'accesso resterebbe lì. Se la pagina non lo ritrova, si ricarica dov'è.
+async function ricarica(wcId, ftn, segno) {
+  let wc = null;
+  try { wc = require('electron').webContents.fromId(wcId); } catch (_) {}
+  if (!wc || wc.isDestroyed()) return false;
+  if (segno && (await chiamaPagina(wc, 'ricarica', segno)) === true) return true;
+  const f = frameDi(wcId, ftn);
+  if (!f) return false;
+  try { f.reload(); return true; } catch (_) { return false; }
 }
 
 // Il rettangolo del riquadro nella pagina, letto in un mondo isolato: la pagina non lo può falsare a suo piacere.
@@ -124,10 +150,12 @@ function codiceMisura(url, origin) {
 })()`;
 }
 
-async function foto(c) {
-  let r = null;
-  try { r = await c.wc.executeJavaScriptInIsolatedWorld(MONDO, [{ code: codiceMisura(c.figlio.url, c.figlio.origin) }]); } catch (_) { return null; }
-  if (!r) return null;
+async function foto(c, segno) {
+  let r = segno ? await chiamaPagina(c.wc, 'rettangolo', segno) : null;
+  if (!r) {
+    try { r = await c.wc.executeJavaScriptInIsolatedWorld(MONDO, [{ code: codiceMisura(c.figlio.url, c.figlio.origin) }]); } catch (_) { return null; }
+  }
+  if (!r || ![r.x, r.y, r.w, r.h].every(Number.isFinite)) return null;
   let z = 1;
   try { z = c.wc.getZoomFactor() || 1; } catch (_) {}
   const rect = { x: Math.round(r.x * z), y: Math.round(r.y * z), width: Math.round(r.w * z), height: Math.round(r.h * z) };
@@ -148,7 +176,7 @@ function puoGuardare() {
   return true;
 }
 
-async function guarda(c) {
+async function guarda(c, segno) {
   if (typeof chiamaModello !== 'function') return null;
   const quando = funziona.get(c.servizio);
   if (quando && Date.now() - quando < FUNZIONA_MS) return null;
@@ -159,7 +187,7 @@ async function guarda(c) {
     if (delicata(c.urlTop) || delicata(c.urlFrame)) return null;
   } catch (_) { return null; }
   if (!puoGuardare()) return null;
-  const immagine = await foto(c);
+  const immagine = await foto(c, segno);
   if (!immagine) return null;
   let testo = '';
   try { testo = await chiamaModello(R.messaggi({ immagine, sito: c.servizio })); } catch (e) {
@@ -182,20 +210,21 @@ async function segnala(msg, sender) {
   if (visti.has(chiave) || rifiutate.has(`${c.servizio}|${c.ospite}`)) return { ok: true };
   if (!rifiutati(c) || pubblicita(c.urlFrame)) return { ok: true };
   const o = osservazione(msg);
+  const segno = segnoDi(msg);
   const { host, percorso } = hostEPercorso(c.urlFrame);
-  const regola = R.riconosci({ host, percorso, testo: o.testo });
+  const regola = R.riconosci({ host, percorso, testo: o.testo, parole: o.parole });
   if (regola) {
     tieni(visti, chiave);
-    proponi(c, regola.nome || R.nomeDi(c.servizio, host, percorso));
+    proponi(c, regola.nome || R.nomeDi(c.servizio, host, percorso), segno);
     return { ok: true, via: 'regola' };
   }
   if (!R.sembraRotto(o)) return { ok: true };
   tieni(visti, chiave);
   // Un modulo con la password è delicato (#1004): la sua immagine non va a un modello.
   if (o.password) return { ok: true };
-  const esito = await guarda(c);
+  const esito = await guarda(c, segno);
   if (!esito || !esito.rotto || c.wc.isDestroyed() || !rifiutati(c)) return { ok: true };
-  proponi(c, esito.nome);
+  proponi(c, esito.nome, segno);
   return { ok: true, via: 'modello' };
 }
 
@@ -246,7 +275,7 @@ async function cambia(msg, sender) {
     try { w = require('electron').webContents.fromId(p.wcId); } catch (_) {}
     if (w && !w.isDestroyed()) ritira(w, token);
   }
-  try { c.figlio.reload(); } catch (_) {}
+  await ricarica(c.wc.id, c.figlio.frameTreeNodeId, segnoDi(msg));
   return { ok: true };
 }
 
@@ -272,8 +301,7 @@ async function risposta(msg, sender) {
   }
   let ricaricato = false;
   for (const q of [p, ...fratelli.map(([, x]) => x)]) {
-    const f = frameDi(q.wcId, q.ftn);
-    if (f) { try { f.reload(); ricaricato = true; } catch (_) {} }
+    if (await ricarica(q.wcId, q.ftn, q.segno)) ricaricato = true;
   }
   return { ok: true, ricaricato };
 }

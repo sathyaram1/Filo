@@ -36,6 +36,13 @@
   const PAUSA_MS = 2500;
   const TENTATIVI = 5;
   let stato = null;
+  // Il riquadro si presenta alla pagina con un segno: lei lo lega al suo elemento iframe, che resta quello anche
+  // quando il riquadro finisce su un altro indirizzo (un rimando alla pagina d'accesso).
+  const SEGNO = (() => { try { return crypto.randomUUID(); } catch (_) { return `s${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`; } })();
+  const CHIAVE_SEGNO = '__filoRiquadroCookie';
+  function presentati() {
+    try { window.top.postMessage({ [CHIAVE_SEGNO]: SEGNO }, '*'); } catch (_) {}
+  }
 
   function osserva() {
     const corpo = document.body;
@@ -65,7 +72,7 @@
     let n = 0;
     const giro = () => {
       const ora = osserva();
-      if (stessa(prima, ora) || ++n >= TENTATIVI) { ask({ type: T_SEGNALA, ...ora }); return; }
+      if (stessa(prima, ora) || ++n >= TENTATIVI) { presentati(); ask({ type: T_SEGNALA, ...ora, segno: SEGNO }); return; }
       prima = ora;
       setTimeout(giro, PAUSA_MS);
     };
@@ -97,6 +104,7 @@
 
   function avviaRiquadro() {
     if (!/^https?:/i.test(location.href) || !diTerzi()) return;
+    presentati();
     aggiornaStato();
     const via = () => quandoVisibile(aspettaFermo);
     if (document.readyState === 'complete') via();
@@ -106,7 +114,7 @@
   // Le voci del tasto destro sul riquadro: riattivare e togliere passano dalla stessa porta.
   function voci() {
     if (IS_TOP || !stato || !stato.nome) return [];
-    const cambia = (attiva) => () => { ask({ type: T_CAMBIA, attiva }).then(aggiornaStato); };
+    const cambia = (attiva) => () => { presentati(); ask({ type: T_CAMBIA, attiva, segno: SEGNO }).then(aggiornaStato); };
     if (stato.consentito) return [{ type: 'item', label: t('riquadro_cookie_menu_togli', stato.nome), onClick: cambia(false) }];
     if (stato.proponibile) return [{ type: 'item', label: t('riquadro_cookie_menu_attiva', stato.nome), onClick: cambia(true) }];
     return [];
@@ -158,13 +166,48 @@ button:focus-visible { outline: 2px solid var(--sn-accent, #c45a3b); outline-off
   const proposte = new Map(); // gettone → { host, bar, iframe, nome, url, origin, cercaFino }
   let foglio = null;
 
+  // segno → iframe. Vince il primo: chi ripete un segno visto passare non sposta il legame su un altro riquadro.
+  const segni = new Map();
+  const MAX_SEGNI = 200;
+
+  function iframeDi(sorgente) {
+    let w = sorgente;
+    try {
+      for (let i = 0; w && i < 20 && w.parent !== window; i++) {
+        if (w.parent === w) return null;
+        w = w.parent;
+      }
+      if (!w || w.parent !== window) return null;
+      return [...document.querySelectorAll('iframe, frame')].find((f) => f.contentWindow === w) || null;
+    } catch (_) { return null; }
+  }
+
+  function ascoltaSegni() {
+    window.addEventListener('message', (e) => {
+      const d = e && e.data;
+      const s = d && typeof d === 'object' ? d[CHIAVE_SEGNO] : null;
+      if (typeof s !== 'string' || !/^[\w-]{8,64}$/.test(s) || segni.has(s)) return;
+      const f = iframeDi(e.source);
+      if (!f) return;
+      segni.set(s, f);
+      while (segni.size > MAX_SEGNI) segni.delete(segni.keys().next().value);
+    });
+  }
+
+  function perSegno(segno) {
+    const f = segno ? segni.get(segno) : null;
+    return f && f.isConnected ? f : null;
+  }
+
   function foglioCondiviso() {
     if (foglio) return foglio;
     try { foglio = new CSSStyleSheet(); foglio.replaceSync(CSS); } catch (_) { foglio = null; }
     return foglio;
   }
 
-  function trovaRiquadro(url, origin) {
+  function trovaRiquadro(url, origin, segno) {
+    const delSegno = perSegno(segno);
+    if (delSegno && ![...proposte.values()].some((p) => p.iframe === delSegno)) return delSegno;
     let tutti = [];
     try { tutti = [...document.querySelectorAll('iframe')]; } catch (_) { return null; }
     const pieno = (f) => { try { return new URL(f.src, location.href).href; } catch (_) { return ''; } };
@@ -257,7 +300,7 @@ button:focus-visible { outline: 2px solid var(--sn-accent, #c45a3b); outline-off
     if (!m || !m.token || proposte.has(m.token)) return;
     const fino = Date.now() + 5000;
     const cerca = () => {
-      const f = trovaRiquadro(m.url, m.origin);
+      const f = trovaRiquadro(m.url, m.origin, m.segno);
       if (f) { disegna(m, f); return; }
       if (Date.now() < fino) setTimeout(cerca, 250);
     };
@@ -265,6 +308,7 @@ button:focus-visible { outline: 2px solid var(--sn-accent, #c45a3b); outline-off
   }
 
   if (IS_TOP) {
+    ascoltaSegni();
     try {
       chrome.runtime.onMessage.addListener((m) => {
         if (m && m.type === T_PROPONI) proponi(m);
@@ -290,5 +334,22 @@ button:focus-visible { outline: 2px solid var(--sn-accent, #c45a3b); outline-off
     stato: () => stato,
   };
 
-  global.SN_RIQUADRO_COOKIE = { voci, aggiornaStato, _test };
+  // Le chiamate del main (riquadriRotti.js): il rettangolo per la foto, e la ricarica all'indirizzo della pagina.
+  function rettangoloDi(segno) {
+    const f = perSegno(segno);
+    if (!f) return null;
+    const r = f.getBoundingClientRect();
+    const x = Math.max(0, r.left), y = Math.max(0, r.top);
+    const w = Math.min(window.innerWidth, r.right) - x, h = Math.min(window.innerHeight, r.bottom) - y;
+    return w >= 40 && h >= 40 ? { x, y, w, h } : null;
+  }
+  function ricaricaDi(segno) {
+    const f = perSegno(segno);
+    const src = f && f.getAttribute('src');
+    if (!src) return false;
+    f.setAttribute('src', src);
+    return true;
+  }
+
+  global.SN_RIQUADRO_COOKIE = { voci, aggiornaStato, rettangolo: rettangoloDi, ricarica: ricaricaDi, _test };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

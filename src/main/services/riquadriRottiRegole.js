@@ -116,10 +116,19 @@ function testoPulito(t) {
   return String(t || '').replace(/\s+/g, ' ').trim().slice(0, 4000);
 }
 
-// Il riconoscimento a regole: il segnaposto noto del servizio, o la frase che chiede i cookie.
-function riconosci({ host, percorso, testo } = {}) {
+// Oltre questo numero di parole il riquadro mostra il suo contenuto: una frase sui cookie in fondo non lo rende rotto.
+const PAROLE_CONTENUTO = 80;
+
+function contaParole(t, parole) {
+  return typeof parole === 'number' && Number.isFinite(parole) ? parole : (t ? t.split(' ').length : 0);
+}
+
+// Il riconoscimento a regole: il segnaposto noto del servizio, o la frase che chiede i cookie, in un riquadro che
+// non sta mostrando il suo contenuto.
+function riconosci({ host, percorso, testo, parole } = {}) {
   const t = testoPulito(testo);
   if (!t) return null;
+  if (contaParole(t, parole) > PAROLE_CONTENUTO) return null;
   const s = servizioDi(host, percorso);
   if (CHIEDE_COOKIE.test(t)) return { nome: s ? s.nome : null, via: 'regola' };
   if (s && s.segnaposto.some((r) => r.test(t))) return { nome: s.nome, via: 'regola' };
@@ -143,10 +152,10 @@ function sembraRotto({ testo, parole, media, password, larghezza, altezza } = {}
   if ((Number(larghezza) || 0) < 120 || (Number(altezza) || 0) < 60) return false;
   if (sembraPubblicita({ larghezza, altezza })) return false;
   const t = testoPulito(testo);
-  const n = Number.isFinite(Number(parole)) ? Number(parole) : (t ? t.split(' ').length : 0);
+  const n = contaParole(t, parole);
   const conMedia = Number(media) > 0;
   if (!t && !conMedia) return true;
-  if (n > 80) return false;
+  if (n > PAROLE_CONTENUTO) return false;
   if (password) return true;
   if (ERRORE.test(t)) return true;
   if (ACCESSO.test(t) && !conMedia && n <= 40) return true;
@@ -170,13 +179,14 @@ function messaggi({ immagine, sito }) {
   ];
 }
 
-// Il nome del modello si mostra solo se il sito lo conferma (un riquadro che si fa chiamare «Banca» resta il suo sito).
+// Il nome del modello si mostra solo se è il nome del sito stesso: un riquadro che si fa chiamare «Banca» resta il
+// suo sito, e instagram-accesso.xyz non diventa Instagram.
 function nomeConfermato(nome, sito) {
   const n = String(nome || '').trim();
   if (!n || n.length > 30 || /[<>"{}]/.test(n)) return null;
   const chiave = n.toLowerCase().replace(/[^a-z0-9]/g, '');
-  const dom = String(sito || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-  return chiave.length >= 2 && dom.includes(chiave) ? n : null;
+  const nomeSito = String(sito || '').toLowerCase().split('.')[0].replace(/[^a-z0-9]/g, '');
+  return chiave.length >= 2 && chiave === nomeSito ? n : null;
 }
 
 // La risposta del modello: solo il formato chiesto. Tutto il resto vale «non so», e un «non so» non mostra niente.
