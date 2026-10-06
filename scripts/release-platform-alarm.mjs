@@ -56,7 +56,7 @@ export const PIATTAFORME = {
  */
 export const PASSI = {
   strumento: 'il prelievo del codice di questa corsa, quello che porta lo strumento di questo avviso',
-  riparo: "la copia dello strumento di questo avviso fuori dalla copia di lavoro",
+  riparo: "la copia degli strumenti di questa corsa (questo avviso, l'installazione che ritenta) fuori dalla copia di lavoro",
   bersaglio: 'la scelta della versione a cui attaccarsi e del codice da costruire',
   checkout: 'il prelievo del codice di questa versione',
   node: 'la preparazione di Node',
@@ -67,6 +67,15 @@ export const PASSI = {
   istruzioni: 'il caricamento del foglietto del primo avvio',
   controllo: 'il controllo che i file siano davvero nella release',
 };
+
+/**
+ * Le chiavi dell'allarme: `piattaforma:mac` o `piattaforma:linux`. Un guasto
+ * della stessa metà con un feedback ancora aperto non ne apre un altro. PURA.
+ */
+export function chiaviAllarme(piattaforma) {
+  const nome = String(piattaforma || '').trim().toLowerCase();
+  return [nome ? `piattaforma:${nome}` : 'piattaforma'];
+}
 
 /**
  * L'id del primo passo fallito, letto da `toJSON(steps)` di Actions (che li
@@ -218,7 +227,7 @@ async function main() {
     mancanti: process.env.MANCANTI,
     esiti,
   });
-  await inviaAllarme(titolo, testo);
+  await inviaAllarme(titolo, testo, chiaviAllarme(process.env.PIATTAFORMA));
 }
 
 // Il workflow lancia una COPIA di questo file, fuori dalla copia di lavoro: se

@@ -73,7 +73,7 @@ test('nessun punto prende il modello da un valore deciso nel codice', () => {
 
 test('ogni funzione dell\'app è censita, e il censimento non inventa funzioni', () => {
   const actions = new Set(Object.values(C.ACTIONS));
-  const censused = new Set(Usage.userActions());
+  const censused = new Set([...Usage.userActions(), ...Usage.ownerActions().map((p) => p.action)]);
 
   const missing = [...actions].filter((a) => !censused.has(a));
   assert.deepEqual(missing, [], `funzioni che usano un modello ma non sono nel censimento: ${missing.join(', ')}`);
@@ -98,6 +98,18 @@ test('ogni slot dei modelli di supporto è censito, e viceversa', () => {
 
   const ghosts = [...censused].filter((s) => !slots.has(s));
   assert.deepEqual(ghosts, [], `il censimento cita slot che non esistono: ${ghosts.join(', ')}`);
+});
+
+test('una funzione che usa solo chi gestisce Filo sta nel suo slot, non nella griglia di tutti (#465)', () => {
+  const A = C.ACTIONS;
+  assert.equal(Usage.ownerSlotForAction(A.MANAGE_SEARCH), 'manageSearch');
+  assert.ok(SupportModels.SLOTS.includes('manageSearch'));
+  assert.ok(!Usage.userActions().includes(A.MANAGE_SEARCH), 'la ricerca fra i feedback non va in Opzioni né in Modelli predefiniti');
+  assert.ok(!Chain.actionLabels().some(([a]) => a === A.MANAGE_SEARCH));
+  // Nessuna funzione sta in due posti: sarebbe impostabile in due punti che divergono.
+  const both = Usage.ownerActions().map((p) => p.action).filter((a) => Usage.userActions().includes(a));
+  assert.deepEqual(both, []);
+  assert.equal(Usage.ownerSlotForAction(A.EXPLAIN), '');
 });
 
 // ── Ogni funzione censita ha davvero un posto dove impostarla ────────────────

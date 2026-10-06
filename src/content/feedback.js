@@ -205,7 +205,8 @@
     } catch (_) {}
   }
 
-  function open() {
+  // `testo`: una segnalazione già scritta da Filo (il falso allarme dal tasto destro sull'avviso di un sito, #813.5).
+  function open({ testo: proposta = '' } = {}) {
     if (activeRoot) return;
     const root = document.createElement('div');
     root.className = 'sn-fb-overlay';
@@ -296,11 +297,20 @@
       clearTimeout(saveTimer);
       saveTimer = setTimeout(saveDraft, 250);
     });
-    // Ripristina l'eventuale bozza salvata (solo se l'utente non ha già scritto).
+    // Ripristina l'eventuale bozza salvata (solo se l'utente non ha già scritto). Il testo proposto da Filo si
+    // aggiunge alla bozza, non la sostituisce: la bozza è dell'utente.
+    const inFondo = () => { try { textEl.setSelectionRange(textEl.value.length, textEl.value.length); } catch (_) {} };
+    if (typeof proposta === 'string' && proposta) { textEl.value = proposta; inFondo(); }
     try {
       chrome.storage.local.get([DRAFT_KEY]).then((r) => {
         const saved = r?.[DRAFT_KEY];
-        if (saved && activeRoot === root && !textEl.value) textEl.value = saved;
+        if (activeRoot !== root) return;
+        if (saved && !textEl.value) textEl.value = saved;
+        else if (saved && proposta && textEl.value === proposta && !saved.includes(proposta)) {
+          textEl.value = `${saved}\n\n${proposta}`;
+          inFondo();
+        }
+        if (proposta) saveDraft();
       }).catch(() => {});
     } catch (_) {}
 
@@ -492,7 +502,8 @@
         return;
       }
       const dataUrl = await blobToDataUrl(blob);
-      images.push({ dataUrl });
+      // Il nome resta sul computer: lo leggono l'avviso degli allegati non partiti e l'elenco delle segnalazioni.
+      images.push({ dataUrl, name: String(blob.name || '') });
       bumpSubmissionId();
       renderThumbs();
     }
@@ -732,10 +743,10 @@
           if (shot) {
             const annotated = await composeAnnotated(shot);
             const full = await stackTopbar(annotated, topbarShot);
-            if (outImages.length < MAX_IMAGES) outImages.push({ dataUrl: full });
+            if (outImages.length < MAX_IMAGES) outImages.push({ dataUrl: full, name: 'schermata annotata' });
           } else if (topbarShot) {
             // La pagina non si lascia catturare ma la barra sì: allega almeno quella.
-            if (outImages.length < MAX_IMAGES) outImages.push({ dataUrl: topbarShot });
+            if (outImages.length < MAX_IMAGES) outImages.push({ dataUrl: topbarShot, name: 'schermata annotata' });
           } else {
             statusEl.textContent = 'Screenshot non disponibile su questa pagina.';
           }
@@ -838,6 +849,7 @@
 
     updateClearBtn();
     textEl.focus();
+    if (proposta) inFondo();
   }
 
   global.SN_FEEDBACK_UI = { open, close };

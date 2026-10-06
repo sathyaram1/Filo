@@ -72,14 +72,15 @@ async function vociMenuAccount(app, shell) {
   return [];
 }
 
-test('senza portachiavi: all\'accesso Filo dice subito che non verrà ricordato', async ({ app, shell }) => {
+test('senza portachiavi: all\'accesso Filo dice subito che non verrà ricordato', async ({ app, shell, avvisi }) => {
   await preparaLogin(app, { cifra: false });
   const esito = await accedi(app, shell);
   expect(esito.ok, esito.error).toBe(true);
   expect(esito.profile.email).toBe(EMAIL);
   expect(esito.remembered).toBe(false);
 
-  const avviso = shell.locator('.shell-notif-msg', { hasText: 'dovrai accedere di nuovo' });
+  const vista = await avvisi();
+  const avviso = vista.locator('.shell-notif-msg', { hasText: 'dovrai accedere di nuovo' });
   await expect(avviso).toBeVisible({ timeout: 8_000 });
   await expect(avviso).toContainText('portachiavi di sistema');
   if (process.platform === 'linux') {
@@ -90,7 +91,7 @@ test('senza portachiavi: all\'accesso Filo dice subito che non verrà ricordato'
   await shell.waitForTimeout(6_500);
   await expect(avviso).toBeVisible();
   mkdirSync(SHOTS, { recursive: true });
-  await shell.screenshot({ path: join(SHOTS, 'accesso-non-ricordato.png') });
+  await vista.screenshot({ path: join(SHOTS, 'accesso-non-ricordato.png') });
 
   const stato = await shell.evaluate(() => window.filoShell.auth.status());
   expect(stato.signedIn).toBe(true);
@@ -101,23 +102,25 @@ test('senza portachiavi: all\'accesso Filo dice subito che non verrà ricordato'
 });
 
 // Su KDE Filo usa solo KWallet: consigliare GNOME Keyring lì non fa ricordare niente.
-test('su KDE senza KWallet l\'avviso consiglia KWallet e non GNOME Keyring', async ({ app, shell }) => {
+test('su KDE senza KWallet l\'avviso consiglia KWallet e non GNOME Keyring', async ({ app, shell, avvisi }) => {
   test.skip(process.platform !== 'linux', 'il consiglio sul portachiavi è solo di Linux');
   await preparaLogin(app, { cifra: false, backend: 'kwallet5' });
   const esito = await accedi(app, shell);
   expect(esito.ok, esito.error).toBe(true);
-  const avviso = shell.locator('.shell-notif-msg', { hasText: 'dovrai accedere di nuovo' });
+  const vista = await avvisi();
+  const avviso = vista.locator('.shell-notif-msg', { hasText: 'dovrai accedere di nuovo' });
   await expect(avviso).toBeVisible({ timeout: 8_000 });
   await expect(avviso).toContainText('KWallet');
   await expect(avviso).not.toContainText('GNOME Keyring');
 });
 
 // Con la cifratura di ripiego imposta da chi lancia Filo nessun portachiavi servirebbe.
-test('con il ripiego imposto l\'avviso non consiglia niente da installare', async ({ app, shell }) => {
+test('con il ripiego imposto l\'avviso non consiglia niente da installare', async ({ app, shell, avvisi }) => {
   await preparaLogin(app, { cifra: false, backend: 'basic_text' });
   const esito = await accedi(app, shell);
   expect(esito.ok, esito.error).toBe(true);
-  const avviso = shell.locator('.shell-notif-msg', { hasText: 'dovrai accedere di nuovo' });
+  const vista = await avvisi();
+  const avviso = vista.locator('.shell-notif-msg', { hasText: 'dovrai accedere di nuovo' });
   await expect(avviso).toBeVisible({ timeout: 8_000 });
   await expect(avviso).not.toContainText('installa');
 });

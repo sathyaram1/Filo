@@ -26,22 +26,37 @@ const ESEMPI = [
   ['apply.com', 'Apple'],
 ];
 
+// L'avviso sta in una vista sopra la scheda, non nella pagina.
+async function vistaAvviso(app, ms = 12_000) {
+  const fine = Date.now() + ms;
+  while (Date.now() < fine) {
+    const p = app.windows().find((w) => { try { return w.url().startsWith('filo://shell/avviso-sito.html'); } catch (_) { return false; } });
+    if (p) return p;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  throw new Error('la vista dell\'avviso non è nata');
+}
+
+const coperta = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+  .some((w) => w._filoTabs && w._filoTabs.avvisoSito && !!w._filoTabs.avvisoSito.coperta()));
+
 for (const [host, marchio] of ESEMPI) {
   test(`${host}: popup «Continua», non il blocco da «confermo»`, async ({ app, openTab }) => {
     await servi(app, { [host]: `<h1>Pagina di ${host}</h1><p>contenuto vero</p>` });
     const page = await openTab(`https://${host}/`);
-    const continua = page.getByRole('button', { name: 'Continua' });
+    const avviso = await vistaAvviso(app);
+    const continua = avviso.getByRole('button', { name: 'Continua' });
     await expect(continua).toBeVisible({ timeout: 12_000 });
-    await expect(page.getByPlaceholder('confermo')).toHaveCount(0);
-    await expect(page.getByText(new RegExp(`assomiglia all'indirizzo di ${marchio}`))).toBeVisible();
-    if (host === 'posts.com') await page.screenshot({ path: 'tests/.shots/verifica-728-posts.png' });
+    await expect(avviso.getByPlaceholder('confermo')).toHaveCount(0);
+    await expect(avviso.getByText(new RegExp(`assomiglia all'indirizzo di ${marchio}`))).toBeVisible();
+    if (host === 'posts.com') await avviso.screenshot({ path: 'tests/.shots/verifica-728-posts.png' });
     await continua.click();
-    await expect(continua).toHaveCount(0, { timeout: 6_000 });
+    await expect.poll(() => coperta(app)).toBe(false);
     await expect(page.getByRole('heading', { name: `Pagina di ${host}` })).toBeVisible();
     // Ricaricando nella stessa scheda il popup già chiuso non torna.
     await page.reload();
     await expect(page.getByRole('heading', { name: `Pagina di ${host}` })).toBeVisible();
     await page.waitForTimeout(2500);
-    await expect(page.getByRole('button', { name: 'Continua' })).toHaveCount(0);
+    expect(await coperta(app)).toBe(false);
   });
 }

@@ -47,6 +47,11 @@ const ICON_PATHS = {
   close:
     '<path d="M6 6l12 12"/><path d="M18 6L6 18"/>',
 
+  // Freccia indietro: COPIA di `back` in src/shared/icons.js. Voce «Torna indietro» del menu dell'avviso del sito.
+  back:
+    '<path d="M19 12H5"/>' +
+    '<path d="M11 6l-6 6 6 6"/>',
+
   // Biscotto morsicato — righe del banner dei cookie nel menu della scheda (#754).
   cookie:
     '<path d="M12 3a9 9 0 1 0 9 9 3 3 0 0 1-3.6-3.4A3 3 0 0 1 14.4 5 3 3 0 0 1 12 3z"/>' +
@@ -203,6 +208,10 @@ function showPopupMenu(parentWin, entries, x, y, onSelect) {
   // Non uscire dal bordo destro
   if (popX + WIN_W > cb.x + cb.width) {
     popX = cb.x + cb.width - WIN_W;
+  }
+  // Sotto non c'è posto (un tasto destro in fondo alla finestra, sugli avvisi): si apre sopra il punto.
+  if (popY + WIN_H - MARGIN > cb.y + cb.height) {
+    popY = Math.max(cb.y - MARGIN, cb.y + y - 6 - contentH - MARGIN);
   }
 
   const popup = new BrowserWindow({
@@ -393,4 +402,10 @@ html,body{background:transparent;overflow:hidden;height:100%}
 </style></head><body><div class="menu">${items}</div><script>${TASTIERA_MENU}</script></body></html>`;
 }
 
-module.exports = { showPopupMenu, buildHTML, computeMenuWidth };
+// Il menu aperto sopra questa finestra, se c'è: la carta di anteprima delle schede non gli si apre sotto.
+function menuAperto(parentWin) {
+  if (!activePopup || activePopup.isDestroyed()) return null;
+  try { return activePopup.getParentWindow() === parentWin ? activePopup : null; } catch (_) { return null; }
+}
+
+module.exports = { showPopupMenu, buildHTML, computeMenuWidth, menuAperto };

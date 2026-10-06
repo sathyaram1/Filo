@@ -53,7 +53,7 @@ test('creare, rinominare, duplicare ed eliminare un mazzo dalla libreria', async
   await expect(page.locator('[data-deck-id]')).toHaveCount(1);
 });
 
-test('routing: il click su una card apre il suo mazzo; Partita è uno stub raggiungibile', async ({ openTab }) => {
+test('routing: il click su una card apre il suo mazzo; Partita, ancora stub, non ha porte', async ({ openTab }) => {
   const page = await openTab('filo://decks/decks.html');
   await page.waitForLoadState('domcontentloaded');
 
@@ -68,12 +68,26 @@ test('routing: il click su una card apre il suo mazzo; Partita è uno stub raggi
   await expect(page.locator('#screenBuilder')).toBeVisible();
   await expect(page.locator('#deckNameText')).toHaveText('Nuovo mazzo');
 
-  // Schermata Partita: stub con ritorno alla libreria.
+  // Partita è un segnaposto (#391): la libreria non offre un pulsante che porta a un vicolo cieco,
+  // e un #/game da link o cronologia riporta ai mazzi invece che alla pagina vuota.
   await page.click('#backToLibrary');
-  await page.click('#openGame');
-  await expect(page.locator('#screenGame')).toBeVisible();
-  await page.click('#gameBack');
   await expect(page.locator('#screenLibrary')).toBeVisible();
+  await expect(page.locator('#newDeck')).toBeVisible();
+  await expect(page.locator('#openGame')).toBeHidden();
+  await page.evaluate(() => { location.hash = '#/game'; });
+  await expect(page.locator('#screenLibrary')).toBeVisible();
+  await expect(page.locator('[data-deck-id]')).toHaveCount(1);
+  await expect(page.locator('#screenGame')).toBeHidden();
+  await expect.poll(() => page.evaluate(() => location.hash)).toBe('#/');
+});
+
+test('una scheda aperta su #/game atterra sui mazzi, non sul segnaposto della Partita', async ({ openTab }) => {
+  const page = await openTab('filo://decks/decks.html#/game');
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('#screenLibrary')).toBeVisible();
+  await expect(page.locator('#deckEmpty')).toBeVisible();
+  await expect(page.locator('#screenGame')).toBeHidden();
+  await expect(page.locator('#openGame')).toBeHidden();
 });
 
 test('i mazzi sopravvivono alla riapertura della pagina (storage locale)', async ({ openTab }) => {

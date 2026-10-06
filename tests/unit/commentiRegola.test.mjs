@@ -151,7 +151,8 @@ function comments(file, text) {
 }
 
 const perFile = new Map(SRC.map((f) => {
-  const text = readFileSync(join(ROOT, f), 'utf8');
+  // Su un altro disco (Windows: repo su D:, temporanea su C:) il nome relativo è assoluto: `join` incollerebbe i due dischi.
+  const text = readFileSync(resolve(ROOT, f), 'utf8');
   return [f, { commenti: comments(f, text), righe: text.split('\n') }];
 }));
 

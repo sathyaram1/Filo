@@ -15,6 +15,8 @@
 (function (global) {
   'use strict';
 
+  const OPZIONI_ARRIVATE = 'sn-combo-opzioni-arrivate';
+
   // Attacca un dropdown custom a `input`, ancorato dentro `host` (che deve
   // essere position:relative). L'input resta editabile: si può scrivere a mano
   // o scegliere dalla lista; digitando, la lista si filtra. Ritorna close().
@@ -133,9 +135,13 @@
       setHover(optionEls[i]);
     }
 
+    // Il catalogo si chiede al primo fuoco: un menu rimasto chiuso perché la lista era ancora vuota si apre quando
+    // arriva, se il campo ha ancora il fuoco. Uno già aperto non si ricompone sotto il puntatore.
+    let aVuoto = false;
     function open() {
       if (!pop.hidden) return;
-      if (!build()) return; // niente opzioni → niente popup
+      aVuoto = !build();
+      if (aVuoto) return;
       pop.hidden = false;
       host.classList.add('sn-combo-open');
       const sel = optionEls.find((el) => el.classList.contains('sn-selected'));
@@ -149,7 +155,17 @@
       hoverEl = null;
     }
 
-    input.addEventListener('focus', () => { filterText = ''; open(); });
+    // Un ritorno a fuoco entro il ritardo del blur annulla la chiusura: altrimenti il menu
+    // appena riaperto si chiude sotto un campo a fuoco (#1004.2).
+    let blurTimer = null;
+    input.addEventListener('focus', () => {
+      clearTimeout(blurTimer);
+      filterText = '';
+      close();
+      open();
+    });
+    // Campo già a fuoco col menu chiuso (dopo una scelta, Esc): il clic lo riapre.
+    input.addEventListener('click', () => { if (pop.hidden) { filterText = ''; open(); } });
     input.addEventListener('input', () => {
       filterText = input.value || '';
       if (pop.hidden) open(); else build();
@@ -157,6 +173,7 @@
     input.addEventListener('keydown', (e) => {
       if (pop.hidden) {
         if (e.key === 'ArrowDown') { e.preventDefault(); open(); }
+        else if (e.key === 'Escape') aVuoto = false;
         return;
       }
       if (e.key === 'ArrowDown') { e.preventDefault(); moveHover(1); }
@@ -165,10 +182,19 @@
         if (hoverEl) { e.preventDefault(); pick(hoverEl.dataset.value); }
       } else if (e.key === 'Escape') { e.preventDefault(); close(); }
     });
-    input.addEventListener('blur', () => { setTimeout(close, 120); });
+    input.addEventListener('blur', () => { aVuoto = false; clearTimeout(blurTimer); blurTimer = setTimeout(close, 120); });
+    input.addEventListener(OPZIONI_ARRIVATE, () => {
+      if (aVuoto && pop.hidden && input.ownerDocument.activeElement === input) open();
+    });
 
     return close;
   }
 
-  global.SN_COMBOBOX = { attach };
+  // Chi riempie una lista dopo il fuoco lo dice qui: lo sente solo il campo che ha il fuoco.
+  function opzioniArrivate() {
+    const el = global.document.activeElement;
+    if (el) el.dispatchEvent(new CustomEvent(OPZIONI_ARRIVATE));
+  }
+
+  global.SN_COMBOBOX = { attach, opzioniArrivate };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

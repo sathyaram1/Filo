@@ -5,8 +5,6 @@ import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const Permessi = require('../../src/main/services/permessiPagine.js');
@@ -231,7 +229,8 @@ test('nelle sessioni su disco le risposte si condividono, si salvano, si elencan
 
 // Ogni nome che Electron può mandare ai gestori ha una regola: un nome nuovo, qui, è un rosso e non un no silenzioso.
 test('ogni permesso che Electron dichiara è chiesto, concesso o negato per una ragione scritta', () => {
-  const dts = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'node_modules', 'electron', 'electron.d.ts'), 'utf8');
+  // Risolto come un pacchetto: nella prova degli unit sulla fusione node_modules sta una cartella più su (#929).
+  const dts = readFileSync(createRequire(import.meta.url).resolve('electron/electron.d.ts'), 'utf8');
   const nomi = new Set();
   for (const firma of ['setPermissionRequestHandler(handler: ((webContents: WebContents, permission: ',
     'setPermissionCheckHandler(handler: ((webContents: (WebContents) | (null), permission: ']) {
@@ -321,4 +320,23 @@ test('le notifiche si leggono «da chiedere» finché l\'utente non decide; il n
   assert.deepEqual(Permessi.dimentica(wc), { tolte: 1, ricarica: true }, 'la pagina aperta legge il no finché non si ricarica');
   assert.equal(Permessi.statoNotifiche(ses, 'https://posta.example/'), 'default');
   assert.equal(Permessi.statoNotifiche(ses, 'filo://options/'), 'default');
+});
+
+test('un sito usa-e-getta della Privacy buttato all\'uscita dimentica le risposte; una sessione su disco no', () => {
+  const effimera = sessioneFinta();
+  effimera.isPersistent = () => false;
+  const wc = wcFinto('https://posta.example/in-arrivo');
+  wc.session = effimera;
+  Permessi.seguiGesti(wc);
+  wc.emetti('input-event', {}, { type: 'mouseDown' });
+  chiedi(effimera, wc, 'notifications');
+  Permessi.rispondi(effimera.avvisi.find((a) => a.evento === 'chiedi').dati.id, true);
+  assert.equal(Permessi.statoNotifiche(effimera, 'https://posta.example/'), 'granted');
+  Permessi.dimenticaSessione(effimera);
+  assert.equal(Permessi.statoNotifiche(effimera, 'https://posta.example/'), 'default', 'il sito riaperto deve richiedere');
+
+  const disco = { isPersistent: () => true };
+  const prima = Permessi.scelteRicordate().length;
+  Permessi.dimenticaSessione(disco);
+  assert.equal(Permessi.scelteRicordate().length, prima);
 });

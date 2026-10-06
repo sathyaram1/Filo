@@ -21,7 +21,9 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
-const { pushIssue } = await import('../agent/feedback.mjs');
+const { pushIssue, credenziale } = await import('../agent/feedback.mjs');
+// Nessuna credenziale vera nei test: il token è finto, e chi lo vuole assente lo dice.
+credenziale.ottieni = async () => ({ idToken: 'tok-admin' });
 // Il modulo di cifratura lo registra già l'import qui sopra (l'agente lo carica
 // come lo carica l'app): qui serve solo per rileggere cosa è finito nel deposito.
 const CRYPTO = globalThis.SN_FEEDBACK_CRYPTO;
@@ -33,8 +35,8 @@ function screenshotFinto() {
   return p;
 }
 
-/** Finge il deposito e Firestore. `codice` vuoto = nessun codice di scarico. */
-function depositoFinto(codice, ricevuti = []) {
+/** Finge il deposito e Firestore. `codice` vuoto = nessun codice di scarico. `create` raccoglie le create. */
+function depositoFinto(codice, ricevuti = [], create = []) {
   const originale = globalThis.fetch;
   globalThis.fetch = async (url, opts) => {
     if (String(url).includes('uploadType=media')) {
@@ -46,6 +48,7 @@ function depositoFinto(codice, ricevuti = []) {
         text: async () => '',
       };
     }
+    create.push({ url: String(url), headers: { ...((opts && opts.headers) || {}) }, body: JSON.parse(opts.body) });
     return {
       ok: true,
       status: 200,
@@ -112,18 +115,53 @@ test('lo screenshot dell’agente sale cifrato, non in chiaro', async () => {
   }
 });
 
-test('senza cifratura non parte nessuno screenshot, e la segnalazione va lo stesso', async () => {
+// Come dall'app (#602): senza cifratura non parte niente, né lo screenshot né la segnalazione in chiaro.
+test('senza cifratura non parte niente', async () => {
   const ricevuti = [];
-  const ripristina = depositoFinto('CODICE-1', ricevuti);
+  const create = [];
+  const ripristina = depositoFinto('CODICE-1', ricevuti, create);
   const pub = globalThis.SN_FEEDBACK_PUBKEY;
   globalThis.SN_FEEDBACK_PUBKEY = null;
   try {
-    const esito = await pushIssue({ ...ISSUE, screenshotPath: screenshotFinto() });
-    assert.deepEqual(esito.images, [], 'niente allegato');
+    await assert.rejects(pushIssue({ ...ISSUE, screenshotPath: screenshotFinto() }), /cifratura non disponibile/);
     assert.equal(ricevuti.length, 0, 'il deposito non doveva ricevere niente');
-    assert.ok(esito.id, 'la segnalazione parte lo stesso, senza schermata');
+    assert.equal(create.length, 0, 'nessuna segnalazione in chiaro');
   } finally {
     globalThis.SN_FEEDBACK_PUBKEY = pub;
+    ripristina();
+  }
+});
+
+// #912 — l'esploratore crea solo con la credenziale admin e la prova del mittente: da anonimo sarebbe un utente.
+test('senza credenziale admin l’esploratore non crea niente, e non ripiega sull’anonimo', async () => {
+  const ricevuti = [];
+  const create = [];
+  const ripristina = depositoFinto('CODICE-1', ricevuti, create);
+  const vera = credenziale.ottieni;
+  credenziale.ottieni = async () => ({ idToken: '', motivo: 'nessuna credenziale' });
+  try {
+    await assert.rejects(pushIssue({ ...ISSUE, screenshotPath: screenshotFinto() }), /token admin/);
+    assert.equal(create.length, 0, 'nessuna create');
+    assert.equal(ricevuti.length, 0, 'nemmeno lo screenshot sale');
+  } finally {
+    credenziale.ottieni = vera;
+    ripristina();
+  }
+});
+
+test('con la credenziale la create è autenticata, porta la prova, e il mittente agent: viaggia cifrato', async () => {
+  const create = [];
+  const ripristina = depositoFinto('CODICE-1', [], create);
+  try {
+    await pushIssue({ ...ISSUE, model: 'gemma-4' });
+    assert.equal(create.length, 1);
+    const [c] = create;
+    assert.equal(c.headers.Authorization, 'Bearer tok-admin');
+    assert.deepEqual(c.body.fields.senderProof, { stringValue: 'admin' });
+    for (const campo of ['clientId', 'text', 'url']) {
+      assert.ok(CRYPTO.isEncrypted(c.body.fields[campo].stringValue), `${campo} in chiaro`);
+    }
+  } finally {
     ripristina();
   }
 });

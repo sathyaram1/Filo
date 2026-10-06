@@ -14,7 +14,7 @@
 'use strict';
 
 const { normalize } = require('./normalize');
-const { isWhitelisted, hostedPlatform } = require('./whitelist');
+const { isWhitelisted, hostedPlatform, pagePath } = require('./whitelist');
 const { localSignals } = require('./signals');
 
 const YOUNG_DOMAIN_DAYS = 30;     // sotto: dominio "giovane" → rinforzo sospetto
@@ -126,9 +126,10 @@ function evaluate(url, ctx = {}, asyncData = {}) {
   }
 
   const { gsb, ageDays, cert, sandbox, llm } = asyncData;
-  const hosted = hostedPlatform(norm.host, pathOf(url));
+  const page = pagePath(norm.host, url);
+  const hosted = hostedPlatform(norm.host, page);
   // Conferma e chiusura di un avviso valgono per il sito; su una pagina ospitata solo per quella pagina.
-  const scope = hosted ? norm.host + pathOf(url) : norm.registrable;
+  const scope = hosted ? norm.host + page : norm.registrable;
   const whitelisted = !hosted && isWhitelisted(norm.registrable);
   const sigs = localSignals(norm, ctx);
   const reasons = sigs.map((s) => s.kind).concat(hosted ? ['hosted_content'] : []);
@@ -213,10 +214,6 @@ function evaluate(url, ctx = {}, asyncData = {}) {
   const weakHint = sigs.some((s) => s.kind === 'insecure_transport') || (ageDays == null && (broad || sensitive))
     || (hosted && sensitive);
   return { level: 'safe', reasons: reasons.length ? reasons : ['clean'], norm, message: null, needsLlm: !!weakHint && !whitelisted, whitelisted, hosted };
-}
-
-function pathOf(url) {
-  try { return new URL(String(url)).pathname; } catch (_) { return '/'; }
 }
 
 function checkSync(url, ctx = {}) {

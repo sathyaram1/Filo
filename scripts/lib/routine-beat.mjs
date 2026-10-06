@@ -6,7 +6,7 @@
 //   intero: venti commit spinti sul ramo, consegna rifiutata (`dead_ticket`),
 //   esito e report mai registrati da nessuna parte. Non è un caso isolato:
 //   capita a ogni lavorazione che supera l'ora (dal 2026-09-15 la suite
-//   completa gira solo in GitHub Actions nel lavoro di release, mai nelle
+//   completa gira solo in GitHub Actions a ogni fusione su main, mai nelle
 //   routine; finish:check più le prove del giro possono superarla lo stesso).
 //
 //   Il comando che tiene vivo il semaforo esisteva già (`routine-channel.mjs

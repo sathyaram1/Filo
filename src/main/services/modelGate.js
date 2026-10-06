@@ -50,8 +50,8 @@
   function plainNoteServed(settings, action, result) {
     const servedBy = (result && result.servedBy) || null;
     const C = global.SN_CONST;
-    const violation = Boolean(servedBy && C && typeof C.isProviderExcluded === 'function'
-      && C.isProviderExcluded(servedBy, (settings && settings.excludedProviders) || []));
+    const violation = Boolean(servedBy && C && typeof C.servedPolicyViolation === 'function'
+      && C.servedPolicyViolation(servedBy, result.model, (settings && settings.excludedProviders) || []));
     return { servedBy, violation };
   }
 
@@ -64,7 +64,22 @@
       noteServed = plainNoteServed,
       costs = global.SN_COSTS,
       auditDelaysMs = AUDIT_DELAYS_MS,
+      segreti = async () => [],
+      ricordaEsterni = () => {},
     } = deps;
+
+    // Nessun segreto custodito da Filo entra nel contesto di un modello (#810): quello che non
+    // ha, il modello non lo può far uscire. Sentinella: tests/unit/usciteSegreti.test.mjs.
+    // Di qui passa anche tutto quello che da fuori arriva a un modello, qualunque strada abbia preso: i segreti che
+    // contiene diventano letti, e la porta delle uscite li ferma (#810).
+    async function senzaSegreti(messages) {
+      try { ricordaEsterni(messages); } catch (_) {}
+      const G = global.SN_GUARDIANO_STATICO;
+      if (!G || typeof G.oscuraSegreti !== 'function') return messages;
+      let lista = [];
+      try { lista = await segreti(); } catch (_) { lista = []; }
+      return G.oscuraSegreti(messages, lista);
+    }
 
     async function ensureUnderLimit(settings) {
       if (await costs.isOverLimit(settings && settings.monthlyLimitEur)) throw limitError();
@@ -95,14 +110,14 @@
       const res = r || {};
       const provider = res.provider || (chain[0] && chain[0].provider);
       const model = res.model || (chain[0] && chain[0].model);
-      const { servedBy, violation } = noteServed(s, action, res);
+      const { servedBy, violation } = noteServed(s, action, { ...res, model });
       const costEur = await recordCost(s, action, provider, model, res.usage);
       return { ...res, provider, model, servedBy, violation, costEur };
     }
 
     async function complete({ action, settings, attempts, messages, tools, toolChoice, signal, onFallback } = {}) {
       const { s, chain } = await chainFor({ action, settings, attempts });
-      const r = await providers().completeWithFallback({ attempts: chain, messages, tools, toolChoice, signal, onFallback });
+      const r = await providers().completeWithFallback({ attempts: chain, messages: await senzaSegreti(messages), tools, toolChoice, signal, onFallback });
       return settleChain(s, action, chain, r);
     }
 
@@ -118,7 +133,7 @@
       let r;
       try {
         r = await providers().streamCompleteWithFallback({
-          attempts: chain, messages, tools, toolChoice, signal, onDelta, onReasoning, onToolCall, onFallback, onReset,
+          attempts: chain, messages: await senzaSegreti(messages), tools, toolChoice, signal, onDelta, onReasoning, onToolCall, onFallback, onReset,
         });
       } catch (e) {
         auditBroken(s, action, e && e.brokenAttempts);
@@ -153,7 +168,7 @@
           await recordCost(s, action, provider, model, { costUsd: r.costUsd, keySource: keySource || '' });
         }
         if (!r || !r.servedBy) { schedule(); return; }
-        const seen = noteServed(s, action, { servedBy: r.servedBy });
+        const seen = noteServed(s, action, { servedBy: r.servedBy, model });
         if (typeof onServedBy === 'function') {
           try { await onServedBy(seen); } catch (_) {}
         }
@@ -172,8 +187,10 @@
       if (!P || typeof P[method] !== 'function') {
         throw codeError(`Il fornitore ${a.provider || '—'} non sa fare questa chiamata (${method})`, 'PROVIDER_METHOD_MISSING');
       }
+      const conMessaggi = args && Array.isArray(args.messages) ? { messages: await senzaSegreti(args.messages) } : {};
       const input = {
         ...(args || {}),
+        ...conMessaggi,
         apiKey: a.apiKey,
         model: a.model,
         ...(a.reasoning !== undefined ? { reasoning: a.reasoning } : {}),
@@ -184,7 +201,7 @@
       const viaRouter = (method === 'complete' || method === 'streamComplete') && typeof router[method] === 'function';
       const r = (await (viaRouter ? router[method]({ ...input, provider: a.provider }) : P[method](input))) || {};
       const usage = r.usage;
-      const { servedBy, violation } = noteServed(s, action, r);
+      const { servedBy, violation } = noteServed(s, action, { ...r, model: r.model || a.model });
       const later = !servedBy && Boolean(r.generationId);
       const costNow = carriesCost(usage) || (!later && Boolean(usage));
       const costEur = costNow ? await recordCost(s, action, a.provider, a.model, usage) : 0;

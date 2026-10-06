@@ -2,6 +2,7 @@
 //
 // Non coinvolge LLM. Raccoglie:
 //   - TEMPO (data/ora, sessione, ultima interazione)
+//   - SISTEMA (batteria, rete, Bluetooth: dal main, src/main/services/statoSistema.js)
 //   - TAB APERTE (URL/titolo/focus, ultima attività via chrome.tabs)
 //   - PROCESSI ATTIVI (timer, notifiche pending)
 //   - NOTIFICHE NON GESTITE
@@ -29,12 +30,16 @@
         if (la !== lb) return lb - la;
         return (b.id || 0) - (a.id || 0);
       });
+      // Una pagina delicata entra nel contesto della chat solo col nome del sito (#1004): la regola la tiene il main.
+      let fuori = () => null;
+      try { if (global.SN_DELICATE) fuori = await global.SN_DELICATE.filtro(); } catch (_) {}
       return sorted.map((t) => ({
         url: t.url || '',
         title: t.title || '',
         active: !!t.active,
         lastAccessed: t.lastAccessed || null,
         zoomPercent: typeof t.zoomPercent === 'number' ? t.zoomPercent : null,
+        delicata: fuori(t.url || '') || null,
       }));
     } catch (_) {
       return [];
@@ -87,12 +92,31 @@
     }
   }
 
+  // Batteria, rete e Bluetooth di adesso (#873): li legge il main, senza modello. `undefined` dove il lettore
+  // non c'è (una pagina), `null` se c'è e non ha risposto.
+  async function readSistema() {
+    const M = global.SN_SISTEMA_MAIN;
+    if (!M || typeof M.statoPerChat !== 'function') return undefined;
+    try { return (await M.statoPerChat()) || null; } catch (_) { return null; }
+  }
+
   // `creditiFreschi`: la chiede un turno di chat, dove «quanti crediti ho?» va
   // risposto col saldo di adesso; la home si accontenta dell'ultimo letto.
-  async function assemble({ creditiFreschi = false } = {}) {
+  // I cambi di stato recenti (#867): li tiene il registro del main, che qui c'è solo nel main.
+  async function readCambi() {
+    try {
+      const R = global.SN_REGISTRO_CAMBI;
+      return R && typeof R.ultimi === 'function' ? await R.ultimi() : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // `sistema: false`: il messaggio della home resta in cache per ore, e una batteria citata lì invecchierebbe.
+  async function assemble({ creditiFreschi = false, sistema: conSistema = true } = {}) {
     const Mem = global.SN_FILO_MEMORY;
     const now = new Date();
-    const [tabs, session, timers, notifications, dashboardCache, rawLog, credits] = await Promise.all([
+    const [tabs, session, timers, notifications, dashboardCache, rawLog, credits, cambi, sistema] = await Promise.all([
       listTabs(),
       Mem.getSession(),
       Mem.listTimers(),
@@ -100,6 +124,8 @@
       Mem.getDashboardCache(),
       Mem.listRaw({ since: new Date(Date.now() - 24 * 3600 * 1000).toISOString(), limit: 50 }),
       readCredits({ fresco: creditiFreschi }),
+      readCambi(),
+      conSistema ? readSistema() : Promise.resolve(undefined),
     ]);
 
     const sessionInfo = session.sessionStartedAt
@@ -148,8 +174,10 @@
         ageRel: formatRelativeTime(n.ts),
       })),
       recentActions: rawLog,
+      cambi: cambi ? { righe: cambi.righe || [], tolti: cambi.tolti || 0 } : null,
       dashboard: dashboardCache,
       credits,
+      sistema,
     };
 
     const stateText = renderForPrompt(state);
@@ -201,6 +229,27 @@
     return out;
   }
 
+  // Le righe le scrive Filo; il nome del Wi-Fi e dei dispositivi li sceglie chi li gestisce, e vanno in busta.
+  function righeSistema(sistema) {
+    const out = ['SISTEMA (letto dal computer adesso, senza modello: «quanta batteria ho?», «sono online?», «il Bluetooth è acceso?» si rispondono da qui)'];
+    const Sis = global.SN_SISTEMA;
+    if (!sistema || !Sis) {
+      out.push('(il computer non ha risposto: batteria, rete e Bluetooth adesso non li sai, non tirare a indovinare)');
+      return out;
+    }
+    const { righe, nomi } = Sis.righePrompt(sistema);
+    out.push(...righe);
+    if (nomi.length) {
+      const E = esterno();
+      out.push(E.imbusta({
+        tipo: 'NOMI_DISPOSITIVI',
+        conIntestazione: true,
+        testo: nomi.map((n) => E.neutralizza(n, { unaRiga: true })).join('\n'),
+      }));
+    }
+    return out;
+  }
+
   function renderForPrompt(state) {
     const lines = [];
     lines.push('═══ FILO STATE ═══', '');
@@ -215,6 +264,7 @@
       lines.push(`Inizio sessione: ${formatDate(state.time.session.startedAt)} (${state.time.session.ageMin} min fa, ${state.time.session.count} interazioni)`);
     }
     lines.push('');
+    if (state.sistema !== undefined) lines.push(...righeSistema(state.sistema), '');
     // CREDITI — se l'utente chiede quanti crediti gli restano, rispondi con
     // questo saldo. Senza portafoglio la ricarica è DAILY_REFILL, letta dal
     // valore in vigore e non scritta a mano.
@@ -226,22 +276,27 @@
       lines.push(`Saldo: ${state.credits.balance} crediti (si ricaricano di ${refill} ogni giorno a mezzanotte)`);
       lines.push('');
     }
-    // TAB APERTE
     // TAB APERTE — il titolo di una scheda lo scrive il SITO, non Filo e non
     // l'utente: è contenuto esterno come i risultati di una ricerca, e va
     // dichiarato tale e recintato prima di entrare in un prompt (#593). Filo
     // scrive la riga intorno (numero, fuoco, ultima attività); dentro la busta
     // ci va il titolo, ripulito come un campo, così non può aprire una riga
     // per conto suo.
+    const E = esterno();
     lines.push('TAB APERTE');
     if (!state.tabs.length) lines.push('(nessuna)');
     else {
-      const E = esterno();
       const top = state.tabs.slice(0, 12);
       const righe = [];
       top.forEach((t, i) => {
         const focus = t.active ? '[FOCUS] ' : '';
         const rel = t.lastAccessed ? ` (ultima attività: ${formatRelativeTime(new Date(t.lastAccessed))})` : '';
+        if (t.delicata) {
+          let sito = '';
+          try { sito = new URL(t.url).hostname.replace(/^www\./, ''); } catch (_) {}
+          righe.push(`${i + 1}. ${focus}[pagina delicata] ${E.neutralizza(sito || 'sito', { unaRiga: true })}${rel}`);
+          return;
+        }
         const grezzo = (t.title || '').slice(0, 80) || '(senza titolo)';
         const title = E.neutralizza(grezzo, { unaRiga: true });
         righe.push(`${i + 1}. ${focus}${title}${rel}`);
@@ -260,52 +315,63 @@
       lines.push(`Scheda davanti: ${davanti.zoomPercent}% (100% = dimensione reale; si cambia con ZOOM_PAGINA)`);
       lines.push('');
     }
-    // PROCESSI
+    // Da qui in giù i testi salvati: nomi, notifiche, frasi della chat e della
+    // home. Li può aver scritti un modello che leggeva una pagina (#592.4).
+    const salvati = (righe) => E.imbusta({
+      tipo: 'TESTO_SALVATO',
+      conIntestazione: true,
+      testo: righe.map((r) => E.neutralizza(r, { unaRiga: true })).join('\n'),
+    });
     lines.push('PROCESSI ATTIVI');
     if (!state.timers.length) lines.push('(nessuno)');
     else {
-      state.timers.forEach((t) => {
+      lines.push(salvati(state.timers.map((t) => {
         if (t.kind === 'alarm') {
           // #322 — le sveglie si descrivono con l'orario assoluto, non col
           // countdown (che per una sveglia a ore di distanza confonderebbe).
           const d = new Date(t.endsAt);
           const hhmm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-          // Ricorrenza: dicitura unica con la colonna destra (SN_FILO_MEMORY),
+          // Ricorrenza: dicitura unica con le carte della home (SN_FILO_MEMORY),
           // così l'agente e l'utente leggono la stessa cosa.
           const M = global.SN_FILO_MEMORY;
           const rep = (t.repeat && t.repeat.length && M && M.formatRepeat) ? M.formatRepeat(t.repeat) : '';
-          lines.push(`- Sveglia${t.label ? ` "${t.label}"` : ''}${rep ? ` ricorrente ${rep}` : ''}: suona alle ${hhmm}`);
-        } else {
-          const rem = t.paused ? '(in pausa)' : `${Math.floor(t.remainingSec / 60)}m ${t.remainingSec % 60}s rimanenti`;
-          lines.push(`- Timer "${t.label}": ${rem}`);
+          return `- Sveglia${t.label ? ` "${t.label}"` : ''}${rep ? ` ricorrente ${rep}` : ''}: suona alle ${hhmm}`;
         }
-      });
+        const rem = t.paused ? '(in pausa)' : `${Math.floor(t.remainingSec / 60)}m ${t.remainingSec % 60}s rimanenti`;
+        return `- Timer "${t.label}": ${rem}`;
+      })));
     }
     lines.push('');
-    // NOTIFICHE
     lines.push('NOTIFICHE NON GESTITE');
     if (!state.notifications.length) lines.push('(nessuna)');
-    else state.notifications.forEach((n) => lines.push(`- [${n.ageRel}] ${n.kind}: ${n.text}`));
+    else lines.push(salvati(state.notifications.map((n) => `- [${n.ageRel}] ${n.kind}: ${n.text}`)));
     lines.push('');
-    // AZIONI RECENTI
     lines.push('AZIONI RECENTI (ultime 24h)');
     if (!state.recentActions.length) lines.push('(nessuna)');
     else {
-      state.recentActions.slice(0, 30).forEach((a) => {
-        lines.push(`- [${formatRelativeTime(a.ts)}] ${a.type}: ${a.summary}`);
-      });
+      lines.push(salvati(state.recentActions.slice(0, 30)
+        .map((a) => `- [${formatRelativeTime(a.ts)}] ${a.type}: ${a.summary}`)));
     }
     lines.push('');
-    // DASHBOARD CORRENTE
+    // Le frasi portano nomi di timer e valori che può aver scritto un modello: recinto come sopra.
+    if (state.cambi) {
+      lines.push('CAMBI RECENTI (impostazioni, aspetto, sveglie e timer, regole del proxy, zoom; dal più vecchio al più nuovo)');
+      lines.push('Fatti dalla chat o dalle pagine, sono lo stesso evento: «rimetti come prima» si fa con ANNULLA_CAMBIO e l\'id.');
+      if (!state.cambi.righe.length) lines.push('(nessuno)');
+      else lines.push(salvati(state.cambi.righe));
+      if (state.cambi.tolti > 0) lines.push(`(più ${state.cambi.tolti} cambi più vecchi, non elencati qui)`);
+      lines.push('');
+    }
     lines.push('DASHBOARD ATTUALE');
     if (state.dashboard) {
-      lines.push(`Messaggio: "${(state.dashboard.message || '').slice(0, 200)}"`);
+      const righe = [`Messaggio: "${String(state.dashboard.message || '').slice(0, 200)}"`];
       if (state.dashboard.suggestions?.length) {
-        lines.push('Suggerimenti:');
+        righe.push('Suggerimenti:');
         state.dashboard.suggestions.slice(0, 8).forEach((s, i) => {
-          lines.push(`${i + 1}. ${s.icon || '·'} | ${s.text || ''} (imp ${s.importance ?? '?'})`);
+          righe.push(`${i + 1}. ${s.icon || '·'} | ${s.text || ''} (imp ${s.importance ?? '?'})`);
         });
       }
+      lines.push(salvati(righe));
     } else {
       lines.push('(non ancora generata)');
     }

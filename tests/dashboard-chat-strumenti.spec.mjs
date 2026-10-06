@@ -98,8 +98,9 @@ test('A — cerca, agisce e risponde in un turno solo; note e azioni nel blocco,
   await expect(activity).toHaveAttribute('data-phase', 'done');
   await expect(activity.locator('.dash-activity-label')).toHaveText(/^Ha avviato un timer e verificato cosa sa fare · \d+ s$/);
 
-  // Dentro, nell'ordine: ragionamento, nota di lavoro, righe delle azioni,
-  // ragionamento del secondo giro.
+  // Dentro, nell'ordine: il nodo del primo giro (ragionamento, nota di lavoro,
+  // righe delle due azioni chiamate insieme), poi la coda col ragionamento del
+  // secondo giro (#578: due strumenti insieme fanno un nodo solo).
   await activity.locator('.dash-activity-head').click();
   const body = activity.locator('.dash-activity-body');
   await expect(body).toBeVisible();
@@ -110,8 +111,15 @@ test('A — cerca, agisce e risponde in un turno solo; note e azioni nel blocco,
   await expect(body.locator('.dash-activity-row', { hasText: 'Verifico cosa so fare' })).toHaveCount(1);
   await expect(body).toContainText('Serve un timer e una verifica.');
   await expect(body).toContainText('Ora rispondo.');
-  const order = await body.evaluate((el) => Array.from(el.children).map((c) => c.className.split(' ').find((k) => k.startsWith('dash-activity-'))));
-  expect(order).toEqual(['dash-activity-reasoning', 'dash-activity-note', 'dash-activity-row', 'dash-activity-row', 'dash-activity-reasoning']);
+  const segs = await body.evaluate((el) => Array.from(el.children).map((c) => c.dataset.stato));
+  expect(segs).toEqual(['agisce', 'coda']);
+  await expect(activity.locator('.dash-activity-nodo')).toHaveCount(1);
+  await expect(activity.locator('.dash-activity-seg-head').first()).toHaveText('2 azioni · timer, capacità');
+  const nodo = body.locator('.dash-activity-seg').first().locator('.dash-activity-seg-body');
+  const order = await nodo.evaluate((el) => Array.from(el.children).map((c) => c.className.split(' ').find((k) => k.startsWith('dash-activity-'))));
+  expect(order).toEqual(['dash-activity-reasoning', 'dash-activity-note', 'dash-activity-esiti']);
+  expect(await nodo.locator('.dash-activity-esiti > .dash-activity-row').count()).toBe(2);
+  await expect(body.locator('.dash-activity-seg[data-stato="coda"]')).toContainText('Ora rispondo.');
   await page.screenshot({ path: 'tests/agent/.out/strumenti-aperto.png' });
 
   // Al modello sono tornati gli esiti nello stesso turno, nella forma del
@@ -240,7 +248,7 @@ test('D — un\'azione eseguita senza bottone in chat torna al modello come eseg
   expect(m[m.length - 1].tool_call_id).toBe(ids[1]);
   expect(m[m.length - 2].content).toMatch(/^Eseguita/);
   expect(m[m.length - 2].content).not.toMatch(/NON eseguita/);
-  expect(m[m.length - 1].content).toMatch(/^Tolte: .*Uovo/);
+  expect(m[m.length - 1].content).toMatch(/^Tolte:\n<<<TESTO_SALVATO>>>\n.*Uovo/);
 
   // La riga della sveglia tolta c'è, una volta sola; il timer non c'è più.
   const activity = page.locator('.dash-activity');
@@ -316,13 +324,15 @@ test('C — appena il modello nomina un\'azione la riga in testa lo dice, prima 
   await page.locator('#input').fill('timer di un minuto per l\'uovo');
   await page.locator('#sendBtn').click();
 
-  const label = page.locator('.dash-activity .dash-activity-label');
-  await expect(label).toHaveText('Avvio un timer…', { timeout: 3_000 });
+  // La riga del nodo lo dice (#578: il filo si annoda lì), poi il gomitolo col riassunto.
+  const riga = page.locator('.dash-activity .dash-activity-seg-label');
+  await expect(riga).toHaveText('Avvio un timer…', { timeout: 3_000 });
   await expect(page.locator('.dash-activity')).toHaveAttribute('data-phase', 'act');
   await page.screenshot({ path: 'tests/agent/.out/strumenti-inizio.png' });
 
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Un minuto, via.' })).toBeVisible({ timeout: 10_000 });
-  await expect(label).toHaveText(/^Ha avviato un timer · \d+ s$/);
+  await expect(page.locator('.dash-activity .dash-activity-label')).toHaveText(/^Ha avviato un timer · \d+ s$/);
+  await expect(riga).toHaveText(/^Avviato un timer · Uovo/);
 
   await app.evaluate(() => { try { globalThis.__restoreProvider3?.(); } catch (_) {} });
 });

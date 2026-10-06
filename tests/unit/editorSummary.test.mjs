@@ -81,8 +81,9 @@ test('con più file il contesto ha UN riassunto per file e NON il testo integral
   // Il blocco per il prompt: una riga per file, con id e titolo, e SENZA il
   // corpo integrale dei documenti.
   const prompt = SUM.renderForPrompt(ctx);
-  const lines = prompt.split('\n').filter(Boolean);
-  assert.equal(lines.length, 2, 'una riga per file');
+  const { inizio, fine } = globalThis.SN_ESTERNO.marcature('TESTO_SALVATO');
+  const lines = prompt.slice(prompt.indexOf(inizio) + inizio.length, prompt.indexOf(fine)).split('\n').filter(Boolean);
+  assert.equal(lines.length, 2, 'una riga per file, dentro il recinto');
   assert.ok(prompt.includes('[f1] Romanzo:'));
   assert.ok(prompt.includes('[f2] Ricette:'));
   // Il testo integrale NON deve comparire: nessun token del corpo.

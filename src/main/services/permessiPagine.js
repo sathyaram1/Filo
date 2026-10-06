@@ -131,6 +131,19 @@ function lasciapassare(wc, tipo) {
   return true;
 }
 
+function tastoDelMenu(input) {
+  const type = input.type;
+  // Electron non dà il pulsante: il tasto destro premuto sta fra i modificatori.
+  if (type === 'mouseDown') return Array.isArray(input.modifiers) && input.modifiers.includes('rightbuttondown');
+  return (type === 'rawKeyDown' || type === 'keyDown') && input.key === 'ContextMenu';
+}
+
+function segnaMenu(wc, frame) {
+  let nodo = null; let origine = null;
+  try { if (frame) { nodo = frame.frameTreeNodeId; origine = frame.origin; } } catch (_) {}
+  wc._filoMenuAperto = { alle: Date.now(), nodo, origine };
+}
+
 // Il gesto conta per il documento su cui è stato fatto: il clic che porta altrove non vale per la pagina d'arrivo.
 function seguiGesti(wc) {
   if (!wc || wc._filoGestiSeguiti) return;
@@ -140,18 +153,42 @@ function seguiGesti(wc) {
       const type = (input && input.type) || '';
       if (!GESTI.has(type) || String(input.key || '') === 'Escape') return;
       wc._filoGestoAlle = Date.now();
+      // Un sito che annulla il `contextmenu` spegne il `context-menu` qui sotto, non il tasto destro vero (#589.4 giro 2).
+      if (tastoDelMenu(input)) segnaMenu(wc, wc.mainFrame);
     });
-    wc.on('did-start-navigation', (e, _url, isInPlace, isMainFrame) => {
+    // Un riquadro di un altro sito non passa da `input-event`: lì il tasto destro e i tasti premuti arrivano da qui.
+    // Il menu tiene anche il riquadro dove l'utente l'ha aperto: un evento finto della pagina non arriva qui (#589.4).
+    wc.on('context-menu', (_e, params) => {
+      wc._filoGestoAlle = Date.now();
+      segnaMenu(wc, params && params.frame);
+    });
+    wc.on('before-input-event', (_e, input) => {
+      if (input && input.type === 'keyDown' && String(input.key || '') !== 'Escape') wc._filoGestoAlle = Date.now();
+    });
+    wc.on('did-start-navigation', (e, url, isInPlace, isMainFrame) => {
       const principale = e && typeof e.isMainFrame === 'boolean' ? e.isMainFrame : isMainFrame;
       const stessa = e && typeof e.isSameDocument === 'boolean' ? e.isSameDocument : isInPlace;
-      if (principale && !stessa) wc._filoGestoAlle = 0;
+      // Un invito non si carica mai (#664): la pagina resta, e il gesto che l'ha chiesto deve arrivare a chi lo porta dentro.
+      const invito = Boolean(globalThis.SN_WALLET?.isInviteDeepLink?.((e && e.url) || url));
+      if (principale && !stessa && !invito) {
+        // Il clic che ha fatto partire la navigazione vale per i suoi rinvii, non per la pagina d'arrivo (#664 giro 2).
+        wc._filoNavDaGesto = gestoRecente(wc);
+        wc._filoGestoAlle = 0; wc._filoMenuAperto = null;
+      }
     });
+    wc.on('did-navigate', () => { wc._filoNavDaGesto = false; });
+    wc.on('did-fail-load', (_e, _c, _d, _u, principale) => { if (principale !== false) wc._filoNavDaGesto = false; });
   } catch (_) {}
 }
 
 function gestoRecente(wc) {
   const t = wc && wc._filoGestoAlle;
   return Boolean(t && Date.now() - t < GESTO_MS);
+}
+
+// Il gesto vale anche per la navigazione che ha fatto partire, finché non arriva: un rinvio del sito resta del clic.
+function navigazioneDaGesto(wc) {
+  return Boolean(wc && wc._filoNavDaGesto);
 }
 
 // Il dominio registrato va sempre letto: con un indirizzo lungo la parte che sceglie chi attacca è quella davanti.
@@ -311,6 +348,11 @@ function dimentica(wc) {
   return { tolte: scelte.length, ricarica: scelte.some((s) => s.si || s.parte === 'notifiche') };
 }
 
+// Un sito usa-e-getta della Privacy buttato all'uscita (services/cookies.js): le risposte date lì se ne vanno col jar.
+function dimenticaSessione(ses) {
+  if (ses && !persistente(ses)) delete ses._filoScelte;
+}
+
 // Tutte le risposte che restano, per la pagina Sicurezza: si vedono e si tolgono anche senza aprire il sito.
 function scelteRicordate() {
   const out = [];
@@ -328,6 +370,50 @@ function togliScelta(origine, parte) {
   return ok;
 }
 
+// ── Le stesse risposte per la chat (#949): lette come nella pagina Sicurezza, tolte per sito e per permesso ──
+const PAROLE_PARTE = {
+  microfono: 'audio', mic: 'audio', audio: 'audio', fotocamera: 'video', videocamera: 'video', webcam: 'video',
+  camera: 'video', video: 'video', appunti: 'appunti', posizione: 'posizione', geolocalizzazione: 'posizione',
+  localizzazione: 'posizione', notifiche: 'notifiche', notifica: 'notifiche', schermi: 'schermi', schermo: 'schermi',
+  presenza: 'presenza', 'presenza al computer': 'presenza', strumenti: 'strumenti', 'strumenti musicali': 'strumenti', midi: 'strumenti',
+};
+function nomeParte(parte) {
+  const S = (globalThis.SN_I18N && globalThis.SN_I18N.STRINGS) || {};
+  const t = S[`options_site_perms_part_${parte}`];
+  return t ? t.toLowerCase() : parte;
+}
+function rigaScelta(s) {
+  return `${s.sotto ? `${s.sotto}.` : ''}${s.dominio} · ${nomeParte(s.parte)}: ${s.si ? 'consentito' : 'negato'}`;
+}
+function righeRicordate() {
+  return scelteRicordate().map(rigaScelta);
+}
+// Un sito scritto come capita (con «www.», con l'indirizzo intero, accentato) → il nome con cui si confronta.
+function hostDaTesto(raw) {
+  let t = String(raw || '').trim().toLowerCase().replace(/^["'«(]+|["'»),.;]+$/g, '');
+  if (!t) return '';
+  try { t = new URL(t.includes('://') ? t : `http://${t}`).hostname; } catch (_) { return ''; }
+  return t.replace(/^www\./, '');
+}
+// Toglie le risposte ricordate di un sito (anche dei suoi sottodomini); `permesso` vuoto o «tutti» le toglie tutte.
+// Toglierle non concede niente: alla prossima richiesta il sito torna a chiedere.
+function togliPerChat(sito, permesso) {
+  const host = hostDaTesto(sito);
+  if (!host) return { errore: `«${String(sito || '').slice(0, 60)}» non è un sito: scrivilo come meet.google.com` };
+  const p = String(permesso || '').trim().toLowerCase();
+  const tutti = !p || /^(tutt[oiea]|ogni|qualsiasi|all)$/.test(p);
+  const parte = tutti ? '' : (PAROLE_PARTE[p] || (TIPI[p] ? TIPI[p] : ''));
+  if (!tutti && !parte) return { errore: `«${p.slice(0, 40)}» non è un permesso che un sito chiede (microfono, fotocamera, appunti, posizione, notifiche, schermi, presenza, strumenti)` };
+  const delSito = scelteRicordate().filter((s) => {
+    let h = '';
+    try { h = new URL(s.origine).hostname.replace(/^www\./, ''); } catch (_) { return false; }
+    return h === host || h.endsWith(`.${host}`);
+  });
+  const prese = delSito.filter((s) => tutti || s.parte === parte);
+  for (const s of prese) togliScelta(s.origine, s.parte);
+  return { tolte: prese.map(rigaScelta), restano: righeRicordate(), host, ricarica: prese.some((s) => s.si || s.parte === 'notifiche') };
+}
+
 // Quello che una pagina deve leggere delle notifiche prima di chiedere, come in Chrome: il controllo di Electron sa dire
 // solo sì o no, e il sì mostrerebbe le notifiche senza domanda. La traduzione nella pagina: preload/stato-permessi.js.
 function statoNotifiche(ses, url) {
@@ -337,8 +423,8 @@ function statoNotifiche(ses, url) {
 }
 
 module.exports = {
-  installa, negaTutto, rispondi, lasciapassare, seguiGesti, scelteDi, dimentica, nomeDaMostrare, statoNotifiche,
-  carica, scelteRicordate, togliScelta, classifica,
+  installa, negaTutto, rispondi, lasciapassare, seguiGesti, gestoRecente, navigazioneDaGesto, scelteDi, dimentica, dimenticaSessione, nomeDaMostrare, statoNotifiche,
+  carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica,
   TIPI, INNOCUI, NON_DISPONIBILI, COL_GESTO_SENZA_DOMANDA, GESTO_MS, _inAttesa: inAttesa,
   _usaDisco: (d) => { disco = () => d; },
 };

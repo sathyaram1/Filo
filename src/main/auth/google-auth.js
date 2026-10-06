@@ -172,6 +172,30 @@ function setSession(fb) {
     name: fb.displayName || '',
     picture: fb.photoUrl || '',
   };
+  segnaOwnerCaduto(false);
+}
+
+// #912: l'owner buttato fuori da un rinnovo fallito resta l'owner per i feedback che manda dopo (aspettano che
+// rientri, non partono da anonimi). Un file e non la memoria: vale anche dopo un riavvio. Lo toglie solo un accesso o un'uscita voluta.
+let ownerCaduto = null;
+function fileOwnerCaduto() {
+  const { app } = require('electron');
+  return require('node:path').join(app.getPath('userData'), 'accesso-owner-caduto');
+}
+function accessoOwnerCaduto() {
+  if (ownerCaduto === null) {
+    try { ownerCaduto = require('node:fs').existsSync(fileOwnerCaduto()); } catch (_) { ownerCaduto = false; }
+  }
+  return ownerCaduto;
+}
+function segnaOwnerCaduto(caduto) {
+  if (accessoOwnerCaduto() === !!caduto) return;
+  ownerCaduto = !!caduto;
+  try {
+    const fs = require('node:fs');
+    if (caduto) fs.writeFileSync(fileOwnerCaduto(), String(Date.now()));
+    else fs.rmSync(fileOwnerCaduto(), { force: true });
+  } catch (_) {}
 }
 
 // ─── API pubblica ──────────────────────────────────────────────────────────
@@ -277,10 +301,20 @@ async function nuovoFlusso() {
   return f;
 }
 
-function signOut() {
+// Per il confronto delle uscite (#810): i valori, mai a un prompt.
+function segreti() {
+  return [session?.refreshToken, session?.idToken].filter(Boolean);
+}
+
+function chiudiSessione() {
   session = null;
   ricordata = false;
   store.clear();
+}
+
+function signOut() {
+  chiudiSessione();
+  segnaOwnerCaduto(false);
 }
 
 async function refreshIfNeeded() {
@@ -297,7 +331,9 @@ async function refreshIfNeeded() {
   });
   if (!res.ok) {
     // Refresh token revocato/scaduto → sessione non più valida.
-    signOut();
+    const eraOwner = isAdmin();
+    chiudiSessione();
+    if (eraOwner) segnaOwnerCaduto(true);
     throw new Error(`refresh sessione fallito (${res.status})`);
   }
   const j = await res.json(); // { id_token, refresh_token, expires_in }
@@ -360,6 +396,7 @@ function isAdmin() {
 
 module.exports = {
   restore,
+  segreti,
   signIn,
   signOut,
   getIdToken,
@@ -369,6 +406,7 @@ module.exports = {
   isSignedIn,
   isRemembered,
   isAdmin,
+  accessoOwnerCaduto,
   // esportati per i test
   _internals: { decodeJwtPayload, startLoopback },
 };

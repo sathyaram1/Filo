@@ -32,6 +32,7 @@ const FAKE = [
     subSeq: 0,
     status: 'unlabeled',
     clientId: 'routine:nightly-audit',
+    senderProof: 'server',
     createdAt: '2026-06-15T11:00:00Z',
   },
   {
@@ -44,6 +45,7 @@ const FAKE = [
     subSeq: 1,
     status: 'todo',
     clientId: 'routine:feedback-routine',
+    senderProof: 'server',
     createdAt: '2026-06-14T11:00:00Z',
   },
   {
@@ -55,6 +57,7 @@ const FAKE = [
     subSeq: 0,
     status: 'unlabeled',
     clientId: 'owner:abc-123',
+    senderProof: 'admin',
     createdAt: '2026-06-15T10:00:00Z',
   },
   {
