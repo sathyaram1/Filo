@@ -203,3 +203,26 @@ test('un gesto mentre una scrittura è in volo non cancella quella prima', async
   await expect(page.locator('#mgAtteseLista .mg-attesa')).toHaveCount(1);
   await expect(page.locator('#mgAtteseLista')).toContainText('#13');
 });
+
+test('coi numeri il tasto delle attese non allunga la fila dei tasti; con uno solo si legge intero', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page);
+  const sfora = (sel) => page.evaluate((s) => { const el = document.querySelector(s); return el.scrollWidth - el.clientWidth; }, sel);
+  const larghezza = () => page.evaluate(() => document.getElementById('mgAtteseToggle').getBoundingClientRect().width);
+  const altri = [12, 13, 14].map((n) => fb({ _id: `f${n}`, seq: n, name: `Il ${n}` }));
+  await page.evaluate((l) => window.__mgTest.setData(l), [
+    fb({ waitsFor: [{ id: 'f12', num: '663.2' }] }),
+    fb({ _id: 'f904', seq: 904, waitsFor: altri.map((a) => ({ id: a._id, num: `${a.seq}0663.2` })) }),
+    ...altri,
+  ]);
+  await page.evaluate(() => window.__mgTest.openDetail('f903'));
+  await expect(page.locator('#mgAtteseToggle')).toHaveText('⏳ Aspetta #663.2');
+  expect(await sfora('#mgAtteseToggle')).toBeLessThanOrEqual(1);
+  const uno = await larghezza();
+
+  await page.evaluate(() => window.__mgTest.openDetail('f904'));
+  await expect(page.locator('#mgAtteseLista .mg-attesa')).toHaveCount(3);
+  expect(await larghezza()).toBeLessThanOrEqual(uno + 40);
+  await expect(page.locator('#mgAtteseToggle')).toHaveAttribute('title', /#140663\.2/);
+  await page.screenshot({ path: 'tests/.shots/aspetta-tre-numeri.png' });
+});
