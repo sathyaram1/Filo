@@ -54,7 +54,7 @@ function pageHints(doc) {
         if (!sp) continue;
         const posizionato = sp.position !== 'static' || (sp.transform && sp.transform !== 'none');
         if (pos === 'absolute' && !posizionato) continue;
-        if (posizionato || pos !== 'absolute') pos = sp.position || 'static';
+        pos = sp.position || 'static';
         if (/hidden|clip|scroll|auto/.test(`${sp.overflowX} ${sp.overflowY}`) || (sp.clip && sp.clip.startsWith('rect('))) ritaglia(p.getBoundingClientRect());
       }
       if (w && typeof w.innerWidth === 'number') {
