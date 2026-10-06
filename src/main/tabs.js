@@ -2746,10 +2746,8 @@ installSafebrowse(TabManager);
 installGeoBlock(TabManager);
 installCookies(TabManager);
 
-// Il sito ha ricevuto il testo dell'utente quando una richiesta che lo porta ha avuto risposta
-// senza errore (#824): un rifiuto, una connessione caduta o una richiesta bloccata non contano. Lo
-// si dice ai frame di quel sito, che ci cercano le loro righe. Un altro sito (le registrazioni delle
-// sessioni) non conta.
+// Il sito ha ricevuto il testo dell'utente quando una richiesta che lo porta ha risposta senza errore
+// (#824); lo si dice ai frame di quel sito. Un altro sito (le registrazioni delle sessioni) non conta.
 const RICHIESTE_CON_TESTO = new Set(['xhr', 'ping', 'mainFrame', 'subFrame', 'other']);
 function schedaConTestoDi(wcId) {
   for (const w of BrowserWindow.getAllWindows()) {

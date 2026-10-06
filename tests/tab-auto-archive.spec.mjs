@@ -6,6 +6,7 @@
 // dello scroll alla riapertura dall'archivio.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { createServer } from 'node:http';
 
 const mk = (title, color, h = 1500) =>
   `<!doctype html><html><head><title>${title}</title>${color ? `<meta name="theme-color" content="${color}">` : ''}</head>`
@@ -701,7 +702,7 @@ test('un numero o una data messi dai pulsanti della pagina non proteggono la sch
 test('un modulo di più campi mandato al sito senza cambiare pagina non protegge più la scheda, uno respinto sì (#824)', async ({ app, shell, testServer }) => {
   const page = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Voli</title></head><body>
     <form id="f"><input id="da" placeholder="Da dove parti?"><input id="a" placeholder="Dove vuoi andare?"><button>Cerca voli</button></form><ul id="ris"></ul>
-    <script>f.addEventListener('submit', async (e) => { e.preventDefault(); await fetch('/voli?da=' + encodeURIComponent(da.value) + '&a=' + encodeURIComponent(a.value));
+    <script>f.addEventListener('submit', async (e) => { e.preventDefault(); await fetch(location.pathname + '?da=' + encodeURIComponent(da.value) + '&a=' + encodeURIComponent(a.value));
       ris.innerHTML = '<li>' + da.value + ' → ' + a.value + ' 49 €</li>'; });</script>
     </body></html>`));
   await page.locator('#da').click();
@@ -824,7 +825,7 @@ test('il testo mandato al sito senza cambiare pagina non protegge la scheda: un 
   const voli = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>VoliSPA</title></head><body>
     <div><input id="da" placeholder="Da dove parti?"><input id="a" placeholder="Dove vuoi andare?"><button id="cerca">Cerca voli</button></div><ul id="ris"></ul>
     <script>const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-      cerca.onclick = async () => { await fetch('/voli/' + encodeURIComponent(da.value) + '/' + encodeURIComponent(a.value)).catch(() => {});
+      cerca.onclick = async () => { await fetch(location.pathname + '?voli=' + encodeURIComponent(da.value) + '/' + encodeURIComponent(a.value)).catch(() => {});
         ris.innerHTML = '<li>' + cap(da.value) + ' → ' + cap(a.value) + ' 49 €</li>'; };</script>
     </body></html>`));
   await voli.locator('#da').click();
@@ -841,4 +842,167 @@ test('il testo mandato al sito senza cambiare pagina non protegge la scheda: un 
   expect(aperte).not.toContain('Social');
   expect(aperte).not.toContain('Progetti');
   expect(aperte).not.toContain('VoliSPA');
+});
+
+// Un sito che risponde come quelli veri: un rifiuto, una connessione che cade, un'anteprima, i suggerimenti.
+async function apriSito() {
+  const pagine = new Map();
+  let n = 0;
+  const server = createServer((req, res) => {
+    const [percorso, qs] = req.url.split('?');
+    let corpo = '';
+    req.on('data', (c) => { if (corpo.length < 100_000) corpo += c; });
+    req.on('end', () => {
+      if (percorso === '/api/rifiuta') {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ errore: 'Devi accedere per rispondere' }));
+        return;
+      }
+      if (percorso === '/api/cade') { req.socket.destroy(); return; }
+      if (percorso === '/api/anteprima') {
+        let t = '';
+        try { t = JSON.parse(corpo).testo || ''; } catch (_) {}
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end('<p>' + t.replace(/[<&]/g, '').replace(/\n/g, '<br>') + '</p>');
+        return;
+      }
+      if (percorso === '/suggerimenti') {
+        const q = (new URLSearchParams(qs || '').get('q') || '').toLowerCase();
+        const tutti = [['Milano Malpensa (MXP)', 'MXP'], ['Milano Linate (LIN)', 'LIN'], ['Parigi Charles de Gaulle (CDG)', 'CDG']];
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(tutti.filter(([nome]) => nome.toLowerCase().startsWith(q))));
+        return;
+      }
+      if (percorso.startsWith('/api/')) { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{"ok":true}'); return; }
+      const html = pagine.get(percorso.replace(/^\//, ''));
+      if (!html) { res.writeHead(404); res.end('no'); return; }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
+    });
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const origine = `http://127.0.0.1:${server.address().port}`;
+  return {
+    pagina(html) { const id = `p${++n}`; pagine.set(id, html); return `${origine}/${id}`; },
+    async chiudi() { try { server.closeAllConnections(); } catch (_) {} await new Promise((r) => server.close(r)); },
+  };
+}
+
+const MANDA_JSON = (percorso, campo) => `fetch('${percorso}', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ testo: ${campo} }) })`;
+
+test('il testo che il sito respinge, che non parte per la rete o che va solo in anteprima tiene aperta la scheda (#824)', async ({ app, shell, testServer }) => {
+  const sito = await apriSito();
+  try {
+    const rifiutata = await apriEsatta(app, shell, sito.pagina(`<!doctype html><html><head><title>Rifiutata</title></head><body>
+      <textarea id="corpo" style="width:400px;height:100px"></textarea><button id="pub">Pubblica la risposta</button><p id="err"></p>
+      <script>pub.onclick = async () => { const r = await ${MANDA_JSON('/api/rifiuta', 'corpo.value')}; if (!r.ok) err.textContent = (await r.json()).errore; };</script>
+      </body></html>`));
+    const RISPOSTA = 'Il problema nasce dal ciclo che non si ferma mai';
+    await rifiutata.locator('#corpo').click();
+    await rifiutata.keyboard.type(RISPOSTA);
+    await rifiutata.locator('#pub').click();
+    await expect(rifiutata.locator('#err')).toHaveText('Devi accedere per rispondere');
+
+    // Un campo di una riga respinto resta da proteggere come una casella.
+    const caduta = await apriEsatta(app, shell, sito.pagina(`<!doctype html><html><head><title>Caduta</title></head><body>
+      <input id="oggetto" style="width:300px"><textarea id="mail" style="width:400px;height:100px"></textarea><button id="invia">Invia</button><p id="err"></p>
+      <script>invia.onclick = async () => { try { await fetch('/api/cade', { method: 'POST', body: JSON.stringify({ o: oggetto.value, m: mail.value }) }); }
+        catch (_) { err.textContent = 'Non sono riuscito a inviare: controlla la connessione'; } };</script>
+      </body></html>`));
+    await caduta.locator('#oggetto').click();
+    await caduta.keyboard.type('Riepilogo della riunione');
+    await caduta.locator('#mail').click();
+    await caduta.keyboard.type('Ciao Marco, ti mando i punti decisi ieri');
+    await caduta.locator('#invia').click();
+    await expect(caduta.locator('#err')).toHaveText(/controlla la connessione/);
+
+    const anteprima = await apriEsatta(app, shell, sito.pagina(`<!doctype html><html><head><title>Commento</title></head><body>
+      <textarea id="c" style="width:400px;height:100px"></textarea><button id="ant">Anteprima</button><div id="vista"></div>
+      <script>ant.onclick = async () => { vista.innerHTML = await (await ${MANDA_JSON('/api/anteprima', 'c.value')}).text(); };</script>
+      </body></html>`));
+    await anteprima.locator('#c').click();
+    await anteprima.keyboard.type('Ho provato la patch e il crash sparisce');
+    await anteprima.keyboard.press('Enter');
+    await anteprima.keyboard.type('resta solo il problema del tema scuro');
+    await anteprima.locator('#ant').click();
+    await expect(anteprima.locator('#vista')).toContainText('Ho provato la patch');
+    await anteprima.waitForTimeout(800);
+
+    await pulisciTutto(app, shell, testServer);
+    const aperte = await titoliAperti(shell);
+    expect(aperte).toContain('Rifiutata');
+    expect(aperte).toContain('Caduta');
+    expect(aperte).toContain('Commento');
+    expect(await rifiutata.locator('#corpo').inputValue()).toBe(RISPOSTA);
+  } finally { await sito.chiudi(); }
+});
+
+test('una città scelta dai suggerimenti e un post mandato in Markdown non proteggono la scheda (#824)', async ({ app, shell, testServer }) => {
+  const sito = await apriSito();
+  try {
+    const voli = await apriEsatta(app, shell, sito.pagina(`<!doctype html><html><head><title>Suggerimenti</title></head><body>
+      <div><input id="da" placeholder="Da dove parti?" autocomplete="off"><input id="a" placeholder="Dove vuoi andare?" autocomplete="off"><button id="cerca">Cerca voli</button></div>
+      <ul id="sug"></ul><ul id="ris"></ul>
+      <script>const codici = {};
+        for (const campo of [da, a]) campo.addEventListener('input', async () => {
+          const l = await (await fetch('/suggerimenti?q=' + encodeURIComponent(campo.value))).json();
+          sug.innerHTML = ''; for (const [nome, cod] of l) { const li = document.createElement('li'); li.textContent = nome;
+            li.onclick = () => { campo.value = nome; codici[campo.id] = cod; sug.innerHTML = ''; }; sug.append(li); } });
+        cerca.onclick = async () => { await fetch('/api/voli?da=' + codici.da + '&a=' + codici.a);
+          ris.innerHTML = '<li>' + da.value + ' → ' + a.value + ' 49 €</li>'; };</script>
+      </body></html>`));
+    await voli.locator('#da').click();
+    await voli.keyboard.type('Mil');
+    await voli.locator('#sug li', { hasText: 'Malpensa' }).click();
+    await voli.locator('#a').click();
+    await voli.keyboard.type('Par');
+    await voli.locator('#sug li', { hasText: 'Charles' }).click();
+    await voli.locator('#cerca').click();
+    await expect(voli.locator('#ris li')).toContainText('49 €');
+
+    const social = await apriEsatta(app, shell, sito.pagina(`<!doctype html><html><head><title>Markdown</title></head><body>
+      <div id="modale" role="dialog"><div id="ed" contenteditable="true" style="min-height:80px;border:1px solid"></div><button id="pub">Pubblica</button></div><p id="toast"></p>
+      <script>const md = (n) => [...n.childNodes].map((c) => c.nodeType === 3 ? c.textContent : (/^(b|strong)$/i.test(c.tagName) ? '**' + md(c) + '**' : md(c))).join('');
+        pub.onclick = () => { fetch('/api/post', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ post: md(ed) }) }); modale.remove(); toast.textContent = 'Post pubblicato'; };</script>
+      </body></html>`));
+    await social.locator('#ed').click();
+    await social.keyboard.type('Oggi ho ');
+    await social.keyboard.press('ControlOrMeta+b');
+    await social.keyboard.type('finito');
+    await social.keyboard.press('ControlOrMeta+b');
+    await social.keyboard.type(' la maratona di Firenze');
+    await social.locator('#pub').click();
+    await expect(social.locator('#toast')).toHaveText('Post pubblicato');
+    await social.waitForTimeout(800);
+
+    await pulisciTutto(app, shell, testServer);
+    const aperte = await titoliAperti(shell);
+    expect(aperte).not.toContain('Suggerimenti');
+    expect(aperte).not.toContain('Markdown');
+  } finally { await sito.chiudi(); }
+});
+
+test('le richieste grandi di una scheda con del testo scritto non fermano Filo (#824)', async ({ app, shell }) => {
+  const sito = await apriSito();
+  try {
+    const page = await apriEsatta(app, shell, sito.pagina(`<!doctype html><html><head><title>Grande</title></head><body>
+      <textarea id="t" style="width:400px;height:100px"></textarea>
+      <script>window.manda = async (ms) => { const s = 'a<b>c</b>&amp;%41 '.repeat(120000); const fine = Date.now() + ms;
+        const uno = async () => { while (Date.now() < fine) await fetch('/api/salva', { method: 'POST', body: s }); };
+        await Promise.all([uno(), uno(), uno(), uno()]); };</script>
+      </body></html>`));
+    await page.locator('#t').click();
+    await page.keyboard.type('Didascalia della foto');
+    await expect.poll(() => moduloDi(shell, 'Grande'), { timeout: 8_000 }).toBe(true);
+
+    await app.evaluate(() => {
+      globalThis.__ritardo = 0;
+      let ult = Date.now();
+      clearInterval(globalThis.__ritardoT);
+      globalThis.__ritardoT = setInterval(() => { const ora = Date.now(); globalThis.__ritardo = Math.max(globalThis.__ritardo, ora - ult - 20); ult = ora; }, 20);
+    });
+    await page.evaluate(() => window.manda(5000));
+    const ritardo = await app.evaluate(() => { clearInterval(globalThis.__ritardoT); return globalThis.__ritardo; });
+    expect(ritardo).toBeLessThan(250);
+  } finally { await sito.chiudi(); }
 });

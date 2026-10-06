@@ -649,11 +649,8 @@
       orfani.push({ t, righe: viste && viste.join('') === t ? viste : [t] });
       if (orfani.length > 100) orfani.shift();
     }
-    // Il sito ha ricevuto un testo se una richiesta riuscita ne porta ogni riga; il testo intero
-    // conta anche se il sito ne ha cambiato gli a capo. Un campo di una riga ricevuto non protegge
-    // più (una ricerca, un accesso). Una casella a più righe sì, finché il testo è lì: un'anteprima
-    // o un invio respinto con risposta riuscita portano il testo come un salvataggio. Tolta dalla
-    // pagina, non lascia un orfano.
+    // Ricevuto = una richiesta riuscita ne porta ogni riga. Una casella a più righe protegge finché il
+    // testo è lì (un'anteprima lo porta come un salvataggio); tolta dalla pagina, non lascia un orfano.
     function partito(inviato) {
       if (typeof inviato !== 'string' || !inviato) return;
       const dentro = (t, righe) => {
