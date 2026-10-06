@@ -387,6 +387,46 @@ function togliRichiesta(P) {
   try { unlinkSync(fileRichiesta(P)); } catch (_) { /* non c'era */ }
 }
 
+/**
+ * Le due strade per fermare avvia (#1043): `smetti` da un altro terminale, letto dal file di richiesta, e i Ctrl-C del suo
+ * terminale. Con «subito» ferma anche i processi in corso. → la funzione che le stacca. `pid`, `ferma`, `esci` e i tempi servono alle prove.
+ */
+export function ascoltaFermate({ P, motore, log, pid = process.pid, ferma = fermaFigli, esci = (c) => process.exit(c), ogniMs = 2000, finestraMs = 1000, ora = () => new Date().toISOString() }) {
+  const chiedi = (modo, da) => {
+    const prima = motore.chiusura();
+    const dopo = motore.smetti(modo);
+    if (dopo === prima) return;
+    scriviRichiesta(P, { pid, modo: dopo, at: ora() });
+    if (dopo === 'subito') {
+      log(`fermata immediata (${da}): fermo le istanze e i processi in corso; il prossimo «avvia» rifà i passi interrotti`);
+      ferma();
+      // Un processo che non si lascia fermare non tiene aperto l'orchestratore: lo stato dice già cosa rifare.
+      setTimeout(() => { log('qualcosa non si è fermato in un minuto: esco lo stesso'); esci(1); }, 60_000).unref();
+      return;
+    }
+    log(`chiusura con calma (${da}): non avvio altro, i passi in corso finiscono, poi esco. Per fermare tutto adesso: di nuovo Ctrl-C, o npm run orchestra -- smetti --subito`);
+    // npm su Windows chiude la sua shell al Ctrl-C e il terminale torna al prompt, ma questo processo continua.
+    if (process.platform === 'win32' && process.env.npm_lifecycle_event) log('se il terminale torna al prompt, l’orchestratore continua lo stesso qui sotto finché i passi non finiscono');
+  };
+  const guardia = setInterval(() => {
+    const r = leggiRichiesta(P);
+    if (r && r.pid === pid && (r.modo === 'subito' || r.modo === 'calma')) chiedi(r.modo, 'smetti');
+  }, ogniMs);
+  const colpo = contaColpi(finestraMs);
+  const alSegnale = () => {
+    const c = colpo(Date.now());
+    if (c === 'esci') { log('terzo Ctrl-C: esco adesso'); esci(130); return; }
+    if (c) chiedi(c, 'Ctrl-C');
+  };
+  // Ctrl-Break su Windows; SIGTERM fuori, dove su Windows non arriva mai.
+  const segnali = process.platform === 'win32' ? ['SIGINT', 'SIGBREAK'] : ['SIGINT', 'SIGTERM'];
+  for (const sg of segnali) process.on(sg, alSegnale);
+  return () => {
+    clearInterval(guardia);
+    for (const sg of segnali) process.off(sg, alSegnale);
+  };
+}
+
 function negozio(file) {
   const vuoto = () => ({ coda: [], pratiche: {} });
   const leggi = () => {
