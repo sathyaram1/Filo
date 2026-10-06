@@ -61,7 +61,9 @@ const SERVIZI = [
   },
   {
     nome: 'Google Maps',
-    domini: ['maps.google.com', 'google.com'],
+    domini: ['google.com'],
+    // Su google.com solo l'indirizzo delle mappe: il resto di Google non è questo servizio.
+    percorso: /^\/maps/i,
     segnaposto: [/sign in to (google|continue)|accedi (a google|per continuare)/i],
   },
   {
@@ -97,16 +99,16 @@ function sotto(host, dominio) {
   return host === dominio || host.endsWith('.' + dominio);
 }
 
-function servizioDi(host) {
+function servizioDi(host, percorso) {
   const h = String(host || '').toLowerCase().replace(/^\./, '');
   if (!h) return null;
-  // Google Maps sta su google.com: vale solo per l'indirizzo delle mappe, che il riquadro dichiara col percorso.
-  return [...extra, ...SERVIZI].find((s) => s.domini.some((d) => sotto(h, d))) || null;
+  return [...extra, ...SERVIZI].find((s) => s.domini.some((d) => sotto(h, d))
+    && (!s.percorso || /^maps\./.test(h) || s.percorso.test(String(percorso || '')))) || null;
 }
 
 // Il nome da mostrare: quello del servizio noto, altrimenti il sito (un nome che nessuno ha verificato non si inventa).
-function nomeDi(sito, host) {
-  const s = servizioDi(host || sito);
+function nomeDi(sito, host, percorso) {
+  const s = servizioDi(host || sito, percorso);
   return s ? s.nome : String(sito || '');
 }
 
@@ -118,8 +120,7 @@ function testoPulito(t) {
 function riconosci({ host, percorso, testo } = {}) {
   const t = testoPulito(testo);
   if (!t) return null;
-  const s = servizioDi(host);
-  if (s && s.nome === 'Google Maps' && !/\/maps/i.test(String(percorso || '')) && !/^maps\./i.test(String(host || ''))) return null;
+  const s = servizioDi(host, percorso);
   if (CHIEDE_COOKIE.test(t)) return { nome: s ? s.nome : null, via: 'regola' };
   if (s && s.segnaposto.some((r) => r.test(t))) return { nome: s.nome, via: 'regola' };
   return null;

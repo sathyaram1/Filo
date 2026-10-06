@@ -46,6 +46,8 @@ const partizionati = new Map();
 let modo = 'default';
 let fidati = new Set();
 let accessi = new Set();
+// Servizi a cui l'utente ha riattivato i cookie dal riquadro rotto (#760): si trattano come quelli con accesso.
+let riattivati = new Set();
 let agganciata = null;
 let giro = null;
 let scrittura = Promise.resolve();
@@ -61,6 +63,7 @@ function sitoDi(url) {
 function protetti() {
   const out = new Set(accessi);
   for (const d of fidati) out.add(d);
+  for (const d of riattivati) out.add(d);
   const ora = Date.now();
   for (const [sito, v] of [...attesa]) {
     if (ora - v.at > ATTESA_ACCESSO_MS) attesa.delete(sito);
@@ -444,6 +447,25 @@ function inIncognito() {
   try { return !!require('../shim/storage').inIncognito(); } catch (_) { return false; }
 }
 
+// I riquadri di un servizio a cui l'utente ha appena tolto i cookie riattivati tornano come gli altri: quelli che
+// ha già durano fino all'uscita da Filo, a meno che il servizio non sia aperto come sito in una scheda.
+async function rimettiDeclassati(sito) {
+  const ses = agganciata;
+  if (!ses || modo !== 'default' || protetti().has(sito) || aperti().has(sito)) return;
+  let lista = [];
+  try { lista = await ses.cookies.get({ domain: sito }); } catch (_) { return; }
+  for (const c of lista) {
+    if (c.session) continue;
+    try { await declassa(ses, c); } catch (_) {}
+  }
+}
+
+// Il riquadro di `sito` dentro `ospite` ha i cookie declassati da Filo, adesso.
+function declassaQui(sito, ospite) {
+  if (inIncognito()) return false;
+  return R.daDeclassare({ modo, sito, ospiti: new Set([ospite]), aperti: aperti(), protetti: protetti() });
+}
+
 function configureFromSettings(settings) {
   if (inIncognito()) return;
   const C = Cookies();
@@ -451,7 +473,10 @@ function configureFromSettings(settings) {
   modo = C.getMode(settings);
   fidati = new Set(C.getTrustedSites(settings).map((d) => String(d || '').toLowerCase()).filter(Boolean));
   accessi = new Set((Array.isArray(c.loggedSites) ? c.loggedSites : []).map((d) => String(d || '').toLowerCase()).filter(Boolean));
-  for (const s of [...accessi, ...fidati]) { siti.delete(s); partizionati.delete(s); }
+  const prima = riattivati;
+  riattivati = new Set(C.getEmbedSites(settings));
+  for (const s of [...accessi, ...fidati, ...riattivati]) { siti.delete(s); partizionati.delete(s); }
+  for (const s of prima) if (!riattivati.has(s)) rimettiDeclassati(s).catch(() => {});
   // Fuori dall'Automatico Filo non tocca più niente: i cookie già declassati valgono per la visita e muoiono con lei.
   if (modo !== 'default') { attesa.clear(); siti.clear(); fermaGiro(); }
 }
@@ -465,6 +490,7 @@ module.exports = {
   init,
   aggancia,
   configureFromSettings,
+  declassaQui,
   navigazione,
   paginaDiAccesso,
   credenziali,
