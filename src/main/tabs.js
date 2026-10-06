@@ -351,6 +351,7 @@ class TabManager {
         const t = this.tabs.find((x) => x.id === this.activeId);
         return (t && t.view) || null;
       },
+      sottoIlVuoto: () => this.vistaSottoIlVuoto(),
     });
     this.barra = new BarraLaterale(window, this, { alto: () => this._altezzaCornice() });
     this.avvisoSito = new AvvisoSito(window, {
