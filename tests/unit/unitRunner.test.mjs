@@ -18,7 +18,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { join, dirname, resolve, isAbsolute, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
@@ -31,7 +31,7 @@ import {
 } from '../../scripts/run-unit-tests.mjs';
 import { costoArgomentoWindows, lottiPerRigaDiComando } from '../../scripts/lib/riga-di-comando.mjs';
 import { lottiPerRigaDiComando as lottiDiFinish } from '../../scripts/finish-local.mjs';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..', '..');
@@ -103,7 +103,7 @@ describe('raccolta dei file di test', () => {
       writeFileSync(join(casa, '.cache', 'y.test.mjs'), '');
       const trovati = collectTestFiles(casa).map((f) => f.slice(casa.length + 1));
       assert.deepEqual(trovati.sort(), [join('dentro', 'due.test.mjs'), 'uno.test.mjs'].sort());
-    } finally { rmSync(casa, { recursive: true, force: true }); }
+    } finally { togliCartella(casa); }
   });
 
   test('cartella assente o vuota: nessun file, e nessuna eccezione', () => {
@@ -111,7 +111,7 @@ describe('raccolta dei file di test', () => {
     try {
       assert.deepEqual(collectTestFiles(vuota), []);
       assert.deepEqual(collectTestFiles(join(vuota, 'non-esiste')), []);
-    } finally { rmSync(vuota, { recursive: true, force: true }); }
+    } finally { togliCartella(vuota); }
   });
 
   test('isTestFile riconosce solo i *.test.mjs', () => {
@@ -136,7 +136,7 @@ describe('il lanciatore lanciato da fuori', () => {
       // sta guardando la cartella sbagliata.
       assert.ok(righe.some((f) => f.endsWith('unitRunner.test.mjs')), 'manca il file della sentinella');
       assert.equal(REPO_ROOT, ROOT);
-    } finally { rmSync(altrove, { recursive: true, force: true }); }
+    } finally { togliCartella(altrove); }
   });
 
   test('zero test trovati = uscita ROSSA, mai un verde silenzioso', () => {
@@ -147,7 +147,7 @@ describe('il lanciatore lanciato da fuori', () => {
       });
       assert.equal(r.status, 1, 'una suite vuota deve fallire');
       assert.match(r.stderr, /nessun file/);
-    } finally { rmSync(vuota, { recursive: true, force: true }); }
+    } finally { togliCartella(vuota); }
   });
 });
 
@@ -272,12 +272,12 @@ describe('il riepilogo di una suite a gruppi', () => {
       assert.match(coda, /ROSSO: gruppo 2 di 3\.\s*$/);
 
       scrivi('b.test.mjs', false);
-      rmSync(marche, { recursive: true, force: true }); mkdirSync(marche);
+      assert.ok(togliCartella(marche), `${marche} è ancora tenuta da qualcuno`); mkdirSync(marche);
       const verde = lancia();
       assert.equal(verde.status, 0, verde.stdout + verde.stderr);
       assert.equal(readdirSync(marche).length, 3);
       assert.match(verde.stdout, /3 test, 3 passati, 0 falliti\.\s+\[test:unit\] verde: 3 gruppi, 3 file\.\s*$/);
-    } finally { rmSync(casa, { recursive: true, force: true }); }
+    } finally { togliCartella(casa); }
   });
 });
 
@@ -327,7 +327,7 @@ describe('a gruppi, ciò che node fa una volta per corsa resta uno', () => {
       assert.match(r.stdout.trim(), /^<\?xml[^>]*\?>\s*<testsuites>[\s\S]*<\/testsuites>$/);
       assert.equal((r.stdout.match(/<\?xml/g) || []).length, 1);
       for (const n of ['uno', 'due', 'tre']) assert.match(r.stdout, new RegExp(`name="caso-${n}"`));
-    } finally { rmSync(casa, { recursive: true, force: true }); }
+    } finally { togliCartella(casa); }
   });
 
   test('un rapporto che non si può scrivere fa rosso l’esito, e il riepilogo non lo dà per riunito', () => {
@@ -340,7 +340,7 @@ describe('a gruppi, ciò che node fa una volta per corsa resta uno', () => {
       assert.doesNotMatch(r.stdout, /riuniti/);
       assert.match(r.stdout, /non è stato scritto/);
       assert.match(r.stdout.trim().split('\n').pop(), /^\[test:unit\] ROSSO: rapporto non scritto\.$/);
-    } finally { rmSync(casa, { recursive: true, force: true }); }
+    } finally { togliCartella(casa); }
   });
 
   test('a gruppi un tap su file non si dice riunito: il riepilogo dice che ha un rapporto per gruppo', () => {
@@ -354,7 +354,7 @@ describe('a gruppi, ciò che node fa una volta per corsa resta uno', () => {
       assert.ok(r.stdout.includes(`in ${dest} c'è un rapporto per gruppo, uno dopo l'altro`), r.stdout);
       assert.match(r.stdout, /i conti di tutta la suite sono in questo riepilogo/);
       assert.equal((readFileSync(dest, 'utf8').match(/^TAP version/gm) || []).length, 2);
-    } finally { rmSync(casa, { recursive: true, force: true }); }
+    } finally { togliCartella(casa); }
   });
 
   test('a gruppi un file dato a mano gira una volta, e i conti tornano', () => {
@@ -370,8 +370,8 @@ describe('a gruppi, ciò che node fa una volta per corsa resta uno', () => {
       assert.equal((r.stdout.match(/ok \d+ - a\b/g) || []).length, 1, 'un file già trovato non gira due volte');
       assert.match(r.stdout, /2 file: 3 test, 3 passati, 0 falliti/);
     } finally {
-      rmSync(casa, { recursive: true, force: true });
-      rmSync(fuori, { recursive: true, force: true });
+      togliCartella(casa);
+      togliCartella(fuori);
     }
   });
 
@@ -400,7 +400,7 @@ describe('a gruppi, ciò che node fa una volta per corsa resta uno', () => {
         assert.match(junit, new RegExp(`name="caso-${n}"`));
         assert.match(readFileSync(testo, 'utf8'), new RegExp(`caso-${n}`));
       }
-    } finally { rmSync(casa, { recursive: true, force: true }); }
+    } finally { togliCartella(casa); }
   });
 
   test('--watch a gruppi si rifiuta con la ragione, invece di fermarsi al primo gruppo per sempre', () => {
@@ -411,7 +411,7 @@ describe('a gruppi, ciò che node fa una volta per corsa resta uno', () => {
       const r = lanciaSu(casa, ['--watch'], { FILO_UNIT_TETTO_RIGA: '1' });
       assert.equal(r.status, 1);
       assert.match(r.stderr, /--watch/);
-    } finally { rmSync(casa, { recursive: true, force: true }); }
+    } finally { togliCartella(casa); }
   });
 
   test('copertura e rapporti su file a gruppi si dichiarano nel riepilogo; il rosso senza test rimanda anche al file', () => {
@@ -449,7 +449,7 @@ describe('un file trovato è un file che gira', () => {
         assert.notEqual(r.status, 0, `il file con le quadre non è girato: ${JSON.stringify(extra)}`);
         assert.match(r.stdout, /rosso-nel-nome-strano/);
       }
-    } finally { rmSync(casa, { recursive: true, force: true }); }
+    } finally { togliCartella(casa); }
   });
 
   test('un nome con graffe che node espanderebbe ferma la corsa e lo nomina, mai un verde senza quel file', () => {
@@ -461,7 +461,7 @@ describe('un file trovato è un file che gira', () => {
       const r = lanciaSu(casa);
       assert.equal(r.status, 1);
       assert.match(r.stderr, /a\{b,c\}\.test\.mjs/);
-    } finally { rmSync(casa, { recursive: true, force: true }); }
+    } finally { togliCartella(casa); }
   });
 });
 
@@ -486,6 +486,6 @@ test('un file appeso diventa un rosso col suo nome, e la corsa finisce', () => {
     assert.equal(r.status, 1);
     assert.match(r.stdout, /appeso\.test\.mjs/);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });

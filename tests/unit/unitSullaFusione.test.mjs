@@ -5,11 +5,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea, collegaCartella } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, collegaCartella, togliCartella } from '../helpers/percorsi.mjs';
 import {
   decidiEsito, campoPerIlServer, chiaveTest, fileDellaChiave, testoProva, togliCollegamento, chiudiAlbero, gitIn,
   provaUnitSullaFusione, chiediConProva, pulisciResti, TETTO_ROSSI, assicuraStoria, testoStoria,
@@ -115,7 +115,7 @@ test('togliere il collegamento a node_modules non tocca la cartella a cui punta'
     assert.ok(existsSync(join(finto, 'dentro.txt')));
     assert.deepEqual(togliCollegamento(join(casa, 'non-c-e')), { ok: true });
   } finally {
-    rmSync(casa, { recursive: true, force: true });
+    togliCartella(casa);
   }
 });
 
@@ -186,7 +186,7 @@ test('prova vera: main dentro il ramo, verde, conflitto', () => {
     assert.deepEqual(p2.file, ['valore.txt']);
     pulita(r);
   } finally {
-    rmSync(r.casa, { recursive: true, force: true });
+    togliCartella(r.casa);
   }
 });
 
@@ -216,7 +216,7 @@ test('prova vera: rosso solo sulla fusione ferma con l\'elenco, rosso anche su m
     assert.deepEqual(s.rossi, ['tests/unit/valore.test.mjs › il valore è uno']);
     pulita(r);
   } finally {
-    rmSync(r.casa, { recursive: true, force: true });
+    togliCartella(r.casa);
   }
 });
 
@@ -229,7 +229,7 @@ test('senza origin la prova si salta e lo si dice; con origin irraggiungibile è
     g(['remote', 'add', 'origin', join(casa, 'non-esiste.git')]);
     assert.match(provaUnitSullaFusione({ root: casa, punta: SHA, scrivi: () => {} }).errore, /non riesco a scaricare main/);
   } finally {
-    rmSync(casa, { recursive: true, force: true });
+    togliCartella(casa);
   }
 });
 
@@ -244,7 +244,7 @@ test('una cartella di prova si toglie anche dopo un guasto, e il node_modules co
     assert.match(String(e.message), /lanciatore esploso/);
     pulita(r);
   } finally {
-    rmSync(r.casa, { recursive: true, force: true });
+    togliCartella(r.casa);
   }
 });
 
@@ -258,7 +258,7 @@ test('chiudiAlbero toglie prima il collegamento: con un collegamento che non si 
     assert.equal(r.ok, false);
     assert.ok(existsSync(join(albero, 'node_modules', 'dentro.txt')));
   } finally {
-    rmSync(casa, { recursive: true, force: true });
+    togliCartella(casa);
   }
 });
 
@@ -329,7 +329,7 @@ test('prova vera: un rosso instabile si riprova da solo e non ferma la fusione',
     assert.match(testoProva(p), /instabili/);
     pulita(r);
   } finally {
-    rmSync(r.casa, { recursive: true, force: true });
+    togliCartella(r.casa);
   }
 });
 
@@ -354,7 +354,7 @@ test('prova vera: due test verdi da soli che si rompono sempre insieme non sono 
     assert.ok(!p.instabili, 'niente instabili: si rompono a ogni suite intera');
     pulita(r);
   } finally {
-    rmSync(r.casa, { recursive: true, force: true });
+    togliCartella(r.casa);
   }
 });
 
@@ -388,7 +388,7 @@ test('durante la prova i worktree non contengono collegamenti: unlock e remove -
     assert.equal(rimosso, true, 'la pulizia che git suggerisce va fino in fondo');
     pulita(r);
   } finally {
-    rmSync(r.casa, { recursive: true, force: true });
+    togliCartella(r.casa);
   }
 });
 
@@ -408,8 +408,8 @@ test('i resti di una prova interrotta si tolgono alla richiesta dopo anche se il
     pulita(r);
   } finally {
     togliCollegamento(join(base, 'node_modules'));
-    rmSync(base, { recursive: true, force: true });
-    rmSync(r.casa, { recursive: true, force: true });
+    togliCartella(base);
+    togliCartella(r.casa);
   }
 });
 
@@ -437,8 +437,8 @@ test('i resti di una prova interrotta li toglie la prova dopo, senza attraversar
     assert.deepEqual(pulisciResti({ git: r.g, tmp, vivo: () => false }), [viva]);
     pulita(r);
   } finally {
-    rmSync(r.casa, { recursive: true, force: true });
-    rmSync(tmp, { recursive: true, force: true });
+    togliCartella(r.casa);
+    togliCartella(tmp);
   }
 });
 
@@ -466,7 +466,7 @@ test('clone poco profondo: la prova scarica la storia che manca e gira davvero s
     assert.equal(campo.storia.superficiale, true, 'la profondità del clone arriva al server');
     assert.equal(campo.storia.approfondito, p.storia.approfondito);
   } finally {
-    rmSync(r.casa, { recursive: true, force: true });
+    togliCartella(r.casa);
   }
 });
 
@@ -482,7 +482,7 @@ test('clone poco profondo: un ramo che contiene già main si riconosce solo dopo
     const p = provaUnitSullaFusione({ root: clone, punta, scrivi: () => {}, lancia: () => assert.fail('main è già dentro: niente unit') });
     assert.equal(p.esito, 'main_contenuto', JSON.stringify(p));
   } finally {
-    rmSync(r.casa, { recursive: true, force: true });
+    togliCartella(r.casa);
   }
 });
 
@@ -560,7 +560,7 @@ test('clone del solo ramo: il primo download di main ha il tetto della storia, e
     assert.match(senzaRete.errore, /non riesco a scaricare main/);
     assert.equal(campoPerIlServer(senzaRete).storia.superficiale, true, 'il registro sa che il clone era poco profondo');
   } finally {
-    rmSync(r.casa, { recursive: true, force: true });
+    togliCartella(r.casa);
   }
 });
 

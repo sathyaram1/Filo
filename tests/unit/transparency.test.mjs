@@ -10,10 +10,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, existsSync, cpSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { readFileSync, existsSync, cpSync, mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve, join } from 'node:path';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -199,7 +199,7 @@ test('un comando fra apici inversi si legge come codice sulla pagina e senza seg
   assert.ok(!html.includes('`'), 'sulla pagina sono rimasti gli apici inversi');
   const testo = leggi('src', 'shared', 'transparency.js');
   assert.ok(testo.includes('Scrivi certutil -hashfile <file> SHA256 e poi guarda qui [1]'), 'il testo per il modello non è pulito');
-  rmSync(tmp, { recursive: true, force: true });
+  togliCartella(tmp);
 });
 
 test('la barra si deriva dai documenti: uno nuovo e non previsto ci finisce da sé', () => {
@@ -225,7 +225,7 @@ test('la barra si deriva dai documenti: uno nuovo e non previsto ci finisce da s
   const barra = readFileSync(join(tmp, 'site', 'transparency', 'models.html'), 'utf8')
     .split('<nav class="sn-nav">')[1].split('</nav>')[0];
   assert.ok(barra.includes('dati.html'), 'sul sito la barra non porta al documento nuovo');
-  rmSync(tmp, { recursive: true, force: true });
+  togliCartella(tmp);
 });
 
 // #515 — Terza copia dello stesso elenco: il manifesto che l'assistente
@@ -360,7 +360,7 @@ test('un documento scritto in un\'area annunciata porta nella barra il suo nome 
     'la barra non usa il nome corto e l\'ordine che il documento si dà');
   const barra = leggi('site', 'transparency', 'models.html').split('<nav class="sn-nav">')[1].split('</nav>')[0];
   assert.ok(barra.includes('>I tuoi dati<'), 'sul sito la barra tiene il nome dell\'area invece di quello del documento');
-  rmSync(tmp, { recursive: true, force: true });
+  togliCartella(tmp);
 });
 
 // #515 — L'etichetta di una fonte veniva presa dal testo già escapato: sulla
@@ -386,7 +386,7 @@ test('le fonti si leggono come testo, sulla pagina e per il modello', () => {
   const testo = leggi('src', 'shared', 'transparency.js');
   assert.ok(testo.includes('[1] titolo \\"tra virgolette\\" con <b>markup</b> e l\'apostrofo — https://example.com/a?x=1&y=2'),
     'il testo per il modello non riporta la fonte com\'è scritta');
-  rmSync(tmp, { recursive: true, force: true });
+  togliCartella(tmp);
 });
 
 // #515 — Presentato col sottotitolo («le motivazioni etiche…»), il documento

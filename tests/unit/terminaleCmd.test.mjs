@@ -7,8 +7,8 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -17,7 +17,7 @@ const S = require(join(ROOT, 'src', 'main', 'services', 'shell.js'));
 
 const ATTESA = 300_000;
 const TMP = cartellaTemporanea('filo-cmd-');
-process.on('exit', () => { try { rmSync(TMP, { recursive: true, force: true }); } catch (_) {} });
+process.on('exit', () => { try { togliCartella(TMP); } catch (_) {} });
 
 // ─────────── la strada: su Windows cmd passa dalla sessione, intero ───────────
 // Qui si finge Windows e si guarda cosa arriva alla sessione: su Linux cmd non c'è, ma la scelta della strada sì.

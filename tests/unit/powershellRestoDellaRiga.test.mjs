@@ -8,8 +8,8 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { delimiter, dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, rmSync } from 'node:fs';
-import { cartellaTemporanea, collegaFile } from '../helpers/percorsi.mjs';
+import { mkdirSync } from 'node:fs';
+import { cartellaTemporanea, collegaFile, togliCartella } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -19,7 +19,7 @@ const S = require(join(ROOT, 'src', 'main', 'services', 'shell.js'));
 const SU_WINDOWS = process.platform === 'win32';
 const ATTESA = 300_000;
 const TMP = cartellaTemporanea('filo-ps-riga-');
-process.on('exit', () => { try { rmSync(TMP, { recursive: true, force: true }); } catch (_) {} });
+process.on('exit', () => { try { togliCartella(TMP); } catch (_) {} });
 
 // Fuori da Windows Filo non lancia mai PowerShell: per provarne le righe si presenta `pwsh` col nome che Filo
 // cerca e si finge Windows solo mentre la shell parte. TERM=dumb: pwsh su Linux scrive sequenze di tasti in testa.

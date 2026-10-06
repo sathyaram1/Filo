@@ -18,7 +18,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, readdirSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -242,7 +242,7 @@ describe('la guardia sul ramo rimasto indietro (caso #500)', () => {
       assert.equal(g('rev-parse', 'HEAD'), prima, 'la prova non tocca il ramo');
       assert.equal(g('status', '--porcelain'), '', 'né l\'albero');
     } finally {
-      rmSync(dir, { recursive: true, force: true });
+      togliCartella(dir);
     }
   });
 
@@ -351,7 +351,7 @@ function repoDiProva() {
 }
 
 test.after(() => {
-  for (const d of temporanei) { try { rmSync(d, { recursive: true, force: true }); } catch (_) {} }
+  for (const d of temporanei) { try { togliCartella(d); } catch (_) {} }
 });
 
 describe('la spedizione dice DOVE, non solo cosa', () => {
@@ -491,7 +491,7 @@ describe('quale ramo NON si spedisce mai', () => {
 // regressione blocca la pubblicazione di un lavoro sano: l'elenco tracciato
 // dice quali sono, e il cancello li separa da quelli che devono essere verdi.
 import { splitKnownRed, esitoVerificaPerCheck, specDaRilanciare, esitoUnitPerCheck } from '../../scripts/finish-local.mjs';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 // `--check` promette solo i controlli: chi verifica lo lancia al posto della
 // suite intera (decisione owner 2026-09-10) e per lui la verifica è per forza

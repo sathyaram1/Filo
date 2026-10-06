@@ -8,9 +8,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { readdirSync, readFileSync, writeFileSync, appendFileSync, rmSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { costoInUnita } from '../helpers/tempoRelativo.mjs';
 
 const require = createRequire(import.meta.url);
@@ -52,7 +52,7 @@ test('6000 record: tornano tutti dopo un riavvio, dal più recente, coi vettori'
   assert.equal(tutti[5999].id, 'id-0');
   assert.deepEqual(tutti[5999].embedding, [0, 0, 3]);
   assert.equal(tutti[5999].summary, 'riassunto 0');
-  rmSync(cartella, { recursive: true, force: true });
+  togliCartella(cartella);
 });
 
 test('aggiungere e aggiornare accodano una riga: il file non si riscrive', async () => {
@@ -70,7 +70,7 @@ test('aggiungere e aggiornare accodano una riga: il file non si riscrive', async
   assert.equal(r.prendi('id-0').summary, 'nuovo riassunto');
   assert.deepEqual(r.prendi('id-0').embedding, [9, 9, 9]);
   assert.equal(r.prendi('id-0').url, 'https://sito-0.test/pagina');
-  rmSync(cartella, { recursive: true, force: true });
+  togliCartella(cartella);
 });
 
 test('togliere cancella il record dai file, e anche le sue righe di aggiornamento', async () => {
@@ -86,7 +86,7 @@ test('togliere cancella il record dai file, e anche le sue righe di aggiornament
   assert.equal(r.numero(), 48);
   assert.equal(r.prendi('id-7'), null);
   assert.equal(r.prendi('id-9').title, 'Scheda 9');
-  rmSync(cartella, { recursive: true, force: true });
+  togliCartella(cartella);
 });
 
 test('togliere con ripulisci riscrive anche i record che restano', async () => {
@@ -98,7 +98,7 @@ test('togliere con ripulisci riscrive anche i record che restano', async () => {
   assert.ok(!testoDiTutto(cartella).includes('sito-1.test'));
   const r = await riapri(cartella);
   assert.deepEqual(r.prendi('id-2').coOpenUrls, ['https://altro.test/']);
-  rmSync(cartella, { recursive: true, force: true });
+  togliCartella(cartella);
 });
 
 test('svuota toglie tutti i file; togliere l\'ultimo record di un mese toglie il file', async () => {
@@ -110,7 +110,7 @@ test('svuota toglie tutti i file; togliere l\'ultimo record di un mese toglie il
   d.svuota();
   assert.deepEqual(readdirSync(cartella), []);
   assert.equal((await riapri(cartella)).numero(), 0);
-  rmSync(cartella, { recursive: true, force: true });
+  togliCartella(cartella);
 });
 
 test('in coda: migrazione e importazione finiscono dietro ai presenti, nel loro ordine', async () => {
@@ -121,7 +121,7 @@ test('in coda: migrazione e importazione finiscono dietro ai presenti, nel loro 
   const ordine = ['id-3', 'id-0', 'id-1', 'id-2'];
   assert.deepEqual(d.tutti().map((x) => x.id), ordine);
   assert.deepEqual((await riapri(cartella)).tutti().map((x) => x.id), ordine);
-  rmSync(cartella, { recursive: true, force: true });
+  togliCartella(cartella);
 });
 
 test('una riga troncata da un arresto non si incolla alla prossima aggiunta', async () => {
@@ -133,7 +133,7 @@ test('una riga troncata da un arresto non si incolla alla prossima aggiunta', as
   r.aggiungi(scheda(2));
   const r2 = await riapri(cartella);
   assert.deepEqual(r2.tutti().map((x) => x.id), ['id-2', 'id-1']);
-  rmSync(cartella, { recursive: true, force: true });
+  togliCartella(cartella);
 });
 
 test('molti aggiornamenti: il mese si ricompatta e non perde niente', async () => {
@@ -145,7 +145,7 @@ test('molti aggiornamenti: il mese si ricompatta e non perde niente', async () =
   const r = await riapri(cartella);
   assert.equal(r.numero(), 20);
   assert.ok(r.tutti().every((x) => x.embedModel === 'm9' && x.summary));
-  rmSync(cartella, { recursive: true, force: true });
+  togliCartella(cartella);
 });
 
 test('un file scritto da mano con un mese strano non rompe il caricamento', async () => {
@@ -156,5 +156,5 @@ test('un file scritto da mano con un mese strano non rompe il caricamento', asyn
   const r = await riapri(cartella);
   assert.equal(r.numero(), 2);
   assert.ok(readdirSync(cartella).every((n) => /^\d{4}-\d{2}\.jsonl$/.test(n) || n === 'appunti.txt'));
-  rmSync(cartella, { recursive: true, force: true });
+  togliCartella(cartella);
 });

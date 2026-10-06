@@ -14,9 +14,9 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { writeFileSync, rmSync, mkdirSync, existsSync } from 'node:fs';
+import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { costoInUnita } from '../helpers/tempoRelativo.mjs';
 
 const require = createRequire(import.meta.url);
@@ -29,7 +29,7 @@ const DR = require(join(ROOT, 'src', 'main', 'services', 'documentRead.js'));
 // Cartella usa-e-getta per i file costruiti al volo (troppo grandi o troppo
 // specifici per stare tra le fixture committate).
 const TMP = cartellaTemporanea('filo-doc-');
-process.on('exit', () => { try { rmSync(TMP, { recursive: true, force: true }); } catch (_) {} });
+process.on('exit', () => { try { togliCartella(TMP); } catch (_) {} });
 
 // ─────────────────────────── PDF con testo vero ──────────────────────────────
 

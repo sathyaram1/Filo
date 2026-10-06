@@ -40,7 +40,7 @@ import { execFile, execFileSync } from 'node:child_process';
 import { rmSync, writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const {
   applySecaudit,
@@ -160,8 +160,8 @@ test('dispatch --record-secaudit: il verdetto parte con lo sha del commit contro
     assert.equal(stato.secauditSha, atteso, 'lo specchio locale ricorda su cosa è stato dato');
   } finally {
     srv.close();
-    rmSync(dir, { recursive: true, force: true });
-    rmSync(fuori, { recursive: true, force: true });
+    togliCartella(dir);
+    togliCartella(fuori);
   }
 });
 
@@ -196,7 +196,7 @@ test('canale deliver secaudit: lo sha lo timbra lo strumento, e uno dichiarato p
     assert.equal((ricevuti[ricevuti.length - 1].body.data || {}).sha, atteso);
   } finally {
     srv.close();
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -263,8 +263,8 @@ test('la fusione: parte dichiarando il commit esaminato, e non parte se il ramo 
     assert.equal(buste.length, quante, 'e il server non viene nemmeno chiamato');
   } finally {
     srv.close();
-    rmSync(dir, { recursive: true, force: true });
-    rmSync(fuori, { recursive: true, force: true });
+    togliCartella(dir);
+    togliCartella(fuori);
   }
 });
 
@@ -304,8 +304,8 @@ test('la fusione di un ramo verificato su un commit più vecchio la chiede lo st
     assert.match(r.stderr, /la verifica ha dato l'ok su .* Lo giudica il server/, 'e chi legge sa perché non si è fermata');
   } finally {
     srv.close();
-    rmSync(dir, { recursive: true, force: true });
-    rmSync(fuori, { recursive: true, force: true });
+    togliCartella(dir);
+    togliCartella(fuori);
   }
 });
 
@@ -335,8 +335,8 @@ test('la fusione non si chiede con roba fuori dai commit: il salvataggio automat
     assert.equal(buste.length, 0, 'il server non deve nemmeno essere chiamato');
   } finally {
     srv.close();
-    rmSync(dir, { recursive: true, force: true });
-    rmSync(fuori, { recursive: true, force: true });
+    togliCartella(dir);
+    togliCartella(fuori);
   }
 });
 
@@ -366,7 +366,7 @@ test('lo stato della directory non si può leggere: il verdetto non si registra 
     assert.equal(existsSync(resolve(statoDir, 'ID1.json')), false, 'e non deve restare niente scritto');
   } finally {
     srv.close();
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
 
@@ -498,8 +498,8 @@ test('lo specchio locale lo scrivono tutte e due le strade, e una correzione lo 
   } finally {
     if (precedente === undefined) delete process.env.FILO_DISPATCH_STATE_DIR;
     else process.env.FILO_DISPATCH_STATE_DIR = precedente;
-    rmSync(dir, { recursive: true, force: true });
-    rmSync(statoDir, { recursive: true, force: true });
+    togliCartella(dir);
+    togliCartella(statoDir);
   }
 });
 
@@ -726,7 +726,7 @@ test('la fusione non parte se su origin il ramo è più avanti del contenuto esa
     assert.equal(buste.length, quante, 'finché il controllo di sicurezza non ha letto il pezzo nuovo, il server non viene chiamato');
   } finally {
     srv.close();
-    for (const d of [dir, remoto, altra, fuori]) rmSync(d, { recursive: true, force: true });
+    for (const d of [dir, remoto, altra, fuori]) togliCartella(d);
   }
 });
 
@@ -760,6 +760,6 @@ test('la fusione non parte se il ramo nominato non è quello su cui sta la direc
     assert.equal(buste.length, 0);
   } finally {
     srv.close();
-    for (const d of [dir, fuori]) rmSync(d, { recursive: true, force: true });
+    for (const d of [dir, fuori]) togliCartella(d);
   }
 });

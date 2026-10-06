@@ -19,7 +19,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { writeFileSync, rmSync, readFileSync, mkdirSync, realpathSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync, realpathSync } from 'node:fs';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
@@ -40,7 +40,7 @@ const PAZIENZA = { tentativi: 20 };
 const NOME_DIFFICILE = 'RELAZIONE — attività finale.txt';
 
 const TMP = cartellaTemporanea('filo-codifica-');
-process.on('exit', () => { try { rmSync(TMP, { recursive: true, force: true }); } catch (_) {} });
+process.on('exit', () => { try { togliCartella(TMP); } catch (_) {} });
 
 // ───────────────────────── il preludio, per shell ────────────────────────────
 // Le costanti si controllano su OGNI piattaforma: il preludio di PowerShell
@@ -308,7 +308,7 @@ test('un comando che stampa moltissimo non fa perdere cartella ed esito', async 
 
 test('la cartella in cui il comando è finito torna anche con un output enorme', async () => {
   const sotto = join(TMP, 'sottocartella');
-  try { rmSync(sotto, { recursive: true, force: true }); } catch (_) {}
+  try { togliCartella(sotto); } catch (_) {}
   const righe = Math.ceil((T.MAX_OUTPUT_CHARS * 3) / 15);
   const comando = process.platform === 'win32'
     ? `mkdir "${sotto}" | Out-Null; Set-Location "${sotto}"; 1..${righe} | ForEach-Object { "riga-di-elenco" }`

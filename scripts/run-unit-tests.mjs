@@ -407,7 +407,9 @@ async function main() {
     // `exitCode` e non `exit()`, come sopra: l'ultima riga non deve perdersi.
     process.exitCode = esiti.find((e) => e !== 0) ?? (rapportiPersi.length ? 1 : 0);
   } finally {
-    rmSync(cartella, { recursive: true, force: true });
+    // Su Windows un figlio appena uscito tiene ancora la cartella dei rapporti: resta nella temporanea della corsa, che
+    // se ne va con lei, e l'esito della suite non cambia (#1063).
+    try { rmSync(cartella, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch (_) { /* vedi sopra */ }
   }
 }
 

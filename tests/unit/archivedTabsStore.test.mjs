@@ -15,6 +15,7 @@ import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { rapportoFraCosti } from '../helpers/tempoRelativo.mjs';
 
 const require = createRequire(import.meta.url);
 const userData = cartellaTemporanea('filo-archivio-');
@@ -101,17 +102,44 @@ test('ogni scheda che entra in archivio si annuncia all\'indice: chiusa, importa
   await A.removeMany([chiusa.id, 'imp-1']);
 });
 
-test('oltre le 5000 non sparisce niente, e chiudere una scheda resta rapido', async () => {
-  const tempi = [];
-  for (let i = 0; i < 1200; i++) {
-    const t0 = performance.now();
-    await A.archive({ url: `https://nuova-${i}.test/`, title: `Nuova ${i}` });
-    tempi.push(performance.now() - t0);
+// Lo stesso archivio in un'altra istanza, su una cartella dati quasi vuota: il termine di paragone per il tempo.
+async function archivioPiccolo() {
+  const modulo = require.resolve(join(ROOT, 'src', 'main', 'services', 'archivedTabs.js'));
+  const grande = globalThis.SN_ARCHIVED_TABS;
+  const dati = process.env.FILO_USER_DATA;
+  delete require.cache[modulo];
+  require(modulo);
+  const piccolo = globalThis.SN_ARCHIVED_TABS;
+  globalThis.SN_ARCHIVED_TABS = grande;
+  process.env.FILO_USER_DATA = cartellaTemporanea('filo-archivio-piccolo-');
+  // La cartella si legge quando l'archivio si apre, cioè adesso: dopo si può rimettere quella vera.
+  const aperto = piccolo.list();
+  process.env.FILO_USER_DATA = dati;
+  await aperto;
+  return piccolo;
+}
+
+// Quello che `fn` fa sui file di `cartella`: ogni chiamata sincrona di fs, col nome e le righe scritte. Solo quella più
+// esterna: appendFileSync passa da writeFileSync.
+function spiaDisco(cartella, fn) {
+  const fs = require('node:fs');
+  const visto = [];
+  let dentroUnaChiamata = 0;
+  const dentro = (p) => typeof p === 'string' && p.startsWith(cartella);
+  const nomi = ['appendFileSync', 'writeFileSync', 'renameSync', 'readFileSync', 'unlinkSync', 'openSync'];
+  const veri = Object.fromEntries(nomi.map((n) => [n, fs[n]]));
+  for (const n of nomi) {
+    fs[n] = (p, d, ...r) => {
+      if (dentro(p) && !dentroUnaChiamata) visto.push({ n, righe: typeof d === 'string' ? d.split('\n').length - 1 : 0 });
+      dentroUnaChiamata++;
+      try { return veri[n](p, d, ...r); } finally { dentroUnaChiamata--; }
+    };
   }
-  tempi.sort((a, b) => a - b);
-  const mediana = tempi[Math.floor(tempi.length / 2)];
-  console.log(`[misura] archiviare con ${VECCHIE}+ schede: mediana ${mediana.toFixed(2)} ms, peggiore ${tempi.at(-1).toFixed(2)} ms`);
-  assert.ok(mediana < 20, `mediana ${mediana} ms`);
+  return Promise.resolve().then(fn).then(() => visto).finally(() => Object.assign(fs, veri));
+}
+
+test('oltre le 5000 non sparisce niente, e chiudere una scheda resta rapido', async () => {
+  for (let i = 0; i < 1200; i++) await A.archive({ url: `https://nuova-${i}.test/`, title: `Nuova ${i}` });
   const lista = await A.list();
   assert.equal(lista.length, VECCHIE + 1200);
   assert.equal(lista[0].title, 'Nuova 1199');
@@ -121,6 +149,25 @@ test('oltre le 5000 non sparisce niente, e chiudere una scheda resta rapido', as
   const a = await A.update('vecchia-4999', { embedding: [5, 5, 5], embedModel: 'nuovo' });
   assert.deepEqual(a.embedding, [5, 5, 5]);
   assert.deepEqual((await A.list()).find((t) => t.id === 'vecchia-4999').embedding, [5, 5, 5]);
+
+  // Il disco non dipende dal tempo: con 6200 schede, chiuderne una aggiunge la sua riga e non rilegge né riscrive niente.
+  const aggiunte = [];
+  const visto = await spiaDisco(join(userData, 'archivio-schede'),
+    async () => { aggiunte.push(await A.archive({ url: 'https://una-ancora.test/', title: 'Una ancora' })); });
+  assert.deepEqual(visto.map(({ n, righe }) => [n, righe]), [['appendFileSync', 1]], JSON.stringify(visto));
+
+  // Il lavoro in memoria si misura a turno con l'archivio quasi vuoto, così il carico della macchina cade su tutti e due.
+  const piccolo = await archivioPiccolo();
+  let n = 0;
+  const chiudi = (archivio) => async () => {
+    const t = await archivio.archive({ url: `https://misura-${++n}.test/`, title: `Misura ${n}` });
+    if (archivio === A) aggiunte.push(t);
+  };
+  const r = await rapportoFraCosti(chiudi(piccolo), chiudi(A), { tetto: 3 });
+  // Le prove dopo contano le schede: quelle della misura se ne vanno.
+  await A.removeMany(aggiunte.map((t) => t.id));
+  console.log(`[misura] archiviare con ${VECCHIE}+ schede: ${r.come}`);
+  assert.ok(r.entro, `con ${VECCHIE}+ schede chiuderne una costa ${r.come} rispetto all'archivio quasi vuoto`);
 });
 
 test('cancellata una scheda, il suo indirizzo non è più in nessun file della cartella dati', async () => {

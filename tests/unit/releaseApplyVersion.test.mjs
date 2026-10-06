@@ -3,12 +3,12 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applicaVersione, confrontaVersioni } from '../../scripts/release-apply-version.mjs';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PKG = readFileSync(join(ROOT, 'package.json'), 'utf8');
@@ -93,7 +93,7 @@ describe('il conto "qualcosa di nuovo dal tag" di release.yml', () => {
       commit('release: v0.2.229 [skip ci]');
       g('tag', 'v0.2.229', provato);
       assert.equal(conta(), 0, 'ogni corsa ripubblicherebbe il solo numero');
-    } finally { rmSync(dir, { recursive: true, force: true }); }
+    } finally { togliCartella(dir); }
   });
 
   test('una fusione entrata durante la suite resta da pubblicare alla corsa dopo', () => {
@@ -106,7 +106,7 @@ describe('il conto "qualcosa di nuovo dal tag" di release.yml', () => {
       commit('release: v0.2.229 [skip ci]');
       g('tag', 'v0.2.229', provato);
       assert.equal(conta(), 1);
-    } finally { rmSync(dir, { recursive: true, force: true }); }
+    } finally { togliCartella(dir); }
   });
 
   test('un commit qualunque che parla di release nel testo conta come codice nuovo', () => {
@@ -116,6 +116,6 @@ describe('il conto "qualcosa di nuovo dal tag" di release.yml', () => {
       g('tag', 'v0.2.228');
       commit('#641: release: pubblica il commit provato');
       assert.equal(conta(), 1);
-    } finally { rmSync(dir, { recursive: true, force: true }); }
+    } finally { togliCartella(dir); }
   });
 });

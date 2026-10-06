@@ -263,7 +263,7 @@ test('afterRebase in conflitto senza elenco file: messaggio comunque utilizzabil
 const VERIFY = fileURLToPath(new URL('../../scripts/verify-local.mjs', import.meta.url));
 const sandbox = [];
 test.after(() => {
-  for (const d of sandbox) { try { rmSync(d, { recursive: true, force: true }); } catch (_) {} }
+  for (const d of sandbox) { try { togliCartella(d); } catch (_) {} }
 });
 
 function g(cwd, args) {
@@ -548,7 +548,7 @@ test('#561 giro 4: «[2]» senza testo è respinto, non un pass; il riassunto pu
 // non usciva mai: start e critica respinti, e l'unica uscita era «corretto».
 import { execFileSync as _exec } from 'node:child_process';
 import { writeFileSync as _write } from 'node:fs';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 const _ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 
 function depositoUsaEGetta() {

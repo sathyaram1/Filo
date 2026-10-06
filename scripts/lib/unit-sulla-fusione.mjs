@@ -164,7 +164,7 @@ export function chiudiAlbero(git, dir) {
   if (!c.ok) return c;
   git(['worktree', 'unlock', dir]);
   if (!git(['worktree', 'remove', '--force', dir]).ok) {
-    try { rmSync(dir, { recursive: true, force: true }); } catch (_) { /* resta: lo dice il controllo sotto */ }
+    try { rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch (_) { /* resta: lo dice il controllo sotto */ }
     git(['worktree', 'prune']);
   }
   return existsSync(dir) ? { ok: false, motivo: `non riesco a togliere ${dir}` } : { ok: true };
@@ -194,7 +194,8 @@ function apriAlbero(git, base, nome, sha) {
 function togliBase(base) {
   const c = togliCollegamento(join(base, 'node_modules'));
   if (!c.ok) return c;
-  try { rmSync(base, { recursive: true, force: true }); } catch (_) { /* lo dice il controllo sotto */ }
+  // I tentativi: su Windows un processo appena uscito tiene la cartella ancora per un poco (#1063).
+  try { rmSync(base, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch (_) { /* lo dice il controllo sotto */ }
   return existsSync(base) ? { ok: false, motivo: `non riesco a togliere ${base}` } : { ok: true };
 }
 
