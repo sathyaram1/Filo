@@ -148,6 +148,7 @@ const IMITAZIONI = {
   'nome e dominio col trattino': ['https://paypal-com.net/', /paypal\.com.*paypal-com\.net/],
   'lettere cirilliche': ['https://раураl.com/', /paypal\.com.*lettere/],
   'attaccato a un\'altra parola': ['https://paypallogin.com/', /paypal\.com.*paypallogin\.com/],
+  'di un marchio fuori dai più famosi (#732)': ['https://chase-login.com/', /chase\.com.*chase-login\.com/],
 };
 
 test('un marchio che è una parola, dentro un\'altra parola, non fa scattare l\'avviso (#732)', async ({ openTab, testServer }) => {

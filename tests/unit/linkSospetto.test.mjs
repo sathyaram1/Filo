@@ -363,3 +363,12 @@ test('un marchio che è una parola conta da solo, uno distintivo anche attaccato
     assert.ok(LS.analizza(u).some((c) => c.startsWith('nome_altrui:' + marchio + '|')), `nessun avviso su ${u}`);
   }
 });
+
+test('dal tasto destro avvisano gli stessi marchi del controllo all’apertura, non solo i più famosi (#732)', () => {
+  for (const [u, marchio] of [['https://chase-login.com/', 'chase.com'], ['https://wise-transfer.com/', 'wise.com'], ['https://gmail-verify.com/', 'gmail.com']]) {
+    assert.ok(LS.analizza(u).some((c) => c.startsWith('nome_altrui:' + marchio + '|')), `nessun avviso su ${u}`);
+  }
+  for (const u of ['https://chase.com/', 'https://steamcommunity.com/', 'https://amazonia.org/', 'https://google-gemini.github.io/', 'https://otherwise.github.io/']) {
+    assert.deepEqual(LS.analizza(u), [], `avviso a sproposito su ${u}`);
+  }
+});

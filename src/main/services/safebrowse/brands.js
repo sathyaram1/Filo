@@ -45,16 +45,19 @@ const BRANDS = [
   // Email / account / cloud
   { token: 'google', display: 'Google', domains: ['google.com', 'google.it', 'gmail.com', 'googlemail.com', 'googleblog.blogspot.com', 'google.ch', 'google.at', 'google.nl', 'google.be', 'google.pl', 'google.pt', 'google.ca', 'google.com.au', 'google.co.jp', 'google.com.br', 'google.co.in', 'google-developers.appspot.com',
     ...gh('google', 'google-research', 'google-deepmind', 'googlechromelabs', 'googlechrome', 'googlecloudplatform', 'googleapis',
-      'googlesamples', 'googlefonts', 'googlemaps', 'googlecodelabs', 'googlecreativelab', 'googleworkspace', 'googlearchive')] },
+      'googlesamples', 'googlefonts', 'googlemaps', 'googlecodelabs', 'googlecreativelab', 'googleworkspace', 'googlearchive',
+      'google-gemini', 'googleprojectzero', 'google-ai-edge', 'googleads', 'googlecontainertools', 'googlegenomics',
+      'google-marketing-solutions', 'google-pay', 'googlecolab', 'google-developer-training', 'googleforgames',
+      'google-github-actions', 'google-coral', 'googlevr', 'google-ar', 'googleanalytics', 'googlecast', 'google-wallet')] },
   { token: 'gmail', display: 'Gmail', domains: ['gmail.com', 'google.com'] },
   { token: 'microsoft', display: 'Microsoft', domains: ['microsoft.com', 'live.com', 'office.com', 'office365.com', 'microsoft.sharepoint.com', 'microsoftonline.com', 'microsoft365.com', 'cloud.microsoft',
     ...gh('microsoft', 'microsoftdocs', 'microsoftedge', 'microsoftgraph', 'microsoftlearning')] },
   { token: 'outlook', display: 'Outlook', domains: ['outlook.com', 'live.com', 'microsoft.com'] },
   { token: 'office365', display: 'Microsoft 365', domains: ['office.com', 'office365.com', 'microsoft.com', 'microsoft365.com'] },
-  { token: 'apple', display: 'Apple', domains: ['apple.com', 'icloud.com', 'me.com', ...gh('apple')] },
+  { token: 'apple', display: 'Apple', domains: ['apple.com', 'icloud.com', 'me.com', ...gh('apple', 'apple-oss-distributions')] },
   { token: 'icloud', display: 'iCloud', domains: ['icloud.com', 'apple.com'] },
   { token: 'dropbox', display: 'Dropbox', domains: ['dropbox.com', 'dropboxusercontent.com', ...gh('dropbox')] },
-  { token: 'yahoo', display: 'Yahoo', domains: ['yahoo.com', 'yahoo.it', ...gh('yahoo')] },
+  { token: 'yahoo', display: 'Yahoo', domains: ['yahoo.com', 'yahoo.it', ...gh('yahoo', 'yahoojapan')] },
   { token: 'proton', display: 'Proton', domains: ['proton.me', 'protonmail.com', ...gh('protonmail')] },
 
   // Social / comunicazione
@@ -66,11 +69,11 @@ const BRANDS = [
   { token: 'tiktok', display: 'TikTok', domains: ['tiktok.com'] },
   { token: 'telegram', display: 'Telegram', domains: ['telegram.org', 't.me'] },
   { token: 'discord', display: 'Discord', domains: ['discord.com', 'discord.gg', ...gh('discord')] },
-  { token: 'netflix', display: 'Netflix', domains: ['netflix.com', ...gh('netflix')] },
+  { token: 'netflix', display: 'Netflix', domains: ['netflix.com', ...gh('netflix', 'netflix-skunkworks')] },
   { token: 'steam', display: 'Steam', domains: ['steampowered.com', 'steamcommunity.com'] },
 
   // Shopping
-  { token: 'amazon', display: 'Amazon', domains: ['amazon.com', 'amazon.it', 'amazon.co.uk', 'amazon.de', 'amazon.fr', 'amazon.es', 'amazon.nl', 'amazon.ca', 'amazon.se', 'amazon.pl', 'amazon.ae', 'amazon.sg', 'amazon.in', 'amazon.co.jp', 'amazon.com.au', 'amazon.com.br', 'amazoncognito.com', ...gh('amazon-science')] },
+  { token: 'amazon', display: 'Amazon', domains: ['amazon.com', 'amazon.it', 'amazon.co.uk', 'amazon.de', 'amazon.fr', 'amazon.es', 'amazon.nl', 'amazon.ca', 'amazon.se', 'amazon.pl', 'amazon.ae', 'amazon.sg', 'amazon.in', 'amazon.co.jp', 'amazon.com.au', 'amazon.com.br', 'amazoncognito.com', ...gh('amazon-science', 'amazon-ion', 'amazon-archives', 'amazon-connect')] },
   { token: 'ebay', display: 'eBay', domains: ['ebay.com', 'ebay.it', 'ebay.de', 'ebay.co.uk', 'ebay.fr', 'ebay.es', 'ebay.ca', 'ebay.com.au', 'ebay.at', 'ebay.ch', 'ebay.nl', 'ebay.be', 'ebay.ie', 'ebay.pl', ...gh('ebay')] },
   { token: 'aliexpress', display: 'AliExpress', domains: ['aliexpress.com'] },
   { token: 'shopify', display: 'Shopify', domains: ['shopify.com', 'myshopify.com', ...gh('shopify')] },
@@ -101,6 +104,9 @@ const MARCHI_PAROLA = new Map([
   ['telegram', ['telegramweb']],
 ]);
 
+// Parole di tutti i giorni che contengono un marchio distintivo: tolte prima di cercarlo (amazonia non è Amazon) (#732).
+const PAROLE_CON_MARCHIO = ['amazonian', 'amazonia', 'amazonas'];
+
 // Vero se `nome` (un'etichetta o più, separate da punti) porta il marchio `token` secondo la regola sopra.
 // `scheletro` porta ogni pezzo alla forma con cui si legge a schermo (omoglifi, sosia).
 function nominaMarchio(nome, token, scheletro = (x) => x) {
@@ -113,7 +119,10 @@ function nominaMarchio(nome, token, scheletro = (x) => x) {
       || forme.some((f) => nome.includes(f) || pezzi.some((p) => scheletro(p).includes(scheletro(f))));
   }
   // Il trattino non spezza un marchio distintivo: pay-pal resta paypal.
-  return nome.split('.').some((l) => { const unito = l.replace(/-/g, ''); return unito.includes(token) || scheletro(unito).includes(tok); });
+  return nome.split('.').some((l) => {
+    const unito = PAROLE_CON_MARCHIO.reduce((x, w) => x.split(w).join(' '), l.replace(/-/g, ''));
+    return unito.includes(token) || scheletro(unito).includes(tok);
+  });
 }
 
 // Indice per lookup veloce: eTLD+1 legittimo → brand (per non flaggare il vero).

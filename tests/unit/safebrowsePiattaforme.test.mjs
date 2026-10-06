@@ -141,3 +141,13 @@ test('l’elenco dei marchi che sono parole è uno solo, e ogni voce è un march
   const link = fs.readFileSync(new URL('../../src/shared/linkSospetto.js', import.meta.url), 'utf8');
   assert.match(link, /nominaMarchio/, 'l’avviso sui link deve usare la stessa regola');
 });
+
+test('le pagine GitHub più visitate di Google e Amazon e le parole come amazonia non fanno scattare il marchio (#732)', () => {
+  for (const url of [
+    'https://google-gemini.github.io/gemini-cli/', 'https://googleprojectzero.github.io/0days-in-the-wild/',
+    'https://google-ai-edge.github.io/', 'https://amazon-ion.github.io/ion-docs/', 'https://amazonia.github.io/', 'https://amazonia.org/',
+  ]) assert.equal(livello(url), 'safe', url);
+  for (const url of ['https://amazonlogin.com/', 'https://amazon-login.github.io/', 'https://google-gemini-login.github.io/']) {
+    assert.notEqual(livello(url), 'safe', url);
+  }
+});

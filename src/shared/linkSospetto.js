@@ -85,6 +85,11 @@
       const nudo = MARCHI ? MARCHI.nominaMarchio(catena, suo, scheletro) : (suo.length >= 6 && catena.split(/[.-]/).includes(suo));
       if (intero || nudo) return 'nome_altrui:' + p + '|' + sito.dominio;
     }
+    // #732 — gli altri marchi del controllo all'apertura (chase-login.com): il tasto destro avvisa sugli stessi.
+    for (const b of ALTRI_MARCHI) {
+      if (b.domains.includes(sito.dominio)) continue;
+      if (MARCHI.nominaMarchio(catena, b.token, scheletro)) return 'nome_altrui:' + b.domains[0] + '|' + sito.dominio;
+    }
     return '';
   }
   const MARCHI = (() => {
@@ -94,6 +99,7 @@
     } catch (_) {}
     return null;
   })();
+  const ALTRI_MARCHI = MARCHI ? MARCHI.BRANDS.filter((b) => !POPULAR.some((p) => sitoDi(p).nome === b.token)) : [];
 
   // Suffissi di secondo livello: in 'amazon.co.uk' il nome del sito è 'amazon'.
   const SUFFISSI_2L = new Set(['co', 'com', 'net', 'org', 'gov', 'edu', 'ac']);
