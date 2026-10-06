@@ -1,4 +1,4 @@
-// Verifica locale di «aspetta #N» in Gestione: si mette, la pratica esce dalla coda, si toglie.
+// Rilievo 1 del giro 1: il tasto che toglie tutte le attese compare anche senza attese.
 import { test, expect } from '../../fixtures/electron.mjs';
 
 const MANAGE = 'filo://manage/manage.html';
@@ -51,31 +51,19 @@ async function apri(page, lista, tab = 'queue') {
 
 const tabBtn = (page, tab) => page.locator(`.mg-tab[data-tab="${tab}"]`);
 
-test('casella aperta senza attese: il tasto «Non aspettare più» si vede?', async ({ openTab }) => {
+test('r1 «Non aspettare più» non si vede quando il feedback non aspetta niente, né con una sola attesa', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   const a = fb();
   const b = fb({ _id: 'b-1', seq: 951 });
   await apri(page, [a, b]);
   await page.evaluate((id) => window.__mgTest.openDetail(id), a._id);
   await page.locator('#mgAtteseToggle').click();
-  const info = await page.locator('#mgAtteseTogliTutte').evaluate((el) => ({ hidden: el.hidden, display: getComputedStyle(el).display, w: el.getBoundingClientRect().width }));
-  console.log('TOGLI-TUTTE zero attese', JSON.stringify(info));
-  await page.screenshot({ path: 'tests/.shots/aspetta-casella-vuota.png' });
-  await page.locator('#mgAtteseInput').press('Escape');
-  console.log('dopo Esc casella hidden', await page.locator('#mgAttese').evaluate((el) => el.hidden));
-});
+  await expect(page.locator('#mgAtteseInput')).toBeVisible();
+  await expect(page.locator('#mgAtteseTogliTutte')).toBeHidden();
 
-test('pagina gemella dei feedback: la sezione Aspettano', async ({ openTab }) => {
-  const page = await openTab('filo://feedback/feedback.html');
-  await page.waitForLoadState('domcontentloaded');
-  await page.waitForFunction(() => window.__fbTest && window.SN_MANAGE_REVIEW);
-  await page.evaluate((items) => window.__fbTest.setData(items), [
-    fb({ waitsFor: [{ id: 'b-1', num: '951' }] }),
-    fb({ _id: 'b-1', seq: 951 }),
-  ]);
-  await expect(page.locator('#tabs [data-tab="waiting"]')).toHaveText('Aspettano (1)');
-  await expect(page.locator('#tabs [data-tab="queue"]')).toHaveText('In coda (1)');
-  await page.locator('#tabs [data-tab="waiting"]').click();
-  await page.waitForTimeout(500);
-  await page.screenshot({ path: 'tests/.shots/aspetta-gemella.png' });
+  await page.locator('#mgAtteseInput').fill('951');
+  await page.locator('#mgAtteseInput').press('Enter');
+  await expect(page.locator('#mgAtteseLista .mg-attesa')).toHaveCount(1);
+  // Con una sola attesa c'è già la × sulla sua etichetta.
+  await expect(page.locator('#mgAtteseTogliTutte')).toBeHidden();
 });
