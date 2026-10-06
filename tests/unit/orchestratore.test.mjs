@@ -87,6 +87,7 @@ function banco({ pratiche = [nuovaPratica({ num: 7, slug: 'sette', richiesta: 'f
       return { ...x, ok: !!x.entry && x.entry.verdict === 'pass' && x.entry.sha === (punta[wt] || 0) && !x.dirty };
     },
     pubblica: async () => { chiamate.push({ riga: 'server:pubblica' }); return { code: 0, out: '' }; },
+    filoAperto: async () => { const a = typeof filo === 'function' ? filo() : filo; chiamate.push({ riga: `filo ${a ? 'aperto' : 'chiuso'}` }); return a; },
     carico: async () => (carichi ? carichi() : { cpu: 10, liberaGB: 16 }),
     dormi: (ms) => { dormite.push(ms); return new Promise((ok) => setImmediate(ok)); },
     log: () => {},
