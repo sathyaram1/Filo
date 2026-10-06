@@ -23,8 +23,31 @@
   // resterebbe nascosto dietro al video — ed era il motivo per cui col tasto
   // destro sul video non compariva nulla (e non si poteva mandare feedback).
   // Se c'è un fullscreenElement montiamo lì dentro, così il menu è visibile.
+  // Un dialogo modale del sito rende inerte tutto quello che sta fuori di lui: lì il menu si vedrebbe e non risponderebbe.
   function menuHost() {
-    return document.fullscreenElement || document.documentElement;
+    let modale = null;
+    try { const aperti = document.querySelectorAll('dialog:modal'); modale = aperti[aperti.length - 1] || null; } catch (_) {}
+    return modale || document.fullscreenElement || document.documentElement;
+  }
+  // Nato dentro un elemento del sito (dialogo, schermo intero), il menu non gli fa arrivare i suoi clic: il sito li
+  // leggerebbe come suoi (un clic «fuori dal riquadro» chiude il dialogo, uno sul lettore ferma il video).
+  const RISALITE = ['click', 'auxclick', 'dblclick', 'mousedown', 'mouseup', 'pointerdown', 'pointerup'];
+  function tieniPerSe(root, host) {
+    if (host === document.documentElement) return;
+    for (const tipo of RISALITE) root.addEventListener(tipo, (e) => e.stopPropagation());
+  }
+  // Sulle pagine web il menu non eredita lo zoom CSS del documento: con lo zoom nascerebbe lontano dal cursore, e il
+  // posto letto dal browser non sarebbe quello in cui Filo l'ha posato (il menu non risponderebbe più).
+  function senzaZoomDelSito(root, host) {
+    if (!SUL_WEB) return;
+    const z = Number(host && host.currentCSSZoom);
+    if (Number.isFinite(z) && z > 0 && Math.abs(z - 1) > 0.001) root.style.zoom = String(1 / z);
+  }
+  // Sulle pagine web il menu non si deforma per compensare lo zoom di Filo: una scala messa da Filo il browser la conta
+  // come manomissione e il menu smetterebbe di rispondere. Lì segue lo zoom come la pagina, e si riposa.
+  function compensaZoom(el) {
+    if (SUL_WEB) return () => {};
+    return (global.SN_POPUP?.attachZoomCompensation || (() => () => {}))(el);
   }
 
   let activeMenu = null;
