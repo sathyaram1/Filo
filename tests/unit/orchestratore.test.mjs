@@ -10,7 +10,7 @@ import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  apriDerivatiDi, modoDerivati, attesaLimite, caricoBasta, chiaveVerdetto, classificaFinish, creaMotore, decidiDopoVerifica, decidiRegole, derivatiDaAprire, doveSiLavora, notaPerOwner, nuovaPratica, passoDalRamo, rigaChiusura, ruoloDelLavoro,
+  apriDerivatiDi, modoDerivati, attesaLimite, caricoBasta, chiaveVerdetto, classificaFinish, creaMotore, decidiDopoVerifica, decidiRegole, derivatiDaAprire, doveSiLavora, leggiSmistamento, notaPerOwner, promptSmistamento, nuovaPratica, passoDalRamo, rigaChiusura, ruoloDelLavoro,
   promptLavoratore, promptVerificatore, regolaFile, richiestaArg, riprendi, rigaStato, serveDeploy, siSovrappongono, toccaRegole, togliWorktree,
 } from '../../scripts/lib/orchestratore.mjs';
 import {
@@ -1380,4 +1380,65 @@ test('avvia ascolta smetti da un altro terminale e i Ctrl-C del suo: prima con c
     stacca();
   }
   assert.equal(segnali.listenerCount('SIGINT'), 0);
+});
+
+test('smistamento a giudizio (#1036): dove si lavora un rilievo lo decide la risposta, una volta sola; senza risposta le parole, con un avviso', async () => {
+  // Due rilievi che le parole metterebbero dalla parte sbagliata: il giudizio li rimette a posto.
+  const derived = [
+    { level: 1, sede: 'e', text: 'La funzione che fonde i rami accetta un’approvazione scaduta da una settimana' },
+    { level: 1, sede: 'e', text: 'Dopo il deploy di una nuova versione il changelog nella home non si aggiorna' },
+  ];
+  assert.deepEqual(derived.map((f) => doveSiLavora(f)), ['non-locale', 'locale']);
+  const p = nuovaPratica({ num: 7, slug: 'sette' });
+  const aperti = [];
+  const domande = [];
+  let risposta = 'Ecco: ["locale", "non-locale"]';
+  const dep = {
+    percorsi: { wt: (s) => `/r/.claude/worktrees/${s}` },
+    verifica: () => ({ entry: { derived } }),
+    smista: async (prompt) => { domande.push(prompt); return risposta; },
+    esegui: async (cmd, args) => { aperti.push([args[1], args[3]]); return /approvazione/.test(args[1]) ? { code: 0, out: 'Aperto #1001' } : { code: 1, out: 'fetch failed' }; },
+  };
+  assert.equal(await apriDerivatiDi(dep, p), 1);
+  assert.equal(domande.length, 1);
+  assert.match(domande[0], /approvazione scaduta[\s\S]*changelog/);
+  assert.deepEqual(aperti, [[derived[1].text, '--non-locale'], [derived[0].text, '--locale']]);
+  // Il rilievo rimasto da aprire tiene il giudizio già dato: niente seconda domanda.
+  risposta = 'non so';
+  assert.equal(await apriDerivatiDi(dep, p), 1);
+  assert.equal(domande.length, 1);
+  assert.deepEqual(aperti[2], [derived[1].text, '--non-locale']);
+  assert.equal((p.avvisi || []).filter((a) => /smistati a parole/.test(a)).length, 0);
+
+  // Senza risposta leggibile, o con lo smistamento che si rompe: le parole, un avviso solo, e si richiede al passo dopo.
+  for (const rotto of [async () => 'non so', async () => '["locale"]', async () => '["forse","locale"]', async () => { throw new Error('Not logged in'); }]) {
+    const q = nuovaPratica({ num: 8, slug: 'otto' });
+    const righe = [];
+    let chieste = 0;
+    const d2 = { ...dep, smista: async (x) => { chieste += 1; return rotto(x); }, esegui: async (cmd, args) => { righe.push(args[3]); return { code: 1, out: 'fetch failed' }; } };
+    await apriDerivatiDi(d2, q);
+    await apriDerivatiDi(d2, q);
+    assert.deepEqual(righe, ['--non-locale', '--locale', '--non-locale', '--locale']);
+    assert.equal(chieste, 2);
+    assert.equal(q.avvisi.filter((a) => /smistati a parole/.test(a)).length, 1);
+  }
+
+  // Con un modo scelto a mano non si chiede niente.
+  const r = nuovaPratica({ num: 9, slug: 'nove' });
+  let chiesto = false;
+  await apriDerivatiDi({ ...dep, smista: async () => { chiesto = true; return '[]'; }, esegui: async () => ({ code: 0, out: 'Aperto #1' }) }, r, { derivati: 'locale' });
+  assert.equal(chiesto, false);
+});
+
+test('smistamento a giudizio: la risposta si legge solo se è un elenco giusto, e il ripiego tiene l’interfaccia dalla parte dell’app', () => {
+  assert.deepEqual(leggiSmistamento('["non-locale","locale"]', 2), ['non-locale', 'locale']);
+  assert.deepEqual(leggiSmistamento('Risposta:\n```json\n["locale"]\n```', 1), ['locale']);
+  for (const [t, n] of [['', 1], ['["locale"]', 2], ['["Locale"]', 1], ['[locale]', 1], [null, 1], ['{"a":1}', 1]]) assert.equal(leggiSmistamento(t, n), null, String(t));
+  const prompt = promptSmistamento(['primo «rilievo»', 'secondo']);
+  assert.match(prompt, /array JSON di 2 stringhe/);
+  assert.match(prompt, /Rilievo 1:\nprimo «rilievo»[\s\S]*Rilievo 2:\nsecondo/);
+  for (const t of ['La regola di Firestore sul campo crediti lascia scrivere chiunque', 'Chiunque può leggere da Firestore i feedback degli altri utenti',
+    'Su Firebase i dati di un utente restano dopo la cancellazione dell’account', 'I server di Filo non controllano la firma della critica']) assert.equal(doveSiLavora({ text: t }), 'locale', t);
+  for (const t of ['Il messaggio di errore quando il server non risponde è in inglese', 'La pagina Gestione mostra «errore del server» quando cade la rete',
+    'In Gestione la colonna con lo stato delle Cloud Functions esce dallo schermo a finestra stretta']) assert.equal(doveSiLavora({ text: t }), 'non-locale', t);
 });
