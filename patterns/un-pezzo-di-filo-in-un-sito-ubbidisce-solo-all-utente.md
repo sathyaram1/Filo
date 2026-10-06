@@ -139,8 +139,9 @@ Un sito controlla lo stile e i nodi del menu che stanno nel suo documento. La
 regola 3 ferma ciò che il sito disegna **sopra** il menu; non ferma ciò che fa
 **al** menu: il suo CSS sulle nostre classi (colori trasparenti, opacità, un
 `::after` dentro un nostro nodo) o il suo script sui nostri nodi. La cura vera
-è disegnare il menu fuori dal documento del sito (#589.11 giro 1, in attesa
-della scelta dell'owner; la prova rossa sta in `tests/verifica/589.11/`).
+è disegnare il menu fuori dal documento del sito: l'owner l'ha deciso come
+lavoro a parte (D14); fino ad allora questa porta resta aperta e dichiarata, e la
+sua prova in `tests/verifica/589.11/` è un rosso atteso.
 
 Un filtro, un'opacità o una trasformazione sul contenitore del menu (`html {
 filter: grayscale(1) }`, una pagina in lutto) per il browser nasconde anche le

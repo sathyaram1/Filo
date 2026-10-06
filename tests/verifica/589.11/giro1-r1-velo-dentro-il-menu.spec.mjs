@@ -17,6 +17,7 @@ async function centro(locator) {
 }
 
 test('un velo bianco appeso dentro il menu fa incollare la password della cronologia senza vederla', async ({ app, shell, openTab, testServer }) => {
+  test.fail(true, 'porta dichiarata: la chiude il menu disegnato fuori dalla pagina, lavoro a parte deciso dall\'owner (D14)');
   for (const text of ['un testo qualsiasi', SEGRETO]) {
     await shell.evaluate((t) => window.filoShell.message({ type: 'push_clipboard_entry', entry: { type: 'text', text: t } }), text);
   }
@@ -50,6 +51,7 @@ test('un velo bianco appeso dentro il menu fa incollare la password della cronol
 });
 
 test('il foglio di stile del sito rende trasparente il menu: Incolla sotto il velo non incolla', async ({ app, openTab, testServer }) => {
+  test.fail(true, 'porta dichiarata: la chiude il menu disegnato fuori dalla pagina, lavoro a parte deciso dall\'owner (D14)');
   await app.evaluate(({ clipboard }, s) => clipboard.writeText(s), SEGRETO);
   const page = await apri(openTab, testServer, `<!doctype html><html><head>
     <style>.sn-menu { opacity: 0 !important; }</style></head>
