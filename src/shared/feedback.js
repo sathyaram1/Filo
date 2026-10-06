@@ -705,7 +705,9 @@
     // #908: un lavoro locale nasce solo con la prova; da anonimo diventerebbe un feedback d'utente.
     const localOnly = (opts && opts.localOnly && typeof opts.localOnly === 'object') ? opts.localOnly : null;
     // `soloAdmin`: chi chiama vuole la prova o niente (lo script delle sessioni locali).
-    const soloAdmin = !!((opts && opts.soloAdmin) || localOnly);
+    // #903: le attese le scrive solo l'admin; da anonimo il feedback partirebbe senza, e senza dirlo.
+    const attese = (opts && Array.isArray(opts.waitsFor) && opts.waitsFor.length) ? attesePerScrittura(opts.waitsFor) : [];
+    const soloAdmin = !!((opts && opts.soloAdmin) || localOnly || attese.length);
     // `accessoOwner`: chi chiama distingue l'accesso che manca dalla rete che manca (la coda d'invio aspetta, non rinuncia).
     if (soloAdmin && !idToken) throw Object.assign(new Error('create senza token admin (401): questo feedback non parte da anonimo'), { accessoOwner: true });
     // NIENTE PARTE SE NON SI PUÒ CIFRARE (#602). Il controllo sta QUI, prima di
@@ -873,6 +875,7 @@
           at: Math.round(Number(localOnly.at) || Date.now()),
         });
       }
+      if (attese.length) doc.fields.waitsFor = toFsValue(attese);
       // La priorità scelta da chi apre nasce col documento (#914): il server decide alla nascita se giudicarla,
       // e una scritta dopo arriverebbe quando il giudice ha già scelto. Solo admin: il create anonimo non la ammette.
       const prioritaScelta = opts && opts.priority;
