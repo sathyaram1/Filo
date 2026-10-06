@@ -2,22 +2,45 @@
 
 [← Tutti i pattern](../PATTERNS.md)
 
-Ogni azione che Filo (l'AI) può intraprendere dichiara il proprio livello nel
-**registro** `src/shared/actionLevels.js` (#146.2): 1 = reversibile, esegue
-subito; 2 = popup di conferma con spiegazione (OK/Annulla); 3 = irreversibile,
-l'utente digita "conferma". Il dispatch (`executeFiloAction` nel main)
-**rifiuta le azioni non registrate**: un nuovo potere di Filo che non dichiara
-il livello non viene eseguito.
+Ogni azione che Filo (l'AI) può intraprendere dichiara nel **registro**
+`src/shared/actionLevels.js` il suo **costo** di sbagliarla (0 resta in chat,
+1 si disfa, 2 dura o si vede fuori ma si rimedia, 3 irreversibile o costoso) e
+il suo **campo** (posta, messaggistica, file, terminale, web, o nessuno). Se
+l'azione parte da sola, chiede un OK, vuole «conferma» digitato o non parte lo
+decide **una funzione sola**, `decideDettaglio` in `src/shared/autonomia.js`
+(#530), con cinque ingressi che il motore conosce senza chiederli al modello:
+il livello di autonomia scelto dall'utente, lo stato del compito (pulito o
+contaminato, dalla classe peggiore fra le fonti lette: le letture lo dichiarano
+nel registro con `fonte`. Ciò che è stato letto vale per la **conversazione che
+l'utente ha davanti**, mai per un contenitore: non per lo storico che la pagina
+rimanda, che si perde riprendendo la chat e si ferma agli ultimi venti messaggi,
+e non per la scheda. La chat lo tiene per targa, anche nel suo archivio; per
+l'Aiuto ogni apertura del pannello, o pagina nuova, è una conversazione nuova), il costo,
+il perimetro e l'origine. Sopra la tabella
+stanno l'elenco fisso (no a ogni livello: segreti, molti destinatari,
+credenziali, regole, cancellazioni definitive) e la difesa abbassata («conferma»
+a ogni livello). Il dispatch (`executeFiloAction` nel main) **rifiuta le azioni
+non registrate o senza costo**, e nessuna superficie decide da sé: nemmeno le
+azioni che l'agente sulla pagina fa nel content script, che dichiarano il costo
+e chiedono la risposta al main (`MSG.FILO_DECIDI_PAGINA`), né i pannelli propri
+della chat (riordino delle schede, svuota archivio), che chiedono come dice la
+`domanda` arrivata dal main. Sentinella:
+`tests/unit/autonomia.test.mjs`. Nelle regole che seguono, scritte prima del
+#530, «livello 2» vuol dire «chiede» e «livello 3» vuol dire «conferma».
 
 - **Regola operativa:** quando aggiungi un'azione Filo, registrala in
-  `actionLevels.js` con livello + `describe()` (la spiegazione in chiaro per il
-  popup) E in `actionTools.js` con descrizione + parametri: è lì che il modello
+  `actionLevels.js` con costo, campo e `describe()` (la spiegazione in chiaro
+  per il popup); se legge qualcosa dichiara la `fonte` con la sua classe, se
+  manda testo fuori dichiara l'`uscita` (ci passano i controlli sui segreti).
+  Poi in `actionTools.js` con descrizione + parametri: è lì che il modello
   la vede, come strumento nativo (tool calling), non più in un elenco nel
   prompt. Il nome dello strumento È il tipo dell'azione. La sentinella
   `tests/unit/actionTools.test.mjs` pretende che i due elenchi combacino: uno
-  strumento senza livello non si esegue, un livello senza strumento non si può
+  strumento senza costo non si esegue, un costo senza strumento non si può
   chiamare. Le descrizioni che dipendono dal sistema (shell, percorsi) sono
-  funzioni di `{ sistema }`, mai testo fisso con un esempio di Windows.
+  funzioni di `{ sistema }`, mai testo fisso con un esempio di Windows. Una
+  descrizione non promette mai «il sistema chiede conferma»: dipende dal
+  livello, quindi «se serve l'OK, lo chiede il sistema».
 - **L'esito di un'azione ha due assi, non uno.** `executed` dice se è andata
   a buon fine; `kept` dice se in chat c'è qualcosa da CLICCARE (un bottone).
   Un appunto scritto o una lezione fissata sono `executed: true, kept: false`.
@@ -36,15 +59,18 @@ il livello non viene eseguito.
   che racconta e il bottone che porta all'editor; un'azione in attesa di
   conferma ha la riga «Conferma chiesta …» e il bottone per rispondere (senza
   quella riga un turno di sola richiesta non lasciava blocco, e alla conferma
-  non c'era più dove scrivere che era stata data).
+  non c'era più dove scrivere che era stata data). Un no della regola (`_output.no`) è
+  un'azione che non è partita: la riga dice «non eseguito» col motivo e il
+  blocco si apre da solo (un comando rifiutato si raccontava come eseguito,
+  un «dimentica» rifiutato come «niente da dimenticare»).
 - **Quello che succede DOPO la risposta deve arrivare al modello.** Una
   conferma data nel popup (livello 2 e 3) e le azioni già eseguite in un
   tentativo interrotto da un guasto non stanno in nessun messaggio: rientrano
   nel contesto del turno successivo come righe di sistema
   (`confirmedActionsForPrompt`, `interruptedActionsForPrompt`). Senza, a «l'hai
   attivato?» il modello tirava a indovinare, e un «Riprova» rifaceva il timer
-  che aveva appena messo. Per le preferenze il livello è per-setter in `preferences.js`
-  (`level: 2` su ciò che tocca sicurezza/shell). La sospensione e la conferma
+  che aveva appena messo. Per le preferenze il costo è per-setter in `preferences.js`
+  (`costo`, più `allenta` sui valori che spengono una difesa). La sospensione e la conferma
   passano da `needsConfirm` → bottone in chat → `MSG.FILO_CONFIRM_ACTION`; il
   main **riclassifica** alla conferma, non si fida del client.
 - **Il popup di livello 2 spiega COSA Filo fa e i RISCHI (#183).** Non basta
@@ -63,6 +89,11 @@ il livello non viene eseguito.
   che copra le strade che non hai visto: `-P` sceglie la cartella invece del
   nome, `-c`/`-N` accodano o sovrascrivono un file già lì, `-K` prende le opzioni
   da un file. Un check per flag si aggira con un altro flag.
+- **Un comando che manda qualcosa fuori è costo 3 (#530).** Da quando a Normale il
+  costo 2 parte da solo, «2» non vuol più dire «popup»: un file caricato con
+  `curl -F`, un `-X DELETE` sul server, un `git push` verso un indirizzo scritto
+  nel comando o un remoto riscritto (`remote add`/`set-url`, `remote.*.url`) non
+  tornano indietro. Il push verso il remoto già configurato resta 2.
 - **Un'ESENZIONE non si decide leggendo il testo del comando (#479).** Alzare
   il livello guardando una parola è sicuro (al massimo costa attrito); ABBASSARLO
   perché una parola compare non lo è mai, perché il classificatore legge un

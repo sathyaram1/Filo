@@ -91,6 +91,8 @@
     collapsed = false;
     aiPrefersOpen = true;
     session = newSession();
+    // Ciò che ha letto la conversazione di prima non vale per questa (#530).
+    try { chrome.runtime.sendMessage({ type: MSG.FILO_AIUTO_NUOVO }).catch(() => {}); } catch (_) {}
     // L'URL "iniziale" è quello al momento dell'apertura della sidebar — anche
     // se l'utente è arrivato qui da altre pagine, contano solo le azioni che
     // farà DA QUI in avanti.
@@ -784,7 +786,7 @@
     // l'azione (riclassificata di nuovo nel main) via FILO_CONFIRM_ACTION.
     if (res.needsConfirm) {
       const Ui = global.SN_CONFIRM_UI;
-      const opts = { title: 'Filo chiede conferma', text: res.describe || '' };
+      const opts = { title: 'Filo chiede conferma', text: res.describe || '', avviso: res.avviso || '' };
       let ok = false;
       try {
         ok = Ui
@@ -821,32 +823,32 @@
   //
   // L'agente "Aiuto" può eseguire le stesse azioni del menu contestuale su
   // testo/immagine/link. A differenza delle azioni tipizzate di Filo (sopra),
-  // queste NON passano per il main: vivono nel content script (SN_ACTIONS in
-  // src/content/actions.js, SN_TTS in tts.js) e operano sull'elemento o sulla
-  // selezione corrente. Le azioni che ESCONO verso l'esterno (cerca sul web,
-  // condividi) chiedono conferma con lo stesso popup di Filo (SN_CONFIRM_UI);
-  // copia/leggi/salva-per-dopo sono immediate (locali).
+  // queste vivono nel content script (SN_ACTIONS in src/content/actions.js,
+  // SN_TTS in tts.js) e operano sull'elemento o sulla selezione corrente. Ognuna
+  // dichiara solo il suo COSTO: se parte, chiede o no lo decide il main con la
+  // stessa regola del dispatch (#530, MSG.FILO_DECIDI_PAGINA). Uscire verso
+  // l'esterno (cercare, condividere) costa 2; il resto resta sul computer e costa 1.
   //
   // SN_ACTIONS/SN_TTS sono caricati DOPO sidebar.js (vedi i preload), quindi li
   // risolviamo al volo dentro la funzione, non al top dell'IIFE.
   const PAGE_ACTIONS = {
     // testo / selezione
-    copy:         { target: 'text',  confirm: false, label: 'copia testo' },
-    cut:          { target: 'text',  confirm: false, label: 'taglia testo' },
-    search_text:  { target: 'text',  confirm: true,  label: 'cerca testo sul web' },
-    read_aloud:   { target: 'text',  confirm: false, label: 'leggi ad alta voce' },
-    stop_reading: { target: 'none',  confirm: false, label: 'ferma la lettura' },
-    edit_text:    { target: 'text',  confirm: false, label: 'modifica testo' },
+    copy:         { target: 'text',  costo: 1, label: 'copia testo' },
+    cut:          { target: 'text',  costo: 1, label: 'taglia testo' },
+    search_text:  { target: 'text',  costo: 2, label: 'cerca testo sul web' },
+    read_aloud:   { target: 'text',  costo: 1, label: 'leggi ad alta voce' },
+    stop_reading: { target: 'none',  costo: 1, label: 'ferma la lettura' },
+    edit_text:    { target: 'text',  costo: 1, label: 'modifica testo' },
     // immagini
-    copy_image:      { target: 'image', confirm: false, label: 'copia immagine' },
-    save_image:      { target: 'image', confirm: false, label: 'salva immagine' },
-    copy_image_link: { target: 'image', confirm: false, label: 'copia link immagine' },
-    search_image:    { target: 'image', confirm: true,  label: 'cerca immagine sul web' },
-    // link
-    open_link:  { target: 'link', confirm: false, label: 'apri link in nuova scheda' },
-    copy_link:  { target: 'link', confirm: false, label: 'copia link' },
-    save_link:  { target: 'link', confirm: false, label: 'salva link per dopo' },
-    share_link: { target: 'link', confirm: true,  label: 'condividi link' },
+    copy_image:      { target: 'image', costo: 1, label: 'copia immagine' },
+    save_image:      { target: 'image', costo: 1, label: 'salva immagine' },
+    copy_image_link: { target: 'image', costo: 1, label: 'copia link immagine' },
+    search_image:    { target: 'image', costo: 2, label: 'cerca immagine sul web' },
+    // link: aprire passa da NAVIGA, che il dispatch decide da sé
+    open_link:  { target: 'link', costo: 1, label: 'apri link in nuova scheda', viaFilo: true },
+    copy_link:  { target: 'link', costo: 1, label: 'copia link' },
+    save_link:  { target: 'link', costo: 1, label: 'salva link per dopo' },
+    share_link: { target: 'link', costo: 2, label: 'condividi link' },
   };
 
   // Testo bersaglio: quello fornito dall'agente, altrimenti la selezione corrente.
@@ -930,19 +932,26 @@
       }
     }
 
-    // Conferma per le azioni che escono verso l'esterno (stesso popup di Filo).
-    if (spec.confirm) {
-      const Ui = global.SN_CONFIRM_UI;
-      let detail = '';
-      if (spec.target === 'text') detail = text.length > 80 ? `${text.slice(0, 80)}…` : text;
-      else if (imgEl) detail = imgEl.currentSrc || imgEl.src || '';
-      else if (linkEl) detail = linkEl.href || '';
-      const describe = `${label}${detail ? `:\n“${detail}”` : ''}`;
-      let ok = false;
-      try {
-        ok = Ui ? await Ui.confirm({ title: 'Filo chiede conferma', text: describe }) : global.confirm(describe);
-      } catch (_) { ok = false; }
-      if (!ok) { appendActionLog(`${label}: annullata`); return false; }
+    // Senza risposta dal main si chiede: il caso prudente.
+    if (!spec.viaFilo) {
+      let d = null;
+      try { d = await chrome.runtime.sendMessage({ type: MSG.FILO_DECIDI_PAGINA, costo: spec.costo, campo: 'web' }); } catch (_) {}
+      const risposta = d && d.ok ? d.risposta : 'chiede';
+      if (risposta === 'no') { appendActionLog(`${label}: non applicata, ${(d && d.no) || 'Filo non la fa da solo'}`); return false; }
+      if (risposta !== 'si') {
+        const Ui = global.SN_CONFIRM_UI;
+        let detail = '';
+        if (spec.target === 'text') detail = text.length > 80 ? `${text.slice(0, 80)}…` : text;
+        else if (imgEl) detail = imgEl.currentSrc || imgEl.src || '';
+        else if (linkEl) detail = linkEl.href || '';
+        const perche = d && d.perche ? `\n\n${d.perche}` : '';
+        const opts = { title: 'Filo chiede conferma', text: `${label}${detail ? `:\n“${detail}”` : ''}${perche}` };
+        let ok = false;
+        try {
+          ok = Ui ? await (d && d.digita ? Ui.confirmTyped(opts) : Ui.confirm(opts)) : global.confirm(opts.text);
+        } catch (_) { ok = false; }
+        if (!ok) { appendActionLog(`${label}: annullata`); return false; }
+      }
     }
 
     try {

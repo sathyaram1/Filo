@@ -42,7 +42,7 @@ test('«invia da solo» e «lascia il testo da correggere» si chiedono anche a 
   assert.equal(auto('non inviare da solo'), false);
   assert.equal(auto(false), false);
   assert.equal(auto('boh'), undefined);
-  assert.equal(P.buildPreferencePartial('invio_vocale', true).level, 1, 'reversibile e innocua: niente conferma');
+  assert.equal(P.buildPreferencePartial('invio_vocale', true).costo, 1, 'reversibile e innocua: niente conferma');
   const desc = globalThis.SN_ACTION_TOOLS.definitions({ sistema: 'linux' })
     .find((d) => d.function.name === 'IMPOSTA_PREFERENZA').function.description;
   assert.match(desc, /invio_vocale/, 'il modello non sa che la chiave esiste');

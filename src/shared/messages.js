@@ -894,6 +894,11 @@
     // needsConfirm, describe }: se needsConfirm il client mostra il popup di
     // conferma e poi rimanda l'azione via FILO_CONFIRM_ACTION. { action }
     FILO_RUN_ACTION: 'filo_run_action',
+    // #530 — l'agente "Aiuto" chiede se una sua azione sulla pagina (copia, cerca,
+    // condividi) parte, chiede o no. { costo, campo } → { risposta, digita, perche, no? }.
+    FILO_DECIDI_PAGINA: 'filo_decidi_pagina',
+    // #530 — l'Aiuto si è aperto: comincia una conversazione nuova, che non ha ancora letto niente. {}
+    FILO_AIUTO_NUOVO: 'filo_aiuto_nuovo',
 
     // #810 — un indirizzo web proposto da un modello in una pagina di Filo si apre solo dopo la porta delle
     // uscite. { url, parole } → { aperto, frase }

@@ -121,6 +121,7 @@
     'timer:ferma': 'fermare la suoneria chiude il giro del timer: rimetterlo non avrebbe più niente da far suonare',
     'timer:pausa': 'pausa e ripresa di un timer sono il suo pulsante play: si riprende da lì',
     'zoom:propria': 'una pagina che scala da sé il suo contenuto (l\'editor) tiene lei il suo zoom',
+    'autonomia.*': 'quanto Filo fa da solo lo sceglie solo l\'utente in Preferenze: un «annulla» dalla chat lo cambierebbe a nome di Filo (#530)',
   };
 
   function jollyDi(chiave, tabella) {

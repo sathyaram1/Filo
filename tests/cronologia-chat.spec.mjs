@@ -1082,6 +1082,8 @@ test('il resoconto di un comando con lo slash non riapre la chat che hai chiuso'
   test.setTimeout(180_000);
   await configura(app);
   await stubProvider(app, { Epicuro: { tipo: 'conversazione', titolo: 'Epicuro' } });
+  // A Normale il riordino parte da solo nel main (#530): a Conservativo passa dal popup e dal riordino lento qui sotto.
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'conservativo' } }));
 
   const dash = await openTab('filo://dashboard/dashboard.html');
   // Il riordino delle schede ci mette qualche secondo: qui lo si rallenta

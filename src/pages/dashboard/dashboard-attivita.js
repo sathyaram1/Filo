@@ -465,6 +465,8 @@
         if (failed) wrap.dataset.failed = '1';
       },
       remove() { filo.distruggi(); wrap.remove(); },
+      // Un rifiuto della regola si legge senza cercarlo: il blocco si apre.
+      mostra() { setOpen(true); },
     };
 
     function closeTurnReasoning() {
@@ -765,6 +767,7 @@
     CARTA_HOME: 'Carta della home non cambiata',
     EVENTO_CALENDARIO: 'Evento non creato', ONBOARDING: 'Accoglienza non aggiornata',
     VOLUME: 'Volume non cambiato', BLUETOOTH: 'Bluetooth non cambiato', WIFI: 'Wi-Fi non cambiato',
+    PULISCI_TAB: 'Schede non riordinate',
   };
   function rigaRadio(a, radio) {
     const o = a._output || {};
@@ -778,6 +781,18 @@
     if (o.collegato === null) return { icon, text: `Collegamento chiesto · ${nome}` };
     return { icon, text: `${o.collegato === false ? 'Scollegato' : 'Collegato'} · ${nome}` };
   }
+  // Detto di un'azione che la regola ha fermato prima di cominciare: dove l'etichetta di sopra parla di un esito.
+  const NO_LABELS = {
+    ESEGUI_COMANDO: 'Comando non eseguito', DIMENTICA: 'Non dimenticato',
+    CANCELLA_SVEGLIA: 'Non cancellata', MODIFICA_SVEGLIA: 'Non spostata',
+    CANCELLA_MEMORIA: 'Memoria non cancellata', CANCELLA_ARCHIVIO: 'Archivio non svuotato',
+    INVIA_FEEDBACK: 'Segnalazione non inviata',
+  };
+  // Riordino e svuotamento dell'archivio chiedono col loro pannello: come chiedere lo porta `_domanda` (#530).
+  const DOMANDE_PANNELLO = { PULISCI_TAB: 'riordino delle schede', CANCELLA_ARCHIVIO: 'eliminazione dall’archivio' };
+  // Aspetta una risposta dell'utente, da un popup o dal pannello dell'azione: non è un'azione fallita, e il suo bottone resta.
+  function aspettaUtente(a) { return !!(a && (a._confirm || a._domanda)); }
+
   function activityRowFor(a) {
     const row = rigaAttivita(a);
     if (!row || row.failed) return row;
@@ -801,11 +816,16 @@
     // Un segreto che sarebbe uscito (#810): cosa è stato fermato e da dove veniva, frase del main.
     const fermata = a._output && a._output.blocked === 'segreto' ? String(a._output.frase || '').trim() : '';
     if (fermata) return { icon: '🔒', text: fermata.charAt(0).toUpperCase() + fermata.slice(1), tipo: 'FERMATA' };
+    if (a._domanda) return { icon: '❔', text: `Conferma chiesta · ${DOMANDE_PANNELLO[type] || type.toLowerCase()}`, failed: true };
     // Non riuscita: la riga lo DICE, invece di raccontare un successo che non
     // c'è stato (un documento inesistente diceva «Leggo il documento…»).
     if (a._executed === false) {
       const perche = motivoFallimento(a);
-      return { icon: '⚠', text: `${FAILED_LABELS[type] || 'Azione non riuscita'}${perche ? ` · ${perche}` : ''}`, failed: true };
+      // Un no della regola di autonomia non è un'azione andata a vuoto: «Niente da dimenticare» con le righe lì è falso.
+      const cosa = rifiutataDallaRegola(a)
+        ? (NO_LABELS[type] || FAILED_LABELS[type] || 'Non fatto')
+        : (FAILED_LABELS[type] || 'Azione non riuscita');
+      return { icon: '⚠', text: `${cosa}${perche ? ` · ${perche}` : ''}`, failed: true };
     }
     const fn = ACTIVITY_ROWS[type];
     if (fn) return fn(a);
@@ -813,6 +833,14 @@
     // che il silenzio — il diario deve dire tutto quello che Filo ha fatto.
     if (a._traccia) return { icon: '•', text: type.toLowerCase().replace(/_/g, ' ') };
     return null;
+  }
+  // Il main ha detto no prima di toccare niente (#530): l'azione non è partita, e il diario non la racconta come fatta.
+  function rifiutataDallaRegola(a) {
+    return !!(a && a._output && a._output.no);
+  }
+  // L'esito di un comando che è partito davvero: un comando bloccato o rifiutato si racconta come riga.
+  function esitoDiComando(a) {
+    return isType(a, 'ESEGUI_COMANDO') && !a._confirm && !!a._output && !a._output.blocked && !rifiutataDallaRegola(a);
   }
   // La ragione del fallimento, quando il main la conosce.
   function motivoFallimento(a) {
@@ -842,12 +870,16 @@
     // Comando già eseguito (livello 1): il suo esito è un passo del lavoro e
     // va nella cronologia del blocco, non sotto la risposta. Se è stato
     // bloccato (terminale spento) resta in vista: è un problema da leggere.
-    if (isType(a, 'ESEGUI_COMANDO') && !a._confirm && a._output && !a._output.blocked) {
+    if (esitoDiComando(a)) {
       activity.addCommand(a._output, spiegazioneDi(a), a);
       return true;
     }
     const row = activityRowFor(a);
-    if (row) { activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed, row.cambi, a); return true; }
+    if (row) {
+      activity.addRow(row.tipo || a.type, row.icon, row.text, !!row.failed, row.cambi, a);
+      if (rifiutataDallaRegola(a) && activity.mostra) activity.mostra();
+      return true;
+    }
     // Un link aperto resta un bottone sotto la risposta, ma il nodo del filo lo conta e lo nomina.
     if (activity.azioneSenzaRiga) activity.azioneSenzaRiga(a);
     return false;
@@ -995,13 +1027,13 @@
       // (riga che racconta, bottone che porta all'editor) vale per tutto ciò
       // che aspetta una conferma: la riga dice che Filo l'ha chiesta, il
       // bottone è come si risponde.
-      const anche = a._confirm
+      const anche = aspettaUtente(a)
         || (ROW_AND_BUTTON.includes(String(a.type || '').toUpperCase()) && a._executed !== false)
         || apribileComunque(a) || permessoDaConcedere(a) || stileAccoglienza(a);
       if (activity) {
         if (told) {
           // Già in cronologia; resta solo l'eventuale bottone (link, conferma).
-          if (!anche && (activityRowFor(a) || (isType(a, 'ESEGUI_COMANDO') && !a._confirm && a._output && !a._output.blocked))) continue;
+          if (!anche && (activityRowFor(a) || esitoDiComando(a))) continue;
         } else if (tellActionInActivity(activity, a) && !anche) {
           continue;
         }
@@ -1017,7 +1049,7 @@
       // cieco (era il caso di un link con un indirizzo non ammesso). La sua
       // riga sta già nel diario. Un'azione IN ATTESA DI CONFERMA non è
       // «fallita»: non è ancora partita, e il suo bottone è tutto il punto.
-      if (!a._confirm && !apribileComunque(a) && !permessoDaConcedere(a) && ((a._traccia && !anche) || a._executed === false)) continue;
+      if (!aspettaUtente(a) && !apribileComunque(a) && !permessoDaConcedere(a) && ((a._traccia && !anche) || a._executed === false)) continue;
       const btn = renderActionButton(a, { onAck, activity });
       if (btn) wrap.appendChild(btn);
       if (String(a.type || '').toUpperCase() === 'SALVA_APPUNTO') hasAck = true;
@@ -1323,7 +1355,8 @@
       // e aspetta l'OK, esattamente come nella sidebar (che già fa così).
       // Le azioni distruttive (livello 3) e i comandi restano a click esplicito.
       const AUTO_CONFIRM_TYPES = ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'INVIA_FEEDBACK', 'SALVA_LEZIONE', 'DIMENTICA', 'RINOMINA_FILE', 'BLUETOOTH', 'WIFI'];
-      if (AUTO_CONFIRM_TYPES.includes(type) && a._confirm.level === 2) {
+      // Una difesa abbassata (#530) vuole la parola, ma non è distruttiva: il box si apre da solo come il popup.
+      if (AUTO_CONFIRM_TYPES.includes(type) && (a._confirm.level === 2 || a._confirm.avviso)) {
         btn.dataset.autoConfirm = '1';
       }
       // La conferma (popup + esecuzione) è una funzione a sé, così renderActions
@@ -1334,7 +1367,7 @@
       async function runConfirm() {
         if (btn.disabled) return;
         const Ui = window.SN_CONFIRM_UI;
-        const opts = { title: 'Filo chiede conferma', text: a._confirm.text || '' };
+        const opts = { title: 'Filo chiede conferma', text: a._confirm.text || '', avviso: a._confirm.avviso || '' };
         const ok = Ui
           ? await (a._confirm.level >= 3 ? Ui.confirmTyped(opts) : Ui.confirm(opts))
           : window.confirm(opts.text); // fallback se il modulo non è caricato
@@ -1360,7 +1393,7 @@
         // #146.6 — comando confermato (livello 2/3): mostra l'output in chat.
         if (isCmd) {
           segnaComando((r && r.executed) ? '✓' : '✗');
-          if (r && r.output) btn.after(renderCommandResult(r.output));
+          if (r && r.output && !r.output.no) btn.after(renderCommandResult(r.output));
           if (r && r.output) applyCommandCwd([{ _output: r.output }]);
           return;
         }
@@ -1558,7 +1591,7 @@
     try { archiviaAzione(String(a.type || '').toUpperCase(), ids.map((c) => c.id)); } catch (_) {}
   }
 
-  // La pulizia parte SOLO al click, con conferma, mai da sola (spec §2.1).
+  // Il riordino che la regola non fa partire da solo parte al clic, e chiede come dice `_domanda` (#530).
   function renderBottoneRiordino(a, activity) {
     const btn = document.createElement('button');
     btn.className = 'dash-action-btn dash-action-btn-primary';
@@ -1566,14 +1599,7 @@
     btn.textContent = '🧹 Riordina e archivia le schede';
     btn.addEventListener('click', async () => {
       if (btn.disabled) return;
-      // Livello 2 (#146.2): popup Filo che spiega la modifica, non il
-      // window.confirm nativo (PATTERNS.md: niente default del browser).
-      const text = 'Filo valuterà tutte le schede aperte e archivierà quelle non più utili. '
-        + 'Le schede archiviate restano riapribili da “Tab archiviate”.';
-      const ok = window.SN_CONFIRM_UI
-        ? await window.SN_CONFIRM_UI.confirm({ title: 'Riordino delle schede', text, okLabel: 'Procedi' })
-        : window.confirm(`${text} Procedo?`);
-      if (!ok) return;
+      if (!(await chiediSecondoRegola(a._domanda, { title: 'Riordino delle schede', text: TESTO_RIORDINO, okLabel: 'Procedi' }, a._perche))) return;
       btn.disabled = true;
       btn.textContent = '🧹 Riordino in corso…';
       const r = await send({ type: MSG.RUN_TAB_TRIAGE });
@@ -1589,6 +1615,31 @@
       segnaConfermata(a, { archived: n }, activity);
     });
     return btn;
+  }
+
+  // Come chiedere lo dice la regola di autonomia del main (#530), mai il pannello. Senza risposta: la parola.
+  // `perche`: la frase della regola quando a far chiedere è ciò che il compito ha letto.
+  async function chiediSecondoRegola(domanda, opts, perche = '') {
+    if (domanda === 'si') return true;
+    if (perche) opts = { ...opts, text: `${opts.text}\n\n${perche}` };
+    const Ui = window.SN_CONFIRM_UI;
+    if (!Ui) return window.confirm(opts.text);
+    return domanda === 'chiede' ? Ui.confirm(opts) : Ui.confirmTyped(opts);
+  }
+
+  const TESTO_RIORDINO = 'Filo valuterà tutte le schede aperte e archivierà quelle non più utili. '
+    + 'Le schede archiviate restano riapribili da “Tab archiviate”.';
+  // Il riordino chiesto fuori dalla chat (/pulisci, il suggerimento della home) passa dalla stessa regola della
+  // chat: parte nel main, o torna la domanda da fare. `{ archived }`, `{ annullato }` o `{ errore }`.
+  async function riordinaSchede() {
+    const r = await send({ type: MSG.FILO_RUN_ACTION, action: { type: 'PULISCI_TAB' }, parole: paroleUtente() });
+    if (r && r.executed) return { archived: Number(r.output && r.output.archived) || 0 };
+    if (!r || !r.kept) return { errore: (r && r.output && r.output.error) || 'non riuscito' };
+    // Chiesto come assistente (#825.3) torna dal popup generico, che dice `needsConfirm` invece di `domanda`.
+    const domanda = r.domanda || (r.needsConfirm === 3 ? 'conferma' : 'chiede');
+    if (!(await chiediSecondoRegola(domanda, { title: 'Riordino delle schede', text: TESTO_RIORDINO, okLabel: 'Procedi' }, r.perche))) return { annullato: true };
+    const t = await send({ type: MSG.RUN_TAB_TRIAGE });
+    return { archived: (t && t.archived) || 0 };
   }
 
   // §5 — pannello di cancellazione retroattiva: propone TUTTE e SOLE le schede
@@ -1682,12 +1733,8 @@
         if (del.disabled) return;
         const scelta = spuntate();
         if (!scelta.length) return;
-        // Livello 3 (#146.2): eliminazione irreversibile → l'utente deve
-        // digitare espressamente "conferma".
         const text = `Eliminare definitivamente ${quante(scelta.length)} dall’archivio.`;
-        const ok = window.SN_CONFIRM_UI
-          ? await window.SN_CONFIRM_UI.confirmTyped({ title: 'Eliminazione definitiva', text, okLabel: 'Elimina' })
-          : window.confirm(`${text} L’operazione non è reversibile.`);
+        const ok = await chiediSecondoRegola(a._domanda, { title: 'Eliminazione definitiva', text, okLabel: 'Elimina' }, a._perche);
         if (!ok || del.disabled) return;
         del.disabled = true;
         scelte.forEach((x) => { x.box.disabled = true; });
@@ -1736,5 +1783,6 @@
     // si rimettono (un'azione da confermare non si può ri-offrire giorni
     // dopo): resta il racconto di cosa Filo ha fatto.
     summarizeActivity,
+    riordinaSchede,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

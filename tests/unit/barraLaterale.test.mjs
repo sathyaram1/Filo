@@ -170,6 +170,6 @@ test('SPOSTA_ICONA: lo strumento elenca le icone vere col nome del menu, e dice 
   assert.match(p.icona.description, /screenshot \([^)]+\)/);
   assert.equal(D.nome('closeTab') !== 'closeTab', true, 'il nome del menu, non l\'id');
   const L = globalThis.SN_ACTION_LEVELS;
-  assert.equal(L.levelFor({ type: 'SPOSTA_ICONA', icona: 'screenshot', dove: 'barra' }), 1);
+  assert.equal(L.costoFor({ type: 'SPOSTA_ICONA', icona: 'screenshot', dove: 'barra' }), 1);
   assert.match(L.describeDone({ type: 'SPOSTA_ICONA', icona: 'screenshot', dove: 'barra' }), /nella barra laterale/);
 });
