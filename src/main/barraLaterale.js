@@ -175,7 +175,13 @@ class BarraLaterale {
     return false;
   }
 
-  // Input vero arrivato alla scheda o alla fila delle schede, cioè fuori dalla barra.
+  // Input vero di una vista della finestra: conta solo quello di ciò che l'utente vede sotto la barra (l'avviso del
+  // sito quando copre la scheda, sennò la scheda), la stessa regola del vuoto (#871 giro 6).
+  inputDa(wc, input) {
+    const sotto = this.tabs.vistaSottoIlVuoto();
+    if (wc && sotto && sotto.webContents === wc) this.inputAltrove(input);
+  }
+
   inputAltrove(input) {
     if (!input) return;
     this._tasti('scheda', input);
