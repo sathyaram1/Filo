@@ -40,7 +40,7 @@ export const OPZIONI_DI = Object.freeze({
   avvia: {
     '--paralleli': intero(1),
     '--tetto': intero(1),
-    '--derivati': { atteso: 'non-locale, locale o nessuno', leggi: (v) => (['non-locale', 'locale', 'nessuno'].includes(v.trim()) ? v.trim() : undefined) },
+    '--derivati': { atteso: 'auto, non-locale, locale o nessuno', leggi: (v) => (MODI_DERIVATI.includes(v.trim()) ? v.trim() : undefined) },
     '--tieni-worktree': SI,
     '--budget-istanza': numero('un importo in dollari sopra zero', (n) => n > 0),
     '--ore-istanza': numero('un numero di ore da 0.5 in su', (n) => n >= 0.5),
