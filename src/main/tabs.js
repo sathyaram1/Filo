@@ -2490,9 +2490,10 @@ class TabManager {
         try { nuovo = wc.getTitle() || ''; } catch (_) {}
         tab.title = nuovo || userUrl(url);
       }
+      // Prima della misura: la storia che conta è quella senza la voce gemella.
+      this._sostituisciVoceGemella(wc, url);
       if (tab.view && tab.view.webContents === wc) { this.anteprime.navigata(tab); this._misuraStoria(tab, wc); }
       if (tab._vistaNuova && tab._vistaNuova.wc === wc) tab._vistaNuova = null;
-      this._sostituisciVoceBloccata(wc, url);
       // #590 — una navigazione già partita quando il suo sito è entrato in lista arriva lo stesso: si ferma qui.
       const bloccata = /^https?:\/\//i.test(url) && this._decisioneBlocco(tab, url);
       if (bloccata) {
