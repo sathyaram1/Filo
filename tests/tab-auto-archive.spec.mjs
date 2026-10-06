@@ -266,7 +266,7 @@ test('conta solo il testo ancora da inviare: spunte, invio e cambio pagina non p
     <label><input type="checkbox" id="spunta"> ricordami</label>
     <select id="scelta"><option>uno</option><option>due</option></select>
     <textarea id="nota"></textarea>
-    <form id="attivita" onsubmit="event.preventDefault()"><input id="q" type="text"><button>Aggiungi</button></form>
+    <form id="attivita" onsubmit="event.preventDefault(); fetch(location.pathname + '?api=1', { method: 'POST', body: q.value })"><input id="q" type="text"><button>Aggiungi</button></form>
     <a id="via" href="${dopo}">avanti</a>
   </body></html>`));
   const attesa = () => page.waitForTimeout(800);
@@ -279,7 +279,7 @@ test('conta solo il testo ancora da inviare: spunte, invio e cambio pagina non p
   await page.locator('#nota').fill('appunto a metà');
   await expect.poll(() => moduloDi(shell, 'Campi'), { timeout: 8_000 }).toBe(true);
 
-  // Inviare un modulo di una riga non cancella l'appunto scritto fuori da lui.
+  // Mandare al sito un modulo di una riga non cancella l'appunto scritto fuori da lui.
   await page.locator('#q').fill('comprare il latte');
   await page.locator('#q').press('Enter');
   await attesa();
@@ -568,10 +568,11 @@ test('il testo spostato dalla pagina in un altro campo, o rimandato dal server, 
     await page.waitForFunction((t) => document.title === t && document.documentElement.dataset.filoReady === '1', titolo);
   }
 
-  // Pubblicato: il riquadro sparisce col testo dentro, e il testo compare come commento.
+  // Pubblicato: il testo parte verso il sito, il riquadro sparisce e il testo compare come commento.
   const social = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Commenti</title></head><body>
     <div id="box"><div id="ed" contenteditable="true" style="min-height:60px;border:1px solid"></div><button id="pub">Rispondi</button></div><ul id="lista"></ul>
-    <script>pub.onclick = () => { const li = document.createElement('li'); li.textContent = ed.textContent; lista.append(li); box.remove(); };</script>
+    <script>pub.onclick = async () => { await fetch(location.pathname + '?api=1', { method: 'POST', body: JSON.stringify({ html: ed.innerHTML }) });
+      const li = document.createElement('li'); li.textContent = ed.textContent; lista.append(li); box.remove(); };</script>
     </body></html>`));
   await social.locator('#ed').click();
   await social.keyboard.type(TESTO);
@@ -596,7 +597,7 @@ test('il testo spostato dalla pagina in un altro campo, o rimandato dal server, 
   expect(aperte).not.toContain('Risultati');
 });
 
-test('il testo di un campo tolto dalla pagina tiene aperta la scheda finché non ricompare nella pagina (#824)', async ({ app, shell, testServer }) => {
+test('il testo di un campo tolto dalla pagina tiene aperta la scheda finché non parte verso il sito o non torna in un campo (#824)', async ({ app, shell, testServer }) => {
   // Procedura a passi: «Avanti» toglie il primo passo, la lettera resta solo nella memoria della pagina.
   const domanda = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Domanda</title></head><body>
     <form onsubmit="event.preventDefault()"><div id="passo">
@@ -697,10 +698,11 @@ test('un numero o una data messi dai pulsanti della pagina non proteggono la sch
   expect(aperte).toContain('Nota');
 });
 
-test('un modulo di più campi mandato senza cambiare pagina non protegge più la scheda quando la pagina ne mostra il testo (#824)', async ({ app, shell, testServer }) => {
+test('un modulo di più campi mandato al sito senza cambiare pagina non protegge più la scheda, uno respinto sì (#824)', async ({ app, shell, testServer }) => {
   const page = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Voli</title></head><body>
     <form id="f"><input id="da" placeholder="Da dove parti?"><input id="a" placeholder="Dove vuoi andare?"><button>Cerca voli</button></form><ul id="ris"></ul>
-    <script>f.addEventListener('submit', (e) => { e.preventDefault(); setTimeout(() => { ris.innerHTML = '<li>' + da.value + ' → ' + a.value + ' 49 €</li>'; }, 300); });</script>
+    <script>f.addEventListener('submit', async (e) => { e.preventDefault(); await fetch('/voli?da=' + encodeURIComponent(da.value) + '&a=' + encodeURIComponent(a.value));
+      ris.innerHTML = '<li>' + da.value + ' → ' + a.value + ' 49 €</li>'; });</script>
     </body></html>`));
   await page.locator('#da').click();
   await page.keyboard.type('Milano');
@@ -748,4 +750,95 @@ test('il testo scritto nei riquadri di Filo dentro la pagina non protegge la sch
 
   await pulisciTutto(app, shell, testServer);
   expect(await titoliAperti(shell)).not.toContain('Articolo');
+});
+
+// Se il testo è partito lo dice la richiesta che lo porta al sito, non come appare la pagina.
+const MANDA = `const manda = (dati) => fetch(location.pathname + '?api=1', { method: 'POST', body: JSON.stringify(dati) }).catch(() => {});`;
+
+test('il testo che la pagina mostra senza mandarlo, o che manda solo a un altro sito, tiene aperta la scheda (#824)', async ({ app, shell, testServer }) => {
+  // Riepilogo di una procedura: la lettera si vede, ma «Invia candidatura» non è ancora premuto.
+  const candidatura = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Candidatura</title></head><body>
+    <div id="passo"><textarea id="lettera" style="width:400px;height:100px"></textarea><button type="button" id="avanti">Avanti</button></div>
+    <script>const dati = {}; avanti.onclick = () => { dati.lettera = lettera.value;
+      passo.innerHTML = '<h2>Controlla e invia</h2><p id="rie"></p><button id="invia">Invia candidatura</button>'; rie.textContent = dati.lettera; };</script>
+    </body></html>`));
+  await candidatura.locator('#lettera').click();
+  await candidatura.keyboard.type('Gentile ufficio, vorrei candidarmi per la posizione di grafico');
+  await candidatura.locator('#avanti').click();
+  await expect(candidatura.locator('#rie')).toContainText('Gentile ufficio');
+
+  // Anteprima dal vivo e invio respinto: la risposta è sotto la casella, ma non è partita.
+  const risposta = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Risposta</title></head><body>
+    <form id="f"><textarea id="corpo" style="width:400px;height:100px"></textarea><button>Pubblica la risposta</button></form><p id="err"></p><div id="ant"></div>
+    <script>corpo.addEventListener('input', () => { ant.textContent = corpo.value; });
+      f.addEventListener('submit', (e) => { e.preventDefault(); err.textContent = 'Devi accedere per rispondere'; });</script>
+    </body></html>`));
+  await risposta.locator('#corpo').click();
+  await risposta.keyboard.type('Il problema nasce dal ciclo che non si ferma mai');
+  await risposta.locator('button').click();
+  await expect(risposta.locator('#err')).toHaveText('Devi accedere per rispondere');
+
+  // Una registrazione della sessione su un altro sito porta fuori la bozza, ma il sito non l'ha.
+  const registrata = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Registrata</title></head><body>
+    <textarea id="nota" style="width:400px;height:100px"></textarea>
+    <script>nota.addEventListener('input', () => { fetch('http://sito-pubblico.test:' + location.port + '/registra', { method: 'POST', mode: 'no-cors', body: nota.value }).catch(() => {}); });</script>
+    </body></html>`));
+  await registrata.locator('#nota').click();
+  await registrata.keyboard.type('Bozza che il sito non ha ancora');
+  await registrata.waitForTimeout(800);
+
+  await pulisciTutto(app, shell, testServer);
+  const aperte = await titoliAperti(shell);
+  expect(aperte).toContain('Candidatura');
+  expect(aperte).toContain('Risposta');
+  expect(aperte).toContain('Registrata');
+});
+
+test('il testo mandato al sito senza cambiare pagina non protegge la scheda: un post da una finestrella, un accesso, una ricerca senza modulo (#824)', async ({ app, shell, testServer }) => {
+  // La finestrella si chiude mentre la richiesta è ancora in viaggio.
+  const social = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Social</title></head><body>
+    <main><p>Il tuo feed</p></main>
+    <div id="modale" role="dialog"><div id="ed" contenteditable="true" style="min-height:80px;border:1px solid"></div><button id="pub">Pubblica</button></div><p id="toast"></p>
+    <script>${MANDA} pub.onclick = () => { manda({ post: ed.innerText }); modale.remove(); toast.textContent = 'Post pubblicato'; };</script>
+    </body></html>`));
+  await social.locator('#ed').click();
+  await social.keyboard.type('Oggi ho finito la maratona di Firenze');
+  await social.keyboard.press('Enter');
+  await social.keyboard.type('grazie a tutti 🙂');
+  await social.locator('#pub').click();
+  await expect(social.locator('#toast')).toHaveText('Post pubblicato');
+
+  const app2 = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Progetti</title></head><body>
+    <div id="vista"><form id="f"><input id="mail" type="email"><input id="pw" type="password"><button>Accedi</button></form></div>
+    <script>${MANDA} f.addEventListener('submit', async (e) => { e.preventDefault(); await manda({ mail: mail.value, pw: pw.value });
+      vista.innerHTML = '<h1>I tuoi progetti</h1>'; history.pushState({}, '', '#/progetti'); });</script>
+    </body></html>`));
+  // Su http Filo avvisa delle password con un riquadro sopra la pagina: il campo si raggiunge col fuoco.
+  await app2.locator('#mail').focus();
+  await app2.keyboard.type('giulia.verdi@example.com');
+  await app2.locator('#pw').focus();
+  await app2.keyboard.type('segreta123');
+  await app2.keyboard.press('Enter');
+  await expect(app2.locator('h1')).toHaveText('I tuoi progetti');
+
+  const voli = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>VoliSPA</title></head><body>
+    <div><input id="da" placeholder="Da dove parti?"><input id="a" placeholder="Dove vuoi andare?"><button id="cerca">Cerca voli</button></div><ul id="ris"></ul>
+    <script>const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+      cerca.onclick = async () => { await fetch('/voli/' + encodeURIComponent(da.value) + '/' + encodeURIComponent(a.value)).catch(() => {});
+        ris.innerHTML = '<li>' + cap(da.value) + ' → ' + cap(a.value) + ' 49 €</li>'; };</script>
+    </body></html>`));
+  await voli.locator('#da').click();
+  await voli.keyboard.type('milano');
+  await voli.locator('#a').click();
+  await voli.keyboard.type('parigi charles de gaulle');
+  await expect.poll(() => moduloDi(shell, 'VoliSPA'), { timeout: 8_000 }).toBe(true);
+  await voli.locator('#cerca').click();
+  await expect(voli.locator('#ris li')).toHaveText('Milano → Parigi charles de gaulle 49 €');
+  await voli.waitForTimeout(800);
+
+  await pulisciTutto(app, shell, testServer);
+  const aperte = await titoliAperti(shell);
+  expect(aperte).not.toContain('Social');
+  expect(aperte).not.toContain('Progetti');
+  expect(aperte).not.toContain('VoliSPA');
 });

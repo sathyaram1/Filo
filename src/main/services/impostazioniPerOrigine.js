@@ -169,19 +169,21 @@ function messaggioPerDestinazione(message, url, pagina, dove = {}) {
 // Una spinta a una scheda, frame per frame (#405: i content script girano anche nei
 // riquadri), ognuno col messaggio ritagliato sul suo indirizzo e su `inVista` (la
 // scheda in primo piano della finestra). Ogni spinta a più schede passa da qui.
-function spingiAllaScheda(wc, message, { inVista = false } = {}) {
+// `soloFrame(url)` restringe la spinta ai frame che lo meritano (un dato di un sito solo ai suoi).
+function spingiAllaScheda(wc, message, { inVista = false, soloFrame = null } = {}) {
   if (!wc || wc.isDestroyed?.()) return;
   let pagina = '';
   try { pagina = String(wc.getURL() || ''); } catch (_) { pagina = ''; }
   let frames = null;
   try { frames = wc.mainFrame && wc.mainFrame.framesInSubtree; } catch (_) { frames = null; }
   if (!frames || !frames.length) {
+    if (soloFrame && !soloFrame(pagina)) return;
     try { const m = messaggioPerDestinazione(message, pagina, undefined, { inVista }); if (m) wc.send('filo:broadcast', m); } catch (_) {}
     return;
   }
   for (const f of frames) {
     try {
-      if (f.detached) continue;
+      if (f.detached || (soloFrame && !soloFrame(f.url))) continue;
       const m = messaggioPerDestinazione(message, f.url, pagina, { inVista, riquadro: Boolean(f.parent) });
       if (m) f.send('filo:broadcast', m);
     } catch (_) {}

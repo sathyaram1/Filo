@@ -8,6 +8,7 @@ const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const Cookies = require('./services/cookies');
 const { spingiAllaScheda } = require('./services/impostazioniPerOrigine');
+const { testoDellaRichiesta } = require('./services/testoInviato');
 const ProxyTab = require('./services/proxyTab');
 const { registerFiloProtocolForSession } = require('./protocol');
 const GeoBlock = require('./services/geoBlock');
@@ -1087,6 +1088,8 @@ class TabManager {
     const ses = session.fromPartition(partition);
     // Senza filo:// qui la pagina d'errore non si carica e un proxy muto lascia la scheda vuota.
     if (!ses.protocol.isProtocolHandled('filo')) registerFiloProtocolForSession(ses);
+    // Anche qui il testo scritto risulta partito quando esce verso il sito (#824).
+    Cookies.ensureRequestHook(ses);
     try {
       await ses.setProxy({
         proxyRules: resolved.proxyRules,
@@ -2750,15 +2753,16 @@ const RICHIESTE_CON_TESTO = new Set(['xhr', 'ping', 'mainFrame', 'subFrame', 'ot
 function schedaConTestoDi(wcId) {
   for (const w of BrowserWindow.getAllWindows()) {
     for (const t of (w._filoTabs && w._filoTabs.tabs) || []) {
-      try { if (t.formDirty && t.view.webContents.id === wcId) return t; } catch (_) {}
+      try { if (t.formDirty && t.view.webContents.id === wcId) return { tab: t, inVista: w._filoTabs.activeId === t.id }; } catch (_) {}
     }
   }
   return null;
 }
 Cookies.osservaRichieste((d) => {
   if (!d || !d.webContentsId || !RICHIESTE_CON_TESTO.has(d.resourceType)) return;
-  const tab = schedaConTestoDi(d.webContentsId);
-  if (!tab) return;
+  const trovata = schedaConTestoDi(d.webContentsId);
+  if (!trovata) return;
+  const { tab, inVista } = trovata;
   let da = '';
   try { da = (d.frame && d.frame.url) || ''; } catch (_) {}
   const sito = Cookies.registrableOf(d.url);
@@ -2768,16 +2772,9 @@ Cookies.osservaRichieste((d) => {
     const testo = testoDellaRichiesta(d);
     if (!testo) return;
     const type = globalThis.SN_MSG?.MSG?.FORM_SENT || 'form_sent';
-    let wc = null;
-    let pagina = '';
-    try { wc = tab.view.webContents; pagina = wc.getURL(); } catch (_) { return; }
-    for (const f of wc.mainFrame.framesInSubtree || []) {
-      try {
-        if (f.detached || Cookies.registrableOf(f.url) !== sito) continue;
-        const m = messaggioPerDestinazione({ type, testo }, f.url, pagina, { riquadro: Boolean(f.parent) });
-        if (m) f.send('filo:broadcast', m);
-      } catch (_) {}
-    }
+    try {
+      spingiAllaScheda(tab.view.webContents, { type, testo }, { inVista, soloFrame: (url) => Cookies.registrableOf(url) === sito });
+    } catch (_) {}
   });
 });
 

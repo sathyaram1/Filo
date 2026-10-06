@@ -522,9 +522,9 @@
     setTimeout(() => send({ scrollPct: Math.round(scrollPct()) }), 600);
   }
 
-  // Testo scritto dall'utente e non ancora inviato: finché ce n'è la pulizia non chiude la
-  // scheda (#824). Conta solo il testo nato da un gesto dell'utente (o scritto da Filo per lui),
-  // e lo segue per contenuto quando la pagina lo sposta. Porte: tests/tab-auto-archive.spec.mjs.
+  // Testo scritto dall'utente e non ancora inviato: finché ce n'è la pulizia non chiude la scheda
+  // (#824). Conta il testo nato da un gesto (o scritto da Filo per lui), seguito per contenuto; è
+  // partito quando una richiesta lo porta al suo sito (src/main/tabs.js). Porte: tests/tab-auto-archive.spec.mjs.
   function startFormTracker() {
     if (/^filo:\/\/(options|preferences)\//i.test(location.href)) return;
     const PAGINA_DI_FILO = /^filo:/i.test(location.href);
@@ -536,8 +536,10 @@
     // Componenti chiusi in cui è arrivata una scrittura: il testo lì dentro non si legge.
     const opachi = new Set();
     // Testo di un campo tolto dalla pagina: la pagina può tenerlo in memoria (il passo dopo di una
-    // procedura), quindi protegge finché non ricompare in un campo (adottato) o nella pagina (pubblicato).
+    // procedura, il riepilogo), quindi protegge finché non ricompare in un campo o non parte. { t, righe }
     const orfani = [];
+    // Le righe di ogni area all'ultima rilettura: tolta dalla pagina, un editor non le dà più.
+    const righeViste = new WeakMap();
     // Impronte dei testi lunghi mandati al server: la risposta può rimetterli in un campo.
     const partiti = new Set();
     let ultimoMandato = null;
@@ -622,14 +624,36 @@
       // Un componente chiuso tolto dalla pagina non dice se il testo è ricomparso: resta protetto.
       return daInviare || opachi.size > 0 || orfani.length > 0;
     }
+    function righeDi(area) {
+      let s = '';
+      try { s = area.isContentEditable ? area.innerText || area.textContent || '' : testo(area); } catch (_) { s = testo(area); }
+      return s.split(/\r\n|\r|\n/).map(pulito).filter(Boolean);
+    }
     function lascia(area, base) {
       aree.delete(area);
       // Una password non è una bozza: dopo un accesso fatto senza cambiare pagina proteggerebbe per sempre.
       if (/^input$/i.test(area.tagName) && String(area.type).toLowerCase() === 'password') return;
       const t = pulito(testo(area));
-      if (!t || t === pulito(base) || orfani.includes(t)) return;
-      orfani.push(t);
+      if (!t || t === pulito(base) || orfani.some((o) => o.t === t)) return;
+      const viste = righeViste.get(area);
+      orfani.push({ t, righe: viste && viste.join('') === t ? viste : [t] });
       if (orfani.length > 100) orfani.shift();
+    }
+    // Una riga è partita se la richiesta la porta; il testo intero conta anche se il sito ne ha
+    // cambiato gli a capo.
+    function partito(inviato) {
+      if (typeof inviato !== 'string' || !inviato) return;
+      const dentro = (t, righe) => inviato.includes(t) || (righe.length > 0 && righe.every((r) => inviato.includes(r)));
+      // Il campo può sparire mentre la richiesta è in viaggio: prima diventa un orfano, poi si cerca.
+      stato();
+      for (const area of [...aree.keys()]) {
+        if (!viva(area)) continue;
+        const ora = testo(area);
+        const t = pulito(ora);
+        if (t && dentro(t, righeDi(area))) aree.set(area, ora);
+      }
+      for (let i = orfani.length - 1; i >= 0; i--) if (dentro(orfani[i].t, orfani[i].righe)) orfani.splice(i, 1);
+      aggiorna(false);
     }
     function impronta(s) {
       let h1 = 0xdeadbeef;
@@ -702,10 +726,15 @@
     }
     function aRiposo() {
       clearTimeout(rilettura);
-      rilettura = setTimeout(() => { stato(); ricomparsi(); aggiorna(false); mandaImpronte(); }, 400);
+      rilettura = setTimeout(() => {
+        stato();
+        for (const area of aree.keys()) righeViste.set(area, righeDi(area));
+        adotta(null);
+        aggiorna(false);
+        mandaImpronte();
+      }, 400);
     }
     function scritto(area, base) {
-      inAttesa.delete(area);
       if (!aree.has(area)) aree.set(area, base);
       if (area.tagName.toUpperCase() === 'TEXTAREA' || area.isContentEditable) lunghe.add(area);
       aggiorna(true);
@@ -743,30 +772,19 @@
       setTimeout(() => aggiorna(true), 0);
     }
 
-    // Chi invia davvero lascia la pagina. Se la pagina trattiene l'invio, un
-    // rifiuto (campo mancante) e un invio via script si somigliano: un modulo di
-    // una riga conta come inviato; in uno più lungo ogni campo resta da proteggere
-    // finché la pagina non lo svuota, non lo toglie o non ne mostra il testo (i risultati).
-    const inAttesa = new WeakSet();
-    function soloUnaRiga(form) {
-      const campi = [...(form.elements || [])].filter((el) => campoDiTesto(el));
-      return campi.length <= 1 && !campi.some((el) => el.tagName.toUpperCase() === 'TEXTAREA')
-        && !(form.querySelector && form.querySelector('[contenteditable=""], [contenteditable="true"]'));
-    }
+    // Chi invia davvero lascia la pagina. Se la pagina trattiene l'invio, un rifiuto e un invio
+    // via script si somigliano: lì decide se il testo esce verso il sito (partito).
     function onSubmit(e) {
       const form = e.target;
       if (!form || !aree.size) return;
       mandaImpronte();
       setTimeout(() => {
-        if (!e.defaultPrevented || soloUnaRiga(form)) {
-          for (const [a, base] of [...aree]) {
-            if (a.form !== form && !(form.contains && form.contains(a))) continue;
-            const t = !e.defaultPrevented && lunghe.has(a) ? pulito(testo(a)) : '';
-            if (t && t !== pulito(base)) partiti.add(impronta(t));
-            aree.delete(a);
-          }
-        } else {
-          for (const a of aree.keys()) if (a.form === form || (form.contains && form.contains(a))) inAttesa.add(a);
+        if (e.defaultPrevented) return;
+        for (const [a, base] of [...aree]) {
+          if (a.form !== form && !(form.contains && form.contains(a))) continue;
+          const t = lunghe.has(a) ? pulito(testo(a)) : '';
+          if (t && t !== pulito(base)) partiti.add(impronta(t));
+          aree.delete(a);
         }
         aggiorna(false);
         mandaImpronte();
@@ -801,7 +819,7 @@
           if (!area || aree.has(area) || area.readOnly || area.disabled || diRicerca(area) || diFilo(area)) continue;
           const t = pulito(testo(area));
           if (!t) continue;
-          const o = orfani.findIndex((x) => x === t || (x.length >= 20 && t.includes(x)));
+          const o = orfani.findIndex((x) => x.t === t || (x.t.length >= 20 && t.includes(x.t)));
           if (o < 0 && !cercate.has(impronta(t))) continue;
           if (o >= 0) orfani.splice(o, 1);
           aree.set(area, '');
@@ -809,31 +827,6 @@
         }
       }
     }
-    // Il testo dei campi non conta (lo guarda adotta), né quello degli script della pagina.
-    const NON_PAGINA = /^(script|style|noscript|template|textarea)$/i;
-    const fuoriPagina = (p) => !!p && (NON_PAGINA.test(p.tagName) || p.isContentEditable);
-    function testoDellaPagina() {
-      const pezzi = [];
-      for (const doc of documenti(document)) for (const r of radici(doc)) {
-        const w = doc.createTreeWalker(r, NodeFilter.SHOW_TEXT, {
-          acceptNode: (n) => (fuoriPagina(n.parentElement) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
-        });
-        for (let n = w.nextNode(); n; n = w.nextNode()) pezzi.push(n.data);
-      }
-      return pulito(pezzi.join(''));
-    }
-    function ricomparsi() {
-      if (orfani.length) adotta(null);
-      const mostrabili = [...aree.keys()].filter((a) => inAttesa.has(a) && viva(a));
-      if (!orfani.length && !mostrabili.length) return;
-      const pagina = testoDellaPagina();
-      for (let i = orfani.length - 1; i >= 0; i--) if (pagina.includes(orfani[i])) orfani.splice(i, 1);
-      for (const a of mostrabili) {
-        const t = pulito(testo(a));
-        if (t && pagina.includes(t)) aree.delete(a);
-      }
-    }
-
     // I riquadri senza indirizzo proprio (gli editor classici scritti dalla pagina)
     // non caricano Filo: li segue il documento che li contiene. Riaggiungere gli
     // ascoltatori non li duplica, e dopo un document.open() li rimette.
@@ -903,10 +896,11 @@
       mandaImpronte();
     });
     chrome.runtime.onMessage.addListener((msg) => {
+      if (msg && msg.type === MSG.FORM_SENT) { try { partito(msg.testo); } catch (_) {} return; }
       if (!msg || msg.type !== MSG.FORM_RECHECK) return;
       osserva(window);
       stato();
-      try { adotta(msg.impronte); ricomparsi(); } catch (_) {}
+      try { adotta(msg.impronte); } catch (_) {}
       manda(stato(), false);
       mandaImpronte();
     });
