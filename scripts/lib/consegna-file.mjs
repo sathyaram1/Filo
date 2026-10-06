@@ -34,6 +34,14 @@ export function immagineSuFile(voce, scriviByte) {
   if (Number.isFinite(voce.byte) && byte.length !== voce.byte) {
     return { ...resto, errore: `immagine arrivata incompleta (${byte.length} byte invece di ${voce.byte})` };
   }
+  // Chi lavora apre le immagini con uno strumento che non legge le bmp: arrivano rifatte png.
+  if (voce.tipo === 'image/bmp') {
+    let rifatta;
+    try { rifatta = bmpInPng(byte); } catch (e) {
+      return { ...resto, errore: `immagine bmp che non si apre: ${e.message}` };
+    }
+    return { ...resto, tipo: 'image/png', byte: rifatta.length, convertitaDa: 'image/bmp', file: scriviByte(`immagine-${voce.id}`, rifatta, 'png') };
+  }
   return { ...resto, file: scriviByte(`immagine-${voce.id}`, byte, ESTENSIONE_IMMAGINE[voce.tipo] || 'bin') };
 }
 
