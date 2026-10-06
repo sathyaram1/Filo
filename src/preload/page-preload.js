@@ -247,7 +247,60 @@ const broadcastListeners = new Set();
 // c'è ancora (i moduli condivisi si caricano dopo): il valore letterale è
 // l'unico modo, ed è lo stesso trucco della consegna delle scorciatoie.
 const WAKE_BROADCASTS = new Set(['frame_translate']);
+
+// #503 — il giudizio di chi ospita il riquadro, arrivato per lettera dalla finestra madre (translatePage.js lo
+// scrive con la stessa chiave). Un riquadro che lei non vede non si sveglia, non risponde al conto e non si paga.
+const VERDETTO_ATTESA_MS = 1500;
+const verdettiRiquadro = new Map();
+const inAttesaDiVerdetto = new Set();
+function riquadriFigli() {
+  try { return Array.from(document.querySelectorAll('iframe, frame')); } catch (_) { return []; }
+}
+if (IS_SUBFRAME) try {
+  window.addEventListener('message', (e) => {
+    const d = e && e.data;
+    if (!d || typeof d !== 'object' || d.filoFrameVerdict !== 1 || e.source !== window.parent) return;
+    const runId = typeof d.runId === 'string' ? d.runId.slice(0, 64) : '';
+    if (!runId) return;
+    const visto = d.visible === true;
+    verdettiRiquadro.delete(runId);
+    verdettiRiquadro.set(runId, visto);
+    if (verdettiRiquadro.size > 20) verdettiRiquadro.delete(verdettiRiquadro.keys().next().value);
+    // Nascosto io, nascosti quelli dentro di me: nessuno qui dentro può farsi vedere.
+    if (!visto) {
+      for (const f of riquadriFigli()) {
+        try { f.contentWindow.postMessage({ filoFrameVerdict: 1, runId, visible: false }, '*'); } catch (_) {}
+      }
+    }
+    for (const fn of inAttesaDiVerdetto) fn();
+  });
+} catch (_) { /* mai bloccare il caricamento della pagina */ }
+
+// Senza un giudizio entro l'attesa (chi ospita non ha Filo dentro) vale quello di prima: si traduce.
+function conVerdetto(runId, fn) {
+  if (verdettiRiquadro.has(runId)) { fn(verdettiRiquadro.get(runId)); return; }
+  let fatto = false;
+  const chiudi = (visto) => {
+    if (fatto) return;
+    fatto = true;
+    inAttesaDiVerdetto.delete(guarda);
+    clearTimeout(timer);
+    fn(visto);
+  };
+  const guarda = () => { if (verdettiRiquadro.has(runId)) chiudi(verdettiRiquadro.get(runId)); };
+  const timer = setTimeout(() => chiudi(true), VERDETTO_ATTESA_MS);
+  inAttesaDiVerdetto.add(guarda);
+}
+
 ipcRenderer.on('filo:broadcast', (_event, msg) => {
+  if (IS_SUBFRAME && msg && msg.type === 'frame_translate' && msg.mode !== 'restore') {
+    conVerdetto(String(msg.runId || ''), (visto) => { if (visto) consegnaBroadcast(msg); });
+    return;
+  }
+  consegnaBroadcast(msg);
+});
+
+function consegnaBroadcast(msg) {
   const deliver = () => {
     for (const fn of broadcastListeners) {
       try { fn(msg, { id: 'filo-desktop' }, () => {}); } catch (e) { console.warn('[Filo CS] listener err', e); }
