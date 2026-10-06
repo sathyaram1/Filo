@@ -3393,6 +3393,8 @@
       const r = await sendToMain({ type: 'feedback_update', id, waitsFor: lette.numeri.join(', ') });
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
       fb.waitsFor = Array.isArray(r.waitsFor) && r.waitsFor.length ? r.waitsFor : undefined;
+      // Tolta l'ultima, la casella si chiude: non c'è più niente da guardare.
+      if (!fb.waitsFor && atteseApertePer === id) atteseApertePer = '';
       renderList();
       if (selectedId === id) reflectAttese(fb);
       const dove = MR.manageTabFor(fb, opzSezioni());
