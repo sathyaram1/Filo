@@ -70,4 +70,13 @@ function looksLike(a, b) {
   return sa.length > 0 && sa === sb;
 }
 
-module.exports = { skeleton, looksLike, MAP };
+// Come un nome si legge a schermo, separatori compresi: i prototipi di MAP più i sosia di due lettere (rn→m, vv→w).
+// Unica lettura per la regola del marchio, all'apertura come dal tasto destro (#732): due letture divergono su un sosia.
+function leggiSosia(s) {
+  if (!s || typeof s !== 'string') return '';
+  let out = '';
+  for (const ch of s.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase()) out += MAP.get(ch) || ch;
+  return out.replace(/rn/g, 'm').replace(/vv/g, 'w');
+}
+
+module.exports = { skeleton, looksLike, leggiSosia, MAP };
