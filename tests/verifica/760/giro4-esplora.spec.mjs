@@ -12,6 +12,7 @@ async function serve() {
       res.end(`<!doctype html><meta charset="utf-8"><body style="margin:0;font:15px sans-serif">${corpo}`);
     };
     const conCookie = { 'Set-Cookie': ['vista=1; Max-Age=86400; Path=/; SameSite=None; Secure'] };
+    if (u.pathname === '/vuota') { html('<p>home</p>'); return; }
     if (u.pathname === '/due') {
       const ri = (id) => `<iframe id="${id}" width="400" height="220" style="border:0" src="http://b.localhost:${porta}/post?n=${id}"></iframe>`;
       html(`<p>articolo</p>${ri('r1')}<p>mezzo</p>${ri('r2')}`);
@@ -104,11 +105,27 @@ test('B ricarica della pagina con un riquadro sconosciuto rotto', async ({ app, 
     await prepara(app);
     const page = await openTab(srv.url('art?h=cosmo&p=vuoto'));
     await expect.poll(async () => (await proposte(app, 'a.localhost')).length, { timeout: 30_000 }).toBe(1);
+    console.log('B chiamate prima:', await chiamate(app));
     await page.reload();
+    await page.waitForTimeout(15000);
+    console.log('B dopo ricarica: proposte', (await proposte(app, 'a.localhost')).length, 'chiamate', await chiamate(app));
+    const ftn = await app.evaluate(({ webContents }) => webContents.getAllWebContents().map((w) => { try { return w.mainFrame.framesInSubtree.map((f) => f.frameTreeNodeId + ' ' + f.url); } catch (_) { return []; } }));
+    console.log('B frames', JSON.stringify(ftn));
+  } finally { await srv.chiudi(); }
+});
+
+test('B2 ricarica della pagina con un servizio noto rotto', async ({ app, openTab }) => {
+  const srv = await serve();
+  try {
+    await prepara(app);
+    const page = await openTab(srv.url('art?h=b&p=post'));
     await expect.poll(async () => (await proposte(app, 'a.localhost')).length, { timeout: 30_000 }).toBe(1);
     await page.reload();
-    await expect.poll(async () => (await proposte(app, 'a.localhost')).length, { timeout: 30_000 }).toBe(1);
-    console.log('B chiamate dopo 2 ricariche:', await chiamate(app));
+    await page.waitForTimeout(12000);
+    console.log('B2 dopo ricarica: proposte', (await proposte(app, 'a.localhost')).length);
+    await page.goto(srv.url('art?h=b&p=post&altro=1'));
+    await page.waitForTimeout(12000);
+    console.log('B2 altra pagina: proposte', (await proposte(app, 'a.localhost')).length);
   } finally { await srv.chiudi(); }
 });
 
@@ -125,3 +142,24 @@ test('C riquadro dentro un involucro di un altro sito', async ({ app, openTab })
     await expect(page.frameLocator('#ri').frameLocator('iframe').locator('#ok')).toBeVisible({ timeout: 10_000 });
   } finally { await srv.chiudi(); }
 });
+
+const ftns = (app) => app.evaluate(({ webContents }) => webContents.getAllWebContents().flatMap((w) => { try { return w.mainFrame.framesInSubtree.filter((f) => /localhost/.test(f.url)).map((f) => f.frameTreeNodeId + ' ' + f.url); } catch (_) { return []; } }));
+
+test('D navigazione nella stessa scheda', async ({ app, openTab }) => {
+  const srv = await serve();
+  try {
+    await prepara(app);
+    const page = await openTab(srv.url('vuota'));
+    await page.waitForTimeout(1500);
+    await page.goto(srv.url('art?h=b&p=post'));
+    await page.waitForTimeout(12000);
+    console.log('D1 dopo navigazione da pagina senza riquadri: proposte', (await proposte(app, 'a.localhost')).length, JSON.stringify(await ftns(app)));
+    await page.goto(srv.url('art?h=cosmo&p=vuoto'));
+    await page.waitForTimeout(15000);
+    console.log('D2 poi un articolo con servizio sconosciuto: proposte', (await proposte(app, 'a.localhost')).length, 'chiamate', await chiamate(app), JSON.stringify(await ftns(app)));
+    await page.goto(srv.url('art?h=b&p=post&x=2'));
+    await page.waitForTimeout(12000);
+    console.log('D3 poi un altro articolo del servizio noto: proposte', (await proposte(app, 'a.localhost')).length, JSON.stringify(await ftns(app)));
+  } finally { await srv.chiudi(); }
+});
+
