@@ -834,6 +834,7 @@
       case 'timerRingtone': return $('timerRingtone').value || 'default';
       case 'terminal.enabled': return $('terminalEnabled').checked;
       case 'nomiSensati.scaricamenti': return $('nomiSensatiScaricamenti').checked;
+      case 'aggiornamenti.automatici': return $('aggiornamentiAutomatici').checked;
       case 'terminal.shell': return $('terminalShell').value;
       case 'tts.voice': return $('ttsVoice').value || '';
       case 'tts.rate': return parseFloat($('ttsRate').value) || 1;
@@ -874,6 +875,7 @@
       case 'timerRingtone': return s.timerRingtone || 'default';
       case 'terminal.enabled': return !!(s.terminal && s.terminal.enabled === true);
       case 'nomiSensati.scaricamenti': return !!(s.nomiSensati && s.nomiSensati.scaricamenti === true);
+      case 'aggiornamenti.automatici': return !(s.aggiornamenti && s.aggiornamenti.automatici === false);
       case 'terminal.shell': return (s.terminal && s.terminal.shell) || '';
       case 'tts.voice': return tts.voice || '';
       case 'tts.rate': return Number(tts.rate) || 1;
@@ -979,6 +981,7 @@
     const terminal = settings.terminal || {};
     if (vuole('terminal.enabled')) $('terminalEnabled').checked = terminal.enabled === true;
     if (vuole('nomiSensati.scaricamenti')) $('nomiSensatiScaricamenti').checked = !!(settings.nomiSensati && settings.nomiSensati.scaricamenti === true);
+    if (vuole('aggiornamenti.automatici')) $('aggiornamentiAutomatici').checked = !(settings.aggiornamenti && settings.aggiornamenti.automatici === false);
     if (vuole('terminal.shell')) {
       const sel = $('terminalShell');
       const suWindows = shellDiWindows();
@@ -1159,6 +1162,12 @@
       : { ...(settings.tabColor || {}) };
     buildTabColorSection();
     caricato = true;
+    // La sezione chiesta dall'indirizzo (la carta dell'aggiornamento manda a #sec-aggiornamenti) si raggiunge solo
+    // adesso: le sezioni costruite qui sopra l'hanno spostata in giù dopo lo scorrimento del browser.
+    try {
+      const sezione = location.hash && document.getElementById(decodeURIComponent(location.hash.slice(1)));
+      if (sezione) sezione.scrollIntoView();
+    } catch (_) {}
   }
 
   // Un cambio arrivato da altrove: si riscrive solo quello che è davvero
@@ -1217,6 +1226,7 @@
     $('riassuntoSchede').addEventListener('change', persist);
     $('terminalEnabled').addEventListener('change', persist);
     $('nomiSensatiScaricamenti').addEventListener('change', persist);
+    $('aggiornamentiAutomatici').addEventListener('change', persist);
     $('terminalShell').addEventListener('change', persist);
 
     // Lettura ad alta voce: la lista voci può popolarsi in ritardo.

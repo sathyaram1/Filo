@@ -130,6 +130,8 @@
     // I siti (dominio registrabile) dove Filo ha visto un campo password o carta: restano delicati anche dopo un
     // riavvio, quando la scheda riaperta è già dentro l'area riservata e il campo non c'è più (#1004).
     SITI_CON_CAMPI: 'filo_siti_con_campi',
+    // { versione } su cui l'utente ha premuto «Installa» da spento (#786): vale anche dopo un riavvio a metà scaricamento.
+    AGGIORNAMENTO_CHIESTO: 'filo_aggiornamento_chiesto',
     // Ultima versione di cui l'utente ha visto il recap aggiornamento (popup
     // all'avvio). All'avvio si confronta con app.getVersion(): se è più vecchia
     // e ci sono note (src/shared/patchNotes.js), mostra il recap. Vedi C4.
@@ -2338,6 +2340,8 @@
     // #950 — nome sensato da solo agli scaricamenti col nome che non dice niente. Spento: il contenuto del file
     // andrebbe a un modello senza che l'utente l'abbia chiesto per quel file.
     nomiSensati: { scaricamenti: false },
+    // #786 — spento, Filo controlla ma non scarica né installa: avvisa in home e aspetta «Installa».
+    aggiornamenti: { automatici: true },
     // Colore identità delle tab (spec "Colore identità delle tab"): i sei
     // parametri che governano come si estrae il colore dal favicon e quanto
     // tinge la tab. La fonte di verità dei default/range/commenti è

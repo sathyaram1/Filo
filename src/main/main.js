@@ -73,6 +73,7 @@ if (process.env.NODE_ENV === 'test') {
     globalThis.__filoProxyTab = require('./services/proxyTab');
     globalThis.__filoShortcuts = require('./shortcuts');
     globalThis.__filoAuth = require('./auth/google-auth');
+    globalThis.__filoUpdater = require('./updater');
   } catch (_) {}
 }
 

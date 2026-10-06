@@ -1004,6 +1004,7 @@ async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
     }
   } catch (_) {}
   try { require('./fingerprint').setMode(merged); } catch (_) {}
+  try { require('../updater').seguiImpostazioni(merged); } catch (_) {}
   wireSafebrowse(merged).catch(() => {});
   try {
     const Cookies = require('./cookies');
@@ -2535,6 +2536,12 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         const r = await Registro.annulla(idDelCambio(action), { via: assistente ? 'assistente' : 'chat' });
         if (!r.ok) return { executed: false, kept: false, output: { error: r.motivo, ...(r.id ? { id: r.id } : {}) } };
         return { executed: true, kept: false, output: { annullato: r.id, frase: r.frase, saltati: r.saltati || [] } };
+      }
+      case 'INSTALLA_AGGIORNAMENTO': {
+        // #786 — la stessa porta di «Installa» sulla carta della home.
+        const r = await require('../updater').installaAggiornamento();
+        if (!r.ok) return { executed: false, kept: false, output: { error: r.error } };
+        return { executed: true, kept: false, output: { aggiornamento: r.stato, versione: r.versione, ...(r.errore ? { error: r.errore } : {}) } };
       }
       case 'VOLUME':
       case 'BLUETOOTH':
