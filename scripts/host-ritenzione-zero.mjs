@@ -3,12 +3,13 @@
 // Esce 2 se un predefinito resta senza host: coi crediti di Filo quella funzione si fermerebbe per tutti.
 
 import { createRequire } from 'node:module';
+import './lib/freno-letture.mjs';
 
 const require = createRequire(import.meta.url);
 require('../src/shared/constants.js');
-require('../src/main/services/providers/openrouter.js');
 const C = globalThis.SN_CONST;
-const OR = globalThis.SN_PROVIDER_OPENROUTER;
+const MODELS_ENDPOINT = 'https://openrouter.ai/api/v1/models';
+const ZDR_ENDPOINT = 'https://openrouter.ai/api/v1/endpoints/zdr';
 
 const FIRESTORE = 'https://firestore.googleapis.com/v1/projects/filo-8b9cb/databases/(default)/documents/config/models';
 
@@ -57,13 +58,13 @@ for (const [action, chain] of Object.entries(doc.models || {})) {
   }
 }
 
-const zdrMap = OR.parseZdrCatalog(await json(OR.ZDR_ENDPOINT));
+const zdrMap = C.zdrCatalogFrom(await json(ZDR_ENDPOINT));
 if (!zdrMap) throw new Error('catalogo a ritenzione zero illeggibile: la forma della risposta non è quella attesa');
 
 let senzaHost = 0;
 for (const [id, actions] of useBy) {
   if (C.producerOnlyRule(id)) { console.log(`${id}: solo dal produttore, la ritenzione zero non si applica`); continue; }
-  const data = await json(`${OR.MODELS_ENDPOINT}/${id}/endpoints`);
+  const data = await json(`${MODELS_ENDPOINT}/${id}/endpoints`);
   const endpoints = ((data.data && data.data.endpoints) || []).map((e) => ({
     name: e.provider_name || '', tag: e.tag || '', speed: speed(e),
   }));

@@ -144,13 +144,20 @@ test('complete: providerRouting.ignore finisce in body.provider.ignore', async (
   assert.equal(res.servedBy, 'DeepInfra');
 });
 
-test('complete: senza providerRouting nessun blocco provider (retro-compat)', async () => {
-  const sent = {};
-  await withFetch(
-    (url, opts) => { Object.assign(sent, JSON.parse(opts.body)); return Promise.resolve(jsonResponse({ choices: [{ message: { content: 'ok' } }], usage: {} })); },
-    () => OpenRouter.complete({ apiKey: 'k', model: 'x/y', messages: [{ role: 'user', content: 'x' }] }),
-  );
-  assert.equal(sent.provider, undefined);
+test('complete: senza providerRouting nessun blocco provider con la chiave propria; coi crediti solo la ritenzione zero', async () => {
+  globalThis.SN_WALLET_MAIN = { keySourceOf: async (k) => (k === 'own' ? 'own' : 'personal') };
+  try {
+    for (const [apiKey, atteso] of [['own', undefined], ['personal', { zdr: true }]]) {
+      const sent = {};
+      await withFetch(
+        (url, opts) => { Object.assign(sent, JSON.parse(opts.body)); return Promise.resolve(jsonResponse({ choices: [{ message: { content: 'ok' } }], usage: {} })); },
+        () => OpenRouter.complete({ apiKey, model: 'x/y', messages: [{ role: 'user', content: 'x' }] }),
+      );
+      assert.deepEqual(sent.provider, atteso, apiKey);
+    }
+  } finally {
+    delete globalThis.SN_WALLET_MAIN;
+  }
 });
 
 test('streamComplete: ignore nel body e servedBy estratto dallo stream', async () => {

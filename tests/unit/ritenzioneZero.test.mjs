@@ -191,12 +191,12 @@ test('voce e dettatura: senza host a ritenzione zero non parte niente, e l\'erro
 });
 
 test('il catalogo a ritenzione zero: si legge nelle forme note, e una forma ignota vale come non saputo', () => {
-  const m = OR.parseZdrCatalog({ data: [
+  const m = C.zdrCatalogFrom({ data: [
     { name: 'DeepInfra | z-ai/glm-5.3-flash', provider_name: 'DeepInfra', tag: 'deepinfra/fp8' },
     { model_id: 'Moonshotai/Kimi-K3', provider_name: 'Parasail', tag: 'parasail' },
   ] });
   assert.deepEqual(m.get('z-ai/glm-5.3-flash'), [{ name: 'DeepInfra', tag: 'deepinfra/fp8' }]);
   assert.deepEqual(m.get('moonshotai/kimi-k3'), [{ name: 'Parasail', tag: 'parasail' }]);
-  assert.equal(OR.parseZdrCatalog({ data: [{ provider_name: 'X' }] }), null);
-  assert.equal(OR.parseZdrCatalog(null), null);
+  assert.equal(C.zdrCatalogFrom({ data: [{ provider_name: 'X' }] }), null);
+  assert.equal(C.zdrCatalogFrom(null), null);
 });

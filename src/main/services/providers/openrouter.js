@@ -583,32 +583,6 @@
   const ZDR_ENDPOINT = `${MODELS_ENDPOINT.replace(/\/models$/, '')}/endpoints/zdr`;
   let zdrCache = { until: 0, map: null, pending: null };
 
-  function zdrModelId(e) {
-    for (const v of [e.model_id, e.modelId, e.model, e.model_slug]) {
-      if (typeof v === 'string' && v.includes('/')) return v.trim().toLowerCase();
-    }
-    const m = typeof e.name === 'string' ? /\|\s*([^|\s]+\/[^|\s]+)\s*$/.exec(e.name) : null;
-    return m ? m[1].toLowerCase() : '';
-  }
-
-  // Un elenco da cui non si ricava nessun modello non dice «nessuno a ritenzione zero»: dice che la forma
-  // non è quella attesa, e vale come non saputo.
-  function parseZdrCatalog(data) {
-    const list = Array.isArray(data) ? data : Array.isArray(data && data.data) ? data.data
-      : Array.isArray(data && data.data && data.data.endpoints) ? data.data.endpoints : [];
-    const map = new Map();
-    for (const e of list) {
-      if (!e || typeof e !== 'object') continue;
-      const id = zdrModelId(e);
-      const name = typeof e.provider_name === 'string' ? e.provider_name.trim() : '';
-      const tag = typeof e.tag === 'string' ? e.tag.trim() : '';
-      if (!id || (!name && !tag)) continue;
-      if (!map.has(id)) map.set(id, []);
-      map.get(id).push({ name, tag });
-    }
-    return map.size ? map : null;
-  }
-
   async function zdrCatalog({ apiKey } = {}) {
     if (zdrCache.pending) return zdrCache.map || zdrCache.pending;
     if (Date.now() < zdrCache.until) return zdrCache.map;
@@ -616,7 +590,8 @@
     zdrCache.pending = fetch(ZDR_ENDPOINT, { headers, signal: AbortSignal.timeout(HOSTS_TIMEOUT_MS) })
       .then(async (res) => {
         if (!res.ok) throw new Error(`OpenRouter zdr ${res.status}`);
-        return parseZdrCatalog(await res.json());
+        const C = global.SN_CONST;
+        return C && typeof C.zdrCatalogFrom === 'function' ? C.zdrCatalogFrom(await res.json()) : null;
       })
       .then((map) => {
         zdrCache.map = map || zdrCache.map;
@@ -862,7 +837,7 @@
   global.SN_PROVIDER_OPENROUTER = {
     listModels, complete, streamComplete, reasoningField, providerBlock, extractServedBy,
     cachedPromptTokens, synthesizeSpeech, transcribe, embed, lookupServedBy, keyInfo, fetchWithKey,
-    modelHosts, forgetModelHosts, forgetReasoningRefusals, withZdr, zdrApplies, zdrHostsOf, parseZdrCatalog,
+    modelHosts, forgetModelHosts, forgetReasoningRefusals, withZdr, zdrApplies, zdrHostsOf,
     createToolCallAccumulator, createReasoningDetailsAccumulator, toolsFields,
     ENDPOINT, MODELS_ENDPOINT, ZDR_ENDPOINT, SPEECH_ENDPOINT, TRANSCRIPTIONS_ENDPOINT, EMBEDDINGS_ENDPOINT, GENERATION_ENDPOINT, AUTH_KEY_ENDPOINT, CREDITS_ENDPOINT,
   };

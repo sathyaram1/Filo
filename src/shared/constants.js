@@ -648,6 +648,32 @@
     return '';
   }
 
+  // Il catalogo degli host a ritenzione zero (GET /endpoints/zdr) → Map(id modello → [{ name, tag }]). Un elenco da
+  // cui non si ricava nessun modello vale come non saputo (null), non come «nessuno»: la forma non è quella attesa. PURA.
+  function zdrModelId(e) {
+    for (const v of [e.model_id, e.modelId, e.model, e.model_slug]) {
+      if (typeof v === 'string' && v.includes('/')) return v.trim().toLowerCase();
+    }
+    const m = typeof e.name === 'string' ? /\|\s*([^|\s]+\/[^|\s]+)\s*$/.exec(e.name) : null;
+    return m ? m[1].toLowerCase() : '';
+  }
+
+  function zdrCatalogFrom(data) {
+    const list = Array.isArray(data) ? data : Array.isArray(data && data.data) ? data.data
+      : Array.isArray(data && data.data && data.data.endpoints) ? data.data.endpoints : [];
+    const map = new Map();
+    for (const e of list) {
+      if (!e || typeof e !== 'object') continue;
+      const id = zdrModelId(e);
+      const name = typeof e.provider_name === 'string' ? e.provider_name.trim() : '';
+      const tag = typeof e.tag === 'string' ? e.tag.trim() : '';
+      if (!id || (!name && !tag)) continue;
+      if (!map.has(id)) map.set(id, []);
+      map.get(id).push({ name, tag });
+    }
+    return map.size ? map : null;
+  }
+
   // I tempi del microfono delle chat (settings.dictation), dentro limiti che lo lasciano usabile: sotto un
   // secondo di pausa ogni respiro chiude la frase, oltre otto (dieci per annullare) sembra rotto. PURA.
   const DICTATION_LIMITS = Object.freeze({ silenceSec: [1, 8, 2], cancelSec: [0, 10, 2.5] });
@@ -2777,6 +2803,7 @@
     producerOnlyRule,
     servedPolicyViolation,
     hostPolicyViolation,
+    zdrCatalogFrom,
     DICTATION_LIMITS,
     dictationTimes,
     missingExcludedProviders,
