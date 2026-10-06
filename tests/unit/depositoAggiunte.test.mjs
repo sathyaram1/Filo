@@ -11,7 +11,7 @@ import { createRequire } from 'node:module';
 import { readdirSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
-import { costoInUnita } from '../helpers/tempoRelativo.mjs';
+import { spiaDiscoSincrono } from '../helpers/spiaDisco.mjs';
 
 const require = createRequire(import.meta.url);
 const { creaDeposito } = require('../../src/main/services/depositoAggiunte.js');
@@ -60,12 +60,15 @@ test('aggiungere e aggiornare accodano una riga: il file non si riscrive', async
   for (let i = 0; i < 500; i++) d.aggiungi(scheda(i));
   const file = join(cartella, '2026-01.jsonl');
   const prima = readFileSync(file, 'utf8');
-  const c = costoInUnita(() => d.aggiungi(scheda(500)), { tetto: 5, giri: 1 });
-  d.aggiorna('id-0', { summary: 'nuovo riassunto', embedding: [9, 9, 9], embedModel: 'm' });
+  // Contato, non cronometrato: con 500 record un'aggiunta e un aggiornamento sono una riga in coda ciascuno (#1063).
+  const visto = await spiaDiscoSincrono(cartella, () => {
+    d.aggiungi(scheda(500));
+    d.aggiorna('id-0', { summary: 'nuovo riassunto', embedding: [9, 9, 9], embedModel: 'm' });
+  });
+  assert.deepEqual(visto.map(({ n, righe }) => [n, righe]), [['appendFileSync', 1], ['appendFileSync', 1]], JSON.stringify(visto));
   const dopo = readFileSync(file, 'utf8');
   assert.ok(dopo.startsWith(prima), 'le righe di prima restano identiche, in testa al file');
   assert.equal(dopo.slice(prima.length).split('\n').filter(Boolean).length, 2);
-  assert.ok(c.entro, `un'aggiunta con 500 record presenti costa ${c.come}`);
   const r = await riapri(cartella);
   assert.equal(r.prendi('id-0').summary, 'nuovo riassunto');
   assert.deepEqual(r.prendi('id-0').embedding, [9, 9, 9]);

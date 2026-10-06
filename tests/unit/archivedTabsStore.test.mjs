@@ -16,6 +16,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import { rapportoFraCosti } from '../helpers/tempoRelativo.mjs';
+import { spiaDiscoSincrono } from '../helpers/spiaDisco.mjs';
 
 const require = createRequire(import.meta.url);
 const userData = cartellaTemporanea('filo-archivio-');
@@ -119,25 +120,6 @@ async function archivioPiccolo() {
   return piccolo;
 }
 
-// Quello che `fn` fa sui file di `cartella`: ogni chiamata sincrona di fs, col nome e le righe scritte. Solo quella più
-// esterna: appendFileSync passa da writeFileSync.
-function spiaDisco(cartella, fn) {
-  const fs = require('node:fs');
-  const visto = [];
-  let dentroUnaChiamata = 0;
-  const dentro = (p) => typeof p === 'string' && p.startsWith(cartella);
-  const nomi = ['appendFileSync', 'writeFileSync', 'renameSync', 'readFileSync', 'unlinkSync', 'openSync'];
-  const veri = Object.fromEntries(nomi.map((n) => [n, fs[n]]));
-  for (const n of nomi) {
-    fs[n] = (p, d, ...r) => {
-      if (dentro(p) && !dentroUnaChiamata) visto.push({ n, righe: typeof d === 'string' ? d.split('\n').length - 1 : 0 });
-      dentroUnaChiamata++;
-      try { return veri[n](p, d, ...r); } finally { dentroUnaChiamata--; }
-    };
-  }
-  return Promise.resolve().then(fn).then(() => visto).finally(() => Object.assign(fs, veri));
-}
-
 test('oltre le 5000 non sparisce niente, e chiudere una scheda resta rapido', async () => {
   for (let i = 0; i < 1200; i++) await A.archive({ url: `https://nuova-${i}.test/`, title: `Nuova ${i}` });
   const lista = await A.list();
@@ -152,7 +134,7 @@ test('oltre le 5000 non sparisce niente, e chiudere una scheda resta rapido', as
 
   // Il disco non dipende dal tempo: con 6200 schede, chiuderne una aggiunge la sua riga e non rilegge né riscrive niente.
   const aggiunte = [];
-  const visto = await spiaDisco(join(userData, 'archivio-schede'),
+  const visto = await spiaDiscoSincrono(join(userData, 'archivio-schede'),
     async () => { aggiunte.push(await A.archive({ url: 'https://una-ancora.test/', title: 'Una ancora' })); });
   assert.deepEqual(visto.map(({ n, righe }) => [n, righe]), [['appendFileSync', 1]], JSON.stringify(visto));
 
