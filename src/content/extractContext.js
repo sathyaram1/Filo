@@ -1315,6 +1315,7 @@
     findTranslatedElements,
     hasRevealedText,
     inlineFrameBody,
+    isHiddenFromUser,
     isFiloOwnUi,
     pageMeta,
     pageExcerpt,
