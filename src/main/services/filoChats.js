@@ -160,14 +160,15 @@
     return Number(chat.triagedCount) !== n;
   }
 
-  // Il testo di una chat cancellata se ne va anche dalle sue copie: registro grezzo, cache e richieste ai modelli.
+  // Il testo di una chat cancellata se ne va anche dalle sue copie: cache, richieste ai modelli, vettori ed esiti
+  // tenuti per il contesto della chat (#868).
   async function dimenticaCopie(chat) {
+    try { global.SN_CONTESTO_FILO?.dimentica(chat.id); } catch (_) {}
+    await global.SN_RICORDI_FILO?.dimentica(chat.id);
     const forme = CA().formeDaDimenticare((chat.messages || []).map((m) => m && m.text));
     if (!forme.length) return;
-    const M = global.SN_FILO_MEMORY;
     const C = global.SN_AI_CACHE;
     const H = global.SN_HISTORY;
-    if (M && M.togliRaw) await M.togliRaw((e) => !!e && /^chat_/.test(String(e.type)) && CA().riguardaChat(e.summary, forme));
     if (C && C.togli) await C.togli((e) => CA().riguardaChat(e, forme));
     if (H && H.redigi) {
       await H.redigi((it) => (CA().riguardaChat([it.input, it.output], forme)
@@ -206,6 +207,8 @@
     if (ids.length) {
       await F().transazione((t) => t.scrivi(ids.map((id) => t.evento(T().CANCELLAZIONE, { chat: id }, { autore: 'utente' }))));
     }
+    try { global.SN_CONTESTO_FILO?.dimentica(null); } catch (_) {}
+    await global.SN_RICORDI_FILO?.dimentica(null).catch(() => {});
     return [];
   }
 

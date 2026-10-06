@@ -499,7 +499,7 @@
     // Un'azione fermata perché avrebbe portato fuori un segreto (#810): si vede anche a blocco chiuso.
     FERMATA: (n) => (n > 1 ? `fermato ${n} azioni` : 'fermato un\'azione'),
     CERCA_WEB: (n) => (n > 1 ? `cercato sul web ${n} volte` : 'cercato sul web'),
-    CERCA_CHAT: (n) => (n > 1 ? `riletto ${n} conversazioni di prima` : 'riletto una conversazione di prima'),
+    CERCA_CHAT: (n) => (n > 1 ? `cercato nel filo ${n} volte` : 'cercato nel filo'),
     LEGGI_DOCUMENTO: (n) => (n > 1 ? `letto ${n} documenti` : 'letto un documento'),
     RINOMINA_FILE: () => 'dato un nome ai file',
     LEGGI_FILE: (n) => (n > 1 ? `letto ${n} file` : 'letto un file'),
@@ -594,6 +594,11 @@
   function pulito(v) {
     return String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, '').trim();
   }
+  // «lunedì 28 set»: il giorno di una conversazione senza titolo.
+  function quandoBreve(ts) {
+    const d = new Date(ts);
+    return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'short' });
+  }
   function frasiCambi(a) {
     const l = Array.isArray(a && a._cambi) ? a._cambi : [];
     return l.map((c) => pulito(c && c.frase)).filter(Boolean).join('; ');
@@ -641,9 +646,15 @@
     // risultati rientrano nel turno successivo, dove compare la risposta.
     CERCA_WEB: (a) => ({ icon: '🔎', text: `Cerco sul web: ${a.query || ''}` }),
     CERCA_CHAT: (a) => {
+      // Ripescati da Filo senza che il modello li chiedesse (#868): si dice da quali conversazioni.
+      if (a._auto) {
+        const r = (a._output && Array.isArray(a._output.results)) ? a._output.results : [];
+        const quali = r.map((x) => pulito(x.title) || quandoBreve(x.date)).filter(Boolean);
+        return { icon: '💬', text: `Ricordato dal filo${quali.length ? ` · ${quali.join('; ')}` : ''}` };
+      }
       const q = String(a.query || a.testo || '').trim();
       if (a.id && !q) return { icon: '💬', text: 'Rileggo una conversazione di prima' };
-      return { icon: '💬', text: `Cerco fra le chat di prima: ${q}` };
+      return { icon: '💬', text: `Cerco nel filo: ${q}` };
     },
     CAPACITA_DETTAGLIO: () => ({ icon: '📖', text: 'Verifico cosa so fare' }),
     LEGGI_IMPOSTAZIONI: (a) => {

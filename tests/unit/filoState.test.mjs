@@ -26,7 +26,7 @@ function baseState(extra = {}) {
     tabs: [],
     timers: [],
     notifications: [],
-    recentActions: [],
+   
     dashboard: null,
     ...extra,
   };
@@ -69,7 +69,7 @@ async function assembleCon({ wallet, locale }) {
   globalThis.SN_CREDITS = { getPublic: async () => ({ balance: locale }) };
   globalThis.SN_FILO_MEMORY = {
     getSession: async () => ({}), listTimers: async () => [], listNotifications: async () => [],
-    getDashboardCache: async () => null, listRaw: async () => [],
+    getDashboardCache: async () => null,
   };
   try {
     const { state, stateText } = await FS.assemble({ creditiFreschi: true });

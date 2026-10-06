@@ -6,7 +6,6 @@
 //   - TAB APERTE (URL/titolo/focus, ultima attività via chrome.tabs)
 //   - PROCESSI ATTIVI (timer, notifiche pending)
 //   - NOTIFICHE NON GESTITE
-//   - AZIONI RECENTI (ultime 24h dal raw log)
 //   - DASHBOARD ATTUALE (cache dell'ultimo output del Generatore Dashboard)
 //
 // Esposto come funzione che ritorna sia l'oggetto strutturato sia un testo
@@ -126,13 +125,12 @@
   async function assemble({ creditiFreschi = false, sistema: conSistema = true } = {}) {
     const Mem = global.SN_FILO_MEMORY;
     const now = new Date();
-    const [tabs, session, timers, notifications, dashboardCache, rawLog, credits, cambi, sistema, autonomia] = await Promise.all([
+    const [tabs, session, timers, notifications, dashboardCache, credits, cambi, sistema, autonomia] = await Promise.all([
       listTabs(),
       Mem.getSession(),
       Mem.listTimers(),
       Mem.listNotifications(),
       Mem.getDashboardCache(),
-      Mem.listRaw({ since: new Date(Date.now() - 24 * 3600 * 1000).toISOString(), limit: 50 }),
       readCredits({ fresco: creditiFreschi }),
       readCambi(),
       conSistema ? readSistema() : Promise.resolve(undefined),
@@ -184,7 +182,6 @@
         text: n.text,
         ageRel: formatRelativeTime(n.ts),
       })),
-      recentActions: rawLog,
       cambi: cambi ? { righe: cambi.righe || [], tolti: cambi.tolti || 0 } : null,
       dashboard: dashboardCache,
       credits,
@@ -363,13 +360,6 @@
     lines.push('NOTIFICHE NON GESTITE');
     if (!state.notifications.length) lines.push('(nessuna)');
     else lines.push(salvati(state.notifications.map((n) => `- [${n.ageRel}] ${n.kind}: ${n.text}`)));
-    lines.push('');
-    lines.push('AZIONI RECENTI (ultime 24h)');
-    if (!state.recentActions.length) lines.push('(nessuna)');
-    else {
-      lines.push(salvati(state.recentActions.slice(0, 30)
-        .map((a) => `- [${formatRelativeTime(a.ts)}] ${a.type}: ${a.summary}`)));
-    }
     lines.push('');
     // Le frasi portano nomi di timer e valori che può aver scritto un modello: recinto come sopra.
     if (state.cambi) {

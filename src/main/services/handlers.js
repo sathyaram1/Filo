@@ -2446,17 +2446,19 @@ async function eseguiAzioneFilo(action, {
               },
             };
           }
+          // #868 — tutto il filo: le conversazioni di ogni scheda (non quella di adesso, che il modello ha già
+          // davanti e ritrovarsela come risultato gliela farebbe raccontare come un ricordo), le pagine visitate e i cambi.
           const all = await FiloChats.list();
-          // Solo le chat CHIUSE: quella in corso è già davanti al modello
-          // (è la conversazione di adesso) e ritrovarcela come "risultato"
-          // gliela farebbe raccontare all'utente come un ricordo.
-          const closed = all.filter((c) => c && c.closedAt);
+          const altre = all.filter((c) => c && c.id !== chatId && Array.isArray(c.messages) && c.messages.length);
           // «Riprendi la discussione di ieri sulla coscienza» arriva qui come
           // frase, non come parola chiave: pretendere che compaiano tutte le
           // parole faceva rispondere "non c'è niente" su una chat che c'era.
           // Se la ricerca stretta non trova niente si allarga alle parole che
           // distinguono, e l'esito dice con quali ha cercato davvero.
-          const { results: found, termini, allargata } = ChatArchive.searchWide(closed, query, { limit: 8 });
+          const { results: found, termini, allargata } = ChatArchive.searchWide(altre, query, { limit: 8 });
+          const [pagine, cambiTrovati] = query
+            ? await Promise.all([paginePerChat(query).catch(() => []), cambiPerChat(query).catch(() => [])])
+            : [[], []];
           return {
             executed: true,
             kept: true,
@@ -2471,6 +2473,8 @@ async function eseguiAzioneFilo(action, {
                 kind: c.kind || null,
                 snippet: ChatArchive.snippetFor(c, termini.join(' ')),
               })),
+              ...(pagine.length ? { pagine } : {}),
+              ...(cambiTrovati.length ? { cambi: cambiTrovati } : {}),
             },
           };
         } catch (e) {
@@ -3131,6 +3135,82 @@ function transparencyDocsForPrompt(actions) {
   return blocks.join('\n\n').trim();
 }
 
+// #868 — le pagine del filo per CERCA_CHAT: quelle visitate (titolo e indirizzo, per parole) e le schede chiuse
+// anche per contenuto, coi vettori della Cronologia. Una pagina delicata o di casa dice solo il sito (#1004).
+const MAX_PAGINE_CHAT = 8;
+const SOGLIA_PAGINA = 0.35;
+async function paginePerChat(query) {
+  const CA = ChatArchive;
+  const forti = CA.terminiCheDistinguono(CA.normalizeForSearch(query).split(/\s+/).filter(Boolean));
+  const parole = forti.length ? forti : CA.normalizeForSearch(query).split(/\s+/).filter((p) => p.length > 2);
+  if (!parole.length) return [];
+  const settings = await getEffectiveSettings();
+  const fuori = await filtroDelicate(settings);
+  const combacia = (...campi) => {
+    const h = CA.normalizeForSearch(campi.filter(Boolean).join(' '));
+    return parole.every((p) => h.includes(p));
+  };
+  const trovate = new Map();
+  const metti = (p) => {
+    const k = String(p.url || '').replace(/#.*$/, '');
+    const prima = trovate.get(k);
+    if (!prima || (p.chiusa && !prima.chiusa) || Date.parse(p.date || 0) > Date.parse(prima.date || 0)) trovate.set(k, { ...prima, ...p });
+  };
+  // Le visite del filo, dalla più recente: titolo e indirizzo li confronta Filo, qui sul computer.
+  let visite = [];
+  try { visite = await globalThis.SN_IL_FILO.pagine(); } catch (_) {}
+  for (let i = visite.length - 1; i >= 0 && trovate.size < MAX_PAGINE_CHAT * 3; i--) {
+    const v = visite[i];
+    if (v && combacia(v.titolo, v.url)) metti({ url: v.url, title: v.titolo || '', date: v.ts, chiusa: false, _voce: v });
+  }
+  // Le schede chiuse: per significato se c'è l'indice, altrimenti per parole su titolo, riassunto e indirizzo.
+  const archivio = await ArchivedTabs.list().catch(() => []);
+  let emb = null;
+  try { emb = archivio.length ? await embedTexts([query], settings) : null; } catch (_) { emb = null; }
+  const qv = emb && emb.vectors && emb.vectors[0] && emb.vectors[0].length ? quantizeEmbedding(emb.vectors[0]) : null;
+  const punteggi = [];
+  for (const it of archivio) {
+    const casa = restaQui(it, fuori);
+    if (combacia(it.title, casa ? '' : it.summary, it.url)) { punteggi.push({ it, score: 2 }); continue; }
+    if (!casa && qv && conVettoreDi(it, emb.model)) {
+      const sc = cosineInt(qv, it.embedding);
+      if (sc >= SOGLIA_PAGINA) punteggi.push({ it, score: sc });
+    }
+  }
+  punteggi.sort((a, b) => b.score - a.score);
+  for (const { it } of punteggi.slice(0, MAX_PAGINE_CHAT)) {
+    metti({ url: it.url, title: it.title || '', date: it.closedAt || null, chiusa: true, riassunto: restaQui(it, fuori) ? '' : (it.summary || ''), _voce: it });
+  }
+  const out = [];
+  for (const p of [...trovate.values()].sort((a, b) => Date.parse(b.date || 0) - Date.parse(a.date || 0)).slice(0, MAX_PAGINE_CHAT)) {
+    const delicata = fuori(p.url) || (p.chiusa && restaQui(p._voce || {}, fuori));
+    let sito = '';
+    try { sito = new URL(p.url).hostname.replace(/^www\./, ''); } catch (_) {}
+    out.push(delicata
+      ? { url: sito ? `https://${sito}/` : '', title: sito || 'sito', date: p.date, chiusa: !!p.chiusa, delicata: true }
+      : { url: p.url, title: p.title, date: p.date, chiusa: !!p.chiusa, ...(p.riassunto ? { riassunto: String(p.riassunto).slice(0, 400) } : {}) });
+  }
+  return out.filter((p) => p.url);
+}
+
+// I cambi di impostazioni, aspetto, sveglie e zoom (#867) che combaciano: si annullano con ANNULLA_CAMBIO e l'id.
+async function cambiPerChat(query) {
+  const CA = ChatArchive;
+  const K = globalThis.SN_CAMBI;
+  const parole = CA.terminiCheDistinguono(CA.normalizeForSearch(query).split(/\s+/).filter(Boolean));
+  if (!K || !parole.length) return [];
+  const { eventi } = await Registro.ultimi({ max: 1 });
+  const out = [];
+  for (let i = (eventi || []).length - 1; i >= 0 && out.length < 6; i--) {
+    const e = eventi[i];
+    const frase = K.frase(e);
+    if (!frase) continue;
+    const h = CA.normalizeForSearch(`${frase} ${(K.frasi(e) || []).join(' ')}`);
+    if (parole.every((p) => h.includes(p))) out.push({ id: e.id, frase, date: e.agg || e.ts });
+  }
+  return out;
+}
+
 // #525 — re-immissione di quello che CERCA_CHAT ha trovato nell'archivio delle
 // conversazioni passate.
 //
@@ -3194,13 +3274,31 @@ function chatSearchesForPrompt(actions) {
     const cercato = E.perCanaleSistema(out.chatSearch);
     const results = Array.isArray(out.results) ? out.results : [];
     const usati = Array.isArray(out.cercatoCon) ? out.cercatoCon : [];
+    const pagine = Array.isArray(out.pagine) ? out.pagine : [];
+    const cambiTrovati = Array.isArray(out.cambi) ? out.cambi : [];
+    // #868 — le pagine visitate: titoli, indirizzi e riassunti li scrivono i siti, quindi in busta.
+    if (pagine.length) {
+      const righe = pagine.map((pg) => {
+        const when = pg.date ? new Date(pg.date).toLocaleString('it-IT') : '';
+        const stato = pg.chiusa ? 'scheda chiusa' : 'visitata';
+        return `- ${pg.title || '(senza titolo)'} · ${stato}${when ? ` · ${when}` : ''}${pg.delicata ? ' · pagina delicata: qui solo il sito' : ''}\n  ${pg.url}${pg.riassunto ? `\n  ${pg.riassunto}` : ''}`;
+      });
+      blocks.push(`[Le pagine del filo che combaciano con "${cercato}". Per riaprirne una usa NAVIGA col suo indirizzo.]\n`
+        + E.imbusta({ tipo: 'DATI_PAGINA', testo: righe.join('\n'), conIntestazione: true }));
+    }
+    if (cambiTrovati.length) {
+      const righe = cambiTrovati.map((c) => `- [${c.id}] ${c.frase}${c.date ? ` · ${new Date(c.date).toLocaleString('it-IT')}` : ''}`);
+      blocks.push(`[I cambi del filo che combaciano con "${cercato}": si rimettono com'erano con ANNULLA_CAMBIO e l'id.]\n`
+        + E.imbusta({ tipo: 'TESTO_SALVATO', testo: righe.join('\n'), conIntestazione: true }));
+    }
+    if (!results.length && (pagine.length || cambiTrovati.length)) continue;
     if (!results.length) {
       // Zero risultati non vuol dire «quella conversazione non c'è»: vuol dire
       // che nessuna chat contiene tutte quelle parole. Chi legge deve saperlo,
       // altrimenti riferisce all'utente che la discussione non esiste invece di
       // riprovare con la parola che conta.
       blocks.push(
-        `[Nessuna conversazione passata contiene tutte queste parole: "${cercato}". `
+        `[Niente nel filo (conversazioni delle altre schede, pagine visitate, cambi) contiene tutte queste parole: "${cercato}". `
         + 'Non significa che non ci sia: riprova con la parola che identifica '
         + 'l\'argomento (una o due, senza "ieri", "discussione", "di cui abbiamo parlato") '
         + 'prima di dire all\'utente che non l\'hai trovata.]',
@@ -3941,7 +4039,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   const vistiDalFilo = filo ? filo.visti : [];
   // I pezzi vecchi si cercano mentre si prepara il resto: arrivano in coda, prima della domanda.
   const ricordiP = filo && !internal && !onbActive && RicordiFilo
-    ? RicordiFilo.cerca(String(userMessage || ''), { vecchi: filo.vecchi, chatId }).catch(() => [])
+    ? RicordiFilo.cerca(String(userMessage || ''), { vecchi: filo.vecchi, davanti: filo.visti }).catch(() => [])
     : Promise.resolve([]);
   // #592.2 — nell'intervista di benvenuto lo stile proposto si imposta senza riquadro finché nella conversazione non
   // è entrato testo di altri; quello letto dalle azioni lo guarda executeFiloAction.
@@ -5636,6 +5734,8 @@ function casaPertinente(parole, it) {
 // Ogni destinatario riceve il messaggio ritagliato sul PROPRIO indirizzo (frame
 // per frame): a un sito arrivano solo i tipi che il codice di Filo lì ascolta.
 // Quello che serve al registro dei cambi per rimettere le cose com'erano, e per dirlo alle pagine.
+RicordiFilo.collega({ vettori: (texts) => embedTexts(texts), quantizza: quantizeEmbedding, coseno: cosineInt });
+
 Registro.collega({
   applicaImpostazioni: (parziale) => applySettingsUpdate(parziale),
   aggiornaVivo: () => broadcastLiveUpdate(),

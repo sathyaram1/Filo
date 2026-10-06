@@ -127,7 +127,21 @@ function creaFilo({ cartella } = {}) {
     return lista.length;
   }
 
+  // Il registro grezzo di prima (#868): la sua sola copia dei messaggi tagliati a 200 caratteri non serve più a nessuno.
+  async function togliRegistroGrezzo() {
+    const D = disco();
+    const KEY = globalThis.SN_CONST && globalThis.SN_CONST.STORAGE_KEYS && globalThis.SN_CONST.STORAGE_KEYS.FILO_RAW_LOG;
+    const chrome = globalThis.chrome;
+    if (!KEY || !chrome || !chrome.storage || !chrome.storage.local) return;
+    const togli = async () => {
+      const r = await chrome.storage.local.get(KEY);
+      if (r && r[KEY] !== undefined) await chrome.storage.local.remove(KEY);
+    };
+    if (D && D.fuoriDaIncognito) await D.fuoriDaIncognito(togli); else await togli();
+  }
+
   async function migraDaStorage() {
+    try { await togliRegistroGrezzo(); } catch (e) { console.warn('[Filo] registro grezzo non tolto:', e?.message || e); }
     const D = disco();
     const KEY = globalThis.SN_CONST && globalThis.SN_CONST.STORAGE_KEYS && globalThis.SN_CONST.STORAGE_KEYS.FILO_CHATS;
     const chrome = globalThis.chrome;

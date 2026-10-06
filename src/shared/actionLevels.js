@@ -401,7 +401,7 @@
       describe: (a) => {
         const q = String((a && (a.query ?? a.testo)) || '').trim();
         if (a && a.id && !q) return 'Rileggere una conversazione passata';
-        return `Cercare fra le conversazioni passate${q ? ` ("${q}")` : ''}`;
+        return `Cercare nel filo${q ? ` ("${q}")` : ''}`;
       },
     },
     LEGGI_FILE: {

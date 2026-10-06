@@ -185,9 +185,9 @@
     // Chiedere subito il testo intero di otto chat riempirebbe il contesto di
     // roba che non serve.
     CERCA_CHAT: {
-      description: 'Cerca fra le conversazioni PASSATE fra te e l\'utente, salvate sul suo computer. Usalo quando l\'utente si riferisce a una chat di prima ("riprendi la discussione di ieri sulla coscienza", "cosa mi avevi detto su X?", "com\'era finita quella cosa di cui abbiamo parlato la settimana scorsa"). Due passi: con `query` ti tornano le chat che combaciano, con id, titolo, data e il frammento che combacia; poi, se ti serve leggerne una per intero, richiamalo con `id` e ti torna la conversazione completa. Sola lettura: non modifica e non cancella niente. La conversazione che ti torna l\'avete scritta tu e l\'utente.',
+      description: 'Cerca in tutto il filo, salvato sul computer dell\'utente: le conversazioni con te di ogni scheda e di ogni giorno, le pagine visitate (anche il contenuto delle schede chiuse) e i cambi di impostazioni, aspetto, sveglie e zoom. Usalo per ciò che non hai già davanti: una chat di giorni fa ("riprendi la discussione di lunedì sulla coscienza", "cosa mi avevi detto su X?"), una pagina ("quella pagina sulle orche che ho chiuso ieri": poi la riapri con NAVIGA e il suo indirizzo), un cambio da rimettere com\'era (ANNULLA_CAMBIO con l\'id). Due passi per le chat: con `query` ti tornano chat, pagine e cambi che combaciano; poi, se ti serve leggere una chat per intero, richiamalo con `id`. Sola lettura: non modifica e non cancella niente.',
       properties: {
-        query: S('Le parole da cercare dentro le chat (argomento, nomi, frasi). Ometti solo quando passi `id`.'),
+        query: S('Le parole da cercare nel filo (argomento, nomi, titolo o sito di una pagina, frasi). Ometti solo quando passi `id`.'),
         id: S('L\'id di una chat trovata prima: la fa tornare per intero.'),
       },
       required: [],

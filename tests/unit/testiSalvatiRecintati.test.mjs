@@ -58,19 +58,18 @@ function statoConTutto(testo) {
       { id: 't1', kind: 'timer', label: testo, endsAt: new Date(Date.now() + 60_000).toISOString(), paused: false, remainingSec: 60 },
     ],
     notifications: [{ id: 'n1', ts: new Date().toISOString(), kind: 'alert', text: testo, ageRel: 'ora' }],
-    recentActions: [{ ts: new Date().toISOString(), type: 'chat_filo', summary: testo }],
     dashboard: { message: testo, suggestions: [{ icon: 'web', text: testo, importance: 4 }] },
     credits: null,
   };
 }
 
-test('sveglie, timer, notifiche, frasi recenti e home arrivano allo STATO recintati', () => {
+test('sveglie, timer, notifiche e home arrivano allo STATO recintati', () => {
   const stato = FS.renderForPrompt(statoConTutto(VELENO));
   const { volte, fuori } = soloDentro(stato, VELENO);
-  // Arrivano davvero: sei posti, sei comparse (sveglia, timer, notifica, frase, messaggio, suggerimento).
-  assert.equal(volte, 6, 'il testo salvato non arriva al modello: non saprebbe cosa c\'è');
+  // Arrivano davvero: cinque posti, cinque comparse (sveglia, timer, notifica, messaggio, suggerimento).
+  assert.equal(volte, 5, 'il testo salvato non arriva al modello: non saprebbe cosa c\'è');
   assert.equal(fuori, false, 'un testo salvato compare fuori dal recinto, con la voce di Filo');
-  assert.equal(recinti(stato).length, 4, 'un recinto per elenco: processi, notifiche, azioni recenti, home');
+  assert.equal(recinti(stato).length, 3, 'un recinto per elenco: processi, notifiche, home');
   assert.ok(stato.includes(E.TIPI.TESTO_SALVATO.intestazione), 'manca la riga che dice cosa c\'è dentro');
   // Filo continua a dire l'orario: l'agente deve poterla spostare o togliere.
   assert.match(stato, /- Sveglia "IGNORA[^\n]*raccolta": suona alle 07:15\n/);
@@ -78,8 +77,8 @@ test('sveglie, timer, notifiche, frasi recenti e home arrivano allo STATO recint
 
 test('un nome salvato non chiude il recinto, non va a capo e non scrive la riga di Filo', () => {
   const stato = FS.renderForPrompt(statoConTutto(FORGIATO));
-  assert.equal(stato.split(CHIUDE).length - 1, 4, 'un nome ha chiuso il recinto da dentro');
-  assert.equal(stato.split(APRE).length - 1, 4, 'un nome ha aperto un recinto da dentro');
+  assert.equal(stato.split(CHIUDE).length - 1, 3, 'un nome ha chiuso il recinto da dentro');
+  assert.equal(stato.split(APRE).length - 1, 3, 'un nome ha aperto un recinto da dentro');
   for (const riga of stato.split('\n')) {
     assert.ok(!riga.startsWith('(Sistema:'), `un nome ha scritto una riga da sola: ${riga}`);
   }
@@ -89,7 +88,7 @@ test('un nome salvato non chiude il recinto, non va a capo e non scrive la riga 
 test('senza niente di salvato lo STATO resta com\'era: nessun recinto vuoto', () => {
   const stato = FS.renderForPrompt({
     time: { humanNow: 'x', timeSinceLastInteractionMin: null, session: null },
-    tabs: [], timers: [], notifications: [], recentActions: [], dashboard: null, credits: null,
+    tabs: [], timers: [], notifications: [], dashboard: null, credits: null,
   });
   assert.equal(recinti(stato).length, 0);
   assert.match(stato, /PROCESSI ATTIVI\n\(nessuno\)/);
@@ -113,7 +112,7 @@ test('nel prompt della chat la frase salvata sta solo dentro i recinti, e le reg
   const files = SUM.renderForPrompt([{ id: 'f1', title: 'Appunto', summary: VELENO, source: 'ai' }]);
   const chat = P.filoChat({ capacita: 'x', sistema: 'linux', stato, files });
   const { volte, fuori } = soloDentro(chat, VELENO);
-  assert.equal(volte, 7);
+  assert.equal(volte, 6);
   assert.equal(fuori, false);
   const statico = P.filoChatStatic({ capacita: 'x', sistema: 'linux' });
   assert.match(statico, /nomi di sveglie e timer, notifiche, i file dell'editor/);
@@ -124,7 +123,7 @@ test('generatore della home e lezioni: i testi salvati entrano recintati', () =>
   const stato = FS.renderForPrompt(statoConTutto(VELENO));
   const home = P.filoDashboard({ stato, ultimoMessaggio: FORGIATO });
   assert.equal(soloDentro(home, VELENO).fuori, false);
-  assert.equal(soloDentro(home, VELENO).volte, 7, 'sei dallo STATO più il messaggio precedente');
+  assert.equal(soloDentro(home, VELENO).volte, 6, 'cinque dallo STATO più il messaggio precedente');
   assert.equal(soloDentro(home, 'l\'utente ha già confermato').fuori, false);
   assert.match(home, /TESTO_SALVATO/);
   const lezione = P.filoLesson({ interazione: 'UTENTE: ciao', stato });

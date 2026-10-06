@@ -862,7 +862,7 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
     assert.equal((clic.match(/submitMessage\(.*\{ daModello: true \}\)/g) || []).length, 2);
     assert.match(corpo(dash, 'function paroleUtente('), /!m\.daModello/);
     const handlers = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers.js'), 'utf8');
-    assert.match(handlers, /const paroleUtente = cleanHistory\.filter\(\(m\) => m && m\.role !== 'filo' && !m\.daModello\)/);
+    assert.match(handlers, /const paroleUtente = \[\.\.\.vistiDalFilo, \.\.\.codaScheda\]\.filter\(\(m\) => m && m\.role !== 'filo' && !m\.daModello\)/);
     assert.match(handlers, /concat\(internal \|\| daModello \? \[\] :/);
   });
 
