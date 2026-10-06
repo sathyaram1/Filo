@@ -923,11 +923,10 @@
         el.style.maxWidth = `${ferma}px`;
       }
 
-      // Tab attiva: il colore della cima della pagina (§1.1), anche nei "piedini" a
-      // goccia via --tab-active. Una cima neutra (l'header bianco di YouTube) non è
-      // il sito: si ripiega sul suo colore. Inchiostro con la regola delle inattive.
+      // Tab attiva: sempre il colore della cima della pagina, anche bianca, mai il
+      // marchio del sito (decisione D63). Inchiostro con la regola delle inattive.
       if (t.id === state.activeId) {
-        const activeColor = hasColorIdentity(t.color) ? t.color : (siteColor(t) || t.color);
+        const activeColor = t.color;
         if (activeColor) {
           el.style.setProperty('--tab-active', activeColor);
           const c = TabColor ? themeColors() : null;
