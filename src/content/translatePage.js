@@ -455,8 +455,12 @@
         // che possa rispondere, ma il testo lo prende l'estrazione da qui.
         if (Extract && typeof Extract.inlineFrameBody === 'function' && Extract.inlineFrameBody(f)) continue;
         const r = f.getBoundingClientRect();
-        if (r.width < FRAME_MIN_W || r.height < FRAME_MIN_H || isInsideFiloUi(f)) { skipped.push(f); continue; }
-        if (Extract && typeof Extract.isHiddenFromUser === 'function' && Extract.isHiddenFromUser(f)) {
+        const nascosto = Extract && typeof Extract.isHiddenFromUser === 'function' && Extract.isHiddenFromUser(f);
+        if (isInsideFiloUi(f)) { skipped.push(f); continue; }
+        // Una scheda spenta del tutto toglie al riquadro anche la misura: per la riapertura conta che sia nascosto,
+        // non quanto è grande adesso (la misura la riguarda chi si chiede se si è scoperto).
+        if (r.width < FRAME_MIN_W || r.height < FRAME_MIN_H) { skipped.push(f); if (nascosto) folded.push(f); continue; }
+        if (nascosto) {
           skipped.push(f);
           folded.push(f);
           continue;
