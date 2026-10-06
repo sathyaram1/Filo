@@ -464,7 +464,8 @@ server, il lavoro restava fermo per sempre (#256 dal 7/09; #567, #663, #667 dal
   copre più la punta (anche le due copie del ramo divergenti) → il cancello lo
   azzera e `select` rimanda il controllo da sé; già fuso ma mai chiuso → `done`
   senza chiedere niente;
-- **tetto**: tre controlli rimandati di fila sulla stessa verifica, o tre guasti
+- **tetto**: tre controlli rimandati di fila sullo stesso lavoro (li fa ripartire solo una
+  correzione consegnata: ogni rimando rifà i verdetti su un commit nuovo), o tre guasti
   tecnici di fila (GitHub o server che non rispondono) → `design`
   (`statusReason: arenato`) con nota per l'owner. Un guasto non tocca il verdetto:
   si riprova un'ora dopo. I contatori (`mergeRecoveries`, `mergeFaults`) stanno
