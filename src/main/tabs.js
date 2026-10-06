@@ -25,7 +25,7 @@ const { normalizeUrl, canonicalizeFiloUrl } = globalThis.SN_URL_NAV;
 require('../shared/downloadTabs'); // #412/#441 — schede usa e getta dei download (logica pura)
 const { decideCloseOnDownload } = globalThis.SN_DOWNLOAD_TABS;
 require('../shared/tasti'); // nome E comportamento delle scorciatoie, per il sistema su cui gira
-const { indiceSaltoScheda, comandoNavigazione } = globalThis.SN_TASTI;
+const { indiceSaltoScheda, comandoNavigazione, comandoNavigazioneFuoriDalCampo } = globalThis.SN_TASTI;
 const { collegaScorciatoie } = require('./shortcuts');
 const { AvvisiSopraPagina } = require('./avvisiSopraPagina');
 const { AnteprimeSchede } = require('./tabs/anteprime');
@@ -1812,6 +1812,15 @@ class TabManager {
     else this.goBack(target);
   }
 
+  // Cmd+freccia su Mac: il tasto non si toglie alla pagina, perché in un campo
+  // di testo sposta il cursore; diventa indietro/avanti solo se lì non si scrive.
+  async _navigaSeNonScrive(wc, verso, id) {
+    try {
+      if (await require('./menu').staScrivendo(wc)) return;
+    } catch (_) { return; }
+    this.navigaCronologia(verso, id);
+  }
+
   goForward(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
@@ -1928,9 +1937,13 @@ class TabManager {
     shellWc.on('before-input-event', (event, input) => {
       if (input.type !== 'keyDown') return;
       const verso = comandoNavigazione(input);
-      if (!verso) return;
-      event.preventDefault();
-      this.navigaCronologia(verso);
+      if (verso) {
+        event.preventDefault();
+        this.navigaCronologia(verso);
+        return;
+      }
+      const fuoriDalCampo = comandoNavigazioneFuoriDalCampo(input);
+      if (fuoriDalCampo) this._navigaSeNonScrive(shellWc, fuoriDalCampo);
     });
   }
 
@@ -2100,6 +2113,8 @@ class TabManager {
           this.navigaCronologia(verso, tab.id);
           return;
         }
+        const fuoriDalCampo = comandoNavigazioneFuoriDalCampo(input);
+        if (fuoriDalCampo) this._navigaSeNonScrive(wc, fuoriDalCampo, tab.id);
       }
       // #404 — Ctrl/Cmd+T/W/L/R "da browser". La shell (src/renderer/shell.js)
       // le gestisce nel keydown della barra, ma quel keydown NON riceve eventi

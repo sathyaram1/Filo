@@ -64,6 +64,29 @@ test('su Mac sono Cmd+[ e Cmd+], e Alt+freccia resta al cursore', () => {
   assert.equal(T.comandoNavigazione({ ctrlKey: true, code: 'BracketLeft' }, 'win32'), null);
 });
 
+test('su Mac anche Cmd+freccia, ma con una regola a parte che chiede se si scrive', () => {
+  for (const forma of [dom, main]) {
+    assert.equal(T.comandoNavigazioneFuoriDalCampo(forma({ metaKey: true, code: 'ArrowLeft' }), 'darwin'), 'indietro');
+    assert.equal(T.comandoNavigazioneFuoriDalCampo(forma({ metaKey: true, code: 'ArrowRight' }), 'darwin'), 'avanti');
+    // Cmd+Shift+freccia seleziona fino a inizio o fine riga; Cmd+Opzione+freccia cambia scheda in Safari.
+    assert.equal(T.comandoNavigazioneFuoriDalCampo(forma({ metaKey: true, shiftKey: true, code: 'ArrowLeft' }), 'darwin'), null);
+    assert.equal(T.comandoNavigazioneFuoriDalCampo(forma({ metaKey: true, altKey: true, code: 'ArrowLeft' }), 'darwin'), null);
+    assert.equal(T.comandoNavigazioneFuoriDalCampo(forma({ metaKey: true, code: 'ArrowUp' }), 'darwin'), null);
+    assert.equal(T.comandoNavigazioneFuoriDalCampo(forma({ code: 'ArrowLeft' }), 'darwin'), null);
+    // La regola che naviga SEMPRE non la conosce: preso lì, il cursore non arriverebbe più a inizio riga.
+    assert.equal(T.comandoNavigazione(forma({ metaKey: true, code: 'ArrowLeft' }), 'darwin'), null);
+    // Su Windows e Linux Ctrl+freccia salta di parola, e Cmd non c'è.
+    for (const sistema of ['win32', 'linux']) {
+      assert.equal(T.comandoNavigazioneFuoriDalCampo(forma({ metaKey: true, code: 'ArrowLeft' }), sistema), null);
+      assert.equal(T.comandoNavigazioneFuoriDalCampo(forma({ ctrlKey: true, code: 'ArrowLeft' }), sistema), null);
+    }
+  }
+  assert.equal(T.comandoNavigazioneFuoriDalCampo(null, 'darwin'), null);
+  assert.equal(T.comandoNavigazioneFuoriDalCampo({ metaKey: true, key: 'ArrowRight' }, 'darwin'), 'avanti');
+  // Il nome resta Cmd+[: Cmd+freccia vale solo a metà, e un nome deve funzionare ovunque.
+  assert.equal(T.etichettaIndietro('darwin'), 'Cmd+[');
+});
+
 test('il tasto si legge dal codice fisico, ma gli eventi sintetici passano da key', () => {
   assert.equal(T.comandoNavigazione({ altKey: true, key: 'ArrowLeft' }, 'win32'), 'indietro');
   assert.equal(T.comandoNavigazione({ metaKey: true, key: ']' }, 'darwin'), 'avanti');
@@ -85,12 +108,14 @@ test('chi si assegna una scorciatoia sa che queste sono già prese', () => {
   for (const scritta of ['Alt+←', 'Alt+Left', 'Alt+ArrowLeft', 'Alt+→', 'Alt+Right']) {
     assert.equal(T.riservato(scritta, 'win32'), true, `${scritta} risulta libera su Windows`);
   }
-  for (const scritta of ['Cmd+[', 'Ctrl+[', 'Cmd+]']) {
+  for (const scritta of ['Cmd+[', 'Ctrl+[', 'Cmd+]', 'Cmd+←', 'Cmd+Left', 'Cmd+→']) {
     assert.equal(T.riservato(scritta, 'darwin'), true, `${scritta} risulta libera su Mac`);
   }
   // E all'incontrario: su Mac Alt+freccia arriva alla pagina, su Windows Ctrl+[.
   assert.equal(T.riservato('Alt+←', 'darwin'), false);
   assert.equal(T.riservato('Ctrl+[', 'win32'), false);
+  // Ctrl+freccia su Windows e Linux salta di parola, e resta della pagina.
+  assert.equal(T.riservato('Ctrl+←', 'win32'), false);
 });
 
 // ── Tutte le porte sono attaccate ──────────────────────────────────────────
@@ -109,6 +134,10 @@ test('i tasti arrivano sia dalla pagina sia dalla barra di Filo', () => {
   const usi = tabs.match(/comandoNavigazione\(/g) || [];
   assert.ok(usi.length >= 2, `la regola è ascoltata in ${usi.length} punto/i: manca il fuoco sulla barra o quello sulla pagina`);
   assert.match(tabs, /navigaCronologia\(verso/, 'tabs.js non manda il comando alla porta unica');
+  // Cmd+freccia su Mac: anche lei da tutte e due le porte, e sempre dopo aver chiesto se si scrive.
+  const fuori = tabs.match(/comandoNavigazioneFuoriDalCampo\(/g) || [];
+  assert.ok(fuori.length >= 2, `Cmd+freccia è ascoltata in ${fuori.length} punto/i su due`);
+  assert.match(tabs, /staScrivendo\(wc\)\) return;\s*\} catch \(_\) \{ return; \}\s*this\.navigaCronologia/);
 });
 
 test('i tasti laterali del mouse e lo scorrimento a due dita sono attaccati', () => {
@@ -138,7 +167,7 @@ test('il manifesto e l\'elenco delle scorciatoie dicono le stesse strade', () =>
   const voce = globalThis.SN_CAPABILITIES.get('navigate-back-forward');
   assert.ok(voce, 'la voce indietro/avanti è sparita dal manifesto');
   const testo = `${voce.invoke} ${voce.desc}`;
-  for (const pezzo of ['Alt+←', 'Alt+→', 'Cmd+[', 'Cmd+]', 'mouse']) {
+  for (const pezzo of ['Alt+←', 'Alt+→', 'Cmd+[', 'Cmd+]', 'Cmd+←', 'Cmd+→', 'mouse']) {
     assert.ok(testo.includes(pezzo), `il manifesto non cita ${pezzo}`);
   }
   // L'elenco delle scorciatoie deve chiedere il nome alla regola, non scriverlo.

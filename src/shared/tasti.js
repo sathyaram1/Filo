@@ -268,6 +268,21 @@
     return null;
   }
 
+  // L'altra metà della convenzione del Mac: Cmd+freccia. Dentro un campo di
+  // testo quel tasto porta il cursore a inizio o fine riga, quindi naviga solo
+  // quando non si scrive, e la domanda va fatta alla pagina (src/shared/campoTesto.js)
+  // prima di muoversi. Per questo è una funzione a parte e l'etichetta resta Cmd+[.
+  function comandoNavigazioneFuoriDalCampo(ev, esplicita) {
+    if (!ev || !suMac(esplicita)) return null;
+    if (modificatore(ev, 'shift')) return null;
+    if (!(modificatore(ev, 'meta') && !modificatore(ev, 'ctrl') && !modificatore(ev, 'alt'))) return null;
+    const code = String(ev.code || '');
+    const key = String(ev.key || '');
+    if (code === 'ArrowLeft' || key === 'ArrowLeft') return 'indietro';
+    if (code === 'ArrowRight' || key === 'ArrowRight') return 'avanti';
+    return null;
+  }
+
   function etichettaIndietro(esplicita) { return etichetta('Alt+\u2190', esplicita); }
   function etichettaAvanti(esplicita) { return etichetta('Alt+\u2192', esplicita); }
 
@@ -355,6 +370,8 @@
     'Ctrl+Plus', 'Ctrl+=', 'Ctrl+-', 'Ctrl+0',
     'Ctrl+X', 'Ctrl+C', 'Ctrl+V', 'Ctrl+Alt+Shift+V', 'Ctrl+A',
     'Ctrl+Q', 'Ctrl+M', 'Ctrl+H', 'Ctrl+Alt+H', 'Ctrl+?',
+    // Cmd+freccia: indietro e avanti fuori dai campi di testo (`comandoNavigazioneFuoriDalCampo`).
+    'Ctrl+\u2190', 'Ctrl+\u2192',
   ];
   // Spiega, Traduci, Salva, Aiuto (src/main/shortcuts.js): con Filo davanti se
   // li prende lui prima della pagina.
@@ -497,7 +514,7 @@
   global.SN_TASTI = {
     piattaforma, suMac, etichetta, etichettaScritta, frase, acceleratoreElectron,
     indiceSaltoScheda, etichettaSaltoScheda, descrizioneSaltoScheda,
-    comandoNavigazione, etichettaIndietro, etichettaAvanti,
+    comandoNavigazione, comandoNavigazioneFuoriDalCampo, etichettaIndietro, etichettaAvanti,
     tastiRiservati, riservato,
     tastoRiconosciuto, tipoModificatore, pezzoSconosciuto, soloModificatori, combacia, pressioneScritta, delSistema,
     modificatoreCheCambiaSimbolo,
