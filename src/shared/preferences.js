@@ -878,7 +878,7 @@
     interruttore({
       keys: ['blocco_pubblicita', 'blocco pubblicità', 'blocco pubblicita', 'blocco della pubblicità', 'blocco delle pubblicità',
         'blocca pubblicità', 'blocca la pubblicità', 'blocca pubblicità e tracker', 'blocco pubblicità e tracker', 'adblock',
-        'ad block', 'ad-block', 'blocco annunci', 'blocco tracker', 'blocca tracker', 'pubblicità', 'pubblicita', 'annunci'],
+        'ad block', 'ad-block', 'blocco annunci', 'blocco tracker', 'blocca tracker'],
       percorso: 'security.adblock.enabled',
       nome: 'Blocco di pubblicità e tracker',
       aiuto: 'true | false (blocca pubblicità e tracker con le liste pubbliche; attivo di serie)',

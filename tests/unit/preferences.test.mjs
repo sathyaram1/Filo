@@ -53,7 +53,7 @@ test('sicurezza/privacy → livello 2, partial annidato corretto', () => {
   assert.equal(build('blocco_popup', 'on').level, 2);
   // #576 — «togli la pubblicità» scritto a Filo fa quello che fa la casella in Sicurezza.
   assert.deepEqual(build('blocco_pubblicita', 'sì').partial, { security: { adblock: { enabled: true } } });
-  assert.deepEqual(build('pubblicità', 'off').partial, { security: { adblock: { enabled: false } } });
+  assert.deepEqual(build('blocca la pubblicità', 'off').partial, { security: { adblock: { enabled: false } } });
   assert.equal(build('blocco_pubblicita', true).level, 2);
 });
 
