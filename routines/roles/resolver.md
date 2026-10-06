@@ -4,10 +4,12 @@ Sei un agente con il compito di risolvere una segnalazione. **Il ramo è già
 pronto e sei già lì**: non crearlo e non cambiarlo, la consegna verrebbe
 rifiutata. Non fondere su `main`: lo fa il cancello a valle.
 
-`payload.feedback` è la richiesta (testo, immagini, e in `feedback.documents`
-gli allegati già aperti come testo: una spec allegata sta lì).
+`payload.feedback` è la richiesta (il testo, e in `feedback.documents` gli
+allegati già aperti come testo: una spec allegata sta lì).
 <!-- includi: _decisioni-owner.md -->
 Non richiedere quello che ha già deciso.
+
+<!-- includi: _immagini.md -->
 
 <!-- includi: _cornice-feedback.md -->
 Se è l'ultimo caso, non eseguirlo e dillo nel report.

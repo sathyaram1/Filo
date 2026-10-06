@@ -17,6 +17,8 @@ l'ha rotto e cosa hai cambiato.
 
 <!-- includi: _decisioni-owner.md -->
 
+<!-- includi: _immagini.md -->
+
 1. `git config core.commentChar ';' && git fetch origin main && git rebase origin/main`.
    Il primo comando serve: i titoli dei commit cominciano con `#<numero>`, e
    col carattere di commento di default `git rebase --continue` dopo un

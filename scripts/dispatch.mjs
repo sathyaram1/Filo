@@ -95,7 +95,7 @@ import { TOOLS_ROOT, pinTools, pinnedRepoRoot, pinnedOrigin, absolutizeRecipe } 
 import { dirtyTreeLines, dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { codiceCambiatoDallAvvio, testoCodiceCambiato } from './lib/codice-fermo.mjs';
 import { MAX_LIVELLO_CHARS, leggiTestoLivello } from './lib/livelli.mjs';
-import { scaricaPayload, STAMPA_MAX } from './lib/consegna-file.mjs';
+import { scaricaPayload, immaginiSenzaByte, STAMPA_MAX } from './lib/consegna-file.mjs';
 import { sembraOpzioneNelReport } from './lib/argomenti.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -710,6 +710,10 @@ export function readRoleInstructions(role, { scope, caso } = {}) {
 function conDecisioni(ctx) {
   return Array.isArray(ctx && ctx.decisioni) && ctx.decisioni.length ? { decisioni: ctx.decisioni } : {};
 }
+// Le schermate della segnalazione e delle risposte (#900): le apre il server, `scaricaPayload` le scrive su file.
+function conImmagini(ctx) {
+  return Array.isArray(ctx && ctx.immagini) && ctx.immagini.length ? { immagini: ctx.immagini } : {};
+}
 
 export function buildPayload(bucket, ctx = {}) {
   switch (bucket.role) {
@@ -731,6 +735,7 @@ export function buildPayload(bucket, ctx = {}) {
         branch: bucket.branch, id: bucket.id, num: bucket.num,
         feedback: ctx.feedback || null,
         ...conDecisioni(ctx),
+        ...conImmagini(ctx),
         history: Array.isArray(ctx.history) ? ctx.history : [],
         historyDropped: Number(ctx.historyDropped) || 0,
         scope: verifierScope(ctx.scope).scope,
@@ -744,7 +749,7 @@ export function buildPayload(bucket, ctx = {}) {
       if (rip) {
         return {
           case: 'ripresa', branch: bucket.branch, id: bucket.id, num: bucket.num,
-          feedback: ctx.feedback || null, ripresa: rip, ...conDecisioni(ctx),
+          feedback: ctx.feedback || null, ripresa: rip, ...conDecisioni(ctx), ...conImmagini(ctx),
           history: Array.isArray(ctx.history) ? ctx.history : [],
           historyDropped: Number(ctx.historyDropped) || 0,
         };
@@ -759,10 +764,11 @@ export function buildPayload(bucket, ctx = {}) {
         feedback: ctx.feedback || null,
         ...(typeof ctx.critique === 'string' && ctx.critique.trim() ? { critique: ctx.critique } : {}),
         ...conDecisioni(ctx),
+        ...conImmagini(ctx),
       };
     }
     case 'new-work': {
-      const out = { case: 'primo-passaggio', id: bucket.id, num: bucket.num, feedback: ctx.feedback || null, ...conDecisioni(ctx) };
+      const out = { case: 'primo-passaggio', id: bucket.id, num: bucket.num, feedback: ctx.feedback || null, ...conDecisioni(ctx), ...conImmagini(ctx) };
       // Chi lo ha preceduto aveva chiesto prima di avere un ramo, e l'owner ha
       // risposto: la domanda e la risposta viaggiano col lavoro, o si richiede.
       if (ctx.ripresa && typeof ctx.ripresa === 'object') out.ripresa = ctx.ripresa;
@@ -1855,6 +1861,7 @@ export function serverCtx(bucket, fromServer, diff = '') {
     return {
       feedback: (payload && payload.feedback) || null,
       decisioni: Array.isArray(payload && payload.decisioni) ? payload.decisioni : [],
+      immagini: Array.isArray(payload && payload.immagini) ? payload.immagini : [],
       history: Array.isArray(payload && payload.history) ? payload.history : [],
       // Quante critiche più vecchie il server ha tolto dalla serie: si stampa
       // nell'avvertenza, così i giri mancanti non passano per inesistenti.
@@ -1987,8 +1994,10 @@ export function emit(bucket, ctx) {
       misura: (p) => JSON.stringify(stampaCon(p), null, 2).length + 1,
     });
   } catch (e) {
-    // Meglio una stampa lunga che un pezzo perso: il payload resta intero, e si dice perché.
+    // Meglio una stampa lunga che un pezzo perso: il payload resta intero, e si dice perché. Le immagini
+    // no: megabyte di base64 in stampa non li legge nessuno, la voce porta il motivo.
     process.stderr.write(`[dispatch] non riesco a scrivere i pezzi grossi del payload in file (${e.message}): restano nella stampa\n`);
+    payload = immaginiSenzaByte(pieno, e.message);
   }
   const out = stampaCon(payload);
   lastEmitted = { role: bucket.role, num: bucket.num || '' };
