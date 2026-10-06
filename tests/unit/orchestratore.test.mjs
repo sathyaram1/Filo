@@ -5,14 +5,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { createRequire } from 'node:module';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   apriDerivatiDi, modoDerivati, attesaLimite, caricoBasta, chiaveVerdetto, classificaFinish, creaMotore, decidiDopoVerifica, derivatiDaAprire, nuovaPratica, passoDalRamo,
   promptLavoratore, promptVerificatore, regolaFile, richiestaArg, riprendi, rigaStato, serveDeploy, siSovrappongono, toccaRegole, togliWorktree,
 } from '../../scripts/lib/orchestratore.mjs';
 import {
-  accessoDaStatus, argomentiClaude, envFiglio, frontmatter, leggiUscitaClaude, modelloDelRuolo, richiestaDaLettura, trovaClaude,
+  IMPOSTAZIONI_NPM_VICINE, OPZIONI_DI, accessoDaStatus, argomentiClaude, envFiglio, frontmatter, leggiArgomenti, leggiUscitaClaude, modelloDelRuolo, opzioniDa, opzioniTenuteDaNpm, richiestaDaLettura, trovaClaude,
 } from '../../scripts/orchestratore-locale.mjs';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
@@ -895,4 +896,115 @@ test('due lavori arrivano alla chiusura insieme: un finish per volta, anche ment
   const fine = await b.motore.avvia();
   assert.deepEqual([fine.pratiche[21].fase, fine.pratiche[22].fase], ['fuso', 'fuso']);
   assert.equal(massimo, 1);
+});
+
+// ─── #1027: un argomento che non torna ferma il comando, mai preso per buono ───
+
+test('argomenti: opzione storpiata o di un altro comando, senza valore, che si mangia la successiva, ripetuta o con un numero che non lo è → errore che lo dice', () => {
+  const no = (cmd, args, re) => assert.throws(() => (cmd === 'avvia' ? opzioniDa(args) : leggiArgomenti(cmd, args)), (e) => re.test(e.message) && /Non ho fatto niente/.test(e.message) && e.uso, `${cmd} ${args.join(' ')}`);
+  no('aggiungi', ['41', '--richeista', 'fai X'], /opzione sconosciuta --richeista \(forse --richiesta\?\)/);
+  no('aggiungi', ['41', '--fiel', 'scripts/'], /forse --file\?/);
+  no('aggiungi', ['41', '--richiesta'], /--richiesta vuole un testo/);
+  no('aggiungi', ['41', '--file'], /--file vuole una o più regole/);
+  no('aggiungi', ['41', '--file', ' , '], /--file vuole una o più regole/);
+  no('aggiungi', ['41', '--richiesta', ' \t '], /--richiesta vuole un testo, non solo spazi/);
+  no('aggiungi', ['41', '--richiesta', '--file', 'x'], /«--file» è un’altra opzione/);
+  no('aggiungi', ['41', '--dry-run'], /--dry-run vale per avvia/);
+  no('avvia', ['--paralleli', '--dry-run', '41'], /--paralleli vuole un numero intero da 1 in su, e «--dry-run» è un’altra opzione/);
+  no('avvia', ['--paralleli', '--dry-run'], /«--dry-run» è un’altra opzione/);
+  no('avvia', ['--paralleli', 'due', '--dry-run'], /--paralleli vuole un numero intero da 1 in su, non «due»/);
+  no('avvia', ['--tetto', '-3'], /--tetto vuole un numero intero da 1 in su, non «-3»/);
+  no('avvia', ['--tetto', '0'], /non «0»/);
+  no('avvia', ['--paralleli', '1.5'], /non «1\.5»/);
+  no('avvia', ['--tetto'], /--tetto vuole un numero intero/);
+  no('avvia', ['--budget-istanza', 'dieci'], /--budget-istanza vuole un importo in dollari sopra zero, non «dieci»/);
+  no('avvia', ['--budget-istanza'], /--budget-istanza vuole un importo/);
+  no('avvia', ['--ore-istanza', 'tante'], /--ore-istanza vuole/);
+  no('avvia', ['--cpu-max', '120'], /--cpu-max vuole una percentuale da 1 a 100/);
+  no('avvia', ['--derivati', 'tutti'], /--derivati vuole non-locale, locale o nessuno/);
+  no('avvia', ['--dry-run=si'], /--dry-run non vuole un valore/);
+  no('avvia', ['--paralleli=3', '--paralleli', '2'], /--paralleli data due volte/);
+  no('avvia', ['41'], /i numeri valgono solo con --dry-run.*aggiungi 41/);
+  no('avvia', ['—dry-run'], /opzione sconosciuta —dry-run \(forse --dry-run\?\)/);
+  no('avvia', ['--dry-run', 'quarantuno'], /argomento non capito «quarantuno»/);
+  no('togli', ['7', '--dry-run'], /--dry-run vale per avvia/);
+  no('riprendi', ['7', 'la B', '--forza'], /opzione sconosciuta --forza/);
+
+  const o = opzioniDa(['--dry-run', '#4242', '--paralleli=3', '--budget-istanza', '2,5', '--tetto', '2', '--derivati', 'nessuno', '--ore-istanza', '1.5', '--cpu-max', '70']);
+  assert.deepEqual([o.dryRun, o.numeri, o.paralleli, o.budgetIstanza, o.tetto, o.derivati, o.oreIstanza, o.cpuMax], [true, [4242], 3, 2.5, 2, 'nessuno', 1.5, 70]);
+  assert.equal(opzioniDa([]).paralleli, 2);
+  assert.deepEqual(leggiArgomenti('aggiungi', ['41', '--richiesta', '- punto uno\n- punto due', '--file', 'scripts/**, tests/']), {
+    opz: { richiesta: '- punto uno\n- punto due', file: ['scripts/**', 'tests/'] }, posizionali: ['41'],
+  });
+  assert.deepEqual(leggiArgomenti('riprendi', ['7', 'la', '-B']).posizionali, ['7', 'la', '-B']);
+});
+
+test('aggiungi e avvia dalla riga di comando: col refuso o col valore mancante niente coda e niente giro; scritti bene la richiesta arriva intera', () => {
+  const d = cartellaTemporanea('orch-argomenti-');
+  const orch = (...a) => spawnSync(process.execPath, ['scripts/orchestratore-locale.mjs', ...a], {
+    cwd: ROOT, encoding: 'utf8', env: { ...process.env, FILO_ORCH_DIR: d }, timeout: 60_000,
+  });
+  const stato = join(d, 'stato.json');
+  for (const a of [['41', '--richeista', 'solo il bottone'], ['41', '--richiesta'], ['41', '--file'], ['41', '--richiesta', '   ']]) {
+    const r = orch('aggiungi', ...a);
+    assert.equal(r.status, 1, a.join(' '));
+    assert.match(r.stderr, /Non ho fatto niente/);
+    assert.doesNotMatch(r.stdout, /in coda/);
+    assert.equal(existsSync(stato), false, a.join(' '));
+  }
+  for (const a of [['--paralleli', '--dry-run', '41'], ['--paralleli', '--dry-run'], ['--tetto', '-3', '--dry-run'], ['--budget-istanza', 'dieci']]) {
+    const r = orch('avvia', ...a);
+    assert.equal(r.status, 1, a.join(' '));
+    assert.match(r.stderr, /Non ho fatto niente/);
+    assert.equal(r.stdout, '', a.join(' '));
+    assert.deepEqual([existsSync(join(d, 'avvia.lock')), existsSync(join(d, 'orchestratore.log'))], [false, false]);
+  }
+  const r = orch('aggiungi', '41', '--richiesta', '  solo il bottone  ', '--file', 'src/pages/**');
+  assert.equal(r.status, 0, r.stderr);
+  const p = JSON.parse(readFileSync(stato, 'utf8')).pratiche[41];
+  assert.deepEqual([p.richiesta, p.file], ['solo il bottone', ['src/pages/**']]);
+  const v = orch('avvia', '--dry-run', '--budget-istanza', '2,5');
+  assert.equal(v.status, 0, v.stderr);
+  assert.match(v.stdout, /verify-local\.mjs start "solo il bottone" --feedback 41/);
+});
+
+test('npm run orchestra senza «--»: le opzioni che npm si è tenuto (anche storpiate) fermano il comando invece di sparire', () => {
+  const npm = { npm_lifecycle_script: 'node scripts/orchestratore-locale.mjs', npm_config_cache: '/c', npm_config_user_agent: 'npm/10', npm_config_prefix: '/p' };
+  assert.deepEqual(opzioniTenuteDaNpm(npm), []);
+  assert.deepEqual(opzioniTenuteDaNpm({ ...npm, npm_config_dry_run: 'true', npm_config_paralleli: '3', npm_config_richeista: 'true' }), ['--dry-run', '--paralleli', '--richeista']);
+  assert.deepEqual(opzioniTenuteDaNpm({ npm_lifecycle_script: 'node --test tests/unit', npm_config_dry_run: 'true' }), [], 'un altro script npm non è affar suo');
+
+  const d = cartellaTemporanea('orch-npm-');
+  const r = spawnSync(process.execPath, ['scripts/orchestratore-locale.mjs', 'avvia'], {
+    cwd: ROOT, encoding: 'utf8', timeout: 60_000, env: { ...process.env, ...npm, npm_config_dry_run: 'true', FILO_ORCH_DIR: d },
+  });
+  assert.equal(r.status, 1, r.stdout);
+  assert.match(r.stderr, /npm si è tenuto --dry-run: .*npm run orchestra -- avvia.*Non ho fatto niente/);
+  assert.equal(r.stdout, '');
+  assert.deepEqual([existsSync(join(d, 'avvia.lock')), existsSync(join(d, 'orchestratore.log'))], [false, false]);
+});
+
+test('le impostazioni di npm stesso (cafile nel .npmrc) non sono opzioni tenute da npm: col «--» giusto il comando parte', (t) => {
+  const npm = { npm_lifecycle_script: 'node scripts/orchestratore-locale.mjs', npm_config_cafile: '/certs/azienda.pem' };
+  assert.deepEqual(opzioniTenuteDaNpm(npm), []);
+  assert.deepEqual(opzioniTenuteDaNpm({ ...npm, npm_config_fiel: 'true' }), ['--fiel'], 'un refuso vero resta un refuso');
+
+  const dir = [process.env.npm_execpath, join(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+    join(dirname(process.execPath), '..', 'lib', 'node_modules', 'npm', 'bin', 'npm-cli.js')].find((f) => f && /npm-cli\.js$/.test(f) && existsSync(f));
+  let definizioni;
+  try { definizioni = createRequire(dir)('@npmcli/config/lib/definitions').definitions; } catch (_) { /* npm vecchio o altrove */ }
+  if (!definizioni) { t.skip('definizioni di npm non trovate'); return; }
+  const tutte = Object.fromEntries(Object.keys(definizioni).map((k) => [`npm_config_${k.replace(/-/g, '_')}`, 'x']));
+  const tenute = opzioniTenuteDaNpm({ npm_lifecycle_script: 'node scripts/orchestratore-locale.mjs', ...tutte });
+  const nostre = new Set(Object.values(OPZIONI_DI).flatMap((s) => Object.keys(s)));
+  assert.deepEqual(tenute.filter((o) => !nostre.has(o)), [], `impostazioni di npm prese per refusi: aggiungile a IMPOSTAZIONI_NPM_VICINE (${IMPOSTAZIONI_NPM_VICINE.join(', ')})`);
+});
+
+test('una richiesta di soli spazi rimasta nello stato vale come mancante: lavoratore e verifica ricevono quella del feedback', async () => {
+  assert.equal(nuovaPratica({ num: 9, richiesta: ' \n ' }).richiesta, '');
+  const b = banco({ pratiche: [{ ...nuovaPratica({ num: 9, slug: 'nove' }), richiesta: '   ' }] });
+  const p = (await b.motore.avvia()).pratiche[9];
+  assert.equal(p.fase, 'fuso', JSON.stringify(p.fermo));
+  assert.equal(p.richiesta, 'richiesta letta');
+  assert.match(b.righe().find((x) => /verify-local\.mjs start/.test(x)), /start richiesta letta --feedback 9/);
 });
