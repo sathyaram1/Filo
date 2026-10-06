@@ -435,6 +435,7 @@ module.exports = function register(on, ctx) {
       // La pagina mostra subito chi ha messo il segno «fondi senza chiedermelo»:
       // glielo dice il main, che è l'unico a saperlo. Anche il quando, che per
       // la pagina è l'identità del segno (#701).
+      if (waitsFor) return { ok: true, waitsFor };
       if (localOnly) return { ok: true, by: localOnly.by, at: localOnly.at };
       return mergePreapproved ? { ok: true, by: mergePreapproved.by, at: mergePreapproved.at } : { ok: true };
     } catch (e) {
