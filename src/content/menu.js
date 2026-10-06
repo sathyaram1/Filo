@@ -597,7 +597,10 @@
       root.appendChild(el);
     }
 
-    menuHost().appendChild(root);
+    const host = menuHost();
+    host.appendChild(root);
+    senzaZoomDelSito(root, host);
+    tieniPerSe(root, host);
     osserva(root);
 
     // #405 — su una pagina con riquadri incorporati il menu può nascere dentro
@@ -611,8 +614,8 @@
       if (nested && T) Promise.resolve(chrome.runtime.sendMessage({ type: T })).catch(() => {});
     } catch (_) {}
 
-    // Compensazione zoom (così il menu non scala con Ctrl+/-)
-    const cleanupZoom = (global.SN_POPUP?.attachZoomCompensation || (() => () => {}))(root);
+    // Nelle pagine di Filo il menu non scala con Ctrl+/- (sul web sì: vedi compensaZoom).
+    const cleanupZoom = compensaZoom(root);
 
     // Posizionamento: misura, flip se necessario.
     place(root, x, y);
@@ -808,7 +811,7 @@
     }
 
     casaDeiPezzi().appendChild(sub);
-    const cleanupZoom = (global.SN_POPUP?.attachZoomCompensation || (() => () => {}))(sub);
+    const cleanupZoom = compensaZoom(sub);
     activeMenu.cleanups.push(cleanupZoom);
     activeMenu.subRoot = sub;
     osserva(sub);
@@ -1025,7 +1028,7 @@
 
     casaDeiPezzi().appendChild(sub);
     // Compensazione zoom anche per il sub-menu
-    const cleanupZoom = (global.SN_POPUP?.attachZoomCompensation || (() => () => {}))(sub);
+    const cleanupZoom = compensaZoom(sub);
     activeMenu.cleanups.push(cleanupZoom);
     activeMenu.subRoot = sub;
     osserva(sub);
@@ -1067,7 +1070,7 @@
     if (opts.dropTarget) attachDropZone(sub, { target: opts.dropTarget, onDrop: opts.onDrop });
 
     casaDeiPezzi().appendChild(sub);
-    const cleanupZoom = (global.SN_POPUP?.attachZoomCompensation || (() => () => {}))(sub);
+    const cleanupZoom = compensaZoom(sub);
     activeMenu.cleanups.push(cleanupZoom);
     activeMenu.subRoot = sub;
     osserva(sub);
