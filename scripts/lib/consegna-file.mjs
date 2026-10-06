@@ -6,6 +6,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
+import { bmpInPng } from './bmp-png.mjs';
 
 // Tetto del solo payload quando chi chiama non misura la stampa intera (`misura`).
 export const PAYLOAD_IN_STAMPA_MAX = 8000;
