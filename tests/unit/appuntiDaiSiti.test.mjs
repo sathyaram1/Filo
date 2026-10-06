@@ -1,9 +1,10 @@
 // #589.4 — chi tocca la cronologia appunti: Filo sempre; un sito legge l'elenco solo dal riquadro dove l'utente ha appena
 // aperto il menu, nella scheda in vista, e scrive solo dopo un gesto dell'utente su quella scheda.
 
-import { test } from 'node:test';
+import { test, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { scorri, inAttesa, finoA } from '../helpers/orologio.mjs';
 
 const require = createRequire(import.meta.url);
 const Appunti = require('../../src/main/services/appuntiDaiSiti.js');
@@ -33,25 +34,35 @@ const sito = (over = {}) => {
 const apriMenu = (s, frame) => s.wc.emetti('context-menu', {}, { frame });
 const leggi = (s) => Appunti.elencoLeggibile(s, 'https://sito.example/');
 
-test('una scheda di sfondo non legge l\'elenco, nemmeno col menu appena aperto, e non aspetta', async () => {
+// Le attese del menu sull'orologio finto: «subito» e «dopo l'attesa» si contano in tick, non in millisecondi di una
+// macchina che può essere carica (#1063). Si parte dall'ora vera: un gesto all'istante zero sembrerebbe assente.
+async function conOrologioFinto(fn) {
+  mock.timers.enable({ apis: ['setTimeout', 'Date'], now: Date.now() });
+  try { await fn(); } finally { mock.timers.reset(); }
+}
+
+test('una scheda di sfondo non legge l\'elenco, nemmeno col menu appena aperto, e non aspetta', () => conOrologioFinto(async () => {
   const s = sito({ tab: { id: 2, url: 'https://sito.example/' } });
   apriMenu(s, PRINCIPALE);
-  const t0 = Date.now();
-  assert.equal(await leggi(s), false);
-  assert.ok(Date.now() - t0 < 200, 'il rifiuto per la scheda di sfondo è subito');
-});
+  const esito = inAttesa(leggi(s));
+  await scorri(0);
+  assert.equal(esito.fatto, true, 'il rifiuto per la scheda di sfondo è subito, senza che passi tempo');
+  assert.equal(esito.valore, false);
+}));
 
-test('la scheda in vista legge solo col menu aperto nel suo riquadro: un clic qualunque non basta', async () => {
+test('la scheda in vista legge solo col menu aperto nel suo riquadro: un clic qualunque non basta', () => conOrologioFinto(async () => {
   const s = sito();
   s.wc.emetti('input-event', {}, { type: 'mouseDown', modifiers: ['leftbuttondown'] });
-  const t0 = Date.now();
-  assert.equal(await leggi(s), false, 'un clic che non apre il menu');
-  assert.ok(Date.now() - t0 >= Appunti.ATTESA_DEL_MENU_MS - 50, 'prima del no si aspetta il segnale del menu');
+  const lettura = leggi(s);
+  const esito = inAttesa(lettura);
+  await scorri(Appunti.ATTESA_DEL_MENU_MS - 50);
+  assert.equal(esito.fatto, false, 'prima del no si aspetta il segnale del menu');
+  assert.equal(await finoA(lettura, { passo: 20 }), false, 'un clic che non apre il menu');
   apriMenu(s, PRINCIPALE);
-  assert.equal(await leggi(s), true);
+  assert.equal(await finoA(leggi(s), { passo: 20 }), true);
   s.wc._filoMenuAperto.alle = Date.now() - Permessi.GESTO_MS - 1;
-  assert.equal(await leggi(s), false, 'un menu vecchio non vale');
-});
+  assert.equal(await finoA(leggi(s), { passo: 20 }), false, 'un menu vecchio non vale');
+}));
 
 test('il menu aperto nella pagina non vale per il riquadro di un altro sito, e viceversa', async () => {
   const s = sito();
@@ -146,13 +157,14 @@ test('un mittente senza finestra non legge; una finestra aperta da un sito legge
   assert.equal(Appunti.mittenteInVista(sito({ tab: null })), false, 'in una finestra con le schede serve la scheda');
 });
 
-test('una scheda che chiude durante l\'attesa non legge', async () => {
+test('una scheda che chiude durante l\'attesa non legge', () => conOrologioFinto(async () => {
   const s = sito();
   let morta = false;
   s.wc.isDestroyed = () => morta;
-  const esito = leggi(s);
-  setTimeout(() => { morta = true; }, 40);
-  const t0 = Date.now();
-  assert.equal(await esito, false);
-  assert.ok(Date.now() - t0 < Appunti.ATTESA_DEL_MENU_MS);
-});
+  const esito = inAttesa(leggi(s));
+  await scorri(40);
+  morta = true;
+  await scorri(40);
+  assert.equal(esito.fatto, true, 'chiusa la scheda, il no arriva prima della fine dell\'attesa del menu');
+  assert.equal(esito.valore, false);
+}));
