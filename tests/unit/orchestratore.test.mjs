@@ -721,7 +721,9 @@ test('verificatore che registra la critica e poi cade (limite d’uso, rete): no
     let n = 0;
     b.dep.claude = async (x) => { n += 1; if (n === 2) errori.push(registraECade); if (n === 3) errori.push(consegna); return claude(x); };
     const p = (await b.motore.avvia()).pratiche[7];
-    assert.deepEqual(b.prompt.map((x) => x.ruolo), ['lavoratore', 'verificatore', 'correttore', 'verificatore'], errore);
+    const ruoli = b.prompt.map((x) => x.ruolo);
+    assert.deepEqual(ruoli.filter((_, i) => i % 2 === 0), ['lavoratore', 'correttore'], errore);
+    assert.deepEqual(ruoli.filter((_, i) => i % 2 === 1), Array(2).fill('verificatore'), errore);
     assert.match(b.prompt[2].testo, /- \[2i\] manca Y/);
     assert.equal(p.fase, 'fuso', errore);
   }
@@ -1227,7 +1229,11 @@ test('sforzo per ruolo come nelle routine (#1041): il primo lavoro dal suo agent
   assert.equal(ruoloDelLavoro({ compito: 'correzione' }), 'correttore');
   assert.equal(ruoloDelLavoro({ compito: 'riallinea' }), 'riallineatore');
   assert.equal(AGENTE_DEL_RUOLO.lavoratore, 'routine-nuovo-lavoro');
-  for (const r of ['correttore', 'riallineatore', 'ripresa', 'verificatore']) assert.equal(AGENTE_DEL_RUOLO[r], 'routine-worker', r);
+  const delWorker = [
+    'correttore', 'riallineatore', 'ripresa',
+    'verificatore',
+  ];
+  for (const r of delWorker) assert.equal(AGENTE_DEL_RUOLO[r], 'routine-worker', r);
   for (const [ruolo, nome] of Object.entries(AGENTE_DEL_RUOLO)) {
     const a = frontmatter(readFileSync(join(ROOT, '.claude', 'agents', `${nome}.md`), 'utf8'));
     assert.deepEqual(modelloDelRuolo(ruolo, ROOT), { model: a.model, effort: a.effort }, ruolo);
