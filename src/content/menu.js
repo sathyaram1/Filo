@@ -961,7 +961,8 @@
             // `detail === 0` distingue Invio/Barra dal clic del mouse: col
             // mouse il fuoco non si sposta, o comparirebbe un anello di fuoco
             // sulla riga vicina a ogni clic.
-            const avevaFuoco = ev.detail === 0 && document.activeElement === rm;
+            // Nello shadow chiuso (#589.8) il documento vede solo l'ospite: il fuoco si chiede alla radice del bottone.
+            const avevaFuoco = ev.detail === 0 && rm.getRootNode().activeElement === rm;
             for (const gemella of list.querySelectorAll('.sn-menu-history-item')) {
               if (gemella.dataset.snKey !== row.dataset.snKey) continue;
               gemella.classList.add('sn-menu-history-gone');
@@ -1517,6 +1518,8 @@
         incolla: centro(riga.querySelector('.sn-menu-history-paste')),
         rimuovi: centro(riga.querySelector('.sn-menu-history-remove')),
         tolta: riga.classList.contains('sn-menu-history-gone'),
+        miniatura: riga.querySelector('.sn-menu-history-thumb')?.getAttribute('src') || null,
+        fuocoRimuovi: sub.getRootNode().activeElement === riga.querySelector('.sn-menu-history-remove'),
       })),
       vuoto: [...sub.querySelectorAll('.sn-menu-empty')].filter(visibile).map((e) => e.textContent).join(' '),
       cerca: cerca ? {
