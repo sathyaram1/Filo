@@ -208,27 +208,37 @@ const chiaveRilievo = (f) => `${f.level}${f.sede}:${String(f.text).slice(0, 80)}
 /** Come togli apre i rilievi rimasti: come li apriva l'avvia che ha guidato il lavoro. PURA. */
 export const modoDerivati = (p) => (p && p.derivati) || OPZIONI_BASE.derivati;
 
+// Si fa solo in locale (LOCAL.md): il server e i suoi deploy, le regole pubblicate, le impostazioni dell'owner. Il resto alle routine.
+const SOLO_IN_LOCALE = /filo-security|\bfunctions[/\\]|\b(firestore|storage)\.rules\b|firestore\.indexes|\b(ri)?deploy|server:(pubblica|fondi)|regole:pubblica|console (di |del )?Firebase|Firebase console|\bSecrets? (di|su) GitHub|GitHub Secrets?|\bruleset\b|token admin|FILO_ADMIN_/i;
+
+/** Chi lavora un rilievo messo da parte: 'locale' solo se si fa soltanto in locale, sennò le routine. PURA. */
+export function doveSiLavora(f) {
+  return SOLO_IN_LOCALE.test(String((f && f.text) || '')) ? 'locale' : 'non-locale';
+}
+
 /**
  * I feedback da aprire per i rilievi che il lavoro non ha corretto, raggruppati come li apre il server. PURA.
  * Il registro accumula i messi da parte giro dopo giro: si salta il singolo rilievo già aperto, non il gruppo, o ogni giro ripete i precedenti.
+ * Con `auto` i rilievi da lavorare in locale e quelli per le routine finiscono in feedback separati.
  */
-export function derivatiDaAprire(p, derived) {
+export function derivatiDaAprire(p, derived, modo = 'auto') {
   const fatti = new Set((p.derivatiAperti || []).flatMap((d) => (Array.isArray(d.chiavi) ? d.chiavi : String(d.chiave || '').split('|'))));
   const nuovi = ROUND.derivedGroups(Array.isArray(derived) ? derived : []).flatMap((g) => g.findings).filter((f) => !fatti.has(chiaveRilievo(f)));
-  return ROUND.derivedGroups(nuovi).map((g) => {
+  const dove = (f) => (modo === 'auto' ? doveSiLavora(f) : modo);
+  return ['non-locale', 'locale'].flatMap((qui) => ROUND.derivedGroups(nuovi.filter((f) => dove(f) === qui)).map((g) => {
     const chiavi = g.findings.map(chiaveRilievo);
     const chiave = chiavi.join('|');
     const prima = primaRiga(g.findings[0].text).replace(/\s+/g, ' ').trim();
     const titolo = g.tipo === 'rimasti' && g.findings.length > 1
-      ? `Rilievi rimasti del lavoro locale #${p.num}`
+      ? `Rilievi rimasti del lavoro locale #${p.num}${qui === 'locale' && modo === 'auto' ? ' (da fare in locale)' : ''}`
       : (prima.length > 90 ? `${prima.slice(0, 89)}…` : prima);
     const testo = [
       `Rilievo messo da parte nella verifica del lavoro locale #${p.num} (ramo ${ramoDi(p)}): ${ROUND.groupLabel(g)}.`,
       '',
       ROUND.formatFindings(g.findings),
     ].join('\n');
-    return { chiave, chiavi, titolo, testo, priorita: g.priority };
-  });
+    return { chiave, chiavi, titolo, testo, priorita: g.priority, dove: qui };
+  }));
 }
 
 const testa = (regole) => (regole ? [String(regole).trim(), '', '════════'] : []);
