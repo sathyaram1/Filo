@@ -23,7 +23,7 @@ export function cartellaConsegna(root, base = tmpdir()) {
 }
 
 // Il server riconosce il tipo dai primi byte (contratto #900); l'estensione fa aprire il file come immagine.
-const ESTENSIONE_IMMAGINE = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'image/bmp': 'bmp' };
+const ESTENSIONE_IMMAGINE = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' };
 
 // Una voce di `immagini` aperta diventa un file: `file` al posto di `base64`. Fallite e rinviate restano
 // com'erano, col loro motivo. Byte diversi da quelli dichiarati sono un'immagine rotta, non da aprire.
