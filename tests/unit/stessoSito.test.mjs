@@ -28,6 +28,10 @@ for (const mode of ['default', 'privacy']) {
       ['https://uno.com.pe/', 'https://due.com.pe/'],
       ['https://ena.com.gr/', 'https://dio.com.gr/'],
       ['https://comune.bergamo.it/', 'https://altro.bergamo.it/'],
+      ['https://uno.com.pg/', 'https://due.com.pg/'],
+      ['https://a.chiyoda.tokyo.jp/', 'https://b.chiyoda.tokyo.jp/'],
+      ['https://a.lib.ca.us/', 'https://b.lib.ca.us/'],
+      ['https://x.公司.cn/', 'https://y.公司.cn/'],
       ['http://192.168.1.10/', 'http://10.0.1.10/'],
       ['http://[::1]:8080/', 'http://[fe80::1]/'],
       ['http://localhost:3000/', 'http://127.0.0.1:3000/'],
@@ -64,6 +68,13 @@ test('il sito di un indirizzo: dominio registrabile, piattaforme comprese, IP e 
     ['http://192.168.1.10:8080/x', '192.168.1.10'],
     ['http://localhost:3000/', 'localhost'],
     ['alice.github.io', 'alice.github.io'],
+    // Regole a jolly, a tre etichette, con eccezione e non latine: la sezione ICANN della lista pubblica intera.
+    ['https://uno.com.pg/', 'uno.com.pg'],
+    ['https://www.scuola.distretto.sch.uk/', 'scuola.distretto.sch.uk'],
+    ['https://www.a.chiyoda.tokyo.jp/', 'a.chiyoda.tokyo.jp'],
+    ['https://www.city.kawasaki.jp/', 'city.kawasaki.jp'],
+    ['https://www.x.公司.cn/', 'x.xn--55qx5d.cn'],
+    ['https://www.foo.kw/', 'foo.kw'],
   ]) assert.equal(Sito.sitoDi(url), sito, url);
   for (const vuoto of ['', '   ', null, undefined, 'about:blank', 'data:text/plain,x', 'non è un indirizzo']) {
     assert.equal(Sito.sitoDi(vuoto), null, String(vuoto));
