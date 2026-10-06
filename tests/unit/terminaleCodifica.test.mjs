@@ -134,31 +134,24 @@ test('il comando digitato dall\'utente non arriva a PowerShell con byte fuori da
   // dalla parte opposta. La cura è non far viaggiare caratteri non ASCII.
   const S = require(join(ROOT, 'src', 'main', 'services', 'shell.js'));
 
-  // Un comando di soli caratteri ASCII parte identico a prima: `exit`, `cd`,
-  // le variabili e tutto quello che un utente digita di solito non cambiano.
-  for (const c of ['exit', 'cd ..', '$x = 5', 'Get-ChildItem -Name', '']) {
-    assert.equal(S.comandoPerPowerShell(c), c);
-  }
-
-  // Un comando accentato parte in una forma che sul filo è solo ASCII…
+  // Ogni comando, accentato o no, parte in una forma che sul filo è solo ASCII (anche come dato per l'esito, #718)…
   const comando = 'Get-Content "RELAZIONE — attività finale.txt"';
+  for (const c of [comando, 'exit', 'cd ..', '']) {
+    const sulFilo = S.comandoPerPowerShell(c);
+    assert.ok(
+      // eslint-disable-next-line no-control-regex
+      /^[\x00-\x7F]*$/.test(sulFilo),
+      `sul filo ci sono ancora byte fuori dall'ASCII: ${sulFilo}`,
+    );
+    // …e PowerShell lo rimette insieme IDENTICO a quello che l'utente ha digitato.
+    const espressione = (sulFilo.match(/\$__filo_t=\(-join @\(((?:'(?:[^']|'')*'|\[char\]\d+)(?:,(?:'(?:[^']|'')*'|\[char\]\d+))*)\)\);/) || [])[1];
+    assert.ok(espressione, 'il comando deve viaggiare codificato, non interpolato');
+    const ricomposto = espressione.match(/'(?:[^']|'')*'|\[char\]\d+/g)
+      .map((p) => (p[0] === "'" ? p.slice(1, -1).replace(/''/g, "'") : String.fromCharCode(Number(p.slice(6)))))
+      .join('');
+    assert.equal(ricomposto, c);
+  }
   const sulFilo = S.comandoPerPowerShell(comando);
-  assert.ok(sulFilo !== comando, 'un comando accentato non può partire così com\'è');
-  assert.ok(
-    // eslint-disable-next-line no-control-regex
-    /^[\x00-\x7F]*$/.test(sulFilo),
-    `sul filo ci sono ancora byte fuori dall'ASCII: ${sulFilo}`,
-  );
-
-  // …e PowerShell lo rimette insieme IDENTICO a quello che l'utente ha
-  // digitato. Qui si rifà il giro che farebbe lui: si ripesca il testo
-  // codificato e lo si riporta a caratteri.
-  const espressione = (sulFilo.match(/\$__filo_t=\(-join @\(((?:'(?:[^']|'')*'|\[char\]\d+)(?:,(?:'(?:[^']|'')*'|\[char\]\d+))*)\)\);/) || [])[1];
-  assert.ok(espressione, 'il comando deve viaggiare codificato, non interpolato');
-  const ricomposto = espressione.match(/'(?:[^']|'')*'|\[char\]\d+/g)
-    .map((p) => (p[0] === "'" ? p.slice(1, -1).replace(/''/g, "'") : String.fromCharCode(Number(p.slice(6)))))
-    .join('');
-  assert.equal(ricomposto, comando);
   // Niente del comando dell'utente finisce dritto nella riga: se ci finisse,
   // una virgoletta basterebbe a uscire dalla stringa e a farsi eseguire altro.
   assert.ok(!sulFilo.includes('attività'));

@@ -52,20 +52,14 @@ function defaultCwd() {
 // in avanti: la riga di «pronto» parte nello stesso pezzo del preludio, quindi
 // andrebbe persa e la sessione resterebbe muta per sempre.
 //
-// La cura è non far viaggiare caratteri non ASCII sul filo. Il comando parte con
-// i caratteri speciali scritti come numeri e lo rimette insieme PowerShell, che
-// ricostruisce il testo da sé senza passare da nessuna tabella. Si fa SOLO quando serve: un comando di soli
-// caratteri ASCII parte identico a prima, e `exit`, `cd`, le variabili e tutto
-// quello che un utente digita di solito si comportano come si sono sempre
-// comportati. Il testo ricomposto gira nello scope di chi chiama, quindi anche
-// per un comando accentato le variabili e la cartella restano quelle della
-// sessione: continua a essere un terminale vero.
+// La cura è non far viaggiare caratteri non ASCII sul filo: il comando parte con i caratteri speciali scritti come
+// numeri e lo rimette insieme PowerShell, senza passare da nessuna tabella. Sempre, non solo per gli accenti, perché
+// il testo serve anche come dato a chi conta gli esiti dei programmi (#718, terminal.js); gira nello scope di chi
+// chiama, quindi variabili, cartella ed `exit` restano quelli di un terminale vero.
 const SOLO_ASCII = /^[\x00-\x7F]*$/;
 
 function comandoPerPowerShell(command, coda = '') {
-  const cmd = String(command == null ? '' : command);
-  if (!SOLO_ASCII.test(cmd)) return invocaCodificato(cmd, coda);
-  return coda ? `${cmd}\n${coda}` : cmd;
+  return invocaCodificato(String(command == null ? '' : command), coda);
 }
 
 // cmd legge lo stdin di una pipe un byte per volta e decodifica ogni byte da solo con la tabella attiva: con 65001
