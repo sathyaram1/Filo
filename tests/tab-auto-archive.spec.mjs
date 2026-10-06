@@ -696,3 +696,56 @@ test('un numero o una data messi dai pulsanti della pagina non proteggono la sch
   expect(aperte).not.toContain('Negozio');
   expect(aperte).toContain('Nota');
 });
+
+test('un modulo di più campi mandato senza cambiare pagina non protegge più la scheda quando la pagina ne mostra il testo (#824)', async ({ app, shell, testServer }) => {
+  const page = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Voli</title></head><body>
+    <form id="f"><input id="da" placeholder="Da dove parti?"><input id="a" placeholder="Dove vuoi andare?"><button>Cerca voli</button></form><ul id="ris"></ul>
+    <script>f.addEventListener('submit', (e) => { e.preventDefault(); setTimeout(() => { ris.innerHTML = '<li>' + da.value + ' → ' + a.value + ' 49 €</li>'; }, 300); });</script>
+    </body></html>`));
+  await page.locator('#da').click();
+  await page.keyboard.type('Milano');
+  await page.locator('#a').click();
+  await page.keyboard.type('Parigi');
+  await expect.poll(() => moduloDi(shell, 'Voli'), { timeout: 8_000 }).toBe(true);
+  await page.locator('button').click();
+  await expect(page.locator('#ris li')).toHaveText('Milano → Parigi 49 €');
+
+  // Lo stesso modulo respinto, senza risultati, resta da proteggere.
+  const respinto = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Respinto</title></head><body>
+    <form id="f"><input id="nome"><input id="cognome"><button>Avanti</button></form><p id="err"></p>
+    <script>f.addEventListener('submit', (e) => { e.preventDefault(); err.textContent = 'Manca la data di nascita'; });</script>
+    </body></html>`));
+  await respinto.locator('#nome').click();
+  await respinto.keyboard.type('Giovanna');
+  await respinto.locator('#cognome').click();
+  await respinto.keyboard.type('Bianchi');
+  await respinto.locator('button').click();
+  await expect(respinto.locator('#err')).toHaveText('Manca la data di nascita');
+
+  await pulisciTutto(app, shell, testServer);
+  const aperte = await titoliAperti(shell);
+  expect(aperte).not.toContain('Voli');
+  expect(aperte).toContain('Respinto');
+});
+
+test('il testo scritto nei riquadri di Filo dentro la pagina non protegge la scheda (#824)', async ({ app, shell, testServer }) => {
+  const page = await apriEsatta(app, shell, testServer.html('<!doctype html><html><head><title>Articolo</title></head><body><p>Un articolo qualunque.</p></body></html>'));
+  // Niente cifratura nel contenitore dei test: l'invio si accoda sul disco come per un utente vero.
+  await app.evaluate(() => { globalThis.SN_FEEDBACK.encryptionUnavailable = () => ''; });
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    const tab = win._filoTabs.tabs.find((t) => t.title === 'Articolo');
+    tab.view.webContents.mainFrame.send('filo:broadcast', { type: 'top_frame_command', surface: 'feedback' });
+  });
+  await expect(page.locator('.sn-fb-text')).toBeVisible({ timeout: 6000 });
+  await page.locator('.sn-fb-text').click();
+  await page.keyboard.type('Il bottone non funziona');
+  await page.waitForTimeout(800);
+  expect(await moduloDi(shell, 'Articolo')).toBe(false);
+  await page.locator('.sn-fb-send').click();
+  await expect(page.locator('.sn-fb-modal')).toHaveCount(0, { timeout: 8000 });
+  await page.waitForTimeout(800);
+
+  await pulisciTutto(app, shell, testServer);
+  expect(await titoliAperti(shell)).not.toContain('Articolo');
+});

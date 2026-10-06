@@ -677,22 +677,35 @@
     }
 
     const bersaglio = (e) => (e.composedPath && e.composedPath()[0]) || e.target;
+    // I riquadri di Filo nella pagina (feedback, spiegazioni, Aiuto) non sono del sito: il loro
+    // testo parte o si butta col riquadro. Vale l'elenco di chi li ha disegnati, non l'attributo.
+    function diFilo(el) {
+      let nostre = [];
+      try { nostre = self.SN_FILO_UI?.aperti?.() || []; } catch (_) {}
+      for (let n = el; n && nostre.length;) {
+        if (nostre.some((r) => r === n || (r.contains && r.contains(n)))) return true;
+        const radice = n.getRootNode && n.getRootNode();
+        n = radice && radice.host ? radice.host : null;
+      }
+      return false;
+    }
     function campoDa(e) {
       const el = campoDiTesto(bersaglio(e));
-      return el && !diRicerca(el) ? el : null;
+      return el && !diRicerca(el) && !diFilo(el) ? el : null;
     }
     // Da dentro un componente chiuso la scrittura arriva al suo host, che non è un campo.
     function opaco(e) {
       if (typeof e.inputType !== 'string') return null;
       const t = bersaglio(e);
       if (!t || t.nodeType !== 1 || t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName)) return null;
-      return t;
+      return diFilo(t) ? null : t;
     }
     function aRiposo() {
       clearTimeout(rilettura);
       rilettura = setTimeout(() => { stato(); ricomparsi(); aggiorna(false); mandaImpronte(); }, 400);
     }
     function scritto(area, base) {
+      inAttesa.delete(area);
       if (!aree.has(area)) aree.set(area, base);
       if (area.tagName.toUpperCase() === 'TEXTAREA' || area.isContentEditable) lunghe.add(area);
       aggiorna(true);
@@ -732,8 +745,9 @@
 
     // Chi invia davvero lascia la pagina. Se la pagina trattiene l'invio, un
     // rifiuto (campo mancante) e un invio via script si somigliano: un modulo di
-    // una riga conta come inviato, uno più lungo resta da proteggere finché la
-    // pagina non ne svuota o toglie i campi.
+    // una riga conta come inviato; in uno più lungo ogni campo resta da proteggere
+    // finché la pagina non lo svuota, non lo toglie o non ne mostra il testo (i risultati).
+    const inAttesa = new WeakSet();
     function soloUnaRiga(form) {
       const campi = [...(form.elements || [])].filter((el) => campoDiTesto(el));
       return campi.length <= 1 && !campi.some((el) => el.tagName.toUpperCase() === 'TEXTAREA')
@@ -751,6 +765,8 @@
             if (t && t !== pulito(base)) partiti.add(impronta(t));
             aree.delete(a);
           }
+        } else {
+          for (const a of aree.keys()) if (a.form === form || (form.contains && form.contains(a))) inAttesa.add(a);
         }
         aggiorna(false);
         mandaImpronte();
@@ -782,7 +798,7 @@
         for (const el of r.querySelectorAll('textarea, [contenteditable], input')) {
           const nascosto = el.tagName.toUpperCase() === 'INPUT' && String(el.type).toLowerCase() === 'hidden';
           const area = nascosto ? el : campoDiTesto(el);
-          if (!area || aree.has(area) || area.readOnly || area.disabled || diRicerca(area)) continue;
+          if (!area || aree.has(area) || area.readOnly || area.disabled || diRicerca(area) || diFilo(area)) continue;
           const t = pulito(testo(area));
           if (!t) continue;
           const o = orfani.findIndex((x) => x === t || (x.length >= 20 && t.includes(x)));
@@ -795,22 +811,27 @@
     }
     // Il testo dei campi non conta (lo guarda adotta), né quello degli script della pagina.
     const NON_PAGINA = /^(script|style|noscript|template|textarea)$/i;
+    const fuoriPagina = (p) => !!p && (NON_PAGINA.test(p.tagName) || p.isContentEditable);
     function testoDellaPagina() {
       const pezzi = [];
       for (const doc of documenti(document)) for (const r of radici(doc)) {
         const w = doc.createTreeWalker(r, NodeFilter.SHOW_TEXT, {
-          acceptNode: (n) => (n.parentElement && NON_PAGINA.test(n.parentElement.tagName) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+          acceptNode: (n) => (fuoriPagina(n.parentElement) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
         });
         for (let n = w.nextNode(); n; n = w.nextNode()) pezzi.push(n.data);
       }
       return pulito(pezzi.join(''));
     }
     function ricomparsi() {
-      if (!orfani.length) return;
-      adotta(null);
-      if (!orfani.length) return;
+      if (orfani.length) adotta(null);
+      const mostrabili = [...aree.keys()].filter((a) => inAttesa.has(a) && viva(a));
+      if (!orfani.length && !mostrabili.length) return;
       const pagina = testoDellaPagina();
       for (let i = orfani.length - 1; i >= 0; i--) if (pagina.includes(orfani[i])) orfani.splice(i, 1);
+      for (const a of mostrabili) {
+        const t = pulito(testo(a));
+        if (t && pagina.includes(t)) aree.delete(a);
+      }
     }
 
     // I riquadri senza indirizzo proprio (gli editor classici scritti dalla pagina)
