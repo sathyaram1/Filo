@@ -163,9 +163,43 @@ test('nessuna voce della barra è un vicolo cieco: anche le aree non scritte han
     const pagina = join(ROOT, 'site', 'transparency', `${n.id}.html`);
     assert.ok(existsSync(pagina), `"${n.label}" è nella barra ma sul sito non ha nessuna pagina: 404`);
   }
-  const vuota = readFileSync(join(ROOT, 'site', 'transparency', 'privacy.html'), 'utf8');
+  const mancante = T.NAV.find((n) => !T.ids().includes(n.id));
+  if (!mancante) return;
+  const vuota = readFileSync(join(ROOT, 'site', 'transparency', `${mancante.id}.html`), 'utf8');
   assert.match(vuota, /non è ancora scritta/, 'la pagina di un\'area non scritta non lo dice');
   assert.match(vuota, /models\.html/, 'la pagina di un\'area non scritta non porta a quello che c\'è');
+});
+
+// #951 — Privacy e Sicurezza sono scritte: la loro pagina pubblica ha il documento, non il segnaposto.
+test('privacy e sicurezza hanno il loro documento, sulla pagina e per l\'agente', () => {
+  const { T } = loadModules();
+  for (const [id, titolo] of [['privacy', 'Privacy'], ['security', 'Sicurezza']]) {
+    const doc = T.get(id);
+    assert.ok(doc, `il documento "${id}" non esiste`);
+    assert.equal(doc.title, titolo);
+    assert.ok(doc.sections.some((s) => s.title === 'I punti deboli'), `"${id}": manca la sezione dei punti deboli`);
+    const pagina = readFileSync(join(ROOT, 'site', 'transparency', `${id}.html`), 'utf8');
+    assert.doesNotMatch(pagina, /non è ancora scritta/, `"${id}": la pagina pubblica è ancora il segnaposto`);
+    assert.match(pagina, /id="i-punti-deboli"/, `"${id}": la pagina pubblica non ha il documento`);
+    assert.doesNotMatch(T.asText(id), /NON esiste/, `"${id}": l'agente riceve un no`);
+    assert.doesNotMatch(doc.text, /NOTE DI LAVORO|BOZZA|\[NOTA/, `"${id}": è rimasto un pezzo della bozza`);
+  }
+  assert.match(T.asText('security'), /SHA-256/, 'il documento sulla sicurezza non dice come controllare il file scaricato');
+});
+
+test('un comando fra apici inversi si legge come codice sulla pagina e senza segni per l\'agente', () => {
+  const { tmp, leggi } = generaCopia({
+    'zz-codice.md': [
+      '---', 'id: zz-codice', 'title: Codice', 'order: 50', '---',
+      '', 'Scrivi `certutil -hashfile <file> SHA256` e poi **guarda** [qui](https://example.com/x).', '',
+    ],
+  });
+  const html = leggi('site', 'transparency', 'zz-codice.html');
+  assert.ok(html.includes('<code>certutil -hashfile &lt;file&gt; SHA256</code>'), 'il comando non è reso come codice');
+  assert.ok(!html.includes('`'), 'sulla pagina sono rimasti gli apici inversi');
+  const testo = leggi('src', 'shared', 'transparency.js');
+  assert.ok(testo.includes('Scrivi certutil -hashfile <file> SHA256 e poi guarda qui [1]'), 'il testo per il modello non è pulito');
+  rmSync(tmp, { recursive: true, force: true });
 });
 
 test('la barra si deriva dai documenti: uno nuovo e non previsto ci finisce da sé', () => {

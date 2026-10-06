@@ -23,10 +23,12 @@
   <script src="filo://shared/paneLayout.js"></script>
   <script src="filo://shared/feedback.js"></script>
   <script src="filo://shared/feedbackLive.js"></script>
+  <script src="filo://shared/feedbackLivePagina.js"></script>
   <script src="filo://shared/feedbackTransitions.js"></script>
   <script src="filo://shared/feedbackStatus.js"></script>
   <script src="filo://shared/feedbackThread.js"></script>
   <script src="filo://shared/manageReview.js"></script>
+  <script src="filo://shared/filoMarkdown.js"></script>
   <!-- #496 — va DOPO feedbackThread e manageReview: da lì prende la categoria d'autore e lo stato
        normalizzato, e se mancano si ferma dicendolo. -->
   <script src="filo://shared/feedbackStats.js"></script>
@@ -629,9 +631,11 @@
       width: 5px; height: 5px; margin-left: 3px; border-radius: 50%;
       background: var(--mg-arrivo-color, var(--sn-accent));
     }
+    /* Il giro ha avvisato (lettura interrotta, tetto, registro): si vede, l'hover dice cosa. Prima di «ferma», che vince. */
+    #mgListHead.mg-list-head--avviso::after { content: var(--mg-avviso-segno, ' !'); font-weight: 700; color: var(--mg-avviso-color, var(--sn-accent)); }
     /* Lista che non riesce più ad allinearsi: il titolo si spegne, l'hover dice da quando. */
     #mgListHead.mg-list-head--ferma { opacity: var(--mg-ferma-opacity, 0.55); }
-    #mgListHead.mg-list-head--ferma::after { content: ' · ferma'; font-weight: 400; }
+    #mgListHead.mg-list-head--ferma::after { content: ' · ferma'; font-weight: 400; color: inherit; }
     /* "Non filtrato": il colore del bordo è bianco. Per renderlo leggibile su
        qualunque tema affianchiamo al bordo bianco una sottile linea grigia. */
     .mg-item--unfiltered {
@@ -842,7 +846,8 @@
       padding: 10px 12px; border-radius: 12px;
       border: 1px solid var(--sn-border);
       background: var(--sn-bg, transparent);
-      max-width: 100%;
+      /* border-box: col margine interno fuori dal tetto, un blocco di codice largo faceva scorrere di lato la conversazione. */
+      max-width: 100%; box-sizing: border-box;
     }
     .mg-bubble--user { align-self: flex-end; border-bottom-right-radius: 4px; }
     .mg-bubble--model {
@@ -855,7 +860,7 @@
     .mg-bubble-body {
       font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word;
     }
-    .mg-bubble-body em { color: var(--sn-muted); font-style: italic; }
+    .mg-bubble-body > em { color: var(--sn-muted); font-style: italic; }
     .mg-bubble-imgs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
     .mg-bubble-imgs img {
       max-width: 200px; max-height: 200px; border-radius: 6px;
@@ -952,13 +957,6 @@
       font-size: 13px; line-height: 1.6; white-space: pre-wrap;
       word-break: break-word; color: var(--sn-text);
     }
-    .mg-liv-testo em { color: var(--sn-muted); font-style: italic; }
-    /* Markdown in arrivo: titoli e voci a trattino si vedono come tali, il resto è testo. Niente HTML dal testo. */
-    .mg-liv-titolo { font-weight: 600; margin: 10px 0 4px; }
-    .mg-liv-titolo:first-child { margin-top: 0; }
-    .mg-liv-par { margin: 0 0 6px; }
-    .mg-liv-elenco { margin: 0 0 6px 18px; padding: 0; }
-    .mg-liv-elenco li { margin: 2px 0; }
     /* Il tasto che scavalca l'audit è un'eccezione, non un'azione di tutti i giorni: si arma con un secondo clic,
        come l'approvazione di una fusione, perché il primo non basti. */
     .mg-liv-azioni { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
@@ -966,6 +964,7 @@
     .mg-liv-esito[data-kind="ok"]   { color: #2e9e5b; }
     .mg-liv-esito[data-kind="err"]  { color: #c0392b; }
     .mg-liv-esito[data-kind="wait"] { color: var(--sn-muted); }
+    .mg-liv-risposta { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
 
     /* Toast in basso a destra, come nell'editor e nei mazzi: serve quando l'esito conta anche se l'owner ha già
        spostato lo sguardo dal pannello. */
@@ -1014,6 +1013,24 @@
        barra. `[hidden]` va riaffermato o `display:flex` se lo mangia. */
     .mg-actions-group { display: flex; align-items: center; min-width: 0; }
     .mg-actions-group[hidden] { display: none; }
+    /* Tasti dell'owner su UNA riga a ogni larghezza (#1034): se non entrano cedono gli spazi, poi la riga scorre di lato
+       e nessun tasto sparisce o perde il nome. Chi ha messo il segno resta fuori e va sotto da solo. */
+    .mg-owner { container-type: inline-size; }
+    .mg-owner-tasti {
+      --mg-tasti-gap: 10px; --mg-tasti-pad: 12px;
+      display: flex; align-items: center; gap: var(--mg-tasti-gap);
+      flex: 0 1 auto; min-width: 0;
+      overflow-x: auto; scrollbar-width: thin;
+    }
+    .mg-owner-tasti .mg-actions-group,
+    .mg-owner-tasti .mg-actions-row { flex: none; flex-wrap: nowrap; gap: var(--mg-tasti-gap); }
+    #mgOwnerBar .mg-owner-tasti button {
+      flex: none; white-space: nowrap;
+      padding-left: var(--mg-tasti-pad); padding-right: var(--mg-tasti-pad);
+    }
+    @container (max-width: 860px) { .mg-owner-tasti { --mg-tasti-gap: 8px; --mg-tasti-pad: 10px; } }
+    @container (max-width: 720px) { .mg-owner-tasti { --mg-tasti-gap: 6px; --mg-tasti-pad: 8px; } }
+    @container (max-width: 580px) { .mg-owner-tasti { --mg-tasti-gap: 4px; --mg-tasti-pad: 6px; } }
     /* Il tasto della frase è acceso quando una frase c'è già: da chiusa, la sezione non direbbe da nessuna parte
        che è stata scritta. */
     .mg-usernote-toggle::after {
@@ -1060,12 +1077,13 @@
       border-color: var(--sn-accent); color: var(--sn-accent);
       background: color-mix(in srgb, var(--sn-accent) 12%, var(--sn-bg, transparent));
     }
-    .mg-preapprove-line { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
-    .mg-preapprove-line[hidden] { display: none; }
+    /* Prende lo spazio che i tasti lasciano e va a capo dentro di sé: la riga dei tasti resta una. */
     .mg-preapproved-info {
-      font-size: 12px;
+      flex: 1 1 14em; min-width: 0;
+      font-size: 12px; line-height: 1.35;
       color: var(--sn-muted);
     }
+    .mg-preapproved-info[hidden] { display: none; }
     /* Il segno in lista è piccolo e sta prima dei pallini di priorità, che si spingono a destra da soli. */
     .mg-preapproved {
       flex: none;
@@ -1379,6 +1397,8 @@
                 placeholder="Commento (opzionale): perché lo sblocchi…" hidden></textarea>
 
               <div class="mg-owner-row">
+                <!-- I tasti non vanno mai a capo (#1034): quando non entrano si stringono, vedi `.mg-owner-tasti`. -->
+                <div class="mg-owner-tasti">
                 <!-- Quali siano le azioni di stato lo dice la tabella condivisa MR.ownerActions, non questa pagina. Il gruppo
                    sparisce quando lo stato non si legge: su una segnalazione cifrata la macchina se lo inventerebbe. -->
                 <div class="mg-actions-group" id="mgActions" hidden>
@@ -1400,8 +1420,18 @@
                     <button type="button" class="mg-star-btn mg-local-btn" id="mgLocalBtn" aria-pressed="false" hidden>Locale</button>
                     <!-- «È mio» (#908): sul prefisso dell'owner o di una sessione senza prova; solo l'owner la può dare. -->
                     <button type="button" class="mg-star-btn mg-sender-btn" id="mgSenderBtn" hidden>🙋 È mio</button>
+                    <!-- «Fondi senza chiedermelo» (#1034): sulla riga col nome corto, lo stesso della lista; il nome intero sta
+                       nell'hover. Acceso = aria-pressed; testi e visibilità dal JS, sulle pratiche chiuse sparisce. -->
+                    <button type="button" class="mg-star-btn mg-preapprove-btn" id="mgPreapproveBtn"
+                      aria-pressed="false" hidden>Senza chiedere</button>
+                    <button type="button" class="mg-star-btn mg-preapprove-btn" id="mgPreapproveRevokeBtn"
+                      hidden>Chiedimi prima</button>
                   </div>
                 </div>
+                </div>
+
+                <!-- Chi ha messo il segno: in fondo alla riga, accanto al tasto che lo dice acceso. -->
+                <span class="mg-preapproved-info" id="mgPreapprovedInfo" hidden></span>
               </div>
 
               <!-- «Il segno era un errore» (#922): la conferma dice cosa cambia, subito sotto il tasto. Testi dal JS. -->
@@ -1412,16 +1442,6 @@
               <div class="mg-owner-msgs" id="mgOwnerMsgs" hidden>
                 <span class="mg-action-msg" id="mgActionMsg" role="status"></span>
                 <span class="mg-action-msg" id="mgManageMsg" role="status"></span>
-              </div>
-
-              <!-- «Fondi senza chiedermelo» sta su una riga sua perché qui il nome intero serve, e nella riga dei tasti un
-                 nome per esteso manda a capo tutto. Testo e hover li compone il JS; sulle pratiche chiuse sparisce. -->
-              <div class="mg-preapprove-line" id="mgPreapproveLine" hidden>
-                <button type="button" class="mg-star-btn mg-preapprove-btn" id="mgPreapproveBtn"
-                  aria-pressed="false" hidden>Fondi senza chiedermelo</button>
-                <button type="button" class="mg-star-btn mg-preapprove-btn" id="mgPreapproveRevokeBtn"
-                  hidden>Chiedimi prima di fondere</button>
-                <span class="mg-preapproved-info" id="mgPreapprovedInfo" hidden></span>
               </div>
 
               <!-- "Riapri" non scrive subito: chiede COSA manca ancora e lo appende alla conversazione, come la gemella. -->
@@ -1999,8 +2019,9 @@
         <div class="mg-log-section" id="mgChannelSection" hidden>
           <h3>Canale delle routine</h3>
           <p class="mg-log-intro">
-            Le richieste respinte dal server e, finché il canale nuovo affianca
-            quello vecchio, quanto le due strade scelgono lo stesso lavoro.
+            Le richieste respinte dal server, le fusioni chieste senza gli unit
+            sul risultato e, finché il canale nuovo affianca quello vecchio,
+            quanto le due strade scelgono lo stesso lavoro.
           </p>
           <div class="mg-log-empty" id="mgChannelEmpty" hidden>
             Nessun rifiuto e nessun confronto finora.

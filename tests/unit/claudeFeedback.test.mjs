@@ -32,6 +32,8 @@ const FB = globalThis.SN_FEEDBACK;
 // (#908: senza token lo strumento non apre niente), tolta dove un test lo vuole.
 const CRED_FINTA = async () => ({ idToken: 'tok-test' });
 SCRIPT.credenziale.ottieni = CRED_FINTA;
+// Le routine lanciano questi test con FILO_ROUTINE=1 nell'ambiente: lo strumento non deve credersi una routine qui.
+SCRIPT.ambiente.routine = () => false;
 
 /** Sostituisce submit per la durata di `fn`, raccogliendo cosa gli è arrivato. */
 async function conSubmit(impl, fn) {
@@ -375,4 +377,102 @@ test('#908 apri senza token: rifiuto, non una submit anonima', async () => {
     assert.equal(r.codice, SCRIPT.EXIT.RIFIUTATO);
     assert.equal(visti.length, 0);
   });
+});
+
+// #914: da qui il feedback nasce dell'owner e salta i giudici; una routine apre dal canale, mai lavoro locale.
+test('#914 una routine non apre feedback da qui, né locali né per le routine: niente credenziale, niente submit', async () => {
+  let chiesta = 0;
+  SCRIPT.credenziale.ottieni = async () => { chiesta += 1; return { idToken: 'tok-owner' }; };
+  SCRIPT.ambiente.routine = () => true;
+  try {
+    for (const scelta of ['--locale', '--non-locale']) {
+      await conSubmit(async () => ({ id: 'd', seq: 1, senderProof: 'admin' }), async (visti) => {
+        let code;
+        const err = await conStderr(async () => { code = await SCRIPT.main(['T', 'X', scelta]); });
+        assert.equal(code, SCRIPT.EXIT.RIFIUTATO, scelta);
+        assert.equal(visti.length, 0, scelta);
+        assert.match(err, /routine-channel\.mjs deliver feedback/);
+        assert.match(err, /--reason locale/);
+      });
+    }
+    assert.equal(chiesta, 0);
+  } finally {
+    SCRIPT.credenziale.ottieni = CRED_FINTA;
+    SCRIPT.ambiente.routine = () => false;
+  }
+});
+
+test('#914 una routine si riconosce dalla dichiarazione, dal biglietto o dal ruolo; una sessione no', async () => {
+  const { isRoutineInstance } = await import('../../scripts/lib/routine-role.mjs');
+  const { cartellaTemporanea } = await import('../helpers/percorsi.mjs');
+  const vuota = cartellaTemporanea('routine-o-no-');
+  assert.equal(isRoutineInstance(vuota, { env: {} }), false);
+  assert.equal(isRoutineInstance(vuota, { env: { FILO_ROUTINE: '0' } }), false);
+  assert.equal(isRoutineInstance(vuota, { env: { FILO_ROUTINE_ROLE: 'boh' } }), false);
+  assert.equal(isRoutineInstance(vuota, { env: { FILO_ROUTINE: '1' } }), true);
+  assert.equal(isRoutineInstance(vuota, { env: { FILO_ROUTINE_TICKET: 'abc' } }), true);
+  assert.equal(isRoutineInstance(vuota, { env: { FILO_ROUTINE_ROLE: 'fixer' } }), true);
+  const { writeRole } = await import('../../scripts/lib/routine-role.mjs');
+  writeRole(vuota, 'new-work');
+  assert.equal(isRoutineInstance(vuota, { env: {} }), true, 'il ruolo scritto da dispatch');
+});
+
+test('#914 dentro una routine owner-feedback rifiuta il segno locale e il sì dell’owner (#913) prima di scrivere', async () => {
+  const { spawnSync } = await import('node:child_process');
+  // #957: --approva-locale non c'è più per nessuno, routine compresa.
+  const tolta = spawnSync(process.execPath, [resolve(ROOT, 'scripts', 'owner-feedback.mjs'), '123', '--approva-locale'], {
+    env: { ...process.env, FILO_ROUTINE: '1' }, encoding: 'utf8', timeout: 30000,
+  });
+  assert.equal(tolta.status, 1, tolta.stderr);
+  assert.match(tolta.stderr, /--approva-locale non c'è più/);
+  for (const opzione of ['--solo-locale']) {
+    const r = spawnSync(process.execPath, [resolve(ROOT, 'scripts', 'owner-feedback.mjs'), '123', opzione], {
+      env: { ...process.env, FILO_ROUTINE: '1' }, encoding: 'utf8', timeout: 30000,
+    });
+    assert.equal(r.status, 3, `${opzione}: ${r.stderr}`);
+    assert.match(r.stderr, /una routine non segna lavoro locale/);
+  }
+});
+
+test('#914 la priorità scelta parte col documento, e senza scelta non se ne inventa una', async () => {
+  SCRIPT.credenziale.ottieni = async () => ({ idToken: 'tok-owner' });
+  try {
+    await conSubmit(async (_p, opts) => ({ id: 'd', seq: 4, senderProof: opts && opts.idToken ? 'admin' : '' }), async (visti) => {
+      const out = [];
+      const orig = console.log;
+      console.log = (...a) => out.push(a.join(' '));
+      try {
+        assert.equal(await SCRIPT.main(['T', 'X', '--non-locale', '--priorita', '0']), SCRIPT.EXIT.FATTO);
+        assert.equal(await SCRIPT.main(['T', 'X', '--non-locale']), SCRIPT.EXIT.FATTO);
+      } finally { console.log = orig; }
+      assert.equal(visti.opts[0].priority, 0, 'lo 0 è una priorità da scrivere');
+      assert.equal('priority' in visti.opts[1], false);
+      assert.match(out.join('\n'), /Priorità 0 impostata/);
+      assert.match(out.join('\n'), /la decide il giudice di priorità/);
+    });
+  } finally {
+    SCRIPT.credenziale.ottieni = CRED_FINTA;
+  }
+});
+
+test('#914 la create admin porta priorità cifrata e priorityManual; la create anonima no', async () => {
+  const corpi = [];
+  const origFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => {
+    if (init.method === 'POST' && /\/feedback\?/.test(String(url))) {
+      corpi.push({ auth: !!(init.headers && init.headers.Authorization), body: JSON.parse(init.body) });
+      return { ok: true, status: 200, json: async () => ({ name: 'projects/p/databases/(default)/documents/feedback/x' }), text: async () => '' };
+    }
+    return { ok: false, status: 404, json: async () => ({}), text: async () => '' };
+  };
+  try {
+    await FB.submit({ text: 't', clientId: 'local:claude', name: 'n' }, { idToken: 'tok', soloAdmin: true, priority: 2 });
+    await FB.submit({ text: 't', clientId: 'utente', name: 'n' }, { priority: 2 });
+  } finally { globalThis.fetch = origFetch; }
+  const admin = corpi.find((c) => c.auth);
+  const anonimo = corpi.find((c) => !c.auth);
+  assert.ok(admin && anonimo, 'due create, una autenticata e una no');
+  assert.match(admin.body.fields.priority.stringValue, /^FENC1:/, 'cifrata: il documento è pubblico');
+  assert.equal(admin.body.fields.priorityManual.booleanValue, true);
+  assert.equal('priority' in anonimo.body.fields, false, 'il create anonimo non la ammette');
 });

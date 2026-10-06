@@ -98,6 +98,7 @@
   // subito di là, e viceversa (il main avvisa la pagina a ogni cambio).
   const W = window.SN_WALLET;
   let ownKeyInfoFor = ''; // la coda della chiave per cui spesa e residuo sono già stati chiesti
+  let ownKeyRefusalFor = ''; // …e il rifiuto che c'era allora: uno nuovo cambia anche spesa e residuo
   function renderOwnKey(w) {
     const section = $('ownKeySection');
     if (!w || !w.ok) { section.hidden = true; return; }
@@ -108,6 +109,7 @@
     $('ownKeyHave').hidden = !has;
     if (!has) {
       ownKeyInfoFor = '';
+      ownKeyRefusalFor = '';
       return;
     }
     $('ownKeyTail').textContent = `…${w.ownKeyTail || ''}`;
@@ -132,10 +134,17 @@
     $('ownKeyConfirm').hidden = true;
     $('ownKeyRemoveBtn').hidden = false;
     // Spesa e residuo li dice OpenRouter: si chiedono una volta per chiave,
-    // appena la chiave è a schermo, non a ogni ridisegno.
+    // appena la chiave è a schermo, non a ogni ridisegno; di nuovo, senza
+    // svuotare la riga, quando arriva un rifiuto (#662: «restano 8,77 $»
+    // sotto «il suo credito è finito» si contraddicevano).
+    const refusalAt = (w.ownKeyRefusal && w.ownKeyRefusal.at) || '';
     if (ownKeyInfoFor !== w.ownKeyTail) {
       ownKeyInfoFor = w.ownKeyTail;
+      ownKeyRefusalFor = refusalAt;
       loadOwnKeyInfo().catch(() => {});
+    } else if (ownKeyRefusalFor !== refusalAt) {
+      ownKeyRefusalFor = refusalAt;
+      if (refusalAt) loadOwnKeyInfo({ quiet: true }).catch(() => {});
     }
   }
 

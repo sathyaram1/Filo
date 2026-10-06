@@ -248,6 +248,7 @@ html[data-chrome-compact="1"] .addr {
   background-position: center;
 }
 .tab .spinner {
+  flex: 0 0 12px;
   width: 12px; height: 12px;
   border: 2px solid var(--border);
   border-top-color: var(--accent);
@@ -300,6 +301,21 @@ html[data-chrome-compact="1"] .addr {
 @container tab (width < 38px) {
   .tab:has(> .tab-alert) > :is(.favicon, .spinner) { display: none; }
   .tab > .tab-alert { margin: 0 auto; }
+}
+
+/* Scheda stretta senza avviso, stessa priorità e stesso conto: senza, con tante schede la X usciva dalla sua
+   e il clic sul suo centro cadeva sulla vicina (#945). Prova in tests/tab-scheda-stretta.spec.mjs. */
+@container tab (width < 78px) {
+  .tab:not(:has(> .tab-alert)) > .proxy-ind { display: none; }
+}
+@container tab (width < 46px) {
+  .tab:not(:has(> .tab-alert)) > .title { display: none; }
+  .tab:not(:has(> .tab-alert)) > .close { margin-left: auto; }
+}
+@container tab (width < 40px) {
+  .tab:not(.active):not(:has(> .tab-alert)) > .close { display: none; }
+  .tab.active:not(:has(> .tab-alert)) > :is(.favicon, .spinner) { display: none; }
+  .tab:not(:has(> .tab-alert)) > :is(.favicon, .spinner, .close) { margin: 0 auto; }
 }
 
 .tab-new {
@@ -614,6 +630,28 @@ html[data-feedback-dim="1"] .shell {
   cursor: pointer;
 }
 .dl-row-btn:hover { background: var(--tab-active); }
+/* #950 — il menu del tasto destro su una riga: dentro il pannello, perché fuori lo coprirebbe la pagina. */
+.dl-row-menu {
+  display: flex;
+  flex-direction: column;
+  margin-top: 6px;
+  padding: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+.dl-row-menu-voce {
+  padding: 6px 10px;
+  border-radius: 6px;
+  font: 12px/1.3 system-ui, sans-serif;
+  color: var(--fg);
+  cursor: pointer;
+  outline: none;
+  transition: background 0.12s ease;
+}
+.dl-row-menu-voce:hover,
+.dl-row-menu-voce:focus-visible { background: var(--tab-bg); }
 /* #588 — un «sì» appena comparso non risponde ancora: si vede spento finché si arma. */
 /* Spento non prende il clic: lo riceve la riga, che così ricomincia l'attesa. */
 .dl-row-btn:disabled { opacity: 0.45; cursor: default; background: var(--tab-bg); pointer-events: none; }

@@ -44,6 +44,7 @@ export default defineConfig({
   // In GitHub (CI=true) una prova lasciata «a fuoco» fa girare solo sé stessa: la suite risulterebbe verde e il
   // commit si pubblicherebbe senza essere provato. Lì si rifiuta; in locale resta lo strumento di chi prova.
   forbidOnly: !!process.env.CI,
+  globalSetup: './tests/fixtures/prima-della-corsa.mjs',
   timeout: 60_000,
   expect: { timeout: 5_000 },
   fullyParallel: false, // 1 worker: Electron + globalShortcut non amano la concorrenza

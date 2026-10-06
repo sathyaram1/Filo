@@ -90,7 +90,6 @@ test('una scelta fatta mentre la prima lettura è ancora per strada non viene ri
 });
 
 test('dopo una lettura andata a buon fine non resta scritto che non si è potuto leggere', async ({ openTab }) => {
-  test.fail(true, 'rilievo del giro 2: l\'avviso «non ho potuto leggere» resta anche quando i valori a schermo vengono dal server');
   // Prima apertura con la rete giù: le tre righe dicono «non ho potuto leggere».
   const page = await apri(openTab, { maxSessions: 9, accountAOff: true }, { getFail: true });
   await expect(page.locator('#mgAccountsMsg')).toContainText('Non ho potuto leggere');
@@ -109,7 +108,6 @@ test('dopo una lettura andata a buon fine non resta scritto che non si è potuto
 });
 
 test('due scelte a poca distanza: lo schermo non torna a dire il contrario del server', async ({ openTab }) => {
-  test.fail(true, 'rilievo del giro 2: la risposta più vecchia arriva per ultima e riscrive lo schermo con lo stato di prima');
   // La prima risposta viaggia lenta, la seconda no: è il caso normale di due
   // scritture di fila su una rete che non risponde sempre allo stesso modo.
   const page = await apri(openTab, {}, { delaySet: [600, 0] });

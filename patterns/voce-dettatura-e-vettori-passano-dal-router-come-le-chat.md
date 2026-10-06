@@ -39,11 +39,22 @@ delle chat. Regole che ne seguono:
   definitiva nel campo; ogni ~1,2 s di parlato → provvisoria nel riquadro. Il
   main riceve `{ audioBase64, format, lang, interim }`; le provvisorie non
   finiscono in cronologia, il costo sì.
+- **Il microfono è uno solo** (#948): `ascolto.js` apre il microfono, spezza in
+  frasi, chiede la trascrizione al main e dice ogni guasto con una frase che
+  dice cosa fare. Lo usano «Detta» e il tasto microfono delle chat
+  (`voceChat.js`, accanto all'invio della home, dell'Aiuto e della chat
+  dell'Editor): una strada sola verso la trascrizione, quindi lo stesso
+  controllo degli host. Il tasto invia con la funzione della sua chat, mai con
+  una copia; nella casella di una chat «Detta» gli passa la mano; risponde solo
+  a gesti veri, perché dentro un sito un clic fabbricato accenderebbe il
+  microfono di Filo. Quando chi parla ha finito lo decide `endOfSpeech`
+  (dictationSegmenter.js, pura), su tutta la registrazione e non sullo
+  spezzone, che a ogni frase si azzera.
 - **Le voci del registro dichiarano le modalità** (`inputs`/`outputs`) e chi
   valida (editor delle Opzioni, menu «Detta», pulsanti «Prova») le legge via
   `entryModalities`: un modello dal nome muto non passa per "forse sa tutto".
 - **Test:** `tests/unit/openrouterAudio.test.mjs`, `vocePoliticaHost.test.mjs`,
-  `dictationSegmenter.test.mjs`, `ttsVoices.test.mjs`;
-  `tests/tts-voice-openrouter.spec.mjs`, `voce-dettatura-host-esclusi.spec.mjs`,
+  `dictationSegmenter.test.mjs`, `ttsVoices.test.mjs`, `voceChat.test.mjs`;
+  `tests/voce-chat.spec.mjs`, `tts-voice-openrouter.spec.mjs`, `voce-dettatura-host-esclusi.spec.mjs`,
   `dictation-live.spec.mjs`, `dictation-open-weights-reason.spec.mjs`,
   `tab-semantic-search.spec.mjs` (reindicizzazione).

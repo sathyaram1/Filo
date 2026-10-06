@@ -203,8 +203,8 @@ test('riordina per numero / priorità / creatore dal menu, e ripristina il prede
   await expect(page.locator('#mgSortBtn')).not.toHaveClass(/mg-sort-btn--active/);
 });
 
-// #595: il clientId lo sceglie chi scrive. Un prefisso riservato senza la prova del mittente non vale come
-// owner, sessione locale o routine: si vede come utente non provato e sta in un gruppo suo nel pannello del
+// #595, #912: il clientId lo sceglie chi scrive. Un prefisso riservato senza la prova del mittente non vale come
+// owner, sessione locale o routine: si vede come un utente qualunque e sta in un gruppo suo nel pannello del
 // mittente, separato da chi ha la prova. Tolto il controllo, 👑/💻/🧪 tornano sulle card finte.
 const FBS_PROVA = [
   { _id: 'VO', seq: 60, subSeq: 0, priority: 0, name: 'Owner vero',      clientId: 'owner:me', senderProof: 'admin', text: 'vero', createdAt: '2026-09-30T10:00:00Z' },
@@ -213,7 +213,7 @@ const FBS_PROVA = [
   { _id: 'FR', seq: 63, subSeq: 0, priority: 0, name: 'Routine finta',   clientId: 'routine:verifier', senderProof: 'utente', text: 'finto', createdAt: '2026-09-30T10:03:00Z' },
 ];
 
-test('un prefisso riservato senza prova del mittente si legge come utente non provato', async ({ openTab }) => {
+test('un prefisso riservato senza prova del mittente si legge come un utente qualunque', async ({ openTab }) => {
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK_THREAD && window.SN_MANAGE_REVIEW);
@@ -223,14 +223,15 @@ test('un prefisso riservato senza prova del mittente si legge come utente non pr
   const author = (id) => page.locator(`.mg-item[data-id="${id}"] .mg-item-author`);
   await expect(author('VO')).toHaveText('👑');
   for (const id of ['FO', 'FL', 'FR']) {
-    await expect(author(id)).toHaveText('❔');
-    await expect(author(id)).toHaveAttribute('title', /senza prova/);
+    await expect(author(id)).toHaveText('👤');
+    await expect(author(id)).toHaveAttribute('title', 'Scritto da: Utente');
   }
 
-  // Il dettaglio non dice «Owner», la segnalazione è una bolla dell'utente e l'identificativo resta leggibile.
+  // Il dettaglio dice «Utente» senza la firma che si era dato, la segnalazione è una bolla dell'utente, e
+  // l'identificativo intero resta leggibile al passaggio.
   await page.locator('.mg-item[data-id="FO"]').click();
   const link = page.locator('#senderLink');
-  await expect(link).toContainText('senza prova');
+  await expect(link).toHaveText('👤 Utente · me…');
   await expect(link).not.toContainText('Owner');
   await expect(link).toHaveAttribute('title', 'owner:me');
   await expect(page.locator('.mg-bubble').first()).toHaveClass(/mg-bubble--user/);

@@ -5,7 +5,7 @@
 // quanto portato dall'estensione. Possiamo assegnare direttamente window.*
 // e l'assegnazione è visibile alla pagina.
 
-const { ipcRenderer, webFrame } = require('electron');
+const { ipcRenderer, webFrame, webUtils } = require('electron');
 
 // ─── SICUREZZA: gate d'origine ─────────────────────────────────────────────
 // Questo preload è PRIVILEGIATO: espone window.filo (IPC, shell, AI stream) e
@@ -42,6 +42,10 @@ const filoApi = {
   // nella modalità terminale non sono le stesse. È un dato pubblico del
   // sistema, non un'informazione dell'utente: nessuna superficie in più.
   sistema: process.platform,
+  // Il percorso su disco di un file trascinato in una pagina di Filo (#950): '' se non viene dal disco.
+  percorsoDelFile: (file) => {
+    try { return (webUtils && webUtils.getPathForFile(file)) || ''; } catch (_) { return ''; }
+  },
   onBroadcast: (fn) => {
     const wrapped = (_event, msg) => { try { fn(msg); } catch (_) {} };
     ipcRenderer.on('filo:broadcast', wrapped);
@@ -111,7 +115,7 @@ const filoApi = {
   // Esecuzione shell (modalità terminale della dashboard), gemella di aiStream.
   // onData({chunk, stream}), onExit({code, cwd}), onError({message}).
   // Ritorna { sendInput(text), abort() }.
-  shellExec: ({ command, cwd, shell, onData, onExit, onError }) => {
+  shellExec: ({ command, cwd, shell, chat, onData, onExit, onError }) => {
     const execId = `sh${Date.now()}_${++streamCounter}`;
     const offData = (_e, data) => onData && onData(data);
     const offExit = (_e, data) => { cleanup(); onExit && onExit(data); };
@@ -124,7 +128,7 @@ const filoApi = {
     ipcRenderer.on(`shell:${execId}:data`, offData);
     ipcRenderer.on(`shell:${execId}:exit`, offExit);
     ipcRenderer.on(`shell:${execId}:error`, offError);
-    ipcRenderer.invoke('shell:start', { execId, command, cwd, shell });
+    ipcRenderer.invoke('shell:start', { execId, command, cwd, shell, chat });
     return {
       sendInput: (text) => ipcRenderer.send('shell:input', { execId, text }),
       abort: () => { ipcRenderer.send('shell:abort', { execId }); cleanup(); },
@@ -272,7 +276,7 @@ if (IS_FILO_ORIGIN) {
 const path = require('node:path');
 const shouldInjectContentScripts = () => true;
 function injectContentScriptStyles() {
-  const STYLES = ['theme.css', 'menu.css', 'popup.css', 'sidebar.css',
+  const STYLES = ['theme.css', 'menu.css', 'popup.css', 'sidebar.css', 'voce.css',
     'highlight.css', 'spellcheck.css', 'feedback.css', 'redteam-attack.css'];
   for (const f of STYLES) {
     if (document.querySelector(`link[href="filo://style/${f}"]`)) continue;
@@ -301,6 +305,7 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'tasti.js')); // nomi delle scorciatoie per il sistema di chi legge: PRIMA di menu/actions/content
   safe(path.join(SHARED, 'campoTesto.js')); // "si sta scrivendo qui?": PRIMA di content.js, che ci decide Ctrl+Z
   safe(path.join(SHARED, 'urlNav.js')); // #437 — "è davvero un indirizzo?" per Copia URL/Condividi
+  safe(path.join(SHARED, 'wallet.js')); // #664 — «è un link d'invito?» per il tasto destro
   safe(path.join(SHARED, 'filoMarkdown.js')); // #853 — senza, le risposte del modello entrano come HTML
   safe(path.join(SHARED, 'linkSospetto.js')); // #725 — link sospetti: euristica e frasi, PRIMA di actions.js
   safe(path.join(SHARED, 'themeTokens.js'));
@@ -329,6 +334,8 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'modelCaps.js'));
   safe(path.join(SHARED, 'ttsVoices.js'));
   safe(path.join(SHARED, 'dictationSegmenter.js'));
+  safe(path.join(SHARED, 'ascolto.js')); // microfono e trascrizione: Detta e le chat
+  safe(path.join(SHARED, 'voceChat.js')); // tasto microfono delle chat, a cui «Detta» passa la mano
   // Solo nei test: modelli di prova (vedi loader.js).
   if (process.env.NODE_ENV === 'test') safe(path.join(SHARED, '..', '..', 'tests', 'fixtures', 'testModels.js'));
   safe(path.join(CONTENT, 'tts.js'));

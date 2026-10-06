@@ -30,6 +30,10 @@ process.env.FILO_REPO_ROOT = TMP;
 // quelle del progetto sono quelle del ramo su cui si sta lavorando
 // (scripts/lib/tools-pin.mjs). Qui le due coincidono, come in locale.
 process.env.FILO_TOOLS_ROOT = TMP;
+// Anche la temporanea, fuori dalla ROOT: dispatch ci scarica i pezzi grossi del payload, e una cartella nuova a
+// ogni corsa restava lì per sempre (#717).
+const TEMP = cartellaTemporanea('filo-dispatch-tmp-');
+Object.assign(process.env, { TMPDIR: TEMP, TEMP, TMP: TEMP });
 
 const {
   applyVerifierVerdict,
@@ -568,6 +572,18 @@ test('serverCtx: la ripresa passa dalla busta del server a chi riprende, e un va
   assert.equal(serverCtx({ role: 'fixer' }, { payload: { feedback: { text: 't' } } }).ripresa, null);
 });
 
+test('riallineamento per unit rossi sulla fusione (#929): l\'elenco dei test rotti scritto dal server arriva a chi riallinea', () => {
+  const critica = 'FAIL tecnico: unit ROSSI sul risultato della fusione.\n  - tests/unit/x.test.mjs › rotto sulla fusione';
+  const fx = buildPayload({ role: 'fixer', id: 'A', num: '#1', branch: 'worker/A' }, serverCtx({ role: 'fixer' }, { payload: { feedback: { text: 't' }, critique: critica } }));
+  assert.equal(fx.case, 'riallineamento');
+  assert.equal(fx.critique, critica);
+  const senza = buildPayload({ role: 'fixer', id: 'A', branch: 'worker/A' }, serverCtx({ role: 'fixer' }, { payload: { feedback: { text: 't' } } }));
+  assert.ok(!('critique' in senza), 'un server vecchio non la manda: nessun campo vuoto');
+  assert.equal(serverCtx({ role: 'new-work' }, { payload: { critique: critica } }).critique, undefined, 'solo chi riallinea');
+  const testo = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'routines', 'roles', 'resolver-rebase.md'), 'utf8');
+  assert.match(testo, /Unit rossi sulla fusione/, 'il testo di ruolo dice cosa fare dei test elencati');
+});
+
 test('readRoleInstructions: il caso del correttore sceglie il testo (ripresa ≠ rebase), e un caso ignoto vale il rebase', () => {
   const dir = resolve(TMP, 'routines', 'roles');
   mkdirSync(dir, { recursive: true });
@@ -801,6 +817,15 @@ test('secaudit: sul fail la ricetta non chiede una consegna di design, che il se
   const fail = t.match(/Su \*\*fail\*\*[^]*?rilascio del biglietto/);
   assert.ok(fail, 'la ricetta deve dire cosa fare sul fail, fino al rilascio');
   assert.ok(!/accoda|deliver status/.test(fail[0]), `sul fail niente consegne a mano: «${fail[0]}»`);
+});
+
+test('secaudit: la richiesta di fusione fa girare gli unit sulla fusione per minuti, e la ricetta la manda in sottofondo (#929)', () => {
+  // Una chiamata da due minuti la taglia a metà: nessuna richiesta parte e resta la cartella di prova.
+  const t = readFileSync(fileURLToPath(new URL('../../routines/roles/secaudit.md', import.meta.url)), 'utf8').replace(/\s+/g, ' ');
+  const i = t.indexOf('merge-gate.mjs');
+  assert.ok(i > -1);
+  assert.match(t.slice(i, i + 1200), /sottofondo/);
+  assert.ok(!/Qui non gira nessun git/.test(t), 'qui adesso girano git e gli unit');
 });
 
 // ─── Il biglietto perso non deve più poter succedere (incidente #444) ─────────

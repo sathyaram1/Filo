@@ -10,8 +10,8 @@
 //   - immagini carta: URL diretti https://cards.scryfall.io — le cachea il
 //     browser (HTTP cache di Chromium), non duplichiamo su disco
 //
-// Rate limit di cortesia (~10 req/s): coda interna serializzata con distanza
-// minima fra le richieste. Tutte le chiamate passano da qui.
+// Rate limit di cortesia (~10 req/s): le PARTENZE si distanziano, le risposte no, e ogni richiesta ha un tempo
+// limite: una richiesta appesa non tiene in coda le altre (#792). Tutte le chiamate passano da qui.
 
 (function (global) {
   'use strict';
@@ -21,6 +21,9 @@
 
   const BASE = process.env.FILO_SCRYFALL_BASE || 'https://api.scryfall.com';
   const MIN_GAP_MS = 110;               // ~9 req/s, sotto il tetto di cortesia
+  // Di norma Scryfall risponde in meno di un secondo: trenta sono il caso peggiore realistico con molto margine, e
+  // oltre la chat lo dice invece di aspettare per sempre (#792).
+  const REQUEST_TIMEOUT_MS = 30_000;
   const PRICE_TTL_MS = 6 * 60 * 60 * 1000; // prezzi: stantii dopo 6 ore
 
   // User-Agent identificativo, OBBLIGATORIO: l'API Scryfall risponde
@@ -36,25 +39,62 @@
   let _fetch = (...args) => fetch(...args);
   function _setFetch(fn) { _fetch = fn || ((...args) => fetch(...args)); }
 
-  // ── Coda rate-limited ────────────────────────────────────────────────────
-  let chain = Promise.resolve();
-  let lastAt = 0;
+  let timeoutMs = REQUEST_TIMEOUT_MS;
+  function _setTimeoutMs(ms) { timeoutMs = Number(ms) > 0 ? Number(ms) : REQUEST_TIMEOUT_MS; }
+
+  // ── Rate limit: ogni richiesta prenota la sua partenza ──────────────────
+  let nextAt = 0;
   function throttled(fn) {
-    const run = chain.then(async () => {
-      const wait = lastAt + MIN_GAP_MS - Date.now();
-      if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-      lastAt = Date.now();
-      return fn();
-    });
-    // La coda prosegue anche se una richiesta fallisce.
-    chain = run.catch(() => {});
-    return run;
+    const now = Date.now();
+    const at = Math.max(now, nextAt);
+    nextAt = at + MIN_GAP_MS;
+    return (at > now ? new Promise((r) => setTimeout(r, at - now)) : Promise.resolve()).then(fn);
   }
 
-  async function apiGet(path) {
-    return throttled(async () => {
+  function stoppedError() {
+    const e = new Error('richiesta a Scryfall fermata');
+    e.name = 'AbortError';
+    e.code = 'ABORT_ERR';
+    return e;
+  }
+
+  function timeoutError(ms) {
+    const sec = Math.max(1, Math.round(ms / 1000));
+    const e = new Error(`Scryfall non ha risposto entro ${ms} ms`);
+    e.code = 'SCRYFALL_TIMEOUT';
+    e.userText = `Scryfall, l'archivio delle carte, non ha risposto entro ${sec} second${sec === 1 ? 'o' : 'i'}`;
+    return e;
+  }
+  function isTimeout(e) { return !!(e && e.code === 'SCRYFALL_TIMEOUT'); }
+
+  // La corsa col tempo limite non si fida del fetch: anche uno che ignora il segnale lascia andare chi aspetta.
+  function withLimit(work, signal) {
+    const ms = timeoutMs;
+    return new Promise((resolve, reject) => {
+      const ac = new AbortController();
+      let settled = false;
+      let timer = 0;
+      const onStop = () => { ac.abort(); finish(reject, stoppedError()); };
+      function finish(fn, v) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        if (signal) signal.removeEventListener('abort', onStop);
+        fn(v);
+      }
+      if (signal && signal.aborted) { onStop(); return; }
+      timer = setTimeout(() => { ac.abort(); finish(reject, timeoutError(ms)); }, ms);
+      if (signal) signal.addEventListener('abort', onStop, { once: true });
+      Promise.resolve().then(() => work(ac.signal)).then((v) => finish(resolve, v), (e) => finish(reject, e));
+    });
+  }
+
+  // `signal`: chi ha chiesto non aspetta più (la chat fermata dall'utente), la richiesta si chiude subito.
+  async function apiGet(path, { signal = null } = {}) {
+    return throttled(() => withLimit(async (limitSignal) => {
       const res = await _fetch(BASE + path, {
         headers: { Accept: 'application/json', 'User-Agent': USER_AGENT },
+        signal: limitSignal,
       });
       if (res.status === 404) return null; // "nessun risultato" per Scryfall
       if (!res.ok) {
@@ -73,18 +113,20 @@
         throw err;
       }
       return res.json();
-    });
+    }, signal));
   }
 
-  // Un guasto passeggero (rete, 429, 5xx) si riprova prima di arrendersi; una query rifiutata (4xx) tornerebbe uguale.
+  // Un guasto passeggero (rete, 429, 5xx) si riprova prima di arrendersi; una query rifiutata (4xx) tornerebbe uguale,
+  // e un tempo limite scaduto ha già fatto aspettare abbastanza: riprovarlo triplicherebbe l'attesa.
   const PAGE_RETRY_MS = [700, 2000];
-  async function searchPage(path) {
+  async function searchPage(path, signal) {
     for (let i = 0; ; i += 1) {
       try {
-        return await apiGet(path);
+        return await apiGet(path, { signal });
       } catch (e) {
         const status = Number(e && e.status);
-        if (i >= PAGE_RETRY_MS.length || (status && status !== 429 && status < 500)) throw e;
+        if (i >= PAGE_RETRY_MS.length || isTimeout(e) || (e && e.code === 'ABORT_ERR')
+          || (status && status !== 429 && status < 500)) throw e;
         await new Promise((r) => setTimeout(r, PAGE_RETRY_MS[i]));
       }
     }
@@ -96,7 +138,7 @@
   //    ne restano fuori (mai un taglio muto, #382). Una pagina successiva che non risponde nemmeno riprovata chiude
   //    lì con `broken`: le altre non le ha tagliate un tetto, e chi mostra lo dice.
   //    `remember: false`: chi filtra i risultati mette in cache solo quelli che tiene (`remember()`).
-  async function search(userQuery, { identity, maxCards = 0, remember = true, onPage = null } = {}) {
+  async function search(userQuery, { identity, maxCards = 0, remember = true, onPage = null, signal = null } = {}) {
     const q = Q.buildSearchQuery(userQuery, identity);
     if (!q) return { cards: [], hasMore: false, total: 0, query: q, broken: false };
     const cards = [];
@@ -106,9 +148,9 @@
     for (let page = 1; ; page += 1) {
       let data;
       try {
-        data = await searchPage(`/cards/search?q=${encodeURIComponent(q)}&order=cmc${page > 1 ? `&page=${page}` : ''}`);
+        data = await searchPage(`/cards/search?q=${encodeURIComponent(q)}&order=cmc${page > 1 ? `&page=${page}` : ''}`, signal);
       } catch (e) {
-        if (page === 1) throw e;
+        if (page === 1 || (e && e.code === 'ABORT_ERR')) throw e;
         hasMore = true;
         broken = true;
         break;
@@ -125,10 +167,10 @@
   }
 
   // Risoluzione nome fuzzy (§3.5): null se Scryfall non riconosce il nome.
-  async function named(name) {
+  async function named(name, { signal = null } = {}) {
     const n = String(name || '').trim();
     if (!n) return null;
-    const data = await apiGet(`/cards/named?fuzzy=${encodeURIComponent(n)}`);
+    const data = await apiGet(`/cards/named?fuzzy=${encodeURIComponent(n)}`, { signal });
     const card = data ? Q.simplifyCard(data) : null;
     if (card) cacheCards([card]).catch(() => {});
     return card;
@@ -156,7 +198,7 @@
   // (la coda rate-limited le serializza). Ritorna una mappa id → card
   // (id introvabili semplicemente assenti). `cacheOnly`: niente rete, quello che c'è anche se vecchio (la chat
   // riaperta si disegna subito; le mancanti le chiede dopo).
-  async function cards(ids, { maxAgeMs = Infinity, cacheOnly = false } = {}) {
+  async function cards(ids, { maxAgeMs = Infinity, cacheOnly = false, signal = null } = {}) {
     const wanted = [...new Set((ids || []).map(String).filter(Boolean))];
     const map = await readCardCache();
     const out = {};
@@ -174,13 +216,17 @@
       else missing.push(id);
     }
     const fetched = [];
+    // Scaduto il tempo limite una volta, le altre carte non si chiedono: aspetterebbero lo stesso servizio fermo.
+    let down = false;
     for (const id of missing) {
       try {
-        const data = await apiGet(`/cards/${encodeURIComponent(id)}`);
+        if (down) throw timeoutError(timeoutMs);
+        const data = await apiGet(`/cards/${encodeURIComponent(id)}`, { signal });
         const card = data ? Q.simplifyCard(data) : null;
         if (card) { out[id] = card; fetched.push(card); }
         else if (map[id]) out[id] = map[id].card; // irraggiungibile: meglio stantio che niente
-      } catch (_) {
+      } catch (e) {
+        if (isTimeout(e) || (e && e.code === 'ABORT_ERR')) down = true;
         if (map[id]) out[id] = map[id].card;
       }
     }
@@ -227,5 +273,8 @@
     return map;
   }
 
-  global.SN_SCRYFALL = { search, named, card, cards, symbols, prints, remember: cacheCards, PRICE_TTL_MS, _setFetch };
+  global.SN_SCRYFALL = {
+    search, named, card, cards, symbols, prints, remember: cacheCards, isTimeout,
+    PRICE_TTL_MS, REQUEST_TIMEOUT_MS, _setFetch, _setTimeoutMs,
+  };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

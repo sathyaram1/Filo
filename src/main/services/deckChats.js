@@ -33,23 +33,27 @@
     return true;
   }
 
-  function watchTurn(turn, wc, onAbandon) {
-    if (!turn || live.has(turn)) return;
-    const abandon = () => { if (endTurn(turn) && onAbandon) onAbandon(); };
-    // Un cambio di hash (#/deck/…) è la stessa pagina che continua ad aspettare: conta solo un documento nuovo.
+  // La pagina che aspetta se ne va (ricaricata, chiusa, altrove): `fn` una volta sola. Torna la funzione che smette
+  // di guardare. Un cambio di hash (#/deck/…) è la stessa pagina che continua ad aspettare: conta solo un documento nuovo.
+  function onLeave(wc, fn) {
+    if (!wc || typeof wc.on !== 'function') return () => {};
+    let stop = () => {};
+    const leave = () => { stop(); fn(); };
     const onNav = (e, _url, isInPlace, isMainFrame) => {
       const main = e && typeof e.isMainFrame === 'boolean' ? e.isMainFrame : isMainFrame;
       const same = e && typeof e.isSameDocument === 'boolean' ? e.isSameDocument : isInPlace;
-      if (main && !same) abandon();
+      if (main && !same) leave();
     };
-    let stop = () => {};
-    if (wc && typeof wc.on === 'function') {
-      try { wc.on('did-start-navigation', onNav); wc.once('destroyed', abandon); } catch (_) {}
-      stop = () => {
-        try { wc.removeListener('did-start-navigation', onNav); wc.removeListener('destroyed', abandon); } catch (_) {}
-      };
-    }
-    live.set(turn, stop);
+    try { wc.on('did-start-navigation', onNav); wc.once('destroyed', leave); } catch (_) {}
+    stop = () => {
+      try { wc.removeListener('did-start-navigation', onNav); wc.removeListener('destroyed', leave); } catch (_) {}
+    };
+    return stop;
+  }
+
+  function watchTurn(turn, wc, onAbandon) {
+    if (!turn || live.has(turn)) return;
+    live.set(turn, onLeave(wc, () => { if (endTurn(turn) && onAbandon) onAbandon(); }));
   }
 
   function isLive(turn) { return live.has(turn); }
@@ -98,5 +102,5 @@
     });
   }
 
-  global.SN_DECK_CHATS_SVC = { get, edit, dropDeck, isLive };
+  global.SN_DECK_CHATS_SVC = { get, edit, dropDeck, isLive, onLeave };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

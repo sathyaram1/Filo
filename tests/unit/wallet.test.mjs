@@ -4,6 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { costoInUnita } from '../helpers/tempoRelativo.mjs';
 
 const require = createRequire(import.meta.url);
 require('../../src/shared/wallet.js');
@@ -206,6 +207,63 @@ test('codeFromInput: il codice nudo si trova anche col saluto davanti', () => {
   assert.equal(W.codeFromInput('buon giro a tutti quanti'), null);
 });
 
+// Un saluto fatto di lettere che un codice può avere («Cara Sara», «Sera
+// Anna») è otto caratteri buoni: non deve vincere sul codice che segue (#664).
+// Il codice scritto come si mostra (col trattino, con una cifra, in
+// maiuscolo) passa davanti; a pari segni il server sceglie, e chi riscatta
+// prova il blocco dopo.
+test('codesFromInput: il saluto che sembra un codice non vince sul codice', () => {
+  for (const m of [
+    'Cara Sara, ecco il codice: ABCD-EFGH',
+    'Sera Anna, ecco il codice: ABCD-EFGH fammi sapere',
+    'Bene Anna, ti mando il codice ABCD-EFGH',
+    'Cara Sara ABCDEFGH',
+    'cara sara, il codice è abcd-efgh',
+  ]) {
+    assert.equal(W.codeFromInput(m), 'ABCDEFGH', m);
+  }
+  assert.equal(W.codeFromInput('Cara Sara, ecco: AB2D EFGH'), 'AB2DEFGH', 'una cifra: le parole non ne hanno');
+  // A pari segni restano tutti e due, nell'ordine del testo.
+  assert.deepEqual(W.codesFromInput('CARA SARA ABCDEFGH'), ['CARASARA', 'ABCDEFGH']);
+  assert.deepEqual(W.codesFromInput('ABCD-EFGH e ancora ABCD-EFGH'), ['ABCDEFGH'], 'lo stesso codice si prova una volta');
+  assert.deepEqual(W.codesFromInput('ciao come stai'), []);
+  assert.ok(W.CODE_TRIES >= 3, 'un messaggio vero ha saluto, codice e magari una firma');
+  assert.match(W.tooManyCodesMessage(12, 5), /12 blocchi.*primi 5/);
+});
+
+// Il campo si legge nel main: una lettura che cresce col quadrato della
+// lunghezza ferma tutte le schede per decine di secondi (#664).
+test('codesFromInput: un incollaggio lunghissimo si legge in fretta', () => {
+  // Duecentomila caratteri: la lettura di prima ci metteva quasi un minuto,
+  // migliaia di unità di riferimento; quella lineare ne costa qualcuna.
+  const n = 200000;
+  const testi = {
+    trattini: '-'.repeat(n),
+    lettere: 'a'.repeat(n),
+    codici: 'ABCD EFGH '.repeat(n / 10),
+    sottodomini: ('x'.repeat(30) + '.').repeat(n / 31),
+    link: ('filo.red/i/' + '-'.repeat(1000) + ' ').repeat(n / 1012),
+    barre: ('filo:' + '/'.repeat(1000)).repeat(n / 1005),
+  };
+  for (const [nome, t] of Object.entries(testi)) {
+    const c = costoInUnita(() => W.codesFromInput(t), { tetto: 30 });
+    assert.ok(c.entro, `${nome}: ${c.come}`);
+  }
+});
+
+test('inviteCodeFromLink: il link di filo.red e filo://invito, nient\'altro', () => {
+  assert.equal(W.inviteCodeFromLink('https://filo.red/i/ABCD-EFGH'), 'ABCDEFGH');
+  assert.equal(W.inviteCodeFromLink('https://www.filo.red/i/abcdefgh/'), 'ABCDEFGH');
+  assert.equal(W.inviteCodeFromLink('filo://invito/abcd-efgh'), 'ABCDEFGH');
+  assert.equal(W.inviteCodeFromLink('https://filo.red.evil.com/i/ABCDEFGH'), null);
+  assert.equal(W.inviteCodeFromLink('https://evil.com/filo.red/i/ABCDEFGH'), null);
+  assert.equal(W.inviteCodeFromLink('https://filo.red/i/ABCD'), null, 'codice storto: niente voce');
+  assert.equal(W.inviteCodeFromLink('https://filo.red/'), null);
+  assert.equal(W.inviteCodeFromLink('filo://credits/credits.html'), null);
+  assert.equal(W.inviteCodeFromLink('javascript:alert(1)'), null);
+  assert.equal(W.inviteCodeFromLink(''), null);
+});
+
 test('filo://invito/<codice>: si accetta il solo host invito, il resto non apre niente', () => {
   assert.equal(W.inviteCodeFromDeepLink('filo://invito/ABCDEFGH'), 'ABCDEFGH');
   assert.equal(W.inviteCodeFromDeepLink('filo://invito/abcd-efgh'), 'ABCDEFGH');
@@ -370,4 +428,14 @@ test('archiviata o doppione: il server non la premia, si annuncia senza cifra e 
 test('segnalazione mandata prima del riscatto: il server non sa a chi darlo, niente attesa', () => {
   const r = W.resolutionReward({ card: scheda(), grants: [], grantsFresh: true, redeemedAt: '2026-09-25T00:00:00.000Z', now: ORA });
   assert.deepEqual(r, { announce: true, credits: 0 });
+});
+
+// Il preload delle pagine manda il clic sull'invito prima che SN_MSG esista,
+// col valore letterale: se il nome del messaggio cambia, il clic non arriva più.
+test('il clic sull\'invito dal preload delle pagine usa il messaggio giusto', async () => {
+  const { readFileSync } = await import('node:fs');
+  require('../../src/shared/messages.js');
+  const preload = readFileSync(new URL('../../src/preload/page-preload.js', import.meta.url), 'utf8');
+  assert.ok(globalThis.SN_MSG.MSG.WALLET_INVITE_OPEN, 'il messaggio esiste');
+  assert.ok(preload.includes(`type: '${globalThis.SN_MSG.MSG.WALLET_INVITE_OPEN}'`), 'il preload lo chiama col suo nome');
 });

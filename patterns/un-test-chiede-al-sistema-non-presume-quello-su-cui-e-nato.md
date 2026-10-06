@@ -50,7 +50,10 @@ cade nel vuoto e la finestra resta com'era. La prova chiede `isMinimized()`; se 
 sistema non l'ha ridotta, finge la sua risposta (`isMinimized` vero ed evento
 `minimize`, poi il contrario) e prova lo stesso cammino del codice. Sostituire la
 riduzione con un'altra uscita dalla vista lascerebbe la riduzione provata solo sul
-Windows dell'owner. Riferimento: `tests/manage-ricevuti-vivi.spec.mjs`.
+Windows dell'owner. Lo fa `riduciAIcona`/`rialza` (`tests/helpers/riduzione.mjs`), e
+nessuno spec chiama `minimize()` da solo: la home (#873) era nata due giorni dopo questa
+regola nascondendo la finestra al posto di ridurla (#810.10). Sentinella:
+`tests/unit/riduzioneNeiTest.test.mjs`.
 
 ## Il contenitore che disegna adagio (#592.11)
 
@@ -77,7 +80,28 @@ nasceva rosso solo per l'owner, per settimane (undici spec così):
   lunga. La cartella temporanea di un test si chiede a `cartellaTemporanea()`
   (`tests/helpers/percorsi.mjs`), che la fa canonica e con uno spazio nel nome per tutti:
   una costruita con `mkdtempSync` prova su un percorso che sulla macchina dell'owner non
-  esiste, e una sentinella lo impedisce.
+  esiste, e una sentinella lo impedisce. La stessa funzione la toglie quando il processo
+  finisce, verde o rosso (lasciate lì erano diventate 17 GB, #717); quelle di un processo
+  ucciso le toglie il lanciatore della corsa dopo, passato un giorno. Quello che nessuna
+  prova chiede (i file che il codice provato o Chromium scrivono nella temporanea per
+  conto loro) finisce nella temporanea della corsa: la crea chi carica quel modulo (i due
+  lanciatori, ma anche un file di prova lanciato da solo), i figli la ereditano e se ne va
+  con lui.
+
+Gli ultimi quattro rossi di quella macchina (#650) presumevano altro:
+
+- **L'uscita di un comando ha la forma della sua shell.** `pwd` in PowerShell è una
+  tabella («Path», «----», il percorso): si legge l'ultima riga piena, non tutto lo stdout.
+- **Il fuoco non c'è.** In Electron Playwright non finge il fuoco come in un browser, e la
+  finestra della suite, parcheggiata fuori schermo mentre l'owner lavora, spesso non ce
+  l'ha: un `change` che nasce dal passaggio del fuoco da una casella all'altra non arriva.
+  La prova manda lei il gesto che conferma.
+- **Un segnale acceso da prima.** «Salvato» resta a schermo un secondo e mezzo: lo
+  accende anche il salvataggio precedente, e aspettarlo non dice che è arrivato il
+  secondo. Si aspetta il valore salvato.
+- **Una cache che la prova non vede.** Il colore identità di una scheda si ricorda per
+  host, e tre pagine dello stesso server di prova sono un host solo: appena aperta, una
+  scheda porta il colore della sorella. Si aspetta che ognuna abbia il suo.
 
 ## Il cancello di pubblicazione (#931)
 
@@ -97,3 +121,45 @@ il rosso ferma le versioni per tutti:
   con EPERM. Si copia.
 
 Sentinella delle due forme: `tests/unit/cartelleTemporanee.test.mjs`.
+
+## Il collegamento simbolico (#742)
+
+Su Windows un collegamento simbolico lo crea solo l'amministratore o chi ha la
+modalità sviluppatore: per tutti gli altri è EPERM. Il cancello di GitHub gira da
+amministratore e lì passa, quindi l'unico posto dove si vede è la macchina
+dell'owner, dove ferma ogni chiusura locale. Una cartella si collega con
+`collegaCartella` (una junction su Windows, che non chiede privilegi); un file non ha
+junction, e `collegaFile` restituisce il motivo da passare a `t.skip` solo su Windows
+e solo per EPERM: altrove il caso gira e un errore resta un errore. Gli script che la
+chiusura esegue passano `'junction'` da sé. Sentinella nello stesso file.
+
+## La macchina carica (#943)
+
+Gli unit girano in parallelo, e spesso più verifiche girano insieme sulla stessa
+macchina. «Due milioni di caratteri in meno di un secondo e mezzo» passava sempre da
+solo e cadeva in quasi ogni corsa completa: a macchina carica la stessa valutazione
+arriva a tre secondi senza che il codice sia cambiato, e un rosso degli unit rende
+rosso `finish:check` (che con `--check` corre lo stesso gli spec, #874.1).
+
+Un tempo non si confronta con millisecondi fissi. Si confronta con un lavoro di
+riferimento misurato accanto, nello stesso processo: il carico rallenta tutti e due e il
+rapporto resta (con ottanta processi occupati su quattro core la valutazione durava fino
+a tre secondi e il rapporto restava fra otto e undici, come a macchina ferma). `costoInUnita`
+(`tests/helpers/tempoRelativo.mjs`) misura l'operazione fra due unità di riferimento,
+ripete solo se il giro sfora e tiene il giro migliore: una regressione vera sfora a ogni
+giro, un carico passeggero no. Il tetto si sceglie una decina di volte sopra il costo
+visto: quello che la prova deve fermare, un algoritmo quadratico o un'espressione che
+torna indietro, costa centinaia di unità.
+
+Un timer atteso (`await` di qualcosa che scade da sé) misura il timer e non il lavoro, e
+resta in millisecondi. Sentinella: `tests/unit/tempiSottoCarico.test.mjs`.
+
+## Il verso opposto (#937)
+
+Una prova nata su Windows che asserisce un percorso `C:\…` cade su Linux se la
+funzione chiede la forma al sistema che la esegue: `isAbsolute('C:\\x')` lì risponde
+falso. Quando il risultato deve essere lo stesso su ogni macchina (la chiave di un test
+rosso confrontata fra due cartelle), si riconoscono entrambe le forme:
+`isAbsolute(p) || win32.isAbsolute(p)`. Un rosso solo su Linux non ferma né le fusioni
+né le versioni, quindi nessun allarme lo segnala: resta finché una routine non lo trova.
+Riferimento: `chiaveTest` in `scripts/lib/unit-sulla-fusione.mjs`.

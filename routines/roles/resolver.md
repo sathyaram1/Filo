@@ -65,6 +65,8 @@ il rilievo che riproduce.
 
 <!-- includi: _segnala.md -->
 
+<!-- includi: _solo-in-locale.md -->
+
 ## Consegna
 
 I tre testi (report, frase, changelog) li scrivi tu.

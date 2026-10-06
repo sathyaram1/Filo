@@ -109,7 +109,7 @@ test('davvero, con --solo-server: presa in carico, server con la pratica, a fusi
   assert.deepEqual(r.lanci, [{ cartella: '/srv/functions', args: ['claude/x'], pratica: '#910' }]);
   assert.equal(r.scritture.length, 3, r.scritture.join('\n'));
   assert.ok(!r.scritture[0].includes('resolvedInVersion'), 'la prima scrittura è la presa in carico');
-  assert.match(r.scritture[1], /fieldPaths=localMerges\.server&updateMask\.fieldPaths=localMerges\.solo&updateMask\.fieldPaths=localMerges\.ramo$/, 'poi la parte del server, sola, col suo ramo');
+  assert.match(r.scritture[1], /fieldPaths=localMerges\.server&updateMask\.fieldPaths=localMerges\.solo&updateMask\.fieldPaths=localMerges\.ramo&updateMask\.fieldPaths=updatedAt$/, 'poi la parte del server, sola, col suo ramo');
   assert.ok(r.scritture[2].includes('resolvedInVersion'), 'l’ultima chiude la pratica');
   assert.match(r.testo, /Pratica #910 chiusa/);
 });
@@ -118,7 +118,7 @@ test('senza --solo-server e senza un ramo dell’app in vista la pratica resta a
   const r = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p'] });
   assert.equal(r.k, 0, r.testo);
   assert.equal(r.scritture.length, 3);
-  assert.match(r.scritture[1], /updateMask\.fieldPaths=localMerges\.server&updateMask\.fieldPaths=localMerges\.ramo$/, 'la parte del server col suo ramo, senza «solo»');
+  assert.match(r.scritture[1], /updateMask\.fieldPaths=localMerges\.server&updateMask\.fieldPaths=localMerges\.ramo&updateMask\.fieldPaths=updatedAt$/, 'la parte del server col suo ramo, senza «solo»');
   assert.ok(r.scritture.every((u) => !u.includes('resolvedInVersion')), 'non si chiude');
   assert.match(r.testo, /resta aperta: manca la parte dell’app, la chiude la fusione di quella parte \(npm run finish -- --feedback 910\)/);
   assert.match(r.testo, /npm run server:fondi -- claude\/x --feedback 910 --solo-server/);
@@ -193,7 +193,7 @@ test('pratica chiusa da poco dalla fusione dell’app dello stesso lavoro: il se
   assert.equal(r.k, 0, r.testo);
   assert.deepEqual(r.lanci, [{ cartella: '/srv/functions', args: ['claude/x'], pratica: '#910' }]);
   assert.equal(r.scritture.length, 2, 'nessuna presa in carico: la parte e la nota');
-  assert.match(r.scritture[0], /localMerges\.server&updateMask\.fieldPaths=localMerges\.ramo$/);
+  assert.match(r.scritture[0], /localMerges\.server&updateMask\.fieldPaths=localMerges\.ramo&updateMask\.fieldPaths=updatedAt$/);
   assert.match(r.testo, /meno di 48 ore fa/);
   assert.match(r.testo, /resta chiusa/);
 });

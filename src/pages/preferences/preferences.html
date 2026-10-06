@@ -19,6 +19,7 @@
   <script src="filo://shared/confirmUi.js"></script>
   <script src="filo://shared/onboarding.js"></script>
   <script src="filo://shared/caselleAlSicuro.js"></script>
+  <script src="filo://shared/vociImpostazioni.js"></script>
   <style>
     /* Rifare un'intervista di benvenuto non cancella quella di prima: restano qui, rileggibili. */
     .onb-archive { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
@@ -96,6 +97,40 @@
     </section>
 
     <section>
+      <h2>Ora, batteria, rete, Bluetooth e volume nella home</h2>
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="homeSisOra" />
+          <span>Ora</span>
+        </label>
+      </div>
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="homeSisBatteria" />
+          <span>Batteria</span>
+        </label>
+      </div>
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="homeSisRete" />
+          <span>Rete</span>
+        </label>
+      </div>
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="homeSisBluetooth" />
+          <span>Bluetooth</span>
+        </label>
+      </div>
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="homeSisVolume" />
+          <span>Volume</span>
+        </label>
+      </div>
+    </section>
+
+    <section>
       <h2>Anteprima delle schede</h2>
       <p class="sn-muted">Passando il mouse su una scheda vedi cosa contiene, senza aprirla.</p>
       <div class="sn-toggle-row">
@@ -129,6 +164,12 @@
       </div>
       <label for="autoArchiveIdleHours" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Archivia dopo questo periodo di inattività di Filo (ore)</label>
       <input type="number" id="autoArchiveIdleHours" min="1" max="168" step="1" style="width:120px;" />
+      <div class="sn-toggle-row" style="margin-top:12px">
+        <label>
+          <input type="checkbox" id="riassuntoSchede" />
+          <span>Riassumi le schede chiuse, per ritrovarle in Cronologia anche per significato</span>
+        </label>
+      </div>
     </section>
 
     <section>
@@ -184,6 +225,19 @@
     </section>
 
     <section>
+      <h2>Microfono delle chat</h2>
+      <label for="dictationAutoSend" class="sn-muted" style="display:block;margin-bottom:4px;">Finito di parlare</label>
+      <select id="dictationAutoSend">
+        <option value="si">Invia da solo</option>
+        <option value="no">Lascia il testo da correggere</option>
+      </select>
+      <label for="dictationSilence" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Pausa che chiude: <span id="dictationSilenceVal">2 s</span></label>
+      <input type="range" id="dictationSilence" min="1" max="8" step="0.5" value="2" style="width:100%;max-width:360px;display:block;" />
+      <label for="dictationCancel" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Tempo per annullare l'invio: <span id="dictationCancelVal">2,5 s</span></label>
+      <input type="range" id="dictationCancel" min="0" max="10" step="0.5" value="2.5" style="width:100%;max-width:360px;display:block;" />
+    </section>
+
+    <section>
       <h2>Notifiche</h2>
       <p class="sn-muted">Gli avvisi in basso a destra, nella barra e dentro le pagine.</p>
       <label for="notifDuration" class="sn-muted" style="display:block;margin-bottom:4px;">Durata in secondi, <strong>0 = restano finché non li chiudi</strong></label>
@@ -235,13 +289,24 @@
       </select>
     </section>
 
+    <section id="sec-nomi-file">
+      <h2>Nomi dei file scaricati</h2>
+      <p class="sn-muted">Un file che arriva con un nome che non dice niente («scan_00231.pdf», «IMG_2026…», «documento (3)») prende un nome che dice cosa contiene, come «Bolletta luce marzo 2026.pdf». Filo ne legge l'inizio o una miniatura, l'estensione resta quella, e l'avviso che compare ha «Annulla». I nomi scelti da qualcuno restano com'erano, e nelle finestre in incognito non succede.</p>
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="nomiSensatiScaricamenti" />
+          <span>Dai da solo un nome sensato ai file scaricati</span>
+        </label>
+      </div>
+    </section>
+
     <section id="sec-advanced" style="margin-top:32px;border-top:1px solid var(--sn-border);padding-top:8px;">
       <h2>Impostazioni avanzate</h2>
       <p class="sn-muted">Qui puoi modificare ogni aspetto estetico di Filo. Ricorda però che puoi sempre chiedere a Filo di fare le modifiche, se non ti va di cercare l'impostazione giusta.</p>
 
       <section id="sec-tokens">
         <h2>Aspetto: token estetici</h2>
-        <p class="sn-muted">Tutti i colori, i font e le misure dell'aspetto di Filo, coi loro valori predefiniti. Cambia un valore per personalizzarlo: l'aspetto si aggiorna subito, ovunque (shell, pagine di Filo, menu sulle pagine web). I valori che hai modificato sono <strong>evidenziati</strong>; con <span aria-hidden="true">↺</span> riporti il singolo token al predefinito. I colori si scrivono come <code>#rrggbb</code> o <code>rgb(...)</code>; le misure come <code>6px</code>; le opacità come numero fra 0 e 1.</p>
+        <p class="sn-muted">Tutti i colori, i font e le misure dell'aspetto di Filo, coi loro valori predefiniti. Cambia un valore per personalizzarlo: l'aspetto si aggiorna subito, ovunque (shell, pagine di Filo, menu sulle pagine web). I valori che hai modificato sono <strong>evidenziati</strong>; con <span aria-hidden="true">↺</span> riporti il singolo token al predefinito. I colori si scrivono come <code>#rrggbb</code> o <code>rgb(...)</code>; le misure come <code>6px</code>; le opacità come numero fra 0 e 1; le durate come <code>450ms</code>.</p>
         <div class="sn-token-code" id="tokenCode" role="group" aria-label="Token estetici"></div>
         <div class="sn-row" style="margin-top:12px;">
           <button class="sn-btn sn-btn-secondary" id="resetAllTokens" type="button">Ripristina tutti i predefiniti</button>

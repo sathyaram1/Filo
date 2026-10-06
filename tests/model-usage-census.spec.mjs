@@ -22,6 +22,10 @@ async function revealAdvanced(page) {
   await page.waitForSelector('#useDefaultModels', { timeout: 8_000 });
   await page.uncheck('#useDefaultModels');
   await page.waitForSelector('#modelsGrid .sn-chain', { timeout: 4_000 });
+  // Spegnere l'interruttore salva tutta la pagina (catene e registro compresi): una scrittura della prova fatta
+  // prima che quel salvataggio arrivi viene ricoperta (#687). Si aspetta il valore salvato, non un tempo.
+  await expect.poll(() => page.evaluate(async () => (await window.SN_STORAGE.getSettings()).useDefaultModels),
+    { timeout: 5_000 }).toBe(false);
 }
 
 test('ogni punto censito come impostabile ha davvero un campo nelle Opzioni', async ({ openTab }) => {

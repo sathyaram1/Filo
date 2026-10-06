@@ -90,10 +90,12 @@
 
     let currentResult = '';
     let inFlight = false;
+    let $nota = null; // la riga del ripiego sui crediti di Filo, della proposta in vista
     async function runEdit() {
       const instruction = $instr.value.trim();
       if (!instruction || inFlight) return;
       inFlight = true;
+      if ($nota) { $nota.remove(); $nota = null; }
       $prop.classList.add('sn-editbox-empty');
       $prop.textContent = I18n.t('edit_box_loading');
       $copy.disabled = true;
@@ -103,6 +105,7 @@
           type: MSG.AI_REQUEST,
           action: ACTIONS.EDIT_TEXT,
           payload: { original: originalText, instruction },
+          diceRipiego: true,
         });
         if (!res?.ok || !res.text) {
           $prop.textContent = res?.error || I18n.t('edit_box_error');
@@ -111,6 +114,7 @@
         currentResult = res.text.trim();
         $prop.classList.remove('sn-editbox-empty');
         renderDiff($prop, originalText, currentResult);
+        $nota = Popup.notaRipiego($prop.parentNode, res.keyFallback);
         $copy.disabled = false;
         $replace.disabled = false;
       } catch (_) {

@@ -54,7 +54,9 @@
     // Filo in chat, e quella strada non cambia.
     '/feedback': (text, chat) => {
       if (!isOwner) {
-        showFiloLine('I feedback li vede chi li gestisce. Per mandarne uno: tasto destro → «Invia feedback», oppure scrivimi cosa non va e lo scrivo io.', chat);
+        // #986 — chi cerca le sue segnalazioni ci arriva, non legge solo dove sono.
+        showFiloLine('I feedback li vede chi li gestisce: ti apro quelli che hai mandato tu, in Bacheca. Per mandarne uno: tasto destro → «Invia feedback», oppure scrivimi cosa non va e lo scrivo io.', chat);
+        send({ type: MSG.OPEN_URL, url: 'filo://board/board.html#segnalazioni' });
         return;
       }
       send({ type: MSG.OPEN_URL, url: 'filo://feedback/feedback.html' });
@@ -64,6 +66,8 @@
     '/pulizia': (text, chat) => { runTabCleanup(chat); },
     '/riordina': (text, chat) => { runTabReorder(chat); },
     '/set': (text, chat) => { handleSetCommand(text, chat); },
+    // #664 — l'invito anche dalla chat: col codice (o il link, o la riga del messaggio) lo riscatta, da solo apre Crediti.
+    '/invito': (text, chat) => { handleInviteCommand(text, chat); },
     '/users': (text, chat) => { handleUsersCommand(text, chat); },
     '/gift': (text, chat) => { handleGiftCommand(text, chat); },
     '/help': (text, chat) => {
@@ -81,6 +85,7 @@
         '/pulisci, /pulizia — riordina e archivia le schede non più utili',
         '/riordina — riordina le schede per colore (nessuna viene chiusa)',
         '/set timer 5:00 — avvia un timer (anche /set timer 8 = 8 minuti)',
+        '/invito CODICE — riscatta un invito (va bene anche il link); da solo apre i Crediti',
         '/help — lista comandi',
         '/google.com — apri un sito',
       ];
@@ -304,6 +309,14 @@
   // `chat` è la targa presa quando l'utente ha dato il comando: una riga che
   // arriva quando quella conversazione qui non c'è più si archivia lì dentro e
   // basta, senza riportare a schermo una chat che l'utente aveva chiuso.
+  async function handleInviteCommand(text, chat) {
+    const resto = String(text || '').trim().replace(/^\/invito/i, '').trim();
+    if (!resto) { send({ type: MSG.OPEN_URL, url: 'filo://credits/credits.html' }); return; }
+    let r = null;
+    try { r = await send({ type: MSG.WALLET_REDEEM, code: resto }); } catch (_) { r = null; }
+    showFiloLine((r && r.message) || 'Non ci sono riuscito: riprova.', chat);
+  }
+
   function showFiloLine(text, chat) {
     try { archiviaRiga(text, 'filo', chat); } catch (_) {}
     if (!inChatAperta(chat)) return;

@@ -76,6 +76,22 @@ describe('il titolo', () => {
     assert.match(UI.headline(1), /^Una fusione/);
     assert.match(UI.headline(3), /^3 fusioni/);
   });
+
+  test('una richiesta già mandata a fondere non aspetta il via libera di nessuno (#702)', () => {
+    assert.equal(UI.headline(0, 1), 'Una fusione in corso');
+    assert.equal(UI.headline(0, 2), '2 fusioni in corso');
+    assert.equal(UI.headline(1, 1), 'Una fusione aspetta il tuo via libera');
+    assert.equal(UI.headline(0, 0), '');
+    // Fusa, scartata o sostituita, in attesa della rilettura: non aspetta più, e non è in corso (#702).
+    assert.equal(UI.headline(0, 0, 1), 'Una fusione decisa');
+    assert.equal(UI.headline(0, 1, 1), 'Una fusione in corso');
+    assert.match(UI.introText(1, 1), /Aspettano il tuo sì/);
+    assert.doesNotMatch(UI.introText(0, 1), /Aspettano il tuo sì|via libera/);
+    assert.equal(UI.introText(0, 0), '');
+    // Decisa: la frase resta (sparendo spostava i tasti) e non chiede più il sì.
+    assert.match(UI.introText(0, 0, 1), /Hai già deciso/);
+    assert.doesNotMatch(UI.introText(0, 0, 1), /Aspettano il tuo sì|via libera|sta fondendo/);
+  });
 });
 
 describe('la scadenza, detta prima', () => {
@@ -433,8 +449,8 @@ describe('richiesteCoperte: quali richieste ferme copre il segno «fondi senza c
 describe('i lavori locali (#908)', () => {
   test('la provenienza locale porta la sua pratica, quando c’è', () => {
     assert.equal(UI.originLabel({ origin: 'locale', num: '#908' }), 'lavoro locale · feedback #908');
-    assert.equal(UI.originLabel({ origin: 'locale' }), 'lavoro tuo, da questo computer');
-    assert.equal(UI.originLabel({}), 'lavoro tuo, da questo computer');
+    assert.equal(UI.originLabel({ origin: 'locale' }), 'lavoro tuo, in locale');
+    assert.equal(UI.originLabel({}), 'lavoro tuo, in locale');
   });
 
   test('una fusione che ha saltato L5 si legge come tale nella traccia', () => {
@@ -461,5 +477,17 @@ describe('i lavori locali (#908)', () => {
     }
     assert.match(pattern, /#908/);
     assert.match(riga, /lavoro locale provato/);
+  });
+});
+
+describe('la prova degli unit sulla fusione nella richiesta (#929)', () => {
+  test('dice su quale main e quanto tempo fa; al clic non si rifà, e il suggerimento lo spiega', () => {
+    const p = UI.provaNote({ provaUnit: { esito: 'verde', mainSha: 'b'.repeat(40), atMs: ORA - 3 * ORE } }, ORA);
+    assert.equal(p.testo, 'Unit verdi sulla fusione con main di 3 ore fa');
+    assert.match(p.titolo, /bbbbbbbb/);
+    assert.match(p.titolo, /non si rifanno/);
+    assert.match(UI.provaNote({ provaUnit: { esito: 'rosso_anche_su_main', mainSha: 'b'.repeat(40), atMs: ORA } }, ORA).testo, /già rossi su main/);
+    assert.match(UI.provaNote({ provaUnit: { esito: 'conflitto', mainSha: 'b'.repeat(40), atMs: ORA } }, ORA).testo, /conflitto/);
+    assert.equal(UI.provaNote({}, ORA), null, 'una richiesta di prima non dice niente');
   });
 });

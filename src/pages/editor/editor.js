@@ -3792,6 +3792,9 @@
     const log = pad.querySelector('[data-chat="log"]');
     const input = pad.querySelector('[data-chat="input"]');
     const sendBtn = pad.querySelector('[data-chat="send"]');
+    // La riga del ripiego sui crediti di Filo (#662) resta sotto la sua risposta finché la
+    // pagina è aperta: è un fatto di quel momento, non entra nel documento.
+    const noteRipiego = new WeakMap();
     const renderLog = () => {
       log.innerHTML = '';
       for (const msg of m.data.messages) {
@@ -3799,6 +3802,13 @@
         b.className = 'ed-chat-msg ' + (msg.role === 'user' ? 'user' : 'assistant');
         b.textContent = msg.content;
         log.appendChild(b);
+        const nota = noteRipiego.get(msg);
+        if (nota) {
+          const n = document.createElement('div');
+          n.className = 'ed-chat-note';
+          n.textContent = nota;
+          log.appendChild(n);
+        }
       }
       log.scrollTop = log.scrollHeight;
     };
@@ -3819,12 +3829,16 @@
       ];
       try {
         const r = await sendMessage({
-          type: MSG.AI_REQUEST, action: ACTIONS.EDITOR_CHAT || 'editor_chat', payload: { messages },
+          type: MSG.AI_REQUEST, action: ACTIONS.EDITOR_CHAT || 'editor_chat', payload: { messages }, diceRipiego: true,
         });
         const raw = (r && r.ok && typeof r.text === 'string') ? r.text : null;
         if (raw == null) {
           thinking.content = 'Errore: ' + ((r && r.error) || 'nessuna risposta');
         } else {
+          if (r.keyFallback && r.keyFallback.line) {
+            noteRipiego.set(thinking, r.keyFallback.line);
+            sendMessage({ type: MSG.KEY_FALLBACK_SHOWN });
+          }
           // Se la risposta contiene azioni di formattazione, applicale al
           // documento e mostra in chat la conferma; altrimenti è testo normale.
           const parsed = parseFormatActions(raw);
@@ -3847,6 +3861,8 @@
     };
     sendBtn.addEventListener('click', (e) => { e.stopPropagation(); send(); });
     input.addEventListener('click', (e) => e.stopPropagation());
+    // Il tasto microfono: si parla, e la domanda parte come con l'invio (o resta da correggere).
+    window.SN_VOCE_CHAT?.collega({ campo: input, contenitore: input.parentNode, prima: sendBtn, invia: () => send() });
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
     });
@@ -4121,11 +4137,14 @@
   // Aprire e CHIUDERE un pannello sono entrambi cambi sotto il cursore: aperto,
   // il colpo di coda cade su un comando del pannello nuovo; chiuso, cade sul
   // foglio dietro (che apre "Aggiungi modulo"). Armano tutti e due.
-  function openOverlay(html) { staleClick.arm(); overlayBox.innerHTML = html; overlay.hidden = false; }
+  let overlayGen = 0;
+  function openOverlay(html) { staleClick.arm(); overlayGen++; overlayBox.innerHTML = html; overlay.hidden = false; }
   function closeOverlay() { staleClick.arm(); overlay.hidden = true; overlayBox.innerHTML = ''; }
+  // Allo scadere chiude solo sé stesso: chiudeva qualunque pannello ci fosse, compreso il commento aperto nel frattempo.
   function flashOverlayMsg(text, ms) {
     openOverlay(`<div style="text-align:center;padding:8px 4px">${escapeHtml(text)}</div>`);
-    setTimeout(closeOverlay, ms || 1400);
+    const mio = overlayGen;
+    setTimeout(() => { if (overlayGen === mio && !overlay.hidden) closeOverlay(); }, ms || 1400);
   }
   overlay.addEventListener('click', (e) => { if (e.target === overlay) closeOverlay(); });
 
@@ -4436,6 +4455,11 @@
   loadVersions();                           // storico dall'archivio app (async)
   loadTrash();                              // documenti eliminati recuperabili
   loadCollection();                         // da localStorage (sincrono)
-  activateFile(STORE.activeFile(collection)); // apre l'ultimo file attivo
-  reloadFromArchive();                      // fonde i file scritti da Filo (appunti/migrazione)
+  // ?file=<id>: un documento scelto da fuori (la carta dell'Editor nella home, #870). Può stare solo
+  // nell'archivio (un appunto scritto da Filo a editor chiuso): lo si cerca di nuovo dopo la fusione.
+  const fileChiesto = (() => { try { return new URLSearchParams(location.search).get('file') || ''; } catch (_) { return ''; } })();
+  activateFile((fileChiesto && STORE.findFile(collection, fileChiesto)) || STORE.activeFile(collection));
+  reloadFromArchive().then(() => {
+    if (fileChiesto && STORE.findFile(collection, fileChiesto) && (!doc || doc.id !== fileChiesto)) switchToFile(fileChiesto);
+  });
 })();
