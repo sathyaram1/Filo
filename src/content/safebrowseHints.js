@@ -24,18 +24,61 @@ function pageHints(doc) {
     }
     return parti.filter(Boolean).join(' ');
   };
-  // Mostrato = a schermo, anche sotto la piega: un modulo di accesso tenuto pronto e nascosto non rende delicato un
-  // sito (#1004). Senza motore di disegno (un documento finto) non si sa, e vale mostrato.
+  // Mostrato = l'utente lo vede, o lo vede scorrendo la pagina: un modulo di accesso tenuto pronto e nascosto non rende
+  // delicato un sito (#1004) né un sosia (#728), comunque lo si nasconda. Una regola sola: un pezzo del campo resta
+  // dopo i ritagli di tutti i contenitori e dello schermo raggiungibile, e né lui né un contenitore è trasparente.
+  // Senza motore di disegno (un documento finto) non si sa, e vale mostrato.
   const mostrato = (el) => {
     try {
       if (!el || typeof el.getClientRects !== 'function') return true;
       if (!el.getClientRects().length) return false;
-      const r = el.getBoundingClientRect();
-      if (r.width < 2 || r.height < 2) return false;
       const w = doc.defaultView;
-      const st = w && w.getComputedStyle ? w.getComputedStyle(el) : null;
+      const stile = (n) => (w && w.getComputedStyle ? w.getComputedStyle(n) : null);
+      if (typeof el.checkVisibility === 'function'
+        && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true, contentVisibilityAuto: true })) return false;
+      const r = el.getBoundingClientRect();
+      let [x0, y0, x1, y1] = [r.left, r.top, r.right, r.bottom];
+      const st = stile(el);
       if (st && (st.visibility === 'hidden' || st.visibility === 'collapse' || Number(st.opacity) === 0)) return false;
-      return r.right + ((w && w.scrollX) || 0) > 0 && r.bottom + ((w && w.scrollY) || 0) > 0;
+      const ritaglia = (b) => { x0 = Math.max(x0, b.left); y0 = Math.max(y0, b.top); x1 = Math.min(x1, b.right); y1 = Math.min(y1, b.bottom); };
+      // Si sale lungo l'albero disegnato (anche fuori dai componenti incapsulati): ritaglia solo il contenitore che fa
+      // da riferimento alla posizione del campo, come fa il motore.
+      let pos = (st && st.position) || 'static';
+      const radice = doc.documentElement;
+      for (let n = el; n && pos !== 'fixed';) {
+        const rn = n.getRootNode ? n.getRootNode() : null;
+        const p = n.assignedSlot || n.parentElement || (rn && rn.host) || null;
+        if (!p || p === radice || p === doc.body) break;
+        const sp = stile(p);
+        n = p;
+        if (!sp) continue;
+        const posizionato = sp.position !== 'static' || (sp.transform && sp.transform !== 'none');
+        if (pos === 'absolute' && !posizionato) continue;
+        if (posizionato || pos !== 'absolute') pos = sp.position || 'static';
+        if (/hidden|clip|scroll|auto/.test(`${sp.overflowX} ${sp.overflowY}`) || (sp.clip && sp.clip.startsWith('rect('))) ritaglia(p.getBoundingClientRect());
+      }
+      if (w && typeof w.innerWidth === 'number') {
+        const vw = w.innerWidth;
+        const vh = w.innerHeight;
+        if (pos === 'fixed') ritaglia({ left: 0, top: 0, right: vw, bottom: vh });
+        else {
+          // Sotto la piega si arriva scorrendo; oltre un bordo che non scorre no.
+          const sr = [stile(radice), doc.body && stile(doc.body)].filter(Boolean);
+          const ferma = (asse) => sr.some((s) => /hidden|clip/.test(s[asse]));
+          const sx = w.scrollX || 0;
+          const sy = w.scrollY || 0;
+          ritaglia({
+            left: -sx, top: -sy,
+            right: ferma('overflowX') ? vw : Math.max(vw, (radice && radice.scrollWidth) || 0) - sx,
+            bottom: ferma('overflowY') ? vh : Math.max(vh, (radice && radice.scrollHeight) || 0) - sy,
+          });
+        }
+      } else {
+        const sx = (w && w.scrollX) || 0;
+        const sy = (w && w.scrollY) || 0;
+        ritaglia({ left: -sx, top: -sy, right: Infinity, bottom: Infinity });
+      }
+      return x1 - x0 >= 2 && y1 - y0 >= 2;
     } catch (_) { return true; }
   };
   // Un modulo dentro un componente incapsulato (shadow DOM aperto) è un modulo della pagina come gli altri.
