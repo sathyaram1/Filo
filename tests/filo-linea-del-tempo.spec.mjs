@@ -507,7 +507,7 @@ test('una pagina che si dà il titolo dopo il caricamento, o lo cambia dopo un c
   expect(eventi(userData).filter((e) => e.tipo === 'navigazione.titolo').map((e) => e.titolo)).toContain('Orche al tramonto - Video');
 });
 
-test('cancellata una chat dalla Cronologia, il suo testo sparisce anche dalle richieste ai modelli, dalla cache e dal registro grezzo', async ({ app }) => {
+test('cancellata una chat dalla Cronologia, il suo testo sparisce anche dalle richieste ai modelli e dalla cache', async ({ app }) => {
   test.setTimeout(90_000);
   await configura(app);
   await turno(app, 'chat-privata', 'La mia diagnosi è arrivata oggi.\nIl medico dice PRIVATO-77, cosa ne pensi?');
@@ -526,7 +526,9 @@ test('cancellata una chat dalla Cronologia, il suo testo sparisce anche dalle ri
   });
   expect(dove.privato).toEqual([]);
   // L'altra chat resta dov'era, e le richieste della chat cancellata restano coi loro costi, senza il testo.
-  expect(dove.tenuto).toEqual(expect.arrayContaining(['aiHistory', 'filo_raw_log']));
+  expect(dove.tenuto).toEqual(expect.arrayContaining(['aiHistory']));
+  // Il registro grezzo non c'è più (#868): il contesto della chat è il filo.
+  expect(dove.tenuto).not.toContain('filo_raw_log');
   expect(dove.segnate).toBeGreaterThan(0);
   expect(await voci()).toBe(prima);
 });
