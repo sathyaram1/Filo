@@ -304,6 +304,7 @@ function publicRecord(r) {
     exe: !!r.exe,
     site: r.site || '',
     siteUncertain: !!r.siteUncertain,
+    servedBy: r.servedBy || '',
     // #950 — il nome con cui il file era arrivato, finché Filo l'ha cambiato: le superfici offrono di rimetterlo.
     nomeOriginale: r.nomeOriginale || '',
   };
@@ -554,7 +555,13 @@ function onWillDownload(item, webContents, scope = '') {
   })() || 'download');
 
   const url = item.getURL();
-  const { sito, incerto } = sitoDi(url, webContents);
+  // La fiducia si lega al PRIMO indirizzo della catena di rimandi, quello
+  // cliccato; chi ha servito il file davvero va comunque nominato (#588.3).
+  let primo = url;
+  try { const c = item.getURLChain(); if (Array.isArray(c) && c[0]) primo = c[0]; } catch (_) {}
+  const { sito, incerto } = sitoDi(primo, webContents);
+  let servito = '';
+  try { servito = ESE().servitoDa(sito, url); } catch (_) {}
   let exe = false;
   try { exe = ESE().eEseguibile(filename); } catch (_) {}
   // Un programma si ferma PRIMA della cartella Download: i byte scendono in
@@ -587,6 +594,7 @@ function onWillDownload(item, webContents, scope = '') {
     exe,
     site: sito,
     siteUncertain: incerto,
+    servedBy: servito,
     _quarantena: attesa,
     _scope: scope || '',
   };
@@ -785,7 +793,7 @@ function finalizeManual(rec, state, savePath) {
   // già la sua conferma nella pagina (un secondo avviso sarebbe un doppione).
 }
 
-function beginManual({ url, filename, totalBytes, scope } = {}) {
+function beginManual({ url, filename, totalBytes, scope, servedFrom } = {}) {
   const id = uuid();
   const nome = safeName(filename || 'download');
   const indirizzo = String(url || '');
@@ -798,6 +806,7 @@ function beginManual({ url, filename, totalBytes, scope } = {}) {
     // lo dichiara e "Apri file" chiede conferma come per ogni altro (#588).
     exe: marca(() => ESE().eEseguibile(nome), false),
     site: marca(() => ESE().sito(indirizzo), ''),
+    servedBy: marca(() => ESE().servitoDa(indirizzo, servedFrom), ''),
     mime: '',
     totalBytes: Number(totalBytes) > 0 ? Number(totalBytes) : 0,
     receivedBytes: 0,
@@ -976,7 +985,7 @@ function openFile(id, opts, scope = '') {
   if (rec.exe && !(opts && opts.confirmed) && chiedeConferma(rec.site, rec.siteUncertain)) {
     let text = `«${rec.filename}» è un programma: aprirlo vuol dire eseguirlo.`;
     let title = 'Aprire un programma?';
-    try { text = ESE().testoApri(rec.filename, rec.site, rec.siteUncertain); title = ESE().titoloApri(rec.filename); } catch (_) {}
+    try { text = ESE().testoApri(rec.filename, rec.site, rec.siteUncertain, rec.servedBy); title = ESE().titoloApri(rec.filename); } catch (_) {}
     return { ok: false, needsConfirm: true, exe: true, title, text };
   }
   try {
