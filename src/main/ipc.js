@@ -139,6 +139,25 @@ function registerIpcHandlers() {
     event.returnValue = out;
   });
 
+  // #576 — i riquadri pubblicitari da nascondere nella pagina che sta per caricarsi: SINCRONO, o compaiono prima.
+  ipcMain.on('filo:adblock-css', (event, href, gate) => {
+    try {
+      event.returnValue = require('./services/adblock').cosmeticForPage(String(href || ''), gate);
+    } catch (_) {
+      event.returnValue = { css: '', tokens: false };
+    }
+  });
+
+  // Il sito vale quello del frame che chiede, non quello che il messaggio dichiara.
+  ipcMain.handle('filo:adblock-tokens', (event, msg) => {
+    try {
+      const href = (event.senderFrame && event.senderFrame.url) || '';
+      return require('./services/adblock').cosmeticForTokens(href, msg && msg.ids, msg && msg.classes, msg && msg.gate);
+    } catch (_) {
+      return '';
+    }
+  });
+
   // Cosa la pagina che sta per caricarsi legge delle notifiche (#591): SINCRONO per lo stesso motivo di filo:fp-config.
   ipcMain.on('filo:permessi-stato', (event, href) => {
     try {
