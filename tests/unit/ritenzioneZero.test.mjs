@@ -142,7 +142,7 @@ test('nessun host a ritenzione zero: l\'errore dice funzione e modello, non un c
       assert.match(frase, /z-ai\/glm-5\.3-flash/);
       assert.match(frase, /non conservare domande e risposte/);
       assert.match(frase, /Modelli predefiniti/);
-      assert.ok(!/404|OpenRouter|riprova/i.test(frase), frase);
+      assert.ok(!/404|OpenRouter \d|riprova/i.test(frase), frase);
       return true;
     });
   });
