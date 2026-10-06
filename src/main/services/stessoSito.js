@@ -61,4 +61,4 @@ class ElencoSiti extends Set {
   has(sito) { return super.has(sito) || copertura(String(sito || '').toLowerCase(), this) !== null; }
 }
 
-module.exports = { sitoDi, voceSalvata, ElencoSiti, suffissoPubblico };
+module.exports = { sitoDi, voceSalvata, ElencoSiti };
