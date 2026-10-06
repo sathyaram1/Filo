@@ -253,10 +253,12 @@ test('un output enorme non fa perdere esito e cartella', async () => {
 test('un comando che non finisce scade, e lo dice', async () => {
   const inizio = Date.now();
   // Fuori da Windows la sessione uccide solo sh: un `sleep` lungo terrebbe aperti i tubi e fermo il test.
-  const out = await esegui(WIN ? 'ping -n 60 127.0.0.1 >nul' : 'sleep 5', { timeoutMs: 1500 });
+  // Su Windows il comando durerebbe dieci minuti: fermato, finisce molto prima anche a macchina carica (#1063).
+  const naturaleMs = WIN ? 600_000 : 5_000;
+  const out = await esegui(WIN ? `ping -n ${naturaleMs / 1000} 127.0.0.1 >nul` : 'sleep 5', { timeoutMs: 1500 });
   assert.equal(out.timedOut, true);
   assert.equal(out.code, 124);
-  assert.ok(Date.now() - inizio < 30_000, 'il tempo scaduto non ha fermato il comando');
+  assert.ok(Date.now() - inizio < (WIN ? naturaleMs / 2 : 30_000), 'il tempo scaduto non ha fermato il comando');
 });
 
 test('con cmd anche un ciclo `for` scritto come al prompt gira', { skip: !WIN && 'cmd esiste solo su Windows' }, async () => {
