@@ -13,6 +13,7 @@
       features: [],
       fixes: [
         'Un sito dal nome comune non passa pi\u00f9 per l\'imitazione di un marchio. team.com, email.com, apply.com, telegraph.co.uk e le altre parole vicine a Steam, Gmail, Apple o Telegram aprivano il blocco a tutta pagina, quello che si toglie solo scrivendo \u00abconfermo\u00bb. Adesso trovi un avviso che chiudi con un clic. Il blocco resta sui sosia scritti con lettere che si somigliano, come paypa1 o g00gle, e su ogni sito che oltre al nome somigliante \u00e8 stato registrato da poco, ha il certificato rotto o ti chiede la password, anche se il modulo compare dopo.',
+        'Su Windows, se un programma lanciato dal terminale esce con un errore, il comando risulta fallito anche quando dopo c\'è altro che riesce, come una compilazione fallita seguita da un messaggio di fine o uno script che termina con quella compilazione. Prima risultava riuscito, sia a Filo sia nel terminale che usi tu.',
       ],
     },
     {
@@ -37,7 +38,6 @@
         'Quando OpenRouter rifiuta la tua chiave e una spiegazione, una traduzione o una modifica del testo sulle pagine la pagano i crediti di Filo, sotto la risposta c\'è scritto, come in chat; dettatura, lettura ad alta voce e trascrizione dello schermo lo dicono con un avviso. In Crediti spesa e residuo della chiave si aggiornano appena arriva il rifiuto, e la pagina dice che Filo ha usato i tuoi crediti solo se è successo.',
         'Filo controlla anche i questionari di Microsoft Customer Voice e le app che chiunque pubblica su Hugging Face Spaces. Se ti chiedono una password o i dati della carta, Filo giudica la pagina invece di fidarsi del nome di Microsoft o di Hugging Face.',
         'Con la protezione fingerprinting accesa, ogni finestra in incognito mostra ai siti un\'impronta sua, diversa da quella della finestra normale e delle altre finestre in incognito. Prima un sito poteva riconoscerti in incognito anche senza cookie. Se cambi la protezione da una finestra in incognito, il cambio vale solo lì, come per i cookie. Prima toccava anche le finestre normali.',
-        'Su Windows, se un programma lanciato dal terminale esce con un errore, il comando risulta fallito anche quando dopo c\'è altro che riesce, come una compilazione fallita seguita da un messaggio di fine o uno script che termina con quella compilazione. Prima risultava riuscito, sia a Filo sia nel terminale che usi tu.',
       ],
     },
     {
