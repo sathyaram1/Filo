@@ -27,7 +27,7 @@ test('la × della scheda zittisce la shell come «Ferma»', async ({ app, shell 
   await expect(shell.locator('#ring-indicator')).toBeVisible({ timeout: 12_000 });
   expect(await suona(shell)).toBe(true);
 
-  await page.locator('#live .dash-live-card[data-ringing="1"] .dash-live-dismiss').click();
+  await page.locator('#accade .dash-carta[data-suona="1"] .dash-carta-togli').click({ force: true });
 
   await expect(shell.locator('#ring-indicator')).toBeHidden({ timeout: 6_000 });
   await shell.waitForTimeout(1200);
