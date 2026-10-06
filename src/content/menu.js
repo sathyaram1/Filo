@@ -126,6 +126,9 @@
     try { if (!dentro && typeof radice.showPopover === 'function') { radice.popover = 'manual'; radice.showPopover(); } } catch (_) {}
     const st = { padre: radice.parentNode, visibile: undefined, io: null };
     radici.set(radice, st);
+    // Il verdetto del browser sulla vista conta solo nel documento principale, dove lo strato alto è quello della
+    // finestra. In un riquadro mette nel conto quello che il sito ospite fa al riquadro (scala, trasparenza, una bolla).
+    if (!VISTA_CONTA) { st.visibile = true; return; }
     try {
       st.io = new IntersectionObserver((voci) => {
         for (const v of voci) st.visibile = v.isVisible === undefined ? v.isIntersecting : !!v.isVisible;
