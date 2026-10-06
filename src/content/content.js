@@ -752,9 +752,12 @@
         mandaImpronte();
       }, 400);
     }
-    function scritto(area, base) {
+    // Un editor di codice riceve i tasti in una casella a più righe e mostra il testo altrove.
+    const aPiuRighe = (el) => !!el && (el.tagName.toUpperCase() === 'TEXTAREA' || el.isContentEditable);
+    function scritto(area, base, campo) {
       if (!aree.has(area)) aree.set(area, base);
-      if (area.tagName.toUpperCase() === 'TEXTAREA' || area.isContentEditable) lunghe.add(area);
+      if (aPiuRighe(area) || aPiuRighe(campo)) lunghe.add(area);
+      else digitati.set(area, essenziale(testo(area)));
       aggiorna(true);
       aRiposo();
     }
