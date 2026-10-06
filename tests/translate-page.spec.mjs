@@ -1610,3 +1610,235 @@ test('quel che si vede continua a tradursi: scorrimento, pannelli aperti, testo 
     await expect(page.locator(id)).toHaveText(/^IT /, { timeout: 30000 });
   }
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// #503 — l'avviso "tradotta solo in parte" non deve scattare a vuoto.
+//
+// Gli spazi pubblicitari, i banner dei cookie già chiusi e i riquadri di
+// statistica sono componenti chiusi NASCOSTI: su un sito di giornale ce n'è
+// sempre almeno uno, e l'avviso usciva praticamente sempre mandando l'utente a
+// cercare sullo schermo un rettangolo in lingua originale che non c'è.
+//
+// Il metro è "l'utente lo vede?", non "quanto è grande il rettangolo": portato
+// fuori dallo schermo, reso trasparente, nascosto lasciandogli l'ingombro o tolto
+// dal flusso → NON conta, l'avviso dice "Pagina tradotta". Quel che sta sotto la
+// prima schermata lo decide la prova del punto (#407): dove non si può guardare,
+// si tace.
+// ───────────────────────────────────────────────────────────────────────────
+
+const AD_SLOT_SCRIPT = `<script>
+    customElements.define('ad-slot', class extends HTMLElement {
+      connectedCallback() {
+        this.style.display = 'block';
+        this.style.width = '300px';
+        this.style.height = '250px';
+        const r = this.attachShadow({ mode: 'closed' });
+        r.innerHTML = '<div>Sponsored message nobody outside can read</div>';
+      }
+    });
+  </script>`;
+
+// Pagina di giornale tradotta per intero, con quattro spazi pubblicitari chiusi
+// nascosti nei quattro modi soliti. Nessuno di loro è sullo schermo.
+const HIDDEN_ADS = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px;margin:0">
+  <h1 id="plain">The end of an era in European football</h1>
+  <p id="body">First paragraph of the body text, long enough to be picked up by the extractor.</p>
+  <div style="position:absolute;left:-9999px;top:0"><ad-slot id="adOffscreen"></ad-slot></div>
+  <div style="transform:translateX(-200vw)"><ad-slot id="adPushed"></ad-slot></div>
+  <div style="opacity:0"><ad-slot id="adTransparent"></ad-slot></div>
+  <div style="visibility:hidden"><ad-slot id="adInvisible"></ad-slot></div>
+  <div style="display:none"><ad-slot id="adRemoved"></ad-slot></div>
+  ${AD_SLOT_SCRIPT}
+</body></html>`;
+
+test('spazi chiusi ma invisibili: la pagina è tradotta e l’avviso non manda a cercare niente', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, HIDDEN_ADS);
+  await watchToasts(page);
+
+  // Il presupposto della prova: gli spazi ci sono davvero, sono componenti
+  // chiusi (nessuno script può leggerci dentro) e nessuno di loro si vede.
+  expect(await page.evaluate(() => document.querySelectorAll('ad-slot').length)).toBe(5);
+  expect(await page.evaluate(() => [...document.querySelectorAll('ad-slot')].every((el) => !el.shadowRoot))).toBe(true);
+
+  await clickTranslateIcon(page, '#plain');
+
+  await expect(page.locator('#plain')).toHaveText(/^IT /);
+  await expect(page.locator('#body')).toHaveText(/^IT /);
+
+  // Quello che conta: l'avviso di fine lavoro dice che la pagina è tradotta,
+  // punto. Senza il fix qui usciva "tradotta solo in parte".
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
+  expect((await toasts(page)).filter((t) => t.startsWith('Pagina tradotta solo in parte'))).toEqual([]);
+  await page.screenshot({ path: 'tests/.shots/translate-page-hidden-ads.png' }).catch(() => {});
+});
+
+// Striscia pubblicitaria agganciata alla finestra e spinta fuori dallo schermo:
+// non scorre con la pagina, quindi non la si raggiunge nemmeno arrivando in
+// fondo. Le coordinate del documento qui mentono, ed è per questo che la prova
+// scorre prima di tradurre.
+const FIXED_HIDDEN_AD = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px;margin:0">
+  <h1 id="plain">The end of an era in European football</h1>
+  <p id="body">First paragraph of the body text, long enough to be picked up by the extractor.</p>
+  <div style="height:3000px"></div>
+  <p id="tail">Closing paragraph at the very bottom of a long page.</p>
+  <div style="position:fixed;top:-400px;left:0"><ad-slot id="adSticky"></ad-slot></div>
+  ${AD_SLOT_SCRIPT}
+</body></html>`;
+
+test('striscia agganciata alla finestra e spinta fuori: non la si raggiunge scorrendo, e non fa uscire l’avviso', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, FIXED_HIDDEN_AD);
+  await watchToasts(page);
+
+  await page.evaluate(() => window.scrollTo(0, 3000));
+  // Con la pagina scorsa, le coordinate del documento direbbero che la striscia
+  // sta a metà pagina; sullo schermo invece non c'è.
+  expect(await page.evaluate(() => {
+    const r = document.querySelector('#adSticky').getBoundingClientRect();
+    return { onScreen: r.bottom > 0, docWouldSay: r.top + window.scrollY > 0 };
+  })).toEqual({ onScreen: false, docWouldSay: true });
+
+  await clickTranslateIcon(page, '#tail');
+  await expect(page.locator('#tail')).toHaveText(/^IT /);
+
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
+  expect((await toasts(page)).filter((t) => t.startsWith('Pagina tradotta solo in parte'))).toEqual([]);
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// #503 (secondo giro) — nascondere non è solo questione di CSS sull'elemento:
+// il modo più comune è RITAGLIARLO da un antenato.
+//
+//  1) fisarmonica ripiegata / banner dei cookie chiuso: il contenitore è
+//     schiacciato a zero e taglia via quello che sborda → NON conta;
+//  2) contenitore di dimensioni normali che ritaglia il riquadro spinto più in
+//     basso del suo bordo → NON conta.
+// ───────────────────────────────────────────────────────────────────────────
+
+const CLIPPED_ADS = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px;margin:0">
+  <h1 id="plain">The end of an era in European football</h1>
+  <p id="body">First paragraph of the body text, long enough to be picked up by the extractor.</p>
+  <!-- Fisarmonica ripiegata: contenitore a zero che taglia via quel che sborda. -->
+  <section id="accordion" style="height:0;overflow:hidden">
+    <ad-slot id="adFolded"></ad-slot>
+  </section>
+  <!-- Banner dei cookie chiuso: contenitore di dimensioni normali, riquadro
+       spinto fuori dal suo bordo e ritagliato via. -->
+  <div id="cookiebar" style="height:30px;overflow:hidden">
+    <div style="height:400px"></div>
+    <ad-slot id="adClipped"></ad-slot>
+  </div>
+  ${AD_SLOT_SCRIPT}
+</body></html>`;
+
+test('riquadro ritagliato via da un antenato: la pagina è tradotta e l’avviso non manda a cercare niente', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, CLIPPED_ADS);
+  await watchToasts(page);
+
+  // Il presupposto della prova: i due riquadri hanno un rettangolo grande —
+  // quindi il conteggio "a rettangolo" li prenderebbe — ma sullo schermo non
+  // c'è un solo pixel loro, perché l'antenato li ritaglia.
+  expect(await page.evaluate(() => {
+    const big = (id) => {
+      const r = document.querySelector(id).getBoundingClientRect();
+      return r.width >= 40 && r.height >= 16;
+    };
+    const painted = (id) => {
+      const el = document.querySelector(id);
+      const r = el.getBoundingClientRect();
+      const x = Math.round(r.left + r.width / 2);
+      const y = Math.round(r.top + r.height / 2);
+      return document.elementsFromPoint(x, y).includes(el);
+    };
+    return {
+      folded: { big: big('#adFolded'), painted: painted('#adFolded') },
+      clipped: { big: big('#adClipped'), painted: painted('#adClipped') },
+    };
+  })).toEqual({
+    folded: { big: true, painted: false },
+    clipped: { big: true, painted: false },
+  });
+
+  await clickTranslateIcon(page, '#plain');
+  await expect(page.locator('#plain')).toHaveText(/^IT /);
+  await expect(page.locator('#body')).toHaveText(/^IT /);
+
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
+  expect((await toasts(page)).filter((t) => t.startsWith('Pagina tradotta solo in parte'))).toEqual([]);
+  await page.screenshot({ path: 'tests/.shots/translate-page-clipped-ads.png' }).catch(() => {});
+});
+
+// Chi ritaglia non ritaglia tutti: un riquadro in posizione assoluta NON è
+// ritagliato dagli antenati che non lo contengono, e sta lì bello visibile.
+// Scambiarli per ritagliatori sarebbe l'errore opposto — l'avviso muto proprio
+// quando serve — e i contenitori con `overflow:hidden` messi lì per ragioni di
+// impaginazione sono ovunque.
+const ESCAPING_AD = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px;margin:0">
+  <h1 id="plain">The end of an era in European football</h1>
+  <p id="body">First paragraph of the body text, long enough to be picked up by the extractor.</p>
+  <div id="clipper" style="height:30px;overflow:hidden">
+    <ad-slot id="adEscapes" style="position:absolute;top:200px;left:20px"></ad-slot>
+  </div>
+  ${AD_SLOT_SCRIPT}
+</body></html>`;
+
+test('riquadro in posizione assoluta dentro un contenitore che ritaglia: si vede, quindi conta', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, ESCAPING_AD);
+  await watchToasts(page);
+
+  // Il presupposto: il contenitore ritaglia, ma non questo — il riquadro è
+  // davvero disegnato sullo schermo.
+  expect(await page.evaluate(() => {
+    const el = document.querySelector('#adEscapes');
+    const r = el.getBoundingClientRect();
+    const x = Math.round(r.left + r.width / 2);
+    const y = Math.round(r.top + r.height / 2);
+    return document.elementsFromPoint(x, y).includes(el);
+  })).toBe(true);
+
+  await clickTranslateIcon(page, '#plain');
+  await expect(page.locator('#plain')).toHaveText(/^IT /);
+
+  const partialEsc = async () => (await toasts(page)).find((t) => t.startsWith('Pagina tradotta solo in parte'));
+  await expect.poll(partialEsc, { timeout: 30000 }).toBeTruthy();
+  expect(await toasts(page)).not.toContain('Pagina tradotta');
+});
+
+// Pagina da destra a sinistra: lì l'area scorribile cresce VERSO SINISTRA e le
+// coordinate del documento vanno in negativo. Un conto che desse per scontato
+// che il bordo è lo zero butterebbe via il riquadro visibile.
+const RTL_AD = `<!doctype html><html lang="ar" dir="rtl"><body style="font:16px sans-serif;padding:20px;margin:0">
+  <h1 id="plain">The end of an era in European football</h1>
+  <p id="body">First paragraph of the body text, long enough to be picked up by the extractor.</p>
+  <div style="width:4000px;height:8px"></div>
+  <ad-slot id="adRtl"></ad-slot>
+  ${AD_SLOT_SCRIPT}
+</body></html>`;
+
+test('pagina da destra a sinistra: il riquadro visibile conta anche con le coordinate in negativo', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, RTL_AD);
+  await watchToasts(page);
+
+  // Il presupposto: la pagina scorre in orizzontale verso sinistra (corsa della
+  // barra in negativo) e il riquadro è sullo schermo.
+  expect(await page.evaluate(() => {
+    const de = document.documentElement;
+    const r = document.querySelector('#adRtl').getBoundingClientRect();
+    return {
+      overflowsSideways: de.scrollWidth > de.clientWidth,
+      rtl: getComputedStyle(de).direction === 'rtl',
+      onScreen: r.right > 0 && r.left < de.clientWidth && r.bottom > 0,
+    };
+  })).toEqual({ overflowsSideways: true, rtl: true, onScreen: true });
+
+  await clickTranslateIcon(page, '#plain');
+  await expect(page.locator('#plain')).toHaveText(/^IT /);
+
+  const partialRtl = async () => (await toasts(page)).find((t) => t.startsWith('Pagina tradotta solo in parte'));
+  await expect.poll(partialRtl, { timeout: 30000 }).toBeTruthy();
+  expect(await toasts(page)).not.toContain('Pagina tradotta');
+});
