@@ -134,8 +134,7 @@ function getBannerSites(settings) {
 
 function isBannerSiteIn(sites, url) {
   if (!/^https?:/i.test(String(url || ''))) return false;
-  const reg = registrableOf(url);
-  return !!reg && sites.includes(reg);
+  return !!Sito.voceSalvata(url, sites);
 }
 
 function trustedSetOf(settings) {
@@ -158,11 +157,11 @@ function baseDelSito(reg) {
 function partitionForUrl(url, trusted) {
   const reg = registrableOf(url);
   if (!reg) return null;
-  const base = baseDelSito(reg);
-  const isTrusted = trusted instanceof Set && trusted.has(reg);
-  // 'persist:' → jar isolato per-sito ma persistente (resta connesso).
+  // 'persist:' → jar isolato per-sito ma persistente (resta connesso): quello della voce fidata, che tiene l'accesso.
   // Senza prefisso → jar isolato ed effimero, buttato all'uscita dal sito (vedi «uscita dal sito»).
-  if (isTrusted) return 'persist:' + base;
+  const fidato = Sito.voceSalvata(url, trusted instanceof Set ? trusted : null);
+  if (fidato) return 'persist:' + baseDelSito(fidato);
+  const base = baseDelSito(reg);
   sitoDelJar.set(base, reg);
   const g = jarGen.get(base);
   return g && g.n ? `${base}~${g.n}` : base;
@@ -558,8 +557,7 @@ function setConfigChangeHandler(fn) { configChange = typeof fn === 'function' ? 
 // In Privacy un sito non fidato non tiene niente oltre la sessione, nemmeno quello che Filo sa di lui.
 function keepsSiteData(site) {
   if (_cached.mode !== MODES.PRIVACY) return true;
-  const s = String(site || '').toLowerCase();
-  return _cached.trustedSites.some((d) => String(d || '').toLowerCase() === s);
+  return !!Sito.voceSalvata(String(site || '').toLowerCase(), _cached.trustedSites);
 }
 
 // I nomi che il sito ha dato alla sua risposta, visti dopo il clic sul banner: li tiene tabs/tabCookies.js.

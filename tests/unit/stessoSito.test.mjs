@@ -111,3 +111,25 @@ test('una sola lista di suffissi: la Public Suffix List di safebrowse/psl.js', (
   giro(src);
   assert.deepEqual(fuori, ['src/main/services/safebrowse/psl.js']);
 });
+
+// Una scelta salvata quando gov.it o com.co contavano come un sito solo non deve smettere di valere: la voce copre ancora
+// i siti sotto di lei (fidati, banner, accessi, regole di paese); una voce che non è un suffisso resta un sito solo.
+test('scelte salvate su un dominio diventato suffisso pubblico continuano a valere sui siti sotto di lui', () => {
+  assert.equal(Sito.voceSalvata('https://www.agenziaentrate.gov.it/portale/', ['gov.it']), 'gov.it');
+  assert.equal(Sito.voceSalvata('https://tienda.com.co/', new Set(['com.co'])), 'com.co');
+  assert.equal(Sito.voceSalvata('https://comune.milano.it/', ['milano.it']), 'milano.it');
+  assert.equal(Sito.voceSalvata('https://www.example.com/', ['example.com']), 'example.com');
+  assert.equal(Sito.voceSalvata('https://alice.github.io/', ['github.io']), null, 'una piattaforma non copre i suoi utenti');
+  assert.equal(Sito.voceSalvata('https://shop.example.com/', ['other.example.com']), null);
+  assert.equal(Sito.voceSalvata('http://10.0.1.10/', ['1.10']), null);
+
+  assert.equal(Cookies.partitionForUrl('https://www.agenziaentrate.gov.it/', new Set(['gov.it'])), 'persist:filo-priv-gov.it',
+    'il vaso persistente che tiene l\'accesso resta quello di prima');
+  assert.match(Cookies.partitionForUrl('https://alice.github.io/', new Set(['github.io'])), /^filo-priv-alice\.github\.io/);
+  assert.equal(Cookies.isBannerSiteIn(['gov.it'], 'https://www.salute.gov.it/'), true);
+  assert.equal(Cookies.isBannerSiteIn(['salute.gov.it'], 'https://www.inps.gov.it/'), false);
+
+  const elenco = new Sito.ElencoSiti(['gov.it', 'esempio.it']);
+  assert.ok(elenco.has('salute.gov.it') && elenco.has('esempio.it') && elenco.has('gov.it'));
+  assert.ok(!elenco.has('altro.it') && !elenco.has('x.esempio.it') && !elenco.has(''));
+});

@@ -7,6 +7,7 @@ const { WebContentsView, Menu, MenuItem, session, shell, BrowserWindow, ipcMain 
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const Cookies = require('./services/cookies');
+const Sito = require('./services/stessoSito');
 const { spingiAllaScheda } = require('./services/impostazioniPerOrigine');
 const ProxyTab = require('./services/proxyTab');
 const { registerFiloProtocolForSession } = require('./protocol');
@@ -1277,8 +1278,8 @@ class TabManager {
   // Sincrono: usato in will-navigate dove non si può attendere lo storage.
   _ruleForUrl(url) {
     if (!url || url.startsWith('filo://') || !/^https?:\/\//i.test(url)) return null;
-    const dom = Cookies.registrableOf(url);
-    return (dom && this._proxyRules && this._proxyRules[dom]) || null;
+    const dom = Sito.voceSalvata(url, Object.keys(this._proxyRules || {}));
+    return (dom && this._proxyRules[dom]) || null;
   }
 
   // Se `url` ha una regola persistente e la tab non è già instradata su quel
@@ -1317,7 +1318,7 @@ class TabManager {
     // Applica subito alle tab già aperte su quel dominio (born proxied immediato).
     for (const t of this.tabs) {
       if (t.isInternal || !/^https?:\/\//i.test(t.url || '')) continue;
-      if (Cookies.registrableOf(t.url) !== dom) continue;
+      if (Sito.voceSalvata(t.url, [dom]) !== dom) continue;
       if (t.proxy && t.proxy.country === code) continue;
       try { await this.setTabProxy(t.id, code); } catch (_) {}
     }
@@ -1329,7 +1330,8 @@ class TabManager {
   // futuro alla navigazione.
   async removeDomainProxyRule({ domain } = {}) {
     const src = String(domain || '');
-    const dom = src ? Cookies.registrableOf(/:\/\//.test(src) ? src : `https://${src}`) : null;
+    const url = /:\/\//.test(src) ? src : `https://${src}`;
+    const dom = src ? (Sito.voceSalvata(url, Object.keys(this._proxyRules || {})) || Cookies.registrableOf(url)) : null;
     if (!dom) return { ok: false, error: 'no_domain' };
     const FM = globalThis.SN_FILO_MEMORY;
     if (FM) await FM.removeProxyRule(dom);
