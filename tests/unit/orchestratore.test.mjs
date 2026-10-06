@@ -55,6 +55,8 @@ function banco({ pratiche = [nuovaPratica({ num: 7, slug: 'sette', richiesta: 'f
       if (/rev-list --count origin\/main\.\.refs/.test(riga)) return { code: 0, out: server ? '1' : '0', stdout: '' };
       if (/diff --name-only/.test(riga)) return { code: 0, out: 'scripts/a.mjs\nsrc/shared/verifierRound.js', stdout: '' };
       if (/claude-feedback\.mjs/.test(riga)) return { code: 0, out: 'Aperto #1001', stdout: '' };
+      if (/^git rev-parse --abbrev-ref HEAD$/.test(riga)) return { code: 0, out: 'main', stdout: 'main\n' };
+      if (/^git rev-parse (HEAD|origin\/main)$/.test(riga)) return { code: 0, out: 'abc', stdout: 'abc\n' };
       return { code: 0, out: '', stdout: '' };
     },
     claude: async ({ ruolo, prompt: testo, cwd }) => {
