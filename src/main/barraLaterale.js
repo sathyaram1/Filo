@@ -81,7 +81,7 @@ class BarraLaterale {
     this.strisciaPx = STRISCIA;
     this.vuoto = new VuotoDellaVista({
       vista: () => (this.vista && !this.vista.webContents.isDestroyed() ? this.vista : null),
-      scheda: () => { const t = this._attiva(); return t ? t.view : null; },
+      scheda: () => this.tabs.vistaSottoIlVuoto(),
       canale: 'barra:cursore',
       // Un clic arrivato alla pagina chiude la barra come ogni clic sulla pagina, e la tastiera torna a lei.
       primaDelClic: (tasto) => { if (tasto === 'left') this.chiudi(); this._restituisciTastiera(); },
