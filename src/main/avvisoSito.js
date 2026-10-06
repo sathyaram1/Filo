@@ -15,8 +15,10 @@ class AvvisoSito {
   // del tasto destro. restituisciTastiera: tolto l'avviso, i tasti tornano alla scheda attiva.
   // inCima: dopo che l'avviso è salito, chi deve restargli sopra (la barra laterale) ci risale.
   // cambiata: la scheda coperta è cambiata (la barra spegne o riaccende le azioni della pagina).
-  constructor(win, { schedaAttiva = () => null, scegli = () => {}, menu = () => [], restituisciTastiera = () => {}, inCima = () => {}, cambiata = () => {} } = {}) {
+  // input(wc, input): il puntatore sull'avviso, che la barra sente come quello sulla pagina.
+  constructor(win, { schedaAttiva = () => null, scegli = () => {}, menu = () => [], restituisciTastiera = () => {}, inCima = () => {}, cambiata = () => {}, input = () => {} } = {}) {
     this.win = win;
+    this.input = input;
     this.dopoInCima = inCima;
     this.cambiata = cambiata;
     this.schedaAttiva = schedaAttiva;
@@ -177,6 +179,7 @@ class AvvisoSito {
     wc.setWindowOpenHandler(() => ({ action: 'deny' }));
     wc.on('will-navigate', (e) => e.preventDefault());
     wc.on('before-input-event', (e, input) => this._tasto(e, input));
+    wc.on('input-event', (_e, input) => { try { this.input(wc, input); } catch (_) {} });
     wc.on('ipc-message', (_e, canale, dati) => {
       const tab = this.su;
       if (!tab) return;

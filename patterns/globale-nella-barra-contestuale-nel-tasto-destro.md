@@ -56,7 +56,11 @@ ogni voce globale lo allungava e seppelliva le voci dell'elemento.
   pericoloso copre la scheda, le icone della pagina portate nella barra (QR,
   Salva per dopo, Traduci…) sono spente: agirebbero sulla pagina nascosta e
   quello che mostrano resterebbe dietro l'avviso. Tornano alla conferma. È la
-  stessa regola del vuoto (`vistaSottoIlVuoto`, `tests/barra-laterale-vuoto.spec.mjs`).
+  stessa regola del vuoto (`vistaSottoIlVuoto`, `tests/barra-laterale-vuoto.spec.mjs`),
+  e vale anche al contrario: il puntatore che la barra sente (spinta sul bordo,
+  clic che la chiude, uscita) è quello di chi sta sotto, l'avviso quando copre
+  la scheda (`inputDa`). Ogni cosa nuova che la barra prende dalla «pagina» passa
+  da lì: la famiglia è rientrata tre volte (giri 4, 5 e 6 di #871).
 - **La disposizione la scrive il main, uno solo**
   (`src/main/services/layoutIcone.js`): menu e barra mandano lo spostamento,
   il main lo mette in fila e lo annuncia a tutte le schede e alle barre delle

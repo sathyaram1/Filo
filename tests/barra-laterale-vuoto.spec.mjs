@@ -119,6 +119,8 @@ test('sopra l\'avviso del sito pericoloso il vuoto della barra e degli avvisi è
     { type: 'mouseWheel', x, y: 200, deltaX: 0, deltaY: -400 },
     ...clic(x, 200, 'right'),
   ]);
+  // Il tasto destro arrivato all'avviso chiude la barra come sulla pagina: si riapre dopo che è arrivato.
+  await expect.poll(() => avviso.evaluate(() => window.__g)).toBeGreaterThanOrEqual(1);
   await comandaBarra(app, 'tasto');
   await pannelloFermo(barra);
   await nellaVista(app, 'barra', [{ type: 'mouseMove', x, y: 260 }, ...clic(x, 260)]);
@@ -179,4 +181,24 @@ test('sopra l\'avviso del sito pericoloso le icone della pagina nella barra sono
   await pannelloFermo(barra);
   await qr.click();
   await expect(page.locator('.sn-qr-overlay')).toBeVisible({ timeout: 5000 });
+});
+
+// Il puntatore sull'avviso conta come quello sulla pagina: un clic chiude la barra, uscendoci sopra si chiude.
+test('sopra l\'avviso del sito pericoloso un clic sull\'avviso chiude la barra, e il puntatore che ci va sopra pure', async ({ app, shell }) => {
+  await apriSegnalata(app, shell);
+  const barra = await barraPage(app);
+  const sullAvviso = (eventi) => app.evaluate(({ BrowserWindow }, ev) => {
+    const tm = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs;
+    for (const e of ev) tm.avvisoSito.webContents().sendInputEvent(e);
+  }, eventi);
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  await sullAvviso([{ type: 'mouseMove', x: 700, y: 500 }, ...clic(700, 500)]);
+  await expect.poll(async () => (await statoBarra(app)).aperta, { timeout: 3000 }).toBe(false);
+
+  await comandaBarra(app, 'spinta');
+  await pannelloFermo(barra);
+  for (let i = 0; i < 10; i++) { await sullAvviso([{ type: 'mouseMove', x: 600 + i * 10, y: 400 }]); await barra.waitForTimeout(150); }
+  await expect.poll(async () => (await statoBarra(app)).aperta, { timeout: 4000 }).toBe(false);
+  expect(await coperta(app)).toBe(true);
 });

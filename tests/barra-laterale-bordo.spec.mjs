@@ -219,3 +219,38 @@ test('la striscia si tocca oltre la fascia del sistema: il clic la apre anche a 
     await chiudi();
   }
 });
+
+// La barra sente il puntatore su quello che l'utente vede: sopra l'avviso del sito pericoloso è l'avviso, e
+// chi lo guarda cerca proprio Indietro (giro 6 di #871).
+test('sopra l\'avviso del sito pericoloso, fermo sul bordo la barra si apre, e il clic sulla striscia pure', async () => {
+  test.skip(!xtestDisponibile(), 'serve uno schermo X con XTest (contenitore Linux sotto xvfb-run)');
+  test.setTimeout(90_000);
+  const { app, x0, y, px, chiudi } = await avvia();
+  try {
+    await app.evaluate(async ({ session, net }) => {
+      const pagina = '<title>Accedi</title><body style="margin:0"><button style="position:fixed;inset:0;width:100%">Accedi</button></body>';
+      const risposta = (req) => (new URL(req.url).hostname === 'conto-paypa1.com'
+        ? new Response(pagina, { headers: { 'content-type': 'text/html; charset=utf-8' } })
+        : net.fetch(req, { bypassCustomProtocolHandlers: true }));
+      for (const s of ['http', 'https']) {
+        try { session.defaultSession.protocol.unhandle(s); } catch (_) {}
+        session.defaultSession.protocol.handle(s, risposta);
+      }
+      globalThis.SN_SAFEBROWSE.setProviders({ gsb: async (u) => ({ listed: /paypa1/.test(String(u && (u.url || u))), category: 'phishing' }), rdap: null, ct: null, sandbox: null, llm: async () => ({ suspicious: false }) });
+    });
+    const sito = app.windows().find((w) => { try { return w.url().endsWith('/sito'); } catch (_) { return false; } });
+    await sito.evaluate(() => { location.href = 'https://conto-paypa1.com/login'; });
+    const coperta = () => app.evaluate(({ BrowserWindow }) => !!BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs.avvisoSito.coperta());
+    await expect.poll(coperta, { timeout: 10_000 }).toBe(true);
+    await pausa(600);
+
+    puntatore(`move:${x0 + px(400)}:${y};wait:150;move:${x0 + 2}:${y};wait:40;move:${x0 + 1}:${y + 2};wait:1200`);
+    await expect.poll(() => aperta(app), { timeout: 2000 }).toBe(true);
+    await comandaBarra(app, 'chiudi');
+    puntatore(`move:${x0 + px(400)}:${y};wait:900;move:${x0 + 1}:${y + 60};wait:60;down;wait:40;up;wait:600`);
+    await expect.poll(() => aperta(app), { timeout: 2000 }).toBe(true);
+    expect(await coperta()).toBe(true);
+  } finally {
+    await chiudi();
+  }
+});
