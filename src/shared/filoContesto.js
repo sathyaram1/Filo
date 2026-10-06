@@ -165,7 +165,7 @@
       if (!m || !m.chat) continue;
       let t = aperti.get(m.chat);
       if (m.role === 'user' || !t) {
-        t = { chiave: chiave(m), chat: m.chat, ts: m.ts, fine: m.ts, righe: [], titolo: titoli ? titoli(m.chat) || '' : '' };
+        t = { chiave: chiave(m), chat: m.chat, ts: m.ts, fine: m.ts, righe: [], titolo: (titoli ? titoli(m.chat) : m.titolo) || '' };
         aperti.set(m.chat, t);
         out.push(t);
       }

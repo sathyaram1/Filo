@@ -17,7 +17,7 @@ const IN_PARALLELO = 3;
 const ATTESA_INDICE_MS = 1500;
 
 // Quello che serve dal resto dell'app (handlers.js): i vettori passano dal router come per la Cronologia.
-const app = { embed: null, quantizza: null, coseno: null };
+const app = { vettori: null, quantizza: null, coseno: null };
 function collega(f) { Object.assign(app, f || {}); }
 
 function file() {
@@ -77,6 +77,7 @@ function riscrivi() {
 
 // Una chat cancellata porta via anche i suoi vettori; senza id, tutti.
 async function dimentica(chat) {
+  if (Disco.inIncognito()) return;
   await carica().catch(() => null);
   if (!indice) return;
   let tolti = 0;
@@ -96,7 +97,7 @@ function indicizza(tratti, modello) {
       while (prossimo < blocchi.length) {
         const b = blocchi[prossimo++];
         let emb = null;
-        try { emb = await app.embed(b.map((t) => FC().testoPerIndice(t))); } catch (_) { return; }
+        try { emb = await app.vettori(b.map((t) => FC().testoPerIndice(t))); } catch (_) { return; }
         if (!emb || emb.model !== modello || !Array.isArray(emb.vectors)) return;
         const nuove = [];
         b.forEach((t, i) => {
@@ -133,7 +134,7 @@ async function cerca(domanda, { vecchi = [], davanti = [] } = {}) {
   const tratti = FC().tratti(vecchi).filter((t) => !gia.has(t.chiave));
   if (!tratti.length) return [];
   let emb = null;
-  try { emb = app.embed ? await app.embed([q]) : null; } catch (_) { emb = null; }
+  try { emb = app.vettori ? await app.vettori([q]) : null; } catch (_) { emb = null; }
   const qv = emb && emb.vectors && emb.vectors[0];
   if (!Array.isArray(qv) || !qv.length) return perParole(q, tratti);
   await carica();
