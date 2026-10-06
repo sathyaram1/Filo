@@ -523,8 +523,8 @@
   }
 
   // Testo scritto dall'utente e non ancora inviato: finché ce n'è la pulizia non chiude la scheda
-  // (#824). Conta il testo nato da un gesto (o scritto da Filo per lui), seguito per contenuto; è
-  // partito quando una richiesta lo porta al suo sito (src/main/tabs.js). Porte: tests/tab-auto-archive.spec.mjs.
+  // (#824). Conta il testo nato da un gesto (o scritto da Filo per lui), seguito per contenuto; il sito
+  // l'ha ricevuto quando una richiesta riuscita lo porta (src/main/tabs.js). Porte: tests/tab-auto-archive.spec.mjs.
   function startFormTracker() {
     if (/^filo:\/\/(options|preferences)\//i.test(location.href)) return;
     const PAGINA_DI_FILO = /^filo:/i.test(location.href);
@@ -690,7 +690,7 @@
       for (const [area, base] of aree) {
         if (!lunghe.has(area) || !viva(area)) continue;
         const t = pulito(testo(area));
-        if (t && t !== pulito(base)) out.add(impronta(t));
+        if (t && t !== pulito(base) && ricevuti.get(area) !== t) out.add(impronta(t));
       }
       return [...out].slice(-50);
     }
@@ -781,7 +781,7 @@
       const campo = campoDa(e);
       if (!campo) { scrittoInOpaco(e); return; }
       const area = areaDi(campo);
-      scritto(area, basi.has(area) ? basi.get(area) : iniziale(area));
+      scritto(area, basi.has(area) ? basi.get(area) : iniziale(area), campo);
     }
     // Molti editor ricchi incollano e ricevono il trascinamento da soli, senza «input».
     function onIncolla(e) {
@@ -789,12 +789,15 @@
       const campo = campoDa(e);
       if (!campo) return;
       const area = areaDi(campo);
-      scritto(area, testo(area));
-      setTimeout(() => aggiorna(true), 0);
+      scritto(area, testo(area), campo);
+      setTimeout(() => {
+        if (aree.has(area) && !lunghe.has(area)) digitati.set(area, essenziale(testo(area)));
+        aggiorna(true);
+      }, 0);
     }
 
     // Chi invia davvero lascia la pagina. Se la pagina trattiene l'invio, un rifiuto e un invio
-    // via script si somigliano: lì decide se il testo esce verso il sito (partito).
+    // via script si somigliano: lì decide la risposta del sito alla richiesta che porta il testo (partito).
     function onSubmit(e) {
       const form = e.target;
       if (!form || !aree.size) return;
