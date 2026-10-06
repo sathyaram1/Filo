@@ -407,9 +407,15 @@ module.exports = function register(on, ctx) {
       }
       // «È mio» (#908): l'unico valore che l'owner può dare è la sua prova.
       const senderProof = msg.senderProof === 'admin' ? 'admin' : undefined;
+      let waitsFor;
+      if (msg.waitsFor !== undefined) {
+        const r = await prepareAttese(id, msg.waitsFor, idToken);
+        if (!r.ok) return { ok: false, error: r.motivo, rifiutato: true };
+        waitsFor = r.attese;
+      }
       await globalThis.SN_FEEDBACK.updateStatus(
         id,
-        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, mergePreapproved, localOnly, localApproval, senderProof },
+        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, mergePreapproved, localOnly, localApproval, senderProof, waitsFor },
         { idToken },
       );
       // Il triage cambia quello che la bacheca deve mostrare (un fix chiuso
