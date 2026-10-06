@@ -100,6 +100,16 @@ all'utente e gli fa buttare (e ripagare) il lavoro già riuscito.
   "sale" al viewport — il `body { overflow-x: hidden }` che sta ovunque non
   ritaglia niente, e va giudicato con l'area scorribile del documento.
   Implementazione: `isReachableByUser` in `src/content/extractContext.js`.
+- **I riquadri incorporati si giudicano col metro delle sezioni ripiegate**
+  (#503), sul riquadro e su ogni antenato: fuori schermo, trasparente, in una
+  fisarmonica chiusa non si conta e non si traduce; più in basso della prima
+  schermata sì. Chi non si conta **non deve rispondere**: un "ci sono" in più
+  copre nel conto il silenzio di un riquadro chiuso a chiave. Il riquadro non
+  sa se chi lo ospita lo mostra, quindi il giudizio glielo manda la finestra
+  madre per lettera (`postMessage`, accettata solo da `window.parent`) prima
+  della parola di tradurre, e il suo preload senza un sì non lo sveglia. Un
+  riquadro nascosto passa il no ai suoi; aperto, il menu lo offre come testo
+  scoperto.
 - **Dove:** `src/content/translatePage.js` (stato + ripresa),
   `src/content/extractContext.js` (`extractTranslatableBlocks`),
   `src/content/menuIcons.js` + `src/content/content.js` (menu). Test:
