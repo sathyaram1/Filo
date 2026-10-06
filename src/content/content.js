@@ -628,7 +628,7 @@
       for (const [area, base] of aree) {
         if (!viva(area)) { lascia(area, base); continue; }
         const ora = pulito(testo(area));
-        if (ora && ora !== pulito(base)) daInviare = true;
+        if (ora && ora !== pulito(base) && !sostituito(area)) daInviare = true;
       }
       // Un componente chiuso tolto dalla pagina non dice se il testo è ricomparso: resta protetto.
       return daInviare || opachi.size > 0 || orfani.length > 0;
