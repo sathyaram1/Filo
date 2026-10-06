@@ -1208,6 +1208,7 @@ class TabManager {
     const ses = session.fromPartition(partition);
     // Senza filo:// qui la pagina d'errore non si carica e un proxy muto lascia la scheda vuota.
     if (!ses.protocol.isProtocolHandled('filo')) registerFiloProtocolForSession(ses);
+    try { Cookies.coverAdblock(ses); } catch (_) {}
     try {
       await ses.setProxy({
         proxyRules: resolved.proxyRules,

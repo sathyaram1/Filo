@@ -241,16 +241,16 @@ function ensureRequestHook(ses) {
       callback({ cancel: false });
       return;
     }
-    if (s.enabled && isTrackerUrl(details.url)) {
-      callback({ cancel: true });
-      return;
-    }
     let ad = null;
     try { ad = require('./adblock'); } catch (_) {}
-    if (ad && ad.shouldBlock && ad.shouldBlock(details.url)) {
+    // La pagina che l'utente apre non si ferma qui in silenzio: la decide il blocco dei siti, che avvisa con «Apri comunque» (#576).
+    const pagina = details.resourceType === 'mainFrame';
+    if ((s.enabled && isTrackerUrl(details.url)) || (!pagina && ad && ad.shouldBlock && ad.shouldBlock(details.url))) {
       callback({ cancel: true });
+      if (ad) ad.chiudiInPagina(details);
       return;
     }
+    if (ad && ad.ricordaRichiesta) ad.ricordaRichiesta(details);
     callback({ cancel: false });
   });
   return state;
@@ -261,6 +261,13 @@ function applyTrackerBlocking(ses, enabled) {
   if (!state) return;
   state.filtri = true;
   state.enabled = !!enabled;
+}
+
+// Finestra incognito e scheda col proxy hanno una sessione loro: senza, lì la pubblicità passava intera (#576).
+// Accende solo le liste della pubblicità; il blocco tracker resta com'era.
+function coverAdblock(ses) {
+  const state = ensureRequestHook(ses);
+  if (state) state.filtri = true;
 }
 
 // ─── sessioni per-sito (modalità privacy) ─────────────────────────────────
@@ -659,6 +666,7 @@ module.exports = {
   ensureHeaderHook,
   applyGpc,
   applyTrackerBlocking,
+  coverAdblock,
   ensureRequestHook,
   chiudiHost,
   permettiRichieste,

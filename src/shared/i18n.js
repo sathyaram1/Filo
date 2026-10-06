@@ -466,8 +466,9 @@
       'in alto ti permette di aprirlo comunque se era legittimo.',
     options_security_adblock: 'Blocca pubblicità e tracker',
     options_security_adblock_desc:
-      'Usa liste di blocco pubbliche e gratuite (StevenBlack, EasyList) per impedire ' +
-      'il caricamento di pubblicità e tracker. Le liste si scaricano dalla rete, restano ' +
+      'Usa liste di blocco pubbliche e gratuite (StevenBlack, EasyList e le sue liste per i siti ' +
+      'italiani e francesi): pubblicità e tracker non si caricano, e i riquadri della pubblicità ' +
+      'che restano nella pagina spariscono. Le liste si scaricano dalla rete, restano ' +
       'in cache sul tuo computer e si aggiornano da sole una volta a settimana. I siti ' +
       'che usi davvero (Google, YouTube, banche…) non vengono mai bloccati.',
     options_security_adskip: 'Salta le pubblicità dei video',
