@@ -95,3 +95,21 @@ test('il nome dato dal modello vale solo se è il nome del sito, non se il sito 
   assert.equal(R.leggiRisposta('{"rotto": true, "servizio": "BBC"}', 'bbc.co.uk').nome, 'BBC');
   assert.equal(R.leggiRisposta('{"rotto": true, "servizio": "Sound Cloud"}', 'soundcloud.com').nome, 'Sound Cloud');
 });
+
+test('un contenuto che non c\'è più non si propone a regole, di nessun servizio: decide il modello', () => {
+  const casi = [
+    ['www.tiktok.com', '/embed/v2/7212345678901234567', 'Video currently unavailable'],
+    ['www.facebook.com', '/plugins/post.php', 'This content isn\'t available right now'],
+    ['www.facebook.com', '/plugins/video.php', 'Questo contenuto non è disponibile al momento'],
+    ['w.soundcloud.com', '/player/', 'This track is not available.'],
+    ['www.instagram.com', '/p/abc/embed', 'Sorry, this post was deleted. Log in to see more'],
+    ['platform.twitter.com', '/embed/Tweet.html', 'This post is private'],
+  ];
+  const misura = { larghezza: 400, altezza: 300, media: 0 };
+  for (const [host, percorso, testo] of casi) {
+    assert.equal(R.riconosci({ host, percorso, testo }), null, `${host}: «${testo}»`);
+    assert.equal(R.sembraRotto({ ...misura, testo }), true, `al modello: «${testo}»`);
+  }
+  // Se il riquadro chiede proprio i cookie, la regola vale anche col contenuto non disponibile.
+  assert.ok(R.riconosci({ host: 'player.esempio.io', testo: 'Video non disponibile: attiva i cookie per vederlo' }));
+});

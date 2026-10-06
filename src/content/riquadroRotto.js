@@ -127,6 +127,7 @@
 .bar {
   position: absolute;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   /* L'ospite è largo zero: la larghezza la dà il testo, il tetto lo mette il riquadro (posa). */
@@ -143,7 +144,8 @@
   animation: entra var(--sn-anim-fast, 160ms) ease-out;
 }
 @keyframes entra { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
-.testo { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+/* Sotto questa misura il testo non sta accanto ai pulsanti senza spezzare le parole: i pulsanti vanno sotto. */
+.testo { flex: 1 1 150px; min-width: 0; overflow-wrap: break-word; }
 button {
   all: unset;
   flex: 0 0 auto;
@@ -222,10 +224,12 @@ button:focus-visible { outline: 2px solid var(--sn-accent, #c45a3b); outline-off
     const r = p.iframe.getBoundingClientRect();
     const sx = window.scrollX || 0;
     const sy = window.scrollY || 0;
-    p.bar.style.top = `${Math.round(r.top + sy + 8)}px`;
-    p.bar.style.left = `${Math.round(r.left + sx + 8)}px`;
-    p.bar.style.maxWidth = `${Math.max(160, Math.round(r.width - 16))}px`;
-    p.host.hidden = r.width < 40 || r.height < 40;
+    const scrivi = (k, v) => { if (p.bar.style[k] !== v) p.bar.style[k] = v; };
+    scrivi('top', `${Math.round(r.top + sy + 8)}px`);
+    scrivi('left', `${Math.round(r.left + sx + 8)}px`);
+    scrivi('maxWidth', `${Math.max(160, Math.round(r.width - 16))}px`);
+    const nascosto = r.width < 40 || r.height < 40;
+    if (p.host.hidden !== nascosto) p.host.hidden = nascosto;
   }
 
   function togli(token) {
@@ -237,19 +241,34 @@ button:focus-visible { outline: 2px solid var(--sn-accent, #c45a3b); outline-off
     if (!proposte.size) staccaAscolti();
   }
 
+  // La pagina può spostare il riquadro senza scorrere né ridimensionarsi (una pubblicità o un'immagine arrivata dopo,
+  // sopra di lui): la pagina che cresce si sente subito, il resto lo raccoglie un controllo lento.
+  const CONTROLLO_MS = 400;
   let ascolti = false;
-  function riposaTutte() { for (const p of proposte.values()) posa(p); }
+  let roPagina = null;
+  let controllo = null;
+  function riposaTutte() { for (const p of [...proposte.values()]) posa(p); }
   function attaccaAscolti() {
     if (ascolti) return;
     ascolti = true;
     window.addEventListener('resize', riposaTutte, { passive: true });
     window.addEventListener('scroll', riposaTutte, { passive: true, capture: true });
+    try {
+      roPagina = new ResizeObserver(riposaTutte);
+      roPagina.observe(document.documentElement);
+      if (document.body) roPagina.observe(document.body);
+    } catch (_) { roPagina = null; }
+    controllo = setInterval(riposaTutte, CONTROLLO_MS);
   }
   function staccaAscolti() {
     if (!ascolti) return;
     ascolti = false;
     window.removeEventListener('resize', riposaTutte);
     window.removeEventListener('scroll', riposaTutte, true);
+    try { roPagina && roPagina.disconnect(); } catch (_) {}
+    roPagina = null;
+    clearInterval(controllo);
+    controllo = null;
   }
 
   function rispondi(p, si, e) {
@@ -327,9 +346,25 @@ button:focus-visible { outline: 2px solid var(--sn-accent, #c45a3b); outline-off
     const r = el.getBoundingClientRect();
     return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height };
   }
+  // Le parole della domanda che vanno a capo a metà: ognuna dovrebbe stare in una riga sola.
+  function spezzate(el) {
+    const nodo = el.firstChild;
+    if (!nodo || nodo.nodeType !== 3) return [];
+    const out = [];
+    const re = /\S+/g;
+    let m;
+    while ((m = re.exec(nodo.data))) {
+      const r = document.createRange();
+      r.setStart(nodo, m.index);
+      r.setEnd(nodo, m.index + m[0].length);
+      if (new Set([...r.getClientRects()].map((q) => Math.round(q.top))).size > 1) out.push(m[0]);
+    }
+    return out;
+  }
   const _test = {
     proposte: () => [...proposte.values()].map((x) => ({
       testo: x.testo.textContent, visibile: !x.host.hidden, si: rettangolo(x.si), no: rettangolo(x.no), riquadro: rettangolo(x.iframe),
+      domanda: rettangolo(x.testo), spezzate: spezzate(x.testo),
     })),
     stato: () => stato,
   };

@@ -32,12 +32,12 @@ const SERVIZI = [
   {
     nome: 'TikTok',
     domini: ['tiktok.com', 'tiktokcdn.com'],
-    segnaposto: [/log ?in to tiktok|accedi a tiktok|video (currently )?unavailable|video non disponibile/i],
+    segnaposto: [/log ?in to tiktok|accedi a tiktok/i],
   },
   {
     nome: 'Facebook',
     domini: ['facebook.com', 'fbcdn.net'],
-    segnaposto: [/you must log ?in to continue|devi accedere per continuare|log ?in to facebook|accedi a facebook|this content isn.t available|questo contenuto non è disponibile/i],
+    segnaposto: [/you must log ?in to continue|devi accedere per continuare|log ?in to facebook|accedi a facebook/i],
   },
   {
     nome: 'Spotify',
@@ -47,7 +47,7 @@ const SERVIZI = [
   {
     nome: 'SoundCloud',
     domini: ['soundcloud.com'],
-    segnaposto: [/sign ?in to soundcloud|accedi a soundcloud|track (is )?not available/i],
+    segnaposto: [/sign ?in to soundcloud|accedi a soundcloud/i],
   },
   {
     nome: 'Vimeo',
@@ -116,6 +116,8 @@ function testoPulito(t) {
   return String(t || '').replace(/\s+/g, ' ').trim().slice(0, 4000);
 }
 
+const NON_DISPONIBILE = /\b(un|not |isn.t |no longer |non (è )?(più )?)(available|disponibile)\b|\b(was|has been|been) (deleted|removed)\b|\bè stat[oa] (rimoss|eliminat|cancellat)|\b(this|the) (post|video|content|track|page|account) is private\b|\bnon (è|e) più (visibile|online)\b/i;
+
 // Oltre questo numero di parole il riquadro mostra il suo contenuto: una frase sui cookie in fondo non lo rende rotto.
 const PAROLE_CONTENUTO = 80;
 
@@ -131,6 +133,9 @@ function riconosci({ host, percorso, testo, parole } = {}) {
   if (contaParole(t, parole) > PAROLE_CONTENUTO) return null;
   const s = servizioDi(host, percorso);
   if (CHIEDE_COOKIE.test(t)) return { nome: s ? s.nome : null, via: 'regola' };
+  // Un contenuto che non c'è più (cancellato, privato, rimosso) i cookie non lo riportano: la regola non decide, e
+  // il riquadro passa alla domanda chiusa del modello, che sa distinguere.
+  if (NON_DISPONIBILE.test(t)) return null;
   if (s && s.segnaposto.some((r) => r.test(t))) return { nome: s.nome, via: 'regola' };
   return null;
 }
@@ -157,7 +162,7 @@ function sembraRotto({ testo, parole, media, password, larghezza, altezza } = {}
   if (!t && !conMedia) return true;
   if (n > PAROLE_CONTENUTO) return false;
   if (password) return true;
-  if (ERRORE.test(t)) return true;
+  if (ERRORE.test(t) || NON_DISPONIBILE.test(t)) return true;
   if (ACCESSO.test(t) && !conMedia && n <= 40) return true;
   return false;
 }

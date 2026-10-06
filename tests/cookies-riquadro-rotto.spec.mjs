@@ -28,6 +28,16 @@ async function serve() {
       html(`<title>ARTICOLO</title><p>articolo</p><iframe id="ri" width="${LARGO}" height="${ALTO}" style="border:0" src="http://${h}.localhost:${porta}/${p}"></iframe><p>fine</p>`);
       return;
     }
+    // Il riquadro stretto di una colonna laterale, e due riquadri dello stesso servizio in un articolo.
+    if (u.pathname === '/stretto') {
+      html(`<p>articolo</p><iframe id="ri" width="190" height="260" style="border:0;margin-left:30px" src="http://b.localhost:${porta}/post"></iframe>`);
+      return;
+    }
+    if (u.pathname === '/due') {
+      const ri = (id) => `<iframe id="${id}" width="400" height="220" style="border:0" src="http://b.localhost:${porta}/post?n=${id}"></iframe>`;
+      html(`<p>articolo</p>${ri('r1')}<p>mezzo</p>${ri('r2')}`);
+      return;
+    }
     if (u.pathname === '/post') {
       // Il servizio noto: senza il suo cookie mostra il segnaposto, con il cookie il post. Il cookie lo rinfresca
       // a ogni caricamento, come fanno i servizi veri.
@@ -68,6 +78,7 @@ async function serve() {
   const porta = server.address().port;
   return {
     art: (h, p) => `http://a.localhost:${porta}/art?h=${h}&p=${p}`,
+    pagina: (p) => `http://a.localhost:${porta}/${p}`,
     async chiudi() {
       try { server.closeAllConnections?.(); } catch (_) {}
       await new Promise((r) => server.close(r));
@@ -308,6 +319,49 @@ test('sconosciuto rimandato all\'accesso: il modello guarda il solo riquadro, e 
     await ri.locator('.sn-menu').getByText('Attiva i cookie di cosmo.localhost qui', { exact: true }).click();
     await expect(ri.locator('#ok')).toHaveText('Il contenuto dopo l\'accesso', { timeout: 10_000 });
     expect(await impostazioni(app)).toEqual(['cosmo.localhost']);
+  } finally {
+    await srv.chiudi();
+  }
+});
+
+const sopraIlSuo = (p) => p.si.y > p.riquadro.y - p.riquadro.h / 2 && p.si.y < p.riquadro.y;
+
+test('la pagina cresce sopra i riquadri dopo che la proposta è comparsa: ogni proposta resta sopra il suo riquadro', async ({ app, openTab }) => {
+  const srv = await serve();
+  try {
+    await prepara(app);
+    const page = await openTab(srv.pagina('due'));
+    let lista = [];
+    await expect.poll(async () => { lista = await proposte(app, 'a.localhost'); return lista.length; }, { timeout: 30_000 }).toBe(2);
+    expect(lista.every(sopraIlSuo)).toBe(true);
+    // Una pubblicità arrivata in ritardo spinge giù l'articolo, senza scorrere né ridimensionare.
+    await page.evaluate(() => {
+      const d = document.createElement('div');
+      d.style.cssText = 'height:180px;background:#9cf';
+      document.body.prepend(d);
+    });
+    await expect.poll(async () => (await proposte(app, 'a.localhost')).every(sopraIlSuo), { timeout: 1_500 }).toBe(true);
+    // E anche quando il riquadro si sposta senza che la pagina cambi misura.
+    await page.evaluate(() => { document.getElementById('r1').style.marginLeft = '200px'; });
+    await expect.poll(async () => {
+      const p = (await proposte(app, 'a.localhost')).find((x) => x.riquadro.x > 300);
+      return !!p && p.si.x > p.riquadro.x - p.riquadro.w / 2;
+    }, { timeout: 1_500 }).toBe(true);
+  } finally {
+    await srv.chiudi();
+  }
+});
+
+test('riquadro stretto: la domanda non spezza le parole e i pulsanti vanno sotto, dentro il riquadro', async ({ app, openTab }) => {
+  const srv = await serve();
+  try {
+    await prepara(app);
+    const page = await openTab(srv.pagina('stretto'));
+    const p = await aspettaProposta(app, 'a.localhost');
+    await page.screenshot({ path: 'tests/.shots/riquadro-rotto-stretto.png' });
+    expect(p.spezzate).toEqual([]);
+    expect(p.si.y).toBeGreaterThan(p.domanda.y + p.domanda.h / 2);
+    expect(p.no.x + p.no.w / 2).toBeLessThanOrEqual(p.riquadro.x + p.riquadro.w / 2);
   } finally {
     await srv.chiudi();
   }
