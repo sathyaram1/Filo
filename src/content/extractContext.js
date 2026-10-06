@@ -810,6 +810,23 @@
     return withinPage(box, pos === 'fixed');
   }
 
+  // Un riquadro incorporato che l'utente non vede (#503): il metro delle sezioni ripiegate, su di lui e su ogni
+  // antenato fino alla pagina. Più in basso della prima schermata non è nascosto: ci si arriva scorrendo.
+  function isHiddenFromUser(el) {
+    try {
+      if (isVisibilityHidden(el)) return true;
+      const doc = el.ownerDocument;
+      const stop = doc && (doc.body || doc.documentElement);
+      let cur = parentOrHost(el);
+      for (let hops = 0; cur && cur.nodeType === 1 && cur !== stop && hops < REACH_MAX_HOPS; hops++) {
+        // `visibility` l'ha già detta il riquadro, che la eredita: un antenato invisibile così non decide per lui.
+        if (isVisibilityHidden(cur) === true) return true;
+        cur = parentOrHost(cur);
+      }
+      return false;
+    } catch (_) { return false; }
+  }
+
   function isClosedComponent(el) {
     const tag = (el.tagName || '').toLowerCase();
     if (tag.indexOf('-') < 0) return false;
