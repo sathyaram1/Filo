@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { SPAZIO, ORFANA_DOPO_MS, PREFISSO_CORSA, cartellaTemporanea, togliCartelleOrfane } from '../helpers/percorsi.mjs';
+import { aspettaChe } from '../helpers/attese.mjs';
 
 const RADICE = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PERCORSI = pathToFileURL(join(RADICE, 'tests', 'helpers', 'percorsi.mjs')).href;
@@ -77,11 +78,13 @@ test('le cartelle di un processo ucciso restano finché sono giovani, e la corsa
   const b = banco();
   const figlio = spawn(process.execPath, ['--input-type=module', '-e', `${crea(b.rapporto)}setInterval(() => {}, 1000);`],
     { env: b.env, stdio: 'ignore' });
-  const fine = Date.now() + 20_000;
-  while (!existsSync(b.rapporto) && Date.now() < fine) await new Promise((ok) => setTimeout(ok, 50));
-  assert.ok(existsSync(b.rapporto), 'il figlio non ha creato le sue cartelle in 20 secondi');
-  figlio.kill('SIGKILL');
-  await once(figlio, 'exit');
+  const uscito = once(figlio, 'exit');
+  try {
+    await aspettaChe(() => existsSync(b.rapporto), { cosa: 'il figlio non ha creato le sue cartelle' });
+  } finally {
+    figlio.kill('SIGKILL');
+    await uscito;
+  }
   const dirs = fatte(b.rapporto);
   for (const d of dirs) assert.ok(existsSync(d), `un processo ucciso non vede la sua uscita: ${d}`);
 
@@ -193,19 +196,23 @@ test('un file di prova lanciato da solo non lascia nella temporanea quello che i
 test('npm run test:unit interrotto lascia solo quello che la pulizia del giorno dopo riconosce', async () => {
   const b = banco();
   const unit = join(b.base, 'unit');
+  const partita = join(b.base, 'partita');
   mkdirSync(unit);
-  writeFileSync(join(unit, 'appesa.test.mjs'), "import { test } from 'node:test';\ntest('appesa', () => new Promise(() => setInterval(() => {}, 1000)));\n");
+  writeFileSync(join(unit, 'appesa.test.mjs'), "import { test } from 'node:test';\nimport { writeFileSync } from 'node:fs';\n"
+    + `test('appesa', () => { writeFileSync(${JSON.stringify(partita)}, 'x'); return new Promise(() => setInterval(() => {}, 1000)); });\n`);
   const figlio = spawn(process.execPath, [join(RADICE, 'scripts', 'run-unit-tests.mjs')],
-    { env: { ...b.env, FILO_UNIT_DIR: unit }, cwd: RADICE, stdio: ['ignore', 'pipe', 'ignore'], detached: process.platform !== 'win32' });
-  let uscita = '';
-  figlio.stdout.on('data', (d) => { uscita += d; });
-  const fine = Date.now() + 30_000;
-  while (!/appesa|Subtest|gruppo/.test(uscita) && Date.now() < fine) await new Promise((ok) => setTimeout(ok, 50));
-  await new Promise((ok) => setTimeout(ok, 500));
-  // Come un Ctrl+C: arriva a tutto il gruppo, lanciatore e prove.
-  if (process.platform === 'win32') spawnSync('taskkill', ['/pid', String(figlio.pid), '/T', '/F']);
-  else process.kill(-figlio.pid, 'SIGINT');
-  await once(figlio, 'exit');
+    { env: { ...b.env, FILO_UNIT_DIR: unit }, cwd: RADICE, stdio: 'ignore', detached: process.platform !== 'win32' });
+  const uscito = once(figlio, 'exit');
+  try {
+    // Si interrompe quando la corsa c'è davvero: la prova appesa è partita, quindi la temporanea della corsa esiste (#1063).
+    await aspettaChe(() => existsSync(partita), { cosa: 'la prova appesa non è partita' });
+    await new Promise((ok) => setTimeout(ok, 500));
+  } finally {
+    // Come un Ctrl+C: arriva a tutto il gruppo, lanciatore e prove. Anche se l'attesa è fallita, o il file resta appeso.
+    if (process.platform === 'win32') spawnSync('taskkill', ['/pid', String(figlio.pid), '/T', '/F']);
+    else process.kill(-figlio.pid, 'SIGINT');
+    await uscito;
+  }
   assert.notDeepEqual(readdirSync(b.tmp), [], 'la corsa non ha lasciato niente: la prova non prova l\'interruzione');
   togliCartelleOrfane({ dove: [b.tmp], oraMs: Date.now() + ORFANA_DOPO_MS + 60_000 });
   assert.deepEqual(readdirSync(b.tmp), [], 'resta qualcosa che la pulizia del giorno dopo non riconosce');
