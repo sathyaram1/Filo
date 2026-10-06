@@ -208,9 +208,14 @@ const blockState = new WeakMap(); // session → { enabled, filtri }
 let hostChiusoFn = null;
 function chiudiHost(fn) { hostChiusoFn = typeof fn === 'function' ? fn : null; }
 
-// Chi guarda le richieste senza deciderne la sorte (il testo dell'utente partito, #824).
+// Chi guarda le richieste senza deciderne la sorte (il testo dell'utente ricevuto dal sito, #824):
+// `fn` alla partenza, `esitoFn(details, riuscita)` alla fine.
 let osservatoreFn = null;
-function osservaRichieste(fn) { osservatoreFn = typeof fn === 'function' ? fn : null; }
+let esitoFn = null;
+function osservaRichieste(fn, esito) {
+  osservatoreFn = typeof fn === 'function' ? fn : null;
+  esitoFn = typeof esito === 'function' ? esito : null;
+}
 
 // Registra (se manca) l'unico listener onBeforeRequest della sessione. Tracker e
 // ad-blocking restano spenti finché applyTrackerBlocking non accende i filtri.
@@ -248,6 +253,9 @@ function ensureRequestHook(ses) {
     }
     callback({ cancel: false });
   });
+  // Nessun altro ascolta la fine delle richieste: una seconda registrazione sostituirebbe questa.
+  ses.webRequest.onCompleted((details) => { if (esitoFn) { try { esitoFn(details, true); } catch (_) {} } });
+  ses.webRequest.onErrorOccurred((details) => { if (esitoFn) { try { esitoFn(details, false); } catch (_) {} } });
   return state;
 }
 

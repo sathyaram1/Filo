@@ -2746,37 +2746,56 @@ installSafebrowse(TabManager);
 installGeoBlock(TabManager);
 installCookies(TabManager);
 
-// Il testo dell'utente è partito quando esce verso il suo sito in una richiesta, non quando la
-// pagina lo mostra o toglie il campo (#824): lo si dice ai frame di quel sito, che ci cercano le
-// loro righe. Un altro sito (le registrazioni delle sessioni) non conta.
+// Il sito ha ricevuto il testo dell'utente quando una richiesta che lo porta ha avuto risposta
+// senza errore (#824): un rifiuto, una connessione caduta o una richiesta bloccata non contano. Lo
+// si dice ai frame di quel sito, che ci cercano le loro righe. Un altro sito (le registrazioni delle
+// sessioni) non conta.
 const RICHIESTE_CON_TESTO = new Set(['xhr', 'ping', 'mainFrame', 'subFrame', 'other']);
 function schedaConTestoDi(wcId) {
   for (const w of BrowserWindow.getAllWindows()) {
     for (const t of (w._filoTabs && w._filoTabs.tabs) || []) {
-      try { if (t.formDirty && t.view.webContents.id === wcId) return { tab: t, inVista: w._filoTabs.activeId === t.id }; } catch (_) {}
+      try { if (t.formDirty && t.view.webContents.id === wcId) return { tab: t, w }; } catch (_) {}
     }
   }
   return null;
 }
+const inViaggio = new Map();
 Cookies.osservaRichieste((d) => {
   if (!d || !d.webContentsId || !RICHIESTE_CON_TESTO.has(d.resourceType)) return;
   const trovata = schedaConTestoDi(d.webContentsId);
   if (!trovata) return;
-  const { tab, inVista } = trovata;
   let da = '';
   try { da = (d.frame && d.frame.url) || ''; } catch (_) {}
   const sito = Cookies.registrableOf(d.url);
-  if (!sito || Cookies.registrableOf(da || d.referrer || tab.url) !== sito) return;
-  // Il calcolo non trattiene la richiesta.
-  setImmediate(() => {
-    const testo = testoDellaRichiesta(d);
-    if (!testo) return;
-    const type = globalThis.SN_MSG?.MSG?.FORM_SENT || 'form_sent';
-    try {
-      spingiAllaScheda(tab.view.webContents, { type, testo }, { inVista, soloFrame: (url) => Cookies.registrableOf(url) === sito });
-    } catch (_) {}
-  });
+  if (!sito || Cookies.registrableOf(da || d.referrer || trovata.tab.url) !== sito) return;
+  if (inViaggio.size >= 200) inViaggio.delete(inViaggio.keys().next().value);
+  inViaggio.set(d.id, { ...trovata, sito, url: d.url, corpo: corpoDa(d.uploadData) });
+}, (d, riuscita) => {
+  const r = d && inViaggio.get(d.id);
+  if (!r) return;
+  inViaggio.delete(d.id);
+  if (riuscita && d.statusCode >= 200 && d.statusCode < 400) accodaRicevuta(r);
 });
+// Una richiesta alla volta, cedendo il passo fra l'una e l'altra: una pagina che ne manda tante
+// non ferma Filo. Oltre la coda si lasciano andare, e nel dubbio la scheda resta protetta.
+const ricevute = [];
+let leggendo = false;
+function accodaRicevuta(r) {
+  if (ricevute.length >= 8) return;
+  ricevute.push(r);
+  if (!leggendo) { leggendo = true; setImmediate(leggiRicevuta); }
+}
+function leggiRicevuta() {
+  const r = ricevute.shift();
+  if (!r) { leggendo = false; return; }
+  try {
+    const testo = testoDellaRichiesta(r);
+    const type = globalThis.SN_MSG?.MSG?.FORM_SENT || 'form_sent';
+    const inVista = !!(r.w._filoTabs && r.w._filoTabs.activeId === r.tab.id);
+    if (testo) spingiAllaScheda(r.tab.view.webContents, { type, testo }, { inVista, soloFrame: (url) => Cookies.registrableOf(url) === r.sito });
+  } catch (_) {}
+  setImmediate(leggiRicevuta);
+}
 
 function chiaveFrame(f) {
   try { return `${f.processId}:${f.routingId}`; } catch (_) { return ''; }
