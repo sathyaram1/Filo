@@ -58,8 +58,8 @@ const BRANDS = [
   { token: 'telepass', unaLetteraAvvisa: true, display: 'Telepass', domains: ['telepass.com'] },
   { token: 'brt', unaLetteraAvvisa: true, display: 'BRT', domains: ['brt.it'] },
   { token: 'gls', unaLetteraAvvisa: true, display: 'GLS', domains: ['gls-italy.com', 'gls-group.eu', 'gls-group.com', 'gls-pakete.de', 'gls-us.com', 'gls-canada.com',
-    'gls-spain.es', 'gls-portugal.pt', 'gls-hungary.com', 'gls-czech.com', 'gls-slovakia.sk', 'gls-croatia.com', 'gls-slovenia.com', 'gls-romania.ro'] },
-  { token: 'dhl', unaLetteraAvvisa: true, display: 'DHL', domains: ['dhl.com', 'dhl.it', 'dhl.de', 'dhl.co.uk', 'express.dhl', 'dhlparcel.nl', 'dhlparcel.co.uk', 'dhlparcel.be', 'dhlparcel.es'] },
+    'gls-spain.es', 'gls-portugal.pt', 'gls-hungary.com', 'gls-czech.com', 'gls-slovakia.sk', 'gls-croatia.com', 'gls-slovenia.com', 'gls-romania.ro', 'gls-poland.com', 'gls-info.nl'] },
+  { token: 'dhl', unaLetteraAvvisa: true, display: 'DHL', domains: ['dhl.com', 'dhl.it', 'dhl.de', 'dhl.co.uk', 'express.dhl', 'dhlparcel.nl', 'dhlparcel.co.uk', 'dhlparcel.be', 'dhlparcel.es', 'dhlecommerce.co.uk'] },
 
   // Crypto
   { token: 'coinbase', display: 'Coinbase', domains: ['coinbase.com'] },

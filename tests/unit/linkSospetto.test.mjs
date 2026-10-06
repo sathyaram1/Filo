@@ -264,6 +264,9 @@ const SITI_VERI = [
   'https://spid.register.it/login/selfcare/login', 'https://spid.intesigroup.com/', 'https://loginspid.infocamere.it/',
   'https://spid.intesa.it/', 'https://www.intesa.it/', 'https://github.blog/changelog/', 'https://discordstatus.com/',
   'https://discord.gift/abc', 'https://www.dhlparcel.nl/nl', 'https://gls-us.com/', 'https://gls-spain.es/',
+  // Giro 4: La Poste francese, le sedi nazionali di GLS e DHL.
+  'https://www.laposte.fr/', 'https://www.laposte.net/', 'https://www.lapostemobile.fr/', 'https://gls-poland.com/',
+  'https://www.gls-info.nl/', 'https://www.dhlecommerce.co.uk/',
   'https://urldefense.com/v3/__https://www.poste.it/__;!!AbC!x$', 'https://www.poste.it@www.poste.it/', 'https://mario.rossi@example.com/',
 ];
 
