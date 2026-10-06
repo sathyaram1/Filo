@@ -20,9 +20,9 @@ const URL = 'filo://manage/manage.html';
 // categoria d'autore, con numero/priorità/creatore distinti così i tre criteri
 // di ordinamento danno tre ordini DIVERSI e non ambigui.
 const FBS = [
-  { _id: 'A', seq: 10, subSeq: 0, priority: 3, name: 'Owner fb',  clientId: 'owner:me',            createdAt: '2026-06-20T10:00:00Z' },
+  { _id: 'A', seq: 10, subSeq: 0, priority: 3, name: 'Owner fb',  clientId: 'owner:me', senderProof: 'admin', createdAt: '2026-06-20T10:00:00Z' },
   { _id: 'B', seq: 30, subSeq: 0, priority: 1, name: 'User fb',   clientId: 'tester@example.com',  createdAt: '2026-06-22T10:00:00Z' },
-  { _id: 'C', seq: 20, subSeq: 0, priority: 2, name: 'Claude fb', clientId: 'routine:nightly',     createdAt: '2026-06-21T10:00:00Z' },
+  { _id: 'C', seq: 20, subSeq: 0, priority: 2, name: 'Claude fb', clientId: 'routine:nightly', senderProof: 'server', createdAt: '2026-06-21T10:00:00Z' },
   { _id: 'D', seq:  5, subSeq: 0, priority: 0, name: 'Filo fb',   clientId: 'auto:complaint',      createdAt: '2026-06-19T10:00:00Z' },
 ];
 
@@ -72,12 +72,12 @@ test('ogni card mostra l’icona di chi ha scritto il feedback (owner/utente/Cla
 // P/W/V collassano su 🤖 e F diventa 👤: tutti gli assert qui sotto diventano
 // rossi.
 const FBS_ORIGINI = [
-  { _id: 'P', seq: 50, subSeq: 0, priority: 0, name: 'Esplorazione', clientId: 'routine:prober',   createdAt: '2026-08-05T10:00:00Z' },
-  { _id: 'W', seq: 51, subSeq: 0, priority: 0, name: 'Sviluppo',     clientId: 'routine:new-work', createdAt: '2026-08-05T11:00:00Z' },
-  { _id: 'V', seq: 52, subSeq: 0, priority: 0, name: 'Verifica',     clientId: 'routine:verifier', createdAt: '2026-08-05T12:00:00Z' },
+  { _id: 'P', seq: 50, subSeq: 0, priority: 0, name: 'Esplorazione', clientId: 'routine:prober', senderProof: 'server', createdAt: '2026-08-05T10:00:00Z' },
+  { _id: 'W', seq: 51, subSeq: 0, priority: 0, name: 'Sviluppo',     clientId: 'routine:new-work', senderProof: 'server', createdAt: '2026-08-05T11:00:00Z' },
+  { _id: 'V', seq: 52, subSeq: 0, priority: 0, name: 'Verifica',     clientId: 'routine:verifier', senderProof: 'server', createdAt: '2026-08-05T12:00:00Z' },
   { _id: 'F', seq: 53, subSeq: 0, priority: 0, name: 'Da Filo',      clientId: 'filo:chat',        createdAt: '2026-08-05T13:00:00Z' },
   // La sessione locale: Claude che lavora sulla macchina dell'owner.
-  { _id: 'L', seq: 54, subSeq: 0, priority: 0, name: 'Sessione locale', clientId: 'local:claude',  createdAt: '2026-08-05T14:00:00Z' },
+  { _id: 'L', seq: 54, subSeq: 0, priority: 0, name: 'Sessione locale', clientId: 'local:claude', senderProof: 'admin', createdAt: '2026-08-05T14:00:00Z' },
 ];
 
 test('le tre automazioni, la sessione locale e Filo-per-conto-di-un-utente si distinguono in lista', async ({ openTab }) => {
@@ -201,4 +201,48 @@ test('riordina per numero / priorità / creatore dal menu, e ripristina il prede
   await page.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Ordine predefinito' }).click();
   expect(await numOrder(page)).toEqual(['#30', '#20', '#10', '#5']);
   await expect(page.locator('#mgSortBtn')).not.toHaveClass(/mg-sort-btn--active/);
+});
+
+// #595, #912: il clientId lo sceglie chi scrive. Un prefisso riservato senza la prova del mittente non vale come
+// owner, sessione locale o routine: si vede come un utente qualunque e sta in un gruppo suo nel pannello del
+// mittente, separato da chi ha la prova. Tolto il controllo, 👑/💻/🧪 tornano sulle card finte.
+const FBS_PROVA = [
+  { _id: 'VO', seq: 60, subSeq: 0, priority: 0, name: 'Owner vero',      clientId: 'owner:me', senderProof: 'admin', text: 'vero', createdAt: '2026-09-30T10:00:00Z' },
+  { _id: 'FO', seq: 61, subSeq: 0, priority: 0, name: 'Owner finto',     clientId: 'owner:me', text: 'finto', createdAt: '2026-09-30T10:01:00Z' },
+  { _id: 'FL', seq: 62, subSeq: 0, priority: 0, name: 'Locale finta',    clientId: 'local:claude', text: 'finto', createdAt: '2026-09-30T10:02:00Z' },
+  { _id: 'FR', seq: 63, subSeq: 0, priority: 0, name: 'Routine finta',   clientId: 'routine:verifier', senderProof: 'utente', text: 'finto', createdAt: '2026-09-30T10:03:00Z' },
+];
+
+test('un prefisso riservato senza prova del mittente si legge come un utente qualunque', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK_THREAD && window.SN_MANAGE_REVIEW);
+  await page.evaluate((fbs) => { window.__mgTest.setData(fbs); window.__mgTest.setTab('inbox'); }, FBS_PROVA);
+  await expect(page.locator('.mg-item')).toHaveCount(4);
+
+  const author = (id) => page.locator(`.mg-item[data-id="${id}"] .mg-item-author`);
+  await expect(author('VO')).toHaveText('👑');
+  for (const id of ['FO', 'FL', 'FR']) {
+    await expect(author(id)).toHaveText('👤');
+    await expect(author(id)).toHaveAttribute('title', 'Scritto da: Utente');
+  }
+
+  // Il dettaglio dice «Utente» senza la firma che si era dato, la segnalazione è una bolla dell'utente, e
+  // l'identificativo intero resta leggibile al passaggio.
+  await page.locator('.mg-item[data-id="FO"]').click();
+  const link = page.locator('#senderLink');
+  await expect(link).toHaveText('👤 Utente · me…');
+  await expect(link).not.toContainText('Owner');
+  await expect(link).toHaveAttribute('title', 'owner:me');
+  await expect(page.locator('.mg-bubble').first()).toHaveClass(/mg-bubble--user/);
+
+  // Il pannello del mittente non mescola il finto col vero, anche se il clientId è identico.
+  await link.click();
+  await expect(page.locator('#senderFbList .mg-sender-item')).toHaveCount(1);
+  await expect(page.locator('#senderFbList')).toContainText('#61');
+  await expect(page.locator('#senderFbList')).not.toContainText('#60');
+
+  await page.locator('.mg-item[data-id="FR"]').click();
+  await expect(page.locator('#senderLink')).not.toContainText('verifica');
+  await expect(page.locator('.mg-bubble').first()).toHaveClass(/mg-bubble--user/);
 });

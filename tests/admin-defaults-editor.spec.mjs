@@ -333,6 +333,33 @@ test('scelto dal catalogo il nome di una voce del codice, l\'avviso lo conta e i
   await expect(page.locator('#excludedDrift')).toBeHidden();
 });
 
+// #1004.2: il blur chiude il menu in ritardo; un campo tornato a fuoco nel frattempo
+// deve tenerlo aperto, e un campo già a fuoco lo riapre al clic.
+test('il menu del catalogo resta sceglibile se il campo torna a fuoco subito, e si riapre al clic', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab);
+  await page.click('#addExcludedRow');
+  const row = page.locator('#excludedList .sn-excluded-row').last();
+  const name = row.locator('.sn-excluded-name');
+  const pop = row.locator('.sn-model-id-wrap .sn-select-pop');
+  await name.click();
+  await expect(pop).toBeVisible();
+
+  await name.evaluate((el) => { el.blur(); el.focus(); });
+  await page.waitForTimeout(300);
+  await expect(pop).toBeVisible();
+  await pop.locator('.sn-select-option', { hasText: 'NovitaAI' }).click();
+  await expect(name).toHaveValue('NovitaAI');
+  await expect(row.locator('.sn-excluded-kind')).toHaveValue('unreliable');
+  await expect(pop).toBeHidden();
+
+  // Dopo la scelta il campo resta a fuoco: cambiarla passa di nuovo dal menu.
+  await expect(name).toBeFocused();
+  await name.click();
+  await expect(pop).toBeVisible();
+  await pop.locator('.sn-select-option', { hasText: 'Google Vertex' }).click();
+  await expect(name).toHaveValue('Google Vertex');
+});
+
 test('il main rifiuta test espliciti e catalogo ai non admin (gate reale, senza stub)', async ({ openTab }) => {
   const page = await openTab(ADMIN_URL);
   await page.waitForSelector('#title', { timeout: 8_000 });
@@ -350,4 +377,25 @@ test('il main rifiuta test espliciti e catalogo ai non admin (gate reale, senza 
   const provRes = await page.evaluate(() => window.filo.message({ type: 'default_providers_list' }));
   expect(provRes.ok).toBe(false);
   expect(String(provRes.error || '')).toMatch(/amministrator/i);
+});
+
+// #465: la ricerca fra i feedback si imposta in Gestione, ma finché lì non la si salva la
+// sua catena vive qui. Salvare la griglia non deve cancellare le funzioni che non mostra.
+test('salvare i modelli predefiniti tiene la catena delle funzioni spostate in Gestione', async ({ openTab }) => {
+  const page = await openStubbedEditor(openTab, {
+    models: { manage_search: 'esistente', explain: 'esistente' },
+  });
+  await expect(page.locator('#modelsGrid label', { hasText: /ricerca fra i feedback/i })).toHaveCount(0);
+
+  await page.click('#saveBtn');
+  await expect.poll(() => page.evaluate(() => window.__sent.some((m) => m.type === 'defaults_update'))).toBe(true);
+  const upd = await page.evaluate(() => window.__sent.filter((m) => m.type === 'defaults_update').pop());
+  expect(upd.config.models.manage_search).toBe('esistente');
+  expect(upd.config.models.explain).toBe('esistente');
+
+  // Anche al secondo salvataggio, dopo che la pagina ha riletto la risposta.
+  await page.click('#saveBtn');
+  await expect.poll(() => page.evaluate(() => window.__sent.filter((m) => m.type === 'defaults_update').length)).toBe(2);
+  const upd2 = await page.evaluate(() => window.__sent.filter((m) => m.type === 'defaults_update').pop());
+  expect(upd2.config.models.manage_search).toBe('esistente');
 });

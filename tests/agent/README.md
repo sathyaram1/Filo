@@ -3,15 +3,18 @@
 Due strumenti complementari per scoprire problemi UI (specie quelli **compositi**
 shell + WebContentsView, che i normali test Playwright per-pagina non vedono).
 
-Entrambi catturano la **finestra reale composita** (shell + WebContentsView) tramite
-`captureComposite` in `driver.mjs`:
+Entrambi catturano la **finestra reale composita** (shell + WebContentsView +
+finestre figlie come menu e fumetti) tramite `captureComposite` in `driver.mjs`.
+L'immagine è sempre l'area contenuto della finestra, col suo (0,0) in alto a sinistra:
 
 - **Windows**: Win32 `PrintWindow(PW_RENDERFULLCONTENT)` — cattura il contenuto
   anche se la finestra non è in primo piano/occlusa.
-- **Linux/xvfb** (cloud): `scrot` cattura il framebuffer X11 del display virtuale —
-  già include il composito Electron completo. Richiede `scrot` installato
-  (`apt-get install -y scrot`) e la variabile `DISPLAY` impostata da `xvfb-run`.
-  Fallback: `xwd` + ImageMagick `convert`.
+- **Linux/xvfb** (cloud), con la finestra su uno schermo e in primo piano:
+  `scrot` ritagliato sulla finestra (fallback `xwd` + ImageMagick `convert`).
+  Richiede la variabile `DISPLAY` impostata da `xvfb-run`.
+- **Mac, e Linux quando nessuno schermo la mostra** (fuori schermo come nella suite,
+  coperta, o senza `scrot`/`xwd`): la compone Electron fotografando ogni superficie
+  con `capturePage`. Non vede quello che disegna il sistema (dialoghi nativi).
 
 ## 1. `shoot.mjs` — controllo visivo SCRIPTATO (deterministico, niente LLM)
 
@@ -117,5 +120,5 @@ Modelli vision usati:
   `captureComposite` (driver) — al momento usa `PrintWindow` sul rettangolo finestra.
 - I modelli a bassa disciplina (Gemma) possono produrre falsi positivi: pesare la
   severità e incrociare con gli screenshot allegati.
-- Solo Windows (cattura via PowerShell/Win32). Per mac/Linux serve un equivalente
-  di `PrintWindow`.
+- Su Mac la cattura è solo quella composta da Electron: nessuno l'ha mai provata
+  su un Mac vero.

@@ -696,7 +696,18 @@
   // storico): il collegato nasce come un feedback normale (numero
   // proprio), `parentId` serve solo a far comparire "collegato a #N" in
   // dashboard e a far risalire chi triagia all'originale.
-  async function submit({ text, url, title, userAgent, clientId, clientIdHash, images, files, name, parentId, capabilityGapId, submissionId }) {
+  // `opts.idToken` (#595): solo il token admin. Create autenticata con `senderProof: 'admin'`;
+  // token rifiutato (401/403) → si riparte anonimi e il risultato lo dice (`authRefused`).
+  // I nomi che valgono solo con la prova (gemello di RESERVED_SENDER_RE in feedbackThread.js).
+  const NOME_RISERVATO_RE = /^(owner|routine|agent|local):/i;
+  async function submit({ text, url, title, userAgent, clientId, clientIdHash, images, files, name, parentId, capabilityGapId, submissionId }, opts = {}) {
+    const idToken = (opts && typeof opts.idToken === 'string') ? opts.idToken : '';
+    // #908: un lavoro locale nasce solo con la prova; da anonimo diventerebbe un feedback d'utente.
+    const localOnly = (opts && opts.localOnly && typeof opts.localOnly === 'object') ? opts.localOnly : null;
+    // `soloAdmin`: chi chiama vuole la prova o niente (lo script delle sessioni locali).
+    const soloAdmin = !!((opts && opts.soloAdmin) || localOnly);
+    // `accessoOwner`: chi chiama distingue l'accesso che manca dalla rete che manca (la coda d'invio aspetta, non rinuncia).
+    if (soloAdmin && !idToken) throw Object.assign(new Error('create senza token admin (401): questo feedback non parte da anonimo'), { accessoOwner: true });
     // NIENTE PARTE SE NON SI PUÒ CIFRARE (#602). Il controllo sta QUI, prima di
     // qualunque caricamento e prima di creare il documento: così «non è partito
     // niente» è vero alla lettera, e non «è partito tutto tranne il testo».
@@ -804,6 +815,7 @@
       if (/^[0-9a-f]{16}$/.test(raw)) walletPseudonym = raw;
     } catch (_) {}
 
+    const nowIso = new Date().toISOString();
     const doc = {
       fields: {
         text: toFsValue(encText),
@@ -819,7 +831,12 @@
         // S1.F2.1: statusPublic SEMPRE in chiaro anche se status fine è cifrato.
         // Un feedback nuovo parte da 'new' → mappa su 'open'.
         statusPublic: toFsValue('open'),
-        createdAt: { timestampValue: new Date().toISOString() },
+        createdAt: { timestampValue: nowIso },
+        // L'ORA DELL'ULTIMA SCRITTURA, scritta da chi scrive. È il campo su cui
+        // la dashboard chiede «cosa è cambiato da allora?»: un feedback che non
+        // ce l'ha non compare più in quella domanda, quindi OGNI cammino che
+        // tocca un feedback deve rimetterlo (vedi `touchUpdatedAt`).
+        updatedAt: { timestampValue: nowIso },
       },
     };
     if (seq) {
@@ -845,12 +862,67 @@
     const docId = sanitizeDocId(submissionId);
     const idParam = docId ? `documentId=${encodeURIComponent(docId)}&` : '';
     const endpoint = `${FIRESTORE_BASE}/${COLLECTION}?${idParam}key=${API_KEY}`;
-    let res = await fetch(endpoint, {
+    let res = null;
+    let senderProof = '';
+    let authRefused = 0;
+    if (idToken) {
+      doc.fields.senderProof = toFsValue('admin');
+      if (localOnly) {
+        doc.fields.localOnly = toFsValue({
+          by: String(localOnly.by || '').slice(0, 120),
+          at: Math.round(Number(localOnly.at) || Date.now()),
+        });
+      }
+      // La priorità scelta da chi apre nasce col documento (#914): il server decide alla nascita se giudicarla,
+      // e una scritta dopo arriverebbe quando il giudice ha già scelto. Solo admin: il create anonimo non la ammette.
+      const prioritaScelta = opts && opts.priority;
+      if (Number.isInteger(prioritaScelta) && prioritaScelta >= 0 && prioritaScelta <= 3) {
+        doc.fields.priority = { stringValue: await maybeEncrypt(String(prioritaScelta)) };
+        doc.fields.priorityManual = { booleanValue: true };
+      }
+      res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify(doc),
+      });
+      // #912: un nome riservato col token rifiutato non riparte da anonimo: sarebbe un utente che nessuno può dire suo.
+      if ((soloAdmin || NOME_RISERVATO_RE.test(String(clientId || ''))) && (res.status === 401 || res.status === 403)) {
+        throw Object.assign(new Error(`firestore create fallito (${res.status}): token admin rifiutato, e questo feedback non parte da anonimo`), { accessoOwner: true });
+      }
+      if (res.status === 401 || res.status === 403) {
+        authRefused = res.status;
+        delete doc.fields.senderProof;
+        delete doc.fields.priority;
+        delete doc.fields.priorityManual;
+        res = null;
+      } else {
+        senderProof = 'admin';
+      }
+    }
+    if (!res) {
+      // #912: un nome riservato senza token è un utente, nello stesso spazio in cui lo mette il server
+      // (senderOf in feedbackThread.js).
+      if (NOME_RISERVATO_RE.test(String(clientId || ''))) {
+        doc.fields.clientId = toFsValue(await maybeEncrypt('non-provato:' + String(clientId)));
+      }
+      res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(doc),
+      });
+    }
+    const riprova = () => fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(doc),
     });
-    if (res.status === 403) {
+    if (!senderProof && res.status === 403 && doc.fields.updatedAt) {
+      // Regole senza `updatedAt` ancora in produzione: si toglie solo quello,
+      // non numero e titolo con tutto lo schema.
+      delete doc.fields.updatedAt;
+      res = await riprova();
+    }
+    if (!senderProof && res.status === 403) {
       // Rules non ancora aggiornate ai campi nuovi (name/seq/subSeq/parentId/clientIdHash):
       // meglio un feedback senza numero/titolo/collegamento che un invio
       // fallito. Ritenta con il solo schema storico.
@@ -861,24 +933,21 @@
       delete doc.fields.clientIdHash; // S1.F2.2: rules vecchie potrebbero rifiutarlo
       delete doc.fields.walletPseudonym; // #652: idem, finché le regole non sono deployate
       seq = null;
-      res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(doc),
-      });
+      res = await riprova();
     }
     // 409 ALREADY_EXISTS con documentId → il feedback è già stato scritto da un
     // tentativo precedente (identico submissionId). Non è un errore: successo
     // idempotente, nessun duplicato creato.
+    const prova = idToken ? { senderProof, ...(authRefused ? { authRefused } : {}), ...(localOnly ? { localOnly: true } : {}) } : {};
     if (docId && res.status === 409) {
-      return { id: docId, seq: null, images: uploaded, files: uploadedFiles, failed, deduped: true };
+      return { id: docId, seq: null, images: uploaded, files: uploadedFiles, failed, deduped: true, ...prova };
     }
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
       throw new Error(`firestore create fallito (${res.status}): ${errText.slice(0, 300)}`);
     }
     const json = await res.json();
-    return { id: json.name?.split('/').pop() || '', seq, images: uploaded, files: uploadedFiles, failed };
+    return { id: json.name?.split('/').pop() || '', seq, images: uploaded, files: uploadedFiles, failed, ...prova };
   }
 
   // ── Il tetto del caricamento, e come si dice ──────────────────────────────
@@ -911,12 +980,12 @@
   const CAMPI_LISTA = [
     'archiveOverride', 'beatAt', 'blockReason', 'branch', 'capabilityGapId',
     'claimExpiresAt', 'claimNum', 'claimedAt', 'claimedBy', 'clientId',
-    'clientIdHash', 'createdAt', 'mergePreapproved', 'name', 'parentId', 'pipeline',
+    'clientIdHash', 'createdAt', 'localApproval', 'localMerges', 'localOnly', 'mergePreapproved', 'name', 'parentId', 'pipeline',
     'priority', 'priorityManual', 'reopenRequests', 'resolvedAt',
-    'resolvedInVersion', 'reviewDecision', 'reviewedAt', 'seq', 'stalls',
+    'resolvedInVersion', 'reviewDecision', 'reviewedAt', 'senderProof', 'seq', 'stalls',
     'starred', 'status', 'statusPublic', 'statusReason', 'subSeq', 'text',
     'title', 'url', 'userAgent', 'userNote', 'verifiedAt', 'votes',
-    'walletPseudonym', 'workingResets', 'workingSince',
+    'updatedAt', 'walletPseudonym', 'workingResets', 'workingSince',
   ];
 
   // Un documento letto con la proiezione della lista porta questo marchio: chi
@@ -950,6 +1019,11 @@
   const COUNT_CAP_HINT =
     `Caricati i ${LIST_PAGE_SIZE} feedback più recenti: se ce ne sono di più vecchi, non sono in pagina e non entrano nel conto.`;
 
+  // Chi legge TUTTI i feedback (la Gestione, #676) non ha un tetto: il «+» lì
+  // vuol dire che il freno sulle pagine ha interrotto la lettura.
+  const COUNT_INCOMPLETE_HINT =
+    'La lettura di tutti i feedback si è fermata prima della fine: i più vecchi non sono in pagina e non entrano nel conto.';
+
   // Lista tutti i feedback (più recenti prima). Usata dalla dashboard e dalla
   // bacheca. `timeoutMs` (opzionale): se > 0, la fetch si arrende dopo quel tempo
   // invece di restare muta finché il sistema operativo non decide di mollare
@@ -981,7 +1055,8 @@
       return marcaProiezione(await readViaMain(bridge, { op, pageSize, timeoutMs, fields }), fields);
     }
     if (typeof afterName === 'string') {
-      const { rows } = await listByNameDirect(COLLECTION, { pageSize, timeoutMs, afterName, idToken, fields });
+      const { rows, readTime } = await listByNameDirect(COLLECTION, { pageSize, timeoutMs, afterName, idToken, fields });
+      if (readTime) Object.defineProperty(rows, 'readTime', { value: readTime, enumerable: false });
       return marcaProiezione(rows, fields);
     }
     return marcaProiezione(await listDirect(COLLECTION, { pageSize, timeoutMs, fields, idToken }), fields);
@@ -1075,7 +1150,9 @@
   // stabile, si passa sempre dalla porta ESPOSTA (`SN_FEEDBACK.list`) così chi
   // la sostituisce in una prova sostituisce anche questa, e il freno sulle
   // pagine non mente — se scatta, la risposta lo dice.
-  async function listAllPaged({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, idToken = '', maxPages = ALL_PAGES_MAX, fields = null } = {}) {
+  // `lista` (solo da una pagina): è il caricamento della Gestione, e il main ci
+  // riunisce le schede e ci fa ripartire il giro (#676).
+  async function listAllPaged({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, idToken = '', maxPages = ALL_PAGES_MAX, fields = null, lista = false } = {}) {
     // Da una pagina filo:// il cursore non è percorribile: `list` rifiuta
     // apposta `afterName` (le credenziali stanno nel main, non qui). Quindi la
     // lettura completa la fa il main e torna di là, col suo `complete`. Senza
@@ -1083,18 +1160,21 @@
     // alla prima riga (#496).
     const bridge = pageBridge();
     if (bridge) {
-      const r = await replyViaMain(bridge, { op: 'listAll', timeoutMs });
-      return { rows: Array.isArray(r.rows) ? r.rows : [], complete: r.complete !== false };
+      const r = await replyViaMain(bridge, { op: 'listAll', timeoutMs, ...(fields ? { fields } : {}), ...(lista ? { lista: true } : {}) });
+      return { rows: marcaProiezione(Array.isArray(r.rows) ? r.rows : [], fields), complete: r.complete !== false, readTime: String(r.readTime || '') };
     }
     const limit = Math.max(1, Math.min(LIST_PAGE_SIZE, Number(pageSize) || LIST_PAGE_SIZE));
     const rows = [];
     const visti = new Set();
     let cursor = '';
     let complete = false;
+    let readTime = '';
     for (let page = 0; page < Math.max(1, Number(maxPages) || ALL_PAGES_MAX); page += 1) {
       const porta = (global.SN_FEEDBACK && global.SN_FEEDBACK.list) || list;
       // eslint-disable-next-line no-await-in-loop
       const batch = await porta({ pageSize: limit, timeoutMs, idToken, afterName: cursor, fields });
+      // Le pagine si leggono in momenti diversi: il giro della Gestione riparte dalla PRIMA (#676).
+      if (page === 0 && batch && batch.readTime) readTime = String(batch.readTime);
       const arr = Array.isArray(batch) ? batch : [];
       let nuove = 0;
       for (const r of arr) {
@@ -1108,7 +1188,7 @@
       if (arr.length < limit || nuove === 0 || !ultimo || ultimo === cursor) { complete = true; break; }
       cursor = ultimo;
     }
-    return { rows, complete };
+    return { rows, complete, readTime };
   }
 
   async function listAll(opts = {}) {
@@ -1257,6 +1337,72 @@
     return rows.map((r) => ({ _id: r._id, _updateTime: r._updateTime }));
   }
 
+  // ── Il giro della Gestione: solo quello che è cambiato (#676) ────────────
+  // Un giro a vuoto costa una lettura. Ordine (updatedAt, nome): due scritture
+  // nello stesso istante non si saltano paginando, e non serve un indice
+  // composto. Regola: patterns/chi-guarda-in-continuo-chiede-cosa-e-cambiato.md.
+  async function listChangedDirect({ since, after = null, pageSize = LIST_PAGE_SIZE, timeoutMs = 0, idToken = '', fields = null } = {}) {
+    const structuredQuery = {
+      from: [{ collectionId: COLLECTION }],
+      where: {
+        fieldFilter: {
+          field: { fieldPath: 'updatedAt' },
+          op: 'GREATER_THAN',
+          value: { timestampValue: String(since) },
+        },
+      },
+      orderBy: [
+        { field: { fieldPath: 'updatedAt' }, direction: 'ASCENDING' },
+        { field: { fieldPath: '__name__' }, direction: 'ASCENDING' },
+      ],
+      limit: Math.max(1, Math.min(LIST_PAGE_SIZE, Number(pageSize) || LIST_PAGE_SIZE)),
+    };
+    // Il cursore della pagina dopo si scrive con `updatedAt`: in proiezione va chiesto.
+    const campi = Array.isArray(fields) && fields.length ? Array.from(new Set([...fields, 'updatedAt'])) : null;
+    const select = selectFields(campi);
+    if (select) structuredQuery.select = select;
+    if (after && after.name) {
+      structuredQuery.startAt = {
+        before: false,
+        values: [{ timestampValue: String(after.at) }, { referenceValue: String(after.name) }],
+      };
+    }
+    return marcaProiezione(await runQueryDirect(structuredQuery, { timeoutMs, idToken, what: 'cambiati' }), fields);
+  }
+
+  // Tutti i cambiati, paginati: `maxPages` è un freno contro un ciclo, e se
+  // scatta la risposta lo dice (`complete: false`).
+  async function listChangedSince({ since, after = null, pageSize = LIST_PAGE_SIZE, timeoutMs = 0, idToken = '', maxPages = ALL_PAGES_MAX, fields = null } = {}) {
+    const limit = Math.max(1, Math.min(LIST_PAGE_SIZE, Number(pageSize) || LIST_PAGE_SIZE));
+    const rows = [];
+    const visti = new Set();
+    let cursor = after || null;
+    let complete = false;
+    let readTime = '';
+    for (let page = 0; page < Math.max(1, Number(maxPages) || ALL_PAGES_MAX); page += 1) {
+      const porta = (global.SN_FEEDBACK && global.SN_FEEDBACK.listChangedDirect) || listChangedDirect;
+      // eslint-disable-next-line no-await-in-loop
+      const batch = await porta({ since, after: cursor, pageSize: limit, timeoutMs, idToken, fields });
+      const arr = Array.isArray(batch) ? batch : [];
+      // La prima pagina: quello scritto dopo può mancare alle pagine successive, mai al giro dopo.
+      if (page === 0 && batch && batch.readTime) readTime = String(batch.readTime);
+      let nuove = 0;
+      for (const r of arr) {
+        const id = String((r && r._id) || '');
+        if (id && visti.has(id)) continue;
+        if (id) visti.add(id);
+        rows.push(r);
+        nuove += 1;
+      }
+      const ultima = arr[arr.length - 1];
+      const nome = nomeDocumento(COLLECTION, ultima);
+      // Una sorgente che ignora il cursore tornerebbe sempre la stessa pagina.
+      if (arr.length < limit || nuove === 0 || !nome) { complete = true; break; }
+      cursor = { at: String((ultima && ultima.updatedAt) || since), name: nome };
+    }
+    return { rows, complete, readTime };
+  }
+
   // Legge i documenti indicati (interi) in UNA richiesta (batchGet). Ritorna
   // solo quelli trovati: un id cancellato nel frattempo non compare. Vuoto → [].
   async function getMany(ids, { timeoutMs = 0, idToken = '', fields = null } = {}) {
@@ -1289,9 +1435,64 @@
 
   const BATCH_GET_MAX = 100;
 
+  // L'ora di Firestore (`_updateTime`) dei soli id indicati, a pezzi e tutti:
+  // regge anche su chi scrive senza firmare `updatedAt` o con l'orologio
+  // indietro. La maschera tiene i byte a zero; le letture si pagano a documento.
+  async function versionsOf(ids, { timeoutMs = 0, idToken = '' } = {}) {
+    const wanted = [...new Set((Array.isArray(ids) ? ids : []).map((s) => String(s || '')).filter(Boolean))];
+    const out = [];
+    for (let i = 0; i < wanted.length; i += BATCH_GET_MAX) {
+      // eslint-disable-next-line no-await-in-loop
+      const parte = await batchGetDirect(COLLECTION, wanted.slice(i, i + BATCH_GET_MAX), { timeoutMs, idToken, fields: ['createdAt'] });
+      for (const r of parte) out.push({ _id: r._id, _updateTime: r._updateTime });
+    }
+    return out;
+  }
+
+  // L'id del feedback col numero dato («676», «#676.1»): il registro dei
+  // worker porta il numero, il giro vuole l'id (#676.1). Si legge chi ha quel
+  // `seq` (il padre e i suoi figli), non la lista.
+  async function idDelNumero(num, { timeoutMs = 0, idToken = '' } = {}) {
+    const m = /^#?(\d+)(?:\.(\d+))?$/.exec(String(num || '').trim());
+    if (!m) return null;
+    const seq = Number(m[1]);
+    const sub = Number(m[2] || 0);
+    const rows = await runQueryDirect({
+      from: [{ collectionId: COLLECTION }],
+      where: { fieldFilter: { field: { fieldPath: 'seq' }, op: 'EQUAL', value: { integerValue: String(seq) } } },
+      select: selectFields(['seq', 'subSeq']),
+      limit: 200,
+    }, { timeoutMs, idToken, what: 'numero' });
+    const trovato = rows.find((r) => (Number(r && r.subSeq) || 0) === sub);
+    return trovato ? String(trovato._id) : null;
+  }
+
+  // Quanti invii in tutto: il contatore avanza PRIMA che il documento sia
+  // scritto, e nessun orologio ci entra. `null` = non lo so, non «zero».
+  async function submissionCount({ timeoutMs = 0, idToken = '' } = {}) {
+    const url = `${FIRESTORE_BASE}/${COUNTERS_COLLECTION}/${SEQ_COUNTER}?key=${API_KEY}`;
+    const headers = {};
+    if (idToken) headers.Authorization = `Bearer ${idToken}`;
+    const opts = { headers };
+    let timer = null;
+    if (timeoutMs > 0 && typeof AbortController !== 'undefined') {
+      const controller = new AbortController();
+      opts.signal = controller.signal;
+      timer = setTimeout(() => { try { controller.abort(); } catch (_) {} }, timeoutMs);
+    }
+    let res;
+    try { res = await fetch(url, opts); } finally { if (timer) clearTimeout(timer); }
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`firestore contatore invii fallito (${res.status})`);
+    const doc = await res.json();
+    const n = Number(fromFsValue(doc.fields?.value));
+    return Number.isInteger(n) && n >= 0 ? n : null;
+  }
+
   async function batchGetDirect(collectionId, wanted, { timeoutMs = 0, idToken = '', fields = null } = {}) {
     const endpoint = `${FIRESTORE_BASE}:batchGet?key=${API_KEY}`;
-    const prefix = `${FIRESTORE_BASE}/${collectionId}/`;
+    // batchGet vuole il NOME della risorsa: con l'indirizzo intero risponde 400 a ogni richiesta.
+    const prefix = `projects/${PROJECT_ID}/databases/(default)/documents/${collectionId}/`;
     const headers = { 'Content-Type': 'application/json' };
     if (idToken) headers.Authorization = `Bearer ${idToken}`;
     const corpo = { documents: wanted.map((id) => prefix + id) };
@@ -1508,9 +1709,13 @@
     }
     const arr = await res.json();
     const out = [];
+    let readTime = '';
     for (const row of Array.isArray(arr) ? arr : []) {
       if (row && row.document) out.push(fsDocToObject(row.document));
+      if (!readTime && row && row.readTime) readTime = String(row.readTime);
     }
+    // L'ora del server della lettura, fuori dalle righe: il giro dei cambiati ci prende il confine (#676).
+    if (readTime) Object.defineProperty(out, 'readTime', { value: readTime, enumerable: false });
     return out;
   }
 
@@ -1657,12 +1862,14 @@
     const arr = await res.json();
     const rows = [];
     let lastName = '';
+    let readTime = '';
     for (const row of arr) {
+      if (!readTime && row && row.readTime) readTime = String(row.readTime);
       if (!row.document) continue;
       lastName = row.document.name || lastName;
       rows.push(fsDocToObject(row.document));
     }
-    return { rows, lastName };
+    return { rows, lastName, readTime };
   }
 
   // UNA scheda pubblica (per id). Torna null se non c'è: un feedback che non è
@@ -1738,11 +1945,21 @@
     return true;
   }
 
+  // Ogni scrittura su un feedback firma l'ora: è l'unico modo che ha la
+  // dashboard di chiedere «cosa è cambiato da allora?» invece di rileggere la
+  // collezione intera a ogni giro. Un cammino che scrive senza passare di qui
+  // rende quel cambiamento invisibile fino alla riconciliazione.
+  function touchUpdatedAt(fields, mask, iso) {
+    fields.updatedAt = { timestampValue: String(iso || new Date().toISOString()) };
+    if (Array.isArray(mask) && !mask.includes('updatedAt')) mask.push('updatedAt');
+    return fields;
+  }
+
   // Aggiorna stato/note di un feedback esistente. status ∈ new|todo|done|verified|ignored.
   // opts.idToken (Firebase ID token) viene allegato come Bearer: serve perché le
   // Firestore rules verifichino che l'utente è un admin. Senza token la scrittura
   // riuscirà solo se le regole consentono l'accesso anonimo (sconsigliato).
-  async function updateStatus(id, { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, mergePreapproved }, opts = {}) {
+  async function updateStatus(id, { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, mergePreapproved, localOnly, localApproval, senderProof }, opts = {}) {
     if (!id) throw new Error('id mancante');
     const idToken = opts.idToken;
     const fields = {};
@@ -1851,6 +2068,31 @@
       }
       mask.push('mergePreapproved');
     }
+    // Il segno «solo in locale» (#908): stessa forma di scrittura, `at` in millisecondi.
+    if (localOnly !== undefined) {
+      if (localOnly && typeof localOnly === 'object') {
+        fields.localOnly = toFsValue({
+          by: String(localOnly.by || '').slice(0, 120),
+          at: Math.round(Number(localOnly.at) || Date.now()),
+        });
+      }
+      mask.push('localOnly');
+    }
+    // L'approvazione dell'owner come lavoro locale (#913): stessa forma del segno; `null` la toglie.
+    if (localApproval !== undefined) {
+      if (localApproval && typeof localApproval === 'object') {
+        fields.localApproval = toFsValue({
+          by: String(localApproval.by || '').slice(0, 120),
+          at: Math.round(Number(localApproval.at) || Date.now()),
+        });
+      }
+      mask.push('localApproval');
+    }
+    // La prova del mittente data dall'owner («È mio», #908): si aggiunge e basta, non si toglie da qui.
+    if (senderProof === 'admin') {
+      fields.senderProof = toFsValue('admin');
+      mask.push('senderProof');
+    }
     if (priority !== undefined) {
       // Priorità 1-3 (0 = nessuna). Clamp PRIMA di cifrare.
       const p = Math.max(0, Math.min(3, Math.round(Number(priority) || 0)));
@@ -1877,15 +2119,22 @@
       fields.verifiedAt = { timestampValue: new Date().toISOString() };
       mask.push('verifiedAt');
     }
-    const qs = mask.map((m) => `updateMask.fieldPaths=${encodeURIComponent(m)}`).join('&');
-    const endpoint = `${FIRESTORE_BASE}/${COLLECTION}/${encodeURIComponent(id)}?${qs}&key=${API_KEY}`;
+    touchUpdatedAt(fields, mask);
     const headers = { 'Content-Type': 'application/json' };
     if (idToken) headers.Authorization = `Bearer ${idToken}`;
-    const res = await fetch(endpoint, {
-      method: 'PATCH',
-      headers,
-      body: JSON.stringify({ fields }),
-    });
+    const scrivi = () => {
+      const qs = mask.map((m) => `updateMask.fieldPaths=${encodeURIComponent(m)}`).join('&');
+      const endpoint = `${FIRESTORE_BASE}/${COLLECTION}/${encodeURIComponent(id)}?${qs}&key=${API_KEY}`;
+      return fetch(endpoint, { method: 'PATCH', headers, body: JSON.stringify({ fields }) });
+    };
+    let res = await scrivi();
+    if (res.status === 403) {
+      // Regole senza `updatedAt` ancora in produzione: la scrittura dell'owner
+      // passa lo stesso, e il giro la vede al riallineamento.
+      delete fields.updatedAt;
+      mask.splice(mask.indexOf('updatedAt'), 1);
+      res = await scrivi();
+    }
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
       throw new Error(`firestore update fallito (${res.status}): ${errText.slice(0, 300)}`);
@@ -2071,7 +2320,14 @@
     listAll,
     listAllPaged,
     listVersions,
+    // Il giro al minuto della dashboard: i soli feedback scritti dopo un
+    // istante. Un giro a vuoto costa una lettura, non una per feedback.
+    listChangedSince,
+    listChangedDirect,
     getMany,
+    versionsOf,
+    idDelNumero,
+    submissionCount,
     // #583 — la vista pubblica: l'unica lettura dei feedback che non chiede
     // credenziali. Ci sono dentro i soli campi pubblici dei feedback chiusi.
     listPublic,
@@ -2107,6 +2363,7 @@
     listHitCap,
     countLabel,
     COUNT_CAP_HINT,
+    COUNT_INCOMPLETE_HINT,
     updateStatus,
     // S1.F2.1: mapping status fine → valore pubblico grossolano (in chiaro).
     // Esportata perché owner-feedback.mjs (script .mjs) la riusa per scrivere statusPublic.

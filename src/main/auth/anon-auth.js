@@ -208,8 +208,11 @@ function currentIdTokenSync() {
 
 function hasIdentity() { return Boolean(session?.refreshToken); }
 
+// Per il confronto delle uscite (#810): i valori, mai a un prompt.
+function segreti() { return [session?.refreshToken, session?.idToken].filter(Boolean); }
+
 // Dopo un collegamento riuscito l'account non è più anonimo, ma il refresh
 // token resta valido e punta allo stesso uid: nulla da fare. Esposto per i test.
 function _reset() { session = null; inflight = null; }
 
-module.exports = { restore, getIdToken, getUid, currentIdTokenSync, hasIdentity, isLost, resetIdentity, _reset, _expireToken };
+module.exports = { restore, segreti, getIdToken, getUid, currentIdTokenSync, hasIdentity, isLost, resetIdentity, _reset, _expireToken };

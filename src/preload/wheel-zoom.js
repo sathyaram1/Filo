@@ -145,12 +145,29 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     };
   } catch (_) {}
 
+  // Ogni cambio di zoom è un evento del filo (#867): una raffica di tasti o di rotella è UN cambio,
+  // detto al main quando si ferma. Quello chiesto in chat lo registra il main con la risposta (`daRichiesta`).
+  let raffica = null;
+  function annotaZoom(prima) {
+    if (!ipc || typeof ipc.send !== 'function') return;
+    if (!raffica) raffica = { prima, timer: null };
+    clearTimeout(raffica.timer);
+    raffica.timer = setTimeout(() => {
+      const r = raffica;
+      raffica = null;
+      const dopo = currentPercent();
+      if (r && r.prima !== dopo) { try { ipc.send('filo:zoom-registra', { prima: r.prima, dopo }); } catch (_) {} }
+    }, 800);
+  }
+
   // Applica un livello di zoom dentro i limiti condivisi. Unico punto che
   // scrive lo zoom del webFrame: rotella, badge, tasti e chat passano da qui.
-  function setLevel(level) {
+  function setLevel(level, { daRichiesta = false } = {}) {
+    const prima = currentPercent();
     const clamped = Z ? Z.limita(level) : Math.max(MIN_LEVEL, Math.min(MAX_LEVEL, level));
     try { webFrame.setZoomLevel(clamped); } catch (_) {}
     refreshPercent();
+    if (!daRichiesta) annotaZoom(prima);
   }
 
   // Applica la percentuale BATTUTA nel campo, con gli stessi limiti di ogni
@@ -291,10 +308,7 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     e.preventDefault();
     e.stopPropagation();
     const dir = e.deltaY < 0 ? 1 : -1; // rotella su = zoom in
-    let next = webFrame.getZoomLevel() + dir * ZOOM_STEP;
-    next = Math.max(MIN_LEVEL, Math.min(MAX_LEVEL, next));
-    webFrame.setZoomLevel(next);
-    refreshPercent();
+    setLevel(webFrame.getZoomLevel() + dir * ZOOM_STEP);
   }, { capture: true, passive: false });
 
   // Qualsiasi tasto chiude la modalità — tranne mentre si edita la percentuale
@@ -364,8 +378,9 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     }
     const esito = Z ? Z.risolvi(letturaLivello(), spec) : null;
     if (!esito) return null;
-    setLevel(esito.livello);
-    return { percentuale: currentPercent(), richiesto: esito.richiesto, limitato: esito.limitato, min: esito.min, max: esito.max };
+    const prima = currentPercent();
+    setLevel(esito.livello, { daRichiesta: !!(spec && spec.rid) });
+    return { prima, percentuale: currentPercent(), richiesto: esito.richiesto, limitato: esito.limitato, min: esito.min, max: esito.max };
   }
 
   // ── Zoom della pagina con Ctrl/Cmd (solo se opts.pageZoom) ──────────────

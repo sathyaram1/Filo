@@ -35,13 +35,21 @@
   let aiPrefersOpen = false;
   let docClickHandler = null;
 
-  // Telemetria sessione: viene inviata a fine task (status:"done" + 👍/👎) per
-  // arricchire il database globale dei percorsi (vedi pathsCollector.js).
+  // Telemetria sessione per la raccolta dei percorsi (pathsCollector.js), che
+  // oggi è spenta: il riquadro con pollice su/giù non compare e niente esce.
   // Tutto qui resta locale finché l'utente non clicca pollice su/giù.
   // executedSteps contiene SOLO le azioni effettivamente eseguite dall'utente
   // (o auto-action reveal/hover andate a buon fine), niente value di fill.
   // rawUserMessages serve solo al "judge" lato server come riferimento.
   let session = null;
+  let ripiegoDetto = false;
+  let ripiegoDaDire = '';
+  function diciRipiego() {
+    if (!ripiegoDaDire) return;
+    const riga = ripiegoDaDire;
+    ripiegoDaDire = '';
+    appendActionLog(riga)?.classList.add('sn-sidebar-log-intera');
+  }
   function newSession() {
     return {
       initialUrl: '',
@@ -78,6 +86,8 @@
   function open(context) {
     if (root) return;
     history = [];
+    ripiegoDetto = false;
+    ripiegoDaDire = '';
     collapsed = false;
     aiPrefersOpen = true;
     session = newSession();
@@ -150,6 +160,11 @@
         e.preventDefault();
         form.requestSubmit();
       }
+    });
+    // Il tasto microfono: si parla, e la richiesta parte come con l'invio (o resta da correggere).
+    global.SN_VOCE_CHAT?.collega({
+      campo: ta, contenitore: form, prima: form.querySelector('button[type="submit"]'),
+      invia: () => form.requestSubmit(),
     });
     // Focus o tasto sull'input → riapri la chat
     ta.addEventListener('focus', () => expand({ ai: false }));
@@ -274,6 +289,7 @@
     }
     conv.appendChild(msg);
     conv.scrollTop = conv.scrollHeight;
+    if (role === 'assistant') diciRipiego();
     return msg;
   }
 
@@ -294,7 +310,7 @@
         wrap.classList.add('sn-sidebar-choices-used');
         // disabilita visivamente tutti i bottoni
         wrap.querySelectorAll('button').forEach((b) => { b.disabled = true; });
-        submit({ userMessage: c.prompt });
+        submit({ userMessage: c.prompt, daScelta: true });
       });
       wrap.appendChild(btn);
     });
@@ -393,9 +409,8 @@
   //
   // Render del riquadrino "Ha funzionato?" che appare in chat quando l'AI
   // dichiara conclusa la sessione (status:"done") e l'utente ha eseguito
-  // almeno un'azione. Le risposte alimentano la collection `paths` su
-  // Firestore via SAVE_PATH (vedi pathsCollector.js per la pipeline di
-  // sanitizzazione 2-LLM).
+  // almeno un'azione, solo a raccolta accesa (RACCOLTA_ACCESA in
+  // pathsCollector.js, oggi spenta). Le risposte partono via SAVE_PATH.
   function renderFeedbackPrompt() {
     const conv = convEl();
     if (!conv) return;
@@ -415,7 +430,7 @@
     // modello guarda il resto e blocca tutto il percorso se ci riconosce una
     // persona. Prometteva «senza il tuo nome» quando quel modello, di fatto,
     // non vedeva niente di quello che stava per uscire (#584, terzo giro).
-    nota.textContent = 'Rispondendo condividi i passi di questo percorso con chi userà Filo su questo sito. Filo toglie prima i dati personali e l’ora; se resta qualcosa che dice chi sei, non lo pubblica.';
+    nota.textContent = 'Rispondendo condividi i passi di questo percorso in una raccolta che chiunque può leggere. Filo toglie prima i dati personali e l’ora; se resta qualcosa che dice chi sei, non lo pubblica.';
     wrap.appendChild(nota);
     const row = document.createElement('div');
     row.className = 'sn-sidebar-feedback-row';
@@ -637,13 +652,132 @@
     return `azione Filo: ${type.toLowerCase().replace(/_/g, ' ')}`;
   }
 
-  async function runFiloAction(action) {
-    const label = filoActionLabel(action);
+  // #590 — Le aperture chieste da qui, per id: se la pagina aperta finisce più tardi su un sito
+  // della lista, il main lo dice con APERTURA_FERMATA e la riga «fatto» diventa il blocco.
+  const apertureSeguite = new Map();
+
+  function rigaBloccata(label, { host, reason } = {}) {
+    return `${label}: ${host || 'il sito'} è fra i siti ${reason === 'lists' ? 'di pubblicità e tracciamento' : 'bloccati'}`;
+  }
+
+  // Il perché del blocco sta in fondo alla riga: va a capo invece di finire nei puntini.
+  function scriviRigaBloccata(riga, label, dati) {
+    if (!riga) return null;
+    riga.textContent = '· ' + rigaBloccata(label, dati);
+    riga.classList.add('sn-sidebar-log-intera');
+    return riga;
+  }
+
+  // La notifica se ne va in pochi secondi, il bottone resta. Sta nel DOM della pagina, che ne guida clic
+  // e tasti: non apre niente, riporta la notifica «Sito bloccato» (che la pagina ottiene anche da sé).
+  function bottoneApriComunque(dopo, { host, url } = {}) {
+    if (!dopo || !/^https?:\/\//i.test(String(url || ''))) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'sn-sidebar-choices';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-sidebar-choice';
+    btn.textContent = `Apri comunque ${host || url}`;
+    btn.title = 'Filo ti chiede conferma nella notifica «Sito bloccato»';
+    btn.addEventListener('click', () => {
+      Promise.resolve().then(() => chrome.runtime.sendMessage({ type: MSG.APRI_COMUNQUE, url })).catch(() => {});
+    });
+    wrap.appendChild(btn);
+    dopo.insertAdjacentElement('afterend', wrap);
+    const conv = convEl();
+    if (conv) conv.scrollTop = conv.scrollHeight;
+  }
+
+  // L'esito di un'azione di Filo nel diario, uguale dopo l'invio diretto e dopo la conferma.
+  function scriviEsito(label, action, r) {
+    const done = !!(r && r.executed);
+    const o = (r && r.output) || null;
+    if (!done && o && o.blocked === 'site') {
+      bottoneApriComunque(scriviRigaBloccata(appendActionLog(''), label, o), o);
+      return false;
+    }
+    const riga = appendActionLog(esitoAzione(label, done, r));
+    if (done && riga && action && action._callId) {
+      apertureSeguite.set(action._callId, { riga, label });
+      // Il main segue l'apertura per un minuto: oltre, un avviso non arriva più.
+      setTimeout(() => apertureSeguite.delete(action._callId), 60_000);
+    }
+    return done;
+  }
+
+  try {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (!msg || msg.type !== MSG.APERTURA_FERMATA) return;
+      const seguita = apertureSeguite.get(msg.callId);
+      if (!seguita) return;
+      apertureSeguite.delete(msg.callId);
+      bottoneApriComunque(scriviRigaBloccata(seguita.riga, seguita.label, msg), msg);
+    });
+  } catch (_) {}
+
+  function logFermata(frase) {
+    const el = appendActionLog(frase);
+    if (el) el.classList.add('sn-sidebar-log-fermata');
+  }
+
+  // Un'uscita fermata (#810): oltre alla riga, l'assistente deve saperlo, come per la ricerca fermata. Una volta
+  // per domanda con un giro in più, perché lo dica; dopo resta solo nella storia, così un modello che insiste non gira.
+  const NOTA_FERMATA = 'l\'azione che avevi chiesto NON è partita, è stata fermata: avrebbe portato fuori un codice, una password, '
+    + 'una chiave o dati bancari letti fuori dalla conversazione, e Filo non li lascia uscire a nessun livello. Non riprovarla '
+    + 'in un\'altra forma; dillo all\'utente in una riga (se vuole la fa lui a mano)';
+  // Un collegamento della risposta fermato al clic: la riga, e la nota nella storia per la domanda dopo. Nessun giro in
+  // più, perché l'ha chiesto l'utente e non il modello.
+  const NOTA_COLLEGAMENTO = 'l\'utente ha cliccato un collegamento della tua risposta, ma non si è aperto: avrebbe portato '
+    + 'fuori un codice, una password, una chiave o dati bancari letti fuori dalla conversazione, e Filo non li lascia uscire '
+    + 'a nessun livello. Non riproporlo in un\'altra forma';
+  function notaFermata(frase) {
+    logFermata(frase);
+    history.push({ role: 'user', content: PROMPTS.turnoAutomaticoAiuto({ nota: NOTA_COLLEGAMENTO, perCronologia: true }), kind: 'action' });
+  }
+  let fermataDetta = false;
+  function fermata(frase) {
+    logFermata(frase);
+    if (fermataDetta) {
+      history.push({ role: 'user', content: PROMPTS.turnoAutomaticoAiuto({ nota: NOTA_FERMATA, perCronologia: true }), kind: 'action' });
+      return;
+    }
+    fermataDetta = true;
+    setTimeout(() => submit({
+      userAction: `${NOTA_FERMATA}. Procedi ora con il JSON normale (highlight / choices / text / status) usando solo ciò che già sai`,
+      preActionUrl: location.href,
+    }), 50);
+  }
+
+  // Quello che l'utente ha scritto qui: il main lascia uscire un codice scritto da lui (#810).
+  // Il testo dietro una scelta lo scrive il modello, e una pagina ostile può dettarlo: non conta.
+  function paroleUtente() {
+    return history.filter((h) => h && h.kind === 'real' && !h.daScelta).map((h) => String(h.content || ''));
+  }
+
+  // La frase della porta delle uscite se il testo per un campo della pagina porterebbe fuori un segreto, se no ''.
+  async function campoFermato(testo) {
+    if (!String(testo || '').trim()) return '';
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.CONTROLLA_CAMPO, testo: String(testo), parole: paroleUtente() });
+      return r && r.blocca ? String(r.frase || '') : '';
+    } catch (_) { return ''; }
+  }
+
+  async function runFiloAction(action, { etichetta = '' } = {}) {
+    const label = etichetta || filoActionLabel(action);
+    if (action && String(action.type || '').toUpperCase() === 'NAVIGA' && !action._callId) {
+      action._callId = `assistente-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    }
     let res = null;
     try {
-      res = await chrome.runtime.sendMessage({ type: MSG.FILO_RUN_ACTION, action });
+      res = await chrome.runtime.sendMessage({ type: MSG.FILO_RUN_ACTION, action, parole: paroleUtente() });
     } catch (_) {}
     if (!res || !res.ok) { appendActionLog(`${label}: non riuscita`); return false; }
+    // Un segreto che sarebbe uscito: la riga dice cosa è stato fermato e da dove veniva.
+    if (res.output && res.output.blocked === 'segreto') {
+      fermata(res.output.frase || `${label}: fermata`);
+      return false;
+    }
 
     // Livello ≥ 2: il main NON ha eseguito e ci ha mandato la spiegazione per il
     // popup di conferma di Filo. Mostriamo il popup; solo dopo l'OK rimandiamo
@@ -660,16 +794,17 @@
       if (!ok) { appendActionLog(`${label}: annullata`); return false; }
       let c = null;
       try {
-        c = await chrome.runtime.sendMessage({ type: MSG.FILO_CONFIRM_ACTION, action });
+        c = await chrome.runtime.sendMessage({ type: MSG.FILO_CONFIRM_ACTION, action, assistente: true, parole: paroleUtente() });
       } catch (_) {}
-      const done = !!(c && c.executed);
-      appendActionLog(esitoAzione(label, done, c));
-      return done;
+      if (c && c.output && c.output.blocked === 'segreto') {
+        fermata(c.output.frase || `${label}: fermata`);
+        return false;
+      }
+      return scriviEsito(label, action, c);
     }
 
-    const done = !!res.executed;
-    appendActionLog(esitoAzione(label, done, res));
-    return done;
+    // #590 — un blocco muto sembra un guasto: la lista dei siti bloccati si dice.
+    return scriviEsito(label, action, res);
   }
 
   // Un rifiuto spiegato dal main (uno stile oltre il tetto) arriva all'utente col
@@ -817,14 +952,14 @@
       switch (page.op) {
         case 'copy': Actions?.copyToClipboard(text); break;
         case 'cut': Actions?.cutSelection(); break;
-        case 'search_text': Actions?.searchTextOnWeb(text); break;
+        case 'search_text': return await runFiloAction({ type: 'NAVIGA', url: Actions.searchUrlFor(text) }, { etichetta: label });
         case 'read_aloud': await Tts?.readAloud(text); break;
         case 'stop_reading': Tts?.stopReading(); break;
         case 'edit_text': global.SN_EDITBOX?.openEditBox(text); break;
         case 'copy_image': await Actions?.copyImage(imgEl); break;
         case 'save_image': Actions?.downloadImage(imgEl); break;
         case 'copy_image_link': Actions?.copyUrlToClipboard(imgEl.currentSrc || imgEl.src); break;
-        case 'search_image': Actions?.searchImageOnWeb(imgEl); break;
+        case 'search_image': return await runFiloAction({ type: 'NAVIGA', url: Actions.imageSearchUrlFor(imgEl) }, { etichetta: label });
         case 'open_link': {
           // "Apri in nuova scheda" è un'azione di sistema già registrata: la
           // instradiamo via il ponte di #192.1 (NAVIGA → TabManager del main).
@@ -867,6 +1002,63 @@
       outline,
       viewport,
     };
+  }
+
+  // #711 — «questa foto è fatta con l'AI?» chiesto qui deve avere la stessa lettura del
+  // tasto destro: si leggono le etichette delle immagini che l'utente ha davanti, dalle
+  // più grandi. Oltre il tetto il modello sa quante ne sono rimaste fuori.
+  const MAX_IMMAGINI_ORIGINE = 12;
+  // Un'immagine che non arriva non deve tenere ferma la risposta: conta come non letta.
+  const ATTESA_ORIGINE_MS = 3000;
+  // Un'immagine letta resta letta: le domande dopo non la riscaricano.
+  const origineLetta = new Map();
+  function immaginiVisibili() {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const viste = new Set();
+    const out = [];
+    for (const im of Array.from(document.images || [])) {
+      if (root && root.contains(im)) continue;
+      const src = im.currentSrc || im.src;
+      if (!src || viste.has(src) || !im.complete || !im.naturalWidth) continue;
+      const r = im.getBoundingClientRect();
+      if (r.width < 48 || r.height < 48) continue;
+      if (r.bottom <= 0 || r.right <= 0 || r.top >= vh || r.left >= vw) continue;
+      viste.add(src);
+      out.push({ im, src, r, area: r.width * r.height });
+    }
+    return out.sort((a, b) => b.area - a.area);
+  }
+  async function origineImmaginiVisibili() {
+    const Actions = global.SN_ACTIONS;
+    if (!Actions?.leggiOrigine || !Actions?.scaricaImmagine) return null;
+    const tutte = immaginiVisibili();
+    if (!tutte.length) return null;
+    const esiti = await Promise.all(tutte.slice(0, MAX_IMMAGINI_ORIGINE).map(async ({ im, src, r }, i) => {
+      try {
+        let lettura = origineLetta.get(src);
+        if (!lettura) {
+          lettura = (async () => Actions.leggiOrigine(await Actions.scaricaImmagine(src)))();
+          lettura.then((p) => { if (!p || !p.ok || p.firmatario === 'non_verificato') origineLetta.delete(src); }, () => origineLetta.delete(src));
+          if (origineLetta.size >= 500) origineLetta.delete(origineLetta.keys().next().value);
+          origineLetta.set(src, lettura);
+        }
+        const p = await Promise.race([
+          lettura,
+          new Promise((ok) => setTimeout(() => ok(null), ATTESA_ORIGINE_MS)),
+        ]);
+        if (!p || !p.ok) return null;
+        return {
+          n: i + 1,
+          alt: String(im.alt || im.title || '').slice(0, 120),
+          larghezza: Math.round(r.width),
+          altezza: Math.round(r.height),
+          frase: p.frase || '',
+        };
+      } catch (_) { return null; }
+    }));
+    const lette = esiti.filter(Boolean);
+    return { visibili: tutte.length, controllate: lette.length, esiti: lette.filter((e) => e.frase) };
   }
 
   async function captureScreenshot() {
@@ -923,7 +1115,7 @@
   //   qualcosa che viene da fuori: i risultati di una ricerca web, l'etichetta
   //   di un elemento della pagina. Quella roba NON entra nella nota (#593):
   //   viaggia qui e finisce imbustata, dichiarata dati e recintata.
-  async function submit({ userMessage = '', userAction = '', esterno = null, preActionUrl = '' } = {}) {
+  async function submit({ userMessage = '', userAction = '', esterno = null, preActionUrl = '', daScelta = false } = {}) {
     if (!root) return;
     const wasCollapsed = collapsed;
     // Espandi solo se l'utente ha scritto qualcosa. Sui proseguimenti automatici
@@ -932,8 +1124,9 @@
     if (userMessage) expand({ ai: false });
 
     if (userMessage) {
+      fermataDetta = false;
       appendChatMessage('user', userMessage);
-      history.push({ role: 'user', content: userMessage, kind: 'real' });
+      history.push({ role: 'user', content: userMessage, kind: 'real', ...(daScelta ? { daScelta: true } : {}) });
       // Salva il messaggio raw per il "judge" lato server (vedi pathsCollector).
       // Niente userAction qui: quelli sono note di sistema, non input dell'utente.
       if (session) session.rawUserMessages.push(userMessage);
@@ -949,17 +1142,33 @@
     if (userAction) {
       await waitForPageSettle({ initialUrl: preActionUrl || location.href });
     }
-    const screenshot = await captureScreenshot();
+    const [screenshot, origineImmagini] = await Promise.all([
+      captureScreenshot(),
+      userMessage ? origineImmaginiVisibili().catch(() => null) : Promise.resolve(null),
+    ]);
     const payload = buildPayload(userMessage, userAction, esterno);
     payload.screenshot = screenshot || undefined;
+    payload.origineImmagini = origineImmagini || undefined;
 
     try {
       const res = await chrome.runtime.sendMessage({
         type: MSG.AI_REQUEST,
         action: ACTIONS.HELP,
         payload,
+        diceRipiego: true,
       });
       if (!res?.ok) throw new Error(res?.error || I18n.t('err_provider_failed'));
+      // Risposta pagata coi crediti di Filo perché OpenRouter ha rifiutato la chiave (#662): la
+      // riga della chat, una volta per serie, non a ogni passo che l'agente fa da solo.
+      // Sotto la risposta, come in chat: la scrive il prossimo messaggio di Filo (o la fine del turno).
+      if (res.keyFallback && res.keyFallback.line) {
+        // La riga è già nella conversazione, o la scrive questo turno: l'avviso non la ripete.
+        if (!ripiegoDetto) ripiegoDaDire = res.keyFallback.line;
+        Popup?.ripiegoMostrato?.(convEl());
+        ripiegoDetto = true;
+      } else {
+        ripiegoDetto = false;
+      }
       const parsed = parseAssistantOutput(res.text);
 
       // Caso speciale: l'AI ha chiesto una ricerca web. Esegui la ricerca,
@@ -976,7 +1185,6 @@
           return;
         }
         if (session) session.webSearchCount += 1;
-        appendActionLog(`ricerca web: "${parsed.query}"`);
         // #593 — I RISULTATI NON SONO UNA NOTA DI FILO.
         //
         // Titolo, indirizzo e riassunto di ogni risultato li scrive chi
@@ -989,10 +1197,18 @@
         let ricercaWeb = null;
         let esitoVuoto = '';
         try {
-          const r = await chrome.runtime.sendMessage({ type: MSG.WEB_SEARCH, query: parsed.query });
+          const r = await chrome.runtime.sendMessage({ type: MSG.WEB_SEARCH, query: parsed.query, parole: paroleUtente() });
+          // #810 — la domanda avrebbe portato fuori un segreto: la ricerca non parte, e né la
+          // riga né la nota ripetono la domanda.
+          if (r && r.blocked === 'segreto') {
+            logFermata(r.frase || 'non ho fatto la ricerca');
+            esitoVuoto = 'la ricerca web che avevi chiesto NON è partita: la domanda conteneva un codice, una password, una chiave o dati bancari letti fuori dalla conversazione, e Filo non li lascia uscire a nessun livello. Non riprovarla in altra forma; dillo all\'utente in una riga (se vuole la fa lui a mano)';
+          } else {
+            appendActionLog(`ricerca web: "${parsed.query}"`);
+          }
           if (r?.ok && Array.isArray(r.results) && r.results.length) {
             ricercaWeb = { query: parsed.query, provider: r.provider || '', results: r.results };
-          } else {
+          } else if (!esitoVuoto) {
             esitoVuoto = 'la ricerca web che avevi chiesto non ha dato nessun risultato';
           }
         } catch (_) {
@@ -1048,6 +1264,7 @@
         } else {
           expand({ ai: true });
         }
+        diciRipiego();
         return;
       }
 
@@ -1064,6 +1281,7 @@
         }
         await runFiloAction(parsed.filoAction);
         expand({ ai: true });
+        diciRipiego();
         return;
       }
 
@@ -1084,6 +1302,7 @@
         } else {
           expand({ ai: true });
         }
+        diciRipiego();
         return;
       }
 
@@ -1163,12 +1382,19 @@
           const onAct = parsed.status === 'continue'
             ? () => onUserAction(parsed.highlight)
             : null;
-          Highlight.show(parsed.highlight.selector, {
-            note: parsed.highlight.note || '',
-            action: parsed.highlight.action,
-            value: parsed.highlight.value,
-            onAction: onAct,
-          });
+          // Il testo proposto per un campo esce verso il sito: prima passa dalla porta delle uscite (#810).
+          const fermo = act === 'fill' ? await campoFermato(parsed.highlight.value) : '';
+          if (fermo) {
+            fermata(fermo);
+            parsed.highlight = null;
+          } else {
+            Highlight.show(parsed.highlight.selector, {
+              note: parsed.highlight.note || '',
+              action: parsed.highlight.action,
+              value: parsed.highlight.value,
+              onAction: onAct,
+            });
+          }
         }
       }
 
@@ -1202,9 +1428,9 @@
         session.feedbackShown = true;
         // …e solo se da qui partirebbe davvero qualcosa. Da un server di prova,
         // dall'intranet, dal disco di rete e dalle pagine interne di Filo non
-        // si raccoglie niente (#584, sesto giro): chiedere lì vuol dire
-        // promettere una condivisione che non avviene e ringraziare per una
-        // risposta che non serve a nessuno. La domanda la fa il processo
+        // si raccoglie niente (#584, sesto giro), e a raccolta spenta da
+        // nessuna parte (#897): chiedere lì vuol dire promettere una
+        // condivisione che non avviene. La domanda la fa il processo
         // principale, con la stessa porta che usa la raccolta.
         if (await percorsoRaccoglibile()) {
           // Chat sempre aperta quando chiediamo feedback (l'utente deve vederlo).
@@ -1270,7 +1496,7 @@
     });
   }
 
-  global.SN_SIDEBAR = { open, close, isOpen, ensureNotOverTarget };
+  global.SN_SIDEBAR = { open, close, isOpen, ensureNotOverTarget, paroleUtente, notaFermata };
   // Hook di test: esercita il ponte azioni-Filo (popup di conferma + dispatch)
   // senza dover passare dal modello. Stesso pattern di window.__filoDashActions.
   global.__filoSidebarTest = {

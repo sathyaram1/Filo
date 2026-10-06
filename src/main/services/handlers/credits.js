@@ -7,31 +7,15 @@
 // trasporto: IPC verso la UI + REST Firestore autenticato con l'ID token utente.
 
 const auth = require('../../auth/google-auth');
-const { soloFilo } = require('./origine');
 // SN_FEEDBACK_THREAD: ci serve splitNotes() per estrarre la spiegazione non
 // tecnica dalle note del feedback risolto (C5). Idempotente se già caricato.
 require('../../../shared/feedbackThread.js');
-
-// I campi del doc `credits/<uid>`, divisi fra quelli che una RIGA dell'elenco
-// dell'owner mostra e tutti gli altri. Stanno dichiarati insieme perché un
-// campo nuovo deve finire in uno dei due e mai in nessuno: quello che la
-// proiezione non nomina non arriva, e arriva come `undefined`, che si legge
-// come «questo utente non ce l'ha». La somma la tiene ferma
-// `tests/unit/elencoUtentiPagine.test.mjs`.
-const CAMPI_RIGA_UTENTE = ['email', 'name', 'balance'];
-const CAMPI_SOLO_DETTAGLIO = [
-  'lastRefillDate', 'byUsage', 'byAction', 'totalSpentCredits', 'totalCostEur',
-  'rewards', 'rewardedFeedback', 'giftNotice',
-];
 
 // Campi sincronizzati: tutto lo stato del motore (saldo, refill, aggregati,
 // ricompense). Il costo € resta nel doc privato dell'utente ma non lascia mai
 // il main verso la UI (la vista pubblica lo elimina).
 const SYNC_FIELDS = ['balance', 'lastRefillDate', 'byUsage', 'byAction',
   'totalSpentCredits', 'totalCostEur', 'rewards', 'rewardedFeedback'];
-
-// Quanti utenti per pagina nell'elenco dell'owner.
-const USERS_PAGE_SIZE = 50;
 
 module.exports = function register(on, ctx) {
   const { MSG, broadcastToTabs } = ctx;
@@ -82,167 +66,20 @@ module.exports = function register(on, ctx) {
     if (!res.ok) throw new Error(`credits push ${res.status}`);
   }
 
-  // ── Comandi proprietario (#210): registro utenti + regalo crediti ───────────
-  // Tutte le operazioni qui sotto sono riservate all'owner (auth.isAdmin()): il
-  // gate applicativo è negli handler IPC, la garanzia forte è nelle Firestore
-  // rules (match /credits/{uid} … allow read,write: if isAdmin()). Le scritture
-  // cross-account usano l'ID token dell'owner come Bearer.
-
-  // Elenco degli utenti registrati (doc credits con campo `email`), UNA PAGINA
-  // per volta e coi soli tre campi che la riga mostra.
-  //
-  // #679 — prima scaricava fino a MILLE documenti interi (saldo, aggregati per
-  // tipo d'uso, ricompense, costo in euro) per stamparne email, nome e saldo, e
-  // il conto degli iscritti si ricavava dalla lunghezza di quella lista. Ora i
-  // documenti arrivano proiettati, cinquanta alla volta, e il totale lo dà una
-  // query di conteggio che i documenti non li legge affatto.
-  //
-  // Il filtro «ha un'email» è anche l'ordinamento: paginare per email rende la
-  // pagina dopo ripetibile senza `offset`, che a Firestore si paga come se i
-  // documenti saltati li avesse letti.
-  const SOLO_CON_EMAIL = { unaryFilter: { field: { fieldPath: 'email' }, op: 'IS_NOT_NULL' } };
-
-  // Chi cerca una persona scrive l'inizio del suo indirizzo: le email stanno
-  // salvate in minuscolo, e `\uf8ff` chiude l'intervallo dopo ogni carattere
-  // che può seguire quell'inizio (#679.3).
-  function filtroUtenti(cerca) {
-    if (!cerca) return SOLO_CON_EMAIL;
-    const campo = { fieldPath: 'email' };
-    return {
-      compositeFilter: {
-        op: 'AND',
-        filters: [
-          { fieldFilter: { field: campo, op: 'GREATER_THAN_OR_EQUAL', value: { stringValue: cerca } } },
-          { fieldFilter: { field: campo, op: 'LESS_THAN', value: { stringValue: `${cerca}\uf8ff` } } },
-        ],
-      },
-    };
-  }
-
-  function corpoElencoUtenti(after, cerca = '') {
-    const q = {
-      from: [{ collectionId: 'credits' }],
-      where: filtroUtenti(cerca),
-      orderBy: [{ field: { fieldPath: 'email' }, direction: 'ASCENDING' }],
-      select: { fields: CAMPI_RIGA_UTENTE.map((f) => ({ fieldPath: f })) },
-      limit: USERS_PAGE_SIZE,
-    };
-    // `before: false` su `startAt` vuol dire «comincia DOPO questo valore»:
-    // il segnalibro è l'ultima email già mostrata.
-    if (after) q.startAt = { values: [{ stringValue: String(after) }], before: false };
-    return { structuredQuery: q };
-  }
-
-  // Quanti sono in tutto. Un conteggio non è un errore che valga la pena
-  // mostrare: se non arriva, l'elenco si mostra lo stesso senza il totale.
-  async function adminCountUsers(idToken, cerca = '') {
-    const endpoint = `${FB.rest.FIRESTORE_BASE}:runAggregationQuery?key=${FB.rest.API_KEY}`;
-    const body = {
-      structuredAggregationQuery: {
-        structuredQuery: { from: [{ collectionId: 'credits' }], where: filtroUtenti(cerca) },
-        aggregations: [{ alias: 'totale', count: {} }],
-      },
-    };
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error(`users count ${res.status}`);
-    const rows = await res.json();
-    for (const r of Array.isArray(rows) ? rows : []) {
-      const campo = r?.result?.aggregateFields?.totale;
-      if (!campo) continue;
-      const n = Number(campo.integerValue ?? campo.doubleValue);
-      if (Number.isFinite(n)) return n;
-    }
-    return null;
-  }
-
-  async function adminListUsers({ after = '', cerca = '' } = {}) {
-    if (!FB?.rest) return { users: [], total: null, next: '' };
-    const idToken = await auth.getIdToken();
-    if (!idToken) throw new Error('Sessione scaduta: rifai l\'accesso.');
-    const endpoint = `${FB.rest.FIRESTORE_BASE}:runQuery?key=${FB.rest.API_KEY}`;
-    const [res, total] = await Promise.all([
-      fetch(endpoint, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(corpoElencoUtenti(after, cerca)),
-      }),
-      adminCountUsers(idToken, cerca).catch(() => null),
-    ]);
-    if (!res.ok) throw new Error(`users ${res.status}`);
-    const rows = await res.json();
-    const users = [];
-    for (const r of Array.isArray(rows) ? rows : []) {
-      if (!r.document) continue;
-      const o = FB.fsDocToObject(r.document);
-      if (o.email) users.push({ email: o.email, name: o.name || '', balance: Math.round(Number(o.balance) || 0) });
-    }
-    // Il segnalibro esce solo se la pagina era piena: una pagina corta è
-    // l'ultima, e offrire «gli altri» che non ci sono è una strada morta.
-    const next = users.length >= USERS_PAGE_SIZE ? users[users.length - 1].email : '';
-    return { users, total, next };
-  }
-
-  // Trova il doc credits il cui campo `email` corrisponde (esatto). Ritorna
-  // l'oggetto completo (incluso uid in _id e l'eventuale giftNotice) o null.
-  async function adminFindByEmail(email) {
-    if (!FB?.rest) return null;
-    const idToken = await auth.getIdToken();
-    if (!idToken) throw new Error('Sessione scaduta: rifai l\'accesso.');
-    const endpoint = `${FB.rest.FIRESTORE_BASE}:runQuery?key=${FB.rest.API_KEY}`;
-    const body = {
-      structuredQuery: {
-        from: [{ collectionId: 'credits' }],
-        where: { fieldFilter: { field: { fieldPath: 'email' }, op: 'EQUAL', value: { stringValue: email } } },
-        limit: 1,
-      },
-    };
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error(`lookup ${res.status}`);
-    const rows = await res.json();
-    for (const r of rows) { if (r.document) return FB.fsDocToObject(r.document); }
-    return null;
-  }
-
-  // Regala `amount` crediti all'utente con `email`: somma al suo saldo remoto e
-  // lascia un avviso `giftNotice` (cumulativo finché non lo vede) sul suo doc.
-  async function adminGift(email, amount) {
-    const target = await adminFindByEmail(email);
-    if (!target || !target._id) throw new Error('Nessun utente registrato con questa email.');
-    const uid = target._id;
-    const newBalance = Math.round((Number(target.balance) || 0) + amount);
-    const prevNotice = target.giftNotice && Math.round(Number(target.giftNotice.amount) || 0);
-    const noticeAmount = (prevNotice > 0 ? prevNotice : 0) + amount;
-    const idToken = await auth.getIdToken();
-    const fields = {
-      balance: FB.toFsValue(newBalance),
-      giftNotice: FB.toFsValue({ amount: noticeAmount, ts: Date.now() }),
-    };
-    const mask = ['balance', 'giftNotice'].map((k) => `updateMask.fieldPaths=${k}`).join('&');
-    const url = `${FB.rest.FIRESTORE_BASE}/credits/${encodeURIComponent(uid)}?${mask}&key=${FB.rest.API_KEY}`;
-    const res = await fetch(url, {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fields }),
-    });
-    if (!res.ok) throw new Error(`gift ${res.status}`);
-    return { balance: newBalance };
-  }
-
   // Avviso "crediti regalati" (#210.4): se il doc dell'utente corrente porta un
   // `giftNotice`, mostra il popup una volta sola e azzera il campo così non si
   // ripresenta. `remote` è il doc appena letto in ensureAccountSync.
+  // La spinta arriva a ogni home aperta: il regalo lo racconta la prima che lo prende (#664), come il benvenuto dell'invito.
+  let regaloDaDire = 0;
+  function annunciaRegalo(amount) {
+    regaloDaDire = amount;
+    broadcastToTabs({ type: MSG.GIFT_NOTICE, amount });
+  }
+  globalThis.SN_CREDITS_MAIN = { annunciaRegalo };
   async function maybeNotifyGift(uid, remote) {
     const amount = remote?.giftNotice && Math.round(Number(remote.giftNotice.amount) || 0);
     if (!amount || amount <= 0) return;
-    broadcastToTabs({ type: MSG.GIFT_NOTICE, amount });
+    annunciaRegalo(amount);
     const idToken = await auth.getIdToken();
     if (!idToken) return;
     const url = `${FB.rest.FIRESTORE_BASE}/credits/${encodeURIComponent(uid)}?updateMask.fieldPaths=giftNotice&key=${FB.rest.API_KEY}`;
@@ -327,45 +164,17 @@ module.exports = function register(on, ctx) {
   });
 
   // ── IPC ─────────────────────────────────────────────────────────────────────
+  on(MSG.GIFT_NOTICE_CLAIM, async (_msg, _sender, origin) => {
+    if (!String(origin || '').startsWith('filo://')) return { ok: false, error: 'forbidden' };
+    const amount = regaloDaDire;
+    regaloDaDire = 0;
+    return { ok: true, amount };
+  });
+
   on(MSG.GET_CREDITS, async () => {
     await ensureAccountSync().catch(() => {});
     return { ok: true, credits: await Credits.getPublic(), signedIn: auth.isSignedIn() };
   });
-
-  // ── Comandi proprietario (#210): /users e /gift ─────────────────────────────
-  //
-  // #583 — «sei il proprietario?» da solo non basta: sul suo computer la
-  // risposta è sempre sì, ed è l'unico dove c'è qualcosa da prendere. Questi
-  // due comandi si scrivono nella chat della dashboard, che è una pagina di
-  // Filo; un sito visitato non deve poter chiedere l'elenco di chi usa Filo né
-  // regalare crediti a un indirizzo che sceglie lui.
-  on(MSG.OWNER_LIST_USERS, soloFilo(async (msg) => {
-    if (!auth.isAdmin()) return { ok: false, error: 'Comando riservato al proprietario.' };
-    try {
-      // Il segnalibro è un'email: più lungo del massimo che un'email può essere
-      // non è un segnalibro, è solo corpo della richiesta in più.
-      const cerca = String(msg?.cerca || '').trim().toLowerCase().slice(0, 320);
-      const { users, total, next } = await adminListUsers({ after: String(msg?.after || '').slice(0, 320), cerca });
-      return { ok: true, users, total, next, cerca };
-    }
-    catch (e) { return { ok: false, error: e?.message || String(e) }; }
-  }));
-
-  on(MSG.OWNER_GIFT_CREDITS, soloFilo(async (msg) => {
-    if (!auth.isAdmin()) return { ok: false, error: 'Comando riservato al proprietario.' };
-    const amount = Math.round(Number(msg?.amount));
-    const email = String(msg?.email || '').trim().toLowerCase();
-    if (!Number.isInteger(amount) || amount <= 0) {
-      return { ok: false, error: 'Numero di crediti non valido: usa un intero positivo.' };
-    }
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-      return { ok: false, error: 'Email non valida.' };
-    }
-    try {
-      const r = await adminGift(email, amount);
-      return { ok: true, email, amount, balance: r.balance };
-    } catch (e) { return { ok: false, error: e?.message || String(e) }; }
-  }));
 
   // +5 crediti subito all'invio di un feedback (C3). Idempotenza per-invio è del
   // chiamante: ogni invio è un evento distinto, quindi premiamo ogni volta.
@@ -559,7 +368,7 @@ module.exports = function register(on, ctx) {
           // così alla prossima apertura non ricompare.
           await Credits.award({ kind: 'feedback_resolved', credits, ref: fid });
         }
-        rewards.push({
+        const annuncio = {
           id: fid,
           num: FB.formatNum ? FB.formatNum(f.seq, f.subSeq) : '',
           name: String(f.name || '').slice(0, 200),
@@ -567,7 +376,16 @@ module.exports = function register(on, ctx) {
           // Risolta o chiusa senza modifiche: il riquadro non le racconta uguali.
           status: f.status === 'done' || !f.status ? 'done' : 'closed',
           credits,
-        });
+        };
+        rewards.push(annuncio);
+        // #986 — l'annuncio è anche il momento in cui la copia locale passa a «risolta»: dopo, non torna.
+        try {
+          await globalThis.SN_SEGNALAZIONI_MIE?.chiusa?.(fid, {
+            stato: annuncio.status === 'closed' ? 'chiusa' : 'risolta',
+            creataIl: f.createdAt,
+            num: annuncio.num, titolo: annuncio.name, risposta: annuncio.explanation,
+          });
+        } catch (_) {}
       }
       await MINE.segnaControllo(adesso, { visti: guardati, impara: imparati, scansione });
       const totalCredits = rewards.reduce((s, r) => s + r.credits, 0);
@@ -579,7 +397,4 @@ module.exports = function register(on, ctx) {
   });
 };
 
-module.exports.CAMPI_RIGA_UTENTE = CAMPI_RIGA_UTENTE;
-module.exports.CAMPI_SOLO_DETTAGLIO = CAMPI_SOLO_DETTAGLIO;
 module.exports.SYNC_FIELDS = SYNC_FIELDS;
-module.exports.USERS_PAGE_SIZE = USERS_PAGE_SIZE;

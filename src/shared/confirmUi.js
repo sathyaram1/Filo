@@ -295,6 +295,7 @@
     doc.addEventListener('visibilitychange', onVisibile);
     onVisibile();
     const troppoPresto = (e) => !!(e && e.isTrusted) && !(performance.now() - visibileDa >= RITARDO_SI_MS);
+    active.pronto = () => !troppoPresto({ isTrusted: true });
     // Chi stava scrivendo continua a scrivere nel suo campo: il fuoco va al
     // riquadro, che gli gira i tasti, e non al bottone o al campo del popup.
     const scriveva = scrivibile(prima) && performance.now() - ultimoTasto < STA_SCRIVENDO_MS;
@@ -530,6 +531,9 @@
         okDisabled: !!(okBtn && (okBtn.disabled || okBtn.getAttribute('aria-disabled') === 'true')),
         textScrollTop: textEl ? textEl.scrollTop : 0,
         hasInput: !!q('.sn-confirm-input'),
+        // Un clic o un tasto veri adesso varrebbero: il primo fotogramma può
+        // arrivare ben dopo che il riquadro sta nel DOM (#592.11).
+        pronto: !!(active.pronto && active.pronto()),
         textScrolls: !!(textEl && textEl.scrollHeight > textEl.clientHeight + 1),
         selectionBg,
       };

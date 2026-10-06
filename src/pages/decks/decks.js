@@ -24,6 +24,10 @@
   }
   function send(msg) { return chrome.runtime.sendMessage(msg); }
 
+  // La Partita è uno stub (spec §12): finché il tavolo non c'è nessuna strada ci porta, né il
+  // pulsante né un #/game ripreso da cronologia, sessione o link, perché è un vicolo cieco (#391).
+  const PARTITA_PRONTA = false;
+
   let decks = [];        // cache della lista per la libreria
   let current = null;    // mazzo aperto nel builder
 
@@ -166,7 +170,10 @@
       await renderBuilder(true); // apertura: la chat parte dall'ultimo scambio
       return;
     }
-    if (r.screen === 'game') { show('game'); return; }
+    if (r.screen === 'game') {
+      if (PARTITA_PRONTA) { show('game'); return; }
+      history.replaceState(null, '', '#/');
+    }
     current = null;
     await loadLibrary();
     show('library');
@@ -238,6 +245,14 @@
       const row = document.createElement('div');
       row.className = 'sn-select-option';
       row.textContent = it.label;
+      // Un dato da leggere sotto la voce (la ricerca esatta di una lista, #788): va a capo, non si taglia.
+      if (it.detail) {
+        row.classList.add('dk-ctx-has-detail');
+        const d = document.createElement('code');
+        d.className = 'dk-ctx-detail';
+        d.textContent = it.detail;
+        row.appendChild(d);
+      }
       row.addEventListener('click', (e) => { e.stopPropagation(); closeCtx(); it.run(); });
       pop.appendChild(row);
     }
@@ -265,6 +280,7 @@
       okLabel: 'Elimina',
     });
     if (!ok) return;
+    stopTurnOf(chatByDeck.get(id));
     await send({ type: MSG.DECKS_DELETE, id });
     await loadLibrary();
   }
@@ -285,12 +301,20 @@
   // nei refresh dopo una modifica si rispetta invece la posizione dell'utente.
   async function renderBuilder(stickChat) {
     $('deckNameText').textContent = current.nome;
-    const commander = (current.commanderMeta && current.commanderMeta.name)
-      ? `Commander: ${current.commanderMeta.name}`
-      : 'Nessun commander — impostalo col tasto destro su una carta del mazzo.';
-    const budget = (current.budget !== null && current.budget !== undefined)
-      ? ` · Budget: ${fmtBudgetShort(current.budget)} €` : '';
-    $('commanderLine').textContent = commander + budget;
+    const line = $('commanderLine');
+    const commanderName = current.commander && current.commanderMeta && current.commanderMeta.name;
+    line.textContent = commanderName ? 'Commander: ' : 'Nessun commander. Impostalo col tasto destro su una carta.';
+    if (commanderName) {
+      // Il nome del commander è un nome di carta come gli altri (§5.1): anteprima al passaggio, carosello al clic.
+      const name = document.createElement('span');
+      name.className = 'dk-prose-card';
+      name.dataset.cardId = current.commander;
+      name.textContent = commanderName;
+      line.appendChild(name);
+    }
+    if (current.budget !== null && current.budget !== undefined) {
+      line.appendChild(document.createTextNode(` · Budget: ${fmtBudgetShort(current.budget)} €`));
+    }
     // Suggerisce, senza ingombrare, come tornare indietro (feedback #302).
     $('commanderLine').title = current.commander
       ? 'Tasto destro per rimuovere il commander' : '';
@@ -303,6 +327,7 @@
     renderDeckList();
     renderChat(stickChat);
     renderStats();
+    syncDetailInDeck();
     refreshPrices();
   }
 
@@ -766,30 +791,38 @@
     })));
   }
 
-  // "Imposta come commander" (§8.4): il commander è un PARAMETRO del mazzo,
-  // non una carta dell'elenco — la riga esce dall'elenco.
-  async function makeCommander(cardId) {
+  // Imposta, cambia o toglie (id vuoto) il commander (§8.4): chi esce dall'elenco e chi ci rientra lo decide il main
+  // (Decks.replaceCommander); qui la riga che dice quale carta è tornata nel mazzo, per poterla togliere (#789).
+  async function setCommanderTo(cardId) {
     const r = await send({ type: MSG.DECKS_SET_COMMANDER, id: current.id, scryfallId: cardId });
-    if (!r || !r.ok) return;
+    if (!r || !r.ok) {
+      showToast('Non sono riuscito a cambiare il commander.');
+      return;
+    }
+    if (!current || r.deck.id !== current.id) return;
     current = r.deck;
-    const { deck, removed } = Decks.removeCard(current, cardId);
-    if (removed) await saveDeck(deck);
-    else await renderBuilder();
+    await renderBuilder();
+    if (r.previous) showToast(`${r.previous.name || 'Il commander di prima'} torna nel mazzo come carta normale.`);
   }
+  function makeCommander(cardId) { return setCommanderTo(cardId); }
+  function removeCommander() { return current.commander ? setCommanderTo('') : Promise.resolve(); }
 
-  // Inverso di makeCommander (feedback #302): torna a "nessun commander". Poiché
-  // impostare un commander ne toglie la carta dall'elenco, rimuoverlo la RIMETTE
-  // nel mazzo come carta normale — così non si perde la carta scelta per sbaglio
-  // (il software deve reggere gli errori, non costringere a rifare il mazzo).
-  async function removeCommander() {
-    const prevId = current.commander;
-    if (!prevId) return;
-    const r = await send({ type: MSG.DECKS_SET_COMMANDER, id: current.id, scryfallId: '' });
-    if (!r || !r.ok) return;
-    current = r.deck;
-    const { deck, added } = Decks.addCard(current, prevId);
-    if (added) await saveDeck(deck);
-    else await renderBuilder();
+  // Le azioni su una carta fuori dall'elenco del mazzo (risultati, nomi citati, intestazione, carta grande), le stesse
+  // della riga del mazzo dove hanno senso (§8.3): il commander offre di toglierlo, le altre di entrare, uscire o diventarlo.
+  function cardMenuItems(id, qty = 1) {
+    const card = cardsById[id];
+    const items = id === current.commander
+      ? [{ label: 'Rimuovi commander', run: () => removeCommander() }]
+      : [
+          inDeck(id)
+            ? { label: 'Rimuovi dal mazzo', run: () => { if (inDeck(id)) toggleCard(id); } }
+            : { label: 'Aggiungi al mazzo', run: () => { if (!inDeck(id)) toggleCard(id, qty); } },
+          { label: 'Imposta come commander', run: () => makeCommander(id) },
+        ];
+    if (card && card.scryfallUri) {
+      items.push({ label: 'Apri su Scryfall', run: () => send({ type: MSG.OPEN_URL, url: card.scryfallUri }) });
+    }
+    return items;
   }
 
   // ── Colonna Chat / Risultati (§3): la ricerca È la chat ────────────────────
@@ -803,8 +836,18 @@
   const Chat = window.SN_DECK_CHAT;
   const chatByDeck = new Map(); // deckId → [{ who, text, reply, cardIds, query, error, pending, interrupted, expanded, … }]
   const chatLoading = new Map(); // deckId → lettura in corso
-  // Per conversazione, non globale: svuotata la chat mentre Filo risponde, la nuova è subito libera.
-  const busyChats = new WeakSet();
+  // Per conversazione, non globale: svuotata la chat mentre Filo risponde, la nuova è subito libera. Il turno resta
+  // qui finché la sua bolla non è scritta; arrivata o fermata la risposta, la chat è già dell'utente (chatTaken).
+  const busyChats = new WeakMap(); // conversazione → { bot, reqId, startedAt, stopped, stop }
+  function chatTaken(msgs) {
+    const t = msgs && busyChats.get(msgs);
+    return !!t && !!t.bot.pending;
+  }
+  // Una risposta che nessuno leggerà più (chat svuotata, mazzo eliminato) non si lascia lavorare a pagamento.
+  function stopTurnOf(msgs) {
+    const t = msgs && busyChats.get(msgs);
+    if (t && !t.stopped) t.stop();
+  }
   // Cambiata altrove mentre qui si aspettava Filo: si rilegge appena la risposta è scritta.
   const staleChats = new WeakSet();
   // Chi ha salvato: la scheda che scrive non si rilegge al proprio avviso (DECKS_CHAT_CHANGED).
@@ -905,18 +948,19 @@
       okLabel: 'Svuota',
     });
     if (!ok) return;
+    stopTurnOf(chatByDeck.get(deck.id));
     chatByDeck.set(deck.id, []);
     if (current && current.id === deck.id) renderChat(true);
     await send({ type: MSG.DECKS_CHAT_CLEAR, deckId: deck.id, clientId: chatClientId }).catch(() => {});
   }
 
-  // «Riprova» sull'ultima bolla fallita o interrotta: lo stesso turno rifatto, non una domanda in più.
+  // «Riprova» sull'ultima bolla fallita, interrotta o riuscita solo in parte: lo stesso turno rifatto, non una domanda in più.
   function retryLastTurn() {
     const msgs = chatMsgs();
-    if (busyChats.has(msgs)) return;
+    if (chatTaken(msgs)) return;
     const bot = msgs[msgs.length - 1];
     const user = msgs[msgs.length - 2];
-    if (!bot || bot.who !== 'bot' || !(bot.error || bot.interrupted)) return;
+    if (!bot || bot.who !== 'bot' || !(bot.error || bot.interrupted || bot.stopped || bot.retryable)) return;
     if (!user || user.who !== 'user' || !user.text) return;
     msgs.splice(msgs.length - 2, 2);
     editChat(current.id, { op: 'drop', turn: bot.turn || '', userText: user.text });
@@ -932,18 +976,24 @@
   // detail all'hover, ma è già precaricata (preloadVisibleCards) così è istantanea.
   // `qty` arriva dall'import (§11.2, es. "37 Forest"): il toggle la userà
   // come quantità reale invece del default 1 delle ricerche normali.
-  function chatRowHtml(id, qty) {
+  // `unchecked`: il giudice non l'ha potuta guardare (§4.1), la riga lo dice.
+  function chatRowHtml(id, qty, unchecked) {
     const card = cardsById[id];
     const name = card ? card.name : id;
     const mana = card ? manaHtml(card.manaCost) : '';
     const added = inDeck(id);
     const q = Number(qty) > 1 ? Number(qty) : 0;
-    return `
-      <div class="dk-row" data-card-id="${esc(id)}">
-        <button class="dk-add" data-add="${esc(id)}" data-qty="${q || 1}" data-in="${added ? 1 : 0}"
+    const flag = unchecked ? '<span class="dk-row-flag" title="Non controllata: potrebbe non c\'entrare">?</span>' : '';
+    const addBtn = id === current.commander
+      ? `<button class="dk-add" data-add="${esc(id)}" data-in="cmd" aria-disabled="true"
+                title="È il commander del mazzo" aria-label="${esc(name)} è il commander del mazzo">✓</button>`
+      : `<button class="dk-add" data-add="${esc(id)}" data-qty="${q || 1}" data-in="${added ? 1 : 0}"
                 title="${added ? 'Rimuovi dal mazzo' : 'Aggiungi al mazzo'}"
-                aria-label="${added ? `Rimuovi ${esc(name)} dal mazzo` : `Aggiungi ${esc(name)} al mazzo`}">${added ? '✓' : '+'}</button>
-        <span class="dk-row-name">${q ? `<span class="dk-row-qty">${q}×</span> ` : ''}${esc(name)}</span>
+                aria-label="${added ? `Rimuovi ${esc(name)} dal mazzo` : `Aggiungi ${esc(name)} al mazzo`}">${added ? '✓' : '+'}</button>`;
+    return `
+      <div class="dk-row${unchecked ? ' dk-row-unchecked' : ''}" data-card-id="${esc(id)}">
+        ${addBtn}
+        <span class="dk-row-name">${q ? `<span class="dk-row-qty">${q}×</span> ` : ''}${esc(name)}</span>${flag}
         <span class="dk-row-mana">${mana}</span>
       </div>`;
   }
@@ -978,45 +1028,59 @@
       </div>`;
   }
 
+  // Bolla in attesa: la frase del modello appena c'è, e la fase della ricerca con quante carte su quante (#382).
+  function progressHtml(p) {
+    if (!p || !(p.total > 0)) return '<div class="dk-msg-pending">Filo sta pensando…</div>';
+    const n = (x) => Number(x).toLocaleString('it-IT');
+    const done = Math.min(Number(p.done) || 0, p.total);
+    const label = p.fase === 'controllo'
+      ? `Controllo una per una le ${n(p.total)} carte trovate…`
+      : 'Cerco le carte su Scryfall…';
+    const pct = Math.round((done / p.total) * 100);
+    return `${p.reply ? `<p class="dk-msg-text">${proseHtml(p.reply)}</p>` : ''}
+      <div class="dk-msg-pending dk-progress" role="status">
+        <span>${esc(label)}</span><span class="dk-progress-n">${n(done)} di ${n(p.total)}</span>
+        <span class="dk-progress-bar" aria-hidden="true"><span style="width:${pct}%"></span></span>
+      </div>`;
+  }
+
   function chatBubbleHtml(m, isLast) {
     if (m.who === 'user') return `<div class="dk-msg dk-msg-user">${esc(m.text)}</div>`;
-    if (m.pending) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-pending">Filo sta pensando…</div></div>`;
+    if (m.pending) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}${progressHtml(m.progress)}</div>`;
     // Solo l'ultima bolla si riprova: rifarne una in mezzo metterebbe la risposta fuori posto.
     const retry = isLast ? '<button class="dk-retry" data-retry="1" title="Rimanda la stessa domanda">↻ Riprova</button>' : '';
     if (m.interrupted) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-pending">Risposta interrotta. La pagina si è chiusa prima che Filo finisse.</div>${retry}</div>`;
+    if (m.stopped) return `<div class="dk-msg dk-msg-bot dk-msg-stopped" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-pending">Risposta fermata.</div>${retry}</div>`;
     if (m.error) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}<div class="dk-msg-error">Non ha funzionato: ${esc(m.error)}</div>${retry}</div>`;
     const parts = [cotHtml(m)];
     if (m.reply) parts.push(`<p class="dk-msg-text">${proseHtml(m.reply)}</p>`);
+    // Sopra la lista: con decine di righe, sotto non lo vedrebbe nessuno.
+    if (m.retryable) parts.push(retry);
     if (m.clearChat) {
       parts.push('<button class="dk-retry" data-clear-chat="1" title="Chiede conferma, poi svuota la chat di questo mazzo">Svuota la chat…</button>');
     } else if (m.cardIds && m.cardIds.length) {
-      const n = m.cardIds.length;
-      const label = m.query ? `per "${m.query}"` : '';
+      const label = Chat.listLabel(m.cardIds.length, m.title);
       // Le righe di una lista chiusa non si disegnano: una chat salvata cresce di sessione in sessione, e
-      // renderChat gira a ogni pezzo di ragionamento.
-      const open = isLast || m.expanded;
-      // CMC crescente, il default di ordinamento delle liste (§3.4).
-      const ids = !open ? [] : [...m.cardIds].sort((a, b) => {
-        const ca = Number(cardsById[a] && cardsById[a].cmc) || 0;
-        const cb = Number(cardsById[b] && cardsById[b].cmc) || 0;
-        return ca - cb;
-      });
+      // renderChat gira a ogni pezzo di ragionamento. Senza una scelta dell'utente è aperta solo l'ultima (§3.3).
+      const open = m.expanded === undefined ? isLast : !!m.expanded;
+      const ids = open ? Chat.sortIds(m.cardIds, cardsById, m.sort) : [];
       // Import via chat (§11.2): oltre al toggle per riga, un bottone che
       // aggiunge/aggiorna TUTTE le carte riconosciute in un colpo solo — con
       // 100 carte di una lista incollata, cliccare riga per riga è attrito
       // puro. Resta comunque una conferma esplicita, mai automatica.
+      const unchecked = new Set(open && Array.isArray(m.uncheckedIds) ? m.uncheckedIds : []);
       const importDone = open && !!m.importQty && !importAllWouldChange(m);
       const importAllHtml = open && m.importQty
         ? `<button class="dk-import-all" data-import-all="1" ${importDone ? 'disabled' : ''}>${importDone ? 'Aggiunte ✓' : 'Aggiungi tutte al mazzo'}</button>`
         : '';
       parts.push(`
-        <button class="dk-list-summary" data-toggle-list="1" aria-expanded="${open ? 'true' : 'false'}">
+        <button class="dk-list-summary" data-toggle-list="1" aria-expanded="${open ? 'true' : 'false'}" title="${esc(label)}">
           <span>${open ? '▾' : '▸'}</span>
-          <span>${n} risultat${n === 1 ? 'o' : 'i'} ${esc(label)}</span>
+          <span class="dk-list-title">${esc(label)}</span>
         </button>
-        <div class="dk-cardlist" ${open ? '' : 'hidden'}>${open ? importAllHtml + ids.map((id) => chatRowHtml(id, m.importQty && m.importQty[id])).join('') : ''}</div>`);
+        <div class="dk-cardlist" ${open ? '' : 'hidden'}>${open ? importAllHtml + ids.map((id) => chatRowHtml(id, m.importQty && m.importQty[id], unchecked.has(id))).join('') : ''}</div>`);
     } else if (!m.reply) {
-      parts.push(`<p class="dk-msg-text dk-msg-pending">Nessun risultato${m.query ? ` per "${esc(m.query)}"` : ''}.</p>`);
+      parts.push('<p class="dk-msg-text dk-msg-pending">Nessun risultato.</p>');
     }
     return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${parts.join('')}</div>`;
   }
@@ -1076,6 +1140,7 @@
     log.scrollTop = follow ? log.scrollHeight : prevTop;
     syncCarouselHighlight();
     preloadVisibleCards();
+    syncWait();
   }
 
   // Mentre il ragionamento scorre cambia solo la bolla che aspetta: si rifà quella, senza ricalcolare le altre.
@@ -1105,11 +1170,44 @@
     if (d) d.html = '';
   }
 
+  // L'attesa della chat del mazzo aperto (#792): da quanto dura e il tasto per fermarla, nel campo di scrittura, che
+  // non si ridisegna mai (le bolle sì, a ogni pezzo di ragionamento, e un clic a metà ridisegno andrebbe perso).
+  let waitTick = 0;
+  function syncWait() {
+    const msgs = current && !$('screenBuilder').hidden ? chatByDeck.get(current.id) : null;
+    const t = chatTaken(msgs) ? busyChats.get(msgs) : null;
+    const box = $('chatWait');
+    if (!box) return;
+    box.hidden = !t;
+    $('chatForm').classList.toggle('dk-busy', !!t);
+    if (t) $('chatWaitTime').textContent = window.SN_TIME.fmtCountdown((Date.now() - t.startedAt) / 1000);
+    if (t && !waitTick) waitTick = setInterval(syncWait, 1000);
+    else if (!t && waitTick) { clearInterval(waitTick); waitTick = 0; }
+  }
+
+  function stopChat() {
+    if (!current) return;
+    stopTurnOf(chatByDeck.get(current.id));
+    const input = $('chatInput');
+    if (input && !$('screenBuilder').hidden) input.focus();
+  }
+
+  // Invio con la chat occupata: il messaggio resta nel campo e il tasto Ferma si fa vedere, che è lui a tenerla.
+  let nudgeTimer = 0;
+  function nudgeStop() {
+    const btn = $('chatStop');
+    if (!btn) return;
+    btn.classList.remove('dk-nudge');
+    void btn.offsetWidth;
+    btn.classList.add('dk-nudge');
+    clearTimeout(nudgeTimer);
+    nudgeTimer = setTimeout(() => btn.classList.remove('dk-nudge'), 900);
+  }
+
   async function sendChat(text) {
     const deckId = current.id;
     const msgs = chatMsgs();
-    if (busyChats.has(msgs)) return;
-    busyChats.add(msgs);
+    if (chatTaken(msgs)) return;
     // Le bolle precedenti tornano collassate quando arriva un nuovo scambio (§3.3).
     for (const m of msgs) m.expanded = false;
     // La cronologia per l'agente si costruisce PRIMA di accodare il nuovo turno.
@@ -1120,20 +1218,24 @@
     const lastResults = lastList ? [...lastList.cardIds] : [];
     const user = { who: 'user', text };
     const bot = { who: 'bot', pending: true, turn: newTurnId() };
+    // Ragionamento in diretta (#331): mentre il modello pensa, i chunk di CoT
+    // arrivano sul canale filo:reasoning e riempiono la bolla "sta pensando"
+    // (render con throttle: i chunk possono essere fitti). Lo stesso id ferma il turno nel main (#792).
+    const reasoningReqId = `dk${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const turno = { bot, reqId: reasoningReqId, startedAt: Date.now(), stopped: false, stop: null };
+    busyChats.set(msgs, turno);
     msgs.push(user, bot);
     // Salvata subito: chi chiude la pagina adesso ritrova la domanda, con la risposta segnata come interrotta.
     // Oltre il tetto il main la rifiuta: la pagina lo dice (renderChat), la conversazione continua qui.
     editChat(deckId, { op: 'append', messages: [user, bot] });
     renderChat(true); // nuovo turno: porta la vista in fondo per mostrarlo
-    // Ragionamento in diretta (#331): mentre il modello pensa, i chunk di CoT
-    // arrivano sul canale filo:reasoning e riempiono la bolla "sta pensando"
-    // (render con throttle: i chunk possono essere fitti).
-    const reasoningReqId = `dk${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     let cotRenderTimer = 0;
     const offReasoning = (window.filo && window.filo.onReasoning)
       ? window.filo.onReasoning((data) => {
-          if (!data || data.reqId !== reasoningReqId || !data.text || !bot.pending) return;
-          bot.reasoning = (bot.reasoning || '') + data.text;
+          if (!data || data.reqId !== reasoningReqId || !bot.pending) return;
+          if (data.progress) bot.progress = data.progress;
+          else if (data.text) bot.reasoning = (bot.reasoning || '') + data.text;
+          else return;
           if (!cotRenderTimer) {
             cotRenderTimer = setTimeout(() => {
               cotRenderTimer = 0;
@@ -1142,60 +1244,154 @@
           }
         })
       : null;
+    const stopListening = () => {
+      if (offReasoning) offReasoning();
+      if (cotRenderTimer) { clearTimeout(cotRenderTimer); cotRenderTimer = 0; }
+    };
+    const onScreen = () => current && !$('screenBuilder').hidden;
+    // La risposta entra al posto del SUO turno nella chat salvata: svuotata nel frattempo (qui o altrove), non
+    // rientra. Solo dopo il turno lascia la conversazione, così un avviso arrivato intanto la fa rileggere dal salvato.
+    const saveAndRelease = async () => {
+      await editChat(deckId, { op: 'fill', turn: bot.turn, message: bot });
+      if (busyChats.get(msgs) !== turno) return;
+      busyChats.delete(msgs);
+      if (staleChats.has(msgs)) {
+        staleChats.delete(msgs);
+        await rereadChat(deckId, msgs);
+      }
+    };
+    // «Ferma» (#792): la chat torna subito dell'utente e il main spegne la chiamata al modello. Nessuna modifica al
+    // mazzo: il main la scrive solo a risposta arrivata.
+    turno.stop = () => {
+      if (turno.stopped || !bot.pending) return;
+      turno.stopped = true;
+      bot.pending = false;
+      bot.stopped = true;
+      // Chi ferma ha visto qualcosa che non gli torna: il ragionamento resta aperto dov'era.
+      if (bot.reasoning && bot.cotOpen === undefined) bot.cotOpen = true;
+      stopListening();
+      send({ type: MSG.DECKS_CHAT_STOP, reqId: reasoningReqId }).catch(() => {});
+      if (onScreen() && chatByDeck.get(current.id) === msgs) renderChat();
+      syncWait();
+      saveAndRelease();
+    };
+    syncWait();
     let deckChanged = false;
     let wantsClear = false;
+    let r = null;
+    let failure = null;
     try {
-      const r = await send({ type: MSG.DECKS_CHAT, deckId, text, history, lastResults, reasoningReqId });
-      bot.pending = false;
-      // Il testo completo del ragionamento torna con la risposta (anche in
-      // caso d'errore): è la versione autoritativa rispetto ai chunk live.
-      if (r && r.reasoning) bot.reasoning = r.reasoning;
-      if (!r || !r.ok) {
-        bot.error = (r && r.error) || 'nessuna risposta';
-      } else {
-        bot.reply = r.reply || '';
-        bot.cardIds = r.cardIds || [];
-        bot.query = r.query || '';
-        // Import via chat (§11.2): quantità reali per riga (basics tipo
-        // "37 Forest") + eventuale commander candidato, per il bottone
-        // "Aggiungi tutte" e per il toggle per riga.
-        if (r.importPending) {
-          bot.importQty = r.importPending.qtyById || {};
-          bot.importCommanderId = r.importPending.commanderId || '';
-        }
-        Object.assign(cardsById, r.cards || {});
-        // La chat può aver calcolato pareri nuovi ("valuta il mazzo", §6.1):
-        // la cache di pagina si svuota così il prossimo hover legge dal main
-        // i pareri freschi invece di mostrare quelli vecchi.
-        opinionsByCard.clear();
-        // La chat può aver modificato il mazzo (es. budget, §9.2): il mazzo
-        // aggiornato torna nella risposta → header e statistiche si rinfrescano.
-        if (r.deck && current && r.deck.id === current.id) { current = r.deck; deckChanged = true; }
-        // «Svuota la chat» chiesto a parole: stessa conferma della gomma, dopo aver mostrato la risposta. La bolla
-        // tiene il tasto: se la conferma non arriva adesso (Annulla, mazzo lasciato), la richiesta resta lì.
-        wantsClear = !!r.clearChat;
-        if (wantsClear) bot.clearChat = true;
-      }
+      r = await send({ type: MSG.DECKS_CHAT, deckId, text, history, lastResults, reasoningReqId });
     } catch (e) {
-      bot.pending = false;
-      bot.error = (e && e.message) || 'errore di rete';
+      failure = e;
     }
-    if (offReasoning) offReasoning();
-    if (cotRenderTimer) { clearTimeout(cotRenderTimer); cotRenderTimer = 0; }
-    const onScreen = () => current && !$('screenBuilder').hidden;
+    // Fermata: la bolla l'ha già detto e la chat è già libera. Una risposta che il main aveva già finito di scrivere
+    // nel mazzo arriva lo stesso, perché il mazzo è cambiato e la bolla deve dire come.
+    if (turno.stopped && !(r && r.ok)) return;
+    stopListening();
+    bot.pending = false;
+    bot.stopped = false;
+    // Il testo completo del ragionamento torna con la risposta (anche in
+    // caso d'errore): è la versione autoritativa rispetto ai chunk live.
+    if (r && r.reasoning) bot.reasoning = r.reasoning;
+    if (failure) {
+      bot.error = (failure && failure.message) || 'errore di rete';
+    } else if (r && r.stopped) {
+      bot.stopped = true;
+    } else if (!r || !r.ok) {
+      bot.error = (r && r.error) || 'nessuna risposta';
+    } else {
+      bot.reply = r.reply || '';
+      bot.cardIds = r.cardIds || [];
+      bot.query = r.query || '';
+      if (r.title) bot.title = r.title;
+      // L'ordine chiesto a parole vale per la lista di questa risposta, o senza carte nuove per quella di prima.
+      if (Chat.SORTS.includes(r.sort)) {
+        if (bot.cardIds.length) setListSort(deckId, bot, r.sort, false);
+        else if (lastList && msgs.includes(lastList)) setListSort(deckId, lastList, r.sort, true);
+      }
+      if (Array.isArray(r.uncheckedIds) && r.uncheckedIds.length) bot.uncheckedIds = r.uncheckedIds;
+      if (r.retryable) bot.retryable = true;
+      // Import via chat (§11.2): quantità reali per riga (basics tipo
+      // "37 Forest") + eventuale commander candidato, per il bottone
+      // "Aggiungi tutte" e per il toggle per riga.
+      if (r.importPending) {
+        bot.importQty = r.importPending.qtyById || {};
+        bot.importCommanderId = r.importPending.commanderId || '';
+      }
+      Object.assign(cardsById, r.cards || {});
+      // La chat può aver calcolato pareri nuovi ("valuta il mazzo", §6.1):
+      // la cache di pagina si svuota così il prossimo hover legge dal main
+      // i pareri freschi invece di mostrare quelli vecchi.
+      opinionsByCard.clear();
+      // La chat può aver modificato il mazzo (es. budget, §9.2): il mazzo
+      // aggiornato torna nella risposta → header e statistiche si rinfrescano.
+      if (r.deck && current && r.deck.id === current.id) { current = r.deck; deckChanged = true; }
+      // «Svuota la chat» chiesto a parole: stessa conferma della gomma, dopo aver mostrato la risposta. La bolla
+      // tiene il tasto: se la conferma non arriva adesso (Annulla, mazzo lasciato), la richiesta resta lì.
+      wantsClear = !!r.clearChat && !turno.stopped;
+      if (wantsClear) bot.clearChat = true;
+    }
+    turno.stopped = false;
     if (onScreen()) {
       if (deckChanged) await renderBuilder();
       else renderChat();
     }
-    // La risposta entra al posto del SUO turno nella chat salvata: svuotata nel frattempo (qui o altrove), non
-    // rientra. Solo dopo la scheda è libera, così un avviso arrivato intanto la fa rileggere dal salvato.
-    await editChat(deckId, { op: 'fill', turn: bot.turn, message: bot });
-    busyChats.delete(msgs);
-    if (staleChats.has(msgs)) {
-      staleChats.delete(msgs);
-      await rereadChat(deckId, msgs);
-    }
+    await saveAndRelease();
+    syncWait();
     if (wantsClear && onScreen() && current.id === deckId && chatByDeck.get(deckId) === msgs) clearChat();
+  }
+
+  // Tasto destro sulla riga di sintesi di una lista (#788): la ricerca esatta, l'ordinamento, la stessa ricerca su
+  // Scryfall. Una lista senza ricerca (import, carte da un altro mazzo) ha solo l'ordinamento.
+  const LIST_SORT_LABELS = { cmc: 'Ordina per costo di mana', name: 'Ordina per nome', price: 'Ordina per prezzo' };
+  const SCRYFALL_ORDER = { cmc: 'cmc', name: 'name', price: 'eur' };
+  function listMenuItems(m) {
+    const cur = m.sort || Chat.SORTS[0];
+    const items = [];
+    if (m.query) items.push({ label: 'Copia la ricerca', detail: m.query, run: () => copyText(m.query, 'Ricerca copiata.') });
+    for (const key of Chat.SORTS) {
+      items.push({ label: LIST_SORT_LABELS[key] + (key === cur ? ' ✓' : ''), run: () => sortList(m, key) });
+    }
+    if (m.query) {
+      const url = `https://scryfall.com/search?q=${encodeURIComponent(m.query)}&order=${SCRYFALL_ORDER[cur]}&dir=asc`;
+      items.push({ label: 'Apri la ricerca su Scryfall', run: () => send({ type: MSG.OPEN_URL, url }) });
+    }
+    return items;
+  }
+
+  // L'ordine scelto è della lista, e si salva con lei. Una lista chiusa si apre: chi la riordina la vuole vedere.
+  function sortList(m, sort) {
+    if (!current) return;
+    const msgs = chatMsgs();
+    const target = (m.turn && msgs.find((x) => x.who === 'bot' && x.turn === m.turn)) || m;
+    if (!msgs.includes(target)) return;
+    setListSort(current.id, target, sort, true);
+    renderChat();
+  }
+
+  // `save`: la lista è già scritta nella chat salvata. Quella di una risposta in arrivo si salva col suo turno.
+  function setListSort(deckId, m, sort, save) {
+    if (sort === Chat.SORTS[0]) delete m.sort; else m.sort = sort;
+    m.expanded = true;
+    if (save && m.turn) editChat(deckId, { op: 'sort', turn: m.turn, sort });
+  }
+
+  async function copyText(text, done) {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (_) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
+      document.body.appendChild(ta);
+      ta.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (_) { /* resta il messaggio sotto */ }
+      ta.remove();
+      if (!ok) { showToast('Non sono riuscito a copiare.'); return; }
+    }
+    showToast(done);
   }
 
   // Toggle aggiungi/rimuovi dalla riga della CardList (§3.4): la carta entra
@@ -1203,6 +1399,8 @@
   // dall'import via chat (§11.2, es. basics con "×37"): default 1 per le
   // ricerche normali.
   async function toggleCard(cardId, qty = 1) {
+    // Il commander sta nell'intestazione, non anche fra le 99 (§8.4): nessuna strada lo duplica nell'elenco.
+    if (cardId === current.commander) return;
     const adding = !inDeck(cardId);
     const { deck, added } = adding
       ? Decks.addCard(current, cardId, { qty })
@@ -1247,12 +1445,23 @@
     }
     await renderBuilder();
     const total = addedCount + updatedCount + (commanderSet ? 1 : 0);
-    showToast(total ? `Aggiunte ${total} cart${total === 1 ? 'a' : 'e'} al mazzo.` : 'Nessuna carta nuova da aggiungere.');
+    // Il commander della lista resta fuori se il mazzo ne ha già un altro: l'avviso lo nomina (#789).
+    const skipped = m.importCommanderId && !commanderSet && current.commander !== m.importCommanderId
+      ? ` ${(cardsById[m.importCommanderId] && cardsById[m.importCommanderId].name) || 'Il commander della lista'} non è diventato commander: il mazzo ha già il suo.`
+      : '';
+    showToast((total ? `${total === 1 ? 'Aggiunta 1 carta' : `Aggiunte ${total} carte`} al mazzo.` : 'Nessuna carta nuova da aggiungere.') + skipped);
   }
 
   // Toast discreto in basso a destra (conferme di import/export non
-  // bloccanti): stesso pattern del toast dell'editor.
-  let dkToastTimer = null;
+  // bloccanti): stesso pattern del toast dell'editor. Tempi in avvisiTempo.js.
+  const dkToastTempi = window.SN_AVVISI.orologio();
+  let dkToastTempo = null;
+  function hideToast(el) {
+    if (dkToastTempo) dkToastTempo.annulla();
+    dkToastTempo = null;
+    el.classList.remove('show');
+    dkToastTempi.lascia(el);
+  }
   function showToast(text) {
     let el = document.getElementById('dkToast');
     if (!el) {
@@ -1260,13 +1469,20 @@
       el.id = 'dkToast';
       el.className = 'dk-toast';
       el.setAttribute('role', 'status');
+      el.addEventListener('click', () => {
+        const sel = document.getSelection();
+        if (sel && !sel.isCollapsed && el.contains(sel.anchorNode)) return;
+        hideToast(el);
+      });
+      dkToastTempi.segui(el);
+      window.SN_AVVISI.chiudibile(el, () => hideToast(el));
       document.body.appendChild(el);
     }
     el.textContent = text;
     void el.offsetWidth;
     el.classList.add('show');
-    clearTimeout(dkToastTimer);
-    dkToastTimer = setTimeout(() => el.classList.remove('show'), 3400);
+    if (dkToastTempo) dkToastTempo.annulla();
+    dkToastTempo = dkToastTempi.avvia(window.SN_AVVISI.durata(3400), () => hideToast(el));
   }
 
   // ── Import/Export rigido (§11), via switcher ────────────────────────────────
@@ -1384,7 +1600,7 @@
         closeIoOverlay();
         await renderBuilder();
         const total = res.addedCount + res.updatedCount;
-        showToast(`Importate ${total} cart${total === 1 ? 'a' : 'e'}${res.updatedCount ? ` (${res.updatedCount} aggiornate)` : ''}.`);
+        showToast(`${total === 1 ? 'Importata 1 carta' : `Importate ${total} carte`}${res.updatedCount ? ` (${res.updatedCount} aggiornat${res.updatedCount === 1 ? 'a' : 'e'})` : ''}.`);
       } else {
         showToast('Import non riuscito.');
         applyBtn.disabled = false;
@@ -1644,9 +1860,8 @@
     for (const t of (entry && entry.tags) || []) {
       parts.push(`<span class="dk-tag">${esc(t)}</span>`);
     }
-    if (entry || card.id === current.commander) {
-      parts.push('<span class="dk-indeck">✓ già nel mazzo</span>');
-    }
+    if (card.id === current.commander) parts.push('<span class="dk-indeck">✓ commander</span>');
+    else if (entry) parts.push('<span class="dk-indeck">✓ già nel mazzo</span>');
     $('previewCtx').innerHTML = parts.join('');
   }
 
@@ -1757,11 +1972,7 @@
     const card = cardsById[id];
     paintCardImage($('carouselImg'), card || null);
     $('carouselPos').textContent = `${carousel.i + 1}/${carousel.ids.length}`;
-    const added = inDeck(id);
-    const btn = $('carouselToggle');
-    btn.dataset.in = added ? '1' : '0';
-    btn.textContent = added ? '✓ nel mazzo' : '+ aggiungi';
-    btn.title = added ? 'Rimuovi dal mazzo (Invio)' : 'Aggiungi al mazzo (Invio)';
+    syncCarouselToggle();
     // Prefetch di precedente e successiva (§5.1): la navigazione non aspetta.
     // Stesso warm-up (dedup) del precarico delle righe visibili.
     preloadCardImages([carousel.ids[carousel.i - 1], carousel.ids[carousel.i + 1]].filter(Boolean));
@@ -1775,6 +1986,24 @@
       requestOpinions(near).catch(() => {});
     }
     syncCarouselHighlight();
+  }
+
+  function syncCarouselToggle() {
+    const id = carousel.ids[carousel.i];
+    const added = inDeck(id);
+    const isCommander = id === current.commander;
+    const btn = $('carouselToggle');
+    btn.dataset.in = isCommander ? 'cmd' : (added ? '1' : '0');
+    btn.setAttribute('aria-disabled', isCommander ? 'true' : 'false');
+    btn.textContent = isCommander ? '✓ commander' : (added ? '✓ nel mazzo' : '+ aggiungi');
+    btn.title = isCommander ? 'È il commander del mazzo' : (added ? 'Rimuovi dal mazzo (Invio)' : 'Aggiungi al mazzo (Invio)');
+  }
+
+  // Lo stato «nel mazzo / commander» del dettaglio segue il mazzo da qualunque strada cambi (menu, chat, righe),
+  // senza ridipingere l'immagine (resterebbe girata sul retro).
+  function syncDetailInDeck() {
+    if (detailState === 'carousel' && carousel) syncCarouselToggle();
+    else if (detailState === 'preview') { const card = currentDetailCard(); if (card) renderDetailCtx(card); }
   }
 
   function carouselNav(delta) {
@@ -1882,6 +2111,15 @@
     $('carouselFlip').addEventListener('click', (e) => { e.stopPropagation(); flipCardImage($('carouselImg')); });
     $('previewImg').addEventListener('click', () => flipCardImage($('previewImg')));
     $('carouselImg').addEventListener('click', () => flipCardImage($('carouselImg')));
+    // Tasto destro sulla carta grande (§8.3): le stesse azioni della riga da cui è arrivata, commander compreso.
+    const openCardImageMenu = (e) => {
+      const card = current && currentDetailCard();
+      if (!card) return;
+      e.preventDefault();
+      openCtx(e.clientX, e.clientY, cardMenuItems(card.id));
+    };
+    $('previewImg').addEventListener('contextmenu', openCardImageMenu);
+    $('carouselImg').addEventListener('contextmenu', openCardImageMenu);
 
     // Tasto destro sul box modulare (§5.2): scelta del modulo dello slot —
     // vale sia per la preview sia per il carosello (stesso sistema moduli).
@@ -1978,6 +2216,7 @@
         okLabel: 'Elimina',
       });
       if (!ok) return;
+      stopTurnOf(chatByDeck.get(current.id));
       await send({ type: MSG.DECKS_DELETE, id: current.id });
       location.hash = '#/';
     });
@@ -2023,6 +2262,7 @@
       const res = await send({ type: MSG.DECKS_CREATE });
       if (res && res.ok) location.hash = `#/deck/${encodeURIComponent(res.deck.id)}`;
     });
+    $('openGame').hidden = !PARTITA_PRONTA;
     $('openGame').addEventListener('click', () => { location.hash = '#/game'; });
     $('backToLibrary').addEventListener('click', () => { location.hash = '#/'; });
     $('gameBack').addEventListener('click', () => { location.hash = '#/'; });
@@ -2050,13 +2290,16 @@
 
     $('deckName').addEventListener('click', (e) => { e.stopPropagation(); openSwitcher(); });
     // Svuota la chat del mazzo: icona nell'intestazione della chat, tasto destro sulla stessa intestazione e voce
-    // del menu del mazzo fanno la stessa cosa (clearChat, con conferma).
+    // del menu del mazzo fanno la stessa cosa (clearChat, con conferma). Mentre Filo risponde, il tasto destro su
+    // intestazione e bolla in attesa ferma come «Ferma» ed Esc (#792).
     $('chatClear').innerHTML = (window.SN_ICONS && window.SN_ICONS.eraser && window.SN_ICONS.eraser(15)) || '⌫';
     $('chatClear').addEventListener('click', () => clearChat());
+    const stopItem = { label: 'Ferma la risposta', run: () => stopChat() };
     $('chatHead').addEventListener('contextmenu', (e) => {
-      if (!current || !(chatByDeck.get(current.id) || []).length) return;
+      const msgs = current && chatByDeck.get(current.id);
+      if (!msgs || !msgs.length) return;
       e.preventDefault();
-      openCtx(e.clientX, e.clientY, [{ label: 'Svuota la chat…', run: () => clearChat() }]);
+      openCtx(e.clientX, e.clientY, [...(chatTaken(msgs) ? [stopItem] : []), { label: 'Svuota la chat…', run: () => clearChat() }]);
     });
     if (chrome.runtime.onMessage && chrome.runtime.onMessage.addListener) {
       chrome.runtime.onMessage.addListener(onChatChangedElsewhere);
@@ -2067,9 +2310,10 @@
     $('commanderLine').addEventListener('contextmenu', (e) => {
       if (!current || !current.commander) return;
       e.preventDefault();
-      openCtx(e.clientX, e.clientY, [
-        { label: 'Rimuovi commander', run: () => removeCommander() },
-      ]);
+      openCtx(e.clientX, e.clientY, cardMenuItems(current.commander));
+    });
+    $('commanderLine').addEventListener('click', (e) => {
+      if (current && current.commander && e.target.closest('.dk-prose-card')) openCarousel([current.commander], 0);
     });
     wireDividers();
     wireDetailPanel();
@@ -2080,10 +2324,18 @@
       e.preventDefault();
       const input = $('chatInput');
       const text = input.value.trim();
-      if (!text || busyChats.has(chatMsgs())) return;
+      if (chatTaken(chatMsgs())) { nudgeStop(); return; }
+      if (!text) return;
       input.value = '';
       sendChat(text);
     });
+    // Esc nel campo ferma la risposta come il tasto: è il gesto di chi vuole uscire da un'attesa (#792).
+    $('chatInput').addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || !current || !chatTaken(chatByDeck.get(current.id))) return;
+      e.preventDefault();
+      stopChat();
+    });
+    $('chatStop').addEventListener('click', stopChat);
     const log = $('chatLog');
     // Toggle del blocco Ragionamento (#331): click (o Invio/Spazio) apre e
     // chiude. Vale per bolle normali, pending e d'errore.
@@ -2107,7 +2359,7 @@
       if (sum) {
         const bubble = sum.closest('[data-msg-i]');
         const m = chatMsgs()[Number(bubble.dataset.msgI)];
-        if (m) { m.expanded = !(m.expanded || sum.getAttribute('aria-expanded') === 'true'); renderChat(); }
+        if (m) { m.expanded = sum.getAttribute('aria-expanded') !== 'true'; renderChat(); }
         return;
       }
       // Click su una riga risultato → carosello sulla lista di QUELLA bolla (§5.3).
@@ -2128,6 +2380,39 @@
     log.addEventListener('mouseover', (e) => {
       const span = e.target.closest('.dk-prose-card');
       if (span) resolveProseCard(span);
+    });
+    // Tasto destro su un risultato o su un nome citato (§8.3): le stesse azioni della carta, compreso il commander.
+    log.addEventListener('contextmenu', async (e) => {
+      const sum = e.target.closest('[data-toggle-list]');
+      if (sum) {
+        const bubble = sum.closest('[data-msg-i]');
+        const m = bubble && chatMsgs()[Number(bubble.dataset.msgI)];
+        if (!m || !m.cardIds || !m.cardIds.length) return;
+        e.preventDefault();
+        openCtx(e.clientX, e.clientY, listMenuItems(m));
+        return;
+      }
+      const row = e.target.closest('.dk-row[data-card-id]');
+      if (row) {
+        e.preventDefault();
+        const btn = row.querySelector('[data-add]');
+        openCtx(e.clientX, e.clientY, cardMenuItems(row.dataset.cardId, Number(btn && btn.dataset.qty) || 1));
+        return;
+      }
+      const span = e.target.closest('.dk-prose-card');
+      if (!span) {
+        const bubble = e.target.closest('[data-msg-i]');
+        const msgs = current && chatByDeck.get(current.id);
+        const m = bubble && msgs && msgs[Number(bubble.dataset.msgI)];
+        if (!m || !m.pending || !chatTaken(msgs)) return;
+        e.preventDefault();
+        openCtx(e.clientX, e.clientY, [stopItem]);
+        return;
+      }
+      e.preventDefault();
+      const deckId = current && current.id;
+      const id = await resolveProseCard(span).catch(() => null);
+      if (id && current && current.id === deckId) openCtx(e.clientX, e.clientY, cardMenuItems(id));
     });
 
     // Colonna mazzo: collassa/espandi i gruppi al click sul divisore.

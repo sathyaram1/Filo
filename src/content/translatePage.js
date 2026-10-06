@@ -104,6 +104,9 @@
   // si buttano via, invece di scaricarsi addosso a una pagina che l'utente ha
   // appena riportato indietro (#407).
   let runSeq = 0;
+  // La riga del ripiego sui crediti di Filo (#662): la pagina tradotta non ha un riquadro sotto cui
+  // scriverla, la dice un avviso al primo pezzo pagato così (a fine giro si perde chi lascia la pagina prima).
+  let ripiegoDelGiro = '';
   // L'avviso "sto traducendo" del giro in corso. Serve a chi lo FERMA: le
   // richieste già spedite tornano quando vogliono, e finché non tornano il
   // riquadro "Traduzione pagina in corso…" resterebbe sullo schermo accanto a
@@ -153,6 +156,7 @@
       return;
     }
     pageTranslating = true;
+    ripiegoDelGiro = '';
     const myRun = ++runSeq;
     const aborted = () => myRun !== runSeq;
     // L'avviso "sto traducendo" dura quanto la traduzione e viene SOSTITUITO
@@ -729,9 +733,14 @@
           type: MSG.AI_REQUEST,
           action: ACTIONS.TRANSLATE_PAGE,
           payload: { chunk },
+          diceRipiego: true,
         });
       } catch (e) {
         res = { ok: false, error: (e && e.message) || '', code: (e && e.code) || '' };
+      }
+      if (res?.ok && res.keyFallback && res.keyFallback.line && !ripiegoDelGiro) {
+        ripiegoDelGiro = res.keyFallback.line;
+        Popup.ripiegoMostrato(Popup.showToast(ripiegoDelGiro, { duration: 7000 }).el);
       }
       if (res?.ok && String(res.text || '').trim()) return { ok: true, text: res.text };
       answeredEmpty = !!(res && res.ok);

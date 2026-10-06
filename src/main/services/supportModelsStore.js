@@ -31,6 +31,7 @@
 //     judgeDynamic:  "flash",
 //     judgeRedTeam:  "flash",
 //     judgePriority: "flash",
+//     manageSearch:  "flash",   // ricerca fra i feedback: gira nell'app dell'owner
 //     judgeRegistry: { "<nick>": { provider: "openrouter", model: "...", label?: "..." } },
 //   }
 
@@ -48,7 +49,11 @@ const JUDGE_SECRETS_DOC = 'config/judgeSecrets';
 // I 3 giudici fissi del panel L2 + il giudice dinamico hanno ciascuno il proprio
 // slot (judge1/judge2/judge3/judgeDynamic). Il vecchio slot unico `judgeL2`,
 // non letto da nessuno, è stato rimosso.
-const SLOTS = ['sanitizer', 'judge1', 'judge2', 'judge3', 'judgeDynamic', 'judgeRedTeam', 'judgePriority'];
+const SLOTS = ['sanitizer', 'judge1', 'judge2', 'judge3', 'judgeDynamic', 'judgeRedTeam', 'judgePriority', 'manageSearch'];
+
+// Slot spostati qui dalle Opzioni (#465): campo assente nel doc = null, e vale ancora la scelta di
+// prima; una stringa vuota invece è una scelta (nessun modello).
+const SLOTS_SPOSTATI = ['manageSearch'];
 
 // Timeout per giudice, salvato in MILLISECONDI nel campo `judgeTimeoutMs` dello
 // stesso doc (lo legge il backend dei giudici). I bound vivono nelle costanti
@@ -291,7 +296,7 @@ async function update(partial, idToken) {
 }
 
 function emptyModels() {
-  const out = Object.fromEntries(SLOTS.map((s) => [s, '']));
+  const out = Object.fromEntries(SLOTS.map((s) => [s, SLOTS_SPOSTATI.includes(s) ? null : '']));
   out.judgeRegistry = {};
   out.openrouterKeyPresent = false;
   out.judgeTimeoutMs = null; // null = non impostato → la UI mostra il default

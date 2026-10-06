@@ -18,6 +18,8 @@ import {
   messageForOwnerMerge,
   exitCodeForOwnerMerge,
   askServerMerge,
+  statoDellaRichiesta,
+  richiestaForseInAttesa,
 } from '../../scripts/lib/owner-merge.mjs';
 
 const risposta = (result) => ({ result });
@@ -122,7 +124,7 @@ describe('cosa legge l’owner', () => {
     // ferma al blocco lascia chi legge senza nessuna mossa possibile: su main,
     // da questa macchina, non scrive più nessuno.
     const msg = messageForOwnerMerge(
-      { outcome: 'blocked', reason: 'guard_the_guards: firestore.rules', requestId: 'ab12cd34ef56ab12cd34ef56' },
+      { outcome: 'blocked', reason: 'guard_the_guards: firestore.rules', requestId: 'ab12cd34ef56ab12cd34ef56', requestState: 'pending' },
       'claude/x'
     );
     assert.match(msg, /in attesa/i);
@@ -142,6 +144,8 @@ describe('cosa legge l’owner', () => {
     // E che una pagina già aperta se ne accorge da sola: senza questa riga
     // l'owner chiude e riapre una scheda per far comparire l'avviso.
     assert.match(msg, /già apert/i);
+    // Il giorno che Filo non si apre, la strada che resta si legge qui (#489).
+    assert.ok(msg.includes('https://filo-8b9cb.web.app'), msg);
   });
 
   test('bloccato SENZA richiesta: non promette un avviso che non comparirà mai', () => {
@@ -208,5 +212,208 @@ describe('la chiamata al server', () => {
       globalThis.fetch = vero;
       delete process.env.FILO_ADMIN_REFRESH_TOKEN;
     }
+  });
+});
+
+// Risposta VERA di runOwnerMerge (filo-security, giroLocale di test/lavori-locali-908.test.js):
+// se la forma cambia là, va ricopiata qui, o il finish smette di dire cosa è successo alla pratica.
+const BLOCCO = { gate: 'guard_the_guards', label: 'Tocca aree protette (guardie, regole del database, chiavi, automatismi)', detail: 'firestore.rules' };
+const RISPOSTA_908 = {
+  ok: true, result: 'merged', sha: 'c'.repeat(40),
+  local: { feedbackId: 'fid908', eligible: true, num: '#908', skippedL5: true, record: 'traccia-1', closed: true, blocks: [BLOCCO] },
+};
+const NON_AMMESSA = { feedbackId: 'fid908', eligible: false, reason: 'mittente_non_provato', detail: 'il feedback non porta la prova del mittente (senderProof admin)' };
+
+describe('la pratica del lavoro locale (#908)', () => {
+  test('fuso saltando L5, risposta vera del server: L5 saltato, blocchi registrati, pratica chiusa', () => {
+    const r = classifyOwnerMerge(200, risposta(RISPOSTA_908));
+    assert.equal(r.outcome, 'merged');
+    assert.equal(r.skippedL5, true);
+    assert.deepEqual(r.blocks, [BLOCCO]);
+    assert.equal(r.closed, true);
+    const msg = messageForOwnerMerge(r, 'claude/x', { feedbackId: 'fid908' });
+    assert.match(msg, /^✓/);
+    assert.match(msg, /L5 saltato.*#908/, 'il numero arriva dal server anche senza quello del finish');
+    assert.match(msg, /Blocchi registrati \(1\)[^\n]*\n\s+· Tocca aree protette .*: firestore\.rules/);
+    assert.match(msg, /Pratica #908 chiusa/);
+    assert.doesNotMatch(msg, /NON si è registrata/);
+    assert.equal(exitCodeForOwnerMerge(r), 0);
+  });
+
+  test('blocchi col solo nome, o con un elenco lunghissimo: si stampano, e un taglio si dichiara', () => {
+    const lungo = Array.from({ length: 400 }, (_, i) => `src/file-${i}.js`).join(', ');
+    const corpo = { ...RISPOSTA_908, local: { ...RISPOSTA_908.local, blocks: ['new_dependency', { ...BLOCCO, detail: lungo }] } };
+    const msg = messageForOwnerMerge(classifyOwnerMerge(200, risposta(corpo)), 'claude/x', {});
+    assert.match(msg, /· new_dependency\n/);
+    assert.match(msg, /src\/file-0\.js.*… \(elenco intero nella nota della pratica\)/);
+  });
+
+  test('fuso ma la pratica non si è chiusa: si dice, con il comando per chiuderla', () => {
+    const corpo = { ...RISPOSTA_908, local: { ...RISPOSTA_908.local, closed: false } };
+    const msg = messageForOwnerMerge(classifyOwnerMerge(200, risposta(corpo)), 'claude/x', { feedbackId: 'fid908', feedbackNum: 908 });
+    assert.match(msg, /La pratica #908 NON si è chiusa\. Chiudila a mano: npm run feedback -- fid908 done .* --come-routine/);
+  });
+
+  test('fuso con blocchi ma senza traccia: si dice che l’elenco non è in Automazioni', () => {
+    const corpo = { ...RISPOSTA_908, local: { ...RISPOSTA_908.local, record: '' } };
+    const msg = messageForOwnerMerge(classifyOwnerMerge(200, risposta(corpo)), 'claude/x', { feedbackNum: 908 });
+    assert.match(msg, /traccia dei blocchi NON si è registrata/);
+  });
+
+  test('fuso con L5 pulito: niente riga su L5, la pratica chiusa sì', () => {
+    const corpo = { ...RISPOSTA_908, local: { feedbackId: 'fid908', eligible: true, num: '#908', skippedL5: false, record: '', closed: true } };
+    const msg = messageForOwnerMerge(classifyOwnerMerge(200, risposta(corpo)), 'claude/x', {});
+    assert.doesNotMatch(msg, /L5 saltato/);
+    assert.match(msg, /Pratica #908 chiusa/);
+  });
+
+  test('fuso con L5 pulito ma pratica non ammessa: resta aperta, e si dice perché', () => {
+    const corpo = { ok: true, result: 'merged', sha: 'd'.repeat(40), local: NON_AMMESSA };
+    const msg = messageForOwnerMerge(classifyOwnerMerge(200, risposta(corpo)), 'claude/x', { feedbackId: 'fid908', feedbackNum: 908 });
+    assert.match(msg, /^✓/);
+    assert.match(msg, /Pratica #908 non chiusa: il feedback non porta la prova del mittente/);
+    assert.match(msg, /npm run feedback -- fid908 done/);
+  });
+
+  test('bloccato con la pratica, risposta vera del server: dice perché L5 non è stato saltato, e aspetta il sì senza parlare di muri', () => {
+    const corpo = { ok: true, result: 'blocked', reason: 'x', trips: [{ gate: 'guard_the_guards', detail: 'firestore.rules' }], requestId: 'richiesta-1', local: NON_AMMESSA };
+    const r = classifyOwnerMerge(200, risposta(corpo));
+    assert.equal(r.localReason, 'mittente_non_provato');
+    const msg = messageForOwnerMerge(r, 'claude/x', { feedbackId: 'fid908' });
+    assert.match(msg, /L5 non è stato saltato: il feedback non porta la prova/);
+    assert.match(msg, /aspetta il tuo sì/);
+    assert.doesNotMatch(msg, /non si aggirano|da qui non|unica strada/);
+  });
+
+  test('bloccato senza pratica: ricorda come legarla', () => {
+    const msg = messageForOwnerMerge({ outcome: 'blocked', reason: 'x', requestId: 'ab12' }, 'claude/x');
+    assert.match(msg, /--feedback/);
+  });
+
+  test('la domanda porta feedbackId solo quando c’è', async () => {
+    process.env.FILO_ADMIN_REFRESH_TOKEN = 'refresh-finto';
+    const corpi = [];
+    const vero = globalThis.fetch;
+    globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ id_token: 'id-finto' }), text: async () => '' });
+    const fetchImpl = async (_u, opts) => {
+      corpi.push(JSON.parse(opts.body));
+      return { status: 200, text: async () => JSON.stringify({ result: { ok: true, result: 'merged', sha: 'd' } }) };
+    };
+    try {
+      await askServerMerge({ branch: 'claude/x', sha: 'a'.repeat(40), feedbackId: 'xEedWgj3AnlLh3lTZ5z5', fetchImpl, url: 'https://esempio/ownerMerge' });
+      await askServerMerge({ branch: 'claude/x', sha: 'a'.repeat(40), fetchImpl, url: 'https://esempio/ownerMerge' });
+    } finally {
+      globalThis.fetch = vero;
+      delete process.env.FILO_ADMIN_REFRESH_TOKEN;
+    }
+    assert.deepEqual(corpi[0], { data: { branch: 'claude/x', sha: 'a'.repeat(40), feedbackId: 'xEedWgj3AnlLh3lTZ5z5' } });
+    assert.deepEqual(corpi[1], { data: { branch: 'claude/x', sha: 'a'.repeat(40) } });
+  });
+});
+
+// #486: il deposito non riapre una richiesta già decisa, ma il server ne restituisce il nome lo stesso. «In attesa» si
+// dice solo se l'elenco del deposito la mostra fra quelle in attesa; altrimenti si dice com'era finita e come riproporla.
+describe('una richiesta già decisa non si annuncia in attesa (#486)', () => {
+  const ID = 'ab12cd34ef56ab12cd34ef56';
+  const vista = (extra) => ({ id: ID, branch: 'claude/x', sha: 'a'.repeat(40), used: false, discarded: false, expired: false, outcome: '', ...extra });
+  const elenco = (parti) => ({ ok: true, ttlMs: 7 * 864e5, pending: [], failed: [], recent: [], preapproved: [], preapprovedTotal: 0, ...parti });
+
+  test('lo stato si legge dall’elenco del deposito', () => {
+    assert.deepEqual(statoDellaRichiesta(ID, elenco({ pending: [vista()] })), { state: 'pending' });
+    assert.deepEqual(statoDellaRichiesta(ID, elenco({ recent: [vista({ discarded: true })] })), { state: 'discarded' });
+    assert.deepEqual(statoDellaRichiesta(ID, elenco({ failed: [vista({ used: true, outcome: 'conflict' })] })), { state: 'used', outcome: 'conflict' });
+    // Fuori dalle decisioni recenti (ne mostra poche): non è in attesa, e il deposito rifiuta solo le decise.
+    assert.deepEqual(statoDellaRichiesta(ID, elenco({ pending: [vista({ id: 'ff'.repeat(12) })] })), { state: 'decided' });
+    for (const rotto of [null, {}, { ok: false }, { ok: true }]) assert.equal(statoDellaRichiesta(ID, rotto).state, '');
+  });
+
+  test('scartata, approvata o decisa: niente «approvala da Filo», e la strada per riproporla', () => {
+    const casi = {
+      discarded: /già stata SCARTATA/,
+      used: /già stata APPROVATA, e la fusione\s+era finita in conflitto/,
+      decided: /già stata decisa \(approvata o\s+scartata\)/,
+    };
+    for (const [requestState, re] of Object.entries(casi)) {
+      const reply = { outcome: 'blocked', reason: 'x', requestId: ID, requestState, ...(requestState === 'used' ? { requestOutcome: 'conflict' } : {}) };
+      const msg = messageForOwnerMerge(reply, 'claude/x');
+      assert.match(msg, re);
+      assert.match(msg, /NON l'ho messa in attesa/);
+      assert.match(msg, /In Filo non c'è niente da approvare/);
+      assert.match(msg, /git commit --allow-empty -m "riproposta"/);
+      assert.match(msg, /npm run finish/);
+      assert.doesNotMatch(msg, /approvala da Filo|IN ATTESA|aspetta il tuo sì|compare da solo/, `"${requestState}" promette un avviso che non arriverà`);
+      assert.equal(richiestaForseInAttesa(reply), false, `"${requestState}" non deve suonare il campanello`);
+      assert.equal(exitCodeForOwnerMerge(reply), 10);
+    }
+  });
+
+  test('stato non controllato: lo dice, e dice come accorgersi che era già decisa', () => {
+    const reply = { outcome: 'blocked', reason: 'x', requestId: ID, requestState: '', requestCheck: 'elenco delle richieste: http_500' };
+    const msg = messageForOwnerMerge(reply, 'claude/x');
+    assert.match(msg, /non sono riuscito a\s+controllarlo \(elenco delle richieste: http_500\)/);
+    assert.match(msg, /Se in cima ai Ricevuti della dashboard di gestione non c'è l'avviso/);
+    assert.match(msg, /git commit --allow-empty/);
+    assert.doesNotMatch(msg, /L'ho messa IN ATTESA/);
+    assert.equal(richiestaForseInAttesa(reply), true);
+    assert.equal(richiestaForseInAttesa({ outcome: 'blocked', reason: 'x', requestId: ID, requestState: 'pending' }), true);
+    assert.equal(richiestaForseInAttesa({ outcome: 'blocked', reason: 'x' }), false);
+  });
+
+  const conServer = async (rispostaElenco, corpoFusione = { ok: true, result: 'blocked', reason: 'Tocca aree protette', trips: [], requestId: ID }) => {
+    process.env.FILO_ADMIN_REFRESH_TOKEN = 'refresh-finto';
+    const chiamate = [];
+    const vero = globalThis.fetch;
+    globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ id_token: 'id-finto' }), text: async () => '' });
+    const fetchImpl = async (url, opts) => {
+      chiamate.push({ url, opts });
+      if (String(url).endsWith('/ownerMerge')) return { status: 200, text: async () => JSON.stringify({ result: corpoFusione }) };
+      return rispostaElenco();
+    };
+    try {
+      const r = await askServerMerge({ branch: 'claude/x', sha: 'a'.repeat(40), fetchImpl, url: 'https://esempio/ownerMerge', listUrl: 'https://esempio/ownerMergeApprovals' });
+      return { r, chiamate };
+    } finally {
+      globalThis.fetch = vero;
+      delete process.env.FILO_ADMIN_REFRESH_TOKEN;
+    }
+  };
+
+  test('finish sulla versione già scartata: rilegge il deposito e dice che è stata scartata', async () => {
+    const { r, chiamate } = await conServer(async () => ({ status: 200, text: async () => JSON.stringify({ result: elenco({ recent: [vista({ discarded: true })] }) }) }));
+    assert.equal(r.outcome, 'blocked');
+    assert.equal(r.requestState, 'discarded');
+    const lettura = chiamate.find((c) => String(c.url).endsWith('/ownerMergeApprovals'));
+    assert.ok(lettura, 'lo stato della richiesta va riletto dal deposito');
+    assert.equal(lettura.opts.headers.Authorization, 'Bearer id-finto');
+    assert.deepEqual(JSON.parse(lettura.opts.body), { data: { op: 'list' } });
+    const msg = messageForOwnerMerge(r, 'claude/x');
+    assert.match(msg, /già stata SCARTATA/);
+    assert.doesNotMatch(msg, /approvala da Filo/);
+  });
+
+  test('finish su una versione nuova: in attesa davvero, il messaggio di sempre', async () => {
+    const { r } = await conServer(async () => ({ status: 200, text: async () => JSON.stringify({ result: elenco({ pending: [vista()] }) }) }));
+    assert.equal(r.requestState, 'pending');
+    assert.match(messageForOwnerMerge(r, 'claude/x'), /L'ho messa IN ATTESA: approvala da Filo/);
+  });
+
+  test('elenco che non risponde: blocco intatto, stato dichiarato non controllato', async () => {
+    const giu = await conServer(async () => ({ status: 500, text: async () => JSON.stringify({ error: { message: 'INTERNAL' } }) }));
+    assert.equal(giu.r.outcome, 'blocked');
+    assert.equal(giu.r.requestState, '');
+    assert.match(giu.r.requestCheck, /INTERNAL/);
+    const rete = await conServer(async () => { throw new Error('ENOTFOUND'); });
+    assert.equal(rete.r.outcome, 'blocked');
+    assert.equal(rete.r.requestState, '');
+    assert.match(rete.r.requestCheck, /ENOTFOUND/);
+  });
+
+  test('l’elenco si rilegge solo per un blocco con richiesta', async () => {
+    const fuso = await conServer(async () => { throw new Error('non doveva chiamare'); }, { ok: true, result: 'merged', sha: 'd' });
+    assert.deepEqual(fuso.r, { outcome: 'merged', sha: 'd' });
+    assert.equal(fuso.chiamate.length, 1);
+    const senza = await conServer(async () => { throw new Error('non doveva chiamare'); }, { ok: true, result: 'blocked', reason: 'x', trips: [], requestId: '' });
+    assert.equal(senza.chiamate.length, 1);
+    assert.equal(senza.r.requestState, undefined);
   });
 });

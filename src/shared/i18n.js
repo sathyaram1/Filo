@@ -19,6 +19,11 @@
     // Traduzione finita, ma il sito ha aggiunto altro testo dopo (scorrimento
     // infinito, schermate che cambiano senza ricaricare).
     menu_translate_new_content: 'Traduci il testo nuovo',
+    // #711 — l'hover della riga di origine: dice il CONFINE della lettura, cioè
+    // perché l'assenza di quella riga non vuol dire niente.
+    menu_origin_hint: 'Filo legge solo le etichette che il file si porta dietro. Uno screenshot le cancella, un social pure, e molti generatori non le scrivono affatto.',
+    menu_image_unreadable: 'Filo non è riuscito a scaricare questa immagine.',
+    menu_origin_hint_unverified: 'Filo non ha ancora scaricato l’elenco ufficiale dei firmatari riconosciuti, quindi per ora sa solo che la firma è valida. Appena lo scarica, lo verifica.',
     menu_explain_deep: 'Approfondisci',
     menu_paste_history: 'Cronologia incolla',
     menu_paste_search: 'Cerca…',
@@ -74,6 +79,7 @@
     toast_media_loop_off: 'Ripetizione disattivata',
     toast_pip_failed: 'Finestra mobile non disponibile per questo video',
     menu_share_link: 'Condividi link',
+    menu_redeem_invite: 'Riscatta l’invito',
     menu_edit_selection: 'Modifica',
     menu_read_aloud: 'Leggi',
     menu_stop_reading: 'Interrompi lettura',
@@ -88,6 +94,10 @@
     err_tts_voice_required: 'Il modello di lettura «%s» vuole il nome di una voce, e Filo non ne conosce nessuna per questo modello: scrivilo in Preferenze → Lettura ad alta voce.',
     // %s = id del modello, %s = nome scritto a mano che il modello ha rifiutato.
     err_tts_voice_unknown: 'Il modello di lettura «%s» non conosce la voce «%s»: controlla il nome in Preferenze → Lettura ad alta voce.',
+    // %s = id del modello, %s = chi lo serve («OpenAI», «OpenAI e Azure»).
+    // Voce e dettatura: nessun host ammesso, la richiesta non parte (#713).
+    err_audio_no_allowed_host: 'Il modello «%s» lo serve solo %s, che Filo esclude. Non ho mandato niente: scegli un altro modello.',
+    err_audio_no_allowed_host_many: 'Il modello «%s» lo servono solo %s, che Filo esclude. Non ho mandato niente: scegli un altro modello.',
     menu_dictate: 'Detta',
     menu_screenshot: 'Screenshot',
     menu_screenshot_crop: 'Screenshot di una parte',
@@ -121,10 +131,26 @@
     menu_dictate_partial: 'Ti ascolto…',
     menu_dictate_model_select: 'Modello per dettatura',
     menu_dictate_not_supported: 'Dettatura non supportata in questo browser',
-    menu_dictate_no_mic: 'Microfono non disponibile o negato',
     menu_dictate_model_set: 'Modello dettatura aggiornato',
     menu_dictate_transcribing: 'Trascrivo l\'audio…',
-    menu_dictate_empty: 'Nessun audio comprensibile',
+
+    // Il microfono (src/shared/ascolto.js) e il suo tasto nelle chat (voceChat.js). Ogni guasto dice cosa fare.
+    voce_parla: 'Parla',
+    voce_ferma: 'Ferma',
+    voce_trascrivo: 'Trascrivo…',
+    voce_annulla_invio: 'Annulla l\'invio',
+    voce_invia_da_solo: 'Invia da solo',
+    voce_lascia_testo: 'Lascia il testo da correggere',
+    voce_err_mic_negato: 'Filo non ha il permesso di usare il microfono: consentilo %s, poi riprova.',
+    voce_dove_mac: 'in Impostazioni di Sistema → Privacy e sicurezza → Microfono',
+    voce_dove_windows: 'in Impostazioni → Privacy e sicurezza → Microfono',
+    voce_dove_linux: 'nelle impostazioni audio del sistema',
+    voce_err_mic_assente: 'Non trovo un microfono: collegane uno e riprova.',
+    voce_err_mic_occupato: 'Il microfono non risponde: forse lo sta usando un\'altra app. Chiudila e riprova.',
+    voce_err_trascrizione: 'Non sono riuscito a trascrivere quello che hai detto: %s',
+    voce_riprova: 'riprova tra poco.',
+    voce_vuoto: 'Non ho capito quello che hai detto: riprova parlando un po\' più vicino al microfono.',
+    voce_err_muto: 'Non ho sentito niente: premi il microfono e parla, o controlla che sia acceso quello giusto.',
     menu_overflow_soon: 'Pannello completo in arrivo',
     menu_link_loading: 'Analizzo il link…',
 
@@ -182,6 +208,7 @@
       'Hai scelto solo modelli a pesi aperti: «%s» non lo è, quindi la prova non parte. Spegni «Solo modelli a pesi aperti» per provarlo.',
     err_model_where_own: 'Lo imposti in Opzioni → Modelli per azione.',
     err_model_where_default: 'Stai usando i modelli predefiniti: apri Opzioni, togli «Usa modelli predefiniti» e scegli il modello per questa funzione.',
+    err_model_where_owner: 'Lo imposti in Gestione → Modelli di supporto.',
 
     // Toast
     toast_saved: 'Salvata in: %s',
@@ -237,6 +264,7 @@
     toast_paste_failed: 'Non riesco a incollare qui (rifocalizza il campo e riprova)',
     clipboard_image_pending: 'Descrizione…',
     clipboard_image_no_model: 'Immagine (nessun modello per la descrizione)',
+    clipboard_image_delicata: 'Immagine da una pagina delicata',
 
     // Categorie default
     category_default: 'Da vedere',
@@ -345,9 +373,9 @@
     options_action_editor_title: 'Editor — titolo automatico del documento',
     options_action_editor_summary: 'Editor — riassunto automatico del documento',
     options_action_editor_chat: 'Editor — chat col documento',
-    options_action_manage_search: 'Gestione — ricerca fra i feedback',
     options_action_archive_embed: 'Indicizzazione delle schede archiviate',
     options_action_provider_test: 'Prova di un fornitore (pulsante «Prova»)',
+    options_action_file_name: 'Nome sensato ai file (legge l\'inizio del file o una miniatura)',
     // Elenco (di sola lettura) degli altri punti in cui Filo usa un modello:
     // quelli che girano sui server di Filo e quelli che un modello non lo usano.
     options_h_model_usage: 'Dove altro Filo usa un modello',
@@ -366,6 +394,7 @@
     options_category_delete: 'Elimina',
     options_category_delete_confirm: 'Eliminare la categoria "%s"? Le schede diventeranno non categorizzate.',
     options_category_pages: '%s schede',
+    options_category_name_taken: 'C\'è già «%s»: Rinomina le unisce',
 
     // Pagina admin "Modelli predefiniti" (config condivisa via Firestore)
     admin_defaults_title: 'Modelli predefiniti',
@@ -402,6 +431,13 @@
     admin_defaults_excluded_kind_producer: 'Produce i modelli',
     admin_defaults_excluded_kind_unreliable: 'Serve male',
     admin_defaults_excluded_note: 'Nota (quando, cosa è successo)',
+    // Pagine delicate (#1004)
+    admin_defaults_delicate: 'Pagine delicate',
+    admin_defaults_delicate_desc:
+      'I siti di posta, banche e sanità di cui il riassunto delle schede chiuse e la pulizia automatica non mandano il testo ai modelli. Uno per riga; un dominio vale anche per i suoi sottodomini. Vale per tutti gli utenti: una categoria salvata qui sostituisce quella scritta nel codice, una lasciata com\'è segue il codice.',
+    admin_defaults_delicate_posta: 'Posta',
+    admin_defaults_delicate_banche: 'Banche',
+    admin_defaults_delicate_sanita: 'Sanità',
     admin_defaults_excluded_unknown: 'Nessun fornitore di OpenRouter si chiama così: questa voce non esclude nessuno.',
     admin_defaults_excluded_guess: 'Forse «%s»?',
     admin_defaults_excluded_drift_title: 'Esclusioni del codice che questa lista non copre',
@@ -434,12 +470,16 @@
       'il caricamento di pubblicità e tracker. Le liste si scaricano dalla rete, restano ' +
       'in cache sul tuo computer e si aggiornano da sole una volta a settimana. I siti ' +
       'che usi davvero (Google, YouTube, banche…) non vengono mai bloccati.',
+    options_security_adskip: 'Salta le pubblicità dei video',
+    options_security_adskip_desc:
+      'Quando un video, per esempio su YouTube, mostra una pubblicità col pulsante «Salta», ' +
+      'Filo lo preme appena compare. Quelle che non si possono saltare restano come sono.',
     options_security_siteblock: 'Blocca l’apertura dei siti in blacklist',
     options_security_siteblock_desc:
-      'Impedisce di APRIRE i siti in blacklist (non solo le loro pubblicità). Se provi ' +
-      'ad aprire un sito bloccato compare una notifica con “Apri comunque”. ' +
-      'Eccezioni: se arrivi da un motore di ricerca o lo apre Filo per te, l’apertura ' +
-      'è permessa. Puoi aggiungere domini tuoi qui sotto (uno per riga).',
+      'Impedisce di APRIRE i siti in blacklist (non solo le loro pubblicità), anche dai ' +
+      'risultati di una ricerca e quando è Filo ad aprirli. Se provi ad aprire un sito ' +
+      'bloccato compare una notifica con “Apri comunque”. Puoi aggiungere domini tuoi ' +
+      'qui sotto (uno per riga).',
     options_security_siteblock_lists: 'Usa anche le liste pubbliche (pubblicità/tracker) come blacklist',
     options_security_siteblock_blacklist_label: 'Domini in blacklist (uno per riga)',
     options_security_siteblock_blacklist_invalid:
@@ -502,6 +542,20 @@
       'Il controllo della blacklist ufficiale di Google (phishing e malware) usa una chiave condivisa, ' +
       'gestita centralmente dall\'amministratore in "Modelli predefiniti": è già attiva per tutti gli ' +
       'account, non devi configurare nulla qui.',
+    // #1004 — pagine delicate
+    options_security_delicate: 'Non mandare ai modelli le pagine delicate',
+    options_security_delicate_desc:
+      'Posta, banca, sanità e le pagine dove hai visto un campo password o carta. Quando chiudi queste ' +
+      'schede o Filo le riordina, ne tiene solo titolo e indirizzo e non manda il testo a nessun modello.',
+    options_security_delicate_sites_label:
+      'Altri siti delicati, uno per riga',
+    options_security_delicate_sites_invalid:
+      'Queste righe non sono domini validi e verranno ignorate (usa un dominio ' +
+      'con estensione, es. studiorossi.it): %s',
+    options_security_delicate_campi_title: 'Siti dove Filo ha visto un campo password o carta',
+    options_security_delicate_campi_togli: 'Non è delicato',
+    options_security_delicate_campi_tolto: 'non delicato per te',
+    options_security_delicate_campi_rimetti: 'Torna delicato',
     // F4 — Feedback autonomo
     options_security_auto_feedback: 'Segnalazione automatica dei problemi',
     options_security_auto_feedback_desc:
@@ -521,26 +575,35 @@
     options_cookies_mode_default_desc:
       'Filo blocca a monte i tracker noti (Google Analytics, reti pubblicitarie, pixel dei social): lo script non ' +
       'si carica nemmeno. Rifiuta da solo i banner dei cookie, nasconde quelli che non hanno un «rifiuta», dice ai siti che non vuoi essere profilato ' +
-      'e carica i video YouTube senza cookie. I cookie utili a te (login, preferenze, le tue scelte sui siti) ' +
+      'e carica i video YouTube senza cookie. I cookie dei contenuti incorporati di siti dove non sei entrato durano ' +
+      'solo la visita. I cookie utili a te (accessi, preferenze, le tue scelte sui siti) ' +
       'restano: non perdi quello che hai impostato.',
     options_cookies_mode_privacy: 'Privacy massima',
     options_cookies_mode_privacy_desc:
-      'Come l\'Automatico, ma ogni sito vive in uno spazio separato e usa-e-getta: i siti non possono mettersi ' +
-      'd\'accordo per riconoscerti e niente sopravvive alla chiusura di Filo, nemmeno i tuoi accessi — tranne i ' +
-      '"siti fidati" qui sotto. Massima riservatezza.',
+      'Come l\'Automatico, ma ogni sito vive in uno spazio separato e usa-e-getta, così i siti non possono mettersi ' +
+      'd\'accordo per riconoscerti. Qualche minuto dopo che chiudi l\'ultima scheda di un sito, Filo butta via tutto ' +
+      'quello che il sito aveva salvato, accessi compresi. Fanno eccezione i "siti fidati" qui sotto.',
     options_cookies_whitelist_title: 'Siti fidati: resta connesso',
     options_cookies_whitelist_desc:
-      'In "Privacy massima" ogni sito è isolato e usa-e-getta. I siti che aggiungi qui fanno eccezione: vivono in ' +
-      'uno spazio isolato ma persistente, così resti connesso. Aggiungi il sito (es. gmail.com) e premi Invio.',
+      'I siti che aggiungi qui restano connessi: in "Privacy massima" vivono in uno spazio isolato ma persistente, ' +
+      'e in "Automatico" tengono i loro cookie anche quando un loro contenuto compare dentro un\'altra pagina. ' +
+      'Aggiungi il sito (es. gmail.com) e premi Invio; se poi lo togli, in "Privacy massima" Filo butta via ' +
+      'quello che aveva salvato.',
     options_cookies_whitelist_placeholder: 'es. gmail.com',
     options_cookies_whitelist_add: 'Aggiungi',
     options_cookies_whitelist_remove: 'Rimuovi',
-    options_cookies_whitelist_empty: 'Nessun sito fidato: in "Privacy massima" dovrai rifare il login a ogni avvio.',
+    options_cookies_whitelist_empty: 'Nessun sito fidato. In "Privacy massima" rifai l\'accesso ogni volta che torni su un sito che avevi chiuso.',
     options_cookies_whitelist_invalid: 'Non sembra un dominio valido. Usa un dominio con estensione, es. gmail.com (niente IP o nomi senza punto).',
     options_cookies_whitelist_dup: '"%s" è già nell\'elenco dei siti fidati.',
     options_cookies_trusted_note_other:
-      'I siti fidati hanno effetto solo in "Privacy massima". In "Automatico" i tuoi login restano comunque salvati, ' +
-      'quindi qui non serve aggiungere nulla.',
+      'In "Automatico" i tuoi accessi restano salvati comunque. Qui serve aggiungere un sito solo se ne vedi i ' +
+      'contenuti dentro altre pagine e vuoi che restino connessi prima che tu ci sia entrato da Filo.',
+    options_cookies_accessi_title: 'Siti dove sei entrato',
+    options_cookies_accessi_desc:
+      'Quando un contenuto di questi siti compare dentro un\'altra pagina (un post, un video, una mappa), i suoi '
+      + 'cookie restano, così non esci dai siti dove hai fatto l\'accesso. Degli altri siti, i cookie messi da un '
+      + 'contenuto incorporato durano solo la visita.',
+    options_cookies_accessi_remove: 'Togli',
     options_cookies_banners_title: 'Qui i banner dei cookie li vedi',
     options_cookies_banners_remove: 'Rifiuta in automatico',
     options_cookies_done_title: 'Qui Filo li ha rifiutati o nascosti',
@@ -581,24 +644,37 @@
     security_export_title: 'Esporta dati Filo',
     security_export_label: 'Esporta dati',
     security_export_desc:
-      'Salva tutti i tuoi dati di Filo (memorie degli agenti, pagine salvate, ' +
-      'cronologia incolla, costi e impostazioni) in un file .zip che contiene un ' +
-      'data.json e le immagini copiate come file separati. Utile come backup o per ' +
-      'trasferire i dati su un altro computer.',
+      'Salva tutti i tuoi dati di Filo (memorie degli agenti, chat con Filo, pagine ' +
+      'visitate, pagine salvate, cronologia incolla, costi e impostazioni) in un file ' +
+      '.zip che contiene un data.json, il filo delle chat e delle pagine visitate e le ' +
+      'immagini copiate come file separati. Utile come backup o per trasferire i dati ' +
+      'su un altro computer.',
     security_export_btn: 'Esporta dati (.zip)',
     security_export_done: 'Dati esportati',
     security_export_fail: 'Esportazione non riuscita',
     security_import_title: 'Importa dati Filo',
     security_import_btn: 'Importa dati (.zip)',
     security_import_desc:
-      'Ricarica un .zip esportato da Filo: rimette al loro posto memorie, pagine ' +
-      'salvate, cronologia, immagini e impostazioni. Quello che hai già non viene ' +
+      'Ricarica un .zip esportato da Filo: rimette al loro posto memorie, chat con ' +
+      'Filo, pagine visitate, pagine salvate, cronologia, immagini e impostazioni. ' +
+      'Quello che hai già non viene ' +
       'cancellato — le liste si uniscono e, dove c\'è un conflitto, vince il backup.',
+    security_visite_title: 'Pagine visitate',
+    security_visite_desc: 'Filo ricorda le pagine che apri nelle schede, sul tuo computer. Quelle aperte in incognito no.',
+    security_visite_ora: 'Cancella l’ultima ora',
+    security_visite_oggi: 'Cancella oggi',
+    security_visite_tutto: 'Cancella tutto',
+    security_visite_confirm_title: 'Cancellare le pagine visitate?',
+    // %1 = "la pagina visitata" / "le N pagine visitate", %2 = "nell’ultima ora" / "oggi" / "da sempre"
+    security_visite_confirm_text: 'Filo dimentica %1 %2. Le chat e le schede chiuse restano.',
+    security_visite_confirm_ok: 'Cancella',
+    security_visite_nessuna: 'Nessuna pagina da cancellare',
+    security_visite_fail: 'Cancellazione non riuscita',
     security_import_confirm_title: 'Importa dati da backup',
-    // %1 = nome file, %2 = " (del …)" o vuoto, %3/%4 = conteggi già declinati
+    // %1 = nome file, %2 = " (del …)" o vuoto, %3/%4 = conteggi già declinati, %5 = chat e pagine del filo o vuoto
     security_import_confirm_text:
-      'Da "%1"%2: %3 e %4.\n\n' +
-      'Nulla di ciò che hai ora viene cancellato: le liste (pagine salvate, ' +
+      'Da "%1"%2: %3 e %4%5.\n\n' +
+      'Nulla di ciò che hai ora viene cancellato: le liste (chat, pagine visitate, pagine salvate, ' +
       'cronologia, appunti) si uniscono senza duplicati e le sezioni che qui non ' +
       'esistono vengono aggiunte. Dove lo stesso dato esiste in entrambi, vince ' +
       'quello del backup. Le impostazioni del backup diventano attive subito.',
@@ -626,7 +702,7 @@
     history_reuse: 'riuso %s%',
     history_reuse_title: '%s token su %s riusati da una richiesta precedente invece di essere rielaborati: costano meno e la risposta arriva prima.',
     history_reuse_none_title: 'Nessuna parte di questa richiesta (%s token) è stata riusata da una richiesta precedente: è stata rielaborata tutta.',
-    history_policy_violation: '⚠ fornitore escluso',
+    history_policy_violation: '⚠ fornitore non ammesso',
     // Tempi del turno (idee «Latenza della chat»): quando è arrivato il primo
     // pezzo di ragionamento, la prima parola, e quando è finito.
     history_timing: 'ragiona %s · scrive %s · fine %s',
