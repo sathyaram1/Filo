@@ -245,9 +245,9 @@ button:focus-visible { outline: 2px solid var(--sn-accent, #c45a3b); outline-off
     (document.documentElement || document.body).appendChild(host);
     try { p.ro = new ResizeObserver(() => posa(p)); p.ro.observe(iframe); } catch (_) {}
     attaccaAscolti();
+    p.si = si;
+    p.no = no;
     posa(p);
-    // Fuori dalla vista del riquadro non la vede nessuno: le tue proposte di Filo stanno test hook.
-    global.__snRiquadroCookieTest = { proposte: () => [...proposte.values()].map((x) => ({ nome: x.nome, testo: x.testo.textContent, visibile: !x.host.hidden })), rispondi: (i, si) => { const x = [...proposte.values()][i]; if (x) rispondi(x, si, { isTrusted: true }); } };
   }
 
   // Il riquadro può comparire un attimo dopo la proposta (pagine che li montano da script): lo si cerca per poco.
@@ -273,5 +273,17 @@ button:focus-visible { outline: 2px solid var(--sn-accent, #c45a3b); outline-off
     avviaRiquadro();
   }
 
-  global.SN_RIQUADRO_COOKIE = { voci, aggiornaStato };
+  // Gli spec leggono la proposta dal mondo isolato (lo shadow è chiuso) e la cliccano col mouse vero.
+  function rettangolo(el) {
+    const r = el.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height };
+  }
+  const _test = {
+    proposte: () => [...proposte.values()].map((x) => ({
+      testo: x.testo.textContent, visibile: !x.host.hidden, si: rettangolo(x.si), no: rettangolo(x.no), riquadro: rettangolo(x.iframe),
+    })),
+    stato: () => stato,
+  };
+
+  global.SN_RIQUADRO_COOKIE = { voci, aggiornaStato, _test };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

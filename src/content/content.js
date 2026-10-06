@@ -1746,11 +1746,14 @@
     if (zoomItem) items.push(zoomItem);
 
     // 3. Zona contestuale — assente se non c'è contesto utile.
+    // #760 — il tasto destro dentro un riquadro di un altro sito riattiva o toglie i cookie del suo servizio.
+    const vociRiquadro = (self.SN_RIQUADRO_COOKIE && self.SN_RIQUADRO_COOKIE.voci()) || [];
     const contextItems = [
       ...vociDellaPagina(target),
       ...buildContextualItems({
         selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target,
       }),
+      ...vociRiquadro,
     ];
     if (contextItems.length > 0) {
       items.push({ type: 'separator' });
