@@ -60,6 +60,13 @@ nuovo: le lettere che a occhio ne valgono un'altra (`paypa1`, `micros0ft`,
 `arnazon`) si riconoscono normalizzandole, e lì la prova è l'uguaglianza, non
 una distanza.
 
+**Un nome a una lettera avvisa, il blocco vuole un secondo segnale** (decisione
+dell'owner, #725.8). Vale per i marchi segnati `unaLetteraAvvisa`, quelli con
+vicini veri (`ariba.com`, `isbank.com.tr`, `bancobpi.pt`): avviso che si chiude,
+e pagina piena solo con dominio giovane, certificato non valido o password
+chiesta. Queste regole sono il ripiego: le eccezioni a mano per i siti vicini a
+un marchio non si aggiungono, la classificazione principale passa a Jev (#890).
+
 **Ogni frase ipotizza, nessuna afferma.** Il controllo guarda l'indirizzo, non
 il sito: «potrebbe essere un'imitazione» si può dire, «chi lo riceve entra al
 posto tuo» no.
