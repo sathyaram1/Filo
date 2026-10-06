@@ -317,7 +317,7 @@ function consegnaBroadcast(msg) {
     return;
   }
   deliver();
-});
+}
 
 const chromeShim = {
   runtime: {
