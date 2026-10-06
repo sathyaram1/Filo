@@ -441,7 +441,7 @@ function depVere(P, opz, log) {
     async claude({ ruolo, prompt, cwd, addDirs, nome }) {
       for (const d of addDirs || []) mkdirSync(d, { recursive: true });
       const r = await esegui(bin, argomentiClaude({ ...ruoli[ruolo], nome, addDirs, budget: opz.budgetIstanza }), {
-        cwd, input: prompt, env, timeoutMs: opz.oreIstanza * 60 * 60_000,
+        cwd, input: prompt, env, timeoutMs: opz.oreIstanza ? opz.oreIstanza * 60 * 60_000 : 0,
       });
       const f = join(P.note, 'log', `${nome.replace(/[^a-z0-9]+/gi, '-')}-${new Date().toISOString().replace(/[:.]/g, '')}.json`);
       writeFileSync(f, `${r.stdout}\n${r.stderr ? `\n--- stderr ---\n${r.stderr}` : ''}`);
