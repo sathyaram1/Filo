@@ -637,6 +637,7 @@
       // gli appunti più vecchi (feedback alpha).
       const t = e && e.target;
       if (t && t.nodeType === 1) {
+        if (activeMenu?.subRoot && activeMenu.subRoot.contains(t)) return;
         if (root.contains(t)) {
           // #500 — il menu ha scorso sotto al pannello ancorato: la freccetta
           // che l'ha aperto si è spostata, e il pannello va con lei (o si
@@ -646,7 +647,6 @@
           repositionSub();
           return;
         }
-        if (activeMenu?.subRoot && activeMenu.subRoot.contains(t)) return;
       }
       if (keepOnScroll) return;
       close();
@@ -780,7 +780,7 @@
       }
     }
 
-    menuHost().appendChild(sub);
+    casaDeiPezzi().appendChild(sub);
     const cleanupZoom = (global.SN_POPUP?.attachZoomCompensation || (() => () => {}))(sub);
     activeMenu.cleanups.push(cleanupZoom);
     activeMenu.subRoot = sub;
@@ -996,7 +996,7 @@
       setTimeout(() => { try { input.focus({ preventScroll: true }); } catch (_) {} }, 0);
     }
 
-    menuHost().appendChild(sub);
+    casaDeiPezzi().appendChild(sub);
     // Compensazione zoom anche per il sub-menu
     const cleanupZoom = (global.SN_POPUP?.attachZoomCompensation || (() => () => {}))(sub);
     activeMenu.cleanups.push(cleanupZoom);
@@ -1039,7 +1039,7 @@
     populateGrid(sub, items, { dropTarget: opts.dropTarget });
     if (opts.dropTarget) attachDropZone(sub, { target: opts.dropTarget, onDrop: opts.onDrop });
 
-    menuHost().appendChild(sub);
+    casaDeiPezzi().appendChild(sub);
     const cleanupZoom = (global.SN_POPUP?.attachZoomCompensation || (() => () => {}))(sub);
     activeMenu.cleanups.push(cleanupZoom);
     activeMenu.subRoot = sub;
@@ -1070,6 +1070,8 @@
   function showTooltip(target, text) {
     if (!text) return;
     const el = ensureTooltipEl();
+    const casa = casaDeiPezzi(target);
+    if (el.parentNode !== casa) casa.appendChild(el);
     el.dataset.snTheme = document.documentElement.dataset.snTheme || '';
     el.textContent = text;
     el.style.display = '';
@@ -1283,7 +1285,7 @@
         const r = el.getBoundingClientRect();
         preview.style.width = r.width + 'px';
         preview.style.height = r.height + 'px';
-        menuHost().appendChild(preview);
+        casaDeiPezzi().appendChild(preview);
         updatePreview(x, y);
       };
 
