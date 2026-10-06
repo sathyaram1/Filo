@@ -230,9 +230,18 @@
     ].filter((x) => String(x || '').trim()).join('\n\n');
   }
 
+  // L'ordine dei messaggi per il modello: il tratto del filo (identico fra un turno e l'altro), quello che la scheda
+  // ha in più, il contesto di adesso con i ricordi, la domanda. Tutto ciò che cambia sta dopo il tratto.
+  function assembla({ tratto = [], scheda = [], contesto = '', domanda = null } = {}) {
+    const out = [...tratto, ...scheda];
+    if (String(contesto || '').trim()) out.push({ role: 'user', content: contesto });
+    if (domanda) out.push(domanda);
+    return out;
+  }
+
   global.SN_FILO_CONTESTO = {
     TETTI_DI_SERIE, LIMITI, MESSAGGI_CON_ESITI, MESSAGGI_DELLA_CHAT, SOGLIA_RICORDO, MAX_RICORDI,
     tetti, numeroIn, stimaToken, taglio, passoTaglio, etichettaChat, quando, intestazione, chiave,
-    finestra, tratti, testoPerIndice, scegliRicordi, rendiRicordi, coda,
+    finestra, tratti, testoPerIndice, scegliRicordi, rendiRicordi, coda, assembla,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
