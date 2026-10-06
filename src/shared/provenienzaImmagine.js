@@ -1,0 +1,1304 @@
+// Cosa DICHIARA un'immagine sulla propria origine, letta dai suoi soli byte.
+// Non guarda mai i pixel e non stima niente: nessuna etichetta = nessuna riga.
+// Perché il silenzio e i «non so» sono obbligatori: patterns/unetichetta-di-origine-e-una-dichiarazione-non-una-prova.md
+
+(function (global) {
+  'use strict';
+
+  // Node c'è nel main e negli unit test, non nelle pagine: senza, la firma
+  // resta «non verificabile» e non diventa mai «valida».
+  function nodeMod(nome) {
+    try { return (typeof require === 'function') ? require(nome) : null; } catch (_) { return null; }
+  }
+
+  // Gli usi che il C2PA ammette sul certificato di chi firma un manifesto: gli
+  // stessi del lettore di riferimento, così un firmatario valido là vale anche qui.
+  const USI_FIRMA = new Set([
+    '1.3.6.1.5.5.7.3.4',
+    '1.3.6.1.5.5.7.3.36',
+    '1.3.6.1.5.5.7.3.8',
+    '1.3.6.1.5.5.7.3.9',
+    '1.3.6.1.4.1.311.76.59.1.9',
+    '1.3.6.1.4.1.62558.2.1',
+  ]);
+
+  // I codici IPTC: sono URI, e la coda dopo l'ultima barra è il vocabolo.
+  const SORGENTI = {
+    trainedalgorithmicmedia: 'ai',
+    compositewithtrainedalgorithmicmedia: 'ai-modificata',
+    algorithmicallyenhanced: 'ai-modificata',
+    digitalcapture: 'fotocamera',
+    digitalcreation: null,
+    algorithmicmedia: null,
+    negativefilm: null,
+    positivefilm: null,
+    print: null,
+    minorhumanedits: null,
+    compositecapture: null,
+    composite: null,
+    softwareimage: null,
+  };
+
+  // Chiavi di testo che i generatori scrivono nei PNG: la chiave da sola basta a
+  // dire chi ha scritto, il valore serve solo a sapere che non è vuoto.
+  const CHIAVI_PNG = [
+    { chiave: 'parameters', ente: 'Stable Diffusion' },
+    { chiave: 'workflow', ente: 'ComfyUI' },
+    { chiave: 'prompt', ente: 'ComfyUI' },
+    { chiave: 'sd-metadata', ente: 'InvokeAI' },
+    { chiave: 'invokeai_metadata', ente: 'InvokeAI' },
+    { chiave: 'invokeai_graph', ente: 'InvokeAI' },
+    { chiave: 'dream', ente: 'InvokeAI' },
+  ];
+
+  // `Software`/`Comment` non dicono da soli che è AI: serve il nome del programma.
+  const PROGRAMMI_AI = [
+    { ago: 'novelai', ente: 'NovelAI' },
+    { ago: 'stable diffusion', ente: 'Stable Diffusion' },
+    { ago: 'stablediffusion', ente: 'Stable Diffusion' },
+    { ago: 'automatic1111', ente: 'Stable Diffusion' },
+    { ago: 'comfyui', ente: 'ComfyUI' },
+    { ago: 'invokeai', ente: 'InvokeAI' },
+    { ago: 'midjourney', ente: 'Midjourney' },
+    { ago: 'dall-e', ente: 'OpenAI' },
+    { ago: 'dalle', ente: 'OpenAI' },
+    { ago: 'chatgpt', ente: 'OpenAI' },
+    { ago: 'openai', ente: 'OpenAI' },
+    { ago: 'imagen', ente: 'Google' },
+    { ago: 'gemini', ente: 'Google' },
+    { ago: 'firefly', ente: 'Adobe' },
+    { ago: 'grok', ente: 'xAI' },
+    { ago: 'flux', ente: 'Black Forest Labs' },
+    { ago: 'leonardo.ai', ente: 'Leonardo.Ai' },
+    { ago: 'ideogram', ente: 'Ideogram' },
+    { ago: 'recraft', ente: 'Recraft' },
+  ];
+
+  // ───────────────────────────── byte e numeri ─────────────────────────────
+
+  function u8(b) {
+    if (!b) return new Uint8Array(0);
+    if (b instanceof Uint8Array) return b;
+    if (typeof ArrayBuffer !== 'undefined' && b instanceof ArrayBuffer) return new Uint8Array(b);
+    if (b.buffer) return new Uint8Array(b.buffer, b.byteOffset || 0, b.byteLength);
+    return new Uint8Array(b);
+  }
+  const be16 = (b, i) => (b[i] << 8) | b[i + 1];
+  const be32 = (b, i) => ((b[i] << 24) | (b[i + 1] << 16) | (b[i + 2] << 8) | b[i + 3]) >>> 0;
+  const le32 = (b, i) => ((b[i + 3] << 24) | (b[i + 2] << 16) | (b[i + 1] << 8) | b[i]) >>> 0;
+  const fourcc = (b, i) => String.fromCharCode(b[i], b[i + 1], b[i + 2], b[i + 3]);
+
+  function latin1(b, i, n) {
+    let s = '';
+    for (let k = i; k < i + n; k++) s += String.fromCharCode(b[k]);
+    return s;
+  }
+  function utf8(b, i = 0, n = b.length - i) {
+    const slice = b.subarray(i, i + n);
+    if (typeof TextDecoder !== 'undefined') {
+      try { return new TextDecoder('utf-8', { fatal: false }).decode(slice); } catch (_) {}
+    }
+    return latin1(slice, 0, slice.length);
+  }
+
+  // ───────────────────────────────── CBOR ──────────────────────────────────
+
+  // Sottoinsieme che serve al C2PA: interi, byte, testo, liste, mappe, tag,
+  // costanti e float. Rifiuta invece di indovinare: un CBOR storto non è un dato.
+  function cborDecode(b, stato) {
+    const s = stato || { i: 0 };
+    const b0 = b[s.i++];
+    if (b0 === undefined) throw new Error('cbor troncato');
+    const mt = b0 >> 5;
+    const ai = b0 & 0x1f;
+    let len = 0;
+    let indef = false;
+    if (ai < 24) len = ai;
+    else if (ai === 24) len = b[s.i++];
+    else if (ai === 25) { len = be16(b, s.i); s.i += 2; }
+    else if (ai === 26) { len = be32(b, s.i); s.i += 4; }
+    else if (ai === 27) {
+      const hi = be32(b, s.i); const lo = be32(b, s.i + 4); s.i += 8;
+      len = hi * 4294967296 + lo;
+    } else if (ai === 31) indef = true;
+    else throw new Error('cbor: lunghezza non valida');
+
+    if (mt === 0) return len;
+    if (mt === 1) return -1 - len;
+    if (mt === 2 || mt === 3) {
+      if (indef) {
+        const pezzi = [];
+        for (;;) {
+          if (b[s.i] === 0xff) { s.i++; break; }
+          const p = cborDecode(b, s);
+          pezzi.push(mt === 2 ? u8(p) : p);
+        }
+        if (mt === 3) return pezzi.join('');
+        let tot = 0; for (const p of pezzi) tot += p.length;
+        const out = new Uint8Array(tot);
+        let o = 0; for (const p of pezzi) { out.set(p, o); o += p.length; }
+        return out;
+      }
+      if (s.i + len > b.length) throw new Error('cbor troncato');
+      const raw = b.subarray(s.i, s.i + len);
+      s.i += len;
+      return mt === 2 ? raw : utf8(raw, 0, raw.length);
+    }
+    if (mt === 4) {
+      const out = [];
+      if (indef) { for (;;) { if (b[s.i] === 0xff) { s.i++; break; } out.push(cborDecode(b, s)); } return out; }
+      for (let k = 0; k < len; k++) out.push(cborDecode(b, s));
+      return out;
+    }
+    if (mt === 5) {
+      // Chiavi scelte da chi manda il file: la mappa non eredita da Object.
+      const out = Object.create(null);
+      const metti = () => {
+        const k = cborDecode(b, s);
+        const v = cborDecode(b, s);
+        out[typeof k === 'string' ? k : String(k)] = v;
+      };
+      if (indef) { for (;;) { if (b[s.i] === 0xff) { s.i++; break; } metti(); } return out; }
+      for (let k = 0; k < len; k++) metti();
+      return out;
+    }
+    if (mt === 6) return { __tag: len, valore: cborDecode(b, s) };
+    if (mt === 7) {
+      if (ai === 20) return false;
+      if (ai === 21) return true;
+      if (ai === 22) return null;
+      if (ai === 23) return undefined;
+      if (ai === 25 || ai === 26 || ai === 27) return 0;
+      return len;
+    }
+    throw new Error('cbor: tipo sconosciuto');
+  }
+
+  function cborTesta(b) {
+    try { return cborDecode(u8(b), { i: 0 }); } catch (_) { return null; }
+  }
+
+  // Encoder minimo: serve solo a ricostruire la Sig_structure da firmare.
+  function cborLen(mt, n) {
+    if (n < 24) return new Uint8Array([(mt << 5) | n]);
+    if (n < 256) return new Uint8Array([(mt << 5) | 24, n]);
+    if (n < 65536) return new Uint8Array([(mt << 5) | 25, n >> 8, n & 255]);
+    return new Uint8Array([(mt << 5) | 26, (n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255]);
+  }
+  function cborBstr(bytes) { return concat([cborLen(2, bytes.length), bytes]); }
+  function cborTstr(s) {
+    const bytes = (typeof TextEncoder !== 'undefined') ? new TextEncoder().encode(s) : u8(Array.from(s, (c) => c.charCodeAt(0)));
+    return concat([cborLen(3, bytes.length), bytes]);
+  }
+  function concat(parti) {
+    let tot = 0; for (const p of parti) tot += p.length;
+    const out = new Uint8Array(tot);
+    let o = 0; for (const p of parti) { out.set(p, o); o += p.length; }
+    return out;
+  }
+
+  // ───────────────────────────────── JUMBF ─────────────────────────────────
+
+  // Un box: { tipo, etichetta, dati, figli, raw }. Le impronte del claim (asserzioni,
+  // manifesti degli ingredienti) lo standard le calcola su `dati`, senza intestazione.
+  function jumbfBoxes(b, da, a) {
+    const out = [];
+    let i = da;
+    while (i + 8 <= a) {
+      let lbox = be32(b, i);
+      const tipo = fourcc(b, i + 4);
+      let testa = 8;
+      if (lbox === 1) {
+        if (i + 16 > a) break;
+        const hi = be32(b, i + 8); const lo = be32(b, i + 12);
+        lbox = hi * 4294967296 + lo;
+        testa = 16;
+      } else if (lbox === 0) {
+        lbox = a - i;
+      }
+      if (lbox < testa || i + lbox > a) break;
+      const box = { tipo, etichetta: '', dati: b.subarray(i + testa, i + lbox), raw: b.subarray(i, i + lbox), figli: [] };
+      if (tipo === 'jumb') {
+        box.figli = jumbfBoxes(b, i + testa, i + lbox);
+        const jumd = box.figli.find((f) => f.tipo === 'jumd');
+        if (jumd) box.etichetta = etichettaJumd(jumd.dati);
+      }
+      out.push(box);
+      i += lbox;
+    }
+    return out;
+  }
+
+  function etichettaJumd(d) {
+    if (d.length < 17) return '';
+    const tog = d[16];
+    if (!(tog & 0x02)) return '';
+    let fine = 17;
+    while (fine < d.length && d[fine] !== 0) fine++;
+    return utf8(d, 17, fine - 17);
+  }
+
+  // Cerca in profondità il primo superbox con quell'etichetta.
+  function perEtichetta(boxes, etichetta) {
+    for (const b of boxes) {
+      if (b.etichetta === etichetta) return b;
+      if (b.figli.length) {
+        const dentro = perEtichetta(b.figli, etichetta);
+        if (dentro) return dentro;
+      }
+    }
+    return null;
+  }
+  // Il contenuto vero di un superbox: il primo figlio che non è la descrizione.
+  function contenuto(box) {
+    if (!box) return null;
+    const c = box.figli.find((f) => f.tipo !== 'jumd');
+    return c ? c.dati : null;
+  }
+
+  // ─────────────────────────── contenitori immagine ────────────────────────
+
+  function leggiContenitore(b) {
+    if (b.length >= 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return png(b);
+    if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8) return jpeg(b);
+    if (b.length >= 12 && fourcc(b, 0) === 'RIFF' && fourcc(b, 8) === 'WEBP') return webp(b);
+    if (b.length >= 12 && fourcc(b, 4) === 'ftyp') return bmff(b);
+    return { c2pa: null, xmp: [], testiPng: null, formato: '' };
+  }
+
+  function png(b) {
+    const res = { c2pa: null, xmp: [], testiPng: Object.create(null), formato: 'png' };
+    const zlib = nodeMod('node:zlib');
+    let i = 8;
+    while (i + 8 <= b.length) {
+      const len = be32(b, i);
+      const tipo = fourcc(b, i + 4);
+      const da = i + 8;
+      if (len > b.length || da + len > b.length) break;
+      const dati = b.subarray(da, da + len);
+      if (tipo === 'caBX' && !res.c2pa) res.c2pa = jumbfBoxes(dati, 0, dati.length);
+      else if (tipo === 'tEXt' || tipo === 'zTXt' || tipo === 'iTXt') {
+        const voce = testoPng(tipo, dati, zlib);
+        if (voce) {
+          if (/^XML:com\.adobe\.xmp$/i.test(voce.chiave)) res.xmp.push(voce.valore);
+          else if (!(voce.chiave.toLowerCase() in res.testiPng)) res.testiPng[voce.chiave.toLowerCase()] = voce.valore;
+        }
+      }
+      if (tipo === 'IEND') break;
+      i = da + len + 4;
+    }
+    return res;
+  }
+
+  // Un testo compresso può valere mille volte il file (#946): oltre il tetto non si decomprime, ma la chiave da sola resta una prova.
+  const MAX_TESTO_PNG = 16 * 1024 * 1024;
+  const TESTO_OLTRE_TETTO = '…';
+  function decomprimi(zlib, dati) {
+    try {
+      return utf8(u8(zlib.inflateSync(Buffer.from(dati), { maxOutputLength: MAX_TESTO_PNG })));
+    } catch (e) {
+      if (e && (e.code === 'ERR_BUFFER_TOO_LARGE' || e instanceof RangeError)) return TESTO_OLTRE_TETTO;
+      throw e;
+    }
+  }
+
+  function testoPng(tipo, d, zlib) {
+    let fine = 0;
+    while (fine < d.length && d[fine] !== 0) fine++;
+    if (fine >= d.length) return null;
+    const chiave = latin1(d, 0, fine);
+    let p = fine + 1;
+    try {
+      if (tipo === 'tEXt') return { chiave, valore: latin1(d, p, d.length - p) };
+      if (tipo === 'zTXt') {
+        p += 1;
+        if (!zlib) return null;
+        return { chiave, valore: decomprimi(zlib, d.subarray(p)) };
+      }
+      const compresso = d[p]; p += 2;
+      while (p < d.length && d[p] !== 0) p++; p++;
+      while (p < d.length && d[p] !== 0) p++; p++;
+      if (p > d.length) return null;
+      const coda = d.subarray(p);
+      if (!compresso) return { chiave, valore: utf8(coda) };
+      if (!zlib) return null;
+      return { chiave, valore: decomprimi(zlib, coda) };
+    } catch (_) { return null; }
+  }
+
+  function jpeg(b) {
+    const res = { c2pa: null, xmp: [], testiPng: null, formato: 'jpeg' };
+    const pacchetti = new Map();
+    let i = 2;
+    while (i + 4 <= b.length) {
+      if (b[i] !== 0xff) { i++; continue; }
+      const m = b[i + 1];
+      if (m === 0xd8 || m === 0x01 || (m >= 0xd0 && m <= 0xd7)) { i += 2; continue; }
+      if (m === 0xd9 || m === 0xda) break;
+      const len = be16(b, i + 2);
+      if (len < 2 || i + 2 + len > b.length) break;
+      const dati = b.subarray(i + 4, i + 2 + len);
+      if (m === 0xe1 && dati.length > 29 && latin1(dati, 0, 28) === 'http://ns.adobe.com/xap/1.0/') {
+        res.xmp.push(utf8(dati, 29, dati.length - 29));
+      } else if (m === 0xeb && dati.length > 8 && dati[0] === 0x4a && dati[1] === 0x50) {
+        const istanza = be16(dati, 2);
+        const seq = be32(dati, 4);
+        if (!pacchetti.has(istanza)) pacchetti.set(istanza, []);
+        pacchetti.get(istanza).push({ seq, dati: dati.subarray(8) });
+      }
+      i += 2 + len;
+    }
+    for (const lista of pacchetti.values()) {
+      lista.sort((x, y) => x.seq - y.seq);
+      // LBox e TBox si ripetono in ogni pacchetto: si tengono solo dal primo.
+      const pezzi = lista.map((p, k) => (k === 0 ? p.dati : p.dati.subarray(8)));
+      const unito = concat(pezzi);
+      const boxes = jumbfBoxes(unito, 0, unito.length);
+      if (boxes.length) { res.c2pa = boxes; break; }
+    }
+    return res;
+  }
+
+  function webp(b) {
+    const res = { c2pa: null, xmp: [], testiPng: null, formato: 'webp' };
+    let i = 12;
+    while (i + 8 <= b.length) {
+      const tag = fourcc(b, i);
+      const len = le32(b, i + 4);
+      const da = i + 8;
+      if (da + len > b.length) break;
+      const dati = b.subarray(da, da + len);
+      if (tag === 'C2PA' && !res.c2pa) res.c2pa = jumbfBoxes(dati, 0, dati.length);
+      else if (tag === 'XMP ') res.xmp.push(utf8(dati));
+      i = da + len + (len & 1);
+    }
+    return res;
+  }
+
+  const UUID_C2PA = 'd8fec3d61b0e483c92975828877ec481';
+
+  // I box di un livello: { tipo, inizio, fine, testa }. `testa` include l'usertype dei box uuid.
+  function boxBmff(b, da, a) {
+    const out = [];
+    let i = da;
+    while (i + 8 <= a) {
+      let size = be32(b, i);
+      const tipo = fourcc(b, i + 4);
+      let testa = 8;
+      if (size === 1) {
+        if (i + 16 > a) break;
+        size = be32(b, i + 8) * 4294967296 + be32(b, i + 12);
+        testa = 16;
+      } else if (size === 0) size = a - i;
+      if (size < testa || i + size > a) break;
+      if (tipo === 'uuid') testa += 16;
+      out.push({ tipo, inizio: i, fine: i + size, testa: Math.min(testa, size) });
+      i += size;
+    }
+    return out;
+  }
+  function uuidDi(b, box) {
+    if (box.tipo !== 'uuid' || box.testa - 16 < 8) return '';
+    let hex = '';
+    for (let k = box.inizio + box.testa - 16; k < box.inizio + box.testa; k++) hex += b[k].toString(16).padStart(2, '0');
+    return hex;
+  }
+
+  // Lo standard mette davanti al JUMBF versione e flag, lo scopo del box e, per «manifest», una posizione da 8 byte.
+  function jumbfDaUuid(b, box) {
+    let p = box.inizio + box.testa + 4;
+    let fine = p;
+    while (fine < box.fine && fine - p < 64 && b[fine] !== 0) fine++;
+    if (fine >= box.fine || b[fine] !== 0) return null;
+    const scopo = latin1(b, p, fine - p);
+    if (scopo !== 'manifest') return null;
+    p = fine + 1 + 8;
+    const boxes = p < box.fine ? jumbfBoxes(b, p, box.fine) : [];
+    return boxes.some((x) => x.tipo === 'jumb') ? boxes : null;
+  }
+
+  // Nei file BMFF l'XMP è un elemento dentro meta/mdat, puntato da tabelle di posizioni:
+  // il pacchetto è testo in chiaro, quindi lo si cerca dov'è invece di ricostruire le tabelle.
+  const XMP_APRE = [0x3c, 0x78, 0x3a, 0x78, 0x6d, 0x70, 0x6d, 0x65, 0x74, 0x61]; // <x:xmpmeta
+  const XMP_CHIUDE = '</x:xmpmeta>';
+  const MAX_XMP = 4 * 1024 * 1024;
+  function cercaXmp(b, da, a, out) {
+    let i = da;
+    while (out.length < 8) {
+      i = b.indexOf(XMP_APRE[0], i);
+      if (i < 0 || i + XMP_APRE.length > a) return;
+      let uguale = true;
+      for (let k = 1; k < XMP_APRE.length; k++) if (b[i + k] !== XMP_APRE[k]) { uguale = false; break; }
+      if (!uguale) { i++; continue; }
+      const testo = utf8(b, i, Math.min(a - i, MAX_XMP));
+      const chiude = testo.indexOf(XMP_CHIUDE);
+      if (chiude < 0) return;
+      out.push(testo.slice(0, chiude + XMP_CHIUDE.length));
+      i += chiude + XMP_CHIUDE.length;
+    }
+  }
+
+  function bmff(b) {
+    const res = { c2pa: null, xmp: [], testiPng: null, formato: 'bmff' };
+    for (const box of boxBmff(b, 0, b.length)) {
+      if (uuidDi(b, box) === UUID_C2PA) {
+        if (!res.c2pa) res.c2pa = jumbfDaUuid(b, box);
+        continue;
+      }
+      if (box.tipo === 'meta' || box.tipo === 'mdat' || box.tipo === 'uuid') cercaXmp(b, box.inizio, box.fine, res.xmp);
+    }
+    return res;
+  }
+
+  // Il legame duro dei file BMFF: si escludono i box che l'asserzione nomina; dalla
+  // versione 2 ogni box di primo livello rimasto porta nell'impronta anche la propria posizione.
+  function boxPerPercorso(b, xpath) {
+    const passi = String(xpath || '').split('/').filter(Boolean);
+    if (!passi.length || passi.length > 8) return [];
+    let livello = boxBmff(b, 0, b.length);
+    let trovati = [];
+    for (let n = 0; n < passi.length; n++) {
+      const m = /^([^[\]]{1,4})(?:\[(\d+)\])?$/.exec(passi[n]);
+      if (!m) return [];
+      trovati = livello.filter((x) => x.tipo === m[1].padEnd(4, ' ').slice(0, 4) || x.tipo === m[1]);
+      if (m[2] !== undefined) trovati = trovati[Number(m[2])] ? [trovati[Number(m[2])]] : [];
+      if (n + 1 < passi.length) {
+        livello = [];
+        for (const t of trovati) livello.push(...boxBmff(b, t.inizio + t.testa + (t.tipo === 'meta' ? 4 : 0), t.fine));
+      }
+    }
+    return trovati;
+  }
+  function fileIntattoBmff(hashBmff, byteFile) {
+    const h = hashBmff && hashBmff.dati;
+    if (!h || typeof h !== 'object') return null;
+    const atteso = u8(h.hash);
+    if (!atteso.length) return null;
+    const crypto = nodeMod('node:crypto');
+    if (!crypto) return null;
+    const b = byteFile;
+    const escluse = [];
+    let posizioni = boxBmff(b, 0, b.length).map((x) => x.inizio);
+    for (const ex of Array.isArray(h.exclusions) ? h.exclusions : []) {
+      if (!ex || typeof ex !== 'object') continue;
+      for (const box of boxPerPercorso(b, ex.xpath)) {
+        const lungo = box.fine - box.inizio;
+        if (ex.length != null && Number(ex.length) !== lungo) continue;
+        const dopo = box.inizio + box.testa;
+        if (ex.version != null && b[dopo] !== Number(ex.version)) continue;
+        if (ex.flags != null) {
+          const f = u8(ex.flags);
+          const voluti = ((f[0] || 0) << 16) | ((f[1] || 0) << 8) | (f[2] || 0);
+          const veri = (b[dopo + 1] << 16) | (b[dopo + 2] << 8) | b[dopo + 3];
+          if (ex.exact === false ? (voluti | veri) !== voluti : voluti !== veri) continue;
+        }
+        if (Array.isArray(ex.data) && !ex.data.every((d) => {
+          const v = u8(d && d.value);
+          const da = box.inizio + (Number(d && d.offset) || 0);
+          return da + v.length <= b.length && ugualiByte(b.subarray(da, da + v.length), v);
+        })) continue;
+        if (Array.isArray(ex.subset)) {
+          for (const s of ex.subset) {
+            const off = Number(s && s.offset) || 0;
+            if (off > lungo) continue;
+            const l = Number(s && s.length) ? Math.min(Number(s.length), lungo - off) : lungo - off;
+            escluse.push([box.inizio + off, box.inizio + off + l]);
+          }
+        } else {
+          escluse.push([box.inizio, box.fine]);
+          posizioni = posizioni.filter((p) => p !== box.inizio);
+        }
+      }
+    }
+    escluse.sort((x, y) => x[0] - y[0]);
+    const incluse = [];
+    let i = 0;
+    for (const [da, a] of escluse) {
+      if (da > i) incluse.push([i, da]);
+      i = Math.max(i, a);
+    }
+    if (i < b.length) incluse.push([i, b.length]);
+    const conPosizioni = hashBmff.versione > 1;
+    // Come il lettore di riferimento: la posizione di un box entra nell'impronta subito prima dei suoi byte.
+    const pezzi = [];
+    for (const [da, a] of incluse) {
+      let inizio = da;
+      if (conPosizioni) {
+        for (const p of posizioni) {
+          if (p < inizio || p >= a) continue;
+          if (p > inizio) pezzi.push({ da: inizio, a: p });
+          pezzi.push({ posizione: p });
+          inizio = p;
+        }
+      }
+      pezzi.push({ da: inizio, a });
+    }
+    if (conPosizioni && incluse.length) {
+      const primo = incluse[0][0];
+      const ultimo = incluse[incluse.length - 1][1] - 1;
+      for (const p of posizioni) {
+        if (incluse.some(([da, a]) => p >= da && p < a)) continue;
+        if (p > primo && p < ultimo) pezzi.push({ posizione: p, dopo: true });
+      }
+      pezzi.sort((x, y) => (x.posizione != null ? x.posizione : x.da) - (y.posizione != null ? y.posizione : y.da));
+    }
+    const nome = { sha256: 'sha256', sha384: 'sha384', sha512: 'sha512' }[String(h.alg || hashBmff.alg || 'sha256').toLowerCase()];
+    if (!nome) return false;
+    const hasher = crypto.createHash(nome);
+    for (const pz of pezzi) {
+      if (pz.posizione != null) {
+        const o = Buffer.alloc(8);
+        o.writeBigUInt64BE(BigInt(pz.posizione));
+        hasher.update(o);
+      } else if (pz.a > pz.da) hasher.update(b.subarray(pz.da, pz.a));
+    }
+    return ugualiByte(u8(hasher.digest()), atteso);
+  }
+
+  // ─────────────────────────────── XMP e IPTC ──────────────────────────────
+
+  function codiceSorgente(uri) {
+    const coda = String(uri || '').trim().replace(/\/+$/, '').split('/').pop().toLowerCase();
+    return Object.prototype.hasOwnProperty.call(SORGENTI, coda) ? SORGENTI[coda] : null;
+  }
+
+  function leggiXmp(testo) {
+    const t = String(testo || '');
+    const fonti = [];
+    // Quantificatori con un tetto: senza, un XMP ripetitivo costa il quadrato della sua lunghezza (#946).
+    // XML ammette gli attributi fra apici semplici quanto fra virgolette.
+    const re = /DigitalSourceType\s{0,200}(?:=\s{0,200}(?:"([^"]{0,400})"|'([^']{0,400})')|>\s{0,200}([^<]{0,400})<)/gi;
+    let m;
+    while ((m = re.exec(t))) fonti.push((m[1] || m[2] || m[3] || '').trim());
+    const res2 = /DigitalSourceType[^>]{0,400}rdf:resource\s{0,200}=\s{0,200}(?:"([^"]{0,400})"|'([^']{0,400})')/i.exec(t);
+    if (res2) fonti.push(res2[1] || res2[2]);
+    let origine = null;
+    for (const f of fonti) {
+      const c = codiceSorgente(f);
+      if (c === 'ai') { origine = 'ai'; break; }
+      if (c && !origine) origine = c;
+    }
+    // Il programma prima dell'autore: è lui che dice se l'immagine è generata, in qualunque ordine stiano nel file.
+    let nome = '';
+    for (const campo of ['xmp:CreatorTool', 'photoshop:Credit', 'dc:creator', 'tiff:Make']) {
+      const chi = new RegExp(campo + `\\s{0,200}(?:=\\s{0,200}(?:"([^"]{0,400})"|'([^']{0,400})')|>\\s{0,200}(?:<rdf:(?:Seq|Bag|Alt)>\\s{0,200}<rdf:li[^>]{0,200}>)?([^<]{0,400})<)`, 'i').exec(t);
+      nome = chi ? String(chi[1] || chi[2] || chi[3] || '').trim() : '';
+      if (nome) break;
+    }
+    // «Adobe Photoshop 25.0 (Windows)»: il sistema su cui girava non dice chi dichiara.
+    return { origine, dichiarante: nome.replace(/\s*\((?:windows|macintosh|mac ?os[^)]*|linux|android|ios)\)$/i, '') };
+  }
+
+  // ─────────────────────────────── C2PA ────────────────────────────────────
+
+  function sha(alg, bytes) {
+    const crypto = nodeMod('node:crypto');
+    if (!crypto) return null;
+    const nome = { 'sha256': 'sha256', 'sha384': 'sha384', 'sha512': 'sha512' }[String(alg || 'sha256').toLowerCase()] || 'sha256';
+    return u8(crypto.createHash(nome).update(Buffer.from(bytes)).digest());
+  }
+  function ugualiByte(a, b) {
+    if (!a || !b || a.length !== b.length) return false;
+    let diff = 0;
+    for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+    return diff === 0;
+  }
+
+  const ALG_COSE = {
+    '-7': { hash: 'sha256', tipo: 'ec' },
+    '-35': { hash: 'sha384', tipo: 'ec' },
+    '-36': { hash: 'sha512', tipo: 'ec' },
+    '-37': { hash: 'sha256', tipo: 'pss' },
+    '-38': { hash: 'sha384', tipo: 'pss' },
+    '-39': { hash: 'sha512', tipo: 'pss' },
+    '-257': { hash: 'sha256', tipo: 'pkcs1' },
+    '-8': { hash: null, tipo: 'eddsa' },
+  };
+
+  // Verifica la COSE_Sign1 staccata del C2PA sul claim. Torna
+  // { valida, motivo, certificati } — mai `valida` senza aver verificato davvero.
+  function verificaCose(coseBytes, claimBytes) {
+    const crypto = nodeMod('node:crypto');
+    if (!crypto || !crypto.X509Certificate) return { valida: false, motivo: 'non_verificabile', soggetto: '' };
+    let cose = cborTesta(coseBytes);
+    if (cose && cose.__tag !== undefined) cose = cose.valore;
+    if (!Array.isArray(cose) || cose.length < 4) return { valida: false, motivo: 'firma_illeggibile', soggetto: '' };
+    const protetto = u8(cose[0]);
+    const nonProtetto = cose[1];
+    const firma = u8(cose[3]);
+    const testa = cborTesta(protetto);
+    if (!testa || typeof testa !== 'object') return { valida: false, motivo: 'firma_illeggibile', soggetto: '' };
+    const alg = ALG_COSE[String(testa['1'])];
+    if (!alg) return { valida: false, motivo: 'firma_algoritmo_ignoto', soggetto: '' };
+
+    // Fino al 2023 circa la catena stava sotto l'etichetta testuale «x5chain», di solito fuori dalla parte protetta:
+    // il lettore di riferimento la legge ancora, e un file valido non va detto «firma non valida» (#946).
+    const fuori = nonProtetto && typeof nonProtetto === 'object' ? nonProtetto : {};
+    let catena = [testa['33'], testa.x5chain, fuori['33'], fuori.x5chain].find((c) => c !== undefined);
+    if (catena && !Array.isArray(catena)) catena = [catena];
+    if (!Array.isArray(catena) || !catena.length) return { valida: false, motivo: 'firma_senza_certificato', soggetto: '' };
+
+    let certs;
+    try { certs = catena.map((c) => new crypto.X509Certificate(Buffer.from(u8(c)))); } catch (_) {
+      return { valida: false, motivo: 'firma_illeggibile', soggetto: '' };
+    }
+
+    const sig = concat([cborTstr('Signature1'), cborBstr(protetto), cborBstr(new Uint8Array(0)), cborBstr(u8(claimBytes))]);
+    const dati = Buffer.from(concat([cborLen(4, 4), sig]));
+
+    // Una chiave che questo motore crittografico non sa leggere non rende falsa la firma: la rende non verificabile (#946).
+    let chiave;
+    try { chiave = chiavePubblica(certs[0]); } catch (_) {
+      return { valida: false, motivo: 'non_verificabile', soggetto: '' };
+    }
+    let ok = false;
+    try {
+      if (alg.tipo === 'eddsa') ok = crypto.verify(null, dati, chiave, Buffer.from(firma));
+      else if (alg.tipo === 'ec') ok = crypto.verify(alg.hash, dati, { key: chiave, dsaEncoding: 'ieee-p1363' }, Buffer.from(firma));
+      else if (alg.tipo === 'pss') {
+        ok = crypto.verify(alg.hash, dati, {
+          key: chiave,
+          padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
+          saltLength: crypto.constants.RSA_PSS_SALTLEN_DIGEST,
+        }, Buffer.from(firma));
+      } else ok = crypto.verify(alg.hash, dati, chiave, Buffer.from(firma));
+    } catch (_) {
+      return { valida: false, motivo: 'non_verificabile', soggetto: '' };
+    }
+    if (!ok) return { valida: false, motivo: 'firma_non_valida', soggetto: '' };
+
+    // La catena serve a sapere CHI ha firmato: un anello che non torna rende il
+    // nome sul certificato una parola come un'altra, non un'attribuzione.
+    let catenaIntegra = true;
+    for (let i = 0; i + 1 < certs.length; i++) {
+      try { if (!certs[i].verify(chiavePubblica(certs[i + 1]))) catenaIntegra = false; } catch (_) { catenaIntegra = false; }
+    }
+    return {
+      valida: true,
+      motivo: '',
+      soggetto: campoCert(certs[0].subject, 'O') || campoCert(certs[0].subject, 'CN') || '',
+      catenaIntegra,
+      scaduto: scaduto(certs[0]),
+      marca: scaduto(certs[0]) ? leggiMarca(nonProtetto, protetto, claimBytes, firma) : null,
+      certificati: certs,
+    };
+  }
+
+  function campoCert(testo, nome) {
+    const m = new RegExp('(?:^|\\n)' + nome + '=([^\\n]*)').exec(String(testo || ''));
+    return m ? m[1].trim() : '';
+  }
+  // «OpenAI, L.L.C.» e «Google LLC» a schermo sono OpenAI e Google: la forma
+  // societaria non aiuta a capire chi ha firmato.
+  const FORMA_SOCIETARIA = /[\s,]+(?:inc|incorporated|llc|l\.l\.c|ltd|limited|co|corp|corporation|company|gmbh|ag|s\.?p\.?a|s\.?r\.?l|s\.?a|b\.?v|n\.?v|plc|pty|k\.?k|oy|ab|a\/s|se)\.?$/i;
+  function nomeLeggibile(nome) {
+    let s = String(nome || '').trim();
+    for (let i = 0; i < 4; i++) {
+      const t = s.replace(FORMA_SOCIETARIA, '').replace(/[\s,]+$/, '');
+      if (!t || t === s) break;
+      s = t;
+    }
+    return s;
+  }
+  function scaduto(cert) {
+    const a = Date.parse(cert.validTo);
+    return Number.isFinite(a) ? Date.now() > a : false;
+  }
+  // Riconosciuto vuol dire una cosa sola: la catena di chi ha firmato arriva a un
+  // certificato dell'elenco ufficiale. Il nome sul certificato lo scrive chiunque.
+  // `ancore` assente = elenco mai scaricato, che non è la stessa cosa di «sconosciuto».
+  function statoFirmatario(certs, ancore) {
+    if (!Array.isArray(ancore)) return 'non_verificato';
+    const foglia = certs && certs[0];
+    if (!foglia || foglia.ca) return 'sconosciuto';
+    const usi = foglia.extKeyUsage || foglia.keyUsage;
+    if (!Array.isArray(usi) || !usi.some((u) => USI_FIRMA.has(u))) return 'sconosciuto';
+    const elenco = new Set(ancore.map((a) => a && a.fingerprint256).filter(Boolean));
+    for (let i = 0; i < certs.length; i++) {
+      if (i > 0 && elenco.has(certs[i].fingerprint256)) return 'riconosciuto';
+      const padre = certs[i + 1];
+      if (padre) {
+        if (!emessoDa(certs[i], padre)) return 'sconosciuto';
+      } else if (ancore.some((a) => emessoDa(certs[i], a))) return 'riconosciuto';
+    }
+    return 'sconosciuto';
+  }
+  // Il motore crittografico di Electron non decodifica le chiavi RSA dichiarate «solo per PSS» (id-RSASSA-PSS),
+  // che Node legge: i byte della chiave sono quelli di una RSA qualunque, quindi si rileggono con l'identificativo generico.
+  const OID_RSA_PSS = '1.2.840.113549.1.1.10';
+  const ALG_RSA = Uint8Array.from([0x30, 0x0d, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01, 0x05, 0x00]);
+  function chiavePubblica(cert) {
+    try { return cert.publicKey; } catch (e) {
+      const crypto = nodeMod('node:crypto');
+      const spki = crypto && spkiComeRsa(cert.raw);
+      if (!spki) throw e;
+      return crypto.createPublicKey({ key: Buffer.from(spki), format: 'der', type: 'spki' });
+    }
+  }
+  function spkiComeRsa(raw) {
+    const campi = derFigli(derFigli(der(u8(raw), 0))[0]);
+    const spki = campi[(campi[0].tag === 0xa0 ? 1 : 0) + 5];
+    if (!spki || spki.tag !== 0x30) return null;
+    const [alg, bit] = derFigli(spki);
+    if (!alg || !bit || derOid(derFigli(alg)[0]) !== OID_RSA_PSS) return null;
+    const corpo = concat([ALG_RSA, bit.tutto]);
+    const n = corpo.length;
+    const lunghezza = n < 0x80 ? [n] : n < 0x100 ? [0x81, n] : n < 0x10000 ? [0x82, n >> 8, n & 255] : [0x83, n >> 16, (n >> 8) & 255, n & 255];
+    return concat([Uint8Array.from([0x30, ...lunghezza]), corpo]);
+  }
+  function emessoDa(figlio, padre) {
+    try { return !!padre.ca && !!figlio.checkIssued(padre) && figlio.verify(chiavePubblica(padre)); } catch (_) { return false; }
+  }
+
+  // L'elenco scaricato è un PEM con righe di commento in mezzo: vale ogni
+  // certificato che si legge, gli altri blocchi si saltano.
+  function ancoreDaPem(testo) {
+    const crypto = nodeMod('node:crypto');
+    if (!crypto || !crypto.X509Certificate) return [];
+    const out = [];
+    const re = /-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g;
+    let m;
+    while ((m = re.exec(String(testo || '')))) {
+      try {
+        const c = new crypto.X509Certificate(m[0]);
+        if (c.ca) out.push(c);
+      } catch (_) {}
+    }
+    return out;
+  }
+
+  // ───────────────────────── marca temporale (RFC 3161) ─────────────────────────
+  // Un certificato scaduto oggi non dice niente su una firma fatta quando valeva: lo
+  // dice la marca temporale, se la sua firma regge e la sua autorità sta nell'elenco
+  // delle autorità di marcatura (#946). Una marca che non regge non vale niente.
+
+  const OID_SIGNED_DATA = '1.2.840.113549.1.7.2';
+  const OID_TST_INFO = '1.2.840.113549.1.9.16.1.4';
+  const OID_MESSAGE_DIGEST = '1.2.840.113549.1.9.4';
+  const USO_MARCA = '1.3.6.1.5.5.7.3.8';
+  const HASH_OID = {
+    '2.16.840.1.101.3.4.2.1': 'sha256',
+    '2.16.840.1.101.3.4.2.2': 'sha384',
+    '2.16.840.1.101.3.4.2.3': 'sha512',
+  };
+  const FIRMA_OID = {
+    '1.2.840.113549.1.1.1': { tipo: 'pkcs1' },
+    '1.2.840.113549.1.1.11': { tipo: 'pkcs1', hash: 'sha256' },
+    '1.2.840.113549.1.1.12': { tipo: 'pkcs1', hash: 'sha384' },
+    '1.2.840.113549.1.1.13': { tipo: 'pkcs1', hash: 'sha512' },
+    '1.2.840.113549.1.1.10': { tipo: 'pss' },
+    '1.2.840.10045.4.3.2': { tipo: 'ec', hash: 'sha256' },
+    '1.2.840.10045.4.3.3': { tipo: 'ec', hash: 'sha384' },
+    '1.2.840.10045.4.3.4': { tipo: 'ec', hash: 'sha512' },
+    '1.3.101.112': { tipo: 'eddsa' },
+  };
+
+  function der(b, i) {
+    const tag = b[i];
+    let len = b[i + 1];
+    if (tag === undefined || len === undefined) throw new Error('der troncato');
+    let p = i + 2;
+    if (len & 0x80) {
+      const n = len & 0x7f;
+      if (n < 1 || n > 4) throw new Error('der: lunghezza non valida');
+      len = 0;
+      for (let k = 0; k < n; k++) len = len * 256 + b[p++];
+    }
+    if (p + len > b.length) throw new Error('der troncato');
+    return { tag, dentro: b.subarray(p, p + len), tutto: b.subarray(i, p + len), fine: p + len };
+  }
+  function derFigli(nodo) {
+    const out = [];
+    let i = 0;
+    while (i < nodo.dentro.length) {
+      const f = der(nodo.dentro, i);
+      out.push(f);
+      i = f.fine;
+    }
+    return out;
+  }
+  function derOid(nodo) {
+    const b = nodo.dentro;
+    if (nodo.tag !== 0x06 || !b.length) return '';
+    const parti = [Math.floor(b[0] / 40), b[0] % 40];
+    let v = 0;
+    for (let i = 1; i < b.length; i++) {
+      v = v * 128 + (b[i] & 0x7f);
+      if (!(b[i] & 0x80)) { parti.push(v); v = 0; }
+    }
+    return parti.join('.');
+  }
+  function derOra(nodo) {
+    const m = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(?:[.,](\d+))?Z$/.exec(latin1(nodo.dentro, 0, nodo.dentro.length));
+    if (nodo.tag !== 0x18 || !m) return NaN;
+    return Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]);
+  }
+
+  // Verifica la marca: firma della sua autorità sul contenuto, e impronta uguale a
+  // quella della firma del manifesto. Torna { ora, certificati } o null.
+  function leggiMarca(nonProtetto, protetto, claimBytes, firma) {
+    const crypto = nodeMod('node:crypto');
+    if (!crypto || !nonProtetto || typeof nonProtetto !== 'object') return null;
+    const v2 = nonProtetto.sigTst2 !== undefined;
+    const contenitore = v2 ? nonProtetto.sigTst2 : nonProtetto.sigTst;
+    const gettoni = contenitore && contenitore.tstTokens;
+    // Il lettore di riferimento ne ammette una sola.
+    if (!Array.isArray(gettoni) || gettoni.length !== 1 || !gettoni[0] || !gettoni[0].val) return null;
+    try {
+      const dati = v2 ? cborBstr(u8(firma)) : u8(claimBytes);
+      const daMarcare = concat([cborLen(4, 4), cborTstr('CounterSignature'), cborBstr(protetto), cborBstr(new Uint8Array(0)), cborBstr(dati)]);
+
+      const t = u8(gettoni[0].val);
+      let info = der(t, 0);
+      let figli = derFigli(info);
+      // Una risposta intera del servizio (stato + gettone) o il solo gettone.
+      if (figli[0] && figli[0].tag === 0x30 && figli[1]) { info = figli[1]; figli = derFigli(info); }
+      if (derOid(figli[0]) !== OID_SIGNED_DATA || !figli[1] || figli[1].tag !== 0xa0) return null;
+      const sd = derFigli(derFigli(figli[1])[0]);
+      const incapsulato = derFigli(sd[2]);
+      if (derOid(incapsulato[0]) !== OID_TST_INFO || !incapsulato[1]) return null;
+      const ottetti = derFigli(incapsulato[1])[0];
+      if (!ottetti || ottetti.tag !== 0x04) return null;
+      const eContent = ottetti.dentro;
+
+      const certificati = [];
+      for (const f of sd) {
+        if (f.tag !== 0xa0) continue;
+        for (const c of derFigli(f)) {
+          if (c.tag !== 0x30) continue;
+          try { certificati.push(new crypto.X509Certificate(Buffer.from(c.tutto))); } catch (_) {}
+        }
+      }
+      const firmatari = derFigli(sd[sd.length - 1]);
+      if (sd[sd.length - 1].tag !== 0x31 || firmatari.length !== 1) return null;
+      const si = derFigli(firmatari[0]);
+      const hashFirma = HASH_OID[derOid(derFigli(si[2])[0])];
+      if (!hashFirma) return null;
+      let k = 3;
+      let attributi = null;
+      if (si[k] && si[k].tag === 0xa0) attributi = si[k++];
+      const algFirma = FIRMA_OID[derOid(derFigli(si[k++])[0])];
+      const valoreFirma = si[k];
+      if (!algFirma || !valoreFirma || valoreFirma.tag !== 0x04) return null;
+
+      let firmato = eContent;
+      if (attributi) {
+        let impronta = null;
+        for (const a of derFigli(attributi)) {
+          const [oid, valori] = derFigli(a);
+          if (derOid(oid) === OID_MESSAGE_DIGEST) impronta = derFigli(valori)[0];
+        }
+        if (!impronta || !ugualiByte(impronta.dentro, sha(hashFirma, eContent))) return null;
+        firmato = concat([new Uint8Array([0x31]), attributi.tutto.subarray(1)]);
+      }
+
+      const verifica = (cert) => {
+        try {
+          const chiave = chiavePubblica(cert);
+          const h = algFirma.hash || hashFirma;
+          if (algFirma.tipo === 'eddsa') return crypto.verify(null, Buffer.from(firmato), chiave, Buffer.from(valoreFirma.dentro));
+          if (algFirma.tipo === 'pss') {
+            return crypto.verify(h, Buffer.from(firmato), {
+              key: chiave, padding: crypto.constants.RSA_PKCS1_PSS_PADDING, saltLength: crypto.constants.RSA_PSS_SALTLEN_AUTO,
+            }, Buffer.from(valoreFirma.dentro));
+          }
+          return crypto.verify(h, Buffer.from(firmato), chiave, Buffer.from(valoreFirma.dentro));
+        } catch (_) { return false; }
+      };
+      const autorita = certificati.find(verifica);
+      if (!autorita) return null;
+
+      const tst = derFigli(der(eContent, 0));
+      const imprint = derFigli(tst[2]);
+      const hashImprint = HASH_OID[derOid(derFigli(imprint[0])[0])];
+      if (!hashImprint || !ugualiByte(imprint[1].dentro, sha(hashImprint, daMarcare))) return null;
+      const ora = derOra(tst[4]);
+      if (!Number.isFinite(ora)) return null;
+      return { ora, certificati: [autorita, ...certificati.filter((c) => c !== autorita)] };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // La marca vale se la sua autorità arriva all'elenco delle autorità di marcatura
+  // e se l'ora che certifica cade dentro la validità del certificato di chi ha firmato.
+  function marcaValida(marca, certFirmatario, ancoreTsa) {
+    if (!marca || !certFirmatario || !Array.isArray(ancoreTsa) || !ancoreTsa.length) return false;
+    const da = Date.parse(certFirmatario.validFrom);
+    const a = Date.parse(certFirmatario.validTo);
+    if (!(marca.ora >= da && marca.ora <= a)) return false;
+    const [foglia, ...borsa] = marca.certificati;
+    const usi = foglia.extKeyUsage || foglia.keyUsage;
+    if (foglia.ca || !Array.isArray(usi) || !usi.includes(USO_MARCA)) return false;
+    const elenco = new Set(ancoreTsa.map((x) => x && x.fingerprint256).filter(Boolean));
+    let cur = foglia;
+    const visti = new Set([foglia.fingerprint256]);
+    for (let d = 0; d < 8; d++) {
+      if (d > 0 && elenco.has(cur.fingerprint256)) return true;
+      if (ancoreTsa.some((x) => emessoDa(cur, x))) return true;
+      const padre = borsa.find((c) => !visti.has(c.fingerprint256) && emessoDa(cur, c));
+      if (!padre) return false;
+      visti.add(padre.fingerprint256);
+      cur = padre;
+    }
+    return false;
+  }
+
+  // Ciò che il claim afferma, ma solo per le asserzioni la cui impronta combacia
+  // con quella firmata: un'asserzione non coperta dalla firma non è firmata.
+  const RELAZIONI = new Set(['parentOf', 'componentOf']);
+  function leggiManifesto(manifesto, claim) {
+    const attese = new Map();
+    const liste = [claim && claim.assertions, claim && claim.created_assertions, claim && claim.gathered_assertions];
+    for (const lista of liste) {
+      if (!Array.isArray(lista)) continue;
+      for (const a of lista) {
+        if (!a || typeof a !== 'object' || typeof a.url !== 'string') continue;
+        const nome = a.url.split('/').pop();
+        attese.set(nome, { hash: u8(a.hash), alg: a.alg || claim.alg || 'sha256' });
+      }
+    }
+    const store = perEtichetta(manifesto.figli, 'c2pa.assertions');
+    const out = { origine: null, generatore: '', coperte: 0, scoperte: 0, hashDati: null, hashBmff: null, ingredienti: [] };
+    if (!store) return out;
+    for (const box of store.figli) {
+      if (box.tipo !== 'jumb' || !box.etichetta) continue;
+      const atteso = attese.get(box.etichetta);
+      if (atteso && atteso.hash && atteso.hash.length) {
+        const vero = sha(atteso.alg, box.dati);
+        if (!vero || !ugualiByte(vero, atteso.hash)) { out.scoperte++; continue; }
+      } else if (attese.size) { out.scoperte++; continue; }
+      out.coperte++;
+      const dati = contenuto(box);
+      if (!dati) continue;
+      const etichetta = box.etichetta.replace(/__\d+$/, '');
+      if (etichetta === 'c2pa.hash.data') out.hashDati = cborTesta(dati);
+      else if (/^c2pa\.hash\.bmff(\.v\d+)?$/.test(etichetta)) {
+        const v = /\.v(\d+)$/.exec(etichetta);
+        out.hashBmff = { dati: cborTesta(dati), versione: v ? Number(v[1]) : 1, alg: claim.alg };
+      }
+      else if (/^c2pa\.ingredient(\.v\d+)?$/.test(etichetta)) {
+        const ing = cborTesta(dati);
+        const rif = ing && (ing.activeManifest || ing.c2pa_manifest);
+        if (rif && typeof rif.url === 'string' && RELAZIONI.has(String(ing.relationship))) {
+          out.ingredienti.push({ relazione: String(ing.relationship), url: rif.url, hash: u8(rif.hash), alg: rif.alg || claim.alg || 'sha256' });
+        }
+      } else if (etichetta === 'c2pa.actions' || etichetta === 'c2pa.actions.v2') {
+        const az = cborTesta(dati);
+        const elenco = az && Array.isArray(az.actions) ? az.actions : [];
+        for (const a of elenco) {
+          if (!a || typeof a !== 'object') continue;
+          const c = codiceSorgente(a.digitalSourceType);
+          if (c === 'ai') out.origine = 'ai';
+          else if (c && out.origine !== 'ai') out.origine = c;
+          if (!out.origine && /^c2pa\.(edited|filtered|color_adjustments|placed)$/.test(String(a.action || '')) && /ai|generative|firefly|diffusion/i.test(String(a.softwareAgent && a.softwareAgent.name || a.softwareAgent || ''))) {
+            out.origine = 'ai-modificata';
+          }
+        }
+      } else if (/^stds\.(iptc|schema-org)/.test(etichetta)) {
+        let testo = '';
+        try { testo = utf8(dati); } catch (_) {}
+        const c = codiceSorgente((/digitalSourceType"?\s*[:=]\s*"([^"]*)"/i.exec(testo) || [])[1]);
+        if (c === 'ai') out.origine = 'ai';
+        else if (c && !out.origine) out.origine = c;
+      }
+    }
+    const gen = claim && (claim.claim_generator_info || claim.claim_generator);
+    if (Array.isArray(gen) && gen[0] && gen[0].name) out.generatore = String(gen[0].name);
+    else if (gen && typeof gen === 'object' && typeof gen.name === 'string') out.generatore = gen.name;
+    else if (typeof gen === 'string') out.generatore = gen.split('(')[0].trim();
+    return out;
+  }
+
+  // Il legame duro: l'impronta dei byte del file, tolte le zone che contengono
+  // il manifesto. Se non torna, le credenziali non parlano più di QUESTA immagine.
+  function fileIntatto(hashDati, byteFile) {
+    if (!hashDati || typeof hashDati !== 'object') return null;
+    const atteso = u8(hashDati.hash);
+    if (!atteso.length) return null;
+    const esclusioni = Array.isArray(hashDati.exclusions) ? hashDati.exclusions.slice() : [];
+    esclusioni.sort((a, b) => (a.start || 0) - (b.start || 0));
+    const pezzi = [];
+    let i = 0;
+    for (const e of esclusioni) {
+      const da = Math.max(0, Math.min(byteFile.length, Number(e.start) || 0));
+      const a = Math.max(da, Math.min(byteFile.length, da + (Number(e.length) || 0)));
+      if (da > i) pezzi.push(byteFile.subarray(i, da));
+      i = Math.max(i, a);
+    }
+    if (i < byteFile.length) pezzi.push(byteFile.subarray(i));
+    const vero = sha(hashDati.alg || 'sha256', concat(pezzi));
+    if (!vero) return null;
+    return ugualiByte(vero, atteso);
+  }
+
+  // ──────────────────────────────── analisi ────────────────────────────────
+
+  // `opzioni.ancore`: i certificati dell'elenco ufficiale dei firmatari
+  // (`ancoreDaPem`); assente se Filo non l'ha mai scaricato.
+  function analizza(byte, opzioni) {
+    const ancore = opzioni && Array.isArray(opzioni.ancore) ? opzioni.ancore : null;
+    const ancoreTsa = opzioni && Array.isArray(opzioni.ancoreTsa) ? opzioni.ancoreTsa : null;
+    const b = u8(byte);
+    const vuoto = { trovato: false, origine: null, prova: '', dichiarante: '', firmatario: '', avvisi: [], fonte: '' };
+    if (b.length < 12) return vuoto;
+
+    let cont;
+    try { cont = leggiContenitore(b); } catch (_) { return vuoto; }
+
+    // 1. Credenziali firmate: l'unica cosa che può valere come attribuzione.
+    if (cont.c2pa && cont.c2pa.length) {
+      const esito = daC2pa(cont.c2pa, b, ancore, ancoreTsa);
+      if (esito) return esito;
+    }
+
+    // 2. Etichetta IPTC/XMP: è una dichiarazione del file, non una prova.
+    for (const testo of cont.xmp) {
+      const x = leggiXmp(testo);
+      if (x.origine) {
+        return {
+          trovato: true, origine: x.origine, prova: 'dichiarata',
+          dichiarante: enteDaTesto(x.dichiarante) || x.dichiarante, firmatario: '',
+          avvisi: [], fonte: 'xmp',
+        };
+      }
+    }
+
+    // 3. Parametri di generazione scritti nei PNG.
+    if (cont.testiPng) {
+      const p = daPng(cont.testiPng);
+      if (p) return p;
+    }
+    return vuoto;
+  }
+
+  function firmaDelManifesto(manifesto) {
+    const claimBox = perEtichetta([manifesto], 'c2pa.claim') || perEtichetta([manifesto], 'c2pa.claim.v2');
+    const firmaBox = perEtichetta([manifesto], 'c2pa.signature');
+    const claimBytes = contenuto(claimBox);
+    const coseBytes = contenuto(firmaBox);
+    if (!claimBytes || !coseBytes) return null;
+    const claim = cborTesta(claimBytes);
+    if (!claim || typeof claim !== 'object') return null;
+    return { claim, firma: verificaCose(coseBytes, claimBytes) };
+  }
+
+  // Quanto conta un'origine quando la dicono più passi della storia del file.
+  const PESO_ORIGINE = { 'ai': 3, 'ai-modificata': 2, 'fotocamera': 1 };
+
+  // Un'immagine generata e poi solo ritagliata porta l'origine nel manifesto del
+  // passo prima: vale se la sua impronta è quella che il passo dopo ha firmato e
+  // se la sua firma regge. Torna { origine, firma } o null.
+  function daIngredienti(store, ingredienti, profondita, visti) {
+    if (profondita > 16) return null;
+    let meglio = null;
+    for (const ing of ingredienti) {
+      const etichetta = ing.url.split('/c2pa/').pop().split('/')[0];
+      if (!etichetta || visti.has(etichetta)) continue;
+      const box = store.figli.find((f) => f.tipo === 'jumb' && f.etichetta === etichetta);
+      if (!box || !ing.hash.length) continue;
+      const vero = sha(ing.alg, box.dati);
+      if (!vero || !ugualiByte(vero, ing.hash)) continue;
+      const letto = firmaDelManifesto(box);
+      if (!letto || !letto.firma.valida) continue;
+      visti.add(etichetta);
+      const dentro = leggiManifesto(box, letto.claim);
+      let esito = dentro.origine ? { origine: dentro.origine, firma: letto.firma, generatore: dentro.generatore } : null;
+      const sotto = daIngredienti(store, dentro.ingredienti, profondita + 1, visti);
+      if (sotto && (!esito || PESO_ORIGINE[sotto.origine] > PESO_ORIGINE[esito.origine])) esito = sotto;
+      if (!esito) continue;
+      // Un pezzo incollato dentro l'immagine non la rende scattata né generata: la rende modificata.
+      if (ing.relazione === 'componentOf') {
+        if (esito.origine === 'fotocamera') continue;
+        esito = { ...esito, origine: 'ai-modificata' };
+      }
+      if (!meglio || PESO_ORIGINE[esito.origine] > PESO_ORIGINE[meglio.origine]) meglio = esito;
+    }
+    return meglio;
+  }
+
+  function daC2pa(boxes, byteFile, ancore, ancoreTsa) {
+    const store = boxes.find((x) => x.tipo === 'jumb') || boxes[0];
+    if (!store || !store.figli) return null;
+    // L'ultimo manifesto è quello attivo: i precedenti sono la storia del file.
+    const manifesti = store.figli.filter((f) => f.tipo === 'jumb'
+      && (perEtichetta([f], 'c2pa.claim') || perEtichetta([f], 'c2pa.claim.v2')));
+    const manifesto = manifesti.length ? manifesti[manifesti.length - 1] : null;
+    if (!manifesto) return null;
+
+    const attivo = firmaDelManifesto(manifesto);
+    if (!attivo) return null;
+    const { claim, firma } = attivo;
+    const avvisi = [];
+    if (!firma.valida) {
+      // Credenziali che non reggono la verifica: si dice che ci sono e che non
+      // valgono, mai cosa affermano — sarebbe ripetere il testo di chi le ha messe.
+      // «Non valida» solo se la verifica è stata fatta e ha fallito: una firma che Filo non sa leggere non è falsa.
+      return {
+        trovato: true, origine: null, prova: firma.motivo === 'firma_non_valida' ? 'firma-rotta' : 'non-verificabile', dichiarante: '',
+        firmatario: '', avvisi: [firma.motivo || 'firma_non_valida'], fonte: 'c2pa',
+      };
+    }
+
+    const letto = leggiManifesto(manifesto, claim);
+    const intatto = letto.hashDati ? fileIntatto(letto.hashDati, byteFile) : fileIntattoBmff(letto.hashBmff, byteFile);
+    if (intatto === false) avvisi.push('file_cambiato');
+    if (intatto === null) avvisi.push('legame_assente');
+    if (letto.scoperte) avvisi.push('asserzioni_scoperte');
+
+    // Chi DICHIARA l'origine è chi ha firmato il manifesto che la contiene: per
+    // un'immagine generata e poi ritagliata, il generatore e non il programma del ritaglio.
+    let origine = letto.origine;
+    let chi = { firma, generatore: letto.generatore };
+    const storia = daIngredienti(store, letto.ingredienti, 0, new Set([manifesto.etichetta]));
+    if (storia && (!origine || PESO_ORIGINE[storia.origine] > PESO_ORIGINE[origine])) {
+      origine = storia.origine;
+      chi = { firma: storia.firma, generatore: storia.generatore };
+    }
+    const firmataInTempo = chi.firma.marca && marcaValida(chi.firma.marca, chi.firma.certificati[0], ancoreTsa);
+    if (chi.firma.scaduto && !firmataInTempo) avvisi.push('certificato_scaduto');
+    if (chi.firma.catenaIntegra === false) avvisi.push('catena_rotta');
+
+    // Un file cambiato dopo la firma chiama in causa chi ha firmato QUEI byte, cioè l'ultimo passo.
+    if (avvisi.includes('file_cambiato')) chi = { firma, generatore: letto.generatore };
+    const firmatario = statoFirmatario(chi.firma.certificati, ancore);
+    const dichiarante = nomeLeggibile(chi.firma.soggetto) || chi.generatore || '';
+    // Un manifesto valido che non dice niente sull'origine non è una notizia:
+    // si tace e si lascia parlare le altre etichette del file.
+    const dicibile = origine || avvisi.includes('file_cambiato');
+    if (!dicibile) return null;
+    return {
+      trovato: true,
+      origine,
+      prova: 'firmata',
+      dichiarante,
+      firmatario,
+      avvisi,
+      fonte: 'c2pa',
+    };
+  }
+
+  function daPng(testi) {
+    for (const v of CHIAVI_PNG) {
+      const valore = testi[v.chiave];
+      if (typeof valore === 'string' && valore.trim()) {
+        return {
+          trovato: true, origine: 'ai', prova: 'dichiarata',
+          dichiarante: v.ente, firmatario: '', avvisi: [], fonte: 'png',
+        };
+      }
+    }
+    // Solo i campi che contengono un NOME DI PROGRAMMA: in una descrizione
+    // libera «imagen» è una parola spagnola e «flux» un termine di fisica.
+    for (const chiave of ['software', 'creator', 'creatortool', 'xmp:creatortool']) {
+      const valore = testi[chiave];
+      const ente = typeof valore === 'string' ? enteDaTesto(valore) : '';
+      if (ente) {
+        return { trovato: true, origine: 'ai', prova: 'dichiarata', dichiarante: ente, firmatario: '', avvisi: [], fonte: 'png' };
+      }
+    }
+    return null;
+  }
+
+  function enteDaTesto(testo) {
+    const t = String(testo || '').toLowerCase();
+    for (const p of PROGRAMMI_AI) {
+      const re = new RegExp('(^|[^a-z0-9])' + p.ago.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[^a-z0-9])');
+      if (re.test(t)) return p.ente;
+    }
+    return '';
+  }
+
+  // ──────────────────────────────── la frase ───────────────────────────────
+
+  const COSA = {
+    'ai': 'Generata con l’AI',
+    'ai-modificata': 'Modificata con l’AI',
+    'fotocamera': 'Scattata con una fotocamera',
+  };
+
+  // Una riga sola, o niente. Mai «autentica», mai «nessun segno di AI»:
+  // le etichette si perdono a ogni ricompressione e quasi nessuno le mette.
+  // Il nome lo scrive chi ha fatto il file: una riga sola, corta, senza segni di
+  // controllo né marcature — così non può fingersi altro né sfondare il riquadro.
+  function pulisci(nome) {
+    let s = String(nome || '');
+    // Node consegna il soggetto del certificato con gli a capo già sfuggiti
+    // (`\0A`): si tolgono prima, o restano a schermo come testo.
+    s = s.replace(/\\[0-9A-Fa-f]{2}/g, ' ');
+    s = s.replace(/[\u0000-\u001f\u007f\u200b-\u200f\u2028\u2029<>"'`\\]+/g, ' ');
+    s = s.replace(/\s+/g, ' ').trim();
+    return s.length > 60 ? s.slice(0, 60).trim() + '…' : s;
+  }
+
+  function frase(res) {
+    if (!res || !res.trovato) return '';
+    const chi = pulisci(res.dichiarante);
+
+    if (res.prova === 'firma-rotta') {
+      return 'Ha credenziali di origine, ma la firma non è valida. Non dicono niente su questa immagine.';
+    }
+    if (res.prova === 'non-verificabile') {
+      return 'Ha credenziali di origine in una forma che Filo non sa verificare: non dice niente su cosa affermano.';
+    }
+    if (res.avvisi && res.avvisi.includes('file_cambiato')) {
+      return chi
+        ? `Il file è stato cambiato dopo la firma di ${chi}, quindi le sue credenziali non valgono più.`
+        : 'Il file è stato cambiato dopo la firma, quindi le credenziali non valgono più.';
+    }
+    const cosa = COSA[res.origine];
+    if (!cosa) return '';
+
+    if (res.prova === 'firmata') {
+      if (res.firmatario === 'non_verificato') {
+        return chi
+          ? `${cosa} secondo credenziali firmate da ${chi}. Firma valida, firmatario non verificato.`
+          : `${cosa} secondo credenziali firmate. Firma valida, firmatario non verificato.`;
+      }
+      if (res.firmatario !== 'riconosciuto') {
+        return chi
+          ? `${cosa} secondo credenziali firmate da ${chi}, che non è nell’elenco ufficiale dei firmatari riconosciuti.`
+          : `${cosa} secondo credenziali firmate da qualcuno che non è nell’elenco ufficiale dei firmatari riconosciuti.`;
+      }
+      const debole = (res.avvisi || []).some((a) => a === 'legame_assente' || a === 'asserzioni_scoperte' || a === 'catena_rotta' || a === 'certificato_scaduto');
+      if (!chi) return `${cosa} secondo credenziali firmate da un firmatario riconosciuto${debole ? ', ma incomplete' : ''}.`;
+      if (debole) return `${cosa} secondo ${chi}, ma le sue credenziali sono incomplete.`;
+      if (res.origine === 'fotocamera') return `Scattata con una fotocamera, firmata da ${chi}.`;
+      if (res.origine === 'ai-modificata') return `Modificata con l’AI, credenziali di ${chi}.`;
+      return `Generata con l’AI, lo dichiara ${chi} nelle credenziali firmate.`;
+    }
+    return chi
+      ? `${cosa} secondo il file stesso (${chi}), senza firma che lo confermi.`
+      : `${cosa} secondo il file stesso, senza firma che lo confermi.`;
+  }
+
+  // Quello che l'agente deve sapere quando gli si chiede «è fatta con l'AI?»:
+  // un file muto non è una risposta, ed è il caso più frequente.
+  // `sistema` è voce di Filo, `etichetta` è quello che dice il file: chi compone
+  // il prompt tiene le due cose separate, o il file parla con l'autorità di Filo.
+  function notaPerModello(res, opzioni) {
+    const etichetta = frase(res);
+    if (etichetta) {
+      const dove = opzioni && opzioni.daCopia
+        ? 'dell’immagine originale da cui l’utente ha copiato questa (gli appunti le hanno tolte alla copia, i pixel sono gli stessi)'
+        : 'dell’immagine';
+      return {
+        sistema: `ho letto in locale le etichette di origine ${dove} e l’esito è nel blocco qui sotto; `
+          + 'Filo legge solo ciò che il file dichiara e non giudica mai i pixel, quindi riporta quell’esito senza aggiungerci un verdetto tuo',
+        etichetta,
+      };
+    }
+    return {
+      sistema: 'ho letto in locale le etichette di origine dell’immagine: il file non ne porta nessuna — '
+        + 'né credenziali firmate, né etichetta IPTC/XMP, né parametri di generazione. Questo NON prova che l’immagine sia '
+        + 'autentica: uno screenshot, una ricompressione o il caricamento su un social le cancellano, e molti generatori non '
+        + 'le scrivono affatto. Dillo così, senza sbilanciarti sull’origine',
+      etichetta: '',
+    };
+  }
+
+  global.SN_PROVENIENZA = {
+    analizza, frase, notaPerModello, ancoreDaPem,
+    _interni: { chiavePubblica, leggiMarca, marcaValida, pulisci, nomeLeggibile, cborDecode: cborTesta, jumbfBoxes, leggiContenitore, leggiXmp, codiceSorgente, verificaCose, fileIntatto, fileIntattoBmff, statoFirmatario },
+  };
+})(typeof globalThis !== 'undefined' ? globalThis : this);

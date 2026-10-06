@@ -33,7 +33,7 @@
   function controlTypeFor(name, Tokens) {
     const t = Tokens && Tokens.get && Tokens.get(name);
     const type = t && t.type;
-    if (type === 'color' || type === 'opacity' || type === 'size' || type === 'font') return type;
+    if (type === 'color' || type === 'opacity' || type === 'size' || type === 'font' || type === 'time') return type;
     return 'color';
   }
 
@@ -43,6 +43,7 @@
     opacity: 'Regola l’opacità',
     size: 'Regola la dimensione',
     font: 'Cambia il font',
+    time: 'Regola la durata',
     color: 'Scegli il colore esatto',
   };
   function triggerHint(name, Tokens) {
@@ -182,6 +183,11 @@
         lbl.className = 'sn-refine-sample-text';
         lbl.textContent = eff;
         sample.appendChild(lbl);
+      } else if (type === 'time') {
+        const txt = doc.createElement('span');
+        txt.className = 'sn-refine-sample-text';
+        txt.textContent = eff;
+        sample.appendChild(txt);
       } else if (type === 'font') {
         const txt = doc.createElement('span');
         txt.className = 'sn-refine-sample-text';
@@ -224,6 +230,15 @@
       control.value = String(parseInt(startEff, 10) || 0);
       control.setAttribute('aria-label', t.label || name);
       control.addEventListener('input', () => setValue(`${parseInt(control.value, 10) || 0}px`));
+    } else if (type === 'time') {
+      control = doc.createElement('input');
+      control.type = 'range';
+      control.className = 'sn-refine-input sn-refine-range';
+      control.min = '0'; control.max = '3000'; control.step = '50';
+      const m = String(startEff).match(/^(\d+(?:\.\d+)?)(ms|s)$/);
+      control.value = String(m ? Math.round(Number(m[1]) * (m[2] === 's' ? 1000 : 1)) : 0);
+      control.setAttribute('aria-label', t.label || name);
+      control.addEventListener('input', () => setValue(`${parseInt(control.value, 10) || 0}ms`));
     } else { // font
       control = doc.createElement('select');
       control.className = 'sn-refine-input sn-refine-select';

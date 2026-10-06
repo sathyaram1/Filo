@@ -77,11 +77,21 @@ server un verdetto raccontato non lo legge).
    controllato. Se ti ferma: guarda cosa sono quei file, portali a un commit,
    e se cambiano il codice rileggi il diff prima di registrare lo stesso
    verdetto.
-2. Su **pass**, chiedi la fusione (su **fail** non fondere: accoda `design`
-   con la tua spiegazione nella nota — decide l'owner):
+2. Su **fail** hai finito: non fondere e non consegnare nessuno stato. Il
+   server, ricevuto il fail del passo 1, porta già da solo il feedback in
+   `design` con la tua nota, e decide l'owner; una consegna di `design` in più
+   verrebbe respinta. Resta solo il rilascio del biglietto.
+   Su **pass**, chiedi la fusione:
    ```bash
    node scripts/merge-gate.mjs <branch>
    ```
+   **Dura minuti, non secondi**: prima di chiedere fa girare gli unit sul
+   risultato della fusione del ramo con origin/main, in una cartella
+   temporanea (dai cinque ai venti minuti, di più se main si muove e la prova
+   si rifà). Lancialo in sottofondo e aspettalo a pezzi, come dice il
+   contratto: una chiamata tagliata a metà non chiede niente. Se gli unit sono
+   rossi solo sulla fusione il server non fonde e rimanda il lavoro al
+   riallineamento con l'elenco (exit 20): non è un tuo fail.
    Anche la richiesta di fusione parla del commit, non del ramo: dichiara la
    punta della directory, e prima di partire rifà i due controlli del passo 1.
    Se il ramo si è mosso dopo il TUO verdetto, il rifiuto ti scrive cosa
@@ -101,13 +111,13 @@ server un verdetto raccontato non lo legge).
    directory lì col comando che il rifiuto ti scrive e rilancia.
    Il gate è una chiamata al SERVER: è lui che verifica dallo stato vero che
    verifica e controllo di sicurezza risultino registrati `pass`, fa girare L5
-   sul diff che scarica da GitHub, e fonde con la sua identità. Qui non gira
-   nessun git e non si passa nessun verdetto: se il tuo `pass` non è stato
-   registrato al passo 1, la fusione viene rifiutata.
+   sul diff che scarica da GitHub, e fonde con la sua identità. Qui girano
+   solo la prova degli unit e la richiesta, e non si passa nessun verdetto: se
+   il tuo `pass` non è stato registrato al passo 1, la fusione viene rifiutata.
 3. Chiudi in base all'exit del gate:
-   - `0` → fuso → `deliver status --status done --notes "<riga>"` +
-     `dispatch.mjs --clear-state <id>`
-   - `10` → BLOCCATO (L5 sul diff) → `deliver status --status design
+   - `0` → fuso → `node scripts/routine-channel.mjs deliver status --status done --notes "<riga>"` +
+     `node scripts/dispatch.mjs --clear-state <id>`
+   - `10` → BLOCCATO (L5 sul diff) → `node scripts/routine-channel.mjs deliver status --status design
      --notes "<spiegazione>" --branch <branch> --reason l5`.
      Il motivo è `l5`, non `secaudit`: il tuo controllo è passato, a fermare è
      stato il cancello del server, e in dashboard sono due forme diverse (il
@@ -116,11 +126,16 @@ server un verdetto raccontato non lo legge).
      dopo aver letto cosa è stato bloccato. La tua spiegazione è quello che
      legge per decidere: scrivila per lui, non per il registro.
    - `20` → conflitto: main è andato avanti e il ramo non si fonde più da
-     solo. **Non fare niente**: il server ha già instradato il giro di
+     solo; oppure gli unit, che il gate fa girare sul risultato della fusione
+     con main prima di chiederla, lì sono rossi e su main da solo no.
+     **Non fare niente**: il server ha già instradato il giro di
      riallineamento (la pratica torna a chi risolve con la critica che spiega
      il rebase). Niente `design`, niente nota: la sovrascriveresti.
    - `1` → errore tecnico (o richiesta rifiutata dal server: il motivo è
-     nell'output e il tentativo è già a registro).
+     nell'output e il tentativo è già a registro). Con `secaudit_stale` o
+     `stale` il server ha trovato il tuo verdetto su un commit diverso dalla
+     punta che fonderebbe: l'ha azzerato e rimanda da sé un nuovo controllo di
+     sicurezza sulla punta. Rilascia il biglietto e basta.
 
 **Quanto scrivere — dipende dall'esito:**
 

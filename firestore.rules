@@ -87,6 +87,52 @@ service cloud.firestore {
             && (!('l4' in d.livelli) || livelloValido(d.livelli.l4)));
     }
 
+    // `localOnly` { by, at } (#908): la pratica la lavora solo una sessione
+    // locale e la coda delle routine la salta. Solo l'admin la scrive (create
+    // e ramo di triage admin); assente = feedback normale. `at` in millisecondi.
+    function localOnlyValido(d) {
+      return !('localOnly' in d)
+        || (d.localOnly is map
+            && d.localOnly.keys().hasOnly(['by', 'at'])
+            && d.localOnly.get('by', '') is string
+            && d.localOnly.get('by', '').size() > 0
+            && d.localOnly.get('by', '').size() <= 120
+            && d.localOnly.get('at', 0) is int
+            && d.localOnly.get('at', 0) > 0);
+    }
+
+    // `localMerges` { app?, server?, solo?, ramo? } (#915): quando ogni parte di un
+    // lavoro locale è arrivata su main, in millisecondi, `solo` la parte che
+    // ha chiuso dicendo che il lavoro stava tutto lì, `ramo` il ramo dell'ultima
+    // parte fusa (una parte tardiva vale solo col suo nome). Lo scrivono il server e
+    // server:fondi (admin); la pratica si chiude all'ultima parte.
+    function localMergesValido(d) {
+      return !('localMerges' in d)
+        || (d.localMerges is map
+            && d.localMerges.keys().hasOnly(['app', 'server', 'solo', 'ramo'])
+            && (!('ramo' in d.localMerges)
+                || (d.localMerges.ramo is string && d.localMerges.ramo.size() <= 200
+                    && d.localMerges.ramo.matches('^claude/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$')))
+            && (!('app' in d.localMerges) || (d.localMerges.app is int && d.localMerges.app > 0))
+            && (!('server' in d.localMerges) || (d.localMerges.server is int && d.localMerges.server > 0))
+            && (!('solo' in d.localMerges) || d.localMerges.solo in ['app', 'server']));
+    }
+
+    // `localApproval` { by, at } (#913): l'owner approva come lavoro locale il
+    // feedback di un utente o di una routine, e alla fusione vale quanto la prova
+    // del mittente. Solo l'admin: nessun altro ramo lo nomina (sentinella
+    // tests/unit/firestoreRulesLocalOnly.test.mjs). Stessa forma di localOnly.
+    function localApprovalValido(d) {
+      return !('localApproval' in d)
+        || (d.localApproval is map
+            && d.localApproval.keys().hasOnly(['by', 'at'])
+            && d.localApproval.get('by', '') is string
+            && d.localApproval.get('by', '').size() > 0
+            && d.localApproval.get('by', '').size() <= 120
+            && d.localApproval.get('at', 0) is int
+            && d.localApproval.get('at', 0) > 0);
+    }
+
     // Allowlist amministratori. Gestita SOLO da console Firebase.
     match /admins/{email} {
       allow read: if isAdmin();
@@ -158,6 +204,9 @@ service cloud.firestore {
     //   - `workerLog` (array di { role, startedAt, num }): il registro dei worker
     //     mostrato in dashboard. Lo scrive il server (functions, Admin SDK) al
     //     rilascio di ogni biglietto (le routine non hanno credenziali: #451).
+    //   - `senderProofSince` ({ local, owner }: ms): storico, non lo legge più
+    //     nessuno. Il ripasso dava la prova per epoca a chi nasceva prima;
+    //     dal #912 non la dà più al solo nome.
     // Le regole NON enumerano i campi (read/write admin-only): nuovi campi non
     // richiedono redeploy. Riservato agli admin: nessun utente normale legge/scrive.
     match /config/automation {
@@ -198,6 +247,22 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // config/redteam (#896) → `openToAll`: il Red Team è aperto a chi non è
+    // admin? Spento, assente o illeggibile = in pausa; le callable del server lo
+    // leggono con l'Admin SDK. Lettura pubblica: dentro c'è un interruttore e
+    // basta, e la pagina del Red Team deve poter dire «in pausa» a chiunque.
+    match /config/redteam {
+      allow read: if true;
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['openToAll', 'updatedAt'])
+        && request.resource.data.get('openToAll', false) is bool
+        && (!('updatedAt' in request.resource.data)
+            || request.resource.data.updatedAt is timestamp
+            || (request.resource.data.updatedAt is string
+                && request.resource.data.updatedAt.size() <= 40));
+      allow delete: if isAdmin();
+    }
+
     // config/supportModels → modelli per gli slot di supporto (sanitizer,
     // judge1, judge2, judge3, judgeDynamic, judgeRedTeam, judgePriority). Ogni
     // campo è una stringa catena di nickname ("flash, flash-or"), stesso
@@ -223,11 +288,13 @@ service cloud.firestore {
       // finiti in link e log.
       allow get, list: if isAdmin() || isRoutine();
 
-      // Creazione admin: senza vincoli di forma. Serve all'applier locale
-      // dell'owner (npm run feedback:apply col token admin) per creare i
-      // sub-feedback accodati dalle routine, che portano campi non previsti
-      // dal create anonimo (status, notes, seq/subSeq, priority…).
-      allow create: if isAdmin();
+      // Creazione admin: senza vincoli di forma. La usano l'app dell'owner e
+      // scripts/claude-feedback.mjs col token admin per scrivere `senderProof`
+      // (#595), la prova del mittente che il create anonimo sotto NON ammette:
+      // la sentinella tests/unit/firestoreRulesSenderProof.test.mjs lo tiene vero.
+      allow create: if isAdmin() && localOnlyValido(request.resource.data) && localApprovalValido(request.resource.data)
+        // #676: una data, mai testo (anche qui il giro della Gestione la confronta).
+        && (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp);
 
       // `name` = titolo breve generato da un LLM all'invio; `seq`/`subSeq` =
       // numero progressivo leggibile (#22, #22.1) calcolato dal client.
@@ -240,9 +307,12 @@ service cloud.firestore {
            'files', 'createdAt', 'seq', 'subSeq', 'parentId',
            'statusPublic',   // S1.F2.1: aggiunto statusPublic (sempre in chiaro, nuovo nei submit)
            'capabilityGapId', // F4: id gap capacità per dedup auto-feedback (F5)
-           'walletPseudonym' // #652: pseudonimo del portafoglio — a chi accreditare il premio
+           'walletPseudonym', // #652: pseudonimo del portafoglio — a chi accreditare il premio
+           'updatedAt'       // #676: l'ora dell'ultima scrittura — la dashboard ci chiede "cosa è cambiato?"
           ]
         )
+        && (!('updatedAt' in request.resource.data)
+            || request.resource.data.updatedAt is timestamp)
         // #652: se c'è, è uno pseudonimo di portafoglio (16 hex). Facoltativo:
         // chi non ha un portafoglio manda il feedback e basta.
         && request.resource.data.get('walletPseudonym', '') is string
@@ -317,6 +387,12 @@ service cloud.firestore {
                     // 'userNote' la frase in chiaro per chi ha mandato il feedback.
                     'userNote',
                     'archiveOverride', 'reopenRequests',
+                    // #676: l'ora dell'ultima scrittura, firmata da chi scrive.
+                    // È il campo su cui la dashboard chiede «cosa è cambiato
+                    // da allora?» invece di rileggere la collezione a ogni
+                    // giro: chi scrive un feedback senza rimetterlo rende quel
+                    // cambiamento invisibile fino alla riconciliazione.
+                    'updatedAt',
                     // I livelli L3/L4 (vincolo di forma: livelliValidi, in cima).
                     'livelli',
                     // La pre-approvazione della fusione, per singola pratica:
@@ -324,6 +400,14 @@ service cloud.firestore {
                     // forma più sotto). Il server la legge prima di aprire una
                     // richiesta di approvazione per il lavoro delle routine.
                     'mergePreapproved',
+                    // #908: il segno «solo in locale» (forma: localOnlyValido).
+                    'localOnly',
+                    // #915: le parti del lavoro locale già su main (forma: localMergesValido).
+                    'localMerges',
+                    // #913: l'approvazione dell'owner come lavoro locale (forma: localApprovalValido).
+                    'localApproval',
+                    // #595: il ripasso dei documenti vecchi con prefisso riservato.
+                    'senderProof',
                     'capabilityGapId']) // F4: permettere update del gap id (backfill)
         // S1.F2.1: status accetta l'enum esistente O un ciphertext FENC1: (gate on).
         // Enum: stati CANONICI della macchina a stati (FEEDBACK-STATES.md) +
@@ -423,6 +507,10 @@ service cloud.firestore {
         // archiviare nonostante il punteggio. '' = nessun override (substrato
         // SN_BOARD_ARCHIVE.hasOwnerOverride).
         && request.resource.data.get('archiveOverride', '') in ['', 'archived', 'keep_open']
+        // #676: una DATA, mai testo. Scritta come testo il confronto per data
+        // non la riconosce, e quel feedback resta fuori dal giro per sempre.
+        && (!('updatedAt' in request.resource.data)
+            || request.resource.data.updatedAt is timestamp)
         // `reopenRequests` (DC4): l'admin può azzerarlo (es. {}) quando un fix
         // riaperto viene risistemato e rispedito, sbloccando una futura
         // riapertura sullo stesso doc. Nessun vincolo di forma extra qui: il
@@ -442,6 +530,11 @@ service cloud.firestore {
                 && request.resource.data.mergePreapproved.get('at', '') is string
                 && request.resource.data.mergePreapproved.get('at', '').size() <= 40))
         && livelliValidi(request.resource.data)
+        && localOnlyValido(request.resource.data)
+        && localMergesValido(request.resource.data)
+        && localApprovalValido(request.resource.data)
+        && (!('senderProof' in request.resource.data)
+            || request.resource.data.senderProof in ['admin', 'server'])
         // F4: capabilityGapId (opzionale) — id strutturale del gap di capacità
         // per il dedup auto-feedback. Stringa breve.
         && request.resource.data.get('capabilityGapId', '') is string
@@ -507,7 +600,9 @@ service cloud.firestore {
       allow update: if
         isRoutine()
         && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['status', 'notes', 'resolvedAt', 'statusReason', 'workingSince', 'branch', 'livelli'])
+          // `updatedAt` (#676): il server firma l'ora come chiunque altro, o
+          // la dashboard non vede più quello che scrive fino al riallineamento.
+          .hasOnly(['status', 'notes', 'resolvedAt', 'statusReason', 'workingSince', 'branch', 'livelli', 'updatedAt'])
         && request.resource.data.get('status', 'new') in
              ['todo', 'working', 'revision_capability', 'revision_security', 'done', 'design', 'clarify']
         && request.resource.data.get('statusReason', '') is string
@@ -521,6 +616,8 @@ service cloud.firestore {
         // che poi bloccano l'owner.
         && request.resource.data.get('notes', '') is string
         && request.resource.data.get('notes', '').size() <= 60000
+        && (!('updatedAt' in request.resource.data)
+            || request.resource.data.updatedAt is timestamp)
         && livelliValidi(request.resource.data);
 
       // Cancellazione: solo admin.
@@ -557,6 +654,9 @@ service cloud.firestore {
       // per costruzione. `text`, `url`, `userAgent`, `images`, `files`,
       // `notes`, `clientId`, `pipeline`, `priority` non sono qui dentro: se
       // qualcuno provasse a scriverli, la regola respinge tutto il documento.
+      // Un lavoro locale (#908) non ha scheda, ma qui NON si respinge: un'app
+      // rimasta alla versione di prima si fermerebbe alla prima scheda rifiutata
+      // e non pubblicherebbe più niente. La toglie il server (onPublicCardWrite).
       allow create, update: if (isAdmin() || isRoutine())
         && request.resource.data.keys().hasOnly(
              ['name', 'seq', 'subSeq', 'status', 'statusPublic', 'resolvedInVersion',

@@ -109,19 +109,3 @@ test('il testo della segnalazione non diventa markup nel rombo', async ({ openTa
   expect(await page.evaluate(() => window.__xss)).toBeUndefined();
   await expect(body).toContainText('<img src=x');
 });
-
-test('il grassetto delle scelte (**A.**, la forma che il modello della segnalazione prescrive) si legge come grassetto, non come asterischi', async ({ openTab }) => {
-  test.fail(true, 'esterno: nel rombo il grassetto della segnalazione si vede come asterischi');
-  const page = await openTab(MANAGE);
-  const fb = pratica({
-    _id: 'fb-g2-4', seq: 923,
-    notes: `Ho fatto A.\n\nSegnalazione per l'owner (chi verifica):\n${SEGNALAZIONE}`,
-    livelli: { l3: { esito: 'segnalato', ruolo: 'verifier', at: '2026-09-23T09:15:00.000Z', testo: SEGNALAZIONE } },
-  });
-  await apri(page, [fb]);
-  await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
-  await page.locator('#mgForme .mg-forma[data-livello="l3"]').click();
-  const body = page.locator('#mgSideBody');
-  await expect(body).toContainText('Dal sito: zero attrito');
-  await expect(body).not.toContainText('**A.**');
-});

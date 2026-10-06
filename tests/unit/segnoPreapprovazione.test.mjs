@@ -54,3 +54,37 @@ test('fra le fusioni fatte senza chiedere, il segno da approvazione non si stamp
   const s = UI.preapprovedBy({ preapprovedBy: daSi.by, preapprovedAt: AT });
   assert.equal(s, `pre-approvata dal tuo sì alla richiesta del ${UI.dateTimeText(Date.parse(AT))}`);
 });
+
+// #743: l'introduzione delle «Fuse senza chiedere» diceva «fondi senza chiedermelo» anche
+// per le fusioni nate da un sì, contraddicendo la riga sotto.
+test('fra le fuse senza chiedere, l’introduzione nomina solo i segni che l’elenco contiene', () => {
+  const daSiRiga = { preapprovedBy: daSi.by, preapprovedAt: AT };
+  const aManoRiga = { preapprovedBy: aMano.by, preapprovedAt: AT };
+  const locale = { skippedL5: true, preapprovedBy: aMano.by };
+
+  const soloSi = UI.preapprovedIntro([daSiRiga, daSiRiga]);
+  assert.ok(!soloSi.includes('fondi senza chiedermelo'), soloSi);
+  assert.match(soloSi, /fusi lo stesso\. Avevano solo blocchi che avevi già approvato, con un sì a una richiesta precedente/);
+  assert.ok(!soloSi.includes('lavoro locale'), soloSi);
+
+  const soloMano = UI.preapprovedIntro([aManoRiga]);
+  assert.match(soloMano, /fusi lo stesso\. Sulla pratica avevi messo «fondi senza chiedermelo»\./);
+  assert.ok(!soloMano.includes('già approvat'), soloMano);
+
+  const misto = UI.preapprovedIntro([daSiRiga, locale, aManoRiga]);
+  assert.match(misto, /^Lavori fermati dai controlli e fusi lo stesso\. Alcuni avevano sulla pratica il tuo «fondi senza chiedermelo»; altri avevano solo blocchi che avevi già approvato con un sì a una richiesta precedente; altri ancora erano lavoro locale \(/);
+
+  // Un segno vuoto o senza la forma del server resta quello a mano, come nella riga.
+  assert.match(UI.preapprovedIntro([{ preapprovedBy: '' }]), /«fondi senza chiedermelo»/);
+  assert.match(UI.preapprovedIntro([]), /^Lavori fermati dai controlli e fusi lo stesso\. Qui c’è/);
+});
+
+test('la chiave del segno: rimesso è un altro segno, riletto è lo stesso (#701)', () => {
+  const k = UI.chiaveSegno(UI.segnoPreapprovazione(aMano));
+  assert.equal(k, UI.chiaveSegno(UI.segnoPreapprovazione({ ...aMano })));
+  // Lo stesso istante scritto con più cifre resta lo stesso segno.
+  assert.equal(k, UI.chiaveSegno({ by: aMano.by, at: '2026-09-26T10:26:00Z' }));
+  assert.notEqual(k, UI.chiaveSegno(UI.segnoPreapprovazione({ by: aMano.by, at: '2026-09-26T10:27:00.000Z' })));
+  assert.equal(UI.chiaveSegno(null), '');
+  assert.notEqual(UI.chiaveSegno({ by: 'owner', at: '' }), '');
+});

@@ -38,7 +38,7 @@ test('livello 1 — comandi di sola lettura in whitelist eseguono subito', () =>
 test('livello 1 — git e npm di sola lettura', () => {
   for (const cmd of [
     'git status', 'git log', 'git log --oneline -10', 'git diff', 'git diff HEAD~1',
-    'git show', 'git branch', 'git remote -v', 'git config --get user.name',
+    'git show', 'git branch', 'git remote', 'git config --get user.name',
     'npm list', 'npm ls', 'npm --version', 'npm view react', 'npm outdated',
     'pip list', 'git', 'npm',
   ]) {
@@ -82,7 +82,7 @@ test('livello 3 — concatenazioni e redirezioni (non interamente riconoscibili)
     'echo ciao >> file.txt',   // >>
     'cat < input.txt',         // < redirezione
     'echo `whoami`',           // backtick
-    'echo $(whoami)',          // $()
+    'echo $(rm x)',            // $() che esegue una cancellazione
     'ls & dir',                // & background/call
   ]) {
     assert.equal(lvl(cmd), 3, `"${cmd}" con metacaratteri dovrebbe essere livello 3`);
@@ -120,7 +120,7 @@ test('mescolare sequenza e pipe NON è sicuro → resta 3', () => {
     'ls | cat && rm x',  // sequenza dentro una pipe
     'ls & pwd',          // background
     'cd x && ls > out',  // redirezione
-    'cd x && echo $(pwd)',
+    'cd x && echo $(rm x)',
     'ls | cat > out.txt',// pipe che finisce in una redirezione
     'ls || rm x',        // `||` è una sequenza, non una pipe: vale il massimo
     'ls |',              // pipe monca
@@ -338,7 +338,7 @@ test('le shell dirette restano sempre 3, anche con flag di versione', () => {
 });
 
 test('livello 1 — comandi di diagnostica di sola lettura aggiunti', () => {
-  for (const cmd of ['ps', 'ps aux', 'free -h', 'lscpu', 'lsblk', 'printenv PATH', 'whereis node', 'who', 'sha256sum file']) {
+  for (const cmd of ['free -h', 'lscpu', 'lsblk', 'whereis node', 'who', 'sha256sum file']) {
     assert.equal(lvl(cmd), 1, `"${cmd}" dovrebbe essere livello 1`);
   }
 });
@@ -401,8 +401,13 @@ test('livello 3 — git tag -d / branch -D (cancellazioni) restano conferma-test
 });
 
 test('git config — legge (1), imposta (2), cancella (3) secondo gli argomenti', () => {
-  for (const cmd of ['git config --list', 'git config -l', 'git config --get user.name', 'git config user.name']) {
-    assert.equal(lvl(cmd), 1, `"${cmd}" (legge) dovrebbe essere livello 1`);
+  for (const cmd of ['git config --get user.name', 'git config user.name', 'git config user.email']) {
+    assert.equal(lvl(cmd), 1, `"${cmd}" (legge una chiave innocua) dovrebbe essere livello 1`);
+  }
+  // #587: un dump completo o una chiave che porta credenziali (URL di un remoto
+  // col token) stampa un segreto in chiaro → conferma.
+  for (const cmd of ['git config --list', 'git config -l', 'git config --get remote.origin.url', 'git config --get-regexp remote']) {
+    assert.equal(lvl(cmd), 2, `"${cmd}" (può stampare una credenziale) dovrebbe essere livello 2`);
   }
   for (const cmd of ['git config user.name "Mario"', 'git config --global user.email a@b.c', 'git config --add safe.directory /x', 'git config --replace-all k v']) {
     assert.equal(lvl(cmd), 2, `"${cmd}" (imposta) dovrebbe essere livello 2`);
@@ -413,8 +418,10 @@ test('git config — legge (1), imposta (2), cancella (3) secondo gli argomenti'
 });
 
 test('git remote — elenca/mostra (1), aggiunge/rinomina (2), rimuove (3)', () => {
-  for (const cmd of ['git remote', 'git remote -v', 'git remote show origin', 'git remote get-url origin']) {
-    assert.equal(lvl(cmd), 1, `"${cmd}" (legge) dovrebbe essere livello 1`);
+  assert.equal(lvl('git remote'), 1, '"git remote" (soli nomi) dovrebbe essere livello 1');
+  // #587: `-v`, `show`, `get-url` stampano gli URL, che possono contenere un token.
+  for (const cmd of ['git remote -v', 'git remote show origin', 'git remote get-url origin']) {
+    assert.equal(lvl(cmd), 2, `"${cmd}" (stampa un URL col token) dovrebbe essere livello 2`);
   }
   for (const cmd of ['git remote add origin http://x/y.git', 'git remote rename origin upstream', 'git remote set-url origin http://z']) {
     assert.equal(lvl(cmd), 2, `"${cmd}" (modifica) dovrebbe essere livello 2`);
@@ -698,9 +705,8 @@ test('livello 1 — cmdlet PowerShell di sola lettura invocati da soli', () => {
     'Get-ChildItem', 'gci', 'Get-ChildItem -Path C:\\Users -Recurse',
     'Get-ChildItem -Filter *.js -Force',       // -Force qui = mostra i file nascosti
     'Get-Content package.json', 'Get-Content -Raw log.txt', 'gc log.txt -Tail 20',
-    'Get-Item .', 'Get-ItemProperty HKCU:\\Software', 'Get-ItemPropertyValue x y',
+    'Get-Item .', 'Get-ItemPropertyValue x y',
     'Get-Location', 'gl', 'Get-Date', 'Get-Date -Format yyyy-MM-dd',
-    'Get-Process', 'Get-Process -Name filo', 'gps',
     'Select-String errore log.txt', 'sls TODO -Path src',
     'Select-Object -First 5', 'Sort-Object Length', 'Measure-Object -Sum',
     'Test-Path C:\\Users', 'Resolve-Path .', 'Split-Path C:\\a\\b -Parent',
@@ -740,13 +746,11 @@ test('livello 1 — pipeline in cui OGNI segmento è una lettura', () => {
     'Get-Content log.txt | Select-String errore',
     'Get-ChildItem | Measure-Object -Sum Length',
     'Get-ChildItem | Group-Object Extension | Sort-Object Count',
-    'Get-Process | Sort-Object CPU | Select-Object -First 3 | Format-Table',
     'Get-ChildItem | Out-String',
     'gci | select -First 3',
     // le pipeline delle altre shell valgono lo stesso: incanalare una lettura
     // dentro un'altra lettura non fa niente che la prima non facesse già
     'cat file | grep errore',
-    'ls | cat',
     'git log --oneline | head -n 20',
     'cat a.txt | wc -l',
   ]) {
@@ -785,7 +789,6 @@ test('livello 1 — Where-Object/ForEach-Object con uno scriptblock INERTE', () 
     'gci | % { $_.Name }',
     'gci | %{$_.Name}',
     'gci | foreach { $_.Length }',
-    'Get-Process | Where-Object { $_.CPU -gt 10 } | Sort-Object CPU | Select-Object -First 3',
     'Get-ChildItem | Where-Object { $_.Length -gt 100 -and $_.Length -lt 900 } | Measure-Object',
     // Where-Object sa filtrare anche senza blocco (sintassi a proprietà): inerte
     'Get-ChildItem | Where-Object Length -gt 1000',
@@ -844,9 +847,9 @@ test('livello 3 — sottoespressioni e chiamate dentro un cmdlet di lettura', ()
   // `$(...)`, `@(...)`, `@{...}`, i backtick e le parentesi possono contenere
   // QUALSIASI comando: un cmdlet di lettura non le rende innocue.
   for (const cmd of [
-    'Select-String pwd $(cat f)',
+    'Select-String pwd $(rm f)',
     'Get-Content $(Remove-Item x)',
-    'Get-ChildItem -Path (Get-Location)',
+    'Get-ChildItem -Path (Remove-Item x)',
     'Get-ChildItem @(Remove-Item x)',
     'Get-ChildItem | Select-Object @{n="x";e={Remove-Item $_}}',
     'Get-Content `whoami`',
@@ -958,12 +961,16 @@ test('livello 2 — npm/pip config che SCRIVE (registry incluso) non è lettura'
   }
 });
 
-test('livello 1 — npm/pip config che LEGGE resta lettura', () => {
-  for (const cmd of [
-    'npm config get registry', 'npm config list', 'npm config ls', 'npm config',
-    'pip config list', 'pip config get global.index-url', 'pip config debug',
-  ]) {
-    assert.equal(lvl(cmd), 1, `"${cmd}" (legge config) dovrebbe essere livello 1`);
+test('npm/pip config — help resta 1, il dump della config chiede conferma (#587)', () => {
+  // Bare/`debug` non stampano credenziali → 1.
+  for (const cmd of ['npm config', 'pip config', 'pip config debug']) {
+    assert.equal(lvl(cmd), 1, `"${cmd}" dovrebbe essere livello 1`);
+  }
+  // get/list/ls stampano l'URL del registro/indice, dove finiscono utente,
+  // password o token → conferma.
+  for (const cmd of ['npm config get registry', 'npm config list', 'npm config ls',
+    'pip config list', 'pip config get global.index-url']) {
+    assert.equal(lvl(cmd), 2, `"${cmd}" (può stampare una credenziale) dovrebbe essere livello 2`);
   }
 });
 
@@ -973,4 +980,211 @@ test('"criterio di fatto" della spec — gli esempi citati', () => {
   assert.equal(lvl('rm qualcosa'), 3, 'rm → digita conferma');
   assert.equal(lvl('comandoinventato'), 3, 'comando inventato → digita conferma');
   assert.equal(lvl('ls && rm -rf /'), 3, '&& → livello 3');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// #516 — gruppi, sottoespressioni e `if` di PowerShell. Un costrutto fatto solo
+// di letture è una lettura; un gruppo si classifica per ciò che ESEGUE, anche
+// quando fa da argomento di un comando di lettura.
+// ─────────────────────────────────────────────────────────────────────────────
+const WIN = { cwd: 'C:\\Users\\Mario', home: 'C:\\Users\\Mario', win: true, maiuscole: true };
+
+test('#516 — le letture composte del banco restano livello 1, non «conferma»', () => {
+  for (const cmd of [
+    // i tre casi della segnalazione
+    'Get-ChildItem -Path "$env:USERPROFILE\\Downloads","$env:USERPROFILE\\Documents"',
+    '(Get-ChildItem "$env:USERPROFILE\\Downloads").Count',
+    'if (Test-Path "$env:USERPROFILE\\Downloads") { Get-ChildItem "$env:USERPROFILE\\Downloads" }',
+    // le loro varianti naturali
+    'Get-ChildItem -Path "$env:USERPROFILE\\Downloads", "$env:USERPROFILE\\Documents" -File',
+    'Get-ChildItem -Path @("$env:USERPROFILE\\Downloads","$env:USERPROFILE\\Documents")',
+    '(Get-ChildItem -Path "$env:USERPROFILE\\Downloads" -File).Count',
+    '@(Get-ChildItem "$env:USERPROFILE\\Downloads" -File).Count',
+    '$(Get-ChildItem "$env:USERPROFILE\\Downloads").Count',
+    '(Get-ChildItem "$env:USERPROFILE\\Downloads" | Measure-Object).Count',
+    '(Get-ChildItem "$env:USERPROFILE\\Downloads").Count -gt 0',
+    '(Get-ChildItem "$env:USERPROFILE\\Downloads").Name -join ", "',
+    '(Get-ChildItem "$env:USERPROFILE\\Downloads")[0].Name',
+    '(Get-ChildItem "$env:USERPROFILE\\Downloads").Name | Sort-Object',
+    'if(Test-Path "$env:USERPROFILE\\Downloads"){Get-ChildItem "$env:USERPROFILE\\Downloads"}',
+    'if (-not (Test-Path "$env:USERPROFILE\\Downloads")) { Write-Output "manca" }',
+    'if (!(Test-Path Downloads)) { "manca" } elseif (Test-Path Documents) { gci Documents } else { gci Downloads }',
+    'if ((Get-ChildItem Downloads).Count -gt 0) { "ci sono file" } else { "vuota" }',
+    'if ((Test-Path Downloads) -and (Test-Path Documents)) { gci Downloads, Documents }',
+    'if (Test-Path Downloads) { }',
+    // un ramo che restituisce un valore solo: numero, booleano, stringa
+    'if (Test-Path Downloads) { (Get-ChildItem Downloads).Count } else { 0 }',
+    'if (Test-Path Downloads) { (gci Downloads).Count } else { -1 }',
+    'if (Test-Path Downloads) { 1 } else { 0 }',
+    'if (Test-Path Downloads) { $true } else { $false }',
+    'if (Test-Path Downloads) { 1.5GB } else { $null }',
+    'if (Test-Path Downloads) { gci Downloads }; Get-Date',
+    'Test-Path (Join-Path $env:USERPROFILE "Downloads")',
+    'Write-Output (Get-Date)',
+    'echo $(whoami)',
+    '(cd Downloads && ls)',
+  ]) {
+    assert.equal(C.classify(cmd, WIN), 1, `"${cmd}" (solo letture) dovrebbe essere livello 1`);
+    assert.equal(lvl(cmd), 1, `"${cmd}" senza contesto dovrebbe essere livello 1`);
+  }
+});
+
+test('#516 — basta un pezzo che non legge e il costrutto resta 3', () => {
+  for (const cmd of [
+    'if (Test-Path x) { Remove-Item x }',
+    'if (Test-Path x) { gci } else { rm x }',
+    'if (Test-Path x) { gci } elseif (Remove-Item y) { gci }',
+    'if (Remove-Item x) { gci }',
+    'if (Test-Path x) { if (Test-Path y) { Remove-Item y } }',
+    'if (Test-Path x) { gci }; Remove-Item x',
+    'if (Test-Path x) { gci } Remove-Item x',           // niente separatore: non è la forma
+    'if (Test-Path x) { gci } | Remove-Item',
+    'if (Test-Path x) gci',
+    'if (Test-Path x) { gci } else if (Test-Path y) { gci }',
+    'if (Test-Path x) { 0; Remove-Item x }',            // un valore seguito da altro non è più un valore solo
+    'if (Test-Path x) { 0 Remove-Item x }',
+    '(Remove-Item x).Count',
+    '(gci; Remove-Item x).Count',
+    '(gci).Delete()',                                    // chiamata di metodo
+    '(gci) | Remove-Item',
+    '(gci) | % { $_.Delete() }',
+    '(gci) > elenco.txt',
+    '(gci) Remove-Item x',
+    '(gci).Count -eq (Remove-Item x)',
+    '-not (Remove-Item x)',
+    '()', 'echo ()', '(gci', 'gci)',
+    '((((((((((gci))))))))))',                           // annidamento oltre il tetto
+    'foreach ($f in (gci)) { Remove-Item $f }',
+    'while ((gci).Count) { Remove-Item x }',
+    'if exist x (dir x) else (del x)',                   // cmd
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" dovrebbe restare livello 3`);
+  }
+});
+
+test('#516 SICUREZZA — un gruppo come argomento esegue: si classifica ciò che esegue', () => {
+  // In PowerShell `ls`, `cat`, `echo`, `cd` sono alias di cmdlet, e un `( … )`
+  // fra i loro argomenti viene eseguito prima del comando: `ls (Remove-Item x)` cancella.
+  for (const cmd of [
+    'echo (Remove-Item x)', 'ls (Remove-Item x)', 'cat (rm x)', 'cd (Remove-Item x)',
+    'dir (Remove-Item -Recurse C:\\x)', 'echo @(Remove-Item x)', 'ls -Path (ri x)',
+    'Get-ChildItem -Path:(Remove-Item x)', 'echo ((Remove-Item x))', 'echo (,(Remove-Item x))',
+    'echo @{a=Remove-Item x}',                           // i valori di una tabella sono comandi
+    'echo @{a="x"} (gci)',
+    'echo $f.Delete()', '$f.MoveTo("C:\\x")', 'echo [IO.File]::Delete("x")',
+    'echo $(rm x)', 'echo "$(rm x)"', 'echo (gci) "$(rm x)"',
+    'dir C:\\Program Files (x86)',                       // senza virgolette `(x86)` è un comando
+    'echo { (Remove-Item x) }',
+    'gci | % { (Get-Date) }',
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" dovrebbe essere livello 3`);
+  }
+  // Fra virgolette le parentesi sono testo.
+  assert.equal(lvl('cd "C:\\Program Files (x86)"'), 1);
+  assert.equal(lvl('echo "a (b)"'), 1);
+  assert.equal(lvl('git commit -m "fix (x)"'), 2);
+});
+
+test('#516 SICUREZZA — il valore di un gruppo non può fare da flag che il testo non mostra', () => {
+  // In bash, e verso un programma esterno, il valore di `$( … )` arriva come argv:
+  // può essere `-o`, `.` o `-r`. Dove gli argomenti cambiano il livello si resta a 3.
+  for (const cmd of [
+    'git checkout $(echo .)', 'git stash $(echo drop)', 'git log (Remove-Item x)',
+    'curl $(echo -o) ~/.ssh/authorized_keys http://x', 'grep $(echo -r) password ~',
+    'findstr $(echo /s) password *', 'date $(echo -s) 2020-01-01', 'hostname $(echo nuovo)',
+    'mkdir (Join-Path ~ x)', 'node $(echo --version)', 'npm $(echo ls)', '$x (gci)',
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" dovrebbe restare livello 3`);
+  }
+  // Un gruppo di soli letterali vale quei letterali: il testo mostra già tutto.
+  assert.equal(lvl('git checkout (".")'), 3);
+  assert.equal(lvl('curl ("-o") x http://x'), 3);
+  assert.equal(lvl('git checkout ("main")'), 2);
+});
+
+test('#516 SICUREZZA — il valore di un gruppo può essere uno scriptblock: niente cmdlet che lo eseguono', () => {
+  // `Sort-Object`, `Where-Object`, `Select-Object`… eseguono uno scriptblock passato
+  // come argomento; con un input dal tubo lo fa qualunque cmdlet (delay-bind);
+  // `-replace` e `-split` lo fanno in PowerShell 7. Il gruppo può leggere soltanto,
+  // ma il suo valore (`(Get-Command f).ScriptBlock`) è codice.
+  for (const cmd of [
+    'gci | Sort-Object (Get-Command mkdir).ScriptBlock',
+    'gci | Where-Object (Get-Command mkdir | Select-Object -ExpandProperty ScriptBlock)',
+    'gci | where (Get-Command f).ScriptBlock',
+    'gci | Get-Content (Get-Command f).ScriptBlock',
+    'gci | cd (Get-Location)',
+    'Select-Object -InputObject (gci) -Property (Get-Command f).ScriptBlock',
+    'Format-Table -InputObject (gci) (Get-Command f).ScriptBlock',
+    'Measure-Object -InputObject (gci) (Get-Command f).ScriptBlock',
+    '(gci).Name -replace "a", (Get-Command f).ScriptBlock',
+    '(gci).Name -split (Get-Command f).ScriptBlock',
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" dovrebbe restare livello 3`);
+  }
+  // Stampato, o passato come oggetto lungo il tubo, uno scriptblock resta testo.
+  assert.equal(lvl('Write-Output (Get-Command f).ScriptBlock'), 1);
+  assert.equal(lvl('(Get-Command f).ScriptBlock | Sort-Object'), 1);
+});
+
+test('#516 — dentro i gruppi vale il perimetro di lettura', () => {
+  const det = (cmd) => C.classifyDetail(cmd, WIN);
+  // Una lettura che esce dal perimetro chiede un OK anche dentro un costrutto.
+  assert.deepEqual(det('(Get-Content ~\\.ssh\\id_rsa).Length'), { level: 2, motivo: 'legge un file nascosto o di configurazione' });
+  assert.equal(det('if (Test-Path x) { Get-Content C:\\Windows\\win.ini }').level, 2);
+  assert.equal(det('Write-Output (Get-Process)').level, 2);
+  assert.equal(det('echo (gci env:)').level, 2);
+  assert.deepEqual(det('(Get-Date), $env:API_TOKEN'), { level: 2, motivo: "legge le variabili d'ambiente" });
+  assert.equal(det('Get-ChildItem ($env:API_TOKEN)').level, 2);
+  // Il valore di un gruppo non si conosce prima: chi legge o elenca quel percorso chiede un OK.
+  for (const cmd of [
+    'Get-ChildItem (Join-Path $env:USERPROFILE "Downloads")', 'Get-ChildItem -Path (Get-Location)',
+    'Get-ChildItem -Path:(Get-Location)', 'Select-String pwd $(cat f)', 'cat $(ls)', 'ls $(pwd)',
+    '(gci) | Get-Content',
+  ]) {
+    assert.deepEqual(det(cmd), { level: 2, motivo: 'non si sa prima quali file leggerà' }, cmd);
+  }
+  // Una cartella cambiata dentro un gruppo o un `if` non è più quella di prima.
+  for (const cmd of [
+    '(Set-Location C:\\Windows), (Get-Content win.ini)',
+    'if ((Set-Location C:\\Windows) -eq $null) { Get-Content win.ini }',
+    'if (Test-Path x) { cd C:\\Windows }; Get-Content win.ini',
+    'cd (Join-Path C:\\ Windows); Get-Content win.ini',
+    'Set-Location C:\\Windows; (Get-Content win.ini).Length',
+    // PowerShell esegue `c""d` come `cd`: le virgolette non nascondono lo spostamento.
+    '(c""d C:\\Windows); Get-Content win.ini', "(c''d C:\\Windows); Get-Content win.ini",
+    '(Set-Loc""ation C:\\Windows); gc win.ini', 'if (Test-Path x) { ch""dir C:\\Windows }; cat win.ini',
+  ]) {
+    assert.equal(det(cmd).level, 2, `"${cmd}" legge fuori dalla cartella personale`);
+  }
+  assert.equal(det('if (Test-Path Downloads) { cd Downloads; gci }').level, 1);
+});
+
+test('#516 SICUREZZA — un elenco fra parentesi arriva a un programma esterno come argomenti separati', () => {
+  // `git branch ("-D","x")` esegue `git branch -D x`: stesso livello della forma per esteso.
+  for (const [lista, esteso] of [
+    ['git branch ("-D","x")', 'git branch -D x'],
+    ['git checkout ("main","--",".")', 'git checkout main -- .'],
+    ['git push ("origin","--force")', 'git push origin --force'],
+    ['git checkout @("main",".")', 'git checkout main .'],
+    ['git branch $("-D","x")', 'git branch -D x'],
+  ]) {
+    assert.equal(lvl(esteso), 3, esteso);
+    assert.equal(lvl(lista), 3, lista);
+  }
+  // A un cmdlet lo stesso elenco resta un elenco di percorsi, ciascuno nel perimetro.
+  assert.equal(C.classifyDetail('Get-ChildItem -Path ("Downloads","Documents")', WIN).level, 1);
+  assert.equal(C.classifyDetail('Get-Content ("a.txt","~\\.ssh\\id_rsa")', WIN).level, 2);
+});
+
+test('#516 — virgolette che la shell legge diversamente non nascondono un comando', () => {
+  // PowerShell accetta anche le virgolette tipografiche: `‘a' ; rm x ; ‘b'` sono due
+  // stringhe e un comando. Qui non si leggono come lui, quindi la forma è 3.
+  for (const cmd of [
+    "(gci x).Count -eq 'a ‘ ; Remove-Item x ; ‘'",
+    '(gci x).Count -eq "a ; b"',
+    '(gci x).Count -eq "a\\" ; rm x ; echo \\""',
+    "(gci x).Count -eq '",
+  ]) {
+    assert.equal(lvl(cmd), 3, `"${cmd}" dovrebbe restare livello 3`);
+  }
 });

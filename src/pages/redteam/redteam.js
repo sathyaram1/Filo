@@ -931,10 +931,23 @@
   async function send(type, args) {
     try {
       const r = await chrome.runtime.sendMessage(Object.assign({ type }, args || {}));
+      if (r && r.paused) mostraPausa(r.error);
       return r || {};
     } catch (_) {
       return { error: 'ipc' };
     }
+  }
+
+  // Messo in pausa a pagina aperta (#896): resta la sola frase, come nella pagina servita a chi non lo vede.
+  function mostraPausa(frase) {
+    if (document.getElementById('rtPausa')) return;
+    const main = document.createElement('main');
+    main.className = 'rt-pausa';
+    main.id = 'rtPausa';
+    const p = document.createElement('p');
+    p.textContent = String(frase || 'Il Red Team è in pausa: tornerà dopo il rilascio');
+    main.appendChild(p);
+    document.body.replaceChildren(main);
   }
 
   let lastState = {};

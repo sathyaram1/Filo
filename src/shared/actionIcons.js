@@ -23,6 +23,7 @@
   const AZIONI = {
     NAVIGA: 'openTab',
     APRI_FILE: 'folder',
+    RINOMINA_FILE: 'pencil',
     TIMER: 'timer',
     SVEGLIA: 'alarm',
     CANCELLA_SVEGLIA: 'alarmOff',
@@ -39,10 +40,14 @@
     LEGGI_FILE: 'readDocument',
     LEGGI_DOCUMENTO: 'readDocument',
     LEGGI_TRASPARENZA: 'transparency',
+    LEGGI_IMPOSTAZIONI: 'options',
+    TOGLI_PERMESSO_SITO: 'eraser',
     EVENTO_CALENDARIO: 'calendar',
     PULISCI_TAB: 'broom',
     CANCELLA_ARCHIVIO: 'trash',
     CANCELLA_MEMORIA: 'eraser',
+    DIMENTICA: 'eraser',
+    CANCELLA_PAGINE: 'eraser',
     IMPOSTA_PREFERENZA: 'options',
     IMPOSTA_ESTETICA: 'palette',
     ESEGUI_COMANDO: 'terminal',
@@ -52,9 +57,15 @@
     REGOLA_PROXY_DOMINIO: 'globePinned',
     RIMUOVI_REGOLA_PROXY: 'globeOff',
     COMANDO_FINESTRA: 'windowFrame',
+    INSTALLA_AGGIORNAMENTO: 'download',
+    CARTA_HOME: 'home',
     ZOOM_PAGINA: 'zoomPagina',
+    VOLUME: 'volume',
+    BLUETOOTH: 'bluetooth',
+    WIFI: 'wifi',
     STILE_PAGINA: 'brush',
     RIPRISTINA_STILE_PAGINA: 'undo',
+    ANNULLA_CAMBIO: 'undo',
   };
 
   const PREVISTE = {

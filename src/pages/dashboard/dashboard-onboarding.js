@@ -28,7 +28,9 @@
   let goThread = null;
   let resetHistory = null;
   let pushHistory = null;
+  let segnaFermato = null;
   let isSending = null;
+  let giaAschermo = null;
   let beginSending = null;
   let runTurnAndContinue = null;
   let isHomeMessageVisible = null;
@@ -60,6 +62,9 @@
   // un'altra scheda fa avanzare la stessa intervista.
   function renderOnboardingThread(state) {
     const thread = Array.isArray(state?.thread) ? state.thread : [];
+    // I segni dei cambi chiesti durante l'intervista sopravvivono al ridisegno (#867).
+    const Cambi = global.SN_DASH_CAMBI;
+    const segni = Cambi ? Cambi.fotografa(bubblesEl) : [];
     bubblesEl.innerHTML = '';
     // Lo stato viaggia con l'azzeramento: la home lo usa per legare TUTTA
     // l'intervista a una sola chat in archivio (#525), anche quando si svolge
@@ -71,6 +76,9 @@
       pushHistory({ role, text: m.text });
       bubblesEl.appendChild(makeBubble({ role, text: m.text, markdown: role === 'filo' }));
     }
+    const ultimo = thread[thread.length - 1];
+    if (state.fermato && ultimo && ultimo.role !== 'filo' && segnaFermato) segnaFermato();
+    if (Cambi && segni.length) Cambi.rimetti(bubblesEl, segni);
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
   }
 
@@ -100,6 +108,9 @@
     // se questa home mostrava la riga «abbiamo chiuso a metà», adesso mente.
     if (!onboardingActive) { hideOnboardingNotice(); return; }
     if (isSending()) return;
+    // L'annuncio del turno appena finito QUI arriva anche dopo la risposta: ridisegnare la stessa conversazione
+    // butterebbe via il blocco di attività e i bottoni delle azioni.
+    if (giaAschermo && giaAschermo(state)) return;
     renderOnboardingThread(state);
   }
 
@@ -313,7 +324,9 @@
     goThread = deps.goThread;
     resetHistory = deps.resetHistory;
     pushHistory = deps.pushHistory;
+    segnaFermato = deps.segnaFermato || null;
     isSending = deps.isSending;
+    giaAschermo = deps.giaAschermo || null;
     beginSending = deps.beginSending;
     runTurnAndContinue = deps.runTurnAndContinue;
     isHomeMessageVisible = deps.isHomeMessageVisible;

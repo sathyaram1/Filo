@@ -88,3 +88,13 @@ test('LOCATIONS: lista curata (~5-8 paesi, non 50) con codici alpha-2 unici', ()
   }
   assert.ok(codes.includes('us')); // default da spec
 });
+
+// #771 — la pagina Sicurezza dichiara l'host del fornitore, mai le credenziali,
+// e lo legge dalla stessa config di isConfigured (env compresa).
+test('providerHost: host del fornitore effettivo, senza credenziali', () => {
+  assert.equal(P.providerHost({ proxy: { datacenter: 'socks5://user-{country}:pw@gate.testprovider.net:7000' } }, {}), 'gate.testprovider.net');
+  assert.equal(P.providerHost({}, { FILO_PROXY_DATACENTER: 'http://u:p@env.provider.io:8080' }), 'env.provider.io');
+  assert.equal(P.providerHost({ proxy: { datacenter: 'gate.nudo.com:9000' } }, {}), 'gate.nudo.com');
+  assert.equal(P.providerHost({}, {}), '');
+  assert.equal(P.providerHost({ proxy: { residential: 'socks5://r.x:1' } }, {}), '');
+});

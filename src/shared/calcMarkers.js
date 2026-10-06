@@ -16,6 +16,22 @@
   //   postfix= atom ('!')*
   //   atom   = number | '(' expr ')' | ident ['(' expr ')'] | ident
   // ----------------------------------------------------------------
+  const DUE_ARGOMENTI_RE = /\b(?:round|floor|ceil|log)\s*\(/gi;
+  function proteggiSecondoArgomento(s) {
+    const c = s.split('');
+    let m;
+    DUE_ARGOMENTI_RE.lastIndex = 0;
+    while ((m = DUE_ARGOMENTI_RE.exec(s))) {
+      let prof = 0;
+      for (let k = m.index + m[0].length - 1; k < c.length; k++) {
+        if (c[k] === '(') prof++;
+        else if (c[k] === ')' && --prof === 0) break;
+        else if (c[k] === ',' && prof === 1) { c[k] = ';'; break; }
+      }
+    }
+    return c.join('');
+  }
+
   function tryMathEval(input) {
     if (input == null) return { ok: false };
     let s = String(input).trim();
@@ -34,6 +50,10 @@
       .replace(/³/g, '^3')    // ³
       .replace(/\*\*/g, '^');
 
+    // Dentro round/floor/ceil/log la virgola di primo livello separa gli
+    // argomenti (round(x, 2), log(x, 2)): il modello scrive così, e letta come
+    // decimale italiana «round(3000/92,2)» diventava un altro conto (#724.1).
+    s = proteggiSecondoArgomento(s);
     // Decimali italiani: virgola tra cifre -> punto
     s = s.replace(/(\d),(\d)/g, '$1.$2');
     // Separatori delle migliaia con spazi tra cifre: rimuovili
@@ -41,8 +61,8 @@
     // Rimuovi un eventuale segno '=' finale (es. "2+2=")
     s = s.replace(/=\s*$/, '').trim();
 
-    // Whitelist caratteri ammessi
-    if (!/^[0-9+\-*/^%().\s a-zA-Z!]+$/.test(s)) return { ok: false };
+    // Whitelist caratteri ammessi (';' è solo il separatore messo qui sopra)
+    if (!/^[0-9+\-*/^%().;\s a-zA-Z!]+$/.test(s)) return { ok: false };
     // Deve "sembrare" matematica: almeno un operatore, fattoriale, funzione o costante
     const hasMathToken = /[+\-*/^%!]/.test(s)
       || /\b(sqrt|cbrt|sin|cos|tan|asin|acos|atan|log|ln|exp|abs|floor|ceil|round|pi|e)\b/i.test(s);
@@ -100,8 +120,9 @@
         if (s[i] === '(') {
           i++;
           const arg = parseExpr();
+          const arg2 = eat(';') ? parseExpr() : undefined;
           if (!eat(')')) throw new Error('paren');
-          return applyFunc(name, arg);
+          return arg2 === undefined ? applyFunc(name, arg) : applyFunc2(name, arg, arg2);
         }
         return applyConst(name);
       }
@@ -131,6 +152,13 @@
         case 'round': return Math.round(x);
       }
       throw new Error('fn');
+    }
+    function applyFunc2(name, x, n) {
+      if (name === 'log') return Math.log(x) / Math.log(n);
+      const arrotonda = { round: Math.round, floor: Math.floor, ceil: Math.ceil }[name];
+      if (!arrotonda || !Number.isInteger(n) || Math.abs(n) > 15) throw new Error('fn2');
+      const f = Math.pow(10, n);
+      return arrotonda(x * f) / f;
     }
     function applyConst(name) {
       if (name === 'pi') return Math.PI;

@@ -250,6 +250,20 @@ module.exports = function setupWheelZoom(webFrame, opts) {
   // sta nel documento, e su un sito lo scriverebbe il sito (#686).
   const interna = !!(opts && opts.interna);
 
+  // Lo zoom cambia anche da fuori (main, un'altra scheda dello stesso sito): il main tiene valori in px CSS
+  // della scheda (l'altezza degli avvisi della barra, #588.5) e va avvisato a ogni cambio, da qualunque parte.
+  if (ipc && typeof ipc.send === 'function' && typeof matchMedia === 'function') {
+    const osservaZoom = () => {
+      try {
+        matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`).addEventListener('change', () => {
+          try { ipc.send('filo:zoom-cambiato'); } catch (_) {}
+          osservaZoom();
+        }, { once: true });
+      } catch (_) {}
+    };
+    osservaZoom();
+  }
+
   const Z = caricaRegole();
   const ZOOM_STEP = Z ? Z.PASSO : 0.5;
   const MIN_LEVEL = Z ? Z.MIN_LIVELLO : -5;
@@ -309,11 +323,28 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     };
   } catch (_) {}
 
+  // Ogni cambio di zoom è un evento del filo (#867): una raffica di tasti o di rotella è UN cambio,
+  // detto al main quando si ferma. Quello chiesto in chat lo registra il main con la risposta (`daRichiesta`).
+  let raffica = null;
+  function annotaZoom(prima) {
+    if (!ipc || typeof ipc.send !== 'function') return;
+    if (!raffica) raffica = { prima, timer: null };
+    clearTimeout(raffica.timer);
+    raffica.timer = setTimeout(() => {
+      const r = raffica;
+      raffica = null;
+      const dopo = currentPercent();
+      if (r && r.prima !== dopo) { try { ipc.send('filo:zoom-registra', { prima: r.prima, dopo }); } catch (_) {} }
+    }, 800);
+  }
+
   // Unico punto che scrive lo zoom del webFrame, dentro i limiti condivisi.
-  function setLevel(level) {
+  function setLevel(level, { daRichiesta = false } = {}) {
+    const prima = currentPercent();
     const clamped = Z ? Z.limita(level) : Math.max(MIN_LEVEL, Math.min(MAX_LEVEL, level));
     try { webFrame.setZoomLevel(clamped); } catch (_) {}
     refreshPercent();
+    if (!daRichiesta) annotaZoom(prima);
   }
 
   // Col campo aperto le cifre le prende il main prima di qualunque frame (src/main/tabs/tabZoom.js).
@@ -610,8 +641,9 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     }
     const esito = Z ? Z.risolvi(letturaLivello(), spec) : null;
     if (!esito) return null;
-    setLevel(esito.livello);
-    return { percentuale: currentPercent(), richiesto: esito.richiesto, limitato: esito.limitato, min: esito.min, max: esito.max };
+    const prima = currentPercent();
+    setLevel(esito.livello, { daRichiesta: !!(spec && spec.rid) });
+    return { prima, percentuale: currentPercent(), richiesto: esito.richiesto, limitato: esito.limitato, min: esito.min, max: esito.max };
   }
 
   // ── Ascoltatori ─────────────────────────────────────────────────────────

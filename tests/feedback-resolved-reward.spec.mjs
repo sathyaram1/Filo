@@ -154,6 +154,12 @@ test('aggrega più feedback risolti e somma la ricompensa', async ({ app, openTa
   // 50 + 50 = 100.
   await expect(page.locator('.dash-thanks-total')).toContainText('+100');
   await expect.poll(() => balanceOf(app)).toBe(1100);
+  // Il titolo su due righe spinge il totale in basso a destra: la X di
+  // chiusura non gli finisce sopra (#816).
+  await page.waitForTimeout(300);
+  const totale = await page.locator('.dash-thanks-total').boundingBox();
+  const x = await page.locator('.dash-recap-x').boundingBox();
+  expect(x.x, `X ${JSON.stringify(x)} sopra il totale ${JSON.stringify(totale)}`).toBeGreaterThanOrEqual(totale.x + totale.width);
 });
 
 // Quando escono insieme due fix di chi sta guardando, l'annuncio li mette in

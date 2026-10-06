@@ -69,5 +69,15 @@
     await chrome.storage.local.remove(STORAGE_KEYS.AI_CACHE);
   }
 
-  global.SN_AI_CACHE = { get, set, clear, hashKey };
+  // Toglie le risposte che `pred` riconosce (quelle di una chat cancellata, #866).
+  async function togli(pred) {
+    const map = await readAll();
+    const via = Object.keys(map).filter((k) => map[k] && pred(map[k]));
+    if (!via.length) return 0;
+    for (const k of via) delete map[k];
+    await writeAll(map);
+    return via.length;
+  }
+
+  global.SN_AI_CACHE = { get, set, clear, togli, hashKey };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

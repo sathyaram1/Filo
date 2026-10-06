@@ -13,6 +13,8 @@ import { fileURLToPath } from 'node:url';
 const QUI = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(QUI, '..', '..');
 const CANALE = resolve(ROOT, 'scripts', 'routine-channel.mjs');
+// Col biglietto a mano il canale vuole la forma di un biglietto: uno finto ma della forma giusta.
+const TK = 'bigliettodiprova0123';
 const canale = await import('../../scripts/routine-channel.mjs');
 const owner = await import('../../scripts/routine-domanda.mjs');
 const { absolutizeRecipe } = await import('../../scripts/lib/tools-pin.mjs');
@@ -169,7 +171,7 @@ test('CLI: server senza l\'endpoint (404 con una pagina) → exit 2 su domanda e
   try {
     const d = await cli(port, ['domanda', 'p']);
     assert.equal(d.status, 2, d.stderr);
-    const r = await cli(port, ['risposta', '--biglietto', 'tk'], 'niente\n');
+    const r = await cli(port, ['risposta', '--biglietto', TK], 'niente\n');
     assert.equal(r.status, 2, r.stderr);
   } finally { srv.close(); }
 });
@@ -191,9 +193,9 @@ test('CLI: domanda → exit 0, stampa la domanda e il comando esatto per rispond
 test('CLI: risposta da stdin col biglietto → arriva intera, apostrofi compresi', async () => {
   const { srv, richieste, port } = await fintoServer(200, { ok: true });
   try {
-    const r = await cli(port, ['risposta', '--biglietto', 'tk'], "L'ultimo passo m'ha confuso.\n");
+    const r = await cli(port, ['risposta', '--biglietto', TK], "L'ultimo passo m'ha confuso.\n");
     assert.equal(r.status, 0, r.stderr);
-    assert.deepEqual(richieste[0].body, { ticket: 'tk', op: 'answer', answer: "L'ultimo passo m'ha confuso." });
+    assert.deepEqual(richieste[0].body, { ticket: TK, op: 'answer', answer: "L'ultimo passo m'ha confuso." });
   } finally { srv.close(); }
 });
 
@@ -210,7 +212,7 @@ test('CLI: answer_too_big → exit 4 coi numeri stampati', async () => {
 test('CLI: risposta vuota → non manda niente', async () => {
   const { srv, richieste, port } = await fintoServer(200, { ok: true });
   try {
-    const r = await cli(port, ['risposta', '--biglietto', 'tk'], '  \n');
+    const r = await cli(port, ['risposta', '--biglietto', TK], '  \n');
     assert.equal(r.status, 1);
     assert.equal(richieste.length, 0);
   } finally { srv.close(); }

@@ -11,6 +11,11 @@
 //   - su una pagina normale e piena (non ambigua) il gate evita la chiamata al
 //     modello → nessun segnale.
 //
+// Il livello 2 parte solo con un fornitore configurato (#771; il caso senza sta
+// in proxy-senza-fornitore.spec.mjs): qui c'è, quindi un geo_block fa scattare
+// il nuovo tentativo attraverso il fornitore. L'endpoint è finto ma non serve:
+// Chromium manda comunque diretto il traffico verso 127.0.0.1.
+//
 // Il modello è SIMULATO (dependency injection): sostituiamo SN_GEO_CLASSIFY con
 // la stessa logica del classificatore ma con un `complete` che ritorna la
 // classe decisa dal test. Così esercitiamo gate + emit reali senza rete.
@@ -35,7 +40,8 @@ async function startServer() {
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   return {
-    origin: `http://127.0.0.1:${server.address().port}`,
+    // Un nome da internet (la fixture lo porta al loopback): una pagina della rete di casa non va al classificatore (#591).
+    origin: `http://sito-pubblico.test:${server.address().port}`,
     async close() {
       try { server.closeAllConnections?.(); } catch (_) {}
       await new Promise((r) => server.close(r));
@@ -64,6 +70,9 @@ test('geo-block livello 2: solo geo_block dalla coda ambigua emette il segnale (
   test.setTimeout(120_000);
   const srv = await startServer();
   try {
+    await app.evaluate(async () => {
+      await globalThis.SN_STORAGE.updateSettings({ proxy: { datacenter: 'socks5://127.0.0.1:9' } });
+    });
     // Modello simulato + registro segnali, nel main process. Usiamo la VERA
     // logica del classificatore (gate, parsing, routing) ma un complete finto.
     await app.evaluate(() => {
@@ -84,28 +93,16 @@ test('geo-block livello 2: solo geo_block dalla coda ambigua emette il segnale (
     // del test è il secondo.
     const setClass = (c) => app.evaluate((_electron, cl) => { globalThis.__fakeClass = cl; }, c);
 
-    // ── 403 ambiguo classificato geo_block → segnale con source llm_classifier ──
-    await setClass('geo_block');
-    const page = await openTab(`${srv.origin}/forbidden-geo`);
-    await page.waitForSelector('#msg');
-    await expect.poll(async () => (await signals()).length, { timeout: 15_000 }).toBe(1);
-    let sig = (await signals())[0];
-    expect(sig.source).toBe('llm_classifier');
-    expect(sig.detail).toBe('geo_block');
-    expect(sig.host).toBe('127.0.0.1');
-    let tab = await webTabGeo(app);
-    expect(tab.geoBlock.source).toBe('llm_classifier');
-    // RILEVA, NON AGISCE: nessun retry via proxy è partito.
-    expect(tab.proxy).toBeNull();
-
-    // ── 403 ambiguo classificato bot_block → NESSUN segnale (no azione proxy) ──
+    // ── 403 ambiguo classificato bot_block → modello interrogato, NESSUN segnale ──
     await setClass('bot_block');
-    await navigate(app, tab.id, `${srv.origin}/forbidden-bot`);
-    await expect.poll(async () => (await webTabGeo(app)).url, { timeout: 10_000 }).toBe(`${srv.origin}/forbidden-bot`);
+    const page = await openTab(`${srv.origin}/forbidden-bot`);
+    await page.waitForSelector('#msg');
+    await expect.poll(modelCalls, { timeout: 15_000 }).toBeGreaterThan(0);
     await new Promise((r) => setTimeout(r, 3500)); // oltre il campione di testo ritardato
-    tab = await webTabGeo(app);
+    let tab = await webTabGeo(app);
     expect(tab.geoBlock).toBeNull();
-    expect((await signals()).length).toBe(1); // nessun nuovo segnale
+    expect(tab.proxy).toBeNull(); // nessuna azione proxy
+    expect((await signals()).length).toBe(0);
 
     // ── pagina normale e piena: il gate evita del tutto la chiamata al modello ──
     const callsBefore = await modelCalls();
@@ -115,9 +112,19 @@ test('geo-block livello 2: solo geo_block dalla coda ambigua emette il segnale (
     await new Promise((r) => setTimeout(r, 3500));
     tab = await webTabGeo(app);
     expect(tab.geoBlock).toBeNull();
-    expect((await signals()).length).toBe(1);
-    // il modello NON è stato interrogato per la pagina piena (gate)
+    expect((await signals()).length).toBe(0);
     expect(await modelCalls()).toBe(callsBefore);
+
+    // ── 403 ambiguo classificato geo_block → segnale con source llm_classifier ──
+    await navigate(app, tab.id, `${srv.origin}/forbidden-geo`);
+    await expect.poll(async () => (await signals()).length, { timeout: 15_000 }).toBeGreaterThan(0);
+    const sig = (await signals())[0];
+    expect(sig.source).toBe('llm_classifier');
+    expect(sig.detail).toBe('geo_block');
+    expect(sig.host).toBe('sito-pubblico.test');
+    // Col fornitore la matrice d'azione riprova da sola attraverso di lui.
+    await expect.poll(async () => (await webTabGeo(app)).proxy, { timeout: 15_000 })
+      .toEqual({ country: 'us', tier: 'datacenter' });
   } finally {
     await srv.close();
   }

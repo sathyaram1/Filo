@@ -49,6 +49,8 @@ const ROUTINES_DOC = 'config/routines';
 // Le manopole dei crediti (#652). Il documento lo legge il server dei crediti a
 // ogni riscatto, quota e premio; da qui lo scrive l'owner dalla sua pagina.
 const CREDITS_DOC = 'config/credits';
+// L'interruttore del Red Team (#896): lettura pubblica, scrittura dell'owner.
+const REDTEAM_DOC = 'config/redteam';
 
 // Cache degli override remoti dall'ultimo refresh.
 let remoteModels = null;  // { provider?, models?, modelRegistry? }
@@ -211,8 +213,8 @@ function fornitoreUsabile(nome, C = globalThis.SN_CONST || {}) {
   if (typeof nome !== 'string' || !nome) return false;
   if ((C.PRODUCER_DIRECT_PROVIDERS || []).includes(nome)) return false;
   if (nome === (C.DEFAULT_PROVIDER || 'openrouter')) return true;
-  const P = globalThis.SN_PROVIDERS;
-  try { return Boolean(P && P.getProvider(nome)); } catch (_) { return false; }
+  const Gate = globalThis.SN_MODEL_GATE;
+  return Boolean(Gate && Gate.hasProvider(nome));
 }
 
 function get() {
@@ -275,6 +277,10 @@ function get() {
     if (typeof remoteModels.providerSort === 'string') {
       out.providerSort = remoteModels.providerSort.trim();
     }
+    // #1004 — gli elenchi delle pagine delicate (posta, banche, sanità): ogni categoria remota sostituisce la sua.
+    if (remoteModels.sitiDelicati && typeof remoteModels.sitiDelicati === 'object') {
+      out.sitiDelicati = remoteModels.sitiDelicati;
+    }
     if (Array.isArray(remoteModels.modelRegistryDeleted)) {
       for (const nick of remoteModels.modelRegistryDeleted) {
         if (typeof nick !== 'string' || !nick) continue;
@@ -325,8 +331,13 @@ function getPublicForAdmin() {
       tavily: Boolean(eff.apiKeys.tavily),
     },
     safeBrowsingKeyPresent: Boolean(eff.safeBrowsingKey),
+    // #1004 — gli elenchi delle pagine delicate in vigore, e quelli del codice: l'editor salva solo le categorie che
+    // se ne discostano, così una banca aggiunta con un rilascio arriva anche dove l'owner non ha toccato niente.
+    sitiDelicati: PD() ? PD().elenco(eff.sitiDelicati) : (eff.sitiDelicati || {}),
+    sitiDelicatiDiSerie: PD() ? PD().elenco(null) : {},
   };
 }
+const PD = () => globalThis.SN_PAGINE_DELICATE || null;
 
 async function patchDoc(docPath, fields, mask, idToken) {
   const qs = mask.map((m) => `updateMask.fieldPaths=${encodeURIComponent(m)}`).join('&');
@@ -399,6 +410,16 @@ async function update(partial, idToken) {
   if (typeof partial.providerSort === 'string') {
     modelFields.providerSort = toFsValue(partial.providerSort.trim());
     modelMask.push('providerSort');
+  }
+  // #1004 — le categorie delle pagine delicate: l'oggetto inviato sostituisce quello remoto per intero.
+  if (partial.sitiDelicati && typeof partial.sitiDelicati === 'object' && !Array.isArray(partial.sitiDelicati)) {
+    const clean = {};
+    for (const [k, v] of Object.entries(partial.sitiDelicati)) {
+      if (!/^[a-z0-9_-]{1,40}$/i.test(k) || !Array.isArray(v)) continue;
+      clean[k] = [...new Set(v.filter((x) => typeof x === 'string').map((x) => x.trim().toLowerCase()).filter(Boolean))];
+    }
+    modelFields.sitiDelicati = toFsValue(clean);
+    modelMask.push('sitiDelicati');
   }
   if (modelMask.length) {
     await patchDoc(MODELS_DOC, modelFields, modelMask, idToken);
@@ -696,6 +717,24 @@ async function setRoutineSessions(patch, idToken) {
 }
 
 
+// ── Red Team aperto a tutti (#896) ───────────────────────────────────────────
+// `aperto` è vero solo per un `openToAll: true` scritto: documento assente o
+// illeggibile vale «in pausa», come sul server. `risposto` distingue la rete giù
+// dal no del server, perché chi tiene una copia in memoria possa riprovare.
+async function getRedteamOpen() {
+  const r = await leggiDoc(REDTEAM_DOC, null);
+  return { risposto: r.risposto, aperto: !!(r.doc && r.doc.openToAll === true) };
+}
+
+async function setRedteamOpen(on, idToken) {
+  if (!idToken) throw new Error('Serve un ID token admin per aprire o mettere in pausa il Red Team.');
+  await patchDoc(REDTEAM_DOC, {
+    openToAll: toFsValue(Boolean(on)),
+    updatedAt: { timestampValue: new Date(adesso()).toISOString() },
+  }, ['openToAll', 'updatedAt'], idToken);
+  return Boolean(on);
+}
+
 // ── Manopole dei crediti (#652) ──────────────────────────────────────────────
 // Le sette impostazioni di `config/credits` che l'owner cambia dalla sua
 // pagina. La tabella di cosa sono e quanto possono valere sta in
@@ -751,8 +790,12 @@ async function setCreditsKnobs(patch, idToken) {
 // (owner-gated) per la tab "Log" della dashboard. Ritorna le voci più recenti
 // PRIMA (ordine decrescente per istante d'avvio), già normalizzate. Documento o
 // campo assente / lettura fallita ⇒ lista vuota (mai un errore per un log).
-async function getWorkerLog(idToken) {
-  const doc = await fetchDoc(AUTOMATION_DOC, idToken);
+// `severo`: una lettura fallita lancia invece di valere «registro vuoto» (il giro
+// della Gestione deve distinguere «non lo so» da «niente di nuovo», #676.1).
+async function getWorkerLog(idToken, { severo = false } = {}) {
+  const letto = await leggiDoc(AUTOMATION_DOC, idToken);
+  if (severo && (!letto.risposto || !letto.doc)) throw new Error('registro dei worker non letto');
+  const doc = letto.doc;
   const raw = doc && Array.isArray(doc.workerLog) ? doc.workerLog : [];
   const entries = raw
     .filter((e) => e && typeof e === 'object')
@@ -791,5 +834,7 @@ module.exports = {
   setRoutineSessions,
   getCreditsKnobs,
   setCreditsKnobs,
+  getRedteamOpen,
+  setRedteamOpen,
   getWorkerLog,
 };

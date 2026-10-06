@@ -78,3 +78,35 @@ test('describe: crash del renderer ha il suo messaggio', () => {
   const c = NE.describe(NE.CRASH_CODE, 'oom');
   assert.match(c.title, /si è bloccata/);
 });
+
+// #771 — il consiglio «togli l'instradamento da un altro paese» solo a chi ha
+// davvero una scheda instradata: col proxy di sistema (rete aziendale) non c'entra.
+test('-130: il paese compare solo nella scheda instradata da un altro paese', () => {
+  const diretta = NE.parse(NE.buildUrl('https://x.it/', -130, 'ERR_PROXY_CONNECTION_FAILED'));
+  assert.equal(diretta.altroPaese, false);
+  const hintDiretta = NE.describe(diretta.code, diretta.desc, { altroPaese: diretta.altroPaese }).hint;
+  assert.doesNotMatch(hintDiretta, /paese/i);
+  assert.match(hintDiretta, /proxy/i);
+
+  const estera = NE.parse(NE.buildUrl('https://x.it/', -130, 'ERR_PROXY_CONNECTION_FAILED', { altroPaese: true }));
+  assert.equal(estera.altroPaese, true);
+  assert.equal(estera.target, 'https://x.it/');
+  assert.match(NE.describe(estera.code, estera.desc, { altroPaese: true }).hint, /altro paese/);
+  // Gli altri codici non cambiano consiglio.
+  assert.equal(NE.describe(-105, '', { altroPaese: true }).hint, NE.describe(-105, '').hint);
+});
+
+test('#590: la pagina «Sito bloccato» si riconosce, tiene il sito e offre «Apri comunque»', () => {
+  const u = NE.buildUrl('https://bloccato.esempio/pagina', NE.BLOCKED_CODE, 'blacklist');
+  assert.equal(NE.isBlockedPageUrl(u), true);
+  assert.equal(NE.targetOf(u), 'https://bloccato.esempio/pagina');
+  assert.equal(NE.isBlockedPageUrl(NE.buildUrl('https://x.esempio/', -105, 'ERR_NAME_NOT_RESOLVED')), false);
+  assert.equal(NE.isBlockedPageUrl('https://x.esempio/'), false);
+  const mia = NE.describe(NE.BLOCKED_CODE, 'blacklist');
+  assert.equal(mia.title, 'Sito bloccato');
+  assert.equal(mia.blocked, true);
+  assert.equal(mia.offline, false);
+  assert.notEqual(NE.describe(NE.BLOCKED_CODE, 'lists').hint, mia.hint);
+  // Non è un errore di rete: il ramo di did-fail-load non la produce mai.
+  assert.equal(NE.shouldShowErrorPage({ code: NE.BLOCKED_CODE, failedUrl: 'https://x.esempio/', isMainFrame: true }), false);
+});

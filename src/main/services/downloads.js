@@ -34,6 +34,7 @@
 
 const path = require('node:path');
 const fs = require('node:fs');
+const { spingiAllaScheda } = require('./impostazioniPerOrigine');
 
 // Tetto della cronologia persistita: teniamo le voci più recenti. 200 è ampio
 // per l'uso reale e non gonfia storage.json (poche centinaia di byte a voce).
@@ -54,11 +55,19 @@ function ESE() { return globalThis.SN_ESEGUIBILI; }
 // finché le impostazioni non sono arrivate, un programma si ferma comunque.
 let chiediEseguibili = true;
 let sitiFidati = [];
+// #950 — un nome sensato da solo agli scaricamenti che arrivano con un nome che non dice niente. Spento di
+// serie: il contenuto del file va a un modello senza che l'utente l'abbia chiesto per quel file.
+let nomeDaSolo = false;
+// Senza modello l'avviso arriva una volta, non a ogni scaricamento; riacceso l'interruttore, di nuovo.
+let avvisatoSenzaNome = false;
 
 function configureFromSettings(settings) {
   const d = (settings && settings.security && settings.security.downloads) || {};
   chiediEseguibili = d.confirmExecutables !== false;
   sitiFidati = Array.isArray(d.trustedSites) ? d.trustedSites.slice() : [];
+  const prima = nomeDaSolo;
+  nomeDaSolo = !!(settings && settings.nomiSensati && settings.nomiSensati.scaricamenti === true);
+  if (nomeDaSolo && !prima) avvisatoSenzaNome = false;
 }
 
 // Un programma da un sito che l'utente ha dichiarato fidato scende come un PDF.
@@ -295,6 +304,8 @@ function publicRecord(r) {
     exe: !!r.exe,
     site: r.site || '',
     siteUncertain: !!r.siteUncertain,
+    // #950 — il nome con cui il file era arrivato, finché Filo l'ha cambiato: le superfici offrono di rimetterlo.
+    nomeOriginale: r.nomeOriginale || '',
   };
 }
 
@@ -359,18 +370,18 @@ function broadcast(kind, rec) {
   const scope = scopeOf(rec);
   try {
     const payload = { kind, item: publicRecord(rec) };
+    // Solo le finestre di Filo: un popup di accesso è la pagina di un sito, e il
+    // record porta il percorso su disco.
     for (const win of windowsOf(scope)) {
+      if (!win._filoTabs) continue;
       try { win.webContents.send('shell:download', payload); } catch (_) {}
     }
   } catch (_) {}
   notifyTabs(scope);
 }
 
-// Segnale CONTENTLESS alle pagine (schede) — serve alla pagina filo://downloads
-// per sapere quando ri-leggere la lista. NON portiamo qui il record: questo
-// canale (`filo:broadcast`) raggiunge ANCHE le schede di siti esterni, e il
-// record contiene il percorso ASSOLUTO su disco (con lo username). La pagina
-// legge i dati veri dal canale DOWNLOADS_LIST, riservato alle superfici interne.
+// Segnale senza contenuto alla pagina filo://downloads, che rilegge la lista dal
+// canale DOWNLOADS_LIST. Ai siti non arriva: passa dalla lista delle spinte.
 function notifyTabs(scope = '') {
   try {
     const type = (globalThis.SN_MSG && globalThis.SN_MSG.MSG.DOWNLOADS_UPDATED) || 'downloads_updated';
@@ -378,9 +389,7 @@ function notifyTabs(scope = '') {
     for (const win of windowsOf(scope)) {
       const tm = win._filoTabs;
       if (tm && Array.isArray(tm.tabs)) {
-        for (const t of tm.tabs) {
-          try { t.view.webContents.send('filo:broadcast', msg); } catch (_) {}
-        }
+        for (const t of tm.tabs) spingiAllaScheda(t.view && t.view.webContents, msg, { inVista: t.id === tm.activeId });
       }
     }
   } catch (_) {}
@@ -465,6 +474,75 @@ function completa(rec) {
       { label: 'Apri cartella', revealDownloadId: rec.id },
     ],
   }, scopeOf(rec));
+  if (nomeDaSolo) nominaDaSolo(rec);
+}
+
+// #950 — solo i nomi che non dicono niente («scan_00231.pdf»): un nome scelto da qualcuno resta. L'incognito
+// no: lì il contenuto di un file non parte verso un modello senza che l'utente lo chieda.
+async function nominaDaSolo(rec) {
+  const NF = globalThis.SN_NOMI_FILE;
+  if (!NF || scopeOf(rec) || rec.exe || !rec.savePath) return;
+  if (!NF.tipoDi(rec.filename) || !NF.nomeSenzaSenso(rec.filename)) return;
+  const Nomi = require('./nomiFile');
+  const letto = rec.savePath;
+  const p = await Nomi.proponi(letto);
+  if (!records.has(rec.id) || rec.state !== 'completed') return;
+  // Un nome dato dall'utente mentre il modello leggeva vince sempre su quello automatico.
+  if (rec.savePath !== letto) return;
+  if (!p.ok) {
+    // Senza modello, o col modello che non risponde, l'utente che ha acceso la funzione deve saperlo.
+    if (p.errore === 'modello' && !avvisatoSenzaNome) {
+      avvisatoSenzaNome = true;
+      shellToast(`Nessun nome dato a ${shortName(rec.filename)}. ${p.frase}`, { durationSec: 10 }, '');
+    }
+    return;
+  }
+  const r = await Nomi.rinomina(letto, p.proposta);
+  if (!r.ok || r.invariato) return;
+  shellToast(`Nome dato: ${shortName(r.nome)}`, {
+    durationSec: 10,
+    actions: [
+      { label: 'Annulla', rimettiNomeDownloadId: rec.id },
+      { label: 'Apri file', openDownloadId: rec.id },
+    ],
+  }, '');
+}
+
+const stessoPercorso = (a, b) => (process.platform === 'win32' || process.platform === 'darwin'
+  ? String(a).toLowerCase() === String(b).toLowerCase()
+  : String(a) === String(b));
+
+// #950 — un file dell'elenco cambiato di nome da Filo (da qualunque strada): la voce lo segue, invece di
+// dichiararlo sparito, e ricorda il nome di arrivo per poterlo rimettere.
+function rinominato(da, a) {
+  let toccati = 0;
+  for (const rec of records.values()) {
+    if (!rec.savePath || !stessoPercorso(rec.savePath, da)) continue;
+    if (!rec.nomeOriginale) rec.nomeOriginale = rec.filename;
+    forgetExists(rec.savePath);
+    rec.savePath = a;
+    rec.filename = path.basename(a);
+    if (rec.filename === rec.nomeOriginale) rec.nomeOriginale = '';
+    forgetExists(a);
+    toccati += 1;
+    broadcast('renamed', rec);
+  }
+  if (toccati) persist();
+  return toccati;
+}
+
+function percorsoDi(id, scope = '') {
+  const rec = recordIn(id, scope);
+  return rec && rec.state === 'completed' ? (rec.savePath || '') : '';
+}
+
+async function rimettiNome(id, scope = '') {
+  const rec = recordIn(id, scope);
+  if (!rec) return { ok: false, frase: 'Questo scaricamento non è più nell’elenco' };
+  if (!rec.nomeOriginale) return { ok: false, frase: 'Ha già il nome con cui era arrivato' };
+  const r = await require('./nomiFile').rinomina(rec.savePath, rec.nomeOriginale, { esatto: true });
+  if (!r.ok) return { ok: false, frase: r.frase };
+  return { ok: true, nome: r.nome, cambiato: !!r.cambiato };
 }
 
 // ─── intercettazione ────────────────────────────────────────────────────
@@ -963,6 +1041,9 @@ function resume(id, scope = '') {
 
 module.exports = {
   init,
+  rinominato,
+  percorsoDi,
+  rimettiNome,
   attachSession,
   forgetScope,
   scopeOfWindow,

@@ -593,6 +593,18 @@ test('CLI: anche la consegna della correzione vuole il suo motivo', () => {
   assert.match(vl(casa, 'status').out, /giro di correzione aperto/, 'niente scritto');
 });
 
+test('CLI: un report di correzione a elenco puntato passa; la critica resta sulla regola di sempre', () => {
+  const casa = depositoUsaEGetta();
+  assert.equal(vl(casa, 'start', 'richiesta').code, 0);
+  const critica = vl(casa, 'critica', `- ${LUNGA_FIX}`);
+  assert.equal(critica.code, 1, 'cosa accetta il verificatore non cambia');
+  assert.match(critica.out, /Argomento non capito/);
+  assert.equal(vl(casa, 'critica', LUNGA_FIX).code, 0);
+  const r = vl(casa, 'corretto', '- Corretto il pulsante che non salvava col titolo vuoto.\n- Lasciato stare il resto, che era già a posto.');
+  assert.doesNotMatch(r.out, /Argomento non capito/, r.out);
+  assert.doesNotMatch(vl(casa, 'status').out, /giro di correzione aperto/, 'la consegna è arrivata');
+});
+
 test('CLI: una motivazione di due parole è respinta, sia per promuovere sia per bocciare', () => {
   const casa = depositoUsaEGetta();
   assert.equal(vl(casa, 'start', 'richiesta').code, 0);
