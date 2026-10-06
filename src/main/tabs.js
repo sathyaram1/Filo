@@ -8,7 +8,7 @@ const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const Cookies = require('./services/cookies');
 const { spingiAllaScheda } = require('./services/impostazioniPerOrigine');
-const { testoDellaRichiesta } = require('./services/testoInviato');
+const { testoDellaRichiesta, corpoDa } = require('./services/testoInviato');
 const ProxyTab = require('./services/proxyTab');
 const { registerFiloProtocolForSession } = require('./protocol');
 const GeoBlock = require('./services/geoBlock');
@@ -2769,11 +2769,12 @@ Cookies.osservaRichieste((d) => {
   const sito = Cookies.registrableOf(d.url);
   if (!sito || Cookies.registrableOf(da || d.referrer || trovata.tab.url) !== sito) return;
   if (inViaggio.size >= 200) inViaggio.delete(inViaggio.keys().next().value);
-  inViaggio.set(d.id, { ...trovata, sito, url: d.url, corpo: corpoDa(d.uploadData) });
+  inViaggio.set(`${d.webContentsId}:${d.id}`, { ...trovata, sito, url: d.url, corpo: corpoDa(d.uploadData) });
 }, (d, riuscita) => {
-  const r = d && inViaggio.get(d.id);
+  const k = d ? `${d.webContentsId}:${d.id}` : '';
+  const r = inViaggio.get(k);
   if (!r) return;
-  inViaggio.delete(d.id);
+  inViaggio.delete(k);
   if (riuscita && d.statusCode >= 200 && d.statusCode < 400) accodaRicevuta(r);
 });
 // Una richiesta alla volta, cedendo il passo fra l'una e l'altra: una pagina che ne manda tante

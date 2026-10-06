@@ -594,6 +594,15 @@
     }
     // Gli editor ricchi lasciano spazi a larghezza zero anche quando sono vuoti.
     const pulito = (s) => String(s).replace(/[\s\u200B-\u200D\u2060\uFEFF]+/g, '');
+    // Solo lettere e cifre minuscole, come il main riduce il testo delle richieste: il sito pu\u00F2
+    // averlo mandato in Markdown, in HTML o con le maiuscole sue.
+    const essenziale = (s) => String(s).toLowerCase().replace(/[^\p{L}\p{M}\p{N}]+/gu, '');
+    // Casella a pi\u00F9 righe \u2192 il suo testo all'ultima richiesta riuscita che lo portava al sito.
+    const ricevuti = new WeakMap();
+    // Campo di una riga \u2192 il suo testo dopo l'ultima scrittura dell'utente: se la pagina lo cambia
+    // (una voce scelta dai suggerimenti, una correzione) quel testo non \u00E8 pi\u00F9 suo.
+    const digitati = new WeakMap();
+    const sostituito = (area) => !lunghe.has(area) && digitati.has(area) && essenziale(testo(area)) !== digitati.get(area);
     // Un riquadro tolto dalla pagina lascia i suoi nodi «connessi» a un documento morto.
     const viva = (a) => a.isConnected && !!(a.ownerDocument && a.ownerDocument.defaultView);
 
