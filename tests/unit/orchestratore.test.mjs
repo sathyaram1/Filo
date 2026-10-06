@@ -1094,8 +1094,9 @@ function lente(b, quante = Infinity) {
   return { lanciate, vera };
 }
 
-test('smetti con calma (#1043): dopo nessuna istanza nuova, quelle in corso arrivano in fondo al passo, lo stato è coerente e un avvia nuovo riprende', async () => {
+test('smetti con calma (#1043): dopo nessuna istanza nuova, quelle in corso arrivano in fondo al passo, lo stato è coerente e un avvia nuovo riprende', async (t) => {
   const b = banco({ pratiche: [prova(1, 'uno', 'a/**'), prova(2, 'due', 'b/**'), prova(3, 'tre', 'c/**')], server: false, opz: { paralleli: 2 } });
+  t.after(() => b.motore.smetti('subito'));
   const { lanciate, vera } = lente(b);
   const corsa = b.motore.avvia();
   await finche(() => lanciate.length === 2, 'due lavoratori in corso');
@@ -1118,8 +1119,9 @@ test('smetti con calma (#1043): dopo nessuna istanza nuova, quelle in corso arri
   assert.equal(b.prompt.filter((x) => x.ruolo === 'lavoratore').length, 3, 'il passo finito prima di smetti non si rifà');
 });
 
-test('smetti subito (#1043): istanza e chiusura fermate a metà tornano al loro passo, lo stato dice quale, niente fermata né nota all’owner; la ripresa li rifà', async () => {
+test('smetti subito (#1043): istanza e chiusura fermate a metà tornano al loro passo, lo stato dice quale, niente fermata né nota all’owner; la ripresa li rifà', async (t) => {
   const b = banco({ pratiche: [prova(1, 'uno', 'a/**'), prova(2, 'due', 'b/**', { fase: 'chiusura' })], server: false });
+  t.after(() => b.motore.smetti('subito'));
   const { lanciate, vera } = lente(b);
   const esegui = b.dep.esegui;
   let fermaFinish = null;
@@ -1150,8 +1152,9 @@ test('smetti subito (#1043): istanza e chiusura fermate a metà tornano al loro 
   assert.deepEqual([dopo.pratiche[1].interrotto, dopo.pratiche[2].interrotto], [undefined, undefined]);
 });
 
-test('smetti durante l’attesa del limite d’uso: non si aspettano ore, il passo resta da rifare', async () => {
+test('smetti durante l’attesa del limite d’uso: non si aspettano ore, il passo resta da rifare', async (t) => {
   const b = banco({ server: false, errori: ['Claude AI usage limit reached'] });
+  t.after(() => b.motore.smetti('subito'));
   b.dep.dormi = (ms) => (ms > 1000 ? new Promise(() => {}) : unGiro());
   const corsa = b.motore.avvia();
   await finche(() => b.stato.pratiche[7].istanze.length === 1, 'la prima istanza caduta sul limite');
@@ -1162,9 +1165,10 @@ test('smetti durante l’attesa del limite d’uso: non si aspettano ore, il pas
   assert.match(p.interrotto.cosa, /in attesa del limite d’uso/);
 });
 
-test('posti decisi dalla macchina (#1041): senza numero fisso partono finché il carico lo permette; a macchina carica uno per volta', async () => {
+test('posti decisi dalla macchina (#1041): senza numero fisso partono finché il carico lo permette; a macchina carica uno per volta', async (t) => {
   const tre = () => [prova(1, 'uno', 'a/**'), prova(2, 'due', 'b/**'), prova(3, 'tre', 'c/**')];
   const libera = banco({ pratiche: tre(), server: false });
+  t.after(() => libera.motore.smetti('subito'));
   const a = lente(libera, 3);
   const corsa = libera.motore.avvia();
   await finche(() => a.lanciate.length === 3, 'tre istanze insieme a macchina libera');
@@ -1175,6 +1179,7 @@ test('posti decisi dalla macchina (#1041): senza numero fisso partono finché il
   // Carica finché gira la prima istanza: poi le chiusure, che vogliono la macchina calma, possono partire.
   const carica = banco({ pratiche: tre(), server: false, carichi: () => ({ cpu: c && c.lanciate.some((i) => !i.fatta) ? 95 : 10, liberaGB: 16 }) });
   c = lente(carica, 1);
+  t.after(() => carica.motore.smetti('subito'));
   const corsa2 = carica.motore.avvia();
   await finche(() => c.lanciate.length === 1, 'la prima istanza');
   for (let i = 0; i < 200; i += 1) await unGiro();
@@ -1183,7 +1188,7 @@ test('posti decisi dalla macchina (#1041): senza numero fisso partono finché il
   assert.deepEqual(Object.values((await corsa2).pratiche).map((p) => p.fase), ['fuso', 'fuso', 'fuso']);
 });
 
-test('un lavoro pronto a chiudere ferma le istanze nuove degli altri finché la sua chiusura non è fatta (#1041)', async () => {
+test('un lavoro pronto a chiudere ferma le istanze nuove degli altri finché la sua chiusura non è fatta (#1041)', async (t) => {
   let occupata = false;
   let misure = 0;
   // 70%: sotto la soglia di un'istanza (80), sopra quella di una chiusura (60).
@@ -1192,6 +1197,7 @@ test('un lavoro pronto a chiudere ferma le istanze nuove degli altri finché la 
     carichi: () => { misure += 1; return { cpu: occupata ? 70 : 10, liberaGB: 16 }; },
   });
   const { lanciate } = lente(b, 1);
+  t.after(() => b.motore.smetti('subito'));
   const vera = b.dep.claude;
   b.dep.claude = (x) => { occupata = true; return Promise.resolve(vera(x)).finally(() => { occupata = false; }); };
   const corsa = b.motore.avvia();
