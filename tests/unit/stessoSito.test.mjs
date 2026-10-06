@@ -24,6 +24,10 @@ for (const mode of ['default', 'privacy']) {
       ['https://blog-a.blogspot.com/', 'https://blog-b.blogspot.com/'],
       ['https://shop.com.tw/', 'https://altro.com.tw/'],
       ['https://negozio.co.id/', 'https://toko.co.id/'],
+      ['https://tienda.com.co/', 'https://otra.com.co/'],
+      ['https://uno.com.pe/', 'https://due.com.pe/'],
+      ['https://ena.com.gr/', 'https://dio.com.gr/'],
+      ['https://comune.bergamo.it/', 'https://altro.bergamo.it/'],
       ['http://192.168.1.10/', 'http://10.0.1.10/'],
       ['http://[::1]:8080/', 'http://[fe80::1]/'],
       ['http://localhost:3000/', 'http://127.0.0.1:3000/'],
@@ -40,6 +44,7 @@ for (const mode of ['default', 'privacy']) {
       ['https://news.bbc.co.uk/', 'https://www.bbc.co.uk/'],
       ['https://www.shop.com.tw/', 'https://shop.com.tw/cart'],
       ['https://www.alice.github.io/', 'https://alice.github.io/'],
+      ['https://www.tienda.com.co/', 'https://tienda.com.co/carrito'],
       ['https://example.com./', 'https://EXAMPLE.com/'],
     ]) assert.equal(seme(a), seme(b), `${a} e ${b} sono lo stesso sito`);
     // accounts.google.com è esente dal rumore (login): il seme del suo sito resta quello di google.com.

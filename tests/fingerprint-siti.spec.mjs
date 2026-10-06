@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const NOMI = ['shop.com.tw', 'www.shop.com.tw', 'altro.com.tw', 'negozio.co.id', 'toko.co.id', '192.168.1.10', '10.0.1.10'];
+const NOMI = ['shop.com.tw', 'www.shop.com.tw', 'altro.com.tw', 'negozio.co.id', 'toko.co.id', 'tienda.com.co', 'otra.com.co', '192.168.1.10', '10.0.1.10'];
 
 const test = base.extend({
   app: async ({}, use) => {
@@ -54,5 +54,6 @@ test('due siti diversi leggono impronte diverse, due pagine dello stesso sito la
   expect(impronte['www.shop.com.tw']).toBe(impronte['shop.com.tw']);
   expect(impronte['altro.com.tw']).not.toBe(impronte['shop.com.tw']);
   expect(impronte['toko.co.id']).not.toBe(impronte['negozio.co.id']);
+  expect(impronte['otra.com.co']).not.toBe(impronte['tienda.com.co']);
   expect(impronte['10.0.1.10']).not.toBe(impronte['192.168.1.10']);
 });

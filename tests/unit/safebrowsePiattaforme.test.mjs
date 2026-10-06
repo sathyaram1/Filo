@@ -95,3 +95,13 @@ test('un Microsoft Form su cloud.microsoft resta una pagina ospitata da giudicar
   assert.equal(v.whitelisted, false);
   assert.equal(v.needsLlm, true, JSON.stringify(v.reasons));
 });
+
+test('sotto un suffisso nazionale ogni sito è suo, e una voce fidata che è un suffisso (gov.it) li copre tutti', () => {
+  assert.equal(dominio('www.salute.gov.it'), 'salute.gov.it');
+  assert.equal(dominio('tienda.com.co'), 'tienda.com.co');
+  for (const url of ['https://www.salute.gov.it/', 'https://www.interno.gov.it/', 'https://www.agenziaentrate.gov.it/']) {
+    assert.deepEqual(evaluate(url).reasons, ['whitelisted'], url);
+  }
+  assert.notEqual(livello('https://paypal-login.com.co/'), 'safe');
+  assert.notEqual(evaluate('https://paypal-login.vercel.app/').reasons[0], 'whitelisted');
+});
