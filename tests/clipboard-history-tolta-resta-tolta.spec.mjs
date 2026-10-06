@@ -4,6 +4,7 @@
 
 import { test, expect, argomentiScala } from './fixtures/electron.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { apriCronologia, statoCronologia } from './helpers/cronologiaAppunti.mjs';
 import { _electron as electron } from '@playwright/test';
 import { writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
@@ -49,6 +50,13 @@ async function avvia(items) {
       await w.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 20000 });
       return w;
     },
+    async mostraWeb() {
+      await shell.evaluate(async (u) => {
+        const s = await window.filoShell.tabs.snapshot();
+        const t = s.tabs.find((x) => String(x.url || '').startsWith(u));
+        if (t) await window.filoShell.tabs.activate(t.id);
+      }, ctx.url);
+    },
     async sec() {
       await shell.evaluate((u) => window.filoShell.tabs.open(u), SEC_URL);
       const s = await findTabPage(app, 'security');
@@ -90,10 +98,8 @@ test('la segnalazione: dal menu «Incolla» si toglie una voce e si svuota tutto
   const c = await avvia(voci(4));
   try {
     const web = await c.web();
-    await web.locator('#ta').click({ button: 'right' });
-    await web.locator('.sn-menu-paste-arrow').click();
-    await expect(web.locator('.sn-menu-history-sub')).toBeVisible();
-    await web.locator('.sn-menu-history-item').nth(1).locator('.sn-menu-history-remove').click();
+    let stato = await apriCronologia(c.app, web, '#ta');
+    await web.mouse.click(stato.voci[1].rimuovi.x, stato.voci[1].rimuovi.y);
     await expect.poll(() => c.disco()).toEqual(['voce-0', 'voce-2', 'voce-3']);
 
     const sec = await c.sec();
@@ -101,10 +107,11 @@ test('la segnalazione: dal menu «Incolla» si toglie una voce e si svuota tutto
     await sec.locator('#sec-clip-list .sn-clip-remove').first().click();
     await expect.poll(() => c.disco()).toEqual(['voce-2', 'voce-3']);
 
-    await web.locator('#ta').click({ button: 'right' });
-    await web.locator('.sn-menu-paste-arrow').click();
-    await expect(web.locator('.sn-menu-history-item')).toHaveCount(2);
-    await web.locator('.sn-menu-history-clear-btn').click();
+    // Il menu legge la cronologia solo nella scheda in vista (#589.4): si torna sulla pagina.
+    await c.mostraWeb();
+    stato = await apriCronologia(c.app, web, '#ta');
+    expect(stato.voci).toHaveLength(2);
+    await web.mouse.click(stato.svuota.x, stato.svuota.y);
     await confermaWeb(c.app, '127.0.0.1');
     await expect.poll(() => c.disco()).toEqual([]);
   } finally { await c.chiudi(); }
@@ -147,9 +154,8 @@ test('svuotata dal menu, la cosa ancora negli appunti non rientra al primo «Inc
     await incolla('password-due');
     await expect.poll(() => c.disco()).toEqual(['password-due', 'vecchia']);
 
-    await web.locator('#ta').click({ button: 'right' });
-    await web.locator('.sn-menu-paste-arrow').click();
-    await web.locator('.sn-menu-history-clear-btn').click();
+    const { svuota } = await apriCronologia(c.app, web, '#ta');
+    await web.mouse.click(svuota.x, svuota.y);
     await confermaWeb(c.app, '127.0.0.1');
     await expect.poll(() => c.disco()).toEqual([]);
 
@@ -171,19 +177,17 @@ test('menu «Incolla»: tolta una voce, la sua gemella a schermo non resta viva 
   ]);
   try {
     const web = await c.web();
-    await web.locator('#ta').click({ button: 'right' });
-    await web.locator('.sn-menu-paste-arrow').click();
-    await web.locator('.sn-menu-history-item').first().locator('.sn-menu-history-remove').click();
+    const { voci: righe } = await apriCronologia(c.app, web, '#ta');
+    await web.mouse.click(righe[0].rimuovi.x, righe[0].rimuovi.y);
     await expect.poll(() => c.disco()).toEqual(['nota qualunque']);
-    const vive = web.locator('.sn-menu-history-item:not(.sn-menu-history-gone)').filter({ hasText: 'password' });
-    await expect(vive, 'la gemella già sparita dal disco resta viva nel menu').toHaveCount(0);
+    const vive = async () => (await statoCronologia(c.app, web)).voci.filter((v) => !v.tolta && v.testo.includes('password')).length;
+    await expect.poll(vive, { message: 'la gemella già sparita dal disco resta viva nel menu' }).toBe(0);
   } finally { await c.chiudi(); }
 });
 
-test('Sicurezza col puntatore fermo sulla lista: uno svuotamento dal menu di un\'altra scheda non sposta le righe sotto la mano', async () => {
+test('Sicurezza col puntatore fermo sulla lista: uno svuotamento fatto altrove non sposta le righe sotto la mano', async () => {
   const c = await avvia(voci(4));
   try {
-    const web = await c.web();
     const sec = await c.sec();
     await sec.locator('#sec-clip-list').scrollIntoViewIfNeeded();
     const box = await sec.locator('#sec-clip-list .sn-clip-item').nth(1).boundingBox();
@@ -192,11 +196,11 @@ test('Sicurezza col puntatore fermo sulla lista: uno svuotamento dal menu di un\
     await sec.waitForTimeout(300);
     const top0 = await sec.evaluate(() => document.querySelectorAll('#sec-clip-list .sn-clip-item')[1].getBoundingClientRect().top);
 
-    // Lo svuotamento parte davvero dal menu «Incolla» della scheda web.
-    await web.locator('#ta').click({ button: 'right' });
-    await web.locator('.sn-menu-paste-arrow').click();
-    await web.locator('.sn-menu-history-clear-btn').click();
-    await confermaWeb(c.app, '127.0.0.1');
+    // Da un sito il menu «Incolla» risponde solo nella scheda in vista (#589.4): con la Sicurezza davanti
+    // lo svuotamento arriva al main come da un'altra finestra.
+    await c.app.evaluate(async () => {
+      await globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.CLEAR_CLIPBOARD_HISTORY }, { url: 'filo://security/security.html' });
+    });
     await expect.poll(() => c.disco()).toEqual([]);
 
     await sec.waitForTimeout(800);

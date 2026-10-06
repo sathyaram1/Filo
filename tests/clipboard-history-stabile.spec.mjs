@@ -15,6 +15,7 @@
 
 import { test, expect, argomentiScala } from './fixtures/electron.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { apriCronologia, statoCronologia } from './helpers/cronologiaAppunti.mjs';
 import { _electron as electron } from '@playwright/test';
 import { writeFileSync, rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
@@ -215,38 +216,32 @@ test('menu Incolla: un doppio clic sulla × toglie UNA voce, e due immagini si d
     await shell.evaluate((u) => window.filoShell.tabs.open(u), srv.url);
     const web = await findTabPage(app, '127.0.0.1');
     await web.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 10000 });
-    await web.locator('#ta').click({ button: 'right' });
-    await expect(web.locator('.sn-menu')).toBeVisible();
-    await web.locator('.sn-menu-paste-arrow').click();
-    const sub = web.locator('.sn-menu-history-sub');
-    await expect(sub).toBeVisible();
-    const righe = sub.locator('.sn-menu-history-item');
-    await expect(righe).toHaveCount(8);
+    const stato = await apriCronologia(app, web, '#ta');
+    expect(stato.voci).toHaveLength(8);
 
     // Le due immagini si vedono: una miniatura per ciascuna, con dati diversi.
-    const sorgenti = await sub.locator('.sn-menu-history-thumb').evaluateAll((n) => n.map((x) => x.getAttribute('src')));
+    const sorgenti = stato.voci.map((v) => v.miniatura).filter(Boolean);
     expect(sorgenti).toHaveLength(2);
     expect(sorgenti[0]).not.toBe(sorgenti[1]);
 
     // Doppio clic sulla "×" della terza riga (voce-0): ne sparisce una sola.
-    await righe.nth(2).locator('.sn-menu-history-remove').hover();
+    const x = stato.voci[2].rimuovi;
+    await web.mouse.move(x.x, x.y);
     await web.mouse.down(); await web.mouse.up();
     await web.waitForTimeout(200);
     await web.mouse.down(); await web.mouse.up();
     await web.waitForTimeout(1000);
-    await expect(righe.nth(2)).toHaveClass(/sn-menu-history-gone/);
-    await expect(righe).toHaveCount(8); // niente si è spostato
-    await expect(sub.locator('.sn-menu-history-item:not(.sn-menu-history-gone)')).toHaveCount(7);
+    const dopo = (await statoCronologia(app, web)).voci;
+    expect(dopo[2].tolta).toBe(true);
+    expect(dopo).toHaveLength(8); // niente si è spostato
+    expect(dopo.filter((v) => !v.tolta)).toHaveLength(7);
 
     // Riaperto il menu, sul disco è sparita solo "voce-0".
     await web.keyboard.press('Escape');
-    await web.locator('#ta').click({ button: 'right' });
-    await web.locator('.sn-menu-paste-arrow').click();
-    const sub2 = web.locator('.sn-menu-history-sub');
-    await expect(sub2).toBeVisible();
-    await expect(sub2.locator('.sn-menu-history-item')).toHaveCount(7);
-    await expect(sub2).not.toContainText('voce-0');
-    await expect(sub2).toContainText('voce-1');
+    const riaperto = (await apriCronologia(app, web, '#ta')).voci.map((v) => v.testo);
+    expect(riaperto).toHaveLength(7);
+    expect(riaperto).not.toContain('voce-0');
+    expect(riaperto).toContain('voce-1');
   } finally {
     srv.close();
     try { await app.close(); } catch (_) {}

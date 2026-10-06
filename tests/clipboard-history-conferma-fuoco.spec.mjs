@@ -21,6 +21,7 @@
 
 import { test, expect, argomentiScala } from './fixtures/electron.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { apriCronologia, statoCronologia } from './helpers/cronologiaAppunti.mjs';
 import { _electron as electron } from '@playwright/test';
 import { writeFileSync, rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
@@ -201,31 +202,26 @@ test('menu Incolla: da tastiera, tolta una voce il fuoco passa alla "x" successi
     await shell.evaluate((u) => window.filoShell.tabs.open(u), srv.url);
     const web = await findTabPage(app, '127.0.0.1');
     await web.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 15000 });
-    await web.locator('#ta').click({ button: 'right' });
-    await web.locator('.sn-menu-paste-arrow').click();
-    const sub = web.locator('.sn-menu-history-sub');
-    await expect(sub).toBeVisible();
-    const righe = sub.locator('.sn-menu-history-item');
-    await expect(righe).toHaveCount(4);
+    const stato = await apriCronologia(app, web, '#ta');
+    expect(stato.voci).toHaveLength(4);
+    const voci = async () => (await statoCronologia(app, web)).voci;
 
-    await righe.nth(1).locator('.sn-menu-history-remove').focus();
+    // Il pannello sta in uno shadow root chiuso: dalla ricerca, che ha il fuoco ed è dopo la lista, si risale col tabulatore.
+    for (let i = 0; i < 12 && !(await voci())[1].fuocoRimuovi; i++) await web.keyboard.press('Shift+Tab');
+    expect((await voci())[1].fuocoRimuovi).toBe(true);
     await web.keyboard.press('Enter');
-    await expect(righe.nth(1)).toHaveClass(/sn-menu-history-gone/);
+    await expect.poll(async () => (await voci())[1].tolta).toBe(true);
     // Il fuoco è sulla "x" della voce dopo: un altro Invio toglie quella, non
     // niente. (Prima il bottone disabilitato buttava fuori il fuoco.)
     await web.keyboard.press('Enter');
-    await expect(righe.nth(2)).toHaveClass(/sn-menu-history-gone/);
-    await expect(sub.locator('.sn-menu-history-item:not(.sn-menu-history-gone)')).toHaveCount(2);
+    await expect.poll(async () => (await voci())[2].tolta).toBe(true);
+    await expect.poll(async () => (await voci()).filter((v) => !v.tolta).length).toBe(2);
 
     // E sul disco sono sparite proprio quelle due: riaperto il menu ne restano
     // due, la prima e l'ultima.
     await web.keyboard.press('Escape');
-    await web.locator('#ta').click({ button: 'right' });
-    await web.locator('.sn-menu-paste-arrow').click();
-    const sub2 = web.locator('.sn-menu-history-sub');
-    await expect(sub2.locator('.sn-menu-history-item')).toHaveCount(2);
-    await expect(sub2).toContainText('voce-0');
-    await expect(sub2).toContainText('voce-3');
+    const dopo = await apriCronologia(app, web, '#ta');
+    expect(dopo.voci.map((v) => v.testo)).toEqual(['voce-0', 'voce-3']);
   } finally {
     srv.close();
     try { await app.close(); } catch (_) {}

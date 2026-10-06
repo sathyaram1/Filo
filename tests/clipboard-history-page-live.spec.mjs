@@ -15,13 +15,15 @@
 // Pre-fix: il primo assert è rosso (la password non compare mai).
 
 import { test, expect } from './fixtures/electron.mjs';
+import { apriCronologia } from './helpers/cronologiaAppunti.mjs';
 
 async function push(app, text) {
   await app.evaluate(async (_e, t) => {
     const MSG = globalThis.SN_MSG.MSG;
     await globalThis.SN_HANDLE_MESSAGE(
       { type: MSG.PUSH_CLIPBOARD_ENTRY, entry: { type: 'text', text: t } },
-      { url: 'https://example.com/page' },
+      // Il seme passa da Filo: da un sito una scrittura senza un gesto vero è rifiutata (#589.4).
+      { url: 'filo://security/security.html' },
     );
   }, text);
 }
@@ -66,13 +68,9 @@ test('Sicurezza: la voce tolta dal menu "Incolla" sparisce dalla pagina già ape
     openTab,
     '<!doctype html><html><body style="padding:40px"><textarea id="ta" rows="4" cols="50"></textarea></body></html>',
   );
-  await web.locator('#ta').click({ button: 'right' });
-  await expect(web.locator('.sn-menu')).toBeVisible();
-  await web.locator('.sn-menu-paste-arrow').click();
-  const sub = web.locator('.sn-menu-history-sub');
-  await expect(sub).toBeVisible();
-  await sub.locator('.sn-menu-history-item', { hasText: 'segreto-condiviso' })
-    .locator('.sn-menu-history-remove').click();
+  const { voci } = await apriCronologia(app, web, '#ta');
+  const segreto = voci.find((v) => v.testo === 'segreto-condiviso');
+  await web.mouse.click(segreto.rimuovi.x, segreto.rimuovi.y);
   await expect.poll(() => stored(app)).toEqual(['testo qualunque']);
 
   // La pagina aperta si riallinea da sola, senza ricaricarla.

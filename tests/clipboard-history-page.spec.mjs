@@ -28,7 +28,8 @@ async function seed(app, entries) {
     for (const entry of list) {
       await globalThis.SN_HANDLE_MESSAGE(
         { type: MSG.PUSH_CLIPBOARD_ENTRY, entry },
-        { url: 'https://example.com/page' },
+        // Il seme passa da Filo: da un sito una scrittura senza un gesto vero è rifiutata (#589.4).
+        { url: 'filo://security/security.html' },
       );
     }
   }, entries.map((e) => (typeof e === 'string' ? { type: 'text', text: e } : e)));
