@@ -63,7 +63,7 @@ function banco({ pratiche = [nuovaPratica({ num: 7, slug: 'sette', richiesta: 'f
         const x = errori.shift();
         return typeof x === 'function' ? x({ ruolo, cwd, per }) : { ok: false, testo: '', costo: 0, errore: x };
       }
-      if (ruolo === 'lavoratore') punta[cwd] = (punta[cwd] || 0) + 1;
+      if (ruolo !== 'verificatore') punta[cwd] = (punta[cwd] || 0) + 1;
       if (ruolo === 'verificatore') {
         const v = coda.length ? coda.shift() : 'pass';
         const e = { ...(per[cwd].entry || {}) };
@@ -176,14 +176,14 @@ test('esito «fermato»: domanda all’owner, annotata sulla pratica; riprendi c
   assert.equal(p.fase, 'fermo');
   assert.match(p.fermo.domanda, /scegli A o B/);
   await new Promise((ok) => setImmediate(ok));
-  assert.ok(indice(b.righe(), /annota fid7 .*Serve la risposta/) >= 0);
+  assert.ok(indice(b.righe(), /^annota fid7 [^\n]*serve una tua scelta[\s\S]*scegli A o B[\s\S]*Cosa fare: rispondi con `npm run orchestra -- riprendi 7 "/) >= 0, b.righe().join('\n'));
   assert.match(rigaStato(p), /domanda:\n\s+- \[3i\?\] scegli A o B/);
 
   b.stato.pratiche[7] = riprendi(p, 'la B');
   fine = await b.motore.avvia();
   p = fine.pratiche[7];
   assert.equal(p.fase, 'fuso');
-  const ultimo = b.prompt.filter((x) => x.ruolo === 'lavoratore').pop().testo;
+  const ultimo = b.prompt.filter((x) => x.ruolo === 'ripresa').pop().testo;
   assert.match(ultimo, /L’owner ha risposto[\s\S]*la B/);
   assert.match(ultimo, /scegli A o B/);
 });
@@ -212,7 +212,7 @@ test('correzione non consegnata e ripresa: il lavoratore riceve i rilievi e cons
   const verificatori = b.prompt.filter((x) => x.ruolo === 'verificatore').length;
   p = (await b.motore.avvia()).pratiche[7];
   const ultimo = b.prompt[b.prompt.length - 1];
-  assert.equal(ultimo.ruolo, 'lavoratore');
+  assert.equal(ultimo.ruolo, 'correttore');
   assert.match(ultimo.testo, /- \[2i\] manca Y/);
   assert.match(ultimo.testo, /verify-local\.mjs corretto/);
   // Il finto non consegna: si ferma di nuovo coi rilievi, senza un verificatore in più, e la ripresa con una risposta li riporta.
@@ -254,7 +254,7 @@ test('correzione interrotta (tetto di spesa) e ripresa, con o senza risposta: ri
     b.stato.pratiche[7] = riprendi(p, risposta);
     p = (await b.motore.avvia()).pratiche[7];
     const nuovi = b.prompt.slice(prima);
-    assert.equal(nuovi[0].ruolo, 'lavoratore', risposta);
+    assert.equal(nuovi[0].ruolo, 'correttore', risposta);
     assert.match(nuovi[0].testo, /- \[2i\] manca Y/);
     assert.match(nuovi[0].testo, /verify-local\.mjs corretto/);
     if (risposta) assert.match(nuovi[0].testo, /riprova pure/);
@@ -276,7 +276,7 @@ test('fusione in attesa dell’approvazione ripresa con un testo: con l’approv
       assert.equal(p.fase, 'fuso');
       assert.deepEqual(nuovi, []);
     } else {
-      assert.equal(nuovi[0].ruolo, 'lavoratore');
+      assert.equal(nuovi[0].ruolo, 'ripresa');
       assert.match(nuovi[0].testo, /rinomina il comando/);
     }
   }
@@ -324,7 +324,7 @@ test('ramo con un merge commit e indietro: merge di origin/main prima di start; 
   assert.equal(fine.pratiche[7].fase, 'fuso');
   const r = b.righe();
   assert.ok(indice(r, /merge --abort/) >= 0);
-  const riall = b.prompt.filter((x) => x.ruolo === 'lavoratore')[1];
+  const riall = b.prompt.find((x) => x.ruolo === 'riallineatore');
   assert.match(riall.testo, /va in conflitto con origin\/main/);
   assert.ok(indice(r, /push origin HEAD:refs\/heads\/claude\/sette/) < indice(r, /verify-local\.mjs start/), 'il merge si spedisce prima di start');
 });
@@ -619,7 +619,7 @@ test('superato e ripresa con un testo: il lavoratore applica il testo, e senza c
   b.stato.pratiche[7] = riprendi({ ...p0, giri: 1, giriTotali: 1, fase: 'fermo', fermo: { motivo: 'modifiche non salvate nel worktree dopo il verdetto', dove: 'verifica' } }, 'ho pulito io');
   b.per[WT7].dirty = false;
   const p = (await b.motore.avvia()).pratiche[7];
-  assert.equal(b.prompt[0].ruolo, 'lavoratore');
+  assert.equal(b.prompt[0].ruolo, 'ripresa');
   assert.match(b.prompt[0].testo, /ho pulito io/);
   assert.equal(p.fase, 'fuso');
   assert.equal(starts(b) + verificatori(b), 0);
@@ -642,7 +642,7 @@ test('orchestratore riavviato dopo il verdetto: superato → chiusura; fermato �
   b.stato.pratiche[7] = riprendi(p, 'la B');
   p = (await b.motore.avvia()).pratiche[7];
   assert.equal(p.fase, 'fuso');
-  assert.equal(b.prompt[0].ruolo, 'lavoratore');
+  assert.equal(b.prompt[0].ruolo, 'ripresa');
   assert.equal(starts(b), 1);
 });
 
@@ -662,7 +662,7 @@ test('verificatore che registra la critica e poi cade (limite d’uso, rete): no
     let n = 0;
     b.dep.claude = async (x) => { n += 1; if (n === 2) errori.push(registraECade); if (n === 3) errori.push(consegna); return claude(x); };
     const p = (await b.motore.avvia()).pratiche[7];
-    assert.deepEqual(b.prompt.map((x) => x.ruolo), ['lavoratore', 'verificatore', 'lavoratore', 'verificatore'], errore);
+    assert.deepEqual(b.prompt.map((x) => x.ruolo), ['lavoratore', 'verificatore', 'correttore', 'verificatore'], errore);
     assert.match(b.prompt[2].testo, /- \[2i\] manca Y/);
     assert.equal(p.fase, 'fuso', errore);
   }
@@ -692,7 +692,7 @@ test('lavoratore interrotto mentre applicava una decisione: riprendi senza testo
   b.stato.pratiche[7] = riprendi(p, '');
   p = (await b.motore.avvia()).pratiche[7];
   const nuovi = b.prompt.slice(prima);
-  assert.equal(nuovi[0].ruolo, 'lavoratore');
+  assert.equal(nuovi[0].ruolo, 'ripresa');
   assert.match(nuovi[0].testo, /la B/);
   assert.equal(p.fase, 'fuso');
 });
@@ -791,7 +791,7 @@ test('il lavoratore che riparte su un ramo con commit lo sa dal ramo, anche al p
   assert.match(p.fermo.motivo, /non ha finito/);
   b.stato.pratiche[7] = riprendi(p, '');
   assert.equal((await b.motore.avvia()).pratiche[7].fase, 'fuso');
-  assert.equal(b.prompt[1].ruolo, 'lavoratore');
+  assert.equal(b.prompt[1].ruolo, 'ripresa');
   assert.match(b.prompt[1].testo, /già del lavoro/);
 });
 
