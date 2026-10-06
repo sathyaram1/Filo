@@ -93,6 +93,7 @@ import '../src/shared/feedbackPublicKey.js';
 import '../src/shared/feedbackCrypto.js';
 import '../src/shared/feedback.js';
 import '../src/shared/feedbackStatus.js';
+import '../src/shared/feedbackAttese.js';
 import '../src/shared/manageReview.js';
 
 const THREAD = globalThis.SN_FEEDBACK_THREAD;

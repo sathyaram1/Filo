@@ -232,6 +232,7 @@
 
   const FB  = window.SN_FEEDBACK;
   const MR  = window.SN_MANAGE_REVIEW;
+  const ATT = window.SN_FB_ATTESE;
   const TH  = window.SN_FEEDBACK_THREAD;
   const SRCH = window.SN_MANAGE_SEARCH;
   const AUTO_MODE_KEY = (window.SN_CONST?.STORAGE_KEYS?.AUTO_MODE) || 'filo_auto_mode';
@@ -2053,6 +2054,17 @@
         azione: () => segnoDalMenu(fb, true),
       });
     }
+    if (isAdmin && ATT) {
+      if (!MR.praticaChiusa(fb, opzSezioni())) {
+        voci.push({ testo: '⏳ Aspetta un altro feedback…', titolo: 'Nessuna routine lo prende finché quello non è fuso.', azione: () => apriCasellaAttese(fb._id) });
+      }
+      if (ATT.atteseDi(fb).length) {
+        voci.push({
+          testo: '⏳ Non aspettare più', titolo: testoStatiAttese(ATT.statiDelleAttese(fb, trovaAtteso)),
+          azione: () => { if (selectedId !== fb._id) openDetail(fb._id); scriviAttese(fb._id, []); },
+        });
+      }
+    }
     const lavoroLocale = isAdmin ? MR.ownerActionFor(fb, 'accept_local', { releasedVersion }) : null;
     if (lavoroLocale) {
       voci.push({ testo: '💻 Approva come lavoro locale', titolo: titoloLavoroLocale(fb), azione: () => approvaDalMenu(fb, lavoroLocale) });
@@ -3281,7 +3293,6 @@
   // ── «Aspetta #N» (#903) ───────────────────────────────────────────────────
   // I feedback da fondere prima: finché uno non lo è nessuna routine lo prende, e qui sta fra quelli che aspettano.
   // Numeri, esistenza e giri li controlla il main (MSG.FEEDBACK_UPDATE); la regola sta in SN_FB_ATTESE.
-  const ATT = window.SN_FB_ATTESE;
   function trovaAtteso(id) {
     return allFeedbacks.find((f) => f._id === id) || attesiFuori.get(id);
   }
