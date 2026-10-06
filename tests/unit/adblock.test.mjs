@@ -305,3 +305,19 @@ test('regole sotto cancello: ogni selettore dell\'elenco prende la radice aperta
   assert.equal(A.cosmeticForTokens('https://pagina.test/', [], ['ad-slot'], g), ':root:not([data-filo-abc123]) .ad-slot{display:none!important}');
   assert.equal(A.cosmeticForTokens('https://pagina.test/', [], ['ad-slot'], 'x]{} body'), '.ad-slot{display:none!important}');
 });
+
+// #576 giro 5: chat e novità raccontano il blocco com'è. Una voce sola nel manifesto, e nessuna promessa di aprire
+// i link delle reti di affiliazione che il file hosts ferma come siti.
+test('il manifesto ha una voce sola per il blocco della pubblicità, e le novità non promettono i link di affiliazione', () => {
+  require(join(__dirname, '..', '..', 'src', 'shared', 'capabilities.js'));
+  const voci = globalThis.SN_CAPABILITIES.all().filter((v) => /EasyList/.test(`${v.desc} ${v.doesNot}`));
+  assert.deepEqual(voci.map((v) => v.id), ['ad-block']);
+  assert.doesNotMatch(voci[0].doesNot, /spazio vuoto/);
+
+  const pagine = new Set();
+  const domini = A.parseList('0.0.0.0 go.skimresources.com\n0.0.0.0 www.awin1.com', pagine);
+  A.setDomainsForTest([...domini], [...pagine]);
+  assert.equal(A.isBlockedSite('go.skimresources.com'), true);
+  require(join(__dirname, '..', '..', 'src', 'shared', 'patchNotes.js'));
+  assert.doesNotMatch(JSON.stringify(globalThis.SN_PATCH_NOTES.NOTES), /link di affiliazione[^"]*?si aprono/i);
+});
