@@ -1941,6 +1941,32 @@ test('un riquadro con script nascosto non si paga; aperta la sua sezione, si tra
   expect(dopo).not.toContain('ZZLOW');
 });
 
+// La scheda spenta del tutto toglie al riquadro anche la misura: da sola, senza testo attorno, deve farsi offrire lo stesso.
+for (const [nome, apre, chiusa] of [
+  ['con l’attributo hidden', (el) => { el.hidden = false; }, 'hidden'],
+  ['con display:none', (el) => { el.style.display = 'block'; }, 'style="display:none"'],
+]) {
+  test(`scheda spenta ${nome} con dentro solo un riquadro con script: aperta, il menu offre di tradurlo`, async ({ app, openTab, testServer }) => {
+    test.setTimeout(120000);
+    await stubTranslationProvider(app);
+    const src = testServer.html(frameInner('ZZTAB')).replace('127.0.0.1', 'blocked.test');
+    const page = await testServer.openReady(openTab, framePage(
+      `<div id="tab" ${chiusa}><iframe id="emb" src="${src}" style="width:520px;height:220px"></iframe></div>`));
+    await watchToasts(page);
+    await clickTranslateIcon(page, '#p1');
+    await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 30000 }).toContain('Pagina tradotta');
+    expect(await sentText(app)).not.toContain('ZZTAB');
+
+    await page.evaluate(`(${apre.toString()})(document.getElementById('tab'))`);
+    await page.waitForTimeout(150);
+    await page.locator('#p1').click({ button: 'right', position: { x: 5, y: 5 } });
+    const btn = page.locator('[data-sn-icon-id="translate"]');
+    await expect(btn).toHaveAttribute('aria-label', 'Traduci il testo nuovo');
+    await btn.click();
+    await expect(page.frameLocator('#emb').locator('#fbody')).toHaveText(/^IT /, { timeout: 60000 });
+  });
+}
+
 test('un riquadro che non si conta non risponde al posto di uno chiuso a chiave che si vede', async ({ app, openTab, testServer }) => {
   test.setTimeout(120000);
   await stubTranslationProvider(app);
