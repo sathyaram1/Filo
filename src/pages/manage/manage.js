@@ -2285,6 +2285,7 @@
     // resterebbe lì anche dopo che la sua scheda è arrivata, e si leggerebbe
     // due volte.
     renderFusioniOrfane();
+    caricaAttesiFuori();
   }
 
   // Questa segnalazione ha una fusione ferma che aspetta l'owner?
