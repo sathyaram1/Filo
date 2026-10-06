@@ -240,7 +240,8 @@ test.describe('tinta viva delle schede non attive', () => {
 
   // Fondo, barra e titolo della scheda rossa come li mostra lo schermo.
   const readRedTab = () => shell.evaluate(() => {
-    const el = document.querySelector('.tab[data-tip="Sito rosso"]');
+    // Col suggerimento delle anteprime la scheda non porta data-tip: si cerca per titolo.
+    const el = [...document.querySelectorAll('.tab')].find((e) => e.querySelector('.title')?.textContent === 'Sito rosso');
     if (!el || el.classList.contains('active')) return null;
     const probe = document.createElement('div');
     probe.style.background = 'var(--tab-bg)';
@@ -330,7 +331,7 @@ test.describe('tinta viva delle schede non attive', () => {
     const dark = await expectFormula(0.6, true);
     expect(lum(dark.bar)).toBeLessThan(0.05);
 
-    await shell.hover('.tab[data-tip="Sito rosso"] .title');
+    await shell.hover('.tab .title:text-is("Sito rosso")');
     await expect.poll(async () => {
       const r = await readRedTab();
       return !!r && !near(r.bg, dark.bg) && contrast(r.title, r.bg) >= 4.5;
@@ -344,7 +345,7 @@ test.describe('tinta viva delle schede non attive', () => {
   // D63: la scheda attiva prende sempre la cima della pagina, mai il marchio; il testo si sceglie per contrasto (#821).
   test('scheda attiva: cima bianca resta bianca col favicon rosso, cima rossa è rossa; titolo a 4,5:1 e crocetta a 3:1, nei due temi', async () => {
     const readActive = (titolo) => shell.evaluate((tt) => {
-      const el = document.querySelector(`.tab.active[data-tip="${tt}"]`);
+      const el = [...document.querySelectorAll('.tab.active')].find((e) => e.querySelector('.title')?.textContent === tt);
       if (!el) return null;
       const nums = (c) => (/rgba?\(([^)]+)\)/.exec(c) || [, ''])[1].split(',').slice(0, 3).map(Number);
       return {

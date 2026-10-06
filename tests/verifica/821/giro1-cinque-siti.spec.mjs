@@ -56,7 +56,7 @@ async function leggiSchede(shell) {
       tabs: [...document.querySelectorAll('.tab')].map((el) => {
         const t = snap.tabs.find((x) => String(x.id) === el.dataset.id) || {};
         return {
-          tip: el.dataset.tip, active: el.classList.contains('active'), tinted: el.classList.contains('tinted'),
+          tip: el.querySelector('.title')?.textContent, active: el.classList.contains('active'), tinted: el.classList.contains('tinted'),
           identity: t.identityColor || null,
           bg: getComputedStyle(el).backgroundColor,
           title: getComputedStyle(el.querySelector('.title')).color,
@@ -101,7 +101,7 @@ test('cinque siti noti: tinta viva, formula, titolo leggibile, chiaro e scuro', 
     await shell.screenshot({ path: `tests/.shots/v821-barra-${scheme}.png`, clip: { x: 0, y: 0, width: w, height: 44 } });
     // hover su ogni scheda colorata
     for (const t of s.tabs.filter((x) => x.tinted)) {
-      await shell.hover(`.tab[data-tip="${t.tip}"] .title`);
+      await shell.hover(`.tab .title:text-is("${t.tip}")`);
       await shell.waitForTimeout(200);
       const h = await leggiSchede(shell);
       const ht = h.tabs.find((x) => x.tip === t.tip);
