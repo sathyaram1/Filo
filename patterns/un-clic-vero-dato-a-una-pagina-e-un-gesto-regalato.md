@@ -75,7 +75,9 @@ voleva.
   (menu, risposte, assistente: le radici di `SN_FILO_UI`, non l'attributo) è di Filo e spende il gesto, come una
   scorciatoia. Lo schermo pieno invece lo decide Chromium sull'attivazione del frame, che il clic sul menu di Filo dà
   lo stesso: negarlo dal gestore dei permessi lascia la richiesta in sospeso, e la pagina non ci va più nemmeno col
-  clic dopo, fino al ricaricamento. Il collegamento o il pulsante d'invio cliccato e la voce del menu di Filo che apre un indirizzo
+  clic dopo, fino al ricaricamento. L'owner l'ha accettato (#737.1): si esce con Esc, e la porta la chiude il menu
+  disegnato fuori dalla pagina (D14), non una pezza qui. La conferma sincrona costa meno di un millisecondo a tasto
+  (misurato: +0,6 ms di mediana sul `keydown`), sotto la soglia che si vede scrivendo. Il collegamento o il pulsante d'invio cliccato e la voce del menu di Filo che apre un indirizzo
   dichiarano quell'indirizzo (`aperturaScelta`): si apre una volta anche se la pagina ha già speso il gesto per una
   sua pubblicità, e spende il gesto rimasto. Il main non sa chi ha chiesto la finestra; il preload sa che cosa l'utente ha toccato.
 
