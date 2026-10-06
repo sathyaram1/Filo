@@ -649,18 +649,26 @@
       orfani.push({ t, righe: viste && viste.join('') === t ? viste : [t] });
       if (orfani.length > 100) orfani.shift();
     }
-    // Una riga è partita se la richiesta la porta; il testo intero conta anche se il sito ne ha
-    // cambiato gli a capo.
+    // Il sito ha ricevuto un testo se una richiesta riuscita ne porta ogni riga; il testo intero
+    // conta anche se il sito ne ha cambiato gli a capo. Un campo di una riga ricevuto non protegge
+    // più (una ricerca, un accesso). Una casella a più righe sì, finché il testo è lì: un'anteprima
+    // o un invio respinto con risposta riuscita portano il testo come un salvataggio. Tolta dalla
+    // pagina, non lascia un orfano.
     function partito(inviato) {
       if (typeof inviato !== 'string' || !inviato) return;
-      const dentro = (t, righe) => inviato.includes(t) || (righe.length > 0 && righe.every((r) => inviato.includes(r)));
+      const dentro = (t, righe) => {
+        const tutto = essenziale(t);
+        if (tutto && inviato.includes(tutto)) return true;
+        const r = righe.map(essenziale).filter(Boolean);
+        return r.length > 0 && r.every((x) => inviato.includes(x));
+      };
       // Il campo può sparire mentre la richiesta è in viaggio: prima diventa un orfano, poi si cerca.
       stato();
       for (const area of [...aree.keys()]) {
         if (!viva(area)) continue;
         const ora = testo(area);
-        const t = pulito(ora);
-        if (t && dentro(t, righeDi(area))) aree.set(area, ora);
+        if (!pulito(ora) || !dentro(ora, righeDi(area))) continue;
+        if (lunghe.has(area)) ricevuti.set(area, pulito(ora)); else aree.set(area, ora);
       }
       for (let i = orfani.length - 1; i >= 0; i--) if (dentro(orfani[i].t, orfani[i].righe)) orfani.splice(i, 1);
       aggiorna(false);
