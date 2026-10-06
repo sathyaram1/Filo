@@ -160,6 +160,17 @@ test('un marchio che è una parola, dentro un\'altra parola, non fa scattare l\'
   await expect(page.locator('.sn-menu .sn-menu-link-warn')).toHaveCount(0);
 });
 
+for (const href of ['https://raw.githubusercontent.com/microsoft/vscode/main/README.md', 'https://cdn.discordapp.com/attachments/1/2/foto.png']) {
+  test(`il file servito dal marchio stesso (${new URL(href).hostname}) non è un'imitazione (#732)`, async ({ openTab, testServer }) => {
+    const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:40px;font:16px sans-serif">
+      <p><a id="lnk" href="${href}">Il file</a></p></body></html>`);
+    await page.locator('#lnk').click({ button: 'right' });
+    await expect(page.locator('.sn-menu .sn-menu-inline[data-subject="link"]')).toBeVisible();
+    await page.waitForTimeout(800);
+    await expect(page.locator('.sn-menu .sn-menu-link-warn')).toHaveCount(0);
+  });
+}
+
 for (const [forma, [href, atteso]] of Object.entries(IMITAZIONI)) {
   test(`imitazione ${forma}: il menu la segnala e dice dove porta`, async ({ openTab, testServer }) => {
     const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:40px;font:16px sans-serif">

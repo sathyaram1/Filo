@@ -56,25 +56,25 @@ const BRANDS = [
   { token: 'office365', display: 'Microsoft 365', domains: ['office.com', 'office365.com', 'microsoft.com', 'microsoft365.com'] },
   { token: 'apple', display: 'Apple', domains: ['apple.com', 'icloud.com', 'me.com', ...gh('apple', 'apple-oss-distributions')] },
   { token: 'icloud', display: 'iCloud', domains: ['icloud.com', 'apple.com'] },
-  { token: 'dropbox', display: 'Dropbox', domains: ['dropbox.com', 'dropboxusercontent.com', ...gh('dropbox')] },
+  { token: 'dropbox', display: 'Dropbox', domains: ['dropbox.com', 'dropboxusercontent.com', 'dropboxapi.com', 'dropboxstatic.com', ...gh('dropbox')] },
   { token: 'yahoo', display: 'Yahoo', domains: ['yahoo.com', 'yahoo.it', ...gh('yahoo', 'yahoojapan')] },
   { token: 'proton', display: 'Proton', domains: ['proton.me', 'protonmail.com', ...gh('protonmail')] },
 
   // Social / comunicazione
-  { token: 'facebook', display: 'Facebook', domains: ['facebook.com', 'fb.com', ...gh('facebook', 'facebookresearch', 'facebookincubator', 'facebookexperimental', 'facebookarchive')] },
+  { token: 'facebook', display: 'Facebook', domains: ['facebook.com', 'fb.com', 'facebook.net', ...gh('facebook', 'facebookresearch', 'facebookincubator', 'facebookexperimental', 'facebookarchive')] },
   { token: 'instagram', display: 'Instagram', domains: ['instagram.com', 'instagram-engineering.com', ...gh('instagram')] },
-  { token: 'whatsapp', display: 'WhatsApp', domains: ['whatsapp.com', ...gh('whatsapp')] },
+  { token: 'whatsapp', display: 'WhatsApp', domains: ['whatsapp.com', 'whatsapp.net', ...gh('whatsapp')] },
   { token: 'twitter', display: 'X (Twitter)', domains: ['twitter.com', 'x.com', ...gh('twitter', 'twitterdev')] },
   { token: 'linkedin', display: 'LinkedIn', domains: ['linkedin.com', ...gh('linkedin')] },
-  { token: 'tiktok', display: 'TikTok', domains: ['tiktok.com'] },
+  { token: 'tiktok', display: 'TikTok', domains: ['tiktok.com', 'tiktokcdn.com', 'tiktokv.com'] },
   { token: 'telegram', display: 'Telegram', domains: ['telegram.org', 't.me'] },
-  { token: 'discord', display: 'Discord', domains: ['discord.com', 'discord.gg', ...gh('discord')] },
+  { token: 'discord', display: 'Discord', domains: ['discord.com', 'discord.gg', 'discordapp.com', 'discordapp.net', ...gh('discord')] },
   { token: 'netflix', display: 'Netflix', domains: ['netflix.com', ...gh('netflix', 'netflix-skunkworks')] },
-  { token: 'steam', display: 'Steam', domains: ['steampowered.com', 'steamcommunity.com'] },
+  { token: 'steam', display: 'Steam', domains: ['steampowered.com', 'steamcommunity.com', 'steamstatic.com', 'steamusercontent.com'] },
 
   // Shopping
   { token: 'amazon', display: 'Amazon', domains: ['amazon.com', 'amazon.it', 'amazon.co.uk', 'amazon.de', 'amazon.fr', 'amazon.es', 'amazon.nl', 'amazon.ca', 'amazon.se', 'amazon.pl', 'amazon.ae', 'amazon.sg', 'amazon.in', 'amazon.co.jp', 'amazon.com.au', 'amazon.com.br', 'amazoncognito.com', ...gh('amazon-science', 'amazon-ion', 'amazon-archives', 'amazon-connect')] },
-  { token: 'ebay', display: 'eBay', domains: ['ebay.com', 'ebay.it', 'ebay.de', 'ebay.co.uk', 'ebay.fr', 'ebay.es', 'ebay.ca', 'ebay.com.au', 'ebay.at', 'ebay.ch', 'ebay.nl', 'ebay.be', 'ebay.ie', 'ebay.pl', ...gh('ebay')] },
+  { token: 'ebay', display: 'eBay', domains: ['ebay.com', 'ebay.it', 'ebay.de', 'ebay.co.uk', 'ebay.fr', 'ebay.es', 'ebay.ca', 'ebay.com.au', 'ebay.at', 'ebay.ch', 'ebay.nl', 'ebay.be', 'ebay.ie', 'ebay.pl', 'ebayimg.com', 'ebaystatic.com', ...gh('ebay')] },
   { token: 'aliexpress', display: 'AliExpress', domains: ['aliexpress.com'] },
   { token: 'shopify', display: 'Shopify', domains: ['shopify.com', 'myshopify.com', ...gh('shopify')] },
 
@@ -115,7 +115,8 @@ function nominaMarchio(nome, token, scheletro = (x) => x) {
   const forme = MARCHI_PAROLA.get(token);
   if (forme) {
     const pezzi = nome.split(/[.-]/).filter(Boolean);
-    return pezzi.some((p) => p === token || scheletro(p) === tok)
+    // Un marchio scritto con lettere finte (аpplelogin, app1elogin) non è una parola di nessuno: conta anche attaccato.
+    return pezzi.some((p) => p === token || scheletro(p) === tok || (!p.includes(token) && scheletro(p).includes(tok)))
       || forme.some((f) => nome.includes(f) || pezzi.some((p) => scheletro(p).includes(scheletro(f))));
   }
   // Il trattino non spezza un marchio distintivo: pay-pal resta paypal.

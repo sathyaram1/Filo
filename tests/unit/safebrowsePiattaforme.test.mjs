@@ -151,3 +151,20 @@ test('le pagine GitHub più visitate di Google e Amazon e le parole come amazoni
     assert.notEqual(livello(url), 'safe', url);
   }
 });
+
+test('un marchio-parola scritto con lettere finte e attaccato a un’altra parola avvisa all’apertura (#732)', () => {
+  const { domainToASCII } = require('node:url');
+  for (const [h, marchio] of [['аpplelogin.com', 'apple'], ['сhaselogin.com', 'chase'], ['аpplelogin.github.io', 'apple'], ['app1elogin.com', 'apple']]) {
+    const v = evaluate('https://' + domainToASCII(h) + '/');
+    assert.notEqual(v.level, 'safe', h);
+    assert.equal(v.imp && v.imp.brand.token, marchio, h + ' ' + JSON.stringify(v.reasons));
+  }
+  for (const url of ['https://applelogin.com/', 'https://pineapple.github.io/', 'https://appleseed.github.io/']) assert.equal(livello(url), 'safe', url);
+});
+
+test('i domini con cui i marchi servono file e allegati sono loro anche all’apertura (#732)', () => {
+  for (const url of [
+    'https://cdn.discordapp.com/attachments/1/2/foto.png', 'https://media.discordapp.net/x.png', 'https://i.ebayimg.com/images/x.jpg',
+    'https://mmg.whatsapp.net/x', 'https://connect.facebook.net/it_IT/sdk.js', 'https://content.dropboxapi.com/x',
+  ]) assert.equal(livello(url), 'safe', url);
+});

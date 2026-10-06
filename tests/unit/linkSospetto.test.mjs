@@ -372,3 +372,23 @@ test('dal tasto destro avvisano gli stessi marchi del controllo all’apertura, 
     assert.deepEqual(LS.analizza(u), [], `avviso a sproposito su ${u}`);
   }
 });
+
+test('i domini con cui i marchi servono file, immagini e allegati non sono imitazioni, chi ci si appoggia sì (#732)', () => {
+  for (const u of [
+    'https://raw.githubusercontent.com/microsoft/vscode/main/README.md', 'https://lh3.googleusercontent.com/a/foto.jpg',
+    'https://fonts.googleapis.com/css2?family=Inter', 'https://storage.googleapis.com/secchio/file.pdf',
+    'https://s3.amazonaws.com/secchio/file.pdf', 'https://cdn.discordapp.com/attachments/1/2/foto.png',
+    'https://media.discordapp.net/x.png', 'https://i.ebayimg.com/images/x.jpg', 'https://mmg.whatsapp.net/x',
+  ]) assert.deepEqual(LS.analizza(u), [], `avviso a sproposito su ${u}`);
+  for (const u of ['https://paypal-login.s3.amazonaws.com/', 'https://paypal-login.storage.googleapis.com/', 'https://paypal.wordpress.com/']) {
+    assert.ok(LS.analizza(u).some((c) => c.startsWith('nome_altrui:paypal.com|')), `nessun avviso su ${u}`);
+  }
+});
+
+test('un marchio-parola scritto con lettere finte e attaccato a un’altra parola avvisa dal tasto destro come all’apertura (#732)', () => {
+  for (const [u, marchio] of [
+    ['https://аpplelogin.com/', 'apple.com'], ['https://сhaselogin.com/', 'chase.com'],
+    ['https://аpplelogin.github.io/', 'apple.com'], ['https://app1elogin.com/', 'apple.com'],
+  ]) assert.ok(LS.analizza(u).some((c) => c.startsWith('nome_altrui:' + marchio + '|')), `nessun avviso su ${u}: ${LS.analizza(u)}`);
+  assert.deepEqual(LS.analizza('https://applelogin.com/'), []);
+});

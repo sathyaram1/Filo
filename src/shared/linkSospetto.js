@@ -63,9 +63,12 @@
     // sito, e i suoi sottodomini (facebook.github.io) sono affar suo.
     if (POPULAR.some((p) => sitoDi(p).nome === sito.nome)) return '';
 
+    // #732 — il nome di un dominio che il controllo all'apertura conosce come fidato è suo (githubusercontent.com,
+    // googleapis.com): contano solo i pezzi davanti (paypal-login.s3.amazonaws.com).
+    const nomeSuo = !!SAFEBROWSE && SAFEBROWSE.isWhitelisted(sito.dominio);
     const scritto = scheletro(sito.nome);
     const straniero = /[^\x00-\x7f]/.test(sito.nome);
-    for (const p of POPULAR) {
+    for (const p of nomeSuo ? [] : POPULAR) {
       const suo = sitoDi(p).nome;
       // Il nome di un sito ospitato è una parola scelta da chi l'ha aperto
       // (apply.vercel.app non imita apple): lì conta solo la stessa grafia.
@@ -77,18 +80,21 @@
     // #725.2 — il nome vero c'è tutto ma non comanda: una regola sola per ogni
     // pezzo, davanti al sito o nel suo nome, spezzato ai punti e ai trattini
     // (paypal.com.altro.net, login-paypal.com.altro.net, paypal-login.wixsite.com).
-    const catena = '.' + esca.concat(sito.sotto, [sito.nome]).map(scheletro).join('.') + '.';
+    const pezziSito = esca.concat(sito.sotto, nomeSuo ? [] : [sito.nome]);
+    const catena = '.' + pezziSito.map(scheletro).join('.') + '.';
+    // Alla regola comune va la grafia vera: le lettere finte attaccate a un marchio-parola (аpplelogin) le vede lei.
+    const grezza = '.' + pezziSito.join('.') + '.';
     for (const p of POPULAR) {
       const suo = sitoDi(p).nome;
       const intero = new RegExp('[.-]' + p.replace(/\./g, '[.-]') + '[.-]').test(catena);
       // #732 — il nome da solo conta con la stessa regola del controllo all'apertura (paypallogin sì, pineapple no).
-      const nudo = MARCHI ? MARCHI.nominaMarchio(catena, suo, scheletro) : (suo.length >= 6 && catena.split(/[.-]/).includes(suo));
+      const nudo = MARCHI ? MARCHI.nominaMarchio(grezza, suo, scheletro) : (suo.length >= 6 && catena.split(/[.-]/).includes(suo));
       if (intero || nudo) return 'nome_altrui:' + p + '|' + sito.dominio;
     }
     // #732 — gli altri marchi del controllo all'apertura (chase-login.com): il tasto destro avvisa sugli stessi.
     for (const b of ALTRI_MARCHI) {
       if (b.domains.includes(sito.dominio)) continue;
-      if (MARCHI.nominaMarchio(catena, b.token, scheletro)) return 'nome_altrui:' + b.domains[0] + '|' + sito.dominio;
+      if (MARCHI.nominaMarchio(grezza, b.token, scheletro)) return 'nome_altrui:' + b.domains[0] + '|' + sito.dominio;
     }
     return '';
   }
