@@ -162,6 +162,7 @@
   // Come il nome si legge a schermo: accenti via, lettere cirilliche, greche
   // e armene che sembrano latine al loro posto, poi i sosia ASCII di sopra.
   function scheletro(nome) {
+    if (LEGGI_SOSIA) return LEGGI_SOSIA(nome); // la stessa lettura dell'apertura (#732)
     let out = '';
     for (const ch of nome.normalize('NFKD').replace(/[\u0300-\u036f]/g, '')) {
       out += ch.charCodeAt(0) < 0x80 ? ch : (CONFONDIBILI.get(ch) || ch);
