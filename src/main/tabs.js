@@ -1644,6 +1644,15 @@ class TabManager {
   // Ctrl+W, Alt+cifra o Alt+S i tasti non arrivano a nessuno finché non si
   // clicca (#838). La barra che ha la tastiera la tiene; Filo dietro non la ruba.
   // Una scheda coperta dall'avviso del sito pericoloso dà la tastiera all'avviso, mai alla pagina (#813.5).
+  // Quello che l'utente vede sotto le viste posate sulla pagina (barra, avvisi): l'avviso del sito quando copre la
+  // scheda, sennò la scheda. I gesti del loro vuoto vanno qui, mai alla pagina che l'avviso nasconde.
+  vistaSottoIlVuoto() {
+    const tab = this.tabs.find((t) => t.id === this.activeId);
+    if (!tab) return null;
+    const avviso = this.avvisoSito && this.avvisoSito.coperta() === tab && this.avvisoSito.webContents() ? this.avvisoSito.vista : null;
+    return avviso || tab.view || null;
+  }
+
   _tastieraAllaSchedaAttiva() {
     const tab = this.tabs.find((t) => t.id === this.activeId);
     if (!tab || this.win.isDestroyed() || !this.win.isFocused()) return;
