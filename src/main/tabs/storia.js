@@ -7,7 +7,8 @@ const tornabile = (url) => /^(https?|filo):/i.test(String(url || ''));
 function nuova() { return { prima: [], dopo: [] }; }
 
 // Le voci della vista come le vede l'utente: la pagina d'errore vale per l'indirizzo fallito, il resto non si riapre.
-function vociDellaVista(entries, attiva, utente = (u) => u) {
+// `inArrivo`: la pagina che una vista appena nata sta caricando conta già, o un secondo Indietro di fila la perde.
+function vociDellaVista(entries, attiva, utente = (u) => u, inArrivo = null) {
   const voci = [];
   let a = -1;
   (Array.isArray(entries) ? entries : []).forEach((e, i) => {
