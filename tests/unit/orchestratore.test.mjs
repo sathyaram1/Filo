@@ -366,12 +366,67 @@ test('fuso a metà (server sì, app no) e ripreso: non rifonde il server', async
   assert.equal(b.righe().filter((x) => /server-fondi/.test(x)).length, prima);
 });
 
-test('regole toccate: avviso per la pubblicazione a Filo chiuso, il lavoro si chiude lo stesso', async () => {
-  const b = banco({ server: false, risposte: [[/diff --name-only/, { code: 0, out: 'firestore.rules' }]] });
+test('regole toccate (#1036): con Filo aperto aspetta e riprova; chiuso le pubblica dal checkout principale, dopo la fusione e i worktree tolti', async () => {
+  let aperto = 3;
+  const b = banco({ server: false, filo: () => aperto-- > 0, risposte: [[/diff --name-only/, { code: 0, out: 'firestore.rules' }]] });
   const p = (await b.motore.avvia()).pratiche[7];
-  assert.equal(p.fase, 'fuso');
-  assert.match(p.avvisi.join('\n'), /regole:pubblica/);
+  assert.equal(p.fase, 'fuso', JSON.stringify(p.fermo));
+  assert.equal(p.regolePubblicate, true);
+  assert.equal(p.attesa, '');
+  const r = b.righe();
+  assert.equal(r.filter((x) => x === 'filo aperto').length, 3);
+  const pubblica = b.chiamate.findIndex((c) => /^node scripts\/regole-pubblica\.mjs$/.test(c.riga));
+  assert.ok(pubblica > indice(r, /finish-local/) && pubblica > indice(r, /worktree remove/), r.join('\n'));
+  assert.equal(b.chiamate[pubblica].cwd, '/r', 'dal checkout principale');
+  assert.doesNotMatch(p.avvisi.join('\n'), /regole/);
   assert.equal(toccaRegole(['src/x.js']), false);
+});
+
+test('regole toccate e checkout principale indietro: lo porta avanti solo in avanti; su un altro ramo serve l’owner, scritto sulla pratica, e riprendi pubblica senza rifondere', async () => {
+  let testa = 'vecchio';
+  const indietro = banco({ server: false, risposte: [
+    [/diff --name-only/, { code: 0, out: 'firestore.rules' }],
+    [/^git rev-parse HEAD$/, () => ({ code: 0, out: testa, stdout: testa })],
+    [/^git merge --ff-only origin\/main$/, () => { testa = 'abc'; return { code: 0, out: '' }; }],
+  ] });
+  assert.equal((await indietro.motore.avvia()).pratiche[7].fase, 'fuso');
+  const ri = indietro.righe();
+  assert.ok(indice(ri, /^git merge --ff-only origin\/main$/) < indice(ri, /regole-pubblica/));
+  assert.equal(indietro.chiamate.find((c) => /--ff-only/.test(c.riga)).cwd, '/r');
+
+  let ramo = 'claude/altro';
+  const b = banco({ server: false, risposte: [
+    [/diff --name-only/, { code: 0, out: 'firestore.rules' }],
+    [/^git rev-parse --abbrev-ref HEAD$/, () => ({ code: 0, out: ramo, stdout: ramo })],
+  ] });
+  let p = (await b.motore.avvia()).pratiche[7];
+  await new Promise((ok) => setImmediate(ok));
+  assert.equal(p.fase, 'fermo');
+  assert.match(p.fermo.motivo, /checkout principale è su «claude\/altro»/);
+  assert.match(p.fermo.azione, /git switch main.*riprendi 7/);
+  assert.match(rigaStato(p), /da fare: riporta il checkout principale su main/);
+  assert.ok(indice(b.righe(), /^annota fid7 [^\n]*le regole cambiate non si pubblicano[\s\S]*Cosa fare: riporta/) >= 0, b.righe().join('\n'));
+  assert.equal(indice(b.righe(), /regole-pubblica/), -1);
+  ramo = 'main';
+  const finish = b.righe().filter((x) => /finish-local/.test(x)).length;
+  b.stato.pratiche[7] = riprendi(p, '');
+  p = (await b.motore.avvia()).pratiche[7];
+  assert.equal(p.fase, 'fuso', JSON.stringify(p.fermo));
+  assert.equal(b.righe().filter((x) => /finish-local/.test(x)).length, finish);
+  assert.ok(indice(b.righe(), /regole-pubblica/) >= 0);
+});
+
+test('decidiRegole', () => {
+  const ok = { ramo: 'main', testa: 'a', origine: 'a', indietro: true, toccati: [] };
+  assert.equal(decidiRegole({ ...ok, filoAperto: true }, 7).azione, 'aspetta');
+  assert.equal(decidiRegole({ reteGiu: 'fetch failed' }, 7).azione, 'aspetta');
+  assert.equal(decidiRegole(ok, 7).azione, 'pubblica');
+  assert.equal(decidiRegole({ ...ok, testa: 'b' }, 7).azione, 'allinea');
+  assert.equal(decidiRegole({ ...ok, testa: 'b', indietro: false }, 7).azione, 'owner');
+  assert.equal(decidiRegole({ ...ok, ramo: '' }, 7).azione, 'owner');
+  const t = decidiRegole({ ...ok, toccati: ['firestore.rules'] }, 7);
+  assert.equal(t.azione, 'owner');
+  assert.match(t.fai, /riprendi 7/);
 });
 
 test('il collegamento a node_modules che non si toglie lascia il worktree al suo posto', async () => {
