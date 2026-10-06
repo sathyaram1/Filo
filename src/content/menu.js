@@ -1064,7 +1064,7 @@
     tooltipEl.className = 'sn-tooltip';
     global.SN_FILO_UI?.mark(tooltipEl);
     tooltipEl.style.display = 'none';
-    menuHost().appendChild(tooltipEl);
+    casaDeiPezzi().appendChild(tooltipEl);
     return tooltipEl;
   }
   function showTooltip(target, text) {
