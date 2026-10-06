@@ -22,7 +22,8 @@ const ROOT = resolve(fileURLToPath(import.meta.url), '..', '..', '..');
 // ─── Il motore con tutto finto ───────────────────────────────────────────────
 // `verdetti`: uno per verificatore lanciato ('fixed' | 'pass' | 'fail' | 'nulla' | 'fix-pending').
 // `risposte`: [regex sul comando, { code, out } | funzione] in ordine; vince la prima che combacia.
-function banco({ pratiche = [nuovaPratica({ num: 7, slug: 'sette', richiesta: 'fai X' })], verdetti = ['pass'], risposte = [], carichi = null, esiste = null, server = true, derived = [], opz = {}, errori = [] } = {}) {
+// `filo`: il Filo dell'owner aperto (true) o chiuso, anche come funzione; il checkout principale è su main = origin/main.
+function banco({ pratiche = [nuovaPratica({ num: 7, slug: 'sette', richiesta: 'fai X' })], verdetti = ['pass'], risposte = [], carichi = null, esiste = null, server = true, derived = [], opz = {}, errori = [], filo = false } = {}) {
   const stato = { coda: pratiche.map((p) => p.num), pratiche: Object.fromEntries(pratiche.map((p) => [p.num, p])) };
   const chiamate = [];
   const prompt = [];
