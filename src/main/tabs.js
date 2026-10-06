@@ -33,6 +33,7 @@ const { AnteprimeSchede } = require('./tabs/anteprime');
 const { VisiteSchede } = require('./tabs/visite');
 const CartaAnteprima = require('./popup-anteprima');
 const { AvvisoSito } = require('./avvisoSito');
+const Storia = require('./tabs/storia');
 
 // #441 — eventi di solo PUNTAMENTO: il cursore che attraversa la pagina non è
 // un'interazione dell'utente con quella scheda (tutto il resto — click, tasti,
@@ -1712,7 +1713,7 @@ class TabManager {
     // fissati alla creazione della view e un loadURL non li rivaluta, quindi
     // riusare la view caricherebbe il contenuto col preload sbagliato.
     if (this._needsRecreate(tab, target)) {
-      this._recreateView(tab, target);
+      this._recreateView(tab, target, { nuova: true });
     } else {
       tab.view.webContents.loadURL(target);
     }
@@ -1764,6 +1765,10 @@ class TabManager {
     // La pagina che la vista vecchia mostrava: se il primo salto della nuova si ferma sulla lista, si torna lì.
     let prima = '';
     try { prima = opts.ritorno ? '' : (tab.view.webContents.getURL() || ''); } catch (_) {}
+    if (!opts.storia) {
+      const modo = opts.ritorno ? 'ritorno' : opts.nuova ? 'nuova' : 'stessa';
+      tab.storia = Storia.conserva(tab.storia, this._vociDellaVista(tab.view.webContents), modo, url);
+    }
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
     try { tab.view.webContents.close(); } catch (_) {}
     const view = this._makeView(url, partition, { suppressAutoplay: tab.suppressAutoplay });
@@ -1808,8 +1813,10 @@ class TabManager {
   goBack(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
+    if (!canGoBack(tab.view.webContents)) { this._vaiFuori(tab, 'indietro', 0); return; }
     const meta = this._vocePassoStoria(tab, -1);
     if (meta && this._maybeBlockNavigation(tab, meta)) return;
+    tab._passoStoria = true;
     if (tab.view.webContents.navigationHistory?.canGoBack()) {
       tab.view.webContents.navigationHistory.goBack();
     } else if (tab.view.webContents.canGoBack?.()) {
@@ -1841,22 +1848,70 @@ class TabManager {
       const e = h.getEntryAtIndex(i);
       if (e) out.push({ indice: i, titolo: String(e.title || ''), url: String(e.url || '') });
     }
-    return out;
+    return [...out, ...Storia.elenco(tab.storia, verso, h.length())];
   }
 
   vaiAllaVoce(id, indice) {
     const tab = this.tabs.find((t) => t.id === id);
     const h = tab && tab.view.webContents.navigationHistory;
     const i = Math.round(Number(indice));
-    if (!h || !Number.isFinite(i) || i < 0 || i >= h.length() || i === h.getActiveIndex()) return;
+    if (!h || !Number.isFinite(i) || i === h.getActiveIndex()) return;
+    const f = Storia.fuori(i, h.length());
+    if (f) { this._vaiFuori(tab, f.verso, f.k); return; }
+    tab._passoStoria = true;
     h.goToIndex(i);
+  }
+
+  // ── la cronologia oltre la vista (src/main/tabs/storia.js) ──
+  _urlUtente(raw) {
+    const NE = globalThis.SN_NET_ERROR;
+    return (NE && NE.targetOf(raw)) || raw;
+  }
+
+  _vociDellaVista(wc) {
+    try {
+      const h = wc.navigationHistory;
+      const entries = [];
+      for (let i = 0; i < h.length(); i++) entries.push(h.getEntryAtIndex(i) || {});
+      return Storia.vociDellaVista(entries, h.getActiveIndex(), (u) => this._urlUtente(u));
+    } catch (_) { return { voci: [], attiva: 0 }; }
+  }
+
+  // Indietro e Avanti hanno dove andare: nella vista, o nella cronologia che la scheda ha tenuto da quelle di prima.
+  puoTornare(tab, verso, wc = tab && tab.view && tab.view.webContents) {
+    if (!tab || !wc) return false;
+    let inVista = false;
+    try { inVista = verso === 'avanti' ? canGoFwd(wc) : canGoBack(wc); } catch (_) {}
+    const s = tab.storia;
+    return inVista || !!(s && (verso === 'avanti' ? s.dopo : s.prima).length);
+  }
+
+  _vaiFuori(tab, verso, k) {
+    const salto = Storia.salta(tab.storia, this._vociDellaVista(tab.view.webContents).voci, verso, k);
+    if (!salto) return false;
+    if (this._maybeBlockNavigation(tab, salto.meta.url)) return true;
+    tab.storia = salto.storia;
+    this._recreateView(tab, salto.meta.url, { storia: true });
+    return true;
+  }
+
+  // Una pagina nuova nella stessa vista toglie il davanti che la scheda teneva fuori dalla vista.
+  _misuraStoria(tab, wc) {
+    let ora = null;
+    try { ora = { wc, n: wc.navigationHistory.length(), a: wc.navigationHistory.getActiveIndex() }; } catch (_) { return; }
+    const prima = tab._misuraStoria && tab._misuraStoria.wc === wc ? tab._misuraStoria : null;
+    if (tab.storia && tab.storia.dopo.length && Storia.paginaNuova(prima, ora, tab._passoStoria)) tab.storia = { prima: tab.storia.prima, dopo: [] };
+    tab._misuraStoria = ora;
+    tab._passoStoria = false;
   }
 
   goForward(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
+    if (!canGoFwd(tab.view.webContents)) { this._vaiFuori(tab, 'avanti', 0); return; }
     const meta = this._vocePassoStoria(tab, 1);
     if (meta && this._maybeBlockNavigation(tab, meta)) return;
+    tab._passoStoria = true;
     if (tab.view.webContents.navigationHistory?.canGoForward()) {
       tab.view.webContents.navigationHistory.goForward();
     } else if (tab.view.webContents.canGoForward?.()) {
@@ -2202,7 +2257,7 @@ class TabManager {
       }
       if (this._needsRecreate(tab, url)) {
         event.preventDefault();
-        this._recreateView(tab, url);
+        this._recreateView(tab, url, { nuova: true });
       }
       // #152 — born proxied su click-link/redirect verso un dominio con regola
       // persistente: NON preventDefault (la navigazione in-place prosegue), poi
@@ -2390,8 +2445,8 @@ class TabManager {
       update({
         loading: false,
         url: userUrl(wc.getURL()),
-        canBack: canGoBack(wc),
-        canFwd: canGoFwd(wc),
+        canBack: this.puoTornare(tab, 'indietro', wc),
+        canFwd: this.puoTornare(tab, 'avanti', wc),
       });
       if (tab.view && tab.view.webContents === wc) this.anteprime.caricata(tab);
       this.visite.caricata(wc);
@@ -2429,7 +2484,7 @@ class TabManager {
         try { nuovo = wc.getTitle() || ''; } catch (_) {}
         tab.title = nuovo || userUrl(url);
       }
-      if (tab.view && tab.view.webContents === wc) this.anteprime.navigata(tab);
+      if (tab.view && tab.view.webContents === wc) { this.anteprime.navigata(tab); this._misuraStoria(tab, wc); }
       if (tab._vistaNuova && tab._vistaNuova.wc === wc) tab._vistaNuova = null;
       this._sostituisciVoceBloccata(wc, url);
       // #590 — una navigazione già partita quando il suo sito è entrato in lista arriva lo stesso: si ferma qui.
@@ -2469,8 +2524,8 @@ class TabManager {
         url: userUrl(url),
         color: null,
         identityColor: cachedIdentity,
-        canBack: canGoBack(wc),
-        canFwd: canGoFwd(wc),
+        canBack: this.puoTornare(tab, 'indietro', wc),
+        canFwd: this.puoTornare(tab, 'avanti', wc),
       });
       // Rilevamento siti pericolosi: ricontrolla l'URL FINALE (dopo i redirect)
       // appena il main-frame si è committato, prima che la pagina sia
@@ -2495,7 +2550,8 @@ class TabManager {
       }
     });
     wc.on('did-navigate-in-page', (_e, url, isMainFrame) => {
-      update({ url: userUrl(url), canBack: canGoBack(wc), canFwd: canGoFwd(wc) });
+      if (isMainFrame === true && tab.view && tab.view.webContents === wc) this._misuraStoria(tab, wc);
+      update({ url: userUrl(url), canBack: this.puoTornare(tab, 'indietro', wc), canFwd: this.puoTornare(tab, 'avanti', wc) });
       if (isMainFrame === true && tab.view && tab.view.webContents === wc) this.anteprime.navigata(tab, { inPagina: true });
       if (isMainFrame === true) this.visite.navigata(wc, tab.id, url, { inPagina: true });
     });
