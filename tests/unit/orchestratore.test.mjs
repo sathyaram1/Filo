@@ -4,6 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
@@ -13,7 +14,7 @@ import {
   promptLavoratore, promptVerificatore, regolaFile, richiestaArg, riprendi, rigaStato, serveDeploy, siSovrappongono, toccaRegole, togliWorktree,
 } from '../../scripts/lib/orchestratore.mjs';
 import {
-  AGENTE_DEL_RUOLO, IMPOSTAZIONI_NPM_VICINE, OPZIONI_DI, accessoDaStatus, argomentiClaude, cartelleDatiFilo, contaColpi, envFiglio, filoAperto, frontmatter, leggiArgomenti, leggiUscitaClaude, modelloDelRuolo, opzioniDa, opzioniTenuteDaNpm, richiestaDaLettura, trovaClaude,
+  AGENTE_DEL_RUOLO, IMPOSTAZIONI_NPM_VICINE, OPZIONI_DI, accessoDaStatus, ascoltaFermate, argomentiClaude, cartelleDatiFilo, contaColpi, envFiglio, filoAperto, frontmatter, leggiArgomenti, leggiUscitaClaude, modelloDelRuolo, opzioniDa, opzioniTenuteDaNpm, richiestaDaLettura, trovaClaude,
 } from '../../scripts/orchestratore-locale.mjs';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
@@ -1343,7 +1344,7 @@ test('avvia ascolta smetti da un altro terminale e i Ctrl-C del suo: prima con c
   const segnali = new EventEmitter();
   let fermati = 0;
   const uscite = [];
-  const stacca = ascoltaFermate({ P: { note: d }, motore, log: () => {}, pid: 4242, ferma: () => { fermati += 1; }, esci: (c) => uscite.push(c), segnali, ogniMs: 5, finestraMs: 30 });
+  const stacca = ascoltaFermate({ P: { note: d }, motore, log: () => {}, pid: 4242, ferma: () => { fermati += 1; }, esci: (c) => uscite.push(c), segnali, ogniMs: 5, finestraMs: 2000 });
   const richiesta = () => JSON.parse(readFileSync(join(d, 'smetti.json'), 'utf8'));
   const aspetta = (ms) => new Promise((ok) => setTimeout(ok, ms));
   const sg = process.platform === 'win32' ? 'SIGBREAK' : 'SIGTERM';
@@ -1355,10 +1356,10 @@ test('avvia ascolta smetti da un altro terminale e i Ctrl-C del suo: prima con c
     for (let i = 0; i < 100 && !chiusura; i += 1) await aspetta(10);
     assert.deepEqual([chiusura, fermati], ['calma', 0]);
     segnali.emit('SIGINT');
-    assert.deepEqual([chiusura, fermati, richiesta().modo, richiesta().pid], ['subito', 1, 'subito', 4242]);
     segnali.emit(sg);
-    assert.deepEqual(uscite, [], 'il segnale doppio di npm non conta');
-    await aspetta(50);
+    assert.deepEqual([chiusura, fermati, uscite], ['subito', 1, []], 'il segnale doppio di npm non conta');
+    assert.deepEqual([richiesta().modo, richiesta().pid], ['subito', 4242]);
+    await aspetta(2100);
     segnali.emit('SIGINT');
     assert.deepEqual(uscite, [130]);
   } finally {
