@@ -83,6 +83,8 @@ function pageHints(doc) {
   };
   // Un modulo dentro un componente incapsulato (shadow DOM aperto) è un modulo della pagina come gli altri.
   const radici = [doc];
+  // Quelli chiusi li elenca la pagina stessa, nel suo mondo (vedi page-preload).
+  try { for (const r of (doc.defaultView && doc.defaultView[Symbol.for('filo.ombreChiuse')]) || []) radici.push(r); } catch (_) {}
   for (let i = 0; i < radici.length; i++) {
     try { for (const el of radici[i].querySelectorAll('*')) if (el.shadowRoot) radici.push(el.shadowRoot); } catch (_) {}
   }
