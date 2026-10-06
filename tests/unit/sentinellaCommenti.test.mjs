@@ -9,6 +9,7 @@ import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -25,7 +26,7 @@ function corsa(albero) {
     const env = { ...process.env, FILO_COMMENTI_ROOT: dir };
     delete env.NODE_TEST_CONTEXT;
     const r = spawnSync(process.execPath, ['--test', 'tests/unit/commentiRegola.test.mjs'], {
-      cwd: ROOT, encoding: 'utf8', timeout: 240000, env,
+      cwd: ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS, env,
     });
     return `${r.stdout || ''}${r.stderr || ''}`;
   } finally {

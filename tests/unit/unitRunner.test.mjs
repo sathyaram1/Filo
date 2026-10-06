@@ -32,6 +32,7 @@ import {
 import { costoArgomentoWindows, lottiPerRigaDiComando } from '../../scripts/lib/riga-di-comando.mjs';
 import { lottiPerRigaDiComando as lottiDiFinish } from '../../scripts/finish-local.mjs';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..', '..');
@@ -481,7 +482,7 @@ test('un file appeso diventa un rosso col suo nome, e la corsa finisce', () => {
     const env = { ...process.env, FILO_UNIT_DIR: dir };
     delete env.NODE_TEST_CONTEXT;
     const r = spawnSync(process.execPath, [join(REPO_ROOT, 'scripts', 'run-unit-tests.mjs'), '--test-timeout=1500'],
-      { env, cwd: REPO_ROOT, encoding: 'utf8', timeout: 60_000 });
+      { env, cwd: REPO_ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
     assert.notEqual(r.error?.code, 'ETIMEDOUT', 'la corsa è rimasta appesa');
     assert.equal(r.status, 1);
     assert.match(r.stdout, /appeso\.test\.mjs/);

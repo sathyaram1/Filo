@@ -51,7 +51,7 @@ async function conDashboard(fn) {
   const sessione = comeSuWindows(() => S.createSession({ shell: 'powershell', cwd: TMP }));
   const esegui = (comando) => new Promise((risolvi, rifiuta) => {
     let stdout = '';
-    const stop = setTimeout(() => rifiuta(new Error(`la shell non ha risposto: ${comando}`)), 60_000);
+    const stop = setTimeout(() => rifiuta(new Error(`la shell non ha risposto in ${ATTESA / 1000} s: ${comando}`)), ATTESA);
     sessione.exec(comando, {
       onData: ({ chunk, stream }) => { if (stream === 'stdout') stdout += chunk; },
       onExit: ({ code, cwd }) => { clearTimeout(stop); risolvi({ stdout, code, cwd }); },

@@ -11,6 +11,7 @@ import fs, { mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { cartellaTemporanea, nomeSuDisco, nomiVeri, togliCartella } from '../helpers/percorsi.mjs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 import { execFileSync } from 'node:child_process';
 
 const require = createRequire(import.meta.url);
@@ -460,7 +461,7 @@ const storia = [];
 const MODULO = ${MODULO};
 const nota = (S) => storia.push(S.stato() && S.stato().batteria ? S.stato().batteria.collegata : null);
 ${corpo}`;
-  return JSON.parse(execFileSync(process.execPath, ['-e', codice], { encoding: 'utf8', timeout: 20_000 }).trim().split('\n').pop());
+  return JSON.parse(execFileSync(process.execPath, ['-e', codice], { encoding: 'utf8', timeout: TETTO_ATTESA_MS }).trim().split('\n').pop());
 }
 
 test('staccando il caricatore la voce non torna «collegata» per una lettura fatta prima dell\'avviso (Windows e Mac)', () => {

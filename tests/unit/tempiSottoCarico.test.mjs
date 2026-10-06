@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, join, relative } from 'node:path';
+import { dirname, join, relative, sep } from 'node:path';
 import { collectTestFiles } from '../../scripts/run-unit-tests.mjs';
 import { costoInUnita, rapportoFraCosti, unitaDiRiferimento, GIRI } from '../helpers/tempoRelativo.mjs';
 
@@ -63,6 +63,22 @@ test('la sentinella riconosce le forme della soglia fissa, e lascia stare i time
     'const t0 = performance.now();\nf();\nconst ms = performance.now() - t0;\nassert.ok(ms < altro * 3);': [],
   };
   for (const [testo, atteso] of Object.entries(casi)) assert.deepEqual(confrontiFissi(testo), atteso, testo);
+});
+
+// Un processo vero sotto carico parte quando può (#1063): il suo tempo massimo è una guardia contro l'appeso, non una
+// misura, e si chiede a TETTO_ATTESA_MS (tests/helpers/attese.mjs). Un numero scritto lì cadeva a macchina carica.
+const TETTO_A_MANO = /\b(?:spawnSync|execFileSync|execSync|spawn|execFile|exec)\s*\([^;]*?\btimeout:\s*\d/;
+
+test('nessuno unit test dà a un processo vero un tempo massimo scritto a mano', () => {
+  assert.ok(TETTO_A_MANO.test("spawnSync(process.execPath, ['x'], { encoding: 'utf8', timeout: 60_000 });"));
+  assert.ok(TETTO_A_MANO.test('execFileSync(node, [\n  a,\n], { timeout: 20000 })'));
+  assert.ok(!TETTO_A_MANO.test("spawnSync(process.execPath, ['x'], { timeout: TETTO_ATTESA_MS });"));
+  const fuori = [];
+  for (const file of collectTestFiles(join(ROOT, 'tests', 'unit'))) {
+    if (file === QUI) continue;
+    if (TETTO_A_MANO.test(readFileSync(file, 'utf8'))) fuori.push(relative(ROOT, file).split(sep).join('/'));
+  }
+  assert.deepEqual(fuori, [], 'usa TETTO_ATTESA_MS da tests/helpers/attese.mjs: sotto carico un tetto stretto è un rosso finto');
 });
 
 // Un orologio finto: ogni chiamata avanza del costo che le si dà, così il conto si prova senza misurare niente.

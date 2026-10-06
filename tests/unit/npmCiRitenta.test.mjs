@@ -7,6 +7,7 @@ import { readFileSync, readdirSync, writeFileSync, copyFileSync, mkdirSync, chmo
 import { dirname, resolve, join, delimiter } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { cartellaTemporanea, collegaCartella, togliCartella } from '../helpers/percorsi.mjs';
+import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 import { fileURLToPath } from 'node:url';
 import { installa, daRitentare, esegui, ATTESE_S } from '../../scripts/npm-ci-ritenta.mjs';
 
@@ -100,7 +101,7 @@ describe('npm ci che ritenta', () => {
       const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.toUpperCase() !== 'PATH'));
       const percorso = Object.entries(process.env).find(([k]) => k.toUpperCase() === 'PATH')?.[1] || '';
       env.PATH = `${finti}${delimiter}${percorso}`;
-      const r = spawnSync(process.execPath, [join(base, 'collegamento', 'npm-ci-ritenta.mjs')], { cwd: progetto, env, encoding: 'utf8', timeout: 60_000 });
+      const r = spawnSync(process.execPath, [join(base, 'collegamento', 'npm-ci-ritenta.mjs')], { cwd: progetto, env, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
       const uscita = `${r.stdout}${r.stderr}`;
       assert.match(uscita, /EUSAGE/, `npm ci non è nemmeno partito:\n${uscita}`);
       assert.equal(readFileSync(chiamata, 'utf8').trim(), 'ci', 'lo script deve lanciare proprio `npm ci`');
