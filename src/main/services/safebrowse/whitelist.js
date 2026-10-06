@@ -12,7 +12,7 @@
 'use strict';
 
 const { BRANDS } = require('./brands');
-const { S3 } = require('./psl');
+const { S3, getDomainInfo } = require('./psl');
 
 const EXTRA = [
   // Motori / portali
