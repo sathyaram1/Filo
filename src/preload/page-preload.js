@@ -556,6 +556,24 @@ function waitForContentScripts(fn) {
   tick();
 }
 
+// Il modulo di pagamento o di accesso di un altro sito, in un riquadro, rende delicata la pagina che lo contiene (#1004):
+// il content script della pagina non lo vede. Si guarda a pagina caricata e quando si entra in un campo, e si dice una volta.
+function vediCampiDelicati() {
+  let detto = false;
+  const guarda = () => {
+    if (detto) return;
+    let h = null;
+    try { h = require(path.join(CONTENT_DIR, 'safebrowseHints.js')).pageHints(document); } catch (_) { return; }
+    if (!h || !(h.shownPassword || h.shownPayment)) return;
+    detto = true;
+    filoMessage({ type: 'campi_delicati', hasPassword: !!h.shownPassword, hasPayment: !!h.shownPayment }).catch(() => {});
+  };
+  try {
+    window.addEventListener('load', guarda, { once: true });
+    window.addEventListener('focusin', (e) => { if (e.target && e.target.tagName === 'INPUT') guarda(); }, { capture: true, passive: true });
+  } catch (_) {}
+}
+
 // L'avviso del sito pericoloso non aspetta la pagina costruita: un modulo password già a schermo sopra uno script che
 // non arriva mai resterebbe scrivibile senza avviso (#813.1). loadScripts() ritrova questi moduli già caricati.
 function startSafebrowse() {
@@ -573,6 +591,7 @@ if (!IS_SUBFRAME) {
   }
 } else {
   startCookiesInFrame();
+  vediCampiDelicati();
   // Un clic, un tasto premuto o il fuoco su un campo dentro il riquadro dicono
   // "sto usando questa cosa": da lì in poi il riquadro deve rispondere come il
   // resto della pagina. Il tasto destro ha il suo cammino (il bridge qui sopra),

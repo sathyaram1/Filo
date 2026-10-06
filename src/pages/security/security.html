@@ -136,6 +136,23 @@
 
       <div class="sn-toggle-row" style="margin-top:16px">
         <label>
+          <input type="checkbox" id="sec-delicate" />
+          <span id="sec-delicate-label"></span>
+        </label>
+        <span class="sn-muted" id="sec-delicate-desc"></span>
+        <div id="sec-delicate-sub" style="margin-top: 8px; margin-left: 24px;">
+          <label class="sn-muted" id="sec-delicate-sites-label" for="sec-delicate-sites" style="display: block; margin-bottom: 4px;"></label>
+          <textarea id="sec-delicate-sites" rows="3" style="width: 100%;"></textarea>
+          <div id="sec-delicate-sites-error" role="alert" aria-live="polite" style="display:none;color:var(--sn-error);font-size:12px;margin-top:6px"></div>
+          <div id="sec-delicate-campi" style="margin-top:12px" hidden>
+            <div class="sn-muted" id="sec-delicate-campi-title" style="margin-bottom:4px"></div>
+            <ul id="sec-delicate-campi-list" style="list-style:none;padding:0;margin:0"></ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="sn-toggle-row">
+        <label>
           <input type="checkbox" id="sec-auto-feedback" />
           <span id="sec-auto-feedback-label"></span>
         </label>
@@ -185,6 +202,12 @@
         <div id="sec-cookies-banners" style="margin-top:18px" hidden>
           <div class="sn-info-box-title" id="sec-cookies-banners-title"></div>
           <ul id="cookie-banners-list" style="list-style:none;padding:0;margin:0"></ul>
+        </div>
+
+        <div id="sec-cookies-accessi" style="margin-top:18px" hidden>
+          <div class="sn-info-box-title" id="sec-cookies-accessi-title"></div>
+          <div class="sn-muted" id="sec-cookies-accessi-desc" style="margin-bottom:8px"></div>
+          <ul id="cookie-accessi-list" style="list-style:none;padding:0;margin:0"></ul>
         </div>
 
         <div id="sec-cookies-done" style="margin-top:18px" hidden>

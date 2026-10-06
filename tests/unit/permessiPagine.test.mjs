@@ -321,3 +321,22 @@ test('le notifiche si leggono «da chiedere» finché l\'utente non decide; il n
   assert.equal(Permessi.statoNotifiche(ses, 'https://posta.example/'), 'default');
   assert.equal(Permessi.statoNotifiche(ses, 'filo://options/'), 'default');
 });
+
+test('un sito usa-e-getta della Privacy buttato all\'uscita dimentica le risposte; una sessione su disco no', () => {
+  const effimera = sessioneFinta();
+  effimera.isPersistent = () => false;
+  const wc = wcFinto('https://posta.example/in-arrivo');
+  wc.session = effimera;
+  Permessi.seguiGesti(wc);
+  wc.emetti('input-event', {}, { type: 'mouseDown' });
+  chiedi(effimera, wc, 'notifications');
+  Permessi.rispondi(effimera.avvisi.find((a) => a.evento === 'chiedi').dati.id, true);
+  assert.equal(Permessi.statoNotifiche(effimera, 'https://posta.example/'), 'granted');
+  Permessi.dimenticaSessione(effimera);
+  assert.equal(Permessi.statoNotifiche(effimera, 'https://posta.example/'), 'default', 'il sito riaperto deve richiedere');
+
+  const disco = { isPersistent: () => true };
+  const prima = Permessi.scelteRicordate().length;
+  Permessi.dimenticaSessione(disco);
+  assert.equal(Permessi.scelteRicordate().length, prima);
+});

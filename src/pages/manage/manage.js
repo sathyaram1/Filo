@@ -143,6 +143,11 @@
   const mgClarifyText = document.getElementById('mgClarifyText');
   const mgClarifyBtn  = document.getElementById('mgClarifyBtn');
   const mgClarifyMsg  = document.getElementById('mgClarifyMsg');
+  // La casella sotto la conversazione e quella nel pannello del rombo verde
+  // (#1033) sono la stessa risposta: una bozza per pratica, fuori dai nodi che
+  // i ridisegni ricostruiscono, e un solo invio per volta.
+  const bozzeRisposta = new Map();
+  const rispostaInVolo = new Set();
   // Frase per chi ha segnalato: il modulo (`mgUserNote`) sta chiuso finché non
   // lo si apre col tasto della barra (`mgUserNoteToggle`).
   const mgUserNote       = document.getElementById('mgUserNote');
@@ -156,7 +161,6 @@
   const mgPreapproveBtn = document.getElementById('mgPreapproveBtn');
   const mgPreapproveRevokeBtn = document.getElementById('mgPreapproveRevokeBtn');
   const mgPreapprovedInfo = document.getElementById('mgPreapprovedInfo');
-  const mgPreapproveLine = document.getElementById('mgPreapproveLine');
   const mgLocalBtn   = document.getElementById('mgLocalBtn');
   const mgSenderBtn  = document.getElementById('mgSenderBtn');
   const mgStarBtn    = document.getElementById('mgStarBtn');
@@ -1192,8 +1196,6 @@
   const MERGE_APPROVAL_APPROVE = (window.SN_MSG?.MSG?.MERGE_APPROVAL_APPROVE) || 'merge_approval_approve';
   const MERGE_APPROVAL_DISCARD = (window.SN_MSG?.MSG?.MERGE_APPROVAL_DISCARD) || 'merge_approval_discard';
   const MERGE_APPROVALS_CHANGED = (window.SN_MSG?.MSG?.MERGE_APPROVALS_CHANGED) || 'merge_approvals_changed';
-  const TAB_IN_VISTA = (window.SN_MSG?.MSG?.TAB_IN_VISTA) || 'tab_in_vista';
-  const TAB_IN_VISTA_GET = (window.SN_MSG?.MSG?.TAB_IN_VISTA_GET) || 'tab_in_vista_get';
   const LIVELLO4_SALTA = (window.SN_MSG?.MSG?.LIVELLO4_SALTA) || 'livello4_salta';
   const FEEDBACK_SENDER_FLAG = (window.SN_MSG?.MSG?.FEEDBACK_SENDER_FLAG) || 'feedback_sender_flag';
 
@@ -1310,9 +1312,9 @@
   // senza rileggere niente.
   let fusioni = { pending: [], failed: [], recent: [], preapproved: [] };
   let fusioniLette = false;
-  // Una richiesta si manda a fondere per il segno UNA volta per pagina: un
-  // rifiuto o un conflitto non si ritentano da soli a ogni rilettura.
-  const fusioniTentate = new Set();
+  // Una richiesta si manda a fondere UNA volta per segno: un rifiuto o un
+  // conflitto non si ritentano da soli a ogni rilettura. id → { fb, segno }.
+  const fusioniTentate = new Map();
   // L'esito di quel tentativo, per richiesta: il riquadro in basso e la riga
   // del dettaglio sono un posto solo, e chi arriva dopo cancella chi c'era.
   const esitiTentati = new Map();
@@ -1320,6 +1322,7 @@
   // stessa, e una card disegnata nel frattempo la mostra coi tasti spenti (#702).
   const approvazioniInVolo = new Map();
   const ATTESA_SEGNO = { kind: 'wait', text: 'Pratica segnata «fondi senza chiedermelo»: chiedo al server di fondere…' };
+  const IN_VOLO = { kind: 'wait', text: 'Fusione già in corso: il server ci sta lavorando…' };
   function approvaUnaVolta(req, attesa) {
     const gia = approvazioniInVolo.get(req.id);
     if (gia) return gia.risposta;
@@ -1421,15 +1424,27 @@
   async function fondiCoperte(fb, opts) {
     const UI = window.SN_MERGE_APPROVALS;
     if (!UI || !fb || !isAdmin) return [];
-    const daFondere = UI.richiesteCoperte(fusioni.pending, {
+    // Decide la pratica com'è ADESSO: chi chiama può tenere una copia presa prima di
+    // un'attesa, e un segno tolto o rimesso intanto vale per quello che è (#701).
+    fb = allFeedbacks.find((f) => f._id === fb._id) || fb;
+    if (!segnoCheFonde(fb)) return [];
+    dimenticaTentativiSuperati();
+    const coperte = UI.richiesteCoperte(fusioni.pending, {
       feedbackId: fb._id,
       numero: FB && typeof FB.formatNum === 'function' ? FB.formatNum(fb.seq, fb.subSeq) : '',
       ancheNuovi: !!(opts && opts.ancheNuovi),
     }).filter((req) => !fusioniTentate.has(req.id) && daDecidere(req));
+    // Una già in viaggio non riparte: la rilettura dopo l'esito la ritenta se il segno è cambiato (#701).
+    const occupate = coperte.filter((req) => approvazioniInVolo.has(req.id));
+    const daFondere = coperte.filter((req) => !approvazioniInVolo.has(req.id));
     if (daFondere.length && opts && typeof opts.avvia === 'function') opts.avvia(daFondere.length);
-    const esiti = [];
+    const esiti = opts && opts.ancheInVolo ? occupate.map((req) => ({
+      req,
+      msg: IN_VOLO,
+      attesa: approvazioniInVolo.get(req.id).risposta,
+    })) : [];
     for (const req of daFondere) {
-      fusioniTentate.add(req.id);
+      fusioniTentate.set(req.id, { fb: fb._id, segno: segnoCheFonde(fb) });
       const risposta = approvaUnaVolta(req, ATTESA_SEGNO);
       if (livelloAperto === 'l5') ridisegnaPannelloAperto();
       const reply = await risposta;
@@ -1437,21 +1452,25 @@
       esitiTentati.set(req.id, msg);
       esiti.push({ req, msg });
     }
-    if (esiti.length) setTimeout(loadMergeApprovals, 1200);
+    if (daFondere.length) setTimeout(loadMergeApprovals, 1200);
     return esiti;
   }
 
-  // Il segno rimesso a mano è una decisione nuova, non una rilettura: quello che
-  // non era riuscito si ritenta. Senza, dopo un server irraggiungibile il ramo
-  // restava fermo e la pagina rispondeva lo stesso «da ora si fonde senza chiedere».
-  function dimenticaTentativi(fb) {
+  // Il segno che può fondere, come chiave: '' se non c'è, o se la pratica è chiusa.
+  function segnoCheFonde(fb) {
     const UI = window.SN_MERGE_APPROVALS;
-    if (!UI || !fb) return;
-    for (const req of UI.richiesteCoperte(fusioni.pending, {
-      feedbackId: fb._id,
-      numero: FB && typeof FB.formatNum === 'function' ? FB.formatNum(fb.seq, fb.subSeq) : '',
-      ancheNuovi: true,
-    }).filter(daDecidere)) { fusioniTentate.delete(req.id); esitiTentati.delete(req.id); }
+    if (!UI || !preapprovatoPieno(fb) || !isOpenPublic(fb)) return '';
+    return UI.chiaveSegno(preapprovedOf(fb));
+  }
+
+  // Un tentativo vale per il segno che l'ha fatto partire: visto sparire o
+  // cambiare, da qui, dallo script o da un'altra finestra, il segno dopo è una
+  // decisione nuova e ritenta (#701). Una pratica che manca dalla lista non dice niente.
+  function dimenticaTentativiSuperati() {
+    for (const [id, t] of Array.from(fusioniTentate)) {
+      const fb = allFeedbacks.find((f) => f._id === t.fb);
+      if (fb && segnoCheFonde(fb) !== t.segno) fusioniTentate.delete(id);
+    }
   }
 
   // Le richieste ferme sulle pratiche già segnate si fondono appena la pagina
@@ -1459,6 +1478,8 @@
   // diverse, in un ordine qualunque.
   let fusioniInCorso = false;
   async function fondiPreapprovateInAttesa() {
+    // Prima della guardia: un segno tolto mentre una fusione è in volo va visto lo stesso.
+    if (dataLoaded) dimenticaTentativiSuperati();
     if (fusioniInCorso || !isAdmin || !dataLoaded) return;
     fusioniInCorso = true;
     const righe = [];
@@ -1538,17 +1559,8 @@
     if (!r || r.ok === false) return spegni();
     // Una richiesta nuova sposta la pratica nei Ricevuti: quello è un arrivo come un cambio di stato.
     // Non alla prima lettura, dove niente è «arrivato» mentre la pagina era aperta.
-    const primaDelleFusioni = fusioniLette && LIVE
-      ? new Map(allFeedbacks.map((f) => [String(f._id), sezioneDi(f)]))
-      : null;
-    fusioni = {
-      pending: r.pending || [],
-      failed: r.failed || [],
-      recent: r.recent || [],
-      // Il campanello del main manda solo ciò che è cambiato: quello che c'era
-      // resta finché non si rilegge.
-      preapproved: Array.isArray(r.preapproved) ? r.preapproved : (fusioni.preapproved || []),
-    };
+    const primaDelleFusioni = fusioniLette ? live.fotoSezioni() : null;
+    fusioni = LIVE.fusioniDa(r, fusioni);
     fusioniLette = true;
     if (primaDelleFusioni && dataLoaded) segnaArrivi(primaDelleFusioni, allFeedbacks);
     // Una richiesta che non c'è più non ha un esito da raccontare.
@@ -2277,7 +2289,7 @@
   // Le segnalazioni con una fusione ferma davanti a tutte, conservando fra loro
   // l'ordine che avevano (`sort` è stabile).
   function pinFusioniFerme(lista) {
-    return lista.slice().sort((a, b) => (fusioneFerma(b) ? 1 : 0) - (fusioneFerma(a) ? 1 : 0));
+    return MR.fusioniFermeInCima(lista, { fusioni });
   }
 
   // Disegna la colonna a partire da `currentList`: è la parte che NON dipende
@@ -3063,13 +3075,12 @@
     // pulsanti nascono dallo stato, e su una segnalazione cifrata la macchina
     // lo inventa (`unlabeled`): offrire "→ In coda" o "Conferma attacco" su una
     // pratica che potrebbe essere già chiusa è peggio che non offrire niente.
-    // La casella e il rombo verde della fila nascono dalla stessa domanda.
-    const isClarify = leggibile && MR.aspettaRisposta(fb);
     renderActions(fb);
     disegnaSegnoTestata(fb);
-    mgClarify.hidden = !(isAdmin && isClarify);
-    mgClarifyText.value = '';
-    setClarifyMsg('', '');
+    mgClarify.hidden = !rispostaOfferta(fb);
+    mgClarifyText.value = bozzeRisposta.get(fb._id) || '';
+    if (!ridisegno) setClarifyMsg('', '');
+    mgClarifyBtn.disabled = rispostaInVolo.has(fb._id);
 
     // Gestione (⭐ + archivia/ripristina): visibile per l'owner su QUALUNQUE
     // feedback selezionato, accanto alle azioni contestuali.
@@ -3264,18 +3275,17 @@
     const locale = MR.isProvenLocalWork(fb);
     mgPreapproveBtn.disabled = false;
     mgPreapproveBtn.hidden = !aperta || locale;
-    if (mgPreapproveLine) mgPreapproveLine.hidden = !aperta;
+    // Il nome resta fermo (acceso = aria-pressed): cambiando, spostava i tasti accanto sotto il secondo clic.
     mgPreapproveBtn.setAttribute('aria-pressed', m ? 'true' : 'false');
-    mgPreapproveBtn.textContent = m ? 'Chiedimi prima di fondere' : 'Fondi senza chiedermelo';
     mgPreapproveBtn.title = m
-      ? 'Oggi il lavoro delle automazioni su questa pratica si fonde da solo anche se i controlli lo fermano. Toglilo per tornare a ricevere la richiesta da approvare.'
-      : 'Se i controlli di sicurezza fermano il lavoro delle automazioni su questa pratica, il server fonde lo stesso, senza aspettare il tuo click. Quello che era stato fermato lo trovi poi in Automazioni.';
+      ? 'Acceso: il lavoro delle automazioni su questa pratica si fonde da solo anche se i controlli lo fermano. Un clic lo spegne, e torni a ricevere la richiesta da approvare.'
+      : 'Fondi senza chiedermelo: se i controlli di sicurezza fermano il lavoro delle automazioni su questa pratica, il server fonde lo stesso, senza aspettare il tuo click. Quello che era stato fermato lo trovi poi in Automazioni.';
     // Il segno nato da un «Approva» si toglie da qui: con l'interruttore passerebbe prima per il pieno,
     // che fonde subito la richiesta ferma.
     if (mgPreapproveRevokeBtn) {
       mgPreapproveRevokeBtn.disabled = false;
       mgPreapproveRevokeBtn.hidden = !(aperta && !locale && segno && segno.tipo === 'approvazione');
-      mgPreapproveRevokeBtn.title = 'Toglie il sì dato col clic: da ora anche i riallineamenti di questa pratica aspettano il tuo via libera.';
+      mgPreapproveRevokeBtn.title = 'Chiedimi prima di fondere: toglie il sì dato col clic, e da ora anche i riallineamenti di questa pratica aspettano il tuo via libera.';
     }
     if (mgPreapprovedInfo) {
       const UI = window.SN_MERGE_APPROVALS;
@@ -3303,9 +3313,12 @@
     try {
       const r = await sendToMain({ type: 'feedback_update', id, mergePreapproved: next });
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
-      // Il documento vero porta l'email della sessione; qui basta che il segno
-      // ci sia, e l'aggiornamento continuo porterà il resto.
-      fb.mergePreapproved = next ? { by: (r && r.by) || 'te', at: new Date().toISOString() } : undefined;
+      // Chi e quando come li ha scritti il main: tornato dal server il segno
+      // dev'essere lo stesso, o la fusione ferma si ritenterebbe da sola.
+      fb.mergePreapproved = next ? { by: (r && r.by) || 'te', at: (r && r.at) || new Date().toISOString() } : undefined;
+      // Una rilettura arrivata durante l'attesa ha sostituito la pratica: il segno va su quella che conta.
+      const ora = allFeedbacks.find((f) => f._id === id);
+      if (ora && ora !== fb) ora.mergePreapproved = fb.mergePreapproved;
       if (selectedId !== id) { renderList(); return; }
       reflectPreapproved(fb);
       renderList();
@@ -3315,10 +3328,27 @@
         // Il segno messo con una richiesta già ferma davanti: si fonde adesso,
         // anche quella aperta per i soli blocchi nuovi, che l'owner ha sotto gli occhi.
         const avvia = () => setManageMsg(testo + ' Chiedo al server di fondere la richiesta ferma…', '');
-        dimenticaTentativi(fb);
-        for (const { msg } of await fondiCoperte(fb, { ancheNuovi: true, avvia })) {
-          testo += ` Fusione ferma su questa pratica: ${msg.text}`;
-          if (msg.kind !== 'ok') kind = 'err';
+        const esiti = await fondiCoperte(fb, { ancheNuovi: true, ancheInVolo: true, avvia });
+        const base = testo;
+        const riga = (lista) => {
+          let t = base;
+          let k = 'ok';
+          for (const { msg } of lista) {
+            t += ` Fusione ferma su questa pratica: ${msg.text}`;
+            if (msg.kind === 'wait') { if (k === 'ok') k = ''; } else if (msg.kind !== 'ok') k = 'err';
+          }
+          return { t, k };
+        };
+        ({ t: testo, k: kind } = riga(esiti));
+        // La fusione già in viaggio, partita da un altro gesto: tornato l'esito
+        // la riga lo dice, se nessuno l'ha riscritta nel frattempo.
+        if (esiti.some((e) => e.attesa)) {
+          const detto = testo;
+          Promise.all(esiti.map((e) => e.attesa || null)).then((risposte) => {
+            if (selectedId !== id || mgManageMsg.textContent !== detto) return;
+            const fine = riga(esiti.map((e, i) => (e.attesa ? { req: e.req, msg: UI.outcomeMessage(risposte[i], e.req) } : e)));
+            setManageMsg(fine.t, fine.k);
+          });
         }
       }
       if (selectedId !== id) return;
@@ -3336,6 +3366,16 @@
   }
   if (mgPreapproveBtn) mgPreapproveBtn.addEventListener('click', () => togglePreapproved());
   if (mgPreapproveRevokeBtn) mgPreapproveRevokeBtn.addEventListener('click', () => togglePreapproved(false));
+
+  // La riga dei tasti, quando non entra, scorre di lato (#1034): la rotella normale deve bastare a raggiungerli.
+  const mgOwnerTasti = mgOwnerBar && mgOwnerBar.querySelector('.mg-owner-tasti');
+  if (mgOwnerTasti) {
+    mgOwnerTasti.addEventListener('wheel', (e) => {
+      if (mgOwnerTasti.scrollWidth <= mgOwnerTasti.clientWidth || Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return;
+      e.preventDefault();
+      mgOwnerTasti.scrollLeft += e.deltaY;
+    }, { passive: false });
+  }
 
   // L'etichetta di stato NON si scrive più nel dettaglio (scelta owner
   // 2026-09-13): lo stato lo dicono il colore della scheda in lista e le
@@ -3900,19 +3940,45 @@
 
   mgStarBtn.addEventListener('click', toggleStarred);
 
+  // Le due caselle e il rombo verde della fila nascono dalla stessa domanda.
+  function rispostaOfferta(fb) {
+    return !!(isAdmin && fb && statoLeggibile(fb) && MR.aspettaRisposta(fb));
+  }
+  function caselleRisposta() {
+    return [mgClarifyText, document.getElementById('mgSideRispostaText')].filter(Boolean);
+  }
+  function scriviBozzaRisposta(origine) {
+    if (!selectedId) return;
+    const v = origine.value || '';
+    if (v) bozzeRisposta.set(selectedId, v); else bozzeRisposta.delete(selectedId);
+    for (const c of caselleRisposta()) if (c !== origine) c.value = v;
+  }
+  function bottoniRisposta(disabled) {
+    for (const b of [mgClarifyBtn, document.getElementById('mgSideRispostaBtn')]) if (b) b.disabled = disabled;
+  }
+  function tastiRisposta(e) {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); sendClarifyReply(e.currentTarget); }
+  }
+
   function setClarifyMsg(text, kind) {
-    mgClarifyMsg.textContent = text || '';
-    mgClarifyMsg.className = 'mg-action-msg' + (kind ? ` mg-${kind}` : '');
+    const side = document.getElementById('mgSideRispostaMsg');
+    for (const el of [mgClarifyMsg, side]) {
+      if (!el) continue;
+      el.textContent = text || '';
+      el.className = 'mg-action-msg' + (kind ? ` mg-${kind}` : '');
+    }
   }
 
   // Risposta dell'owner a un feedback in `clarify`: la risposta si appende alle
   // note (come turno utente, preservando lo storico) e il feedback rientra in
   // coda (todo) per la prossima passata.
-  async function sendClarifyReply() {
+  async function sendClarifyReply(origine) {
     if (!selectedId) return;
     const id = selectedId;
-    const reply = (mgClarifyText.value || '').trim();
-    if (!reply) { mgClarifyText.focus(); return; }
+    if (rispostaInVolo.has(id)) return;
+    const casella = (origine && origine.tagName === 'TEXTAREA') ? origine : mgClarifyText;
+    const reply = (bozzeRisposta.get(id) || '').trim();
+    if (!reply) { casella.focus(); return; }
     // Come la riapertura: la conversazione si legge intera prima di
     // appenderci la risposta, o al suo posto resterebbe la sola risposta.
     const fb = await feedbackCompleto(id);
@@ -3938,12 +4004,14 @@
       ? T.appendUserTurn(oldNotes, reply, {})
       : (oldNotes ? `${oldNotes}\n\n${reply}` : reply);
 
-    mgClarifyBtn.disabled = true;
+    rispostaInVolo.add(id);
+    bottoniRisposta(true);
     setClarifyMsg('Invio in corso…', '');
     try {
       const r = await sendToMain({ type: 'feedback_update', id, status: 'todo', notes: newNotes });
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
       if (fb) { fb.status = 'todo'; fb.notes = newNotes; }
+      bozzeRisposta.delete(id);
       // Nell'attesa l'owner può aver aperto un ALTRO feedback. Il dato è
       // salvato lo stesso e la lista si ridisegna, ma il pannello NON si tocca:
       // chiuderlo adesso chiuderebbe il dettaglio dell'altro feedback, che
@@ -3962,11 +4030,47 @@
       if (selectedId !== id) return;
       setClarifyMsg(e.message || 'Errore nell\'invio', 'err');
     } finally {
-      mgClarifyBtn.disabled = false;
+      rispostaInVolo.delete(id);
+      bottoniRisposta(false);
     }
   }
 
-  mgClarifyBtn.addEventListener('click', sendClarifyReply);
+  mgClarifyBtn.addEventListener('click', () => sendClarifyReply(mgClarifyText));
+  mgClarifyText.addEventListener('input', () => scriviBozzaRisposta(mgClarifyText));
+  mgClarifyText.addEventListener('keydown', tastiRisposta);
+
+  // La stessa casella dentro il pannello del rombo verde, sotto le domande.
+  function pannelloRisposta(fb) {
+    const box = document.createElement('div');
+    box.className = 'mg-liv-risposta';
+    const t = document.createElement('textarea');
+    t.id = 'mgSideRispostaText';
+    t.className = 'mg-accept-comment';
+    t.rows = 3;
+    t.placeholder = 'Rispondi a Claude…';
+    t.value = bozzeRisposta.get(fb._id) || '';
+    t.addEventListener('input', () => scriviBozzaRisposta(t));
+    t.addEventListener('keydown', tastiRisposta);
+    const riga = document.createElement('div');
+    riga.className = 'mg-actions-row';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-btn';
+    btn.id = 'mgSideRispostaBtn';
+    btn.textContent = 'Invia risposta';
+    btn.title = 'La risposta entra nella conversazione e la segnalazione torna in coda.';
+    btn.disabled = rispostaInVolo.has(fb._id);
+    btn.addEventListener('click', () => sendClarifyReply(t));
+    const msg = document.createElement('span');
+    msg.id = 'mgSideRispostaMsg';
+    msg.setAttribute('role', 'status');
+    // Un esito solo per le due caselle: il pannello lo riprende da quella sotto la conversazione.
+    msg.className = mgClarifyMsg.className;
+    msg.textContent = mgClarifyMsg.textContent;
+    riga.appendChild(btn); riga.appendChild(msg);
+    box.appendChild(t); box.appendChild(riga);
+    return box;
+  }
 
   // La casella della frase ha due cose da ricordare: se l'owner ci ha messo
   // mano dopo l'ultimo invio (allora comanda quello che ha scritto lui), e
@@ -4627,9 +4731,9 @@
         const et = document.createElement('strong');
         et.textContent = `${r.etichetta}:`;
         const va = document.createElement('span');
-        // Le date arrivano in ISO dal server: qui si scrivono come le scrive
-        // il resto della pagina.
-        va.textContent = /^Quando$/i.test(r.etichetta) ? formatDateTime(r.valore) : r.valore;
+        // Le date arrivano in ISO: qui si scrivono come le scrive il resto della
+        // pagina. Una che non si legge resta com'è, mai una riga vuota.
+        va.textContent = (/^Quando$/i.test(r.etichetta) && formatDateTime(r.valore)) || r.valore;
         el.appendChild(et); el.appendChild(va);
         righe.appendChild(el);
       }
@@ -4645,9 +4749,16 @@
 
     if (liv.key === 'l5') body.appendChild(pannelloFusione(fb, liv));
     if (mostraSaltaAudit(fb, liv)) body.appendChild(pannelloSaltaAudit(fb));
+    if (liv.key === 'l3' && rispostaOfferta(fb)) body.appendChild(pannelloRisposta(fb));
 
+    // Un ridisegno a metà risposta non porta via il cursore a chi sta scrivendo.
+    const prima = document.getElementById('mgSideRispostaText');
+    const cursore = (prima && document.activeElement === prima)
+      ? [prima.selectionStart, prima.selectionEnd] : null;
     openSidebar(p.titolo, '');
     mgSideBody.replaceChildren(body);
+    const dopo = cursore && document.getElementById('mgSideRispostaText');
+    if (dopo) { dopo.focus(); dopo.setSelectionRange(cursore[0], cursore[1]); }
   }
 
   // La segnalazione e i report sono il markdown di un modello: lo stesso formattatore delle risposte di Filo in
@@ -4988,8 +5099,7 @@
     reindexByClient();
     renderList();
     aggiornaSeguiti();
-    liveLastAt = Date.now();
-    liveOkAt = liveLastAt;
+    live.segnaRiuscito();
   }
 
   // Indice per mittente (il pannello laterale lo usa). Si rifà a ogni
@@ -5008,15 +5118,11 @@
   }
 
   // ── Aggiornamento continuo ────────────────────────────────────────────────
-  // Solo mentre qualcuno guarda: patterns/dati-che-cambiano-altrove-cloud-si-chiede-la-versione.md.
+  // Solo mentre qualcuno guarda: patterns/dati-che-cambiano-altrove-cloud-si-chiede-la-versione.md. Il giro
+  // della pagina è quello condiviso con la pagina Feedback (SN_FEEDBACK_LIVE_PAGINA); qui solo gli agganci.
   const LIVE = window.SN_FEEDBACK_LIVE;
-  const LIVE_SUBSCRIBE = (window.SN_MSG?.MSG?.FEEDBACK_LIVE_SUBSCRIBE) || 'feedback_live_subscribe';
-  const LIVE_CHANGED = (window.SN_MSG?.MSG?.FEEDBACK_LIVE_CHANGED) || 'feedback_live_changed';
-  // Il giro vero: lo chiede al main, che ne tiene uno per tutte le Gestioni.
-  const giroDalMain = ({ watch, force } = {}) => sendToMain({ type: LIVE_SUBSCRIBE, giro: true, watch, force: !!force });
-  // Sorgenti sostituibili dagli spec (che non hanno Firestore).
+  // Sorgenti sostituibili dagli spec (che non hanno Firestore); `giro` lo mette il modulo (il main).
   const liveSources = {
-    giro: giroDalMain,
     // Il giro dal vivo rilegge le RIGHE: stessa proiezione del caricamento.
     getMany: (ids) => FB.getMany(ids, { fields: FB.CAMPI_LISTA, timeoutMs: 20000 }),
     // Il documento intero, per il feedback che l'owner ha aperto. Col tempo
@@ -5024,34 +5130,42 @@
     // dietro di sé tutti i tasti che scrivono sulla conversazione.
     getDettagli: (ids) => FB.getMany(ids, { timeoutMs: 20000 }),
   };
-  let liveEnabled = false;
-  let liveBlocked = false;  // dati finti iniettati: il giro non parte più, nemmeno se l'avvio finisce dopo
-  let liveClock   = null;
-  let liveTick    = null;   // promessa del giro in corso: uno alla volta
-  let liveTickDa  = 0;
-  let liveGen     = 0;      // un giro abbandonato perché appeso non scrive più sulla lista
-  let liveLastAt  = 0;      // ultimo giro tentato
-  let liveOkAt    = 0;      // ultimo giro riuscito
-  let inVista     = true;   // lo dice il main: in una scheda `document.hidden` non cambia mai
-  // Le soglie vengono dal modulo; gli spec le accorciano per non aspettare minuti.
-  const liveTempi = LIVE
-    ? { pollMs: LIVE.POLL_MS, rientroMs: LIVE.RIENTRO_MIN_MS, clockMs: LIVE.CLOCK_MS }
-    : { pollMs: 60000, rientroMs: 15000, clockMs: 5000 };
+  const live = window.SN_FEEDBACK_LIVE_PAGINA.crea({
+    nome: 'manage',
+    invia: sendToMain,
+    sorgenti: liveSources,
+    pronta: () => dataLoaded,
+    carica: () => loadData(),
+    righe: () => allFeedbacks,
+    sostituisci: (lista) => { allFeedbacks = lista; reindexByClient(); },
+    decifra: () => isAdmin,
+    sezioneDi: (fb) => sezioneDi(fb),
+    // Il segno «fondi senza chiedermelo» può arrivare da fuori (script
+    // dell'owner, altra finestra): senza questo giro il ramo resta fermo.
+    dopoFusione: () => fondiPreapprovateInAttesa(),
+    ridisegna: ({ ids, righe, removed }) => {
+      rerenderAfterLive(ids);
+      fsSegueLive(righe, removed).catch(() => {});
+    },
+    senzaNovita: ({ giro }) => {
+      // Niente di nuovo, ma una scheda sparita in un giro precedente (tenuta
+      // aperta per una bozza) può chiudersi ora che la bozza non c'è più.
+      closeDetailIfGone();
+      // Il registro delle routine può essere cresciuto lo stesso: le
+      // statistiche seguono anche questo giro (feedback #496).
+      if (giro && live.inVista()) fsSegueLive([], []).catch(() => {});
+    },
+    rileggiFusioni: () => { if (isAdmin) loadMergeApprovals(); },
+    avvisi: (testo) => segnaAvvisoGiro(testo),
+    segno: () => aggiornaSegnoFerma(),
+  });
   // Arrivate in una sezione mentre la pagina era aperta: con un ordinamento a
   // scelta possono finire a metà lista, e senza un segno l'arrivo non si vede.
-  const arrivate = new Set();
-
-  function vistaOra() {
-    return inVista && !document.hidden;
-  }
-
-  function conTempo(promessa, ms) {
-    let t = null;
-    return Promise.race([
-      promessa,
-      new Promise((_, rej) => { t = setTimeout(() => rej(new Error('nessuna risposta')), ms); }),
-    ]).finally(() => clearTimeout(t));
-  }
+  const arrivate = live.arrivate;
+  const refreshFromRemote = (opts) => live.giro(opts);
+  const startLive = () => live.start();
+  const stopLive = () => live.stop();
+  const aggiornaSeguiti = () => live.aggiornaSeguiti();
 
   function sezioneDi(fb) {
     if (!sezioniAttendibili() || !statoLeggibile(fb)) return null;
@@ -5059,16 +5173,16 @@
   }
 
   function segnaArrivi(prima, fresh) {
-    for (const id of LIVE.arrivi(prima, fresh, sezioneDi)) arrivate.add(id);
+    live.segnaArrivi(prima, fresh);
   }
 
   // «Ferma» si dice solo a chi guarda, e solo dopo più giri mancati.
   function aggiornaSegnoFerma() {
     if (!mgListHead) return;
-    const ferma = !!LIVE && LIVE.listaFerma({ ora: Date.now(), inVista: vistaOra(), ultimoRiuscito: liveOkAt });
+    const ferma = live.ferma();
     mgListHead.classList.toggle('mg-list-head--ferma', ferma);
     scriviTitoloTesta(ferma
-      ? `Lista ferma alle ${formatDateTime(new Date(liveOkAt).toISOString())}: il server non risponde, riprovo da solo.`
+      ? `Lista ferma alle ${formatDateTime(new Date(live.okAt()).toISOString())}: il server non risponde, riprovo da solo.`
       : '');
   }
 
@@ -5094,6 +5208,9 @@
     if (mgUserNote && mgUserNoteText) {
       if (String(mgUserNoteText.value || '') !== String(mgUserNoteText.dataset.saved || '')) return true;
     }
+    // La risposta scritta nel pannello del rombo (#1033) sta fuori dal dettaglio, ma è sua.
+    const rispostaLaterale = document.getElementById('mgSideRispostaText');
+    if (rispostaLaterale && (el === rispostaLaterale || String(rispostaLaterale.value || '').trim())) return true;
     // Una conferma del segno aperta (#922): ridisegnare la chiuderebbe mentre l'owner la legge.
     if (mgSegnoConferma && !mgSegnoConferma.hidden && mgSegnoConferma.offsetParent !== null) return true;
     if (document.querySelector('#mgSideSegno .mg-segno-conferma:not([hidden])')) return true;
@@ -5140,50 +5257,29 @@
     return true;
   }
 
-  let listaMossaAt = 0;
-  let listaPremuta = false;
-  let listaRimandata = null;
-  if (mgList) {
-    mgList.addEventListener('pointermove', () => { listaMossaAt = Date.now(); });
-    mgList.addEventListener('pointerdown', () => { listaPremuta = true; listaMossaAt = Date.now(); });
-    window.addEventListener('pointerup', () => { listaPremuta = false; }, true);
-    mgList.addEventListener('pointerleave', () => { listaMossaAt = 0; listaPremuta = false; riprendiLista(); });
-  }
+  const puntatoreLista = window.SN_FEEDBACK_LIVE_PAGINA.seguiPuntatore(mgList, { quandoLibera: () => riprendiLista() });
   function listaOccupata() {
-    return LIVE.listaInUso({ ora: Date.now(), ultimoMovimento: listaMossaAt, premuto: listaPremuta });
+    return puntatoreLista.occupata();
   }
   function rimandaLista() {
-    if (listaRimandata) return;
-    listaRimandata = setTimeout(() => { listaRimandata = null; riprendiLista(); }, LIVE.LISTA_IN_USO_MS);
+    puntatoreLista.rimanda();
   }
   function riprendiLista() {
     if (!dataLoaded || searchMode) return;
     if (listaOccupata()) { rimandaLista(); return; }
-    if (listaRimandata) { clearTimeout(listaRimandata); listaRimandata = null; }
+    puntatoreLista.annulla();
     ridisegnaListaAlSuoPosto();
   }
   function listaCheScorre() {
     return [mgList, mgList && mgList.parentElement]
       .find((el) => el && el.scrollHeight > el.clientHeight) || null;
   }
-  function righeLista(scroller) {
-    const base = scroller.getBoundingClientRect().top - scroller.scrollTop;
-    return Array.from(mgList.querySelectorAll('.mg-item')).map((el) => {
-      const r = el.getBoundingClientRect();
-      return { id: el.dataset.id, top: r.top - base, height: r.height };
-    });
-  }
-  // Lo scorrimento si ancora alla prima scheda visibile: se ne esce una più
-  // su, la vista non salta.
   function ridisegnaListaAlSuoPosto() {
-    if (!LIVE || !mgList) { renderList(); return; }
-    const scroller = listaCheScorre();
-    const prima = scroller ? scroller.scrollTop : 0;
-    const ancora = scroller ? LIVE.ancoraScorrimento(righeLista(scroller), prima) : null;
-    scrollDelGiroAt = Date.now();
-    renderList();
-    const dopo = listaCheScorre();
-    if (dopo) dopo.scrollTop = LIVE.scrollDaAncora(ancora, righeLista(dopo), prima);
+    if (!mgList) { renderList(); return; }
+    window.SN_FEEDBACK_LIVE_PAGINA.alSuoPosto({ lista: mgList, voci: '.mg-item', scorre: listaCheScorre }, () => {
+      scrollDelGiroAt = Date.now();
+      renderList();
+    });
   }
 
   // Ridisegna la lista senza perdere lo scorrimento né la selezione. In
@@ -5209,212 +5305,22 @@
   }
 
   // ── Il giro dei cambiati (#676) ───────────────────────────────────────────
-  // Il giro vive nel main, uno per tutte le Gestioni: la pagina in vista lo
-  // chiede (orologio → decidiGiro), riceve le righe cambiate o, ogni mezz'ora,
-  // le versioni di tutta la collezione; le altre Gestioni aperte ricevono lo
-  // stesso esito per avviso. Regola: patterns/chi-guarda-in-continuo-chiede-cosa-e-cambiato.md.
-
-  // Le fusioni del giro e degli avvisi passano in fila: due sulla stessa lista
-  // si pesterebbero.
-  let codaFusioni = Promise.resolve();
-  function inCoda(fn) {
-    const p = codaFusioni.then(fn, fn);
-    codaFusioni = p.catch(() => {});
-    return p;
-  }
-
-  // Fonde righe già lette. `fresche`: solo quelle scritte dopo la copia in
-  // mano (la domanda per data torna indietro di qualche minuto e rimanda righe
-  // già viste: rifonderle ridisegnerebbe il pannello per niente).
-  async function mergeLive(fresh, { removed = [], fresche = false, gen = liveGen } = {}) {
-    const inMano = new Map(allFeedbacks.map((f) => [String(f && f._id), f && f._updateTime]));
-    let righe = (Array.isArray(fresh) ? fresh : []).filter((r) => {
-      if (!r || !r._id) return false;
-      if (!fresche) return true;
-      const mio = inMano.get(String(r._id));
-      return !mio || !r._updateTime || r._updateTime > mio;
-    });
-    if (righe.length === 0 && removed.length === 0) {
-      // Niente di nuovo, ma una scheda sparita in un giro precedente (tenuta
-      // aperta per una bozza) può chiudersi ora che la bozza non c'è più.
-      closeDetailIfGone();
-      // Il registro delle routine può essere cresciuto lo stesso: le
-      // statistiche seguono anche questo giro (feedback #496).
-      fsSegueLive([], []).catch(() => {});
-      return { changed: 0 };
-    }
-    if (isAdmin && righe.length > 0) {
-      try {
-        const r = await conTempo(sendToMain({ type: 'feedback_decrypt_fields', list: righe }), 30000);
-        if (r && r.ok && Array.isArray(r.list)) righe = r.list;
-      } catch (_) { /* come al caricamento: valori cifrati piuttosto che niente */ }
-    }
-    if (gen !== liveGen) return { changed: 0 };
-    const ids = righe.map((f) => f && f._id).filter(Boolean);
-    const primaDelGiro = new Map(allFeedbacks.map((f) => [String(f._id), sezioneDi(f)]));
-    const statiMossi = LIVE.statoCambiato(allFeedbacks, righe);
-    allFeedbacks = LIVE.applyChanges(allFeedbacks, { fresh: righe, removed });
-    reindexByClient();
-    segnaArrivi(primaDelGiro, righe);
-    if (statiMossi && isAdmin) loadMergeApprovals();
-    // Il segno «fondi senza chiedermelo» può arrivare da fuori (script
-    // dell'owner, altra finestra): senza questo giro il ramo resta fermo.
-    fondiPreapprovateInAttesa();
-    rerenderAfterLive(new Set(ids));
-    fsSegueLive(righe, removed).catch(() => {});
-    aggiornaSeguiti();
-    return { changed: ids.length + removed.length };
-  }
-
-  // Il riallineamento: versioni → differenze → rilettura dei soli cambiati.
-  // Lo fa la pagina perché solo lei sa quali documenti le mancano. Una lettura
-  // interrotta non fa uscire nessuno: «non l'ho visto» non vuol dire «non c'è».
-  async function reconcileFrom(remote, { complete = true, gen = liveGen } = {}) {
-    if (!Array.isArray(remote)) throw new Error('versioni non lette');
-    const { changed, added, removed } = LIVE.diffVersions(allFeedbacks, remote);
-    const ids = changed.concat(added);
-    const fresh = ids.length > 0 ? await liveSources.getMany(ids) : [];
-    if (gen !== liveGen) return { changed: 0 };
-    return mergeLive(fresh, { removed: complete ? removed : [], gen });
-  }
+  // Vive nel main, uno per tutte le pagine iscritte: regola in
+  // patterns/chi-guarda-in-continuo-chiede-cosa-e-cambiato.md.
 
   // Avvisi del giro (freno sulle pagine, tetto dei seguiti, registro
   // illeggibile): si dicono sull'intestazione della lista, non si tacciono.
-  function segnaAvvisoGiro(avvisi) {
-    const testo = (Array.isArray(avvisi) ? avvisi : []).filter(Boolean).join(' · ');
-    if (testo) console.warn('[manage] giro:', testo);
-    avvisoGiro = testo;
+  function segnaAvvisoGiro(testo) {
+    avvisoGiro = testo || '';
     if (!mgListHead) return;
-    mgListHead.classList.toggle('mg-list-head--avviso', !!testo);
+    mgListHead.classList.toggle('mg-list-head--avviso', !!avvisoGiro);
     aggiornaSegnoFerma();
   }
 
-  function applicaEsito(esito, gen = liveGen) {
-    return inCoda(async () => {
-      if (!esito || !dataLoaded) return { changed: 0 };
-      if (Array.isArray(esito.avvisi) || esito.kind === 'changed' || esito.kind === 'reconcile') {
-        segnaAvvisoGiro(esito.avvisi);
-      }
-      if (esito.kind === 'reconcile') return reconcileFrom(esito.versions, { complete: esito.complete !== false, gen });
-      if (esito.kind === 'changed') return mergeLive(esito.rows, { fresche: true, gen });
-      closeDetailIfGone();
-      return { changed: 0 };
-    });
-  }
-
-  // L'avviso di un giro chiesto da un'altra Gestione.
-  function onLiveBroadcast(m) {
-    if (!liveEnabled || liveBlocked || !dataLoaded) return;
-    applicaEsito(m).catch((e) => console.warn('[manage] aggiornamento:', e?.message || e));
-  }
-
-  // Un giro: si chiede al main, si fonde l'esito. Ritorna { changed }. Un giro
-  // già in corso viene riusato, non raddoppiato.
-  function refreshFromRemote({ force = false } = {}) {
-    if (liveTick) return liveTick;
-    const gen = ++liveGen;
-    liveTickDa = Date.now();
-    liveTick = (async () => {
-      const watch = idsDaSeguire();
-      seguitiInviati = watch.join(',');
-      const r = await liveSources.giro({ watch, force });
-      if (gen !== liveGen) return { changed: 0 };
-      if (!r || r.ok !== true) throw new Error((r && r.error) || 'giro non riuscito');
-      if (r.scartati) console.warn(`[manage] giro: ${r.scartati} seguiti oltre il tetto`);
-      const out = await applicaEsito(r.giro || { kind: 'skipped' }, gen);
-      liveOkAt = Date.now();
-      return out;
-    })().finally(() => {
-      if (gen === liveGen) { liveTick = null; liveTickDa = 0; }
-      liveLastAt = Date.now();
-      aggiornaSegnoFerma();
-    });
-    return liveTick;
-  }
-
-  // I feedback in mano alle routine: di loro il giro chiede l'ora di Firestore,
-  // perché chi li scrive può non firmare la sua. Tutti, senza campione della
-  // coda: quale sarà il prossimo lo dice il registro dei worker al main (#676.1).
+  // Chi la pagina chiede al giro di seguire con l'ora vera di Firestore (la regola sta nel modulo).
   function idsDaSeguire() {
-    return (allFeedbacks || []).filter((fb) => fb && fb._id && MR.workProgress(fb)).map((fb) => String(fb._id));
+    return live.seguiti();
   }
-
-  let seguitiInviati = '';
-  function inviaSeguiti(extra = {}) {
-    const watch = idsDaSeguire();
-    seguitiInviati = watch.join(',');
-    return sendToMain({ type: LIVE_SUBSCRIBE, watch, ...extra }).catch(() => {});
-  }
-
-  // Chi va seguito è cambiato: il main lo sa subito (costa un messaggio, non letture).
-  function aggiornaSeguiti() {
-    if (!liveEnabled || liveBlocked || liveSources.giro !== giroDalMain) return;
-    if (idsDaSeguire().join(',') === seguitiInviati) return;
-    inviaSeguiti();
-  }
-
-  function orologio(motivo) {
-    if (!liveEnabled || !LIVE) return;
-    const ora = Date.now();
-    if (liveTick && ora - liveTickDa >= LIVE.GIRO_BLOCCATO_MS) {
-      console.warn('[manage] aggiornamento: un giro non ha avuto risposta, ne parte un altro');
-      liveGen += 1;
-      liveTick = null;
-      liveTickDa = 0;
-    }
-    const scelta = LIVE.decidiGiro({
-      ora, motivo, inVista: vistaOra(), dataLoaded,
-      ultimoGiro: liveLastAt, giroDa: liveTick ? liveTickDa : 0,
-      pollMs: liveTempi.pollMs, rientroMs: liveTempi.rientroMs,
-    });
-    aggiornaSegnoFerma();
-    if (scelta === 'carica') {
-      // La prima lista non è arrivata: si ritenta da soli invece di lasciare
-      // «Errore nel caricamento» finché l'owner non ricarica a mano.
-      liveLastAt = ora;
-      loadData().catch(() => {});
-    } else if (scelta === 'giro') {
-      refreshFromRemote().catch((e) => console.warn('[manage] aggiornamento:', e?.message || e));
-    }
-  }
-
-  function impostaVista(v) {
-    const eraInVista = vistaOra();
-    inVista = v !== false;
-    if (!eraInVista && vistaOra()) orologio('rientro');
-    else aggiornaSegnoFerma();
-  }
-
-  function armaOrologio() {
-    if (liveClock) clearInterval(liveClock);
-    liveClock = setInterval(() => orologio('battito'), liveTempi.clockMs);
-  }
-
-  let rientroAgganciato = false;
-  function startLive() {
-    if (!LIVE || liveEnabled || liveBlocked) return;
-    liveEnabled = true;
-    armaOrologio();
-    if (!rientroAgganciato) {
-      rientroAgganciato = true;
-      document.addEventListener('visibilitychange', () => orologio('rientro'));
-      if (window.filo?.onBroadcast) {
-        window.filo.onBroadcast((m) => { if (m && m.type === TAB_IN_VISTA) impostaVista(m.inVista); });
-      }
-    }
-    sendToMain({ type: TAB_IN_VISTA_GET })
-      .then((r) => { if (r && r.ok && typeof r.inVista === 'boolean') impostaVista(r.inVista); })
-      .catch(() => {});
-    if (liveSources.giro === giroDalMain) inviaSeguiti();
-  }
-
-  function stopLive() {
-    const eraAcceso = liveEnabled;
-    liveEnabled = false;
-    if (liveClock) { clearInterval(liveClock); liveClock = null; }
-    if (eraAcceso) sendToMain({ type: LIVE_SUBSCRIBE, off: true }).catch(() => {});
-  }
-  window.addEventListener('pagehide', () => { sendToMain({ type: LIVE_SUBSCRIBE, off: true }).catch(() => {}); });
 
   // ── Hook di test ────────────────────────────────────────────────────────
   // Solo per gli spec Playwright: inietta feedback e apre il dettaglio
@@ -5430,7 +5336,7 @@
       // Fermo E bloccato: se l'avvio vero finisce DOPO l'iniezione, startLive
       // non deve ripartire e rimpiazzare i dati finti con Firestore.
       stopLive();
-      liveBlocked = !(opts && opts.dalVivo);
+      live.blocca(!(opts && opts.dalVivo));
       testDataInjected = true;
       arrivate.clear();
       allFeedbacks = Array.isArray(fbs) ? fbs : [];
@@ -5441,17 +5347,13 @@
       reindexByClient();
       renderList();
       if (opts && opts.dalVivo) {
-        liveLastAt = Date.now();
-        liveOkAt = liveLastAt;
+        live.segnaRiuscito();
         startLive();
       }
     },
     // Le soglie dell'orologio, accorciate: un giro vero ogni minuto farebbe
     // aspettare minuti a ogni spec.
-    setLiveTiming(t) {
-      Object.assign(liveTempi, t || {});
-      if (liveEnabled) armaOrologio();
-    },
+    setLiveTiming(t) { live.tempi(t); },
     liveArrivate() { return Array.from(arrivate); },
     // Caricamento FALLITO, su richiesta. Lo spec che verifica "niente numeri
     // inventati quando i dati non sono arrivati" si affidava al fatto che nel
@@ -5461,7 +5363,7 @@
     // ovunque allo stesso modo.
     simulaCaricamentoFallito() {
       stopLive();
-      liveBlocked = true;
+      live.blocca(true);
       testDataInjected = true;   // il caricamento vero, se atterra dopo, non lo annulla
       allFeedbacks = [];
       dataLoaded = false;
@@ -5478,11 +5380,11 @@
     pollNow() { return refreshFromRemote({ force: true }); },
     // L'avviso del giro del main, come se fosse arrivato dal canale: gli spec
     // provano le due forme senza dover fingere anche l'IPC.
-    liveMessage(m) { return applicaEsito(m); },
+    liveMessage(m) { return live.applicaEsito(m); },
     // Dopo `setData` il canale resta chiuso, o il giro vero rimpiazzerebbe i
     // dati finti. Uno spec che vuole provare il giro INTERO (main → pagina)
     // lo riapre da qui, coi dati finti già in pagina.
-    resumeLive() { liveBlocked = false; liveSources.giro = giroDalMain; stopLive(); startLive(); },
+    resumeLive() { live.riprendi(); },
     avvisoGiro() { return avvisoGiro; },
     // Un giro di ridisegno da aggiornamento remoto, su richiesta: i test lo
     // usano per verificare che una bozza in corso lo trattenga (ritorna false).
@@ -5498,7 +5400,7 @@
         });
       }
     },
-    isLiveOn() { return liveEnabled; },
+    isLiveOn() { return live.acceso(); },
     setAdmin(v) { setIsAdmin(!!v); applyAutoModeGate(); },
     // Ri-legge i contatori del verificatore dalla fonte (IPC) — per i test.
     loadCaps,
@@ -7329,7 +7231,6 @@
   if (window.filo?.onBroadcast) {
     window.filo.onBroadcast((m) => {
       if (m && m.type === MERGE_APPROVALS_CHANGED) loadMergeApprovals(m);
-      if (m && m.type === LIVE_CHANGED) onLiveBroadcast(m);
     });
   }
 

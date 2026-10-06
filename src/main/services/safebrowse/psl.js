@@ -67,7 +67,7 @@ const PRIVATE_PSL = new Set([
   'vercel.app', 'netlify.app', 'web.app', 'firebaseapp.com', 'herokuapp.com',
   'appspot.com', 'blogspot.com', 'azurewebsites.net', 'onrender.com', 'fly.dev',
   'surge.sh', 'glitch.me', 'neocities.org', 'blob.core.windows.net', 'web.core.windows.net',
-  's3.amazonaws.com', 'googleapis.com', 'myshopify.com',
+  's3.amazonaws.com', 'googleapis.com', 'myshopify.com', 'hf.space', 'static.hf.space',
 ]);
 // Gli indirizzi di S3 per regione e da sito statico, uno per regione nella PSL: il secchio è il sito, non la regione.
 const S3 = /^s3(?:[.-][a-z0-9-]+){0,3}\.amazonaws\.com$/;

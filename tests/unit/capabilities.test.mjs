@@ -134,6 +134,7 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
   // della stessa feature (es. add/get/delete) puntano alla stessa voce.
   const FILO_MSG_TO_CAP = {
     FILO_CHAT: 'filo-assistant',
+    FILO_CHAT_STOP: 'filo-assistant',
     FILO_GENERATE_DASHBOARD: 'generate-dashboard',
     FILO_RUN_ACTION: 'agent-actions',
     FILO_CONFIRM_ACTION: 'agent-actions',
@@ -171,6 +172,7 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     FILO_STOP_TIMER_ALARM: 'filo-timers',
     FILO_GET_NOTIFICATIONS: 'filo-notifications',
     FILO_DISMISS_NOTIFICATION: 'filo-notifications',
+    FILO_INSTALLA_AGGIORNAMENTO: 'auto-update',
     FILO_GET_ONBOARDING: 'onboarding',
     FILO_RESTART_ONBOARDING: 'onboarding',
     FILO_CLOSE_ONBOARDING: 'onboarding',

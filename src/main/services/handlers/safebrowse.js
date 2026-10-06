@@ -13,7 +13,42 @@ module.exports = function register(on, ctx) {
     const tabId = sender?.tab?.id;
     if (!win || !win._filoTabs || !tabId) return { ok: true, level: 'safe', message: null };
     const ctxPage = { hasPassword: !!msg.hasPassword, hasPayment: !!msg.hasPayment };
+    // #758 — un campo password nella PAGINA (non in un riquadro, che nominerebbe un sito non suo) è una pagina di
+    // accesso: il sito vale quello della scheda.
+    if (msg.hasPassword) {
+      const top = sender.wc && !sender.wc.isDestroyed() && sender.wc.mainFrame;
+      const suo = top && sender.frame && sender.frame.frameTreeNodeId === top.frameTreeNodeId;
+      if (suo) { try { require('../cookieIncorporati').paginaDiAccesso(sender.tab.url, { forte: true }); } catch (_) {} }
+    }
     return win._filoTabs.safebrowseGet(tabId, msg.url || origin, ctxPage);
+  });
+
+  // Un campo password o carta a schermo, nella pagina o in un suo riquadro: vale per la pagina della scheda, che dà il
+  // main (sender.url), mai il riquadro. Chi si dichiara delicato può solo mandare meno ai modelli (#1004).
+  on(MSG.CAMPI_DELICATI, async (msg, sender) => {
+    const win = winOf(sender);
+    if (!win || !win._filoTabs || !sender?.tab?.id || !sender.url) return { ok: false };
+    if (!msg || !(msg.hasPassword || msg.hasPayment)) return { ok: true };
+    await globalThis.SN_DELICATE?.segnaCampi(sender.url, { incognito: !!win._filoTabs.incognito })?.catch?.(() => {});
+    return { ok: true };
+  });
+
+  on(MSG.PAGINE_DELICATE_CAMPI, soloFilo(async () => {
+    const D = globalThis.SN_DELICATE;
+    const PD = globalThis.SN_PAGINE_DELICATE;
+    const segnati = D ? await D.elencoCampi() : [];
+    const tolti = PD ? PD.nonDelicati(await Storage.getSettings()) : [];
+    const siti = [...new Set([...segnati, ...tolti])].sort().map((sito) => ({ sito, tolto: tolti.includes(sito) }));
+    return { ok: true, siti };
+  }));
+
+  // Il sito è quello della scheda, non uno detto dalla pagina; un riquadro non conta (l'accesso vale nella scheda sua).
+  on(MSG.ACCESSO_CREDENZIALI, async (msg, sender) => {
+    const top = sender && sender.wc && !sender.wc.isDestroyed() && sender.wc.mainFrame;
+    const suo = top && sender.frame && sender.frame.frameTreeNodeId === top.frameTreeNodeId;
+    if (!suo || !sender.tab || !sender.tab.url) return { ok: false };
+    try { require('../cookieIncorporati').credenziali(sender.tab.url); } catch (_) {}
+    return { ok: true };
   });
 
   // La home aperta dal tasto destro sull'avviso del sito pericoloso prende la domanda o la segnalazione che il main le

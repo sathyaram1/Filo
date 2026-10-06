@@ -363,6 +363,8 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 .ed-chat-msg { font-size: 12px; padding: 6px 9px; border-radius: 10px; max-width: 92%; white-space: pre-wrap; }
 .ed-chat-msg.user { align-self: flex-end; background: var(--sn-accent); color: #fff; }
 .ed-chat-msg.assistant { align-self: flex-start; background: var(--sn-bg); border: 1px solid var(--sn-border); }
+/* Risposta pagata coi crediti di Filo (chiave dell'utente rifiutata): non è un errore, è una nota. */
+.ed-chat-note { align-self: flex-start; font-size: 11px; font-style: italic; color: var(--sn-muted); padding: 0 9px; }
 .ed-chat-input { display: flex; gap: 4px; align-items: flex-end; --sn-voce-size: 30px; --sn-voce-ink: var(--sn-muted); }
 .ed-chat-input .sn-voce-btn { margin-bottom: 2px; }
 /* La casella cresce con quello che contiene (anche il suggerimento, che col microfono accanto va a capo):

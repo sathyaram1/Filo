@@ -34,10 +34,10 @@
 
   // ── Transizioni legali (FEEDBACK-STATES.md §3) ─────────────────────────────
   // from → { to: [attori autorizzati] }. Attori:
-  //   'owner'    dashboard di gestione (solo l'owner fa uscire dagli stati di
-  //              revisione umana);
-  //   'pipeline' filo-security (giudici + gate file): è l'UNICO che fa uscire
-  //              da `unlabeled`;
+  //   'owner'    Gestione, pagina dei feedback e `npm run feedback`: una riga per
+  //              ogni azione di ownerActions (manageReview.js), sentinella in
+  //              tests/unit/ownerActionsTransizioni.test.mjs; mai → done;
+  //   'pipeline' filo-security (giudici + gate file);
   //   'routine'  routine Claude via canale autenticato (iter di lavorazione).
   // Una coppia (from,to) assente = transizione ILLEGALE: il writer la rifiuta.
   const TRANSITIONS = {
@@ -46,8 +46,9 @@
       attack:          ['pipeline'],
       spam:            ['pipeline'],
       design:          ['pipeline'],
-      todo:            ['pipeline'], // sicuro + automatica ON (letta al giudizio)
+      todo:            ['pipeline', 'owner'], // pipeline: sicuro + automatica ON; owner: «→ In coda» dai Ricevuti
       aligned:         ['pipeline'], // sicuro + automatica OFF
+      archived:        ['owner'],
     },
     suspicious_file: {
       todo:             ['owner'],
@@ -58,11 +59,13 @@
     attack: {
       attack_confirmed: ['owner'],
       todo:             ['owner'],   // falso positivo
+      archived:         ['owner'],   // non si fa, senza confermarlo attacco
       unlabeled:        ['pipeline'], // mittente fidato flaggato per errore → ri-giudizio
     },
     spam: {
       spam_confirmed: ['owner'],
       todo:           ['owner'],
+      archived:       ['owner'],
       unlabeled:      ['pipeline'],
     },
     design: {
@@ -79,8 +82,9 @@
       unlabeled: ['pipeline'],
     },
     todo: {
-      working: ['routine'], // presa in carico (il semaforo lo tiene il server)
-      design:  ['routine'], // la routine ha domande → chat + statusReason clarify
+      working:  ['routine'], // presa in carico (il semaforo lo tiene il server)
+      design:   ['routine'], // la routine ha domande → chat + statusReason clarify
+      archived: ['owner'],   // un doppione, o una cosa che non si farà più
       // NB: il passo diretto todo→done (attore routine) è stato RITIRATO col
       // ridisegno (SPEC-RIDISEGNO-MAX.md §1): esisteva per il pianificatore che
       // spezzava le spec in sotto-feedback, che non esiste più. Le chiusure
@@ -93,14 +97,17 @@
       // Arenato: il ramo non avanza da un'ora → il pacemaker lo rimette in coda
       // da solo (FEEDBACK-STATES.md §6a). Alla terza volta va in `design`.
       todo:                ['routine'],
+      archived:            ['owner'],
     },
     revision_capability: {
       revision_security: ['routine'], // PASS verifica comportamentale
       design:            ['routine'], // fail cap raggiunto → statusReason loop
+      archived:          ['owner'],
     },
     revision_security: {
-      done:   ['routine'], // PASS secaudit + merge-gate fonde su main
-      design: ['routine'], // FAIL fixer-loop → statusReason loop
+      done:     ['routine'], // PASS secaudit + merge-gate fonde su main
+      design:   ['routine'], // FAIL fixer-loop → statusReason loop
+      archived: ['owner'],
       // Conflitto di fusione: main è andato avanti mentre il lavoro aspettava
       // e le modifiche non si incastrano più da sole. Non è una bocciatura di
       // qualità: il ramo torna in lavorazione per il RIALLINEAMENTO (rifare la

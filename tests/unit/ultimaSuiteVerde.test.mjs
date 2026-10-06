@@ -4,11 +4,11 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
-import { chmodSync, copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const SCRIPT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'scripts', 'ultima-suite-verde.mjs');
 
@@ -244,7 +244,7 @@ else { process.stderr.write('percorso non previsto ' + p); process.exit(1); }
       return { codice, ricevute, output: readFileSync(join(tmp, 'output.txt'), 'utf8'), verde: sha[1] };
     } finally {
       await new Promise((ok) => srv.close(ok));
-      rmSync(tmp, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+      togliCartella(tmp, { tentativi: 10 });
     }
   }
 
@@ -347,7 +347,7 @@ else process.stdout.write(JSON.stringify({ workflow_runs: [] }));
       return aperti;
     } finally {
       await new Promise((ok) => srv.close(ok));
-      rmSync(tmp, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+      togliCartella(tmp, { tentativi: 10 });
     }
   }
 

@@ -30,12 +30,16 @@
         if (la !== lb) return lb - la;
         return (b.id || 0) - (a.id || 0);
       });
+      // Una pagina delicata entra nel contesto della chat solo col nome del sito (#1004): la regola la tiene il main.
+      let fuori = () => null;
+      try { if (global.SN_DELICATE) fuori = await global.SN_DELICATE.filtro(); } catch (_) {}
       return sorted.map((t) => ({
         url: t.url || '',
         title: t.title || '',
         active: !!t.active,
         lastAccessed: t.lastAccessed || null,
         zoomPercent: typeof t.zoomPercent === 'number' ? t.zoomPercent : null,
+        delicata: fuori(t.url || '') || null,
       }));
     } catch (_) {
       return [];
@@ -287,6 +291,12 @@
       top.forEach((t, i) => {
         const focus = t.active ? '[FOCUS] ' : '';
         const rel = t.lastAccessed ? ` (ultima attività: ${formatRelativeTime(new Date(t.lastAccessed))})` : '';
+        if (t.delicata) {
+          let sito = '';
+          try { sito = new URL(t.url).hostname.replace(/^www\./, ''); } catch (_) {}
+          righe.push(`${i + 1}. ${focus}[pagina delicata] ${E.neutralizza(sito || 'sito', { unaRiga: true })}${rel}`);
+          return;
+        }
         const grezzo = (t.title || '').slice(0, 80) || '(senza titolo)';
         const title = E.neutralizza(grezzo, { unaRiga: true });
         righe.push(`${i + 1}. ${focus}${title}${rel}`);

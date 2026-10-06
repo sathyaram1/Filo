@@ -76,11 +76,14 @@
     // Scryfall e scrive commander + commanderMeta (nome, identity, art crop).
     DECKS_SET_COMMANDER: 'decks_set_commander', // { id, scryfallId }
     // Chat unificata del Builder (§3-§4): NL → query Scryfall / carte
-    // cross-mazzo via LLM. { deckId, text, history?, lastResults? } →
-    // { ok, reply, cardIds, cards, query, deck?, clearChat? }. `lastResults` sono gli id
+    // cross-mazzo via LLM. { deckId, text, history?, lastResults?, reasoningReqId? } →
+    // { ok, reply, cardIds, cards, query, deck?, clearChat? } | { ok:false, stopped:true }. `lastResults` sono gli id
     // dell'ultima CardList mostrata (per "valuta questi risultati", §6.1); `clearChat`: l'utente ha
     // chiesto a parole di svuotare la chat, la pagina chiede conferma.
     DECKS_CHAT: 'decks_chat',
+    // «Ferma» sulla chat dei mazzi (#792): { reqId } (il reasoningReqId del turno) → { ok, fermato }. Solo dalle
+    // superfici di Filo e solo dalla scheda che ha avviato il turno.
+    DECKS_CHAT_STOP: 'decks_chat_stop',
     // La chat salvata di un mazzo (§3.2), solo dalle pagine filo://. EDIT applica UNA modifica alla chat salvata
     // (SN_DECK_CHAT.applyEdit: op 'append' | 'fill' | 'drop' | 'names') e rifiuta un mazzo che non esiste più, una
     // chat oltre il tetto (error 'too_many', max) o un turno che non c'è più (error 'gone').
@@ -113,6 +116,9 @@
     // Broadcast main→renderer quando il saldo crediti cambia (consumo, refill,
     // ricompensa): la shell aggiorna l'icona/animazione, la pagina il grafico.
     CREDITS_CHANGED: 'credits_changed',
+    // La riga «ho usato i crediti di Filo» è a schermo (#662): l'avviso che la
+    // ripeterebbe non parte. Da ogni superficie, siti compresi. { } → { ok }.
+    KEY_FALLBACK_SHOWN: 'key_fallback_shown',
     // Ricompensa crediti per un feedback inviato (+5 subito). { } → { ok, credits, balance }.
     // Con un portafoglio (#816) non accredita: { ok, wallet: true, credits: 0, inArrivo }.
     CREDITS_AWARD_FEEDBACK: 'credits_award_feedback',
@@ -637,6 +643,14 @@
     // vista sopra la scheda, i cui pulsanti non passano da questo canale, che i siti raggiungono (#813.5).
     // → { ok, level:'safe'|'sospetto'|'pericoloso', message:{title,body}|null, registrable }
     SAFEBROWSE_GET: 'safebrowse_get',              // { url, hasPassword?, hasPayment? }
+    // #1004 — la pagina, o un suo riquadro (il modulo di pagamento di un altro sito), mostra un campo password o carta:
+    // il sito della scheda diventa delicato. Il sito lo dà il main, dalla scheda.
+    CAMPI_DELICATI: 'campi_delicati', // { hasPassword, hasPayment } (campi a schermo) → { ok }
+    // Solo pagine filo:// (Sicurezza): i siti segnati per un campo password o carta, e quelli che l'utente ne ha tolto.
+    PAGINE_DELICATE_CAMPI: 'pagine_delicate_campi', // {} → { ok, siti: [{ sito, tolto }] }
+    // La pagina principale di una scheda ha una password scritta dall'utente (#758): una scrittura verso il sito che
+    // segue è l'invio di un accesso, e il sito entra fra quelli dove sei entrato.
+    ACCESSO_CREDENZIALI: 'accesso_credenziali',    // {} → { ok }
     // La home aperta dal tasto destro sull'avviso chiede cosa le ha lasciato il main: la domanda a Filo sul sito o la
     // segnalazione del falso allarme, una volta sola. Solo pagine filo://. → { ok, richiesta: { tipo, testo } | null }
     CASA_RICHIESTA: 'casa_richiesta',
@@ -717,6 +731,9 @@
     // { userMessage, threadHistory: [{role, text, actions?}] }
     // Risposta: { ok, text, actions: [...], model, costEur }
     FILO_CHAT: 'filo_chat',
+    // Ferma il turno di chat in corso (#578): { reqId } è il `reasoningReqId` del turno. Solo pagine di Filo, e solo
+    // la scheda che l'ha avviato. Le azioni già partite finiscono, nessuna nuova parte. → { ok, fermato }
+    FILO_CHAT_STOP: 'filo_chat_stop',
     // Filo State: assembla stato programmatico (tab aperte, tempo, processi).
     // Risposta: { ok, state: {...}, stateText: "..." }
     FILO_GET_STATE: 'filo_get_state',
@@ -830,6 +847,8 @@
     FILO_STOP_TIMER_ALARM: 'filo_stop_timer_alarm', // { id } — silenzia/rimuove un timer che sta suonando
     FILO_GET_NOTIFICATIONS: 'filo_get_notifications',
     FILO_DISMISS_NOTIFICATION: 'filo_dismiss_notification', // { id }
+    // «Installa» sulla carta della versione nuova (#786): scarica, e si installa alla chiusura. {} → { ok } | { ok:false, error }
+    FILO_INSTALLA_AGGIORNAMENTO: 'filo_installa_aggiornamento',
     // Le carte della home (#870), solo pagine filo://. La mossa è quella di SN_CARTE_HOME.applica: la pagina
     // manda il cambio, non la disposizione intera. CAMBIATE va alle pagine di Filo quando la disposizione cambia.
     CARTE_HOME_GET: 'carte_home_get',             // {} → { ok, layout }

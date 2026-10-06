@@ -1382,6 +1382,11 @@
     return MOTIVI_RISPOSTA.includes(String(norm.statusReason || '')) || String(fb.status || '') === 'clarify';
   }
 
+  function istanteDelTurno(ts) {
+    const FT = global.SN_FEEDBACK_THREAD;
+    return (FT && FT.istanteDelMarcatore && FT.istanteDelMarcatore(ts)) || String(ts);
+  }
+
   /** L'ultimo turno di Filo nella conversazione, o null. PURA. */
   function ultimaDomanda(fb) {
     const note = fb && fb.notes;
@@ -1420,7 +1425,8 @@
       if (attesa) {
         return forma('l3', 'rombo', titolo, 'design', 'domande', {
           titolo,
-          righe: (domanda && domanda.ts) ? [riga('Quando', String(domanda.ts))] : [],
+          // Il pannello vuole l'ISO; un marcatore che non si legge passa com'è scritto, piuttosto che sparire.
+          righe: (domanda && domanda.ts) ? [riga('Quando', istanteDelTurno(domanda.ts))] : [],
           testo: (domanda && domanda.body) || L3_ATTESA,
           illeggibile: valueUnreadable(fb && fb.notes),
           azioni: [],
@@ -1631,6 +1637,12 @@
     return l5.esito === 'bloccato' || l5.esito === 'conflitto';
   }
 
+  /** Le pratiche con una fusione ferma davanti, le altre nell'ordine che avevano (`sort` è stabile). PURA. */
+  function fusioniFermeInCima(lista, opts) {
+    const ferma = (fb) => (fusioneInAttesa(fb, opts) ? 1 : 0);
+    return (Array.isArray(lista) ? lista : []).slice().sort((a, b) => ferma(b) - ferma(a));
+  }
+
   /**
    * Le richieste di fusione che NON hanno una segnalazione in questa lista:
    * non hanno una scheda dove vivere, e restano visibili in Automazioni.
@@ -1663,7 +1675,7 @@
     ownerActions, ownerActionFor, ownerActionAllowsStatus, stateBadge,
     classifyReevalResult, reevalErrorHint, REEVAL_WASTE_LIMIT,
     livelli, livelloPer, livelloL1, livelloL2, livelloL3, livelloL4, livelloL5, righeStato,
-    fusioneInAttesa, fusioniSenzaFeedback, richiestaDiQuesto, numeroOf,
+    fusioneInAttesa, fusioniFermeInCima, fusioniSenzaFeedback, richiestaDiQuesto, numeroOf,
     l1MotivoText, LIVELLO_COLORI, L1_MOTIVI,
     aspettaRisposta, ultimaDomanda, TESTO_CIFRATO,
     FRASE_SEGNO_ERRATO, fermatoDalSegno, motivoSegnoText,

@@ -3792,6 +3792,9 @@
     const log = pad.querySelector('[data-chat="log"]');
     const input = pad.querySelector('[data-chat="input"]');
     const sendBtn = pad.querySelector('[data-chat="send"]');
+    // La riga del ripiego sui crediti di Filo (#662) resta sotto la sua risposta finché la
+    // pagina è aperta: è un fatto di quel momento, non entra nel documento.
+    const noteRipiego = new WeakMap();
     const renderLog = () => {
       log.innerHTML = '';
       for (const msg of m.data.messages) {
@@ -3799,6 +3802,13 @@
         b.className = 'ed-chat-msg ' + (msg.role === 'user' ? 'user' : 'assistant');
         b.textContent = msg.content;
         log.appendChild(b);
+        const nota = noteRipiego.get(msg);
+        if (nota) {
+          const n = document.createElement('div');
+          n.className = 'ed-chat-note';
+          n.textContent = nota;
+          log.appendChild(n);
+        }
       }
       log.scrollTop = log.scrollHeight;
     };
@@ -3819,12 +3829,16 @@
       ];
       try {
         const r = await sendMessage({
-          type: MSG.AI_REQUEST, action: ACTIONS.EDITOR_CHAT || 'editor_chat', payload: { messages },
+          type: MSG.AI_REQUEST, action: ACTIONS.EDITOR_CHAT || 'editor_chat', payload: { messages }, diceRipiego: true,
         });
         const raw = (r && r.ok && typeof r.text === 'string') ? r.text : null;
         if (raw == null) {
           thinking.content = 'Errore: ' + ((r && r.error) || 'nessuna risposta');
         } else {
+          if (r.keyFallback && r.keyFallback.line) {
+            noteRipiego.set(thinking, r.keyFallback.line);
+            sendMessage({ type: MSG.KEY_FALLBACK_SHOWN });
+          }
           // Se la risposta contiene azioni di formattazione, applicale al
           // documento e mostra in chat la conferma; altrimenti è testo normale.
           const parsed = parseFormatActions(raw);

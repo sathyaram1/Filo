@@ -80,7 +80,13 @@ nasceva rosso solo per l'owner, per settimane (undici spec così):
   lunga. La cartella temporanea di un test si chiede a `cartellaTemporanea()`
   (`tests/helpers/percorsi.mjs`), che la fa canonica e con uno spazio nel nome per tutti:
   una costruita con `mkdtempSync` prova su un percorso che sulla macchina dell'owner non
-  esiste, e una sentinella lo impedisce.
+  esiste, e una sentinella lo impedisce. La stessa funzione la toglie quando il processo
+  finisce, verde o rosso (lasciate lì erano diventate 17 GB, #717); quelle di un processo
+  ucciso le toglie il lanciatore della corsa dopo, passato un giorno. Quello che nessuna
+  prova chiede (i file che il codice provato o Chromium scrivono nella temporanea per
+  conto loro) finisce nella temporanea della corsa: la crea chi carica quel modulo (i due
+  lanciatori, ma anche un file di prova lanciato da solo), i figli la ereditano e se ne va
+  con lui.
 
 Gli ultimi quattro rossi di quella macchina (#650) presumevano altro:
 
@@ -115,6 +121,17 @@ il rosso ferma le versioni per tutti:
   con EPERM. Si copia.
 
 Sentinella delle due forme: `tests/unit/cartelleTemporanee.test.mjs`.
+
+## Il collegamento simbolico (#742)
+
+Su Windows un collegamento simbolico lo crea solo l'amministratore o chi ha la
+modalità sviluppatore: per tutti gli altri è EPERM. Il cancello di GitHub gira da
+amministratore e lì passa, quindi l'unico posto dove si vede è la macchina
+dell'owner, dove ferma ogni chiusura locale. Una cartella si collega con
+`collegaCartella` (una junction su Windows, che non chiede privilegi); un file non ha
+junction, e `collegaFile` restituisce il motivo da passare a `t.skip` solo su Windows
+e solo per EPERM: altrove il caso gira e un errore resta un errore. Gli script che la
+chiusura esegue passano `'junction'` da sé. Sentinella nello stesso file.
 
 ## La macchina carica (#943)
 

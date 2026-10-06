@@ -45,6 +45,7 @@ require(path.join(SHARED, 'tabColor.js'));
 require(path.join(SHARED, 'tabTriage.js')); // §2.1 — candidati/dedup riordino schede (logica pura)
 require(path.join(SHARED, 'downloadTabs.js')); // #412/#441 — schede usa e getta dei download (logica pura)
 require(path.join(SHARED, 'nomiSito.js')); // #590 — quando un dominio scritto a mano è valido, e come si legge (prima di eseguibili)
+require(path.join(SHARED, 'pagineDelicate.js')); // #1004 — quali pagine non mandano testo ai modelli nei lavori automatici
 require(path.join(SHARED, 'eseguibili.js')); // #588 — quali file il sistema ESEGUE (logica pura)
 require(path.join(SHARED, 'nomiFile.js')); // #950 — nome sensato ai file dell'utente (logica pura)
 // #585 — pulizia e incapsulamento dei percorsi condivisi. Va PRIMA di paths.js
@@ -153,6 +154,7 @@ require(path.join(SVC, 'fxRates.js'));
 require(path.join(SVC, 'statoSistema.js')); // batteria, rete, Bluetooth del computer: SN_SISTEMA_MAIN per lo STATO
 require(path.join(SVC, 'comandiSistema.js')); // #874 volume, Bluetooth e Wi-Fi a comando: SN_COMANDI_SISTEMA
 require(path.join(SVC, 'safebrowse', 'index.js'));
+require(path.join(SVC, 'pagineDelicate.js')); // #1004 — i siti che hanno mostrato un campo password o carta, per la sessione
 require(path.join(SVC, 'geoBlock.js'));
 require(path.join(SVC, 'geoBlockClassifier.js'));
 require(path.join(SVC, 'geoBlockRules.js'));

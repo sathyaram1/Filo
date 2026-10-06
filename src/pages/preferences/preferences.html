@@ -164,6 +164,12 @@
       </div>
       <label for="autoArchiveIdleHours" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Archivia dopo questo periodo di inattività di Filo (ore)</label>
       <input type="number" id="autoArchiveIdleHours" min="1" max="168" step="1" style="width:120px;" />
+      <div class="sn-toggle-row" style="margin-top:12px">
+        <label>
+          <input type="checkbox" id="riassuntoSchede" />
+          <span>Riassumi le schede chiuse, per ritrovarle in Cronologia anche per significato</span>
+        </label>
+      </div>
     </section>
 
     <section>
@@ -300,7 +306,7 @@
 
       <section id="sec-tokens">
         <h2>Aspetto: token estetici</h2>
-        <p class="sn-muted">Tutti i colori, i font e le misure dell'aspetto di Filo, coi loro valori predefiniti. Cambia un valore per personalizzarlo: l'aspetto si aggiorna subito, ovunque (shell, pagine di Filo, menu sulle pagine web). I valori che hai modificato sono <strong>evidenziati</strong>; con <span aria-hidden="true">↺</span> riporti il singolo token al predefinito. I colori si scrivono come <code>#rrggbb</code> o <code>rgb(...)</code>; le misure come <code>6px</code>; le opacità come numero fra 0 e 1.</p>
+        <p class="sn-muted">Tutti i colori, i font e le misure dell'aspetto di Filo, coi loro valori predefiniti. Cambia un valore per personalizzarlo: l'aspetto si aggiorna subito, ovunque (shell, pagine di Filo, menu sulle pagine web). I valori che hai modificato sono <strong>evidenziati</strong>; con <span aria-hidden="true">↺</span> riporti il singolo token al predefinito. I colori si scrivono come <code>#rrggbb</code> o <code>rgb(...)</code>; le misure come <code>6px</code>; le opacità come numero fra 0 e 1; le durate come <code>450ms</code>.</p>
         <div class="sn-token-code" id="tokenCode" role="group" aria-label="Token estetici"></div>
         <div class="sn-row" style="margin-top:12px;">
           <button class="sn-btn sn-btn-secondary" id="resetAllTokens" type="button">Ripristina tutti i predefiniti</button>
@@ -315,6 +321,17 @@
         <div class="sn-row" style="margin-top:12px;">
           <button class="sn-btn sn-btn-secondary" id="resetAllTabColor" type="button">Ripristina tutti i predefiniti</button>
           <span id="tabColorSavedHint" class="sn-saved-indicator">Salvato</span>
+        </div>
+      </section>
+
+      <section id="sec-aggiornamenti">
+        <h2>Aggiornamenti</h2>
+        <p class="sn-muted">A ogni avvio Filo controlla se c'è una versione nuova, la scarica e la installa quando lo chiudi. Se togli la spunta ti avvisa nella home e aspetta che premi «Installa». Fino ad allora restano aperti anche i problemi di sicurezza già corretti nella versione nuova.</p>
+        <div class="sn-toggle-row">
+          <label>
+            <input type="checkbox" id="aggiornamentiAutomatici" />
+            <span>Installa gli aggiornamenti da solo</span>
+          </label>
         </div>
       </section>
 

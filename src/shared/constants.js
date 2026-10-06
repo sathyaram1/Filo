@@ -127,6 +127,11 @@
     // true dopo il primo comando che Filo propone o esegue in chat: la frase che
     // spiega il terminale si dice una volta sola, anche dopo un riavvio (#892).
     FILO_TERMINALE_SPIEGATO: 'filo_terminale_spiegato',
+    // I siti (dominio registrabile) dove Filo ha visto un campo password o carta: restano delicati anche dopo un
+    // riavvio, quando la scheda riaperta è già dentro l'area riservata e il campo non c'è più (#1004).
+    SITI_CON_CAMPI: 'filo_siti_con_campi',
+    // { versione } su cui l'utente ha premuto «Installa» da spento (#786): vale anche dopo un riavvio a metà scaricamento.
+    AGGIORNAMENTO_CHIESTO: 'filo_aggiornamento_chiesto',
     // Ultima versione di cui l'utente ha visto il recap aggiornamento (popup
     // all'avvio). All'avvio si confronta con app.getVersion(): se è più vecchia
     // e ci sono note (src/shared/patchNotes.js), mostra il recap. Vedi C4.
@@ -2172,11 +2177,13 @@
       `Sei l'assistente di un deck builder per Magic: The Gathering, formato Commander. L'utente ti scrive in una chat che è anche la barra di ricerca carte.\n` +
       `Le regole valgono sempre; il mazzo su cui state lavorando è in fondo, dopo le regole.\n\n` +
       `Decidi la natura del messaggio e rispondi con UN SOLO JSON valido (niente markdown, niente \`\`\`):\n` +
-      `{"reply": "<testo breve in italiano, opzionale>", "query": "<query Scryfall, opzionale>", "filter": "<criterio in italiano, opzionale>", "cards": ["<scryfall_id>", ...] (opzionale), "budget": <numero | null> (opzionale), "prob": {"turn": <N>, "needs": {"<categoria>": <quante>}} (opzionale), "evaluate": "deck" | "results" (opzionale), "tagWith": ["<tag>", ...] (opzionale), "import": [{"name": "<nome carta>", "qty": <N>}, ...] (opzionale), "commander": "<nome carta>" (opzionale), "replaceCommander": true (opzionale), "clearChat": true (opzionale)}\n\n` +
+      `{"reply": "<testo breve in italiano, opzionale>", "query": "<query Scryfall, opzionale>", "filter": "<criterio in italiano, opzionale>", "title": "<titolo della lista in italiano, opzionale>", "sort": "cmc" | "name" | "price" (opzionale), "cards": ["<scryfall_id>", ...] (opzionale), "budget": <numero | null> (opzionale), "prob": {"turn": <N>, "needs": {"<categoria>": <quante>}} (opzionale), "evaluate": "deck" | "results" (opzionale), "tagWith": ["<tag>", ...] (opzionale), "import": [{"name": "<nome carta>", "qty": <N>}, ...] (opzionale), "commander": "<nome carta>" (opzionale), "replaceCommander": true (opzionale), "clearChat": true (opzionale)}\n\n` +
       `Regole:\n` +
       `- RICERCA (query secca o frase che chiede carte): produci "query" in sintassi Scryfall (termini in inglese: o:, t:, cmc, kw:, ecc.). NON aggiungere vincoli di color identity (id/id<=): li aggiunge il sistema automaticamente. "reply" può restare vuota o contenere UNA frase di contesto. La ricerca la ESEGUE IL SISTEMA con la tua query: hai quindi pieno accesso al database delle carte — non dire mai il contrario. Anche cercare un commander da zero ("un commander izzet che costa 4 e crea elementali") è una RICERCA: query con is:commander e i vincoli richiesti (per i colori del commander cercato usa id:, es. is:commander id:UR).\n` +
       `- QUERY LARGA: quando la richiesta è concettuale/fuzzy (un EFFETTO, un TEMA, un RUOLO descritti a parole — es. "carte che fanno tornare creature dal cimitero", "pedine che si moltiplicano", "protezione per il commander"), NON restringere troppo la query: scrivi una query VOLUTAMENTE LARGA e generosa, includendo SINONIMI e formulazioni alternative del testo Oracle in OR (usa la sintassi "(o:parola1 or o:parola2 or o:parola3)"), così non perdi carte scritte con parole diverse.\n` +
       `- FILTRO: ogni RICERCA chiesta a parole ha SEMPRE anche "filter", una frase in italiano che descrive CON PRECISIONE cosa deve essere o fare la carta per andare bene, con tutti i vincoli della richiesta (anche quelli dei messaggi precedenti che la richiesta riprende). Un secondo modello giudica i risultati carta per carta con "filter" e mostra solo quelli che lo rispettano. Descrivi la FUNZIONE, non la parola: "carte che danno haste" è "fa guadagnare haste ad altre creature", non "ha haste". Ometti "filter" SOLO quando il messaggio è scritto tutto in sintassi Scryfall (es. "t:dragon cmc<=3"): lì la query è già la richiesta esatta.\n` +
+      `- TITOLO: quando la risposta porta carte da mostrare ("query", "cards" o "import"), metti in "title" il titolo della lista: poche parole in italiano (al massimo sei o sette) che dicono a chi legge cosa sono quelle carte. Il sistema ci mette davanti da solo quante sono, quindi il titolo NON ha il numero e si legge dopo un numero: es. "carte che danno rapidità", "rimozioni istantanee economiche", "terre che producono mana blu". Mai sintassi Scryfall nel titolo (niente o:, t:, id<=…): chi legge non la conosce.\n` +
+      `- ORDINE: le liste si mostrano per costo di mana. Se l'utente chiede un altro ordine (per prezzo, per nome, di nuovo per costo di mana) metti "sort" ("price", "name" o "cmc"): insieme alla "query" se chiede anche una ricerca ("le più economiche con haste" → query + "sort": "price"); da solo, senza query, se chiede di riordinare la lista appena mostrata ("ordinale per prezzo"), con una frase breve in "reply". Non usare order: nella query.\n` +
       `- SINTASSI ESPLICITA: se il messaggio contiene già sintassi Scryfall (es. "o:haste cmc<=2", "t:dragon"), quelle parti passano INVARIATE nella query; traduci solo l'eventuale parte in linguaggio naturale attorno.\n` +
       `- CROSS-MAZZO ("il ramp di mazzo X", "le terre del mio mazzo Y"): NON fare una query. Seleziona dalla lista dell'altro mazzo le carte pertinenti (usa nomi e tag) e metti i loro scryfall_id in "cards", nell'ordine della lista. In "reply" una frase breve su cosa hai selezionato.\n` +
       `- BUDGET ("budget 40 euro", "metti un tetto di 25€", "togli il budget"): metti in "budget" il numero in euro, oppure null per rimuovere il tetto. Il sistema lo applica e conferma da solo: "reply" può restare vuota.\n` +
@@ -2333,6 +2340,8 @@
     // #950 — nome sensato da solo agli scaricamenti col nome che non dice niente. Spento: il contenuto del file
     // andrebbe a un modello senza che l'utente l'abbia chiesto per quel file.
     nomiSensati: { scaricamenti: false },
+    // #786 — spento, Filo controlla ma non scarica né installa: avvisa in home e aspetta «Installa».
+    aggiornamenti: { automatici: true },
     // Colore identità delle tab (spec "Colore identità delle tab"): i sei
     // parametri che governano come si estrae il colore dal favicon e quanto
     // tinge la tab. La fonte di verità dei default/range/commenti è
@@ -2431,10 +2440,15 @@
       //   non hanno effetto.
       // bannerSites: domini (eTLD+1) dove l'utente ha chiesto di rivedere i
       //   banner dei cookie (menu della scheda): lì Filo non rifiuta e non nasconde.
+      // loggedSites: domini (eTLD+1) dove Filo ha VISTO un accesso (pagina di
+      //   accesso del dominio + un cookie di sessione nuovo suo): in 'default' i
+      //   cookie di questi domini restano anche quando compaiono incorporati in
+      //   un'altra pagina (#758). Lo scrive Filo, l'utente lo corregge in Sicurezza.
       cookies: {
         mode: 'default',
         trustedSites: [],
         bannerSites: [],
+        loggedSites: [],
         // Il testo lasciato nella casella dei siti fidati che non è un dominio: torna lì con l'avviso.
         bozza: '',
       },
@@ -2492,6 +2506,15 @@
         trustedSites: [],
         righeScartate: [],
       },
+      // #1004 — le pagine delicate (posta, banche, sanità, quelle che hanno mostrato un campo password o carta, e
+      // `siti` scritti dall'utente) non mandano testo ai modelli nei lavori automatici. Regola: src/shared/pagineDelicate.js.
+      pagineDelicate: {
+        enabled: true,
+        siti: [],
+        righeScartate: [],
+        // Tolti in Sicurezza fra i siti che Filo ha segnato per un campo password o carta: valgono solo per quel motivo.
+        nonDelicati: [],
+      },
     },
     // Modalità terminale: Filo risponde con un comando a «quanto spazio ho sul
     // disco?», e nella home un `/comando` va alla shell. Accesa di serie (#892):
@@ -2531,6 +2554,9 @@
       idleHours: 6,
       onClose: true,
     },
+    // #1004 — riassunto e indice delle schede chiuse, per ritrovarle nella Cronologia per significato. Spento, di una
+    // scheda che si chiude non parte niente verso i modelli: la si ritrova per parole.
+    riassuntoSchede: { enabled: true },
     // Suoneria del timer: suono riprodotto alla scadenza finché l'utente non
     // preme "Ferma". Generato via WebAudio API (nessun file audio esterno).
     // Valori: 'default' | 'gentle' | 'urgent' | 'chime'

@@ -189,6 +189,28 @@
       css: '--sn-selection-opacity',
       default: { light: '0.25', dark: '0.35' },
     },
+    // Il filo dell'attesa in chat (#578): le sue gemelle --dash-* hanno il predefinito in dashboard.css.
+    'filo.trama.opacity': {
+      label: 'Opacità del ragionamento che scorre in chat',
+      type: 'opacity',
+      css: '--sn-filo-trama-opacity',
+      dashCss: ['--dash-trama-opacity'],
+      default: '0.5',
+    },
+    'filo.nodo.durata': {
+      label: 'Durata del nodo che si stringe in chat',
+      type: 'time',
+      css: '--sn-filo-nodo',
+      dashCss: ['--dash-filo-nodo'],
+      default: '450ms',
+    },
+    'filo.gomitolo.durata': {
+      label: 'Durata del filo che si avvolge in gomitolo',
+      type: 'time',
+      css: '--sn-filo-gomitolo',
+      dashCss: ['--dash-filo-gomitolo'],
+      default: '850ms',
+    },
   };
 
   function names() { return Object.keys(TOKENS); }
@@ -201,6 +223,8 @@
   // Font: lista di famiglie, solo caratteri "da nome font" (lettere, numeri,
   // spazi, trattini, virgole, apici). Niente ';', '}', '(' ecc.
   const RE_FONT = /^[\w\s,'"-]{1,200}$/;
+  // Durate: millisecondi interi o secondi, fino a dieci secondi. Zero spegne l'animazione.
+  const RE_TIME = /^(\d{1,5})ms$|^(\d{1,2}(?:\.\d{1,3})?)s$/;
 
   function validate(name, value) {
     const t = TOKENS[name];
@@ -216,6 +240,12 @@
       }
       case 'size': return RE_SIZE.test(v);
       case 'font': return RE_FONT.test(v);
+      case 'time': {
+        const m = v.match(RE_TIME);
+        if (!m) return false;
+        const ms = m[1] !== undefined ? Number(m[1]) : Number(m[2]) * 1000;
+        return ms >= 0 && ms <= 10000;
+      }
       default: return false;
     }
   }
