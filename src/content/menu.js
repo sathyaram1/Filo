@@ -80,12 +80,15 @@
       }
       const cs = getComputedStyle(radice);
       if (cs.visibility !== 'visible' || cs.display === 'none' || Number(cs.opacity) < 0.95 || (cs.filter && cs.filter !== 'none')) return false;
-      let alto = false;
-      try { alto = radice.matches(':popover-open'); } catch (_) {}
-      if (alto) return true;
-      for (let n = radice.parentElement; n && n.nodeType === 1; n = n.parentElement) {
-        const c = getComputedStyle(n);
-        if (Number(c.opacity) < 0.95 || (c.filter && c.filter !== 'none')) return false;
+      // Dallo strato alto in su gli antenati della pagina non si vedono più: lì il controllo si ferma.
+      for (let n = radice; n && n.nodeType === 1; n = n.parentElement) {
+        if (n !== radice) {
+          const c = getComputedStyle(n);
+          if (Number(c.opacity) < 0.95 || (c.filter && c.filter !== 'none')) return false;
+        }
+        let alto = false;
+        try { alto = n.matches(':popover-open'); } catch (_) {}
+        if (alto) return true;
       }
       return true;
     } catch (_) { return false; }
