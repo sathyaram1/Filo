@@ -91,14 +91,12 @@
     return `${m.chat}|${m.ts}`;
   }
 
-  // `prima`: il messaggio che precede nel blocco. L'ora sta sui messaggi dell'utente; su quelli di Filo solo quando
-  // aprono un tratto di un'altra conversazione, così il modello non impara a scriverla nelle sue risposte.
+  // `prima`: il messaggio che precede nel blocco. Ora e conversazione stanno sui messaggi dell'utente; su quelli di
+  // Filo solo quando aprono un tratto di un'altra conversazione, così il modello non impara a scriverle nelle risposte.
   function rendi(m, prima, { tetto, esito, osserva }) {
     const cambia = !prima || prima.chat !== m.chat;
     const testo = tienilo(m.text, tetto);
-    if (m.role === 'user') {
-      return { role: 'user', content: `${intestazione(m.ts, cambia || true ? m.chat : null)} ${testo}`.trim() };
-    }
+    if (m.role === 'user') return { role: 'user', content: `${intestazione(m.ts, m.chat)} ${testo}`.trim() };
     const parti = [];
     if (cambia) parti.push(intestazione(m.ts, m.chat));
     if (testo.trim()) parti.push(testo);
@@ -106,8 +104,7 @@
     const oss = esito && Array.isArray(esito.azioni) && esito.azioni.length && typeof osserva === 'function' ? osserva(esito.azioni) : '';
     if (oss) parti.push(oss);
     else if (tipi.length) parti.push(`(azioni di questo turno: ${tipi.join(', ')})`);
-    const msg = { role: 'assistant', content: parti.join('\n\n') || '(nessun testo)' };
-    return msg;
+    return { role: 'assistant', content: parti.join('\n\n') || '(nessun testo)' };
   }
 
   // Il tratto del filo che il modello ha davanti. `messaggi` è tutto il filo in ordine di tempo, senza la domanda di
