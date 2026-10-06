@@ -1368,6 +1368,15 @@ function ricordaLettoInChat(azioni, storia = []) {
   }
 }
 
+// Le azioni hanno portato nel contesto testo che non ha scritto né l'utente né Filo: un file, un documento, l'esito
+// di un comando, una ricerca, una chat archiviata. Senza il modulo che lo sa dire, si assume di sì.
+function testoDiAltriNelleAzioni(azioni) {
+  const Exfil = globalThis.SN_URL_EXFIL;
+  if (!Exfil) return true;
+  const c = Exfil.contestoDaAzioni(azioni);
+  return c.nonFidato || !!String(c.letto || '').trim();
+}
+
 function lettiDallAiuto(sender) {
   const reg = sender?.wc ? LETTI_DALL_AIUTO.get(sender.wc) : null;
   return reg ? reg.tutti() : [];
@@ -1606,7 +1615,7 @@ async function executeFiloAction(action, opzioni = {}) {
   return res;
 }
 
-async function eseguiAzioneFilo(action, { confirmed = false, sender = null, contesto = null, assistente = false, parole = '', avanzamento = null, chatId = null } = {}) {
+async function eseguiAzioneFilo(action, { confirmed = false, sender = null, contesto = null, assistente = false, parole = '', avanzamento = null, chatId = null, accoglienza = false } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
   // Da un sito (anche via una chat aperta da lì) passano solo le azioni della
@@ -1634,6 +1643,13 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
   // non chiede conferma per poi non fare niente: lo si sa prima del gate, mai dall'LLM (#949).
   if (type === 'IMPOSTA_PREFERENZA') {
     delete action._invariato;
+    // Mai dal modello né da una conferma: lo scrive solo un turno dell'intervista di benvenuto (#592.2).
+    delete action._accoglienza;
+    try {
+      const setter = global.SN_PREF.setterDellaChiave(action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza);
+      if (accoglienza && !confirmed && !assistente && setter && setter.scrive.includes('agentStyle')
+        && !testoDiAltriNelleAzioni(contesto)) action._accoglienza = true;
+    } catch (_) {}
     // «Questo sito», «scheda: <titolo>» fra i siti delicati: la chat vede i titoli delle schede, non gli indirizzi (#1004).
     try {
       const chiave = action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza;
@@ -2111,7 +2127,8 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         }
         await applySettingsUpdate(partial);
         // Il nome leggibile serve alla riga della chat quando il valore era già quello (niente evento).
-        return { executed: true, kept: true, output: { etichetta: built.label } };
+        const stile = globalThis.SN_ACTION_LEVELS.stileDellAccoglienza(action);
+        return { executed: true, kept: true, output: { etichetta: built.label, ...(stile ? { stile } : {}) } };
       }
       case 'IMPOSTA_ESTETICA': {
         // Filo cambia un token estetico (colore/font/raggio/opacità) su
@@ -3558,7 +3575,7 @@ function fermaFiloChat(reqId, wc) {
 }
 
 // `daModello`: il messaggio l'ha scritto un modello (un suggerimento della home), anche se parte dalla casella dell'utente.
-async function handleFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, daModello = false, chatId = null, sender = null }) {
+async function handleFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, daModello = false, daFuori = false, chatId = null, sender = null }) {
   await FiloMem.touchSession();
   await FiloMem.appendRaw({ type: 'chat_user', summary: String(userMessage || '').slice(0, 200) });
   // #524 — l'intervista di benvenuto si legge PRIMA di qualsiasi altra cosa,
@@ -3597,9 +3614,13 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // che chi chiude la finestra a metà la ritrova dov'era. I turni interni (i
   // nudge di prosecuzione automatica) non sono parole dell'utente e non entrano;
   // lo stesso messaggio ripetuto di fila non è un turno nuovo (appendTurn).
+  // Il messaggio porta testo che l'utente non ha scritto lui: incollato o trascinato (lo dice la scheda), un'immagine,
+  // il suggerimento di un modello.
+  const messaggioDaFuori = !internal && (daFuori === true || daModello === true
+    || (Array.isArray(images) && images.length > 0) || !!image);
   if (onbActive && !internal && String(userMessage || '').trim()) {
     onbBefore = await saveOnboarding(
-      Onboarding.appendTurn(onbBefore, { role: 'user', text: String(userMessage) }),
+      Onboarding.appendTurn(onbBefore, { role: 'user', text: String(userMessage), ...(messaggioDaFuori ? { daFuori: true } : {}) }),
     );
   }
   // «Riprendi» toglie il segno dello stop: da qui il turno è di nuovo in corso, e se la scheda muore riparte come gli altri.
@@ -3639,6 +3660,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // chat normale: nessuna schermata a passi, nessun modulo.
   const onboardingText = onbActive ? Onboarding.renderChecklistForPrompt(onbBefore) : '';
   const cleanHistory = Array.isArray(threadHistory) ? threadHistory.slice(-20) : [];
+  // #592.2 — nell'intervista di benvenuto lo stile proposto si imposta senza riquadro finché nella conversazione non
+  // è entrato testo di altri; quello letto dalle azioni lo guarda executeFiloAction.
+  const accoglienza = onbActive && !messaggioDaFuori && !Onboarding.haTestoDiAltri(onbBefore)
+    && !cleanHistory.some((m) => m && (m.daFuori === true || m.daModello === true));
   // Re-immissione dell'output dei comandi nel contesto del modello: l'output di
   // un ESEGUI_COMANDO eseguito in un turno precedente viene accodato al
   // messaggio dell'assistente, così nei turni successivi il modello SA davvero
@@ -3834,7 +3859,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       const avvia = (a) => (a._argsError
         ? Promise.resolve({ executed: false, kept: false, rejected: true, error: a._argsError })
         : executeFiloAction(a, {
-          sender, contesto: azioniViste, parole: paroleUtente, chatId,
+          sender, contesto: azioniViste, parole: paroleUtente, chatId, accoglienza,
           // Le azioni lunghe dicono a che punto sono: la riga d'attesa le conta.
           avanzamento: canPush ? (fatti, totali) => push('filo:action', {
             kind: 'progress', type: String(a.type || '').toUpperCase(), callId: a._callId || '', fatti, totali,
@@ -4019,7 +4044,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   if (onbActive) {
     let after = await FiloMem.getOnboarding();
     if (textReply && textReply !== '(vuoto)') {
-      after = Onboarding.appendTurn(after, { role: 'filo', text: textReply });
+      after = Onboarding.appendTurn(after, { role: 'filo', text: textReply, ...(testoDiAltriNelleAzioni(renderedActions) ? { daFuori: true } : {}) });
     }
     if (!after.done && Onboarding.shouldForceClose(after)) after = Onboarding.close(after);
     await saveOnboarding(after);
