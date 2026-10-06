@@ -4,7 +4,7 @@
 
 'use strict';
 
-function pageHints(doc) {
+function pageHints(doc, opz) {
   const PASSWORD = /pass ?word|passwort|contrase[ñn]a|mot de passe|\bsenha\b|parola d.ordine|passcode|\bpin\b/i;
   const CARTA = new RegExp(['carta di (credito|debito)', 'numero (della |di )?carta', 'credit ?card', 'debit ?card',
     'card ?number', 'n[uú]mero de (la )?tarjeta', 'tarjeta de (cr[eé]dito|d[eé]bito)', 'num[eé]ro de (la )?carte',
@@ -25,14 +25,15 @@ function pageHints(doc) {
     return parti.filter(Boolean).join(' ');
   };
   // Mostrato = l'utente lo vede, o lo vede scorrendo la pagina: un modulo di accesso tenuto pronto e nascosto non rende
-  // delicato un sito (#1004) né un sosia (#728), comunque lo si nasconda. Una regola sola: un pezzo del campo resta
-  // dopo i ritagli di tutti i contenitori e dello schermo raggiungibile, e né lui né un contenitore è trasparente.
+  // delicato un sito (#1004) né un sosia (#728), comunque lo si nasconda. Dove il campo cade nello schermo lo dice il
+  // motore (si chiede cosa c'è in quel punto: ritagli di ogni forma inclusi); fuori dallo schermo, le misure dei
+  // contenitori. Un riquadro conta se è mostrato anche il riquadro nella pagina che lo contiene.
   // Senza motore di disegno (un documento finto) non si sa, e vale mostrato.
-  const mostrato = (el) => {
+  const mostratoIn = (el, d, profondita) => {
     try {
       if (!el || typeof el.getClientRects !== 'function') return true;
       if (!el.getClientRects().length) return false;
-      const w = doc.defaultView;
+      const w = d.defaultView;
       const stile = (n) => (w && w.getComputedStyle ? w.getComputedStyle(n) : null);
       if (typeof el.checkVisibility === 'function'
         && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true, contentVisibilityAuto: true })) return false;
@@ -44,11 +45,11 @@ function pageHints(doc) {
       // Si sale lungo l'albero disegnato (anche fuori dai componenti incapsulati): ritaglia solo il contenitore che fa
       // da riferimento alla posizione del campo, come fa il motore.
       let pos = (st && st.position) || 'static';
-      const radice = doc.documentElement;
+      const radice = d.documentElement;
       for (let n = el; n && pos !== 'fixed';) {
         const rn = n.getRootNode ? n.getRootNode() : null;
         const p = n.assignedSlot || n.parentElement || (rn && rn.host) || null;
-        if (!p || p === radice || p === doc.body) break;
+        if (!p || p === radice || p === d.body) break;
         const sp = stile(p);
         n = p;
         if (!sp) continue;
@@ -57,13 +58,13 @@ function pageHints(doc) {
         pos = sp.position || 'static';
         if (/hidden|clip|scroll|auto/.test(`${sp.overflowX} ${sp.overflowY}`) || (sp.clip && sp.clip.startsWith('rect('))) ritaglia(p.getBoundingClientRect());
       }
+      const vw = w && typeof w.innerWidth === 'number' ? w.innerWidth : 0;
+      const vh = w && typeof w.innerHeight === 'number' ? w.innerHeight : 0;
       if (w && typeof w.innerWidth === 'number') {
-        const vw = w.innerWidth;
-        const vh = w.innerHeight;
         if (pos === 'fixed') ritaglia({ left: 0, top: 0, right: vw, bottom: vh });
         else {
           // Sotto la piega si arriva scorrendo; oltre un bordo che non scorre no.
-          const sr = [stile(radice), doc.body && stile(doc.body)].filter(Boolean);
+          const sr = [stile(radice), d.body && stile(d.body)].filter(Boolean);
           const ferma = (asse) => sr.some((s) => /hidden|clip/.test(s[asse]));
           const sx = w.scrollX || 0;
           const sy = w.scrollY || 0;
@@ -78,13 +79,34 @@ function pageHints(doc) {
         const sy = (w && w.scrollY) || 0;
         ritaglia({ left: -sx, top: -sy, right: Infinity, bottom: Infinity });
       }
-      return x1 - x0 >= 2 && y1 - y0 >= 2;
+      if (!(x1 - x0 >= 2 && y1 - y0 >= 2)) return false;
+      // La parte che cade nello schermo: c'è il campo, in quel punto, per il motore?
+      const sx0 = Math.max(x0, 0); const sy0 = Math.max(y0, 0);
+      const sx1 = Math.min(x1, vw); const sy1 = Math.min(y1, vh);
+      const rp = el.getRootNode ? el.getRootNode() : d;
+      const sonda = rp && typeof rp.elementsFromPoint === 'function' ? rp : (typeof d.elementsFromPoint === 'function' ? d : null);
+      // Un campo che non prende il puntatore il motore non lo trova in nessun punto: lì valgono le misure.
+      if (sonda && sx1 - sx0 >= 2 && sy1 - sy0 >= 2 && !(st && st.pointerEvents === 'none')) {
+        const mx = (sx0 + sx1) / 2; const my = (sy0 + sy1) / 2;
+        const punti = [[mx, my], [sx0 + 1, sy0 + 1], [sx1 - 1, sy0 + 1], [sx0 + 1, sy1 - 1], [sx1 - 1, sy1 - 1]];
+        if (!punti.some(([px, py]) => { try { return sonda.elementsFromPoint(px, py).includes(el); } catch (_) { return true; } })) return false;
+      }
+      // Il riquadro che contiene questo documento, nella pagina sopra (se la si può guardare).
+      let fe = null;
+      try { fe = w && w.frameElement; } catch (_) { fe = null; }
+      if (fe && fe.ownerDocument && (profondita || 0) < 10) return mostratoIn(fe, fe.ownerDocument, (profondita || 0) + 1);
+      return true;
     } catch (_) { return true; }
   };
-  // Un modulo dentro un componente incapsulato (shadow DOM aperto) è un modulo della pagina come gli altri.
-  const radici = [doc];
-  // Quelli chiusi li elenca la pagina stessa, nel suo mondo (vedi page-preload).
-  try { for (const r of (doc.defaultView && doc.defaultView[Symbol.for('filo.ombreChiuse')]) || []) radici.push(r); } catch (_) {}
+  // opz.mostrati raccoglie i campi mostrati per chi deve guardarli ancora (un riquadro di un altro sito).
+  const mostrato = (tipo) => (el) => {
+    const si = mostratoIn(el, doc, 0);
+    if (si && opz && Array.isArray(opz.mostrati)) opz.mostrati.push({ el, tipo });
+    return si;
+  };
+  // Un modulo dentro un componente incapsulato (shadow DOM aperto) è un modulo della pagina come gli altri. Quelli
+  // chiusi nessuno script li vede: li passa il main, che li trova col protocollo di debug (opz.radici).
+  const radici = opz && Array.isArray(opz.radici) ? opz.radici.slice() : [doc];
   for (let i = 0; i < radici.length; i++) {
     try { for (const el of radici[i].querySelectorAll('*')) if (el.shadowRoot) radici.push(el.shadowRoot); } catch (_) {}
   }
@@ -96,8 +118,8 @@ function pageHints(doc) {
   const almenoUno = (sel) => radici.some((r) => { try { return !!r.querySelector(sel); } catch (_) { return false; } });
   let hasPassword = almenoUno('input[type="password"]');
   let hasPayment = almenoUno(PAGAMENTO);
-  let shownPassword = hasPassword && tutti('input[type="password"]').some(mostrato);
-  let shownPayment = hasPayment && tutti(PAGAMENTO).some(mostrato);
+  let shownPassword = hasPassword && tutti('input[type="password"]').some(mostrato('pw'));
+  let shownPayment = hasPayment && tutti(PAGAMENTO).some(mostrato('carta'));
   if (!shownPassword || !shownPayment) {
     try {
       for (const el of tutti(CAMPI)) {
@@ -107,7 +129,7 @@ function pageHints(doc) {
         if (pw) hasPassword = true;
         if (carta) hasPayment = true;
         if ((pw && !shownPassword) || (carta && !shownPayment)) {
-          const si = mostrato(el);
+          const si = mostrato(pw ? 'pw' : 'carta')(el);
           if (pw && si) shownPassword = true;
           if (carta && si) shownPayment = true;
         }

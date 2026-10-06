@@ -1090,3 +1090,68 @@ test('sosia di un marchio corto col modulo d\'accesso in un componente incapsula
   await openTab('https://paypak.com/');
   await expect.poll(() => livelloScheda(app, 'paypak.com', 1000), { timeout: 12_000 }).toBe('pericoloso');
 });
+
+// #728 — a schermo lo dice il motore, non un elenco di trucchi: un ritaglio di qualunque forma, o la pagina che nasconde
+// il riquadro col modulo (dello stesso sito o di un altro), lasciano il sito vero al popup.
+const NASCOSTI_DAL_MOTORE_728 = {
+  'tendina ritagliata (clip-path)': `<div style="clip-path:inset(0 0 100% 0);position:absolute;top:60px;right:0">${ACCESSO}</div>`,
+  'riquadro dello stesso sito in una tendina trasparente':
+    '<div style="opacity:0;position:absolute;top:60px;right:0"><iframe src="/login" width="400" height="200"></iframe></div>',
+  'riquadro di un altro sito in una tendina trasparente':
+    '<div style="opacity:0;position:absolute;top:60px;right:0"><iframe src="https://accesso-posta.net/login" width="400" height="200"></iframe></div>',
+};
+for (const [modo, corpo] of Object.entries(NASCOSTI_DAL_MOTORE_728)) {
+  test(`parola comune vicina a un marchio, modulo d'accesso nascosto (${modo}): popup, non il blocco (#728)`, async ({ app, openTab }) => {
+    await serviSenzaRete(app, {
+      'email.com/login': `<!doctype html><body>${ACCESSO}</body>`,
+      'accesso-posta.net/login': `<!doctype html><body>${ACCESSO}</body>`,
+      'email.com': `<h1>Posta gratuita</h1><button>Accedi</button>${corpo}`,
+    });
+    await openTab('https://email.com/');
+    expect(await livelloScheda(app, 'email.com', 12_000)).toBe('sospetto');
+    await new Promise((r) => setTimeout(r, 5000));
+    expect(await livelloScheda(app, 'email.com', 1000)).toBe('sospetto');
+  });
+}
+
+test('sosia di un marchio corto col modulo d\'accesso nel riquadro di un altro sito, a schermo: blocco (#728)', async ({ app, openTab }) => {
+  await serviSenzaRete(app, {
+    'accesso-posta.net/login': `<!doctype html><body>${ACCESSO}</body>`,
+    'paypak.com': '<h1>PayPal</h1><iframe src="https://accesso-posta.net/login" width="400" height="200"></iframe>',
+  });
+  await openTab('https://paypak.com/');
+  await expect.poll(() => livelloScheda(app, 'paypak.com', 1000), { timeout: 12_000 }).toBe('pericoloso');
+});
+
+const CHIUSI_728 = {
+  'scritto nell\'HTML': `<div><template shadowrootmode="closed">${ACCESSO}</template></div>`,
+  'dentro un riquadro della pagina': '<iframe src="/inner" width="400" height="200"></iframe>',
+};
+for (const [modo, corpo] of Object.entries(CHIUSI_728)) {
+  test(`sosia di un marchio corto col modulo in un componente chiuso ${modo}: blocco (#728)`, async ({ app, openTab }) => {
+    await serviSenzaRete(app, {
+      'paypak.com/inner': '<!doctype html><body><div id="h"></div><script>document.getElementById("h")'
+        + `.attachShadow({mode:"closed"}).innerHTML = ${JSON.stringify(ACCESSO)};</script></body>`,
+      'paypak.com': `<h1>PayPal</h1>${corpo}`,
+    });
+    await openTab('https://paypak.com/');
+    await expect.poll(() => livelloScheda(app, 'paypak.com', 1000), { timeout: 12_000 }).toBe('pericoloso');
+  });
+}
+
+test('i componenti chiusi di una pagina restano chiusi ai suoi script: Filo non li espone (#728)', async ({ app, openTab }) => {
+  await serviSenzaRete(app, {
+    'esempio-negozio.com': '<div id="h"></div><script>document.getElementById("h").attachShadow({mode:"closed"})'
+      + '.innerHTML = "<input id=segreto value=123>";</script>',
+  });
+  const page = await openTab('https://esempio-negozio.com/');
+  await page.waitForLoadState('load');
+  const letto = await page.evaluate(() => {
+    const cerca = (lista) => { for (const r of lista || []) { try { const el = r.querySelector('#segreto'); if (el) return el.value; } catch (_) {} } return null; };
+    for (const k of [...Object.getOwnPropertySymbols(window), ...Object.getOwnPropertyNames(window)]) {
+      try { const v = window[k]; if (Array.isArray(v) || (v && typeof v[Symbol.iterator] === 'function' && typeof v !== 'string')) { const x = cerca(v); if (x) return x; } } catch (_) {}
+    }
+    return null;
+  });
+  expect(letto).toBeNull();
+});

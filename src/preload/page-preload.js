@@ -202,32 +202,6 @@ if (!IS_SUBFRAME) try {
   }
 } catch (e) { /* come sopra: mai bloccare il caricamento */ }
 
-// Un modulo d'accesso in un componente incapsulato chiuso la pagina lo mostra, ma nessuno script lo vede (#728): il
-// main lo cerca col giro sui riquadri, che gira nel mondo della pagina e legge l'elenco qui. In ogni riquadro.
-try {
-  const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
-  if (/^(https?|blob):/i.test(loc)) {
-    webFrame.executeJavaScript(`(() => {
-      const K = Symbol.for('filo.ombreChiuse');
-      const orig = Element.prototype.attachShadow;
-      if (typeof orig !== 'function' || Object.prototype.hasOwnProperty.call(window, K)) return;
-      let radici = [];
-      Object.defineProperty(window, K, { get: () => radici.map((r) => r.deref()).filter(Boolean) });
-      const avvolta = { attachShadow(init) {
-        const r = Reflect.apply(orig, this, arguments);
-        if (init && init.mode === 'closed') {
-          radici.push(new WeakRef(r));
-          if (radici.length > 500) radici = radici.filter((x) => x.deref());
-        }
-        return r;
-      } }.attachShadow;
-      const ts = function toString() { return 'function attachShadow() { [native code] }'; };
-      Object.defineProperty(avvolta, 'toString', { value: ts, configurable: true, writable: true });
-      Object.defineProperty(Element.prototype, 'attachShadow', { value: avvolta, configurable: true, writable: true, enumerable: true });
-    })()`, false).catch(() => {});
-  }
-} catch (e) { /* come sopra: mai bloccare il caricamento */ }
-
 // ─── chrome.* shim per i content script ────────────────────────────────────
 //
 // Gira nel preload context (mondo isolato), invisibile alla pagina. I content
