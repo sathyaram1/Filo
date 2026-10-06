@@ -40,6 +40,8 @@
 //   node scripts/owner-feedback.mjs <n|id> --solo-locale    (segno «solo in locale»)
 //   node scripts/owner-feedback.mjs <n|id> --non-locale
 //   node scripts/owner-feedback.mjs <n|id> --serve-locale ["perché"]
+//   node scripts/owner-feedback.mjs <n|id> --aspetta 676,663.2   (attese, stato invariato)
+//   node scripts/owner-feedback.mjs <n|id> --aspetta-niente
 //
 //   <n|id>: il numero del feedback (910, #910, 22.1) o il suo id.
 //   Un segno locale su una pratica chiusa ne toglie la scheda dalla bacheca pubblica: era un lavoro locale.
@@ -747,6 +749,7 @@ if (isMain) {
     console.error('     node scripts/owner-feedback.mjs <numero|id> --frase "riga per chi ha segnalato"   (solo la frase, stato invariato)');
     console.error('     node scripts/owner-feedback.mjs <numero|id> --solo-locale | --non-locale    (segno «solo in locale», stato invariato)');
     console.error('     node scripts/owner-feedback.mjs <numero|id> --serve-locale ["perché"]       (feedback di un utente → Ricevuti, «richiede lavoro locale»)');
+    console.error('     node scripts/owner-feedback.mjs <numero|id> --aspetta 676,663.2 | --aspetta-niente   (attese, stato invariato)');
     console.error(`     status ∈ ${ALLOWED.join(' | ')}`);
   };
   if (argv.includes('--help') || argv.includes('-h')) { uso(); process.exit(0); }
@@ -760,8 +763,8 @@ if (isMain) {
   const { controllaArgomenti, argomentiDaNpm, espandiUguali, opzioneStorpiata } = await import('./lib/argomenti.mjs');
   const OPZ = {
     opzioni: ['--branch', '--reason', '--frase', '--dry-run', '--come-routine', '--starred', '--unstar', '--preapprova', '--chiedi-prima',
-      '--solo-locale', '--non-locale', '--serve-locale'],
-    conValore: ['--branch', '--reason', '--frase'],
+      '--solo-locale', '--non-locale', '--serve-locale', '--aspetta', '--aspetta-niente'],
+    conValore: ['--branch', '--reason', '--frase', '--aspetta'],
   };
   argv = espandiUguali(argv, OPZ.conValore);
   const storpiata = opzioneStorpiata(process.env, OPZ.opzioni);
@@ -797,7 +800,7 @@ if (isMain) {
   // Per POSTO, non per valore: come nello strumento gemello (#565). Prima si
   // toglievano le parole «uguali al valore di un'opzione», e una nota scritta
   // identica alla frase per chi ha segnalato spariva senza dire niente.
-  const CON_VALORE = new Set(['--branch', '--reason', '--frase']);
+  const CON_VALORE = new Set(['--branch', '--reason', '--frase', '--aspetta']);
   const posizionali = [];
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
@@ -819,6 +822,28 @@ if (isMain) {
     const r = await idDelFeedback(riferimento, { bearer });
     if (!r.ok) { console.error(`RIFIUTATO: ${r.motivo} — non ho toccato niente.`); process.exit(3); }
     id = r.id;
+  }
+
+  // Le attese (#903): da sole, senza stato. Il valore di --aspetta è uno solo: «676,663.2» (o fra virgolette, con gli spazi).
+  const attese = ['--aspetta', '--aspetta-niente'].filter((o) => argv.includes(o));
+  if (attese.length) {
+    if (!id) { uso(); process.exit(1); }
+    if (attese.length > 1) { console.error('RIFIUTATO: --aspetta e --aspetta-niente insieme — non ho toccato niente.'); process.exit(1); }
+    if (status || argv.some((a) => ['--solo-locale', '--non-locale', '--serve-locale', '--preapprova', '--chiedi-prima', '--frase', '--starred', '--unstar'].includes(a))) {
+      console.error(`RIFIUTATO: ${attese[0]} va da solo, senza stato né altri segni — non ho toccato niente.`);
+      process.exit(1);
+    }
+    const valore = attese[0] === '--aspetta' ? String(flag('aspetta') || '') : '';
+    if (attese[0] === '--aspetta' && !valore.trim()) { console.error('RIFIUTATO: --aspetta vuole i numeri (--aspetta 676,663.2); per toglierle --aspetta-niente.'); process.exit(1); }
+    const r = await segnaAttese(id, valore, { dryRun, bearer });
+    if (!r.ok) { console.error(`RIFIUTATO: ${r.motivo} — non ho toccato niente.`); process.exit(3); }
+    const elenco = globalThis.SN_FB_ATTESE.testoAttese(r.attese);
+    console.log(r.dryRun
+      ? `[dry-run] ${riferimento}: ${r.attese.length ? `scriverei «aspetta ${elenco}»` : 'toglierei le attese'}, stato invariato`
+      : r.attese.length
+        ? `${riferimento}: aspetta ${elenco}. Nessuna routine lo prende finché non sono tutti fusi; poi entra in coda da solo.`
+        : `${riferimento}: non aspetta più niente.`);
+    process.exit(0);
   }
 
   // Il segno «solo in locale» e il ritorno nei Ricevuti: da soli, senza stato.

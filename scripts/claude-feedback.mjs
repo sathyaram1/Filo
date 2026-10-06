@@ -31,6 +31,7 @@
 //                                                         [--priorita 0..3]
 //                                                         [--url <indirizzo>]
 //                                                         [--allega <file>]…
+//                                                         [--aspetta 676,663.2]
 //                                                         [--dry-run]
 //
 //   `--allega` (ripetibile, al più 5): un documento che viaggia CON il feedback,
@@ -40,6 +41,9 @@
 //   dell'allowlist del gate L0 (md, txt, log, json, csv, tsv, yaml, pdf,
 //   immagini); un tipo diverso è un errore d'uso, non un feedback sospetto.
 //   node scripts/claude-feedback.mjs "<titolo>" -          ← testo da stdin
+//
+//   `--aspetta` (#903): nasce aspettando quei feedback; nessuna routine lo prende finché non sono tutti fusi.
+//   Numeri inesistenti e più di venti si rifiutano prima di aprire.
 //
 // USCITE (distinte apposta: chi lancia lo script deve poter distinguere
 // "non l'ho scritto io male" da "il server non c'è")
@@ -61,7 +65,9 @@ import '../src/shared/feedbackCrypto.js';
 import '../src/shared/feedbackClientIdHash.js';
 import '../src/shared/feedback.js';
 import '../src/shared/feedbackStatus.js';
+import '../src/shared/feedbackAttese.js';
 import './lib/freno-letture.mjs';
+import { risolviFeedback } from './lib/pratica-locale.mjs';
 import { isRoutineInstance } from './lib/routine-role.mjs';
 
 const THREAD = globalThis.SN_FEEDBACK_THREAD;
@@ -175,14 +181,14 @@ export function parsePriorita(raw) {
  * numerazione non risponde il feedback parte lo stesso, senza numero), quindi
  * qui può tornare null senza che sia un errore.
  */
-export async function apri({ titolo, testo, url = '', priorita = null, allegati = [], dryRun = false, idToken = '', locale = true } = {}) {
+export async function apri({ titolo, testo, url = '', priorita = null, allegati = [], dryRun = false, idToken = '', locale = true, attese = [] } = {}) {
   const name = String(titolo || '').trim();
   const text = String(testo || '').trim();
   if (!name) return { ok: false, uso: true, motivo: 'titolo mancante' };
   if (!text) return { ok: false, uso: true, motivo: 'testo mancante' };
 
   if (dryRun) {
-    return { ok: true, dryRun: true, id: '', seq: null, clientId: CLIENT_ID, name, priorita, allegati: allegati.length, locale };
+    return { ok: true, dryRun: true, id: '', seq: null, clientId: CLIENT_ID, name, priorita, allegati: allegati.length, locale, attese };
   }
   if (!idToken) {
     return { ok: false, codice: EXIT.RIFIUTATO, motivo: 'manca il token admin: senza la prova del mittente il feedback sarebbe di un utente. Rigenera le credenziali: node scripts/admin-login.mjs' };
@@ -208,6 +214,7 @@ export async function apri({ titolo, testo, url = '', priorita = null, allegati 
       // Nasce col documento: il server alla nascita la vede e non la fa decidere al giudice (#914).
       ...(Number.isInteger(priorita) ? { priority: priorita } : {}),
       ...(locale ? { localOnly: { by: CLIENT_ID, at: Date.now() } } : {}),
+      ...(Array.isArray(attese) && attese.length ? { waitsFor: attese } : {}),
     });
   } catch (e) {
     return { ok: false, motivo: String((e && e.message) || e), codice: exitCodeForError(e) };
@@ -218,7 +225,7 @@ export async function apri({ titolo, testo, url = '', priorita = null, allegati 
   const caricati = ((res && res.files) || []).length + ((res && res.images) || []).length;
   return {
     ok: true, id: res.id, seq: res.seq, clientId: CLIENT_ID, name, allegati: caricati, falliti,
-    senderProof: (res && res.senderProof) || '', locale: !!(res && res.localOnly),
+    senderProof: (res && res.senderProof) || '', locale: !!(res && res.localOnly), attese,
     priorita: Number.isInteger(priorita) && res && res.senderProof === 'admin' ? priorita : null,
   };
 }
@@ -237,6 +244,29 @@ export const credenziale = {
     } catch (e) {
       return { idToken: '', motivo: String((e && e.message) || e) };
     }
+  },
+};
+
+/**
+ * I numeri di `--aspetta` → [{ id, num }], con le regole di Gestione (SN_FB_ATTESE.valida): un feedback che nasce non
+ * può aspettare sé stesso né chiudere un giro, quindi restano i numeri inesistenti e il tetto. Oggetto: i test lo sostituiscono.
+ */
+export const attese = {
+  async risolvi(testo, idToken) {
+    const ATT = globalThis.SN_FB_ATTESE;
+    const letti = ATT.leggiNumeri(testo);
+    if (!letti.ok || !letti.numeri.length) return letti.ok ? { ok: true, attese: [] } : letti;
+    const { FIRESTORE_BASE } = await import('./lib/firestore-auth.mjs');
+    return ATT.valida({
+      id: '', numeri: letti.numeri,
+      risolvi: async (n) => {
+        const r = await risolviFeedback(n, { bearer: idToken, base: FIRESTORE_BASE });
+        if (r.ok) return r.id;
+        if (/^nessun feedback/.test(r.motivo)) return null;
+        throw new Error(r.motivo);
+      },
+      leggiAttese: async () => new Map(),
+    });
   },
 };
 
@@ -268,7 +298,7 @@ export const ambiente = {
 };
 
 function uso() {
-  console.error('Uso: node scripts/claude-feedback.mjs "<titolo>" "<testo>" --locale|--non-locale [--priorita 0..3] [--url <indirizzo>] [--allega <file>]… [--dry-run]');
+  console.error('Uso: node scripts/claude-feedback.mjs "<titolo>" "<testo>" --locale|--non-locale [--priorita 0..3] [--url <indirizzo>] [--allega <file>]… [--aspetta 676,663.2] [--dry-run]');
   console.error('     --non-locale lo apre per le routine; --locale è il lavoro di questa sessione, e nessuna routine lo prende.');
   console.error('     "<testo>" può essere "-" per leggerlo da stdin.');
   console.error('     Da npm, opzione e valore attaccati: npm run feedback:apri -- "t" "x" --allega=spec.md');
@@ -288,8 +318,8 @@ export async function main(argvIn) {
   // riga che chi l'ha scritta considera giusta.
   const { controllaArgomenti, argomentiDaNpm, espandiUguali, opzioneStorpiata } = await import('./lib/argomenti.mjs');
   const OPZ = {
-    opzioni: ['--priorita', '--url', '--allega', '--locale', '--non-locale', '--dry-run'],
-    conValore: ['--priorita', '--url', '--allega'],
+    opzioni: ['--priorita', '--url', '--allega', '--locale', '--non-locale', '--aspetta', '--dry-run'],
+    conValore: ['--priorita', '--url', '--allega', '--aspetta'],
   };
   argv = espandiUguali(argv, OPZ.conValore);
   const storpiata = opzioneStorpiata(process.env, OPZ.opzioni);
@@ -329,7 +359,7 @@ export async function main(argvIn) {
   // parole «uguali al valore di un'opzione», e una parola del testo scritta
   // identica all'indirizzo passato spariva dal corpo senza dire niente — un
   // taglio muto sul testo di chi segnala (feedback #565).
-  const CON_VALORE = new Set(['--priorita', '--url', '--allega']);
+  const CON_VALORE = new Set(['--priorita', '--url', '--allega', '--aspetta']);
   const posizionali = [];
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
@@ -345,6 +375,10 @@ export async function main(argvIn) {
 
   const p = parsePriorita(prioritaRaw);
   if (!p.ok) { console.error(`RIFIUTATO: ${p.motivo}`); return EXIT.USO; }
+  const aspettaRaw = flag('aspetta');
+  if (argv.includes('--aspetta') && !String(aspettaRaw || '').trim()) { console.error('RIFIUTATO: --aspetta vuole i numeri (--aspetta 676,663.2). Non ho aperto niente.'); return EXIT.USO; }
+  const numeriAttesa = globalThis.SN_FB_ATTESE.leggiNumeri(aspettaRaw || '');
+  if (!numeriAttesa.ok) { console.error(`RIFIUTATO: --aspetta: ${numeriAttesa.motivo}. Non ho aperto niente.`); return EXIT.USO; }
 
   if (percorsiAllegati.length > MAX_ALLEGATI) {
     console.error(`USO: al più ${MAX_ALLEGATI} allegati`);
@@ -362,14 +396,22 @@ export async function main(argvIn) {
     console.error(`RIFIUTATO: ${cred.motivo || 'nessun token admin'}. Senza la prova del mittente non apro niente: node scripts/admin-login.mjs`);
     return EXIT.RIFIUTATO;
   }
-  const r = await apri({ titolo, testo, url, priorita: p.valore, allegati, dryRun, idToken: cred.idToken, locale });
+  // Le attese si controllano prima di aprire: un numero sbagliato non deve lasciare dietro un feedback senza.
+  let listaAttese = [];
+  if (deposita && numeriAttesa.numeri.length) {
+    let v;
+    try { v = await attese.risolvi(numeriAttesa.numeri, cred.idToken); } catch (e) { v = { ok: false, motivo: `lettura dei numeri fallita: ${String((e && e.message) || e)}`, rete: true }; }
+    if (!v.ok) { console.error(`RIFIUTATO: --aspetta: ${v.motivo}. Non ho aperto niente.`); return v.rete ? EXIT.IRRAGGIUNGIBILE : EXIT.RIFIUTATO; }
+    listaAttese = v.attese;
+  }
+  const r = await apri({ titolo, testo, url, priorita: p.valore, allegati, dryRun, idToken: cred.idToken, locale, attese: listaAttese });
   if (!r.ok) {
     console.error(`${r.uso ? 'USO' : 'RIFIUTATO'}: ${r.motivo}`);
     if (r.uso) uso();
     return r.uso ? EXIT.USO : (r.codice || EXIT.RIFIUTATO);
   }
   if (r.dryRun) {
-    console.log(`(prova a vuoto) aprirei "${r.name}" come ${r.clientId}, ${locale ? 'lavoro locale' : 'per le routine'}${p.valore != null ? `, priorità ${p.valore}` : ''}${r.allegati ? `, con ${r.allegati} allegati` : ''}.`);
+    console.log(`(prova a vuoto) aprirei "${r.name}" come ${r.clientId}, ${locale ? 'lavoro locale' : 'per le routine'}${p.valore != null ? `, priorità ${p.valore}` : ''}${r.allegati ? `, con ${r.allegati} allegati` : ''}${numeriAttesa.numeri.length ? `, che aspetta ${numeriAttesa.numeri.map((n) => `#${n}`).join(', ')}` : ''}.`);
     return EXIT.FATTO;
   }
 
@@ -382,6 +424,7 @@ export async function main(argvIn) {
     ? `Lavoro locale: nessuna routine lo prende. Legalo al ramo con verify-local start --feedback ${r.seq || r.id} (o npm run finish -- --feedback ${r.seq || r.id}).`
     : 'Aperto per le routine: con la prova del mittente salta i giudici e va dritto In coda.');
 
+  if (r.attese && r.attese.length) console.log(`Aspetta ${globalThis.SN_FB_ATTESE.testoAttese(r.attese)}: nessuna routine lo prende finché non sono tutti fusi, poi entra in coda da solo.`);
   if (r.allegati) console.log(`Allegati caricati: ${r.allegati}.`);
   for (const f of (r.falliti || [])) {
     console.error(`ALLEGATO NON CARICATO: ${f.name} (${f.reason}). Il feedback esiste ma senza questo documento.`);
