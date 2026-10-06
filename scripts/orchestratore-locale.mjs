@@ -141,8 +141,15 @@ export function numeroDiFeedback(cmd, a) {
   return Number(m[1]);
 }
 
-// I ruoli prendono modello e sforzo dagli agenti delle routine: una scelta sola per lo stesso lavoro, in locale e in cloud.
-export const AGENTE_DEL_RUOLO = Object.freeze({ lavoratore: 'routine-nuovo-lavoro', verificatore: 'routine-worker' });
+// I ruoli prendono modello e sforzo dagli agenti delle routine, come dispatch nel cloud: il primo lavoro dal suo agente,
+// correzione, riallineamento, ripresa e verifica dal worker. Una scelta sola per lo stesso passo, in locale e in cloud (#1041).
+export const AGENTE_DEL_RUOLO = Object.freeze({
+  lavoratore: 'routine-nuovo-lavoro',
+  correttore: 'routine-worker',
+  riallineatore: 'routine-worker',
+  ripresa: 'routine-worker',
+  verificatore: 'routine-worker',
+});
 
 export function radicePrincipale(root = ROOT) {
   const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: root, encoding: 'utf8' }).trim();
