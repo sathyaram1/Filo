@@ -282,6 +282,30 @@ module.exports = function register(on, ctx) {
     return { ok: true, items: Array.isArray(list) ? list : [] };
   });
 
+  // La cronologia appunti cambia da dovunque: una copia in una scheda qualsiasi,
+  // il "×" del menu "Incolla", lo svuotamento dalla pagina della sicurezza. Chi
+  // la sta GUARDANDO in quel momento sta guardando un'altra scheda, e senza
+  // questo avviso resterebbe fermo a com'era quando l'ha aperta: su una pagina
+  // che si apre per controllare cosa Filo tiene da parte, mostrare meno del vero
+  // fa concludere che una password non c'è mentre c'è (#256).
+  // L'avviso NON porta con sé le voci — chi lo riceve rilegge la cronologia — e
+  // va alle sole pagine filo://: ciò che l'utente ha copiato non deve arrivare
+  // da solo a una scheda aperta su un sito qualunque.
+  const clipboardChanged = () => {
+    try { ctx.broadcastToFiloPages?.({ type: MSG.CLIPBOARD_HISTORY_UPDATED }); } catch (_) {}
+  };
+
+  // Una voce tolta (o svuotata) mentre è ancora negli appunti di sistema non
+  // deve rientrare dal primo «Incolla» di Filo: la sua chiave resta sospesa
+  // finché si incolla altro o la si ricopia apposta.
+  let chiaveSospesa = '';
+  const chiaveAppunti = () => {
+    try {
+      const t = require('electron').clipboard.readText();
+      return t ? globalThis.SN_CLIPBOARD.chiave({ type: 'text', text: t }) : '';
+    } catch (_) { return ''; }
+  };
+
   on(MSG.PUSH_CLIPBOARD_ENTRY, async (msg, sender, origin) => {
     if (!AppuntiDaiSiti.scritturaAmmessa(sender, origin, msg.entry)) return vietato;
     const cap = SN_CONST.CLIPBOARD_HISTORY_MAX;
@@ -297,6 +321,11 @@ module.exports = function register(on, ctx) {
       return '';
     };
     const newKey = keyOf(e);
+    if (chiaveSospesa) {
+      const incolla = msg.via === 'paste';
+      if (incolla && newKey === chiaveSospesa) return { ok: true };
+      if (incolla || newKey === chiaveSospesa) chiaveSospesa = '';
+    }
     const seen = new Set([newKey]);
     const filtered = [];
     for (const x of arr) {
@@ -308,6 +337,7 @@ module.exports = function register(on, ctx) {
     filtered.unshift({ ...e, ts: Date.now() });
     const trimmed = filtered.slice(0, cap);
     await Storage.setRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, trimmed);
+    clipboardChanged();
     return { ok: true };
   });
 
@@ -322,7 +352,10 @@ module.exports = function register(on, ctx) {
         break;
       }
     }
-    if (updated) await Storage.setRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, arr);
+    if (updated) {
+      await Storage.setRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, arr);
+      clipboardChanged();
+    }
     return { ok: true };
   });
 
@@ -341,9 +374,11 @@ module.exports = function register(on, ctx) {
       return '';
     };
     const target = keyOf(e);
+    if (target && target === chiaveAppunti()) chiaveSospesa = target;
     const next = arr.filter((x) => keyOf(x) !== target);
     if (next.length !== arr.length) {
       await Storage.setRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, next);
+      clipboardChanged();
     }
     return { ok: true };
   });
@@ -351,7 +386,13 @@ module.exports = function register(on, ctx) {
   // Svuotare sta nello stesso menu Incolla che mostra la cronologia, su qualunque pagina (#256).
   on(MSG.CLEAR_CLIPBOARD_HISTORY, async (msg, sender, origin) => {
     if (!AppuntiDaiSiti.scritturaAmmessa(sender, origin)) return vietato;
+    const prima = await Storage.getRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
+    const inAppunti = chiaveAppunti();
+    if (inAppunti && Array.isArray(prima) && prima.some((x) => globalThis.SN_CLIPBOARD.chiave(x) === inAppunti)) {
+      chiaveSospesa = inAppunti;
+    }
     await Storage.setRaw(SN_CONST.STORAGE_KEYS.CLIPBOARD_HISTORY, []);
+    clipboardChanged();
     return { ok: true };
   });
 

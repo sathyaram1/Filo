@@ -301,6 +301,7 @@ function loadContentScripts() {
   // la disegnano, lo legge chi cammina sulla pagina.
   safe(path.join(SHARED, 'filoUi.js'));
   safe(path.join(SHARED, 'i18n.js'));
+  safe(path.join(SHARED, 'clipboardHistory.js')); // #256 — cronologia appunti: chiave e testi uguali da ogni parte
   safe(path.join(SHARED, 'messages.js'));
   safe(path.join(SHARED, 'tasti.js')); // nomi delle scorciatoie per il sistema di chi legge: PRIMA di menu/actions/content
   safe(path.join(SHARED, 'disposizioneIcone.js')); // dove sta ogni icona globale: PRIMA di menuIcons

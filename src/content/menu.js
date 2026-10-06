@@ -770,9 +770,10 @@
       const list = document.createElement('div');
       list.className = 'sn-menu-history-list';
 
-      const searchTextOf = (entry) =>
-        (entry.type === 'image' ? (entry.description || 'Immagine') : (entry.text || ''))
-          .replace(/\s+/g, ' ').trim();
+      // Come si legge una voce: la decide il modulo condiviso della cronologia
+      // appunti, così menu e pagina della Sicurezza non divergono.
+      const Clip = global.SN_CLIPBOARD;
+      const searchTextOf = (entry) => Clip.etichetta(entry).replace(/\s+/g, ' ').trim();
 
       // Messaggi di stato (creati prima così i gestori possono riferirli):
       // - noResults: nessuna corrispondenza nella ricerca;
@@ -798,9 +799,10 @@
       let clearWrap = null;
 
       // Quando l'utente rimuove l'ultima voce: mostra lo stato vuoto e nascondi
-      // ricerca/svuota (non c'è più nulla da cercare o svuotare).
+      // ricerca/svuota (non c'è più nulla da cercare o svuotare). Le righe già
+      // tolte restano a schermo barrate, quindi non contano.
       const refreshEmptyState = () => {
-        if (list.querySelector('.sn-menu-history-item')) return;
+        if (list.querySelector('.sn-menu-history-item:not(.sn-menu-history-gone)')) return;
         noResults.style.display = 'none';
         emptyMsg.style.display = '';
         searchWrap.style.display = 'none';
@@ -816,10 +818,34 @@
       // rimozione è avvenuta davvero sul disco, ma la UI dice il contrario, e su
       // una password copiata è la bugia peggiore possibile. Quindi la togliamo
       // anche di lì, così le due viste restano d'accordo.
+      // Si dimenticano tutte le voci con la stessa chiave: chi tiene la
+      // cronologia su disco le toglie tutte insieme (le gemelle che lascia
+      // «Importa dati»), e il menu deve dire lo stesso.
       const forgetEntry = (entry) => {
         if (!Array.isArray(entries)) return;
-        const i = entries.indexOf(entry);
-        if (i >= 0) entries.splice(i, 1);
+        const k = Clip.chiave(entry);
+        for (let i = entries.length - 1; i >= 0; i--) {
+          if (Clip.chiave(entries[i]) === k) entries.splice(i, 1);
+        }
+      };
+
+      // Quante voci VIVE la ricerca sta mostrando IN QUESTO MOMENTO: le righe
+      // già tolte restano a schermo barrate ma non contano più. Si conta
+      // guardando la lista invece di tenere un numero a parte che qualcuno deve
+      // ricordarsi di aggiornare: quel numero partiva da zero e nessuno lo
+      // toccava finché non scrivevi nel campo di ricerca, così la conferma
+      // dello svuotamento parlava di una ricerca mai scritta (#256).
+      // Ritorna null quando NON c'è nessuna ricerca in corso: è il modo di dire
+      // "della ricerca non parlarne".
+      const visibiliVive = () => {
+        if (!input.value.trim()) return null;
+        let n = 0;
+        for (const b of list.querySelectorAll('.sn-menu-history-item')) {
+          if (b.style.display === 'none') continue;
+          if (b.classList.contains('sn-menu-history-gone')) continue;
+          n++;
+        }
+        return n;
       };
 
       // Applica il filtro di ricerca corrente. Serve anche DOPO una rimozione:
@@ -831,9 +857,29 @@
         for (const b of list.querySelectorAll('.sn-menu-history-item')) {
           const match = !q || (b.dataset.snSearch || '').includes(q);
           b.style.display = match ? '' : 'none';
-          if (match) visible++;
+          if (match && !b.classList.contains('sn-menu-history-gone')) visible++;
         }
         noResults.style.display = visible === 0 ? '' : 'none';
+      };
+
+      // Dove va il fuoco dopo aver tolto una voce col tasto Invio: sulla "×"
+      // della prima voce ancora viva DOPO quella tolta (a scorrere in giù, poi
+      // in su), e se non ne resta nessuna sul campo di ricerca. Le righe tolte
+      // e quelle nascoste dal filtro si saltano: non sono cose che si possono
+      // premere.
+      const fuocoDopoRimozione = (rowTolta) => {
+        const righe = [...list.querySelectorAll('.sn-menu-history-item')];
+        const i = righe.indexOf(rowTolta);
+        const utile = (r) => r
+          && r.style.display !== 'none'
+          && !r.classList.contains('sn-menu-history-gone')
+          && r.querySelector('.sn-menu-history-remove');
+        const candidate = [...righe.slice(i + 1), ...righe.slice(0, Math.max(i, 0)).reverse()];
+        const prossima = candidate.find(utile);
+        const target = prossima
+          ? prossima.querySelector('.sn-menu-history-remove')
+          : input;
+        try { target.focus({ preventScroll: true }); } catch (_) { try { target.focus(); } catch (__) {} }
       };
 
       entries.forEach((entry) => {
@@ -842,6 +888,7 @@
         const row = document.createElement('div');
         row.className = 'sn-menu-history-item';
         row.dataset.snSearch = searchTextOf(entry).toLowerCase();
+        row.dataset.snKey = Clip.chiave(entry);
 
         const b = document.createElement('button');
         b.type = 'button';
@@ -849,19 +896,37 @@
         if (entry.type === 'image') {
           const icon = document.createElement('span');
           icon.className = 'sn-menu-history-icon';
-          const img = global.SN_ICONS?.image;
-          if (img) icon.innerHTML = img(16);
-          else icon.textContent = '🖼';
+          const iconaGenerica = () => {
+            const img = global.SN_ICONS?.image;
+            if (img) icon.innerHTML = img(16);
+            else icon.textContent = '🖼';
+          };
+          // Due immagini copiate diverse con la stessa iconcina e la stessa
+          // parola "Immagine" si leggono uguali: con la "×" accanto, che
+          // cancella per sempre, non si sa quale delle due si sta buttando. La
+          // miniatura c'è già nella pagina della Sicurezza ed è quella che
+          // toglie il dubbio. Se la pagina ospite vieta le immagini `data:`
+          // (CSP), l'`onerror` rimette l'iconcina di prima.
+          if (entry.dataUrl) {
+            const thumb = document.createElement('img');
+            thumb.className = 'sn-menu-history-thumb';
+            thumb.alt = '';
+            thumb.addEventListener('error', () => { thumb.remove(); iconaGenerica(); });
+            thumb.src = entry.dataUrl;
+            icon.appendChild(thumb);
+          } else {
+            iconaGenerica();
+          }
           const desc = document.createElement('span');
           desc.className = 'sn-menu-label';
-          testoNascosto(desc, b, entry.description || 'Immagine');
+          testoNascosto(desc, b, Clip.etichetta(entry));
           b.appendChild(icon);
           b.appendChild(desc);
         } else {
           const lbl = document.createElement('span');
           lbl.className = 'sn-menu-label';
-          const text = (entry.text || '').replace(/\s+/g, ' ').trim();
-          testoNascosto(lbl, b, text.length > 40 ? text.slice(0, 40) + '…' : text);
+          const mostrato = Clip.etichetta(entry);
+          testoNascosto(lbl, b, mostrato.length > 40 ? mostrato.slice(0, 40) + '…' : mostrato);
           b.appendChild(lbl);
         }
         b.addEventListener('click', () => {
@@ -879,11 +944,37 @@
           rm.setAttribute('aria-label', I18n.t('menu_paste_remove'));
           rm.addEventListener('click', (ev) => {
             ev.stopPropagation();
+            if (row.classList.contains('sn-menu-history-gone')) return;
             try { onRemove(entry); } catch (e) { console.error(e); }
             forgetEntry(entry);
-            row.remove();
+            // La riga NON sparisce: resta al suo posto barrata finché il
+            // sotto-menu è aperto. Toglierla ricompattava la lista e faceva
+            // salire di una posizione tutte quelle sotto, così il secondo clic
+            // di un doppio clic colpiva la voce vicina e la cancellava anche
+            // lei, per sempre e senza dirlo.
+            // Chi ha premuto col TASTO INVIO non deve restare senza niente
+            // sotto le dita: disabilitare il bottone che ha il fuoco lo
+            // rimanda al corpo della pagina, e per togliere la voce dopo
+            // toccherebbe ricominciare il giro col tabulatore. Il fuoco passa
+            // alla "×" della prima voce ancora viva dopo questa, o al campo di
+            // ricerca se non ne resta nessuna.
+            // `detail === 0` distingue Invio/Barra dal clic del mouse: col
+            // mouse il fuoco non si sposta, o comparirebbe un anello di fuoco
+            // sulla riga vicina a ogni clic.
+            const avevaFuoco = ev.detail === 0 && document.activeElement === rm;
+            for (const gemella of list.querySelectorAll('.sn-menu-history-item')) {
+              if (gemella.dataset.snKey !== row.dataset.snKey) continue;
+              gemella.classList.add('sn-menu-history-gone');
+              gemella.querySelectorAll('button').forEach((x) => { x.disabled = true; });
+              const x = gemella.querySelector('.sn-menu-history-remove');
+              if (x) {
+                x.title = I18n.t('menu_paste_removed');
+                x.setAttribute('aria-label', I18n.t('menu_paste_removed'));
+              }
+            }
             applyFilter();
             refreshEmptyState();
+            if (avevaFuoco) fuocoDopoRimozione(row);
           });
           row.appendChild(rm);
         }
@@ -923,8 +1014,15 @@
           const Ui = global.SN_CONFIRM_UI;
           let ok = true;
           try {
+            // La conferma dice QUANTE voci spariscono, e se la ricerca ne sta
+            // nascondendo una parte lo dichiara: con un filtro attivo la lista
+            // ne mostrava una e lo svuotamento le portava via tutte.
+            const testo = Clip.testoConferma(
+              Array.isArray(entries) ? entries.length : 0,
+              visibiliVive(),
+            );
             ok = Ui
-              ? await Ui.confirm({ title: I18n.t('menu_paste_clear'), text: I18n.t('menu_paste_clear_confirm') })
+              ? await Ui.confirm({ title: I18n.t('menu_paste_clear'), text: testo })
               : true;
           } catch (_) { ok = false; }
           if (activeMenu) activeMenu.subLocked = false;
@@ -1418,6 +1516,7 @@
         testo: riga.querySelector('.sn-menu-history-paste')?.getAttribute('aria-label') || '',
         incolla: centro(riga.querySelector('.sn-menu-history-paste')),
         rimuovi: centro(riga.querySelector('.sn-menu-history-remove')),
+        tolta: riga.classList.contains('sn-menu-history-gone'),
       })),
       vuoto: [...sub.querySelectorAll('.sn-menu-empty')].filter(visibile).map((e) => e.textContent).join(' '),
       cerca: cerca ? {

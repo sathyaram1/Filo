@@ -329,6 +329,23 @@ function mergeLists(local, imported) {
   return out;
 }
 
+// La cronologia appunti ha un'identità sua (testo a spazi compattati, dato
+// dell'immagine): la stessa cosa copiata in due momenti è una voce sola, come
+// quando la si copia. Con l'identità generica il backup lasciava due gemelle.
+function mergeClipboardHistory(local, imported) {
+  require('../../shared/clipboardHistory.js');
+  const chiave = globalThis.SN_CLIPBOARD.chiave;
+  const seen = new Set();
+  const out = [];
+  for (const item of [...local, ...imported]) {
+    const k = chiave(item) || itemKey(item);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(item);
+  }
+  return out;
+}
+
 function mergeValue(local, imported) {
   if (Array.isArray(local) && Array.isArray(imported)) return mergeLists(local, imported);
   if (isPlainObject(local) && isPlainObject(imported)) {
@@ -362,7 +379,9 @@ function mergeImportedData(current, imported) {
       stats.added++;
       continue;
     }
-    const next = mergeValue(cur[k], imp[k]);
+    const next = k === 'clipboardHistory' && Array.isArray(cur[k]) && Array.isArray(imp[k])
+      ? mergeClipboardHistory(cur[k], imp[k])
+      : mergeValue(cur[k], imp[k]);
     merged[k] = next;
     if (JSON.stringify(next) === JSON.stringify(cur[k])) stats.unchanged++;
     else stats.updated++;

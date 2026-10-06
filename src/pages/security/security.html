@@ -12,6 +12,12 @@
   <script src="filo://shared/contenutoEsterno.js"></script>
   <script src="filo://shared/messages.js"></script>
   <script src="filo://shared/i18n.js"></script>
+  <!-- #256 — cronologia appunti: chiave di una voce, etichetta e testo della
+       conferma, gli stessi che usa il menu "Incolla" del tasto destro. -->
+  <script src="filo://shared/clipboardHistory.js"></script>
+  <!-- Icone di Filo: serve il ripiego dell'immagine copiata che non si riesce a
+       disegnare, lo stesso che usa il menu "Incolla". -->
+  <script src="filo://shared/icons.js"></script>
   <script src="filo://shared/storage.js"></script>
   <script src="filo://shared/nomiSito.js"></script>
   <script src="filo://shared/confirmUi.js"></script>
@@ -193,7 +199,7 @@
           <div class="sn-muted" id="sec-cookies-trusted-note" style="margin-bottom:8px;display:none"></div>
           <div class="sn-cookie-wl-add" style="display:flex;gap:8px;margin-bottom:6px">
             <input type="text" id="cookie-wl-input" />
-            <button type="button" id="cookie-wl-add-btn"></button>
+            <button type="button" class="sn-btn sn-btn-secondary" id="cookie-wl-add-btn"></button>
           </div>
           <div id="cookie-wl-error" role="alert" aria-live="polite" style="display:none;color:var(--sn-error);font-size:12px;margin-bottom:10px"></div>
           <ul id="cookie-wl-list" style="list-style:none;padding:0;margin:0"></ul>
@@ -264,6 +270,25 @@
           <button type="button" class="sn-btn sn-btn-secondary" id="sec-visite-oggi" data-periodo="oggi"></button>
           <button type="button" class="sn-btn sn-btn-secondary" id="sec-visite-tutto" data-periodo="tutto"></button>
           <span class="sn-saved-indicator" id="sec-visite-hint"></span>
+        </div>
+      </section>
+
+      <section id="sec-clipboard" style="margin-top:28px">
+        <h2 id="sec-clip-title" style="font-size:1.05rem;margin-bottom:4px"></h2>
+        <p class="sn-muted" id="sec-clip-desc" style="margin-top:0"></p>
+        <div class="sn-muted" id="sec-clip-empty" style="display:none"></div>
+        <div class="sn-clip-search" id="sec-clip-search-row" style="display:none">
+          <input type="text" id="sec-clip-search" autocomplete="off" spellcheck="false">
+        </div>
+        <div id="sec-clip-list" class="sn-clip-list"></div>
+        <div class="sn-muted sn-clip-noresults" id="sec-clip-noresults" style="display:none"></div>
+        <!-- Voci copiate mentre il puntatore era sulla lista: aspettano fuori
+             per non spostare le righe sotto la mano. Sta SOTTO la lista, mai
+             sopra: una riga in più in cima le sposterebbe di nuovo. -->
+        <div class="sn-muted sn-clip-pending" id="sec-clip-pending" style="display:none"></div>
+        <div class="sn-clip-actions" id="sec-clip-actions">
+          <button type="button" class="sn-btn sn-btn-secondary" id="sec-clip-clear"></button>
+          <span class="sn-saved-indicator" id="sec-clip-hint"></span>
         </div>
       </section>
 

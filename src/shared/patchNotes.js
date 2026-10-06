@@ -238,6 +238,23 @@
       ],
     },
     {
+      version: '0.2.222', date: '2026-09-06',
+      features: [
+        'In Impostazioni → Sicurezza c\'è "Cronologia appunti": vedi tutto quello che hai copiato di recente, togli una voce sola o svuoti tutto. Prima ci si arrivava solo dal menu del tasto destro dentro un campo di testo, quindi una password copiata mentre leggevi una pagina non si riusciva a togliere.',
+        'Nella stessa pagina c\'è un campo per cercare fra le voci copiate: con la cronologia piena trovi subito quella da togliere, senza scorrerle tutte.',
+        'Cliccando una voce della cronologia la rimetti negli appunti, pronta da incollare dove vuoi.',
+        'Nella cronologia del menu "Incolla" le immagini copiate si vedono in miniatura: due schermate copiate una dietro l\'altra non si leggono più tutte e due "Immagine".',
+      ],
+      fixes: [
+        'La cronologia degli appunti non si sposta più mentre ci stai cliccando sopra: prima un doppio clic sul tasto che toglie una voce ne portava via due, quella che avevi puntato e la vicina, e non c\'era modo di riaverle. Lo stesso valeva se copiavi qualcosa in un\'altra scheda proprio mentre stavi per togliere una voce.',
+        'Prima di svuotare la cronologia degli appunti, Filo dice quante voci stanno per sparire; se hai una ricerca in corso avverte che spariscono anche quelle che il filtro sta nascondendo.',
+        'La cronologia appunti in Impostazioni → Sicurezza si aggiorna da sola: quello che copi mentre la pagina è aperta compare subito, e una voce tolta dal menu "Incolla" sparisce anche lì. Prima la pagina restava ferma a com\'era quando l\'avevi aperta, e sembrava che una password copiata poco prima non ci fosse.',
+        'Una voce copiata fatta di soli spazi non è più una riga vuota senza spiegazione: adesso dice che sono spazi e quanti.',
+        'Una voce tolta dalla cronologia appunti resta tolta: se la stessa cosa è ancora negli appunti e la incolli con "Incolla", Filo non la rimette in cronologia.',
+        'Togliendo le voci della cronologia appunti con la tastiera il fuoco resta sulla lista, pronto per la voce dopo, anche se il mouse è fermo sopra le righe. Prima in quel caso tornava all\'inizio della pagina e per ogni voce bisognava riattraversare tutte le impostazioni col tabulatore.',
+      ],
+    },
+    {
       version: '0.2.219', date: '2026-09-05',
       features: [
         'Nella chat della nuova scheda Filo fa tutto in un turno solo: cerca, legge il risultato, mette la sveglia e poi risponde, senza chiudere il messaggio a metà per dirti cosa farà dopo. Nel blocco sopra la risposta vedi ogni passo mentre succede: il ragionamento, ogni azione appena la decide («Cerco sul web…»), l\'esito, le due parole che scrive a metà lavoro.',

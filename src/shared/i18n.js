@@ -30,7 +30,10 @@
     menu_paste_no_results: 'Nessun risultato',
     menu_paste_remove: 'Rimuovi dalla cronologia',
     menu_paste_clear: 'Svuota cronologia',
-    menu_paste_clear_confirm: 'Vuoi svuotare tutta la cronologia degli appunti? Le voci copiate finora verranno eliminate.',
+    menu_paste_clear_confirm_one: 'Vuoi svuotare la cronologia degli appunti? Sparisce l\'unica voce copiata finora, e non si può riavere.',
+    menu_paste_clear_confirm_n: 'Vuoi svuotare la cronologia degli appunti? Spariscono tutte e %d le voci copiate finora, e non si possono riavere.',
+    menu_paste_clear_confirm_hidden: 'La ricerca che hai scritto ne mostra %d: spariscono anche le altre.',
+    menu_paste_removed: 'Rimossa',
     menu_explain_loading: 'Spiegazione…',
 
     // Menu — pagina
@@ -263,6 +266,10 @@
     toast_cannot_paste_image: 'Qui non si può incollare un\'immagine (campo di solo testo)',
     toast_paste_failed: 'Non riesco a incollare qui (rifocalizza il campo e riprova)',
     clipboard_image_pending: 'Descrizione…',
+    // Una selezione di soli spazi (o a capo, o tabulazioni) si copia per
+    // sbaglio: senza un'etichetta diventa una riga vuota che non si capisce.
+    clipboard_only_spaces: 'Spazi vuoti (%d caratteri)',
+    clipboard_empty_entry: 'Voce vuota',
     clipboard_image_no_model: 'Immagine (nessun modello per la descrizione)',
     clipboard_image_delicata: 'Immagine da una pagina delicata',
 
@@ -652,6 +659,28 @@
     options_fp_mode_privacy_desc:
       'Come l\'Automatico, ma cambi "impronta" a ogni avvio di Filo: i siti non possono riconoscerti ' +
       'nemmeno fra una sessione e l\'altra. In rari casi qualche CAPTCHA in più.',
+    // Cronologia appunti nella pagina Sicurezza (#256). Il menu del tasto destro
+    // la mostra solo dentro un campo di testo: chi ha appena copiato una password
+    // leggendo un articolo non ha nessun campo da cliccare. Qui è sempre
+    // raggiungibile, con le stesse due azioni del menu (togli una voce, svuota).
+    security_clipboard_title: 'Cronologia appunti',
+    security_clipboard_desc:
+      'Quello che hai copiato di recente: Filo lo tiene da parte per riproportelo ' +
+      'quando incolli. Se ci è finita una password o un testo privato, toglilo da qui.',
+    security_clipboard_empty: 'Non c\'è niente: nessun testo o immagine copiato di recente.',
+    security_clipboard_image: 'Immagine',
+    security_clipboard_search: 'Cerca fra le voci copiate…',
+    security_clipboard_no_results: 'Nessuna voce copiata corrisponde.',
+    security_clipboard_remove: 'Rimuovi',
+    security_clipboard_remove_title: 'Rimuovi questa voce dalla cronologia',
+    security_clipboard_removed: 'Voce rimossa',
+    security_clipboard_gone: 'Rimossa',
+    security_clipboard_copy_title: 'Rimetti questa voce negli appunti',
+    security_clipboard_copied: 'Rimessa negli appunti',
+    security_clipboard_pending: 'Hai copiato altre %d cose: allontana il puntatore dalla lista e compaiono.',
+    security_clipboard_pending_one: 'Hai copiato un\'altra cosa: allontana il puntatore dalla lista e compare.',
+    security_clipboard_cleared: 'Cronologia svuotata',
+    security_clipboard_fail: 'Non è riuscito',
     security_export_title: 'Esporta dati Filo',
     security_export_label: 'Esporta dati',
     security_export_desc:

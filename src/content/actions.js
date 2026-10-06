@@ -142,7 +142,7 @@
               if (textType) {
                 const text = await (await it.getType(textType)).text();
                 insertTextAtSelection(text);
-                pushClipboardEntry({ type: 'text', text });
+                pushClipboardEntry({ type: 'text', text }, 'paste');
               } else {
                 Popup.showToast(I18n.t('toast_cannot_paste_image'));
               }
@@ -159,7 +159,7 @@
               return;
             }
             const description = await describeImage(blob);
-            pushClipboardEntry({ type: 'image', dataUrl, description });
+            pushClipboardEntry({ type: 'image', dataUrl, description }, 'paste');
             Popup.showToast(I18n.t('toast_pasted_image'));
             return;
           }
@@ -174,7 +174,7 @@
       if (!text) return;
       deps.restorePasteContext();
       insertTextAtSelection(text);
-      pushClipboardEntry({ type: 'text', text });
+      pushClipboardEntry({ type: 'text', text }, 'paste');
     } catch (_) {}
   }
 
@@ -414,8 +414,10 @@
     } catch (_) { return { canBack: true, canFwd: true }; }
   }
 
-  function pushClipboardEntry(entry) {
-    chrome.runtime.sendMessage({ type: MSG.PUSH_CLIPBOARD_ENTRY, entry }).catch(() => {});
+  // `via: 'paste'` dice a chi tiene la cronologia che la voce viene da un
+  // incolla, non da una copia scelta: una voce appena tolta non rientra così.
+  function pushClipboardEntry(entry, via) {
+    chrome.runtime.sendMessage({ type: MSG.PUSH_CLIPBOARD_ENTRY, entry, via }).catch(() => {});
     // Per le immagini, chiedi all'AI una breve descrizione e aggiorna l'entry.
     if (entry?.type === 'image' && entry.dataUrl) {
       requestImageDescription(entry.dataUrl).catch(() => {});
