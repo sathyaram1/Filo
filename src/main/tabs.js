@@ -1753,9 +1753,8 @@ class TabManager {
   // Ricrea la WebContentsView di `tab` nella partizione corretta per `url`,
   // preservando id/posizione/stato attivo. Necessario in privacy ai cambi di
   // sito: la partizione non è modificabile dopo la creazione della view.
-  // NOTA: la cronologia avanti/indietro è per-WebContents, quindi attraversare
-  // un confine di sito in privacy riparte con cronologia pulita (è il prezzo
-  // dell'isolamento per-sito; resta intatta entro lo stesso sito).
+  // La cronologia è per-WebContents: le voci della vista vecchia restano nella
+  // scheda (tab.storia, src/main/tabs/storia.js), e Indietro e Avanti ci arrivano.
   // `opts.loadUrl` (#327): URL da caricare al posto di `url` — la view resta
   // configurata (preload/partition/isInternal) per `url`. Usato dal recupero
   // crash per mostrare la pagina d'errore in una view pronta a ritentare il sito.
