@@ -12,6 +12,7 @@
       version: '0.2.235', date: '2026-10-06',
       features: [
         'Se un post, un video o una mappa dentro la pagina di un altro sito non si vede perché Filo ne ha bloccato i cookie, sopra compare la domanda «Attivo i cookie di Instagram per questo contenuto?». Con «Sì» il contenuto si ricarica e funziona. Li togli col tasto destro sul contenuto o in Impostazioni, Sicurezza.',
+        'Nell\'intervista di benvenuto, quando dici a Filo come vuoi che ti scriva, lo stile si imposta subito senza riquadri da confermare. In chat leggi «Userò questo stile» con il testo esatto, e «Annulla» lo toglie.',
       ],
       fixes: [
         'Un sito dal nome comune non passa pi\u00f9 per l\'imitazione di un marchio. team.com, email.com, apply.com, telegraph.co.uk e le altre parole vicine a Steam, Gmail, Apple o Telegram aprivano il blocco a tutta pagina, quello che si toglie solo scrivendo \u00abconfermo\u00bb. Adesso trovi un avviso che chiudi con un clic. Il blocco resta sui sosia scritti con lettere che si somigliano, come paypa1 o g00gle, e su ogni sito che oltre al nome somigliante \u00e8 stato registrato da poco, ha il certificato rotto o ti chiede la password, anche se il modulo compare dopo.',
