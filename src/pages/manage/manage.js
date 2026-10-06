@@ -3278,6 +3278,184 @@
     });
   }
 
+  // ── «Aspetta #N» (#903) ───────────────────────────────────────────────────
+  // I feedback da fondere prima: finché uno non lo è nessuna routine lo prende, e qui sta fra quelli che aspettano.
+  // Numeri, esistenza e giri li controlla il main (MSG.FEEDBACK_UPDATE); la regola sta in SN_FB_ATTESE.
+  const ATT = window.SN_FB_ATTESE;
+  function trovaAtteso(id) {
+    return allFeedbacks.find((f) => f._id === id) || attesiFuori.get(id);
+  }
+  function opzSezioni(extra) {
+    return Object.assign({ releasedVersion, fusioni, trovaAtteso }, extra);
+  }
+  // Gli aspettati più vecchi della finestra caricata: una lettura, poi la lista si ridisegna con il loro stato.
+  function caricaAttesiFuori() {
+    if (!ATT || !isAdmin || !dataLoaded) return;
+    const mancano = [];
+    for (const fb of allFeedbacks) {
+      for (const w of ATT.atteseDi(fb)) {
+        if (attesiChiesti.has(w.id) || allFeedbacks.some((f) => f._id === w.id)) continue;
+        attesiChiesti.add(w.id);
+        mancano.push(w.id);
+      }
+    }
+    if (!mancano.length) return;
+    (async () => {
+      let righe = await FB.getMany(mancano, { fields: FB.CAMPI_LISTA, timeoutMs: 20000 });
+      if (righe.length) {
+        const r = await sendToMain({ type: 'feedback_decrypt_fields', list: righe });
+        if (r && r.ok && Array.isArray(r.list)) righe = r.list;
+      }
+      for (const r of righe) attesiFuori.set(r._id, r);
+      for (const id of mancano) if (!attesiFuori.has(id)) attesiFuori.set(id, { _id: id, missing: true });
+      renderList();
+      const aperto = selectedId && allFeedbacks.find((f) => f._id === selectedId);
+      if (aperto) reflectAttese(aperto);
+    })().catch(() => { /* restano «stato non letto»: chi li aspetta resta fra quelli che aspettano, come per la coda */ });
+  }
+
+  function numeroDi(doc) {
+    return doc ? FB.formatNum(doc.seq, doc.subSeq) : '';
+  }
+  function statoAttesaTesto(w) {
+    if (w.stato !== ATT.STATO.APERTO) return ATT.ETICHETTA[w.stato] || w.stato;
+    const doc = trovaAtteso(w.id);
+    const info = doc && window.SN_FB_STATUS && window.SN_FB_STATUS.STATUSES[MR.normalizeStatus(doc).status];
+    if (!info) return ATT.ETICHETTA.aperto;
+    return info.tab === 'inbox' ? 'nei Ricevuti' : info.label.toLowerCase();
+  }
+  function testoStatiAttese(stati) {
+    return `Aspetta ${stati.map((w) => `${ATT.etichetta(w)} (${statoAttesaTesto(w)})`).join(', ')}. `
+      + 'Finché non sono tutti fusi nessuna routine lo prende.';
+  }
+  function attesaBadgeHtml(fb) {
+    if (!ATT) return '';
+    const stati = ATT.statiDelleAttese(fb, trovaAtteso);
+    const aperte = stati.filter((w) => w.stato !== ATT.STATO.FUSO);
+    if (!aperte.length) return '';
+    return `<span class="mg-attesa-badge" title="${esc(testoStatiAttese(stati))}">⏳ ${esc(aperte.map(ATT.etichetta).join(' '))}</span>`;
+  }
+
+  function reflectAttese(fb) {
+    if (!mgAtteseToggle || !mgAttese || !ATT) return;
+    const stati = ATT.statiDelleAttese(fb, trovaAtteso);
+    const chiusa = MR.praticaChiusa(fb, opzSezioni());
+    mgAtteseToggle.hidden = !isAdmin || (chiusa && !stati.length);
+    mgAtteseToggle.disabled = false;
+    mgAtteseToggle.textContent = !stati.length ? '⏳ Aspetta'
+      : stati.length <= 3 ? `⏳ Aspetta ${ATT.testoAttese(stati)}` : `⏳ Aspetta ${stati.length} feedback`;
+    mgAtteseToggle.classList.toggle('mg-attese-piena', stati.some((w) => w.stato !== ATT.STATO.FUSO));
+    mgAtteseToggle.title = stati.length ? testoStatiAttese(stati)
+      : 'Fallo aspettare un altro feedback: nessuna routine lo prende finché quello non è fuso.';
+    const mostra = isAdmin && (stati.length > 0 || atteseApertePer === fb._id);
+    mgAttese.hidden = !mostra;
+    mgAtteseToggle.setAttribute('aria-expanded', mostra ? 'true' : 'false');
+    if (mgAtteseScrivi) mgAtteseScrivi.hidden = chiusa;
+    if (mgAtteseTogliTutte) mgAtteseTogliTutte.hidden = stati.length < 2;
+    mgAtteseLista.innerHTML = stati.map((w) => {
+      const nota = statoAttesaTesto(w);
+      const apribile = allFeedbacks.some((f) => f._id === w.id);
+      return `<li class="mg-attesa mg-attesa--${esc(w.stato)}" data-id="${esc(w.id)}">`
+        + `<button type="button" class="mg-attesa-num" data-azione="apri" ${apribile ? `title="Apri ${esc(ATT.etichetta(w))}"` : 'disabled'}>${esc(ATT.etichetta(w))}</button>`
+        + `<span class="mg-attesa-stato">${esc(nota)}</span>`
+        + (chiusa ? '' : `<button type="button" class="mg-attesa-togli" data-azione="togli" title="Non aspettare più ${esc(ATT.etichetta(w))}" aria-label="Non aspettare più ${esc(ATT.etichetta(w))}">×</button>`)
+        + '</li>';
+    }).join('');
+  }
+
+  // I numeri da riscrivere: quelli di adesso (anche quando l'attesa ne ha perso uno, dal documento) più o meno uno.
+  function numeriAttuali(fb) {
+    return ATT.atteseDi(fb).map((w) => w.num || numeroDi(trovaAtteso(w.id)));
+  }
+
+  async function scriviAttese(id, numeri) {
+    const fb = allFeedbacks.find((f) => f._id === id);
+    if (!fb || !ATT) return false;
+    const num = numeroDi(fb);
+    const chi = num ? `#${num}` : 'Il feedback';
+    if (numeri.some((n) => !n)) { setManageMsg('Attese non scritte: una non ha numero. Toglile tutte e rimetti quelle che servono.', 'err'); return false; }
+    const lette = ATT.leggiNumeri(numeri);
+    if (!lette.ok) { setManageMsg(`Attese non scritte: ${lette.motivo}.`, 'err'); return false; }
+    for (const b of [mgAtteseToggle, mgAtteseAggiungi, mgAtteseTogliTutte]) if (b) b.disabled = true;
+    setManageMsg(lette.numeri.length ? 'Scrivo le attese…' : 'Tolgo le attese…', '');
+    try {
+      const r = await sendToMain({ type: 'feedback_update', id, waitsFor: lette.numeri.join(', ') });
+      if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
+      fb.waitsFor = Array.isArray(r.waitsFor) && r.waitsFor.length ? r.waitsFor : undefined;
+      renderList();
+      if (selectedId === id) reflectAttese(fb);
+      const dove = MR.manageTabFor(fb, opzSezioni());
+      setManageMsg(fb.waitsFor
+        ? `Da ora ${chi} aspetta ${ATT.testoAttese(fb.waitsFor)}${dove === 'waiting' ? ': nessuna routine lo prende finché non sono tutti fusi.' : '.'}`
+        : `${chi} non aspetta più niente.`, 'ok');
+      return true;
+    } catch (e) {
+      setManageMsg(`Attese non scritte: ${e.message || 'Errore'}`, 'err');
+      return false;
+    } finally {
+      for (const b of [mgAtteseToggle, mgAtteseAggiungi, mgAtteseTogliTutte]) if (b) b.disabled = false;
+    }
+  }
+
+  function apriCasellaAttese(id) {
+    if (selectedId !== id) openDetail(id);
+    atteseApertePer = id;
+    const fb = allFeedbacks.find((f) => f._id === id);
+    if (fb) reflectAttese(fb);
+    if (mgAtteseInput && mgAttese && !mgAttese.hidden) mgAtteseInput.focus();
+  }
+  async function aggiungiAttese() {
+    const fb = selectedId && allFeedbacks.find((f) => f._id === selectedId);
+    if (!fb || !mgAtteseInput) return;
+    const nuovi = ATT.leggiNumeri(mgAtteseInput.value);
+    if (!nuovi.ok) { setManageMsg(`Attese non scritte: ${nuovi.motivo}.`, 'err'); return; }
+    if (!nuovi.numeri.length) { mgAtteseInput.focus(); return; }
+    if (await scriviAttese(fb._id, [...numeriAttuali(fb), ...nuovi.numeri])) mgAtteseInput.value = '';
+  }
+  if (mgAtteseToggle) {
+    mgAtteseToggle.addEventListener('click', () => {
+      const fb = selectedId && allFeedbacks.find((f) => f._id === selectedId);
+      if (!fb) return;
+      // Con le attese la casella resta aperta (lo stato di ciascuna è quello che si viene a guardare): il tasto porta lì.
+      if (mgAttese.hidden || ATT.atteseDi(fb).length) { apriCasellaAttese(fb._id); return; }
+      atteseApertePer = '';
+      reflectAttese(fb);
+    });
+  }
+  if (mgAtteseAggiungi) mgAtteseAggiungi.addEventListener('click', () => { aggiungiAttese(); });
+  if (mgAtteseInput) {
+    mgAtteseInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); aggiungiAttese(); }
+      if (e.key === 'Escape' && !mgAtteseInput.value) {
+        const fb = selectedId && allFeedbacks.find((f) => f._id === selectedId);
+        atteseApertePer = '';
+        if (fb) reflectAttese(fb);
+      }
+    });
+  }
+  if (mgAtteseTogliTutte) {
+    mgAtteseTogliTutte.addEventListener('click', () => { if (selectedId) scriviAttese(selectedId, []); });
+  }
+  if (mgAtteseLista) {
+    mgAtteseLista.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-azione]');
+      const li = btn && btn.closest('.mg-attesa[data-id]');
+      const fb = li && selectedId && allFeedbacks.find((f) => f._id === selectedId);
+      if (!fb) return;
+      if (btn.dataset.azione === 'apri') { openFromAttesa(li.dataset.id); return; }
+      const resto = ATT.atteseDi(fb).filter((w) => w.id !== li.dataset.id);
+      scriviAttese(fb._id, resto.map((w) => w.num || numeroDi(trovaAtteso(w.id))));
+    });
+  }
+  // Dall'attesa alla pratica aspettata, nella sua sezione.
+  function openFromAttesa(id) {
+    const altro = allFeedbacks.find((f) => f._id === id);
+    if (!altro) return;
+    const tab = sezioneDi(altro);
+    if (tab && tab !== currentTab) selectTab(tab);
+    openDetail(id);
+  }
+
   // Il tasto «Fondi senza chiedermelo» e la riga che dice chi ha messo il
   // segno. Sulle pratiche chiuse il tasto sparisce: il segno lì non conta.
   function reflectPreapproved(fb) {
