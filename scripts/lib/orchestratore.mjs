@@ -313,15 +313,87 @@ export function promptVerificatore({ p, regole, wtApp, wtServer, brief, cartella
   ].join('\n');
 }
 
-/** Una riga per pratica, per chi guarda (npm run orchestra -- stato). PURA. */
-export function rigaStato(p) {
+const oraBreve = (iso) => String(iso || '').slice(11, 16);
+
+/** Una riga per pratica, per chi guarda (npm run orchestra -- stato). `vivo`: l'orchestratore che la guida gira ancora. PURA. */
+export function rigaStato(p, { vivo = true } = {}) {
   const costo = p.costo ? ` · ${Number(p.costo).toFixed(2)} $` : '';
   const giri = p.giriTotali ? ` · giri ${p.giriTotali}` : '';
   let r = `#${p.num} ${ramoDi(p)}: ${p.fase}${p.fase === 'lavoro' && p.compito !== 'lavoro' ? ` (${p.compito})` : ''}${giri}${costo}`;
+  if (p.inCorso) {
+    r += vivo
+      ? `\n    in corso: ${p.inCorso.cosa} (dalle ${oraBreve(p.inCorso.da)})`
+      : `\n    interrotto: ${p.inCorso.cosa}, l’orchestratore si è chiuso a metà; riparte col prossimo «avvia»`;
+  }
+  if (p.interrotto) r += `\n    lasciato a metà (${p.interrotto.come === 'subito' ? 'fermata immediata' : 'chiusura con calma'}): ${p.interrotto.cosa}; il prossimo «avvia» rifà il passo`;
+  if (p.attesa) r += `\n    in attesa: ${p.attesa}`;
   if (p.fermo) r += `\n    fermo: ${p.fermo.motivo}${p.fermo.domanda ? `\n    domanda:\n${p.fermo.domanda.replace(/^/gm, '      ')}` : ''}`;
-  if (p.derivatiAperti && p.derivatiAperti.length) r += `\n    feedback aperti dai rilievi: ${p.derivatiAperti.map((d) => (d.num ? `#${d.num}` : d.titolo)).join(', ')}`;
+  if (p.fermo && p.fermo.azione) r += `\n    da fare: ${p.fermo.azione}`;
+  if (p.derivatiAperti && p.derivatiAperti.length) {
+    r += `\n    feedback aperti dai rilievi: ${p.derivatiAperti.map((d) => `${d.num ? `#${d.num}` : d.titolo}${d.dove === 'locale' ? ' (locale)' : ''}`).join(', ')}`;
+  }
   for (const a of p.avvisi || []) r += `\n    avviso: ${a}`;
   return r;
+}
+
+/** La riga di `stato` per un orchestratore a cui è stato chiesto di smettere. r = { modo, at }, inCorso = pratiche con un'istanza viva. PURA. */
+export function rigaChiusura(r, inCorso = []) {
+  const come = r.modo === 'subito' ? 'In chiusura immediata' : 'In chiusura con calma';
+  const n = inCorso.length;
+  const quali = inCorso.map((p) => `#${p.num} ${p.inCorso.cosa} (dalle ${oraBreve(p.inCorso.da)})`).join(', ');
+  if (!n) return `${come} (chiesta alle ${oraBreve(r.at)}): niente più in corso, sta uscendo.`;
+  return r.modo === 'subito'
+    ? `${come} (chiesta alle ${oraBreve(r.at)}): sto fermando ${n === 1 ? 'un’istanza' : `${n} istanze`}: ${quali}.`
+    : `${come} (chiesta alle ${oraBreve(r.at)}): non avvia altro, aspetta ${n === 1 ? 'un’istanza' : `${n} istanze`}: ${quali}.`;
+}
+
+// Una domanda lunga nella nota resta leggibile; intera la mostra `stato`, e la nota lo dice.
+const DOMANDA_NELLA_NOTA = 4000;
+
+/** La nota sulla pratica del feedback quando il lavoro si ferma: cosa è successo e cosa deve fare l'owner, in chiaro. PURA. */
+export function notaPerOwner(p, f) {
+  const riprendiCmd = (conRisposta) => `\`npm run orchestra -- riprendi ${p.num}${conRisposta ? ' "<la tua risposta>"' : ''}\``;
+  if (f.attesaApprovazione) {
+    return [
+      'Orchestratore locale: il lavoro è pronto e la fusione aspetta il tuo sì.',
+      `Cosa fare: approvala in Filo (Gestione → Automazioni), poi ${riprendiCmd(false)}.`,
+    ].join('\n');
+  }
+  if (f.domanda) {
+    const d = String(f.domanda).trim();
+    const corta = d.length > DOMANDA_NELLA_NOTA
+      ? `${d.slice(0, DOMANDA_NELLA_NOTA)}\n[… la domanda continua: ${d.length} caratteri in tutto, intera con \`npm run orchestra -- stato\`]`
+      : d;
+    return [
+      `Orchestratore locale: il lavoro si è fermato e serve una tua scelta (${primaRiga(f.motivo)}).`,
+      '', corta, '',
+      `Cosa fare: rispondi con ${riprendiCmd(true)}.`,
+    ].join('\n');
+  }
+  if (f.azione) return `Orchestratore locale: ${primaRiga(f.motivo)}.\nCosa fare: ${f.azione}`;
+  return [
+    `Orchestratore locale: lavoro fermo, ${primaRiga(f.motivo)}.`,
+    `Cosa fare: il motivo intero è in \`npm run orchestra -- stato\`; poi ${riprendiCmd(false)}, con una risposta fra virgolette se serve una scelta.`,
+  ].join('\n');
+}
+
+/**
+ * Le regole cambiate si pubblicano dal checkout principale su main = origin/main, a Filo chiuso (#1036). PURA.
+ * s = { filoAperto, reteGiu, ramo, testa, origine, indietro, toccati } → { azione: 'aspetta'|'allinea'|'pubblica'|'owner', motivo, fai }
+ */
+export function decidiRegole(s, num) {
+  const poi = `poi \`npm run orchestra -- riprendi ${num}\``;
+  if (s.filoAperto) return { azione: 'aspetta', motivo: 'Filo è aperto: le regole cambiate si pubblicano appena lo chiudi' };
+  if (s.reteGiu) return { azione: 'aspetta', motivo: `origin/main non si legge (${s.reteGiu}): riprovo` };
+  if (s.ramo !== 'main') {
+    return { azione: 'owner', motivo: `fuso, ma le regole cambiate non si pubblicano: il checkout principale è su «${s.ramo || 'testa staccata'}», non su main`, fai: `riporta il checkout principale su main (git switch main), ${poi}.` };
+  }
+  if ((s.toccati || []).length) {
+    return { azione: 'owner', motivo: `fuso, ma le regole cambiate non si pubblicano: nel checkout principale ${s.toccati.join(', ')} hanno modifiche non fuse`, fai: `togli o metti da parte quelle modifiche, ${poi}.` };
+  }
+  if (s.testa && s.testa === s.origine) return { azione: 'pubblica' };
+  if (s.indietro) return { azione: 'allinea' };
+  return { azione: 'owner', motivo: 'fuso, ma le regole cambiate non si pubblicano: il main del checkout principale ha commit che origin/main non ha', fai: `riallinealo a origin/main, ${poi}.` };
 }
 
 /** Rimette in moto una pratica ferma, con la risposta dell'owner se c'è. PURA. */
