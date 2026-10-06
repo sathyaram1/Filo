@@ -1332,5 +1332,37 @@ test('Filo dell’owner aperto: lo dice il blocco nella sua cartella dati, su Wi
 
 test('Ctrl-C nel terminale di avvia: il primo smette con calma, il secondo ferma subito, il terzo esce; il segnale che npm rimanda subito dopo non conta', () => {
   const colpo = contaColpi(1000);
-  assert.deepEqual([colpo(0), colpo(5), colpo(2000), colpo(4000)], ['calma', null, 'subito', 'esci']);
+  assert.deepEqual([colpo(0, ''), colpo(5, 'calma'), colpo(2000, 'calma'), colpo(4000, 'subito')], ['calma', null, 'subito', 'esci']);
+  assert.equal(contaColpi(1000)(0, 'calma'), 'subito', 'dopo uno smetti da un altro terminale, il primo Ctrl-C ferma subito');
+});
+
+test('avvia ascolta smetti da un altro terminale e i Ctrl-C del suo: prima con calma, poi subito coi processi fermati; la richiesta di un altro orchestratore non conta', async () => {
+  const d = cartellaTemporanea('orch-ascolta-');
+  let chiusura = '';
+  const motore = { chiusura: () => chiusura, smetti: (m) => { chiusura = m === 'subito' ? 'subito' : (chiusura || 'calma'); return chiusura; } };
+  const segnali = new EventEmitter();
+  let fermati = 0;
+  const uscite = [];
+  const stacca = ascoltaFermate({ P: { note: d }, motore, log: () => {}, pid: 4242, ferma: () => { fermati += 1; }, esci: (c) => uscite.push(c), segnali, ogniMs: 5, finestraMs: 30 });
+  const richiesta = () => JSON.parse(readFileSync(join(d, 'smetti.json'), 'utf8'));
+  const aspetta = (ms) => new Promise((ok) => setTimeout(ok, ms));
+  const sg = process.platform === 'win32' ? 'SIGBREAK' : 'SIGTERM';
+  try {
+    writeFileSync(join(d, 'smetti.json'), JSON.stringify({ pid: 999, modo: 'subito' }));
+    await aspetta(60);
+    assert.equal(chiusura, '', 'la richiesta era per un altro orchestratore');
+    writeFileSync(join(d, 'smetti.json'), JSON.stringify({ pid: 4242, modo: 'calma', at: 'x' }));
+    for (let i = 0; i < 100 && !chiusura; i += 1) await aspetta(10);
+    assert.deepEqual([chiusura, fermati], ['calma', 0]);
+    segnali.emit('SIGINT');
+    assert.deepEqual([chiusura, fermati, richiesta().modo, richiesta().pid], ['subito', 1, 'subito', 4242]);
+    segnali.emit(sg);
+    assert.deepEqual(uscite, [], 'il segnale doppio di npm non conta');
+    await aspetta(50);
+    segnali.emit('SIGINT');
+    assert.deepEqual(uscite, [130]);
+  } finally {
+    stacca();
+  }
+  assert.equal(segnali.listenerCount('SIGINT'), 0);
 });

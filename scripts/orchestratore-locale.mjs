@@ -358,17 +358,16 @@ export function filoAperto(cartelle = cartelleDatiFilo(), piattaforma = process.
 }
 
 /**
- * I Ctrl-C del terminale di avvia: il primo vale «smetti», il secondo «subito», dal terzo si esce. Due segnali a meno di
- * `finestraMs` sono un colpo solo: fuori da Windows npm rimanda al figlio il segnale che il terminale gli ha già dato. PURA.
+ * Cosa vale un Ctrl-C nel terminale di avvia, dalla chiusura già chiesta (anche con smetti): nessuna → «smetti», con calma
+ * → «subito», subito → si esce. Due segnali a meno di `finestraMs` sono un colpo solo: fuori da Windows npm rimanda al
+ * figlio il segnale che il terminale gli ha già dato. → (adessoMs, chiusura) → 'calma' | 'subito' | 'esci' | null. PURA.
  */
 export function contaColpi(finestraMs = 1000) {
-  let colpi = 0;
   let ultimo = -Infinity;
-  return (adessoMs) => {
+  return (adessoMs, chiusura = '') => {
     if (adessoMs - ultimo < finestraMs) return null;
     ultimo = adessoMs;
-    colpi += 1;
-    return colpi === 1 ? 'calma' : colpi === 2 ? 'subito' : 'esci';
+    return !chiusura ? 'calma' : chiusura === 'calma' ? 'subito' : 'esci';
   };
 }
 
@@ -389,9 +388,11 @@ function togliRichiesta(P) {
 
 /**
  * Le due strade per fermare avvia (#1043): `smetti` da un altro terminale, letto dal file di richiesta, e i Ctrl-C del suo
- * terminale. Con «subito» ferma anche i processi in corso. → la funzione che le stacca. `pid`, `ferma`, `esci` e i tempi servono alle prove.
+ * terminale. Con «subito» ferma anche i processi in corso. → la funzione che le stacca. `pid`, `ferma`, `esci`, `segnali` e i tempi servono alle prove.
  */
-export function ascoltaFermate({ P, motore, log, pid = process.pid, ferma = fermaFigli, esci = (c) => process.exit(c), ogniMs = 2000, finestraMs = 1000, ora = () => new Date().toISOString() }) {
+export function ascoltaFermate({
+  P, motore, log, pid = process.pid, ferma = fermaFigli, esci = (c) => process.exit(c), segnali = process, ogniMs = 2000, finestraMs = 1000, ora = () => new Date().toISOString(),
+}) {
   const chiedi = (modo, da) => {
     const prima = motore.chiusura();
     const dopo = motore.smetti(modo);
@@ -414,16 +415,16 @@ export function ascoltaFermate({ P, motore, log, pid = process.pid, ferma = ferm
   }, ogniMs);
   const colpo = contaColpi(finestraMs);
   const alSegnale = () => {
-    const c = colpo(Date.now());
-    if (c === 'esci') { log('terzo Ctrl-C: esco adesso'); esci(130); return; }
+    const c = colpo(Date.now(), motore.chiusura());
+    if (c === 'esci') { log('Ctrl-C a fermata immediata già chiesta: esco adesso'); esci(130); return; }
     if (c) chiedi(c, 'Ctrl-C');
   };
   // Ctrl-Break su Windows; SIGTERM fuori, dove su Windows non arriva mai.
-  const segnali = process.platform === 'win32' ? ['SIGINT', 'SIGBREAK'] : ['SIGINT', 'SIGTERM'];
-  for (const sg of segnali) process.on(sg, alSegnale);
+  const nomi = process.platform === 'win32' ? ['SIGINT', 'SIGBREAK'] : ['SIGINT', 'SIGTERM'];
+  for (const sg of nomi) segnali.on(sg, alSegnale);
   return () => {
     clearInterval(guardia);
-    for (const sg of segnali) process.off(sg, alSegnale);
+    for (const sg of nomi) segnali.off(sg, alSegnale);
   };
 }
 
