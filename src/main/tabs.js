@@ -3141,19 +3141,19 @@ class TabManager {
     if (nuovo) wc.once('destroyed', () => permessiApriComunque.delete(wcId));
   }
 
-  // La pagina «Sito bloccato» prende nella storia il posto del suo sito, e viceversa:
-  // senza, indietro da lì riporta sul sito e si ferma di nuovo.
-  _sostituisciVoceBloccata(wc, url) {
+  // Una pagina che sta per un indirizzo (errore di rete, «Sito bloccato») ne prende il posto nella storia, e
+  // viceversa: senza, Indietro da lì riapre l'indirizzo, che fallisce o si ferma di nuovo (#871 giro 9).
+  _sostituisciVoceGemella(wc, url) {
     const NE = globalThis.SN_NET_ERROR;
     if (!NE) return;
     try {
       const h = wc.navigationHistory;
-      const i = h.getActiveIndex();
-      if (i < 1) return;
-      const prima = (h.getEntryAtIndex(i - 1) || {}).url || '';
-      const gemelle = (NE.isBlockedPageUrl(url) && NE.targetOf(url) === prima)
-        || (NE.isBlockedPageUrl(prima) && NE.targetOf(prima) === url);
-      if (gemelle) h.removeEntryAtIndex(i - 1);
+      for (let i = h.getActiveIndex(); i >= 1; i--) {
+        const prima = (h.getEntryAtIndex(i - 1) || {}).url || '';
+        const gemelle = (NE.isErrorPageUrl(url) || NE.isErrorPageUrl(prima)) && this._urlUtente(prima) === this._urlUtente(url);
+        if (!gemelle) return;
+        h.removeEntryAtIndex(i - 1);
+      }
     } catch (_) {}
   }
 
