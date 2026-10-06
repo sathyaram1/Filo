@@ -83,7 +83,7 @@ test('lettura ad alta voce: velocità 1 non si manda, audio vuoto è un errore',
       /audio vuoto/,
     );
     assert.equal(calls[0].body.speed, undefined);
-    assert.equal(calls[0].body.provider, undefined, 'senza politica non si manda un blocco vuoto');
+    assert.deepEqual(calls[0].body.provider, { zdr: true }, 'senza lista di esclusione, coi crediti di Filo resta solo la ritenzione zero');
   });
 });
 

@@ -41,12 +41,17 @@ function audioRes() {
 
 const endpoints = (...hosts) => jsonRes({ data: { endpoints: hosts.map(([provider_name, tag]) => ({ provider_name, tag })) } });
 
-// `hosts`: modello → risposta dell'elenco host (o funzione che la costruisce).
-async function withRouter(hosts, run) {
+// `hosts`: modello → risposta dell'elenco host (o funzione che la costruisce); `zdr`: il catalogo a ritenzione
+// zero (assente = non letto, e il controllo non ferma niente).
+async function withRouter(hosts, run, { zdr = null } = {}) {
   const real = global.fetch;
-  const calls = { endpoints: [], audio: [] };
+  const calls = { endpoints: [], audio: [], zdr: 0 };
   global.fetch = async (url) => {
     const u = String(url);
+    if (u === OR.ZDR_ENDPOINT) {
+      calls.zdr++;
+      return zdr ? jsonRes(zdr) : jsonRes({ error: 'not found' }, 404);
+    }
     if (u.endsWith('/endpoints')) {
       calls.endpoints.push(u);
       const model = decodeURIComponent(u.slice(`${OR.MODELS_ENDPOINT}/`.length, -'/endpoints'.length));
