@@ -468,6 +468,17 @@ function pubblicaDavvero(P) {
   return esegui('npm', ['run', 'server:pubblica'], { cwd, timeoutMs: 60 * 60_000 });
 }
 
+// Dove si lavora un rilievo messo da parte lo decide un giudizio, non un elenco di parole (#1036): una domanda breve, sforzo basso.
+export const SMISTATORE = Object.freeze({ model: 'opus', effort: 'low' });
+function smistaCon(bin, env) {
+  return async (prompt) => {
+    const r = await esegui(bin, argomentiClaude({ ...SMISTATORE, nome: 'filo smistamento rilievi' }), { cwd: ROOT, input: prompt, env, timeoutMs: 15 * 60_000 });
+    const u = leggiUscitaClaude(r.stdout, r.stderr, r.code);
+    if (!u.ok) throw new Error(u.errore);
+    return u.testo;
+  };
+}
+
 function depVere(P, opz, log) {
   const bin = trovaClaude();
   if (!bin) throw new Error('Claude Code non trovato: imposta FILO_CLAUDE_BIN col percorso del binario');
@@ -488,6 +499,7 @@ function depVere(P, opz, log) {
       writeFileSync(f, `${r.stdout}\n${r.stderr ? `\n--- stderr ---\n${r.stderr}` : ''}`);
       return leggiUscitaClaude(r.stdout, r.stderr, r.code);
     },
+    smista: smistaCon(bin, env),
     verifica: (wt) => {
       if (!existsSync(wt)) return {};
       return { ...verifyLocal.verdictForCurrentBranch(wt), dirty: verifyLocal.isDirty(wt) };
@@ -679,7 +691,8 @@ async function main(argv) {
     const giaAperti = (p.derivatiAperti || []).length;
     if (p.fase !== 'fuso' && existsSync(P.wt(p.slug))) {
       verifyLocal = await import('./verify-local.mjs');
-      const depTogli = { esegui, percorsi: P, verifica: (wt) => (existsSync(wt) ? verifyLocal.verdictForCurrentBranch(wt) : {}) };
+      const bin = trovaClaude();
+      const depTogli = { esegui, percorsi: P, verifica: (wt) => (existsSync(wt) ? verifyLocal.verdictForCurrentBranch(wt) : {}), smista: bin ? smistaCon(bin, envFiglio(process.env)) : undefined };
       const falliti = await apriDerivatiDi(depTogli, p, { derivati: modoDerivati(p), salva: (q) => { s.pratiche[n] = q; store.scrivi(s); } });
       if (falliti) {
         throw new Error(`#${n} non tolta: ${falliti === 1 ? 'un rilievo non si è aperto' : `${falliti} rilievi non si sono aperti`} come feedback, e col worktree se ne andrebbe:\n${p.avvisi.filter((a) => a.startsWith('feedback non aperto')).join('\n')}\nRiprova togli: quelli già aperti non si riaprono.`);
