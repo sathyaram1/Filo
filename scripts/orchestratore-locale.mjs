@@ -576,8 +576,31 @@ async function main(argv) {
     const s = store.leggi();
     const pid = inCorso();
     console.log(pid ? `Orchestratore in corso (pid ${pid}).` : 'Orchestratore fermo.');
+    const r = leggiRichiesta(P);
+    if (pid && r && r.pid === pid) console.log(rigaChiusura(r, Object.values(s.pratiche).filter((p) => p && p.inCorso)));
     if (!(s.coda || []).length) console.log('Coda vuota.');
-    for (const n of s.coda || []) if (s.pratiche[n]) console.log(rigaStato(s.pratiche[n]));
+    for (const n of s.coda || []) if (s.pratiche[n]) console.log(rigaStato(s.pratiche[n], { vivo: !!pid }));
+    return 0;
+  }
+
+  if (cmd === 'smetti') {
+    const { opz, posizionali } = leggiArgomenti('smetti', rest);
+    if (posizionali.length) throw erroreDiUso(`smetti: argomento non capito «${posizionali[0]}»`);
+    const pid = inCorso();
+    if (!pid) {
+      togliRichiesta(P);
+      console.log('Nessun orchestratore in corso: non c’è niente da fermare.');
+      return 0;
+    }
+    const prima = leggiRichiesta(P);
+    const modo = opz.subito || (prima && prima.pid === pid && prima.modo === 'subito') ? 'subito' : 'calma';
+    scriviRichiesta(P, { pid, modo, at: ora() });
+    const vive = Object.values(store.leggi().pratiche).filter((p) => p && p.inCorso);
+    const quante = vive.length === 1 ? 'l’istanza in corso' : `le ${vive.length} istanze in corso`;
+    console.log(modo === 'subito'
+      ? `Chiesto all’orchestratore (pid ${pid}) di fermarsi subito: ferma ${vive.length ? quante : 'quello che sta facendo'}; il prossimo «npm run orchestra -- avvia» rifà i passi interrotti.`
+      : `Chiesto all’orchestratore (pid ${pid}) di smettere con calma: non avvia altro, ${vive.length ? `aspetta ${quante}` : 'finisce il passo in corso'} e poi esce da solo.\n`
+        + 'Per fermarlo subito: npm run orchestra -- smetti --subito. Per seguirlo: npm run orchestra -- stato.');
     return 0;
   }
 
