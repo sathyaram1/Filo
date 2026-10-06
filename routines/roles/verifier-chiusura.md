@@ -10,6 +10,8 @@ versione del codice viene rifiutata.
 
 <!-- includi: _decisioni-owner.md -->
 
+<!-- includi: _immagini.md -->
+
 <!-- includi: _cornice-feedback.md -->
 
 ## Il perimetro

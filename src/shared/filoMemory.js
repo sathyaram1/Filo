@@ -9,7 +9,7 @@
 //
 // In aggiunta gestiamo qui anche due store legati alla dashboard:
 //   - timers: countdown attivi (azione TIMER).
-//   - notifications: voci della colonna destra.
+//   - notifications: avvisi, carte della colonna sinistra della home.
 //
 // Gli appunti NON stanno più qui: l'azione SALVA_APPUNTO li scrive nei file
 // dell'editor (src/main/services/editorFiles.js), che è anche l'unico posto che
@@ -69,7 +69,14 @@
   }
   async function setRaw(key, value) {
     await chrome.storage.local.set({ [key]: value });
+    if ((key === KEYS.FILO_MEMORY || key === KEYS.FILO_LESSONS_BUFFER) && onMemoriaCambiata) {
+      try { onMemoriaCambiata(); } catch (_) {}
+    }
   }
+
+  // Il main avvisa da qui le pagine che mostrano la memoria (Preferenze, #592).
+  let onMemoriaCambiata = null;
+  function setOnMemoryChange(fn) { onMemoriaCambiata = typeof fn === 'function' ? fn : null; }
 
   // ===== Raw log =====
 
@@ -96,6 +103,14 @@
     return out.slice(0, limit);
   }
 
+  // Toglie le voci che `pred` riconosce (i messaggi di una chat cancellata, #866).
+  async function togliRaw(pred) {
+    const list = await getRaw(KEYS.FILO_RAW_LOG, []);
+    const next = list.filter((e) => !pred(e));
+    if (next.length !== list.length) await setRaw(KEYS.FILO_RAW_LOG, next);
+    return list.length - next.length;
+  }
+
   // ===== Lessons buffer =====
 
   async function getLessonsBuffer() {
@@ -119,6 +134,17 @@
     await setRaw(KEYS.FILO_LESSONS_BUFFER, []);
   }
 
+  // Toglie UNA lezione, riconosciuta da data e testo: una pagina rimasta indietro
+  // non deve poter togliere la riga sbagliata. Torna se l'ha trovata (#592).
+  async function forgetLesson({ ts, text } = {}) {
+    const buf = await getLessonsBuffer();
+    const i = buf.findIndex((l) => l && l.ts === ts && l.text === text);
+    if (i < 0) return false;
+    buf.splice(i, 1);
+    await setRaw(KEYS.FILO_LESSONS_BUFFER, buf);
+    return true;
+  }
+
   // ===== Moduli =====
 
   // Forma in storage: { PROFILO: "...", PREFERENZE: "...", <ESPANSIONE>: "..." }
@@ -130,6 +156,65 @@
 
   async function setMemory(memory) {
     await setRaw(KEYS.FILO_MEMORY, memory);
+  }
+
+  // Toglie UNA riga da un modulo, riconosciuta dal testo esatto. Torna se c'era.
+  async function forgetModuleLine(nome, riga) {
+    const mem = await getMemory();
+    const testo = mem && typeof mem[nome] === 'string' ? mem[nome] : null;
+    if (testo == null || typeof riga !== 'string' || !riga.trim()) return false;
+    const righe = testo.split(/\r?\n/);
+    const i = righe.findIndex((r) => r.trim() === riga.trim());
+    if (i < 0) return false;
+    righe.splice(i, 1);
+    await setMemory({ ...mem, [nome]: righe.join('\n').trim() });
+    return true;
+  }
+
+  // La memoria come la rilegge l'utente nelle Preferenze (#592): i moduli in
+  // righe, e le lezioni ancora da riordinare.
+  async function viewForUser() {
+    const mem = await getMemory();
+    const moduli = Object.entries(mem || {})
+      .filter(([, v]) => typeof v === 'string')
+      .map(([nome, v]) => ({ nome, righe: v.split(/\r?\n/).map((r) => r.trim()).filter(Boolean) }));
+    const lezioni = (await getLessonsBuffer())
+      .filter((l) => l && typeof l.text === 'string' && l.text.trim())
+      .map((l) => ({ ts: l.ts, text: l.text }));
+    return { moduli, lezioni };
+  }
+
+  // Le righe che una frase detta a voce indica (#592): quelle uguali, se ce ne
+  // sono, altrimenti quelle che la contengono. Ognuna porta il `via` di
+  // FILO_MEMORY_FORGET, così la voce toglie esattamente quello che toglie la ×.
+  async function tutteLeRighe() {
+    const { moduli, lezioni } = await viewForUser();
+    return [
+      ...moduli.flatMap((m) => m.righe.map((riga) => ({ testo: riga, via: { modulo: m.nome, riga } }))),
+      ...lezioni.map((l) => ({ testo: l.text, via: { lezione: { ts: l.ts, text: l.text } } })),
+    ];
+  }
+
+  async function findLines(frase) {
+    const norma = (s) => String(s == null ? '' : s).replace(/^\s*[-•*]\s+/, '').replace(/\s+/g, ' ').trim().toLowerCase();
+    const cerca = norma(frase);
+    if (!cerca) return [];
+    const tutte = await tutteLeRighe();
+    const uguali = tutte.filter((r) => norma(r.testo) === cerca);
+    return uguali.length ? uguali : tutte.filter((r) => norma(r.testo).includes(cerca));
+  }
+
+  // Le righe che ci sono ancora fra quelle che un popup ha mostrato, per testo.
+  async function linesWithText(testi) {
+    const visti = new Set((Array.isArray(testi) ? testi : []).filter((t) => typeof t === 'string'));
+    if (!visti.size) return [];
+    return (await tutteLeRighe()).filter((r) => visti.has(r.testo));
+  }
+
+  async function forgetLine(via) {
+    if (via && via.lezione && typeof via.lezione === 'object') return forgetLesson(via.lezione);
+    if (via && typeof via.modulo === 'string' && typeof via.riga === 'string') return forgetModuleLine(via.modulo, via.riga);
+    return false;
   }
 
   // Aggiorna alcuni moduli senza toccare gli altri (semantica patch).
@@ -232,7 +317,10 @@
     return getRaw(KEYS.FILO_TIMERS, []);
   }
 
-  async function addTimer({ label, seconds }) {
+  // `chat`: la conversazione che l'ha chiesto, se c'è; la carta nella home ci riporta lì (#870).
+  const chatValida = (c) => (typeof c === 'string' && c.length > 0 && c.length <= 200 ? c : null);
+
+  async function addTimer({ label, seconds, chat }) {
     // Una durata non interpretabile o non positiva (0, negativa, NaN) NON crea un
     // timer: torniamo null e i chiamanti non lo trasmettono né lo segnano eseguito
     // (`if (t) broadcastLiveUpdate()`, `executed: !!entry`). Stessa filosofia di
@@ -249,6 +337,7 @@
       endsAt: new Date(Date.now() + sec * 1000).toISOString(),
       paused: false,
     };
+    if (chatValida(chat)) entry.chat = chat;
     list.unshift(entry);
     await setRaw(KEYS.FILO_TIMERS, list);
     return entry;
@@ -461,7 +550,7 @@
 
   // Dicitura leggibile della ricorrenza: "ogni giorno", "feriali", "weekend"
   // oppure l'elenco dei giorni ("lun+mer"). Unica per stato dell'agente e
-  // colonna destra: se cambia, cambia in un posto solo.
+  // carte della home: se cambia, cambia in un posto solo.
   function formatRepeat(days) {
     const d = normalizeRepeat(days);
     if (!d.length) return '';
@@ -471,7 +560,7 @@
     return d.join('+');
   }
 
-  async function addAlarm({ label, time, repeat, nowMs }) {
+  async function addAlarm({ label, time, repeat, nowMs, chat }) {
     const now = Number.isFinite(nowMs) ? nowMs : Date.now();
     const days = normalizeRepeat(repeat);
     const clock = days.length ? parseClock(time) : null;
@@ -490,6 +579,7 @@
       entry.repeat = days;
       entry.atTime = fmtClock(clock);
     }
+    if (chatValida(chat)) entry.chat = chat;
     list.unshift(entry);
     await setRaw(KEYS.FILO_TIMERS, list);
     return entry;
@@ -819,12 +909,13 @@
 
   global.SN_FILO_MEMORY = {
     // raw log
-    appendRaw, listRaw,
+    appendRaw, listRaw, togliRaw,
     // lessons
-    getLessonsBuffer, appendLesson, lessonsBufferShouldCompact, clearLessonsBuffer,
+    getLessonsBuffer, appendLesson, lessonsBufferShouldCompact, clearLessonsBuffer, forgetLesson,
     LESSONS_BUFFER_TRIGGER_CHARS,
     // moduli
-    getMemory, setMemory, patchMemory, parseCompactorOutput, renderMemoryForPrompt,
+    getMemory, setMemory, patchMemory, parseCompactorOutput, renderMemoryForPrompt, forgetModuleLine,
+    setOnMemoryChange, viewForUser, findLines, linesWithText, forgetLine,
     // onboarding (#524)
     getOnboarding, setOnboarding,
     // timer + sveglie (#322)

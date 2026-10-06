@@ -56,8 +56,29 @@ function esegui(script, argv, env) {
   });
 }
 
+/**
+ * Un deposito git usa-e-getta, pulito e POSIZIONATO sul ramo del lavoro: le
+ * consegne valgono per un commit e guardano la directory. Sul repo vero una
+ * modifica non committata di chi lancia gli unit faceva rosso questo file.
+ */
+function depositoSulRamo() {
+  const casa = cartellaTemporanea('filo-due-testi-');
+  execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: casa });
+  execFileSync('git', ['config', 'user.email', 't@t'], { cwd: casa });
+  execFileSync('git', ['config', 'user.name', 't'], { cwd: casa });
+  writeFileSync(resolve(casa, 'segnaposto.txt'), 'x', 'utf8');
+  // Lo stato del giro sta fuori da git, come nel repo vero
+  // (`.claude/routine-state/` è ignorato).
+  writeFileSync(resolve(casa, '.gitignore'), 'stato/\n', 'utf8');
+  execFileSync('git', ['add', '-A'], { cwd: casa });
+  execFileSync('git', ['commit', '-qm', 'init'], { cwd: casa });
+  execFileSync('git', ['checkout', '-q', '-b', 'worker/900'], { cwd: casa });
+  return casa;
+}
+
 test('il canale manda DUE testi distinti: il report e la frase', async () => {
   const { srv, ricevuti, port } = await fintoServer();
+  const casa = depositoSulRamo();
   try {
     const r = await esegui('routine-channel.mjs', [
       'deliver', 'biglietto-di-prova', 'status',
@@ -65,7 +86,7 @@ test('il canale manda DUE testi distinti: il report e la frase', async () => {
       '--notes', 'Report per l’owner: ho scartato la strada A perché costava una chiamata a pagamento in più.',
       '--frase', 'Ora puoi rimuovere un modello dalle impostazioni.',
       '--branch', 'worker/900',
-    ], { FILO_ROUTINE_API: `http://127.0.0.1:${port}` });
+    ], { FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: casa, FILO_NO_BEAT: '1' });
     assert.equal(r.code, 0, `la consegna doveva essere accettata (stderr: ${r.se})`);
 
     const consegna = ricevuti.find((x) => x.url.includes('routineDeliver'));
@@ -77,30 +98,16 @@ test('il canale manda DUE testi distinti: il report e la frase', async () => {
     assert.equal(d.frase, undefined,
       'un campo che il server non conosce verrebbe scartato in silenzio: la frase sarebbe persa');
     assert.notEqual(d.notes, d.userNote, 'sono due testi, non lo stesso testo due volte');
-  } finally { srv.close(); }
+  } finally { srv.close(); rmSync(casa, { recursive: true, force: true }); }
 });
 
 test('la correzione consegna il report E la frase (non solo il report)', async () => {
   const { srv, ricevuti, port } = await fintoServer();
-  const casa = cartellaTemporanea('filo-due-testi-');
+  // `--record-fixed` passa dallo stato locale del giro: gli si dà una cartella
+  // usa-e-getta, così non tocca niente di reale; la guardia sull'identità
+  // rifiuta le consegne fatte da un'altra versione del codice.
+  const casa = depositoSulRamo();
   try {
-    // `--record-fixed` passa dallo stato locale del giro: gli si dà una cartella
-    // usa-e-getta, così non tocca niente di reale. Deve essere un deposito git
-    // POSIZIONATO sul ramo del lavoro: la guardia sull'identità rifiuta le
-    // consegne fatte da un'altra versione del codice, e senza questo il test
-    // fallirebbe per un motivo che non è quello in prova.
-    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: casa });
-    execFileSync('git', ['config', 'user.email', 't@t'], { cwd: casa });
-    execFileSync('git', ['config', 'user.name', 't'], { cwd: casa });
-    writeFileSync(resolve(casa, 'segnaposto.txt'), 'x', 'utf8');
-    // Lo stato del giro sta fuori da git, come nel repo vero
-    // (`.claude/routine-state/` è ignorato): la consegna vale per un commit e
-    // con file non registrati si ferma prima del server — non è ciò che si
-    // prova qui.
-    writeFileSync(resolve(casa, '.gitignore'), 'stato/\n', 'utf8');
-    execFileSync('git', ['add', '-A'], { cwd: casa });
-    execFileSync('git', ['commit', '-qm', 'init'], { cwd: casa });
-    execFileSync('git', ['checkout', '-q', '-b', 'worker/900'], { cwd: casa });
     mkdirSync(resolve(casa, 'stato'), { recursive: true });
     writeFileSync(resolve(casa, 'stato', 'fid-900.json'), JSON.stringify({
       id: 'fid-900', branch: 'worker/900', loopCount: 1, verifierVerdict: 'fail',
@@ -131,6 +138,31 @@ test('la correzione consegna il report E la frase (non solo il report)', async (
       'senza questa, a chi ha segnalato arriva "risolto" e basta');
     assert.equal(String(d.report).includes('--frase'), false,
       'la frase non deve finire dentro il report: sarebbero due testi impastati in uno');
+  } finally { srv.close(); rmSync(casa, { recursive: true, force: true }); }
+});
+
+test('un report a elenco puntato arriva intero anche dalla correzione, come dal canale', async () => {
+  const PUNTI = '- Corretto il pulsante che non salvava col titolo vuoto.\n- Lasciato stare il resto, che era già a posto.';
+  const { srv, ricevuti, port } = await fintoServer();
+  const casa = depositoSulRamo();
+  try {
+    mkdirSync(resolve(casa, 'stato'), { recursive: true });
+    writeFileSync(resolve(casa, 'stato', 'fid-900.json'), JSON.stringify({
+      id: 'fid-900', branch: 'worker/900', loopCount: 1, verifierVerdict: 'fail',
+    }), 'utf8');
+    const r = await esegui('dispatch.mjs', ['--record-fixed', 'fid-900', PUNTI, '--frase', 'Ora il pulsante salva.'], {
+      FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
+      FILO_REPO_ROOT: casa,
+      FILO_DISPATCH_STATE_DIR: resolve(casa, 'stato'),
+      FILO_ROUTINES_ENABLED: '1',
+      FILO_ROUTINE_TICKET: 'biglietto-di-prova',
+      FILO_NO_BEAT: '1',
+    });
+    assert.doesNotMatch(r.se, /Argomento non capito/, 'un elenco puntato non è un\'opzione');
+    const consegna = ricevuti.find((x) => x.url.includes('routineDeliver'));
+    assert.ok(consegna, `la correzione deve arrivare al server (uscita ${r.code}, stderr: ${r.se})`);
+    assert.equal(consegna.body.data?.report, PUNTI);
+    assert.equal(consegna.body.data?.userNote, 'Ora il pulsante salva.');
   } finally { srv.close(); rmSync(casa, { recursive: true, force: true }); }
 });
 

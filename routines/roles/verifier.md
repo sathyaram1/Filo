@@ -22,13 +22,16 @@ un **livello**.
   o se quel file è fra quelli che il ramo modifica già
   (`git diff --name-only origin/main...HEAD`).
 
+<!-- includi: _immagini.md -->
+
 <!-- includi: _cornice-feedback.md -->
 Se è l'ultimo caso, dillo nella critica.
 
 ## Passi
 
-1. **Capisci il sintomo** (`feedback.text`, `feedback.images`,
-   `feedback.documents`): cosa voleva fare l'utente, cosa lamentava.
+1. **Capisci il sintomo** (`feedback.text`, `feedback.documents`, le immagini
+   di `payload.immagini` aperte con Read): cosa voleva fare l'utente, cosa
+   lamentava.
 2. **Sei già sul ramo del lavoro: non cambiarlo.** Una critica emessa da
    un'altra versione del codice viene rifiutata.
 3. **Rilancia le prove dei giri passati**, se `payload.history` non è vuoto:

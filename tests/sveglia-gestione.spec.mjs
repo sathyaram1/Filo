@@ -50,8 +50,8 @@ test('sveglia ricorrente: si vede con i suoi giorni e si cancella chiedendolo', 
   expect(when.getHours()).toBe(7);
   expect(when.getMinutes()).toBe(55);
 
-  // La colonna destra lo dice: orario + giorni, non "07:55 di domani".
-  const card = page.locator('.dash-live-card', { hasText: 'lezione' });
+  // La carta lo dice: orario + giorni, non "07:55 di domani".
+  const card = page.locator('#accade .dash-carta', { hasText: 'lezione' });
   await expect(card).toBeVisible({ timeout: 10_000 });
   await expect(card).toContainText('07:55');
   await expect(card).toContainText('lun+mer');
@@ -60,7 +60,7 @@ test('sveglia ricorrente: si vede con i suoi giorni e si cancella chiedendolo', 
   const del = await execAction(app, { type: 'CANCELLA_SVEGLIA', etichetta: 'lezione' });
   expect(del.executed).toBe(true);
   expect(del.output.removed.join(' ')).toContain('lezione');
-  await expect(page.locator('.dash-live-card', { hasText: 'lezione' })).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.locator('#accade .dash-carta', { hasText: 'lezione' })).toHaveCount(0, { timeout: 10_000 });
   expect((await readTimers(page)).length).toBe(0);
 });
 
@@ -69,7 +69,7 @@ test('spostare una sveglia a un altro orario', async ({ app, openTab }) => {
   await page.waitForLoadState('domcontentloaded');
 
   await execAction(app, { type: 'SVEGLIA', time: '06:30', label: 'palestra', ripeti: 'feriali' });
-  const card = page.locator('.dash-live-card', { hasText: 'palestra' });
+  const card = page.locator('#accade .dash-carta', { hasText: 'palestra' });
   await expect(card).toContainText('06:30', { timeout: 10_000 });
   await expect(card).toContainText('feriali');
 
@@ -77,9 +77,9 @@ test('spostare una sveglia a un altro orario', async ({ app, openTab }) => {
   expect(mod.executed).toBe(true);
 
   // L'utente vede il nuovo orario, e la ricorrenza non si è persa per strada.
-  await expect(page.locator('.dash-live-card', { hasText: 'palestra' }))
+  await expect(page.locator('#accade .dash-carta', { hasText: 'palestra' }))
     .toContainText('08:15', { timeout: 10_000 });
-  await expect(page.locator('.dash-live-card', { hasText: 'palestra' })).toContainText('feriali');
+  await expect(page.locator('#accade .dash-carta', { hasText: 'palestra' })).toContainText('feriali');
 
   const alarm = (await readTimers(page)).find((t) => t.kind === 'alarm');
   expect(alarm.atTime).toBe('08:15');
@@ -104,18 +104,37 @@ test('"togli tutte le sveglie" elenca cosa sparisce e aspetta l\'OK; i timer res
   expect(ask.describe).toContain('antibiotico');
 
   // Finché l'utente non conferma, in colonna c'è ancora tutto.
-  await expect(page.locator('.dash-live-card', { hasText: 'antibiotico' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('#accade .dash-carta', { hasText: 'antibiotico' })).toBeVisible({ timeout: 10_000 });
   expect((await readTimers(page)).length).toBe(3);
 
   // Dopo l'OK spariscono le sveglie — e SOLO quelle: il timer della pasta resta.
   const done = await execAction(app, { type: 'CANCELLA_SVEGLIA', tutte: true, tipo: 'sveglia' }, { confirmed: true });
   expect(done.executed).toBe(true);
-  await expect(page.locator('.dash-live-card', { hasText: 'antibiotico' })).toHaveCount(0, { timeout: 10_000 });
-  await expect(page.locator('.dash-live-card', { hasText: 'pasta' })).toBeVisible();
+  await expect(page.locator('#accade .dash-carta', { hasText: 'antibiotico' })).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.locator('#accade .dash-carta', { hasText: 'pasta' })).toBeVisible();
 
   const left = await readTimers(page);
   expect(left.length).toBe(1);
   expect(left[0].label).toBe('pasta');
+});
+
+// #592: fra la domanda e l'OK la lista può cambiare. L'OK vale per le voci che
+// il popup ha mostrato, non per quelle che lo stesso riferimento trova dopo.
+test('una sveglia aggiunta mentre il popup è aperto non sparisce con l\'OK dato alle altre', async ({ app, openTab }) => {
+  const page = await openTab(NEWTAB);
+  await page.waitForLoadState('domcontentloaded');
+
+  await execAction(app, { type: 'SVEGLIA', time: '07:00', label: 'palestra' });
+  await execAction(app, { type: 'SVEGLIA', time: '08:00', label: 'treno' });
+  const ask = await execAction(app, { type: 'CANCELLA_SVEGLIA', tutte: true, tipo: 'sveglia' });
+  expect(ask.needsConfirm).toBe(2);
+  expect(ask.describe).not.toContain('antibiotico');
+
+  await execAction(app, { type: 'SVEGLIA', time: '20:00', label: 'antibiotico' });
+  const done = await execAction(app, { type: 'CANCELLA_SVEGLIA', tutte: true, tipo: 'sveglia' }, { confirmed: true });
+  expect(done.executed).toBe(true);
+  const left = await readTimers(page);
+  expect(left.map((t) => t.label)).toEqual(['antibiotico']);
 });
 
 test('una sveglia che non esiste non fa sparire quella che c\'è', async ({ app, openTab }) => {
@@ -125,7 +144,7 @@ test('una sveglia che non esiste non fa sparire quella che c\'è', async ({ app,
   await execAction(app, { type: 'SVEGLIA', time: '07:00', label: 'palestra' });
   const r = await execAction(app, { type: 'CANCELLA_SVEGLIA', etichetta: 'dentista' });
   expect(r.executed).toBe(false);
-  await expect(page.locator('.dash-live-card', { hasText: 'palestra' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('#accade .dash-carta', { hasText: 'palestra' })).toBeVisible({ timeout: 10_000 });
   expect((await readTimers(page)).length).toBe(1);
 });
 
@@ -150,8 +169,8 @@ test('una sveglia ricorrente suona e resta: "Ferma" non la disdice', async ({ ap
   });
 
   // Suona.
-  await expect(page.locator('#live')).toHaveAttribute('data-ringing', '1', { timeout: 20_000 });
-  const card = page.locator('.dash-live-card', { hasText: 'pillola' });
+  await expect(page.locator('#accade')).toHaveAttribute('data-suona', '1', { timeout: 20_000 });
+  const card = page.locator('#accade .dash-carta', { hasText: 'pillola' });
   await expect(card).toContainText('ogni giorno');
 
   // "Ferma" la zittisce, ma domani suona ancora: resta in colonna con la sua
@@ -159,9 +178,9 @@ test('una sveglia ricorrente suona e resta: "Ferma" non la disdice', async ({ ap
   // fermata spariva, e questo è il passo che senza la ricorrenza è rosso.
   // La colonna si ridisegna ogni secondo (i timer scorrono): senza `force` il
   // click aspetta una stabilità che non arriva mai.
-  await page.locator('.dash-live-stop').click({ force: true });
-  await expect(page.locator('#live')).toHaveAttribute('data-ringing', '0', { timeout: 10_000 });
-  await expect(page.locator('.dash-live-card', { hasText: 'pillola' })).toContainText('ogni giorno');
+  await page.locator('#accade .dash-carta[data-suona="1"] .dash-carta-az.principale').click({ force: true });
+  await expect(page.locator('#accade')).toHaveAttribute('data-suona', '0', { timeout: 10_000 });
+  await expect(page.locator('#accade .dash-carta', { hasText: 'pillola' })).toContainText('ogni giorno');
 
   const left = await readTimers(page);
   expect(left.length).toBe(1);
@@ -169,6 +188,6 @@ test('una sveglia ricorrente suona e resta: "Ferma" non la disdice', async ({ ap
   expect(new Date(left[0].endsAt).getTime()).toBeGreaterThan(Date.now());
 
   // La × invece la toglie davvero, anche se si ripete.
-  await page.locator('.dash-live-card', { hasText: 'pillola' }).locator('.dash-live-dismiss').click({ force: true });
-  await expect(page.locator('.dash-live-card', { hasText: 'pillola' })).toHaveCount(0, { timeout: 10_000 });
+  await page.locator('#accade .dash-carta', { hasText: 'pillola' }).locator('.dash-carta-togli').click({ force: true });
+  await expect(page.locator('#accade .dash-carta', { hasText: 'pillola' })).toHaveCount(0, { timeout: 10_000 });
 });

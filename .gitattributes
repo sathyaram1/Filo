@@ -43,5 +43,11 @@
 # Binari: niente conversione, nemmeno per sbaglio. `text=auto` li riconosce da
 # solo, ma scriverlo evita che un file "quasi testo" ci finisca dentro.
 *.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
 *.ico binary
 *.pdf binary
+*.avif binary
+*.heic binary

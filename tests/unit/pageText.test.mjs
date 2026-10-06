@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { costoInUnita } from '../helpers/tempoRelativo.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -120,10 +121,9 @@ test('il tempo della lettura cresce con la pagina, non col suo quadrato', () => 
     `<html><body>${'<table><tr><td>'.repeat(130)}${'<p>parola parola</p>'.repeat(40000)}</body></html>`,
   ];
   for (const html of casi) {
-    const t0 = Date.now();
-    PT.estrai(html);
-    // Su una macchina carica ci sta qualche secondo; col costo al quadrato erano da venti secondi a un minuto.
-    assert.ok(Date.now() - t0 < 5000, `${html.slice(0, 40)}…: ${Date.now() - t0} ms`);
+    // Lineare costa da 10 a 50 unità; col costo al quadrato erano da venti secondi a un minuto, migliaia di unità.
+    const c = costoInUnita(() => PT.estrai(html), { tetto: 400 });
+    assert.ok(c.unita < 400, `${html.slice(0, 40)}…: ${c.unita.toFixed(0)} unità (${c.ms.toFixed(0)} ms)`);
   }
 });
 

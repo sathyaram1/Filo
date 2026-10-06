@@ -749,11 +749,17 @@ function annotaAzione(ctx, azione) {
   }
 }
 
-function formaDaControllare(ctx, tipo, url, schede = []) {
-  if (!ctx || (tipo !== 'LEGGI_PAGINA' && !ctx.esterno)) return false;
+// 'nota' = trovato; 'forma' = scritto da sé e da controllare; '' = scritto da sé in una chat ancora pulita.
+function provenienza(ctx, tipo, url, schede = []) {
+  if (!ctx) return '';
   const k = chiaveForma(url);
-  if (!k || ctx.noti.has(k)) return false;
-  return !schede.some((u) => chiaveForma(u) === k);
+  if (!k) return '';
+  if (ctx.noti.has(k) || schede.some((u) => chiaveForma(u) === k)) return 'nota';
+  return (tipo === 'LEGGI_PAGINA' || ctx.esterno) ? 'forma' : '';
+}
+
+function formaDaControllare(ctx, tipo, url, schede = []) {
+  return provenienza(ctx, tipo, url, schede) === 'forma';
 }
 
 const api = {
@@ -762,6 +768,7 @@ const api = {
   annotaLink,
   annotaAzione,
   formaDaControllare,
+  provenienza,
   ricordaApertura,
   ricordaLetturaRiservata,
   materialeRiservato,

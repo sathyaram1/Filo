@@ -34,6 +34,8 @@
       padding: 6px 12px; background: var(--sn-card); color: var(--sn-fg);
     }
     .bd-auth button:hover { border-color: var(--sn-accent); }
+    .bd-auth .bd-auth-ko { color: var(--sn-error); }
+    .bd-auth .bd-auth-lascia { background: transparent; }
 
     .bd-loading, .bd-empty { color: var(--sn-muted); font-size: 14px; padding: 24px 4px; }
     /* Quando non si può stimare il tempo, una rotella: la pagina non deve restare muta a "Caricamento…". */
@@ -42,7 +44,7 @@
        una riga per OGNI classe. patterns/una-classe-che-scrive-display-deve-lasciarsi-nascondere.md */
     .bd-auth[hidden], .bd-loading[hidden], .bd-error[hidden], .bd-retry[hidden], .bd-list[hidden],
     .bd-more[hidden], .bd-card[hidden], .bd-vote[hidden], .bd-vote-btn[hidden],
-    .bd-reopen-actions[hidden] { display: none; }
+    .bd-reopen-actions[hidden], .bd-spinner[hidden] { display: none; }
     .bd-spinner {
       width: 16px; height: 16px; flex: 0 0 auto; border-radius: 50%;
       border: 2px solid var(--sn-border); border-top-color: var(--sn-accent);
@@ -147,6 +149,64 @@
     .bd-card-msg { flex: 1 1 100%; margin: 0; font-size: 12px; color: var(--sn-error); }
     .bd-card-msg-info { color: var(--sn-muted); }
     .bd-reopen-ok { flex: 1 1 100%; margin: 0; font-size: 12px; color: var(--sn-success); }
+
+    /* «Le tue segnalazioni» (#986): righe più basse delle schede dei miglioramenti, lo stato come pastiglia. */
+    .bd-mie[hidden], .bd-h2[hidden], .bd-mie-vuoto[hidden], .bd-mie-altre[hidden], .bd-mia-corpo[hidden],
+    .bd-mia-testo[hidden], .bd-mia-allegati[hidden], .bd-mia-risposta[hidden] { display: none; }
+    .bd-mie { display: flex; flex-direction: column; }
+    .sn-page h2.bd-h2 { display: flex; align-items: baseline; gap: 8px; margin: 22px 0 10px; }
+    .bd-conto { font-size: 13px; font-weight: 600; color: var(--sn-muted); font-variant-numeric: tabular-nums; }
+    .bd-mie-lista { display: flex; flex-direction: column; gap: 6px; }
+    .bd-mie-vuoto { margin: 0; color: var(--sn-muted); font-size: 13px; }
+    .bd-mia {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px;
+      border: 1px solid var(--sn-border); border-radius: 10px; background: var(--sn-card);
+      padding: 4px 6px 4px 4px; transition: border-color .15s;
+    }
+    .bd-mia:hover, .bd-mia.bd-mia-aperta { border-color: color-mix(in srgb, var(--sn-accent) 45%, var(--sn-border)); }
+    .bd-mia-testa {
+      flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+      font: inherit; text-align: left; cursor: pointer; color: var(--sn-fg);
+      background: none; border: none; border-radius: 7px; padding: 6px 8px;
+    }
+    .bd-mia-testa:hover { background: var(--sn-hover); }
+    .bd-mia-titolo {
+      max-width: 100%; font-size: 14px; font-weight: 600;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .bd-mia-aperta .bd-mia-titolo { white-space: normal; overflow-wrap: anywhere; }
+    .bd-mia-sub { font-size: 12px; color: var(--sn-muted); }
+    .bd-mia-stato {
+      flex: 0 0 auto; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px;
+      color: var(--sn-muted); background: color-mix(in srgb, var(--sn-muted) 14%, transparent);
+    }
+    .bd-mia-stato[data-stato="inviata"] { color: var(--sn-accent); background: color-mix(in srgb, var(--sn-accent) 14%, transparent); }
+    .bd-mia-stato[data-stato="risolta"] { color: var(--sn-success); background: color-mix(in srgb, var(--sn-success) 15%, transparent); }
+    .bd-mia-stato[data-stato="non_partita"] { color: var(--sn-error); background: color-mix(in srgb, var(--sn-error) 14%, transparent); }
+    .bd-mia-togli {
+      flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+      min-width: 30px; height: 30px; padding: 0 8px; cursor: pointer;
+      font: inherit; font-size: 12px; font-weight: 600; color: var(--sn-muted);
+      background: transparent; border: 1px solid transparent; border-radius: 8px;
+    }
+    .bd-mia-togli:hover { color: var(--sn-fg); background: var(--sn-hover); border-color: var(--sn-border); }
+    .bd-mia-togli.bd-mia-togli-conferma { color: var(--sn-error); border-color: var(--sn-error); }
+    .bd-mia-togli[disabled] { opacity: .6; cursor: default; }
+    .bd-mia-corpo { flex: 1 1 100%; padding: 2px 8px 8px; }
+    .bd-mia-corpo p { margin: 6px 0 0; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+    .bd-mia-testo { white-space: pre-wrap; color: var(--sn-fg); }
+    .bd-mia-allegati { color: var(--sn-muted); }
+    .bd-mia-risposta { color: var(--sn-fg); padding-left: 10px; border-left: 2px solid var(--sn-success); }
+    .bd-mia-menu { position: fixed; right: auto; top: auto; min-width: 160px; z-index: 50; }
+    .bd-mia-menu:focus { outline: none; }
+    .bd-mia-menu .sn-select-option:hover, .bd-mia-menu .sn-select-option:focus {
+      background-color: rgba(var(--sn-accent-rgb), 0.18); outline: none;
+    }
+    .bd-mie-altre {
+      align-self: flex-start; margin-top: 8px; font: inherit; font-size: 13px; cursor: pointer;
+      color: var(--sn-muted); background: none; border: none; padding: 2px 0; text-decoration: underline;
+    }
+    .bd-mie-altre:hover { color: var(--sn-fg); }
   </style>
 </head>
 <body>
@@ -156,9 +216,19 @@
       <p>I miglioramenti già rilasciati. Provali e dicci se funzionano.</p>
     </header>
 
+    <section id="bdMie" class="bd-mie" aria-labelledby="bdMieTitolo" hidden>
+      <h2 id="bdMieTitolo" class="bd-h2">Le tue segnalazioni <span id="bdMieConto" class="bd-conto"></span></h2>
+      <div id="bdMieLista" class="bd-mie-lista"></div>
+      <p id="bdMieVuoto" class="bd-mie-vuoto" hidden>Da questo computer non hai ancora mandato segnalazioni.</p>
+      <button id="bdMieAltre" class="bd-mie-altre" type="button" hidden></button>
+    </section>
+    <h2 id="bdMiglioramentiTitolo" class="bd-h2" hidden>Miglioramenti rilasciati</h2>
+
     <div class="bd-auth">
-      <span id="bdAuthMsg">Accedi per votare i miglioramenti.</span>
+      <span id="bdAuthSpin" class="bd-spinner" aria-hidden="true" hidden></span>
+      <span id="bdAuthMsg" role="status">Accedi per votare i miglioramenti.</span>
       <button id="bdSignIn" type="button">Accedi</button>
+      <button id="bdAuthLascia" class="bd-auth-lascia" type="button" hidden>Lascia stare</button>
     </div>
 
     <div id="bdLoading" class="bd-loading"><span class="bd-spinner" aria-hidden="true"></span><span>Caricamento…</span></div>
@@ -171,5 +241,6 @@
   </main>
 
   <script src="filo://board/board.js"></script>
+  <script src="filo://board/board-segnalazioni.js"></script>
 </body>
 </html>

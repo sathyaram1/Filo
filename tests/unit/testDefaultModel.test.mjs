@@ -8,8 +8,8 @@
 // settings personali dell'utente.
 //
 // L'handler è registrato via register(on, ctx): qui lo carichiamo con `on` e
-// `ctx` finti, e stubbiamo SN_PROVIDERS.streamComplete per catturare con quale
-// provider/modello/chiave verrebbe chiamata l'API. Niente rete, niente Electron.
+// `ctx` finti; la prova passa dal cancello dei modelli vero, davanti a un fornitore
+// finto che cattura provider/modello/chiave. Niente rete, niente Electron.
 
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -42,17 +42,30 @@ const state = {
   calls: [],            // chiamate catturate a streamComplete
   streamError: null,    // se valorizzato, streamComplete lancia
   emptyStream: false,   // se true, lo stream finisce senza contenuto
+  overLimit: false,     // limite di spesa del mese già raggiunto
 };
 
-globalThis.SN_PROVIDERS = {
-  streamComplete: async ({ provider, apiKey, model, messages, providerRouting, onDelta }) => {
+const fornitoreFinto = (provider) => ({
+  streamComplete: async ({ apiKey, model, messages, providerRouting, onDelta }) => {
     state.calls.push({ provider, apiKey, model, providerRouting });
     if (state.streamError) throw new Error(state.streamError);
     if (state.emptyStream) return { usage: { completionTokens: 0 } };
     onDelta('1, 2, 3');
     return { usage: { completionTokens: 7 } };
   },
+});
+globalThis.SN_PROVIDERS = { getProvider: (nome) => fornitoreFinto(nome) };
+require(join(__dirname, '..', '..', 'src', 'main', 'services', 'modelGate.js'));
+
+const providerRoutingFinto = (settings) => {
+  const ignore = globalThis.SN_CONST.providerIgnoreList((settings && settings.excludedProviders) || []);
+  return ignore.length ? { ignore } : null;
 };
+const modelGate = globalThis.SN_MODEL_GATE.create({
+  getSettings: async () => state.effective,
+  routing: providerRoutingFinto,
+  costs: { isOverLimit: async () => state.overLimit, record: async () => 0 },
+});
 
 const handlers = new Map();
 registerAi((type, fn) => handlers.set(type, fn), {
@@ -75,10 +88,8 @@ registerAi((type, fn) => handlers.set(type, fn), {
     );
     return kind ? `bloccato: ${kind}` : null;
   },
-  providerRouting: (settings) => {
-    const ignore = globalThis.SN_CONST.providerIgnoreList((settings && settings.excludedProviders) || []);
-    return ignore.length ? { ignore } : null;
-  },
+  providerRouting: providerRoutingFinto,
+  modelGate,
 });
 
 const testModel = (msg) => handlers.get(MSG.TEST_DEFAULT_MODEL)(msg);
@@ -91,6 +102,7 @@ beforeEach(() => {
   state.calls = [];
   state.streamError = null;
   state.emptyStream = false;
+  state.overLimit = false;
 });
 
 // ── { provider, model } espliciti: riga dell'editor admin, anche non salvata ─
@@ -283,4 +295,19 @@ test('la prova porta con sé chi NON deve servirla (lista di esclusione)', async
   assert.equal(res.ok, true, `atteso ok, ottenuto: ${res.error}`);
   const ignore = (state.calls[0].providerRouting || {}).ignore || [];
   assert.ok(ignore.length, 'la prova partiva senza dire chi è escluso');
+});
+
+// ── Il limite di spesa vale anche per le prove (#591): sono chiamate vere ─────
+
+test('limite di spesa raggiunto: né la prova di un modello né quella di una chiave partono', async () => {
+  state.overLimit = true;
+  state.admin = true;
+  state.defaults.apiKeys = { openrouter: 'sk-or-default' };
+  const res = await testModel({ provider: 'openrouter', model: 'a/b' });
+  assert.equal(res.ok, false);
+  assert.match(String(res.error), /limite di spesa/i);
+  const chiave = await testProvider({ provider: 'openrouter', apiKey: 'sk-or-utente', model: 'a/b' });
+  assert.equal(chiave.ok, false);
+  assert.match(String(chiave.error), /limite di spesa/i);
+  assert.equal(state.calls.length, 0);
 });

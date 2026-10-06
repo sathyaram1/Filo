@@ -91,7 +91,7 @@ async function configureProxy(app, port) {
   }, { endpoint: `socks5://127.0.0.1:${port}` });
 }
 
-test('(a) sito non flaggato senza login → retry silenzioso e toast "Aperto da …"', async ({ app, openTab, shell, testServer }) => {
+test('(a) sito non flaggato senza login → retry silenzioso e toast "Aperto da …"', async ({ app, openTab, shell, testServer, avvisi }) => {
   test.setTimeout(120_000);
   const socks = await startSocks5();
   try {
@@ -111,8 +111,9 @@ test('(a) sito non flaggato senza login → retry silenzioso e toast "Aperto da 
       .toEqual({ country: 'us', tier: 'datacenter' });
     await expect.poll(() => socks.connections.length, { timeout: 15_000 }).toBeGreaterThan(0);
 
-    // Toast discreto nella shell: informa, non chiede.
-    const toast = shell.locator('.shell-notif.show .shell-notif-msg');
+    // Avviso discreto sopra la pagina: informa, non chiede.
+    await expect(shell.locator('.shell-notif.show .shell-notif-msg')).toHaveCount(1, { timeout: 10_000 });
+    const toast = (await avvisi()).locator('.shell-notif.show .shell-notif-msg');
     await expect(toast).toBeVisible({ timeout: 10_000 });
     await expect(toast).toHaveText('Aperto da Stati Uniti');
   } finally {

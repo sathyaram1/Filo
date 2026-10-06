@@ -149,14 +149,24 @@ test('blacklist siti: una voce senza estensione avvisa e NON viene salvata (#225
   await expect(page.locator('#sec-siteblock-blacklist-error')).toContainText(/facebook/);
   await expect(page.locator('#sec-siteblock-blacklist-error')).toContainText(/non sono domini validi/i);
 
-  // Alla riapertura: la voce non valida NON è persistita, quella valida sì e
-  // normalizzata a bare host (niente schema/path/www).
+  // Alla riapertura: in vigore c'è solo la voce valida, normalizzata a bare host (niente
+  // schema/path/www); quella scartata resta scritta, con l'avviso, finché l'utente non la toglie (#590.2).
   await page.reload();
   await page.waitForSelector('#sec-siteblock-blacklist', { timeout: 8_000 });
-  const saved = await page.locator('#sec-siteblock-blacklist').inputValue();
-  const lines = saved.split('\n').map((s) => s.trim()).filter(Boolean);
-  expect(lines).toEqual(['facebook.com']);
-  // Senza voci invalide residue, l'avviso non compare al caricamento.
+  const settings = (await page.evaluate(() => chrome.runtime.sendMessage({ type: 'get_settings' }))).settings;
+  expect(settings.security.siteBlock.blacklist).toEqual(['facebook.com']);
+  const lines = (await page.locator('#sec-siteblock-blacklist').inputValue()).split('\n').map((s) => s.trim()).filter(Boolean);
+  expect(lines).toEqual(['facebook', 'facebook.com']);
+  await expect(page.locator('#sec-siteblock-blacklist-error')).toContainText(/facebook/);
+
+  // Tolta la riga, l'avviso sparisce e alla riapertura non torna.
+  await page.locator('#sec-siteblock-blacklist').fill('facebook.com');
+  await page.locator('#sec-siteblock-blacklist').blur();
+  await expect(page.locator('#sec-siteblock-blacklist-error')).toBeHidden();
+  await page.waitForTimeout(300);
+  await page.reload();
+  await page.waitForSelector('#sec-siteblock-blacklist', { timeout: 8_000 });
+  await expect(page.locator('#sec-siteblock-blacklist')).toHaveValue('facebook.com');
   await expect(page.locator('#sec-siteblock-blacklist-error')).toBeHidden();
 });
 

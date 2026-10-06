@@ -182,9 +182,8 @@
   // ── Filtro semantico dei risultati di ricerca (§4.1) ───────────────────────
   // La chat produce una query Scryfall LARGA (con sinonimi) + un "criterio" in
   // linguaggio naturale; il sistema tiene solo le carte che, giudicate da un
-  // LLM economico, rispettano quel criterio. Il giudizio (carta, criterio) →
-  // bool è cacheabile PERMANENTEMENTE cross-ricerca: dipende solo dal testo
-  // della carta e dal criterio, mai dal mazzo. Cache: { cardId → { critKey → bool } }.
+  // LLM economico, rispettano quel criterio. Cache: { carta come l'ha vista il giudice → { critKey → bool } }; chi la
+  // usa mette nelle due chiavi tutto quello che il giudice ha letto, così un prezzo o un modello cambiati la fanno scadere.
 
   // Chiave di cache di un criterio: minuscolo, spazi normalizzati. Due ricerche
   // scritte uguale (a meno di spazi/maiuscole) condividono i giudizi in cache.
@@ -192,19 +191,23 @@
     return String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
   }
 
-  // Risposta del batch filtro (§4.1): { "keep": ["id", ...] } oppure un array
-  // nudo di id. Ritorna un Set degli id "keep" RISTRETTO a quelli davvero
-  // giudicati (mai id inventati dal modello). Gli id giudicati e non presenti in
-  // "keep" sono "scartati" (bool false), informazione cacheabile dal chiamante.
+  // { "keep": [...] } o array nudo, coi NUMERI della lista (1 = judgeIds[0]) o gli id esatti. `null` = illeggibile:
+  // non è «nessuna tiene», e salvata come tutte scartate avvelenerebbe la cache per sempre (#382). Basta una voce
+  // che non indica una carta della lista (un nome, un numero fuori lista) e non si sa più cosa intendeva il giudice.
   function parseSearchKeep(text, judgeIds) {
-    const allow = new Set((judgeIds || []).map(String));
+    const ids = (judgeIds || []).map(String);
+    const allow = new Set(ids);
     const o = firstJson(text);
+    if (!o) return null;
+    const list = Array.isArray(o) ? o : (Array.isArray(o.keep) ? o.keep : null);
+    if (!list) return null;
     const out = new Set();
-    if (!o) return out;
-    const list = Array.isArray(o) ? o : (Array.isArray(o.keep) ? o.keep : []);
     for (const it of list) {
-      const id = String(it || '').trim();
-      if (id && allow.has(id)) out.add(id);
+      const s = String(it == null ? '' : it).trim();
+      if (allow.has(s)) { out.add(s); continue; }
+      const n = /^\d+$/.test(s) ? Number(s) : NaN;
+      if (!(n >= 1 && n <= ids.length)) return null;
+      out.add(ids[n - 1]);
     }
     return out;
   }
@@ -232,19 +235,88 @@
 
   // Aggiorna la cache coi giudizi freschi (id → bool) per un criterio. Ritorna
   // una NUOVA mappa (mai mutare l'input). Solo gli id davvero giudicati.
-  function updateSearchCache(searchCache, criterion, judged) {
+  // `keepPrefix`: le chiavi che non cominciano così vengono da un giudice con altre istruzioni e si buttano.
+  // `maxPairs`/`maxPerCard`: tetti sui giudizi tenuti. L'ordine delle chiavi è l'età (JSON lo conserva): un giudizio
+  // fresco va in fondo, e oltre il tetto escono i più vecchi, prima per carta e poi le carte intere.
+  function updateSearchCache(searchCache, criterion, judged, { keepPrefix = '', maxPairs = Infinity, maxPerCard = Infinity } = {}) {
     const key = normCriterion(criterion);
     if (!key) return searchCache && typeof searchCache === 'object' ? searchCache : {};
     const next = {};
     for (const [id, e] of Object.entries(searchCache && typeof searchCache === 'object' ? searchCache : {})) {
-      next[id] = { ...e };
+      const kept = {};
+      for (const [k, v] of Object.entries(e && typeof e === 'object' ? e : {})) {
+        if (!keepPrefix || k.startsWith(keepPrefix)) kept[k] = v;
+      }
+      if (Object.keys(kept).length) next[id] = kept;
     }
     for (const [id, matched] of Object.entries(judged || {})) {
-      if (!next[id]) next[id] = {};
-      next[id][key] = !!matched;
+      const entry = { ...(next[id] || {}) };
+      delete next[id];
+      delete entry[key];
+      entry[key] = !!matched;
+      const ks = Object.keys(entry);
+      for (let i = 0; i < ks.length - maxPerCard; i += 1) delete entry[ks[i]];
+      next[id] = entry;
+    }
+    let pairs = 0;
+    for (const e of Object.values(next)) pairs += Object.keys(e).length;
+    for (const id of Object.keys(next)) {
+      if (pairs <= maxPairs) break;
+      pairs -= Object.keys(next[id]).length;
+      delete next[id];
     }
     return next;
   }
+
+  // Riga della risposta in chat dopo il giudice (§4.1): una scartata non si mostra mai, una non controllata si dichiara
+  // (la lista la segna con ?), e le carte trovate oltre quelle arrivate al giudice (`total` > `found`) pure (#382).
+  // `broken`: le pagine dopo `found` non sono arrivate per un guasto, non per un tetto; si riprova, non si restringe.
+  function searchFilterNote({ found, kept, unverified, criterion, why, total = 0, broken = false }) {
+    const motivo = why ? ` Motivo: ${why}` : '';
+    const cap = searchCapNote({ seen: found, total, judged: unverified < found, broken });
+    const withCap = (s) => [s, cap].filter(Boolean).join(' ');
+    if (found > 0 && unverified >= found) {
+      return withCap(`Non sono riuscito a controllare una per una le carte trovate. Qui sotto c'è la ricerca senza filtro, quindi può contenere carte che non c'entrano.${motivo}`);
+    }
+    if (unverified > 0) {
+      return withCap(unverified === 1
+        ? `Una delle carte qui sotto, segnata con ?, non l'ho potuta controllare, quindi potrebbe non c'entrare.${motivo}`
+        : `${unverified} delle carte qui sotto, segnate con ?, non le ho potute controllare, quindi potrebbero non c'entrare.${motivo}`);
+    }
+    if (found > 0 && kept === 0) {
+      // Il criterio può essere il messaggio intero dell'utente: in chat se ne cita l'inizio, dichiarando il taglio.
+      const c = String(criterion || '').trim().replace(/\s+/g, ' ');
+      const crit = `«${c.length > 160 ? `${c.slice(0, 159).trimEnd()}…` : c}»`;
+      if (total > found) {
+        return broken
+          ? `Ho controllato una per una le prime ${num(found)} delle ${num(total)} carte trovate, in ordine di costo, e nessuna corrisponde a ${crit}. Poi Scryfall ha smesso di rispondere. Riprova per controllare anche le altre.`
+          : `Ho controllato una per una le prime ${num(found)} delle ${num(total)} carte trovate, in ordine di costo, e nessuna corrisponde a ${crit}. Per arrivare alle altre aggiungi un vincolo, per esempio un costo massimo o un tipo, o chiedilo con altre parole.`;
+      }
+      return found === 1
+        ? `Ho controllato la carta trovata, ma non corrisponde a ${crit}. Prova a chiederlo con altre parole.`
+        : `Ho controllato una per una le ${num(found)} carte trovate, ma nessuna corrisponde a ${crit}. Prova a chiederlo con altre parole.`;
+    }
+    return cap;
+  }
+
+  // Scryfall ne ha trovate più di quante ne sono arrivate in chat: la frase che lo dice, '' se sono tutte lì.
+  function searchCapNote({ seen, total, judged, broken = false }) {
+    if (!(total > seen) || !(seen > 0)) return '';
+    if (broken) {
+      return `Scryfall ne ha trovate ${num(total)} ma ha smesso di rispondere dopo le prime ${num(seen)}, quindi ${judged ? 'ho controllato solo quelle' : 'qui sotto ci sono solo quelle'}. Riprova per avere anche le altre.`;
+    }
+    return judged
+      ? `Scryfall ne ha trovate ${num(total)} e ho controllato le prime ${num(seen)}, in ordine di costo. Per arrivare alle altre aggiungi un vincolo, per esempio un costo massimo o un tipo.`
+      : `Scryfall ne ha trovate ${num(total)} e qui sotto ci sono le prime ${num(seen)}, in ordine di costo. Per arrivare alle altre aggiungi un vincolo, per esempio un costo massimo o un tipo.`;
+  }
+
+  // Ricerca che Scryfall non trova: la dice come quella che il giudice scarta tutta, mai una bolla muta.
+  function searchEmptyNote({ identity = false } = {}) {
+    return `Nessun risultato su Scryfall per questa ricerca${identity ? ', fra le carte nei colori del commander' : ''}. Prova a chiederlo con altre parole.`;
+  }
+
+  // Punto delle migliaia scritto qui: il separatore di toLocaleString cambia fra Node ed Electron.
+  function num(n) { return String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
 
   global.SN_DECK_OPINIONS = {
     normTag,
@@ -259,5 +331,8 @@
     parseSearchKeep,
     planSearchFilter,
     updateSearchCache,
+    searchFilterNote,
+    searchCapNote,
+    searchEmptyNote,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

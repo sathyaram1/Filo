@@ -23,6 +23,9 @@
 //   (senza marcatore di provider AI). Se la chat non interroga nient'altro,
 //   ometti l'opzione: l'errore diventa una frase generica.
 //
+//   `offline` (opzionale, bool) dice se il computer è senza rete; senza, lo si
+//   chiede al lettore del sistema nel main o al browser in una pagina.
+//
 //   SN_CHAT_ERRORS.isTransientNetwork(err) → bool
 //     Vero per i guasti di rete PASSEGGERI (connessione caduta, DNS, timeout,
 //     socket chiusa): quelli per cui vale la pena riprovare da soli.
@@ -65,6 +68,17 @@
     return TRANSIENT_NETWORK_RE.test(messageOf(e));
   }
 
+  // Offline davvero, non una chiamata andata storta (#873): nel main lo dice il lettore del sistema, in una
+  // pagina il browser. `opts.offline` vince su entrambi.
+  function pareOffline(o) {
+    if (typeof o.offline === 'boolean') return o.offline;
+    try {
+      const M = global.SN_SISTEMA_MAIN;
+      if (M && typeof M.offline === 'function') return M.offline() === true;
+    } catch (_) {}
+    try { return !!(global.navigator && global.navigator.onLine === false); } catch (_) { return false; }
+  }
+
   // Errore → proposizione per l'utente. Mai un codice HTTP nudo, mai un nome di
   // endpoint: gli errori con `code` applicativo (NO_API_KEY, LIMIT_REACHED,
   // NO_MODEL_FOR_ACTION) portano già un messaggio i18n scritto per l'utente —
@@ -80,6 +94,7 @@
     // Guasto di rete: la prima cosa da controllare è la connessione. Va PRIMA
     // dell'analisi HTTP perché qui non c'è nessuna risposta da interpretare.
     if (isTransientNetwork(e)) {
+      if (pareOffline(o)) return 'il computer è offline, non è collegato a nessuna rete. Riprova quando torna la connessione.';
       return 'problema di rete: non sono riuscito a raggiungere il servizio. Controlla la connessione e riprova.';
     }
 
@@ -90,6 +105,26 @@
     const pm = /^(OpenRouter|Gemini)(?:\s+\S+)?\s+(\d{3})\b/.exec(raw);
     if ((e && e.provider) || pm) {
       const st = Number(e && e.status) || (pm ? Number(pm[2]) : 0);
+      // #700: gli host li ha scartati la politica sui dati dell'account OpenRouter, non gli strumenti.
+      // Con la chiave dell'utente la rimedia lui; con quella di Filo resta solo un altro modello.
+      if ((e && e.code === 'DATA_POLICY') || (st === 404 && /data policy/i.test(raw))) {
+        return e && e.keySource === 'own'
+          ? 'nessun fornitore di questo modello rispetta le impostazioni sulla privacy del tuo account OpenRouter: allentale su openrouter.ai/settings/privacy, o scegli un altro modello in Modelli predefiniti.'
+          : 'nessun fornitore di questo modello rispetta le regole sulla privacy dei dati: scegli un altro modello in Modelli predefiniti.';
+      }
+      // #700: gli altri «nessun host» del router hanno ciascuno il suo rimedio, e nessuno riguarda gli strumenti.
+      if (e && e.code === 'NO_PROVIDER_ALLOWED') {
+        return e.keySource === 'own'
+          ? 'nessun fornitore di questo modello è fra quelli ammessi, dalle regole sui fornitori di Filo o dalle impostazioni del tuo account OpenRouter: allarga i fornitori ammessi nel tuo account, o scegli un altro modello in Modelli predefiniti.'
+          : 'nessun fornitore di questo modello è fra quelli ammessi dalle regole sui fornitori: scegli un altro modello in Modelli predefiniti.';
+      }
+      if (e && e.code === 'MODEL_UNAVAILABLE') {
+        return 'il modello scelto non è più disponibile sul servizio AI: scegli un altro modello in Modelli predefiniti.';
+      }
+      // #700: fra gli host ammessi per quel modello nessuno regge gli strumenti, e riprovare non serve.
+      if (e && e.code === 'NO_TOOL_HOST') {
+        return 'per il modello scelto nessun fornitore ammesso sa usare gli strumenti (cercare, leggere, impostare), e la chat di Filo ne ha bisogno. Scegli un altro modello in Modelli predefiniti.';
+      }
       // Il router non ha trovato un host che accetti gli strumenti (tool
       // calling) per il modello scelto: la chat della home non funziona senza.
       // Non è un guasto passeggero, è una scelta di modello da cambiare.

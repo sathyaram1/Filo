@@ -1,8 +1,7 @@
 // Unit test per il blocco apertura siti in blacklist (#170.3,
-// src/main/services/siteBlock.js). Assertano i TRE CASI richiesti dalla spec:
+// src/main/services/siteBlock.js):
 //   1) apertura diretta di un sito in blacklist  → BLOCCATO
-//   2) stessa apertura ma con referrer di un motore di ricerca → CONSENTITA
-//   3) stessa apertura ma originata da Filo (viaFilo) → CONSENTITA
+//   2) nessuna provenienza è esente, né una ricerca né Filo o il modello (#590)
 // più i bordi: schemi non-web, host non in lista, blocco disattivato, match per
 // suffisso/sottodominio. electron è richiesto in modo pigro (solo da adblock),
 // e qui usiamo useAdblockLists:false, quindi il modulo gira senza Electron.
@@ -29,78 +28,18 @@ test('caso 1: apertura DIRETTA di un sito in blacklist → bloccato', () => {
   assert.equal(d.host, 'evil.example');
 });
 
-test('caso 2: apertura da un motore di ricerca (referrer Google) → consentita', () => {
+test('#590: nessuna provenienza scavalca la lista, nemmeno una pagina di risultati', () => {
   reset();
-  const d = SB.shouldBlockNavigation('https://evil.example/page', {
-    fromUrl: 'https://www.google.com/search?q=evil',
-  });
-  assert.equal(d.block, false);
-});
-
-test('caso 3: apertura originata da Filo (viaFilo) → consentita', () => {
-  reset();
-  const d = SB.shouldBlockNavigation('https://evil.example/page', { viaFilo: true });
-  assert.equal(d.block, false);
-});
-
-test('referrer di ricerca robusto su TLD e sottodomini diversi', () => {
-  reset();
+  // Scelta dell'owner: niente eccezione «arrivo da una ricerca». Un secondo argomento
+  // (il vecchio `fromUrl`, il vecchio `viaFilo`) non deve riaprire nessuna porta.
   for (const ref of [
-    'https://www.google.it/search?q=x',
-    'https://google.co.uk/search?q=x',
-    'https://www.bing.com/search?q=x',
-    'https://duckduckgo.com/?q=x',
-    'https://search.brave.com/search?q=x',
-    'https://search.yahoo.com/search?p=x',
-    'https://yandex.ru/search/?text=x',
+    'https://www.google.com/search?q=evil', 'https://www.bing.com/search?q=x', 'https://duckduckgo.com/?q=x',
+    'https://searx.esempio.com/search?q=x', 'https://searx.xyz/search?q=x', 'https://sites.google.com/view/pagina',
+    'https://baijiahao.baidu.com/s?id=1', 'filo://newtab/', '',
   ]) {
-    const d = SB.shouldBlockNavigation('https://evil.example/', { fromUrl: ref });
-    assert.equal(d.block, false, `dovrebbe consentire da ${ref}`);
+    assert.equal(SB.shouldBlockNavigation('https://evil.example/page', { fromUrl: ref, viaFilo: true }).block, true, `da ${ref || 'nessuna pagina'}`);
   }
-});
-
-test('#230: referrer che INIZIA per google./yahoo./yandex. ma NON è il motore → NON concede eccezione', () => {
-  reset();
-  // Domini-civetta: 'google'/'yahoo'/'yandex' sono solo una sottodominio-label,
-  // il dominio registrabile è un altro. Prima del fix passavano per motori di
-  // ricerca e il sito in blacklist si apriva lo stesso.
-  for (const ref of [
-    'https://yahoo.phishing.io/',
-    'https://google.evil.com/',
-    'https://yandex.bad.net/',
-    'https://google.com.evil.com/',
-    'https://www.google.co.evil.com/',
-  ]) {
-    const d = SB.shouldBlockNavigation('https://evil.example/', { fromUrl: ref });
-    assert.equal(d.block, true, `dovrebbe BLOCCARE con referrer-civetta ${ref}`);
-    assert.equal(SB.isSearchEngineUrl(ref), false, `${ref} non è un motore`);
-  }
-});
-
-test('#230: i motori multi-TLD legittimi restano riconosciuti', () => {
-  reset();
-  for (const ref of [
-    'https://www.google.com/search?q=x',
-    'https://google.co.uk/search?q=x',
-    'https://www.google.com.au/search?q=x',
-    'https://search.yahoo.com/search?p=x',
-    'https://es.search.yahoo.com/search?p=x',
-    'https://yahoo.co.jp/',
-    'https://yandex.ru/search/?text=x',
-    'https://yandex.com.tr/search/?text=x',
-  ]) {
-    assert.equal(SB.isSearchEngineUrl(ref), true, `${ref} è un motore`);
-    const d = SB.shouldBlockNavigation('https://evil.example/', { fromUrl: ref });
-    assert.equal(d.block, false, `dovrebbe consentire da ${ref}`);
-  }
-});
-
-test('referrer NON di ricerca non concede eccezioni', () => {
-  reset();
-  const d = SB.shouldBlockNavigation('https://evil.example/', {
-    fromUrl: 'https://news.example/article',
-  });
-  assert.equal(d.block, true);
+  assert.equal('isSearchEngineUrl' in SB, false);
 });
 
 test('match per suffisso: i sottodomini di un dominio in blacklist sono bloccati', () => {
@@ -134,11 +73,6 @@ test('configureFromSettings legge security.siteBlock', () => {
   assert.equal(SB.shouldBlockNavigation('https://bad.example/x').block, true);
 });
 
-test('isSearchEngineUrl riconosce i motori e ignora gli altri', () => {
-  assert.equal(SB.isSearchEngineUrl('https://www.google.com/search?q=a'), true);
-  assert.equal(SB.isSearchEngineUrl('https://example.com/'), false);
-});
-
 test('voci senza estensione (es. "facebook") non entrano nella blacklist e non fingono di bloccare', () => {
   // Pre-condizione: senza validazione, "facebook" entrava nel Set ma non
   // matchava mai un host reale (facebook.com/com), dando falsa sicurezza.
@@ -168,4 +102,31 @@ test('configureFromSettings scarta le voci non valide dalla blacklist salvata', 
   assert.equal(SB.status().blacklistSize, 2);
   assert.equal(SB.shouldBlockNavigation('https://evil.example/').block, true);
   assert.equal(SB.shouldBlockNavigation('https://ads.test/').block, true);
+});
+
+test('#590: il punto finale del nome non aggira la lista, e un dominio con accenti blocca davvero', () => {
+  SB.setForTest({ enabled: true, useAdblockLists: false, blacklist: ['evil.example', 'münchen-evil.de'] });
+  assert.equal(SB.shouldBlockNavigation('https://evil.example./x').block, true);
+  assert.equal(SB.shouldBlockNavigation('https://www.evil.example../x').block, true);
+  // L'URL porta il nome in punycode: la voce scritta con l'accento deve combaciare.
+  assert.equal(SB.shouldBlockNavigation('https://münchen-evil.de/').block, true);
+  assert.equal(SB.shouldBlockNavigation('https://xn--mnchen-evil-thb.de/').block, true);
+});
+
+test('#590: un sito con l\'estensione in caratteri non latini entra in lista e blocca; il nome si legge com\'è scritto', () => {
+  SB.setForTest({ enabled: true, useAdblockLists: false, blacklist: ['сайт.рф', 'xn--r8jz45g.xn--zckzah', 'münchen.de'] });
+  assert.equal(SB.status().blacklistSize, 3);
+  const d = SB.shouldBlockNavigation('https://сайт.рф/pagina');
+  assert.equal(d.block, true);
+  assert.equal(d.host, 'сайт.рф');
+  assert.equal(SB.shouldBlockNavigation('https://例え.テスト/').block, true);
+  assert.equal(SB.shouldBlockNavigation('https://münchen.de/').host, 'münchen.de');
+});
+
+test('#590: «.sito.it» e «*.sito.it», la forma «il sito e i sottodomini» di filtri e cookie, bloccano il sito', () => {
+  SB.setForTest({ enabled: true, useAdblockLists: false, blacklist: ['.evil.example', '*.ads.test'] });
+  assert.equal(SB.status().blacklistSize, 2);
+  for (const u of ['https://evil.example/', 'https://m.evil.example/x', 'https://ads.test/', 'https://cdn.ads.test/']) {
+    assert.equal(SB.shouldBlockNavigation(u).block, true, u);
+  }
 });

@@ -7,11 +7,9 @@
 //   automazioni — codice scritto da un'IA a partire da testo di sconosciuti.
 //
 //   Il lavoro LOCALE dell'owner però ci cade dentro quasi sempre, perché in
-//   locale si lavora proprio su quelle cose. Da oggi il blocco non è un rifiuto
-//   secco: il server apre una richiesta in attesa, e l'owner la approva QUI —
-//   davanti allo schermo, su una superficie diversa dal terminale. È questo che
-//   rende l'eccezione accettabile: una sessione catturata ha le credenziali
-//   della macchina, non le mani dell'owner sulla finestra di Filo.
+//   locale si lavora proprio su quelle cose. Il blocco non è un rifiuto secco:
+//   il server apre una richiesta che aspetta il sì dell'owner, QUI. Da #908 il
+//   lavoro locale di una pratica provata non la apre: fonde e registra i blocchi.
 //
 // DOVE VIVE (scelta dell'owner, 2026-08-26)
 //   SOLO nella dashboard di gestione, in cima ai Ricevuti: i Ricevuti sono le
@@ -19,6 +17,8 @@
 //   sta lì, prima dei feedback, non su una superficie a parte. Prima l'avviso
 //   viveva anche sulla prima schermata del browser: due posti per la stessa
 //   decisione erano rumore per la home di tutti i giorni.
+//   Dal #489 le stesse card si disegnano anche nella pagina da browser (site/approvazioni): è la via
+//   d'uscita per il giorno in cui Filo non parte, non un secondo posto da guardare.
 //
 //   Il modulo resta separato dalla pagina perché tiene insieme le due rese —
 //   l'avviso da decidere (Ricevuti) e la traccia delle decisioni passate
@@ -89,12 +89,31 @@
   /**
    * Il titolo dell'avviso. PURA.
    * Zero richieste → stringa vuota: chi non ne ha non deve vedere niente.
+   * Una richiesta già mandata a fondere, o già decisa, non aspetta più il sì di nessuno: conta a parte (#702).
    */
-  function headline(count) {
+  function headline(count, inCorso, decise) {
     var n = Math.max(0, Math.floor(Number(count) || 0));
-    if (!n) return '';
+    var v = Math.max(0, Math.floor(Number(inCorso) || 0));
+    var d = Math.max(0, Math.floor(Number(decise) || 0));
     if (n === 1) return 'Una fusione aspetta il tuo via libera';
-    return n + ' fusioni aspettano il tuo via libera';
+    if (n > 1) return n + ' fusioni aspettano il tuo via libera';
+    if (v === 1) return 'Una fusione in corso';
+    if (v > 1) return v + ' fusioni in corso';
+    if (d === 1) return 'Una fusione decisa';
+    if (d > 1) return d + ' fusioni decise';
+    return '';
+  }
+
+  /** La frase sotto il titolo, con lo stesso conto: «aspettano il tuo sì» solo se qualcuna aspetta. PURA. */
+  var INTRO_FERME = 'I controlli di sicurezza del server le hanno fermate perché toccano parti protette. Aspettano il tuo sì.';
+  var INTRO_IN_CORSO = 'I controlli di sicurezza del server l’hanno fermata perché tocca parti protette. È approvata: il server la sta fondendo.';
+  // Anche a fusione decisa la frase resta: sparendo, tirava su i tasti sotto il cursore (#550).
+  var INTRO_DECISA = 'I controlli di sicurezza del server l’hanno fermata perché tocca parti protette. Hai già deciso: esce da qui alla prossima rilettura.';
+  function introText(count, inCorso, decise) {
+    if (Math.floor(Number(count) || 0) > 0) return INTRO_FERME;
+    if (Math.floor(Number(inCorso) || 0) > 0) return INTRO_IN_CORSO;
+    if (Math.floor(Number(decise) || 0) > 0) return INTRO_DECISA;
+    return '';
   }
 
   /**
@@ -172,8 +191,9 @@
 
   /** L'etichetta della provenienza, col numero del feedback quando c'è. PURA. */
   function originLabel(req) {
-    if (originOf(req) !== 'routine') return 'lavoro tuo, da questo computer';
     var num = feedbackNum(req);
+    // Da #908 anche il lavoro locale porta la sua pratica.
+    if (originOf(req) !== 'routine') return num ? 'lavoro locale · feedback #' + num : 'lavoro tuo, in locale';
     return num ? 'automazione · feedback #' + num : 'automazione';
   }
 
@@ -181,7 +201,23 @@
   function originHint(req) {
     return originOf(req) === 'routine'
       ? 'Questo ramo l’ha scritto un’automazione partendo da una segnalazione: guarda cosa è stato bloccato prima di approvarlo.'
-      : 'Questo ramo l’hai scritto tu su questo computer.';
+      : 'Questo ramo l’hai scritto tu, in locale.';
+  }
+
+  /**
+   * Fusa senza passare dall’owner perché era il lavoro locale di una pratica provata (#908) o di un feedback che
+   * l’owner ha approvato come lavoro locale (#913): L5 ha girato solo per registrare i blocchi. PURA.
+   */
+  function isSkippedL5(r) {
+    return !!(r && r.skippedL5 === true);
+  }
+
+  /** Perché quella fusione non ha chiesto: la prova del mittente, o il sì dell’owner a un feedback non suo. PURA. */
+  function skippedL5Hint(r) {
+    var dopo = ' I controlli hanno solo registrato cosa avrebbero fermato.';
+    if (!(r && r.localApproved === true)) return 'Pratica aperta da te o da una sessione locale, con la prova del mittente.' + dopo;
+    var by = String(r.preapprovedBy || '').trim().slice(0, 120);
+    return 'Feedback di un utente o di una routine, approvato come lavoro locale' + (by ? ' da ' + by : '') + '.' + dopo;
   }
 
   /** Un blocco, in una riga leggibile. PURA. Un blocco senza frase si NOMINA lo stesso. */
@@ -281,6 +317,25 @@
   }
 
   /**
+   * Gli unit sul risultato della fusione (#929): su quale main sono girati, e quando. Al clic non si rifanno, quindi
+   * chi approva giorni dopo deve sapere quanto è vecchia la prova. PURA: null per una richiesta senza prova.
+   */
+  function provaNote(req, nowMs) {
+    var p = req && req.provaUnit;
+    if (!p || typeof p !== 'object') return null;
+    var t = timeAgo(p.atMs, nowMs);
+    var quando = t ? (t === 'adesso' ? ' di adesso' : ' di ' + t) : '';
+    var titolo = 'Gli unit test sono girati sul risultato della fusione con main com’era allora (' + shortSha(p.mainSha)
+      + '). Approvando non si rifanno, quindi se main nel frattempo è andato avanti la combinazione che fondi non l’ha provata nessuno.';
+    if (p.esito === 'verde' || p.esito === 'main_contenuto') return { testo: 'Unit verdi sulla fusione con main' + quando, titolo: titolo };
+    if (p.esito === 'rosso_anche_su_main') {
+      return { testo: 'Unit già rossi su main da solo' + (t ? ' ' + t : '') + ', la fusione non ne rompeva altri', titolo: titolo };
+    }
+    if (p.esito === 'conflitto') return { testo: 'Unit non provati, la fusione con main' + quando + ' andava in conflitto', titolo: titolo };
+    return null;
+  }
+
+  /**
    * L'esito di una decisione passata, in due parole. PURA.
    *
    * `stale` con `used: true` è una richiesta CONSUMATA senza fusione: dirla
@@ -291,6 +346,7 @@
   function recentOutcome(r) {
     var v = r || {};
     var ria = !!(v.realigned && typeof v.realigned === 'object');
+    if (isSkippedL5(v)) return 'fusa senza chiedere (lavoro locale)';
     if (v.outcome === 'merged') return ria ? 'approvata, riallineata e fusa' : 'approvata e fusa';
     if (v.outcome === 'conflict') return 'approvata, ma in conflitto';
     if (v.outcome === 'stale') return ria ? 'riallineata, chiede di nuovo' : 'decaduta';
@@ -358,6 +414,66 @@
     return n;
   }
 
+  // Una conferma a metà (tasto armato, o richiesta in volo) blocca ogni ridisegno automatico
+  // di `root`: rifatta sotto il cursore, la card perdeva la conferma e spostava i tasti (#550).
+  var LIBERA = 'sn-mac-libera';
+  var ATTESA_CLIC = { kind: 'wait', text: 'Chiedo al server di fondere…' };
+  function occupata(root) {
+    return !!(root && root.querySelector
+      && root.querySelector('.sn-mac-btn-go.is-armed, .sn-mac-card.is-busy:not(.is-done)'));
+  }
+  // Rimanda `fn` a quando `root` si libera; vale l'ultima chiesta, perché ognuna ridisegna lo stato di quel momento.
+  function quandoLibera(root, fn) {
+    if (!root) return;
+    if (!occupata(root)) { root.__snMacDopo = null; fn(); return; }
+    root.__snMacDopo = fn;
+    if (root.__snMacAscolta) return;
+    root.__snMacAscolta = true;
+    root.addEventListener(LIBERA, function () {
+      Promise.resolve().then(function () {
+        var f = root.__snMacDopo;
+        if (!f || occupata(root)) return;
+        root.__snMacDopo = null;
+        f();
+      });
+    });
+  }
+  function liberata(card) {
+    var Ev = global.CustomEvent;
+    if (typeof Ev === 'function') card.dispatchEvent(new Ev(LIBERA, { bubbles: true }));
+  }
+  // Titolo e frase seguono le card: una che sta fondendo, o già decisa, esce dal conto di quelle che aspettano.
+  function rititola(box) {
+    var t = box && box.querySelector ? box.querySelector('.sn-mac-title-text') : null;
+    if (!t) return;
+    var cards = box.querySelectorAll('.sn-mac-card');
+    var ferme = 0, inCorso = 0, decise = 0;
+    for (var i = 0; i < cards.length; i++) {
+      if (cards[i].classList.contains('is-done')) decise++;
+      else if (cards[i].classList.contains('is-merging')) inCorso++;
+      else ferme++;
+    }
+    var testo = headline(ferme, inCorso, decise);
+    if (testo) t.textContent = testo;
+    var intro = box.querySelector('.sn-mac-intro');
+    if (intro) {
+      intro.textContent = introText(ferme, inCorso, decise);
+      intro.hidden = !intro.textContent;
+    }
+  }
+
+  // Un'approvazione partita da un'altra strada mentre la card è già sullo schermo (magari col
+  // tasto armato, che trattiene i ridisegni): la card la segue subito, senza aspettare (#702).
+  function seguiSulPosto(root, id, volo) {
+    if (!root || !root.querySelectorAll || !volo) return;
+    var cards = root.querySelectorAll('.sn-mac-card');
+    for (var i = 0; i < cards.length; i++) {
+      if (cards[i].dataset.requestId === String(id) && typeof cards[i].__snMacSegui === 'function') {
+        cards[i].__snMacSegui(volo.attesa || ATTESA_CLIC, volo.risposta);
+      }
+    }
+  }
+
   /**
    * Una richiesta = una card.
    *
@@ -390,7 +506,7 @@
     // chiesto" è esattamente il gesto che serve prima di approvare, e deve
     // stare a un click, non a una ricerca.
     var origin;
-    if (originOf(req) === 'routine' && feedbackNum(req) && typeof o.onFeedback === 'function') {
+    if (feedbackNum(req) && typeof o.onFeedback === 'function') {
       origin = el('button', 'sn-mac-origin sn-mac-origin-link', originLabel(req));
       origin.type = 'button';
       origin.title = 'Apri la segnalazione #' + feedbackNum(req) + ' da cui nasce questo lavoro.';
@@ -427,6 +543,13 @@
       card.appendChild(ria);
     }
 
+    var prova = provaNote(req, now);
+    if (prova) {
+      var pr = el('p', 'sn-mac-prova', prova.testo);
+      pr.title = prova.titolo;
+      card.appendChild(pr);
+    }
+
     var blocks = Array.isArray(req.blocks) ? req.blocks : [];
     if (blocks.length) {
       card.appendChild(el('p', 'sn-mac-why', nota ? 'Bloccata perché (solo il nuovo):' : 'Bloccata perché:'));
@@ -459,12 +582,26 @@
       armed = false;
       approveBtn.textContent = 'Approva e fondi';
       approveBtn.classList.remove('is-armed');
+      approveBtn.style.minWidth = '';
       if (armTimer) { clearTimeout(armTimer); armTimer = null; }
+      liberata(card);
     }
     function setBusy(on) {
       approveBtn.disabled = !!on;
       discardBtn.disabled = !!on;
       card.classList.toggle('is-busy', !!on);
+      if (!on) {
+        card.classList.remove('is-merging');
+        rititola(card.closest ? card.closest('.sn-mac') : null);
+        liberata(card);
+      }
+    }
+    // Esito definitivo: i tasti restano spenti, ma la rilettura che toglie la card può passare.
+    function finita() {
+      card.classList.add('is-done');
+      card.classList.remove('is-merging');
+      rititola(card.closest ? card.closest('.sn-mac') : null);
+      liberata(card);
     }
     function say(msg) {
       if (!msg) { status.hidden = true; status.textContent = ''; return; }
@@ -473,30 +610,51 @@
       status.dataset.kind = msg.kind;
     }
 
-    approveBtn.addEventListener('click', function () {
+    approveBtn.addEventListener('click', function (e) {
+      // La coda di un doppio clic (`detail > 1`) non è la conferma: fonderebbe in un gesto solo.
+      if (armed && e && e.detail > 1) return;
       if (!armed) {
-        // Conferma sul posto: un click solo non manda niente su main.
+        // Conferma sul posto: un click solo non manda niente su main. Il secondo
+        // clic cade dove è caduto il primo: il tasto armato non si accorcia, o Scarta gli scivola sotto (#550).
         armed = true;
+        approveBtn.style.minWidth = approveBtn.getBoundingClientRect().width + 'px';
         approveBtn.textContent = 'Confermi?';
         approveBtn.classList.add('is-armed');
         armTimer = setTimeout(disarm, 5000);
         return;
       }
       disarm();
+      segui(ATTESA_CLIC, o.onApprove ? o.onApprove(req) : null);
+    });
+
+    // Un'approvazione in volo, partita da qui o da un'altra strada (il segno «fondi senza
+    // chiedermelo»): finché il server non risponde la card lo dice e non se ne manda un'altra (#702).
+    var seguita = null;
+    function segui(attesa, risposta) {
+      // La stessa risposta arriva anche da seguiSulPosto: seguita due volte, l'esito si direbbe due volte.
+      if (risposta && seguita === risposta) return;
+      seguita = risposta;
       setBusy(true);
-      say({ kind: 'wait', text: 'Chiedo al server di fondere…' });
-      Promise.resolve(o.onApprove ? o.onApprove(req) : null)
+      card.classList.add('is-merging');
+      rititola(card.closest ? card.closest('.sn-mac') : null);
+      say(attesa);
+      Promise.resolve(risposta)
         .then(function (reply) {
           var msg = outcomeMessage(reply, req);
           say(msg);
-          if ((msg.kind === 'ok' || msg.reload) && o.onDone) o.onDone();
+          if ((msg.kind === 'ok' || msg.reload) && o.onDone) { finita(); o.onDone(); }
           else setBusy(false);
         })
         .catch(function (e) {
           say(outcomeMessage({ ok: false, error: (e && e.message) || String(e) }, req));
           setBusy(false);
         });
-    });
+    }
+    card.__snMacSegui = function (attesa, risposta) {
+      if (card.classList.contains('is-done')) return;
+      if (armed) disarm();
+      segui(attesa, risposta);
+    };
 
     discardBtn.addEventListener('click', function () {
       disarm();
@@ -504,7 +662,7 @@
       Promise.resolve(o.onDiscard ? o.onDiscard(req) : null)
         .then(function (reply) {
           var msg = outcomeMessage(reply, req);
-          if (msg.kind === 'ok' && o.onDone) { o.onDone(); return; }
+          if (msg.kind === 'ok' && o.onDone) { finita(); o.onDone(); return; }
           say(msg);
           setBusy(false);
         })
@@ -516,12 +674,19 @@
 
     actions.appendChild(discardBtn);
     actions.appendChild(approveBtn);
-    card.appendChild(status);
+    // L'esito sotto i tasti: comparendo sopra li spingeva giù, e il clic per riprovare cadeva fuori.
     card.appendChild(actions);
+    card.appendChild(status);
     // Un tentativo già fatto — e non riuscito — resta scritto sulla card: un
     // avviso che passa lo legge solo chi è davanti allo schermo in quel momento.
-    var prima = o.esitoIniziale ? o.esitoIniziale(req) : null;
-    if (prima) say(prima);
+    var volo = o.inVolo ? o.inVolo(req) : null;
+    var prima = volo ? null : (o.esitoIniziale ? o.esitoIniziale(req) : null);
+    if (volo) segui(volo.attesa || ATTESA_CLIC, volo.risposta);
+    else if (prima) {
+      say(prima);
+      // Già fusa, scartata o sostituita: non c'è più niente da approvare finché la rilettura non la toglie.
+      if (prima.kind === 'ok' || prima.reload) { setBusy(true); finita(); }
+    }
     return card;
   }
 
@@ -552,7 +717,7 @@
 
     var head = el('div', 'sn-mac-head');
     var origin;
-    if (originOf(req) === 'routine' && feedbackNum(req) && typeof o.onFeedback === 'function') {
+    if (feedbackNum(req) && typeof o.onFeedback === 'function') {
       origin = el('button', 'sn-mac-origin sn-mac-origin-link', originLabel(req));
       origin.type = 'button';
       origin.title = 'Apri la segnalazione #' + feedbackNum(req) + ' da cui nasce questo lavoro.';
@@ -600,8 +765,8 @@
         });
     });
     actions.appendChild(okBtn);
-    card.appendChild(status);
     card.appendChild(actions);
+    card.appendChild(status);
     return card;
   }
 
@@ -610,6 +775,11 @@
     var o = opts || {};
     var list = Array.isArray(o.requests) ? o.requests : [];
     var failed = Array.isArray(o.failed) ? o.failed : [];
+    if (occupata(host)) {
+      quandoLibera(host, function () { render(host, o); });
+      return list.length + failed.length;
+    }
+    host.__snMacDopo = null;
     host.replaceChildren();
     host.hidden = list.length === 0 && failed.length === 0;
     if (!list.length && !failed.length) return 0;
@@ -646,12 +816,11 @@
       title.appendChild(el('span', 'sn-mac-title-text', headline(list.length)));
       box.appendChild(title);
 
-      var intro = el('p', 'sn-mac-intro',
-        'I controlli di sicurezza del server le hanno fermate perché toccano parti protette. '
-        + 'Approvarle da qui è l’unica strada: il terminale, da solo, non può.');
+      var intro = el('p', 'sn-mac-intro', INTRO_FERME);
       box.appendChild(intro);
 
       for (var i = 0; i < list.length; i++) box.appendChild(buildCard(list[i], o));
+      rititola(box);
       host.appendChild(box);
     }
     return list.length + failed.length;
@@ -790,6 +959,18 @@
     return !(segno && segno.tipo === 'pieno');
   }
 
+  /**
+   * Quale segno è, fra una lettura e l'altra. PURA. '' = nessun segno. Chi lo
+   * rimette (Gestione, lo script, un'altra finestra) scrive un `at` nuovo: la
+   * chiave cambia anche se fra le due letture il segno non si è visto sparire.
+   */
+  function chiaveSegno(segno) {
+    if (!segno) return '';
+    var at = String(segno.at || '').trim();
+    var ms = Date.parse(at);
+    return isFinite(ms) ? String(ms) : (at || String(segno.by || '').trim());
+  }
+
   /** Chi aveva messo il segno sulla pratica, in una frase. PURA. */
   function preapprovedBy(r) {
     var by = String((r && r.preapprovedBy) || '').trim();
@@ -797,6 +978,47 @@
     if (segno && segno.tipo === 'approvazione') return 'pre-approvata ' + origineSegnoDaApprovazione(segno);
     by = by.slice(0, 120);
     return by ? 'pre-approvata da ' + by : 'pre-approvata sulla pratica';
+  }
+
+  /** Perché una fusione non ha chiesto: 'pieno' (segno a mano), 'approvazione' (segno da un sì), 'locale'. PURA. */
+  function specieFusaSenzaChiedere(r) {
+    if (isSkippedL5(r)) return 'locale';
+    var segno = segnoPreapprovazione({ by: r && r.preapprovedBy, at: r && r.preapprovedAt });
+    return segno && segno.tipo === 'approvazione' ? 'approvazione' : 'pieno';
+  }
+
+  // Per specie: `solo` è una frase intera, `misto` segue «Alcuni/altri».
+  var PERCHE_SENZA_CHIEDERE = [
+    ['pieno', {
+      solo: 'Sulla pratica avevi messo «fondi senza chiedermelo».',
+      misto: 'avevano sulla pratica il tuo «fondi senza chiedermelo»',
+    }],
+    ['approvazione', {
+      solo: 'Avevano solo blocchi che avevi già approvato, con un sì a una richiesta precedente sulla stessa pratica.',
+      misto: 'avevano solo blocchi che avevi già approvato con un sì a una richiesta precedente',
+    }],
+    ['locale', {
+      solo: 'Venivano da una pratica tua con la prova del mittente, o da un feedback che hai approvato come lavoro locale.',
+      misto: 'erano lavoro locale (una pratica tua con la prova del mittente, o un feedback che hai approvato come lavoro locale)',
+    }],
+  ];
+
+  /**
+   * L'introduzione delle «Fuse senza chiedere», detta solo per le specie che l'elenco contiene. PURA.
+   * Una frase sola per tutte dava il «fondi senza chiedermelo» anche alle fusioni nate da un sì (#743).
+   */
+  function preapprovedIntro(list) {
+    var righe = Array.isArray(list) ? list : [];
+    var presenti = {};
+    for (var i = 0; i < righe.length; i++) presenti[specieFusaSenzaChiedere(righe[i])] = true;
+    var frasi = PERCHE_SENZA_CHIEDERE.filter(function (p) { return presenti[p[0]]; });
+    var testa = 'Lavori fermati dai controlli e fusi lo stesso. ';
+    var coda = ' Qui c’è tutto quello che era stato segnalato.';
+    if (!frasi.length) return testa.trim() + coda;
+    if (frasi.length === 1) return testa + frasi[0][1].solo + coda;
+    var soggetti = ['Alcuni ', 'altri ', 'altri ancora '];
+    var parti = frasi.map(function (p, k) { return soggetti[k] + p[1].misto; });
+    return testa + parti.join('; ') + '.' + coda;
   }
 
   /**
@@ -831,10 +1053,7 @@
     host.hidden = list.length === 0;
     if (!list.length) return 0;
     host.appendChild(el('p', 'sn-mac-recent-title', 'Fuse senza chiedere'));
-    var intro = el('p', 'sn-mac-preapproved-intro',
-      'Lavori delle automazioni fermati dai controlli e fusi lo stesso, perché sulla pratica avevi detto «fondi senza chiedermelo». '
-      + 'Qui c’è tutto quello che era stato segnalato.');
-    host.appendChild(intro);
+    host.appendChild(el('p', 'sn-mac-preapproved-intro', preapprovedIntro(list)));
     var ul = el('ul', 'sn-mac-preapproved');
     for (var i = 0; i < list.length; i++) {
       var r = list[i];
@@ -853,8 +1072,11 @@
       var sha = el('span', 'sn-mac-sha', shortSha(r.mergeSha || r.sha));
       sha.title = 'Il commit esaminato: ' + String(r.sha || '') + (r.mergeSha ? '\nIl commit di fusione: ' + String(r.mergeSha) : '');
       head.appendChild(sha);
-      var who = el('span', 'sn-mac-recent-who', preapprovedBy(r));
-      if (r.preapprovedAt) who.title = preapprovedWhenText(r.preapprovedAt);
+      var who = el('span', 'sn-mac-recent-who', isSkippedL5(r) ? 'lavoro locale: L5 saltato' : preapprovedBy(r));
+      var specie = specieFusaSenzaChiedere(r);
+      if (specie === 'locale') who.title = skippedL5Hint(r);
+      else if (specie === 'approvazione') who.title = 'Il segno l’aveva lasciato il tuo sì e valeva solo per i blocchi già approvati. Con blocchi nuovi ti avrebbe chiesto.';
+      else if (r.preapprovedAt) who.title = preapprovedWhenText(r.preapprovedAt);
       head.appendChild(who);
       head.appendChild(el('span', 'sn-mac-recent-when', mergedWhenText(r.decidedAtMs || r.createdAtMs, now)));
       li.appendChild(head);
@@ -891,30 +1113,39 @@
     realignReasonText: realignReasonText,
     realignFailureText: realignFailureText,
     realignedNote: realignedNote,
+    provaNote: provaNote,
     recentOutcome: recentOutcome,
     timeAgo: timeAgo,
     expiresIn: expiresIn,
     headline: headline,
+    introText: introText,
     requestedBy: requestedBy,
     originOf: originOf,
     feedbackNum: feedbackNum,
     originLabel: originLabel,
     originHint: originHint,
+    isSkippedL5: isSkippedL5,
+    skippedL5Hint: skippedL5Hint,
     howToRetry: howToRetry,
     blockLabel: blockLabel,
     blockItems: blockItems,
     outcomeMessage: outcomeMessage,
     richiesteCoperte: richiesteCoperte,
     render: render,
+    occupata: occupata,
+    quandoLibera: quandoLibera,
+    seguiSulPosto: seguiSulPosto,
     renderRecent: renderRecent,
     preapprovedBy: preapprovedBy,
     segnoPreapprovazione: segnoPreapprovazione,
     segnoTesti: segnoTesti,
     segnoAlClic: segnoAlClic,
+    chiaveSegno: chiaveSegno,
     preapprovedWhenText: preapprovedWhenText,
     dateTimeText: dateTimeText,
     mergedWhenText: mergedWhenText,
     preapprovedMoreText: preapprovedMoreText,
+    preapprovedIntro: preapprovedIntro,
     renderPreapproved: renderPreapproved,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

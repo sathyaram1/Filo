@@ -116,6 +116,11 @@ test('isLocalHost copre loopback, *.localhost e gli IP privati', () => {
   assert.equal(isLocalHost('192.168.0.1'), true);
   assert.equal(isLocalHost('172.16.0.1'), true);
   assert.equal(isLocalHost('[::1]'), true);
+  assert.equal(isLocalHost('169.254.10.20'), true);
+  assert.equal(isLocalHost('fd00::1'), true);
+  assert.equal(isLocalHost('[fe80::1]'), true);
+  assert.equal(isLocalHost('fda.gov'), false);   // un nome, non un indirizzo IPv6
+  assert.equal(isLocalHost('2001:db8::1'), false);
   assert.equal(isLocalHost('8.8.8.8'), false);  // IP pubblico
   assert.equal(isLocalHost('example.com'), false);
 });
@@ -203,4 +208,28 @@ test('#437 gli indirizzi veri restano copiabili', () => {
   assert.equal(isShareableAddress('tel:+390123'), true);
   assert.equal(isShareableAddress('magnet:?xt=urn:btih:abc'), true);
   assert.equal(isShareableAddress('filo://home/home.html'), true); // riapribile dentro Filo
+});
+
+// #591 — la rete di casa dei lavori automatici: per nome conta dove ha risposto la pagina, la forma solo finché non si sa.
+test('#591 la rete di casa: nomi senza punto, forma locale, e nomi che hanno risposto da casa', () => {
+  const { isHomeNetworkHost, isHomeNetworkUrl, noteHostAddress, isLanAddress } = globalThis.SN_URL_NAV;
+  for (const h of ['homeassistant', 'router', 'nas', 'speedport.ip', 'nas.local', '192.168.1.1', '[fd00::1]', 'localhost', '127.0.0.1']) {
+    assert.equal(isHomeNetworkHost(h), true, h);
+  }
+  assert.equal(isHomeNetworkUrl('http://homeassistant:8123/auth'), true);
+  assert.equal(isHomeNetworkHost('tplinkwifi.net'), false, 'prima di rispondere è un nome pubblico');
+  noteHostAddress('tplinkwifi.net', '192.168.0.1');
+  assert.equal(isHomeNetworkUrl('http://tplinkwifi.net/webpages/login.html'), true, 'il router lo intercetta');
+  noteHostAddress('tplinkwifi.net', '34.120.1.2');
+  assert.equal(isHomeNetworkHost('tplinkwifi.net'), false, 'fuori casa risponde il sito vero');
+  assert.equal(isHomeNetworkHost('negozio.box'), false, '.box è un dominio pubblico vero');
+  noteHostAddress('fritz.box', '192.168.178.1');
+  assert.equal(isHomeNetworkHost('fritz.box'), true);
+  noteHostAddress('nas.tail1234.ts.net', '100.101.102.103');
+  assert.equal(isHomeNetworkHost('nas.tail1234.ts.net'), true, 'un dispositivo della propria rete Tailscale');
+  noteHostAddress('app.localtest.me', '127.0.0.1');
+  assert.equal(isHomeNetworkHost('app.localtest.me'), false, 'il loopback per nome è sviluppo locale, non casa');
+  assert.equal(isLanAddress('8.8.8.8'), false);
+  assert.equal(isLanAddress('::ffff:10.0.0.1'), true);
+  assert.equal(isLanAddress('fe80::1'), true);
 });

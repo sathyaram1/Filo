@@ -30,6 +30,8 @@
 
   const bdAuthMsg = document.getElementById('bdAuthMsg');
   const bdSignIn  = document.getElementById('bdSignIn');
+  const bdAuthSpin = document.getElementById('bdAuthSpin');
+  const bdAuthLascia = document.getElementById('bdAuthLascia');
   const bdLoading = document.getElementById('bdLoading');
   const bdEmpty   = document.getElementById('bdEmpty');
   const bdError   = document.getElementById('bdError');
@@ -98,6 +100,14 @@
   let releasedVersion = '';
   const pending = new Set();    // id feedback con voto in volo (IPC), per disabilitare i pulsanti
   let openReopenAfterLogin = null; // id del fix il cui form "Ancora rotto?" va riaperto dopo un login riuscito
+  // #678.2 — un accesso partito dalla bacheca dice sempre com'è andato: mentre
+  // aspetta il browser, e se non riesce il perché, su ogni scheda che aspettava
+  // (in testa se partito da «Accedi»). Un gesto fatto durante l'attesa si unisce
+  // agli altri: partono tutti appena l'account è dentro, da dovunque ci entri.
+  // Un gesto per tipo e scheda: ripremere il pollice cambia il voto, ma il voto e
+  // «Ancora rotto?» sulla stessa scheda partono tutti e due.
+  let attesa = null;           // { gesti: Map(`tipo:id` → { id, dopo, poi }), testa } finché l'accesso non si chiude
+  let accessoFallito = null;   // frase per la testa
   // Form "Ancora rotto?" aperti e testo scritto dentro, per id: renderList()
   // ricostruisce tutte le schede da zero, e un ridisegno che arriva mentre
   // scrivi (i dati che finiscono di caricare, un voto che torna dal server, un
@@ -123,6 +133,7 @@
   // non l'email: è la chiave con cui i voti sono salvati in `votes.<uid>` (DB4).
   // Senza questo, dopo un reload "il mio voto" non si riconoscerebbe più
   // (i voti salvati sono sempre per uid reale, mai per email).
+  const CODICI_ACCESSO = new Set(['auth', 'accesso', 'accesso-ko', 'lasciato']);
   async function refreshAuth() {
     try {
       const r = await sendToMain({ type: 'auth_status' });
@@ -132,27 +143,109 @@
       signedIn = false; uid = null;
     }
     if (signedIn) {
-      for (const [id, a] of avvisi) if (a.code === 'auth') avvisi.delete(id);
+      for (const [id, a] of avvisi) if (CODICI_ACCESSO.has(a.code)) avvisi.delete(id);
+      accessoFallito = null;
     }
     reflectAuth();
   }
 
   function reflectAuth() {
+    const inCorso = !signedIn && !!attesa;
+    const fallito = !signedIn && !inCorso && accessoFallito;
+    bdAuthSpin.hidden = !inCorso;
+    bdAuthLascia.hidden = !inCorso;
+    bdAuthMsg.classList.toggle('bd-auth-ko', !!fallito);
     if (signedIn) {
       bdAuthMsg.textContent = 'Sei connesso: vota i miglioramenti qui sotto.';
       bdSignIn.hidden = true;
+      return;
+    }
+    bdSignIn.hidden = false;
+    if (inCorso) {
+      bdAuthMsg.textContent = 'Completa l\'accesso nel browser che si è aperto.';
+      bdSignIn.textContent = 'Riapri il browser';
+    } else if (fallito) {
+      bdAuthMsg.textContent = fallito;
+      bdSignIn.textContent = 'Riprova';
     } else {
       bdAuthMsg.textContent = 'Accedi per votare i miglioramenti.';
-      bdSignIn.hidden = false;
+      bdSignIn.textContent = 'Accedi';
     }
   }
 
-  bdSignIn.addEventListener('click', () => {
+  // Un gesto durante l'attesa non apre un altro browser (un doppio clic ne
+  // aprirebbe due): lo riapre solo «Riapri il browser».
+  function accedi(id, tipo, dopo, poi) {
+    const nuova = !attesa;
+    if (nuova) attesa = { gesti: new Map(), testa: false };
+    if (id) {
+      attesa.gesti.set(`${tipo}:${id}`, { id, dopo, poi });
+      const promesse = [...attesa.gesti.values()].filter((g) => g.id === id).map((g) => g.dopo);
+      avvisi.set(id, { testo: `Completa l'accesso nel browser: ${promesse.join(', ')}.`, code: 'accesso' });
+    } else {
+      attesa.testa = true;
+    }
+    accessoFallito = null;
+    reflectAuth();
+    renderList();
+    if (nuova) chiediAccesso();
+  }
+
+  // Il main tiene un accesso solo: chiederlo di nuovo riapre il browser sulla
+  // stessa pagina e restituisce lo stesso esito.
+  function chiediAccesso() {
+    const a = attesa;
     sendToMain({ type: 'auth_signin' })
-      .then(() => refreshAuth())
-      .then(() => renderList())
-      .catch(() => {});
+      .catch(() => null)
+      .then((r) => refreshAuth().then(() => r))
+      .then((r) => chiudiAttesa(a, r));
+  }
+
+  // `poi(ok)` riprende ogni gesto a esito noto (il perché di un fallimento è già
+  // in pagina). Un'attesa già chiusa, o lasciata stare, non si chiude due volte.
+  function chiudiAttesa(a, r) {
+    if (!a || attesa !== a) return;
+    attesa = null;
+    const ok = !!(signedIn && uid);
+    for (const { id } of a.gesti.values()) if (avvisi.get(id)?.code === 'accesso') avvisi.delete(id);
+    if (!ok) {
+      const testo = (r && typeof r.error === 'string' && r.error.trim()) || 'Accesso non riuscito: riprova.';
+      for (const { id } of a.gesti.values()) avvisi.set(id, { testo, code: 'accesso-ko' });
+      if (a.testa || !a.gesti.size) accessoFallito = testo;
+    }
+    reflectAuth();
+    renderList();
+    for (const g of a.gesti.values()) if (g.poi) g.poi(ok);
+  }
+
+  bdSignIn.addEventListener('click', () => {
+    if (attesa) chiediAccesso();
+    else accedi(null);
   });
+
+  // Chi ha chiuso il browser senza accedere non deve aspettare il tetto del main.
+  bdAuthLascia.addEventListener('click', () => {
+    const a = attesa;
+    if (!a) return;
+    attesa = null;
+    for (const { id } of a.gesti.values()) {
+      avvisi.set(id, { testo: 'Senza accesso non è partito niente: riprova quando vuoi.', code: 'lasciato' });
+    }
+    reflectAuth();
+    renderList();
+  });
+
+  // Un accesso o un'uscita fatti altrove (menu account, un'altra pagina) valgono
+  // anche qui: i gesti in attesa partono appena l'account è dentro.
+  if (window.filo?.onBroadcast) {
+    window.filo.onBroadcast((m) => {
+      if (m?.type !== 'auth_changed') return;
+      refreshAuth().then(() => {
+        if (attesa && signedIn && uid) chiudiAttesa(attesa, { ok: true });
+        else renderList();
+      }).catch(() => {});
+    });
+  }
 
   // ── Titolo SICURO di un miglioramento ───────────────────────────────────
   // Solo il titolo breve già generato (`name`). Mai il testo grezzo (cifrato /
@@ -246,7 +339,7 @@
     if (!a) return null;
     const p = document.createElement('p');
     // Un fix ritirato non è un errore di chi ha votato: tono neutro.
-    p.className = a.code === 'gone' ? 'bd-card-msg bd-card-msg-info' : 'bd-card-msg';
+    p.className = a.code === 'gone' || a.code === 'accesso' || a.code === 'lasciato' ? 'bd-card-msg bd-card-msg-info' : 'bd-card-msg';
     p.setAttribute('role', 'status');
     p.textContent = a.testo;
     return p;
@@ -369,28 +462,15 @@
     form.appendChild(err);
     form.appendChild(actions);
 
-    // Se l'utente non è ancora autenticato, l'intenzione (aprire il form "Ancora
-    // rotto?") non va persa: dopo un login riuscito `renderList()` ricrea il DOM,
-    // quindi segniamo l'id del fix in `openReopenAfterLogin` e lo controlliamo
-    // in `renderReopen` alla ricostruzione, per riaprire il form da solo.
+    // Da anonimo l'intenzione (aprire il form) sopravvive al login: il render
+    // dopo l'accesso riuscito, e solo quello, ricrea la scheda col form aperto.
     link.addEventListener('click', () => {
       if (!signedIn || !uid) {
-        openReopenAfterLogin = fb._id;
-        sendToMain({ type: 'auth_signin' })
-          .then((r) => refreshAuth().then(() => r))
-          .then((r) => {
-            // `openReopenAfterLogin` resta impostato fino a QUESTO render finale
-            // (i render intermedi innescati da refreshAuth/AUTH_CHANGED non lo
-            // devono consumare prima del tempo, altrimenti il form si richiude
-            // subito dopo essersi aperto): se il login non è riuscito lo si
-            // azzera PRIMA di ridisegnare, altrimenti resta impostato per
-            // questo render (che apre il form) e viene azzerato subito dopo.
-            const ok = !!(r && r.ok && signedIn && uid);
-            if (!ok) openReopenAfterLogin = null;
-            renderList();
-            if (ok) openReopenAfterLogin = null;
-          })
-          .catch(() => { openReopenAfterLogin = null; renderList(); });
+        accedi(fb._id, 'modulo', 'poi scrivi qui cosa non va', (ok) => {
+          if (ok) openReopenAfterLogin = fb._id;
+          renderList();
+          openReopenAfterLogin = null;
+        });
         return;
       }
       form.hidden = !form.hidden;
@@ -504,27 +584,27 @@
   // login riuscito il flusso riprende da solo e il voto viene eseguito subito
   // (niente secondo click). `renderList()` ricrea il DOM (perde `btn`), quindi
   // il retry richiama onVote con l'`fb` fresco preso dalla lista ricreata.
-  function onVote(fb, vote, btn) {
+  function onVote(fb, vote, btn, dopoAccesso = false) {
     if (!signedIn || !uid) {
-      sendToMain({ type: 'auth_signin' })
-        .then((r) => refreshAuth().then(() => r))
-        .then((r) => {
-          renderList();
-          if (r && r.ok && signedIn && uid) {
-            const freshFb = allFeedbacks.find((x) => x._id === fb._id) || fb;
-            onVote(freshFb, vote, null);
-          }
-        })
-        .catch(() => {});
+      accedi(fb._id, 'voto', 'poi il voto parte da solo', (ok) => {
+        renderList();
+        if (ok) {
+          const freshFb = allFeedbacks.find((x) => x._id === fb._id) || fb;
+          onVote(freshFb, vote, null, true);
+        }
+      });
       return;
     }
     const id = fb._id;
     if (!id || pending.has(id)) return;
     avvisi.delete(id);
 
-    // Ottimistico: ri-cliccare la propria scelta la annulla (toggle).
+    // Ottimistico: ri-cliccare la propria scelta la annulla (toggle). Un voto
+    // ripreso dopo l'accesso no: da anonimo il proprio voto non si vedeva, e
+    // quel pollice chiedeva di votare, mai di togliere.
     const prevVotes = (fb.votes && typeof fb.votes === 'object') ? fb.votes : {};
     const current = FB.userVote(prevVotes, uid);
+    if (dopoAccesso && current === vote) return;
     const clearing = current === vote;
     const optimistic = { ...prevVotes };
     if (clearing) {
@@ -921,6 +1001,8 @@
   }
 
   async function init() {
+    // «Le tue segnalazioni» (#986) vive in board-segnalazioni.js e non aspetta la rete dei miglioramenti.
+    try { window.SN_BOARD_SEGNALAZIONI?.init(); } catch (e) { console.warn('[bacheca] segnalazioni:', e); }
     await refreshAuth();
     await loadData();
   }

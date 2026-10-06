@@ -15,12 +15,11 @@
   const code = (info && info.code) || '';
   const desc = (info && info.desc) || '';
 
-  const msg = NE ? NE.describe(code, desc) : { title: 'Impossibile caricare la pagina', hint: '', offline: false };
+  const msg = NE ? NE.describe(code, desc, { altroPaese: !!(info && info.altroPaese) }) : { title: 'Impossibile caricare la pagina', hint: '', offline: false };
 
   // Host del bersaglio, per titolo scheda + riga sotto al titolo. textContent
   // ovunque: l'URL arriva dalla query string, mai iniettarlo come HTML.
-  let host = '';
-  try { host = target ? (new URL(target).host || target) : ''; } catch (_) { host = target || ''; }
+  const host = target ? ((window.SN_NOMI_SITO && window.SN_NOMI_SITO.sitoDi(target)) || target) : '';
 
   document.getElementById('err-title').textContent = msg.title;
   document.getElementById('err-host').textContent = host ? host : '';
@@ -31,13 +30,18 @@
   const detailBits = [];
   if (desc) detailBits.push(desc);
   if (code && String(code) !== (NE && NE.CRASH_CODE)) detailBits.push(`(${code})`);
-  document.getElementById('err-detail').textContent = detailBits.join(' ');
+  document.getElementById('err-detail').textContent = msg.blocked ? '' : detailBits.join(' ');
+  if (msg.blocked) document.getElementById('page').classList.add('err-blocked');
 
   // Il titolo del documento diventa il titolo della scheda (via
   // page-title-updated): il sito fallito, non più "Nuova scheda".
   document.title = host || msg.title;
 
   const retryBtn = document.getElementById('err-retry');
+  // Sul sito bloccato il bottone è «Apri comunque»: il main riconosce il salto da qui al bersaglio.
+  if (msg.blocked) retryBtn.textContent = 'Apri comunque';
+  // Per togliere il sito dalla lista per sempre: la scheda resta qui, e torna sul sito appena esce dalla lista.
+  if (msg.blocked) document.getElementById('err-lista').hidden = false;
   function retry() {
     if (!target) return;
     // replace(): il tentativo non aggiunge un'ulteriore voce di cronologia

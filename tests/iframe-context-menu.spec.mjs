@@ -129,7 +129,7 @@ test('Alt+E sul testo selezionato DENTRO il riquadro arriva al riquadro', async 
     sel.removeAllRanges();
     sel.addRange(range);
   });
-  // Stessa strada della scorciatoia globale Alt+E.
+  // Quello che fa Alt+E dopo aver riconosciuto il tasto.
   await app.evaluate(({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
     globalThis.__filoShortcuts.dispatch('explain-selection', win);

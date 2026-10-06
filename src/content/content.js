@@ -29,6 +29,7 @@
     getPasteContext: () => pasteContext,
     restorePasteContext: () => restorePasteContext(),
     isBlocked: () => isBlocked(),
+    isIncognito: () => inIncognito,
     getLastMouseEvent: () => lastMouseEvent,
   });
   MenuIcons.init({
@@ -183,6 +184,7 @@
     settings = await fetchSettings();
     applyTheme(settings.theme);
     applyThemeTokens(settings.themeTokens);
+    self.SN_AVVISI?.imposta(settings.notifications);
 
     // Le tre cose qui sotto descrivono la SCHEDA: il colore che la tinge e i
     // segnali su quanto è stata usata. Un riquadro incorporato non ne sa nulla —
@@ -196,7 +198,7 @@
 
       // Colore identità del sito (§1.2): calcolato una volta (theme-color →
       // manifest → favicon → fallback) e mandato al main, che lo cacha per dominio
-      // e lo applica attenuato alle tab inattive.
+      // e lo mescola col fondo della barra nelle tab inattive.
       try { PageColor.reportTabIdentityColor(() => settings && settings.tabColor); } catch (_) {}
 
       // Segnali di attività (§2.1): ultima interazione, % di scroll, form sporco.
@@ -409,12 +411,22 @@
       // activeElement nel caso il keydown arrivi sul body con un campo a fuoco.
       const target = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target;
       if (isEditable(target) || isEditable(document.activeElement)) return;
+      // Una pagina di Filo in cui l'utente ha dato Ctrl+Z a un suo comando (un
+      // modulo dell'Editor) se lo tiene: vince la scelta esplicita (#545).
+      if (PAGINA_DI_FILO && document.documentElement.dataset.filoCtrlZ === 'pagina') return;
       e.preventDefault();
       e.stopPropagation();
       chrome.runtime.sendMessage({ type: MSG.NAV_BACK }).catch(() => {});
     }, { capture: true });
 
-    if (isBlocked()) return;
+    if (isBlocked()) {
+      self.__snFiloSpento = true;
+      // Alt+S è un gesto rivolto a Filo: anche qui salva con la miniatura e la conferma della voce del menu (#839).
+      chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+        if (msg?.type === MSG.SHORTCUT_TRIGGERED && COMANDI_SALVA.has(msg.command)) suSalvaPerDopo(msg, sendResponse);
+      });
+      return;
+    }
 
     SpellCheck.init(settings);
 
@@ -560,11 +572,14 @@
   // frame principale). Arriva dal main insieme alle impostazioni: da dentro un
   // riquadro di un'altra origine non è leggibile.
   let pageUrl = '';
+  // Finché il main non l'ha detto non si sa: vale incognito, e la selezione non parte da sola verso un modello.
+  let inIncognito = true;
 
   async function fetchSettings() {
     try {
       const res = await chrome.runtime.sendMessage({ type: MSG.GET_SETTINGS });
       if (res && typeof res.pageUrl === 'string') pageUrl = res.pageUrl;
+      if (res && typeof res.incognito === 'boolean') inIncognito = res.incognito;
       return res?.settings || self.SN_CONST.DEFAULT_SETTINGS;
     } catch (_) {
       return self.SN_CONST.DEFAULT_SETTINGS;
@@ -674,6 +689,9 @@
     // lo stesso canale `context-menu` del webContents.
     e.stopPropagation();
 
+    const avviso = self.SN_AVVISI?.avvisoSotto?.(realTarget(e));
+    if (avviso) { openAvvisoMenu(avviso, e); return; }
+
     // Spellcheck: in un editabile supportato, prima cerchiamo un errore "blu"
     // (sincrono); altrimenti partiamo con la richiesta on-demand all'LLM per la
     // parola sotto il cursore (zigzag rosso del browser).
@@ -721,6 +739,21 @@
     await openNormalMenuAt(e);
   }
 
+  // Le azioni dell'avviso e «Chiudi», nello stesso ordine del menu degli avvisi della barra.
+  function openAvvisoMenu({ el, chiudi, azioni }, e) {
+    const items = [];
+    if (azioni) {
+      for (const a of azioni) items.push({ type: 'item', label: a.label, onClick: () => a.fn() });
+    } else {
+      for (const b of el.querySelectorAll('button')) {
+        const label = (b.textContent || '').trim();
+        if (label) items.push({ type: 'item', label, onClick: () => b.click() });
+      }
+    }
+    items.push({ type: 'item', label: I18n.t('popup_close'), onClick: () => chiudi() });
+    Menu.open({ x: e.clientX, y: e.clientY, items });
+  }
+
   // Input testuali in cui ha senso aspettarsi una correzione ortografica
   // (esclude type=password, email, number, ecc. dove la spellcheck nativa è
   // disabilitata o non significativa).
@@ -755,7 +788,7 @@
       Actions.getNavState(),
     ]);
     const items = buildMenuItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState,
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState, target,
     });
 
     // Slot riservato per la correzione ortografica nativa: nascosto finché
@@ -1393,7 +1426,7 @@
       Actions.getNavState(),
     ]);
     return buildMenuItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState,
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState, target,
     });
   }
 
@@ -1669,7 +1702,7 @@
   // Ordine verticale: riga icone globali → Aiuto → zona contestuale → Feedback.
   // La riga globale è stabile (ancora), la zona contestuale varia in base al click.
   function buildMenuItems({
-    selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState,
+    selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState, target = null,
   }) {
     const items = [];
 
@@ -1713,9 +1746,15 @@
     if (zoomItem) items.push(zoomItem);
 
     // 3. Zona contestuale — assente se non c'è contesto utile.
-    const contextItems = buildContextualItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory,
-    });
+    // #760 — il tasto destro dentro un riquadro di un altro sito riattiva o toglie i cookie del suo servizio.
+    const vociRiquadro = (self.SN_RIQUADRO_COOKIE && self.SN_RIQUADRO_COOKIE.voci()) || [];
+    const contextItems = [
+      ...vociDellaPagina(target),
+      ...buildContextualItems({
+        selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target,
+      }),
+      ...vociRiquadro,
+    ];
     if (contextItems.length > 0) {
       items.push({ type: 'separator' });
       for (const it of contextItems) items.push(it);
@@ -1724,10 +1763,38 @@
     // 4. Feedback (alpha) + Red-team (invia attacco)
     items.push({ type: 'separator' });
     items.push(buildFeedbackItem());
-    items.push(buildRedteamAttackItem());
+    // In pausa (#896) la voce c'è solo per chi vede il Red Team. Si richiede a ogni apertura: vale dalla successiva.
+    refreshRedteamVisibile();
+    if (redteamVisibile) items.push(buildRedteamAttackItem());
 
     return items;
   }
+
+  // Le voci che una pagina di Filo dà ai suoi elementi (il segno di un cambio sulla bolla, #867): ogni
+  // fornitore in SN_VOCI_PAGINA riceve l'elemento cliccato. Mai sui siti: lì quel nome è della pagina.
+  function vociDellaPagina(target) {
+    if (!PAGINA_DI_FILO || !target) return [];
+    const fornitori = Array.isArray(self.SN_VOCI_PAGINA) ? self.SN_VOCI_PAGINA : [];
+    const out = [];
+    for (const f of fornitori) {
+      try {
+        const voci = typeof f === 'function' ? f(target) : null;
+        if (Array.isArray(voci)) out.push(...voci.filter((v) => v && v.label && typeof v.onClick === 'function'));
+      } catch (_) {}
+    }
+    return out;
+  }
+
+  // Parte nascosta: per difetto la voce manca a chi la vedrebbe fino alla risposta, per eccesso porta tutti in un vicolo cieco.
+  let redteamVisibile = false;
+  function refreshRedteamVisibile() {
+    try {
+      Promise.resolve(chrome.runtime.sendMessage({ type: MSG.REDTEAM_VISIBILITY }))
+        .then((r) => { redteamVisibile = !!(r && r.ok && r.visible); })
+        .catch(() => {});
+    } catch (_) {}
+  }
+  refreshRedteamVisibile();
 
   // Red-team — "Invia attacco" (spec §8.1): apre un pannello dedicato (mirrors
   // il flusso feedback) con due campi separati (testo attacco + descrizione) e
@@ -1804,13 +1871,24 @@
 
   // Azioni sul collegamento (senza la sezione "Spiega", come sopra).
   function buildLinkActionItems(linkEl) {
-    const out = [
+    // Un collegamento scritto da un modello di Filo si apre e si scarica solo dal main, dopo la porta delle uscite (#810).
+    const diFilo = !!(linkEl.classList && linkEl.classList.contains('filo-md-link') && Popup && Popup.apriCollegamento);
+    const out = [];
+    // Un link d'invito esiste per portare l'invito dentro Filo: è la sua prima voce (#664).
+    if (self.SN_WALLET && self.SN_WALLET.inviteCodeFromLink(linkEl.href)) {
+      out.push({
+        type: 'item',
+        label: I18n.t('menu_redeem_invite'),
+        onClick: () => { chrome.runtime.sendMessage({ type: MSG.WALLET_INVITE_OPEN, link: String(linkEl.href) }).catch(() => {}); },
+      });
+    }
+    out.push(
       {
         type: 'item',
         label: I18n.t('menu_open_in_new_tab'),
-        onClick: () => window.open(linkEl.href, '_blank', 'noopener'),
+        onClick: () => (diFilo ? Popup.apriCollegamento(linkEl) : window.open(linkEl.href, '_blank', 'noopener')),
       },
-    ];
+    );
     // "Salva file" — gemello di "Salva immagine come" per i link a un file
     // (PDF, ZIP, allegato). Compare SOLO quando il link punta davvero a un
     // file (vedi isDownloadableLink): su un link a un'altra pagina scaricare
@@ -1819,7 +1897,7 @@
       out.push({
         type: 'item',
         label: I18n.t('menu_save_file'),
-        onClick: () => Actions.downloadLink(linkEl),
+        onClick: () => (diFilo ? Popup.scaricaCollegamento(linkEl) : Actions.downloadLink(linkEl)),
       });
     }
     out.push(
@@ -1846,7 +1924,7 @@
   // Matrice: testo / testo+editabile / video-audio / immagine (+ link) / link /
   // casella input / niente.
   function buildContextualItems({
-    selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory,
+    selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target = null,
   }) {
     const items = [];
 
@@ -1855,7 +1933,7 @@
       items.push({ type: 'item', label: I18n.t('menu_cut'), onClick: () => Actions.cutSelection() });
       items.push({ type: 'item', label: I18n.t('menu_copy'), onClick: () => Actions.copyToClipboard(selInfo.selection) });
       items.push(Actions.buildPasteItem(clipboardHistory));
-      items.push(TTS.buildDictateItem());
+      items.push(TTS.buildDictateItem(target));
       { const ra = TTS.buildReadAloudItem(selInfo.selection); if (ra) items.push(ra); }
       items.push({ type: 'separator' });
       items.push(Actions.buildInlineExplain(selInfo, { withDeepArrow: true }));
@@ -1975,7 +2053,7 @@
     if (editable) {
       // Casella input senza selezione: incolla + detta.
       items.push(Actions.buildPasteItem(clipboardHistory));
-      items.push(TTS.buildDictateItem());
+      items.push(TTS.buildDictateItem(target));
       return items;
     }
 
@@ -2097,7 +2175,7 @@
     if (msg?.type === MSG.TOP_FRAME_COMMAND) {
       try {
         if (msg.surface === 'feedback') self.SN_FEEDBACK_UI?.open();
-        else if (msg.surface === 'redteam') self.SN_REDTEAM_ATTACK_UI?.open();
+        else if (msg.surface === 'redteam') { if (redteamVisibile) self.SN_REDTEAM_ATTACK_UI?.open(); }
         else if (msg.surface === 'help') openHelpSidebar();
         else MenuIcons.runIconAction(msg.iconId);
       } catch (e) { console.error('[SN] azione di pagina dal riquadro', e); }
@@ -2125,6 +2203,7 @@
       settings = msg.settings;
       applyTheme(settings.theme);
       applyThemeTokens(settings.themeTokens);
+      self.SN_AVVISI?.imposta(settings.notifications);
       // Colore identità delle tab: i parametri di estrazione possono essere
       // cambiati (a voce o nelle Preferenze). Ricalcola il colore del favicon
       // coi nuovi parametri così la tinta della tab si aggiorna live.
@@ -2135,15 +2214,27 @@
       return;
     }
     if (msg?.type === MSG.SHORTCUT_TRIGGERED) {
-      // Shortcut save-for-later: il SW chiede al content il payload.
-      if (msg.command === 'save-for-later') {
-        if (isBlocked()) { sendResponse({ savePayload: null }); return; }
-        sendResponse({ savePayload: Actions.buildSavePayload() });
-        return;
-      }
+      if (COMANDI_SALVA.has(msg.command)) { suSalvaPerDopo(msg, sendResponse); return; }
       handleShortcut(msg.command, msg.context);
       sendResponse({ ok: true });
     }
+  }
+
+  // #839 — Alt+S è la voce «Salva per dopo» del menu: stessa funzione, stessa miniatura, stessa conferma.
+  // La conferma arriva qui anche per un salvataggio che la scheda salvata non poteva mostrare: questa è quella davanti.
+  const COMANDI_SALVA = new Set(['save-for-later', 'save-for-later-confirm']);
+
+  function suSalvaPerDopo(msg, sendResponse) {
+    if (IS_SUBFRAME) return;
+    // Anche la conferma torna con la ricevuta: finché nessuna pagina la prende il main la riprova sulla scheda davanti.
+    sendResponse({ presa: true });
+    if (msg.command === 'save-for-later') {
+      try { Menu.close(); } catch (_) {}
+      Actions.savePage();
+      return;
+    }
+    const ctx = msg.context || {};
+    Actions.showSaveConfirm(ctx.entry, { chiudiScheda: false, conferma: ctx.conferma });
   }
 
   function selectionAnchor() {
@@ -2173,7 +2264,6 @@
     } else if (command === 'open-help-sidebar') {
       openHelpSidebar(context);
     }
-    // save-for-later è gestito direttamente nel background
   }
 
   // La lettura ad alta voce e la dettatura (tutto l'audio del content script)

@@ -37,6 +37,34 @@
     return { shellPref: '"powershell" | "cmd" | "bash" | "zsh"', esempioPercorso: '~/Documenti/bolletta.pdf' };
   }
 
+  function tettoLezione() {
+    const C = global.SN_CONST;
+    return C && C.LESSON_MAX ? `${C.LESSON_MAX} caratteri` : 'qualche centinaio di caratteri';
+  }
+
+  // Dove il nome del registro non basta a scegliere il token giusto, una parola in più.
+  const NOTE_TOKEN = {
+    accent: 'da cui ereditano link e selezione',
+    topbar: 'la fascia dietro le schede: è QUESTO per "colora la barra in alto/la barra delle schede", NON `background` né `colore_tab`',
+    hover: 'voci di menu, righe e bottoni secondari',
+    overlay: 'anche la barra laterale',
+    'button.bg': 'è questo per "rendi i bottoni di un colore"',
+  };
+  // Nel main i moduli sono già caricati dal loader; negli unit test che caricano solo questo, li porta require.
+  function modulo(nome, file) {
+    if (!global[nome] && typeof require === 'function') { try { require(file); } catch (_) {} }
+    return global[nome] || null;
+  }
+  function righeToken() {
+    const T = modulo('SN_THEME_TOKENS', './themeTokens.js');
+    if (!T || typeof T.names !== 'function') return '';
+    return T.names().map((n) => {
+      const t = T.get(n) || {};
+      const nota = NOTE_TOKEN[n] ? `; ${NOTE_TOKEN[n]}` : '';
+      return `• ${n} (${String(t.label || n).toLowerCase()}${nota})`;
+    }).join('\n');
+  }
+
   // I documenti di trasparenza che ESISTONO davvero. L'elenco non si scrive a
   // mano: lo dà SN_TRANSPARENCY, generato dai markdown in transparency/.
   // Scritto a mano prometteva quattro documenti quando ne esisteva uno solo
@@ -90,7 +118,7 @@
       required: ['url'],
     },
     TIMER: {
-      description: 'Crea un timer nella colonna destra della home.',
+      description: 'Crea un timer: compare come carta nella colonna sinistra della home.',
       properties: {
         secondi: I('Durata in secondi.'),
         etichetta: S('Nome del timer (es. "Pasta").'),
@@ -134,7 +162,7 @@
       required: ['testo', 'contesto'],
     },
     SALVA_LEZIONE: {
-      description: 'Fissa una LEZIONE nella memoria di Filo (la sezione LEZIONI RECENTI): una regola breve, in terza persona, che vale da subito in TUTTE le conversazioni. L\'utente la vede e può cancellarla fra le memorie. Non usarla per i contenuti dell\'utente (per quelli c\'è SALVA_APPUNTO): è per come TU devi comportarti d\'ora in poi.',
+      description: () => 'Fissa una LEZIONE nella memoria di Filo (la sezione LEZIONI RECENTI): una regola breve, in terza persona, che vale da subito in TUTTE le conversazioni. Il sistema la mostra all\'utente col testo esatto e la salva solo col suo OK: non chiederlo tu a parole. Al massimo ' + tettoLezione() + '. L\'utente la rilegge e la toglie nelle Preferenze, sotto «Memoria di Filo». Non usarla per i contenuti dell\'utente (per quelli c\'è SALVA_APPUNTO): è per come TU devi comportarti d\'ora in poi.',
       properties: { testo: S('La regola, breve e in terza persona ("L\'utente non beve caffè").') },
       required: ['testo'],
     },
@@ -195,6 +223,28 @@
       required: [],
       risultato: true,
     },
+    LEGGI_IMPOSTAZIONI: {
+      description: 'Legge com\'è impostato Filo ADESSO: il valore vero di ogni voce delle pagine Preferenze, Sicurezza, Modelli e Altro (anche i permessi dati ai siti), con la chiave per cambiarla. '
+        + 'Usalo SEMPRE prima di rispondere a «com\'è impostato X?», «è attivo il blocco della pubblicità?», «che tema ho?», «quali siti ho bloccato?», '
+        + 'e prima di un cambio relativo («un po\' più veloce»): non rispondere a memoria né dai valori di serie. Sola lettura. '
+        + 'Le chiavi API non tornano mai: solo se ci sono.',
+      properties: {
+        cerca: S('Una o più parole della voce, o la sua chiave ("blocco pubblicità", "tema", "notifiche"); ometti per averle tutte.'),
+      },
+      required: [],
+      risultato: true,
+    },
+    TOGLI_PERMESSO_SITO: {
+      description: 'Toglie una risposta che Filo ricorda per un sito (microfono, fotocamera, appunti, posizione, notifiche, '
+        + 'schermi, presenza, strumenti), come «Togli» nella pagina Sicurezza: «togli il microfono a meet.google.com», '
+        + '«non ricordare più cosa ho risposto a example.com». Quali risposte ci sono lo dice LEGGI_IMPOSTAZIONI. '
+        + 'Toglierla non concede niente: alla prossima richiesta il sito torna a chiedere.',
+      properties: {
+        sito: S('Il sito, come meet.google.com; vale anche per i suoi sottodomini.'),
+        permesso: S('Quale permesso ("microfono", "fotocamera", "appunti", "posizione", "notifiche", "schermi", "presenza", "strumenti"); ometti per toglierle tutte.'),
+      },
+      required: ['sito'],
+    },
     LEGGI_TRASPARENZA: {
       description: () => {
         const docs = docsTrasparenza();
@@ -233,6 +283,23 @@
       },
       required: ['percorso'],
     },
+    RINOMINA_FILE: {
+      description: ({ sistema }) => 'Dà un nome sensato a file del computer dell\'utente. Filo legge l\'inizio di ciascuno '
+        + '(PDF, immagini, documenti Word e LibreOffice, testo) e propone un nome che dice cosa contiene; l\'estensione '
+        + 'non cambia mai e nessun file viene sovrascritto. L\'utente vede l\'elenco vecchio → nuovo e conferma, e dopo '
+        + 'può rimettere tutto com\'era con «Annulla». Indica i file con `percorsi`, oppure una `cartella`: di una cartella '
+        + 'si prendono i file col nome che non dice niente (scan_00231, IMG_2026…, documento (3)), con `tutti` true anche '
+        + 'gli altri. Se è l\'utente a dettare il nome, passalo in `nome` con un solo file. Per rimettere un nome di prima '
+        + `usa \`nome\` col nome di prima. Esempio di percorso: ${sistemaInfo(sistema).esempioPercorso}`,
+      properties: {
+        percorsi: { type: 'array', items: { type: 'string' }, description: 'I file da rinominare (percorso assoluto, o con ~ per la cartella dell\'utente).' },
+        cartella: S('Una cartella: si rinominano i file che contiene (non le sottocartelle).'),
+        tutti: B('Con `cartella`: anche i file che hanno già un nome comprensibile. Di norma false.'),
+        nome: S('Il nome deciso dall\'utente per UN file, senza estensione.'),
+      },
+      required: [],
+      risultato: true,
+    },
     PULISCI_TAB: {
       description: 'Mostra un bottone "Riordina e archivia le schede"; l\'utente conferma e Filo archivia le tab non più utili (riapribili dalla cronologia). NON archiviare nulla da solo: spiega in una frase cosa farà.',
       properties: {},
@@ -243,34 +310,40 @@
       properties: { query: S('Descrizione di cosa cancellare.') },
       required: ['query'],
     },
+    CANCELLA_PAGINE: {
+      description: 'Cancella le pagine visitate che Filo ricorda ("cancella le pagine dell\'ultima ora", "togli la cronologia di oggi", "cancella tutta la cronologia", "cancella le pagine di YouTube"). Il sistema mostra all\'utente quante sono e le toglie solo col suo OK: non chiederlo tu a parole. Non tocca le chat né le schede chiuse.',
+      properties: {
+        periodo: S('Quali pagine: "ultima_ora", "oggi", "ieri" o "tutto". Per un numero di ore o di giorni usa `ore` o `giorni`, per un intervallo qualsiasi `da`/`a`. Con `sito` e senza periodo valgono tutte le pagine di quel sito.', { enum: ['ultima_ora', 'oggi', 'ieri', 'tutto'] }),
+        ore: I('Le ultime N ore ("cancella le pagine delle ultime 3 ore"); ometti per un periodo con nome.'),
+        giorni: I('Gli ultimi N giorni ("cancella le pagine dell\'ultima settimana" = 7).'),
+        da: S('Inizio di un intervallo qualsiasi ("ieri sera", "la settimana scorsa", "dal 2 ottobre"): istante ISO con l\'ora locale, o giorno AAAA-MM-GG (dalla sua mezzanotte).'),
+        a: S('Fine dell\'intervallo, come `da` (un giorno vale fino alla sua fine); ometti per "fino a adesso".'),
+        sito: S('Solo le pagine di questo sito ("youtube.com", o il nome "youtube"); ometti per tutti i siti.'),
+      },
+      required: [],
+    },
     CANCELLA_MEMORIA: {
       description: 'Cancella DEFINITIVAMENTE tutta la memoria di Filo (profilo, preferenze apprese, lezioni). Il sistema chiede all\'utente di digitare "conferma" prima di eseguire; non parte mai senza. NON dichiarare di averlo già fatto.',
       properties: {},
       required: [],
     },
+    DIMENTICA: {
+      description: 'Fa dimenticare a Filo UNA cosa che ha imparato sull\'utente ("dimentica che non bevo caffè", "togli dalla memoria che vivo a Lisbona"): toglie le righe della memoria (profilo, preferenze, lezioni) che corrispondono a `testo`. Il sistema mostra all\'utente le righe esatte e le toglie solo col suo OK: non chiederlo tu a parole. Se non ne trova nessuna te lo dice. Per cancellare TUTTO c\'è CANCELLA_MEMORIA.',
+      properties: { testo: S('La riga da dimenticare, copiata dalla memoria che vedi nel contesto (basta un pezzo che la identifichi).') },
+      required: ['testo'],
+    },
     IMPOSTA_PREFERENZA: {
-      description: ({ sistema }) =>
-        'Modifica un\'impostazione dell\'app. Una sola chiave per chiamata (chiama più volte per più impostazioni). Le impostazioni segnate [conferma] sono di livello 2: il sistema chiede conferma all\'utente da sé, tu non chiederla a parole. Chiavi valide e valori ammessi:\n'
-        + '• tema: "sistema" | "chiaro" | "scuro"\n'
-        + '• dimensione_testo: "piccolo" | "normale" | "grande" | "molto grande" | "enorme"\n'
-        + '• commento_home: true | false (commento di Filo al centro della home)\n'
-        + '• stile_agente: testo libero (come deve scrivere Filo)\n'
-        + '• correttore: true | false (correttore ortografico AI)\n'
-        + '• sidebar_aiuto: true | false ; categorizzazione: true | false\n'
-        + '• archiviazione_automatica: true | false ; archivia_alla_riapertura: true | false ; archivia_se_inattivo: true | false\n'
-        + '• ore_inattivita: numero 1-168 (dopo quante ore archiviare)\n'
-        + `• modalita_terminale: true | false [conferma] ; shell_terminale: ${sistemaInfo(sistema).shellPref} [conferma]\n`
-        + '• velocita_voce: numero 0.5-2 ; tono_voce: numero 0-2 (lettura ad alta voce)\n'
-        + '• protezione_ip: true | false [conferma] (anti-leak WebRTC)\n'
-        + '• blocco_popup: true | false [conferma]\n'
-        + '• navigazione_sicura: true | false [conferma] (rilevamento siti pericolosi)\n'
-        + '• gestione_cookie: "manuale" | "automatico" | "privacy" [conferma]\n'
-        + '• fingerprint: "off" | "default" | "privacy" [conferma] (anti-fingerprinting)\n'
-        + '• provider: "openrouter" [conferma] ; modelli_predefiniti: true | false [conferma]\n'
-        + '• solo_pesi_aperti: true | false [conferma] (spegne tutti i modelli proprietari, Anthropic compresa, e lascia solo modelli a pesi aperti serviti da fornitori indipendenti)\n'
-        + '• chiave_openrouter / chiave_tavily: la chiave API come testo [conferma]\n'
-        + '• limite_spesa: numero in euro (limite di spesa mensile) [conferma]\n'
-        + '• colore_tab: "più vivaci" | "più neutre" | "nessuno" | "più preciso" | "predefinito" (colore identità delle tab: "vivaci"=tinte accese, "neutre"=tinte spente, "nessuno"=tab senza colore, "più preciso"=estrai meglio quando la tab prende il colore sbagliato, "predefinito"=ripristina)',
+      // L'elenco delle chiavi esce dai setter (SN_PREF.righeDescrizione): una voce nuova arriva da sola (#949).
+      description: ({ sistema }) => {
+        const P = modulo('SN_PREF', './preferences.js');
+        const righe = P && typeof P.righeDescrizione === 'function'
+          ? P.righeDescrizione({ sistema, shellPref: sistemaInfo(sistema).shellPref }) : [];
+        return 'Modifica un\'impostazione dell\'app: ogni voce delle pagine Preferenze, Sicurezza, Modelli e Altro ha la sua chiave qui sotto. '
+          + 'Una sola chiave per chiamata (chiama più volte per più impostazioni). Le impostazioni segnate [conferma] sono di livello 2: '
+          + 'il sistema chiede conferma all\'utente da sé, tu non chiederla a parole. Per un cambio relativo («un po\' più veloce») '
+          + 'o per dire com\'era prima, leggi il valore attuale con LEGGI_IMPOSTAZIONI. Chiavi valide e valori ammessi:\n'
+          + righe.join('\n');
+      },
       properties: {
         chiave: S('La chiave dell\'impostazione, dall\'elenco.'),
         valore: { description: 'Il valore, del tipo indicato nell\'elenco.', anyOf: [{ type: 'string' }, { type: 'number' }, { type: 'boolean' }] },
@@ -278,20 +351,23 @@
       required: ['chiave', 'valore'],
     },
     IMPOSTA_ESTETICA: {
-      description: 'Cambia un singolo token estetico dell\'app, applicato live a tutte le superfici. Una sola coppia token/valore per chiamata. Scegli SEMPRE un valore concreto tu, non lasciarlo decidere all\'utente: l\'interfaccia mostra da sé un controllo per raffinarlo. Token disponibili:\n'
-        + '• accent (colore d\'accento, da cui ereditano link e selezione) · text (colore del testo) · background (sfondo) · topbar (barra in alto del browser: la fascia dietro le schede — è QUESTO per "colora la barra in alto/la barra delle schede", NON `background` né `colore_tab`) · muted (testo secondario) · border (bordi) · error (colore degli errori) · hover (sfondo al passaggio del mouse su voci di menu, righe e bottoni secondari) · overlay (sfondo di menu, popup e barra laterale)\n'
-        + '• button.bg (sfondo dei bottoni primari → è questo per "rendi i bottoni di un colore") · button.fg (testo dei bottoni) · link.color (colore dei link) · selection.color (colore della selezione del testo)\n'
-        + '• font (font della UI) · radius (raggio degli angoli, una misura) · selection.opacity (opacità della selezione, 0-1)',
+      // I token escono dal registro (SN_THEME_TOKENS): ogni riga della pagina ha la sua voce (#949).
+      description: () => 'Cambia un singolo token estetico dell\'app, applicato live a tutte le superfici. Una sola coppia token/valore per chiamata. '
+        + 'Scegli SEMPRE un valore concreto tu, non lasciarlo decidere all\'utente: l\'interfaccia mostra da sé un controllo per raffinarlo. '
+        + 'Con valore "predefinito" il token torna al suo valore di serie. Token disponibili:\n' + righeToken(),
       properties: {
         token: S('Il token, dall\'elenco.'),
-        valore: S('Un valore CSS concreto: per i colori un esadecimale #rrggbb (NON nomi come "green"); per il raggio una misura con unità ("8px"); per l\'opacità un numero 0-1 ("0.4"); per il font una lista di famiglie ("Georgia, serif").'),
+        valore: S('Un valore CSS concreto: per i colori un esadecimale #rrggbb (NON nomi come "green"); per il raggio una misura con unità ("8px"); per l\'opacità un numero 0-1 ("0.4"); per una durata i millisecondi ("450ms"); per il font una lista di famiglie ("Georgia, serif").'),
       },
       required: ['token', 'valore'],
     },
     ESEGUI_COMANDO: {
       description: 'Esegue un comando shell. Il livello di sicurezza lo decide il SISTEMA dal comando (sola lettura → subito; modifiche recuperabili → conferma; cancellazioni / non riconosciuti / concatenati → digita "conferma"). L\'output ti torna subito e lo vede anche l\'utente. Solo con modalità terminale attiva: se è spenta il sistema te lo dice, e tu proponi di attivarla (IMPOSTA_PREFERENZA modalita_terminale true). UN comando per chiamata, niente concatenazioni con && o ;. La cartella di lavoro è persistente: un "cd" resta valido per i comandi successivi.',
-      properties: { comando: S('Il comando shell esatto.') },
-      required: ['comando'],
+      properties: {
+        comando: S('Il comando shell esatto.'),
+        spiegazione: S('Cosa fa il comando, in una frase semplice e in prima persona, per chi non sa cos\'è un terminale: «Misuro lo spazio libero sul disco», «Cancello la cartella build». È la prima cosa che l\'utente legge, sopra il comando: dice l\'effetto vero, anche quando cancella o cambia qualcosa. Non decide il livello di sicurezza.'),
+      },
+      required: ['comando', 'spiegazione'],
       risultato: true,
     },
     PROXY_TAB: {
@@ -346,6 +422,11 @@
       properties: {},
       required: [],
     },
+    ANNULLA_CAMBIO: {
+      description: 'Rimette com\'era un cambio di stato: un\'impostazione, l\'aspetto, una sveglia o un timer, una regola del proxy, lo zoom di un sito. Per "rimetti come prima", "annulla", "torna com\'era", "no, era meglio prima". I cambi sono nei CAMBI RECENTI dello STATO, con l\'id e da dove sono venuti: valgono allo stesso modo quelli chiesti in chat e quelli fatti dall\'utente nelle pagine delle impostazioni. Passa l\'id del cambio che l\'utente intende; senza id si annulla l\'ultimo ancora in piedi. Anche l\'annullo è un cambio: annullarlo rifà quello di prima. Il livello lo decide il sistema dal cambio: per le impostazioni sensibili chiede lui conferma all\'utente.',
+      properties: { id: S('L\'id del cambio da annullare, dai CAMBI RECENTI (per esempio "c1a2b3c4d5").') },
+      required: [],
+    },
     ZOOM_PAGINA: {
       description: 'INGRANDISCE o RIMPICCIOLISCE tutta la pagina che l\'utente sta guardando — testo E immagini insieme, come Ctrl +/-/0. Per "ingrandisci la pagina", "zoom al 150%", "è troppo piccolo", "rimpicciolisci", "torna alla dimensione normale". NON confonderlo con la dimensione del testo nelle impostazioni (IMPOSTA_PREFERENZA, che cambia l\'interfaccia di Filo) né con STILE_PAGINA (che cambia il carattere di un pezzo di pagina): qui si scala la pagina intera. Passa `percentuale` quando l\'utente dice un numero, altrimenti `verso`. Il livello attuale è nello STATO: usalo per capire "un po\' più grande". Lo zoom resta sul sito finché Filo è aperto; chiudendo e riaprendo Filo si riparte dal 100%, quindi non promettere che duri oltre.',
       properties: {
@@ -354,10 +435,54 @@
       },
       required: [],
     },
+    VOLUME: {
+      description: 'Cambia il volume del COMPUTER (l\'uscita audio del sistema, come i tasti del volume della tastiera): "alza il volume al 40%", "abbassa un po\'", "metti muto", "togli il muto". Non è il volume di un video dentro un sito. Il volume di adesso è nella sezione SISTEMA dello STATO: usalo per capire "un po\' più alto" e passa il numero. Dare un livello o alzare toglie anche il muto, come fanno i tasti. Esegue subito; l\'esito ti dice il numero vero.',
+      properties: {
+        livello: I('Livello esatto da 0 a 100.'),
+        verso: S('Un passo di 10 per volta: "su" alza, "giu" abbassa.', { enum: ['su', 'giu'] }),
+        muto: B('true mette muto, false lo toglie.'),
+      },
+      required: [],
+    },
+    BLUETOOTH: {
+      description: 'Comanda il Bluetooth del COMPUTER: acceso o spento ("spegni il Bluetooth"), collegare o scollegare un dispositivo GIÀ abbinato ("collega le cuffie", "scollega la cassa"), oppure leggere l\'elenco dei dispositivi abbinati. Per il dispositivo passa le parole dell\'utente: il sistema trova il nome vero, e se non lo trova ti rimanda l\'elenco. Abbinare un dispositivo nuovo non si fa da qui. Collegare col Bluetooth spento lo accende prima. Spegnere e scollegare chiedono conferma all\'utente: il sistema gliela mostra da sé. Lo stato di adesso è nella sezione SISTEMA dello STATO. Se manca un permesso del sistema l\'esito ti dà la frase e dove si concede: riportala.',
+      properties: {
+        acceso: B('true accende, false spegne.'),
+        dispositivo: S('Il dispositivo abbinato da collegare o scollegare, come lo chiama l\'utente (per esempio "le cuffie Sony").'),
+        collega: B('Con `dispositivo`: true collega (è il valore se lo ometti), false scollega.'),
+        elenca: B('true per avere i dispositivi abbinati, senza cambiare niente.'),
+      },
+      required: [],
+    },
+    WIFI: {
+      description: 'Comanda il Wi-Fi del COMPUTER: acceso o spento ("spegni il Wi-Fi"), collegarsi a una rete che il computer CONOSCE già ("collegati alla rete di casa"), oppure leggere l\'elenco delle reti conosciute. Per la rete passa le parole dell\'utente: il sistema trova il nome vero, e se non lo trova ti rimanda l\'elenco. Una rete mai usata (che vuole la password) non si aggiunge da qui. Spegnere il Wi-Fi e cambiare rete chiedono conferma all\'utente; dopo averlo spento, senza un cavo, non sentirai più l\'utente finché non lo riaccende dal tasto nella home. Lo stato di adesso è nella sezione SISTEMA dello STATO. Se manca un permesso del sistema l\'esito ti dà la frase e dove si concede: riportala.',
+      properties: {
+        acceso: B('true accende, false spegne.'),
+        rete: S('La rete conosciuta a cui collegarsi, come la chiama l\'utente.'),
+        elenca: B('true per avere le reti conosciute, senza cambiare niente.'),
+      },
+      required: [],
+    },
     COMANDO_FINESTRA: {
       description: 'Aziona un controllo del browser Filo (la finestra e la barra in alto), non il sito. "fullscreen" = schermo intero immersivo (la pagina attiva copre tutta la finestra, barre nascoste, Esc esce), non il pulsante del lettore video dentro il sito. NON esiste un comando per CHIUDERE la finestra o le schede. Esegue subito.',
       properties: { comando: S('Uno di: fullscreen, minimize (riduci a icona), home (apri la home di Filo), settings (menu Impostazioni), apps (menu App), account (menu Account).', { enum: ['fullscreen', 'minimize', 'home', 'settings', 'apps', 'account'] }) },
       required: ['comando'],
+    },
+    INSTALLA_AGGIORNAMENTO: {
+      description: 'Installa la versione nuova di Filo quando l\'utente lo chiede ("aggiornati", "installa la versione nuova", "installa l\'aggiornamento"): la scarica e si installa quando l\'utente chiude Filo. Serve soprattutto a chi ha spento «Installa gli aggiornamenti da solo». L\'esito dice se c\'è una versione nuova, quale, e se sta scaricando o è già pronta: riporta quello, senza promettere di più. Per accendere o spegnere l\'installazione automatica si usa IMPOSTA_PREFERENZA.',
+      properties: {},
+      required: [],
+      risultato: true,
+    },
+    CARTA_HOME: {
+      description: 'Dispone le carte della home. A destra quelle che l\'utente tiene ("togli la carta dei mazzi", "rimetti l\'editor", "metti i suggerimenti in cima", "rimetti le carte com\'erano"): una carta tolta diventa un\'icona in «altro», sotto le carte, e da lì si rimette. A sinistra quello che sta succedendo (timer, sveglie, scaricamenti, avvisi, lavori in corso): si spostano ("metti il timer della pasta in cima") e si tolgono ("togli l\'avviso del backup": un avviso si chiude, uno scaricamento o un lavoro spariscono solo dalla home, e con rimetti tornano). Un timer o una sveglia si tolgono con CANCELLA_SVEGLIA. Se la carta di sinistra non si trova, l\'esito elenca quelle che ci sono con la loro chiave.',
+      properties: {
+        operazione: S('togli, rimetti, sposta, oppure ripristina (tutte le carte al loro posto di partenza, e tornano anche quelle di sinistra che erano state solo nascoste, come uno scaricamento finito o la carta dei Crediti).', { enum: ['togli', 'rimetti', 'sposta', 'ripristina'] }),
+        carta: S('A destra: editor = Editor (documenti recenti), mazzi = Mazzi del deck builder, suggerimenti = «Filo ti suggerisce», rapide = Impostazioni rapide. A sinistra: le parole con cui l\'utente la indica (il nome del timer, del file scaricato, un pezzo del testo dell\'avviso, oppure solo il tipo, come "gli avvisi") o la chiave che un esito precedente ti ha dato. Serve a tutte le operazioni tranne ripristina.'),
+        verso: S('Dove metterla, per sposta (e cima per rimetti): su o giu di un posto, cima, fondo.', { enum: ['su', 'giu', 'cima', 'fondo'] }),
+        prima_di: S('In alternativa a verso: la carta davanti a cui metterla, della stessa colonna.'),
+      },
+      required: ['operazione'],
     },
     // Disponibile solo durante l'intervista di benvenuto (#524): la aggiunge
     // `definitions({ onboarding: true })`.

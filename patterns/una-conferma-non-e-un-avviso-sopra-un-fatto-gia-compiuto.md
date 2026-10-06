@@ -62,7 +62,10 @@ domanda sia mai stata letta (quarto giro di verifica). I pulsanti che dicono sì
 («Scarica», «Apri comunque») restano spenti finché l'elenco del pannello non è
 fermo da un secondo; ogni riga che entra, esce o cambia domanda riapre l'attesa,
 e così la riapertura del pannello. I no restano sempre attivi: un no dato per
-sbaglio non costa niente.
+sbaglio non costa niente. Vale per ogni domanda che una pagina fa comparire
+sotto il cursore: anche «Consenti» nella domanda dei permessi si accende un
+secondo dopo che la domanda compare o cambia (#591, giro 18), con la stessa
+attesa della shell.
 
 ## Da quale sito: solo un'origine che il browser garantisce
 

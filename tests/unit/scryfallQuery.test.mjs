@@ -23,6 +23,15 @@ test('identityCode: ordina in WUBRG, scarta ignoti, incolore → C', () => {
   assert.equal(Q.identityCode(['X', 'u']), 'U');
 });
 
+test('isPureSyntax: solo un messaggio tutto in sintassi Scryfall salta il giudice dei risultati (#382)', () => {
+  for (const q of ['t:dragon cmc<=3', 'o:haste', '(o:"gains haste" or o:"have haste") -t:creature', 'is:commander id:UR', 'kw:flying and pow>=4']) {
+    assert.equal(Q.isPureSyntax(q), true, q);
+  }
+  for (const q of ['carte che danno haste', 'o:haste a 2 mana', 'draghi', 'Lightning Bolt', '', '   ', 'or and', '(( ))']) {
+    assert.equal(Q.isPureSyntax(q), false, q);
+  }
+});
+
 test('buildSearchQuery: aggiunge id<= con l\'identity del commander (§4)', () => {
   assert.equal(Q.buildSearchQuery('haste', ['U', 'R']), 'haste id<=UR');
   assert.equal(Q.buildSearchQuery('t:artifact cmc<3', []), 't:artifact cmc<3 id<=C');
@@ -100,6 +109,18 @@ test('simplifyCard: campi essenziali estratti e tipizzati', () => {
   assert.equal(c.legalCommander, true);
 });
 
+test('simplifyCard: forza e costituzione per il giudice della ricerca, anche dalla faccia davanti (#382)', () => {
+  const c = Q.simplifyCard({ ...API_CARD, power: '5', toughness: '5' });
+  assert.equal(c.power, '5');
+  assert.equal(c.toughness, '5');
+  const dfc = Q.simplifyCard({ id: 'd-1', name: 'A // B', card_faces: [{ name: 'A', power: '*', toughness: '3' }, { name: 'B' }] });
+  assert.equal(dfc.power, '*');
+  assert.equal(dfc.toughness, '3');
+  const spell = Q.simplifyCard({ id: 's-1', name: 'Shock', type_line: 'Instant' });
+  assert.equal(spell.power, '');
+  assert.equal(spell.toughness, '');
+});
+
 test('simplifyCard: carta a due facce — immagini e costo dalle card_faces', () => {
   const c = Q.simplifyCard({
     id: 'dfc-1',
@@ -171,9 +192,32 @@ test('isFresh: dentro il TTL sì, oltre no, timestamp rotto no', () => {
 // ── parseAgentReply (chat unificata §3): JSON tollerante ─────────────────────
 
 const NONE = {
-  reply: '', query: '', filter: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '', tagWith: [],
-  import: [], commanderName: '',
+  reply: '', query: '', filter: '', title: '', sort: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '',
+  tagWith: [], import: [], commanderName: '', replaceCommander: false, clearChat: false,
 };
+
+// #788 — il titolo della lista è una riga d'italiano: con dentro la sintassi della query vale il ripiego.
+test('parseAgentReply: title — frase leggibile tenuta, sintassi Scryfall scartata', () => {
+  assert.equal(Q.parseAgentReply('{"query":"o:haste","title":"carte che danno rapidità"}').title, 'carte che danno rapidità');
+  assert.equal(Q.parseAgentReply('{"query":"o:haste","title":"  «carte\\nche danno rapidità»  "}').title, 'carte che danno rapidità');
+  assert.equal(Q.parseAgentReply('{"query":"o:haste","title":"risultati per o:haste"}').title, '');
+  assert.equal(Q.parseAgentReply('{"query":"o:haste","title":"haste (id<=UR)"}').title, '');
+  assert.equal(Q.parseAgentReply('{"query":"o:haste","title":"rimozioni: istantanee"}').title, 'rimozioni: istantanee');
+  assert.equal(Q.parseAgentReply('{"query":"o:haste","title":42}').title, '');
+  assert.equal(Q.listTitle('x'.repeat(500)).length, 200);
+});
+
+// #788 — l'ordine di una lista si chiede anche a parole: il campo del modello, o l'order: che ha scritto nella query.
+test('parseAgentReply: sort — dal campo o dall\'order: della query, sconosciuto ignorato', () => {
+  assert.equal(Q.parseAgentReply('{"sort":"price"}').sort, 'price');
+  assert.equal(Q.parseAgentReply('{"sort":"Prezzo","query":"o:haste"}').sort, 'price');
+  assert.equal(Q.parseAgentReply('{"sort":"name"}').sort, 'name');
+  assert.equal(Q.parseAgentReply('{"query":"o:haste order:eur"}').sort, 'price');
+  assert.equal(Q.parseAgentReply('{"query":"(o:haste) order:name dir:desc"}').sort, 'name');
+  assert.equal(Q.parseAgentReply('{"query":"o:haste order:rarity"}').sort, '');
+  assert.equal(Q.parseAgentReply('{"query":"o:\\"border:black\\""}').sort, '');
+  assert.equal(Q.parseAgentReply('{"sort":"colore"}').sort, '');
+});
 
 test('parseAgentReply: JSON pulito → campi normalizzati', () => {
   const r = Q.parseAgentReply('{"reply":"Ecco","query":"o:haste","cards":["a","b"]}');
@@ -254,6 +298,14 @@ test('parseAgentReply: commander — stringa non vuota si accetta, tipi sbagliat
   assert.equal(Q.parseAgentReply('{}').commanderName, '');
 });
 
+test('parseAgentReply: replaceCommander vale solo se è true ed è accompagnato dal nome (#789)', () => {
+  assert.equal(Q.parseAgentReply('{"commander":"Atraxa, Praetors\' Voice","replaceCommander":true}').replaceCommander, true);
+  assert.equal(Q.parseAgentReply('{"commander":"Atraxa, Praetors\' Voice"}').replaceCommander, false, 'una menzione non sostituisce');
+  assert.equal(Q.parseAgentReply('{"commander":"Atraxa","replaceCommander":"true"}').replaceCommander, false);
+  assert.equal(Q.parseAgentReply('{"replaceCommander":true}').replaceCommander, false, 'senza nome non c\'è niente da mettere');
+  assert.equal(Q.parseAgentReply('{"commander":"  ","replaceCommander":true}').replaceCommander, false);
+});
+
 // ── proseSegments ([[Nome Carta]] §3.5) ──────────────────────────────────────
 
 test('proseSegments: spezza la prosa sui marcatori [[...]]', () => {
@@ -274,4 +326,10 @@ test('proseSegments: testo senza marcatori / vuoto / marcatore vuoto', () => {
     { type: 'text', text: '[[ ]]' },
     { type: 'text', text: ' b' },
   ]);
+});
+
+test('parseAgentReply: «svuota la chat» chiesto a parole arriva come intenzione, solo se è proprio true', () => {
+  assert.equal(Q.parseAgentReply('{"clearChat":true}').clearChat, true);
+  assert.equal(Q.parseAgentReply('{"clearChat":"true","reply":"ok"}').clearChat, false);
+  assert.equal(Q.parseAgentReply('{"reply":"ciao"}').clearChat, false);
 });

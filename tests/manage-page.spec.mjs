@@ -43,19 +43,20 @@ test('le 8 tab esistono col testo corretto e "Ricevuti" e\' attiva di default (D
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
-  // 9 tab della dashboard unificata (la nona: «Statistiche feedback», #496).
-  await expect(page.locator('.mg-tab')).toHaveCount(9);
-  // Con i feedback caricati (qui: nessuno) le quattro schede-lista dicono
-  // quante ne contengono, le altre quattro no (#495).
+  // 10 tab della dashboard unificata (la nona: «Statistiche feedback», #496; la decima: «Lavori locali», #908).
+  await expect(page.locator('.mg-tab')).toHaveCount(10);
+  // Con i feedback caricati (qui: nessuno) le cinque schede-lista dicono
+  // quante ne contengono, le altre no (#495).
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
   await page.evaluate(() => window.__mgTest.whenReady());
   await page.evaluate(() => window.__mgTest.setData([]));
   await expect(page.locator('.mg-tab[data-tab="inbox"]')).toHaveText('Ricevuti (0)');
   await expect(page.locator('.mg-tab[data-tab="queue"]')).toHaveText('In coda (0)');
+  await expect(page.locator('.mg-tab[data-tab="local"]')).toHaveText('Lavori locali (0)');
   await expect(page.locator('.mg-tab[data-tab="resolved"]')).toHaveText('Risolti (0)');
   await expect(page.locator('.mg-tab[data-tab="archived"]')).toHaveText('Archiviati (0)');
   await expect(page.locator('.mg-tab[data-tab="fbstats"]')).toHaveText('Statistiche feedback');
-  await expect(page.locator('.mg-tab[data-tab="stats"]')).toHaveText('Statistiche Red Team');
+  await expect(page.locator('.mg-tab[data-tab="stats"]')).toHaveText('Red Team');
   await expect(page.locator('.mg-tab[data-tab="models"]')).toHaveText('Modelli di supporto');
   await expect(page.locator('.mg-tab[data-tab="automation"]')).toHaveText('Automazioni');
   await expect(page.locator('.mg-tab[data-tab="log"]')).toHaveText('Log');
@@ -85,10 +86,10 @@ test('le tab-lista condividono panel-list; stats/models sono segnaposto "In arri
     await expect(page.locator('#mgListHead')).toHaveText(`${head} (0)`);
   }
 
-  // Statistiche Red Team → segnaposto dedicato.
+  // Red Team → l'interruttore «aperto a tutti» (#896).
   await page.locator('.mg-tab[data-tab="stats"]').click();
   await expect(page.locator('#panel-stats')).toHaveClass(/mg-panel--active/);
-  await expect(page.locator('#panel-stats .mg-coming')).toBeVisible();
+  await expect(page.locator('#panel-stats #mgRtOpenSwitch')).toBeVisible();
   await expect(page.locator('#panel-list')).not.toHaveClass(/mg-panel--active/);
 
   // Modelli di supporto → pannello dedicato (DD1: non più un segnaposto).
@@ -1302,7 +1303,7 @@ test('colori giudici: scala rosso→giallo→verde→blu; "design" è verde e co
 const FAKE_FB_TRUSTED_BLOCKED = {
   _id: 'test-fb-routine-blocked', text: 'Regole proxy per dominio: nessuna UI per vederle.',
   name: 'Regole proxy', seq: 261, subSeq: 0, status: 'new',
-  clientId: 'routine:routine', createdAt: '2026-06-29T10:00:00Z', images: [],
+  clientId: 'routine:routine', senderProof: 'server', createdAt: '2026-06-29T10:00:00Z', images: [],
   pipeline: { action: 'human_review', l1Category: 'dangerous', l1Reasons: ['linked_prior_attack'], verdicts: [], stage: 'L1' },
 };
 
@@ -1384,7 +1385,7 @@ test('fix bocciato dalla sicurezza (design/secaudit) → card ROSSA + frase acca
 const FAKE_FB_TRUSTED_FLAGGED = {
   _id: 'test-fb-trusted-flagged', text: 'Feedback di routine segnalato dal panel.',
   name: 'Fidato ma segnalato', seq: 238, subSeq: 0, status: 'unlabeled',
-  clientId: 'routine:routine', createdAt: '2026-06-27T10:00:00Z', images: [],
+  clientId: 'routine:routine', senderProof: 'server', createdAt: '2026-06-27T10:00:00Z', images: [],
   pipeline: {
     action: 'block_attack', l2Class: 'attack',
     expectedJudges: ['fixed_1', 'fixed_2', 'fixed_3', 'dynamic'],
@@ -1982,6 +1983,165 @@ test('#497 — azioni di stato, ⭐ e frase: tutti i tasti sulla stessa riga', a
   expect(Math.abs(centri.frase - centri.azione)).toBeLessThan(6);
 });
 
+// ── #1034: anche «fondi senza chiedermelo» sta sulla riga dei tasti ────────
+// Aveva una riga sua sotto gli altri tasti, su ogni pratica aperta. Si guarda
+// alla misura della finestra di serie: i Ricevuti (il caso con più tasti fra
+// quelli di ogni giorno) e una pratica in coda col segno, dove accanto ai tasti
+// c'è anche chi l'ha messo.
+async function tastiDellOwner(page) {
+  return page.evaluate(() => {
+    const vis = (el) => el && !el.hidden && el.getClientRects().length > 0;
+    const tasti = [...document.querySelectorAll('#mgOwnerBar button')].filter(vis).map((b) => {
+      const r = b.getBoundingClientRect();
+      return { id: b.id || b.dataset.actionKey, centro: r.top + r.height / 2, basso: r.bottom };
+    });
+    const info = document.getElementById('mgPreapprovedInfo');
+    return { tasti, infoTop: vis(info) ? info.getBoundingClientRect().top : null };
+  });
+}
+
+test('#1034 — Ricevuti: anche «Senza chiedere» sta sulla riga degli altri tasti', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
+  await stubFeedbackUpdate(page);
+  const fb = { ...FB_PLAIN_TODO, _id: 'fb-una-riga-in', status: 'new', reviewDecision: undefined };
+  await page.evaluate((f) => {
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData([f]);
+    window.__mgTest.setTab('inbox');
+    window.__mgTest.openDetail(f._id);
+  }, fb);
+
+  await expect(page.locator('#mgPreapproveBtn')).toBeVisible();
+  await expect(page.locator('#mgPreapproveBtn')).toHaveText('Senza chiedere');
+  await expect(page.locator('#mgAcceptLocalBtn')).toBeVisible();
+  const { tasti } = await tastiDellOwner(page);
+  expect(tasti.map((t) => t.id)).toEqual(expect.arrayContaining(['mgAcceptBtn', 'mgArchiveBtn', 'mgStarBtn', 'mgUserNoteToggle', 'mgPreapproveBtn']));
+  for (const t of tasti) expect(Math.abs(t.centro - tasti[0].centro), t.id).toBeLessThan(6);
+});
+
+test('#1034 — In coda col segno: tasto acceso e chi l’ha messo, sulla stessa riga; il clic non sposta i vicini', async ({ openTab }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
+  await page.evaluate(() => {
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => (msg && msg.type === 'feedback_update')
+      ? { ok: true, by: 'owner@esempio' } : orig(msg);
+  });
+  const fb = { ...FB_PLAIN_TODO, _id: 'fb-una-riga-coda', mergePreapproved: { by: 'owner@esempio', at: '2026-09-13T07:30:00.000Z' } };
+  await page.evaluate((f) => {
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData([f]);
+    window.__mgTest.setTab('queue');
+    window.__mgTest.openDetail(f._id);
+  }, fb);
+
+  const tasto = page.locator('#mgPreapproveBtn');
+  await expect(tasto).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#mgPreapprovedInfo')).toContainText('owner@esempio');
+  const prima = await tastiDellOwner(page);
+  for (const t of prima.tasti) expect(Math.abs(t.centro - prima.tasti[0].centro), t.id).toBeLessThan(6);
+  // Chi l'ha messo sta accanto ai tasti, non sotto.
+  expect(prima.infoTop).toBeLessThan(prima.tasti[0].basso);
+
+  const box = await tasto.boundingBox();
+  await tasto.click();
+  await expect(tasto).toHaveAttribute('aria-pressed', 'false');
+  await expect(tasto).toHaveText('Senza chiedere');
+  const dopo = await tasto.boundingBox();
+  expect(Math.round(dopo.x)).toBe(Math.round(box.x));
+  expect(Math.round(dopo.width)).toBe(Math.round(box.width));
+});
+
+// La riga non va mai a capo: con tanti tasti (spam, file sospetto, «È mio») o con la colonna stretta i tasti
+// si stringono e restano dentro la riga; chi ha messo il segno va sotto, leggibile.
+const RIGA_BASE = { text: 'Testo.', name: 'Prova', seq: 12, subSeq: 0, createdAt: '2026-06-22T10:00:00Z', images: [] };
+const RIGA_CASI = [
+  ['spam', 'inbox', { ...RIGA_BASE, _id: 'riga-spam', status: 'spam', clientId: 'tester@example.com' }],
+  ['mittente da riconoscere', 'inbox', { ...RIGA_BASE, _id: 'riga-mio', status: 'new', clientId: 'owner:abc' }],
+  ['file sospetto da riconoscere', 'inbox', { ...RIGA_BASE, _id: 'riga-file', status: 'suspicious_file', clientId: 'owner:abc' }],
+  ['in coda col segno da approvazione', 'queue', { ...RIGA_BASE, _id: 'riga-coda', status: 'todo', reviewDecision: 'accepted', clientId: 'tester@example.com',
+    mergePreapproved: { by: 'owner@esempio.it · approvazione 0123456789abcdef01234567', at: '2026-09-13T07:30:00.000Z' } }],
+];
+for (const larghezza of [1280, 960]) {
+  for (const [nome, tab, fb] of RIGA_CASI) {
+    test(`#1034 — finestra ${larghezza}, ${nome}: i tasti restano su una riga e dentro la colonna`, async ({ openTab, app }) => {
+      const page = await openTab(URL);
+      await page.waitForLoadState('domcontentloaded');
+      await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
+      await app.evaluate(({ BrowserWindow }, w) => {
+        const win = BrowserWindow.getAllWindows()[0];
+        win.setSize(w, win.getSize()[1]);
+      }, larghezza);
+      await page.waitForFunction((w) => Math.abs(window.outerWidth - w) < 40, larghezza);
+      await page.evaluate(([f, t]) => {
+        window.__mgTest.setAdmin(true);
+        window.__mgTest.setData([f]);
+        window.__mgTest.setTab(t);
+        window.__mgTest.openDetail(f._id);
+      }, [fb, tab]);
+      await expect(page.locator('#mgPreapproveBtn')).toBeVisible();
+      const m = await page.evaluate(() => {
+        const vis = (el) => el && !el.hidden && el.getClientRects().length > 0;
+        const riga = document.querySelector('#mgOwnerBar .mg-owner-row').getBoundingClientRect();
+        const scatola = document.querySelector('#mgOwnerBar .mg-owner-tasti');
+        const tasti = [...document.querySelectorAll('#mgOwnerBar .mg-owner-row button')].filter(vis).map((b) => {
+          const r = b.getBoundingClientRect();
+          // Raggiungibile = portato in vista (la riga stretta scorre), sta dentro la colonna.
+          b.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+          const v = b.getBoundingClientRect();
+          return { id: b.id || b.dataset.actionKey, centro: r.top + r.height / 2, destra: v.right, sinistra: v.left, largo: r.width };
+        });
+        const info = document.getElementById('mgPreapprovedInfo');
+        return { sinistraRiga: riga.left, destraRiga: riga.right, destraScatola: scatola.getBoundingClientRect().right, tasti, infoLarga: vis(info) ? info.getBoundingClientRect().width : null };
+      });
+      expect(m.tasti.length).toBeGreaterThanOrEqual(5);
+      expect(m.destraScatola).toBeLessThanOrEqual(m.destraRiga + 1);
+      for (const t of m.tasti) {
+        expect(Math.abs(t.centro - m.tasti[0].centro), t.id).toBeLessThan(6);
+        expect(t.destra, t.id).toBeLessThanOrEqual(m.destraRiga + 2);
+        expect(t.sinistra, t.id).toBeGreaterThanOrEqual(m.sinistraRiga - 2);
+        expect(t.largo, t.id).toBeGreaterThan(24);
+      }
+      if (m.infoLarga !== null) expect(m.infoLarga).toBeGreaterThan(150);
+    });
+  }
+}
+
+test('#1034 — riga stretta: la rotella la fa scorrere fino all’ultimo tasto', async ({ openTab, app }) => {
+  const page = await openTab(URL);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
+  await app.evaluate(({ BrowserWindow }) => { const win = BrowserWindow.getAllWindows()[0]; win.setSize(960, win.getSize()[1]); });
+  await page.waitForFunction(() => Math.abs(window.outerWidth - 960) < 40);
+  await page.evaluate(() => {
+    const orig = window.filo.message.bind(window.filo);
+    window.filo.message = async (msg) => (msg && msg.type === 'feedback_update') ? { ok: true, by: 'owner@esempio' } : orig(msg);
+  });
+  const fb = RIGA_CASI[2][2];
+  await page.evaluate((f) => {
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData([f]);
+    window.__mgTest.setTab('inbox');
+    window.__mgTest.openDetail(f._id);
+  }, fb);
+  const ultimo = page.locator('#mgPreapproveBtn');
+  await expect(ultimo).toBeVisible();
+  const dentro = () => page.evaluate(() => {
+    const s = document.querySelector('#mgOwnerBar .mg-owner-tasti').getBoundingClientRect();
+    const b = document.getElementById('mgPreapproveBtn').getBoundingClientRect();
+    return b.right <= s.right + 2;
+  });
+  expect(await dentro()).toBe(false);
+  await page.locator('#mgOwnerBar .mg-owner-tasti').hover();
+  await page.mouse.wheel(0, 600);
+  await expect.poll(dentro).toBe(true);
+  await ultimo.click();
+  await expect(ultimo).toHaveAttribute('aria-pressed', 'true');
+});
+
 // ── Priorità visibile + modificabile dalla coda ─────────────────────────────
 // I feedback "In coda" mostrano i pallini priorità; per l'owner il click li
 // modifica (patch priority + priorityManual) e la coda si riordina (priorità
@@ -2180,8 +2340,10 @@ test('DD1: la tab Modelli di supporto renderizza tutti gli slot col modelChainEd
   // Attendi che l'editor sia visibile (caricamento IPC completato).
   await expect(page.locator('#mgSmEditor')).toBeVisible({ timeout: 5000 });
 
-  // 7 slot presenti nel DOM (sanitizer + 3 giudici fissi + dinamico + red-team + priorità).
-  await expect(page.locator('.mg-sm-slot')).toHaveCount(7);
+  // 8 slot presenti nel DOM (sanitizer + 3 giudici fissi + dinamico + red-team +
+  // priorità, e la ricerca fra i feedback spostata qui dalle Opzioni, #465).
+  await expect(page.locator('.mg-sm-slot')).toHaveCount(8);
+  await expect(page.locator('[data-slot="manageSearch"] label')).toHaveText('Ricerca fra i feedback');
   await expect(page.locator('[data-slot="sanitizer"]')).toBeVisible();
   await expect(page.locator('[data-slot="judge1"]')).toBeVisible();
   await expect(page.locator('[data-slot="judge2"]')).toBeVisible();
@@ -2201,7 +2363,7 @@ test('DD1: la tab Modelli di supporto renderizza tutti gli slot col modelChainEd
   // Ogni slot ha almeno un input (modelChainEditor crea .sn-chain-input per ogni segmento).
   const chainInputs = page.locator('.mg-sm-chain-host .sn-chain-input');
   const count = await chainInputs.count();
-  expect(count).toBeGreaterThanOrEqual(7);
+  expect(count).toBeGreaterThanOrEqual(8);
 
   // Il bottone "Salva" è visibile.
   await expect(page.locator('#mgSmSaveBtn')).toBeVisible();
@@ -2257,6 +2419,7 @@ test('DD1: il bottone Salva invia support_models_update con i valori corretti', 
   expect(sent).toHaveProperty('judgeDynamic');
   expect(sent).toHaveProperty('judgeRedTeam');
   expect(sent).toHaveProperty('judgePriority');
+  expect(sent).toHaveProperty('manageSearch');
   // Il vecchio slot unico non viene più inviato.
   expect(sent).not.toHaveProperty('judgeL2');
 

@@ -112,6 +112,8 @@
     switch (action) {
       case A.DESCRIBE_IMAGE:
       case A.TRANSCRIBE_IMAGE:
+      case A.FILE_NAME:
+      case A.EMBED_COOKIE_CHECK:
         return { output: M.TEXT, inputs: [M.IMAGE] };
       case A.TRANSCRIBE_AUDIO:
         return { output: M.TEXT, inputs: [M.AUDIO] };

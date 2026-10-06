@@ -39,9 +39,11 @@
   //                        predefinito dei router FRITZ!Box (diffusissimi) e
   //                        quello è il caso reale; il prezzo è che un sito
   //                        pubblico .box si aprirebbe in http invece che https.
+  //   • ip               → mai delegato: è dove rispondono i router Speedport
+  //                        di Telekom (speedport.ip).
   const LOCAL_NET_TLDS = new Set([
     'local', 'lan', 'home', 'internal', 'intranet', 'private', 'box',
-    'homenet', 'localdomain', 'corp',
+    'homenet', 'localdomain', 'corp', 'ip',
   ]);
 
   // Vero se l'host è un nome della rete locale (vedi sopra). Un'etichetta sola
@@ -67,7 +69,64 @@
     if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) return true;         // privato /8
     if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(h)) return true;           // privato /16
     if (/^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(h)) return true; // privato /12
+    if (/^169\.254\.\d{1,3}\.\d{1,3}$/.test(h)) return true;           // link-local
+    if (h.includes(':') && /^(f[cd]|fe[89ab])[0-9a-f]*:/.test(h)) return true; // IPv6 privato e link-local
     return false;
+  }
+
+  // La rete di casa dei lavori che Filo fa da solo (#591): un nome conta per dove ha risposto la pagina (tplinkwifi.net
+  // intercettato dal router, un NAS per nome), e per la sua forma solo finché non lo si sa. Lo annota noteHostAddress.
+  const answeredFrom = new Map();
+
+  // Un indirizzo della rete di casa: privato, link-local, CGNAT (Tailscale). Il loopback no: per nome è la macchina
+  // stessa, cioè sviluppo locale, e localhost o 127.x restano di casa per la loro forma.
+  function isLanAddress(ip) {
+    const a = String(ip || '').toLowerCase().replace(/^\[|\]$/g, '').replace(/^::ffff:(?=\d)/, '');
+    if (!a || /^127\./.test(a) || a === '::1') return false;
+    if (/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d{1,3}\.\d{1,3}$/.test(a)) return true;
+    return (isIpv4(a) || a.includes(':')) && isLocalHost(a);
+  }
+
+  const hostKey = (host) => String(host || '').toLowerCase().replace(/^\[|\]$/g, '').replace(/\.$/, '');
+
+  function noteHostAddress(host, ip) {
+    const h = hostKey(host);
+    if (!h || !ip) return;
+    answeredFrom.set(h, isLanAddress(ip));
+    // Tetto largo e senza perdita di sicurezza: un nome dimenticato torna a valere per la sua forma.
+    if (answeredFrom.size > 5000) answeredFrom.delete(answeredFrom.keys().next().value);
+  }
+
+  // Una pagina arrivata da un proxy ha risposto dal proxy: il suo indirizzo non dice niente, e il nome torna alla sua forma.
+  function forgetHostAddress(host) {
+    answeredFrom.delete(hostKey(host));
+  }
+
+  // Mentre si accerta se l'indirizzo che ha risposto conta (proxy o no), chi deve decidere se far uscire la pagina aspetta.
+  const pendingFrom = new Map();
+  function noteHostPending(host, until) {
+    const h = hostKey(host);
+    if (!h) return Promise.resolve();
+    const p = Promise.resolve(until).catch(() => {}).then(() => { if (pendingFrom.get(h) === p) pendingFrom.delete(h); });
+    pendingFrom.set(h, p);
+    return p;
+  }
+  function homeNetworkPending(host) {
+    return pendingFrom.get(hostKey(host)) || null;
+  }
+
+  function isHomeNetworkHost(host) {
+    const h = hostKey(host);
+    if (!h) return false;
+    if (!h.includes('.') && !h.includes(':')) return true; // un nome senza punto su internet non esiste
+    if (/^localhost$|\.localhost$|^127\.|^::1$/.test(h)) return true;
+    if (answeredFrom.has(h)) return answeredFrom.get(h);
+    // .box è un dominio pubblico vero: fritz.box è di casa perché risponde da casa, non per come si scrive.
+    return isLocalHost(h) && !h.endsWith('.box');
+  }
+
+  function isHomeNetworkUrl(url) {
+    try { return isHomeNetworkHost(new URL(String(url)).hostname); } catch (_) { return false; }
   }
 
   // IPv4 dotted-quad con ottetti in range (0-255). Serve a distinguere un IP
@@ -195,7 +254,8 @@
   }
 
   global.SN_URL_NAV = {
-    isLocalHost, isLocalNetworkName, isIpv4, normalizeUrl, looksLikeAddress,
-    canonicalizeFiloUrl, isShareableAddress,
+    isLocalHost, isHomeNetworkUrl, isHomeNetworkHost, isLanAddress, noteHostAddress, forgetHostAddress,
+    noteHostPending, homeNetworkPending, isLocalNetworkName, isIpv4,
+    normalizeUrl, looksLikeAddress, canonicalizeFiloUrl, isShareableAddress,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

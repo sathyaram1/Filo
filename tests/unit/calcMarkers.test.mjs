@@ -113,3 +113,19 @@ test('un\'unità che Filo non conosce non toglie le cifre né rompe il conto', (
 test('col prezzo dichiarato in streaming non c\'è niente da aspettare', () => {
   assert.equal(risolvi('costa [[calc: 3000/109.3 | eur]]', { streaming: true }), 'costa 27,45');
 });
+
+test('un arrotondamento con le cifre decimali è un conto, non un marker grezzo', () => {
+  const R = globalThis.SN_CALC.resolveCalcMarkers;
+  assert.equal(R('sono [[calc: round(3000/92, 2) | eur]] €'), 'sono 32,61 €');
+  // Senza spazio la virgola separa ancora gli argomenti: non è 3000/92,2.
+  assert.equal(R('sono [[calc: round(3000/92,2) | eur]] €'), 'sono 32,61 €');
+  assert.equal(R('[[calc: round(round(2.344, 2), 1)]]'), '2,3');
+  assert.equal(R('[[calc: floor(2.789, 1)]] e [[calc: ceil(2.711, 1)]]'), '2,7 e 2,8');
+  assert.equal(R('[[calc: log(8, 2)]]'), '3');
+  // La virgola decimale italiana fuori da quelle funzioni resta un decimale.
+  assert.equal(R('[[calc: sqrt(2,25)]]'), '1,5');
+  assert.equal(R('[[calc: 3000/105,3 | eur]] €'), '28,49 €');
+  // Un secondo argomento che non ha senso lascia il marker visibile.
+  assert.equal(R('[[calc: sqrt(4, 2)]]'), '[[calc: sqrt(4, 2)]]');
+  assert.equal(R('[[calc: round(2.5, 0.5)]]'), '[[calc: round(2.5, 0.5)]]');
+});

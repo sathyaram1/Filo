@@ -507,6 +507,7 @@ html, body {
   min-width: 60px;
   text-align: right;
 }
+.sn-cat-row .sn-cat-meta.sn-cat-warn { color: var(--sn-error); }
 
 .sn-spell-table {
   display: flex;
@@ -767,7 +768,12 @@ section:has(#dictList) .sn-spell-add-row {
 .sn-page .sn-cookie-mode-desc { display: block; margin-top: 3px; line-height: 1.5; }
 
 .sn-page .sn-cookie-wl-add > input { flex: 1; }
-.sn-page #cookie-wl-list li {
+.sn-page #cookie-wl-list li,
+.sn-page #cookie-banners-list li,
+.sn-page #cookie-done-list li,
+.sn-page #sec-delicate-campi-list li,
+.sn-page #cookie-accessi-list li,
+.sn-page #sec-perm-list li {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -778,7 +784,31 @@ section:has(#dictList) .sn-spell-add-row {
   margin-bottom: 6px;
   font-size: 13px;
 }
-.sn-page #cookie-wl-list li button {
+.sn-page #cookie-wl-list li button,
+.sn-page #cookie-banners-list li button,
+.sn-page #cookie-done-list li button,
+.sn-page #sec-delicate-campi-list li button,
+.sn-page #cookie-accessi-list li button,
+.sn-page #sec-perm-list li button {
   font-size: 12px;
   padding: 2px 8px;
 }
+
+/* Il markdown dei modelli (segnalazioni, report) nelle pagine di Gestione: stesso disegno delle risposte in chat. */
+.filo-md { white-space: normal; }
+.filo-md p { margin: 0 0 8px 0; }
+.filo-md > :last-child { margin-bottom: 0; }
+.filo-md > :first-child { margin-top: 0; }
+.filo-md h3, .filo-md h4, .filo-md h5, .filo-md h6 { margin: 10px 0 4px 0; font-weight: 600; font-size: 1em; }
+.filo-md strong { font-weight: 600; }
+.filo-md em { font-style: italic; }
+.filo-md ul, .filo-md ol { margin: 4px 0 8px 0; padding-left: 22px; }
+.filo-md li { margin: 2px 0; }
+.filo-md code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em; background: var(--sn-border); padding: 1px 4px; border-radius: 3px;
+}
+.filo-md pre { background: var(--sn-border); border-radius: 6px; padding: 8px; overflow-x: auto; margin: 6px 0; }
+.filo-md pre code { background: transparent; padding: 0; }
+.filo-md a.filo-md-link { color: var(--sn-accent); text-decoration: underline; text-underline-offset: 2px; word-break: break-word; }
+.filo-md a.filo-md-link:hover { text-decoration: none; }

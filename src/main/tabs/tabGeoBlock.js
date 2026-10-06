@@ -200,15 +200,19 @@ const geoBlockMethods = {
   // quindi nella stragrande maggioranza delle pagine NON si chiama il modello.
   // Solo `geo_block` emette il segnale (con SOURCES.LLM); le altre classi
   // (paywall/login_wall/bot_block/errore_generico) non attivano nulla.
+  // Senza fornitore la matrice scarterebbe ogni esito (not_configured): niente
+  // crediti né testo della pagina mandati al modello per niente (#771).
   _geoLevel2Check(tab, url, text) {
     const classify = globalThis.SN_GEO_CLASSIFY;
     if (typeof classify !== 'function') return;
     if (tab.geoBlock) return; // già rilevato (livello 1)
+    // In incognito il testo della pagina non parte da solo verso il modello (#591): resta il livello 1, che è locale.
+    if (this.incognito) return;
     let host = '';
     try { host = new URL(url).hostname; } catch (_) { return; }
-    const input = { title: tab.title || '', text, statusCode: tab._lastStatus || 0, host, url };
-    Promise.resolve()
-      .then(() => classify(input))
+    const input = { title: tab.title || '', text, statusCode: tab._lastStatus || 0, host, url, budgetUrl: tab._urlNavigato };
+    this.proxyAvailable()
+      .then((ok) => (ok ? classify(input) : null))
       .then((res) => {
         if (!res || res.skipped) return;
         if (!res.route || !res.route.proxy) return; // solo geo_block agisce
@@ -229,4 +233,4 @@ function installGeoBlock(TabManager) {
   Object.assign(TabManager.prototype, geoBlockMethods);
 }
 
-module.exports = { installGeoBlock };
+module.exports = { installGeoBlock, geoBlockMethods };
