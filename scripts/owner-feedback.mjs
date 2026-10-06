@@ -299,6 +299,58 @@ async function togliScheda(id, bearer) {
 }
 
 /**
+ * Le attese (#903), stato invariato: `numeri` come li scrive l'owner («676,663.2»), '' per toglierle. Le regole sono
+ * quelle di Gestione (SN_FB_ATTESE.valida): numeri inesistenti, sé stesso, giri e più di venti si rifiutano col motivo.
+ * @returns {Promise<{ ok: true, attese: Array<{id,num}>, dryRun?: true } | { ok: false, motivo: string }>}
+ */
+export async function segnaAttese(id, numeri, opts = {}) {
+  const ATT = globalThis.SN_FB_ATTESE;
+  const letti = ATT.leggiNumeri(numeri || '');
+  if (!letti.ok) return letti;
+  const bearer = opts.bearer || await acquireBearer();
+  const doc = await getDoc(id, bearer, ['seq', 'subSeq']);
+  if (opts.letture) opts.letture.aggiungi(1, 'segnalazioni riscritte');
+  if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
+  let attese = [];
+  if (letti.numeri.length) {
+    const f = doc.fields || {};
+    const v = await ATT.valida({
+      id,
+      num: globalThis.SN_FEEDBACK.formatNum(Number(f.seq?.integerValue), Number(f.subSeq?.integerValue)),
+      numeri: letti.numeri,
+      risolvi: async (n) => {
+        const r = await risolviFeedback(n, { bearer, base: FIRESTORE_BASE });
+        if (r.ok) return r.id;
+        if (/^nessun feedback/.test(r.motivo)) return null;
+        throw new Error(r.motivo);
+      },
+      leggiAttese: async (ids) => new Map(await Promise.all(ids.map(async (x) => {
+        const d = await getDoc(x, bearer, [ATT.CAMPO]);
+        return [x, ATT.atteseDi({ waitsFor: atteseDaCampo(d?.fields?.[ATT.CAMPO]) })];
+      }))),
+    });
+    if (!v.ok) return v;
+    attese = v.attese;
+  }
+  if (opts.dryRun) return { ok: true, dryRun: true, attese };
+  const fields = attese.length ? { [ATT.CAMPO]: toFsValue(attese), updatedAt: firmaOra() } : { updatedAt: firmaOra() };
+  const res = await patchFirmato(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?updateMask.fieldPaths=${ATT.CAMPO}&updateMask.fieldPaths=updatedAt`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
+    body: JSON.stringify({ fields }),
+  });
+  if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
+  return { ok: true, attese };
+}
+
+/** Il campo `waitsFor` letto dall'API REST: [{ id, num }]. */
+function atteseDaCampo(v) {
+  return (v?.arrayValue?.values || []).map((x) => ({
+    id: x?.mapValue?.fields?.id?.stringValue || '', num: x?.mapValue?.fields?.num?.stringValue || '',
+  }));
+}
+
+/**
  * Un feedback di un utente che richiederebbe lavoro locale torna nei Ricevuti:
  * stato design, motivo 'locale', nota «Richiede lavoro locale». Decide l'owner.
  * È il passaggio che una routine fa quando ha domande, e si dichiara come tale.
