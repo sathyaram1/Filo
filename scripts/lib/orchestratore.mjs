@@ -13,9 +13,10 @@ const ROUND = globalThis.SN_VERIFIER_ROUND;
 export const FASI_FINITE = Object.freeze(['fuso', 'fermo']);
 
 export const OPZIONI_BASE = Object.freeze({
-  paralleli: 2,
-  // Un giro in più costa un'istanza; un lavoro fermato troppo presto costa una decisione dell'owner.
-  tetto: 8,
+  // 0 = nessun numero fisso: un'istanza nuova parte finché processore e memoria lo permettono (#1041).
+  paralleli: 0,
+  // 0 = nessun tetto proprio: i giri li limitano i bilanci del server, come nelle sessioni in cloud (#1036).
+  tetto: 0,
   cpuMax: 80,
   // Il test a tempo del 2FA cade sotto carico (#943): la chiusura aspetta una macchina più calma.
   cpuChiusura: 60,
