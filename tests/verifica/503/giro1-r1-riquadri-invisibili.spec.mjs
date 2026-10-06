@@ -1,6 +1,6 @@
-// Verifica #503 giro 1: i riquadri incorporati che l'utente non vede non fanno
+// Verifica #503 giro 1, rilievo 1: i riquadri incorporati che l'utente non vede non fanno
 // scattare l'avviso «tranne un riquadro incorporato» e non si pagano; quelli
-// raggiungibili scorrendo restano contati e tradotti.
+// raggiungibili scorrendo restano contati e tradotti (guardie verdi).
 import { test, expect } from '../../fixtures/electron.mjs';
 
 async function stubTranslationProvider(app) {
@@ -80,7 +80,7 @@ const NASCOSTI = [
 ];
 
 for (const [nome, stile] of NASCOSTI) {
-  test(`riquadro chiuso a chiave e ${nome}: «Pagina tradotta», senza avviso a vuoto`, async ({ app, openTab, testServer }) => {
+  test(`r1 riquadro chiuso a chiave e ${nome}: «Pagina tradotta», senza avviso a vuoto`, async ({ app, openTab, testServer }) => {
     test.setTimeout(120000);
     await stubTranslationProvider(app);
     const src = testServer.html(INNER('ZZLOCK'));
@@ -95,7 +95,7 @@ for (const [nome, stile] of NASCOSTI) {
   });
 }
 
-test('riquadro nascosto dentro un contenitore trasparente: nessun avviso a vuoto', async ({ app, openTab, testServer }) => {
+test('r1 riquadro nascosto dentro un contenitore trasparente: nessun avviso a vuoto', async ({ app, openTab, testServer }) => {
   test.setTimeout(120000);
   await stubTranslationProvider(app);
   const src = testServer.html(INNER('ZZLOCK'));
@@ -109,7 +109,7 @@ test('riquadro nascosto dentro un contenitore trasparente: nessun avviso a vuoto
   expect(t).toContain('Pagina tradotta');
 });
 
-test('riquadro chiuso a chiave più in basso della prima schermata: resta contato', async ({ app, openTab, testServer }) => {
+test('r1 riquadro chiuso a chiave più in basso della prima schermata: resta contato', async ({ app, openTab, testServer }) => {
   test.setTimeout(120000);
   await stubTranslationProvider(app);
   const src = testServer.html(INNER('ZZLOCK'));
@@ -120,7 +120,7 @@ test('riquadro chiuso a chiave più in basso della prima schermata: resta contat
   await expect.poll(() => toasts(page), { timeout: 60000 }).toContain('riquadro incorporato');
 });
 
-test('riquadro chiuso a chiave in fondo a un pannello che scorre: resta contato', async ({ app, openTab, testServer }) => {
+test('r1 riquadro chiuso a chiave in fondo a un pannello che scorre: resta contato', async ({ app, openTab, testServer }) => {
   test.setTimeout(120000);
   await stubTranslationProvider(app);
   const src = testServer.html(INNER('ZZLOCK'));
@@ -131,7 +131,7 @@ test('riquadro chiuso a chiave in fondo a un pannello che scorre: resta contato'
   await expect.poll(() => toasts(page), { timeout: 60000 }).toContain('riquadro incorporato');
 });
 
-test('riquadro con script più in basso della prima schermata: tradotto', async ({ app, openTab, testServer }) => {
+test('r1 riquadro con script più in basso della prima schermata: tradotto', async ({ app, openTab, testServer }) => {
   test.setTimeout(120000);
   await stubTranslationProvider(app);
   const src = testServer.html(INNER('ZZLOW')).replace('127.0.0.1', 'blocked.test');
@@ -143,7 +143,7 @@ test('riquadro con script più in basso della prima schermata: tradotto', async 
   expect(t).not.toContain('riquadro incorporato');
 });
 
-test('riquadro con script dentro una sezione ripiegata: non si paga, e si traduce quando la si apre', async ({ app, openTab, testServer }) => {
+test('r1 riquadro con script dentro una sezione ripiegata: non si paga, e si traduce quando la si apre', async ({ app, openTab, testServer }) => {
   test.setTimeout(120000);
   await stubTranslationProvider(app);
   const src = testServer.html(INNER('ZZFOLD')).replace('127.0.0.1', 'blocked.test');
@@ -170,7 +170,7 @@ test('riquadro con script dentro una sezione ripiegata: non si paga, e si traduc
   await expect(page.frameLocator('#emb').locator('#fbody')).toHaveText(/^IT /, { timeout: 60000 });
 });
 
-test('riquadro con script trasparente: non si paga', async ({ app, openTab, testServer }) => {
+test('r1 riquadro con script trasparente: non si paga', async ({ app, openTab, testServer }) => {
   test.setTimeout(120000);
   await stubTranslationProvider(app);
   const src = testServer.html(INNER('ZZFADE')).replace('127.0.0.1', 'blocked.test');
@@ -183,7 +183,7 @@ test('riquadro con script trasparente: non si paga', async ({ app, openTab, test
   expect(await sent(app)).not.toContain('ZZFADE');
 });
 
-test('riquadro chiuso a chiave dentro una sezione ripiegata: nessun avviso a vuoto', async ({ app, openTab, testServer }) => {
+test('r1 riquadro chiuso a chiave dentro una sezione ripiegata: nessun avviso a vuoto', async ({ app, openTab, testServer }) => {
   test.setTimeout(120000);
   await stubTranslationProvider(app);
   const src = testServer.html(INNER('ZZLOCK'));
@@ -192,6 +192,23 @@ test('riquadro chiuso a chiave dentro una sezione ripiegata: nessun avviso a vuo
   await watchToasts(page);
   await clickTranslateIcon(page, '#p1');
   await expect(page.locator('#p1')).toHaveText(/^IT /, { timeout: 30000 });
+  await page.waitForTimeout(4000);
+  const t = await toasts(page);
+  expect(t).not.toContain('riquadro incorporato');
+  expect(t).toContain('Pagina tradotta');
+});
+
+test('r1 riquadro trasparente e chiuso a chiave dentro un riquadro visibile: nessun avviso a vuoto', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  const lock = testServer.html(INNER('ZZLOCK'));
+  const outer = testServer.html(`<!doctype html><html lang="en"><body style="font:16px sans-serif;margin:0;padding:10px">
+    <p id="obody">The outer embedded box with a comment thread written in english, long enough.</p>
+    <iframe sandbox src="${lock}" style="opacity:0;width:300px;height:120px;border:0"></iframe></body></html>`).replace('127.0.0.1', 'blocked.test');
+  const page = await testServer.openReady(openTab, pagina(`<iframe id="emb" src="${outer}" style="width:520px;height:260px"></iframe>`));
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#p1');
+  await expect(page.frameLocator('#emb').locator('#obody')).toHaveText(/^IT /, { timeout: 60000 });
   await page.waitForTimeout(4000);
   const t = await toasts(page);
   expect(t).not.toContain('riquadro incorporato');
