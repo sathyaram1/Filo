@@ -23,9 +23,8 @@ export const OPZIONI_BASE = Object.freeze({
   memMinGB: 2,
   ritenta: 2,
   pausaMs: 60_000,
-  // Il limite d'uso dell'abbonamento si aspetta (un quarto d'ora per volta, se non dice quando riparte); oltre il tetto il lavoro si ferma col motivo.
+  // Il limite d'uso dell'abbonamento si aspetta quanto serve, anche giorni (#1036: nessun tetto di tempo); un quarto d'ora per volta se non dice quando riparte.
   pausaLimiteMs: 15 * 60_000,
-  oreLimite: 12,
   // auto = ogni rilievo dove si può lavorare: in locale solo ciò che si fa solo qui, il resto alle routine.
   derivati: 'auto',
   tieniWorktree: false,
@@ -209,11 +208,15 @@ const chiaveRilievo = (f) => `${f.level}${f.sede}:${String(f.text).slice(0, 80)}
 export const modoDerivati = (p) => (p && p.derivati) || OPZIONI_BASE.derivati;
 
 // Si fa solo in locale (LOCAL.md): il server e i suoi deploy, le regole pubblicate, le impostazioni dell'owner. Il resto alle routine.
-const SOLO_IN_LOCALE = /filo-security|\bfunctions[/\\]|\b(firestore|storage)\.rules\b|firestore\.indexes|\b(ri)?deploy|server:(pubblica|fondi)|regole:pubblica|console (di |del )?Firebase|Firebase console|\bSecrets? (di|su) GitHub|GitHub Secrets?|\bruleset\b|token admin|FILO_ADMIN_/i;
+// La critica parla a parole e senza nomi di file: valgono anche «il server» (non quello di un altro), le regole del database, le Cloud Functions.
+const SOLO_IN_LOCALE = /filo-security|\bfunctions[/\\]|\bCloud Functions?\b|\b(firestore|storage)\.rules\b|firestore\.indexes|server:(pubblica|fondi)|regole:pubblica|console (di |del )?Firebase|Firebase console|\bSecrets? (di|su) GitHub|GitHub Secrets?|\bruleset\b|token admin|FILO_ADMIN_|\b(il|lo|del|dello|al|dal|sul|nel|col|lato)\s+server\b(?!\s+(di|dei|del|della|delle|degli)\s+(?!Filo\b))|\bregole\s+(di|del|della|dello|delle)\s+(Firestore|Storage|database|sicurezza)\b|\bindic[ei]\s+(di|del)\s+(Firestore|database)\b/i;
+// Il deploy conta come lavoro da fare; nominato da un elemento dell'interfaccia («il pulsante per il deploy») è un difetto dell'app.
+const DEPLOY = /(?<!\b(pulsante|bottone|voce|tasto|icona|scritta|etichetta|menu|scheda|riga|colonna)\b[^.,;:\n]{0,30})\b(ri)?deploy/i;
 
 /** Chi lavora un rilievo messo da parte: 'locale' solo se si fa soltanto in locale, sennò le routine. PURA. */
 export function doveSiLavora(f) {
-  return SOLO_IN_LOCALE.test(String((f && f.text) || '')) ? 'locale' : 'non-locale';
+  const t = String((f && f.text) || '');
+  return SOLO_IN_LOCALE.test(t) || DEPLOY.test(t) ? 'locale' : 'non-locale';
 }
 
 /**
@@ -628,7 +631,6 @@ export function creaMotore(dep, opzioni = {}) {
   }
 
   async function istanza(p, ruolo, prompt, nome, cartella = P.note) {
-    let atteso = 0;
     const prima = (((dep.verifica(P.wt(p.slug)) || {}).entry) || {}).verdict || '';
     for (let t = 0; ; t += 1) {
       const r = await lancia(p, ruolo, { ruolo, prompt, cwd: P.wt(p.slug), addDirs: [cartella, P.serverRadice].filter(Boolean), nome });
@@ -637,14 +639,15 @@ export function creaMotore(dep, opzioni = {}) {
         return r;
       }
       const attesa = r.ok ? 0 : attesaLimite(`${r.errore || ''}\n${r.testo || ''}`, adesso(), opz);
-      if (attesa && atteso + attesa <= opz.oreLimite * 60 * 60_000) {
-        atteso += attesa;
+      if (attesa) {
         t -= 1;
-        dep.log(`#${p.num} ${ruolo}: limite d’uso raggiunto, riprovo fra ${Math.round(attesa / 60_000)} min`);
-        await attendi(attesa, `${ruolo} in attesa del limite d’uso`);
+        const quando = new Date(adesso() + attesa).toLocaleString('it-IT', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
+        p.attesa = `limite d’uso: ${ruolo} da rilanciare il ${quando}`;
+        salva(p);
+        dep.log(`#${p.num} ${ruolo}: limite d’uso raggiunto, riprovo il ${quando}`);
+        try { await attendi(attesa, `${ruolo} in attesa del limite d’uso`); } finally { p.attesa = ''; }
         continue;
       }
-      if (attesa) return { ...r, errore: `limite d’uso ancora attivo dopo ${opz.oreLimite} ore di attesa: ${primaRiga(r.errore)}` };
       if (r.ok || t >= opz.ritenta || !eTransitorio(r.errore)) return r;
       dep.log(`#${p.num} ${ruolo}: errore transitorio, riprovo`);
       await attendi(opz.pausaMs, `${ruolo} da rilanciare dopo un errore transitorio`);

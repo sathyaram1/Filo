@@ -296,16 +296,24 @@ test('una fermata qualunque ripresa con una risposta: il lavoratore legge il mot
   assert.match(t, /non hanno registrato la critica/);
 });
 
-test('limite d’uso: l’istanza aspetta e riparte, e il lavoro arriva in fondo; oltre il tetto di ore si ferma col motivo', async () => {
+test('limite d’uso: l’istanza aspetta e riparte, e il lavoro arriva in fondo, senza un tetto di ore (#1036)', async () => {
   const b = banco({ server: false, errori: ["You've hit your limit · resets 3pm (Europe/Rome)", 'Claude AI usage limit reached|1759590000'] });
   const p = (await b.motore.avvia()).pratiche[7];
   assert.equal(p.fase, 'fuso');
   assert.ok(b.dormite.includes(15 * 60_000));
   assert.ok(b.dormite.includes(60_000));
-  const c = banco({ server: false, errori: Array(60).fill('5-hour limit reached ∙ resets 3pm'), opz: { oreLimite: 1 } });
+  const c = banco({ server: false, errori: Array(60).fill('5-hour limit reached ∙ resets 3pm') });
   const f = (await c.motore.avvia()).pratiche[7];
-  assert.equal(f.fase, 'fermo');
-  assert.match(f.fermo.motivo, /limite d’uso ancora attivo dopo 1 ore/);
+  assert.equal(f.fase, 'fuso');
+  assert.equal(c.dormite.filter((ms) => ms === 15 * 60_000).length, 60);
+  // Il limite settimanale riparte fra giorni: si aspetta fino a lì, mai una fermata con una nota all’owner.
+  const fra3giorni = Date.parse('2026-10-04T10:00:00Z') / 1000 + 3 * 86400;
+  const d = banco({ server: false, errori: [`Claude AI usage limit reached|${fra3giorni}`] });
+  const g = (await d.motore.avvia()).pratiche[7];
+  assert.equal(g.fase, 'fuso');
+  assert.ok(d.dormite.includes(3 * 86400_000 + 60_000));
+  assert.ok(!d.righe().some((r) => r.startsWith('annota')));
+  assert.equal(g.attesa, '');
 });
 
 test('attesaLimite: solo il limite d’uso, fino all’ora che dice', () => {
@@ -1246,6 +1254,12 @@ test('rilievi messi da parte secondo il caso (#1036): in locale solo ciò che si
   assert.equal(doveSiLavora({ text: 'la function in filo-security non controlla il mittente' }), 'locale');
   assert.equal(doveSiLavora({ text: 'dopo la fusione serve rideployare il server' }), 'locale');
   assert.equal(doveSiLavora({ text: 'il pulsante in Gestione non ha l’hover' }), 'non-locale');
+  // Come la critica li scrive: a parole, senza nomi di file.
+  for (const t of ['Il server accetta la critica di un verificatore senza controllare da quale ramo arriva', 'Le regole di Firestore lasciano scrivere il campo nuovo a qualunque utente',
+    'La funzione del server che apre i feedback non controlla la priorità', 'Le regole di sicurezza del database non ammettono il campo nuovo', 'il server di Filo rifiuta la richiesta',
+    'dopo la fusione serve rideployare le functions', 'le Cloud Functions non leggono il campo']) assert.equal(doveSiLavora({ text: t }), 'locale', t);
+  for (const t of ['Nella pagina Gestione il pulsante per il deploy è tagliato in tema scuro', 'la voce Deploy del menu non ha l’hover', 'la chat si blocca quando il server di OpenRouter è lento',
+    'il mini server dei test non risponde', 'Nel menu del tasto destro la voce Copia non copia niente']) assert.equal(doveSiLavora({ text: t }), 'non-locale', t);
   const der = [{ level: 1, sede: 'i', text: 'hover mancante' }, { level: 1, sede: 'i', text: 'aggiorna storage.rules' }, { level: 2, sede: 'e', text: 'altro lavoro Z' }];
   const p = { num: 7, slug: 'sette', derivatiAperti: [] };
   assert.deepEqual(derivatiDaAprire(p, der).map((x) => [x.titolo, x.dove]), [['altro lavoro Z', 'non-locale'], ['hover mancante', 'non-locale'], ['aggiorna storage.rules', 'locale']]);
