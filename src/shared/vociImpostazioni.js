@@ -93,7 +93,9 @@
       },
       gruppi: { 'sec-cookies-banners': 'security.cookies.bannerSites', 'sec-delicate-campi': 'security.pagineDelicate.nonDelicati', 'sec-cookies-accessi': 'security.cookies.loggedSites', 'sec-cookies-riquadri': 'security.cookies.embedSites' },
       altrove: { 'sec-perm-list': 'permessiSiti' },
-      fuori: {},
+      fuori: {
+        'sec-clip-search': 'cerca fra le voci della cronologia appunti mostrate nella pagina: non è un valore da salvare',
+      },
       messaggi: {
         PERMESSI_SITI_GET: 'LEGGI_IMPOSTAZIONI',
         PERMESSI_SITI_TOGLI: 'TOGLI_PERMESSO_SITO',
@@ -105,6 +107,9 @@
         EXPORT_DATA: 'pulsante che fa un’azione (esporta i dati in un file): resta nella pagina',
         IMPORT_DATA_PREVIEW: 'pulsante che fa un’azione (importa i dati da un file): resta nella pagina',
         IMPORT_DATA_APPLY: 'pulsante che fa un’azione (importa i dati da un file): resta nella pagina',
+        GET_CLIPBOARD_HISTORY: 'la cronologia appunti è un dato dell’utente (anche password copiate), non un’impostazione: si legge nella pagina',
+        REMOVE_CLIPBOARD_ENTRY: 'pulsante che fa un’azione (toglie una voce della cronologia appunti): resta nella pagina',
+        CLEAR_CLIPBOARD_HISTORY: 'pulsante che fa un’azione (svuota la cronologia appunti): resta nella pagina',
       },
     },
     options: {

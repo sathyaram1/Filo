@@ -13,10 +13,10 @@
 // Senza le correzioni sono rossi (ne spariscono due, si cancella il vicino, il
 // menu mostra due volte "Immagine", la conferma non dice nessun numero).
 
-import { test, expect } from './fixtures/electron.mjs';
+import { test, expect, argomentiScala } from './fixtures/electron.mjs';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { _electron as electron } from '@playwright/test';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync, rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
@@ -44,13 +44,13 @@ async function findTabPage(app, hostname, timeout = 15000) {
 
 function avvia(userData) {
   return electron.launch({
-    args: ['.'], cwd: APP_ROOT,
+    args: [...argomentiScala, '.'], cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });
 }
 
 function conCronologia(prefix, items, extra) {
-  const userData = mkdtempSync(join(tmpdir(), prefix));
+  const userData = cartellaTemporanea(prefix);
   writeFileSync(join(userData, 'storage.json'), JSON.stringify({ clipboardHistory: items, ...extra }), 'utf8');
   return userData;
 }
