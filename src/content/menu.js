@@ -61,6 +61,7 @@
   // Questi fanno qualcosa: vogliono anche che il browser abbia visto il menu intero, scoperto e opaco. Per questo
   // sulle pagine web il menu non entra in dissolvenza (`data-sn-sul-web` in menu.css).
   const VOGLIONO_LA_VISTA = new Set(['click', 'auxclick', 'dblclick', 'mouseenter']);
+  const VISTA_CONTA = (() => { try { return window.top === window.self; } catch (_) { return false; } })();
   const radici = new WeakMap();
   let gestoInterno = false;
   function gestoDiFilo(fn) {
