@@ -9,11 +9,12 @@
 //   strict  — confusable (omoglifi UTS-39) o typo puro sulla label di brand.
 //             Da solo basta per "Pericoloso".
 //   broad   — combosquat (brand + altre parole), nome esatto su suffisso non
-//             ufficiale, o brand come sottodominio con eTLD+1 altro. → "Sospetto".
+//             ufficiale, brand come sottodominio con eTLD+1 altro, o typo su un
+//             marchio `unaLetteraAvvisa`. → "Sospetto".
 
 'use strict';
 
-const { BRANDS, PAROLE, isLegitBrandDomain } = require('./brands');
+const { BRANDS, PAROLE, legitBrandOf } = require('./brands');
 const { skeleton, skeletonCoppie } = require('./confusables');
 
 const PAROLE_VERE = new Set(PAROLE);
@@ -101,7 +102,7 @@ function matchBrands(norm) {
   const regLabelCount = norm.registrable ? norm.registrable.split('.').length : 1;
   const subLabels = uLabels.slice(0, Math.max(0, uLabels.length - regLabelCount));
   // Il sito vero di un marchio non imita nessun altro marchio (paypal.poste.it non esiste, ma nemmeno il suo avviso).
-  if (isLegitBrandDomain(norm.registrable)) return { strict: null, broad: null };
+  if (legitBrandOf(norm.host, norm.registrable)) return { strict: null, broad: null };
 
   let strict = null;
   let broad = null;
@@ -122,6 +123,7 @@ function matchBrands(norm) {
       const th = typoThreshold(token.length);
       if (th > 0 && Math.abs(sld.length - token.length) <= th) {
         const dist = osaDistance(sld, token);
+        if (dist > 0 && dist <= th && brand.unaLetteraAvvisa) { if (!broad) broad = { brand, reason: 'typo', sld, distance: dist }; continue; }
         if (dist > 0 && dist <= th) { strict = { brand, reason: 'typo', sld, distance: dist }; continue; }
       }
     }

@@ -375,3 +375,32 @@ test('un gestore SPID usa il nome di SPID, non quello degli altri marchi', () =>
   assert.ok(LS.avviso(LS.analizza('https://spid.accesso-sicuro.net/')).includes('SPID'));
   assert.ok(LS.avviso(LS.analizza('https://spid.gov.it.accesso.net/')).includes('SPID'));
 });
+
+// #725.8, decisione dell'owner: sui marchi entrati con questo lavoro un nome a una lettera dà l'avviso che si chiude
+// con «Continua», e il blocco solo con un altro segnale. Sono siti veri: SAP Ariba, İş Bankası, banche portoghesi.
+test('un nome a una lettera da un marchio nuovo avvisa, e blocca solo con un altro segnale', () => {
+  const vicini = {
+    'https://service.ariba.com/Supplier.aw': 'aruba.it', 'https://www.isbank.com.tr/': 'isybank.com',
+    'https://www.bancobpi.pt/': 'bancobpm.it', 'https://www.bancobic.pt/': 'bancobpm.it', 'https://bancobmg.com.br/': 'bancobpm.it',
+  };
+  for (const [u, vero] of Object.entries(vicini)) {
+    assert.match(LS.avviso(LS.analizza(u)), new RegExp('somiglia ad? ' + vero.replace(/\./g, '\\.')), `menu su ${u}`);
+    assert.equal(Pagina.evaluate(u).level, 'sospetto', `all’apertura di ${u}`);
+    assert.equal(Pagina.evaluate(u, { hasPassword: true }).level, 'pericoloso', `${u} che chiede la password`);
+    assert.equal(Pagina.evaluate(u, {}, { ageDays: 3 }).level, 'pericoloso', `${u} registrato da tre giorni`);
+    assert.equal(Pagina.evaluate(u, {}, { cert: { status: 'self_signed' } }).level, 'pericoloso', `${u} col certificato autofirmato`);
+  }
+  // I marchi di prima restano com'erano: un nome a una lettera da PayPal o Amazon si blocca da solo.
+  for (const u of ['https://paypa1.com/', 'https://arnazon.it/', 'https://gooogle.com/']) {
+    assert.equal(Pagina.evaluate(u).level, 'pericoloso', `${u} non più bloccato`);
+  }
+});
+
+test('gli indirizzi da cui Steam distribuisce i file sono suoi, il nome di Steam altrove su quella rete no', () => {
+  for (const u of ['https://steamuserimages-a.akamaihd.net/ugc/1234567890/ABCDEF0123456789/', 'https://steamcdn-a.akamaihd.net/apps/570/header.jpg']) {
+    assert.deepEqual(LS.analizza(u), [], `avviso nel menu su ${u}`);
+    assert.equal(Pagina.evaluate(u).level, 'safe', `avviso all’apertura di ${u}`);
+  }
+  assert.ok(LS.avviso(LS.analizza('https://steam-login.akamaihd.net/')).includes('Steam'));
+  assert.ok(LS.avviso(LS.analizza('https://steamcdn-a.akamaihd.net@accesso-sicuro.net/')).includes('Steam'));
+});

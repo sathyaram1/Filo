@@ -16,7 +16,7 @@
 const { normalize } = require('./normalize');
 const { isWhitelisted, hostedPlatform } = require('./whitelist');
 const { localSignals } = require('./signals');
-const { LEGIT_DOMAINS } = require('./brands');
+const { legitBrandOf } = require('./brands');
 
 const YOUNG_DOMAIN_DAYS = 30;     // sotto: dominio "giovane" → rinforzo sospetto
 const VERY_YOUNG_DOMAIN_DAYS = 7; // sotto: rinforzo forte (combinato → pericoloso)
@@ -80,7 +80,13 @@ function buildMessage({ level, norm, gsb, imp, ageDays, cert, hasPassword, hasPa
       body: `Questo non è ${imp.brand.display}. Il dominio è ${dom}${tail}`,
     };
   }
-  // 3) Impersonazione larga.
+  // 3) Impersonazione larga: un nome a una lettera, o il nome usato altrove.
+  if (imp && imp.kind === 'broad_impersonation' && imp.reason === 'typo') {
+    return {
+      title: `${imp.brand.display}? Controlla l'indirizzo`,
+      body: `${dom} somiglia ${/^a/i.test(imp.brand.display) ? 'ad' : 'a'} ${imp.brand.display} ma non è un suo indirizzo ufficiale${tail}`,
+    };
+  }
   if (imp && imp.kind === 'broad_impersonation') {
     return {
       title: `${imp.brand.display}? Controlla l'indirizzo`,
@@ -159,6 +165,7 @@ function evaluate(url, ctx = {}, asyncData = {}) {
   // strict impersonation da sola basta; oppure rinforzi forti combinati.
   const strongCombo =
     (broad && (young || certBad)) ||
+    (broad && broad.reason === 'typo' && sensitive) ||
     (sandboxBad) ||
     (imp && sensitive && certBad) ||
     (doubleExt && (young || certBad));
@@ -218,7 +225,8 @@ function imitazione(url) {
   const v = evaluate(url);
   if (!v.imp) return null;
   const n = v.norm;
-  return { stretta: v.imp.kind === 'strict_impersonation', brand: v.imp.brand, reason: v.imp.reason, publicSuffix: n.publicSuffix };
+  const somiglia = v.imp.reason === 'typo' || v.imp.reason === 'confusable';
+  return { somiglia, brand: v.imp.brand, reason: v.imp.reason, publicSuffix: n.publicSuffix };
 }
 
 // Il sito che un pezzo d'indirizzo nomina (www.paypal.com prima della chiocciola, #725.8): il dominio e, se è un
@@ -226,7 +234,7 @@ function imitazione(url) {
 function sitoNominato(url) {
   const n = normalize(url);
   if (!n || !n.ok || n.isIp || n.single || n.suffixOnly || !n.registrable) return null;
-  return { registrable: n.registrable, brand: LEGIT_DOMAINS.get(n.registrable) || null };
+  return { registrable: n.registrable, brand: legitBrandOf(n.host, n.registrable) };
 }
 
 module.exports = { evaluate, checkSync, imitazione, sitoNominato, buildMessage, agePhrase, YOUNG_DOMAIN_DAYS, VERY_YOUNG_DOMAIN_DAYS };

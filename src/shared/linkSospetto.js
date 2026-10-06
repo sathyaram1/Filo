@@ -42,7 +42,7 @@
   function codiceImitazione(url) {
     const imp = imitazione ? imitazione(url) : null;
     if (!imp) return '';
-    return imp.stretta ? 'typosquatting:' + dominioImitato(imp) : 'marchio_imitato:' + imp.brand.display;
+    return imp.somiglia ? 'typosquatting:' + dominioImitato(imp) : 'marchio_imitato:' + imp.brand.display;
   }
 
   // https://www.paypal.com@altro.net si legge come il sito vero, ma porta a quello dopo la chiocciola. Conta il nome con
@@ -75,11 +75,11 @@
     try { return decodeURIComponent(s || ''); } catch (_) { return s || ''; }
   }
 
-  // Il dominio vero da nominare: quello dello stesso Paese, se il marchio ce l'ha (arnazon.it somiglia ad amazon.it).
+  // Il dominio vero da nominare: il nome del marchio nello stesso Paese, se c'è (arnazon.it somiglia ad amazon.it),
+  // altrimenti il sito principale (ariba.com somiglia ad aruba.it, non ad arubacloud.com).
   function dominioImitato(imp) {
     const domini = imp.brand.domains;
-    return domini.find((d) => imp.publicSuffix && d.endsWith('.' + imp.publicSuffix) && !d.slice(0, -imp.publicSuffix.length - 1).includes('.'))
-      || domini[0];
+    return domini.find((d) => imp.publicSuffix && d === imp.brand.token + '.' + imp.publicSuffix) || domini[0];
   }
 
   // #725 — il nome del parametro da solo non basta: chiamarsi «t» o «hash» è

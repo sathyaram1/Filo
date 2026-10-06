@@ -11,6 +11,9 @@
 //             questi, NON è impersonazione (è il sito vero).
 //   gestori — chi usa il nome per conto del marchio senza esserne il sito (i gestori SPID accreditati): lì il
 //             nome non è un'imitazione, ma il dominio non entra nella whitelist.
+//   hosts   — indirizzi ufficiali interi su un dominio altrui (le reti che distribuiscono i file del marchio).
+//   unaLetteraAvvisa — un nome a una lettera dà l'avviso e blocca solo con un altro segnale: i marchi entrati con
+//             #725.8 hanno vicini veri (ariba.com, isbank.com.tr, bancobpi.pt) e il ripiego non li elenca a mano.
 //
 // La lista è volutamente corta e curata: pochi brand ad altissimo valore, per
 // tenere bassi i falsi positivi. Allungarla è sicuro finché i token restano
@@ -32,31 +35,31 @@ const BRANDS = [
   { token: 'unicredit', display: 'UniCredit', domains: ['unicredit.it', 'unicreditgroup.eu', 'unicredit.eu', 'unicredit.ro', 'unicreditbank.cz', 'unicreditbank.hu', 'unicreditbank.si', 'unicreditbank.rs', 'unicreditbank.ba', 'unicreditbulbank.bg'] },
   { token: 'intesa', display: 'Intesa Sanpaolo', domains: ['intesasanpaolo.com', 'intesasanpaolovita.it', 'intesasanpaoloassicura.com', 'intesasanpaoloprivatebanking.it'] },
   { token: 'intesasanpaolo', display: 'Intesa Sanpaolo', domains: ['intesasanpaolo.com', 'intesasanpaolovita.it', 'intesasanpaoloassicura.com', 'intesasanpaoloprivatebanking.it'] },
-  { token: 'isybank', display: 'Isybank', domains: ['isybank.com', 'isybank.it'] },
+  { token: 'isybank', unaLetteraAvvisa: true, display: 'Isybank', domains: ['isybank.com', 'isybank.it'] },
   { token: 'poste', display: 'Poste Italiane', domains: ['poste.it', 'posteitaliane.it', 'postemobile.it', 'postevita.it', 'postel.it'] },
-  { token: 'bancoposta', display: 'Poste Italiane', domains: ['poste.it', 'posteitaliane.it'] },
+  { token: 'bancoposta', unaLetteraAvvisa: true, display: 'Poste Italiane', domains: ['poste.it', 'posteitaliane.it'] },
   { token: 'nexi', display: 'Nexi', domains: ['nexi.it', 'nexigroup.com'] },
-  { token: 'bper', display: 'BPER Banca', domains: ['bper.it'] },
-  { token: 'bancobpm', display: 'Banco BPM', domains: ['bancobpm.it'] },
-  { token: 'bnl', display: 'BNL', domains: ['bnl.it'] },
-  { token: 'montepaschi', display: 'Monte dei Paschi di Siena', domains: ['mps.it', 'gruppomps.it'] },
-  { token: 'mediolanum', display: 'Banca Mediolanum', domains: ['bancamediolanum.it', 'mediolanum.com', 'mediolanum.it'] },
-  { token: 'fineco', display: 'Fineco', domains: ['finecobank.com', 'fineco.it'] },
+  { token: 'bper', unaLetteraAvvisa: true, display: 'BPER Banca', domains: ['bper.it'] },
+  { token: 'bancobpm', unaLetteraAvvisa: true, display: 'Banco BPM', domains: ['bancobpm.it'] },
+  { token: 'bnl', unaLetteraAvvisa: true, display: 'BNL', domains: ['bnl.it'] },
+  { token: 'montepaschi', unaLetteraAvvisa: true, display: 'Monte dei Paschi di Siena', domains: ['mps.it', 'gruppomps.it'] },
+  { token: 'mediolanum', unaLetteraAvvisa: true, display: 'Banca Mediolanum', domains: ['bancamediolanum.it', 'mediolanum.com', 'mediolanum.it'] },
+  { token: 'fineco', unaLetteraAvvisa: true, display: 'Fineco', domains: ['finecobank.com', 'fineco.it'] },
 
   // Enti e servizi italiani imitati nelle mail truffa
-  { token: 'inps', display: 'INPS', domains: ['inps.it'] },
-  { token: 'agenziaentrate', display: 'Agenzia delle Entrate', domains: ['agenziaentrate.gov.it', 'agenziaentrateriscossione.gov.it'] },
-  { token: 'agenziadelleentrate', display: 'Agenzia delle Entrate', domains: ['agenziaentrate.gov.it', 'agenziaentrateriscossione.gov.it'] },
+  { token: 'inps', unaLetteraAvvisa: true, display: 'INPS', domains: ['inps.it'] },
+  { token: 'agenziaentrate', unaLetteraAvvisa: true, display: 'Agenzia delle Entrate', domains: ['agenziaentrate.gov.it', 'agenziaentrateriscossione.gov.it'] },
+  { token: 'agenziadelleentrate', unaLetteraAvvisa: true, display: 'Agenzia delle Entrate', domains: ['agenziaentrate.gov.it', 'agenziaentrateriscossione.gov.it'] },
   // Le pagine d'accesso SPID stanno sui domini dei gestori (spid.register.it, loginspid.infocamere.it): #725.8.
-  { token: 'spid', display: 'SPID', domains: ['spid.gov.it'],
+  { token: 'spid', unaLetteraAvvisa: true, display: 'SPID', domains: ['spid.gov.it'],
     gestori: ['aruba.it', 'infocert.it', 'intesa.it', 'lepida.it', 'namirialtsp.com', 'poste.it', 'register.it', 'sieltecloud.it',
       'tim.it', 'intesigroup.com', 'teamsystem.com', 'eht.eu', 'infocamere.it'] },
-  { token: 'aruba', display: 'Aruba', domains: ['aruba.it', 'arubapec.it', 'arubacloud.com', 'cloud.it'] },
-  { token: 'telepass', display: 'Telepass', domains: ['telepass.com'] },
-  { token: 'brt', display: 'BRT', domains: ['brt.it'] },
-  { token: 'gls', display: 'GLS', domains: ['gls-italy.com', 'gls-group.eu', 'gls-group.com', 'gls-pakete.de', 'gls-us.com', 'gls-canada.com',
+  { token: 'aruba', unaLetteraAvvisa: true, display: 'Aruba', domains: ['aruba.it', 'arubapec.it', 'arubacloud.com', 'cloud.it'] },
+  { token: 'telepass', unaLetteraAvvisa: true, display: 'Telepass', domains: ['telepass.com'] },
+  { token: 'brt', unaLetteraAvvisa: true, display: 'BRT', domains: ['brt.it'] },
+  { token: 'gls', unaLetteraAvvisa: true, display: 'GLS', domains: ['gls-italy.com', 'gls-group.eu', 'gls-group.com', 'gls-pakete.de', 'gls-us.com', 'gls-canada.com',
     'gls-spain.es', 'gls-portugal.pt', 'gls-hungary.com', 'gls-czech.com', 'gls-slovakia.sk', 'gls-croatia.com', 'gls-slovenia.com', 'gls-romania.ro'] },
-  { token: 'dhl', display: 'DHL', domains: ['dhl.com', 'dhl.it', 'dhl.de', 'dhl.co.uk', 'express.dhl', 'dhlparcel.nl', 'dhlparcel.co.uk', 'dhlparcel.be', 'dhlparcel.es'] },
+  { token: 'dhl', unaLetteraAvvisa: true, display: 'DHL', domains: ['dhl.com', 'dhl.it', 'dhl.de', 'dhl.co.uk', 'express.dhl', 'dhlparcel.nl', 'dhlparcel.co.uk', 'dhlparcel.be', 'dhlparcel.es'] },
 
   // Crypto
   { token: 'coinbase', display: 'Coinbase', domains: ['coinbase.com'] },
@@ -87,8 +90,9 @@ const BRANDS = [
   { token: 'telegram', display: 'Telegram', domains: ['telegram.org', 't.me', 'telegram.me', 'telegra.ph', 'telegram.dog'] },
   { token: 'discord', display: 'Discord', domains: ['discord.com', 'discord.gg', 'discordapp.com', 'discordapp.net', 'discord.media', 'discordstatus.com', 'discord.new', 'discord.gift'] },
   { token: 'netflix', display: 'Netflix', domains: ['netflix.com', 'netflix.net', 'netflixtechblog.com'] },
-  { token: 'youtube', display: 'YouTube', domains: ['youtube.com', 'youtu.be', 'youtube-nocookie.com', 'youtubekids.com', 'youtube.it', 'youtube.de', 'youtube.fr', 'youtube.es', 'youtube.co.uk', 'youtube.ch', 'youtube.at', 'youtube.nl', 'youtube.be', 'youtube.pl', 'youtube.pt', 'youtube.ca', 'youtube.com.br', 'youtube.co.jp', 'youtube.com.au'] },
-  { token: 'steam', display: 'Steam', domains: ['steampowered.com', 'steamcommunity.com', 'steamstatic.com', 'steamgames.com', 'steamdeck.com', 'steamusercontent.com'] },
+  { token: 'youtube', unaLetteraAvvisa: true, display: 'YouTube', domains: ['youtube.com', 'youtu.be', 'youtube-nocookie.com', 'youtubekids.com', 'youtube.it', 'youtube.de', 'youtube.fr', 'youtube.es', 'youtube.co.uk', 'youtube.ch', 'youtube.at', 'youtube.nl', 'youtube.be', 'youtube.pl', 'youtube.pt', 'youtube.ca', 'youtube.com.br', 'youtube.co.jp', 'youtube.com.au'] },
+  { token: 'steam', display: 'Steam', domains: ['steampowered.com', 'steamcommunity.com', 'steamstatic.com', 'steamgames.com', 'steamdeck.com', 'steamusercontent.com'],
+    hosts: ['steamuserimages-a.akamaihd.net', 'steamcdn-a.akamaihd.net'] },
 
   // Shopping
   { token: 'amazon', display: 'Amazon', domains: ['amazon.com', 'amazon.it', 'amazon.co.uk', 'amazon.de', 'amazon.fr', 'amazon.es', 'amazon.nl', 'amazon.ca', 'amazon.se', 'amazon.pl', 'amazon.ae', 'amazon.sg', 'amazon.in', 'amazon.co.jp', 'amazon.com.au', 'amazon.com.br', 'amazon.com.mx', 'amazon.com.tr', 'amazon.eg', 'amazon.sa', 'amazon.cn', 'amazoncognito.com', 'amazon.jobs', 'amazon.science', 'aboutamazon.com', 'aboutamazon.it', 'aboutamazon.co.uk', 'aboutamazon.de', 'aboutamazon.fr', 'aboutamazon.es', 'media-amazon.com', 'ssl-images-amazon.com', 'amazonses.com', 'amazontrust.com'] },
@@ -144,9 +148,19 @@ for (const b of BRANDS) {
   for (const d of b.domains) LEGIT_DOMAINS.set(d, b);
 }
 
+const LEGIT_HOSTS = new Map();
+for (const b of BRANDS) {
+  for (const h of b.hosts || []) LEGIT_HOSTS.set(h, b);
+}
+
 // Vero se l'eTLD+1 dato è un dominio legittimo di un brand noto.
 function isLegitBrandDomain(registrable) {
   return LEGIT_DOMAINS.has(registrable);
 }
 
-module.exports = { BRANDS, PAROLE, LEGIT_DOMAINS, isLegitBrandDomain };
+// Il marchio di cui l'indirizzo è un sito ufficiale, per dominio o per indirizzo intero; null se non lo è.
+function legitBrandOf(host, registrable) {
+  return LEGIT_HOSTS.get(host) || LEGIT_DOMAINS.get(registrable) || null;
+}
+
+module.exports = { BRANDS, PAROLE, LEGIT_DOMAINS, isLegitBrandDomain, legitBrandOf };
