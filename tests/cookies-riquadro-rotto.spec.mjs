@@ -28,6 +28,16 @@ async function serve() {
       html(`<title>ARTICOLO</title><p>articolo</p><iframe id="ri" width="${LARGO}" height="${ALTO}" style="border:0" src="http://${h}.localhost:${porta}/${p}"></iframe><p>fine</p>`);
       return;
     }
+    // Un articolo lungo: il riquadro in alto, e tanto testo sotto da scorrerlo via.
+    if (u.pathname === '/lungo') {
+      html(`<p>articolo</p><iframe id="ri" width="${LARGO}" height="${ALTO}" style="border:0" src="http://${u.searchParams.get('h')}.localhost:${porta}/${u.searchParams.get('p')}"></iframe><div style="height:3000px">testo</div>`);
+      return;
+    }
+    // Un contenuto che l'autore ha tolto: il riquadro non è rotto dai cookie.
+    if (u.pathname === '/rimosso') {
+      html('<div style="padding:40px"><p>This video is unavailable</p></div>');
+      return;
+    }
     // Il riquadro stretto di una colonna laterale, e due riquadri dello stesso servizio in un articolo.
     if (u.pathname === '/stretto') {
       html(`<p>articolo</p><iframe id="ri" width="190" height="260" style="border:0;margin-left:30px" src="http://b.localhost:${porta}/post"></iframe>`);
@@ -78,6 +88,8 @@ async function serve() {
   const porta = server.address().port;
   return {
     art: (h, p) => `http://a.localhost:${porta}/art?h=${h}&p=${p}`,
+    artSu: (ospite, h, p) => `http://${ospite}.localhost:${porta}/art?h=${h}&p=${p}`,
+    lungo: (h, p) => `http://a.localhost:${porta}/lungo?h=${h}&p=${p}`,
     pagina: (p) => `http://a.localhost:${porta}/${p}`,
     async chiudi() {
       try { server.closeAllConnections?.(); } catch (_) {}
@@ -362,6 +374,40 @@ test('riquadro stretto: la domanda non spezza le parole e i pulsanti vanno sotto
     expect(p.spezzate).toEqual([]);
     expect(p.si.y).toBeGreaterThan(p.domanda.y + p.domanda.h / 2);
     expect(p.no.x + p.no.w / 2).toBeLessThanOrEqual(p.riquadro.x + p.riquadro.w / 2);
+  } finally {
+    await srv.chiudi();
+  }
+});
+
+test('un riquadro con un contenuto rimosso, giudicato non rotto, non spegne la proposta sugli altri riquadri rotti dello stesso servizio', async ({ app, openTab }) => {
+  const srv = await serve();
+  try {
+    await prepara(app, { risposta: '{"rotto": false, "servizio": ""}' });
+    await openTab(srv.art('d', 'rimosso'));
+    await expect.poll(() => chiamate(app).then((c) => c.length), { timeout: 25_000 }).toBe(1);
+    expect(await proposte(app, 'a.localhost')).toEqual([]);
+    await prepara(app);
+    await openTab(srv.artSu('e', 'd', 'vuoto'));
+    await aspettaProposta(app, 'e.localhost');
+    expect((await chiamate(app)).length).toBe(1);
+  } finally {
+    await srv.chiudi();
+  }
+});
+
+test('il riquadro sconosciuto rotto scorso via prima della foto riceve la proposta quando lo si torna a vedere', async ({ app, openTab }) => {
+  const srv = await serve();
+  try {
+    await prepara(app);
+    const page = await openTab(srv.lungo('d', 'vuoto'));
+    await page.waitForTimeout(800);
+    await page.evaluate(() => window.scrollTo(0, 2500));
+    await page.waitForTimeout(12_000);
+    expect(await chiamate(app)).toEqual([]);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    const p = await aspettaProposta(app, 'a.localhost');
+    expect(p.visibile).toBe(true);
+    expect((await chiamate(app)).length).toBe(1);
   } finally {
     await srv.chiudi();
   }

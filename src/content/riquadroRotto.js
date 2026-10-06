@@ -72,7 +72,12 @@
     let n = 0;
     const giro = () => {
       const ora = osserva();
-      if (stessa(prima, ora) || ++n >= TENTATIVI) { presentati(); ask({ type: T_SEGNALA, ...ora, segno: SEGNO }); return; }
+      if (stessa(prima, ora) || ++n >= TENTATIVI) {
+        presentati();
+        // Il main non è riuscito a fotografarlo (era già fuori dallo schermo): si riprova quando torna visibile.
+        ask({ type: T_SEGNALA, ...ora, segno: SEGNO }).then((r) => { if (r && r.riprova) quandoVisibile(aspettaFermo); });
+        return;
+      }
       prima = ora;
       setTimeout(giro, PAUSA_MS);
     };

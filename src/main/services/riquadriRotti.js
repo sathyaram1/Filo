@@ -9,8 +9,11 @@ const R = require('./riquadriRottiRegole');
 
 // Il modello guarda al massimo questi riquadri in un'ora: un sito pieno di riquadri strani non diventa una spesa.
 const VISIONI_ORA = 20;
-// Un servizio che il modello ha visto funzionare non si riguarda per un giorno.
+// Un riquadro che il modello ha visto non rotto non si riguarda per un giorno. Il suo «no» vale per quel contenuto
+// su quella pagina, non per il servizio: un video rimosso non dice niente degli altri riquadri dello stesso servizio.
 const FUNZIONA_MS = 24 * 60 * 60 * 1000;
+// Un riquadro che non si è lasciato fotografare (scorso via prima della foto) torna a farsi vedere, fino a qui.
+const FOTO_TENTATIVI = 3;
 const MAX_VOCI = 500;
 // Il lato lungo dell'immagine che parte: basta a leggere un segnaposto.
 const LATO_MAX = 768;
@@ -20,7 +23,8 @@ let chiamaModello = null;
 const proposte = new Map();   // gettone → { wcId, ftn, servizio, ospite, nome, url, origin, segno }
 const visti = new Set();      // riquadri già proposti o già guardati: una volta per riquadro
 const rifiutate = new Set();  // servizio|ospite a cui l'utente ha detto no, per questa sessione di Filo
-const funziona = new Map();   // servizio → quando il modello l'ha visto funzionare
+const funziona = new Map();   // pagina|riquadro → quando il modello l'ha visto non rotto
+const fotoMancate = new Map(); // riquadro → foto non riuscite
 let visioni = [];
 
 function Cookies() { return require('./cookies'); }
@@ -168,17 +172,21 @@ async function foto(c, segno) {
   return 'data:image/jpeg;base64,' + img.toJPEG(80).toString('base64');
 }
 
-function puoGuardare() {
+function restanoVisioni() {
   const ora = Date.now();
   visioni = visioni.filter((t) => ora - t < 60 * 60 * 1000);
-  if (visioni.length >= VISIONI_ORA) return false;
-  visioni.push(ora);
-  return true;
+  return visioni.length < VISIONI_ORA;
 }
+
+function senzaFrammento(url) { return String(url || '').split('#')[0]; }
+function chiaveFunziona(c) { return `${senzaFrammento(c.urlTop)}|${senzaFrammento(c.urlFrame)}`; }
+
+// La foto non riuscita non è uno sguardo: il riquadro resta da guardare e il controllo dell'ora non si spende.
+const FOTO_MANCATA = { fotoMancata: true };
 
 async function guarda(c, segno) {
   if (typeof chiamaModello !== 'function') return null;
-  const quando = funziona.get(c.servizio);
+  const quando = funziona.get(chiaveFunziona(c));
   if (quando && Date.now() - quando < FUNZIONA_MS) return null;
   if (diCasa(c.urlFrame) || diCasa(c.urlTop)) return null;
   // Una pagina delicata (password, carta: #1004) non va a un modello, nemmeno a pezzi.
@@ -186,9 +194,10 @@ async function guarda(c, segno) {
     const delicata = await globalThis.SN_DELICATE.filtro();
     if (delicata(c.urlTop) || delicata(c.urlFrame)) return null;
   } catch (_) { return null; }
-  if (!puoGuardare()) return null;
+  if (!restanoVisioni()) return null;
   const immagine = await foto(c, segno);
-  if (!immagine) return null;
+  if (!immagine) return FOTO_MANCATA;
+  visioni.push(Date.now());
   let testo = '';
   try { testo = await chiamaModello(R.messaggi({ immagine, sito: c.servizio })); } catch (e) {
     console.warn('[Filo riquadri] riconoscimento non riuscito:', (e && e.message) || e);
@@ -196,7 +205,7 @@ async function guarda(c, segno) {
   }
   const esito = R.leggiRisposta(testo, c.servizio);
   if (esito && !esito.rotto) {
-    funziona.set(c.servizio, Date.now());
+    funziona.set(chiaveFunziona(c), Date.now());
     while (funziona.size > MAX_VOCI) funziona.delete(funziona.keys().next().value);
   }
   return esito;
@@ -223,6 +232,14 @@ async function segnala(msg, sender) {
   // Un modulo con la password è delicato (#1004): la sua immagine non va a un modello.
   if (o.password) return { ok: true };
   const esito = await guarda(c, segno);
+  if (esito === FOTO_MANCATA) {
+    const n = (fotoMancate.get(chiave) || 0) + 1;
+    fotoMancate.set(chiave, n);
+    while (fotoMancate.size > MAX_VOCI) fotoMancate.delete(fotoMancate.keys().next().value);
+    if (n >= FOTO_TENTATIVI) return { ok: true };
+    visti.delete(chiave);
+    return { ok: true, riprova: true };
+  }
   if (!esito || !esito.rotto || c.wc.isDestroyed() || !rifiutati(c)) return { ok: true };
   proponi(c, esito.nome, segno);
   return { ok: true, via: 'modello' };
