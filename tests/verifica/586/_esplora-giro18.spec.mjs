@@ -35,6 +35,10 @@ test('dialogo modale della pagina', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, `<!doctype html><title>Dialogo</title><body>
   <dialog id="d" style="width:420px;height:300px">${CAMPO}</dialog><script>document.getElementById('d').showModal()</script></body>`);
   console.log('ESITO dialogo', await incolla(app, page, page, 'dialogo-586'));
+  await page.locator('#c').click({ button: 'right' });
+  await sleep(600);
+  await page.screenshot({ path: 'tests/.shots/586-giro18-dialogo.png' });
+  console.log('ESITO dialogo-inerte', await page.evaluate(() => { const m = document.querySelector('.sn-menu'); return m ? { inerte: m.matches(':popover-open') ? 'popover' : 'no', da: document.elementFromPoint(m.getBoundingClientRect().left + 20, m.getBoundingClientRect().top + 20)?.className } : 'nessun menu'; }));
 });
 
 test('dialogo non modale della pagina', async ({ app, openTab, testServer }) => {
@@ -48,8 +52,9 @@ for (const [nome, stile] of [['nudo', ''], ['opacita99', 'opacity:.99'], ['scala
     const dentro = testServer.html(`<!doctype html><title>Dentro</title><body style="margin:0">${CAMPO}</body>`);
     const page = await testServer.openReady(openTab, `<!doctype html><title>Fuori</title><body style="margin:0">
       <div style="${stile};width:700px;height:520px"><iframe id="f" src="${dentro}" style="width:700px;height:520px;border:0"></iframe></div></body>`);
-    const fr = page.frameLocator('#f');
-    await page.waitForFunction(() => document.getElementById('f').contentDocument?.documentElement?.dataset.filoReady === '1', null, { timeout: 8000 });
+    await page.frameLocator('#f').locator('#c').waitFor({ state: 'visible', timeout: 8000 });
+    const fr = page.frame({ url: dentro });
+    await sleep(1500);
     console.log(`ESITO riquadro-${nome}`, await incolla(app, page, fr, `riquadro-${nome}`));
   });
 }
@@ -75,3 +80,82 @@ for (const ms of [0, 60, 120, 200]) {
     console.log(`ESITO veloce-${ms}`, await incolla(app, page, page, `veloce-${ms}`, { attesa: ms }));
   });
 }
+
+test('riquadro basso: il menu non ci sta dentro', async ({ app, openTab, testServer }) => {
+  const dentro = testServer.html(`<!doctype html><title>Dentro</title><body style="margin:0"><input id="c" style="margin:10px;width:300px"></body>`);
+  const page = await testServer.openReady(openTab, `<!doctype html><title>Fuori</title><body style="margin:20px">
+    <iframe id="f" src="${dentro}" style="width:600px;height:160px;border:1px solid #888"></iframe><p>sotto</p></body>`);
+  await page.frameLocator('#f').locator('#c').waitFor({ state: 'visible', timeout: 8000 });
+  await sleep(1500);
+  const fr = page.frame({ url: dentro });
+  console.log('ESITO riquadro-basso', await incolla(app, page, fr, 'basso-586'));
+  await page.screenshot({ path: 'tests/.shots/586-giro18-riquadro-basso.png' });
+});
+
+test('riquadro con la bolla della chat della pagina sopra un angolo', async ({ app, openTab, testServer }) => {
+  const dentro = testServer.html(`<!doctype html><title>Dentro</title><body style="margin:0">${CAMPO}</body>`);
+  const page = await testServer.openReady(openTab, `<!doctype html><title>Fuori</title><body style="margin:0">
+    <iframe id="f" src="${dentro}" style="width:100%;height:96vh;border:0"></iframe>
+    <div style="position:fixed;left:200px;top:200px;width:60px;height:60px;border-radius:50%;background:#36c"></div></body>`);
+  await page.frameLocator('#f').locator('#c').waitFor({ state: 'visible', timeout: 8000 });
+  await sleep(1500);
+  const fr = page.frame({ url: dentro });
+  console.log('ESITO riquadro-bolla', await incolla(app, page, fr, 'bolla-586'));
+});
+
+test('pagina ingrandita al 125% con lo zoom di Filo', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><title>Zoom125</title><body>${CAMPO}</body>`);
+  const url = page.url();
+  await app.evaluate(({ webContents }, u) => { const w = webContents.getAllWebContents().find((x) => x.getURL() === u); w.setZoomFactor(1.25); }, url);
+  await sleep(800);
+  console.log('ESITO zoom-filo-125', await incolla(app, page, page, 'zoom125-586'));
+});
+
+test('zoom cambiato a menu aperto', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><title>ZoomAperto</title><body>${CAMPO}</body>`);
+  const url = page.url();
+  await app.evaluate(({ clipboard }) => clipboard.writeText('zoomaperto-586'));
+  await page.locator('#c').click({ button: 'right' });
+  await page.locator('.sn-menu .sn-menu-paste-main').first().waitFor({ state: 'visible' });
+  await sleep(400);
+  await app.evaluate(({ webContents }, u) => { const w = webContents.getAllWebContents().find((x) => x.getURL() === u); w.setZoomFactor(1.25); }, url);
+  await sleep(800);
+  const aperto = await page.locator('.sn-menu').count();
+  if (!aperto) { console.log('ESITO zoom-aperto: il menu si chiude'); return; }
+  const bb = await page.locator('.sn-menu .sn-menu-paste-main').first().boundingBox();
+  await page.mouse.move(bb.x + 10, bb.y + bb.height / 2, { steps: 3 });
+  await sleep(200);
+  await page.mouse.down(); await page.mouse.up();
+  const ok = await expect.poll(() => page.locator('#c').inputValue(), { timeout: 3000 }).toBe('zoomaperto-586').then(() => true, () => false);
+  console.log('ESITO zoom-aperto', ok ? 'incollato' : 'non incollato');
+});
+
+test('aspetto: etichetta e cronologia dentro il menu', async ({ app, openTab, testServer }) => {
+  await app.evaluate(({ clipboard }) => clipboard.writeText('prima voce'));
+  const page = await testServer.openReady(openTab, `<!doctype html><title>Aspetto</title><body style="background:#fff">${CAMPO}</body>`);
+  await page.locator('#c').click({ button: 'right' });
+  await page.locator('.sn-menu .sn-menu-paste-main').first().click();
+  await app.evaluate(({ clipboard }) => clipboard.writeText('seconda voce'));
+  await page.locator('#c').click({ button: 'right' });
+  await sleep(500);
+  await page.locator('.sn-menu-paste-arrow').first().hover();
+  await sleep(900);
+  await page.screenshot({ path: 'tests/.shots/586-giro18-cronologia.png' });
+  await page.mouse.move(5, 5);
+  await page.keyboard.press('Escape');
+  await page.locator('#c').click({ button: 'right' });
+  await sleep(500);
+  const bb = await page.locator('.sn-menu-row-btn[data-sn-icon-id="newTab"]').first().boundingBox();
+  await page.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2, { steps: 4 });
+  await sleep(1200);
+  await page.screenshot({ path: 'tests/.shots/586-giro18-etichetta.png' });
+});
+
+test('schermo intero della pagina', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><title>Intero</title><body>
+  <div id="box" style="background:#eee"><button id="b" onclick="document.getElementById('box').requestFullscreen()">intero</button>${CAMPO}</div></body>`);
+  await page.locator('#b').click();
+  await expect.poll(() => page.evaluate(() => !!document.fullscreenElement)).toBe(true);
+  await sleep(1200);
+  console.log('ESITO schermo-intero', await incolla(app, page, page, 'intero-586'));
+});
