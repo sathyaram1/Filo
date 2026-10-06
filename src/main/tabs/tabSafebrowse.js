@@ -158,7 +158,7 @@ const safebrowseMethods = {
     pwc.on('did-finish-load', async () => {
       let h = null;
       try { h = await pwc.executeJavaScript(`(${pageHints.toString()})(document)`); } catch (_) {}
-      if (h && (h.hasPassword || h.hasPayment)) giudica({ hasPassword: !!h.hasPassword, hasPayment: !!h.hasPayment });
+      if (h && (h.shownPassword || h.shownPayment)) giudica({ hasPassword: !!h.shownPassword, hasPayment: !!h.shownPayment });
     });
   },
 
@@ -193,8 +193,9 @@ const safebrowseMethods = {
         // Un riquadro ostile non deve tenere ferma l'analisi.
         const scade = new Promise((ok) => setTimeout(() => ok(null), 1000));
         const r = await Promise.race([f.executeJavaScript(codice), scade]);
-        if (r && r.hasPassword) hints.hasPassword = true;
-        if (r && r.hasPayment) hints.hasPayment = true;
+        // Conta il campo a schermo: un modulo nascosto dietro «Accedi» si vedrà al giro dopo, quando si apre.
+        if (r && r.shownPassword) hints.hasPassword = true;
+        if (r && r.shownPayment) hints.hasPayment = true;
       } catch (_) {}
     }));
     if (wc.isDestroyed() || tab._sbScanGiro !== giro) return;

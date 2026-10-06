@@ -17,8 +17,9 @@ function pageHints(doc) {
     const parti = [el.getAttribute('aria-label'), el.getAttribute('placeholder'), el.getAttribute('name'),
       el.getAttribute('title')];
     try { for (const l of el.labels || []) parti.push(l.textContent); } catch (_) {}
+    const radice = el.getRootNode && el.getRootNode().getElementById ? el.getRootNode() : doc;
     for (const id of String(el.getAttribute('aria-labelledby') || '').split(/\s+/)) {
-      const t = id && doc.getElementById(id);
+      const t = id && radice.getElementById(id);
       if (t) parti.push(t.textContent);
     }
     return parti.filter(Boolean).join(' ');
@@ -37,10 +38,19 @@ function pageHints(doc) {
       return r.right + ((w && w.scrollX) || 0) > 0 && r.bottom + ((w && w.scrollY) || 0) > 0;
     } catch (_) { return true; }
   };
-  const tutti = (sel) => { try { return Array.from(doc.querySelectorAll(sel)); } catch (_) { return []; } };
-  let hasPassword = false, hasPayment = false;
-  try { hasPassword = !!doc.querySelector('input[type="password"]'); } catch (_) {}
-  try { hasPayment = !!doc.querySelector(PAGAMENTO); } catch (_) {}
+  // Un modulo dentro un componente incapsulato (shadow DOM aperto) è un modulo della pagina come gli altri.
+  const radici = [doc];
+  for (let i = 0; i < radici.length; i++) {
+    try { for (const el of radici[i].querySelectorAll('*')) if (el.shadowRoot) radici.push(el.shadowRoot); } catch (_) {}
+  }
+  const tutti = (sel) => {
+    const out = [];
+    for (const r of radici) { try { out.push(...r.querySelectorAll(sel)); } catch (_) {} }
+    return out;
+  };
+  const almenoUno = (sel) => radici.some((r) => { try { return !!r.querySelector(sel); } catch (_) { return false; } });
+  let hasPassword = almenoUno('input[type="password"]');
+  let hasPayment = almenoUno(PAGAMENTO);
   let shownPassword = hasPassword && tutti('input[type="password"]').some(mostrato);
   let shownPayment = hasPayment && tutti(PAGAMENTO).some(mostrato);
   if (!shownPassword || !shownPayment) {

@@ -1005,3 +1005,41 @@ test('il blocco già a schermo non si ridisegna quando un\'altra analisi lo rima
   await new Promise((r) => setTimeout(r, 3000));
   await expect(campo).toHaveValue('conf');
 });
+
+// #728 — conta il campo a schermo: un modulo d'accesso tenuto nascosto dietro «Accedi» non fa del sito vero un sosia.
+test('parola comune vicina a un marchio col modulo d\'accesso nascosto: popup, non il blocco (#728)', async ({ app, openTab }) => {
+  await serviSenzaRete(app, {
+    'email.com': '<h1>Posta gratuita</h1><button onclick="document.getElementById(\'m\').hidden=false">Accedi</button>'
+      + `<div id="m" hidden>${ACCESSO}</div>`,
+  });
+  await openTab('https://email.com/');
+  const avviso = await vistaAvviso(app, 12_000);
+  await expect(avviso.getByRole('button', { name: 'Continua' })).toBeVisible({ timeout: 12_000 });
+  // Più di un giro sui campi della pagina.
+  await new Promise((r) => setTimeout(r, 4000));
+  await expect(avviso.getByPlaceholder('confermo')).toBeHidden();
+});
+
+test('sosia di un marchio corto: il modulo nascosto che si apre dopo «Continua» porta al blocco (#728)', async ({ app, openTab }) => {
+  await serviSenzaRete(app, {
+    'paypak.com': '<h1>PayPal</h1><button id="apri" onclick="document.getElementById(\'m\').hidden=false">Accedi</button>'
+      + `<div id="m" hidden>${ACCESSO}</div>`,
+  });
+  const page = await openTab('https://paypak.com/');
+  const avviso = await vistaAvviso(app, 12_000);
+  const continua = avviso.getByRole('button', { name: 'Continua' });
+  await expect(continua).toBeVisible({ timeout: 12_000 });
+  await continua.click();
+  await expect.poll(async () => (await copertura(app)).coperta).toBe(false);
+  await page.click('#apri');
+  await bloccoMostrato(app);
+});
+
+test('sosia di un marchio corto col modulo d\'accesso in un componente incapsulato (shadow DOM): blocco (#728)', async ({ app, openTab }) => {
+  await serviSenzaRete(app, {
+    'paypak.com': '<h1>PayPal</h1><login-box></login-box><script>customElements.define("login-box", class extends HTMLElement {'
+      + `constructor(){super(); this.attachShadow({mode:"open"}).innerHTML = ${JSON.stringify(ACCESSO)};}});</script>`,
+  });
+  await openTab('https://paypak.com/');
+  await bloccoMostrato(app);
+});
