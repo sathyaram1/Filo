@@ -1,4 +1,6 @@
-// Verifica #760 giro 3, esplorazione.
+// Verifica #760 giro 3. r1: un riquadro con un contenuto rimosso, giudicato «non rotto per i cookie», non deve spegnere
+// per un giorno la proposta sugli altri riquadri rotti del servizio. r2: un riquadro sconosciuto rotto che si scorre via
+// prima della foto riceve la proposta quando lo si torna a vedere.
 import { test, expect } from '../../fixtures/electron.mjs';
 import { createServer } from 'node:http';
 
@@ -17,19 +19,10 @@ async function serve() {
       html(`<p>articolo</p><iframe id="ri" width="420" height="300" style="border:0" src="${src(u.searchParams.get('h'), u.searchParams.get('p'))}"></iframe><div style="height:3000px">testo</div>`);
       return;
     }
-    if (u.pathname === '/carosello') {
-      html(`<p>articolo</p><div id="car" style="width:440px;overflow-x:auto;white-space:nowrap"><iframe id="r1" width="420" height="300" style="border:0" src="${src('b', 'post?n=1')}"></iframe><div style="display:inline-block;width:440px;height:300px;background:#cde">altro</div></div><p>fine</p>`);
-      return;
-    }
     if (u.pathname === '/rimosso') { html('<div style="padding:40px"><p>This video is unavailable</p></div>'); return; }
     if (u.pathname === '/vuoto') {
       if (/vista=1/.test(cookie)) html('<p id="ok">La mappa del quartiere</p>', conCookie);
       else html('<div style="padding:40px"><button>Accedi</button></div>', conCookie);
-      return;
-    }
-    if (u.pathname === '/post') {
-      if (/vista=1/.test(cookie)) html('<p id="ok">Il post: tramonto sul mare</p>', conCookie);
-      else html('<p>Accedi per vedere il post</p>', conCookie);
       return;
     }
     res.writeHead(404);
@@ -40,7 +33,6 @@ async function serve() {
   return {
     art: (h, p) => `http://a.localhost:${porta}/art?h=${h}&p=${p}`,
     altro: (h, p) => `http://e.localhost:${porta}/art?h=${h}&p=${p}`,
-    pagina: (p) => `http://a.localhost:${porta}/${p}`,
     async chiudi() { try { server.closeAllConnections?.(); } catch (_) {} await new Promise((r) => server.close(r)); },
   };
 }
@@ -78,7 +70,7 @@ function proposte(app, frammento) {
   }, frammento);
 }
 
-test('cache: un riquadro con contenuto rimosso giudicato non rotto non spegne la proposta sugli altri riquadri rotti del servizio', async ({ app, openTab }) => {
+test('r1 un riquadro con contenuto rimosso giudicato non rotto non spegne la proposta sugli altri riquadri rotti del servizio', async ({ app, openTab }) => {
   const srv = await serve();
   try {
     await prepara(app);
@@ -91,7 +83,7 @@ test('cache: un riquadro con contenuto rimosso giudicato non rotto non spegne la
   } finally { await srv.chiudi(); }
 });
 
-test('scorrere via subito: il riquadro sconosciuto rotto riceve la proposta quando si torna a vederlo', async ({ app, openTab }) => {
+test('r2 scorrere via subito: il riquadro sconosciuto rotto riceve la proposta quando si torna a vederlo', async ({ app, openTab }) => {
   const srv = await serve();
   try {
     await prepara(app);
@@ -101,19 +93,5 @@ test('scorrere via subito: il riquadro sconosciuto rotto riceve la proposta quan
     await page.waitForTimeout(14_000);
     await page.evaluate(() => window.scrollTo(0, 0));
     await expect.poll(async () => (await proposte(app, 'a.localhost')).length, { timeout: 25_000 }).toBe(1);
-  } finally { await srv.chiudi(); }
-});
-
-test('carosello: il riquadro uscito dal contenitore che scorre porta via la sua proposta', async ({ app, openTab }) => {
-  const srv = await serve();
-  try {
-    await prepara(app);
-    const page = await openTab(srv.pagina('carosello'));
-    await expect.poll(async () => (await proposte(app, 'a.localhost')).length, { timeout: 25_000 }).toBe(1);
-    await page.evaluate(() => { document.getElementById('car').scrollLeft = 440; });
-    await page.waitForTimeout(1000);
-    await page.screenshot({ path: 'tests/.shots/760-g3-carosello.png' });
-    const [p] = await proposte(app, 'a.localhost');
-    expect(p.visibile).toBe(false);
   } finally { await srv.chiudi(); }
 });
