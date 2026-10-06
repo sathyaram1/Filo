@@ -361,6 +361,7 @@ class TabManager {
       restituisciTastiera: () => this._tastieraAllaSchedaAttiva(),
       inCima: () => { if (this.barra) this.barra._inCima(); },
       cambiata: () => { if (this.barra) this.barra.aggiornaNav(); },
+      input: (wc, input) => { if (this.barra) this.barra.inputDa(wc, input); },
     });
     // §1.2 — cache del colore identità per dominio (host → 'rgb(r,g,b)'). Così
     // una nuova tab su un dominio già visto mostra subito la sua tinta, senza
