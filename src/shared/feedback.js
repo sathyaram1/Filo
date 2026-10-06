@@ -1958,9 +1958,14 @@
   // Le attese (#903) nella forma che le regole ammettono: [{ id, num }], al più 20. Oltre si rifiuta, mai un taglio.
   function attesePerScrittura(lista) {
     const A = global.SN_FB_ATTESE;
-    const pulite = A ? A.atteseDi({ waitsFor: Array.isArray(lista) ? lista : [] }) : [];
-    const max = A ? A.MAX : 20;
-    if (pulite.length > max) throw new Error(`un feedback aspetta al più ${max} feedback: qui sono ${pulite.length}`);
+    const grezze = Array.isArray(lista) ? lista : [];
+    if (!A) {
+      if (grezze.length) throw new Error('attese non scritte: SN_FB_ATTESE non è caricato');
+      return [];
+    }
+    const pulite = A.atteseDi({ waitsFor: grezze });
+    if (pulite.length !== grezze.length) throw new Error('attese non scritte: c’è un id non valido o doppio');
+    if (pulite.length > A.MAX) throw new Error(`un feedback aspetta al più ${A.MAX} feedback: qui sono ${pulite.length}`);
     return pulite.map((w) => ({ id: w.id, num: w.num }));
   }
 
