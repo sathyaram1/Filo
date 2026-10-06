@@ -199,6 +199,13 @@
     } catch (_) {}
     return new Map();
   })();
+  const LEGGI_SOSIA = (() => {
+    try {
+      // eslint-disable-next-line no-undef
+      if (typeof require === 'function') return require('../main/services/safebrowse/confusables.js').leggiSosia;
+    } catch (_) {}
+    return null;
+  })();
 
   // RFC 3492, solo decodifica: un'etichetta che non torna resta com'è.
   function daPunycode(host) {
