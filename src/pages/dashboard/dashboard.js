@@ -58,6 +58,8 @@
   // #950 — file trascinati dal disco: { percorso, nome }. Il percorso parte col messaggio, come se l'utente
   // l'avesse incollato; le immagini arrivate dal disco ricordano il loro.
   let pendingFiles = [];
+  // Nel campo è entrato testo incollato o trascinato: il main lo tratta come testo di altri (#592.2).
+  let testoDaFuori = false;
   const percorsiImmagini = new Map();
 
   // ===== Le parti della home =====
@@ -195,7 +197,11 @@
       const riga = (m) => `${m.role === 'filo' ? 'filo' : 'user'}\n${String(m.text || '').trim()}`;
       const loro = (Array.isArray(state && state.thread) ? state.thread : []).map(riga);
       const nostri = threadHistory.filter((m) => !m.interno && (m.role !== 'filo' || String(m.text || '').trim())).map(riga);
-      return loro.length === nostri.length && loro.every((x, i) => x === nostri[i]);
+      // Un annuncio più vecchio di quello che è a schermo (l'intervista salvata a metà turno, consegnato dopo la
+      // risposta) è già superato: ridisegnare butterebbe via le righe e i bottoni delle azioni (#592.2).
+      // Un'intervista rifatta da capo ha un'altra targa: quella si ridisegna anche se comincia uguale.
+      if (loro.length < nostri.length && chatIdOnboarding(state) !== chatId) return false;
+      return loro.length <= nostri.length && loro.every((x, i) => x === nostri[i]);
     },
     beginSending: () => { sending = true; aggiornaTasto(); },
     runTurnAndContinue: (args) => runTurnAndContinue(args),
@@ -761,7 +767,7 @@
     return h;
   }
 
-  async function runFiloTurn({ userMessage, images = [], internal = false, daModello = false, activity = null }) {
+  async function runFiloTurn({ userMessage, images = [], internal = false, daModello = false, daFuori = false, activity = null }) {
     // Blocco di attività della domanda (#521): lo crea e lo chiude chi guida
     // la sequenza dei turni (runTurnAndContinue); qui ci si scrive dentro.
     const pending = activity || Att.create(bubblesEl);
@@ -867,6 +873,7 @@
       reasoningReqId,
       internal,
       ...(daModello ? { daModello: true } : {}),
+      ...(daFuori ? { daFuori: true } : {}),
       // #525 — la chat si archivia nel main, mentre la si fa.
       chatId: ensureChatId(),
     };
@@ -1041,6 +1048,8 @@
     ripresa = null;
     aggiornaTasto();
     const imagesToSend = pendingImages.slice();
+    const daFuori = testoDaFuori || imagesToSend.length > 0 || pendingFiles.length > 0;
+    testoDaFuori = false;
     const righeFile = [...pendingFiles.map((f) => f.percorso), ...imagesToSend.map((d) => percorsiImmagini.get(d))]
       .filter(Boolean).map((p) => `File: ${p}`);
     clearImagePreviews();
@@ -1052,7 +1061,7 @@
     if (body.dataset.state !== 'thread') goThread();
 
     // Bolla utente
-    threadHistory.push({ role: 'user', text: text || '(immagine)', ...(daModello ? { daModello: true } : {}) });
+    threadHistory.push({ role: 'user', text: text || '(immagine)', ...(daModello ? { daModello: true } : {}), ...(daFuori ? { daFuori: true } : {}) });
     const userBubble = makeBubble({ role: 'user', text: text || '' });
     // Mostra TUTTE le immagini inviate nella bolla, ognuna ingrandibile al click.
     imagesToSend.forEach((src, i) => {
@@ -1064,7 +1073,7 @@
     });
     bubblesEl.appendChild(userBubble);
 
-    await runTurnAndContinue({ userMessage: text || 'Descrivi questa immagine.', images: imagesToSend, daModello });
+    await runTurnAndContinue({ userMessage: text || 'Descrivi questa immagine.', images: imagesToSend, daModello, daFuori });
   }
 
   // Un turno + la sua eventuale prosecuzione autonoma, e il rilascio della barra
@@ -1382,6 +1391,7 @@
     }
     const testo = e.dataTransfer?.getData('text/plain') || '';
     if (!testo) return;
+    testoDaFuori = true;
     const prima = inputEl.value.slice(0, inputEl.selectionStart);
     const dopo = inputEl.value.slice(inputEl.selectionEnd);
     const pezzo = `${prima && !/\s$/.test(prima) ? ' ' : ''}${testo}${dopo && !/^\s/.test(dopo) ? ' ' : ''}`;
@@ -1472,7 +1482,11 @@
 
   // Evidenziazione live mentre si scrive: arancione = comando Filo (o sito),
   // azzurro = comando shell (solo in modalità terminale).
-  inputEl.addEventListener('input', () => { Comandi.updateInputClass(); autoGrowInput(); Sistema.scrive(); aggiornaTasto(); });
+  inputEl.addEventListener('input', (e) => {
+    if (!inputEl.value) testoDaFuori = false;
+    else if (e.inputType === 'insertFromPaste' || e.inputType === 'insertFromDrop') testoDaFuori = true;
+    Comandi.updateInputClass(); autoGrowInput(); Sistema.scrive(); aggiornaTasto();
+  });
 
   // Il tasto microfono: si parla, e la richiesta parte come col tasto d'invio (o resta da correggere).
   // La scorciatoia vale in tutta la home, che è la sua chat.
@@ -2113,6 +2127,7 @@
     } else if (q.tipo === 'chiedi') {
       if (!inAccoglienza) { submitMessage(q.testo); return; }
       inputEl.value = q.testo;
+      testoDaFuori = true;
       autoGrowInput();
       inputEl.focus();
     }

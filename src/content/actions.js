@@ -298,7 +298,8 @@
       el.setSelectionRange(caret, caret);
       ctx.start = caret;
       ctx.end = caret;
-      el.dispatchEvent(new Event('input', { bubbles: true }));
+      // Un incolla vero: chi ascolta il campo lo distingue da quello che l'utente scrive (#592.2).
+      el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertFromPaste', data: text }));
     } else if (kind === 'ce') {
       el.focus();
       // Ripristina la selezione salvata all'apertura del menu PRIMA di inserire:
