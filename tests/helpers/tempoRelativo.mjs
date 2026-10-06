@@ -43,3 +43,30 @@ export function costoInUnita(op, { tetto = Infinity, giri = GIRI, ora = () => pe
   const come = `${migliore.unita.toFixed(1)} unità di riferimento (tetto ${tetto}): ${migliore.ms.toFixed(1)} ms contro ${migliore.msRif.toFixed(1)} ms, giro migliore di ${fatti}`;
   return { ...migliore, entro, giri: fatti, come };
 }
+
+/**
+ * Quante volte `b` costa più di `a`: due lavori asincroni misurati a turno, campione per campione, così un carico
+ * passeggero cade su tutti e due. Vale il campione migliore di ciascuno, e il giro si ripete solo se il rapporto supera
+ * `tetto`, fino a `giri` volte: un costo che cresce davvero sfora a ogni giro.
+ */
+export async function rapportoFraCosti(a, b, { tetto = Infinity, campioni = 15, giri = GIRI, ora = () => performance.now() } = {}) {
+  const misuraAsync = async (fn) => { const t = ora(); await fn(); return ora() - t; };
+  let migliore = { rapporto: Infinity, msA: 0, msB: 0 };
+  let fatti = 0;
+  while (fatti < giri) {
+    fatti++;
+    let minA = Infinity;
+    let minB = Infinity;
+    for (let i = 0; i < campioni; i++) {
+      // L'ordine si alterna: chi viene secondo trova le cache scaldate dal primo.
+      if (i % 2) { minB = Math.min(minB, await misuraAsync(b)); minA = Math.min(minA, await misuraAsync(a)); }
+      else { minA = Math.min(minA, await misuraAsync(a)); minB = Math.min(minB, await misuraAsync(b)); }
+    }
+    const rapporto = minB / Math.max(minA, Number.EPSILON);
+    if (rapporto < migliore.rapporto) migliore = { rapporto, msA: minA, msB: minB };
+    if (migliore.rapporto <= tetto) break;
+  }
+  const entro = migliore.rapporto <= tetto;
+  const come = `${migliore.rapporto.toFixed(2)} volte (tetto ${tetto}): ${migliore.msB.toFixed(2)} ms contro ${migliore.msA.toFixed(2)} ms, giro migliore di ${fatti}`;
+  return { ...migliore, entro, giri: fatti, come };
+}

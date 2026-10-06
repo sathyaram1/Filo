@@ -5,10 +5,11 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { readFileSync, writeFileSync, appendFileSync, existsSync, rmSync, readdirSync, statSync } from 'node:fs';
-import { join, dirname, relative } from 'node:path';
+import { readFileSync, writeFileSync, appendFileSync, existsSync, readdirSync, statSync } from 'node:fs';
+import { join, dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { rapportoFraCosti } from '../helpers/tempoRelativo.mjs';
 import '../../src/shared/chatArchive.js';
 import '../../src/shared/filoEventi.js';
 
@@ -32,7 +33,7 @@ const E = globalThis.SN_FILO_EVENTI;
 const Chats = globalThis.SN_FILO_CHATS;
 
 const cartelle = new Set();
-after(() => { for (const c of cartelle) rmSync(c, { recursive: true, force: true }); });
+after(() => { for (const c of cartelle) togliCartella(c); });
 
 function nuovo(cartella = cartellaTemporanea('filo-ev-')) {
   cartelle.add(cartella);
@@ -151,6 +152,36 @@ test('un messaggio di 20.000 caratteri torna intero, e oltre le 5000 voci non si
   assert.equal((await riletto.pagine()).length, 6000);
 });
 
+// Quello che `fn` fa sul file del filo: letture, aperture (col modo), riscritture e byte scritti.
+async function spiaDisco(file, fn) {
+  const fsp = require('node:fs/promises');
+  const visto = { letture: 0, aperture: [], riscritture: 0, scritti: 0 };
+  const stesso = (p) => typeof p === 'string' && resolve(p) === resolve(file);
+  const vero = { readFile: fsp.readFile, writeFile: fsp.writeFile, appendFile: fsp.appendFile, rename: fsp.rename, open: fsp.open };
+  fsp.readFile = (p, ...r) => { if (stesso(p)) visto.letture++; return vero.readFile(p, ...r); };
+  fsp.writeFile = (p, d, ...r) => { if (stesso(p)) visto.riscritture++; return vero.writeFile(p, d, ...r); };
+  fsp.appendFile = (p, d, ...r) => { if (stesso(p)) visto.scritti += Buffer.byteLength(d); return vero.appendFile(p, d, ...r); };
+  fsp.rename = (da, a, ...r) => { if (stesso(a)) visto.riscritture++; return vero.rename(da, a, ...r); };
+  fsp.open = async (p, modo, ...r) => {
+    const fh = await vero.open(p, modo, ...r);
+    if (!stesso(p)) return fh;
+    visto.aperture.push(String(modo ?? 'r'));
+    for (const n of ['appendFile', 'writeFile']) {
+      const f = fh[n].bind(fh);
+      fh[n] = (d, ...x) => { visto.scritti += Buffer.byteLength(d); return f(d, ...x); };
+    }
+    for (const n of ['readFile', 'read', 'readLines', 'createReadStream']) {
+      const f = fh[n].bind(fh);
+      fh[n] = (...x) => { visto.letture++; return f(...x); };
+    }
+    return fh;
+  };
+  try {
+    await fn();
+    return visto;
+  } finally { Object.assign(fsp, vero); }
+}
+
 test('con 50.000 eventi nel filo un messaggio si scrive veloce come a filo vuoto', async () => {
   magazzino = {};
   const vuoto = nuovo();
@@ -163,21 +194,27 @@ test('con 50.000 eventi nel filo un messaggio si scrive veloce come a filo vuoto
       : { chat: `c${(i / 2) % 500}`, msg: { role: 'user', text: `messaggio numero ${i} `.repeat(8) } }, { dispositivo })));
   }
   writeFileSync(pieno.file, blocco.join(''));
-  const misura = async ({ f }) => {
-    globalThis.SN_IL_FILO = f;
-    await f.carica();
-    const tempi = [];
-    for (let i = 0; i < 15; i++) {
-      const t0 = performance.now();
-      await Chats.append('misura', { role: 'user', text: `domanda ${i}` });
-      tempi.push(performance.now() - t0);
-    }
-    return tempi.sort((a, b) => a - b)[7];
+  for (const { f } of [vuoto, pieno]) { globalThis.SN_IL_FILO = f; await f.carica(); }
+  let n = 0;
+  const scrivi = ({ f }) => { globalThis.SN_IL_FILO = f; n += 1; return Chats.append('misura', { role: 'user', text: `domanda ${String(n).padStart(6, '0')}` }); };
+
+  // Il disco non dipende dal tempo: a filo pieno un messaggio non rilegge e non riscrive il filo, aggiunge la sua riga.
+  const disco = async (x) => {
+    const prima = existsSync(x.file) ? statSync(x.file).size : 0;
+    const visto = await spiaDisco(x.file, () => scrivi(x));
+    return { ...visto, crescita: statSync(x.file).size - prima };
   };
-  const tVuoto = await misura(vuoto);
-  const tPieno = await misura(pieno);
+  const dVuoto = await disco(vuoto);
+  const dPieno = await disco(pieno);
+  assert.deepEqual({ letture: dPieno.letture, aperture: dPieno.aperture, riscritture: dPieno.riscritture },
+    { letture: 0, aperture: ['a'], riscritture: 0 }, 'a filo pieno un messaggio ha toccato il resto del filo');
+  assert.equal(dPieno.scritti, dPieno.crescita);
+  assert.equal(dPieno.scritti, dVuoto.scritti, 'lo stesso messaggio scrive gli stessi byte a filo pieno e a filo vuoto');
+
+  // Il lavoro in memoria si misura a turno sui due fili, così il carico della macchina cade su tutti e due.
+  const r = await rapportoFraCosti(() => scrivi(vuoto), () => scrivi(pieno), { tetto: 3 });
+  assert.ok(r.entro, `a filo pieno un messaggio costa ${r.come} rispetto al filo vuoto`);
   assert.equal((await pieno.f.chats()).length, 501);
-  assert.ok(tPieno < tVuoto * 3 + 15, `a filo pieno un messaggio ci mette ${tPieno.toFixed(1)} ms, a filo vuoto ${tVuoto.toFixed(1)} ms`);
 });
 
 test('dall’incognito niente arriva su disco, e da fuori non si vede', async () => {

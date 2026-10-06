@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, relative } from 'node:path';
 import { collectTestFiles } from '../../scripts/run-unit-tests.mjs';
-import { costoInUnita, unitaDiRiferimento, GIRI } from '../helpers/tempoRelativo.mjs';
+import { costoInUnita, rapportoFraCosti, unitaDiRiferimento, GIRI } from '../helpers/tempoRelativo.mjs';
 
 const QUI = fileURLToPath(import.meta.url);
 const ROOT = join(dirname(QUI), '..', '..');
@@ -103,4 +103,33 @@ test("l'unità di riferimento fa davvero del lavoro e dura abbastanza da stare s
   assert.ok(unitaDiRiferimento() > 0);
   const c = costoInUnita(() => {}, { tetto: 1 });
   assert.ok(c.msRif >= 1, c.come);
+});
+
+// Due lavori asincroni su un orologio finto: ogni chiamata avanza del costo che le tocca, nell'ordine.
+function coppia(costiA, costiB) {
+  let adesso = 0;
+  let iA = 0;
+  let iB = 0;
+  return {
+    ora: () => adesso,
+    a: async () => { adesso += costiA[Math.min(iA++, costiA.length - 1)]; },
+    b: async () => { adesso += costiB[Math.min(iB++, costiB.length - 1)]; },
+  };
+}
+
+test('rapportoFraCosti: un carico passeggero su qualche campione non conta, un costo che cresce davvero sì', async () => {
+  const pari = coppia([10], [900, 12, 800]);
+  const a = await rapportoFraCosti(pari.a, pari.b, { tetto: 3, ora: pari.ora });
+  assert.deepEqual([a.entro, a.rapporto, a.giri], [true, 1.2, 1]);
+
+  const cresce = coppia([10], [50]);
+  const b = await rapportoFraCosti(cresce.a, cresce.b, { tetto: 3, ora: cresce.ora });
+  assert.deepEqual([b.entro, b.rapporto, b.giri], [false, 5, GIRI]);
+  assert.match(b.come, /5\.00 volte \(tetto 3\)/);
+});
+
+test('rapportoFraCosti misura i due lavori a turno, non uno tutto e poi l’altro', async () => {
+  const ordine = [];
+  await rapportoFraCosti(async () => { ordine.push('a'); }, async () => { ordine.push('b'); }, { campioni: 4 });
+  assert.equal(ordine.join(''), 'abbaabba');
 });
