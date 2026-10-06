@@ -25,11 +25,13 @@ const EXTRA = [
   'google.es', 'android.com', 'chromium.org', 'gstatic.com',
   'googleusercontent.com', 'googleapis.com', 'googletagmanager.com',
   'google-analytics.com', 'youtube-nocookie.com', 'ggpht.com', 'doubleclick.net', 'withgoogle.com',
-  'goo.gl', 'recaptcha.net',
+  'goo.gl', 'recaptcha.net', 'googleblog.com', 'googlesource.com', 'googlevideo.com', 'googlesyndication.com',
+  'googleadservices.com', 'youtubekids.com',
   // CDN/infra di altri brand (contengono il token del brand ma sono ufficiali)
   'fbcdn.net', 'cdninstagram.com', 'licdn.com', 'twimg.com',
   'paypalobjects.com', 'icloud-content.com', 'amazon-adsystem.com',
   'media-amazon.com', 'ssl-images-amazon.com', 'images-amazon.com',
+  'githubusercontent.com', 'githubassets.com', 'githubstatus.com', 'netflixtechblog.com', 'facebookmail.com',
   // Microsoft / Apple ecosistema
   'bing.net', 'msn.com', 'skype.com', 'xbox.com', 'windows.com',
   'sharepoint.com', 'onedrive.com', 'azure.com', 'visualstudio.com',

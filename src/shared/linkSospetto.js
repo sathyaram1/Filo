@@ -78,18 +78,22 @@
     // pezzo, davanti al sito o nel suo nome, spezzato ai punti e ai trattini
     // (paypal.com.altro.net, login-paypal.com.altro.net, paypal-login.wixsite.com).
     const catena = '.' + esca.concat(sito.sotto, [sito.nome]).map(scheletro).join('.') + '.';
-    const pezzi = catena.split(/[.-]/).filter(Boolean);
     for (const p of POPULAR) {
       const suo = sitoDi(p).nome;
       const intero = new RegExp('[.-]' + p.replace(/\./g, '[.-]') + '[.-]').test(catena);
-      // Un nome corto o di tutti i giorni (x, apple) da solo non prova niente:
-      // apple.stackexchange.com e apple-pie.it non imitano nessuno.
-      const nudo = suo.length >= NOME_DISTINTIVO && pezzi.includes(suo);
+      // #732 — il nome da solo conta con la stessa regola del controllo all'apertura (paypallogin sì, pineapple no).
+      const nudo = MARCHI ? MARCHI.nominaMarchio(catena, suo, scheletro) : (suo.length >= 6 && catena.split(/[.-]/).includes(suo));
       if (intero || nudo) return 'nome_altrui:' + p + '|' + sito.dominio;
     }
     return '';
   }
-  const NOME_DISTINTIVO = 6;
+  const MARCHI = (() => {
+    try {
+      // eslint-disable-next-line no-undef
+      if (typeof require === 'function') return require('../main/services/safebrowse/brands.js');
+    } catch (_) {}
+    return null;
+  })();
 
   // Suffissi di secondo livello: in 'amazon.co.uk' il nome del sito è 'amazon'.
   const SUFFISSI_2L = new Set(['co', 'com', 'net', 'org', 'gov', 'edu', 'ac']);

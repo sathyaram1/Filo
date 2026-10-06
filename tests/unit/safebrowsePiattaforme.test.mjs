@@ -111,3 +111,33 @@ test('ogni indirizzo ufficiale di un marchio è un sito intero, o il confronto e
   const { BRANDS } = require('../../src/main/services/safebrowse/brands.js');
   for (const b of BRANDS) for (const d of b.domains) assert.equal(dominio(d), d, b.display + ': ' + d);
 });
+
+test('un marchio che è anche una parola conta solo da solo o in una forma tipica; uno distintivo anche attaccato (#732)', () => {
+  for (const url of [
+    'https://pineapple.github.io/', 'https://otherwise.github.io/', 'https://bitwise.github.io/', 'https://purchase.com/',
+    'https://steampunk.it/', 'https://likewise.io/', 'https://pinstripe.com/', 'https://revolution.com/', 'https://appleinsider.com/',
+    'https://chromium.googlesource.com/', 'https://github.githubassets.com/x', 'https://netflixtechblog.com/',
+  ]) assert.equal(livello(url), 'safe', url);
+  for (const [url, marchio] of [
+    ['https://paypallogin.github.io/', 'paypal'], ['https://paypallogin.com/', 'paypal'], ['https://pay-pal-login.com/', 'paypal'],
+    ['https://apple-pie.it/', 'apple'], ['https://appleid-verifica.com/', 'apple'], ['https://apple.esempio.com/', 'apple'],
+    ['https://posteitaliane-verifica.com/', 'poste'], ['https://posteitalianeverifica.com/', 'poste'], ['https://steam-gift.github.io/', 'steam'],
+    ['https://steamcommunity-gift.com/', 'steam'], ['https://chasebank-login.com/', 'chase'], ['https://paypal-login.esempio.com/', 'paypal'],
+  ]) {
+    const v = evaluate(url);
+    assert.notEqual(v.level, 'safe', url);
+    assert.equal(v.imp && v.imp.brand.token, marchio, url + ' ' + JSON.stringify(v.reasons));
+  }
+});
+
+test('l’elenco dei marchi che sono parole è uno solo, e ogni voce è un marchio vero', () => {
+  const { BRANDS, MARCHI_PAROLA } = require('../../src/main/services/safebrowse/brands.js');
+  const token = new Set(BRANDS.map((b) => b.token));
+  for (const [parola, forme] of MARCHI_PAROLA) {
+    assert.ok(token.has(parola), parola);
+    for (const f of forme) assert.ok(f.includes(parola) && f !== parola, parola + ': ' + f);
+  }
+  const fs = require('node:fs');
+  const link = fs.readFileSync(new URL('../../src/shared/linkSospetto.js', import.meta.url), 'utf8');
+  assert.match(link, /nominaMarchio/, 'l’avviso sui link deve usare la stessa regola');
+});

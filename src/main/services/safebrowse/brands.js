@@ -80,6 +80,42 @@ const BRANDS = [
   { token: 'gitlab', display: 'GitLab', domains: ['gitlab.com', 'gitlab.io', 'gitlab-org.gitlab.io', 'gitlab-com.gitlab.io'] },
 ];
 
+// Marchi che sono anche parole, o stanno dentro parole comuni (pineapple, otherwise, purchase, steampunk): contano
+// solo da soli fra punti e trattini, o in una delle loro forme tipiche; gli altri anche attaccati (paypallogin) (#732).
+// Elenco unico per il controllo all'apertura e per l'avviso sui link: un marchio nuovo che è una parola va aggiunto qui.
+const MARCHI_PAROLA = new Map([
+  ['apple', ['appleid', 'applepay', 'applesupport', 'applecare', 'appleaccount']],
+  ['wise', ['transferwise', 'wisetransfer']],
+  ['chase', ['chasebank', 'chaseonline']],
+  ['steam', ['steamcommunity', 'steampowered', 'steamgift']],
+  ['poste', ['posteitaliane', 'postepay', 'posteid']],
+  ['kraken', ['krakenexchange']],
+  ['ledger', ['ledgerlive', 'ledgerwallet']],
+  ['stripe', ['stripepay', 'stripecheckout']],
+  ['proton', ['protonmail', 'protonvpn']],
+  ['intesa', ['intesasanpaolo']],
+  ['revolut', []],
+  ['nexi', ['nexipay']],
+  ['discord', ['discordapp', 'discordnitro']],
+  ['outlook', ['outlookweb', 'outlooklogin']],
+  ['telegram', ['telegramweb']],
+]);
+
+// Vero se `nome` (un'etichetta o più, separate da punti) porta il marchio `token` secondo la regola sopra.
+// `scheletro` porta ogni pezzo alla forma con cui si legge a schermo (omoglifi, sosia).
+function nominaMarchio(nome, token, scheletro = (x) => x) {
+  if (!nome || !token || token.length < 3) return false; // un nome di una o due lettere sta in ogni parola (x-plane)
+  const tok = scheletro(token);
+  const forme = MARCHI_PAROLA.get(token);
+  if (forme) {
+    const pezzi = nome.split(/[.-]/).filter(Boolean);
+    return pezzi.some((p) => p === token || scheletro(p) === tok)
+      || forme.some((f) => nome.includes(f) || pezzi.some((p) => scheletro(p).includes(scheletro(f))));
+  }
+  // Il trattino non spezza un marchio distintivo: pay-pal resta paypal.
+  return nome.split('.').some((l) => { const unito = l.replace(/-/g, ''); return unito.includes(token) || scheletro(unito).includes(tok); });
+}
+
 // Indice per lookup veloce: eTLD+1 legittimo → brand (per non flaggare il vero).
 const LEGIT_DOMAINS = new Map();
 for (const b of BRANDS) {
@@ -91,4 +127,4 @@ function isLegitBrandDomain(registrable) {
   return LEGIT_DOMAINS.has(registrable);
 }
 
-module.exports = { BRANDS, LEGIT_DOMAINS, isLegitBrandDomain };
+module.exports = { BRANDS, LEGIT_DOMAINS, isLegitBrandDomain, MARCHI_PAROLA, nominaMarchio };

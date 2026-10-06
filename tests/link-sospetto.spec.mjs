@@ -147,7 +147,17 @@ const IMITAZIONI = {
   'legato col trattino': ['https://secure-paypal.com/', /paypal\.com.*secure-paypal\.com/],
   'nome e dominio col trattino': ['https://paypal-com.net/', /paypal\.com.*paypal-com\.net/],
   'lettere cirilliche': ['https://раураl.com/', /paypal\.com.*lettere/],
+  'attaccato a un\'altra parola': ['https://paypallogin.com/', /paypal\.com.*paypallogin\.com/],
 };
+
+test('un marchio che è una parola, dentro un\'altra parola, non fa scattare l\'avviso (#732)', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:40px;font:16px sans-serif">
+    <p><a id="lnk" href="https://pineapple.github.io/ricette">Ricette</a></p></body></html>`);
+  await page.locator('#lnk').click({ button: 'right' });
+  await expect(page.locator('.sn-menu .sn-menu-inline[data-subject="link"]')).toBeVisible();
+  await page.waitForTimeout(800);
+  await expect(page.locator('.sn-menu .sn-menu-link-warn')).toHaveCount(0);
+});
 
 for (const [forma, [href, atteso]] of Object.entries(IMITAZIONI)) {
   test(`imitazione ${forma}: il menu la segnala e dice dove porta`, async ({ openTab, testServer }) => {

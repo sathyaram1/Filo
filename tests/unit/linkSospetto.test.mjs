@@ -237,7 +237,7 @@ test('i nomi scritti per intero in un’altra lingua, e i siti che usano un nome
     'https://пример.рф/', 'https://яндекс.рф/', 'https://münchen.de/', 'https://ελληνικά.gr/',
     'https://日本語.jp/', 'https://😀.com/', 'https://рост.рф/', 'https://сок.ru/', 'https://кот.bg/',
     'https://facebook.github.io/react/', 'https://microsoft.github.io/vscode/',
-    'https://apple.stackexchange.com/questions/1', 'https://apple-pie.it/', 'https://pineapple.com/',
+    'https://apple.stackexchange.com/questions/1', 'https://pineapple.com/',
     'https://appleinsider.com/', 'https://x-plane.com/', 'https://googleblog.com/', 'https://amazonaws.com/',
     'https://www.youtube-nocookie.com/embed/abc',
     'https://login.microsoftonline.com/', 'https://aws.amazon.com/', 'https://www.amazon.co.uk/',
@@ -349,4 +349,17 @@ test('il nome vero col trattino si vede in ogni pezzo, non solo nel nome del sit
     assert.deepEqual(LS.analizza(u), [], `avviso a sproposito su ${u}`);
   }
   assert.ok(LS.analizza('https://paypal-login.appspot.com/').some((c) => c.startsWith('nome_altrui:paypal.com')));
+});
+
+test('un marchio che è una parola conta da solo, uno distintivo anche attaccato: stessa regola del controllo all’apertura (#732)', () => {
+  for (const u of ['https://pineapple.com/', 'https://appleinsider.com/', 'https://pineapple.github.io/', 'https://x-plane.com/']) {
+    assert.deepEqual(LS.analizza(u), [], `avviso a sproposito su ${u}`);
+  }
+  for (const [u, marchio] of [
+    ['https://paypallogin.github.io/', 'paypal.com'], ['https://paypallogin.com/', 'paypal.com'],
+    ['https://netflixaccount-verify.net/', 'netflix.com'], ['https://apple-pie.it/', 'apple.com'],
+    ['https://appleid-verifica.com/', 'apple.com'], ['https://apple-id.evil.com/', 'apple.com'],
+  ]) {
+    assert.ok(LS.analizza(u).some((c) => c.startsWith('nome_altrui:' + marchio + '|')), `nessun avviso su ${u}`);
+  }
 });
