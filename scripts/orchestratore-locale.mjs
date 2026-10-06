@@ -692,8 +692,7 @@ async function main(argv) {
       // 2 = qualche lavoro fermo: chi ha lanciato in sottofondo lo sa dal codice, senza leggere le righe.
       return fine.coda.some((n) => fine.pratiche[n] && fine.pratiche[n].fase === 'fermo') ? 2 : 0;
     } finally {
-      clearInterval(guardia);
-      for (const sg of segnali) process.off(sg, alSegnale);
+      stacca();
       togliRichiesta(P);
       try { unlinkSync(lock); } catch (_) { /* già tolto */ }
     }
