@@ -137,5 +137,11 @@ export function bmpInPng(buf) {
       if (alfa) out[o + 3] = a;
     }
   }
+  // Una maschera d'alfa con tutti i pixel a zero è un'immagine opaca scritta male, non un'immagine invisibile.
+  if (alfa) {
+    let vista = false;
+    for (let i = 4; i < out.length && !vista; i += 4) if (i % riga !== 0 && out[i] !== 0) vista = true;
+    if (!vista) for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) out[y * riga + 1 + x * 4 + 3] = 255;
+  }
   return png(w, h, out, alfa);
 }
