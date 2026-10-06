@@ -1,5 +1,5 @@
-// #824 giro 3, rilievo 3: senza testo scritto dall'utente la scheda non è protetta (valori messi
-// dai pulsanti della pagina, ricerche coi risultati nella stessa pagina).
+// #824: senza testo scritto dall'utente la scheda non è protetta. Giro 3: valori messi dai pulsanti
+// della pagina (porte chiuse); giro 4, rilievo 1: ricerca di due campi coi risultati nella stessa pagina.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
@@ -51,7 +51,7 @@ test('la data scelta dal calendario non protegge la scheda', async ({ app, shell
   expect(await titoliAperti(shell)).not.toContain('Albergo');
 });
 
-test('una ricerca di voli coi risultati nella stessa pagina non protegge la scheda', async ({ app, shell, testServer }) => {
+test('r1 una ricerca di voli coi risultati nella stessa pagina non protegge la scheda', async ({ app, shell, testServer }) => {
   const page = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Voli</title></head><body>
     <form id="f"><input id="da" placeholder="Da dove parti?"><input id="a" placeholder="Dove vuoi andare?"><button>Cerca voli</button></form><ul id="ris"></ul>
     <script>f.addEventListener('submit', (e) => { e.preventDefault(); ris.innerHTML = '<li>' + da.value + ' → ' + a.value + ' 49 €</li>'; });</script>
