@@ -281,6 +281,10 @@ function get() {
     if (remoteModels.sitiDelicati && typeof remoteModels.sitiDelicati === 'object') {
       out.sitiDelicati = remoteModels.sitiDelicati;
     }
+    // #868 — i due tetti di quanto filo la chat ha davanti: valgono per chi non li ha cambiati in Preferenze.
+    if (remoteModels.contestoFilo && typeof remoteModels.contestoFilo === 'object') {
+      out.contestoFilo = tettiContesto(remoteModels.contestoFilo);
+    }
     if (Array.isArray(remoteModels.modelRegistryDeleted)) {
       for (const nick of remoteModels.modelRegistryDeleted) {
         if (typeof nick !== 'string' || !nick) continue;
@@ -335,9 +339,26 @@ function getPublicForAdmin() {
     // se ne discostano, così una banca aggiunta con un rilascio arriva anche dove l'owner non ha toccato niente.
     sitiDelicati: PD() ? PD().elenco(eff.sitiDelicati) : (eff.sitiDelicati || {}),
     sitiDelicatiDiSerie: PD() ? PD().elenco(null) : {},
+    contestoFilo: eff.contestoFilo || {},
+    contestoFiloDiSerie: contestoDiSerie(),
   };
 }
 const PD = () => globalThis.SN_PAGINE_DELICATE || null;
+
+// Solo numeri dentro i limiti: un valore assente vuol dire «quello del codice».
+function tettiContesto(o) {
+  const FC = globalThis.SN_FILO_CONTESTO;
+  const out = {};
+  for (const k of ['giorni', 'token']) {
+    const v = FC ? FC.numeroIn(o && o[k], FC.LIMITI[k]) : null;
+    if (v != null) out[k] = k === 'token' ? Math.round(v) : v;
+  }
+  return out;
+}
+function contestoDiSerie() {
+  const FC = globalThis.SN_FILO_CONTESTO;
+  return FC ? { ...FC.TETTI_DI_SERIE } : {};
+}
 
 async function patchDoc(docPath, fields, mask, idToken) {
   const qs = mask.map((m) => `updateMask.fieldPaths=${encodeURIComponent(m)}`).join('&');
@@ -420,6 +441,11 @@ async function update(partial, idToken) {
     }
     modelFields.sitiDelicati = toFsValue(clean);
     modelMask.push('sitiDelicati');
+  }
+  // #868 — l'oggetto inviato sostituisce quello remoto: un tetto tolto torna al valore del codice.
+  if (partial.contestoFilo && typeof partial.contestoFilo === 'object' && !Array.isArray(partial.contestoFilo)) {
+    modelFields.contestoFilo = toFsValue(tettiContesto(partial.contestoFilo));
+    modelMask.push('contestoFilo');
   }
   if (modelMask.length) {
     await patchDoc(MODELS_DOC, modelFields, modelMask, idToken);
@@ -810,6 +836,7 @@ async function getWorkerLog(idToken, { severo = false } = {}) {
 }
 
 module.exports = {
+  tettiContesto,
   get,
   fornitoreUsabile,
   getPublicForAdmin,

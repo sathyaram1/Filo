@@ -21,6 +21,7 @@
   <script src="filo://shared/onboarding.js"></script>
   <script src="filo://shared/caselleAlSicuro.js"></script>
   <script src="filo://shared/vociImpostazioni.js"></script>
+  <script src="filo://shared/filoContesto.js"></script>
   <style>
     /* Rifare un'intervista di benvenuto non cancella quella di prima: restano qui, rileggibili. */
     .onb-archive { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
@@ -350,6 +351,20 @@
         <div class="sn-row" style="margin-top:12px;">
           <button class="sn-btn sn-btn-secondary" id="resetAllTabColor" type="button">Ripristina tutti i predefiniti</button>
           <span id="tabColorSavedHint" class="sn-saved-indicator">Salvato</span>
+        </div>
+      </section>
+
+      <section id="sec-contesto">
+        <h2>Quanto ricorda la chat</h2>
+        <div class="sn-row" style="gap:16px;flex-wrap:wrap;align-items:flex-end;">
+          <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Gli ultimi giorni di conversazioni, di tutte le schede, che Filo ha davanti a ogni messaggio. Vuoto: il valore predefinito. Vince il minore dei due tetti.">
+            <span>Giorni</span>
+            <input type="number" id="contestoGiorni" min="0.5" max="365" step="0.5" style="width:120px;" />
+          </label>
+          <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Il tetto in token di quello che Filo ha davanti. Vuoto: il valore predefinito. Vince il minore dei due tetti.">
+            <span>Tetto in token</span>
+            <input type="number" id="contestoToken" min="2000" max="2000000" step="1000" style="width:160px;" />
+          </label>
         </div>
       </section>
 

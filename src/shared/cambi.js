@@ -56,6 +56,16 @@
     'dictation.autoSend': { nome: 'invio di quello che detti nelle chat', valore: sino('da solo', 'a mano, dopo averlo corretto'), livello: 1 },
     'dictation.silenceSec': { nome: 'pausa che chiude il microfono delle chat', valore: (v) => `${numero(v)} s`, livello: 1 },
     'dictation.cancelSec': { nome: 'tempo per annullare l\'invio vocale', valore: (v) => `${numero(v)} s`, livello: 1 },
+    'contestoFilo.giorni': {
+      nome: 'giorni di conversazioni che la chat ricorda',
+      valore: (v) => (v == null || v === '' ? 'come i predefiniti' : `${numero(v)} ${Number(v) === 1 ? 'giorno' : 'giorni'}`),
+      livello: 2,
+    },
+    'contestoFilo.token': {
+      nome: 'tetto in token di quello che la chat ricorda',
+      valore: (v) => (v == null || v === '' ? 'come i predefiniti' : `${Math.round(Number(v)).toLocaleString('it-IT')} token`),
+      livello: 2,
+    },
     'autoArchive.enabled': { nome: 'riordino automatico delle schede', valore: ATTIVO, livello: 1 },
     'autoArchive.onIdle': { nome: 'archiviazione quando Filo è inattivo', valore: ATTIVA, livello: 1 },
     'autoArchive.idleHours': { nome: 'ore di inattività prima di archiviare', valore: numero, livello: 1 },

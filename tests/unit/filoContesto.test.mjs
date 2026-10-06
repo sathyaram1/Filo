@@ -71,7 +71,7 @@ test('una conversazione in un\'altra scheda di ieri è nel tratto, con l\'ora e 
   const f = FC.finestra(filoDiProva(), { ora: ORA, ...TETTI, chatCorrente: 'nuova' });
   const testo = f.messaggi.map((m) => m.content).join('\n');
   assert.match(testo, /domani ho l'esame di fisica/);
-  assert.match(testo, /\[\w{3} \d+ \w{3} 2026, \d\d:\d\d · chat iera\] domani ho l'esame di fisica/);
+  assert.match(testo, /\[\w{3} \d+ \w{3} 2026, \d\d:\d\d · chat ieri\] domani ho l'esame di fisica/);
   assert.doesNotMatch(testo, /orche/);
 });
 

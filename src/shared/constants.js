@@ -2393,6 +2393,9 @@
     // dopo un attimo per annullare (true) o il testo resta nella casella da correggere (false).
     // silenceSec: quanto silenzio vuol dire «ho finito»; cancelSec: l'attimo per annullare. Limiti in dictationTimes.
     dictation: { autoSend: true, silenceSec: 2, cancelSec: 2.5 },
+    // #868 — quanto filo la chat ha davanti: gli ultimi giorni, fino a un tetto in token (vince il minore). Vuoto vale
+    // come nei Modelli predefiniti dell'owner; valori del codice e limiti in src/shared/filoContesto.js.
+    contestoFilo: { giorni: null, token: null },
     // Notifiche/toast in basso a destra della shell (spec #170.1). È la base
     // riusata dai blocchi (#170.2/#170.3) per segnalare gli eventi.
     // - durationSec: secondi prima dell'auto-dismiss. 0 = infinita: la notifica

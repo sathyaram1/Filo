@@ -587,7 +587,11 @@ module.exports = function register(on, ctx) {
     try {
       await Defaults.refreshIfStale().catch(() => {});
       const d = Defaults.get();
-      return { ok: true, modelRegistry: d.modelRegistry || {}, models: d.models || {} };
+      const FC = globalThis.SN_FILO_CONTESTO;
+      return {
+        ok: true, modelRegistry: d.modelRegistry || {}, models: d.models || {},
+        contestoFilo: d.contestoFilo || {}, contestoFiloDiSerie: FC ? { ...FC.TETTI_DI_SERIE } : {},
+      };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }

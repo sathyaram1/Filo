@@ -15,6 +15,8 @@ const { settingsForOwnerAction, fillMovedSlots, ownerSlotFor } = require('./reso
 const { isFilo, azioneAmmessaDa, spingiAllaScheda, spingiAllaFinestra } = require('./impostazioniPerOrigine');
 const SegretiLetti = require('./segretiLetti');
 const Registro = require('./registroCambi');
+const ContestoFilo = require('./contestoFilo');
+const RicordiFilo = require('./ricordiFilo');
 
 const { SN_CONST, SN_MSG } = globalThis;
 const { ACTIONS, PROMPTS } = SN_CONST;
@@ -268,9 +270,29 @@ async function buildMessages(action, payload) {
     // che manda il payload non ha `process`. Senza, il modello indovina — e
     // indovina Windows, perché è l'unico che gli esempi del prompt gli hanno
     // mai mostrato: su un Mac proporrebbe comandi PowerShell e percorsi `C:\`.
+    const p = { ...payload, sistema: process.platform };
+    if (!Array.isArray(payload.filoTratto)) {
+      return [{ role: 'system', content: PROMPTS.filoChat(p) }, ...(payload.threadMessages || [])];
+    }
+    // #868 — istruzioni, poi il tratto del filo (uguale da un turno all'altro: la cache lo riusa), poi tutto ciò che
+    // cambia, subito prima della domanda. Ordine e sentinella in src/shared/filoContesto.js.
+    const FC = globalThis.SN_FILO_CONTESTO;
+    const giro = payload.threadMessages || [];
+    const i = Math.max(0, Math.min(giro.length, Number(payload.indiceDomanda) || 0));
+    const contesto = FC.coda({
+      contesto: PROMPTS.filoChatContext({ ...p, onboarding: '' }),
+      ricordi: payload.ricordi || '',
+      chatCorrente: payload.chatCorrente || null,
+      nuova: !!payload.chatNuova,
+    });
     return [
-      { role: 'system', content: PROMPTS.filoChat({ ...payload, sistema: process.platform }) },
-      ...(payload.threadMessages || []),
+      ...FC.assembla({
+        tratto: [{ role: 'system', content: PROMPTS.filoChatStatic(p) + PROMPTS.filoChatOnboarding(p) }, ...payload.filoTratto],
+        scheda: giro.slice(0, i),
+        contesto,
+        domanda: giro[i] || null,
+      }),
+      ...giro.slice(i + 1),
     ];
   }
   if (action === ACTIONS.FILO_DASHBOARD) {
@@ -3155,6 +3177,19 @@ function chatSearchesForPrompt(actions) {
       );
       continue;
     }
+    // I pezzi vecchi che Filo ha ripescato da solo per una domanda (#868): restano davanti come una ricerca.
+    if (out.automatica) {
+      const righe = (Array.isArray(out.results) ? out.results : []).map((r) => {
+        const when = r.date ? new Date(r.date).toLocaleString('it-IT') : '';
+        return `- [${r.id}] "${r.title || 'senza titolo'}"${when ? ` · ${when}` : ''}\n${r.snippet || ''}`;
+      });
+      if (righe.length) {
+        blocks.push('[Tratti di conversazioni più vecchie che Filo ha ripescato da solo per questa domanda.]\n'
+          + E.imbusta({ tipo: 'CONVERSAZIONE_ARCHIVIATA', testo: righe.join('\n'), conIntestazione: true })
+          + '\n[Per rileggerne una per intero richiama CERCA_CHAT con il suo id.]');
+      }
+      continue;
+    }
     if (!('chatSearch' in out)) continue;
     const cercato = E.perCanaleSistema(out.chatSearch);
     const results = Array.isArray(out.results) ? out.results : [];
@@ -3785,9 +3820,31 @@ function fermaFiloChat(reqId, wc) {
 }
 
 // `daModello`: il messaggio l'ha scritto un modello (un suggerimento della home), anche se parte dalla casella dell'utente.
+// #868 — quanto si aspettano i pezzi vecchi del filo: oltre, il turno parte senza (l'attesa è attrito).
+const ATTESA_RICORDI_MS = 2500;
+function entroIl(p, ms, ripiego) {
+  let timer = null;
+  return Promise.race([p, new Promise((ok) => { timer = setTimeout(() => ok(ripiego), ms); })])
+    .finally(() => clearTimeout(timer));
+}
+
+// I pezzi vecchi ripescati da soli hanno la forma di una ricerca fra le chat: il blocco di attività li racconta, le
+// uscite li contano fra le cose lette (#587), la chat riaperta li ritrova.
+function ricordoComeAzione(ricordi) {
+  const results = ricordi.map((r) => ({
+    id: r.tratto.chat,
+    title: r.tratto.titolo || '',
+    date: r.tratto.ts,
+    snippet: String(r.tratto.testo || '').slice(0, 3000),
+  }));
+  return {
+    type: 'CERCA_CHAT', _auto: true, _callId: `ricordo_${Date.now().toString(36)}`, _executed: true,
+    _output: { automatica: true, results },
+  };
+}
+
 async function handleFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, daModello = false, daFuori = false, chatId = null, sender = null }) {
   await FiloMem.touchSession();
-  await FiloMem.appendRaw({ type: 'chat_user', summary: String(userMessage || '').slice(0, 200) });
   // #524 — l'intervista di benvenuto si legge PRIMA di qualsiasi altra cosa,
   // perché la parola di stop deve funzionare anche quando il resto non
   // funziona: nessuna chiamata al modello, nessuna rete. Vedi
@@ -3870,28 +3927,43 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // chat normale: nessuna schermata a passi, nessun modulo.
   const onboardingText = onbActive ? Onboarding.renderChecklistForPrompt(onbBefore) : '';
   const cleanHistory = Array.isArray(threadHistory) ? threadHistory.slice(-20) : [];
+  // #868 — il modello ha davanti il filo, non la sola scheda: gli ultimi giorni di conversazioni di ogni scheda, con
+  // le ore, entro i due tetti. Quello che la scheda ha e il filo no (un turno interrotto, una ripresa) viene dopo.
+  // Se il filo non si legge, si risponde con la conversazione della scheda come prima.
+  let filo = null;
+  try {
+    const tetti = globalThis.SN_FILO_CONTESTO.tetti((await getEffectiveSettings()).contestoFilo, Defaults.get().contestoFilo);
+    filo = await ContestoFilo.componi({
+      chatId, userMessage: internal ? null : String(userMessage || ''), storia: threadHistory, tetti, osserva: observationsForPrompt,
+    });
+  } catch (e) { console.warn('[Filo] tratto del filo non letto, rispondo con la sola scheda:', e?.message || e); }
+  const codaScheda = filo && chatId ? filo.coda : cleanHistory;
+  const vistiDalFilo = filo ? filo.visti : [];
+  // I pezzi vecchi si cercano mentre si prepara il resto: arrivano in coda, prima della domanda.
+  const ricordiP = filo && !internal && !onbActive && RicordiFilo
+    ? RicordiFilo.cerca(String(userMessage || ''), { vecchi: filo.vecchi, chatId }).catch(() => [])
+    : Promise.resolve([]);
   // #592.2 — nell'intervista di benvenuto lo stile proposto si imposta senza riquadro finché nella conversazione non
   // è entrato testo di altri; quello letto dalle azioni lo guarda executeFiloAction.
   const accoglienza = onbActive && !messaggioDaFuori && !Onboarding.haTestoDiAltri(onbBefore)
-    && !cleanHistory.some((m) => m && (m.daFuori === true || m.daModello === true || (typeof m.esterno === 'string' && !!m.esterno)));
+    && ![...cleanHistory, ...vistiDalFilo, ...codaScheda].some((m) => m && (m.daFuori === true || m.daModello === true || (typeof m.esterno === 'string' && !!m.esterno)));
   // Re-immissione dell'output dei comandi nel contesto del modello: l'output di
   // un ESEGUI_COMANDO eseguito in un turno precedente viene accodato al
   // messaggio dell'assistente, così nei turni successivi il modello SA davvero
   // cosa ha prodotto il comando (prima lo vedeva solo l'utente, e l'assistente
   // rispondeva "non ho ancora l'output").
   const threadMessages = [];
-  // Le azioni che il modello ha davanti, turni passati compresi: i loro esiti
-  // decidono se un NAVIGA di questo turno può portare fuori dati (#587).
-  const azioniViste = [];
-  for (const m of cleanHistory) if (m && Array.isArray(m.actions)) azioniViste.push(...m.actions);
-  // Le parole dell'utente in questa chat: un codice che ha scritto lui può uscire (#810). Un turno
-  // interno non è sua voce.
-  // Nemmeno il testo di un suggerimento della home: lo scrive un modello.
-  const paroleUtente = cleanHistory.filter((m) => m && m.role !== 'filo' && !m.daModello).map((m) => String(m.text || ''))
+  // Le azioni il cui esito il modello ha davanti, da qualunque scheda e giorno: decidono se un NAVIGA di questo
+  // turno può portare fuori dati (#587).
+  const azioniViste = filo ? [...filo.azioni] : [];
+  for (const m of codaScheda) if (m && Array.isArray(m.actions)) azioniViste.push(...m.actions);
+  // Le parole dell'utente che il modello ha davanti: un codice che ha scritto lui può uscire (#810). Un turno
+  // interno non è sua voce, nemmeno il testo di un suggerimento della home: lo scrive un modello.
+  const paroleUtente = [...vistiDalFilo, ...codaScheda].filter((m) => m && m.role !== 'filo' && !m.daModello).map((m) => String(m.text || ''))
     .concat(internal || daModello ? [] : [String(userMessage || '')]).join('\n');
   // Quello che la chat ha davanti e non ha scritto l'utente entra nel registro dei segreti letti (#810). Anche
   // le frasi di Filo: riaperta dalla Cronologia, la chat non ha più l'esito che aveva portato il codice.
-  ricordaLettoInChat(azioniViste, cleanHistory);
+  ricordaLettoInChat(azioniViste, [...vistiDalFilo, ...codaScheda]);
   const fontiLette = chatId ? await fontiDellaChat(chatId) : [];
   for (const a of azioniViste) await segnaFonteLetta(chatId, fontiLette, a);
   // Nel benvenuto il testo di altri (incollato, trascinato, da un sito) sporca il compito: lo stile torna al riquadro (#592.2).
@@ -3899,8 +3971,8 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     await segnaFonte(chatId, fontiLette, { classe: 5, campo: null, chiave: 'benvenuto:testo-di-altri', motivo: 'è entrato un testo che non hai scritto tu' });
   }
   // Cosa ha scritto l'utente nel compito: le coordinate bancarie che ci stanno dentro le ha chieste lui (#530).
-  const richiesta = [...cleanHistory.filter((m) => m && m.role !== 'filo').map((m) => String(m.text || '')), String(userMessage || '')].join('\n');
-  for (const m of cleanHistory) {
+  const richiesta = [...codaScheda.filter((m) => m && m.role !== 'filo').map((m) => String(m.text || '')), String(userMessage || '')].join('\n');
+  for (const m of codaScheda) {
     const role = m.role === 'filo' ? 'assistant' : 'user';
     let content = String(m.text || '');
     const msg = { role, content };
@@ -3925,6 +3997,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     }
     threadMessages.push(msg);
   }
+  const indiceDomanda = threadMessages.length;
   const imageList = (Array.isArray(images) && images.length) ? images : (image ? [image] : []);
   const giaLetta = origineGiaLettaInChat(chatId);
   if (imageList.length) {
@@ -3977,6 +4050,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     onboarding: onboardingText,
     onboardingTurns: onbActive ? Onboarding.userTurns(onbBefore) : 0,
     onboardingMax: Onboarding ? Onboarding.MAX_EXCHANGES : 0,
+    ...(filo ? { filoTratto: filo.messaggi, indiceDomanda, chatCorrente: chatId, chatNuova: filo.nuova } : {}),
   };
 
   // IL GIRO. Il modello chiama le azioni come strumenti; il main le esegue,
@@ -4013,6 +4087,17 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     const prima = stopPrimaDelTurno.get(String(reasoningReqId));
     stopPrimaDelTurno.delete(String(reasoningReqId));
     if (prima && prima.wcId === turno.wcId) turno.fermato = true;
+  }
+  // I pezzi vecchi ripescati entrano in coda al contesto, e il blocco di attività lo dice come una ricerca (#868).
+  const ricordi = await entroIl(ricordiP, ATTESA_RICORDI_MS, []);
+  if (ricordi.length) {
+    const a = ricordoComeAzione(ricordi);
+    payloadBase.ricordi = globalThis.SN_FILO_CONTESTO.rendiRicordi(ricordi);
+    if (onToolCall) onToolCall({ name: a.type, id: a._callId });
+    push('filo:action', { kind: 'done', action: a, kept: true, executed: true });
+    renderedActions.push(a);
+    azioniViste.push(a);
+    ricordaLettoInChat([a]);
   }
   let fermato = false;
   try {
@@ -4170,7 +4255,9 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     const successe = renderedActions.filter((x) => x && ((x._executed && !x._confirm) || (x._output && x._output.blocked === 'segreto')));
     if (chatId && successe.length) {
       const cambi = successe.flatMap((x) => (x && Array.isArray(x._cambi) ? x._cambi.map((c) => c.id) : []));
-      await appendToChatArchive(chatId, { role: 'filo', text: '', actions: successe, ...(cambi.length ? { cambi } : {}) }, { onboarding: onbActive });
+      const dopo = await appendToChatArchive(chatId, { role: 'filo', text: '', actions: successe, ...(cambi.length ? { cambi } : {}) }, { onboarding: onbActive });
+      const fermo = dopo && Array.isArray(dopo.messages) ? dopo.messages[dopo.messages.length - 1] : null;
+      if (fermo && fermo.role === 'filo') ContestoFilo.ricordaEsiti(chatId, fermo.ts, { azioni: successe });
     }
     return {
       text: '', actions: renderedActions, stopped: true, notes, reasoningDetails: [], costEur,
@@ -4226,8 +4313,6 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       renderedActions.push(rendered);
     }
   }
-  const actionsToRun = proposal ? [...rawActions, proposal] : rawActions;
-  await FiloMem.appendRaw({ type: 'chat_filo', summary: textReply.slice(0, 200), extra: { actions: actionsToRun } });
   // I segreti letti da fuori che la risposta ripete, con la loro fonte: restano con la frase (#810).
   let lettiRisposta = [];
   try { lettiRisposta = globalThis.SN_URL_EXFIL.lettiNelTesto(textReply, SegretiLetti.tutti()); } catch (_) {}
@@ -4248,6 +4333,9 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       },
       { onboarding: onbActive },
     );
+    // Gli esiti di questo turno restano davanti al modello anche dalle altre schede, finché il messaggio è recente.
+    const risposta = dopo && Array.isArray(dopo.messages) ? dopo.messages[dopo.messages.length - 1] : null;
+    if (risposta && risposta.role === 'filo') ContestoFilo.ricordaEsiti(chatId, risposta.ts, { azioni: renderedActions, reasoningDetails });
     // La chat può essere finita mentre Filo stava ancora rispondendo: l'utente
     // ha chiesto qualcosa ed è tornato alla home (o ha chiuso la scheda) prima
     // di leggere. La risposta si salva lo stesso, ma poi la chat va RICHIUSA,

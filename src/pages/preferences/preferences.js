@@ -855,6 +855,8 @@
       case 'dictation.autoSend': return $('dictationAutoSend').value !== 'no';
       case 'dictation.silenceSec': return dictationTimes({ silenceSec: $('dictationSilence').value }).silenceSec;
       case 'dictation.cancelSec': return dictationTimes({ cancelSec: $('dictationCancel').value }).cancelSec;
+      case 'contestoFilo.giorni': return tettoContesto('giorni', $('contestoGiorni').value);
+      case 'contestoFilo.token': return tettoContesto('token', $('contestoToken').value);
       default: return undefined;
     }
   }
@@ -901,8 +903,32 @@
       case 'dictation.autoSend': return !(s.dictation && s.dictation.autoSend === false);
       case 'dictation.silenceSec': return dictationTimes(s.dictation).silenceSec;
       case 'dictation.cancelSec': return dictationTimes(s.dictation).cancelSec;
+      case 'contestoFilo.giorni': return tettoContesto('giorni', s.contestoFilo && s.contestoFilo.giorni);
+      case 'contestoFilo.token': return tettoContesto('token', s.contestoFilo && s.contestoFilo.token);
       default: return undefined;
     }
+  }
+
+  // Quanto ricorda la chat (#868): vuoto = come i predefiniti; fuori scala si riporta dentro come fa il main.
+  function tettoContesto(k, v) {
+    const FC = window.SN_FILO_CONTESTO;
+    const c = FC.numeroIn(v, FC.LIMITI[k]);
+    return c != null && k === 'token' ? Math.round(c) : c;
+  }
+  function canonContesto() {
+    for (const [k, id] of [['giorni', 'contestoGiorni'], ['token', 'contestoToken']]) {
+      const v = tettoContesto(k, $(id).value);
+      $(id).value = v == null ? '' : String(v);
+    }
+  }
+  // I segnaposto dicono il valore che vale quando il campo è vuoto: quello dei Modelli predefiniti, o del codice.
+  async function segnapostiContesto() {
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.DEFAULT_MODELS_PUBLIC });
+      const d = { ...((r && r.contestoFiloDiSerie) || {}), ...((r && r.contestoFilo) || {}) };
+      if (d.giorni != null) $('contestoGiorni').placeholder = String(d.giorni);
+      if (d.token != null) $('contestoToken').placeholder = String(d.token);
+    } catch (_) {}
   }
 
   function scriviTempiVoce() {
@@ -1029,6 +1055,10 @@
     if (vuole('dictation.silenceSec')) $('dictationSilence').value = String(tempiVoce.silenceSec);
     if (vuole('dictation.cancelSec')) $('dictationCancel').value = String(tempiVoce.cancelSec);
     scriviTempiVoce();
+
+    const cf = settings.contestoFilo || {};
+    if (vuole('contestoFilo.giorni')) $('contestoGiorni').value = cf.giorni == null ? '' : String(cf.giorni);
+    if (vuole('contestoFilo.token')) $('contestoToken').value = cf.token == null ? '' : String(cf.token);
 
     if (vuole('timerRingtone')) {
       const ringtone = settings.timerRingtone || 'default';
@@ -1314,6 +1344,12 @@
     $('terminalEnabled').addEventListener('change', persist);
     $('nomiSensatiScaricamenti').addEventListener('change', persist);
     $('aggiornamentiAutomatici').addEventListener('change', persist);
+    for (const id of ['contestoGiorni', 'contestoToken']) {
+      $(id).addEventListener('change', persist);
+      $(id).addEventListener('input', (e) => caselle.cambiato('pref', e));
+      $(id).addEventListener('blur', canonContesto);
+    }
+    segnapostiContesto();
     $('terminalShell').addEventListener('change', persist);
     $('barraSpinta').addEventListener('change', persist);
     $('barraStriscia').addEventListener('change', persist);

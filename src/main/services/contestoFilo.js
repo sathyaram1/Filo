@@ -62,7 +62,7 @@ const stesso = (a, b) => a && b && (a.role === 'user' ? 'user' : 'filo') === (b.
 
 // La domanda di adesso è già nel filo (la chat si scrive prima di rispondere): va in fondo, dopo il contesto, non nel tratto.
 function senzaDomanda(lista, chatId, userMessage) {
-  if (!chatId) return lista;
+  if (!chatId || userMessage == null) return lista;
   for (let i = lista.length - 1; i >= 0; i--) {
     if (lista[i].chat !== chatId) continue;
     if (lista[i].role === 'user' && vuotoDiImmagine(lista[i].text) === vuotoDiImmagine(userMessage)) return [...lista.slice(0, i), ...lista.slice(i + 1)];

@@ -439,6 +439,12 @@
     admin_defaults_delicate_posta: 'Posta',
     admin_defaults_delicate_banche: 'Banche',
     admin_defaults_delicate_sanita: 'Sanità',
+    // Quanto filo ha davanti la chat (#868)
+    admin_defaults_contesto: 'Quanto ricorda la chat',
+    admin_defaults_contesto_desc:
+      'Gli ultimi giorni di conversazioni, di tutte le schede, entrano in ogni messaggio fino al minore dei due tetti. Vale per chi non li ha cambiati in Preferenze; un campo vuoto segue il codice.',
+    admin_defaults_contesto_giorni: 'Giorni',
+    admin_defaults_contesto_token: 'Tetto in token',
     admin_defaults_excluded_unknown: 'Nessun fornitore di OpenRouter si chiama così: questa voce non esclude nessuno.',
     admin_defaults_excluded_guess: 'Forse «%s»?',
     admin_defaults_excluded_drift_title: 'Esclusioni del codice che questa lista non copre',
