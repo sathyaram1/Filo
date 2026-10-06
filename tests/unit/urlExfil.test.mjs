@@ -142,6 +142,33 @@ test('fallback strutturale — un indirizzo normale scritto da un modello non è
   }
 });
 
+// #553, giro 15: la documentazione nomina le pagine con un nome composto lungo, e Wikipedia in un alfabeto non latino
+// mette sei caratteri nell'indirizzo per ogni lettera. Nessuno dei due è un blocco di dati.
+test('fallback strutturale — nomi composti della documentazione e voci in alfabeti non latini passano', () => {
+  for (const url of [
+    'https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect',
+    'https://developer.mozilla.org/en-US/docs/Web/API/Document/getElementsByTagName',
+    'https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D',
+    'https://developer.mozilla.org/en-US/docs/Web/API/HTMLFormControlsCollection',
+    'https://developer.mozilla.org/en-US/docs/Web/API/WebGL2RenderingContext/bufferData',
+    'https://ru.wikipedia.org/wiki/Великая_Отечественная_война',
+    `https://ru.wikipedia.org/wiki/${encodeURIComponent('Великая_Отечественная_война')}`,
+    `https://ar.wikipedia.org/wiki/${encodeURIComponent('الحرب_العالمية_الثانية')}`,
+    `https://ja.wikipedia.org/wiki/${encodeURIComponent('第二次世界大戦')}`,
+    'https://open.spotify.com/track/6rqhFgbbKwnb9MLmUQDhG6',
+  ]) {
+    assert.equal(isExfil(url, { fromUntrusted: true }), false, url);
+  }
+  // Le maiuscole sparse di un codice restano codice, e un pezzo lungo senza maiuscole di parola pure.
+  for (const url of [
+    'https://att.example/?d=TWFyaW9Sb3NzaUJvbG9nbmFWaWFSb21h',
+    'https://att.example/a/QmFzZWxpbmVQ/ZnJvbVRoZQ/c2VjcmV0',
+    'https://att.example/?d=znevbebffvobybtanivnebzn',
+  ]) {
+    assert.equal(isExfil(url, { fromUntrusted: true }), true, url);
+  }
+});
+
 test('fallback strutturale — i dati travestiti restano un blocco, anche spezzati da barre, trattini o punti', () => {
   const hex = Buffer.from('Mario Rossi, Bologna').toString('hex');
   const altro = Buffer.from('Luigi Verdi, via Po 3').toString('hex');

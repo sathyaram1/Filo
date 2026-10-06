@@ -213,14 +213,21 @@
     const path = (u.pathname && u.pathname !== '/') ? u.pathname : '';
     // Le credenziali nell'indirizzo arrivano al server come qualunque altro pezzo.
     const cred = `${u.username || ''} ${u.password || ''}`.trim();
-    const labels = (u.hostname || '').split('.');
-    if (opaco(labels.slice(0, Math.max(0, labels.length - 2)).join('.')) >= STRUCT_BLOB) {
+    const labels = (u.hostname || '').split('.').slice(0, -2);
+    if (labels.some((l) => l.length >= STRUCT_BLOB) || opaco(labels.join('.')) >= STRUCT_BLOB) {
       return { reason: 'usa un sottodominio anomalo' };
     }
-    if (opaco(decodificaPercento(`${cred} ${search} ${hash} ${path}`)) >= STRUCT_BLOB) {
+    const resto = `${cred} ${search} ${hash} ${path}`;
+    const pezzoLungo = resto.split(/[^A-Za-z0-9]+/).some((seg) => seg.length >= STRUCT_BLOB && !/^https?$/i.test(seg) && !nomeLungo(seg));
+    if (pezzoLungo || opaco(decodificaPercento(resto)) >= STRUCT_BLOB) {
       return { reason: 'contiene un blocco di dati codificato' };
     }
     return null;
+  }
+
+  // Un pezzo lungo senza separatori resta parola solo se è un nome composto con le sue maiuscole (la documentazione).
+  function nomeLungo(seg) {
+    return /\p{Lu}/u.test(seg.slice(1)) && (nomeComposto(seg) || nomeConNumero(seg));
   }
 
   // Quanti caratteri di un pezzo d'indirizzo sono codice e non parole: parole, date e numeri corti non contano;
