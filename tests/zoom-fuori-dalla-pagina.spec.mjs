@@ -14,10 +14,11 @@ import { createServer } from 'node:http';
 const PAGINA = `<!doctype html><html><head><meta charset="utf-8"><title>sito</title></head>
 <body style="height:4000px"><h1>un sito qualunque</h1><p>testo</p></body></html>`;
 
+// Il mittente porta l'indirizzo della home, come quello vero: senza vale come un sito e lo zoom gli è negato.
 const execAction = (app, action) =>
   app.evaluate(({ BrowserWindow }, { action }) => {
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
-    return globalThis.SN_EXECUTE_FILO_ACTION(action, { sender: { win, wc: win.webContents } });
+    return globalThis.SN_EXECUTE_FILO_ACTION(action, { sender: { win, wc: win.webContents, url: 'filo://newtab/' } });
   }, { action });
 
 async function percentOf(app, page) {
