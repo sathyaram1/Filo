@@ -683,10 +683,10 @@ async function main(argv) {
     const motore = creaMotore(depVere(P, opz, log), opz);
     const chiedi = (modo, da) => {
       const prima = motore.chiusura();
-      const ora2 = motore.smetti(modo);
-      if (ora2 === prima) return;
-      scriviRichiesta(P, { pid: process.pid, modo: ora2, at: ora() });
-      if (ora2 === 'subito') {
+      const dopo = motore.smetti(modo);
+      if (dopo === prima) return;
+      scriviRichiesta(P, { pid: process.pid, modo: dopo, at: ora() });
+      if (dopo === 'subito') {
         log(`fermata immediata (${da}): fermo le istanze e i processi in corso; il prossimo «avvia» rifà i passi interrotti`);
         fermaFigli();
         // Un processo che non si lascia fermare non tiene aperto l'orchestratore: lo stato dice già cosa rifare.
