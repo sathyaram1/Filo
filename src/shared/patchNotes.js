@@ -13,6 +13,7 @@
       features: [
         'Su Windows e Linux, quando una versione nuova di Filo è pronta te lo dice un avviso in basso a destra, e nella home resta una carta con «Riavvia e aggiorna» finché non la installi. Puoi anche scrivere a Filo «aggiornati». Su Windows, se non lo premi, la versione nuova si installa la prossima volta che apri Filo: vedi la barra di avanzamento per una decina di secondi e poi Filo si riapre da solo. Prima si installava di nascosto quando lo chiudevi, e se lo riaprivi in quel momento Windows diceva che il collegamento non funzionava. Chi preferisce il modo di prima lo rimette in Preferenze, Impostazioni avanzate.',
         'Nella pagina Trasparenza, «Come si sostiene» adesso dice come stanno le cose oggi. Finché Filo non chiede pagamenti è tutto offerto, e se usi una tua chiave OpenRouter paghi solo quella. Se chiedi a Filo quanto costa, ti risponde con le stesse parole.',
+        'La suoneria del timer e delle sveglie ha il suo volume, in Preferenze accanto alla scelta del motivo, e lo stesso vale per il suono delle notifiche. Puoi girare le manopole o chiederlo a Filo: "abbassa il volume della suoneria", "metti la suoneria delicata", "azzera il volume delle notifiche". A zero resta muta.',
       ],
       fixes: [
         'La protezione dal fingerprinting copre anche le scene 3D che un sito disegna per riconoscere la tua scheda grafica, e i disegni che prepara senza mostrarli. Prima da lì passava la tua impronta vera. Se poi una pagina salva un\'immagine prima di cominciare a disegnare, la sua grafica 3D parte lo stesso, mentre con la protezione accesa restava bloccata.',
@@ -21,6 +22,8 @@
         'Su Linux il clic sulla rotella in un campo di testo incolla di nuovo il testo selezionato, anche dentro un riquadro incorporato. Fuori dai campi apre lo zoom come prima, e non incolla più niente nel campo dove stavi scrivendo.',
         'Il clic sulla rotella su un link apre solo il link anche sui siti costruiti a componenti: prima apriva in più lo zoom. E con lo zoom aperto, un clic in un campo di testo lo chiude e ti lascia scrivere lì.',
         'Il riquadro con la percentuale dello zoom resta della stessa misura a qualunque zoom. Prima al 300% copriva la pagina e al 33% non si leggeva.',
+        'Il timer e la sveglia suonano da qualunque scheda tu stia guardando, anche se la home non è aperta, e anche in una finestra incognito. Prima il suono usciva solo dalla home. Mentre suona, in cima alla finestra c’è il pulsante che la ferma, e finché suona quel pulsante resta a portata: se mandi qualcosa a tutto schermo Filo ne esce da solo. E se non hai nessuna finestra aperta dove quella scadenza si possa sentire, Filo ne apre una invece di restare muto.',
+        'Il riquadro che sceglie la tonalità esatta di un colore cambia solo il suo: gli altri colori che hai cambiato mentre era aperto restano dove li hai messi.',
       ],
     },
     {

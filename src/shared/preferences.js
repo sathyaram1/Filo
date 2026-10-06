@@ -245,6 +245,18 @@
     };
   }
 
+  // Volume 0-100. Accetta anche le parole con cui lo si chiede a voce; null se
+  // non è né una parola nota né un numero, così non si spegne niente per sbaglio.
+  function parseVolume(raw) {
+    const s = String(raw == null ? '' : raw).trim().toLowerCase();
+    const parole = { muto: 0, muta: 0, zero: 0, silenzio: 0, basso: 30, bassa: 30, piano: 30, medio: 60, media: 60, alto: 100, alta: 100, massimo: 100, forte: 100 };
+    const n = Object.prototype.hasOwnProperty.call(parole, s)
+      ? parole[s]
+      : parseInt(s.replace('%', ''), 10);
+    if (!Number.isFinite(n)) return null;
+    return Math.min(100, Math.max(0, n));
+  }
+
   // Un tempo della barra laterale in millisecondi ("300", "300 ms", "0,5 secondi"); fuori dai limiti è un
   // rifiuto col numero, mai un taglio. Un numero sotto 10 senza unità sono secondi: nessuno chiede 1 ms.
   function msBarra(v, campo, etichetta) {
@@ -927,6 +939,24 @@
       },
     },
 
+    // ── Volume della suoneria — reversibile, innocuo → costo 1 ──
+    // Niente chiave «volume» secca: i volumi sono due (suoneria e notifiche) e
+    // una chiave così generica se li prendeva tutti, azzerando la suoneria a
+    // chi chiedeva le notifiche. Resta la prima per ordine, quindi un «volume»
+    // senza altro resta la suoneria, che è il caso che si chiede davvero.
+    {
+      scrive: ['timerRingtoneVolume'],
+      aiuto: 'numero 0-100 (volume di timer e sveglie; 0 = muta)',
+      keys: ['volume_suoneria', 'volume suoneria', 'volume timer', 'volume sveglia',
+        'ringtone volume', 'volume della suoneria'],
+      costo: 1,
+      build(v) {
+        const vol = parseVolume(v);
+        if (vol === null) return null;
+        return { partial: { timerRingtoneVolume: vol }, label: `Volume suoneria → ${vol}%` };
+      },
+    },
+
     // ── Avvisi in basso a destra (barra e pagine) — reversibili, innocui → costo 1 ──
     {
       scrive: ['notifications.durationSec'],
@@ -971,6 +1001,20 @@
         const b = parsePrefBool(v);
         if (b === null) return null;
         return { partial: { notifications: { soundEnabled: b } }, label: `Suono degli avvisi → ${b ? 'acceso' : 'spento'}` };
+      },
+    },
+    // Il suono degli avvisi nasce spento: un volume sopra zero senza accenderlo prometterebbe un suono che non si sente.
+    {
+      scrive: ['notifications.soundVolume'],
+      aiuto: 'numero 0-100 (volume del suono degli avvisi)',
+      keys: ['volume_notifiche', 'volume notifiche', 'volume delle notifiche', 'volume notifica',
+        'volume del suono delle notifiche', 'notification volume'],
+      costo: 1,
+      build(v) {
+        const vol = parseVolume(v);
+        if (vol === null) return null;
+        const notifications = vol > 0 ? { soundVolume: vol, soundEnabled: true } : { soundVolume: vol };
+        return { partial: { notifications }, label: `Volume delle notifiche → ${vol}%` };
       },
     },
 

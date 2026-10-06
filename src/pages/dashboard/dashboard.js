@@ -228,95 +228,6 @@
     scriviNelCampo: (t) => scriviNelCampo(t),
     chatCorrente: () => chatId,
   });
-  // ===== Suoneria timer =====
-  // Singleton AudioContext + oscillatori per la suoneria del timer.
-  // Non usiamo file audio per non dover committare binari; generiamo
-  // sequenze di beep via WebAudio. La suoneria parte quando il primo
-  // timer passa in stato `ringing` e si ferma quando non ce ne sono più.
-  let _alarmCtx = null;
-  let _alarmPlaying = false;
-  let _alarmLoopTimeout = null;
-  let _timerRingTone = 'default'; // suoneria attiva (ID stringa)
-
-  // Catalogo suonerie: ogni voce è un array di note [ [freq, durMs], … ]
-  // seguite da un gap prima del loop successivo.
-  const RINGTONES = {
-    default: {
-      label: 'Standard',
-      notes: [[880, 150], [0, 80], [880, 150], [0, 80], [880, 150], [0, 400]],
-    },
-    gentle: {
-      label: 'Delicata',
-      notes: [[523, 200], [0, 100], [659, 200], [0, 100], [784, 300], [0, 600]],
-    },
-    urgent: {
-      label: 'Urgente',
-      notes: [[1047, 80], [0, 50], [1047, 80], [0, 50], [1047, 80], [0, 50],
-               [1047, 80], [0, 50], [1047, 80], [0, 300]],
-    },
-    chime: {
-      label: 'Carillon',
-      notes: [[1046, 120], [0, 60], [1318, 120], [0, 60], [1568, 120], [0, 60],
-               [2093, 200], [0, 700]],
-    },
-  };
-
-  function _getAlarmCtx() {
-    if (!_alarmCtx) _alarmCtx = new (window.AudioContext || window.webkitAudioContext)();
-    return _alarmCtx;
-  }
-
-  // Suona UNA sequenza di note (non in loop). Ritorna una Promise che si
-  // risolve quando la sequenza è finita. Usata sia per la suoneria in loop
-  // sia per l'anteprima nelle opzioni (ma lì non in loop).
-  function _playSequence(toneId) {
-    const tone = RINGTONES[toneId] || RINGTONES.default;
-    const ctx = _getAlarmCtx();
-    // Risveglia il contesto se sospeso (politica autoplay browser).
-    const resume = ctx.state === 'suspended' ? ctx.resume() : Promise.resolve();
-    return resume.then(() => {
-      return new Promise((resolve) => {
-        let t = ctx.currentTime;
-        for (const [freq, durMs] of tone.notes) {
-          if (freq > 0) {
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.type = 'sine';
-            osc.frequency.value = freq;
-            gain.gain.setValueAtTime(0.35, t);
-            gain.gain.exponentialRampToValueAtTime(0.001, t + durMs / 1000 - 0.01);
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start(t);
-            osc.stop(t + durMs / 1000);
-          }
-          t += durMs / 1000;
-        }
-        // Risolvi al termine dell'ultima nota + gap.
-        setTimeout(resolve, Math.max(0, (t - ctx.currentTime) * 1000));
-      });
-    });
-  }
-
-  // Avvia la suoneria in loop continuo. Idempotente: se già suona, non fa nulla.
-  function startAlarm() {
-    if (_alarmPlaying) return;
-    _alarmPlaying = true;
-    async function loop() {
-      if (!_alarmPlaying) return;
-      try { await _playSequence(_timerRingTone); } catch (_) {}
-      if (_alarmPlaying) _alarmLoopTimeout = setTimeout(loop, 0);
-    }
-    loop();
-  }
-
-  // Ferma la suoneria. Idempotente.
-  function stopAlarm() {
-    _alarmPlaying = false;
-    clearTimeout(_alarmLoopTimeout);
-    _alarmLoopTimeout = null;
-  }
-
   // ===== Helpers messaggi =====
   function send(msg) {
     return new Promise((resolve) => {
@@ -613,14 +524,6 @@
     const timers = (timersR?.ok && timersR.timers) || [];
     const notifications = (notiR?.ok && notiR.notifications) || [];
     Carte.setVive({ timers, notifiche: notifications });
-
-    // La suoneria parte se c'è almeno un timer che suona e si ferma quando non ce ne sono più.
-    const hasRinging = timers.some((t) => t.ringing);
-    if (hasRinging) {
-      startAlarm();
-    } else {
-      stopAlarm();
-    }
 
     // Il conto alla rovescia si ridisegna ogni secondo solo finché c'è qualcosa che scorre o suona.
     const hasActiveTimer = timers.some((t) => !t.paused || t.ringing);
@@ -1546,10 +1449,6 @@
       }
       if (msg.settings && msg.settings.terminal) Term.applySettings(msg.settings.terminal);
       if (msg.settings && msg.settings.autonomia) mostraAutonomia(msg.settings.autonomia);
-      // Aggiorna suoneria in live se l'utente la cambia dalle opzioni.
-      if (msg.settings && msg.settings.timerRingtone && RINGTONES[msg.settings.timerRingtone]) {
-        _timerRingTone = msg.settings.timerRingtone;
-      }
     } else if (msg?.type === MSG.AUTH_CHANGED) {
       // Login/logout fatto altrove (es. dal menu profilo): aggiorna l'avatar.
       Comandi.setOwner(msg.signedIn && msg.isAdmin);
@@ -2124,9 +2023,6 @@
       mostraAutonomia(settings?.autonomia);
       Term.setEnabled(!!settings?.terminal?.enabled);
       Term.setShell(settings?.terminal?.shell || 'powershell');
-      // Suoneria timer: legge la preferenza; se non impostata o non valida usa 'default'.
-      const saved = settings?.timerRingtone;
-      if (saved && RINGTONES[saved]) _timerRingTone = saved;
     } catch (_) {}
     applyHomeMessageVisibility();
     if (Term.isEnabled()) await Term.initCwd();
