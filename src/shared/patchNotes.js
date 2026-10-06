@@ -17,6 +17,7 @@
         'Puoi decidere tu quando aggiornare Filo. Togli la spunta a «Installa gli aggiornamenti da solo» in Preferenze, Impostazioni avanzate, oppure di\' a Filo «non aggiornarti da solo». Quando esce una versione nuova te lo dice nella home e la installa solo se premi «Installa», o se dici a Filo «aggiornati».',
       ],
       fixes: [
+        'Le schede in secondo piano hanno il colore del loro sito, e si riconosce: YouTube è rossa, Poste gialla. Prima restavano grigiastre anche col colore al massimo. Se le vuoi più vivaci o più neutre chiedilo a Filo, o cambia l\'opacità nelle Preferenze avanzate. Il titolo resta leggibile su qualunque colore, e in Cronologia le schede chiuse hanno gli stessi colori.',
         'Nella chat del deck builder vedi da quanto aspetti la risposta, e «Ferma» la interrompe, come Esc nel campo. La chat torna subito libera e il mazzo resta com\'era. Se Scryfall non risponde, dopo 30 secondi la chat te lo dice, e intanto anteprime e prezzi non restano bloccati.',
         'Su Windows, se in un comando che Filo esegue per te una parte sbaglia, per esempio un programma che non esiste, il resto della riga gira lo stesso, come quando la scrivi tu nel terminale. Prima si fermava tutto lì.',
         'La chat di Filo chiede le risposte solo ai fornitori che sanno usare i suoi strumenti, come cercare sul web o cambiare un\'impostazione. Prima uno che li ignorava faceva fallire la risposta senza spiegazione. Se per il modello che hai scelto non ce n\'è nessuno, Filo te lo dice.',
