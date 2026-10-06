@@ -523,7 +523,8 @@ export function creaMotore(dep, opzioni = {}) {
     if (chiusura === 'subito') throw new Interrotto(`${cosa} fermato a metà`);
     return r;
   }
-  const depM = { ...dep, esegui };
+  // Il resto di dep si legge a ogni chiamata: chi lo sostituisce dopo (le prove) vale anche qui.
+  const depM = Object.assign(Object.create(dep), { esegui });
 
   const salva = (p) => { p.aggiornato = dep.ora(); dep.store.salvaPratica(p); };
   const git = (cwd, ...args) => esegui('git', args, { cwd });

@@ -1183,15 +1183,18 @@ test('posti decisi dalla macchina (#1041): senza numero fisso partono finché il
 
 test('un lavoro pronto a chiudere ferma le istanze nuove degli altri finché la sua chiusura non è fatta (#1041)', async () => {
   let occupata = false;
+  let misure = 0;
   // 70%: sotto la soglia di un'istanza (80), sopra quella di una chiusura (60).
-  const b = banco({ pratiche: [prova(1, 'uno', 'a/**'), prova(2, 'due', 'b/**', { fase: 'chiusura' })], server: false, carichi: () => ({ cpu: occupata ? 70 : 10, liberaGB: 16 }) });
+  const b = banco({
+    pratiche: [prova(1, 'uno', 'a/**'), prova(2, 'due', 'b/**', { fase: 'chiusura' })], server: false,
+    carichi: () => { misure += 1; return { cpu: occupata ? 70 : 10, liberaGB: 16 }; },
+  });
   const { lanciate } = lente(b, 1);
   const vera = b.dep.claude;
   b.dep.claude = (x) => { occupata = true; return Promise.resolve(vera(x)).finally(() => { occupata = false; }); };
   const corsa = b.motore.avvia();
   await finche(() => lanciate.length === 1, 'il lavoratore di #1');
-  await finche(() => b.righe().length && b.stato.pratiche[2].fase === 'chiusura' && indice(b.righe(), /chiusura in attesa/) === -1 && b.chiamate.some((c) => c.cwd === '/r/.claude/worktrees/due'), '#2 ammessa');
-  for (let i = 0; i < 50; i += 1) await unGiro();
+  await finche(() => misure > 10, '#2 ammessa e in attesa della macchina calma');
   assert.equal(indice(b.righe(), /finish-local/), -1, 'la chiusura aspetta la macchina calma');
   lanciate[0].finisci();
   const fine = await corsa;
