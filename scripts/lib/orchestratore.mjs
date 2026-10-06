@@ -459,36 +459,93 @@ export async function apriDerivatiDi(dep, p, { derivati = OPZIONI_BASE.derivati,
   return falliti;
 }
 
+/** Un passo lasciato a metà perché è stato chiesto di smettere: chi guida lo rimette dov'era e il prossimo avvia lo rifà. */
+export class Interrotto extends Error {
+  constructor(cosa) {
+    super(`interrotto: ${cosa}`);
+    this.cosa = cosa;
+  }
+}
+
 /**
  * Il motore. dep = {
  *   store: { leggi() → { coda, pratiche }, salvaPratica(p) },
  *   esegui(cmd, args, { cwd, input, timeoutMs }) → { code, stdout, out },   // out = stdout + stderr
  *   claude({ ruolo, prompt, cwd, addDirs, nome }) → { ok, testo, costo, errore },
- *   verifica(wtApp) → { ok, entry, dirty }, pubblica() → { code, out },
+ *   verifica(wtApp) → { ok, entry, dirty }, pubblica() → { code, out }, filoAperto() → bool,
  *   carico() → { cpu, liberaGB }, dormi(ms), log(riga), ora() → ISO,
  *   percorsi: { radice, wt(slug), serverRadice ('' se manca), wtServer(slug), note, regole },
- *   fs: { esiste(p), collega(verso, link), scollega(link) }, annota(feedbackId, testo), richiestaDi(num),
+ *   fs: { esiste(p), collega(verso, link), scollega(link) }, annota(numero o id, testo), richiestaDi(num),
  * }
+ * smetti('calma'): nessuna istanza nuova, i passi in corso arrivano in fondo. smetti('subito'): i processi li ferma chi
+ * lancia, e il motore rimette dov'erano i passi interrotti (#1043).
  */
 export function creaMotore(dep, opzioni = {}) {
   const opz = { ...OPZIONI_BASE, ...opzioni };
   const P = dep.percorsi;
   let chiusure = 0;
+  let chiusura = '';
+  let segnaCalma;
+  let segnaSubito;
+  const suCalma = new Promise((ok) => { segnaCalma = ok; });
+  const suSubito = new Promise((ok) => { segnaSubito = ok; });
+  let vive = 0;
+  let ultimoAvvio = -Infinity;
+  // Chi aspetta il posto per un'istanza, in ordine d'arrivo; chi è pronto a chiudere, o chiude, ferma le istanze nuove (#1041).
+  const fila = [];
+  const inChiusura = new Set();
+  const inVolo = new Set();
+
+  function smetti(modo = 'calma') {
+    if (modo === 'subito') { chiusura = 'subito'; segnaSubito(); } else if (!chiusura) chiusura = 'calma';
+    segnaCalma();
+    return chiusura;
+  }
+
+  const adesso = () => Date.parse(dep.ora()) || Date.now();
+  // Un'attesa che una chiusura chiesta abbandona: il passo resta da fare.
+  async function attendi(ms, cosa) {
+    if (chiusura) throw new Interrotto(cosa);
+    await Promise.race([dep.dormi(ms), suCalma]);
+    if (chiusura) throw new Interrotto(cosa);
+  }
+  // Una pausa dentro una chiusura già partita: con calma la si finisce, la ferma solo «subito».
+  async function pausa(ms, cosa) {
+    if (chiusura === 'subito') throw new Interrotto(cosa);
+    await Promise.race([dep.dormi(ms), suSubito]);
+    if (chiusura === 'subito') throw new Interrotto(cosa);
+  }
+  // Dopo «subito» l'esito di un processo fermato a metà non vale niente: il passo si rifà.
+  async function esegui(cmd, args, o) {
+    const cosa = cmd === 'node' ? String(args[0] || 'node') : `${cmd} ${args[0] || ''}`.trim();
+    if (chiusura === 'subito') throw new Interrotto(cosa);
+    const r = await dep.esegui(cmd, args, o);
+    if (chiusura === 'subito') throw new Interrotto(`${cosa} fermato a metà`);
+    return r;
+  }
+  const depM = { ...dep, esegui };
 
   const salva = (p) => { p.aggiornato = dep.ora(); dep.store.salvaPratica(p); };
-  const git = (cwd, ...args) => dep.esegui('git', args, { cwd });
-  const node = (cwd, args, timeoutMs) => dep.esegui('node', args, { cwd, timeoutMs });
+  const git = (cwd, ...args) => esegui('git', args, { cwd });
+  const node = (cwd, args, timeoutMs) => esegui('node', args, { cwd, timeoutMs });
   const numero = (r) => (r.code === 0 ? Number(String(r.out).trim()) || 0 : 0);
 
   function ferma(p, motivo, domanda = '', altro = {}) {
+    // Un processo fermato da «subito» non è una fermata: niente nota all'owner, il passo si rifà.
+    if (chiusura === 'subito') throw new Interrotto(primaRiga(motivo));
     const dove = p.fase;
     const verdetto = chiaveVerdetto(((dep.verifica(P.wt(p.slug)) || {}).entry) || null);
     p.fase = 'fermo';
+    p.attesa = '';
     p.fermo = { motivo, ...(domanda ? { domanda } : {}), dove, ...(verdetto ? { verdetto } : {}), ...altro, at: dep.ora() };
     dep.log(`#${p.num} fermo: ${primaRiga(motivo)}`);
-    if (p.feedbackId && dep.annota) {
-      const nota = `Orchestratore locale: lavoro fermo, ${primaRiga(motivo)}${domanda ? '. Serve la risposta dell’owner (npm run orchestra -- riprendi).' : '.'}`;
-      Promise.resolve().then(() => dep.annota(p.feedbackId, nota)).catch(() => {});
+    if (dep.annota) {
+      const avvisa = (perche) => { avvisaUnaVolta(p, `nota per l’owner non scritta sulla pratica: ${perche}`); salva(p); };
+      const v = Promise.resolve()
+        .then(() => dep.annota(p.feedbackId || String(p.num), notaPerOwner(p, p.fermo)))
+        .then((r) => { if (r && r.ok === false) avvisa(r.motivo || 'rifiutata'); }, (e) => avvisa(primaRiga(String((e && e.message) || e))))
+        .finally(() => inVolo.delete(v));
+      inVolo.add(v);
     }
     return 'fermo';
   }
@@ -499,8 +556,8 @@ export function creaMotore(dep, opzioni = {}) {
     const w = P.serverRadice ? P.wtServer(p.slug) : '';
     return w && dep.fs.esiste(w) ? w : '';
   };
-  const aspettaCalma = async (perChiusura) => {
-    while (!caricoBasta(await dep.carico(), opz, perChiusura)) await dep.dormi(opz.pausaMs);
+  const aspettaCalma = async (perChiusura, cosa) => {
+    while (!caricoBasta(await dep.carico(), opz, perChiusura)) await pausa(opz.pausaMs, cosa);
   };
 
   async function prepara(p) {
@@ -528,31 +585,68 @@ export function creaMotore(dep, opzioni = {}) {
     return prima === 'fix-pending' && e.verdict === 'fixed';
   }
 
+  const altraChiude = (p) => [...inChiusura].some((n) => n !== p.num);
+
+  // Il posto per un'istanza nuova (#1041): prima chi aspetta da più tempo, mai mentre un altro lavoro chiude; con altre
+  // istanze vive solo a macchina sotto le soglie e dopo una pausa dall'ultimo avvio, perché il carico nuovo si faccia vedere.
+  async function postoIstanza(p, cosa) {
+    fila.push(p.num);
+    try {
+      for (;;) {
+        if (chiusura) throw new Interrotto(cosa);
+        if (fila[0] === p.num && !altraChiude(p)) {
+          const ok = !vive || (adesso() - ultimoAvvio >= opz.pausaMs && caricoBasta(await dep.carico(), opz));
+          if (chiusura) throw new Interrotto(cosa);
+          if (ok && !altraChiude(p)) { vive += 1; ultimoAvvio = adesso(); return; }
+        }
+        await attendi(opz.pausaMs, cosa);
+      }
+    } finally {
+      fila.splice(fila.indexOf(p.num), 1);
+    }
+  }
+
+  // Un'istanza di Claude: il posto, il segno «in corso» per chi guarda, il costo registrato anche se poi la si ferma.
+  async function lancia(p, ruolo, args) {
+    await postoIstanza(p, `${ruolo} non lanciato`);
+    p.inCorso = { cosa: ruolo, da: dep.ora() };
+    salva(p);
+    let r;
+    try {
+      r = await dep.claude(args);
+    } finally {
+      vive -= 1;
+      p.inCorso = null;
+    }
+    const costo = Number(r.costo) || 0;
+    p.costo += costo;
+    p.istanze.push({ ruolo, giro: p.giriTotali, at: dep.ora(), ok: !!r.ok, costo, riga: primaRiga(r.testo || r.errore).slice(0, 300) });
+    salva(p);
+    if (chiusura === 'subito') throw new Interrotto(`${ruolo} fermato a metà`);
+    return r;
+  }
+
   async function istanza(p, ruolo, prompt, nome, cartella = P.note) {
     let atteso = 0;
     const prima = (((dep.verifica(P.wt(p.slug)) || {}).entry) || {}).verdict || '';
     for (let t = 0; ; t += 1) {
-      const r = await dep.claude({ ruolo, prompt, cwd: P.wt(p.slug), addDirs: [cartella, P.serverRadice].filter(Boolean), nome });
-      const costo = Number(r.costo) || 0;
-      p.costo += costo;
-      p.istanze.push({ ruolo, giro: p.giriTotali, at: dep.ora(), ok: !!r.ok, costo, riga: primaRiga(r.testo || r.errore).slice(0, 300) });
-      salva(p);
+      const r = await lancia(p, ruolo, { ruolo, prompt, cwd: P.wt(p.slug), addDirs: [cartella, P.serverRadice].filter(Boolean), nome });
       if (!r.ok && passoFatto(p, ruolo, prima)) {
         dep.log(`#${p.num} ${ruolo}: uscito con errore dopo aver fatto il suo passo, non lo rilancio`);
         return r;
       }
-      const attesa = r.ok ? 0 : attesaLimite(`${r.errore || ''}\n${r.testo || ''}`, Date.parse(dep.ora()) || Date.now(), opz);
+      const attesa = r.ok ? 0 : attesaLimite(`${r.errore || ''}\n${r.testo || ''}`, adesso(), opz);
       if (attesa && atteso + attesa <= opz.oreLimite * 60 * 60_000) {
         atteso += attesa;
         t -= 1;
         dep.log(`#${p.num} ${ruolo}: limite d’uso raggiunto, riprovo fra ${Math.round(attesa / 60_000)} min`);
-        await dep.dormi(attesa);
+        await attendi(attesa, `${ruolo} in attesa del limite d’uso`);
         continue;
       }
       if (attesa) return { ...r, errore: `limite d’uso ancora attivo dopo ${opz.oreLimite} ore di attesa: ${primaRiga(r.errore)}` };
       if (r.ok || t >= opz.ritenta || !eTransitorio(r.errore)) return r;
       dep.log(`#${p.num} ${ruolo}: errore transitorio, riprovo`);
-      await dep.dormi(opz.pausaMs);
+      await attendi(opz.pausaMs, `${ruolo} da rilanciare dopo un errore transitorio`);
     }
   }
 
@@ -565,8 +659,9 @@ export function creaMotore(dep, opzioni = {}) {
     const crit = sospesi || (['decisione', 'correzione'].includes(p.compito) ? (fp.correzione || fp.domanda || fp.motivo || '') : '');
     // Un lavoratore interrotto, o un orchestratore riavviato, lascia commit sul ramo: chi riparte lo sa dal ramo, non dal numero di giri.
     const giaLavoro = p.compito === 'lavoro' && ((await avanti(wtApp)) > 0 || (await serverAvanti(p)) > 0);
-    dep.log(`#${p.num} lavoratore (${p.compito})`);
-    const r = await istanza(p, 'lavoratore', promptLavoratore({ p, regole: P.regole, wtApp, wtServer: wtServerSeC(p), cartellaNote: P.note, crit, giaLavoro }), `filo #${p.num} lavoratore`);
+    const ruolo = ruoloDelLavoro(p);
+    dep.log(`#${p.num} ${ruolo} (${p.compito})`);
+    const r = await istanza(p, ruolo, promptLavoratore({ p, regole: P.regole, wtApp, wtServer: wtServerSeC(p), cartellaNote: P.note, crit, giaLavoro }), `filo #${p.num} ${ruolo}`);
     const consegnata = p.compito === 'correzione' && ((dep.verifica(wtApp) || {}).entry || {}).verdict === 'fixed';
     if (!r.ok && !consegnata) return ferma(p, `il lavoratore non ha finito: ${primaRiga(r.errore)}`);
     const st = await git(wtApp, 'status', '--porcelain');
@@ -607,7 +702,8 @@ export function creaMotore(dep, opzioni = {}) {
   }
 
   async function giro(p) {
-    if (p.giri >= opz.tetto) return ferma(p, `tetto dei giri raggiunto (${opz.tetto}) senza un esito superato`);
+    if (opz.tetto && p.giri >= opz.tetto) return ferma(p, `tetto dei giri raggiunto (${opz.tetto}) senza un esito superato`);
+    if (chiusura) throw new Interrotto('verifica non partita');
     const wt = P.wt(p.slug);
     if ((await preStart(p, wt)) === 'riallinea') return riallinea(p, 'il merge di origin/main va in conflitto');
     const primo = !((dep.verifica(wt) || {}).entry || {}).request;
@@ -616,7 +712,7 @@ export function creaMotore(dep, opzioni = {}) {
     for (let t = 0; ; t += 1) {
       s = await node(wt, args);
       if (s.code === 0 || t >= opz.ritenta || !eTransitorio(s.out)) break;
-      await dep.dormi(opz.pausaMs);
+      await attendi(opz.pausaMs, 'verify-local start da rilanciare');
     }
     if (s.code !== 0) {
       if (/conflitt/i.test(s.out)) return riallinea(p, 'verify-local start va in conflitto con origin/main');
@@ -647,19 +743,30 @@ export function creaMotore(dep, opzioni = {}) {
     return ferma(p, d.motivo, d.domanda, d.correzione ? { correzione: d.correzione } : {});
   }
 
+  // Un processo lungo della chiusura, segnato «in corso» per chi guarda e per chi chiede di smettere.
+  async function conInCorso(p, cosa, fare) {
+    p.inCorso = { cosa, da: dep.ora() };
+    salva(p);
+    try {
+      return await fare();
+    } finally {
+      p.inCorso = null;
+    }
+  }
+
   async function conRitenta(p, fare, cosa) {
     for (let t = 0; ; t += 1) {
       const r = await fare();
       if (r.code === 0 || t >= opz.ritenta || !eTransitorio(r.out)) return r;
       dep.log(`#${p.num} ${cosa}: rosso transitorio, riprovo a macchina più calma`);
-      await dep.dormi(opz.pausaMs);
-      await aspettaCalma(true);
+      await pausa(opz.pausaMs, cosa);
+      await aspettaCalma(true, cosa);
     }
   }
 
   async function fondiApp(p, wt) {
     for (let t = 0; ; t += 1) {
-      const r = await node(wt, ['scripts/finish-local.mjs', '--feedback', String(p.num)], 4 * 60 * 60_000);
+      const r = await conInCorso(p, 'finish', () => node(wt, ['scripts/finish-local.mjs', '--feedback', String(p.num)], 4 * 60 * 60_000));
       const k = classificaFinish(r);
       if (k === 'fuso') return 'ok';
       if (k === 'conflitto') return riallinea(p, 'finish trova un conflitto con main');
@@ -672,15 +779,17 @@ export function creaMotore(dep, opzioni = {}) {
       if (k === 'attesa-owner') return ferma(p, 'la fusione aspetta la tua approvazione in Filo (Gestione → Automazioni), poi npm run orchestra -- riprendi', '', { attesaApprovazione: true });
       if ((k === 'superato' || k === 'transitorio') && t < opz.ritenta) {
         dep.log(`#${p.num} finish: ${k}, riprovo`);
-        await dep.dormi(opz.pausaMs);
-        await aspettaCalma(true);
+        await pausa(opz.pausaMs, 'finish');
+        await aspettaCalma(true, 'finish');
         continue;
       }
       return ferma(p, `npm run finish non ha fuso (${k}):\n${coda(r.out)}`);
     }
   }
 
-  async function chiudi(p) {
+  // Server su main, poi l'app (che chiude la pratica), poi il deploy che incorpora il main pubblico appena fuso; infine i
+  // rilievi rimasti come feedback e i worktree tolti. Una chiusura partita arriva in fondo anche se si chiede di smettere.
+  async function fondi(p) {
     const wt = P.wt(p.slug);
     await git(wt, 'fetch', 'origin', 'main');
     if (P.serverRadice) await git(P.serverRadice, 'fetch', 'origin');
@@ -704,60 +813,135 @@ export function creaMotore(dep, opzioni = {}) {
     }
     if (!nApp && !nSrv && !p.fusa.app && !p.fusa.server) return ferma(p, 'niente da fondere: il ramo non ha commit oltre origin/main, né qui né sul server');
 
-    // Il carico si misura con un'attesa: dopo, il posto si rilegge senza altre attese prima di prenderlo, o due chiusure partono insieme.
-    while (chiusure > 0 || !caricoBasta(await dep.carico(), opz, true) || chiusure > 0) {
-      dep.log(`#${p.num} chiusura in attesa: un'altra chiusura in corso o macchina carica`);
-      await dep.dormi(opz.pausaMs);
-    }
-    chiusure += 1;
+    inChiusura.add(p.num);
     try {
-      // Server su main, poi l'app (che chiude la pratica), poi il deploy che incorpora il main pubblico appena fuso.
-      if (nSrv && !p.fusa.server) {
-        await git(P.serverRadice, 'push', 'origin', `refs/heads/${ramoDi(p)}:refs/heads/${ramoDi(p)}`);
-        const args = ['scripts/server-fondi-pratica.mjs', ramoDi(p), '--feedback', String(p.num), ...(nApp || p.fusa.app ? [] : ['--solo-server'])];
-        dep.log(`#${p.num} server:fondi`);
-        const r = await conRitenta(p, () => node(wt, args, 60 * 60_000), 'server:fondi');
-        if (r.code !== 0) return ferma(p, `server:fondi non ha fuso:\n${coda(r.out)}`);
-        p.fusa.server = true;
-        salva(p);
+      // Il carico si misura con un'attesa: dopo, il posto si rilegge senza altre attese prima di prenderlo, o due chiusure partono insieme.
+      while (chiusure > 0 || !caricoBasta(await dep.carico(), opz, true) || chiusure > 0) {
+        dep.log(`#${p.num} chiusura in attesa: un'altra chiusura in corso o macchina carica`);
+        await attendi(opz.pausaMs, 'chiusura non partita');
       }
-      if (nApp && !p.fusa.app) {
-        dep.log(`#${p.num} finish`);
-        const e = await fondiApp(p, wt);
-        if (e !== 'ok' || p.fase !== 'chiusura') return e;
-        p.fusa.app = true;
-        salva(p);
-      }
-      if (serveDeploy(p, p.fileApp) && !p.fusa.deploy) {
-        dep.log(`#${p.num} server:pubblica`);
-        const r = await conRitenta(p, () => dep.pubblica(), 'server:pubblica');
-        if (r.code !== 0) return ferma(p, `fuso, ma il deploy del server non è andato:\n${coda(r.out)}`);
-        p.fusa.deploy = true;
-        salva(p);
+      chiusure += 1;
+      try {
+        if (nSrv && !p.fusa.server) {
+          await git(P.serverRadice, 'push', 'origin', `refs/heads/${ramoDi(p)}:refs/heads/${ramoDi(p)}`);
+          const args = ['scripts/server-fondi-pratica.mjs', ramoDi(p), '--feedback', String(p.num), ...(nApp || p.fusa.app ? [] : ['--solo-server'])];
+          dep.log(`#${p.num} server:fondi`);
+          const r = await conInCorso(p, 'server:fondi', () => conRitenta(p, () => node(wt, args, 60 * 60_000), 'server:fondi'));
+          if (r.code !== 0) return ferma(p, `server:fondi non ha fuso:\n${coda(r.out)}`);
+          p.fusa.server = true;
+          salva(p);
+        }
+        if (nApp && !p.fusa.app) {
+          dep.log(`#${p.num} finish`);
+          const e = await fondiApp(p, wt);
+          if (e !== 'ok' || p.fase !== 'chiusura') return e;
+          p.fusa.app = true;
+          salva(p);
+        }
+        if (serveDeploy(p, p.fileApp) && !p.fusa.deploy) {
+          dep.log(`#${p.num} server:pubblica`);
+          const r = await conInCorso(p, 'server:pubblica', () => conRitenta(p, () => dep.pubblica(), 'server:pubblica'));
+          if (r.code !== 0) return ferma(p, `fuso, ma il deploy del server non è andato:\n${coda(r.out)}`);
+          p.fusa.deploy = true;
+          salva(p);
+        }
+      } finally {
+        chiusure -= 1;
       }
     } finally {
-      chiusure -= 1;
-    }
-    if (toccaRegole(p.fileApp) && !p.avvisi.some((a) => a.startsWith('regole'))) {
-      p.avvisi.push('regole cambiate: npm run regole:pubblica dal checkout principale su main, a Filo chiuso');
+      inChiusura.delete(p.num);
     }
     await apriDerivati(p);
     if (!opz.tieniWorktree) await pulisci(p);
+    p.fusioneFatta = true;
+    salva(p);
+    return 'ok';
+  }
+
+  async function statoCheckout() {
+    const R = P.radice;
+    if (dep.filoAperto && await dep.filoAperto()) return { filoAperto: true };
+    const f = await git(R, 'fetch', 'origin', 'main');
+    if (f.code !== 0) return { reteGiu: coda(f.out, 1) || 'git fetch non riuscito' };
+    const uscita = (r) => String(r.stdout !== undefined ? r.stdout : r.out);
+    const testo = async (...a) => { const r = await git(R, ...a); return r.code === 0 ? uscita(r).trim() : ''; };
+    const ramo = await testo('rev-parse', '--abbrev-ref', 'HEAD');
+    const st = await git(R, 'status', '--porcelain', '--', ...FILE_REGOLE);
+    return {
+      ramo: ramo === 'HEAD' ? '' : ramo,
+      testa: await testo('rev-parse', 'HEAD'),
+      origine: await testo('rev-parse', 'origin/main'),
+      indietro: (await git(R, 'merge-base', '--is-ancestor', 'HEAD', 'origin/main')).code === 0,
+      toccati: st.code === 0 ? uscita(st).split('\n').map((x) => x.slice(3).trim()).filter(Boolean) : [],
+    };
+  }
+
+  // Regole cambiate: le pubblica il motore stesso, a Filo chiuso e dal main allineato; se Filo è aperto aspetta (#1036).
+  async function pubblicaRegole(p) {
+    const riprendiCmd = `\`npm run orchestra -- riprendi ${p.num}\``;
+    let allineamenti = 0;
+    for (let t = 0; ;) {
+      const d = decidiRegole(await statoCheckout(), p.num);
+      if (d.azione === 'aspetta') {
+        if (p.attesa !== d.motivo) { p.attesa = d.motivo; salva(p); dep.log(`#${p.num} ${d.motivo}`); }
+        await attendi(opz.pausaMs, 'regole cambiate ancora da pubblicare');
+        continue;
+      }
+      p.attesa = '';
+      if (d.azione === 'owner') return ferma(p, d.motivo, '', { azione: d.fai });
+      if (d.azione === 'allinea') {
+        allineamenti += 1;
+        const r = allineamenti > 3 ? { code: 1, out: 'il checkout resta indietro dopo tre allineamenti' } : await git(P.radice, 'merge', '--ff-only', 'origin/main');
+        if (r.code !== 0) {
+          return ferma(p, `fuso, ma le regole cambiate non si pubblicano: il checkout principale non si allinea a origin/main:\n${coda(r.out)}`, '', { azione: `allinealo tu (git pull --ff-only), poi ${riprendiCmd}.` });
+        }
+        dep.log(`#${p.num} checkout principale allineato a origin/main per pubblicare le regole`);
+        continue;
+      }
+      dep.log(`#${p.num} regole:pubblica`);
+      const r = await conInCorso(p, 'regole:pubblica', () => node(P.radice, ['scripts/regole-pubblica.mjs'], 30 * 60_000));
+      if (r.code === 0) {
+        p.regolePubblicate = true;
+        salva(p);
+        return 'ok';
+      }
+      if (eTransitorio(r.out) && t < opz.ritenta) {
+        t += 1;
+        dep.log(`#${p.num} regole:pubblica: errore transitorio, riprovo`);
+        await attendi(opz.pausaMs, 'regole:pubblica da rilanciare');
+        continue;
+      }
+      return ferma(p, `fuso, ma regole:pubblica non è andato:\n${coda(r.out)}`, '', { azione: `guarda l’errore in \`npm run orchestra -- stato\`, poi ${riprendiCmd}.` });
+    }
+  }
+
+  async function chiudi(p) {
+    if (!p.fusioneFatta) {
+      const e = await fondi(p);
+      if (e !== 'ok' || p.fase !== 'chiusura') return e;
+    }
+    if (toccaRegole(p.fileApp) && !p.regolePubblicate) {
+      const e = await pubblicaRegole(p);
+      if (e !== 'ok') return e;
+    }
     p.fase = 'fuso';
     p.fermo = null;
     p.risposta = '';
+    p.attesa = '';
     dep.log(`#${p.num} fuso`);
     return 'ok';
   }
 
-  const apriDerivati = (p) => apriDerivatiDi(dep, p, { derivati: opz.derivati, salva });
+  const apriDerivati = (p) => apriDerivatiDi(depM, p, { derivati: opz.derivati, salva });
 
   async function pulisci(p) {
-    p.avvisi.push(...await togliWorktree(dep, p));
+    p.avvisi.push(...await togliWorktree(depM, p));
   }
 
   async function guida(p) {
     for (;;) {
+      if (chiusura) return p;
+      const prima = { fase: p.fase, compito: p.compito, giri: p.giri, giriTotali: p.giriTotali };
       let esito;
       try {
         const passo = passoDalRamo(dep.verifica(P.wt(p.slug)), p);
@@ -770,51 +954,67 @@ export function creaMotore(dep, opzioni = {}) {
         else if (p.fase === 'chiusura') esito = await chiudi(p);
         else return p;
       } catch (e) {
+        if (e instanceof Interrotto || chiusura === 'subito') {
+          Object.assign(p, prima, { inCorso: null, attesa: '' });
+          p.interrotto = { fase: prima.fase, cosa: e instanceof Interrotto ? e.cosa : primaRiga(String((e && e.message) || e)), come: chiusura || 'calma', at: dep.ora() };
+          dep.log(`#${p.num} lasciato a metà (${p.interrotto.cosa}): il prossimo avvia riparte da ${prima.fase}`);
+          salva(p);
+          return p;
+        }
         esito = ferma(p, `errore dell'orchestratore: ${String((e && e.stack) || e).split('\n').slice(0, 3).join(' · ')}`);
       }
       // Dopo ogni passo, non solo alla fusione: un lavoro che si ferma o viene tolto non tiene nascosti esterni e messi da parte.
       if (p.fase !== 'fuso') {
-        try { await apriDerivati(p); } catch (e) { avvisaUnaVolta(p, `feedback dei rilievi non aperti: ${primaRiga(String((e && e.message) || e))}`); }
+        try { await apriDerivati(p); } catch (e) {
+          if (!(e instanceof Interrotto)) avvisaUnaVolta(p, `feedback dei rilievi non aperti: ${primaRiga(String((e && e.message) || e))}`);
+        }
       }
       salva(p);
       if (esito === 'fermo') return p;
     }
   }
 
+  // Solo lettura: non passa dal controllo di «subito», o l'ammissione di un lavoro cadrebbe a metà.
   async function toccatiDa(p) {
     if (!dep.fs.esiste(P.wt(p.slug))) return [];
-    const r = await git(P.wt(p.slug), 'diff', '--name-only', 'origin/main...HEAD');
+    const r = await dep.esegui('git', ['diff', '--name-only', 'origin/main...HEAD'], { cwd: P.wt(p.slug) });
     return r.code === 0 ? String(r.out).split('\n').map((x) => x.trim()).filter(Boolean) : [];
   }
 
-  /** Parte quello che si può (posti, carico, file in comune); esce quando non resta niente da guidare. */
+  /** Fa partire i lavori uno per volta (file in comune, carico, chiusure); esce quando non resta niente da guidare o è stato chiesto di smettere. */
   async function avvia() {
     const attivi = new Map();
     for (;;) {
       const stato = dep.store.leggi();
       const daFare = (stato.coda || []).map((n) => stato.pratiche[n])
         .filter((p) => p && !FASI_FINITE.includes(p.fase) && !attivi.has(p.num));
-      if (!daFare.length && !attivi.size) return dep.store.leggi();
-      const vivi = [];
-      for (const a of attivi.values()) vivi.push({ file: a.p.file, toccati: await toccatiDa(a.p) });
-      for (const p of daFare) {
-        if (attivi.size >= opz.paralleli) break;
-        const io = { file: p.file, toccati: await toccatiDa(p) };
-        if (vivi.some((v) => siSovrappongono(io, v))) continue;
-        if (attivi.size && !caricoBasta(await dep.carico(), opz)) break;
-        p.tentativi = p.tentativi || {};
-        if (p.fase === 'in-coda' || p.ripreso) p.giri = 0;
-        delete p.ripreso;
-        p.derivati = opz.derivati;
-        dep.log(`#${p.num} parte (${p.fase})`);
-        const corsa = guida(p).finally(() => attivi.delete(p.num));
-        attivi.set(p.num, { p, corsa });
-        vivi.push(io);
+      if (!attivi.size && (chiusura || !daFare.length)) {
+        await Promise.allSettled([...inVolo]);
+        return dep.store.leggi();
+      }
+      // Un lavoro nuovo per giro, e solo se nessuno aspetta un posto né sta chiudendo: le istanze le regola postoIstanza.
+      if (!chiusura && !fila.length && !inChiusura.size && !(opz.paralleli && attivi.size >= opz.paralleli)) {
+        const vivi = [];
+        for (const a of attivi.values()) vivi.push({ file: a.p.file, toccati: await toccatiDa(a.p) });
+        for (const p of daFare) {
+          const io = { file: p.file, toccati: await toccatiDa(p) };
+          if (vivi.some((v) => siSovrappongono(io, v))) continue;
+          if ((attivi.size && !caricoBasta(await dep.carico(), opz)) || chiusura) break;
+          p.tentativi = p.tentativi || {};
+          if (p.fase === 'in-coda' || p.ripreso) p.giri = 0;
+          for (const k of ['ripreso', 'interrotto', 'inCorso', 'attesa']) delete p[k];
+          p.derivati = opz.derivati;
+          dep.log(`#${p.num} parte (${p.fase})`);
+          const corsa = guida(p).finally(() => attivi.delete(p.num));
+          attivi.set(p.num, { p, corsa });
+          break;
+        }
       }
       const corse = [...attivi.values()].map((a) => a.corsa);
-      await Promise.race([...corse, dep.dormi(opz.pausaMs)]);
+      if (chiusura && !corse.length) continue;
+      await Promise.race(chiusura ? corse : [...corse, Promise.race([dep.dormi(opz.pausaMs), suCalma])]);
     }
   }
 
-  return { avvia, guida, opz };
+  return { avvia, guida, opz, smetti, chiusura: () => chiusura };
 }
