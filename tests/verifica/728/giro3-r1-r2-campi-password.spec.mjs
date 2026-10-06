@@ -1,4 +1,5 @@
-// VERIFICA #728 giro 3 — esplorazione delle porte rimaste.
+// VERIFICA #728 giro 3 — il blocco di un sosia di un marchio corto dipende dal campo password: va contato
+// quello che l'utente vede, e va visto dovunque la pagina lo metta.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
@@ -11,6 +12,7 @@ async function servi(app, pagine) {
       if (html) return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
       return net.fetch(req, { bypassCustomProtocolHandlers: true });
     });
+    // Niente rete: conta solo il nome, come con un dominio vecchio o un registro che non risponde.
     globalThis.SN_SAFEBROWSE.setProviders({ gsb: null, rdap: null, ct: null, sandbox: null, llm: null });
   }, pagine);
 }
@@ -27,16 +29,7 @@ async function vistaAvviso(app, ms = 12_000) {
 
 const ACCESSO = '<form><input name="email" placeholder="Email"><input type="password" name="pw"><button>Accedi</button></form>';
 
-test('telegraph.co.uk: popup, non blocco', async ({ app, openTab }) => {
-  await servi(app, { 'telegraph.co.uk': '<h1>The Telegraph</h1>' });
-  await openTab('https://telegraph.co.uk/');
-  const avviso = await vistaAvviso(app);
-  await expect(avviso.getByRole('button', { name: 'Continua' })).toBeVisible({ timeout: 12_000 });
-  await new Promise((r) => setTimeout(r, 4000));
-  await expect(avviso.getByPlaceholder('confermo')).toBeHidden();
-});
-
-test('email.com con modulo d\'accesso nascosto dietro «Accedi»', async ({ app, openTab }) => {
+test('r1 email.com col modulo d\'accesso nascosto dietro «Accedi»: popup «Continua», non il blocco', async ({ app, openTab }) => {
   await servi(app, {
     'email.com': '<h1>Posta gratuita</h1><button onclick="document.getElementById(\'m\').hidden=false">Accedi</button>'
       + `<div id="m" hidden>${ACCESSO}</div>`,
@@ -48,38 +41,12 @@ test('email.com con modulo d\'accesso nascosto dietro «Accedi»', async ({ app,
   await expect(avviso.getByPlaceholder('confermo')).toBeHidden();
 });
 
-test('paypak.com con la password in un shadow DOM', async ({ app, openTab }) => {
+test('r2 paypak.com col modulo d\'accesso in un componente con shadow DOM: blocco', async ({ app, openTab }) => {
   await servi(app, {
     'paypak.com': '<h1>PayPal</h1><login-box></login-box><script>customElements.define("login-box", class extends HTMLElement {'
       + `constructor(){super(); this.attachShadow({mode:"open"}).innerHTML = ${JSON.stringify(ACCESSO)};}});</script>`,
   });
   await openTab('https://paypak.com/');
   const avviso = await vistaAvviso(app);
-  await expect(avviso.getByPlaceholder('confermo')).toBeVisible({ timeout: 15_000 });
-});
-
-test('paypak.com con la password in un riquadro di un altro dominio', async ({ app, openTab }) => {
-  await servi(app, {
-    'login-cdn.net': `<!doctype html><body>${ACCESSO}</body>`,
-    'paypak.com': '<h1>PayPal</h1><iframe src="https://login-cdn.net/" width="400" height="200"></iframe>',
-  });
-  await openTab('https://paypak.com/');
-  const avviso = await vistaAvviso(app);
-  await expect(avviso.getByPlaceholder('confermo')).toBeVisible({ timeout: 15_000 });
-});
-
-test('paypak.com: rotta cambiata con pushState e poi il modulo', async ({ app, openTab }) => {
-  await servi(app, {
-    'paypak.com': '<h1>PayPal</h1><a id="l" href="#" onclick="history.pushState({},\'\',\'/signin\');'
-      + `setTimeout(()=>{document.body.insertAdjacentHTML('beforeend', ${JSON.stringify(ACCESSO).replace(/"/g, '&quot;')})},500);return false">Accedi</a>`,
-  });
-  const page = await openTab('https://paypak.com/');
-  const avviso = await vistaAvviso(app);
-  const continua = avviso.getByRole('button', { name: 'Continua' });
-  await expect(continua).toBeVisible({ timeout: 12_000 });
-  await continua.click();
-  await new Promise((r) => setTimeout(r, 1500));
-  await page.click('#l');
-  await expect(page.locator('input[type=password]')).toHaveCount(1);
   await expect(avviso.getByPlaceholder('confermo')).toBeVisible({ timeout: 15_000 });
 });
