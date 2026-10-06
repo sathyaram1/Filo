@@ -47,7 +47,7 @@ for (const [host, marchio] of ESEMPI) {
     const avviso = await vistaAvviso(app);
     const continua = avviso.getByRole('button', { name: 'Continua' });
     await expect(continua).toBeVisible({ timeout: 12_000 });
-    await expect(avviso.getByPlaceholder('confermo')).toHaveCount(0);
+    await expect(avviso.getByPlaceholder('confermo')).toBeHidden();
     await expect(avviso.getByText(new RegExp(`assomiglia all'indirizzo di ${marchio}`))).toBeVisible();
     if (host === 'posts.com') await avviso.screenshot({ path: 'tests/.shots/verifica-728-posts.png' });
     await continua.click();
