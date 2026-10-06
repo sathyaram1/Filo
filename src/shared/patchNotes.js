@@ -20,6 +20,10 @@
         'La pagina dei file scaricati adesso si chiama «Download»: nella home, nel menu App e sulla scheda. E nella home non trovi più il tasto dei download in alto, che ripeteva quello che vedi già nelle carte.',
         'Su Mac Cmd+← e Cmd+→ tornano indietro e vanno avanti come in Safari e in Chrome, quando non stai scrivendo. In un campo di testo portano il cursore a inizio o fine riga, come sempre.',
         'Quando un post o un video di un altro sito resta vuoto e Filo non lo conosce, la foto che manda a un modello per capire se sono i cookie la puoi spegnere: in Sicurezza, sotto i cookie, «Riconosci con un modello i contenuti incorporati rotti», o chiedendolo a Filo. Da spento quel riquadro lo riattivi col tasto destro.',
+        'In Impostazioni → Sicurezza c\'è "Cronologia appunti": vedi tutto quello che hai copiato di recente, togli una voce sola o svuoti tutto. Prima ci si arrivava solo dal menu del tasto destro dentro un campo di testo, quindi una password copiata mentre leggevi una pagina non si riusciva a togliere.',
+        'Nella stessa pagina c\'è un campo per cercare fra le voci copiate: con la cronologia piena trovi subito quella da togliere, senza scorrerle tutte.',
+        'Cliccando una voce della cronologia la rimetti negli appunti, pronta da incollare dove vuoi.',
+        'Nella cronologia del menu "Incolla" le immagini copiate si vedono in miniatura: due schermate copiate una dietro l\'altra non si leggono più tutte e due "Immagine".',
       ],
       fixes: [
         'Filo vede ancora le foto che gli mandi in chat anche nei messaggi dopo, e puoi continuare a chiedergli di quello che c\'è dentro; riaprendo la chat le ritrovi anche tu. Prima dal secondo messaggio diceva di non vederle. Dopo una ventina di messaggi, o se riapri Filo, non le ha più davanti, ma sa che c\'erano e ti chiede di rimandarle se gli servono.',
@@ -59,6 +63,12 @@
         'Quando riscatti un invito, la conferma dice quanti crediti d’ingresso ricevi. Prima nominava anche i crediti contati sul tuo computer, e sembrava che te li togliesse.',
         'Quando Filo ti mostra il file di cui parla o ti propone un evento per il calendario, la risposta resta nella chat sopra il bottone, anche se dopo qualcosa va storto. Prima a volte finiva chiusa nel blocco delle attività, e in chat restava solo «Ti ho messo anche il bottone per aprirlo».',
         'Anche le schede dei siti senza https mostrano la loro icona.',
+        'La cronologia degli appunti non si sposta più mentre ci stai cliccando sopra: prima un doppio clic sul tasto che toglie una voce ne portava via due, quella che avevi puntato e la vicina, e non c\'era modo di riaverle. Lo stesso valeva se copiavi qualcosa in un\'altra scheda proprio mentre stavi per togliere una voce.',
+        'Prima di svuotare la cronologia degli appunti, Filo dice quante voci stanno per sparire; se hai una ricerca in corso avverte che spariscono anche quelle che il filtro sta nascondendo.',
+        'La cronologia appunti in Impostazioni → Sicurezza si aggiorna da sola: quello che copi mentre la pagina è aperta compare subito, e una voce tolta dal menu "Incolla" sparisce anche lì. Prima la pagina restava ferma a com\'era quando l\'avevi aperta, e sembrava che una password copiata poco prima non ci fosse.',
+        'Una voce copiata fatta di soli spazi non è più una riga vuota senza spiegazione: adesso dice che sono spazi e quanti.',
+        'Una voce tolta dalla cronologia appunti resta tolta: se la stessa cosa è ancora negli appunti e la incolli con "Incolla", Filo non la rimette in cronologia.',
+        'Togliendo le voci della cronologia appunti con la tastiera il fuoco resta sulla lista, pronto per la voce dopo, anche se il mouse è fermo sopra le righe. Prima in quel caso tornava all\'inizio della pagina e per ogni voce bisognava riattraversare tutte le impostazioni col tabulatore.',
       ],
     },
     {
@@ -291,23 +301,6 @@
         'A schermo intero Esc chiude prima quello che hai aperto sopra la pagina, qualunque cosa sia: la risposta di Filo, un menu del tasto destro, un\'immagine ingrandita, una domanda di conferma, il QR code, la selezione di una parte dello schermo, la ricerca in una pagina di Filo. Se ne hai aperte due, un Esc per ciascuna. Dallo schermo intero esci col tasto dopo. Prima li scavalcava tutti e ti buttava fuori lasciandoli lì.',
         'Vale anche quando a stare a schermo pieno è un video: apri il menu del tasto destro sopra il filmato, premi Esc e si chiude il menu, non il filmato. Prima quel tasto ti riportava alla finestra piccola e il menu restava lì sopra.',
         'Nessun sito può più tenerti dentro allo schermo intero, né riportartici mentre premi Esc per uscirne. E premere Esc su una pagina qualunque non le regala più tutto lo schermo, barra di Filo compresa: per prendersi lo schermo un sito deve chiedertelo con un clic, come prima.',
-      ],
-    },
-    {
-      version: '0.2.222', date: '2026-09-06',
-      features: [
-        'In Impostazioni → Sicurezza c\'è "Cronologia appunti": vedi tutto quello che hai copiato di recente, togli una voce sola o svuoti tutto. Prima ci si arrivava solo dal menu del tasto destro dentro un campo di testo, quindi una password copiata mentre leggevi una pagina non si riusciva a togliere.',
-        'Nella stessa pagina c\'è un campo per cercare fra le voci copiate: con la cronologia piena trovi subito quella da togliere, senza scorrerle tutte.',
-        'Cliccando una voce della cronologia la rimetti negli appunti, pronta da incollare dove vuoi.',
-        'Nella cronologia del menu "Incolla" le immagini copiate si vedono in miniatura: due schermate copiate una dietro l\'altra non si leggono più tutte e due "Immagine".',
-      ],
-      fixes: [
-        'La cronologia degli appunti non si sposta più mentre ci stai cliccando sopra: prima un doppio clic sul tasto che toglie una voce ne portava via due, quella che avevi puntato e la vicina, e non c\'era modo di riaverle. Lo stesso valeva se copiavi qualcosa in un\'altra scheda proprio mentre stavi per togliere una voce.',
-        'Prima di svuotare la cronologia degli appunti, Filo dice quante voci stanno per sparire; se hai una ricerca in corso avverte che spariscono anche quelle che il filtro sta nascondendo.',
-        'La cronologia appunti in Impostazioni → Sicurezza si aggiorna da sola: quello che copi mentre la pagina è aperta compare subito, e una voce tolta dal menu "Incolla" sparisce anche lì. Prima la pagina restava ferma a com\'era quando l\'avevi aperta, e sembrava che una password copiata poco prima non ci fosse.',
-        'Una voce copiata fatta di soli spazi non è più una riga vuota senza spiegazione: adesso dice che sono spazi e quanti.',
-        'Una voce tolta dalla cronologia appunti resta tolta: se la stessa cosa è ancora negli appunti e la incolli con "Incolla", Filo non la rimette in cronologia.',
-        'Togliendo le voci della cronologia appunti con la tastiera il fuoco resta sulla lista, pronto per la voce dopo, anche se il mouse è fermo sopra le righe. Prima in quel caso tornava all\'inizio della pagina e per ogni voce bisognava riattraversare tutte le impostazioni col tabulatore.',
       ],
     },
     {

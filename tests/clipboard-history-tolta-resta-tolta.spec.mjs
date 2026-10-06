@@ -2,10 +2,10 @@
 // «Incolla» e con le gemelle lasciate da un import) e la lista della Sicurezza
 // non si muove sotto il puntatore né promette azioni su righe già tolte.
 
-import { test, expect } from './fixtures/electron.mjs';
+import { test, expect, argomentiScala } from './fixtures/electron.mjs';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { _electron as electron } from '@playwright/test';
-import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
@@ -27,7 +27,7 @@ async function findTabPage(app, hostname, timeout = 20000) {
 }
 
 async function avvia(items) {
-  const userData = mkdtempSync(join(tmpdir(), 'clip-tolta-'));
+  const userData = cartellaTemporanea('clip-tolta-');
   writeFileSync(join(userData, 'storage.json'), JSON.stringify({ clipboardHistory: items }), 'utf8');
   const server = createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -35,7 +35,7 @@ async function avvia(items) {
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const app = await electron.launch({
-    args: ['.'], cwd: APP_ROOT,
+    args: [...argomentiScala, '.'], cwd: APP_ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });
   const shell = await app.firstWindow();

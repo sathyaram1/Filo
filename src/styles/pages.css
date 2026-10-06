@@ -813,12 +813,8 @@ section:has(#dictList) .sn-spell-add-row {
 .filo-md a.filo-md-link { color: var(--sn-accent); text-decoration: underline; text-underline-offset: 2px; word-break: break-word; }
 .filo-md a.filo-md-link:hover { text-decoration: none; }
 
-/* Cronologia appunti nella pagina Sicurezza (#256).
-   Il "Rimuovi" qui NON si nasconde fino all'hover come nella cronologia AI:
-   quella è una lista che si legge, questa è una lista che si POTA — chi ci
-   arriva ci arriva apposta per togliere qualcosa (una password copiata per
-   sbaglio), e un bottone invisibile finché non ci passi sopra era esattamente
-   il problema segnalato. Resta discreto nel colore, non nella presenza. */
+/* Cronologia appunti in Sicurezza (#256): "Rimuovi" sempre visibile, discreto nel colore e non nella
+   presenza, perché è una lista che si pota e un tasto nascosto fino all'hover era il problema segnalato. */
 .sn-page .sn-clip-list {
   border: 1px solid var(--sn-border);
   border-radius: 8px;
@@ -833,9 +829,8 @@ section:has(#dictList) .sn-spell-add-row {
   transition: background 0.12s ease;
 }
 .sn-page .sn-clip-item + .sn-clip-item { border-top: 1px solid var(--sn-border); }
-/* La zona cliccabile della riga: rimette la voce negli appunti. Prima la riga
-   si illuminava intera ma cliccarla non faceva niente, cioè prometteva
-   un'azione che non esisteva. */
+/* La zona cliccabile rimette la voce negli appunti: una riga che si illumina
+   deve anche fare qualcosa. */
 .sn-page .sn-clip-copy {
   flex: 1;
   min-width: 0;
@@ -861,9 +856,8 @@ section:has(#dictList) .sn-spell-add-row {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* Voce tolta mentre il puntatore è ancora sulla lista: resta al suo posto,
-   barrata, finché il puntatore non esce. Se sparisse subito, le righe sotto
-   salirebbero di una posizione e il clic dopo colpirebbe la voce sbagliata. */
+/* Voce tolta col puntatore sulla lista: resta barrata al suo posto finché esce,
+   o le righe sotto salirebbero e il clic dopo colpirebbe la voce sbagliata. */
 .sn-page .sn-clip-gone { opacity: 0.5; }
 .sn-page .sn-clip-gone .sn-clip-text { text-decoration: line-through; }
 .sn-page .sn-clip-gone .sn-clip-copy { cursor: default; }
