@@ -32,7 +32,9 @@ async function serve() {
       res.end();
       return;
     }
-    if (u.pathname === '/login') { html('<p>Accedi per vedere il post</p>', conCookie); return; }
+    // Il cookie vale per tutto il servizio, come quello di un accesso vero: uno solo del sottodominio d'accesso non
+    // arriverebbe mai al riquadro, con o senza Filo.
+    if (u.pathname === '/login') { html('<p>Accedi per vedere il post</p>', { 'Set-Cookie': ['vista=1; Max-Age=86400; Path=/; Domain=b.localhost; SameSite=None; Secure'] }); return; }
     res.writeHead(404);
     res.end();
   });
