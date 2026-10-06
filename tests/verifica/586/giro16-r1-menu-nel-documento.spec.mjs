@@ -22,6 +22,7 @@ async function incollaVero(app, openTab, testServer, testo) {
 }
 
 test('la cronologia di Incolla aperta passandoci sopra non si legge dalla pagina', async ({ app, openTab, testServer }) => {
+  test.fail(true, 'porta aperta per scelta dell’owner (D14): il menu del tasto destro vive nel documento del sito, si chiude solo portandolo fuori, lavoro a parte');
   test.setTimeout(60_000);
   await incollaVero(app, openTab, testServer, 'codice-banca-586');
   const page = await apriOstile(openTab, testServer, `<!doctype html><title>Ostile</title><input id="campo" style="width:300px"><script>
@@ -39,6 +40,7 @@ test('la cronologia di Incolla aperta passandoci sopra non si legge dalla pagina
 });
 
 test('un «Incolla» travestito dalla pagina non porta gli appunti al sito con un clic vero', async ({ app, openTab, testServer }) => {
+  test.fail(true, 'porta aperta per scelta dell’owner (D14): il menu del tasto destro vive nel documento del sito, si chiude solo portandolo fuori, lavoro a parte');
   test.setTimeout(60_000);
   await app.evaluate(({ clipboard }) => clipboard.writeText('password-586'));
   const page = await apriOstile(openTab, testServer, `<!doctype html><title>Ostile</title><input id="campo" style="width:300px"><script>

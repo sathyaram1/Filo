@@ -33,6 +33,7 @@ const PAGINA = `<!doctype html><html><head><title>Vecchia</title></head><body>
 
 for (const [fn, cosa] of [['soloAudio', 'l’audio del computer senza immagine'], ['schermoEMic', 'lo schermo insieme al microfono']]) {
   test(`chiedere ${cosa} dalla copia intonsa non fa morire la scheda`, async ({ openTab, testServer }) => {
+    test.fail(true, 'porta aperta per scelta dell’owner (D14): un riquadro vuoto preso per indice resta fuori dalla chiusura messa nella pagina');
     test.setTimeout(60_000);
     const page = await testServer.openReady(openTab, PAGINA);
     let morta = false;
@@ -46,6 +47,7 @@ for (const [fn, cosa] of [['soloAudio', 'l’audio del computer senza immagine']
 }
 
 test('nel riquadro preso per indice i permessi mai decisi si leggono «da chiedere»', async ({ openTab, testServer }) => {
+  test.fail(true, 'porta aperta per scelta dell’owner (D14): un riquadro vuoto preso per indice resta fuori dalla chiusura messa nella pagina');
   const page = await testServer.openReady(openTab, PAGINA);
   const s = await page.evaluate(() => window.stati());
   expect(s).toEqual({ camera: 'prompt', microphone: 'prompt', geolocation: 'prompt', notifications: 'prompt', notifica: 'default' });
