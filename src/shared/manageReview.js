@@ -1643,6 +1643,15 @@
     return (Array.isArray(lista) ? lista : []).slice().sort((a, b) => ferma(b) - ferma(a));
   }
 
+  // Le forme dei livelli in una griglia di 16. Nel dettaglio i giudici restano `.mg-dot`: il cerchio serve al segno in lista.
+  const FORME_SVG = {
+    triangolo: 'M8 2 L14.5 13.6 L1.5 13.6 Z',
+    rombo:     'M8 1.4 L14.6 8 L8 14.6 L1.4 8 Z',
+    pentagono: 'M8 1.4 L14.6 6.3 L12.1 14.2 L3.9 14.2 L1.4 6.3 Z',
+    quadrato:  'M2.6 2.6 H13.4 V13.4 H2.6 Z',
+    cerchio:   'M8 2.2 A5.8 5.8 0 1 1 7.99 2.2 Z',
+  };
+
   // Il motivo di design → il livello che ha fermato la pratica (D93). Il rombo è Claude che chiede.
   const SEGNO_DESIGN = {
     secaudit: { forma: 'pentagono', livello: 'l4', classe: 'attack', testo: 'Bloccato dalla sicurezza: l’audit ha bocciato il fix' },
@@ -1657,7 +1666,7 @@
   /**
    * Il simbolo in lista che dice cosa ha fermato una pratica dei Ricevuti: la stessa forma del dettaglio
    * (triangolo L1, cerchio giudici, rombo L3, pentagono L4, quadrato L5), il motivo in parole. null fuori
-   * dai Ricevuti o a stato illeggibile. PURA. Regole: patterns/il-motivo-in-lista-e-una-forma.md
+   * dai Ricevuti o a stato illeggibile. PURA. Regola: patterns/il-colore-di-una-card-dice-che-decisione-serve-non-lo-stato.md
    */
   function segnoFermata(fb, opts) {
     if (!fb || statusUnreadable(fb)) return null;
@@ -1733,7 +1742,7 @@
     ownerActions, ownerActionFor, ownerActionAllowsStatus, stateBadge,
     classifyReevalResult, reevalErrorHint, REEVAL_WASTE_LIMIT,
     livelli, livelloPer, livelloL1, livelloL2, livelloL3, livelloL4, livelloL5, righeStato,
-    fusioneInAttesa, fusioniFermeInCima, segnoFermata, fusioniSenzaFeedback, richiestaDiQuesto, numeroOf,
+    fusioneInAttesa, fusioniFermeInCima, segnoFermata, FORME_SVG, fusioniSenzaFeedback, richiestaDiQuesto, numeroOf,
     l1MotivoText, LIVELLO_COLORI, L1_MOTIVI,
     aspettaRisposta, ultimaDomanda, TESTO_CIFRATO,
     FRASE_SEGNO_ERRATO, fermatoDalSegno, motivoSegnoText,

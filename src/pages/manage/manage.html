@@ -604,7 +604,7 @@
     }
 
     .mg-list { display: flex; flex-direction: column; gap: 4px; }
-    /* #N · titolo con ellissi. Il motivo resta implicito nel colore del border-left. */
+    /* #N · segno · titolo con ellissi: il bordo dice la famiglia del motivo, il segno chi ha fermato la pratica. */
     .mg-item {
       display: flex; flex-direction: row; align-items: baseline; gap: 6px;
       padding: 8px 10px; border-radius: 6px; cursor: pointer;
@@ -676,6 +676,17 @@
     /* Icona d'autore (chi ha scritto il feedback): owner/utente/Claude/Filo. */
     .mg-item-author { flex: 0 0 auto; font-size: 13px; line-height: 1; align-self: center; }
     .mg-item-num { font-size: 11px; color: var(--sn-muted); font-weight: 600; flex: 0 0 auto; }
+    /* Il segno dei Ricevuti: la forma del livello che ha fermato la pratica, più piccola di quella del dettaglio
+       perché sta nella riga del titolo. Il contorno nel colore del testo la tiene leggibile anche sul bianco. */
+    .mg-segno-fermata {
+      flex: 0 0 auto; align-self: center; display: inline-flex;
+      width: var(--mg-segno-size, 11px); height: var(--mg-segno-size, 11px); color: var(--sn-muted);
+      cursor: help; transition: transform 0.1s;
+    }
+    .mg-segno-fermata:hover { transform: scale(1.25); }
+    .mg-segno-fermata svg { width: 100%; height: 100%; display: block; overflow: visible; }
+    .mg-segno-fermata svg path { fill: currentColor; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }
+    .mg-segno-fermata--vuoto svg path { fill: none; stroke-width: 1.6; stroke-dasharray: 3 2; }
     /* Base zero: col titolo che non chiede spazio suo, a mandare a capo sono le etichette, non lui. Il minimo
        lo tiene leggibile: sotto, sono le etichette ad andare a capo invece di ridurlo a una lettera. */
     .mg-item-title {
