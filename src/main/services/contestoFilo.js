@@ -75,13 +75,13 @@ function senzaDomanda(lista, chatId, userMessage) {
 // l'ultimo messaggio che il filo conosce.
 function codaDellaScheda(storia, chatMsgs) {
   const h = (Array.isArray(storia) ? storia : []).slice(-20);
-  const ultimo = chatMsgs[chatMsgs.length - 1] || null;
+  const recenti = chatMsgs.slice(-20);
   const coda = [];
   for (let i = h.length - 1; i >= 0; i--) {
     const m = h[i];
     if (!m) continue;
-    if (ultimo && stesso(m, ultimo) && !m.interrotto) break;
-    if (!ultimo && !m.interrotto && !m.interno) continue;
+    if (!m.interrotto && recenti.some((x) => stesso(m, x))) break;
+    if (!recenti.length && !m.interrotto && !m.interno) continue;
     coda.unshift(m);
   }
   return coda;
