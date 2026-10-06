@@ -9,9 +9,15 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
-      version: '0.2.234', date: '2026-10-05',
+      version: '0.2.235', date: '2026-10-06',
       features: [
         'Su ogni pagina, spingendo il mouse contro il bordo sinistro, si apre una barra con indietro, avanti, ricarica, home, incognito, schermo intero e chiudi scheda, e in fondo l\'ora, la cronologia, le app, il profilo e le impostazioni. La apri anche dalla linguetta a sinistra delle schede o con Ctrl+Shift+B (Cmd+Shift+B su Mac). Le icone del tasto destro si trascinano nella barra e ritorno, o lo chiedi a Filo a parole, e restano dove le metti. Col tasto destro su Indietro e Avanti vedi le pagine della scheda e ci torni con un clic. In Preferenze → Impostazioni avanzate, col tasto destro sulla striscia o chiedendolo a Filo nascondi la striscia, spegni l\'apertura dal bordo o cambi quanto aspetta e quanto resta aperta.',
+      ],
+      fixes: [],
+    },
+    {
+      version: '0.2.234', date: '2026-10-05',
+      features: [
         'Nel deck builder ogni lista di carte in chat ha un titolo in italiano che dice cosa contiene, per esempio «12 carte che danno rapidità», e il triangolino la chiude e la riapre anche nell\'ultima risposta. Col tasto destro sul titolo copi la ricerca usata, riordini la lista per costo di mana, nome o prezzo, oppure apri la stessa ricerca su Scryfall. L\'ordine puoi chiederlo anche a Filo («ordinale per prezzo») e resta quando riapri la chat.',
         'I post, i video e le mappe che vedi dentro le pagine di altri siti non lasciano più cookie per sempre: durano finché leggi la pagina e per qualche minuto dopo che l\'hai chiusa. Dai siti dove sei entrato con il tuo account resti connesso lo stesso, e quali sono lo vedi (e lo correggi) in Impostazioni → Sicurezza.',
         'Mentre Filo lavora, al posto della rotella corre un filo. Accanto vedi scorrere il suo ragionamento, e ogni volta che fa qualcosa il filo fa un nodo col nome di quello che sta facendo, per esempio «Cercato sul web · orari treni». Quando risponde il filo si avvolge in un gomitolo con il riassunto, e un clic lo srotola. Il tasto d\'invio intanto diventa un quadrato che lo ferma subito, anche con Invio. Quello che aveva già fatto resta, e lo stesso tasto ti offre di riprendere senza rifarlo.',
