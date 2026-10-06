@@ -80,6 +80,69 @@ test('byte vuoti o diversi da quelli dichiarati: niente file, la voce dice il pe
   assert.ok(p.immagini.every((v) => v.file === undefined && v.base64 === undefined));
 });
 
+// Una BMP 2×2 a 24 bit; `alto` = righe dall'alto (altezza negativa), come la scrivono alcuni programmi.
+function bmp24(pixel, { alto = false } = {}) {
+  const passo = 8;
+  const b = Buffer.alloc(54 + passo * 2);
+  b.write('BM', 0); b.writeUInt32LE(b.length, 2); b.writeUInt32LE(54, 10); b.writeUInt32LE(40, 14);
+  b.writeInt32LE(2, 18); b.writeInt32LE(alto ? -2 : 2, 22); b.writeUInt16LE(1, 26); b.writeUInt16LE(24, 28);
+  pixel.forEach(([r, g, bl], i) => {
+    const y = i >> 1; const x = i & 1;
+    const o = 54 + (alto ? y : 1 - y) * passo + x * 3;
+    b[o] = bl; b[o + 1] = g; b[o + 2] = r;
+  });
+  return b;
+}
+// I pixel di un PNG a 8 bit senza filtri, come li scrive la conversione: [[r,g,b(,a)], …] dall'alto.
+function pixelDelPng(buf) {
+  assert.deepEqual([...buf.subarray(0, 4)], [0x89, 0x50, 0x4e, 0x47]);
+  const w = buf.readUInt32BE(16); const canali = buf[25] === 6 ? 4 : 3;
+  const idat = []; let o = 8;
+  while (o < buf.length) { const n = buf.readUInt32BE(o); if (buf.toString('latin1', o + 4, o + 8) === 'IDAT') idat.push(buf.subarray(o + 8, o + 8 + n)); o += 12 + n; }
+  const raw = inflateSync(Buffer.concat(idat)); const riga = w * canali + 1; const out = [];
+  for (let r = 0; r < raw.length / riga; r++) for (let x = 0; x < w; x++) out.push([...raw.subarray(r * riga + 1 + x * canali, r * riga + 1 + (x + 1) * canali)]);
+  return out;
+}
+const COLORI = [[200, 30, 30], [30, 200, 30], [30, 30, 200], [240, 230, 210]];
+
+test('una bmp arriva rifatta png, nello stesso ordine di pixel, per le righe dal basso e dall\'alto', () => {
+  for (const alto of [false, true]) {
+    const b = bmp24(COLORI, { alto });
+    const v = scriviImmagine(aperta('s1', b, 'image/bmp', { origine: 'segnalazione' }), { root: ROOT, base: BASE });
+    assert.equal(v.errore, undefined);
+    assert.match(v.file, /\.png$/);
+    assert.equal(v.tipo, 'image/png');
+    assert.equal(v.convertitaDa, 'image/bmp');
+    const png = readFileSync(v.file);
+    assert.equal(v.byte, png.length);
+    assert.deepEqual(pixelDelPng(png), COLORI);
+  }
+});
+
+test('una bmp a 32 bit con maschera d\'alfa tiene la trasparenza; una con l\'alfa tutto a zero resta visibile', () => {
+  const fai = (alfa) => {
+    const b = Buffer.alloc(14 + 108 + 4);
+    b.write('BM', 0); b.writeUInt32LE(b.length, 2); b.writeUInt32LE(14 + 108, 10); b.writeUInt32LE(108, 14);
+    b.writeInt32LE(1, 18); b.writeInt32LE(1, 22); b.writeUInt16LE(1, 26); b.writeUInt16LE(32, 28); b.writeUInt32LE(3, 30);
+    b.writeUInt32LE(0x00ff0000, 54); b.writeUInt32LE(0x0000ff00, 58); b.writeUInt32LE(0x000000ff, 62); b.writeUInt32LE(0xff000000, 66);
+    b.writeUInt32LE(((alfa << 24) | (10 << 16) | (20 << 8) | 30) >>> 0, 122);
+    return b;
+  };
+  for (const [alfa, atteso] of [[128, 128], [0, 255]]) {
+    const v = scriviImmagine(aperta('s1', fai(alfa), 'image/bmp'), { root: ROOT, base: BASE });
+    assert.deepEqual(pixelDelPng(readFileSync(v.file)), [[10, 20, 30, atteso]]);
+  }
+});
+
+test('una bmp che non si sa leggere: niente file, la voce dice che è una bmp e perché', () => {
+  const rle = bmp24(COLORI); rle.writeUInt32LE(1, 30);
+  const tronca = bmp24(COLORI).subarray(0, 60);
+  const p = scaricaPayload({ immagini: [aperta('s1', rle, 'image/bmp'), aperta('s2', tronca, 'image/bmp')] }, { root: ROOT, base: BASE });
+  assert.match(p.immagini[0].errore, /bmp.*compressa/);
+  assert.match(p.immagini[1].errore, /bmp.*troncata/);
+  assert.ok(p.immagini.every((v) => v.file === undefined && v.base64 === undefined));
+});
+
 test('server vecchio: niente «immagini», gli indirizzi in feedback.images passano senza errori', () => {
   const entrata = { feedback: { text: 'x', images: ['https://firebasestorage.googleapis.com/v0/b/a/o/x.enc'] } };
   assert.deepEqual(scaricaPayload(entrata, { root: ROOT, base: BASE }), entrata);
