@@ -336,15 +336,21 @@ test('prova vera: un rosso instabile si riprova da solo e non ferma la fusione',
 test('prova vera: due test verdi da soli che si rompono sempre insieme non sono instabili, e fermano la fusione', () => {
   const r = repoFinto();
   try {
-    // Il test di main lascia un segno legato alla corsa (il `node --test` padre), quello del ramo cade se lo trova:
-    // da solo passa sempre, nella stessa suite mai, in parallelo o in fila (main.test viene prima).
+    // Il test di main lascia un segno legato alla corsa (il `node --test` padre), quello del ramo cade se lo trova: da
+    // solo passa sempre, nella stessa suite mai. La suite del repo finto gira un file alla volta, in ordine (main.test
+    // prima di ramo.test): in parallelo il segno arrivava a tempo solo a macchina scarica (#1063).
     const diMain = "import { test } from 'node:test';\nimport { writeFileSync } from 'node:fs';\nimport { join } from 'node:path';\n"
       + "test('main da solo', () => writeFileSync(join(process.cwd(), '..', `segno-${process.ppid}`), 'x'));\n";
     const delRamo = "import { test } from 'node:test';\nimport assert from 'node:assert';\nimport { existsSync } from 'node:fs';\n"
-      + "import { join } from 'node:path';\ntest('ramo da solo', async () => {\n"
-      + '  for (let i = 0; i < 40; i++) {\n'
-      + "    assert.ok(!existsSync(join(process.cwd(), '..', `segno-${process.ppid}`)), 'insieme a main no');\n"
-      + '    await new Promise((ok) => setTimeout(ok, 100));\n  }\n});\n';
+      + "import { join } from 'node:path';\n"
+      + "test('ramo da solo', () => assert.ok(!existsSync(join(process.cwd(), '..', `segno-${process.ppid}`)), 'insieme a main no'));\n";
+    const inFila = "import { fileURLToPath } from 'node:url';\n"
+      + "process.argv.splice(1, 1, fileURLToPath(new URL('./run-unit-tests-vero.mjs', import.meta.url)));\n"
+      + "process.argv.push('--test-concurrency=1');\nawait import('./run-unit-tests-vero.mjs');\n";
+    r.suMain(() => {
+      r.scrivi('scripts/run-unit-tests-vero.mjs', readFileSync(join(r.lavoro, 'scripts', 'run-unit-tests.mjs'), 'utf8'));
+      r.scrivi('scripts/run-unit-tests.mjs', inFila);
+    });
     const punta = r.ramo('claude/insieme', () => r.scrivi('tests/unit/ramo.test.mjs', delRamo));
     r.suMain(() => r.scrivi('tests/unit/main.test.mjs', diMain));
     r.ok(['checkout', '-q', 'claude/insieme']);
