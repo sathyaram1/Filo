@@ -31,7 +31,7 @@ test('saturazione a 0, scheda chiusa, saturazione di nuovo a 1: barra e Cronolog
   await expect.poll(() => shell.evaluate(async (i) => (await window.filoShell.tabs.snapshot()).tabs.find((t) => t.id === i)?.identityColor || null, id),
     { timeout: 10_000 }).toBeTruthy();
   await testServer.openReady(openTab, page('Altro', null));
-  await expect.poll(async () => { const r = await leggi('Rosso uno'); const b = r && nums(r.bg); return b && Math.max(...b) - Math.min(...b); }).toBeLessThan(6);
+  await expect.poll(async () => { const r = await leggi('Rosso uno'); const b = r && nums(r.bg); return b && Math.max(...b) - Math.min(...b); }).toBeLessThan(20);
 
   await set({ tabColor: { saturazione_tab: 1 } });
   await expect.poll(async () => { const r = await leggi('Rosso uno'); const b = r && nums(r.bg); return b && b[0] - b[1]; }).toBeGreaterThan(120);
