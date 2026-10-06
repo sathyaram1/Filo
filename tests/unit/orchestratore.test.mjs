@@ -1165,7 +1165,7 @@ test('smetti durante l’attesa del limite d’uso: non si aspettano ore, il pas
 test('posti decisi dalla macchina (#1041): senza numero fisso partono finché il carico lo permette; a macchina carica uno per volta', async () => {
   const tre = () => [prova(1, 'uno', 'a/**'), prova(2, 'due', 'b/**'), prova(3, 'tre', 'c/**')];
   const libera = banco({ pratiche: tre(), server: false });
-  const a = lente(libera);
+  const a = lente(libera, 3);
   const corsa = libera.motore.avvia();
   await finche(() => a.lanciate.length === 3, 'tre istanze insieme a macchina libera');
   for (const i of a.lanciate) i.finisci();
