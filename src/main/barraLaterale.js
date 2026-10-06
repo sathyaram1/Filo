@@ -901,7 +901,13 @@ class BarraLaterale {
     // Il fuoco è della barra solo quando la si apre da tastiera: un clic lo rende a chi scriveva.
     wc.on('focus', () => setTimeout(() => { if (this.motivo !== 'tasto') this._restituisciTastiera(); }, 0));
     wc.on('before-input-event', (event, input) => {
-      if (this.tasto(input)) event.preventDefault();
+      if (this.tasto(input)) { event.preventDefault(); return; }
+      // I tasti del browser valgono anche col fuoco qui, sulla scheda attiva; poi la tastiera torna a lei.
+      const attiva = this._attiva();
+      if (attiva && typeof this.tabs.tastoDelBrowser === 'function' && this.tabs.tastoDelBrowser(input, attiva)) {
+        event.preventDefault();
+        this.chiudi();
+      }
     });
     collegaScorciatoie(wc, this.win);
     wc.on('ipc-message', (_e, canale, dati) => this._messaggio(canale, dati));

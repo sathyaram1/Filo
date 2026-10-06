@@ -1834,6 +1834,64 @@ class TabManager {
     else this.goBack(target);
   }
 
+  // I tasti del browser (#404, #685) da qualunque vista della finestra abbia il fuoco: la scheda, e la barra
+  // laterale aperta da tastiera (#871 giro 9). `tab` è la scheda su cui agire. true = preso.
+  tastoDelBrowser(input, tab) {
+    if (!input || !tab) return false;
+    // Salto alla N-esima scheda: Alt+cifra su Windows/Linux, Cmd+cifra su
+    // Mac (lì Opzione+cifra scrive un simbolo, e prendercela impediva di
+    // digitarlo). Quale combinazione sia, e come si chiama nell'elenco delle
+    // scorciatoie, lo decide un posto solo: src/shared/tasti.js.
+    // Intercettiamo qui (per-webContents) invece che con un globalShortcut
+    // OS-wide, così la combinazione resta disponibile alle altre app.
+    if (input.type === 'keyDown') {
+      // Il numero di schede serve alla regola: su Mac la cifra 9 è "l'ultima
+      // scheda", perché lo 0 lì è lo zoom e non può essere anche la decima.
+      const idx = indiceSaltoScheda(input, undefined, this.tabs.length);
+      if (idx != null) {
+        const target = this.tabs[idx];
+        if (target) {
+          this.activate(target.id);
+          return true;
+        }
+      }
+    }
+    // Indietro e avanti (#685). Qui, nel main, e non nel content script:
+    // `before-input-event` arriva PRIMA che il documento veda il tasto, così
+    // la combinazione vale anche con un campo di testo a fuoco e anche sulle
+    // pagine dove i content script non girano (le filo:// e quelle bloccate).
+    // Quale combinazione sia lo decide src/shared/tasti.js: su Mac è Cmd+[ e
+    // Cmd+], perché lì Opzione+freccia muove il cursore.
+    if (input.type === 'keyDown') {
+      const verso = comandoNavigazione(input);
+      if (verso) {
+        this.navigaCronologia(verso, tab.id);
+        return true;
+      }
+    }
+    // #404 — Ctrl/Cmd+T/W/L/R "da browser". La shell (src/renderer/shell.js)
+    // le gestisce nel keydown della barra, ma quel keydown NON riceve eventi
+    // quando il focus è dentro una pagina (WebContentsView): risultato, le
+    // scorciatoie erano morte proprio mentre si naviga un sito — il caso più
+    // comune. Come per il salto di scheda qui sopra, le intercettiamo per-webContents
+    // così valgono anche dalle pagine. In un browser questi tasti sono
+    // riservati alla shell e vincono SEMPRE sulla pagina: preventDefault li
+    // toglie al contenuto (niente doppio reload su Ctrl+R, ecc.). Escludiamo
+    // Alt per non catturare AltGr (Ctrl+Alt su Windows), che sui layout
+    // europei serve a digitare caratteri mentre si scrive nella pagina.
+    // `tab` è la scheda che ha il focus (quella che riceve l'input) = quella
+    // che l'utente sta guardando, quindi è la "scheda corrente" su cui agire.
+    if (input.type === 'keyDown' && (input.control || input.meta) && !input.alt) {
+      const k = String(input.key || '').toLowerCase();
+      if (k === 't') { this.openTab('filo://newtab/'); return true; }
+      if (k === 'w') { this.closeTab(tab.id); return true; }
+      // L'indirizzo si digita dalla home (la barra indirizzi è stata tolta):
+      // Ctrl+L apre la home di Filo, esattamente come nella shell.
+      if (k === 'l') { this.navigate(tab.id, 'filo://newtab/'); return true; }
+      if (k === 'r') { this.reload(tab.id); return true; }
+    }
+    return false;
+  }
   // Le pagine dietro (o davanti) nella cronologia della scheda, dalla più vicina: il tasto destro su
   // Indietro e Avanti della barra laterale le elenca, e sceglierne una ci torna con vaiAllaVoce.
   vociCronologia(verso, id) {
@@ -2176,59 +2234,7 @@ class TabManager {
           return;
         }
       }
-      // Salto alla N-esima scheda: Alt+cifra su Windows/Linux, Cmd+cifra su
-      // Mac (lì Opzione+cifra scrive un simbolo, e prendercela impediva di
-      // digitarlo). Quale combinazione sia, e come si chiama nell'elenco delle
-      // scorciatoie, lo decide un posto solo: src/shared/tasti.js.
-      // Intercettiamo qui (per-webContents) invece che con un globalShortcut
-      // OS-wide, così la combinazione resta disponibile alle altre app.
-      if (input.type === 'keyDown') {
-        // Il numero di schede serve alla regola: su Mac la cifra 9 è "l'ultima
-        // scheda", perché lo 0 lì è lo zoom e non può essere anche la decima.
-        const idx = indiceSaltoScheda(input, undefined, this.tabs.length);
-        if (idx != null) {
-          const target = this.tabs[idx];
-          if (target) {
-            event.preventDefault();
-            this.activate(target.id);
-          }
-        }
-      }
-      // Indietro e avanti (#685). Qui, nel main, e non nel content script:
-      // `before-input-event` arriva PRIMA che il documento veda il tasto, così
-      // la combinazione vale anche con un campo di testo a fuoco e anche sulle
-      // pagine dove i content script non girano (le filo:// e quelle bloccate).
-      // Quale combinazione sia lo decide src/shared/tasti.js: su Mac è Cmd+[ e
-      // Cmd+], perché lì Opzione+freccia muove il cursore.
-      if (input.type === 'keyDown') {
-        const verso = comandoNavigazione(input);
-        if (verso) {
-          event.preventDefault();
-          this.navigaCronologia(verso, tab.id);
-          return;
-        }
-      }
-      // #404 — Ctrl/Cmd+T/W/L/R "da browser". La shell (src/renderer/shell.js)
-      // le gestisce nel keydown della barra, ma quel keydown NON riceve eventi
-      // quando il focus è dentro una pagina (WebContentsView): risultato, le
-      // scorciatoie erano morte proprio mentre si naviga un sito — il caso più
-      // comune. Come per il salto di scheda qui sopra, le intercettiamo per-webContents
-      // così valgono anche dalle pagine. In un browser questi tasti sono
-      // riservati alla shell e vincono SEMPRE sulla pagina: preventDefault li
-      // toglie al contenuto (niente doppio reload su Ctrl+R, ecc.). Escludiamo
-      // Alt per non catturare AltGr (Ctrl+Alt su Windows), che sui layout
-      // europei serve a digitare caratteri mentre si scrive nella pagina.
-      // `tab` è la scheda che ha il focus (quella che riceve l'input) = quella
-      // che l'utente sta guardando, quindi è la "scheda corrente" su cui agire.
-      if (input.type === 'keyDown' && (input.control || input.meta) && !input.alt) {
-        const k = String(input.key || '').toLowerCase();
-        if (k === 't') { event.preventDefault(); this.openTab('filo://newtab/'); return; }
-        if (k === 'w') { event.preventDefault(); this.closeTab(tab.id); return; }
-        // L'indirizzo si digita dalla home (la barra indirizzi è stata tolta):
-        // Ctrl+L apre la home di Filo, esattamente come nella shell.
-        if (k === 'l') { event.preventDefault(); this.navigate(tab.id, 'filo://newtab/'); return; }
-        if (k === 'r') { event.preventDefault(); this.reload(tab.id); return; }
-      }
+      if (this.tastoDelBrowser(input, tab)) event.preventDefault();
     });
     // Navigazione main-frame iniziata dalla pagina (click su link,
     // window.location). Due casi richiedono di RICREARE la view invece di
