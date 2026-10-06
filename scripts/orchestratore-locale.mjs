@@ -503,6 +503,7 @@ function depAVuoto(P, stato, log) {
       return {};
     },
     pubblica: async () => { log(`[a vuoto] (${join(P.serverRadice, 'functions')}) npm run server:pubblica`); return { code: 0, out: '' }; },
+    filoAperto: async () => false,
     carico: async () => ({ cpu: 0, liberaGB: 99 }),
     dormi: () => new Promise((ok) => setImmediate(ok)),
     log,
