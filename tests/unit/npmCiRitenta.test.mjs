@@ -3,10 +3,10 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, writeFileSync, copyFileSync, mkdirSync, rmSync } from 'node:fs';
-import { dirname, resolve, join } from 'node:path';
+import { readFileSync, readdirSync, writeFileSync, copyFileSync, mkdirSync, chmodSync } from 'node:fs';
+import { dirname, resolve, join, delimiter } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { cartellaTemporanea, collegaCartella } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, collegaCartella, togliCartella } from '../helpers/percorsi.mjs';
 import { fileURLToPath } from 'node:url';
 import { installa, daRitentare, esegui, ATTESE_S } from '../../scripts/npm-ci-ritenta.mjs';
 
@@ -77,6 +77,8 @@ describe('npm ci che ritenta', () => {
   });
 
   // I lavori Mac e Linux la lanciano da una copia nella temporanea del runner, che su Mac passa da un collegamento.
+  // L'`npm` trovato per primo nel PATH è finto: quello vero, a macchina carica, ha superato il minuto (#1063). Si lancia
+  // per nome come quello vero, quindi su Windows passa dalla shell come lui.
   test('lanciato da un percorso con un collegamento, installa davvero (non esce verde senza far niente)', () => {
     const base = cartellaTemporanea('npm-ci-ritenta-');
     try {
@@ -86,15 +88,26 @@ describe('npm ci che ritenta', () => {
       collegaCartella(vera, join(base, 'collegamento'));
       const progetto = join(base, 'progetto');
       mkdirSync(progetto);
-      writeFileSync(join(progetto, 'package.json'), JSON.stringify({ name: 'x', version: '1.0.0', dependencies: { 'left-pad': '1.3.0' } }));
-      writeFileSync(join(progetto, 'package-lock.json'), JSON.stringify({ name: 'x', version: '1.0.0', lockfileVersion: 3, requires: true, packages: { '': { name: 'x', version: '1.0.0' } } }));
-      const r = spawnSync(process.execPath, [join(base, 'collegamento', 'npm-ci-ritenta.mjs')], { cwd: progetto, encoding: 'utf8', timeout: 60_000 });
+      const finti = join(base, 'finti');
+      mkdirSync(finti);
+      const chiamata = join(finti, 'chiamata.txt');
+      if (process.platform === 'win32') {
+        writeFileSync(join(finti, 'npm.cmd'), '@echo off\r\necho %*> "%~dp0chiamata.txt"\r\necho npm error code EUSAGE 1>&2\r\nexit /b 1\r\n');
+      } else {
+        writeFileSync(join(finti, 'npm'), '#!/bin/sh\necho "$*" > "$(dirname "$0")/chiamata.txt"\necho "npm error code EUSAGE" >&2\nexit 1\n');
+        chmodSync(join(finti, 'npm'), 0o755);
+      }
+      const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.toUpperCase() !== 'PATH'));
+      const percorso = Object.entries(process.env).find(([k]) => k.toUpperCase() === 'PATH')?.[1] || '';
+      env.PATH = `${finti}${delimiter}${percorso}`;
+      const r = spawnSync(process.execPath, [join(base, 'collegamento', 'npm-ci-ritenta.mjs')], { cwd: progetto, env, encoding: 'utf8', timeout: 60_000 });
       const uscita = `${r.stdout}${r.stderr}`;
       assert.match(uscita, /EUSAGE/, `npm ci non è nemmeno partito:\n${uscita}`);
+      assert.equal(readFileSync(chiamata, 'utf8').trim(), 'ci', 'lo script deve lanciare proprio `npm ci`');
       assert.equal(r.status, 1, 'il lockfile fuori sincrono deve arrivare rosso, al primo tentativo');
       assert.match(uscita, /niente altri tentativi/);
     } finally {
-      rmSync(base, { recursive: true, force: true });
+      togliCartella(base);
     }
   });
 
