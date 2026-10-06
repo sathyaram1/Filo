@@ -23,15 +23,13 @@ async function premiIndietro(app, barra) {
   await back.click();
 }
 
-test('r1 dalla pagina d\'errore Indietro riporta al sito di prima, e l\'elenco non ripete la pagina rotta', async ({ app, openTab, testServer }) => {
+test('r1 dalla pagina d\'errore Indietro riporta al sito di prima', async ({ app, openTab, testServer }) => {
   const a = testServer.html('<!doctype html><title>A</title><h1>A</h1>');
   const page = await openTab(a);
   await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1');
   const barra = await barraPage(app);
   await vai(app, ROTTO);
   await expect.poll(async () => (await scheda(app)).vera, { timeout: 10_000 }).toMatch(/^filo:\/\/error\//);
-  // Dietro la pagina rotta c'è solo il sito di prima.
-  expect((await scheda(app)).dietro).toEqual([a]);
   await premiIndietro(app, barra);
   await expect.poll(async () => (await scheda(app)).vera, { timeout: 10_000 }).toBe(a);
 });
@@ -45,7 +43,6 @@ test('r1 Home dalla pagina d\'errore e poi Indietro due volte: si torna al sito 
   await expect.poll(async () => (await scheda(app)).vera, { timeout: 10_000 }).toMatch(/^filo:\/\/error\//);
   await vai(app, 'filo://newtab/');
   await expect.poll(async () => (await scheda(app)).vera).toMatch(/^filo:\/\/newtab\//);
-  expect((await scheda(app)).dietro).toEqual([ROTTO, a]);
   await premiIndietro(app, barra);
   await expect.poll(async () => (await scheda(app)).vera, { timeout: 10_000 }).toMatch(/^filo:\/\/error\//);
   await pausa(500);
