@@ -353,8 +353,8 @@ class BarraLaterale {
     vista.setBounds({ x: 0, y, width: w, height: Math.max(0, H - y) });
     this._inCima();
     vista.setVisible(true);
-    const t = this._attiva();
-    if (t && this.aperta) this.vuoto.segui(t.view.webContents);
+    const sotto = this.aperta ? this.tabs.vistaSottoIlVuoto() : null;
+    if (sotto) this.vuoto.segui(sotto.webContents);
     if (chiusa !== this.strisciaPx) { this.strisciaPx = chiusa; this._invia(); }
     // Il layout cambia anche per lo schermo intero: la voce che lo dice va ridetta.
     this.aggiornaNav();
