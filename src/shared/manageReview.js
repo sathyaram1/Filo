@@ -650,7 +650,17 @@
     // Col segno locale la coda delle routine non la vede: mostrarla «In coda» direbbe il falso.
     // Negli stati dei Ricevuti resta lì, perché aspetta comunque una decisione dell'owner.
     if (tab === 'queue' && isLocalOnly(fb)) return 'local';
+    // Chi aspetta un feedback non ancora fuso la coda non lo dà a nessuno (#903): sta fra quelli che aspettano.
+    if (tab === 'queue' && STATI_CHE_ASPETTANO.includes(status) && aspettaAncora(fb, opts)) return 'waiting';
     return tab;
+  }
+
+  // Gli stati in cui la coda delle routine darebbe lavoro: lì le attese contano (functions/src/routine/waits.js).
+  const STATI_CHE_ASPETTANO = ['todo', 'revision_capability', 'revision_security'];
+  // `opts.trovaAtteso(id)` → il documento dell'aspettato, se la pagina lo conosce. Senza il modulo nessuna attesa.
+  function aspettaAncora(fb, opts) {
+    const A = global.SN_FB_ATTESE;
+    return !!A && A.aspettaAncora(fb, opts && opts.trovaAtteso);
   }
 
   // Gli stati in cui una pratica aspetta l'owner: le sessioni locali non la spostano da lì (#908).
