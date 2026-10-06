@@ -337,7 +337,7 @@
     // Stesso trattamento quando il modello c'è ma pretende il nome di una voce
     // che Filo non conosce: il messaggio dice dove scriverlo.
     // E quando nessun fornitore ammesso serve il modello: la richiesta non è partita.
-    const spiegato = ['NO_MODEL_FOR_ACTION', 'TTS_VOICE_REQUIRED', 'TTS_VOICE_UNKNOWN', 'NO_ALLOWED_HOST'];
+    const spiegato = ['NO_MODEL_FOR_ACTION', 'TTS_VOICE_REQUIRED', 'TTS_VOICE_UNKNOWN', 'NO_ALLOWED_HOST', 'NO_ZDR_HOST'];
     if (spiegato.includes(res.errorCode) && res.error) {
       try { Popup.showToast(I18n.t('tts_model_fallback_reason', String(res.error)), { duration: 9000 }); } catch (_) {}
       return;

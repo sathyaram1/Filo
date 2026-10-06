@@ -118,6 +118,11 @@
           ? 'nessun fornitore di questo modello è fra quelli ammessi, dalle regole sui fornitori di Filo o dalle impostazioni del tuo account OpenRouter: allarga i fornitori ammessi nel tuo account, o scegli un altro modello in Modelli predefiniti.'
           : 'nessun fornitore di questo modello è fra quelli ammessi dalle regole sui fornitori: scegli un altro modello in Modelli predefiniti.';
       }
+      // #831: coi crediti di Filo il router cerca solo host a ritenzione zero; con la chiave propria il vincolo non c'è.
+      if (e && e.code === 'NO_ZDR_HOST') {
+        const chi = e.model ? `il modello «${e.model}»` : 'questo modello';
+        return `nessun fornitore ammesso per ${chi} si impegna a non conservare domande e risposte, e coi crediti di Filo è una condizione: scegli un altro modello in Modelli predefiniti, o usa una tua chiave OpenRouter nella pagina Crediti.`;
+      }
       if (e && e.code === 'MODEL_UNAVAILABLE') {
         return 'il modello scelto non è più disponibile sul servizio AI: scegli un altro modello in Modelli predefiniti.';
       }

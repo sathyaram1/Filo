@@ -98,6 +98,8 @@
     // Voce e dettatura: nessun host ammesso, la richiesta non parte (#713).
     err_audio_no_allowed_host: 'Il modello «%s» lo serve solo %s, che Filo esclude. Non ho mandato niente: scegli un altro modello.',
     err_audio_no_allowed_host_many: 'Il modello «%s» lo servono solo %s, che Filo esclude. Non ho mandato niente: scegli un altro modello.',
+    // Coi crediti di Filo si usano solo host a ritenzione zero (#831).
+    err_audio_no_zdr_host: 'Il modello «%s» non ha fornitori che si impegnino a non conservare quello che gli mandi, e coi crediti di Filo è una condizione. Non ho mandato niente: scegli un altro modello, o usa una tua chiave OpenRouter nella pagina Crediti.',
     menu_dictate: 'Detta',
     menu_screenshot: 'Screenshot',
     menu_screenshot_crop: 'Screenshot di una parte',

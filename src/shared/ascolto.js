@@ -11,7 +11,7 @@
   const RATE = 16000;
   const MAX_MS = 5 * 60 * 1000;
   // Errori di configurazione dei modelli: arrivano già scritti per l'utente e dicono cosa fare.
-  const SPIEGATI = ['NO_MODEL_FOR_ACTION', 'NO_OPEN_WEIGHTS_MODEL', 'NO_ALLOWED_HOST'];
+  const SPIEGATI = ['NO_MODEL_FOR_ACTION', 'NO_OPEN_WEIGHTS_MODEL', 'NO_ALLOWED_HOST', 'NO_ZDR_HOST'];
 
   let attiva = null;
 

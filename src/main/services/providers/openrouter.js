@@ -48,12 +48,18 @@
   // personale un 402 sono i crediti finiti), e il rifiuto della chiave
   // propria resta comunque registrato: la pagina Crediti lo mostra.
   // La prova di una chiave non ripiega (SN_WALLET_MAIN.senzaRipiego).
+  // `makeInit(key, keySource)` costruisce la richiesta per QUELLA chiave: il corpo cambia con chi paga (withZdr).
   async function fetchWithKey(url, apiKey, makeInit) {
-    let res = await fetch(url, makeInit(apiKey));
-    let keyUsed = apiKey;
-    let keyFallback = null;
     const W = global.SN_WALLET;
     const K = global.SN_WALLET_MAIN;
+    const sourceOf = async (k) => {
+      if (!K || typeof K.keySourceOf !== 'function') return '';
+      try { return await K.keySourceOf(k); } catch (_) { return ''; }
+    };
+    let keySource = await sourceOf(apiKey);
+    let res = await fetch(url, await makeInit(apiKey, keySource));
+    let keyUsed = apiKey;
+    let keyFallback = null;
     if (!res.ok && W && W.isKeyRefusalStatus(res.status) && K && typeof K.alternativeKeyFor === 'function') {
       // Un 403 è un rifiuto della chiave solo se il corpo non parla di
       // moderazione: un testo segnalato lo è con qualunque chiave, e la
@@ -69,7 +75,8 @@
         // Il rifiuto si annota DOPO il ripiego: Crediti dice che Filo ha
         // usato i crediti solo se la personale ha risposto davvero.
         try {
-          res = await fetch(url, makeInit(alt.key));
+          keySource = await sourceOf(alt.key);
+          res = await fetch(url, await makeInit(alt.key, keySource));
         } catch (e) {
           try { await K.noteOwnKeyRefusal({ ...refused, served: false }); } catch (_) {}
           throw e;
@@ -79,10 +86,6 @@
         keyFallback = { status: refused.status, from: 'own', to: alt.source || 'personal' };
         if (!res.ok) keyFallback.failed = res.status;
       }
-    }
-    let keySource = '';
-    if (K && typeof K.keySourceOf === 'function') {
-      try { keySource = await K.keySourceOf(keyUsed); } catch (_) { keySource = ''; }
     }
     // La chiave propria ha appena servito una chiamata: il rifiuto ricordato
     // in Crediti (se c'era) non vale più, e spesa e residuo sono cambiati.
@@ -138,6 +141,19 @@
     return Object.keys(p).length ? p : null;
   }
 
+  // Ritenzione zero (#831): quando paga Filo (ogni chiave che non è quella propria dell'utente) si chiedono
+  // solo host che non conservano domanda e risposta. I modelli venduti solo dal produttore hanno già `only`.
+  function zdrApplies(model, keySource) {
+    if (keySource === 'own') return false;
+    const C = global.SN_CONST;
+    return !(C && typeof C.producerOnlyRule === 'function' && C.producerOnlyRule(model));
+  }
+
+  function withZdr(body, keySource) {
+    if (!body || !zdrApplies(body.model, keySource)) return body;
+    return { ...body, provider: { ...(body.provider || {}), zdr: true } };
+  }
+
   // Le definizioni degli strumenti nel corpo della richiesta, se ci sono.
   // `toolChoice` ('auto' | 'none' | 'required') è facoltativo.
   function toolsFields(tools, toolChoice) {
@@ -171,10 +187,9 @@
   function forgetReasoningRefusals() { reasoningRefused.clear(); }
 
   async function postChat(body, apiKey, signal) {
-    const send = (b, key) => {
-      const payload = JSON.stringify(b);
-      return fetchWithKey(ENDPOINT, key, (k) => ({ method: 'POST', headers: buildHeaders(k), body: payload, signal }));
-    };
+    const send = (b, key) => fetchWithKey(ENDPOINT, key, (k, src) => ({
+      method: 'POST', headers: buildHeaders(k), body: JSON.stringify(withZdr(b, src)), signal,
+    }));
     const needsParams = !!(body.provider && body.provider.require_parameters);
     const { reasoning: _omesso, ...senzaRagionamento } = body;
     const refusalKey = needsParams && body.reasoning ? JSON.stringify([body.model, body.provider]) : null;
@@ -349,7 +364,7 @@
     const { res, keyUsed, keySource, keyFallback } = await postChat(body, apiKey, signal);
     // status/provider strutturati sull'errore: chi lo mostra all'utente può
     // tradurlo in una frase comprensibile invece del codice HTTP nudo (#331).
-    if (!res.ok) throw await httpError(res, { tools: !!body.tools });
+    if (!res.ok) throw await httpError(res, { tools: !!body.tools, model, providerRouting, apiKey: keyUsed });
     const data = await res.json();
     const message = data.choices?.[0]?.message || {};
     const text = message.content || '';
@@ -388,7 +403,7 @@
     // Il rifiuto della chiave arriva con lo status, prima di qualunque delta:
     // il ripiego qui non ha ancora niente da azzerare nel chiamante.
     const { res, keyUsed, keySource, keyFallback } = await postChat(reqBody, apiKey, signal);
-    if (!res.ok || !res.body) throw await httpError(res, { tools: !!reqBody.tools });
+    if (!res.ok || !res.body) throw await httpError(res, { tools: !!reqBody.tools, model, providerRouting, apiKey: keyUsed });
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder('utf-8');
@@ -468,7 +483,7 @@
   // personale c'è stato e ha fallito (fetchWithKey li lascia sulla risposta):
   // un 402 «la tua chiave» e un 402 «anche i crediti di Filo» sono due frasi
   // diverse per l'utente.
-  async function httpError(res, { tools = false } = {}) {
+  async function httpError(res, { tools = false, model = '', providerRouting = null, apiKey = '' } = {}) {
     const errText = await res.text().catch(() => '');
     const err = new Error(`OpenRouter ${res.status}: ${errText.slice(0, 300)}`);
     err.status = res.status;
@@ -477,9 +492,30 @@
     // ammessi non ce n'è, e chi lo racconta deve dire questo, non «riprova».
     const refusal = res.status === 404 ? routerRefusal(errText) : null;
     if (refusal === 'PARAMS') { if (tools) err.code = 'NO_TOOL_HOST'; } else if (refusal) err.code = refusal;
+    if (refusal && model) err.model = model;
+    if ((refusal === 'DATA_POLICY' || refusal === 'NO_PROVIDER_ALLOWED') && model && zdrApplies(model, res.keySource)
+      && await zdrIsTheCause({ apiKey, model, providerRouting, text: errText })) err.code = 'NO_ZDR_HOST';
     if (res.keySource) err.keySource = res.keySource;
     if (res.keyFallback) err.keyFallback = res.keyFallback;
     return err;
+  }
+
+  // Il «nessun host» del router non dice quale vincolo l'ha svuotato: se senza la ritenzione zero un host
+  // ammesso c'era, è lei. Se gli host non si sanno resta il codice del router.
+  async function zdrIsTheCause({ apiKey, model, providerRouting, text }) {
+    if (/zero data retention|\bzdr\b/i.test(String(text || ''))) return true;
+    const C = global.SN_CONST;
+    if (!C || typeof C.hostPolicyViolation !== 'function') return false;
+    let hosts = null;
+    try { hosts = await modelHosts({ apiKey, model }); } catch (_) { hosts = null; }
+    if (!Array.isArray(hosts) || !hosts.length) return false;
+    const excluded = excludedOf(providerRouting);
+    return hosts.some((h) => !C.hostPolicyViolation(h, model, excluded));
+  }
+
+  function excludedOf(providerRouting) {
+    const r = providerRouting && typeof providerRouting === 'object' ? providerRouting : {};
+    return Array.isArray(r.ignore) ? r.ignore.filter(Boolean) : [];
   }
 
   // ─── Chi può servire un modello, prima di chiamarlo ───────────────────────
@@ -542,7 +578,67 @@
     return entry.hosts || entry.pending;
   }
 
-  function forgetModelHosts() { hostsCache.clear(); }
+  // Gli host che dichiarano la ritenzione zero, per modello: Map(id → [{ name, tag }]) o null se non si sa.
+  // Serve dove il router ignora il blocco `provider` (voce, dettatura): lì `zdr` nel corpo non basta.
+  const ZDR_ENDPOINT = `${MODELS_ENDPOINT.replace(/\/models$/, '')}/endpoints/zdr`;
+  let zdrCache = { until: 0, map: null, pending: null };
+
+  function zdrModelId(e) {
+    for (const v of [e.model_id, e.modelId, e.model, e.model_slug]) {
+      if (typeof v === 'string' && v.includes('/')) return v.trim().toLowerCase();
+    }
+    const m = typeof e.name === 'string' ? /\|\s*([^|\s]+\/[^|\s]+)\s*$/.exec(e.name) : null;
+    return m ? m[1].toLowerCase() : '';
+  }
+
+  // Un elenco da cui non si ricava nessun modello non dice «nessuno a ritenzione zero»: dice che la forma
+  // non è quella attesa, e vale come non saputo.
+  function parseZdrCatalog(data) {
+    const list = Array.isArray(data) ? data : Array.isArray(data && data.data) ? data.data
+      : Array.isArray(data && data.data && data.data.endpoints) ? data.data.endpoints : [];
+    const map = new Map();
+    for (const e of list) {
+      if (!e || typeof e !== 'object') continue;
+      const id = zdrModelId(e);
+      const name = typeof e.provider_name === 'string' ? e.provider_name.trim() : '';
+      const tag = typeof e.tag === 'string' ? e.tag.trim() : '';
+      if (!id || (!name && !tag)) continue;
+      if (!map.has(id)) map.set(id, []);
+      map.get(id).push({ name, tag });
+    }
+    return map.size ? map : null;
+  }
+
+  async function zdrCatalog({ apiKey } = {}) {
+    if (zdrCache.pending) return zdrCache.map || zdrCache.pending;
+    if (Date.now() < zdrCache.until) return zdrCache.map;
+    const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
+    zdrCache.pending = fetch(ZDR_ENDPOINT, { headers, signal: AbortSignal.timeout(HOSTS_TIMEOUT_MS) })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`OpenRouter zdr ${res.status}`);
+        return parseZdrCatalog(await res.json());
+      })
+      .then((map) => {
+        zdrCache.map = map || zdrCache.map;
+        zdrCache.until = Date.now() + (map ? HOSTS_FRESH_MS : HOSTS_RETRY_MS);
+        return zdrCache.map;
+      })
+      .catch((e) => {
+        console.warn('[Filo policy] host a ritenzione zero non letti:', (e && e.message) || e);
+        zdrCache.until = Date.now() + HOSTS_RETRY_MS;
+        return zdrCache.map;
+      })
+      .finally(() => { zdrCache.pending = null; });
+    return zdrCache.map || zdrCache.pending;
+  }
+
+  async function zdrHostsOf({ apiKey, model } = {}) {
+    const map = await zdrCatalog({ apiKey });
+    if (!map) return null;
+    return map.get(String(model == null ? '' : model).trim().toLowerCase().replace(/^~/, '')) || [];
+  }
+
+  function forgetModelHosts() { hostsCache.clear(); zdrCache = { until: 0, map: null, pending: null }; }
 
   function joinNames(names) {
     if (names.length < 2) return names.join('');
@@ -552,9 +648,33 @@
   async function ensureAllowedHost({ apiKey, model, providerRouting }) {
     const C = global.SN_CONST;
     if (!C || typeof C.hostPolicyViolation !== 'function') return;
-    const r = providerRouting && typeof providerRouting === 'object' ? providerRouting : {};
-    const excluded = Array.isArray(r.ignore) ? r.ignore.filter(Boolean) : [];
-    if (!excluded.length && !C.producerOnlyRule(model)) return;
+    const excluded = excludedOf(providerRouting);
+    if (excluded.length || C.producerOnlyRule(model)) await ensureNotAllExcluded({ apiKey, model, excluded });
+    await ensureZdrHost({ apiKey, model, excluded });
+  }
+
+  async function ensureZdrHost({ apiKey, model, excluded }) {
+    const K = global.SN_WALLET_MAIN;
+    let source = '';
+    if (K && typeof K.keySourceOf === 'function') {
+      try { source = await K.keySourceOf(apiKey); } catch (_) { source = ''; }
+    }
+    if (!zdrApplies(model, source)) return;
+    const zdr = await zdrHostsOf({ apiKey, model });
+    if (!Array.isArray(zdr)) return;
+    const C = global.SN_CONST;
+    if (zdr.some((h) => !C.hostPolicyViolation(h, model, excluded))) return;
+    const I18n = global.SN_I18N;
+    const err = new Error(I18n ? I18n.t('err_audio_no_zdr_host', model) : `NO_ZDR_HOST ${model}`);
+    err.code = 'NO_ZDR_HOST';
+    err.provider = 'openrouter';
+    err.model = model;
+    err.keySource = source;
+    throw err;
+  }
+
+  async function ensureNotAllExcluded({ apiKey, model, excluded }) {
+    const C = global.SN_CONST;
     const hosts = await modelHosts({ apiKey, model });
     if (!Array.isArray(hosts) || !hosts.length) return;
     if (hosts.some((h) => !C.hostPolicyViolation(h, model, excluded))) return;
@@ -586,11 +706,10 @@
     if (Number.isFinite(sp) && sp > 0 && sp !== 1) body.speed = sp;
     const pb = providerBlock(providerRouting, model);
     if (pb) body.provider = pb;
-    const payload = JSON.stringify(body);
-    const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(SPEECH_ENDPOINT, apiKey, (key) => ({
-      method: 'POST', headers: buildHeaders(key), body: payload, signal,
+    const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(SPEECH_ENDPOINT, apiKey, (key, src) => ({
+      method: 'POST', headers: buildHeaders(key), body: JSON.stringify(withZdr(body, src)), signal,
     }));
-    if (!res.ok) throw await httpError(res);
+    if (!res.ok) throw await httpError(res, { model, providerRouting, apiKey: keyUsed });
     const buf = Buffer.from(await res.arrayBuffer());
     if (!buf.length) {
       const err = new Error('OpenRouter: audio vuoto');
@@ -617,11 +736,10 @@
     if (language) body.language = language;
     const pb = providerBlock(providerRouting, model);
     if (pb) body.provider = pb;
-    const payload = JSON.stringify(body);
-    const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(TRANSCRIPTIONS_ENDPOINT, apiKey, (key) => ({
-      method: 'POST', headers: buildHeaders(key), body: payload, signal,
+    const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(TRANSCRIPTIONS_ENDPOINT, apiKey, (key, src) => ({
+      method: 'POST', headers: buildHeaders(key), body: JSON.stringify(withZdr(body, src)), signal,
     }));
-    if (!res.ok) throw await httpError(res);
+    if (!res.ok) throw await httpError(res, { model, providerRouting, apiKey: keyUsed });
     const data = await res.json();
     const usage = data.usage || {};
     return {
@@ -655,11 +773,10 @@
     if (Number.isInteger(d) && d > 0) body.dimensions = d;
     const pb = providerBlock(providerRouting, model);
     if (pb) body.provider = pb;
-    const payload = JSON.stringify(body);
-    const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(EMBEDDINGS_ENDPOINT, apiKey, (key) => ({
-      method: 'POST', headers: buildHeaders(key), body: payload, signal,
+    const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(EMBEDDINGS_ENDPOINT, apiKey, (key, src) => ({
+      method: 'POST', headers: buildHeaders(key), body: JSON.stringify(withZdr(body, src)), signal,
     }));
-    if (!res.ok) throw await httpError(res);
+    if (!res.ok) throw await httpError(res, { model, providerRouting, apiKey: keyUsed });
     const data = await res.json();
     const rows = Array.isArray(data.data) ? data.data.slice() : [];
     rows.sort((a, b) => (Number(a.index) || 0) - (Number(b.index) || 0));
@@ -745,8 +862,8 @@
   global.SN_PROVIDER_OPENROUTER = {
     listModels, complete, streamComplete, reasoningField, providerBlock, extractServedBy,
     cachedPromptTokens, synthesizeSpeech, transcribe, embed, lookupServedBy, keyInfo, fetchWithKey,
-    modelHosts, forgetModelHosts, forgetReasoningRefusals,
+    modelHosts, forgetModelHosts, forgetReasoningRefusals, withZdr, zdrApplies, zdrHostsOf, parseZdrCatalog,
     createToolCallAccumulator, createReasoningDetailsAccumulator, toolsFields,
-    ENDPOINT, MODELS_ENDPOINT, SPEECH_ENDPOINT, TRANSCRIPTIONS_ENDPOINT, EMBEDDINGS_ENDPOINT, GENERATION_ENDPOINT, AUTH_KEY_ENDPOINT, CREDITS_ENDPOINT,
+    ENDPOINT, MODELS_ENDPOINT, ZDR_ENDPOINT, SPEECH_ENDPOINT, TRANSCRIPTIONS_ENDPOINT, EMBEDDINGS_ENDPOINT, GENERATION_ENDPOINT, AUTH_KEY_ENDPOINT, CREDITS_ENDPOINT,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
