@@ -525,7 +525,8 @@ export function opzioniDa(args) {
   const { opz, posizionali } = leggiArgomenti('avvia', args);
   const numeri = posizionali.map((a) => numeroDiFeedback('avvia', a));
   if (numeri.length && !opz.dryRun) throw erroreDiUso(`avvia: i numeri valgono solo con --dry-run; per metterli in coda: aggiungi ${numeri.join(' ')}`);
-  return { ...OPZIONI_BASE, budgetIstanza: '', oreIstanza: 4, dryRun: false, ...opz, numeri };
+  // Di serie nessun tetto di tempo né di spesa per istanza (#1036): le opzioni li mettono solo se chiesti.
+  return { ...OPZIONI_BASE, budgetIstanza: '', oreIstanza: 0, dryRun: false, ...opz, numeri };
 }
 
 function vivo(pid) {
