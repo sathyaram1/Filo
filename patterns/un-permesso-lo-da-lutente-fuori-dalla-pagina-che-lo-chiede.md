@@ -41,6 +41,8 @@ cornice. Fuori da una scheda (finestre di accesso) si chiede con la finestra del
   passa solo un gesto vero su un menu che sta dove Filo l'ha messo e che il browser vede intero
   (IntersectionObserver con `trackVisibility`). Per questo sulle pagine web il menu sta nello strato alto (popover),
   senza dissolvenza e senza `backdrop-filter`: con uno dei due il browser lo dice «non visibile» e i bottoni tacciono.
+  Sotto-menu, etichette e icona trascinata stanno DENTRO il menu (`casaDeiPezzi`): appesi fuori finirebbero sotto
+  di lui, o nello strato alto conterebbero come una copertura e lo spegnerebbero (sentinella in `permessiSiti.test.mjs`).
   Quello che resta aperto è sotto, in «Due porte aperte». Le porte del main che
   danno qualcosa guardano anche l'input vero della scheda (`gestoVeroRecente`, da `input-event`).
 - **Il controllo silenzioso non ha il «chiedi».** In Electron `setPermissionCheckHandler` risponde sì o no. Nel mondo

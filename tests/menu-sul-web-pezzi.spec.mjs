@@ -1,6 +1,6 @@
-// Giro 17, rilievo 1: sulle pagine web il menu del tasto destro sta nello strato alto, e i pezzi che Filo gli mette
-// accanto (etichetta delle icone, anteprima trascinata, sotto-menu) devono restare visibili e lasciarlo rispondere.
-import { test, expect } from '../../fixtures/electron.mjs';
+// Sulle pagine web il menu del tasto destro sta nello strato alto e risponde solo se il browser lo vede intero (#586):
+// le sue etichette, l'icona trascinata e i sotto-menu gli stanno dentro, si vedono e non lo spengono.
+import { test, expect } from './fixtures/electron.mjs';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -28,7 +28,7 @@ async function apriMenu(page) {
   await sleep(400);
 }
 
-test('r1 l’etichetta di un’icona del menu si vede sopra il menu', async ({ openTab, testServer }) => {
+test('l’etichetta di un’icona del menu si vede sopra il menu', async ({ openTab, testServer }) => {
   test.setTimeout(60_000);
   const page = await testServer.openReady(openTab, PAGINA);
   await apriMenu(page);
@@ -41,7 +41,7 @@ test('r1 l’etichetta di un’icona del menu si vede sopra il menu', async ({ o
   expect(await sopraTutto(page, '.sn-tooltip')).toBe('visibile');
 });
 
-test('r1 l’icona trascinata per riordinare il menu si vede mentre la si porta', async ({ openTab, testServer }) => {
+test('l’icona trascinata per riordinare il menu si vede mentre la si porta', async ({ openTab, testServer }) => {
   test.setTimeout(60_000);
   const page = await testServer.openReady(openTab, PAGINA);
   await apriMenu(page);
@@ -75,8 +75,39 @@ async function incollaDopoCronologia(app, page) {
   await expect.poll(() => page.locator('#c').inputValue(), { timeout: 5000 }).toBe('voce-nuova');
 }
 
-test('r1 con la cronologia degli appunti aperta, un clic vero su Incolla incolla', async ({ app, openTab, testServer }) => {
+test('con la cronologia degli appunti aperta, un clic vero su Incolla incolla', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
   const page = await testServer.openReady(openTab, PAGINA);
   await incollaDopoCronologia(app, page);
+});
+
+test('con la scelta del modello di Detta aperta, un clic vero su Incolla incolla', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await app.evaluate(({ clipboard }) => clipboard.writeText('voce-detta'));
+  const page = await testServer.openReady(openTab, PAGINA);
+  await page.locator('#c').click({ button: 'right' });
+  await sleep(500);
+  await page.locator('.sn-menu-split-arrow').first().hover();
+  await expect.poll(() => page.evaluate(() => document.querySelectorAll('.sn-menu').length)).toBe(2);
+  const bb = await page.locator('.sn-menu .sn-menu-paste-main').first().boundingBox();
+  await page.mouse.move(bb.x + 10, bb.y + bb.height / 2, { steps: 3 });
+  await sleep(300);
+  await page.mouse.down(); await page.mouse.up();
+  await expect.poll(() => page.locator('#c').inputValue(), { timeout: 5000 }).toBe('voce-detta');
+});
+
+test('nella griglia «Altro» l’etichetta di un’icona si vede', async ({ openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, PAGINA);
+  await apriMenu(page);
+  await page.locator('.sn-menu-row-overflow').first().hover();
+  const icona = page.locator('.sn-menu-icon-grid button[aria-label]').first();
+  await expect(icona).toBeVisible({ timeout: 5000 });
+  const bb = await icona.boundingBox();
+  await page.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2, { steps: 4 });
+  await expect.poll(() => page.evaluate(() => {
+    const t = document.querySelector('.sn-tooltip');
+    return !!(t && t.style.display !== 'none' && t.textContent);
+  })).toBe(true);
+  expect(await sopraTutto(page, '.sn-tooltip')).toBe('visibile');
 });
