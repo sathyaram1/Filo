@@ -18,10 +18,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const HOOK = resolve(__dirname, '..', '..', '.claude', 'hooks', 'auto-commit-merge.sh');
@@ -118,7 +118,7 @@ function gate(port, args, { ticket = 'biglietto-di-prova' } = {}) {
     p.stdout.on('data', (c) => { stdout += c; });
     p.stderr.on('data', (c) => { stderr += c; });
     p.on('close', (status) => {
-      rmSync(casa, { recursive: true, force: true });
+      togliCartella(casa);
       risolvi({ status, stdout, stderr });
     });
   });
@@ -178,25 +178,34 @@ test('tieniVivo: un battito subito, poi un figlio che batte col biglietto nell\'
   assert.equal(ucciso, true);
 });
 
+// Il silenzio si conta in battiti, non in secondi (#1063): la prova lunga dura finché il server non ha visto due battiti
+// arrivati mentre lei girava, e il server dà il biglietto per morto se in quella prova non è arrivato nessun battito.
+// Senza chi batte durante gli unit la prova lunga arriva al suo tetto e la fusione trova il biglietto morto.
 test('una prova degli unit più lunga della finestra di silenzio non fa arrivare la fusione a biglietto morto', async () => {
-  const SILENZIO_MS = 8000;
+  const TETTO_PROVA_LUNGA_MS = 5 * 60 * 1000;
   const casa = cartellaTemporanea('filo-mg-battito-');
   const g = (cwd, ...a) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-  let ultimoSegno = Date.now();
+  let provaLunga = false;
+  let battitiNellaProva = 0;
   const vie = [];
   const srv = createServer((req, res) => {
     req.on('data', () => {});
     req.on('end', () => {
-      const vivo = Date.now() - ultimoSegno <= SILENZIO_MS;
+      if (req.url === '/prova-lunga') { provaLunga = true; res.end('ok'); return; }
+      if (req.url === '/battiti-nella-prova') { res.end(String(battitiNellaProva)); return; }
+      const battito = req.url.endsWith('/routineHeartbeat');
+      if (battito && provaLunga) battitiNellaProva += 1;
+      const vivo = battito || !provaLunga || battitiNellaProva > 0;
       vie.push(`${req.url}${vivo ? '' : ' (morto)'}`);
       res.setHeader('Content-Type', 'application/json');
       if (!vivo) { res.statusCode = 403; res.end(JSON.stringify({ ok: false, reason: 'dead_ticket' })); return; }
-      ultimoSegno = Date.now();
-      if (req.url.endsWith('/routineHeartbeat')) res.end(JSON.stringify({ ok: true, expiresAt: new Date(ultimoSegno + SILENZIO_MS).toISOString() }));
+      // Una scadenza vicina fa battere il figlio ogni secondo: la prova lunga finisce presto se il battito c'è.
+      if (battito) res.end(JSON.stringify({ ok: true, expiresAt: new Date(Date.now() + 3000).toISOString() }));
       else res.end(JSON.stringify({ ok: true, result: 'merged', sha: 'f'.repeat(40) }));
     });
   });
   await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const server = `http://127.0.0.1:${srv.address().port}`;
   try {
     const origin = join(casa, 'origin.git');
     const lavoro = join(casa, 'lavoro');
@@ -215,24 +224,34 @@ test('una prova degli unit più lunga della finestra di silenzio non fa arrivare
     writeFileSync(join(altro, 'nuovo.txt'), 'main va avanti\n');
     g(altro, 'add', '-A'); g(altro, 'commit', '-qm', 'main avanti'); g(altro, 'push', '-q', 'origin', 'main');
     g(lavoro, 'checkout', '-q', '-b', 'claude/lungo');
-    writeFileSync(join(lavoro, 'tests', 'unit', 'lungo.test.mjs'), `import test from 'node:test'; test('lungo', async () => { await new Promise((r) => setTimeout(r, ${SILENZIO_MS * 2})); });\n`);
+    writeFileSync(join(lavoro, 'tests', 'unit', 'lungo.test.mjs'), `import test from 'node:test';
+test('lungo', async () => {
+  const server = ${JSON.stringify(server)};
+  await fetch(server + '/prova-lunga');
+  const fine = Date.now() + ${TETTO_PROVA_LUNGA_MS};
+  while (Date.now() < fine && Number(await (await fetch(server + '/battiti-nella-prova')).text()) < 2) {
+    await new Promise((r) => setTimeout(r, 100));
+  }
+});
+`);
     g(lavoro, 'add', '-A'); g(lavoro, 'commit', '-qm', 'ramo'); g(lavoro, 'push', '-q', 'origin', 'claude/lungo');
     const tmp = join(casa, 'tmp');
     mkdirSync(tmp);
-    ultimoSegno = Date.now();
     const esito = await new Promise((ok) => {
-      const env = { ...process.env, FILO_REPO_ROOT: lavoro, FILO_ROUTINE_TICKET: 'biglietto-lungo', FILO_ROUTINE_API: `http://127.0.0.1:${srv.address().port}`, TEMP: tmp, TMP: tmp, TMPDIR: tmp };
+      const env = { ...process.env, FILO_REPO_ROOT: lavoro, FILO_ROUTINE_TICKET: 'biglietto-lungo', FILO_ROUTINE_API: server, TEMP: tmp, TMP: tmp, TMPDIR: tmp };
       const p = spawn(process.execPath, [MERGE_GATE, 'claude/lungo'], { cwd: lavoro, env, stdio: ['ignore', 'pipe', 'pipe'] });
       let out = '';
       p.stdout.on('data', (c) => { out += c; });
       p.stderr.on('data', (c) => { out += c; });
       p.on('close', (code) => ok({ code, out }));
     });
+    assert.equal(provaLunga, true, `la prova lunga non è partita:\n${esito.out}`);
+    assert.ok(battitiNellaProva >= 2, `mentre giravano gli unit il lavoro non ha battuto:\n${vie.join('\n')}`);
     assert.equal(esito.code, 0, `${esito.out}\n${vie.join('\n')}`);
     assert.ok(vie.some((v) => v === '/routineMerge'), vie.join('\n'));
   } finally {
     srv.close();
-    rmSync(casa, { recursive: true, force: true });
+    togliCartella(casa);
   }
 });
 
@@ -387,7 +406,7 @@ test('nessun branch di lavoro arriva su main da solo, nemmeno con un nome qualsi
       'una modifica in corso non deve raggiungere main: da lì viene distribuita agli utenti ogni 6 ore');
     assert.ok(originHasFile(origin, 'claude/foo', 'normal.txt'),
       'ma deve essere al sicuro sul suo branch: è ciò che salva il lavoro se la sessione si interrompe');
-  } finally { rmSync(base, { recursive: true, force: true }); }
+  } finally { togliCartella(base); }
 });
 
 test('un branch worker/* NON arriva su main, ma resta sul suo branch', { skip }, () => {
@@ -406,5 +425,5 @@ test('un branch worker/* NON arriva su main, ma resta sul suo branch', { skip },
     assert.ok(originHasBranch(origin, 'worker/42'), 'il branch worker/42 deve esistere su origin');
     assert.ok(originHasFile(origin, 'worker/42', 'worker.txt'),
       'la edit deve essere committata e pushata sul branch worker/42');
-  } finally { rmSync(base, { recursive: true, force: true }); }
+  } finally { togliCartella(base); }
 });
