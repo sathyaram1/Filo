@@ -408,6 +408,9 @@ test('dalla scheda aperta arriva quello che l\'utente vede: i pezzi affiancati s
 </main></body></html>`);
   await apriInSecondoPiano(app, url);
   await reteDiProva(app, { vietata: true });
+  const larghezza = () => app.evaluate(({ BrowserWindow }, u) => BrowserWindow.getAllWindows().flatMap((w) => (w._filoTabs ? w._filoTabs.tabs : []))
+    .find((x) => x.view.webContents.getURL() === u).view.webContents.executeJavaScript('innerWidth'), url);
+  const prima = await larghezza();
   const r = await leggi(app, { type: 'LEGGI_PAGINA', url });
   expect(r.output.fonte).toBe('scheda');
   const t = String(r.output.testo);
@@ -417,8 +420,7 @@ test('dalla scheda aperta arriva quello che l\'utente vede: i pezzi affiancati s
   expect(t).toContain(`[Contenuto incorporato: Dove siamo](${mappa})`);
   expect(t).toContain('Sportello aperto il sabato dalle 9:00');
   // Finita la lettura la scheda torna com'era.
-  expect(await app.evaluate(({ BrowserWindow }, u) => BrowserWindow.getAllWindows().flatMap((w) => (w._filoTabs ? w._filoTabs.tabs : []))
-    .find((x) => x.view.webContents.getURL() === u).view.webContents.executeJavaScript('innerWidth'), url)).toBe(0);
+  expect(await larghezza()).toBe(prima);
 });
 
 // ── #553, giro 14 ─────────────────────────────────────────────────────────────

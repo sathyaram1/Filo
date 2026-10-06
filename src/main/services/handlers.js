@@ -1965,12 +1965,13 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
             if (sender && sender.wc && seguibile && action._callId && typeof tm.seguiApertura === 'function') {
               tm.seguiApertura(tabId, { wc: sender.wc, callId: action._callId, assistente });
             }
+            // Prima dell'attesa qui sotto: un rinvio della pagina arriva durante, e la rilettura deve conoscerlo (#553).
+            const t = (tm.tabs || []).find((x) => x && x.id === tabId);
+            if (t && t.view) PageRead.ricordaApertura(t.view.webContents, url);
             // La scheda nata può fermarla dopo un rimbalzo verso la lista (un link accorciato, un rinvio della pagina).
             const esito = typeof tm.esitoApertura === 'function' ? await tm.esitoApertura(tabId) : null;
             if (esito && esito.bloccata) return fermata(esito.bloccata.host, esito.bloccata.reason, esito.bloccata.target);
             opened = true;
-            const t = (tm.tabs || []).find((x) => x && x.id === tabId);
-            if (t && t.view) PageRead.ricordaApertura(t.view.webContents, url);
           }
         } catch (e) {
           console.warn('[Filo] apertura link fallita', e?.message || e);
