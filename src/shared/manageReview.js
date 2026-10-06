@@ -608,6 +608,7 @@
     loop: 'difetto non più correggibile da soli',
     decisione: 'fermo: aspetta una tua scelta',
     locale: 'richiede lavoro locale',
+    attesa_chiusa: 'un feedback che aspettava si è chiuso senza fusione',
     arenato: 'lavorazione arenata',
     judges: 'verdetto dei giudici',
     duplicate: 'duplicato',
