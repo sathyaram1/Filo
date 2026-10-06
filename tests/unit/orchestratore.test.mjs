@@ -1067,3 +1067,253 @@ test('una richiesta di soli spazi rimasta nello stato vale come mancante: lavora
   assert.equal(p.richiesta, 'richiesta letta');
   assert.match(b.righe().find((x) => /verify-local\.mjs start/.test(x)), /start richiesta letta --feedback 9/);
 });
+
+// ─── #1036, #1041, #1043: nessun tetto proprio, posti decisi dalla macchina, smetti lasciando finire ───
+
+const prova = (num, slug, file, altro = {}) => ({ ...nuovaPratica({ num, slug, richiesta: 'fai X', file: [file] }), ...altro });
+const unGiro = () => new Promise((ok) => setImmediate(ok));
+async function finche(cond, cosa) {
+  for (let i = 0; i < 5000 && !cond(); i += 1) await unGiro();
+  assert.ok(cond(), `non arriva: ${cosa}`);
+}
+
+// Istanze lente: le prime `quante` aspettano che la prova le lasci finire, o le fermi come farebbe la riga di comando con «subito».
+function lente(b, quante = Infinity) {
+  const vera = b.dep.claude;
+  const lanciate = [];
+  b.dep.claude = (x) => {
+    b.chiamate.push({ riga: `lancio ${x.ruolo}`, cwd: x.cwd });
+    if (lanciate.length >= quante) return vera(x);
+    return new Promise((ok) => {
+      const i = { ruolo: x.ruolo, cwd: x.cwd, fatta: false };
+      i.finisci = () => { i.fatta = true; ok(vera(x)); };
+      i.ferma = () => { i.fatta = true; ok({ ok: false, testo: '', costo: 0.2, errore: 'processo fermato' }); };
+      lanciate.push(i);
+    });
+  };
+  return { lanciate, vera };
+}
+
+test('smetti con calma (#1043): dopo nessuna istanza nuova, quelle in corso arrivano in fondo al passo, lo stato è coerente e un avvia nuovo riprende', async () => {
+  const b = banco({ pratiche: [prova(1, 'uno', 'a/**'), prova(2, 'due', 'b/**'), prova(3, 'tre', 'c/**')], server: false, opz: { paralleli: 2 } });
+  const { lanciate, vera } = lente(b);
+  const corsa = b.motore.avvia();
+  await finche(() => lanciate.length === 2, 'due lavoratori in corso');
+  assert.equal(b.motore.smetti(), 'calma');
+  for (let i = 0; i < 50; i += 1) await unGiro();
+  for (const i of lanciate) i.finisci();
+  const fine = await corsa;
+  assert.equal(lanciate.length, 2, 'nessuna istanza dopo smetti');
+  assert.equal(starts(b), 0, 'nessuna verifica partita dopo smetti');
+  assert.deepEqual([1, 2, 3].map((n) => fine.pratiche[n].fase), ['verifica', 'verifica', 'in-coda']);
+  for (const n of [1, 2]) {
+    const p = fine.pratiche[n];
+    assert.deepEqual([p.inCorso, p.interrotto, p.fermo], [null, undefined, null], `#${n}`);
+    assert.equal(p.istanze.length, 1);
+  }
+
+  b.dep.claude = vera;
+  const dopo = await creaMotore(b.dep, { pausaMs: 0 }).avvia();
+  assert.deepEqual([1, 2, 3].map((n) => dopo.pratiche[n].fase), ['fuso', 'fuso', 'fuso']);
+  assert.equal(b.prompt.filter((x) => x.ruolo === 'lavoratore').length, 3, 'il passo finito prima di smetti non si rifà');
+});
+
+test('smetti subito (#1043): istanza e chiusura fermate a metà tornano al loro passo, lo stato dice quale, niente fermata né nota all’owner; la ripresa li rifà', async () => {
+  const b = banco({ pratiche: [prova(1, 'uno', 'a/**'), prova(2, 'due', 'b/**', { fase: 'chiusura' })], server: false });
+  const { lanciate, vera } = lente(b);
+  const esegui = b.dep.esegui;
+  let fermaFinish = null;
+  b.dep.esegui = (cmd, args, o) => (/finish-local/.test(args.join(' ')) && !fermaFinish
+    ? new Promise((ok) => { fermaFinish = () => ok({ code: 1, out: 'processo fermato', stdout: '' }); })
+    : esegui(cmd, args, o));
+  const corsa = b.motore.avvia();
+  await finche(() => lanciate.length === 1 && fermaFinish, 'un lavoratore e un finish in corso');
+  assert.equal(b.motore.smetti('subito'), 'subito');
+  lanciate[0].ferma();
+  fermaFinish();
+  const fine = await corsa;
+  const [uno, due] = [fine.pratiche[1], fine.pratiche[2]];
+  assert.equal(uno.fase, 'lavoro');
+  assert.deepEqual([uno.interrotto.fase, uno.interrotto.come], ['lavoro', 'subito']);
+  assert.match(uno.interrotto.cosa, /lavoratore fermato a metà/);
+  assert.equal(uno.costo, 0.2, 'il costo dell’istanza fermata resta contato');
+  assert.equal(due.fase, 'chiusura');
+  assert.match(due.interrotto.cosa, /finish-local\.mjs fermato a metà/);
+  assert.equal(due.fusa.app, false);
+  for (const p of [uno, due]) assert.deepEqual([p.fermo, p.inCorso], [null, null]);
+  assert.equal(indice(b.righe(), /^annota /), -1, 'nessuna nota all’owner per un passo fermato da lui');
+  assert.match(rigaStato(uno), /lasciato a metà \(fermata immediata\): lavoratore fermato a metà; il prossimo «avvia» rifà il passo/);
+
+  b.dep.claude = vera;
+  const dopo = await creaMotore(b.dep, { pausaMs: 0 }).avvia();
+  assert.deepEqual([dopo.pratiche[1].fase, dopo.pratiche[2].fase], ['fuso', 'fuso']);
+  assert.deepEqual([dopo.pratiche[1].interrotto, dopo.pratiche[2].interrotto], [undefined, undefined]);
+});
+
+test('smetti durante l’attesa del limite d’uso: non si aspettano ore, il passo resta da rifare', async () => {
+  const b = banco({ server: false, errori: ['Claude AI usage limit reached'] });
+  b.dep.dormi = (ms) => (ms > 1000 ? new Promise(() => {}) : unGiro());
+  const corsa = b.motore.avvia();
+  await finche(() => b.stato.pratiche[7].istanze.length === 1, 'la prima istanza caduta sul limite');
+  for (let i = 0; i < 20; i += 1) await unGiro();
+  b.motore.smetti();
+  const p = (await corsa).pratiche[7];
+  assert.equal(p.fase, 'lavoro');
+  assert.match(p.interrotto.cosa, /in attesa del limite d’uso/);
+});
+
+test('posti decisi dalla macchina (#1041): senza numero fisso partono finché il carico lo permette; a macchina carica uno per volta', async () => {
+  const tre = () => [prova(1, 'uno', 'a/**'), prova(2, 'due', 'b/**'), prova(3, 'tre', 'c/**')];
+  const libera = banco({ pratiche: tre(), server: false });
+  const a = lente(libera);
+  const corsa = libera.motore.avvia();
+  await finche(() => a.lanciate.length === 3, 'tre istanze insieme a macchina libera');
+  for (const i of a.lanciate) i.finisci();
+  assert.deepEqual(Object.values((await corsa).pratiche).map((p) => p.fase), ['fuso', 'fuso', 'fuso']);
+
+  const carica = banco({ pratiche: tre(), server: false, carichi: () => ({ cpu: 95, liberaGB: 16 }) });
+  const c = lente(carica, 1);
+  const corsa2 = carica.motore.avvia();
+  await finche(() => c.lanciate.length === 1, 'la prima istanza');
+  for (let i = 0; i < 200; i += 1) await unGiro();
+  assert.equal(carica.righe().filter((x) => /^lancio /.test(x)).length, 1, 'a macchina carica non ne parte un’altra');
+  c.lanciate[0].finisci();
+  assert.deepEqual(Object.values((await corsa2).pratiche).map((p) => p.fase), ['fuso', 'fuso', 'fuso']);
+});
+
+test('un lavoro pronto a chiudere ferma le istanze nuove degli altri finché la sua chiusura non è fatta (#1041)', async () => {
+  let occupata = false;
+  // 70%: sotto la soglia di un'istanza (80), sopra quella di una chiusura (60).
+  const b = banco({ pratiche: [prova(1, 'uno', 'a/**'), prova(2, 'due', 'b/**', { fase: 'chiusura' })], server: false, carichi: () => ({ cpu: occupata ? 70 : 10, liberaGB: 16 }) });
+  const { lanciate } = lente(b, 1);
+  const vera = b.dep.claude;
+  b.dep.claude = (x) => { occupata = true; return Promise.resolve(vera(x)).finally(() => { occupata = false; }); };
+  const corsa = b.motore.avvia();
+  await finche(() => lanciate.length === 1, 'il lavoratore di #1');
+  await finche(() => b.righe().length && b.stato.pratiche[2].fase === 'chiusura' && indice(b.righe(), /chiusura in attesa/) === -1 && b.chiamate.some((c) => c.cwd === '/r/.claude/worktrees/due'), '#2 ammessa');
+  for (let i = 0; i < 50; i += 1) await unGiro();
+  assert.equal(indice(b.righe(), /finish-local/), -1, 'la chiusura aspetta la macchina calma');
+  lanciate[0].finisci();
+  const fine = await corsa;
+  assert.deepEqual([fine.pratiche[1].fase, fine.pratiche[2].fase], ['fuso', 'fuso']);
+  const r = b.chiamate;
+  const finish2 = r.findIndex((c) => /finish-local/.test(c.riga) && c.cwd === '/r/.claude/worktrees/due');
+  const verifica1 = r.findIndex((c) => c.riga === 'lancio verificatore' && c.cwd === '/r/.claude/worktrees/uno');
+  assert.ok(finish2 >= 0 && verifica1 > finish2, `il verificatore di #1 parte a chiusura di #2 fatta:\n${r.map((c) => `${c.riga} @${c.cwd}`).join('\n')}`);
+});
+
+test('di serie nessun tetto di giri proprio (#1036): si va avanti finché il server non dice superato', async () => {
+  const b = banco({ verdetti: [...Array(10).fill('fixed'), 'pass'], server: false });
+  const p = (await b.motore.avvia()).pratiche[7];
+  assert.equal(p.fase, 'fuso', JSON.stringify(p.fermo));
+  assert.equal(p.giriTotali, 11);
+});
+
+test('sforzo per ruolo come nelle routine (#1041): il primo lavoro dal suo agente; correzione, riallineamento, ripresa e verifica dal worker', () => {
+  assert.equal(ruoloDelLavoro({ compito: 'lavoro' }), 'lavoratore');
+  assert.equal(ruoloDelLavoro({ compito: 'lavoro', fermoPrima: { motivo: 'caduto' } }), 'ripresa');
+  assert.equal(ruoloDelLavoro({ compito: 'decisione' }), 'ripresa');
+  assert.equal(ruoloDelLavoro({ compito: 'correzione' }), 'correttore');
+  assert.equal(ruoloDelLavoro({ compito: 'riallinea' }), 'riallineatore');
+  assert.equal(AGENTE_DEL_RUOLO.lavoratore, 'routine-nuovo-lavoro');
+  for (const r of ['correttore', 'riallineatore', 'ripresa', 'verificatore']) assert.equal(AGENTE_DEL_RUOLO[r], 'routine-worker', r);
+  for (const [ruolo, nome] of Object.entries(AGENTE_DEL_RUOLO)) {
+    const a = frontmatter(readFileSync(join(ROOT, '.claude', 'agents', `${nome}.md`), 'utf8'));
+    assert.deepEqual(modelloDelRuolo(ruolo, ROOT), { model: a.model, effort: a.effort }, ruolo);
+  }
+});
+
+test('rilievi messi da parte secondo il caso (#1036): in locale solo ciò che si fa solo qui, il resto alle routine, in feedback separati', async () => {
+  assert.equal(doveSiLavora({ text: 'manca il campo nuovo in firestore.rules' }), 'locale');
+  assert.equal(doveSiLavora({ text: 'la function in filo-security non controlla il mittente' }), 'locale');
+  assert.equal(doveSiLavora({ text: 'dopo la fusione serve rideployare il server' }), 'locale');
+  assert.equal(doveSiLavora({ text: 'il pulsante in Gestione non ha l’hover' }), 'non-locale');
+  const der = [{ level: 1, sede: 'i', text: 'hover mancante' }, { level: 1, sede: 'i', text: 'aggiorna storage.rules' }, { level: 2, sede: 'e', text: 'altro lavoro Z' }];
+  const p = { num: 7, slug: 'sette', derivatiAperti: [] };
+  assert.deepEqual(derivatiDaAprire(p, der).map((x) => [x.titolo, x.dove]), [['altro lavoro Z', 'non-locale'], ['hover mancante', 'non-locale'], ['aggiorna storage.rules', 'locale']]);
+  assert.deepEqual(derivatiDaAprire(p, der, 'locale').map((x) => x.dove), ['locale', 'locale']);
+
+  const b = banco({ server: false, derived: der.slice(0, 2) });
+  const fine = (await b.motore.avvia()).pratiche[7];
+  const aperti = b.chiamate.filter((c) => /claude-feedback/.test(c.riga));
+  assert.deepEqual(aperti.map((c) => / --(non-locale|locale) /.exec(c.riga)[1]), ['non-locale', 'locale']);
+  assert.match(aperti[1].input, /storage\.rules/);
+  assert.deepEqual(fine.derivatiAperti.map((d) => d.dove), ['non-locale', 'locale']);
+  assert.match(rigaStato(fine), /#1001, #1001 \(locale\)/);
+});
+
+test('nota per l’owner sulla pratica: cosa è successo e cosa deve fare, in chiaro', () => {
+  const p = { num: 41 };
+  assert.match(notaPerOwner(p, { motivo: 'x', attesaApprovazione: true }), /approvala in Filo \(Gestione → Automazioni\), poi `npm run orchestra -- riprendi 41`/);
+  const lunga = 'scegli A o B? '.repeat(400);
+  const d = notaPerOwner(p, { motivo: 'la verifica ha fermato il lavoro', domanda: lunga });
+  assert.match(d, /serve una tua scelta \(la verifica ha fermato il lavoro\)/);
+  assert.match(d, /la domanda continua: \d+ caratteri in tutto, intera con `npm run orchestra -- stato`/);
+  assert.match(d, /Cosa fare: rispondi con `npm run orchestra -- riprendi 41 "<la tua risposta>"`/);
+  assert.match(notaPerOwner(p, { motivo: 'fuso, ma le regole no', azione: 'riporta il checkout su main.' }), /Cosa fare: riporta il checkout su main\./);
+  assert.match(notaPerOwner(p, { motivo: 'il lavoratore non ha finito: x' }), /lavoro fermo, il lavoratore non ha finito[\s\S]*riprendi 41/);
+});
+
+test('stato durante la chiusura: quante istanze aspetta, e un orchestratore morto lascia «interrotto»', () => {
+  const p = { ...nuovaPratica({ num: 7, slug: 'sette' }), fase: 'verifica', inCorso: { cosa: 'verificatore', da: '2026-10-06T22:15:00.000Z' } };
+  assert.equal(rigaChiusura({ modo: 'calma', at: '2026-10-06T22:20:00.000Z' }, [p]), 'In chiusura con calma (chiesta alle 22:20): non avvia altro, aspetta un’istanza: #7 verificatore (dalle 22:15).');
+  assert.match(rigaChiusura({ modo: 'subito', at: '2026-10-06T22:20:00.000Z' }, [p, { ...p, num: 8 }]), /In chiusura immediata .*sto fermando 2 istanze/);
+  assert.match(rigaChiusura({ modo: 'calma', at: '' }, []), /niente più in corso/);
+  assert.match(rigaStato(p), /in corso: verificatore \(dalle 22:15\)/);
+  assert.match(rigaStato(p, { vivo: false }), /interrotto: verificatore, l’orchestratore si è chiuso a metà/);
+});
+
+test('smetti dalla riga di comando: senza orchestratore non scrive niente; con uno vivo lascia la richiesta, --subito la alza, stato la mostra', () => {
+  const d = cartellaTemporanea('orch-smetti-');
+  const orch = (...a) => spawnSync(process.execPath, ['scripts/orchestratore-locale.mjs', ...a], {
+    cwd: ROOT, encoding: 'utf8', env: { ...process.env, FILO_ORCH_DIR: d }, timeout: 60_000,
+  });
+  const richiesta = () => { const r = JSON.parse(readFileSync(join(d, 'smetti.json'), 'utf8')); return [r.pid, r.modo]; };
+  let r = orch('smetti');
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /Nessun orchestratore in corso/);
+  assert.equal(existsSync(join(d, 'smetti.json')), false);
+
+  assert.equal(orch('aggiungi', '7', '--slug', 'smetti-prova', '--richiesta', 'una prova').status, 0);
+  const f = join(d, 'stato.json');
+  const s = JSON.parse(readFileSync(f, 'utf8'));
+  Object.assign(s.pratiche[7], { fase: 'verifica', giri: 1, giriTotali: 1, inCorso: { cosa: 'verificatore', da: '2026-10-06T22:15:00.000Z' } });
+  writeFileSync(f, JSON.stringify(s));
+  writeFileSync(join(d, 'avvia.lock'), String(process.pid));
+  r = orch('smetti');
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /di smettere con calma: non avvia altro, aspetta l’istanza in corso e poi esce da solo/);
+  assert.deepEqual(richiesta(), [process.pid, 'calma']);
+  r = orch('stato');
+  assert.match(r.stdout, /In chiusura con calma \(chiesta alle \d\d:\d\d\): non avvia altro, aspetta un’istanza: #7 verificatore \(dalle 22:15\)/);
+  assert.match(r.stdout, /in corso: verificatore/);
+  assert.match(orch('smetti', '--subito').stdout, /fermarsi subito/);
+  assert.deepEqual(richiesta(), [process.pid, 'subito']);
+  orch('smetti');
+  assert.deepEqual(richiesta(), [process.pid, 'subito'], 'una richiesta di fermata immediata non torna indietro');
+  assert.match(orch('smetti', 'adesso').stderr, /argomento non capito «adesso»/);
+
+  writeFileSync(join(d, 'avvia.lock'), String(spawnSync(process.execPath, ['-e', '']).pid));
+  r = orch('stato');
+  assert.match(r.stdout, /Orchestratore fermo/);
+  assert.doesNotMatch(r.stdout, /In chiusura/);
+  assert.match(r.stdout, /interrotto: verificatore, l’orchestratore si è chiuso a metà; riparte col prossimo «avvia»/);
+});
+
+test('Filo dell’owner aperto: lo dice il blocco nella sua cartella dati, su Windows come altrove', () => {
+  const errore = (code) => Object.assign(new Error(code), { code });
+  assert.equal(filoAperto(['/d/Filo'], 'win32', { apri: () => { throw errore('EBUSY'); } }), true);
+  assert.equal(filoAperto(['/d/Filo'], 'win32', { apri: () => {} }), false);
+  assert.equal(filoAperto(['/d/Filo'], 'win32', { apri: () => { throw errore('ENOENT'); } }), false);
+  const link = (vivoIl) => ({ leggiLink: (f) => { if (/[/\\]filo[/\\]SingletonLock$/.test(f)) return 'portatile-4242'; throw errore('ENOENT'); }, vivo: (pid) => pid === vivoIl });
+  assert.equal(filoAperto(['/c/Filo', '/c/filo'], 'linux', link(4242)), true);
+  assert.equal(filoAperto(['/c/Filo', '/c/filo'], 'darwin', link(1)), false, 'il blocco di un Filo caduto non conta');
+  assert.deepEqual(cartelleDatiFilo({ APPDATA: '/u/Roaming' }, 'win32', '/u'), [join('/u/Roaming', 'Filo')]);
+  assert.deepEqual(cartelleDatiFilo({}, 'linux', '/home/o'), [join('/home/o', '.config', 'Filo'), join('/home/o', '.config', 'filo')]);
+  assert.equal(cartelleDatiFilo({}, 'darwin', '/Users/o')[0], join('/Users/o', 'Library', 'Application Support', 'Filo'));
+});
+
+test('Ctrl-C nel terminale di avvia: il primo smette con calma, il secondo ferma subito, il terzo esce; il segnale che npm rimanda subito dopo non conta', () => {
+  const colpo = contaColpi(1000);
+  assert.deepEqual([colpo(0), colpo(5), colpo(2000), colpo(4000)], ['calma', null, 'subito', 'esci']);
+});
