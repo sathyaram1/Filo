@@ -207,27 +207,61 @@ const chiaveRilievo = (f) => `${f.level}${f.sede}:${String(f.text).slice(0, 80)}
 /** Come togli apre i rilievi rimasti: come li apriva l'avvia che ha guidato il lavoro. PURA. */
 export const modoDerivati = (p) => (p && p.derivati) || OPZIONI_BASE.derivati;
 
-// Si fa solo in locale (LOCAL.md): il server e i suoi deploy, le regole pubblicate, le impostazioni dell'owner. Il resto alle routine.
-// La critica parla a parole e senza nomi di file: valgono anche «il server» (non quello di un altro), le regole del database, le Cloud Functions.
-const SOLO_IN_LOCALE = /filo-security|\bfunctions[/\\]|\bCloud Functions?\b|\b(firestore|storage)\.rules\b|firestore\.indexes|server:(pubblica|fondi)|regole:pubblica|console (di |del )?Firebase|Firebase console|\bSecrets? (di|su) GitHub|GitHub Secrets?|\bruleset\b|token admin|FILO_ADMIN_|\b(il|lo|del|dello|al|dal|sul|nel|col|lato)\s+server\b(?!\s+(di|dei|del|della|delle|degli)\s+(?!Filo\b))|\bregole\s+(di|del|della|dello|delle)\s+(Firestore|Storage|database|sicurezza)\b|\bindic[ei]\s+(di|del)\s+(Firestore|database)\b/i;
-// Il deploy conta come lavoro da fare; nominato da un elemento dell'interfaccia («il pulsante per il deploy») è un difetto dell'app.
-const DEPLOY = /(?<!\b(pulsante|bottone|voce|tasto|icona|scritta|etichetta|menu|scheda|riga|colonna)\b[^.,;:\n]{0,30})\b(ri)?deploy/i;
+// Il ripiego quando lo smistamento a giudizio non risponde (#1036): nomi espliciti → locale; un difetto mostrato
+// dall'interfaccia → routine, anche se nomina il server; il server, il database, Firestore o un deploy da fare → locale.
+const NOMI_SOLO_LOCALE = /filo-security|\bfunctions[/\\]|\b(firestore|storage)\.rules\b|firestore\.indexes|server:(pubblica|fondi)|regole:pubblica|\bSecrets? (di|su) GitHub|GitHub Secrets?|\bruleset\b|token admin|FILO_ADMIN_/i;
+const INTERFACCIA = /\b(pagin[ae]|pulsant[ei]|bottone|colonn[ae]|messaggi[oa]? (di|d’|d')\s*errore|scritt[ae]|etichett[ae]|tema (chiaro|scuro)|schermo|finestr[ae]|menu|hover|icon[ae]|tasto destro|toast|voce|voci)\b/i;
+const TEMI_SOLO_LOCALE = /\bCloud Functions?\b|\bFirestore\b|\bFirebase\b|\b(il|lo|i|del|dello|dei|al|ai|dal|dai|sul|sui|nel|nei|col|coi|lato)\s+server\b(?!\s+(di|dei|del|della|delle|degli)\s+(?!Filo\b))|\b(il|del|nel|sul|al|dal)\s+database\b|\bregol[ae]\s+(di|del|della|dello|delle)\s+(Storage|database|sicurezza)\b|\bindic[ei]\s+(di|del)\s+database\b|\b(ri)?deploy/i;
 
-/** Chi lavora un rilievo messo da parte: 'locale' solo se si fa soltanto in locale, sennò le routine. PURA. */
+/** Il ripiego a parole per un rilievo che lo smistamento non ha giudicato: 'locale' o 'non-locale'. PURA. */
 export function doveSiLavora(f) {
   const t = String((f && f.text) || '');
-  return SOLO_IN_LOCALE.test(t) || DEPLOY.test(t) ? 'locale' : 'non-locale';
+  if (NOMI_SOLO_LOCALE.test(t)) return 'locale';
+  if (INTERFACCIA.test(t)) return 'non-locale';
+  return TEMI_SOLO_LOCALE.test(t) ? 'locale' : 'non-locale';
+}
+
+/** Il compito di chi smista i rilievi a giudizio: risponde un array JSON di 'locale'/'non-locale', uno per rilievo. PURA. */
+export function promptSmistamento(testi) {
+  return [
+    'Smisti i rilievi di una verifica di Filo, un browser Electron, fra chi può lavorarli. Non usare strumenti: rispondi subito.',
+    '',
+    '- "locale": si lavora solo in una sessione sul computer dell’owner. È il server di Filo (Cloud Functions, il progetto filo-security,',
+    '  le API che ricevono feedback, critiche, fusioni, crediti, giudici), le regole e gli indici di Firestore o Storage, i dati su Firebase,',
+    '  i deploy, i Secrets e le regole di GitHub, le impostazioni dell’owner che vivono sul server.',
+    '- "non-locale": lo lavorano le routine in cloud, che toccano solo il repo dell’app. È l’app e le sue pagine (anche Gestione e la',
+    '  bacheca), i suoi testi, i suoi script e strumenti, i test. Un difetto che l’utente vede nell’interfaccia è dell’app anche quando',
+    '  parla del server: un messaggio d’errore, una colonna, un pulsante.',
+    '',
+    'Decidi da cosa va cambiato per curare il rilievo, non dalle parole che usa.',
+    `Rispondi SOLO con un array JSON di ${testi.length} stringhe, nell’ordine dei rilievi, per esempio ["locale","non-locale"].`,
+    '',
+    ...testi.map((t, i) => `Rilievo ${i + 1}:\n${String(t).trim()}\n`),
+  ].join('\n');
+}
+
+/** La risposta dello smistamento → un array lungo n di 'locale'/'non-locale', o null se non torna. PURA. */
+export function leggiSmistamento(testo, n) {
+  const m = /\[[^[\]]*\]/.exec(String(testo || ''));
+  if (!m) return null;
+  let a;
+  try { a = JSON.parse(m[0]); } catch (_) { return null; }
+  return Array.isArray(a) && a.length === n && a.every((x) => x === 'locale' || x === 'non-locale') ? a : null;
+}
+
+// Il registro accumula i messi da parte giro dopo giro: si salta il singolo rilievo già aperto, non il gruppo, o ogni giro ripete i precedenti.
+function rilieviNuovi(p, derived) {
+  const fatti = new Set((p.derivatiAperti || []).flatMap((d) => (Array.isArray(d.chiavi) ? d.chiavi : String(d.chiave || '').split('|'))));
+  return ROUND.derivedGroups(Array.isArray(derived) ? derived : []).flatMap((g) => g.findings).filter((f) => !fatti.has(chiaveRilievo(f)));
 }
 
 /**
  * I feedback da aprire per i rilievi che il lavoro non ha corretto, raggruppati come li apre il server. PURA.
- * Il registro accumula i messi da parte giro dopo giro: si salta il singolo rilievo già aperto, non il gruppo, o ogni giro ripete i precedenti.
- * Con `auto` i rilievi da lavorare in locale e quelli per le routine finiscono in feedback separati.
+ * Con `auto` i rilievi da lavorare in locale e quelli per le routine finiscono in feedback separati; `doveDi` è lo smistamento.
  */
-export function derivatiDaAprire(p, derived, modo = 'auto') {
-  const fatti = new Set((p.derivatiAperti || []).flatMap((d) => (Array.isArray(d.chiavi) ? d.chiavi : String(d.chiave || '').split('|'))));
-  const nuovi = ROUND.derivedGroups(Array.isArray(derived) ? derived : []).flatMap((g) => g.findings).filter((f) => !fatti.has(chiaveRilievo(f)));
-  const dove = (f) => (modo === 'auto' ? doveSiLavora(f) : modo);
+export function derivatiDaAprire(p, derived, modo = 'auto', doveDi = doveSiLavora) {
+  const nuovi = rilieviNuovi(p, derived);
+  const dove = (f) => (modo === 'auto' ? doveDi(f) : modo);
   return ['non-locale', 'locale'].flatMap((qui) => ROUND.derivedGroups(nuovi.filter((f) => dove(f) === qui)).map((g) => {
     const chiavi = g.findings.map(chiaveRilievo);
     const chiave = chiavi.join('|');
@@ -443,6 +477,22 @@ export async function togliWorktree(dep, p) {
 const avvisaUnaVolta = (p, a) => { p.avvisi = p.avvisi || []; if (!p.avvisi.includes(a)) p.avvisi.push(a); };
 
 /**
+ * Dove si lavora ogni rilievo nuovo, deciso a giudizio da dep.smista(prompt) e tenuto sulla pratica: le parole sbagliano nei due sensi.
+ * Senza giudizio si ripiega sulle parole, con un avviso, e si riprova al passo dopo.
+ */
+async function smista(dep, p, derived) {
+  p.doveRilievi = p.doveRilievi || {};
+  const mancano = rilieviNuovi(p, derived).filter((f) => !p.doveRilievi[chiaveRilievo(f)]);
+  if (mancano.length && typeof dep.smista === 'function') {
+    let r = null;
+    try { r = leggiSmistamento(await dep.smista(promptSmistamento(mancano.map((f) => f.text))), mancano.length); } catch (_) { r = null; }
+    if (r) mancano.forEach((f, i) => { p.doveRilievi[chiaveRilievo(f)] = r[i]; });
+    else avvisaUnaVolta(p, 'rilievi smistati a parole: lo smistamento a giudizio non ha risposto');
+  }
+  return (f) => p.doveRilievi[chiaveRilievo(f)] || doveSiLavora(f);
+}
+
+/**
  * Apre come feedback i rilievi esterni e messi da parte che il registro della verifica ha e la pratica non ha ancora aperto.
  * La usano il motore dopo ogni passo e togli prima di rimuovere il worktree, che quel registro se lo porta via. → quanti non aperti.
  */
@@ -451,8 +501,9 @@ export async function apriDerivatiDi(dep, p, { derivati = OPZIONI_BASE.derivati,
   const wt = dep.percorsi.wt(p.slug);
   const entry = (dep.verifica(wt) || {}).entry || {};
   p.derivatiAperti = p.derivatiAperti || [];
+  const doveDi = derivati === 'auto' ? await smista(dep, p, entry.derived) : undefined;
   let falliti = 0;
-  for (const d of derivatiDaAprire(p, entry.derived, derivati)) {
+  for (const d of derivatiDaAprire(p, entry.derived, derivati, doveDi)) {
     const r = await dep.esegui('node', ['scripts/claude-feedback.mjs', d.titolo, '-', `--${d.dove}`, '--priorita', String(d.priorita)], { cwd: wt, input: d.testo });
     const m = /#(\d+)/.exec(String(r.out || ''));
     if (r.code === 0) p.derivatiAperti.push({ chiave: d.chiave, chiavi: d.chiavi, titolo: d.titolo, num: m ? Number(m[1]) : null, dove: d.dove });
