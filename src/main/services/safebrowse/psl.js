@@ -1,11 +1,10 @@
 // Public Suffix List (sottoinsieme curato) + estrazione del dominio
 // registrabile (eTLD+1).
 //
-// NON è la PSL completa (~9000 voci): è un sottoinsieme che copre i TLD comuni
-// e i ccSLD più diffusi (co.uk, com.au, com.br, ...). Per i suffissi non
-// elencati ricadiamo sulla regola implicita "*" del PSL (ogni etichetta è un
-// suffisso valido), quindi l'eTLD+1 resta sempre calcolabile e ragionevole.
-// Quando serviranno casi più esotici, basta aggiungere righe a SUFFIX_RULES.
+// NON è la PSL completa (~9000 voci): ci sono i TLD comuni, TUTTE le regole
+// ICANN a due etichette (pslDueEtichette.js: com.co e tienda.com.co, roma.it e
+// comune.roma.it) e le piattaforme qui sotto. Mancano le regole a tre o più
+// etichette (città giapponesi, contee USA): lì vale la regola implicita "*".
 //
 // L'algoritmo segue publicsuffix.org: cerca la regola che combacia con il
 // maggior numero di etichette (con gestione di wildcard `*` ed eccezioni `!`),
