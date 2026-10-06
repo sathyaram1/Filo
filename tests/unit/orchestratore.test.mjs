@@ -1171,8 +1171,10 @@ test('posti decisi dalla macchina (#1041): senza numero fisso partono finché il
   for (const i of a.lanciate) i.finisci();
   assert.deepEqual(Object.values((await corsa).pratiche).map((p) => p.fase), ['fuso', 'fuso', 'fuso']);
 
-  const carica = banco({ pratiche: tre(), server: false, carichi: () => ({ cpu: 95, liberaGB: 16 }) });
-  const c = lente(carica, 1);
+  let c = null;
+  // Carica finché gira la prima istanza: poi le chiusure, che vogliono la macchina calma, possono partire.
+  const carica = banco({ pratiche: tre(), server: false, carichi: () => ({ cpu: c && c.lanciate.some((i) => !i.fatta) ? 95 : 10, liberaGB: 16 }) });
+  c = lente(carica, 1);
   const corsa2 = carica.motore.avvia();
   await finche(() => c.lanciate.length === 1, 'la prima istanza');
   for (let i = 0; i < 200; i += 1) await unGiro();
