@@ -59,9 +59,9 @@
     for (const p of POPULAR) {
       if (host === p || host.endsWith('.' + p)) return '';
     }
-    // Stesso nome, altro dominio di primo livello (amazon.de, google.co): è il
-    // sito, e i suoi sottodomini (facebook.github.io) sono affar suo.
-    if (POPULAR.some((p) => sitoDi(p).nome === sito.nome)) return '';
+    // Stesso nome, altro dominio di primo livello (amazon.de, google.co): è il sito. Su una piattaforma che
+    // ospita altri il nome è di chi l'ha preso: lì è del marchio solo se lo dice l'elenco dei siti ufficiali (#732).
+    if (!sito.ospitato && POPULAR.some((p) => sitoDi(p).nome === sito.nome)) return '';
 
     // #732 — il nome di un dominio che il controllo all'apertura conosce come fidato è suo (githubusercontent.com,
     // googleapis.com): contano solo i pezzi davanti (paypal-login.s3.amazonaws.com).
@@ -72,7 +72,7 @@
       const suo = sitoDi(p).nome;
       // Il nome di un sito ospitato è una parola scelta da chi l'ha aperto
       // (apply.vercel.app non imita apple): lì conta solo la stessa grafia.
-      if (scritto === suo || (!sito.ospitato && levenshteinSmall(scritto, suo, tolleranza(suo)))) {
+      if ((scritto === suo && sito.nome !== suo) || (!sito.ospitato && levenshteinSmall(scritto, suo, tolleranza(suo)))) {
         return (straniero ? 'omografo:' : 'typosquatting:') + p;
       }
     }

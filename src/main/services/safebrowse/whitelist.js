@@ -26,7 +26,7 @@ const EXTRA = [
   'googleusercontent.com', 'googleapis.com', 'googletagmanager.com',
   'google-analytics.com', 'youtube-nocookie.com', 'ggpht.com', 'doubleclick.net', 'withgoogle.com',
   'goo.gl', 'recaptcha.net', 'googleblog.com', 'googlesource.com', 'googlevideo.com', 'googlesyndication.com',
-  'googleadservices.com', 'youtubekids.com',
+  'googleadservices.com', 'youtubekids.com', 'youtube.github.io',
   // CDN/infra di altri brand (contengono il token del brand ma sono ufficiali)
   'fbcdn.net', 'cdninstagram.com', 'licdn.com', 'twimg.com',
   'paypalobjects.com', 'icloud-content.com', 'amazon-adsystem.com',

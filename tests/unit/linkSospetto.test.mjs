@@ -392,3 +392,14 @@ test('un marchio-parola scritto con lettere finte e attaccato a un’altra parol
   ]) assert.ok(LS.analizza(u).some((c) => c.startsWith('nome_altrui:' + marchio + '|')), `nessun avviso su ${u}: ${LS.analizza(u)}`);
   assert.deepEqual(LS.analizza('https://applelogin.com/'), []);
 });
+
+test('su una piattaforma che ospita altri il nome nudo di un marchio è suo solo se lo dice l’elenco dei siti ufficiali: tasto destro e apertura rispondono uguale (#732)', () => {
+  const { evaluate } = require(join(ROOT, 'src/main/services/safebrowse/engine.js'));
+  const imita = (u) => LS.analizza(u).some((c) => /^(nome_altrui|typosquatting|omografo):/.test(c));
+  for (const u of ['https://amazon.github.io/', 'https://sub.amazon.github.io/', 'https://youtube.github.io/', 'https://google.github.io/',
+    'https://facebook.github.io/react/', 'https://x.github.io/', 'https://amazon.netlify.app/', 'https://amazon.de/', 'https://amazon-ion.github.io/']) {
+    assert.equal(imita(u), evaluate(u).level !== 'safe', `le due strade non concordano su ${u}: ${LS.analizza(u)}`);
+  }
+  assert.ok(LS.analizza('https://amazon.github.io/').some((c) => c.startsWith('nome_altrui:amazon.com|')));
+  assert.deepEqual(LS.analizza('https://amazon.de/'), []);
+});
