@@ -2,7 +2,7 @@
 //
 // COSA DEVE ESSERE VERO
 //   1. Dal dettaglio l'owner scrive «#12, #13»: il main riceve i numeri, la scheda mostra ciascuno col suo stato
-//      (#12 in coda, #13 fuso) e la pratica passa fra quelli che «Aspettano», fuori da «In coda».
+//      (#12 in coda, #13 archiviato dopo la fusione) e la pratica passa fra quelli che «Aspettano», fuori da «In coda».
 //   2. Si toglie dalla stessa scheda: la casella sparisce e la pratica torna In coda.
 //   3. Un rifiuto del main (numero inesistente, giro) si legge con il suo motivo, e niente cambia.
 //   4. Dal tasto destro sulla scheda si arriva alla casella, e si toglie tutto in un gesto.
@@ -22,7 +22,7 @@ function fb(over = {}) {
 const LISTA = [
   fb(),
   fb({ _id: 'f12', seq: 12, name: 'Il primo', status: 'todo' }),
-  fb({ _id: 'f13', seq: 13, name: 'Il secondo', status: 'done', statusPublic: 'closed', resolvedInVersion: '' }),
+  fb({ _id: 'f13', seq: 13, name: 'Il secondo', status: 'archived', statusPublic: 'closed', resolvedInVersion: '0.2.230' }),
 ];
 
 async function apri(page) {
@@ -55,7 +55,7 @@ const tabBtn = (page, tab) => page.locator(`.mg-tab[data-tab="${tab}"]`);
 test('dal dettaglio: «aspetta #12, #13» si scrive, mostra lo stato di ciascuno, e si toglie', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apri(page);
-  await expect(tabBtn(page, 'queue')).toHaveText('In coda (3)');
+  await expect(tabBtn(page, 'queue')).toHaveText('In coda (2)');
   await page.evaluate(() => window.__mgTest.openDetail('f903'));
 
   const toggle = page.locator('#mgAtteseToggle');
@@ -79,7 +79,7 @@ test('dal dettaglio: «aspetta #12, #13» si scrive, mostra lo stato di ciascuno
 
   // Fuori da «In coda»: sta fra quelli che aspettano, col numero ancora aperto sulla scheda.
   await expect(tabBtn(page, 'waiting')).toHaveText('Aspettano (1)');
-  await expect(tabBtn(page, 'queue')).toHaveText('In coda (2)');
+  await expect(tabBtn(page, 'queue')).toHaveText('In coda (1)');
   await tabBtn(page, 'waiting').click();
   const riga = page.locator('.mg-item[data-id="f903"]');
   await expect(riga).toBeVisible();
@@ -98,7 +98,7 @@ test('dal dettaglio: «aspetta #12, #13» si scrive, mostra lo stato di ciascuno
   await expect(page.locator('#mgAttese')).toBeHidden();
   await expect(toggle).toHaveText('⏳ Aspetta');
   expect((await page.evaluate(() => window.__updates))[2]).toEqual({ type: 'feedback_update', id: 'f903', waitsFor: '' });
-  await expect(tabBtn(page, 'queue')).toHaveText('In coda (3)');
+  await expect(tabBtn(page, 'queue')).toHaveText('In coda (2)');
 });
 
 test('un rifiuto del main si legge col suo motivo, e la pratica non cambia', async ({ openTab }) => {
@@ -116,7 +116,7 @@ test('un rifiuto del main si legge col suo motivo, e la pratica non cambia', asy
   await page.locator('#mgAtteseAggiungi').click();
   await expect(page.locator('#mgManageMsg')).toContainText('«abc» non è un numero di feedback');
   expect((await page.evaluate(() => window.__updates)).length).toBe(1);
-  await expect(tabBtn(page, 'queue')).toHaveText('In coda (3)');
+  await expect(tabBtn(page, 'queue')).toHaveText('In coda (2)');
 });
 
 test('tasto destro sulla scheda: «Aspetta un altro feedback…» apre la casella, «Non aspettare più» toglie tutto', async ({ openTab }) => {
