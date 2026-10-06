@@ -20,7 +20,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { writeFileSync, rmSync, readFileSync, mkdirSync, realpathSync } from 'node:fs';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -29,8 +29,11 @@ const ROOT = join(__dirname, '..', '..');
 const T = require(join(ROOT, 'src', 'main', 'services', 'terminal.js'));
 
 // Da solo un comando qui dura pochi secondi; fra gli unit test in parallelo PowerShell sulla macchina dell'owner
-// ne ha presi 61 e il tetto di 60 faceva un rosso finto. Le prove misurano l'esito, non la velocità.
+// ne ha presi 61 e il tetto di 60 faceva un rosso finto. Le prove misurano l'esito, non la velocità: vale anche per
+// le sessioni del terminale della dashboard, che col loro tetto di 30 s cadevano allo stesso modo (#1063).
 const ATTESA = 300_000;
+// La shell appena uscita può tenere ancora la cartella in cui girava: chi la toglie per provare aspetta che la lasci.
+const PAZIENZA = { tentativi: 20 };
 
 // Il nome che rompeva tutto: un trattino lungo e una «à». Entrambi assenti
 // dalla tabella OEM di Windows.
@@ -326,7 +329,7 @@ test('se la cartella di prima non c\'è più, il comando gira lo stesso e lo dic
   mkdirSync(sparita, { recursive: true });
   const prima = await T.runCommand('echo ciao', { cwd: sparita, trackCwd: true, timeoutMs: ATTESA });
   assert.ok(prima.stdout.includes('ciao'), 'il comando non gira nemmeno a cartella viva');
-  rmSync(sparita, { recursive: true, force: true });
+  assert.ok(togliCartella(sparita, PAZIENZA), 'la cartella di prima è ancora tenuta da qualcuno');
 
   const dopo = await T.runCommand('echo ciao', { cwd: sparita, trackCwd: true, timeoutMs: ATTESA });
   assert.ok(
@@ -342,7 +345,7 @@ test('da una cartella sparita si può ancora andare altrove', async () => {
   // terminale è finito finché l'utente non la chiude, e nessuno glielo dice.
   const sparita = join(TMP, 'cartella-senza-uscita');
   mkdirSync(sparita, { recursive: true });
-  rmSync(sparita, { recursive: true, force: true });
+  assert.ok(togliCartella(sparita, PAZIENZA), 'la cartella è ancora tenuta da qualcuno');
   const dove = process.platform === 'win32' ? `Set-Location "${TMP}"` : `cd "${TMP}"`;
   const out = await T.runCommand(dove, { cwd: sparita, trackCwd: true, timeoutMs: ATTESA });
   assert.equal(out.cwd, TMP, `non si riesce ad andarsene: ${out.cwd} (${out.stderr.slice(0, 120)})`);
@@ -389,7 +392,7 @@ test('l\'uscita di un comando non può scriversi la riga di servizio', async () 
   assert.notEqual(ko.code, 0, 'un comando fallito viene riportato come riuscito');
   assert.notEqual(ko.cwd, altrove, 'e intanto si sposta dove dice il file');
 
-  rmSync(dir, { recursive: true, force: true });
+  togliCartella(dir);
 });
 
 // ── #714: l'esito che arriva all'assistente è quello vero ───────────────────
@@ -453,7 +456,7 @@ test('nel terminale della dashboard un comando fallito risulta fallito', async (
   const sessione = S.createSession({ shell: 'powershell', cwd: TMP });
   const esegui = (comando) => new Promise((risolvi, rifiuta) => {
     let uscita = '';
-    const stop = setTimeout(() => rifiuta(new Error(`la shell non ha risposto: ${comando}`)), 30_000);
+    const stop = setTimeout(() => rifiuta(new Error(`la shell non ha risposto in ${ATTESA / 1000} s: ${comando}`)), ATTESA);
     sessione.exec(comando, {
       onData: ({ chunk, stream }) => { if (stream === 'stdout') uscita += chunk; },
       onExit: ({ code }) => { clearTimeout(stop); risolvi({ code, uscita }); },
@@ -498,7 +501,7 @@ test('un programma esterno riuscito che scrive su stderr resta riuscito anche co
   const S = require(join(ROOT, 'src', 'main', 'services', 'shell.js'));
   const sessione = S.createSession({ shell: 'powershell', cwd: TMP });
   const esegui = (comando) => new Promise((risolvi, rifiuta) => {
-    const stop = setTimeout(() => rifiuta(new Error(`la shell non ha risposto: ${comando}`)), 30_000);
+    const stop = setTimeout(() => rifiuta(new Error(`la shell non ha risposto in ${ATTESA / 1000} s: ${comando}`)), ATTESA);
     sessione.exec(comando, {
       onExit: ({ code }) => { clearTimeout(stop); risolvi(code); },
       onError: ({ message }) => { clearTimeout(stop); rifiuta(new Error(message)); },
