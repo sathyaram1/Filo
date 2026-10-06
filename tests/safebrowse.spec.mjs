@@ -950,7 +950,8 @@ async function serviSenzaRete(app, pagine) {
 async function bloccoMostrato(app) {
   const avviso = await vistaAvviso(app, 12_000);
   await expect(avviso.getByPlaceholder('confermo')).toBeVisible({ timeout: 10_000 });
-  await expect.poll(() => copertura(app)).toEqual(COPERTA);
+  // La tastiera non si guarda: openTab non porta la finestra in primo piano.
+  await expect.poll(async () => { const c = await copertura(app); return c.coperta && c.sopra; }).toBe(true);
   return avviso;
 }
 
