@@ -678,12 +678,50 @@ async function main(argv) {
     mkdirSync(P.note, { recursive: true });
     if (existsSync(lock) && vivo(Number(readFileSync(lock, 'utf8')))) throw new Error(`un orchestratore è già in corso (pid ${readFileSync(lock, 'utf8').trim()})`);
     writeFileSync(lock, String(process.pid));
+    // Una richiesta rimasta da un orchestratore di prima non vale per questo.
+    togliRichiesta(P);
+    const motore = creaMotore(depVere(P, opz, log), opz);
+    const chiedi = (modo, da) => {
+      const prima = motore.chiusura();
+      const ora2 = motore.smetti(modo);
+      if (ora2 === prima) return;
+      scriviRichiesta(P, { pid: process.pid, modo: ora2, at: ora() });
+      if (ora2 === 'subito') {
+        log(`fermata immediata (${da}): fermo le istanze e i processi in corso; il prossimo «avvia» rifà i passi interrotti`);
+        fermaFigli();
+        // Un processo che non si lascia fermare non tiene aperto l'orchestratore: lo stato dice già cosa rifare.
+        setTimeout(() => { log('qualcosa non si è fermato in un minuto: esco lo stesso'); process.exit(1); }, 60_000).unref();
+        return;
+      }
+      log(`chiusura con calma (${da}): non avvio altro, i passi in corso finiscono, poi esco. Per fermare tutto adesso: di nuovo Ctrl-C, o npm run orchestra -- smetti --subito`);
+      // npm su Windows chiude la sua shell al Ctrl-C e il terminale torna al prompt, ma questo processo continua.
+      if (process.platform === 'win32' && process.env.npm_lifecycle_event) log('se il terminale torna al prompt, l’orchestratore continua lo stesso qui sotto finché i passi non finiscono');
+    };
+    const guardia = setInterval(() => {
+      const r = leggiRichiesta(P);
+      if (r && r.pid === process.pid && (r.modo === 'subito' || r.modo === 'calma')) chiedi(r.modo, 'smetti');
+    }, 2000);
+    const colpo = contaColpi();
+    const alSegnale = () => {
+      const c = colpo(Date.now());
+      if (c === 'esci') { log('terzo Ctrl-C: esco adesso'); process.exit(130); }
+      if (c) chiedi(c, 'Ctrl-C');
+    };
+    const segnali = process.platform === 'win32' ? ['SIGINT', 'SIGBREAK'] : ['SIGINT', 'SIGTERM'];
+    for (const sg of segnali) process.on(sg, alSegnale);
     try {
-      const fine = await creaMotore(depVere(P, opz, log), opz).avvia();
+      const fine = await motore.avvia();
+      const modo = motore.chiusura();
+      const restano = fine.coda.filter((n) => fine.pratiche[n] && !FASI_FINITE.includes(fine.pratiche[n].fase));
+      if (modo) console.log(`Fermato su richiesta (${modo === 'subito' ? 'subito' : 'con calma'}).${restano.length ? ` Restano ${restano.length === 1 ? 'un lavoro' : `${restano.length} lavori`}:` : ' Non resta niente da fare.'}`);
       for (const n of fine.coda) console.log(rigaStato(fine.pratiche[n]));
+      if (modo && restano.length) console.log('Per riprendere: npm run orchestra -- avvia (riparte da dove era).');
       // 2 = qualche lavoro fermo: chi ha lanciato in sottofondo lo sa dal codice, senza leggere le righe.
       return fine.coda.some((n) => fine.pratiche[n] && fine.pratiche[n].fase === 'fermo') ? 2 : 0;
     } finally {
+      clearInterval(guardia);
+      for (const sg of segnali) process.off(sg, alSegnale);
+      togliRichiesta(P);
       try { unlinkSync(lock); } catch (_) { /* già tolto */ }
     }
   }
