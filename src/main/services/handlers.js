@@ -4012,18 +4012,6 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // I cambi partono subito, in parallelo al resto del contesto: una volta al
   // giorno vanno presi in rete, e non devono sommarsi all'attesa (#724.1).
   const cambiP = Fx.get().then((fx) => Fx.formatForPrompt(fx)).catch(() => '');
-  const memory = await FiloMem.getMemory();
-  const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(memory);
-  const lezioni = await lessonsBufferText();
-  const { stateText } = await FiloState.assemble({ creditiFreschi: true });
-  // #379.5 — i file dell'editor entrano nel contesto come RIASSUNTI (uno per
-  // file), non come testo integrale: economico e sempre presente. Filo, se serve,
-  // chiede il contenuto completo di un file con l'azione LEGGI_FILE.
-  const fileSummaries = await editorFileSummaries();
-  // #524 — finché la micro-intervista di benvenuto è aperta, il prompt riceve
-  // l'elenco di ciò che resta da scoprire e da dire. Per l'utente resta una
-  // chat normale: nessuna schermata a passi, nessun modulo.
-  const onboardingText = onbActive ? Onboarding.renderChecklistForPrompt(onbBefore) : '';
   const cleanHistory = Array.isArray(threadHistory) ? threadHistory.slice(-20) : [];
   // #868 — il modello ha davanti il filo, non la sola scheda: gli ultimi giorni di conversazioni di ogni scheda, con
   // le ore, entro i due tetti. Quello che la scheda ha e il filo no (un turno interrotto, una ripresa) viene dopo.
@@ -4037,7 +4025,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   } catch (e) { console.warn('[Filo] tratto del filo non letto, rispondo con la sola scheda:', e?.message || e); }
   const codaScheda = filo && chatId ? filo.coda : cleanHistory;
   const vistiDalFilo = filo ? filo.visti : [];
-  // I pezzi vecchi si cercano mentre si prepara il resto: arrivano in coda, prima della domanda.
+  // I pezzi vecchi si cercano mentre si prepara il resto (memorie, stato, file): arrivano in coda, prima della domanda.
   const ricordiP = filo && !internal && !onbActive && RicordiFilo
     ? RicordiFilo.cerca(String(userMessage || ''), { vecchi: filo.vecchi, davanti: filo.visti }).catch(() => [])
     : Promise.resolve([]);
@@ -4045,6 +4033,18 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // è entrato testo di altri; quello letto dalle azioni lo guarda executeFiloAction.
   const accoglienza = onbActive && !messaggioDaFuori && !Onboarding.haTestoDiAltri(onbBefore)
     && ![...cleanHistory, ...vistiDalFilo, ...codaScheda].some((m) => m && (m.daFuori === true || m.daModello === true || (typeof m.esterno === 'string' && !!m.esterno)));
+  const memory = await FiloMem.getMemory();
+  const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(memory);
+  const lezioni = await lessonsBufferText();
+  const { stateText } = await FiloState.assemble({ creditiFreschi: true });
+  // #379.5 — i file dell'editor entrano nel contesto come RIASSUNTI (uno per
+  // file), non come testo integrale: economico e sempre presente. Filo, se serve,
+  // chiede il contenuto completo di un file con l'azione LEGGI_FILE.
+  const fileSummaries = await editorFileSummaries();
+  // #524 — finché la micro-intervista di benvenuto è aperta, il prompt riceve
+  // l'elenco di ciò che resta da scoprire e da dire. Per l'utente resta una
+  // chat normale: nessuna schermata a passi, nessun modulo.
+  const onboardingText = onbActive ? Onboarding.renderChecklistForPrompt(onbBefore) : '';
   // Re-immissione dell'output dei comandi nel contesto del modello: l'output di
   // un ESEGUI_COMANDO eseguito in un turno precedente viene accodato al
   // messaggio dell'assistente, così nei turni successivi il modello SA davvero

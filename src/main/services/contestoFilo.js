@@ -108,7 +108,9 @@ const ancore = { normale: null, incognito: null };
 
 // `osserva(azioni)` scrive gli esiti per il modello (handlers.js). Ritorna il tratto da mandare e quello che serve alle
 // uscite: le azioni il cui esito arriva al modello, i messaggi che porta (letti, voce dell'utente), i più vecchi.
-async function componi({ chatId = null, userMessage = '', storia = [], incognito = false, tetti, osserva, ora = Date.now() } = {}) {
+async function componi({ chatId = null, userMessage = '', storia = [], incognito = null, tetti, osserva, ora = Date.now() } = {}) {
+  // Deciso alla richiesta, come fa il filo: dall'incognito si legge il filo in memoria, mai quello sul disco.
+  if (incognito == null) incognito = require('../shim/storage').inIncognito();
   const tutti = senzaDomanda(await messaggiDelFilo({ incognito }), chatId, userMessage);
   const chatMsgs = chatId ? tutti.filter((m) => m.chat === chatId) : [];
   const dallaScheda = esitiDellaScheda(storia, chatMsgs);

@@ -41,6 +41,8 @@ async function schedaNuova(app, shell) {
 async function preparaModello(app, copione) {
   await app.evaluate(async (_e, copione) => {
     const C = globalThis.SN_CONST;
+    // L'intervista di benvenuto ha il suo blocco nelle istruzioni: qui si prova il filo di tutti i giorni.
+    await globalThis.SN_FILO_MEMORY.setOnboarding({ done: true, ticked: [], thread: [] });
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
@@ -58,10 +60,10 @@ async function preparaModello(app, copione) {
     });
     globalThis.__copione = copione.slice();
     globalThis.__chiamate = [];
-    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, onDelta }) => {
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages, onDelta }) => {
       const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
-      const sys = String((messages[0] && messages[0].content) || '');
-      if (!sys.startsWith('Sei Filo, un assistente personale')) return { ...base, text: '{}', toolCalls: [], finishReason: 'stop' };
+      const chat = messages.some((m) => m.role === 'user' && String(m.content).startsWith('═══ CONTESTO DI ADESSO'));
+      if (!chat) return { ...base, text: '{}', toolCalls: [], finishReason: 'stop' };
       globalThis.__chiamate.push(JSON.parse(JSON.stringify(messages)));
       const r = globalThis.__copione.shift() || { text: 'ok' };
       if (r.text) { try { onDelta && onDelta(r.text); } catch (_) {} }
@@ -112,6 +114,8 @@ test('in una scheda nuova Filo ha davanti quello che hai detto nell\'altra, e du
     { text: 'Domani: me l\'hai detto nell\'altra scheda.' },
     { text: 'L\'ora non me l\'hai detta.' },
   ]);
+  await a.reload();
+  await expect(a.locator('#input')).toBeVisible();
   await scrivi(a, 'domani ho l\'esame di fisica');
   await expect(a.locator('.dash-bubble-filo', { hasText: 'In bocca al lupo!' })).toBeVisible({ timeout: 15_000 });
 
@@ -132,8 +136,8 @@ test('in una scheda nuova Filo ha davanti quello che hai detto nell\'altra, e du
   expect(testo(primo[esame])).toMatch(/^\[\w{3} \d+ \w{3} \d{4}, \d\d:\d\d · chat \w{4}\]/);
   expect(testo(primo[primo.length - 1])).toBe('quando ho l\'esame?');
   expect(primo[0].role).toBe('system');
-  expect(testo(primo[0])).not.toContain('STATO:');
-  expect(testo(primo[k])).toContain('STATO:');
+  expect(testo(primo[0])).not.toContain('═══ FILO STATE');
+  expect(testo(primo[k])).toContain('═══ FILO STATE');
   // Il turno dopo nella stessa scheda ripete identico tutto quello che stava prima del contesto: la cache lo riusa.
   expect(secondo.slice(0, k)).toEqual(primo.slice(0, k));
   expect(testo(secondo[k])).toMatch(/quando ho l'esame\?$/);
@@ -155,7 +159,7 @@ test('una conversazione di cinque giorni fa non è davanti, ma «riprendi la dis
   const k = posContesto(primo);
   expect(primo.slice(0, k).some((m) => /delfini/.test(testo(m)))).toBe(false);
   const esito = secondo.find((m) => m.role === 'tool');
-  expect(testo(esito)).toContain('Le orche sono delfini, non balene.');
+  expect(testo(esito)).toContain('parliamo delle orche');
   expect(testo(esito)).toContain('orche-di-lunedi');
   const blocco = page.locator('.dash-activity');
   await blocco.locator('.dash-activity-head').click();
@@ -185,6 +189,7 @@ test('una domanda legata a un tratto vecchio lo porta in coda al contesto, e il 
   const blocco = page.locator('.dash-activity');
   await blocco.locator('.dash-activity-head').click();
   await expect(blocco.locator('.dash-activity-row', { hasText: 'Ricordato dal filo' })).toContainText('Viaggio a Lisbona');
+  await blocco.screenshot({ path: 'tests/.shots/868-ricordo-nel-blocco.png' });
 });
 
 test('«quella pagina sulle orche che ho chiuso ieri»: la ricerca la trova nel filo e la riapre', async ({ app, testServer }) => {
@@ -221,6 +226,11 @@ test('col tetto a un giorno in Preferenze avanzate il contesto si accorcia al tu
   await pref.locator('#contestoGiorni').fill('1');
   await pref.locator('#contestoGiorni').dispatchEvent('change');
   await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).contestoFilo.giorni)).toBe(1);
+  await pref.locator('#sec-contesto').screenshot({ path: 'tests/.shots/868-contesto-chiaro.png' });
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }));
+  await pref.reload();
+  await expect(pref.locator('#contestoGiorni')).toHaveValue('1');
+  await pref.locator('#sec-contesto').screenshot({ path: 'tests/.shots/868-contesto-scuro.png' });
 
   await page.bringToFront();
   await scrivi(page, 'e domani?');

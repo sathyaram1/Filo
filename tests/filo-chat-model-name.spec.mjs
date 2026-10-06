@@ -65,8 +65,9 @@ test('il system prompt della chat nomina il modello con il suo id concreto, non 
       globalThis.SN_PROVIDERS.completeWithFallback = orig;
     }
 
-    const sys = (captured.messages || []).find((m) => m.role === 'system');
-    const sysContent = sys ? (typeof sys.content === 'string' ? sys.content : JSON.stringify(sys.content)) : null;
+    // Istruzioni e contesto di adesso: dal #868 il nome del modello sta nel contesto, subito prima della domanda.
+    const parti = (captured.messages || []).filter((m) => m.role === 'system' || String(m.content).startsWith('═══ CONTESTO DI ADESSO'));
+    const sysContent = parti.length ? parti.map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n') : null;
     const primaryModel = captured.attempts && captured.attempts[0] ? captured.attempts[0].model : null;
 
     // Risolvi quale chiave-nickname del registry corrisponde a quell'id concreto.

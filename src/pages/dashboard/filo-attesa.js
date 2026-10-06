@@ -11,6 +11,7 @@
   const TITOLI = {
     CERCA_WEB: ['Cercato sul web', (k) => `Fatte ${n(k)} ricerche sul web`, 'ricerca'],
     CERCA_CHAT: ['Cercato nel filo', (k) => `Fatte ${n(k)} ricerche nel filo`, 'filo'],
+    RICORDO_FILO: ['Ricordato dal filo', (k) => `Ricordati ${n(k)} pezzi del filo`, 'ricordo'],
     LEGGI_FILE: ['Letto un file', (k) => `Letti ${n(k)} file`, 'file'],
     LEGGI_DOCUMENTO: ['Letto un documento', (k) => `Letti ${n(k)} documenti`, 'documento'],
     LEGGI_TRASPARENZA: ['Riletta la trasparenza', (k) => `Rilette ${n(k)} pagine di trasparenza`, 'trasparenza'],
