@@ -163,6 +163,13 @@
   const mgPreapprovedInfo = document.getElementById('mgPreapprovedInfo');
   const mgLocalBtn   = document.getElementById('mgLocalBtn');
   const mgSenderBtn  = document.getElementById('mgSenderBtn');
+  const mgAtteseToggle = document.getElementById('mgAtteseToggle');
+  const mgAttese       = document.getElementById('mgAttese');
+  const mgAtteseLista  = document.getElementById('mgAtteseLista');
+  const mgAtteseScrivi = document.getElementById('mgAtteseScrivi');
+  const mgAtteseInput  = document.getElementById('mgAtteseInput');
+  const mgAtteseAggiungi = document.getElementById('mgAtteseAggiungi');
+  const mgAtteseTogliTutte = document.getElementById('mgAtteseTogliTutte');
   const mgStarBtn    = document.getElementById('mgStarBtn');
   const mgManageMsg  = document.getElementById('mgManageMsg');
 
@@ -199,19 +206,24 @@
   let testDataInjected = false; // uno spec ha iniettato la lista: il caricamento vero non la tocca più
   let searchMode    = false;      // true = la lista mostra i risultati di ricerca
   let searchSeq     = 0;          // guardia anti-race tra ricerche concorrenti
+  // #903: gli aspettati che l'elenco non ha caricato, letti a parte una volta (id → riga, o { missing: true }).
+  const attesiFuori = new Map();
+  const attesiChiesti = new Set();
+  let atteseApertePer = '';     // la pratica su cui l'owner ha aperto la casella delle attese
 
   // Etichette/testi vuoto per le tab-lista (DB1).
   const TAB_LABELS = {
-    inbox: 'Ricevuti', queue: 'In coda', local: 'Lavori locali', resolved: 'Risolti', archived: 'Archiviati',
+    inbox: 'Ricevuti', queue: 'In coda', local: 'Lavori locali', waiting: 'Aspettano', resolved: 'Risolti', archived: 'Archiviati',
   };
   const TAB_EMPTY = {
     inbox:    'Nessun feedback ricevuto.',
     queue:    'Nessun feedback in coda.',
     local:    'Nessun lavoro locale.',
+    waiting:  'Nessun feedback aspetta un altro.',
     resolved: 'Nessun feedback risolto.',
     archived: 'Nessun feedback archiviato.',
   };
-  const LIST_TABS = ['inbox', 'queue', 'local', 'resolved', 'archived'];
+  const LIST_TABS = ['inbox', 'queue', 'local', 'waiting', 'resolved', 'archived'];
   // Come si chiama la lista quando le sezioni non ci sono: nessun nome di
   // sezione, perché nessuna sezione è stata scelta.
   const SENZA_SEZIONI_LABEL = 'Segnalazioni';
@@ -1370,7 +1382,7 @@
     if (!fb) return;
     // Senza sezioni non c'è una sezione in cui saltare: la lista è una sola e
     // la segnalazione è già lì.
-    if (sezioniAttendibili()) selectTab(MR.manageTabFor(fb, { releasedVersion, fusioni }));
+    if (sezioniAttendibili()) selectTab(MR.manageTabFor(fb, opzSezioni()));
     openDetail(fb._id);
   }
 
@@ -1875,7 +1887,7 @@
   // dall'owner. Più pallini pieni = priorità più alta → le routine di Claude la
   // affrontano prima. Non mostrata su Risolti/Archiviati (lì non serve agire).
   function priorityHasDots() {
-    return currentTab === 'queue' || currentTab === 'local' || currentTab === 'inbox';
+    return currentTab === 'queue' || currentTab === 'local' || currentTab === 'waiting' || currentTab === 'inbox';
   }
   function priorityDotsHtml(fb) {
     if (!priorityHasDots()) return '';
@@ -2187,7 +2199,7 @@
     // ricomparire al primo dato leggibile che non passa da renderList.
     if (!sezioniAttendibili()) return;
     const counts = dataLoaded
-      ? MR.manageTabCounts(allFeedbacks, { releasedVersion, starredOnly, confirmedOnly, fusioni })
+      ? MR.manageTabCounts(allFeedbacks, opzSezioni({ starredOnly, confirmedOnly }))
       : null;
     const capped = counts ? loadHitCap() : false;
     // Una sezione che ha ricevuto schede mentre si guardava altro lo dice.
@@ -2251,7 +2263,7 @@
       // davvero in produzione; i done-ma-non-ancora-spediti restano in "In coda".
       // Macchina a stati: la tab deriva SOLO dallo status (la modalità
       // automatica non è più una lente sulle liste).
-      currentList = MR.listForManageTab(allFeedbacks, currentTab, { releasedVersion, fusioni });
+      currentList = MR.listForManageTab(allFeedbacks, currentTab, opzSezioni());
     }
 
     // Override di ordinamento scelto dall'owner dal menu contestuale (tasto
@@ -2354,7 +2366,7 @@
       // In lavorazione (working/revision_*): la card mostra una seconda riga con
       // il passaggio corrente dell'iter e se un'istanza ci lavora ORA. Solo
       // nella tab "In coda" (dove queste card sono pinnate in cima).
-      const progress = (leggibile && (currentTab === 'queue' || currentTab === 'local')) ? MR.workProgress(fb) : null;
+      const progress = (leggibile && (currentTab === 'queue' || currentTab === 'local' || currentTab === 'waiting')) ? MR.workProgress(fb) : null;
       item.className = 'mg-item'
         + (fb._id === selectedId ? ' mg-item--selected' : '')
         + unfilteredCls
@@ -2399,6 +2411,7 @@
         ${leggibile ? '' : statePublicHtml(fb)}
         ${preapprovedHtml(fb)}
         ${localBadgeHtml(fb)}
+        ${attesaBadgeHtml(fb)}
         ${priorityDotsHtml(fb)}
       `;
       item.innerHTML = progress
@@ -3150,6 +3163,7 @@
     reflectPreapproved(fb);
     reflectLocal(fb);
     reflectSender(fb);
+    reflectAttese(fb);
   }
 
   // ── «Solo in locale» (#908) ───────────────────────────────────────────────
@@ -3244,7 +3258,7 @@
       fb.localOnly = valore ? { by: (r && r.by) || 'te', at: Number(r && r.at) || Date.now() } : undefined;
       if (selectedId === id) { reflectLocal(fb); reflectPreapproved(fb); }
       renderList();
-      const dove = MR.manageTabFor(fb, { releasedVersion, fusioni });
+      const dove = MR.manageTabFor(fb, opzSezioni());
       const fatto = !valore
         ? (check.chiusa ? `Da ora${chi} non è più un lavoro locale${MR.isLocalApproved(fb) ? '' : ': la sua scheda torna nella bacheca pubblica'}.` : `Da ora${chi} la possono prendere anche le routine.`)
         : check.chiusa ? `Segnata${chi} come lavoro locale${MR.isLocalApproved(fb) ? '' : ': fuori dalla bacheca pubblica'}.`
@@ -5169,7 +5183,7 @@
 
   function sezioneDi(fb) {
     if (!sezioniAttendibili() || !statoLeggibile(fb)) return null;
-    return MR.manageTabFor(fb, { releasedVersion, fusioni });
+    return MR.manageTabFor(fb, opzSezioni());
   }
 
   function segnaArrivi(prima, fresh) {
