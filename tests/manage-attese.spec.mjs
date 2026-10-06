@@ -6,6 +6,8 @@
 //   2. Si toglie dalla stessa scheda: la casella sparisce e la pratica torna In coda.
 //   3. Un rifiuto del main (numero inesistente, giro) si legge con il suo motivo, e niente cambia.
 //   4. Dal tasto destro sulla scheda si arriva alla casella, e si toglie tutto in un gesto.
+//   5. «Non aspettare più» sotto il campo c'è solo con due attese o più: con una basta la sua ×.
+//   6. Un gesto fatto mentre una scrittura è in volo parte dall'elenco già scritto, non da quello di prima.
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -149,4 +151,55 @@ test('la pagina gemella dei feedback ha la stessa sezione, e la scheda dice cosa
   await expect(page.locator('#tabs [data-tab="queue"]')).toHaveText('In coda (1)');
   await page.locator('#tabs [data-tab="waiting"]').click();
   await expect(page.locator('.fb-card[data-id="f903"] .fb-attesa')).toHaveText('⏳ aspetta #12 non ancora fuso, #13 fuso');
+});
+
+test('«Non aspettare più» sotto il campo solo con due attese o più', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page);
+  await page.evaluate(() => window.__mgTest.openDetail('f903'));
+  await page.locator('#mgAtteseToggle').click();
+  await expect(page.locator('#mgAtteseInput')).toBeVisible();
+  const tutte = page.locator('#mgAtteseTogliTutte');
+  await expect(tutte).toBeHidden();
+  await page.locator('#mgAtteseInput').fill('12');
+  await page.locator('#mgAtteseInput').press('Enter');
+  await expect(page.locator('#mgAtteseLista .mg-attesa')).toHaveCount(1);
+  await expect(tutte).toBeHidden();
+  await page.locator('#mgAtteseInput').fill('13');
+  await page.locator('#mgAtteseInput').press('Enter');
+  await expect(page.locator('#mgAtteseLista .mg-attesa')).toHaveCount(2);
+  await expect(tutte).toBeVisible();
+});
+
+test('un gesto mentre una scrittura è in volo non cancella quella prima', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page);
+  // Il main risponde dopo un po', come con la rete vera.
+  await page.evaluate(() => {
+    const prima = window.filo.message;
+    window.filo.message = async (msg) => {
+      if (msg && msg.type === 'feedback_update') await new Promise((r) => setTimeout(r, 1200));
+      return prima(msg);
+    };
+  });
+  await page.evaluate(() => window.__mgTest.openDetail('f903'));
+  await page.locator('#mgAtteseToggle').click();
+  const campo = page.locator('#mgAtteseInput');
+  await campo.fill('12');
+  await campo.press('Enter');
+  await expect(campo).toHaveValue('');
+  await campo.fill('13');
+  await campo.press('Enter');
+  await expect(page.locator('#mgAtteseLista .mg-attesa')).toHaveCount(2, { timeout: 10000 });
+  expect((await page.evaluate(() => window.__updates)).map((u) => u.waitsFor)).toEqual(['12', '12, 13']);
+
+  // La × premuta mentre un'aggiunta è in volo toglie solo la sua.
+  await page.locator('#mgAtteseLista .mg-attesa', { hasText: '#13' }).locator('.mg-attesa-togli').click();
+  await campo.fill('13');
+  await campo.press('Enter');
+  await page.locator('#mgAtteseLista .mg-attesa', { hasText: '#12' }).locator('.mg-attesa-togli').click();
+  await expect.poll(() => page.evaluate(() => window.__updates.length), { timeout: 10000 }).toBe(5);
+  expect((await page.evaluate(() => window.__updates)).slice(2).map((u) => u.waitsFor)).toEqual(['12', '12, 13', '13']);
+  await expect(page.locator('#mgAtteseLista .mg-attesa')).toHaveCount(1);
+  await expect(page.locator('#mgAtteseLista')).toContainText('#13');
 });

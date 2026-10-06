@@ -2061,7 +2061,7 @@
       if (ATT.atteseDi(fb).length) {
         voci.push({
           testo: '⏳ Non aspettare più', titolo: testoStatiAttese(ATT.statiDelleAttese(fb, trovaAtteso)),
-          azione: () => { if (selectedId !== fb._id) openDetail(fb._id); scriviAttese(fb._id, []); },
+          azione: () => { if (selectedId !== fb._id) openDetail(fb._id); accodaAttese(fb._id, () => []); },
         });
       }
     }
@@ -3410,6 +3410,18 @@
     }
   }
 
+  // Una scrittura alla volta, e ciascuna calcola l'elenco solo quando tocca a lei: calcolato prima, un gesto fatto
+  // mentre la precedente è in volo riscriverebbe l'elenco vecchio e la cancellerebbe.
+  let codaAttese = Promise.resolve();
+  function accodaAttese(id, calcola) {
+    const giro = codaAttese.then(() => {
+      const fb = allFeedbacks.find((f) => f._id === id);
+      return fb ? scriviAttese(id, calcola(fb)) : false;
+    });
+    codaAttese = giro.catch(() => false);
+    return giro;
+  }
+
   function apriCasellaAttese(id) {
     if (selectedId !== id) openDetail(id);
     atteseApertePer = id;
@@ -3423,7 +3435,11 @@
     const nuovi = ATT.leggiNumeri(mgAtteseInput.value);
     if (!nuovi.ok) { setManageMsg(`Attese non scritte: ${nuovi.motivo}.`, 'err'); return; }
     if (!nuovi.numeri.length) { mgAtteseInput.focus(); return; }
-    if (await scriviAttese(fb._id, [...numeriAttuali(fb), ...nuovi.numeri])) mgAtteseInput.value = '';
+    // Il campo si libera subito per il numero dopo; a un rifiuto torna il testo, se nel frattempo non se n'è scritto altro.
+    const testo = mgAtteseInput.value;
+    mgAtteseInput.value = '';
+    const ok = await accodaAttese(fb._id, (f) => [...numeriAttuali(f), ...nuovi.numeri]);
+    if (!ok && !mgAtteseInput.value) mgAtteseInput.value = testo;
   }
   if (mgAtteseToggle) {
     mgAtteseToggle.addEventListener('click', () => {
@@ -3447,7 +3463,7 @@
     });
   }
   if (mgAtteseTogliTutte) {
-    mgAtteseTogliTutte.addEventListener('click', () => { if (selectedId) scriviAttese(selectedId, []); });
+    mgAtteseTogliTutte.addEventListener('click', () => { if (selectedId) accodaAttese(selectedId, () => []); });
   }
   if (mgAtteseLista) {
     mgAtteseLista.addEventListener('click', (e) => {
@@ -3456,8 +3472,8 @@
       const fb = li && selectedId && allFeedbacks.find((f) => f._id === selectedId);
       if (!fb) return;
       if (btn.dataset.azione === 'apri') { openFromAttesa(li.dataset.id); return; }
-      const resto = ATT.atteseDi(fb).filter((w) => w.id !== li.dataset.id);
-      scriviAttese(fb._id, resto.map((w) => w.num || numeroDi(trovaAtteso(w.id))));
+      const via = li.dataset.id;
+      accodaAttese(fb._id, (f) => ATT.atteseDi(f).filter((w) => w.id !== via).map((w) => w.num || numeroDi(trovaAtteso(w.id))));
     });
   }
   // Dall'attesa alla pratica aspettata, nella sua sezione.
