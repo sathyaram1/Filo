@@ -26,7 +26,10 @@ Quello che la **shell** deve mostrare nell'area della pagina e che deve restarci
   processo in più), ha sfondo trasparente ed è grande **quanto il contenuto**:
   una vista trasparente prende i clic su tutta la sua area, e ogni pixel in più è
   una zona morta sopra la pagina. Il vuoto che resta (il margine dell'ombra, lo
-  spazio accanto a una carta più stretta) è **della pagina**: la vista le rigira i
+  spazio accanto a una carta più stretta) è **della pagina**, o meglio di quello
+  che l'utente vede lì: quando l'avviso del sito pericoloso copre la scheda è suo,
+  e la pagina segnalata non riceve niente (una regola sola per tutte le viste, nel
+  gestore delle schede; `tests/barra-laterale-vuoto.spec.mjs`). La vista le rigira i
   gesti che ci cadono (clic, doppio clic, tasto destro, rotella, e un trascinamento
   fino al rilascio, anche se passa sopra una carta) e mostra il puntatore che
   mostrerebbe la pagina (Electron chiama `pointer` la freccia e `hand` la mano;
