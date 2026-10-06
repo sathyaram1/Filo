@@ -540,7 +540,7 @@ class BarraLaterale {
     const tabs = this.tabs;
     const attiva = this._attiva();
     if (d.tipo === 'pagina') {
-      if (!attiva) return;
+      if (!attiva || !this._nav().pagina) return;
       this.chiudi();
       this._restituisciTastiera();
       const tipo = globalThis.SN_MSG?.MSG?.TOP_FRAME_COMMAND || 'top_frame_command';
