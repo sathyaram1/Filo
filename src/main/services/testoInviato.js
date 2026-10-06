@@ -38,7 +38,7 @@ function corpo(uploadData) {
     const b = parte && parte.bytes;
     if (!b || !b.length || n >= LIMITE_CORPO) continue;
     const quanto = Math.min(b.length, LIMITE_CORPO - n);
-    pezzi.push(Buffer.from(b.buffer ? b : Buffer.from(b)).subarray(0, quanto).toString('utf8'));
+    pezzi.push((Buffer.isBuffer(b) ? b : Buffer.from(b)).subarray(0, quanto).toString('utf8'));
     n += quanto;
   }
   return pezzi.join('');
