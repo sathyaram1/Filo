@@ -257,3 +257,17 @@ test('ogni azione registrata ha un livello valido e una describe', () => {
     assert.equal(typeof entry.describe, 'function', `${type} senza describe`);
   }
 });
+
+test('lo stile del benvenuto si imposta senza riquadro solo col segno del main (#592.2)', () => {
+  const stile = { type: 'IMPOSTA_PREFERENZA', chiave: 'stile_agente', valore: 'Risposte brevi, dà del tu.' };
+  // Fuori dal benvenuto, o col testo di altri nel contesto, resta il riquadro intero coi rischi.
+  assert.equal(AL.levelFor(stile), 2);
+  assert.ok(AL.describe(stile).includes('Confermalo solo se'));
+  // Nel benvenuto pulito: si imposta subito, e la riga dice lo stile esatto.
+  assert.equal(AL.levelFor({ ...stile, _accoglienza: true }), 1);
+  assert.equal(AL.describeDone({ ...stile, _accoglienza: true }), 'Userò questo stile: «Risposte brevi, dà del tu.»');
+  // Il segno vale solo per uno stile da impostare: non per toglierlo, non per un'altra preferenza, non se è un vero sì scritto dal modello.
+  assert.equal(AL.levelFor({ ...stile, valore: 'nessuno', _accoglienza: true }), 2);
+  assert.equal(AL.levelFor({ ...stile, _accoglienza: 'true' }), 2);
+  assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'chiave_openrouter', valore: 'sk-or-v1-abcdefghijkl', _accoglienza: true }), 2);
+});
