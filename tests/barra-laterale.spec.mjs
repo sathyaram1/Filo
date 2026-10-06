@@ -171,6 +171,54 @@ test('indietro e avanti funzionano anche fra le pagine di Filo', async ({ app, o
   await expect(barra.locator('#nav .ico[data-id="forward"]')).toHaveAttribute('aria-disabled', 'false');
 });
 
+test('Home e poi Indietro riportano al sito, con tutta la sua cronologia; una pagina nuova toglie il davanti', async ({ app, openTab, testServer }) => {
+  const a = testServer.html('<!doctype html><title>A</title><body><h1>A</h1></body>');
+  const b = testServer.html('<!doctype html><title>B</title><body><h1>B</h1></body>');
+  const c = testServer.html('<!doctype html><title>C</title><body><h1>C</h1></body>');
+  const urlAttiva = () => app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    return w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId).url;
+  });
+  const page = await openTab(a);
+  await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1');
+  await page.evaluate((u) => { location.href = u; }, b);
+  await page.waitForURL(b);
+  const barra = await barraPage(app);
+  const icona = (id) => barra.locator(`#nav .ico[data-id="${id}"]`);
+  const premiIcona = async (id) => {
+    await comandaBarra(app, 'clic');
+    await pannelloFermo(barra);
+    await expect(icona(id)).toHaveAttribute('aria-disabled', 'false');
+    await icona(id).click();
+  };
+  await premiIcona('home');
+  await expect.poll(urlAttiva).toMatch(/^filo:\/\/newtab\//);
+  // Il tasto destro su Indietro elenca le pagine del sito, dalla più vicina.
+  const elenco = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs.vociCronologia('indietro').map((v) => v.url));
+  expect(elenco).toEqual([b, a]);
+  await premiIcona('back');
+  await expect.poll(urlAttiva).toBe(b);
+  await premiIcona('back');
+  await expect.poll(urlAttiva).toBe(a);
+  await premiIcona('forward');
+  await expect.poll(urlAttiva).toBe(b);
+  await premiIcona('forward');
+  await expect.poll(urlAttiva).toMatch(/^filo:\/\/newtab\//);
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  await expect(icona('forward')).toHaveAttribute('aria-disabled', 'true');
+  // Tornato al sito, un collegamento nuovo toglie il davanti: Avanti non porta più alla home.
+  await premiIcona('back');
+  await expect.poll(urlAttiva).toBe(b);
+  const vista = app.windows().find((w) => { try { return w.url() === b; } catch (_) { return false; } });
+  await vista.evaluate((u) => { location.href = u; }, c);
+  await expect.poll(urlAttiva).toBe(c);
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  await expect(icona('forward')).toHaveAttribute('aria-disabled', 'true');
+  await expect(icona('back')).toHaveAttribute('aria-disabled', 'false');
+});
+
 test('«Altro…» non ha più le voci globali, e la barra le ha', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, SITO);
   await page.locator('#p').click({ button: 'right' });
