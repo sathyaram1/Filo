@@ -452,15 +452,21 @@ function depVere(P, opz, log) {
       return { ...verifyLocal.verdictForCurrentBranch(wt), dirty: verifyLocal.isDirty(wt) };
     },
     pubblica: () => pubblicaDavvero(P),
+    filoAperto: () => filoAperto(),
     carico,
     dormi: (ms) => new Promise((ok) => setTimeout(ok, ms)),
     log,
     ora: () => new Date().toISOString(),
     percorsi: P,
     fs: sistemaFs,
-    annota: async (id, testo) => {
-      const { annotaPratica } = await import('./owner-feedback.mjs');
-      return annotaPratica(id, testo);
+    // Prima della verifica il lavoro ha solo il numero: la pratica si trova da quello, come fanno lettura e chiusura.
+    annota: async (rif, testo) => {
+      const { annotaPratica, idDelFeedback } = await import('./owner-feedback.mjs');
+      const { acquireBearer } = await import('./lib/firestore-auth.mjs');
+      const bearer = await acquireBearer();
+      const id = await idDelFeedback(rif, { bearer });
+      if (!id.ok) return { ok: false, motivo: id.motivo };
+      return annotaPratica(id.id, testo, { bearer });
     },
     richiestaDi: async (num) => richiestaDaLettura((await esegui('node', ['scripts/leggi-feedback.mjs', String(num)], { cwd: ROOT })).stdout),
   };
