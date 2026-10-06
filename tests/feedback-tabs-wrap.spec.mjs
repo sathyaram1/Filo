@@ -33,12 +33,13 @@ test('con finestra stretta le schede vanno a capo, la pagina non scorre di lato'
   // misurare, non quella dei soli nomi.
   await page.evaluate(() => window.__fbTest.setData([]));
 
-  // Le sezioni della macchina a stati, con i Lavori locali (#908).
+  // Le sezioni della macchina a stati, con i Lavori locali (#908) e quelli che aspettano (#903).
   const tabs = page.locator('.fb-tab');
-  await expect(tabs).toHaveCount(5);
+  await expect(tabs).toHaveCount(6);
   await expect(tabs.nth(2)).toHaveText(/Lavori locali/);
+  await expect(tabs.nth(3)).toHaveText(/Aspettano/);
 
-  // Larghezza stretta davvero: qui le cinque schede NON stanno su una riga.
+  // Larghezza stretta davvero: qui le sei schede NON stanno su una riga.
   await page.setViewportSize({ width: 360, height: 800 });
 
   // Il corpo della pagina NON produce scorrimento orizzontale.

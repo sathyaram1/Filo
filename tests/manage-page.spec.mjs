@@ -43,9 +43,10 @@ test('le 8 tab esistono col testo corretto e "Ricevuti" e\' attiva di default (D
   const page = await openTab(URL);
   await page.waitForLoadState('domcontentloaded');
 
-  // 10 tab della dashboard unificata (la nona: «Statistiche feedback», #496; la decima: «Lavori locali», #908).
-  await expect(page.locator('.mg-tab')).toHaveCount(10);
-  // Con i feedback caricati (qui: nessuno) le cinque schede-lista dicono
+  // 11 tab della dashboard unificata (la nona: «Statistiche feedback», #496; la decima: «Lavori locali», #908;
+  // l'undicesima: «Aspettano», #903).
+  await expect(page.locator('.mg-tab')).toHaveCount(11);
+  // Con i feedback caricati (qui: nessuno) le sei schede-lista dicono
   // quante ne contengono, le altre no (#495).
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
   await page.evaluate(() => window.__mgTest.whenReady());
@@ -53,6 +54,7 @@ test('le 8 tab esistono col testo corretto e "Ricevuti" e\' attiva di default (D
   await expect(page.locator('.mg-tab[data-tab="inbox"]')).toHaveText('Ricevuti (0)');
   await expect(page.locator('.mg-tab[data-tab="queue"]')).toHaveText('In coda (0)');
   await expect(page.locator('.mg-tab[data-tab="local"]')).toHaveText('Lavori locali (0)');
+  await expect(page.locator('.mg-tab[data-tab="waiting"]')).toHaveText('Aspettano (0)');
   await expect(page.locator('.mg-tab[data-tab="resolved"]')).toHaveText('Risolti (0)');
   await expect(page.locator('.mg-tab[data-tab="archived"]')).toHaveText('Archiviati (0)');
   await expect(page.locator('.mg-tab[data-tab="fbstats"]')).toHaveText('Statistiche feedback');
