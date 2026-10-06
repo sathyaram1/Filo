@@ -137,3 +137,16 @@ test('tasto destro sulla scheda: «Aspetta un altro feedback…» apre la casell
   await expect(tabBtn(page, 'waiting')).toHaveText('Aspettano (0)');
   expect((await page.evaluate(() => window.__updates)).map((u) => u.waitsFor)).toEqual(['12', '']);
 });
+
+test('la pagina gemella dei feedback ha la stessa sezione, e la scheda dice cosa aspetta', async ({ openTab }) => {
+  const page = await openTab('filo://feedback/feedback.html');
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__fbTest && window.SN_MANAGE_REVIEW && window.SN_FB_ATTESE);
+  await page.evaluate((items) => window.__fbTest.setData(items), [
+    fb({ waitsFor: [{ id: 'f12', num: '12' }, { id: 'f13', num: '13' }] }), ...LISTA.slice(1),
+  ]);
+  await expect(page.locator('#tabs [data-tab="waiting"]')).toHaveText('Aspettano (1)');
+  await expect(page.locator('#tabs [data-tab="queue"]')).toHaveText('In coda (1)');
+  await page.locator('#tabs [data-tab="waiting"]').click();
+  await expect(page.locator('.fb-card[data-id="f903"] .fb-attesa')).toHaveText('⏳ aspetta #12 non ancora fuso, #13 fuso');
+});
