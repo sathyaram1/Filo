@@ -51,10 +51,16 @@
   function radiceDi(el) {
     if (!activeMenu || !el) return null;
     try {
-      if (activeMenu.root.contains(el)) return activeMenu.root;
       if (activeMenu.subRoot && activeMenu.subRoot.contains(el)) return activeMenu.subRoot;
+      if (activeMenu.root.contains(el)) return activeMenu.root;
     } catch (_) {}
     return null;
+  }
+  // Sulle pagine web sotto-menu, etichette e icona trascinata vivono DENTRO il menu: fuori, nello strato normale
+  // starebbero sotto di lui, e nello strato alto il browser li conterebbe come qualcosa che lo copre.
+  function casaDeiPezzi(vicino) {
+    if (!SUL_WEB || !activeMenu || !activeMenu.root || !activeMenu.root.isConnected) return menuHost();
+    return (vicino && radiceDi(vicino)) || activeMenu.root;
   }
   // Dove Filo ha posato la radice (subito dopo averlo scritto): un menu che la pagina sposta non risponde più.
   function ricordaPosto(radice) {
