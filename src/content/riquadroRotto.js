@@ -15,6 +15,7 @@
   const T_PROPONI = MSG.RIQUADRO_COOKIE_PROPONI || 'riquadro_cookie_proponi';
   const T_RITIRA = MSG.RIQUADRO_COOKIE_RITIRA || 'riquadro_cookie_ritira';
   const T_RISPOSTA = MSG.RIQUADRO_COOKIE_RISPOSTA || 'riquadro_cookie_risposta';
+  const T_AGGIORNA = MSG.RIQUADRO_COOKIE_AGGIORNA || 'riquadro_cookie_aggiorna';
 
   const IS_TOP = (() => { try { return window.top === window.self; } catch (_) { return false; } })();
   const chrome = global.chrome;
@@ -120,7 +121,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  max-width: calc(100% - 16px);
+  /* L'ospite è largo zero: la larghezza la dà il testo, il tetto lo mette il riquadro (posa). */
+  width: max-content;
   box-sizing: border-box;
   padding: 7px 8px 7px 12px;
   font: 13px/1.35 var(--sn-font, system-ui, sans-serif);
@@ -271,6 +273,9 @@ button:focus-visible { outline: 2px solid var(--sn-accent, #c45a3b); outline-off
     } catch (_) {}
   } else {
     avviaRiquadro();
+    try {
+      chrome.runtime.onMessage.addListener((m) => { if (m && m.type === T_AGGIORNA && stato) aggiornaStato(); });
+    } catch (_) {}
   }
 
   // Gli spec leggono la proposta dal mondo isolato (lo shadow è chiuso) e la cliccano col mouse vero.

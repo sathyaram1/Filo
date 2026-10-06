@@ -153,6 +153,11 @@ async function guarda(c) {
   const quando = funziona.get(c.servizio);
   if (quando && Date.now() - quando < FUNZIONA_MS) return null;
   if (diCasa(c.urlFrame) || diCasa(c.urlTop)) return null;
+  // Una pagina delicata (password, carta: #1004) non va a un modello, nemmeno a pezzi.
+  try {
+    const delicata = await globalThis.SN_DELICATE.filtro();
+    if (delicata(c.urlTop) || delicata(c.urlFrame)) return null;
+  } catch (_) { return null; }
   if (!puoGuardare()) return null;
   const immagine = await foto(c);
   if (!immagine) return null;
@@ -186,6 +191,8 @@ async function segnala(msg, sender) {
   }
   if (!R.sembraRotto(o)) return { ok: true };
   tieni(visti, chiave);
+  // Un modulo con la password è delicato (#1004): la sua immagine non va a un modello.
+  if (o.password) return { ok: true };
   const esito = await guarda(c);
   if (!esito || !esito.rotto || c.wc.isDestroyed() || !rifiutati(c)) return { ok: true };
   proponi(c, esito.nome);
@@ -233,7 +240,11 @@ async function cambia(msg, sender) {
   if (attiva && !riattivati.has(c.servizio) && !rifiutati(c)) return { ok: false };
   await scrivi(c.servizio, attiva);
   for (const [token, p] of [...proposte]) {
-    if (p.wcId === c.wc.id && p.servizio === c.servizio) { proposte.delete(token); ritira(c.wc, token); }
+    if (p.servizio !== c.servizio) continue;
+    proposte.delete(token);
+    let w = null;
+    try { w = require('electron').webContents.fromId(p.wcId); } catch (_) {}
+    if (w && !w.isDestroyed()) ritira(w, token);
   }
   try { c.figlio.reload(); } catch (_) {}
   return { ok: true };
@@ -251,14 +262,49 @@ async function risposta(msg, sender) {
     return { ok: true };
   }
   await scrivi(p.servizio, true);
-  const f = frameDi(p.wcId, p.ftn);
-  if (f) { try { f.reload(); } catch (_) {} }
-  return { ok: true, ricaricato: !!f };
+  // Gli altri riquadri dello stesso servizio erano rotti per la stessa ragione: si ricaricano anche loro.
+  const fratelli = [...proposte].filter(([, q]) => q.servizio === p.servizio);
+  for (const [altro, q] of fratelli) {
+    proposte.delete(altro);
+    let w = null;
+    try { w = require('electron').webContents.fromId(q.wcId); } catch (_) {}
+    if (w && !w.isDestroyed()) ritira(w, altro);
+  }
+  let ricaricato = false;
+  for (const q of [p, ...fratelli.map(([, x]) => x)]) {
+    const f = frameDi(q.wcId, q.ftn);
+    if (f) { try { f.reload(); ricaricato = true; } catch (_) {} }
+  }
+  return { ok: true, ricaricato };
 }
 
+// I riquadri aperti tengono lo stato per il tasto destro: cambiato l'elenco o la modalità (da Sicurezza, da un altro
+// riquadro, dalla chat), lo rileggono, se no offrirebbero di togliere quello che non c'è più.
+function avvisaRiquadri() {
+  let finestre = [];
+  try { finestre = require('electron').BrowserWindow.getAllWindows(); } catch (_) { return; }
+  for (const w of finestre) {
+    if (w._filoIncognito || !w._filoTabs) continue;
+    for (const t of w._filoTabs.tabs || []) {
+      const wc = t.view && t.view.webContents;
+      if (!wc || wc.isDestroyed()) continue;
+      let frames = [];
+      try { frames = wc.mainFrame.framesInSubtree; } catch (_) { continue; }
+      for (const f of frames) {
+        if (f === wc.mainFrame) continue;
+        try { f.send('filo:broadcast', { type: MSG().RIQUADRO_COOKIE_AGGIORNA }); } catch (_) {}
+      }
+    }
+  }
+}
+
+let firma = '';
 function configureFromSettings(settings) {
   try { if (require('../shim/storage').inIncognito()) return; } catch (_) {}
   riattivati = new Set(Cookies().getEmbedSites(settings));
+  const ora = `${Cookies().getMode(settings)}|${[...riattivati].join(',')}`;
+  if (firma && ora !== firma) avvisaRiquadri();
+  firma = ora;
 }
 
 function init(settings) { configureFromSettings(settings); }

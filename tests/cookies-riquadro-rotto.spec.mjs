@@ -29,13 +29,14 @@ async function serve() {
       return;
     }
     if (u.pathname === '/post') {
-      // Il servizio noto: senza il suo cookie mostra il segnaposto, con il cookie il post.
-      if (/vista=1/.test(cookie)) html('<p id="ok">Il post: tramonto sul mare</p>');
+      // Il servizio noto: senza il suo cookie mostra il segnaposto, con il cookie il post. Il cookie lo rinfresca
+      // a ogni caricamento, come fanno i servizi veri.
+      if (/vista=1/.test(cookie)) html('<p id="ok">Il post: tramonto sul mare</p>', conCookie);
       else html('<p>Accedi per vedere il post</p>', conCookie);
       return;
     }
     if (u.pathname === '/vuoto') {
-      if (/vista=1/.test(cookie)) html('<p id="ok">La mappa del quartiere</p>');
+      if (/vista=1/.test(cookie)) html('<p id="ok">La mappa del quartiere</p>', conCookie);
       else html('<div style="padding:40px"><button>Accedi</button></div>', conCookie);
       return;
     }
@@ -61,7 +62,7 @@ async function serve() {
 // b.localhost fa la parte di un servizio noto col suo segnaposto; il modello è finto e ogni chiamata si conta.
 // I siti di casa non vanno mai al modello (#591): qui tutto è su localhost, quindi il controllo si spegne.
 async function prepara(app, { risposta = '{"rotto": true, "servizio": "Cosmo"}' } = {}) {
-  await app.evaluate(async (_e, risp) => {
+  await app.evaluate(async ({ nativeImage }, risp) => {
     const C = globalThis.SN_CONST;
     globalThis.__filoRiquadriRotti.servizioTest({ nome: 'Fotogrammi', domini: ['b.localhost'], segnaposto: ['accedi per vedere il post'] });
     await globalThis.SN_STORAGE.updateSettings({
@@ -76,7 +77,7 @@ async function prepara(app, { risposta = '{"rotto": true, "servizio": "Cosmo"}' 
       const u = messages.find((m) => m.role === 'user');
       const img = Array.isArray(u.content) ? u.content.find((p) => p.type === 'image_url') : null;
       let misura = null;
-      if (img) misura = require('electron').nativeImage.createFromDataURL(img.image_url.url).getSize();
+      if (img) misura = nativeImage.createFromDataURL(img.image_url.url).getSize();
       globalThis.__chiamateRiquadri.push({ immagine: !!img, misura });
       return { text: risp, model: attempts[0].model, provider: attempts[0].provider, usage: {} };
     };
@@ -119,7 +120,11 @@ test('servizio noto col segnaposto: la proposta compare senza il modello, «Sì�
     const p = await aspettaProposta(app, 'a.localhost');
     expect(p.testo).toBe('Attivo i cookie di Fotogrammi per questo contenuto?');
     expect(p.visibile).toBe(true);
-    // Sta sopra il riquadro, non altrove nella pagina.
+    await page.screenshot({ path: 'tests/.shots/riquadro-rotto-proposta.png' });
+    await app.evaluate(() => globalThis.__filoHandlers.applySettingsUpdate({ theme: 'dark' }));
+    await expect(page.locator('html')).toHaveAttribute('data-sn-theme', 'dark', { timeout: 5_000 });
+    await page.screenshot({ path: 'tests/.shots/riquadro-rotto-proposta-scuro.png' });
+    // Sta sopra il riquadro, nella sua metà alta, non altrove nella pagina.
     expect(p.si.y).toBeGreaterThan(p.riquadro.y - ALTO / 2);
     expect(p.si.y).toBeLessThan(p.riquadro.y);
     expect(await chiamate(app)).toEqual([]);
@@ -189,7 +194,7 @@ test('«No» chiude la proposta e non la ripropone; il tasto destro sul riquadro
 
     // Dal tasto destro dentro il riquadro si riattiva lo stesso.
     const ri = page.frameLocator('#ri');
-    await ri.locator('body').click({ button: 'right', position: { x: 60, y: 60 } });
+    await ri.locator('html').click({ button: 'right', position: { x: 60, y: 60 } });
     await ri.locator('.sn-menu').getByText('Attiva i cookie di Fotogrammi qui', { exact: true }).click();
     await expect(ri.locator('#ok')).toHaveText('Il post: tramonto sul mare', { timeout: 10_000 });
     expect(await impostazioni(app)).toEqual(['b.localhost']);
@@ -204,12 +209,12 @@ test('«No» chiude la proposta e non la ripropone; il tasto destro sul riquadro
     await expect(sec.locator('#sec-cookies-riquadri')).toBeHidden();
 
     // Riattivato di nuovo dal tasto destro, si toglie anche da lì.
-    await ri.locator('body').click({ button: 'right', position: { x: 60, y: 60 } });
+    await ri.locator('html').click({ button: 'right', position: { x: 60, y: 60 } });
     await ri.locator('.sn-menu').getByText('Attiva i cookie di Fotogrammi qui', { exact: true }).click();
     await expect.poll(() => impostazioni(app), { timeout: 5_000 }).toEqual(['b.localhost']);
     await expect.poll(() => sec.locator('#cookie-riquadri-list li').count(), { timeout: 5_000 }).toBe(1);
     await expect(ri.locator('#ok')).toBeVisible({ timeout: 10_000 });
-    await ri.locator('body').click({ button: 'right', position: { x: 60, y: 60 } });
+    await ri.locator('html').click({ button: 'right', position: { x: 60, y: 60 } });
     await ri.locator('.sn-menu').getByText('Togli i cookie riattivati di Fotogrammi', { exact: true }).click();
     await expect.poll(() => impostazioni(app), { timeout: 5_000 }).toEqual([]);
     await expect(sec.locator('#sec-cookies-riquadri')).toBeHidden();
@@ -240,7 +245,7 @@ test('in Privacy: «Sì» fa sopravvivere i cookie del servizio nello spazio del
         }
       }
     });
-    await page.waitForTimeout(3000).catch(() => {});
+    await new Promise((r) => setTimeout(r, 3000));
     const di = await openTab(srv.art('b', 'post') + '&di=nuovo');
     await expect(di.frameLocator('#ri').locator('#ok')).toHaveText('Il post: tramonto sul mare', { timeout: 10_000 });
     // E il servizio non ha ricevuto niente nello spazio suo: i cookie stanno solo in quello del sito che lo ospita.

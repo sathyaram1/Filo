@@ -691,6 +691,7 @@
     RIQUADRO_COOKIE_CAMBIA: 'riquadro_cookie_cambia',   // (riquadro, tasto destro) { attiva } → { ok }
     RIQUADRO_COOKIE_PROPONI: 'riquadro_cookie_proponi', // main → pagina { token, nome, url, origin }
     RIQUADRO_COOKIE_RITIRA: 'riquadro_cookie_ritira',   // main → pagina { token }
+    RIQUADRO_COOKIE_AGGIORNA: 'riquadro_cookie_aggiorna', // main → riquadri: l'elenco o la modalità sono cambiati
     RIQUADRO_COOKIE_RISPOSTA: 'riquadro_cookie_risposta', // (pagina) { token, si } → { ok }
     // Solo pagine filo:// (Sicurezza): cosa Filo ha fatto coi banner, sito per sito, nel profilo della finestra.
     COOKIES_SITES: 'cookies_sites',                 // {} → { ok, sites: [{ site, rejected, hidden, at }] }
