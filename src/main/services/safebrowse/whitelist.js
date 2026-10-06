@@ -60,9 +60,14 @@ const WHITELIST = new Set();
 for (const b of BRANDS) for (const d of b.domains) WHITELIST.add(d);
 for (const d of EXTRA) WHITELIST.add(d);
 
+// Una voce che è essa stessa un suffisso pubblico (gov.it, dove registra solo lo Stato) copre ogni sito sotto di lei:
+// salute.gov.it è un sito a sé per cookie e impronte, ma resta fidato. Le piattaforme (vercel.app) non sono suffissi qui.
+const SUFFISSI_FIDATI = new Set([...WHITELIST].filter((d) => (getDomainInfo(d) || {}).suffixOnly));
+
 // Confronto esatto dell'eTLD+1 normalizzato con la lista.
 function isWhitelisted(registrable) {
-  return !!registrable && WHITELIST.has(registrable);
+  if (!registrable) return false;
+  return WHITELIST.has(registrable) || SUFFISSI_FIDATI.has(registrable.slice(registrable.indexOf('.') + 1));
 }
 
 // Pagine che chiunque pubblica sotto un dominio in whitelist: il dominio dice chi ospita, non chi ha scritto.
