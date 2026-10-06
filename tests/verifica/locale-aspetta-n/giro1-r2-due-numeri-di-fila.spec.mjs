@@ -1,4 +1,4 @@
-// Verifica locale di «aspetta #N» in Gestione: si mette, la pratica esce dalla coda, si toglie.
+// Rilievo 2 del giro 1: un secondo numero scritto prima che il primo sia salvato lo cancella.
 import { test, expect } from '../../fixtures/electron.mjs';
 
 const MANAGE = 'filo://manage/manage.html';
@@ -51,7 +51,7 @@ async function apri(page, lista, tab = 'queue') {
 
 const tabBtn = (page, tab) => page.locator(`.mg-tab[data-tab="${tab}"]`);
 
-test('due numeri di fila, il secondo prima che torni il primo', async ({ openTab }) => {
+test('r2 un secondo numero aggiunto mentre il primo si sta scrivendo non cancella il primo', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   const a = fb();
   await apri(page, [a, fb({ _id: 'b-1', seq: 951 }), fb({ _id: 'c-1', seq: 952 })]);
@@ -63,7 +63,7 @@ test('due numeri di fila, il secondo prima che torni il primo', async ({ openTab
   await page.waitForTimeout(200);
   await input.fill('952');
   await input.press('Enter');
-  await page.waitForTimeout(4000);
-  console.log('UPDATES', JSON.stringify(await page.evaluate(() => window.__updates.map((u) => u.waitsFor))));
-  console.log('LISTA', await page.locator('#mgAtteseLista').innerText());
+  await expect(page.locator('#mgManageMsg')).toContainText('952', { timeout: 10000 });
+  await expect(page.locator('#mgAtteseLista .mg-attesa')).toHaveCount(2);
+  await expect(page.locator('#mgAtteseLista')).toContainText('#951');
 });
