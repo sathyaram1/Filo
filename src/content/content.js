@@ -644,6 +644,7 @@
       if (/^input$/i.test(area.tagName) && String(area.type).toLowerCase() === 'password') return;
       const t = pulito(testo(area));
       if (!t || t === pulito(base) || orfani.some((o) => o.t === t)) return;
+      if (ricevuti.get(area) === t || sostituito(area)) return;
       const viste = righeViste.get(area);
       orfani.push({ t, righe: viste && viste.join('') === t ? viste : [t] });
       if (orfani.length > 100) orfani.shift();
