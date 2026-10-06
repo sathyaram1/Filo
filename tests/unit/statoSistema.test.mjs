@@ -439,15 +439,23 @@ test('ogni piattaforma ha il suo ramo, scritto intero', () => {
 });
 
 // Il monitor gira in un Node a parte, con la piattaforma e l'avviso del caricatore finti: qui il contenitore è Linux.
+// Il tempo del figlio è finto e passa a passi di 10 ms: i giri, le letture e la validità dell'avviso si contano in tick,
+// e una macchina carica non sposta niente (#1063).
 function simula(corpo) {
   const MODULO = JSON.stringify(join(ROOT, 'src', 'main', 'services', 'statoSistema.js'));
   const codice = `
 const { EventEmitter } = require('node:events');
 const Module = require('node:module');
+const { mock } = require('node:test');
+mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'], now: Date.now() });
 const pm = new EventEmitter();
 const vero = Module._load;
 Module._load = function (r, ...a) { return r === 'electron' ? { powerMonitor: pm, app: { on() {} }, net: { isOnline: () => true } } : vero.call(this, r, ...a); };
-const attesa = (ms) => new Promise((r) => setTimeout(r, ms));
+const svuota = async () => { for (let i = 0; i < 20; i++) await new Promise((r) => setImmediate(r)); };
+const attesa = async (ms) => {
+  for (let fatto = 0; fatto < ms; fatto += 10) { await svuota(); mock.timers.tick(Math.min(10, ms - fatto)); }
+  await svuota();
+};
 const storia = [];
 const MODULO = ${MODULO};
 const nota = (S) => storia.push(S.stato() && S.stato().batteria ? S.stato().batteria.collegata : null);
