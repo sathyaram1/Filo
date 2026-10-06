@@ -840,7 +840,7 @@
       acts.push({ key: 'archive', kind: 'archive', to: 'archived', label: 'Archivia', primary: false });
       return acts;
     }
-    if (tab === 'queue' || tab === 'local') {
+    if (tab === 'queue' || tab === 'local' || tab === 'waiting') {
       // Nell'iter di lavorazione: l'owner può chiuderlo a mano o archiviarlo.
       const acts = [];
       if (status !== 'done') acts.push({ key: 'resolve', kind: 'resolve', to: 'done', label: '✓ Risolto', primary: true });
@@ -987,8 +987,8 @@
     // `sort` è stabile, quindi a parità di priorità si conserva l'ordine di
     // sortReview (severità poi recenza), e il pinning finale conserva a sua
     // volta l'ordine per priorità dentro ogni gruppo. I Lavori locali sono la
-    // stessa coda, lavorata da un'altra parte.
-    if (tab === 'queue' || tab === 'local') {
+    // stessa coda, lavorata da un'altra parte; chi aspetta (#903) la stessa coda, più tardi.
+    if (tab === 'queue' || tab === 'local' || tab === 'waiting') {
       const now = (opts && opts.now) != null ? opts.now : Date.now();
       // Rango di pinning: istanza attiva ora > fase più avanzata > non in
       // lavorazione (-1). Il +10 separa nettamente gli attivi dagli inattivi.
@@ -1049,10 +1049,10 @@
   // `opts`: { releasedVersion, starredOnly, confirmedOnly }. PURA.
   function manageTabCounts(feedbacks, opts) {
     const list = feedbacks || [];
-    const counts = { inbox: 0, queue: 0, local: 0, resolved: 0, archived: 0 };
+    const counts = { inbox: 0, queue: 0, local: 0, waiting: 0, resolved: 0, archived: 0 };
     for (const f of list) {
       const tab = manageTabFor(f, opts);
-      if (tab === 'inbox' || tab === 'queue' || tab === 'local' || tab === 'resolved') counts[tab]++;
+      if (tab === 'inbox' || tab === 'queue' || tab === 'local' || tab === 'waiting' || tab === 'resolved') counts[tab]++;
     }
     counts.archived = listArchiveTab(list, opts).length;
     return counts;

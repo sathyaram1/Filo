@@ -985,7 +985,7 @@
     'resolvedInVersion', 'reviewDecision', 'reviewedAt', 'senderProof', 'seq', 'stalls',
     'starred', 'status', 'statusPublic', 'statusReason', 'subSeq', 'text',
     'title', 'url', 'userAgent', 'userNote', 'verifiedAt', 'votes',
-    'updatedAt', 'walletPseudonym', 'workingResets', 'workingSince',
+    'updatedAt', 'waitsFor', 'walletPseudonym', 'workingResets', 'workingSince',
   ];
 
   // Un documento letto con la proiezione della lista porta questo marchio: chi
@@ -1955,11 +1955,20 @@
     return fields;
   }
 
+  // Le attese (#903) nella forma che le regole ammettono: [{ id, num }], al più 20. Oltre si rifiuta, mai un taglio.
+  function attesePerScrittura(lista) {
+    const A = global.SN_FB_ATTESE;
+    const pulite = A ? A.atteseDi({ waitsFor: Array.isArray(lista) ? lista : [] }) : [];
+    const max = A ? A.MAX : 20;
+    if (pulite.length > max) throw new Error(`un feedback aspetta al più ${max} feedback: qui sono ${pulite.length}`);
+    return pulite.map((w) => ({ id: w.id, num: w.num }));
+  }
+
   // Aggiorna stato/note di un feedback esistente. status ∈ new|todo|done|verified|ignored.
   // opts.idToken (Firebase ID token) viene allegato come Bearer: serve perché le
   // Firestore rules verifichino che l'utente è un admin. Senza token la scrittura
   // riuscirà solo se le regole consentono l'accesso anonimo (sconsigliato).
-  async function updateStatus(id, { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, mergePreapproved, localOnly, localApproval, senderProof }, opts = {}) {
+  async function updateStatus(id, { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, mergePreapproved, localOnly, localApproval, senderProof, waitsFor }, opts = {}) {
     if (!id) throw new Error('id mancante');
     const idToken = opts.idToken;
     const fields = {};
@@ -2087,6 +2096,12 @@
         });
       }
       mask.push('localApproval');
+    }
+    // Le attese (#903): [{ id, num }] già controllate da SN_FB_ATTESE.valida; vuota o null le toglie (campo cancellato).
+    if (waitsFor !== undefined) {
+      const lista = attesePerScrittura(waitsFor);
+      if (lista.length) fields.waitsFor = toFsValue(lista);
+      mask.push('waitsFor');
     }
     // La prova del mittente data dall'owner («È mio», #908): si aggiunge e basta, non si toglie da qui.
     if (senderProof === 'admin') {
