@@ -1043,3 +1043,50 @@ test('sosia di un marchio corto col modulo d\'accesso in un componente incapsula
   await openTab('https://paypak.com/');
   await bloccoMostrato(app);
 });
+
+// #728 — a schermo è ciò che l'utente vede: un modulo nascosto dal riquadro che lo contiene (trasparente, chiuso,
+// fuori dal bordo) non conta; lo stesso modulo, aperto, sì.
+const NASCOSTI_728 = {
+  'menu a tendina trasparente': ['<style>.m{opacity:0;pointer-events:none;position:absolute;top:40px;right:0}.m.su{opacity:1}</style>', 'm'],
+  'pannello chiuso': ['<style>.m{max-height:0;overflow:hidden}.m.su{max-height:none}</style>', 'm'],
+  'cassetto laterale fuori schermo': ['<style>body{overflow-x:hidden}.m{position:fixed;top:0;right:0;width:300px;height:100%;'
+    + 'transform:translateX(100%)}.m.su{transform:none}</style>', 'm'],
+};
+const conModulo = (stile, titolo) => `${stile}<h1>${titolo}</h1><button id="apri" onclick="document.querySelector('.m').classList.add('su')">Accedi</button>`
+  + `<div class="m">${ACCESSO}</div>`;
+
+for (const [modo, [stile]] of Object.entries(NASCOSTI_728)) {
+  test(`parola comune vicina a un marchio, modulo d'accesso nascosto (${modo}): popup, non il blocco (#728)`, async ({ app, openTab }) => {
+    await serviSenzaRete(app, { 'email.com': conModulo(stile, 'Posta gratuita') });
+    await openTab('https://email.com/');
+    expect(await livelloScheda(app, 'email.com', 12_000)).toBe('sospetto');
+    await new Promise((r) => setTimeout(r, 4500));
+    expect(await livelloScheda(app, 'email.com', 1000)).toBe('sospetto');
+  });
+
+  test(`sosia di un marchio corto, modulo d'accesso nascosto (${modo}) che si apre: blocco (#728)`, async ({ app, openTab }) => {
+    await serviSenzaRete(app, { 'paypak.com': conModulo(stile, 'PayPal') });
+    const page = await openTab('https://paypak.com/');
+    expect(await livelloScheda(app, 'paypak.com', 12_000)).toBe('sospetto');
+    await page.evaluate(() => document.querySelector('.m').classList.add('su'));
+    await expect.poll(() => livelloScheda(app, 'paypak.com', 1000), { timeout: 10_000 }).toBe('pericoloso');
+  });
+}
+
+test('sosia di un marchio corto, modulo in una tendina che esce da una testata che ritaglia: blocco (#728)', async ({ app, openTab }) => {
+  await serviSenzaRete(app, {
+    'paypak.com': '<style>header{height:40px;overflow:hidden}.m{position:absolute;top:40px;left:0}</style>'
+      + `<header><h1>PayPal</h1><div class="m">${ACCESSO}</div></header>`,
+  });
+  await openTab('https://paypak.com/');
+  await expect.poll(() => livelloScheda(app, 'paypak.com', 1000), { timeout: 12_000 }).toBe('pericoloso');
+});
+
+test('sosia di un marchio corto col modulo d\'accesso in un componente incapsulato chiuso: blocco (#728)', async ({ app, openTab }) => {
+  await serviSenzaRete(app, {
+    'paypak.com': '<h1>PayPal</h1><login-box></login-box><script>customElements.define("login-box", class extends HTMLElement {'
+      + `constructor(){super(); this.attachShadow({mode:"closed"}).innerHTML = ${JSON.stringify(ACCESSO)};}});</script>`,
+  });
+  await openTab('https://paypak.com/');
+  await expect.poll(() => livelloScheda(app, 'paypak.com', 1000), { timeout: 12_000 }).toBe('pericoloso');
+});
