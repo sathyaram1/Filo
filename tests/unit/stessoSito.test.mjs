@@ -120,7 +120,9 @@ test('scelte salvate su un dominio diventato suffisso pubblico continuano a vale
   assert.equal(Sito.voceSalvata('https://comune.milano.it/', ['milano.it']), 'milano.it');
   assert.equal(Sito.voceSalvata('https://www.example.com/', ['example.com']), 'example.com');
   assert.equal(Sito.voceSalvata('https://alice.github.io/', ['github.io']), null, 'una piattaforma non copre i suoi utenti');
-  assert.equal(Sito.voceSalvata('https://shop.example.com/', ['other.example.com']), null);
+  assert.equal(Sito.voceSalvata('https://shop.example.com/', ['other.example.com']), 'other.example.com',
+    'una voce col sottodominio vale per il suo sito: il vaso di cookie è uno per sito');
+  assert.equal(Sito.voceSalvata('https://shop.example.org/', ['other.example.com']), null);
   assert.equal(Sito.voceSalvata('http://10.0.1.10/', ['1.10']), null);
 
   assert.equal(Cookies.partitionForUrl('https://www.agenziaentrate.gov.it/', new Set(['gov.it'])), 'persist:filo-priv-gov.it',
@@ -132,4 +134,25 @@ test('scelte salvate su un dominio diventato suffisso pubblico continuano a vale
   const elenco = new Sito.ElencoSiti(['gov.it', 'esempio.it']);
   assert.ok(elenco.has('salute.gov.it') && elenco.has('esempio.it') && elenco.has('gov.it'));
   assert.ok(!elenco.has('altro.it') && !elenco.has('x.esempio.it') && !elenco.has(''));
+});
+
+// #796 giro 5 — un sito fidato scritto col suo sottodominio vale per il suo sito; un suffisso pubblico non è un sito,
+// e la chat non lo aggiunge fra i fidati (la pagina Sicurezza lo chiede al main: tests/security-settings.spec.mjs).
+test('la voce scritta col sottodominio vale per il sito; un suffisso pubblico non entra fra i fidati', () => {
+  assert.equal(Sito.voceSalvata('https://webmail.libero.it/', ['webmail.libero.it']), 'webmail.libero.it');
+  assert.equal(Sito.voceSalvata('https://mail.google.com/', new Set(['mail.google.com'])), 'mail.google.com');
+  assert.match(Cookies.partitionForUrl('https://webmail.libero.it/', new Set(['webmail.libero.it'])), /^persist:/);
+  assert.ok(new Sito.ElencoSiti(['webmail.libero.it']).has('libero.it'));
+  assert.equal(Sito.voceSalvata('https://alice.github.io/', ['bob.github.io']), null, 'due utenti della piattaforma restano due siti');
+  assert.equal(Sito.voceSalvata('https://www.bbc.co.uk/', ['www.argos.co.uk']), null);
+
+  for (const d of ['co.uk', 'gov.it', 'com.co', 'milano.it']) assert.equal(Sito.suffissoPubblico(d), true, d);
+  for (const d of ['bbc.co.uk', 'github.io', 'libero.it']) assert.equal(Sito.suffissoPubblico(d), false, d);
+
+  require('../../src/shared/nomiSito.js');
+  require('../../src/shared/preferences.js');
+  const P = globalThis.SN_PREF;
+  assert.match(String(P.buildPreferencePartial('siti_fidati_cookie', 'aggiungi co.uk').rifiuto || ''), /non è un sito/);
+  assert.deepEqual(P.buildPreferencePartial('siti_fidati_cookie', 'aggiungi bbc.co.uk').elenco.voci, ['bbc.co.uk']);
+  assert.ok(P.buildPreferencePartial('siti_fidati_cookie', 'togli gov.it').elenco, 'una voce vecchia si toglie');
 });

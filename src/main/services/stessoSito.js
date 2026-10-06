@@ -23,11 +23,24 @@ function suffissoPubblico(d) {
 const contiene = (voci, v) => (voci instanceof Set ? Set.prototype.has.call(voci, v)
   : Array.isArray(voci) && voci.some((d) => String(d || '').toLowerCase() === v));
 
+// Il sito di una voce scritta a mano: webmail.libero.it vale per libero.it, il vaso di cookie è uno per sito.
+const sitiDelleVoci = new Map();
+function sitoDellaVoce(voce) {
+  const v = String(voce || '').toLowerCase();
+  if (!sitiDelleVoci.has(v)) {
+    if (sitiDelleVoci.size > 5000) sitiDelleVoci.clear();
+    sitiDelleVoci.set(v, v && !suffissoPubblico(v) ? sitoDi(v) : null);
+  }
+  return sitiDelleVoci.get(v);
+}
+const vociDi = (voci) => (voci instanceof Set ? Set.prototype.values.call(voci) : Array.isArray(voci) ? voci : []);
+
 // Una voce salvata quando il suo dominio contava come un sito solo (gov.it, com.co prima della lista pubblica intera)
 // oggi è un suffisso pubblico: copre ancora i siti sotto di lei, se no la scelta dell'utente smette di valere in silenzio.
 function copertura(sito, voci) {
   if (!sito) return null;
   if (contiene(voci, sito)) return sito;
+  for (const d of vociDi(voci)) if (sitoDellaVoce(d) === sito) return d;
   if (isIpAddress(sito)) return null;
   const parti = sito.split('.');
   for (let i = 1; i < parti.length; i++) {
@@ -48,4 +61,4 @@ class ElencoSiti extends Set {
   has(sito) { return super.has(sito) || copertura(String(sito || '').toLowerCase(), this) !== null; }
 }
 
-module.exports = { sitoDi, voceSalvata, ElencoSiti };
+module.exports = { sitoDi, voceSalvata, ElencoSiti, suffissoPubblico };
