@@ -430,7 +430,7 @@ function pubblicaDavvero(P) {
 function depVere(P, opz, log) {
   const bin = trovaClaude();
   if (!bin) throw new Error('Claude Code non trovato: imposta FILO_CLAUDE_BIN col percorso del binario');
-  const ruoli = { lavoratore: modelloDelRuolo('lavoratore'), verificatore: modelloDelRuolo('verificatore') };
+  const ruoli = Object.fromEntries(Object.keys(AGENTE_DEL_RUOLO).map((r) => [r, modelloDelRuolo(r)]));
   const env = envFiglio(process.env);
   const auth = spawnSync(bin, ['auth', 'status'], { encoding: 'utf8', env, timeout: 60_000, windowsHide: true });
   if (!accessoDaStatus(auth.stdout)) throw new Error(SENZA_ACCESSO);
