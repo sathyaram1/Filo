@@ -49,6 +49,7 @@
         barraStriscia: 'barraLaterale.striscia',
         barraAttesa: 'barraLaterale.attesaMs',
         barraUscita: 'barraLaterale.uscitaMs',
+        aggiornamentiAutomatici: 'aggiornamenti.automatici',
       },
       gruppi: { tokenCode: 'themeTokens.*', tabColorCode: 'tabColor.*' },
       fuori: {},

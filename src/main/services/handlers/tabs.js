@@ -51,7 +51,7 @@ module.exports = function register(on, ctx) {
 
   on(MSG.TAB_IDENTITY_COLOR, async (msg, sender) => {
     // Colore identità del sito (§1.2) → cachato per dominio dal TabManager e
-    // applicato attenuato alle tab inattive.
+    // mescolato col fondo della barra nelle tab inattive.
     const win = winOf(sender);
     if (win && win._filoTabs && sender?.tab?.id) {
       win._filoTabs.setTabIdentityColor(sender.tab.id, msg.color || null);

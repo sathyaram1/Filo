@@ -734,6 +734,11 @@
     // ── zoom della pagina via chat (#686) ────────────────────────────────────
     // Livello 1: è la stessa cosa che fanno Ctrl +/- e Ctrl 0, visibile e
     // reversibile in un tasto.
+    // #786 — installare la versione nuova è quello che Filo fa di serie: chiederlo a parole non chiede conferma.
+    INSTALLA_AGGIORNAMENTO: {
+      level: 1,
+      describe: () => 'Scaricare la versione nuova di Filo, che si installa quando lo chiudi',
+    },
     ZOOM_PAGINA: {
       level: 1,
       describe: (a) => {

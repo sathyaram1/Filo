@@ -103,7 +103,7 @@ export function nuovaPratica({ num, slug, richiesta = '', file = [], ora = '' })
   const s = String(slug || slugDi(n)).trim();
   if (!/^[a-z0-9][a-z0-9._-]*$/i.test(s)) throw new Error(`nome del ramo non valido: ${s} (lettere, cifre, . _ -)`);
   return {
-    num: n, slug: s, richiesta: String(richiesta || ''), file: (Array.isArray(file) ? file : []).filter(Boolean),
+    num: n, slug: s, richiesta: String(richiesta || '').trim(), file: (Array.isArray(file) ? file : []).filter(Boolean),
     fase: 'in-coda', compito: 'lavoro', giri: 0, giriTotali: 0, tentativi: {}, costo: 0, istanze: [],
     fermo: null, risposta: '', avvisi: [], derivatiAperti: [], fusa: { app: false, server: false, deploy: false },
     aggiornato: ora,
@@ -408,7 +408,8 @@ export function creaMotore(dep, opzioni = {}) {
 
   async function prepara(p) {
     const wt = P.wt(p.slug);
-    if (!p.richiesta) p.richiesta = await dep.richiestaDi(p.num);
+    // Una richiesta di soli spazi arriverebbe vuota a lavoratore e verifica (#1027): vale quella del feedback.
+    if (!String(p.richiesta || '').trim()) p.richiesta = String(await dep.richiestaDi(p.num) || '').trim();
     if (!p.richiesta) return ferma(p, `richiesta del feedback #${p.num} non letta (npm run feedback:leggi): niente worktree né ramo creati`);
     await git(P.radice, 'fetch', 'origin', 'main');
     if (!dep.fs.esiste(wt)) {

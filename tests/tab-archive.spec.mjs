@@ -97,13 +97,36 @@ test('la pagina è "Cronologia", un giorno per riga, con chip colorate come le t
   });
   expect(wrap).toBe('nowrap');
 
-  // (3) Chip colorata come le tab in alto: la tinta identità (attenuata) è
-  //     impostata come variabile di sfondo e il fondo NON è trasparente.
-  const tint = await row.evaluate((el) => el.style.getPropertyValue('--arc-tint'));
-  expect(tint.trim()).toMatch(/^rgb\(/);
-  const bg = await row.evaluate((el) => getComputedStyle(el).backgroundColor);
-  expect(bg).not.toBe('rgba(0, 0, 0, 0)');
-  expect(bg).not.toBe('transparent');
+  // (3) Chip colorata con la regola delle tab in alto (#821): la tinta del sito
+  //     (352,5°, adattata a saturazione 1 e luminosità 0,5 = rgb(255, 0, 32))
+  //     sul neutro della chip all'opacità 0,6, e il titolo si legge (4,5:1).
+  const readChip = () => row.evaluate((el) => {
+    const probe = document.createElement('div');
+    probe.style.background = 'var(--sn-hover)';
+    document.body.appendChild(probe);
+    const nums = (c) => (/rgba?\(([^)]+)\)/.exec(c) || [, ''])[1].split(',').slice(0, 3).map(Number);
+    const neutral = nums(getComputedStyle(probe).backgroundColor);
+    probe.remove();
+    return {
+      bg: nums(getComputedStyle(el).backgroundColor),
+      title: nums(getComputedStyle(el.querySelector('.arc-title')).color),
+      neutral,
+    };
+  });
+  const lum = ([r, g, b]) => {
+    const l = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+    return 0.2126 * l(r) + 0.7152 * l(g) + 0.0722 * l(b);
+  };
+  const contrast = (a, b) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05);
+  const near = (got, want) => got.every((v, i) => Math.abs(v - want[i]) <= 2);
+  const chip = await readChip();
+  const want = [255, 0, 32].map((v, i) => v * 0.6 + chip.neutral[i] * 0.4);
+  expect(near(chip.bg, want), `chip ${chip.bg} invece di ${want}`).toBe(true);
+  expect(contrast(chip.title, chip.bg)).toBeGreaterThanOrEqual(4.5);
+
+  // opacita_tab 0 cambiato altrove: la chip già a schermo torna neutra.
+  await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { tabColor: { opacita_tab: 0 } } }));
+  await expect.poll(async () => { const c = await readChip(); return near(c.bg, c.neutral); }, { timeout: 5_000 }).toBe(true);
 });
 
 test('menu contestuale: "Elimina" rimuove la tab dall\'archivio', async ({ shell, openTab, testServer }) => {

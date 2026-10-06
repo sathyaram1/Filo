@@ -503,6 +503,12 @@
 
     // ───────────────────────────── Impostazioni ──────────────────────────────
     {
+      id: 'auto-update', title: 'Aggiornamenti di Filo', category: 'settings',
+      desc: 'A ogni avvio Filo controlla se c’è una versione nuova, la scarica e la installa quando lo chiudi. Puoi impedirgli di installarla da solo. In quel caso controlla lo stesso, ma non scarica niente e mette nella home una carta «C’è la versione …» con «Installa». Premuto «Installa», la carta mostra lo scaricamento e la versione si installa quando chiudi Filo; «Chiudi» la toglie per quella versione. Chi la spegne resta senza le correzioni di sicurezza delle versioni nuove finché non installa.',
+      invoke: 'Preferenze → Impostazioni avanzate → «Installa gli aggiornamenti da solo» (acceso di serie), oppure chiedendolo a Filo («non aggiornarti da solo»), che chiede conferma. La versione nuova si installa anche chiedendola a Filo («aggiornati»), pure dopo aver chiuso la sua carta.',
+      doesNot: 'Non ti fa saltare una sola versione né scegliere un canale di prova. Su Mac e su Linux l’installazione può fermarsi da sé: in quel caso un avviso dice dove scaricare la versione nuova a mano. Una copia di Filo avviata dal codice, non installata, non si aggiorna da qui.',
+    },
+    {
       id: 'options-models', title: 'Modelli e chiavi AI', category: 'settings',
       desc: 'Imposta le chiavi dei servizi AI (OpenRouter, Tavily), scegli il modello di OGNI funzione che ne usa uno — con la possibilità di indicarne più d’uno come ripiego, provati in ordine — e un limite di spesa mensile, che ferma ogni chiamata ai modelli: anche quelle che Filo fa da solo, come il controllo dei siti pericolosi o il riconoscimento dei blocchi geografici, e le prove delle Opzioni. Puoi anche affidarti ai modelli predefiniti di Filo.',
       invoke: 'Menu del tasto destro → "Opzioni Filo", oppure filo://options/options.html.',
@@ -562,9 +568,9 @@
     },
     {
       id: 'ad-block', title: 'Blocco di pubblicità e tracker', category: 'settings',
-      desc: 'Filo blocca da sé pubblicità e tracker: le richieste verso i domini delle liste pubbliche e gratuite (StevenBlack, EasyList) si fermano prima di partire, così annunci e script che seguono cosa fai da un sito all’altro non si caricano nemmeno. Le liste restano sul tuo computer e si aggiornano da sole una volta a settimana; un elenco di siti legittimi non viene bloccato anche se finisce per errore in una lista.',
-      invoke: 'Attivo di serie. Si spegne in Impostazioni → Sicurezza → «Blocca pubblicità e tracker», o chiedendolo a Filo («spegni il blocco della pubblicità»), che chiede prima un OK. A «blocchi la pubblicità?» Filo risponde con lo stato vero.',
-      doesNot: 'Non nasconde lo spazio vuoto che un annuncio bloccato lascia nella pagina, e non ferma la pubblicità che arriva dallo stesso dominio del sito, come gli annunci dentro i video di YouTube (quelli li salta «Salta le pubblicità dei video»). Se al primo avvio manca la rete, parte senza liste finché non riesce a scaricarle.',
+      desc: 'Filo blocca da sé pubblicità e tracker con liste pubbliche e gratuite (EasyList, con le sue liste per i siti italiani e francesi, e StevenBlack), che restano sul tuo computer e si aggiornano da sole una volta a settimana. Le richieste ai server della pubblicità e dei tracker non partono, e i riquadri pubblicitari che restano nella pagina spariscono: quelli rimasti vuoti, le immagini e i riquadri fermati dal blocco e i banner che il sito mette da sé. Vale anche nella finestra in incognito. Un elenco di siti legittimi non viene bloccato anche se finisce per errore in una lista.',
+      invoke: 'Attivo di serie. Si spegne e si riaccende in Impostazioni → Sicurezza → «Blocca pubblicità e tracker», o chiedendolo a Filo («spegni il blocco della pubblicità»), che chiede prima un OK; vale subito anche nelle pagine già aperte. A «blocchi la pubblicità?» Filo risponde con lo stato vero.',
+      doesNot: 'Non si spegne per un sito solo. Non blocca i server dei servizi più usati (Google, YouTube, Facebook, Amazon…), quindi la pubblicità dentro i video di YouTube resta: quella la salta «Salta le pubblicità dei video». Non toglie gli avvisi dei siti che chiedono di spegnere il blocco. Un link verso un server delle liste, come quelli di molte reti di affiliazione (Skimlinks, Awin, Rakuten), si ferma sull\'avviso «Sito bloccato», da cui «Apri comunque» lo apre. Se al primo avvio manca la rete, parte senza liste finché non riesce a scaricarle.',
     },
     {
       id: 'video-ad-skip', title: 'Pubblicità dei video saltate da sole', category: 'settings',

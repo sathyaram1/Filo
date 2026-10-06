@@ -13,7 +13,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { CONFIRM_HOST, confirmState, clickConfirm, fillConfirmInput } from './helpers/confirm.mjs';
-import { tempCanonico } from './helpers/percorsi.mjs';
+import { tempCanonico, cartellaTemporanea } from './helpers/percorsi.mjs';
 import path from 'node:path';
 import fs from 'node:fs';
 
@@ -143,6 +143,35 @@ test('#201 — una concatenazione di soli comandi sicuri esegue senza conferma',
   expect(r.executed).toBe(true);
   expect(r.needsConfirm).toBeFalsy();
   expect(r.output.stdout).toContain(marker);
+});
+
+test('#516 — una lettura composta (conteggio, controllo che la cartella esista) esegue senza conferma', async ({ app, openTab }) => {
+  const page = await openTab(NEWTAB);
+  await enableTerminal(page);
+  const dir = cartellaTemporanea('filo516-');
+  for (const f of ['a.txt', 'b.txt', 'c.txt']) fs.writeFileSync(path.join(dir, f), 'x');
+  try {
+    // La forma della segnalazione nella shell che gira davvero; fuori da Windows
+    // lo stesso gruppo è una sottoshell.
+    const comando = process.platform === 'win32'
+      ? `if (Test-Path "${dir}") { (Get-ChildItem "${dir}").Count }`
+      : `(ls "${dir}" | wc -l)`;
+    const r = await execAction(app, { type: 'ESEGUI_COMANDO', comando });
+    expect(r.needsConfirm).toBeFalsy();
+    expect(r.executed).toBe(true);
+    expect(r.output.stdout.trim()).toBe('3');
+
+    // Lo stesso costrutto con dentro una cancellazione resta a «conferma», e il file c'è ancora.
+    const file = path.join(dir, 'a.txt');
+    for (const pericoloso of [`if (Test-Path "${file}") { Remove-Item "${file}" }`, `ls (Remove-Item "${file}")`]) {
+      const p = await execAction(app, { type: 'ESEGUI_COMANDO', comando: pericoloso });
+      expect(p.executed, pericoloso).toBe(false);
+      expect(p.needsConfirm, pericoloso).toBe(3);
+    }
+    expect(fs.existsSync(file)).toBe(true);
+  } finally {
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
+  }
 });
 
 test('UI: l’output di un comando livello 1 compare nella bolla di chat', async ({ openTab }) => {

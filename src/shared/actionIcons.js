@@ -58,6 +58,7 @@
     RIMUOVI_REGOLA_PROXY: 'globeOff',
     COMANDO_FINESTRA: 'windowFrame',
     SPOSTA_ICONA: 'pin',
+    INSTALLA_AGGIORNAMENTO: 'download',
     CARTA_HOME: 'home',
     ZOOM_PAGINA: 'zoomPagina',
     VOLUME: 'volume',

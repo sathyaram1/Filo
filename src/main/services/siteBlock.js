@@ -58,7 +58,7 @@ function isBlacklistedHost(host) {
   if (useAdblockLists) {
     try {
       const ad = require('./adblock');
-      if (ad && typeof ad.isBlockedHost === 'function' && ad.isBlockedHost(host)) return true;
+      if (ad && typeof ad.isBlockedSite === 'function' && ad.isBlockedSite(host)) return true;
     } catch (_) {}
   }
   return false;

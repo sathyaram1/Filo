@@ -51,6 +51,10 @@ test('sicurezza/privacy → livello 2, partial annidato corretto', () => {
   assert.deepEqual(build('protezione_ip', 'off').partial, { security: { protectIpLeak: false } });
   assert.deepEqual(build('blocco_popup', 'on').partial, { security: { blockPopups: true } });
   assert.equal(build('blocco_popup', 'on').level, 2);
+  // #576 — «togli la pubblicità» scritto a Filo fa quello che fa la casella in Sicurezza.
+  assert.deepEqual(build('blocco_pubblicita', 'sì').partial, { security: { adblock: { enabled: true } } });
+  assert.deepEqual(build('blocca la pubblicità', 'off').partial, { security: { adblock: { enabled: false } } });
+  assert.equal(build('blocco_pubblicita', true).level, 2);
 });
 
 test('modelli / provider / chiavi / costi → livello 2', () => {
@@ -317,18 +321,21 @@ test('tabColor: clampParams riporta i valori dentro i range e arrotonda i bucket
   assert.equal(c.peso_centralita, 5);  // mancante → default
 });
 
-test('extractIdentityFromPixels rispetta saturazione_tab (param di estrazione)', () => {
+// #821: il colore salvato del sito (cache per dominio, Cronologia, sessione) tiene
+// la tinta piena; saturazione e luminosità dell'utente pesano solo a schermo.
+test('saturazione_tab e luminosita_tab non entrano nel colore salvato, solo in quello mostrato', () => {
   const TC = globalThis.SN_TAB_COLOR;
   const W = 32, H = 32;
   const px = new Uint8ClampedArray(W * H * 4);
   for (let i = 0; i < W * H; i++) { // logo rosso pieno
     px[i * 4] = 220; px[i * 4 + 1] = 20; px[i * 4 + 2] = 20; px[i * 4 + 3] = 255;
   }
-  const full = TC.extractIdentityFromPixels(px, W, H, { saturazione_tab: 1 });
-  const flat = TC.extractIdentityFromPixels(px, W, H, { saturazione_tab: 0 });
-  const sat = (s) => { const m = /rgb\((\d+),\s*(\d+),\s*(\d+)\)/.exec(s); const p = [+m[1], +m[2], +m[3]]; return Math.max(...p) - Math.min(...p); };
-  assert.ok(sat(full) > sat(flat), `saturazione 1 (${full}) deve essere più satura di 0 (${flat})`);
-  assert.equal(sat(flat), 0, 'saturazione 0 → grigio');
+  for (const estremi of [{ saturazione_tab: 0 }, { luminosita_tab: 0 }, { luminosita_tab: 1 }]) {
+    assert.equal(TC.extractIdentityFromPixels(px, W, H, estremi), 'rgb(255, 0, 0)', JSON.stringify(estremi));
+  }
+  const salvato = TC.extractIdentityFromPixels(px, W, H, TC.defaultParams());
+  assert.deepEqual(TC.adaptIdentity(salvato, { saturazione_tab: 0 }), [128, 128, 128]);
+  assert.deepEqual(TC.adaptIdentity(salvato, { saturazione_tab: 1 }), [255, 0, 0]);
 });
 
 // ── #592: la lezione è la preferenza a testo libero sorella dello stile ─────
