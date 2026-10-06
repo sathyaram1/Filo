@@ -219,6 +219,45 @@ test('Home e poi Indietro riportano al sito, con tutta la sua cronologia; una pa
   await expect(icona('back')).toHaveAttribute('aria-disabled', 'false');
 });
 
+test('Indietro e Avanti premuti di fila, prima che la pagina si carichi, non perdono le pagine saltate', async ({ app, openTab, testServer }) => {
+  const a = testServer.html('<!doctype html><title>A</title><body><h1>A</h1></body>');
+  const b = testServer.html('<!doctype html><title>B</title><body><h1>B</h1></body>');
+  const c = testServer.html('<!doctype html><title>C</title><body><h1>C</h1></body>');
+  const scheda = () => app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
+    return { url: t.url, dietro: w._filoTabs.vociCronologia('indietro').map((v) => v.url), davanti: w._filoTabs.vociCronologia('avanti').map((v) => v.url) };
+  });
+  // Due pressioni a un soffio: la seconda arriva mentre la vista nuova sta ancora caricando.
+  const diFila = (verso, volte) => app.evaluate(async ({ BrowserWindow }, [v, n]) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    for (let i = 0; i < n; i++) { w._filoTabs.navigaCronologia(v); await new Promise((r) => setTimeout(r, 20)); }
+  }, [verso, volte]);
+  const home = () => app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    w._filoTabs.navigate(w._filoTabs.activeId, 'filo://newtab/');
+  });
+  const page = await openTab(a);
+  await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1');
+  await page.evaluate((u) => { location.href = u; }, b);
+  await page.waitForURL(b);
+  await page.evaluate((u) => { location.href = u; }, c);
+  await expect.poll(async () => (await scheda()).url).toBe(c);
+  await home();
+  await expect.poll(async () => (await scheda()).dietro).toEqual([c, b, a]);
+  await diFila('indietro', 3);
+  await expect.poll(async () => (await scheda()).url).toBe(a);
+  await expect.poll(async () => (await scheda()).davanti).toEqual([b, c, 'filo://newtab/']);
+  await diFila('avanti', 2);
+  await expect.poll(async () => (await scheda()).url).toBe(c);
+  await expect.poll(async () => (await scheda()).dietro).toEqual([b, a]);
+  // Home e subito Indietro: la home resta davanti.
+  await home();
+  await diFila('indietro', 1);
+  await expect.poll(async () => (await scheda()).url).toBe(c);
+  await expect.poll(async () => (await scheda()).davanti).toEqual(['filo://newtab/']);
+});
+
 test('«Altro…» non ha più le voci globali, e la barra le ha', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, SITO);
   await page.locator('#p').click({ button: 'right' });

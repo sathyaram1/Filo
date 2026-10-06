@@ -1763,16 +1763,16 @@ class TabManager {
     const partition = this._partitionForTab(tab, url);
     // La pagina che la vista vecchia mostrava: se il primo salto della nuova si ferma sulla lista, si torna lì.
     let prima = '';
-    try { prima = opts.ritorno ? '' : (tab.view.webContents.getURL() || ''); } catch (_) {}
+    try { prima = opts.ritorno ? '' : (tab.view.webContents.getURL() || this._inArrivo(tab).url || ''); } catch (_) {}
     if (!opts.storia) {
       const modo = opts.ritorno ? 'ritorno' : opts.nuova ? 'nuova' : 'stessa';
-      tab.storia = Storia.conserva(tab.storia, this._vociDellaVista(tab.view.webContents), modo, url);
+      tab.storia = Storia.conserva(tab.storia, this._vociDellaVista(tab), modo, url);
     }
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
     try { tab.view.webContents.close(); } catch (_) {}
     const view = this._makeView(url, partition, { suppressAutoplay: tab.suppressAutoplay });
     tab.view = view;
-    tab._vistaNuova = { wc: view.webContents, prima: /^(https?|filo):/i.test(prima) ? prima : '' };
+    tab._vistaNuova = { wc: view.webContents, prima: /^(https?|filo):/i.test(prima) ? prima : '', meta: { url, titolo: opts.titolo || '' } };
     tab.partition = partition;
     tab.isInternal = url.startsWith('filo://');
     tab.partitionSite = tab.isInternal ? null : Cookies.registrableOf(url);
@@ -1867,13 +1867,20 @@ class TabManager {
     return (NE && NE.targetOf(raw)) || raw;
   }
 
-  _vociDellaVista(wc) {
+  // La pagina che la vista appena nata sta ancora caricando: fino al primo commit la sua cronologia è vuota.
+  _inArrivo(tab) {
+    const n = tab && tab._vistaNuova;
+    return (n && tab.view && n.wc === tab.view.webContents && n.meta) || { url: '' };
+  }
+
+  _vociDellaVista(tab) {
+    const inArrivo = this._inArrivo(tab);
     try {
-      const h = wc.navigationHistory;
+      const h = tab.view.webContents.navigationHistory;
       const entries = [];
       for (let i = 0; i < h.length(); i++) entries.push(h.getEntryAtIndex(i) || {});
-      return Storia.vociDellaVista(entries, h.getActiveIndex(), (u) => this._urlUtente(u));
-    } catch (_) { return { voci: [], attiva: 0 }; }
+      return Storia.vociDellaVista(entries, h.getActiveIndex(), (u) => this._urlUtente(u), inArrivo);
+    } catch (_) { return Storia.vociDellaVista([], 0, (u) => u, inArrivo); }
   }
 
   // Indietro e Avanti hanno dove andare: nella vista, o nella cronologia che la scheda ha tenuto da quelle di prima.
@@ -1886,11 +1893,11 @@ class TabManager {
   }
 
   _vaiFuori(tab, verso, k) {
-    const salto = Storia.salta(tab.storia, this._vociDellaVista(tab.view.webContents).voci, verso, k);
+    const salto = Storia.salta(tab.storia, this._vociDellaVista(tab).voci, verso, k);
     if (!salto) return false;
     if (this._maybeBlockNavigation(tab, salto.meta.url)) return true;
     tab.storia = salto.storia;
-    this._recreateView(tab, salto.meta.url, { storia: true });
+    this._recreateView(tab, salto.meta.url, { storia: true, titolo: salto.meta.titolo });
     return true;
   }
 

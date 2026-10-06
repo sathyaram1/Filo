@@ -73,3 +73,15 @@ test('una pagina nuova nella vista toglie il davanti; un passo chiesto da Filo o
   assert.equal(Storia.paginaNuova({ n: 2, a: 1 }, { n: 2, a: 1 }, false), false);
   assert.equal(Storia.paginaNuova(null, { n: 1, a: 0 }, false), false);
 });
+
+test('una vista appena nata conta già la pagina che sta caricando: due Indietro di fila non la perdono', () => {
+  const s0 = { prima: [v('https://a/1'), v('https://a/2')], dopo: [] };
+  const primo = Storia.salta(s0, [v('filo://newtab/')], 'indietro', 0);
+  const vistaInCarico = Storia.vociDellaVista([], 0, (u) => u, { url: primo.meta.url, titolo: 'A2' });
+  assert.deepEqual(urls(vistaInCarico.voci), ['https://a/2']);
+  const secondo = Storia.salta(primo.storia, vistaInCarico.voci, 'indietro', 0);
+  assert.equal(secondo.meta.url, 'https://a/1');
+  assert.deepEqual(urls(secondo.storia.dopo), ['https://a/2', 'filo://newtab/']);
+  // Committata la pagina, contano le voci vere.
+  assert.deepEqual(urls(Storia.vociDellaVista([{ url: 'https://a/3' }], 0, (u) => u, { url: 'https://a/2' }).voci), ['https://a/3']);
+});
