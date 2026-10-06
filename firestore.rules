@@ -101,6 +101,14 @@ service cloud.firestore {
             && d.localOnly.get('at', 0) > 0);
     }
 
+    // `waitsFor` [{ id, num }] (#903): i feedback che devono essere fusi prima; la coda
+    // non dà lavoro finché uno non lo è. Solo l'admin; da 1 a 20, e chi scrive rifiuta
+    // numeri inesistenti, sé stesso e i giri (src/shared/feedbackAttese.js). Togliere = cancellare il campo.
+    function waitsForValido(d) {
+      return !('waitsFor' in d)
+        || (d.waitsFor is list && d.waitsFor.size() >= 1 && d.waitsFor.size() <= 20);
+    }
+
     // `localMerges` { app?, server?, solo?, ramo? } (#915): quando ogni parte di un
     // lavoro locale è arrivata su main, in millisecondi, `solo` la parte che
     // ha chiuso dicendo che il lavoro stava tutto lì, `ramo` il ramo dell'ultima
@@ -293,6 +301,7 @@ service cloud.firestore {
       // (#595), la prova del mittente che il create anonimo sotto NON ammette:
       // la sentinella tests/unit/firestoreRulesSenderProof.test.mjs lo tiene vero.
       allow create: if isAdmin() && localOnlyValido(request.resource.data) && localApprovalValido(request.resource.data)
+        && waitsForValido(request.resource.data)
         // #676: una data, mai testo (anche qui il giro della Gestione la confronta).
         && (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp);
 
@@ -406,6 +415,8 @@ service cloud.firestore {
                     'localMerges',
                     // #913: l'approvazione dell'owner come lavoro locale (forma: localApprovalValido).
                     'localApproval',
+                    // #903: i feedback che aspetta (forma: waitsForValido).
+                    'waitsFor',
                     // #595: il ripasso dei documenti vecchi con prefisso riservato.
                     'senderProof',
                     'capabilityGapId']) // F4: permettere update del gap id (backfill)
@@ -533,6 +544,7 @@ service cloud.firestore {
         && localOnlyValido(request.resource.data)
         && localMergesValido(request.resource.data)
         && localApprovalValido(request.resource.data)
+        && waitsForValido(request.resource.data)
         && (!('senderProof' in request.resource.data)
             || request.resource.data.senderProof in ['admin', 'server'])
         // F4: capabilityGapId (opzionale) — id strutturale del gap di capacità

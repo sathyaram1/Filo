@@ -332,6 +332,30 @@ module.exports = function register(on, ctx) {
     }
   }));
 
+  // «Aspetta #N» (#903): la pagina manda i numeri come li ha scritti l'owner; li risolve e li controlla il main, che
+  // legge i documenti col token (la pagina ne vede una finestra). Vuoto = togliere. Regole: SN_FB_ATTESE.valida.
+  async function prepareAttese(id, valore, idToken) {
+    const A = globalThis.SN_FB_ATTESE;
+    const FB = globalThis.SN_FEEDBACK;
+    const letti = A.leggiNumeri(valore === null || valore === false ? '' : valore);
+    if (!letti.ok || !letti.numeri.length) return letti.ok ? { ok: true, attese: [] } : letti;
+    const [proprio] = await FB.getMany([id], { idToken, fields: ['seq', 'subSeq'], timeoutMs: 20000 });
+    if (!proprio) return { ok: false, motivo: 'il feedback non esiste più' };
+    return A.valida({
+      id, num: FB.formatNum(proprio.seq, proprio.subSeq), numeri: letti.numeri,
+      risolvi: (n) => FB.idDelNumero(n, { idToken, timeoutMs: 20000 }),
+      leggiAttese: async (ids) => {
+        const out = new Map();
+        for (let i = 0; i < ids.length; i += 100) {
+          // eslint-disable-next-line no-await-in-loop
+          const righe = await FB.getMany(ids.slice(i, i + 100), { idToken, fields: [A.CAMPO], timeoutMs: 20000 });
+          for (const r of righe) out.set(r._id, A.atteseDi(r));
+        }
+        return out;
+      },
+    });
+  }
+
   // Triage admin di un feedback: solo admin loggati, con Firebase ID token
   // come Bearer (il token non lascia mai il main). La garanzia forte è nelle
   // Firestore rules; questo è il gate applicativo + il trasporto autenticato.
