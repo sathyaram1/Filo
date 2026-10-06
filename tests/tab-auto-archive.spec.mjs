@@ -596,6 +596,48 @@ test('il testo spostato dalla pagina in un altro campo, o rimandato dal server, 
   expect(aperte).not.toContain('Risultati');
 });
 
+test('il testo di un campo tolto dalla pagina tiene aperta la scheda finché non ricompare nella pagina (#824)', async ({ app, shell, testServer }) => {
+  // Procedura a passi: «Avanti» toglie il primo passo, la lettera resta solo nella memoria della pagina.
+  const domanda = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Domanda</title></head><body>
+    <form onsubmit="event.preventDefault()"><div id="passo">
+      <textarea id="lettera" style="width:400px;height:100px"></textarea><button type="button" id="avanti">Avanti</button></div></form>
+    <script>const dati = {}; avanti.onclick = () => { dati.lettera = lettera.value;
+      passo.innerHTML = '<input id="tel" type="tel"><button>Invia candidatura</button>'; };</script>
+    </body></html>`));
+  await domanda.locator('#lettera').click();
+  await domanda.keyboard.type('Lettera di presentazione scritta con cura 🙂');
+  await domanda.locator('#avanti').click();
+  await expect(domanda.locator('#tel')).toBeVisible();
+
+  // Vale anche per un campo di una riga.
+  const iscrizione = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Iscrizione</title></head><body>
+    <div id="passo"><input id="via" style="width:300px"><button id="avanti">Avanti</button></div>
+    <script>avanti.onclick = () => { passo.innerHTML = '<p>Passo 2 di 3</p>'; };</script>
+    </body></html>`));
+  await iscrizione.locator('#via').click();
+  await iscrizione.keyboard.type('Via dei Mille 12, scala B');
+  await iscrizione.locator('#avanti').click();
+  await expect(iscrizione.getByText('Passo 2 di 3')).toBeVisible();
+
+  // Una password non è una bozza.
+  const accesso = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Accesso</title></head><body>
+    <div id="box"><input id="pw" type="password"><button id="entra">Entra</button></div>
+    <script>entra.onclick = () => { box.innerHTML = '<p>Benvenuto</p>'; };</script>
+    </body></html>`));
+  // Su http Filo avvisa delle password con un riquadro sopra la pagina: il campo si raggiunge col fuoco.
+  await accesso.locator('#pw').focus();
+  await accesso.keyboard.type('segreta123');
+  await accesso.locator('#entra').evaluate((b) => b.click());
+  await expect(accesso.getByText('Benvenuto')).toBeVisible();
+
+  await pulisciTutto(app, shell, testServer);
+  const aperte = await titoliAperti(shell);
+  expect(aperte).toContain('Domanda');
+  expect(aperte).toContain('Iscrizione');
+  expect(aperte).not.toContain('Accesso');
+  expect(await domanda.evaluate(() => dati.lettera)).toBe('Lettera di presentazione scritta con cura 🙂');
+});
+
 test('il testo scritto in un campo dentro un componente della pagina tiene aperta la scheda (#824)', async ({ app, shell, testServer }) => {
   const chiuso = await apriEsatta(app, shell, testServer.html(`<!doctype html><html><head><title>Chiuso</title></head><body>
     <x-campo style="display:block"></x-campo>

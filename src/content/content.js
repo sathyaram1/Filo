@@ -535,7 +535,8 @@
     const lunghe = new WeakSet();
     // Componenti chiusi in cui è arrivata una scrittura: il testo lì dentro non si legge.
     const opachi = new Set();
-    // Testo lungo di un'area tolta dalla pagina: se ricompare in un altro campo è ancora dell'utente.
+    // Testo di un campo tolto dalla pagina: la pagina può tenerlo in memoria (il passo dopo di una
+    // procedura), quindi protegge finché non ricompare in un campo (adottato) o nella pagina (pubblicato).
     const orfani = [];
     // Impronte dei testi lunghi mandati al server: la risposta può rimetterli in un campo.
     const partiti = new Set();
@@ -618,16 +619,17 @@
         const ora = pulito(testo(area));
         if (ora && ora !== pulito(base)) daInviare = true;
       }
-      for (const h of opachi) if (viva(h)) daInviare = true; else opachi.delete(h);
-      return daInviare;
+      // Un componente chiuso tolto dalla pagina non dice se il testo è ricomparso: resta protetto.
+      return daInviare || opachi.size > 0 || orfani.length > 0;
     }
     function lascia(area, base) {
       aree.delete(area);
-      if (!lunghe.has(area)) return;
+      // Una password non è una bozza: dopo un accesso fatto senza cambiare pagina proteggerebbe per sempre.
+      if (/^input$/i.test(area.tagName) && String(area.type).toLowerCase() === 'password') return;
       const t = pulito(testo(area));
-      if (!t || t === pulito(base)) return;
+      if (!t || t === pulito(base) || orfani.includes(t)) return;
       orfani.push(t);
-      if (orfani.length > 20) orfani.shift();
+      if (orfani.length > 100) orfani.shift();
     }
     function impronta(s) {
       let h1 = 0xdeadbeef;
@@ -688,7 +690,7 @@
     }
     function aRiposo() {
       clearTimeout(rilettura);
-      rilettura = setTimeout(() => { aggiorna(false); mandaImpronte(); }, 400);
+      rilettura = setTimeout(() => { stato(); ricomparsi(); aggiorna(false); mandaImpronte(); }, 400);
     }
     function scritto(area, base) {
       if (!aree.has(area)) aree.set(area, base);
@@ -777,8 +779,9 @@
       const cercate = new Set(Array.isArray(daServer) ? daServer.map(String) : []);
       if (!cercate.size && !orfani.length) return;
       for (const doc of documenti(document)) for (const r of radici(doc)) {
-        for (const el of r.querySelectorAll('textarea, [contenteditable], input[type="hidden" i]')) {
-          const area = el.tagName.toUpperCase() === 'INPUT' ? el : campoDiTesto(el);
+        for (const el of r.querySelectorAll('textarea, [contenteditable], input')) {
+          const nascosto = el.tagName.toUpperCase() === 'INPUT' && String(el.type).toLowerCase() === 'hidden';
+          const area = nascosto ? el : campoDiTesto(el);
           if (!area || aree.has(area) || area.readOnly || area.disabled || diRicerca(area)) continue;
           const t = pulito(testo(area));
           if (!t) continue;
@@ -786,9 +789,28 @@
           if (o < 0 && !cercate.has(impronta(t))) continue;
           if (o >= 0) orfani.splice(o, 1);
           aree.set(area, '');
-          lunghe.add(area);
+          if (area.tagName.toUpperCase() !== 'INPUT' || nascosto) lunghe.add(area);
         }
       }
+    }
+    // Il testo dei campi non conta (lo guarda adotta), né quello degli script della pagina.
+    const NON_PAGINA = /^(script|style|noscript|template|textarea)$/i;
+    function testoDellaPagina() {
+      const pezzi = [];
+      for (const doc of documenti(document)) for (const r of radici(doc)) {
+        const w = doc.createTreeWalker(r, NodeFilter.SHOW_TEXT, {
+          acceptNode: (n) => (n.parentElement && NON_PAGINA.test(n.parentElement.tagName) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+        });
+        for (let n = w.nextNode(); n; n = w.nextNode()) pezzi.push(n.data);
+      }
+      return pulito(pezzi.join(''));
+    }
+    function ricomparsi() {
+      if (!orfani.length) return;
+      adotta(null);
+      if (!orfani.length) return;
+      const pagina = testoDellaPagina();
+      for (let i = orfani.length - 1; i >= 0; i--) if (pagina.includes(orfani[i])) orfani.splice(i, 1);
     }
 
     // I riquadri senza indirizzo proprio (gli editor classici scritti dalla pagina)
@@ -863,7 +885,7 @@
       if (!msg || msg.type !== MSG.FORM_RECHECK) return;
       osserva(window);
       stato();
-      try { adotta(msg.impronte); } catch (_) {}
+      try { adotta(msg.impronte); ricomparsi(); } catch (_) {}
       manda(stato(), false);
       mandaImpronte();
     });
