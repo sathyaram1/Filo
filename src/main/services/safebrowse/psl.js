@@ -2,8 +2,8 @@
 // registrabile (eTLD+1).
 //
 // NON è la PSL completa (~9000 voci): ci sono i TLD comuni, TUTTE le regole
-// ICANN a due etichette (pslDueEtichette.js: com.co e tienda.com.co, roma.it e
-// comune.roma.it) e le piattaforme qui sotto. Mancano le regole a tre o più
+// ICANN a due etichette (pslDueEtichette.js: com.co, roma.it, così tienda.com.co
+// e comune.roma.it sono siti a sé) e le piattaforme qui sotto. Mancano le regole a tre o più
 // etichette (città giapponesi, contee USA): lì vale la regola implicita "*".
 //
 // L'algoritmo segue publicsuffix.org: cerca la regola che combacia con il
