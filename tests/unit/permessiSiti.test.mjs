@@ -628,6 +628,13 @@ test('Incolla e Detta sulle pagine web non passano dal permesso del sito', () =>
   for (const f of sorgenti(join(ROOT, 'src'))) assert.doesNotMatch(readFileSync(f, 'utf8'), /PERMESSO_FILO|permesso_filo/, f);
 });
 
+test('sulle pagine web solo il menu va nello strato alto: sotto-menu, etichette e icona trascinata ci stanno dentro', () => {
+  const menu = readFileSync(join(ROOT, 'src', 'content', 'menu.js'), 'utf8');
+  const fuori = menu.match(/menuHost\(\)\.appendChild\((\w+)\)/g) || [];
+  assert.deepEqual(fuori, ['menuHost().appendChild(root)'], 'un pezzo appeso fuori dal menu lo copre o gli sta sotto');
+  assert.equal((menu.match(/showPopover\(\)/g) || []).length, 1, 'uno strato alto solo, quello del menu');
+});
+
 test('il sorgente per il mondo della pagina: «da chiedere» dove nessuno ha negato, e niente strada vecchia per lo schermo', () => {
   const { buildPermessiPaginaSource } = require(join(ROOT, 'src', 'preload', 'permessi-pagina.js'));
   const src = buildPermessiPaginaSource(['camera']);
