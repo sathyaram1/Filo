@@ -16,6 +16,10 @@
   --dash-green: #4a7a3a;
   --dash-radius: 18px;
   --dash-radius-pill: 28px;
+  /* Il filo dell'attesa: quanto dura il cappio che si stringe, quanto l'avvolgimento, quanto si vede la trama. */
+  --dash-filo-nodo: 450ms;
+  --dash-filo-gomitolo: 850ms;
+  --dash-trama-opacity: 0.5;
 }
 
 [data-sn-theme="dark"] {
@@ -48,9 +52,10 @@ html, body {
    `display: inline-flex` lo sovrascrivono: qui gli si ridà la priorità. */
 [hidden] { display: none !important; }
 
+/* Alta esattamente la finestra in tutti e due gli stati: scorrono le colonne e il filo, mai la pagina. */
 .dash {
   position: relative;
-  min-height: calc(100vh / var(--sn-zoom, 1));
+  height: calc(100vh / var(--sn-zoom, 1));
   display: grid;
   grid-template-columns: 260px 1fr 260px;
   grid-template-rows: 1fr auto;
@@ -62,104 +67,362 @@ html, body {
 @media (max-width: 980px) {
   .dash { grid-template-columns: 200px 1fr 200px; padding: 28px 20px 20px; gap: 16px; }
 }
+/* Le colonne non si nascondono: le carte (un timer che suona) servono anche nella finestra più stretta. */
 @media (max-width: 720px) {
-  .dash { grid-template-columns: 1fr; }
-  .dash-left, .dash-right { display: none; }
+  .dash { grid-template-columns: 170px 1fr 170px; padding: 24px 12px 16px; gap: 12px; }
 }
 
 .dash-left {
   grid-column: 1;
-  grid-row: 1;
+  grid-row: 1 / span 2;
+  padding-top: 14px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding-top: 8px;
   min-width: 0;
+  min-height: 0;
 }
-.dash-suggestions {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+
+/* Le carte (#870): stesso contratto ai due lati. Le colonne scorrono da sole, così a cedere è la colonna e non il filo. */
+.dash-carte {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 10px;
+  min-height: 24px;
 }
-.dash-suggestion {
+.dash-left .dash-carte {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 2px 2px 8px;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.dash-left .dash-carte:hover { scrollbar-color: var(--dash-line-strong) transparent; }
+
+.dash-carta {
+  position: relative;
+  flex: none;
+  background: var(--dash-card);
+  border: 1px solid var(--dash-line);
+  border-radius: var(--dash-radius);
+  padding: 11px 13px 12px;
+  color: var(--dash-ink);
+  font-size: 13px;
+  line-height: 1.4;
+  outline: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease, opacity 0.18s ease;
+  cursor: pointer;
+}
+.dash-carta:hover,
+.dash-carta:focus-visible {
+  border-color: var(--dash-line-strong);
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--dash-ink) 7%, transparent);
+}
+.dash-carta:focus-visible { border-color: var(--dash-accent); }
+.dash-carta.presa { opacity: 0.4; }
+.dash-carta.sopra-prima { box-shadow: 0 -3px 0 -1px var(--dash-accent); }
+.dash-carta.sopra-dopo { box-shadow: 0 3px 0 -1px var(--dash-accent); }
+.dash-carta[data-suona="1"] {
+  border-color: var(--dash-accent);
+  animation: dash-ring-pulse 1s ease-in-out infinite;
+}
+@keyframes dash-ring-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--dash-accent) 30%, transparent); }
+}
+
+.dash-carta-testa {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  background: transparent;
+  gap: 8px;
+  min-width: 0;
+}
+.dash-carta-ico { display: inline-flex; flex: none; color: var(--dash-accent); }
+.dash-carta-ico svg { display: block; }
+.dash-carta-tit {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* «apri nel filo» e la × compaiono passandoci sopra, sopra la coda del titolo: da ferma la carta mostra il titolo intero. */
+.dash-carta-mani {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-left: 18px;
+  background: linear-gradient(to right, transparent, var(--dash-card) 16px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+.dash-carta:hover .dash-carta-mani,
+.dash-carta:focus-within .dash-carta-mani { opacity: 1; pointer-events: auto; }
+.dash-carta-filo,
+.dash-carta-togli {
+  flex: none;
   border: none;
-  border-radius: 10px;
-  text-align: left;
-  cursor: pointer;
-  color: var(--dash-ink-soft);
-  font-size: 13px;
-  line-height: 1.35;
-  transition: background 0.12s, color 0.12s;
-  width: 100%;
-}
-.dash-suggestion:hover {
   background: var(--dash-card);
-  color: var(--dash-ink);
+  color: var(--dash-ink-mute);
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
 }
-.dash-suggestion .dash-sug-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  flex-shrink: 0;
+.dash-carta-filo { font-size: 11px; padding: 2px 7px; border-radius: 7px; }
+.dash-carta-togli {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 14px;
+  line-height: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: transparent;
-  border: none;
-  font-size: 16px;
-  font-weight: 600;
+  padding: 0;
+}
+.dash-carta-filo:hover,
+.dash-carta-togli:hover { background: var(--dash-line); color: var(--dash-ink); }
+
+.dash-carta-stato {
+  margin-top: 3px;
+  font-size: 12px;
   color: var(--dash-ink-mute);
-  text-transform: uppercase;
-}
-.dash-sug-favicon {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  display: block;
-  object-fit: contain;
-}
-
-.dash-sug-icon[data-icon="gmail"]      { color: #8a4a1f; }
-.dash-sug-icon[data-icon="calendar"]   { color: #4a6238; }
-.dash-sug-icon[data-icon="editor"],
-.dash-sug-icon[data-icon="file"]       { color: #6b5a3a; }
-.dash-sug-icon[data-icon="link"]       { color: #3b556d; }
-.dash-sug-icon[data-icon="note"]       { color: #7a5a2a; }
-.dash-sug-icon[data-icon="web"]        { color: #3d5a30; }
-
-.dash-suggestion .dash-sug-text {
-  flex: 1;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
-/* In conversazione la colonna si comprime a sole icone. */
-body[data-state="thread"] .dash-suggestion .dash-sug-text { display: none; }
-body[data-state="thread"] .dash-suggestion { justify-content: flex-start; padding: 6px; }
+.dash-carta-stato.grande {
+  font-size: 19px;
+  color: var(--dash-ink);
+  font-variant-numeric: tabular-nums;
+}
+.dash-carta-stato.lungo {
+  white-space: pre-wrap;
+  -webkit-line-clamp: 5;
+  color: var(--dash-ink-soft);
+}
+.dash-carta[data-suona="1"] .dash-carta-stato { color: var(--dash-accent); }
 
-.dash-expand-btn {
+.dash-carta-avanza {
+  height: 4px;
+  margin-top: 9px;
+  border-radius: 3px;
+  background: var(--dash-line);
+  overflow: hidden;
+}
+.dash-carta-avanza > i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--dash-accent);
+  transition: width 0.6s linear;
+}
+.dash-carta-avanza.indeterminato > i {
+  width: 30%;
+  animation: dash-avanza-vai 1.4s ease-in-out infinite;
+}
+@keyframes dash-avanza-vai {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(340%); }
+}
+
+.dash-carta-voci {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.dash-carta-voce {
+  width: calc(100% + 14px);
+  margin: 0 -7px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 7px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--dash-ink-soft);
+  font-family: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+.dash-carta-voce:hover,
+.dash-carta-voce:focus-visible { background: var(--dash-line); color: var(--dash-ink); outline: none; }
+.dash-carta-voce.piano { color: var(--dash-ink-mute); font-size: 12px; }
+.dash-carta-voce-testo { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-carta-voce-coda { flex: none; font-size: 11px; color: var(--dash-ink-mute); font-variant-numeric: tabular-nums; }
+.dash-carta-voce-ico {
+  flex: none;
+  width: 16px;
+  height: 16px;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  background: transparent;
-  border: none;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
   color: var(--dash-ink-mute);
-  font-size: 12px;
-  padding: 6px 10px;
-  cursor: pointer;
-  align-self: flex-start;
 }
-.dash-expand-btn:hover { color: var(--dash-ink); }
+.dash-carta-voce-ico img { width: 16px; height: 16px; border-radius: 4px; object-fit: contain; }
+
+.dash-carta-pastiglie { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.dash-pastiglia {
+  font-family: inherit;
+  font-size: 12px;
+  border: 1px solid var(--dash-line-strong);
+  background: transparent;
+  color: var(--dash-ink-soft);
+  border-radius: var(--dash-radius-pill);
+  padding: 3px 11px;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+.dash-pastiglia:hover { border-color: var(--dash-ink); color: var(--dash-ink); }
+.dash-pastiglia.acceso { background: var(--dash-accent); border-color: var(--dash-accent); color: var(--dash-paper); }
+
+.dash-carta-piede { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 9px; }
+.dash-carta-az {
+  font-family: inherit;
+  font-size: 12px;
+  border: 1px solid var(--dash-line-strong);
+  background: transparent;
+  color: var(--dash-ink);
+  border-radius: var(--dash-radius-pill);
+  padding: 3px 11px;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, transform 0.12s ease;
+}
+.dash-carta-az:hover { background: var(--dash-ink); color: var(--dash-paper); }
+.dash-carta-az:active { transform: scale(0.95); }
+.dash-carta-az.forte { background: var(--dash-accent); border-color: var(--dash-accent); color: var(--dash-paper); }
+.dash-carta-az.forte:hover { filter: brightness(1.08); }
+.dash-carta-az.secondaria { border-color: transparent; color: var(--dash-ink-mute); padding: 3px 8px; }
+.dash-carta-az.secondaria:hover { background: var(--dash-line); color: var(--dash-ink); }
+
+/* «altro»: le app senza carta e le carte tolte, da cui si rimettono. */
+.dash-altro { flex: none; padding: 4px 2px 2px; border-radius: var(--dash-radius); transition: background 0.18s ease; }
+.dash-altro.bersaglio { background: var(--dash-line); }
+.dash-altro-tit {
+  padding: 0 4px 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--dash-ink-mute);
+}
+.dash-altro-griglia { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 2px; }
+.dash-altro-cella { position: relative; }
+.dash-altro-app {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 9px 2px 7px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--dash-ink-soft);
+  font-family: inherit;
+  font-size: 10.5px;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, transform 0.12s ease;
+}
+.dash-altro-app:hover,
+.dash-altro-app:focus-visible { background: var(--dash-line); color: var(--dash-ink); transform: translateY(-1px); outline: none; }
+.dash-altro-app .dash-carta-ico { color: inherit; }
+.dash-altro-nome { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-altro-app[data-tolta="1"] .dash-carta-ico { color: var(--dash-accent); }
+.dash-altro-rimetti {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--dash-accent);
+  color: var(--dash-paper);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 18px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.18s ease, transform 0.12s ease;
+}
+.dash-altro-cella:hover .dash-altro-rimetti,
+.dash-altro-cella:focus-within .dash-altro-rimetti { opacity: 1; }
+.dash-altro-rimetti:hover { transform: scale(1.1); }
+
+/* Menu del tasto destro sulle carte: stesse voci, stessa animazione al passaggio del puntatore. */
+.dash-menu {
+  position: fixed;
+  z-index: 1100;
+  min-width: 180px;
+  max-width: 320px;
+  padding: 4px;
+  background: var(--dash-card);
+  border: 1px solid var(--dash-line-strong);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--dash-ink) 18%, transparent);
+}
+.dash-menu-voce {
+  display: block;
+  width: 100%;
+  padding: 7px 11px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dash-ink);
+  font-family: inherit;
+  font-size: 13px;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: background 0.12s ease, padding-left 0.12s ease;
+}
+.dash-menu-voce:hover,
+.dash-menu-voce:focus-visible { background: var(--dash-line); padding-left: 14px; outline: none; }
+.dash-menu-sep { height: 1px; margin: 4px 6px; background: var(--dash-line); }
+
+.dash-flash {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  z-index: 1100;
+  max-width: 70vw;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: var(--dash-ink);
+  color: var(--dash-paper);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 6px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.dash-flash.vista { opacity: 1; transform: translate(-50%, 0); }
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-carta[data-suona="1"], .dash-carta-avanza.indeterminato > i { animation: none; }
+}
 
 .dash-center {
   grid-column: 2;
@@ -169,6 +432,7 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
   align-items: stretch;
   justify-content: center;
   min-width: 0;
+  min-height: 0;
 }
 .dash-home {
   display: flex;
@@ -226,12 +490,6 @@ body[data-state="thread"] .dash-suggestion { justify-content: flex-start; paddin
 .dash-home-msg.dash-home-msg-loading { color: var(--dash-ink-mute); font-style: italic; }
 
 
-/* In conversazione la griglia ha un'altezza fissa (la viewport, con la stessa compensazione dello zoom)
-   e la colonna centrale può restringersi: scorre il thread, e il campo di scrittura resta in fondo. */
-body[data-state="thread"] .dash { height: calc(100vh / var(--sn-zoom, 1)); }
-body[data-state="thread"] .dash-left,
-body[data-state="thread"] .dash-center,
-body[data-state="thread"] .dash-right { min-height: 0; }
 .dash-thread {
   display: flex;
   flex-direction: column;
@@ -263,6 +521,61 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   color: var(--dash-paper);
   border-bottom-right-radius: 6px;
 }
+/* #867 — il segno di un cambio sulla bolla dell'utente, come la conferma di lettura: passandoci sopra
+   (sul segno, non sulla bolla che si attraversa leggendo) la frase e «annulla» in una pastiglia. */
+.dash-bubble-cambi { position: relative; margin-bottom: 6px; }
+.dash-cambi-segno {
+  position: absolute; right: 10px; bottom: -9px;
+  width: 19px; height: 19px; padding: 0; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--dash-accent); color: var(--dash-paper);
+  border: 2px solid var(--dash-paper); cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.dash-cambi-segno svg { stroke-width: 3; }
+.dash-cambi-segno:hover, .dash-cambi-segno:focus-visible { transform: scale(1.12); outline: none; }
+.dash-cambi-segno.dash-cambi-tutti-annullati { background: var(--dash-ink-mute); }
+.dash-bubble-cambi.dash-cambi-vuoto .dash-cambi-segno { display: none; }
+.dash-cambi-pop {
+  position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 5;
+  display: flex; flex-direction: column; gap: 4px; width: max-content; max-width: min(460px, 80vw);
+  background: var(--dash-ink); color: var(--dash-paper);
+  border-radius: 12px; padding: 6px 8px 6px 12px;
+  font-size: 12px; line-height: 1.35; white-space: normal; user-select: none;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  opacity: 0; visibility: hidden; transform: translateY(4px);
+  /* Si chiude con un attimo di ritardo: dal segno alla pastiglia il mouse attraversa la bolla. */
+  transition: opacity 0.15s ease 0.35s, transform 0.15s ease 0.35s, visibility 0s linear 0.5s;
+}
+/* Il ponte fra la bolla e la pastiglia: andandoci col mouse non si chiude. */
+.dash-cambi-pop::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 10px; }
+.dash-bubble-cambi.dash-cambi-sotto .dash-cambi-pop { bottom: auto; top: calc(100% + 14px); }
+.dash-bubble-cambi.dash-cambi-sotto .dash-cambi-pop::after { top: auto; bottom: 100%; }
+/* Il fuoco apre solo da tastiera: quello lasciato da un clic terrebbe aperta la pastiglia che il clic ha chiuso. */
+.dash-cambi-segno:hover + .dash-cambi-pop,
+.dash-cambi-pop:hover,
+.dash-cambi-segno:focus-visible + .dash-cambi-pop,
+.dash-cambi-pop:has(:focus-visible),
+.dash-bubble-cambi.dash-cambi-aperto .dash-cambi-pop {
+  opacity: 1; visibility: visible; transform: none;
+  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0s;
+}
+.dash-cambi-riga { display: flex; align-items: center; gap: 9px; }
+.dash-cambi-frase { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.dash-cambi-annullato .dash-cambi-frase { text-decoration: line-through; opacity: 0.6; }
+.dash-cambi-stato { flex: none; opacity: 0.6; font-size: 11px; }
+.dash-activity-row.dash-cambi-annullato > span:nth-child(2) { text-decoration: line-through; opacity: 0.6; }
+.dash-cambi-annulla {
+  flex: none; font: inherit; font-size: 11.5px; cursor: pointer;
+  border: 1px solid currentColor; background: transparent; color: inherit;
+  border-radius: 13px; padding: 1px 9px; opacity: 0.8;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.dash-cambi-annulla:hover, .dash-cambi-annulla:focus-visible {
+  opacity: 1; background: var(--dash-paper); color: var(--dash-ink); border-color: var(--dash-paper); outline: none;
+}
+.dash-cambi-annulla.dash-cambi-in-corso { opacity: 0.5; cursor: progress; }
+
 .dash-bubble-filo {
   align-self: flex-start;
   background: var(--dash-card);
@@ -318,109 +631,155 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   .dash-bubble-filo.dash-bubble-streaming::after { animation: none; }
 }
 
-/* Il retroscena del turno (attesa, ragionamento, azioni) sta sopra la risposta: colore smorzato e
-   niente cornice, perché la risposta è la bolla sotto. */
+/* Il retroscena del turno sta sopra la risposta, smorzato e senza cornice. A sinistra corre il filo (#578):
+   niente scritte di stato, il movimento dice cosa succede. Regole: patterns/il-filo-dell-attesa.md. */
 .dash-activity {
+  position: relative;
   align-self: flex-start;
   width: 86%;
   max-width: 86%;
+  box-sizing: border-box;
+  padding-left: 26px;
   color: var(--dash-ink-mute);
   font-size: 13px;
   line-height: 1.45;
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding-left: 4px;
 }
 /* La risposta si attacca al suo retroscena: meno aria fra i due che fra bolle. */
 .dash-activity + .dash-bubble-filo { margin-top: -6px; }
+.dash-activity.dash-activity-vuoto { display: none; }
+@keyframes dash-activity-spin { to { transform: rotate(360deg); } }
+
+.dash-activity-filo { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.dash-activity-filo-tratto {
+  fill: none;
+  stroke: var(--dash-accent);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* Tutti i nodi uguali: un puntino pieno, senza alone. La presa più larga è solo per il mouse. */
+.dash-activity-nodo { fill: var(--dash-accent); }
+.dash-activity-nodo-presa { fill: transparent; pointer-events: all; cursor: pointer; }
+.dash-activity[data-filo="gomitolo"] .dash-activity-nodo-presa { pointer-events: none; }
+
+/* Il gomitolo: una riga sola, il riassunto e la durata. La presa comprende il gomitolo a sinistra. */
 .dash-activity-head {
   display: flex;
   align-items: center;
-  gap: 8px;
   align-self: flex-start;
-  max-width: 100%;
+  max-width: calc(100% + 26px);
   min-width: 0;
+  margin-left: -26px;
+  padding: 0 6px 0 26px;
   border: none;
   background: transparent;
   color: inherit;
   font: inherit;
-  padding: 2px 6px 2px 0;
-  border-radius: 6px;
-  cursor: pointer;
   text-align: left;
+  cursor: pointer;
+  border-radius: 6px;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height var(--dash-filo-gomitolo) cubic-bezier(.4, 0, .2, 1), opacity 300ms ease, color 160ms ease,
+    padding-left var(--dash-filo-gomitolo) cubic-bezier(.4, 0, .2, 1);
 }
+.dash-activity[data-testa] .dash-activity-head { max-height: 26px; opacity: 1; }
+.dash-activity[data-filo="gomitolo"] .dash-activity-head { padding-left: calc(26px + var(--dash-gomitolo-spazio, 0px)); }
 .dash-activity-head:hover { color: var(--dash-ink-soft); }
-/* La riga dice cosa succede adesso: una riga sola, il resto sfuma. */
 .dash-activity-label {
   min-width: 0;
+  line-height: 24px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 /* Un tentativo andato male: resta leggibile, ma non sembra un lavoro riuscito. */
 .dash-activity[data-failed="1"] .dash-activity-label { color: var(--dash-accent); }
-.dash-activity-icon {
-  width: 12px;
-  height: 12px;
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  font-size: 11px;
-}
-/* In attesa o mentre ragiona: una rotella. Non c'è un avanzamento da stimare. */
-.dash-activity[data-phase="wait"] .dash-activity-icon,
-.dash-activity[data-phase="reason"] .dash-activity-icon,
-.dash-activity[data-phase="act"] .dash-activity-icon {
-  border-radius: 50%;
-  border: 2px solid currentColor;
-  border-top-color: transparent;
-  opacity: 0.7;
-  animation: dash-activity-spin 0.9s linear infinite;
-}
-@keyframes dash-activity-spin { to { transform: rotate(360deg); } }
-/* Finito: la riga è un interruttore, la freccetta dice da che parte è. */
-.dash-activity[data-phase="done"] .dash-activity-icon::before { content: '▸'; }
-.dash-activity[data-phase="done"] .dash-activity-head[aria-expanded="true"] .dash-activity-icon::before { content: '▾'; }
-@media (prefers-reduced-motion: reduce) {
-  .dash-activity[data-phase="wait"] .dash-activity-icon,
-  .dash-activity[data-phase="reason"] .dash-activity-icon,
-  .dash-activity[data-phase="act"] .dash-activity-icon {
-    animation: none;
-    border-top-color: currentColor;
-    opacity: 0.35;
-  }
-}
-/* Ragionamento, azioni, note e comandi nell'ordine in cui sono avvenuti. Si apre a richiesta e
-   scorre da sola restando in fondo mentre il lavoro va avanti. */
+
 .dash-activity-body {
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  transition: max-height var(--dash-filo-gomitolo) cubic-bezier(.4, 0, .2, 1), opacity 300ms ease;
+}
+/* In attesa il filo penzola da solo: gli serve un po' di posto. */
+.dash-activity[data-phase="wait"] .dash-activity-body { min-height: 22px; }
+
+/* Una sezione: un pensiero e le azioni che ne sono nate. */
+.dash-activity-seg { display: flex; flex-direction: column; min-width: 0; animation: dash-seg-entra 320ms ease-out; }
+@keyframes dash-seg-entra { from { opacity: 0; transform: translateY(-4px); } }
+.dash-activity-seg-head {
+  display: flex;
+  align-items: center;
+  align-self: flex-start;
+  max-width: 100%;
+  min-width: 0;
+  height: 24px;
+  padding: 0 4px 0 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: color 160ms ease;
+}
+.dash-activity-seg-head:hover,
+.dash-activity-seg-aperta > .dash-activity-seg-head,
+.dash-activity[data-phase="act"] .dash-activity-seg:last-child > .dash-activity-seg-head { color: var(--dash-ink-soft); }
+.dash-activity-seg-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-activity-seg[data-stato="pensa"] > .dash-activity-seg-head,
+.dash-activity-seg[data-stato="coda"] > .dash-activity-seg-head { display: none; }
+
+/* La trama: il ragionamento che scorre, piccolo e sfumato. Non si legge, si intravede. */
+.dash-activity-trama { display: none; }
+.dash-activity-seg[data-stato="pensa"] > .dash-activity-trama {
+  display: block;
+  height: 24px;
+  line-height: 24px;
+  overflow: hidden;
+  white-space: nowrap;
+  cursor: pointer;
+  font-size: 10.5px;
+  opacity: var(--dash-trama-opacity);
+  direction: rtl;
+  text-align: left;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 25%, #000 75%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 25%, #000 75%, transparent);
+}
+.dash-activity-trama > span { direction: ltr; unicode-bidi: isolate; }
+
+/* L'ultimo pensiero non compare prima della risposta: lo si legge srotolando il gomitolo. */
+.dash-activity:not([data-filo="srotolato"]) .dash-activity-seg[data-stato="coda"] { display: none; }
+.dash-activity-seg[data-stato="coda"] > .dash-activity-seg-body { opacity: 0.85; }
+
+/* Dentro una sezione: il ragionamento per intero e, staccati sotto, gli esiti con la loro icona. */
+.dash-activity-seg-body {
+  display: flex;
+  flex-direction: column;
   gap: 6px;
-  max-height: 40vh;
+  max-height: 240px;
   overflow-y: auto;
-  padding: 4px 10px 4px 12px;
-  margin: 0 0 2px 5px;
-  border-left: 2px solid var(--dash-line-strong);
+  padding: 2px 10px 8px 0;
   font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--dash-ink-soft);
   user-select: text;
 }
-.dash-activity-reasoning {
-  white-space: pre-wrap;
-  word-wrap: break-word;
-}
+.dash-activity-reasoning { white-space: pre-wrap; word-wrap: break-word; }
 /* Commento a metà lavoro («Provo subito tutti e tre…»): è una nota, non una bolla. */
-.dash-activity-note {
-  font-style: italic;
-  color: var(--dash-ink-soft);
-}
+.dash-activity-note { font-style: italic; color: var(--dash-ink-soft); }
+.dash-activity-esiti { display: flex; flex-direction: column; gap: 4px; color: var(--dash-ink-mute); }
+.dash-activity-esiti:empty { display: none; }
+.dash-activity-esiti:not(:first-child) { border-top: 1px solid var(--dash-line); padding-top: 7px; }
 /* Esito di un comando dentro la cronologia: più piccolo, output limitato. */
 .dash-cmd-result.dash-activity-cmd { margin-top: 0; font-size: 12px; }
 .dash-activity-cmd .dash-cmd-output { max-height: 10em; overflow: auto; }
-/* Le righe delle azioni: icona e due parole, in tono col blocco (non corsive,
-   non un bottone). */
+/* Le righe delle azioni: icona e due parole, in tono col blocco (non corsive, non un bottone). */
 .dash-action-step.dash-activity-row {
   font-style: normal;
   opacity: 1;
@@ -433,6 +792,29 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   flex: none;
   text-align: center;
   font-size: 12px;
+}
+/* Il titolo esteso di un nodo, al passaggio del mouse. */
+.dash-filo-hint {
+  position: fixed;
+  z-index: 30;
+  pointer-events: none;
+  max-width: 60vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--dash-ink);
+  color: var(--dash-paper);
+  font-size: 11.5px;
+  padding: 4px 9px;
+  border-radius: 7px;
+  transform: translate(-50%, -125%);
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+.dash-filo-hint.dash-filo-hint-vis { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .dash-activity-head, .dash-activity-body, .dash-filo-hint { transition: none; }
+  .dash-activity-seg { animation: none; }
 }
 .dash-bubble-actions {
   margin-top: 10px;
@@ -545,6 +927,43 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   margin-top: 8px;
   width: 100%;
 }
+/* #892 — un comando si presenta prima a parole; il comando vero sta sotto, più piccolo. */
+.dash-cmd-btn {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  max-width: 100%;
+  padding: 7px 14px;
+  border-radius: 14px;
+  text-align: left;
+}
+.dash-cmd-btn-cosa { line-height: 1.35; }
+.dash-cmd-btn-codice {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  opacity: 0.72;
+  word-break: break-all;
+}
+.dash-cmd-cosa {
+  margin-bottom: 4px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--dash-ink-soft);
+}
+/* La frase della prima volta: una riga a sé sopra i bottoni, discreta come una nota. */
+.dash-cmd-primavolta {
+  flex-basis: 100%;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--dash-ink-soft);
+}
+.dash-cmd-primavolta a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.15s ease;
+}
+.dash-cmd-primavolta a:hover { color: var(--dash-accent); }
 /* Riga di comando: scatola QUADRATA col colore della bolla utente, così si distingue a colpo d'occhio
    dalle bolle arrotondate delle istruzioni, e il testo resta leggibile invece che tenue sul trasparente. */
 .dash-cmd-line {
@@ -592,23 +1011,60 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   border: 1px dashed var(--dash-line-strong);
   border-radius: 8px;
 }
+/* Riga intera delle azioni e mai oltre: i titoli lunghi si accorciano coi puntini invece di allargare la bolla. */
 .dash-delete-panel {
+  flex: 1 1 100%;
+  min-width: 0;
+  box-sizing: border-box;
   margin-top: 8px;
   padding: 10px 12px;
   border: 1px solid color-mix(in srgb, #c0392b 40%, transparent);
   border-radius: 10px;
   background: color-mix(in srgb, #c0392b 6%, transparent);
 }
-.dash-delete-note { font-size: 13px; margin-bottom: 6px; }
-.dash-delete-list {
+.dash-delete-note { font-size: 13px; margin-bottom: 6px; overflow-wrap: anywhere; }
+/* Il modello sta giudicando le schede: niente avanzamento da stimare, una rotella. */
+.dash-delete-note[data-cerco="1"]::before {
+  content: '';
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  vertical-align: -1px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  opacity: 0.7;
+  animation: dash-activity-spin 0.9s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dash-delete-note[data-cerco="1"]::before { animation: none; border-top-color: currentColor; }
+}
+/* Selettore lungo quanto quello delle liste nel testo della bolla, che sennò rimette il rientro. */
+.dash-delete-panel ul.dash-delete-list {
   margin: 6px 0 10px;
-  padding-left: 18px;
+  padding: 0;
+  list-style: none;
   max-height: 180px;
   overflow: auto;
   font-size: 12px;
-  opacity: 0.85;
 }
-.dash-delete-list li { margin: 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dash-delete-list li {
+  margin: 1px 0;
+  padding: 2px 4px;
+  border-radius: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background-color 0.15s ease;
+}
+.dash-delete-list li:hover { background: color-mix(in srgb, #c0392b 10%, transparent); }
+.dash-delete-list label { cursor: pointer; }
+.dash-delete-list input { margin: 0 6px 0 0; vertical-align: -2px; accent-color: #c0392b; cursor: pointer; }
+.dash-delete-list span { opacity: 0.85; }
+/* Tolta dall'elenco: resta visibile, ma si legge che non verrà eliminata. */
+.dash-delete-list input:not(:checked) + span { opacity: 0.45; text-decoration: line-through; }
 
 /* Il raffinamento estetico (color picker, slider) è volutamente poco invadente: lo sfondo resta
    visibile perché l'anteprima live sulle superfici dietro si veda mentre si trascina. */
@@ -702,115 +1158,190 @@ body[data-state="thread"] .dash-right { min-height: 0; }
 
 .dash-right {
   grid-column: 3;
-  grid-row: 1;
-  padding-top: 60px;
+  grid-row: 1 / span 2;
+  padding-top: 14px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  align-items: stretch;
-  justify-content: flex-end;
+  gap: 10px;
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
 }
-.dash-live {
+.dash-right:hover { scrollbar-color: var(--dash-line-strong) transparent; }
+/* A destra scorre la colonna intera: le carte non si schiacciano sotto «altro» quando la finestra è bassa. */
+.dash-right > .dash-carte { flex: none; padding: 2px; }
+
+/* Le voci del computer (#873) dove sul desktop sta l'orologio, allineate al testo delle carte; restano appoggiate
+   al bordo basso anche quando gli avvisi allungano la colonna. Colore solo per ciò che chiede attenzione. */
+.dash-sistema {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 0 4px 14px;
+  background: var(--dash-paper);
 }
-.dash-live-card {
-  position: relative;
+.dash-sis-icone {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  max-width: 100%;
+}
+.dash-sis-voce {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0 8px;
+  border-radius: 10px;
+  color: var(--dash-ink-soft);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s, color 0.12s;
+}
+.dash-sis-voce:hover,
+.dash-sis-voce:focus-visible {
   background: var(--dash-card);
-  border: 1px solid var(--dash-line-strong);
-  border-radius: var(--dash-radius);
-  padding: 14px 16px 14px 22px;
+  color: var(--dash-ink);
+  outline: none;
+}
+.dash-sis-voce:active { transform: translateY(0.5px); }
+.dash-sis-voce[data-voce="ora"] {
+  height: 38px;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--dash-ink);
+}
+.dash-sis-icona { display: inline-flex; flex: none; }
+.dash-sis-icona:empty { display: none; }
+.dash-sis-icona svg { display: block; }
+.dash-sis-testo {
+  min-width: 0;
+  max-width: 104px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.dash-sis-voce[data-stato="bassa"],
+.dash-sis-voce[data-stato="offline"] { color: var(--dash-accent); }
+.dash-sis-voce[data-stato="spento"] .dash-sis-icona { opacity: 0.55; }
+
+.dash-sis-box {
+  position: fixed;
+  right: auto;
+  top: auto;
+  min-width: 190px;
+  max-width: 280px;
+  /* Con l'elenco dei dispositivi e un errore da leggere il riquadro si allunga: scorre solo oltre lo schermo. */
+  max-height: calc(100vh - 16px);
+}
+.dash-sis-box .dash-sis-info {
+  padding: 8px 12px 8px;
   font-size: 13px;
   line-height: 1.45;
-  color: var(--dash-ink);
+  color: var(--sn-fg);
+  overflow-wrap: anywhere;
+}
+.dash-sis-box .dash-sis-info > div:first-child { font-weight: 600; }
+.dash-sis-box .dash-sis-info > div + div { color: var(--sn-muted); }
+.dash-sis-box .dash-sis-comandi,
+.dash-sis-box .dash-sis-altre { border-top: 1px solid var(--sn-border); }
+/* I comandi del sistema (#874): il cursore del volume a tutta riga, gli elenchi coi nomi tagliati e interi al passaggio. */
+.dash-sis-cursore {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 8px;
-  overflow: hidden;
+  padding: 8px 12px 4px;
+  color: var(--sn-fg);
 }
-.dash-live-card::before {
-  content: '';
-  position: absolute;
-  left: 6px;
-  top: 10px;
-  bottom: 10px;
-  width: 3px;
-  border-radius: 2px;
-  background: var(--dash-accent);
-}
-.dash-live-card[data-kind="alert"]::before { background: var(--dash-accent); }
-.dash-live-card[data-kind="process"]::before { background: var(--dash-accent-2); }
-.dash-live-card[data-kind="background"]::before { background: var(--dash-blue); }
-.dash-live-card[data-kind="info"]::before { background: var(--dash-green); }
-
-.dash-live-card .dash-live-text { white-space: pre-wrap; }
-.dash-live-card .dash-live-meta {
-  font-size: 11px;
-  color: var(--dash-ink-mute);
-  margin-top: 2px;
-}
-.dash-live-dismiss {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: none;
-  background: transparent;
-  color: var(--dash-ink-mute);
+.dash-sis-cursore input[type="range"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  accent-color: var(--sn-accent);
   cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  line-height: 1;
 }
-.dash-live-dismiss:hover { background: var(--dash-line); color: var(--dash-ink); }
-
-.dash-live-pause {
-  position: absolute;
-  top: 6px;
-  right: 32px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: none;
-  background: transparent;
-  color: var(--dash-ink-mute);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  line-height: 1;
-}
-.dash-live-pause:hover { background: var(--dash-line); color: var(--dash-ink); }
-
-.dash-live-card[data-ringing="1"] {
-  border-color: var(--dash-accent);
-  animation: dash-ring-pulse 1s ease-in-out infinite;
-}
-.dash-live-card[data-ringing="1"]::before { background: var(--dash-accent); }
-@keyframes dash-ring-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 transparent; }
-  50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--dash-accent) 30%, transparent); }
-}
-.dash-live-stop {
-  align-self: flex-start;
-  padding: 4px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--dash-accent);
-  background: transparent;
-  color: var(--dash-accent);
+.dash-sis-valore {
+  flex: none;
+  min-width: 3.6ch;
+  text-align: right;
   font-size: 12px;
-  font-family: inherit;
-  cursor: pointer;
-  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+  color: var(--sn-muted);
 }
-.dash-live-stop:hover { background: var(--dash-accent); color: var(--dash-paper); }
+.dash-sis-cursore.dash-sis-occupato .dash-sis-valore { color: var(--sn-accent); }
+.dash-sis-titolo {
+  padding: 8px 12px 2px;
+  font-size: 11px;
+  color: var(--sn-muted);
+}
+.dash-sis-attesa {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--sn-muted);
+}
+.dash-sis-rotella {
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  vertical-align: -1px;
+  border: 2px solid var(--sn-border);
+  border-top-color: var(--sn-accent);
+  border-radius: 50%;
+  animation: sn-rinomina-gira 0.8s linear infinite;
+}
+.dash-sis-attesa .dash-sis-rotella { margin-right: 0; }
+@media (prefers-reduced-motion: reduce) { .dash-sis-rotella { animation-duration: 2.4s; } }
+.dash-sis-box .sn-select-option.dash-sis-occupato { color: var(--sn-muted); cursor: progress; }
+.dash-sis-box .sn-select-option.dash-sis-attuale { font-weight: 600; }
+.dash-sis-box .sn-select-option.dash-sis-attuale[aria-disabled="true"] { color: var(--sn-fg); cursor: default; }
+.dash-sis-box .sn-select-option.dash-sis-attuale[aria-disabled="true"]:hover { background: none; }
+.dash-sis-errore {
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  color: var(--sn-fg);
+}
+.dash-sis-errore[hidden] { display: none; }
+.dash-sis-errore .dash-sis-come { margin-top: 2px; color: var(--sn-muted); }
+.dash-sis-apri {
+  margin-top: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--sn-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--sn-fg);
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.dash-sis-apri:hover,
+.dash-sis-apri:focus-visible { background: rgba(var(--sn-accent-rgb), 0.18); outline: none; }
+.dash-sis-box .sn-select-option:hover,
+.dash-sis-box .sn-select-option:focus-visible {
+  background-color: rgba(var(--sn-accent-rgb), 0.18);
+  outline: none;
+}
 
 .dash-input-wrap {
   grid-column: 2;
@@ -827,6 +1358,7 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   margin: 0 auto;
   width: 100%;
   max-width: 720px;
+  box-sizing: border-box;
 }
 .dash-input {
   flex: 1;
@@ -844,6 +1376,8 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   resize: none;
   overflow-y: auto;
   max-height: 160px;
+  /* L'altezza che il JS copia da scrollHeight comprende il padding: in content-box la casella cresce di una riga vuota. */
+  box-sizing: border-box;
 }
 .dash-input::placeholder { color: var(--dash-ink-mute); }
 .dash-send {
@@ -858,8 +1392,13 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   align-items: center;
   justify-content: center;
 }
+/* Il microfono sta accanto all'invio, della sua misura, con l'inchiostro tenue: l'invio resta il gesto principale. */
+.dash-input-wrap { --sn-voce-size: 36px; --sn-voce-ink: var(--dash-ink-soft); }
 .dash-send:hover { opacity: 0.85; }
 .dash-send[disabled] { opacity: 0.4; cursor: not-allowed; }
+/* Il quadrato che ferma: stesso posto dell'invio, nel colore d'accento perché è urgente per natura. */
+.dash-send.dash-stop { background: var(--dash-accent); color: #fff; transition: transform 160ms ease, opacity 160ms ease; }
+.dash-send.dash-stop:hover { opacity: 1; transform: scale(1.07); }
 
 .dash-img-preview {
   position: relative;
@@ -911,6 +1450,27 @@ body[data-state="thread"] .dash-right { min-height: 0; }
   width: 48px; height: 48px; border-radius: 8px; object-fit: cover; cursor: zoom-in;
 }
 .dash-img-previews .dash-img-remove { top: -6px; right: -6px; left: auto; }
+/* #950 — un file trascinato dal disco: il nome in una pastiglia, alta quanto le anteprime delle immagini. */
+.dash-file-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 260px;
+  height: 48px;
+  box-sizing: border-box;
+  padding: 0 14px;
+  border: 1px solid var(--dash-ink);
+  border-radius: 8px;
+  color: var(--dash-ink);
+  font-size: 13px;
+  cursor: default;
+  transition: background 0.12s ease;
+}
+.dash-file-chip:hover,
+.dash-file-chip:focus-visible { background: rgba(var(--sn-accent-rgb), 0.12); outline: none; }
+.dash-file-chip-nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-file-chip .dash-file-chip-togli { position: absolute; top: -6px; right: -6px; left: auto; }
 
 .dash-lightbox {
   position: fixed; inset: 0;
@@ -920,10 +1480,6 @@ body[data-state="thread"] .dash-right { min-height: 0; }
 }
 .dash-lightbox.open { display: flex; }
 .dash-lightbox img { max-width: 95vw; max-height: 95vh; border-radius: 8px; }
-
-@media (max-width: 720px) {
-  .dash-input-wrap { grid-column: 1; }
-}
 
 .dash-dir {
   flex-basis: 100%;

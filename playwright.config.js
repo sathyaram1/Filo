@@ -33,14 +33,18 @@ export default defineConfig({
   // Le prove dei giri di verifica (tests/verifica/<numero>/) restano nel ramo
   // ma NON entrano nella suite completa: quelle di un solo feedback costano
   // otto minuti e mezzo (misurato il 9/09/2026 su #495), e la suite completa
-  // dal 2026-09-15 gira SOLO in GitHub Actions, nel lavoro di release, ogni
-  // sei ore prima di pubblicare: nessun ruolo e nessuna sessione la lancia.
+  // dal 2026-09-15 gira SOLO in GitHub Actions, a ogni fusione su main
+  // (suite.yml): nessun ruolo e nessuna sessione la lancia.
   // Si lanciano per numero (`npx playwright test tests/verifica/<numero>`:
   // il filtro si spegne da solo quando la cartella è nominata sulla riga di
   // comando), oppure tutte con FILO_TEST_VERIFICA=1.
   testIgnore: (process.env.FILO_TEST_VERIFICA === '1' || process.argv.some((a) => /tests[\\/]verifica/.test(a)))
     ? []
     : [/[\\/]tests[\\/]verifica[\\/]/],
+  // In GitHub (CI=true) una prova lasciata «a fuoco» fa girare solo sé stessa: la suite risulterebbe verde e il
+  // commit si pubblicherebbe senza essere provato. Lì si rifiuta; in locale resta lo strumento di chi prova.
+  forbidOnly: !!process.env.CI,
+  globalSetup: './tests/fixtures/prima-della-corsa.mjs',
   timeout: 60_000,
   expect: { timeout: 5_000 },
   fullyParallel: false, // 1 worker: Electron + globalShortcut non amano la concorrenza

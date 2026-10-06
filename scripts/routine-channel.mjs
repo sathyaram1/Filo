@@ -45,6 +45,12 @@
 //   node scripts/routine-channel.mjs work <biglietto>
 //       → stampa il JSON del proprio lavoro { role, ... }.
 //
+//   node scripts/routine-channel.mjs immagine <id> [--ticket <codice>]
+//       → un'immagine del feedback rinviata dalla consegna (`rinviata: true` in `immagini`), chiesta da
+//         sola col suo id (`s2`, `r1.3`). La scrive accanto alle altre e stampa la voce col percorso in
+//         `file`. Il biglietto lo ritrova da solo, come heartbeat. Exit 0 = voce (aperta o col motivo
+//         in `errore`), 4 = rifiutato (`no_image`: id che il tuo ruolo non vede), 3 = guasto.
+//
 //   node scripts/routine-channel.mjs heartbeat [<biglietto>] [--loop]
 //       → tiene vivo il semaforo. Con --loop batte finché il biglietto vive.
 //         NON serve lanciarlo a mano: il ciclo lo avvia dispatch nel momento in
@@ -104,6 +110,7 @@ import { isProtectedBranch, headSha } from './lib/branch-integrity.mjs';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { leggiTestoLivello } from './lib/livelli.mjs';
 import { haFormaDiBigliettoVero, leggiBigliettoAMano } from './lib/routine-ticket.mjs';
+import { scriviImmagine } from './lib/consegna-file.mjs';
 
 // La radice del checkout, con lo stesso ripiego di dispatch: i marcatori del
 // giro (biglietto, battito) stanno lì dentro, e chi lavora in una cartella di
@@ -245,6 +252,37 @@ export async function work(t, opts) {
   return { ok: false, reason: String((body && body.reason) || (status === 200 ? 'busta_incompleta' : `http_${status}`)) };
 }
 
+// Gli id delle immagini del contratto #900: `sN` della segnalazione, `rK.j` della risposta K.
+export const ID_IMMAGINE_RE = /^(s\d{1,4}|r\d{1,4}\.\d{1,4})$/;
+
+/**
+ * Chi chiede un'immagine: l'id, e il biglietto se passato (davanti all'id o con `--ticket`, uguali se
+ * tutti e due). Senza biglietto lo ritrova chi chiama, come heartbeat. PURA.
+ * @returns {{ id: string, ticket: string } | { errore: string }}
+ */
+export function argomentiImmagine(args, aMano = '') {
+  const lista = Array.isArray(args) ? args.map(String) : [];
+  const mano = String(aMano || '').trim();
+  let davanti = '';
+  if (lista.length === 2 && haFormaDiBigliettoVero(lista[0])) davanti = lista.shift();
+  if (lista.length !== 1) return { errore: 'Uso: immagine <id> [--ticket <codice>], un id solo (s2, r1.3).' };
+  const id = lista[0].trim();
+  if (!ID_IMMAGINE_RE.test(id)) return { errore: `Id d'immagine non valido: «${id.slice(0, 20)}». La forma è sN (segnalazione) o rK.j (risposta K), come in «immagini».` };
+  if (davanti && mano && davanti !== mano) return { errore: 'Due biglietti diversi: passane uno solo.' };
+  return { id, ticket: davanti || mano };
+}
+
+/** Un'immagine rinviata, chiesta da sola allo stesso endpoint del lavoro (contratto #900 §3). */
+export async function immagine(t, id, opts) {
+  const { status, body } = await call('routineWork', { ticket: t, immagine: id }, opts);
+  if (status === 200 && body && body.ok && body.immagine && typeof body.immagine === 'object') {
+    return { outcome: 'ok', voce: body.immagine };
+  }
+  // Un 200 senza voce è un server che non conosce la domanda (prima del deploy): non è un no.
+  const outcome = classifyReply(status, body);
+  return { outcome: outcome === 'ok' ? 'fault' : outcome, reason: String((body && body.reason) || (outcome === 'ok' ? 'risposta_senza_immagine' : `http_${status}`)) };
+}
+
 // I motivi per cui il battito NON va ritentato: il server ha guardato il
 // biglietto e ha detto che non vale più. Qualunque altro motivo (rete giù, 5xx,
 // risposta illeggibile) è un intoppo che può passare da solo, e mollare lì
@@ -351,6 +389,13 @@ export function statoContenitore({ osImpl = os, proc = process, leggi = leggiFil
     rssMb: num(Math.round(usata !== null ? usata : proc.memoryUsage().rss / 1048576)),
     loadAvg: num(Math.round(((Array.isArray(carico) && carico[0]) || 0) * 100) / 100),
   };
+}
+
+/** Quanto aspettare il battito dopo: ogni dieci minuti, ma sempre ben dentro la scadenza che il server ha detto. PURA. */
+export function attesaBattito(expiresAt, now = Date.now()) {
+  const resta = Date.parse(String(expiresAt || '')) - now;
+  if (!Number.isFinite(resta) || resta <= 0) return BEAT_EVERY_MS;
+  return Math.min(BEAT_EVERY_MS, Math.max(1000, Math.floor(resta / 3)));
 }
 
 export async function heartbeat(t, opts = {}) {
@@ -710,13 +755,17 @@ export async function compare(t, mine, opts) {
  * se la chiede comunque. Questo è il controllo in più, e il posto dove
  * l'informazione arriva.
  *
- * @returns {{ ok:true, result:'merged'|'blocked'|'conflict', reason?, sha?, approval? }
+ * `opts.provaUnit` è l'esito degli unit sul risultato della fusione (#929, scripts/lib/unit-sulla-fusione.mjs):
+ * il server fonde solo se main è ancora lo sha provato, e altrimenti risponde `main_moved`.
+ *
+ * @returns {{ ok:true, result:'merged'|'blocked'|'conflict'|'main_moved'|'unit_rossi', reason?, sha?, approval?, mainSha? }
  *           | { ok:false, reason }}
  */
 export async function merge(t, branch, opts) {
-  const { sha = '', ...rest } = opts && typeof opts === 'object' ? opts : {};
+  const { sha = '', provaUnit = null, ...rest } = opts && typeof opts === 'object' ? opts : {};
   const payload = { ticket: t, branch: String(branch || '') };
   if (String(sha || '')) payload.sha = String(sha);
+  if (provaUnit && typeof provaUnit === 'object') payload.provaUnit = provaUnit;
   const { status, body } = await call('routineMerge', payload, rest);
   if (status === 200 && body && body.ok && body.result) {
     return {
@@ -725,6 +774,7 @@ export async function merge(t, branch, opts) {
       reason: String(body.reason || ''),
       sha: String(body.sha || ''),
       approval: String(body.approval || ''),
+      ...(body.mainSha ? { mainSha: String(body.mainSha) } : {}),
     };
   }
   return { ok: false, reason: String((body && body.reason) || `http_${status}`) };
@@ -1001,7 +1051,7 @@ if (isMain) {
     // la copia fissata, `scripts/…` porterebbe a quello del ramo di lavoro —
     // cioè proprio la cosa che il contratto dei worker vieta di scrivere a mano.
     const io = resolve(fileURLToPath(import.meta.url)).split('\\').join('/');
-    console.error(`Uso: node "${io}" <probe|ticket|work|heartbeat|release|deliver|compare|domanda|risposta> <segreto> [...]`);
+    console.error(`Uso: node "${io}" <probe|ticket|work|immagine|heartbeat|release|deliver|compare|domanda|risposta> <segreto> [...]`);
     process.exit(1);
   };
 
@@ -1053,6 +1103,32 @@ if (isMain) {
     const r = await work(args[0]);
     if (!r.ok) { console.error(`guasto ${r.reason}`); process.exit(3); }
     console.log(JSON.stringify(r.payload, null, 2));
+  } else if (cmd === 'immagine') {
+    const a = argomentiImmagine(args, mano.ticket);
+    if (a.errore) { console.error(`${a.errore} Il server non è stato chiamato.`); process.exit(1); }
+    let biglietto = a.ticket;
+    if (!biglietto) {
+      const { readTicket } = await import('./lib/routine-ticket.mjs');
+      biglietto = readTicket(ROOT);
+    }
+    if (!biglietto) {
+      console.error('NESSUN BIGLIETTO: il server non è stato chiamato. Passalo con --ticket <codice>.');
+      process.exit(1);
+    }
+    const r = await immagine(biglietto, a.id);
+    if (r.outcome === 'refused') {
+      console.error(r.reason === 'no_image'
+        ? `Nessuna immagine «${a.id}» per il tuo lavoro: usa un id che c'è in «immagini».`
+        : `RIFIUTATO dal server (${r.reason}).`);
+      process.exit(4);
+    }
+    if (r.outcome !== 'ok') { console.error(`guasto ${r.reason}`); process.exit(3); }
+    let voce;
+    try { voce = scriviImmagine(r.voce, { root: ROOT }); } catch (e) {
+      console.error(`immagine ricevuta ma non scritta su disco (${e.message})`); process.exit(3);
+    }
+    console.log(JSON.stringify(voce, null, 2));
+    if (voce && voce.errore) console.error(`immagine ${a.id} non aperta: ${voce.errore}`);
   } else if (cmd === 'heartbeat') {
     // Il ciclo lo avvia dispatch, che passa il biglietto nell'ambiente: la riga
     // di comando di un processo la legge chiunque sulla macchina.
@@ -1083,7 +1159,7 @@ if (isMain) {
       let primoGuastoMs = 0;
       for (;;) {
         const r = await heartbeat(biglietto);
-        if (r.ok) { primoGuastoMs = 0; await defaultSleep(BEAT_EVERY_MS); continue; }
+        if (r.ok) { primoGuastoMs = 0; await defaultSleep(attesaBattito(r.expiresAt)); continue; }
         if (r.final) { console.error(`battito finito: ${r.reason}`); process.exit(0); }
         const ora = Date.now();
         if (!primoGuastoMs) primoGuastoMs = ora;
@@ -1166,7 +1242,10 @@ if (isMain) {
       // clone verrebbero scartati come moncone di un'istanza morta.
       try {
         const { sealCurrentWork } = await import('./lib/branch-integrity.mjs');
-        sealCurrentWork(ROOT, { by: 'release' });
+        const { readRole } = await import('./lib/routine-role.mjs');
+        // Il ruolo nel sigillo: dopo un «pass» vale come pulizia solo quello del verificatore (#880).
+        const chi = readRole(ROOT);
+        sealCurrentWork(ROOT, { by: chi ? `release:${chi}` : 'release' });
       } catch (_) { /* best-effort: il rilascio è già andato */ }
     }
     if (r.ok) console.log(guasto ? 'OK: biglietto rilasciato, guasto dichiarato.' : 'OK: biglietto rilasciato.');

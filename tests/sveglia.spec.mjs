@@ -44,20 +44,20 @@ test('SVEGLIA programma una scadenza reale e suona all\'orario', async ({ app, o
   expect(notifications.find((n) => /Sveglia:/.test(n.text || ''))).toBeFalsy();
 
   // 3) La card della sveglia è visibile con l'orario programmato.
-  const card = page.locator('.dash-live-card', { hasText: 'Sveglia' });
+  const card = page.locator('#accade .dash-carta[data-tipo="sveglia"]');
   await expect(card).toBeVisible({ timeout: 10_000 });
 
   // 4) Allo scattare dell'orario la sveglia SUONA: la colonna live passa in
   //    stato ringing (proxy osservabile della suoneria, che in headless non
   //    si sente) e compare il bottone "Ferma".
-  await expect(page.locator('#live')).toHaveAttribute('data-ringing', '1', { timeout: 20_000 });
-  const stop = page.locator('.dash-live-stop');
+  await expect(page.locator('#accade')).toHaveAttribute('data-suona', '1', { timeout: 20_000 });
+  const stop = page.locator('#accade .dash-carta[data-suona="1"] .dash-carta-az.principale');
   await expect(stop).toBeVisible();
   await page.screenshot({ path: 'tests/.shots/sveglia-ringing.png' });
 
   // 5) "Ferma" spegne la sveglia: niente più ringing, lista timer vuota.
   await stop.click();
-  await expect(page.locator('#live')).toHaveAttribute('data-ringing', '0', { timeout: 5_000 });
+  await expect(page.locator('#accade')).toHaveAttribute('data-suona', '0', { timeout: 5_000 });
   const after = await page.evaluate(async () =>
     (await chrome.runtime.sendMessage({ type: 'filo_get_timers' })).timers);
   expect(after.length).toBe(0);

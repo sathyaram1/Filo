@@ -55,7 +55,10 @@ import { fileURLToPath } from 'node:url';
 // scrittura in cache a 5 minuti = 1,25× l'input, a UN'ORA = 2× l'input
 // (`cacheWrite1h`), lettura = 0,1× l'input, tranne Fable 5.1 (lettura
 // 0,25 $/M) e Fable 5 (1 $/M). Sonnet 4.x costa 3/15, Sonnet 5 costa 2/10.
-// Un modello sconosciuto paga la tariffa opus, con una nota nel rapporto.
+// Opus 5.5 costa 4/20 (lettura 0,20 $/M): a tariffa opus le routine
+// risultavano care più del doppio, perché la lettura della cache è quasi tutto.
+// Un modello che il listino non conosce per nome paga la tariffa della sua
+// famiglia (opus se non ne ha una), con una nota nel rapporto.
 //
 // Le due durate si distinguono nel transcript (`usage.cache_creation.
 // ephemeral_5m_input_tokens` / `ephemeral_1h_input_tokens`; la somma è
@@ -64,6 +67,7 @@ import { fileURLToPath } from 'node:url';
 // scrive a un'ora, e il costo usciva più basso del 18-39% su ogni sessione.
 export const PREZZI = Object.freeze({
   opus: { input: 5, cacheWrite: 6.25, cacheWrite1h: 10, cacheRead: 0.5, output: 25 },
+  'opus-5-5': { input: 4, cacheWrite: 5, cacheWrite1h: 8, cacheRead: 0.2, output: 20 },
   sonnet: { input: 2, cacheWrite: 2.5, cacheWrite1h: 4, cacheRead: 0.2, output: 10 },
   'sonnet-4': { input: 3, cacheWrite: 3.75, cacheWrite1h: 6, cacheRead: 0.3, output: 15 },
   haiku: { input: 1, cacheWrite: 1.25, cacheWrite1h: 2, cacheRead: 0.1, output: 5 },
@@ -88,14 +92,36 @@ export function scrittureCache(u) {
   return { cw5m: cw5m + resto, cw1h };
 }
 
-/** La famiglia di prezzo di un modello. PURA. `known` è falso se si ripiega su opus. */
+/** Le versioni che il listino conosce per nome, con la tariffa che devono avere. */
+const VERSIONI = Object.freeze({
+  opus: { '5-5': 'opus-5-5', 5: 'opus', '4-8': 'opus', '4-7': 'opus', '4-6': 'opus', '4-5': 'opus' },
+  sonnet: { 5: 'sonnet', '4-6': 'sonnet-4', '4-5': 'sonnet-4', 4: 'sonnet-4' },
+  haiku: { '4-5': 'haiku' },
+  fable: { '5-1': 'fable', 5: 'fable-5' },
+  mythos: { '5-1': 'fable', 5: 'fable-5' },
+});
+
+/** Il nome di ogni tariffa, per la nota del rapporto. */
+export const NOMI_TARIFFA = Object.freeze({
+  opus: 'Opus 5', 'opus-5-5': 'Opus 5.5', sonnet: 'Sonnet 5', 'sonnet-4': 'Sonnet 4.6',
+  haiku: 'Haiku 4.5', fable: 'Fable 5.1', 'fable-5': 'Fable 5',
+});
+
+/**
+ * La tariffa di un modello. PURA. `known` è falso se il listino non conosce
+ * quella versione per nome: Opus 5.5 passò in silenzio per Opus 5, il
+ * prossimo modello di una famiglia nota deve almeno lasciare la nota.
+ */
 export function famigliaPrezzo(model) {
   const m = String(model || '').toLowerCase();
-  if (/fable|mythos/.test(m)) return { key: /(fable|mythos)-5(?![-\d])/.test(m) ? 'fable-5' : 'fable', known: true };
-  if (m.includes('opus')) return { key: 'opus', known: true };
-  if (m.includes('sonnet')) return { key: /sonnet-4/.test(m) ? 'sonnet-4' : 'sonnet', known: true };
-  if (m.includes('haiku')) return { key: 'haiku', known: true };
-  return { key: 'opus', known: false };
+  let key = 'opus';
+  if (/fable|mythos/.test(m)) key = /(fable|mythos)-5(?![-\d])/.test(m) ? 'fable-5' : 'fable';
+  else if (m.includes('opus')) key = /opus-5-5(?!\d)/.test(m) ? 'opus-5-5' : 'opus';
+  else if (m.includes('sonnet')) key = /sonnet-4/.test(m) ? 'sonnet-4' : 'sonnet';
+  else if (m.includes('haiku')) key = 'haiku';
+  // La minore ha una o due cifre: un suffisso di data (otto) non è una versione.
+  const v = /(fable|mythos|opus|sonnet|haiku)-(\d+)(?:-(\d{1,2})(?!\d))?/.exec(m);
+  return { key, known: !!v && VERSIONI[v[1]][v[3] ? `${v[2]}-${v[3]}` : v[2]] === key };
 }
 
 /** Il nome della cartella dei transcript per una cartella di lavoro. PURA. */
@@ -337,7 +363,7 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
   const strumentiVisti = new Set();
   const inCorso = new Map();
   const modelli = new Set();
-  const sconosciuti = new Set();
+  const sconosciuti = new Map();
   // `since`: solo quello che è successo da quel momento (il biglietto di
   // questo giro): quando l'orchestratore rilascia il biglietto di un worker
   // morto, il suo transcript è quello scelto, e senza finestra ci finirebbero
@@ -432,7 +458,7 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
     rep.tokens.output += out;
     if (typeof model === 'string' && model) modelli.add(model);
     const fam = famigliaPrezzo(model);
-    if (!fam.known && model) sconosciuti.add(String(model));
+    if (!fam.known && model) sconosciuti.set(String(model), fam.key);
     const p = PREZZI[fam.key];
     costo += (input * p.input + cw5m * p.cacheWrite + cw1h * p.cacheWrite1h + cr * p.cacheRead + out * p.output) / 1e6;
   }
@@ -442,7 +468,7 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
   if (Number.isFinite(ultimoMs)) rep.endedAt = new Date(ultimoMs).toISOString();
   if (Number.isFinite(primoMs) && Number.isFinite(ultimoMs)) rep.durationS = Math.round((ultimoMs - primoMs) / 1000);
   rep.costUsd = Math.round(costo * 10000) / 10000;
-  for (const m of sconosciuti) rep.notes.push(`modello sconosciuto «${m}»: costo calcolato a tariffa opus`);
+  for (const [m, key] of sconosciuti) rep.notes.push(`modello sconosciuto «${m}»: costo calcolato a tariffa ${NOMI_TARIFFA[key]}`);
   if (illeggibili) rep.notes.push(`${illeggibili} righe del transcript non erano JSON e sono state saltate`);
   return rep;
 }

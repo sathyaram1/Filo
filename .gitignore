@@ -71,3 +71,7 @@ test-results/
 # gli altri marcatori — e soprattutto NON deve tornare nel repo, che e' il
 # posto da cui questa roba e' appena stata tolta.
 .claude/routine-state/
+
+# Diario locale delle interruzioni di sessione e dump di bash su Windows: macchina, non repo.
+.claude/cap-observations.jsonl
+*.stackdump

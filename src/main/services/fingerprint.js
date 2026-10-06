@@ -18,6 +18,7 @@
 //                 settimana. Nessun impatto su banche/CAPTCHA.
 //   privacy (2) — seed = HMAC(secret, eTLD+1 + session_id). Ruota a ogni
 //                 avvio dell'app.
+// In una finestra in incognito, a qualunque livello acceso, il seme nasce e muore con la finestra (#800).
 
 const crypto = require('node:crypto');
 
@@ -27,6 +28,8 @@ const SECRET_KEY = '__fpMasterSecret';
 let _secret = null; // Buffer (32 byte)
 let _sessionId = crypto.randomUUID();
 let _mode = MODES.DEFAULT;
+// Il livello scelto da una finestra in incognito vale solo per l'incognito, come i suoi cookie (#754); null = segue _mode.
+let _modeIncognito = null;
 
 function _storage() {
   // Lo stesso store su disco usato dallo shim chrome.storage.local.
@@ -64,9 +67,16 @@ async function init(settings) {
   return _secret;
 }
 
-function setMode(settings) {
-  _mode = getMode(settings);
+function inIncognito() {
+  try { return !!require('../shim/storage').inIncognito(); } catch (_) { return false; }
 }
+
+function setMode(settings, incognito = inIncognito()) {
+  if (incognito) _modeIncognito = getMode(settings);
+  else _mode = getMode(settings);
+}
+
+function resetIncognito() { _modeIncognito = null; }
 
 // eTLD+1 con una piccola lista di suffissi multi-parte comuni. Non è un Public
 // Suffix List completo (sarebbe pesante da bundlare nel preload e qui non
@@ -98,8 +108,9 @@ function isoWeekId(d = new Date()) {
   return `${date.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
 }
 
-// Seed uint32 per un'origine (già ridotta a eTLD+1).
-function seedForOrigin(origin) {
+// Seed uint32 per un'origine (già ridotta a eTLD+1). `ambito`: la partizione della finestra in incognito
+// della pagina, '' fuori; lì il seme è della finestra, se no un sito ricollega l'incognito alla normale (#800).
+function seedForOrigin(origin, ambito = '') {
   // Garantisce un master secret anche se init() non ha ancora caricato/generato
   // quello persistente. Senza questo, una pagina che chiede la config nella
   // finestra di avvio (IPC sincrono filo:fp-config, prima che whenReady completi
@@ -107,7 +118,7 @@ function seedForOrigin(origin) {
   // Il fallback effimero la tiene attiva; init() poi sovrascrive _secret con
   // quello persistente (coerente fra riavvii).
   if (!_secret) _secret = crypto.randomBytes(32);
-  const temporal = _mode === MODES.PRIVACY ? _sessionId : isoWeekId();
+  const temporal = ambito ? `incognito:${ambito}` : _mode === MODES.PRIVACY ? _sessionId : isoWeekId();
   const h = crypto.createHmac('sha256', _secret).update(`${origin}|${temporal}`).digest();
   return h.readUInt32BE(0) >>> 0;
 }
@@ -193,9 +204,9 @@ function isGoogleAppSurface(href) {
 }
 
 // Config { level, seed } per la pagina identificata da href. Solo http/https
-// vengono protette (filo://, file://, about: → off).
-function configForHref(href) {
-  const level = levelNum(_mode);
+// vengono protette (filo://, file://, about: → off). `ambito` come in seedForOrigin.
+function configForHref(href, ambito = '') {
+  const level = levelNum((ambito && _modeIncognito) || _mode);
   if (!level) return { level: 0, seed: 0 };
   let host = '';
   try {
@@ -208,7 +219,7 @@ function configForHref(href) {
   if (!host) return { level: 0, seed: 0 };
   if (isIdentityProviderHref(href)) return { level: 0, seed: 0 };
   if (isGoogleAppSurface(href)) return { level: 0, seed: 0 };
-  return { level, seed: seedForOrigin(etld1(host)) };
+  return { level, seed: seedForOrigin(etld1(host), String(ambito || '')) };
 }
 
 module.exports = {
@@ -217,6 +228,7 @@ module.exports = {
   levelNum,
   init,
   setMode,
+  resetIncognito,
   etld1,
   isoWeekId,
   seedForOrigin,

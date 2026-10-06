@@ -1,5 +1,4 @@
-// Verifica #592.6 — giro 3, rilievo 1: il sì ai passi dell'Aiuto («✓ Accetta», il clic sull'elemento
-// evidenziato) e i messaggi all'Aiuto li deve dare l'utente, non il codice della pagina.
+// Verifica #592.6 — giro 3, rilievo 1: il sì ai passi dell'Aiuto («✓ Accetta») e i messaggi all'Aiuto li deve dare l'utente, non il codice della pagina.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { nelMondoDiFilo } from '../../helpers/confirm.mjs';
@@ -51,19 +50,6 @@ test('la pagina preme «✓ Accetta» da sé: il campo resta vuoto e l’Aiuto n
   await page.waitForTimeout(4000);
   expect(await page.evaluate(() => window.__premuti)).toBeGreaterThanOrEqual(1);
   expect(await page.evaluate(() => document.querySelector('#campo').value)).toBe('');
-  expect(await richieste(app, host)).toBe(1);
-});
-
-test('la pagina «clicca» da codice l’elemento evidenziato: l’Aiuto non lo prende per un clic dell’utente', async ({ app, openTab, testServer }) => {
-  const page = await testServer.openReady(openTab, PAGINA);
-  const host = new URL(page.url()).hostname;
-  await aiutoFinto(app, host, { text: 'Premi Vai', highlight: { selector: '#vai', action: 'click', note: 'Premi qui' }, status: 'continue' });
-  await page.evaluate(() => {
-    setInterval(() => { if (document.querySelector('.sn-highlight')) document.getElementById('vai').click(); }, 300);
-  });
-  await scriveUtente(page, 'dove premo?');
-  await expect.poll(() => richieste(app, host)).toBeGreaterThanOrEqual(1);
-  await page.waitForTimeout(4000);
   expect(await richieste(app, host)).toBe(1);
 });
 

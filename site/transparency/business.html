@@ -111,6 +111,17 @@
 
 .sn-doc strong { font-weight: 600; }
 
+/* I comandi da copiare: si devono distinguere dalla prosa e andare a capo senza allargare la pagina. */
+.sn-doc code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 0.86em;
+  padding: 0.05em 0.35em;
+  background: var(--sn-hover, #ffffff);
+  border: 1px solid var(--sn-border, #e0dcd4);
+  border-radius: var(--sn-radius, 6px);
+  overflow-wrap: anywhere;
+}
+
 .sn-doc hr {
   border: 0;
   border-top: 1px solid var(--sn-border, #e0dcd4);
@@ -233,15 +244,15 @@ html:not([data-sn-theme]) body {
     <a class="sn-doc-brand" href="../">Filo</a>
     <nav class="sn-nav">
       <a class="sn-nav-item" href="./models.html">Modelli</a>
-      <a class="sn-nav-item is-soon" href="./privacy.html" title="in arrivo" aria-label="Privacy: non ancora scritta">Privacy</a>
-      <a class="sn-nav-item is-soon" href="./security.html" title="in arrivo" aria-label="Sicurezza: non ancora scritta">Sicurezza</a>
+      <a class="sn-nav-item" href="./privacy.html">Privacy</a>
+      <a class="sn-nav-item" href="./security.html">Sicurezza</a>
       <a class="sn-nav-item is-active is-soon" href="./business.html" title="in arrivo" aria-label="Come si sostiene: non ancora scritta">Come si sostiene</a>
     </nav>
   </header>
   <h1>Come si sostiene</h1>
   <p class="sn-doc-sub">Questa sezione non è ancora scritta.</p>
   <article id="doc-body">
-<p>Quello che c’è scritto: <a href="./models.html">Politica sui modelli</a>.</p>
+<p>Quello che c’è scritto: <a href="./models.html">Politica sui modelli</a>, <a href="./privacy.html">Privacy</a>, <a href="./security.html">Sicurezza</a>.</p>
   </article>
 </main>
 </body>

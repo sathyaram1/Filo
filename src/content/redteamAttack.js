@@ -56,6 +56,9 @@
       }
       case 'dormant':
         return { ok: false, text: 'Canale non ancora attivo. Riprova più tardi.' };
+      case 'paused':
+        // La frase del server, così com'è (#896): mai l'errore di trasporto.
+        return { ok: false, paused: true, text: String(r.error || 'Il Red Team è in pausa: tornerà dopo il rilascio') };
       case 'not_signed_in':
         return { ok: false, needLogin: true, text: 'Accedi al tuo account per inviare un attacco.' };
       case 'empty':
@@ -126,7 +129,8 @@
     }
 
     // Abilita/disabilita il bottone d'invio in base a stato login, saldo e testo.
-    function refreshSendState() {
+    // Solo chi scrive cancella un errore: un rifiuto appena arrivato (la pausa del server) deve restare leggibile.
+    function refreshSendState({ daInput = false } = {}) {
       sendBtn.textContent = sendLabel();
       const hasText = !!attackEl.value.trim();
       // Crediti insufficienti noti → disabilita con messaggio (spec §8.1 punto 4).
@@ -141,7 +145,7 @@
         return;
       }
       sendBtn.disabled = !hasText;
-      if (statusEl.classList.contains('sn-rt-status--err') && hasText) setStatus('');
+      if (daInput && statusEl.classList.contains('sn-rt-status--err') && hasText) setStatus('');
     }
 
     // ---- bozze persistenti (sopravvivono a chiusura/riapertura) ----
@@ -160,7 +164,7 @@
     const onInput = () => {
       clearTimeout(saveTimer);
       saveTimer = setTimeout(saveDraft, 250);
-      refreshSendState();
+      refreshSendState({ daInput: true });
     };
     attackEl.addEventListener('input', onInput);
     descEl.addEventListener('input', onInput);

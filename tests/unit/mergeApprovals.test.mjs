@@ -76,6 +76,22 @@ describe('il titolo', () => {
     assert.match(UI.headline(1), /^Una fusione/);
     assert.match(UI.headline(3), /^3 fusioni/);
   });
+
+  test('una richiesta già mandata a fondere non aspetta il via libera di nessuno (#702)', () => {
+    assert.equal(UI.headline(0, 1), 'Una fusione in corso');
+    assert.equal(UI.headline(0, 2), '2 fusioni in corso');
+    assert.equal(UI.headline(1, 1), 'Una fusione aspetta il tuo via libera');
+    assert.equal(UI.headline(0, 0), '');
+    // Fusa, scartata o sostituita, in attesa della rilettura: non aspetta più, e non è in corso (#702).
+    assert.equal(UI.headline(0, 0, 1), 'Una fusione decisa');
+    assert.equal(UI.headline(0, 1, 1), 'Una fusione in corso');
+    assert.match(UI.introText(1, 1), /Aspettano il tuo sì/);
+    assert.doesNotMatch(UI.introText(0, 1), /Aspettano il tuo sì|via libera/);
+    assert.equal(UI.introText(0, 0), '');
+    // Decisa: la frase resta (sparendo spostava i tasti) e non chiede più il sì.
+    assert.match(UI.introText(0, 0, 1), /Hai già deciso/);
+    assert.doesNotMatch(UI.introText(0, 0, 1), /Aspettano il tuo sì|via libera|sta fondendo/);
+  });
 });
 
 describe('la scadenza, detta prima', () => {
@@ -427,5 +443,51 @@ describe('richiesteCoperte: quali richieste ferme copre il segno «fondi senza c
     assert.deepEqual(UI.richiesteCoperte(null, { feedbackId: ID }), []);
     assert.deepEqual(UI.richiesteCoperte([base()], null), []);
     assert.deepEqual(UI.richiesteCoperte([base({ id: '' })], { feedbackId: ID }), []);
+  });
+});
+
+describe('i lavori locali (#908)', () => {
+  test('la provenienza locale porta la sua pratica, quando c’è', () => {
+    assert.equal(UI.originLabel({ origin: 'locale', num: '#908' }), 'lavoro locale · feedback #908');
+    assert.equal(UI.originLabel({ origin: 'locale' }), 'lavoro tuo, in locale');
+    assert.equal(UI.originLabel({}), 'lavoro tuo, in locale');
+  });
+
+  test('una fusione che ha saltato L5 si legge come tale nella traccia', () => {
+    assert.equal(UI.isSkippedL5({ skippedL5: true }), true);
+    assert.equal(UI.isSkippedL5({ skippedL5: 'true' }), false);
+    assert.equal(UI.isSkippedL5(null), false);
+    assert.equal(UI.recentOutcome({ skippedL5: true, outcome: 'merged' }), 'fusa senza chiedere (lavoro locale)');
+    // Le altre restano come prima.
+    assert.equal(UI.recentOutcome({ used: true, outcome: 'merged' }), 'approvata e fusa');
+  });
+
+  test('nessuna frase dell’avviso parla del terminale come di un muro', () => {
+    const src = require('node:fs').readFileSync(join(ROOT, 'src', 'shared', 'mergeApprovals.js'), 'utf8');
+    assert.doesNotMatch(src, /il terminale, da solo, non può/);
+  });
+
+  test('il pattern del cancello dice regola, non muro, e che il lavoro locale provato non aspetta (#908)', () => {
+    const fs = require('node:fs');
+    const pattern = fs.readFileSync(join(ROOT, 'patterns', 'un-cancello-automatico-che-blocca-deve-avere-una-via-duscita.md'), 'utf8');
+    const riga = fs.readFileSync(join(ROOT, 'PATTERNS.md'), 'utf8').split('\n').find((l) => l.includes('un-cancello-automatico-che-blocca'));
+    for (const testo of [pattern, riga]) {
+      assert.doesNotMatch(testo, /non lo può dare una sessione|persona su un'altra superficie|può chiedere quanto vuole/);
+      assert.match(testo, /regola del server, non un muro/i);
+    }
+    assert.match(pattern, /#908/);
+    assert.match(riga, /lavoro locale provato/);
+  });
+});
+
+describe('la prova degli unit sulla fusione nella richiesta (#929)', () => {
+  test('dice su quale main e quanto tempo fa; al clic non si rifà, e il suggerimento lo spiega', () => {
+    const p = UI.provaNote({ provaUnit: { esito: 'verde', mainSha: 'b'.repeat(40), atMs: ORA - 3 * ORE } }, ORA);
+    assert.equal(p.testo, 'Unit verdi sulla fusione con main di 3 ore fa');
+    assert.match(p.titolo, /bbbbbbbb/);
+    assert.match(p.titolo, /non si rifanno/);
+    assert.match(UI.provaNote({ provaUnit: { esito: 'rosso_anche_su_main', mainSha: 'b'.repeat(40), atMs: ORA } }, ORA).testo, /già rossi su main/);
+    assert.match(UI.provaNote({ provaUnit: { esito: 'conflitto', mainSha: 'b'.repeat(40), atMs: ORA } }, ORA).testo, /conflitto/);
+    assert.equal(UI.provaNote({}, ORA), null, 'una richiesta di prima non dice niente');
   });
 });

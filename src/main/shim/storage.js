@@ -66,11 +66,13 @@ function deserializeFromDisk(data) {
 
 const STATE = {
   loaded: false,
+  loading: null,
   data: {},
   filePath: null,
   pending: null,
   flushTimer: null,
   listeners: new Set(),
+  scritture: new Set(),
 };
 
 // === Modalità incognito ===========================================
@@ -102,6 +104,8 @@ const INCOGNITO = {
 // Vedi STORAGE_KEYS in src/shared/constants.js.
 const INCOGNITO_READABLE = new Set([
   'settings', 'blocklist', 'sn_personal_dict', 'sn_autocorrect', 'sn_icon_layout',
+  // La disposizione delle carte della home (#870): come le icone, la scelta dell'utente vale anche in incognito.
+  'filo_carte_home',
 ]);
 
 // I conti di Filo (spesa del mese contro il limite, saldo dei crediti) valgono per tutte le finestre: in incognito si
@@ -117,6 +121,17 @@ function inIncognito() {
 // Promise: AsyncLocalStorage propaga il contesto attraverso la catena async).
 function runIncognito(fn) {
   return als.run({ incognito: true }, fn);
+}
+
+// Il contrario, per chi scrive da una coda condivisa: la sua scrittura va sul disco anche se
+// la catena che l'ha messa in fila era partita da una finestra incognito.
+function runNormale(fn) {
+  return als.run({ incognito: false }, fn);
+}
+
+// Il filo (src/main/services/ilFilo.js) migra le chat dal disco anche se la prima richiesta arriva da un incognito.
+function fuoriDaIncognito(fn) {
+  return als.run({ incognito: false }, fn);
 }
 
 // Azzera l'overlay incognito. Chiamato dalla chiusura dell'ultima finestra
@@ -149,8 +164,15 @@ function filePath() {
   return STATE.filePath;
 }
 
-async function loadIfNeeded() {
-  if (STATE.loaded) return;
+// Una lettura sola, e chi arriva mentre è in corso aspetta quella: due letture
+// in parallelo all'avvio rimettevano il file sopra una scrittura appena fatta (#897).
+function loadIfNeeded() {
+  if (STATE.loaded) return Promise.resolve();
+  if (!STATE.loading) STATE.loading = leggiFile();
+  return STATE.loading;
+}
+
+async function leggiFile() {
   try {
     const txt = await fsp.readFile(filePath(), 'utf8');
     STATE.data = deserializeFromDisk(JSON.parse(txt) || {});
@@ -281,7 +303,17 @@ async function get(keysOrNull) {
 async function set(obj) {
   await loadIfNeeded();
   let keys = Object.keys(obj);
-  if (inIncognito()) {
+  // Chi tiene il registro dei cambi (src/main/services/registroCambi.js) vede OGNI scrittura,
+  // anche quelle dell'incognito: sono loro che decidono dove finisce l'evento, non questo file.
+  const incog = inIncognito();
+  if (STATE.scritture.size) {
+    const visti = {};
+    for (const k of keys) visti[k] = { oldValue: incog ? incognitoReadKey(k) : STATE.data[k], newValue: obj[k] };
+    for (const fn of STATE.scritture) {
+      try { fn(visti, { incognito: incog }); } catch (e) { console.warn('[Filo storage] scrittura osservata, errore', e); }
+    }
+  }
+  if (incog) {
     // Scrive solo nell'overlay in RAM: niente disco, niente flush e niente
     // emitChange (così non contamina i listener delle finestre normali).
     for (const k of keys) {
@@ -352,6 +384,12 @@ function onChanged(fn) {
   return () => STATE.listeners.delete(fn);
 }
 
+// Come onChanged, ma chiamato PRIMA della scrittura e anche in incognito, con { incognito }.
+function onScrittura(fn) {
+  STATE.scritture.add(fn);
+  return () => STATE.scritture.delete(fn);
+}
+
 // Flush sincrono best-effort prima della chiusura.
 function flushSync() {
   try {
@@ -378,12 +416,15 @@ module.exports = {
   remove,
   clear,
   onChanged,
+  onScrittura,
   flushSync,
   whenSettled,
   flushNow,
   maxFlushOverlap,
   setSync,
   runIncognito,
+  runNormale,
+  fuoriDaIncognito,
   resetIncognito,
   inIncognito,
 };

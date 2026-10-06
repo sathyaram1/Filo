@@ -267,3 +267,45 @@ test('quanto resta con un tetto sulla chiave: il minore fra il residuo del tetto
   assert.equal(W.ownKeyBalanceLine({ limit: 10, usage: 1.23, limit_remaining: 8.77, account: { credits: 20, usage: 20 } }), 'Spesi 1,23 $ · restano 0,00 $ sul tuo conto OpenRouter, meno del tetto della chiave (10,00 $)', 'conto a zero');
   assert.equal(W.ownKeyBalanceLine({ limit: 10, usage: 1.23, limit_remaining: 8.77, account: null }), 'Spesi 1,23 $ · restano 8,77 $ su 10,00 $', 'senza il conto resta il tetto');
 });
+
+// #662: Crediti diceva «Filo ha usato i tuoi crediti» anche quando il ripiego
+// non aveva prodotto niente (la personale in quel momento rispondeva 500).
+test('il rifiuto si annota col suo esito: la personale ha risposto, oppure il ripiego è caduto e non ha speso niente', async () => {
+  statusFor = { [OWN]: 402 };
+  await P.complete({ apiKey: OWN, model: 'm', messages: [] });
+  assert.equal(refusals.length, 1);
+  assert.equal(refusals[0].served, true, 'la personale ha risposto: i crediti sono stati usati');
+
+  refusals = [];
+  statusFor = { [OWN]: 402, [PERSONAL]: 500 };
+  await assert.rejects(P.complete({ apiKey: OWN, model: 'm', messages: [] }), (e) => e.status === 500);
+  assert.equal(refusals.length, 1, 'il rifiuto della chiave resta un fatto');
+  assert.equal(refusals[0].status, 402);
+  assert.equal(refusals[0].served, false, 'il ripiego è caduto: niente speso');
+
+  // La rete cade proprio sul ripiego: l'errore risale, il rifiuto si annota lo stesso.
+  refusals = []; calls = [];
+  const vero = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    const key = String(init.headers.Authorization || '').replace('Bearer ', '');
+    if (key === PERSONAL) { calls.push({ url, key }); throw new TypeError('fetch failed'); }
+    return vero(url, init);
+  };
+  await assert.rejects(P.complete({ apiKey: OWN, model: 'm', messages: [] }), /fetch failed/);
+  assert.deepEqual(calls.map((c) => c.key), [OWN, PERSONAL]);
+  assert.equal(refusals.length, 1);
+  assert.equal(refusals[0].served, false);
+});
+
+test('la nota di Crediti dice che Filo ha usato i crediti solo se è successo', () => {
+  const usati = W.ownKeyRefusalNote({ at: '2026-09-18T07:41:00.000Z', status: 402, usedCredits: true });
+  assert.match(usati, /ha usato i tuoi crediti/);
+  const vecchia = W.ownKeyRefusalNote({ at: '2026-09-18T07:41:00.000Z', status: 402 });
+  assert.match(vecchia, /ha usato i tuoi crediti/, 'i rifiuti annotati prima di #662 restano com’erano');
+  const caduto = W.ownKeyRefusalNote({ at: '2026-09-18T07:41:00.000Z', status: 402, usedCredits: false });
+  assert.doesNotMatch(caduto, /ha usato/);
+  assert.match(caduto, /rifiutato la tua chiave/);
+  assert.match(caduto, /credito è finito/);
+  assert.match(caduto, /18 set/);
+  assert.match(caduto, /prova prima lei/);
+});

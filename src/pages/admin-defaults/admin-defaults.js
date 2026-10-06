@@ -16,6 +16,9 @@
 
   // Mappa azione → editor a segmenti della catena di modelli (popolata in applyConfig()).
   let modelChains = {};
+  // Catene lette che la griglia non mostra: il salvataggio riscrive la mappa intera, e senza
+  // queste cancellerebbe la scelta di una funzione spostata in Gestione prima che lì la si salvi (#465).
+  let hiddenModels = {};
 
   // Cache dei cataloghi modelli per provider (come nelle Opzioni), ma recuperati
   // dal MAIN con le chiavi predefinite: questa pagina non vede mai le chiavi.
@@ -57,6 +60,7 @@
       if (it && it.label) opt.label = it.label;
       dl.appendChild(opt);
     }
+    if (window.SN_COMBOBOX) window.SN_COMBOBOX.opzioniArrivate();
   }
 
   // Carica (una sola volta) il catalogo di un provider chiedendolo al main.
@@ -100,6 +104,8 @@
     $('excluded-desc').textContent = I18n.t('admin_defaults_excluded_desc');
     $('addExcludedRow').textContent = I18n.t('admin_defaults_excluded_add');
     $('saveBtn').textContent = I18n.t('admin_defaults_save');
+    $('h-delicate').textContent = I18n.t('admin_defaults_delicate');
+    $('delicate-desc').textContent = I18n.t('admin_defaults_delicate_desc');
   }
 
   function keyStateText(present) {
@@ -534,10 +540,50 @@
       models: models || {},
       getRegistry: () => collectModelRegistry(),
     });
+    hiddenModels = Object.fromEntries(Object.entries(models || {})
+      .filter(([action, chain]) => !(action in modelChains) && typeof chain === 'string'));
   }
 
   function collectModels() {
-    return ModelChain.collect(modelChains);
+    return { ...hiddenModels, ...ModelChain.collect(modelChains) };
+  }
+
+  // ── Pagine delicate (#1004) ─────────────────────────────────────────────────
+  let delicateCaricate = {};
+  let delicateDiSerie = {};
+  const righeSiti = (testo) => [...new Set(String(testo || '').split(/[\n,]+/)
+    .map((x) => x.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, ''))
+    .filter(Boolean))];
+  function renderDelicate(elenco, diSerie) {
+    delicateCaricate = elenco || {};
+    delicateDiSerie = diSerie || {};
+    const box = $('delicateLists');
+    box.textContent = '';
+    for (const k of [...new Set([...Object.keys(delicateDiSerie), ...Object.keys(delicateCaricate)])]) {
+      const id = `delicate-${k}`;
+      const label = document.createElement('label');
+      label.htmlFor = id;
+      label.style.marginTop = '12px';
+      const nome = I18n.t(`admin_defaults_delicate_${k}`);
+      label.textContent = nome && !nome.startsWith('admin_defaults_') ? nome : k;
+      const ta = document.createElement('textarea');
+      ta.id = id;
+      ta.dataset.categoria = k;
+      ta.rows = 6;
+      ta.style.width = '100%';
+      ta.value = (delicateCaricate[k] || []).join('\n');
+      box.append(label, ta);
+    }
+  }
+  // Le categorie da salvare: tutte quelle che non sono come nel codice. null = niente di cambiato.
+  function collectDelicate() {
+    const ora = {};
+    for (const ta of $('delicateLists').querySelectorAll('textarea[data-categoria]')) ora[ta.dataset.categoria] = righeSiti(ta.value);
+    const uguali = (a, b) => JSON.stringify(a || []) === JSON.stringify(b || []);
+    if (Object.keys(ora).every((k) => uguali(ora[k], delicateCaricate[k]))) return null;
+    const out = {};
+    for (const [k, v] of Object.entries(ora)) if (!uguali(v, delicateDiSerie[k])) out[k] = v;
+    return out;
   }
 
   // ── Load / Save ─────────────────────────────────────────────────────────────
@@ -551,6 +597,7 @@
     // Lista EFFETTIVA (codice ⊕ override remoto): è quella che l'app applica, ed
     // è quella che il salvataggio riscrive per intero.
     renderExcluded(cfg.excludedProviders || [], cfg.excludedProviderReasons || []);
+    renderDelicate(cfg.sitiDelicati, cfg.sitiDelicatiDiSerie);
     ensureProviderCatalog();
     // Combobox modelli: semina con gli id già nel registry (compaiono subito),
     // poi carica i cataloghi completi in background (non blocca il render).
@@ -613,6 +660,8 @@
     if (config.excludedProviders || JSON.stringify(reasons) !== loadedReasons) {
       config.excludedProviderReasons = reasons;
     }
+    const delicate = collectDelicate();
+    if (delicate) config.sitiDelicati = delicate;
     if (Object.keys(apiKeys).length) config.apiKeys = apiKeys;
     // La chiave Safe Browsing si invia solo se digitata (vuoto = "non toccare").
     const gsb = $('apiKeySafebrowse').value.trim();

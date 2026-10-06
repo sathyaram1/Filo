@@ -24,6 +24,7 @@
 //   SN_FILO_UI.inside(el)   → sta dentro (o è) un pezzo di UI di Filo?
 //   SN_FILO_UI.aperti()     → le radici NOSTRE attaccate al documento adesso
 //   SN_FILO_UI.gestoVero(e) → l'evento viene dall'utente, non dal codice del sito?
+//   SN_FILO_UI.soloGestiVeri(el) → i gesti fabbricati dallo script del sito non lo toccano
 //
 // L'attributo e l'elenco rispondono a due domande diverse, e la differenza è
 // tutta nel mittente. Chi cammina sulla pagina chiede «questo pezzo lo salto?»:
@@ -111,5 +112,40 @@
     return !!(e && e.isTrusted === true);
   }
 
-  global.SN_FILO_UI = { ATTR, SELECTOR, mark, is, inside, aperti, onMark, gestoVero };
+  // Lo script del sito raggiunge ogni nodo del suo documento e sa fabbricarci sopra clic, passaggi e tasti:
+  // a un pezzo di Filo arrivano solo quelli dell'utente (#589.8). Il cancello sta su OGNI nodo, non sulla radice:
+  // un pulsante che il sito sposta fuori dal pezzo se lo porta dietro. Si chiama prima di attaccare al documento.
+  const GESTI = ['click', 'dblclick', 'auxclick', 'contextmenu', 'mousedown', 'mouseup', 'mousemove',
+    'mouseover', 'mouseout', 'mouseenter', 'mouseleave', 'pointerdown', 'pointerup', 'pointermove',
+    'pointerover', 'pointerout', 'pointerenter', 'pointerleave', 'keydown', 'keyup', 'keypress',
+    'beforeinput', 'input', 'change', 'wheel', 'dragstart', 'dragenter', 'dragover', 'drop',
+    'touchstart', 'touchmove', 'touchend'];
+  function fermaIFinti(e) { if (!e.isTrusted) e.stopImmediatePropagation(); }
+  const chiusi = new WeakSet();
+  function chiudi(n) {
+    if (!n || n.nodeType !== 1 || chiusi.has(n)) return;
+    chiusi.add(n);
+    for (const t of GESTI) n.addEventListener(t, fermaIFinti, true);
+  }
+  function chiudiAlbero(n) {
+    chiudi(n);
+    if (n && n.querySelectorAll) for (const d of n.querySelectorAll('*')) chiudi(d);
+  }
+  // Ciò che entra dopo nel pezzo (contenuti che arrivano in ritardo) lo chiude l'osservatore: è la rete, non la
+  // strada principale, perché un osservatore del sito creato prima del nostro viene avvisato per primo.
+  const osservati = new WeakSet();
+  function soloGestiVeri(el) {
+    try {
+      chiudiAlbero(el);
+      if (!osservati.has(el) && typeof MutationObserver === 'function') {
+        osservati.add(el);
+        new MutationObserver((ms) => {
+          for (const m of ms) for (const n of m.addedNodes) chiudiAlbero(n);
+        }).observe(el, { childList: true, subtree: true });
+      }
+    } catch (_) {}
+    return el;
+  }
+
+  global.SN_FILO_UI = { ATTR, SELECTOR, mark, is, inside, aperti, onMark, soloGestiVeri, gestoVero };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

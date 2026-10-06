@@ -114,12 +114,44 @@ test('modello sconosciuto: tariffa opus e una nota', async () => {
   const righe = [assistant('z', 'claude-nuovo-9', { input_tokens: 1000000, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 0 }, [], T('00:00'))];
   const rep = await analizzaRighe(righe);
   assert.equal(rep.costUsd, PREZZI.opus.input);
-  assert.match(rep.notes[0], /claude-nuovo-9.*opus/);
+  assert.match(rep.notes[0], /claude-nuovo-9.*Opus 5/);
   assert.equal(famigliaPrezzo('claude-fable-5').key, 'fable-5');
   assert.equal(famigliaPrezzo('claude-fable-5-1').key, 'fable');
   assert.equal(famigliaPrezzo('claude-sonnet-4-6').key, 'sonnet-4');
   assert.equal(famigliaPrezzo('claude-sonnet-5').key, 'sonnet');
   assert.equal(famigliaPrezzo('claude-haiku-4-5').key, 'haiku');
+});
+
+test('Opus 5.5 ha la sua tariffa: 4/20, lettura della cache 0,20 $/M', async () => {
+  assert.equal(famigliaPrezzo('claude-opus-5-5').key, 'opus-5-5');
+  assert.equal(famigliaPrezzo('claude-opus-5').key, 'opus');
+  assert.equal(famigliaPrezzo('claude-opus-4-8').key, 'opus');
+  const righe = [assistant('o', 'claude-opus-5-5', {
+    input_tokens: 100, cache_creation_input_tokens: 1000, cache_read_input_tokens: 1000000, output_tokens: 1000,
+  }, [], T('00:00'))];
+  const rep = await analizzaRighe(righe);
+  // 100·4 + 1000·5 + 1.000.000·0,2 + 1000·20 = 225.400 / 1e6
+  assert.equal(rep.costUsd, 0.2254);
+  assert.deepEqual(rep.notes, [], 'un modello conosciuto non porta la nota della tariffa di ripiego');
+});
+
+// Opus 5.5 era passato per Opus 5 senza nota: il prossimo modello di una
+// famiglia nota paga la tariffa di oggi, ma il rapporto lo dice.
+test('una versione che il listino non conosce per nome lascia la nota, col costo di prima', async () => {
+  const letture = { input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 1000000, output_tokens: 0 };
+  for (const [model, tariffa, costo] of [
+    ['claude-opus-6', 'Opus 5', 0.5], ['claude-opus-5-6', 'Opus 5', 0.5], ['claude-opus-4-1', 'Opus 5', 0.5],
+    ['claude-sonnet-6', 'Sonnet 5', 0.2], ['claude-haiku-5', 'Haiku 4.5', 0.1], ['claude-fable-6', 'Fable 5.1', 0.25],
+  ]) {
+    const rep = await analizzaRighe([assistant('n', model, letture, [], T('00:00'))]);
+    assert.equal(rep.costUsd, costo, model);
+    assert.ok(rep.notes.some((n) => n.includes(`«${model}»`) && n.includes(tariffa)), `${model}: ${JSON.stringify(rep.notes)}`);
+  }
+  for (const model of [
+    'claude-opus-5-5', 'claude-opus-5-5[1m]', 'us.anthropic.claude-opus-5-5-v1:0', 'claude-opus-5', 'claude-opus-4-8',
+    'claude-opus-4-5-20251101', 'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-sonnet-4-20250514', 'claude-haiku-4-5',
+    'claude-fable-5', 'claude-fable-5-1', 'claude-mythos-5-1',
+  ]) assert.equal(famigliaPrezzo(model).known, true, model);
 });
 
 test('lo slug della cartella dei transcript e le chiavi ammesse da Firestore', () => {

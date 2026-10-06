@@ -95,6 +95,9 @@ test('le righe scritte a mano si normalizzano, e le inservibili si scartano', ()
   // Niente etichetta singola, niente riga vuota: non corrisponderebbero mai.
   assert.deepEqual(E.normalizzaSiti(['mozilla', '   ', '...']), []);
   assert.deepEqual(E.normalizzaSiti('mozilla.org\napache.org'), ['mozilla.org', 'apache.org']);
+  // #590: un'estensione non latina (сайт.рф) è salvata nella forma «xn--» e resta valida.
+  assert.deepEqual(E.normalizzaSiti(['xn--80aswg.xn--p1ai']), ['xn--80aswg.xn--p1ai']);
+  assert.equal(E.fidato('https://сайт.рф/setup.exe', ['xn--80aswg.xn--p1ai']), true);
 });
 
 test('le frasi nominano il file e il sito: sono quelle su cui si decide', () => {

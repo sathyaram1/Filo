@@ -17,6 +17,7 @@ import { dirname, join } from 'node:path';
 import { writeFileSync, rmSync, mkdirSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { costoInUnita } from '../helpers/tempoRelativo.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -574,10 +575,10 @@ test('un nome con molti caratteri persi non impantana Filo', () => {
   for (const n of [28, 40, 120]) {
     const chiesto = `${'a�'.repeat(n)}.txt`;
     const vero = `${'a'.repeat(n * 3)}b.txt`;
-    const t0 = Date.now();
-    assert.equal(DR.nomiCombaciano(chiesto, vero), false);
-    const quanto = Date.now() - t0;
-    assert.ok(quanto < 1000, `con ${n} caratteri persi il confronto ha impiegato ${quanto} ms`);
+    let combaciano;
+    const c = costoInUnita(() => { combaciano = DR.nomiCombaciano(chiesto, vero); }, { tetto: 10 });
+    assert.equal(combaciano, false);
+    assert.ok(c.entro, `con ${n} caratteri persi il confronto costa ${c.come}`);
   }
   // E quello che deve ancora combaciare, combacia: la regola non è cambiata.
   assert.equal(DR.nomiCombaciano('Perch� citt�.txt', 'Perché città.txt'), true);

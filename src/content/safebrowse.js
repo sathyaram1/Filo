@@ -1,139 +1,102 @@
-// Avviso di sito pericoloso o sospetto (content script): il verdetto arriva dal main (services/safebrowse),
-// la domanda la fa il popup di Filo, che su un sito sta sopra la scheda e fuori dal suo documento: la pagina
-// di cui l'avviso parla non può né toglierlo né rispondere al posto dell'utente (#592.6). Non blocca la navigazione.
+// Rilevamento siti pericolosi, lato pagina: manda al main l'indirizzo e gli indizi (campi password o di pagamento)
+// quando compaiono, e avvisa quando l'utente scrive una password (accessi, #758). Non disegna niente: l'avviso sta in
+// una vista sopra la scheda (src/main/avvisoSito.js), dove la pagina non lo sente, non lo copre e non lo cancella.
 
 (function (global) {
   'use strict';
 
   const MSG = (global.SN_MSG && global.SN_MSG.MSG) || {};
   const T_GET = MSG.SAFEBROWSE_GET || 'safebrowse_get';
-  const T_PROCEED = MSG.SAFEBROWSE_PROCEED || 'safebrowse_proceed';
-  const T_DISMISS = MSG.SAFEBROWSE_DISMISS || 'safebrowse_dismiss';
-  const T_UPDATE = MSG.SAFEBROWSE_UPDATE || 'safebrowse_update';
-
-  let currentLevel = 'safe';
-  let aperta = null; // { level, chiave, ritiro }
+  const T_CAMPI = MSG.CAMPI_DELICATI || 'campi_delicati';
 
   const chrome = global.chrome;
   function send(msg, cb) {
     try { chrome.runtime.sendMessage(msg, cb); } catch (_) { if (cb) cb(null); }
   }
 
-  // Indizi di pagina: la presenza di campi sensibili alza la gravità lato motore.
   let hintsOf = null;
   try { hintsOf = require('./safebrowseHints.js').pageHints; } catch (_) {}
   function pageHints() {
     try { if (hintsOf) return hintsOf(document); } catch (_) {}
-    return { hasPassword: false, hasPayment: false };
+    return { hasPassword: false, hasPayment: false, shownPassword: false, shownPayment: false };
   }
 
-  function sameHost(a, b) {
-    try { return new URL(a).host === new URL(b).host; } catch (_) { return true; }
+  // Un campo password o carta a schermo rende delicato il sito (#1004): uno solo nascosto nel codice no. Si dice una volta.
+  let campiDetti = false;
+  function campiMostrati(h) {
+    if (campiDetti || !h || !(h.shownPassword || h.shownPayment)) return;
+    campiDetti = true;
+    send({ type: T_CAMPI, hasPassword: !!h.shownPassword, hasPayment: !!h.shownPayment });
   }
 
-  function ritira() {
-    const a = aperta;
-    aperta = null;
-    if (a) a.ritiro.abort();
-  }
-
-  function clear() {
-    currentLevel = 'safe';
-    ritira();
-  }
-
-  function testi(level, message) {
-    const m = message || {};
-    if (level === 'pericoloso') {
-      return {
-        title: m.title || 'Sito pericoloso',
-        text: m.body || 'Questo sito potrebbe essere una truffa o tentare di rubare i tuoi dati.',
-      };
-    }
-    return {
-      title: m.title || 'Sito potenzialmente sospetto',
-      text: m.body || 'Questo sito ha alcune caratteristiche sospette. Fai attenzione ai dati che inserisci.',
-    };
-  }
-
-  // «Torna indietro» non conferma MAI il sito (#288): senza una pagina prima si esce e basta.
-  function tornaIndietro(level, url, message) {
-    // Un «indietro» che resta in questo documento (voci aggiunte dalla pagina, uscita trattenuta) non la lascia scoperta.
-    const ancora = () => { if (!aperta && currentLevel === level) chiedi(level, url, message); };
-    try { global.addEventListener('popstate', ancora, { once: true }); } catch (_) {}
-    setTimeout(ancora, 3000);
-    try {
-      if (history.length > 1) history.back();
-      else if (level === 'sospetto') send({ type: T_DISMISS, url }, () => location.replace('about:blank'));
-      else location.replace('about:blank');
-    } catch (_) {}
-  }
-
-  function chiedi(level, url, message) {
-    const Ui = global.SN_CONFIRM_UI;
-    if (!Ui) return;
-    ritira();
-    const t = testi(level, message);
-    const voce = { level, chiave: `${level}\n${t.title}\n${t.text}`, ritiro: new AbortController() };
-    aperta = voce;
-    const pericoloso = level === 'pericoloso';
-    const opts = {
-      ...t,
-      okLabel: pericoloso ? 'Procedi comunque' : 'Continua',
-      cancelLabel: 'Torna indietro',
-      coprePagina: true,
-      segnale: voce.ritiro.signal,
-    };
-    const domanda = pericoloso ? Ui.confirmTyped({ ...opts, word: 'confermo', reversibile: true }) : Ui.confirm(opts);
-    domanda.then((ok) => {
-      if (aperta !== voce) return;
-      aperta = null;
-      if (ok) {
-        currentLevel = 'safe';
-        send({ type: pericoloso ? T_PROCEED : T_DISMISS, url });
-      } else {
-        tornaIndietro(level, url, message);
-      }
-    });
-  }
-
-  function render(level, message, url) {
-    const u = url || location.href;
-    if (level !== 'pericoloso' && level !== 'sospetto') { clear(); return; }
-    currentLevel = level;
-    const t = testi(level, message);
-    if (aperta && aperta.chiave === `${level}\n${t.title}\n${t.text}`) return;
-    chiedi(level, u, message);
-  }
-
+  let level = 'safe';
+  let sentHints = { hasPassword: false, hasPayment: false };
   function requestVerdict() {
     const hints = pageHints();
+    sentHints = hints;
+    campiMostrati(hints);
     send({ type: T_GET, url: location.href, hasPassword: hints.hasPassword, hasPayment: hints.hasPayment }, (r) => {
-      if (r && r.ok) render(r.level, r.message);
+      if (r && r.ok) level = r.level || 'safe';
     });
   }
 
-  // Broadcast dal main: il verdetto per la URL è cambiato.
-  try {
-    chrome.runtime.onMessage.addListener((msg) => {
-      if (!msg || msg.type !== T_UPDATE) return;
-      if (msg.url && !sameHost(msg.url, location.href)) return;
-      render(msg.level, msg.message, msg.url);
-    });
-  } catch (_) {}
+  // Un campo password o di carta alza la gravità: va chiesto appena compare, non quando la pagina dice di aver finito.
+  function hintsGrew() {
+    if (sentHints.hasPassword && sentHints.hasPayment && campiDetti) return;
+    const h = pageHints();
+    campiMostrati(h);
+    if ((h.hasPassword && !sentHints.hasPassword) || (h.hasPayment && !sentHints.hasPayment)) requestVerdict();
+  }
 
-  function start() {
+  // Finché il parser lavora i campi sensibili si guardano a ogni pezzo di pagina (al più ogni 200 ms).
+  function watchLoading() {
+    if (typeof MutationObserver !== 'function') return;
+    let timer = null;
+    const mo = new MutationObserver(() => {
+      if (!timer) timer = setTimeout(() => { timer = null; hintsGrew(); }, 200);
+    });
+    try { mo.observe(document, { childList: true, subtree: true }); } catch (_) { return; }
+    document.addEventListener('DOMContentLoaded', () => { mo.disconnect(); clearTimeout(timer); }, { once: true });
+  }
+
+  function onReady() {
     requestVerdict();
-    // Ricontrolla dopo un attimo: alcuni siti montano i campi password/pagamento
-    // via JS dopo il primo paint, alzando la gravità del verdetto.
-    setTimeout(() => { if (currentLevel === 'safe') requestVerdict(); }, 1600);
+    // Alcuni siti montano i campi password o di pagamento via JS dopo il primo disegno.
+    setTimeout(() => { if (level === 'safe') requestVerdict(); }, 1600);
+  }
+
+  // Il campo che compare dopo, in una finestrella di accesso aperta da un clic, si vede quando ci si entra.
+  document.addEventListener('focusin', (e) => {
+    if (e.target && e.target.tagName === 'INPUT') hintsGrew();
+  }, true);
+
+  // #758 — un accesso vale solo dopo una password scritta dall'utente: gli eventi creati da uno script della pagina
+  // (isTrusted falso) non contano. Il main lega l'avviso alla richiesta che segue.
+  const T_CRED = MSG.ACCESSO_CREDENZIALI || 'accesso_credenziali';
+  let credenzialiAt = 0;
+  function passwordScritta(e) {
+    const t = e.composedPath ? e.composedPath()[0] : e.target;
+    if (t && t.type === 'password' && t.value) return true;
+    if (e.type === 'input') return false;
+    try { for (const el of document.querySelectorAll('input[type="password"]')) if (el.value) return true; } catch (_) {}
+    return false;
+  }
+  function forseCredenziali(e) {
+    if (!e || !e.isTrusted) return;
+    if (e.type === 'keydown' && e.key !== 'Enter') return;
+    if (Date.now() - credenzialiAt < 5000 || !passwordScritta(e)) return;
+    credenzialiAt = Date.now();
+    send({ type: T_CRED });
+  }
+  for (const t of ['input', 'submit', 'click', 'keydown']) {
+    try { document.addEventListener(t, forseCredenziali, true); } catch (_) {}
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', start, { once: true });
+    requestVerdict();
+    watchLoading();
+    document.addEventListener('DOMContentLoaded', onReady, { once: true });
   } else {
-    start();
+    onReady();
   }
-
-  global.SN_SAFEBROWSE_UI = { render, requestVerdict, clear, _state: () => currentLevel };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

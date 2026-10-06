@@ -38,6 +38,13 @@ export async function scrollConfirmToEnd(page) {
   expect(done, 'testo del dialogo presente').toBe(true);
 }
 
+// Prima di un clic o di un tasto veri che devono valere come risposta: il dialogo
+// li ignora per mezzo secondo dal primo fotogramma, e sotto xvfb quel fotogramma
+// arriva anche un secondo dopo `toBeVisible()` (#592.11). Un'attesa fissa non basta.
+export async function aspettaConfermaPronta(page) {
+  await expect.poll(async () => (await confirmState(page))?.pronto, { message: 'il dialogo non accetta ancora un gesto vero' }).toBe(true);
+}
+
 // Clic vero del mouse su un bottone del dialogo, anche su OK in attesa (#592).
 export async function mouseClickConfirm(page, which = 'ok') {
   const p = await page.evaluate((w) => window.SN_CONFIRM_UI._test.point(w), which);

@@ -4,6 +4,7 @@ import { writeFileSync, rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CONFIRM_HOST, confermaSopraPagina, confirmText } from './helpers/confirm.mjs';
+import { apriCronologia, statoCronologia, testiCronologia } from './helpers/cronologiaAppunti.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 // Feedback #256: nella cronologia degli appunti (freccia accanto a "Incolla")
@@ -31,17 +32,6 @@ async function findTabPage(app, hostname, timeout = 10000) {
     await new Promise((r) => setTimeout(r, 100));
   }
   return null;
-}
-
-async function openHistorySubmenu(page) {
-  await page.locator('#ta').click({ button: 'right' });
-  await expect(page.locator('.sn-menu')).toBeVisible();
-  const arrow = page.locator('.sn-menu-paste-arrow');
-  await expect(arrow).toBeVisible();
-  await arrow.click();
-  const sub = page.locator('.sn-menu-history-sub');
-  await expect(sub).toBeVisible();
-  return sub;
 }
 
 const PAGE_HTML = `<!doctype html><html><body style="padding:40px"><textarea id="ta" rows="5" cols="60"></textarea></body></html>`;
@@ -84,31 +74,29 @@ test('paste history: rimuovi una singola voce e svuota tutta la cronologia', asy
     await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
 
     // (1) Apri il sotto-menu: 3 voci, ciascuna con il proprio "×".
-    let sub = await openHistorySubmenu(page);
-    await expect(sub.locator('.sn-menu-history-item')).toHaveCount(3);
-    await expect(sub.locator('.sn-menu-history-remove')).toHaveCount(3);
+    let stato = await apriCronologia(app, page, '#ta');
+    expect(stato.voci).toHaveLength(3);
+    expect(stato.voci.every((v) => v.rimuovi)).toBe(true);
 
     // (2) Rimuovi la voce sensibile cliccando il suo "×".
-    const sensitiveRow = sub.locator('.sn-menu-history-item', { hasText: SENSITIVE });
-    await expect(sensitiveRow).toHaveCount(1);
-    await sensitiveRow.locator('.sn-menu-history-remove').click();
+    const sensibile = stato.voci.find((v) => v.testo === SENSITIVE);
+    expect(sensibile).toBeTruthy();
+    await page.mouse.click(sensibile.rimuovi.x, sensibile.rimuovi.y);
 
     // Sparisce subito dalla lista, le altre restano.
-    await expect(sub.locator('.sn-menu-history-item')).toHaveCount(2);
-    await expect(sub).not.toContainText(SENSITIVE);
+    await expect.poll(() => testiCronologia(app, page)).toEqual(['secondo testo generico', 'terzo testo normale']);
 
     // (3) Persistenza: chiudi il menu e riaprilo — la cronologia riletta dallo
     // storage NON contiene più la voce sensibile (la rimozione è stata salvata).
     await page.keyboard.press('Escape');
     await expect(page.locator('.sn-menu')).toHaveCount(0);
-    sub = await openHistorySubmenu(page);
-    await expect(sub.locator('.sn-menu-history-item')).toHaveCount(2);
-    await expect(sub).not.toContainText(SENSITIVE);
+    expect(await statoCronologia(app, page)).toBeNull();
+    stato = await apriCronologia(app, page, '#ta');
+    expect(stato.voci.map((v) => v.testo)).toEqual(['secondo testo generico', 'terzo testo normale']);
 
     // (4) "Svuota cronologia" è presente e, essendo distruttivo, chiede conferma.
-    const clearBtn = sub.locator('.sn-menu-history-clear-btn');
-    await expect(clearBtn).toBeVisible();
-    await clearBtn.click();
+    expect(stato.svuota).toBeTruthy();
+    await page.mouse.click(stato.svuota.x, stato.svuota.y);
     // Compare il dialogo di conferma di Filo: sopra la scheda, fuori dal documento del sito (#592.6).
     const sopra = await confermaSopraPagina(app);
     await expect(sopra.locator(CONFIRM_HOST)).toBeVisible();
@@ -161,14 +149,12 @@ test('paste history: la voce rimossa non ricompare riaprendo la cronologia nello
     await expect(page.locator('.sn-menu')).toBeVisible();
     const arrow = page.locator('.sn-menu-paste-arrow');
     await arrow.hover();
-    const sub = page.locator('.sn-menu-history-sub');
-    await expect(sub).toBeVisible();
-    await expect(sub.locator('.sn-menu-history-item')).toHaveCount(3);
+    await expect.poll(() => testiCronologia(app, page)).toHaveLength(3);
 
     // Rimuovi la voce sensibile.
-    await sub.locator('.sn-menu-history-item', { hasText: SENSITIVE })
-      .locator('.sn-menu-history-remove').click();
-    await expect(sub.locator('.sn-menu-history-item')).toHaveCount(2);
+    const sensibile = (await statoCronologia(app, page)).voci.find((v) => v.testo === SENSITIVE);
+    await page.mouse.click(sensibile.rimuovi.x, sensibile.rimuovi.y);
+    await expect.poll(() => testiCronologia(app, page)).toHaveLength(2);
 
     // Porta il mouse lontano: il sotto-menu si richiude da solo, il menu del
     // tasto destro resta aperto (si chiude solo con un click o Esc).
@@ -180,9 +166,10 @@ test('paste history: la voce rimossa non ricompare riaprendo la cronologia nello
     // non ne è mai uscito, il timer di chiusura non parte, e il rosso dice
     // "non si chiude" parlando del test, non di Filo. E ci si arriva muovendosi,
     // non teletrasportandosi: è quello che fa una mano.
-    const lontano = await page.evaluate(() => {
+    const pannello = (await statoCronologia(app, page)).riquadro;
+    const lontano = await page.evaluate((p) => {
       const rects = Array.from(document.querySelectorAll('.sn-menu'))
-        .map((el) => el.getBoundingClientRect());
+        .map((el) => el.getBoundingClientRect()).concat([p]);
       const dentro = (x, y) => rects.some((r) => x >= r.left - 4 && x <= r.right + 4 && y >= r.top - 4 && y <= r.bottom + 4);
       const candidati = [
         [4, 4], [window.innerWidth - 4, 4],
@@ -190,18 +177,15 @@ test('paste history: la voce rimossa non ricompare riaprendo la cronologia nello
       ];
       const buono = candidati.find(([x, y]) => !dentro(x, y));
       return buono ? { x: buono[0], y: buono[1] } : null;
-    });
+    }, pannello);
     expect(lontano, 'nessun angolo della pagina è fuori dal menu').toBeTruthy();
     await page.mouse.move(lontano.x, lontano.y, { steps: 12 });
-    await expect(page.locator('.sn-menu-history-sub')).toHaveCount(0, { timeout: 5000 });
+    await expect.poll(() => statoCronologia(app, page), { timeout: 5000 }).toBeNull();
     await expect(page.locator('.sn-menu')).toBeVisible();
 
     // Riapri la cronologia dalla stessa freccetta: la voce rimossa NON torna.
     await arrow.hover();
-    const sub2 = page.locator('.sn-menu-history-sub');
-    await expect(sub2).toBeVisible();
-    await expect(sub2).not.toContainText(SENSITIVE);
-    await expect(sub2.locator('.sn-menu-history-item')).toHaveCount(2);
+    await expect.poll(() => testiCronologia(app, page)).toEqual(['secondo testo generico', 'terzo testo normale']);
 
     await page.screenshot({ path: 'tests/.shots/clipboard-history-remove-reopen.png' });
   } finally {

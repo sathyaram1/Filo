@@ -253,6 +253,7 @@
     doc.addEventListener('visibilitychange', onVisibile);
     onVisibile();
     const troppoPresto = (e) => !!(e && e.isTrusted) && !(performance.now() - visibileDa >= RITARDO_SI_MS);
+    active.pronto = () => !troppoPresto({ isTrusted: true });
     // Chi stava scrivendo continua a scrivere nel suo campo: il fuoco va al
     // riquadro, che gli gira i tasti, e non al bottone o al campo del popup.
     const scriveva = !copre && (ospite ? !!ospite.scriveva : staScrivendo(prima));
@@ -489,6 +490,9 @@
         copre: !!q('.sn-confirm-copre'),
         okLabel: (okBtn && okBtn.textContent) || '',
         cancelLabel: (q('.sn-confirm-btn-cancel') && q('.sn-confirm-btn-cancel').textContent) || '',
+        // Un clic o un tasto veri adesso varrebbero: il primo fotogramma può
+        // arrivare ben dopo che il riquadro sta nel DOM (#592.11).
+        pronto: !!(active.pronto && active.pronto()),
         textScrolls: !!(textEl && textEl.scrollHeight > textEl.clientHeight + 1),
         selectionBg,
       };

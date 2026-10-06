@@ -39,12 +39,18 @@ test('alla riapertura le schede vengono riordinate per colore anche senza archiv
   await testServer.openReady(openTab, mk('Verde', 'rgb(40,200,80)'));
   await testServer.openReady(openTab, mk('Rosso', 'rgb(200,40,40)')); // ultima → attiva
 
-  // Attendi che tutte e tre abbiano ricevuto un colore identità dal content script.
-  await expect.poll(async () => shell.evaluate(async () => {
-    const s = await window.filoShell.tabs.snapshot();
-    const web = s.tabs.filter((t) => /127\.0\.0\.1/.test(t.url || ''));
-    return web.length === 3 && web.every((t) => !!t.identityColor);
-  }), { timeout: 12_000 }).toBe(true);
+  // Attendi che ognuna abbia il SUO colore dal content script: le tre pagine stanno sullo stesso host, e il
+  // colore identità si ricorda per host, quindi appena aperta una scheda porta quello della sorella.
+  const dichiarato = { Blu: 'rgb(40,80,200)', Verde: 'rgb(40,200,80)', Rosso: 'rgb(200,40,40)' };
+  await expect.poll(async () => {
+    const web = await shell.evaluate(async () => {
+      const s = await window.filoShell.tabs.snapshot();
+      return s.tabs.filter((t) => /127\.0\.0\.1/.test(t.url || ''))
+        .map((t) => ({ title: t.title, identityColor: t.identityColor }));
+    });
+    return web.length === 3 && web.every((t) => dichiarato[t.title]
+      && Math.abs(hueOf(t.identityColor) - hueOf(dichiarato[t.title])) < 2);
+  }, { timeout: 12_000 }).toBe(true);
 
   // Ordine di inserimento e ordine cromatico atteso, dai colori REALI assegnati.
   const before = await shell.evaluate(async () => {
