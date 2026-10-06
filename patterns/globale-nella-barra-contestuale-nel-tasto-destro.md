@@ -52,6 +52,11 @@ ogni voce globale lo allungava e seppelliva le voci dell'elemento.
 - **Solo gesti veri.** Un sito non arriva alla vista della barra; nella pagina
   il trascinamento dal menu parte solo da eventi `isTrusted`, perché un
   trascinamento finto aprirebbe la barra a comando del sito.
+- **La barra agisce su quello che l'utente vede.** Quando l'avviso del sito
+  pericoloso copre la scheda, le icone della pagina portate nella barra (QR,
+  Salva per dopo, Traduci…) sono spente: agirebbero sulla pagina nascosta e
+  quello che mostrano resterebbe dietro l'avviso. Tornano alla conferma. È la
+  stessa regola del vuoto (`vistaSottoIlVuoto`, `tests/barra-laterale-vuoto.spec.mjs`).
 - **La disposizione la scrive il main, uno solo**
   (`src/main/services/layoutIcone.js`): menu e barra mandano lo spostamento,
   il main lo mette in fila e lo annuncia a tutte le schede e alle barre delle

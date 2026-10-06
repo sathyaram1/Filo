@@ -3,7 +3,7 @@
 // Regole: patterns/la-shell-non-disegna-sopra-la-pagina.md
 
 import { test, expect } from './fixtures/electron.mjs';
-import { barraPage, statoBarra, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
+import { barraPage, statoBarra, comandaBarra, pannelloFermo, mettiNelMenu } from './helpers/barra.mjs';
 
 const SITO = `<!doctype html><html><body style="margin:0;height:4000px;font:16px sans-serif">
   <div id="z" style="position:fixed;left:0;top:0;width:240px;height:100%;background:#f3eee6">colonna del sito</div>
@@ -144,4 +144,39 @@ test('sopra l\'avviso del sito pericoloso il vuoto della barra e degli avvisi è
   await page.waitForTimeout(400);
   expect(await coperta(app)).toBe(true);
   expect(await page.evaluate(() => window.__g)).toEqual({ giu: 0, clic: 0, rotella: 0 });
+});
+
+// Le icone della pagina portate nella barra agirebbero sulla pagina nascosta, e quello che mostrano resterebbe
+// dietro l'avviso: spente finché l'avviso copre la scheda, riaccese quando l'utente conferma.
+test('sopra l\'avviso del sito pericoloso le icone della pagina nella barra sono spente; dopo la conferma tornano', async ({ app, shell }) => {
+  await mettiNelMenu(app, ['qrCode', 'saveForLater'], 'bar');
+  const { page, avviso } = await apriSegnalata(app, shell);
+  const barra = await barraPage(app);
+  const qr = barra.locator('#nav .ico[data-id="qrCode"]');
+  const salva = barra.locator('#nav .ico[data-id="saveForLater"]');
+  await expect(qr).toHaveAttribute('aria-disabled', 'true');
+  await expect(salva).toHaveAttribute('aria-disabled', 'true');
+  await expect(barra.locator('#nav .ico[data-id="home"]')).toHaveAttribute('aria-disabled', 'false');
+
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  await qr.click({ force: true });
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  await salva.click({ force: true });
+  // La conferma di «Salva per dopo» chiude la scheda dopo quattro secondi: non deve partire.
+  await page.waitForTimeout(5000);
+  expect(await page.locator('.sn-qr-overlay').count()).toBe(0);
+  const salvati = await app.evaluate(async () => globalThis.__filoHandlers.handleMessage({ type: globalThis.SN_MSG.MSG.GET_SAVED_PAGES }, { url: 'filo://newtab/' }));
+  expect((salvati.pages || []).map((p) => p.url)).not.toContain('https://conto-paypa1.com/login');
+  expect(await coperta(app)).toBe(true);
+
+  await avviso.getByPlaceholder('confermo').fill('confermo');
+  await avviso.getByRole('button', { name: 'Procedi comunque' }).click();
+  await expect.poll(() => coperta(app)).toBe(false);
+  await expect(qr).toHaveAttribute('aria-disabled', 'false');
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  await qr.click();
+  await expect(page.locator('.sn-qr-overlay')).toBeVisible({ timeout: 5000 });
 });

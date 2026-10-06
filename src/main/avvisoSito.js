@@ -14,9 +14,11 @@ class AvvisoSito {
   // schedaAttiva: la scheda del TabManager in primo piano (o null). scegli(tab, scelta, dati): un pulsante o una voce
   // del tasto destro. restituisciTastiera: tolto l'avviso, i tasti tornano alla scheda attiva.
   // inCima: dopo che l'avviso è salito, chi deve restargli sopra (la barra laterale) ci risale.
-  constructor(win, { schedaAttiva = () => null, scegli = () => {}, menu = () => [], restituisciTastiera = () => {}, inCima = () => {} } = {}) {
+  // cambiata: la scheda coperta è cambiata (la barra spegne o riaccende le azioni della pagina).
+  constructor(win, { schedaAttiva = () => null, scegli = () => {}, menu = () => [], restituisciTastiera = () => {}, inCima = () => {}, cambiata = () => {} } = {}) {
     this.win = win;
     this.dopoInCima = inCima;
+    this.cambiata = cambiata;
     this.schedaAttiva = schedaAttiva;
     this.scegli = scegli;
     this.vociMenu = menu;
@@ -57,8 +59,13 @@ class AvvisoSito {
     const prima = this.su;
     this.su = tab;
     this._invia();
-    if (prima !== tab) this.prendiTastiera();
+    if (prima !== tab) {
+      this.prendiTastiera();
+      this._cambiata();
+    }
   }
+
+  _cambiata() { try { this.cambiata(); } catch (_) {} }
 
   // I tasti di chi stava scrivendo nella pagina vanno all'avviso; la barra che scrive li tiene.
   prendiTastiera() {
@@ -83,6 +90,7 @@ class AvvisoSito {
   _togli(restituisci) {
     const era = this.su;
     this.su = null;
+    if (era) this._cambiata();
     const vista = this.vista;
     if (!vista || vista.webContents.isDestroyed()) return;
     let aveva = false;

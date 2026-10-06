@@ -360,6 +360,7 @@ class TabManager {
       menu: (tab) => this._sbVociMenu(tab),
       restituisciTastiera: () => this._tastieraAllaSchedaAttiva(),
       inCima: () => { if (this.barra) this.barra._inCima(); },
+      cambiata: () => { if (this.barra) this.barra.aggiornaNav(); },
     });
     // §1.2 — cache del colore identità per dominio (host → 'rgb(r,g,b)'). Così
     // una nuova tab su un dominio già visto mostra subito la sua tinta, senza
