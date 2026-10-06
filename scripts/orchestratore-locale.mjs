@@ -681,34 +681,7 @@ async function main(argv) {
     // Una richiesta rimasta da un orchestratore di prima non vale per questo.
     togliRichiesta(P);
     const motore = creaMotore(depVere(P, opz, log), opz);
-    const chiedi = (modo, da) => {
-      const prima = motore.chiusura();
-      const dopo = motore.smetti(modo);
-      if (dopo === prima) return;
-      scriviRichiesta(P, { pid: process.pid, modo: dopo, at: ora() });
-      if (dopo === 'subito') {
-        log(`fermata immediata (${da}): fermo le istanze e i processi in corso; il prossimo «avvia» rifà i passi interrotti`);
-        fermaFigli();
-        // Un processo che non si lascia fermare non tiene aperto l'orchestratore: lo stato dice già cosa rifare.
-        setTimeout(() => { log('qualcosa non si è fermato in un minuto: esco lo stesso'); process.exit(1); }, 60_000).unref();
-        return;
-      }
-      log(`chiusura con calma (${da}): non avvio altro, i passi in corso finiscono, poi esco. Per fermare tutto adesso: di nuovo Ctrl-C, o npm run orchestra -- smetti --subito`);
-      // npm su Windows chiude la sua shell al Ctrl-C e il terminale torna al prompt, ma questo processo continua.
-      if (process.platform === 'win32' && process.env.npm_lifecycle_event) log('se il terminale torna al prompt, l’orchestratore continua lo stesso qui sotto finché i passi non finiscono');
-    };
-    const guardia = setInterval(() => {
-      const r = leggiRichiesta(P);
-      if (r && r.pid === process.pid && (r.modo === 'subito' || r.modo === 'calma')) chiedi(r.modo, 'smetti');
-    }, 2000);
-    const colpo = contaColpi();
-    const alSegnale = () => {
-      const c = colpo(Date.now());
-      if (c === 'esci') { log('terzo Ctrl-C: esco adesso'); process.exit(130); }
-      if (c) chiedi(c, 'Ctrl-C');
-    };
-    const segnali = process.platform === 'win32' ? ['SIGINT', 'SIGBREAK'] : ['SIGINT', 'SIGTERM'];
-    for (const sg of segnali) process.on(sg, alSegnale);
+    const stacca = ascoltaFermate({ P, motore, log });
     try {
       const fine = await motore.avvia();
       const modo = motore.chiusura();
