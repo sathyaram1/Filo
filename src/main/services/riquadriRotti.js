@@ -261,13 +261,14 @@ function configureFromSettings(settings) {
   riattivati = new Set(Cookies().getEmbedSites(settings));
 }
 
-function init(settings, { modello } = {}) {
-  if (typeof modello === 'function') chiamaModello = modello;
-  configureFromSettings(settings);
-}
+function init(settings) { configureFromSettings(settings); }
+
+// La chiamata al modello la dà handlers.js, che tiene il cancello dei modelli.
+function usaModello(fn) { chiamaModello = typeof fn === 'function' ? fn : null; }
 
 module.exports = {
   init,
+  usaModello,
   configureFromSettings,
   segnala,
   stato,
