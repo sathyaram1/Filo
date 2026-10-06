@@ -211,6 +211,24 @@ let streamCounter = 0;
 
 const filoMessage = (msg) => ipcRenderer.invoke('filo:message', msg);
 
+// ─── #664 — il collegamento d'invito cliccato dentro Filo ──────────────────
+// `filo://invito/<codice>` non è una pagina: da fuori lo consegna il sistema e
+// Filo riscatta. Dentro Filo lo stesso clic deve fare lo stesso, ma solo un
+// clic VERO: una pagina che lo spinge da sé non riscatta niente (il main la
+// ferma). Il tipo è letterale: qui SN_MSG non c'è ancora.
+try {
+  const INVITO = /^filo:\/*invito(?:[/?#]|$)/i;
+  const suInvito = (e) => {
+    if (!e.isTrusted || (e.type === 'click' ? e.button !== 0 : e.button !== 1)) return;
+    const a = (e.composedPath ? e.composedPath() : []).find((n) => n && typeof n.href === 'string' && /^(A|AREA)$/.test(n.tagName));
+    if (!a || !INVITO.test(a.href)) return;
+    e.preventDefault();
+    filoMessage({ type: 'wallet_invite_open', link: a.href }).catch(() => {});
+  };
+  window.addEventListener('click', suInvito, true);
+  window.addEventListener('auxclick', suInvito, true);
+} catch (_) { /* mai bloccare il caricamento della pagina */ }
+
 const broadcastListeners = new Set();
 // #407 — messaggi che devono SVEGLIARE un riquadro incorporato. Dentro un
 // riquadro i content script si montano solo quando l'utente lo tocca; ma
@@ -396,7 +414,7 @@ ipcRenderer.on('shortcut:triggered', (_event, payload = {}) => {
 // DOMContentLoaded della pagina ospite.
 
 const STYLES = [
-  'theme.css', 'menu.css', 'popup.css', 'sidebar.css',
+  'theme.css', 'menu.css', 'popup.css', 'sidebar.css', 'voce.css',
   'highlight.css', 'spellcheck.css', 'feedback.css', 'redteam-attack.css',
 ];
 
@@ -436,6 +454,7 @@ function loadScripts() {
   try { require(path.join(SHARED_DIR, 'tasti.js')); } catch (e) { console.error('[Filo CS] tasti', e); } // nomi delle scorciatoie per il sistema di chi legge: PRIMA di menu/actions/content
   try { require(path.join(SHARED_DIR, 'campoTesto.js')); } catch (e) { console.error('[Filo CS] campoTesto', e); } // "si sta scrivendo qui?": PRIMA di content.js, che ci decide Ctrl+Z
   try { require(path.join(SHARED_DIR, 'urlNav.js')); } catch (e) { console.error('[Filo CS] urlNav', e); } // #437 — "è davvero un indirizzo?" per Copia URL/Condividi
+  try { require(path.join(SHARED_DIR, 'wallet.js')); } catch (e) { console.error('[Filo CS] wallet', e); } // #664 — «è un link d'invito?» per il tasto destro
   try { require(path.join(SHARED_DIR, 'filoMarkdown.js')); } catch (e) { console.error('[Filo CS] filoMarkdown', e); }
   try { require(path.join(SHARED_DIR, 'linkSospetto.js')); } catch (e) { console.error('[Filo CS] linkSospetto', e); } // #725 — link sospetti: euristica e frasi, PRIMA di actions.js
   try { require(path.join(SHARED_DIR, 'themeTokens.js')); } catch (e) { console.error('[Filo CS] themeTokens', e); }
@@ -446,6 +465,7 @@ function loadScripts() {
   try { require(path.join(SHARED_DIR, 'calcMarkers.js')); } catch (e) { console.error('[Filo CS] calcMarkers', e); } // #724 — calcolatrice e marker [[calc:]]: PRIMA di popup.js
   try { require(path.join(SHARED_DIR, 'overlayPlacement.js')); } catch (e) { console.error('[Filo CS] overlayPlacement', e); } // #500 — geometria di menu e riquadro risposta: PRIMA di popup.js e menu.js
   try { require(path.join(CONTENT_DIR, 'extractContext.js')); } catch (e) { console.error('[Filo CS] extractContext', e); }
+  try { require(path.join(SHARED_DIR, 'avvisiTempo.js')); } catch (e) { console.error('[Filo CS] avvisiTempo', e); } // tempi della pila degli avvisi: PRIMA di popup.js
   try { require(path.join(CONTENT_DIR, 'popup.js')); } catch (e) { console.error('[Filo CS] popup', e); }
   try { require(path.join(CONTENT_DIR, 'vistoDavvero.js')); } catch (e) { console.error('[Filo CS] vistoDavvero', e); } // #589.11 — un clic sul menu conta solo se la voce si vedeva: PRIMA di menu.js
   try { require(path.join(CONTENT_DIR, 'menu.js')); } catch (e) { console.error('[Filo CS] menu', e); }
@@ -457,6 +477,7 @@ function loadScripts() {
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'cookieRules.js')); } catch (e) { console.error('[Filo CS] cookieRules', e); }
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'cookieBanners.js')); } catch (e) { console.error('[Filo CS] cookieBanners', e); }
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'cookies.js')); } catch (e) { console.error('[Filo CS] cookies', e); }
+  try { require(path.join(CONTENT_DIR, 'adSkip.js')); } catch (e) { console.error('[Filo CS] adSkip', e); } // #737 — nei riquadri è già partito da solo
   try { require(path.join(SHARED_DIR, 'feedback.js')); } catch (e) { console.error('[Filo CS] feedback shared', e); }
   try { require(path.join(SHARED_DIR, 'feedbackClientIdHash.js')); } catch (e) { console.error('[Filo CS] feedbackClientIdHash', e); } // S1.F2.2
   try { require(path.join(SHARED_DIR, 'feedbackAttachTypes.js')); } catch (e) { console.error('[Filo CS] feedbackAttachTypes', e); }
@@ -469,6 +490,8 @@ function loadScripts() {
   try { require(path.join(SHARED_DIR, 'modelCaps.js')); } catch (e) { console.error('[Filo CS] modelCaps', e); }
   try { require(path.join(SHARED_DIR, 'ttsVoices.js')); } catch (e) { console.error('[Filo CS] ttsVoices', e); }
   try { require(path.join(SHARED_DIR, 'dictationSegmenter.js')); } catch (e) { console.error('[Filo CS] dictationSegmenter', e); }
+  try { require(path.join(SHARED_DIR, 'ascolto.js')); } catch (e) { console.error('[Filo CS] ascolto', e); } // microfono e trascrizione: Detta e le chat
+  try { require(path.join(SHARED_DIR, 'voceChat.js')); } catch (e) { console.error('[Filo CS] voceChat', e); } // tasto microfono delle chat, a cui «Detta» passa la mano
   try { require(path.join(CONTENT_DIR, 'tts.js')); } catch (e) { console.error('[Filo CS] tts', e); }
   try { require(path.join(CONTENT_DIR, 'editBox.js')); } catch (e) { console.error('[Filo CS] editBox', e); }
   try { require(path.join(CONTENT_DIR, 'actions.js')); } catch (e) { console.error('[Filo CS] actions', e); }
@@ -493,6 +516,7 @@ function start() {
 
 // #754 — molti banner dei cookie vivono in un riquadro (Sourcepoint, TrustArc, varianti di Didomi e
 // Quantcast): lì il modulo cookie parte da solo, senza il resto di Filo, e solo sulle pagine web.
+// #737 — così il «Salta» delle pubblicità: il lettore incorporato e quello di Google IMA stanno in un riquadro.
 function startCookiesInFrame() {
   let href = '';
   try { href = window.location.href || ''; } catch (_) {}
@@ -500,6 +524,7 @@ function startCookiesInFrame() {
   const go = () => {
     try { require(path.join(CONTENT_DIR, 'cookieRules.js')); } catch (e) { console.error('[Filo CS] cookieRules (riquadro)', e); }
     try { require(path.join(CONTENT_DIR, 'cookies.js')); } catch (e) { console.error('[Filo CS] cookies (riquadro)', e); }
+    try { require(path.join(CONTENT_DIR, 'adSkip.js')); } catch (e) { console.error('[Filo CS] adSkip (riquadro)', e); }
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go, { once: true });
   else go();
@@ -532,10 +557,27 @@ function waitForContentScripts(fn) {
   tick();
 }
 
+// Il modulo di pagamento o di accesso di un altro sito, in un riquadro, rende delicata la pagina che lo contiene (#1004):
+// il content script della pagina non lo vede. Si guarda a pagina caricata e quando si entra in un campo, e si dice una volta.
+function vediCampiDelicati() {
+  let detto = false;
+  const guarda = () => {
+    if (detto) return;
+    let h = null;
+    try { h = require(path.join(CONTENT_DIR, 'safebrowseHints.js')).pageHints(document); } catch (_) { return; }
+    if (!h || !(h.shownPassword || h.shownPayment)) return;
+    detto = true;
+    filoMessage({ type: 'campi_delicati', hasPassword: !!h.shownPassword, hasPayment: !!h.shownPayment }).catch(() => {});
+  };
+  try {
+    window.addEventListener('load', guarda, { once: true });
+    window.addEventListener('focusin', (e) => { if (e.target && e.target.tagName === 'INPUT') guarda(); }, { capture: true, passive: true });
+  } catch (_) {}
+}
+
 // L'avviso del sito pericoloso non aspetta la pagina costruita: un modulo password già a schermo sopra uno script che
 // non arriva mai resterebbe scrivibile senza avviso (#813.1). loadScripts() ritrova questi moduli già caricati.
 function startSafebrowse() {
-  try { require(path.join(SHARED_DIR, 'filoUi.js')); } catch (e) { console.error('[Filo CS] filoUi', e); }
   try { require(path.join(SHARED_DIR, 'messages.js')); } catch (e) { console.error('[Filo CS] messages', e); }
   try { require(path.join(CONTENT_DIR, 'safebrowse.js')); } catch (e) { console.error('[Filo CS] safebrowse', e); }
 }
@@ -550,6 +592,7 @@ if (!IS_SUBFRAME) {
   }
 } else {
   startCookiesInFrame();
+  vediCampiDelicati();
   // Un clic, un tasto premuto o il fuoco su un campo dentro il riquadro dicono
   // "sto usando questa cosa": da lì in poi il riquadro deve rispondere come il
   // resto della pagina. Il tasto destro ha il suo cammino (il bridge qui sopra),

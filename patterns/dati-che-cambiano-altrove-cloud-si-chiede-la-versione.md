@@ -31,6 +31,10 @@ secondi e nessuno la ricaricava.
   il broadcast `TAB_IN_VISTA` a ogni cambio. Al rientro si rilegge subito
   (se l'assenza supera `RIENTRO_MIN_MS`). Una finestra coperta da un'altra
   applicazione ma non ridotta a icona resta «in vista»: il sistema non lo dice.
+  L'esito del giro chiesto da un'altra pagina arriva anche a quelle fuori
+  vista: le righe che porta entrano subito (il cursore del main è già andato
+  avanti), mentre quello che legge (riallineamento, fusioni, ridisegno che
+  completa le schede) aspetta il rientro.
 - **L'orologio decide, non legge.** Batte ogni pochi secondi e chiede a
   `decidiGiro` se è ora; un giro senza risposta oltre `GIRO_BLOCCATO_MS` si
   abbandona (prima fermava per sempre tutti i successivi, in silenzio), e dopo
@@ -56,11 +60,19 @@ secondi e nessuno la ricaricava.
   l'aggiornamento continuo, altrimenti il primo giro la rimpiazzerebbe con
   Firestore a metà spec; chi vuole provare il giro sostituisce le sorgenti
   (e con `setData(…, { dalVivo: true })` tiene acceso l'orologio vero).
+- **Un giro di pagina solo, per tutte le pagine che lo seguono.** Gestione e
+  pagina Feedback usano lo stesso (`SN_FEEDBACK_LIVE_PAGINA`) e cambiano solo
+  gli agganci: cosa ridisegnare, cosa conta come bozza. Dove la scheda è il
+  dettaglio (pagina Feedback) la lista aspetta anche le bozze, le scritture in
+  volo e il puntatore fermo su un pulsante, e le schede toccate si rileggono
+  prima di ridisegnare.
 - **Dove:** `src/shared/feedbackLive.js` (confronto, fusione, decisione del
-  giro, arrivi, ancora dello scorrimento: tutto puro), `listVersions`/`getMany`
+  giro, arrivi, ancora dello scorrimento: tutto puro), `src/shared/feedbackLivePagina.js`
+  (il giro della pagina), `listVersions`/`getMany`
   /`getManyPublic` in `src/shared/feedback.js`, `inVista`/`_annunciaVista` in
-  `src/main/tabs.js`, la sezione "Aggiornamento continuo" di
-  `src/pages/manage/manage.js`. Test: `tests/unit/feedbackLive.test.mjs`,
+  `src/main/tabs.js`, gli agganci in `src/pages/manage/manage.js` e
+  `src/pages/feedback/feedback.js`. Test: `tests/unit/feedbackLive.test.mjs`,
+  `tests/unit/feedbackLivePagina.test.mjs`, `tests/feedback-pagina-viva.spec.mjs`,
   `tests/unit/feedbackLiveGiro.test.mjs`, `tests/unit/feedbackListLight.test.mjs`,
   `tests/unit/feedbackCryptoKeyCache.test.mjs`, `tests/manage-live-update.spec.mjs`,
   `tests/manage-ricevuti-vivi.spec.mjs`.

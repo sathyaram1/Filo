@@ -8,11 +8,12 @@
 //   ai-stream:abort  — send({ requestId })
 //   tabs:*           — controllo del TabManager dalla shell renderer.
 
-const { ipcMain, BrowserWindow, app } = require('electron');
+const { ipcMain, BrowserWindow, app, session } = require('electron');
 const path = require('node:path');
 const { handleMessage, handleStream, broadcastToTabs } = require('./services/handlers');
 const { showPopupMenu } = require('./popup-menu');
 const { showTooltip, hideTooltip } = require('./popup-tooltip');
+const CartaAnteprima = require('./popup-anteprima');
 const { createSession, defaultCwd, commandExists } = require('./services/shell');
 const { resolveShell } = require('./services/terminal');
 const SegretiLetti = require('./services/segretiLetti');
@@ -26,6 +27,7 @@ const inFlightStreams = new Map(); // requestId → AbortController
 // possiede: i comandi successivi della stessa scheda riusano lo stesso
 // processo (variabili, $env, cwd persistono). Muore alla chiusura della scheda.
 const shellSessions = new Map(); // webContents.id → sessione shell persistente
+const comandiInCorso = new Map(); // webContents.id → chiude la carta del comando nella home (#870)
 
 // La finestra di Filo di cui `wc` è la barra, o null. Essere il frame principale di una
 // finestra non basta: un popup di accesso è una finestra vera con dentro un sito (#589.3).
@@ -77,6 +79,28 @@ function senderInfo(event) {
   };
 }
 
+// La partizione della finestra in incognito a cui appartiene la pagina, '' se è di una normale. Un popup di
+// accesso aperto da una sua scheda non sta in nessuna finestra di Filo: lo riconosce la sessione, che è solo sua.
+function ambitoIncognitoDi(info) {
+  const tieneLaPartizione = (w) => !!(w && w._filoIncognito && w._filoTabs && w._filoTabs.partition);
+  if (tieneLaPartizione(info.win)) return info.win._filoTabs.partition;
+  const ses = info.wc && info.wc.session;
+  const w = ses ? BrowserWindow.getAllWindows().find((x) => tieneLaPartizione(x) && session.fromPartition(x._filoTabs.partition) === ses) : null;
+  return w ? w._filoTabs.partition : '';
+}
+
+// La pagina che ha chiesto, come la nomina il registro dei cambi (src/shared/cambi.js, DOVE).
+function provenienzaDi(info) {
+  if (info && info.isShell) return { via: 'interfaccia', dove: 'shell' };
+  let u = null;
+  try { u = new URL(String((info && info.url) || '')); } catch (_) { u = null; }
+  if (u && u.protocol === 'filo:') {
+    const dove = u.hostname === 'options' && /altro/.test(u.pathname) ? 'altro' : u.hostname;
+    return { via: 'interfaccia', dove };
+  }
+  return { via: 'pagina' };
+}
+
 function registerIpcHandlers() {
   // Alla chiusura di Filo non lasciamo shell orfane: nessuna persistenza dopo
   // l'uscita (alla riapertura si parte da una shell pulita).
@@ -92,7 +116,7 @@ function registerIpcHandlers() {
   // services/fingerprint.js e preload/fingerprint-guard.js.
   ipcMain.on('filo:fp-config', (event, href) => {
     try {
-      event.returnValue = require('./services/fingerprint').configForHref(href);
+      event.returnValue = require('./services/fingerprint').configForHref(href, ambitoIncognitoDi(senderInfo(event)));
     } catch (_) {
       event.returnValue = { level: 0, seed: 0 };
     }
@@ -139,7 +163,8 @@ function registerIpcHandlers() {
     // dello storage che ne discende (anche dopo await) finisce nell'overlay in
     // RAM invece che su disco. Copre TUTTE le azioni di memoria senza dover
     // gattare ogni singolo case.
-    const run = () => handleMessage(msg, info);
+    // Ogni stato che la richiesta salva diventa un evento del filo che dice da dove è venuto (#867).
+    const run = () => require('./services/registroCambi').con(provenienzaDi(info), () => handleMessage(msg, info));
     try {
       return info.isIncognito ? await DiskStorage.runIncognito(run) : await run();
     } catch (err) {
@@ -170,7 +195,10 @@ function registerIpcHandlers() {
     const work = async () => {
       try {
         const meta = {};
-        const result = await handleStream({
+        // Chi legge lo stream (il riquadro di «spiega») scrive da sé la riga del ripiego (#662).
+        const K = globalThis.SN_WALLET_MAIN;
+        const conDetto = (fn) => (K && K.conRipiegoDetto ? K.conRipiegoDetto(fn) : fn());
+        const result = await conDetto(() => handleStream({
           action, payload, origin: event.sender.getURL(),
           signal: ac.signal,
           onMeta: (m) => { Object.assign(meta, m); send('meta', m); },
@@ -178,7 +206,7 @@ function registerIpcHandlers() {
           // Fallback dopo delta già streamati: il renderer deve azzerare il
           // testo parziale del tentativo fallito (#273).
           onReset: () => send('reset', {}),
-        });
+        }));
         send('done', { ...result });
       } catch (err) {
         console.warn('[Filo IPC] stream error', requestId, err);
@@ -203,7 +231,7 @@ function registerIpcHandlers() {
   // Esegue un comando in streaming su una shell PERSISTENTE per scheda. SOLO
   // per le pagine interne fidate (filo://): le pagine web esterne NON devono
   // poter avviare una shell.
-  ipcMain.handle('shell:start', (event, { execId, command, cwd, shell } = {}) => {
+  ipcMain.handle('shell:start', (event, { execId, command, cwd, shell, chat } = {}) => {
     const url = event.sender.getURL() || '';
     if (!url.startsWith('filo://')) return { ok: false, error: 'forbidden' };
     if (!execId || typeof command !== 'string') return { ok: false, error: 'bad-args' };
@@ -235,6 +263,10 @@ function registerIpcHandlers() {
     // una frase di Filo, e la porta delle uscite deve saperlo (#810). Si tiene la coda, dove finisce l'esito.
     const stampato = [];
     let quanto = 0;
+    const ambito = require('./services/downloads').scopeOfWindow(senderInfo(event).win);
+    const fineLavoro = require('./services/lavoriInCorso').inizia({ tipo: 'comando', chat, testo: command, wc: event.sender, ambito });
+    comandiInCorso.set(key, fineLavoro);
+    const chiudi = () => { fineLavoro(); if (comandiInCorso.get(key) === fineLavoro) comandiInCorso.delete(key); };
     session.exec(command, {
       onData: (d) => {
         const pezzo = String((d && d.chunk) || '');
@@ -243,8 +275,8 @@ function registerIpcHandlers() {
         while (quanto > MAX_STAMPATO && stampato.length > 1) quanto -= stampato.shift().length;
         send('data', d);
       },
-      onExit: (e) => { SegretiLetti.ricorda(stampato.join(''), "dall'output di un comando"); send('exit', e); },
-      onError: (e) => send('error', e),
+      onExit: (e) => { chiudi(); SegretiLetti.ricorda(stampato.join(''), "dall'output di un comando"); send('exit', e); },
+      onError: (e) => { chiudi(); send('error', e); },
     });
     return { ok: true };
   });
@@ -295,6 +327,8 @@ function registerIpcHandlers() {
   // dashboard (che la ripassa). Le variabili impostate prima dello Stop vanno
   // perse: è il compromesso per un'interruzione affidabile su Windows.
   ipcMain.on('shell:abort', (event) => {
+    const fine = comandiInCorso.get(event.sender.id);
+    if (fine) { fine(); comandiInCorso.delete(event.sender.id); }
     const s = shellSessions.get(event.sender.id);
     if (s) { try { s.kill(); } catch (_) {} shellSessions.delete(event.sender.id); }
   });
@@ -448,7 +482,7 @@ function registerIpcHandlers() {
     const win = finestraDellaBarra(event.sender);
     if (!win) return { ok: false, error: 'forbidden' };
     // In incognito l'elenco dei siti si scrive nella memoria della sessione, non sul disco.
-    const run = () => win._filoTabs.setCookieBanners(id, !!show);
+    const run = () => require('./services/registroCambi').con({ via: 'interfaccia', dove: 'menu-scheda' }, () => win._filoTabs.setCookieBanners(id, !!show));
     return win._filoIncognito ? DiskStorage.runIncognito(run) : run();
   });
   // Stato per il menu della shell: la voce compare solo se un endpoint è
@@ -507,6 +541,20 @@ function registerIpcHandlers() {
     const b = win.getContentBounds();
     const z = event.sender.getZoomFactor() || 1;
     return { x: (p.x - b.x) / z, y: (p.y - b.y) / z };
+  });
+
+  // #430 — solo la barra della finestra chiede la carta, e solo per le sue schede.
+  ipcMain.on('anteprima:mostra', (event, dati) => {
+    const win = finestraDellaBarra(event.sender);
+    if (win) CartaAnteprima.mostra(win, dati);
+  });
+  ipcMain.on('anteprima:prepara', (event) => {
+    const win = finestraDellaBarra(event.sender);
+    if (win) CartaAnteprima.prepara(win);
+  });
+  ipcMain.on('anteprima:nascondi', (event) => {
+    const win = finestraDellaBarra(event.sender);
+    if (win) CartaAnteprima.nascondi(win);
   });
 
   // ─── disegno annotazione sulla barra in alto (shell) ─────────────────────

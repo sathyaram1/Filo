@@ -74,11 +74,22 @@
       sound: typeof notifications.sound === 'string' ? notifications.sound : 'default',
     };
   }
+  // #430 — carta con l'anteprima della scheda al passaggio del puntatore: accesa e misura dalle Preferenze.
+  let anteprimaSchede = { enabled: true, size: 'media' };
+  function applyTabPreview(tp) {
+    if (!tp || typeof tp !== 'object') return;
+    anteprimaSchede = {
+      enabled: tp.enabled !== false,
+      size: ['piccola', 'media', 'grande'].includes(tp.size) ? tp.size : 'media',
+    };
+    if (!anteprimaSchede.enabled) try { ANTEPRIMA.nascondi(); } catch (_) {}
+  }
   api.message({ type: 'get_settings' })
     .then((r) => {
       applyShellTokens(r?.settings?.themeTokens);
       applyTabColorParams(r?.settings?.tabColor);
       applyNotifConfig(r?.settings?.notifications);
+      applyTabPreview(r?.settings?.tabPreview);
       try { render(); } catch (_) {}
       try { NOTIFS.rispecchia(); } catch (_) {}
     })
@@ -89,6 +100,7 @@
         applyShellTokens(m.settings?.themeTokens);
         applyTabColorParams(m.settings?.tabColor);
         applyNotifConfig(m.settings?.notifications);
+        applyTabPreview(m.settings?.tabPreview);
         try { render(); } catch (_) {}
         try { NOTIFS.rispecchia(); } catch (_) {}
       }
@@ -350,10 +362,11 @@
   // perché la shell è alta solo 88px e gli elementi DOM non possono apparire
   // sopra le WebContentsView delle tab. Delega globale così funziona anche per i
   // tab ricreati ad ogni render().
+  // Anche la carta di una scheda lo usa: cede al suggerimento di un controllo nell'istante in cui lui compare.
+  const SUGGERIMENTO_RITARDO = 350;
   (() => {
     let showTimer = null;
     let currentTarget = null;
-    const SHOW_DELAY = 350;
 
     function hide() {
       if (showTimer) { clearTimeout(showTimer); showTimer = null; }
@@ -362,7 +375,9 @@
     }
     document.addEventListener('mouseover', (e) => {
       const t = e.target.closest('[data-tip]');
-      if (!t || t === currentTarget) return;
+      if (t === currentTarget) return;
+      // Un elemento tolto dal ridisegno non riceve mouseout: il suo suggerimento resterebbe sopra la carta.
+      if (!t) { if (currentTarget && !currentTarget.isConnected) hide(); return; }
       hide();
       currentTarget = t;
       const text = t.dataset.tip;
@@ -374,7 +389,7 @@
         const x = Math.round(r.left + r.width / 2 - 60);
         const y = Math.round(r.bottom + 6);
         api.tooltipShow(text, x, y);
-      }, SHOW_DELAY);
+      }, SUGGERIMENTO_RITARDO);
     });
     document.addEventListener('mouseout', (e) => {
       const t = e.target.closest('[data-tip]');
@@ -386,6 +401,125 @@
   })();
 
   let state = { activeId: null, tabs: [] };
+
+  // #430 — la carta di anteprima. La prima compare dopo un attimo (attraversare la barra non deve accendere
+  // niente); da lì, finché si resta sulle schede, passa dall'una all'altra subito. Le foto sono già nella carta.
+  const ANTEPRIMA = (() => {
+    const RITARDO = 200;
+    const CALDA = 600;
+    const VAR_TEMA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--accent', '--font', '--radius'];
+    let timer = null;
+    let attesaDi = null;
+    let puntatore = null;
+    let vaVia = null;
+    let aperta = null;
+    let spentaAlle = 0;
+    // La scheda appena cliccata non riapre la carta finché il puntatore non passa su un'altra.
+    let zittita = null;
+
+    function elDi(id) {
+      return tabsEl.querySelector(`.tab[data-anteprima="${CSS.escape(id)}"]`);
+    }
+    function tema() {
+      const cs = getComputedStyle(document.documentElement);
+      const vars = {};
+      for (const k of VAR_TEMA) {
+        const v = cs.getPropertyValue(k).trim();
+        if (v) vars[k] = v;
+      }
+      return vars;
+    }
+    function invia(id) {
+      const el = elDi(id);
+      const t = state.tabs.find((x) => x.id === id);
+      if (!el || !t || !api.anteprima) { nascondi(); return; }
+      const r = el.getBoundingClientRect();
+      aperta = id;
+      api.anteprima.mostra({
+        id, titolo: tabLabel(t), x: Math.round(r.left), y: Math.round(r.bottom + 4),
+        misura: anteprimaSchede.size, tema: tema(),
+      });
+    }
+    function nascondi() {
+      if (timer) { clearTimeout(timer); timer = null; attesaDi = null; }
+      if (vaVia) { clearTimeout(vaVia); vaVia = null; }
+      if (!aperta) return;
+      aperta = null;
+      spentaAlle = Date.now();
+      try { api.anteprima && api.anteprima.nascondi(); } catch (_) {}
+    }
+    function sopra(id) {
+      if (vaVia) { clearTimeout(vaVia); vaVia = null; }
+      if (!anteprimaSchede.enabled || drag) return;
+      if (id === zittita) return;
+      zittita = null;
+      if (id === aperta) return;
+      // La barra si ridisegna a ogni titolo o icona che cambia e il puntatore «rientra» nella scheda rifatta:
+      // l'attesa della stessa scheda non riparte, o con un titolo che cambia spesso la carta non arriverebbe mai.
+      if (timer && attesaDi === id) return;
+      if (timer) { clearTimeout(timer); timer = null; attesaDi = null; }
+      if (aperta || Date.now() - spentaAlle < CALDA) { invia(id); return; }
+      attesaDi = id;
+      timer = setTimeout(() => {
+        timer = null;
+        attesaDi = null;
+        if (sottoIlPuntatore(id)) invia(id);
+      }, RITARDO);
+    }
+    // Croce, avviso audio e paese hanno il loro suggerimento, che cade dove sta la carta (#589.16): la carta gli
+    // cede il posto quando lui compare, non prima, o attraversando la croce verso la scheda accanto lampeggerebbe.
+    function suUnControllo(target, el) {
+      const c = target.closest('[data-tip]');
+      return !!c && c !== el && el.contains(c);
+    }
+    function cede() {
+      if (timer) { clearTimeout(timer); timer = null; attesaDi = null; }
+      if (aperta && !vaVia) vaVia = setTimeout(nascondi, SUGGERIMENTO_RITARDO);
+    }
+    // Una scheda appena rifatta non ha ancora :hover col puntatore fermo sopra: conta dove sta il puntatore.
+    function sottoIlPuntatore(id) {
+      const el = elDi(id);
+      if (!el) return false;
+      if (el.matches(':hover')) return true;
+      if (!puntatore) return false;
+      const sotto = document.elementFromPoint(puntatore.x, puntatore.y);
+      return !!sotto && sotto.closest('.tab[data-anteprima]') === el;
+    }
+    // La barra si ridisegna a ogni titolo o icona che cambia: la carta segue la sua scheda, o sparisce con lei.
+    function ridisegnata() {
+      if (!aperta) return;
+      if (!anteprimaSchede.enabled || !elDi(aperta)) { nascondi(); return; }
+      invia(aperta);
+    }
+    tabsEl.addEventListener('mousemove', (e) => { puntatore = { x: e.clientX, y: e.clientY }; }, { passive: true });
+    tabsEl.addEventListener('mouseover', (e) => {
+      puntatore = { x: e.clientX, y: e.clientY };
+      const el = e.target.closest('.tab[data-anteprima]');
+      if (el && suUnControllo(e.target, el)) cede();
+      else if (el) sopra(el.dataset.anteprima);
+      // Il bordo fra due schede non spegne la carta: passando alla vicina cambierebbe con un lampo.
+      else if (!vaVia) vaVia = setTimeout(nascondi, 120);
+    });
+    tabsEl.addEventListener('mouseenter', () => {
+      if (anteprimaSchede.enabled) try { api.anteprima && api.anteprima.prepara(); } catch (_) {}
+    });
+    tabsEl.addEventListener('mouseleave', () => { zittita = null; puntatore = null; nascondi(); });
+    // Se la barra si ridisegna mentre il puntatore esce, l'uscita può perdersi: basta essere altrove.
+    document.addEventListener('mouseover', (e) => {
+      if (aperta && !tabsEl.contains(e.target)) { zittita = null; nascondi(); }
+    });
+    document.documentElement.addEventListener('mouseleave', nascondi);
+    tabsEl.addEventListener('mousedown', (e) => {
+      const el = e.target.closest('.tab[data-anteprima]');
+      zittita = el ? el.dataset.anteprima : null;
+      nascondi();
+    }, true);
+    tabsEl.addEventListener('wheel', nascondi, { passive: true });
+    tabsEl.addEventListener('contextmenu', nascondi, true);
+    window.addEventListener('blur', nascondi);
+    window.addEventListener('resize', nascondi);
+    return { nascondi, ridisegnata, aperta: () => aperta };
+  })();
 
   function activeTab() {
     return state.tabs.find((t) => t.id === state.activeId) || null;
@@ -810,7 +944,9 @@
       const el = document.createElement('div');
       el.className = 'tab' + (t.id === state.activeId ? ' active' : '');
       el.dataset.id = t.id;
-      el.dataset.tip = t.title || t.url;
+      // Con l'anteprima accesa la carta dice già il titolo: il suggerimento di testo sarebbe un doppione.
+      if (anteprimaSchede.enabled) el.dataset.anteprima = t.id;
+      else el.dataset.tip = t.title || t.url;
       const ferma = larghezzeFerme && larghezzeFerme.get(String(t.id));
       if (ferma) {
         el.style.flex = `0 0 ${ferma}px`;
@@ -940,6 +1076,7 @@
     misuraLarghezzeNaturali();
 
     tabsEl.style.flex = larghezzeFerme && strisciaFerma ? `0 0 ${strisciaFerma}px` : '';
+    try { ANTEPRIMA.ridisegnata(); } catch (_) {}
 
     // §6 — con la striscia scrollabile, assicuriamoci che la scheda attiva sia
     // sempre visibile (può finire fuori vista dopo che ne apri molte).
@@ -1053,9 +1190,8 @@
     // Con un tetto teniamo solo le più recenti (le più rilevanti); le eccedenti
     // vengono rimosse subito, senza attendere il timeout.
     const MAX_STACK = 5;
-    // Col puntatore sopra la pila i tempi aspettano; uscito, a chi era agli sgoccioli restano almeno questi ms.
-    const RIPRESA_MS = 2000;
-    let fermi = false;
+    // Col puntatore sopra la pila (lo dice la vista che la disegna) i tempi aspettano: regola in avvisiTempo.js.
+    const tempi = window.SN_AVVISI.orologio();
     let seq = 0;
     function hostEl() {
       if (!host) {
@@ -1090,7 +1226,7 @@
       try { api.avvisi.stato({ carte, tema: { vars } }); } catch (_) {}
     }
     if (api.avvisi) {
-      if (api.avvisi.onSopra) api.avvisi.onSopra((dati) => ferma(!!(dati && dati.sopra)));
+      if (api.avvisi.onSopra) api.avvisi.onSopra((dati) => tempi.ferma(!!(dati && dati.sopra)));
       api.avvisi.onAzione((dati) => {
         if (!host || !dati) return;
         const card = Array.from(host.children).find((c) => c.dataset.nid === String(dati.id));
@@ -1110,39 +1246,22 @@
       const over = live.length - MAX_STACK;
       for (let i = 0; i < over; i++) {
         const c = live[i]; // le più vecchie sono in cima (append in coda)
-        if (c._timer) clearTimeout(c._timer);
+        if (c._tempo) c._tempo.annulla();
         try { c.remove(); } catch (_) {}
       }
     }
     function avviaTempo(card, ms) {
-      card._restano = ms;
-      if (fermi) return;
-      card._scade = Date.now() + ms;
-      card._timer = setTimeout(() => dismiss(card), ms);
-    }
-    function ferma(sopra) {
-      if (sopra === fermi) return;
-      fermi = sopra;
-      for (const c of hostEl().children) {
-        if (c.dataset.closing === '1' || c._restano == null) continue;
-        if (sopra) {
-          if (!c._timer) continue;
-          clearTimeout(c._timer);
-          c._timer = null;
-          c._restano = Math.max(0, c._scade - Date.now());
-        } else if (!c._timer) {
-          avviaTempo(c, Math.max(c._restano, RIPRESA_MS));
-        }
-      }
+      if (card._tempo) card._tempo.annulla();
+      card._tempo = tempi.avvia(ms, () => dismiss(card));
     }
     function dismiss(card) {
       if (!card || card.dataset.closing === '1') return;
       card.dataset.closing = '1';
-      if (card._timer) clearTimeout(card._timer);
-      card._timer = null;
+      if (card._tempo) card._tempo.annulla();
+      card._tempo = null;
       card.classList.remove('show');
       // Pila vuota: nessuno ha più il puntatore sopra, anche se la vista sparendo non l'ha potuto dire.
-      if (!Array.from(hostEl().children).some((c) => c.dataset.closing !== '1')) fermi = false;
+      if (!Array.from(hostEl().children).some((c) => c.dataset.closing !== '1')) tempi.ferma(false);
       // attende la transizione prima di rimuovere dal DOM
       setTimeout(() => { try { card.remove(); } catch (_) {} }, 220);
     }
@@ -1178,10 +1297,9 @@
       if (!text) return null;
       opts = opts || {};
       if (opts.key) dismissKey(opts.key);
-      const durationSec = opts.durationSec != null
-        ? Number(opts.durationSec)
-        : notifConfig.durationSec;
-      const durata = Number.isFinite(durationSec) && durationSec > 0 ? durationSec : 0;
+      // Una durata scelta da chi chiama vale per la durata standard: quella delle Preferenze la riporta in scala.
+      const chiesta = opts.durationSec != null ? Number(opts.durationSec) : window.SN_AVVISI.STANDARD_SEC;
+      const durata = window.SN_AVVISI.durata(Number.isFinite(chiesta) && chiesta >= 0 ? chiesta * 1000 : undefined, notifConfig.durationSec);
 
       const chiave = opts.unica ? String(opts.unica) : '';
       const gemella = chiave && Array.from(hostEl().children)
@@ -1189,10 +1307,7 @@
       if (gemella) {
         gemella.querySelector('.shell-notif-msg').textContent = text;
         azioni(gemella, opts.actions);
-        if (gemella._timer) clearTimeout(gemella._timer);
-        gemella._timer = null;
-        gemella._restano = null;
-        if (durata) avviaTempo(gemella, durata * 1000);
+        avviaTempo(gemella, durata);
         return gemella;
       }
 
@@ -1234,7 +1349,7 @@
         try { window.SN_SOUNDS.play(typeof wantSound === 'string' ? wantSound : notifConfig.sound); } catch (_) {}
       }
 
-      if (durata) avviaTempo(card, durata * 1000);
+      avviaTempo(card, durata);
       return card;
     }
     // Un avviso con chiave dice uno stato: quando lo stato cambia se ne va.
@@ -1316,6 +1431,17 @@
           if (a && a.revealDownloadId && !a.onClick && api.downloads) {
             const id = a.revealDownloadId;
             return { label: a.label, onClick: () => openDownloadFolder(id) };
+          }
+          // #950 — il nome dato da solo a uno scaricamento: «Annulla» rimette quello con cui era arrivato.
+          if (a && a.rimettiNomeDownloadId && !a.onClick && api.downloads && api.downloads.rimettiNome) {
+            const id = a.rimettiNomeDownloadId;
+            return {
+              label: a.label,
+              onClick: () => api.downloads.rimettiNome(id).then((r) => {
+                if (r && r.ok) NOTIFS.show(r.cambiato ? `Il nome di prima era occupato: ora è «${r.nome}»` : `Nome di prima rimesso: ${r.nome}`);
+                else NOTIFS.show((r && r.frase) || 'Non sono riuscito a rimettere il nome di prima');
+              }).catch(() => {}),
+            };
           }
           return a;
         }),
@@ -1622,8 +1748,83 @@
         addBtn('Rimuovi', () => api.downloads.remove(r.id).then((res) => syncFromList(res && res.items)).catch(() => {}));
       }
       row.appendChild(actions);
+      if (r.state === 'completed' && !apri) {
+        row.addEventListener('contextmenu', (e) => { e.preventDefault(); apriMenuRiga(r); });
+        if (menuRiga.id === r.id && menuRiga.voci.length) {
+          row.classList.add('dl-row-con-menu');
+          row.appendChild(costruisciMenuRiga(r));
+        }
+      }
       return row;
     }
+
+    // #950 — il tasto destro su un file del pannello: le azioni della pagina Scaricamenti, compreso il nome
+    // sensato. Il menu si apre DENTRO la riga: fuori dal pannello lo coprirebbe la pagina, che sta sopra la barra.
+    // «Dai un nome sensato» porta alla pagina col riquadro aperto: nel pannello non c'è posto per casella ed esito.
+    const menuRiga = { id: '', voci: [] };
+    function chiudiMenuRiga() {
+      if (!menuRiga.id) return;
+      menuRiga.id = '';
+      menuRiga.voci = [];
+      if (panelOpen) renderPanel();
+    }
+    async function apriMenuRiga(riga) {
+      // La riga resta in pagina mentre il record cambia (nome nuovo, file sparito): conta quello di adesso.
+      const r = dls.get(riga.id) || riga;
+      const voci = [];
+      if (!r.missing) voci.push(['Apri file', () => openDownloadFile(r.id)]);
+      voci.push(['Apri cartella', () => openDownloadFolder(r.id)]);
+      const N = window.SN_NOMI_FILE;
+      if (!r.missing && !r.exe && N && N.tipoDi(r.filename)) {
+        let disp = false;
+        try { disp = !!((await api.message({ type: 'file_nome_stato' })) || {}).disponibile; } catch (_) { disp = false; }
+        if (disp) {
+          voci.push(['Dai un nome sensato', () => {
+            api.tabs.open(`filo://downloads/downloads.html?rinomina=${encodeURIComponent(r.id)}`);
+            closePanel();
+          }]);
+        }
+      }
+      if (!r.missing && r.nomeOriginale) {
+        voci.push(['Rimetti il nome di prima', () => api.downloads.rimettiNome(r.id).then((res) => {
+          avvisiRiga.set(r.id, res && res.ok
+            ? (res.cambiato ? `Il nome di prima era occupato: ora è «${res.nome}»` : `Nome di prima rimesso: ${res.nome}`)
+            : ((res && res.frase) || 'Non sono riuscito a rimettere il nome di prima'));
+          if (panelOpen) renderPanel();
+        }).catch(() => {})]);
+      }
+      voci.push(['Rimuovi', () => api.downloads.remove(r.id).then((res) => syncFromList(res && res.items)).catch(() => {})]);
+      menuRiga.id = r.id;
+      menuRiga.voci = voci;
+      if (panelOpen) renderPanel();
+      const primo = panel && panel.querySelector('.dl-row-menu-voce');
+      if (primo) try { primo.focus({ preventScroll: false }); } catch (_) {}
+    }
+    function costruisciMenuRiga() {
+      const m = document.createElement('div');
+      m.className = 'dl-row-menu';
+      m.setAttribute('role', 'menu');
+      for (const [label, fn] of menuRiga.voci) {
+        const v = document.createElement('div');
+        v.className = 'dl-row-menu-voce';
+        v.setAttribute('role', 'menuitem');
+        v.tabIndex = 0;
+        v.textContent = label;
+        const scegli = () => { chiudiMenuRiga(); fn(); };
+        v.addEventListener('click', (e) => { e.stopPropagation(); scegli(); });
+        v.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scegli(); }
+        });
+        m.appendChild(v);
+      }
+      return m;
+    }
+    document.addEventListener('mousedown', (e) => {
+      if (menuRiga.id && !(e.target.closest && e.target.closest('.dl-row-menu'))) chiudiMenuRiga();
+    }, true);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && menuRiga.id) { e.stopImmediatePropagation(); chiudiMenuRiga(); }
+    }, true);
 
     // reserveTop = altezza del pannello (capped) così la view della pagina
     // scende e il pannello non finisce sotto di essa. Vedi setTopInset in tabs.js.

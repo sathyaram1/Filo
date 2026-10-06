@@ -14,7 +14,10 @@ chiede, ma **far decidere l'owner su ciò che non viene da lui**:
 
 - **Il blocco apre una RICHIESTA IN ATTESA, non un rifiuto secco.** Chi ha
   chiesto riceve "l'ho messa in attesa, ecco dove approvarla" — mai un "decidi
-  tu cosa farne" che non nomina nessuna mossa possibile.
+  tu cosa farne" che non nomina nessuna mossa possibile. «In attesa» si dice
+  solo se il deposito la mostra in attesa: una richiesta già decisa (approvata
+  o scartata) non si riapre, ma il server ne restituisce il nome lo stesso, e
+  chi chiede deve dire com'era finita e come riproporla (#486).
 - **Il sì lo dà l'owner, in Gestione: è una REGOLA del server, non un muro.**
   Vale per il lavoro senza la prova di chi l'ha chiesto (routine, feedback
   d'utente). Una sessione locale ha i poteri dell'owner, approvazione

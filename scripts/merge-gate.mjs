@@ -37,20 +37,22 @@
 //          messo in stato `design`, decide l'utente. Nessuna fusione — ma il
 //          ramo non è perduto: il server apre una richiesta di approvazione
 //          che l'owner trova in cima alla dashboard di gestione.
-//     20 → conflitto di merge: serve risoluzione manuale. Nessuna fusione.
+//     20 → conflitto di merge, o unit rossi sul risultato della fusione con main
+//          (#929): il server ha già instradato il riallineamento. Nessuna fusione.
 //     1  → errore tecnico (argomenti, biglietto assente, server/GitHub giù) o
 //          richiesta RIFIUTATA dal server (verdetti non registrati, ramo che
 //          non combacia col biglietto, via libera che non copre la punta): il
 //          server l'ha già messa a registro.
 
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pinnedRepoRoot, absolutizeRecipe, TOOLS_ROOT } from './lib/tools-pin.mjs';
-import { merge } from './routine-channel.mjs';
+import { merge, heartbeat } from './routine-channel.mjs';
 import { readTicket } from './lib/routine-ticket.mjs';
 import { headSha, currentBranch, findStateIdByBranch, readBranchState } from './lib/branch-integrity.mjs';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
+import { chiediConProva } from './lib/unit-sulla-fusione.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // FILO_REPO_ROOT: override della root (dove si cerca il biglietto). Esiste SOLO
@@ -314,11 +316,31 @@ export function testoRamoDiverso(nominato, corrente) {
     + 'Posizionati sul ramo del lavoro e rilancia, oppure nomina il ramo su cui sei.';
 }
 
+/**
+ * Tiene vivo il lavoro sul server finché gira la prova degli unit: dura minuti, a volte più dell'ora di silenzio dopo
+ * cui il semaforo cade, e in cloud nient'altro batte intanto (verifica #929 giro 3). Gli unit bloccano questo processo,
+ * quindi batte un figlio, fermato alla fine. Un battito subito: quello del figlio arriva solo dopo il suo avvio.
+ */
+export async function tieniVivo(ticket, { batti = heartbeat, avvia = spawn, script = resolve(__dirname, 'routine-channel.mjs') } = {}) {
+  try { await batti(ticket); } catch (_) { /* il figlio ci riprova */ }
+  let figlio = null;
+  try {
+    figlio = avvia(process.execPath, [script, 'heartbeat', '--loop'], {
+      env: { ...process.env, FILO_ROUTINE_TICKET: ticket, FILO_REPO_ROOT: ROOT }, stdio: 'ignore', windowsHide: true,
+    });
+    if (figlio && typeof figlio.on === 'function') figlio.on('error', () => {});
+  } catch (_) { figlio = null; }
+  const ferma = () => { try { if (figlio) figlio.kill(); } catch (_) { /* già uscito */ } };
+  process.once('exit', ferma);
+  return { ferma, figlio };
+}
+
 export function exitCodeFor(reply) {
   const r = reply || {};
   if (r.ok === true && r.result === 'merged') return 0;
   if (r.ok === true && r.result === 'blocked') return 10;
-  if (r.ok === true && r.result === 'conflict') return 20;
+  // Unit rossi sul risultato della fusione (#929): come un conflitto, il server ha già instradato il riallineamento.
+  if (r.ok === true && (r.result === 'conflict' || r.result === 'unit_rossi')) return 20;
   return 1;
 }
 
@@ -334,9 +356,10 @@ const USO = [
   '  se nella directory c\'è qualcosa fuori dai commit, o se in cima al ramo su',
   '  origin (da dove il server lo prende) non c\'è il contenuto esaminato, non parte.',
   '  Exit: 0 fuso · 10 fermato dal cancello di sicurezza (decide l’owner)',
-  '        20 conflitto · 1 uso sbagliato, ramo diverso da quello della directory,',
+  '  Prima di chiedere fa girare gli unit sul risultato della fusione con origin/main.',
+  '        20 conflitto o unit rossi sulla fusione · 1 uso sbagliato, ramo diverso da quello della directory,',
   '           ramo mosso dopo il controllo di sicurezza, contenuto che non è quello in cima',
-  '           su origin, o rifiuto del server',
+  '           su origin, main mosso a ogni prova, o rifiuto del server',
 ].join('\n');
 
 async function main() {
@@ -444,7 +467,25 @@ async function main() {
     console.error('[merge-gate] nota: in questa directory non c\'è nessun origin, quindi non ho potuto guardare cosa troverà chi fonde. Decide il server.');
   }
 
-  const reply = await merge(ticket, source, { sha: punta });
+  // Gli unit sul RISULTATO della fusione con main di adesso (#929): due lavori verdi da soli possono rompere main
+  // insieme. Un rosso solo sulla fusione lo dice al server, che rimanda il lavoro al riallineamento con l'elenco.
+  const battito = await tieniVivo(ticket);
+  let giro;
+  try {
+    giro = await chiediConProva({
+      root: ROOT, punta,
+      chiedi: (provaUnit) => merge(ticket, source, provaUnit ? { sha: punta, provaUnit } : { sha: punta }),
+      mainMosso: (r) => !!(r && r.ok === true && r.result === 'main_moved'),
+      scrivi: (s) => console.error(`[merge-gate] ${s}`),
+    });
+  } finally {
+    battito.ferma();
+  }
+  const reply = giro.reply;
+  if (giro.esaurito) {
+    console.error(`[merge-gate] ERROR: main si è mosso a ogni prova (${giro.tentativi} tentativi): niente fusione. Il lavoro è intatto sul ramo; rilancia questo comando.`);
+    process.exit(1);
+  }
   const code = exitCodeFor(reply);
   if (code === 0) console.log(`[merge-gate] OK: ${source} fuso su main dal server${reply.sha ? ` (${reply.sha.slice(0, 12)})` : ''}`);
   else if (code === 10) {
@@ -453,6 +494,9 @@ async function main() {
     // l'owner trova in cima alla dashboard di gestione. Dirlo qui evita che
     // chi legge il registro creda che il ramo sia perduto.
     if (reply.approval) console.error('[merge-gate] il ramo aspetta il via libera dell’owner nella dashboard di gestione');
+  }
+  else if (code === 20 && reply.result === 'unit_rossi') {
+    console.error('[merge-gate] UNIT ROSSI SULLA FUSIONE: niente fusione. Il server ha rimandato il lavoro al riallineamento con l\'elenco dei test rotti.');
   }
   else if (code === 20) console.error(`[merge-gate] CONFLICT: ${reply.reason || 'serve risoluzione manuale'}`);
   else console.error(testoRifiutoServer(reply.reason) || `[merge-gate] ERROR: ${reply.reason || 'guasto'}`);

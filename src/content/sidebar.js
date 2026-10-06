@@ -42,6 +42,14 @@
   // (o auto-action reveal/hover andate a buon fine), niente value di fill.
   // rawUserMessages serve solo al "judge" lato server come riferimento.
   let session = null;
+  let ripiegoDetto = false;
+  let ripiegoDaDire = '';
+  function diciRipiego() {
+    if (!ripiegoDaDire) return;
+    const riga = ripiegoDaDire;
+    ripiegoDaDire = '';
+    appendActionLog(riga)?.classList.add('sn-sidebar-log-intera');
+  }
   function newSession() {
     return {
       initialUrl: '',
@@ -78,6 +86,8 @@
   function open(context) {
     if (root) return;
     history = [];
+    ripiegoDetto = false;
+    ripiegoDaDire = '';
     collapsed = false;
     aiPrefersOpen = true;
     session = newSession();
@@ -150,6 +160,11 @@
         e.preventDefault();
         form.requestSubmit();
       }
+    });
+    // Il tasto microfono: si parla, e la richiesta parte come con l'invio (o resta da correggere).
+    global.SN_VOCE_CHAT?.collega({
+      campo: ta, contenitore: form, prima: form.querySelector('button[type="submit"]'),
+      invia: () => form.requestSubmit(),
     });
     // Focus o tasto sull'input → riapri la chat
     ta.addEventListener('focus', () => expand({ ai: false }));
@@ -274,6 +289,7 @@
     }
     conv.appendChild(msg);
     conv.scrollTop = conv.scrollHeight;
+    if (role === 'assistant') diciRipiego();
     return msg;
   }
 
@@ -985,6 +1001,63 @@
     };
   }
 
+  // #711 — «questa foto è fatta con l'AI?» chiesto qui deve avere la stessa lettura del
+  // tasto destro: si leggono le etichette delle immagini che l'utente ha davanti, dalle
+  // più grandi. Oltre il tetto il modello sa quante ne sono rimaste fuori.
+  const MAX_IMMAGINI_ORIGINE = 12;
+  // Un'immagine che non arriva non deve tenere ferma la risposta: conta come non letta.
+  const ATTESA_ORIGINE_MS = 3000;
+  // Un'immagine letta resta letta: le domande dopo non la riscaricano.
+  const origineLetta = new Map();
+  function immaginiVisibili() {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const viste = new Set();
+    const out = [];
+    for (const im of Array.from(document.images || [])) {
+      if (root && root.contains(im)) continue;
+      const src = im.currentSrc || im.src;
+      if (!src || viste.has(src) || !im.complete || !im.naturalWidth) continue;
+      const r = im.getBoundingClientRect();
+      if (r.width < 48 || r.height < 48) continue;
+      if (r.bottom <= 0 || r.right <= 0 || r.top >= vh || r.left >= vw) continue;
+      viste.add(src);
+      out.push({ im, src, r, area: r.width * r.height });
+    }
+    return out.sort((a, b) => b.area - a.area);
+  }
+  async function origineImmaginiVisibili() {
+    const Actions = global.SN_ACTIONS;
+    if (!Actions?.leggiOrigine || !Actions?.scaricaImmagine) return null;
+    const tutte = immaginiVisibili();
+    if (!tutte.length) return null;
+    const esiti = await Promise.all(tutte.slice(0, MAX_IMMAGINI_ORIGINE).map(async ({ im, src, r }, i) => {
+      try {
+        let lettura = origineLetta.get(src);
+        if (!lettura) {
+          lettura = (async () => Actions.leggiOrigine(await Actions.scaricaImmagine(src)))();
+          lettura.then((p) => { if (!p || !p.ok || p.firmatario === 'non_verificato') origineLetta.delete(src); }, () => origineLetta.delete(src));
+          if (origineLetta.size >= 500) origineLetta.delete(origineLetta.keys().next().value);
+          origineLetta.set(src, lettura);
+        }
+        const p = await Promise.race([
+          lettura,
+          new Promise((ok) => setTimeout(() => ok(null), ATTESA_ORIGINE_MS)),
+        ]);
+        if (!p || !p.ok) return null;
+        return {
+          n: i + 1,
+          alt: String(im.alt || im.title || '').slice(0, 120),
+          larghezza: Math.round(r.width),
+          altezza: Math.round(r.height),
+          frase: p.frase || '',
+        };
+      } catch (_) { return null; }
+    }));
+    const lette = esiti.filter(Boolean);
+    return { visibili: tutte.length, controllate: lette.length, esiti: lette.filter((e) => e.frase) };
+  }
+
   async function captureScreenshot() {
     try {
       const r = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB });
@@ -1066,17 +1139,33 @@
     if (userAction) {
       await waitForPageSettle({ initialUrl: preActionUrl || location.href });
     }
-    const screenshot = await captureScreenshot();
+    const [screenshot, origineImmagini] = await Promise.all([
+      captureScreenshot(),
+      userMessage ? origineImmaginiVisibili().catch(() => null) : Promise.resolve(null),
+    ]);
     const payload = buildPayload(userMessage, userAction, esterno);
     payload.screenshot = screenshot || undefined;
+    payload.origineImmagini = origineImmagini || undefined;
 
     try {
       const res = await chrome.runtime.sendMessage({
         type: MSG.AI_REQUEST,
         action: ACTIONS.HELP,
         payload,
+        diceRipiego: true,
       });
       if (!res?.ok) throw new Error(res?.error || I18n.t('err_provider_failed'));
+      // Risposta pagata coi crediti di Filo perché OpenRouter ha rifiutato la chiave (#662): la
+      // riga della chat, una volta per serie, non a ogni passo che l'agente fa da solo.
+      // Sotto la risposta, come in chat: la scrive il prossimo messaggio di Filo (o la fine del turno).
+      if (res.keyFallback && res.keyFallback.line) {
+        // La riga è già nella conversazione, o la scrive questo turno: l'avviso non la ripete.
+        if (!ripiegoDetto) ripiegoDaDire = res.keyFallback.line;
+        Popup?.ripiegoMostrato?.(convEl());
+        ripiegoDetto = true;
+      } else {
+        ripiegoDetto = false;
+      }
       const parsed = parseAssistantOutput(res.text);
 
       // Caso speciale: l'AI ha chiesto una ricerca web. Esegui la ricerca,
@@ -1172,6 +1261,7 @@
         } else {
           expand({ ai: true });
         }
+        diciRipiego();
         return;
       }
 
@@ -1188,6 +1278,7 @@
         }
         await runFiloAction(parsed.filoAction);
         expand({ ai: true });
+        diciRipiego();
         return;
       }
 
@@ -1208,6 +1299,7 @@
         } else {
           expand({ ai: true });
         }
+        diciRipiego();
         return;
       }
 

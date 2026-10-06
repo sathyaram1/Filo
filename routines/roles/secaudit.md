@@ -85,6 +85,13 @@ server un verdetto raccontato non lo legge).
    ```bash
    node scripts/merge-gate.mjs <branch>
    ```
+   **Dura minuti, non secondi**: prima di chiedere fa girare gli unit sul
+   risultato della fusione del ramo con origin/main, in una cartella
+   temporanea (dai cinque ai venti minuti, di più se main si muove e la prova
+   si rifà). Lancialo in sottofondo e aspettalo a pezzi, come dice il
+   contratto: una chiamata tagliata a metà non chiede niente. Se gli unit sono
+   rossi solo sulla fusione il server non fonde e rimanda il lavoro al
+   riallineamento con l'elenco (exit 20): non è un tuo fail.
    Anche la richiesta di fusione parla del commit, non del ramo: dichiara la
    punta della directory, e prima di partire rifà i due controlli del passo 1.
    Se il ramo si è mosso dopo il TUO verdetto, il rifiuto ti scrive cosa
@@ -104,9 +111,9 @@ server un verdetto raccontato non lo legge).
    directory lì col comando che il rifiuto ti scrive e rilancia.
    Il gate è una chiamata al SERVER: è lui che verifica dallo stato vero che
    verifica e controllo di sicurezza risultino registrati `pass`, fa girare L5
-   sul diff che scarica da GitHub, e fonde con la sua identità. Qui non gira
-   nessun git e non si passa nessun verdetto: se il tuo `pass` non è stato
-   registrato al passo 1, la fusione viene rifiutata.
+   sul diff che scarica da GitHub, e fonde con la sua identità. Qui girano
+   solo la prova degli unit e la richiesta, e non si passa nessun verdetto: se
+   il tuo `pass` non è stato registrato al passo 1, la fusione viene rifiutata.
 3. Chiudi in base all'exit del gate:
    - `0` → fuso → `node scripts/routine-channel.mjs deliver status --status done --notes "<riga>"` +
      `node scripts/dispatch.mjs --clear-state <id>`
@@ -119,7 +126,9 @@ server un verdetto raccontato non lo legge).
      dopo aver letto cosa è stato bloccato. La tua spiegazione è quello che
      legge per decidere: scrivila per lui, non per il registro.
    - `20` → conflitto: main è andato avanti e il ramo non si fonde più da
-     solo. **Non fare niente**: il server ha già instradato il giro di
+     solo; oppure gli unit, che il gate fa girare sul risultato della fusione
+     con main prima di chiederla, lì sono rossi e su main da solo no.
+     **Non fare niente**: il server ha già instradato il giro di
      riallineamento (la pratica torna a chi risolve con la critica che spiega
      il rebase). Niente `design`, niente nota: la sovrascriveresti.
    - `1` → errore tecnico (o richiesta rifiutata dal server: il motivo è

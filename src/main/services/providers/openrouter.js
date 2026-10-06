@@ -47,6 +47,7 @@
   // Se anche la riserva rifiuta, l'errore che risale è il SUO (con la
   // personale un 402 sono i crediti finiti), e il rifiuto della chiave
   // propria resta comunque registrato: la pagina Crediti lo mostra.
+  // La prova di una chiave non ripiega (SN_WALLET_MAIN.senzaRipiego).
   async function fetchWithKey(url, apiKey, makeInit) {
     let res = await fetch(url, makeInit(apiKey));
     let keyUsed = apiKey;
@@ -65,8 +66,15 @@
       }
       if (alt && alt.key) {
         const refused = { status: res.status, detail };
-        try { await K.noteOwnKeyRefusal(refused); } catch (_) {}
-        res = await fetch(url, makeInit(alt.key));
+        // Il rifiuto si annota DOPO il ripiego: Crediti dice che Filo ha
+        // usato i crediti solo se la personale ha risposto davvero.
+        try {
+          res = await fetch(url, makeInit(alt.key));
+        } catch (e) {
+          try { await K.noteOwnKeyRefusal({ ...refused, served: false }); } catch (_) {}
+          throw e;
+        }
+        try { await K.noteOwnKeyRefusal({ ...refused, served: res.ok }); } catch (_) {}
         keyUsed = alt.key;
         keyFallback = { status: refused.status, from: 'own', to: alt.source || 'personal' };
         if (!res.ok) keyFallback.failed = res.status;
@@ -112,7 +120,7 @@
   // escluso. `sort` sceglie l'ordine fra gli ammessi (latency/throughput) invece
   // del prezzo. `allow_fallbacks` resta acceso: fra gli host AMMESSI il ripiego
   // serve. Un modello da comprare solo dal produttore (#904) porta `only` anche senza `routing`.
-  function providerBlock(routing, model) {
+  function providerBlock(routing, model, { tools = false } = {}) {
     const p = {};
     const r = routing && typeof routing === 'object' ? routing : {};
     const ignore = Array.isArray(r.ignore) ? r.ignore.filter(Boolean) : [];
@@ -121,10 +129,9 @@
       p.sort = r.sort;
     }
     if (r.allowFallbacks === false) p.allow_fallbacks = false;
-    // Con gli strumenti (tool calling) in richiesta, solo gli host che li
-    // supportano davvero: senza questo il router può passare a un host che
-    // ignora `tools` in silenzio, e il modello risponde a parole invece di agire.
-    if (r.requireParameters === true) p.require_parameters = true;
+    // Strumenti in richiesta → solo host che li supportano davvero (#700): un host che li ignora o
+    // ne rompe il JSON fa fallire il turno senza che si capisca perché. Vale per OGNI chiamata con strumenti.
+    if (tools) p.require_parameters = true;
     const C = global.SN_CONST;
     const rule = C && typeof C.producerOnlyRule === 'function' ? C.producerOnlyRule(model) : null;
     if (rule) p.only = rule.only.slice();
@@ -140,6 +147,52 @@
       if (toolChoice) out.tool_choice = toolChoice;
     }
     return out;
+  }
+
+  // Il 404 «nessun host» del router ha più cause, e solo quella sui parametri chiesti riguarda strumenti e
+  // ragionamento: le altre hanno un rimedio diverso e non si ritentano. Prove: tests/unit/openrouterTools.test.mjs.
+  function routerRefusal(text) {
+    const t = String(text || '');
+    if (/data policy|settings\/privacy/i.test(t)) return 'DATA_POLICY';
+    if (/requested parameters|tool/i.test(t)) return 'PARAMS';
+    if (/no endpoints found for\b/i.test(t)) return 'MODEL_UNAVAILABLE';
+    if (/no allowed providers|no endpoints (found|available)/i.test(t)) return 'NO_PROVIDER_ALLOWED';
+    return null;
+  }
+  const isParamsRefusal = (text) => routerRefusal(text) === 'PARAMS';
+
+  // Una chiamata di chat (con o senza streaming). `require_parameters` scarta anche gli host che non
+  // conoscono `reasoning`, e per un modello che non ragiona non ne resterebbe nessuno: il ragionamento
+  // è facoltativo, gli strumenti no, quindi a quel rifiuto si rifà la richiesta senza.
+  // Il rifiuto si ricorda per modello e vincoli: senza, ogni messaggio e ogni giro di strumenti lo ripaga in attesa.
+  // Scade perché gli host di un modello cambiano, e uno nuovo che regge il ragionamento va ritrovato.
+  const REASONING_REFUSED_MS = 60 * 60 * 1000;
+  const reasoningRefused = new Map();
+  function forgetReasoningRefusals() { reasoningRefused.clear(); }
+
+  async function postChat(body, apiKey, signal) {
+    const send = (b, key) => {
+      const payload = JSON.stringify(b);
+      return fetchWithKey(ENDPOINT, key, (k) => ({ method: 'POST', headers: buildHeaders(k), body: payload, signal }));
+    };
+    const needsParams = !!(body.provider && body.provider.require_parameters);
+    const { reasoning: _omesso, ...senzaRagionamento } = body;
+    const refusalKey = needsParams && body.reasoning ? JSON.stringify([body.model, body.provider]) : null;
+    if (refusalKey) {
+      if ((reasoningRefused.get(refusalKey) || 0) > Date.now()) return send(senzaRagionamento, apiKey);
+      reasoningRefused.delete(refusalKey);
+    }
+    const first = await send(body, apiKey);
+    if (first.res.ok || first.res.status !== 404 || !refusalKey) return first;
+    const detail = await first.res.clone().text().catch(() => '');
+    if (!isParamsRefusal(detail)) return first;
+    const second = await send(senzaRagionamento, first.keyUsed);
+    if (second.res.ok) reasoningRefused.set(refusalKey, Date.now() + REASONING_REFUSED_MS);
+    if (!second.keyFallback && first.keyFallback) {
+      second.keyFallback = first.keyFallback;
+      try { second.res.keyFallback = first.keyFallback; } catch (_) {}
+    }
+    return second;
   }
 
   // Le chiamate agli strumenti di una risposta NON in streaming, nella forma
@@ -291,15 +344,12 @@
     const body = { model, messages, stream: false, usage: { include: true }, ...toolsFields(tools, toolChoice) };
     const r = reasoningField(reasoning, false);
     if (r) body.reasoning = r;
-    const pb = providerBlock(providerRouting, model);
+    const pb = providerBlock(providerRouting, model, { tools: !!body.tools });
     if (pb) body.provider = pb;
-    const payload = JSON.stringify(body);
-    const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(ENDPOINT, apiKey, (key) => ({
-      method: 'POST', headers: buildHeaders(key), body: payload, signal,
-    }));
+    const { res, keyUsed, keySource, keyFallback } = await postChat(body, apiKey, signal);
     // status/provider strutturati sull'errore: chi lo mostra all'utente può
     // tradurlo in una frase comprensibile invece del codice HTTP nudo (#331).
-    if (!res.ok) throw await httpError(res);
+    if (!res.ok) throw await httpError(res, { tools: !!body.tools });
     const data = await res.json();
     const message = data.choices?.[0]?.message || {};
     const text = message.content || '';
@@ -333,15 +383,12 @@
     // non ragionano semplicemente non ne emettono — best-effort.
     const r = reasoningField(reasoning, !!onReasoning);
     if (r) reqBody.reasoning = r;
-    const pb = providerBlock(providerRouting, model);
+    const pb = providerBlock(providerRouting, model, { tools: !!reqBody.tools });
     if (pb) reqBody.provider = pb;
-    const payload = JSON.stringify(reqBody);
     // Il rifiuto della chiave arriva con lo status, prima di qualunque delta:
     // il ripiego qui non ha ancora niente da azzerare nel chiamante.
-    const { res, keyUsed, keySource, keyFallback } = await fetchWithKey(ENDPOINT, apiKey, (key) => ({
-      method: 'POST', headers: buildHeaders(key), body: payload, signal,
-    }));
-    if (!res.ok || !res.body) throw await httpError(res);
+    const { res, keyUsed, keySource, keyFallback } = await postChat(reqBody, apiKey, signal);
+    if (!res.ok || !res.body) throw await httpError(res, { tools: !!reqBody.tools });
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder('utf-8');
@@ -421,14 +468,109 @@
   // personale c'è stato e ha fallito (fetchWithKey li lascia sulla risposta):
   // un 402 «la tua chiave» e un 402 «anche i crediti di Filo» sono due frasi
   // diverse per l'utente.
-  async function httpError(res) {
+  async function httpError(res, { tools = false } = {}) {
     const errText = await res.text().catch(() => '');
     const err = new Error(`OpenRouter ${res.status}: ${errText.slice(0, 300)}`);
     err.status = res.status;
     err.provider = 'openrouter';
+    // Con gli strumenti il router cerca solo host che li reggono: il suo 404 vuol dire che fra gli
+    // ammessi non ce n'è, e chi lo racconta deve dire questo, non «riprova».
+    const refusal = res.status === 404 ? routerRefusal(errText) : null;
+    if (refusal === 'PARAMS') { if (tools) err.code = 'NO_TOOL_HOST'; } else if (refusal) err.code = refusal;
     if (res.keySource) err.keySource = res.keySource;
     if (res.keyFallback) err.keyFallback = res.keyFallback;
     return err;
+  }
+
+  // ─── Chi può servire un modello, prima di chiamarlo ───────────────────────
+  // Sugli endpoint audio il router ignora il blocco `provider` (#713): l'esclusione si applica qui, sugli host
+  // dichiarati. Regole: patterns/voce-dettatura-e-vettori-passano-dal-router-come-le-chat.md.
+  const HOSTS_FRESH_MS = 60 * 60 * 1000;
+  const HOSTS_RETRY_MS = 5 * 60 * 1000;
+  const HOSTS_TIMEOUT_MS = 10 * 1000;
+  const HOSTS_MAX_MODELS = 500;
+  const hostsCache = new Map(); // id → { until, hosts, pending }
+
+  function endpointsUrl(model) {
+    const id = String(model == null ? '' : model).trim();
+    const parts = id.split('/');
+    if (parts.length !== 2 || parts.some((p) => !p || p === '.' || p === '..')) return '';
+    return `${MODELS_ENDPOINT}/${parts.map(encodeURIComponent).join('/')}/endpoints`;
+  }
+
+  async function fetchModelHosts(apiKey, model) {
+    const url = endpointsUrl(model);
+    if (!url) return null;
+    const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
+    const res = await fetch(url, { headers, signal: AbortSignal.timeout(HOSTS_TIMEOUT_MS) });
+    if (!res.ok) throw new Error(`OpenRouter endpoints ${res.status}`);
+    const data = (await res.json()) || {};
+    const list = data.data && Array.isArray(data.data.endpoints) ? data.data.endpoints : [];
+    const hosts = [];
+    for (const e of list) {
+      const name = e && typeof e.provider_name === 'string' ? e.provider_name.trim() : '';
+      const tag = e && typeof e.tag === 'string' ? e.tag.trim() : '';
+      if (name || tag) hosts.push({ name, tag });
+    }
+    return hosts;
+  }
+
+  // [{ name, tag }] o null se non si sa. Un elenco scaduto si usa mentre si rilegge;
+  // una lettura fallita si ritenta dopo qualche minuto, non a ogni frase dettata.
+  async function modelHosts({ apiKey, model } = {}) {
+    const key = String(model == null ? '' : model).trim();
+    if (!key) return null;
+    const hit = hostsCache.get(key);
+    if (hit && hit.pending) return hit.hosts || hit.pending;
+    if (hit && Date.now() < hit.until) return hit.hosts;
+    const entry = { until: 0, hosts: hit ? hit.hosts : null, pending: null };
+    entry.pending = fetchModelHosts(apiKey, key)
+      .then((hosts) => {
+        entry.hosts = hosts;
+        entry.until = Date.now() + (hosts ? HOSTS_FRESH_MS : HOSTS_RETRY_MS);
+        return entry.hosts;
+      })
+      .catch((e) => {
+        console.warn(`[Filo policy] host di "${key}" non letti:`, (e && e.message) || e);
+        entry.until = Date.now() + HOSTS_RETRY_MS;
+        return entry.hosts;
+      })
+      .finally(() => { entry.pending = null; });
+    hostsCache.delete(key);
+    hostsCache.set(key, entry);
+    while (hostsCache.size > HOSTS_MAX_MODELS) hostsCache.delete(hostsCache.keys().next().value);
+    return entry.hosts || entry.pending;
+  }
+
+  function forgetModelHosts() { hostsCache.clear(); }
+
+  function joinNames(names) {
+    if (names.length < 2) return names.join('');
+    return `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`;
+  }
+
+  async function ensureAllowedHost({ apiKey, model, providerRouting }) {
+    const C = global.SN_CONST;
+    if (!C || typeof C.hostPolicyViolation !== 'function') return;
+    const r = providerRouting && typeof providerRouting === 'object' ? providerRouting : {};
+    const excluded = Array.isArray(r.ignore) ? r.ignore.filter(Boolean) : [];
+    if (!excluded.length && !C.producerOnlyRule(model)) return;
+    const hosts = await modelHosts({ apiKey, model });
+    if (!Array.isArray(hosts) || !hosts.length) return;
+    if (hosts.some((h) => !C.hostPolicyViolation(h, model, excluded))) return;
+    const names = [];
+    for (const h of hosts) {
+      const n = h.name || h.tag;
+      if (!names.some((x) => x.toLowerCase() === n.toLowerCase())) names.push(n);
+    }
+    const I18n = global.SN_I18N;
+    const chiave = names.length > 1 ? 'err_audio_no_allowed_host_many' : 'err_audio_no_allowed_host';
+    const err = new Error(I18n ? I18n.t(chiave, model, joinNames(names)) : `NO_ALLOWED_HOST ${model}`);
+    err.code = 'NO_ALLOWED_HOST';
+    err.provider = 'openrouter';
+    err.model = model;
+    err.hosts = names;
+    throw err;
   }
 
   // ─── Lettura ad alta voce ──────────────────────────────────────────────────
@@ -437,6 +579,7 @@
   // con i byte e basta: chi ha servito non è nella risposta, ma l'id della
   // generazione sì (header), e con quello si chiede dopo (lookupServedBy).
   async function synthesizeSpeech({ apiKey, model, text, voice, speed, providerRouting, signal }) {
+    await ensureAllowedHost({ apiKey, model, providerRouting });
     const body = { model, input: String(text == null ? '' : text), response_format: 'pcm' };
     if (voice) body.voice = voice;
     const sp = Number(speed);
@@ -469,6 +612,7 @@
   // l'estensione ('wav', 'mp3', 'webm', …). `language` è un codice ISO-639-1
   // ('it'): se manca, il modello la riconosce da sé.
   async function transcribe({ apiKey, model, audioBase64, format, language, providerRouting, signal }) {
+    await ensureAllowedHost({ apiKey, model, providerRouting });
     const body = { model, input_audio: { data: audioBase64, format: format || 'wav' } };
     if (language) body.language = language;
     const pb = providerBlock(providerRouting, model);
@@ -601,7 +745,8 @@
   global.SN_PROVIDER_OPENROUTER = {
     listModels, complete, streamComplete, reasoningField, providerBlock, extractServedBy,
     cachedPromptTokens, synthesizeSpeech, transcribe, embed, lookupServedBy, keyInfo, fetchWithKey,
+    modelHosts, forgetModelHosts, forgetReasoningRefusals,
     createToolCallAccumulator, createReasoningDetailsAccumulator, toolsFields,
-    ENDPOINT, SPEECH_ENDPOINT, TRANSCRIPTIONS_ENDPOINT, EMBEDDINGS_ENDPOINT, GENERATION_ENDPOINT, AUTH_KEY_ENDPOINT, CREDITS_ENDPOINT,
+    ENDPOINT, MODELS_ENDPOINT, SPEECH_ENDPOINT, TRANSCRIPTIONS_ENDPOINT, EMBEDDINGS_ENDPOINT, GENERATION_ENDPOINT, AUTH_KEY_ENDPOINT, CREDITS_ENDPOINT,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

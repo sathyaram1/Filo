@@ -66,11 +66,12 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { verdictForCurrentBranch, readState } from './verify-local.mjs';
-import { askServerMerge, messageForOwnerMerge, exitCodeForOwnerMerge } from './lib/owner-merge.mjs';
+import { askServerMerge, messageForOwnerMerge, exitCodeForOwnerMerge, richiestaForseInAttesa } from './lib/owner-merge.mjs';
 import { preparaLancioElectron } from './lib/schermo-virtuale.mjs';
 import { lottiPerRigaDiComando } from './lib/riga-di-comando.mjs';
 import { readMarker } from './lib/routine-role.mjs';
 import { partiServerInSospeso } from './lib/parti-lavoro.mjs';
+import { chiediConProva, pulisciResti, gitIn } from './lib/unit-sulla-fusione.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
 import mergeApprovalSignal from '../src/main/services/mergeApprovalSignal.js';
 
@@ -417,6 +418,15 @@ export function esitoVerificaPerCheck({ checkOnly, ok, reason }) {
 }
 
 /**
+ * Unit rossi: con `--check` gli spec delle aree girano lo stesso e l'esito resta rosso alla fine. PURA.
+ * Fermarsi lì lasciava chi verifica senza gli spec, anche per un rosso che c'è uguale su main (#874.1).
+ */
+export function esitoUnitPerCheck({ checkOnly }) {
+  if (!checkOnly) return { ferma: true, messaggio: 'Controlli di logica rossi: non pubblico. Sistema e rilancia.' };
+  return { ferma: false, messaggio: 'Controlli di logica rossi: corro lo stesso gli spec delle aree toccate, l\'esito finale resta rosso.' };
+}
+
+/**
  * Gli spec delle aree toccate si rilanciano, o li ha già corsi chi ha
  * verificato sullo stesso contenuto? PURA.
  *
@@ -479,6 +489,17 @@ export function senzaPraticaStop({ checkOnly, pratica }) {
     '  npm run finish -- --feedback <N>',
     'Non ho toccato niente.',
   ].join('\n');
+}
+
+/** Perché il finish si ferma dopo la prova degli unit sulla fusione (#929). PURA. */
+export function fermoDopoLaProva(prova) {
+  const p = prova || {};
+  if (p.errore) {
+    return `✗ Non ho potuto provare gli unit sul risultato della fusione con main: ${p.errore}.\n`
+      + '  Non ho chiesto la fusione. Il ramo è spedito e intatto: rilancia npm run finish.';
+  }
+  return '✗ Gli unit sono rossi sul risultato della fusione con main, e su main da solo no: non ho chiesto la fusione.\n'
+    + '  Riallinea il ramo (git merge origin/main, o rebase), fai tornare verdi i test elencati sopra e rilancia npm run finish.';
 }
 
 async function praticaDelLavoro(valore) {
@@ -598,6 +619,8 @@ async function main() {
     console.error('Ci sono modifiche non salvate: falle salvare (un Edit qualsiasi) prima di chiudere.');
     process.exit(1);
   }
+  // Anche con --check, che la prova sulla fusione non la fa: i resti di una prova interrotta non aspettano la prossima.
+  pulisciResti({ git: gitIn(ROOT) });
 
   // La linea principale VERA è su origin: il ref locale può essere indietro di
   // centinaia di commit (vedi resolveDiffBase). Un fetch qui serve a due cose:
@@ -621,6 +644,7 @@ async function main() {
   // resta più sotto, dopo i controlli, dov'è sempre stato).
   const v = verdictForCurrentBranch(ROOT);
   const spec = specDaRilanciare({ checkOnly, ok: v.ok, sha: v.entry && v.entry.sha, tollerato: v.tollerato });
+  let unitRossi = false;
 
   {
     // Gli spec si scelgono PRIMA dei controlli di logica: se non potranno partire, ci si ferma
@@ -642,14 +666,17 @@ async function main() {
     }
     // 1. Logica pura — veloce, nessuna finestra che si apre.
     if (!run('npm', ['run', 'test:unit'], 'Controlli di logica')) {
-      console.error('\n✗ Controlli di logica rossi: non pubblico. Sistema e rilancia.');
-      process.exit(1);
+      const esito = esitoUnitPerCheck({ checkOnly });
+      console.error(`\n✗ ${esito.messaggio}`);
+      if (esito.ferma) process.exit(1);
+      unitRossi = true;
     }
     // 2. Spec mirati alle aree toccate. La suite completa gira SOLO in GitHub
     //    Actions, a ogni fusione su main: qui serve il segnale rapido.
     if (blocking.length) {
       if (!runSpecsALotti(blocking, `Spec delle aree toccate (${blocking.length})`)) {
         console.error('\n✗ Spec rossi: non pubblico. Sistema e rilancia.');
+        if (unitRossi) console.error('  Rossi anche i controlli di logica, più sopra.');
         process.exit(1);
       }
     }
@@ -698,6 +725,10 @@ async function main() {
     }
   }
 
+  if (unitRossi) {
+    console.error('\n✗ Controlli di logica rossi, più sopra: sistema e rilancia.');
+    process.exit(1);
+  }
   if (checkOnly) { console.log('\n✓ Controlli passati (--check: non chiedo la fusione).'); return; }
 
   // 4. Il ramo dev'essere SU ORIGIN: il server fonde ciò che vede lui, non ciò
@@ -742,20 +773,34 @@ async function main() {
 
   // 5. La fusione la CHIEDE, non la fa: su main scrive solo il server, con
   //    un'identità che qui non esiste. Lo sha lega la richiesta esattamente al
-  //    codice appena controllato.
-  process.stdout.write('\n▸ Chiedo al server di fondere\n');
-  if (pratica && pratica.id) console.log(`  pratica ${pratica.seq ? `#${pratica.seq}` : pratica.id}`);
-  else console.log('  nessuna pratica collegata: se i controlli fermano, la fusione aspetta il tuo sì');
+  //    codice appena controllato; la prova degli unit sulla fusione (#929) la
+  //    lega al main su cui sono girati.
   // La parte del server dello stesso lavoro (ramo con lo stesso nome) non ancora su main tiene aperta la pratica (#915).
   const pendingParts = pratica && pratica.id ? partiServerInSospeso(branch, { cartellaServer: cartellaDelServer(ROOT) }) : [];
-  for (const p of pendingParts) console.log(`  parte del server non ancora su main: ${p.branch} (la pratica resta aperta per lei)`);
-  const reply = await askServerMerge({ branch, sha: cur, feedbackId: pratica ? pratica.id : '', pendingParts });
-  // Il server ha aperto una richiesta: suona il campanello, così una finestra
+  const giro = await chiediConProva({
+    root: ROOT, punta: cur,
+    fermaSe: (p) => !!(p.errore || p.esito === 'rosso_sulla_fusione'),
+    chiedi: (provaUnit) => {
+      process.stdout.write('\n▸ Chiedo al server di fondere\n');
+      if (pratica && pratica.id) console.log(`  pratica ${pratica.seq ? `#${pratica.seq}` : pratica.id}`);
+      else console.log('  nessuna pratica collegata: se i controlli fermano, la fusione aspetta il tuo sì');
+      for (const p of pendingParts) console.log(`  parte del server non ancora su main: ${p.branch} (la pratica resta aperta per lei)`);
+      return askServerMerge({ branch, sha: cur, feedbackId: pratica ? pratica.id : '', pendingParts, provaUnit });
+    },
+    mainMosso: (r) => !!(r && r.outcome === 'main_moved'),
+    scrivi: (s) => console.log(`\n${s}`),
+  });
+  if (giro.fermo) {
+    console.error(`\n${fermoDopoLaProva(giro.prova)}`);
+    process.exit(1);
+  }
+  const reply = giro.reply;
+  // C'è (o può esserci) una richiesta in attesa: suona il campanello, così una finestra
   // di Filo GIÀ APERTA se ne accorge da sola. Non è un permesso in più — non
   // crea niente e non approva niente, fa solo rileggere l'elenco vero — ed è
   // l'unica cosa che impedisce all'avviso di cui parla il messaggio qui sotto
   // di comparire soltanto a chi apre una scheda nuova.
-  if (reply?.outcome === 'blocked' && reply.requestId) mergeApprovalSignal.note(reply.requestId);
+  if (richiestaForseInAttesa(reply)) mergeApprovalSignal.note(reply.requestId);
   const code = exitCodeForOwnerMerge(reply);
   const message = messageForOwnerMerge(reply, branch, { feedbackId: pratica ? pratica.id : '', feedbackNum: pratica ? pratica.seq : '' });
   if (code === 0) console.log(`\n${message}`);

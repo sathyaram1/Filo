@@ -6,7 +6,7 @@
   'use strict';
 
   const { MSG } = window.SN_MSG;
-  const { AGENT_STYLE_PRESETS, AGENT_STYLE_MAX, agentStyleLength, testoLeggibile } = window.SN_CONST;
+  const { AGENT_STYLE_PRESETS, AGENT_STYLE_MAX, agentStyleLength, testoLeggibile, dictationTimes } = window.SN_CONST;
   const Storage = window.SN_STORAGE;
   const Bootstrap = window.SN_PAGE_BOOTSTRAP;
   const Tokens = window.SN_THEME_TOKENS;
@@ -74,6 +74,7 @@
       case 'color': return 'Colore non valido: usa #rrggbb (o #rgb) oppure rgb(…)/rgba(…).';
       case 'size': return 'Misura non valida: usa un numero con unità, es. 6px, 0.5rem, 50%.';
       case 'opacity': return 'Opacità non valida: un numero fra 0 e 1, es. 0.3.';
+      case 'time': return 'Durata non valida: millisecondi o secondi fino a 10 s, es. 450ms o 0.8s.';
       case 'font': return 'Font non valido: solo nomi di famiglie separati da virgola.';
       default: return 'Valore non valido.';
     }
@@ -813,26 +814,27 @@
   // cambio arrivato da altrove (la chat, un'altra scheda) non li riscrive. Il
   // resto della pagina segue la memoria (#592).
   const toccati = new Set();
-  const CAMPO_DI = {
-    theme: 'theme', textScale: 'textScale', showHomeMessage: 'showHomeMessage',
-    agentStylePreset: 'agentStyle', agentStyleText: 'agentStyle', timerRingtone: 'timerRingtone',
-    terminalEnabled: 'terminal.enabled', terminalShell: 'terminal.shell',
-    ttsVoice: 'tts.voice', ttsRate: 'tts.rate', ttsPitch: 'tts.pitch',
-    ttsModelVoice: 'tts.modelVoice', ttsModelVoiceCustom: 'tts.modelVoice',
-    autoArchiveEnabled: 'autoArchive.enabled', autoArchiveIdleHours: 'autoArchive.idleHours',
-    autoArchiveOnClose: 'autoArchive.onClose',
-    notifDuration: 'notifications.durationSec', notifSoundEnabled: 'notifications.soundEnabled',
-    notifSound: 'notifications.sound',
-  };
+  // Quale campo scrive quale impostazione: lo dice la fonte unica delle voci, la stessa da cui la chat
+  // legge e cambia ogni preferenza (#949).
+  const CAMPO_DI = window.SN_VOCI_IMPOSTAZIONI.campi('preferences');
 
   function valoreDelCampo(k) {
     switch (k) {
       case 'theme': return $('theme').value;
       case 'textScale': return parseFloat($('textScale').value) || 1;
       case 'showHomeMessage': return $('showHomeMessage').checked;
+      case 'homeSistema.ora': return $('homeSisOra').checked;
+      case 'homeSistema.batteria': return $('homeSisBatteria').checked;
+      case 'homeSistema.rete': return $('homeSisRete').checked;
+      case 'homeSistema.bluetooth': return $('homeSisBluetooth').checked;
+      case 'homeSistema.volume': return $('homeSisVolume').checked;
+      case 'tabPreview.enabled': return $('tabPreviewEnabled').checked;
+      case 'tabPreview.size': return misuraAnteprima($('tabPreviewSize').value);
       case 'agentStyle': return currentStyleText();
       case 'timerRingtone': return $('timerRingtone').value || 'default';
       case 'terminal.enabled': return $('terminalEnabled').checked;
+      case 'nomiSensati.scaricamenti': return $('nomiSensatiScaricamenti').checked;
+      case 'aggiornamenti.automatici': return $('aggiornamentiAutomatici').checked;
       case 'terminal.shell': return $('terminalShell').value;
       case 'tts.voice': return $('ttsVoice').value || '';
       case 'tts.rate': return parseFloat($('ttsRate').value) || 1;
@@ -841,9 +843,13 @@
       case 'autoArchive.enabled': return $('autoArchiveEnabled').checked;
       case 'autoArchive.idleHours': return clampIdleHours(parseInt($('autoArchiveIdleHours').value, 10));
       case 'autoArchive.onClose': return $('autoArchiveOnClose').checked;
+      case 'riassuntoSchede.enabled': return $('riassuntoSchede').checked;
       case 'notifications.durationSec': return clampNotifDurationSec(parseInt($('notifDuration').value, 10));
       case 'notifications.soundEnabled': return $('notifSoundEnabled').checked;
       case 'notifications.sound': return $('notifSound').value || 'default';
+      case 'dictation.autoSend': return $('dictationAutoSend').value !== 'no';
+      case 'dictation.silenceSec': return dictationTimes({ silenceSec: $('dictationSilence').value }).silenceSec;
+      case 'dictation.cancelSec': return dictationTimes({ cancelSec: $('dictationCancel').value }).cancelSec;
       default: return undefined;
     }
   }
@@ -858,9 +864,18 @@
       case 'theme': return s.theme || 'system';
       case 'textScale': return Number(s.textScale ?? 1);
       case 'showHomeMessage': return s.showHomeMessage !== false;
+      case 'homeSistema.ora': return !(s.homeSistema && s.homeSistema.ora === false);
+      case 'homeSistema.batteria': return !(s.homeSistema && s.homeSistema.batteria === false);
+      case 'homeSistema.rete': return !(s.homeSistema && s.homeSistema.rete === false);
+      case 'homeSistema.bluetooth': return !(s.homeSistema && s.homeSistema.bluetooth === false);
+      case 'homeSistema.volume': return !(s.homeSistema && s.homeSistema.volume === false);
+      case 'tabPreview.enabled': return !(s.tabPreview && s.tabPreview.enabled === false);
+      case 'tabPreview.size': return misuraAnteprima(s.tabPreview && s.tabPreview.size);
       case 'agentStyle': return String(s.agentStyle || '').trim();
       case 'timerRingtone': return s.timerRingtone || 'default';
       case 'terminal.enabled': return !!(s.terminal && s.terminal.enabled === true);
+      case 'nomiSensati.scaricamenti': return !!(s.nomiSensati && s.nomiSensati.scaricamenti === true);
+      case 'aggiornamenti.automatici': return !(s.aggiornamenti && s.aggiornamenti.automatici === false);
       case 'terminal.shell': return (s.terminal && s.terminal.shell) || '';
       case 'tts.voice': return tts.voice || '';
       case 'tts.rate': return Number(tts.rate) || 1;
@@ -869,11 +884,25 @@
       case 'autoArchive.enabled': return aa.enabled !== false;
       case 'autoArchive.idleHours': return clampIdleHours(Number(aa.idleHours) > 0 ? Number(aa.idleHours) : 6);
       case 'autoArchive.onClose': return aa.onClose !== false;
+      case 'riassuntoSchede.enabled': return !(s.riassuntoSchede && s.riassuntoSchede.enabled === false);
       case 'notifications.durationSec': return clampNotifDurationSec(Number.isFinite(dur) && dur >= 0 ? dur : 5);
       case 'notifications.soundEnabled': return notif.soundEnabled === true;
       case 'notifications.sound': return notif.sound || 'default';
+      case 'dictation.autoSend': return !(s.dictation && s.dictation.autoSend === false);
+      case 'dictation.silenceSec': return dictationTimes(s.dictation).silenceSec;
+      case 'dictation.cancelSec': return dictationTimes(s.dictation).cancelSec;
       default: return undefined;
     }
+  }
+
+  function scriviTempiVoce() {
+    const sec = (n) => `${String(n).replace('.', ',')} s`;
+    $('dictationSilenceVal').textContent = sec(parseFloat($('dictationSilence').value) || 0);
+    $('dictationCancelVal').textContent = sec(parseFloat($('dictationCancel').value) || 0);
+  }
+
+  function misuraAnteprima(v) {
+    return ['piccola', 'media', 'grande'].includes(v) ? v : 'media';
   }
 
   async function persist() {
@@ -926,6 +955,16 @@
       $('textScale').value = opt ? scale : '1';
     }
     if (vuole('showHomeMessage')) $('showHomeMessage').checked = settings.showHomeMessage !== false;
+    const sis = settings.homeSistema || {};
+    if (vuole('homeSistema.ora')) $('homeSisOra').checked = sis.ora !== false;
+    if (vuole('homeSistema.batteria')) $('homeSisBatteria').checked = sis.batteria !== false;
+    if (vuole('homeSistema.rete')) $('homeSisRete').checked = sis.rete !== false;
+    if (vuole('homeSistema.bluetooth')) $('homeSisBluetooth').checked = sis.bluetooth !== false;
+    if (vuole('homeSistema.volume')) $('homeSisVolume').checked = sis.volume !== false;
+    const tp = settings.tabPreview || {};
+    if (vuole('tabPreview.enabled')) $('tabPreviewEnabled').checked = tp.enabled !== false;
+    if (vuole('tabPreview.size')) $('tabPreviewSize').value = misuraAnteprima(tp.size);
+    $('tabPreviewSize').disabled = !$('tabPreviewEnabled').checked;
 
     if (vuole('agentStyle')) {
       $('agentStyleText').value = settings.agentStyle || '';
@@ -937,9 +976,12 @@
     if (vuole('autoArchive.enabled')) $('autoArchiveEnabled').checked = aa.enabled !== false;
     if (vuole('autoArchive.onClose')) $('autoArchiveOnClose').checked = aa.onClose !== false;
     if (vuole('autoArchive.idleHours')) $('autoArchiveIdleHours').value = String(Number(aa.idleHours) > 0 ? Number(aa.idleHours) : 6);
+    if (vuole('riassuntoSchede.enabled')) $('riassuntoSchede').checked = !(settings.riassuntoSchede && settings.riassuntoSchede.enabled === false);
 
     const terminal = settings.terminal || {};
     if (vuole('terminal.enabled')) $('terminalEnabled').checked = terminal.enabled === true;
+    if (vuole('nomiSensati.scaricamenti')) $('nomiSensatiScaricamenti').checked = !!(settings.nomiSensati && settings.nomiSensati.scaricamenti === true);
+    if (vuole('aggiornamenti.automatici')) $('aggiornamentiAutomatici').checked = !(settings.aggiornamenti && settings.aggiornamenti.automatici === false);
     if (vuole('terminal.shell')) {
       const sel = $('terminalShell');
       const suWindows = shellDiWindows();
@@ -960,6 +1002,14 @@
       const nsOpt = [...$('notifSound').options].find((o) => o.value === notifSound);
       $('notifSound').value = nsOpt ? notifSound : 'default';
     }
+
+    if (vuole('dictation.autoSend')) {
+      $('dictationAutoSend').value = settings.dictation && settings.dictation.autoSend === false ? 'no' : 'si';
+    }
+    const tempiVoce = dictationTimes(settings.dictation);
+    if (vuole('dictation.silenceSec')) $('dictationSilence').value = String(tempiVoce.silenceSec);
+    if (vuole('dictation.cancelSec')) $('dictationCancel').value = String(tempiVoce.cancelSec);
+    scriviTempiVoce();
 
     if (vuole('timerRingtone')) {
       const ringtone = settings.timerRingtone || 'default';
@@ -1112,6 +1162,12 @@
       : { ...(settings.tabColor || {}) };
     buildTabColorSection();
     caricato = true;
+    // La sezione chiesta dall'indirizzo (la carta dell'aggiornamento manda a #sec-aggiornamenti) si raggiunge solo
+    // adesso: le sezioni costruite qui sopra l'hanno spostata in giù dopo lo scorrimento del browser.
+    try {
+      const sezione = location.hash && document.getElementById(decodeURIComponent(location.hash.slice(1)));
+      if (sezione) sezione.scrollIntoView();
+    } catch (_) {}
   }
 
   // Un cambio arrivato da altrove: si riscrive solo quello che è davvero
@@ -1154,6 +1210,12 @@
       persist();
     });
     $('showHomeMessage').addEventListener('change', persist);
+    for (const id of ['homeSisOra', 'homeSisBatteria', 'homeSisRete', 'homeSisBluetooth', 'homeSisVolume']) $(id).addEventListener('change', persist);
+    $('tabPreviewEnabled').addEventListener('change', () => {
+      $('tabPreviewSize').disabled = !$('tabPreviewEnabled').checked;
+      persist();
+    });
+    $('tabPreviewSize').addEventListener('change', persist);
     $('autoArchiveEnabled').addEventListener('change', persist);
     $('autoArchiveOnClose').addEventListener('change', persist);
     $('autoArchiveIdleHours').addEventListener('change', persist);
@@ -1161,7 +1223,10 @@
     // Al blur riallinea il campo al valore realmente salvato (clampato), così
     // un numero fuori scala non resta a schermo a mentire sul valore in uso.
     $('autoArchiveIdleHours').addEventListener('blur', canonAutoArchiveIdle);
+    $('riassuntoSchede').addEventListener('change', persist);
     $('terminalEnabled').addEventListener('change', persist);
+    $('nomiSensatiScaricamenti').addEventListener('change', persist);
+    $('aggiornamentiAutomatici').addEventListener('change', persist);
     $('terminalShell').addEventListener('change', persist);
 
     // Lettura ad alta voce: la lista voci può popolarsi in ritardo.
@@ -1193,6 +1258,10 @@
     $('notifDuration').addEventListener('blur', canonNotifDuration);
     $('notifSoundEnabled').addEventListener('change', persist);
     $('notifSound').addEventListener('change', persist);
+    $('dictationAutoSend').addEventListener('change', persist);
+    for (const id of ['dictationSilence', 'dictationCancel']) {
+      $(id).addEventListener('input', (e) => { scriviTempiVoce(); caselle.cambiato('pref', e); });
+    }
     $('notifSoundPreview').addEventListener('click', previewNotifSound);
 
     // Suoneria timer: salva al cambio + anteprima.

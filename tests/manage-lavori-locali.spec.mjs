@@ -249,7 +249,7 @@ test('lavoro locale: niente «Fondi senza chiedermelo», una riga dice che si fo
   await tabBtn(page, 'queue').click();
   await page.evaluate(() => window.__mgTest.openDetail('own-1'));
   await expect(tasto).toBeVisible();
-  await expect(tasto).toHaveText('Fondi senza chiedermelo');
+  await expect(tasto).toHaveText('Senza chiedere');
   await page.locator('#mgLocalBtn').click();
   await expect(page.locator('#mgLocalBtn')).toHaveAttribute('aria-pressed', 'true');
   await expect(tasto).toBeHidden();

@@ -22,7 +22,7 @@ const HOME = 'filo://newtab/';
 const INBOX = 'filo://feedback/feedback.html';
 const MANAGE = 'filo://manage/manage.html';
 
-test('/feedback da chi non gestisce i feedback: nessuna scheda nuova, e la strada giusta detta a parole', async ({ app, openTab }) => {
+test('/feedback da chi non gestisce i feedback: niente posta dell\'owner, la strada giusta detta a parole e le sue segnalazioni aperte', async ({ app, openTab }) => {
   const page = await openTab(HOME);
   await page.waitForLoadState('domcontentloaded');
 
@@ -50,7 +50,9 @@ test('/feedback da chi non gestisce i feedback: nessuna scheda nuova, e la strad
     return urls;
   });
   expect(dopo.filter((u) => u.includes('feedback/feedback.html'))).toHaveLength(0);
-  expect(dopo.length).toBe(primaSchede);
+  // #986 — l'unica scheda nuova sono le segnalazioni mandate da chi scrive, in Bacheca.
+  expect(dopo.length).toBe(primaSchede + 1);
+  expect(dopo.filter((u) => u.startsWith('filo://board/board.html#segnalazioni'))).toHaveLength(1);
 });
 
 test('arrivandoci per indirizzo, la posta spiega invece di dare un errore', async ({ openTab }) => {

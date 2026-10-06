@@ -70,6 +70,7 @@
       [A.EDITOR_CHAT, 'options_action_editor_chat'],
       [A.ARCHIVE_EMBED, 'options_action_archive_embed'],
       [A.PROVIDER_TEST, 'options_action_provider_test'],
+      [A.FILE_NAME, 'options_action_file_name'],
     ];
   }
 

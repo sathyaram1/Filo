@@ -210,6 +210,8 @@ function template(piattaforma) {
       { type: 'separator' },
       { label: 'Preferenze', click: () => apriPagina('filo://preferences/preferences.html') },
       { label: 'Opzioni', click: () => apriPagina('filo://options/options.html') },
+      // Dove si riscatta un invito (#664): fuori dalla pagina, l'invito non aveva altre porte.
+      { label: 'Crediti e inviti', click: () => apriPagina('filo://credits/credits.html') },
       { type: 'separator' },
       ...(MAC ? [
         { role: 'services', label: 'Servizi' },

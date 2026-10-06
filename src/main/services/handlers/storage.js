@@ -20,6 +20,7 @@ module.exports = function register(on, ctx) {
   // solo da origine filo://; ciò che i content script fanno davvero (leggere le
   // impostazioni, salvare dizionario/draft/layout) resta consentito.
   const SETTINGS_KEY = SN_CONST.STORAGE_KEYS.SETTINGS; // 'settings' → contiene apiKeys
+  const ARCHIVE_KEY = SN_CONST.STORAGE_KEYS.ARCHIVED_TABS;
   // Verso un'origine web passa solo ciò che è nelle liste di impostazioniPerOrigine
   // (campi letti e scritti, scomparti del magazzino): le stesse delle spinte.
   const {
@@ -64,7 +65,11 @@ module.exports = function register(on, ctx) {
     // un'altra origine quell'indirizzo è illeggibile, e senza questo il menu
     // sarebbe ricomparso proprio nei siti esclusi.
     const pageUrl = String(sender?.tab?.url || '');
-    return { ok: true, pageUrl, settings: impostazioniPerOrigine(settings, origin, indirizziDelMittente(sender)) };
+    // In incognito il testo della pagina non parte da solo verso i modelli (#591): la pagina lo deve sapere per non
+    // preparare la spiegazione della selezione.
+    const win = winOf(sender);
+    const incognito = !!(win && (win._filoIncognito || (win._filoTabs && win._filoTabs.incognito)));
+    return { ok: true, pageUrl, incognito, settings: impostazioniPerOrigine(settings, origin, indirizziDelMittente(sender)) };
   });
 
   on(MSG.UPDATE_SETTINGS, async (msg, sender, origin) => {
@@ -112,7 +117,14 @@ module.exports = function register(on, ctx) {
       const { buildExportZip } = require('../exportData');
 
       const allData = await DiskStorage.get(null);
-      const zip = buildExportZip(allData);
+      // L'archivio delle schede ha file suoi: nel backup torna sotto la chiave di sempre.
+      const archivio = await globalThis.SN_ARCHIVED_TABS.list();
+      if (archivio.length) allData[ARCHIVE_KEY] = archivio;
+      const Mie = globalThis.SN_SEGNALAZIONI_MIE;
+      const mie = Mie ? await Mie.elenco() : null;
+      if (mie && mie.length) allData[Mie.CHIAVE_BACKUP] = mie;
+      const filo = await require('../ilFilo').esporta();
+      const zip = buildExportZip(allData, { filo });
 
       const win = winOf(sender);
       const stamp = new Date().toISOString().slice(0, 10);
@@ -141,6 +153,15 @@ module.exports = function register(on, ctx) {
   // facciamo attraversare l'IPC a un dump completo dei dati utente — chiavi
   // API comprese — solo per mostrarne il conteggio.
   let PENDING_IMPORT = null;
+  // Le chat e le pagine visitate non stanno in data.json ma nel filo (#866); un export di prima porta le chat qui.
+  const FILO_CHATS_KEY = SN_CONST.STORAGE_KEYS.FILO_CHATS;
+  function contaFilo(parsed) {
+    const E = globalThis.SN_FILO_EVENTI;
+    const stato = E.nuovoStato();
+    if (parsed.filo) for (const ev of E.analizza(parsed.filo.toString('utf8')).eventi) E.applica(stato, ev);
+    const vecchie = Array.isArray(parsed.data[FILO_CHATS_KEY]) ? parsed.data[FILO_CHATS_KEY].filter((c) => c && c.id && !stato.chat.has(c.id)) : [];
+    return { chats: stato.chat.size + vecchie.length, pagine: stato.pagine.size };
+  }
 
   on(MSG.IMPORT_DATA_PREVIEW, async (msg, sender, origin) => {
     if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
@@ -163,14 +184,17 @@ module.exports = function register(on, ctx) {
       const parsed = readExportZip(buf); // lancia se non è un export di Filo
 
       const token = `imp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-      PENDING_IMPORT = { token, data: parsed.data, at: Date.now() };
+      PENDING_IMPORT = { token, data: parsed.data, filo: parsed.filo, at: Date.now() };
+      const filo = contaFilo(parsed);
       return {
         ok: true,
         token,
         fileName: path.basename(filePath),
         exportedAt: parsed.exportedAt || '',
-        sections: parsed.sectionCount,
+        sections: parsed.sectionCount - (Array.isArray(parsed.data[FILO_CHATS_KEY]) ? 1 : 0),
         images: parsed.imageCount,
+        chats: filo.chats,
+        pagine: filo.pagine,
       };
     } catch (e) {
       // File non riconosciuto: distinguiamo il caso "non è un archivio di Filo"
@@ -199,8 +223,23 @@ module.exports = function register(on, ctx) {
       const DiskStorage = require('../../shim/storage');
       const { mergeImportedData } = require('../exportData');
 
+      const IlFilo = require('../ilFilo');
+      const dati = { ...pending.data };
+      const chatVecchie = dati[FILO_CHATS_KEY];
+      delete dati[FILO_CHATS_KEY];
+      if (pending.filo) await IlFilo.importa(pending.filo);
+      if (Array.isArray(chatVecchie) && chatVecchie.length) await IlFilo.importaChatSalvate(chatVecchie);
+      try { ctx.broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED }); } catch (_) {}
+
       const current = await DiskStorage.get(null);
-      const { merged, stats } = mergeImportedData(current, pending.data);
+      const ArchivedTabs = globalThis.SN_ARCHIVED_TABS;
+      const archivio = await ArchivedTabs.list();
+      if (archivio.length) current[ARCHIVE_KEY] = archivio;
+      const Mie = globalThis.SN_SEGNALAZIONI_MIE;
+      const MIE_KEY = Mie ? Mie.CHIAVE_BACKUP : null;
+      const mie = Mie ? await Mie.elenco() : null;
+      if (mie && mie.length) current[MIE_KEY] = mie;
+      const { merged, stats } = mergeImportedData(current, dati);
 
       // Le impostazioni passano da applySettingsUpdate come qualsiasi altra
       // modifica: così tema, sicurezza, cookie, fingerprint e adblock del
@@ -214,11 +253,16 @@ module.exports = function register(on, ctx) {
       const settings = merged[SETTINGS_KEY];
       const rest = {};
       for (const k of Object.keys(merged)) {
-        if (k === SETTINGS_KEY) continue;
+        if (k === SETTINGS_KEY || k === ARCHIVE_KEY || k === MIE_KEY) continue;
         if (JSON.stringify(merged[k]) !== JSON.stringify(current[k])) rest[k] = merged[k];
       }
-      if (Object.keys(rest).length) await DiskStorage.set(rest);
-      if (settings && typeof settings === 'object') await applySettingsUpdate(settings);
+      // I cambi che l'importazione porta entrano nel filo come suoi, e si annullano come gli altri (#867).
+      await require('../registroCambi').con({ via: 'importazione' }, async () => {
+        if (Object.keys(rest).length) await DiskStorage.set(rest);
+        await ArchivedTabs.importa(merged[ARCHIVE_KEY]);
+        if (Mie) await Mie.importa(merged[MIE_KEY]);
+        if (settings && typeof settings === 'object') await applySettingsUpdate(settings);
+      });
       // Un backup di una versione vecchia porta le miniature a piena risoluzione (#839).
       globalThis.SN_SAVED_PAGES?.rimpicciolisciMiniature?.().catch(() => {});
 

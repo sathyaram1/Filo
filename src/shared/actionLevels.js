@@ -85,6 +85,27 @@
     if (v === true) return true;
     return /^(true|1|si|sì|yes|tutte|tutti)$/i.test(String(v ?? ''));
   }
+  function periodoDetto(action) {
+    const vuoto = (v) => v == null || v === '';
+    if (action && (!vuoto(action.da) || !vuoto(action.a)) && action._periodo) {
+      const quando = (iso) => new Date(iso).toLocaleString('it-IT', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+      const { da, a } = action._periodo;
+      return da ? `dal ${quando(da)} al ${quando(a)}` : `fino al ${quando(a)}`;
+    }
+    const ore = Number(action && action.ore);
+    if (Number.isFinite(ore) && ore > 0) return ore === 1 ? 'dell’ultima ora' : `delle ultime ${ore} ore`;
+    const giorni = Number(action && action.giorni);
+    if (Number.isFinite(giorni) && giorni > 0) return giorni === 1 ? 'dell’ultimo giorno' : `degli ultimi ${giorni} giorni`;
+    const p = String((action && (action.periodo || action._nomePeriodo)) || '').toLowerCase();
+    if (p === 'oggi') return 'di oggi';
+    if (p === 'ieri') return 'di ieri';
+    if (p === 'tutto') return 'di sempre';
+    return 'dell’ultima ora';
+  }
+  function sitoDetto(action) {
+    const s = String((action && (action._sito || action.sito)) || '').trim();
+    return s ? ` su ${s}` : '';
+  }
   function timerRefLabel(action) {
     const kind = String((action && (action.tipo ?? action.kind)) || '').toLowerCase();
     const cosa = /timer/.test(kind) ? 'i timer' : (/svegli|alarm/.test(kind) ? 'le sveglie' : 'sveglie e timer');
@@ -98,6 +119,22 @@
     const raw = action && (action.ripeti ?? action.repeat ?? action.giorni);
     if (!raw || !M || !M.formatRepeat) return '';
     return M.formatRepeat(raw);
+  }
+
+  // Il nome che l'utente vede sulla carta, non l'id che il modello manda.
+  function descriviCarta(a, fatto) {
+    const C = global.SN_CARTE_HOME;
+    // Un nome di destra si riconosce solo esatto: «lo scaricamento del file» è una carta di sinistra, non l'Editor.
+    const id = C ? C.risolvi(a && a.carta, { esatto: true }) : null;
+    const detto = String((a && a.carta) || '').trim();
+    // Una chiave («avviso:…») non è un nome da mostrare: la frase resta senza.
+    const nome = id ? ` «${C.carta(id).titolo}»` : (detto && !/^[a-z]+:/.test(detto) ? ` «${detto.length > 60 ? `${detto.slice(0, 59)}…` : detto}»` : '');
+    const op = String((a && (a.operazione ?? a.op)) || '').toLowerCase();
+    if (op === 'ripristina') return fatto ? 'Carte della home rimesse com\'erano all\'inizio' : 'Rimettere le carte della home com\'erano all\'inizio';
+    if (op === 'togli' && !id) return fatto ? `Carta${nome} tolta dalla home` : `Togliere la carta${nome} dalla home`;
+    if (op === 'togli') return fatto ? `Carta${nome} tolta dalla home: ora è un'icona in «altro»` : `Togliere la carta${nome} dalla home`;
+    if (op === 'rimetti' || op === 'aggiungi') return fatto ? `Carta${nome} rimessa nella home` : `Rimettere la carta${nome} nella home`;
+    return fatto ? `Carta${nome} spostata nella home` : `Spostare la carta${nome} nella home`;
   }
 
   // Perché LEGGI_DOCUMENTO esce dal perimetro di lettura ('' se ci sta). Senza
@@ -121,6 +158,24 @@
     const segni = Array.from(t);
     if (segni.length > SPIEGAZIONE_MAX) t = `${segni.slice(0, SPIEGAZIONE_MAX - 1).join('').trimEnd()}…`;
     return t || 'Uso il terminale del computer';
+  }
+
+  function nomeLeggibile(n) {
+    const N = global.SN_NOMI_FILE;
+    const s = N ? N.nomeVisibile(n) : String(n == null ? '' : n).replace(/[\u0000-\u001f\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]/g, '');
+    return s.trim();
+  }
+  function elencoRinomine(a) {
+    const proposte = Array.isArray(a && a._proposte) ? a._proposte : [];
+    const saltati = Array.isArray(a && a._saltati) ? a._saltati : [];
+    const n = proposte.length;
+    const righe = proposte.map((p) => `«${nomeLeggibile(p && p.prima)}» → «${nomeLeggibile(p && p.nome)}»`);
+    let t = `${n === 1 ? 'Rinominare questo file' : `Rinominare questi ${n} file`}:\n${righe.join('\n')}`;
+    if (saltati.length) {
+      t += `\n\nRestano come sono:\n${saltati.map((x) => `«${nomeLeggibile(x && x.nome)}»: ${nomeLeggibile(x && x.perche)}`).join('\n')}`;
+    }
+    if (a && a._oltre > 0) t += `\n\nNe restano altri ${a._oltre}: chiedimelo di nuovo dopo questi.`;
+    return `${t}\n\nL'estensione non cambia e nessun file viene sovrascritto. Dopo puoi rimettere i nomi di prima con «Annulla».`;
   }
 
   const REGISTRY = {
@@ -149,6 +204,17 @@
     TIMER: {
       level: 1,
       describe: (a) => `Avviare il timer "${a.label || a.etichetta || 'Timer'}"`,
+    },
+    // Rinominare file dell'utente (#950): si torna indietro con «Annulla», ma un programma che cercava il file
+    // per nome non lo trova più → 2. L'elenco vecchio → nuovo lo prepara il main (`_proposte`), mai il modello.
+    RINOMINA_FILE: {
+      level: 2,
+      describe: (a) => elencoRinomine(a),
+      describeDone: (a) => {
+        const fatti = a && a._output && Array.isArray(a._output.rinominati) ? a._output.rinominati : null;
+        const n = fatti ? fatti.length : (Array.isArray(a && a._proposte) ? a._proposte.length : 0);
+        return n === 1 ? 'Rinominato un file (si rimette com\'era con «Annulla»)' : `Rinominati ${n} file (si rimettono com'erano con «Annulla»)`;
+      },
     },
     SVEGLIA: {
       level: 1,
@@ -266,6 +332,31 @@
         return `Verificare cosa sa fare Filo${ids.length ? ` (${ids.join(', ')})` : ''}`;
       },
     },
+    // #949 — togliere una risposta ricordata non concede niente: il sito torna a chiedere.
+    TOGLI_PERMESSO_SITO: {
+      level: 1,
+      describe: (a) => {
+        const sito = String((a && (a.sito ?? a.dominio)) || '').trim().slice(0, 80) || 'un sito';
+        const p = String((a && a.permesso) || '').trim().slice(0, 40);
+        return `Togliere ${p ? `il permesso «${p}»` : 'i permessi ricordati'} di ${sito}`;
+      },
+      describeDone: (a) => {
+        const tolte = (a && a._output && Array.isArray(a._output.tolte)) ? a._output.tolte : [];
+        return tolte.length ? `Tolte le risposte ricordate: ${tolte.join('; ')} (il sito tornerà a chiedere)` : 'Nessuna risposta tolta';
+      },
+    },
+    LEGGI_IMPOSTAZIONI: {
+      // #949 — rilegge le impostazioni dell'utente, senza le chiavi: sola lettura, niente esce.
+      level: 1,
+      describe: (a) => {
+        const cerca = String((a && (a.cerca ?? a.query ?? a.chiave)) || '').replace(/\s+/g, ' ').trim();
+        return cerca ? `Leggere com'è impostato «${cerca.slice(0, 60)}»` : 'Leggere le impostazioni';
+      },
+      describeDone: (a) => {
+        const cerca = String((a && (a.cerca ?? a.query ?? a.chiave)) || '').replace(/\s+/g, ' ').trim();
+        return cerca ? `Letto com'è impostato «${cerca.slice(0, 60)}»` : 'Lette le impostazioni';
+      },
+    },
     CERCA_CHAT: {
       // #525 — Filo rilegge le conversazioni passate con lo stesso utente per
       // riprendere un discorso di ieri. Sola lettura di dati che sono già
@@ -338,6 +429,19 @@
         return `Eliminate DEFINITIVAMENTE dall'archivio ${n} ${n === 1 ? 'scheda' : 'schede'} su “${a.query || a.testo || ''}”`;
       },
     },
+    // #866 — come in ogni browser: il popup dice quante pagine e di quale periodo, il conto lo fa il main (`_n`).
+    CANCELLA_PAGINE: {
+      level: 2,
+      describe: (a) => {
+        const n = Number(a && a._n);
+        const quali = Number.isFinite(n) ? (n === 1 ? 'la pagina visitata' : `le ${n} pagine visitate`) : 'le pagine visitate';
+        return `Cancellare ${quali}${sitoDetto(a)} ${periodoDetto(a)}.\nFilo non le ricorderà più. Chat e schede chiuse restano.`;
+      },
+      describeDone: (a) => {
+        const n = Number(a && a._output && a._output.cancellate) || 0;
+        return n ? `Cancellate ${n === 1 ? '1 pagina visitata' : `${n} pagine visitate`}${sitoDetto(a)} ${periodoDetto(a)}` : `Nessuna pagina visitata${sitoDetto(a)} ${periodoDetto(a)}`;
+      },
+    },
     CANCELLA_MEMORIA: {
       // Cancella tutti i moduli di memoria di Filo (PROFILO, PREFERENZE, espansioni)
       // e il buffer delle lezioni non ancora compattate. Irreversibile: il profilo
@@ -367,12 +471,13 @@
     },
     IMPOSTA_PREFERENZA: {
       // Livello per-preferenza: lo dichiara il setter in preferences.js
-      // (default 1). Preferenza sconosciuta/non valida → 2 per prudenza
-      // (tanto il dispatch non la eseguirà comunque). Un `rifiuto` → 1: non
-      // c'è niente da confermare, il dispatch lo respinge spiegando perché.
+      // (default 1). Preferenza sconosciuta/non valida o `rifiuto` → 1: non c'è
+      // niente da confermare, il dispatch la respinge spiegando perché (un OK a vuoto no).
       level: (a) => {
+        // Un elenco che resterebbe com'è: niente da confermare (`_invariato` lo mette il main, #949).
+        if (a && a._invariato) return 1;
         const built = prefBuilt(a);
-        return (built && built.level) || (built ? 1 : 2);
+        return (built && built.level) || 1;
       },
       describe: (a) => {
         const built = prefBuilt(a);
@@ -492,6 +597,13 @@
         return labels[cmd] || 'Azionare un comando della finestra di Filo';
       },
     },
+    // #870 — le carte della home, come le dispone l'utente trascinandole. Livello 1: ogni mossa si annulla con
+    // quella opposta, e una carta tolta resta in «altro», da cui si rimette.
+    CARTA_HOME: {
+      level: 1,
+      describe: (a) => descriviCarta(a, false),
+      describeDone: (a) => descriviCarta(a, true),
+    },
     // ── estetica del CONTENUTO della pagina via chat (#185) ───────────────────
     // Filo cambia l'aspetto del testo della pagina che l'utente sta guardando
     // ("scrivi in grassetto tutti i titoli"). Livello 1: si applica subito, vale
@@ -511,9 +623,102 @@
       level: 1,
       describe: () => 'Togliere le modifiche di stile applicate alla pagina',
     },
+    // ── rimettere com'era un cambio di stato (#867) ─────────────────────────
+    // Il livello è quello del cambio da rimettere: `_livelloCambio` lo scrive il main dal registro,
+    // sempre, prima del cancello (mai dall'azione del modello). Rimettere la protezione dell'IP
+    // spenta chiede la stessa conferma che chiederebbe spegnerla.
+    ANNULLA_CAMBIO: {
+      level: (a) => (a && a._livelloCambio === 1 ? 1 : 2),
+      describe: (a) => {
+        const f = String((a && a._fraseCambio) || '').trim();
+        const base = f ? `Filo vuole rimettere com'era prima di: ${f}.` : 'Filo vuole rimettere com\'era l\'ultimo cambio.';
+        if (a && a._livelloCambio === 1) return base;
+        return `${base}\n\nTocca un'impostazione di sicurezza, dei modelli o delle spese: conferma solo se l'hai chiesto tu.`;
+      },
+      describeDone: (a) => {
+        const f = String((a && a._fraseCambio) || '').trim();
+        return f ? `Rimesso com'era prima di: ${f}` : 'Cambio annullato';
+      },
+    },
+    // ── volume, Bluetooth e Wi-Fi del computer (#874) ───────────────────────
+    // Spegnere o staccare quello che sta servendo (le cuffie, la tastiera, la rete della chat stessa) è 2; il resto
+    // 1, e 1 anche ciò che è già com'è chiesto (`gia`: niente cade). Il livello legge `_richiestaSistema`, che il main scrive sempre prima del cancello con la stessa funzione che
+    // poi esegue (src/main/services/comandiSistema.js): quello che si conferma è quello che parte.
+    VOLUME: {
+      level: 1,
+      describe: (a) => {
+        const r = (a && a._richiestaSistema) || {};
+        if (r.livello != null) return `Portare il volume del computer al ${r.livello}%`;
+        if (r.passo != null) return r.passo > 0 ? 'Alzare il volume del computer' : 'Abbassare il volume del computer';
+        if (r.muto === true) return 'Mettere muto il computer';
+        if (r.muto === false) return 'Togliere il muto al computer';
+        return 'Cambiare il volume del computer';
+      },
+    },
+    BLUETOOTH: {
+      level: (a) => {
+        const r = a && a._richiestaSistema;
+        if (!r || r.errore) return 2;
+        if (r.gia === true) return 1;
+        return r.acceso === false || (r.nome && r.collega === false) ? 2 : 1;
+      },
+      describe: (a) => {
+        const r = (a && a._richiestaSistema) || {};
+        const nome = (a && a._nomeSistema) || r.nome;
+        if (r.elenca) return 'Leggere i dispositivi Bluetooth abbinati';
+        if (r.nome && r.collega === false) {
+          return `Scollegare «${nome}» dal Bluetooth.\n\nSe è una tastiera, un mouse o le cuffie che stai usando, smette di funzionare finché non lo ricolleghi.`;
+        }
+        if (r.nome) return `Collegare «${nome}» col Bluetooth`;
+        if (r.acceso === true) return 'Accendere il Bluetooth';
+        if (r.acceso === false) {
+          return 'Spegnere il Bluetooth.\n\nCuffie, casse, tastiere e mouse Bluetooth si scollegano finché non lo riaccendi, dal tasto nella home o chiedendolo a Filo.';
+        }
+        return 'Cambiare il Bluetooth del computer';
+      },
+      // Dopo una conferma: quello che è successo, senza i rischi che il popup ha già spiegato.
+      describeDone: (a) => {
+        const r = (a && a._richiestaSistema) || {};
+        const nome = (a && a._nomeSistema) || r.nome;
+        if (r.nome) return r.collega === false ? `Scollegato «${nome}» dal Bluetooth` : `Collegato «${nome}» col Bluetooth`;
+        return r.acceso === false ? 'Bluetooth spento' : r.acceso === true ? 'Bluetooth acceso' : 'Bluetooth cambiato';
+      },
+    },
+    WIFI: {
+      level: (a) => {
+        const r = a && a._richiestaSistema;
+        if (!r || r.errore) return 2;
+        if (r.gia === true) return 1;
+        return r.acceso === false || !!r.nome ? 2 : 1;
+      },
+      describe: (a) => {
+        const r = (a && a._richiestaSistema) || {};
+        const nome = (a && a._nomeSistema) || r.nome;
+        if (r.elenca) return 'Leggere le reti Wi-Fi che il computer conosce';
+        if (r.nome) {
+          return `Collegare il computer alla rete Wi-Fi «${nome}».\n\nPer qualche secondo la connessione di adesso cade: scaricamenti e chiamate in corso possono interrompersi.`;
+        }
+        if (r.acceso === true) return 'Accendere il Wi-Fi';
+        if (r.acceso === false) {
+          return 'Spegnere il Wi-Fi.\n\nSenza un cavo il computer resta senza rete, e a parole non potrai riaccenderlo: senza rete Filo non ti sente. Si riaccende dal tasto nella home o dal sistema.';
+        }
+        return 'Cambiare il Wi-Fi del computer';
+      },
+      describeDone: (a) => {
+        const r = (a && a._richiestaSistema) || {};
+        const nome = (a && a._nomeSistema) || r.nome;
+        if (r.nome) return `Collegato il computer alla rete Wi-Fi «${nome}»`;
+        return r.acceso === false ? 'Wi-Fi spento' : r.acceso === true ? 'Wi-Fi acceso' : 'Wi-Fi cambiato';
+      },
+    },
     // ── zoom della pagina via chat (#686) ────────────────────────────────────
     // Livello 1: è la stessa cosa che fanno Ctrl +/- e Ctrl 0, visibile e
     // reversibile in un tasto.
+    // #786 — installare la versione nuova è quello che Filo fa di serie: chiederlo a parole non chiede conferma.
+    INSTALLA_AGGIORNAMENTO: {
+      level: 1,
+      describe: () => 'Scaricare la versione nuova di Filo, che si installa quando lo chiudi',
+    },
     ZOOM_PAGINA: {
       level: 1,
       describe: (a) => {

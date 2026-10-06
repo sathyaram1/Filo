@@ -277,6 +277,10 @@ function get() {
     if (typeof remoteModels.providerSort === 'string') {
       out.providerSort = remoteModels.providerSort.trim();
     }
+    // #1004 — gli elenchi delle pagine delicate (posta, banche, sanità): ogni categoria remota sostituisce la sua.
+    if (remoteModels.sitiDelicati && typeof remoteModels.sitiDelicati === 'object') {
+      out.sitiDelicati = remoteModels.sitiDelicati;
+    }
     if (Array.isArray(remoteModels.modelRegistryDeleted)) {
       for (const nick of remoteModels.modelRegistryDeleted) {
         if (typeof nick !== 'string' || !nick) continue;
@@ -327,8 +331,13 @@ function getPublicForAdmin() {
       tavily: Boolean(eff.apiKeys.tavily),
     },
     safeBrowsingKeyPresent: Boolean(eff.safeBrowsingKey),
+    // #1004 — gli elenchi delle pagine delicate in vigore, e quelli del codice: l'editor salva solo le categorie che
+    // se ne discostano, così una banca aggiunta con un rilascio arriva anche dove l'owner non ha toccato niente.
+    sitiDelicati: PD() ? PD().elenco(eff.sitiDelicati) : (eff.sitiDelicati || {}),
+    sitiDelicatiDiSerie: PD() ? PD().elenco(null) : {},
   };
 }
+const PD = () => globalThis.SN_PAGINE_DELICATE || null;
 
 async function patchDoc(docPath, fields, mask, idToken) {
   const qs = mask.map((m) => `updateMask.fieldPaths=${encodeURIComponent(m)}`).join('&');
@@ -401,6 +410,16 @@ async function update(partial, idToken) {
   if (typeof partial.providerSort === 'string') {
     modelFields.providerSort = toFsValue(partial.providerSort.trim());
     modelMask.push('providerSort');
+  }
+  // #1004 — le categorie delle pagine delicate: l'oggetto inviato sostituisce quello remoto per intero.
+  if (partial.sitiDelicati && typeof partial.sitiDelicati === 'object' && !Array.isArray(partial.sitiDelicati)) {
+    const clean = {};
+    for (const [k, v] of Object.entries(partial.sitiDelicati)) {
+      if (!/^[a-z0-9_-]{1,40}$/i.test(k) || !Array.isArray(v)) continue;
+      clean[k] = [...new Set(v.filter((x) => typeof x === 'string').map((x) => x.trim().toLowerCase()).filter(Boolean))];
+    }
+    modelFields.sitiDelicati = toFsValue(clean);
+    modelMask.push('sitiDelicati');
   }
   if (modelMask.length) {
     await patchDoc(MODELS_DOC, modelFields, modelMask, idToken);
@@ -771,8 +790,12 @@ async function setCreditsKnobs(patch, idToken) {
 // (owner-gated) per la tab "Log" della dashboard. Ritorna le voci più recenti
 // PRIMA (ordine decrescente per istante d'avvio), già normalizzate. Documento o
 // campo assente / lettura fallita ⇒ lista vuota (mai un errore per un log).
-async function getWorkerLog(idToken) {
-  const doc = await fetchDoc(AUTOMATION_DOC, idToken);
+// `severo`: una lettura fallita lancia invece di valere «registro vuoto» (il giro
+// della Gestione deve distinguere «non lo so» da «niente di nuovo», #676.1).
+async function getWorkerLog(idToken, { severo = false } = {}) {
+  const letto = await leggiDoc(AUTOMATION_DOC, idToken);
+  if (severo && (!letto.risposto || !letto.doc)) throw new Error('registro dei worker non letto');
+  const doc = letto.doc;
   const raw = doc && Array.isArray(doc.workerLog) ? doc.workerLog : [];
   const entries = raw
     .filter((e) => e && typeof e === 'object')
