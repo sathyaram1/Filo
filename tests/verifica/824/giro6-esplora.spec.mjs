@@ -244,3 +244,66 @@ test('caricamento grande da una scheda con una bozza: quanto si ferma Filo', asy
     console.log('carica senza bozza', JSON.stringify(senza), 'con bozza', JSON.stringify(con), 'blob con bozza', JSON.stringify(blob));
   } finally { await sito.chiudi(); }
 });
+
+test('pagina ostile: richieste grandi in fila da una scheda con una bozza', async ({ app, shell }) => {
+  test.setTimeout(120_000);
+  const sito = await apriSito();
+  try {
+    const pagina = await apriEsatta(app, shell, sito.pagina(`<!doctype html><html><head><title>Ostile</title></head><body>
+      <textarea id="t" style="width:400px;height:100px"></textarea>
+      <script>window.martella = async (ms) => { const s = 'a<b>c</b>&amp;%41 '.repeat(120000); const fine = Date.now() + ms; let n = 0;
+        const uno = async () => { while (Date.now() < fine) { await fetch('/api/carica', { method: 'POST', body: s }); n++; } };
+        await Promise.all([uno(), uno(), uno(), uno()]); return n; };</script>
+      </body></html>`));
+    await pagina.locator('#t').click();
+    await pagina.keyboard.type('Bozza');
+    await expect.poll(() => moduloDi(shell, 'Ostile'), { timeout: 8_000 }).toBe(true);
+    await app.evaluate(() => { globalThis.__lag = 0; globalThis.__lagTot = 0; let ult = Date.now(); clearInterval(globalThis.__lagT);
+      globalThis.__lagT = setInterval(() => { const ora = Date.now(); const d = ora - ult - 20; if (d > 0) globalThis.__lagTot += d; globalThis.__lag = Math.max(globalThis.__lag, d); ult = ora; }, 20); });
+    const corsa = pagina.evaluate(() => window.martella(8000));
+    await pagina.waitForTimeout(3000);
+    const t0 = Date.now();
+    await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs.length);
+    const risposta = Date.now() - t0;
+    const n = await corsa;
+    const lag = await app.evaluate(() => { clearInterval(globalThis.__lagT); return { max: globalThis.__lag, tot: globalThis.__lagTot }; });
+    console.log('ostile: richieste', n, 'lag main', JSON.stringify(lag), 'risposta shell ms', risposta);
+  } finally { await sito.chiudi(); }
+});
+
+test('caricamento di byte: lento anche senza bozza? confronto senza ascoltatore', async ({ app, shell }) => {
+  test.setTimeout(120_000);
+  const sito = await apriSito();
+  try {
+    const pagina = await apriEsatta(app, shell, sito.pagina(`<!doctype html><html><head><title>Byte</title></head><body>
+      <script>window.carica = async (volte) => { const b = new Uint8Array(4 * 1024 * 1024); const t0 = performance.now();
+        for (let i = 0; i < volte; i++) await fetch('/api/carica', { method: 'POST', body: b }); return Math.round(performance.now() - t0); };</script>
+      </body></html>`));
+    const con = await pagina.evaluate(() => window.carica(3));
+    await app.evaluate(({ session }) => { session.defaultSession.webRequest.onBeforeRequest(null); });
+    const senza = await pagina.evaluate(() => window.carica(3));
+    console.log('3 x 4MB byte: con ascoltatore', con, 'ms, senza ascoltatore', senza, 'ms');
+  } finally { await sito.chiudi(); }
+});
+
+test('editor che salva a pezzi: ogni richiesta porta solo le lettere nuove', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  const sito = await apriSito();
+  try {
+    const doc = await apriEsatta(app, shell, sito.pagina(`<!doctype html><html><head><title>Documento</title></head><body>
+      <div id="ed" contenteditable="true" style="min-height:120px;border:1px solid"></div><p id="stato"></p>
+      <script>let visto = ''; let timer = null;
+        ed.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(async () => { const ora = ed.innerText; let i = 0; while (i < visto.length && visto[i] === ora[i]) i++;
+          await fetch('/api/carica', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ops: [{ pos: i, ins: ora.slice(i) }] }) }); visto = ora; stato.textContent = 'Salvato'; }, 150); });</script>
+      </body></html>`));
+    await doc.locator('#ed').click();
+    for (const pezzo of ['Verbale della riunione', 'Presenti: Anna, Bruno', 'Decisioni: si rimanda a lunedì']) {
+      await doc.keyboard.type(pezzo, { delay: 5 });
+      await doc.waitForTimeout(400);
+      await doc.keyboard.press('Enter');
+    }
+    await doc.waitForTimeout(800);
+    await expect(doc.locator('#stato')).toHaveText('Salvato');
+    console.log('formDirty documento', await moduloDi(shell, 'Documento'));
+  } finally { await sito.chiudi(); }
+});
