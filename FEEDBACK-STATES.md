@@ -442,6 +442,36 @@ dashboard scriveva "in attesa di ripresa". Adesso:
     non solo ai push: un'istanza morta non pusha niente, senza cron nessun trigger
     resetterebbe mai il suo `working`.
 
+### 6c. I lavori approvati e mai fusi (#715, dal 2026-10-06)
+
+`revision_security` con verifica `pass` e sicurezza `pass` (o `saltato` dall'owner)
+non ha ruolo in `select`: tocca al cancello di fusione, che fino a qui chiamava solo
+la sessione di sicurezza. Se moriva dopo il verdetto, o la richiesta non arrivava al
+server, il lavoro restava fermo per sempre (#256 dal 7/09; #567, #663, #667 dal
+24/09). Adesso:
+
+- il controllo di sicurezza passato salva anche l'ora (`secauditAt`); un verdetto
+  senza ora conta come vecchio;
+- il **pacemaker**, nello stesso giro degli arenati (§6a), prende chi è così da più
+  di un'ora (dal verdetto, dal salto dell'owner o dall'ultimo tentativo) senza
+  semaforo vivo, e **chiede lui la fusione al cancello** (`channel.mergeFromState`):
+  niente biglietto né modello, ramo e verdetti dallo stato registrato, stessa
+  decisione (punta risolta una volta, L5, fusione di quello sha). Al massimo cinque
+  per giro, i più vecchi prima;
+- gli esiti: fuso → `done` con nota; L5 → richiesta d'approvazione e `design`
+  (`statusReason: l5`); conflitto → giro di riallineamento della routine, non quello
+  del server, perché sul risultato non ha girato nessun unit; via libera che non
+  copre più la punta (anche le due copie del ramo divergenti) → il cancello lo
+  azzera e `select` rimanda il controllo da sé; già fuso ma mai chiuso → `done`
+  senza chiedere niente;
+- **tetto**: tre controlli rimandati di fila sulla stessa verifica, o tre guasti
+  tecnici di fila (GitHub o server che non rispondono) → `design`
+  (`statusReason: arenato`) con nota per l'owner. Un guasto non tocca il verdetto:
+  si riprova un'ora dopo. I contatori (`mergeRecoveries`, `mergeFaults`) stanno
+  nello stato del giro e ripartono da zero a ogni uscita in `design`;
+- questa fusione non ha la prova degli unit sul risultato (#929): nel registro delle
+  prove compare come `assente`, via `recupero`.
+
 ## 7. Dove si implementa
 
 ### 7a. filo-security (repo `C:/Users/agenti AI/Desktop/Filo/filo-security`)
