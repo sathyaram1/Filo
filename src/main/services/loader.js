@@ -71,6 +71,7 @@ require(path.join(SHARED, 'feedbackLive.js')); // confronto versioni + fusione p
 require(path.join(SHARED, 'feedbackTransitions.js')); // DATI della macchina a stati (fonte unica, SPEC-RIDISEGNO-MAX.md §7)
 require(path.join(SHARED, 'verifierRound.js')); // regole del giro di verifica (fonte unica, feedback #561)
 require(path.join(SHARED, 'feedbackStatus.js')); // prima di manageReview: vocabolario stati (consuma i dati qui sopra)
+require(path.join(SHARED, 'feedbackAttese.js')); // #903 — «aspetta #N»: prima di manageReview, che ne fa una sezione
 require(path.join(SHARED, 'manageReview.js'));
 require(path.join(SHARED, 'feedbackClientIdHash.js')); // prima di feedbackPublicView: l'impronta della scheda (#583)
 require(path.join(SHARED, 'feedbackPublicView.js')); // #583 — quali feedback hanno una scheda pubblica, e con quali campi (dopo manageReview: la usa)
