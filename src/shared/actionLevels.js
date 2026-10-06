@@ -162,8 +162,9 @@
       .replace(/\s+/g, ' ').trim();
     const segni = Array.from(t);
     if (segni.length > SPIEGAZIONE_MAX) t = `${segni.slice(0, SPIEGAZIONE_MAX - 1).join('').trimEnd()}…`;
-    return t || 'Uso il terminale del computer';
+    return t || SPIEGAZIONE_DI_FILO;
   }
+  const SPIEGAZIONE_DI_FILO = 'Uso il terminale del computer';
 
   function nomeLeggibile(n) {
     const N = global.SN_NOMI_FILE;
@@ -556,7 +557,9 @@
         const C = global.SN_CMD_CLASSIFY;
         let perche = '';
         try { perche = (cmd && C && C.classifyDetail) ? C.classifyDetail(cmd, a._perimetro).motivo : ''; } catch (_) {}
-        return [`${spiegazioneComando(a)}\n\nIl comando, nel terminale:\n`, cmd ? cit(cmd, true) : '(comando vuoto)',
+        // La spiegazione la scrive il modello: sta in un riquadro come il comando, mai fra le parole di Filo (#592.7).
+        const sp = spiegazioneComando(a);
+        return [sp === SPIEGAZIONE_DI_FILO ? sp : cit(sp, true), '\n\nIl comando, nel terminale:\n', cmd ? cit(cmd, true) : '(comando vuoto)',
           (cwd ? `\nCartella di lavoro: ${cwd}` : '') + (perche ? `\nPerché te lo chiedo: ${perche}` : '')];
       },
     },
