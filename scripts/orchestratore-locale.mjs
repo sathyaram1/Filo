@@ -1,24 +1,26 @@
 // L'orchestratore dei lavori locali (#956): worktree, lavoratore, verificatori, chiusura e deploy, senza una sessione in mezzo.
 // La sessione resta per le decisioni: legge `stato` e risponde con `riprendi`. Logica e regole in scripts/lib/orchestratore.mjs.
-// Uso: npm run orchestra -- aggiungi <N>… | avvia [opzioni] [--dry-run] | stato | riprendi <N> ["risposta"] | togli <N>
+// Uso: npm run orchestra -- aggiungi <N>… | avvia [opzioni] [--dry-run] | stato | smetti [--subito] | riprendi <N> ["risposta"] | togli <N>
 
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import {
-  existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmdirSync, symlinkSync, unlinkSync, writeFileSync,
+  closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, readlinkSync, renameSync, rmdirSync, symlinkSync, unlinkSync, writeFileSync,
 } from 'node:fs';
 import { cpus, freemem, homedir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  OPZIONI_BASE, apriDerivatiDi, coda, creaMotore, modoDerivati, nuovaPratica, rigaStato, riprendi, slugDi, togliWorktree,
+  FASI_FINITE, MODI_DERIVATI, OPZIONI_BASE, apriDerivatiDi, coda, creaMotore, modoDerivati, nuovaPratica, rigaChiusura, rigaStato, riprendi, slugDi, togliWorktree,
 } from './lib/orchestratore.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const USO = 'Uso: npm run orchestra -- aggiungi <N> [<N>…] [--slug <nome>] [--file <regola,regola>] [--richiesta "<testo>"]\n'
-  + '                          avvia [--paralleli N] [--tetto N] [--derivati non-locale|locale|nessuno] [--tieni-worktree] [--budget-istanza <$>]\n'
+  + '                          avvia [--paralleli N] [--tetto N] [--derivati auto|non-locale|locale|nessuno] [--tieni-worktree] [--budget-istanza <$>]\n'
   + '                                [--ore-istanza <ore>] [--cpu-max <%>] [--cpu-chiusura <%>] [--dry-run [<N>…]]\n'
-  + '                          stato | riprendi <N> ["<risposta dell’owner>"] | togli <N>';
+  + '                          stato | smetti [--subito] | riprendi <N> ["<risposta dell’owner>"] | togli <N>\n'
+  + 'Senza --paralleli, --tetto, --budget-istanza e --ore-istanza non c’è un numero fisso: decidono macchina libera e bilanci del server.\n'
+  + 'smetti, da un altro terminale (o il primo Ctrl-C): niente di nuovo, i passi in corso finiscono, poi esce; --subito (o il secondo Ctrl-C) ferma tutto adesso.';
 
 // Un lettore solo per ogni comando (#1027): un argomento che non torna ferma tutto prima di qualsiasi lavoro, mai preso per buono o saltato.
 const TESTO = { atteso: 'un testo', leggi: (v) => v.trim() || undefined };
