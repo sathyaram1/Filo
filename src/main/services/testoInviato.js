@@ -5,10 +5,10 @@
 // Logica pura; chi la usa è src/main/tabs.js. Sentinella: tests/unit/testoInviato.test.mjs.
 
 // Oltre si legge l'inizio: una riga trovata lì è partita davvero, una persa resta protetta.
-const LIMITE_CORPO = 4 * 1024 * 1024;
+const LIMITE_CORPO = 2 * 1024 * 1024;
 const SEPARATORE = '\u0001';
 
-const pulito = (s) => String(s).replace(/[\s​-‍⁠﻿]+/g, '');
+const pulito = (s) => String(s).replace(/[\s\u200B-\u200D\u2060\uFEFF]+/g, '');
 
 function decodificaPercento(s) {
   return String(s).replace(/\+/g, ' ').replace(/(?:%[0-9a-fA-F]{2})+/g, (m) => {

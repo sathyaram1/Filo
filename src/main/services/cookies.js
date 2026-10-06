@@ -208,6 +208,10 @@ const blockState = new WeakMap(); // session → { enabled, filtri }
 let hostChiusoFn = null;
 function chiudiHost(fn) { hostChiusoFn = typeof fn === 'function' ? fn : null; }
 
+// Chi guarda le richieste senza deciderne la sorte (il testo dell'utente partito, #824).
+let osservatoreFn = null;
+function osservaRichieste(fn) { osservatoreFn = typeof fn === 'function' ? fn : null; }
+
 // Registra (se manca) l'unico listener onBeforeRequest della sessione. Tracker e
 // ad-blocking restano spenti finché applyTrackerBlocking non accende i filtri.
 function ensureRequestHook(ses) {
@@ -222,6 +226,7 @@ function ensureRequestHook(ses) {
   // devono convivere qui dentro. I due hanno gate indipendenti: il tracker è
   // legato alla modalità cookie (s.enabled), l'ad-blocking ha il suo toggle.
   ses.webRequest.onBeforeRequest((details, callback) => {
+    if (osservatoreFn) { try { osservatoreFn(details); } catch (_) {} }
     if (hostChiusoFn && hostChiusoFn(details.url)) {
       callback({ cancel: true });
       return;
@@ -485,6 +490,7 @@ module.exports = {
   applyTrackerBlocking,
   ensureRequestHook,
   chiudiHost,
+  osservaRichieste,
   ensureSiteSession,
   configureForMode,
   configureFromSettings,

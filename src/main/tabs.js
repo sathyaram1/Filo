@@ -2743,6 +2743,44 @@ installSafebrowse(TabManager);
 installGeoBlock(TabManager);
 installCookies(TabManager);
 
+// Il testo dell'utente è partito quando esce verso il suo sito in una richiesta, non quando la
+// pagina lo mostra o toglie il campo (#824): lo si dice ai frame di quel sito, che ci cercano le
+// loro righe. Un altro sito (le registrazioni delle sessioni) non conta.
+const RICHIESTE_CON_TESTO = new Set(['xhr', 'ping', 'mainFrame', 'subFrame', 'other']);
+function schedaConTestoDi(wcId) {
+  for (const w of BrowserWindow.getAllWindows()) {
+    for (const t of (w._filoTabs && w._filoTabs.tabs) || []) {
+      try { if (t.formDirty && t.view.webContents.id === wcId) return t; } catch (_) {}
+    }
+  }
+  return null;
+}
+Cookies.osservaRichieste((d) => {
+  if (!d || !d.webContentsId || !RICHIESTE_CON_TESTO.has(d.resourceType)) return;
+  const tab = schedaConTestoDi(d.webContentsId);
+  if (!tab) return;
+  let da = '';
+  try { da = (d.frame && d.frame.url) || ''; } catch (_) {}
+  const sito = Cookies.registrableOf(d.url);
+  if (!sito || Cookies.registrableOf(da || d.referrer || tab.url) !== sito) return;
+  // Il calcolo non trattiene la richiesta.
+  setImmediate(() => {
+    const testo = testoDellaRichiesta(d);
+    if (!testo) return;
+    const type = globalThis.SN_MSG?.MSG?.FORM_SENT || 'form_sent';
+    let wc = null;
+    let pagina = '';
+    try { wc = tab.view.webContents; pagina = wc.getURL(); } catch (_) { return; }
+    for (const f of wc.mainFrame.framesInSubtree || []) {
+      try {
+        if (f.detached || Cookies.registrableOf(f.url) !== sito) continue;
+        const m = messaggioPerDestinazione({ type, testo }, f.url, pagina, { riquadro: Boolean(f.parent) });
+        if (m) f.send('filo:broadcast', m);
+      } catch (_) {}
+    }
+  });
+});
+
 function chiaveFrame(f) {
   try { return `${f.processId}:${f.routingId}`; } catch (_) { return ''; }
 }

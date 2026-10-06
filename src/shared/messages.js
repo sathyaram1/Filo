@@ -384,6 +384,9 @@
     // Main → ogni frame: «rimanda adesso se hai testo da inviare» (la pulizia sta
     // per decidere, #824). { impronte: del documento di prima } → TAB_ACTIVITY con formDirty.
     FORM_RECHECK: 'form_recheck',
+    // Main → frame dello stesso sito: una richiesta della scheda ha portato fuori questo testo
+    // (senza spazi, in più forme). Le righe dell'utente che ci stanno dentro sono partite. { testo }
+    FORM_SENT: 'form_sent',
 
     // §2.1 — pulizia/riordino su richiesta esplicita dell'utente (lo invoca
     // l'agente Filo dopo conferma). Esegue il triage su tutte le tab della finestra.
