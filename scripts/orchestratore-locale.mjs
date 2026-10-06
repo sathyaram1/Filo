@@ -49,6 +49,7 @@ export const OPZIONI_DI = Object.freeze({
     '--dry-run': SI,
   },
   stato: {},
+  smetti: { '--subito': SI },
   riprendi: {},
   togli: {},
 });
