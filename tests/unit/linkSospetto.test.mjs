@@ -395,7 +395,7 @@ test('un marchio-parola scritto con lettere finte e attaccato a un’altra parol
 
 test('«vv» e «rn» latini non sono lettere finte, e le parole come amazonite o rosebay non sono il marchio: tasto destro e apertura tacciono uguale (#732)', () => {
   const { evaluate } = require(join(ROOT, 'src/main/services/safebrowse/engine.js'));
-  for (const u of ['https://improvvise.it/', 'https://cene-improvvise.it/', 'https://avviserai.it/', 'https://ravviserai.com/', 'https://stearns.com/',
+  for (const u of ['https://improvvise.it/', 'https://cene-improvvise.it/', 'https://avviserai.it/', 'https://avviserà.it/', 'https://ravviserai.com/', 'https://stearns.com/',
     'https://amazonite.com/', 'https://amazonite-gioielli.it/', 'https://rosebay.com/', 'https://forebay.org/', 'https://rosebay.github.io/']) {
     assert.deepEqual(LS.analizza(u), [], u);
     assert.equal(evaluate(u).level, 'safe', u);

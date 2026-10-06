@@ -108,6 +108,10 @@ const MARCHI_PAROLA = new Map([
 // Elenco chiuso, ricavato passando i vocabolari interi inglese e italiano; le forme del marchio stesso (googlerà) restano fuori.
 const PAROLE_CON_MARCHIO = ['amazonian', 'amazonia', 'amazonas', 'amazonite', 'amazonstone', 'stramazon', 'rosebay', 'forebay', 'bebay'];
 
+function letteraFinta(pezzo) {
+  return /[^a-z]/.test(pezzo.normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+}
+
 // Vero se `nome` (un'etichetta o più, separate da punti) porta il marchio `token` secondo la regola sopra.
 // `scheletro` porta ogni pezzo alla forma con cui si legge a schermo (omoglifi, sosia).
 function nominaMarchio(nome, token, scheletro = (x) => x) {
@@ -117,8 +121,8 @@ function nominaMarchio(nome, token, scheletro = (x) => x) {
   if (forme) {
     const pezzi = nome.split(/[.-]/).filter(Boolean);
     // Un marchio scritto con lettere finte (аpplelogin, app1elogin) non è una parola di nessuno: conta anche attaccato.
-    // Finte sono le cifre e le lettere di un altro alfabeto; «vv» e «rn» sono latino scritto normale (improvvise, stearns).
-    return pezzi.some((p) => p === token || scheletro(p) === tok || (/[^a-z]/.test(p) && !p.includes(token) && scheletro(p).includes(tok)))
+    // Finte sono le cifre e le lettere di un altro alfabeto; «vv», «rn» e gli accenti sono latino normale (improvvise, avviserà).
+    return pezzi.some((p) => p === token || scheletro(p) === tok || (letteraFinta(p) && !p.includes(token) && scheletro(p).includes(tok)))
       || forme.some((f) => nome.includes(f) || pezzi.some((p) => scheletro(p).includes(scheletro(f))));
   }
   // Il trattino non spezza un marchio distintivo: pay-pal resta paypal.
