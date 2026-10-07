@@ -422,11 +422,42 @@ try {
     if (!SCHEMI_APRIBILI.test(url)) return;
     try { ipcRenderer.sendSync('filo:apertura-scelta', url); } catch (_) {}
   };
-  // Prima della pagina e dopo di lei: un sito che riscrive il collegamento al clic apre quello riscritto.
-  for (const ev of ['click', 'auxclick']) {
-    window.addEventListener(ev, scelto, { capture: true, passive: true });
-    window.addEventListener(ev, scelto, { passive: true });
-  }
+  const ascolta = (win) => {
+    // Solo l'inizio di un gesto, come nella pagina: il rilascio dello stesso clic non è un gesto nuovo (il tocco finisce).
+    for (const ev of ['pointerdown', 'mousedown', 'keydown', 'touchend']) {
+      win.addEventListener(ev, gesto, { capture: true, passive: true });
+    }
+    // Prima della pagina e dopo di lei: un sito che riscrive il collegamento al clic apre quello riscritto.
+    for (const ev of ['click', 'auxclick']) {
+      win.addEventListener(ev, scelto, { capture: true, passive: true });
+      win.addEventListener(ev, scelto, { passive: true });
+    }
+  };
+  // I documenti che la pagina si scrive da sé non hanno un preload loro (il riquadro vuoto riempito dallo script), o
+  // perdono gli ascolti (la riscrittura da capo li cancella): il gesto si ascolta anche lì (#737.1 giro 8).
+  const seguiti = new WeakSet();
+  const vuoto = (f) => { try { const w = f.contentWindow; return w && w.location.href === 'about:blank' ? w : null; } catch (_) { return null; } };
+  const segui = (win) => {
+    ascolta(win);
+    let doc = null;
+    try { doc = win.document; } catch (_) {}
+    if (!doc || seguiti.has(doc)) return;
+    seguiti.add(doc);
+    new MutationObserver(() => ascolta(win)).observe(doc, { childList: true });
+    const riquadri = doc.getElementsByTagName('iframe');
+    const nuovi = () => {
+      for (const f of riquadri) {
+        if (seguiti.has(f)) continue;
+        seguiti.add(f);
+        const entra = () => { const w = vuoto(f); if (w) segui(w); };
+        f.addEventListener('load', entra, true);
+        entra();
+      }
+    };
+    new MutationObserver(nuovi).observe(doc, { childList: true, subtree: true });
+    nuovi();
+  };
+  segui(window);
   // Le voci del menu di Filo che aprono un indirizzo lo dichiarano qui prima di aprirlo.
   globalThis.SN_APERTURA_SCELTA = (url) => { try { ipcRenderer.sendSync('filo:apertura-scelta', String(url || '')); } catch (_) {} };
 } catch (_) {}
