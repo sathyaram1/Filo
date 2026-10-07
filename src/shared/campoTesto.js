@@ -58,7 +58,13 @@
       }
       break;
     }
-    return campoDiTesto(el);
+    if (campoDiTesto(el)) return true;
+    // Un componente a shadow DOM chiuso nasconde il suo campo (#685.1): lì si chiede al
+    // documento se il cursore sta in un punto scrivibile, che vale in ogni mondo e oltre ogni ombra.
+    if (el && !el.shadowRoot && String(el.localName || '').indexOf('-') !== -1) {
+      try { return !!(el.ownerDocument || doc).queryCommandEnabled('insertText'); } catch (_) { return false; }
+    }
+    return false;
   }
 
   // La stessa domanda, in forma di sorgente da valutare dentro una pagina:
