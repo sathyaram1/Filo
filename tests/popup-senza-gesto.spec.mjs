@@ -200,6 +200,29 @@ test('chiuso l\'avviso di una pagina che riprova di continuo, non torna finché 
   await expect(vista.locator('.shell-notif.show', { hasText: 'Bloccato popup' })).toHaveCount(0);
 });
 
+test('scaduto da solo l\'avviso, un blocco dopo una pausa sulla stessa pagina ha di nuovo il suo avviso con «Apri»', async ({ app, openTab, testServer, avvisi }) => {
+  const dest = testServer.html('<title>PAGA</title>');
+  await openTab(testServer.html(`<title>Negozio</title><p>articolo</p><script>var D=${JSON.stringify(dest)};
+    setTimeout(function(){window.open(D)},600);setTimeout(function(){window.open(D)},14000);</script>`));
+  const vista = await avvisi();
+  const carta = vista.locator('.shell-notif.show', { hasText: 'Bloccato popup' });
+  await expect(carta).toBeVisible({ timeout: 8000 });
+  await expect(carta).toHaveCount(0, { timeout: 12000 });
+  await expect(carta, 'il secondo blocco ha il suo avviso').toBeVisible({ timeout: 8000 });
+  await carta.locator('.shell-notif-action', { hasText: 'Apri' }).click();
+  await expect.poll(() => aperteSu(app, dest), { timeout: 8000 }).toBe(1);
+});
+
+test('scaduto da solo l\'avviso di una pagina che riprova di continuo, non torna finché i tentativi non fanno una pausa', async ({ openTab, testServer, avvisi }) => {
+  await openTab(testServer.html('<title>Catena</title><p>articolo</p><script>setInterval(function(){window.open(location.href)},700)</script>'));
+  const vista = await avvisi();
+  const carta = vista.locator('.shell-notif.show', { hasText: 'Bloccato popup' });
+  await expect(carta).toBeVisible({ timeout: 8000 });
+  await expect(carta).toHaveCount(0, { timeout: 12000 });
+  await new Promise((r) => setTimeout(r, 5000));
+  await expect(carta).toHaveCount(0);
+});
+
 test('«Apri» su una finestra di accesso bloccata la fa aprire alla pagina, collegata a lei', async ({ app, openTab, testServer, avvisi }) => {
   const accesso = `${testServer.html('<title>ACCESSO</title><script>document.title = window.opener ? "COLLEGATA" : "STACCATA"</script>')}?client_id=z&response_type=code`;
   await openTab(testServer.html(`<title>Sito</title><script>setTimeout(function(){window.open(${JSON.stringify(accesso)}, 'login', 'width=400,height=500')},1500)</script>`));

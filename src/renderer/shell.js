@@ -2090,9 +2090,11 @@
   // Il main blocca un window.open() non richiesto e manda { tabId, url, host }: è un avviso della
   // pila in basso a destra, con «Apri» per aprirlo comunque (la chip sotto la barra la copriva la scheda).
   if (api.tabs.onPopupBlocked) {
-    // Una pagina che riprova di continuo ha un avviso solo: i tentativi lo aggiornano senza allungarlo, e chiuso o
-    // scaduto tace finché la scheda resta su quella pagina (#737.1 giro 3). Una voce per scheda.
+    // Una pagina che riprova di continuo ha un avviso solo: i tentativi lo aggiornano senza allungarlo, e chiuso
+    // dall'utente tace finché la scheda resta su quella pagina (#737.1 giro 3). Scaduto da solo torna dopo una pausa
+    // dei tentativi: un blocco isolato si vede sempre, la catena no (giro 9). Una voce per scheda.
     const popupAvvisati = new Map();
+    const PAUSA_POPUP_MS = 10000;
     api.tabs.onPopupBlocked((info) => {
       if (!info || !info.url) return;
       const { tabId } = info;
@@ -2102,21 +2104,27 @@
         : info.app === 'tel' ? `Bloccata la chiamata avviata da ${da}`
           : info.app === 'sms' ? `Bloccato l'SMS aperto da ${da}`
             : `Bloccato popup da ${da}`;
+      const ora = Date.now();
       const prima = popupAvvisati.get(tabId);
       if (prima && prima.pagina === pagina) {
+        const dopoUnaPausa = ora - prima.ultimo >= PAUSA_POPUP_MS;
+        prima.ultimo = ora;
         if (prima.carta && prima.carta.isConnected && prima.carta.dataset.closing !== '1') {
           prima.url = info.url;
           const msg = prima.carta.querySelector('.shell-notif-msg');
           if (msg && msg.textContent !== testo) msg.textContent = testo;
+          return;
         }
-        return;
+        if (prima.chiusa || !dopoUnaPausa) return;
       }
-      const voce = { pagina, url: info.url, carta: null };
+      const voce = { pagina, url: info.url, carta: null, ultimo: ora, chiusa: false };
       popupAvvisati.set(tabId, voce);
       voce.carta = NOTIFS.show(testo, {
         durationSec: 8,
         actions: [{ label: 'Apri', onClick: () => { try { api.tabs.openBlockedPopup(voce.url, false, tabId); } catch (_) {} } }],
       });
+      const x = voce.carta && voce.carta.querySelector('.shell-notif-close');
+      if (x) x.addEventListener('click', () => { voce.chiusa = true; });
     });
     if (api.tabs.onUpdate) {
       api.tabs.onUpdate((snap) => {
