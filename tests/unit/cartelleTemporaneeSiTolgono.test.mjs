@@ -199,7 +199,7 @@ test('npm run test:unit interrotto lascia solo quello che la pulizia del giorno 
   const partita = join(b.base, 'partita');
   mkdirSync(unit);
   writeFileSync(join(unit, 'appesa.test.mjs'), "import { test } from 'node:test';\nimport { writeFileSync } from 'node:fs';\n"
-    + `test('appesa', () => { writeFileSync(${JSON.stringify(partita)}, 'x'); return new Promise(() => setInterval(() => {}, 1000)); });\n`);
+    + `test('appesa', () => { writeFileSync(${JSON.stringify(partita)}, String(process.pid)); return new Promise(() => setInterval(() => {}, 1000)); });\n`);
   const figlio = spawn(process.execPath, [join(RADICE, 'scripts', 'run-unit-tests.mjs')],
     { env: { ...b.env, FILO_UNIT_DIR: unit }, cwd: RADICE, stdio: 'ignore', detached: process.platform !== 'win32' });
   const uscito = once(figlio, 'exit');
@@ -209,8 +209,13 @@ test('npm run test:unit interrotto lascia solo quello che la pulizia del giorno 
     await new Promise((ok) => setTimeout(ok, 500));
   } finally {
     // Come un Ctrl+C: arriva a tutto il gruppo, lanciatore e prove. Anche se l'attesa è fallita, o il file resta appeso.
-    if (process.platform === 'win32') spawnSync('taskkill', ['/pid', String(figlio.pid), '/T', '/F']);
-    else process.kill(-figlio.pid, 'SIGINT');
+    // taskkill /T parte dalle foglie: sotto carico il lanciatore sopravviveva secondi alle sue prove, finiva la corsa da
+    // vivo e toglieva la sua cartella. Lui per primo, poi la prova appesa: il Ctrl+C vero non gli lascia finire niente.
+    if (process.platform === 'win32') {
+      const appesa = existsSync(partita) ? Number(readFileSync(partita, 'utf8')) : 0;
+      spawnSync('taskkill', ['/pid', String(figlio.pid), ...(appesa ? [] : ['/T']), '/F']);
+      if (appesa) spawnSync('taskkill', ['/pid', String(appesa), '/T', '/F']);
+    } else process.kill(-figlio.pid, 'SIGINT');
     await uscito;
   }
   assert.notDeepEqual(readdirSync(b.tmp), [], 'la corsa non ha lasciato niente: la prova non prova l\'interruzione');
