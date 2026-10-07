@@ -87,6 +87,34 @@ test('il clic dentro un riquadro di un altro sito apre la sua scheda; da solo il
   await expect.poll(() => aperteSu(app, colClic), { timeout: 8000 }).toBe(1);
 });
 
+// I documenti che la pagina si scrive da sé non hanno un preload loro o ne perdono gli ascolti (#737.1 giro 8).
+const SCRITTI_DALLA_PAGINA = {
+  'un riquadro vuoto riempito dallo script': (dest) => `<iframe id="f" width="400" height="200"></iframe><script>
+    var d=document.getElementById('f').contentDocument;var a=d.createElement('a');a.id='b';a.href=${JSON.stringify(dest)};a.target='_blank';
+    a.textContent='apri';a.style.cssText='display:block;width:200px;height:60px';d.body.appendChild(a);</script>`,
+  'un riquadro vuoto scritto da capo dentro un altro riquadro vuoto': (dest, daSolo) => `<iframe id="f" width="400" height="200"></iframe><script>
+    var esterno=document.getElementById('f').contentDocument;esterno.open();esterno.write('<iframe width=380 height=180></iframe>');esterno.close();
+    var d=esterno.querySelector('iframe').contentDocument;d.open();
+    d.write('<button id=b style="width:200px;height:60px" onclick="window.open(${dest.replace(/"/g, '&quot;')})">apri</button>');
+    d.write('<scr'+'ipt>setTimeout(function(){window.open(${JSON.stringify(daSolo).replace(/"/g, '&quot;')})},600)</scr'+'ipt>');d.close();</script>`,
+  'una pagina che si riscrive da capo': (dest) => `<p>caricamento</p><script>setTimeout(function(){document.open();
+    document.write('<a id=b target=_blank style="display:block;width:200px;height:60px" href="${dest}">apri</a>');document.close();},300)</script>`,
+};
+
+for (const [dove, html] of Object.entries(SCRITTI_DALLA_PAGINA)) {
+  test(`il clic dentro ${dove} apre la sua scheda`, async ({ app, openTab, testServer }) => {
+    const dest = testServer.html('<title>COL CLIC</title>');
+    const daSolo = testServer.html('<title>DA SOLO</title>');
+    const page = await openTab(testServer.html(html(dest, daSolo)));
+    // Lontano da ogni input dato alla scheda prima di questo clic.
+    await page.waitForTimeout(5600);
+    const frame = page.frames().reverse().find((f) => f.childFrames().length === 0);
+    await frame.click('#b');
+    await expect.poll(() => aperteSu(app, dest), { timeout: 6000 }).toBe(1);
+    expect(await aperteSu(app, daSolo), 'da solo il riquadro non apre niente').toBe(0);
+  });
+}
+
 test('col blocco spento la scheda che la pagina apre da sola passa', async ({ app, openTab, testServer }) => {
   await app.evaluate(({ BrowserWindow }) => {
     const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
