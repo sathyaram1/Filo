@@ -1409,7 +1409,7 @@
         preview.style.width = '36px';
         preview.style.height = '36px';
         preview.innerHTML = icon || '';
-        menuHost().appendChild(preview);
+        monta(preview);
         esterno = { id, preview, zona: null };
       }
       esterno.preview.style.left = (x - 18) + 'px';
