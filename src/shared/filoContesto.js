@@ -97,6 +97,19 @@
     return `${m.chat}|${m.ts}`;
   }
 
+  // Il testo che la chat scrive nella conversazione venendo da fuori (l'esito di un comando dato in chat, il nome di un
+  // file scaricato) è una lettura come le altre: imbustato, contato per le uscite (#587), con la vita delle letture.
+  const ESTERNO_COMANDO = "dall'output di un comando";
+  function letturaDaFuori(m, comando = '') {
+    if (!m || m.role === 'user' || typeof m.esterno !== 'string' || !m.esterno) return null;
+    const text = String(m.text == null ? '' : m.text);
+    if (m.esterno === ESTERNO_COMANDO) {
+      const cmd = String(comando || '').replace(/^\//, '').trim();
+      return { type: 'ESEGUI_COMANDO', command: cmd, _dallaChat: true, _executed: true, _output: { command: cmd, stdout: text, stderr: '' } };
+    }
+    return { type: 'TESTO_DI_FUORI', _executed: true, _output: { text, fonte: m.esterno } };
+  }
+
   // `prima`: il messaggio che precede nel blocco. Ora e conversazione stanno sui messaggi dell'utente; su quelli di
   // Filo solo quando aprono un tratto di un'altra conversazione, così il modello non impara a scriverle nelle risposte.
   function rendi(m, prima, { tetto, esito, osserva }) {
