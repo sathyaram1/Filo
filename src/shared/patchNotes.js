@@ -11,21 +11,22 @@
     {
       version: '0.2.238', date: '2026-10-07',
       features: [
-        'Su Windows e Linux, quando una versione nuova di Filo è pronta te lo dice un avviso in basso a destra, e nella home resta una carta con «Riavvia e aggiorna» finché non la installi. Puoi anche scrivere a Filo «aggiornati». Su Windows, se non lo premi, la versione nuova si installa la prossima volta che apri Filo: vedi la barra di avanzamento per una decina di secondi e poi Filo si riapre da solo. Prima si installava di nascosto quando lo chiudevi, e se lo riaprivi in quel momento Windows diceva che il collegamento non funzionava. Chi preferisce il modo di prima lo rimette in Preferenze, Impostazioni avanzate.',
-      ],
-      fixes: [],
-    },
-    {
-      version: '0.2.237', date: '2026-10-07',
-      features: [
         'Nelle Opzioni, sotto «Host dei modelli», scegli se i modelli rispondono dagli host più veloci, da quelli che cominciano a rispondere prima o dai più economici. Lo puoi chiedere anche a Filo, per esempio «voglio la chat più veloce». I fornitori esclusi restano esclusi.',
         'Il pulsante «Prova» dei modelli predefiniti misura il modello come lo useresti davvero e la misura resta: riapri la pagina e ritrovi latenza e velocità. Se cambi modello o host la misura sparisce, e se non è di oggi porta la sua data.',
-        'Su ogni pagina, spingendo il mouse contro il bordo sinistro, si apre una barra con indietro, avanti, ricarica, home, incognito, schermo intero e chiudi scheda, e in fondo l\'ora, la cronologia, le app, il profilo e le impostazioni. La apri anche dalla linguetta a sinistra delle schede o con Ctrl+Shift+B (Cmd+Shift+B su Mac). Le icone del tasto destro si trascinano nella barra e ritorno, o lo chiedi a Filo a parole, e restano dove le metti. Col tasto destro su Indietro e Avanti vedi le pagine della scheda e ci torni con un clic, anche dopo essere passato dalla home. In Preferenze → Impostazioni avanzate, col tasto destro sulla striscia o chiedendolo a Filo nascondi la striscia, spegni l\'apertura dal bordo o cambi quanto aspetta e quanto resta aperta.',
-        'Adesso scegli tu quanto Filo fa da solo. In Preferenze, sotto «Autonomia di Filo», ci sono Conservativo, Normale e Automatico, e il livello scelto si vede sempre nella nuova scheda, accanto a dove scrivi. A Normale Filo fa da solo le cose che si rimediano, come ricordarsi una regola o mandare la segnalazione che gli hai chiesto. Quando ha appena letto cose scritte da altri, come una pagina web, una ricerca o un documento, ti chiede di più, e il riquadro dice cosa ha letto.',
+        'Su Windows e Linux, quando una versione nuova di Filo è pronta te lo dice un avviso in basso a destra, e nella home resta una carta con «Riavvia e aggiorna» finché non la installi. Puoi anche scrivere a Filo «aggiornati». Su Windows, se non lo premi, la versione nuova si installa la prossima volta che apri Filo: vedi la barra di avanzamento per una decina di secondi e poi Filo si riapre da solo. Prima si installava di nascosto quando lo chiudevi, e se lo riaprivi in quel momento Windows diceva che il collegamento non funzionava. Chi preferisce il modo di prima lo rimette in Preferenze, Impostazioni avanzate.',
       ],
       fixes: [
         'Quello che scrivi nelle pagine di Filo non si perde più se chiudi la scheda col mouse, chiudi la finestra o esci da Filo subito dopo: vale per le impostazioni, il nome di un documento dell\'Editor, le correzioni del Correttore e il titolo di una chat in Cronologia.',
         'Nelle Preferenze e nelle Opzioni la scritta «Salvato» compare per l\'ultima cosa che hai toccato, non per una modifica di prima.',
+      ],
+    },
+    {
+      version: '0.2.237', date: '2026-10-07',
+      features: [
+        'Su ogni pagina, spingendo il mouse contro il bordo sinistro, si apre una barra con indietro, avanti, ricarica, home, incognito, schermo intero e chiudi scheda, e in fondo l\'ora, la cronologia, le app, il profilo e le impostazioni. La apri anche dalla linguetta a sinistra delle schede o con Ctrl+Shift+B (Cmd+Shift+B su Mac). Le icone del tasto destro si trascinano nella barra e ritorno, o lo chiedi a Filo a parole, e restano dove le metti. Col tasto destro su Indietro e Avanti vedi le pagine della scheda e ci torni con un clic, anche dopo essere passato dalla home. In Preferenze → Impostazioni avanzate, col tasto destro sulla striscia o chiedendolo a Filo nascondi la striscia, spegni l\'apertura dal bordo o cambi quanto aspetta e quanto resta aperta.',
+        'Adesso scegli tu quanto Filo fa da solo. In Preferenze, sotto «Autonomia di Filo», ci sono Conservativo, Normale e Automatico, e il livello scelto si vede sempre nella nuova scheda, accanto a dove scrivi. A Normale Filo fa da solo le cose che si rimediano, come ricordarsi una regola o mandare la segnalazione che gli hai chiesto. Quando ha appena letto cose scritte da altri, come una pagina web, una ricerca o un documento, ti chiede di più, e il riquadro dice cosa ha letto.',
+      ],
+      fixes: [
         'Con la protezione fingerprinting accesa, Filo dà un\'impronta diversa a ogni sito anche quando due siti stanno sulla stessa piattaforma, come due pagine su github.io o vercel.app, due negozi sotto .com.tw, .co.id o .com.co, o due indirizzi IP. Prima ricevevano la stessa, e uno script di tracciamento presente su entrambi li collegava. Le pagine di uno stesso sito restano con la stessa impronta.',
         'Con i cookie su Privacy massima, un sito fidato scritto col suo indirizzo completo, come webmail.libero.it o mail.google.com, ti tiene connesso. Prima l\'elenco lo mostrava ma il sito ti faceva uscire a ogni visita.',
         'Dopo «Traduci la pagina» l\'avviso non dice più che un riquadro è rimasto in lingua originale quando quel riquadro sullo schermo non c\'è, come gli spazi pubblicitari e i banner nascosti. I riquadri nascosti non si traducono e non si pagano. Se ne apri uno, il tasto destro offre di tradurlo.',
