@@ -155,8 +155,16 @@ export function rapportoVuoto({ role = '', ticket = '' } = {}) {
     durationS: 0,
     turns: 0,
     coldTurns: 0,
+    // Cache scaduta anche solo in parte (scrive più di quanto legge): i
+    // sotto-agenti hanno la cache a 5 minuti, un comando lungo la fa scadere.
+    rewarmTurns: 0,
+    rewarmTokens: 0,
+    maxContextTokens: 0,
     tokens: { input: 0, cacheRead: 0, cacheWrite: 0, output: 0 },
     costUsd: 0,
+    // I turni dell'orchestratore fra il biglietto prima e questo (FUORI da
+    // costUsd): senza, un terzo del consumo vero non stava in nessun rapporto.
+    orchestrator: null,
     tools: { total: 0, byName: {}, timeouts: 0, errors: 0 },
     // Turni per sforzo dichiarato ({ xhigh: 40 }): dice se le definizioni degli
     // agenti hanno avuto effetto. Un turno senza il campo non si conta.
