@@ -27,7 +27,9 @@ in testa ai messaggi dell'utente. La logica è in `src/shared/filoContesto.js` (
   venti della sua chat, nella scheda di quella chat; nelle altre schede solo finché è anche fra gli ultimi venti del
   filo. Poi resta il nome dell'azione. Contati solo sul filo morivano prima di oggi a chi parla in due schede; contati
   solo sulla loro chat, una chat ferma li teneva davanti a ogni scheda per giorni. Gli esiti stanno in memoria (mai
-  su disco) e se ne vanno con la loro chat.
+  su disco) e se ne vanno con la loro chat. Il testo che la chat scrive nella conversazione venendo da fuori
+  (l'esito di un comando dato in chat con «/», il nome di un file scaricato) è una lettura allo stesso modo
+  (`letturaDaFuori`): mai nudo come parole di Filo, imbustato, contato per le uscite, con la stessa vita.
 - **Un messaggio tagliato si rilegge davvero**: oltre un quarto del tetto restano testa e coda, con l'id intero della
   chat; CERCA_CHAT con l'id rilegge la conversazione intera fino al tetto in token, oltre dà testa, coda e il
   numero da cui leggere il mezzo, e con `da` lo dà a pezzi. Nessun secondo taglio nella busta.
