@@ -294,6 +294,8 @@
         const trovati = (Array.isArray(out.risultati) ? out.risultati : []).filter(Boolean)
           .map((r) => `${testo(r.nome)}\n${testo(r.percorso)}\n${testo(r.inizio)}\n${testo(r.squarcio)}`);
         if (trovati.length) { nonFidato = true; pezzi.push(...trovati); daFuori(trovati.join('\n'), 'dai documenti trovati sul disco'); }
+      } else if (type === 'TESTO_DI_FUORI') {
+        if (testo(out.text)) { nonFidato = true; pezzi.push(out.text); daFuori(out.text, testo(out.fonte) || 'da fuori'); }
       } else if (type === 'LEGGI_FILE') {
         pezzi.push(testo(out.text));
       } else if (type === 'CERCA_CHAT') {

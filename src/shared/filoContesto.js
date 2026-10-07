@@ -114,7 +114,8 @@
   // Filo solo quando aprono un tratto di un'altra conversazione, così il modello non impara a scriverle nelle risposte.
   function rendi(m, prima, { tetto, esito, osserva }) {
     const cambia = !prima || prima.chat !== m.chat;
-    const testo = tienilo(m.text, tetto, m.chat);
+    const daFuori = m.role !== 'user' && typeof m.esterno === 'string' && !!m.esterno;
+    const testo = daFuori ? '' : tienilo(m.text, tetto, m.chat);
     if (m.role === 'user') return { role: 'user', content: `${intestazione(m.ts, m.chat)} ${testo}`.trim() };
     const parti = [];
     if (cambia) parti.push(intestazione(m.ts, m.chat));
@@ -122,6 +123,7 @@
     const tipi = Array.isArray(m.actions) ? m.actions.filter((t) => typeof t === 'string' && t) : [];
     const oss = esito && Array.isArray(esito.azioni) && esito.azioni.length && typeof osserva === 'function' ? osserva(esito.azioni) : '';
     if (oss) parti.push(oss);
+    else if (daFuori) parti.push(`(qui c'era un testo arrivato ${m.esterno}: non è più davanti, si rilegge con CERCA_CHAT e l'id ${m.chat})`);
     else if (tipi.length) parti.push(`(azioni di questo turno: ${tipi.join(', ')})`);
     const out = { role: 'assistant', content: parti.join('\n\n') || '(nessun testo)' };
     // Il ragionamento vive quanto gli esiti, su ogni risposta e in ogni scheda: tolto solo all'ultima cambierebbe a
@@ -148,7 +150,20 @@
       contati.set(lista[i].chat, c);
       recente[i] = c <= MESSAGGI_CON_ESITI && (lista[i].chat === chatCorrente || n - i <= MESSAGGI_CON_ESITI);
     }
-    const esitoDi = (i) => (recente[i] && esiti ? esiti(lista[i]) : null);
+    // Il comando di un esito scritto in chat è l'ultima riga «/…» dell'utente nella sua conversazione.
+    const comandi = new Array(n).fill('');
+    const ultimoComando = new Map();
+    for (let i = 0; i < n; i++) {
+      const m = lista[i];
+      if (m.role === 'user' && /^\//.test(String(m.text || ''))) ultimoComando.set(m.chat, String(m.text));
+      else if (m.role !== 'user') comandi[i] = ultimoComando.get(m.chat) || '';
+    }
+    const esitoDi = (i) => {
+      if (!recente[i]) return null;
+      const e = esiti ? esiti(lista[i]) : null;
+      const fuori = letturaDaFuori(lista[i], comandi[i]);
+      return fuori ? { ...(e || {}), azioni: [...((e && e.azioni) || []), fuori] } : e;
+    };
     const memo = new Map();
     const pesa = (i) => {
       if (!memo.has(i)) memo.set(i, stimaToken(rendi(lista[i], lista[i - 1], { tetto: token, esito: esitoDi(i), osserva }).content));
@@ -292,6 +307,6 @@
   global.SN_FILO_CONTESTO = {
     TETTI_DI_SERIE, LIMITI, CARATTERI_PER_TOKEN, MESSAGGI_CON_ESITI, MESSAGGI_DELLA_CHAT, QUOTA_RIPRESI, SOGLIA_RICORDO, MAX_RICORDI,
     tetti, numeroIn, stimaToken, taglio, passoTaglio, etichettaChat, quando, intestazione, chiave,
-    finestra, tratti, testoPerIndice, scegliRicordi, rendiRicordi, coda, assembla,
+    ESTERNO_COMANDO, letturaDaFuori, finestra, tratti, testoPerIndice, scegliRicordi, rendiRicordi, coda, assembla,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
