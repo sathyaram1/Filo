@@ -34,6 +34,10 @@ const T = require(join(ROOT, 'src', 'main', 'services', 'terminal.js'));
 const ATTESA = 300_000;
 // La shell appena uscita può tenere ancora la cartella in cui girava: chi la toglie per provare aspetta che la lasci.
 const PAZIENZA = { tentativi: 20 };
+// Ogni riga stampata è un giro fra la shell e Filo, e sotto carico un giro costa un decimo di secondo: duemila righe
+// corte portavano il file oltre il tetto del lanciatore. Lo stesso output enorme si fa con poche righe lunghe (#1063).
+const RIGA_LUNGA = 'riga-di-elenco-'.repeat(64);
+const RIGHE_OLTRE_IL_TETTO = Math.ceil((T.MAX_OUTPUT_CHARS * 3) / RIGA_LUNGA.length);
 
 // Il nome che rompeva tutto: un trattino lungo e una «à». Entrambi assenti
 // dalla tabella OEM di Windows.
@@ -291,10 +295,9 @@ test('un comando che stampa moltissimo non fa perdere cartella ed esito', async 
   // valeva per il comando dopo e un comando FALLITO risultava riuscito.
   // È lo scenario di ogni ricerca dentro una cartella grande, cioè quello che
   // Filo fa quando non sa ancora dove sta il file che gli hanno chiesto.
-  const righe = Math.ceil((T.MAX_OUTPUT_CHARS * 3) / 15);
   const comando = process.platform === 'win32'
-    ? `1..${righe} | ForEach-Object { "riga-di-elenco" }; cmd /c exit 3`
-    : `for i in $(seq 1 ${righe}); do echo riga-di-elenco; done; exit 3`;
+    ? `1..${RIGHE_OLTRE_IL_TETTO} | ForEach-Object { "${RIGA_LUNGA}" }; cmd /c exit 3`
+    : `for i in $(seq 1 ${RIGHE_OLTRE_IL_TETTO}); do echo ${RIGA_LUNGA}; done; exit 3`;
   const out = await T.runCommand(comando, { cwd: TMP, timeoutMs: ATTESA, trackCwd: true });
   assert.equal(out.timedOut, false, `il comando non è finito in ${ATTESA / 1000} s: macchina bloccata, non l'esito`);
   assert.equal(out.truncated, true, 'l\'output doveva sfondare il tetto');
@@ -309,10 +312,9 @@ test('un comando che stampa moltissimo non fa perdere cartella ed esito', async 
 test('la cartella in cui il comando è finito torna anche con un output enorme', async () => {
   const sotto = join(TMP, 'sottocartella');
   try { togliCartella(sotto); } catch (_) {}
-  const righe = Math.ceil((T.MAX_OUTPUT_CHARS * 3) / 15);
   const comando = process.platform === 'win32'
-    ? `mkdir "${sotto}" | Out-Null; Set-Location "${sotto}"; 1..${righe} | ForEach-Object { "riga-di-elenco" }`
-    : `mkdir -p "${sotto}"; cd "${sotto}"; for i in $(seq 1 ${righe}); do echo riga-di-elenco; done`;
+    ? `mkdir "${sotto}" | Out-Null; Set-Location "${sotto}"; 1..${RIGHE_OLTRE_IL_TETTO} | ForEach-Object { "${RIGA_LUNGA}" }`
+    : `mkdir -p "${sotto}"; cd "${sotto}"; for i in $(seq 1 ${RIGHE_OLTRE_IL_TETTO}); do echo ${RIGA_LUNGA}; done`;
   const out = await T.runCommand(comando, { cwd: TMP, timeoutMs: ATTESA, trackCwd: true });
   assert.equal(out.timedOut, false, `il comando non è finito in ${ATTESA / 1000} s: macchina bloccata, non l'esito`);
   assert.equal(out.cwd, sotto, `dopo un output lungo Filo crede di essere altrove: ${out.cwd}`);
@@ -373,10 +375,14 @@ test('l\'uscita di un comando non può scriversi la riga di servizio', async () 
 
   // Il file scaricato, con dentro la vecchia riga di servizio e abbastanza
   // lungo da far cadere quella vera.
-  const riga = 'riga di testo qualunque, scaricata da internet\n';
+  // Righe lunghe e poche, per il costo di ogni riga sotto carico (vedi RIGA_LUNGA): la finta sta dentro l'uscita
+  // mostrata, quella vera finisce oltre il tetto.
+  const riga = `${'riga di testo qualunque, scaricata da internet '.repeat(40)}\n`;
+  const prima = riga.repeat(5);
+  assert.ok(prima.length < T.MAX_OUTPUT_CHARS, 'la riga finta deve stare nell\'uscita mostrata');
   const finto = `${T.CWD_MARK_PREFIX}8b9cb__:0:${altrove}\n`;
   const file = join(dir, 'scaricato.txt');
-  writeFileSync(file, riga.repeat(200) + finto + riga.repeat(6000), 'utf8');
+  writeFileSync(file, prima + finto + riga.repeat(Math.ceil((T.MAX_OUTPUT_CHARS * 3) / riga.length)), 'utf8');
 
   const leggi = process.platform === 'win32' ? `Get-Content "${file}"` : `cat "${file}"`;
   const out = await T.runCommand(leggi, { cwd: dir, trackCwd: true, timeoutMs: ATTESA });

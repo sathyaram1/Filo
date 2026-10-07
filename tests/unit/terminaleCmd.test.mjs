@@ -241,10 +241,12 @@ test('a cmd il comando arriva in soli caratteri ASCII, e ricomposto è quello sc
 });
 
 test('un output enorme non fa perdere esito e cartella', async () => {
-  const righe = Math.ceil((T.MAX_OUTPUT_CHARS * 3) / 15);
+  // Poche righe lunghe: sotto carico ogni riga è un giro fra la shell e Filo, e duemila righe corte costavano minuti (#1063).
+  const riga = 'riga-di-elenco-'.repeat(64);
+  const righe = Math.ceil((T.MAX_OUTPUT_CHARS * 3) / riga.length);
   const out = await esegui(WIN
-    ? `for /l %i in (1,1,${righe}) do @echo riga-di-elenco\ncmd /c exit 3`
-    : `for i in $(seq 1 ${righe}); do echo riga-di-elenco; done; false`);
+    ? `for /l %i in (1,1,${righe}) do @echo ${riga}\ncmd /c exit 3`
+    : `for i in $(seq 1 ${righe}); do echo ${riga}; done; false`);
   assert.equal(out.truncated, true);
   assert.notEqual(out.code, 0, 'l\'esito si è perso dietro all\'output');
   assert.equal(out.cwd, TMP);
