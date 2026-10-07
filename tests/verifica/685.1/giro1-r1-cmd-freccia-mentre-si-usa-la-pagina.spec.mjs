@@ -37,7 +37,7 @@ const DOC = '<!doctype html><title>Doc</title>'
   + '<iframe id="fr" srcdoc="<div id=ed contenteditable=true style=min-height:40px></div>"></iframe>'
   + '<script>document.getElementById("foglio").addEventListener("mousedown", e => e.preventDefault());</script>';
 
-test('editor in un riquadro: clic sul foglio e Cmd+← non porta via la pagina', async ({ app, openTab, testServer }) => {
+test('r1 editor in un riquadro: clic sul foglio e Cmd+← non porta via la pagina', async ({ app, openTab, testServer }) => {
   const { page, urlB } = await prepara({ app, openTab, testServer }, DOC);
   const ed = page.frameLocator('#fr').locator('#ed');
   await ed.click();
@@ -53,7 +53,7 @@ test('editor in un riquadro: clic sul foglio e Cmd+← non porta via la pagina',
 const PROPRIO = '<!doctype html><title>P</title><h1 id="p">griglia</h1><div id="n">0</div>'
   + '<script>addEventListener("keydown", e => { if (e.metaKey && e.key === "ArrowLeft") { e.preventDefault(); n.textContent = +n.textContent + 1; } });</script>';
 
-test('una pagina che usa Cmd+← per sé non viene portata via', async ({ app, openTab, testServer }) => {
+test('r1 una pagina che usa Cmd+← per sé non viene portata via', async ({ app, openTab, testServer }) => {
   const { page, urlB } = await prepara({ app, openTab, testServer }, PROPRIO);
   await page.locator('#p').click();
   await premi(app, 'Left', ['meta']);
@@ -63,7 +63,7 @@ test('una pagina che usa Cmd+← per sé non viene portata via', async ({ app, o
 
 const PLAIN = '<!doctype html><title>T</title><div id="ed" contenteditable="plaintext-only" style="min-height:40px"></div>';
 
-test('campo plaintext-only: Cmd+← non porta via la pagina', async ({ app, openTab, testServer }) => {
+test('r1 campo plaintext-only: Cmd+← non porta via la pagina', async ({ app, openTab, testServer }) => {
   const { page, urlB } = await prepara({ app, openTab, testServer }, PLAIN);
   await page.locator('#ed').click();
   await page.keyboard.type('testo');
