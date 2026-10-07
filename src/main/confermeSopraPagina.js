@@ -45,10 +45,11 @@ function allineaFinestre() {
   }
 }
 
-// Ogni finestra nata da una pagina web passa di qui; se il sito la rimostra mentre c'è una domanda, torna nascosta.
-function registraFinestraDelSito(win) {
+// Ogni finestra nata da una pagina web passa di qui, con la finestra di Filo da cui viene (`padre`); se il sito la
+// rimostra mentre c'è una domanda, torna nascosta.
+function registraFinestraDelSito(win, padre) {
   if (!win || finestreDelSito.has(win) || win.isDestroyed()) return;
-  finestreDelSito.add(win);
+  finestreDelSito.set(win, padre || null);
   win.once('closed', () => { finestreDelSito.delete(win); nascoste.delete(win); });
   win.on('show', () => { if (aSchermo.size) setImmediate(allineaFinestre); });
   allineaFinestre();
