@@ -145,7 +145,7 @@ function testoDi(content) {
 /** Il rapporto vuoto: ogni chiave al suo posto, così un server che lo legge non trova buchi. */
 export function rapportoVuoto({ role = '', ticket = '' } = {}) {
   return {
-    v: 2,
+    v: 3,
     role: String(role || ''),
     ticket: String(ticket || ''),
     sessionId: '',
@@ -750,7 +750,7 @@ export function riassunto(rep) {
     `rapporto sessione — ruolo: ${rep.role || '(nessuno)'}, biglietto: ${rep.ticket ? `${rep.ticket.slice(0, 8)}…` : '(nessuno)'}, sessione: ${rep.sessionId || '(sconosciuta)'}`,
     `durata ${durata}, ${rep.turns} turni (${rep.coldTurns} freddi), modelli: ${rep.models.join(', ') || '(nessuno)'}, sforzo: ${Object.entries(rep.effort || {}).map(([k, n]) => `${k} ${n}`).join(', ') || '(non dichiarato)'}`,
     `token: input ${rep.tokens.input}, cache letta ${rep.tokens.cacheRead}, cache scritta ${rep.tokens.cacheWrite}, output ${rep.tokens.output}`,
-    `costo stimato: $${rep.costUsd.toFixed(4)}`,
+    `costo stimato: $${rep.costUsd.toFixed(4)}${rep.orchestrator ? ` + orchestratore $${rep.orchestrator.costUsd.toFixed(4)} (${rep.orchestrator.turns} turni, contesto ${rep.orchestrator.maxContextTokens}, ${rep.orchestrator.rewarmTurns} da riscaldare, fermo ${rep.orchestrator.attesaPrimaS}s)` : ''} · cache riscaldata ${rep.rewarmTurns} volte`,
     `strumenti: ${rep.tools.total} (timeout ${rep.tools.timeouts}, errori ${rep.tools.errors}, sotto-agenti ${rep.subagents}, il più lungo ${rep.longestToolS}s) · sotto-agenti letti: ${Number(rep.subagentRuns) || 0}, il loro costo $${(Number(rep.subagentCostUsd) || 0).toFixed(4)}${rep.notes.length ? ` — note: ${rep.notes.join(' | ')}` : ''}`,
   ];
 }

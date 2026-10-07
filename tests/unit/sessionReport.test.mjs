@@ -15,7 +15,7 @@ import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const {
   analizzaRighe, generaRapporto, trovaTranscript, slugProgetto, chiaveSicura,
-  famigliaPrezzo, rapportoVuoto, riassunto, PREZZI, sommaSottoAgente,
+  famigliaPrezzo, rapportoVuoto, riassunto, PREZZI, sommaSottoAgente, finestraOrchestratore,
 } = await import('../../scripts/session-report.mjs');
 
 const T = (s) => `2026-09-16T10:${s}.000Z`;
@@ -58,7 +58,7 @@ const RIGHE = [
 
 test('dieci righe: turni, freddi, token, strumenti, timeout, sotto-agenti, durata', async () => {
   const rep = await analizzaRighe(RIGHE, { role: 'resolver', ticket: 'tkt-1' });
-  assert.equal(rep.v, 2);
+  assert.equal(rep.v, 3);
   assert.equal(rep.role, 'resolver');
   assert.equal(rep.ticket, 'tkt-1');
   assert.equal(rep.sessionId, 'sess-1');
@@ -506,5 +506,73 @@ test('giro 6: la data della prima riga si trova anche oltre i 64 KB di compito',
     const senza = join(base, 'agent-y.jsonl');
     writeFileSync(senza, 'niente\n{"type":"user"}\n');
     assert.ok(Number.isNaN(primoTimestampMs(senza)));
+  } finally { rmSync(base, { recursive: true, force: true }); }
+});
+
+// Il thread principale di una routine: due worker chiusi, un rilascio fatto
+// dall'orchestratore per un worker morto, il worker che sta rilasciando adesso.
+const H = (s) => `2026-10-07T${s}.000Z`;
+const orch = (id, ts, { cw = 0, cr = 0, out = 10, tool = null } = {}) => JSON.stringify({
+  type: 'assistant', timestamp: ts, sessionId: 'orch',
+  message: { id, model: 'claude-opus-5-5', usage: { input_tokens: 0, cache_creation_input_tokens: cw, cache_read_input_tokens: cr, output_tokens: out }, content: tool ? [tool] : [{ type: 'text', text: id }] },
+});
+const fine = (id, ts) => JSON.stringify({ type: 'user', timestamp: ts, sessionId: 'orch', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: 'fatto' }] } });
+const PRINCIPALE = [
+  orch('o1', H('09:00:00'), { cw: 30000 }),
+  orch('o2', H('09:01:00'), { cr: 30000, tool: { type: 'tool_use', id: 'ag1', name: 'Agent', input: {} } }),
+  fine('ag1', H('09:30:00')),
+  orch('o3', H('09:30:10'), { cr: 31000, cw: 2000 }),
+  orch('o4', H('09:31:00'), { cr: 33000, tool: { type: 'tool_use', id: 'ag2', name: 'Agent', input: {} } }),
+  fine('ag2', H('11:00:00')),
+  // il worker 2 è morto: rilascia l'orchestratore, e quel turno sta nel rapporto di allora
+  orch('o5', H('11:00:30'), { cw: 34000, tool: { type: 'tool_use', id: 'b1', name: 'Bash', input: { command: 'node scripts/routine-channel.mjs release abc --role orchestrator' } } }),
+  fine('b1', H('11:01:00')),
+  orch('o6', H('11:02:00'), { cr: 34000, cw: 1000 }),
+  orch('o7', H('11:03:00'), { cr: 35000, tool: { type: 'tool_use', id: 'ag3', name: 'Agent', input: {} } }),
+];
+
+test('finestra dell\'orchestratore: dal rilascio (o dalla fine del worker) di prima alla chiamata Agent aperta', () => {
+  const f = finestraOrchestratore(PRINCIPALE);
+  const ids = f.righe.map((l) => JSON.parse(l).message.id).filter(Boolean);
+  assert.deepEqual(ids, ['o6', 'o7']);
+  assert.equal(f.attesaPrimaS, 90, 'da o5 a o6');
+  // Primo worker della sessione: tutto dall'inizio fino alla sua chiamata.
+  const primo = finestraOrchestratore(PRINCIPALE.slice(0, 2));
+  assert.deepEqual(primo.righe.map((l) => JSON.parse(l).message.id), ['o1', 'o2']);
+  // Secondo worker: dopo la fine del primo, col turno che riscalda la cache dopo 29 minuti.
+  const secondo = finestraOrchestratore(PRINCIPALE.slice(0, 5));
+  assert.deepEqual(secondo.righe.map((l) => JSON.parse(l).message.id).filter(Boolean), ['o3', 'o4']);
+  assert.equal(secondo.attesaPrimaS, 1750);
+});
+
+test('il rapporto del worker porta a parte i turni dell\'orchestratore, e la cache riscaldata', async () => {
+  const base = cartellaTemporanea('filo-rapporto-orch-');
+  try {
+    const progetto = join(base, 'repo');
+    mkdirSync(progetto);
+    const config = join(base, 'config');
+    const dir = join(config, 'projects', slugProgetto(progetto));
+    const sub = join(dir, 'orch', 'subagents');
+    mkdirSync(sub, { recursive: true });
+    writeFileSync(join(dir, 'orch.jsonl'), PRINCIPALE.join('\n') + '\n');
+    // Il worker: un comando lungo fa scadere la cache a 5 minuti e il terzo turno riscrive quasi tutto.
+    const w = (id, ts, cw, cr) => JSON.stringify({ type: 'assistant', timestamp: ts, sessionId: 'w3', message: { id, model: 'claude-opus-5-5', usage: { input_tokens: 0, cache_creation_input_tokens: cw, cache_read_input_tokens: cr, output_tokens: 100 }, content: [{ type: 'text', text: id }] } });
+    writeFileSync(join(sub, 'agent-w3.jsonl'), [w('a1', H('11:03:10'), 40000, 0), w('a2', H('11:04:00'), 1000, 40000), w('a3', H('11:20:00'), 38000, 3000)].join('\n') + '\n');
+    const t = Date.now() / 1000;
+    utimesSync(join(dir, 'orch.jsonl'), t - 60, t - 60);
+    const rep = await generaRapporto({ role: 'verifier', cwd: progetto, configDir: config });
+    assert.equal(rep.sessionId, 'w3');
+    assert.equal(rep.rewarmTurns, 1, 'a3 scrive 38.000 e ne legge 3.000');
+    assert.equal(rep.rewarmTokens, 38000);
+    assert.equal(rep.coldTurns, 0, 'la definizione vecchia (lettura zero) non lo vedeva');
+    assert.equal(rep.maxContextTokens, 41000);
+    const o = rep.orchestrator;
+    assert.equal(o.turns, 2);
+    assert.deepEqual(o.tokens, { input: 0, cacheRead: 69000, cacheWrite: 1000, output: 20 });
+    assert.equal(o.costUsd, Math.round(((69000 * 0.2 + 1000 * 5 + 20 * 20) / 1e6) * 10000) / 10000);
+    assert.equal(o.attesaPrimaS, 90);
+    assert.equal(o.maxContextTokens, 35000);
+    assert.equal(rep.costUsd, 0.4096, 'costUsd resta quello del worker, senza l’orchestratore');
+    assert.match(riassunto(rep)[3], /orchestratore \$/);
   } finally { rmSync(base, { recursive: true, force: true }); }
 });
