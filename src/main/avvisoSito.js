@@ -92,14 +92,16 @@ class AvvisoSito {
   _togli(restituisci) {
     const era = this.su;
     this.su = null;
-    if (era) this._cambiata();
     const vista = this.vista;
-    if (!vista || vista.webContents.isDestroyed()) return;
-    let aveva = false;
-    try { aveva = require('electron').webContents.getFocusedWebContents() === vista.webContents; } catch (_) {}
-    vista.setVisible(false);
-    vista.setBounds({ x: 0, y: 0, width: 0, height: 0 });
-    if (era && aveva && restituisci) this.restituisciTastiera();
+    if (vista && !vista.webContents.isDestroyed()) {
+      let aveva = false;
+      try { aveva = require('electron').webContents.getFocusedWebContents() === vista.webContents; } catch (_) {}
+      vista.setVisible(false);
+      vista.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+      if (era && aveva && restituisci) this.restituisciTastiera();
+    }
+    // Per ultima: chi la sente può far arrivare un verdetto che rimette l'avviso, e qui non va più nascosto.
+    if (era) this._cambiata();
   }
 
   // Ogni scheda nuova entra in cima alle viste della finestra: l'avviso deve tornarle sopra.
