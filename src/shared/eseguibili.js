@@ -124,8 +124,8 @@
   }
 
   // Chi ha servito il file, se non è il sito del primo indirizzo cliccato: la
-  // fiducia si lega al primo (decisione dell'owner, #588.3), ma chi decide deve
-  // vedere anche dove il rimando l'ha portato. Un sottodominio è lo stesso sito.
+  // fiducia vale per l'uno o per l'altro (#588.3), e chi decide deve vedere
+  // anche dove il rimando l'ha portato. Un sottodominio è lo stesso sito.
   function servitoDa(primo, ultimo) {
     const a = comeSito(primo);
     const b = comeSito(ultimo);

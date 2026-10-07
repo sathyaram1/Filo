@@ -73,8 +73,11 @@ function configureFromSettings(settings) {
 // Un programma da un sito che l'utente ha dichiarato fidato scende come un PDF.
 // La fiducia vale solo per un sito CERTO: un file che può venire da un
 // riquadro di altri non prende quella della pagina che lo ospita (#588).
-function chiedeConferma(sito, incerto) {
+// Dopo un rimando valgono il sito cliccato E quello che ha servito i byte,
+// che il browser garantisce: fidarsi di chi serve il file non presta fiducia a nessuno (#588.3).
+function chiedeConferma(sito, incerto, servito) {
   if (!chiediEseguibili) return false;
+  try { if (servito && ESE().fidato(servito, sitiFidati)) return false; } catch (_) {}
   if (incerto) return true;
   try { return !ESE().fidato(sito, sitiFidati); } catch (_) { return true; }
 }
@@ -567,7 +570,9 @@ function onWillDownload(item, webContents, scope = '') {
   // Un programma si ferma PRIMA della cartella Download: i byte scendono in
   // quarantena e ci restano finché l'utente non risponde (#588). Il resto dei
   // file non cambia di una virgola: l'attrito va solo dove serve.
-  const attesa = exe && chiedeConferma(sito, incerto);
+  let finale = '';
+  try { finale = ESE().sito(url); } catch (_) {}
+  const attesa = exe && chiedeConferma(sito, incerto, finale);
 
   // Salvataggio diretto nella cartella Download (niente dialogo "Salva come":
   // vedi nota di filosofia in testa al file). setSavePath disattiva il dialogo
@@ -963,6 +968,13 @@ function confirmDownload(id, allow, scope = '') {
   return { ok: true, items: listRecords(scope) };
 }
 
+// Chi ha servito i byte: in un record nativo `url` è già l'ultimo indirizzo,
+// in uno «a mano» è il primo e l'ultimo sta in `servedBy`.
+function servitoDi(rec) {
+  if (rec.servedBy) return rec.servedBy;
+  try { return ESE().sito(rec.url); } catch (_) { return ''; }
+}
+
 function openFile(id, opts, scope = '') {
   const rec = recordIn(id, scope);
   if (!rec) return { ok: false, error: 'Questo scaricamento non è più nell’elenco' };
@@ -982,7 +994,7 @@ function openFile(id, opts, scope = '') {
   // e qui non si passa senza una seconda risposta. Il gate sta nel main perché
   // le superfici che offrono "Apri file" sono tre (avviso, barra, pagina) e una
   // regola per porta sarebbe una porta dimenticata.
-  if (rec.exe && !(opts && opts.confirmed) && chiedeConferma(rec.site, rec.siteUncertain)) {
+  if (rec.exe && !(opts && opts.confirmed) && chiedeConferma(rec.site, rec.siteUncertain, servitoDi(rec))) {
     let text = `«${rec.filename}» è un programma: aprirlo vuol dire eseguirlo.`;
     let title = 'Aprire un programma?';
     try { text = ESE().testoApri(rec.filename, rec.site, rec.siteUncertain, rec.servedBy); title = ESE().titoloApri(rec.filename); } catch (_) {}
