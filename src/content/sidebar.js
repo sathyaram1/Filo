@@ -959,7 +959,7 @@
       switch (page.op) {
         case 'copy': Actions?.copyToClipboard(text); break;
         case 'cut': Actions?.cutSelection(); break;
-        case 'search_text': return await runFiloAction({ type: 'NAVIGA', url: Actions.searchUrlFor(text) }, { etichetta: label });
+        case 'search_text': return await runFiloAction({ type: 'NAVIGA', url: Actions.searchUrlFor(text), cerca: text }, { etichetta: label });
         case 'read_aloud': await Tts?.readAloud(text); break;
         case 'stop_reading': Tts?.stopReading(); break;
         case 'edit_text': global.SN_EDITBOX?.openEditBox(text); break;
