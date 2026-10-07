@@ -290,6 +290,8 @@
         if (t.trim()) { nonFidato = true; pezzi.push(t); daFuori(t, "dall'output di un comando"); }
       } else if (type === 'LEGGI_DOCUMENTO') {
         if (testo(out.text)) { nonFidato = true; pezzi.push(out.text); daFuori(out.text, 'da un documento'); }
+      } else if (type === 'TESTO_DI_FUORI') {
+        if (testo(out.text)) { nonFidato = true; pezzi.push(out.text); daFuori(out.text, testo(out.fonte) || 'da fuori'); }
       } else if (type === 'LEGGI_FILE') {
         pezzi.push(testo(out.text));
       } else if (type === 'CERCA_CHAT') {

@@ -3008,7 +3008,7 @@ function commandOutputsForPrompt(actions) {
     // li scrive Filo, e il comando passa comunque dalla rete del canale di
     // sistema perché non apra una riga per conto suo.
     blocks.push(
-      `[Ho eseguito nel terminale: ${E.perCanaleSistema(cmd)}]\n` +
+      `[${a._dallaChat ? 'L\'utente ha eseguito nel terminale, scrivendolo in chat' : 'Ho eseguito nel terminale'}: ${E.perCanaleSistema(cmd)}]\n` +
       (body
         ? E.imbusta({ tipo: 'ESITO_COMANDO', testo: body, conIntestazione: true, max: 4000 })
         : '[Nessun output]') +
@@ -3475,8 +3475,20 @@ function observationsForPrompt(actions) {
     fileReadsForPrompt(actions), documentReadsForPrompt(actions), transparencyDocsForPrompt(actions),
     chatSearchesForPrompt(actions), confirmedActionsForPrompt(actions), proxyUnavailableForPrompt(actions),
     apertureFermateDopoForPrompt(actions),
-    fermateForPrompt(actions),
+    fermateForPrompt(actions), testiDiFuoriForPrompt(actions),
   ].filter(Boolean).join('\n\n');
+}
+
+// Una riga che la chat ha scritto nella conversazione venendo da fuori (il nome di un file scaricato, #868): dati, non
+// parole di Filo. La regola che la fa lettura sta in src/shared/filoContesto.js.
+function testiDiFuoriForPrompt(actions) {
+  if (!Array.isArray(actions)) return '';
+  const E = globalThis.SN_ESTERNO;
+  return actions
+    .filter((a) => a && String(a.type || '').toUpperCase() === 'TESTO_DI_FUORI' && a._output && String(a._output.text || '').trim())
+    .map((a) => `[Riga scritta nella chat ${E.perCanaleSistema(String(a._output.fonte || 'da fuori'))}]\n`
+      + E.imbusta({ tipo: 'TESTO_SALVATO', testo: String(a._output.text), conIntestazione: true }))
+    .join('\n\n');
 }
 
 // Le azioni fermate perché portavano fuori un segreto (#810): nei turni dopo, e nella chat riaperta, il modello
@@ -4072,7 +4084,12 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // Le azioni il cui esito il modello ha davanti, da qualunque scheda e giorno: decidono se un NAVIGA di questo
   // turno può portare fuori dati (#587).
   const azioniViste = filo ? [...filo.azioni] : [];
-  for (const m of codaScheda) if (m && Array.isArray(m.actions)) azioniViste.push(...m.actions);
+  const FCx = globalThis.SN_FILO_CONTESTO;
+  for (const m of codaScheda) {
+    if (m && Array.isArray(m.actions)) azioniViste.push(...m.actions);
+    const fuori = FCx.letturaDaFuori(m);
+    if (fuori) azioniViste.push(fuori);
+  }
   // Le parole dell'utente che il modello ha davanti: un codice che ha scritto lui può uscire (#810). Un turno
   // interno non è sua voce, nemmeno il testo di un suggerimento della home: lo scrive un modello.
   const paroleUtente = [...vistiDalFilo, ...codaScheda].filter((m) => m && m.role !== 'filo' && !m.daModello).map((m) => String(m.text || ''))
@@ -4092,7 +4109,8 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   const richiesta = [...conversazioneScheda.filter((m) => m && m.role !== 'filo').map((m) => String(m.text || '')), String(userMessage || '')].join('\n');
   for (const m of codaScheda) {
     const role = m.role === 'filo' ? 'assistant' : 'user';
-    let content = String(m.text || '');
+    const fuori = FCx.letturaDaFuori(m);
+    let content = fuori ? '' : String(m.text || '');
     const msg = { role, content };
     if (role === 'assistant') {
       const parts = [];
@@ -4103,7 +4121,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
         const fatte = interruptedActionsForPrompt(m.actions, { fermato: !!m.fermato });
         if (fatte) parts.push(fatte);
       }
-      const obs = observationsForPrompt(m.actions);
+      const obs = observationsForPrompt(fuori ? [...(Array.isArray(m.actions) ? m.actions : []), fuori] : m.actions);
       if (obs) parts.push(obs);
       const extra = parts.join('\n\n');
       if (extra) msg.content = content ? `${content}\n\n${extra}` : extra;

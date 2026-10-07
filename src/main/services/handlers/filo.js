@@ -318,7 +318,7 @@ module.exports = function register(on, ctx) {
     const role = msg.role === 'user' ? 'user' : 'filo';
     // L'esito di un comando lanciato a mano l'ha scritto il comando: riaperta, la chat lo tratta da letto (#810).
     // Così il nome di un file scaricato, che sceglie il sito, quando una carta della home lo porta nel filo (#870).
-    const ESTERNI = { comando: "dall'output di un comando", download: 'dal nome di un file scaricato' };
+    const ESTERNI = { comando: globalThis.SN_FILO_CONTESTO.ESTERNO_COMANDO, download: 'dal nome di un file scaricato' };
     const esterno = role === 'filo' && Object.hasOwn(ESTERNI, msg.esterno) ? ESTERNI[msg.esterno] : '';
     // I cambi di stato di un'azione confermata dopo il turno (#867): riaperta, la bolla ritrova il segno.
     const cambi = (Array.isArray(msg.cambi) ? msg.cambi : []).filter((c) => typeof c === 'string');
