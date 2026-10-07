@@ -556,7 +556,8 @@ module.exports = function setupWheelZoom(webFrame, opts) {
     if (zoomMode) return;
     zoomMode = true;
     try {
-      if (!badge) badge = makeBadge();
+      if (!badge) { badge = makeBadge(); scalaFatta = 0; }
+      scalaRiquadro();
       togliVelo();
       mettiInCima();
       avviaGuardia();
