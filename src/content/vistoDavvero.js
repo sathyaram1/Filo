@@ -128,16 +128,99 @@
     for (const n of genitore.children) if (sotto.has(n)) { primo = n; break; }
     sotto.add(f);
     genitore.insertBefore(f, primo || ospite);
+    // Ciò che il sito tiene sopra il menu sta anche sopra il fondo: il filtro lo riceve da sé, dopo il suo.
+    for (const el of sopraIlMenu(genitore)) {
+      let proprio = 'none';
+      try { proprio = global.getComputedStyle(el).filter; } catch (_) {}
+      sospesi.vecchi.push([el, 'filter', el.style.getPropertyValue('filter'), el.style.getPropertyPriority('filter')]);
+      el.style.setProperty('filter', (proprio && proprio !== 'none' ? proprio + ' ' : '') + filtro, 'important');
+    }
     return f;
+  }
+  // Gli elementi del sito al piano del menu o più su: solo quelli il cui piano conta per la radice, cioè senza un
+  // antenato che faccia da contesto di sovrapposizione (lì dentro nessun piano supera quello dell'antenato).
+  function sopraIlMenu(radice) {
+    const out = [];
+    const visita = (padre) => {
+      for (const c of padre.children) {
+        if (sotto.has(c) || c === ospite) continue;
+        let cs;
+        try { cs = global.getComputedStyle(c); } catch (_) { continue; }
+        const z = cs.zIndex === 'auto' ? null : Number(cs.zIndex);
+        if (z !== null && z >= Number(Z) && cs.position !== 'static') { out.push(c); continue; }
+        const contesto = z !== null || cs.position === 'fixed' || cs.position === 'sticky' || cs.opacity !== '1'
+          || cs.transform !== 'none' || cs.filter !== 'none' || cs.isolation === 'isolate' || cs.mixBlendMode !== 'normal';
+        if (!contesto) visita(c);
+      }
+    };
+    visita(radice);
+    return out;
   }
   function rimettiEffetti() {
     if (!sospesi) return;
     const { el, vecchi, fondo } = sospesi;
     sospesi = null;
     try { fondo?.remove(); } catch (_) {}
-    for (const [p, v, pr] of vecchi) {
-      try { if (v) el.style.setProperty(p, v, pr); else el.style.removeProperty(p); } catch (_) {}
+    for (const v of vecchi) rimetti(v.length === 4 ? v : [el, ...v]);
+  }
+  function rimetti([el, p, v, pr]) {
+    try { if (v) el.style.setProperty(p, v, pr); else el.style.removeProperty(p); } catch (_) {}
+  }
+
+  // Un riquadro incorporato: gli effetti della pagina che lo contiene (una scheda semitrasparente, un'ombra fatta
+  // con un filtro, la pagina in grigio) accecano le sonde come quelli del suo documento, e da qui non si toccano.
+  // Il riquadro chiede alla pagina sopra di sospenderli finché il menu è aperto; ripete la richiesta mentre resta
+  // aperto, e senza richieste la pagina li rimette da sé. Una richiesta finta toglie solo effetti, mai un velo.
+  const CHIAVE_RIQUADRO = '__snVistoSospendi';
+  const RINNOVO_MS = 1000;
+  const SCADENZA_MS = 2500;
+  const IN_RIQUADRO = (() => { try { return global.top !== global; } catch (_) { return true; } })();
+  let chiestoAl = -Infinity;
+  function chiediAlGenitore(si) {
+    if (!IN_RIQUADRO) return;
+    const ora = global.performance.now();
+    if (si && ora - chiestoAl < RINNOVO_MS) return;
+    chiestoAl = si ? ora : -Infinity;
+    try { global.parent.postMessage({ [CHIAVE_RIQUADRO]: si ? 1 : 0 }, '*'); } catch (_) {}
+  }
+  const perRiquadro = new Map();
+  function sospendiPerRiquadro(fr) {
+    let reg = perRiquadro.get(fr);
+    if (!reg) {
+      reg = { vecchi: [], timer: 0 };
+      for (let el = fr; el && el.nodeType === 1; el = el.parentElement || el.getRootNode?.().host || null) {
+        let cs;
+        try { cs = global.getComputedStyle(el); } catch (_) { continue; }
+        for (const [p, neutro] of EFFETTI) {
+          const v = cs.getPropertyValue(p);
+          if (!v || v === neutro || (p === 'transform' && /^matrix\(1, 0, 0, 1, [^,]+, [^,]+\)$/.test(v))) continue;
+          reg.vecchi.push([el, p, el.style.getPropertyValue(p), el.style.getPropertyPriority(p)]);
+          el.style.setProperty(p, neutro, 'important');
+        }
+      }
+      perRiquadro.set(fr, reg);
     }
+    clearTimeout(reg.timer);
+    reg.timer = setTimeout(() => rimettiPerRiquadro(fr), SCADENZA_MS);
+  }
+  function rimettiPerRiquadro(fr) {
+    const reg = perRiquadro.get(fr);
+    if (!reg) return;
+    perRiquadro.delete(fr);
+    clearTimeout(reg.timer);
+    for (const v of reg.vecchi) rimetti(v);
+  }
+  if (DOC) {
+    global.addEventListener('message', (e) => {
+      const d = e.data;
+      if (!d || typeof d !== 'object' || !(CHIAVE_RIQUADRO in d) || !e.source) return;
+      let fr = null;
+      try { for (const f of DOC.querySelectorAll('iframe, frame')) if (f.contentWindow === e.source) { fr = f; break; } } catch (_) {}
+      if (!fr) return;
+      if (d[CHIAVE_RIQUADRO]) sospendiPerRiquadro(fr); else rimettiPerRiquadro(fr);
+      // Un riquadro dentro un riquadro: anche la pagina sopra di questo ha i suoi effetti.
+      if (IN_RIQUADRO) { try { global.parent.postMessage({ [CHIAVE_RIQUADRO]: d[CHIAVE_RIQUADRO] ? 1 : 0 }, '*'); } catch (_) {} }
+    });
   }
 
   // Il nodo prima del quale montare un pezzo del menu in `parent` (null se la guardia è spenta).
