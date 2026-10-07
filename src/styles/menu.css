@@ -9,10 +9,8 @@
   to   { transform: translateY(0); }
 }
 
-/* Sulle pagine web il menu non prende niente dalle regole del sito, ovunque nasca (dentro un dialogo modale o
-   l'elemento a schermo intero valgono anche le regole scritte per il loro contenuto, #586): ogni suo elemento torna
-   ai valori di serie, con una forza che le regole di un sito non raggiungono (due id). Le icone no: i loro attributi
-   di disegno contano come regole della pagina e sparirebbero. */
+/* Sul web il menu non prende le regole del sito, ovunque nasca (#586): torna ai valori di serie con due id di forza.
+   Le icone no: i loro attributi di disegno contano come regole della pagina e sparirebbero. */
 :is(:root, #sn-scudo#sn-scudo) :is(.sn-menu[data-sn-sul-web], .sn-menu[data-sn-sul-web] :not(svg, svg *)) { all: revert; }
 
 /* Le regole di Filo invece passano sopra il ritorno ai valori di serie: tre id che nessun elemento ha, davanti a tutte. */
