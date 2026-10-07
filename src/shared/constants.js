@@ -571,9 +571,7 @@
     'Moonshot AI',
     'MiniMax',
     'Qwen',         // Alibaba/Qwen
-    // Su OpenRouter l'host di Alibaba si chiama "Alibaba": "qwen/" è solo il prefisso dei modelli, e con la
-    // sola voce "Qwen" l'ignore lasciava passare Alibaba, che serve anche DeepSeek, GLM e altri pesi aperti.
-    'Alibaba',
+    'Alibaba',      // l'host di Alibaba Cloud su OpenRouter: la sola voce "Qwen" lo lasciava passare
     'Cohere',
     'Meta',         // produttore di Llama
     'Z.AI',         // Zhipu / GLM
