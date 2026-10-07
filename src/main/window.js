@@ -73,6 +73,8 @@ function wireWindowCommon(win, tabs) {
   // handleFullscreenEscape risponde false e l'Esc resta a chi lo usa nella barra
   // (il pannello degli scaricamenti si chiude ancora con Esc).
   win.webContents.on('before-input-event', (event, input) => {
+    // La barra laterale prima: il suo tasto, e l'Esc che la chiude prima di uscire dalla modalità.
+    if (tabs.barra && tabs.barra.tasto(input)) { event.preventDefault(); return; }
     if (input.type !== 'keyDown' || input.key !== 'Escape') return;
     if (tabs.handleFullscreenEscape(null)) event.preventDefault();
   });

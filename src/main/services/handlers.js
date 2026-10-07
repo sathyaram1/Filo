@@ -1001,6 +1001,7 @@ async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
       if (w._filoTabs && typeof w._filoTabs.setSecurity === 'function') {
         w._filoTabs.setSecurity(merged.security || {});
       }
+      try { w._filoTabs?.barra?.impostazioni(merged.barraLaterale); } catch (_) {}
     }
   } catch (_) {}
   try { require('./fingerprint').setMode(merged); } catch (_) {}
@@ -2601,6 +2602,24 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
           },
         };
       }
+      case 'SPOSTA_ICONA': {
+        // #871 — la disposizione delle icone (barra laterale, riga e «Altro…» del tasto destro) a parole: stessa
+        // porta del trascinamento, così menu aperti e barre di tutte le finestre la ricevono uguale.
+        const D = globalThis.SN_DISPOSIZIONE_ICONE;
+        const id = String(action.icona ?? action.id ?? '').trim();
+        const dove = String(action.dove ?? '').trim().toLowerCase();
+        const prima = String(action.prima_di ?? '').trim();
+        if (!D || !D.noto(id) || !Object.prototype.hasOwnProperty.call(D.DOVE, dove)) {
+          return { executed: false, kept: false, output: { icona: 'invalid', id, dove } };
+        }
+        const incognito = !!winOf(sender)?._filoIncognito;
+        const layout = await require('./layoutIcone').posa(
+          { id, target: D.DOVE[dove], beforeId: D.noto(prima) && prima !== id ? prima : null }, { incognito });
+        if (!layout) return { executed: false, kept: false, output: { icona: 'invalid', id, dove } };
+        // La riga del tasto destro ha sei posti: chi ci entra per ultimo può spingerne fuori un'altra.
+        const finita = ['bar', 'primary', 'secondary'].find((z) => layout[z].includes(id));
+        return { executed: true, kept: false, output: { icona: id, dove, finita, layout } };
+      }
       case 'CARTA_HOME': {
         const op = String(action.operazione ?? action.op ?? '').trim().toLowerCase();
         const tipo = { togli: 'togli', rimetti: 'aggiungi', aggiungi: 'aggiungi', sposta: 'sposta', ripristina: 'ripristina' }[op];
@@ -2632,7 +2651,7 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         // #419 — l'agente della home aziona i controlli del browser Filo (schermo
         // intero, riduci a icona, menu Impostazioni/App/Account, home): prima poteva
         // solo spiegare a parole come cliccarli. "close" è escluso di proposito.
-        const allowed = ['home', 'settings', 'apps', 'account', 'minimize', 'fullscreen'];
+        const allowed = ['home', 'settings', 'apps', 'account', 'minimize', 'fullscreen', 'sidebar'];
         const cmd = String(action.comando ?? action.command ?? action.cmd ?? '').trim().toLowerCase();
         if (!allowed.includes(cmd)) {
           return { executed: false, kept: false, output: { window: 'invalid', command: cmd } };
@@ -2653,6 +2672,12 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
             win.setFullScreen(!win.isFullScreen());
           }
           return { executed: true, kept: false, output: { window: 'fullscreen' } };
+        }
+        // #871 — la barra laterale chiesta in chat resta aperta finché la si chiude, come da tastiera.
+        if (cmd === 'sidebar') {
+          if (!win._filoTabs?.barra) return { executed: false, kept: false };
+          win._filoTabs.barra.apri('chat');
+          return { executed: true, kept: false, output: { window: 'sidebar' } };
         }
         // home / minimize / settings / apps / account: clicca il bottone REALE
         // della shell, riusando il canale dei comandi rapidi della barra (stessa
@@ -4493,6 +4518,7 @@ const handlerCtx = {
 };
 
 require('./handlers/nav')(on, handlerCtx);
+require('./handlers/barra')(on, handlerCtx);
 require('./handlers/tabs')(on, handlerCtx);
 require('./handlers/storage')(on, handlerCtx);
 require('./handlers/pages')(on, handlerCtx);

@@ -9,7 +9,6 @@
 (function (global) {
   'use strict';
 
-  const { STORAGE_KEYS } = global.SN_CONST;
   const { MSG } = global.SN_MSG;
   const I18n = global.SN_I18N;
   const Menu = global.SN_MENU;
@@ -115,7 +114,7 @@
     const canBack = navState ? !!navState.canBack : true;
     const canFwd = navState ? !!navState.canFwd : true;
     const registry = {
-      translate:     { id: 'translate',     icon: translateIcon,    label: translateLabel,                   onClick: () => (restore ? Translate.restoreOriginal() : Translate.translatePage()) },
+      translate:     { id: 'translate',     icon: translateIcon,    iconName: restore ? 'showOriginal' : 'translate', label: translateLabel, onClick: () => (restore ? Translate.restoreOriginal() : Translate.translatePage()) },
       screenshot:    { id: 'screenshot',    icon: I('screenshot'),  label: I18n.t('menu_screenshot'),        onClick: () => Actions.takeScreenshot() },
       screenshotCrop:{ id: 'screenshotCrop',icon: I('screenshotCrop'),label: I18n.t('menu_screenshot_crop'), onClick: () => Actions.takePartialScreenshot() },
       transcribe:    { id: 'transcribe',    icon: I('transcribe'),  label: I18n.t('menu_transcribe'),        onClick: () => Actions.transcribeRegion() },
@@ -147,97 +146,28 @@
     return registry;
   }
 
-  // Layout di default: icone primarie nella riga, le altre nella griglia
-  // "Altro…". Fra le secondarie ci sono le scorciatoie a Impostazioni (`openOptions`),
-  // Home (`home`) e alle app interne Editor (`editorApp`) e Feedback (`feedbackApp`),
-  // così sono raggiungibili direttamente dal menu del tasto destro (feedback alpha).
-  const DEFAULT_ICON_LAYOUT = {
-    primary: ['translate', 'screenshot', 'share', 'saveForLater', 'qrCode', 'newTab'],
-    secondary: ['openOptions', 'home', 'editorApp', 'feedbackApp', 'incognito', 'screenshotCrop', 'transcribe', 'colorPicker', 'closeTab', 'fullscreen', 'back', 'forward', 'reload'],
-  };
-
-  // Marker (storage) della promozione una-tantum di `qrCode` nella riga primaria.
-  // Feedback alpha: il QR doveva stare "fra le azioni rapide", non nascosto in
-  // "Altro…". Promuoviamo l'icona una sola volta per chi aveva già un layout
-  // salvato; dopo, l'utente resta libero di rispostarla dove vuole.
-  const QR_PRIMARY_MARKER = 'sn_qr_in_primary_migrated';
-
-  // Icone ritirate dal registro: vanno purgate dal layout salvato per non
-  // generare bottoni "fantasma" (registry lookup miss).
-  const RETIRED_ICONS = new Set(['openForLater']);
-
-  // Vecchio default (prima del cambio a 5 slot): se trovo esattamente questo
-  // layout in storage, è il default che non è mai stato customizzato — migro.
-  const LEGACY_DEFAULT_LAYOUT = {
-    primary: ['translate', 'screenshot', 'share', 'saveForLater'],
-    secondary: ['openForLater', 'fullscreen', 'back', 'forward', 'reload'],
-  };
-
-  function arraysEqual(a, b) {
-    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
-    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
-    return true;
-  }
-  function isLegacyDefault(v) {
-    return v && arraysEqual(v.primary, LEGACY_DEFAULT_LAYOUT.primary)
-            && arraysEqual(v.secondary, LEGACY_DEFAULT_LAYOUT.secondary);
-  }
+  // Dove sta ogni icona (riga, «Altro…», barra laterale) lo decide src/shared/disposizioneIcone.js,
+  // e lo scrive il main, uno solo: qui c'è la copia per disegnare subito (#871).
+  const Disp = global.SN_DISPOSIZIONE_ICONE;
+  const DEFAULT_ICON_LAYOUT = Disp.DEFAULT;
 
   let iconLayoutCache = null;
   // Stato di navigazione (canBack/canFwd) dell'ultima apertura menu: riusato
-  // dai redraw post-drag per non perdere il grigio di avanti/indietro. Senza
-  // questo, riordinare un'icona faceva tornare avanti/indietro non grigi
-  // perché il rebuild girava con navState=undefined (→ canBack/canFwd=true).
+  // dai redraw post-drag per non perdere il grigio di avanti/indietro.
   let lastNavState = null;
+
+  function setLayout(v) {
+    if (!Disp.valida(v)) return false;
+    iconLayoutCache = { primary: [...v.primary], secondary: [...v.secondary], bar: [...(v.bar || [])] };
+    return true;
+  }
+
   function loadIconLayout() {
     try {
-      chrome.storage.local.get([STORAGE_KEYS.ICON_LAYOUT, QR_PRIMARY_MARKER], (out) => {
-        let v = out?.[STORAGE_KEYS.ICON_LAYOUT];
-        const qrPromoted = !!out?.[QR_PRIMARY_MARKER];
-        if (v && Array.isArray(v.primary) && Array.isArray(v.secondary)) {
-          if (isLegacyDefault(v)) {
-            iconLayoutCache = DEFAULT_ICON_LAYOUT;
-            try { chrome.storage.local.set({ [STORAGE_KEYS.ICON_LAYOUT]: DEFAULT_ICON_LAYOUT, [QR_PRIMARY_MARKER]: true }); } catch (_) {}
-          } else {
-            // Migrazione (idempotente):
-            //  1) purga le icone ritirate (openOptions, openForLater)
-            //  2) aggiunge le icone introdotte dopo che il layout era stato
-            //     salvato, così l'utente non perde feature nuove
-            const filterRetired = (arr) => (arr || []).filter((id) => !RETIRED_ICONS.has(id));
-            const beforePrim = (v.primary || []).join('|');
-            const beforeSec = (v.secondary || []).join('|');
-            v = { ...v, primary: filterRetired(v.primary), secondary: filterRetired(v.secondary) };
-            const known = new Set([...v.primary, ...v.secondary]);
-            const additions = ['incognito', 'qrCode', 'colorPicker', 'closeTab', 'screenshotCrop', 'transcribe', 'newTab', 'openOptions', 'home', 'editorApp', 'feedbackApp'].filter((id) => !known.has(id));
-            if (additions.length) {
-              v = { ...v, secondary: [...additions, ...v.secondary] };
-            }
-            // Promozione una-tantum di qrCode nella riga primaria (feedback
-            // alpha: il QR è un'azione rapida, non va sepolto in "Altro…").
-            // Solo se c'è spazio e l'utente non l'aveva già spostato in primaria.
-            if (!qrPromoted && !v.primary.includes('qrCode')
-                && v.secondary.includes('qrCode')
-                && v.primary.length < MAX_PRIMARY_ICONS) {
-              v = {
-                ...v,
-                primary: [...v.primary, 'qrCode'],
-                secondary: v.secondary.filter((id) => id !== 'qrCode'),
-              };
-            }
-            const changed = beforePrim !== v.primary.join('|') || beforeSec !== v.secondary.join('|');
-            if (changed || !qrPromoted) {
-              try {
-                chrome.storage.local.set({ [STORAGE_KEYS.ICON_LAYOUT]: v, [QR_PRIMARY_MARKER]: true });
-              } catch (_) {}
-            }
-            iconLayoutCache = v;
-          }
-        } else {
-          iconLayoutCache = DEFAULT_ICON_LAYOUT;
-          try { chrome.storage.local.set({ [QR_PRIMARY_MARKER]: true }); } catch (_) {}
-        }
-      });
-    } catch (_) { iconLayoutCache = DEFAULT_ICON_LAYOUT; }
+      Promise.resolve(chrome.runtime.sendMessage({ type: MSG.ICON_LAYOUT_GET }))
+        .then((r) => { if (r && r.ok) setLayout(r.layout); })
+        .catch(() => {});
+    } catch (_) {}
   }
   loadIconLayout();
   refreshOwner();
@@ -246,38 +176,21 @@
     return iconLayoutCache || DEFAULT_ICON_LAYOUT;
   }
 
-  function saveIconLayout(layout) {
-    iconLayoutCache = layout;
-    try { chrome.storage.local.set({ [STORAGE_KEYS.ICON_LAYOUT]: layout }); } catch (_) {}
+  // Cambiata altrove (un'altra scheda, la barra laterale): il menu aperto si ridisegna.
+  function layoutCambiato(v) {
+    if (setLayout(v)) { try { redrawIconRows(); } catch (_) {} }
   }
 
-  // Numero massimo di icone visibili nella riga primaria. Le eccedenti
-  // (es. dopo un drag) traboccano automaticamente nella griglia secondaria.
-  const MAX_PRIMARY_ICONS = 6;
-
-  // Gestisce il drop di un'icona fra zone (riga primaria ↔ griglia secondaria),
-  // reinserendola nell'ordine indicato (beforeId = ID dell'icona davanti alla
-  // quale inserire; null = in fondo). Se la primaria sfora il limite, l'ultima
-  // icona viene spinta in cima alla secondaria (swap di fatto).
-  function applyIconDrop({ id, source, target, beforeId }) {
+  // Il drop si vede subito qui, poi vale quello che il main ha scritto.
+  function applyIconDrop({ id, target, beforeId }) {
     if (!id) return;
-    const layout = { ...getIconLayout() };
-    layout.primary = (layout.primary || []).slice().filter((x) => x !== id);
-    layout.secondary = (layout.secondary || []).slice().filter((x) => x !== id);
-    if (target === 'primary') {
-      const idx = beforeId ? layout.primary.indexOf(beforeId) : -1;
-      if (idx >= 0) layout.primary.splice(idx, 0, id);
-      else layout.primary.push(id);
-      while (layout.primary.length > MAX_PRIMARY_ICONS) {
-        const popped = layout.primary.pop();
-        if (popped && !layout.secondary.includes(popped)) layout.secondary.unshift(popped);
-      }
-    } else {
-      const idx = beforeId ? layout.secondary.indexOf(beforeId) : -1;
-      if (idx >= 0) layout.secondary.splice(idx, 0, id);
-      else layout.secondary.push(id);
-    }
-    saveIconLayout(layout);
+    const locale = Disp.applicaPosa(getIconLayout(), { id, target, beforeId: beforeId || null });
+    if (locale) setLayout(locale);
+    try {
+      Promise.resolve(chrome.runtime.sendMessage({ type: MSG.ICON_LAYOUT_DROP, id, target, beforeId: beforeId || null }))
+        .then((r) => { if (r && r.ok) layoutCambiato(r.layout); })
+        .catch(() => {});
+    } catch (_) {}
   }
 
   // Costruisce gli item della riga primaria (icone + bottone overflow).
@@ -335,17 +248,75 @@
     try { Menu.refreshIconGrid?.(buildSecondaryGridItems(lastNavState)); } catch (_) {}
   }
 
+  // ── la barra laterale, terza zona (#871) ─────────────────────────────────
+  // Solo nel frame principale: le coordinate di un riquadro non sono quelle della barra.
+  let barraAperta = null;
+  let miraInviata = null;
+  const trascina = (dati) => {
+    try { return Promise.resolve(chrome.runtime.sendMessage({ type: MSG.BARRA_TRASCINA, ...dati })).catch(() => null); } catch (_) { return Promise.resolve(null); }
+  };
+  if (!IS_SUBFRAME) {
+    Menu.setPonteBarra?.({
+      inizio(id, menuSinistra) {
+        barraAperta = null;
+        miraInviata = null;
+        trascina({ fase: 'inizio', id, menuSinistra }).then((r) => { if (r && r.ok) barraAperta = { larghezza: Number(r.larghezza) || 0 }; });
+      },
+      sopra(x, y) {
+        const dentro = !!barraAperta && x <= barraAperta.larghezza;
+        const mira = dentro ? Math.round(y) : null;
+        if (mira !== miraInviata) { miraInviata = mira; trascina({ fase: 'sopra', y: mira }); }
+        return dentro;
+      },
+      posa(id, x, y) {
+        if (!barraAperta || x > barraAperta.larghezza) return false;
+        trascina({ fase: 'posa', id, x: Math.round(x), y: Math.round(y) });
+        return true;
+      },
+      fine() {
+        barraAperta = null;
+        miraInviata = null;
+        trascina({ fase: 'fine' });
+      },
+    });
+  }
+
+  // Come si chiamano adesso, su questa pagina, le sue azioni che stanno nella barra laterale: la barra le
+  // mostra con lo stesso nome e la stessa icona del menu («Traduci» o «Mostra originale»).
+  function statoPerBarra(ids) {
+    if (IS_SUBFRAME) return [];
+    const reg = buildLocalIconRegistry(lastNavState);
+    return (Array.isArray(ids) ? ids : []).map(String)
+      .filter((id) => Disp.noto(id) && Disp.ICONE[id].tipo === 'pagina' && reg[id])
+      .map((id) => ({ id, etichetta: String(reg[id].label || ''), icona: reg[id].iconName || Disp.ICONE[id].icona }));
+  }
+
+  // Un'icona portata fuori dalla barra sopra questa pagina: se il menu è aperto ci cade dentro.
+  function dallaBarra(msg) {
+    if (IS_SUBFRAME || !msg) return;
+    const id = String(msg.id || '');
+    const entry = Disp.noto(id) ? buildLocalIconRegistry(lastNavState)[id] : null;
+    Menu.trascinaDaFuori?.({
+      fase: String(msg.fase || ''), id,
+      x: Number(msg.x) || 0, y: Number(msg.y) || 0,
+      icon: entry ? entry.icon : '',
+    });
+  }
+
   function init(d) { deps = { ...deps, ...d }; }
 
   global.SN_MENU_ICONS = {
     init,
     buildGlobalIconRow,
     runIconAction,
+    statoPerBarra,
     // Ridisegna le icone del menu già aperto. Serve quando lo stato che
     // decide il NOME di una voce cambia mentre il menu è sotto gli occhi: lo
     // schermo intero si spegne per un'altra strada (l'assistente, un gesto di
     // sistema, un'altra scheda) e la voce continuerebbe a promettere «Esci da
     // schermo intero» quando non c'è più niente da cui uscire (#514).
     redrawIconRows,
+    layoutCambiato,
+    dallaBarra,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

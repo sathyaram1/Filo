@@ -13,8 +13,14 @@ const coord = (v) => Math.max(-10000, Math.min(10000, Math.round(Number(v) || 0)
 class AvvisoSito {
   // schedaAttiva: la scheda del TabManager in primo piano (o null). scegli(tab, scelta, dati): un pulsante o una voce
   // del tasto destro. restituisciTastiera: tolto l'avviso, i tasti tornano alla scheda attiva.
-  constructor(win, { schedaAttiva = () => null, scegli = () => {}, menu = () => [], restituisciTastiera = () => {} } = {}) {
+  // inCima: dopo che l'avviso è salito, chi deve restargli sopra (la barra laterale) ci risale.
+  // cambiata: la scheda coperta è cambiata (la barra spegne o riaccende le azioni della pagina).
+  // input(wc, input): il puntatore sull'avviso, che la barra sente come quello sulla pagina.
+  constructor(win, { schedaAttiva = () => null, scegli = () => {}, menu = () => [], restituisciTastiera = () => {}, inCima = () => {}, cambiata = () => {}, input = () => {} } = {}) {
     this.win = win;
+    this.input = input;
+    this.dopoInCima = inCima;
+    this.cambiata = cambiata;
     this.schedaAttiva = schedaAttiva;
     this.scegli = scegli;
     this.vociMenu = menu;
@@ -55,8 +61,13 @@ class AvvisoSito {
     const prima = this.su;
     this.su = tab;
     this._invia();
-    if (prima !== tab) this.prendiTastiera();
+    if (prima !== tab) {
+      this.prendiTastiera();
+      this._cambiata();
+    }
   }
+
+  _cambiata() { try { this.cambiata(); } catch (_) {} }
 
   // I tasti di chi stava scrivendo nella pagina vanno all'avviso; la barra che scrive li tiene.
   prendiTastiera() {
@@ -81,6 +92,7 @@ class AvvisoSito {
   _togli(restituisci) {
     const era = this.su;
     this.su = null;
+    if (era) this._cambiata();
     const vista = this.vista;
     if (!vista || vista.webContents.isDestroyed()) return;
     let aveva = false;
@@ -95,6 +107,7 @@ class AvvisoSito {
     const cv = this.win.contentView;
     const figli = cv.children || [];
     if (figli[figli.length - 1] !== this.vista) cv.addChildView(this.vista);
+    try { this.dopoInCima(); } catch (_) {}
   }
 
   _stato() {
@@ -166,6 +179,7 @@ class AvvisoSito {
     wc.setWindowOpenHandler(() => ({ action: 'deny' }));
     wc.on('will-navigate', (e) => e.preventDefault());
     wc.on('before-input-event', (e, input) => this._tasto(e, input));
+    wc.on('input-event', (_e, input) => { try { this.input(wc, input); } catch (_) {} });
     wc.on('ipc-message', (_e, canale, dati) => {
       const tab = this.su;
       if (!tab) return;

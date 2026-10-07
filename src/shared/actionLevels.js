@@ -634,6 +634,26 @@
       level: 1,
       describe: () => 'Togliere le modifiche di stile applicate alla pagina',
     },
+    // ── la disposizione delle icone a parole (#871) ──────────────────────────
+    // Livello 1: è lo stesso trascinamento che l'utente fa col mouse, e si disfa allo stesso modo.
+    SPOSTA_ICONA: {
+      level: 1,
+      describe: (a) => {
+        const D = global.SN_DISPOSIZIONE_ICONE;
+        const id = String((a && (a.icona ?? a.id)) || '').trim();
+        const nome = D && D.noto(id) ? D.nome(id) : (id || 'un\'icona');
+        const dove = { barra: 'nella barra laterale', menu: 'nella riga del tasto destro', altro: 'in «Altro…» del tasto destro' };
+        const d = dove[String((a && a.dove) || '').trim().toLowerCase()];
+        return d ? `Spostare «${nome}» ${d}` : `Spostare «${nome}»`;
+      },
+      describeDone: (a) => {
+        const D = global.SN_DISPOSIZIONE_ICONE;
+        const id = String((a && (a.icona ?? a.id)) || '').trim();
+        const nome = D && D.noto(id) ? D.nome(id) : id;
+        const dove = { barra: 'nella barra laterale', menu: 'nella riga del tasto destro', altro: 'in «Altro…» del tasto destro' };
+        return `«${nome}» ora sta ${dove[String((a && a.dove) || '').trim().toLowerCase()] || 'al suo nuovo posto'}`;
+      },
+    },
     // ── rimettere com'era un cambio di stato (#867) ─────────────────────────
     // Il livello è quello del cambio da rimettere: `_livelloCambio` lo scrive il main dal registro,
     // sempre, prima del cancello (mai dall'azione del modello). Rimettere la protezione dell'IP
