@@ -432,6 +432,7 @@ try {
       win.addEventListener(ev, scelto, { capture: true, passive: true });
       win.addEventListener(ev, scelto, { passive: true });
     }
+    win.addEventListener('pointerover', confine, { capture: true, passive: true });
   };
   // I documenti che la pagina si scrive da sé non hanno un preload loro (il riquadro vuoto riempito dallo script), o
   // perdono gli ascolti (la riscrittura da capo): il gesto si ascolta anche lì (#737.1 giro 8). Regole nel pattern.
@@ -443,7 +444,17 @@ try {
     if (!caricato && inArrivo(f)) return null;
     try { const w = f.contentWindow; return w && w.document && !w[PRELOAD_PROPRIO] ? w : null; } catch (_) { return null; }
   };
+  // Riquadri che aspettano il primo load: finché c'è, nessuna finestra si tocca alla cieca.
+  const inAttesa = new Set();
   // Lo stesso riquadro cambia documento tenendo la finestra (il vuoto iniziale, la riscrittura): si riaggancia al load.
+  const riquadro = (f) => {
+    if (seguiti.has(f)) return;
+    seguiti.add(f);
+    f.addEventListener('load', () => { inAttesa.delete(f); const w = senzaPreload(f, true); if (w) segui(w); }, true);
+    if (inArrivo(f)) inAttesa.add(f);
+    const w = senzaPreload(f, false);
+    if (w) segui(w);
+  };
   const segui = (win) => {
     ascolta(win);
     let doc = null;
@@ -452,18 +463,53 @@ try {
     seguiti.add(doc);
     new MutationObserver(() => ascolta(win)).observe(doc, { childList: true });
     const riquadri = doc.getElementsByTagName('iframe');
-    const nuovi = () => {
-      for (const f of riquadri) {
-        if (seguiti.has(f)) continue;
-        seguiti.add(f);
-        f.addEventListener('load', () => { const w = senzaPreload(f, true); if (w) segui(w); }, true);
-        const w = senzaPreload(f, false);
-        if (w) segui(w);
-      }
-    };
+    const nuovi = () => { for (const f of riquadri) riquadro(f); };
     new MutationObserver(nuovi).observe(doc, { childList: true, subtree: true });
     nuovi();
   };
+  // Un riquadro dentro una radice ombra sfugge agli osservatori del documento e a window.frames (#737.1 giro 10): si
+  // cerca quando il puntatore passa, prima della pressione. Una radice chiusa mostra solo l'ospite: lì il riquadro lo
+  // trova l'albero dei frame, e si presenta lui nel mondo isolato del preload (lo stesso in tutti i frame).
+  const OSPITI_DI_FINESTRE = 'iframe,frame,object,embed';
+  const NASCOSTO = Symbol.for('filo:gesto-riquadro-nascosto');
+  const MONDO_DEL_PRELOAD = 999;
+  const PRESENTATI = `(()=>{try{const f=parent[Symbol.for('filo:gesto-riquadro-nascosto')];if(typeof f==='function'&&!window[Symbol.for('filo:gesto-preload-proprio')])f(window)}catch(_){}})()`;
+  let figliContati = 0;
+  const inOmbre = (doc) => {
+    let n = 0;
+    const visita = (radice) => {
+      const passi = doc.createTreeWalker(radice, NodeFilter.SHOW_ELEMENT);
+      for (let el = passi.nextNode(); el; el = passi.nextNode()) {
+        const r = el.shadowRoot;
+        if (!r) continue;
+        for (const f of r.querySelectorAll(OSPITI_DI_FINESTRE)) { n++; if (f.localName === 'iframe' || f.localName === 'frame') riquadro(f); }
+        visita(r);
+      }
+    };
+    visita(doc);
+    return n;
+  };
+  const confine = (e) => {
+    if (!e.isTrusted) return;
+    const n = typeof e.composedPath === 'function' ? e.composedPath()[0] : e.target;
+    if (n && (n.localName === 'iframe' || n.localName === 'frame')) { riquadro(n); return; }
+    if (e.currentTarget !== window) return;
+    const figli = [];
+    try { for (let c = webFrame.firstChild; c && figli.length < 256; c = c.nextSibling) figli.push(c); } catch (_) { return; }
+    if (!figli.length || figli.length === figliContati) return;
+    let visti = document.querySelectorAll(OSPITI_DI_FINESTRE).length;
+    if (figli.length > visti) visti += inOmbre(document);
+    if (figli.length > visti) {
+      for (const f of inAttesa) if (!f.isConnected) inAttesa.delete(f);
+      // Toccato prima del suo load un riquadro perde il preload: alla cieca solo quando nessuno è in arrivo.
+      if (inAttesa.size) return;
+      for (const c of figli) { try { c.executeJavaScriptInIsolatedWorld(MONDO_DEL_PRELOAD, [{ code: PRESENTATI }], false).catch(() => {}); } catch (_) {} }
+    }
+    figliContati = figli.length;
+  };
+  try {
+    Object.defineProperty(window, NASCOSTO, { value: (w) => { try { if (w && w.parent === window && !seguiti.has(w.document)) segui(w); } catch (_) {} } });
+  } catch (_) {}
   try { Object.defineProperty(window, PRELOAD_PROPRIO, { value: true }); } catch (_) {}
   segui(window);
   // Le voci del menu di Filo che aprono un indirizzo lo dichiarano qui prima di aprirlo.

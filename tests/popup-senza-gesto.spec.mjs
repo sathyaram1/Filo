@@ -100,6 +100,16 @@ const SCRITTI_DALLA_PAGINA = {
     d.write('<scr'+'ipt>setTimeout(function(){window.open(top.SOLO)},600)</scr'+'ipt>');d.close();</script>`,
   'una pagina che si riscrive da capo': (dest) => `<p>caricamento</p><script>setTimeout(function(){document.open();
     document.write('<a id=b target=_blank style="display:block;width:200px;height:60px" href="${dest}">apri</a>');document.close();},300)</script>`,
+  // Fuori dagli osservatori del documento e da window.frames (#737.1 giro 10).
+  'un riquadro vuoto riempito dallo script dentro un componente con la radice ombra aperta': (dest) => `<div id="h"></div><script>
+    var f=document.createElement('iframe');f.width=400;f.height=200;document.getElementById('h').attachShadow({mode:'open'}).appendChild(f);
+    var d=f.contentDocument;var a=d.createElement('a');a.id='b';a.href=${JSON.stringify(dest)};a.target='_blank';a.textContent='apri';
+    a.style.cssText='display:block;width:200px;height:60px';d.body.appendChild(a);</script>`,
+  'un riquadro vuoto riempito dallo script dentro un componente con la radice ombra chiusa': (dest, daSolo) => `<div id="h"></div><script>
+    var DEST=${JSON.stringify(dest)},SOLO=${JSON.stringify(daSolo)};
+    var f=document.createElement('iframe');f.width=400;f.height=200;document.getElementById('h').attachShadow({mode:'closed'}).appendChild(f);
+    var d=f.contentDocument;d.open();d.write('<button id=b style="width:200px;height:60px" onclick="window.open(top.DEST)">apri</button>');
+    d.write('<scr'+'ipt>setTimeout(function(){window.open(top.SOLO)},600)</scr'+'ipt>');d.close();</script>`,
 };
 
 for (const [dove, html] of Object.entries(SCRITTI_DALLA_PAGINA)) {
