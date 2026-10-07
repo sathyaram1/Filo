@@ -30,6 +30,7 @@
         'Il riquadro con la percentuale dello zoom resta della stessa misura a qualunque zoom. Prima al 300% copriva la pagina e al 33% non si leggeva.',
         'Il timer e la sveglia suonano da qualunque scheda tu stia guardando, anche se la home non è aperta, e anche in una finestra incognito. Prima il suono usciva solo dalla home. Mentre suona, in cima alla finestra c’è il pulsante che la ferma, e finché suona quel pulsante resta a portata: se mandi qualcosa a tutto schermo Filo ne esce da solo. E se non hai nessuna finestra aperta dove quella scadenza si possa sentire, Filo ne apre una invece di restare muto.',
         'Il riquadro che sceglie la tonalità esatta di un colore cambia solo il suo: gli altri colori che hai cambiato mentre era aperto restano dove li hai messi.',
+        'Filo ti avvisa quando un sito si spaccia per un marchio famoso anche se sta su un servizio che ospita i siti di altri, come Weebly, Wix o Google Traduttore. Prima se ne accorgeva solo su pochi servizi, come GitHub Pages. Le immagini di Discord e le pagine dei marchi stessi su GitHub, come quelle di Google o Microsoft, non hanno più l\'avviso.',
       ],
     },
     {
