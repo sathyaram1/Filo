@@ -835,7 +835,7 @@
     // testo / selezione
     copy:         { target: 'text',  costo: 1, label: 'copia testo' },
     cut:          { target: 'text',  costo: 1, label: 'taglia testo' },
-    search_text:  { target: 'text',  costo: 2, label: 'cerca testo sul web' },
+    search_text:  { target: 'text',  costo: 2, label: 'cerca testo sul web', viaFilo: true },
     read_aloud:   { target: 'text',  costo: 1, label: 'leggi ad alta voce' },
     stop_reading: { target: 'none',  costo: 1, label: 'ferma la lettura' },
     edit_text:    { target: 'text',  costo: 1, label: 'modifica testo' },
