@@ -6,17 +6,9 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { confermaSopraPagina } from '../../helpers/confirm.mjs';
 import { cartellaTemporanea } from '../../helpers/percorsi.mjs';
+import { apriCronologia, statoCronologia } from '../../helpers/cronologiaAppunti.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-
-async function apriSotto(page) {
-  await page.locator('#ta').click({ button: 'right' });
-  await expect(page.locator('.sn-menu')).toBeVisible();
-  await page.locator('.sn-menu-paste-arrow').click();
-  const sub = page.locator('.sn-menu-history-sub');
-  await expect(sub).toBeVisible();
-  return sub;
-}
 
 test('tasto destro → Svuota cronologia: Annulla lascia tutto, OK svuota davvero', async ({ testServer }) => {
   const history = [
@@ -38,18 +30,19 @@ test('tasto destro → Svuota cronologia: Annulla lascia tutto, OK svuota davver
       if (!page) await new Promise((r) => setTimeout(r, 100));
     }
     await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
-    let sub = await apriSotto(page);
-    await sub.locator('.sn-menu-history-clear-btn').click();
+    // Il pannello sta in uno shadow root chiuso (#589.8): si legge e si clicca con l'hook del menu.
+    let stato = await apriCronologia(app, page, '#ta');
+    expect(stato.voci).toHaveLength(2);
+    await page.mouse.click(stato.svuota.x, stato.svuota.y);
     let vista = await confermaSopraPagina(app);
     await new Promise((r) => setTimeout(r, 700));
     let p = await vista.evaluate(() => window.SN_CONFIRM_UI._test.point('cancel'));
     await vista.mouse.click(p.x, p.y);
     await new Promise((r) => setTimeout(r, 500));
-    expect(await page.locator('.sn-menu').count()).toBeGreaterThan(0);
-    if (await page.locator('.sn-menu').count() === 0) sub = await apriSotto(page);
-    else if (!(await sub.isVisible())) sub = await apriSotto(page);
-    await expect(sub.locator('.sn-menu-history-item')).toHaveCount(2);
-    await sub.locator('.sn-menu-history-clear-btn').click();
+    await page.keyboard.press('Escape');
+    stato = await apriCronologia(app, page, '#ta');
+    expect(stato.voci).toHaveLength(2);
+    await page.mouse.click(stato.svuota.x, stato.svuota.y);
     vista = await confermaSopraPagina(app);
     await new Promise((r) => setTimeout(r, 700));
     p = await vista.evaluate(() => window.SN_CONFIRM_UI._test.point('ok'));
@@ -57,10 +50,14 @@ test('tasto destro → Svuota cronologia: Annulla lascia tutto, OK svuota davver
     await new Promise((r) => setTimeout(r, 800));
     await page.keyboard.press('Escape');
     await page.locator('#ta').click({ button: 'right' });
-    await expect(page.locator('.sn-menu')).toBeVisible();
-    const frecce = await page.locator('.sn-menu-paste-arrow').count();
+    await expect(page.locator('.sn-menu').first()).toBeVisible();
     let voci = 0;
-    if (frecce) { await page.locator('.sn-menu-paste-arrow').click(); voci = await page.locator('.sn-menu-history-item').count(); }
+    if (await page.locator('.sn-menu-paste-arrow').count()) {
+      await page.locator('.sn-menu-paste-arrow').click();
+      await new Promise((r) => setTimeout(r, 500));
+      const s2 = await statoCronologia(app, page);
+      voci = s2 ? s2.voci.length : 0;
+    }
     expect(voci).toBe(0);
   } finally {
     try { await app.close(); } catch (_) {}
