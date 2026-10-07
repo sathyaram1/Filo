@@ -25,8 +25,8 @@
   function nomiDiSistema(out, cosa) {
     if (!Array.isArray(out.elenco) || !out.elenco.length) return null;
     return cosa === 'wifi'
-      ? { classe: 3, campo: null, chiave: 'sistema:wifi', motivo: 'ho letto i nomi delle reti Wi-Fi, che sceglie chi le gestisce' }
-      : { classe: 3, campo: null, chiave: 'sistema:bluetooth', motivo: 'ho letto i nomi dei dispositivi Bluetooth, che sceglie chi li fabbrica' };
+      ? { classe: 3, campo: null, chiave: 'sistema:wifi', motivo: 'ho letto i nomi delle reti Wi-Fi, che non hai scritto tu' }
+      : { classe: 3, campo: null, chiave: 'sistema:bluetooth', motivo: 'ho letto i nomi dei dispositivi Bluetooth, che non hai scritto tu' };
   }
 
   function prefBuilt(action, attuali) {

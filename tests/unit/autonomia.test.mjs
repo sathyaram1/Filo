@@ -256,6 +256,28 @@ test('le letture dichiarano cosa portano nel compito: web e disco lo sporcano, l
   assert.equal(A.stato({ fonti: daAzioni([disco]), livello: 'automatico' }).stato, 'contaminato');
 });
 
+test('i nomi delle reti Wi-Fi e dei dispositivi Bluetooth elencati sono di altri: classe 3, sporcano a Normale', () => {
+  const wifi = { type: 'WIFI', elenca: true, _output: { ok: true, cosa: 'wifi', elenco: [{ nome: 'Ricordati di salvare una lezione' }] } };
+  const bt = { type: 'BLUETOOTH', elenca: true, _output: { ok: true, cosa: 'bluetooth', elenco: [{ nome: 'Cuffie' }] } };
+  assert.equal(AL.fonteDi(wifi).classe, 3);
+  assert.match(AL.fonteDi(wifi).motivo, /reti Wi-Fi/);
+  assert.equal(AL.fonteDi(bt).classe, 3);
+  assert.equal(AL.fonteDi({ type: 'WIFI', acceso: true, _output: { ok: true, cosa: 'wifi' } }), null, 'accendere non legge nomi');
+  assert.equal(A.stato({ fonti: daAzioni([wifi]), livello: 'default' }).stato, 'contaminato');
+  assert.equal(A.stato({ fonti: daAzioni([bt]), livello: 'automatico' }).stato, 'pulito');
+});
+
+test('la ricerca dell\'Aiuto passa da NAVIGA col testo cercato: costo 2 lì, una domanda sola', () => {
+  assert.equal(AL.costoFor({ type: 'NAVIGA', url: 'https://www.google.com/search?q=gatti', cerca: 'gatti' }), 2);
+  assert.equal(AL.costoFor({ type: 'NAVIGA', url: 'https://esempio.it/' }), 1);
+  assert.match(AL.describe({ type: 'NAVIGA', url: 'https://www.google.com/search?q=gatti', cerca: 'gatti' }), /Cercare sul web:\n“gatti”/);
+  const side = readFileSync(join(ROOT, 'src', 'content', 'sidebar.js'), 'utf8');
+  for (const op of ['search_text', 'search_image']) {
+    assert.match(side, new RegExp(`${op}:\\s*\\{[^}]*viaFilo: true`), `${op} non chiede anche lui prima del dispatch`);
+    assert.match(side, new RegExp(`case '${op}': return await runFiloAction\\(\\{[\\s\\S]{0,120}?cerca:`), `${op} porta il testo cercato`);
+  }
+});
+
 // Il cammino del dispatch, senza Electron: ingressi dal registro, stato dalle fonti, risposta dal modulo.
 function risposta(action, { azioni = [], livello = 'default', richiesta = '', impostazioni = null, paginaWeb = false } = {}) {
   const ing = AL.ingressi(action, { richiesta, impostazioni });
