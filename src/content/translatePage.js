@@ -509,11 +509,17 @@
     return false;
   }
 
-  // Sotto le misure minime, lui o chi lo contiene: dentro un francobollo non c'è niente da leggere.
+  // Sotto le misure minime, lui o chi lo contiene: dentro un francobollo non c'è niente da leggere. Conta la finestra
+  // da cui si vede, non il rettangolo: un riquadro grande dietro una finestrella da un pixel è un francobollo.
   function frameTooSmall(f) {
-    for (let el = f, hops = 0; el && hops < 16; el = hostFrameOf(el), hops++) {
+    const misura = (el) => {
+      if (Extract && typeof Extract.clippedExtent === 'function') return Extract.clippedExtent(el);
       const r = el.getBoundingClientRect();
-      if (r.width < FRAME_MIN_W || r.height < FRAME_MIN_H) return true;
+      return { w: r.width, h: r.height };
+    };
+    for (let el = f, hops = 0; el && hops < 16; el = hostFrameOf(el), hops++) {
+      const m = misura(el);
+      if (m.w < FRAME_MIN_W || m.h < FRAME_MIN_H) return true;
     }
     return false;
   }
