@@ -13,7 +13,11 @@
       features: [
         'Su Windows e Linux, quando una versione nuova di Filo è pronta te lo dice un avviso in basso a destra, e nella home resta una carta con «Riavvia e aggiorna» finché non la installi. Puoi anche scrivere a Filo «aggiornati». Su Windows, se non lo premi, la versione nuova si installa la prossima volta che apri Filo: vedi la barra di avanzamento per una decina di secondi e poi Filo si riapre da solo. Prima si installava di nascosto quando lo chiudevi, e se lo riaprivi in quel momento Windows diceva che il collegamento non funzionava. Chi preferisce il modo di prima lo rimette in Preferenze, Impostazioni avanzate.',
       ],
-      fixes: [],
+      fixes: [
+        'Il menu del tasto destro non esegue più un clic su una voce che la pagina stava coprendo con qualcosa di suo: il menu si chiude e te lo dice.',
+        'Il menu del tasto destro funziona anche nei campi delle finestre che un sito apre sopra la pagina, come quelle di accesso o di iscrizione. Prima compariva grigio, sotto la finestra, e non rispondeva.',
+        'Sui siti che ingrandiscono o rimpiccioliscono da soli tutta la pagina il menu del tasto destro si apre dove hai cliccato. Prima poteva finire lontano o fuori dallo schermo.',
+      ],
     },
     {
       version: '0.2.237', date: '2026-10-07',
@@ -60,7 +64,6 @@
         'Quando OpenRouter rifiuta la tua chiave e una spiegazione, una traduzione o una modifica del testo sulle pagine la pagano i crediti di Filo, sotto la risposta c\'è scritto, come in chat; dettatura, lettura ad alta voce e trascrizione dello schermo lo dicono con un avviso. In Crediti spesa e residuo della chiave si aggiornano appena arriva il rifiuto, e la pagina dice che Filo ha usato i tuoi crediti solo se è successo.',
         'Filo controlla anche i questionari di Microsoft Customer Voice e le app che chiunque pubblica su Hugging Face Spaces. Se ti chiedono una password o i dati della carta, Filo giudica la pagina invece di fidarsi del nome di Microsoft o di Hugging Face.',
         'Con la protezione fingerprinting accesa, ogni finestra in incognito mostra ai siti un\'impronta sua, diversa da quella della finestra normale e delle altre finestre in incognito. Prima un sito poteva riconoscerti in incognito anche senza cookie. Se cambi la protezione da una finestra in incognito, il cambio vale solo lì, come per i cookie. Prima toccava anche le finestre normali.',
-        'Il menu del tasto destro non esegue più un clic su una voce che la pagina stava coprendo con qualcosa di suo: il menu si chiude e te lo dice.',
       ],
     },
     {
