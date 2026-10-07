@@ -4087,7 +4087,9 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     await segnaFonte(chatId, fontiLette, { classe: 5, campo: null, chiave: 'benvenuto:testo-di-altri', motivo: 'è entrato un testo che non hai scritto tu' });
   }
   // Cosa ha scritto l'utente nel compito: le coordinate bancarie che ci stanno dentro le ha chieste lui (#530).
-  const richiesta = [...codaScheda.filter((m) => m && m.role !== 'filo').map((m) => String(m.text || '')), String(userMessage || '')].join('\n');
+  // Il compito è la conversazione di questa scheda come la vede il modello: nel filo, più la coda.
+  const conversazioneScheda = filo && chatId ? [...vistiDalFilo.filter((m) => m && m.chat === chatId), ...codaScheda] : codaScheda;
+  const richiesta = [...conversazioneScheda.filter((m) => m && m.role !== 'filo').map((m) => String(m.text || '')), String(userMessage || '')].join('\n');
   for (const m of codaScheda) {
     const role = m.role === 'filo' ? 'assistant' : 'user';
     let content = String(m.text || '');
