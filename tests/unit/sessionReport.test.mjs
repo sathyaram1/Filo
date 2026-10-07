@@ -611,3 +611,14 @@ test('worker in sottofondo: la finestra va dalla notifica del worker di prima a 
   primoPiano.splice(3, 0, fine('bg1', H('11:31:05')));
   assert.deepEqual(ids(finestraOrchestratore(primoPiano.slice(0, -1))), ['s4', 's5', 's6']);
 });
+
+test('worker in sottofondo: la notifica si riconosce anche dal solo task-id, o senza id chiude il lancio più vecchio', () => {
+  const ids = (f) => f.righe.map((l) => JSON.parse(l)).filter((e) => e.type === 'assistant').map((e) => e.message.id);
+  const soloTask = SOTTOFONDO.map((l) => l.split('<tool-use-id>bg1</tool-use-id>').join(''));
+  assert.deepEqual(ids(finestraOrchestratore(soloTask)), ['s4', 's5', 's6', 's7'], 'agentId: x del lancio = task-id della notifica');
+  const senzaId = SOTTOFONDO.map((l) => l.split('<tool-use-id>bg1</tool-use-id>').join('').split('<task-id>x</task-id>').join(''));
+  assert.deepEqual(ids(finestraOrchestratore(senzaId)), ['s4', 's5', 's6', 's7']);
+  // Un comando in sottofondo che finisce ha il suo tool-use-id: non chiude il worker.
+  const bash = SOTTOFONDO.slice(0, 4).concat(JSON.stringify({ type: 'user', timestamp: H('10:30:00'), message: { role: 'user', content: '<task-notification>\n<tool-use-id>toolu_bash</tool-use-id>\n</task-notification>' } }), orch('s3b', H('10:30:05'), { cr: 31000 }));
+  assert.deepEqual(ids(finestraOrchestratore(bash)), ['s1', 's2', 's3', 's3b']);
+});

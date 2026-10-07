@@ -679,13 +679,23 @@ export function finestraOrchestratore(linee) {
       }
     }
   }
-  // La notifica arriva in più forme (messaggio, allegato, coda): vale la prima dopo il lancio.
+  // La notifica arriva in più forme (messaggio, allegato, coda): vale la prima
+  // dopo il lancio. Si riconosce dal tool-use-id o dal task-id (l'agentId del
+  // lancio); una senza nessuno dei due chiude il worker in sottofondo più vecchio.
+  const aperta = (c, ms) => c.inizio <= ms && !(c.fine <= ms);
   for (const { l, ms } of voci) {
     if (!Number.isFinite(ms) || !l.includes('task-notification')) continue;
-    for (const m of l.matchAll(/<tool-use-id>([^<\\]+)<\/tool-use-id>/g)) {
-      const c = chiamate.get(m[1]);
-      if (c && ms >= c.inizio && !(c.fine <= ms)) c.fine = ms;
+    const ids = [...l.matchAll(/<tool-use-id>([^<\\]+)<\/tool-use-id>/g)].map((m) => m[1]);
+    const task = [...l.matchAll(/<task-id>([^<\\]+)<\/task-id>/g)].map((m) => m[1]);
+    let chiuse = 0;
+    for (const [id, c] of chiamate) {
+      if (!aperta(c, ms) || !(ids.includes(id) || (c.agentId && task.includes(c.agentId)))) continue;
+      c.fine = ms;
+      chiuse += 1;
     }
+    if (chiuse || ids.length) continue;
+    const vecchia = [...chiamate.values()].filter((c) => c.sottofondo && aperta(c, ms)).sort((a, b) => a.inizio - b.inizio)[0];
+    if (vecchia) vecchia.fine = ms;
   }
   // La finestra arriva fino a adesso: in primo piano dopo la chiamata aperta
   // non c'è niente, in sottofondo i turni d'attesa dopo il lancio sono suoi.
