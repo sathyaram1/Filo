@@ -29,7 +29,10 @@ in testa ai messaggi dell'utente. La logica è in `src/shared/filoContesto.js` (
   solo sulla loro chat, una chat ferma li teneva davanti a ogni scheda per giorni. Gli esiti stanno in memoria (mai
   su disco) e se ne vanno con la loro chat. Il testo che la chat scrive nella conversazione venendo da fuori
   (l'esito di un comando dato in chat con «/», il nome di un file scaricato) è una lettura allo stesso modo
-  (`letturaDaFuori`): mai nudo come parole di Filo, imbustato, contato per le uscite, con la stessa vita.
+  (`letturaDaFuori`): mai nudo come parole di Filo, imbustato, contato per le uscite, con la stessa vita. Resta una
+  lettura anche quando torna dall'archivio (un ricordo, una ricerca, una rilettura con l'id): l'azione che lo riporta
+  lo dichiara in `_output.daFuori`, e uscite (`contestoDaAzioni`) e conferme (`fonteDi`) lo contano per tutte le
+  azioni allo stesso modo. Una regola sul messaggio segnato, non una per strada: tre giri l'avevano messa sulla strada.
 - **Un messaggio tagliato si rilegge davvero**: oltre un quarto del tetto restano testa e coda, con l'id intero della
   chat; CERCA_CHAT con l'id rilegge la conversazione intera fino al tetto in token, oltre dà testa, coda e il
   numero da cui leggere il mezzo, e con `da` lo dà a pezzi. Nessun secondo taglio nella busta.
@@ -41,7 +44,8 @@ in testa ai messaggi dell'utente. La logica è in `src/shared/filoContesto.js` (
   massimo tre sopra la soglia nel CONTESTO DI ADESSO, imbustati come archivio, e il blocco di attività lo dice come
   una ricerca («Ricordato dal filo · titolo»). Senza modello d'indicizzazione vale per parole, tutte quelle che
   distinguono. L'attesa ha un tetto: oltre, il turno parte senza.
-- **CERCA_CHAT cerca in tutto il filo**: chat di ogni scheda tranne quella di adesso, pagine visitate (e il contenuto
+- **CERCA_CHAT cerca in tutto il filo**: chat di ogni scheda (di quella di adesso solo i messaggi che il modello non ha
+  davanti: una conversazione ripresa o lunga ha un inizio che si cerca), pagine visitate (e il contenuto
   delle schede chiuse, coi vettori della Cronologia), cambi annullabili. Pagine e chat si cercano per parole con
   gli stessi tre passi (tutte, quelle che distinguono, almeno una): una parola in più nella domanda non fa sparire
   la pagina mentre la chat si trova. Le pagine non entrano mai da sole nel

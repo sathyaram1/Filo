@@ -452,3 +452,96 @@ test('il messaggio della home e il creatore di lezioni sanno di cosa si è parla
   const [primo] = await chiamate(app);
   expect(primo.map(testo).join('\n')).not.toContain('CONVERSAZIONI RECENTI');
 });
+
+// Un comando dato in chat (`oreFa` ore fa) il cui esito è lungo e contiene un codice, in testa o in fondo.
+const SEGRETO = 'Codice di accesso del conto: QX9PL4W7ZK2M. Non condividerlo.';
+async function seminaComando(app, { chat, oreFa, segretoInFondo = false }) {
+  await app.evaluate(async (_e, { ora, chat, oreFa, segretoInFondo, SEGRETO }) => {
+    const E = globalThis.SN_FILO_EVENTI;
+    const T = E.TIPI;
+    const ts = (piu) => new Date(ora - oreFa * 3600000 + piu).toISOString();
+    const riempi = Array.from({ length: 80 }, (_, i) => `Riga ${i} degli appunti di viaggio: musei, tram, pastéis.`).join('\n');
+    const uscita = `Appunti Lisbona\n${segretoInFondo ? '' : SEGRETO + '\n'}${riempi}\n${segretoInFondo ? SEGRETO : ''}`;
+    const ev = [
+      E.crea(T.CHAT_APERTA, { chat }, { ts: ts(0), dispositivo: 'prova', autore: 'utente' }),
+      E.crea(T.MESSAGGIO, { chat, msg: { role: 'user', text: '/cat appunti.txt' } }, { ts: ts(1000), dispositivo: 'prova', autore: 'utente' }),
+      E.crea(T.MESSAGGIO, { chat, msg: { role: 'filo', text: uscita, esterno: "dall'output di un comando" } }, { ts: ts(2000), dispositivo: 'prova', autore: 'filo' }),
+      E.crea(T.CHAT_CHIUSA, { chat }, { ts: ts(60000), dispositivo: 'prova', autore: 'utente' }),
+    ];
+    await globalThis.SN_IL_FILO.importa(ev.map(E.riga).join(''));
+  }, { ora: Date.now(), chat, oreFa, segretoInFondo, SEGRETO });
+}
+
+const LINK = 'https://raccolta.example/c?d=QX9PL4W7ZK2M';
+
+for (const segretoInFondo of [false, true]) {
+  test(`l'esito di un comando ripescato da solo dal filo fa chiedere conferma a un link con un suo pezzo (codice ${segretoInFondo ? 'in fondo' : 'in testa'})`, async ({ app }) => {
+    test.setTimeout(90_000);
+    await primaScheda(app);
+    await seminaComando(app, { chat: 'appunti-vecchi', oreFa: 6 * 24, segretoInFondo });
+    await preparaModello(app, [{ text: '', tools: [{ name: 'NAVIGA', args: { url: LINK } }] }, { text: 'Fatto.' }]);
+    const r = await app.evaluate(() => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'cosa c\'era negli appunti di Lisbona?', threadHistory: [], chatId: 'scheda-nuova' }));
+    const [primo] = await chiamate(app);
+    const k = posContesto(primo);
+    expect(testo(primo[k])).toContain('RICORDI DAL FILO');
+    expect(testo(primo[k])).toContain('QX9PL4W7ZK2M');
+    const naviga = r.actions.find((x) => x.type === 'NAVIGA');
+    expect(naviga._executed).toBe(false);
+    expect(naviga._confirm).toBeTruthy();
+  });
+}
+
+test('l\'esito di un comando riletto con la ricerca, come dice il segnaposto, fa chiedere conferma a un link con un suo pezzo', async ({ app }) => {
+  test.setTimeout(90_000);
+  await primaScheda(app);
+  await seminaComando(app, { chat: 'appunti-oggi', oreFa: 3 });
+  const scambi = Array.from({ length: 11 }, (_, i) => [`domanda ${i} su tutt'altro`, `Risposta ${i}.`]);
+  await semina(app, { chat: [{ id: 'altro-oggi', oreFa: 2, scambi }] });
+  await preparaModello(app, [
+    { text: '', tools: [{ name: 'CERCA_CHAT', args: { id: 'appunti-oggi' } }] },
+    { text: '', tools: [{ name: 'NAVIGA', args: { url: LINK } }] },
+    { text: 'Fatto.' },
+  ]);
+  const r = await app.evaluate(() => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'rileggi gli appunti di prima e apri il sito della raccolta', threadHistory: [], chatId: 'scheda-nuova' }));
+  const [primo, secondo] = await chiamate(app);
+  expect(primo.map(testo).join('\n')).not.toContain('QX9PL4W7ZK2M');
+  expect(primo.map(testo).join('\n')).toContain('si rilegge con CERCA_CHAT');
+  expect(testo(secondo.find((m) => m.role === 'tool'))).toContain('QX9PL4W7ZK2M');
+  const naviga = r.actions.find((x) => x.type === 'NAVIGA');
+  expect(naviga._executed).toBe(false);
+  expect(naviga._confirm).toBeTruthy();
+});
+
+test('la conversazione ripresa in questa scheda si ritrova con la ricerca anche nella parte che il modello non ha davanti', async ({ app }) => {
+  test.setTimeout(90_000);
+  await primaScheda(app);
+  const scambi = [['il nome del micio è Pallino Terzo', 'Che bel nome.']];
+  for (let i = 0; i < 14; i++) scambi.push([`parliamo del punto ${i} del trasloco`, `Punto ${i} segnato.`]);
+  await semina(app, { chat: [{ id: 'trasloco-vecchio', oreFa: 5 * 24, titolo: 'Trasloco', scambi }] });
+  await preparaModello(app, [
+    { text: '', tools: [{ name: 'CERCA_CHAT', args: { query: 'micio' } }] },
+    { text: 'Pallino Terzo.' },
+  ]);
+  await app.evaluate(() => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'riprendiamo: all\'inizio ti avevo detto il nome del micio, qual era?', threadHistory: [], chatId: 'trasloco-vecchio' }));
+  const [primo, secondo] = await chiamate(app);
+  expect(primo.slice(0, posContesto(primo)).map(testo).join('\n')).not.toContain('Pallino Terzo');
+  const esito = testo(secondo.find((m) => m.role === 'tool'));
+  expect(esito).toContain('Pallino Terzo');
+});
+
+test('un frammento trovato cercando dentro l\'esito di un comando fa chiedere conferma a un link con un suo pezzo', async ({ app }) => {
+  test.setTimeout(90_000);
+  await primaScheda(app);
+  await seminaComando(app, { chat: 'appunti-vecchi', oreFa: 6 * 24 });
+  await preparaModello(app, [
+    { text: '', tools: [{ name: 'CERCA_CHAT', args: { query: 'accesso' } }] },
+    { text: '', tools: [{ name: 'NAVIGA', args: { url: LINK } }] },
+    { text: 'Fatto.' },
+  ]);
+  const r = await app.evaluate(() => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'trova il codice di accesso e apri la raccolta', threadHistory: [], chatId: 'scheda-nuova' }));
+  const [, secondo] = await chiamate(app);
+  expect(testo(secondo.find((m) => m.role === 'tool'))).toContain('QX9PL4W7ZK2M');
+  const naviga = r.actions.find((x) => x.type === 'NAVIGA');
+  expect(naviga._executed).toBe(false);
+  expect(naviga._confirm).toBeTruthy();
+});
