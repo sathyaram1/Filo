@@ -77,7 +77,7 @@
       kind: 'scoprire',
       label: 'Come vuole che Filo gli parli',
       detail: 'Breve o dettagliato, «tu» o «lei», formale o no.',
-      applica: 'Appena lo sai, emetti IMPOSTA_PREFERENZA con chiave "stile_agente" e il valore che descrive quello stile, e da lì in poi scrivi già così.',
+      applica: 'Appena lo sai, emetti IMPOSTA_PREFERENZA con chiave "stile_agente" e il valore che descrive quello stile, e da lì in poi scrivi già così. Si imposta subito e l’utente vede lo stile con il suo Annulla: non chiedergli conferma a parole.',
     },
     {
       id: 'estetica',
@@ -234,7 +234,7 @@
     return Array.isArray(raw)
       ? raw
         .filter((m) => m && typeof m === 'object')
-        .map((m) => ({ role: m.role === 'filo' ? 'filo' : 'user', text: String(m.text || '') }))
+        .map((m) => ({ role: m.role === 'filo' ? 'filo' : 'user', text: String(m.text || ''), ...(m.daFuori === true ? { daFuori: true } : {}) }))
         .filter((m) => m.text)
         .slice(-THREAD_CAP)
       : [];
@@ -273,6 +273,7 @@
       // 'early' = chiusa prima di aver finito: la home lo dice, con la strada
       // per rifarla. Si spegne appena l'utente l'ha letto.
       notice: s.notice === 'early' ? 'early' : '',
+      ...(s.fermato ? { fermato: true } : {}),
     };
   }
 
@@ -392,16 +393,23 @@
   }
 
   function appendTurn(state, turn) {
-    const cur = normalize(state);
     const role = turn && turn.role === 'filo' ? 'filo' : 'user';
     const text = String((turn && turn.text) || '');
-    if (!text) return cur;
+    if (!text) return normalize(state);
+    const cur = togliFermato(state);
     const last = cur.thread[cur.thread.length - 1];
     if (last && last.role === role && last.text.trim() === text.trim()) {
-      return { ...cur, startedAt: cur.startedAt || new Date().toISOString() };
+      const segnato = turn.daFuori === true && !last.daFuori ? { thread: [...cur.thread.slice(0, -1), { ...last, daFuori: true }] } : {};
+      return { ...cur, ...segnato, startedAt: cur.startedAt || new Date().toISOString() };
     }
-    const thread = [...cur.thread, { role, text }].slice(-THREAD_CAP);
+    const thread = [...cur.thread, { role, text, ...(turn.daFuori === true ? { daFuori: true } : {}) }].slice(-THREAD_CAP);
     return { ...cur, thread, startedAt: cur.startedAt || new Date().toISOString() };
+  }
+
+  // Nella conversazione è entrato testo di altri (incollato, trascinato, un'immagine, una pagina o un file letto
+  // da Filo): da lì lo stile proposto torna a passare dal riquadro di conferma (#592.2).
+  function haTestoDiAltri(state) {
+    return normalize(state).thread.some((m) => m.daFuori === true);
   }
 
   // Quanti messaggi ha scritto l'utente: è il conto degli "scambi" del tetto.
@@ -415,7 +423,19 @@
   function hasPendingTurn(state) {
     const cur = normalize(state);
     const last = cur.thread[cur.thread.length - 1];
-    return !cur.done && !!last && last.role === 'user';
+    return !cur.done && !cur.fermato && !!last && last.role === 'user';
+  }
+
+  // Il turno a metà l'ha fermato l'utente col quadrato (#578): non riparte da solo, aspetta «riprendi» o un messaggio
+  // nuovo (appendTurn lo toglie). Sentinella: tests/unit/onboarding.test.mjs.
+  function segnaFermato(state) {
+    const cur = normalize(state);
+    const last = cur.thread[cur.thread.length - 1];
+    return !cur.done && last && last.role === 'user' ? { ...cur, fermato: true } : cur;
+  }
+  function togliFermato(state) {
+    const { fermato: _fermato, ...cur } = normalize(state);
+    return cur;
   }
 
   // Oltre il tetto duro l'intervista si chiude da sé, qualunque cosa faccia il
@@ -444,7 +464,7 @@
     MAX_EXCHANGES, HARD_MAX_EXCHANGES, THREAD_CAP, PAST_CAP,
     ITEMS, ITEM_IDS, STOP_PHRASES, DECLINE_PHRASES,
     emptyState, normalize, isActive, isTicked, tick, close, restart, conversations,
-    remaining, isComplete, appendTurn, userTurns, hasPendingTurn, shouldForceClose,
+    remaining, isComplete, appendTurn, haTestoDiAltri, userTurns, hasPendingTurn, segnaFermato, togliFermato, shouldForceClose,
     isStopRequest, isDecline, isExitRequest, dismissNotice, renderChecklistForPrompt,
     chatId,
   };

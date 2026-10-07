@@ -319,15 +319,46 @@ test('#595 voce di un utente: nessun token chiesto, submit anonima come prima', 
   assert.equal(state.calls[0].argomenti, 1, 'submit chiamata con il solo payload');
 });
 
-test('#595 owner senza accesso valido: parte anonima e lo scrive nel log', async () => {
-  const { OB, state } = setup();
+// #912: la voce dell'owner non parte mai da anonima. Senza accesso aspetta, lo dice una volta, non scade, e parte
+// con la prova appena l'accesso torna.
+test('#912 owner senza accesso valido: aspetta in coda, lo dice una volta, poi parte con la prova', async () => {
+  const { OB, state, store } = setup();
   conSubmitRegistrata(state);
-  const log = [];
-  OB.init({ tokenOwner: async () => '', log: (...a) => log.push(a.join(' ')) });
+  let token = '';
+  const avvisi = [];
+  OB.init({ tokenOwner: async () => token, onAttesaOwner: (it) => { avvisi.push(it.id); return true; } });
   state.online = true;
   await OB.enqueue({ submissionId: 'o2', clientId: 'owner:abc', text: 'sessione chiusa' }, { dallOwner: true });
   await OB.flush();
-  assert.equal(OB.size(), 0, 'non si ferma: parte lo stesso');
-  assert.equal(state.calls[0].argomenti, 1);
-  assert.ok(log.some((r) => /anonima/.test(r) && r.includes('o2')), log.join('\n'));
+  await OB.flush();
+  assert.equal(state.calls.length, 0, 'senza accesso non si spedisce niente, nemmeno da anonimo');
+  assert.equal(OB.size(), 1);
+  assert.deepEqual(avvisi, ['o2'], 'detto una volta sola');
+  // Un giorno dopo resta: buttarla perderebbe il feedback.
+  store.get('feedbackOutbox')[0].queuedAt = Date.now() - 48 * 3600e3;
+  OB._reset(); OB._setAuto(false);
+  OB.init({ tokenOwner: async () => token, onAttesaOwner: (it) => { avvisi.push(it.id); return true; } });
+  await OB.flush();
+  assert.equal(OB.size(), 1, 'la voce in attesa dell’accesso non scade');
+  assert.deepEqual(avvisi, ['o2'], 'l’avviso dato sopravvive al riavvio');
+  token = 'tok';
+  await OB.flush();
+  assert.equal(OB.size(), 0);
+  assert.equal(state.calls[0].opts.idToken, 'tok');
+  assert.equal(state.calls[0].opts.soloAdmin, true, 'col token rifiutato non deve ripiegare sull’anonimo');
+});
+
+test('#912 owner col token rifiutato: la voce resta in coda invece di partire da anonima', async () => {
+  const { OB, state } = setup();
+  const avvisi = [];
+  globalThis.SN_FEEDBACK.submit = async (payload, opts) => {
+    state.calls.push({ payload, opts });
+    throw Object.assign(new Error('firestore create fallito (403): token admin rifiutato'), { accessoOwner: true });
+  };
+  OB.init({ tokenOwner: async () => 'scaduto', onAttesaOwner: (it) => { avvisi.push(it.id); return true; } });
+  await OB.enqueue({ submissionId: 'o3', clientId: 'owner:abc', text: 'token vecchio' }, { dallOwner: true });
+  await OB.flush();
+  assert.equal(OB.size(), 1);
+  assert.deepEqual(avvisi, ['o3']);
+  assert.ok(state.calls.every((c) => c.opts && c.opts.soloAdmin === true));
 });

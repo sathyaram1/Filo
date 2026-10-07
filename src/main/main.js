@@ -67,10 +67,14 @@ if (process.env.NODE_ENV === 'test') {
     globalThis.__filoCookies = require('./services/cookies');
     globalThis.__filoAdblock = require('./services/adblock');
     globalThis.__filoCookieBanners = require('./services/cookieBanners');
+    globalThis.__filoCookieIncorporati = require('./services/cookieIncorporati');
+    globalThis.__filoRiquadriRotti = require('./services/riquadriRotti');
     globalThis.__filoFirmatariC2pa = require('./services/firmatariC2pa');
     globalThis.__filoFingerprint = require('./services/fingerprint');
     globalThis.__filoProxyTab = require('./services/proxyTab');
     globalThis.__filoShortcuts = require('./shortcuts');
+    globalThis.__filoAuth = require('./auth/google-auth');
+    globalThis.__filoUpdater = require('./updater');
   } catch (_) {}
 }
 
@@ -117,11 +121,9 @@ function apriInvito(code) {
   // aspetta lì e parte appena la finestra c'è.
   if (!mainWindow) { invitoInAttesa = { code }; return true; }
   try { revealWindow(mainWindow); } catch (_) {}
-  // La pagina Crediti è dove l'esito si legge: il riscatto e l'apertura
-  // partono insieme, e la pagina si aggiorna da sé all'avviso di saldo
-  // cambiato.
-  try { globalThis.SN_WALLET_MAIN?.redeemFromInvite?.(code)?.catch?.(() => {}); } catch (_) {}
-  try { mainWindow._filoTabs?.openTab('filo://credits/credits.html', { activate: true }); } catch (_) {}
+  // Riscatto e pagina Crediti partono insieme, e la pagina si aggiorna da sé
+  // all'avviso di saldo cambiato. È la stessa strada del clic dentro Filo.
+  try { globalThis.SN_WALLET_MAIN?.portaDentroInvito?.(code, mainWindow); } catch (_) {}
   return true;
 }
 
@@ -202,6 +204,10 @@ app.whenReady().then(async () => {
     // Gestione cookie: emetti GPC sulla sessione di default secondo la modalità.
     const Cookies = require('./services/cookies');
     Cookies.configureFromSettings(s);
+    // Cookie dei contenuti incorporati di terzi (#758): va agganciato prima della prima scheda, è lui che vede
+    // nascere i cookie dei riquadri.
+    try { require('./services/cookieIncorporati').init(s); } catch (_) {}
+    try { require('./services/riquadriRotti').init(s); } catch (_) {}
     // Anti-fingerprinting: carica/genera il master secret persistente e fissa
     // la modalità corrente (off/default/privacy) prima di aprire qualsiasi tab.
     try { await require('./services/fingerprint').init(s); } catch (_) {}
@@ -472,6 +478,8 @@ app.on('before-quit', (e) => {
   if (cookieWipeDone) return;
   let pending;
   try { pending = require('./services/cookies').wipeOnExit(); } catch (_) { return; }
+  // #758 — i cookie partizionati dei riquadri non si possono declassare: quelli ancora in attesa escono qui.
+  try { pending = Promise.all([pending, require('./services/cookieIncorporati').allUscita()]); } catch (_) {}
   if (!pending || typeof pending.then !== 'function') return;
   e.preventDefault();
   const finish = () => { cookieWipeDone = true; app.quit(); };

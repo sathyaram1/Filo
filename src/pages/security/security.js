@@ -45,6 +45,10 @@
     $('sec-dl-exe-label').textContent = I18n.t('options_security_downloads');
     $('sec-dl-exe-desc').textContent = I18n.t('options_security_downloads_desc');
     $('sec-dl-trusted-label').textContent = I18n.t('options_security_downloads_trusted_label');
+    $('sec-delicate-label').textContent = I18n.t('options_security_delicate');
+    $('sec-delicate-desc').textContent = I18n.t('options_security_delicate_desc');
+    $('sec-delicate-sites-label').textContent = I18n.t('options_security_delicate_sites_label');
+    $('sec-delicate-campi-title').textContent = I18n.t('options_security_delicate_campi_title');
     $('sec-p2p-box-title').textContent = I18n.t('options_security_p2p_box_title');
     $('sec-p2p-box-body').textContent = I18n.t('options_security_p2p_box_body');
     $('sec-proxy-box-title').textContent = I18n.t('options_security_proxy_box_title');
@@ -72,6 +76,10 @@
     $('sec-cookies-trusted-note').textContent = I18n.t('options_cookies_trusted_note_other');
     $('cookie-wl-input').placeholder = I18n.t('options_cookies_whitelist_placeholder');
     $('cookie-wl-add-btn').textContent = I18n.t('options_cookies_whitelist_add');
+    $('sec-cookies-accessi-title').textContent = I18n.t('options_cookies_accessi_title');
+    $('sec-cookies-accessi-desc').textContent = I18n.t('options_cookies_accessi_desc');
+    $('sec-cookies-riquadri-title').textContent = I18n.t('options_cookies_riquadri_title');
+    $('sec-cookies-riquadri-desc').textContent = I18n.t('options_cookies_riquadri_desc');
     $('sec-cookies-banners-title').textContent = I18n.t('options_cookies_banners_title');
     $('sec-cookies-done-title').textContent = I18n.t('options_cookies_done_title');
     $('sec-fp-title').textContent = I18n.t('options_fp_title');
@@ -304,6 +312,12 @@
     $('sec-dl-trusted').value = righe(dl.trustedSites, dl.righeScartate);
     setTrustedError(parseBlacklist($('sec-dl-trusted').value).invalid);
     syncDownloadsEnabled();
+    const del = sec.pagineDelicate || {};
+    $('sec-delicate').checked = del.enabled !== false;
+    $('sec-delicate-sites').value = righe(del.siti, del.righeScartate);
+    setDelicateError(parseBlacklist($('sec-delicate-sites').value).invalid);
+    syncDelicateEnabled();
+    loadDelicateCampi();
     const sb = sec.safeBrowse || {};
     $('sec-safebrowse').checked = sb.enabled !== false;
     $('sec-safebrowse-network').checked = sb.networkSignals !== false;
@@ -318,8 +332,12 @@
     const trusted = cookies.trustedSites || cookies.loginWhitelist;
     cookieWhitelist = Array.isArray(trusted) ? trusted.slice() : [];
     cookieBannerSites = Array.isArray(cookies.bannerSites) ? cookies.bannerSites.slice() : [];
+    cookieLoggedSites = Array.isArray(cookies.loggedSites) ? cookies.loggedSites.slice() : [];
+    cookieEmbedSites = Array.isArray(cookies.embedSites) ? cookies.embedSites.slice() : [];
     renderWhitelist();
     renderBannerSites();
+    renderLoggedSites();
+    renderEmbedSites();
     // Il testo lasciato nella casella dei fidati torna lì: un sito valido è già nell'elenco, il resto con l'avviso.
     const bozza = typeof cookies.bozza === 'string' ? cookies.bozza : '';
     $('cookie-wl-input').value = bozza;
@@ -358,23 +376,27 @@
   let cookieWhitelist = [];
   // #754 — siti dove l'utente ha chiesto di rivedere i banner (dal menu della scheda): qui si vedono e si tolgono.
   let cookieBannerSites = [];
+  // #758 — siti dove Filo ha visto un tuo accesso: i loro contenuti incorporati tengono i cookie. Li scrive Filo,
+  // qui si vedono e si tolgono.
+  let cookieLoggedSites = [];
+  let cookieEmbedSites = [];
 
   function currentMode() {
     const checked = document.querySelector('input[name="cookie-mode"]:checked');
     return checked ? checked.value : 'default';
   }
 
-  // I "siti fidati" hanno effetto SOLO in "Privacy massima" (dove ogni sito è
-  // isolato/effimero): lì la lista è attiva. In "Automatico"/"Manuale" i login
-  // restano comunque, quindi la lista è informativa (disabilitata + nota).
+  // I "siti fidati" contano in "Privacy massima" (jar isolato ma persistente) e in "Automatico" (#758: i loro
+  // contenuti incorporati altrove tengono i cookie): lì la lista si usa. In "Manuale" Filo non gestisce niente.
   function syncCookieMode() {
-    const privacy = currentMode() === 'privacy';
-    $('sec-cookies-trusted-note').style.display = privacy ? 'none' : 'block';
+    const modo = currentMode();
+    const conta = modo !== 'manual';
+    $('sec-cookies-trusted-note').style.display = modo === 'default' ? 'block' : 'none';
     const wl = $('sec-cookies-whitelist');
-    wl.style.opacity = privacy ? '1' : '0.45';
-    $('cookie-wl-input').disabled = !privacy;
-    $('cookie-wl-add-btn').disabled = !privacy;
-    for (const btn of $('cookie-wl-list').querySelectorAll('button')) btn.disabled = !privacy;
+    wl.style.opacity = conta ? '1' : '0.45';
+    $('cookie-wl-input').disabled = !conta;
+    $('cookie-wl-add-btn').disabled = !conta;
+    for (const btn of $('cookie-wl-list').querySelectorAll('button')) btn.disabled = !conta;
   }
 
   // Pulisce l'input utente in un dominio confrontabile: toglie schema, path,
@@ -441,6 +463,58 @@
       btn.addEventListener('click', () => {
         cookieBannerSites = cookieBannerSites.filter((d) => d !== domain);
         renderBannerSites();
+        saveCookies();
+      });
+      li.appendChild(span);
+      li.appendChild(btn);
+      list.appendChild(li);
+    }
+  }
+
+  function renderLoggedSites() {
+    const box = $('sec-cookies-accessi');
+    const list = $('cookie-accessi-list');
+    list.innerHTML = '';
+    // L'elenco si vede in tutte le modalità: è roba che Filo ha segnato su di te, e si toglie da qui anche quando
+    // la modalità di adesso non lo usa.
+    box.hidden = !cookieLoggedSites.length;
+    for (const domain of cookieLoggedSites) {
+      const li = document.createElement('li');
+      const span = document.createElement('span');
+      span.textContent = leggibile(domain);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sn-btn-secondary';
+      btn.textContent = I18n.t('options_cookies_accessi_remove');
+      btn.addEventListener('click', () => {
+        cookieLoggedSites = cookieLoggedSites.filter((d) => d !== domain);
+        renderLoggedSites();
+        saveCookies();
+      });
+      li.appendChild(span);
+      li.appendChild(btn);
+      list.appendChild(li);
+    }
+  }
+
+  // I servizi a cui hai riattivato i cookie dal riquadro rotto (#760): si vedono tutti e si tolgono da qui o dal
+  // tasto destro sul riquadro.
+  function renderEmbedSites() {
+    const box = $('sec-cookies-riquadri');
+    const list = $('cookie-riquadri-list');
+    list.innerHTML = '';
+    box.hidden = !cookieEmbedSites.length;
+    for (const domain of cookieEmbedSites) {
+      const li = document.createElement('li');
+      const span = document.createElement('span');
+      span.textContent = leggibile(domain);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sn-btn-secondary';
+      btn.textContent = I18n.t('options_cookies_riquadri_remove');
+      btn.addEventListener('click', () => {
+        cookieEmbedSites = cookieEmbedSites.filter((d) => d !== domain);
+        renderEmbedSites();
         saveCookies();
       });
       li.appendChild(span);
@@ -541,7 +615,14 @@
     const fidati = dominio && !cookieWhitelist.includes(dominio) ? [...cookieWhitelist, dominio].sort() : cookieWhitelist.slice();
     const partial = {
       security: {
-        cookies: { mode: currentMode(), trustedSites: fidati, bannerSites: cookieBannerSites.slice(), bozza: dominio ? '' : bozza },
+        cookies: {
+          mode: currentMode(),
+          trustedSites: fidati,
+          bannerSites: cookieBannerSites.slice(),
+          loggedSites: cookieLoggedSites.slice(),
+          embedSites: cookieEmbedSites.slice(),
+          bozza: dominio ? '' : bozza,
+        },
       },
     };
     await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: partial });
@@ -576,6 +657,76 @@
     const sub = $('sec-dl-exe-sub');
     if (sub) sub.style.opacity = on ? '1' : '0.45';
     $('sec-dl-trusted').disabled = !on;
+  }
+
+  // Spenta la protezione, l'elenco resta lì ma non vale: si vede attenuato, come quello dei siti fidati.
+  function syncDelicateEnabled() {
+    const on = !!$('sec-delicate').checked;
+    const sub = $('sec-delicate-sub');
+    if (sub) sub.style.opacity = on ? '1' : '0.45';
+    $('sec-delicate-sites').disabled = !on;
+  }
+
+  // I siti che Filo ha segnato da solo per un campo password o carta: tutti visibili, e ognuno si toglie e si rimette.
+  let delicateCampi = [];
+  let delicateCampiSig = '';
+  async function loadDelicateCampi() {
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.PAGINE_DELICATE_CAMPI }); } catch (_) {}
+    const siti = r && r.ok && Array.isArray(r.siti) ? r.siti : [];
+    const sig = siti.map((x) => x.sito + (x.tolto ? '-' : '')).join('\n');
+    if (sig === delicateCampiSig) return;
+    delicateCampiSig = sig;
+    delicateCampi = siti;
+    renderDelicateCampi();
+  }
+
+  function renderDelicateCampi() {
+    const box = $('sec-delicate-campi');
+    const list = $('sec-delicate-campi-list');
+    list.innerHTML = '';
+    box.hidden = !delicateCampi.length;
+    for (const it of delicateCampi) {
+      const li = document.createElement('li');
+      const span = document.createElement('span');
+      span.textContent = leggibile(it.sito);
+      if (it.tolto) {
+        const what = document.createElement('span');
+        what.className = 'sn-muted';
+        what.style.marginLeft = '8px';
+        what.textContent = I18n.t('options_security_delicate_campi_tolto');
+        span.appendChild(what);
+      }
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'sn-btn-secondary';
+      btn.textContent = I18n.t(it.tolto ? 'options_security_delicate_campi_rimetti' : 'options_security_delicate_campi_togli');
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        // L'elenco ha già tutti i tolti: è da lì che si scrive quello nuovo.
+        const tolti = delicateCampi.filter((x) => x.tolto && x.sito !== it.sito).map((x) => x.sito);
+        if (!it.tolto) tolti.push(it.sito);
+        await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { security: { pagineDelicate: { nonDelicati: tolti.sort() } } } });
+        delicateCampiSig = '';
+        await loadDelicateCampi();
+      });
+      li.appendChild(span);
+      li.appendChild(btn);
+      list.appendChild(li);
+    }
+  }
+
+  // Una riga che non è un dominio non protegge niente, e chi l'ha scritta crede di sì.
+  function setDelicateError(invalidRows) {
+    const el = $('sec-delicate-sites-error');
+    if (!el) return;
+    if (invalidRows && invalidRows.length) {
+      el.textContent = I18n.t('options_security_delicate_sites_invalid', invalidRows.join(', '));
+      el.style.display = 'block';
+    } else {
+      el.textContent = '';
+      el.style.display = 'none';
+    }
   }
 
   // Le righe scartate si dicono, come per la blacklist: un dominio scritto male
@@ -650,6 +801,7 @@
     uscita() {
       setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
       setTrustedError(parseBlacklist($('sec-dl-trusted').value).invalid);
+      setDelicateError(parseBlacklist($('sec-delicate-sites').value).invalid);
       if (String($('cookie-wl-input').value || '').trim()) addWhitelistDomain({ fuoco: false });
     },
   });
@@ -665,6 +817,7 @@
   function leggiSicurezza() {
     const blocco = parseBlacklist($('sec-siteblock-blacklist').value);
     const fidati = parseBlacklist($('sec-dl-trusted').value);
+    const delicati = parseBlacklist($('sec-delicate-sites').value);
     return {
       protectIpLeak: !!$('sec-protect-ip').checked,
       blockPopups: !!$('sec-block-popups').checked,
@@ -687,6 +840,12 @@
         confirmExecutables: !!$('sec-dl-exe').checked,
         trustedSites: fidati.valid,
         righeScartate: fidati.scartate,
+      },
+      // #1004 — le pagine delicate e i siti che l'utente aggiunge all'elenco di serie.
+      pagineDelicate: {
+        enabled: !!$('sec-delicate').checked,
+        siti: delicati.valid,
+        righeScartate: delicati.scartate,
       },
       // F4 — Feedback autonomo: letto da maybeAutoFeedback nel main process.
       autoFeedback: !!$('sec-auto-feedback').checked,
@@ -718,6 +877,7 @@
     if (!(opts && opts.avvisi === false)) {
       setTrustedError(parseBlacklist($('sec-dl-trusted').value).invalid);
       setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
+      setDelicateError(parseBlacklist($('sec-delicate-sites').value).invalid);
     }
     const ora = leggiSicurezza();
     const cambi = soloCambiati(ora, mostrata);
@@ -756,11 +916,13 @@
     const pendenti = foglieDi(soloCambiati(leggiSicurezza(), mostrata));
     // Le righe scartate sono la metà non valida della stessa casella.
     const inSospeso = new Set(pendenti.map((p) => p.replace(/^siteBlock\.righeScartate$/, 'siteBlock.blacklist')
-      .replace(/^downloads\.righeScartate$/, 'downloads.trustedSites')));
+      .replace(/^downloads\.righeScartate$/, 'downloads.trustedSites')
+      .replace(/^pagineDelicate\.righeScartate$/, 'pagineDelicate.siti')));
     const sec = settings.security || {};
     const scartate = {
       'sec-siteblock-blacklist': (sec.siteBlock || {}).righeScartate,
       'sec-dl-trusted': (sec.downloads || {}).righeScartate,
+      'sec-delicate-sites': (sec.pagineDelicate || {}).righeScartate,
     };
     const toccati = Voci.riallineaPagina('security', settings, {
       // La casella dei siti fidati serve ad aggiungerne uno: l'elenco vero è sotto, e si riallinea qui dopo.
@@ -778,8 +940,10 @@
     }
     if (toccati.includes('sec-siteblock-blacklist')) setBlacklistError(parseBlacklist($('sec-siteblock-blacklist').value).invalid);
     if (toccati.includes('sec-dl-trusted')) setTrustedError(parseBlacklist($('sec-dl-trusted').value).invalid);
+    if (toccati.includes('sec-delicate-sites')) setDelicateError(parseBlacklist($('sec-delicate-sites').value).invalid);
     syncSiteBlockEnabled();
     syncDownloadsEnabled();
+    syncDelicateEnabled();
     syncSafebrowseEnabled();
     syncCookieMode();
     const ora = leggiSicurezza();
@@ -795,9 +959,21 @@
         const p = JSON.stringify(msg.settings.proxy || {});
         if (p !== lastProxy) { lastProxy = p; renderProxyBox(); }
         riallinea(msg.settings);
+        loadDelicateCampi();
       }
       const c = msg && msg.type === MSG.SETTINGS_UPDATED && msg.settings && msg.settings.security && msg.settings.security.cookies;
-      if (!c || !Array.isArray(c.bannerSites)) return;
+      if (!c) return;
+      // Un accesso visto da Filo entra nell'elenco mentre la pagina è aperta.
+      if (Array.isArray(c.loggedSites) && c.loggedSites.join('\n') !== cookieLoggedSites.join('\n')) {
+        cookieLoggedSites = c.loggedSites.slice();
+        renderLoggedSites();
+      }
+      // Un servizio riattivato dalla proposta sul riquadro entra nell'elenco mentre la pagina è aperta.
+      if (Array.isArray(c.embedSites) && c.embedSites.join('\n') !== cookieEmbedSites.join('\n')) {
+        cookieEmbedSites = c.embedSites.slice();
+        renderEmbedSites();
+      }
+      if (!Array.isArray(c.bannerSites)) return;
       if (c.bannerSites.join('\n') === cookieBannerSites.join('\n')) return;
       cookieBannerSites = c.bannerSites.slice();
       renderBannerSites();
@@ -808,11 +984,11 @@
   // In una scheda di Filo il cambio di scheda non passa da `visibilitychange` (resta per il
   // ricaricamento): lo annuncia il main con TAB_IN_VISTA. L'uscita la ascolta SN_CASELLE.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') loadCookieDone();
+    if (document.visibilityState === 'visible') { loadCookieDone(); loadDelicateCampi(); }
   });
   if (chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((msg) => {
-      if (msg && msg.type === MSG.TAB_IN_VISTA && msg.inVista) loadCookieDone();
+      if (msg && msg.type === MSG.TAB_IN_VISTA && msg.inVista) { loadCookieDone(); loadDelicateCampi(); }
       if (msg && msg.type === MSG.PERMESSI_SITI_CAMBIATI) renderSitePerms();
     });
   }
@@ -839,6 +1015,9 @@
     $('sec-dl-exe').addEventListener('change', () => { syncDownloadsEnabled(); save(); });
     $('sec-dl-trusted').addEventListener('change', save);
     $('sec-dl-trusted').addEventListener('input', (e) => { setTrustedError([]); caselle.cambiato('liste', e); });
+    $('sec-delicate').addEventListener('change', () => { syncDelicateEnabled(); save(); });
+    $('sec-delicate-sites').addEventListener('change', save);
+    $('sec-delicate-sites').addEventListener('input', (e) => { setDelicateError([]); caselle.cambiato('liste', e); });
     $('sec-safebrowse').addEventListener('change', () => { syncSafebrowseEnabled(); save(); });
     $('sec-safebrowse-network').addEventListener('change', save);
     $('sec-safebrowse-llm').addEventListener('change', save);

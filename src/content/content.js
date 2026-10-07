@@ -29,6 +29,7 @@
     getPasteContext: () => pasteContext,
     restorePasteContext: () => restorePasteContext(),
     isBlocked: () => isBlocked(),
+    isIncognito: () => inIncognito,
     getLastMouseEvent: () => lastMouseEvent,
   });
   MenuIcons.init({
@@ -197,7 +198,7 @@
 
       // Colore identità del sito (§1.2): calcolato una volta (theme-color →
       // manifest → favicon → fallback) e mandato al main, che lo cacha per dominio
-      // e lo applica attenuato alle tab inattive.
+      // e lo mescola col fondo della barra nelle tab inattive.
       try { PageColor.reportTabIdentityColor(() => settings && settings.tabColor); } catch (_) {}
 
       // Segnali di attività (§2.1): ultima interazione, % di scroll, form sporco.
@@ -571,11 +572,14 @@
   // frame principale). Arriva dal main insieme alle impostazioni: da dentro un
   // riquadro di un'altra origine non è leggibile.
   let pageUrl = '';
+  // Finché il main non l'ha detto non si sa: vale incognito, e la selezione non parte da sola verso un modello.
+  let inIncognito = true;
 
   async function fetchSettings() {
     try {
       const res = await chrome.runtime.sendMessage({ type: MSG.GET_SETTINGS });
       if (res && typeof res.pageUrl === 'string') pageUrl = res.pageUrl;
+      if (res && typeof res.incognito === 'boolean') inIncognito = res.incognito;
       return res?.settings || self.SN_CONST.DEFAULT_SETTINGS;
     } catch (_) {
       return self.SN_CONST.DEFAULT_SETTINGS;
@@ -1742,11 +1746,14 @@
     if (zoomItem) items.push(zoomItem);
 
     // 3. Zona contestuale — assente se non c'è contesto utile.
+    // #760 — il tasto destro dentro un riquadro di un altro sito riattiva o toglie i cookie del suo servizio.
+    const vociRiquadro = (self.SN_RIQUADRO_COOKIE && self.SN_RIQUADRO_COOKIE.voci()) || [];
     const contextItems = [
       ...vociDellaPagina(target),
       ...buildContextualItems({
         selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target,
       }),
+      ...vociRiquadro,
     ];
     if (contextItems.length > 0) {
       items.push({ type: 'separator' });
@@ -1866,13 +1873,22 @@
   function buildLinkActionItems(linkEl) {
     // Un collegamento scritto da un modello di Filo si apre e si scarica solo dal main, dopo la porta delle uscite (#810).
     const diFilo = !!(linkEl.classList && linkEl.classList.contains('filo-md-link') && Popup && Popup.apriCollegamento);
-    const out = [
+    const out = [];
+    // Un link d'invito esiste per portare l'invito dentro Filo: è la sua prima voce (#664).
+    if (self.SN_WALLET && self.SN_WALLET.inviteCodeFromLink(linkEl.href)) {
+      out.push({
+        type: 'item',
+        label: I18n.t('menu_redeem_invite'),
+        onClick: () => { chrome.runtime.sendMessage({ type: MSG.WALLET_INVITE_OPEN, link: String(linkEl.href) }).catch(() => {}); },
+      });
+    }
+    out.push(
       {
         type: 'item',
         label: I18n.t('menu_open_in_new_tab'),
         onClick: () => (diFilo ? Popup.apriCollegamento(linkEl) : Actions.apriInSchedaNuova(linkEl.href)),
       },
-    ];
+    );
     // "Salva file" — gemello di "Salva immagine come" per i link a un file
     // (PDF, ZIP, allegato). Compare SOLO quando il link punta davvero a un
     // file (vedi isDownloadableLink): su un link a un'altra pagina scaricare
@@ -2120,7 +2136,28 @@
   // ------------------------------------------------------------
   // Messaggi runtime: shortcut, settings update
   // ------------------------------------------------------------
+  function rispondiEtichetteBarra(ids) {
+    if (IS_SUBFRAME) return;
+    try {
+      const voci = MenuIcons.statoPerBarra?.(ids) || [];
+      if (voci.length) chrome.runtime.sendMessage({ type: MSG.BARRA_ETICHETTE, voci }).catch?.(() => {});
+    } catch (_) {}
+  }
+
   function onRuntimeMessage(msg, sender, sendResponse) {
+    // #871 — la disposizione delle icone è cambiata altrove, o un'icona arriva dalla barra laterale.
+    if (msg?.type === MSG.ICON_LAYOUT_CHANGED) {
+      try { MenuIcons.layoutCambiato?.(msg.layout); } catch (_) {}
+      return;
+    }
+    if (msg?.type === MSG.BARRA_FUORI) {
+      try { MenuIcons.dallaBarra?.(msg); } catch (_) {}
+      return;
+    }
+    if (msg?.type === MSG.BARRA_ETICHETTE_CHIEDI) {
+      rispondiEtichetteBarra(msg.ids);
+      return;
+    }
     if (msg?.type === MSG.FULLSCREEN_CHANGED) {
       fullscreenAnnunciato = true;
       contentFullscreen = !!msg.fullscreen;
@@ -2163,6 +2200,8 @@
         else if (msg.surface === 'help') openHelpSidebar();
         else MenuIcons.runIconAction(msg.iconId);
       } catch (e) { console.error('[SN] azione di pagina dal riquadro', e); }
+      // Premuta dalla barra laterale: la barra rilegge come si chiama adesso (Traduci → Mostra originale).
+      if (msg.daBarra) setTimeout(() => rispondiEtichetteBarra([msg.iconId]), 60);
       return;
     }
     if (msg?.type === MSG.SHOW_TOAST) {

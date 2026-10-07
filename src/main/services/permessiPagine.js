@@ -193,16 +193,22 @@ function seguiGesti(wc) {
         if (!(e && e.defaultPrevented)) { wc._filoGestoDiFilo = false; wc._filoGestoAlle = Date.now(); }
       });
     });
-    wc.on('did-start-navigation', (e, _url, isInPlace, isMainFrame) => {
+    wc.on('did-start-navigation', (e, url, isInPlace, isMainFrame) => {
       const principale = e && typeof e.isMainFrame === 'boolean' ? e.isMainFrame : isMainFrame;
       const stessa = e && typeof e.isSameDocument === 'boolean' ? e.isSameDocument : isInPlace;
       if (!principale || stessa) return;
+      // Un invito non si carica mai (#664): la pagina resta, e il gesto che l'ha chiesto deve arrivare a chi lo porta dentro.
+      if (globalThis.SN_WALLET?.isInviteDeepLink?.((e && e.url) || url)) return;
       // Il clic che fa partire la navigazione vale ancora per dove la portano will-navigate e i redirect (un «scrivici»
       // che finisce in mailto:): qui arriva prima di loro.
       const t = gestoSullaScheda(wc);
       wc._filoGestoNavigazione = t && t > (wc._filoGestoUsatoAlle || 0) ? t : 0;
+      // Il clic che ha fatto partire la navigazione vale per i suoi rinvii, non per la pagina d'arrivo (#664 giro 2).
+      wc._filoNavDaGesto = gestoRecente(wc);
       wc._filoGestoAlle = 0; wc._filoGestoFinestraAlle = 0; wc._filoMenuAperto = null;
     });
+    wc.on('did-navigate', () => { wc._filoNavDaGesto = false; });
+    wc.on('did-fail-load', (_e, _c, _d, _u, principale) => { if (principale !== false) wc._filoNavDaGesto = false; });
   } catch (_) {}
 }
 
@@ -321,6 +327,11 @@ function origineDelReferrer(referrer) {
   const u = referrer && typeof referrer === 'object' ? referrer.url : referrer;
   if (!u) return '';
   try { const o = new URL(String(u)).origin; return o && o !== 'null' ? o : ''; } catch (_) { return ''; }
+}
+
+// Il gesto vale anche per la navigazione che ha fatto partire, finché non arriva: un rinvio del sito resta del clic.
+function navigazioneDaGesto(wc) {
+  return Boolean(wc && wc._filoNavDaGesto);
 }
 
 // Il dominio registrato va sempre letto: con un indirizzo lungo la parte che sceglie chi attacca è quella davanti.
@@ -480,6 +491,11 @@ function dimentica(wc) {
   return { tolte: scelte.length, ricarica: scelte.some((s) => s.si || s.parte === 'notifiche') };
 }
 
+// Un sito usa-e-getta della Privacy buttato all'uscita (services/cookies.js): le risposte date lì se ne vanno col jar.
+function dimenticaSessione(ses) {
+  if (ses && !persistente(ses)) delete ses._filoScelte;
+}
+
 // Tutte le risposte che restano, per la pagina Sicurezza: si vedono e si tolgono anche senza aprire il sito.
 function scelteRicordate() {
   const out = [];
@@ -550,7 +566,7 @@ function statoNotifiche(ses, url) {
 }
 
 module.exports = {
-  installa, negaTutto, rispondi, lasciapassare, seguiGesti, scelteDi, dimentica, nomeDaMostrare, statoNotifiche,
+  installa, negaTutto, rispondi, lasciapassare, seguiGesti, gestoRecente, navigazioneDaGesto, scelteDi, dimentica, dimenticaSessione, nomeDaMostrare, statoNotifiche,
   carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica, gestoDellaPagina, gestoSullaScheda, gestoPerUnaFinestra, gestoPerLaNavigazione, clicDiFilo,
   gestoDiFilo, aperturaScelta, perUnaFinestra,
   TIPI, INNOCUI, NON_DISPONIBILI, COL_GESTO_SENZA_DOMANDA, GESTO_MS, TASTI_SENZA_GESTO, tastoPerLaPagina, _inAttesa: inAttesa,

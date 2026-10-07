@@ -3,7 +3,7 @@
 
 module.exports = function register(on, ctx) {
   const {
-    MSG, winOf, broadcastLiveUpdate, handleFiloChat, handleFiloGenerateDashboard,
+    MSG, winOf, broadcastLiveUpdate, handleFiloChat, fermaFiloChat, handleFiloGenerateDashboard,
     executeFiloAction, controllaUscita, apriDaFilo, SCHEMI_USCITA, ricordaLettoInChat, maybeRunCompactor, closeAndTriageChat,
     archiviaCongedoAccoglienza,
     saveOnboarding, finishOnboarding, claimOnboardingResume,
@@ -40,7 +40,7 @@ module.exports = function register(on, ctx) {
       // scrive dentro il messaggio dell'utente e la risposta, turno per turno.
       const chatId = msg.chatId || null;
       fineLavoro = require('../lavoriInCorso').inizia({ tipo: 'risposta', chat: chatId, testo: msg.userMessage, wc: sender && sender.wc, ambito: ctx.ambitoDellaFinestra(sender && sender.win) });
-      const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images, reasoningReqId: msg.reasoningReqId, internal: !!msg.internal, daModello: !!msg.daModello, chatId, sender });
+      const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images, reasoningReqId: msg.reasoningReqId, internal: !!msg.internal, daModello: !!msg.daModello, daFuori: msg.daFuori === true, chatId, sender });
       return { ok: true, ...r };
     } catch (e) {
       // #360 — la chat non è un log: se il turno fallisce (rete assente, provider
@@ -64,6 +64,9 @@ module.exports = function register(on, ctx) {
       fineLavoro();
     }
   }));
+
+  // Il quadrato al posto dell'invio (#578): ferma il turno di questa scheda, non quello di un'altra.
+  on(MSG.FILO_CHAT_STOP, soloFilo(async (msg, sender) => ({ ok: true, fermato: fermaFiloChat(msg && msg.reqId, sender && sender.wc) })));
 
   // L'utente ha confermato dal client (popup livello 2 / "conferma" digitata
   // livello 3) un'azione rimasta in sospeso: la eseguiamo ora. Il livello
@@ -492,7 +495,10 @@ module.exports = function register(on, ctx) {
     return { ok: true, timers: list };
   }));
 
-  on(MSG.FILO_GET_NOTIFICATIONS, soloFilo(async () => ({ ok: true, notifications: await FiloMem.listNotifications() })));
+  on(MSG.FILO_GET_NOTIFICATIONS, soloFilo(async () => ({
+    ok: true, notifications: require('../../updater').conStatoAggiornamento(await FiloMem.listNotifications()),
+  })));
+  on(MSG.FILO_INSTALLA_AGGIORNAMENTO, soloFilo(async () => require('../../updater').installaAggiornamento()));
 
   on(MSG.FILO_DISMISS_NOTIFICATION, soloFilo(async (msg) => {
     const list = await FiloMem.dismissNotification(msg.id, { acted: !!msg.acted });

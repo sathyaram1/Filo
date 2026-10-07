@@ -27,6 +27,7 @@ import {
   collectTestFiles, fileArgs, isTestFile, UNIT_DIR, REPO_ROOT, TETTO_WINDOWS, TETTO_RIGA,
   gruppiDiLancio, perLaRiga, flagsConRiepilogo, sommaRiepiloghi, testoRiepilogo,
   allaLettera, nomeNonLanciabile, NODE_LEGGE_MODELLI, rapportiDaRiunire, separaArgomenti, unisciRapporti, chiedeWatch, chiedeCopertura,
+  conTettoDiTempo, TETTO_FILE_MS,
 } from '../../scripts/run-unit-tests.mjs';
 import { costoArgomentoWindows, lottiPerRigaDiComando } from '../../scripts/lib/riga-di-comando.mjs';
 import { lottiPerRigaDiComando as lottiDiFinish } from '../../scripts/finish-local.mjs';
@@ -462,4 +463,29 @@ describe('un file trovato è un file che gira', () => {
       assert.match(r.stderr, /a\{b,c\}\.test\.mjs/);
     } finally { rmSync(casa, { recursive: true, force: true }); }
   });
+});
+
+// Un file appeso (col disco pieno, #717) teneva ferma la corsa per sempre, senza dire quale fosse.
+test('ogni corsa ha un tetto di tempo per file, largo, a meno che chi lancia non ne dia uno suo', () => {
+  assert.ok(TETTO_FILE_MS >= 10 * 60 * 1000, 'un tetto stretto fa rossi sui Windows lenti');
+  assert.deepEqual(conTettoDiTempo(['--test-only']), [`--test-timeout=${TETTO_FILE_MS}`, '--test-only']);
+  assert.deepEqual(conTettoDiTempo([]), [`--test-timeout=${TETTO_FILE_MS}`]);
+  assert.deepEqual(conTettoDiTempo(['--test-timeout', '5000']), ['--test-timeout', '5000']);
+  assert.deepEqual(conTettoDiTempo(['--test-timeout=5000']), ['--test-timeout=5000']);
+});
+
+test('un file appeso diventa un rosso col suo nome, e la corsa finisce', () => {
+  const dir = cartellaTemporanea('filo-appeso-');
+  try {
+    writeFileSync(join(dir, 'appeso.test.mjs'), "import { test } from 'node:test';\ntest('appeso', async () => { setInterval(() => {}, 1000); await new Promise(() => {}); });\n");
+    const env = { ...process.env, FILO_UNIT_DIR: dir };
+    delete env.NODE_TEST_CONTEXT;
+    const r = spawnSync(process.execPath, [join(REPO_ROOT, 'scripts', 'run-unit-tests.mjs'), '--test-timeout=1500'],
+      { env, cwd: REPO_ROOT, encoding: 'utf8', timeout: 60_000 });
+    assert.notEqual(r.error?.code, 'ETIMEDOUT', 'la corsa è rimasta appesa');
+    assert.equal(r.status, 1);
+    assert.match(r.stdout, /appeso\.test\.mjs/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

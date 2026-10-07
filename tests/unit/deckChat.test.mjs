@@ -123,3 +123,76 @@ test('le carte che il giudice non ha potuto guardare restano segnate, solo fra q
   const [senza] = C.cleanChat([{ who: 'bot', reply: 'x', cardIds: ['a'], uncheckedIds: ['z'] }]);
   assert.equal('uncheckedIds' in senza, false);
 });
+
+// #788 — la riga di sintesi di una lista: titolo leggibile del modello, ordine scelto dall'utente, tutti e due salvati.
+test('titolo e ordine di una lista si salvano con la lista, il default no', () => {
+  const [bot] = C.cleanChat([{ who: 'bot', turn: 't1', cardIds: ['a', 'b'], title: '  carte che\n danno rapidità ', sort: 'price' }]);
+  assert.equal(bot.title, 'carte che danno rapidità');
+  assert.equal(bot.sort, 'price');
+  const [cmc] = C.cleanChat([{ who: 'bot', cardIds: ['a'], sort: 'cmc' }]);
+  assert.equal('sort' in cmc, false);
+  const [strano] = C.cleanChat([{ who: 'bot', cardIds: ['a'], sort: 'colore', title: 42 }]);
+  assert.equal('sort' in strano, false);
+  assert.equal('title' in strano, false);
+  // Senza carte non c'è lista: niente titolo né ordine.
+  const [vuota] = C.cleanChat([{ who: 'bot', reply: 'x', title: 'carte', sort: 'name' }]);
+  assert.deepEqual(vuota, { who: 'bot', reply: 'x' });
+});
+
+test('cambiare l\'ordine di una lista è una modifica sola, sul suo turno', () => {
+  const base = [{ who: 'user', text: 'haste' }, { who: 'bot', turn: 't1', cardIds: ['a', 'b'], query: 'o:haste' }];
+  const r = C.applyEdit(base, { op: 'sort', turn: 't1', sort: 'name' });
+  assert.equal(r.list[1].sort, 'name');
+  assert.deepEqual(r.list[1].cardIds, ['a', 'b']);
+  const back = C.applyEdit(r.list, { op: 'sort', turn: 't1', sort: 'cmc' });
+  assert.equal('sort' in back.list[1], false);
+  assert.deepEqual(C.applyEdit(base, { op: 'sort', turn: 't9', sort: 'name' }), { error: 'gone' });
+  assert.deepEqual(C.applyEdit(base, { op: 'sort', turn: 't1', sort: 'boh' }), { error: 'bad_sort' });
+});
+
+test('le righe si ordinano per costo, nome o prezzo; senza prezzo in fondo', () => {
+  const cards = {
+    a: { name: 'Zap', cmc: 3, priceEur: 0.5 },
+    b: { name: 'apex', cmc: 1, priceEur: null },
+    c: { name: 'Bolt', cmc: 1, priceEur: 2 },
+  };
+  assert.deepEqual(C.sortIds(['a', 'b', 'c'], cards, 'cmc'), ['b', 'c', 'a']);
+  assert.deepEqual(C.sortIds(['a', 'b', 'c'], cards, undefined), ['b', 'c', 'a']);
+  assert.deepEqual(C.sortIds(['a', 'b', 'c'], cards, 'name'), ['b', 'c', 'a']);
+  assert.deepEqual(C.sortIds(['a', 'b', 'c'], cards, 'price'), ['a', 'c', 'b']);
+  // Le carte non ancora caricate non rompono niente.
+  assert.deepEqual(C.sortIds(['x', 'a'], cards, 'price'), ['a', 'x']);
+  const ids = ['a', 'b'];
+  C.sortIds(ids, cards, 'name');
+  assert.deepEqual(ids, ['a', 'b'], 'la lista salvata non si riordina sotto i piedi');
+});
+
+test('la riga di sintesi dice il numero e la frase, mai la query', () => {
+  assert.equal(C.listLabel(12, 'carte che danno rapidità'), '12 carte che danno rapidità');
+  assert.equal(C.listLabel(12, ''), '12 risultati');
+  assert.equal(C.listLabel(1, undefined), '1 risultato');
+  assert.equal(C.listLabel(1, 'carte che danno rapidità'), '1 risultato: carte che danno rapidità');
+  // Il numero lo mette il sistema: quello del modello (spesso sbagliato, conta prima del filtro) non si raddoppia.
+  assert.equal(C.listLabel(7, '12 carte che danno rapidità'), '7 carte che danno rapidità');
+  // Si legge dopo il numero: niente maiuscola a metà frase né due numeri di fila; i nomi propri restano.
+  assert.equal(C.listLabel(3, 'Carte che danno rapidità'), '3 carte che danno rapidità');
+  assert.equal(C.listLabel(3, 'Rapidità: le migliori'), '3 rapidità: le migliori');
+  assert.equal(C.listLabel(3, '3 modi per vincere'), '3 modi per vincere');
+  assert.equal(C.listLabel(3, 'Sol Ring e simili'), '3 Sol Ring e simili');
+  assert.equal(C.listLabel(3, 'Niv-Mizzet e i suoi draghi'), '3 Niv-Mizzet e i suoi draghi');
+  assert.equal(C.listLabel(3, 'ETB per il mazzo'), '3 ETB per il mazzo');
+});
+
+test('una risposta fermata dall\'utente resta fermata, col ragionamento, e si può riprovare (#792)', () => {
+  const lista = C.applyEdit([], { op: 'append', messages: [
+    { who: 'user', text: 'draghi rossi' }, { who: 'bot', pending: true, turn: 't1' },
+  ] }).list;
+  const dopo = C.applyEdit(lista, { op: 'fill', turn: 't1', message: {
+    who: 'bot', stopped: true, reasoning: 'cerco', reply: 'mezza risposta', cotOpen: true,
+  } }).list;
+  assert.deepEqual(dopo[1], { who: 'bot', turn: 't1', reasoning: 'cerco', stopped: true });
+  assert.deepEqual(C.forReading(dopo, () => false)[1], dopo[1]);
+  // Fuori dallo storico per il modello, come una bolla d'errore; e «Riprova» la toglie con la sua domanda.
+  assert.deepEqual(C.historyFor(dopo), [{ role: 'user', content: 'draghi rossi' }]);
+  assert.deepEqual(C.applyEdit(dopo, { op: 'drop', turn: '', userText: 'draghi rossi' }).list, []);
+});

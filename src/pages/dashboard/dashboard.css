@@ -16,6 +16,10 @@
   --dash-green: #4a7a3a;
   --dash-radius: 18px;
   --dash-radius-pill: 28px;
+  /* Il filo dell'attesa: quanto dura il cappio che si stringe, quanto l'avvolgimento, quanto si vede la trama. */
+  --dash-filo-nodo: 450ms;
+  --dash-filo-gomitolo: 850ms;
+  --dash-trama-opacity: 0.5;
 }
 
 [data-sn-theme="dark"] {
@@ -627,109 +631,155 @@ html, body {
   .dash-bubble-filo.dash-bubble-streaming::after { animation: none; }
 }
 
-/* Il retroscena del turno (attesa, ragionamento, azioni) sta sopra la risposta: colore smorzato e
-   niente cornice, perché la risposta è la bolla sotto. */
+/* Il retroscena del turno sta sopra la risposta, smorzato e senza cornice. A sinistra corre il filo (#578):
+   niente scritte di stato, il movimento dice cosa succede. Regole: patterns/il-filo-dell-attesa.md. */
 .dash-activity {
+  position: relative;
   align-self: flex-start;
   width: 86%;
   max-width: 86%;
+  box-sizing: border-box;
+  padding-left: 26px;
   color: var(--dash-ink-mute);
   font-size: 13px;
   line-height: 1.45;
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding-left: 4px;
 }
 /* La risposta si attacca al suo retroscena: meno aria fra i due che fra bolle. */
 .dash-activity + .dash-bubble-filo { margin-top: -6px; }
+.dash-activity.dash-activity-vuoto { display: none; }
+@keyframes dash-activity-spin { to { transform: rotate(360deg); } }
+
+.dash-activity-filo { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.dash-activity-filo-tratto {
+  fill: none;
+  stroke: var(--dash-accent);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* Tutti i nodi uguali: un puntino pieno, senza alone. La presa più larga è solo per il mouse. */
+.dash-activity-nodo { fill: var(--dash-accent); }
+.dash-activity-nodo-presa { fill: transparent; pointer-events: all; cursor: pointer; }
+.dash-activity[data-filo="gomitolo"] .dash-activity-nodo-presa { pointer-events: none; }
+
+/* Il gomitolo: una riga sola, il riassunto e la durata. La presa comprende il gomitolo a sinistra. */
 .dash-activity-head {
   display: flex;
   align-items: center;
-  gap: 8px;
   align-self: flex-start;
-  max-width: 100%;
+  max-width: calc(100% + 26px);
   min-width: 0;
+  margin-left: -26px;
+  padding: 0 6px 0 26px;
   border: none;
   background: transparent;
   color: inherit;
   font: inherit;
-  padding: 2px 6px 2px 0;
-  border-radius: 6px;
-  cursor: pointer;
   text-align: left;
+  cursor: pointer;
+  border-radius: 6px;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height var(--dash-filo-gomitolo) cubic-bezier(.4, 0, .2, 1), opacity 300ms ease, color 160ms ease,
+    padding-left var(--dash-filo-gomitolo) cubic-bezier(.4, 0, .2, 1);
 }
+.dash-activity[data-testa] .dash-activity-head { max-height: 26px; opacity: 1; }
+.dash-activity[data-filo="gomitolo"] .dash-activity-head { padding-left: calc(26px + var(--dash-gomitolo-spazio, 0px)); }
 .dash-activity-head:hover { color: var(--dash-ink-soft); }
-/* La riga dice cosa succede adesso: una riga sola, il resto sfuma. */
 .dash-activity-label {
   min-width: 0;
+  line-height: 24px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 /* Un tentativo andato male: resta leggibile, ma non sembra un lavoro riuscito. */
 .dash-activity[data-failed="1"] .dash-activity-label { color: var(--dash-accent); }
-.dash-activity-icon {
-  width: 12px;
-  height: 12px;
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  font-size: 11px;
-}
-/* In attesa o mentre ragiona: una rotella. Non c'è un avanzamento da stimare. */
-.dash-activity[data-phase="wait"] .dash-activity-icon,
-.dash-activity[data-phase="reason"] .dash-activity-icon,
-.dash-activity[data-phase="act"] .dash-activity-icon {
-  border-radius: 50%;
-  border: 2px solid currentColor;
-  border-top-color: transparent;
-  opacity: 0.7;
-  animation: dash-activity-spin 0.9s linear infinite;
-}
-@keyframes dash-activity-spin { to { transform: rotate(360deg); } }
-/* Finito: la riga è un interruttore, la freccetta dice da che parte è. */
-.dash-activity[data-phase="done"] .dash-activity-icon::before { content: '▸'; }
-.dash-activity[data-phase="done"] .dash-activity-head[aria-expanded="true"] .dash-activity-icon::before { content: '▾'; }
-@media (prefers-reduced-motion: reduce) {
-  .dash-activity[data-phase="wait"] .dash-activity-icon,
-  .dash-activity[data-phase="reason"] .dash-activity-icon,
-  .dash-activity[data-phase="act"] .dash-activity-icon {
-    animation: none;
-    border-top-color: currentColor;
-    opacity: 0.35;
-  }
-}
-/* Ragionamento, azioni, note e comandi nell'ordine in cui sono avvenuti. Si apre a richiesta e
-   scorre da sola restando in fondo mentre il lavoro va avanti. */
+
 .dash-activity-body {
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  transition: max-height var(--dash-filo-gomitolo) cubic-bezier(.4, 0, .2, 1), opacity 300ms ease;
+}
+/* In attesa il filo penzola da solo: gli serve un po' di posto. */
+.dash-activity[data-phase="wait"] .dash-activity-body { min-height: 22px; }
+
+/* Una sezione: un pensiero e le azioni che ne sono nate. */
+.dash-activity-seg { display: flex; flex-direction: column; min-width: 0; animation: dash-seg-entra 320ms ease-out; }
+@keyframes dash-seg-entra { from { opacity: 0; transform: translateY(-4px); } }
+.dash-activity-seg-head {
+  display: flex;
+  align-items: center;
+  align-self: flex-start;
+  max-width: 100%;
+  min-width: 0;
+  height: 24px;
+  padding: 0 4px 0 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: color 160ms ease;
+}
+.dash-activity-seg-head:hover,
+.dash-activity-seg-aperta > .dash-activity-seg-head,
+.dash-activity[data-phase="act"] .dash-activity-seg:last-child > .dash-activity-seg-head { color: var(--dash-ink-soft); }
+.dash-activity-seg-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-activity-seg[data-stato="pensa"] > .dash-activity-seg-head,
+.dash-activity-seg[data-stato="coda"] > .dash-activity-seg-head { display: none; }
+
+/* La trama: il ragionamento che scorre, piccolo e sfumato. Non si legge, si intravede. */
+.dash-activity-trama { display: none; }
+.dash-activity-seg[data-stato="pensa"] > .dash-activity-trama {
+  display: block;
+  height: 24px;
+  line-height: 24px;
+  overflow: hidden;
+  white-space: nowrap;
+  cursor: pointer;
+  font-size: 10.5px;
+  opacity: var(--dash-trama-opacity);
+  direction: rtl;
+  text-align: left;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 25%, #000 75%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 25%, #000 75%, transparent);
+}
+.dash-activity-trama > span { direction: ltr; unicode-bidi: isolate; }
+
+/* L'ultimo pensiero non compare prima della risposta: lo si legge srotolando il gomitolo. */
+.dash-activity:not([data-filo="srotolato"]) .dash-activity-seg[data-stato="coda"] { display: none; }
+.dash-activity-seg[data-stato="coda"] > .dash-activity-seg-body { opacity: 0.85; }
+
+/* Dentro una sezione: il ragionamento per intero e, staccati sotto, gli esiti con la loro icona. */
+.dash-activity-seg-body {
+  display: flex;
+  flex-direction: column;
   gap: 6px;
-  max-height: 40vh;
+  max-height: 240px;
   overflow-y: auto;
-  padding: 4px 10px 4px 12px;
-  margin: 0 0 2px 5px;
-  border-left: 2px solid var(--dash-line-strong);
+  padding: 2px 10px 8px 0;
   font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--dash-ink-soft);
   user-select: text;
 }
-.dash-activity-reasoning {
-  white-space: pre-wrap;
-  word-wrap: break-word;
-}
+.dash-activity-reasoning { white-space: pre-wrap; word-wrap: break-word; }
 /* Commento a metà lavoro («Provo subito tutti e tre…»): è una nota, non una bolla. */
-.dash-activity-note {
-  font-style: italic;
-  color: var(--dash-ink-soft);
-}
+.dash-activity-note { font-style: italic; color: var(--dash-ink-soft); }
+.dash-activity-esiti { display: flex; flex-direction: column; gap: 4px; color: var(--dash-ink-mute); }
+.dash-activity-esiti:empty { display: none; }
+.dash-activity-esiti:not(:first-child) { border-top: 1px solid var(--dash-line); padding-top: 7px; }
 /* Esito di un comando dentro la cronologia: più piccolo, output limitato. */
 .dash-cmd-result.dash-activity-cmd { margin-top: 0; font-size: 12px; }
 .dash-activity-cmd .dash-cmd-output { max-height: 10em; overflow: auto; }
-/* Le righe delle azioni: icona e due parole, in tono col blocco (non corsive,
-   non un bottone). */
+/* Le righe delle azioni: icona e due parole, in tono col blocco (non corsive, non un bottone). */
 .dash-action-step.dash-activity-row {
   font-style: normal;
   opacity: 1;
@@ -742,6 +792,29 @@ html, body {
   flex: none;
   text-align: center;
   font-size: 12px;
+}
+/* Il titolo esteso di un nodo, al passaggio del mouse. */
+.dash-filo-hint {
+  position: fixed;
+  z-index: 30;
+  pointer-events: none;
+  max-width: 60vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--dash-ink);
+  color: var(--dash-paper);
+  font-size: 11.5px;
+  padding: 4px 9px;
+  border-radius: 7px;
+  transform: translate(-50%, -125%);
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+.dash-filo-hint.dash-filo-hint-vis { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .dash-activity-head, .dash-activity-body, .dash-filo-hint { transition: none; }
+  .dash-activity-seg { animation: none; }
 }
 .dash-bubble-actions {
   margin-top: 10px;
@@ -877,6 +950,19 @@ html, body {
   line-height: 1.4;
   color: var(--dash-ink-soft);
 }
+/* Lo stile scelto nel benvenuto: una nota come quella della prima volta, col suo Annulla accanto. */
+.dash-stile-accoglienza {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--dash-ink-soft);
+}
+.dash-stile-accoglienza-testo { min-width: 0; overflow-wrap: anywhere; }
+.dash-stile-accoglienza .dash-action-btn { padding: 3px 10px; font-size: 12.5px; transition: background 0.15s ease, color 0.15s ease; }
 /* La frase della prima volta: una riga a sé sopra i bottoni, discreta come una nota. */
 .dash-cmd-primavolta {
   flex-basis: 100%;
@@ -1323,6 +1409,9 @@ html, body {
 .dash-input-wrap { --sn-voce-size: 36px; --sn-voce-ink: var(--dash-ink-soft); }
 .dash-send:hover { opacity: 0.85; }
 .dash-send[disabled] { opacity: 0.4; cursor: not-allowed; }
+/* Il quadrato che ferma: stesso posto dell'invio, nel colore d'accento perché è urgente per natura. */
+.dash-send.dash-stop { background: var(--dash-accent); color: #fff; transition: transform 160ms ease, opacity 160ms ease; }
+.dash-send.dash-stop:hover { opacity: 1; transform: scale(1.07); }
 
 .dash-img-preview {
   position: relative;
@@ -1527,10 +1616,6 @@ html, body {
 }
 .dash-ctrl:active { transform: translateY(0.5px); }
 .dash-ctrl svg { display: block; }
-/* Red-team: icona in rosso (canale sicurezza), distinta dai controlli del
-   browser. Gli SVG ereditano currentColor, quindi basta il `color`. */
-.dash-ctrl[data-command="redteam"] { color: #d6243a; }
-.dash-ctrl[data-command="redteam"]:hover { color: #b91c1c; }
 .dash-ctrl .account-avatar {
   width: 22px;
   height: 22px;

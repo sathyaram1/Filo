@@ -1008,6 +1008,28 @@
     try { popup?.pose?.reflow(); } catch (_) {}
   }
 
+  // La risposta l'hanno pagata i crediti di Filo perché OpenRouter ha rifiutato
+  // la chiave dell'utente: la stessa riga che la chat mette sotto la risposta (#662).
+  // Vale come detta solo se `el`, dove sta la frase, resta a schermo il tempo di leggerla: un riquadro
+  // chiuso prima, o appena compare, lascia partire l'avviso (che il main tiene fermo 4 s).
+  const RIPIEGO_LETTO_MS = 1500;
+  function ripiegoMostrato(el) {
+    if (!el || !el.isConnected) return;
+    setTimeout(() => {
+      if (!el.isConnected) return;
+      try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.KEY_FALLBACK_SHOWN })).catch(() => {}); } catch (_) {}
+    }, RIPIEGO_LETTO_MS);
+  }
+  function notaRipiego(parent, keyFallback) {
+    if (!parent || !keyFallback || !keyFallback.line) return null;
+    const el = document.createElement('div');
+    el.className = 'sn-key-fallback';
+    el.textContent = keyFallback.line;
+    parent.appendChild(el);
+    ripiegoMostrato(el);
+    return el;
+  }
+
   // Scrive modello e costo nella riga in basso. Quando lo spazio è così poco
   // che quella riga deve sparire (dentro un riquadro incorporato basso, vedi la
   // posa), l'informazione resta comunque: passando sopra l'intestazione.
@@ -1094,6 +1116,7 @@
           } else {
             bubble.text.innerHTML = renderMarkdown(daMostrare);
           }
+          notaRipiego(bubble.text, m.keyFallback);
           setMeta(popup, `${I18n.t('popup_model')}: ${popup.model} • ${I18n.t('popup_estimated_cost')}: €${eur.toFixed(4)}`);
         });
         // Salva la versione risolta in conversazione: i follow-up vedono i numeri,
@@ -1329,6 +1352,7 @@
 
   global.SN_POPUP = {
     openStreaming,
+    notaRipiego, ripiegoMostrato,
     close,
     closeTopmost,
     showToast,

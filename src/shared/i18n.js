@@ -79,6 +79,7 @@
     toast_media_loop_off: 'Ripetizione disattivata',
     toast_pip_failed: 'Finestra mobile non disponibile per questo video',
     menu_share_link: 'Condividi link',
+    menu_redeem_invite: 'Riscatta l’invito',
     menu_edit_selection: 'Modifica',
     menu_read_aloud: 'Leggi',
     menu_stop_reading: 'Interrompi lettura',
@@ -263,6 +264,7 @@
     toast_paste_failed: 'Non riesco a incollare qui (rifocalizza il campo e riprova)',
     clipboard_image_pending: 'Descrizione…',
     clipboard_image_no_model: 'Immagine (nessun modello per la descrizione)',
+    clipboard_image_delicata: 'Immagine da una pagina delicata',
 
     // Categorie default
     category_default: 'Da vedere',
@@ -374,6 +376,7 @@
     options_action_archive_embed: 'Indicizzazione delle schede archiviate',
     options_action_provider_test: 'Prova di un fornitore (pulsante «Prova»)',
     options_action_file_name: 'Nome sensato ai file (legge l\'inizio del file o una miniatura)',
+    options_action_embed_cookie_check: 'Contenuti incorporati rotti dai cookie (guarda il riquadro)',
     // Elenco (di sola lettura) degli altri punti in cui Filo usa un modello:
     // quelli che girano sui server di Filo e quelli che un modello non lo usano.
     options_h_model_usage: 'Dove altro Filo usa un modello',
@@ -429,6 +432,13 @@
     admin_defaults_excluded_kind_producer: 'Produce i modelli',
     admin_defaults_excluded_kind_unreliable: 'Serve male',
     admin_defaults_excluded_note: 'Nota (quando, cosa è successo)',
+    // Pagine delicate (#1004)
+    admin_defaults_delicate: 'Pagine delicate',
+    admin_defaults_delicate_desc:
+      'I siti di posta, banche e sanità di cui il riassunto delle schede chiuse e la pulizia automatica non mandano il testo ai modelli. Uno per riga; un dominio vale anche per i suoi sottodomini. Vale per tutti gli utenti: una categoria salvata qui sostituisce quella scritta nel codice, una lasciata com\'è segue il codice.',
+    admin_defaults_delicate_posta: 'Posta',
+    admin_defaults_delicate_banche: 'Banche',
+    admin_defaults_delicate_sanita: 'Sanità',
     admin_defaults_excluded_unknown: 'Nessun fornitore di OpenRouter si chiama così: questa voce non esclude nessuno.',
     admin_defaults_excluded_guess: 'Forse «%s»?',
     admin_defaults_excluded_drift_title: 'Esclusioni del codice che questa lista non copre',
@@ -457,8 +467,9 @@
       'in alto ti permette di aprirlo comunque se era legittimo.',
     options_security_adblock: 'Blocca pubblicità e tracker',
     options_security_adblock_desc:
-      'Usa liste di blocco pubbliche e gratuite (StevenBlack, EasyList) per impedire ' +
-      'il caricamento di pubblicità e tracker. Le liste si scaricano dalla rete, restano ' +
+      'Usa liste di blocco pubbliche e gratuite (StevenBlack, EasyList e le sue liste per i siti ' +
+      'italiani e francesi): pubblicità e tracker non si caricano, e i riquadri della pubblicità ' +
+      'che restano nella pagina spariscono. Le liste si scaricano dalla rete, restano ' +
       'in cache sul tuo computer e si aggiornano da sole una volta a settimana. I siti ' +
       'che usi davvero (Google, YouTube, banche…) non vengono mai bloccati.',
     options_security_adskip: 'Salta le pubblicità dei video',
@@ -533,6 +544,20 @@
       'Il controllo della blacklist ufficiale di Google (phishing e malware) usa una chiave condivisa, ' +
       'gestita centralmente dall\'amministratore in "Modelli predefiniti": è già attiva per tutti gli ' +
       'account, non devi configurare nulla qui.',
+    // #1004 — pagine delicate
+    options_security_delicate: 'Non mandare ai modelli le pagine delicate',
+    options_security_delicate_desc:
+      'Posta, banca, sanità e le pagine dove hai visto un campo password o carta. Quando chiudi queste ' +
+      'schede o Filo le riordina, ne tiene solo titolo e indirizzo e non manda il testo a nessun modello.',
+    options_security_delicate_sites_label:
+      'Altri siti delicati, uno per riga',
+    options_security_delicate_sites_invalid:
+      'Queste righe non sono domini validi e verranno ignorate (usa un dominio ' +
+      'con estensione, es. studiorossi.it): %s',
+    options_security_delicate_campi_title: 'Siti dove Filo ha visto un campo password o carta',
+    options_security_delicate_campi_togli: 'Non è delicato',
+    options_security_delicate_campi_tolto: 'non delicato per te',
+    options_security_delicate_campi_rimetti: 'Torna delicato',
     // F4 — Feedback autonomo
     options_security_auto_feedback: 'Segnalazione automatica dei problemi',
     options_security_auto_feedback_desc:
@@ -552,26 +577,44 @@
     options_cookies_mode_default_desc:
       'Filo blocca a monte i tracker noti (Google Analytics, reti pubblicitarie, pixel dei social): lo script non ' +
       'si carica nemmeno. Rifiuta da solo i banner dei cookie, nasconde quelli che non hanno un «rifiuta», dice ai siti che non vuoi essere profilato ' +
-      'e carica i video YouTube senza cookie. I cookie utili a te (login, preferenze, le tue scelte sui siti) ' +
+      'e carica i video YouTube senza cookie. I cookie dei contenuti incorporati di siti dove non sei entrato durano ' +
+      'solo la visita. I cookie utili a te (accessi, preferenze, le tue scelte sui siti) ' +
       'restano: non perdi quello che hai impostato.',
     options_cookies_mode_privacy: 'Privacy massima',
     options_cookies_mode_privacy_desc:
-      'Come l\'Automatico, ma ogni sito vive in uno spazio separato e usa-e-getta: i siti non possono mettersi ' +
-      'd\'accordo per riconoscerti e niente sopravvive alla chiusura di Filo, nemmeno i tuoi accessi — tranne i ' +
-      '"siti fidati" qui sotto. Massima riservatezza.',
+      'Come l\'Automatico, ma ogni sito vive in uno spazio separato e usa-e-getta, così i siti non possono mettersi ' +
+      'd\'accordo per riconoscerti. Qualche minuto dopo che chiudi l\'ultima scheda di un sito, Filo butta via tutto ' +
+      'quello che il sito aveva salvato, accessi compresi. Fanno eccezione i "siti fidati" qui sotto.',
     options_cookies_whitelist_title: 'Siti fidati: resta connesso',
     options_cookies_whitelist_desc:
-      'In "Privacy massima" ogni sito è isolato e usa-e-getta. I siti che aggiungi qui fanno eccezione: vivono in ' +
-      'uno spazio isolato ma persistente, così resti connesso. Aggiungi il sito (es. gmail.com) e premi Invio.',
+      'I siti che aggiungi qui restano connessi: in "Privacy massima" vivono in uno spazio isolato ma persistente, ' +
+      'e in "Automatico" tengono i loro cookie anche quando un loro contenuto compare dentro un\'altra pagina. ' +
+      'Aggiungi il sito (es. gmail.com) e premi Invio; se poi lo togli, in "Privacy massima" Filo butta via ' +
+      'quello che aveva salvato.',
     options_cookies_whitelist_placeholder: 'es. gmail.com',
     options_cookies_whitelist_add: 'Aggiungi',
     options_cookies_whitelist_remove: 'Rimuovi',
-    options_cookies_whitelist_empty: 'Nessun sito fidato: in "Privacy massima" dovrai rifare il login a ogni avvio.',
+    options_cookies_whitelist_empty: 'Nessun sito fidato. In "Privacy massima" rifai l\'accesso ogni volta che torni su un sito che avevi chiuso.',
     options_cookies_whitelist_invalid: 'Non sembra un dominio valido. Usa un dominio con estensione, es. gmail.com (niente IP o nomi senza punto).',
     options_cookies_whitelist_dup: '"%s" è già nell\'elenco dei siti fidati.',
     options_cookies_trusted_note_other:
-      'I siti fidati hanno effetto solo in "Privacy massima". In "Automatico" i tuoi login restano comunque salvati, ' +
-      'quindi qui non serve aggiungere nulla.',
+      'In "Automatico" i tuoi accessi restano salvati comunque. Qui serve aggiungere un sito solo se ne vedi i ' +
+      'contenuti dentro altre pagine e vuoi che restino connessi prima che tu ci sia entrato da Filo.',
+    options_cookies_accessi_title: 'Siti dove sei entrato',
+    options_cookies_accessi_desc:
+      'Quando un contenuto di questi siti compare dentro un\'altra pagina (un post, un video, una mappa), i suoi '
+      + 'cookie restano, così non esci dai siti dove hai fatto l\'accesso. Degli altri siti, i cookie messi da un '
+      + 'contenuto incorporato durano solo la visita.',
+    options_cookies_accessi_remove: 'Togli',
+    options_cookies_riquadri_title: 'Contenuti incorporati con i cookie riattivati',
+    options_cookies_riquadri_desc: 'Post, video e mappe di questi servizi, dentro le pagine di altri siti, tengono i loro cookie.',
+    options_cookies_riquadri_remove: 'Togli',
+    riquadro_cookie_domanda: 'Attivo i cookie di %s per questo contenuto?',
+    riquadro_cookie_si: 'Sì',
+    riquadro_cookie_no: 'No',
+    riquadro_cookie_fatto: 'Cookie di %s attivi: ricarico il contenuto',
+    riquadro_cookie_menu_attiva: 'Attiva i cookie di %s qui',
+    riquadro_cookie_menu_togli: 'Togli i cookie riattivati di %s',
     options_cookies_banners_title: 'Qui i banner dei cookie li vedi',
     options_cookies_banners_remove: 'Rifiuta in automatico',
     options_cookies_done_title: 'Qui Filo li ha rifiutati o nascosti',

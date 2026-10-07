@@ -175,6 +175,15 @@ if (!IS_SUBFRAME) try {
   }
 } catch (e) { /* la protezione non deve MAI bloccare il caricamento della pagina */ }
 
+// #576 — i riquadri della pubblicità che il blocco di rete lascia vuoti o che il sito serve da sé: regole in preload/nascondi-pubblicita.js.
+// Ciò che il blocco ferma si chiude in ogni frame, riquadri compresi: lì può stare l'annuncio.
+try {
+  const nascondi = require('./nascondi-pubblicita.js');
+  nascondi.chiudiBloccati({ ipcRenderer, webFrame });
+  const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
+  if (!IS_SUBFRAME && /^https?:/i.test(loc)) nascondi({ ipcRenderer, webFrame, href: loc });
+} catch (e) { /* come sopra: mai bloccare il caricamento */ }
+
 // Il sito è entrato o uscito dall'elenco coi banner dei cookie: la sua risposta va via prima che i suoi script
 // la leggano (regola e chiavi le decide il main, tabs/tabCookies.js). Solo nel frame principale.
 if (!IS_SUBFRAME) try {
@@ -211,6 +220,24 @@ let streamCounter = 0;
 
 const filoMessage = (msg) => ipcRenderer.invoke('filo:message', msg);
 
+// ─── #664 — il collegamento d'invito cliccato dentro Filo ──────────────────
+// `filo://invito/<codice>` non è una pagina: da fuori lo consegna il sistema e
+// Filo riscatta. Dentro Filo lo stesso clic deve fare lo stesso, ma solo un
+// clic VERO: una pagina che lo spinge da sé non riscatta niente (il main la
+// ferma). Il tipo è letterale: qui SN_MSG non c'è ancora.
+try {
+  const INVITO = /^filo:\/*invito(?:[/?#]|$)/i;
+  const suInvito = (e) => {
+    if (!e.isTrusted || (e.type === 'click' ? e.button !== 0 : e.button !== 1)) return;
+    const a = (e.composedPath ? e.composedPath() : []).find((n) => n && typeof n.href === 'string' && /^(A|AREA)$/.test(n.tagName));
+    if (!a || !INVITO.test(a.href)) return;
+    e.preventDefault();
+    filoMessage({ type: 'wallet_invite_open', link: a.href }).catch(() => {});
+  };
+  window.addEventListener('click', suInvito, true);
+  window.addEventListener('auxclick', suInvito, true);
+} catch (_) { /* mai bloccare il caricamento della pagina */ }
+
 const broadcastListeners = new Set();
 // #407 — messaggi che devono SVEGLIARE un riquadro incorporato. Dentro un
 // riquadro i content script si montano solo quando l'utente lo tocca; ma
@@ -220,7 +247,83 @@ const broadcastListeners = new Set();
 // c'è ancora (i moduli condivisi si caricano dopo): il valore letterale è
 // l'unico modo, ed è lo stesso trucco della consegna delle scorciatoie.
 const WAKE_BROADCASTS = new Set(['frame_translate']);
+
+// #503 — il giudizio di chi ospita il riquadro, arrivato per lettera dalla finestra madre (translatePage.js lo
+// scrive con la stessa chiave). Un riquadro che lei non vede non si sveglia, non risponde al conto e non si paga.
+const VERDETTO_ATTESA_MS = 1500;
+const verdettiRiquadro = new Map();
+const inAttesaDiVerdetto = new Set();
+// Anche quelli dentro un riquadro riempito dalla pagina (about:, srcdoc): lì non c'è un Filo che passi parola.
+function riquadriFigli() {
+  const out = [];
+  const docs = [document];
+  while (docs.length && out.length < 500) {
+    let lista = [];
+    try { lista = Array.from(docs.pop().querySelectorAll('iframe, frame')); } catch (_) {}
+    for (const f of lista) {
+      out.push(f);
+      try { if (f.contentWindow.location.protocol === 'about:' && f.contentDocument) docs.push(f.contentDocument); } catch (_) {}
+    }
+  }
+  return out;
+}
+// Il giudizio arriva da chi ha un Filo e mi vede: la madre, o un antenato quando fra noi c'è solo un riquadro riempito
+// dalla pagina, che un Filo non ce l'ha.
+function daUnAntenato(src) {
+  try {
+    for (let w = window.parent, hops = 0; w && hops < 16; hops++) {
+      if (src === w) return true;
+      if (w === w.parent) break;
+      w = w.parent;
+    }
+  } catch (_) {}
+  return false;
+}
+if (IS_SUBFRAME) try {
+  window.addEventListener('message', (e) => {
+    const d = e && e.data;
+    if (!d || typeof d !== 'object' || d.filoFrameVerdict !== 1 || !daUnAntenato(e.source)) return;
+    const runId = typeof d.runId === 'string' ? d.runId.slice(0, 64) : '';
+    if (!runId) return;
+    const visto = d.visible === true;
+    verdettiRiquadro.delete(runId);
+    verdettiRiquadro.set(runId, visto);
+    if (verdettiRiquadro.size > 20) verdettiRiquadro.delete(verdettiRiquadro.keys().next().value);
+    // Nascosto io, nascosti quelli dentro di me: nessuno qui dentro può farsi vedere.
+    if (!visto) {
+      for (const f of riquadriFigli()) {
+        try { f.contentWindow.postMessage({ filoFrameVerdict: 1, runId, visible: false }, '*'); } catch (_) {}
+      }
+    }
+    for (const fn of inAttesaDiVerdetto) fn();
+  });
+} catch (_) { /* mai bloccare il caricamento della pagina */ }
+
+// Senza un giudizio entro l'attesa (chi ospita non ha Filo dentro) vale quello di prima: si traduce.
+function conVerdetto(runId, fn) {
+  if (verdettiRiquadro.has(runId)) { fn(verdettiRiquadro.get(runId)); return; }
+  let fatto = false;
+  const chiudi = (visto) => {
+    if (fatto) return;
+    fatto = true;
+    inAttesaDiVerdetto.delete(guarda);
+    clearTimeout(timer);
+    fn(visto);
+  };
+  const guarda = () => { if (verdettiRiquadro.has(runId)) chiudi(verdettiRiquadro.get(runId)); };
+  const timer = setTimeout(() => chiudi(true), VERDETTO_ATTESA_MS);
+  inAttesaDiVerdetto.add(guarda);
+}
+
 ipcRenderer.on('filo:broadcast', (_event, msg) => {
+  if (IS_SUBFRAME && msg && msg.type === 'frame_translate' && msg.mode !== 'restore') {
+    conVerdetto(String(msg.runId || ''), (visto) => { if (visto) consegnaBroadcast(msg); });
+    return;
+  }
+  consegnaBroadcast(msg);
+});
+
+function consegnaBroadcast(msg) {
   const deliver = () => {
     for (const fn of broadcastListeners) {
       try { fn(msg, { id: 'filo-desktop' }, () => {}); } catch (e) { console.warn('[Filo CS] listener err', e); }
@@ -237,7 +340,7 @@ ipcRenderer.on('filo:broadcast', (_event, msg) => {
     return;
   }
   deliver();
-});
+}
 
 const chromeShim = {
   runtime: {
@@ -601,8 +704,10 @@ function loadScripts() {
   try { require(path.join(SHARED_DIR, 'i18n.js')); } catch (e) { console.error('[Filo CS] i18n', e); }
   try { require(path.join(SHARED_DIR, 'messages.js')); } catch (e) { console.error('[Filo CS] messages', e); }
   try { require(path.join(SHARED_DIR, 'tasti.js')); } catch (e) { console.error('[Filo CS] tasti', e); } // nomi delle scorciatoie per il sistema di chi legge: PRIMA di menu/actions/content
+  try { require(path.join(SHARED_DIR, 'disposizioneIcone.js')); } catch (e) { console.error('[Filo CS] disposizioneIcone', e); } // dove sta ogni icona globale: PRIMA di menuIcons
   try { require(path.join(SHARED_DIR, 'campoTesto.js')); } catch (e) { console.error('[Filo CS] campoTesto', e); } // "si sta scrivendo qui?": PRIMA di content.js, che ci decide Ctrl+Z
   try { require(path.join(SHARED_DIR, 'urlNav.js')); } catch (e) { console.error('[Filo CS] urlNav', e); } // #437 — "è davvero un indirizzo?" per Copia URL/Condividi
+  try { require(path.join(SHARED_DIR, 'wallet.js')); } catch (e) { console.error('[Filo CS] wallet', e); } // #664 — «è un link d'invito?» per il tasto destro
   try { require(path.join(SHARED_DIR, 'filoMarkdown.js')); } catch (e) { console.error('[Filo CS] filoMarkdown', e); }
   try { require(path.join(SHARED_DIR, 'linkSospetto.js')); } catch (e) { console.error('[Filo CS] linkSospetto', e); } // #725 — link sospetti: euristica e frasi, PRIMA di actions.js
   try { require(path.join(SHARED_DIR, 'themeTokens.js')); } catch (e) { console.error('[Filo CS] themeTokens', e); }
@@ -624,6 +729,7 @@ function loadScripts() {
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'cookieRules.js')); } catch (e) { console.error('[Filo CS] cookieRules', e); }
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'cookieBanners.js')); } catch (e) { console.error('[Filo CS] cookieBanners', e); }
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'cookies.js')); } catch (e) { console.error('[Filo CS] cookies', e); }
+  if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'riquadroRotto.js')); } catch (e) { console.error('[Filo CS] riquadroRotto', e); } // #760 — la proposta sopra il riquadro
   try { require(path.join(CONTENT_DIR, 'adSkip.js')); } catch (e) { console.error('[Filo CS] adSkip', e); } // #737 — nei riquadri è già partito da solo
   try { require(path.join(SHARED_DIR, 'feedback.js')); } catch (e) { console.error('[Filo CS] feedback shared', e); }
   try { require(path.join(SHARED_DIR, 'feedbackClientIdHash.js')); } catch (e) { console.error('[Filo CS] feedbackClientIdHash', e); } // S1.F2.2
@@ -671,6 +777,7 @@ function startCookiesInFrame() {
   const go = () => {
     try { require(path.join(CONTENT_DIR, 'cookieRules.js')); } catch (e) { console.error('[Filo CS] cookieRules (riquadro)', e); }
     try { require(path.join(CONTENT_DIR, 'cookies.js')); } catch (e) { console.error('[Filo CS] cookies (riquadro)', e); }
+    try { require(path.join(CONTENT_DIR, 'riquadroRotto.js')); } catch (e) { console.error('[Filo CS] riquadroRotto (riquadro)', e); } // #760
     try { require(path.join(CONTENT_DIR, 'adSkip.js')); } catch (e) { console.error('[Filo CS] adSkip (riquadro)', e); }
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go, { once: true });
@@ -704,6 +811,24 @@ function waitForContentScripts(fn) {
   tick();
 }
 
+// Il modulo di pagamento o di accesso di un altro sito, in un riquadro, rende delicata la pagina che lo contiene (#1004):
+// il content script della pagina non lo vede. Si guarda a pagina caricata e quando si entra in un campo, e si dice una volta.
+function vediCampiDelicati() {
+  let detto = false;
+  const guarda = () => {
+    if (detto) return;
+    let h = null;
+    try { h = require(path.join(CONTENT_DIR, 'safebrowseHints.js')).pageHints(document); } catch (_) { return; }
+    if (!h || !(h.shownPassword || h.shownPayment)) return;
+    detto = true;
+    filoMessage({ type: 'campi_delicati', hasPassword: !!h.shownPassword, hasPayment: !!h.shownPayment }).catch(() => {});
+  };
+  try {
+    window.addEventListener('load', guarda, { once: true });
+    window.addEventListener('focusin', (e) => { if (e.target && e.target.tagName === 'INPUT') guarda(); }, { capture: true, passive: true });
+  } catch (_) {}
+}
+
 // L'avviso del sito pericoloso non aspetta la pagina costruita: un modulo password già a schermo sopra uno script che
 // non arriva mai resterebbe scrivibile senza avviso (#813.1). loadScripts() ritrova questi moduli già caricati.
 function startSafebrowse() {
@@ -721,6 +846,7 @@ if (!IS_SUBFRAME) {
   }
 } else {
   startCookiesInFrame();
+  vediCampiDelicati();
   // Un clic, un tasto premuto o il fuoco su un campo dentro il riquadro dicono
   // "sto usando questa cosa": da lì in poi il riquadro deve rispondere come il
   // resto della pagina. Il tasto destro ha il suo cammino (il bridge qui sopra),

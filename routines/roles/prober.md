@@ -38,8 +38,9 @@ Electron non parte: il comando si scrive intero).
 
 1. **Riproducilo da utente, non solo leggendo il codice.** Un sospetto nato
    solo dalla lettura del sorgente NON è un feedback: o lo riproduci, o non lo
-   apri. Se visibile, cattura uno screenshot che mostra l'errore e allegalo con
-   `--image` (max 5), solo se mostra davvero l'errore.
+   apri. Un feedback accodato da qui non porta immagini (il canale non ha un
+   campo per allegarle): quello che lo screenshot mostrerebbe, scrivilo nei
+   passi per riprodurlo.
 2. **Struttura del testo: parte utente, poi parte tecnica.**
    - Primo blocco (non tecnico): cosa si rompe dal punto di vista dell'utente +
      passi esatti per riprodurlo. Niente nomi di file/funzioni.

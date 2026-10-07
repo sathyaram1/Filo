@@ -265,6 +265,20 @@
   // subito, 2 chiede conferma con popup. `risk` (obbligatorio quando level=2,
   // #183) è la spiegazione in chiaro mostrata nel popup: cosa controlla
   // l'impostazione e quali rischi comporta toccarla.
+  // Un tempo della barra laterale in millisecondi ("300", "300 ms", "0,5 secondi"); fuori dai limiti è un
+  // rifiuto col numero, mai un taglio. Un numero sotto 10 senza unità sono secondi: nessuno chiede 1 ms.
+  function msBarra(v, campo, etichetta) {
+    const s = String(v == null ? '' : v).trim().toLowerCase();
+    let n = parseItalianNumber(s.replace(/[^0-9.,-]/g, ''));
+    if (!Number.isFinite(n)) return null;
+    const ms = /\bms\b|millisecond/.test(s);
+    if ((/\bs(ec|econd[oi])?\b/.test(s) && !ms) || (!ms && !/[a-z]/.test(s) && n > 0 && n < 10)) n *= 1000;
+    n = Math.round(n);
+    const [min, max] = global.SN_CONST.BARRA_LATERALE_LIMITI[campo];
+    if (n < min || n > max) return { rifiuto: `${n} ms è fuori dai limiti: da ${min} a ${max} ms` };
+    return { partial: { barraLaterale: { [campo]: n } }, label: etichetta(n) };
+  }
+
   const PREF_SETTERS = [
     {
       scrive: ['theme'],
@@ -391,6 +405,38 @@
       },
     },
     {
+      scrive: ['barraLaterale.spinta'],
+      aiuto: 'true | false (la barra laterale si apre spingendo il mouse sul bordo sinistro)',
+      keys: ['barra_spinta', 'barra spinta', 'apertura dal bordo', 'apri la barra dal bordo', 'spinta sul bordo', 'bordo sinistro'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { barraLaterale: { spinta: b } }, label: `Barra laterale spingendo sul bordo → ${b ? 'si apre' : 'non si apre'}` };
+      },
+    },
+    {
+      scrive: ['barraLaterale.attesaMs'],
+      aiuto: 'millisecondi 100-3000 (attesa sul bordo prima che la barra laterale si apra)',
+      keys: ['barra_attesa', 'barra attesa', 'attesa sul bordo', 'attesa della spinta', 'ritardo apertura barra'],
+      build(v) { return msBarra(v, 'attesaMs', (n) => `Attesa sul bordo prima che la barra si apra → ${n} ms`); },
+    },
+    {
+      scrive: ['barraLaterale.uscitaMs'],
+      aiuto: 'millisecondi 100-5000 (dopo quanto la barra laterale si chiude quando il mouse esce)',
+      keys: ['barra_uscita', 'barra uscita', 'chiusura della barra', 'ritardo chiusura barra', 'barra resta aperta'],
+      build(v) { return msBarra(v, 'uscitaMs', (n) => `La barra si chiude ${n} ms dopo che il mouse esce`); },
+    },
+    {
+      scrive: ['barraLaterale.striscia'],
+      aiuto: 'true | false (la striscia sottile sul bordo sinistro che indica la barra laterale)',
+      keys: ['barra_striscia', 'barra striscia', 'striscia sul bordo', 'striscia', 'indizio della barra'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { barraLaterale: { striscia: b } }, label: `Striscia della barra laterale → ${b ? 'visibile' : 'nascosta'}` };
+      },
+    },
+    {
       scrive: ['terminal.enabled'],
       aiuto: 'true | false',
       keys: ['modalita_terminale', 'modalità terminale', 'modalita terminale', 'terminale', 'terminal'],
@@ -420,6 +466,22 @@
         const b = parsePrefBool(v);
         if (b === null) return null;
         return { partial: { nomiSensati: { scaricamenti: b } }, label: `Nome sensato ai file scaricati → ${b ? 'attivo' : 'spento'}` };
+      },
+    },
+    {
+      scrive: ['aggiornamenti.automatici'],
+      aiuto: 'true | false (scarica e installa da solo le versioni nuove; spento avvisa e aspetta «Installa»)',
+      keys: ['aggiornamenti_automatici', 'aggiornamenti automatici', 'installa gli aggiornamenti da solo',
+        'aggiornamento automatico', 'aggiornati da solo', 'aggiornamenti', 'autoupdate', 'auto update'],
+      // Spento lascia aperti i problemi di sicurezza già corretti: chi lo spegne lo sa prima.
+      level: 2,
+      risk: 'Decide se Filo scarica e installa da solo le versioni nuove. Da spento, a ogni avvio controlla '
+        + 'comunque e ti avvisa nella home, ma non scarica niente finché non premi «Installa». Fino ad allora '
+        + 'restano aperti anche i problemi di sicurezza già corretti nelle versioni nuove.',
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { aggiornamenti: { automatici: b } }, label: `Installa gli aggiornamenti da solo → ${b ? 'acceso' : 'spento'}` };
       },
     },
     {
@@ -970,6 +1032,22 @@
         + 'sbagliata sul banner fa accettare i cookie di tracciamento.',
     }),
     elenco({
+      keys: ['siti_con_accesso', 'siti con accesso', 'siti dove sono entrato', 'siti dove ho un account', 'siti con account'],
+      percorso: 'security.cookies.loggedSites',
+      nome: 'Siti dove sei entrato',
+      aiuto: 'siti dove Filo ha visto un tuo accesso: i loro cookie restano anche nei contenuti incorporati altrove',
+      risk: 'Cambia i siti i cui contenuti incorporati in altre pagine tengono i loro cookie: togliere un sito da qui '
+        + 'fa durare i suoi cookie solo per la visita, aggiungerlo glieli fa tenere come a un sito dove sei entrato.',
+    }),
+    elenco({
+      keys: ['contenuti_incorporati_cookie', 'cookie dei contenuti incorporati', 'cookie dei riquadri', 'riquadri con i cookie', 'cookie riattivati'],
+      percorso: 'security.cookies.embedSites',
+      nome: 'Contenuti incorporati con i cookie riattivati',
+      aiuto: 'servizi (post, video, mappe) a cui hai riattivato i cookie quando i loro contenuti dentro altri siti non si vedevano',
+      risk: 'Cambia i servizi i cui contenuti incorporati in altre pagine tengono i loro cookie: aggiungerne uno lo lascia '
+        + 'ricordare di te fra una visita e l’altra, toglierlo fa durare i suoi cookie solo per la visita.',
+    }),
+    elenco({
       keys: ['domini_esclusi', 'domini esclusi', 'siti esclusi', 'blocklist', 'siti dove filo non interviene'],
       percorso: 'blocklist',
       nome: 'Domini dove Filo non interviene',
@@ -1021,6 +1099,48 @@
         return { partial: { dictation: { cancelSec } }, label: `Tempo per annullare l'invio vocale → ${String(cancelSec).replace('.', ',')} s` };
       },
     },
+    // ── #1004: cosa delle pagine va ai modelli senza che l'utente lo chieda ──
+    {
+      scrive: ['riassuntoSchede.enabled'],
+      aiuto: 'true | false (riassunto e indice delle schede chiuse per ritrovarle nella Cronologia; spento, di una scheda chiusa non va niente ai modelli e la si ritrova per parole)',
+      keys: ['riassunto_schede_chiuse', 'riassunto delle schede chiuse', 'riassunto schede chiuse', 'riassunti delle schede chiuse',
+        'riassunto delle schede', 'riassunto schede', 'riassuntoschede'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { riassuntoSchede: { enabled: b } }, label: `Riassunto delle schede chiuse → ${b ? 'attivo' : 'spento'}` };
+      },
+    },
+    interruttore({
+      keys: ['pagine_delicate', 'pagine delicate', 'non mandare ai modelli le pagine delicate', 'proteggi le pagine delicate',
+        'pagine riservate'],
+      percorso: 'security.pagineDelicate.enabled',
+      nome: 'Pagine delicate tenute lontane dai modelli',
+      stati: ['sì', 'no'],
+      aiuto: 'true | false (posta, banche, sanità, pagine con un campo password o carta e i siti delicati scelti dall\'utente: riassunto e pulizia automatica delle schede non ne mandano il testo ai modelli; acceso di serie)',
+      risk: 'Decide se il riassunto delle schede chiuse e la pulizia automatica delle schede mandano ai modelli anche il '
+        + 'testo delle pagine delicate: posta, banca, sanità, pagine dove hai visto un campo password o carta. Spegnerlo '
+        + 'fa arrivare al modello saldi, movimenti, mail e referti delle schede che chiudi.',
+    }),
+    elenco({
+      keys: ['siti_delicati', 'siti delicati', 'elenco dei siti delicati', 'pagine delicate aggiunte', 'sito delicato'],
+      percorso: 'security.pagineDelicate.siti',
+      nome: 'Siti delicati aggiunti da te',
+      aiuto: 'siti che Filo tratta come delicati oltre a posta, banche e sanità: il loro testo non va ai modelli nei lavori automatici. '
+        + 'Per un sito aperto di cui non vedi l\'indirizzo: «questo sito» (la scheda web davanti) o «scheda: <titolo come in TAB APERTE>»',
+      risk: 'Cambia i siti che Filo tratta come delicati oltre a quelli di serie: delle loro pagine il riassunto e la '
+        + 'pulizia automatica delle schede non mandano il testo ai modelli. Un sito tolto torna a mandarlo.',
+    }),
+    elenco({
+      keys: ['siti_non_delicati', 'siti non delicati', 'sito non delicato', 'non delicati'],
+      percorso: 'security.pagineDelicate.nonDelicati',
+      nome: 'Siti non delicati per te',
+      aiuto: 'siti che Filo aveva segnato come delicati perché ci ha visto un campo password o carta, e che per l\'utente non lo '
+        + 'sono (es. google.com dopo un accesso): tornano a mandare il testo al riassunto e alla pulizia. Non toglie posta, '
+        + 'banche, sanità né i siti delicati aggiunti dall\'utente',
+      risk: 'Toglie un sito da quelli che Filo tratta come delicati perché ci ha visto un campo password o carta: delle sue '
+        + 'pagine il riassunto e la pulizia automatica delle schede tornano a mandare il testo ai modelli.',
+    }),
   ];
 
   // Le righe «chiave: valori» della descrizione di IMPOSTA_PREFERENZA: escono da qui, dove sta il setter,
@@ -1159,8 +1279,14 @@
     return PREF_SETTERS.find((s) => Array.isArray(s.scrive) && s.scrive.includes(percorso)) || null;
   }
 
+  // Il setter che una chiave detta in chat sceglie, o null (anche quando è ambigua).
+  function setterDellaChiave(rawKey) {
+    const r = risolviChiave(rawKey);
+    return (r && r.setter) || null;
+  }
+
   global.SN_PREF = {
     buildPreferencePartial, parsePrefBool, parseItalianNumber, PREF_SETTERS, lezioneDaAzione,
-    applicaElenco, righeDescrizione, setterDi, spiegaNonValida, PARAMETRI_COLORE_TAB,
+    applicaElenco, righeDescrizione, setterDi, setterDellaChiave, spiegaNonValida, PARAMETRI_COLORE_TAB,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

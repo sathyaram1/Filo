@@ -298,7 +298,8 @@
       el.setSelectionRange(caret, caret);
       ctx.start = caret;
       ctx.end = caret;
-      el.dispatchEvent(new Event('input', { bubbles: true }));
+      // Un incolla vero: chi ascolta il campo lo distingue da quello che l'utente scrive (#592.2).
+      el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertFromPaste', data: text }));
     } else if (kind === 'ce') {
       el.focus();
       // Ripristina la selezione salvata all'apertura del menu PRIMA di inserire:
@@ -436,7 +437,9 @@
   // finché una descrizione può davvero arrivare, altrimenti dice che manca il
   // modello (un'attesa che non finirà mai è una bugia).
   let imageDescNoModel = false;
-  function imagePlaceholderLabel() {
+  let ultimaDaDelicata = null;
+  function imagePlaceholderLabel(dataUrl) {
+    if (dataUrl && dataUrl === ultimaDaDelicata) return I18n.t('clipboard_image_delicata');
     return I18n.t(imageDescNoModel ? 'clipboard_image_no_model' : 'clipboard_image_pending');
   }
 
@@ -452,10 +455,20 @@
       res = await chrome.runtime.sendMessage({
         type: MSG.AI_REQUEST,
         action: ACTIONS.DESCRIBE_IMAGE,
-        payload: { dataUrl },
+        payload: { dataUrl, automatica: true },
       });
     } catch (e) {
       res = { ok: false, error: e.message || String(e) };
+    }
+    // Da una pagina delicata l'immagine non va al modello: lo screenshot prende data e ora (#1004).
+    if (res?.code === 'PAGINA_DELICATA') {
+      ultimaDaDelicata = dataUrl;
+      chrome.runtime.sendMessage({
+        type: MSG.UPDATE_CLIPBOARD_DESCRIPTION,
+        dataUrl,
+        description: I18n.t('clipboard_image_delicata'),
+      }).catch(() => {});
+      return null;
     }
     if (!res?.ok) {
       if (res?.code === 'NO_MODEL_FOR_ACTION' && res.error) {
@@ -559,7 +572,7 @@
   // il box inline lo mostra istantaneamente invece di aspettare il provider.
   // - Debounce 400ms (selectionchange spara molto durante il drag).
   // - Dedup per chiave selezione (no re-fetch sulla stessa selezione).
-  // - No prefetch se tab nascosto, dominio bloccato, selezione troppo corta.
+  // - No prefetch se tab nascosto, dominio bloccato, incognito, selezione troppo corta.
   // - Una sola entry attiva: la selezione cambia velocemente, non serve cache larga.
   let prefetchedExplain = null; // { key, sentence, promise<{text}|{error}> }
   let prefetchTimer = null;
@@ -573,6 +586,8 @@
 
   function prefetchExplainNow() {
     if (deps.isBlocked()) return;
+    // In incognito la spiegazione parte solo dal tasto destro (#591, #1004).
+    if (!deps.isIncognito || deps.isIncognito()) return;
     if (document.hidden) return;
     const sel = Extract.getSelectionWithSentence();
     if (!sel) return;
@@ -590,9 +605,10 @@
       type: MSG.AI_REQUEST,
       action: ACTIONS.EXPLAIN,
       payload: { selection: selInfo.selection, sentence: selInfo.sentence },
+      diceRipiego: true,
     }).then(
       (res) => (res?.ok && typeof res.text === 'string')
-        ? { text: res.text }
+        ? { text: res.text, keyFallback: res.keyFallback || null }
         : { error: res?.error || I18n.t('err_provider_failed') },
       (e) => ({ error: e?.message || I18n.t('err_provider_failed') }),
     );
@@ -656,6 +672,7 @@
             return;
           }
           body.innerHTML = Popup.renderMarkdown(daMostrare);
+          Popup.notaRipiego(body, res.keyFallback);
         });
         return () => { cancelled = true; };
       },
@@ -756,6 +773,7 @@
               type: MSG.AI_REQUEST,
               action: ACTIONS.DESCRIBE_IMAGE,
               payload: { dataUrl },
+              diceRipiego: true,
             });
             if (cancelled) return;
             el.classList.remove('sn-menu-inline-loading');
@@ -765,6 +783,7 @@
               return;
             }
             testoChiuso(body, res.text);
+            Popup.notaRipiego(el, res.keyFallback);
           } catch (e) {
             if (cancelled) return;
             el.classList.remove('sn-menu-inline-loading');
@@ -833,6 +852,8 @@
               // butta il testo parziale (l'avviso sicurezza resta).
               buf = '';
               body.textContent = '';
+            } else if (m.type === 'done') {
+              Popup.notaRipiego(el, m.keyFallback);
             } else if (m.type === 'error') {
               el.classList.remove('sn-menu-inline-loading');
               el.classList.add('sn-menu-inline-error');
@@ -1430,7 +1451,7 @@
       try {
         chrome.runtime.sendMessage({
           type: MSG.PUSH_CLIPBOARD_ENTRY,
-          entry: { type: 'image', dataUrl: cap.dataUrl, description: desc || imagePlaceholderLabel() },
+          entry: { type: 'image', dataUrl: cap.dataUrl, description: desc || imagePlaceholderLabel(cap.dataUrl) },
         }).catch(() => {});
       } catch (_) {}
       const a = document.createElement('a');
@@ -1621,7 +1642,7 @@
       try {
         chrome.runtime.sendMessage({
           type: MSG.PUSH_CLIPBOARD_ENTRY,
-          entry: { type: 'image', dataUrl, description: desc || imagePlaceholderLabel() },
+          entry: { type: 'image', dataUrl, description: desc || imagePlaceholderLabel(dataUrl) },
         }).catch(() => {});
       } catch (_) {}
       const a = document.createElement('a');

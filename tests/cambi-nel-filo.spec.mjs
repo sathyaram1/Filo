@@ -453,6 +453,8 @@ test('L — tasto destro sulla riga del blocco che nomina il cambio: annulla da 
   await page.keyboard.press('Escape');
   await expect(menu).toBeHidden();
   await page.locator('.dash-activity-head').first().click();
+  // La riga sta dentro il nodo della sua azione (#578): lo si apre.
+  await page.locator('.dash-activity-seg-head', { hasText: 'tema: chiaro → scuro' }).first().click();
   const riga = page.locator('.dash-activity-row', { hasText: 'tema: chiaro → scuro' }).first();
   await riga.click({ button: 'right' });
   await menu.getByText(/^Annulla · tema: chiaro → scuro$/).click();

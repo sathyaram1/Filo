@@ -51,7 +51,8 @@ I messaggi non sono testo: sono **contenuto tipizzato**. Una bolla può contener
 ### 3.3 Gestione dello scroll
 
 - **Ultima bolla**: `CardList` mostra ~10 righe con scroll interno.
-- **Bolle precedenti**: elenchi carte **sempre collassati** a una riga di sintesi ("12 risultati per 'payoff self-mill'"), riespandibili al click. La cronologia resta scorrevole rapidamente.
+- **Bolle precedenti**: elenchi carte **collassati** a ogni domanda nuova, a una riga di sintesi riespandibile al click. La cronologia resta scorrevole rapidamente.
+- **Riga di sintesi** (#788): numero più titolo in italiano che il modello scrive nella stessa risposta ("12 carte che danno rapidità"); senza titolo "12 risultati", mai la query. Il triangolino apre e chiude ogni lista, anche l'ultima. Tasto destro: ricerca esatta copiabile, ordinamento della lista (CMC default, nome, prezzo; salvato con la lista), stessa ricerca su Scryfall.
 
 ### 3.4 Righe carta (in `CardList`)
 
@@ -64,6 +65,10 @@ I messaggi non sono testo: sono **contenuto tipizzato**. Una bolla può contener
 ### 3.5 Nomi carta in prosa
 
 L'agente è istruito a marcare **sempre** i nomi carta con la sintassi `[[Nome Carta]]` (standard delle community MTG, nativa per i modelli). Il renderer trasforma i marcatori in span hoverable, risolti via Scryfall (`/cards/named?fuzzy=`). Niente riconoscimento a posteriori del testo (fragile, fallisce su nomi parziali e in italiano). Dictionary-matching di fallback: solo se serve, dopo.
+
+### 3.6 Attesa e «Ferma»
+
+Mentre Filo prepara una risposta il campo di scrittura mostra da quanto si aspetta e il tasto **Ferma** (anche Esc nel campo). Fermare annulla davvero la richiesta al modello e libera subito la chat; la bolla resta «Risposta fermata.» con Riprova. Per il modello non c'è un taglio automatico: un ragionamento lungo può durare minuti, e a decidere è l'utente. Le modifiche al mazzo chieste nel turno (commander, budget, tag) si scrivono solo a risposta arrivata.
 
 ---
 
@@ -272,7 +277,7 @@ Storage interamente locale (come l'archivio tab: JSON o SQLite). Sync cloud fuor
 | Immagini | `image_uris` (normal per detail, `art_crop` per libreria) — cache locale |
 | Dati carta bulk | Bulk data download opzionale per lookup locale veloce/offline |
 
-Rispettare i rate limit di cortesia (~10 req/s); tutte le risorse statiche cacheate localmente.
+Rispettare i rate limit di cortesia (~10 req/s) distanziando le partenze, non le risposte: una richiesta che non risponde non tiene in coda le altre, e dopo 30 secondi si chiude con una frase per l'utente (di norma Scryfall risponde in meno di un secondo). Tutte le risorse statiche cacheate localmente.
 
 ### 13.3 Cache riassunto
 

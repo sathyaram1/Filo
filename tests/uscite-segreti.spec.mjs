@@ -756,6 +756,8 @@ test('il bottone «apri file» col percorso vuoto e l’indirizzo in un altro ca
   }
   expect(apertoVerso(app, RACCOLTA), 'il clic ha aperto l’indirizzo col codice').toBe(false);
   await page.locator('.dash-activity-head').last().click();
+  // La riga sta nel nodo della sua azione, e il titolo del nodo dice già cosa è stato fermato (#578).
+  await page.locator('.dash-activity-seg-head', { hasText: 'Non ho preparato il collegamento' }).click();
   await expect(page.locator('.dash-activity-row', { hasText: 'Non ho preparato il collegamento' })).toBeVisible();
 });
 

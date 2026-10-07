@@ -25,7 +25,7 @@ import { mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node
 import { tmpdir } from 'node:os';
 import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 // Un percorso alla unix, su Windows, viene ancorato al disco corrente. L'atteso
 // si costruisce con la stessa normalizzazione dello strumento, o il controllo
@@ -64,8 +64,8 @@ test('la copia degli strumenti finisce FUORI dal progetto', () => {
       'dentro il progetto sarebbe di nuovo soggetta al cambio di ramo');
     for (const p of PINNED_PATHS) assert.ok(existsSync(resolve(r.dir, p)), `manca ${p}`);
   } finally {
-    rmSync(dove, { recursive: true, force: true });
-    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(dove);
+    togliCartella(casa);
   }
 });
 
@@ -79,8 +79,8 @@ test('la copia si ricorda da sola dove sta il progetto', () => {
     const r = pinTools(casa, { dest: dove });
     assert.equal(pinnedRepoRoot(r.dir), resolve(casa));
   } finally {
-    rmSync(dove, { recursive: true, force: true });
-    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(dove);
+    togliCartella(casa);
   }
 });
 
@@ -89,7 +89,7 @@ test('strumenti non fissati: nessun progetto da ricordare', () => {
   try {
     assert.equal(pinnedRepoRoot(casa), '');
   } finally {
-    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(casa);
   }
 });
 
@@ -104,7 +104,7 @@ test('non si fissa sopra la copia che sta girando', () => {
     assert.equal(r.why, 'già fissati');
     assert.equal(r.dir, TOOLS_ROOT);
   } finally {
-    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(casa);
   }
 });
 
@@ -123,8 +123,8 @@ test('una copia vecchia non sopravvive alla nuova', () => {
     assert.ok(!existsSync(resolve(r.dir, 'scripts', 'vecchio.mjs')),
       'il residuo del giro prima non deve restare in giro');
   } finally {
-    rmSync(dove, { recursive: true, force: true });
-    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(dove);
+    togliCartella(casa);
   }
 });
 
@@ -209,8 +209,8 @@ test('dalla copia, git continua a parlare col PROGETTO', async () => {
     assert.match(out.so, /segno-del-progetto/,
       `dalla copia non ha ritrovato il progetto: ${out.so.trim()} ${out.se.slice(-200)}`);
   } finally {
-    rmSync(dove, { recursive: true, force: true, maxRetries: 5 });
-    rmSync(finto, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(dove);
+    togliCartella(finto);
   }
 });
 
@@ -298,7 +298,7 @@ test('il preflight FISSA gli strumenti e consegna istruzioni che puntano lì', a
       'le istruzioni devono nominare la copia');
   } finally {
     srv.close();
-    rmSync(dove, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(dove);
   }
 });
 
@@ -376,9 +376,9 @@ test('al lavoratore arrivano le ricette FISSATE, non quelle del ramo', async () 
       `il comando deve nominare gli strumenti fissati: ${out.so.slice(0, 500)}`);
   } finally {
     srv.close();
-    rmSync(dove, { recursive: true, force: true, maxRetries: 5 });
-    rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
-    if (typeof altrove === 'string') rmSync(altrove, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(dove);
+    togliCartella(casa, { tentativi: 10 });
+    if (typeof altrove === 'string') togliCartella(altrove);
   }
 });
 
@@ -439,7 +439,7 @@ test('la copia SA GIRARE da sola: il preflight lanciato da lì non si guasta', a
     assert.ok(!/Cannot find module/i.test(out.se), `alla copia manca un pezzo: ${out.se.slice(-300)}`);
   } finally {
     srv.close();
-    rmSync(dove, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(dove);
   }
 });
 
@@ -553,9 +553,9 @@ test('dalla copia, i marcatori del giro finiscono nel PROGETTO', async () => {
       'accanto alla copia non lo troverebbe nessuno');
   } finally {
     srv.close();
-    rmSync(dove, { recursive: true, force: true, maxRetries: 5 });
-    rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
-    if (typeof altrove === 'string') rmSync(altrove, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(dove);
+    togliCartella(casa, { tentativi: 10 });
+    if (typeof altrove === 'string') togliCartella(altrove);
   }
 });
 
@@ -661,7 +661,7 @@ async function preflightIn(casa, extra = {}) {
     });
   } finally {
     srv.close();
-    rmSync(dove, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(dove);
   }
 }
 
@@ -675,8 +675,8 @@ test('testa staccata sulla PUNTA della linea principale: si passa', async () => 
     const out = await preflightIn(casa);
     assert.equal(out.code, 0, `doveva passare: ${out.se.slice(-300)}`);
   } finally {
-    rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
-    rmSync(altrove, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(casa, { tentativi: 10 });
+    togliCartella(altrove);
   }
 });
 
@@ -697,8 +697,8 @@ test('checkout indietro: si allinea da solo invece di morire', async () => {
     assert.equal(out.code, 0, `doveva allinearsi e proseguire: ${out.se.slice(-300)}`);
     assert.equal(g(['rev-parse', 'HEAD']), punta, 'e il checkout deve essere aggiornato davvero');
   } finally {
-    rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
-    if (typeof altrove === 'string') rmSync(altrove, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(casa, { tentativi: 10 });
+    if (typeof altrove === 'string') togliCartella(altrove);
   }
 });
 
@@ -715,8 +715,8 @@ test('ramo di lavoro: si ferma, e dice come si fa apposta', async () => {
     assert.match(out.se, /FILO_PREFLIGHT_ANY_BRANCH/,
       'e nominare la via di fuga: un rifiuto che non dice come si fa apposta è un muro');
   } finally {
-    rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
-    if (typeof altrove === 'string') rmSync(altrove, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(casa, { tentativi: 10 });
+    if (typeof altrove === 'string') togliCartella(altrove);
   }
 });
 
@@ -733,8 +733,8 @@ test('cartella sporca: ci si ferma ANCHE se il commit è quello giusto', async (
     assert.equal(out.code, 3, `doveva fermarsi: ${out.so.slice(0, 200)}`);
     assert.match(out.se, /non salvata|non salvato/, 'e dire che la cartella non è pulita');
   } finally {
-    rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
-    if (typeof altrove === 'string') rmSync(altrove, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(casa, { tentativi: 10 });
+    if (typeof altrove === 'string') togliCartella(altrove);
   }
 });
 
@@ -752,8 +752,8 @@ test('guardia che non ha potuto guardare: passa, ma lo DICE', async () => {
     assert.match(out.se, /ATTENZIONE/,
       `un controllo saltato non deve somigliare a un controllo passato: ${out.se.slice(-200)}`);
   } finally {
-    rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
-    if (typeof altrove === 'string') rmSync(altrove, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(casa, { tentativi: 10 });
+    if (typeof altrove === 'string') togliCartella(altrove);
   }
 });
 
@@ -766,8 +766,8 @@ test('senza remoto la guardia lascia passare', async () => {
     const out = await preflightIn(casa);
     assert.equal(out.code, 0, `doveva passare: ${out.se.slice(-300)}`);
   } finally {
-    rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
-    if (typeof altrove === 'string') rmSync(altrove, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(casa, { tentativi: 10 });
+    if (typeof altrove === 'string') togliCartella(altrove);
   }
 });
 
@@ -811,8 +811,8 @@ test('aprire un ramo VECCHIO non riporta indietro gli strumenti del giro', () =>
     assert.match(negliStrumenti, /nuova/,
       'gli strumenti del giro devono restare quelli aggiornati: è tutta la differenza');
   } finally {
-    rmSync(dove, { recursive: true, force: true });
-    rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
-    if (typeof altrove === 'string') rmSync(altrove, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(dove);
+    togliCartella(casa, { tentativi: 10 });
+    if (typeof altrove === 'string') togliCartella(altrove);
   }
 });

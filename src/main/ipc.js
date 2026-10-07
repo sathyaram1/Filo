@@ -8,7 +8,7 @@
 //   ai-stream:abort  — send({ requestId })
 //   tabs:*           — controllo del TabManager dalla shell renderer.
 
-const { ipcMain, BrowserWindow, app } = require('electron');
+const { ipcMain, BrowserWindow, app, session } = require('electron');
 const path = require('node:path');
 const { handleMessage, handleStream, broadcastToTabs } = require('./services/handlers');
 const { showPopupMenu } = require('./popup-menu');
@@ -79,6 +79,16 @@ function senderInfo(event) {
   };
 }
 
+// La partizione della finestra in incognito a cui appartiene la pagina, '' se è di una normale. Un popup di
+// accesso aperto da una sua scheda non sta in nessuna finestra di Filo: lo riconosce la sessione, che è solo sua.
+function ambitoIncognitoDi(info) {
+  const tieneLaPartizione = (w) => !!(w && w._filoIncognito && w._filoTabs && w._filoTabs.partition);
+  if (tieneLaPartizione(info.win)) return info.win._filoTabs.partition;
+  const ses = info.wc && info.wc.session;
+  const w = ses ? BrowserWindow.getAllWindows().find((x) => tieneLaPartizione(x) && session.fromPartition(x._filoTabs.partition) === ses) : null;
+  return w ? w._filoTabs.partition : '';
+}
+
 // La pagina che ha chiesto, come la nomina il registro dei cambi (src/shared/cambi.js, DOVE).
 function provenienzaDi(info) {
   if (info && info.isShell) return { via: 'interfaccia', dove: 'shell' };
@@ -106,7 +116,7 @@ function registerIpcHandlers() {
   // services/fingerprint.js e preload/fingerprint-guard.js.
   ipcMain.on('filo:fp-config', (event, href) => {
     try {
-      event.returnValue = require('./services/fingerprint').configForHref(href);
+      event.returnValue = require('./services/fingerprint').configForHref(href, ambitoIncognitoDi(senderInfo(event)));
     } catch (_) {
       event.returnValue = { level: 0, seed: 0 };
     }
@@ -127,6 +137,25 @@ function registerIpcHandlers() {
       }
     } catch (_) { out = null; }
     event.returnValue = out;
+  });
+
+  // #576 — i riquadri pubblicitari da nascondere nella pagina che sta per caricarsi: SINCRONO, o compaiono prima.
+  ipcMain.on('filo:adblock-css', (event, href, gate) => {
+    try {
+      event.returnValue = require('./services/adblock').cosmeticForPage(String(href || ''), gate);
+    } catch (_) {
+      event.returnValue = { css: '', tokens: false };
+    }
+  });
+
+  // Il sito vale quello del frame che chiede, non quello che il messaggio dichiara.
+  ipcMain.handle('filo:adblock-tokens', (event, msg) => {
+    try {
+      const href = (event.senderFrame && event.senderFrame.url) || '';
+      return require('./services/adblock').cosmeticForTokens(href, msg && msg.ids, msg && msg.classes, msg && msg.gate);
+    } catch (_) {
+      return '';
+    }
   });
 
   // Cosa la pagina che sta per caricarsi legge delle notifiche (#591): SINCRONO per lo stesso motivo di filo:fp-config.
@@ -212,7 +241,10 @@ function registerIpcHandlers() {
     const work = async () => {
       try {
         const meta = {};
-        const result = await handleStream({
+        // Chi legge lo stream (il riquadro di «spiega») scrive da sé la riga del ripiego (#662).
+        const K = globalThis.SN_WALLET_MAIN;
+        const conDetto = (fn) => (K && K.conRipiegoDetto ? K.conRipiegoDetto(fn) : fn());
+        const result = await conDetto(() => handleStream({
           action, payload, origin: event.sender.getURL(),
           signal: ac.signal,
           onMeta: (m) => { Object.assign(meta, m); send('meta', m); },
@@ -220,7 +252,7 @@ function registerIpcHandlers() {
           // Fallback dopo delta già streamati: il renderer deve azzerare il
           // testo parziale del tentativo fallito (#273).
           onReset: () => send('reset', {}),
-        });
+        }));
         send('done', { ...result });
       } catch (err) {
         console.warn('[Filo IPC] stream error', requestId, err);
@@ -536,6 +568,18 @@ function registerIpcHandlers() {
     const win = finestraDellaBarra(event.sender);
     if (win && win._filoTabs.avvisi) win._filoTabs.avvisi.aggiorna(stato);
   });
+
+  // ─── barra laterale (#871) ────────────────────────────────────────────────
+  // Solo la shell della propria finestra: tema e profilo che mostra, e la maniglia.
+  const barraDellaShell = (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win || win.isDestroyed() || win.webContents !== event.sender) return null;
+    return win._filoTabs?.barra || null;
+  };
+  ipcMain.on('barra:dalla-shell', (event, dati) => { barraDellaShell(event)?.dallaShell(dati); });
+  ipcMain.on('barra:commuta', (event) => { barraDellaShell(event)?.commuta('clic'); });
+  ipcMain.on('barra:chiudi', (event) => { barraDellaShell(event)?.chiudi(); });
+  ipcMain.on('barra:menu-maniglia', (event, dati) => { barraDellaShell(event)?.menuDellaManiglia(dati); });
 
   // ─── tooltip custom (sopra le WebContentsView) ───────────────────────────
   ipcMain.on('shell:tooltip-show', (event, { text, x, y }) => {

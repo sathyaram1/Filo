@@ -69,10 +69,17 @@ module.exports = function register(on, ctx) {
   // Avviso "crediti regalati" (#210.4): se il doc dell'utente corrente porta un
   // `giftNotice`, mostra il popup una volta sola e azzera il campo così non si
   // ripresenta. `remote` è il doc appena letto in ensureAccountSync.
+  // La spinta arriva a ogni home aperta: il regalo lo racconta la prima che lo prende (#664), come il benvenuto dell'invito.
+  let regaloDaDire = 0;
+  function annunciaRegalo(amount) {
+    regaloDaDire = amount;
+    broadcastToTabs({ type: MSG.GIFT_NOTICE, amount });
+  }
+  globalThis.SN_CREDITS_MAIN = { annunciaRegalo };
   async function maybeNotifyGift(uid, remote) {
     const amount = remote?.giftNotice && Math.round(Number(remote.giftNotice.amount) || 0);
     if (!amount || amount <= 0) return;
-    broadcastToTabs({ type: MSG.GIFT_NOTICE, amount });
+    annunciaRegalo(amount);
     const idToken = await auth.getIdToken();
     if (!idToken) return;
     const url = `${FB.rest.FIRESTORE_BASE}/credits/${encodeURIComponent(uid)}?updateMask.fieldPaths=giftNotice&key=${FB.rest.API_KEY}`;
@@ -157,6 +164,13 @@ module.exports = function register(on, ctx) {
   });
 
   // ── IPC ─────────────────────────────────────────────────────────────────────
+  on(MSG.GIFT_NOTICE_CLAIM, async (_msg, _sender, origin) => {
+    if (!String(origin || '').startsWith('filo://')) return { ok: false, error: 'forbidden' };
+    const amount = regaloDaDire;
+    regaloDaDire = 0;
+    return { ok: true, amount };
+  });
+
   on(MSG.GET_CREDITS, async () => {
     await ensureAccountSync().catch(() => {});
     return { ok: true, credits: await Credits.getPublic(), signedIn: auth.isSignedIn() };

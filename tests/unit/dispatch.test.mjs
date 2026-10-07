@@ -30,6 +30,10 @@ process.env.FILO_REPO_ROOT = TMP;
 // quelle del progetto sono quelle del ramo su cui si sta lavorando
 // (scripts/lib/tools-pin.mjs). Qui le due coincidono, come in locale.
 process.env.FILO_TOOLS_ROOT = TMP;
+// Anche la temporanea, fuori dalla ROOT: dispatch ci scarica i pezzi grossi del payload, e una cartella nuova a
+// ogni corsa restava lì per sempre (#717).
+const TEMP = cartellaTemporanea('filo-dispatch-tmp-');
+Object.assign(process.env, { TMPDIR: TEMP, TEMP, TMP: TEMP });
 
 const {
   applyVerifierVerdict,

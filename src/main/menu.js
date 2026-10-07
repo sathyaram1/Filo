@@ -156,6 +156,11 @@ function schermoIntero() {
   try { win && win._filoTabs.toggleContentFullscreen(); } catch (_) {}
 }
 
+function barraLaterale() {
+  const win = finestra();
+  try { win && win._filoTabs.barra.commuta('tasto'); } catch (_) {}
+}
+
 function apriPagina(url) {
   const win = finestra();
   try { win && win._filoTabs.openTab(url); } catch (_) {}
@@ -210,6 +215,8 @@ function template(piattaforma) {
       { type: 'separator' },
       { label: 'Preferenze', click: () => apriPagina('filo://preferences/preferences.html') },
       { label: 'Opzioni', click: () => apriPagina('filo://options/options.html') },
+      // Dove si riscatta un invito (#664): fuori dalla pagina, l'invito non aveva altre porte.
+      { label: 'Crediti e inviti', click: () => apriPagina('filo://credits/credits.html') },
       { type: 'separator' },
       ...(MAC ? [
         { role: 'services', label: 'Servizi' },
@@ -271,6 +278,7 @@ function template(piattaforma) {
       // SOLO i tasti che Filo fa già ovunque. Un tasto che qui funziona e su
       // Windows no sarebbe la stessa asimmetria da cui nasce tutto #527.
       { label: 'Schermo intero', click: schermoIntero },
+      { label: 'Barra laterale', accelerator: 'CommandOrControl+Shift+B', click: barraLaterale, ...SOLO_SCRITTA },
     ],
   };
 

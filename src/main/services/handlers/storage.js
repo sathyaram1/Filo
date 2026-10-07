@@ -65,7 +65,11 @@ module.exports = function register(on, ctx) {
     // un'altra origine quell'indirizzo è illeggibile, e senza questo il menu
     // sarebbe ricomparso proprio nei siti esclusi.
     const pageUrl = String(sender?.tab?.url || '');
-    return { ok: true, pageUrl, settings: impostazioniPerOrigine(settings, origin, indirizziDelMittente(sender)) };
+    // In incognito il testo della pagina non parte da solo verso i modelli (#591): la pagina lo deve sapere per non
+    // preparare la spiegazione della selezione.
+    const win = winOf(sender);
+    const incognito = !!(win && (win._filoIncognito || (win._filoTabs && win._filoTabs.incognito)));
+    return { ok: true, pageUrl, incognito, settings: impostazioniPerOrigine(settings, origin, indirizziDelMittente(sender)) };
   });
 
   on(MSG.UPDATE_SETTINGS, async (msg, sender, origin) => {

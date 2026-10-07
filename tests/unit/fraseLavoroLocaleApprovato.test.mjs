@@ -69,8 +69,10 @@ test('--frase da sola scrive solo la frase, e dice di no a vuota, troppo lunga o
   await conRete(utente(), async (patch) => {
     assert.deepEqual(await mod.scriviFrase('u1', '  Ora il terminale parte  ', OPTS), { ok: true });
     assert.equal(patch.length, 1);
-    assert.match(patch[0].url, /updateMask\.fieldPaths=userNote$/);
-    assert.deepEqual(patch[0].body.fields, { userNote: { stringValue: 'Ora il terminale parte' } });
+    assert.match(patch[0].url, /updateMask\.fieldPaths=userNote&updateMask\.fieldPaths=updatedAt$/);
+    const { updatedAt, ...resto } = patch[0].body.fields;
+    assert.ok(updatedAt && updatedAt.timestampValue, 'la scrittura firma l\'ora (#676)');
+    assert.deepEqual(resto, { userNote: { stringValue: 'Ora il terminale parte' } });
     const lunga = await mod.scriviFrase('u1', 'a'.repeat(501), OPTS);
     assert.equal(lunga.ok, false);
     assert.match(lunga.motivo, /501/);

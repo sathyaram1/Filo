@@ -19,9 +19,9 @@
 // riporta il nome lungo. Fuori da Windows fa il suo lavoro di sempre (risolve
 // `/tmp` → `/private/tmp` su macOS), quindi si usa ovunque.
 
-import { mkdtempSync, realpathSync, symlinkSync } from 'node:fs';
+import { lstatSync, mkdtempSync, readdirSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
-import path, { join } from 'node:path';
+import path, { basename, dirname, join } from 'node:path';
 
 // Forma canonica di un percorso ESISTENTE. Se il percorso non c'è (o il sistema
 // non sa risolverlo) torna quello che gli è stato dato: un test non deve morire
@@ -55,20 +55,112 @@ export const SPAZIO = 'con spazio-';
 // una sentinella negli unit test diventa rossa se qualcuno torna alla forma
 // vecchia. Il prefisso resta in testa, così la cartella si riconosce a occhio.
 export function cartellaTemporanea(prefisso) {
-  return percorsoCanonico(mkdtempSync(join(tmpdir(), `${prefisso}${SPAZIO}`)));
+  return togliAllUscita(percorsoCanonico(mkdtempSync(join(tmpdir(), `${prefisso}${SPAZIO}`))));
+}
+
+// La pulizia di un test non lo fa mai rosso: su Windows sotto carico un figlio appena ucciso o l'antivirus tengono
+// la cartella anche oltre i tentativi, e rmSync lancia EBUSY col codice giusto (#750). Quella rimasta si ritenta all'uscita.
+const OCCUPATA = new Set(['EBUSY', 'EPERM', 'ENOTEMPTY']);
+const rimaste = new Map();
+function ritentaRimaste() {
+  for (const [dir, rm] of rimaste) {
+    try { rm(dir, { recursive: true, force: true }); } catch (_) { /* resta nella temporanea di sistema */ }
+  }
+}
+export function togliCartella(dir, { tentativi = 5, attesa = 200, rm = rmSync } = {}) {
+  try {
+    rm(dir, { recursive: true, force: true, maxRetries: tentativi, retryDelay: attesa });
+    return true;
+  } catch (e) {
+    if (!OCCUPATA.has(e?.code)) throw e;
+    if (!rimaste.size) process.once('exit', ritentaRimaste);
+    rimaste.set(dir, rm);
+    return false;
+  }
 }
 
 // Una cartella nuova DENTRO la cartella personale: è lì che il perimetro di
 // lettura (#587) lascia leggere senza chiedere. La temporanea di sistema sta
 // fuori (`/tmp`) o in AppData, dove ogni lettura chiede un OK.
 export function cartellaInCasa(prefisso) {
-  return percorsoCanonico(mkdtempSync(join(homedir(), `${prefisso}${SPAZIO}`)));
+  return togliAllUscita(percorsoCanonico(mkdtempSync(join(homedir(), `${prefisso}${SPAZIO}`))));
+}
+
+// La temporanea di una corsa intera, ereditata dai figli: ci finisce anche quello che il codice provato e Chromium
+// scrivono lì per conto loro (#717). Una sola per corsa: chi la eredita la riusa. Corta e non canonica di proposito: su
+// Mac Chromium ci mette il suo socket, che oltre 104 caratteri di percorso non nasce, e /private davanti ne costerebbe otto.
+export const PREFISSO_CORSA = 'filo-corsa-';
+const dentroUnaCorsa = (dir) => basename(dir).startsWith(PREFISSO_CORSA);
+export function temporaneaDellaCorsa() {
+  if (dentroUnaCorsa(tmpdir())) return tmpdir();
+  // Prima i resti, poi la corsa: col disco pieno di resti la corsa non nascerebbe, e nessuno li toglierebbe più (#717).
+  togliCartelleOrfane({ annuncia: (n) => console.error(`[test] tolgo ${n} cartelle temporanee lasciate da prove interrotte`) });
+  const temp = togliAllUscita(mkdtempSync(join(tmpdir(), PREFISSO_CORSA)));
+  Object.assign(process.env, { TMPDIR: temp, TEMP: temp, TMP: temp });
+  return temp;
+}
+
+// Le cartelle chieste qui se ne vanno col processo che le ha chieste, verde o rosso che finisca: lasciate a ogni
+// prova erano diventate 13.000 cartelle e 17 GB nella temporanea dell'owner, e col disco pieno cadevano prove sane (#717).
+const DA_TOGLIERE = new Set();
+function togliAllUscita(dir) {
+  if (!DA_TOGLIERE.size) process.once('exit', () => { for (const d of DA_TOGLIERE) togliSenzaErrori(d); });
+  DA_TOGLIERE.add(dir);
+  return dir;
+}
+
+// All'uscita e fra i resti un guasto non ferma il giro: vero se la cartella non c'è più.
+function togliSenzaErrori(dir) {
+  try { return togliCartella(dir, { tentativi: 2, attesa: 100 }); } catch (_) { return false; }
+}
+
+// Un processo ucciso (Ctrl+C, un timeout) non vede la sua uscita: i suoi resti li tolgono i lanciatori alla corsa dopo.
+// Si riconoscono dal nome che solo le funzioni qui sopra danno, e dall'età: nessuna corsa di prove dura un giorno.
+const fuoriDallaCorsa = (dir) => (dentroUnaCorsa(dir) ? dirname(dir) : dir);
+const NOME_DEI_TEST = new RegExp(`(${SPAZIO}|^${PREFISSO_CORSA})[A-Za-z0-9]{6}$`);
+export const ORFANA_DOPO_MS = 24 * 60 * 60 * 1000;
+
+export function cartelleOrfane({ dove = [fuoriDallaCorsa(tmpdir()), homedir()], oraMs = Date.now(), etaMs = ORFANA_DOPO_MS } = {}) {
+  const orfane = [];
+  for (const base of dove) {
+    let nomi = [];
+    try { nomi = readdirSync(base); } catch (_) { continue; }
+    for (const nome of nomi) {
+      if (!NOME_DEI_TEST.test(nome)) continue;
+      const p = join(base, nome);
+      try {
+        const s = lstatSync(p);
+        if (s.isDirectory() && oraMs - s.mtimeMs >= etaMs) orfane.push(p);
+      } catch (_) { /* sparita nel frattempo */ }
+    }
+  }
+  return orfane;
+}
+
+// Mai un throw. `annuncia` riceve quante sono prima di cominciare: le prime volte possono essere migliaia.
+export function togliCartelleOrfane({ annuncia = () => {}, ...opzioni } = {}) {
+  const orfane = cartelleOrfane(opzioni);
+  if (orfane.length) annuncia(orfane.length);
+  return orfane.filter(togliSenzaErrori);
 }
 
 // Su Windows un symlink vuole l'amministratore o la modalità sviluppatore (EPERM, #742):
 // una junction no, e Node la risolve allo stesso modo. Altrove resta un symlink.
-export function collegaCartella(verso, collegamento) {
-  symlinkSync(verso, collegamento, process.platform === 'win32' ? 'junction' : 'dir');
+export function collegaCartella(verso, collegamento, { sistema = process.platform, collega = symlinkSync } = {}) {
+  collega(verso, collegamento, sistema === 'win32' ? 'junction' : 'dir');
+}
+
+// Un file non ha junction: dove Windows nega il symlink torna il motivo, da passare a `t.skip`
+// (altrimenti null). Altrove l'errore resta un errore: lì il caso deve girare.
+export const COLLEGAMENTO_NEGATO = 'Windows nega il collegamento simbolico senza amministratore né modalità sviluppatore (EPERM)';
+export function collegaFile(verso, collegamento, { sistema = process.platform, collega = symlinkSync } = {}) {
+  try {
+    collega(verso, collegamento, 'file');
+    return null;
+  } catch (e) {
+    if (sistema === 'win32' && e && e.code === 'EPERM') return COLLEGAMENTO_NEGATO;
+    throw e;
+  }
 }
 
 // Un nome che Windows non scrive su disco («:» di un sysfs Linux, #961): lì nasce codificato con `nomeSuDisco`,
@@ -105,3 +197,8 @@ export function fuoriDa(cartella, p, sistema = path) {
   const r = sistema.relative(cartella, p);
   return r === '..' || r.startsWith(`..${sistema.sep}`) || sistema.isAbsolute(r);
 }
+
+// Chi carica questo modulo (un file di prova lanciato da solo, il lanciatore, il globalSetup, gli strumenti a schermo)
+// entra in una corsa: quello che lui e i suoi figli scrivono nella temporanea se ne va con lui (#717). In fondo al file
+// perché `togliAllUscita` usa costanti dichiarate sopra.
+temporaneaDellaCorsa();

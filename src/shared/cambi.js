@@ -13,6 +13,7 @@
   const ATTIVA = sino('attiva', 'spenta');
   const numero = (v) => String(Number(v)).replace('.', ',');
   const percento = (v) => `${Math.round(Number(v) * 100)}%`;
+  const millisecondi = (v) => `${Math.round(Number(v))} ms`;
 
   function etichettaColoreTab(k) {
     const meta = global.SN_TAB_COLOR && Array.isArray(global.SN_TAB_COLOR.IDENTITY_PARAM_META)
@@ -43,6 +44,7 @@
     timerRingtone: { nome: 'suoneria del timer', valori: { default: 'standard', gentle: 'delicata', urgent: 'urgente', chime: 'carillon' }, livello: 1 },
     'terminal.enabled': { nome: 'modalità terminale', valore: ATTIVA, livello: 2 },
     'nomiSensati.scaricamenti': { nome: 'nome sensato ai file scaricati', valore: ATTIVO, livello: 2 },
+    'aggiornamenti.automatici': { nome: 'installazione automatica degli aggiornamenti', valore: ATTIVA, livello: 2 },
     'terminal.shell': { nome: 'shell del terminale', valori: { powershell: 'PowerShell', cmd: 'Prompt dei comandi', bash: 'Bash' }, livello: 2 },
     'tts.voice': { nome: 'voce di riserva della lettura', valore: (v) => v || 'automatica', livello: 1 },
     'tts.rate': { nome: 'velocità di lettura', valore: (v) => `${numero(v)}×`, livello: 1 },
@@ -55,6 +57,11 @@
     'autoArchive.onIdle': { nome: 'archiviazione quando Filo è inattivo', valore: ATTIVA, livello: 1 },
     'autoArchive.idleHours': { nome: 'ore di inattività prima di archiviare', valore: numero, livello: 1 },
     'autoArchive.onClose': { nome: 'riordino alla riapertura', valore: ATTIVO, livello: 1 },
+    'barraLaterale.spinta': { nome: 'apertura della barra laterale dal bordo', valore: ATTIVA, livello: 1 },
+    'barraLaterale.striscia': { nome: 'striscia della barra laterale', valore: sino('visibile', 'nascosta'), livello: 1 },
+    'barraLaterale.attesaMs': { nome: 'attesa sul bordo prima che la barra laterale si apra', valore: millisecondi, livello: 1 },
+    'barraLaterale.uscitaMs': { nome: 'tempo prima che la barra laterale si chiuda', valore: millisecondi, livello: 1 },
+    'riassuntoSchede.enabled': { nome: 'riassunto delle schede chiuse', valore: ATTIVO, livello: 1 },
     'notifications.durationSec': { nome: 'durata delle notifiche', valore: (v) => (Number(v) ? `${numero(v)} s` : 'finché non la chiudi'), livello: 1 },
     'notifications.soundEnabled': { nome: 'suono delle notifiche', valore: ATTIVO, livello: 1 },
     'notifications.sound': { nome: 'suono scelto per le notifiche', valori: { default: 'standard', gentle: 'delicata', urgent: 'urgente', chime: 'carillon' }, livello: 1 },
@@ -79,6 +86,8 @@
     'security.cookies.mode': { nome: 'gestione dei cookie', valori: { manual: 'manuale', default: 'automatica', privacy: 'privacy massima' }, livello: 2 },
     'security.cookies.trustedSites': { nome: 'siti fidati dove resti connesso', elenco: true, livello: 2 },
     'security.cookies.bannerSites': { nome: 'siti dove vedi i banner dei cookie', elenco: true, livello: 2 },
+    'security.cookies.loggedSites': { nome: 'siti dove sei entrato', elenco: true, livello: 2 },
+    'security.cookies.embedSites': { nome: 'contenuti incorporati con i cookie riattivati', elenco: true, livello: 2 },
     'security.fingerprint.mode': { nome: 'protezione dal fingerprinting', valori: { off: 'spenta', default: 'automatica', privacy: 'privacy massima' }, livello: 2 },
     'security.adblock.enabled': { nome: 'blocco di pubblicità e tracker', valore: ATTIVO, livello: 2 },
     'security.adSkip.enabled': { nome: 'salta le pubblicità dei video', valore: ATTIVO, livello: 1 },
@@ -87,6 +96,9 @@
     'security.siteBlock.blacklist': { nome: 'domini in blacklist', elenco: true, livello: 2 },
     'security.downloads.confirmExecutables': { nome: 'domanda prima di scaricare un programma', valore: ATTIVA, livello: 2 },
     'security.downloads.trustedSites': { nome: 'siti fidati per i programmi', elenco: true, livello: 2 },
+    'security.pagineDelicate.enabled': { nome: 'pagine delicate tenute lontane dai modelli', valore: sino('sì', 'no'), livello: 2 },
+    'security.pagineDelicate.siti': { nome: 'siti delicati aggiunti da te', elenco: true, livello: 2 },
+    'security.pagineDelicate.nonDelicati': { nome: 'siti non delicati per te, anche col campo password', elenco: true, livello: 2 },
     'security.autoFeedback': { nome: 'segnalazione automatica dei problemi', valore: ATTIVA, livello: 2 },
     'proxy.datacenter': { nome: 'indirizzo del proxy economico', segreto: true },
     'proxy.residential': { nome: 'indirizzo del proxy residenziale', segreto: true },
@@ -101,6 +113,7 @@
     'security.cookies.bozza': 'è il testo a metà nella casella dei siti fidati: diventa un cambio quando entra nell\'elenco',
     'security.siteBlock.righeScartate': 'le righe scartate dalla blacklist sono un avviso sulla casella, non una scelta',
     'security.downloads.righeScartate': 'le righe scartate dai siti fidati sono un avviso sulla casella, non una scelta',
+    'security.pagineDelicate.righeScartate': 'le righe scartate dai siti delicati sono un avviso sulla casella, non una scelta',
     'pricing.*': 'i prezzi dei modelli servono ai conti e nessuna pagina li scrive',
     usdToEur: 'il cambio dollaro-euro serve ai conti e nessuna pagina lo scrive',
     azzeramento: 'cancellare tutti i dati non lascia traccia: è proprio quello che si è chiesto',

@@ -14,7 +14,7 @@
 'use strict';
 
 const { normalize } = require('./normalize');
-const { isWhitelisted, hostedPlatform } = require('./whitelist');
+const { isWhitelisted, hostedPlatform, pagePath } = require('./whitelist');
 const { localSignals } = require('./signals');
 
 const YOUNG_DOMAIN_DAYS = 30;     // sotto: dominio "giovane" → rinforzo sospetto
@@ -72,11 +72,19 @@ function buildMessage({ level, norm, gsb, imp, ageDays, cert, hasPassword, hasPa
   if (sandbox && sandbox.verdict === 'dangerous') facts.push('analizzato in isolamento, mostra comportamento ingannevole');
   const tail = facts.length ? (', ' + joinIt(facts) + '.') : '.';
 
-  // 2) Impersonazione stretta.
-  if (imp && imp.kind === 'strict_impersonation') {
+  // 2) Impersonazione stretta (e typo su brand corto quando un altro segnale conferma).
+  const somiglianzaSola = imp && imp.kind === 'weak_typo' && level !== 'pericoloso';
+  if (imp && imp.kind !== 'broad_impersonation' && !somiglianzaSola) {
     return {
       title: `Attenzione: questo non è ${imp.brand.display}`,
       body: `Questo non è ${imp.brand.display}. Il dominio è ${dom}${tail}`,
+    };
+  }
+  // 2bis) Solo somiglianza: accusare un sito vero di essere un falso sarebbe peggio del rischio (#728).
+  if (somiglianzaSola) {
+    return {
+      title: `${imp.brand.display}? Controlla l'indirizzo`,
+      body: `${dom} assomiglia all'indirizzo di ${imp.brand.display}, ma non è un suo indirizzo ufficiale${tail}`,
     };
   }
   // 3) Impersonazione larga.
@@ -118,9 +126,10 @@ function evaluate(url, ctx = {}, asyncData = {}) {
   }
 
   const { gsb, ageDays, cert, sandbox, llm } = asyncData;
-  const hosted = hostedPlatform(norm.host, pathOf(url));
+  const page = pagePath(norm.host, url);
+  const hosted = hostedPlatform(norm.host, page);
   // Conferma e chiusura di un avviso valgono per il sito; su una pagina ospitata solo per quella pagina.
-  const scope = hosted ? norm.host + pathOf(url) : norm.registrable;
+  const scope = hosted ? norm.host + page : norm.registrable;
   const whitelisted = !hosted && isWhitelisted(norm.registrable);
   const sigs = localSignals(norm, ctx);
   const reasons = sigs.map((s) => s.kind).concat(hosted ? ['hosted_content'] : []);
@@ -132,8 +141,9 @@ function evaluate(url, ctx = {}, asyncData = {}) {
   }
 
   const strict = sigs.find((s) => s.kind === 'strict_impersonation') || null;
+  const weakTypo = sigs.find((s) => s.kind === 'weak_typo') || null;
   const broad = sigs.find((s) => s.kind === 'broad_impersonation') || null;
-  const imp = strict || broad;
+  const imp = strict || weakTypo || broad;
   const hasPassword = !!ctx.hasPassword;
   const hasPayment = !!ctx.hasPayment;
   const certBad = cert && CERT_BAD.has(cert.status);
@@ -158,6 +168,8 @@ function evaluate(url, ctx = {}, asyncData = {}) {
   // strict impersonation da sola basta; oppure rinforzi forti combinati.
   const strongCombo =
     (broad && (young || certBad)) ||
+    // #728 — il typo su un brand corto blocca solo col secondo segnale.
+    (weakTypo && (young || certBad || sensitive)) ||
     (sandboxBad) ||
     (imp && sensitive && certBad) ||
     (doubleExt && (young || certBad));
@@ -172,24 +184,25 @@ function evaluate(url, ctx = {}, asyncData = {}) {
 
   // ── SOSPETTO ──────────────────────────────────────────────────────────
   const llmSus = llm && llm.suspicious;
-  const suspectTriggers = !!(broad || young || certBad || (sigs.some((s) => s.kind === 'insecure_transport') && sensitive) || doubleExt || sandboxSus || llmSus);
+  const impSus = weakTypo || broad;
+  const suspectTriggers = !!(impSus || young || certBad || (sigs.some((s) => s.kind === 'insecure_transport') && sensitive) || doubleExt || sandboxSus || llmSus);
   if (suspectTriggers) {
-    let message = buildMessage({ level: 'sospetto', norm, imp: broad, ageDays: young ? ageDays : null, cert, hasPassword, hasPayment, sandbox });
+    let message = buildMessage({ level: 'sospetto', norm, imp: impSus, ageDays: young ? ageDays : null, cert, hasPassword, hasPayment, sandbox });
     // Su una pagina ospitata il dominio è della piattaforma: nominarlo farebbe credere che la pagina sia sua.
-    if (hosted && !broad && !certBad) {
+    if (hosted && !impSus && !certBad) {
       message = {
         title: 'Pagina pubblicata da un utente',
         body: `Questa pagina è su ${hosted}, dove chiunque può pubblicare: non l'ha scritta chi gestisce ${norm.hostUnicode || norm.host}.`,
       };
     }
     // LLM rinforza il testo se ha una motivazione fissa.
-    if (llmSus && llm.reason && !broad && !young && !certBad) {
+    if (llmSus && llm.reason && !impSus && !young && !certBad) {
       message.body = `${message.body} ${llm.reason}`.trim();
     }
     return {
       level: 'sospetto',
       reasons: reasons.concat(young ? ['young_domain'] : [], certBad ? ['cert_' + cert.status] : [], llmSus ? ['llm'] : []),
-      norm, message, imp: broad, ageDays, cert, needsLlm: false, whitelisted, hosted, scope,
+      norm, message, imp: impSus, ageDays, cert, needsLlm: false, whitelisted, hosted, scope,
     };
   }
 
@@ -201,10 +214,6 @@ function evaluate(url, ctx = {}, asyncData = {}) {
   const weakHint = sigs.some((s) => s.kind === 'insecure_transport') || (ageDays == null && (broad || sensitive))
     || (hosted && sensitive);
   return { level: 'safe', reasons: reasons.length ? reasons : ['clean'], norm, message: null, needsLlm: !!weakHint && !whitelisted, whitelisted, hosted };
-}
-
-function pathOf(url) {
-  try { return new URL(String(url)).pathname; } catch (_) { return '/'; }
 }
 
 function checkSync(url, ctx = {}) {

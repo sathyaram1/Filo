@@ -14,12 +14,14 @@
 //
 // Tre livelli, come per i cookie:
 //   off     (0) — nessun rumore.
-//   default (1) — seed = HMAC(secret, eTLD+1 + settimana ISO). Ruota ogni
+//   default (1) — seed = HMAC(secret, sito + settimana ISO). Ruota ogni
 //                 settimana. Nessun impatto su banche/CAPTCHA.
-//   privacy (2) — seed = HMAC(secret, eTLD+1 + session_id). Ruota a ogni
+//   privacy (2) — seed = HMAC(secret, sito + session_id). Ruota a ogni
 //                 avvio dell'app.
+// In una finestra in incognito, a qualunque livello acceso, il seme nasce e muore con la finestra (#800).
 
 const crypto = require('node:crypto');
+const Sito = require('./stessoSito');
 
 const MODES = { OFF: 'off', DEFAULT: 'default', PRIVACY: 'privacy' };
 const SECRET_KEY = '__fpMasterSecret';
@@ -27,6 +29,8 @@ const SECRET_KEY = '__fpMasterSecret';
 let _secret = null; // Buffer (32 byte)
 let _sessionId = crypto.randomUUID();
 let _mode = MODES.DEFAULT;
+// Il livello scelto da una finestra in incognito vale solo per l'incognito, come i suoi cookie (#754); null = segue _mode.
+let _modeIncognito = null;
 
 function _storage() {
   // Lo stesso store su disco usato dallo shim chrome.storage.local.
@@ -64,29 +68,16 @@ async function init(settings) {
   return _secret;
 }
 
-function setMode(settings) {
-  _mode = getMode(settings);
+function inIncognito() {
+  try { return !!require('../shim/storage').inIncognito(); } catch (_) { return false; }
 }
 
-// eTLD+1 con una piccola lista di suffissi multi-parte comuni. Non è un Public
-// Suffix List completo (sarebbe pesante da bundlare nel preload e qui non
-// serve: l'obiettivo è solo rendere coerente il seed tra sottodomini dello
-// stesso servizio). "accounts.google.com" → "google.com"; "bbc.co.uk" → "bbc.co.uk".
-const MULTI_SUFFIX = new Set([
-  'co.uk', 'org.uk', 'gov.uk', 'ac.uk', 'me.uk', 'ltd.uk',
-  'co.jp', 'or.jp', 'ne.jp', 'com.au', 'net.au', 'org.au', 'co.nz',
-  'com.br', 'co.in', 'co.za', 'com.mx', 'com.tr', 'co.kr', 'com.cn',
-  'com.hk', 'com.sg', 'co.il', 'com.ar', 'com.es', 'com.pl',
-]);
-
-function etld1(host) {
-  host = String(host || '').toLowerCase().replace(/\.$/, '');
-  const parts = host.split('.').filter(Boolean);
-  if (parts.length <= 2) return host;
-  const last2 = parts.slice(-2).join('.');
-  if (MULTI_SUFFIX.has(last2)) return parts.slice(-3).join('.');
-  return last2;
+function setMode(settings, incognito = inIncognito()) {
+  if (incognito) _modeIncognito = getMode(settings);
+  else _mode = getMode(settings);
 }
+
+function resetIncognito() { _modeIncognito = null; }
 
 // Numero settimana ISO-8601, es. "2026-W23".
 function isoWeekId(d = new Date()) {
@@ -98,8 +89,9 @@ function isoWeekId(d = new Date()) {
   return `${date.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
 }
 
-// Seed uint32 per un'origine (già ridotta a eTLD+1).
-function seedForOrigin(origin) {
+// Seed uint32 per un'origine (già ridotta al sito). `ambito`: la partizione della finestra in incognito
+// della pagina, '' fuori; lì il seme è della finestra, se no un sito ricollega l'incognito alla normale (#800).
+function seedForOrigin(origin, ambito = '') {
   // Garantisce un master secret anche se init() non ha ancora caricato/generato
   // quello persistente. Senza questo, una pagina che chiede la config nella
   // finestra di avvio (IPC sincrono filo:fp-config, prima che whenReady completi
@@ -107,9 +99,15 @@ function seedForOrigin(origin) {
   // Il fallback effimero la tiene attiva; init() poi sovrascrive _secret con
   // quello persistente (coerente fra riavvii).
   if (!_secret) _secret = crypto.randomBytes(32);
-  const temporal = _mode === MODES.PRIVACY ? _sessionId : isoWeekId();
+  const temporal = ambito ? `incognito:${ambito}` : _mode === MODES.PRIVACY ? _sessionId : isoWeekId();
   const h = crypto.createHmac('sha256', _secret).update(`${origin}|${temporal}`).digest();
   return h.readUInt32BE(0) >>> 0;
+}
+
+// Un sito, un rumore: lo stesso sito dei cookie (services/stessoSito.js), così uno script presente su due pagine di
+// github.io le vede come due browser diversi. Le esenzioni stanno in configForHref, non qui.
+function seedForHref(href, ambito = '') {
+  return seedForOrigin(Sito.sitoDi(href) || String(href || ''), ambito);
 }
 
 // Pagine di provider di identità (Google, Microsoft, GitHub, …): il rumore
@@ -193,9 +191,9 @@ function isGoogleAppSurface(href) {
 }
 
 // Config { level, seed } per la pagina identificata da href. Solo http/https
-// vengono protette (filo://, file://, about: → off).
-function configForHref(href) {
-  const level = levelNum(_mode);
+// vengono protette (filo://, file://, about: → off). `ambito` come in seedForOrigin.
+function configForHref(href, ambito = '') {
+  const level = levelNum((ambito && _modeIncognito) || _mode);
   if (!level) return { level: 0, seed: 0 };
   let host = '';
   try {
@@ -208,7 +206,7 @@ function configForHref(href) {
   if (!host) return { level: 0, seed: 0 };
   if (isIdentityProviderHref(href)) return { level: 0, seed: 0 };
   if (isGoogleAppSurface(href)) return { level: 0, seed: 0 };
-  return { level, seed: seedForOrigin(etld1(host)) };
+  return { level, seed: seedForHref(href, String(ambito || '')) };
 }
 
 module.exports = {
@@ -217,9 +215,10 @@ module.exports = {
   levelNum,
   init,
   setMode,
-  etld1,
+  resetIncognito,
   isoWeekId,
   seedForOrigin,
+  seedForHref,
   isIdentityProviderHref,
   isGoogleAppSurface,
   configForHref,

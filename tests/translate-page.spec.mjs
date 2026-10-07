@@ -1610,3 +1610,478 @@ test('quel che si vede continua a tradursi: scorrimento, pannelli aperti, testo 
     await expect(page.locator(id)).toHaveText(/^IT /, { timeout: 30000 });
   }
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// #503 — l'avviso "tradotta solo in parte" non deve scattare a vuoto.
+//
+// Gli spazi pubblicitari, i banner dei cookie già chiusi e i riquadri di
+// statistica sono componenti chiusi NASCOSTI: su un sito di giornale ce n'è
+// sempre almeno uno, e l'avviso usciva praticamente sempre mandando l'utente a
+// cercare sullo schermo un rettangolo in lingua originale che non c'è.
+//
+// Il metro è "l'utente lo vede?", non "quanto è grande il rettangolo": portato
+// fuori dallo schermo, reso trasparente, nascosto lasciandogli l'ingombro o tolto
+// dal flusso → NON conta, l'avviso dice "Pagina tradotta". Quel che sta sotto la
+// prima schermata lo decide la prova del punto (#407): dove non si può guardare,
+// si tace.
+// ───────────────────────────────────────────────────────────────────────────
+
+const AD_SLOT_SCRIPT = `<script>
+    customElements.define('ad-slot', class extends HTMLElement {
+      connectedCallback() {
+        this.style.display = 'block';
+        this.style.width = '300px';
+        this.style.height = '250px';
+        const r = this.attachShadow({ mode: 'closed' });
+        r.innerHTML = '<div>Sponsored message nobody outside can read</div>';
+      }
+    });
+  </script>`;
+
+// Pagina di giornale tradotta per intero, con quattro spazi pubblicitari chiusi
+// nascosti nei quattro modi soliti. Nessuno di loro è sullo schermo.
+const HIDDEN_ADS = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px;margin:0">
+  <h1 id="plain">The end of an era in European football</h1>
+  <p id="body">First paragraph of the body text, long enough to be picked up by the extractor.</p>
+  <div style="position:absolute;left:-9999px;top:0"><ad-slot id="adOffscreen"></ad-slot></div>
+  <div style="transform:translateX(-200vw)"><ad-slot id="adPushed"></ad-slot></div>
+  <div style="opacity:0"><ad-slot id="adTransparent"></ad-slot></div>
+  <div style="visibility:hidden"><ad-slot id="adInvisible"></ad-slot></div>
+  <div style="display:none"><ad-slot id="adRemoved"></ad-slot></div>
+  ${AD_SLOT_SCRIPT}
+</body></html>`;
+
+test('spazi chiusi ma invisibili: la pagina è tradotta e l’avviso non manda a cercare niente', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, HIDDEN_ADS);
+  await watchToasts(page);
+
+  // Il presupposto della prova: gli spazi ci sono davvero, sono componenti
+  // chiusi (nessuno script può leggerci dentro) e nessuno di loro si vede.
+  expect(await page.evaluate(() => document.querySelectorAll('ad-slot').length)).toBe(5);
+  expect(await page.evaluate(() => [...document.querySelectorAll('ad-slot')].every((el) => !el.shadowRoot))).toBe(true);
+
+  await clickTranslateIcon(page, '#plain');
+
+  await expect(page.locator('#plain')).toHaveText(/^IT /);
+  await expect(page.locator('#body')).toHaveText(/^IT /);
+
+  // Quello che conta: l'avviso di fine lavoro dice che la pagina è tradotta,
+  // punto. Senza il fix qui usciva "tradotta solo in parte".
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
+  expect((await toasts(page)).filter((t) => t.startsWith('Pagina tradotta solo in parte'))).toEqual([]);
+  await page.screenshot({ path: 'tests/.shots/translate-page-hidden-ads.png' }).catch(() => {});
+});
+
+// Striscia pubblicitaria agganciata alla finestra e spinta fuori dallo schermo:
+// non scorre con la pagina, quindi non la si raggiunge nemmeno arrivando in
+// fondo. Le coordinate del documento qui mentono, ed è per questo che la prova
+// scorre prima di tradurre.
+const FIXED_HIDDEN_AD = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px;margin:0">
+  <h1 id="plain">The end of an era in European football</h1>
+  <p id="body">First paragraph of the body text, long enough to be picked up by the extractor.</p>
+  <div style="height:3000px"></div>
+  <p id="tail">Closing paragraph at the very bottom of a long page.</p>
+  <div style="position:fixed;top:-400px;left:0"><ad-slot id="adSticky"></ad-slot></div>
+  ${AD_SLOT_SCRIPT}
+</body></html>`;
+
+test('striscia agganciata alla finestra e spinta fuori: non la si raggiunge scorrendo, e non fa uscire l’avviso', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, FIXED_HIDDEN_AD);
+  await watchToasts(page);
+
+  await page.evaluate(() => window.scrollTo(0, 3000));
+  // Con la pagina scorsa, le coordinate del documento direbbero che la striscia
+  // sta a metà pagina; sullo schermo invece non c'è.
+  expect(await page.evaluate(() => {
+    const r = document.querySelector('#adSticky').getBoundingClientRect();
+    return { onScreen: r.bottom > 0, docWouldSay: r.top + window.scrollY > 0 };
+  })).toEqual({ onScreen: false, docWouldSay: true });
+
+  await clickTranslateIcon(page, '#tail');
+  await expect(page.locator('#tail')).toHaveText(/^IT /);
+
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
+  expect((await toasts(page)).filter((t) => t.startsWith('Pagina tradotta solo in parte'))).toEqual([]);
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// #503 (secondo giro) — nascondere non è solo questione di CSS sull'elemento:
+// il modo più comune è RITAGLIARLO da un antenato.
+//
+//  1) fisarmonica ripiegata / banner dei cookie chiuso: il contenitore è
+//     schiacciato a zero e taglia via quello che sborda → NON conta;
+//  2) contenitore di dimensioni normali che ritaglia il riquadro spinto più in
+//     basso del suo bordo → NON conta.
+// ───────────────────────────────────────────────────────────────────────────
+
+const CLIPPED_ADS = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px;margin:0">
+  <h1 id="plain">The end of an era in European football</h1>
+  <p id="body">First paragraph of the body text, long enough to be picked up by the extractor.</p>
+  <!-- Fisarmonica ripiegata: contenitore a zero che taglia via quel che sborda. -->
+  <section id="accordion" style="height:0;overflow:hidden">
+    <ad-slot id="adFolded"></ad-slot>
+  </section>
+  <!-- Banner dei cookie chiuso: contenitore di dimensioni normali, riquadro
+       spinto fuori dal suo bordo e ritagliato via. -->
+  <div id="cookiebar" style="height:30px;overflow:hidden">
+    <div style="height:400px"></div>
+    <ad-slot id="adClipped"></ad-slot>
+  </div>
+  ${AD_SLOT_SCRIPT}
+</body></html>`;
+
+test('riquadro ritagliato via da un antenato: la pagina è tradotta e l’avviso non manda a cercare niente', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, CLIPPED_ADS);
+  await watchToasts(page);
+
+  // Il presupposto della prova: i due riquadri hanno un rettangolo grande —
+  // quindi il conteggio "a rettangolo" li prenderebbe — ma sullo schermo non
+  // c'è un solo pixel loro, perché l'antenato li ritaglia.
+  expect(await page.evaluate(() => {
+    const big = (id) => {
+      const r = document.querySelector(id).getBoundingClientRect();
+      return r.width >= 40 && r.height >= 16;
+    };
+    const painted = (id) => {
+      const el = document.querySelector(id);
+      const r = el.getBoundingClientRect();
+      const x = Math.round(r.left + r.width / 2);
+      const y = Math.round(r.top + r.height / 2);
+      return document.elementsFromPoint(x, y).includes(el);
+    };
+    return {
+      folded: { big: big('#adFolded'), painted: painted('#adFolded') },
+      clipped: { big: big('#adClipped'), painted: painted('#adClipped') },
+    };
+  })).toEqual({
+    folded: { big: true, painted: false },
+    clipped: { big: true, painted: false },
+  });
+
+  await clickTranslateIcon(page, '#plain');
+  await expect(page.locator('#plain')).toHaveText(/^IT /);
+  await expect(page.locator('#body')).toHaveText(/^IT /);
+
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
+  expect((await toasts(page)).filter((t) => t.startsWith('Pagina tradotta solo in parte'))).toEqual([]);
+  await page.screenshot({ path: 'tests/.shots/translate-page-clipped-ads.png' }).catch(() => {});
+});
+
+// Chi ritaglia non ritaglia tutti: un riquadro in posizione assoluta NON è
+// ritagliato dagli antenati che non lo contengono, e sta lì bello visibile.
+// Scambiarli per ritagliatori sarebbe l'errore opposto — l'avviso muto proprio
+// quando serve — e i contenitori con `overflow:hidden` messi lì per ragioni di
+// impaginazione sono ovunque.
+const ESCAPING_AD = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px;margin:0">
+  <h1 id="plain">The end of an era in European football</h1>
+  <p id="body">First paragraph of the body text, long enough to be picked up by the extractor.</p>
+  <div id="clipper" style="height:30px;overflow:hidden">
+    <ad-slot id="adEscapes" style="position:absolute;top:200px;left:20px"></ad-slot>
+  </div>
+  ${AD_SLOT_SCRIPT}
+</body></html>`;
+
+test('riquadro in posizione assoluta dentro un contenitore che ritaglia: si vede, quindi conta', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, ESCAPING_AD);
+  await watchToasts(page);
+
+  // Il presupposto: il contenitore ritaglia, ma non questo — il riquadro è
+  // davvero disegnato sullo schermo.
+  expect(await page.evaluate(() => {
+    const el = document.querySelector('#adEscapes');
+    const r = el.getBoundingClientRect();
+    const x = Math.round(r.left + r.width / 2);
+    const y = Math.round(r.top + r.height / 2);
+    return document.elementsFromPoint(x, y).includes(el);
+  })).toBe(true);
+
+  await clickTranslateIcon(page, '#plain');
+  await expect(page.locator('#plain')).toHaveText(/^IT /);
+
+  const partialEsc = async () => (await toasts(page)).find((t) => t.startsWith('Pagina tradotta solo in parte'));
+  await expect.poll(partialEsc, { timeout: 30000 }).toBeTruthy();
+  expect(await toasts(page)).not.toContain('Pagina tradotta');
+});
+
+// Pagina da destra a sinistra: lì l'area scorribile cresce VERSO SINISTRA e le
+// coordinate del documento vanno in negativo. Un conto che desse per scontato
+// che il bordo è lo zero butterebbe via il riquadro visibile.
+const RTL_AD = `<!doctype html><html lang="ar" dir="rtl"><body style="font:16px sans-serif;padding:20px;margin:0">
+  <h1 id="plain">The end of an era in European football</h1>
+  <p id="body">First paragraph of the body text, long enough to be picked up by the extractor.</p>
+  <div style="width:4000px;height:8px"></div>
+  <ad-slot id="adRtl"></ad-slot>
+  ${AD_SLOT_SCRIPT}
+</body></html>`;
+
+test('pagina da destra a sinistra: il riquadro visibile conta anche con le coordinate in negativo', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, RTL_AD);
+  await watchToasts(page);
+
+  // Il presupposto: la pagina scorre in orizzontale verso sinistra (corsa della
+  // barra in negativo) e il riquadro è sullo schermo.
+  expect(await page.evaluate(() => {
+    const de = document.documentElement;
+    const r = document.querySelector('#adRtl').getBoundingClientRect();
+    return {
+      overflowsSideways: de.scrollWidth > de.clientWidth,
+      rtl: getComputedStyle(de).direction === 'rtl',
+      onScreen: r.right > 0 && r.left < de.clientWidth && r.bottom > 0,
+    };
+  })).toEqual({ overflowsSideways: true, rtl: true, onScreen: true });
+
+  await clickTranslateIcon(page, '#plain');
+  await expect(page.locator('#plain')).toHaveText(/^IT /);
+
+  const partialRtl = async () => (await toasts(page)).find((t) => t.startsWith('Pagina tradotta solo in parte'));
+  await expect.poll(partialRtl, { timeout: 30000 }).toBeTruthy();
+  expect(await toasts(page)).not.toContain('Pagina tradotta');
+});
+
+// ---------------------------------------------------------------------------
+// #503 — un riquadro incorporato si giudica come il resto della pagina: quello
+// che l'utente non vede (fuori schermo, trasparente, in una sezione chiusa) non
+// fa dire «tranne un riquadro incorporato» e non si paga; quello più in basso
+// della prima schermata è contenuto vero, e resta contato e tradotto.
+// ---------------------------------------------------------------------------
+
+const frameInner = (token) => `<!doctype html><html lang="en"><body style="font:16px sans-serif;margin:0;padding:10px">
+  <p id="fbody">${token} an embedded box written in english and long enough to count as text.</p>
+</body></html>`;
+
+const framePage = (frames) => `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <h1 id="head">An article that carries a few embedded boxes around it</h1>
+  <p id="p1">First paragraph of the body text, long enough to be picked up by the translation.</p>
+  ${frames}
+</body></html>`;
+
+const sentText = (app) => app.evaluate(() => (globalThis.__filoTranslatePrompts || []).join('\n'));
+
+test('riquadri chiusi a chiave che non si vedono: «Pagina tradotta», senza mandare a cercare niente', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  const lock = testServer.html(frameInner('ZZLOCK'));
+  const box = 'width:300px;height:200px;border:0';
+  // Annidato: un riquadro che si vede, con dentro uno chiuso a chiave e trasparente.
+  const outer = testServer.html(`<!doctype html><html lang="en"><body style="font:16px sans-serif;margin:0;padding:10px">
+    <p id="obody">The outer embedded box with a comment thread written in english, long enough.</p>
+    <iframe sandbox src="${lock}" style="opacity:0;${box}"></iframe></body></html>`).replace('127.0.0.1', 'blocked.test');
+  const page = await testServer.openReady(openTab, framePage(`
+    <iframe sandbox src="${lock}" style="position:absolute;left:-9999px;top:0;${box}"></iframe>
+    <iframe sandbox src="${lock}" style="opacity:0;${box}"></iframe>
+    <iframe sandbox src="${lock}" style="visibility:hidden;${box}"></iframe>
+    <iframe sandbox src="${lock}" style="position:fixed;left:0;bottom:-600px;${box}"></iframe>
+    <iframe sandbox src="${lock}" style="clip-path:inset(100%);${box}"></iframe>
+    <iframe sandbox src="${lock}" style="filter:opacity(0);${box}"></iframe>
+    <div style="opacity:0"><iframe sandbox src="${lock}" style="${box}"></iframe></div>
+    <details><summary>Show the box</summary><iframe sandbox src="${lock}" style="${box}"></iframe></details>
+    <iframe id="emb" src="${outer}" style="width:520px;height:260px"></iframe>`));
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#p1');
+
+  await expect(page.frameLocator('#emb').locator('#obody')).toHaveText(/^IT /, { timeout: 60000 });
+  await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 30000 }).toContain('Pagina tradotta');
+  expect((await toasts(page)).join(' | ')).not.toContain('riquadro incorporato');
+});
+
+for (const [dove, html] of [
+  ['più in basso della prima schermata', (src) => `<div style="height:2500px"></div><iframe sandbox src="${src}" style="width:520px;height:220px"></iframe>`],
+  ['in fondo a un pannello che scorre', (src) => `<div style="height:200px;overflow:auto"><div style="height:900px"></div><iframe sandbox src="${src}" style="width:420px;height:200px"></iframe></div>`],
+]) {
+  test(`riquadro chiuso a chiave ${dove}: ci si arriva, e l’avviso lo dice ancora`, async ({ app, openTab, testServer }) => {
+    test.setTimeout(120000);
+    await stubTranslationProvider(app);
+    const page = await testServer.openReady(openTab, framePage(html(testServer.html(frameInner('ZZLOCK')))));
+    await watchToasts(page);
+    await clickTranslateIcon(page, '#p1');
+    await expect(page.locator('#p1')).toHaveText(/^IT /, { timeout: 30000 });
+    await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 60000 }).toContain('riquadro incorporato');
+  });
+}
+
+test('un riquadro con script nascosto non si paga; aperta la sua sezione, si traduce dal menu', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  const cross = (token) => testServer.html(frameInner(token)).replace('127.0.0.1', 'blocked.test');
+  const page = await testServer.openReady(openTab, framePage(`
+    <details id="d"><summary>Show the comments</summary>
+      <iframe id="folded" src="${cross('ZZFOLD')}" style="width:520px;height:220px"></iframe></details>
+    <iframe src="${cross('ZZFADE')}" style="opacity:0;width:300px;height:200px"></iframe>
+    <div id="host"></div>
+    <div style="height:2500px"></div>
+    <iframe id="low" src="${cross('ZZLOW')}" style="width:520px;height:220px"></iframe>
+    <script>document.getElementById('host').attachShadow({ mode: 'open' }).innerHTML =
+      '<iframe src="${cross('ZZSHADOW')}" style="position:absolute;left:-9999px;width:300px;height:200px"></iframe>';</script>`));
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#p1');
+
+  // Più in basso della prima schermata: tradotto come adesso.
+  await expect(page.frameLocator('#low').locator('#fbody')).toHaveText(/^IT /, { timeout: 60000 });
+  await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 30000 }).toContain('Pagina tradotta');
+  const primo = await sentText(app);
+  const pagati = ['ZZFOLD', 'ZZFADE', 'ZZSHADOW'].filter((t) => primo.includes(t));
+  expect(pagati, `riquadri nascosti spediti al modello: ${pagati.join(', ')}`).toEqual([]);
+
+  // La sezione ripiegata si apre: il menu offre il testo scoperto, e il riquadro cambia lingua.
+  await page.evaluate(() => { document.getElementById('d').open = true; });
+  await page.waitForTimeout(150);
+  await page.locator('#p1').click({ button: 'right', position: { x: 5, y: 5 } });
+  const btn = page.locator('[data-sn-icon-id="translate"]');
+  await expect(btn).toHaveAttribute('aria-label', 'Traduci il testo nuovo');
+  await btn.click();
+  await expect(page.frameLocator('#folded').locator('#fbody')).toHaveText(/^IT /, { timeout: 60000 });
+  const dopo = (await sentText(app)).slice(primo.length);
+  expect(dopo).toContain('ZZFOLD');
+  expect(dopo).not.toContain('ZZFADE');
+  expect(dopo).not.toContain('ZZLOW');
+});
+
+// La scheda spenta del tutto toglie al riquadro anche la misura: da sola, senza testo attorno, deve farsi offrire lo stesso.
+for (const [nome, apre, chiusa] of [
+  ['con l’attributo hidden', (el) => { el.hidden = false; }, 'hidden'],
+  ['con display:none', (el) => { el.style.display = 'block'; }, 'style="display:none"'],
+]) {
+  test(`scheda spenta ${nome} con dentro solo un riquadro con script: aperta, il menu offre di tradurlo`, async ({ app, openTab, testServer }) => {
+    test.setTimeout(120000);
+    await stubTranslationProvider(app);
+    const src = testServer.html(frameInner('ZZTAB')).replace('127.0.0.1', 'blocked.test');
+    const page = await testServer.openReady(openTab, framePage(
+      `<div id="tab" ${chiusa}><iframe id="emb" src="${src}" style="width:520px;height:220px"></iframe></div>`));
+    await watchToasts(page);
+    await clickTranslateIcon(page, '#p1');
+    await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 30000 }).toContain('Pagina tradotta');
+    expect(await sentText(app)).not.toContain('ZZTAB');
+
+    await page.evaluate(`(${apre.toString()})(document.getElementById('tab'))`);
+    await page.waitForTimeout(150);
+    await page.locator('#p1').click({ button: 'right', position: { x: 5, y: 5 } });
+    const btn = page.locator('[data-sn-icon-id="translate"]');
+    await expect(btn).toHaveAttribute('aria-label', 'Traduci il testo nuovo');
+    await btn.click();
+    await expect(page.frameLocator('#emb').locator('#fbody')).toHaveText(/^IT /, { timeout: 60000 });
+  });
+}
+
+test('un riquadro che non si conta non risponde al posto di uno chiuso a chiave che si vede', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  const cross = (token) => testServer.html(frameInner(token)).replace('127.0.0.1', 'blocked.test');
+  // Un pixel con script e un riquadro trasparente con script: nessuno dei due è nel conto, e un loro
+  // "ci sono" coprirebbe il silenzio del riquadro chiuso a chiave, facendo dire «Pagina tradotta».
+  const page = await testServer.openReady(openTab, framePage(`
+    <iframe src="${cross('ZZPIXEL')}" style="width:1px;height:1px;border:0"></iframe>
+    <iframe src="${cross('ZZFADE')}" style="opacity:0;width:300px;height:200px"></iframe>
+    <iframe id="lock" sandbox src="${testServer.html(frameInner('ZZLOCK'))}" style="width:520px;height:220px"></iframe>`));
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#p1');
+  await expect(page.locator('#p1')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 60000 }).toContain('riquadro incorporato');
+  expect(await toasts(page)).not.toContain('Pagina tradotta');
+});
+
+test('riquadri chiusi a chiave nascosti nei modi meno comuni: «Pagina tradotta», senza mandare a cercare niente', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  const lock = testServer.html(frameInner('ZZLOCK'));
+  const box = 'width:300px;height:200px;border:0';
+  const page = await testServer.openReady(openTab, framePage(`
+    <iframe sandbox src="${lock}" style="transform:translateX(-9999px);${box}"></iframe>
+    <iframe sandbox src="${lock}" style="position:absolute;clip:rect(0 0 0 0);${box}"></iframe>
+    <iframe sandbox src="${lock}" style="clip-path:circle(0);${box}"></iframe>
+    <iframe sandbox src="${lock}" style="clip-path:polygon(0 0, 0 0, 0 0);${box}"></iframe>
+    <iframe sandbox src="${lock}" style="position:absolute;left:100%;top:0;${box}"></iframe>`).replace('<body style="', '<body style="overflow-x:hidden;'));
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#p1');
+  await expect(page.locator('#p1')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 30000 }).toContain('Pagina tradotta');
+  await page.waitForTimeout(2500);
+  expect((await toasts(page)).join(' | ')).not.toContain('riquadro incorporato');
+});
+
+test('riquadro con script nella diapositiva nascosta di una giostra: si traduce, ci si arriva strisciando', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  const src = testServer.html(frameInner('ZZSLIDE')).replace('127.0.0.1', 'blocked.test');
+  const page = await testServer.openReady(openTab, framePage(`
+    <div style="width:520px;overflow:hidden"><div style="display:flex;width:1040px;transform:translateX(0)">
+      <div style="width:520px;flex:none;height:220px">First slide</div>
+      <iframe id="emb" src="${src}" style="width:520px;height:220px;flex:none;border:0"></iframe>
+    </div></div>`));
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#p1');
+  await expect(page.frameLocator('#emb').locator('#fbody')).toHaveText(/^IT /, { timeout: 60000 });
+});
+
+// Gli spazi pubblicitari sono spesso riquadri riempiti dalla pagina, con dentro un riquadro vero: lì in mezzo non c'è
+// un Filo che giudichi, e il giudizio lo dà la pagina.
+const filledWith = (src) => `<!doctype html><html><body style="margin:0"><iframe id="in" src="${src}" style="width:300px;height:200px;border:0"></iframe></body></html>`
+  .replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+
+test('riquadro con script dentro uno spazio della pagina nascosto: non si paga e non copre quello chiuso a chiave', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  const cross = (token) => testServer.html(frameInner(token)).replace('127.0.0.1', 'blocked.test');
+  const page = await testServer.openReady(openTab, framePage(`
+    <iframe src="${cross('ZZSEEN')}" style="width:520px;height:120px"></iframe>
+    <iframe sandbox src="${testServer.html(frameInner('ZZLOCK'))}" style="width:520px;height:120px"></iframe>
+    <iframe srcdoc="${filledWith(cross('ZZNEST'))}" style="opacity:0;width:320px;height:220px"></iframe>`));
+  await page.waitForTimeout(1500);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#p1');
+  await expect(page.locator('#p1')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 60000 }).toContain('riquadro incorporato');
+  await page.waitForTimeout(2000);
+  expect(await sentText(app)).not.toContain('ZZNEST');
+});
+
+test('riquadro con script dentro uno spazio della pagina visibile: si traduce anche da solo', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  const src = testServer.html(frameInner('ZZVIS')).replace('127.0.0.1', 'blocked.test');
+  const page = await testServer.openReady(openTab, framePage(`<iframe id="emb" srcdoc="${filledWith(src)}" style="width:320px;height:220px"></iframe>`));
+  await page.waitForTimeout(1500);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#p1');
+  await expect(page.frameLocator('#emb').frameLocator('#in').locator('#fbody')).toHaveText(/^IT /, { timeout: 60000 });
+  await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 30000 }).toMatch(/Pagina tradotta/);
+  const t = (await toasts(page)).join(' | ');
+  expect(t).not.toContain('riquadro incorporato');
+  expect(t).not.toContain('aggiunta');
+});
+
+// Conta la finestra da cui il riquadro si vede, non il suo rettangolo: dietro una finestrella da un pixel è un francobollo.
+for (const [nome, html] of [
+  ['la ricetta per i lettori di schermo', (src) => `<div style="position:absolute;width:1px;height:1px;overflow:hidden;margin:-1px;clip:rect(0,0,0,0)"><iframe sandbox src="${src}" style="width:300px;height:200px;border:0"></iframe></div>`],
+  ['un contenitore da un pixel', (src) => `<div style="width:1px;height:1px;overflow:hidden"><iframe sandbox src="${src}" style="width:300px;height:200px;border:0"></iframe></div>`],
+]) {
+  test(`riquadro chiuso a chiave dietro ${nome}: «Pagina tradotta», senza mandare a cercare niente`, async ({ app, openTab, testServer }) => {
+    test.setTimeout(120000);
+    await stubTranslationProvider(app);
+    const page = await testServer.openReady(openTab, framePage(html(testServer.html(frameInner('ZZLOCK')))));
+    await watchToasts(page);
+    await clickTranslateIcon(page, '#p1');
+    await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 30000 }).toContain('Pagina tradotta');
+    await page.waitForTimeout(2500);
+    expect((await toasts(page)).join(' | ')).not.toContain('riquadro incorporato');
+  });
+}
+
+test('riquadro con script dietro una finestrella da un pixel non si paga; uno che ne esce in posizione assoluta conta', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  const src = testServer.html(frameInner('ZZTINY')).replace('127.0.0.1', 'blocked.test');
+  const page = await testServer.openReady(openTab, framePage(`
+    <div style="width:1px;height:1px;overflow:hidden"><iframe src="${src}" style="width:300px;height:200px;border:0"></iframe></div>
+    <div style="height:30px;overflow:hidden"><iframe sandbox src="${testServer.html(frameInner('ZZLOCK'))}" style="position:absolute;top:260px;left:20px;width:520px;height:200px"></iframe></div>`));
+  await page.waitForTimeout(1000);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#p1');
+  await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 60000 }).toContain('riquadro incorporato');
+  await page.waitForTimeout(2000);
+  expect(await sentText(app)).not.toContain('ZZTINY');
+});

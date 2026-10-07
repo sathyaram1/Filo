@@ -40,6 +40,17 @@ test('#418 gli elenchi diventano <ul>/<ol>', () => {
   assert.match(ol, /<ol>[\s\S]*<li>primo<\/li>[\s\S]*<li>secondo<\/li>[\s\S]*<\/ol>/);
 });
 
+test('#703 un elenco numerato tiene i numeri scritti: voci staccate da righe vuote, o spezzate da un paragrafo', () => {
+  const staccate = render('1. Dal sito\n\n2. Chiesto\n\n3. Misto');
+  assert.equal((staccate.match(/<ol/g) || []).length, 1);
+  assert.equal((staccate.match(/<li>/g) || []).length, 3);
+  const spezzato = render('1. primo\n2. secondo\n\nUn paragrafo.\n\n3. terzo');
+  assert.match(spezzato, /<ol start="3">\s*<li>terzo<\/li>/);
+  // Una riga vuota prima di un elenco d'altro tipo o di un paragrafo lo chiude ancora.
+  assert.match(render('1. uno\n\n- pallino'), /<\/ol>\s*<ul>/);
+  assert.match(render('- a\n\n- b\n\nfine'), /<ul>\s*<li>a<\/li>\s*<li>b<\/li>\s*<\/ul>\s*<p>fine<\/p>/);
+});
+
 // ─── link: un link scritto da Filo deve diventare cliccabile ─────────────────
 
 test('#418 un link markdown diventa <a> cliccabile in nuova scheda', () => {
