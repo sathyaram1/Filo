@@ -824,6 +824,14 @@
     return box.r > loX && box.l < hiX && box.b > -sY && box.t < rangeY - sY + vh;
   }
 
+  // L'overflow della finestra è quello di <html>, o quello di <body> che sale quando <html> lo lascia visibile.
+  function viewportClipsX() {
+    const de = styleOf(document.documentElement);
+    let o = de && de.overflowX;
+    if ((!o || o === 'visible') && document.body) { const b = styleOf(document.body); o = b && b.overflowX; }
+    return o === 'hidden' || o === 'clip';
+  }
+
   // "L'utente ci arriva?" — con lo stesso metro usato per il resto della pagina.
   function isReachableByUser(el, rect) {
     let box = { l: rect.left, t: rect.top, r: rect.right, b: rect.bottom };
