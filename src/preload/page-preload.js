@@ -435,9 +435,17 @@ try {
   };
   // I documenti che la pagina si scrive da sé non hanno un preload loro (il riquadro vuoto riempito dallo script), o
   // perdono gli ascolti (la riscrittura da capo li cancella): il gesto si ascolta anche lì (#737.1 giro 8).
+  // Il segno lo vede il preload degli altri frame dello stesso sito (stesso mondo isolato), mai la pagina.
+  const ASCOLTATO = Symbol.for('filo:gesto-ascoltato');
   const seguiti = new WeakSet();
-  const vuoto = (f) => { try { const w = f.contentWindow; return w && w.location.href === 'about:blank' ? w : null; } catch (_) { return null; } };
+  // Un riquadro che sta per caricare un indirizzo non si tocca prima del caricamento: toccato, il suo preload non parte.
+  const inArrivo = (f) => (f.hasAttribute('src') && !/^(about:blank)?$/i.test(f.getAttribute('src').trim())) || f.hasAttribute('srcdoc');
+  const senzaPreload = (f, caricato) => {
+    if (!caricato && inArrivo(f)) return null;
+    try { const w = f.contentWindow; return w && w.document && !w[ASCOLTATO] ? w : null; } catch (_) { return null; }
+  };
   const segui = (win) => {
+    try { Object.defineProperty(win, ASCOLTATO, { value: true }); } catch (_) {}
     ascolta(win);
     let doc = null;
     try { doc = win.document; } catch (_) {}
@@ -449,9 +457,9 @@ try {
       for (const f of riquadri) {
         if (seguiti.has(f)) continue;
         seguiti.add(f);
-        const entra = () => { const w = vuoto(f); if (w) segui(w); };
-        f.addEventListener('load', entra, true);
-        entra();
+        f.addEventListener('load', () => { const w = senzaPreload(f, true); if (w) segui(w); }, true);
+        const w = senzaPreload(f, false);
+        if (w) segui(w);
       }
     };
     new MutationObserver(nuovi).observe(doc, { childList: true, subtree: true });

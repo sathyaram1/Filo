@@ -93,10 +93,11 @@ const SCRITTI_DALLA_PAGINA = {
     var d=document.getElementById('f').contentDocument;var a=d.createElement('a');a.id='b';a.href=${JSON.stringify(dest)};a.target='_blank';
     a.textContent='apri';a.style.cssText='display:block;width:200px;height:60px';d.body.appendChild(a);</script>`,
   'un riquadro vuoto scritto da capo dentro un altro riquadro vuoto': (dest, daSolo) => `<iframe id="f" width="400" height="200"></iframe><script>
+    var DEST=${JSON.stringify(dest)},SOLO=${JSON.stringify(daSolo)};
     var esterno=document.getElementById('f').contentDocument;esterno.open();esterno.write('<iframe width=380 height=180></iframe>');esterno.close();
     var d=esterno.querySelector('iframe').contentDocument;d.open();
-    d.write('<button id=b style="width:200px;height:60px" onclick="window.open(${dest.replace(/"/g, '&quot;')})">apri</button>');
-    d.write('<scr'+'ipt>setTimeout(function(){window.open(${JSON.stringify(daSolo).replace(/"/g, '&quot;')})},600)</scr'+'ipt>');d.close();</script>`,
+    d.write('<button id=b style="width:200px;height:60px" onclick="window.open(top.DEST)">apri</button>');
+    d.write('<scr'+'ipt>setTimeout(function(){window.open(top.SOLO)},600)</scr'+'ipt>');d.close();</script>`,
   'una pagina che si riscrive da capo': (dest) => `<p>caricamento</p><script>setTimeout(function(){document.open();
     document.write('<a id=b target=_blank style="display:block;width:200px;height:60px" href="${dest}">apri</a>');document.close();},300)</script>`,
 };
