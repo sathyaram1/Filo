@@ -121,8 +121,29 @@
     }
   }
 
+  // Gli ultimi messaggi del filo per chi non ha il filo davanti (la home, il creatore di lezioni): la chat ha il tratto
+  // intero (#868) e non li riceve. Un taglio si dichiara: «…» sul testo, e quanti messaggi restano fuori.
+  const ORE_CONVERSAZIONI = 24;
+  const MAX_CONVERSAZIONI = 40;
+  const CARATTERI_CONVERSAZIONE = 300;
+  function conversazioniRecenti(messaggi, ora = Date.now()) {
+    const da = Number(ora) - ORE_CONVERSAZIONI * 3600 * 1000;
+    const recenti = (Array.isArray(messaggi) ? messaggi : [])
+      .filter((m) => m && String(m.text || '').trim() && Date.parse(m.ts) >= da);
+    const presi = recenti.slice(-MAX_CONVERSAZIONI);
+    return {
+      righe: presi.map((m) => {
+        const t = String(m.text).replace(/\s+/g, ' ').trim();
+        const testo = t.length > CARATTERI_CONVERSAZIONE ? `${t.slice(0, CARATTERI_CONVERSAZIONE)}…` : t;
+        return `- [${formatRelativeTime(m.ts)}] ${m.role === 'user' ? 'utente' : 'Filo'}: ${testo}`;
+      }),
+      tolti: recenti.length - presi.length,
+    };
+  }
+
   // `sistema: false`: il messaggio della home resta in cache per ore, e una batteria citata lì invecchierebbe.
-  async function assemble({ creditiFreschi = false, sistema: conSistema = true } = {}) {
+  // `conversazioni`: i messaggi del filo, per chi non li ha già davanti (vedi conversazioniRecenti).
+  async function assemble({ creditiFreschi = false, sistema: conSistema = true, conversazioni = null } = {}) {
     const Mem = global.SN_FILO_MEMORY;
     const now = new Date();
     const [tabs, session, timers, notifications, dashboardCache, credits, cambi, sistema, autonomia] = await Promise.all([
@@ -183,6 +204,7 @@
         ageRel: formatRelativeTime(n.ts),
       })),
       cambi: cambi ? { righe: cambi.righe || [], tolti: cambi.tolti || 0 } : null,
+      conversazioni: Array.isArray(conversazioni) ? conversazioniRecenti(conversazioni, now.getTime()) : null,
       dashboard: dashboardCache,
       credits,
       sistema,
@@ -370,6 +392,7 @@
       if (state.cambi.tolti > 0) lines.push(`(più ${state.cambi.tolti} cambi più vecchi, non elencati qui)`);
       lines.push('');
     }
+    if (state.conversazioni) lines.push(testoConversazioni(state.conversazioni, salvati), '');
     lines.push('DASHBOARD ATTUALE');
     if (state.dashboard) {
       const righe = [`Messaggio: "${String(state.dashboard.message || '').slice(0, 200)}"`];
@@ -386,5 +409,18 @@
     return lines.join('\n');
   }
 
-  global.SN_FILO_STATE = { assemble, renderForPrompt, formatRelativeTime, formatDate };
+  // Le frasi le hanno scritte l'utente e un modello che può aver letto una pagina: recinto come gli altri testi salvati.
+  function testoConversazioni(c, salvati) {
+    const E = esterno();
+    const recinto = salvati || ((righe) => E.imbusta({
+      tipo: 'TESTO_SALVATO', conIntestazione: true, testo: righe.map((r) => E.neutralizza(r, { unaRiga: true })).join('\n'),
+    }));
+    const out = [`CONVERSAZIONI RECENTI (ultime ${ORE_CONVERSAZIONI} ore, tutte le schede; dal più vecchio al più nuovo)`];
+    if (!c || !c.righe.length) out.push('(nessuna)');
+    else out.push(recinto(c.righe));
+    if (c && c.tolti > 0) out.push(`(più ${c.tolti} messaggi più vecchi, non elencati qui)`);
+    return out.join('\n');
+  }
+
+  global.SN_FILO_STATE = { assemble, renderForPrompt, formatRelativeTime, formatDate, conversazioniRecenti, testoConversazioni };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
