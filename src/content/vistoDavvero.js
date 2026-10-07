@@ -86,8 +86,7 @@
   function creaOspite() {
     ospite = DOC.createElement('div');
     ospite.setAttribute('aria-hidden', 'true');
-    ospite.style.cssText = STILE_OSPITE;
-    stileOspite = ospite.getAttribute('style');
+    fissaOspite();
     ombra = ospite.attachShadow({ mode: 'closed' });
     // Il browser ricalcola le coperture solo se qualcosa cambia forma: uno z-index alzato da solo passerebbe
     // inosservato. Un pixel che va e viene a ogni fotogramma lo costringe a guardare.
