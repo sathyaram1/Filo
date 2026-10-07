@@ -181,7 +181,9 @@
       // esfiltrazione da origine non fidata (fallback strutturale), sale a
       // costo 2, e dove la risposta è chiedere il popup mostra l'URL. Il flag `_exfil` lo calcola il
       // main (src/main/services/handlers.js → src/shared/urlExfil.js); mai l'LLM.
-      costo: (a) => (a && a._exfil ? 2 : 1),
+      // La ricerca dell'Aiuto (`cerca`) porta fuori testo della pagina: costo 2, deciso qui una volta sola
+      // (#530). Il campo può solo alzare il costo, quindi chi lo forgia non ottiene niente.
+      costo: (a) => (a && (a._exfil || a.cerca) ? 2 : 1),
       campo: 'web',
       uscita: (a) => String((a && (a.url ?? a.href ?? a.link)) || ''),
       describe: (a) => {
@@ -190,6 +192,10 @@
           const why = a._exfilReason ? ` che ${a._exfilReason}` : '';
           return `Aprire un link${why}:\n${url}\n\n`
             + 'Potrebbe inviare tuoi dati a un sito esterno. Apri solo se l\'hai chiesto tu.';
+        }
+        if (a && typeof a.cerca === 'string' && a.cerca.trim()) {
+          const t = a.cerca.trim();
+          return `Cercare sul web:\n“${t.length > 80 ? `${t.slice(0, 80)}…` : t}”`;
         }
         return `Aprire ${url}`;
       },
