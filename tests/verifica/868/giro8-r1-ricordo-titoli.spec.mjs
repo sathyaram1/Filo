@@ -1,10 +1,6 @@
-// Esplorazione del giro 8 di #868: ricordo con più tratti della stessa conversazione, prefisso dopo una lettura,
-// aspetto della sezione in Preferenze.
+// Giro 8 di #868, rilievo 1: tre pezzi ripescati dalla stessa conversazione non ripetono il suo titolo nel blocco.
 
 import { test, expect } from '../../fixtures/electron.mjs';
-import { cartellaInCasa } from '../../helpers/percorsi.mjs';
-import { writeFileSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
 
 async function newtabs(app) {
   return app.windows().filter((w) => { try { return w.url().startsWith('filo://newtab'); } catch (_) { return false; } });
@@ -79,11 +75,8 @@ async function scrivi(page, testo) {
   await page.locator('#input').fill(testo);
   await page.locator('#sendBtn').click();
 }
-const chiamate = (app) => app.evaluate(() => globalThis.__chiamate);
-const testo = (m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content));
-const posContesto = (msgs) => msgs.findIndex((m) => m.role === 'user' && testo(m).startsWith('═══ CONTESTO DI ADESSO'));
 
-test('esplora: tre tratti della stessa conversazione ricordati insieme', async ({ app }) => {
+test('r1 tre pezzi ripescati dalla stessa conversazione: il blocco di attività ne dice il titolo una volta', async ({ app }) => {
   test.setTimeout(90_000);
   const page = await primaScheda(app);
   await semina(app, {
@@ -102,66 +95,7 @@ test('esplora: tre tratti della stessa conversazione ricordati insieme', async (
   const blocco = page.locator('.dash-activity');
   await blocco.locator('.dash-activity-head').click();
   const riga = blocco.locator('.dash-activity-row', { hasText: 'Ricordato dal filo' });
-  console.log('RIGA:', await riga.innerText());
-  await blocco.screenshot({ path: 'tests/.shots/868-g8-ricordo-tre.png' });
+  await expect(riga).toContainText('Viaggio a Lisbona');
+  const volte = (await riga.innerText()).split('Viaggio a Lisbona').length - 1;
+  expect(volte).toBe(1);
 });
-
-test('esplora: dopo una lettura nella scheda, due turni di fila hanno lo stesso prefisso', async ({ app }) => {
-  test.setTimeout(120_000);
-  const page = await primaScheda(app);
-  const casa = cartellaInCasa('filo-g8-');
-  const doc = join(casa, 'nota.txt');
-  writeFileSync(doc, 'Appunto: la riunione è giovedì alle 15 in sala Verde.');
-  try {
-    await preparaModello(app, [
-      { text: '', tools: [{ name: 'LEGGI_DOCUMENTO', args: { percorso: doc } }] },
-      { text: 'Ho letto la nota.' },
-      { text: 'Primo seguito.' },
-      { text: 'Secondo seguito.' },
-    ]);
-    await scrivi(page, `leggi ${doc}`);
-    await expect(page.locator('.dash-bubble-filo', { hasText: 'Ho letto la nota.' })).toBeVisible({ timeout: 20_000 });
-    await scrivi(page, 'grazie');
-    await expect(page.locator('.dash-bubble-filo', { hasText: 'Primo seguito.' })).toBeVisible({ timeout: 20_000 });
-    await scrivi(page, 'e poi?');
-    await expect(page.locator('.dash-bubble-filo', { hasText: 'Secondo seguito.' })).toBeVisible({ timeout: 20_000 });
-    const c = await chiamate(app);
-    console.log('CHIAMATE', c.length);
-    const t2 = c[c.length - 2];
-    const t3 = c[c.length - 1];
-    const k2 = posContesto(t2);
-    const pref2 = t2.slice(0, k2);
-    const pref3 = t3.slice(0, k2);
-    let primo = -1;
-    for (let i = 0; i < pref2.length; i++) if (JSON.stringify(pref2[i]) !== JSON.stringify(pref3[i])) { primo = i; break; }
-    console.log('PRIMO DIVERSO', primo, 'su', pref2.length);
-    if (primo >= 0) {
-      console.log('T2:', JSON.stringify(pref2[primo]).slice(0, 1500));
-      console.log('T3:', JSON.stringify(pref3[primo]).slice(0, 1500));
-    }
-    console.log('LETTURA IN T3:', t3.map(testo).join('\n').includes('sala Verde'));
-    expect(primo).toBe(-1);
-  } finally {
-    rmSync(casa, { recursive: true, force: true });
-  }
-});
-
-for (const tema of ['light', 'dark']) {
-  test(`esplora: sezione «Quanto ricorda la chat» in Preferenze, tema ${tema}`, async ({ app, shell, openTab }) => {
-    test.setTimeout(60_000);
-    await shell.evaluate((t) => window.filoShell.message({ type: 'update_settings', settings: { theme: t } }), tema);
-    const page = await openTab('filo://preferences/preferences.html');
-    await page.waitForLoadState('domcontentloaded');
-    const sez = page.locator('#sec-contesto');
-    await sez.scrollIntoViewIfNeeded();
-    await page.waitForTimeout(400);
-    await sez.screenshot({ path: `tests/.shots/868-g8-pref-${tema}.png` });
-    for (const [v, atteso] of [['abc', ''], ['0', '0.5'], ['1000', '365'], ['  2  ', '2'], ['1,5', '1.5']]) {
-      await page.locator('#contestoGiorni').fill(v);
-      await page.locator('#contestoGiorni').blur();
-      await page.waitForTimeout(200);
-      console.log(`giorni «${v}» →`, JSON.stringify(await page.locator('#contestoGiorni').inputValue()),
-        JSON.stringify(await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).contestoFilo)));
-    }
-  });
-}
