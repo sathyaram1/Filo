@@ -76,12 +76,13 @@ test('il menu aperto nella pagina non vale per il riquadro di un altro sito, e v
   assert.equal(await leggi({ ...s, frame: null }), false, 'senza riquadro noto non si legge');
 });
 
-test('il segnale del menu arriva dopo la domanda: vale se arriva entro l\'attesa', async () => {
+test('il segnale del menu arriva dopo la domanda: vale se arriva entro l\'attesa', () => conOrologioFinto(async () => {
   const s = sito();
   const esito = leggi({ ...s, frame: RIQUADRO });
-  setTimeout(() => apriMenu(s, RIQUADRO), 60);
-  assert.equal(await esito, true);
-});
+  await scorri(60);
+  apriMenu(s, RIQUADRO);
+  assert.equal(await finoA(esito, { passo: 20 }), true);
+}));
 
 test('le domande che arrivano insieme dallo stesso riquadro aspettano una volta sola', async () => {
   const s = sito();
