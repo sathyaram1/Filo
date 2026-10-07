@@ -20,8 +20,12 @@
   const SCARTO_NOSTRO_MS = 300;
   // Sonde allo stesso piano del menu e DOPO di lui: le copre tutto ciò che copre il menu, mai i pezzi del menu.
   const Z = '2147483646';
-  const STILE_OSPITE = 'all:initial!important;display:block!important;position:fixed!important;top:0!important;'
-    + 'left:0!important;width:0!important;height:0!important;z-index:' + Z + '!important;pointer-events:none!important;';
+  // Lo zoom del foglio di stile sul contenitore (html { zoom: 2 }) moltiplica le misure: le sonde, posate con quelle
+  // dello schermo, guarderebbero altrove. L'host lo annulla.
+  const stileOspiteCon = (zoom) => 'all:initial!important;display:block!important;position:fixed!important;top:0!important;'
+    + 'left:0!important;width:0!important;height:0!important;z-index:' + Z + '!important;pointer-events:none!important;'
+    + (zoom === 1 ? '' : 'zoom:' + (1 / zoom) + '!important;');
+  const zoomDi = (el) => { const z = Number(el && el.currentCSSZoom); return z > 0 && Number.isFinite(z) ? z : 1; };
   const STILE_SONDA = 'position:fixed;display:block;margin:0;padding:0;border:0;background:transparent;pointer-events:none;';
   // Una voce nascosta porta la sua sonda fuori dallo schermo, mai a display:none: nascoderebbe la catena sotto.
   const FUORI = 'left:-99999px;top:-99999px;width:1px;height:1px;';
