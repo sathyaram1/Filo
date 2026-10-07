@@ -97,8 +97,17 @@
     // rende cieche: si rimettono a posto prima del disegno.
     new MutationObserver(() => {
       if (ospite.hasAttribute('popover')) ospite.removeAttribute('popover');
-      if (ospite.getAttribute('style') !== stileOspite) ospite.style.cssText = STILE_OSPITE;
+      if (ospite.getAttribute('style') !== stileOspite) fissaOspite();
     }).observe(ospite, { attributes: true, attributeFilter: ['style', 'popover'] });
+  }
+  function fissaOspite() {
+    ospite.style.cssText = stileOspiteCon(zoomOspite);
+    stileOspite = ospite.getAttribute('style');
+  }
+  // A ogni fotogramma: uno zoom cambiato dal sito a menu aperto sposterebbe le sonde.
+  function seguiZoom() {
+    const z = genitore ? zoomDi(genitore) : 1;
+    if (z !== zoomOspite) { zoomOspite = z; fissaOspite(); }
   }
 
   // Un filtro sul contenitore del menu (la pagina in scala di grigi) per il browser nasconde anche le sonde: vale per
