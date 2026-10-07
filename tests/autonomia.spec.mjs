@@ -395,6 +395,37 @@ test('l\'Aiuto su una pagina di Filo ricorda la sua ricerca sul web: dopo, il co
   await expect.poll(() => page.evaluate(() => window.__opened.length)).toBe(1);
 });
 
+test('Conservativo dopo una ricerca: «cerca sul web» dall\'Aiuto chiede una volta sola, e dice cosa cerca e perché', async ({ app, openTab }) => {
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'conservativo' } });
+    globalThis.SN_WEB_SEARCH.search = async () => ({ provider: 'finto', results: [
+      { title: 'Pagina', url: 'https://sconosciuto.test/', content: 'testo di qualcun altro' },
+    ] });
+  });
+  const page = await openTab(PREFS);
+  await page.waitForFunction(() => typeof window.__filoSidebarTest?.runPageAction === 'function', null, { timeout: 10000 });
+  await page.evaluate(() => {
+    window.__aperte = 0;
+    const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
+    chrome.runtime.sendMessage = async (msg, ...resto) => {
+      const r = await orig(msg, ...resto);
+      if (msg && msg.action && msg.action.type === 'NAVIGA' && r && r.executed) window.__aperte += 1;
+      return r;
+    };
+    window.SN_SIDEBAR.open();
+  });
+  await page.evaluate(cercaDallAiuto, 'qualcosa');
+  page.evaluate(() => window.__filoSidebarTest.runPageAction({ op: 'search_text', text: 'gatti' })).catch(() => {});
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 8000 });
+  const testo = await confirmText(page);
+  expect(testo).toContain('Cercare sul web:\n“gatti”');
+  expect(testo).toContain('Te lo chiedo perché in questo compito ho fatto una ricerca sul web.');
+  await scrollConfirmToEnd(page);
+  await clickConfirm(page, 'ok');
+  await expect.poll(() => page.evaluate(() => window.__aperte), { timeout: 8000 }).toBe(1);
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
+});
+
 test('l\'Aiuto chiuso e riaperto è una conversazione nuova: non porta con sé la ricerca di prima', async ({ app, openTab }) => {
   await app.evaluate(async () => {
     await globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'conservativo' }, terminal: { enabled: true } });
