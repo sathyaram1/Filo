@@ -288,3 +288,64 @@ test('documento letto in una scheda: in un\'altra un link con un suo pezzo chied
     rmSync(casa, { recursive: true, force: true });
   }
 });
+
+test('un documento letto in una conversazione ferma non resta davanti a Filo nelle altre schede oltre venti messaggi', async ({ app }) => {
+  test.setTimeout(150_000);
+  await primaScheda(app);
+  const casa = cartellaInCasa('filo-contesto-');
+  const doc = join(casa, 'contratto.txt');
+  writeFileSync(doc, 'Contratto di affitto. Punto 3: il canone mensile è di 742 euro, da pagare entro il giorno 5.');
+  try {
+    const N = 11;
+    const copione = [
+      { text: '', tools: [{ name: 'LEGGI_DOCUMENTO', args: { percorso: doc } }] },
+      { text: 'Ho letto il contratto.' },
+    ];
+    for (let i = 0; i < N; i++) copione.push({ text: `Risposta ${i}.` });
+    copione.push({ text: 'Il canone è 742 euro.' });
+    await preparaModello(app, copione);
+    const domanda = `leggi ${doc}`;
+    const a = await app.evaluate((_e, domanda) => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: domanda, threadHistory: [], chatId: 'scheda-contratto' }), domanda);
+    expect(a.actions.find((x) => x.type === 'LEGGI_DOCUMENTO')._executed).toBe(true);
+    let storia = [];
+    for (let i = 0; i < N; i++) {
+      const q = `domanda numero ${i} su tutt'altro`;
+      const r = await app.evaluate((_e, { q, storia }) => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: q, threadHistory: storia, chatId: 'scheda-altro' }), { q, storia });
+      storia = [...storia, { role: 'user', text: q }, { role: 'filo', text: r.text, actions: r.actions || [] }];
+    }
+    const tutte = await chiamate(app);
+    expect(tutte[2].map(testo).join('\n')).toContain('742 euro');
+    expect(tutte[tutte.length - 1].map(testo).join('\n')).not.toContain('742 euro');
+    // Nella sua scheda la lettura c'è ancora: lì vive i venti messaggi della sua conversazione.
+    const storiaA = [{ role: 'user', text: domanda }, { role: 'filo', text: a.text, actions: a.actions }];
+    await app.evaluate((_e, storiaA) => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'quanto pago al mese secondo il punto 3?', threadHistory: storiaA, chatId: 'scheda-contratto' }), storiaA);
+    const dopo = await chiamate(app);
+    expect(dopo[dopo.length - 1].map(testo).join('\n')).toContain('742 euro');
+  } finally {
+    rmSync(casa, { recursive: true, force: true });
+  }
+});
+
+test('un messaggio lunghissimo incollato e tagliato nel contesto si rilegge davvero, anche nel mezzo', async ({ app }) => {
+  test.setTimeout(90_000);
+  await primaScheda(app);
+  const lungo = 'a'.repeat(100_000) + ' SEGNO-DEL-MEZZO-77 ' + 'b'.repeat(100_000);
+  await preparaModello(app, [
+    { text: 'Letto.' },
+    { text: '', tools: [{ name: 'CERCA_CHAT', args: { id: 'scheda-lunga' } }] },
+    { text: '', tools: [{ name: 'CERCA_CHAT', args: { id: 'scheda-lunga', da: 90_000 } }] },
+    { text: 'Fatto.' },
+  ]);
+  await app.evaluate((_e, lungo) => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: lungo, threadHistory: [], chatId: 'scheda-lunga' }), lungo);
+  await app.evaluate(() => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'cosa c\'era in mezzo al testo che ti ho incollato?', threadHistory: [], chatId: 'scheda-lunga' }));
+  const tutte = await chiamate(app);
+  const secondo = tutte[1];
+  const tratto = secondo.slice(0, posContesto(secondo)).map(testo).join('\n');
+  // Il tratto lo taglia e dice con quale id e come rileggerlo...
+  expect(tratto).toContain('CERCA_CHAT con id "scheda-lunga"');
+  expect(tratto).not.toContain('SEGNO-DEL-MEZZO-77');
+  // ...la rilettura dice da dove continuare, e il pezzo chiesto ha il mezzo.
+  const esiti = tutte[3].filter((m) => m.role === 'tool').map(testo);
+  expect(esiti[0]).toMatch(/da = \d+/);
+  expect(esiti[1]).toContain('SEGNO-DEL-MEZZO-77');
+});

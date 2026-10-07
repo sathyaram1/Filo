@@ -189,6 +189,7 @@
       properties: {
         query: S('Le parole da cercare nel filo (argomento, nomi, titolo o sito di una pagina, frasi). Ometti solo quando passi `id`.'),
         id: S('L\'id di una chat trovata prima: la fa tornare per intero.'),
+        da: I('Solo con `id`: da quale carattere della trascrizione leggere, quando una chat lunga torna con la parte centrale omessa (il numero lo dice la trascrizione stessa).'),
       },
       required: [],
       risultato: true,

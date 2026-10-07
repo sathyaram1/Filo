@@ -119,6 +119,28 @@
     return `${head}\n…(parte centrale della conversazione omessa)…\n${tail}`;
   }
 
+  // La trascrizione per CERCA_CHAT con l'id: testa e coda come sopra, ma la parte omessa si legge davvero, a pezzi,
+  // richiamando con `da` (#868: il contesto della chat promette di rileggere intero un messaggio tagliato).
+  const PEZZO_RILETTURA = 30000;
+  function transcriptForReading(messages, { da = null, cap = 8000, pezzo = PEZZO_RILETTURA } = {}) {
+    const full = (Array.isArray(messages) ? messages : [])
+      .filter((m) => m && String(m.text || '').trim())
+      .map((m) => `${m.role === 'user' ? 'Utente' : 'Filo'}: ${String(m.text).replace(/\s+/g, ' ').trim()}`)
+      .join('\n');
+    const n = full.length;
+    const inizio = Number(da);
+    if (da == null || da === '' || !Number.isFinite(inizio)) {
+      if (n <= cap) return full;
+      const a = Math.floor(cap * 0.6);
+      const b = n - Math.floor(cap * 0.4);
+      return `${full.slice(0, a)}\n…(parte centrale omessa: caratteri ${a}-${b} di ${n}; si legge richiamando CERCA_CHAT con questo id e da = ${a})…\n${full.slice(b)}`;
+    }
+    const a = Math.min(n, Math.max(0, Math.floor(inizio)));
+    const b = Math.min(n, a + pezzo);
+    const dopo = b < n ? `; il seguito con da = ${b}` : '; qui finisce la conversazione';
+    return `…(caratteri ${a}-${b} di ${n}${dopo})…\n${full.slice(a, b)}`;
+  }
+
   // ── Voce d'elenco ────────────────────────────────────────────────────────
   // Quello che la pagina Cronologia deve mostrare senza scaricarsi addosso
   // tutte le conversazioni: titolo, date, tipo, quanti messaggi, e un estratto
@@ -514,6 +536,7 @@
     normalizeKindOrNull,
     parseTriage,
     transcriptForTriage,
+    transcriptForReading,
     toIndexEntry,
     excerptOf,
     isVisibleByDefault,

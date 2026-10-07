@@ -2441,8 +2441,8 @@ async function eseguiAzioneFilo(action, {
                 title: chat.title || ChatArchive.fallbackTitle(chat.messages),
                 date: chat.closedAt || chat.updatedAt || chat.startedAt || null,
                 // La trascrizione arriva già nella forma "Utente: … / Filo: …",
-                // con testa e coda se è lunghissima (mai un taglio muto).
-                transcript: ChatArchive.transcriptForTriage(chat.messages, 8000),
+                // con testa e coda se è lunghissima (mai un taglio muto): il mezzo si chiede con `da`.
+                transcript: ChatArchive.transcriptForReading(chat.messages, { da: action.da }),
               },
             };
           }

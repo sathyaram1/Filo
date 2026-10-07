@@ -22,10 +22,14 @@ in testa ai messaggi dell'utente. La logica è in `src/shared/filoContesto.js` (
   suoi esiti, in ogni scheda: tolto alla sola penultima cambierebbe a ogni turno un messaggio già in cache. Una
   conversazione ripresa da prima dei tetti riporta i suoi ultimi messaggi dentro un quarto del tetto in token, e la
   finestra si stringe di altrettanto: il tetto vale sempre.
-- **Le letture vivono venti messaggi della loro conversazione** (#553.2, decisione dell'owner aperta): l'esito di
-  una pagina, un documento, un comando entra nel messaggio che l'ha prodotto finché è fra gli ultimi venti della sua
-  chat, come prima del filo unico, e lo vede ogni scheda; poi resta solo il nome dell'azione. Contati sul filo intero
-  morivano prima di oggi a chi parla in due schede. Gli esiti stanno in memoria (mai su disco) e se ne vanno con la loro chat.
+- **Le letture non vivono più di prima** (#553.2, decisione dell'owner aperta): l'esito di una pagina, un documento,
+  un comando, e il ragionamento di una risposta, entrano nel messaggio che li ha prodotti finché è fra gli ultimi
+  venti della sua chat, nella scheda di quella chat; nelle altre schede solo finché è anche fra gli ultimi venti del
+  filo. Poi resta il nome dell'azione. Contati solo sul filo morivano prima di oggi a chi parla in due schede; contati
+  solo sulla loro chat, una chat ferma li teneva davanti a ogni scheda per giorni. Gli esiti stanno in memoria (mai
+  su disco) e se ne vanno con la loro chat.
+- **Un messaggio tagliato si rilegge davvero**: oltre un quarto del tetto restano testa e coda, con l'id intero della
+  chat; CERCA_CHAT con l'id dà testa e coda e il numero da cui leggere il mezzo, e con `da` lo dà a pezzi.
 - **Ogni azione il cui esito arriva al modello conta per le uscite** (#587): `azioniViste` nasce dagli stessi esiti
   che finiscono nel prompt, quindi un documento letto in una scheda fa chiedere conferma a un link con un suo pezzo
   aperto da un'altra.
