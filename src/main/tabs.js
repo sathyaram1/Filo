@@ -2820,7 +2820,7 @@ class TabManager {
   _hardenAuthPopup(win, origine = null) {
     if (!win || !win.webContents) return;
     const pwc = win.webContents;
-    registraFinestraDelSito(win);
+    registraFinestraDelSito(win, this.win);
     installaPermessi(pwc.session);
     Permessi.seguiGesti(pwc);
     try {
