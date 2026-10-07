@@ -41,7 +41,17 @@ test('r1 «la pagina sulle orche»: la ricerca nel filo trova la pagina visitata
   const url = testServer.html('<!doctype html><title>Orche - Wikipedia</title><h1>Orche</h1>');
   await app.evaluate(async (_e, { url, ora }) => {
     const E = globalThis.SN_FILO_EVENTI;
-    const ev = [E.crea(E.TIPI.NAVIGAZIONE, { url, titolo: 'Orche - Wikipedia' }, { ts: new Date(ora - 20 * 3600000).toISOString(), dispositivo: 'prova', autore: 'utente' })];
+    const ts = (oreFa, piu = 0) => new Date(ora - oreFa * 3600000 + piu).toISOString();
+    const meta = (oreFa, autore, piu) => ({ ts: ts(oreFa, piu), dispositivo: 'prova', autore });
+    const T = E.TIPI;
+    // Una chat sulle orche c'è anche: la ricerca trova lei, e il modello non ha motivo di riprovare.
+    const ev = [
+      E.crea(T.CHAT_APERTA, { chat: 'orche-chat' }, meta(30, 'utente', 0)),
+      E.crea(T.MESSAGGIO, { chat: 'orche-chat', msg: { role: 'user', text: 'le orche cacciano in gruppo?' } }, meta(30, 'utente', 1000)),
+      E.crea(T.MESSAGGIO, { chat: 'orche-chat', msg: { role: 'filo', text: 'Sì, in branchi familiari.' } }, meta(30, 'filo', 5000)),
+      E.crea(T.CHAT_CHIUSA, { chat: 'orche-chat' }, meta(29, 'utente', 0)),
+      E.crea(T.NAVIGAZIONE, { url, titolo: 'Orche - Wikipedia' }, meta(20, 'utente', 0)),
+    ];
     await globalThis.SN_IL_FILO.importa(ev.map(E.riga).join(''));
   }, { url, ora: Date.now() });
   await preparaModello(app, [
@@ -64,14 +74,15 @@ test('r2 un documento letto in una scheda resta davanti a Filo in quella scheda 
       { text: '', tools: [{ name: 'LEGGI_DOCUMENTO', args: { percorso: doc } }] },
       { text: 'Ho letto il contratto.' },
     ];
-    for (let i = 0; i < 11; i++) copione.push({ text: `Risposta ${i}.` });
+    const N = Number(process.env.N868 || 11);
+    for (let i = 0; i < N; i++) copione.push({ text: `Risposta ${i}.` });
     copione.push({ text: 'Il canone è 742 euro.' });
     await preparaModello(app, copione);
     const domanda = `leggi ${doc}`;
     const a = await app.evaluate((_e, domanda) => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: domanda, threadHistory: [], chatId: 'scheda-contratto' }), domanda);
     expect(a.actions.find((x) => x.type === 'LEGGI_DOCUMENTO')._executed).toBe(true);
     let storiaB = [];
-    for (let i = 0; i < 11; i++) {
+    for (let i = 0; i < N; i++) {
       const q = `domanda numero ${i} su tutt'altro`;
       const r = await app.evaluate((_e, { q, storiaB }) => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: q, threadHistory: storiaB, chatId: 'scheda-altro' }), { q, storiaB });
       storiaB = [...storiaB, { role: 'user', text: q }, { role: 'filo', text: r.text, actions: r.actions || [] }];
@@ -85,4 +96,27 @@ test('r2 un documento letto in una scheda resta davanti a Filo in quella scheda 
   } finally {
     rmSync(casa, { recursive: true, force: true });
   }
+});
+
+test('r3 col tetto in token più basso, la conversazione della scheda non lo scavalca', async ({ app }) => {
+  test.setTimeout(90_000);
+  await preparaModello(app, [{ text: 'Ok.' }]);
+  await app.evaluate(async (_e, ora) => {
+    const E = globalThis.SN_FILO_EVENTI;
+    const T = E.TIPI;
+    const meta = (minFa, autore) => ({ ts: new Date(ora - minFa * 60000).toISOString(), dispositivo: 'prova', autore });
+    const ev = [E.crea(T.CHAT_APERTA, { chat: 'lunga' }, meta(120, 'utente'))];
+    for (let i = 0; i < 30; i++) {
+      const role = i % 2 ? 'filo' : 'user';
+      ev.push(E.crea(T.MESSAGGIO, { chat: 'lunga', msg: { role, text: `testo incollato numero ${i}: ${'parola '.repeat(300)}` } }, meta(100 - i, role === 'user' ? 'utente' : 'filo')));
+    }
+    await globalThis.SN_IL_FILO.importa(ev.map(E.riga).join(''));
+    await globalThis.SN_STORAGE.updateSettings({ contestoFilo: { token: 2000 } });
+  }, Date.now());
+  await app.evaluate(() => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'riassumi', threadHistory: [], chatId: 'lunga' }));
+  const [primo] = await app.evaluate(() => globalThis.__chiamate);
+  const k = primo.findIndex((m) => m.role === 'user' && testo(m).startsWith('═══ CONTESTO DI ADESSO'));
+  const caratteri = primo.slice(1, k).reduce((n, m) => n + testo(m).length, 0);
+  // Il tetto è di 2000 token: circa 7000 caratteri, alla stima che usa Filo stesso.
+  expect(caratteri).toBeLessThanOrEqual(2000 * 3.5);
 });
