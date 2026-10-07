@@ -441,22 +441,59 @@
     return (w > 0 && r.left >= w) || (h > 0 && r.top >= h);
   }
 
-  // Ritagliato via del tutto da una maschera: è il modo in cui certi siti chiudono un pannello. Sotto i quattro
-  // pixel no: lì è la ricetta del testo per i lettori di schermo, che nessuno apre e che va tradotto col resto.
+  // Ritagliato via del tutto: una maschera (di qualunque forma) o il vecchio ritaglio rettangolare lasciano zero area.
+  // È il modo in cui certi siti chiudono un pannello o uno spazio pubblicitario. Sotto i quattro pixel no: lì è la
+  // ricetta del testo per i lettori di schermo, che nessuno apre e che va tradotto col resto.
   function isClippedAwayByPath(el, cs) {
-    const cp = cs.clipPath;
-    if (!cp || cp.indexOf('inset(') !== 0) return false;
+    const cp = cs.clipPath && cs.clipPath !== 'none' ? cs.clipPath : '';
+    const vecchio = cs.clip && cs.clip !== 'auto' && (cs.position === 'absolute' || cs.position === 'fixed') ? cs.clip : '';
+    if (!cp && !vecchio) return false;
     let r;
     try { r = el.getBoundingClientRect(); } catch (_) { return false; }
     if (r.width < 4 || r.height < 4) return false;
-    const parti = cp.slice(6, cp.indexOf(')')).trim().split(/\s+/);
-    if (!parti.length || parti.length > 4) return false;
-    const [alto, destra = alto, basso = alto, sinistra = destra] = parti;
-    const misura = (v, base) => (v.endsWith('%') ? (parseFloat(v) / 100) * base : parseFloat(v));
-    const y = misura(alto, r.height) + misura(basso, r.height);
-    const x = misura(sinistra, r.width) + misura(destra, r.width);
-    if (!Number.isFinite(y) || !Number.isFinite(x)) return false;
-    return y >= r.height - 0.5 || x >= r.width - 0.5;
+    const misura = (v, base) => (String(v).endsWith('%') ? (parseFloat(v) / 100) * base : parseFloat(v));
+    const dentro = (txt) => txt.slice(txt.indexOf('(') + 1, txt.lastIndexOf(')')).trim();
+    if (vecchio && vecchio.indexOf('rect(') === 0) {
+      // rect(alto, destra, basso, sinistra) misurati dal bordo in alto a sinistra; `auto` è il bordo stesso.
+      const v = dentro(vecchio).split(/[\s,]+/);
+      if (v.length === 4) {
+        const lato = (x, auto) => (x === 'auto' ? auto : parseFloat(x));
+        const h = lato(v[2], r.height) - lato(v[0], 0);
+        const w = lato(v[1], r.width) - lato(v[3], 0);
+        if (Number.isFinite(h) && Number.isFinite(w) && (h <= 0.5 || w <= 0.5)) return true;
+      }
+    }
+    if (!cp) return false;
+    const forma = cp.slice(0, cp.indexOf('('));
+    const corpo = dentro(cp).split(/\s+at\s+/)[0].trim();
+    if (forma === 'inset') {
+      const parti = corpo.split(/\s+round\s+/)[0].trim().split(/\s+/);
+      if (!parti.length || parti.length > 4) return false;
+      const [alto, destra = alto, basso = alto, sinistra = destra] = parti;
+      const y = misura(alto, r.height) + misura(basso, r.height);
+      const x = misura(sinistra, r.width) + misura(destra, r.width);
+      if (!Number.isFinite(y) || !Number.isFinite(x)) return false;
+      return y >= r.height - 0.5 || x >= r.width - 0.5;
+    }
+    if (forma === 'circle' || forma === 'ellipse') {
+      const raggi = corpo.split(/\s+/).filter(Boolean);
+      if (!raggi.length) return false;
+      const base = forma === 'circle' ? [Math.hypot(r.width, r.height) / Math.SQRT2] : [r.width, r.height];
+      return raggi.some((x, i) => { const n = misura(x, base[i] || base[0]); return Number.isFinite(n) && n <= 0.25; });
+    }
+    if (forma === 'polygon') {
+      const punti = corpo.replace(/^(nonzero|evenodd)\s*,\s*/, '').split(',').map((c) => c.trim().split(/\s+/))
+        .map(([x, y]) => [misura(x, r.width), misura(y, r.height)]);
+      if (punti.length < 3 || punti.some(([x, y]) => !Number.isFinite(x) || !Number.isFinite(y))) return false;
+      let area = 0;
+      for (let i = 0; i < punti.length; i++) {
+        const [x1, y1] = punti[i];
+        const [x2, y2] = punti[(i + 1) % punti.length];
+        area += x1 * y2 - x2 * y1;
+      }
+      return Math.abs(area) / 2 <= 0.5;
+    }
+    return false;
   }
 
   // Schiacciato a zero e ritagliato (`max-height:0` più `overflow:hidden`). Il RITAGLIO è la condizione che conta:
@@ -776,7 +813,9 @@
     }
     const sX = window.scrollX || 0;
     const sY = window.scrollY || 0;
-    const rangeX = Math.max(0, ((de && de.scrollWidth) || 0) - vw);
+    // Una pagina che non scorre di lato non porta da nessuna parte chi sta oltre il bordo. In verticale no: lo
+    // stesso stile lo mette il sito mentre un suo banner tiene ferma la pagina, e sotto c'è contenuto vero.
+    const rangeX = viewportClipsX() ? 0 : Math.max(0, ((de && de.scrollWidth) || 0) - vw);
     const rangeY = Math.max(0, ((de && de.scrollHeight) || 0) - vh);
     const dirEl = styleOf(de) || (document.body && styleOf(document.body));
     const rtl = !!(dirEl && dirEl.direction === 'rtl');
