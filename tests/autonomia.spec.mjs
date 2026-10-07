@@ -351,13 +351,14 @@ test('l\'Aiuto su una pagina di Filo ricorda la sua ricerca sul web: dopo, il co
   });
   const page = await openTab(PREFS);
   await page.waitForFunction(() => typeof window.__filoSidebarTest?.runPageAction === 'function', null, { timeout: 10000 });
-  // La ricerca esce dal ponte NAVIGA del main (#810): si contano le aperture chieste lì.
+  // La ricerca esce dal ponte NAVIGA del main (#810), che decide se chiedere: si contano le aperture fatte davvero.
   await page.evaluate(() => {
     window.__opened = [];
     const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
-    chrome.runtime.sendMessage = (msg, ...resto) => {
-      if (msg && msg.type === 'filo_run_action' && msg.action && msg.action.type === 'NAVIGA') window.__opened.push(msg.action.url);
-      return orig(msg, ...resto);
+    chrome.runtime.sendMessage = async (msg, ...resto) => {
+      const r = await orig(msg, ...resto);
+      if (msg && msg.action && msg.action.type === 'NAVIGA' && r && r.executed) window.__opened.push(msg.action.url);
+      return r;
     };
     window.SN_SIDEBAR.open();
   });
@@ -381,13 +382,14 @@ test('l\'Aiuto su una pagina di Filo ricorda la sua ricerca sul web: dopo, il co
   // Una pagina nuova è un compito nuovo.
   await page.reload();
   await page.waitForFunction(() => typeof window.__filoSidebarTest?.runPageAction === 'function', null, { timeout: 10000 });
-  // La ricerca esce dal ponte NAVIGA del main (#810): si contano le aperture chieste lì.
+  // La ricerca esce dal ponte NAVIGA del main (#810), che decide se chiedere: si contano le aperture fatte davvero.
   await page.evaluate(() => {
     window.__opened = [];
     const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
-    chrome.runtime.sendMessage = (msg, ...resto) => {
-      if (msg && msg.type === 'filo_run_action' && msg.action && msg.action.type === 'NAVIGA') window.__opened.push(msg.action.url);
-      return orig(msg, ...resto);
+    chrome.runtime.sendMessage = async (msg, ...resto) => {
+      const r = await orig(msg, ...resto);
+      if (msg && msg.action && msg.action.type === 'NAVIGA' && r && r.executed) window.__opened.push(msg.action.url);
+      return r;
     };
     window.SN_SIDEBAR.open();
   });
@@ -395,7 +397,7 @@ test('l\'Aiuto su una pagina di Filo ricorda la sua ricerca sul web: dopo, il co
   await expect.poll(() => page.evaluate(() => window.__opened.length)).toBe(1);
 });
 
-test('Conservativo dopo una ricerca: «cerca sul web» dall\'Aiuto chiede una volta sola, e dice cosa cerca e perché', async ({ app, openTab }) => {
+test('Conservativo dopo una ricerca: «cerca sul web» dall\'Aiuto chiede una volta sola, e dice cosa cerca', async ({ app, openTab }) => {
   await app.evaluate(async () => {
     await globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'conservativo' } });
     globalThis.SN_WEB_SEARCH.search = async () => ({ provider: 'finto', results: [
@@ -418,8 +420,8 @@ test('Conservativo dopo una ricerca: «cerca sul web» dall\'Aiuto chiede una vo
   page.evaluate(() => window.__filoSidebarTest.runPageAction({ op: 'search_text', text: 'gatti' })).catch(() => {});
   await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 8000 });
   const testo = await confirmText(page);
+  // A Conservativo il costo 2 chiede anche a compito pulito: il perché della lettura qui non serve.
   expect(testo).toContain('Cercare sul web:\n“gatti”');
-  expect(testo).toContain('Te lo chiedo perché in questo compito ho fatto una ricerca sul web.');
   await scrollConfirmToEnd(page);
   await clickConfirm(page, 'ok');
   await expect.poll(() => page.evaluate(() => window.__aperte), { timeout: 8000 }).toBe(1);

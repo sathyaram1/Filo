@@ -66,11 +66,15 @@ async function prep(page) {
     T.__origRead = T.readAloud;
     T.readAloud = async (t) => { window.__calls.read.push(t); };
 
-    // Spia sul ponte azioni-Filo (per open_link → NAVIGA), delegando all'originale.
+    // Spia sul ponte azioni-Filo (per open_link → NAVIGA), delegando all'originale. `navFatte`: le aperture che
+    // il main ha eseguito davvero, dopo l'eventuale domanda che decide lui (#530).
+    window.__calls.navFatte = [];
     const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
-    chrome.runtime.sendMessage = (msg, ...rest) => {
+    chrome.runtime.sendMessage = async (msg, ...rest) => {
       if (msg && msg.type === 'filo_run_action') window.__calls.navItems.push(msg.action);
-      return orig(msg, ...rest);
+      const r = await orig(msg, ...rest);
+      if (msg && msg.action && msg.action.type === 'NAVIGA' && r && r.executed) window.__calls.navFatte.push(msg.action);
+      return r;
     };
   });
 }
@@ -117,8 +121,8 @@ test('testo: cerca sul web chiede conferma; Annulla non cerca, OK apre la ricerc
   await expect(host).toBeVisible();
   await clickConfirm(page, 'cancel');
   await expect(host).toHaveCount(0);
-  expect(await page.evaluate(() => window.__calls.navItems.length)).toBe(0);
   await expect(page.locator('.sn-sidebar-log').last()).toContainText('annullata');
+  expect(await page.evaluate(() => window.__calls.navFatte.length)).toBe(0);
 
   // 2) OK → apre la ricerca Google con il testo, passando dal ponte NAVIGA: la domanda
   // esce dalla porta delle uscite del main come ogni altra ricerca dell'assistente (#810).
@@ -126,8 +130,8 @@ test('testo: cerca sul web chiede conferma; Annulla non cerca, OK apre la ricerc
   await expect(host).toBeVisible();
   await clickConfirm(page, 'ok');
   await expect(host).toHaveCount(0);
-  await expect.poll(() => page.evaluate(() => window.__calls.navItems.length)).toBe(1);
-  const nav = await page.evaluate(() => window.__calls.navItems[0]);
+  await expect.poll(() => page.evaluate(() => window.__calls.navFatte.length)).toBe(1);
+  const nav = await page.evaluate(() => window.__calls.navFatte[0]);
   expect(nav.type).toBe('NAVIGA');
   expect(nav.url).toContain('google.com/search');
   expect(nav.url).toContain(encodeURIComponent('gatti buffi'));
