@@ -1,3 +1,4 @@
+// Copia di giro2-conferma-che-non-fa-niente.spec.mjs adattata a main (terminale acceso di serie #892, frasi del filo #867, rifiuto prima del popup #949, suggerimenti come carta #870).
 // #567.1/2/4, secondo giro — la stessa domanda della segnalazione («perché non
 // è successo niente?») sulla porta che resta: l'impostazione che Filo chiede di
 // confermare e che poi non parte.
@@ -31,18 +32,20 @@ test('confermata un\'impostazione che non si può applicare, l\'utente deve capi
   await chiedi(page, 'attiva la modalità terminale quando serve');
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Fatto.' })).toBeVisible({ timeout: 10_000 });
 
-  // Il popup si apre da solo: l'utente legge e conferma.
-  await expect.poll(() => confirmText(page), { timeout: 10_000 }).not.toBe('');
+  // Su main un valore che Filo non sa applicare si rifiuta prima del popup (#949); se il popup c'è, l'utente
+  // legge e conferma.
+  await page.waitForTimeout(1_500);
   const testoPopup = await confirmText(page);
-  await clickConfirm(page, 'ok', { timeout: 10_000 });
-
   const btn = page.locator('.dash-bubble-actions .dash-action-btn').first();
-  await expect(btn).toContainText('✗', { timeout: 10_000 });
+  if (testoPopup) {
+    await clickConfirm(page, 'ok', { timeout: 10_000 });
+    await expect(btn).toContainText('✗', { timeout: 10_000 });
+  }
 
   const activity = page.locator('.dash-activity');
   await activity.locator('.dash-activity-head').click();
   const righe = await activity.locator('.dash-activity-body .dash-activity-row').allTextContents();
-  const testoBtn = (await btn.textContent()) || '';
+  const testoBtn = (await btn.count()) ? ((await btn.textContent()) || '') : '';
   const spiega = /non applicat|non riuscit|non valid|non sa|non è partit/i.test(`${righe.join(' | ')} ${testoBtn}`)
     && !/^\s*✗ Non eseguita\s*$/.test(testoBtn.trim());
   expect(spiega, `popup: ${JSON.stringify(testoPopup)} — bottone: ${JSON.stringify(testoBtn)} — diario: ${JSON.stringify(righe)}`).toBe(true);

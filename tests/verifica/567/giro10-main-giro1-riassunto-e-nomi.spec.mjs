@@ -1,3 +1,4 @@
+// Copia di giro1-riassunto-e-nomi.spec.mjs adattata a main (terminale acceso di serie #892, frasi del filo #867, rifiuto prima del popup #949, suggerimenti come carta #870).
 // #567.1 e #567.4 — quello che l'utente legge del diario del lavoro.
 //
 // 1: un'impostazione confermata nel popup arriva DOPO che il riassunto è già
@@ -39,7 +40,7 @@ test('l\'impostazione applicata subito si legge in italiano e il riassunto la co
   await expect(riga).toHaveCount(1);
   const testo = await riga.textContent();
   // La frase in italiano, non «dimensione_testo = grande».
-  expect(testo).toContain('Dimensione del testo');
+  expect(testo.toLowerCase()).toContain('dimensione del testo');
   expect(testo).toContain('110%');
   expect(testo).not.toContain('dimensione_testo');
   expect(testo).not.toContain('= grande');
@@ -53,6 +54,8 @@ test('l\'impostazione confermata nel popup rifà il riassunto, che non resta «C
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible();
   await configureModel(app);
+  // Su main la modalità terminale nasce accesa: la si spegne, o non c'è niente da cambiare.
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: false } }); });
 
   await fakeProvider(app, [
     { toolCalls: [{ id: 'p2', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"modalita_terminale","valore":"si"}' }] },
@@ -74,7 +77,7 @@ test('l\'impostazione confermata nel popup rifà il riassunto, che non resta «C
   const righe = activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Impostato' });
   await expect(righe).toHaveCount(1);
   const testo = await righe.textContent();
-  expect(testo).toContain('Modalità terminale');
+  expect(testo.toLowerCase()).toContain('modalità terminale');
   expect(testo).not.toContain('modalita_terminale');
 
   // È cambiata davvero, non solo a parole.
@@ -94,6 +97,8 @@ test('la conferma annullata non fa dire al riassunto che l\'impostazione è camb
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible();
   await configureModel(app);
+  // Su main la modalità terminale nasce accesa: la si spegne, o non c'è niente da cambiare.
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: false } }); });
 
   await fakeProvider(app, [
     { toolCalls: [{ id: 'p3', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"modalita_terminale","valore":"si"}' }] },

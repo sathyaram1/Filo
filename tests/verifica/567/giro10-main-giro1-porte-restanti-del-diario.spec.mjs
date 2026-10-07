@@ -1,3 +1,4 @@
+// Copia di giro1-porte-restanti-del-diario.spec.mjs adattata a main (terminale acceso di serie #892, frasi del filo #867, rifiuto prima del popup #949, suggerimenti come carta #870).
 // Le porte restanti della stessa causa di #567.1 e #567.4.
 //
 // Il titolo del blocco e le righe del diario nascono da due tabelle: un verbo
@@ -76,7 +77,8 @@ test('tema scuro: il riquadro del comando bloccato e il diario restano leggibili
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible();
   await configureModel(app);
-  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }); });
+  // Su main la modalità terminale nasce accesa: il riquadro del comando bloccato vuole che sia spenta.
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ theme: 'dark', terminal: { enabled: false } }); });
   await page.reload();
   await expect(page.locator('#input')).toBeVisible({ timeout: 10_000 });
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.snTheme || ''), { timeout: 8_000 }).toBe('dark');

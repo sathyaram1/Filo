@@ -1,3 +1,4 @@
+// Copia di giro3-quel-che-il-click-fa.spec.mjs adattata a main (terminale acceso di serie #892, frasi del filo #867, rifiuto prima del popup #949, suggerimenti come carta #870).
 // #567.1/2, terzo giro — due famiglie sulla stessa chat della home.
 //
 // A) Un'azione che Filo NON esegue perché tocca all'utente finirla (riordina le
@@ -129,7 +130,8 @@ test('il riordino chiesto da un suggerimento della home deve dire com\'è andato
     }
   }, type);
 
-  const sug = page.locator('.dash-suggestion', { hasText: 'Fai pulizia delle schede' });
+  // Su main i suggerimenti sono una carta della home (#870).
+  const sug = page.locator('.dash-carta[data-tipo="suggerimenti"] .dash-carta-voce', { hasText: 'Fai pulizia delle schede' });
   await expect(sug).toBeVisible({ timeout: 10_000 });
   await sug.click();
   await clickConfirm(page, 'ok', { timeout: 10_000 });
