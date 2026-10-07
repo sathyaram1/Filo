@@ -576,3 +576,37 @@ test('il rapporto del worker porta a parte i turni dell\'orchestratore, e la cac
     assert.match(riassunto(rep)[3], /orchestratore \$/);
   } finally { rmSync(base, { recursive: true, force: true }); }
 });
+
+// Worker in sottofondo (il default di Claude Code): la chiamata riceve subito
+// «Async agent launched», la fine arriva come notifica in più forme.
+const lanciato = (id, ts) => JSON.stringify({ type: 'user', timestamp: ts, sessionId: 'orch', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: [{ type: 'text', text: 'Async agent launched successfully.\nagentId: x' }] }] } });
+const notifica = (id) => `<task-notification>\n<task-id>x</task-id>\n<tool-use-id>${id}</tool-use-id>\n<status>completed</status>\n</task-notification>`;
+const SOTTOFONDO = [
+  orch('s1', H('10:00:00'), { cw: 30000 }),
+  orch('s2', H('10:00:50'), { cr: 30000, tool: { type: 'tool_use', id: 'bg1', name: 'Agent', input: {} } }),
+  lanciato('bg1', H('10:00:53')),
+  orch('s3', H('10:01:00'), { cr: 30500 }),
+  JSON.stringify({ type: 'queue-operation', operation: 'enqueue', timestamp: H('11:31:05'), content: notifica('bg1') }),
+  JSON.stringify({ type: 'attachment', timestamp: H('11:31:05'), attachment: { type: 'queued_command', prompt: notifica('bg1') } }),
+  JSON.stringify({ type: 'user', timestamp: H('11:31:06'), message: { role: 'user', content: notifica('bg1') } }),
+  orch('s4', H('11:31:10'), { cw: 32000 }),
+  orch('s5', H('11:31:20'), { cr: 32000 }),
+  orch('s6', H('11:31:50'), { cr: 32500, tool: { type: 'tool_use', id: 'bg2', name: 'Agent', input: {} } }),
+  lanciato('bg2', H('11:31:53')),
+  orch('s7', H('11:32:00'), { cr: 33000 }),
+];
+
+test('worker in sottofondo: la finestra va dalla notifica del worker di prima a adesso, con l\'attesa vera e la cache riscritta', async () => {
+  const ids = (f) => f.righe.map((l) => JSON.parse(l)).filter((e) => e.type === 'assistant').map((e) => e.message.id);
+  const primo = finestraOrchestratore(SOTTOFONDO.slice(0, 4));
+  assert.deepEqual(ids(primo), ['s1', 's2', 's3'], 'il turno d\'attesa dopo il lancio è del primo worker');
+  const secondo = finestraOrchestratore(SOTTOFONDO);
+  assert.deepEqual(ids(secondo), ['s4', 's5', 's6', 's7']);
+  assert.equal(secondo.attesaPrimaS, 5410, 'da s3 a s4: un\'ora e mezza ferma, la cache a un\'ora è scaduta');
+  const r = await analizzaRighe(secondo.righe, { role: 'orchestrator' });
+  assert.equal(r.rewarmTurns, 1, 's4 riscrive la cache');
+  // Il lancio in primo piano, a parità di passi, dà la stessa finestra.
+  const primoPiano = SOTTOFONDO.filter((l) => !l.includes('Async agent') && !l.includes('task-notification'));
+  primoPiano.splice(3, 0, fine('bg1', H('11:31:05')));
+  assert.deepEqual(ids(finestraOrchestratore(primoPiano.slice(0, -1))), ['s4', 's5', 's6']);
+});

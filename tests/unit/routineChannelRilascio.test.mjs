@@ -12,13 +12,21 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
-import { mkdirSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const mod = await import('../../scripts/routine-channel.mjs');
+const { rapportoVuoto } = await import('../../scripts/session-report.mjs');
+
+test('il rapporto di ripiego, quando generarlo fallisce, porta la stessa versione di quello vero', () => {
+  const src = readFileSync(resolve(REPO, 'scripts', 'routine-channel.mjs'), 'utf8');
+  const m = src.match(/rapporto = \{ v: (\d+), role: ruolo/);
+  assert.ok(m, 'il rapporto di ripiego c\'è ancora');
+  assert.equal(Number(m[1]), rapportoVuoto().v);
+});
 const {
   heartbeat, release, releaseConRapporto, pushRamoCorrente, statoContenitore,
   memoriaContenitore, uptimeContenitore, rssProcessi, commitRestante,
@@ -342,7 +350,7 @@ describe('release da riga di comando', () => {
       const rilascio = ricevute.find((x) => x.url.includes('routineRelease'));
       assert.ok(rilascio, 'il server ha ricevuto il rilascio');
       assert.equal(rilascio.body.ticket, 'tkt-cli');
-      assert.equal(rilascio.body.report.v, 2);
+      assert.equal(rilascio.body.report.v, rapportoVuoto().v);
       assert.equal(rilascio.body.report.role, 'resolver');
       assert.equal(rilascio.body.report.ticket, 'tkt-cli');
       assert.ok(Array.isArray(rilascio.body.report.notes) && rilascio.body.report.notes.length >= 1, 'senza transcript: la nota c\'è');

@@ -360,7 +360,7 @@ export function trovaTranscript({ explicit = '', env = process.env, cwd = proces
  * tool_use di nome Agent o Task; `longestToolS` = distanza massima fra un
  * tool_use e il suo tool_result.
  */
-export async function analizzaRighe(righe, { role = '', ticket = '', since = '', finestreAgent = null } = {}) {
+export async function analizzaRighe(righe, { role = '', ticket = '', since = '', finestreAgent = null, continua = false } = {}) {
   const rep = rapportoVuoto({ role, ticket });
   // L'usage di ogni messaggio, per id: un messaggio su più righe (pensa, poi
   // chiama uno strumento) porta sulla PRIMA riga un output parziale (2, 5, 7
@@ -459,8 +459,8 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
     const out = Number(u.output_tokens) || 0;
     rep.turns += 1;
     if (effort) rep.effort[chiaveSicura(effort)] = (rep.effort[chiaveSicura(effort)] || 0) + 1;
-    if (rep.turns > 1 && cr === 0 && cw >= 20000) rep.coldTurns += 1;
-    if (rep.turns > 1 && cw >= 20000 && cw > cr) { rep.rewarmTurns += 1; rep.rewarmTokens += cw; }
+    if ((rep.turns > 1 || continua) && cr === 0 && cw >= 20000) rep.coldTurns += 1;
+    if ((rep.turns > 1 || continua) && cw >= 20000 && cw > cr) { rep.rewarmTurns += 1; rep.rewarmTokens += cw; }
     rep.maxContextTokens = Math.max(rep.maxContextTokens, input + cw + cr);
     rep.tokens.input += input;
     rep.tokens.cacheWrite += cw;
@@ -641,9 +641,10 @@ export function sommaSottoAgente(rep, sub) {
 /**
  * Le righe del thread principale che toccano al biglietto in corso: i turni
  * dell'orchestratore dopo la fine del worker di prima (o dopo un suo rilascio
- * di un biglietto morto, già contato lì) fino alla chiamata Agent ancora aperta,
- * quella del worker che sta rilasciando. Ogni turno finisce in un rapporto solo;
- * restano fuori quelli dopo l'ultimo rilascio della sessione. PURA.
+ * di un biglietto morto, già contato lì) fino a adesso, cioè fino al rilascio
+ * del worker che sta lavorando. Un worker lanciato in sottofondo (il default di
+ * Claude Code) riceve subito «Async agent launched»: la sua fine è la notifica
+ * col suo tool-use-id, non quel risultato. PURA.
  */
 export function finestraOrchestratore(linee) {
   const voci = [];
@@ -669,20 +670,35 @@ export function finestraOrchestratore(linee) {
         if (/routine-channel\.mjs\s+release\b/.test(cmd)) rilasci.push(ms);
       }
     } else if (e.type === 'user') {
-      for (const b of blocchi) if (b && b.type === 'tool_result' && chiamate.has(b.tool_use_id)) chiamate.get(b.tool_use_id).fine = ms;
+      for (const b of blocchi) {
+        if (!b || b.type !== 'tool_result' || !chiamate.has(b.tool_use_id)) continue;
+        if (/^\s*Async agent launched/i.test(testoDi(b.content))) continue;
+        chiamate.get(b.tool_use_id).fine = ms;
+      }
     }
   }
-  const aperte = [...chiamate.values()].filter((c) => !Number.isFinite(c.fine));
-  const fine = aperte.length ? Math.max(...aperte.map((c) => c.inizio)) : Infinity;
-  const confini = [...[...chiamate.values()].map((c) => c.fine), ...rilasci].filter((t) => Number.isFinite(t) && t < fine);
+  // La notifica arriva in più forme (messaggio, allegato, coda): vale la prima dopo il lancio.
+  for (const { l, ms } of voci) {
+    if (!Number.isFinite(ms) || !l.includes('task-notification')) continue;
+    for (const m of l.matchAll(/<tool-use-id>([^<\\]+)<\/tool-use-id>/g)) {
+      const c = chiamate.get(m[1]);
+      if (c && ms >= c.inizio && !(c.fine <= ms)) c.fine = ms;
+    }
+  }
+  // La finestra arriva fino a adesso: in primo piano dopo la chiamata aperta
+  // non c'è niente, in sottofondo i turni d'attesa dopo il lancio sono suoi.
+  const confini = [...[...chiamate.values()].map((c) => c.fine), ...rilasci].filter((t) => Number.isFinite(t));
   const inizio = confini.length ? Math.max(...confini) : -Infinity;
   const prima = turni.filter((t) => t <= inizio);
-  const dentro = turni.filter((t) => t > inizio && t <= fine);
+  const dentro = turni.filter((t) => t > inizio);
   return {
-    righe: voci.filter((v) => Number.isFinite(v.ms) && v.ms > inizio && v.ms <= fine).map((v) => v.l),
+    righe: voci.filter((v) => Number.isFinite(v.ms) && v.ms > inizio).map((v) => v.l),
     // Quanto è rimasto fermo il thread principale prima del primo turno: oltre
     // un'ora la sua cache (a un'ora) è scaduta e il turno riscrive tutto.
     attesaPrimaS: prima.length && dentro.length ? Math.round((Math.min(...dentro) - Math.max(...prima)) / 1000) : 0,
+    // Il primo turno della finestra non è il primo della sessione: se riscrive
+    // la cache dopo l'attesa, conta come riscaldata.
+    continua: prima.length > 0,
   };
 }
 
@@ -691,8 +707,8 @@ async function rapportoOrchestratore(fileSottoAgente) {
   if (!existsSync(principale)) return null;
   const linee = [];
   for await (const l of righeDelFile(principale)) if (String(l).trim()) linee.push(l);
-  const { righe, attesaPrimaS } = finestraOrchestratore(linee);
-  const r = await analizzaRighe(righe, { role: 'orchestrator' });
+  const { righe, attesaPrimaS, continua } = finestraOrchestratore(linee);
+  const r = await analizzaRighe(righe, { role: 'orchestrator', continua });
   return {
     costUsd: r.costUsd, turns: r.turns, coldTurns: r.coldTurns, rewarmTurns: r.rewarmTurns, rewarmTokens: r.rewarmTokens,
     maxContextTokens: r.maxContextTokens, attesaPrimaS, tokens: r.tokens, startedAt: r.startedAt, endedAt: r.endedAt,
