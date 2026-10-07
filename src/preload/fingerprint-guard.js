@@ -194,6 +194,27 @@ function buildGpcSource() {
     var s = leggiAttr.call(el, el.tagName === 'OBJECT' ? 'data' : 'src');
     return !s || /^\\s*about:blank\\s*$/i.test(s);
   }
+  var CORNICI = 'iframe,frame,object', qsa = Element.prototype.querySelectorAll;
+  function tocca(el) {
+    if (/^(IFRAME|FRAME|OBJECT)$/.test(el.tagName) && vuoto(el)) { try { var w = el.contentWindow; } catch (e) {} }
+  }
+  // Un riquadro scritto nell'HTML, o inserito da uno script, si legge anche per indice o per nome della
+  // finestra, strade che nessun getter vede: lo si segna appena entra, e il parser lo fa prima del suo script.
+  function osserva(w) {
+    try {
+      new w.MutationObserver(function (rec) {
+        for (var i = 0; i < rec.length; i++) {
+          var nodi = rec[i].addedNodes;
+          for (var j = 0; j < nodi.length; j++) {
+            var n = nodi[j];
+            if (n.nodeType !== 1) continue;
+            tocca(n);
+            if (n.firstElementChild) { var l = qsa.call(n, CORNICI); for (var k = 0; k < l.length; k++) tocca(l[k]); }
+          }
+        }
+      }).observe(w.document, { childList: true, subtree: true });
+    } catch (e) {}
+  }
   function installa(w) {
     var P;
     try { P = w.Navigator && w.Navigator.prototype; } catch (e) { return; }
