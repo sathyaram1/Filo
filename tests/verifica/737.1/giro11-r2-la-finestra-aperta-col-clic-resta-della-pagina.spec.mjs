@@ -13,7 +13,8 @@ test('r2 «Stampa ricevuta»: la finestra vuota che la pagina apre col clic e ri
     w.document.write('<title>RICEVUTA</title><h1>Ricevuta</h1>');w.document.close();}</script>`));
   await page.click('#b');
   await expect.poll(async () => (await schede(app)).some(([, t]) => t === 'RICEVUTA'), { timeout: 8000 }).toBe(true);
-  expect((await schede(app)).filter(([u]) => u === 'about:blank' || u === '').length, 'nessuna scheda bianca').toBe(0);
+  // La ricevuta scritta dalla pagina ha anche lei l'indirizzo about:blank: bianca è solo quella senza il titolo.
+  expect((await schede(app)).filter(([u, t]) => (u === 'about:blank' || u === '') && t !== 'RICEVUTA').length, 'nessuna scheda bianca').toBe(0);
 });
 
 test('r2 la finestra aperta col clic e portata dopo una risposta all\'indirizzo giusto arriva lì', async ({ app, openTab, testServer }) => {
