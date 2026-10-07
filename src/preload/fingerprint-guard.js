@@ -237,6 +237,7 @@ function buildGpcSource() {
         Object.defineProperty(CP, prop, { get: g, set: d.set, enumerable: d.enumerable, configurable: true });
       });
     });
+    osserva(w);
   }
   try { installa(window); } catch (e) {}
 })();`;
