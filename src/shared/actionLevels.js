@@ -793,6 +793,7 @@
         if (r.gia === true) return 1;
         return r.acceso === false || !!r.nome ? 2 : 1;
       },
+      fonte: (a, out) => nomiDiSistema(out, 'wifi'),
       describe: (a) => {
         const r = (a && a._richiestaSistema) || {};
         const nome = (a && a._nomeSistema) || r.nome;
