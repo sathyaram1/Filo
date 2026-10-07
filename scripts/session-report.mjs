@@ -460,6 +460,8 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
     rep.turns += 1;
     if (effort) rep.effort[chiaveSicura(effort)] = (rep.effort[chiaveSicura(effort)] || 0) + 1;
     if (rep.turns > 1 && cr === 0 && cw >= 20000) rep.coldTurns += 1;
+    if (rep.turns > 1 && cw >= 20000 && cw > cr) { rep.rewarmTurns += 1; rep.rewarmTokens += cw; }
+    rep.maxContextTokens = Math.max(rep.maxContextTokens, input + cw + cr);
     rep.tokens.input += input;
     rep.tokens.cacheWrite += cw;
     rep.tokens.cacheRead += cr;
