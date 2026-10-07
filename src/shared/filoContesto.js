@@ -9,8 +9,9 @@
   const GIORNO_MS = 24 * ORA_MS;
   const TETTI_DI_SERIE = Object.freeze({ giorni: 3, token: 100000 });
   const LIMITI = Object.freeze({ giorni: Object.freeze([0.5, 365]), token: Object.freeze([2000, 2000000]) });
-  // Quanto vive nel contesto l'esito di una lettura (pagina, documento, comando): gli ultimi venti messaggi della SUA
-  // conversazione, come prima del filo unico; contarli sul filo intero la accorciava a chi parla in due schede (#553.2).
+  // Quanto vive nel contesto l'esito di una lettura (pagina, documento, comando) e il ragionamento di una risposta,
+  // finché l'owner non decide (#553.2): nella sua conversazione gli ultimi venti messaggi di quella, come prima del filo
+  // unico; nelle altre schede al più gli ultimi venti del filo, così una conversazione ferma non lo tiene per giorni.
   const MESSAGGI_CON_ESITI = 20;
   // Una conversazione ripresa da prima dei tetti porta con sé i suoi ultimi messaggi, come faceva la chat da sola,
   // ma dentro il tetto in token: al più un quarto, e la finestra si stringe di quanto prendono.
@@ -78,15 +79,18 @@
     return `[${[q, c].filter(Boolean).join(' · ')}]`;
   }
 
-  // Un messaggio da solo non riempie il contesto: oltre un quarto del tetto restano testa e coda, e si dice dove sta il resto.
-  function tienilo(testo, tetto) {
+  // Un messaggio da solo non riempie il contesto: oltre un quarto del tetto restano testa e coda, e si dice come
+  // rileggere il resto (l'id intero: l'etichetta corta non basta a CERCA_CHAT).
+  function tienilo(testo, tetto, chat) {
     const s = String(testo == null ? '' : testo);
     const max = Math.max(4000, Math.floor((tetto * CARATTERI_PER_TOKEN) / 4));
     if (s.length <= max) return s;
     const testa = s.slice(0, Math.floor(max * 0.6));
     const coda = s.slice(-Math.floor(max * 0.4));
     const tolti = s.length - testa.length - coda.length;
-    return `${testa}\n…(${tolti} caratteri di questo messaggio non sono qui: si rileggono interi con CERCA_CHAT)…\n${coda}`;
+    const id = /^[\w.:-]{1,80}$/.test(String(chat || '')) ? String(chat) : '';
+    const come = id ? `CERCA_CHAT con id "${id}", a pezzi con \`da\`` : 'CERCA_CHAT';
+    return `${testa}\n…(${tolti} caratteri di questo messaggio non sono qui: si rileggono interi con ${come})…\n${coda}`;
   }
 
   function chiave(m) {
@@ -97,7 +101,7 @@
   // Filo solo quando aprono un tratto di un'altra conversazione, così il modello non impara a scriverle nelle risposte.
   function rendi(m, prima, { tetto, esito, osserva }) {
     const cambia = !prima || prima.chat !== m.chat;
-    const testo = tienilo(m.text, tetto);
+    const testo = tienilo(m.text, tetto, m.chat);
     if (m.role === 'user') return { role: 'user', content: `${intestazione(m.ts, m.chat)} ${testo}`.trim() };
     const parti = [];
     if (cambia) parti.push(intestazione(m.ts, m.chat));
@@ -129,7 +133,7 @@
     for (let i = n - 1; i >= 0; i--) {
       const c = (contati.get(lista[i].chat) || 0) + 1;
       contati.set(lista[i].chat, c);
-      recente[i] = c <= MESSAGGI_CON_ESITI;
+      recente[i] = c <= MESSAGGI_CON_ESITI && (lista[i].chat === chatCorrente || n - i <= MESSAGGI_CON_ESITI);
     }
     const esitoDi = (i) => (recente[i] && esiti ? esiti(lista[i]) : null);
     const memo = new Map();

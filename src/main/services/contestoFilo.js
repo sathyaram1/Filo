@@ -7,8 +7,8 @@
 const FC = () => globalThis.SN_FILO_CONTESTO;
 const F = () => globalThis.SN_IL_FILO;
 
-// Gli esiti delle azioni (pagine e documenti letti, comandi, ricerche) restano in memoria, mai su disco: entrano nel
-// contesto finché il loro messaggio è fra gli ultimi venti del filo, in qualunque scheda (#553.2, #587).
+// Gli esiti delle azioni (pagine e documenti letti, comandi, ricerche) restano in memoria, mai su disco: quanto
+// entrano nel contesto lo decide la finestra (src/shared/filoContesto.js, #553.2, #587).
 const MAX_ESITI = 300;
 const esiti = new Map();
 
