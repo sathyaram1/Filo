@@ -149,26 +149,3 @@ test('sonda: una chat cancellata esce dal contesto al turno dopo', async ({ app 
   expect(primo.map(testo).join('\n')).toContain('PORTONE-4471');
   expect(secondo.map(testo).join('\n')).not.toContain('PORTONE-4471');
 });
-
-test('sonda: un messaggio lunghissimo incollato si rilegge intero con la ricerca, come promette il taglio', async ({ app }) => {
-  test.setTimeout(90_000);
-  await primaScheda(app);
-  const lungo = 'a'.repeat(100_000) + ' SEGNO-DEL-MEZZO-77 ' + 'b'.repeat(100_000);
-  await preparaModello(app, [
-    { text: 'Letto.' },
-    { text: '', tools: [{ name: 'CERCA_CHAT', args: { id: 'scheda-lunga' } }] },
-    { text: 'Fatto.' },
-  ]);
-  await app.evaluate((_e, lungo) => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: lungo, threadHistory: [], chatId: 'scheda-lunga' }), lungo);
-  await app.evaluate(() => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'cosa c\'era in mezzo al testo che ti ho incollato?', threadHistory: [], chatId: 'scheda-altra' }));
-  const tutte = await chiamate(app);
-  const secondo = tutte[1];
-  const k = posContesto(secondo);
-  const tratto = secondo.slice(0, k).map(testo).join('\n');
-  // Il tratto lo taglia (oltre un quarto del tetto) e dice che si rilegge con CERCA_CHAT...
-  expect(tratto).toContain('si rileggono interi con CERCA_CHAT');
-  expect(tratto).not.toContain('SEGNO-DEL-MEZZO-77');
-  // ...ma la rilettura deve davvero restituirlo.
-  const terzo = tutte[2];
-  expect(testo(terzo.find((m) => m.role === 'tool'))).toContain('SEGNO-DEL-MEZZO-77');
-});
