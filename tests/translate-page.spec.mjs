@@ -2053,3 +2053,35 @@ test('riquadro con script dentro uno spazio della pagina visibile: si traduce an
   expect(t).not.toContain('riquadro incorporato');
   expect(t).not.toContain('aggiunta');
 });
+
+// Conta la finestra da cui il riquadro si vede, non il suo rettangolo: dietro una finestrella da un pixel è un francobollo.
+for (const [nome, html] of [
+  ['la ricetta per i lettori di schermo', (src) => `<div style="position:absolute;width:1px;height:1px;overflow:hidden;margin:-1px;clip:rect(0,0,0,0)"><iframe sandbox src="${src}" style="width:300px;height:200px;border:0"></iframe></div>`],
+  ['un contenitore da un pixel', (src) => `<div style="width:1px;height:1px;overflow:hidden"><iframe sandbox src="${src}" style="width:300px;height:200px;border:0"></iframe></div>`],
+]) {
+  test(`riquadro chiuso a chiave dietro ${nome}: «Pagina tradotta», senza mandare a cercare niente`, async ({ app, openTab, testServer }) => {
+    test.setTimeout(120000);
+    await stubTranslationProvider(app);
+    const page = await testServer.openReady(openTab, framePage(html(testServer.html(frameInner('ZZLOCK')))));
+    await watchToasts(page);
+    await clickTranslateIcon(page, '#p1');
+    await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 30000 }).toContain('Pagina tradotta');
+    await page.waitForTimeout(2500);
+    expect((await toasts(page)).join(' | ')).not.toContain('riquadro incorporato');
+  });
+}
+
+test('riquadro con script dietro una finestrella da un pixel non si paga; uno che ne esce in posizione assoluta conta', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  const src = testServer.html(frameInner('ZZTINY')).replace('127.0.0.1', 'blocked.test');
+  const page = await testServer.openReady(openTab, framePage(`
+    <div style="width:1px;height:1px;overflow:hidden"><iframe src="${src}" style="width:300px;height:200px;border:0"></iframe></div>
+    <div style="height:30px;overflow:hidden"><iframe sandbox src="${testServer.html(frameInner('ZZLOCK'))}" style="position:absolute;top:260px;left:20px;width:520px;height:200px"></iframe></div>`));
+  await page.waitForTimeout(1000);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#p1');
+  await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 60000 }).toContain('riquadro incorporato');
+  await page.waitForTimeout(2000);
+  expect(await sentText(app)).not.toContain('ZZTINY');
+});
