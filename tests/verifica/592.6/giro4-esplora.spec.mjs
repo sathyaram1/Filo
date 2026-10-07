@@ -1,5 +1,6 @@
 // Verifica #592.6 — giro 4, esplorazione: aspetto del popup sopra la scheda e attesa della prima domanda.
 import { test, expect } from '../../fixtures/electron.mjs';
+import { execSync } from 'node:child_process';
 import { confermaSopraPagina, nelMondoDiFilo } from '../../helpers/confirm.mjs';
 
 test.setTimeout(90_000);
@@ -18,6 +19,7 @@ test('aspetto chiaro e scuro, attesa della prima domanda', async ({ app, openTab
   console.log('PRIMA DOMANDA ms', Date.now() - t0);
   await new Promise((r) => setTimeout(r, 700));
   await vista.screenshot({ path: 'tests/.shots/v5926-g4-chiaro.png' });
+  try { execSync('import -window root tests/.shots/v5926-g4-schermo.png'); } catch (e) { console.log('IMPORT', e.message); }
   const st = await vista.evaluate(() => {
     const host = document.querySelector('.sn-confirm-host');
     return { font: getComputedStyle(document.documentElement).getPropertyValue('--sn-font'), bg: getComputedStyle(document.body).backgroundColor, host: !!host };
