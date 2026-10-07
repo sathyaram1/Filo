@@ -728,6 +728,13 @@ export async function generaRapporto({ transcript = '', role = '', ticket = '', 
         rep.notes.push(`transcript di un sotto-agente illeggibile (${f}): ${String((e && e.message) || e)}`);
       }
     }
+    if (sottoAgente) {
+      try {
+        rep.orchestrator = await rapportoOrchestratore(trovato.file);
+      } catch (e) {
+        rep.notes.push(`thread principale illeggibile: ${String((e && e.message) || e)}`);
+      }
+    }
     return rep;
   } catch (e) {
     const rep = rapportoVuoto({ role, ticket });
