@@ -612,6 +612,9 @@
     riquadro_cookie_domanda: 'Attivo i cookie di %s per questo contenuto?',
     riquadro_cookie_si: 'Sì',
     riquadro_cookie_no: 'No',
+    riquadro_cookie_conferma: 'I contenuti di %s dentro le pagine di altri siti terranno i loro cookie, e questo si ricarica. '
+      + 'Li togli dal tasto destro sul contenuto.',
+    riquadro_cookie_attiva: 'Attiva',
     riquadro_cookie_fatto: 'Cookie di %s attivi: ricarico il contenuto',
     riquadro_cookie_menu_attiva: 'Attiva i cookie di %s qui',
     riquadro_cookie_menu_togli: 'Togli i cookie riattivati di %s',
