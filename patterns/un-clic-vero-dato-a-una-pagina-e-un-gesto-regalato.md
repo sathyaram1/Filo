@@ -83,8 +83,9 @@ voleva.
 - **Anche i documenti che la pagina si scrive da sé** (#737.1 giro 8): un riquadro vuoto riempito dallo script non ha
   un preload suo, e la riscrittura da capo (`document.open`) cancella gli ascolti della finestra. Il preload del frame
   sopra ascolta anche lì e li rimette dopo una riscrittura; un riquadro che ha un preload suo lo dice con un segno nel
-  mondo isolato, e non si ascolta due volte. Un riquadro che sta per caricare un indirizzo non si tocca prima del
-  `load`: toccato prima, il suo preload non parte e Filo sparisce da quel riquadro.
+  mondo isolato, e non si ascolta due volte. Il riquadro cambia documento tenendo la finestra (il vuoto iniziale, la
+  riscrittura), e gli osservatori del documento vecchio tacciono: si riaggancia a ogni `load`. Un riquadro che sta per
+  caricare un indirizzo non si tocca prima del `load`: toccato prima, il suo preload non parte e Filo sparisce da lì.
 
 Prove: `tests/unit/gestoNonRegalato.test.mjs` (nessuno script di Filo nelle pagine porta il gesto),
 `tests/popup-senza-gesto.spec.mjs`, `tests/unit/adSkip.test.mjs`, `tests/ad-skip.spec.mjs` (il «Salta» finto
