@@ -71,6 +71,10 @@ dove il sito non arriva, o ci arriva solo per chiedere:
   veda lui, e lo rimette in cima se una notifica del sito gli è arrivata sopra
   (#686.1 giro 7). Conta l'arrivo, non solo il punto: una notifica che non
   prende i clic copre lo stesso, e `elementFromPoint` non la vede.
+  Sullo schermo ha sempre la stessa misura e lo stesso posto, come i riquadri di
+  Filo nella pagina (`src/content/popup.js`): `zoom` CSS a 1/fattore, rimesso
+  dalla stessa guardia quando lo zoom cambia altrove. Prima al 300% copriva il
+  titolo e al 33% non si leggeva (#686.1 giro 10).
 
 **Il caso.** #686 aveva chiuso tre porte una dopo l'altra (eventi finti, il
 marcatore «mi zoomo da solo» scritto dal sito, ascoltatori zittiti dal sito
