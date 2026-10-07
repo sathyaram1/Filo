@@ -23,7 +23,10 @@ nella pagina, in uno Shadow DOM chiuso.
   #813.5), con la stessa regola: non se ne fa una seconda. Vale anche dentro un pannello di Filo
   che sta nella pagina: il sì di «Ha funzionato?» dell'Aiuto, che pubblica i passi, si dà nel popup, e i
   bottoni del riquadro stanno in uno Shadow DOM chiuso perché la pagina non faccia comparire da sé la
-  domanda (#592.6, giro 2).
+  domanda (#592.6, giro 2). E vale per una proposta che deve stare accanto a quello che riguarda: la
+  barra «Attivo i cookie di …» sopra un contenuto incorporato (`riquadroRotto.js`) resta nella pagina,
+  ma il suo «Sì» apre il popup, ed è lì che il sì vale; il sito la rendeva trasparente e ci disegnava
+  sotto una domanda sua (#592.6, giro 6). Il no che non concede niente può restare nella pagina.
 - **Una domanda sulla pagina stessa** (`coprePagina`): copre la pagina quasi del tutto, rispondono solo i
   bottoni (Esc e il velo non scelgono, perché anche «Torna indietro» fa qualcosa), e i tasti non
   tornano al campo di chi scriveva, che potrebbe essere la password chiesta dal sito dell'avviso.

@@ -8,6 +8,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
+import { confermaSopraPagina, aspettaConfermaPronta, mouseClickConfirm, confirmState } from './helpers/confirm.mjs';
 
 const LARGO = 420;
 const ALTO = 300;
@@ -46,6 +47,16 @@ async function serve() {
     if (u.pathname === '/due') {
       const ri = (id) => `<iframe id="${id}" width="400" height="220" style="border:0" src="http://b.localhost:${porta}/post?n=${id}"></iframe>`;
       html(`<p>articolo</p>${ri('r1')}<p>mezzo</p>${ri('r2')}`);
+      return;
+    }
+    // Una pagina scritta contro Filo: la proposta trasparente, e sotto di lei una domanda innocua del sito (#592.6).
+    if (u.pathname === '/ostile') {
+      html(`<style>[data-filo-riquadro-cookie]{opacity:0 !important}
+        #finto{position:absolute;left:0;top:0;width:${LARGO}px;height:${ALTO}px;z-index:2147483645;background:#fff;
+          display:flex;justify-content:center;gap:10px;padding-top:40px;box-sizing:border-box}</style>
+        <p>articolo</p><div style="position:relative">
+        <iframe id="ri" width="${LARGO}" height="${ALTO}" style="border:0" src="http://b.localhost:${porta}/post"></iframe>
+        <div id="finto">Chiudo la pubblicità? <b>Sì</b> <b>No</b></div></div>`);
       return;
     }
     if (u.pathname === '/post') {
@@ -144,6 +155,14 @@ async function aspettaProposta(app, frammento) {
   return lista[0];
 }
 
+// «Sì» sulla proposta apre il popup sopra la scheda (#592.6): è lì che il sì vale.
+async function si(app, page, p) {
+  await page.mouse.click(p.si.x, p.si.y);
+  const sopra = await confermaSopraPagina(app);
+  await aspettaConfermaPronta(sopra);
+  await mouseClickConfirm(sopra, 'ok');
+}
+
 const cookieVista = (app) => app.evaluate(async ({ session }) => {
   const lista = await session.defaultSession.cookies.get({ name: 'vista' });
   return lista.map((c) => ({ dominio: c.domain, session: !!c.session }));
@@ -168,7 +187,7 @@ test('servizio noto col segnaposto: la proposta compare senza il modello, «Sì�
     expect(p.si.y).toBeLessThan(p.riquadro.y);
     expect(await chiamate(app)).toEqual([]);
 
-    await page.mouse.click(p.si.x, p.si.y);
+    await si(app, page, p);
     await expect(page.frameLocator('#ri').locator('#ok')).toHaveText('Il post: tramonto sul mare', { timeout: 10_000 });
     expect(await impostazioni(app)).toEqual(['b.localhost']);
     // Il servizio adesso tiene i suoi cookie come un sito dove sei entrato: non durano più solo la visita.
@@ -193,7 +212,7 @@ test('riquadro sconosciuto rotto: una chiamata al modello con l\'immagine del so
     expect(Math.abs(c[0].misura.width - LARGO)).toBeLessThanOrEqual(2);
     expect(Math.abs(c[0].misura.height - ALTO)).toBeLessThanOrEqual(2);
 
-    await page.mouse.click(p.si.x, p.si.y);
+    await si(app, page, p);
     await expect(page.frameLocator('#ri').locator('#ok')).toHaveText('La mappa del quartiere', { timeout: 10_000 });
     expect(await impostazioni(app)).toEqual(['cosmo.localhost']);
     // Ricaricato e funzionante: non lo si riguarda.
@@ -273,7 +292,7 @@ test('in Privacy: «Sì» fa sopravvivere i cookie del servizio nello spazio del
 
     const page = await openTab(srv.art('b', 'post'));
     const p = await aspettaProposta(app, 'a.localhost');
-    await page.mouse.click(p.si.x, p.si.y);
+    await si(app, page, p);
     await expect(page.frameLocator('#ri').locator('#ok')).toBeVisible({ timeout: 10_000 });
 
     // Uscito dal sito (scheda chiusa, margine passato) lo spazio si butta: il riquadro di Fotogrammi resta servito.
@@ -304,7 +323,7 @@ test('rimandato all\'accesso su un altro sottodominio: la proposta compare sopra
     expect(p.visibile).toBe(true);
     expect(p.si.y).toBeGreaterThan(p.riquadro.y - ALTO / 2);
     expect(p.si.y).toBeLessThan(p.riquadro.y);
-    await page.mouse.click(p.si.x, p.si.y);
+    await si(app, page, p);
     await expect(page.frameLocator('#ri').locator('#ok')).toHaveText('Il contenuto dopo l\'accesso', { timeout: 10_000 });
     expect(await chiamate(app)).toEqual([]);
   } finally {
@@ -408,6 +427,33 @@ test('il riquadro sconosciuto rotto scorso via prima della foto riceve la propos
     const p = await aspettaProposta(app, 'a.localhost');
     expect(p.visibile).toBe(true);
     expect((await chiamate(app)).length).toBe(1);
+  } finally {
+    await srv.chiudi();
+  }
+});
+
+test('una pagina che copre la proposta con una sua domanda: il «Sì» chiede nel popup sopra la scheda, e solo lì vale', async ({ app, openTab }) => {
+  const srv = await serve();
+  try {
+    await prepara(app);
+    const page = await openTab(srv.pagina('ostile'));
+    const p = await aspettaProposta(app, 'a.localhost');
+    expect(await page.evaluate(() => getComputedStyle(document.querySelector('[data-filo-riquadro-cookie]')).opacity)).toBe('0');
+    await page.mouse.click(p.si.x, p.si.y);
+    // L'utente credeva di chiudere una pubblicità: il popup gli dice cosa sta per concedere, e lui annulla.
+    const sopra = await confermaSopraPagina(app);
+    const domanda = await confirmState(sopra);
+    expect(`${domanda.title}\n${domanda.text}`).toContain('Attivo i cookie di Fotogrammi per questo contenuto?');
+    await sopra.screenshot({ path: 'tests/.shots/riquadro-rotto-conferma.png' });
+    await aspettaConfermaPronta(sopra);
+    await mouseClickConfirm(sopra, 'cancel');
+    await expect.poll(() => confirmState(sopra).catch(() => null), { timeout: 5_000 }).toBe(null);
+    await page.waitForTimeout(500);
+    expect(await impostazioni(app)).toEqual([]);
+    // La proposta resta: un altro «Sì», confermato nel popup, attiva davvero.
+    await si(app, page, p);
+    await expect(page.frameLocator('#ri').locator('#ok')).toHaveText('Il post: tramonto sul mare', { timeout: 10_000 });
+    expect(await impostazioni(app)).toEqual(['b.localhost']);
   } finally {
     await srv.chiudi();
   }
