@@ -496,8 +496,21 @@ module.exports = function setupWheelZoom(webFrame, opts) {
 
   // Un dialogo che si apre o si chiude, un tutto schermo o un livello del sito
   // arrivato dopo, a riquadro aperto: lo controlla anche la guardia, senza gesti.
+  // Sullo schermo il riquadro ha sempre la stessa misura, come gli altri riquadri di Filo nella pagina:
+  // al 300% copriva il titolo, al 33% non si leggeva (#686.1 giro 10). La guardia segue anche lo zoom cambiato altrove.
+  let scalaFatta = 0;
+  function scalaRiquadro() {
+    if (!badge) return;
+    let f = 1;
+    try { f = webFrame.getZoomFactor(); } catch (_) {}
+    if (!(f > 0) || f === scalaFatta) return;
+    scalaFatta = f;
+    try { badge.style.zoom = String(1 / f); } catch (_) {}
+  }
+
   function ricontrollaPosto() {
     if (!zoomMode || !badge) return;
+    scalaRiquadro();
     let fuori = !badge.isConnected || badge.parentNode !== ospite();
     try { if (!fuori && badge.showPopover && !badge.matches(':popover-open')) fuori = true; } catch (_) {}
     if (arrivatoQualcuno()) fuori = true;
