@@ -1776,7 +1776,7 @@ async function executeFiloAction(action, opzioni = {}) {
 // compresi: dicono cosa il compito ha letto (#530) e servono all'anti-esfiltrazione di NAVIGA.
 async function eseguiAzioneFilo(action, {
   confirmed = false, sender = null, contesto = null, fontiLette = null, assistente = false, parole = '', avanzamento = null,
-  chatId = null, richiesta = '', origine = 'chat', dentroPerimetro = true, accoglienza = false,
+  chatId = null, richiesta = '', origine = 'chat', dentroPerimetro = true, accoglienza = false, nascostiDellaChat = null,
 } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
@@ -2438,6 +2438,7 @@ async function eseguiAzioneFilo(action, {
               const FC = globalThis.SN_FILO_CONTESTO;
               cap = Math.max(cap, Math.floor(FC.tetti((await getEffectiveSettings()).contestoFilo, Defaults.get().contestoFilo).token * FC.CARATTERI_PER_TOKEN));
             } catch (_) {}
+            const daFuori = globalThis.SN_FILO_CONTESTO.daFuoriDi(chat.messages);
             return {
               executed: true,
               kept: true,
@@ -2449,13 +2450,18 @@ async function eseguiAzioneFilo(action, {
                 // La trascrizione arriva già nella forma "Utente: … / Filo: …",
                 // con testa e coda se è lunghissima (mai un taglio muto): il mezzo si chiede con `da`.
                 transcript: ChatArchive.transcriptForReading(chat.messages, { da: action.da, cap }),
+                ...(daFuori.length ? { daFuori } : {}),
               },
             };
           }
-          // #868 — tutto il filo: le conversazioni di ogni scheda (non quella di adesso, che il modello ha già
-          // davanti e ritrovarsela come risultato gliela farebbe raccontare come un ricordo), le pagine visitate e i cambi.
+          // #868 — tutto il filo: le conversazioni di ogni scheda, le pagine visitate e i cambi. Di quella di adesso solo
+          // i messaggi che il modello non ha davanti: ritrovarsi come risultato quelli che ha gliel'avrebbe fatti
+          // raccontare come un ricordo, ma una conversazione ripresa o lunga ha un inizio che si cerca.
           const all = await FiloChats.list();
           const altre = all.filter((c) => c && c.id !== chatId && Array.isArray(c.messages) && c.messages.length);
+          const nascosti = Array.isArray(nascostiDellaChat) ? nascostiDellaChat : [];
+          const corrente = chatId && nascosti.length ? all.find((c) => c && c.id === chatId) : null;
+          if (corrente) altre.push({ ...corrente, messages: nascosti });
           // «Riprendi la discussione di ieri sulla coscienza» arriva qui come
           // frase, non come parola chiave: pretendere che compaiano tutte le
           // parole faceva rispondere "non c'è niente" su una chat che c'era.
@@ -2465,6 +2471,22 @@ async function eseguiAzioneFilo(action, {
           const [pagine, cambiTrovati] = query
             ? await Promise.all([paginePerChat(query).catch(() => []), cambiPerChat(query).catch(() => [])])
             : [[], []];
+          const results = found.map((c) => ({
+            id: c.id,
+            title: c.title || ChatArchive.fallbackTitle(c.messages),
+            date: c.closedAt || c.updatedAt || null,
+            kind: c.kind || null,
+            snippet: ChatArchive.snippetFor(c, termini.join(' ')),
+          }));
+          // Un frammento preso da un testo venuto da fuori (l'esito di un comando dato in chat) resta quella lettura.
+          const daFuori = [];
+          found.forEach((c, i) => {
+            const pezzo = String(results[i].snippet || '').replace(/^…|…$/g, '').trim();
+            if (!pezzo) return;
+            for (const x of globalThis.SN_FILO_CONTESTO.daFuoriDi(c.messages)) {
+              if (x.testo.replace(/\s+/g, ' ').includes(pezzo)) { daFuori.push({ testo: pezzo, fonte: x.fonte }); break; }
+            }
+          });
           return {
             executed: true,
             kept: true,
@@ -2472,13 +2494,8 @@ async function eseguiAzioneFilo(action, {
               chatSearch: query,
               cercatoCon: termini,
               allargata,
-              results: found.map((c) => ({
-                id: c.id,
-                title: c.title || ChatArchive.fallbackTitle(c.messages),
-                date: c.closedAt || c.updatedAt || null,
-                kind: c.kind || null,
-                snippet: ChatArchive.snippetFor(c, termini.join(' ')),
-              })),
+              results,
+              ...(daFuori.length ? { daFuori } : {}),
               ...(pagine.length ? { pagine } : {}),
               ...(cambiTrovati.length ? { cambi: cambiTrovati } : {}),
             },
@@ -3316,7 +3333,7 @@ function chatSearchesForPrompt(actions) {
       // altrimenti riferisce all'utente che la discussione non esiste invece di
       // riprovare con la parola che conta.
       blocks.push(
-        `[Niente nel filo (conversazioni delle altre schede, pagine visitate, cambi) contiene tutte queste parole: "${cercato}". `
+        `[Niente nel filo (conversazioni, pagine visitate, cambi) contiene tutte queste parole: "${cercato}". `
         + 'Non significa che non ci sia: riprova con la parola che identifica '
         + 'l\'argomento (una o due, senza "ieri", "discussione", "di cui abbiamo parlato") '
         + 'prima di dire all\'utente che non l\'hai trovata.]',
@@ -3959,15 +3976,18 @@ function entroIl(p, ms, ripiego) {
 // I pezzi vecchi ripescati da soli hanno la forma di una ricerca fra le chat: il blocco di attività li racconta, le
 // uscite li contano fra le cose lette (#587), la chat riaperta li ritrova.
 function ricordoComeAzione(ricordi) {
+  const FC = globalThis.SN_FILO_CONTESTO;
+  // Lo stesso testo che il modello ha davanti (testa e coda), così le uscite contano tutto quello che ha letto.
   const results = ricordi.map((r) => ({
     id: r.tratto.chat,
     title: r.tratto.titolo || '',
     date: r.tratto.ts,
-    snippet: String(r.tratto.testo || '').slice(0, 3000),
+    snippet: FC.testoRicordo(r.tratto),
   }));
+  const daFuori = ricordi.flatMap((r) => (Array.isArray(r.tratto.daFuori) ? r.tratto.daFuori : []));
   return {
     type: 'CERCA_CHAT', _auto: true, _callId: `ricordo_${Date.now().toString(36)}`, _executed: true,
-    _output: { automatica: true, results },
+    _output: { automatica: true, results, ...(daFuori.length ? { daFuori } : {}) },
   };
 }
 
@@ -4055,6 +4075,11 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   } catch (e) { console.warn('[Filo] tratto del filo non letto, rispondo con la sola scheda:', e?.message || e); }
   const codaScheda = filo && chatId ? filo.coda : cleanHistory;
   const vistiDalFilo = filo ? filo.visti : [];
+  // La parte della conversazione di questa scheda che il modello non ha davanti: la ricerca la trova (#868).
+  const chiaviDavanti = new Set(vistiDalFilo.map((m) => globalThis.SN_FILO_CONTESTO.chiave(m)));
+  const nascostiDellaChat = filo && chatId
+    ? filo.tutti.filter((m) => m.chat === chatId && !chiaviDavanti.has(globalThis.SN_FILO_CONTESTO.chiave(m)))
+    : [];
   // I pezzi vecchi si cercano mentre si prepara il resto (memorie, stato, file): arrivano in coda, prima della domanda.
   const ricordiP = filo && !internal && !onbActive && RicordiFilo
     ? RicordiFilo.cerca(String(userMessage || ''), { vecchi: filo.vecchi, davanti: filo.visti }).catch(() => [])
@@ -4234,6 +4259,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     renderedActions.push(a);
     azioniViste.push(a);
     ricordaLettoInChat([a]);
+    await segnaFonteLetta(chatId, fontiLette, a);
   }
   let fermato = false;
   try {
@@ -4298,7 +4324,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       const avvia = (a) => (a._argsError
         ? Promise.resolve({ executed: false, kept: false, rejected: true, error: a._argsError })
         : executeFiloAction(a, {
-          sender, contesto: azioniViste, parole: paroleUtente, chatId, fontiLette, richiesta, accoglienza,
+          sender, contesto: azioniViste, parole: paroleUtente, chatId, fontiLette, richiesta, accoglienza, nascostiDellaChat,
           // Le azioni lunghe dicono a che punto sono: la riga d'attesa le conta.
           avanzamento: canPush ? (fatti, totali) => push('filo:action', {
             kind: 'progress', type: String(a.type || '').toUpperCase(), callId: a._callId || '', fatti, totali,

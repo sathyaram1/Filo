@@ -283,6 +283,11 @@
     for (const a of Array.isArray(actions) ? actions : []) {
       const out = a && a._output;
       if (!out || typeof out !== 'object') continue;
+      // Testo venuto da fuori che il filo riporta (#868), da qualunque azione: la lettura che era.
+      for (const x of Array.isArray(out.daFuori) ? out.daFuori : []) {
+        const t = testo(x && x.testo);
+        if (t.trim()) { nonFidato = true; pezzi.push(t); daFuori(t, testo(x.fonte) || 'da fuori'); }
+      }
       const type = String(a.type || '').toUpperCase();
       if (type === 'ESEGUI_COMANDO') {
         if (out.blocked) continue;
@@ -290,8 +295,6 @@
         if (t.trim()) { nonFidato = true; pezzi.push(t); daFuori(t, "dall'output di un comando"); }
       } else if (type === 'LEGGI_DOCUMENTO') {
         if (testo(out.text)) { nonFidato = true; pezzi.push(out.text); daFuori(out.text, 'da un documento'); }
-      } else if (type === 'TESTO_DI_FUORI') {
-        if (testo(out.text)) { nonFidato = true; pezzi.push(out.text); daFuori(out.text, testo(out.fonte) || 'da fuori'); }
       } else if (type === 'LEGGI_FILE') {
         pezzi.push(testo(out.text));
       } else if (type === 'CERCA_CHAT') {

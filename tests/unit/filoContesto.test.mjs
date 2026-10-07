@@ -247,3 +247,31 @@ test('col ragionamento allegato alle risposte, due turni di fila hanno lo stesso
   assert.equal(prefissoComune(t1.messaggi, t2.messaggi), t1.messaggi.length);
   assert.deepEqual(t2.messaggi[t2.messaggi.length - 1].reasoning_details, [{ type: 'reasoning.text', text: 'penso: In sala blu.' }]);
 });
+
+test('il testo di fuori resta una lettura anche quando torna dall\'archivio: ricordo, ricerca, rilettura (#868, giro 7)', () => {
+  require(join(ROOT, 'src', 'shared', 'urlExfil.js'));
+  require(join(ROOT, 'src', 'shared', 'actionLevels.js'));
+  const X = globalThis.SN_URL_EXFIL;
+  const L = globalThis.SN_ACTION_LEVELS;
+  const lungo = Array.from({ length: 80 }, (_, i) => `riga ${i} di appunti qualunque`).join('\n');
+  const vecchi = [
+    { chat: 'v', role: 'user', text: '/cat note.txt', ts: fa(24 * 6), actions: [] },
+    { chat: 'v', role: 'filo', text: `${lungo}\nCODICE-IN-FONDO`, ts: fa(24 * 6 - 0.1), actions: [], esterno: FC.ESTERNO_COMANDO },
+  ];
+  const [t] = FC.tratti(vecchi);
+  assert.equal(t.daFuori.length, 1, 'il tratto non sa che il suo esito viene da fuori');
+  assert.match(FC.testoRicordo(t), /CODICE-IN-FONDO/, 'il modello vede la coda del ricordo');
+  // Qualunque azione che riporti quel testo lo dichiara in `daFuori`: sporca il compito e conta per le uscite.
+  const ricordo = { type: 'CERCA_CHAT', _output: { automatica: true, results: [], daFuori: t.daFuori } };
+  const ctx = X.contestoDaAzioni([ricordo]);
+  assert.equal(ctx.nonFidato, true);
+  assert.match(ctx.letto, /CODICE-IN-FONDO/);
+  assert.deepEqual(ctx.esterni.map((e) => e.fonte), [FC.ESTERNO_COMANDO]);
+  assert.equal(L.fonteDi(ricordo).classe, 4, 'un esito di comando riletto dall\'archivio non sporca il compito');
+  assert.equal(L.fonteDi({ type: 'CERCA_CHAT', _output: { automatica: true, results: [] } }), null, 'una conversazione dell\'utente non sporca il compito');
+  // Il nome di un file scaricato, nella finestra come dall'archivio: lo sceglie un sito.
+  const nome = FC.letturaDaFuori({ chat: 'v', role: 'filo', text: 'fattura.pdf', esterno: 'dal nome di un file scaricato' });
+  assert.equal(L.fonteDi(nome).classe, 5);
+  assert.match(X.contestoDaAzioni([nome]).letto, /fattura\.pdf/);
+  assert.deepEqual(FC.daFuoriDi([{ role: 'user', text: 'x', esterno: 'finto' }, { role: 'filo', text: 'y' }]), [], 'solo le righe di Filo segnate da fuori');
+});

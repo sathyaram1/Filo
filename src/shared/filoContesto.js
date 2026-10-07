@@ -100,21 +100,29 @@
   // Il testo che la chat scrive nella conversazione venendo da fuori (l'esito di un comando dato in chat, il nome di un
   // file scaricato) è una lettura come le altre: imbustato, contato per le uscite (#587), con la vita delle letture.
   const ESTERNO_COMANDO = "dall'output di un comando";
+  const daFuoriIl = (m) => !!m && m.role !== 'user' && typeof m.esterno === 'string' && !!m.esterno;
   function letturaDaFuori(m, comando = '') {
-    if (!m || m.role === 'user' || typeof m.esterno !== 'string' || !m.esterno) return null;
+    if (!daFuoriIl(m)) return null;
     const text = String(m.text == null ? '' : m.text);
     if (m.esterno === ESTERNO_COMANDO) {
       const cmd = String(comando || '').replace(/^\//, '').trim();
       return { type: 'ESEGUI_COMANDO', command: cmd, _dallaChat: true, _executed: true, _output: { command: cmd, stdout: text, stderr: '' } };
     }
-    return { type: 'TESTO_DI_FUORI', _executed: true, _output: { text, fonte: m.esterno } };
+    return { type: 'TESTO_DI_FUORI', _executed: true, _output: { text, fonte: m.esterno, daFuori: [{ testo: text, fonte: m.esterno }] } };
+  }
+  // Lo stesso testo quando torna dall'archivio (un ricordo, una ricerca, una rilettura): l'azione che lo riporta lo
+  // dichiara in `_output.daFuori`, e uscite e conferme lo contano come la lettura che era (urlExfil, actionLevels).
+  function daFuoriDi(messaggi) {
+    return (Array.isArray(messaggi) ? messaggi : []).filter(daFuoriIl)
+      .map((m) => ({ testo: String(m.text == null ? '' : m.text), fonte: m.esterno }))
+      .filter((x) => x.testo.trim());
   }
 
   // `prima`: il messaggio che precede nel blocco. Ora e conversazione stanno sui messaggi dell'utente; su quelli di
   // Filo solo quando aprono un tratto di un'altra conversazione, così il modello non impara a scriverle nelle risposte.
   function rendi(m, prima, { tetto, esito, osserva }) {
     const cambia = !prima || prima.chat !== m.chat;
-    const daFuori = m.role !== 'user' && typeof m.esterno === 'string' && !!m.esterno;
+    const daFuori = daFuoriIl(m);
     const testo = daFuori ? '' : tienilo(m.text, tetto, m.chat);
     if (m.role === 'user') return { role: 'user', content: `${intestazione(m.ts, m.chat)} ${testo}`.trim() };
     const parti = [];
@@ -230,12 +238,13 @@
       if (!m || !m.chat) continue;
       let t = aperti.get(m.chat);
       if (m.role === 'user' || !t) {
-        t = { chiave: chiave(m), chat: m.chat, ts: m.ts, fine: m.ts, righe: [], titolo: (titoli ? titoli(m.chat) : m.titolo) || '' };
+        t = { chiave: chiave(m), chat: m.chat, ts: m.ts, fine: m.ts, righe: [], daFuori: [], titolo: (titoli ? titoli(m.chat) : m.titolo) || '' };
         aperti.set(m.chat, t);
         out.push(t);
       }
       const testo = String(m.text || '').replace(/\s+/g, ' ').trim();
       if (testo) t.righe.push(`${m.role === 'user' ? 'Utente' : 'Filo'}: ${testo}`);
+      t.daFuori.push(...daFuoriDi([m]));
       t.fine = m.ts;
     }
     return out.filter((t) => t.righe.length).map((t) => ({ ...t, testo: t.righe.join('\n') }));
@@ -307,6 +316,6 @@
   global.SN_FILO_CONTESTO = {
     TETTI_DI_SERIE, LIMITI, CARATTERI_PER_TOKEN, MESSAGGI_CON_ESITI, MESSAGGI_DELLA_CHAT, QUOTA_RIPRESI, SOGLIA_RICORDO, MAX_RICORDI,
     tetti, numeroIn, stimaToken, taglio, passoTaglio, etichettaChat, quando, intestazione, chiave,
-    ESTERNO_COMANDO, letturaDaFuori, finestra, tratti, testoPerIndice, scegliRicordi, rendiRicordi, coda, assembla,
+    ESTERNO_COMANDO, letturaDaFuori, daFuoriDi, finestra, tratti, testoPerIndice, scegliRicordi, testoRicordo, rendiRicordi, coda, assembla,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

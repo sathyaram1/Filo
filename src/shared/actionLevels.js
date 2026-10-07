@@ -877,11 +877,25 @@
 
   // Cosa un'azione già fatta ha portato nel compito (la sua uscita `_output`): una fonte con la sua classe,
   // o null se non ha letto niente di nuovo. Lo stato del compito si calcola da qui, mai dal modello.
+  // Testo venuto da fuori che un'azione riporta dal filo (#868: un esito di comando dato in chat, il nome di un file
+  // scaricato), da un ricordo, una ricerca o la finestra: sporca il compito come la lettura che era.
+  function fonteDaFuori(out) {
+    const l = Array.isArray(out.daFuori) ? out.daFuori.filter((x) => x && String(x.testo || '').trim()) : [];
+    if (!l.length) return null;
+    const comando = (global.SN_FILO_CONTESTO && global.SN_FILO_CONTESTO.ESTERNO_COMANDO) || "dall'output di un comando";
+    return l.every((x) => x.fonte === comando)
+      ? { classe: 4, campo: 'terminale', chiave: 'terminale:uscita', motivo: 'ho letto l\'uscita di un comando' }
+      : { classe: 5, campo: 'web', chiave: 'filo:da-fuori', motivo: 'ho letto un testo arrivato da fuori' };
+  }
+
   function fonteDi(action) {
     const entry = voce(action);
     const out = action && action._output;
-    if (!entry || typeof entry.fonte !== 'function' || !out || typeof out !== 'object') return null;
-    try { return entry.fonte(action, out) || null; } catch (_) { return null; }
+    if (!out || typeof out !== 'object') return null;
+    let f = null;
+    if (entry && typeof entry.fonte === 'function') { try { f = entry.fonte(action, out) || null; } catch (_) { f = null; } }
+    const g = fonteDaFuori(out);
+    return g && (!f || g.classe > f.classe) ? g : f;
   }
 
   // Gli ingressi del dispatch per SN_AUTONOMIA. `ctx.richiesta` = cosa ha scritto l'utente nel compito,
