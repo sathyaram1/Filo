@@ -20,6 +20,15 @@
   // Un comando che scarica dal web porta nel compito testo di autore ignoto, non un file del computer.
   const SCARICA = /\b(?:curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod|http|https|aria2c|lynx|w3m)\b|https?:\/\//i;
 
+  // I nomi delle reti conosciute e dei dispositivi abbinati li sceglie chi li gestisce, non l'utente: autori a cui
+  // si è già collegato, classe 3 come i mittenti fidati.
+  function nomiDiSistema(out, cosa) {
+    if (!Array.isArray(out.elenco) || !out.elenco.length) return null;
+    return cosa === 'wifi'
+      ? { classe: 3, campo: null, chiave: 'sistema:wifi', motivo: 'ho letto i nomi delle reti Wi-Fi, che sceglie chi le gestisce' }
+      : { classe: 3, campo: null, chiave: 'sistema:bluetooth', motivo: 'ho letto i nomi dei dispositivi Bluetooth, che sceglie chi li fabbrica' };
+  }
+
   function prefBuilt(action, attuali) {
     const P = global.SN_PREF;
     if (!P) return null;
