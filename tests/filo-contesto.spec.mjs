@@ -356,3 +356,38 @@ test('un messaggio lunghissimo incollato e tagliato nel contesto si rilegge inte
   expect(esiti[0]).toMatch(/da = \d+/);
   expect(esiti[1]).toContain('SEGNO-DEL-MEZZO-77');
 });
+
+// Tolto il registro grezzo, chi non ha il filo davanti (la home, il creatore di lezioni) riceve gli ultimi messaggi.
+test('il messaggio della home e il creatore di lezioni sanno di cosa si è parlato in chat oggi, anche in un\'altra scheda', async ({ app }) => {
+  test.setTimeout(90_000);
+  await primaScheda(app);
+  await preparaModello(app, [{ text: 'In bocca al lupo!' }, { text: 'Ciao!' }]);
+  await app.evaluate(() => {
+    globalThis.__home = [];
+    globalThis.__lezioni = [];
+    const prima = globalThis.SN_PROVIDERS.completeWithFallback;
+    globalThis.SN_PROVIDERS.completeWithFallback = globalThis.SN_PROVIDERS.streamCompleteWithFallback = async (args) => {
+      const tutto = (args.messages || []).map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n');
+      const base = { model: args.attempts[0].model, provider: args.attempts[0].provider, usage: {}, toolCalls: [], finishReason: 'stop' };
+      if (tutto.includes('preparare la dashboard')) { globalThis.__home.push(tutto); return { ...base, text: '{"message":"Ciao","suggestions":[]}' }; }
+      if (tutto.includes('analizzare l\'ultima interazione')) { globalThis.__lezioni.push(tutto); return { ...base, text: 'NULLA DA IMPARARE' }; }
+      return prima(args);
+    };
+  });
+  await app.evaluate(() => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'domani ho l\'esame di fisica alle nove', threadHistory: [], chatId: 'scheda-esame' }));
+  await app.evaluate(() => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'ciao', threadHistory: [], chatId: 'scheda-altra' }));
+  await expect.poll(() => app.evaluate(() => globalThis.__lezioni.length), { timeout: 20_000 }).toBeGreaterThan(1);
+  const lezione = await app.evaluate(() => globalThis.__lezioni[globalThis.__lezioni.length - 1]);
+  expect(lezione).toContain('CONVERSAZIONI RECENTI');
+  expect(lezione).toContain('esame di fisica');
+  await app.evaluate(() => globalThis.__filoHandlers.handleMessage(
+    { type: globalThis.SN_MSG.MSG.FILO_GENERATE_DASHBOARD, force: true },
+    { url: 'filo://newtab/' },
+  ));
+  await expect.poll(() => app.evaluate(() => globalThis.__home.length), { timeout: 20_000 }).toBeGreaterThan(0);
+  const home = await app.evaluate(() => globalThis.__home[globalThis.__home.length - 1]);
+  expect(home).toContain('esame di fisica');
+  // La chat ha il filo davanti: la stessa sezione lì sarebbe un doppione.
+  const [primo] = await chiamate(app);
+  expect(primo.map(testo).join('\n')).not.toContain('CONVERSAZIONI RECENTI');
+});

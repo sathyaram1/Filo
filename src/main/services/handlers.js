@@ -4477,11 +4477,16 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
     onboardingClosed = !!after.done;
     if (!internal) releaseOnboardingResume();
   }
+  // Il creatore di lezioni vede lo scambio e non il filo: gli ultimi messaggi gli arrivano con lo stato (#868).
+  let statoLezioni = stateText;
+  try {
+    if (filo) statoLezioni = `${stateText}\n\n${FiloState.testoConversazioni(FiloState.conversazioniRecenti(filo.tutti))}`;
+  } catch (_) {}
   if (onboardingClosed) {
-    finishOnboarding({ userMessage, filoReply: textReply, stateText });
+    finishOnboarding({ userMessage, filoReply: textReply, stateText: statoLezioni });
   } else {
     lezioniAutomaticheConsentite({ sender, contesto: azioniViste, fontiLette })
-      .then((ok) => (ok ? maybeRunLessonAgent({ userMessage, filoReply: textReply, stateText }) : null))
+      .then((ok) => (ok ? maybeRunLessonAgent({ userMessage, filoReply: textReply, stateText: statoLezioni }) : null))
       .catch(() => {});
   }
   // F4 — Feedback autonomo: fire-and-forget, non blocca la risposta all'utente.
@@ -4513,7 +4518,9 @@ async function gatherDashboardInputs({ openTabsCount = 0 } = {}) {
   const memory = await FiloMem.getMemory();
   const { profilo, preferenze, espansioni } = FiloMem.renderMemoryForPrompt(memory);
   const lezioni = await lessonsBufferText();
-  const { stateText } = await FiloState.assemble({ sistema: false });
+  // La home non ha il filo davanti come la chat: le servono gli ultimi messaggi, per i lavori da riprendere (#868).
+  const conversazioni = await ContestoFilo.messaggiDelFilo().catch(() => []);
+  const { stateText } = await FiloState.assemble({ sistema: false, conversazioni });
   // #379.5 — i "file" dell'editor (appunti inclusi: sono file come gli altri)
   // entrano nel contesto come riassunti, non come testo integrale. Sostituisce
   // la vecchia iniezione degli appunti dall'archivio (silo ormai vuoto dopo la

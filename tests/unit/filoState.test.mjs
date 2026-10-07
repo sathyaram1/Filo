@@ -131,3 +131,22 @@ test('una lettura solo vecchia (la home non ne chiede un\'altra) si data, senza 
   assert.match(stateText, /Saldo: 4\.?000 crediti \(lo tiene il server; letto il 28 set alle \d\d:\d\d\)/);
   assert.doesNotMatch(stateText, /non risponde/);
 });
+
+// #868 — la home e il creatore di lezioni non hanno il filo davanti: ricevono gli ultimi messaggi, e il taglio si dichiara.
+test('conversazioni recenti: solo le ultime 24 ore, le più nuove, il testo lungo con «…» e quanti ne restano fuori', () => {
+  const ora = Date.parse('2026-10-07T12:00:00Z');
+  const ts = (oreFa) => new Date(ora - oreFa * 3600000).toISOString();
+  const msgs = [{ role: 'user', text: 'di due giorni fa', ts: ts(48) }];
+  for (let i = 0; i < 45; i++) msgs.push({ role: i % 2 ? 'filo' : 'user', text: `messaggio ${i}`, ts: ts(10 - i * 0.1) });
+  msgs.push({ role: 'user', text: 'x'.repeat(500), ts: ts(0.01) });
+  const c = FS.conversazioniRecenti(msgs, ora);
+  assert.equal(c.righe.length, 40);
+  assert.equal(c.tolti, 6);
+  assert.ok(!c.righe.some((r) => r.includes('di due giorni fa')));
+  assert.ok(c.righe[c.righe.length - 1].endsWith('…'));
+  const testo = FS.testoConversazioni(c);
+  assert.match(testo, /CONVERSAZIONI RECENTI/);
+  assert.match(testo, /più 6 messaggi più vecchi/);
+  assert.ok(!FS.renderForPrompt(baseState()).includes('CONVERSAZIONI RECENTI'), 'senza conversazioni la sezione non c\'è (la chat ha il filo)');
+  assert.ok(FS.renderForPrompt(baseState({ conversazioni: c })).includes('messaggio 44'));
+});
