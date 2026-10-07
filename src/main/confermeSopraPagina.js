@@ -25,16 +25,18 @@ function pulisci(r) {
 }
 
 // Le finestre che apre un sito (i popup di accesso) stanno sopra quella di Filo: con una domanda a schermo il sito ci
-// posava sopra il testo finto, lasciando scoperto l'OK vero (#592.6, giro 7). Finché una domanda si vede, si nascondono.
-const finestreDelSito = new Set();
+// posava sopra il testo finto, lasciando scoperto l'OK vero (#592.6, giro 7). Finché una domanda si vede, si nascondono
+// quelle nate dalla stessa finestra di Filo: una domanda lasciata in un'altra finestra non spegne gli accessi qui (giro 8).
+const finestreDelSito = new Map();
 const nascoste = new Set();
 const aSchermo = new Set();
 
 function allineaFinestre() {
   const esenti = new Set([...aSchermo].map((c) => c.win));
-  for (const w of [...finestreDelSito]) {
+  const conDomanda = new Set([...aSchermo].map((c) => finestreDelSito.get(c.win) || c.win));
+  for (const [w, padre] of [...finestreDelSito]) {
     if (!w || w.isDestroyed()) { finestreDelSito.delete(w); nascoste.delete(w); continue; }
-    if (aSchermo.size && !esenti.has(w)) {
+    if (conDomanda.has(padre) && !esenti.has(w)) {
       if (w.isVisible()) { nascoste.add(w); try { w.hide(); } catch (_) {} }
     } else if (nascoste.has(w)) {
       nascoste.delete(w);
