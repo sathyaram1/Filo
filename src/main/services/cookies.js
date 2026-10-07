@@ -26,6 +26,7 @@
 'use strict';
 
 const { session } = require('electron');
+const Sito = require('./stessoSito');
 
 const MODES = { MANUAL: 'manual', DEFAULT: 'default', PRIVACY: 'privacy' };
 
@@ -133,25 +134,16 @@ function getBannerSites(settings) {
 
 function isBannerSiteIn(sites, url) {
   if (!/^https?:/i.test(String(url || ''))) return false;
-  const reg = registrableOf(url);
-  return !!reg && sites.includes(reg);
+  return !!Sito.voceSalvata(url, sites);
 }
 
 function trustedSetOf(settings) {
   return new Set(getTrustedSites(settings).map((d) => String(d || '').toLowerCase()).filter(Boolean));
 }
 
-// eTLD+1 per i cookie: solo le piattaforme che il web già separa (un blog su wordpress.com resta con wordpress.com).
-// Ripiego sull'hostname grezzo se il normalizzatore manca o l'URL non ha dominio (IP, localhost).
+// Il sito dei cookie è quello di services/stessoSito.js: un blog su wordpress.com resta con wordpress.com.
 function registrableOf(url) {
-  try {
-    const SB = globalThis.SN_SAFEBROWSE;
-    if (SB && typeof SB.normalize === 'function') {
-      const norm = SB.normalize(url, { soloPsl: true });
-      if (norm && norm.registrable) return norm.registrable;
-    }
-  } catch (_) {}
-  try { return new URL(url).hostname.toLowerCase() || null; } catch (_) { return null; }
+  return Sito.sitoDi(url);
 }
 
 // Chiave di partizione per-sito in modalità privacy. Slug sicuro per il nome di
@@ -165,11 +157,11 @@ function baseDelSito(reg) {
 function partitionForUrl(url, trusted) {
   const reg = registrableOf(url);
   if (!reg) return null;
-  const base = baseDelSito(reg);
-  const isTrusted = trusted instanceof Set && trusted.has(reg);
-  // 'persist:' → jar isolato per-sito ma persistente (resta connesso).
+  // 'persist:' → jar isolato per-sito ma persistente (resta connesso). È del sito anche quando la voce fidata è un
+  // suffisso (co.uk, gov.it): un jar per voce metterebbe tutti i siti sotto di lei insieme (#796).
   // Senza prefisso → jar isolato ed effimero, buttato all'uscita dal sito (vedi «uscita dal sito»).
-  if (isTrusted) return 'persist:' + base;
+  const base = baseDelSito(reg);
+  if (Sito.voceSalvata(url, trusted instanceof Set ? trusted : null)) return 'persist:' + base;
   sitoDelJar.set(base, reg);
   const g = jarGen.get(base);
   return g && g.n ? `${base}~${g.n}` : base;
@@ -376,8 +368,7 @@ function controllaUscita(partition) {
 
 // Il sito non è più un'eccezione: quello che aveva salvato se ne va come per gli altri siti, ma mai mentre
 // è aperto in una scheda (lo butterebbe fuori a metà sessione): lì aspetta che la chiuda, come un jar normale.
-function dimenticaFidato(site) {
-  const partition = 'persist:' + baseDelSito(site);
+function dimenticaFidato(site, partition = 'persist:' + baseDelSito(site)) {
   let ses = siteSessions.get(partition);
   try { if (!ses) ses = session.fromPartition(partition); } catch (_) { return; }
   siteSessions.set(partition, ses);
@@ -406,26 +397,28 @@ function spazzaFidatiOrfani(trusted) {
       .filter((v) => v.isDirectory() && v.name.startsWith('filo-priv-'))
       .map((v) => v.name);
   } catch (_) { return; }
-  const vivi = new Set([...trusted].map((s) => baseDelSito(s)));
   for (const nome of nomi) {
-    if (vivi.has(nome)) continue;
+    if (jarFidato(nome, trusted)) continue;
     const partition = 'persist:' + nome;
-    try {
-      const ses = siteSessions.get(partition) || session.fromPartition(partition);
-      if (inUso(partition, ses)) continue;   // la scheda è ancora aperta: aspetta che la chiuda
-      siteSessions.set(partition, ses);
-      fidatiDaButtare.add(partition);
-      buttaJar(partition, ses);
-    } catch (_) {}
+    if (fidatiDaButtare.has(partition)) continue;
+    dimenticaFidato(nome.slice('filo-priv-'.length), partition);
   }
 }
 
+// Il jar persistente di un sito resta finché una voce fidata copre il sito (la sua, o un suffisso salvato prima).
+function jarFidato(nome, trusted) {
+  const sito = String(nome).replace(/^filo-priv-/, '');
+  return Boolean(Sito.voceSalvata(sito, trusted)) || [...trusted].some((d) => baseDelSito(d) === nome);
+}
+
 // Rimesso fra i fidati prima che il suo jar se ne andasse: resta dov'è, l'utente ha disdetto.
-function tieniFidato(site) {
-  const partition = 'persist:' + baseDelSito(site);
-  if (!fidatiDaButtare.delete(partition)) return;
-  clearTimeout(uscite.get(partition));
-  uscite.delete(partition);
+function tieniFidati(trusted) {
+  for (const partition of [...fidatiDaButtare]) {
+    if (!jarFidato(partition.replace(/^persist:/, ''), trusted)) continue;
+    fidatiDaButtare.delete(partition);
+    clearTimeout(uscite.get(partition));
+    uscite.delete(partition);
+  }
 }
 
 // Il sito riparte subito in un'altra generazione: chi lo riapre mentre il vecchio jar si svuota non perde i cookie a metà.
@@ -565,8 +558,7 @@ function setConfigChangeHandler(fn) { configChange = typeof fn === 'function' ? 
 // In Privacy un sito non fidato non tiene niente oltre la sessione, nemmeno quello che Filo sa di lui.
 function keepsSiteData(site) {
   if (_cached.mode !== MODES.PRIVACY) return true;
-  const s = String(site || '').toLowerCase();
-  return _cached.trustedSites.some((d) => String(d || '').toLowerCase() === s);
+  return !!Sito.voceSalvata(String(site || '').toLowerCase(), _cached.trustedSites);
 }
 
 // I nomi che il sito ha dato alla sua risposta, visti dopo il clic sul banner: li tiene tabs/tabCookies.js.
@@ -600,8 +592,8 @@ function configureFromSettings(settings) {
     const prima = new Set(prevTrusted.split('\n').map((d) => d.toLowerCase()).filter(Boolean));
     const adesso = trustedSetOf(settings);
     if (_configured) {
-      for (const site of prima) if (!adesso.has(site)) dimenticaFidato(site);
-      for (const site of adesso) if (!prima.has(site)) tieniFidato(site);
+      for (const site of prima) if (!adesso.has(site) && !jarFidato(baseDelSito(site), adesso)) dimenticaFidato(site);
+      tieniFidati(adesso);
     }
     spazzaFidatiOrfani(adesso);
   }
