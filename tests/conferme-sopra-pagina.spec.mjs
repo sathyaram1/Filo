@@ -381,3 +381,32 @@ test('con la domanda a schermo la barra laterale resta raggiungibile, e aprirla 
   await vista.keyboard.press('Escape');
   await expect.poll(() => nelMondoDiFilo(app, host, 'globalThis.__e')).toBe(false);
 });
+
+// Giro 7: una finestra aperta dal sito (un finto popup di accesso, senza gesto) si posava sul testo del popup vero.
+test('con la domanda a schermo le finestre aperte dal sito si nascondono, e tornano alla risposta', async ({ app, openTab, testServer }) => {
+  const finto = testServer.html('<title>Filo</title><p>Filo vuole impostare: Tema → Scuro.</p>');
+  const page = await testServer.openReady(openTab, '<h1>pagina</h1>');
+  const host = new URL(page.url()).hostname;
+  const finestre = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+    .filter((w) => !w._filoTabs && /^https?:/.test(w.webContents.getURL()))
+    .map((w) => ({ nome: w.webContents.getURL().includes('nome=prima') ? 'prima' : 'dopo', visibile: w.isVisible() })));
+  const apri = (nome) => page.evaluate(({ u, nome }) => {
+    window[nome] = window.open(`${u}?client_id=a&redirect_uri=b&nome=${nome}`, nome, 'popup,left=500,top=400,width=440,height=100');
+  }, { u: finto, nome });
+  await apri('prima');
+  await expect.poll(finestre).toEqual([{ nome: 'prima', visibile: true }]);
+  await nelMondoDiFilo(app, host, `(() => { globalThis.__e = 'attesa'; SN_CONFIRM_UI.confirm({ title: 'Filo chiede conferma', text: 'Prova' }).then((ok) => { globalThis.__e = ok; }); return 1; })()`);
+  const vista = await confermaSopraPagina(app);
+  await expect.poll(finestre).toEqual([{ nome: 'prima', visibile: false }]);
+  // Il sito ne apre un'altra e prova a riportare davanti la prima: restano nascoste finché c'è la domanda.
+  await apri('dopo');
+  await page.evaluate(() => { try { window.prima.focus(); } catch (_) {} });
+  await new Promise((r) => setTimeout(r, 1000));
+  const durante = await finestre();
+  expect(durante).toHaveLength(2);
+  expect(durante.every((f) => !f.visibile)).toBe(true);
+  expect(await nelMondoDiFilo(app, host, 'globalThis.__e')).toBe('attesa');
+  await vista.keyboard.press('Escape');
+  await expect.poll(() => nelMondoDiFilo(app, host, 'globalThis.__e')).toBe(false);
+  await expect.poll(async () => (await finestre()).every((f) => f.visibile)).toBe(true);
+});

@@ -29,7 +29,7 @@ require('../shared/tasti'); // nome E comportamento delle scorciatoie, per il si
 const { indiceSaltoScheda, comandoNavigazione } = globalThis.SN_TASTI;
 const { collegaScorciatoie } = require('./shortcuts');
 const { AvvisiSopraPagina } = require('./avvisiSopraPagina');
-const { ConfermeSopraPagina } = require('./confermeSopraPagina');
+const { ConfermeSopraPagina, registraFinestraDelSito } = require('./confermeSopraPagina');
 const { BarraLaterale } = require('./barraLaterale');
 const { AnteprimeSchede } = require('./tabs/anteprime');
 const { VisiteSchede } = require('./tabs/visite');
@@ -2820,6 +2820,7 @@ class TabManager {
   _hardenAuthPopup(win, origine = null) {
     if (!win || !win.webContents) return;
     const pwc = win.webContents;
+    registraFinestraDelSito(win);
     installaPermessi(pwc.session);
     Permessi.seguiGesti(pwc);
     try {

@@ -38,6 +38,11 @@ nella pagina, in uno Shadow DOM chiuso.
   (`dopoInCima`), tranne la barra laterale: la sua striscia sul bordo sinistro e il pannello
   restano raggiungibili, e il clic nell'ombra del pannello cade sul velo, non sulla pagina. Dentro gira lo stesso `confirmUi.js` di sempre (stile, testo che si scorre fino in
   fondo, mezzo secondo prima che un clic vero valga), col tema e i token dell'utente mandati dal main.
+- **Nemmeno una finestra del sito ci sta sopra.** Un sito apre senza gesto una finestrella «di accesso»
+  (basta un `/login` nell'indirizzo), grande quanto e dove vuole: la posava sul testo del popup vero e
+  lasciava scoperto l'OK (#592.6, giro 7). Ogni finestra nata da una pagina si registra
+  (`registraFinestraDelSito`); finché una domanda si vede, sono nascoste tutte tranne quella sotto la
+  domanda, e se il sito ne rimostra una torna giù. Alla risposta riappaiono senza rubare il fuoco.
 - **Segue la sua scheda.** Una domanda si vede solo sopra la scheda che l'ha fatta, quando è davanti;
   le altre aspettano. Tornando davanti si ridisegna da capo, e il mezzo secondo riparte. Scheda chiusa,
   pagina nuova, frame che naviga, renderer morto: la domanda vale un Annulla. Da un popup di accesso

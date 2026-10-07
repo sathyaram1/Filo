@@ -24,6 +24,34 @@ function pulisci(r) {
   return out;
 }
 
+// Le finestre che apre un sito (i popup di accesso) stanno sopra quella di Filo: con una domanda a schermo il sito ci
+// posava sopra il testo finto, lasciando scoperto l'OK vero (#592.6, giro 7). Finché una domanda si vede, si nascondono.
+const finestreDelSito = new Set();
+const nascoste = new Set();
+const aSchermo = new Set();
+
+function allineaFinestre() {
+  const esenti = new Set([...aSchermo].map((c) => c.win));
+  for (const w of [...finestreDelSito]) {
+    if (!w || w.isDestroyed()) { finestreDelSito.delete(w); nascoste.delete(w); continue; }
+    if (aSchermo.size && !esenti.has(w)) {
+      if (w.isVisible()) { nascoste.add(w); try { w.hide(); } catch (_) {} }
+    } else if (nascoste.has(w)) {
+      nascoste.delete(w);
+      try { w.showInactive(); } catch (_) {}
+    }
+  }
+}
+
+// Ogni finestra nata da una pagina web passa di qui; se il sito la rimostra mentre c'è una domanda, torna nascosta.
+function registraFinestraDelSito(win) {
+  if (!win || finestreDelSito.has(win) || win.isDestroyed()) return;
+  finestreDelSito.add(win);
+  win.once('closed', () => { finestreDelSito.delete(win); nascoste.delete(win); });
+  win.on('show', () => { if (aSchermo.size) setImmediate(allineaFinestre); });
+  allineaFinestre();
+}
+
 function stessoFrame(frame, pid, rid) {
   try { return frame.processId === pid && frame.routingId === rid; } catch (_) { return true; }
 }
@@ -74,6 +102,7 @@ class ConfermeSopraPagina {
     vista.setBounds(b);
     this._inCima();
     vista.setVisible(true);
+    if (!aSchermo.has(this)) { aSchermo.add(this); allineaFinestre(); }
     if (this.mostrata === voce.id) return;
     this.mostrata = voce.id;
     this._invia(voce);
@@ -99,6 +128,7 @@ class ConfermeSopraPagina {
   }
 
   _nascondi() {
+    if (aSchermo.delete(this)) allineaFinestre();
     const vista = this.vista;
     if (!vista || vista.webContents.isDestroyed()) return;
     const aveva = this._haTastiera();
@@ -231,6 +261,7 @@ class ConfermeSopraPagina {
   }
 
   _butta() {
+    if (aSchermo.delete(this)) allineaFinestre();
     const vista = this.vista;
     this.vista = null;
     this.pronta = false;
@@ -279,4 +310,4 @@ function ritiraConferma(event, d) {
   if (c) c.ritira(wc, event.senderFrame || null, Number(d && d.id));
 }
 
-module.exports = { ConfermeSopraPagina, chiediConferma, ritiraConferma, pulisci };
+module.exports = { ConfermeSopraPagina, chiediConferma, ritiraConferma, registraFinestraDelSito, pulisci };
