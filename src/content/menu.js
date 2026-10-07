@@ -24,7 +24,51 @@
   // destro sul video non compariva nulla (e non si poteva mandare feedback).
   // Se c'è un fullscreenElement montiamo lì dentro, così il menu è visibile.
   function menuHost() {
-    return document.fullscreenElement || document.documentElement;
+    if (document.fullscreenElement) return document.fullscreenElement;
+    const d = dialogoModale();
+    return (d && strato(d)) || document.documentElement;
+  }
+
+  // Una finestra modale del sito (<dialog> aperta con showModal) sta nello strato più alto e rende inerte tutto il
+  // resto: il menu va dentro di lei, in un nostro strato più alto ancora (popover), o resta sotto e non risponde.
+  function dialogoModale() {
+    let modali = [];
+    try { modali = [...document.querySelectorAll('dialog[open]')].filter((d) => d.matches(':modal')); } catch (_) {}
+    if (!modali.length) return null;
+    const attivo = document.activeElement;
+    return modali.find((d) => d.contains(attivo)) || modali[modali.length - 1];
+  }
+  let stratoEl = null;
+  function strato(dialogo) {
+    try {
+      if (!stratoEl) {
+        stratoEl = document.createElement('div');
+        global.SN_FILO_UI?.mark(stratoEl);
+        stratoEl.setAttribute('popover', 'manual');
+        stratoEl.style.cssText = 'all:initial!important;display:block!important;position:fixed!important;inset:0 auto auto 0!important;'
+          + 'width:0!important;height:0!important;overflow:visible!important;margin:0!important;padding:0!important;'
+          + 'border:0!important;background:transparent!important;';
+      }
+      const nuovo = stratoEl.parentNode !== dialogo;
+      if (nuovo) dialogo.appendChild(stratoEl);
+      // Sopra a ciò che il sito ha portato nello strato più alto prima di questo menu.
+      if (!activeMenu && stratoEl.matches(':popover-open')) stratoEl.hidePopover();
+      if (!stratoEl.matches(':popover-open')) stratoEl.showPopover();
+      return stratoEl;
+    } catch (_) {
+      return null;
+    }
+  }
+  function chiudiStrato() {
+    try { if (stratoEl && !activeMenu && stratoEl.matches(':popover-open')) stratoEl.hidePopover(); } catch (_) {}
+  }
+
+  // Uno zoom del foglio di stile sul contenitore (html { zoom: 1.5 }) moltiplicherebbe le misure del menu, che sono
+  // quelle dello schermo: il pezzo lo annulla.
+  function annullaZoom(el, host) {
+    const z = Number(host.currentCSSZoom) || 1;
+    if (z === 1) el.style.removeProperty('zoom');
+    else el.style.setProperty('zoom', String(1 / z), 'important');
   }
 
   // Ogni pezzo entra nel documento del sito già chiuso ai gesti finti, nodo per nodo (#589.8), e sotto le sonde
@@ -32,6 +76,7 @@
   function monta(el) {
     global.SN_FILO_UI?.soloGestiVeri(el);
     const host = menuHost();
+    annullaZoom(el, host);
     return host.insertBefore(el, global.SN_VISTO?.prima(host, el) || null);
   }
 
@@ -59,6 +104,7 @@
       try { activeMenu.cleanupZoom?.(); } catch (_) {}
       try { activeMenu.cleanups?.forEach((fn) => { try { fn(); } catch (_) {} }); } catch (_) {}
       activeMenu = null;
+      chiudiStrato();
     }
     // Pulisce zone di drop residue (vengono ri-registrate alla prossima apertura).
     dropZones.length = 0;
@@ -1034,6 +1080,7 @@
     const el = ensureTooltipEl();
     // Sopra i pannelli aperti dopo di lei (stesso piano: vale l'ordine), sotto le sonde (#589.11).
     const host = menuHost();
+    annullaZoom(el, host);
     host.insertBefore(el, global.SN_VISTO?.prima(host, el) || null);
     el.dataset.snTheme = document.documentElement.dataset.snTheme || '';
     el.textContent = text;

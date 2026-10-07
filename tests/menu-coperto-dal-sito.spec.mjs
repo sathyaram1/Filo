@@ -396,3 +396,101 @@ for (const [nome, [stileHtml, stileScheda]] of Object.entries(SCHEDE)) {
     await expect(coperto).toBeVisible();
   });
 }
+
+// Uno zoom del foglio di stile sul documento moltiplica le misure dei pezzi di Filo: il menu va dove l'utente ha
+// cliccato, e la guardia guarda dove il menu sta davvero, anche se lo zoom cambia a menu aperto.
+test('su una pagina con lo zoom sul documento un velo steso solo sopra il menu resta fermato, anche se lo zoom cambia dopo', async ({ app, openTab, testServer }) => {
+  await app.evaluate(({ clipboard }, s) => clipboard.writeText(s), SEGRETO);
+  const page = await apri(openTab, testServer, `<!doctype html><html style="zoom:1.5"><body style="padding:20px;margin:0">
+    <input id="campo" style="width:200px;font-size:16px">
+    <script>
+      window.veloSulMenu = (zoom) => {
+        if (zoom) document.documentElement.style.zoom = zoom;
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          const r = document.querySelector('.sn-menu').getBoundingClientRect();
+          const z = document.documentElement.currentCSSZoom;
+          const v = document.createElement('div'); v.id = 'velo';
+          v.style.cssText = 'position:fixed;background:#fff;pointer-events:none;z-index:2147483647;left:' + (r.left / z)
+            + 'px;top:' + (r.top / z) + 'px;width:' + (r.width / z) + 'px;height:' + (r.height / z) + 'px';
+          document.body.appendChild(v);
+        }));
+      };
+    </script></body></html>`);
+  for (const zoom of ['', '2']) {
+    await page.evaluate(() => { document.getElementById('velo')?.remove(); document.getElementById('campo').value = ''; });
+    await page.locator('#campo').click({ button: 'right' });
+    await expect(page.locator('.sn-menu-paste-main')).toBeVisible();
+    await page.evaluate((z) => window.veloSulMenu(z), zoom);
+    await expect(page.locator('#velo')).toHaveCount(1);
+    await page.waitForTimeout(700);
+    const b = await page.locator('.sn-menu-paste-main').boundingBox();
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 3 });
+    await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
+    await expect(avvisoCoperto(page).last()).toBeVisible();
+    expect(await page.locator('#campo').inputValue(), `zoom ${zoom || '1.5'}: gli appunti arrivano sotto il velo`).not.toContain(SEGRETO);
+    await page.evaluate(() => { document.documentElement.style.zoom = ''; });
+  }
+});
+
+test('su una pagina con lo zoom sul documento il menu si apre accanto al campo, a schermo, e Incolla incolla', async ({ app, openTab, testServer }) => {
+  await app.evaluate(({ clipboard }, s) => clipboard.writeText(s), SEGRETO);
+  const page = await apri(openTab, testServer, `<!doctype html><html style="zoom:1.5"><body style="margin:0">
+    <input id="campo" style="position:absolute;right:20px;top:200px;width:150px;font-size:16px"></body></html>`);
+  const campo = await page.locator('#campo').boundingBox();
+  await page.locator('#campo').click({ button: 'right', position: { x: 10, y: 5 } });
+  const incolla = page.locator('.sn-menu-paste-main');
+  await expect(incolla).toBeVisible();
+  const menu = await page.locator('.sn-menu').first().boundingBox();
+  const vw = await page.evaluate(() => innerWidth);
+  expect(menu.x + menu.width, 'il menu esce dallo schermo').toBeLessThanOrEqual(vw);
+  expect(Math.abs(menu.y - (campo.y + 5 * 1.5)), 'il menu si apre lontano dal punto cliccato').toBeLessThan(40);
+  await incolla.click();
+  await expect(page.locator('#campo')).toHaveValue(SEGRETO);
+  await expect(avvisoCoperto(page)).toHaveCount(0);
+});
+
+// La pagina toglie gli effetti sopra un riquadro solo se Filo le conferma che lì c'è un suo menu aperto.
+test('un riquadro senza menu non fa togliere alla pagina opacità e trasformazioni dei suoi contenitori', async ({ openTab, testServer }) => {
+  const riquadro = testServer.html(`<!doctype html><html><body>annuncio
+    <script>
+      let i = 0;
+      setInterval(() => {
+        parent.postMessage({ __snVistoSospendi: 1 }, '*');
+        parent.postMessage({ __snVistoSospendi: 1, n: 'chiave-' + (i++ % 3) }, '*');
+      }, 300);
+    </script></body></html>`, { pubblico: true });
+  const page = await apri(openTab, testServer, `<!doctype html><html><body style="padding:20px">
+    <div id="nascosto" style="opacity:0;transform:scale(0.2)"><iframe src="${riquadro}" style="width:300px;height:200px"></iframe></div>
+    </body></html>`);
+  await expect.poll(() => page.frames().some((f) => f.url().includes('sito-pubblico.test'))).toBe(true);
+  await page.waitForTimeout(2000);
+  const stile = await page.locator('#nascosto').evaluate((e) => [getComputedStyle(e).opacity, getComputedStyle(e).transform]);
+  expect(stile, 'il contenitore nascosto è diventato visibile').toEqual(['0', 'matrix(0.2, 0, 0, 0.2, 0, 0)']);
+});
+
+// Una finestra modale del sito rende inerte tutto ciò che sta fuori e sopra di lei disegna solo lo strato più alto.
+test('nel campo di una finestra modale del sito il menu si vede sopra la finestra e Incolla incolla; un velo sopra resta fermato', async ({ app, openTab, testServer }) => {
+  await app.evaluate(({ clipboard }, s) => clipboard.writeText(s), SEGRETO);
+  const page = await apri(openTab, testServer, `<!doctype html><html><body style="padding:40px">
+    <dialog id="d" style="transform:translate(10px, 10px) scale(1.02);overflow:hidden"><input id="campo" style="width:300px;font-size:16px"></dialog>
+    <div id="velo" popover="manual" style="position:fixed;inset:0;margin:0;width:100vw;height:100vh;border:0;background:#fff;pointer-events:none">Clicca i quadrati</div>
+    <script>document.getElementById('d').showModal();</script></body></html>`);
+  await page.locator('#campo').click({ button: 'right' });
+  const incolla = page.locator('.sn-menu-paste-main');
+  await expect(incolla).toBeVisible();
+  const b = await incolla.boundingBox();
+  const x = b.x + b.width / 2, y = b.y + b.height / 2;
+  expect(await page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest('.sn-menu'), [x, y]), 'il menu sta sotto la finestra').toBe(true);
+  await page.mouse.click(x, y);
+  await expect(page.locator('#campo')).toHaveValue(SEGRETO);
+  await expect(page.locator('.sn-menu')).toHaveCount(0);
+
+  await page.locator('#campo').fill('');
+  await page.locator('#campo').click({ button: 'right' });
+  await expect(incolla).toBeVisible();
+  await page.evaluate(() => document.getElementById('velo').showPopover());
+  await page.waitForTimeout(700);
+  await page.mouse.click(x, y);
+  await expect(avvisoCoperto(page)).toBeVisible();
+  expect(await page.locator('#campo').inputValue()).not.toContain(SEGRETO);
+});

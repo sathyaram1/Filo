@@ -103,7 +103,19 @@ il clic sul pulsante del sito.
      pezzo di Filo sopra al menu (un avviso, la conferma di «Svuota»), se il
      browser lo dice appena quel pezzo se ne va;
    - si giudica alla **pressione**; un clic da tastiera, che non ha pressione, si
-     giudica lì. Un clic fermato chiude il menu e lo dice con un avviso.
+     giudica lì. Un clic fermato chiude il menu e lo dice con un avviso;
+   - lo **zoom del foglio di stile** sul contenitore (`html { zoom: 2 }`)
+     moltiplica le misure di ciò che ci sta dentro: menu e sonde, posati con le
+     misure dello schermo, finivano altrove (il menu fuori dallo schermo, le
+     sonde lontano da un velo steso solo sul menu, #589.11 giro 4). Ogni pezzo
+     che entra da `monta` e l'host delle sonde lo annullano (`zoom: 1/z`); l'host
+     lo rilegge a ogni fotogramma, perché il sito può cambiarlo a menu aperto;
+   - una **finestra modale** del sito (`<dialog>` con `showModal`) sta nello
+     strato più alto e rende inerte il resto del documento: il menu montato su
+     `<html>` restava sotto, grigio, e non rispondeva. Lì i pezzi entrano in un
+     nostro `popover` dentro la finestra: non inerte, perché discendente, e sopra
+     di lei, perché aperto dopo. Un velo che il sito porta nello strato più alto
+     dopo il menu copre anche le sonde, e il clic si ferma.
 
    Sulle pagine `filo://` la guardia è spenta: nessuno script può coprire il menu.
 
@@ -163,7 +175,11 @@ messaggio, di sospenderli sugli antenati del suo `iframe` finché il menu resta
 aperto (la richiesta si rinnova ogni secondo, e senza la pagina li rimette da
 sé); le sonde si guardano quando la pagina risponde che li ha tolti, o dopo un
 quarto di secondo, così la prima voce non aspetta il mezzo secondo di una
-scoperta. Una richiesta o una risposta finte del sito tolgono solo effetti o
-fanno guardare prima: un velo resta un velo. Lì il filtro della pagina non
+scoperta. La richiesta porta una chiave a caso che il riquadro manda anche al
+main, e il main la gira alla sola pagina madre: la pagina toglie gli effetti
+solo per una chiave che le arriva da tutte e due le parti. Senza, qualunque
+riquadro (una pubblicità nascosta dalla pagina con `opacity: 0`) si rendeva
+visibile da solo (giro 4). Una risposta finta fa solo guardare prima: un velo
+resta un velo. Lì il filtro della pagina non
 torna su un fondo, che coprirebbe il riquadro: finché il menu è aperto la pagina
 sopra lo perde.

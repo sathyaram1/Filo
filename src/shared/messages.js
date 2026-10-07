@@ -940,6 +940,11 @@
     // il tuo. Gli eventi del mouse non attraversano il confine di un iframe,
     // quindi senza questo due menu potrebbero restare aperti insieme.
     CLOSE_OTHER_MENUS: 'close_other_menus',
+    // #589.11 — un riquadro con un menu di Filo aperto chiede alla pagina che lo contiene di sospendere gli effetti
+    // grafici sopra di lui. Va dal riquadro al main { n, si }, e il main lo gira alla SOLA pagina madre come
+    // VISTO_PERMESSO { n, si }: la pagina crede a una richiesta solo se la chiave le arriva anche da qui.
+    VISTO_SOSPENDI: 'visto_sospendi',
+    VISTO_PERMESSO: 'visto_permesso',
     // Contropartita di TRANSLATE_FRAMES: arriva a ogni riquadro della scheda e
     // gli fa tradurre (o riportare all'originale) se stesso. { mode, runId }
     FRAME_TRANSLATE: 'frame_translate',

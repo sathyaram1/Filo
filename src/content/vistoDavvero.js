@@ -182,22 +182,43 @@
 
   // In un riquadro gli effetti della pagina sopra accecano le sonde e da qui non si toccano: li sospende lei, a
   // richiesta. Le sonde si guardano dopo la sua risposta, o la prima voce aspetterebbe come dopo un velo.
+  // La pagina crede solo a una richiesta che Filo le conferma (stessa chiave, dal main): un riquadro senza un
+  // nostro menu aperto, una pubblicità nascosta, non le fa togliere niente.
   const CHIAVE_RIQUADRO = '__snVistoSospendi';
   const CHIAVE_PRONTO = '__snVistoSospesi';
   const RINNOVO_MS = 1000;
   const SCADENZA_MS = 2500;
   const ATTESA_GENITORE_MS = 250;
+  const TETTO_ATTESE = 64;
   const IN_RIQUADRO = (() => { try { return global.top !== global; } catch (_) { return true; } })();
-  let chiestoAl = -Infinity;
   let rinvio = 0;
   let inCoda = [];
-  function chiediAlGenitore(si) {
-    if (!IN_RIQUADRO) return;
+  function nuovaChiave() {
+    const a = new Uint32Array(4);
+    global.crypto.getRandomValues(a);
+    return Array.from(a, (x) => x.toString(36)).join('-');
+  }
+  // `proprio`: il menu di questo documento; `inoltro`: la richiesta di un riquadro figlio, passata alla pagina sopra.
+  const proprio = { chiave: '', al: -Infinity };
+  const inoltro = { chiave: '', al: -Infinity };
+  // Vero alla prima richiesta di un giro.
+  function chiedi(r, si) {
+    if (!IN_RIQUADRO) return false;
     const ora = global.performance.now();
-    if (si && ora - chiestoAl < RINNOVO_MS) return;
-    if (si && chiestoAl === -Infinity && !rinvio) rinvio = setTimeout(guardaLeSonde, ATTESA_GENITORE_MS);
-    chiestoAl = si ? ora : -Infinity;
-    try { global.parent.postMessage({ [CHIAVE_RIQUADRO]: si ? 1 : 0 }, '*'); } catch (_) {}
+    if (si && ora - r.al < RINNOVO_MS) return false;
+    if (!si && !r.chiave) return false;
+    const primo = si && !r.chiave;
+    if (primo) r.chiave = nuovaChiave();
+    const n = r.chiave;
+    r.al = si ? ora : -Infinity;
+    if (!si) r.chiave = '';
+    const T = global.SN_MSG?.MSG?.VISTO_SOSPENDI;
+    try { if (T) Promise.resolve(global.chrome.runtime.sendMessage({ type: T, n, si: si ? 1 : 0 })).catch(() => {}); } catch (_) {}
+    try { global.parent.postMessage({ [CHIAVE_RIQUADRO]: si ? 1 : 0, n }, '*'); } catch (_) {}
+    return primo;
+  }
+  function chiediAlGenitore(si) {
+    if (chiedi(proprio, si) && !rinvio) rinvio = setTimeout(guardaLeSonde, ATTESA_GENITORE_MS);
   }
   // Una conferma finta fa solo guardare prima, come senza riquadro.
   function guardaLeSonde() {
@@ -234,7 +255,39 @@
     clearTimeout(reg.timer);
     for (const v of reg.vecchi) rimetti(v);
   }
+  // Chiave → scadenza, dette dal main; chiave → richiesta del riquadro arrivata prima della conferma.
+  const permessi = new Map();
+  const inAttesa = new Map();
+  function pota(ora) {
+    for (const [n, t] of permessi) if (t <= ora) permessi.delete(n);
+    for (const [n, r] of inAttesa) if (ora - r.t > SCADENZA_MS) inAttesa.delete(n);
+    while (inAttesa.size > TETTO_ATTESE) inAttesa.delete(inAttesa.keys().next().value);
+  }
+  function accogli(fr, fonte) {
+    sospendiPerRiquadro(fr);
+    // Dopo il prossimo disegno, quando il riquadro sa già di essere scoperto.
+    global.requestAnimationFrame(() => global.requestAnimationFrame(() => {
+      try { fonte.postMessage({ [CHIAVE_PRONTO]: 1 }, '*'); } catch (_) {}
+    }));
+    // Un riquadro dentro un riquadro: anche la pagina sopra di questo ha i suoi effetti.
+    chiedi(inoltro, true);
+  }
+  function permesso(msg) {
+    const n = typeof msg.n === 'string' ? msg.n.slice(0, 64) : '';
+    if (!n) return;
+    const ora = global.performance.now();
+    pota(ora);
+    if (!msg.si) { permessi.delete(n); inAttesa.delete(n); return; }
+    permessi.set(n, ora + SCADENZA_MS);
+    const r = inAttesa.get(n);
+    if (r) { inAttesa.delete(n); if (r.fr.isConnected) accogli(r.fr, r.fonte); }
+  }
   if (DOC) {
+    try {
+      global.chrome?.runtime?.onMessage?.addListener((msg) => {
+        if (msg && msg.type && msg.type === global.SN_MSG?.MSG?.VISTO_PERMESSO) permesso(msg);
+      });
+    } catch (_) {}
     global.addEventListener('message', (e) => {
       const d = e.data;
       if (!d || typeof d !== 'object' || !e.source) return;
@@ -243,16 +296,17 @@
       let fr = null;
       try { for (const f of DOC.querySelectorAll('iframe, frame')) if (f.contentWindow === e.source) { fr = f; break; } } catch (_) {}
       if (!fr) return;
-      if (d[CHIAVE_RIQUADRO]) {
-        sospendiPerRiquadro(fr);
-        // Dopo il prossimo disegno, quando il riquadro sa già di essere scoperto.
-        const fonte = e.source;
-        global.requestAnimationFrame(() => global.requestAnimationFrame(() => {
-          try { fonte.postMessage({ [CHIAVE_PRONTO]: 1 }, '*'); } catch (_) {}
-        }));
-      } else rimettiPerRiquadro(fr);
-      // Un riquadro dentro un riquadro: anche la pagina sopra di questo ha i suoi effetti.
-      if (IN_RIQUADRO) { try { global.parent.postMessage({ [CHIAVE_RIQUADRO]: d[CHIAVE_RIQUADRO] ? 1 : 0 }, '*'); } catch (_) {} }
+      if (!d[CHIAVE_RIQUADRO]) {
+        rimettiPerRiquadro(fr);
+        chiedi(inoltro, false);
+        return;
+      }
+      const n = typeof d.n === 'string' ? d.n.slice(0, 64) : '';
+      if (!n) return;
+      const ora = global.performance.now();
+      pota(ora);
+      if (permessi.has(n)) accogli(fr, e.source);
+      else inAttesa.set(n, { fr, fonte: e.source, t: ora });
     });
   }
 
@@ -267,6 +321,7 @@
       moGenitore.observe(parent, { childList: true });
     }
     if (ospite.parentNode !== parent) parent.appendChild(ospite);
+    seguiZoom();
     if (el) sotto.add(el);
     return ospite;
   }
@@ -428,6 +483,7 @@
     if (!pannelli.size) { smonta(); return; }
     if (ospite.parentNode !== genitore) genitore.appendChild(ospite);
     riordina();
+    seguiZoom();
     const ora = global.performance.now();
     for (const rec of voci.values()) {
       posa(rec);
