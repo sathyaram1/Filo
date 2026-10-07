@@ -15,6 +15,7 @@
       ],
       fixes: [
         'La protezione dal fingerprinting copre anche le scene 3D che un sito disegna per riconoscere la tua scheda grafica, e i disegni che prepara senza mostrarli. Prima da lì passava la tua impronta vera. Se poi una pagina salva un\'immagine prima di cominciare a disegnare, la sua grafica 3D parte lo stesso, mentre con la protezione accesa restava bloccata.',
+        'Il controllo dei siti pericolosi non manda più a Google gli indirizzi che visiti.',
       ],
     },
     {

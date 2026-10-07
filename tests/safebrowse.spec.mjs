@@ -430,6 +430,70 @@ test('Google Sites: un modulo montato secondi dopo il caricamento del riquadro f
   expect(await livelloScheda(app, 'sites.google.com', 12000)).toBe('sospetto');
 });
 
+// Safe Browsing a prefissi (#813): la chiamata a Google è intercettata nel main. Una pagina del mini server in lista
+// mostra l'avviso di oggi anche dopo una pagina pulita dello stesso sito, e verso Google escono solo prefissi di 4 byte.
+// Il nome è da internet: la rete di casa non chiede niente fuori (#591).
+test('Safe Browsing: una pagina in lista mostra l\'avviso, e a Google arrivano solo prefissi dell\'impronta', async ({ app, openTab, testServer }) => {
+  const pulita = testServer.html('<title>SB813_PULITA</title><p>pagina pulita</p>', { pubblico: true });
+  const trappola = testServer.html('<title>SB813_TRAPPOLA</title><p>pagina in lista</p>', { pubblico: true });
+  const { hostname, port, pathname } = new URL(trappola);
+  await app.evaluate(async (_e, listata) => {
+    const crypto = process.getBuiltinModule('crypto');
+    const full = crypto.createHash('sha256').update(listata).digest();
+    const prima = globalThis.fetch;
+    const Defaults = globalThis.__filoDefaults;
+    globalThis.__sb813 = { richieste: [], prima, get: Defaults.get };
+    const risposta = (ok, corpo) => ({ ok, status: ok ? 200 : 404, async json() { return corpo; }, async text() { return ''; } });
+    globalThis.fetch = async (url, opts) => {
+      const u = String(url);
+      if (u.startsWith('https://safebrowsing.googleapis.com/')) {
+        globalThis.__sb813.richieste.push(u + ' ' + JSON.stringify(opts || {}));
+        const chiesti = new URL(u).searchParams.getAll('hashPrefixes');
+        const fullHashes = chiesti.includes(full.subarray(0, 4).toString('base64'))
+          ? [{ fullHash: full.toString('base64'), fullHashDetails: [{ threatType: 'SOCIAL_ENGINEERING' }] }] : [];
+        return risposta(true, { fullHashes, cacheDuration: '300s' });
+      }
+      if (/rdap\.org|crt\.sh/.test(u)) return risposta(false, {});
+      return prima(url, opts);
+    };
+    Defaults.get = () => ({ ...globalThis.__sb813.get(), safeBrowsingKey: 'chiave-finta-813' });
+    await globalThis.__filoHandlers.wireSafebrowse();
+  }, hostname + pathname);
+
+  try {
+    const richieste = () => app.evaluate(() => globalThis.__sb813.richieste.slice());
+
+    const page = await openTab(pulita);
+    await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8_000 });
+    await expect.poll(async () => (await richieste()).length, { timeout: 6_000 }).toBeGreaterThan(0);
+    await page.waitForTimeout(500);
+    expect(await livelloScheda(app, hostname, 500)).toBe('safe');
+
+    // Stessa scheda, stesso sito: la pagina pulita appena vista non deve coprire quella in lista.
+    await page.goto(trappola);
+    const avviso = await vistaAvviso(app);
+    await expect(avviso.getByText(SEGNALATO)).toBeVisible({ timeout: 8_000 });
+    await expect(avviso.getByText(/phishing/)).toBeVisible();
+    await expect.poll(() => copertura(app)).toMatchObject({ coperta: true, sopra: true, stessiBordi: true });
+
+    const uscite = await richieste();
+    expect(uscite.length).toBeGreaterThan(1);
+    for (const r of uscite) {
+      expect(r).not.toContain(hostname);
+      expect(r).not.toContain(`:${port}`);
+      const u = new URL(r.split(' ')[0]);
+      expect([...new Set(u.searchParams.keys())].sort()).toEqual(['alt', 'hashPrefixes', 'key']);
+      for (const p of u.searchParams.getAll('hashPrefixes')) expect(Buffer.from(p, 'base64').length).toBe(4);
+    }
+  } finally {
+    await app.evaluate(async () => {
+      globalThis.fetch = globalThis.__sb813.prima;
+      globalThis.__filoDefaults.get = globalThis.__sb813.get;
+      await globalThis.__filoHandlers.wireSafebrowse();
+    });
+  }
+});
+
 // Una pagina che non finisce di caricarsi (#813.1): il modulo è già a schermo, lo script dopo non arriva mai. Il server
 // tiene aperto lo script finché la prova non lo chiude, e la scheda si apre senza aspettare il DOMContentLoaded.
 async function serviInCaricamento(app, pagine, providers) {

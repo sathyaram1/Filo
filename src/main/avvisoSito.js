@@ -127,7 +127,8 @@ class AvvisoSito {
     const chiave = JSON.stringify(s);
     if (chiave === this.inviato) return;
     this.inviato = chiave;
-    try { this.vista.webContents.send('avviso-sito:stato', s); } catch (_) {}
+    this.giro = (this.giro || 0) + 1;
+    try { this.vista.webContents.send('avviso-sito:stato', { ...s, giro: this.giro }); } catch (_) {}
   }
 
   _menu(d) {

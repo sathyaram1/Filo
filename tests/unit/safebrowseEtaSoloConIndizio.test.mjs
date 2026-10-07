@@ -38,7 +38,7 @@ test('una pagina pulita non manda il nome del sito ai registri; con una password
   await analizza('https://forno-di-marco.com/chi-siamo', {});
   assert.deepEqual(conta.rdap, []);
   assert.deepEqual(conta.ct, []);
-  assert.equal(conta.gsb.length, 1, 'la lista nera resta consultata (e ricordata per il sito)');
+  assert.equal(conta.gsb.length, 2, 'la lista nera resta consultata, una volta per pagina: una pagina pulita non copre le altre del sito (#813)');
 
   await analizza('https://forno-di-marco.com/accedi', { hasPassword: true });
   await analizza('https://forno-di-marco.com/accedi', { hasPassword: true });

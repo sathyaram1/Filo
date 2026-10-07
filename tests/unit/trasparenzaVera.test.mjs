@@ -32,9 +32,11 @@ test('il terminale è acceso di serie, e i due documenti lo dicono', () => {
   legame(acceso, sicurezza, 'è acceso di serie', 'terminale acceso di serie');
 });
 
-test('Safe Browsing riceve l\'indirizzo intero, ed è fra i punti deboli', () => {
-  const intero = /threatEntries:\s*\[\{\s*url:\s*rawUrl\s*\}\]/.test(leggi('src', 'main', 'services', 'safebrowse', 'net.js'));
-  legame(intero, privacy, 'Safe Browsing riceve l\'indirizzo completo delle pagine che apri', 'indirizzo intero a Safe Browsing');
+test('a Safe Browsing escono solo prefissi dell\'impronta, e il documento non dice più che riceve l\'indirizzo', () => {
+  const net = leggi('src', 'main', 'services', 'safebrowse', 'net.js');
+  const prefissi = /hashPrefixes/.test(net) && !/threatEntries/.test(net);
+  legame(!prefissi, privacy, 'Safe Browsing riceve l\'indirizzo completo delle pagine che apri', 'indirizzo intero a Safe Browsing');
+  legame(prefissi, privacy, 'a Google manda solo i primi 4 byte di ciascuna', 'prefissi a Safe Browsing');
 });
 
 test('le richieste ai modelli non chiedono la ritenzione zero, ed è fra i punti deboli', () => {

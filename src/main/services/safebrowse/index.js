@@ -25,6 +25,7 @@ const whitelist = require('./whitelist');
 const confusables = require('./confusables');
 const psl = require('./psl');
 const net = require('./net');
+const gsb = require('./gsb');
 const llm = require('./llm');
 const sandbox = require('./sandbox');
 
@@ -44,24 +45,28 @@ class TtlCache {
 
 const MIN = 60 * 1000, HOUR = 60 * MIN, DAY = 24 * HOUR;
 // Verdetti calcolati: TTL breve (un dominio può diventare malevolo dopo essere
-// stato visto pulito). Età dominio: stabile, TTL lungo.
-const gsbCache = new TtlCache(30 * MIN);
+// stato visto pulito). Età dominio: stabile, TTL lungo. Safe Browsing ha la sua cache per prefisso, coi tempi di Google.
 const ageCache = new TtlCache(7 * DAY);
 const certCache = new TtlCache(HOUR);
 const sandboxCache = new TtlCache(30 * MIN);
 const llmCache = new TtlCache(HOUR);
 
-// Fetcher di rete iniettabili (default: assenti = best-effort no-op).
-let providers = { gsb: null, rdap: null, ct: null, sandbox: null, llm: null };
+// Fetcher di rete iniettabili (default: assenti = best-effort no-op). gsbPeek dà il verdetto già in cache, senza rete.
+let providers = { gsb: null, gsbPeek: null, rdap: null, ct: null, sandbox: null, llm: null };
 // Chiave GSB letta a ogni verifica: la decide chi è dentro ADESSO (l'admin esce o entra senza ricollegare nulla, #679.4).
 let gsbKeyOf = null;
 function setProviders(fns) {
-  if (fns && 'gsb' in fns) gsbKeyOf = null;
-  providers = { ...providers, ...(fns || {}) };
+  const next = { ...(fns || {}) };
+  if ('gsb' in next) {
+    gsbKeyOf = null;
+    if (!('gsbPeek' in next)) next.gsbPeek = null;
+  }
+  providers = { ...providers, ...next };
 }
 function currentGsbKey() {
   try { return String((gsbKeyOf && gsbKeyOf()) || '').trim(); } catch (_) { return ''; }
 }
+const gsbLookup = gsb.createLookup({ search: (prefixes) => net.hashesSearch(prefixes, currentGsbKey()) });
 
 // Configura i provider dai moduli reali, usando le impostazioni correnti.
 //   opts.gsbKey       chiave Google Safe Browsing, o funzione che la dà al momento
@@ -73,10 +78,8 @@ function configure(opts = {}) {
   const { gsbKey, runLlm, enableSandbox = true, enableNetwork = true } = opts;
   const keyOf = typeof gsbKey === 'function' ? gsbKey : (gsbKey ? () => gsbKey : null);
   setProviders({
-    gsb: keyOf ? ((rawUrl) => {
-      const k = currentGsbKey();
-      return k ? net.safeBrowsingLookup(rawUrl, k) : null;
-    }) : null,
+    gsb: keyOf ? ((rawUrl) => (currentGsbKey() ? gsbLookup.check(rawUrl) : null)) : null,
+    gsbPeek: keyOf ? ((rawUrl) => gsbLookup.peek(rawUrl)) : null,
     rdap: enableNetwork ? ((reg) => net.rdapAgeDays(reg)) : null,
     ct: enableNetwork ? ((reg) => net.ctFirstSeenDays(reg)) : null,
     llm: typeof runLlm === 'function' ? ((meta) => llm.judge(meta, runLlm)) : null,
@@ -248,7 +251,7 @@ function assembleCached(norm, url) {
   if (!norm || !norm.registrable) return {};
   const reg = norm.registrable;
   return {
-    gsb: gsbCache.get('u:' + pageKey(norm, url)) || gsbCache.get(reg),
+    gsb: providers.gsbPeek && url ? providers.gsbPeek(url) : undefined,
     ageDays: ageCache.get(reg),
     cert: certCache.get(norm.host),
     sandbox: sandboxCache.get(pageKey(norm, url)),
@@ -269,8 +272,16 @@ function analyze(url, ctx = {}, onUpdate) {
   if (!norm || !norm.ok) return engine.evaluate(url, ctx, {});
   const first = engine.evaluate(url, ctx, assembleCached(norm, url));
 
-  // Se è già pericoloso da blacklist/strict, non serve altro.
+  // Se è già pericoloso da blacklist/strict, non serve altro. Un verdetto Safe Browsing dato da una parte dell'indirizzo
+  // si completa in sottofondo: la pagina può essere in lista con una categoria più grave di quella del sito.
   if (first.level === 'pericoloso' && (first.reasons || []).some((r) => /^gsb_|strict/.test(r))) {
+    if (first.gsb && first.gsb.partial && providers.gsb && typeof onUpdate === 'function') {
+      Promise.resolve(providers.gsb(url, norm)).then((r) => {
+        if (!r || r.partial) return;
+        const next = engine.evaluate(url, ctx, { ...assembleCached(norm, url), gsb: r });
+        if (verdictChanged(first, next)) onUpdate(next);
+      }).catch(() => {});
+    }
     return first;
   }
 
@@ -291,16 +302,24 @@ function analyze(url, ctx = {}, onUpdate) {
   // Il nome del sito esce verso i registri solo con lo stesso indizio che chiama il giudice (#894).
   const worthDeepening = deepWorth(first);
 
+  // La risposta decide questa verifica anche quando Google chiede di non tenerla in cache.
+  let gsbNow;
   if (providers.gsb && need.gsb === undefined) {
+    // In volo una per indirizzo: l'arrivo e la pagina pronta chiedono a pochi millisecondi (#813.1).
     const gsb = providers.gsb;
-    tasks.push(once('gsb:' + key, () => Promise.resolve(gsb(url, norm)).then((r) => {
-      if (r) gsbCache.set('u:' + key, r);
-    }).catch(() => {})));
+    tasks.push(once('gsb:' + url, () => gsb(url, norm)).then((r) => {
+      if (r) gsbNow = r;
+    }).catch(() => {}));
   }
+  const known = () => {
+    const data = assembleCached(norm, url);
+    if (data.gsb === undefined && gsbNow) data.gsb = gsbNow;
+    return data;
+  };
   let last = first;
   const notify = () => {
     if (typeof onUpdate !== 'function') return;
-    const next = engine.evaluate(url, ctx, assembleCached(norm, url));
+    const next = engine.evaluate(url, ctx, known());
     if (verdictChanged(last, next)) { last = next; try { onUpdate(next); } catch (_) {} }
   };
   let ageTask = null;
@@ -328,7 +347,7 @@ function analyze(url, ctx = {}, onUpdate) {
     return out.filter(Boolean);
   };
   if (worthDeepening && ageTask) {
-    tasks.push(ageTask.then(() => Promise.allSettled(deepTasks(engine.evaluate(url, ctx, assembleCached(norm, url))))));
+    tasks.push(ageTask.then(() => Promise.allSettled(deepTasks(engine.evaluate(url, ctx, known())))));
   } else if (worthDeepening) {
     tasks.push(...deepTasks(first));
   }
@@ -392,7 +411,8 @@ const API = {
   },
   // cache (per test / invalidazione)
   DEEP_BUDGET,
-  _caches: { gsbCache, ageCache, certCache, sandboxCache, llmCache, deepBudget, deepFailed },
+  _caches: { ageCache, certCache, sandboxCache, llmCache, deepBudget, deepFailed },
+  _gsbLookup: gsbLookup,
   // sotto-moduli (per test)
   normalize: normalizeMod.normalize,
   parseHost: normalizeMod.parseHost,
@@ -403,6 +423,7 @@ const API = {
   psl,
   engine,
   net,
+  gsb,
   llm,
   sandbox,
 };
