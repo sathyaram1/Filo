@@ -304,7 +304,7 @@
       // Da quale sito arriva è la cosa su cui si decide: sta nella riga, non
       // solo nell'avviso che l'utente può aver già chiuso.
       let da = r.site ? ` · da ${r.site}` : '';
-      try { const t = window.SN_ESEGUIBILI.provenienza(r.site, r.siteUncertain); da = t ? ` · ${t}` : ''; } catch (_) {}
+      try { const t = window.SN_ESEGUIBILI.provenienza(r.site, r.siteUncertain, r.servedBy, r.filename); da = t ? ` · ${t}` : ''; } catch (_) {}
       meta.textContent = `${stateLabel(r)}${da} · ${formatDate(r.startedAt)}`;
     } else {
       const size = fmtBytes(r.totalBytes || r.receivedBytes);

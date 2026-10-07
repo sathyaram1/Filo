@@ -18,6 +18,7 @@
         'Con la protezione fingerprinting accesa, Filo dà un\'impronta diversa a ogni sito anche quando due siti stanno sulla stessa piattaforma, come due pagine su github.io o vercel.app, due negozi sotto .com.tw, .co.id o .com.co, o due indirizzi IP. Prima ricevevano la stessa, e uno script di tracciamento presente su entrambi li collegava. Le pagine di uno stesso sito restano con la stessa impronta.',
         'Con i cookie su Privacy massima, un sito fidato scritto col suo indirizzo completo, come webmail.libero.it o mail.google.com, ti tiene connesso. Prima l\'elenco lo mostrava ma il sito ti faceva uscire a ogni visita.',
         'Dopo «Traduci la pagina» l\'avviso non dice più che un riquadro è rimasto in lingua originale quando quel riquadro sullo schermo non c\'è, come gli spazi pubblicitari e i banner nascosti. I riquadri nascosti non si traducono e non si pagano. Se ne apri uno, il tasto destro offre di tradurlo.',
+        'Un sito messo fra i fidati per gli scaricamenti vale anche quando rimanda il file a un altro indirizzo, come fa github.com: il programma scende senza domande. Quando la domanda c\'è, nomina tutti e due i siti, per esempio «da github.com, servito da objects.githubusercontent.com», e lo stesso fanno l\'elenco degli scaricamenti e la domanda prima di aprirlo.',
       ],
     },
     {
