@@ -99,12 +99,14 @@ test('sottodomini sempre nuovi dello stesso dominio: qualche giudizio del modell
     sandbox: async () => { sandbox++; await new Promise((ok) => setTimeout(ok, 5)); return { verdict: 'clean', redirects: [] }; },
   });
   try {
-    const giro = (n) => Promise.all(Array.from({ length: n }, (_, i) => new Promise((ok) => {
-      const url = `http://x${Math.random().toString(36).slice(2)}${i}.esempio-ostile.com/`;
-      const v = SB.analyze(url, {}, ok);
-      assert.equal(v.needsLlm, true, url);
-      setTimeout(ok, 50);
-    })));
+    const giro = async (n) => {
+      for (let i = 0; i < n; i++) {
+        const url = `http://x${Math.random().toString(36).slice(2)}${i}.esempio-ostile.com/`;
+        const v = SB.analyze(url, {}, () => {});
+        assert.equal(v.needsLlm, true, url);
+      }
+      await SB._settled();
+    };
     await giro(20);  // tutti insieme, mentre il primo giudizio è ancora in volo
     await giro(20);  // e dopo, a giudizio già in memoria
     assert.equal(giudizi, SB.DEEP_BUDGET);
@@ -112,7 +114,7 @@ test('sottodomini sempre nuovi dello stesso dominio: qualche giudizio del modell
     // Un altro dominio ha il suo conto.
     await giro(1);
     SB.analyze('http://a.altro-dominio.com/', {}, () => {});
-    await new Promise((ok) => setTimeout(ok, 30));
+    await SB._settled();
     assert.equal(giudizi, SB.DEEP_BUDGET + 1);
   } finally {
     SB.setProviders({ llm: null, sandbox: null });

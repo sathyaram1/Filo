@@ -81,6 +81,29 @@ test('nessuno unit test dà a un processo vero un tempo massimo scritto a mano',
   assert.deepEqual(fuori, [], 'usa TETTO_ATTESA_MS da tests/helpers/attese.mjs: sotto carico un tetto stretto è un rosso finto');
 });
 
+// Un evento si aspetta, non si corre contro un timer (#1063): «la richiamata o 50 ms» e «la risposta o 5 secondi» su
+// una macchina carica scadono prima che il lavoro finisca. Le forme: il risolutore dato al lavoro e anche a un
+// setTimeout con un numero; una corsa fra la promessa e un setTimeout con un numero.
+const SCADENZA_A_TEMPO = [
+  /new Promise\(\(?(\w+)\)?\s*=>\s*\{(?:(?!new Promise)[\s\S]){0,400}?\b\1\b(?:(?!new Promise)[\s\S]){0,400}?setTimeout\(\s*\1\s*,\s*\d/,
+  /Promise\.race\(\[(?:(?!\]\))[\s\S]){0,300}?setTimeout\([^;]*?,\s*\d[\d_]*\s*\)/,
+];
+const scadeATempo = (testo) => SCADENZA_A_TEMPO.some((re) => re.test(testo));
+
+test('nessuno unit test aspetta un evento con una scadenza in millisecondi scritti a mano', () => {
+  assert.ok(scadeATempo("new Promise((ok) => {\n  SB.analyze(u, c, (v) => { a.push(v); ok(); });\n  setTimeout(ok, 200);\n})"));
+  assert.ok(scadeATempo('await Promise.race([chiuso, new Promise((r) => setTimeout(() => r(false), 5000))])'));
+  assert.ok(!scadeATempo('await new Promise((r) => setTimeout(r, 30));'));
+  assert.ok(!scadeATempo('new Promise((ok) => {\n  setTimeout(ok, 30);\n})'));
+  assert.ok(!scadeATempo('Promise.race([chiuso, new Promise((r) => setTimeout(() => r(false), TETTO_ATTESA_MS))])'));
+  const fuori = [];
+  for (const file of collectTestFiles(join(ROOT, 'tests', 'unit'))) {
+    if (file === QUI) continue;
+    if (scadeATempo(readFileSync(file, 'utf8'))) fuori.push(relative(ROOT, file).split(sep).join('/'));
+  }
+  assert.deepEqual(fuori, [], "aspetta l'evento (una promessa, SB._settled, aspettaChe) o usa l'orologio finto di tests/helpers/orologio.mjs");
+});
+
 // Un orologio finto: ogni chiamata avanza del costo che le si dà, così il conto si prova senza misurare niente.
 function banco(costiOp, costiRif) {
   let adesso = 0;
