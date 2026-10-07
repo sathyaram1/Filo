@@ -173,7 +173,8 @@ function buildGuardSource(seed, level) {
 
 // GPC nel mondo della pagina, gemello dell'header Sec-GPC: sul prototipo e con getter "nativo",
 // come nei browser che lo implementano, così uno script in <head> lo legge già.
-// I riquadri vuoti (about:blank) non ricevono il preload: il segnale ci arriva da chi li raggiunge.
+// I riquadri vuoti (about:blank) non ricevono il preload: il segnale glielo dà il documento che li
+// contiene, appena entrano nel DOM (prima del prossimo script) o quando li si raggiunge dall'elemento.
 // Nei worker no, per scelta dell'owner (#753): servirebbe sostituire Worker; lì vale solo l'header.
 function buildGpcSource() {
   return `(function(){
