@@ -119,8 +119,8 @@
     return `${head}\n…(parte centrale della conversazione omessa)…\n${tail}`;
   }
 
-  // La trascrizione per CERCA_CHAT con l'id: testa e coda come sopra, ma la parte omessa si legge davvero, a pezzi,
-  // richiamando con `da` (#868: il contesto della chat promette di rileggere intero un messaggio tagliato).
+  // La trascrizione per CERCA_CHAT con l'id: intera fino a `cap`, oltre testa e coda, e la parte omessa si legge
+  // davvero, a pezzi, richiamando con `da` (#868: il contesto della chat promette di rileggere intero un messaggio tagliato).
   const PEZZO_RILETTURA = 30000;
   function transcriptForReading(messages, { da = null, cap = 8000, pezzo = PEZZO_RILETTURA } = {}) {
     const full = (Array.isArray(messages) ? messages : [])

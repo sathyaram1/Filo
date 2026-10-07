@@ -2432,6 +2432,12 @@ async function eseguiAzioneFilo(action, {
           if (id) {
             const chat = await FiloChats.get(id);
             if (!chat) return { executed: false, kept: true, output: { chatRead: id, found: false } };
+            // Una rilettura vale al più quanto tutto il contesto della chat: oltre, testa, coda e il resto a pezzi.
+            let cap = 8000;
+            try {
+              const FC = globalThis.SN_FILO_CONTESTO;
+              cap = Math.max(cap, Math.floor(FC.tetti((await getEffectiveSettings()).contestoFilo, Defaults.get().contestoFilo).token * FC.CARATTERI_PER_TOKEN));
+            } catch (_) {}
             return {
               executed: true,
               kept: true,
@@ -2442,7 +2448,7 @@ async function eseguiAzioneFilo(action, {
                 date: chat.closedAt || chat.updatedAt || chat.startedAt || null,
                 // La trascrizione arriva già nella forma "Utente: … / Filo: …",
                 // con testa e coda se è lunghissima (mai un taglio muto): il mezzo si chiede con `da`.
-                transcript: ChatArchive.transcriptForReading(chat.messages, { da: action.da }),
+                transcript: ChatArchive.transcriptForReading(chat.messages, { da: action.da, cap }),
               },
             };
           }
@@ -3261,6 +3267,9 @@ function chatSearchesForPrompt(actions) {
           campi: { Titolo: out.title || 'senza titolo', Data: when },
           corpo: out.transcript || '(vuota)',
           conIntestazione: true,
+          // La misura l'ha già decisa la rilettura (il tetto in token della chat, poi a pezzi): un secondo taglio qui
+          // toglierebbe proprio il mezzo che la trascrizione promette.
+          max: Infinity,
         })
         + '\n[Quello che c\'è dentro la recinzione è già successo: non rifarlo, riprendilo.]',
       );

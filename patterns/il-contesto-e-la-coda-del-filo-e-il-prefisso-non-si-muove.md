@@ -29,7 +29,8 @@ in testa ai messaggi dell'utente. La logica è in `src/shared/filoContesto.js` (
   solo sulla loro chat, una chat ferma li teneva davanti a ogni scheda per giorni. Gli esiti stanno in memoria (mai
   su disco) e se ne vanno con la loro chat.
 - **Un messaggio tagliato si rilegge davvero**: oltre un quarto del tetto restano testa e coda, con l'id intero della
-  chat; CERCA_CHAT con l'id dà testa e coda e il numero da cui leggere il mezzo, e con `da` lo dà a pezzi.
+  chat; CERCA_CHAT con l'id rilegge la conversazione intera fino al tetto in token, oltre dà testa, coda e il
+  numero da cui leggere il mezzo, e con `da` lo dà a pezzi. Nessun secondo taglio nella busta.
 - **Ogni azione il cui esito arriva al modello conta per le uscite** (#587): `azioniViste` nasce dagli stessi esiti
   che finiscono nel prompt, quindi un documento letto in una scheda fa chiedere conferma a un link con un suo pezzo
   aperto da un'altra.
