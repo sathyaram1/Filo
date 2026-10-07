@@ -18,10 +18,14 @@ in testa ai messaggi dell'utente. La logica è in `src/shared/filoContesto.js` (
   `tests/unit/filoContesto.test.mjs` (due turni hanno lo stesso prefisso; i ricordi stanno dopo gli eventi recenti).
 - **Il prefisso non si muove fra due turni.** Ore assolute, mai «2 ore fa»; un nome di chat fisso (quattro caratteri
   dell'id), non «questa scheda»; il taglio per giorni si sposta a scatti (da un'ora a sei); oltre il tetto in token
-  si taglia un quarto sotto e l'inizio si tiene finché basta. Il ragionamento torna solo sull'ultima risposta.
-- **Le letture vivono venti messaggi del filo** (#553.2, decisione dell'owner aperta): l'esito di una pagina, un
-  documento, un comando entra nel messaggio che l'ha prodotto finché è fra gli ultimi venti, in qualunque scheda,
-  poi resta solo il nome dell'azione. Gli esiti stanno in memoria (mai su disco) e se ne vanno con la loro chat.
+  si taglia un quarto sotto e l'inizio si tiene finché basta. Il ragionamento allegato a una risposta vive quanto i
+  suoi esiti, in ogni scheda: tolto alla sola penultima cambierebbe a ogni turno un messaggio già in cache. Una
+  conversazione ripresa da prima dei tetti riporta i suoi ultimi messaggi dentro un quarto del tetto in token, e la
+  finestra si stringe di altrettanto: il tetto vale sempre.
+- **Le letture vivono venti messaggi della loro conversazione** (#553.2, decisione dell'owner aperta): l'esito di
+  una pagina, un documento, un comando entra nel messaggio che l'ha prodotto finché è fra gli ultimi venti della sua
+  chat, come prima del filo unico, e lo vede ogni scheda; poi resta solo il nome dell'azione. Contati sul filo intero
+  morivano prima di oggi a chi parla in due schede. Gli esiti stanno in memoria (mai su disco) e se ne vanno con la loro chat.
 - **Ogni azione il cui esito arriva al modello conta per le uscite** (#587): `azioniViste` nasce dagli stessi esiti
   che finiscono nel prompt, quindi un documento letto in una scheda fa chiedere conferma a un link con un suo pezzo
   aperto da un'altra.
@@ -31,7 +35,9 @@ in testa ai messaggi dell'utente. La logica è in `src/shared/filoContesto.js` (
   una ricerca («Ricordato dal filo · titolo»). Senza modello d'indicizzazione vale per parole, tutte quelle che
   distinguono. L'attesa ha un tetto: oltre, il turno parte senza.
 - **CERCA_CHAT cerca in tutto il filo**: chat di ogni scheda tranne quella di adesso, pagine visitate (e il contenuto
-  delle schede chiuse, coi vettori della Cronologia), cambi annullabili. Le pagine non entrano mai da sole nel
+  delle schede chiuse, coi vettori della Cronologia), cambi annullabili. Pagine e chat si cercano per parole con
+  gli stessi tre passi (tutte, quelle che distinguono, almeno una): una parola in più nella domanda non fa sparire
+  la pagina mentre la chat si trova. Le pagine non entrano mai da sole nel
   contesto: solo cercate (decisione dell'owner, D56 la cambierà con un interruttore). Una pagina delicata dice solo
   il sito; gli indirizzi trovati si riaprono senza conferma, come i link di una ricerca.
 

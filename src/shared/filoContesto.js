@@ -9,11 +9,13 @@
   const GIORNO_MS = 24 * ORA_MS;
   const TETTI_DI_SERIE = Object.freeze({ giorni: 3, token: 100000 });
   const LIMITI = Object.freeze({ giorni: Object.freeze([0.5, 365]), token: Object.freeze([2000, 2000000]) });
-  // Quanto vive nel contesto l'esito di una lettura (pagina, documento, comando): i venti messaggi di prima del
-  // filo unico. Allungarlo lo decide l'owner (#553.2).
+  // Quanto vive nel contesto l'esito di una lettura (pagina, documento, comando): gli ultimi venti messaggi della SUA
+  // conversazione, come prima del filo unico; contarli sul filo intero la accorciava a chi parla in due schede (#553.2).
   const MESSAGGI_CON_ESITI = 20;
-  // Una conversazione ripresa da prima dei tetti porta con sé i suoi ultimi messaggi, come faceva la chat da sola.
+  // Una conversazione ripresa da prima dei tetti porta con sé i suoi ultimi messaggi, come faceva la chat da sola,
+  // ma dentro il tetto in token: al più un quarto, e la finestra si stringe di quanto prendono.
   const MESSAGGI_DELLA_CHAT = 20;
+  const QUOTA_RIPRESI = 0.25;
   const CARATTERI_PER_TOKEN = 3.5;
   // Oltre il tetto il taglio scende un quarto sotto: i turni dopo trovano lo stesso inizio, e la cache lo riusa.
   const RIENTRO = 0.75;
@@ -104,7 +106,12 @@
     const oss = esito && Array.isArray(esito.azioni) && esito.azioni.length && typeof osserva === 'function' ? osserva(esito.azioni) : '';
     if (oss) parti.push(oss);
     else if (tipi.length) parti.push(`(azioni di questo turno: ${tipi.join(', ')})`);
-    return { role: 'assistant', content: parti.join('\n\n') || '(nessun testo)' };
+    const out = { role: 'assistant', content: parti.join('\n\n') || '(nessun testo)' };
+    // Il ragionamento vive quanto gli esiti, su ogni risposta e in ogni scheda: tolto solo all'ultima cambierebbe a
+    // ogni turno un messaggio che la cache aveva già.
+    const rd = esito && Array.isArray(esito.reasoningDetails) && esito.reasoningDetails.length ? esito.reasoningDetails : null;
+    if (rd) out.reasoning_details = rd;
+    return out;
   }
 
   // Il tratto del filo che il modello ha davanti. `messaggi` è tutto il filo in ordine di tempo, senza la domanda di
@@ -117,21 +124,47 @@
     const da = Math.max(t0, stessaAncora ? Date.parse(ancora.ts) : -Infinity);
     let inizio = 0;
     while (inizio < n && Date.parse(lista[inizio].ts) < da) inizio++;
-    const conEsiti = Math.max(0, n - MESSAGGI_CON_ESITI);
-    const esitoDi = (i) => (i >= conEsiti && esiti ? esiti(lista[i]) : null);
-    const pesa = (i) => stimaToken(rendi(lista[i], lista[i - 1], { tetto: token, esito: esitoDi(i), osserva }).content);
-    const pesi = new Array(n).fill(0);
+    const recente = new Array(n).fill(false);
+    const contati = new Map();
+    for (let i = n - 1; i >= 0; i--) {
+      const c = (contati.get(lista[i].chat) || 0) + 1;
+      contati.set(lista[i].chat, c);
+      recente[i] = c <= MESSAGGI_CON_ESITI;
+    }
+    const esitoDi = (i) => (recente[i] && esiti ? esiti(lista[i]) : null);
+    const memo = new Map();
+    const pesa = (i) => {
+      if (!memo.has(i)) memo.set(i, stimaToken(rendi(lista[i], lista[i - 1], { tetto: token, esito: esitoDi(i), osserva }).content));
+      return memo.get(i);
+    };
+    // La conversazione di questa scheda, se è ripresa da prima dei tetti: i suoi ultimi messaggi restano davanti,
+    // dentro la loro quota. Il tetto in token vale per loro e per la finestra insieme.
+    const mie = [];
+    if (chatCorrente) for (let i = 0; i < n; i++) if (lista[i].chat === chatCorrente) mie.push(i);
+    let mieDavanti = 0;
+    while (mieDavanti < mie.length && mie[mieDavanti] < inizio) mieDavanti++;
+    const riprendi = () => {
+      const indici = [];
+      let peso = 0;
+      for (let k = mieDavanti - 1; k >= 0 && indici.length < MESSAGGI_DELLA_CHAT; k--) {
+        const p = pesa(mie[k]);
+        if (peso + p > token * QUOTA_RIPRESI) break;
+        peso += p;
+        indici.unshift(mie[k]);
+      }
+      return { indici, peso };
+    };
+    let ripresi = riprendi();
     let totale = 0;
-    for (let i = inizio; i < n; i++) { pesi[i] = pesa(i); totale += pesi[i]; }
-    if (totale > token) {
-      while (inizio < n && totale > token * RIENTRO) { totale -= pesi[inizio]; inizio++; }
+    for (let i = inizio; i < n; i++) totale += pesa(i);
+    if (totale + ripresi.peso > token) {
+      while (inizio < n && totale + ripresi.peso > token * RIENTRO) {
+        totale -= pesa(inizio);
+        if (lista[inizio].chat === chatCorrente) { mieDavanti++; ripresi = riprendi(); }
+        inizio++;
+      }
     }
-    // La conversazione di questa scheda, se è ripresa da prima dei tetti: i suoi ultimi messaggi restano davanti.
-    const ripresi = [];
-    if (chatCorrente) {
-      for (let i = inizio - 1; i >= 0 && ripresi.length < MESSAGGI_DELLA_CHAT; i--) if (lista[i].chat === chatCorrente) ripresi.unshift(i);
-    }
-    const indici = [...ripresi, ...Array.from({ length: n - inizio }, (_, k) => inizio + k)];
+    const indici = [...ripresi.indici, ...Array.from({ length: n - inizio }, (_, k) => inizio + k)];
     const out = [];
     const azioni = [];
     const visti = [];
@@ -149,10 +182,10 @@
       visti,
       azioni,
       inizio,
-      ripresi: ripresi.length,
+      ripresi: ripresi.indici.length,
       vecchi: lista.slice(0, inizio),
       ancora: inizio < n ? { ts: lista[inizio].ts, giorni, token } : (stessaAncora ? ancora : null),
-      token: totale,
+      token: totale + ripresi.peso,
     };
   }
 
@@ -240,7 +273,7 @@
   }
 
   global.SN_FILO_CONTESTO = {
-    TETTI_DI_SERIE, LIMITI, MESSAGGI_CON_ESITI, MESSAGGI_DELLA_CHAT, SOGLIA_RICORDO, MAX_RICORDI,
+    TETTI_DI_SERIE, LIMITI, MESSAGGI_CON_ESITI, MESSAGGI_DELLA_CHAT, QUOTA_RIPRESI, SOGLIA_RICORDO, MAX_RICORDI,
     tetti, numeroIn, stimaToken, taglio, passoTaglio, etichettaChat, quando, intestazione, chiave,
     finestra, tratti, testoPerIndice, scegliRicordi, rendiRicordi, coda, assembla,
   };

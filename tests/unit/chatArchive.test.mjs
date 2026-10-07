@@ -345,3 +345,10 @@ test('un esito enorme si accorcia, ma dicendolo, e tiene anche la fine', () => {
   assert.ok(out.includes('non conservati'), 'un taglio muto toglie proprio la riga che conta');
   assert.ok(out.endsWith('ERRORE IN FONDO'), 'la fine di un comando è la parte che si va a leggere');
 });
+
+test('searchWide cerca anche dove si dice con `testo`: le pagine del filo si allargano come le chat (#868)', () => {
+  const pagine = [{ id: 'p1', t: 'Orche - Wikipedia https://it.wikipedia.org/wiki/Orca' }, { id: 'p2', t: 'Meteo Roma' }];
+  const r = CA.searchWide(pagine, 'pagina sulle orche chiusa ieri', { testo: (p) => p.t });
+  assert.deepEqual(r.results.map((p) => p.id), ['p1']);
+  assert.equal(r.allargata, true);
+});

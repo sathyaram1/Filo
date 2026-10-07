@@ -3141,48 +3141,57 @@ const MAX_PAGINE_CHAT = 8;
 const SOGLIA_PAGINA = 0.35;
 async function paginePerChat(query) {
   const CA = ChatArchive;
-  const forti = CA.terminiCheDistinguono(CA.normalizeForSearch(query).split(/\s+/).filter(Boolean));
-  const parole = forti.length ? forti : CA.normalizeForSearch(query).split(/\s+/).filter((p) => p.length > 2);
-  if (!parole.length) return [];
+  if (!CA.normalizeForSearch(query).trim()) return [];
   const settings = await getEffectiveSettings();
   const fuori = await filtroDelicate(settings);
-  const combacia = (...campi) => {
-    const h = CA.normalizeForSearch(campi.filter(Boolean).join(' '));
-    return parole.every((p) => h.includes(p));
-  };
-  const trovate = new Map();
-  const metti = (p) => {
-    const k = String(p.url || '').replace(/#.*$/, '');
-    const prima = trovate.get(k);
-    if (!prima || (p.chiusa && !prima.chiusa) || Date.parse(p.date || 0) > Date.parse(prima.date || 0)) trovate.set(k, { ...prima, ...p });
-  };
-  // Le visite del filo, dalla più recente: titolo e indirizzo li confronta Filo, qui sul computer.
+  const chiave = (u) => String(u || '').replace(/#.*$/, '');
+  // Una pagina rivista dieci volte è un candidato solo, con la visita più recente.
   let visite = [];
   try { visite = await globalThis.SN_IL_FILO.pagine(); } catch (_) {}
-  for (let i = visite.length - 1; i >= 0 && trovate.size < MAX_PAGINE_CHAT * 3; i--) {
-    const v = visite[i];
-    if (v && combacia(v.titolo, v.url)) metti({ url: v.url, title: v.titolo || '', date: v.ts, chiusa: false, _voce: v });
+  const viste = new Map();
+  for (const v of visite) {
+    if (!v || !v.url) continue;
+    const prima = viste.get(chiave(v.url));
+    if (!prima || Date.parse(v.ts || 0) >= Date.parse(prima.ts || 0)) viste.set(chiave(v.url), v);
   }
-  // Le schede chiuse: per significato se c'è l'indice, altrimenti per parole su titolo, riassunto e indirizzo.
   const archivio = await ArchivedTabs.list().catch(() => []);
+  const candidati = [
+    ...[...viste.values()].sort((a, b) => Date.parse(b.ts || 0) - Date.parse(a.ts || 0)).map((v, i) => ({
+      id: `v${i}`, testo: `${v.titolo || ''} ${v.url}`,
+      pagina: { url: v.url, title: v.titolo || '', date: v.ts, chiusa: false, _voce: v },
+    })),
+    ...archivio.map((it, i) => {
+      const casa = restaQui(it, fuori);
+      return {
+        id: `a${i}`, testo: [it.title, casa ? '' : it.summary, it.url].filter(Boolean).join(' '),
+        pagina: { url: it.url, title: it.title || '', date: it.closedAt || null, chiusa: true, riassunto: casa ? '' : (it.summary || ''), _voce: it },
+      };
+    }),
+  ];
+  // Per parole, con gli stessi tre passi delle conversazioni: una parola in più nella domanda non fa sparire la pagina.
+  const perParole = CA.searchWide(candidati, query, { testo: (c) => c.testo }).results;
+  // Le schede chiuse anche per significato, se c'è l'indice.
+  const presi = new Set(perParole.map((c) => c.id));
   let emb = null;
   try { emb = archivio.length ? await embedTexts([query], settings) : null; } catch (_) { emb = null; }
   const qv = emb && emb.vectors && emb.vectors[0] && emb.vectors[0].length ? quantizeEmbedding(emb.vectors[0]) : null;
-  const punteggi = [];
-  for (const it of archivio) {
-    const casa = restaQui(it, fuori);
-    if (combacia(it.title, casa ? '' : it.summary, it.url)) { punteggi.push({ it, score: 2 }); continue; }
-    if (!casa && qv && conVettoreDi(it, emb.model)) {
+  const perSenso = [];
+  if (qv) {
+    archivio.forEach((it, i) => {
+      if (presi.has(`a${i}`) || restaQui(it, fuori) || !conVettoreDi(it, emb.model)) return;
       const sc = cosineInt(qv, it.embedding);
-      if (sc >= SOGLIA_PAGINA) punteggi.push({ it, score: sc });
-    }
+      if (sc >= SOGLIA_PAGINA) perSenso.push({ c: candidati[viste.size + i], sc });
+    });
+    perSenso.sort((a, b) => b.sc - a.sc);
   }
-  punteggi.sort((a, b) => b.score - a.score);
-  for (const { it } of punteggi.slice(0, MAX_PAGINE_CHAT)) {
-    metti({ url: it.url, title: it.title || '', date: it.closedAt || null, chiusa: true, riassunto: restaQui(it, fuori) ? '' : (it.summary || ''), _voce: it });
+  const trovate = new Map();
+  for (const { pagina: p } of [...perParole, ...perSenso.map((x) => x.c)]) {
+    if (trovate.size >= MAX_PAGINE_CHAT && !trovate.has(chiave(p.url))) continue;
+    const prima = trovate.get(chiave(p.url));
+    if (!prima || (p.chiusa && !prima.chiusa)) trovate.set(chiave(p.url), { ...prima, ...p });
   }
   const out = [];
-  for (const p of [...trovate.values()].sort((a, b) => Date.parse(b.date || 0) - Date.parse(a.date || 0)).slice(0, MAX_PAGINE_CHAT)) {
+  for (const p of [...trovate.values()].sort((a, b) => Date.parse(b.date || 0) - Date.parse(a.date || 0))) {
     const delicata = fuori(p.url) || (p.chiusa && restaQui(p._voce || {}, fuori));
     let sito = '';
     try { sito = new URL(p.url).hostname.replace(/^www\./, ''); } catch (_) {}

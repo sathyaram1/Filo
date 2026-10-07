@@ -98,7 +98,9 @@ function esitiDellaScheda(storia, chatMsgs) {
     let k = j;
     while (k >= 0 && !stesso(m, chatMsgs[k])) k--;
     if (k < 0) continue;
-    if (Array.isArray(m.actions) && m.actions.some((a) => a && a._output)) out.set(FC().chiave(chatMsgs[k]), { azioni: m.actions });
+    const conEsiti = Array.isArray(m.actions) && m.actions.some((a) => a && a._output);
+    const rd = Array.isArray(m.reasoningDetails) && m.reasoningDetails.length ? m.reasoningDetails : null;
+    if (conEsiti || rd) out.set(FC().chiave(chatMsgs[k]), { azioni: conEsiti ? m.actions : [], ...(rd ? { reasoningDetails: rd } : {}) });
     j = k - 1;
   }
   return out;
@@ -121,18 +123,16 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
     token: tetti.token,
     ancora: ancore[lato],
     chatCorrente: chatId,
-    esiti: (m) => dallaScheda.get(FC().chiave(m)) || esiti.get(FC().chiave(m)) || null,
+    esiti: (m) => {
+      const k = FC().chiave(m);
+      const s = dallaScheda.get(k);
+      const e = esiti.get(k) || null;
+      if (!s) return e;
+      return { azioni: s.azioni.length ? s.azioni : ((e && e.azioni) || []), reasoningDetails: (e && e.reasoningDetails) || s.reasoningDetails };
+    },
     osserva,
   });
   ancore[lato] = f.ancora;
-  // Il ragionamento dell'ultimo turno torna al modello solo sull'ultima risposta di questa scheda: più indietro
-  // cambierebbe a ogni turno un messaggio già in cache.
-  const ultimaFilo = f.visti.length ? f.visti.length - 1 : -1;
-  if (ultimaFilo >= 0) {
-    const m = f.visti[ultimaFilo];
-    const e = m.role === 'filo' && m.chat === chatId ? esiti.get(FC().chiave(m)) : null;
-    if (e && e.reasoningDetails) f.messaggi[ultimaFilo] = { ...f.messaggi[ultimaFilo], reasoning_details: e.reasoningDetails };
-  }
   return {
     messaggi: f.messaggi,
     visti: f.visti,
