@@ -194,7 +194,7 @@
     if (percorso.startsWith('themeTokens.')) return { come: `IMPOSTA_ESTETICA token ${percorso.slice(12)}`, chiave: '', conferma: false };
     const P = global.SN_PREF;
     const s = P && P.setterDi ? P.setterDi(percorso) : null;
-    return s ? { come: `chiave ${s.keys[0]}`, chiave: s.keys[0], conferma: s.level === 2 } : { come: '', chiave: '', conferma: false };
+    return s ? { come: `chiave ${s.keys[0]}`, chiave: s.keys[0], conferma: s.costo >= 2 } : { come: '', chiave: '', conferma: false };
   }
   function minuscola(s) {
     return s.charAt(0).toLowerCase() + s.slice(1);

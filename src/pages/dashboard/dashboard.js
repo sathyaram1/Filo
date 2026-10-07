@@ -31,6 +31,7 @@
   // Il messaggio con cui riparte un turno fermato: non è voce dell'utente, e il main lo sa (`internal`).
   const RIPRENDI = '[L\'utente ti ha chiesto di riprendere il lavoro da dove ti eri fermato.]';
   const dashDir = $('dashDir');
+  const autonomiaEl = $('dashAutonomia');
 
   // ===== Stato locale =====
   let suggestions = [];
@@ -582,17 +583,8 @@
     if (!a) return;
     const type = String(a.type || '').toUpperCase();
     if (type === 'PULISCI_TAB') {
-      // §6 — suggerimento di pulizia dalla home: STESSA conferma del bottone chat.
-      // Popup Filo (SN_CONFIRM_UI), non il window.confirm nativo del browser
-      // (PATTERNS.md: niente default del browser). Fallback al nativo solo se il
-      // modulo non è caricato.
-      const text = 'Filo valuterà tutte le schede aperte e archivierà quelle non più utili. '
-        + 'Le schede archiviate restano riapribili da “Tab archiviate”.';
-      const ok = window.SN_CONFIRM_UI
-        ? await window.SN_CONFIRM_UI.confirm({ title: 'Riordino delle schede', text, okLabel: 'Procedi' })
-        : window.confirm(`${text} Procedo?`);
-      if (!ok) return;
-      send({ type: MSG.RUN_TAB_TRIAGE });
+      // §6 — suggerimento di pulizia dalla home: stessa regola e stesso popup della chat (#530).
+      Att.riordinaSchede();
       return;
     }
     // Il suggerimento l'ha scritto un modello (#810): un indirizzo passa dalla porta delle uscite, e il suo testo va
@@ -1553,6 +1545,7 @@
         applyHomeMessageVisibility();
       }
       if (msg.settings && msg.settings.terminal) Term.applySettings(msg.settings.terminal);
+      if (msg.settings && msg.settings.autonomia) mostraAutonomia(msg.settings.autonomia);
       // Aggiorna suoneria in live se l'utente la cambia dalle opzioni.
       if (msg.settings && msg.settings.timerRingtone && RINGTONES[msg.settings.timerRingtone]) {
         _timerRingTone = msg.settings.timerRingtone;
@@ -2092,6 +2085,35 @@
     }
   }
 
+  // #530 — il livello di autonomia attivo, sempre in vista accanto a dove si scrive.
+  function mostraAutonomia(aut) {
+    const A = self.SN_AUTONOMIA;
+    if (!autonomiaEl || !A) return;
+    const info = A.infoLivello(A.livelloAttivo(aut && aut.livello));
+    const livelli = A.livelliSelezionabili();
+    const n = livelli.findIndex((l) => l.id === info.id) + 1;
+    const tacche = document.createElement('span');
+    tacche.className = 'dash-autonomia-tacche';
+    tacche.setAttribute('aria-hidden', 'true');
+    for (let i = 1; i <= livelli.length; i++) {
+      const t = document.createElement('span');
+      t.className = `dash-autonomia-tacca${i <= n ? ' piena' : ''}`;
+      tacche.appendChild(t);
+    }
+    const nome = document.createElement('span');
+    nome.textContent = info.nome;
+    autonomiaEl.replaceChildren(tacche, nome);
+    autonomiaEl.dataset.livello = info.id;
+    autonomiaEl.title = 'Quanto Filo fa da solo · clic per cambiarlo';
+    autonomiaEl.setAttribute('aria-label', `Autonomia di Filo: ${info.nome}. Clic per cambiarla.`);
+    autonomiaEl.hidden = false;
+  }
+  if (autonomiaEl) {
+    autonomiaEl.addEventListener('click', () => {
+      send({ type: MSG.OPEN_URL, url: 'filo://preferences/preferences.html#autonomia' });
+    });
+  }
+
   (async function init() {
     renderControls();
     await applySavedTheme();
@@ -2099,6 +2121,7 @@
       const settings = await self.SN_STORAGE?.getSettings?.();
       showHomeMessage = settings?.showHomeMessage !== false;
       Sistema.applicaImpostazioni(settings);
+      mostraAutonomia(settings?.autonomia);
       Term.setEnabled(!!settings?.terminal?.enabled);
       Term.setShell(settings?.terminal?.shell || 'powershell');
       // Suoneria timer: legge la preferenza; se non impostata o non valida usa 'default'.

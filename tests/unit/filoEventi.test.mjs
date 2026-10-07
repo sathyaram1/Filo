@@ -412,3 +412,18 @@ test('dall’incognito anche il titolo nuovo di una pagina resta in memoria', as
   assert.deepEqual((await f.pagine(null, { incognito: true })).map((p) => p.titolo), ['Titolo segreto']);
   assert.ok(!leggi(file).includes('Titolo segreto'));
 });
+
+test('ciò che una chat ha letto (#530) resta suo riaprendo il filo, senza doppioni, e se ne va con lei', async () => {
+  magazzino = {};
+  const { cartella, file } = nuovo();
+  await Chats.append('letta', { role: 'user', text: 'cerca il meteo' });
+  const ricerca = { classe: 5, campo: 'web', chiave: 'web:ricerca', motivo: 'ho fatto una ricerca sul web' };
+  await Chats.segnaFonti('letta', [ricerca]);
+  await Chats.segnaFonti('letta', [ricerca]);
+  assert.equal(righe(file).filter((r) => r.includes('"tipo":"chat.fonti"')).length, 1, 'la stessa fonte due volte è un evento solo');
+  nuovo(cartella);
+  assert.deepEqual((await Chats.get('letta')).fonti, [ricerca], 'riaperta, la chat non riparte pulita');
+  assert.equal(await Chats.segnaFonti('mai-vista', [ricerca]), null);
+  await Chats.remove('letta');
+  assert.ok(!leggi(file).includes('web:ricerca'), 'le fonti di una chat cancellata restano su disco');
+});
