@@ -630,8 +630,13 @@ test('Incolla e Detta sulle pagine web non passano dal permesso del sito', () =>
 
 test('sulle pagine web solo il menu va nello strato alto: sotto-menu, etichette e icona trascinata ci stanno dentro', () => {
   const menu = readFileSync(join(ROOT, 'src', 'content', 'menu.js'), 'utf8');
-  const fuori = menu.match(/menuHost\(\)\.appendChild\((\w+)\)/g) || [];
-  assert.deepEqual(fuori, ['menuHost().appendChild(root)'], 'un pezzo appeso fuori dal menu lo copre o gli sta sotto');
+  // La casa del menu si raggiunge chiamandola o tenendola in una variabile: conta chi ci viene appeso, non la grafia.
+  const usi = menu.split('\n').map((l) => l.trim()).filter((l) => /menuHost\(\)/.test(l) && !l.startsWith('function menuHost'));
+  for (const l of usi) assert.match(l, /^const \w+ = menuHost\(\);$|return menuHost\(\);$/, `la casa del menu presa per altro: ${l}`);
+  const case_ = new Set(['menuHost()', ...[...menu.matchAll(/const (\w+) = menuHost\(\);/g)].map((m) => m[1])]);
+  const appesi = [...menu.matchAll(/([\w$]+(?:\(\))?)\.(?:appendChild|append|prepend|insertBefore)\((\w+)/g)]
+    .filter((m) => case_.has(m[1])).map((m) => m[2]);
+  assert.deepEqual(appesi, ['root'], 'un pezzo appeso fuori dal menu lo copre o gli sta sotto');
   assert.equal((menu.match(/showPopover\(\)/g) || []).length, 1, 'uno strato alto solo, quello del menu');
 });
 

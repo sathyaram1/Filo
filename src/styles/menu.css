@@ -16,6 +16,19 @@
   user-select: none;
   animation: sn-fade-in 100ms ease-out;
   backdrop-filter: blur(4px);
+  /* Nasce anche dentro un elemento del sito (dialogo modale, schermo intero): lo stile del testo non si eredita da lì. */
+  font-style: normal;
+  font-weight: 400;
+  font-variant: normal;
+  font-stretch: normal;
+  text-align: start;
+  text-transform: none;
+  text-indent: 0;
+  text-shadow: none;
+  letter-spacing: normal;
+  word-spacing: normal;
+  white-space: normal;
+  cursor: default;
 }
 
 @keyframes sn-fade-in {

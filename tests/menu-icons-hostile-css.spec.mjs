@@ -57,3 +57,19 @@ test('i puntini pieni (fill=currentColor) di un\'icona restano pieni', async ({ 
   expect(dotFill).not.toBe('none');
   expect(dotFill).not.toBe('rgb(255, 0, 0)');
 });
+
+// #586: dentro un dialogo modale il menu nasce nel dialogo, e lo stile del testo del sito non deve arrivare alle voci.
+test('nato in un dialogo modale col testo centrato e maiuscolo, il menu ha le voci di sempre', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, `<!doctype html><title>Dialogo</title><body>
+    <dialog id="d" style="padding:20px;width:360px;text-align:center;text-transform:uppercase;letter-spacing:3px;word-spacing:9px;font-style:italic;font-weight:700">
+    <p>Accedi</p><input id="c" style="width:300px"></dialog><script>d.showModal()</script></body>`);
+  const box = await page.locator('#c').boundingBox();
+  await page.mouse.click(box.x + 30, box.y + 8, { button: 'right' });
+  const voce = page.locator('#d .sn-menu .sn-menu-paste-main .sn-menu-label').first();
+  await expect(voce).toBeVisible({ timeout: 5000 });
+  const st = await voce.evaluate((el) => {
+    const c = getComputedStyle(el);
+    return { textAlign: c.textAlign, textTransform: c.textTransform, letterSpacing: c.letterSpacing, wordSpacing: c.wordSpacing, fontStyle: c.fontStyle, fontWeight: c.fontWeight };
+  });
+  expect(st).toEqual({ textAlign: 'start', textTransform: 'none', letterSpacing: 'normal', wordSpacing: '0px', fontStyle: 'normal', fontWeight: '400' });
+});
