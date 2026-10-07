@@ -548,12 +548,11 @@ test('I — quello che l\'utente finisce col bottone si raggiunge e finisce nel 
   await page.locator('#sendBtn').click();
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Valuto le schede aperte.' })).toBeVisible({ timeout: 10_000 });
 
-  // Filo la propone e l'utente la finisce: la riga dice che è una proposta e
-  // il bottone c'è. Prima il diario la dava per fallita e quella riga si
-  // mangiava il bottone: la funzione non si raggiungeva più dalla chat.
+  // Filo la chiede e l'utente la finisce: la riga dice che aspetta il sì e il
+  // bottone c'è (#825.3). Una riga di fallimento si mangiava il bottone.
   const activity = page.locator('.dash-activity');
   await activity.locator('.dash-activity-head').click();
-  await expect(activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Riordino delle schede' })).toHaveCount(1);
+  await expect(activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Conferma chiesta' })).toHaveCount(1);
   const btn = page.locator('.dash-action-btn', { hasText: 'Riordina e archivia' });
   await expect(btn).toBeVisible();
   await btn.click();
@@ -561,7 +560,7 @@ test('I — quello che l\'utente finisce col bottone si raggiunge e finisce nel 
 
   // Finito il riordino, il diario racconta l'esito e il riassunto lo conta:
   // «Ha proposto di riordinare le schede» a cose fatte era una mezza verità.
-  await expect(activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Archiviate 3 schede' })).toHaveCount(1, { timeout: 10_000 });
+  await expect(activity.locator('.dash-activity-body .dash-activity-row', { hasText: '3 archiviate' })).toHaveCount(1, { timeout: 10_000 });
   await expect(activity.locator('.dash-activity-label')).toContainText('riordinato le schede');
   await restore(app, '__fakeI');
 
@@ -631,8 +630,8 @@ test('L — la conversazione riaperta racconta com’è andata, non solo cosa Fi
   await expect(page.locator('.dash-action-btn').first()).toBeVisible();
   const chatMem = await chatConAzione(app, 'CANCELLA_MEMORIA');
   expect(chatMem, 'la chat non è arrivata nell’archivio').toBeTruthy();
+  // L'archivio tiene solo ciò che è successo (#825.3): la conferma mai data non c'è.
   const raccontoMem = await raccontoRiaperto(openTab, chatMem.id);
-  expect(raccontoMem, 'niente da leggere nella chat riaperta').not.toBe('');
   expect(raccontoMem, `la memoria non è stata cancellata, e la chat riaperta racconta: ${raccontoMem}`)
     .not.toContain('cancellato la memoria');
   await restore(app, '__fakeL1');

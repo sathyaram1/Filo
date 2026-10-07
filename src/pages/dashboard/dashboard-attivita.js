@@ -1494,7 +1494,9 @@
         const fatto = r && typeof r.fatto === 'string' ? r.fatto.trim() : '';
         // Quando non è riuscita il bottone dice PERCHÉ: «Non eseguita» non si può leggere.
         const guasto = row && row.failed ? row.text : 'Non eseguita';
-        btn.textContent = (r && r.executed) ? `✓ ${fatto ? (fatto.length > 140 ? `${fatto.slice(0, 139)}…` : fatto) : shortLabel}` : `✗ ${guasto.length > 70 ? `${guasto.slice(0, 67)}…` : guasto}`;
+        // A cosa fatta il bottone è una ricevuta: «Filo vuole…» con la spunta davanti diceva fatto e da fare insieme.
+        const ricevuta = fatto || (row && !row.failed ? row.text : '') || 'Fatto';
+        btn.textContent = (r && r.executed) ? `✓ ${ricevuta.length > 140 ? `${ricevuta.slice(0, 139)}…` : ricevuta}` : `✗ ${guasto.length > 70 ? `${guasto.slice(0, 67)}…` : guasto}`;
         if (fatto.length > 140) btn.title = fatto;
         else if (!(r && r.executed)) btn.title = guasto;
         // #874 — il sistema ha detto no dopo l'OK (un permesso, una rete fuori portata): la frase e, se serve, il tasto.

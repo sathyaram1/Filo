@@ -461,6 +461,8 @@
       describe: () => 'Eliminare DEFINITIVAMENTE tutta la memoria di Filo: '
         + 'profilo utente, preferenze apprese e lezioni non ancora salvate. '
         + 'Filo ripartirà senza ricordare nulla di te.',
+      // A cosa fatta, la ricevuta: senza, il bottone confermato ripeteva la domanda («Eliminare…»).
+      describeDone: () => 'Memoria di Filo cancellata: profilo utente, preferenze apprese e lezioni',
     },
     DIMENTICA: {
       // Toglie dalla memoria le righe indicate a voce: le stesse della × nelle

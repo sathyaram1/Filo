@@ -16,6 +16,8 @@ test('il comando che non parte spiega che il terminale è spento e porta all\'in
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible();
   await configureModel(app);
+  // Su main la modalità terminale nasce accesa: qui la si vuole spenta.
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: false } }); });
 
   await fakeProvider(app, [
     { toolCalls: [{ id: 'c1', name: 'ESEGUI_COMANDO', arguments: '{"comando":"ls -la"}' }] },
@@ -61,6 +63,8 @@ test('anche un comando che chiederebbe conferma dice perché non è partito, sen
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible();
   await configureModel(app);
+  // Su main la modalità terminale nasce accesa: qui la si vuole spenta.
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: false } }); });
 
   await fakeProvider(app, [
     { toolCalls: [{ id: 'c2', name: 'ESEGUI_COMANDO', arguments: '{"comando":"rm -rf /tmp/qualcosa"}' }] },
@@ -84,6 +88,8 @@ test('comando vuoto, lunghissimo o con caratteri speciali: si legge sempre una r
   const page = await newtabPage(app);
   await expect(page.locator('#input')).toBeVisible();
   await configureModel(app);
+  // Su main la modalità terminale nasce accesa: qui la si vuole spenta.
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: false } }); });
 
   const lungo = 'echo '.concat('a'.repeat(10_000));
   await fakeProvider(app, [
