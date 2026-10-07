@@ -85,7 +85,11 @@ test('spenta, «aggiornati» in chat senza niente di pronto: scarica senza chied
   const { dati } = cacheFinta();
   const page = await home(app);
   await spentaSuWindows(app, dati);
-  await app.evaluate(() => { globalThis.__prova.registro.risposta = { evento: 'update-available', dati: { version: '0.2.234' } }; });
+  // Come electron-updater: «update-available» arriva prima che il controllo si risolva.
+  await app.evaluate(() => {
+    const { finto } = globalThis.__prova;
+    finto.checkForUpdates = async () => { finto.emit('update-available', { version: '0.2.234' }); return {}; };
+  });
   await modelloFinto(app, [
     { toolCalls: [{ id: 'g6', name: 'INSTALLA_AGGIORNAMENTO', arguments: '{}' }] },
     { text: 'La sto scaricando.' },
