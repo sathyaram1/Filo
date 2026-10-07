@@ -9,16 +9,41 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
+      version: '0.2.237', date: '2026-10-07',
+      features: [
+        'Su ogni pagina, spingendo il mouse contro il bordo sinistro, si apre una barra con indietro, avanti, ricarica, home, incognito, schermo intero e chiudi scheda, e in fondo l\'ora, la cronologia, le app, il profilo e le impostazioni. La apri anche dalla linguetta a sinistra delle schede o con Ctrl+Shift+B (Cmd+Shift+B su Mac). Le icone del tasto destro si trascinano nella barra e ritorno, o lo chiedi a Filo a parole, e restano dove le metti. Col tasto destro su Indietro e Avanti vedi le pagine della scheda e ci torni con un clic, anche dopo essere passato dalla home. In Preferenze → Impostazioni avanzate, col tasto destro sulla striscia o chiedendolo a Filo nascondi la striscia, spegni l\'apertura dal bordo o cambi quanto aspetta e quanto resta aperta.',
+      ],
+      fixes: [
+        'Con la protezione fingerprinting accesa, Filo dà un\'impronta diversa a ogni sito anche quando due siti stanno sulla stessa piattaforma, come due pagine su github.io o vercel.app, due negozi sotto .com.tw, .co.id o .com.co, o due indirizzi IP. Prima ricevevano la stessa, e uno script di tracciamento presente su entrambi li collegava. Le pagine di uno stesso sito restano con la stessa impronta.',
+        'Con i cookie su Privacy massima, un sito fidato scritto col suo indirizzo completo, come webmail.libero.it o mail.google.com, ti tiene connesso. Prima l\'elenco lo mostrava ma il sito ti faceva uscire a ogni visita.',
+        'Dopo «Traduci la pagina» l\'avviso non dice più che un riquadro è rimasto in lingua originale quando quel riquadro sullo schermo non c\'è, come gli spazi pubblicitari e i banner nascosti. I riquadri nascosti non si traducono e non si pagano. Se ne apri uno, il tasto destro offre di tradurlo.',
+        'Su un sito il popup con cui Filo ti chiede conferma adesso compare sopra la pagina, dove il codice del sito non arriva. Una pagina scritta apposta non può più renderlo invisibile e mostrarti al suo posto un popup finto con un altro testo. Quello che leggi è quello che confermi.',
+        'Anche la proposta di aprire una pagina da un altro paese compare sopra la pagina: il sito non può nasconderla né rispondere al posto tuo.',
+      ],
+    },
+    {
+      version: '0.2.235', date: '2026-10-06',
+      features: [
+        'Se un post, un video o una mappa dentro la pagina di un altro sito non si vede perché Filo ne ha bloccato i cookie, sopra compare la domanda «Attivo i cookie di Instagram per questo contenuto?». Con «Sì» il contenuto si ricarica e funziona. Li togli col tasto destro sul contenuto o in Impostazioni, Sicurezza.',
+        'Nell\'intervista di benvenuto, quando dici a Filo come vuoi che ti scriva, lo stile si imposta subito senza riquadri da confermare. In chat leggi «Userò questo stile» con il testo esatto, e «Annulla» lo toglie.',
+      ],
+      fixes: [
+        'Un sito dal nome comune non passa pi\u00f9 per l\'imitazione di un marchio. team.com, email.com, apply.com, telegraph.co.uk e le altre parole vicine a Steam, Gmail, Apple o Telegram aprivano il blocco a tutta pagina, quello che si toglie solo scrivendo \u00abconfermo\u00bb. Adesso trovi un avviso che chiudi con un clic. Il blocco resta sui sosia scritti con lettere che si somigliano, come paypa1 o g00gle, e su ogni sito che oltre al nome somigliante \u00e8 stato registrato da poco, ha il certificato rotto o ti chiede la password, anche se il modulo compare dopo.',
+      ],
+    },
+    {
       version: '0.2.234', date: '2026-10-05',
       features: [
         'Nel deck builder ogni lista di carte in chat ha un titolo in italiano che dice cosa contiene, per esempio «12 carte che danno rapidità», e il triangolino la chiude e la riapre anche nell\'ultima risposta. Col tasto destro sul titolo copi la ricerca usata, riordini la lista per costo di mana, nome o prezzo, oppure apri la stessa ricerca su Scryfall. L\'ordine puoi chiederlo anche a Filo («ordinale per prezzo») e resta quando riapri la chat.',
         'I post, i video e le mappe che vedi dentro le pagine di altri siti non lasciano più cookie per sempre: durano finché leggi la pagina e per qualche minuto dopo che l\'hai chiusa. Dai siti dove sei entrato con il tuo account resti connesso lo stesso, e quali sono lo vedi (e lo correggi) in Impostazioni → Sicurezza.',
         'Mentre Filo lavora, al posto della rotella corre un filo. Accanto vedi scorrere il suo ragionamento, e ogni volta che fa qualcosa il filo fa un nodo col nome di quello che sta facendo, per esempio «Cercato sul web · orari treni». Quando risponde il filo si avvolge in un gomitolo con il riassunto, e un clic lo srotola. Il tasto d\'invio intanto diventa un quadrato che lo ferma subito, anche con Invio. Quello che aveva già fatto resta, e lo stesso tasto ti offre di riprendere senza rifarlo.',
+        'La pubblicità sparisce anche dove prima restava: i riquadri vuoti e le immagini rotte lasciati dagli annunci bloccati, e i banner che il sito mette da sé. Filo usa anche le liste per i siti italiani e francesi e blocca la pubblicità pure nella finestra in incognito. Il blocco si spegne e si riaccende anche chiedendolo a Filo, e vale subito anche nelle pagine già aperte.',
         'Puoi decidere tu quando aggiornare Filo. Togli la spunta a «Installa gli aggiornamenti da solo» in Preferenze, Impostazioni avanzate, oppure di\' a Filo «non aggiornarti da solo». Quando esce una versione nuova te lo dice nella home e la installa solo se premi «Installa», o se dici a Filo «aggiornati».',
       ],
       fixes: [
-        'Su un sito il popup con cui Filo ti chiede conferma adesso compare sopra la pagina, dove il codice del sito non arriva. Una pagina scritta apposta non può più renderlo invisibile e mostrarti al suo posto un popup finto con un altro testo. Quello che leggi è quello che confermi.',
-        'Anche la proposta di aprire una pagina da un altro paese compare sopra la pagina: il sito non può nasconderla né rispondere al posto tuo.',
+        'I siti che le liste della pubblicità fermano solo quando compaiono dentro altri siti, come ClickMagick, finivano su «Sito bloccato»: adesso si aprono. E se in Sicurezza hai tolto le liste della pubblicità dal blocco dei siti, quei siti si aprono davvero invece di finire su «Pagina bloccata».',
+        'Alcuni siti come dev.to finivano sulla pagina «Sito bloccato», e le immagini di imgur sparivano dalle pagine che le mostrano: una regola delle liste della pubblicità valeva per un pezzo del sito e Filo la applicava al sito intero. Adesso i siti si aprono e le immagini tornano.',
+        'Le schede in secondo piano hanno il colore del loro sito, e si riconosce: YouTube è rossa, Poste gialla. Prima restavano grigiastre anche col colore al massimo. Se le vuoi più vivaci o più neutre chiedilo a Filo, o cambia l\'opacità nelle Preferenze avanzate. Il titolo resta leggibile su qualunque colore, e in Cronologia le schede chiuse hanno gli stessi colori.',
         'Nella chat del deck builder vedi da quanto aspetti la risposta, e «Ferma» la interrompe, come Esc nel campo. La chat torna subito libera e il mazzo resta com\'era. Se Scryfall non risponde, dopo 30 secondi la chat te lo dice, e intanto anteprime e prezzi non restano bloccati.',
         'Su Windows, se in un comando che Filo esegue per te una parte sbaglia, per esempio un programma che non esiste, il resto della riga gira lo stesso, come quando la scrivi tu nel terminale. Prima si fermava tutto lì.',
         'La chat di Filo chiede le risposte solo ai fornitori che sanno usare i suoi strumenti, come cercare sul web o cambiare un\'impostazione. Prima uno che li ignorava faceva fallire la risposta senza spiegazione. Se per il modello che hai scelto non ce n\'è nessuno, Filo te lo dice.',

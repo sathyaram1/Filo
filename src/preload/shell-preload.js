@@ -95,7 +95,7 @@ contextBridge.exposeInMainWorld('filoShell', {
   // L'agente "Aiuto" può azionare i comandi rapidi della barra (le icone in
   // alto) chiedendo al main, che inoltra qui: la shell clicca il bottone reale.
   onTriggerButton: (fn) => {
-    const wrapped = (_event, info) => { try { fn(info && info.command); } catch (_) {} };
+    const wrapped = (_event, info) => { try { fn(info && info.command, info && info.anchor); } catch (_) {} };
     ipcRenderer.on('shell:trigger-button', wrapped);
     return () => ipcRenderer.removeListener('shell:trigger-button', wrapped);
   },
@@ -126,6 +126,13 @@ contextBridge.exposeInMainWorld('filoShell', {
       ipcRenderer.on('avvisi:sopra', wrapped);
       return () => ipcRenderer.removeListener('avvisi:sopra', wrapped);
     },
+  },
+  // #871 — la barra laterale: la shell le passa tema e profilo, e la apre dalla maniglia.
+  barra: {
+    stato: (dati) => ipcRenderer.send('barra:dalla-shell', dati),
+    commuta: () => ipcRenderer.send('barra:commuta'),
+    chiudi: () => ipcRenderer.send('barra:chiudi'),
+    menu: (x, y) => ipcRenderer.send('barra:menu-maniglia', { x, y }),
   },
   // Modalità annotazione del box feedback: la shell mette/toglie un velo
   // d'ombra sopra la propria barra in alto così tutto Filo va in penombra.

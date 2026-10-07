@@ -41,6 +41,14 @@
     return P.buildPreferencePartial(chiave, valore);
   }
 
+  // Lo stile proposto nell'intervista di benvenuto si imposta senza riquadro (decisione dell'owner, #592.2):
+  // `_accoglienza` lo scrive solo il main, quando nel contesto non c'è testo di altri. Torna il testo, o ''.
+  function stileDellAccoglienza(action) {
+    if (!action || action._accoglienza !== true) return '';
+    const built = prefBuilt(action);
+    return built && !built.rifiuto && built.testo && built.partial && 'agentStyle' in built.partial ? built.testo : '';
+  }
+
   // Token + valore di un'azione estetica (più sinonimi che un LLM può produrre).
   function estTok(action) {
     return action.token ?? action.nome ?? action.name ?? action.chiave ?? action.elemento;
@@ -476,6 +484,7 @@
       level: (a) => {
         // Un elenco che resterebbe com'è: niente da confermare (`_invariato` lo mette il main, #949).
         if (a && a._invariato) return 1;
+        if (stileDellAccoglienza(a)) return 1;
         const built = prefBuilt(a);
         return (built && built.level) || 1;
       },
@@ -493,6 +502,8 @@
       },
       // A cosa fatta (esito allo strumento): niente «vuole», niente rischi.
       describeDone: (a) => {
+        const stile = stileDellAccoglienza(a);
+        if (stile) return `Userò questo stile: «${stile}»`;
         const built = prefBuilt(a);
         return built && !built.rifiuto ? `Impostazione applicata: ${built.label}` : 'Preferenza modificata';
       },
@@ -622,6 +633,26 @@
     RIPRISTINA_STILE_PAGINA: {
       level: 1,
       describe: () => 'Togliere le modifiche di stile applicate alla pagina',
+    },
+    // ── la disposizione delle icone a parole (#871) ──────────────────────────
+    // Livello 1: è lo stesso trascinamento che l'utente fa col mouse, e si disfa allo stesso modo.
+    SPOSTA_ICONA: {
+      level: 1,
+      describe: (a) => {
+        const D = global.SN_DISPOSIZIONE_ICONE;
+        const id = String((a && (a.icona ?? a.id)) || '').trim();
+        const nome = D && D.noto(id) ? D.nome(id) : (id || 'un\'icona');
+        const dove = { barra: 'nella barra laterale', menu: 'nella riga del tasto destro', altro: 'in «Altro…» del tasto destro' };
+        const d = dove[String((a && a.dove) || '').trim().toLowerCase()];
+        return d ? `Spostare «${nome}» ${d}` : `Spostare «${nome}»`;
+      },
+      describeDone: (a) => {
+        const D = global.SN_DISPOSIZIONE_ICONE;
+        const id = String((a && (a.icona ?? a.id)) || '').trim();
+        const nome = D && D.noto(id) ? D.nome(id) : id;
+        const dove = { barra: 'nella barra laterale', menu: 'nella riga del tasto destro', altro: 'in «Altro…» del tasto destro' };
+        return `«${nome}» ora sta ${dove[String((a && a.dove) || '').trim().toLowerCase()] || 'al suo nuovo posto'}`;
+      },
     },
     // ── rimettere com'era un cambio di stato (#867) ─────────────────────────
     // Il livello è quello del cambio da rimettere: `_livelloCambio` lo scrive il main dal registro,
@@ -761,5 +792,5 @@
     try { return (entry.describeDone ? entry.describeDone(action) : entry.describe(action)) || ''; } catch (_) { return ''; }
   }
 
-  global.SN_ACTION_LEVELS = { REGISTRY, levelFor, describe, describeDone, spiegazioneComando };
+  global.SN_ACTION_LEVELS = { REGISTRY, levelFor, describe, describeDone, spiegazioneComando, stileDellAccoglienza };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

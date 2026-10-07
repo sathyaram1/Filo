@@ -53,13 +53,13 @@
     {
       id: 'close-tab', title: 'Chiudi la scheda', category: 'navigation',
       desc: 'Chiude la scheda corrente; la pagina chiusa finisce nell’archivio, da cui puoi riaprirla.',
-      invoke: 'Pulsante di chiusura sulla scheda, il menu del tasto destro → "Chiudi pagina", oppure la scorciatoia Ctrl+W (Cmd+W su Mac) — che funziona anche mentre stai guardando un sito.',
+      invoke: 'Pulsante di chiusura sulla scheda, la barra laterale → "Chiudi pagina", oppure la scorciatoia Ctrl+W (Cmd+W su Mac) — che funziona anche mentre stai guardando un sito.',
       doesNot: 'Le finestre in incognito e le pagine interne di Filo non vengono archiviate.',
     },
     {
       id: 'navigate-back-forward', title: 'Indietro / Avanti', category: 'navigation',
-      desc: 'Torna alla pagina precedente o va a quella successiva nella cronologia della scheda.',
-      invoke: 'Alt+\u2190 e Alt+\u2192 (su Mac Cmd+[ e Cmd+], perch\u00e9 l\u00ec Alt+freccia sposta il cursore), i due tasti laterali del mouse, oppure su Mac lo scorrimento orizzontale a due dita. Funziona su qualsiasi pagina, anche mentre scrivi in un campo di testo. In pi\u00f9: menu del tasto destro \u2192 "Indietro" / "Avanti" (dentro "Altro\u2026"), e Ctrl+Z (Cmd+Z su Mac) torna alla pagina precedente quando non stai scrivendo in un campo di testo.',
+      desc: 'Torna alla pagina precedente o va a quella successiva nella cronologia della scheda. Sui pulsanti della barra laterale il tasto destro elenca le pagine della scheda, dalla più vicina, e ci salta con un clic.',
+      invoke: 'Alt+\u2190 e Alt+\u2192 (su Mac Cmd+[ e Cmd+], perch\u00e9 l\u00ec Alt+freccia sposta il cursore), i due tasti laterali del mouse, oppure su Mac lo scorrimento orizzontale a due dita. Funziona su qualsiasi pagina, anche mentre scrivi in un campo di testo. In pi\u00f9: i pulsanti "Indietro" e "Avanti" in cima alla barra laterale, spenti quando non c\u2019\u00e8 dove andare, e Ctrl+Z (Cmd+Z su Mac) torna alla pagina precedente quando non stai scrivendo in un campo di testo.',
       doesNot: 'Se non c\u2019\u00e8 nessuna pagina dove andare non succede niente. Lo scorrimento a due dita funziona solo se \u00e8 acceso nelle impostazioni del Mac.',
     },
     {
@@ -71,12 +71,12 @@
     {
       id: 'reload', title: 'Ricarica la pagina', category: 'navigation',
       desc: 'Ricarica la pagina corrente.',
-      invoke: 'Menu del tasto destro → "Ricarica", oppure la scorciatoia Ctrl+R (Cmd+R su Mac) — che funziona anche mentre stai guardando un sito.',
+      invoke: 'Pulsante "Ricarica" della barra laterale, oppure la scorciatoia Ctrl+R (Cmd+R su Mac) — che funziona anche mentre stai guardando un sito.',
     },
     {
       id: 'home', title: 'Vai alla home', category: 'navigation',
       desc: 'Apre la home di Filo nella scheda corrente, con suggerimenti e aggiornamenti.',
-      invoke: 'Icona Home in alto a destra nella home (la nuova scheda), oppure menu del tasto destro → "Home".',
+      invoke: 'Icona Home della barra laterale, da qualunque pagina.',
     },
     {
       id: 'address-bar', title: 'Apri un indirizzo', category: 'navigation',
@@ -86,14 +86,20 @@
     {
       id: 'incognito', title: 'Finestra in incognito', category: 'navigation',
       desc: 'Apre una nuova finestra privata e isolata: la sessione è effimera e non viene archiviata.',
-      invoke: 'Menu del tasto destro → "Nuova finestra incognito".',
+      invoke: 'Barra laterale → "Nuova finestra incognito", oppure dal menu del profilo in fondo alla barra.',
       doesNot: 'Non sospende il limite di spesa del mese: quello che si spende lì conta come fuori e resta nel conto. Il testo delle pagine non va al modello per riconoscere i blocchi geografici.',
     },
     {
       id: 'fullscreen', title: 'Schermo intero', category: 'navigation',
       desc: 'Nasconde la barra delle schede così la pagina occupa tutta la finestra.',
-      invoke: 'Menu del tasto destro → "Schermo intero" / "Esci da schermo intero", oppure chiedilo all’assistente ("metti a schermo intero", "togli lo schermo intero"). Esci in ogni momento con Esc.',
+      invoke: 'Barra laterale → "Schermo intero" / "Esci da schermo intero", oppure chiedilo all’assistente ("metti a schermo intero", "togli lo schermo intero"). Esci in ogni momento con Esc; a schermo intero la barra laterale si apre come sempre dal bordo sinistro.',
       doesNot: 'Non preme il pulsante di schermo intero del lettore video dentro un sito (es. quello di YouTube): agisce sulla finestra di Filo, non sui comandi della pagina.',
+    },
+    {
+      id: 'sidebar', title: 'Barra laterale', category: 'navigation',
+      desc: 'Una barra che si apre dal bordo sinistro su ogni pagina, siti e pagine di Filo, con quello che riguarda la finestra e non l\'elemento sotto il mouse: in cima Indietro, Avanti, Ricarica, Home, Nuova finestra incognito, Schermo intero e Chiudi pagina (Indietro e Avanti spenti quando non c\'è dove andare); in fondo l\'ora, Cronologia, App, il profilo e le Impostazioni. Le icone del menu del tasto destro si trascinano nella barra laterale e da lì nel menu aperto, e restano dove le metti anche dopo un riavvio; lo stesso lo chiedi a Filo a parole («metti Screenshot nella barra laterale», «togli Chiudi scheda dalla barra»). Col tasto destro su un\'icona della barra la rimetti nel menu; su Indietro e Avanti vedi le pagine della scheda a cui tornare e ci vai con un clic; il tasto destro sulle voci in fondo, sull\'ora e sulla striscia apre le loro scelte (la data, la Cronologia AI, le Preferenze).',
+      invoke: 'Spingi il mouse contro il bordo sinistro della finestra per un attimo, oppure clicca la striscia sottile sul bordo sinistro (a finestra non massimizzata i primi pixel del bordo servono al sistema per ridimensionarla: la striscia si clicca appena più in dentro) o la linguetta a sinistra delle schede, oppure Ctrl+Shift+B (Cmd+Shift+B su Mac), che la apre e la chiude, oppure chiedilo all’assistente («apri la barra laterale»). Si chiude uscendo col mouse, con Esc o cliccando sulla pagina. In Preferenze → Impostazioni avanzate → «Barra laterale» (o chiedendolo a Filo, o col tasto destro sulla striscia) spegni l\'apertura dal bordo, cambi l\'attesa sul bordo e quanto resta aperta dopo che il mouse esce, e nascondi la striscia.',
+      doesNot: 'Passarci sopra di corsa o trascinare una scheda non la apre. Un sito non può aprirla né premerne i pulsanti.',
     },
     {
       id: 'page-zoom', title: 'Ingrandisci o rimpicciolisci la pagina', category: 'navigation',
@@ -104,7 +110,7 @@
     {
       id: 'network-error-page', title: 'Pagina d’errore quando un sito non si carica', category: 'navigation',
       desc: 'Se un sito non è raggiungibile (indirizzo sbagliato, server spento, sei offline) o una scheda si blocca, compare una pagina che spiega il problema in italiano con un tasto "Riprova". Se eri offline, riprova da sola appena torni in rete.',
-      invoke: 'Automatico quando un caricamento fallisce; "Riprova" sulla pagina o "Ricarica" dal menu ritentano il sito.',
+      invoke: 'Automatico quando un caricamento fallisce; "Riprova" sulla pagina, "Ricarica" della barra laterale o Ctrl+R (Cmd+R su Mac) ritentano il sito.',
       doesNot: 'Non aggira i blocchi di sicurezza: i siti segnalati come pericolosi restano gestiti dagli avvisi dedicati.',
     },
     {
@@ -198,7 +204,7 @@
       id: 'translate-page', title: 'Traduci l’intera pagina', category: 'reading',
       desc: 'Traduce tutto il testo visibile della pagina — titolo, sommario, didascalie, riquadri laterali, voci di menu e testo dei link, non solo i paragrafi, compreso il testo dentro i componenti con cui sono costruiti i siti moderni — mantenendo impaginazione, link, immagini e illustrazioni; mentre lavora mostra a che punto è arrivata, e puoi tornare all’originale quando vuoi. Cambia lingua anche il nome della scheda in alto. Traduce anche le scritte che non stanno nel testo: il grigio dentro i campi di ricerca, i suggerimenti che compaiono fermando il mouse, le descrizioni delle immagini, le voci dei menu a tendina e le scritte sui bottoni dei moduli. Entra anche nei riquadri incorporati, che sono pagine dentro la pagina: i post di altri siti, i blocchi commenti, i moduli di iscrizione. Il testo che il sito carica mentre la traduzione sta ancora lavorando entra nello stesso giro. Quello che arriva dopo — scorrendo, cambiando schermata senza ricaricare — e quello che scopri aprendo una sezione ripiegata si traducono dal menu, senza rifare il resto. Se si interrompe a metà (rete che salta, credito finito) te lo dice, con il motivo e il punto in cui si è fermata, e puoi riprenderla: completa solo i pezzi mancanti senza rifare quelli già tradotti. Le pagine lunghissime le traduce a tratti: te lo dice, e la ripresa arriva in fondo.',
       invoke: 'Menu del tasto destro → "Traduci"; mentre lavora la stessa icona diventa "Mostra originale" e la ferma, a traduzione finita riporta la pagina in lingua originale, se si è interrotta diventa "Riprendi traduzione", e se c\'è del testo nuovo diventa "Traduci il testo nuovo" (in questi due casi "Mostra originale" resta lì sotto come voce).',
-      doesNot: 'Non traduce il testo dentro le immagini, i video, i riquadri di codice, le illustrazioni (grafici, loghi, icone disegnate nella pagina) e le formule, che restano intatte con i loro colori; non tocca quello che scrivi tu nei campi né i valori che il sito rimanda indietro quando invii un modulo (per questo la scritta su un bottone di invio che porta con sé un valore resta com\'è); non traduce quello che al momento è ripiegato o nascosto — lo offre quando lo apri; non traduce le pagine dove non trova testo (in quel caso te lo dice). Se un sito tiene chiusi certi suoi componenti, o chiude a chiave un riquadro incorporato, quel testo non è leggibile da nessuno script e resta nella lingua originale: in quel caso l’avviso dice che una parte è rimasta fuori, invece di dichiarare la pagina tradotta.',
+      doesNot: 'Non traduce il testo dentro le immagini, i video, i riquadri di codice, le illustrazioni (grafici, loghi, icone disegnate nella pagina) e le formule, che restano intatte con i loro colori; non tocca quello che scrivi tu nei campi né i valori che il sito rimanda indietro quando invii un modulo (per questo la scritta su un bottone di invio che porta con sé un valore resta com\'è); non traduce quello che al momento è ripiegato o nascosto — lo offre quando lo apri; non traduce le pagine dove non trova testo (in quel caso te lo dice). Se un sito tiene chiusi certi suoi componenti, o chiude a chiave un riquadro incorporato, quel testo non è leggibile da nessuno script e resta nella lingua originale: in quel caso l’avviso dice che una parte è rimasta fuori, invece di dichiarare la pagina tradotta. I componenti chiusi e i riquadri incorporati che il sito tiene fuori dalla vista, come gli spazi pubblicitari e i banner già chiusi, non fanno comparire nessun avviso, e un riquadro nascosto non si traduce finché non lo apri.',
     },
 
     // ─────────────────── Immagini e cattura schermo ──────────────────────────
@@ -307,12 +313,12 @@
       id: 'open-for-later', title: 'Aperti per dopo', category: 'save',
       desc: 'La lista delle pagine e dei link che hai messo da parte, pronti da riaprire.',
       invoke: 'Menu «App» → «Aperti per dopo», oppure Impostazioni → «Altro» → «Aperti per dopo»; indirizzo filo://home/home.html. Anche cliccando la conferma che appare dopo «Salva per dopo». Clicca una scheda per riaprirla.',
-      doesNot: 'Non è la home: l’icona Home (in alto a destra e nel menu del tasto destro) porta alla nuova scheda, non a questa lista.',
+      doesNot: 'Non è la home: l’icona Home della barra laterale porta alla nuova scheda, non a questa lista.',
     },
     {
       id: 'archive', title: 'Cronologia delle schede', category: 'save',
       desc: 'La cronologia principale: le schede chiuse raggruppate per giorno, una riga per giorno, colorate come le tab in alto; puoi cercarle anche per contenuto e riaprirle. Restano tutte finché non le cancelli tu. Una scheda cancellata esce dall\'archivio sul disco; la copia della pagina nella cache di navigazione resta finché il motore non la scarta.',
-      invoke: 'Icona «Cronologia» in alto a destra nella home (o dalla home → "Cronologia"), pagina filo://archive/archive.html. Clicca una scheda per riaprirla; tasto destro per il menu: «Riapri» o «Elimina». La ricerca per contenuto nasce da un riassunto che un modello scrive quando chiudi la scheda: lo spegni in Preferenze → «Riassumi le schede chiuse» o chiedendolo a Filo («spegni il riassunto delle schede chiuse»), e da spento le schede si ritrovano per parole.',
+      invoke: 'Icona «Cronologia» in fondo alla barra laterale (bordo sinistro, su ogni pagina), pagina filo://archive/archive.html. Clicca una scheda per riaprirla; tasto destro per il menu: «Riapri» o «Elimina». La ricerca per contenuto nasce da un riassunto che un modello scrive quando chiudi la scheda: lo spegni in Preferenze → «Riassumi le schede chiuse» o chiedendolo a Filo («spegni il riassunto delle schede chiuse»), e da spento le schede si ritrovano per parole.',
       doesNot: 'Delle pagine delicate (posta, banca, sanità, quelle con un campo password o carta, i siti delicati aggiunti da te) non fa il riassunto e non tiene il testo: restano titolo e indirizzo, e la ricerca le trova per parole. Le finestre in incognito e le pagine interne di Filo non entrano.',
     },
     {
@@ -462,8 +468,8 @@
     // ─────────────────────────── Pagine interne ──────────────────────────────
     {
       id: 'home-page', title: 'Home di Filo', category: 'pages',
-      desc: 'La pagina della nuova scheda: al centro l’assistente a cui chiedere qualsiasi cosa, con un messaggio in evidenza e gli aggiornamenti recenti; ai lati le carte. A sinistra quello che sta accadendo (timer, sveglie, scaricamenti, avvisi), a destra quello che tieni tu (Editor, Mazzi, «Filo ti suggerisce», Impostazioni rapide) e sotto «altro», con le app che una carta non ce l’hanno. In alto a destra ci sono le icone per Cronologia, Impostazioni, App e Profilo.',
-      invoke: 'Apri una nuova scheda, l\'icona Home in alto a destra nella home, oppure indirizzo filo://newtab/.',
+      desc: 'La pagina della nuova scheda: al centro l’assistente a cui chiedere qualsiasi cosa, con un messaggio in evidenza e gli aggiornamenti recenti; ai lati le carte. A sinistra quello che sta accadendo (timer, sveglie, scaricamenti, avvisi), a destra quello che tieni tu (Editor, Mazzi, «Filo ti suggerisce», Impostazioni rapide) e sotto «altro», con le app che una carta non ce l’hanno. In alto a destra ci sono Impostazioni e Profilo; Cronologia, App, Impostazioni e Profilo stanno anche in fondo alla barra laterale, su ogni pagina.',
+      invoke: 'Apri una nuova scheda, l\'icona Home della barra laterale, oppure indirizzo filo://newtab/.',
     },
     {
       id: 'home-cards', title: 'Le carte della home', category: 'pages',
@@ -474,7 +480,7 @@
     {
       id: 'red-team', title: 'Red Team', category: 'pages', cancello: 'redteam',
       desc: 'Il programma per mettere alla prova la sicurezza di Filo: provi a farne aggirare le difese e, per i tentativi riconosciuti come attacchi reali, guadagni crediti e sali in classifica. La pagina raccoglie le tue statistiche e i tuoi record, la classifica dei partecipanti e le regole del gioco. Per partecipare davvero serve un codice di invito, che leghi al tuo account e sblocca le statistiche personali.',
-      invoke: 'Icona a scudo rosso in alto a destra nella home (nuova scheda), oppure indirizzo filo://redteam/redteam.html.',
+      invoke: 'Icona a scudo rosso in fondo alla barra laterale, oppure indirizzo filo://redteam/redteam.html.',
       doesNot: 'Senza un codice di invito puoi leggere regole e classifica ma non accumulare punteggi. La creazione dei codici di invito è riservata a chi gestisce Filo.',
     },
     {
@@ -561,10 +567,16 @@
       doesNot: 'In Manuale non tocca niente; in "Privacy massima" ogni sito ha già il suo spazio separato. Non blocca i contenuti incorporati e non li fa smettere di funzionare: mentre leggi la pagina il riquadro ha i suoi cookie come sempre. Non tocca i cookie del sito che stai guardando, né quelli dei siti «resta connesso». Non ripulisce i cookie già sul disco da prima, nemmeno quando un contenuto incorporato li riscrive: così chi era già entrato in un sito non ne esce. Un accesso fatto senza password (con una passkey) non entra da solo nell\'elenco: per tenerlo anche nei contenuti incorporati, aggiungi il sito fra quelli «resta connesso».',
     },
     {
+      id: 'cookie-embed-broken', title: 'Contenuto incorporato rotto dai cookie: Filo propone di riattivarli', category: 'settings',
+      desc: 'Quando un post, un video, una mappa o un blocco commenti di un altro sito non si vede perché Filo ne ha rifiutato o accorciato i cookie (Automatico e Privacy), sopra il riquadro compare «Attivo i cookie di Instagram per questo contenuto?». Con «Sì» il riquadro si ricarica e quel servizio tiene i suoi cookie: in Automatico come un sito dove sei entrato, in Privacy dentro lo spazio di ogni sito che lo ospita, anche dopo che ne sei uscito, senza mai ricevere quelli del suo sito vero. I servizi noti (Instagram, X, TikTok, Facebook, Spotify, SoundCloud, Vimeo, YouTube, Google Maps, Disqus, Pinterest, LinkedIn, Twitch) e ogni riquadro che chiede a parole di attivare i cookie si riconoscono da regole, senza costi; un riquadro sconosciuto che resta vuoto, mostra un errore o chiede di entrare lo guarda un modello con la vista, una volta sola.',
+      invoke: 'Compare da sola sopra il riquadro. Tasto destro dentro il riquadro: «Attiva i cookie di … qui» o «Togli i cookie riattivati di …». In Impostazioni → Sicurezza, sotto i cookie, l\'elenco «Contenuti incorporati con i cookie riattivati» mostra tutti i servizi e li toglie; si può anche chiedere a Filo. Il modello che guarda i riquadri si sceglie fra i modelli («Contenuti incorporati rotti dai cookie»).',
+      doesNot: 'Non spiega cosa sono i cookie e non chiede niente per i riquadri che funzionano, per le pubblicità o per un contenuto che non c\'è più (un post cancellato o privato, un video o un brano rimossi: lì decide il modello, non una regola). Al modello va solo l\'immagine del riquadro, mai della pagina, e mai dei siti della rete di casa; se il riconoscimento non riesce non compare niente. Con «No» non lo ripropone per quel servizio su quel sito finché Filo resta aperto. Non riporta i cookie già cancellati: se il riquadro chiede di entrare, entri una volta. In Manuale e in incognito non interviene. In Privacy i cookie tenuti per un servizio restano finché Filo è aperto.',
+    },
+    {
       id: 'ad-block', title: 'Blocco di pubblicità e tracker', category: 'settings',
-      desc: 'Filo blocca da sé pubblicità e tracker: le richieste verso i domini delle liste pubbliche e gratuite (StevenBlack, EasyList) si fermano prima di partire, così annunci e script che seguono cosa fai da un sito all’altro non si caricano nemmeno. Le liste restano sul tuo computer e si aggiornano da sole una volta a settimana; un elenco di siti legittimi non viene bloccato anche se finisce per errore in una lista.',
-      invoke: 'Attivo di serie. Si spegne in Impostazioni → Sicurezza → «Blocca pubblicità e tracker», o chiedendolo a Filo («spegni il blocco della pubblicità»), che chiede prima un OK. A «blocchi la pubblicità?» Filo risponde con lo stato vero.',
-      doesNot: 'Non nasconde lo spazio vuoto che un annuncio bloccato lascia nella pagina, e non ferma la pubblicità che arriva dallo stesso dominio del sito, come gli annunci dentro i video di YouTube (quelli li salta «Salta le pubblicità dei video»). Se al primo avvio manca la rete, parte senza liste finché non riesce a scaricarle.',
+      desc: 'Filo blocca da sé pubblicità e tracker con liste pubbliche e gratuite (EasyList, con le sue liste per i siti italiani e francesi, e StevenBlack), che restano sul tuo computer e si aggiornano da sole una volta a settimana. Le richieste ai server della pubblicità e dei tracker non partono, e i riquadri pubblicitari che restano nella pagina spariscono: quelli rimasti vuoti, le immagini e i riquadri fermati dal blocco e i banner che il sito mette da sé. Vale anche nella finestra in incognito. Un elenco di siti legittimi non viene bloccato anche se finisce per errore in una lista.',
+      invoke: 'Attivo di serie. Si spegne e si riaccende in Impostazioni → Sicurezza → «Blocca pubblicità e tracker», o chiedendolo a Filo («spegni il blocco della pubblicità»), che chiede prima un OK; vale subito anche nelle pagine già aperte. A «blocchi la pubblicità?» Filo risponde con lo stato vero.',
+      doesNot: 'Non si spegne per un sito solo. Non blocca i server dei servizi più usati (Google, YouTube, Facebook, Amazon…), quindi la pubblicità dentro i video di YouTube resta: quella la salta «Salta le pubblicità dei video». Non toglie gli avvisi dei siti che chiedono di spegnere il blocco. Un link verso un server delle liste, come quelli di molte reti di affiliazione (Skimlinks, Awin, Rakuten), si ferma sull\'avviso «Sito bloccato», da cui «Apri comunque» lo apre. Se al primo avvio manca la rete, parte senza liste finché non riesce a scaricarle.',
     },
     {
       id: 'video-ad-skip', title: 'Pubblicità dei video saltate da sole', category: 'settings',

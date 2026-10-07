@@ -511,6 +511,7 @@
     STILE_PAGINA: () => 'cambiato l\'aspetto della pagina',
     RIPRISTINA_STILE_PAGINA: () => 'rimesso la pagina com\'era',
     COMANDO_FINESTRA: () => 'azionato un comando della finestra',
+    SPOSTA_ICONA: () => 'spostato un\'icona',
     INSTALLA_AGGIORNAMENTO: () => 'chiesto la versione nuova di Filo',
     CARTA_HOME: (n) => (n > 1 ? `sistemato ${n} carte della home` : 'sistemato una carta della home'),
     VOLUME: () => 'cambiato il volume',
@@ -728,9 +729,17 @@
       const labels = {
         fullscreen: 'Schermo intero', minimize: 'Finestra ridotta a icona', home: 'Home aperta',
         settings: 'Impostazioni aperte', apps: 'Menu App aperto', account: 'Menu Account aperto',
+        sidebar: 'Barra laterale aperta',
       };
       const cmd = String(a.comando || a.command || a.cmd || '').toLowerCase();
       return { icon: '🪟', text: labels[cmd] || 'Comando della finestra' };
+    },
+    SPOSTA_ICONA: (a) => {
+      const D = window.SN_DISPOSIZIONE_ICONE;
+      const id = String(a.icona || a.id || '');
+      const nome = D && D.noto && D.noto(id) ? D.nome(id) : id;
+      const dove = { barra: 'nella barra laterale', menu: 'nel tasto destro', altro: 'in «Altro…»' }[String(a.dove || '').toLowerCase()] || '';
+      return { icon: '📌', text: `Icona spostata · ${nome}${dove ? ` ${dove}` : ''}` };
     },
   };
   // Che cosa NON è andato a buon fine, detto come lo direbbe l'utente: la riga
@@ -750,6 +759,7 @@
     STILE_PAGINA: 'Aspetto della pagina non cambiato', RIPRISTINA_STILE_PAGINA: 'Aspetto della pagina non ripristinato',
     PROXY_TAB: 'Scheda non instradata', RIMUOVI_PROXY: 'Proxy non tolto',
     RIMUOVI_PROXY_TUTTE: 'Proxy non tolti', REGOLA_PROXY_DOMINIO: 'Regola non salvata',
+    RIMUOVI_REGOLA_PROXY: 'Regola non tolta', COMANDO_FINESTRA: 'Comando non eseguito', SPOSTA_ICONA: 'Icona non spostata',
     RIMUOVI_REGOLA_PROXY: 'Regola non tolta', COMANDO_FINESTRA: 'Comando non eseguito',
     INSTALLA_AGGIORNAMENTO: 'Aggiornamento non partito',
     CARTA_HOME: 'Carta della home non cambiata',
@@ -853,6 +863,46 @@
   // si mangia il bottone e la funzione sparisce dalla chat.
   const ROW_AND_BUTTON = ['SALVA_APPUNTO', 'IMPOSTA_ESTETICA', 'RINOMINA_FILE'];
 
+  // Lo stile proposto nell'intervista di benvenuto si imposta senza riquadro (#592.2): la chat lo dice in una riga
+  // col suo Annulla, fuori dal blocco di attività.
+  function stileAccoglienza(a) {
+    const o = a && a._output;
+    return isType(a, 'IMPOSTA_PREFERENZA') && a._executed !== false && !!o && typeof o.stile === 'string' && !!o.stile.trim();
+  }
+
+  function rigaStileAccoglienza(a) {
+    const o = a._output;
+    const cambio = (Array.isArray(a._cambi) ? a._cambi : []).find((c) => c && c.id);
+    const riga = document.createElement('div');
+    riga.className = 'dash-stile-accoglienza';
+    const testo = document.createElement('span');
+    testo.className = 'dash-stile-accoglienza-testo';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'dash-action-btn';
+    btn.textContent = 'Annulla';
+    btn.title = 'Torna a come scrivevo prima';
+    const mostra = () => {
+      testo.textContent = o.annullato ? 'Stile annullato: scrivo come prima.' : `Userò questo stile: «${o.stile.trim()}»`;
+      // Senza un cambio (lo stile era già quello) non c'è niente da rimettere.
+      btn.hidden = !!o.annullato || !cambio;
+    };
+    btn.addEventListener('click', async () => {
+      if (btn.disabled || !cambio) return;
+      btn.disabled = true;
+      let r = null;
+      try { r = await send({ type: MSG.CAMBI_ANNULLA, id: cambio.id }); } catch (_) { r = null; }
+      btn.disabled = false;
+      // Già annullato dal segno sul messaggio: il risultato è quello voluto.
+      if (r && (r.ok || r.error === 'già annullato')) { o.annullato = true; mostra(); return; }
+      btn.textContent = 'Annulla non riuscito: riprova';
+      btn.title = (r && r.error) || '';
+    });
+    mostra();
+    riga.append(testo, btn);
+    return riga;
+  }
+
   // Una pagina che il modello voleva aprire e che la lista dei siti bloccati ha fermato: la
   // notifica se ne va in pochi secondi, e la chat le tiene il suo «Apri comunque» (#590).
   function apribileComunque(a) {
@@ -947,7 +997,7 @@
       // bottone è come si risponde.
       const anche = a._confirm
         || (ROW_AND_BUTTON.includes(String(a.type || '').toUpperCase()) && a._executed !== false)
-        || apribileComunque(a) || permessoDaConcedere(a);
+        || apribileComunque(a) || permessoDaConcedere(a) || stileAccoglienza(a);
       if (activity) {
         if (told) {
           // Già in cronologia; resta solo l'eventuale bottone (link, conferma).
@@ -1395,6 +1445,7 @@
       return btn;
     }
     if (type === 'RINOMINA_FILE') return bottoneRimettiNomi(a);
+    if (stileAccoglienza(a)) return rigaStileAccoglienza(a);
     if (type === 'APRI_FILE') {
       const btn = document.createElement('a');
       btn.className = 'dash-action-btn';

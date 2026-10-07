@@ -18,14 +18,20 @@ Quello che la **shell** deve mostrare nell'area della pagina e che deve restarci
   2. è di passaggio e ancorata a un pulsante della barra → finestra figlia
      (`src/main/popup-menu.js`, `src/main/popup-tooltip.js`);
   3. resta sopra la pagina e segue la finestra → vista in cima, come
-     `src/main/avvisiSopraPagina.js`.
+     `src/main/avvisiSopraPagina.js` e `src/main/barraLaterale.js`. I gesti del
+     vuoto e il puntatore della pagina li fanno `src/main/vuotoDellaVista.js` e
+     `src/renderer/vuoto.js`, uguali per tutte le viste: una vista nuova dice
+     solo cosa è suo e da che lato c'è la pagina.
   Una domanda modale chiesta da un sito (le conferme di `SN_CONFIRM_UI`) è una vista in cima anche
   lei, ma grande quanto la scheda: `patterns/una-conferma-su-un-sito-sta-fuori-dal-suo-documento.md`.
 - **La vista:** nasce al primo bisogno (una finestra che non ne ha non paga un
   processo in più), ha sfondo trasparente ed è grande **quanto il contenuto**:
   una vista trasparente prende i clic su tutta la sua area, e ogni pixel in più è
   una zona morta sopra la pagina. Il vuoto che resta (il margine dell'ombra, lo
-  spazio accanto a una carta più stretta) è **della pagina**: la vista le rigira i
+  spazio accanto a una carta più stretta) è **della pagina**, o meglio di quello
+  che l'utente vede lì: quando l'avviso del sito pericoloso copre la scheda è suo,
+  e la pagina segnalata non riceve niente (una regola sola per tutte le viste, nel
+  gestore delle schede; `tests/barra-laterale-vuoto.spec.mjs`). La vista le rigira i
   gesti che ci cadono (clic, doppio clic, tasto destro, rotella, e un trascinamento
   fino al rilascio, anche se passa sopra una carta) e mostra il puntatore che
   mostrerebbe la pagina (Electron chiama `pointer` la freccia e `hand` la mano;

@@ -1001,6 +1001,7 @@ async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
       if (w._filoTabs && typeof w._filoTabs.setSecurity === 'function') {
         w._filoTabs.setSecurity(merged.security || {});
       }
+      try { w._filoTabs?.barra?.impostazioni(merged.barraLaterale); } catch (_) {}
     }
   } catch (_) {}
   try { require('./fingerprint').setMode(merged); } catch (_) {}
@@ -1010,6 +1011,7 @@ async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
     const Cookies = require('./cookies');
     const cookiesChanged = Cookies.configureFromSettings(merged);
     require('./cookieIncorporati').configureFromSettings(merged);
+    require('./riquadriRotti').configureFromSettings(merged);
     require('./cookieBanners').configureFromSettings(merged);
     // Ogni frame di ogni scheda rilegge la sua config: solo se la modalità o i siti coi banner sono cambiati.
     if (cookiesChanged) {
@@ -1367,6 +1369,15 @@ function ricordaLettoInChat(azioni, storia = []) {
   }
 }
 
+// Le azioni hanno portato nel contesto testo che non ha scritto né l'utente né Filo: un file, un documento, l'esito
+// di un comando, una ricerca, una chat archiviata. Senza il modulo che lo sa dire, si assume di sì.
+function testoDiAltriNelleAzioni(azioni) {
+  const Exfil = globalThis.SN_URL_EXFIL;
+  if (!Exfil) return true;
+  const c = Exfil.contestoDaAzioni(azioni);
+  return c.nonFidato || !!String(c.letto || '').trim();
+}
+
 function lettiDallAiuto(sender) {
   const reg = sender?.wc ? LETTI_DALL_AIUTO.get(sender.wc) : null;
   return reg ? reg.tutti() : [];
@@ -1605,7 +1616,7 @@ async function executeFiloAction(action, opzioni = {}) {
   return res;
 }
 
-async function eseguiAzioneFilo(action, { confirmed = false, sender = null, contesto = null, assistente = false, parole = '', avanzamento = null, chatId = null } = {}) {
+async function eseguiAzioneFilo(action, { confirmed = false, sender = null, contesto = null, assistente = false, parole = '', avanzamento = null, chatId = null, accoglienza = false } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
   const type = String(action.type || '').toUpperCase();
   // Da un sito (anche via una chat aperta da lì) passano solo le azioni della
@@ -1633,6 +1644,13 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
   // non chiede conferma per poi non fare niente: lo si sa prima del gate, mai dall'LLM (#949).
   if (type === 'IMPOSTA_PREFERENZA') {
     delete action._invariato;
+    // Mai dal modello né da una conferma: lo scrive solo un turno dell'intervista di benvenuto (#592.2).
+    delete action._accoglienza;
+    try {
+      const setter = global.SN_PREF.setterDellaChiave(action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza);
+      if (accoglienza && !confirmed && !assistente && setter && setter.scrive.includes('agentStyle')
+        && !testoDiAltriNelleAzioni(contesto)) action._accoglienza = true;
+    } catch (_) {}
     // «Questo sito», «scheda: <titolo>» fra i siti delicati: la chat vede i titoli delle schede, non gli indirizzi (#1004).
     try {
       const chiave = action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza;
@@ -2110,7 +2128,8 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         }
         await applySettingsUpdate(partial);
         // Il nome leggibile serve alla riga della chat quando il valore era già quello (niente evento).
-        return { executed: true, kept: true, output: { etichetta: built.label } };
+        const stile = globalThis.SN_ACTION_LEVELS.stileDellAccoglienza(action);
+        return { executed: true, kept: true, output: { etichetta: built.label, ...(stile ? { stile } : {}) } };
       }
       case 'IMPOSTA_ESTETICA': {
         // Filo cambia un token estetico (colore/font/raggio/opacità) su
@@ -2583,6 +2602,24 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
           },
         };
       }
+      case 'SPOSTA_ICONA': {
+        // #871 — la disposizione delle icone (barra laterale, riga e «Altro…» del tasto destro) a parole: stessa
+        // porta del trascinamento, così menu aperti e barre di tutte le finestre la ricevono uguale.
+        const D = globalThis.SN_DISPOSIZIONE_ICONE;
+        const id = String(action.icona ?? action.id ?? '').trim();
+        const dove = String(action.dove ?? '').trim().toLowerCase();
+        const prima = String(action.prima_di ?? '').trim();
+        if (!D || !D.noto(id) || !Object.prototype.hasOwnProperty.call(D.DOVE, dove)) {
+          return { executed: false, kept: false, output: { icona: 'invalid', id, dove } };
+        }
+        const incognito = !!winOf(sender)?._filoIncognito;
+        const layout = await require('./layoutIcone').posa(
+          { id, target: D.DOVE[dove], beforeId: D.noto(prima) && prima !== id ? prima : null }, { incognito });
+        if (!layout) return { executed: false, kept: false, output: { icona: 'invalid', id, dove } };
+        // La riga del tasto destro ha sei posti: chi ci entra per ultimo può spingerne fuori un'altra.
+        const finita = ['bar', 'primary', 'secondary'].find((z) => layout[z].includes(id));
+        return { executed: true, kept: false, output: { icona: id, dove, finita, layout } };
+      }
       case 'CARTA_HOME': {
         const op = String(action.operazione ?? action.op ?? '').trim().toLowerCase();
         const tipo = { togli: 'togli', rimetti: 'aggiungi', aggiungi: 'aggiungi', sposta: 'sposta', ripristina: 'ripristina' }[op];
@@ -2614,7 +2651,7 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
         // #419 — l'agente della home aziona i controlli del browser Filo (schermo
         // intero, riduci a icona, menu Impostazioni/App/Account, home): prima poteva
         // solo spiegare a parole come cliccarli. "close" è escluso di proposito.
-        const allowed = ['home', 'settings', 'apps', 'account', 'minimize', 'fullscreen'];
+        const allowed = ['home', 'settings', 'apps', 'account', 'minimize', 'fullscreen', 'sidebar'];
         const cmd = String(action.comando ?? action.command ?? action.cmd ?? '').trim().toLowerCase();
         if (!allowed.includes(cmd)) {
           return { executed: false, kept: false, output: { window: 'invalid', command: cmd } };
@@ -2635,6 +2672,12 @@ async function eseguiAzioneFilo(action, { confirmed = false, sender = null, cont
             win.setFullScreen(!win.isFullScreen());
           }
           return { executed: true, kept: false, output: { window: 'fullscreen' } };
+        }
+        // #871 — la barra laterale chiesta in chat resta aperta finché la si chiude, come da tastiera.
+        if (cmd === 'sidebar') {
+          if (!win._filoTabs?.barra) return { executed: false, kept: false };
+          win._filoTabs.barra.apri('chat');
+          return { executed: true, kept: false, output: { window: 'sidebar' } };
         }
         // home / minimize / settings / apps / account: clicca il bottone REALE
         // della shell, riusando il canale dei comandi rapidi della barra (stessa
@@ -3557,7 +3600,7 @@ function fermaFiloChat(reqId, wc) {
 }
 
 // `daModello`: il messaggio l'ha scritto un modello (un suggerimento della home), anche se parte dalla casella dell'utente.
-async function handleFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, daModello = false, chatId = null, sender = null }) {
+async function handleFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, daModello = false, daFuori = false, chatId = null, sender = null }) {
   await FiloMem.touchSession();
   await FiloMem.appendRaw({ type: 'chat_user', summary: String(userMessage || '').slice(0, 200) });
   // #524 — l'intervista di benvenuto si legge PRIMA di qualsiasi altra cosa,
@@ -3596,9 +3639,13 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // che chi chiude la finestra a metà la ritrova dov'era. I turni interni (i
   // nudge di prosecuzione automatica) non sono parole dell'utente e non entrano;
   // lo stesso messaggio ripetuto di fila non è un turno nuovo (appendTurn).
+  // Il messaggio porta testo che l'utente non ha scritto lui: incollato o trascinato (lo dice la scheda), un'immagine,
+  // il suggerimento di un modello.
+  const messaggioDaFuori = !internal && (daFuori === true || daModello === true
+    || (Array.isArray(images) && images.length > 0) || !!image);
   if (onbActive && !internal && String(userMessage || '').trim()) {
     onbBefore = await saveOnboarding(
-      Onboarding.appendTurn(onbBefore, { role: 'user', text: String(userMessage) }),
+      Onboarding.appendTurn(onbBefore, { role: 'user', text: String(userMessage), ...(messaggioDaFuori ? { daFuori: true } : {}) }),
     );
   }
   // «Riprendi» toglie il segno dello stop: da qui il turno è di nuovo in corso, e se la scheda muore riparte come gli altri.
@@ -3638,6 +3685,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   // chat normale: nessuna schermata a passi, nessun modulo.
   const onboardingText = onbActive ? Onboarding.renderChecklistForPrompt(onbBefore) : '';
   const cleanHistory = Array.isArray(threadHistory) ? threadHistory.slice(-20) : [];
+  // #592.2 — nell'intervista di benvenuto lo stile proposto si imposta senza riquadro finché nella conversazione non
+  // è entrato testo di altri; quello letto dalle azioni lo guarda executeFiloAction.
+  const accoglienza = onbActive && !messaggioDaFuori && !Onboarding.haTestoDiAltri(onbBefore)
+    && !cleanHistory.some((m) => m && (m.daFuori === true || m.daModello === true || (typeof m.esterno === 'string' && !!m.esterno)));
   // Re-immissione dell'output dei comandi nel contesto del modello: l'output di
   // un ESEGUI_COMANDO eseguito in un turno precedente viene accodato al
   // messaggio dell'assistente, così nei turni successivi il modello SA davvero
@@ -3833,7 +3884,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
       const avvia = (a) => (a._argsError
         ? Promise.resolve({ executed: false, kept: false, rejected: true, error: a._argsError })
         : executeFiloAction(a, {
-          sender, contesto: azioniViste, parole: paroleUtente, chatId,
+          sender, contesto: azioniViste, parole: paroleUtente, chatId, accoglienza,
           // Le azioni lunghe dicono a che punto sono: la riga d'attesa le conta.
           avanzamento: canPush ? (fatti, totali) => push('filo:action', {
             kind: 'progress', type: String(a.type || '').toUpperCase(), callId: a._callId || '', fatti, totali,
@@ -4018,7 +4069,7 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   if (onbActive) {
     let after = await FiloMem.getOnboarding();
     if (textReply && textReply !== '(vuoto)') {
-      after = Onboarding.appendTurn(after, { role: 'filo', text: textReply });
+      after = Onboarding.appendTurn(after, { role: 'filo', text: textReply, ...(testoDiAltriNelleAzioni(renderedActions) ? { daFuori: true } : {}) });
     }
     if (!after.done && Onboarding.shouldForceClose(after)) after = Onboarding.close(after);
     await saveOnboarding(after);
@@ -4467,6 +4518,7 @@ const handlerCtx = {
 };
 
 require('./handlers/nav')(on, handlerCtx);
+require('./handlers/barra')(on, handlerCtx);
 require('./handlers/tabs')(on, handlerCtx);
 require('./handlers/storage')(on, handlerCtx);
 require('./handlers/pages')(on, handlerCtx);
@@ -5407,6 +5459,9 @@ globalThis.SN_TAB_TRIAGE_DECIDE = runTabTriageDecision;
 // prompt del classificatore). Cache (dominio, path-pattern) condivisa con TTL.
 // Esposto su globalThis per evitare il ciclo di require tabs.js↔handlers.js.
 let geoClassifierCache = null;
+// #760 — il riquadro di terzi rotto che le regole non riconoscono: un modello con la vista guarda solo il riquadro.
+require('./riquadriRotti').usaModello((messages) => Gate.text({ action: ACTIONS.EMBED_COOKIE_CHECK, messages }));
+
 globalThis.SN_GEO_CLASSIFY = async function geoClassify(input) {
   const Classifier = globalThis.SN_GEOBLOCK_CLASSIFIER;
   if (!Classifier) return { class: null, route: { proxy: false }, skipped: true };
