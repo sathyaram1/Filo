@@ -122,6 +122,26 @@ test('le letture vivono venti messaggi del filo, non di più', () => {
   assert.deepEqual(f.azioni.map((a) => a._output.text), ['CONTENUTO risposta 14'], 'le azioni viste devono essere quelle il cui esito arriva al modello');
 });
 
+test('il testo che la chat scrive da fuori (l\'esito di un comando dato in chat) è una lettura: mai nudo, venti messaggi, conta per le uscite', () => {
+  const filo = [
+    { chat: 'term', role: 'user', text: '/cat note.txt', ts: fa(15), actions: [] },
+    { chat: 'term', role: 'filo', text: 'CODICE-DA-FUORI', ts: fa(14.9), actions: [], esterno: FC.ESTERNO_COMANDO },
+    { chat: 'term', role: 'filo', text: 'FILE-SCARICATO.pdf', ts: fa(14.8), actions: [], esterno: 'dal nome di un file scaricato' },
+  ];
+  const osserva = (azioni) => azioni.map((a) => `[${a.type} ${a.command || ''}] ${a._output.stdout || a._output.text}`).join('\n');
+  const vicino = FC.finestra(filo, { ora: ORA, ...TETTI, osserva });
+  const t1 = vicino.messaggi.map((m) => m.content).join('\n');
+  assert.match(t1, /\[ESEGUI_COMANDO cat note\.txt\] CODICE-DA-FUORI/);
+  assert.match(t1, /\[TESTO_DI_FUORI \] FILE-SCARICATO\.pdf/);
+  assert.deepEqual(vicino.azioni.map((a) => a.type), ['ESEGUI_COMANDO', 'TESTO_DI_FUORI']);
+  for (let i = 0; i < 11; i++) filo.push(...scambio('altra', 14 - i * 0.5, `domanda ${i}`, `risposta ${i}`));
+  const lontano = FC.finestra(filo, { ora: ORA, ...TETTI, chatCorrente: 'altra', osserva });
+  const t2 = lontano.messaggi.map((m) => m.content).join('\n');
+  assert.doesNotMatch(t2, /CODICE-DA-FUORI|FILE-SCARICATO/, 'oltre venti messaggi del filo il testo di fuori è ancora davanti');
+  assert.match(t2, /non è più davanti, si rilegge con CERCA_CHAT e l'id term/);
+  assert.deepEqual(lontano.azioni, []);
+});
+
 test('una conversazione ripresa da prima dei tetti porta i suoi ultimi messaggi, prima del tratto', () => {
   const filo = [...scambio('vecchia', 24 * 10, 'progetto casa', 'ne parliamo'), ...scambio('oggi', 1, 'ciao', 'ciao!')];
   const f = FC.finestra(filo, { ora: ORA, ...TETTI, chatCorrente: 'vecchia' });
