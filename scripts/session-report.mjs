@@ -618,6 +618,9 @@ export function sommaSottoAgente(rep, sub) {
   rep.costUsd = arrotonda(rep.costUsd + (Number(sub.costUsd) || 0));
   rep.turns += Number(sub.turns) || 0;
   rep.coldTurns += Number(sub.coldTurns) || 0;
+  rep.rewarmTurns += Number(sub.rewarmTurns) || 0;
+  rep.rewarmTokens += Number(sub.rewarmTokens) || 0;
+  rep.maxContextTokens = Math.max(rep.maxContextTokens, Number(sub.maxContextTokens) || 0);
   for (const k of Object.keys(rep.tokens)) rep.tokens[k] += Number(sub.tokens && sub.tokens[k]) || 0;
   const st = sub.tools || {};
   rep.tools.total += Number(st.total) || 0;
