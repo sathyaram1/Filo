@@ -86,7 +86,7 @@
 
   // Un campo si conferma quando il cursore ne esce: registrato qui, si conferma
   // anche se la scheda si chiude prima.
-  const campoAlVolo = window.SN_SALVA.campoAlVolo();
+  const campoAlVolo = window.SN_CASELLE.alVolo();
 
   // Una correzione si aggiunge anche dal tasto destro su una parola: se l'elenco
   // cambia da fuori ci si riallinea, ma non mentre il cursore è in una riga,

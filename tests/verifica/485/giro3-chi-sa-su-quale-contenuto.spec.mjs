@@ -213,6 +213,8 @@ test('il contenuto esaminato non è mai arrivato su origin: la fusione non parte
   }
 });
 
+// Dal 24/09/2026 la verifica mossa dopo il verdetto la giudica il server: qui si guarda che la strada del
+// canale lasci la stessa memoria, perché la nota la nomini invece di astenersi.
 test('la strada del canale non è meno severa nemmeno sulla verifica funzionale', async () => {
   const { srv, ricevuti, port } = await fintoServer();
   const { dir, g, punta } = deposito('filo-485-g3-canale-verifica-');
@@ -231,8 +233,9 @@ test('la strada del canale non è meno severa nemmeno sulla verifica funzionale'
 
     const gate = await lancia(GATE, ['worker/485'], env, dir);
     const richiesta = ricevuti.find((x) => x.url.includes('routineMerge'));
-    expect(!richiesta && gate.status !== 0,
-      `la fusione è partita con la verifica funzionale data su ${provato.slice(0, 8)} (busta: ${JSON.stringify(richiesta?.body || null)})`).toBe(true);
+    expect(String(richiesta?.body?.sha || ''), gate.stderr).toBe(punta());
+    expect(gate.stderr, 'la strada del canale non ha lasciato detto su quale contenuto la verifica ha dato l\'ok')
+      .toContain(provato.slice(0, 12));
   } finally {
     srv.close();
     rmSync(dir, { recursive: true, force: true });

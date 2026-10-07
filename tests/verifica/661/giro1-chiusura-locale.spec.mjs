@@ -30,7 +30,7 @@ const SPEC = 'tests/verifica/locale-prova/giro1-bordo.spec.mjs';
 const SERVER = `import { createServer } from 'node:http';
 const srv = createServer((req, res) => {
   res.writeHead(200, { 'content-type': 'application/json' });
-  res.end(JSON.stringify({ fields: { cap2: { integerValue: '1' }, cap1: { integerValue: '0' }, cap0: { integerValue: '0' } } }));
+  res.end(JSON.stringify({ fields: { cap3: { integerValue: '1' }, cap2: { integerValue: '1' }, cap1: { integerValue: '0' }, cap0: { integerValue: '0' } } }));
 });
 srv.listen(0, '127.0.0.1', () => { console.log('PORTA ' + srv.address().port); });
 `;

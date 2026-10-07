@@ -336,8 +336,8 @@ export const CAMPI_ESITO = Object.freeze({
  * quando arriva una correzione).
  *
  * PERCHÉ NON STA SOLO DOVE STAVA (feedback #485, giro 3)
- *   Il rifiuto che ferma la fusione quando il ramo si è mosso dopo i via libera
- *   si regge su questo fogliettino. Se lo scrive una sola delle due strade con
+ *   Il rifiuto che ferma la fusione quando il ramo si è mosso dopo il controllo
+ *   di sicurezza (e la nota sulla verifica) si regge su questo fogliettino. Se lo scrive una sola delle due strade con
  *   cui un esito si registra, basta usare l'altra perché la fusione riparta a
  *   foglio sostituito: la difesa si spegne scegliendo l'ingresso. Qui c'è la
  *   porta unica, e la chiamano tutte e due.
@@ -559,7 +559,40 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
  * @returns {{ok:boolean, current:string, assigned:string, reason:string}}
  */
 export function checkDelivery(root, assignedBranch) {
-  return identityVerdict(currentBranch(root), assignedBranch);
+  const v = identityVerdict(currentBranch(root), assignedBranch);
+  if (v.ok || v.current) return v;
+  // Durante il rebase del ramo assegnato la cartella è staccata per forza: il rifiuto resta, ma non è una
+  // deriva (`rebase: true`). Il rebase di un altro ramo lo è.
+  const r = rebaseInCorso(root);
+  if (!r) return v;
+  if (!r.ramo || r.ramo !== v.assigned) {
+    return { ...v, reason: `la directory è a metà del rebase di un altro ramo${r.ramo ? ` ("${r.ramo}")` : ''}, non di "${v.assigned}"` };
+  }
+  return {
+    ...v,
+    rebase: true,
+    reason: `c'è un rebase in corso del ramo "${r.ramo}": portalo a termine (risolvi i conflitti, poi \`git rebase --continue\`) e registra dopo, dal ramo`,
+  };
+}
+
+/**
+ * Rebase interrotto in `root`? null se no, altrimenti `{ ramo }` (il ramo che si sta riscrivendo, '' se
+ * non si legge). La cartella git si chiede a git: in un worktree `.git` è un file, non una cartella.
+ */
+export function rebaseInCorso(root) {
+  const g = gitIn(root);
+  for (const nome of ['rebase-merge', 'rebase-apply']) {
+    const p = g(['rev-parse', '--git-path', nome]);
+    if (!p.ok || !p.out) continue;
+    const dir = resolve(root, p.out);
+    if (!existsSync(dir)) continue;
+    // `git am` usa la stessa cartella di rebase-apply, e non è un rebase.
+    if (nome === 'rebase-apply' && !existsSync(resolve(dir, 'rebasing'))) continue;
+    let ramo = '';
+    try { ramo = readFileSync(resolve(dir, 'head-name'), 'utf8').trim().replace(/^refs\/heads\//, ''); } catch (_) {}
+    return { ramo };
+  }
+  return null;
 }
 
 /**
@@ -581,6 +614,8 @@ export function guardTransition(root, id, { escalate, persist, clear } = {}) {
   const assigned = prev?.branch || '';
   const v = checkDelivery(root, assigned);
   if (v.ok) return { ok: true, state: prev };
+  // Il rebase del ramo assegnato si finisce e poi si registra: non conta verso la sospensione per deriva.
+  if (v.rebase) return { ok: false, rebase: true, escalated: false, count: 0, message: `registrazione rifiutata su ${id}: ${v.reason}` };
 
   const b = bumpRejects(prev || { id, branch: assigned });
   b.state.id = id;

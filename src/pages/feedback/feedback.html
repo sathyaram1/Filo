@@ -22,7 +22,12 @@
      rifiutano le stesse cose con le stesse parole. -->
   <script src="filo://shared/feedbackAttachTypes.js"></script>
   <script src="filo://shared/manageReview.js"></script>
+  <script src="filo://shared/feedbackLive.js"></script>
+  <script src="filo://shared/feedbackLivePagina.js"></script>
+  <script src="filo://shared/filoMarkdown.js"></script>
   <script src="filo://shared/chatErrors.js"></script>
+  <script src="filo://shared/messages.js"></script>
+  <script src="filo://shared/caselleAlSicuro.js"></script>
   <style>
     .fb-list { display: flex; flex-direction: column; gap: 16px; }
     .fb-card {
@@ -229,6 +234,26 @@
       white-space: nowrap;
     }
     .fb-tab--active { color: var(--sn-text, inherit); border-bottom-color: currentColor; }
+    /* Arrivata a pagina aperta: un punto caldo in testa alla scheda e sulla linguetta, finché non la si tocca. */
+    .fb-card--arrivata .fb-meta::before {
+      content: ''; flex: 0 0 auto; align-self: center;
+      width: var(--fb-arrivo-size, 7px); height: var(--fb-arrivo-size, 7px); border-radius: 50%;
+      background: var(--fb-arrivo-color, var(--sn-accent));
+    }
+    .fb-tab--arrivi::after {
+      content: ''; display: inline-block; vertical-align: super;
+      width: 5px; height: 5px; margin-left: 3px; border-radius: 50%;
+      background: var(--fb-arrivo-color, var(--sn-accent));
+    }
+    /* Il giro ha avvisato: un segno accanto al numero, l'hover dice cosa. Ferma: il numero si spegne e lo dice. */
+    .fb-count--avviso::after { content: ' !'; font-weight: 700; color: var(--sn-accent); }
+    .fb-count--ferma { opacity: 0.55; }
+    .fb-count--ferma::after { content: ' · ferma'; }
+    /* Una fusione ferma: stessa forma e tinta del segno in Gestione. */
+    .fb-fusione {
+      font-size: 10.5px; line-height: 1; padding: 3px 6px; border-radius: 999px; white-space: nowrap;
+      border: 1px solid color-mix(in srgb, #c0392b 55%, transparent); color: #c0392b;
+    }
     .fb-title { font-weight: 600; font-size: 14px; margin-bottom: 6px; }
     .fb-num { color: var(--sn-muted); font-weight: 600; }
     .fb-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
@@ -280,9 +305,13 @@
       background: var(--sn-overlay-bg); font-size: 13px; color: var(--sn-muted);
     }
     .fb-admin-banner button { margin-left: auto; }
+    /* Chi non gestisce i feedback cerca qui quelli che ha mandato (#986): stanno in bacheca. */
+    .fb-admin-mie { margin-left: auto; white-space: nowrap; }
+    .fb-admin-mie + button { margin-left: 0; }
     /* Il `display: flex` qui sopra vince sull'attributo `hidden` (la regola UA è meno specifica di una d'autore):
        senza questa riga il banner "sola lettura" restava visibile anche agli admin, che i feedback li gestiscono. */
     .fb-admin-banner[hidden] { display: none; }
+    .fb-admin-banner .fb-admin-ko { color: var(--sn-error); }
     /* Stesso contorno morbido del banner admin, così il box si legge come "zona proprietario". */
     .fb-automation {
       margin-bottom: 16px; padding: 4px 14px 12px;
@@ -299,6 +328,7 @@
 
     <div class="fb-admin-banner" id="adminBanner" hidden>
       <span id="adminBannerText">I feedback li vede chi li gestisce: accedi con un account amministratore.</span>
+      <a id="adminMie" class="fb-admin-mie" href="filo://board/board.html#segnalazioni">Le tue segnalazioni</a>
       <button type="button" class="sn-btn" id="adminSignIn">Accedi</button>
     </div>
 
@@ -318,6 +348,7 @@
     <div class="fb-tabs" id="tabs">
       <button type="button" class="fb-tab fb-tab--active" data-tab="inbox">Ricevuti</button>
       <button type="button" class="fb-tab" data-tab="queue">In coda</button>
+      <button type="button" class="fb-tab" data-tab="local">Lavori locali</button>
       <button type="button" class="fb-tab" data-tab="resolved">Risolti</button>
       <button type="button" class="fb-tab" data-tab="archived">Archiviati</button>
     </div>

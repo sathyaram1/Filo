@@ -51,6 +51,12 @@
   flex: 1;
 }
 
+/* Voci della cronologia incolla: contenuto generato, mai un nodo di testo che la ricerca del sito legga
+   (#589.8, patterns/un-pezzo-di-filo-in-un-sito-ubbidisce-solo-all-utente.md). */
+.sn-menu-gentesto::before {
+  content: var(--sn-gentesto, "");
+}
+
 .sn-menu-item-icon {
   flex: 0 0 auto;
   display: inline-flex;
@@ -142,9 +148,12 @@
   gap: 6px;
   padding-right: 4px;
 }
+/* Il corpo è HTML di SN_MARKDOWN (a capo già in <br> e <p>): con pre-wrap
+   gli a capo fra un blocco e l'altro diventerebbero righe vuote. */
 .sn-menu-inline-body {
   flex: 1;
   min-width: 0;
+  white-space: normal;
 }
 .sn-menu-inline-arrow {
   all: unset;
@@ -165,6 +174,26 @@
   color: var(--sn-fg);
 }
 
+/* Riga d'origine dell'immagine: sta in cima al riquadro e non deve prendere
+   il corsivo dell'attesa né il rosso dell'errore di chi le sta sotto. */
+.sn-menu-origine {
+  display: block;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--sn-fg);
+  margin-bottom: 5px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--sn-border);
+}
+/* Una dichiarazione senza firma pesa meno di una firmata, e si vede. */
+.sn-menu-origine.sn-menu-origine-debole {
+  font-weight: 500;
+  color: var(--sn-muted);
+}
+.sn-menu-origine[hidden] { display: none; }
+
 .sn-menu-inline.sn-menu-inline-loading,
 .sn-menu-inline.sn-menu-inline-muted {
   color: var(--sn-muted);
@@ -172,6 +201,16 @@
 }
 .sn-menu-inline.sn-menu-inline-error {
   color: var(--sn-error);
+}
+/* La risposta l'hanno pagata i crediti di Filo (chiave dell'utente rifiutata): non è un errore,
+   la risposta c'è, quindi in tono con la riga del modello. Menu, riquadro della risposta, modifica. */
+.sn-key-fallback {
+  margin-top: 6px;
+  font-size: 12px;
+  font-style: italic;
+  line-height: 1.35;
+  white-space: normal;
+  color: var(--sn-muted);
 }
 
 .sn-menu-paste {
@@ -437,6 +476,9 @@
   color: var(--sn-error, #b94a48);
   font-weight: 600;
   font-size: 11px;
+  /* è una frase, non un'etichetta: deve andare a capo senza allargare il menu */
+  line-height: 1.35;
+  word-break: break-word;
   margin-bottom: 4px;
 }
 .sn-menu-link-body {

@@ -43,13 +43,9 @@
 // la forma della barra, cioè la parte che va tenuta d'occhio — si legge anche
 // dalla sentinella negli unit test, che gira in Node puro e in millisecondi
 // sulla macchina di chi scrive la modifica.
-const MAC = process.platform === 'darwin';
-
-// Tasti che le pagine di Filo gestiscono già da sé: su Windows e Linux la voce
-// mostra la scritta ma NON registra il tasto (là arriva alla pagina, e la
-// pagina sa cosa farne). Su Mac la barra lo registra comunque — ed è per questo
-// che la voce deve fare la cosa giusta.
-const SOLO_SCRITTA = MAC ? {} : { registerAccelerator: false };
+// Il nome di una scorciatoia non si scrive a mano nemmeno qui: su Mac indietro
+// e avanti stanno su un'altra combinazione (src/shared/tasti.js).
+require('../shared/tasti');
 
 // ─── a chi si parla ─────────────────────────────────────────────────────────
 
@@ -127,6 +123,19 @@ function ricarica() {
   try { c && c.tabs.reload(c.tab.id); } catch (_) {}
 }
 
+// Indietro e avanti passano dalla stessa porta di tutte le altre strade
+// (scorciatoia, tasti laterali del mouse, swipe): se non c'è dove andare non
+// succede niente.
+function indietro() {
+  const c = schedaAttiva();
+  try { c && c.tabs.navigaCronologia('indietro', c.tab.id); } catch (_) {}
+}
+
+function avanti() {
+  const c = schedaAttiva();
+  try { c && c.tabs.navigaCronologia('avanti', c.tab.id); } catch (_) {}
+}
+
 function vaiAScrivereUnIndirizzo() {
   const c = schedaAttiva();
   if (c) { try { c.tabs.navigate(c.tab.id, 'filo://newtab/'); } catch (_) {} return; }
@@ -145,6 +154,11 @@ function zoom(verso) {
 function schermoIntero() {
   const win = finestra();
   try { win && win._filoTabs.toggleContentFullscreen(); } catch (_) {}
+}
+
+function barraLaterale() {
+  const win = finestra();
+  try { win && win._filoTabs.barra.commuta('tasto'); } catch (_) {}
 }
 
 function apriPagina(url) {
@@ -183,7 +197,17 @@ async function ripeti() {
 
 // ─── la barra ───────────────────────────────────────────────────────────────
 
-function template() {
+function template(piattaforma) {
+  // La piattaforma si può passare: così la sentinella legge la barra VERA del
+  // Mac anche mentre gira su Windows o Linux, dove quelle voci non si vedono.
+  const MAC = (piattaforma || process.platform) === 'darwin';
+  // Tasti che le pagine di Filo gestiscono già da sé: su Windows e Linux la
+  // voce mostra la scritta ma NON registra il tasto (là arriva alla pagina, e
+  // la pagina sa cosa farne). Su Mac la barra lo registra comunque — ed è per
+  // questo che la voce deve fare la cosa giusta.
+  const SOLO_SCRITTA = MAC ? {} : { registerAccelerator: false };
+  const tasto = (accel) => globalThis.SN_TASTI.acceleratoreElectron(accel, MAC ? 'darwin' : 'win32');
+
   const menuFilo = {
     label: 'Filo',
     submenu: [
@@ -191,6 +215,8 @@ function template() {
       { type: 'separator' },
       { label: 'Preferenze', click: () => apriPagina('filo://preferences/preferences.html') },
       { label: 'Opzioni', click: () => apriPagina('filo://options/options.html') },
+      // Dove si riscatta un invito (#664): fuori dalla pagina, l'invito non aveva altre porte.
+      { label: 'Crediti e inviti', click: () => apriPagina('filo://credits/credits.html') },
       { type: 'separator' },
       ...(MAC ? [
         { role: 'services', label: 'Servizi' },
@@ -209,6 +235,9 @@ function template() {
     submenu: [
       { label: 'Nuova scheda', accelerator: 'CommandOrControl+T', click: nuovaScheda, ...SOLO_SCRITTA },
       { label: 'Nuova finestra in incognito', click: finestraIncognito },
+      { type: 'separator' },
+      { label: 'Indietro', accelerator: tasto('Alt+\u2190'), click: indietro, ...SOLO_SCRITTA },
+      { label: 'Avanti', accelerator: tasto('Alt+\u2192'), click: avanti, ...SOLO_SCRITTA },
       { type: 'separator' },
       { label: 'Vai a un indirizzo', accelerator: 'CommandOrControl+L', click: vaiAScrivereUnIndirizzo, ...SOLO_SCRITTA },
       { label: 'Ricarica', accelerator: 'CommandOrControl+R', click: ricarica, ...SOLO_SCRITTA },
@@ -249,6 +278,7 @@ function template() {
       // SOLO i tasti che Filo fa già ovunque. Un tasto che qui funziona e su
       // Windows no sarebbe la stessa asimmetria da cui nasce tutto #527.
       { label: 'Schermo intero', click: schermoIntero },
+      { label: 'Barra laterale', accelerator: 'CommandOrControl+Shift+B', click: barraLaterale, ...SOLO_SCRITTA },
     ],
   };
 
@@ -275,6 +305,40 @@ function template() {
   return [menuFilo, menuSchede, menuModifica, menuVista, menuFinestra, menuAiuto];
 }
 
+// La barra esegue da sé i suoi tasti registrati quando nessuna pagina li ha usati:
+// chi inoltra tasti lo chiede qui per non far fare la stessa cosa due volte (#838).
+const formeDellaBarra = new Map();
+function formaTasto(mods, tasto) {
+  const NOMI = { plus: '+', left: 'arrowleft', right: 'arrowright' };
+  const k = String(tasto || '').toLowerCase();
+  return `${[...new Set(mods)].sort().join('+')}|${NOMI[k] || k}`;
+}
+function tastoDellaBarra(input, piattaforma = process.platform) {
+  if (!input) return false;
+  if (!formeDellaBarra.has(piattaforma)) {
+    const MAC = piattaforma === 'darwin';
+    const MOD = [
+      [/^(commandorcontrol|cmdorctrl)$/, MAC ? 'meta' : 'control'],
+      [/^(command|cmd|meta|super)$/, 'meta'], [/^(control|ctrl)$/, 'control'],
+      [/^(alt|option)$/, 'alt'], [/^shift$/, 'shift'],
+    ];
+    const forme = new Set();
+    const scendi = (voci) => {
+      for (const v of voci) {
+        if (v.submenu) scendi(v.submenu);
+        if (!v.accelerator || v.registerAccelerator === false) continue;
+        const parti = String(v.accelerator).split('+');
+        const mods = parti.slice(0, -1).map((p) => (MOD.find(([re]) => re.test(p.toLowerCase())) || [])[1]);
+        forme.add(formaTasto(mods, parti[parti.length - 1]));
+      }
+    };
+    scendi(template(piattaforma));
+    formeDellaBarra.set(piattaforma, forme);
+  }
+  const mods = ['meta', 'control', 'alt', 'shift'].filter((m) => input[m]);
+  return formeDellaBarra.get(piattaforma).has(formaTasto(mods, input.key));
+}
+
 // Da chiamare una volta sola, dopo `app.whenReady()`.
 function installaMenuApplicazione() {
   const { Menu, app } = require('electron');
@@ -288,4 +352,4 @@ function installaMenuApplicazione() {
   }
 }
 
-module.exports = { installaMenuApplicazione, template, annulla, ripeti, staScrivendo };
+module.exports = { installaMenuApplicazione, template, tastoDellaBarra, annulla, ripeti, staScrivendo };

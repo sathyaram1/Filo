@@ -28,10 +28,13 @@
   let goThread = null;
   let resetHistory = null;
   let pushHistory = null;
+  let segnaFermato = null;
   let isSending = null;
+  let giaAschermo = null;
   let beginSending = null;
   let runTurnAndContinue = null;
   let isHomeMessageVisible = null;
+  let soloRisposteSenzaCrediti = null;
   let setSuggestions = null;
   let loadDashboard = null;
 
@@ -59,6 +62,9 @@
   // un'altra scheda fa avanzare la stessa intervista.
   function renderOnboardingThread(state) {
     const thread = Array.isArray(state?.thread) ? state.thread : [];
+    // I segni dei cambi chiesti durante l'intervista sopravvivono al ridisegno (#867).
+    const Cambi = global.SN_DASH_CAMBI;
+    const segni = Cambi ? Cambi.fotografa(bubblesEl) : [];
     bubblesEl.innerHTML = '';
     // Lo stato viaggia con l'azzeramento: la home lo usa per legare TUTTA
     // l'intervista a una sola chat in archivio (#525), anche quando si svolge
@@ -70,6 +76,9 @@
       pushHistory({ role, text: m.text });
       bubblesEl.appendChild(makeBubble({ role, text: m.text, markdown: role === 'filo' }));
     }
+    const ultimo = thread[thread.length - 1];
+    if (state.fermato && ultimo && ultimo.role !== 'filo' && segnaFermato) segnaFermato();
+    if (Cambi && segni.length) Cambi.rimetti(bubblesEl, segni);
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
   }
 
@@ -99,6 +108,9 @@
     // se questa home mostrava la riga «abbiamo chiuso a metà», adesso mente.
     if (!onboardingActive) { hideOnboardingNotice(); return; }
     if (isSending()) return;
+    // L'annuncio del turno appena finito QUI arriva anche dopo la risposta: ridisegnare la stessa conversazione
+    // butterebbe via il blocco di attività e i bottoni delle azioni.
+    if (giaAschermo && giaAschermo(state)) return;
     renderOnboardingThread(state);
   }
 
@@ -160,11 +172,17 @@
   // già facendo altro — irrompere in una conversazione in corso sarebbe peggio
   // che aspettare la prossima scheda.
   async function maybeOpenOnboardingLater() {
-    if (onboardingActive || isSending()) return;
-    if (document.body.dataset.state !== 'home') return;
+    if (onboardingActive || isSending() || !nienteDaInterrompere()) return;
     const state = await fetchOnboarding();
-    if (!state || onboardingActive || isSending() || document.body.dataset.state !== 'home') return;
+    if (!state || onboardingActive || isSending() || !nienteDaInterrompere()) return;
     await openOnboarding(state);
+  }
+
+  // Una chat in cui Filo ha solo risposto «servono i crediti» non è una conversazione in corso: chi ha scritto
+  // prima di averli deve vedere Filo presentarsi, non la stessa risposta ferma.
+  function nienteDaInterrompere() {
+    if (document.body.dataset.state === 'home') return true;
+    return Boolean(soloRisposteSenzaCrediti && soloRisposteSenzaCrediti());
   }
 
   // Chiusura: l'ultimo atto non è un "fatto", è il risultato — la prima home
@@ -306,10 +324,13 @@
     goThread = deps.goThread;
     resetHistory = deps.resetHistory;
     pushHistory = deps.pushHistory;
+    segnaFermato = deps.segnaFermato || null;
     isSending = deps.isSending;
+    giaAschermo = deps.giaAschermo || null;
     beginSending = deps.beginSending;
     runTurnAndContinue = deps.runTurnAndContinue;
     isHomeMessageVisible = deps.isHomeMessageVisible;
+    soloRisposteSenzaCrediti = deps.soloRisposteSenzaCrediti;
     setSuggestions = deps.setSuggestions;
     loadDashboard = deps.loadDashboard;
   }

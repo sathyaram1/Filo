@@ -9,6 +9,8 @@ contextBridge.exposeInMainWorld('filoShell', {
   // "Nuova scheda" nomina un tasto, e su Mac quel tasto è un altro. È un dato
   // pubblico del sistema, non un'informazione dell'utente.
   sistema: process.platform,
+  // Dove sta il puntatore quando è fuori dal documento della barra (#428).
+  puntatore: () => ipcRenderer.invoke('shell:puntatore'),
   tabs: {
     open: (url) => ipcRenderer.invoke('tabs:open', { url }),
     close: (id) => ipcRenderer.invoke('tabs:close', { id }),
@@ -37,11 +39,25 @@ contextBridge.exposeInMainWorld('filoShell', {
       ipcRenderer.on('tabs:popup-blocked', wrapped);
       return () => ipcRenderer.removeListener('tabs:popup-blocked', wrapped);
     },
-    openBlockedPopup: (url) => ipcRenderer.invoke('tabs:open-blocked-popup', { url }),
+    // `apriComunque`: solo l'«Apri comunque» della notifica di sito bloccato scavalca la lista.
+    // `daScheda`: la scheda del popup fermato, il cui «Apri comunque» vale anche per il popup.
+    openBlockedPopup: (url, apriComunque, daScheda) => ipcRenderer.invoke('tabs:open-blocked-popup', { url, apriComunque: apriComunque === true, daScheda }),
+    onPermesso: (fn) => {
+      const chiedi = (_event, info) => { try { fn('chiedi', info); } catch (_) {} };
+      const fine = (_event, info) => { try { fn('fine', info); } catch (_) {} };
+      ipcRenderer.on('tabs:permesso', chiedi);
+      ipcRenderer.on('tabs:permesso-fine', fine);
+      return () => { ipcRenderer.removeListener('tabs:permesso', chiedi); ipcRenderer.removeListener('tabs:permesso-fine', fine); };
+    },
+    rispondiPermesso: (id, si) => ipcRenderer.invoke('tabs:permesso-risposta', { id, si }),
+    permessi: (id) => ipcRenderer.invoke('tabs:permessi', { id }),
+    dimenticaPermessi: (id) => ipcRenderer.invoke('tabs:permessi-dimentica', { id }),
     // Proxy per-tab ("Apri da un altro paese") + stato (configurato, location).
     setProxy: (id, country, tier) => ipcRenderer.invoke('tabs:set-proxy', { id, country, tier }),
     clearProxy: (id) => ipcRenderer.invoke('tabs:clear-proxy', { id }),
     proxyStatus: () => ipcRenderer.invoke('tabs:proxy-status'),
+    // Banner dei cookie del sito della scheda: true = mostrali, false = Filo li gestisce di nuovo.
+    cookieBanners: (id, show) => ipcRenderer.invoke('tabs:cookie-banners', { id, show }),
   },
   // Scaricamenti della navigazione (#410.1): la shell legge la cronologia,
   // comanda i singoli download e riceve gli aggiornamenti di avanzamento dal
@@ -51,12 +67,18 @@ contextBridge.exposeInMainWorld('filoShell', {
     list: () => ipcRenderer.invoke('filo:message', { type: 'downloads_list' }),
     clear: () => ipcRenderer.invoke('filo:message', { type: 'downloads_clear' }),
     remove: (id) => ipcRenderer.invoke('filo:message', { type: 'download_remove', id }),
-    openFile: (id) => ipcRenderer.invoke('filo:message', { type: 'download_open_file', id }),
+    // `confirmed` = la shell ha già mostrato la seconda conferma su un
+    // programma (#588); senza, il main risponde needsConfirm e non apre niente.
+    openFile: (id, confirmed) => ipcRenderer.invoke('filo:message', { type: 'download_open_file', id, confirmed: !!confirmed }),
+    // Risposta all'avviso "questo è un programma: scaricarlo?".
+    confirm: (id, allow) => ipcRenderer.invoke('filo:message', { type: 'download_confirm', id, allow: !!allow }),
     openFolder: (id) => ipcRenderer.invoke('filo:message', { type: 'download_open_folder', id }),
     cancel: (id) => ipcRenderer.invoke('filo:message', { type: 'download_cancel', id }),
     pause: (id) => ipcRenderer.invoke('filo:message', { type: 'download_pause', id }),
     resume: (id) => ipcRenderer.invoke('filo:message', { type: 'download_resume', id }),
-    // Aggiornamenti live: { kind:'start'|'progress'|'done'|'error', item }
+    // #950 — rimette il nome con cui il file era arrivato (l'«Annulla» dell'avviso «Nome dato»).
+    rimettiNome: (id) => ipcRenderer.invoke('filo:message', { type: 'download_rimetti_nome', id }),
+    // Aggiornamenti live: { kind:'start'|'progress'|'done'|'error'|'missing'|'removed'|'ask', item }
     onEvent: (fn) => {
       const wrapped = (_event, info) => { try { fn(info); } catch (_) {} };
       ipcRenderer.on('shell:download', wrapped);
@@ -73,17 +95,44 @@ contextBridge.exposeInMainWorld('filoShell', {
   // L'agente "Aiuto" può azionare i comandi rapidi della barra (le icone in
   // alto) chiedendo al main, che inoltra qui: la shell clicca il bottone reale.
   onTriggerButton: (fn) => {
-    const wrapped = (_event, info) => { try { fn(info && info.command); } catch (_) {} };
+    const wrapped = (_event, info) => { try { fn(info && info.command, info && info.anchor); } catch (_) {} };
     ipcRenderer.on('shell:trigger-button', wrapped);
     return () => ipcRenderer.removeListener('shell:trigger-button', wrapped);
   },
   tooltipShow: (text, x, y) => ipcRenderer.send('shell:tooltip-show', { text, x, y }),
   tooltipHide: () => ipcRenderer.send('shell:tooltip-hide'),
+  // #430 — la carta con l'anteprima della scheda sotto il puntatore.
+  anteprima: {
+    prepara: () => ipcRenderer.send('anteprima:prepara'),
+    mostra: (dati) => ipcRenderer.send('anteprima:mostra', dati),
+    nascondi: () => ipcRenderer.send('anteprima:nascondi'),
+  },
   // §2.3 — toast informativo (es. "Tab riordinate e salvate in cronologia").
   onToast: (fn) => {
     const wrapped = (_event, info) => { try { fn(info); } catch (_) {} };
     ipcRenderer.on('shell:toast', wrapped);
     return () => ipcRenderer.removeListener('shell:toast', wrapped);
+  },
+  // #588.5 — la pila degli avvisi va a schermo in una vista sopra la pagina; i suoi clic tornano qui.
+  avvisi: {
+    stato: (stato) => ipcRenderer.send('avvisi:stato', stato),
+    onAzione: (fn) => {
+      const wrapped = (_event, dati) => { try { fn(dati); } catch (_) {} };
+      ipcRenderer.on('avvisi:azione', wrapped);
+      return () => ipcRenderer.removeListener('avvisi:azione', wrapped);
+    },
+    onSopra: (fn) => {
+      const wrapped = (_event, dati) => { try { fn(dati); } catch (_) {} };
+      ipcRenderer.on('avvisi:sopra', wrapped);
+      return () => ipcRenderer.removeListener('avvisi:sopra', wrapped);
+    },
+  },
+  // #871 — la barra laterale: la shell le passa tema e profilo, e la apre dalla maniglia.
+  barra: {
+    stato: (dati) => ipcRenderer.send('barra:dalla-shell', dati),
+    commuta: () => ipcRenderer.send('barra:commuta'),
+    chiudi: () => ipcRenderer.send('barra:chiudi'),
+    menu: (x, y) => ipcRenderer.send('barra:menu-maniglia', { x, y }),
   },
   // Modalità annotazione del box feedback: la shell mette/toglie un velo
   // d'ombra sopra la propria barra in alto così tutto Filo va in penombra.

@@ -23,6 +23,13 @@
   if (!FS || !MR) {
     throw new Error('feedback.js: carica shared/feedbackTransitions.js, feedbackStatus.js e manageReview.js prima di questa pagina');
   }
+  // Il giro dal vivo, lo stesso della Gestione (feedbackLive.js + feedbackLivePagina.js).
+  const LIVE = window.SN_FEEDBACK_LIVE;
+  const PAG = window.SN_FEEDBACK_LIVE_PAGINA;
+  // Note e frase partono dopo una pausa e a ogni uscita (Ctrl, cambio o chiusura della scheda): la regola delle caselle.
+  const caselleTesti = window.SN_CASELLE.crea();
+  const PAUSA_TESTI_MS = 1500;
+  let live = null;
 
   const listEl = document.getElementById('list');
   const emptyEl = document.getElementById('empty');
@@ -76,17 +83,19 @@
     return Promise.reject(new Error('canale main non disponibile'));
   }
 
-  // Le quattro sezioni della macchina a stati, le stesse della dashboard di
+  // Le sezioni della macchina a stati, le stesse della dashboard di
   // gestione: 'inbox' Ricevuti (aspettano una decisione dell'owner), 'queue'
-  // In coda (l'iter di lavorazione), 'resolved' Risolti (fix usciti davvero in
+  // In coda (l'iter di lavorazione), 'local' Lavori locali (la stessa coda, che
+  // le routine non prendono: #908), 'resolved' Risolti (fix usciti davvero in
   // una versione rilasciata), 'archived' Archiviati.
-  const TABS = ['inbox', 'queue', 'resolved', 'archived'];
+  const TABS = ['inbox', 'queue', 'local', 'resolved', 'archived'];
   const TAB_LABELS = {
-    inbox: 'Ricevuti', queue: 'In coda', resolved: 'Risolti', archived: 'Archiviati',
+    inbox: 'Ricevuti', queue: 'In coda', local: 'Lavori locali', resolved: 'Risolti', archived: 'Archiviati',
   };
   const TAB_EMPTY = {
     inbox: 'Nessun feedback in attesa di una tua decisione.',
     queue: 'Nessun feedback in lavorazione.',
+    local: 'Nessun lavoro locale.',
     resolved: 'Nessun fix uscito in una versione rilasciata.',
     archived: 'Nessun feedback archiviato.',
   };
@@ -113,6 +122,14 @@
   // reale partito all'apertura — che sui feedback veri richiede secondi —
   // atterrerebbe DOPO e sovrascriverebbe quello più recente.
   let loadGen = 0;
+  // Le richieste di fusione del server (solo l'owner le legge): una che aspetta il suo sì porta la pratica nei
+  // Ricevuti anche con lo stato rimasto indietro. Stessa regola delle sezioni della Gestione (MR.manageTabFor).
+  let fusioni = { pending: [], failed: [], recent: [], preapproved: [] };
+  // Il più vecchio caricato, quando il caricamento si è fermato al tetto: il giro non porta dentro i più vecchi.
+  let sogliaFinestra = null;
+  function opzSezioni() {
+    return { releasedVersion, fusioni };
+  }
 
   // Stato CANONICO di un feedback (spec FEEDBACK-STATES.md §2). Unica porta
   // d'ingresso: normalizeStatus scioglie anche gli stati legacy dello storico
@@ -126,7 +143,7 @@
 
   // Sezione di un feedback: la STESSA funzione della dashboard di gestione.
   function tabOf(f) {
-    return MR.manageTabFor(f, { releasedVersion });
+    return MR.manageTabFor(f, opzSezioni());
   }
 
   // ── Quando lo stato non si legge, le sezioni non si disegnano ─────────────
@@ -148,8 +165,12 @@
   //     normalizza). I sub-feedback di una routine portano lo stesso prefisso ma
   //     nascono `todo`/`design`: NON sono ritrovamenti d'agente, quindi qui si
   //     escludono col vincolo sullo stato.
+  // #595: un prefisso riservato senza prova del mittente vale come un utente, anche nei colori e nei filtri.
+  function mittenteDi(f) {
+    return MR.effectiveClientId(f);
+  }
   function isAgent(f) {
-    const c = String(f.clientId || '');
+    const c = mittenteDi(f);
     if (c.startsWith('agent:')) return true;
     if (c.startsWith('routine:') && statusOf(f) === 'unlabeled') return true;
     return false;
@@ -157,7 +178,7 @@
   // Origine del feedback (per la colorazione di card/bolle). Delega alla logica
   // condivisa così dashboard e main usano la stessa classificazione.
   function originOf(f) {
-    const c = String(f.clientId || '');
+    const c = mittenteDi(f);
     if (window.SN_FEEDBACK_THREAD && SN_FEEDBACK_THREAD.originOf) return SN_FEEDBACK_THREAD.originOf(c);
     if (c.startsWith('owner:')) return 'owner';
     if (c.startsWith('agent:')) return 'agent';
@@ -242,6 +263,16 @@
       : '';
     return `<span class="fb-state" title="${escapeHtml(b.hint)}">${dot}${escapeHtml(b.label)}`
       + `${b.showReason ? ` <span class="fb-state-reason">— ${escapeHtml(b.reasonText)}</span>` : ''}</span>`;
+  }
+
+  // Una fusione ferma è il motivo per cui una pratica con uno stato di lavoro sta nei Ricevuti: la scheda lo dice.
+  // Il sì si dà in Gestione, dove c'è la richiesta con quello che ha fermato i controlli.
+  function fusioneChipHtml(f) {
+    const l5 = MR.livelloL5(f, { fusioni });
+    if (!l5 || (l5.esito !== 'bloccato' && l5.esito !== 'conflitto')) return '';
+    const testo = l5.esito === 'conflitto' ? 'fusione non avvenuta' : 'fusione ferma';
+    const titolo = `${(l5.pannello && l5.pannello.testo) || ''} Si decide in Gestione.`.trim();
+    return `<span class="fb-fusione" title="${escapeHtml(titolo)}">${escapeHtml(testo)}</span>`;
   }
 
   function fmtTs(ts) {
@@ -683,7 +714,7 @@
     if (!s) return { head: '', tail: '' };
     const T = window.SN_FEEDBACK_THREAD;
     if (!T || !T.USER_TURN_RE) return { head: s, tail: '' };
-    const lines = s.split('\n');
+    const lines = T.righe ? T.righe(s) : s.split('\n');
     for (let i = 0; i < lines.length; i++) {
       if (T.USER_TURN_RE.test(lines[i]) || (T.MODEL_TURN_RE && T.MODEL_TURN_RE.test(lines[i]))) {
         const head = lines.slice(0, i).join('\n').replace(/\n+$/, '');
@@ -720,6 +751,13 @@
         + 'Salvare adesso lo sostituirebbe con quello che vedi a schermo. Configura la chiave e riprova.');
       return false;
     }
+    // Stessa regola, altro motivo: la conversazione non è mai arrivata, quindi
+    // la casella è vuota perché non sappiamo, non perché non c'è niente.
+    if (item._dettaglioMancato && payload && typeof payload.notes === 'string') {
+      alert('Il resto di questa segnalazione non è arrivato: salvare adesso sostituirebbe la conversazione '
+        + 'con quello che vedi a schermo. Premi «Aggiorna» e riprova.');
+      return false;
+    }
     // Un cambio di stato passa SOLO se è una delle azioni che la segnalazione
     // offre in questo momento (la stessa tabella che disegna i pulsanti). Il
     // guardiano sta qui e non sui pulsanti: uno stato può essere cambiato
@@ -738,6 +776,7 @@
       status: item.status, notes: item.notes, userNote: item.userNote,
       priority: item.priority, reviewDecision: item.reviewDecision,
       archiveOverride: item.archiveOverride, starred: item.starred,
+      localOnly: item.localOnly, localApproval: item.localApproval,
     };
     Object.assign(item, optimistic);
     if (!silenzioso && !inPlace) applyFilter();
@@ -765,6 +804,7 @@
   // dashboard di gestione legge la stessa tabella, quindi sulla stessa
   // segnalazione le due pagine offrono le stesse azioni per costruzione. Qui
   // resta solo il MODO di disegnarle (pulsanti dentro la scheda).
+  const TITOLO_LAVORO_LOCALE = 'Diventa un lavoro locale. Nessuna routine lo prende, lo chiude una sessione e la fusione non aspetta il tuo sì.';
   function actionsFor(f) {
     // Non-admin: niente pulsanti d'azione (sola lettura).
     if (!isAdmin) return '';
@@ -781,8 +821,10 @@
       if (a.kind === 'reopen') {
         return `<button class="sn-btn sn-btn-secondary fb-reopen-start" data-id="${id}">${escapeHtml(a.label)}</button>`;
       }
+      // #913: «Lavoro locale» scrive anche il segno e il sì dell'owner, come nella gemella.
+      const locale = a.locale ? ` data-local="1" title="${escapeHtml(TITOLO_LAVORO_LOCALE)}"` : '';
       return `<button class="sn-btn${a.primary ? '' : ' sn-btn-secondary'} fb-act"`
-        + ` data-id="${id}" data-to="${escapeHtml(a.to)}"${EXTRA[a.kind] || ''}>${escapeHtml(a.label)}</button>`;
+        + ` data-id="${id}" data-to="${escapeHtml(a.to)}"${EXTRA[a.kind] || ''}${locale}>${escapeHtml(a.label)}</button>`;
     }).join('\n');
   }
 
@@ -836,7 +878,7 @@
   // troverà davvero.
   function esitoDi(item, optimistic) {
     const dopo = Object.assign({}, item, optimistic);
-    const dest = MR.manageTabFor(dopo, { releasedVersion });
+    const dest = MR.manageTabFor(dopo, opzSezioni());
     const nome = TAB_LABELS[dest];
     if (!nome || dest === currentTab) return 'Fatto';
     return `Spostata in «${nome}»`;
@@ -910,6 +952,7 @@
     }
     updateTabCounts();
     aggiornaTotale();
+    provaRidisegno();
   }
 
   // Cattura il campo (textarea/input) attualmente a fuoco dentro la lista, se
@@ -954,7 +997,9 @@
     // decise lasciano il posto, e l'unico in cui la lista si rimescola.
     decise.clear();
     disegnate = items.length;
-    countEl.textContent = items.length ? `${items.length} feedback` : '';
+    // A zero il contatore resta: è proprio lì che dice «la ricerca non ha trovato
+    // niente» (#511). Muto solo finché i dati non sono arrivati.
+    countEl.textContent = dataLoaded ? `${items.length} feedback` : '';
     if (!items.length) {
       listEl.innerHTML = '';
       emptyEl.hidden = false;
@@ -1002,7 +1047,9 @@
       // che sceglieva così cosa si leggeva e dove si finiva (#582, giro 3).
       const safeUrl = safeHref(url);
       const ua = (f.userAgent || '').slice(0, 80);
-      const cid = (f.clientId || '').slice(0, 12);
+      // #912: un utente che si era dato un nome riservato si legge senza quella firma, come in Gestione.
+      const cidGrezzo = String(f.clientId || '');
+      const cid = (originOf(f) === 'user' ? cidGrezzo.replace(/^(non-provato:)?(owner|routine|agent|local):/i, '') : cidGrezzo).slice(0, 12);
       const text = escapeHtml(f.text || '(senza testo)');
       // Allegati della SEGNALAZIONE originale: vivono nei campi piatti images/files.
       const imgsHtml = imagesGridHtml(Array.isArray(f.images) ? f.images : []);
@@ -1039,7 +1086,7 @@
       // blocco. Gli allegati vivono nella bolla della segnalazione.
       const turns = window.SN_FEEDBACK_THREAD ? SN_FEEDBACK_THREAD.parse(f) : [];
       const convoTurns = turns.filter((t) => t.kind !== 'report');
-      const reportRole = window.SN_FEEDBACK_THREAD && SN_FEEDBACK_THREAD.isFromModel(f.clientId) ? 'model' : 'user';
+      const reportRole = window.SN_FEEDBACK_THREAD && SN_FEEDBACK_THREAD.isFromModel(mittenteDi(f)) ? 'model' : 'user';
       const reportWho = reportRole === 'model' ? 'Agente' : 'Segnalazione';
       // Note editabili (textarea) dove l'admin sta lavorando: Ricevuti e In
       // coda. "Ricevuti" è incluso così si può COMMENTARE un feedback appena
@@ -1048,8 +1095,11 @@
       // La routine ha domande: `design` con motivo `clarify`. Vive nei Ricevuti
       // (è una decisione che aspetta l'owner), non più in una sezione sua.
       const clarifyReply = isAdmin && MR.aspettaRisposta(f);
-      const notesEditable = isAdmin && !f.reportIllegibile && !clarifyReply
-        && (currentTab === 'inbox' || currentTab === 'queue');
+      // Con la conversazione non arrivata la casella non si offre: quello che
+      // ci si scrive dentro non si può salvare (sostituirebbe il report), e
+      // offrirla vorrebbe dire far scrivere l'owner per niente.
+      const notesEditable = isAdmin && !f.reportIllegibile && !clarifyReply && !f._dettaglioMancato
+        && (currentTab === 'inbox' || currentTab === 'queue' || currentTab === 'local');
       // Render di un turno come bolla di sola lettura (segnalazione esclusa).
       const convoBubble = (t) => {
         const who = (t.kind === 'note' || t.role === 'model') ? 'Filo' : 'Tu';
@@ -1058,7 +1108,11 @@
         const atts = Array.isArray(t.attachments) ? t.attachments : [];
         const tImgs = atts.filter((a) => a && a.kind === 'img').map((a) => a.url);
         const tFiles = atts.filter((a) => a && a.kind === 'file');
-        const bodyHtml = t.body ? `<div class="fb-bubble-body">${escapeHtml(t.body)}</div>` : '';
+        // Il turno di Filo è il markdown di un modello: lo stesso formattatore della chat, come in Gestione.
+        const corpo = who === 'Filo' && window.SN_MARKDOWN
+          ? `<div class="filo-md">${window.SN_MARKDOWN.render(t.body)}</div>`
+          : escapeHtml(t.body);
+        const bodyHtml = t.body ? `<div class="fb-bubble-body">${corpo}</div>` : '';
         return `
           <div class="fb-bubble fb-bubble--${t.role}">
             <div class="fb-bubble-head"><span class="fb-bubble-who">${who}</span>${tsLabel}</div>
@@ -1101,7 +1155,18 @@
       } else {
         convoHtml = convoTurns.map(convoBubble).join('');
       }
-      const threadHtml = `<div class="fb-thread">${reportBubble}${convoHtml}</div>`;
+      // Il resto non è arrivato: si dice, con le stesse parole della gemella in
+      // Gestione e con lo stesso tasto. Senza, la scheda si disegnava come se
+      // la conversazione fosse vuota e l'owner decideva su metà segnalazione.
+      const mancatoHtml = f._dettaglioMancato
+        ? `<div class="fb-bubble fb-bubble--model fb-dettaglio-mancato">
+             <div class="fb-bubble-body"><em>${f._dettaglioMancato === 'sparito'
+               ? 'Il resto di questa segnalazione non è arrivato: sul server non c&#39;è più.'
+               : 'Il resto di questa segnalazione non è arrivato: controlla la connessione.'}</em></div>
+             <button type="button" class="fb-load-retry fb-riprova-dettaglio" data-id="${escapeHtml(f._id)}">↻ Riprova</button>
+           </div>`
+        : '';
+      const threadHtml = `<div class="fb-thread">${reportBubble}${convoHtml}${mancatoHtml}</div>`;
       const tailThreadHtml = tailBubblesHtml ? `<div class="fb-thread fb-thread--tail">${tailBubblesHtml}</div>` : '';
       // Su "Ricevuti" la casella è un COMMENTO al volo (poi lo metti in coda);
       // altrove è la nota di triage/decisioni di design.
@@ -1138,10 +1203,11 @@
            </div>`
         : '';
       return `
-        <article class="fb-card fb-card--${escapeHtml(statusOf(f))} fb-card--tab-${escapeHtml(tabOf(f) || 'inbox')} fb-card--origin-${origin}${agent ? ' fb-card--agent' : ''}" data-id="${escapeHtml(f._id)}">
+        <article class="fb-card fb-card--${escapeHtml(statusOf(f))} fb-card--tab-${escapeHtml(tabOf(f) || 'inbox')} fb-card--origin-${origin}${agent ? ' fb-card--agent' : ''}${arrivata(f) ? ' fb-card--arrivata' : ''}" data-id="${escapeHtml(f._id)}">
           <div class="fb-meta">
             <span>${escapeHtml(when)}</span>
             ${stateBadgeHtml(f)}
+            ${fusioneChipHtml(f)}
             ${safeUrl ? `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener" title="${escapeHtml(safeUrl)}">${escapeHtml(SN_FEEDBACK.linkLabel(safeUrl) || url.slice(0, 80))}</a>` : (url ? `<span title="${escapeHtml(url)}">${escapeHtml(url.slice(0, 80))}</span>` : '')}
             ${!agent && cid ? `<span>client: ${escapeHtml(cid)}</span>` : ''}
             ${!agent && ua ? `<span title="${escapeHtml(ua)}">UA</span>` : ''}
@@ -1158,6 +1224,10 @@
         </article>
       `;
     }).join('');
+
+    listEl.querySelectorAll('.fb-riprova-dettaglio').forEach((btn) => {
+      btn.addEventListener('click', () => riprovaDettaglio(btn.dataset.id));
+    });
 
     listEl.querySelectorAll('.fb-imgs img').forEach((img) => {
       img.addEventListener('click', () => {
@@ -1221,6 +1291,12 @@
           payload.reviewDecision = 'accepted';
           payload.reviewedAt = new Date().toISOString();
           ottimistico.reviewDecision = 'accepted';
+        }
+        if (b.dataset.local) {
+          payload.localOnly = true;
+          payload.localApproval = true;
+          ottimistico.localOnly = { by: 'te', at: Date.now() };
+          ottimistico.localApproval = { by: 'te', at: Date.now() };
         }
         if (b.dataset.reject) {
           payload.reviewDecision = 'rejected';
@@ -1403,8 +1479,9 @@
     // Salvataggio note: debounce su input + blur. Salva capo (testo + allegati)
     // ricomposto con la coda (notesValueOf).
     root.querySelectorAll('.fb-notes').forEach((ta) => {
-      let timer;
+      const nome = `note:${ta.dataset.id}`;
       const flush = () => {
+        caselleTesti.spedita(nome);
         const id = ta.dataset.id;
         const item = all.find((f) => f._id === id);
         if (!item) return;
@@ -1412,12 +1489,9 @@
         if (item.notes === v) return;
         patch(id, { notes: v }, { notes: v }, { silenzioso: true });
       };
+      caselleTesti.registra(nome, flush);
       ta.addEventListener('blur', flush);
-      ta._salvaInSospeso = flush;
-      ta.addEventListener('input', () => {
-        clearTimeout(timer);
-        timer = setTimeout(flush, 1500);
-      });
+      ta.addEventListener('input', (e) => caselleTesti.cambiato(nome, e, { pausa: PAUSA_TESTI_MS }));
     });
 
     // La frase per chi ha segnalato: stesso salvataggio delle note (debounce +
@@ -1425,8 +1499,9 @@
     // era l'unica strada da cui quella metà si perdeva: chiudendo un feedback
     // col pulsante, a chi l'aveva mandato restava solo la riga generica.
     root.querySelectorAll('.fb-usernote').forEach((input) => {
-      let timer;
+      const nome = `frase:${input.dataset.id}`;
       const flush = () => {
+        caselleTesti.spedita(nome);
         const id = input.dataset.id;
         const item = all.find((f) => f._id === id);
         if (!item) return;
@@ -1434,24 +1509,10 @@
         if (String(item.userNote || '') === v) return;
         patch(id, { userNote: v }, { userNote: v }, { silenzioso: true });
       };
+      caselleTesti.registra(nome, flush);
       input.addEventListener('blur', flush);
-      input._salvaInSospeso = flush;
-      input.addEventListener('input', () => {
-        clearTimeout(timer);
-        timer = setTimeout(flush, 1500);
-      });
+      input.addEventListener('input', (e) => caselleTesti.cambiato(nome, e, { pausa: PAUSA_TESTI_MS }));
     });
-  }
-
-  // Chiudere la scheda o spegnere Filo non passa dal blur: quello che aspetta
-  // la pausa di scrittura non partirebbe mai piu.
-  function salvaTestiInSospeso() {
-    for (const el of document.querySelectorAll('.fb-notes, .fb-usernote')) {
-      try { el._salvaInSospeso && el._salvaInSospeso(); } catch (_) {}
-    }
-  }
-  for (const uscita of ['pagehide', 'beforeunload']) {
-    window.addEventListener(uscita, salvaTestiInSospeso);
   }
 
   // Rimette i pulsanti originali di una scheda AL SUO POSTO, senza toccare il
@@ -1490,14 +1551,154 @@
     const t = tab || currentTab;
     // "Archiviati" ha regole sue (i confermati, i preferiti): la sua lista la
     // costruisce listArchiveTab, esattamente come nella gemella.
-    return t === 'archived'
-      ? MR.listArchiveTab(all, { releasedVersion })
-      : MR.listForManageTab(all, t, { releasedVersion });
+    if (t === 'archived') return MR.listArchiveTab(all, opzSezioni());
+    // Le fusioni ferme davanti, con qualsiasi ordine: sono decisioni che aspettano l'owner, come in Gestione.
+    return MR.fusioniFermeInCima(MR.listForManageTab(all, t, opzSezioni()), opzSezioni());
   }
 
   function sectionItems(tab) {
     const items = sectionBase(tab);
     return agentOnly ? items.filter(isAgent) : items;
+  }
+
+  // ── Qui la scheda È il dettaglio ─────────────────────────────────────────
+  //
+  // Ogni scheda mostra la conversazione intera, gli allegati, il testo: il
+  // caricamento non può chiederli per tutti, o si torna ai dieci MB per
+  // apertura. Li chiede per la SEZIONE che si sta guardando, una volta sola
+  // (chi è già completo non si ridomanda), e lo dice mentre lo fa.
+  const DETTAGLI_PER_VOLTA = 200;
+
+  // Le richieste già partite, per id. Ogni gesto fatto durante l'attesa (una
+  // lettera nella ricerca, un cambio di sezione, la casella «Solo automatici»)
+  // ridisegna, e senza questo registro ogni ridisegno ricomprava la sezione
+  // intera: dodici lettere, tredici volte gli stessi documenti.
+  const dettagliInCorso = new Map();
+
+  async function completaDettagli(ids) {
+    const attese = [];
+    const nuovi = [];
+    for (const id of ids) {
+      const inCorso = dettagliInCorso.get(id);
+      if (inCorso) attese.push(inCorso);
+      else nuovi.push(id);
+    }
+    if (nuovi.length) {
+      const giro = chiediDettagli(nuovi);
+      for (const id of nuovi) dettagliInCorso.set(id, giro);
+      attese.push(giro.finally(() => {
+        // Solo i propri: un giro più recente può già aver preso in carico un id
+        // che questo non è riuscito a completare.
+        for (const id of nuovi) if (dettagliInCorso.get(id) === giro) dettagliInCorso.delete(id);
+      }));
+    }
+    await Promise.all(attese);
+  }
+
+  // Il marchio «questa lettura non è tornata» sulle righe di un blocco: la
+  // scheda lo dice e offre di riprovare, e nessun ridisegno la ricompra.
+  function segnaMancate(chiesti, motivo) {
+    all = all.map((f) => {
+      if (!chiesti.has(f._id)) return f;
+      const { _proiezione, ...resto } = f;
+      return { ...resto, _dettaglioMancato: motivo };
+    });
+  }
+
+  // Riprova la lettura di UNA segnalazione, su richiesta di chi guarda.
+  function riprovaDettaglio(id) {
+    all = all.map((f) => {
+      if (f._id !== id) return f;
+      const { _dettaglioMancato, ...resto } = f;
+      return { ...resto, _proiezione: true };
+    });
+    applyFilter();
+  }
+
+  // Che cosa serve davvero del documento intero. Quando NESSUNO stato si
+  // legge, su questo computer manca la chiave privata: la conversazione non
+  // comparirà in nessun caso, quindi chiederla vorrebbe dire pagare cento KB a
+  // segnalazione per buttarli. Restano gli allegati, che si vedono lo stesso.
+  // `null` = il documento intero, il caso normale.
+  function campiDettaglio() {
+    return sezioniAttendibili() ? null : ['images', 'files', 'userNote'];
+  }
+
+  async function chiediDettagli(ids) {
+    for (let i = 0; i < ids.length; i += DETTAGLI_PER_VOLTA) {
+      const pezzo = ids.slice(i, i + DETTAGLI_PER_VOLTA);
+      // Il gruppo di QUESTO blocco, non tutti: togliere il marchio a chi non è
+      // ancora stato chiesto lo lascerebbe per sempre senza conversazione.
+      const chiesti = new Set(pezzo);
+      let rows;
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        rows = await SN_FEEDBACK.getMany(pezzo, { timeoutMs: 20000, fields: campiDettaglio() });
+      } catch (e) {
+        // La lettura non è tornata. Va SCRITTO sulle righe, o al ridisegno
+        // dopo il primo gesto (una lettera nella ricerca, un cambio di
+        // sezione) sembrerebbero ancora da chiedere e ripartirebbero: la
+        // stessa spesa, moltiplicata per i gesti fatti nell'attesa.
+        segnaMancate(chiesti, 'rete');
+        throw e;
+      }
+      if (isAdmin && rows.length > 0) {
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          const r = await sendToMain({ type: 'feedback_decrypt_fields', list: rows });
+          if (r && r.ok && Array.isArray(r.list)) rows = r.list;
+        } catch (_) { /* come al caricamento: valori cifrati piuttosto che niente */ }
+      }
+      const perId = new Map(rows.map((r) => [String(r && r._id), r]));
+      all = all.map((f) => {
+        if (!chiesti.has(f._id)) return f;
+        const pieno = perId.get(f._id);
+        // Il marchio si toglie ANCHE a chi non è tornato (cancellato nel
+        // frattempo): lasciarcelo rimanderebbe la pagina a richiederlo in
+        // eterno, un giro di caricamento dopo l'altro. Ma la scheda lo disegna
+        // senza conversazione, e su una conversazione mai letta un salvataggio
+        // scrive al posto del report: chi scrive deve saperlo.
+        if (!pieno) { const { _proiezione, _dettaglioVecchio, ...resto } = f; return { ...resto, _dettaglioMancato: 'sparito' }; }
+        const { _proiezione, _dettaglioVecchio, ...resto } = f;
+        // Della riga vale quello che sa un elenco; i campi del dettaglio sono la copia di prima del giro, e sopra il
+        // documento appena letto cancellerebbero proprio il turno nuovo. Stessa regola della Gestione.
+        for (const campo of (SN_FEEDBACK.CAMPI_DETTAGLIO || [])) delete resto[campo];
+        // `pieno` porta con sé il marchio della proiezione quando abbiamo
+        // chiesto i soli allegati: toglierlo qui, o la riga resterebbe per
+        // sempre «da completare» e la pagina la richiederebbe a ogni disegno.
+        const fuso = { ...pieno, ...resto };
+        delete fuso._proiezione;
+        if (campiDettaglio()) {
+          // Senza la chiave il report non si legge comunque: al suo posto va
+          // la frase in chiaro, e la casella resta spenta.
+          fuso.notes = String(fuso.userNote || '').trim();
+          fuso.reportIllegibile = true;
+          return fuso;
+        }
+        return sanitizeReportForReader(fuso);
+      });
+    }
+  }
+
+  // Torna true se la sezione non è ancora completa: allora disegna l'attesa e
+  // ridisegnerà da sé. `applyFilter` si ferma qui.
+  function inAttesaDiDettagli(items) {
+    const mancanti = items.filter((f) => SN_FEEDBACK.soloLista(f)).map((f) => f._id).filter(Boolean);
+    if (!mancanti.length) return false;
+    listEl.innerHTML = '<div class="fb-empty">Caricamento…</div>';
+    emptyEl.hidden = true;
+    countEl.textContent = '';
+    const gen = loadGen;
+    completaDettagli(mancanti)
+      .then(() => { if (gen === loadGen) applyFilter(); })
+      .catch((e) => {
+        if (gen !== loadGen) return;
+        console.error('[feedback] dettagli non caricati:', e);
+        showLoadError((window.SN_CHAT_ERRORS && SN_CHAT_ERRORS.sentence)
+          ? SN_CHAT_ERRORS.sentence(e)
+          : 'Non è stato possibile caricare questi feedback: controlla la connessione e riprova.');
+      });
+    return true;
   }
 
   // Mostra o nasconde la barra delle sezioni. Non è una decorazione: se gli
@@ -1519,6 +1720,10 @@
     const q = (searchEl.value || '').trim().toLowerCase();
     const sezioni = mostraSezioni();
     const base = sectionItems();
+    // I numeri delle sezioni si sanno già dalla proiezione: si scrivono subito,
+    // anche mentre le schede di questa sezione stanno arrivando.
+    if (sezioni) updateTabCounts();
+    if (inAttesaDiDettagli(base)) return;
     const filtered = q
       ? base.filter((f) => {
           const num = SN_FEEDBACK.formatNum(f.seq, f.subSeq);
@@ -1545,8 +1750,9 @@
         return ka.seq - kb.seq || ka.sub - kb.sub;
       });
     }
-    if (sezioni) updateTabCounts();
     render(filtered);
+    // Una scheda che il giro ha toccato si disegna con la conversazione che c'era, e si rilegge in sottofondo.
+    if (base.some((f) => f._dettaglioVecchio && !f._dettaglioMancato)) ridisegnaDalVivo();
   }
 
   function updateTabCounts() {
@@ -1557,7 +1763,7 @@
     // gestione: manageTabCounts è la funzione che conta anche là (#509).
     const counts = agentOnly
       ? TABS.reduce((acc, t) => { acc[t] = sectionItems(t).length; return acc; }, {})
-      : MR.manageTabCounts(all, { releasedVersion });
+      : MR.manageTabCounts(all, opzSezioni());
     // Il caricamento si ferma ai più recenti: quando li ha presi tutti fino al
     // tetto, questi numeri sono minimi e lo dicono con un "+" (#495). Restare
     // su "(312)" quando ce ne sono 400 sembra una risposta, e non lo è.
@@ -1565,9 +1771,13 @@
     // non si scrive nessun numero: "(0)" direbbe "qui non c'è niente" mentre la
     // verità è che non lo sappiamo ancora.
     const capped = dataLoaded && SN_FEEDBACK.listHitCap(all, SN_FEEDBACK.LIST_PAGE_SIZE);
+    // Una sezione dove è arrivato qualcosa a pagina aperta lo dice sulla linguetta, finché non lo si tocca.
+    const conArrivi = new Set();
+    if (live && live.arrivate.size) for (const f of all) if (arrivata(f)) conArrivi.add(tabOf(f));
     for (const tab of TABS) {
       const btn = tabsEl.querySelector(`[data-tab="${tab}"]`);
       if (!btn) continue;
+      btn.classList.toggle('fb-tab--arrivi', conArrivi.has(tab));
       const label = TAB_LABELS[tab];
       btn.textContent = dataLoaded
         ? `${label} ${SN_FEEDBACK.countLabel(counts[tab] || 0, capped)}`
@@ -1621,6 +1831,8 @@
     const gen = ++loadGen;
     listEl.innerHTML = '<div class="fb-empty">Caricamento…</div>';
     emptyEl.hidden = true;
+    // Le richieste di fusione viaggiano insieme alla lista: la prima sezione disegnata è già quella giusta.
+    const letturaFusioni = isAdmin ? leggiFusioni() : Promise.resolve(null);
     // DB3: la versione dell'app in esecuzione è l'ultima rilasciata. Serve al
     // gate di "Risolti" — la stessa domanda che si fa la gemella, con la stessa
     // risposta, o un `done` non ancora uscito starebbe in due sezioni diverse.
@@ -1633,7 +1845,12 @@
     try {
       // timeoutMs: offline la fetch resta muta ~13 s prima che il sistema la
       // lasci cadere. Ci arrendiamo prima e mostriamo l'errore (con Riprova).
-      let list = await SN_FEEDBACK.list({ pageSize: SN_FEEDBACK.LIST_PAGE_SIZE, timeoutMs: 8000 });
+      // La PROIEZIONE della lista: titoli, stati, numeri e tutto ciò su cui
+      // le sezioni contano e la ricerca filtra. Conversazione e allegati — la
+      // parte che pesa — arrivano per la sezione che si guarda davvero.
+      let list = await SN_FEEDBACK.list({
+        pageSize: SN_FEEDBACK.LIST_PAGE_SIZE, timeoutMs: 8000, fields: SN_FEEDBACK.CAMPI_LISTA,
+      });
       // S1.3: decifratura batch dei campi FENC1: — una sola IPC per tutta la lista.
       // Graceful fallback: se l'utente non è admin o l'IPC fallisce, i valori
       // restano invariati (la dashboard non si rompe, mostra il ciphertext).
@@ -1643,9 +1860,12 @@
           if (r && r.ok && Array.isArray(r.list)) list = r.list;
         } catch (_) { /* fallback: render con valori cifrati */ }
       }
+      const rf = await letturaFusioni;
       // Se nel frattempo è partito un caricamento più recente (o un test ha
       // iniettato dati), questo risultato è vecchio: si butta.
       if (gen !== loadGen) return;
+      if (rf) fusioni = LIVE ? LIVE.fusioniDa(rf, fusioni) : fusioni;
+      sogliaFinestra = sogliaDi(list);
       // I DUE TESTI. Il report della lavorazione da qui in avanti è cifrato: chi
       // non è l'owner non ha la chiave, e non deve averla. Al posto del blob
       // illeggibile mostriamo la frase scritta per chi ha segnalato — e se non
@@ -1655,8 +1875,12 @@
       dataLoaded = true;
       loadError = null;
       applyFilter();
+      if (live) live.segnaRiuscito();
+      avviaVivo();
     } catch (e) {
       if (gen !== loadGen) return;
+      // Anche a caricamento fallito: il giro lo ritenta da solo mentre la pagina è in vista.
+      avviaVivo();
       // Errore di caricamento: frase per l'utente (mai il "Failed to fetch"
       // grezzo) + un tasto per riprovare, invece di lasciare l'utente bloccato a
       // chiudere e riaprire la pagina. Stesso pattern della bacheca (SN_CHAT_ERRORS).
@@ -1681,6 +1905,8 @@
     const btn = e.target.closest('[data-tab]');
     if (!btn) return;
     selectTab(btn.dataset.tab);
+    // Come in Gestione: aprire Ricevuti rilegge le fusioni, o una richiesta nata in cloud a stato fermo non si vede.
+    if (btn.dataset.tab === 'inbox') caricaFusioni();
   });
 
   function closeLightbox() {
@@ -1713,6 +1939,7 @@
     if (automationRow) automationRow.hidden = !isAdmin;
     if (isAdmin) loadAutomation();
     if (!isAdmin && adminBannerText) {
+      adminBannerText.classList.remove('fb-admin-ko');
       // Distingui "non loggato" da "loggato ma non admin": il secondo non può
       // diventare admin cliccando Accedi, quindi nascondiamo il pulsante.
       if (profile?.email) {
@@ -1739,6 +1966,13 @@
     }
   }
 
+  // Il perché di un accesso non riuscito sta nel riquadro dove si è premuto Accedi.
+  function mostraAccessoFallito(frase) {
+    if (!adminBannerText) return;
+    adminBannerText.textContent = (typeof frase === 'string' && frase.trim()) || 'Accesso non riuscito: riprova.';
+    adminBannerText.classList.add('fb-admin-ko');
+  }
+
   if (adminSignInBtn) {
     adminSignInBtn.addEventListener('click', async () => {
       adminSignInBtn.disabled = true;
@@ -1747,9 +1981,9 @@
         setIsAdmin(r?.isAdmin);
         renderAuthState(r?.profile);
         applyFilter(); // ridisegna con/senza controlli admin
-        if (r?.ok === false) alert('Accesso non riuscito: ' + (r.error || 'errore sconosciuto'));
-      } catch (e) {
-        alert('Accesso non riuscito: ' + (e?.message || e));
+        if (r?.ok === false) mostraAccessoFallito(r.error);
+      } catch (_) {
+        mostraAccessoFallito();
       } finally {
         adminSignInBtn.disabled = false;
       }
@@ -1801,8 +2035,178 @@
         setIsAdmin(m.isAdmin);
         renderAuthState(m.profile);
         applyFilter();
+        avviaVivo();
+        caricaFusioni();
       }
+      // Una richiesta di fusione nuova o decisa altrove sposta la pratica: l'elenco arriva col messaggio.
+      if (m?.type === 'merge_approvals_changed') caricaFusioni(m);
     });
+  }
+
+  // ── Aggiornamento continuo ─────────────────────────────────────────────────
+  // Il giro della Gestione (SN_FEEDBACK_LIVE_PAGINA): solo per l'owner e solo in vista. Qui la scheda È il
+  // dettaglio, quindi il ridisegno aspetta anche bozze e scritture in volo (patterns/un-clic-una-scheda-…).
+  const liveSources = {
+    getMany: (ids) => SN_FEEDBACK.getMany(ids, { fields: SN_FEEDBACK.CAMPI_LISTA, timeoutMs: 20000 }),
+  };
+  let avvisoGiro = '';
+  let ridisegnoInAttesa = false;
+  let completandoDalVivo = false;
+
+  function arrivata(f) {
+    return !!(live && f && live.arrivate.has(String(f._id)));
+  }
+
+  // Il più vecchio caricato, se il caricamento si è fermato al tetto: il giro non porta dentro quelli prima.
+  function sogliaDi(list) {
+    if (!LIVE || !SN_FEEDBACK.listHitCap(list, SN_FEEDBACK.LIST_PAGE_SIZE)) return null;
+    const date = list.map((f) => LIVE.createdMs(f)).filter((t) => t > 0);
+    return date.length ? Math.min(...date) : null;
+  }
+
+  // Mai un rifiuto né un'attesa senza fine: senza le richieste le sezioni restano quelle dello stato.
+  async function leggiFusioni() {
+    let t = null;
+    try {
+      const r = await Promise.race([
+        sendToMain({ type: 'merge_approvals_get' }),
+        new Promise((_, rej) => { t = setTimeout(() => rej(new Error('nessuna risposta')), 15000); }),
+      ]);
+      return r && r.ok !== false ? r : null;
+    } catch (e) {
+      console.warn('[feedback] fusioni in attesa:', e?.message || e);
+      return null;
+    } finally {
+      clearTimeout(t);
+    }
+  }
+
+  // `gia`: l'elenco già pronto, quando avvisa il main (merge_approvals_changed).
+  async function caricaFusioni(gia) {
+    if (!isAdmin || !LIVE) return;
+    const r = gia || await leggiFusioni();
+    if (!r) return;
+    const prima = dataLoaded && live ? live.fotoSezioni() : null;
+    fusioni = LIVE.fusioniDa(r, fusioni);
+    if (!dataLoaded) return;
+    if (prima) live.segnaArrivi(prima, all);
+    updateTabCounts();
+    ridisegnaDalVivo();
+  }
+
+  // «Ferma» e gli avvisi del giro stanno accanto al numero delle schede, l'hover dice cosa.
+  function aggiornaSegnoFerma() {
+    if (!countEl || !live) return;
+    const ferma = live.ferma();
+    countEl.classList.toggle('fb-count--ferma', ferma);
+    countEl.classList.toggle('fb-count--avviso', !!avvisoGiro && !ferma);
+    const parti = [
+      ferma ? `Lista ferma alle ${fmtTs(live.okAt())}: il server non risponde, riprovo da solo.` : '',
+      avvisoGiro ? `Aggiornamento: ${avvisoGiro}` : '',
+    ].filter(Boolean);
+    if (parti.length) countEl.title = parti.join('\n');
+    else countEl.removeAttribute('title');
+  }
+
+  // Una bozza nella lista: ridisegnare la butterebbe via, e la scrittura dopo leggerebbe la casella vuota.
+  // Una casella già salvata non lo è più (note e frase si salvano da sole).
+  function bozzaInCorso() {
+    const el = document.activeElement;
+    if (el && listEl.contains(el) && (/^(textarea|input|select)$/i.test(el.tagName) || el.isContentEditable)) return true;
+    const di = (box) => all.find((f) => f._id === box.dataset.id);
+    for (const ta of listEl.querySelectorAll('.fb-notes')) {
+      const it = di(ta);
+      if (ta.value !== ta.defaultValue && (!it || notesValueOf(ta) !== it.notes)) return true;
+    }
+    for (const inp of listEl.querySelectorAll('.fb-usernote')) {
+      const it = di(inp);
+      if (inp.value !== inp.defaultValue && (!it || inp.value.slice(0, 500) !== String(it.userNote || ''))) return true;
+    }
+    for (const ta of listEl.querySelectorAll('.fb-reply-text')) if (ta.value.trim()) return true;
+    return !!listEl.querySelector('.fb-reopen-form, .fb-reply .fb-attach-thumb, .fb-reply .fb-attach-chip');
+  }
+
+  function listaCheScorre() {
+    for (let el = listEl; el && el !== document.body && el !== document.documentElement; el = el.parentElement) {
+      const oy = getComputedStyle(el).overflowY;
+      if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight) return el;
+    }
+    return document.scrollingElement || document.documentElement;
+  }
+
+  const puntatore = PAG ? PAG.seguiPuntatore(listEl, {
+    quandoLibera: () => provaRidisegno(),
+    // Col puntatore fermo su un pulsante la lista non si ricompone: sotto arriverebbe quello di un'altra scheda.
+    azioni: 'button, a, input, textarea, select, label',
+  }) : null;
+
+  function ridisegnaDalVivo() {
+    ridisegnoInAttesa = true;
+    provaRidisegno();
+  }
+
+  function provaRidisegno() {
+    if (!ridisegnoInAttesa || !dataLoaded || !live || !PAG) return;
+    if (!live.inVista()) return;
+    if (puntatore && puntatore.occupata()) { puntatore.rimanda(); return; }
+    if (inScrittura.size || bozzaInCorso()) return;
+    // Le schede della sezione toccate dal giro si completano prima: una conversazione vecchia sotto uno stato
+    // nuovo direbbe due cose diverse. Chi non è tornato porta già il suo «riprova» e non si richiede.
+    const daCompletare = sectionItems()
+      .filter((f) => f && f._id && !f._dettaglioMancato && (SN_FEEDBACK.soloLista(f) || f._dettaglioVecchio))
+      .map((f) => f._id);
+    if (daCompletare.length) {
+      if (completandoDalVivo) return;
+      completandoDalVivo = true;
+      completaDettagli(daCompletare)
+        .catch((e) => console.warn('[feedback] dettagli del giro:', e?.message || e))
+        .finally(() => { completandoDalVivo = false; provaRidisegno(); });
+      return;
+    }
+    ridisegnoInAttesa = false;
+    if (puntatore) puntatore.annulla();
+    PAG.alSuoPosto({ lista: listEl, voci: '.fb-card', scorre: listaCheScorre }, applyFilter);
+  }
+
+  if (listEl) {
+    // Una bozza sparita (inviata, svuotata, annullata) lascia passare il ridisegno che aspettava.
+    const piuTardi = () => setTimeout(provaRidisegno, 0);
+    listEl.addEventListener('input', piuTardi);
+    listEl.addEventListener('focusout', piuTardi);
+    listEl.addEventListener('click', piuTardi);
+    // Toccata, una scheda arrivata è vista: il segno se ne va.
+    listEl.addEventListener('pointerdown', (e) => {
+      const card = e.target && e.target.closest && e.target.closest('.fb-card');
+      if (!card || !live || !live.arrivate.delete(String(card.dataset.id))) return;
+      card.classList.remove('fb-card--arrivata');
+      updateTabCounts();
+    });
+  }
+
+  live = PAG ? PAG.crea({
+    nome: 'feedback',
+    invia: sendToMain,
+    sorgenti: liveSources,
+    pronta: () => dataLoaded,
+    carica: () => load(),
+    righe: () => all,
+    sostituisci: (lista) => { all = lista; },
+    decifra: () => isAdmin,
+    sezioneDi: (f) => (sezioniAttendibili() && !statoCifrato(f) ? tabOf(f) : null),
+    finestra: () => sogliaFinestra,
+    // I numeri dicono subito la verità; la lista si ricompone quando nessuno la sta usando.
+    ridisegna: () => { if (sezioniAttendibili()) updateTabCounts(); ridisegnaDalVivo(); },
+    rileggiFusioni: () => caricaFusioni(),
+    avvisi: (testo) => { avvisoGiro = testo || ''; aggiornaSegnoFerma(); },
+    segno: () => aggiornaSegnoFerma(),
+    quandoInVista: () => provaRidisegno(),
+  }) : null;
+
+  // Il giro legge per conto dell'owner: chi non lo è non ha niente da seguire.
+  function avviaVivo() {
+    if (!live) return;
+    if (isAdmin) live.start();
+    else live.stop();
   }
 
   // ── Aggancio di test (stesso pattern di manage: window.__mgTest) ──────────
@@ -1816,14 +2220,35 @@
       renderAuthState(profile || null);
       applyFilter();
     },
-    setData(fbs) {
+    // Dati finti = giro fermo, o il primo giro li rimpiazzerebbe con Firestore. `{ dalVivo: true }` (dopo
+    // setLiveSources) tiene acceso l'orologio vero sulle sorgenti finte, come in Gestione.
+    setData(fbs, opts) {
       loadGen++; // il caricamento reale in volo, se c'è, viene scartato
+      if (live) { live.stop(); live.blocca(!(opts && opts.dalVivo)); live.arrivate.clear(); }
       all = (Array.isArray(fbs) ? fbs : []).map(sanitizeReportForReader);
+      sogliaFinestra = (opts && opts.finestra) || null;
       // Dati iniettati = dati arrivati: da qui i numeri delle sezioni si scrivono.
       dataLoaded = true;
       loadError = null;
       applyFilter();
+      if (live && opts && opts.dalVivo) { live.segnaRiuscito(); live.start(); }
     },
+    setLiveSources(src) {
+      Object.assign(liveSources, src || {});
+      if (src && typeof src.listVersions === 'function' && typeof src.giro !== 'function') {
+        liveSources.giro = async () => ({
+          ok: true,
+          giro: { kind: 'reconcile', versions: await src.listVersions({ timeoutMs: 20000 }) },
+        });
+      }
+    },
+    setLiveTiming(t) { if (live) live.tempi(t); },
+    pollNow() { return live ? live.giro({ force: true }) : Promise.resolve({ changed: 0 }); },
+    liveMessage(m) { return live ? live.applicaEsito(m) : Promise.resolve({ changed: 0 }); },
+    isLiveOn() { return !!(live && live.acceso()); },
+    liveArrivate() { return live ? Array.from(live.arrivate) : []; },
+    caricaFusioni: (gia) => caricaFusioni(gia),
+    fusioni: () => fusioni,
     setTab(tab) { selectTab(tab); },
     // DB3: negli spec non c'è un aggiornamento da interrogare, e il gate di
     // "Risolti" dipende dalla versione rilasciata: iniettabile, come in manage.
@@ -1837,5 +2262,7 @@
 
   // Carica prima lo stato admin, poi i feedback: così il primo render già
   // mostra (o nasconde) i controlli di gestione in modo coerente.
-  refreshAuth().finally(load);
+  const bootDone = refreshAuth().finally(load);
+  // Gli spec aspettano la fine del caricamento vero prima di iniettare dati finti.
+  window.__fbTest.whenReady = () => bootDone;
 })();

@@ -16,6 +16,9 @@
 
   // Mappa azione → editor a segmenti della catena di modelli (popolata in applyConfig()).
   let modelChains = {};
+  // Catene lette che la griglia non mostra: il salvataggio riscrive la mappa intera, e senza
+  // queste cancellerebbe la scelta di una funzione spostata in Gestione prima che lì la si salvi (#465).
+  let hiddenModels = {};
 
   // Cache dei cataloghi modelli per provider (come nelle Opzioni), ma recuperati
   // dal MAIN con le chiavi predefinite: questa pagina non vede mai le chiavi.
@@ -57,6 +60,7 @@
       if (it && it.label) opt.label = it.label;
       dl.appendChild(opt);
     }
+    if (window.SN_COMBOBOX) window.SN_COMBOBOX.opzioniArrivate();
   }
 
   // Carica (una sola volta) il catalogo di un provider chiedendolo al main.
@@ -103,6 +107,8 @@
     $('excluded-desc').textContent = I18n.t('admin_defaults_excluded_desc');
     $('addExcludedRow').textContent = I18n.t('admin_defaults_excluded_add');
     $('saveBtn').textContent = I18n.t('admin_defaults_save');
+    $('h-delicate').textContent = I18n.t('admin_defaults_delicate');
+    $('delicate-desc').textContent = I18n.t('admin_defaults_delicate_desc');
   }
 
   function keyStateText(present) {
@@ -452,22 +458,103 @@
     }
   }
 
-  // ── Fornitori esclusi (politica sui modelli, #421/#518) ─────────────────────
+  // ── Fornitori esclusi (politica sui modelli, #421/#518/#541) ─────────────────
   // La lista salvata qui SOSTITUISCE per intero quella scritta nel codice
   // (defaultsStore.get): è voluto — l'owner deve poterla svuotare o riscrivere —
   // ma significa che un'esclusione aggiunta al codice non arriva dove questa
   // lista esiste già. Perciò la pagina confronta le due e lo dice.
-  function makeExcludedRow(name) {
+
+  // Fornitori che lo smistatore conosce ([{ name, slug }]); null finché non
+  // arrivano o se non arrivano: allora un nome non si può controllare.
+  let providerCatalog = null;
+
+  async function ensureProviderCatalog() {
+    if (providerCatalog) return;
+    try {
+      const res = await chrome.runtime.sendMessage({ type: MSG.DEFAULT_PROVIDERS_LIST });
+      if (res?.ok && Array.isArray(res.items) && res.items.length) {
+        providerCatalog = res.items;
+        for (const row of $('excludedList').querySelectorAll('.sn-excluded-row')) checkExcludedName(row);
+        renderExcludedDrift();
+      }
+    } catch (_) { /* senza catalogo il campo resta libero e non si segnala niente */ }
+  }
+
+  function readCatalogOptions() {
+    return (providerCatalog || []).map((p) => ({ value: p.name, label: '' }));
+  }
+
+  // Un nome che non copre nessun fornitore del catalogo non esclude niente: lo
+  // si dice sulla riga, con la correzione più probabile a un click.
+  function checkExcludedName(row) {
+    const C = window.SN_CONST;
+    const msg = row.querySelector('.sn-model-row-msg');
+    const input = row.querySelector('.sn-excluded-name');
+    msg.textContent = '';
+    row.classList.remove('sn-row-invalid');
+    input.classList.remove('sn-input-invalid');
+    const name = input.value.trim();
+    if (!name || !providerCatalog || !C || typeof C.providerCoversCatalog !== 'function') return;
+    if (C.providerCoversCatalog(name, providerCatalog)) return;
+    row.classList.add('sn-row-invalid');
+    input.classList.add('sn-input-invalid');
+    const text = document.createElement('span');
+    text.textContent = I18n.t('admin_defaults_excluded_unknown');
+    msg.appendChild(text);
+    const guess = C.closestCatalogProvider(name, providerCatalog);
+    if (guess) {
+      const fix = document.createElement('button');
+      fix.type = 'button';
+      fix.className = 'sn-excluded-guess';
+      fix.textContent = I18n.t('admin_defaults_excluded_guess', guess);
+      fix.addEventListener('click', () => {
+        input.value = guess;
+        adoptDefaultReason(row);
+        checkExcludedName(row);
+        renderExcludedDrift();
+      });
+      msg.appendChild(fix);
+    }
+  }
+
+  function makeExcludedRow(name, reason) {
+    const r = reason || {};
     const row = document.createElement('div');
     row.className = 'sn-model-row sn-excluded-row';
 
+    const wrap = document.createElement('div');
+    wrap.className = 'sn-model-id-wrap';
     const input = document.createElement('input');
     input.type = 'text';
     input.className = 'sn-excluded-name';
     input.placeholder = I18n.t('admin_defaults_excluded_name');
     input.setAttribute('autocomplete', 'off');
     input.value = name || '';
-    input.addEventListener('input', renderExcludedDrift);
+    input.addEventListener('input', () => { checkExcludedName(row); renderExcludedDrift(); });
+    wrap.appendChild(input);
+    if (window.SN_COMBOBOX) {
+      window.SN_COMBOBOX.attach(wrap, input, {
+        readOptions: readCatalogOptions,
+        onPick: () => { adoptDefaultReason(row); checkExcludedName(row); renderExcludedDrift(); },
+      });
+    }
+
+    const kind = document.createElement('select');
+    kind.className = 'sn-excluded-kind';
+    for (const k of ['', ...((window.SN_CONST && window.SN_CONST.EXCLUDED_PROVIDER_KINDS) || [])]) {
+      const opt = document.createElement('option');
+      opt.value = k;
+      opt.textContent = I18n.t('admin_defaults_excluded_kind_' + (k || 'none'));
+      kind.appendChild(opt);
+    }
+    kind.value = r.kind || '';
+
+    const note = document.createElement('input');
+    note.type = 'text';
+    note.className = 'sn-excluded-note';
+    note.placeholder = I18n.t('admin_defaults_excluded_note');
+    note.setAttribute('autocomplete', 'off');
+    note.value = r.note || '';
 
     const del = document.createElement('button');
     del.type = 'button';
@@ -475,38 +562,71 @@
     del.textContent = I18n.t('admin_defaults_excluded_remove');
     del.addEventListener('click', () => { row.remove(); renderExcludedDrift(); segnalaModifica(); });
 
-    row.appendChild(input);
-    row.appendChild(del);
+    const msg = document.createElement('div');
+    msg.className = 'sn-model-row-msg';
+
+    row.append(wrap, kind, note, del, msg);
+    checkExcludedName(row);
     return row;
   }
 
-  // Lista com'era all'ultimo caricamento: serve a distinguere "non l'ho
-  // toccata" da "l'ho svuotata".
-  let loadedExcluded = [];
+  function excludedHead() {
+    const head = document.createElement('div');
+    head.className = 'sn-model-row sn-model-row-head sn-excluded-head';
+    for (const key of ['admin_defaults_excluded_name', 'admin_defaults_excluded_kind', 'admin_defaults_excluded_note', '']) {
+      const c = document.createElement('div');
+      c.textContent = key ? I18n.t(key) : '';
+      head.appendChild(c);
+    }
+    return head;
+  }
 
-  function renderExcluded(list) {
+  // Com'era all'ultimo caricamento: serve a distinguere "non l'ho toccata" da
+  // "l'ho svuotata", per i nomi e per i motivi separatamente.
+  let loadedExcluded = [];
+  let loadedReasons = '[]';
+
+  function renderExcluded(list, reasons) {
     const host = $('excludedList');
     host.innerHTML = '';
+    host.appendChild(excludedHead());
+    const byName = new Map((Array.isArray(reasons) ? reasons : [])
+      .filter((r) => r && typeof r.name === 'string')
+      .map((r) => [r.name.trim().toLowerCase(), r]));
     for (const name of (Array.isArray(list) ? list : [])) {
-      if (typeof name === 'string' && name.trim()) host.appendChild(makeExcludedRow(name.trim()));
+      if (typeof name !== 'string' || !name.trim()) continue;
+      host.appendChild(makeExcludedRow(name.trim(), byName.get(name.trim().toLowerCase())));
     }
     loadedExcluded = collectExcluded();
+    loadedReasons = JSON.stringify(collectExcludedReasons());
     renderExcludedDrift();
   }
 
-  function collectExcluded() {
-    const host = $('excludedList');
+  // Righe con un nome, una per nome (le maiuscole non contano): la prima vince.
+  function excludedRows() {
     const out = [];
     const seen = new Set();
-    for (const input of host.querySelectorAll('.sn-excluded-name')) {
-      const v = input.value.trim();
+    for (const row of $('excludedList').querySelectorAll('.sn-excluded-row')) {
+      const v = row.querySelector('.sn-excluded-name').value.trim();
       if (!v) continue;
       const k = v.toLowerCase();
       if (seen.has(k)) continue;
       seen.add(k);
-      out.push(v);
+      out.push({ row, name: v });
     }
     return out;
+  }
+
+  function collectExcluded() {
+    return excludedRows().map((x) => x.name);
+  }
+
+  function collectExcludedReasons() {
+    return excludedRows().map(({ row, name }) => ({
+      name,
+      kind: row.querySelector('.sn-excluded-kind').value,
+      note: row.querySelector('.sn-excluded-note').value.trim(),
+    }));
   }
 
   // Voci escluse dal codice che la lista in pagina non copre: se ce ne sono,
@@ -515,7 +635,22 @@
   function excludedMissingFromBuild() {
     const C = window.SN_CONST;
     if (!C || typeof C.missingExcludedProviders !== 'function') return [];
-    return C.missingExcludedProviders(C.DEFAULT_EXCLUDED_PROVIDERS || [], collectExcluded());
+    return C.missingExcludedProviders(C.DEFAULT_EXCLUDED_PROVIDERS || [], collectExcluded(), providerCatalog);
+  }
+
+  // Un nome scelto dal catalogo che copre una voce del codice ne prende il motivo
+  // di serie, se la riga non ne ha già uno: stessa regola dell'avviso sopra.
+  function adoptDefaultReason(row) {
+    const C = window.SN_CONST || {};
+    const kind = row.querySelector('.sn-excluded-kind');
+    const note = row.querySelector('.sn-excluded-note');
+    if (kind.value || note.value.trim() || typeof C.missingExcludedProviders !== 'function') return;
+    const name = row.querySelector('.sn-excluded-name').value.trim();
+    const d = (C.DEFAULT_EXCLUDED_PROVIDER_REASONS || [])
+      .find((r) => !C.missingExcludedProviders([r.name], [name], providerCatalog).length);
+    if (!d) return;
+    kind.value = d.kind || '';
+    note.value = d.note || '';
   }
 
   function renderExcludedDrift() {
@@ -530,8 +665,12 @@
   }
 
   function addMissingExcluded() {
+    const C = window.SN_CONST || {};
+    const reasons = typeof C.excludedProviderReasons === 'function'
+      ? C.excludedProviderReasons(excludedMissingFromBuild(), [], C.DEFAULT_EXCLUDED_PROVIDER_REASONS)
+      : excludedMissingFromBuild().map((name) => ({ name }));
     const host = $('excludedList');
-    for (const name of excludedMissingFromBuild()) host.appendChild(makeExcludedRow(name));
+    for (const r of reasons) host.appendChild(makeExcludedRow(r.name, r));
     renderExcludedDrift();
   }
 
@@ -541,10 +680,50 @@
       models: models || {},
       getRegistry: () => collectModelRegistry().registry,
     });
+    hiddenModels = Object.fromEntries(Object.entries(models || {})
+      .filter(([action, chain]) => !(action in modelChains) && typeof chain === 'string'));
   }
 
   function collectModels() {
-    return ModelChain.collect(modelChains);
+    return { ...hiddenModels, ...ModelChain.collect(modelChains) };
+  }
+
+  // ── Pagine delicate (#1004) ─────────────────────────────────────────────────
+  let delicateCaricate = {};
+  let delicateDiSerie = {};
+  const righeSiti = (testo) => [...new Set(String(testo || '').split(/[\n,]+/)
+    .map((x) => x.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, ''))
+    .filter(Boolean))];
+  function renderDelicate(elenco, diSerie) {
+    delicateCaricate = elenco || {};
+    delicateDiSerie = diSerie || {};
+    const box = $('delicateLists');
+    box.textContent = '';
+    for (const k of [...new Set([...Object.keys(delicateDiSerie), ...Object.keys(delicateCaricate)])]) {
+      const id = `delicate-${k}`;
+      const label = document.createElement('label');
+      label.htmlFor = id;
+      label.style.marginTop = '12px';
+      const nome = I18n.t(`admin_defaults_delicate_${k}`);
+      label.textContent = nome && !nome.startsWith('admin_defaults_') ? nome : k;
+      const ta = document.createElement('textarea');
+      ta.id = id;
+      ta.dataset.categoria = k;
+      ta.rows = 6;
+      ta.style.width = '100%';
+      ta.value = (delicateCaricate[k] || []).join('\n');
+      box.append(label, ta);
+    }
+  }
+  // Le categorie da salvare: tutte quelle che non sono come nel codice. null = niente di cambiato.
+  function collectDelicate() {
+    const ora = {};
+    for (const ta of $('delicateLists').querySelectorAll('textarea[data-categoria]')) ora[ta.dataset.categoria] = righeSiti(ta.value);
+    const uguali = (a, b) => JSON.stringify(a || []) === JSON.stringify(b || []);
+    if (Object.keys(ora).every((k) => uguali(ora[k], delicateCaricate[k]))) return null;
+    const out = {};
+    for (const [k, v] of Object.entries(ora)) if (!uguali(v, delicateDiSerie[k])) out[k] = v;
+    return out;
   }
 
   // ── Load / Save ─────────────────────────────────────────────────────────────
@@ -576,7 +755,9 @@
     renderModelsGrid(cfg.models || {});
     // Lista EFFETTIVA (codice ⊕ override remoto): è quella che l'app applica, ed
     // è quella che il salvataggio riscrive per intero.
-    renderExcluded(cfg.excludedProviders || []);
+    renderExcluded(cfg.excludedProviders || [], cfg.excludedProviderReasons || []);
+    renderDelicate(cfg.sitiDelicati, cfg.sitiDelicatiDiSerie);
+    ensureProviderCatalog();
     $('providerSort').value = normSort(cfg.providerSort) || 'auto';
     // Combobox modelli: semina con gli id già nel registry (compaiono subito),
     // poi carica i cataloghi completi in background (non blocca il render).
@@ -654,6 +835,14 @@
     if (JSON.stringify(excluded) !== JSON.stringify(loadedExcluded)) {
       config.excludedProviders = excluded;
     }
+    // I motivi stanno in un campo a parte e non decidono niente: viaggiano se
+    // sono cambiati, o insieme ai nomi.
+    const reasons = collectExcludedReasons();
+    if (config.excludedProviders || JSON.stringify(reasons) !== loadedReasons) {
+      config.excludedProviderReasons = reasons;
+    }
+    const delicate = collectDelicate();
+    if (delicate) config.sitiDelicati = delicate;
     if (Object.keys(apiKeys).length) config.apiKeys = apiKeys;
     // La chiave Safe Browsing si invia solo se digitata (vuoto = "non toccare").
     const gsb = $('apiKeySafebrowse').value.trim();

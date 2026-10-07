@@ -1,4 +1,4 @@
-// Regression per il feedback: le scorciatoie globali (Alt+E spiega, Alt+T
+// Regression per il feedback: le scorciatoie di Filo (Alt+E spiega, Alt+T
 // traduci, Alt+H apri Aiuto) e la voce "Aiuto" del menu tasto destro sulla
 // linguetta erano MUTE sulle pagine interne di Filo (Editor, Preferenze,
 // Opzioni, Cronologia, Feedback, Sicurezza, ...).

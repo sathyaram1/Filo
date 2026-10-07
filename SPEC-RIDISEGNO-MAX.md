@@ -264,10 +264,10 @@ Collegato (18/08, revisione del ruolo secaudit con l'owner):
 ## 11. Suite completa: in GitHub, non dentro il giro
 
 **Dal 2026-09-15 la suite intera (`npm test`) non la lancia nessun ruolo**, e
-nemmeno una sessione locale: gira in GitHub, nel lavoro di release, che parte
-ogni sei ore — verde, e la patch si pubblica; un rosso nuovo (fuori dai rossi
-noti del contenitore), e la patch non esce, il rosso diventa un feedback e si
-corregge con calma, saltando un giro. Una regressione è rara: non vale un'ora
+nemmeno una sessione locale: gira in GitHub a ogni fusione su main
+(`suite.yml`), e ogni sei ore si pubblica il commit più nuovo con la suite
+verde; un rosso nuovo (fuori dai rossi noti del contenitore) diventa un
+feedback e si corregge con calma, mentre la pubblicazione resta sull'ultimo verde. Una regressione è rara: non vale un'ora
 d'attesa a ogni consegna.
 
 Dentro il giro: chi scrive codice fa unit test e spec mirati, e le regressioni
@@ -343,8 +343,9 @@ resto.
   col livello davanti (3/2/1/0; `?` = chiede una decisione dell'owner). Il
   metro dei livelli sta nel testo del ruolo
   (`routines/roles/_critica-e-livelli.md`), uno per tutti gli ambiti.
-- **L'esito lo calcola il server** dai livelli e da tre bilanci per lavoro
-  (`cap2` per i livelli 3/2, `cap1`, `cap0`): `pass`, `fix` o `stop`. Le regole
+- **L'esito lo calcola il server** dai livelli e da un bilancio per livello
+  (`cap3`, `cap2`, `cap1`, `cap0`; dal 2026-09-23 solo il 3 ferma a bilancio
+  finito, il 2 esce come feedback a priorità 2): `pass`, `fix` o `stop`. Le regole
   stanno in `src/shared/verifierRound.js`, che il server incorpora al deploy; i
   numeri li scrive l'owner in Gestione → Automazioni e non hanno un default nel
   codice. Un'istanza catturata non può promuoversi da sola: i conti non li fa

@@ -40,6 +40,4 @@ l'obiettivo principale è la chiarezza e l'intuitività. quindi la cosa migliore
 Ogni azione dell'utente deve ricevere feedback, quando clicco o faccio hover su un elemento se è possibile deve succedere qualcosa (nulla di fastidioso o appariscente ma l'utente deve avere conferma che il sistema risponde).
 una sempre tutto lo spazio a disposizione, non mettere il contenuto della pagina in un box, non usare tutta la riga in alto per 2 icone sulla destra… 
 puoi essere creativo e coraggioso nel fare design non convenzionali pur rimanendo coerente con i principi di filo. 
-personalizzazione: ogni scelta che fai deve essere modificabile dall'utente: la tonalità, l'opacità, il colore del bordo, il font, i suoni, i tempi di animazione…
-in un'app normale questo sarebbe inutile in quanto l'utente non può scartabellarsi 20 pagine di menu ma in filo dove può semplicemente chiedere "uno stile più retrò" ha senso che sia possibile. tutto deve essere modificabile sia in preferenze (nella sezione apposita "avanzate") che da filo stesso su richiesta.
 

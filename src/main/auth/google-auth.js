@@ -16,7 +16,7 @@
 const http = require('node:http');
 // Niente require('electron') a livello di modulo: questo file viene richiesto
 // (transitivamente, via defaultsStore/supportModelsStore) anche dagli unit test
-// node:test che girano fuori da Electron. `shell` serve solo dentro signIn(),
+// node:test che girano fuori da Electron. `shell` e `net` servono solo dentro signIn(),
 // quindi si richiede lazy lì (vedi CLAUDE.md — pattern usato anche altrove,
 // es. adblock.js/proxyTab.js).
 const cfg = require('./config');
@@ -24,6 +24,9 @@ const pkce = require('./pkce');
 const store = require('./token-store');
 
 let session = null; // { refreshToken, idToken, idTokenExp, email, name, picture }
+// Se la sessione sopravviverà alla chiusura: senza cifratura del sistema resta
+// solo in memoria, e chi ha appena fatto l'accesso deve saperlo subito (#708.1).
+let ricordata = false;
 
 function decodeJwtPayload(jwt) {
   try {
@@ -35,11 +38,24 @@ function decodeJwtPayload(jwt) {
   }
 }
 
-// Avvia un server loopback effimero e ritorna { redirectUri, waitForCode }.
+// `code` è la causa per chi ha chiesto l'accesso (esitoAccesso.js ne fa la frase).
+function erroreAccesso(code, message) {
+  const e = new Error(message);
+  e.code = code;
+  return e;
+}
+
+// Chi chiude la scheda del browser non richiama mai il loopback: senza un tetto
+// l'accesso resterebbe in corso per sempre. Largo: consenso, scelta account, 2FA.
+const ATTESA_ACCESSO_MS = 10 * 60 * 1000;
+let flussoInCorso = null;
+
+// Avvia un server loopback effimero e ritorna { redirectUri, waitForCode, abort }.
 function startLoopback(expectedState) {
   return new Promise((resolve, reject) => {
     let resolveCode, rejectCode;
     const codePromise = new Promise((res, rej) => { resolveCode = res; rejectCode = rej; });
+    codePromise.catch(() => {}); // un flusso interrotto prima di waitForCode non è un rifiuto orfano
 
     const server = http.createServer((req, res) => {
       const url = new URL(req.url, 'http://127.0.0.1');
@@ -53,7 +69,7 @@ function startLoopback(expectedState) {
           : 'Accesso a Filo completato. Puoi chiudere questa scheda e tornare all\'app.')
         + '</body>');
       server.close();
-      if (error) return rejectCode(new Error('OAuth: ' + error));
+      if (error) return rejectCode(erroreAccesso(error === 'access_denied' ? 'annullato' : 'servizio', 'OAuth: ' + error));
       if (!code) return rejectCode(new Error('OAuth: nessun code nel redirect'));
       if (state !== expectedState) return rejectCode(new Error('OAuth: state non corrispondente (possibile CSRF)'));
       resolveCode(code);
@@ -63,7 +79,8 @@ function startLoopback(expectedState) {
     // porta 0 = il SO assegna una porta libera, solo su loopback.
     server.listen(0, '127.0.0.1', () => {
       const { port } = server.address();
-      resolve({ redirectUri: `http://127.0.0.1:${port}`, waitForCode: () => codePromise });
+      const abort = (err) => { server.close(() => {}); rejectCode(err); };
+      resolve({ redirectUri: `http://127.0.0.1:${port}`, waitForCode: () => codePromise, abort });
     });
   });
 }
@@ -138,7 +155,7 @@ async function installationToken() {
 
 function persist() {
   if (!session) return;
-  store.save({
+  ricordata = store.save({
     refreshToken: session.refreshToken,
     email: session.email,
     name: session.name,
@@ -155,6 +172,30 @@ function setSession(fb) {
     name: fb.displayName || '',
     picture: fb.photoUrl || '',
   };
+  segnaOwnerCaduto(false);
+}
+
+// #912: l'owner buttato fuori da un rinnovo fallito resta l'owner per i feedback che manda dopo (aspettano che
+// rientri, non partono da anonimi). Un file e non la memoria: vale anche dopo un riavvio. Lo toglie solo un accesso o un'uscita voluta.
+let ownerCaduto = null;
+function fileOwnerCaduto() {
+  const { app } = require('electron');
+  return require('node:path').join(app.getPath('userData'), 'accesso-owner-caduto');
+}
+function accessoOwnerCaduto() {
+  if (ownerCaduto === null) {
+    try { ownerCaduto = require('node:fs').existsSync(fileOwnerCaduto()); } catch (_) { ownerCaduto = false; }
+  }
+  return ownerCaduto;
+}
+function segnaOwnerCaduto(caduto) {
+  if (accessoOwnerCaduto() === !!caduto) return;
+  ownerCaduto = !!caduto;
+  try {
+    const fs = require('node:fs');
+    if (caduto) fs.writeFileSync(fileOwnerCaduto(), String(Date.now()));
+    else fs.rmSync(fileOwnerCaduto(), { force: true });
+  } catch (_) {}
 }
 
 // ─── API pubblica ──────────────────────────────────────────────────────────
@@ -165,16 +206,61 @@ function restore() {
   const saved = store.load();
   if (saved?.refreshToken) {
     session = { ...saved, idToken: null, idTokenExp: 0 };
+    ricordata = store.canEncrypt();
   }
   return getProfile();
 }
 
 async function signIn() {
   if (!cfg.isConfigured()) {
-    throw new Error('Login non configurato: manca il Google OAuth Client ID (vedi src/main/auth/config.js).');
+    throw erroreAccesso('non-configurato', 'Login non configurato: manca il Google OAuth Client ID (vedi src/main/auth/config.js).');
   }
+  const { shell, net } = require('electron');
+  if (net && typeof net.isOnline === 'function' && !net.isOnline()) {
+    throw erroreAccesso('rete', 'nessuna connessione');
+  }
+  // Un accesso alla volta: chi lo chiede mentre uno aspetta il browser riapre la
+  // STESSA pagina e ne condivide l'esito, così qualunque scheda completi arriva a Filo.
+  if (flussoInCorso) {
+    const f = await flussoInCorso;
+    if (f.aspettaBrowser) {
+      f.rinnovaAttesa();
+      await apriBrowser(shell, f.url);
+    }
+    return f.esito;
+  }
+  const prossimo = nuovoFlusso();
+  flussoInCorso = prossimo;
+  const libera = () => { if (flussoInCorso === prossimo) flussoInCorso = null; };
+  let f;
+  try {
+    f = await prossimo;
+  } catch (e) {
+    libera();
+    throw e;
+  }
+  f.esito.then(libera, libera);
+  try {
+    await apriBrowser(shell, f.url);
+  } catch (e) {
+    f.loop.abort(e);
+    throw e;
+  }
+  return f.esito;
+}
+
+async function apriBrowser(shell, url) {
+  try {
+    await shell.openExternal(url);
+  } catch (e) {
+    throw erroreAccesso('browser', 'browser non aperto: ' + (e?.message || e));
+  }
+}
+
+async function nuovoFlusso() {
   const { verifier, challenge, method, state } = pkce.createPkce();
-  const { redirectUri, waitForCode } = await startLoopback(state);
+  const loop = await startLoopback(state);
+  const { redirectUri } = loop;
 
   const authUrl = new URL(cfg.authEndpoint);
   authUrl.search = new URLSearchParams({
@@ -189,21 +275,46 @@ async function signIn() {
     prompt: 'consent',
   }).toString();
 
-  const { shell } = require('electron');
-  await shell.openExternal(authUrl.toString());
+  const f = { url: authUrl.toString(), loop, aspettaBrowser: true };
+  let timer = null;
+  // Il tetto riparte a ogni riapertura: chi riapre il browser ricomincia da capo.
+  f.rinnovaAttesa = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => loop.abort(erroreAccesso('scaduto', 'accesso non completato in tempo')), ATTESA_ACCESSO_MS);
+  };
+  f.rinnovaAttesa();
+  f.esito = (async () => {
+    let code;
+    try {
+      code = await loop.waitForCode();
+    } finally {
+      clearTimeout(timer);
+      f.aspettaBrowser = false;
+    }
+    const googleTok = await exchangeCodeForGoogleToken(code, verifier, redirectUri);
+    if (!googleTok.id_token) throw new Error('OAuth: nessun id_token da Google');
+    const fb = await signInWithFirebase(googleTok.id_token);
+    setSession(fb);
+    persist();
+    return getProfile();
+  })();
+  return f;
+}
 
-  const code = await waitForCode();
-  const googleTok = await exchangeCodeForGoogleToken(code, verifier, redirectUri);
-  if (!googleTok.id_token) throw new Error('OAuth: nessun id_token da Google');
-  const fb = await signInWithFirebase(googleTok.id_token);
-  setSession(fb);
-  persist();
-  return getProfile();
+// Per il confronto delle uscite (#810): i valori, mai a un prompt.
+function segreti() {
+  return [session?.refreshToken, session?.idToken].filter(Boolean);
+}
+
+function chiudiSessione() {
+  session = null;
+  ricordata = false;
+  store.clear();
 }
 
 function signOut() {
-  session = null;
-  store.clear();
+  chiudiSessione();
+  segnaOwnerCaduto(false);
 }
 
 async function refreshIfNeeded() {
@@ -220,7 +331,9 @@ async function refreshIfNeeded() {
   });
   if (!res.ok) {
     // Refresh token revocato/scaduto → sessione non più valida.
-    signOut();
+    const eraOwner = isAdmin();
+    chiudiSessione();
+    if (eraOwner) segnaOwnerCaduto(true);
     throw new Error(`refresh sessione fallito (${res.status})`);
   }
   const j = await res.json(); // { id_token, refresh_token, expires_in }
@@ -271,6 +384,10 @@ function isSignedIn() {
   return Boolean(session?.refreshToken);
 }
 
+function isRemembered() {
+  return isSignedIn() && ricordata;
+}
+
 // True se l'utente loggato è nell'allowlist admin (gate UX; la garanzia forte
 // è nelle Firestore rules). Senza sessione → false.
 function isAdmin() {
@@ -279,6 +396,7 @@ function isAdmin() {
 
 module.exports = {
   restore,
+  segreti,
   signIn,
   signOut,
   getIdToken,
@@ -286,7 +404,9 @@ module.exports = {
   getProfile,
   getTokenClaims,
   isSignedIn,
+  isRemembered,
   isAdmin,
+  accessoOwnerCaduto,
   // esportati per i test
   _internals: { decodeJwtPayload, startLoopback },
 };

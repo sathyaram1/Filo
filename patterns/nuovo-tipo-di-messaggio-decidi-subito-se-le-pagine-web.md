@@ -17,6 +17,11 @@ default sbagliato, e non ce ne si accorge finché qualcuno non lo cerca.
   (`origine.js` è la porta unica del confine: risponde `code: 'forbidden'`, così
   chi deve dirlo all'utente sa che è la provenienza e non la rete. `origin` è il
   terzo argomento dell'handler; la shell è `filo://shell/shell.html`.)
+- **La barra è il frame principale di una finestra CON le schede**
+  (`finestraDellaBarra` in `src/main/ipc.js`, che dà `sender.isShell`), non
+  di una finestra qualunque: un popup «Accedi con…» è una finestra vera con
+  dentro un sito, e le porte chiuse ai siti gli rispondevano (#589.3,
+  `tests/popup-di-accesso-da-un-sito.spec.mjs`).
 - **Due bandiere rosse** che rendono il gate non negoziabile: la risposta
   contiene **percorsi assoluti su disco** (rivelano lo username e la struttura
   del computer), oppure il comando fa **aprire/eseguire qualcosa** al sistema
@@ -78,3 +83,48 @@ dentro le pagine dei siti e da lì decidono cosa mostrare (la griglia del tasto
 destro nasconde l'icona Feedback a chi non gestisce i feedback). Rispondere non
 vuol dire dire tutto: di là dal confine passano i booleani che servono a
 disegnare, non l'identità (indirizzo email, nome, identificativo dell'account).
+
+## Anche quello che si MANDA passa il confine
+
+Il confine vale nei due versi. `broadcastToTabs` raggiunge ogni frame di ogni
+scheda, siti compresi (#589: la spinta `SETTINGS_UPDATED` portava a tutti le
+chiavi dei servizi e le credenziali del proxy che le letture già toglievano; poi
+l'intervista di benvenuto, che un sito non poteva chiedere, arrivava da sola).
+
+Tutto quello che attraversa il confine con un sito sta in **liste di ciò che è
+ammesso**, in un file solo (`src/main/services/impostazioniPerOrigine.js`):
+
+- i **tipi di messaggio** spinti che raggiungono un frame non `filo://` (quelli
+  che un content script ascolta); un tipo nuovo resta nelle pagine di Filo;
+- i **campi delle impostazioni** che un sito riceve (risposte, letture dello
+  storage, spinte) e quelli che può **scrivere** (la voce della dettatura);
+- gli **scomparti del magazzino** che un sito legge, scrive o toglie;
+- le **azioni di Filo** che un sito può chiedere: quelle che la barra d'aiuto
+  descrive al modello e quelle che manda da sé (apri il link, solo verso
+  indirizzi web). La conferma disegnata dentro la pagina la può dare anche la
+  pagina: da un sito un'azione fuori lista si rifiuta, confermata o no, anche
+  quando arriva da una chat aperta lì (#589, giro 6: preferenze, memoria e
+  terminale).
+
+Quattro regole valgono per tutte le liste. Un destinatario è di Filo solo se lo
+è anche la **scheda** che lo contiene: l'indirizzo di un riquadro lo sceglie la
+pagina, e un sito può puntarlo su `filo://`. Di un dato che il sito usa per un
+sì o un no (i siti esclusi) gli arriva solo la parte che lo riguarda. La lista
+scende **dentro le sezioni**: di una sezione ammessa passano i campi elencati, e
+un campo nuovo resta a casa finché qualcuno non lo decide (#589, giro 8: un
+segreto messo nella sezione della voce sarebbe arrivato a ogni sito). E ciò che
+si mostra una volta sola, come un avviso, va solo al frame principale della
+scheda **in primo piano**: le altre non lo mostrerebbero mai.
+
+Ogni spinta che gira su più schede o finestre passa da `spingiAllaScheda` /
+`spingiAllaFinestra` di quel file, o si limita da sé alle superfici di Filo: una
+strada parallela (l'avviso dei dati dal vivo, quello degli scaricamenti, lo
+schermo intero) scavalcava la lista, e un popup di accesso è una finestra che
+contiene un sito (#589, giro 7).
+
+Un content script che comincia ad ascoltare una spinta, leggere un campo o
+usare uno scomparto nuovo lo aggiunge lì: le sentinelle di
+`tests/unit/impostazioniPerOrigine.test.mjs` diventano rosse finché non lo fa,
+invece di lasciarlo spegnere in silenzio solo sui siti. Un dato che un sito non
+deve vedere affatto può andare anche con `broadcastToFiloPages`, che lo dice
+esplicitamente.

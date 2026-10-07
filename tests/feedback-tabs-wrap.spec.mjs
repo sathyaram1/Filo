@@ -1,5 +1,5 @@
 // La fila di schede in cima alla pagina dei feedback (Ricevuti, In coda,
-// Risolti, Archiviati — le stesse della dashboard di gestione, #509) deve
+// Lavori locali, Risolti, Archiviati — le stesse della dashboard di gestione, #509) deve
 // adattarsi alla larghezza della finestra: su finestre strette va a capo invece
 // di sforare il bordo destro e trascinare TUTTA la pagina in uno scorrimento
 // orizzontale. E ogni scheda resta di un pezzo solo: il numero non si stacca
@@ -33,11 +33,12 @@ test('con finestra stretta le schede vanno a capo, la pagina non scorre di lato'
   // misurare, non quella dei soli nomi.
   await page.evaluate(() => window.__fbTest.setData([]));
 
-  // Le quattro sezioni della macchina a stati.
+  // Le sezioni della macchina a stati, con i Lavori locali (#908).
   const tabs = page.locator('.fb-tab');
-  await expect(tabs).toHaveCount(4);
+  await expect(tabs).toHaveCount(5);
+  await expect(tabs.nth(2)).toHaveText(/Lavori locali/);
 
-  // Larghezza stretta davvero: qui le quattro schede NON stanno su una riga.
+  // Larghezza stretta davvero: qui le cinque schede NON stanno su una riga.
   await page.setViewportSize({ width: 360, height: 800 });
 
   // Il corpo della pagina NON produce scorrimento orizzontale.

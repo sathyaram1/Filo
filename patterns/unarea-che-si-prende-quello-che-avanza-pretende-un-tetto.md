@@ -54,7 +54,7 @@ sintomo di partenza, ricomparso da un'altra porta.
   sopra e controlla che la pagina non torni a scorrere e che l'area resti sopra
   la metà di quanto aveva a blocco vuoto. Senza il tetto quegli assert devono
   diventare rossi: la controprova sta in
-  `tests/verify-498-giro9.spec.mjs`, che rimette a mano i valori di prima.
+  `tests/verifica/498/verify-498-giro9.spec.mjs`, che rimette a mano i valori di prima.
   Il tetto non basta provarlo alla misura di finestra predefinita: la stessa
   prova va rifatta con lo zoom della pagina alzato (una, due, tre tacche) e su
   finestre più basse, che è dove la mancanza di pressione si vede.

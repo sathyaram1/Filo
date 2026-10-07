@@ -18,12 +18,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
-import { rmSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { beatIsLive, readBeat, startBeat, stopBeat, beatFile } from '../../scripts/lib/routine-beat.mjs';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -76,7 +76,7 @@ test('due invocazioni con lo stesso biglietto accendono UN battito solo', () => 
     assert.equal(secondo.why, 'already_live');
     assert.equal(avvii, 1, 'due processi che battono lo stesso biglietto sono solo rumore');
   } finally {
-    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(casa);
   }
 });
 
@@ -98,7 +98,7 @@ test('biglietto nuovo: il battito si riaccende, e il vecchio non resta orfano', 
     assert.deepEqual(uccisi, [4243], 'il battito del biglietto vecchio va spento prima di perderne le tracce');
   } finally {
     process.kill = killVero;
-    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(casa);
   }
 });
 
@@ -119,7 +119,7 @@ test('un marcatore vecchio di giorni non fa ammazzare un estraneo', () => {
     assert.deepEqual(uccisi, [], 'un numero di processo vecchio di giorni non dice più di chi è');
   } finally {
     process.kill = killVero;
-    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(casa);
   }
 });
 
@@ -142,7 +142,7 @@ test('rilasciare un biglietto NON spegne il battito di un altro lavoro', () => {
     assert.equal(readBeat(casa).ticket, 'b-vivo', 'e il marcatore resta quello di chi lavora');
   } finally {
     process.kill = killVero;
-    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(casa);
   }
 });
 
@@ -159,7 +159,7 @@ test('rilasciare il PROPRIO biglietto spegne il battito', () => {
     assert.equal(readBeat(casa), null);
   } finally {
     process.kill = killVero;
-    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(casa);
   }
 });
 
@@ -171,7 +171,7 @@ test('senza biglietto non si accende niente', () => {
     assert.equal(r.started, false);
     assert.equal(avvii, 0);
   } finally {
-    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(casa);
   }
 });
 
@@ -189,7 +189,7 @@ test('un marcatore rimasto da una sessione morta non blocca il battito nuovo', (
     assert.equal(r.started, true);
     assert.equal(avvii, 1);
   } finally {
-    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(casa);
   }
 });
 
@@ -234,7 +234,7 @@ test('un rilascio RIFIUTATO dal server lascia vivo il battito', async () => {
     assert.ok(readBeat(casa), 'il battito non va toccato quando il rilascio non è andato a buon fine');
   } finally {
     srv.close();
-    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(casa);
   }
 });
 
@@ -261,7 +261,7 @@ test('rilasciare il biglietto di un ALTRO giro non tocca il battito, dal comando
       'il battito di chi sta ancora lavorando deve sopravvivere al rilascio di un altro');
   } finally {
     srv.close();
-    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(casa);
   }
 });
 
@@ -285,7 +285,7 @@ test('un rilascio ACCETTATO spegne il battito', async () => {
     assert.equal(readBeat(casa), null, 'col biglietto muore anche il battito');
   } finally {
     srv.close();
-    rmSync(casa, { recursive: true, force: true, maxRetries: 5 });
+    togliCartella(casa);
   }
 });
 
@@ -335,9 +335,17 @@ test('il giro col biglietto fa arrivare un battito al server, senza che nessuno 
   } finally {
     // Il processo è staccato apposta: se non lo si ferma resta a battere.
     const m = readBeat(casa);
-    if (m && m.pid) { try { process.kill(Number(m.pid)); } catch (_) { /* già morto */ } }
+    if (m && m.pid) {
+      const pid = Number(m.pid);
+      try { process.kill(pid); } catch (_) { /* già morto */ }
+      // Su Windows il processo ucciso tiene la cartella finché non è uscito davvero: sotto carico rmSync dava EBUSY.
+      for (const fine = Date.now() + 30000; Date.now() < fine;) {
+        try { process.kill(pid, 0); } catch (_) { break; }
+        await new Promise((r) => setTimeout(r, 200));
+      }
+    }
     srv.close();
     await new Promise((r) => setTimeout(r, 200));
-    rmSync(casa, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    togliCartella(casa, { tentativi: 10 });
   }
 });

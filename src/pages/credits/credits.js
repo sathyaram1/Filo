@@ -98,6 +98,7 @@
   // subito di là, e viceversa (il main avvisa la pagina a ogni cambio).
   const W = window.SN_WALLET;
   let ownKeyInfoFor = ''; // la coda della chiave per cui spesa e residuo sono già stati chiesti
+  let ownKeyRefusalFor = ''; // …e il rifiuto che c'era allora: uno nuovo cambia anche spesa e residuo
   function renderOwnKey(w) {
     const section = $('ownKeySection');
     if (!w || !w.ok) { section.hidden = true; return; }
@@ -108,6 +109,7 @@
     $('ownKeyHave').hidden = !has;
     if (!has) {
       ownKeyInfoFor = '';
+      ownKeyRefusalFor = '';
       return;
     }
     $('ownKeyTail').textContent = `…${w.ownKeyTail || ''}`;
@@ -132,10 +134,17 @@
     $('ownKeyConfirm').hidden = true;
     $('ownKeyRemoveBtn').hidden = false;
     // Spesa e residuo li dice OpenRouter: si chiedono una volta per chiave,
-    // appena la chiave è a schermo, non a ogni ridisegno.
+    // appena la chiave è a schermo, non a ogni ridisegno; di nuovo, senza
+    // svuotare la riga, quando arriva un rifiuto (#662: «restano 8,77 $»
+    // sotto «il suo credito è finito» si contraddicevano).
+    const refusalAt = (w.ownKeyRefusal && w.ownKeyRefusal.at) || '';
     if (ownKeyInfoFor !== w.ownKeyTail) {
       ownKeyInfoFor = w.ownKeyTail;
+      ownKeyRefusalFor = refusalAt;
       loadOwnKeyInfo().catch(() => {});
+    } else if (ownKeyRefusalFor !== refusalAt) {
+      ownKeyRefusalFor = refusalAt;
+      if (refusalAt) loadOwnKeyInfo({ quiet: true }).catch(() => {});
     }
   }
 
@@ -200,10 +209,12 @@
     const resetBtn = $('resetIdentityBtn');
     reissue.hidden = true;
     resetBtn.hidden = true;
+    const server = w && w.ok ? w.server : null;
+    const has = Boolean(server && server.hasWallet);
+    // Quello del server vince: è il nome con cui la persona compare all'owner.
+    renderPseudonym(has ? String(server.pseudonym || w.pseudonym || '') : '');
     if (!w || !w.ok) { box.hidden = true; return; }
     box.hidden = false;
-    const server = w.server;
-    const has = Boolean(server && server.hasWallet);
     const note = $('walletNote');
     note.hidden = true;
     // Senza nessuna chiave (né personale, né propria, né di fabbrica) il
@@ -271,6 +282,88 @@
       note.textContent = 'Per ora i posti sono finiti: il tuo codice resta valido, riprova fra qualche giorno.';
       note.hidden = false;
     }
+  }
+
+  // ── Il proprio pseudonimo (#895) ────────────────────────────────────────────
+  // Si copia col clic o dal tasto destro. Cambia solo con un portafoglio nuovo,
+  // e chi copia prende quello a schermo adesso, anche a metà dell'animazione.
+  let pseudonimoAttesa = null;
+  function renderPseudonym(p) {
+    const btn = $('pseudonym');
+    $('pseudonymRow').hidden = !p;
+    btn.dataset.pseudonym = p;
+    if (!btn.classList.contains('is-copied')) btn.textContent = p;
+    if (!p) chiudiMenu();
+  }
+
+  async function copiaPseudonimo() {
+    const btn = $('pseudonym');
+    const p = btn.dataset.pseudonym;
+    if (!p) return;
+    let ok = true;
+    try { await navigator.clipboard.writeText(p); } catch (_) { ok = false; }
+    // La larghezza resta quella dello pseudonimo: la riga non salta durante la conferma.
+    if (!btn.classList.contains('is-copied')) btn.style.minWidth = `${btn.offsetWidth}px`;
+    btn.textContent = ok ? 'Copiato' : 'Non copiato';
+    btn.classList.add('is-copied');
+    if (pseudonimoAttesa) clearTimeout(pseudonimoAttesa);
+    pseudonimoAttesa = setTimeout(() => {
+      pseudonimoAttesa = null;
+      btn.classList.remove('is-copied');
+      btn.style.minWidth = '';
+      btn.textContent = btn.dataset.pseudonym || '';
+    }, 1200);
+  }
+
+  // Menu proprio della pagina (pattern «menu contestuale proprio nelle pagine
+  // filo://»): basta preventDefault, quello generale si fa da parte.
+  let menuAperto = null;
+  function chiudiMenu() {
+    if (!menuAperto) return;
+    menuAperto.remove();
+    menuAperto = null;
+    document.removeEventListener('mousedown', fuoriDalMenu, true);
+    document.removeEventListener('keydown', tastoSulMenu, true);
+    window.removeEventListener('wheel', fuoriDalMenu, true);
+    window.removeEventListener('resize', chiudiMenu);
+  }
+  function fuoriDalMenu(ev) { if (menuAperto && !menuAperto.contains(ev.target)) chiudiMenu(); }
+  function tastoSulMenu(ev) { if (ev.key === 'Escape') { ev.preventDefault(); chiudiMenu(); } }
+
+  function apriMenuPseudonimo(x, y) {
+    chiudiMenu();
+    if (!$('pseudonym').dataset.pseudonym) return;
+    const menu = document.createElement('div');
+    menu.className = 'sn-select-pop sn-wallet-ctx sn-wallet-me-menu';
+    menu.setAttribute('role', 'menu');
+    const info = document.createElement('div');
+    info.className = 'sn-wallet-ctx-info';
+    info.textContent = 'Basta questo per ricevere un regalo di crediti. Email e nome restano tuoi.';
+    const voce = document.createElement('div');
+    voce.className = 'sn-select-option';
+    voce.setAttribute('role', 'menuitem');
+    voce.tabIndex = 0;
+    voce.textContent = 'Copia lo pseudonimo';
+    const fai = () => { chiudiMenu(); copiaPseudonimo().catch(() => {}); };
+    voce.addEventListener('click', fai);
+    voce.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      ev.preventDefault();
+      fai();
+    });
+    menu.append(info, voce);
+    document.body.appendChild(menu);
+    const w = menu.offsetWidth; const h = menu.offsetHeight;
+    menu.style.left = `${Math.max(4, Math.min(x, window.innerWidth - w - 4))}px`;
+    menu.style.top = `${Math.max(4, Math.min(y, window.innerHeight - h - 4))}px`;
+    menuAperto = menu;
+    voce.focus();
+    setTimeout(() => {
+      document.addEventListener('mousedown', fuoriDalMenu, true);
+      document.addEventListener('keydown', tastoSulMenu, true);
+      window.addEventListener('wheel', fuoriDalMenu, true);
+      window.addEventListener('resize', chiudiMenu);
+    }, 0);
   }
 
   // Un invito si dà come LINK (#651): chi lo riceve lo apre, scarica Filo e si
@@ -564,12 +657,10 @@
   function formatInt(n) {
     return new Intl.NumberFormat('it-IT').format(Math.round(Number(n) || 0));
   }
-  // Crediti con al più un decimale: mostra "137" per un valore intero e "0,3"
-  // per una frazione, così un consumo sotto il credito resta visibile invece di
-  // sparire arrotondato a zero. Il decimale sparisce se il valore è intero.
+  // Crediti con al più un decimale, così un consumo sotto il credito resta
+  // visibile. La regola è una sola con la chat (#816): SN_WALLET.formatCredits.
   function formatCredits(n) {
-    const v = Math.round((Number(n) || 0) * 10) / 10;
-    return new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 }).format(v);
+    return W.formatCredits(n);
   }
   function formatDate(ts) {
     if (!ts) return '';
@@ -593,6 +684,11 @@
   });
   $('ownKeyRemoveYes').addEventListener('click', () => { removeOwnKey().catch(() => {}); });
   $('reissueBtn').addEventListener('click', () => { reissueKey().catch(() => {}); });
+  $('pseudonym').addEventListener('click', () => { copiaPseudonimo().catch(() => {}); });
+  $('pseudonymRow').addEventListener('contextmenu', (ev) => {
+    ev.preventDefault();
+    apriMenuPseudonimo(ev.clientX, ev.clientY);
+  });
   $('resetIdentityBtn').addEventListener('click', () => { resetIdentity().catch(() => {}); });
 
   // Aggiorna live quando il saldo cambia (consumo in background, refill, ricompensa).

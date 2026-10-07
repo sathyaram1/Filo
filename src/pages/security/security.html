@@ -13,8 +13,10 @@
   <script src="filo://shared/messages.js"></script>
   <script src="filo://shared/i18n.js"></script>
   <script src="filo://shared/storage.js"></script>
-  <script src="filo://shared/salvaRimandato.js"></script>
+  <script src="filo://shared/nomiSito.js"></script>
   <script src="filo://shared/confirmUi.js"></script>
+  <script src="filo://shared/caselleAlSicuro.js"></script>
+  <script src="filo://shared/vociImpostazioni.js"></script>
 </head>
 <body>
   <main class="sn-page" id="page">
@@ -47,6 +49,14 @@
 
       <div class="sn-toggle-row">
         <label>
+          <input type="checkbox" id="sec-adskip" />
+          <span id="sec-adskip-label"></span>
+        </label>
+        <span class="sn-muted" id="sec-adskip-desc"></span>
+      </div>
+
+      <div class="sn-toggle-row">
+        <label>
           <input type="checkbox" id="sec-siteblock" />
           <span id="sec-siteblock-label"></span>
         </label>
@@ -62,15 +72,28 @@
         </div>
       </div>
 
+      <div class="sn-toggle-row">
+        <label>
+          <input type="checkbox" id="sec-dl-exe" />
+          <span id="sec-dl-exe-label"></span>
+        </label>
+        <span class="sn-muted" id="sec-dl-exe-desc"></span>
+        <div id="sec-dl-exe-sub" style="margin-top: 8px;">
+          <label class="sn-muted" id="sec-dl-trusted-label" for="sec-dl-trusted" style="display: block; margin-bottom: 4px;"></label>
+          <textarea id="sec-dl-trusted" rows="3" style="width: 100%;"></textarea>
+          <div id="sec-dl-trusted-error" role="alert" aria-live="polite" style="display:none;color:var(--sn-error);font-size:12px;margin-top:6px"></div>
+        </div>
+      </div>
+
       <div class="sn-info-box" id="sec-p2p-box">
         <div class="sn-info-box-title" id="sec-p2p-box-title"></div>
         <div id="sec-p2p-box-body"></div>
       </div>
 
-      <div class="sn-info-box" id="sec-proxy-box">
+      <div class="sn-info-box" id="sec-proxy-box" hidden>
         <div class="sn-info-box-title" id="sec-proxy-box-title"></div>
         <div id="sec-proxy-box-body"></div>
-        <div class="sn-muted" id="sec-proxy-box-provider" style="margin-top:8px;display:none"></div>
+        <div class="sn-muted" id="sec-proxy-box-provider" style="margin-top:8px" hidden></div>
       </div>
 
       <div class="sn-toggle-row">
@@ -112,6 +135,23 @@
       </div>
 
       <div class="sn-toggle-row" style="margin-top:16px">
+        <label>
+          <input type="checkbox" id="sec-delicate" />
+          <span id="sec-delicate-label"></span>
+        </label>
+        <span class="sn-muted" id="sec-delicate-desc"></span>
+        <div id="sec-delicate-sub" style="margin-top: 8px; margin-left: 24px;">
+          <label class="sn-muted" id="sec-delicate-sites-label" for="sec-delicate-sites" style="display: block; margin-bottom: 4px;"></label>
+          <textarea id="sec-delicate-sites" rows="3" style="width: 100%;"></textarea>
+          <div id="sec-delicate-sites-error" role="alert" aria-live="polite" style="display:none;color:var(--sn-error);font-size:12px;margin-top:6px"></div>
+          <div id="sec-delicate-campi" style="margin-top:12px" hidden>
+            <div class="sn-muted" id="sec-delicate-campi-title" style="margin-bottom:4px"></div>
+            <ul id="sec-delicate-campi-list" style="list-style:none;padding:0;margin:0"></ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="sn-toggle-row">
         <label>
           <input type="checkbox" id="sec-auto-feedback" />
           <span id="sec-auto-feedback-label"></span>
@@ -158,6 +198,28 @@
           <div id="cookie-wl-error" role="alert" aria-live="polite" style="display:none;color:var(--sn-error);font-size:12px;margin-bottom:10px"></div>
           <ul id="cookie-wl-list" style="list-style:none;padding:0;margin:0"></ul>
         </div>
+
+        <div id="sec-cookies-banners" style="margin-top:18px" hidden>
+          <div class="sn-info-box-title" id="sec-cookies-banners-title"></div>
+          <ul id="cookie-banners-list" style="list-style:none;padding:0;margin:0"></ul>
+        </div>
+
+        <div id="sec-cookies-accessi" style="margin-top:18px" hidden>
+          <div class="sn-info-box-title" id="sec-cookies-accessi-title"></div>
+          <div class="sn-muted" id="sec-cookies-accessi-desc" style="margin-bottom:8px"></div>
+          <ul id="cookie-accessi-list" style="list-style:none;padding:0;margin:0"></ul>
+        </div>
+
+        <div id="sec-cookies-riquadri" style="margin-top:18px" hidden>
+          <div class="sn-info-box-title" id="sec-cookies-riquadri-title"></div>
+          <div class="sn-muted" id="sec-cookies-riquadri-desc" style="margin-bottom:8px"></div>
+          <ul id="cookie-riquadri-list" style="list-style:none;padding:0;margin:0"></ul>
+        </div>
+
+        <div id="sec-cookies-done" style="margin-top:18px" hidden>
+          <div class="sn-info-box-title" id="sec-cookies-done-title"></div>
+          <ul id="cookie-done-list" style="list-style:none;padding:0;margin:0"></ul>
+        </div>
       </section>
 
       <section id="sec-fingerprint" style="margin-top:28px">
@@ -189,9 +251,25 @@
         </div>
       </section>
 
+      <section id="sec-site-perms" style="margin-top:28px">
+        <h2 id="sec-site-perms-title" style="font-size:1.05rem;margin-bottom:8px"></h2>
+        <ul id="sec-perm-list" style="list-style:none;padding:0;margin:0"></ul>
+      </section>
+
+      <section id="sec-visite" style="margin-top:28px">
+        <h2 id="sec-visite-title" style="font-size:1.05rem;margin-bottom:4px"></h2>
+        <span class="sn-muted" id="sec-visite-desc" style="display:block;margin-bottom:10px"></span>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+          <button type="button" class="sn-btn sn-btn-secondary" id="sec-visite-ora" data-periodo="ultima_ora"></button>
+          <button type="button" class="sn-btn sn-btn-secondary" id="sec-visite-oggi" data-periodo="oggi"></button>
+          <button type="button" class="sn-btn sn-btn-secondary" id="sec-visite-tutto" data-periodo="tutto"></button>
+          <span class="sn-saved-indicator" id="sec-visite-hint"></span>
+        </div>
+      </section>
+
       <div class="sn-toggle-row" id="sec-export-row" style="margin-top:28px">
         <div>
-          <button type="button" id="sec-export-btn"></button>
+          <button type="button" class="sn-btn sn-btn-secondary" id="sec-export-btn"></button>
           <span class="sn-muted" id="sec-export-desc" style="display:block;margin-top:6px"></span>
         </div>
         <span class="sn-saved-indicator" id="sec-export-hint"></span>
@@ -199,7 +277,7 @@
 
       <div class="sn-toggle-row" id="sec-import-row" style="margin-top:18px">
         <div>
-          <button type="button" id="sec-import-btn"></button>
+          <button type="button" class="sn-btn sn-btn-secondary" id="sec-import-btn"></button>
           <span class="sn-muted" id="sec-import-desc" style="display:block;margin-top:6px"></span>
         </div>
         <span class="sn-saved-indicator" id="sec-import-hint"></span>

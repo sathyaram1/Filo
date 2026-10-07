@@ -47,6 +47,18 @@ async function seed(app, schede) {
     }
     // Niente rete: le schede sono quelle che passiamo noi.
     globalThis.SN_FEEDBACK.listPublic = async () => cards;
+    // #678: l'annuncio chiede le PROPRIE schede per identificativo, non la
+    // bacheca intera. Il registro degli invii di questa installazione è ciò
+    // che glieli dice, e `getManyPublic` risponde solo su quelli chiesti — se
+    // il codice chiedesse di più, qui non arriverebbe.
+    globalThis.SN_FEEDBACK.getManyPublic = async (ids) => {
+      const voluti = new Set((ids || []).map(String));
+      return cards.filter((c) => voluti.has(String(c._id)));
+    };
+    await globalThis.SN_FEEDBACK_MINE.scrivi({
+      ids: schede.map((c) => c._id),
+      checkedAt: 0,
+    });
   }, { clientId: CLIENT_ID, schede });
 }
 
@@ -142,6 +154,12 @@ test('aggrega più feedback risolti e somma la ricompensa', async ({ app, openTa
   // 50 + 50 = 100.
   await expect(page.locator('.dash-thanks-total')).toContainText('+100');
   await expect.poll(() => balanceOf(app)).toBe(1100);
+  // Il titolo su due righe spinge il totale in basso a destra: la X di
+  // chiusura non gli finisce sopra (#816).
+  await page.waitForTimeout(300);
+  const totale = await page.locator('.dash-thanks-total').boundingBox();
+  const x = await page.locator('.dash-recap-x').boundingBox();
+  expect(x.x, `X ${JSON.stringify(x)} sopra il totale ${JSON.stringify(totale)}`).toBeGreaterThanOrEqual(totale.x + totale.width);
 });
 
 // Quando escono insieme due fix di chi sta guardando, l'annuncio li mette in
@@ -290,6 +308,18 @@ test('una segnalazione VECCHIA risolta oggi paga chi l\'ha mandata come una rece
       const dopo = afterName ? perNome.findIndex((r) => afterName.endsWith(`/${r._id}`)) + 1 : 0;
       return perNome.slice(dopo, dopo + pageSize);
     };
+
+    // #678 — questa è un'installazione che segnalava GIÀ prima che esistesse
+    // il registro degli invii: i suoi identificativi non li sa nessuno, e
+    // finché dura la finestra dell'eredità se le cerca leggendo tutte le
+    // schede. È l'unico cammino che deve ancora reggere una scheda fuori
+    // dalla prima pagina.
+    await globalThis.SN_FEEDBACK_MINE.scrivi({
+      ids: [],
+      checkedAt: 0,
+      ereditaFinoA: Date.now() + 24 * 60 * 60 * 1000,
+      ereditaUltimoGiro: 0,
+    });
 
     // La scheda esiste ed è FUORI dalla prima pagina: se un domani la pagina
     // diventasse più larga, questa riga resta vera e la prova continua a dire

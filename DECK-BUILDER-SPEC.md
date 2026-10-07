@@ -51,18 +51,24 @@ I messaggi non sono testo: sono **contenuto tipizzato**. Una bolla può contener
 ### 3.3 Gestione dello scroll
 
 - **Ultima bolla**: `CardList` mostra ~10 righe con scroll interno.
-- **Bolle precedenti**: elenchi carte **sempre collassati** a una riga di sintesi ("12 risultati per 'payoff self-mill'"), riespandibili al click. La cronologia resta scorrevole rapidamente.
+- **Bolle precedenti**: elenchi carte **collassati** a ogni domanda nuova, a una riga di sintesi riespandibile al click. La cronologia resta scorrevole rapidamente.
+- **Riga di sintesi** (#788): numero più titolo in italiano che il modello scrive nella stessa risposta ("12 carte che danno rapidità"); senza titolo "12 risultati", mai la query. Il triangolino apre e chiude ogni lista, anche l'ultima. Tasto destro: ricerca esatta copiabile, ordinamento della lista (CMC default, nome, prezzo; salvato con la lista), stessa ricerca su Scryfall.
 
 ### 3.4 Righe carta (in `CardList`)
 
 - Nome (tronca con ellissi) + **costo di mana** destro-allineato, renderizzato con i simboli SVG ufficiali di Scryfall (`{2}{U}{R}` → glifi; minuscoli, cacheati per sempre).
 - Spunta/toggle "aggiungi al mazzo" per riga.
+- Tasto destro (anche sui nomi in prosa, §3.5): aggiungi/rimuovi dal mazzo · imposta come commander · apri su Scryfall; sul commander del mazzo: rimuovi commander.
 - Ordinamento default per CMC.
 - **Nessuna immagine caricata** finché non c'è hover.
 
 ### 3.5 Nomi carta in prosa
 
 L'agente è istruito a marcare **sempre** i nomi carta con la sintassi `[[Nome Carta]]` (standard delle community MTG, nativa per i modelli). Il renderer trasforma i marcatori in span hoverable, risolti via Scryfall (`/cards/named?fuzzy=`). Niente riconoscimento a posteriori del testo (fragile, fallisce su nomi parziali e in italiano). Dictionary-matching di fallback: solo se serve, dopo.
+
+### 3.6 Attesa e «Ferma»
+
+Mentre Filo prepara una risposta il campo di scrittura mostra da quanto si aspetta e il tasto **Ferma** (anche Esc nel campo). Fermare annulla davvero la richiesta al modello e libera subito la chat; la bolla resta «Risposta fermata.» con Riprova. Per il modello non c'è un taglio automatico: un ragionamento lungo può durare minuti, e a decidere è l'utente. Le modifiche al mazzo chieste nel turno (commander, budget, tag) si scrivono solo a risposta arrivata.
 
 ---
 
@@ -73,6 +79,7 @@ L'agente è istruito a marcare **sempre** i nomi carta con la sintassi `[[Nome C
 - **Filtro color identity automatico**: ogni ricerca è vincolata all'identità del commander (`id<=WUBRG-subset`). "Modi per dare haste" in un mazzo Izzet non deve mai proporre carte verdi.
 - **Query cross-mazzo** ("il ramp di mazzo X"): non è una feature di layout, è scope della query. L'agente risolve il riferimento leggendo l'altro mazzo (carte + tag) e produce una `CardList` normale, aggiungibile al mazzo corrente.
 - Query ibride (semantica + sintassi Scryfall esplicita) passano invariate dove l'utente usa sintassi nativa.
+- **Filtro semantico (§4.1)**: una ricerca a parole usa una query larga apposta (sinonimi in OR) e segue le pagine di Scryfall fino a un tetto largo (sei pagine); ogni carta che torna passa da un giudice LLM economico, a lotti di 50, al più 8 insieme, con cache per carta, criterio e istruzioni del giudice. Si mostra solo quello che il giudice tiene, e mentre lavora la bolla mostra fase e conteggio. Salta il giudice solo un messaggio scritto tutto in sintassi Scryfall (che resta alla prima pagina). Se le scarta tutte, la chat lo dice; se non riesce a giudicare, mostra la ricerca grezza e lo dice, e se non ne giudica solo una parte segna quelle con un «?». Una risposta del giudice con una voce che non indica una carta della lista è illeggibile, mai «nessuna tiene». Il giudice vede ciò che la richiesta dà per scontato: il commander del mazzo, le carte del mazzo quando il criterio lo richiama, prezzo e forza/costituzione di ogni carta, e le ultime richieste dell'utente quando il modello non ha scritto il criterio; un vincolo che dalla riga della carta non si vede l'ha già applicato la query, e non è un motivo per scartare. I giudizi salvati valgono per istruzioni, modello e contesto, con un tetto (i più vecchi escono); le chiamate del giudice non entrano nella cronologia AI né nella cache delle risposte, che hanno un tetto condiviso col resto di Filo. Carte trovate oltre quelle mostrate o giudicate: la chat dice quante. Una pagina di Scryfall che non risponde si riprova; se ancora non risponde la chat lo dice come guasto, non come tetto, e tiene Riprova. Una ricerca senza risultati lo dice anche dopo la frase del modello. Mai un ripiego o un taglio silenzioso sui risultati larghi (#382).
 
 ---
 
@@ -184,7 +191,9 @@ Nome del mazzo + **commander** (sempre visibile). Click sul nome → **switcher*
 
 - La sua **color identity filtra ogni ricerca** automaticamente (§4).
 - Statistiche su 100 singleton; check duplicati, identity per carta, banned list (`legalities.commander` di Scryfall) come riga del pannello stats.
-- Mostrato nell'header e come art crop nella libreria (§10).
+- Mostrato nell'header e come art crop nella libreria (§10). Il nome nell'header è un consumatore della preview (§5.1): hover = anteprima, click = carosello.
+- Una regola sola per cambiarlo (tasto destro, chat, rimozione): il nuovo esce dall'elenco, quello di prima ci rientra come carta normale e una riga lo dice (#302, #789). Il commander non entra anche fra le carte.
+- In chat un commander già impostato cambia solo col segnale esplicito di sostituzione del modello (`replaceCommander`); una menzione o un paragone non lo toccano.
 
 ---
 
@@ -268,7 +277,7 @@ Storage interamente locale (come l'archivio tab: JSON o SQLite). Sync cloud fuor
 | Immagini | `image_uris` (normal per detail, `art_crop` per libreria) — cache locale |
 | Dati carta bulk | Bulk data download opzionale per lookup locale veloce/offline |
 
-Rispettare i rate limit di cortesia (~10 req/s); tutte le risorse statiche cacheate localmente.
+Rispettare i rate limit di cortesia (~10 req/s) distanziando le partenze, non le risposte: una richiesta che non risponde non tiene in coda le altre, e dopo 30 secondi si chiude con una frase per l'utente (di norma Scryfall risponde in meno di un secondo). Tutte le risorse statiche cacheate localmente.
 
 ### 13.3 Cache riassunto
 
@@ -278,6 +287,7 @@ Rispettare i rate limit di cortesia (~10 req/s); tutte le risorse statiche cache
 | Prezzi | scryfall_id | TTL (ore) |
 | Tag context-free | (carta, tag) | Permanente, cross-mazzo |
 | Pareri | (carta, versione mazzo) | Fino a refresh; stantio marcato dopo edit |
+| Chat del banco (bolle come dati, §3.2) | mazzo | Fino a «Svuota la chat» o all'eliminazione del mazzo |
 
 ---
 

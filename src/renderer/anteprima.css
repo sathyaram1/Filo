@@ -1,0 +1,75 @@
+/* La carta di anteprima di una scheda (#430). I token arrivano dalla shell a ogni comparsa: qui solo i valori
+   di partenza, gli stessi di shell.css. */
+
+:root {
+  --bg: #fdf6ec;
+  --fg: #2a221a;
+  --fg-soft: #7a6e60;
+  --border: #e2d3b5;
+  --tab-active: #fdf6ec;
+  --radius: 10px;
+}
+:root.scuro {
+  --bg: #1d1a16;
+  --fg: #f1e7d6;
+  --fg-soft: #aa9c84;
+  --border: #3b332a;
+  --tab-active: #1d1a16;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  overflow: hidden;
+  user-select: none;
+  font-family: var(--font, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif);
+}
+
+#carta {
+  box-sizing: border-box;
+  background: var(--tab-active);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  /* Ombra corta e calda, verso il basso: un foglio appoggiato sotto la scheda. */
+  box-shadow: 0 6px 14px -4px rgba(42, 34, 26, 0.28);
+  overflow: hidden;
+}
+#carta[hidden] { display: none; }
+
+.testa { padding: 8px 11px 8px; }
+
+#titolo {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+#indirizzo {
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--fg-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#indirizzo:empty { display: none; }
+
+#foto {
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+#foto:empty { display: none; }
+#foto img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+}

@@ -4,7 +4,7 @@
 // `safeStorage` di Electron, che cifra con le API del sistema operativo
 // (DPAPI su Windows, Keychain su macOS, libsecret su Linux). Il blob cifrato
 // vive in userData/auth.bin. Se la cifratura OS non è disponibile, NON
-// scriviamo in chiaro: rinunciamo alla persistenza (l'utente rifarà il login).
+// scriviamo in chiaro: rinunciamo alla persistenza fra un avvio e l'altro.
 
 // Niente require('electron') a livello di modulo: questo file viene richiesto
 // (transitivamente, via google-auth → defaultsStore/supportModelsStore) anche
@@ -12,6 +12,12 @@
 // servono solo dentro le funzioni, quindi si richiedono lazy lì.
 const fs = require('node:fs');
 const path = require('node:path');
+
+// La sessione dell'avvio in corso. Senza cifratura del sistema il disco resta
+// vuoto, ma salvare e poi rileggere `null` nello stesso processo farebbe
+// credere a chi legge che il login non sia mai avvenuto (#708): la rinuncia è
+// alla PERSISTENZA fra un avvio e l'altro, non alla sessione.
+let inMemoria = null;
 
 function filePath() {
   const { app } = require('electron');
@@ -30,6 +36,7 @@ function canEncrypt() {
 // Salva l'oggetto sessione (token + profilo) cifrato. Ritorna true se persistito.
 function save(session) {
   if (!session) return false;
+  inMemoria = session;
   if (!canEncrypt()) {
     console.warn('[auth] safeStorage non disponibile: sessione non persistita su disco');
     return false;
@@ -47,12 +54,12 @@ function save(session) {
 
 // Carica la sessione cifrata, o null se assente/illeggibile.
 function load() {
-  if (!canEncrypt()) return null;
+  if (!canEncrypt()) return inMemoria;
   let raw;
   try {
     raw = fs.readFileSync(filePath());
   } catch (_) {
-    return null; // file assente = non loggato
+    return inMemoria; // file assente: non loggato, o salvato solo per questo avvio
   }
   try {
     const { safeStorage } = require('electron');
@@ -68,6 +75,7 @@ function load() {
 }
 
 function clear() {
+  inMemoria = null;
   try {
     fs.rmSync(filePath(), { force: true });
   } catch (_) {}

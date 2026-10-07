@@ -6,12 +6,17 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const TMP = cartellaTemporanea('filo-dispatch-cornice-');
 process.env.FILO_DISPATCH_STATE_DIR = TMP;
 process.env.FILO_REPO_ROOT = TMP;
 process.env.FILO_TOOLS_ROOT = TMP;
+// Anche la temporanea, fuori dalla ROOT: dispatch ci scarica i pezzi grossi del payload, e una cartella nuova a
+// ogni corsa restava lì per sempre (#717).
+const TEMP = cartellaTemporanea('filo-dispatch-tmp-');
+Object.assign(process.env, { TMPDIR: TEMP, TEMP, TMP: TEMP });
 
 const { serverCtx, emit } = await import('../../scripts/dispatch.mjs');
 
@@ -46,7 +51,10 @@ test('la cornice del server arriva al lavoratore intatta, avviso prima del testo
     const fb = parsed.payload.feedback;
     assert.equal(fb.avviso, AVVISO, `${role}: l'avviso deve arrivare`);
     assert.equal(fb.text, TESTO, `${role}: il testo incorniciato deve arrivare uguale`);
-    assert.equal(fb.documents[0].text, DOC, `${role}: il documento (60k) deve arrivare intero`);
+    // Un documento così non sta nella stampa: esce in un file fuori dal repo, intero e con la sua cornice.
+    const fuori = parsed.payload.fileEsterni && parsed.payload.fileEsterni['feedback.documents.0.text'];
+    assert.ok(fuori && fb.documents[0].text.includes(fuori), `${role}: il campo cita il file del documento`);
+    assert.equal(readFileSync(fuori, 'utf8'), DOC, `${role}: il documento (60k) deve arrivare intero`);
     assert.ok(Object.keys(fb).indexOf('avviso') < Object.keys(fb).indexOf('text'), `${role}: l'avviso viene prima del testo`);
     assert.ok(printed.indexOf('"avviso"') < printed.indexOf('"text"'), `${role}: anche nel testo stampato`);
   }

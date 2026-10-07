@@ -467,6 +467,31 @@ muro non era un muro.
   se il codice è arrivato su `main`. Lavorare direttamente su `main` non ha più
   senso e viene fermato subito.
 
+### Il sì si dà anche da browser (2026-10-04, #489)
+
+L'unica superficie di approvazione stava dentro l'app: se il lavoro bloccato
+fosse proprio quello che impedisce a Filo di partire, non ci sarebbe stato
+nessun modo di approvarlo. La seconda superficie è una pagina statica,
+`site/approvazioni`, pubblicata su Firebase Hosting del progetto
+(`https://filo-8b9cb.web.app`) e raggiungibile da qualunque browser.
+
+- **Stessa identità, stessi controlli**: accesso Google con l'account del
+  proprietario, poi la stessa `ownerMergeApprovals` dell'app (`list`,
+  `approve`, `discard`). Il server non distingue le due superfici e non
+  concede niente di più: niente scorciatoie da riga di comando.
+- **Le credenziali restano in memoria** (persistenza `none`): chiusa la scheda
+  non resta niente su disco che un programma sul computer possa riusare, e la
+  scelta dell'account si rivede a ogni accesso.
+- **Non si lascia incorniciare** (`frame-ancestors 'none'`, `X-Frame-Options`,
+  e la pagina stessa non si disegna dentro un riquadro): un'altra pagina non
+  può far cliccare «Approva» a chi non la vede.
+- **Le card sono quelle dell'app**: `scripts/build-approvazioni.mjs` copia
+  modulo, icone e tema; una sentinella negli unit pretende le copie allineate e
+  il predeploy rifiuta una copia vecchia.
+- **Si pubblica solo ciò che è fuso**: `npm run regole:pubblica` porta su
+  Firebase regole, indici e la pagina insieme, da `main` allineato a
+  `origin/main`. Il terminale del finish, a ogni blocco, nomina l'indirizzo.
+
 ### Si esamina e si fonde LO STESSO commit (2026-08-21, verifica avversariale)
 
 La prima versione del cancello scaricava il diff di `main...<ramo>` e poi
@@ -533,7 +558,17 @@ La regola, uguale per tutti e due:
 - **se il contenuto cambia, l'esito decade** e quel controllo va rifatto — la
   stessa cosa che già succede alle richieste di fusione in attesa. Al passo 2
   del cancello i PASS si leggono sullo **sha** risolto al passo 3, non sul nome
-  del ramo;
+  del ramo: ciascuno dei due copre la punta solo se è stato dato lì. Unica
+  eccezione: dopo il pass il verificatore toglie le prove dei rilievi usciti in
+  feedback loro, e se fra il commit di un via libera e la punta (che deve
+  discenderne) ci sono solo prove del giro tolte, quel via libera la copre
+  ancora. Quando non la copre, o è registrato senza commit, il server lo
+  azzera e rimette il lavoro in giro da sé: la verifica si porta dietro anche
+  il controllo di sicurezza e torna al verificatore (`not_approved`), il
+  controllo di sicurezza azzera solo sé stesso e la pratica aspetta un nuovo
+  controllo (`secaudit_stale`, #773). Il salto del controllo deciso
+  dall'owner resta com'è: lì il via libera è una sua scelta, e L5 gira sulla
+  punta;
 - **l'esito vale per un commit, quindi si registra da un commit.** Con
   modifiche fuori dai commit il salvataggio automatico le committa *dopo* la
   registrazione, la punta si sposta e l'esito nasce già decaduto. Le tre
@@ -544,27 +579,39 @@ La regola, uguale per tutti e due:
 - **anche l'ULTIMO passo parla del commit.** Timbrare l'impronta sugli esiti
   non chiude niente finché la fusione si chiede per nome del ramo. Dal
   2026-09-20 `routineMerge` porta anche `sha`, come `ownerMerge` dal
-  2026-08-20, e il citofono (`scripts/merge-gate.mjs`) fa prima due controlli
+  2026-08-20: diverso dalla punta, niente fusione (`stale`) e il controllo di
+  sicurezza si rifà sulla punta vera (#773). Il citofono (`scripts/merge-gate.mjs`) fa prima due controlli
   che sul cammino locale c'erano da sempre e qui mancavano: non chiede la
   fusione se nella directory c'è qualcosa fuori dai commit (il salvataggio
   automatico lo committerebbe e lo spedirebbe, e il server fonderebbe la punta
-  NUOVA), e non la chiede se un via libera registrato su questa macchina parla
-  di un altro commit. Se su questa macchina non risulta su quale commit sono
-  stati dati, lo **dice** e prosegue: astenersi in silenzio è la classe di
-  guasto che questa spec toglie dappertutto;
-- **il decadimento si registra, non si stampa e basta.** Il rifiuto della
-  fusione dice quale passo lo mette a registro: il rientro in verifica
-  (`revision_security` → `revision_capability`, la stessa strada del
-  riallineamento), col comando già scritto e il ramo dentro, e il rilascio con
-  `--guasto` come via d'uscita se il server rifiuta quel passaggio. Fermarsi e
-  basta lascia la notizia su una macchina sola, mentre sul canale i due via
-  libera continuano a risultare buoni per quel ramo: la segnalazione #485
-  spostata di un passo. I comandi del rifiuto si stampano con gli **attrezzi
+  NUOVA), e non la chiede se il verdetto del controllo di sicurezza registrato
+  su questa macchina parla di un altro commit. Dal #929 `routineMerge` e
+  `ownerMerge` portano anche `provaUnit`: gli unit girati da chi chiede sul
+  risultato della fusione con origin/main (`scripts/lib/unit-sulla-fusione.mjs`).
+  Il server fonde solo se main è ancora lo sha provato (`main_moved`
+  altrimenti, e chi chiede rifà la prova, al massimo tre volte); rossi solo
+  sulla fusione → riallineamento con l'elenco dei test (`unit_rossi`); senza il
+  campo fonde come prima e lo scrive nel log (`src/routine/provaUnit.js`). Se la verifica ha dato l'ok su
+  un altro commit lo **dice** in una nota e chiede lo stesso: quella mossa la
+  giudica il server (punto sopra). Se su questa macchina non risulta su quale
+  commit sono stati dati i via libera, lo **dice** e prosegue: astenersi in
+  silenzio è la classe di guasto che questa spec toglie dappertutto;
+- **il decadimento si registra, e con un passo che chi legge il rifiuto può
+  fare.** Fermarsi e basta lascia la notizia su una macchina sola, mentre sul
+  canale i due via libera continuano a risultare buoni per quel ramo: la
+  segnalazione #485 spostata di un passo. Ma chi chiede la fusione è il
+  controllo di sicurezza, e il rientro in verifica il server a lui lo nega:
+  dettarlo lasciava il lavoro con due via libera e nessuno che lo portasse
+  avanti (cinque lavori fermi, settembre 2026, per le sole prove del giro
+  tolte dopo il pass). Quindi la verifica decaduta la registra il server dentro
+  `routineMerge`, e il rifiuto locale resta solo per il verdetto di sicurezza:
+  detta la rilettura del pezzo nuovo (`git diff <controllato> <punta>`) e una
+  nuova `--record-secaudit`, che il server accetta, poi il rilancio. I comandi del rifiuto si stampano con gli **attrezzi
   del giro** (`absolutizeRecipe`), non con `scripts/…`, che riporterebbe alla
   copia che il ramo si porta dietro;
 - **la memoria del confronto la scrive OGNI strada che registra un esito.**
-  Il rifiuto del citofono si regge sullo specchio locale («la verifica ha dato
-  l'ok su X, il controllo di sicurezza su Y»). Finché lo scriveva solo
+  Il rifiuto e le note del citofono si reggono sullo specchio locale («la
+  verifica ha dato l'ok su X, il controllo di sicurezza su Y»). Finché lo scriveva solo
   `dispatch --record-*`, bastava registrare lo stesso esito dal canale
   (`deliver verdict|secaudit`) perché lo specchio restasse vuoto e la fusione
   ripartisse a foglio sostituito: la difesa si spegneva scegliendo l'ingresso.
@@ -585,9 +632,11 @@ La regola, uguale per tutti e due:
   se non ci riesce, per costruzione lo scrive nei log e prosegue — i via libera
   parlano di un contenuto che non atterrerà mai e ad atterrare è quello
   vecchio: si spedisce il ramo. Se in cima c'è DI PIÙ, spedire non c'entra: là
-  c'è lavoro che qui non c'è, sovrascriverlo lo butterebbe via, e gli esiti
-  sono decaduti come per un ramo mosso sotto i piedi, quindi si registra il
-  rientro in verifica. «Il contenuto esaminato è arrivato là» non è la domanda
+  c'è lavoro che qui non c'è, sovrascriverlo lo butterebbe via: la directory
+  si porta su quel contenuto (`git merge --ff-only`, il comando lo detta il
+  rifiuto) e il rilancio dice cosa rileggere, con le regole di un ramo mosso
+  sotto i piedi: il verdetto di sicurezza si registra di nuovo, la verifica la
+  giudica il server. «Il contenuto esaminato è arrivato là» non è la domanda
   giusta: un commit può stare nella storia del ramo senza essere quello che
   atterra, e con il solo contenimento un ramo più avanti passava in silenzio
   (verifica del giro 4). La punta vera si chiede a origin (`ls-remote`), non al
@@ -606,10 +655,10 @@ Nel repo pubblico stanno il lato che consegna — `scripts/dispatch.mjs`,
 `scripts/routine-channel.mjs` e `scripts/merge-gate.mjs`, dove lo sha si
 timbra da solo invece di chiederlo a chi lavora — e questa regola. **Il
 confronto al passo 2 del cancello vive nel server** (`filo-security`), che è
-il posto giusto: è l'ultimo livello, quello che non si può convincere. Finché
-lì il verdetto L4 si legge sul nome del ramo, il campo arriva e non viene
-guardato: quello che il repo pubblico può fare da solo è chiudere il cammino
-onesto (fatto), non il muro.
+il posto giusto: è l'ultimo livello, quello che non si può convincere. Il
+repo pubblico chiude il cammino onesto; il muro è il server, che dal #773
+respinge un verdetto L4 senza sha e al cancello lo confronta con la punta
+come quello della verifica.
 
 ### Gli automatismi locali (2026-08-21, stessa verifica avversariale)
 
@@ -724,8 +773,20 @@ ma a scriverlo è il server.
 - **`scripts/release-bump.mjs`** è il citofono: chiede, stampa il numero nuovo
   su stdout e basta. Exit `0` fatto · `2` rifiutato (freno, parola d'ordine,
   manifesto) · `3` server non raggiungibile o funzione assente. Il lavoro di
-  pubblicazione poi **rilegge** `main` (una lettura, `git pull --rebase`) e si
-  ferma se il numero non combacia: costruire col numero vecchio pubblicherebbe
-  sopra una release già esistente.
+  pubblicazione costruisce il commit **provato dalla suite**, non la punta di
+  `main` (#641): `scripts/release-apply-version.mjs` applica quel numero in
+  locale al suo manifesto, senza commit né push, e si ferma se non è più alto
+  di quello dell'albero. Il tag nasce sul commit costruito (`--target`).
 - Nel lavoro di pubblicazione non è rimasto **nessun** `git push`, `git commit`
   o `npm version`, e una sentinella negli unit test diventa rossa se ci tornano.
+
+## 13. La domanda di fine sessione: `routineClosing` (2026-09-25)
+
+A fine sessione orchestratore e worker rispondono a una domanda che l'owner
+imposta; ognuno risponde per sé (l'orchestratore non legge mai i worker).
+
+- **`routineClosing` `{ passphrase | ticket, op: 'question' | 'answer', id?, answer?, requestId? }`** — domanda e risposta (`requestId`, uno per invocazione, fa ritrovare lo stesso documento ai ritentativi); mai rifiutata per `fault_declared` né a routine spente; `answer` oltre 32768 byte → `answer_too_big` con `bytes` e `max`, mai troncata.
+- **`routineClosingAdmin` (callable owner)** `{ op: 'get' | 'set' | 'clear' | 'answers' }` — slot `orchestrator`, `worker`, `new-work`, `fixer`, `verifier`, `secaudit`, `prober` (gli altri: `bad_slot` con l'elenco); ripiego nel server.
+- `routine-channel.mjs domanda "<parola>"` | `domanda --biglietto <b>` — stampa la domanda e il comando per rispondere; exit 0 · 2 nessuna domanda (404, rete) · 4 rifiutata.
+- `routine-channel.mjs risposta "<parola>" <id>` | `risposta --biglietto <b>` — il testo da stdin (`<<'FINE'`); stessi exit.
+- `routine-domanda.mjs mostra | imposta <slot> "<testo>" | togli <slot> | risposte [--n N]` — lo strumento dell'owner; stampa i testi coi caratteri di controllo resi visibili (`\x1b`), perché le risposte vengono da sessioni che leggono testo non fidato.

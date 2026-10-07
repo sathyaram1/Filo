@@ -230,11 +230,11 @@
 }
 .sn-popup-send:hover { filter: brightness(1.1); }
 
-/* Ogni riquadro che Filo ancora nell'angolo in basso a destra sta QUI DENTRO e si impila: da soli
-   erano tutti `position: fixed` sullo stesso punto e due avvisi ravvicinati si coprivano. */
+/* Ogni riquadro che Filo ancora in basso a destra sta QUI DENTRO e si impila (da soli due avvisi vicini
+   si coprivano), sopra la pila della barra quando c'è: la sua altezza la manda il main, --filo-avvisi-barra. */
 .sn-toasts {
   position: fixed;
-  bottom: 20px;
+  bottom: max(20px, var(--filo-avvisi-barra, 0px));
   right: 20px;
   z-index: 2147483647;
   display: flex;
@@ -244,7 +244,7 @@
   max-width: min(420px, calc(100vw - 40px));
   /* Rete di sicurezza per finestre molto basse: lo stack non esce mai dal
      viewport, al massimo scorre. */
-  max-height: calc(100vh - 40px);
+  max-height: calc(100vh - 20px - max(20px, var(--filo-avvisi-barra, 0px)));
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-width: thin;
@@ -275,14 +275,19 @@
   box-shadow: var(--sn-shadow);
   opacity: 0;
   transform: translateY(8px);
-  transition: opacity 200ms ease, transform 200ms ease;
+  transition: opacity 200ms ease, transform 200ms ease, background 150ms ease;
   pointer-events: none;
 }
 
+/* Visibile prende il puntatore (sopra, i tempi della pila aspettano; un clic lo chiude); il vuoto attorno
+   resta della pagina, e mentre sfuma torna trasparente. */
 .sn-toast.sn-toast-visible {
   opacity: 1;
   transform: translateY(0);
+  pointer-events: auto;
+  cursor: pointer;
 }
+.sn-toast.sn-toast-visible:hover { background: var(--sn-hover); }
 
 /* Pill della dettatura: si comporta come un toast ma è interattiva, cliccandola si ferma la registrazione. */
 .sn-dictate-pill {

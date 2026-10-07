@@ -33,6 +33,33 @@ async function prepara(page, lista, tab, apri) {
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_FEEDBACK && window.filo);
   await page.evaluate(() => {
+    // Quante RIGHE occupano questi pulsanti.
+    //
+    // Prima si arrotondava la coordinata assoluta su una griglia da 8 pixel e
+    // si contavano i valori diversi. Due pulsanti della stessa riga non hanno
+    // però la stessa coordinata: la riga li centra, e uno alto 31 pixel e uno
+    // alto 33 partono uno un pixel più in basso dell'altro. Basta che quel
+    // pixel cada a cavallo di una tacca della griglia (691 e 692 diventano 86
+    // e 87) e sei pulsanti affiancati risultano su due righe. L'altezza di un
+    // pulsante dipende dal font disponibile, quindi lo stesso codice passava
+    // su una macchina e falliva su un'altra, senza che niente fosse cambiato
+    // nella pagina.
+    //
+    // Adesso si confrontano le coordinate con una tolleranza: due pulsanti
+    // stanno sulla stessa riga se si sovrappongono in verticale per più di
+    // metà della loro altezza, che è quello che l'occhio chiama «stessa riga».
+    window.__righeDeiTasti = (bs) => {
+      const righe = [];
+      for (const b of bs) {
+        const r = b.getBoundingClientRect();
+        const centro = r.top + r.height / 2;
+        const riga = righe.find((x) => Math.abs(x - centro) <= r.height / 2);
+        if (riga == null) righe.push(centro);
+      }
+      return righe.length;
+    };
+  });
+  await page.evaluate(() => {
     window.__updates = [];
     const orig = window.filo.message.bind(window.filo);
     window.filo.message = async (msg) => {
@@ -191,21 +218,48 @@ test('la frase già scritta si legge nella conversazione, senza aprire niente', 
   await expect(bolla).toContainText('per chi ha segnalato');
 });
 
-test('anche con quattro azioni i tasti restano su una riga sola', async ({ openTab }) => {
-  // Un file sospetto offre il massimo dei pulsanti: "In coda", "Conferma
-  // attacco", "Conferma spam", "Archivia" — più preferito e frase. Prima gli
-  // ultimi due finivano su una seconda riga.
+// Le due prove qui sotto MISURANO dove cadono i tasti della barra dell'owner,
+// e dove cadono dipende da due cose che cambiano da macchina a macchina: la
+// larghezza della finestra e la larghezza del testo, cioè i font installati.
+// Alla larghezza di serie la stessa pagina dava una riga sulla macchina di chi
+// sviluppa Filo e due sul contenitore di GitHub, e quei due rossi erano spenti
+// da mesi (#708). Qui la finestra si fissa, larga abbastanza perché i sei
+// tasti ci stiano anche col testo più largo: così il controllo torna a parlare
+// dell'IMPAGINAZIONE — un settimo tasto, un'etichetta lunga il doppio, una
+// regola di flex rotta vanno ancora a capo — invece che dei font di chi lancia.
+const LARGHEZZA_FISSA = 1600;
+
+async function finestraLarga(app, px) {
+  const dato = await app.evaluate(({ BrowserWindow }, l) => {
+    const w = BrowserWindow.getAllWindows()[0];
+    if (!w) return 0;
+    if (w.isMaximized()) w.unmaximize();
+    const [, h] = w.getContentSize();
+    w.setContentSize(l, h);
+    return w.getContentSize()[0];
+  }, px);
+  // Se la finestra non è diventata larga come chiesto la misura dopo parlerebbe
+  // di un'altra pagina: meglio dirlo qui che vedere un numero di righe strano.
+  expect(dato).toBe(px);
+}
+
+test('anche con quattro azioni i tasti restano su una riga sola', async ({ app, openTab }) => {
+  // Un file sospetto offre il massimo dei pulsanti: "In coda", "Lavoro locale" (#913), "Conferma
+  // attacco", "Conferma spam", "Archivia" — più preferito, frase e «Senza chiedere» (#1034). Prima gli
+  // ultimi finivano su una seconda riga.
+  await finestraLarga(app, LARGHEZZA_FISSA);
   const page = await openTab(URL);
   await prepara(page, [{ ...BASE, _id: 'fb-sosp', seq: 912, status: 'suspicious_file', statusPublic: 'open' }], 'inbox', 'fb-sosp');
   const misure = await page.evaluate(() => {
     const bs = [...document.querySelectorAll('#mgOwnerBar .mg-owner-row button')].filter((b) => b.offsetParent !== null);
-    return { quanti: bs.length, righe: [...new Set(bs.map((b) => Math.round(b.getBoundingClientRect().top / 8)))].length };
+    return { quanti: bs.length, righe: window.__righeDeiTasti(bs) };
   });
-  expect(misure.quanti).toBe(6);
+  expect(misure.quanti).toBe(8);
   expect(misure.righe).toBe(1);
 });
 
-test('un messaggio d esito lungo non manda i tasti a capo', async ({ openTab }) => {
+test('un messaggio d esito lungo non manda i tasti a capo', async ({ app, openTab }) => {
+  await finestraLarga(app, LARGHEZZA_FISSA);
   const page = await openTab(URL);
   await prepara(page, [IN_CODA], 'queue', 'fb-coda');
   await page.evaluate(() => {
@@ -218,7 +272,7 @@ test('un messaggio d esito lungo non manda i tasti a capo', async ({ openTab }) 
   });
   const righe = async () => page.evaluate(() => {
     const bs = [...document.querySelectorAll('#mgOwnerBar .mg-owner-row button')].filter((b) => b.offsetParent !== null);
-    return [...new Set(bs.map((b) => Math.round(b.getBoundingClientRect().top / 8)))].length;
+    return window.__righeDeiTasti(bs);
   });
   const prima = await righe();
   await page.locator('#mgArchiveBtn').click();

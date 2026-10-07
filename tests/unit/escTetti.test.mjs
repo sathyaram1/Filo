@@ -11,7 +11,7 @@
 //     nessuno ha chiuso — il danno di #514 fatto da noi;
 //   • un tetto sotto la pila che i riquadri raggiungono davvero: con tre, il
 //     quarto Esc di quattro riquadri impilati portava via la modalità (#648,
-//     prova in tests/verify-514-g11.spec.mjs).
+//     prova in tests/verifica/514/verify-514-g11.spec.mjs).
 //
 // Il tetto è la rete contro una pagina ostile, non il budget di chi usa Filo:
 // costa qualche Esc in più per uscire da una pagina che mente, e non deve

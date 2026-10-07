@@ -57,3 +57,15 @@ dai doppioni. Un turno che fallisce lascia la domanda senza risposta; chi preme
 controllo va **stretto**: scatta solo se l'ultima cosa salvata è identica a
 quella che arriva e viene dalla stessa parte. Se in mezzo c'è una risposta, la
 ripetizione è voluta («continua», «continua») e si conserva.
+
+## Un gradino sopra: la copia intera che arriva da una pagina
+
+La fila protegge le scritture del main, non quello che gli arriva. Se una pagina
+manda la SUA copia intera (la chat come ce l'ha in memoria), la fila la scrive
+in ordine e basta: una scheda rimasta indietro riporta in vita una chat
+svuotata altrove, o cancella la domanda che un'altra scheda ha appena fatto. La
+cura è che la pagina mandi la sua **modifica** (aggiungi questo turno, riempi
+quel turno con la risposta, togli quel turno) e il main la applichi sulla
+versione salvata di adesso, dentro la fila. Un turno che non c'è più (svuotato
+nel frattempo) non si riscrive: si risponde che non c'è. Così è fatta la chat
+dei mazzi (`src/main/services/deckChats.js`, #787, secondo giro di verifica).

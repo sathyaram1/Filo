@@ -33,19 +33,29 @@
   function controlTypeFor(name, Tokens) {
     const t = Tokens && Tokens.get && Tokens.get(name);
     const type = t && t.type;
-    if (type === 'color' || type === 'opacity' || type === 'size' || type === 'font') return type;
+    if (type === 'color' || type === 'opacity' || type === 'size' || type === 'font' || type === 'time') return type;
     return 'color';
   }
 
-  // Etichetta del bottone che apre il box, in base al tipo di controllo.
+  // Cosa succede al click, per tipo di controllo: sta nell'hover del bottone,
+  // non nella sua etichetta (vedi triggerLabel).
+  const HINTS = {
+    opacity: 'Regola l’opacità',
+    size: 'Regola la dimensione',
+    font: 'Cambia il font',
+    time: 'Regola la durata',
+    color: 'Scegli il colore esatto',
+  };
+  function triggerHint(name, Tokens) {
+    return HINTS[controlTypeFor(name, Tokens)] || HINTS.color;
+  }
+
+  // Etichetta del bottone: il NOME dell'impostazione dal registro. Col solo
+  // verbo, una risposta che cambiava cinque colori metteva cinque bottoni
+  // identici e nessuno diceva quale colore regolasse (#726).
   function triggerLabel(name, Tokens) {
-    switch (controlTypeFor(name, Tokens)) {
-      case 'opacity': return 'Regola l’opacità';
-      case 'size': return 'Regola la dimensione';
-      case 'font': return 'Cambia il font';
-      case 'color':
-      default: return 'Scegli il colore esatto';
-    }
+    const t = Tokens && Tokens.get && Tokens.get(name);
+    return (t && t.label) || triggerHint(name, Tokens);
   }
 
   // Converte un valore colore valido (#rgb, #rrggbb, rgb()/rgba()) nel formato
@@ -173,6 +183,11 @@
         lbl.className = 'sn-refine-sample-text';
         lbl.textContent = eff;
         sample.appendChild(lbl);
+      } else if (type === 'time') {
+        const txt = doc.createElement('span');
+        txt.className = 'sn-refine-sample-text';
+        txt.textContent = eff;
+        sample.appendChild(txt);
       } else if (type === 'font') {
         const txt = doc.createElement('span');
         txt.className = 'sn-refine-sample-text';
@@ -215,6 +230,15 @@
       control.value = String(parseInt(startEff, 10) || 0);
       control.setAttribute('aria-label', t.label || name);
       control.addEventListener('input', () => setValue(`${parseInt(control.value, 10) || 0}px`));
+    } else if (type === 'time') {
+      control = doc.createElement('input');
+      control.type = 'range';
+      control.className = 'sn-refine-input sn-refine-range';
+      control.min = '0'; control.max = '3000'; control.step = '50';
+      const m = String(startEff).match(/^(\d+(?:\.\d+)?)(ms|s)$/);
+      control.value = String(m ? Math.round(Number(m[1]) * (m[2] === 's' ? 1000 : 1)) : 0);
+      control.setAttribute('aria-label', t.label || name);
+      control.addEventListener('input', () => setValue(`${parseInt(control.value, 10) || 0}ms`));
     } else { // font
       control = doc.createElement('select');
       control.className = 'sn-refine-input sn-refine-select';
@@ -280,15 +304,47 @@
     const Tokens = deps && deps.Tokens;
     if (!doc || !Tokens) return null;
     const name = action.token ?? action.nome ?? action.name ?? action.chiave ?? action.elemento;
+    // Token sconosciuto: openOverlay non aprirebbe nulla e resterebbe un
+    // bottone che al click non fa niente (PATTERNS: in chat non deve esistere).
+    if (!(Tokens.get && Tokens.get(name))) return null;
     const btn = doc.createElement('button');
     btn.type = 'button';
     btn.className = 'dash-action-btn sn-refine-trigger';
-    btn.textContent = `🎨 ${triggerLabel(name, Tokens)}`;
+    btn.title = triggerHint(name, Tokens);
+    // Campione del colore appena applicato: distingue due bottoni vicini prima
+    // ancora di leggerne il nome. Il valore passa dalla whitelist dei token.
+    const value = action.valore ?? action.value ?? action.val ?? action.colore;
+    const mark = doc.createElement('span');
+    mark.setAttribute('aria-hidden', 'true');
+    if (controlTypeFor(name, Tokens) === 'color' && Tokens.validate(name, value)) {
+      mark.className = 'sn-refine-trigger-swatch';
+      mark.style.background = String(value).trim();
+    } else {
+      mark.className = 'sn-refine-trigger-icon';
+      mark.textContent = '🎨';
+    }
+    btn.appendChild(mark);
+    const text = doc.createElement('span');
+    text.className = 'sn-refine-trigger-name';
+    text.textContent = triggerLabel(name, Tokens);
+    btn.appendChild(text);
     btn.addEventListener('click', () => {
       // Le dipendenze possono essere risolte pigramente (deps.resolve) per
       // leggere gli override più freschi al momento del click.
       const resolved = typeof deps.resolve === 'function' ? deps.resolve() : deps;
-      Promise.resolve(resolved).then((d) => openOverlay(action, d || deps));
+      Promise.resolve(resolved).then((d) => {
+        const dd = { ...(d || deps) };
+        // Il campione segue ogni ritocco (e l'Annulla che lo disfa): un
+        // campione fermo sul colore di partenza direbbe il falso.
+        if (mark.className === 'sn-refine-trigger-swatch') {
+          const live = dd.applyLive;
+          dd.applyLive = (ov) => {
+            try { mark.style.background = Tokens.effectiveValue(name, ov, dd.theme) || mark.style.background; } catch (_) {}
+            if (live) live(ov);
+          };
+        }
+        openOverlay(action, dd);
+      });
     });
     return btn;
   }
@@ -296,6 +352,7 @@
   global.SN_AESTHETIC_REFINER = {
     controlTypeFor,
     triggerLabel,
+    triggerHint,
     toHexColor,
     buildButton,
     openOverlay,

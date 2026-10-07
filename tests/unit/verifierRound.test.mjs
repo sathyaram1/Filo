@@ -15,7 +15,7 @@ require(resolve(ROOT, 'src', 'shared', 'verifierRound.js'));
 const R = globalThis.SN_VERIFIER_ROUND;
 // I bilanci di QUESTI test: nel codice non esiste un default (2026-09-16), i
 // numeri veri li scrive l'owner in config/routines.
-const CAPS = { cap2: 5, cap1: 2, cap0: 0 };
+const CAPS = { cap3: 5, cap2: 5, cap1: 2, cap0: 0 };
 
 const f = (level, text, decision = false) => ({ level, text, decision });
 const decide = (findings, counts = {}, caps = CAPS) => R.decideRound({ findings, caps, counts });
@@ -26,18 +26,18 @@ test('parseFindings: riassunto prima, poi una riga per rilievo col livello; le r
   const p = R.parseFindings([
     'Provato: incolla, trascina, tema scuro. Funziona.',
     'Anche gli stress test reggono.',
-    '[2] Il pulsante non salva se il titolo è vuoto.',
+    '[2i] Il pulsante non salva se il titolo è vuoto.',
     '    Passi: apri, lascia vuoto, premi Salva.',
-    '- [1?] Bordo grigio freddo: caldo come il resto? Scelta di gusto.',
-    '**[0]** Sotto i 300 pixel il menu esce.',
-    '[7] livello inesistente: non è un rilievo',
-    '[3]    ',
+    '- [1i?] Bordo grigio freddo: caldo come il resto? Scelta di gusto.',
+    '**[0i]** Sotto i 300 pixel il menu esce.',
+    '[7i] livello inesistente: non è un rilievo',
+    '[3i]    ',
   ].join('\n'));
   assert.match(p.summary, /^Provato: incolla/);
   assert.match(p.summary, /stress test reggono\.$/);
   assert.equal(p.findings.length, 3, 'livello fuori scala e testo vuoto non sono rilievi');
-  assert.deepEqual(p.findings[0], { level: 2, text: 'Il pulsante non salva se il titolo è vuoto.\nPassi: apri, lascia vuoto, premi Salva.', decision: false });
-  assert.deepEqual(p.findings[1], { level: 1, text: 'Bordo grigio freddo: caldo come il resto? Scelta di gusto.', decision: true });
+  assert.deepEqual(p.findings[0], { level: 2, sede: 'i', text: 'Il pulsante non salva se il titolo è vuoto.\nPassi: apri, lascia vuoto, premi Salva.', decision: false });
+  assert.deepEqual(p.findings[1], { level: 1, sede: 'i', text: 'Bordo grigio freddo: caldo come il resto? Scelta di gusto.', decision: true });
   assert.equal(p.findings[2].level, 0);
 });
 
@@ -63,14 +63,14 @@ test('normalizeFindings: tetti su numero e lunghezza, decision solo se true', ()
 
 // ── I bilanci (spec §4) ──────────────────────────────────────────────────────
 
-test('nessun default nel codice: senza uno dei tre bilanci decideRound si ferma e dice quale manca', () => {
+test('nessun default nel codice: senza uno dei quattro bilanci decideRound si ferma e dice quale manca', () => {
   assert.equal(globalThis.SN_FB_TRANSITIONS.VERIFIER_CAPS, undefined);
-  assert.throws(() => R.decideRound({ findings: [f(2, 'rotto')], caps: { cap2: 5, cap0: 0 } }), /bilanci del verificatore mancanti: cap1/);
-  assert.throws(() => R.decideRound({ findings: [], caps: null }), /cap2, cap1, cap0/);
-  assert.throws(() => R.decideRound({ findings: [], caps: { cap2: '', cap1: 'due', cap0: 0 } }), /cap2, cap1/);
-  assert.deepEqual(R.missingCaps({ cap2: 5, cap1: 2, cap0: 0 }), []);
-  assert.deepEqual(R.missingCaps({ cap2: 5 }, { cap1: 2, cap0: 0 }), [], 'i default espliciti del chiamante contano');
-  assert.equal(R.capKeyOf(3), 'cap2', 'i livelli 3 e 2 condividono il bilancio');
+  assert.throws(() => R.decideRound({ findings: [f(2, 'rotto')], caps: { cap3: 5, cap2: 5, cap0: 0 } }), /bilanci del verificatore mancanti: cap1/);
+  assert.throws(() => R.decideRound({ findings: [], caps: null }), /cap3, cap2, cap1, cap0/);
+  assert.throws(() => R.decideRound({ findings: [], caps: { cap3: 5, cap2: '', cap1: 'due', cap0: 0 } }), /cap2, cap1/);
+  assert.deepEqual(R.missingCaps({ cap3: 5, cap2: 5, cap1: 2, cap0: 0 }), []);
+  assert.deepEqual(R.missingCaps({ cap2: 5 }, { cap3: 5, cap1: 2, cap0: 0 }), [], 'i default espliciti del chiamante contano');
+  assert.equal(R.capKeyOf(3), 'cap3', 'un bilancio per livello: il 3 non paga più dal 2');
   assert.equal(R.capKeyOf(2), 'cap2');
   assert.equal(R.capKeyOf(1), 'cap1');
   assert.equal(R.capKeyOf(0), 'cap0');
@@ -113,10 +113,10 @@ test('cap0 a zero: soli 0 → derivato; in elenco con livelli più alti rientran
 });
 
 test('cap0 alzato dall\'owner: soli 0 → fix, il giro si conta su cap0', () => {
-  const d = decide([f(0, 'raro')], {}, { cap2: 5, cap1: 2, cap0: 1 });
+  const d = decide([f(0, 'raro')], {}, { cap3: 5, cap2: 5, cap1: 2, cap0: 1 });
   assert.equal(d.fix.length, 1);
   assert.equal(d.consume, 'cap0');
-  const dopo = decide([f(0, 'raro')], d.counts, { cap2: 5, cap1: 2, cap0: 1 });
+  const dopo = decide([f(0, 'raro')], d.counts, { cap3: 5, cap2: 5, cap1: 2, cap0: 1 });
   assert.deepEqual(dopo.fix, [], 'al secondo giro il bilancio è finito');
 });
 
@@ -135,28 +135,35 @@ test('un 1 entra nel giro di un 2, anche a cap1 finito (decisione owner 2026-09-
   assert.equal(d.consume, 'cap2', 'il giro lo paga il livello più alto');
   assert.equal(d.counts.count1, 2, 'cap1 non si tocca');
   // Con cap1 a zero dall'owner vale lo stesso.
-  const zero = decide([f(1, 'bordo'), f(2, 'rotto')], {}, { cap2: 10, cap1: 0, cap0: 0 });
+  const zero = decide([f(1, 'bordo'), f(2, 'rotto')], {}, { cap3: 10, cap2: 10, cap1: 0, cap0: 0 });
   assert.deepEqual(zero.fix.map((x) => x.level), [1, 2], 'ordine della critica conservato');
   assert.equal(zero.consume, 'cap2');
 });
 
-test('un 1 col segno ? resta derivato anche accanto a un 2 da correggere; se il 2 ferma il lavoro, si ferma tutto', () => {
+test('un 1 col segno ? resta derivato anche accanto a un 2 da correggere; se un 3 ferma il lavoro, si ferma tutto', () => {
   const d = decide([f(2, 'rotto'), f(1, 'gusto?', true)], { count1: 2 });
   assert.deepEqual(d.fix.map((x) => x.level), [2]);
   assert.equal(d.derived.length, 1, 'la domanda non si corregge da soli');
-  const stop = decide([f(2, 'rotto'), f(1, 'bordo')], { count2: 5, count1: 2 });
+  const stop = decide([f(3, 'rotto'), f(1, 'bordo')], { count3: 5, count1: 2 });
   assert.equal(stop.stop, true);
   assert.deepEqual(stop.fix, [], 'fermandosi non si corregge nemmeno l\'1');
+  // Un 2 a bilancio finito invece non ferma: va da parte, e l'1 segue il suo bilancio.
+  const daParte = decide([f(2, 'rotto'), f(1, 'bordo')], { count2: 5, count1: 2 });
+  assert.equal(daParte.stop, false);
+  assert.deepEqual(daParte.derived.map((x) => x.level), [2, 1]);
 });
 
-test('livello 2 o 3 con cap2 esaurito → stop, decide l\'owner', () => {
-  const d = decide([f(2, 'rotto'), f(1, 'bordo'), f(0, 'raro')], { count2: 5 });
+test('livello 3 con cap3 esaurito → stop, decide l\'owner; un 2 a cap2 esaurito non ferma', () => {
+  const d = decide([f(3, 'rotto'), f(1, 'bordo'), f(0, 'raro')], { count3: 5 });
   assert.equal(d.stop, true);
   assert.equal(d.blocking.length, 1);
   assert.deepEqual(d.fix, []);
   assert.deepEqual(d.derived, [], 'fermandosi non si mette da parte niente: l\'owner vede tutto');
   assert.equal(d.consume, null);
-  assert.equal(d.counts.count2, 5, 'fermarsi non paga un giro');
+  assert.equal(d.counts.count3, 5, 'fermarsi non paga un giro');
+  const due = decide([f(2, 'rotto')], { count2: 5 });
+  assert.equal(due.stop, false);
+  assert.deepEqual(due.derived.map((x) => x.priority), [2]);
 });
 
 test('il segno ? → stop ai livelli 3/2, derivato ai livelli 1 e 0', () => {
@@ -172,23 +179,31 @@ test('il segno ? → stop ai livelli 3/2, derivato ai livelli 1 e 0', () => {
 });
 
 test('i bilanci si normalizzano: fuori scala si stringe, assenti → i default ESPLICITI del chiamante, contatori negativi → 0', () => {
-  assert.deepEqual(R.normalizeCaps({ cap2: 99, cap1: -3 }, CAPS), { cap2: 10, cap1: 0, cap0: 0 });
+  assert.deepEqual(R.normalizeCaps({ cap2: 99, cap1: -3 }, CAPS), { cap3: 5, cap2: 10, cap1: 0, cap0: 0 });
   assert.deepEqual(R.normalizeCaps(null, CAPS), CAPS);
-  assert.deepEqual(R.normalizeCounts({ count2: -1, count1: '2' }), { count2: 0, count1: 2, count0: 0 });
+  assert.deepEqual(R.normalizeCounts({ count2: -1, count1: '2' }), { count3: 0, count2: 0, count1: 2, count0: 0 });
 });
 
-test('cap2 a zero: il primo 2 → stop subito (scelta possibile dell\'owner)', () => {
-  assert.equal(decide([f(2, 'rotto')], {}, { cap2: 0, cap1: 2, cap0: 0 }).stop, true);
+test('cap3 a zero: il primo 3 → stop subito (scelta possibile dell\'owner); cap2 a zero: il primo 2 va da parte, non ferma', () => {
+  assert.equal(decide([f(3, 'rotto')], {}, { cap3: 0, cap2: 5, cap1: 2, cap0: 0 }).stop, true);
+  const due = decide([f(2, 'rotto')], {}, { cap3: 5, cap2: 0, cap1: 2, cap0: 0 });
+  assert.equal(due.stop, false);
+  assert.equal(due.derived.length, 1);
 });
 
-test('la sequenza intera: cinque giri di livello 2, il sesto → stop', () => {
-  let counts = {};
-  for (let i = 0; i < 5; i++) {
-    const d = decide([f(2, `giro ${i}`)], counts);
-    assert.equal(d.stop, false, `giro ${i} si corregge`);
-    counts = d.counts;
+test('la sequenza intera: cinque giri di livello 3, il sesto → stop; cinque di livello 2, il sesto passa e mette da parte', () => {
+  for (const [level, ferma] of [[3, true], [2, false]]) {
+    let counts = {};
+    for (let i = 0; i < 5; i++) {
+      const d = decide([f(level, `giro ${i}`)], counts);
+      assert.equal(d.stop, false, `giro ${i} si corregge`);
+      assert.equal(d.fix.length, 1);
+      counts = d.counts;
+    }
+    const sesto = decide([f(level, 'ancora')], counts);
+    assert.equal(sesto.stop, ferma, `livello ${level} al sesto giro`);
+    assert.deepEqual(sesto.fix, []);
   }
-  assert.equal(decide([f(2, 'ancora')], counts).stop, true);
 });
 
 // ── Testi ────────────────────────────────────────────────────────────────────
@@ -196,22 +211,22 @@ test('la sequenza intera: cinque giri di livello 2, il sesto → stop', () => {
 test('formatFindings e roundNote: livelli davanti, il segno ? conservato, esito in chiaro', () => {
   const list = [f(2, 'rotto\ncon passi'), f(1, 'gusto', true)];
   const txt = R.formatFindings(list);
-  assert.match(txt, /^- \[2\] rotto\n  con passi\n- \[1\?\] gusto$/);
+  assert.match(txt, /^- \[2i\] rotto\n  con passi\n- \[1i\?\] gusto$/);
   assert.equal(R.hasDecision(list), true);
   const fix = R.roundNote({ summary: 'il resto regge', findings: list, decision: decide(list) });
   assert.match(fix, /^Verifica: 2 rilievi\./);
   assert.match(fix, /il resto regge/);
   assert.match(fix, /La correzione riguarda 1 su 2/);
-  assert.match(fix, /\[2\] rotto/);
+  assert.match(fix, /\[2i\] rotto/);
   assert.match(R.roundNote({ findings: [] }), /^Verifica superata\.$/);
   assert.match(R.roundNote({ findings: [f(2, 'x')], decision: { stop: true } }), /Il lavoro si ferma/);
-  assert.match(R.roundNote({ findings: [f(0, 'x')], decision: { fix: [] } }), /feedback derivato/);
+  assert.match(R.roundNote({ findings: [f(0, 'x')], decision: { fix: [] } }), /feedback derivati/);
 });
 
 test('#561 giro 2: unparsedLevelLines segnala i livelli fuori posto; «1. [2]» e «- [2]» sono rilievi', () => {
-  assert.deepEqual(R.unparsedLevelLines('Provato. Rilievo [2]: non salva.\n[1] bordo'), ['Provato. Rilievo [2]: non salva.']);
-  assert.deepEqual(R.unparsedLevelLines('Provato.\n1. [2] non salva\n- [1] bordo\n[0] raro'), []);
-  assert.deepEqual(R.parseFindings('1. [2] non salva\n2) [1?] gusto').findings.map((f) => [f.level, f.decision]), [[2, false], [1, true]]);
+  assert.deepEqual(R.unparsedLevelLines('Provato. Rilievo [2]: non salva.\n[1i] bordo'), ['Provato. Rilievo [2]: non salva.']);
+  assert.deepEqual(R.unparsedLevelLines('Provato.\n1. [2i] non salva\n- [1i] bordo\n[0i] raro'), []);
+  assert.deepEqual(R.parseFindings('1. [2i] non salva\n2) [1i?] gusto').findings.map((f) => [f.level, f.decision]), [[2, false], [1, true]]);
   assert.deepEqual(R.unparsedLevelLines(''), []);
 });
 
@@ -219,54 +234,56 @@ test('#561 giro 3: un livello fuori scala o a intervallo a inizio riga non è un
   assert.deepEqual(R.unparsedLevelLines('Provato.\n[4] gravissimo'), ['[4] gravissimo']);
   assert.deepEqual(R.unparsedLevelLines('Provato.\n[2-3] grave\n[2/3] grave'), ['[2-3] grave', '[2/3] grave']);
   assert.deepEqual(R.parseFindings('Provato.\n[4] gravissimo').findings, [], 'non è un rilievo: è un errore da segnalare');
-  assert.deepEqual(R.unparsedLevelLines('Provato.\n[3] grave\n[0?] raro'), []);
+  assert.deepEqual(R.unparsedLevelLines('Provato.\n[3i] grave\n[0i?] raro'), []);
 });
 
 test('#561 giro 4: un livello senza testo non sparisce; nel riassunto le parentesi in mezzo alla frase sono testo; oltre il tetto si dice', () => {
   // «[2]» da solo (riga vuota o fine critica dopo): prima il lettore lo
   // scartava in silenzio e un 2 diventava un pass.
-  assert.deepEqual(R.unparsedLevelLines('Provato: regge quasi tutto.\n[2]'), ['[2] (rilievo senza testo)']);
-  assert.deepEqual(R.unparsedLevelLines('Provato.\n[2]\n\n[1] bordo grigio'), ['[2] (rilievo senza testo)']);
+  assert.deepEqual(R.unparsedLevelLines('Provato: regge quasi tutto.\n[2i]'), ['[2i] (rilievo senza testo)']);
+  assert.deepEqual(R.unparsedLevelLines('Provato.\n[2i]\n\n[1i] bordo grigio'), ['[2i] (rilievo senza testo)']);
   // Col testo sulla riga dopo è un rilievo intero.
-  assert.deepEqual(R.unparsedLevelLines('Provato.\n[2]\nil pulsante non salva'), []);
-  assert.equal(R.parseFindings('Provato.\n[2]\nil pulsante non salva').findings[0].text, 'il pulsante non salva');
+  assert.deepEqual(R.unparsedLevelLines('Provato.\n[2i]\nil pulsante non salva'), []);
+  assert.equal(R.parseFindings('Provato.\n[2i]\nil pulsante non salva').findings[0].text, 'il pulsante non salva');
+  // Senza la sede, prima ancora del testo che manca, si dice cosa manca.
+  assert.match(R.unparsedLevelLines('Provato.\n[2]')[0], /^\[2\] \(manca la sede/);
   // DAL 2026-09-07 (decisione dell'owner su #565) le quadre con dentro un
   // livello sono SEMPRE un rilievo, anche in mezzo a una frase del riassunto:
   // la tolleranza di prima lasciava passare un rilievo scritto dopo
   // un'etichetta lunga, e con lui la bocciatura. Nel riassunto il livello si
   // cita a parole.
-  assert.equal(R.unparsedLevelLines('Provato il caso [2?] del giro prima: chiuso.\n[1] bordo').length, 1);
-  assert.deepEqual(R.unparsedLevelLines('Provato il caso di livello 2 del giro prima: chiuso.\n[1] bordo'), []);
-  assert.equal(R.parseFindings('Provato il caso di livello 2 del giro prima: chiuso.\n[1] bordo').summary, 'Provato il caso di livello 2 del giro prima: chiuso.');
+  assert.equal(R.unparsedLevelLines('Provato il caso [2i?] del giro prima: chiuso.\n[1i] bordo').length, 1);
+  assert.deepEqual(R.unparsedLevelLines('Provato il caso di livello 2 del giro prima: chiuso.\n[1i] bordo'), []);
+  assert.equal(R.parseFindings('Provato il caso di livello 2 del giro prima: chiuso.\n[1i] bordo').summary, 'Provato il caso di livello 2 del giro prima: chiuso.');
   // Le forme sbagliate di prima restano respinte: livello a inizio riga fuori scala, o dopo un'etichetta breve e prima di un separatore.
   assert.deepEqual(R.unparsedLevelLines('Provato.\n[4] gravissimo'), ['[4] gravissimo']);
   assert.deepEqual(R.unparsedLevelLines('Provato. Rilievo [2]: non salva.'), ['Provato. Rilievo [2]: non salva.']);
   assert.deepEqual(R.unparsedLevelLines('Rilievo di livello [2] - non salva'), ['Rilievo di livello [2] - non salva']);
   assert.deepEqual(R.unparsedLevelLines('- Livello [3]: chiavi SSH'), ['- Livello [3]: chiavi SSH']);
   // Oltre il tetto non si taglia in silenzio.
-  const troppi = 'Provato.\n' + Array.from({ length: R.MAX_FINDINGS + 1 }, (_, i) => `[1] rilievo ${i + 1}`).join('\n');
+  const troppi = 'Provato.\n' + Array.from({ length: R.MAX_FINDINGS + 1 }, (_, i) => `[1i] rilievo ${i + 1}`).join('\n');
   const brutte = R.unparsedLevelLines(troppi);
   assert.equal(brutte.length, 1);
   assert.match(brutte[0], /troppi rilievi: 41/);
-  assert.deepEqual(R.unparsedLevelLines('Provato.\n' + Array.from({ length: R.MAX_FINDINGS }, (_, i) => `[1] r${i}`).join('\n')), []);
+  assert.deepEqual(R.unparsedLevelLines('Provato.\n' + Array.from({ length: R.MAX_FINDINGS }, (_, i) => `[1i] r${i}`).join('\n')), []);
 });
 
 // ── L'a capo scritto come barra-n (verifica del giro 5 su #561) ─────────────
 
 const BSN = String.fromCharCode(92) + 'n';
 
-test('una barra-n letterale davanti a un rilievo vale come a capo: il [2] non sparisce nel riassunto', () => {
-  const testo = `Provato.${BSN}[2] rotto${BSN}    passi: x${BSN}[1] bordo`;
+test('una barra-n letterale davanti a un rilievo vale come a capo: il [2i] non sparisce nel riassunto', () => {
+  const testo = `Provato.${BSN}[2i] rotto${BSN}    passi: x${BSN}[1i] bordo`;
   assert.deepEqual(R.unparsedLevelLines(testo), []);
   const p = R.parseFindings(testo);
   assert.equal(p.summary, 'Provato.');
   assert.deepEqual(p.findings.map((x) => [x.level, x.text]), [[2, 'rotto\npassi: x'], [1, 'bordo']]);
-  assert.equal(R.normalizeCritique(testo), 'Provato.\n[2] rotto\n    passi: x\n[1] bordo');
+  assert.equal(R.normalizeCritique(testo), 'Provato.\n[2i] rotto\n    passi: x\n[1i] bordo');
 });
 
 test('con la barra-n anche un livello scritto male viene respinto, non ignorato', () => {
   assert.deepEqual(R.unparsedLevelLines(`Provato.${BSN}[4] gravissimo`), ['[4] gravissimo']);
-  assert.deepEqual(R.unparsedLevelLines(`Provato.${BSN}[2]`), ['[2] (rilievo senza testo)']);
+  assert.deepEqual(R.unparsedLevelLines(`Provato.${BSN}[2i]`), ['[2i] (rilievo senza testo)']);
 });
 
 test('una barra-n in mezzo a una frase, senza una parentesi dopo, resta testo', () => {
@@ -291,9 +308,9 @@ test('un livello scritto con una parola davanti («[livello 2]») è respinto, n
 // un'etichetta si incollava a quello sopra, spariva dall'elenco e il giro si
 // pagava dal bilancio sbagliato. Nei passi il livello si cita a parole.
 test('anche nella continuazione le quadre col livello dentro non sono testo', () => {
-  const testo = 'Provato.\n[2] rotto\nPassi: critica con [2] - poi start\n[1] bordo';
+  const testo = 'Provato.\n[2i] rotto\nPassi: critica con [2] - poi start\n[1i] bordo';
   assert.equal(R.unparsedLevelLines(testo).length, 1);
-  const aParole = 'Provato.\n[2] rotto\nPassi: critica di livello 2 - poi start\n[1] bordo';
+  const aParole = 'Provato.\n[2i] rotto\nPassi: critica di livello 2 - poi start\n[1i] bordo';
   assert.deepEqual(R.unparsedLevelLines(aParole), []);
   const p = R.parseFindings(aParole);
   assert.equal(p.findings.length, 2);
@@ -311,15 +328,15 @@ test('#561 giro 7: il segno prima della cifra («[?2]») o un segno diverso dopo
   assert.deepEqual(R.unparsedLevelLines('Provato.\n- [2?!] rotto'), ['- [2?!] rotto']);
   // Il formato giusto resta un rilievo; in mezzo a una frase, dal 2026-09-07,
   // le quadre col livello dentro sono comunque un rilievo scritto male.
-  assert.deepEqual(R.unparsedLevelLines('Provato.\n[2?] decidi tu'), []);
-  assert.equal(R.unparsedLevelLines('Provato il caso [?2] del giro prima: chiuso.\n[1] bordo').length, 1);
-  assert.equal(R.parseFindings('Provato.\n[2?] decidi tu').findings[0].decision, true);
+  assert.deepEqual(R.unparsedLevelLines('Provato.\n[2i?] decidi tu'), []);
+  assert.equal(R.unparsedLevelLines('Provato il caso [?2] del giro prima: chiuso.\n[1i] bordo').length, 1);
+  assert.equal(R.parseFindings('Provato.\n[2i?] decidi tu').findings[0].decision, true);
 });
 
 test('parseFindings: titolo Markdown, citazione ed elenco con le lettere davanti al livello sono rilievi (giro 11 su #561)', () => {
-  const p = R.parseFindings('Provato.\n### [2] rotto uno\n> [1] rotto due\na) [0] rotto tre\nb) [1?] gusto');
+  const p = R.parseFindings('Provato.\n### [2i] rotto uno\n> [1i] rotto due\na) [0i] rotto tre\nb) [1i?] gusto');
   assert.deepEqual(p.findings.map((f) => [f.level, f.decision]), [[2, false], [1, false], [0, false], [1, true]]);
-  assert.equal(R.unparsedLevelLines('Provato.\n### [2] rotto').length, 0, 'non è una riga da sistemare: è un rilievo');
+  assert.equal(R.unparsedLevelLines('Provato.\n### [2i] rotto').length, 0, 'non è una riga da sistemare: è un rilievo');
 });
 
 // Il lettore e il controllo devono guardare gli STESSI modi di elencare: dove
@@ -336,14 +353,14 @@ ${davanti}[4] gravissimo`;
   // E le stesse forme, scritte bene, restano rilievi veri.
   for (const davanti of ['', '- ', '1. ', 'a) ', '> ', '### ']) {
     const testo = `Provato tutto.
-${davanti}[2] il pulsante non salva`;
+${davanti}[2i] il pulsante non salva`;
     assert.equal(R.unparsedLevelLines(testo).length, 0, `«${davanti}[2]» è un rilievo buono`);
     assert.equal(R.parseFindings(testo).findings.length, 1);
   }
   // In mezzo a una frase le parentesi restano testo.
   // Dal giro 22 su #565 le quadre con dentro un livello sono SEMPRE un rilievo:
   // nel riassunto un livello si cita senza quadre («il livello 2»).
-  assert.equal(R.unparsedLevelLines('ho ri-provato la porta [2] del giro scorso e regge').length, 1);
+  assert.equal(R.unparsedLevelLines('ho ri-provato la porta [2i] del giro scorso e regge').length, 1);
   assert.equal(R.unparsedLevelLines('ho ri-provato la porta di livello 2 del giro scorso').length, 0);
 });
 
@@ -369,7 +386,7 @@ ${forma}`;
 test('un rilievo scritto dopo un modo di elencare che il lettore non conosce non passa per riassunto', () => {
   for (const davanti of ['— ', '+ ', '1.1 ', '100. ', '(a) ', '`', '▪ ']) {
     const testo = `Provato tutto, il resto regge bene.
-${davanti}[2] il pulsante non salva`;
+${davanti}[2i] il pulsante non salva`;
     assert.equal(R.unparsedLevelLines(testo).length, 1, `«${davanti}[2]» non deve finire nel riassunto`);
     assert.equal(R.parseFindings(testo).findings.length, 0);
   }
@@ -380,7 +397,7 @@ ${davanti}[2] il pulsante non salva`;
   // nessuno se ne accorge (feedback #565).
   for (const davanti of ['_', '__', '___']) {
     const testo = `Provato tutto, il resto regge bene.
-${davanti}[2] il pulsante non salva`;
+${davanti}[2i] il pulsante non salva`;
     assert.equal(R.parseFindings(testo).findings.length, 1, `«${davanti}[2]» è un rilievo`);
     assert.equal(R.unparsedLevelLines(testo).length, 0);
   }
@@ -396,17 +413,17 @@ ${davanti}[2] il pulsante non salva`;
   // Il prezzo, dichiarato: una frase del riassunto che porta un livello nelle
   // prime parole viene respinta con la spiegazione. Costa una riscrittura, e
   // vale meno di una bocciatura letta come promozione.
-  assert.equal(R.unparsedLevelLines('Nel caso [2] ho provato tutto').length, 1);
+  assert.equal(R.unparsedLevelLines('Nel caso [2i] ho provato tutto').length, 1);
   // Dovunque stia nella riga, non solo nelle prime parole: è la fine della
   // rincorsa cominciata al giro 18 (feedback #565).
-  assert.equal(R.unparsedLevelLines('Rilievo di sicurezza grave e conclamato: [3] chiavi SSH').length, 1);
+  assert.equal(R.unparsedLevelLines('Rilievo di sicurezza grave e conclamato: [3i] chiavi SSH').length, 1);
 });
 
 // L'etichetta prima del livello («Difetto: [2] …») e l'a capo scritto a mano
 // coi due caratteri barra-n: due modi in più con cui una bocciatura finiva nel
 // riassunto (feedback #565).
 test("un livello dopo un'etichetta, o dopo un a capo scritto a mano, non passa per riassunto", () => {
-  for (const riga of ['Difetto: [2] rotto', 'problema: [2] rotto', 'rilievo grave [2] rotto', 'osservazione: [3] grave']) {
+  for (const riga of ['Difetto: [2i] rotto', 'problema: [2i] rotto', 'rilievo grave [2i] rotto', 'osservazione: [3i] grave']) {
     const testo = `Provato tutto, il resto regge bene.
 ${riga}`;
     assert.equal(R.unparsedLevelLines(testo).length, 1, `«${riga}» non è riassunto`);
@@ -415,7 +432,7 @@ ${riga}`;
   // L'a capo scritto a mano vale davanti a TUTTI i modi di elencare che il
   // lettore accetta, non solo davanti a cinque.
   for (const davanti of ['', '- ', '### ', '> ', 'a) ', '1. ']) {
-    const unaRiga = `Provato tutto.\n${davanti}[2] il pulsante non salva`;
+    const unaRiga = `Provato tutto.\n${davanti}[2i] il pulsante non salva`;
     assert.equal(R.parseFindings(unaRiga).findings.length, 1, `«\n${davanti}[2]» deve valere come rilievo`);
   }
 });
@@ -500,8 +517,8 @@ ${riga}`).length, 1, 'una parentesi dimenticata non deve costare una bocciatura'
 test('due livelli sulla stessa riga: il secondo non sparisce dentro al primo', () => {
   const riassunto = 'Provato tutto per bene, il resto regge.';
   for (const riga of [
-    '[0] con la finestra stretta il menu esce [3] scrive nelle chiavi SSH',
-    '[1] bordo freddo [3] chiavi SSH',
+    '[0i] con la finestra stretta il menu esce [3i] scrive nelle chiavi SSH',
+    '[1i] bordo freddo [3i] chiavi SSH',
   ]) {
     assert.equal(R.unparsedLevelLines(`${riassunto}
 ${riga}`).length, 1, 'un a capo dimenticato non deve costare una bocciatura');
@@ -510,7 +527,7 @@ ${riga}`).findings.length, 1, 'il lettore ne vede uno solo: per questo la riga v
   }
   // Un rilievo con una parentesi tonda dentro al testo resta un rilievo.
   assert.equal(R.unparsedLevelLines(`${riassunto}
-[2] il pulsante (3 volte) non salva`).length, 0);
+[2i] il pulsante (3 volte) non salva`).length, 0);
 });
 
 test('quadra dimenticata E livello scritto a modo suo: la riga non passa muta', () => {
@@ -548,7 +565,7 @@ test('quadra dimenticata con una descrizione lunga accanto al livello: non passa
   // Seconda porta: con un rilievo minore sopra, la riga gli veniva incollata in
   // coda — un difetto di sicurezza spariva dentro a uno cosmetico, e il giro si
   // pagava dal bilancio sbagliato (#565).
-  assert.equal(R.unparsedLevelLines(`${riassunto}\n[1] bordo freddo\n${riga}`).length, 1);
+  assert.equal(R.unparsedLevelLines(`${riassunto}\n[1i] bordo freddo\n${riga}`).length, 1);
   // Anche con la parentesi di chiusura dimenticata invece di quella di apertura.
   assert.equal(R.unparsedLevelLines(`${riassunto}\n[3 dati dell utente a rischio i passi`).length, 1);
   // E la prosa con una quadra appaiata e un numero più avanti resta prosa.
@@ -569,8 +586,8 @@ test('a capo scritto a mano, livello a parole e quadra dimenticata: la riga non 
     assert.equal(R.unparsedLevelLines(riassunto + coda).length, 1, `muta: ${coda}`);
   }
   // Il rilievo scritto bene dopo la stessa barra-n resta un rilievo.
-  assert.equal(R.parseFindings(`${riassunto}\n[2] il pulsante non salva`).findings.length, 1);
-  assert.equal(R.unparsedLevelLines(`${riassunto}\n[2] il pulsante non salva`).length, 0);
+  assert.equal(R.parseFindings(`${riassunto}\n[2i] il pulsante non salva`).findings.length, 1);
+  assert.equal(R.unparsedLevelLines(`${riassunto}\n[2i] il pulsante non salva`).length, 0);
   // E una barra-n in mezzo a una frase, senza niente che somigli a un livello
   // subito dopo, resta testo.
   assert.equal(R.unparsedLevelLines(`${riassunto} Ho provato 3 volte (ok) e regge.`).length, 0);
@@ -596,7 +613,7 @@ test('grassetto con gli underscore e parentesi di apertura dimenticata: niente p
     }
   }
   // Le forme buone restano rilievi, grassetto con gli underscore compreso.
-  for (const riga of ['[2] non salva', '**[2]** non salva', '__[2]__ non salva', '- [1?] bordo freddo']) {
+  for (const riga of ['[2i] non salva', '**[2i]** non salva', '__[2i]__ non salva', '- [1i?] bordo freddo']) {
     assert.equal(R.parseFindings(`Provato tutto.${NL}${riga}`).findings.length, 1, `non letta: ${riga}`);
     assert.equal(R.unparsedLevelLines(`Provato tutto.${NL}${riga}`).length, 0, `respinta a torto: ${riga}`);
   }

@@ -36,6 +36,11 @@ describe('quali spec lanciare', () => {
     assert.deepEqual(specsForChangedFiles(['tests/editor-chat.spec.mjs']), ['tests/editor-chat']);
   });
 
+  test('una prova di un giro toccata NON entra nei controlli: si lancia per numero', () => {
+    assert.deepEqual(specsForChangedFiles(['tests/verifica/514/verify-514-g6.spec.mjs']), [],
+      'un ramo che ne sposta o ne ritocca qualcuna trascinerebbe centinaia di casi di giri passati');
+  });
+
   test('niente duplicati quando più file portano allo stesso spec', () => {
     const out = specsForChangedFiles(['src/pages/manage/manage.js', 'src/pages/manage/manage.html']);
     assert.deepEqual(out, ['tests/manage']);
@@ -178,9 +183,67 @@ describe('la guardia sul ramo rimasto indietro (caso #500)', () => {
     const nota = behindMainNota(31);
     assert.match(nota, /31 commit/);
     assert.match(nota, /npm run finish/, 'la nota dice dove quel ramo indietro fermerebbe davvero');
+    assert.match(nota, /conflitto/, 'e che fermerebbe solo su un conflitto');
     assert.equal(behindMainNota(0), '');
     assert.equal(behindMainNota('fatal'), '');
-    assert.match(SORGENTE, /behindMainStop\(behind, \{ checkOnly \}\)/, 'la chiamata vera passa la modalità');
+    assert.match(SORGENTE, /behindMainStop\(behind, \{ checkOnly, prova \}\)/, 'la chiamata vera passa la modalità e la prova');
+  });
+
+  // Con le routine accese main si muove di continuo: fermarsi per un ramo solo indietro non chiudeva mai.
+  test('ramo indietro senza conflitto → prosegue con una nota; con un conflitto → fermo, coi file', () => {
+    assert.equal(behindMainStop(12, { prova: { conflitti: [] } }), '');
+    assert.match(behindMainNota(12, { checkOnly: false }), /12 commit[\s\S]*non va in conflitto: proseguo/);
+    const fermo = behindMainStop(12, { prova: { conflitti: ['src/a.js', 'docs/b c.md'] } });
+    assert.match(fermo, /12 commit[\s\S]*conflitto su:\n {2}· src\/a\.js\n {2}· docs\/b c\.md/);
+    assert.match(fermo, /verify-local\.mjs start/);
+    // Senza prova (git vecchio o prova fallita) ci si ferma come prima, e lo si dice.
+    const vecchio = behindMainStop(12, { prova: { motivo: 'git version 2.30.1 non sa provarla' } });
+    assert.match(vecchio, /12 commit/);
+    assert.match(vecchio, /2\.30\.1 non sa provarla[\s\S]*Mi fermo/);
+  });
+
+  test('la versione di git e l\'uscita di merge-tree si leggono giuste', async () => {
+    const { gitSaProvareFusione, leggiMergeTree } = await import('../../scripts/finish-local.mjs');
+    assert.equal(gitSaProvareFusione('git version 2.44.0.windows.1'), true);
+    assert.equal(gitSaProvareFusione('git version 2.38.0'), true);
+    assert.equal(gitSaProvareFusione('git version 2.37.9'), false);
+    assert.equal(gitSaProvareFusione('git version 3.0.0'), true);
+    assert.equal(gitSaProvareFusione(''), false);
+    assert.deepEqual(leggiMergeTree(0, 'abc123\n'), { conflitti: [] });
+    assert.deepEqual(leggiMergeTree(1, 'abc123\nsrc/a.js\nsrc/a.js\nb.md\n\nmessaggi\n'), { conflitti: ['src/a.js', 'b.md'] });
+    assert.ok(leggiMergeTree(128, 'fatal').motivo);
+  });
+
+  test('su un repo vero: indietro senza conflitto non ferma, indietro con conflitto sì', async () => {
+    const { provaFusione } = await import('../../scripts/finish-local.mjs');
+    const dir = cartellaTemporanea('finish-ramo-indietro-');
+    const g = (...a) => execFileSync('git', ['-c', 'core.autocrlf=false', ...a], { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    const scrivi = (f, t) => writeFileSync(resolve(dir, f), t);
+    try {
+      g('init', '-q', '-b', 'main');
+      g('config', 'user.email', 't@t'); g('config', 'user.name', 't'); g('config', 'commit.gpgsign', 'false');
+      scrivi('comune.txt', 'uno\ndue\ntre\n'); scrivi('altro.txt', 'x\n');
+      g('add', '-A'); g('commit', '-qm', 'base');
+      g('checkout', '-q', '-b', 'claude/lavoro');
+      scrivi('comune.txt', 'uno\nDUE DEL RAMO\ntre\n'); g('commit', '-qam', 'ramo');
+      g('checkout', '-q', 'main');
+      scrivi('altro.txt', 'y\n'); g('commit', '-qam', 'main: altro file');
+      g('checkout', '-q', 'claude/lavoro');
+      const pulita = provaFusione('main', dir);
+      assert.deepEqual(pulita, { conflitti: [] });
+      assert.equal(behindMainStop(1, { prova: pulita }), '', 'un commit altrui su un altro file non ferma');
+      g('checkout', '-q', 'main');
+      scrivi('comune.txt', 'uno\nDUE DI MAIN\ntre\n'); g('commit', '-qam', 'main: stessa riga');
+      g('checkout', '-q', 'claude/lavoro');
+      const prima = g('rev-parse', 'HEAD');
+      const sporca = provaFusione('main', dir);
+      assert.deepEqual(sporca, { conflitti: ['comune.txt'] });
+      assert.match(behindMainStop(2, { prova: sporca }), /conflitto su:\n {2}· comune\.txt/);
+      assert.equal(g('rev-parse', 'HEAD'), prima, 'la prova non tocca il ramo');
+      assert.equal(g('status', '--porcelain'), '', 'né l\'albero');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   test('la guardia sta PRIMA dei controlli, non dopo', () => {
@@ -427,7 +490,7 @@ describe('quale ramo NON si spedisce mai', () => {
 // Un rosso d'ambiente (rosso anche su main su questa macchina) spacciato per
 // regressione blocca la pubblicazione di un lavoro sano: l'elenco tracciato
 // dice quali sono, e il cancello li separa da quelli che devono essere verdi.
-import { splitKnownRed, esitoVerificaPerCheck } from '../../scripts/finish-local.mjs';
+import { splitKnownRed, esitoVerificaPerCheck, specDaRilanciare, esitoUnitPerCheck } from '../../scripts/finish-local.mjs';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 // `--check` promette solo i controlli: chi verifica lo lancia al posto della
@@ -445,6 +508,54 @@ test('senza --check la verifica mancante ferma la chiusura, come sempre', () => 
   assert.equal(esitoVerificaPerCheck({ checkOnly: false, ok: false, reason: 'x' }).ferma, true);
   assert.deepEqual(esitoVerificaPerCheck({ checkOnly: false, ok: true }), { ferma: false, nota: '' });
   assert.deepEqual(esitoVerificaPerCheck({ checkOnly: true, ok: true }), { ferma: false, nota: '' });
+});
+
+// Gli spec delle aree toccate sono la parte lunga della chiusura, e chi
+// verifica li lancia in partenza per obbligo del suo ruolo: rifarli qui, sullo
+// stesso commit, è la stessa ora pagata due volte (regola del 23/09/2026). Si
+// salta solo con un verdetto valido in mano; senza, non cambia niente.
+test('con la verifica superata gli spec delle aree non si rifanno, e si dice perché', () => {
+  const r = specDaRilanciare({ checkOnly: false, ok: true, sha: 'a'.repeat(40) });
+  assert.equal(r.rilancia, false);
+  assert.match(r.nota, /aaaaaaaa/, 'si dice su quale contenuto li ha corsi');
+  assert.match(r.nota, /logica pura/, 'e che gli unit test girano comunque');
+  // Il verdetto che regge su un commit successivo (prove del giro tolte) dice
+  // anche questo: un cancello che si apre in silenzio non si distingue da uno
+  // che non c'è.
+  assert.match(specDaRilanciare({ checkOnly: false, ok: true, sha: 'b'.repeat(40), tollerato: true }).nota, /prove del giro/);
+});
+
+test('senza verifica superata, o con --check, gli spec si rifanno come sempre', () => {
+  assert.deepEqual(specDaRilanciare({ checkOnly: false, ok: false, sha: 'a'.repeat(40) }), { rilancia: true, nota: '' });
+  // `--check` è il comando che lancia chi verifica: per lui la verifica è la
+  // sua, ancora senza esito, e deve fare i controlli davvero.
+  assert.deepEqual(specDaRilanciare({ checkOnly: true, ok: true, sha: 'a'.repeat(40) }), { rilancia: true, nota: '' });
+  assert.deepEqual(specDaRilanciare({ checkOnly: true, ok: false }), { rilancia: true, nota: '' });
+});
+
+// Chi verifica lancia `--check` per avere gli spec delle aree: un unit rosso, anche uno rosso uguale su main, li
+// saltava tutti e il controllo finiva prima di correrli (#874.1).
+test('--check: un unit rosso non salta gli spec delle aree, e l\'esito finale resta rosso', () => {
+  const check = esitoUnitPerCheck({ checkOnly: true });
+  assert.equal(check.ferma, false);
+  assert.match(check.messaggio, /spec delle aree/);
+  assert.match(check.messaggio, /rosso/);
+  const finish = esitoUnitPerCheck({ checkOnly: false });
+  assert.equal(finish.ferma, true, 'senza --check non si pubblica e non si paga il resto');
+  assert.match(finish.messaggio, /non pubblico/);
+
+  const codice = SORGENTE.split('\n').filter((r) => !/^\s*\/\//.test(r)).join('\n');
+  const unit = codice.indexOf("run('npm', ['run', 'test:unit']");
+  const spec = codice.indexOf('runSpecsALotti(blocking');
+  assert.ok(unit > 0 && spec > unit, 'gli spec delle aree vengono dopo gli unit');
+  const fraIDue = codice.slice(unit, spec);
+  assert.match(fraIDue, /esitoUnitPerCheck\(\{ checkOnly \}\)/);
+  assert.doesNotMatch(fraIDue.replace(/if \(esito\.ferma\) process\.exit\(1\);/, ''), /process\.exit\(/,
+    'fra unit e spec l\'unica uscita è quella senza --check');
+  const fineRossa = codice.indexOf('if (unitRossi)', spec);
+  const verde = codice.indexOf('Controlli passati (--check');
+  assert.ok(fineRossa > spec && fineRossa < verde, 'un unit rosso non arriva mai a «Controlli passati»');
+  assert.match(codice.slice(fineRossa, verde), /process\.exit\(1\)/);
 });
 
 test('splitKnownRed: i rossi noti escono dal gruppo bloccante, gli altri restano', () => {
@@ -467,6 +578,19 @@ test('l\'elenco dei rossi noti non marcisce: ogni voce è uno spec che esiste', 
   for (const s of j.specs) assert.ok(existsSync(resolve(ROOT, `${s}.spec.mjs`)), `${s} non esiste più: toglilo dall'elenco`);
 });
 
+// Una voce senza motivo non la toglie nessuno, e un motivo rimasto senza voce racconta un rosso che non c'è più (#650).
+test('ogni rosso noto della macchina dell\'owner ha il suo motivo, e nessun motivo resta senza voce', () => {
+  const j = JSON.parse(readFileSync(resolve(ROOT, 'tests', 'rossi-noti.json'), 'utf8'));
+  assert.ok(Array.isArray(j.specsMotivi), 'rossi-noti.json deve avere `specsMotivi` (anche vuoto)');
+  const motivi = new Map(j.specsMotivi.map((m) => [m.spec, m]));
+  for (const s of j.specs) {
+    const m = motivi.get(s);
+    assert.ok(m && m.perche && m.perche.length > 20, `${s}: manca il motivo in specsMotivi`);
+    assert.match(String(m.feedback || ''), /#\d+/, `${s}: manca il feedback che lo farà togliere`);
+  }
+  for (const m of j.specsMotivi) assert.ok(j.specs.includes(m.spec), `${m.spec}: motivo senza voce in specs, toglilo`);
+});
+
 // I rossi dei contenitori senza schermo delle routine. Vivevano nella memoria di
 // chi verificava, elencati a voce nelle sue istruzioni: nessun nome preciso,
 // nessun motivo scritto, nessuna scadenza. Da lì a lasciar passare una
@@ -482,7 +606,7 @@ test('i rossi del contenitore hanno nome, caso, motivo e un feedback', () => {
     assert.ok(existsSync(resolve(ROOT, `${v.spec}.spec.mjs`)), `${v.spec} non esiste più: toglilo dall'elenco`);
     // `caso` è il titolo del test (o un elenco di titoli, quando la voce copre
     // due test sorelle): è quello che scripts/suite-verdict.mjs confronta con
-    // l'esito della suite in GitHub prima di pubblicare.
+    // l'esito della suite in GitHub.
     const casi = Array.isArray(v.caso) ? v.caso : [v.caso];
     assert.ok(casi.length && casi.every((c) => typeof c === 'string' && c.length > 3),
       `${v.spec}: manca il caso preciso che è rosso (una stringa o un elenco di titoli)`);
@@ -512,4 +636,16 @@ test('gli spec mirati si spezzano in lotti che stanno nella riga di comando di W
   assert.deepEqual(lottiPerRigaDiComando(['tests/a.spec.mjs', 'tests/b.spec.mjs'], 6000), [['tests/a.spec.mjs', 'tests/b.spec.mjs']], 'pochi spec: un lotto solo');
   assert.deepEqual(lottiPerRigaDiComando([], 6000), [], 'niente spec: nessun lotto');
   assert.deepEqual(lottiPerRigaDiComando(['x'.repeat(7000)], 6000), [['x'.repeat(7000)]], 'uno spec più lungo del tetto va da solo, non sparisce');
+});
+
+// Ogni lavoro locale arriva su main con la sua pratica (#908): senza, la chiusura non parte; i soli controlli sì.
+import { senzaPraticaStop } from '../../scripts/finish-local.mjs';
+
+test('senza pratica la chiusura si ferma e dice come aprirla; --check e una pratica passano', () => {
+  const msg = senzaPraticaStop({ checkOnly: false, pratica: null });
+  assert.match(msg, /npm run feedback:apri/);
+  assert.match(msg, /--feedback <N>/);
+  assert.match(msg, /Non ho toccato niente/);
+  assert.equal(senzaPraticaStop({ checkOnly: true, pratica: null }), '');
+  assert.equal(senzaPraticaStop({ checkOnly: false, pratica: { id: 'abc', seq: 908 } }), '');
 });

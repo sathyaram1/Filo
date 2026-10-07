@@ -45,6 +45,9 @@
     $('useDefaultModels-desc').textContent = I18n.t('options_use_default_models_desc');
     $('openWeightsOnly-label').textContent = I18n.t('options_open_weights_only');
     $('openWeightsOnly-desc').textContent = I18n.t('options_open_weights_only_desc');
+    $('ordineHost-label').textContent = I18n.t('options_host_order');
+    $('ordineHost-desc').textContent = I18n.t('options_host_order_desc');
+    riempiOrdineHost();
     $('h-provider').textContent = I18n.t('options_keys');
     $('h-models').textContent = I18n.t('options_models');
     $('h-costs').textContent = I18n.t('options_costs');
@@ -79,7 +82,8 @@
     if (!Usage || typeof Usage.byArea !== 'function') return;
 
     for (const group of Usage.byArea()) {
-      const rows = group.entries.filter((e) => e.from !== 'user');
+      // Una funzione che usa solo chi gestisce Filo (`action`) qui è rumore (#465).
+      const rows = group.entries.filter((e) => e.from !== 'user' && !e.action);
       if (!rows.length) continue;
 
       const head = document.createElement('div');
@@ -139,7 +143,10 @@
 
   function effectiveModelConfig() {
     if ($('useDefaultModels').checked) {
-      return defaultModelsPublic || { models: {}, modelRegistry: {} };
+      const cfg = defaultModelsPublic || { models: {}, modelRegistry: {} };
+      // La config condivisa può portare ancora funzioni che qui non ci sono più (#465).
+      const qui = new Set((ModelChain.actionLabels() || []).map(([a]) => a));
+      return { ...cfg, models: Object.fromEntries(Object.entries(cfg.models || {}).filter(([a]) => qui.has(a))) };
     }
     return {
       models: ModelChain.collect(modelChains || {}),
@@ -286,6 +293,18 @@
     rinfrescaMisure();
   }
 
+  // «Lo sceglie Filo» al posto di «Automatico»: qui non c'è una scelta generale più in alto a cui rimandare.
+  function riempiOrdineHost() {
+    const sel = $('ordineHost');
+    sel.innerHTML = '';
+    for (const val of window.SN_CONST.PROVIDER_SORTS) {
+      const opt = document.createElement('option');
+      opt.value = val === 'auto' ? '' : val;
+      opt.textContent = I18n.t(val === 'auto' ? 'options_host_order_filo' : 'provider_sort_' + val);
+      sel.appendChild(opt);
+    }
+  }
+
   // Una riga chiama con l'ordinamento suo, o con quello generale se resta su
   // «Automatico»: è quello a cui una misura deve corrispondere per valere.
   let sceltaGeneraleHost = '';
@@ -399,6 +418,7 @@
 
     $('useDefaultModels').checked = settings.useDefaultModels !== false;
     $('openWeightsOnly').checked = settings.openWeightsOnly === true;
+    $('ordineHost').value = window.SN_CONST.normalizeProviderSort(settings.ordineHost) || '';
     // Lista read-only dei modelli predefiniti. Deve mostrare i modelli che l'app
     // userà DAVVERO: li chiediamo al main (config condivisa + eventuali
     // modifiche dell'owner). Se la richiesta non riesce la lista resta vuota
@@ -421,7 +441,9 @@
     // Editor a segmenti "Modelli per azione": una catena di fallback per azione.
     modelChains = ModelChain.renderGrid($('modelsGrid'), {
       models: settings.models || {},
-      onChange: saveDebounced,
+      // Mentre si scrive in un segmento basta l'`input` che sale alla pagina; una scelta dalla tendina, un segmento
+      // aggiunto o tolto e un valore confermato o respinto partono subito.
+      onChange: (scrivendo) => { if (!scrivendo) { caselle.cambiato('pagina'); caselle.subito(true); } },
       // Registry LIVE (dalle righe correnti, anche non salvate) così la
       // validazione modello↔funzione riflette subito le modifiche.
       getRegistry: () => collectModelRegistry().registry,
@@ -492,13 +514,22 @@
 
   // Con che modello, ragionamento e ordinamento degli host la riga chiamerebbe
   // adesso: è la configurazione a cui una misura deve corrispondere per valere.
+  // La scelta personale vince sull'ordinamento delle voci predefinite, non su quello che l'utente dà alle sue.
+  function sortDellaRiga(row, entrySort) {
+    const C = window.SN_CONST;
+    const personale = $('ordineHost') ? $('ordineHost').value : '';
+    return row.classList.contains('sn-default-model-row')
+      ? C.ordinamentoPerUtente(personale, entrySort, sceltaGeneraleHost)
+      : C.ordinamentoEffettivo(entrySort, C.normalizeProviderSort(personale) || sceltaGeneraleHost);
+  }
+
   function configurazioneRiga(row) {
     const campo = row.querySelector('.sn-model-id');
     const e = row._entry || {};
     return {
       model: campo ? campo.value.trim() : (e.model || ''),
       reasoning: e.reasoning,
-      sort: window.SN_CONST.ordinamentoEffettivo(e.sort, sceltaGeneraleHost),
+      sort: sortDellaRiga(row, e.sort),
     };
   }
 
@@ -679,9 +710,16 @@
   }
 
   // Evidenzia (bordo + messaggio inline sotto la riga, niente alert bloccante)
-  // le righe scartate dall'ultimo save(); ripulisce tutte le altre.
-  function markRegistryRowIssues(missingNickRows, dupRows) {
+  // le righe scartate dall'ultimo save(); ripulisce tutte le altre. Con
+  // `soloTogliere` (mentre si scrive) una riga corretta si ripulisce ma una
+  // nuova non si accende: a metà, una riga senza nickname è solo incompleta.
+  function markRegistryRowIssues(missingNickRows, dupRows, soloTogliere) {
     const host = $('modelRegistryList');
+    const gia = soloTogliere ? new Set(host.querySelectorAll('.sn-model-row.sn-row-invalid')) : null;
+    if (gia) {
+      missingNickRows = (missingNickRows || []).filter((row) => gia.has(row));
+      dupRows = (dupRows || []).filter((d) => gia.has(d.row));
+    }
     for (const row of host.querySelectorAll('.sn-model-row:not(.sn-model-row-head)')) {
       row.classList.remove('sn-row-invalid');
       row.querySelector('.sn-model-nick').classList.remove('sn-input-invalid');
@@ -768,6 +806,7 @@
       if (Caps) opt.label = Caps.categoryLabel(provider, it.id, it.meta);
       dl.appendChild(opt);
     }
+    if (window.SN_COMBOBOX) window.SN_COMBOBOX.opzioniArrivate();
   }
 
   // Semina i combobox con gli id già presenti nel registry (divisi per provider)
@@ -870,7 +909,10 @@
     $('modelsStatus').textContent = errors.length ? errors.join(' · ') : `${total} modelli`;
   }
 
-  async function save() {
+  // Con `avvisi: false` (mentre si scrive) le righe scartate non si dicono ancora.
+  async function save(opts) {
+    const biglietto = caselle.spedita('pagina');
+    const avvisi = !(opts && opts.avvisi === false);
     const apiKey = $('apiKey').value.trim();
     const apiKeyTavily = $('apiKeyTavily').value.trim();
 
@@ -886,6 +928,7 @@
     const partial = {
       useDefaultModels: $('useDefaultModels').checked,
       openWeightsOnly: $('openWeightsOnly').checked,
+      ordineHost: $('ordineHost').value,
       apiKeys: { openrouter: apiKey, tavily: apiKeyTavily },
       modelRegistry: registry,
       models: ModelChain.collect(modelChains),
@@ -896,13 +939,13 @@
 
     // Aggiorna la datalist dei nickname (per-action) col registry appena salvato.
     populateNicknames(registry);
-    markRegistryRowIssues(missingNickRows, dupRows);
+    markRegistryRowIssues(missingNickRows, dupRows, !avvisi);
 
-    // Se nel frattempo è arrivata un'altra modifica, la conferma parlerebbe di
-    // uno stato già superato: la scrive il salvataggio che chiude la fila.
-    if (rimandato.inAttesa()) return;
+    // Arrivata un'altra modifica mentre questa viaggiava, la conferma la scrive il salvataggio che chiude la fila.
+    if (!caselle.aggiornata('pagina', biglietto)) return;
 
     const hasDiscarded = (missingNickRows && missingNickRows.length) || (dupRows && dupRows.length);
+    if (hasDiscarded && !avvisi) return;
     const hint = $('savedHint');
     hint.textContent = hasDiscarded ? I18n.t('options_model_row_not_saved') : I18n.t('options_saved');
     hint.classList.toggle('sn-hint-warn', !!hasDiscarded);
@@ -936,13 +979,18 @@
     }
   }
 
-  // Attesa, spegnimento della conferma e salvataggio prima di sparire: la
-  // regola è una sola e sta in SN_SALVA, per tutte le pagine che salvano da sé.
-  const rimandato = window.SN_SALVA.crea({
-    salva: save,
-    spegniConferma: () => $('savedHint').classList.remove('sn-show'),
+  // Chiavi, limite di spesa, righe del registro e modelli per azione non hanno un «Salva», e chiudere o cambiare
+  // scheda non avvisa la pagina (#590.5): tutto parte da qui. Uscendo si accendono gli avvisi sulle righe scartate.
+  const caselle = window.SN_CASELLE.crea({
+    uscita() {
+      if (modelChains) ModelChain.conferma(modelChains);
+      const { missingNickRows, dupRows } = collectModelRegistry();
+      markRegistryRowIssues(missingNickRows, dupRows);
+    },
+    spegni: () => $('savedHint').classList.remove('sn-show'),
   });
-  const saveDebounced = () => rimandato.programma();
+  caselle.registra('pagina', (avvisi) => save({ avvisi }));
+  const CASELLA = /^(text|password|number|search|url|email)$/;
 
   // La chiave OpenRouter si mette e si toglie anche dalla pagina Crediti
   // (#629), e questa pagina risalva TUTTO il modulo a ogni modifica: con la
@@ -950,30 +998,46 @@
   // chiave a com'era prima (o la cancellava, se all'apertura non c'era). Al
   // cambio arrivato da fuori il campo si riallinea, a meno che l'utente ci
   // stia scrivendo dentro proprio adesso.
+  // Lo stesso per gli altri campi semplici, che la chat cambia a parole (#949): le voci le dà la fonte unica.
   if (chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((msg) => {
-      if (!msg || msg.type !== MSG.SETTINGS_UPDATED || !msg.settings || !msg.settings.apiKeys) return;
-      const field = $('apiKey');
-      if (!field || document.activeElement === field) return;
-      const now = String(msg.settings.apiKeys.openrouter || '');
-      if (field.value !== now) field.value = now;
+      if (!msg || msg.type !== MSG.SETTINGS_UPDATED || !msg.settings) return;
+      const toccati = window.SN_VOCI_IMPOSTAZIONI.riallineaPagina('options', msg.settings, {
+        salta: (id, percorso, el) => document.hasFocus() && document.activeElement === el,
+      });
+      if (toccati.includes('useDefaultModels')) applyDefaultModelsVisibility();
+      if (toccati.length) renderOpenWeightsImpact();
+      if (toccati.includes('ordineHost')) rinfrescaMisure();
     });
   }
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
-    // Niente pulsante "Salva": ogni modifica viene applicata e persistita
-    // subito. I controlli testuali salvano allo `change` (cioè al blur), gli
-    // altri (select/checkbox) immediatamente.
-    $('page').addEventListener('change', () => saveDebounced());
-    // Quello che si sta ancora scrivendo è già una modifica: senza questo, chi
-    // chiude la scheda col cursore nel campo perdeva tutto quello che c'era
-    // dentro, e la conferma di prima restava accesa mentre digitava.
-    $('page').addEventListener('input', () => rimandato.modificato());
+    // Niente pulsante "Salva": un `change` (interruttore, tendina, campo lasciato) parte subito. Qui ogni casella a
+    // metà ha effetto (il tetto «1» scrivendo «15» ferma le richieste, una chiave tronca viene rifiutata, un modello
+    // che non esiste fallisce), quindi aspetta la pausa lunga; incollare parte subito.
+    $('page').addEventListener('input', (e) => {
+      const t = e.target;
+      if (!t || !(t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && CASELLA.test(t.type)))) return;
+      caselle.cambiato('pagina', e, { pausa: window.SN_CASELLE.PAUSA_LUNGA_MS });
+      // L'avviso di una riga del registro si toglie mentre la si corregge; uno nuovo aspetta l'uscita.
+      if (t.closest('.sn-model-row.sn-row-invalid')) {
+        const { missingNickRows, dupRows } = collectModelRegistry();
+        markRegistryRowIssues(missingNickRows, dupRows, true);
+      }
+    });
+    // L'editor dei modelli per azione dice da sé quando un segmento è confermato.
+    $('page').addEventListener('change', (e) => {
+      if (e.target && e.target.closest && e.target.closest('.sn-chain')) return;
+      caselle.cambiato('pagina');
+      caselle.subito(true);
+    });
     // Qualunque cosa cambi (interruttore, modelli per azione, registry) può
     // cambiare l'effetto di "solo pesi aperti": lo ricalcoliamo sempre.
     $('page').addEventListener('change', renderOpenWeightsImpact);
     $('useDefaultModels').addEventListener('change', applyDefaultModelsVisibility);
+    // Le misure prese con un altro ordinamento non parlano più di come chiamerebbero le righe.
+    $('ordineHost').addEventListener('change', rinfrescaMisure);
     $('loadModels').addEventListener('click', loadModelsFromProvider);
     $('testOpenrouter').addEventListener('click', () => testProvider('openrouter', $('testOpenrouterStatus'), $('testOpenrouter')));
     $('addModelRow').addEventListener('click', () => {

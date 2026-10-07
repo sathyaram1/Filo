@@ -34,10 +34,10 @@
 
   // ── Transizioni legali (FEEDBACK-STATES.md §3) ─────────────────────────────
   // from → { to: [attori autorizzati] }. Attori:
-  //   'owner'    dashboard di gestione (solo l'owner fa uscire dagli stati di
-  //              revisione umana);
-  //   'pipeline' filo-security (giudici + gate file): è l'UNICO che fa uscire
-  //              da `unlabeled`;
+  //   'owner'    Gestione, pagina dei feedback e `npm run feedback`: una riga per
+  //              ogni azione di ownerActions (manageReview.js), sentinella in
+  //              tests/unit/ownerActionsTransizioni.test.mjs; mai → done;
+  //   'pipeline' filo-security (giudici + gate file);
   //   'routine'  routine Claude via canale autenticato (iter di lavorazione).
   // Una coppia (from,to) assente = transizione ILLEGALE: il writer la rifiuta.
   const TRANSITIONS = {
@@ -46,8 +46,9 @@
       attack:          ['pipeline'],
       spam:            ['pipeline'],
       design:          ['pipeline'],
-      todo:            ['pipeline'], // sicuro + automatica ON (letta al giudizio)
+      todo:            ['pipeline', 'owner'], // pipeline: sicuro + automatica ON; owner: «→ In coda» dai Ricevuti
       aligned:         ['pipeline'], // sicuro + automatica OFF
+      archived:        ['owner'],
     },
     suspicious_file: {
       todo:             ['owner'],
@@ -58,24 +59,32 @@
     attack: {
       attack_confirmed: ['owner'],
       todo:             ['owner'],   // falso positivo
+      archived:         ['owner'],   // non si fa, senza confermarlo attacco
       unlabeled:        ['pipeline'], // mittente fidato flaggato per errore → ri-giudizio
     },
     spam: {
       spam_confirmed: ['owner'],
       todo:           ['owner'],
+      archived:       ['owner'],
       unlabeled:      ['pipeline'],
     },
     design: {
-      todo:     ['owner'],  // l'owner risponde in chat e rimette in coda
-      archived: ['owner'],  // oppure decide che non si fa
+      // 'pipeline': solo un derivato fermo con la sua origine (origine_bloccata), che la segue quando l'owner la libera.
+      todo:      ['owner', 'pipeline'],  // l'owner risponde in chat e rimette in coda
+      archived:  ['owner'],  // oppure decide che non si fa
+      unlabeled: ['pipeline'],
+      aligned:   ['pipeline'],
     },
     aligned: {
-      todo:     ['owner'],  // approvazione manuale (anche bulk)
-      archived: ['owner'],  // un doppione, o una cosa che non si farà: si chiude qui, senza approvarla prima
+      // 'pipeline': solo un derivato tornato qui con l'origine chiusa (origine_chiusa), che la segue quando l'owner la ripristina.
+      todo:      ['owner', 'pipeline'],  // approvazione manuale (anche bulk)
+      archived:  ['owner'],  // un doppione, o una cosa che non si farà: si chiude qui, senza approvarla prima
+      unlabeled: ['pipeline'],
     },
     todo: {
-      working: ['routine'], // presa in carico (il semaforo lo tiene il server)
-      design:  ['routine'], // la routine ha domande → chat + statusReason clarify
+      working:  ['routine'], // presa in carico (il semaforo lo tiene il server)
+      design:   ['routine'], // la routine ha domande → chat + statusReason clarify
+      archived: ['owner'],   // un doppione, o una cosa che non si farà più
       // NB: il passo diretto todo→done (attore routine) è stato RITIRATO col
       // ridisegno (SPEC-RIDISEGNO-MAX.md §1): esisteva per il pianificatore che
       // spezzava le spec in sotto-feedback, che non esiste più. Le chiusure
@@ -88,14 +97,17 @@
       // Arenato: il ramo non avanza da un'ora → il pacemaker lo rimette in coda
       // da solo (FEEDBACK-STATES.md §6a). Alla terza volta va in `design`.
       todo:                ['routine'],
+      archived:            ['owner'],
     },
     revision_capability: {
       revision_security: ['routine'], // PASS verifica comportamentale
       design:            ['routine'], // fail cap raggiunto → statusReason loop
+      archived:          ['owner'],
     },
     revision_security: {
-      done:   ['routine'], // PASS secaudit + merge-gate fonde su main
-      design: ['routine'], // FAIL fixer-loop → statusReason loop
+      done:     ['routine'], // PASS secaudit + merge-gate fonde su main
+      design:   ['routine'], // FAIL fixer-loop → statusReason loop
+      archived: ['owner'],
       // Conflitto di fusione: main è andato avanti mentre il lavoro aspettava
       // e le modifiche non si incastrano più da sole. Non è una bocciatura di
       // qualità: il ramo torna in lavorazione per il RIALLINEAMENTO (rifare la
@@ -155,30 +167,29 @@
   // e spazio per stati futuri. Cambiarla NON rompe i documenti già scritti.
   const CIPHER_PAD = 32;
 
-  // ── I tre bilanci dei giri di correzione (feedback #561, §4) ────────
+  // ── I quattro bilanci dei giri di correzione (feedback #561, §4) ────────
   // I NUMERI non stanno qui. Li detta l'owner dalla dashboard (doc Firestore
-  // `config/routines`, campi `cap2`, `cap1`, `cap0`, Gestione → Automazioni)
-  // e li applica il SERVER quando registra la critica — mai il prompt, mai un
-  // conteggio dichiarato dal client. Fino al 2026-09-16 qui c'era un default
-  // (5/2/0) e la verifica locale ragionava con quello mentre la dashboard
-  // diceva 10/1/0: decisione dell'owner, nessun default nel codice — chi ha
-  // bisogno dei bilanci li legge dal server, e se non ci sono si ferma con un
-  // errore che dice cosa manca. Qui restano solo i NOMI dei tre campi. Le
-  // regole che li consumano stanno in `verifierRound.js` (decideRound),
-  // incorporato anch'esso dal server al deploy.
-  //   cap2 (x): giri di correzione per i rilievi di livello 3 e 2 (la cosa
-  //             chiesta non si ottiene, cammino principale). A bilancio finito
-  //             un 3/2 ferma la pratica e chiama l'owner (statusReason `loop`).
-  //   cap1 (y): giri di correzione per i rilievi di livello 1 (cosmetica,
-  //             attrito fuori cammino). A bilancio finito un 1 va nel feedback
-  //             derivato invece di essere corretto.
-  //   cap0 (z): giri per i soli rilievi di livello 0 (casi rari). Con z = 0 gli
-  //             0 da soli non si correggono mai: si correggono solo insieme ad
-  //             altro (un altro verificatore arriva comunque).
+  // `config/routines`, campi `cap3`, `cap2`, `cap1`, `cap0`, Gestione →
+  // Automazioni) e li applica il SERVER quando registra la critica — mai il
+  // prompt, mai un conteggio dichiarato dal client. Dal 2026-09-16 nel codice
+  // non c'è un default: chi ha bisogno dei bilanci li legge dal server, e se
+  // non ci sono si ferma con un errore che dice cosa manca. Qui restano solo i
+  // NOMI dei campi, uno per livello. Le regole che li consumano stanno in
+  // `verifierRound.js` (decideRound), incorporato anch'esso dal server al
+  // deploy; una sentinella tiene questa lista uguale alla sua e ai campi della
+  // dashboard.
+  //   cap3: giri di correzione per i rilievi di livello 3 (sicurezza, soldi,
+  //         Filo inutilizzabile). A bilancio finito un 3 ferma la pratica e
+  //         chiama l'owner (statusReason `loop`): è l'unico che ferma.
+  //   cap2: giri per i rilievi di livello 2 (la cosa chiesta non si ottiene nel
+  //         caso normale). A bilancio finito un 2 NON ferma: diventa un
+  //         feedback a parte a priorità 2, e il lavoro passa (2026-09-23).
+  //   cap1: giri per i rilievi di livello 1 (di rado, cosmetica evidente). A
+  //         bilancio finito un 1 va nel feedback derivato.
+  //   cap0: giri per i soli rilievi di livello 0 (casi rari). Con 0 gli 0 da
+  //         soli non si correggono mai: solo insieme ad altro.
   // Ogni giro consuma UN giro dal bilancio del livello più alto corretto.
-  // I vecchi nomi (`failCap`/`improvableCap`, i tre esiti pass/migliorabile/
-  // fail) sono aboliti: l'esito lo calcola il server dai livelli e dai bilanci.
-  const VERIFIER_CAP_KEYS = ['cap2', 'cap1', 'cap0'];
+  const VERIFIER_CAP_KEYS = ['cap3', 'cap2', 'cap1', 'cap0'];
 
   global.SN_FB_TRANSITIONS = {
     STATUSES, ACTORS, TRANSITIONS, PUBLIC_MAP, CIPHER_PAD, VERIFIER_CAP_KEYS,

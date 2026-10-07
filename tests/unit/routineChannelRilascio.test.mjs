@@ -342,7 +342,7 @@ describe('release da riga di comando', () => {
       const rilascio = ricevute.find((x) => x.url.includes('routineRelease'));
       assert.ok(rilascio, 'il server ha ricevuto il rilascio');
       assert.equal(rilascio.body.ticket, 'tkt-cli');
-      assert.equal(rilascio.body.report.v, 1);
+      assert.equal(rilascio.body.report.v, 2);
       assert.equal(rilascio.body.report.role, 'resolver');
       assert.equal(rilascio.body.report.ticket, 'tkt-cli');
       assert.ok(Array.isArray(rilascio.body.report.notes) && rilascio.body.report.notes.length >= 1, 'senza transcript: la nota c\'è');

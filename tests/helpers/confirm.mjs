@@ -32,6 +32,41 @@ export async function clickConfirm(page, which = 'ok', opts = {}) {
   expect(clicked, `bottone di conferma "${which}" presente e abilitato`).toBe(true);
 }
 
+// Fa scorrere il testo del dialogo fino in fondo: OK si accende solo dopo (#592).
+export async function scrollConfirmToEnd(page) {
+  const done = await page.evaluate(() => window.SN_CONFIRM_UI._test.scrollToEnd());
+  expect(done, 'testo del dialogo presente').toBe(true);
+}
+
+// Prima di un clic o di un tasto veri che devono valere come risposta: il dialogo
+// li ignora per mezzo secondo dal primo fotogramma, e sotto xvfb quel fotogramma
+// arriva anche un secondo dopo `toBeVisible()` (#592.11). Un'attesa fissa non basta.
+export async function aspettaConfermaPronta(page) {
+  await expect.poll(async () => (await confirmState(page))?.pronto, { message: 'il dialogo non accetta ancora un gesto vero' }).toBe(true);
+}
+
+// Clic vero del mouse su un bottone del dialogo, anche su OK in attesa (#592).
+export async function mouseClickConfirm(page, which = 'ok') {
+  const p = await page.evaluate((w) => window.SN_CONFIRM_UI._test.point(w), which);
+  expect(p, `bottone di conferma "${which}" presente`).toBeTruthy();
+  await page.mouse.click(p.x, p.y);
+}
+
+// Centro del bottone nell'istante in cui il dialogo compare: è il clic che
+// l'utente aveva già in corso per altro (#592). null se non compare entro 15 s.
+export function pointWhenConfirmAppears(page, which = 'ok') {
+  return page.evaluate((w) => new Promise((resolve) => {
+    const t0 = performance.now();
+    const giro = () => {
+      const p = window.SN_CONFIRM_UI && window.SN_CONFIRM_UI._test.point(w);
+      if (p) return resolve(p);
+      if (performance.now() - t0 > 15_000) return resolve(null);
+      requestAnimationFrame(giro);
+    };
+    giro();
+  }), which);
+}
+
 // Scrive nel campo di testo del dialogo livello 3 (digita-la-parola).
 export async function fillConfirmInput(page, value) {
   const filled = await page.evaluate((v) => window.SN_CONFIRM_UI._test.fill(v), value);

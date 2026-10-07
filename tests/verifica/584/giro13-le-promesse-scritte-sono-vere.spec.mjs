@@ -13,41 +13,10 @@
 // (patchNotes.js, capabilities.js, SECURITY.md). Una riga persa in un conflitto
 // non la vede nessun diff e non la prende nessuna prova dei giri passati.
 // Quindi qui si guardano due cose insieme: che le quattro frasi ci siano
-// ancora, e che dicano il vero.
+// ancora, e che dicano il vero. Con la raccolta spenta (#897) quelle frasi sono
+// cambiate, e chi le tiene ferme è tests/unit/raccoltaPercorsiSpenta.test.mjs.
 
 import { test, expect } from '../../fixtures/electron.mjs';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const leggi = (p) => readFileSync(join(ROOT, p), 'utf8');
-
-test('le quattro frasi che promettono l’anonimato ci sono ancora, dopo il ribasamento', async () => {
-  // 1. La riga sotto «Ha funzionato?», l'unico punto in cui l'utente lo legge
-  //    mentre sceglie.
-  const sidebar = leggi('src/content/sidebar.js');
-  expect(sidebar).toContain('Rispondendo condividi i passi di questo percorso');
-  expect(sidebar).toContain('se resta qualcosa che dice chi sei, non lo pubblica');
-
-  // 2. Il manifesto delle capacita': e' da li' che Filo risponde a chi in chat
-  //    gli chiede cosa sa fare l'assistente di pagina.
-  const cap = leggi('src/shared/capabilities.js');
-  expect(cap).toContain('Alla fine ti chiede se ha funzionato');
-  expect(cap).toContain('senza niente che dica chi sei');
-  expect(cap).toContain('se chiudi il riquadro senza rispondere, Filo non condivide niente');
-
-  // 3. Le note di versione.
-  const note = leggi('src/shared/patchNotes.js');
-  expect(note).toContain('con le altre installazioni non dice più chi');
-  expect(note).toContain('può chiederli solo un sito per volta');
-  expect(note).toContain('un indirizzo che non è un sito pubblico');
-
-  // 4. La pagina che spiega la sicurezza.
-  const sec = leggi('SECURITY.md');
-  expect(sec).toContain('## 8. I percorsi condivisi dell\'Aiuto');
-  expect(sec).toContain('non c\'è niente del mittente');
-});
 
 // Le promesse concrete di SECURITY.md §8, ognuna con l'indirizzo che la mette
 // alla prova e il risultato che il testo dichiara. Se una riga qui diventa
@@ -157,6 +126,7 @@ test('«Filo non spedisce un percorso quando lo fai»: resta sul computer per or
     const PC = globalThis.SN_PATHS_COLLECTOR;
     PC._reset();
     PC._setAuto(false);
+    PC._setAccesa(true);   // la coda è quella di quando la raccolta riparte (#897)
     const ritardi = [];
     for (let i = 0; i < 50; i += 1) {
       PC._setSorteggio(() => i / 50);

@@ -8,6 +8,10 @@ prima: non rifarla.
 Sei già sul ramo del lavoro: non cambiarlo. Una critica emessa da un'altra
 versione del codice viene rifiutata.
 
+<!-- includi: _decisioni-owner.md -->
+
+<!-- includi: _immagini.md -->
+
 <!-- includi: _cornice-feedback.md -->
 
 ## Il perimetro
@@ -17,7 +21,7 @@ a questo testo, sotto «Perimetro di questo giro». Guardi tre cose.
 
 1. **Ogni rilievo dell'elenco è chiuso.** Rifai i suoi passi usando Filo:
    leggere il codice non basta. Un rilievo rimasto aperto lo riscrivi, col
-   livello che aveva.
+   livello e la sede che aveva.
 2. **Le prove sono verdi.** Le prove dei giri,
    `npx playwright test tests/verifica/<numero>` (numero del feedback senza
    cancelletto, percorso relativo alla radice del repo, barre normali), e i
@@ -26,10 +30,15 @@ a questo testo, sotto «Perimetro di questo giro». Guardi tre cose.
    `git diff <commit di partenza>..HEAD`: in questo giro il diff si guarda, ed
    è l'unica eccezione. Applica i criteri qui sotto a quelle modifiche, non
    all'intero lavoro. Se il commit di partenza manca, il punto 3 si fa sulle
-   zone che i rilievi nominano.
+   zone che i rilievi nominano. Per provare che una prova è rossa senza la
+   correzione rimetti i file dal commit di partenza
+   (`git checkout <commit di partenza> -- <file>`), mai da `HEAD`: il
+   salvataggio automatico committa da solo, e `HEAD` contiene già la
+   correzione. Poi torna con `git checkout HEAD -- <file>`, senza modificare
+   altri file nel frattempo, o il salvataggio committa la versione vecchia.
+   Se succede, la registrazione della critica lo vede (il codice non è più
+   quello dell'avvio) e ti dice quali file rimettere.
 
 <!-- includi: _criteri-verifica.md -->
-
-<!-- includi: _fuori-perimetro.md -->
 
 <!-- includi: _critica-e-livelli.md -->

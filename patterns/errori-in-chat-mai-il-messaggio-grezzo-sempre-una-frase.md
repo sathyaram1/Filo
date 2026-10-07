@@ -34,4 +34,4 @@ ha funzionato e cosa fare**.
   (`src/main/services/handlers/scryfall.js`), assistente laterale
   (`src/content/sidebar.js`). Test: `tests/unit/chatErrors.test.mjs`,
   `tests/unit/providerNetworkRetry.test.mjs`,
-  `tests/dashboard-chat-gap-feedback.spec.mjs`, `tests/verify-331-stress.spec.mjs`.
+  `tests/dashboard-chat-gap-feedback.spec.mjs`, `tests/verifica/331/verify-331-stress.spec.mjs`.

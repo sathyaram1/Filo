@@ -37,11 +37,51 @@ test('classifyBlock: nessuna pipeline → bianco se aperto (mai giudicato), null
 
 test('classifyBlock: mittente fidato (routine/owner) bloccato a L1 → unfiltered, non attacco', () => {
   // Identità dell'owner flaggata per errore: va RI-GIUDICATA, non mostrata come attacco.
-  const r = MR.classifyBlock({ clientId: 'routine:routine', pipeline: { action: 'human_review', l1Category: 'dangerous', verdicts: [] } });
+  const r = MR.classifyBlock({ clientId: 'routine:routine', senderProof: 'server', pipeline: { action: 'human_review', l1Category: 'dangerous', verdicts: [] } });
   assert.equal(r.reason, 'unfiltered');
   // Un mittente ESTERNO con lo stesso pipeline resta un attacco (rosso).
   const ext = MR.classifyBlock({ clientId: 'caf22093', pipeline: { action: 'human_review', l1Category: 'dangerous', verdicts: [] } });
   assert.equal(ext.reason, 'attack');
+});
+
+test('#595 — il prefisso riservato senza prova del mittente è un anonimo', () => {
+  const pipeline = { action: 'human_review', l1Category: 'dangerous', verdicts: [] };
+  // Chiunque può scrivere `owner:` davanti al proprio clientId: senza la prova
+  // che solo admin e server possono mettere, il suo attacco resta rosso.
+  for (const clientId of ['owner:abc', 'routine:x', 'agent:m', 'local:claude']) {
+    assert.equal(MR.classifyBlock({ clientId, pipeline }).reason, 'attack', `${clientId} senza prova`);
+    assert.equal(MR.classifyBlock({ clientId, senderProof: 'utente', pipeline }).reason, 'attack', `${clientId} con prova inventata`);
+    assert.equal(MR.classifyBlock({ clientId, senderProof: 'admin', pipeline }).reason, 'unfiltered', `${clientId} con prova admin`);
+  }
+  assert.equal(MR.isTrustedClient('local:claude', 'server'), true);
+  assert.equal(MR.isTrustedClient('auto:gap', 'admin'), false, 'auto: non è un prefisso riservato');
+  assert.equal(MR.isTrustedClient('owner:abc'), false);
+});
+
+test('#595 — senza prova il mittente riservato ha una chiave sua, come sul server', () => {
+  assert.equal(MR.effectiveClientId({ clientId: 'owner:me' }), 'non-provato:owner:me');
+  assert.equal(MR.effectiveClientId({ clientId: 'local:claude', senderProof: 'utente' }), 'non-provato:local:claude');
+  assert.equal(MR.effectiveClientId({ clientId: 'owner:me', senderProof: 'admin' }), 'owner:me');
+  assert.equal(MR.effectiveClientId({ clientId: 'routine:verifier', senderProof: 'server' }), 'routine:verifier');
+  // Chi non usa un prefisso riservato non cambia: la prova non gli serve.
+  assert.equal(MR.effectiveClientId({ clientId: 'tester@example.com' }), 'tester@example.com');
+  assert.equal(MR.effectiveClientId({ clientId: 'filo:chat' }), 'filo:chat');
+  assert.equal(MR.effectiveClientId(null), '');
+  assert.equal(MR.isUnprovenSender({ clientId: 'agent:x' }), true);
+  assert.equal(MR.isUnprovenSender({ clientId: 'agent:x', senderProof: 'server' }), false);
+  assert.equal(MR.isUnprovenSender({ clientId: 'tester' }), false);
+});
+
+test('#595 — la frase di un panel completo dice «mittente fidato» solo con la prova', () => {
+  const pipeline = {
+    expectedJudges: ['fixed_1', 'fixed_2', 'fixed_3', 'dynamic'],
+    verdicts: ['fixed_1', 'fixed_2', 'fixed_3', 'dynamic'].map((judge, i) => ({ judge, class: i ? 'aligned' : 'attack' })),
+  };
+  const conProva = MR.judgesNote({ status: 'unlabeled', clientId: 'owner:me', senderProof: 'admin', pipeline });
+  const senza = MR.judgesNote({ status: 'unlabeled', clientId: 'owner:me', pipeline });
+  assert.match(conProva.text, /^Mittente fidato/);
+  assert.doesNotMatch(senza.text, /fidato/);
+  assert.match(senza.text, /decidi tu/);
 });
 
 test('classifyBlock: mittente fidato CON verdetti completi → classificato normalmente', () => {
@@ -569,7 +609,7 @@ test('listArchiveTab: filtro "Bloccati confermati" tiene solo attacchi/spam conf
   assert.equal(MR.listArchiveTab(items).length, 3);
 });
 
-test('manageTabCounts: conta le quattro schede-lista, e solo quelle', () => {
+test('manageTabCounts: conta le cinque schede-lista, e solo quelle', () => {
   const items = [
     { _id: 'i1', status: 'unlabeled', createdAt: '2026-01-01' },
     { _id: 'i2', status: 'attack', createdAt: '2026-01-02' },
@@ -580,17 +620,17 @@ test('manageTabCounts: conta le quattro schede-lista, e solo quelle', () => {
     { _id: 'z1', status: 'archived', createdAt: '2026-04-01' },
   ];
   assert.deepEqual(MR.manageTabCounts(items), {
-    inbox: 3, queue: 2, resolved: 1, archived: 1,
+    inbox: 3, queue: 2, local: 0, resolved: 1, archived: 1,
   });
   // Nessuna chiave in più: le schede senza lista (statistiche, modelli,
   // automazioni, log) non hanno un numero da mostrare.
   assert.deepEqual(Object.keys(MR.manageTabCounts(items)).sort(),
-    ['archived', 'inbox', 'queue', 'resolved']);
+    ['archived', 'inbox', 'local', 'queue', 'resolved']);
 });
 
-test('manageTabCounts: liste vuote → quattro zeri (una scheda vuota lo dice)', () => {
-  assert.deepEqual(MR.manageTabCounts([]), { inbox: 0, queue: 0, resolved: 0, archived: 0 });
-  assert.deepEqual(MR.manageTabCounts(null), { inbox: 0, queue: 0, resolved: 0, archived: 0 });
+test('manageTabCounts: liste vuote → cinque zeri (una scheda vuota lo dice)', () => {
+  assert.deepEqual(MR.manageTabCounts([]), { inbox: 0, queue: 0, local: 0, resolved: 0, archived: 0 });
+  assert.deepEqual(MR.manageTabCounts(null), { inbox: 0, queue: 0, local: 0, resolved: 0, archived: 0 });
 });
 
 test('manageTabCounts: ogni numero è la LUNGHEZZA della lista che la scheda mostra', () => {
@@ -632,9 +672,148 @@ test('manageTabCounts: gli Archiviati seguono i filtri della colonna (⭐, confe
 
 test('manageTabCounts: spostare un feedback sposta due numeri (approvazione)', () => {
   const items = [{ _id: 'a', status: 'unlabeled', createdAt: '2026-01-01' }];
-  assert.deepEqual(MR.manageTabCounts(items), { inbox: 1, queue: 0, resolved: 0, archived: 0 });
+  assert.deepEqual(MR.manageTabCounts(items), { inbox: 1, queue: 0, local: 0, resolved: 0, archived: 0 });
   items[0].status = 'todo';   // l'owner approva: Ricevuti → In coda
-  assert.deepEqual(MR.manageTabCounts(items), { inbox: 0, queue: 1, resolved: 0, archived: 0 });
+  assert.deepEqual(MR.manageTabCounts(items), { inbox: 0, queue: 1, local: 0, resolved: 0, archived: 0 });
+});
+
+// ── Lavori locali (#908) ────────────────────────────────────────────────────
+
+const SEGNO = { by: 'owner@x', at: 1790000000000 };
+const locale = (extra) => ({
+  _id: 'l1', status: 'todo', clientId: 'local:claude', senderProof: 'admin', createdAt: '2026-09-01', ...extra,
+});
+
+test('Lavori locali: col segno la pratica esce da «In coda» e ha la sua sezione', () => {
+  const items = [locale({ localOnly: SEGNO }), { _id: 'q1', status: 'todo', createdAt: '2026-09-02' }];
+  assert.equal(MR.manageTabFor(items[0]), 'local');
+  assert.deepEqual(MR.listForManageTab(items, 'local').map((f) => f._id), ['l1']);
+  assert.deepEqual(MR.listForManageTab(items, 'queue').map((f) => f._id), ['q1']);
+  assert.deepEqual(MR.manageTabCounts(items), { inbox: 0, queue: 1, local: 1, resolved: 0, archived: 0 });
+  // Il numero è la lunghezza della lista che la sezione mostra.
+  assert.equal(MR.manageTabCounts(items).local, MR.listForManageTab(items, 'local').length);
+});
+
+test('Lavori locali: tutto l’iter di lavorazione ci sta, i Ricevuti e i chiusi no', () => {
+  for (const status of ['todo', 'working', 'revision_capability', 'revision_security']) {
+    assert.equal(MR.manageTabFor(locale({ status, localOnly: SEGNO })), 'local', status);
+  }
+  // Aspetta ancora l'owner: resta nei Ricevuti, e l'approvazione dice dove va.
+  const allineato = locale({ status: 'aligned', localOnly: SEGNO });
+  assert.equal(MR.manageTabFor(allineato), 'inbox');
+  assert.equal(MR.ownerActionFor(allineato, 'accept').label, '→ Lavori locali');
+  assert.equal(MR.ownerActionFor(locale({ status: 'aligned' }), 'accept').label, '→ In coda');
+  assert.equal(MR.manageTabFor(locale({ status: 'archived', localOnly: SEGNO })), 'archived');
+  assert.equal(MR.manageTabFor(locale({ status: 'done', localOnly: SEGNO, resolvedInVersion: '1.0.0' }), { releasedVersion: '2.0.0' }), 'resolved');
+});
+
+test('Lavori locali: le azioni sono quelle della coda', () => {
+  const fb = locale({ localOnly: SEGNO });
+  assert.deepEqual(MR.ownerActions(fb).map((a) => a.key), ['resolve', 'archive']);
+});
+
+test('Lavori locali: una fusione che aspetta l’owner lo porta nei Ricevuti anche col segno', () => {
+  const fb = locale({ localOnly: SEGNO, seq: 12 });
+  const fusioni = { pending: [{ id: 'r1', feedbackId: 'l1', num: '12', branch: 'claude/x' }] };
+  assert.equal(MR.manageTabFor(fb, { fusioni }), 'inbox');
+});
+
+test('localSignCheck: il segno si mette solo su owner o sessione CON la prova', () => {
+  assert.equal(MR.localSignCheck(locale(), true).ok, true);
+  assert.equal(MR.localSignCheck(locale({ clientId: 'owner:me' }), true).ok, true);
+  // Il solo prefisso non basta: senza prova vale come un utente.
+  const senzaProva = MR.localSignCheck(locale({ senderProof: undefined }), true);
+  assert.equal(senzaProva.ok, false);
+  assert.equal(senzaProva.utente, true);
+  assert.match(senzaProva.motivo, /prova/);
+  // Un utente: rifiutato, e la risposta lo dice (lo script propone i Ricevuti).
+  const utente = MR.localSignCheck(locale({ clientId: 'abc123', senderProof: undefined }), true);
+  assert.deepEqual([utente.ok, utente.utente], [false, true]);
+  // Una routine con la prova: non è un utente, ma non è nemmeno lavoro locale.
+  const routine = MR.localSignCheck(locale({ clientId: 'routine:worker', senderProof: 'server' }), true);
+  assert.deepEqual([routine.ok, !!routine.utente], [false, false]);
+});
+
+test('localSignCheck: una pratica chiusa si segna (era un lavoro locale: fuori dalla bacheca) e lo dice', () => {
+  for (const status of ['done', 'archived']) {
+    const r = MR.localSignCheck(locale({ status, statusPublic: 'closed' }), true);
+    assert.deepEqual([r.ok, r.chiusa], [true, true], status);
+  }
+  // Il solo prefisso resta di un utente anche a pratica chiusa.
+  assert.equal(MR.localSignCheck(locale({ status: 'done', statusPublic: 'closed', senderProof: undefined }), true).ok, false);
+  assert.equal(MR.localSignCheck(locale({ status: 'attack_confirmed', statusPublic: 'closed' }), true).ok, false);
+});
+
+test('mittenteDaRiconoscere: solo i prefissi dell’owner e delle sessioni senza prova', () => {
+  assert.equal(MR.mittenteDaRiconoscere({ clientId: 'local:claude' }), true);
+  assert.equal(MR.mittenteDaRiconoscere({ clientId: 'owner:abc' }), true);
+  assert.equal(MR.mittenteDaRiconoscere({ clientId: 'local:claude', senderProof: 'admin' }), false);
+  assert.equal(MR.mittenteDaRiconoscere({ clientId: 'routine:residuo' }), false);
+  assert.equal(MR.mittenteDaRiconoscere({ clientId: 'c-utente' }), false);
+});
+
+test('localSignCheck: pratica segnalata o in mano a una routine → no', () => {
+  const now = Date.parse('2026-09-30T10:00:00Z');
+  assert.equal(MR.localSignCheck(locale({ status: 'attack' }), true, { now }).ok, false);
+  // Presa da una routine: il server scrive workingSince alla presa e specchia il battito in beatAt.
+  const dueMinutiFa = '2026-09-30T09:58:00Z';
+  const presa = locale({ status: 'working', workingSince: dueMinutiFa, beatAt: dueMinutiFa });
+  const r = MR.localSignCheck(presa, true, { now });
+  assert.equal(r.ok, false);
+  assert.match(r.motivo, /routine la sta lavorando/);
+  assert.equal(MR.localSignCheck(locale({ status: 'revision_capability', beatAt: dueMinutiFa }), true, { now }).ok, false, 'un verificatore col battito');
+  // Battito fermo da ben oltre la tolleranza: nessuno la tiene più.
+  assert.equal(MR.localSignCheck({ ...presa, workingSince: '2026-09-30T08:00:00Z', beatAt: '2026-09-30T09:00:00Z' }, true, { now }).ok, true);
+  // Consegnata e tornata in coda: il battito recente del giro finito non la tiene.
+  assert.equal(MR.localSignCheck(locale({ status: 'todo', beatAt: dueMinutiFa }), true, { now }).ok, true);
+  // Stato cifrato: non si sa se è aperta, non si segna.
+  assert.equal(MR.localSignCheck(locale({ status: 'FENC1:abc' }), true, { now }).ok, false);
+});
+
+test('localSenderCheck: la pratica da legare a un lavoro locale, segno o no', () => {
+  assert.equal(MR.localSenderCheck(locale({ localOnly: SEGNO })).ok, true);
+  assert.equal(MR.localSenderCheck(locale({ clientId: 'owner:me' })).ok, true);
+  const utente = MR.localSenderCheck(locale({ clientId: 'abc123', senderProof: undefined }));
+  assert.deepEqual([utente.ok, utente.utente], [false, true]);
+  assert.equal(MR.localSenderCheck(locale({ senderProof: undefined })).utente, true);
+  assert.equal(MR.localSenderCheck(locale({ clientId: 'routine:worker', senderProof: 'server' })).ok, false);
+});
+
+test('localSignCheck: togliere il segno si può sempre, se c’è', () => {
+  assert.equal(MR.localSignCheck(locale({ clientId: 'abc', senderProof: undefined, localOnly: SEGNO }), false).ok, true);
+  assert.equal(MR.localSignCheck(locale(), false).ok, false);
+  assert.equal(MR.localSignCheck(locale({ localOnly: SEGNO }), true).ok, false);
+});
+
+test('isRicevutiStatus: i sei stati che aspettano l’owner, e solo quelli', () => {
+  const ric = ['unlabeled', 'suspicious_file', 'attack', 'spam', 'design', 'aligned'];
+  for (const s of ric) assert.equal(MR.isRicevutiStatus(s), true, s);
+  for (const s of ['todo', 'working', 'done', 'archived', 'attack_confirmed', '']) assert.equal(MR.isRicevutiStatus(s), false, s);
+});
+
+test('isLocalOnly: serve una mappa con chi l’ha messo', () => {
+  assert.equal(MR.isLocalOnly({ localOnly: SEGNO }), true);
+  assert.equal(MR.isLocalOnly({ localOnly: {} }), false);
+  assert.equal(MR.isLocalOnly({ localOnly: true }), false);
+  assert.equal(MR.isLocalOnly({}), false);
+});
+
+test('isProvenLocalWork: segno e prova insieme, come il server che la fonde saltando L5', () => {
+  assert.equal(MR.isProvenLocalWork(locale({ localOnly: SEGNO })), true);
+  assert.equal(MR.isProvenLocalWork(locale({ localOnly: SEGNO, clientId: 'owner:me' })), true);
+  assert.equal(MR.isProvenLocalWork(locale()), false);
+  assert.equal(MR.isProvenLocalWork(locale({ localOnly: SEGNO, senderProof: undefined })), false);
+  assert.equal(MR.isProvenLocalWork(locale({ localOnly: SEGNO, clientId: 'utente-x' })), false);
+});
+
+test('livelli L5: la fusione locale che ha saltato L5 non dice «avevi messo il segno»', () => {
+  const fb = locale({ localOnly: SEGNO, seq: 908, subSeq: 0, status: 'done' });
+  const l5 = MR.livelloL5(fb, { fusioni: { preapproved: [{ id: 'x', feedbackId: 'l1', skippedL5: true }] } });
+  assert.equal(l5.esito, 'fuso');
+  assert.match(l5.pannello.testo, /lavoro locale/);
+  assert.doesNotMatch(l5.pannello.testo, /avevi messo il segno/);
+  const segnata = MR.livelloL5(fb, { fusioni: { preapproved: [{ id: 'y', feedbackId: 'l1' }] } });
+  assert.match(segnata.pannello.testo, /avevi messo il segno/);
 });
 
 // ── Riapertura a pagamento dalla board (DC4) ────────────────────────────────
@@ -995,17 +1174,17 @@ const stati  = (fb, opts) => MR.ownerActions(fb, opts).map((a) => a.to);
 
 test('ownerActions: Ricevuti → in coda, le conferme che servono, archivia', () => {
   // Allineato: nessuna conferma da offrire.
-  assert.deepEqual(chiavi({ status: 'aligned' }), ['accept', 'archive']);
+  assert.deepEqual(chiavi({ status: 'aligned' }), ['accept', 'accept_local', 'archive']);
   // Attacco: una conferma sola, quella giusta.
-  assert.deepEqual(chiavi({ status: 'attack' }), ['accept', 'confirm_attack', 'archive']);
-  assert.deepEqual(chiavi({ status: 'spam' }), ['accept', 'confirm_spam', 'archive']);
+  assert.deepEqual(chiavi({ status: 'attack' }), ['accept', 'accept_local', 'confirm_attack', 'archive']);
+  assert.deepEqual(chiavi({ status: 'spam' }), ['accept', 'accept_local', 'confirm_spam', 'archive']);
   // File sospetto: non è ancora classificato, quindi le conferme sono DUE.
   // Ne offriva una sola sulla dashboard di gestione: una delle due decisioni
   // esisteva su una strada sola.
   assert.deepEqual(chiavi({ status: 'suspicious_file' }),
-    ['accept', 'confirm_attack', 'confirm_spam', 'archive']);
+    ['accept', 'accept_local', 'confirm_attack', 'confirm_spam', 'archive']);
   assert.deepEqual(stati({ status: 'suspicious_file' }),
-    ['todo', 'attack_confirmed', 'spam_confirmed', 'archived']);
+    ['todo', 'todo', 'attack_confirmed', 'spam_confirmed', 'archived']);
 });
 
 test('ownerActions: In coda → chiudi a mano o archivia; un `done` non ancora uscito non si richiude', () => {
@@ -1071,7 +1250,7 @@ test('ownerActions: stato illeggibile → nessuna azione (su tutte le superfici)
 
 test('ownerActions: stati storti (assente, vuoto, nullo, inventato) → trattati come Ricevuti', () => {
   for (const fb of [{}, { status: '' }, { status: null }, { status: 'zzz-inventato' }]) {
-    assert.deepEqual(chiavi(fb), ['accept', 'archive'], JSON.stringify(fb));
+    assert.deepEqual(chiavi(fb), ['accept', 'accept_local', 'archive'], JSON.stringify(fb));
   }
 });
 
@@ -1262,6 +1441,24 @@ test('livelli L5: la richiesta si lega alla segnalazione per numero o per id', (
   assert.equal(altrui.esito, 'attesa');
 });
 
+test('livelli L5: una richiesta già mandata a fondere, o già decisa, non dice più che aspetta il via libera (#702)', () => {
+  const fusioni = { pending: [RICHIESTA] };
+  const ferma = MR.livelloL5(FB_412, { fusioni, statoRichiesta: () => null });
+  assert.match(ferma.pannello.testo, /via libera/);
+  assert.equal(ferma.fusione, null);
+  const volo = MR.livelloL5(FB_412, { fusioni, statoRichiesta: () => 'volo' });
+  assert.equal(volo.esito, 'bloccato');
+  assert.equal(volo.fusione, 'volo');
+  assert.doesNotMatch(volo.pannello.testo, /via libera/);
+  assert.equal(volo.richieste.length, 1);
+  assert.equal(MR.livelloL5(FB_412, { fusioni, statoRichiesta: () => 'decisa' }).fusione, 'decisa');
+  // Una in volo e una che aspetta: la frase resta quella dell'attesa.
+  const due = { pending: [RICHIESTA, { id: 'z', feedbackId: 'fb-412' }] };
+  const misto = MR.livelloL5(FB_412, { fusioni: due, statoRichiesta: (r) => (r.id === 'z' ? null : 'volo') });
+  assert.equal(misto.fusione, null);
+  assert.match(misto.pannello.testo, /via libera/);
+});
+
 test('livelli L5: giallo in lavorazione, verde fuso con la versione, grigio se non ci è arrivato', () => {
   assert.equal(MR.livelloL5({ status: 'working' }, {}).esito, 'attesa');
   assert.equal(MR.livelloL5({ status: 'working' }, {}).colore, MR.REASONS.spam.color);
@@ -1299,6 +1496,15 @@ test('statusReason l5: blocco ROSSO in lista, non "questione di design"', () => 
   assert.equal(MR.reasonText('l5'), 'fermo al cancello di fusione');
 });
 
+test('statusReason locale: «In breve» dice il lavoro locale, non un giudizio dei giudici (#908)', () => {
+  const panel = { verdicts: [{ class: 'aligned' }, { class: 'aligned' }, { class: 'aligned' }, { class: 'aligned' }] };
+  for (const fb of [{ status: 'design', statusReason: 'locale' }, { status: 'design', statusReason: 'locale', pipeline: panel }]) {
+    const t = MR.judgesNote(fb).text;
+    assert.match(t, /lavoro locale/);
+    assert.doesNotMatch(t, /giudici/);
+  }
+});
+
 test('fusioneInAttesa: vera solo quando una fusione aspetta davvero l’owner', () => {
   assert.equal(MR.fusioneInAttesa(FB_412, { fusioni: { pending: [RICHIESTA] } }), true);
   assert.equal(MR.fusioneInAttesa(FB_412, { fusioni: {} }), false);
@@ -1325,4 +1531,87 @@ test('livelli L1: il pannello del triangolo porta anche la decisione già presa'
     .pannello.righe.map((r) => `${r.etichetta}: ${r.valore}`).join(' | ');
   assert.match(sec, /bloccato dalla sicurezza/);
   assert.match(sec, /decidi tu/);
+});
+
+// ── Un lavoro fermo su una scelta dell'owner aspetta la sua risposta ─────────
+
+test('aspettaRisposta: la casella di risposta si apre su domande e su una scelta da fare, non sugli altri motivi', () => {
+  assert.equal(MR.aspettaRisposta({ status: 'design', statusReason: 'clarify' }), true);
+  assert.equal(MR.aspettaRisposta({ status: 'design', statusReason: 'decisione' }), true, 'una segnalazione ferma il lavoro: l\'owner risponde qui');
+  assert.equal(MR.aspettaRisposta({ status: 'design', statusReason: 'loop' }), false, 'un bilancio esaurito si rimette in coda e basta');
+  assert.equal(MR.aspettaRisposta({ status: 'design', statusReason: 'secaudit' }), false);
+  assert.equal(MR.aspettaRisposta({ status: 'design', statusReason: 'l5' }), false);
+  assert.equal(MR.aspettaRisposta({ status: 'design', statusReason: 'branch' }), false);
+  assert.equal(MR.aspettaRisposta({ status: 'design' }), false, 'il verdetto dei giudici non è una domanda');
+  assert.equal(MR.aspettaRisposta({ status: 'todo', statusReason: 'decisione' }), false);
+});
+
+test('judgesNote e reasonText: design/decisione dice che il lavoro è fermo su una scelta dell\'owner', () => {
+  const n = MR.judgesNote({ status: 'design', statusReason: 'decisione' });
+  assert.match(n.text, /fermo/i);
+  assert.match(n.text, /scelta/i);
+  assert.match(n.text, /rispondi/i);
+  assert.equal(n.color, '#2e9e5b');
+  assert.match(MR.reasonText('decisione'), /scelta/);
+  assert.equal(MR.manageTabFor({ status: 'design', statusReason: 'decisione' }), 'inbox', 'sta fra i Ricevuti, dove l\'owner guarda');
+});
+
+// Giro 3 della verifica locale: il segno locale usa la regola del lettore. Con il segno una Ri-valutazione
+// manderebbe in coda senza giudici un feedback che il filtro o un giudice hanno segnalato.
+test('localSignCheck: niente segno su un feedback che il lettore rifiuta come segnalato', () => {
+  const segnalati = [
+    locale({ status: 'unlabeled', pipeline: { stage: 'L1', action: 'block_attack', l1Category: 'dangerous' } }),
+    locale({ status: 'unlabeled', pipeline: { verdicts: [{ judge: 'A', class: 'attack' }, { judge: 'B', class: 'attack' }], expectedJudges: ['A', 'B'] } }),
+    locale({ status: 'aligned', pipeline: { verdicts: [{ judge: 'A', class: 'aligned' }, { judge: 'B', class: 'attack' }] } }),
+    locale({ status: 'unlabeled', pipeline: 'FENC1:non-si-apre' }),
+  ];
+  for (const fb of segnalati) {
+    assert.notEqual(MR.segnalatoComeAttacco(fb), '', JSON.stringify(fb.pipeline));
+    const r = MR.localSignCheck(fb, true);
+    assert.equal(r.ok, false, JSON.stringify(fb.pipeline));
+    assert.match(r.motivo, /Ricevuti/);
+  }
+  assert.equal(MR.localSignCheck(locale({ status: 'unlabeled', pipeline: { verdicts: [{ judge: 'A', class: 'aligned' }] } }), true).ok, true);
+  // Toglierlo resta sempre possibile.
+  assert.equal(MR.localSignCheck({ ...segnalati[0], localOnly: { by: 'owner', at: 1 } }, false).ok, true);
+});
+
+test('praticaChiusa e localSignCheck: su un lavoro locale chiuso togliere il segno lo dice (torna nella bacheca)', () => {
+  const chiusa = locale({ status: 'done', statusPublic: 'closed', localOnly: SEGNO });
+  assert.equal(MR.praticaChiusa(chiusa), true);
+  assert.deepEqual(MR.localSignCheck(chiusa, false), { ok: true, chiusa: true });
+  // Il riflesso pubblico può restare indietro: decide anche lo stato.
+  assert.equal(MR.praticaChiusa(locale({ status: 'archived', statusPublic: 'open', localOnly: SEGNO })), true);
+  const aperta = locale({ status: 'working', localOnly: SEGNO });
+  assert.equal(MR.praticaChiusa(aperta), false);
+  assert.deepEqual(MR.localSignCheck(aperta, false), { ok: true });
+});
+
+// ── Segno di mittente pericoloso (#922) ───────────────────────────────────
+
+test('segno: fermato dal segno solo col motivo linked_prior_attack del filtro d’ingresso', () => {
+  assert.equal(MR.fermatoDalSegno({ pipeline: { l1Reasons: ['linked_prior_attack'] } }), true);
+  assert.equal(MR.fermatoDalSegno({ pipeline: { l1Reasons: ['obfuscation', ' linked_prior_attack '] } }), true);
+  // Le raffiche non le ha fermate nessun segno: si sbloccano col rigiudizio.
+  for (const r of ['raffica_mittente', 'raffica_globale', 'raffica_non_contata', 'prior_attack']) {
+    assert.equal(MR.fermatoDalSegno({ pipeline: { l1Reasons: [r] } }), false, r);
+  }
+  // Pipeline cifrata, assente o storta: non si sa, quindi no.
+  assert.equal(MR.fermatoDalSegno({ pipeline: 'FENC1:abc' }), false);
+  assert.equal(MR.fermatoDalSegno({}), false);
+  assert.equal(MR.fermatoDalSegno(null), false);
+  assert.equal(MR.fermatoDalSegno({ pipeline: { l1Reasons: 'linked_prior_attack' } }), false);
+});
+
+test('segno: la frase della conferma è quella che il server accetta', () => {
+  assert.equal(MR.FRASE_SEGNO_ERRATO, 'il segno era un errore');
+});
+
+test('segno: il motivo si traduce se è un codice, passa com’è se è un testo', () => {
+  assert.equal(MR.motivoSegnoText('attack'), 'un suo feedback è stato giudicato un attacco');
+  assert.equal(MR.motivoSegnoText('linked_prior_attack'), 'collegato a un attacco precedente');
+  assert.equal(MR.motivoSegnoText('nuovo_codice'), 'nuovo codice');
+  assert.equal(MR.motivoSegnoText('Il feedback #812 è stato giudicato un attacco'), 'Il feedback #812 è stato giudicato un attacco');
+  assert.equal(MR.motivoSegnoText(''), '');
+  assert.equal(MR.motivoSegnoText(null), '');
 });

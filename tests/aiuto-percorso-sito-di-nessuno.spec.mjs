@@ -71,6 +71,7 @@ async function provaRaccolta(app, rawUrl) {
     const P = globalThis.SN_PATHS;
     C._reset();
     C._setAuto(false);
+    C._setAccesa(true);   // la porta dei siti si prova a raccolta accesa (#897)
     C._setSorteggio(() => 0.5);
     const submitVero = P.submit;
     let spedizioni = 0;
@@ -124,7 +125,7 @@ test('un sito vero continua a essere raccolto', async ({ app }) => {
 test('la stessa porta risponde «no» per tutti quei siti, e «sì» per un sito vero', async ({ app }) => {
   const esito = await app.evaluate(async ({ app: _a }, { chiusi }) => {
     const C = globalThis.SN_PATHS_COLLECTOR;
-    C._reset(); C._setAuto(false);
+    C._reset(); C._setAuto(false); C._setAccesa(true);
     const out = { chiusi: [], aperto: await C.raccoglibile('https://negoziofelice.it/account/ordini') };
     for (const u of chiusi) out.chiusi.push({ u, r: await C.raccoglibile(u) });
     C._reset();
@@ -140,7 +141,7 @@ test('la stessa porta risponde «no» per tutti quei siti, e «sì» per un sito
 test('e dice «no» anche quando la coda è piena: una risposta in più non entrerebbe da nessuna parte', async ({ app }) => {
   const esito = await app.evaluate(async () => {
     const C = globalThis.SN_PATHS_COLLECTOR;
-    C._reset(); C._setAuto(false);
+    C._reset(); C._setAuto(false); C._setAccesa(true);
     const max = C._internal.MAX_IN_CODA;
     for (let i = 0; i < max; i += 1) {
       await C._internal.accoda({ domain: 'negoziofelice.it', initialUrl: '/x', intent: 'fare una cosa', steps: [{ selector: 'a', action: 'click' }], success: true });
@@ -155,7 +156,9 @@ test('e dice «no» anche quando la coda è piena: una risposta in più non entr
   expect(esito.r.reason).toMatch(/coda/);
 });
 
-test('e il riquadrino «Ha funzionato?» si fa la stessa domanda, dalla pagina: su una pagina di Filo la risposta è no', async ({ openTab }) => {
+test('e il riquadrino «Ha funzionato?» si fa la stessa domanda, dalla pagina: su una pagina di Filo la risposta è no', async ({ app, openTab }) => {
+  // a raccolta spenta direbbe no dappertutto: qui si guarda il no del sito
+  await app.evaluate(() => globalThis.SN_PATHS_COLLECTOR._setAccesa(true));
   const page = await openTab('filo://newtab/');
   await page.waitForFunction(
     () => typeof window.__filoSidebarTest?.percorsoRaccoglibile === 'function',

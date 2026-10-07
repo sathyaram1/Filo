@@ -14,18 +14,21 @@
 //   esploratore né automazione cloud — perché il contesto in cui nasce è
 //   diverso da entrambi.
 //
-// NESSUNA CREDENZIALE DELL'OWNER
-//   Si usa la STESSA strada dell'app (`src/shared/feedback.js`): creazione
-//   anonima con la chiave pubblica di Firebase, testo cifrato verso l'owner.
-//   Così questo strumento funziona anche su una copia del repo senza token
-//   admin, e soprattutto non c'è nessuna credenziale in più da tenere qui.
-//   L'unica eccezione è `--priorita`, che le regole non concedono a un mittente
-//   anonimo: quella, se richiesta, si applica dopo con le credenziali
-//   dell'owner se ci sono, e se non ci sono si dice e basta (il feedback è già
-//   depositato).
+// COL TOKEN DELL'OWNER, SEMPRE (#595, #908)
+//   Si usa la STESSA strada dell'app (`src/shared/feedback.js`), testo cifrato
+//   verso l'owner, con la create autenticata che porta `senderProof: 'admin'`:
+//   senza quella prova il prefisso `local:` lo può scrivere chiunque. Chi lo
+//   lavora si sceglie ogni volta: `--locale` mette il segno `localOnly` (il
+//   lavoro di questa sessione: nessuna routine lo prende, e `npm run finish` col
+//   suo numero salta L5), `--non-locale` lo apre per le routine. Con la prova
+//   tutti e due saltano i giudici (#914): il primo va nei Lavori locali, il
+//   secondo In coda. Una routine non lo usa. Senza scelta
+//   non parte niente. Senza token (o col token rifiutato) non parte niente:
+//   da anonimo sarebbe un feedback d'utente. `--priorita` nasce col documento.
 //
 // USO
-//   node scripts/claude-feedback.mjs "<titolo>" "<testo>" [--priorita 1..3]
+//   node scripts/claude-feedback.mjs "<titolo>" "<testo>" --locale|--non-locale
+//                                                         [--priorita 0..3]
 //                                                         [--url <indirizzo>]
 //                                                         [--allega <file>]…
 //                                                         [--dry-run]
@@ -42,7 +45,7 @@
 // "non l'ho scritto io male" da "il server non c'è")
 //   0  fatto           — il feedback è stato depositato
 //   1  uso sbagliato   — mancano titolo o testo
-//   3  rifiutato       — il server ha detto no (regole, campi, duplicato)
+//   3  rifiutato       — il server ha detto no (regole, campi, duplicato), o manca il token admin
 //   4  non raggiungibile — rete assente, timeout, guasto del server
 
 import { readFileSync, statSync } from 'node:fs';
@@ -58,6 +61,8 @@ import '../src/shared/feedbackCrypto.js';
 import '../src/shared/feedbackClientIdHash.js';
 import '../src/shared/feedback.js';
 import '../src/shared/feedbackStatus.js';
+import './lib/freno-letture.mjs';
+import { isRoutineInstance } from './lib/routine-role.mjs';
 
 const THREAD = globalThis.SN_FEEDBACK_THREAD;
 const FB = globalThis.SN_FEEDBACK;
@@ -148,15 +153,17 @@ export function exitCodeForError(err) {
 
 /**
  * Priorità richiesta dalla riga di comando. PURA.
- * Ammessi 1, 2, 3 (0 = nessuna, come nel resto del sistema). Qualunque altra
- * cosa è un errore d'uso: meglio fermarsi che scrivere una priorità inventata.
+ * La scala è 3/2/1/0 (lo 0 è un gradino della scala, non «nessuna»: assente
+ * = non impostata). Qualunque altra cosa è un errore d'uso: meglio fermarsi
+ * che scrivere una priorità inventata.
  * @returns {{ ok: true, valore: number|null } | { ok: false, motivo: string }}
  */
+export const PRIORITA_AMMESSE = Object.freeze([0, 1, 2, 3]);
 export function parsePriorita(raw) {
   if (raw === undefined || raw === null || raw === '') return { ok: true, valore: null };
   const n = Number(raw);
-  if (!Number.isInteger(n) || n < 1 || n > 3) {
-    return { ok: false, motivo: `priorità "${raw}" non valida: ammessi 1, 2, 3` };
+  if (!Number.isInteger(n) || !PRIORITA_AMMESSE.includes(n)) {
+    return { ok: false, motivo: `priorità "${raw}" non valida: ammessi ${PRIORITA_AMMESSE.join(', ')}` };
   }
   return { ok: true, valore: n };
 }
@@ -168,14 +175,17 @@ export function parsePriorita(raw) {
  * numerazione non risponde il feedback parte lo stesso, senza numero), quindi
  * qui può tornare null senza che sia un errore.
  */
-export async function apri({ titolo, testo, url = '', priorita = null, allegati = [], dryRun = false } = {}) {
+export async function apri({ titolo, testo, url = '', priorita = null, allegati = [], dryRun = false, idToken = '', locale = true } = {}) {
   const name = String(titolo || '').trim();
   const text = String(testo || '').trim();
   if (!name) return { ok: false, uso: true, motivo: 'titolo mancante' };
   if (!text) return { ok: false, uso: true, motivo: 'testo mancante' };
 
   if (dryRun) {
-    return { ok: true, dryRun: true, id: '', seq: null, clientId: CLIENT_ID, name, priorita, allegati: allegati.length };
+    return { ok: true, dryRun: true, id: '', seq: null, clientId: CLIENT_ID, name, priorita, allegati: allegati.length, locale };
+  }
+  if (!idToken) {
+    return { ok: false, codice: EXIT.RIFIUTATO, motivo: 'manca il token admin: senza la prova del mittente il feedback sarebbe di un utente. Rigenera le credenziali: node scripts/admin-login.mjs' };
   }
 
   let res;
@@ -193,6 +203,11 @@ export async function apri({ titolo, testo, url = '', priorita = null, allegati 
       // i giudici guardano (le vedono direttamente). Il resto sono documenti.
       images: (Array.isArray(allegati) ? allegati : []).filter((a) => a.type.startsWith('image/')),
       files: (Array.isArray(allegati) ? allegati : []).filter((a) => !a.type.startsWith('image/')),
+    }, {
+      idToken, soloAdmin: true,
+      // Nasce col documento: il server alla nascita la vede e non la fa decidere al giudice (#914).
+      ...(Number.isInteger(priorita) ? { priority: priorita } : {}),
+      ...(locale ? { localOnly: { by: CLIENT_ID, at: Date.now() } } : {}),
     });
   } catch (e) {
     return { ok: false, motivo: String((e && e.message) || e), codice: exitCodeForError(e) };
@@ -201,31 +216,29 @@ export async function apri({ titolo, testo, url = '', priorita = null, allegati 
   // ma senza il documento per cui magari è stato aperto. Si riporta.
   const falliti = Array.isArray(res && res.failed) ? res.failed : [];
   const caricati = ((res && res.files) || []).length + ((res && res.images) || []).length;
-  return { ok: true, id: res.id, seq: res.seq, clientId: CLIENT_ID, name, allegati: caricati, falliti };
+  return {
+    ok: true, id: res.id, seq: res.seq, clientId: CLIENT_ID, name, allegati: caricati, falliti,
+    senderProof: (res && res.senderProof) || '', locale: !!(res && res.localOnly),
+    priorita: Number.isInteger(priorita) && res && res.senderProof === 'admin' ? priorita : null,
+  };
 }
 
 /**
- * Priorità: le regole non la concedono a un mittente anonimo (vedi il ramo
- * `create` di firestore.rules), quindi si scrive DOPO, con le credenziali
- * dell'owner. È l'unico pezzo che ne ha bisogno: se qui non ci sono, il
- * feedback resta depositato e lo si dice — meglio di un feedback non aperto.
- *
- * Si scrive anche `priorityManual`, altrimenti il giudice di priorità del
- * server la sovrascrive appena passa: una priorità che sparisce da sola è
- * peggio di una non impostata.
+ * Il token admin dell'owner: { idToken } oppure { idToken: '', motivo }.
+ * Oggetto e non funzione perché i test lo sostituiscono: il vero va in rete.
  */
-export async function applicaPriorita(id, valore) {
-  const { findAdminRefreshToken, mintIdToken } = await import('./lib/firestore-auth.mjs');
-  const rt = findAdminRefreshToken();
-  if (!rt) return { ok: false, motivo: 'nessuna credenziale admin su questa macchina' };
-  try {
-    const idToken = await mintIdToken(rt);
-    await FB.updateStatus(id, { priority: valore, priorityManual: true }, { idToken });
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, motivo: String((e && e.message) || e) };
-  }
-}
+export const credenziale = {
+  async ottieni() {
+    const { findAdminRefreshToken, mintIdToken } = await import('./lib/firestore-auth.mjs');
+    const rt = findAdminRefreshToken();
+    if (!rt) return { idToken: '', motivo: 'nessuna credenziale admin su questa macchina' };
+    try {
+      return { idToken: await mintIdToken(rt) };
+    } catch (e) {
+      return { idToken: '', motivo: String((e && e.message) || e) };
+    }
+  },
+};
 
 // ─── CLI ─────────────────────────────────────────────────────────────────────
 
@@ -235,8 +248,28 @@ function leggiStdin() {
   try { return readFileSync(0, 'utf8'); } catch (_) { return ''; }
 }
 
+const SENZA_SCELTA = [
+  'RIFIUTATO: manca chi lo lavora, e non ho aperto niente. Rilancia con una delle due:',
+  '  --non-locale  una segnalazione per le routine (un problema da mettere in coda);',
+  '  --locale      il lavoro di questa sessione: nessuna routine lo prende, e la chiusura col suo numero salta L5.',
+].join('\n');
+
+// #914: da qui il feedback nasce dell'owner (prova admin) e salta i giudici; una routine apre i suoi dal canale,
+// che li firma col biglietto, e non apre mai lavoro locale.
+const IN_ROUTINE = [
+  'RIFIUTATO: sei una routine, e da qui non apro niente: un feedback nato qui salterebbe i giudici come uno dell\'owner.',
+  '  Un ritrovamento: node scripts/routine-channel.mjs deliver feedback --name "…" --text "…"',
+  '  Un lavoro che si fa solo in locale: node scripts/routine-channel.mjs deliver status --status design --reason locale --notes "perché"',
+].join('\n');
+
+/** Siamo dentro una routine? Oggetto e non funzione, come `credenziale`, perché i test lo sostituiscono. */
+export const ambiente = {
+  routine() { return isRoutineInstance(resolve(fileURLToPath(import.meta.url), '..', '..')); },
+};
+
 function uso() {
-  console.error('Uso: node scripts/claude-feedback.mjs "<titolo>" "<testo>" [--priorita 1..3] [--url <indirizzo>] [--allega <file>]… [--dry-run]');
+  console.error('Uso: node scripts/claude-feedback.mjs "<titolo>" "<testo>" --locale|--non-locale [--priorita 0..3] [--url <indirizzo>] [--allega <file>]… [--dry-run]');
+  console.error('     --non-locale lo apre per le routine; --locale è il lavoro di questa sessione, e nessuna routine lo prende.');
   console.error('     "<testo>" può essere "-" per leggerlo da stdin.');
   console.error('     Da npm, opzione e valore attaccati: npm run feedback:apri -- "t" "x" --allega=spec.md');
 }
@@ -248,13 +281,14 @@ export async function main(argvIn) {
     return i === -1 ? undefined : argv[i + 1];
   };
   if (argv.includes('--help') || argv.includes('-h')) { uso(); return EXIT.FATTO; }
+  if (ambiente.routine()) { console.error(IN_ROUTINE); return EXIT.RIFIUTATO; }
   // Quello che non capisco lo dico, e non apro niente (feedback #565): il
   // controllo sta in un posto solo, scripts/lib/argomenti.mjs. Le opzioni che
   // npm si è mangiato le riprendiamo dall'ambiente invece di rifiutare una
   // riga che chi l'ha scritta considera giusta.
   const { controllaArgomenti, argomentiDaNpm, espandiUguali, opzioneStorpiata } = await import('./lib/argomenti.mjs');
   const OPZ = {
-    opzioni: ['--priorita', '--url', '--allega', '--dry-run'],
+    opzioni: ['--priorita', '--url', '--allega', '--locale', '--non-locale', '--dry-run'],
     conValore: ['--priorita', '--url', '--allega'],
   };
   argv = espandiUguali(argv, OPZ.conValore);
@@ -274,6 +308,14 @@ export async function main(argvIn) {
   const male = controllaArgomenti(argv, OPZ);
   if (male) {
     console.error(`RIFIUTATO: ${male}`);
+    uso();
+    return EXIT.USO;
+  }
+  // Chi lo lavora si dice sempre: senza scelta, una segnalazione per le routine nasceva lavoro locale e non la
+  // prendeva nessuno (verifica di #908, giro 6). Un errore d'uso costa una riga; un feedback perso no.
+  const locale = argv.includes('--locale');
+  if (locale === argv.includes('--non-locale')) {
+    console.error(locale ? 'RIFIUTATO: --locale e --non-locale insieme: scegline uno. Non ho aperto niente.' : SENZA_SCELTA);
     uso();
     return EXIT.USO;
   }
@@ -312,14 +354,22 @@ export async function main(argvIn) {
   try { allegati = percorsiAllegati.map(leggiAllegato); }
   catch (e) { console.error(`USO: ${e.message}`); return EXIT.USO; }
 
-  const r = await apri({ titolo, testo, url, priorita: p.valore, allegati, dryRun });
+  // La credenziale si chiede solo quando c'è davvero qualcosa da depositare:
+  // un errore d'uso o una prova a vuoto non toccano la rete.
+  const deposita = !dryRun && Boolean(String(titolo || '').trim() && String(testo || '').trim());
+  const cred = deposita ? await credenziale.ottieni() : { idToken: '' };
+  if (deposita && !cred.idToken) {
+    console.error(`RIFIUTATO: ${cred.motivo || 'nessun token admin'}. Senza la prova del mittente non apro niente: node scripts/admin-login.mjs`);
+    return EXIT.RIFIUTATO;
+  }
+  const r = await apri({ titolo, testo, url, priorita: p.valore, allegati, dryRun, idToken: cred.idToken, locale });
   if (!r.ok) {
     console.error(`${r.uso ? 'USO' : 'RIFIUTATO'}: ${r.motivo}`);
     if (r.uso) uso();
     return r.uso ? EXIT.USO : (r.codice || EXIT.RIFIUTATO);
   }
   if (r.dryRun) {
-    console.log(`(prova a vuoto) aprirei "${r.name}" come ${r.clientId}${p.valore ? `, priorità ${p.valore}` : ''}${r.allegati ? `, con ${r.allegati} allegati` : ''}.`);
+    console.log(`(prova a vuoto) aprirei "${r.name}" come ${r.clientId}, ${locale ? 'lavoro locale' : 'per le routine'}${p.valore != null ? `, priorità ${p.valore}` : ''}${r.allegati ? `, con ${r.allegati} allegati` : ''}.`);
     return EXIT.FATTO;
   }
 
@@ -328,17 +378,19 @@ export async function main(argvIn) {
   console.log(r.seq
     ? `OK: feedback #${r.seq} aperto (${r.id}), mittente ${r.clientId}.`
     : `OK: feedback aperto (${r.id}), mittente ${r.clientId}. Numero non assegnato (la numerazione non ha risposto).`);
+  console.log(locale
+    ? `Lavoro locale: nessuna routine lo prende. Legalo al ramo con verify-local start --feedback ${r.seq || r.id} (o npm run finish -- --feedback ${r.seq || r.id}).`
+    : 'Aperto per le routine: con la prova del mittente salta i giudici e va dritto In coda.');
 
   if (r.allegati) console.log(`Allegati caricati: ${r.allegati}.`);
   for (const f of (r.falliti || [])) {
     console.error(`ALLEGATO NON CARICATO: ${f.name} (${f.reason}). Il feedback esiste ma senza questo documento.`);
   }
 
-  if (p.valore) {
-    const pr = await applicaPriorita(r.id, p.valore);
-    if (pr.ok) console.log(`Priorità ${p.valore} impostata.`);
-    else console.log(`Priorità NON impostata (${pr.motivo}): mettila dalla dashboard.`);
-  }
+  // `!= null`, non un controllo di verità: lo 0 è una priorità da scrivere.
+  if (r.priorita != null) console.log(`Priorità ${r.priorita} impostata.`);
+  else if (p.valore != null) console.log(`Priorità ${p.valore} NON impostata: mettila dalla dashboard.`);
+  else if (!locale) console.log('Priorità: la decide il giudice di priorità, come per ogni feedback che entra in coda.');
   // Un allegato mancante è un rifiuto parziale: chi lancia lo script deve
   // accorgersene, perché il feedback senza il documento può non avere senso.
   return (r.falliti && r.falliti.length) ? EXIT.RIFIUTATO : EXIT.FATTO;

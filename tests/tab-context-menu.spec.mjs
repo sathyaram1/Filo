@@ -157,3 +157,72 @@ test('il tasto destro su una tab apre il menu Duplica/Muta/Chiudi e Duplica funz
   });
   await expect(shell.locator('.tab')).toHaveCount(before + 1, { timeout: 8_000 });
 });
+
+// Il menu della linguetta prende la tastiera appena si apre (#838): Esc lo
+// chiude, frecce e Invio scelgono una voce. I tasti arrivano come quelli veri.
+async function apriMenuLinguetta(app, shell) {
+  await shell.evaluate(() => {
+    const el = document.querySelector('.tab.active') || document.querySelector('.tab');
+    const r = el.getBoundingClientRect();
+    el.dispatchEvent(new MouseEvent('contextmenu', {
+      bubbles: true, cancelable: true,
+      clientX: Math.round(r.left + r.width / 2),
+      clientY: Math.round(r.top + r.height / 2),
+    }));
+  });
+  let popup = null;
+  await expect.poll(async () => {
+    for (const w of app.windows()) {
+      try {
+        if (await w.evaluate(() => !!document.body && /Duplica/.test(document.body.innerText))) { popup = w; return true; }
+      } catch (_) {}
+    }
+    return false;
+  }, { timeout: 8_000 }).toBe(true);
+  return popup;
+}
+
+const menuAperto = (app) => app.evaluate(({ BrowserWindow }) =>
+  BrowserWindow.getAllWindows().some((w) => !w.isDestroyed() && w.webContents.getURL().startsWith('data:text/html')));
+
+function tastoAlMenu(app, keyCode) {
+  return app.evaluate(({ BrowserWindow }, k) => {
+    const m = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed() && w.webContents.getURL().startsWith('data:text/html'));
+    m.webContents.sendInputEvent({ type: 'keyDown', keyCode: k });
+    if (k === 'Enter') m.webContents.sendInputEvent({ type: 'char', keyCode: '\r' });
+    m.webContents.sendInputEvent({ type: 'keyUp', keyCode: k });
+  }, keyCode);
+}
+
+const voceAccesa = (popup) => popup.evaluate(() => {
+  const b = document.querySelector('button.item.attiva');
+  return b ? b.textContent.trim() : '';
+});
+
+test('Esc chiude il menu della linguetta senza fare niente', async ({ app, shell, openTab }) => {
+  await setup(openTab, shell);
+  const before = await shell.locator('.tab').count();
+  await apriMenuLinguetta(app, shell);
+  await tastoAlMenu(app, 'Escape');
+  await expect.poll(() => menuAperto(app), { timeout: 3_000 }).toBe(false);
+  await expect(shell.locator('.tab')).toHaveCount(before);
+});
+
+test('nel menu della linguetta le frecce accendono una voce e Invio la esegue', async ({ app, shell, openTab }) => {
+  await setup(openTab, shell);
+  const before = await shell.locator('.tab').count();
+  const popup = await apriMenuLinguetta(app, shell);
+  // Freccia su da nessuna voce: l'ultima, «Chiudi». Poi Home torna in cima.
+  await tastoAlMenu(app, 'Up');
+  await expect.poll(() => voceAccesa(popup)).toBe('Chiudi');
+  await tastoAlMenu(app, 'Home');
+  const voci = await popup.evaluate(() => [...document.querySelectorAll('button.item')].map((b) => b.textContent.trim()));
+  await expect.poll(() => voceAccesa(popup)).toBe(voci[0]);
+  const idx = voci.indexOf('Duplica');
+  expect(idx).toBeGreaterThanOrEqual(0);
+  for (let k = 0; k < idx; k++) await tastoAlMenu(app, 'Down');
+  await expect.poll(() => voceAccesa(popup)).toBe('Duplica');
+  await tastoAlMenu(app, 'Enter');
+  await expect(shell.locator('.tab')).toHaveCount(before + 1, { timeout: 8_000 });
+  await expect.poll(() => menuAperto(app), { timeout: 3_000 }).toBe(false);
+});

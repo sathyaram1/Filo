@@ -7,20 +7,31 @@ un **livello**.
 ## Cosa vedi e cosa no
 
 - **Vedi** il sintomo utente (testo, immagini, allegati del feedback), il
-  codice eseguibile — sei già sul ramo — e lo storico delle critiche dei giri
-  passati (`payload.history`, dalla più vecchia).
+  codice eseguibile — sei già sul ramo — lo storico delle critiche dei giri
+  passati (`payload.history`, dalla più vecchia) e le **decisioni dell'owner**
+  (`payload.decisioni`: le sue risposte alle domande fatte su questo feedback,
+  ciascuna con la domanda, in ordine, e nient'altro della conversazione).
 - **Non vedi** il diff come artefatto né le note di chi ha lavorato. Chi
   sbircia il diff si àncora al caso felice di chi l'ha scritto. Parti dal
   sintomo: cosa doveva ottenere l'utente? Verifica quello, sull'intera
-  richiesta, con le parole del feedback come specifica.
+  richiesta, con le parole del feedback come specifica. Le decisioni
+  dell'owner valgono come specifica insieme alla segnalazione: una scelta che
+  ha già fatto lui non è un rilievo, e non si rimette in discussione. L'unica occhiata al
+  diff è puntuale e viene DOPO aver trovato un difetto: serve a dire la sede
+  del rilievo (più sotto) — se l'ha creato questo ramo, su quel file soltanto,
+  o se quel file è fra quelli che il ramo modifica già
+  (`git diff --name-only origin/main...HEAD`).
+
+<!-- includi: _immagini.md -->
 
 <!-- includi: _cornice-feedback.md -->
 Se è l'ultimo caso, dillo nella critica.
 
 ## Passi
 
-1. **Capisci il sintomo** (`feedback.text`, `feedback.images`,
-   `feedback.documents`): cosa voleva fare l'utente, cosa lamentava.
+1. **Capisci il sintomo** (`feedback.text`, `feedback.documents`, le immagini
+   di `payload.immagini` aperte con Read): cosa voleva fare l'utente, cosa
+   lamentava.
 2. **Sei già sul ramo del lavoro: non cambiarlo.** Una critica emessa da
    un'altra versione del codice viene rifiutata.
 3. **Rilancia le prove dei giri passati**, se `payload.history` non è vuoto:
@@ -28,12 +39,16 @@ Se è l'ultimo caso, dillo nella critica.
    cancelletto). Il percorso va scritto relativo alla radice del repo e con le
    barre normali: in ogni altra forma la risposta è «No tests found» anche a
    cartella piena. Al primo giro la cartella non c'è: controlla con
-   `ls tests/verifica`, non dal messaggio. Una porta di un giro passato che si
-   riapre è un rilievo di livello 2; le porte già chiuse si ri-provano, non si
-   riscoprono come nuove.
+   `ls tests/verifica`, non dal messaggio. **È l'unica corsa di quella cartella
+   in tutto il giro, e tocca a te**: dopo di te chi corregge lancia solo le
+   prove dei rilievi che sta correggendo, e la chiusura non la rilancia. Quindi
+   qui, adesso, in partenza. Una porta di un giro passato che si riapre è un
+   rilievo di livello 2, interno; le porte già chiuse si ri-provano, non si
+   riscoprono come nuove. Una prova già segnata come rosso atteso resta rossa:
+   non è un rilievo.
 4. **Applica i criteri qui sotto**, uno per uno. Ciò che non li regge è un
-   rilievo. Un miglioramento con trade-off si scrive col segno `?` dopo il
-   livello (`[1?] …`). Non apri feedback: i rilievi che restano aperti li
+   rilievo. Un miglioramento con trade-off si scrive col segno `?` dopo la
+   sede (`[1i?] …`). Non apri feedback: i rilievi che restano aperti li
    raccoglie il server dalla critica.
 
 <!-- includi: _criteri-verifica.md -->
@@ -44,9 +59,11 @@ codice e `npm run test:unit` e dichiaralo nella critica: non è un rilievo.
 ## Una famiglia di difetti si scrive insieme
 
 Tutte le porte che trovi per la stessa causa (criterio 9) vanno nella **stessa
-critica**, ciascuna coi suoi passi, e sopra di loro **una riga con la causa
-comune**, in parole da utente: chi corregge deve poter curare il meccanismo,
-non l'ultima porta. Una porta per giro costa un giro per porta.
+critica** e nello **stesso rilievo**: la causa comune, in parole da utente,
+nella riga col livello e la sede; ogni porta coi suoi passi nelle righe sotto.
+Chi corregge deve poter curare il meccanismo, non l'ultima porta. Una porta
+per giro costa un giro per porta; una porta per rilievo, se la famiglia è
+esterna, costa un feedback per porta.
 
 Se lo storico mostra che la stessa famiglia è già rientrata in giri passati,
 dillo nel riassunto: quante volte, e cosa hanno in comune le porte. Una strada

@@ -32,5 +32,5 @@ davanti.
   «chiudi l'accoglienza» da «no a questa proposta», con l'ordine esplicito di
   non chiudere nel secondo caso.
 - **Il test giusto non è la frase, è la coppia domanda-risposta**: «no grazie»
-  dopo una proposta di Filo (`tests/verify-524-g2.spec.mjs`,
+  dopo una proposta di Filo (`tests/verifica/524/verify-524-g2.spec.mjs`,
   `tests/unit/onboarding.test.mjs`).

@@ -40,6 +40,16 @@
   // l'archiviazione automatica dei feedback più vecchi.
   const DAY_MS = 24 * 60 * 60 * 1000;
 
+  // ── I campi che la decisione LEGGE ────────────────────────────────────────
+  // Chi scansiona la collezione per applicarla chiede solo questi: un feedback
+  // pesa qualche KB per testo cifrato, note e allegati, e qui servono duecento
+  // byte (#680). Un campo nuovo letto qui sotto e dimenticato in questo elenco
+  // farebbe decidere su un valore assente, senza errore: la sentinella
+  // `tests/unit/letturePerCampi.test.mjs` confronta i due.
+  const CAMPI_DECISIONE = Object.freeze([
+    'status', 'archiveOverride', 'resolvedAt', 'resolvedInVersion', 'votes',
+  ]);
+
   const DEFAULTS = {
     // Soglia minima di punteggio per l'auto-archiviazione. Bassa per l'alpha:
     // con pochi votanti un punteggio di 2 è già un segnale di "i pochi che
@@ -160,6 +170,7 @@
 
   global.SN_BOARD_ARCHIVE = {
     DEFAULTS,
+    CAMPI_DECISIONE,
     shouldAutoArchive,
     usersSayBroken,
     hasOwnerOverride,

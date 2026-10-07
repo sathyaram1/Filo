@@ -1,6 +1,6 @@
 // Logica pagina "Altro" — opzioni secondarie spostate qui da Opzioni:
 // domini esclusi (blocklist) e gestione categorie, più le scorciatoie alle
-// app (Aperti per dopo, Cronologia AI, Correttore). Auto-save come Opzioni.
+// app (Aperti per dopo, Cronologia AI, Correttore). Niente «Salva»: le caselle passano da SN_CASELLE.
 
 (function () {
   'use strict';
@@ -40,6 +40,9 @@
         T ? T.etichettaSaltoScheda() : 'Alt+cifra',
         T ? T.descrizioneSaltoScheda() : 'Vai alla scheda in quella posizione (0 = la decima)',
       ],
+      [T ? T.etichettaIndietro() : 'Alt+\u2190', 'Torna alla pagina precedente'],
+      [T ? T.etichettaAvanti() : 'Alt+\u2192', 'Vai alla pagina successiva'],
+      [T ? T.etichettaBarra() : 'Ctrl+Shift+B', 'Apri e chiudi la barra laterale'],
     ].forEach(([k, v]) => {
       const li = document.createElement('li');
       li.textContent = `${k} — ${v}`;
@@ -53,12 +56,14 @@
     window.SN_PAGE_THEME = settings.theme;
     window.SN_PAGE_BOOTSTRAP.applyTheme(settings.theme);
     $('blocklist').value = (settings.blocklist || []).join('\n');
+    mostrato = $('blocklist').value;
     await renderCategories();
   }
 
   async function renderCategories() {
     const list = $('categoriesList');
     list.innerHTML = '';
+    caselleCategorie.clear();
     const [catsRes, pagesRes] = await Promise.all([
       chrome.runtime.sendMessage({ type: MSG.GET_CATEGORIES }),
       chrome.runtime.sendMessage({ type: MSG.GET_SAVED_PAGES }),
@@ -95,16 +100,25 @@
     meta.textContent = I18n.t('options_category_pages', count);
     row.appendChild(meta);
 
+    // Il nome scritto vale anche senza «Rinomina» (#590.5): un nome a metà finirebbe nelle altre pagine, quindi parte
+    // quando sta fermo o all'uscita, e la lista non si ridisegna sotto il cursore. Il tasto resta e conferma sempre.
+    const nome = `categoria:${cat.id}`;
+    caselleCategorie.set(input, cat);
+    caselle.registra(nome, (uscita) => rinomina(cat, input, { ripristina: uscita }));
+    input.addEventListener('input', (e) => {
+      avvisoOmonima(input, null);
+      caselle.cambiato(nome, e, { pausa: window.SN_CASELLE.PAUSA_LUNGA_MS });
+    });
+    input.addEventListener('change', () => rinomina(cat, input, { ripristina: true }));
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); rinomina(cat, input, { ripristina: true, conferma: true }); }
+    });
+
     const renameBtn = document.createElement('button');
     renameBtn.className = 'sn-btn sn-btn-secondary';
     renameBtn.type = 'button';
     renameBtn.textContent = I18n.t('options_category_rename');
-    renameBtn.addEventListener('click', async () => {
-      const newName = input.value.trim();
-      if (!newName || newName === cat.name) return;
-      await chrome.runtime.sendMessage({ type: MSG.RENAME_CATEGORY, id: cat.id, name: newName });
-      await renderCategories();
-    });
+    renameBtn.addEventListener('click', () => rinomina(cat, input, { ripristina: true, conferma: true }));
     row.appendChild(renameBtn);
 
     const deleteBtn = document.createElement('button');
@@ -125,31 +139,95 @@
     return row;
   }
 
-  async function save() {
-    const blocklist = $('blocklist').value.split('\n').map((s) => s.trim()).filter(Boolean);
-    await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { blocklist } });
-    // Arrivata un'altra modifica mentre questo salvataggio viaggiava, la
-    // conferma parlerebbe di uno stato superato: la scrive chi chiude la fila.
-    if (rimandato.inAttesa()) return;
-    const hint = $('savedHint');
-    hint.classList.add('sn-show');
-    clearTimeout(save._t);
-    save._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
+  // Un nome vuoto non rinomina: uscendo, la casella torna a dire il nome che la categoria ha davvero. A metà (il Ctrl
+  // di un Ctrl+V) resta vuota, perché ci si sta per incollare il nome nuovo. In fila per categoria: il `change` del
+  // clic su «Rinomina» parte prima del clic, e la conferma deve vedere com'è finito.
+  function rinomina(cat, input, opts) {
+    caselle.spedita(`categoria:${cat.id}`);
+    cat._coda = (cat._coda || Promise.resolve()).then(() => rinominaOra(cat, input, opts), () => {});
+    return cat._coda;
   }
 
-  // Stessa regola della pagina sorella: la conferma non sopravvive a una
-  // modifica nuova, e quello che c'è nella casella parte prima di sparire.
-  const rimandato = window.SN_SALVA.crea({
-    salva: save,
-    spegniConferma: () => $('savedHint').classList.remove('sn-show'),
+  async function rinominaOra(cat, input, opts) {
+    const conferma = !!(opts && opts.conferma);
+    const newName = input.value.trim();
+    if (!newName) {
+      if (opts && opts.ripristina) input.value = cat.name;
+      return;
+    }
+    if (newName !== cat.name) {
+      // Un nome già preso fonde le due categorie e non si disfa: parte solo confermato (Rinomina, Invio), mai da solo.
+      const r = await chrome.runtime.sendMessage({ type: MSG.RENAME_CATEGORY, id: cat.id, name: newName, unisci: conferma }).catch(() => null);
+      if (!r || !r.ok) {
+        if (r && r.error === 'name_taken') avvisoOmonima(input, r.category);
+        return;
+      }
+      if (r.category && r.category.id !== cat.id) {
+        await renderCategories();
+        mostraSalvato();
+        return;
+      }
+      cat.name = newName;
+    } else if (!conferma) {
+      return;
+    }
+    mostraSalvato();
+  }
+
+  function avvisoOmonima(input, omonima) {
+    const meta = input.parentElement.querySelector('.sn-cat-meta');
+    if (!meta) return;
+    if (meta.dataset.conta === undefined) meta.dataset.conta = meta.textContent;
+    meta.textContent = omonima ? I18n.t('options_category_name_taken', omonima.name) : meta.dataset.conta;
+    meta.classList.toggle('sn-cat-warn', !!omonima);
+  }
+
+  function mostraSalvato() {
+    const hint = $('savedHint');
+    hint.classList.add('sn-show');
+    clearTimeout(mostraSalvato._t);
+    mostraSalvato._t = setTimeout(() => hint.classList.remove('sn-show'), 1500);
+  }
+
+  // L'elenco come la pagina l'ha letto o scritto l'ultima volta: un cambio arrivato da altrove (la chat)
+  // si mostra solo se qui non si sta scrivendo (#949).
+  let mostrato = null;
+
+  async function save() {
+    const biglietto = caselle.spedita('blocklist');
+    mostrato = $('blocklist').value;
+    const blocklist = $('blocklist').value.split('\n').map((s) => s.trim()).filter(Boolean);
+    await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { blocklist } });
+    if (caselle.aggiornata('blocklist', biglietto)) mostraSalvato();
+  }
+
+  // Domini esclusi e nomi delle categorie non hanno un «Salva», e chiudere la scheda non avvisa la pagina (#590.5).
+  // Il nome svuotato può essere già partito col fuoco uscito dalla finestra: all'uscita vera la casella lo ridice.
+  const caselleCategorie = new Map();
+  const caselle = window.SN_CASELLE.crea({
+    uscita() {
+      for (const [input, cat] of caselleCategorie) if (!input.value.trim()) input.value = cat.name;
+    },
+    spegni: () => $('savedHint').classList.remove('sn-show'),
   });
+  caselle.registra('blocklist', () => save());
+
+  if (chrome.runtime && chrome.runtime.onMessage) {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (!msg || msg.type !== MSG.SETTINGS_UPDATED || !msg.settings || mostrato === null) return;
+      const el = $('blocklist');
+      const scritti = el.value.split('\n').map((x) => x.trim()).filter(Boolean);
+      // Uno stesso elenco con altre righe vuote non si riscrive: chi scrive perderebbe l'a capo appena battuto.
+      if (el.value !== mostrato || JSON.stringify(scritti) === JSON.stringify(msg.settings.blocklist || [])) return;
+      const toccati = window.SN_VOCI_IMPOSTAZIONI.riallineaPagina('altro', msg.settings);
+      if (toccati.length) mostrato = el.value;
+    });
+  }
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
-    $('blocklist').addEventListener('change', () => rimandato.programma());
-    // Quello che si sta ancora scrivendo è già una modifica, e vale per OGNI
-    // campo della pagina: iscritto campo per campo, prima o poi ne resta fuori uno.
-    $('page').addEventListener('input', () => rimandato.modificato());
+    $('blocklist').addEventListener('input', (e) => caselle.cambiato('blocklist', e));
+    $('blocklist').addEventListener('change', () => save());
     // #252 — indirizzo canonico filo://<page>/<file> (non la forma legacy
     // filo://src/pages/…): un solo URL per pagina, e la scheda già aperta viene
     // riportata a fuoco invece di duplicarla.

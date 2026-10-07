@@ -7,10 +7,15 @@
 // trasporto: IPC verso la UI + REST Firestore autenticato con l'ID token utente.
 
 const auth = require('../../auth/google-auth');
-const { soloFilo } = require('./origine');
 // SN_FEEDBACK_THREAD: ci serve splitNotes() per estrarre la spiegazione non
 // tecnica dalle note del feedback risolto (C5). Idempotente se già caricato.
 require('../../../shared/feedbackThread.js');
+
+// Campi sincronizzati: tutto lo stato del motore (saldo, refill, aggregati,
+// ricompense). Il costo € resta nel doc privato dell'utente ma non lascia mai
+// il main verso la UI (la vista pubblica lo elimina).
+const SYNC_FIELDS = ['balance', 'lastRefillDate', 'byUsage', 'byAction',
+  'totalSpentCredits', 'totalCostEur', 'rewards', 'rewardedFeedback'];
 
 module.exports = function register(on, ctx) {
   const { MSG, broadcastToTabs } = ctx;
@@ -23,11 +28,6 @@ module.exports = function register(on, ctx) {
   const currentUid = auth.getUid;
 
   // ── REST Firestore sul doc credits/<uid> ────────────────────────────────────
-  // Campi sincronizzati: tutto lo stato del motore (saldo, refill, aggregati,
-  // ricompense). Il costo € resta nel doc privato dell'utente ma non lascia mai
-  // il main verso la UI (la vista pubblica lo elimina).
-  const SYNC_FIELDS = ['balance', 'lastRefillDate', 'byUsage', 'byAction',
-    'totalSpentCredits', 'totalCostEur', 'rewards', 'rewardedFeedback'];
 
   async function loadRemote(uid) {
     if (!FB?.rest) return null;
@@ -66,93 +66,20 @@ module.exports = function register(on, ctx) {
     if (!res.ok) throw new Error(`credits push ${res.status}`);
   }
 
-  // ── Comandi proprietario (#210): registro utenti + regalo crediti ───────────
-  // Tutte le operazioni qui sotto sono riservate all'owner (auth.isAdmin()): il
-  // gate applicativo è negli handler IPC, la garanzia forte è nelle Firestore
-  // rules (match /credits/{uid} … allow read,write: if isAdmin()). Le scritture
-  // cross-account usano l'ID token dell'owner come Bearer.
-
-  // Elenco di tutti gli utenti registrati (doc credits con campo `email`).
-  async function adminListUsers() {
-    if (!FB?.rest) return [];
-    const idToken = await auth.getIdToken();
-    if (!idToken) throw new Error('Sessione scaduta: rifai l\'accesso.');
-    const endpoint = `${FB.rest.FIRESTORE_BASE}:runQuery?key=${FB.rest.API_KEY}`;
-    const body = { structuredQuery: { from: [{ collectionId: 'credits' }], limit: 1000 } };
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error(`users ${res.status}`);
-    const rows = await res.json();
-    const users = [];
-    for (const r of rows) {
-      if (!r.document) continue;
-      const o = FB.fsDocToObject(r.document);
-      if (o.email) users.push({ email: o.email, name: o.name || '', balance: Math.round(Number(o.balance) || 0) });
-    }
-    users.sort((a, b) => a.email.localeCompare(b.email));
-    return users;
-  }
-
-  // Trova il doc credits il cui campo `email` corrisponde (esatto). Ritorna
-  // l'oggetto completo (incluso uid in _id e l'eventuale giftNotice) o null.
-  async function adminFindByEmail(email) {
-    if (!FB?.rest) return null;
-    const idToken = await auth.getIdToken();
-    if (!idToken) throw new Error('Sessione scaduta: rifai l\'accesso.');
-    const endpoint = `${FB.rest.FIRESTORE_BASE}:runQuery?key=${FB.rest.API_KEY}`;
-    const body = {
-      structuredQuery: {
-        from: [{ collectionId: 'credits' }],
-        where: { fieldFilter: { field: { fieldPath: 'email' }, op: 'EQUAL', value: { stringValue: email } } },
-        limit: 1,
-      },
-    };
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error(`lookup ${res.status}`);
-    const rows = await res.json();
-    for (const r of rows) { if (r.document) return FB.fsDocToObject(r.document); }
-    return null;
-  }
-
-  // Regala `amount` crediti all'utente con `email`: somma al suo saldo remoto e
-  // lascia un avviso `giftNotice` (cumulativo finché non lo vede) sul suo doc.
-  async function adminGift(email, amount) {
-    const target = await adminFindByEmail(email);
-    if (!target || !target._id) throw new Error('Nessun utente registrato con questa email.');
-    const uid = target._id;
-    const newBalance = Math.round((Number(target.balance) || 0) + amount);
-    const prevNotice = target.giftNotice && Math.round(Number(target.giftNotice.amount) || 0);
-    const noticeAmount = (prevNotice > 0 ? prevNotice : 0) + amount;
-    const idToken = await auth.getIdToken();
-    const fields = {
-      balance: FB.toFsValue(newBalance),
-      giftNotice: FB.toFsValue({ amount: noticeAmount, ts: Date.now() }),
-    };
-    const mask = ['balance', 'giftNotice'].map((k) => `updateMask.fieldPaths=${k}`).join('&');
-    const url = `${FB.rest.FIRESTORE_BASE}/credits/${encodeURIComponent(uid)}?${mask}&key=${FB.rest.API_KEY}`;
-    const res = await fetch(url, {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fields }),
-    });
-    if (!res.ok) throw new Error(`gift ${res.status}`);
-    return { balance: newBalance };
-  }
-
   // Avviso "crediti regalati" (#210.4): se il doc dell'utente corrente porta un
   // `giftNotice`, mostra il popup una volta sola e azzera il campo così non si
   // ripresenta. `remote` è il doc appena letto in ensureAccountSync.
+  // La spinta arriva a ogni home aperta: il regalo lo racconta la prima che lo prende (#664), come il benvenuto dell'invito.
+  let regaloDaDire = 0;
+  function annunciaRegalo(amount) {
+    regaloDaDire = amount;
+    broadcastToTabs({ type: MSG.GIFT_NOTICE, amount });
+  }
+  globalThis.SN_CREDITS_MAIN = { annunciaRegalo };
   async function maybeNotifyGift(uid, remote) {
     const amount = remote?.giftNotice && Math.round(Number(remote.giftNotice.amount) || 0);
     if (!amount || amount <= 0) return;
-    broadcastToTabs({ type: MSG.GIFT_NOTICE, amount });
+    annunciaRegalo(amount);
     const idToken = await auth.getIdToken();
     if (!idToken) return;
     const url = `${FB.rest.FIRESTORE_BASE}/credits/${encodeURIComponent(uid)}?updateMask.fieldPaths=giftNotice&key=${FB.rest.API_KEY}`;
@@ -237,43 +164,28 @@ module.exports = function register(on, ctx) {
   });
 
   // ── IPC ─────────────────────────────────────────────────────────────────────
+  on(MSG.GIFT_NOTICE_CLAIM, async (_msg, _sender, origin) => {
+    if (!String(origin || '').startsWith('filo://')) return { ok: false, error: 'forbidden' };
+    const amount = regaloDaDire;
+    regaloDaDire = 0;
+    return { ok: true, amount };
+  });
+
   on(MSG.GET_CREDITS, async () => {
     await ensureAccountSync().catch(() => {});
     return { ok: true, credits: await Credits.getPublic(), signedIn: auth.isSignedIn() };
   });
 
-  // ── Comandi proprietario (#210): /users e /gift ─────────────────────────────
-  //
-  // #583 — «sei il proprietario?» da solo non basta: sul suo computer la
-  // risposta è sempre sì, ed è l'unico dove c'è qualcosa da prendere. Questi
-  // due comandi si scrivono nella chat della dashboard, che è una pagina di
-  // Filo; un sito visitato non deve poter chiedere l'elenco di chi usa Filo né
-  // regalare crediti a un indirizzo che sceglie lui.
-  on(MSG.OWNER_LIST_USERS, soloFilo(async () => {
-    if (!auth.isAdmin()) return { ok: false, error: 'Comando riservato al proprietario.' };
-    try { return { ok: true, users: await adminListUsers() }; }
-    catch (e) { return { ok: false, error: e?.message || String(e) }; }
-  }));
-
-  on(MSG.OWNER_GIFT_CREDITS, soloFilo(async (msg) => {
-    if (!auth.isAdmin()) return { ok: false, error: 'Comando riservato al proprietario.' };
-    const amount = Math.round(Number(msg?.amount));
-    const email = String(msg?.email || '').trim().toLowerCase();
-    if (!Number.isInteger(amount) || amount <= 0) {
-      return { ok: false, error: 'Numero di crediti non valido: usa un intero positivo.' };
-    }
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-      return { ok: false, error: 'Email non valida.' };
-    }
-    try {
-      const r = await adminGift(email, amount);
-      return { ok: true, email, amount, balance: r.balance };
-    } catch (e) { return { ok: false, error: e?.message || String(e) }; }
-  }));
-
   // +5 crediti subito all'invio di un feedback (C3). Idempotenza per-invio è del
   // chiamante: ogni invio è un evento distinto, quindi premiamo ogni volta.
+  // Con un portafoglio il premio lo dà il server dopo i controlli (#816): il
+  // conteggio locale non si muove. `inArrivo`: la segnalazione porta lo
+  // pseudonimo, senza il quale il server non sa a chi darlo.
   on(MSG.CREDITS_AWARD_FEEDBACK, async (msg) => {
+    const WM = globalThis.SN_WALLET_MAIN;
+    if (WM && WM.haPortafoglio && WM.haPortafoglio()) {
+      return { ok: true, wallet: true, credits: 0, inArrivo: Boolean(WM.pseudonym && WM.pseudonym()) };
+    }
     const { SN_CONST } = globalThis;
     const amount = (msg && Number(msg.credits)) || SN_CONST.CREDIT.FEEDBACK_SEND;
     const r = await Credits.award({ kind: 'feedback_sent', credits: amount, ref: msg?.ref || null });
@@ -303,7 +215,7 @@ module.exports = function register(on, ctx) {
       // quello vero anche dopo un cambio dispositivo) prima di premiare.
       await ensureAccountSync().catch(() => {});
       const id = await globalThis.SN_STORAGE?.getRaw?.('sn_feedback_client_id', null);
-      if (!id || !(FB?.listAllPublic || FB?.listPublic)) return empty;
+      if (!id || !FB) return empty;
 
       // #583: si leggono le SCHEDE pubbliche, non i feedback. La collezione
       // vera non si apre senza credenziali (e questa macchina non ne ha: il
@@ -312,20 +224,53 @@ module.exports = function register(on, ctx) {
       // la frase per chi ha segnalato e la cifra che gli spetta — e niente dei
       // feedback altrui.
       //
-      // TUTTE le schede, non una pagina. La pagina era dei 200 più recenti PER
-      // DATA D'INVIO: una segnalazione vecchia chiusa oggi ha una data d'invio
-      // vecchia, quindi la sua scheda nasceva già fuori e chi l'aveva mandata
-      // non riceveva né l'annuncio né i crediti — mentre il suo fix compariva
-      // in bacheca sotto i suoi occhi. Chiedere una finestra sull'asse
-      // sbagliato è la stessa causa che la verifica del #583 ha visto rientrare
-      // da tre porte.
+      // #678: si chiedono le PROPRIE schede, per id, e non più tutte. La
+      // domanda «mi spetta una ricompensa?» riguarda le poche segnalazioni di
+      // questa installazione, e gli id li sa questa installazione: leggere
+      // l'intera bacheca per cercarsi dentro costava una lettura per scheda
+      // esistente, a ogni apertura di scheda nuova e per ogni utente. Adesso
+      // costa una lettura per propria segnalazione non ancora premiata — di
+      // solito zero — e non più di una volta ogni quattro ore, salvo che
+      // l'utente abbia appena mandato o riaperto qualcosa.
+      const MINE = globalThis.SN_FEEDBACK_MINE;
+      if (!MINE) return empty;
+      const adesso = Date.now();
+      const state = await Credits.load();
+      const rewarded = state.rewardedFeedback || {};
+
+      // Ha mandato segnalazioni PRIMA che il registro esistesse? Il registro
+      // nasce al primo invio, quindi se non c'è ancora l'unica traccia di una
+      // storia precedente sta nel portafoglio.
+      const avevaSegnalato = Object.keys(rewarded).length > 0
+        || (Array.isArray(state.rewards) && state.rewards.some((r) => r && r.kind === 'feedback_sent'));
+      await MINE.inauguraSeServe(adesso, avevaSegnalato);
+      const registro = await MINE.leggi();
+
+      // L'eredità: un'installazione che segnalava già prima del registro si
+      // cerca le schede leggendole tutte, una volta al giorno e per un mese.
+      // Le installazioni nuove non passano mai di qui.
+      const scansione = MINE.toccaScansione(registro, adesso);
+      if (!scansione && !MINE.scaduto(registro, adesso)) return empty;
+      const guardati = registro.ids.slice();
+      const daChiedere = guardati.filter((fid) => !rewarded[fid]);
+      if (!scansione && daChiedere.length === 0) {
+        await MINE.segnaControllo(adesso, { visti: guardati });
+        return empty;
+      }
+
       let lette;
       try {
-        lette = FB.listAllPublic
-          ? await FB.listAllPublic({ timeoutMs: 15000 })
-          : await FB.listPublic({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 15000 });
+        if (!scansione) lette = await FB.getManyPublic(daChiedere, { timeoutMs: 15000 });
+        else if (FB.listAllPublic) lette = await FB.listAllPublic({ timeoutMs: 15000 });
+        else lette = await FB.listPublic({ pageSize: FB.LIST_PAGE_SIZE, timeoutMs: 15000 });
       }
-      catch (e) { console.warn('[credits] schede dei feedback non disponibili:', e?.message || e); return empty; }
+      catch (e) {
+        // Il registro NON si segna come controllato: una rete caduta non è una
+        // risposta, e chiedere di nuovo fra poco è giusto.
+        console.warn('[credits] schede dei feedback non disponibili:', e?.message || e);
+        return empty;
+      }
+      const imparati = [];
 
       // Dal più recente, come le vedeva chi chiedeva una pagina ordinata per
       // data d'invio. La lettura completa arriva nell'ordine interno del
@@ -352,8 +297,23 @@ module.exports = function register(on, ctx) {
         if (H && H.hashClientId) localIdHash = await H.hashClientId(id);
       } catch (_) {}
 
-      const state = await Credits.load();
-      const rewarded = state.rewardedFeedback || {};
+      // #816 — con un portafoglio la cifra è quella che il server ha
+      // accreditato per QUELLA segnalazione; i movimenti si chiedono una volta
+      // sola, e solo se c'è davvero qualcosa da annunciare.
+      const WM = globalThis.SN_WALLET_MAIN;
+      const W = globalThis.SN_WALLET;
+      const conPortafoglio = Boolean(WM && WM.haPortafoglio && WM.haPortafoglio() && W && W.resolutionReward);
+      let movimenti;
+      async function movimentiDelServer() {
+        if (movimenti) return movimenti;
+        movimenti = { grants: null, fresh: false };
+        try {
+          const srv = (await WM.readState())?.server;
+          if (srv && srv.hasWallet && Array.isArray(srv.grants)) movimenti = { grants: srv.grants, fresh: !srv.cached };
+        } catch (_) {}
+        return movimenti;
+      }
+
       const rewards = [];
       for (const f of all) {
         // S1.F2.1: la macchina UTENTE non ha la chiave privata → non può leggere
@@ -382,6 +342,9 @@ module.exports = function register(on, ctx) {
         })();
         if (!matched) continue; // solo i feedback DI questo install
         const fid = f._id;
+        // La scansione dell'eredità è anche il momento in cui il registro
+        // impara gli id di prima: dalla volta dopo bastano quelli.
+        if (scansione && fid) { imparati.push(fid); guardati.push(fid); }
         if (!fid || rewarded[fid]) continue;            // già premiato: niente doppio premio
         // #583 — quanto vale la segnalazione lo dice la SCHEDA (`reward`), non
         // il feedback: la priorità è un giudizio interno e sulla scheda non
@@ -389,20 +352,42 @@ module.exports = function register(on, ctx) {
         // ricompensa scenderebbe in silenzio alla fascia più bassa. Le schede
         // pubblicate prima che il campo esistesse non ce l'hanno: per quelle
         // resta la fascia minima, che è quello che davano comunque.
-        const credits = Number.isFinite(Number(f.reward)) && Number(f.reward) > 0
-          ? Math.round(Number(f.reward))
-          : Credits.rewardForPriority(0);
-        // Accredita e marca questo feedback come premiato (state.rewardedFeedback),
-        // così alla prossima apertura non ricompare.
-        await Credits.award({ kind: 'feedback_resolved', credits, ref: fid });
-        rewards.push({
+        let credits;
+        if (conPortafoglio) {
+          const { grants, fresh } = await movimentiDelServer();
+          const esito = W.resolutionReward({ card: f, grants, grantsFresh: fresh, redeemedAt: WM.redeemedAt(), now: adesso });
+          // Movimento non ancora arrivato: si riguarda al controllo dopo.
+          if (!esito.announce) continue;
+          credits = esito.credits;
+          await Credits.markFeedbackAnnounced(fid);
+        } else {
+          credits = Number.isFinite(Number(f.reward)) && Number(f.reward) > 0
+            ? Math.round(Number(f.reward))
+            : Credits.rewardForPriority(0);
+          // Accredita e marca questo feedback come premiato (state.rewardedFeedback),
+          // così alla prossima apertura non ricompare.
+          await Credits.award({ kind: 'feedback_resolved', credits, ref: fid });
+        }
+        const annuncio = {
           id: fid,
           num: FB.formatNum ? FB.formatNum(f.seq, f.subSeq) : '',
           name: String(f.name || '').slice(0, 200),
           explanation: resolutionExplanation(f),
+          // Risolta o chiusa senza modifiche: il riquadro non le racconta uguali.
+          status: f.status === 'done' || !f.status ? 'done' : 'closed',
           credits,
-        });
+        };
+        rewards.push(annuncio);
+        // #986 — l'annuncio è anche il momento in cui la copia locale passa a «risolta»: dopo, non torna.
+        try {
+          await globalThis.SN_SEGNALAZIONI_MIE?.chiusa?.(fid, {
+            stato: annuncio.status === 'closed' ? 'chiusa' : 'risolta',
+            creataIl: f.createdAt,
+            num: annuncio.num, titolo: annuncio.name, risposta: annuncio.explanation,
+          });
+        } catch (_) {}
       }
+      await MINE.segnaControllo(adesso, { visti: guardati, impara: imparati, scansione });
       const totalCredits = rewards.reduce((s, r) => s + r.credits, 0);
       return { ok: true, rewards, totalCredits };
     } catch (e) {
@@ -411,3 +396,5 @@ module.exports = function register(on, ctx) {
     }
   });
 };
+
+module.exports.SYNC_FIELDS = SYNC_FIELDS;

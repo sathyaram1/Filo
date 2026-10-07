@@ -1,6 +1,6 @@
 // Le pagine che salvano da sé non perdono l'ultima modifica quando spariscono,
 // nemmeno col cursore ancora dentro la casella.
-// La regola pura sta in tests/unit/salvaRimandato.test.mjs.
+// La regola pura sta in tests/unit/caselleAlSicuro.test.mjs.
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -104,7 +104,8 @@ test('Altro: la conferma «Salvato» si spegne appena arriva un\'altra modifica'
   const scrivi = (t) => page.evaluate((v) => {
     const el = document.getElementById('blocklist');
     el.value = v;
-    el.dispatchEvent(new Event('change', { bubbles: true }));
+    // Come un incolla: parte subito, senza la pausa di chi batte i tasti.
+    el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertFromPaste' }));
   }, t);
 
   await scrivi('primo.test');

@@ -38,3 +38,16 @@ test('feedback: il main rifiuta feedback_update da utente non admin', async ({ o
   expect(res.ok).toBe(false);
   expect(String(res.error || '')).toMatch(/amministrator/i);
 });
+
+test('feedback: un accesso non riuscito dal banner dice il perché lì, senza finestre di sistema', async ({ app, openTab }) => {
+  await app.evaluate(({ shell }) => { shell.openExternal = async () => { throw new Error('Failed to open'); }; });
+  const page = await openTab(FEEDBACK_URL);
+  await expect(page.locator('#adminSignIn')).toBeVisible({ timeout: 8_000 });
+  let dialogo = null;
+  page.on('dialog', (d) => { dialogo = d.message(); d.dismiss().catch(() => {}); });
+  await page.locator('#adminSignIn').click();
+  await expect(page.locator('#adminBannerText')).toContainText('aprire il browser');
+  await expect(page.locator('#adminBannerText')).toHaveClass(/fb-admin-ko/);
+  await expect(page.locator('#adminSignIn')).toBeEnabled();
+  expect(dialogo).toBeNull();
+});

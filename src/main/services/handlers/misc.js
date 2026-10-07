@@ -2,6 +2,8 @@
 // feedback (annotazione/invio) e fetch dei metadati Open Graph di un link.
 
 const { safeFetch } = require('../safe-fetch');
+const { avvisoNellaFinestra } = require('../avvisoFinestra');
+const Foto = require('../fotoDellaPagina');
 const auth = require('../../auth/google-auth');
 // L'identità da allegare a un invio che il server limita per identità: la
 // chiede la coda dei percorsi condivisi, al momento in cui spedisce.
@@ -101,7 +103,7 @@ async function httpGetToFile(target, referrer, session, kind, hooks) {
       // voce nella barra e per decidere dove far crescere il file parziale.
       let partPath;
       try {
-        partPath = hooks.onHeaders({ filename, totalBytes: total });
+        partPath = hooks.onHeaders({ filename, totalBytes: total, contentType: String(res.headers['content-type'] || '') });
       } catch (e) {
         res.resume();
         try { req.destroy(); } catch (_) {}
@@ -189,8 +191,92 @@ function safeImageFilename(name) {
   return n.slice(0, 200);
 }
 
+// #711 — i byte attraversano il canale e il thread di lettura: il tetto è largo (un PNG
+// da 60 megapixel ci sta dentro), e oltre il chiamante riceve un rifiuto col motivo, mai un silenzio.
+const MAX_BYTE_PROVENIENZA = 64 * 1024 * 1024;
+
+// Il tipo di un'immagine dai suoi primi byte, o '' se non è un'immagine: il download per
+// conto della scheda, coi cookie dell'utente, non restituisce nient'altro (#946).
+function tipoImmagine(b) {
+  const fourcc = (i) => b.toString('latin1', i, i + 4);
+  if (b.length < 4) return '';
+  if (b[0] === 0x89 && fourcc(1) === 'PNG') return 'image/png';
+  if (b[0] === 0xff && b[1] === 0xd8) return 'image/jpeg';
+  if (fourcc(0) === 'RIFF' && fourcc(8) === 'WEBP') return 'image/webp';
+  if (fourcc(0) === 'GIF8') return 'image/gif';
+  if (fourcc(4) === 'ftyp') {
+    const marca = fourcc(8);
+    if (/^avi[fs]$/.test(marca)) return 'image/avif';
+    if (/^(heic|heix|hevc|hevx|heim|heis|mif1|msf1)$/.test(marca)) return 'image/heic';
+    return '';
+  }
+  if (b[0] === 0x42 && b[1] === 0x4d) return 'image/bmp';
+  if (b[0] === 0 && b[1] === 0 && b[2] === 1 && b[3] === 0) return 'image/x-icon';
+  if ((fourcc(0) === 'II*\u0000') || (fourcc(0) === 'MM\u0000*')) return 'image/tiff';
+  if ((b[0] === 0xff && b[1] === 0x0a) || fourcc(4) === 'JXL ') return 'image/jxl';
+  if (fourcc(4) === 'jP  ') return 'image/jp2';
+  return eSvg(b) ? 'image/svg+xml' : '';
+}
+
+// Un SVG comincia con <svg, dopo al più dichiarazione XML, commenti e doctype: una pagina
+// HTML con un'icona SVG dentro non lo è.
+function eSvg(b) {
+  let t = b.toString('utf8', 0, Math.min(b.length, 4096)).replace(/^\uFEFF/, '');
+  for (;;) {
+    t = t.replace(/^\s+/, '');
+    const preambolo = /^(<\?xml[\s\S]*?\?>|<!--[\s\S]*?-->|<!DOCTYPE[^>]*>)/i.exec(t);
+    if (!preambolo) break;
+    t = t.slice(preambolo[0].length);
+  }
+  return /^<svg[\s>]/i.test(t);
+}
+
+// I byte di un'immagine che la pagina mostra ma che il suo script non può leggere
+// (altra origine): stessa strada di «Salva immagine come…», in un file temporaneo.
+async function byteImmagineRemota({ url, referrer, session }) {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const { app } = require('electron');
+  let tmp = '';
+  let tipo = '';
+  let troppo = false;
+  try {
+    await fetchToFile({
+      url, referrer, session, kind: 'image',
+      onHeaders: ({ totalBytes, contentType }) => {
+        if (totalBytes > MAX_BYTE_PROVENIENZA) { troppo = true; throw new Error('troppo grande'); }
+        tipo = contentType;
+        tmp = path.join(app.getPath('temp'), `filo-immagine-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        return tmp;
+      },
+      onProgress: (ricevuti) => { if (ricevuti > MAX_BYTE_PROVENIENZA) troppo = true; },
+      shouldStop: () => troppo,
+    });
+    const byte = await fs.promises.readFile(tmp);
+    if (byte.length > MAX_BYTE_PROVENIENZA) troppo = true;
+    if (troppo) throw new Error('troppo grande');
+    const tipoVero = tipoImmagine(byte);
+    if (!tipoVero) return { ok: false, notImage: true, error: `non è un’immagine (${String(tipo || 'tipo ignoto').split(';')[0]})` };
+    return { ok: true, dataUrl: `data:${tipoVero};base64,${byte.toString('base64')}` };
+  } catch (e) {
+    if (troppo) return { ok: false, tooBig: true, error: `immagine oltre ${MAX_BYTE_PROVENIENZA / (1024 * 1024)} MB` };
+    return { ok: false, error: e?.message || 'immagine non scaricabile' };
+  } finally {
+    if (tmp) fs.promises.unlink(tmp).catch(() => {});
+  }
+}
+
+function bytesDaDataUrl(dataUrl) {
+  const m = /^data:[^,]*;base64,(.*)$/s.exec(String(dataUrl || ''));
+  if (!m) return null;
+  try {
+    const b = Buffer.from(m[1], 'base64');
+    return b.length ? b : null;
+  } catch (_) { return null; }
+}
+
 module.exports = function register(on, ctx) {
-  const { MSG, winOf, getEffectiveSettings, modelForAction, buildAttemptChain, broadcastToTabs } = ctx;
+  const { MSG, winOf, modelGate, broadcastToTabs, controllaUscita, apriDaFilo } = ctx;
   const ACTIONS = globalThis.SN_CONST.ACTIONS;
 
   // Titolo breve del feedback, generato da un LLM economico al momento
@@ -202,19 +288,15 @@ module.exports = function register(on, ctx) {
     const t = String(text || '').trim();
     if (!t) return fallback;
     try {
-      const settings = await getEffectiveSettings();
-      const attempts = buildAttemptChain(
-        settings, modelForAction(settings, ACTIONS.FEEDBACK_TITLE), ACTIONS.FEEDBACK_TITLE,
-      );
       const messages = [{
         role: 'user',
         content: 'Genera un titolo brevissimo (2-6 parole, nella stessa lingua del testo) che riassuma questo feedback su un\'app. Rispondi SOLO col titolo, senza virgolette e senza punto finale.\n\nFeedback:\n' + t.slice(0, 1500),
       }];
       const r = await Promise.race([
-        globalThis.SN_PROVIDERS.completeWithFallback({ attempts, messages }),
+        modelGate.text({ action: ACTIONS.FEEDBACK_TITLE, messages }),
         new Promise((_, rej) => setTimeout(() => rej(new Error('timeout titolo (8s)')), 8000)),
       ]);
-      const name = String(r?.text || '').trim()
+      const name = String(r || '').trim()
         .split('\n')[0]
         .replace(/^["'«\s]+|["'»\s.]+$/g, '')
         .slice(0, 120);
@@ -226,11 +308,9 @@ module.exports = function register(on, ctx) {
   }
 
   on(MSG.CAPTURE_VISIBLE_TAB, async (msg, sender) => {
-    const win = winOf(sender);
-    if (!win || !win._filoTabs) return { ok: false, error: 'no window' };
-    const tab = win._filoTabs.tabs.find((t) => t.id === win._filoTabs.activeId);
-    if (!tab) return { ok: false, error: 'no active tab' };
-    const img = await tab.view.webContents.capturePage();
+    const wc = Foto.paginaDaFotografare(sender);
+    if (!wc) return { ok: false, code: 'fuori_vista', error: 'la pagina non è in vista' };
+    const img = await wc.capturePage();
     return { ok: true, dataUrl: img.toDataURL() };
   });
 
@@ -333,7 +413,7 @@ module.exports = function register(on, ctx) {
           const name = safeImageFilename(filename || filenameFromUrl(url) || fallbackName);
           // La voce nella barra in alto: percentuale, peso e "Annulla", gli
           // stessi di un download partito da un link.
-          entry = downloads.beginManual({ url, filename: name, totalBytes });
+          entry = downloads.beginManual({ url, filename: name, totalBytes, scope: downloads.scopeOfWindow(sender.win) });
           // Il nome da proporre lo sa solo il server (Content-Disposition):
           // per questo la destinazione si chiede da qui in poi, mai prima.
           askDest = () => pickDestination(name).then((d) => {
@@ -387,6 +467,50 @@ module.exports = function register(on, ctx) {
   on(MSG.DOWNLOAD_IMAGE, handleDownload);
   on(MSG.DOWNLOAD_MEDIA, handleDownload);
 
+  // #711 — le etichette di origine di un'immagine, lette dai suoi byte. Nessun
+  // gate d'origine: la risposta parla solo dei byte che il chiamante ha mandato.
+  on(MSG.IMAGE_PROVENANCE, async (msg) => {
+    const byte = bytesDaDataUrl(msg && msg.dataUrl);
+    if (!byte) return { ok: false, error: 'immagine non leggibile' };
+    if (byte.length > MAX_BYTE_PROVENIENZA) {
+      return { ok: false, error: 'immagine troppo grande per il controllo delle etichette', tooBig: true };
+    }
+    const P = globalThis.SN_PROVENIENZA;
+    if (!P) return { ok: false, error: 'controllo non disponibile' };
+    try {
+      const res = await require('../firmatariC2pa').analizzaImmagine(byte);
+      const forte = res.prova === 'firmata' && res.firmatario === 'riconosciuto';
+      return { ok: true, frase: P.frase(res), forte, ...res };
+    } catch (e) {
+      return { ok: false, error: e?.message || 'controllo fallito' };
+    }
+  });
+
+  on(MSG.IMAGE_COPIED, async (msg) => {
+    const originale = bytesDaDataUrl(msg && msg.originale);
+    const copia = bytesDaDataUrl(msg && msg.copia);
+    if (!originale || !copia) return { ok: false, error: 'immagine non leggibile' };
+    if (originale.length > MAX_BYTE_PROVENIENZA || copia.length > MAX_BYTE_PROVENIENZA) {
+      return { ok: false, error: 'immagine troppo grande per il controllo delle etichette', tooBig: true };
+    }
+    let negliAppunti = null;
+    try { negliAppunti = require('electron').clipboard.readImage(); } catch (_) {}
+    try {
+      const ricordata = await require('../firmatariC2pa').ricordaCopia(originale, [copia, negliAppunti]);
+      return { ok: true, ricordata };
+    } catch (e) {
+      return { ok: false, error: e?.message || 'controllo fallito' };
+    }
+  });
+
+  on(MSG.IMAGE_BYTES, async (msg, sender) => {
+    const url = String((msg && msg.url) || '').trim();
+    if (!/^https?:\/\//i.test(url)) return { ok: false, error: 'URL non scaricabile' };
+    const wc = sender && sender.wc;
+    if (!wc || wc.isDestroyed?.()) return { ok: false, error: 'no sender' };
+    return byteImmagineRemota({ url, referrer: String(sender?.tab?.url || sender?.url || ''), session: wc.session });
+  });
+
   // "Salva file" su un link a un file (#410.2). A differenza di
   // DOWNLOAD_IMAGE/MEDIA (byte scaricati a mano nel main), qui facciamo partire
   // il download NATIVO della scheda: webContents.downloadURL emette
@@ -398,17 +522,28 @@ module.exports = function register(on, ctx) {
   // per il salvataggio immagini. Non serve il gate "solo superfici interne": far
   // partire uno scaricamento di un URL è esattamente ciò che il clic sul link fa
   // già, e non espone cronologia né percorsi su disco (quelli restano riservati).
-  on(MSG.DOWNLOAD_LINK, async (msg, sender) => {
+  on(MSG.DOWNLOAD_LINK, async (msg, sender, origin) => {
     const url = String(msg.url || '').trim();
     if (!/^https?:/i.test(url)) return { ok: false, error: 'URL non scaricabile' };
     const wc = sender && sender.wc;
     if (!wc || wc.isDestroyed?.()) return { ok: false, error: 'no sender' };
-    try {
-      wc.downloadURL(url);
-      return { ok: true };
-    } catch (e) {
-      return { ok: false, error: e?.message || 'download non avviato' };
+    const scarica = () => {
+      try {
+        wc.downloadURL(url);
+        return { ok: true };
+      } catch (e) {
+        return { ok: false, error: e?.message || 'download non avviato' };
+      }
+    };
+    // Scaricare un collegamento scritto da un modello lo chiede al suo sito: passa dalla porta delle uscite (#810).
+    if (msg.diFilo) {
+      const parole = (Array.isArray(msg.parole) ? msg.parole : []).filter((x) => typeof x === 'string').join('\n');
+      let esito = { ok: false, error: 'download non avviato' };
+      const avvisato = String(origin || '').startsWith('filo://');
+      const r = await apriDaFilo(url, { wc, parole, avvisa: avvisato, tipo: 'SCARICA_COLLEGAMENTO', apri: () => { esito = scarica(); } });
+      return r.aperto ? esito : { ok: false, error: 'segreto', frase: r.frase, avvisato };
     }
+    return scarica();
   });
 
   // ── Download "nativi" della navigazione (#410.1): la shell legge la
@@ -436,14 +571,20 @@ module.exports = function register(on, ctx) {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
     return fn(msg, sender, origin);
   };
-  on(MSG.DOWNLOADS_LIST, internalOnly(async () => ({ ok: true, items: DL().list() })));
-  on(MSG.DOWNLOADS_CLEAR, internalOnly(async () => ({ ok: true, items: DL().clearCompleted() })));
-  on(MSG.DOWNLOAD_REMOVE, internalOnly(async (msg) => ({ ok: true, items: DL().remove(msg.id) })));
-  on(MSG.DOWNLOAD_OPEN_FILE, internalOnly(async (msg) => DL().openFile(msg.id)));
-  on(MSG.DOWNLOAD_OPEN_FOLDER, internalOnly(async (msg) => DL().openFolder(msg.id)));
-  on(MSG.DOWNLOAD_CANCEL, internalOnly(async (msg) => DL().cancel(msg.id)));
-  on(MSG.DOWNLOAD_PAUSE, internalOnly(async (msg) => DL().pause(msg.id)));
-  on(MSG.DOWNLOAD_RESUME, internalOnly(async (msg) => DL().resume(msg.id)));
+  // #588.2 — ogni finestra vede e comanda solo le voci del suo ambito: una
+  // finestra incognito le sue, quella normale la cronologia.
+  const ambito = (sender) => DL().scopeOfWindow(sender && sender.win);
+  on(MSG.DOWNLOADS_LIST, internalOnly(async (_m, s) => ({ ok: true, items: DL().list(ambito(s)) })));
+  on(MSG.DOWNLOADS_CLEAR, internalOnly(async (_m, s) => ({ ok: true, items: DL().clearCompleted(ambito(s)) })));
+  on(MSG.DOWNLOAD_REMOVE, internalOnly(async (msg, s) => ({ ok: true, items: DL().remove(msg.id, ambito(s)) })));
+  // #588 — `confirmed` viaggia dalla superficie che ha MOSTRATO la conferma:
+  // senza, il main risponde needsConfirm e non tocca shell.openPath.
+  on(MSG.DOWNLOAD_OPEN_FILE, internalOnly(async (msg, s) => DL().openFile(msg.id, { confirmed: !!msg.confirmed }, ambito(s))));
+  on(MSG.DOWNLOAD_CONFIRM, internalOnly(async (msg, s) => DL().confirmDownload(msg.id, !!msg.allow, ambito(s))));
+  on(MSG.DOWNLOAD_OPEN_FOLDER, internalOnly(async (msg, s) => DL().openFolder(msg.id, ambito(s))));
+  on(MSG.DOWNLOAD_CANCEL, internalOnly(async (msg, s) => DL().cancel(msg.id, ambito(s))));
+  on(MSG.DOWNLOAD_PAUSE, internalOnly(async (msg, s) => DL().pause(msg.id, ambito(s))));
+  on(MSG.DOWNLOAD_RESUME, internalOnly(async (msg, s) => DL().resume(msg.id, ambito(s))));
 
   on(MSG.FEEDBACK_ANNOTATE, async (msg, sender) => {
     // Il box feedback è appena entrato/uscito dalla modalità annotazione.
@@ -467,8 +608,8 @@ module.exports = function register(on, ctx) {
     // impila sopra lo screenshot della pagina per ottenere un'immagine di
     // tutta l'app col disegno. I tratti sono già parte del DOM della shell
     // (canvas di disegno), quindi vengono catturati direttamente.
-    const win = winOf(sender);
-    if (!win || !win._filoTabs) return { ok: false, error: 'no window' };
+    const win = Foto.barraDaFotografare(sender);
+    if (!win) return { ok: false, code: 'fuori_vista', error: 'la pagina non è in vista' };
     try {
       const barH = win._filoTabs.topChromeHeight();
       if (barH <= 0) return { ok: false, error: 'no topbar' };
@@ -479,32 +620,6 @@ module.exports = function register(on, ctx) {
       return { ok: false, error: e?.message || String(e) };
     }
   });
-
-  // #602 — un avviso che DEVE essere visto: va nella cornice della finestra
-  // (la stessa striscia di notifiche che annuncia la fine di uno scaricamento),
-  // non nella pagina davanti. Resta lì finché non lo si chiude, perché dice che
-  // una segnalazione non è mai partita e va rimandata.
-  //
-  // Ritorna `false` se non c'era nessuna finestra pronta a mostrarlo: chi
-  // chiama tiene allora da parte l'avviso e riprova più tardi, invece di
-  // parlare al vuoto. Una finestra che sta ancora caricando non conta: la sua
-  // cornice non ascolta ancora.
-  function avvisoNellaFinestra(testo) {
-    let dette = 0;
-    try {
-      const { BrowserWindow } = require('electron');
-      for (const win of BrowserWindow.getAllWindows()) {
-        if (!win || win.isDestroyed?.() || !win._filoTabs) continue;
-        const wc = win.webContents;
-        if (!wc || wc.isDestroyed?.() || wc.isLoading?.()) continue;
-        try {
-          wc.send('shell:toast', { text: testo, opts: { durationSec: 0 } });
-          dette++;
-        } catch (_) {}
-      }
-    } catch (_) {}
-    return dette > 0;
-  }
 
   // Coda d'invio del feedback (#341): "Invia" NON aspetta più la rete. Il box
   // sparisce subito e il main si fa carico di consegnare il feedback in
@@ -521,6 +636,18 @@ module.exports = function register(on, ctx) {
       // l'utente (l'unico canale disponibile dal main verso le pagine è il
       // broadcast di un toast). Il feedback è comunque partito col resto.
       onDone: (_item, result) => {
+        // #678 — l'id resta scritto qui: è così che il popup delle ricompense
+        // può chiedere LE PROPRIE schede invece di scaricare la bacheca intera
+        // per cercarsi dentro. Best-effort: un registro mancato costa una
+        // ricompensa in ritardo, non un feedback perso.
+        try { globalThis.SN_FEEDBACK_MINE?.ricordaId?.(result?.id); } catch (_) {}
+        try {
+          globalThis.SN_SEGNALAZIONI_MIE?.inviata?.(_item?.id, {
+            feedbackId: result?.id,
+            num: globalThis.SN_FEEDBACK?.formatNum?.(result?.seq, 0) || '',
+            titolo: _item?.name || '',
+          })?.catch?.(() => {});
+        } catch (_) {}
         const failed = Array.isArray(result?.failed) ? result.failed : [];
         if (!failed.length) return;
         const names = failed.map((f) => f?.name || 'allegato').join(', ');
@@ -543,8 +670,26 @@ module.exports = function register(on, ctx) {
       // secondo piano, su una pagina interna o appena avviato non li vedeva
       // nessuno, e la segnalazione spariva in silenzio lo stesso. Va nella
       // cornice della finestra, dove resta finché non la si chiude.
-      onGiveUp: (_item, motivo) => avvisoNellaFinestra(
-        String(motivo || 'La tua segnalazione non è partita.'),
+      onGiveUp: (item, motivo) => {
+        try { globalThis.SN_SEGNALAZIONI_MIE?.nonPartita?.(item?.id)?.catch?.(() => {}); } catch (_) {}
+        return avvisoNellaFinestra(String(motivo || 'La tua segnalazione non è partita.'));
+      },
+      // Dopo un giorno di soli tentativi la coda rinuncia: nell'elenco locale non resta «in partenza».
+      onScaduta: (item) => {
+        try { globalThis.SN_SEGNALAZIONI_MIE?.nonPartita?.(item?.id)?.catch?.(() => {}); } catch (_) {}
+      },
+      // Chiesto al momento della spedizione: fra l'accodamento e l'invio
+      // possono passare ore (offline), e l'owner può aver chiuso la sessione.
+      // '' = l'accesso non c'è; un errore con la sessione ancora aperta è la rete, e la coda riprova senza dire niente.
+      tokenOwner: async () => {
+        if (!auth.isAdmin()) return '';
+        try { return (await auth.getIdToken()) || ''; } catch (e) { if (!auth.isAdmin()) return ''; throw e; }
+      },
+      onAttesaOwner: (_item, perche) => avvisoNellaFinestra(
+        perche === 'rifiutato'
+          ? 'Il tuo feedback aspetta la tua firma da owner: il server non accetta il tuo accesso. Riparte quando rientri, o al prossimo avvio di Filo.'
+          : 'Il tuo feedback aspetta il tuo accesso da owner: parte con la tua firma appena rientri.',
+        { chiave: 'feedback-attesa-accesso-owner' },
       ),
       log: (...a) => { try { console.log('[Filo feedback]', ...a); } catch (_) {} },
     });
@@ -553,7 +698,8 @@ module.exports = function register(on, ctx) {
   // Coda dei percorsi condivisi dell'Aiuto (#584). Ritarda apposta l'invio
   // perché l'ora in cui Firestore riceve un percorso è pubblica e, se fosse
   // quella della sessione, ricucirebbe i percorsi di una persona su domini
-  // diversi. Qui si riprende quello che era rimasto in coda alla chiusura.
+  // diversi. Qui si riprende quello che era rimasto in coda alla chiusura; a
+  // raccolta spenta (#897) lo si butta senza spedirlo.
   //
   // L'identità va chiesta AL MOMENTO DELL'INVIO, non quando il percorso viene
   // raccolto: in mezzo passano ore e un token di allora sarebbe scaduto. Chi
@@ -593,9 +739,14 @@ module.exports = function register(on, ctx) {
       // "owner:" così la dashboard lo distingue (verde) dai feedback dei tester
       // esterni (arancione). L'identità owner è nota solo qui nel main (auth
       // singleton): il content script che genera il clientId non sa di esserlo.
+      // `dallOwner` lo decide il main, non il payload: vale il token admin alla spedizione (#595).
+      let dallOwner = false;
       try {
-        if (auth.isAdmin() && globalThis.SN_FEEDBACK_THREAD?.ownerize) {
+        // #912: anche l'owner appena buttato fuori da un rinnovo fallito: il suo feedback aspetta che rientri.
+        const owner = auth.isAdmin() || !!auth.accessoOwnerCaduto?.();
+        if (owner && globalThis.SN_FEEDBACK_THREAD?.ownerize) {
           payload.clientId = globalThis.SN_FEEDBACK_THREAD.ownerize(payload.clientId);
+          dallOwner = String(payload.clientId || '').startsWith('owner:');
         }
       } catch (_) {}
       console.log('[Filo feedback] submit start', {
@@ -606,7 +757,14 @@ module.exports = function register(on, ctx) {
       // Accoda e prova a inviare subito, ma NON aspettare la rete: l'ack torna
       // appena il feedback è al sicuro in coda (persistito). Il titolo lo genera
       // la coda al momento dell'invio (anche offline, col fallback).
-      const r = await Outbox.enqueue(payload);
+      const r = await Outbox.enqueue(payload, { dallOwner });
+      // #986 — la copia per chi l'ha mandata nasce adesso, «in partenza»; dall'incognito non nasce.
+      try {
+        const Mie = globalThis.SN_SEGNALAZIONI_MIE;
+        if (Mie && r?.id) {
+          await Mie.registra({ id: r.id, testo: payload.text, allegati: Mie.nomiAllegati(payload) });
+        }
+      } catch (e) { console.warn('[Filo feedback] copia locale non scritta:', e?.message || e); }
       return { ok: true, queued: true, id: r?.id };
     } catch (e) {
       console.error('[Filo feedback] submit failed', e);
@@ -632,23 +790,34 @@ module.exports = function register(on, ctx) {
     // ma marca la versione corrente come "vista" così il prossimo update parte
     // pulito. Niente note ritornate → niente popup.
     if (!lastSeen) {
-      try { await globalThis.SN_STORAGE.setRaw(KEYS.LAST_SEEN_VERSION, current); } catch (_) {}
+      await markUpdateSeen(current);
       return { ok: true, current, lastSeen: null, notes: [] };
     }
-    const notes = PN.since(lastSeen, current);
+    const foto = await globalThis.SN_STORAGE.getRaw(KEYS.LAST_SEEN_NOTES, null);
+    const notes = PN.recap(lastSeen, current, foto);
     return { ok: true, current, lastSeen, notes };
   });
 
-  on(MSG.MARK_UPDATE_SEEN, async () => {
+  // Versione e fotografia si scrivono insieme: recap() usa la fotografia solo se è della versione vista.
+  async function markUpdateSeen(version) {
     const KEYS = globalThis.SN_CONST.STORAGE_KEYS;
-    try { await globalThis.SN_STORAGE.setRaw(KEYS.LAST_SEEN_VERSION, appVersion()); } catch (_) {}
+    try { await globalThis.SN_STORAGE.setRaw(KEYS.LAST_SEEN_NOTES, globalThis.SN_PATCH_NOTES.fotografia(version)); } catch (_) {}
+    try { await globalThis.SN_STORAGE.setRaw(KEYS.LAST_SEEN_VERSION, version); } catch (_) {}
+  }
+
+  on(MSG.MARK_UPDATE_SEEN, async () => {
+    await markUpdateSeen(appVersion());
     return { ok: true };
   });
 
-  on('fetch_link_meta', async (msg) => {
+  on('fetch_link_meta', async (msg, sender) => {
     try {
       const url = msg.url;
       if (!url) return { ok: false, error: 'url mancante' };
+      // Leggere un collegamento per descriverlo lo chiede al suo sito: un segreto nell'indirizzo uscirebbe col solo tasto
+      // destro (#810). Fermato, la spiegazione parte senza titolo e descrizione.
+      const porta = await controllaUscita({ type: 'NAVIGA', url: String(url) }, { sender });
+      if (porta.blocca) return { ok: false, error: 'segreto' };
       const controller = new AbortController();
       const t = setTimeout(() => controller.abort(), 4000);
       // safeFetch: solo http/https + blocco di loopback/IP privati, rivalidando

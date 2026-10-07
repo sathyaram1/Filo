@@ -27,6 +27,9 @@ import { readFileSync, existsSync } from 'node:fs';
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..', '..');
+// I file che devono stare nella release vivono in un posto solo dal #733:
+// il controllo del workflow li chiede a questo script invece di nominarli.
+const { PIATTAFORME } = await import('../../scripts/release-platform-alarm.mjs');
 
 const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
 
@@ -246,8 +249,10 @@ test('il pacchetto Linux viene allegato alla release, non solo costruito', () =>
   const job = linuxJob();
   assert.match(job, /gh release view/,
     'manca il controllo finale: senza, un mancato allegato passa inosservato');
+  assert.match(job, /release-platform-alarm\.mjs"? --attesi Linux/,
+    'il controllo finale non chiede l\'elenco dei file attesi: senza elenco non guarda niente e resta verde');
   for (const file of ['Filo-Linux.AppImage', 'latest-linux.yml']) {
-    assert.ok(job.includes(file), `il controllo finale non cerca ${file}`);
+    assert.ok(PIATTAFORME.Linux.attesi.includes(file), `il controllo finale non cerca ${file}`);
   }
 });
 
@@ -307,8 +312,7 @@ test('il foglietto sale nella release, con un nome fisso che il sito può linkar
     `il lavoro di pubblicazione non nomina più ${FOGLIETTO}`);
   // Deve stare anche nel controllo finale, altrimenti un allegato mancato
   // passa inosservato esattamente come passerebbe per l'AppImage.
-  const controllo = job.slice(job.indexOf('gh release view'));
-  assert.ok(controllo.includes(FOGLIETTO),
+  assert.ok(PIATTAFORME.Linux.attesi.includes(FOGLIETTO),
     'il controllo finale non pretende il foglietto: un giorno non salirebbe e nessuno se ne accorgerebbe');
 });
 
@@ -327,13 +331,21 @@ test('il recap degli aggiornamenti non promette un doppio clic che non funziona'
 test("l'aggiornamento automatico su Linux ha da dove partire", () => {
   // `latest-linux.yml` è il file che electron-updater legge su Linux: senza,
   // chi ha scaricato l'AppImage resta fermo a quella versione per sempre.
-  assert.ok(linuxJob().includes('latest-linux.yml'),
+  assert.ok(PIATTAFORME.Linux.attesi.includes('latest-linux.yml') && /--attesi Linux/.test(linuxJob()),
     'nessuno controlla che latest-linux.yml finisca nella release: l\'aggiornamento automatico su Linux resterebbe muto');
 });
 
 test('la versione Linux si costruisce dallo stesso codice di quella Windows', () => {
-  assert.match(linuxJob(), /ref:\s*\$\{\{\s*needs\.release\.outputs\.sha\s*\}\}/,
+  // Dal #733 il codice da costruire lo sceglie un passo, perché ci si arriva
+  // anche a mano per riattaccare i file a una versione già uscita. Sulla strada
+  // automatica deve restare il COMMIT costruito per Windows: il tag nasce alla
+  // pubblicazione e punta a dove sta main in quel momento.
+  assert.match(linuxJob(), /ref:\s*\$\{\{\s*steps\.bersaglio\.outputs\.codice\s*\}\}/,
+    'il lavoro Linux non prende più il codice dal passo che lo sceglie');
+  assert.match(linuxJob(), /COMMIT_APPENA_USCITO:\s*\$\{\{\s*needs\.release\.outputs\.sha\s*\}\}/,
     'il lavoro Linux non parte dal commit costruito per Windows: due file con lo stesso numero di versione e dentro codice diverso');
+  assert.match(linuxJob(), /CODICE="\$CHIESTA"/,
+    'riattaccando a mano si deve costruire il codice DI QUELLA versione, non main');
 });
 
 test('esiste un modo di provare la build Linux senza bruciare una versione', () => {
@@ -536,4 +548,30 @@ test('su Linux le scorciatoie si chiamano e funzionano come su Windows', () => {
   assert.equal(T.indiceSaltoScheda(evento({ metaKey: true }, 'Digit2'), 'linux'), null);
   assert.equal(T.riservato('Ctrl+0', 'linux'), false,
     'su Linux lo zoom arriva alla pagina: quel tasto non è riservato');
+});
+
+// ── Batteria, rete e Bluetooth (#873) ────────────────────────────────────────
+
+test('su Linux batteria, rete e Bluetooth si leggono dal sistema, senza PowerShell né permessi', async () => {
+  const L = require(join(ROOT, 'src', 'main', 'services', 'statoSistema.js'));
+  const chiesti = [];
+  const letto = await L.leggiLinux(join(ROOT, 'non-esiste'), async (file, args) => { chiesti.push([file, ...args].join(' ')); return null; });
+  assert.deepEqual(letto, { batteria: null, rete: null, bluetooth: null, volume: null, wifi: null }, 'senza sysfs non si inventa niente');
+  // Il volume (#874) si legge dal server audio, solo leggendo: nessun «set».
+  assert.ok(chiesti.every((c) => /^busctl --system |^wpctl get-volume |^pactl get-sink-|^amixer -M get /.test(c)), `comandi inattesi: ${chiesti.join(' | ')}`);
+  assert.ok(!chiesti.some((c) => /sudo|pkexec|powershell|set-/i.test(c)));
+});
+
+// ── Volume, Bluetooth e Wi-Fi a comando (#874) ───────────────────────────────
+
+test('su Linux volume, Bluetooth e Wi-Fi si comandano con la shell di sistema e i programmi di sempre, senza sudo', () => {
+  const C = require(join(ROOT, 'src', 'main', 'services', 'comandiSistema.js'));
+  for (const [comando, script] of Object.entries(C.SCRIPT.linux)) {
+    assert.ok(!/\bsudo\b|pkexec|powershell|osascript|networksetup|blueutil/i.test(script), `linux/${comando}: programma di un altro sistema o con privilegi`);
+  }
+  assert.equal(C.costruisci('volume', { livello: 1 }, 'linux').shell, 'sh');
+  assert.match(C.SCRIPT.linux.volume, /wpctl[\s\S]*pactl[\s\S]*amixer/, 'PipeWire, poi PulseAudio, poi ALSA');
+  assert.match(C.SCRIPT.linux['wifi-collega'], /nmcli --wait \d+ connection up uuid "\$U"/, 'la rete si sceglie col suo identificativo, non col nome');
+  // La shell vera la decide resolveShell: su Linux «sh» resta la shell di sistema anche se l'utente preferisce PowerShell.
+  if (process.platform === 'linux') assert.equal(resolveShell('sh'), 'sh');
 });

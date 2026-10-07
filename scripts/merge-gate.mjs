@@ -37,19 +37,22 @@
 //          messo in stato `design`, decide l'utente. Nessuna fusione — ma il
 //          ramo non è perduto: il server apre una richiesta di approvazione
 //          che l'owner trova in cima alla dashboard di gestione.
-//     20 → conflitto di merge: serve risoluzione manuale. Nessuna fusione.
+//     20 → conflitto di merge, o unit rossi sul risultato della fusione con main
+//          (#929): il server ha già instradato il riallineamento. Nessuna fusione.
 //     1  → errore tecnico (argomenti, biglietto assente, server/GitHub giù) o
 //          richiesta RIFIUTATA dal server (verdetti non registrati, ramo che
-//          non combacia col biglietto): il server l'ha già messa a registro.
+//          non combacia col biglietto, via libera che non copre la punta): il
+//          server l'ha già messa a registro.
 
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pinnedRepoRoot, absolutizeRecipe, TOOLS_ROOT } from './lib/tools-pin.mjs';
-import { merge } from './routine-channel.mjs';
+import { merge, heartbeat } from './routine-channel.mjs';
 import { readTicket } from './lib/routine-ticket.mjs';
 import { headSha, currentBranch, findStateIdByBranch, readBranchState } from './lib/branch-integrity.mjs';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
+import { chiediConProva } from './lib/unit-sulla-fusione.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // FILO_REPO_ROOT: override della root (dove si cerca il biglietto). Esiste SOLO
@@ -95,53 +98,67 @@ export function parseArgs(argv) {
  * che il server ha già messo a registro.
  */
 /**
- * I via libera registrati che NON parlano del contenuto che si sta per far
- * fondere. PURA.
- *
- * Un esito vale per la versione esaminata. Verifica e controllo di sicurezza
- * lasciano scritto su quale commit sono stati dati; se la punta del ramo si è
- * mossa dopo, quegli esiti parlano di un contenuto diverso da quello che
- * atterrerebbe su main, e il giro va rifatto invece che chiuso (feedback
- * #485). Un esito senza commit scritto accanto non decade: viene da uno
- * strumento vecchio, e a giudicarlo resta il server.
+ * Il via libera del controllo di sicurezza, se parla di un altro commit (#485). PURA.
+ * Quello della verifica lo giudica il server: tollera le sole prove del giro tolte e
+ * altrimenti rimanda il verificatore; un rifiuto qui fermava il lavoro per sempre.
  */
 export function esitiDecaduti(state, punta) {
   const s = state && typeof state === 'object' ? state : {};
   const p = String(punta || '');
-  if (!p) return [];
-  const fuori = [];
-  for (const [campo, quale] of [['verifierSha', 'la verifica'], ['secauditSha', 'il controllo di sicurezza']]) {
-    const sha = String(s[campo] || '');
-    if (sha && sha !== p) fuori.push({ quale, sha });
-  }
-  return fuori;
+  const sha = String(s.secauditSha || '');
+  return p && sha && sha !== p ? [{ quale: 'il controllo di sicurezza', sha }] : [];
+}
+
+/** La nota per una verifica data su un commit più vecchio della punta. PURA. '' se non serve. */
+export function notaVerificaSuAltroCommit(state, punta) {
+  const s = state && typeof state === 'object' ? state : {};
+  const v = String(s.verifierSha || '');
+  const p = String(punta || '');
+  if (!v || !p || v === p) return '';
+  return `[merge-gate] nota: la verifica ha dato l'ok su ${v.slice(0, 12)}, la punta è ${p.slice(0, 12)}. Lo giudica il server: `
+    + 'se dopo il verdetto sono state solo TOLTE prove del giro, fonde; altrimenti azzera il verdetto e rimanda un '
+    + 'verificatore da sé, e qui arriva un rifiuto (not_approved). In quel caso non c\'è altro da registrare: rilascia il biglietto.';
 }
 
 /**
- * Il rifiuto per un via libera che parla di un altro commit. PURA.
- *
- * Il rifiuto dice anche COSA REGISTRARE. Fermarsi e basta lascia la notizia su
- * questa macchina: sul canale i due via libera continuano a risultare buoni per
- * questo ramo, che è la segnalazione #485 spostata di un passo. Il passo che la
- * registra è il rientro in verifica (`revision_security` → `revision_capability`
- * nella macchina a stati: la stessa strada del riallineamento, dove il
- * contenuto cambia e verifica e controllo di sicurezza si rifanno su quello
- * nuovo). Chi legge non deve inventarsi il comando, né accontentarsi di un
- * guasto, che dice «non riesco a lavorare» e non «gli esiti non parlano più di
- * questo contenuto».
+ * Il rifiuto per un controllo di sicurezza dato su un altro commit. PURA.
+ * Il rimedio è rileggere il pezzo nuovo e registrare di nuovo il verdetto: il ritorno
+ * in verifica, al controllo di sicurezza, il server non lo concede.
  */
-export function testoEsitiDecaduti(decaduti, punta, ramo = '') {
+export function testoEsitiDecaduti(decaduti, punta, ramo = '', id = '') {
   const righe = (Array.isArray(decaduti) ? decaduti : [])
     .map((d) => `  ${d.quale} ha dato l'ok su ${String(d.sha).slice(0, 12)}`);
+  const primo = (Array.isArray(decaduti) ? decaduti : [])[0];
+  const da = primo ? String(primo.sha).slice(0, 12) : '<commit controllato>';
   const p = String(punta || '').slice(0, 12);
   const r = String(ramo || '<ramo>');
-  return 'fusione non chiesta: il ramo si è mosso dopo i via libera, che valgono per il contenuto esaminato e non per il nome del ramo.\n'
+  const i = String(id || '<id>');
+  return 'fusione non chiesta: il ramo si è mosso dopo il tuo controllo di sicurezza, che vale per il contenuto esaminato e non per il nome del ramo.\n'
     + `${righe.join('\n')}\n`
-    + `  la directory adesso è su ${p}\n`
-    + 'Quello che verrebbe fuso contiene righe che nessuno ha letto: il giro va rifatto su questo contenuto, non chiuso.\n'
-    + 'Non fermarti qui. Finché la notizia resta su questa macchina, sul canale i due via libera continuano a risultare buoni per questo ramo. Registrala rimettendo il lavoro in verifica sul contenuto nuovo:\n'
-    + `  node scripts/routine-channel.mjs deliver status --status revision_capability --branch ${r} --notes "il ramo si è mosso dopo i via libera: verifica e controllo di sicurezza vanno rifatti su ${p}"\n`
-    + 'Se il server rifiuta quel passaggio, dichiaralo nel rilascio del biglietto con --guasto e la stessa frase: quello che non è registrato non è successo.';
+    + `  la directory adesso è su ${p} (ramo ${r})\n`
+    + 'Quello che verrebbe fuso contiene righe che non hai letto. Leggile adesso, per intero:\n'
+    + `  git diff ${da} ${p}\n`
+    + 'Poi registra di nuovo il verdetto, che parte timbrato col contenuto nuovo (nella nota scrivi anche cosa hai letto in più):\n'
+    + `  node scripts/dispatch.mjs --record-secaudit ${i} <pass|fail> --nota <file.md>\n`
+    + 'e, se è pass, rilancia questo comando. La verifica funzionale non la rifai tu: se il pezzo nuovo non è fatto solo di prove del giro tolte, il server la rimette in giro da sé quando chiedi la fusione.';
+}
+
+/**
+ * Cosa fare dopo un rifiuto con cui il server ha GIÀ rimesso in giro la
+ * pratica (#773). PURA. '' per ogni altro motivo, che si stampa com'è.
+ */
+export function testoRifiutoServer(reason) {
+  const coda = 'Niente fusione. Il server ha azzerato il tuo via libera di sicurezza e rimanda da sé un nuovo controllo sulla punta: '
+    + 'non registrare altro, rilascia il biglietto.';
+  if (reason === 'secaudit_stale') {
+    return '[merge-gate] RIFIUTATO (secaudit_stale): il via libera di sicurezza registrato sul server non parla della punta del ramo '
+      + `(è stato dato su un altro commit, o registrato senza). ${coda}`;
+  }
+  if (reason === 'stale') {
+    return '[merge-gate] RIFIUTATO (stale): sul server la punta del ramo non è il commit per cui hai chiesto la fusione, quindi il ramo '
+      + `si è mosso nel frattempo. ${coda}`;
+  }
+  return '';
 }
 
 /**
@@ -264,15 +281,8 @@ export function testoNonPubblicato(punta, suOrigin, ramo = '') {
 }
 
 /**
- * Il rifiuto per un ramo che su origin è andato OLTRE il contenuto esaminato.
- * PURA.
- *
- * Qui spedire non c'entra: là c'è già tutto, e c'è pure dell'altro. Il danno è
- * quello della segnalazione #485 all'ultimo passo possibile: chi fonde prende
- * la punta, e la punta è un contenuto che nessuno ha guardato. Il rimedio è lo
- * stesso del ramo mosso sotto i piedi, perché la causa è la stessa: gli esiti
- * parlano di un'altra versione, quindi decadono e il giro si rifà su quella
- * nuova. E si REGISTRA, invece di restare a schermo su questa macchina.
+ * Il rifiuto per un ramo che su origin è andato OLTRE il contenuto esaminato. PURA.
+ * Chi fonde prende la punta di origin (#485): la directory la raggiunge, e il pezzo in più si legge prima di fondere.
  */
 export function testoPiuAvanti(punta, suOrigin, ramo = '') {
   const p = String(punta || '').slice(0, 12);
@@ -281,10 +291,10 @@ export function testoPiuAvanti(punta, suOrigin, ramo = '') {
   return 'fusione non chiesta: su origin il ramo è più avanti del contenuto esaminato, e chi fonde prende la PUNTA del ramo, non quello che c\'è in questa directory.\n'
     + `  qui i via libera valgono per ${p}\n`
     + `  su origin il ramo ${r} è in cima a ${o}\n`
-    + 'Quello che verrebbe fuso è il contenuto in cima, che nessuno ha esaminato. Non spedire niente e non riportare indietro il ramo: là c\'è lavoro che qui non c\'è, e sovrascriverlo lo butterebbe via.\n'
-    + 'Gli esiti parlano di un\'altra versione, quindi sono decaduti: il giro va rifatto su quel contenuto, e la decadenza va registrata invece di restare su questa macchina.\n'
-    + `  node scripts/routine-channel.mjs deliver status --status revision_capability --branch ${r} --notes "su origin il ramo è più avanti del contenuto esaminato: verifica e controllo di sicurezza vanno rifatti su ${o}"\n`
-    + 'Se il server rifiuta quel passaggio, dichiaralo nel rilascio del biglietto con --guasto e la stessa frase: quello che non è registrato non è successo.';
+    + 'Quello che verrebbe fuso è il contenuto in cima, che qui non è stato esaminato. Non spedire niente e non riportare indietro il ramo: là c\'è lavoro che qui non c\'è, e sovrascriverlo lo butterebbe via.\n'
+    + 'Porta la directory su quel contenuto e rilancia questo comando, che ti dirà cosa rileggere:\n'
+    + `  git merge --ff-only ${o}\n`
+    + 'Se il merge non va avanti da solo (le due storie si sono separate), dichiaralo nel rilascio del biglietto con --guasto e questa frase: quello che non è registrato non è successo.';
 }
 
 /**
@@ -306,11 +316,31 @@ export function testoRamoDiverso(nominato, corrente) {
     + 'Posizionati sul ramo del lavoro e rilancia, oppure nomina il ramo su cui sei.';
 }
 
+/**
+ * Tiene vivo il lavoro sul server finché gira la prova degli unit: dura minuti, a volte più dell'ora di silenzio dopo
+ * cui il semaforo cade, e in cloud nient'altro batte intanto (verifica #929 giro 3). Gli unit bloccano questo processo,
+ * quindi batte un figlio, fermato alla fine. Un battito subito: quello del figlio arriva solo dopo il suo avvio.
+ */
+export async function tieniVivo(ticket, { batti = heartbeat, avvia = spawn, script = resolve(__dirname, 'routine-channel.mjs') } = {}) {
+  try { await batti(ticket); } catch (_) { /* il figlio ci riprova */ }
+  let figlio = null;
+  try {
+    figlio = avvia(process.execPath, [script, 'heartbeat', '--loop'], {
+      env: { ...process.env, FILO_ROUTINE_TICKET: ticket, FILO_REPO_ROOT: ROOT }, stdio: 'ignore', windowsHide: true,
+    });
+    if (figlio && typeof figlio.on === 'function') figlio.on('error', () => {});
+  } catch (_) { figlio = null; }
+  const ferma = () => { try { if (figlio) figlio.kill(); } catch (_) { /* già uscito */ } };
+  process.once('exit', ferma);
+  return { ferma, figlio };
+}
+
 export function exitCodeFor(reply) {
   const r = reply || {};
   if (r.ok === true && r.result === 'merged') return 0;
   if (r.ok === true && r.result === 'blocked') return 10;
-  if (r.ok === true && r.result === 'conflict') return 20;
+  // Unit rossi sul risultato della fusione (#929): come un conflitto, il server ha già instradato il riallineamento.
+  if (r.ok === true && (r.result === 'conflict' || r.result === 'unit_rossi')) return 20;
   return 1;
 }
 
@@ -322,13 +352,14 @@ const USO = [
   '  i controlli e fonde con la sua identità. Qui non ci sono opzioni.',
   '  Serve il biglietto del giro, che si rilegge da solo dal promemoria.',
   '  <ramo> dev\'essere quello su cui sta la directory: da lì si legge tutto.',
-  '  La richiesta dichiara il COMMIT: se il ramo si è mosso dopo i via libera,',
+  '  La richiesta dichiara il COMMIT: se il ramo si è mosso dopo il controllo di sicurezza,',
   '  se nella directory c\'è qualcosa fuori dai commit, o se in cima al ramo su',
   '  origin (da dove il server lo prende) non c\'è il contenuto esaminato, non parte.',
   '  Exit: 0 fuso · 10 fermato dal cancello di sicurezza (decide l’owner)',
-  '        20 conflitto · 1 uso sbagliato, ramo diverso da quello della directory,',
-  '           ramo mosso dopo i via libera, contenuto che non è quello in cima',
-  '           su origin, o rifiuto del server',
+  '  Prima di chiedere fa girare gli unit sul risultato della fusione con origin/main.',
+  '        20 conflitto o unit rossi sulla fusione · 1 uso sbagliato, ramo diverso da quello della directory,',
+  '           ramo mosso dopo il controllo di sicurezza, contenuto che non è quello in cima',
+  '           su origin, main mosso a ogni prova, o rifiuto del server',
 ].join('\n');
 
 async function main() {
@@ -395,18 +426,18 @@ async function main() {
   // contenuto? Il muro vero resta il server, che risolve la punta da GitHub;
   // questo è il controllo che si può fare qui, e che sul cammino locale
   // (`npm run finish`) c'è da sempre.
-  const statoRamo = (() => {
-    const id = findStateIdByBranch(ROOT, source);
-    return id ? readBranchState(ROOT, id) : null;
-  })();
+  const idStato = findStateIdByBranch(ROOT, source);
+  const statoRamo = idStato ? readBranchState(ROOT, idStato) : null;
   const decaduti = esitiDecaduti(statoRamo, punta);
   if (decaduti.length) {
     // I comandi del rimedio con gli attrezzi del GIRO, non con quelli che il
     // ramo si porta dietro: `scripts/…` qui dentro è la copia del ramo, che può
     // essere vecchia di giorni e non fare quello che chi legge crede.
-    console.error(absolutizeRecipe(testoEsitiDecaduti(decaduti, punta, source), TOOLS_ROOT, ROOT));
+    console.error(absolutizeRecipe(testoEsitiDecaduti(decaduti, punta, source, idStato || ''), TOOLS_ROOT, ROOT));
     process.exit(1);
   }
+  const notaVerifica = notaVerificaSuAltroCommit(statoRamo, punta);
+  if (notaVerifica) console.error(notaVerifica);
   // Astenersi si dice, e si dice PER CIASCUNO dei due: se di uno non risulta il
   // commit, quel via libera non l'ho controllato, e chi legge il registro non
   // deve credere il contrario perché l'altro tornava.
@@ -436,7 +467,25 @@ async function main() {
     console.error('[merge-gate] nota: in questa directory non c\'è nessun origin, quindi non ho potuto guardare cosa troverà chi fonde. Decide il server.');
   }
 
-  const reply = await merge(ticket, source, { sha: punta });
+  // Gli unit sul RISULTATO della fusione con main di adesso (#929): due lavori verdi da soli possono rompere main
+  // insieme. Un rosso solo sulla fusione lo dice al server, che rimanda il lavoro al riallineamento con l'elenco.
+  const battito = await tieniVivo(ticket);
+  let giro;
+  try {
+    giro = await chiediConProva({
+      root: ROOT, punta,
+      chiedi: (provaUnit) => merge(ticket, source, provaUnit ? { sha: punta, provaUnit } : { sha: punta }),
+      mainMosso: (r) => !!(r && r.ok === true && r.result === 'main_moved'),
+      scrivi: (s) => console.error(`[merge-gate] ${s}`),
+    });
+  } finally {
+    battito.ferma();
+  }
+  const reply = giro.reply;
+  if (giro.esaurito) {
+    console.error(`[merge-gate] ERROR: main si è mosso a ogni prova (${giro.tentativi} tentativi): niente fusione. Il lavoro è intatto sul ramo; rilancia questo comando.`);
+    process.exit(1);
+  }
   const code = exitCodeFor(reply);
   if (code === 0) console.log(`[merge-gate] OK: ${source} fuso su main dal server${reply.sha ? ` (${reply.sha.slice(0, 12)})` : ''}`);
   else if (code === 10) {
@@ -446,8 +495,11 @@ async function main() {
     // chi legge il registro creda che il ramo sia perduto.
     if (reply.approval) console.error('[merge-gate] il ramo aspetta il via libera dell’owner nella dashboard di gestione');
   }
+  else if (code === 20 && reply.result === 'unit_rossi') {
+    console.error('[merge-gate] UNIT ROSSI SULLA FUSIONE: niente fusione. Il server ha rimandato il lavoro al riallineamento con l\'elenco dei test rotti.');
+  }
   else if (code === 20) console.error(`[merge-gate] CONFLICT: ${reply.reason || 'serve risoluzione manuale'}`);
-  else console.error(`[merge-gate] ERROR: ${reply.reason || 'guasto'}`);
+  else console.error(testoRifiutoServer(reply.reason) || `[merge-gate] ERROR: ${reply.reason || 'guasto'}`);
   process.exit(code);
 }
 

@@ -6,6 +6,7 @@ const { BrowserWindow, session } = require('electron');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { TabManager } = require('./tabs');
+const { collegaScorciatoie } = require('./shortcuts');
 const { registerFiloProtocolForSession } = require('./protocol');
 
 const SHELL_HEIGHT = 88;
@@ -86,8 +87,34 @@ function wireWindowCommon(win, tabs) {
   // handleFullscreenEscape risponde false e l'Esc resta a chi lo usa nella barra
   // (il pannello degli scaricamenti si chiude ancora con Esc).
   win.webContents.on('before-input-event', (event, input) => {
+    // La barra laterale prima: il suo tasto, e l'Esc che la chiude prima di uscire dalla modalità.
+    if (tabs.barra && tabs.barra.tasto(input)) { event.preventDefault(); return; }
     if (input.type !== 'keyDown' || input.key !== 'Escape') return;
     if (tabs.handleFullscreenEscape(null)) event.preventDefault();
+  });
+  // Spiega, Traduci, Salva per dopo e Aiuto anche col fuoco sulla barra.
+  collegaScorciatoie(win.webContents, win);
+
+  // Indietro e avanti senza tastiera (#685). Le due strade non si sovrappongono
+  // mai — Electron manda gli app-command su Windows e Linux, lo swipe su Mac —
+  // quindi si ascoltano tutte e due senza ramo di piattaforma: una `if` su
+  // win32 qui lascerebbe scoperto uno dei due sistemi.
+  //   · tasti laterali del mouse → app-command browser-backward/forward;
+  //   · scorrimento orizzontale a due dita su Mac → swipe (l'utente lo accende
+  //     nelle impostazioni di sistema; se è spento l'evento non arriva e basta).
+  // Dove andare lo decide tabs.navigaCronologia: senza cronologia è un no-op.
+  win.on('app-command', (event, comando) => {
+    if (comando === 'browser-backward') tabs.navigaCronologia('indietro');
+    else if (comando === 'browser-forward') tabs.navigaCronologia('avanti');
+    else return;
+    // Senza questo Windows lascia agire anche il comportamento di serie.
+    try { event.preventDefault(); } catch (_) {}
+  });
+  // La direzione è quella delle dita: si spinge la pagina a destra per tornare
+  // indietro, come in ogni browser su Mac.
+  win.on('swipe', (event, direzione) => {
+    if (direzione === 'right') tabs.navigaCronologia('indietro');
+    else if (direzione === 'left') tabs.navigaCronologia('avanti');
   });
 }
 
@@ -150,6 +177,7 @@ function createIncognitoWindow() {
   // filo:// è registrato globalmente solo sulla sessione di default: i tab di
   // questa partizione non lo vedrebbero. Registriamolo qui.
   registerFiloProtocolForSession(ses);
+  try { require('./services/cookies').coverAdblock(ses); } catch (_) {}
 
   const win = new BrowserWindow({
     width: 1180,
@@ -182,16 +210,21 @@ function createIncognitoWindow() {
   wireWindowCommon(win, tabs);
 
   win.webContents.once('did-finish-load', async () => {
-    tabs.openTab('filo://newtab/'); // niente restore in incognito
+    // Niente restore in incognito. Una scheda aperta qui prima che la barra finisse di caricarsi resta davanti.
+    if (!tabs.tabs.length) tabs.openTab('filo://newtab/');
     revealWindow(win);
   });
 
   // Alla chiusura dell'ULTIMA finestra incognito, azzera l'overlay in RAM: nulla
   // di ciò che è stato scritto durante la sessione sopravvive.
   win.on('closed', () => {
+    try { require('./services/downloads').forgetScope(partition); } catch (_) {}
     const stillOpen = BrowserWindow.getAllWindows().some((w) => w !== win && w._filoIncognito);
     if (!stillOpen) {
       try { require('./shim/storage').resetIncognito(); } catch (_) {}
+      try { require('./services/ilFilo').resetIncognito(); } catch (_) {}
+      try { require('./services/cookies').resetIncognito(); } catch (_) {}
+      try { require('./services/fingerprint').resetIncognito(); } catch (_) {}
     }
   });
 

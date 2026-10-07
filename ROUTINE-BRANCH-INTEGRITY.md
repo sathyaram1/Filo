@@ -232,7 +232,7 @@ gli assert.
   macchina; una modifica parziale al dispatcher romperebbe il ciclo in volo. Il
   merge lo decide l'owner, a lavoro completo.
 - Niente voce nei patch notes: è infrastruttura interna, invisibile all'utente
-  (vedi `CLAUDE.md` § Patch notes).
+  (vedi `CLAUDE.md` § Consegna, punto 3).
 - Il report finale lo scrivi tu, minimo, secondo `CLAUDE.md` § "Tono dei report".
 
 ---
@@ -342,6 +342,6 @@ cresciuta a ~390 spec e ~1.600 casi, e sulla macchina di chi sviluppa Filo dura
 quasi sette ore con un solo worker. Dal 2026-09-15 vale **ovunque**: la suite
 intera non la lancia più nessuno, né i ruoli delle routine né le sessioni
 locali. Si lancia `npm run finish:check` (unit test più gli spec delle aree
-toccate dal ramo) più le prove del giro; la suite intera gira in GitHub, nel
-lavoro di release, ogni sei ore prima di pubblicare, e un suo rosso nuovo ferma
-la patch e diventa un feedback.
+toccate dal ramo) più le prove del giro; la suite intera gira in GitHub a ogni
+fusione su main, un suo rosso nuovo diventa un feedback, e si pubblica solo un
+commit con la suite verde.

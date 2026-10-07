@@ -38,6 +38,7 @@
       case 'cancelled': return 'Annullato';
       case 'interrupted': return 'Interrotto';
       case 'paused': return 'In pausa';
+      case 'pending': return 'In attesa di conferma';
       default: return 'In corso';
     }
   }
@@ -82,11 +83,32 @@
   // cestinato): il main se ne accorge guardando il disco e risponde
   // { ok:false, missing:true, error } con la frase da mostrare. La riga viene
   // ridisegnata subito come "non più disponibile", così l'utente non riprova.
-  async function openFile(r) {
-    const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_OPEN_FILE, id: r.id });
+  async function openFile(r, confirmed) {
+    const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_OPEN_FILE, id: r.id, confirmed: !!confirmed });
     if (!res || res.ok !== false) return;
+    // #588 — è un programma: il main non lo apre finché non torna un sì. Il
+    // popup lo chiede qui, con le parole che il main ha scritto per l'utente.
+    if (res.needsConfirm) {
+      const ok = window.SN_CONFIRM_UI
+        ? await window.SN_CONFIRM_UI.confirm({ title: res.title, text: res.text, okLabel: 'Apri comunque' })
+        : window.confirm(res.text);
+      if (ok) await openFile(r, true);
+      return;
+    }
     flash(res.error || 'Impossibile aprire il file');
     if (res.missing) reload();
+  }
+
+  // Risposta all'avviso "questo è un programma: scaricarlo?" (#588). La stessa
+  // che offre la barra in alto: chi ha chiuso l'avviso la ritrova qui.
+  async function confirmExe(r, allow) {
+    const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_CONFIRM, id: r.id, allow: !!allow });
+    items = (res && res.items) || items;
+    render();
+    // Due clic di fretta sulla stessa voce: la seconda risposta non ha più
+    // niente a cui rispondere, e dirlo è meglio che confermare due volte.
+    if (res && res.ok === false) { flash(res.error || 'Risposta non registrata'); return; }
+    flash(allow ? 'Scaricamento avviato' : 'Programma non scaricato');
   }
   async function openFolder(r) {
     const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_OPEN_FOLDER, id: r.id });
@@ -138,6 +160,26 @@
     reload();
   }
 
+  // #950 — nome sensato: la voce c'è solo se Filo sa leggere quel file e ha un modello per farlo.
+  const Rinomina = window.SN_RINOMINA_UI;
+  let nomiDisponibili = false;
+  function aggiornaDisponibilita() {
+    if (!Rinomina) return;
+    Rinomina.disponibile().then((v) => { nomiDisponibili = v; }).catch(() => {});
+  }
+  const rigaDi = (r) => Array.from(document.querySelectorAll('.dl-item')).find((x) => x.dataset.id === r.id);
+  function daiNome(r) {
+    const ancora = rigaDi(r);
+    if (!Rinomina || !ancora) return;
+    Rinomina.apri({ ancora, downloadId: r.id, nome: r.filename, suRinominato: reload, suRimesso: reload });
+  }
+  async function rimettiNome(r) {
+    const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_RIMETTI_NOME, id: r.id });
+    if (res && res.ok) flash(res.cambiato ? `Il nome di prima era preso: ora è ${res.nome}` : `Nome di prima rimesso: ${res.nome}`);
+    else flash((res && res.frase) || 'Non sono riuscito a rimettere il nome di prima');
+    reload();
+  }
+
   // ─── menu contestuale (tasto destro) — set completo di azioni ──────────────
   let openMenu = null;
   function closeCtxMenu() {
@@ -157,7 +199,10 @@
     // azione compare solo quando ha senso (niente "Apri file" su un download mai
     // completato). Invariante UX: si può sempre RIMUOVERE ciò che è in lista.
     const acts = [];
-    if (isActive(r)) {
+    if (r.state === 'pending') {
+      acts.push(['Scarica', () => confirmExe(r, true)]);
+      acts.push(['Non scaricare', () => confirmExe(r, false)]);
+    } else if (isActive(r)) {
       // canPause === false: scaricamento "a mano" (Salva immagine/video come…),
       // che non si può sospendere. Meglio non offrire l'azione che offrirne una
       // muta.
@@ -171,6 +216,10 @@
       // resta la cartella (e più sotto "Ri-scarica", che è la via per riaverlo).
       if (!r.missing) acts.push(['Apri file', () => openFile(r)]);
       acts.push(['Apri cartella', () => openFolder(r)]);
+      if (!r.missing && !r.exe && nomiDisponibili && Rinomina && Rinomina.tipoSupportato(r.filename)) {
+        acts.push([Rinomina.VOCE, () => daiNome(r)]);
+      }
+      if (!r.missing && r.nomeOriginale) acts.push(['Rimetti il nome di prima', () => rimettiNome(r)]);
     } else {
       // interrupted / cancelled: il file completo non c'è, ma la cartella e la
       // sorgente restano utili.
@@ -232,8 +281,16 @@
 
     const name = document.createElement('div');
     name.className = 'dl-name';
-    name.textContent = r.filename || 'download';
-    name.title = r.filename || '';
+    // #588 — la marca precede il nome: l'estensione sta in coda a un testo che
+    // sceglie il sito, e non è lì che l'occhio guarda.
+    if (r.exe) {
+      const tag = document.createElement('span');
+      tag.className = 'dl-tag';
+      tag.textContent = 'Programma';
+      name.appendChild(tag);
+    }
+    name.appendChild(document.createTextNode(r.filename || 'download'));
+    name.title = r.nomeOriginale ? `${r.filename || ''}\nArrivato come: ${r.nomeOriginale}` : (r.filename || '');
     row.appendChild(name);
 
     const meta = document.createElement('div');
@@ -243,6 +300,12 @@
       meta.textContent = p != null
         ? `${stateLabel(r)} · ${p}% · ${fmtBytes(r.receivedBytes)} / ${fmtBytes(r.totalBytes)}`
         : `${stateLabel(r)} · ${fmtBytes(r.receivedBytes)} scaricati`;
+    } else if (r.state === 'pending') {
+      // Da quale sito arriva è la cosa su cui si decide: sta nella riga, non
+      // solo nell'avviso che l'utente può aver già chiuso.
+      let da = r.site ? ` · da ${r.site}` : '';
+      try { const t = window.SN_ESEGUIBILI.provenienza(r.site, r.siteUncertain); da = t ? ` · ${t}` : ''; } catch (_) {}
+      meta.textContent = `${stateLabel(r)}${da} · ${formatDate(r.startedAt)}`;
     } else {
       const size = fmtBytes(r.totalBytes || r.receivedBytes);
       const label = r.missing ? 'Non più sul disco' : stateLabel(r);
@@ -280,7 +343,10 @@
       b.addEventListener('click', (e) => { e.stopPropagation(); fn(); });
       actions.appendChild(b);
     };
-    if (isActive(r)) {
+    if (r.state === 'pending') {
+      addBtn('Scarica', () => confirmExe(r, true));
+      addBtn('Non scaricare', () => confirmExe(r, false));
+    } else if (isActive(r)) {
       if (r.canPause !== false) {
         if (r.state === 'paused') addBtn('Riprendi', () => resume(r));
         else addBtn('Pausa', () => pause(r));
@@ -304,10 +370,12 @@
     if (r.state === 'completed' && !r.missing) {
       row.addEventListener('click', () => openFile(r));
     }
-    // Tasto destro = menu completo (centralità del tasto destro in Filo).
+    // Tasto destro = menu completo (centralità del tasto destro in Filo). La riga può restare in pagina a più
+    // ridisegni (SN_RIGHE_VIVE): il menu si costruisce sulla voce di ADESSO, non su quella che l'ha creata.
+    const attuale = () => items.find((x) => x.id === r.id) || r;
     row.addEventListener('contextmenu', (e) => {
       e.preventDefault();
-      openCtxMenu(e.clientX, e.clientY, r);
+      openCtxMenu(e.clientX, e.clientY, attuale());
     });
     // Tastiera: Invio/Spazio = primaria (apri se completato); Menu/Shift+F10 = menu.
     row.addEventListener('keydown', (e) => {
@@ -316,7 +384,7 @@
       } else if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
         e.preventDefault();
         const rect = row.getBoundingClientRect();
-        openCtxMenu(rect.left, rect.bottom, r);
+        openCtxMenu(rect.left, rect.bottom, attuale());
       }
     });
     return row;
@@ -326,12 +394,11 @@
     const q = ($('search').value || '').trim().toLowerCase();
     const list = $('list');
     list.setAttribute('role', 'list');
-    list.textContent = '';
 
     let filtered = items;
     if (q) {
       filtered = filtered.filter((r) => {
-        const hay = [r.filename, r.url, r.savePath].filter(Boolean).join(' ').toLowerCase();
+        const hay = [r.filename, r.nomeOriginale, r.url, r.savePath].filter(Boolean).join(' ').toLowerCase();
         return hay.includes(q);
       });
     }
@@ -348,11 +415,13 @@
         ? 'Nessuno scaricamento corrisponde alla ricerca.'
         : 'Non hai ancora scaricato nulla.';
       empty.hidden = false;
+      list.textContent = '';
       return;
     }
     $('empty').hidden = true;
 
-    for (const r of filtered) list.appendChild(renderItem(r));
+    if (window.SN_RIGHE_VIVE) window.SN_RIGHE_VIVE.riconcilia(list, filtered.map(renderItem), ':scope > .dl-actions');
+    else list.replaceChildren(...filtered.map(renderItem));
   }
 
   // ─── live: il main segnala "qualcosa è cambiato" (senza dati) → ri-leggiamo ─
@@ -366,14 +435,24 @@
     const settings = await Storage.getSettings();
     window.SN_PAGE_THEME = settings.theme;
     window.SN_PAGE_BOOTSTRAP.applyTheme(settings.theme);
+    aggiornaDisponibilita();
     await reload();
+    // Il tasto destro del pannello degli scaricamenti in alto porta qui, col riquadro aperto su quel file.
+    const daRinominare = new URLSearchParams(location.search).get('rinomina');
+    if (daRinominare) {
+      try { history.replaceState(null, '', location.pathname); } catch (_) {}
+      const r = items.find((x) => x.id === daRinominare);
+      if (r) daiNome(r);
+    }
   }
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
     $('search').addEventListener('input', render);
     $('clear').addEventListener('click', async () => {
-      const hasTerminal = items.some((r) => !isActive(r));
+      // Una voce in attesa di conferma NON è conclusa: "Svuota" non deve
+      // promettere di toglierla (il main la tiene, e giustamente) (#588).
+      const hasTerminal = items.some((r) => !isActive(r) && r.state !== 'pending');
       if (!hasTerminal) { flash('Nessuno scaricamento concluso da rimuovere'); return; }
       const text = 'Rimuovere dall’elenco tutti gli scaricamenti conclusi? Gli scaricamenti in corso restano.';
       const ok = window.SN_CONFIRM_UI
@@ -390,15 +469,18 @@
     // cartella svuotata da fuori, e senza rilettura le voci resterebbero
     // "aperibili" pur non avendo più un file dietro.
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) scheduleReload();
+      if (!document.hidden) { scheduleReload(); aggiornaDisponibilita(); }
     });
-    window.addEventListener('focus', scheduleReload);
+    window.addEventListener('focus', () => { scheduleReload(); aggiornaDisponibilita(); });
 
     // Aggiornamenti live: il main pusha un segnale contentless quando parte/
     // avanza/finisce uno scaricamento. Ri-leggiamo la lista dal canale interno.
     if (chrome.runtime.onMessage && chrome.runtime.onMessage.addListener) {
       chrome.runtime.onMessage.addListener((msg) => {
         if (msg && msg.type === MSG.DOWNLOADS_UPDATED) scheduleReload();
+        // Il ritorno sulla scheda: in una scheda di Filo `visibilitychange`
+        // non arriva, lo annuncia il main.
+        if (msg && msg.type === MSG.TAB_IN_VISTA && msg.inVista) { scheduleReload(); aggiornaDisponibilita(); }
       });
     }
   });

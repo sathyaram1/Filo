@@ -34,7 +34,7 @@
   let runShellCommand = () => {};
 
   // Vero se l'account loggato è l'owner (admin): abilita i comandi /users e
-  // /gift in /help. Il gate forte resta nel main (auth.isAdmin) + Firestore rules.
+  // /gift in /help. Il gate forte resta nel main (auth.isAdmin) e sul server.
   let isOwner = false;
 
   const SLASH_COMMANDS = {
@@ -54,7 +54,9 @@
     // Filo in chat, e quella strada non cambia.
     '/feedback': (text, chat) => {
       if (!isOwner) {
-        showFiloLine('I feedback li vede chi li gestisce. Per mandarne uno: tasto destro → «Invia feedback», oppure scrivimi cosa non va e lo scrivo io.', chat);
+        // #986 — chi cerca le sue segnalazioni ci arriva, non legge solo dove sono.
+        showFiloLine('I feedback li vede chi li gestisce: ti apro quelli che hai mandato tu, in Bacheca. Per mandarne uno: tasto destro → «Invia feedback», oppure scrivimi cosa non va e lo scrivo io.', chat);
+        send({ type: MSG.OPEN_URL, url: 'filo://board/board.html#segnalazioni' });
         return;
       }
       send({ type: MSG.OPEN_URL, url: 'filo://feedback/feedback.html' });
@@ -64,7 +66,9 @@
     '/pulizia': (text, chat) => { runTabCleanup(chat); },
     '/riordina': (text, chat) => { runTabReorder(chat); },
     '/set': (text, chat) => { handleSetCommand(text, chat); },
-    '/users': (text, chat) => { handleUsersCommand(chat); },
+    // #664 — l'invito anche dalla chat: col codice (o il link, o la riga del messaggio) lo riscatta, da solo apre Crediti.
+    '/invito': (text, chat) => { handleInviteCommand(text, chat); },
+    '/users': (text, chat) => { handleUsersCommand(text, chat); },
     '/gift': (text, chat) => { handleGiftCommand(text, chat); },
     '/help': (text, chat) => {
       if (document.body.dataset.state !== 'thread') goThread();
@@ -81,46 +85,215 @@
         '/pulisci, /pulizia — riordina e archivia le schede non più utili',
         '/riordina — riordina le schede per colore (nessuna viene chiusa)',
         '/set timer 5:00 — avvia un timer (anche /set timer 8 = 8 minuti)',
+        '/invito CODICE — riscatta un invito (va bene anche il link); da solo apre i Crediti',
         '/help — lista comandi',
         '/google.com — apri un sito',
       ];
       if (isOwner) {
         lines.push(
           '/feedback — apri la posta delle segnalazioni (proprietario)',
-          '/users — elenca gli utenti registrati (proprietario)',
-          '/gift NUMERO EMAIL — regala crediti a un utente (proprietario)',
+          '/users — elenca chi ha un portafoglio: pseudonimo, saldo, chi l\'ha invitato (proprietario)',
+          '/users INIZIO — cerca una persona dall\'inizio dello pseudonimo (proprietario)',
+          '/gift NUMERO PSEUDONIMO — regala crediti a una persona, basta l\'inizio dello pseudonimo (proprietario)',
         );
       }
       showFiloLine(lines.join('\n'), chat);
     },
   };
 
-  // "/users": elenca le email degli utenti registrati. Riservato al proprietario
-  // (il main rifiuta i non-admin con un messaggio chiaro).
-  async function handleUsersCommand(chat) {
-    showFiloLine('Recupero gli utenti registrati…', chat);
-    const r = await send({ type: MSG.OWNER_LIST_USERS });
-    if (!r || r.ok === false) { showFiloLine(r?.error || 'Non sono riuscito a recuperare gli utenti.', chat); return; }
-    const users = Array.isArray(r.users) ? r.users : [];
-    if (!users.length) { showFiloLine('Nessun utente registrato.', chat); return; }
-    const lines = users.map((u) => `• ${u.email}${u.name ? ` (${u.name})` : ''} — ${u.balance} crediti`);
-    showFiloLine(`Utenti registrati (${users.length}):\n${lines.join('\n')}`, chat);
+  // /users e /gift parlano col portafoglio (#895): una persona esiste per
+  // pseudonimo e l'email non arriva all'owner. Vista e regalo sono quelli della
+  // pagina «Inviti e utenti»: un regalo scritto altrove non arriva a nessuno.
+  const USERS_PAGINA = 50;
+  const USO_GIFT = 'Uso: /gift NUMERO PSEUDONIMO. Basta l’inizio dello pseudonimo, se è di una persona sola. '
+    + 'Gli pseudonimi li elenca /users.';
+
+  function crediti(n) { return global.SN_WALLET.formatCredits(n); }
+
+  // Uno pseudonimo si incolla come capita: fra virgolette, con la virgola in coda.
+  function pezziScritti(testo) {
+    const pezzi = String(testo || '').split(/[\s,;]+/)
+      .map((p) => p.replace(/^[«"'`<([]+|[»"'`>)\].:!?]+$/g, ''))
+      .filter(Boolean);
+    return [...new Set(pezzi)];
   }
 
-  // "/gift NUMERO EMAIL": regala crediti a un utente. Riservato al proprietario.
-  async function handleGiftCommand(text, chat) {
-    const m = /^\/gift\s+(\S+)\s+(\S+)\s*$/i.exec(String(text || '').trim());
-    if (!m) { showFiloLine('Uso: /gift NUMERO EMAIL — es. /gift 2000 mario@esempio.com', chat); return; }
-    const amount = Number(m[1]);
-    const email = m[2];
-    if (!Number.isInteger(amount) || amount <= 0) {
-      showFiloLine(`"${m[1]}" non è un numero di crediti valido. Usa un intero positivo.`, chat);
+  // Quello che l'owner ha scritto torna in chat per intero solo se ci sta in una riga.
+  function citato(t) { return t.length > 40 ? `${t.slice(0, 40)}…` : t; }
+
+  // «2.000» scritto all'italiana sono duemila crediti, non due.
+  function numeroCrediti(raw) {
+    const t = String(raw || '').trim();
+    if (/^\d+$/.test(t)) return Number(t);
+    if (/^\d{1,3}([.'’]\d{3})+$/.test(t)) return Number(t.replace(/[.'’]/g, ''));
+    return NaN;
+  }
+
+  // Lo pseudonimo intero vince; poi chi comincia così, e le maiuscole contano
+  // solo se senza di loro non si trova nessuno.
+  function chiComincia(utenti, inizio) {
+    const esatti = utenti.filter((u) => u.pseudonym === inizio);
+    if (esatti.length === 1) return esatti;
+    const stessi = utenti.filter((u) => u.pseudonym.startsWith(inizio));
+    if (stessi.length) return stessi;
+    const basso = inizio.toLowerCase();
+    return utenti.filter((u) => u.pseudonym.toLowerCase().startsWith(basso));
+  }
+
+  // `certo`: la richiesta non è partita, o il server l'ha respinta. Altrimenti
+  // un regalo può essere arrivato anche senza risposta.
+  function fraseGuasto(raw) {
+    const t = String(raw || '');
+    if (/not_admin|riservat/i.test(t)) return { certo: true, frase: 'comando riservato al proprietario' };
+    if (/not_signed_in|sessione scaduta/i.test(t)) return { certo: true, frase: 'la sessione è scaduta, rifai l’accesso col tuo account' };
+    if (/PERMISSION_DENIED|\b40[13]\b/i.test(t)) return { certo: true, frase: 'il server non ha accettato la richiesta, rientra col tuo account e riprova' };
+    return { certo: false, frase: 'il server dei crediti non risponde adesso' };
+  }
+  function maiuscola(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  // Dalla più nuova, come nella pagina «Inviti e utenti».
+  async function leggiVista() {
+    let r = null;
+    try { r = await send({ type: MSG.WALLET_OWNER_OVERVIEW }); } catch (_) { r = null; }
+    if (!r || r.ok === false || !r.overview) return { errore: `${maiuscola(fraseGuasto(r && r.error).frase)}.` };
+    const utenti = (Array.isArray(r.overview.users) ? r.overview.users : [])
+      .filter((u) => u && typeof u.pseudonym === 'string' && u.pseudonym)
+      .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+    return { utenti };
+  }
+
+  function rigaPersona(u) {
+    const b = u.balance || {};
+    const saldo = b.credits == null ? 'saldo non letto' : `${crediti(b.credits)} crediti`;
+    const chi = u.invitedBy === 'owner' ? 'te' : String(u.invitedBy || '');
+    return `• ${u.pseudonym} — ${saldo}${chi ? `, invitata da ${chi}` : ''}`;
+  }
+
+  // «/users altri» sfoglia la vista letta all'ultimo «/users», senza rileggerla:
+  // due letture diverse sotto lo stesso conto salterebbero o ripeterebbero righe.
+  let usersElenco = [];
+  let usersMostrati = 0;
+  let usersCerca = '';
+  let usersGiro = 0;
+
+  function mostraPaginaUtenti(chat) {
+    const primo = usersMostrati + 1;
+    const pagina = usersElenco.slice(usersMostrati, usersMostrati + USERS_PAGINA);
+    usersMostrati += pagina.length;
+    const totale = usersElenco.length;
+    const testa = usersCerca && totale === 1 ? 'Trovata:'
+      : `${usersCerca ? `Persone con uno pseudonimo che comincia per «${citato(usersCerca)}»` : 'Persone con un portafoglio'} ${primo}-${usersMostrati} di ${totale}:`;
+    const coda = usersMostrati < totale
+      ? `\n\nScrivi /users altri per le prossime${usersCerca ? '' : ', o /users e l’inizio di uno pseudonimo per cercare una persona'}.`
+      : '';
+    showFiloLine(`${testa}\n${pagina.map(rigaPersona).join('\n')}${coda}`, chat);
+  }
+
+  async function handleUsersCommand(text, chat) {
+    const dopo = String(text || '').trim().replace(/^\/users\b/i, '').trim();
+    if (/^(altri|ancora|avanti)$/i.test(dopo)) {
+      if (usersMostrati >= usersElenco.length) {
+        showFiloLine('Non ho altre persone da mostrare. Scrivi /users per ripartire dall’inizio.', chat);
+        return;
+      }
+      mostraPaginaUtenti(chat);
       return;
     }
-    showFiloLine(`Regalo ${amount} crediti a ${email}…`, chat);
-    const r = await send({ type: MSG.OWNER_GIFT_CREDITS, amount, email });
-    if (!r || r.ok === false) { showFiloLine(r?.error || 'Operazione non riuscita.', chat); return; }
-    showFiloLine(`✓ Regalati ${r.amount} crediti a ${r.email}. Nuovo saldo del destinatario: ${r.balance}.`, chat);
+    if (dopo.includes('@')) {
+      showFiloLine('Le persone si cercano per pseudonimo, non per email. Scrivi /users e l’inizio di uno pseudonimo, o /users per vederle tutte.', chat);
+      return;
+    }
+    const pezzi = /^tutti$/i.test(dopo) ? [] : pezziScritti(dopo);
+    if (pezzi.length > 1) {
+      showFiloLine(`Hai scritto ${pezzi.length} pseudonimi (${pezzi.join(', ')}). Cercane uno per volta.`, chat);
+      return;
+    }
+    const cerca = pezzi[0] || '';
+    usersElenco = [];
+    usersMostrati = 0;
+    usersCerca = cerca;
+    const giro = ++usersGiro;
+    showFiloLine(cerca ? `Cerco chi ha uno pseudonimo che comincia per «${citato(cerca)}»…` : 'Recupero le persone con un portafoglio…', chat);
+    const vista = await leggiVista();
+    // Un «/users» dato mentre questa risposta viaggiava vale al suo posto.
+    if (giro !== usersGiro) return;
+    if (vista.errore) { showFiloLine(vista.errore, chat); return; }
+    usersElenco = cerca ? chiComincia(vista.utenti, cerca) : vista.utenti;
+    if (!usersElenco.length) {
+      showFiloLine(cerca
+        ? `Non trovo uno pseudonimo che comincia per «${citato(cerca)}». Con /users le vedi tutte.`
+        : 'Nessuna persona ha ancora un portafoglio.', chat);
+      return;
+    }
+    mostraPaginaUtenti(chat);
+  }
+
+  // "/gift NUMERO PSEUDONIMO": regala crediti a una persona. Riservato al proprietario.
+  async function handleGiftCommand(text, chat) {
+    const m = /^\/gift\s+(\S+)\s+(.+)$/i.exec(String(text || '').trim());
+    if (!m) { showFiloLine(USO_GIFT, chat); return; }
+    let [, quanti, chi] = m;
+    // L'ordine rovesciato («/gift abcd 500») si capisce lo stesso.
+    if (Number.isNaN(numeroCrediti(quanti)) && pezziScritti(chi).length === 1 && !Number.isNaN(numeroCrediti(chi.trim()))) {
+      [quanti, chi] = [chi.trim(), quanti];
+    }
+    const amount = numeroCrediti(quanti);
+    if (!Number.isSafeInteger(amount) || amount <= 0) {
+      showFiloLine(`"${quanti}" non è un numero di crediti valido. Usa un intero positivo.`, chat);
+      return;
+    }
+    if (chi.includes('@')) {
+      showFiloLine(`I regali ora vanno per pseudonimo, non per email, quindi non ho regalato niente. La persona trova il suo nella pagina Crediti, alla voce «Il tuo pseudonimo». Con quello scrivi /gift ${amount} PSEUDONIMO.`, chat);
+      return;
+    }
+    const pezzi = pezziScritti(chi);
+    if (pezzi.length !== 1) {
+      showFiloLine(pezzi.length > 1
+        ? `Hai scritto ${pezzi.length} pseudonimi (${pezzi.join(', ')}), quindi non ho regalato niente. Scrivi /gift una volta per ciascuno.`
+        : USO_GIFT, chat);
+      return;
+    }
+    const inizio = pezzi[0];
+    showFiloLine(`Regalo ${crediti(amount)} crediti a «${citato(inizio)}»…`, chat);
+    const vista = await leggiVista();
+    if (vista.errore) { showFiloLine(vista.errore, chat); return; }
+    const trovati = chiComincia(vista.utenti, inizio);
+    if (!trovati.length) {
+      showFiloLine(`Non trovo uno pseudonimo che comincia per «${citato(inizio)}», quindi non ho regalato niente. Con /users le vedi tutte.`, chat);
+      return;
+    }
+    if (trovati.length > 1) {
+      const nomi = trovati.slice(0, 10).map((u) => u.pseudonym).join(', ');
+      const resto = trovati.length > 10 ? ` e altri ${trovati.length - 10}` : '';
+      showFiloLine(`«${citato(inizio)}» è l’inizio di ${trovati.length} pseudonimi (${nomi}${resto}), quindi non ho regalato niente. Scrivi qualche carattere in più.`, chat);
+      return;
+    }
+    const pseudonym = trovati[0].pseudonym;
+    let r = null;
+    try { r = await send({ type: MSG.WALLET_OWNER_GRANT, pseudonym, credits: amount, why: 'owner' }); } catch (_) { r = null; }
+    const res = r && r.ok !== false ? r.result : null;
+    if (!res || !res.ok) {
+      const rifiuto = {
+        no_wallet: 'nessuna persona con questo pseudonimo',
+        global_cap: 'si supererebbe il tetto di tutti i regali, alzalo nella pagina «Inviti e utenti» o carica OpenRouter',
+        missing_exchange_rate: 'manca il cambio del giorno',
+        provider_error: 'OpenRouter non ha accettato il tetto nuovo, niente è cambiato',
+      }[res && res.reason];
+      const guasto = fraseGuasto(r && r.error);
+      if (rifiuto || (res && res.reason) || guasto.certo) {
+        showFiloLine(`Regalo non fatto: ${rifiuto || (res && res.reason) || guasto.frase}.`, chat);
+      } else {
+        showFiloLine(`Non so se il regalo è arrivato, ${guasto.frase}. Prima di riprovare controlla il saldo con /users ${pseudonym}.`, chat);
+      }
+      return;
+    }
+    const dati = Number(res.credits) > 0 ? Number(res.credits) : amount;
+    const dopo = await leggiVista();
+    const lei = (dopo.utenti || []).find((u) => u.pseudonym === pseudonym);
+    const saldo = lei && lei.balance && lei.balance.credits != null
+      ? `Nuovo saldo: ${crediti(lei.balance.credits)} crediti.`
+      : `Il saldo nuovo non sono riuscito a leggerlo, lo vedi con /users ${pseudonym}.`;
+    showFiloLine(`✓ Regalati ${crediti(dati)} crediti a ${pseudonym}. ${saldo}`, chat);
   }
 
   // Mostra una riga di risposta da Filo nel thread (usata dai comandi che
@@ -136,6 +309,14 @@
   // `chat` è la targa presa quando l'utente ha dato il comando: una riga che
   // arriva quando quella conversazione qui non c'è più si archivia lì dentro e
   // basta, senza riportare a schermo una chat che l'utente aveva chiuso.
+  async function handleInviteCommand(text, chat) {
+    const resto = String(text || '').trim().replace(/^\/invito/i, '').trim();
+    if (!resto) { send({ type: MSG.OPEN_URL, url: 'filo://credits/credits.html' }); return; }
+    let r = null;
+    try { r = await send({ type: MSG.WALLET_REDEEM, code: resto }); } catch (_) { r = null; }
+    showFiloLine((r && r.message) || 'Non ci sono riuscito: riprova.', chat);
+  }
+
   function showFiloLine(text, chat) {
     try { archiviaRiga(text, 'filo', chat); } catch (_) {}
     if (!inChatAperta(chat)) return;
@@ -374,7 +555,7 @@
       // L'utente ha deciso: da qui in poi quell'host non viene più messo in
       // dubbio (niente rosso, niente avviso al prossimo invio).
       siteResolveCache.set(host, true);
-      send({ type: MSG.OPEN_URL, url: siteUrlOf(text) });
+      send({ type: MSG.OPEN_URL, url: siteUrlOf(text), parole: [text] });
       if (inputEl.value.trim() === text) { inputEl.value = ''; autoGrowInput(); }
       updateInputClass();
     });
@@ -436,7 +617,7 @@
     //    indirizzi — SN_URL_NAV.normalizeUrl (#398) — così "/localhost:3000" o
     //    "/192.168.1.1" si aprono davvero invece di partire su un https vuoto.
     if (isSiteToken(text)) {
-      send({ type: MSG.OPEN_URL, url: siteUrlOf(text) });
+      send({ type: MSG.OPEN_URL, url: siteUrlOf(text), parole: [text] });
       inputEl.value = '';
       autoGrowInput();
       updateInputClass();
@@ -456,6 +637,11 @@
   }
 
   function init(deps) {
+    // Una home appena aperta riparte dalla prima persona: la vista sfogliata
+    // da «/users altri» è di quella sessione di pagina, non della precedente.
+    usersElenco = [];
+    usersMostrati = 0;
+    usersCerca = '';
     send = deps.send;
     bubblesEl = deps.bubblesEl;
     inputEl = deps.inputEl;

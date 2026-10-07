@@ -27,6 +27,35 @@
     return `${q} id<=${identityCode(identity)}`.trim();
   }
 
+  // Messaggio scritto TUTTO in sintassi Scryfall: la query è già la richiesta esatta, e il giudice dei risultati
+  // (§4.1) non ha niente da aggiungere. Basta una parola libera e la richiesta torna «a parole» (#382).
+  const SYNTAX_TERM = /^-?[a-z]+(?::|<=|>=|!=|<|>|=)\S+$/i;
+  function isPureSyntax(text) {
+    const tokens = String(text || '').replace(/"[^"]*"/g, 'Q').replace(/[()]/g, ' ').split(/\s+/).filter(Boolean);
+    const terms = tokens.filter((t) => !/^(or|and)$/i.test(t));
+    return terms.length > 0 && terms.every((t) => SYNTAX_TERM.test(t));
+  }
+
+  // Titolo della lista che il modello scrive per la riga di sintesi (#788): una riga di italiano, mai la query.
+  // Con anche un solo termine di sintassi Scryfall dentro non dice niente a chi legge: vale il ripiego.
+  function listTitle(raw) {
+    const t = String(typeof raw === 'string' ? raw : '').replace(/\s+/g, ' ').trim()
+      .replace(/^["'«“]+|["'»”]+$/g, '').trim();
+    if (!t) return '';
+    const tokens = t.replace(/[()"«»“”,;.!?]/g, ' ').split(/\s+/).filter(Boolean);
+    if (tokens.some((x) => SYNTAX_TERM.test(x))) return '';
+    return t.length > 200 ? `${t.slice(0, 199)}…` : t;
+  }
+
+  // Ordine della lista chiesto a parole (#788): il campo del modello, o l'order: che ha messo nella query.
+  const SORT_OF = { cmc: 'cmc', mana: 'cmc', name: 'name', nome: 'name', price: 'price', prezzo: 'price', eur: 'price', usd: 'price', tix: 'price' };
+  function listSort(raw, query) {
+    const own = SORT_OF[String(typeof raw === 'string' ? raw : '').trim().toLowerCase()];
+    if (own) return own;
+    const m = /(?:^|[\s(])order[:=](\w+)/i.exec(String(query || ''));
+    return (m && SORT_OF[m[1].toLowerCase()]) || '';
+  }
+
   // Una carta è DENTRO l'identità di colore del commander se OGNI colore della
   // sua color identity è tra i colori del commander (regola Commander §8.4, la
   // stessa del check di legalità). Le incolori (identity vuota) sono sempre
@@ -95,6 +124,10 @@
       // stringa (vuota = carta senza testo): `undefined` marca le entry di
       // cache vecchio schema da rifetchare.
       oracleText: String(oracleText || ''),
+      // Forza e costituzione ('' se non è una creatura): il giudice della ricerca (§4.1) le deve vedere per
+      // criteri come «creature con forza 4 o più».
+      power: String(api.power != null ? api.power : (front.power != null ? front.power : '')),
+      toughness: String(api.toughness != null ? api.toughness : (front.toughness != null ? front.toughness : '')),
       legalCommander: !!(api.legalities && api.legalities.commander === 'legal'),
       scryfallUri: String(api.scryfall_uri || ''),
     };
@@ -140,8 +173,8 @@
 
   function parseAgentReply(text) {
     const none = {
-      reply: '', query: '', filter: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '', tagWith: [],
-      import: [], commanderName: '',
+      reply: '', query: '', filter: '', title: '', sort: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '',
+      tagWith: [], import: [], commanderName: '', replaceCommander: false, clearChat: false,
     };
     const raw = String(text || '').trim();
     if (!raw) return none;
@@ -174,6 +207,8 @@
           // Criterio del filtro semantico (§4.1): quando presente, il sistema
           // usa un LLM economico per tenere solo le carte che lo rispettano.
           filter: typeof o.filter === 'string' ? o.filter.trim() : '',
+          title: listTitle(o.title),
+          sort: listSort(o.sort, o.query),
           cards: Array.isArray(o.cards) ? o.cards.map(String).filter(Boolean) : [],
           hasBudget,
           budget,
@@ -196,6 +231,10 @@
               })).filter((it) => it.name)
             : [],
           commanderName: typeof o.commander === 'string' ? o.commander.trim() : '',
+          // Sostituire un commander già impostato vuole questo segnale esplicito del modello: una menzione non basta.
+          replaceCommander: o.replaceCommander === true && typeof o.commander === 'string' && !!o.commander.trim(),
+          // Svuotare la chat chiesto a parole: la pagina chiede conferma, qui solo l'intenzione.
+          clearChat: o.clearChat === true,
         };
       } catch (_) { /* prova il prossimo candidato */ }
     }
@@ -225,7 +264,7 @@
   }
 
   global.SN_SCRYFALL_Q = {
-    WUBRG, identityCode, buildSearchQuery, withinIdentity, parseManaCost, simplifyCard, isFresh,
+    WUBRG, identityCode, buildSearchQuery, isPureSyntax, listTitle, listSort, withinIdentity, parseManaCost, simplifyCard, isFresh,
     parseAgentReply, proseSegments,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

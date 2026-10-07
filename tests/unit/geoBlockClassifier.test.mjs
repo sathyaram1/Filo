@@ -274,3 +274,129 @@ test('classify: accetta result come stringa o come { text }', async () => {
   const asObj = await C.classify({ statusCode: 403, text: 'x', host: 'b.com', url: 'https://b.com/x' }, { complete: async () => ({ text: 'login_wall' }) });
   assert.equal(asObj.class, 'login_wall');
 });
+
+// #591 — la scheda campiona la pagina due volte: il secondo campione, col primo ancora dal modello, aspetta quello.
+test('classify: due campioni della stessa pagina col primo in viaggio fanno una chiamata sola', async () => {
+  let called = 0;
+  const complete = async () => { called++; await new Promise((r) => setTimeout(r, 30)); return 'geo_block'; };
+  const cache = C.createCache({ ttlMs: 1e9 });
+  const input = { statusCode: 403, text: 'Access denied', host: 'ex-volo.com', url: 'https://ex-volo.com/v/1' };
+  const [a, b] = await Promise.all([C.classify(input, { complete, cache }), C.classify(input, { complete, cache })]);
+  assert.equal(called, 1);
+  assert.equal(a.class, 'geo_block');
+  assert.equal(b.class, 'geo_block');
+  const c = await C.classify(input, { complete, cache });
+  assert.equal(c.cached, true);
+});
+
+// #591 — una pagina della rete di casa non è mai bloccata per paese: il suo testo non va al modello.
+test('classify: le pagine della rete di casa non vanno al modello', async () => {
+  let called = 0;
+  const complete = async () => { called++; return 'bot_block'; };
+  // Per nome conta dove ha risposto la pagina: il router intercetta tplinkwifi.net, fritz.box risponde da casa.
+  require(join(__dirname, '..', '..', 'src', 'shared', 'urlNav.js'));
+  globalThis.SN_URL_NAV.noteHostAddress('tplinkwifi.net', '192.168.0.1');
+  globalThis.SN_URL_NAV.noteHostAddress('fritz.box', '192.168.178.1');
+  const casa = ['192.168.1.1', '10.0.0.2', 'nas.local', 'localhost', 'homeassistant', 'speedport.ip', 'tplinkwifi.net', 'fritz.box'];
+  for (const host of casa) {
+    const r = await C.classify({ statusCode: 403, text: 'Accesso negato', title: 'admin@casa.it', host, url: `http://${host}/login` }, { complete });
+    assert.equal(r.skipped, true, host);
+  }
+  assert.equal(called, 0);
+  // .box è un dominio pubblico vero: un sito che risponde da internet resta un sito.
+  globalThis.SN_URL_NAV.noteHostAddress('negozio.box', '203.0.113.7');
+  await C.classify({ statusCode: 403, text: 'Accesso negato', title: 'x', host: 'negozio.box', url: 'https://negozio.box/' }, { complete });
+  assert.equal(called, 1);
+});
+
+// #591 — in una finestra in incognito il testo della pagina non parte da solo verso il modello.
+test('in incognito la scheda non chiede al modello del blocco geografico', async () => {
+  const { geoBlockMethods } = require(join(__dirname, '..', '..', 'src', 'main', 'tabs', 'tabGeoBlock.js'));
+  const prima = globalThis.SN_GEO_CLASSIFY;
+  let chiesto = 0;
+  globalThis.SN_GEO_CLASSIFY = async () => { chiesto++; return { skipped: true }; };
+  try {
+    const tab = { title: 'Forbidden', _lastStatus: 403, view: null };
+    geoBlockMethods._geoLevel2Check.call({ incognito: true, proxyAvailable: async () => true }, tab, 'https://video.esempio.it/v/1', 'Access denied');
+    await new Promise((r) => setTimeout(r, 10));
+    assert.equal(chiesto, 0);
+    geoBlockMethods._geoLevel2Check.call({ incognito: false, proxyAvailable: async () => true }, tab, 'https://video.esempio.it/v/1', 'Access denied');
+    await new Promise((r) => setTimeout(r, 10));
+    assert.equal(chiesto, 1, 'caso di riscontro: fuori dall\'incognito il livello 2 parte');
+  } finally { globalThis.SN_GEO_CLASSIFY = prima; }
+});
+
+// Lo stesso conto del controllo dei siti pericolosi (#591): per proprietario dell'indirizzo, qualche chiamata all'ora.
+test('classify: percorsi, sottodomini e indirizzi sempre nuovi dello stesso proprietario fanno qualche chiamata, un altro sito ha le sue', async () => {
+  const SB = require(join(__dirname, '..', '..', 'src', 'main', 'services', 'safebrowse', 'index.js'));
+  const cache = C.createCache();
+  let chiamate = 0;
+  const complete = async () => { chiamate++; return 'errore_generico'; };
+  const vuota = (host, url) => C.classify({ title: '', text: '', statusCode: 200, host, url }, { complete, cache });
+  for (let i = 0; i < 20; i++) await vuota('ostile.esempio-geo.com', `https://ostile.esempio-geo.com/pagina-${i}`);
+  for (let i = 0; i < 20; i++) await vuota(`s${i}.esempio-geo.com`, `https://s${i}.esempio-geo.com/`);
+  assert.equal(chiamate, SB.DEEP_BUDGET);
+  for (let i = 0; i < 20; i++) await vuota(`2001:db8:9:${i}::1`, `http://[2001:db8:9:${i}::1]/`);
+  for (let i = 0; i < 20; i++) await vuota('storage.googleapis.com', `https://storage.googleapis.com/secchio-geo/f-${i}.html`);
+  assert.equal(chiamate, 3 * SB.DEEP_BUDGET);
+  const r = await vuota('ostile.esempio-geo.com', 'https://ostile.esempio-geo.com/ancora');
+  assert.equal(r.skipped, true, 'oltre il conto non si chiama e la scheda non fa niente');
+  await vuota('video.altro-sito.it', 'https://video.altro-sito.it/v/1');
+  assert.equal(chiamate, 3 * SB.DEEP_BUDGET + 1, 'un altro sito non paga per quello ostile');
+});
+
+// Il conto va all'indirizzo navigato (#591): una pagina su un secchio che si riscrive l'indirizzo con secchi inventati
+// resterebbe altrimenti un proprietario nuovo a ogni riscrittura, e il modello senza tetto.
+const secchioInventato = (i) => 'finto' + String.fromCharCode(97 + (i % 26)) + String.fromCharCode(97 + (Math.floor(i / 26) % 26));
+
+test('classify: una pagina che si riscrive l\'indirizzo conta su quello da cui è arrivata', async () => {
+  const SB = require(join(__dirname, '..', '..', 'src', 'main', 'services', 'safebrowse', 'index.js'));
+  const cache = C.createCache();
+  let chiamate = 0;
+  const complete = async () => { chiamate++; return 'errore_generico'; };
+  const arrivata = 'https://storage.googleapis.com/secchio-ostile/vuota.html';
+  const vuota = (url, budgetUrl) => C.classify({ title: '', text: '', statusCode: 200, host: new URL(url).hostname, url, budgetUrl }, { complete, cache });
+  for (let i = 0; i < 20; i++) await vuota(`https://storage.googleapis.com/${secchioInventato(i)}/vuota.html`, arrivata);
+  assert.equal(chiamate, SB.DEEP_BUDGET);
+  await vuota('https://storage.googleapis.com/negozio-vero/vuota.html', 'https://storage.googleapis.com/negozio-vero/vuota.html');
+  assert.equal(chiamate, SB.DEEP_BUDGET + 1, 'il secchio navigato davvero da un altro ha il suo conto');
+  await vuota('https://altro.esempio-geo.com/vuota', arrivata);
+  assert.equal(chiamate, SB.DEEP_BUDGET + 2, 'un indirizzo di un\'altra origine non eredita il conto');
+});
+
+test('nella scheda: una pagina vuota su un secchio che si riscrive l\'indirizzo e si ricarica resta dentro il tetto', async () => {
+  const SB = require(join(__dirname, '..', '..', 'src', 'main', 'services', 'safebrowse', 'index.js'));
+  const { installSafebrowse } = require(join(__dirname, '..', '..', 'src', 'main', 'tabs', 'tabSafebrowse.js'));
+  const { installGeoBlock } = require(join(__dirname, '..', '..', 'src', 'main', 'tabs', 'tabGeoBlock.js'));
+  class Schede {}
+  installSafebrowse(Schede);
+  installGeoBlock(Schede);
+  const schede = new Schede();
+  schede.proxyAvailable = async () => true; // il livello 2 parte solo con un fornitore (#771)
+  const prima = globalThis.SN_GEO_CLASSIFY;
+  const cache = C.createCache();
+  let chiamate = 0;
+  globalThis.SN_GEO_CLASSIFY = (input) => C.classify(input, { complete: async () => { chiamate++; return 'errore_generico'; }, cache });
+  let adesso = '';
+  const wc = { getURL: () => adesso, isDestroyed: () => false, send() {}, executeJavaScript: async () => '\n' };
+  const tab = { id: 1, title: '', _lastStatus: 200, view: { webContents: wc } };
+  schede.tabs = [tab];
+  const campione = async () => { schede._geoTextCheck(tab); await new Promise((r) => setTimeout(r, 5)); };
+  try {
+    for (let giro = 0; giro < 10; giro++) {
+      adesso = `https://s3.amazonaws.com/secchio-ostile/vuota.html?n=${giro}`;
+      schede._sbOnNavigate(tab, adesso);
+      for (let k = 0; k < 2; k++) {
+        adesso = `https://s3.amazonaws.com/${secchioInventato(giro * 2 + k)}/vuota.html`;
+        await campione();
+      }
+    }
+    assert.ok(chiamate >= 1, 'la pagina ha il suo riconoscimento');
+    assert.ok(chiamate <= SB.DEEP_BUDGET, `chiamate: ${chiamate}`);
+    const finoA = chiamate;
+    adesso = 'https://s3.amazonaws.com/negozio-vero/vuota.html';
+    schede._sbOnNavigate(tab, adesso);
+    await campione();
+    assert.equal(chiamate, finoA + 1, 'caso di riscontro: un secchio navigato davvero ha il suo conto');
+  } finally { globalThis.SN_GEO_CLASSIFY = prima; }
+});

@@ -24,6 +24,8 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 import { pinnedRepoRoot } from './tools-pin.mjs';
+// Chi prende le credenziali di Firestore prende anche il freno sulle scansioni.
+import './freno-letture.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // DUE radici, come in dispatch (lib/tools-pin.mjs): la configurazione si legge

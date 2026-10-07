@@ -5,7 +5,7 @@
   'use strict';
 
   const { MSG, PORTS } = global.SN_MSG;
-  const { PROMPTS, ACTIONS } = global.SN_CONST;
+  const { PROMPTS, ACTIONS, spiegazioneDaMostrare } = global.SN_CONST;
   const I18n = global.SN_I18N;
 
   // Stack di popup aperti. L'ultimo è il topmost.
@@ -16,205 +16,80 @@
   const Z_STEP = 1;
 
   // ----------------------------------------------------------------
-  // Calcolatrice locale: valuta espressioni matematiche client-side senza
-  // chiamare l'LLM. Più affidabile e gratis. Parser ricorsivo discendente.
-  // Grammatica:
-  //   expr   = term  (('+'|'-') term)*
-  //   term   = power (('*'|'/'|'%') power)*
-  //   power  = unary ('^' power)?              (^ destra-associativo, ** alias)
-  //   unary  = ('+'|'-') unary | postfix
-  //   postfix= atom ('!')*
-  //   atom   = number | '(' expr ')' | ident ['(' expr ')'] | ident
+  // Calcolatrice locale e marker [[calc: ...]]: logica pura, sta in
+  // src/shared/calcMarkers.js (regole di formato in tests/unit/).
   // ----------------------------------------------------------------
-  function tryMathEval(input) {
-    if (input == null) return { ok: false };
-    let s = String(input).trim();
-    if (!s) return { ok: false };
+  const Calc = global.SN_CALC;
+  const resolveCalcMarkers = (text, opts) => (Calc ? Calc.resolveCalcMarkers(text, opts) : (text || ''));
 
-    // Normalizza simboli matematici Unicode tipici
-    s = s
-      .replace(/×/g, '*')     // ×
-      .replace(/÷/g, '/')     // ÷
-      .replace(/−/g, '-')     // −
-      .replace(/[–—]/g, '-') // – —
-      .replace(/∕/g, '/')     // ∕
-      .replace(/√/g, 'sqrt')  // √
-      .replace(/π/g, 'pi')    // π
-      .replace(/²/g, '^2')    // ²
-      .replace(/³/g, '^3')    // ³
-      .replace(/\*\*/g, '^');
-
-    // Decimali italiani: virgola tra cifre -> punto
-    s = s.replace(/(\d),(\d)/g, '$1.$2');
-    // Separatori delle migliaia con spazi tra cifre: rimuovili
-    s = s.replace(/(\d)\s+(?=\d)/g, '$1');
-    // Rimuovi un eventuale segno '=' finale (es. "2+2=")
-    s = s.replace(/=\s*$/, '').trim();
-
-    // Whitelist caratteri ammessi
-    if (!/^[0-9+\-*/^%().\s a-zA-Z!]+$/.test(s)) return { ok: false };
-    // Deve "sembrare" matematica: almeno un operatore, fattoriale, funzione o costante
-    const hasMathToken = /[+\-*/^%!]/.test(s)
-      || /\b(sqrt|cbrt|sin|cos|tan|asin|acos|atan|log|ln|exp|abs|floor|ceil|round|pi|e)\b/i.test(s);
-    if (!hasMathToken) return { ok: false };
-
-    let i = 0;
-    const skip = () => { while (i < s.length && /\s/.test(s[i])) i++; };
-    const eat = (ch) => { skip(); if (s[i] === ch) { i++; return true; } return false; };
-
-    function parseExpr() {
-      let v = parseTerm();
-      while (true) {
-        if (eat('+')) v += parseTerm();
-        else if (eat('-')) v -= parseTerm();
-        else break;
-      }
-      return v;
-    }
-    function parseTerm() {
-      let v = parsePower();
-      while (true) {
-        if (eat('*')) v *= parsePower();
-        else if (eat('/')) v /= parsePower();
-        else if (eat('%')) v %= parsePower();
-        else break;
-      }
-      return v;
-    }
-    function parsePower() {
-      let v = parseUnary();
-      if (eat('^')) v = Math.pow(v, parsePower());
-      return v;
-    }
-    function parseUnary() {
-      skip();
-      if (eat('+')) return parseUnary();
-      if (eat('-')) return -parseUnary();
-      return parsePostfix();
-    }
-    function parsePostfix() {
-      let v = parseAtom();
-      while (eat('!')) v = factorial(v);
-      return v;
-    }
-    function parseAtom() {
-      skip();
-      const rest = s.slice(i);
-      const numM = rest.match(/^(?:\d+(?:\.\d+)?|\.\d+)/);
-      if (numM) { i += numM[0].length; return parseFloat(numM[0]); }
-      const idM = rest.match(/^[a-zA-Z]+/);
-      if (idM) {
-        const name = idM[0].toLowerCase();
-        i += idM[0].length;
-        skip();
-        if (s[i] === '(') {
-          i++;
-          const arg = parseExpr();
-          if (!eat(')')) throw new Error('paren');
-          return applyFunc(name, arg);
-        }
-        return applyConst(name);
-      }
-      if (eat('(')) {
-        const v = parseExpr();
-        if (!eat(')')) throw new Error('paren');
-        return v;
-      }
-      throw new Error('atom');
-    }
-    function applyFunc(name, x) {
-      switch (name) {
-        case 'sqrt': return Math.sqrt(x);
-        case 'cbrt': return Math.cbrt(x);
-        case 'sin': return Math.sin(x);
-        case 'cos': return Math.cos(x);
-        case 'tan': return Math.tan(x);
-        case 'asin': return Math.asin(x);
-        case 'acos': return Math.acos(x);
-        case 'atan': return Math.atan(x);
-        case 'log': return Math.log10(x);
-        case 'ln': return Math.log(x);
-        case 'exp': return Math.exp(x);
-        case 'abs': return Math.abs(x);
-        case 'floor': return Math.floor(x);
-        case 'ceil': return Math.ceil(x);
-        case 'round': return Math.round(x);
-      }
-      throw new Error('fn');
-    }
-    function applyConst(name) {
-      if (name === 'pi') return Math.PI;
-      if (name === 'e') return Math.E;
-      throw new Error('const');
-    }
-    function factorial(n) {
-      if (!Number.isInteger(n) || n < 0 || n > 170) throw new Error('fact');
-      let r = 1; for (let k = 2; k <= n; k++) r *= k; return r;
-    }
-
-    try {
-      const value = parseExpr();
-      skip();
-      if (i !== s.length) return { ok: false };
-      if (!Number.isFinite(value)) return { ok: false };
-      return { ok: true, value, normalized: s };
-    } catch (_) {
-      return { ok: false };
-    }
-  }
-
-  function formatMathResult(n) {
-    if (Number.isInteger(n)) return String(n);
-    // Limita precisione per evitare 0.30000000000000004
-    let str = parseFloat(n.toPrecision(12)).toString();
-    // Notazione italiana: punto -> virgola decimale
-    if (str.includes('e')) return str; // notazione esponenziale: lascia invariata
-    return str.replace('.', ',');
-  }
-
-  // ----------------------------------------------------------------
-  // Sostituisce i marker [[calc: <espressione>]] emessi dall'LLM
-  // con il risultato calcolato in locale. I marker incompleti
-  // (in streaming, "]]" non ancora arrivato) vengono nascosti con "…"
-  // per evitare flicker visivo. Marker invalidi restano visibili.
-  // ----------------------------------------------------------------
-  const CALC_MARKER_RE = /\[\[calc:\s*([^\[\]]+?)\s*\]\]/g;
-  function resolveCalcMarkers(text) {
-    if (!text) return text;
-    let out = text.replace(CALC_MARKER_RE, (m, expr) => {
-      const r = tryMathEval(expr);
-      return r.ok ? formatMathResult(r.value) : m;
-    });
-    // Nasconde marker incompleti in coda durante lo streaming
-    // (anche solo "[[", "[[c", "[[ca", ecc. mentre arrivano i delta)
-    out = out.replace(/\[\[(?:c(?:a(?:l(?:c(?::[^\]]*)?)?)?)?)?$/, '…');
-    return out;
-  }
-
-  // ----------------------------------------------------------------
-  // Renderer Markdown: delega alla sorgente unica condivisa SN_MARKDOWN (#418),
-  // così popup, riquadro "Spiega", sidebar e chat della home rendono la stessa
-  // formattazione leggera (grassetto/corsivo/codice/elenchi/titoli + LINK).
-  // ----------------------------------------------------------------
-  const Md = global.SN_MARKDOWN;
+  // Il risultato va in innerHTML e il testo del modello non è fidato: senza
+  // SN_MARKDOWN (#418) si mostra come testo, mai come HTML (#853).
+  const ESCAPE = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
   function renderMarkdown(text) {
-    return Md ? Md.render(text) : (text || '');
+    const Md = global.SN_MARKDOWN;
+    if (Md) return Md.render(text);
+    return String(text == null ? '' : text).replace(/[&<>"']/g, (c) => ESCAPE[c]).replace(/\n/g, '<br>');
   }
 
-  // Un solo listener a livello di documento apre i link renderizzati da Filo
-  // (classe filo-md-link) in una NUOVA SCHEDA — vale per il popup, il riquadro
-  // "Spiega" e la sidebar, che vivono tutti nello stesso documento. I link
-  // non-sicuri (filo://, javascript:, relativi) non arrivano qui: SN_MARKDOWN li
-  // ha già scartati in fase di render.
-  document.addEventListener('click', (e) => {
+  // I collegamenti che un modello scrive qui (popup, «Spiega», assistente di pagina: classe filo-md-link) li apre il
+  // main dopo la porta delle uscite (#810), per ogni gesto: un window.open da qui sembrerebbe della pagina e non passa.
+  function paroleAccanto(el) {
+    if (el.closest && el.closest('.sn-sidebar')) {
+      try { return global.SN_SIDEBAR?.paroleUtente?.() || []; } catch (_) { return []; }
+    }
+    const p = popups.find((x) => x.root && x.root.contains(el));
+    // Il primo messaggio lo compone Filo dalla selezione: è testo della pagina, non parole dell'utente.
+    return p ? p.conversation.slice(1).filter((m) => m && m.role === 'user').map((m) => String(m.content || '')) : [];
+  }
+
+  function avvisaFermata(el, frase) {
+    if (el.closest && el.closest('.sn-sidebar') && global.SN_SIDEBAR?.notaFermata) {
+      global.SN_SIDEBAR.notaFermata(frase);
+      return;
+    }
+    showToast(frase.charAt(0).toUpperCase() + frase.slice(1), { duration: 6000 });
+  }
+
+  async function apriCollegamento(a, { sfondo = false } = {}) {
+    const url = a && a.getAttribute ? a.getAttribute('href') : '';
+    if (!url) return;
+    let r = null;
+    try {
+      r = await chrome.runtime.sendMessage({ type: MSG.APRI_COLLEGAMENTO_FILO, url, parole: paroleAccanto(a), sfondo });
+    } catch (_) {}
+    if (r && r.frase && !r.avvisato) avvisaFermata(a, r.frase);
+  }
+
+  // Lo scaricamento di un collegamento scritto da un modello passa dalla stessa porta.
+  async function scaricaCollegamento(a) {
+    const url = a && a.getAttribute ? a.getAttribute('href') : '';
+    if (!url) return null;
+    let r = null;
+    try {
+      r = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_LINK, url, diFilo: true, parole: paroleAccanto(a) });
+    } catch (_) {}
+    if (r && r.frase) { if (!r.avvisato) avvisaFermata(a, r.frase); } else if (!r || r.ok === false) showToast(I18n.t('toast_file_save_failed'));
+    return r;
+  }
+
+  // Nelle pagine di Filo la porta sta già su ogni apertura nel main, e la chat ha la sua: lì il clic arriva in bolla,
+  // dopo quella, e basta aprire. Nelle pagine web in cattura sulla finestra: un antenato che fermasse il clic
+  // lascerebbe al collegamento l'apertura da sé, senza porta.
+  const inPaginaDiFilo = location.protocol === 'filo:';
+  const suCollegamento = (e) => {
+    if (e.type === 'auxclick' && e.button !== 1) return;
     const a = e.target && e.target.closest && e.target.closest('a.filo-md-link');
     if (!a) return;
-    const url = a.getAttribute('href');
-    if (!url) return;
     e.preventDefault();
     e.stopPropagation();
-    try { window.open(url, '_blank', 'noopener'); } catch (_) {}
-  });
+    if (inPaginaDiFilo) { try { window.open(a.getAttribute('href'), '_blank', 'noopener'); } catch (_) {} return; }
+    apriCollegamento(a, { sfondo: e.type === 'auxclick' || e.ctrlKey || e.metaKey });
+  };
+  if (inPaginaDiFilo) document.addEventListener('click', suCollegamento);
+  else {
+    window.addEventListener('click', suCollegamento, true);
+    window.addEventListener('auxclick', suCollegamento, true);
+  }
 
   // ----------------------------------------------------------------
   // Compensazione zoom (Ctrl+/-, pinch). Identica per popup e menu.
@@ -970,9 +845,12 @@
   //  • `scrollHeight` comprende l'IMBOTTITURA, `height` (se il box è
   //    content-box) no. Scriverlo tal quale lasciava la casella più alta del
   //    suo testo di quei pixel, e non li restituiva più: cancellata la domanda
-  //    la casella restava gonfia e la risposta non si riprendeva lo spazio.
+  //    la casella restava gonfia e la risposta non si riprendeva lo spazio;
+  //  • vuota torna alla misura con cui è nata: misurata, andrebbe a capo col
+  //    segnaposto lungo e resterebbe una riga più alta di prima di scrivere.
   function autoGrow(el) {
     if (!el) return;
+    if (!el.value) { el.style.height = ''; return; }
     el.style.height = 'auto';
     let pad = 0;
     try {
@@ -1130,6 +1008,28 @@
     try { popup?.pose?.reflow(); } catch (_) {}
   }
 
+  // La risposta l'hanno pagata i crediti di Filo perché OpenRouter ha rifiutato
+  // la chiave dell'utente: la stessa riga che la chat mette sotto la risposta (#662).
+  // Vale come detta solo se `el`, dove sta la frase, resta a schermo il tempo di leggerla: un riquadro
+  // chiuso prima, o appena compare, lascia partire l'avviso (che il main tiene fermo 4 s).
+  const RIPIEGO_LETTO_MS = 1500;
+  function ripiegoMostrato(el) {
+    if (!el || !el.isConnected) return;
+    setTimeout(() => {
+      if (!el.isConnected) return;
+      try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.KEY_FALLBACK_SHOWN })).catch(() => {}); } catch (_) {}
+    }, RIPIEGO_LETTO_MS);
+  }
+  function notaRipiego(parent, keyFallback) {
+    if (!parent || !keyFallback || !keyFallback.line) return null;
+    const el = document.createElement('div');
+    el.className = 'sn-key-fallback';
+    el.textContent = keyFallback.line;
+    parent.appendChild(el);
+    ripiegoMostrato(el);
+    return el;
+  }
+
   // Scrive modello e costo nella riga in basso. Quando lo spazio è così poco
   // che quella riga deve sparire (dentro un riquadro incorporato basso, vedi la
   // posa), l'informazione resta comunque: passando sopra l'intestazione.
@@ -1143,7 +1043,7 @@
   // Avvia un turno di streaming. messages è la cronologia COMPLETA
   // (incluso il nuovo messaggio user finale).
   // ----------------------------------------------------------------
-  function startTurn(popup, messages, onAssistantDone) {
+  function startTurn(popup, messages, onAssistantDone, opts) {
     // Disconnetti eventuale port precedente
     try { popup.activePort?.disconnect(); } catch (_) {}
 
@@ -1168,6 +1068,9 @@
     port.onMessage.addListener((m) => {
       if (m.type === 'meta') {
         popup.model = m.model; popup.provider = m.provider;
+        // Il prompt vero è quello composto dal main: le domande successive
+        // devono ripartire da lì, non dalla copia locale senza cambi (#724).
+        if (Array.isArray(m.messages) && m.messages.length) popup.conversation = m.messages.slice();
         setMeta(popup, `${I18n.t('popup_model')}: ${popup.model}`);
       } else if (m.type === 'delta') {
         if (firstDelta) {
@@ -1179,7 +1082,7 @@
         // prossimo disegno (#502). E la lettura resta dov'è se l'utente era
         // tornato su a rileggere.
         scrollaConservando(popup, () => {
-          bubble.text.innerHTML = renderMarkdown(resolveCalcMarkers(buf));
+          bubble.text.innerHTML = renderMarkdown(resolveCalcMarkers(buf, { streaming: true }));
         });
       } else if (m.type === 'reset') {
         // Il provider è caduto a metà risposta e il sistema riparte da zero su
@@ -1205,12 +1108,15 @@
         // stava rileggendo a metà si ritrova sbalzato dal clamp del browser.
         scrollaConservando(popup, () => {
           if (vuota) bubble.text.textContent = '';
-          if (popup.action === ACTIONS.EXPLAIN && /NESSUNA SPIEGAZIONE/i.test(resolved.trim())) {
+          const daMostrare = popup.action === ACTIONS.EXPLAIN
+            ? spiegazioneDaMostrare(resolved) : resolved;
+          if (popup.action === ACTIONS.EXPLAIN && !daMostrare) {
             bubble.text.textContent = I18n.t('popup_no_explanation');
             bubble.wrap.classList.add('sn-msg-muted');
           } else {
-            bubble.text.innerHTML = renderMarkdown(resolved);
+            bubble.text.innerHTML = renderMarkdown(daMostrare);
           }
+          notaRipiego(bubble.text, m.keyFallback);
           setMeta(popup, `${I18n.t('popup_model')}: ${popup.model} • ${I18n.t('popup_estimated_cost')}: €${eur.toFixed(4)}`);
         });
         // Salva la versione risolta in conversazione: i follow-up vedono i numeri,
@@ -1230,7 +1136,7 @@
     port.postMessage({
       type: 'start',
       action: popup.action,
-      payload: { messages },
+      payload: (opts && opts.payload) || { messages },
       origin: location.href,
     });
   }
@@ -1270,7 +1176,18 @@
 
     startTurn(popup, popup.conversation, (assistantText) => {
       popup.conversation.push({ role: 'assistant', content: assistantText });
-    });
+    }, { payload: payloadDaComporreNelMain(action, payload) });
+  }
+
+  // I cambi del giorno li ha solo il main: «Spiega» e «Approfondisci» gli
+  // mandano il testo selezionato e si fanno comporre il prompt da lui, come già
+  // fa la spiegazione nel menu del tasto destro. Qui il prompt si costruisce
+  // comunque, ma solo come storia da cui ripartono le domande successive
+  // finché non torna quella vera. #724
+  function payloadDaComporreNelMain(action, payload) {
+    if (action !== ACTIONS.EXPLAIN && action !== ACTIONS.EXPLAIN_DEEP) return null;
+    const sel = payload?.selection || '';
+    return { selection: sel, sentence: payload?.sentence || sel };
   }
 
   function buildInitialPrompt(action, payload) {
@@ -1299,6 +1216,13 @@
   // fuori dal viewport. Teniamo i più recenti, che sono i più rilevanti.
   const MAX_TOAST_STACK = 4;
 
+  // Col puntatore su un avviso della pila i tempi di tutti aspettano (regola in avvisiTempo.js).
+  let tempiPila = null;
+  function tempi() {
+    if (!tempiPila) tempiPila = global.SN_AVVISI.orologio();
+    return tempiPila;
+  }
+
   function toastHost() {
     // `isConnected`: se la pagina rifà il DOM (SPA che rimpiazza il body) il
     // vecchio contenitore resta orfano e gli avvisi successivi sparirebbero.
@@ -1324,7 +1248,7 @@
     for (let i = 0; i < over; i++) {
       const c = live[i]; // i più vecchi stanno in cima: si appende in coda
       if (typeof c._snDispose === 'function') { try { c._snDispose(); } catch (_) {} continue; }
-      try { c.remove(); } catch (_) {}
+      unmountToast(c);
     }
   }
 
@@ -1350,10 +1274,15 @@
 
   // API per gli altri avvisi in pagina ancorati allo stesso angolo: li aggancia
   // allo stack invece che direttamente al documento.
+  // Tutto ciò che entra nella pila risponde al tasto destro col suo menu (regola in avvisiTempo.js):
+  // `chiudi` e `azioni` li dà chi lo mostra; senza, «Chiudi» lo toglie dalla pila.
   function mountToast(el, opts = {}) {
     if (!el) return el;
     if (opts.sticky) el.dataset.snSticky = '1';
+    global.SN_AVVISI.chiudibile(el, opts.chiudi || (() => unmountToast(el)), opts.azioni);
+    tempi().segui(el);
     toastHost().appendChild(el);
+    tempi().ripulisci();
     enforceToastCap();
     syncToastOverflow();
     return el;
@@ -1363,7 +1292,16 @@
   // ricalcola l'overflow dello stack.
   function unmountToast(el) {
     try { el?.remove(); } catch (_) {}
+    if (el) tempi().lascia(el);
     syncToastOverflow();
+  }
+
+  // Il tempo di un avviso agganciato alla pila: in scala con la durata delle Preferenze, fermo col
+  // puntatore sopra. `ms` è quello che vale con la durata standard; 0 = resta finché non lo si chiude.
+  // `deveScadere`: alla scadenza succede qualcosa (si chiude la scheda), e la durata 0 non lo rimanda per sempre.
+  function tempoAvviso(ms, onScade, { deveScadere = false } = {}) {
+    const d = global.SN_AVVISI.durata(ms);
+    return tempi().avvia(d || (deveScadere ? ms : 0), onScade);
   }
 
   // ----------------------------------------------------------------
@@ -1378,12 +1316,12 @@
     t.className = 'sn-toast';
     t.textContent = text;
     let closed = false;
-    let timer = null;
+    let tempo = null;
     // Rimozione immediata usata dallo sfratto per tetto: niente animazione, ma
     // il timer va spento o continuerebbe a puntare a un elemento morto.
     t._snDispose = () => {
       closed = true;
-      if (timer) { clearTimeout(timer); timer = null; }
+      if (tempo) { tempo.annulla(); tempo = null; }
       unmountToast(t);
     };
     mountToast(t);
@@ -1391,14 +1329,21 @@
     const close = () => {
       if (closed) return;
       closed = true;
-      if (timer) { clearTimeout(timer); timer = null; }
+      if (tempo) { tempo.annulla(); tempo = null; }
       // Marcato in uscita: non occupa più uno slot del tetto mentre sfuma.
       t.dataset.snClosing = '1';
       t.classList.remove('sn-toast-visible');
       setTimeout(() => unmountToast(t), 250);
     };
-    const duration = opts.duration === 0 ? 0 : (opts.duration || 2200);
-    if (duration > 0) timer = setTimeout(close, duration);
+    // Sotto il puntatore il toast prende i clic: chiuderlo è la risposta, e l'unica strada con la durata a 0.
+    // Chi ne sta selezionando il testo non lo perde.
+    t.addEventListener('click', () => {
+      const sel = t.ownerDocument.getSelection && t.ownerDocument.getSelection();
+      if (sel && !sel.isCollapsed && t.contains(sel.anchorNode)) return;
+      close();
+    });
+    global.SN_AVVISI.chiudibile(t, close);
+    tempo = tempoAvviso(opts.duration === 0 ? 0 : (opts.duration || 2200), close);
     return { close, el: t };
   }
 
@@ -1407,15 +1352,19 @@
 
   global.SN_POPUP = {
     openStreaming,
+    notaRipiego, ripiegoMostrato,
     close,
     closeTopmost,
     showToast,
     mountToast,
     unmountToast,
+    tempoAvviso,
     attachZoomCompensation,
     renderMarkdown,
     resolveCalcMarkers,
     registerStack,
+    apriCollegamento,
+    scaricaCollegamento,
     // C'è un riquadro aperto adesso? Lo chiede content.js per decidere di chi
     // è l'Esc quando si è a tutto schermo (#514).
     hasOpen: () => popups.length > 0,

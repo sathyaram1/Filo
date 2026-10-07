@@ -299,7 +299,7 @@
     `<path d="M19.5 10l-4 4"/>`;
 
   // --- Cronologia: orologio con freccia antioraria (il classico "indietro nel
-  //     tempo") + lancette. Usata dall'icona Cronologia in alto a destra nella home.
+  //     tempo") + lancette. Usata dall'icona Cronologia della barra laterale.
   const history =
     `<path d="M3.5 12a8.5 8.5 0 1 1 2.6 6.1"/>` +
     `<path d="M3.5 18v-4h4"/>` +
@@ -315,8 +315,8 @@
     `<path d="M12 5.5a2 2 0 1 0 0.01 0"/>`;
 
   // --- Red-team: scudo (sicurezza) con un mirino/bersaglio al centro (l'attacco
-  //     che prova a forare le difese). Usata dall'icona Red-team in alto a destra
-  //     nella home e dalla voce "Invia attacco" del menu tasto destro.
+  //     che prova a forare le difese). Usata dall'icona Red-team della barra
+  //     laterale e dalla voce "Invia attacco" del menu tasto destro.
   const redteam =
     `<path d="M12 3.5l6.5 2.5v5c0 4.2-2.8 7.2-6.5 8.5-3.7-1.3-6.5-4.3-6.5-8.5v-5z"/>` +
     `<circle cx="12" cy="11" r="2.4"/>` +
@@ -343,6 +343,15 @@
   const search =
     `<circle cx="11" cy="11" r="6"/>` +
     `<path d="M20 20l-4.3-4.3"/>`;
+
+  // --- Zoom della pagina: la lente col più dentro. Distinta da `zoom`, che
+  // sono le quattro frecce dello schermo intero: due cose diverse non possono
+  // avere lo stesso disegno.
+  const zoomPagina =
+    `<circle cx="11" cy="11" r="6"/>` +
+    `<path d="M20 20l-4.3-4.3"/>` +
+    `<path d="M8.4 11h5.2"/>` +
+    `<path d="M11 8.4v5.2"/>`;
 
   // ======================================================================
   // Icone delle AZIONI dell'agente Filo (righe del blocco di attività in
@@ -492,6 +501,59 @@
   const globeOff =
     globe +
     `<path d="M4 4l16 16"/>`;
+
+  // --- Il sistema (#873): batteria, rete, Bluetooth. La batteria è un corpo con il polo a destra;
+  //     la carica la dice una barra dentro, il fulmine quando è in carica.
+  const batteryBody =
+    `<rect x="2" y="7" width="17" height="10" rx="2.5"/>` +
+    `<path d="M21.5 10.5v3"/>`;
+  // Il livello è una riga spessa dentro il corpo: da 6.5 a 14.5 per 0-100%, niente sotto l'1%.
+  function batteryLevel(livello) {
+    const n = Number(livello);
+    if (!Number.isFinite(n) || n < 1) return '';
+    const fine = 6.5 + 8 * Math.min(100, n) / 100;
+    return `<path d="M6.5 12H${fine.toFixed(2)}" stroke-width="4.25"/>`;
+  }
+  const batteryCharging =
+    batteryBody +
+    `<path d="M11.6 8.6l-2.4 3.6h3.2l-2.4 3.6"/>`;
+  // Alla corrente ma ferma (piena, o al limite di carica): una spina dentro, così staccarla si vede.
+  const batteryPlugged =
+    batteryBody +
+    `<path d="M9.5 9.75h2.25a2.25 2.25 0 0 1 0 4.5H9.5z"/>` +
+    `<path d="M6.75 10.9H9.5"/><path d="M6.75 13.1H9.5"/><path d="M14 12h2.25"/>`;
+
+  // --- Wi-Fi: tre archi e un punto, il segnale che arriva.
+  const wifi =
+    `<path d="M2.5 9a14 14 0 0 1 19 0"/>` +
+    `<path d="M5.5 12.5a9.5 9.5 0 0 1 13 0"/>` +
+    `<path d="M8.75 15.75a4.75 4.75 0 0 1 6.5 0"/>` +
+    `<path d="M12 19.25h.01"/>`;
+  // --- Nessuna rete: gli stessi archi barrati.
+  const wifiOff =
+    wifi +
+    `<path d="M4 4l16 16"/>`;
+  // --- Rete via cavo: la presa di rete vista di fronte.
+  const ethernet =
+    `<path d="M4 5h16a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 20 16h-3v2.5H7V16H4a1.5 1.5 0 0 1-1.5-1.5v-8A1.5 1.5 0 0 1 4 5z"/>` +
+    `<path d="M7 9v2"/><path d="M10.33 9v2"/><path d="M13.67 9v2"/><path d="M17 9v2"/>`;
+  // --- Bluetooth: la runa, e barrata quando è spento.
+  const bluetooth =
+    `<path d="M7 7.5l10 9-5 4.5V3l5 4.5-10 9"/>`;
+  const bluetoothOff =
+    bluetooth +
+    `<path d="M4 4l16 16"/>`;
+
+  // --- Il volume (#874): l'altoparlante a cono con le onde che escono; muto, le onde diventano una croce.
+  const speaker =
+    `<path d="M4 9.5h3l4.5-4v13L7 14.5H4z"/>`;
+  const volume =
+    speaker +
+    `<path d="M15.5 9a4.5 4.5 0 0 1 0 6"/>` +
+    `<path d="M18.25 6.5a8 8 0 0 1 0 11"/>`;
+  const volumeMute =
+    speaker +
+    `<path d="M15.5 10l4.5 4"/><path d="M20 10l-4.5 4"/>`;
 
   // --- Regola "sempre da un altro paese": globo con un segnalibro nell'angolo.
   const globePinned =
@@ -695,6 +757,7 @@
     decks:        (size) => wrap(decks, { size }),
     note:         (size) => wrap(note, { size }),
     search:       (size) => wrap(search, { size }),
+    zoomPagina:   (size) => wrap(zoomPagina, { size }),
     // --- Azioni dell'agente (la tabella azione → icona è in actionIcons.js)
     openTab:      (size) => wrap(openTab, { size }),
     folder:       (size) => wrap(folder, { size }),
@@ -716,6 +779,17 @@
     globe:        (size) => wrap(globe, { size }),
     globeOff:     (size) => wrap(globeOff, { size }),
     globePinned:  (size) => wrap(globePinned, { size }),
+    // `livello` (0-100) disegna la carica dentro il corpo; senza, la batteria è vuota.
+    battery:      (size, livello) => wrap(batteryBody + batteryLevel(livello), { size }),
+    batteryCharging: (size) => wrap(batteryCharging, { size }),
+    batteryPlugged: (size) => wrap(batteryPlugged, { size }),
+    wifi:         (size) => wrap(wifi, { size }),
+    wifiOff:      (size) => wrap(wifiOff, { size }),
+    ethernet:     (size) => wrap(ethernet, { size }),
+    bluetooth:    (size) => wrap(bluetooth, { size }),
+    bluetoothOff: (size) => wrap(bluetoothOff, { size }),
+    volume:       (size) => wrap(volume, { size }),
+    volumeMute:   (size) => wrap(volumeMute, { size }),
     windowFrame:  (size) => wrap(windowFrame, { size }),
     brush:        (size) => wrap(brush, { size }),
     undo:         (size) => wrap(undo, { size }),

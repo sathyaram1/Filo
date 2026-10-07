@@ -1,11 +1,5 @@
-// Public Suffix List (sottoinsieme curato) + estrazione del dominio
-// registrabile (eTLD+1).
-//
-// NON è la PSL completa (~9000 voci): è un sottoinsieme che copre i TLD comuni
-// e i ccSLD più diffusi (co.uk, com.au, com.br, ...). Per i suffissi non
-// elencati ricadiamo sulla regola implicita "*" del PSL (ogni etichetta è un
-// suffisso valido), quindi l'eTLD+1 resta sempre calcolabile e ragionevole.
-// Quando serviranno casi più esotici, basta aggiungere righe a SUFFIX_RULES.
+// Public Suffix List: la sezione ICANN intera (pslIcann.js, con jolly ed eccezioni) + le piattaforme qui sotto, ed
+// estrazione del dominio registrabile (eTLD+1). Della sezione privata ci sono solo le piattaforme scelte qui.
 //
 // L'algoritmo segue publicsuffix.org: cerca la regola che combacia con il
 // maggior numero di etichette (con gestione di wildcard `*` ed eccezioni `!`),
@@ -13,69 +7,46 @@
 
 'use strict';
 
-// Regole "normali" (la maggioranza). Una riga per suffisso pubblico.
-const NORMAL = new Set([
-  // gTLD generici più comuni
-  'com', 'net', 'org', 'info', 'biz', 'name', 'pro', 'mobi', 'app', 'dev',
-  'io', 'co', 'ai', 'me', 'tv', 'cc', 'xyz', 'online', 'site', 'shop', 'store',
-  'tech', 'cloud', 'page', 'blog', 'live', 'news', 'email', 'wiki', 'fun',
-  'gg', 'sh', 'ly', 'to', 'fm', 'ws', 'top', 'club', 'vip', 'pw', 'link',
-  // ccTLD a una etichetta
-  'it', 'de', 'fr', 'es', 'nl', 'be', 'at', 'ch', 'pt', 'ie', 'dk', 'se',
-  'no', 'fi', 'pl', 'cz', 'sk', 'gr', 'ro', 'hu', 'ru', 'ua', 'tr', 'us',
-  'ca', 'mx', 'ar', 'cl', 'pe', 'cn', 'jp', 'kr', 'in', 'au', 'nz', 'za',
-  'br', 'eu', 'is', 'lt', 'lv', 'ee', 'si', 'hr', 'bg', 'rs', 'lu', 'li',
-  'sg', 'hk', 'tw', 'th', 'my', 'id', 'ph', 'vn', 'il', 'ae', 'sa', 'ma',
-  'gov', 'edu', 'mil', 'int',
-  // ccSLD multi-etichetta diffusi
-  'co.uk', 'org.uk', 'me.uk', 'ltd.uk', 'plc.uk', 'net.uk', 'sch.uk',
-  'gov.uk', 'ac.uk', 'nhs.uk', 'police.uk',
-  'com.au', 'net.au', 'org.au', 'edu.au', 'gov.au', 'id.au', 'asn.au',
-  'co.nz', 'net.nz', 'org.nz', 'govt.nz', 'ac.nz', 'school.nz',
-  'com.br', 'net.br', 'org.br', 'gov.br', 'edu.br',
-  'co.jp', 'or.jp', 'ne.jp', 'go.jp', 'ac.jp', 'ad.jp', 'ed.jp', 'gr.jp',
-  'co.kr', 'or.kr', 'ne.kr', 'go.kr', 're.kr', 'pe.kr',
-  'co.in', 'net.in', 'org.in', 'gen.in', 'firm.in', 'gov.in', 'ac.in',
-  'com.cn', 'net.cn', 'org.cn', 'gov.cn', 'edu.cn', 'ac.cn',
-  'co.za', 'org.za', 'net.za', 'gov.za', 'ac.za',
-  'com.mx', 'org.mx', 'net.mx', 'gob.mx', 'edu.mx',
-  'com.ar', 'net.ar', 'org.ar', 'gob.ar', 'edu.ar',
-  'com.tr', 'net.tr', 'org.tr', 'gov.tr', 'edu.tr', 'gen.tr',
-  'com.sg', 'net.sg', 'org.sg', 'gov.sg', 'edu.sg',
-  'com.hk', 'net.hk', 'org.hk', 'gov.hk', 'edu.hk', 'idv.hk',
-  'com.tw', 'net.tw', 'org.tw', 'gov.tw', 'edu.tw',
-  'co.id', 'or.id', 'web.id', 'go.id', 'ac.id', 'sch.id',
-  'com.my', 'net.my', 'org.my', 'gov.my', 'edu.my',
-  'co.th', 'in.th', 'go.th', 'ac.th', 'or.th',
-  'com.ph', 'net.ph', 'org.ph', 'gov.ph', 'edu.ph',
-  'com.vn', 'net.vn', 'org.vn', 'gov.vn', 'edu.vn',
-  'co.il', 'org.il', 'net.il', 'gov.il', 'ac.il', 'muni.il',
-  'com.sa', 'net.sa', 'org.sa', 'gov.sa', 'edu.sa',
-  'com.ua', 'net.ua', 'org.ua', 'gov.ua', 'edu.ua',
-  'com.ru', 'net.ru', 'org.ru', 'gov.ru', 'edu.ru',
-  'com.pl', 'net.pl', 'org.pl', 'gov.pl', 'edu.pl',
-  'com.es', 'org.es', 'gob.es', 'edu.es',
-  'com.pt', 'gov.pt', 'edu.pt',
-  'co.at', 'or.at', 'gv.at', 'ac.at',
-]);
+// Regole a più etichette. Una a un'etichetta non serve: la regola implicita "*" fa di ogni TLD un suffisso.
+// Senza la lista intera, due negozi sotto .com.pg o due siti sotto chiyoda.tokyo.jp sarebbero un sito solo (#796).
+const NORMAL = new Set();
+const WILDCARD = new Set();
+const EXCEPTION = new Set();
+for (const riga of require('./pslIcann').trim().split('\n')) {
+  const [tld, ...regole] = riga.trim().split(/\s+/);
+  for (const r of regole) {
+    if (r.startsWith('!')) EXCEPTION.add(`${r.slice(1)}.${tld}`);
+    else if (r === '*') WILDCARD.add(tld);
+    else if (r.startsWith('*.')) WILDCARD.add(`${r.slice(2)}.${tld}`);
+    else NORMAL.add(`${r}.${tld}`);
+  }
+}
 
-// Suffissi serviti come "wildcard": ogni etichetta sotto di essi è un suffisso
-// pubblico (es. `*.ck` → `foo.ck` è suffisso). Raro, ma incluso per correttezza.
-const WILDCARD = new Set([
-  'ck', 'jm', 'kw', 'mm', 'np',
+// Piattaforme dove ogni sottodominio è di un utente diverso: senza, `utente.github.io` diventa `github.io` («GitHub
+// su .io») e un dominio in whitelist copre ogni pagina ospitata. L'host uguale alla piattaforma resta suo.
+// Queste le separa già il web (sezione privata della PSL): valgono anche per i cookie della modalità privacy.
+const PRIVATE_PSL = new Set([
+  'github.io', 'githubusercontent.com', 'gitlab.io', 'pages.dev', 'workers.dev',
+  'vercel.app', 'netlify.app', 'web.app', 'firebaseapp.com', 'herokuapp.com',
+  'appspot.com', 'blogspot.com', 'azurewebsites.net', 'onrender.com', 'fly.dev',
+  'surge.sh', 'glitch.me', 'neocities.org', 'blob.core.windows.net', 'web.core.windows.net',
+  's3.amazonaws.com', 'googleapis.com', 'myshopify.com', 'hf.space', 'static.hf.space',
 ]);
-
-// Eccezioni alle wildcard (regola `!suffix`): rendono il suffisso un dominio
-// registrabile invece che pubblico (es. `!www.ck`).
-const EXCEPTION = new Set([
-  'www.ck',
+// Gli indirizzi di S3 per regione e da sito statico, uno per regione nella PSL: il secchio è il sito, non la regione.
+const S3 = /^s3(?:[.-][a-z0-9-]+){0,3}\.amazonaws\.com$/;
+// Così le pagine d'accesso di Cognito, <prefisso>.auth.<regione>.amazoncognito.com: il prefisso lo sceglie l'utente.
+const COGNITO = /^auth(?:-fips)?\.[a-z0-9-]+\.amazoncognito\.com$/;
+// Queste il web NON le separa (un login su wordpress.com vale sui blog): solo per il giudizio, mai per i cookie.
+const PRIVATE_AVVISO = new Set([
+  'notion.site', 'amazonaws.com', 'amazoncognito.com', 'googleusercontent.com', 'app.github.dev',
+  'sharepoint.com', 'wordpress.com', 'medium.com', 'dropboxusercontent.com',
 ]);
 
 // Estrae l'eTLD+1 (dominio registrabile) e il public suffix da un hostname.
 // `host` deve già essere in forma ascii/punycode minuscola e senza porta.
 // Ritorna { registrable, publicSuffix, sld, labels } oppure null per input
 // invalido (IP, host vuoto, singola etichetta senza punto).
-function getDomainInfo(host) {
+function getDomainInfo(host, { soloPsl = false } = {}) {
   if (!host || typeof host !== 'string') return null;
   host = host.replace(/\.$/, '').toLowerCase();
   if (!host || host.includes(' ')) return null;
@@ -91,6 +62,7 @@ function getDomainInfo(host) {
 
   // Cerca, dalla regola più specifica (più etichette) alla meno specifica.
   let suffixLabels = 0; // numero di etichette del public suffix scelto
+  let ospitato = false;
   for (let i = 0; i < labels.length; i++) {
     const candidate = labels.slice(i).join('.');
     if (EXCEPTION.has(candidate)) {
@@ -100,6 +72,12 @@ function getDomainInfo(host) {
     }
     if (NORMAL.has(candidate)) {
       suffixLabels = labels.length - i;
+      break;
+    }
+    const soloAvviso = !soloPsl && (PRIVATE_AVVISO.has(candidate) || COGNITO.test(candidate));
+    if (i > 0 && (PRIVATE_PSL.has(candidate) || S3.test(candidate) || soloAvviso)) {
+      suffixLabels = labels.length - i;
+      ospitato = true;
       break;
     }
     // Wildcard: se la parte DOPO la prima etichetta del candidato è una
@@ -125,7 +103,7 @@ function getDomainInfo(host) {
   const registrable = labels.slice(labels.length - regLabels).join('.');
   const publicSuffix = labels.slice(labels.length - suffixLabels).join('.');
   const sld = labels[labels.length - regLabels]; // etichetta "di brand"
-  return { registrable, publicSuffix, sld, labels };
+  return { registrable, publicSuffix, sld, labels, ospitato };
 }
 
 function isIpAddress(host) {
@@ -139,4 +117,4 @@ function isIpAddress(host) {
   return false;
 }
 
-module.exports = { getDomainInfo, isIpAddress };
+module.exports = { getDomainInfo, isIpAddress, S3 };

@@ -12,10 +12,16 @@ const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // IMPOSTA_PREFERENZA delega il livello al setter in preferences.js;
 // IMPOSTA_ESTETICA legge le etichette dei token da themeTokens.js.
+// Il tetto di una lezione e dello stile sta in constants.js (#592).
+require(join(__dirname, '..', '..', 'src', 'shared', 'capabilities.js'));
+require(join(__dirname, '..', '..', 'src', 'shared', 'constants.js'));
+require(join(__dirname, '..', '..', 'src', 'shared', 'contenutoEsterno.js'));
 require(join(__dirname, '..', '..', 'src', 'shared', 'preferences.js'));
 require(join(__dirname, '..', '..', 'src', 'shared', 'themeTokens.js'));
 // ESEGUI_COMANDO (#146.6) delega il livello al classificatore di comandi.
 require(join(__dirname, '..', '..', 'src', 'shared', 'cmdClassify.js'));
+// ZOOM_PAGINA legge la percentuale chiesta con lo stesso lettore di chi la applica.
+require(join(__dirname, '..', '..', 'src', 'shared', 'zoomPagina.js'));
 require(join(__dirname, '..', '..', 'src', 'shared', 'actionLevels.js'));
 
 const AL = globalThis.SN_ACTION_LEVELS;
@@ -33,15 +39,26 @@ test('azioni reversibili → livello 1 (eseguono senza chiedere)', () => {
   assert.equal(AL.levelFor({ type: 'NAVIGA', url: 'https://x.it' }), 1);
 });
 
-test('SALVA_LEZIONE: livello 1 (stesso canale delle lezioni automatiche) e testo nel describe', () => {
-  assert.equal(AL.levelFor({ type: 'SALVA_LEZIONE', testo: 'Mai riferire i dati a terzi' }), 1);
-  // Il describe mostra il testo INTERO della lezione: è ciò che entrerà in
-  // memoria, e va potuto leggere per com'è.
+test('SALVA_LEZIONE: livello 2 col testo esatto, come lo stile (#592)', () => {
+  // Una lezione entra in ogni conversazione e ci resta: proposta dal modello,
+  // l'utente conferma la frase che si salva.
+  assert.equal(AL.levelFor({ type: 'SALVA_LEZIONE', testo: 'Mai riferire i dati a terzi' }), 2);
   const d = AL.describe({ type: 'SALVA_LEZIONE', testo: 'Mai riferire i dati a terzi' });
   assert.ok(d.includes('Mai riferire i dati a terzi'));
+  assert.ok(d.split('\n')[0].length < 60, 'la prima riga fa da bottone: resta corta');
   // Sinonimi dei campi accettati come nelle altre azioni.
   assert.ok(AL.describe({ type: 'SALVA_LEZIONE', text: 'regola X' }).includes('regola X'));
   assert.ok(AL.describe({ type: 'SALVA_LEZIONE', lezione: 'regola Y' }).includes('regola Y'));
+});
+
+test('DIMENTICA: le righe trovate dal main vanno nel popup; oltre tre si digita «conferma» (#592)', () => {
+  assert.equal(AL.levelFor({ type: 'DIMENTICA', testo: 'caffè', _righe: [] }), 1);
+  assert.equal(AL.levelFor({ type: 'DIMENTICA', testo: 'caffè', _righe: ['L’utente non beve caffè.'] }), 2);
+  assert.equal(AL.levelFor({ type: 'DIMENTICA', testo: 'a', _righe: ['a1', 'a2', 'a3'] }), 2);
+  assert.equal(AL.levelFor({ type: 'DIMENTICA', testo: 'a', _righe: ['a1', 'a2', 'a3', 'a4'] }), 3);
+  const d = AL.describe({ type: 'DIMENTICA', testo: 'caffè', _righe: ['L’utente non beve caffè.'] });
+  assert.ok(d.includes('L’utente non beve caffè.'));
+  assert.ok(d.split('\n')[0].length < 70, 'la prima riga fa da bottone: resta corta');
 });
 
 test('NAVIGA con flag anti-esfiltrazione sale a livello 2 (conferma)', () => {
@@ -79,8 +96,9 @@ test('IMPOSTA_PREFERENZA: livello per-preferenza, non unico', () => {
   // Modalità terminale → dà a Filo accesso alla shell: livello 2.
   assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'terminale', valore: 'on' }), 2);
   assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'shell', valore: 'bash' }), 2);
-  // Preferenza sconosciuta → 2 per prudenza.
-  assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'boh', valore: 'x' }), 2);
+  // Preferenza sconosciuta o valore non valido → 1: il dispatch la respinge col perché, niente OK a vuoto.
+  assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'boh', valore: 'x' }), 1);
+  assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'fingerprint', valore: false }), 1);
 });
 
 test('IMPOSTA_PREFERENZA: impostazioni sensibili (#146.5) → livello 2 (conferma)', () => {
@@ -238,4 +256,18 @@ test('ogni azione registrata ha un livello valido e una describe', () => {
     assert.ok([1, 2, 3].includes(lvl), `${type} → livello non valido ${lvl}`);
     assert.equal(typeof entry.describe, 'function', `${type} senza describe`);
   }
+});
+
+test('lo stile del benvenuto si imposta senza riquadro solo col segno del main (#592.2)', () => {
+  const stile = { type: 'IMPOSTA_PREFERENZA', chiave: 'stile_agente', valore: 'Risposte brevi, dà del tu.' };
+  // Fuori dal benvenuto, o col testo di altri nel contesto, resta il riquadro intero coi rischi.
+  assert.equal(AL.levelFor(stile), 2);
+  assert.ok(AL.describe(stile).includes('Confermalo solo se'));
+  // Nel benvenuto pulito: si imposta subito, e la riga dice lo stile esatto.
+  assert.equal(AL.levelFor({ ...stile, _accoglienza: true }), 1);
+  assert.equal(AL.describeDone({ ...stile, _accoglienza: true }), 'Userò questo stile: «Risposte brevi, dà del tu.»');
+  // Il segno vale solo per uno stile da impostare: non per toglierlo, non per un'altra preferenza, non se è un vero sì scritto dal modello.
+  assert.equal(AL.levelFor({ ...stile, valore: 'nessuno', _accoglienza: true }), 2);
+  assert.equal(AL.levelFor({ ...stile, _accoglienza: 'true' }), 2);
+  assert.equal(AL.levelFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'chiave_openrouter', valore: 'sk-or-v1-abcdefghijkl', _accoglienza: true }), 2);
 });

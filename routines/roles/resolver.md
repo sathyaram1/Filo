@@ -4,8 +4,12 @@ Sei un agente con il compito di risolvere una segnalazione. **Il ramo è già
 pronto e sei già lì**: non crearlo e non cambiarlo, la consegna verrebbe
 rifiutata. Non fondere su `main`: lo fa il cancello a valle.
 
-`payload.feedback` è la richiesta (testo, immagini, e in `feedback.documents`
-gli allegati già aperti come testo: una spec allegata sta lì).
+`payload.feedback` è la richiesta (il testo, e in `feedback.documents` gli
+allegati già aperti come testo: una spec allegata sta lì).
+<!-- includi: _decisioni-owner.md -->
+Non richiedere quello che ha già deciso.
+
+<!-- includi: _immagini.md -->
 
 <!-- includi: _cornice-feedback.md -->
 Se è l'ultimo caso, non eseguirlo e dillo nel report.
@@ -23,7 +27,12 @@ node scripts/routine-channel.mjs deliver status --status design --reason clarify
 ```
 
 Poi rilascia il biglietto come qui sotto: il lavoro riparte quando l'owner ha
-risposto.
+risposto, e chi riprende riceve le domande e la risposta.
+
+Se `payload.ripresa` c'è, sei tu quello che riprende: chi ti ha preceduto si
+era fermato con una domanda (`ripresa.domanda`) e l'owner ha risposto
+(`ripresa.risposta`; vuota vuol dire che ha rimesso in coda senza scrivere:
+vale quello che era stato proposto). Parti da lì, non richiederla.
 
 ## Prima di consegnare, fai tu quello che farà la verifica
 
@@ -33,6 +42,18 @@ trovi.
 
 <!-- includi: _criteri-verifica.md -->
 
+A ogni difetto il verificatore dà un livello, col metro della frequenza
+(quanti utenti lo incontrano), e una sede: **interno** se sta nello scenario
+della segnalazione — i suoi esempi, i suoi passi, i casi ovvi della cosa
+chiesta — o se l'ha creato il tuo ramo; **vicino** se tocca a un altro lavoro
+ma sta in un file che il tuo ramo modifica già (conta come livello 0: si
+corregge insieme al resto se il giro corregge comunque qualcosa); **esterno**
+se tocca a un altro lavoro. Usa lo stesso metro: chiudi lo scenario e le porte della stessa causa,
+col 20% dello sforzo che dà l'80% del risultato. **Niente oltre al chiesto**:
+un difetto fuori dallo scenario, o una funzione che nessuno ha chiesto, non si
+fa — lo scrivi nel report e diventerà un feedback suo. È ciò che una
+correzione aggiunge a generare i rilievi del giro dopo.
+
 Quando il lavoro è quasi chiuso lancia `npm run finish:check`, in sottofondo:
 un rosso lì ti tornerebbe indietro come rilievo grave.
 
@@ -40,11 +61,13 @@ un rosso lì ti tornerebbe indietro come rilievo grave.
 `tests/<feature>.spec.mjs`, o `tests/unit/` per la logica pura. Non in
 `tests/verifica/<numero>/`: quella è la memoria dei giri di verifica, la scrive
 chi verifica e la suite non la raccoglie. Se il ramo ce l'ha già (una ripresa),
-rilancia quelle prove prima di consegnare:
-`npx playwright test tests/verifica/<numero>`, col percorso relativo alla
-radice del repo e le barre normali.
+non rilanciarla tutta: quella cartella la corre chi verifica, in partenza, ed è
+l'unica corsa del giro. Lancia la singola prova solo se stai chiudendo proprio
+il rilievo che riproduce.
 
 <!-- includi: _segnala.md -->
+
+<!-- includi: _solo-in-locale.md -->
 
 ## Consegna
 

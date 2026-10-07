@@ -9,9 +9,10 @@
 // Qui si prova quello che il giro 1 non aveva provato:
 //   1. il cammino ONESTO deve ancora arrivare in fondo (una difesa che ferma
 //      anche chi non ha fatto niente di storto è peggio del buco);
-//   2. la VERIFICA FUNZIONALE — l'altro dei due esiti ragionati — deve
-//      comportarsi come il controllo di sicurezza: impronta con l'esito, e
-//      fusione che si ferma se il contenuto è cambiato dopo;
+//   2. la VERIFICA FUNZIONALE — l'altro dei due esiti ragionati — porta
+//      l'impronta con l'esito; se il contenuto cambia dopo, la mossa la
+//      giudica il server (regola del 24/09/2026: il rifiuto locale dettava un
+//      rientro in verifica che il server nega a chi chiede la fusione);
 //   3. l'impronta non si detta nemmeno sulla strada della verifica funzionale
 //      (il giro 1 aveva chiuso solo quella del controllo di sicurezza);
 //   4. quando da questa macchina non risulta su quale contenuto è stato dato
@@ -129,7 +130,7 @@ test('il cammino onesto arriva in fondo: niente si è mosso, la fusione parte e 
   }
 });
 
-test('anche la verifica funzionale vale per il contenuto: registrata su uno, la fusione si ferma se il ramo si è mosso', async () => {
+test('anche la verifica funzionale vale per il contenuto: registrata su uno, se il ramo si è mosso la fusione la chiede al server dicendolo', async () => {
   const { srv, ricevuti, port } = await fintoServer(RISPOSTE);
   const { dir, g, punta } = deposito('filo-485-verifica-');
   const fuori = cartellaTemporanea('filo-485-verifica-fuori-');
@@ -153,11 +154,13 @@ test('anche la verifica funzionale vale per il contenuto: registrata su uno, la 
     g(['commit', '-qm', 'sostituito dopo la verifica']);
     expect(punta()).not.toBe(provato);
 
+    // Il server tollera le sole prove del giro tolte e altrimenti azzera la
+    // verifica da sé: qui si chiede, dichiarando la punta, e lo si dice.
     const gate = await lancia(GATE, ['worker/485'], env, dir);
     const richiesta = ricevuti.find((x) => x.url.includes('routineMerge'));
-    expect(!richiesta && gate.status !== 0,
-      `la fusione è partita col solo esito della verifica funzionale dato su ${provato.slice(0, 8)} (busta: ${JSON.stringify(richiesta?.body || null)})`).toBe(true);
-    expect(`${gate.stdout}\n${gate.stderr}`).toContain('la verifica');
+    expect(String(richiesta?.body?.sha || ''), gate.stderr).toBe(punta());
+    expect(gate.stderr, 'la nota deve dire su quale contenuto la verifica ha dato l\'ok').toContain(provato.slice(0, 12));
+    expect(gate.stderr).not.toContain('revision_capability');
   } finally {
     srv.close();
     rmSync(dir, { recursive: true, force: true });
@@ -265,11 +268,12 @@ test('la fusione fermata perché il ramo si è mosso dice quale passo registrare
     const gate = await lancia(GATE, ['worker/485'], env, dir);
     const detto = `${gate.stdout}\n${gate.stderr}`;
     expect(gate.status).not.toBe(0);
-    // Fermarsi e basta lascia la notizia su questa macchina: sul canale i due
-    // via libera continuano a risultare buoni per questo ramo.
-    expect(detto, 'il rifiuto non dice quale passo registra la decadenza').toContain('revision_capability');
+    // Il passo dettato dev'essere uno che il server concede a chi chiede la
+    // fusione: rileggere il pezzo nuovo e registrare di nuovo il verdetto.
+    expect(detto, 'il rifiuto non dice cosa rileggere').toContain('git diff ');
+    expect(detto, 'il rifiuto non dice come registrare di nuovo il verdetto').toContain('--record-secaudit ID485');
     expect(detto, 'il comando deve nominare il ramo, per copiarlo invece di ricostruirlo').toContain('worker/485');
-    expect(detto).toContain('--guasto');
+    expect(detto, 'il rientro in verifica il server lo nega al controllo di sicurezza').not.toContain('revision_capability');
     expect(detto, 'nominare una persona che non c\'è non è un passo da registrare')
       .not.toContain('chi ha cambiato il ramo lo rimette in verifica');
     expect(punta()).toBeTruthy();

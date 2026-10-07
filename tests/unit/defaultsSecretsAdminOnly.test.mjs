@@ -122,3 +122,53 @@ test('un admin che esce di sessione non tiene in uso le chiavi che non può più
     global.fetch = origFetch;
   }
 });
+
+// #679.1 — l'uscita dall'account non rilegge la config: la chiave dell'admin
+// deve smettere di valere subito, non alla prossima rilettura (fino a mezz'ora).
+test('logout dell\'admin: la sua chiave smette di valere subito, senza aspettare una rilettura', async () => {
+  const origToken = auth.getIdToken;
+  const origAdmin = auth.isAdmin;
+  const origFetch = global.fetch;
+  auth.getIdToken = async () => 'finto-id-token';
+  auth.isAdmin = () => true;
+  global.fetch = async (url) => {
+    if (String(url).includes('config/secrets')) {
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return {
+            fields: {
+              apiKeys: { mapValue: { fields: { openrouter: { stringValue: 'sk-or-owner' } } } },
+              safeBrowsingKey: { stringValue: 'gsb-owner' },
+            },
+          };
+        },
+        async text() { return ''; },
+      };
+    }
+    return { ok: false, status: 404, async json() { return {}; }, async text() { return ''; } };
+  };
+  try {
+    await Defaults.refresh();
+    assert.equal(Defaults.get().apiKeys.openrouter, 'sk-or-owner');
+
+    // Logout: nessuna rilettura, e la copia è ancora fresca per refreshIfStale.
+    auth.isAdmin = () => false;
+    auth.getIdToken = async () => null;
+    const dopo = await Defaults.refreshIfStale();
+    assert.equal(dopo.apiKeys.openrouter, Defaults.get().apiKeys.openrouter);
+    assert.notEqual(Defaults.get().apiKeys.openrouter, 'sk-or-owner');
+    assert.notEqual(Defaults.get().safeBrowsingKey, 'gsb-owner');
+
+    // Rientro dell'owner: la sua chiave torna a valere.
+    auth.isAdmin = () => true;
+    auth.getIdToken = async () => 'finto-id-token';
+    await Defaults.refresh();
+    assert.equal(Defaults.get().apiKeys.openrouter, 'sk-or-owner');
+  } finally {
+    auth.getIdToken = origToken;
+    auth.isAdmin = origAdmin;
+    global.fetch = origFetch;
+  }
+});

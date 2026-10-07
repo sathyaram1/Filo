@@ -1,59 +1,14 @@
 {
-  "nota": "Spec Playwright che sono rossi ANCHE su main su una macchina precisa, per motivi d'ambiente e non di codice. Due elenchi, perché le macchine sono due e le regole diverse. `specs` sono i rossi della macchina di chi sviluppa Filo: il cancello di `npm run finish` li lancia comunque e ne stampa l'esito, ma un loro rosso non blocca la pubblicazione; un rosso fuori da questo elenco sì. `contenitore` sono i rossi dei contenitori senza schermo in cui girano le routine: nessuno strumento li salta, servono a chi verifica per non scambiarli per regressioni. Per entrambi vale la stessa cosa: l'elenco VUOTO è lo stato normale, ogni voce è un controllo spento, e un controllo spento non protegge nessuno. Se devi aggiungere una voce scrivi QUI perché e apri un feedback per toglierla: un'eccezione senza una data di scadenza diventa permanente. Il primo elenco (feedback #563) conteneva undici spec della macchina di chi sviluppa Filo, ed è stato svuotato risolvendo caso per caso: quasi sempre era il test a dare per scontato qualcosa dell'ambiente (il percorso abbreviato 8.3 di %TEMP% quando il nome utente ha uno spazio, lo zoom di sistema al 125%, la rete di casa raggiungibile, un provider finto che risponde più in fretta di quanto il test riesca a digitare).",
-  "specs": [
-    "tests/board-offline-error",
-    "tests/filo-terminal-context",
-    "tests/tab-reorder-reopen",
-    "tests/verify-495-avversariale",
-    "tests/verify-495-vfx3",
-    "tests/options-home-models",
-    "tests/verify-509-giro4",
-    "tests/verify-downloads-410",
-    "tests/editor-comments"
-  ],
+  "nota": "Spec Playwright che sono rossi ANCHE su main su una macchina precisa, per motivi d'ambiente e non di codice. Due elenchi, perché le macchine sono due e le regole diverse. `specs` sono i rossi della macchina di chi sviluppa Filo: il cancello di `npm run finish` li lancia comunque e ne stampa l'esito, ma un loro rosso non blocca la pubblicazione; un rosso fuori da questo elenco sì. `contenitore` sono i rossi dei contenitori senza schermo in cui girano le routine: nessuno strumento li salta, servono a chi verifica per non scambiarli per regressioni. Per entrambi vale la stessa cosa: l'elenco VUOTO è lo stato normale, ogni voce è un controllo spento, e un controllo spento non protegge nessuno. Se devi aggiungere una voce scrivi QUI perché e apri un feedback per toglierla: un'eccezione senza una data di scadenza diventa permanente. Il primo elenco (feedback #563) conteneva undici spec della macchina di chi sviluppa Filo, ed è stato svuotato risolvendo caso per caso: quasi sempre era il test a dare per scontato qualcosa dell'ambiente (il percorso abbreviato 8.3 di %TEMP% quando il nome utente ha uno spazio, lo zoom di sistema al 125%, la rete di casa raggiungibile, un provider finto che risponde più in fretta di quanto il test riesca a digitare). Si è riempito di nuovo, e l'ha svuotato il #650. Le prove davano per scontati il `pwd` di una shell POSIX (PowerShell stampa una tabella), un colore che la scheda appena aperta eredita dalla sorella sullo stesso host, un `change` che arriva solo spostando il fuoco (e una finestra parcheggiata il fuoco non ce l'ha) e un «Salvato» che restava acceso dal salvataggio prima. Uno solo era un difetto dell'app: l'invito a tempo dell'editor chiudeva il riquadro del commento aperto nel frattempo.",
+  "specs": [],
   "contenitore": {
-    "nota": "Rossi a ogni giro di routine, su qualunque ramo, perché il contenitore non ha uno schermo vero né la rete aperta. Stavano nella memoria di chi verificava (le sue istruzioni ne facevano l'elenco a voce) e nessuno aveva una data di scadenza: un controllo spento senza un posto dove essere scritto è un controllo che nessuno rimetterà mai in piedi. Chi verifica confronta questo elenco con i rossi della sua corsa: quello che non è qui dentro è una regressione. Il primo elenco (feedback #563, terzo giro) ne contava sei; il settimo, «la finestra non compare sullo schermo», è uscito subito chiedendo la trasparenza solo dove il sistema sa darla e verificando sempre la posizione, che è la metà che conta. I quattro del tutto schermo sono usciti col #514, e la diagnosi scritta qui era sbagliata: non mancava il gestore di finestre, rientrava in se stesso il gestore che riparcheggia la finestra fuori schermo quando si esce dal tutto schermo (src/main/test-window-mode.js), finché il processo moriva per stack esaurito. Con la guardia i quattro casi girano nel contenitore così com'è, senza schermo e senza gestore di finestre — è il motivo per cui una voce va tolta appena si può, invece di credere alla sua spiegazione. PRIMA di confrontare la tua corsa con questo elenco, controlla COME l'hai lanciata: nel contenitore (Linux, senza schermo, da root) gli spec che aprono Electron vogliono davanti ELECTRON_DISABLE_SANDBOX=1 e xvfb-run -a (lo dice già scripts/ensure-electron.mjs, riga 154). Senza quei due Electron non parte proprio, e quel rosso non è un rosso del codice né una voce da aggiungere qui: è un comando scritto male. Ogni giro lo riscopriva da capo, quindi sta scritto qui. Dal 2026-09-16 questo elenco lo legge una macchina: scripts/suite-verdict.mjs, nel lavoro di release di GitHub, toglie dal conto i casi elencati qui e ferma la pubblicazione su qualunque altro rosso. Per questo `caso` deve essere il TITOLO ESATTO del test (o un elenco di titoli, se la voce copre due test sorelle), non una descrizione: una voce senza `caso` copre tutto lo spec, e una sentinella negli unit test controlla che ogni titolo esista davvero in quello spec.",
+    "nota": "Rossi a ogni giro di routine, su qualunque ramo, perché il contenitore non ha uno schermo vero né la rete aperta. Stavano nella memoria di chi verificava (le sue istruzioni ne facevano l'elenco a voce) e nessuno aveva una data di scadenza: un controllo spento senza un posto dove essere scritto è un controllo che nessuno rimetterà mai in piedi. Chi verifica confronta questo elenco con i rossi della sua corsa: quello che non è qui dentro è una regressione. Il primo elenco (feedback #563, terzo giro) ne contava sei; il settimo, «la finestra non compare sullo schermo», è uscito subito chiedendo la trasparenza solo dove il sistema sa darla e verificando sempre la posizione, che è la metà che conta. I quattro del tutto schermo sono usciti col #514, e la diagnosi scritta qui era sbagliata: non mancava il gestore di finestre, rientrava in se stesso il gestore che riparcheggia la finestra fuori schermo quando si esce dal tutto schermo (src/main/test-window-mode.js), finché il processo moriva per stack esaurito. Con la guardia i quattro casi girano nel contenitore così com'è, senza schermo e senza gestore di finestre — è il motivo per cui una voce va tolta appena si può, invece di credere alla sua spiegazione. PRIMA di confrontare la tua corsa con questo elenco, controlla COME l'hai lanciata: nel contenitore (Linux, senza schermo, da root) gli spec che aprono Electron vogliono davanti ELECTRON_DISABLE_SANDBOX=1 e xvfb-run -a (lo dice già scripts/ensure-electron.mjs, riga 154). Senza quei due Electron non parte proprio, e quel rosso non è un rosso del codice né una voce da aggiungere qui: è un comando scritto male. Ogni giro lo riscopriva da capo, quindi sta scritto qui. Dal 2026-09-16 questo elenco lo legge una macchina: scripts/suite-verdict.mjs, nella suite che gira in GitHub a ogni fusione su main (suite.yml), toglie dal conto i casi elencati qui; qualunque altro rosso rende quel commit non pubblicabile. Per questo `caso` deve essere il TITOLO ESATTO del test (o un elenco di titoli, se la voce copre due test sorelle), non una descrizione: una voce senza `caso` copre tutto lo spec, e una sentinella negli unit test controlla che ogni titolo esista davvero in quello spec. Il #708 ha svuotato metà di questo elenco correggendo le CAUSE invece di descriverle: le otto prove dell'owner dei crediti (wallet-owner-page, wallet-owner-manopole) erano rosse perché token-store buttava la sessione quando il sistema non sa cifrare, e adesso la tiene per l'avvio in corso; le due di manage-frase-non-si-perde misuravano dove cadono i tasti alla larghezza che capitava, e adesso fissano la finestra. La stessa correzione toglie il motivo alle voci di tests/verifica/locale-pagina-owner-crediti, che restano qui solo perché nessuno può rilanciarle: senza filo-security accanto al repo si saltano, nel contenitore come in GitHub. Vanno via al primo giro che riesce a correrle. Il #645 ha tolto la cattura composita: con la finestra parcheggiata fuori schermo la fotografia non si chiede più al sistema, la compone Electron dalle superfici della finestra.",
     "specs": [
-      {
-        "spec": "tests/capture-composite",
-        "caso": ["screenshot newtab: file esiste e non è vuoto", "screenshot dashboard (filo://dashboard): file esiste e non è vuoto"],
-        "perche": "cattura la finestra a livello di sistema operativo, ma durante la suite la finestra è parcheggiata fuori dallo schermo di proposito: quello che torna è nero. Serve uno schermo vero con la finestra sopra.",
-        "feedback": "#563"
-      },
       {
         "spec": "tests/transparency-page",
         "caso": "un link a una fonte apre una scheda e non porta via la pagina interna",
         "perche": "apre un sito vero su internet, che dal contenitore non si raggiunge.",
         "feedback": "#563"
-      },
-      {
-        "spec": "tests/wallet-owner-page",
-        "caso": "i moduli dell’owner rifiutano con parole di Filo zero codici, crediti con la virgola e pseudonimo vuoto; un utente si conta al singolare",
-        "perche": "la prova finge di essere l’owner salvando una sessione su disco, e la persistenza dei token passa da safeStorage, cioè dal portachiavi del sistema operativo. Nel contenitore delle routine quel portachiavi non c’è: misurato nel secondo giro di verifica del #581, isEncryptionAvailable() risponde false, il salvataggio torna false senza scrivere, la rilettura dà null e l’owner non viene riconosciuto, quindi la prova muore alla prima riga. Succede sempre, su qualunque ramo. Da risolvere (una via per simulare l’owner che non passi dal disco) e poi togliere la voce.",
-        "feedback": "da aprire: rossi del contenitore trovati dalla verifica #581"
-      },
-      {
-        "spec": "tests/wallet-owner-manopole",
-        "caso": [
-          "le sette manopole si salvano davvero, un numero storto non arriva al server e «rimetti com’era» riporta il valore di prima",
-          "i numeri che il server calcola si leggono in cima, e non si possono toccare",
-          "la riga di una persona apre la sua scheda: movimenti, suoi inviti e ultime chiamate",
-          "manopole e numeri si leggono in tema chiaro e in tema scuro"
-        ],
-        "perche": "stesso motivo di tests/wallet-owner-page: la prova finge di essere l’owner salvando una sessione su disco, e la persistenza dei token passa da safeStorage, cioè dal portachiavi del sistema. Nel contenitore delle routine quel portachiavi non c’è, l’owner non viene riconosciuto e la pagina mostra «questa pagina è del proprietario». Succede sempre, su qualunque ramo.",
-        "feedback": "da aprire: rossi del contenitore trovati dalla verifica #581"
-      },
-      {
-        "spec": "tests/manage-frase-non-si-perde",
-        "caso": ["anche con quattro azioni i tasti restano su una riga sola", "un messaggio d esito lungo non manda i tasti a capo"],
-        "perche": "le due prove MISURANO dove cadono i tasti della barra dell’owner, e i tasti vanno a capo o no a seconda di quanto è larga la finestra e di quanto è grande il testo: due cose che nel contenitore senza schermo non sono quelle della macchina di chi sviluppa Filo (là lo schermo sta al 125%). Il numero dei tasti è quello atteso, sei: a divergere è solo il numero di righe, due invece di una. Rosso identico su main: misurato il 2026-09-14 da una copia di lavoro su origin/main nello stesso contenitore, mentre si riallineava il ramo del #583 — non è di nessun ramo. Da risolvere (misurare che i tasti ci stiano, non a quale altezza cadono, oppure fissare la larghezza della finestra nella prova) e poi togliere la voce.",
-        "feedback": "da aprire: rossi del contenitore trovati dal riallineamento del #583"
-      },
-      {
-        "spec": "tests/net-error-page",
-        "caso": "renderer crashato: pagina d'errore \"scheda bloccata\" invece del bianco",
-        "perche": "la prova ammazza il renderer della scheda e aspetta la pagina d'errore interna, che nel contenitore non compare entro 20 secondi. Solo Linux senza sandbox (ELECTRON_DISABLE_SANDBOX=1, xvfb): identico in due corse della suite in GitHub (35088361658 e 35101566321, tre tentativi ciascuna, 1,4 minuti l'uno), mentre le due sorelle dello stesso spec (dominio inesistente, server giù poi su) sono verdi e su Windows la prova è verde. Dopo ognuno dei tre tentativi il worker non riesce a chiudere l'app entro 60 secondi («Worker teardown timeout», tre volte, sempre con questo caso come ultimo): l'app resta appesa dopo il crash forzato. Ipotesi: senza sandbox la view ricreata dopo il crash (src/main/tabs.js, render-process-gone → _recreateView) muore di nuovo e l'anti-loop a 2 secondi ferma i tentativi, lasciando la scheda bianca. Non confermato: il trace del secondo tentativo porta solo i passi del runner, non lo stderr dell'app dove il main scrive render-process-gone. Da riprodurre nel contenitore leggendo lo stderr dell'app, poi correggere e togliere la voce.",
-        "feedback": "da aprire: rossi del contenitore GitHub Actions (corse della suite #35088361658 e #35101566321)"
       },
       {
         "spec": "tests/verifica/locale-pagina-owner-crediti/giro1-attriti",
@@ -76,7 +31,7 @@
           "un numero storto non arriva al server, e lo dice con parole di Filo",
           "il tetto dei crediti elargibili ferma OGNI strada: ingresso, quota, regalo e premi"
         ],
-        "perche": "stesso motivo di tests/wallet-owner-page: le prove del giro di verifica sulla pagina dell'owner dei crediti fingono di essere l'owner salvando una sessione su disco, e la persistenza dei token passa da safeStorage, cioè dal portachiavi del sistema. Nel contenitore delle routine quel portachiavi non c'è, l'owner non viene riconosciuto e la pagina mostra «questa pagina è del proprietario». Succede sempre, su qualunque ramo. Queste prove la suite le raccoglie solo con FILO_TEST_VERIFICA=1.",
+        "perche": "le prove del giro di verifica sulla pagina dell'owner dei crediti fingono di essere l'owner salvando una sessione, e la persistenza dei token passa da safeStorage, cioè dal portachiavi del sistema, che nel contenitore non c'è. Il #708 ha tolto la causa (la sessione resta per l'avvio in corso) e tests/wallet-owner-page, che aveva lo stesso motivo, nel contenitore e in GitHub è verde e non è più in questo elenco (#647). Queste invece restano finché un giro con filo-security accanto al repo non le rilancia: la suite le raccoglie solo con FILO_TEST_VERIFICA=1.",
         "feedback": "da aprire: rossi del contenitore trovati dalla verifica #581"
       },
       {
@@ -137,60 +92,5 @@
       }
     ]
   },
-  "specsMotivi": [
-    {
-      "spec": "tests/board-offline-error",
-      "caso": "un login (o altro ridisegno) non cancella l'errore",
-      "perche": "la bacheca raggiunge Firestore davvero e carica i dati veri: l'errore che il test aspetta non compare. rosso identico su main sulla macchina di chi sviluppa Filo (confrontato caso per caso dalla verifica del #598, secondo giro, 2026-09-09): non è di nessun ramo. Da risolvere o spiegare meglio, poi togliere la voce.",
-      "feedback": "da aprire: rossi della macchina dell'owner trovati dalla verifica #598"
-    },
-    {
-      "spec": "tests/filo-terminal-context",
-      "caso": "un cd persiste, il pwd successivo lo riflette",
-      "perche": "il pwd di PowerShell su questa macchina stampa l'intestazione «Path ----» prima del percorso e il confronto letterale fallisce. rosso identico su main sulla macchina di chi sviluppa Filo (confrontato caso per caso dalla verifica del #598, secondo giro, 2026-09-09): non è di nessun ramo. Da risolvere o spiegare meglio, poi togliere la voce.",
-      "feedback": "da aprire: rossi della macchina dell'owner trovati dalla verifica #598"
-    },
-    {
-      "spec": "tests/tab-reorder-reopen",
-      "caso": "riordinate per colore anche senza archiviare nulla",
-      "perche": "rosso identico su main sulla macchina di chi sviluppa Filo (confrontato caso per caso dalla verifica del #598, secondo giro, 2026-09-09): non è di nessun ramo. Da risolvere o spiegare meglio, poi togliere la voce.",
-      "feedback": "da aprire: rossi della macchina dell'owner trovati dalla verifica #598"
-    },
-    {
-      "spec": "tests/verify-495-avversariale",
-      "caso": "nessun numero finché i feedback non sono arrivati",
-      "perche": "presume Firestore irraggiungibile; qui è raggiungibile e le schede dicono «Ricevuti (495+)». Stesso caso di manage-tab-counts già noto. rosso identico su main sulla macchina di chi sviluppa Filo (confrontato caso per caso dalla verifica del #598, secondo giro, 2026-09-09): non è di nessun ramo. Da risolvere o spiegare meglio, poi togliere la voce.",
-      "feedback": "da aprire: rossi della macchina dell'owner trovati dalla verifica #598"
-    },
-    {
-      "spec": "tests/verify-495-vfx3",
-      "caso": "i due casi «caricamento fallito»",
-      "perche": "presume Firestore irraggiungibile; qui è raggiungibile e le schede dicono «Ricevuti (495+)». rosso identico su main sulla macchina di chi sviluppa Filo (confrontato caso per caso dalla verifica del #598, secondo giro, 2026-09-09): non è di nessun ramo. Da risolvere o spiegare meglio, poi togliere la voce.",
-      "feedback": "da aprire: rossi della macchina dell'owner trovati dalla verifica #598"
-    },
-    {
-      "spec": "tests/options-home-models",
-      "caso": "i modelli della Home (dashboard e chat) sono impostabili e persistono",
-      "perche": "rosso solo sotto il carico della suite intera (il valore salvato torna quello di serie), verde da solo in pochi secondi; visto dalla verifica del #598 (quarto giro, 2026-09-09). Da rendere stabile, poi togliere la voce.",
-      "feedback": "da aprire: rossi della macchina dell'owner trovati dalla verifica #598"
-    },
-    {
-      "spec": "tests/verify-509-giro4",
-      "caso": "stessa azione, stessa scrittura: nessuna decisione cancellata",
-      "perche": "da solo impiega quasi tutto il tetto di 60 secondi e sotto il carico della suite lo sfora; visto dalla verifica del #598 (quarto giro, 2026-09-09). Da rendere stabile o alzare il tetto, poi togliere la voce.",
-      "feedback": "da aprire: rossi della macchina dell'owner trovati dalla verifica #598"
-    },
-    {
-      "spec": "tests/verify-downloads-410",
-      "caso": "SUCCESSO: link a file → il file arriva, la barra avanza; STRESS: due download con lo STESSO nome in parallelo non si sovrascrivono",
-      "perche": "rossi anche da soli e identici su main sulla macchina di chi sviluppa Filo (verifica del #598, quinto giro, 2026-09-09): la barra passa da 0% a 100% senza un valore intermedio (il server locale è troppo veloce per vederne uno), e i due download con lo stesso nome finiscono sullo stesso percorso. La causa non è stata indagata da quel ramo, che i download non li tocca: da risolvere o spiegare, poi togliere la voce.",
-      "feedback": "da aprire: rossi della macchina dell'owner trovati dalla verifica #598"
-    },
-    {
-      "spec": "tests/editor-comments",
-      "caso": "dalla lista si può aggiungere un SECONDO commento (bottone \"Nuovo commento\")",
-      "perche": "rosso solo sotto il carico della suite intera, in tutti e tre i tentativi (dopo il primo commento il campo del nuovo commento non compare entro 30 secondi), verde da solo in mezzo minuto sia sul ramo sia su main; visto dalla verifica del #598 sul ramo -b (secondo giro, 2026-09-10). Da rendere stabile, poi togliere la voce.",
-      "feedback": "da aprire: rossi della macchina dell'owner trovati dalla verifica #598"
-    }
-  ]
+  "specsMotivi": []
 }

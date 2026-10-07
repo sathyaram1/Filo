@@ -28,6 +28,10 @@
 //   fermati: stai ricreando il problema.
 //
 // USO
+//   Nei comandi che usano un biglietto lo si passa davanti oppure con `--ticket <codice>` (o
+//   `--biglietto`); in tutti e due i posti dev'essere lo stesso. Senza biglietto l'uscita è 1, non 3:
+//   il server non è stato chiamato.
+//
 //   node scripts/routine-channel.mjs probe <parola-d-ordine>
 //       → c'è lavoro? Non lega niente. Exit 0 = sì, 2 = niente da fare,
 //         3 = guasto. Da chiedere PRIMA di pagare il setup dell'ambiente.
@@ -40,6 +44,12 @@
 //
 //   node scripts/routine-channel.mjs work <biglietto>
 //       → stampa il JSON del proprio lavoro { role, ... }.
+//
+//   node scripts/routine-channel.mjs immagine <id> [--ticket <codice>]
+//       → un'immagine del feedback rinviata dalla consegna (`rinviata: true` in `immagini`), chiesta da
+//         sola col suo id (`s2`, `r1.3`). La scrive accanto alle altre e stampa la voce col percorso in
+//         `file`. Il biglietto lo ritrova da solo, come heartbeat. Exit 0 = voce (aperta o col motivo
+//         in `errore`), 4 = rifiutato (`no_image`: id che il tuo ruolo non vede), 3 = guasto.
 //
 //   node scripts/routine-channel.mjs heartbeat [<biglietto>] [--loop]
 //       → tiene vivo il semaforo. Con --loop batte finché il biglietto vive.
@@ -79,6 +89,11 @@
 //         scelto il server, e consuma il biglietto. Serve solo nella fase in
 //         cui i due canali convivono.
 //
+//   node scripts/routine-channel.mjs domanda <parola-d-ordine> | domanda --biglietto <biglietto>
+//       → la domanda di fine sessione e il comando per rispondere. Exit 0 = domanda, 2 = nessuna (chiudi e basta), 4 = rifiutato.
+//   node scripts/routine-channel.mjs risposta <parola-d-ordine> <id> | risposta --biglietto <biglietto>   (testo da stdin)
+//       → registra la risposta. Exit come sopra; `answer_too_big` stampa i byte e il massimo.
+//
 //   La FUSIONE su main non ha un sottocomando qui: passa da
 //   `scripts/merge-gate.mjs <branch>`, che usa merge() di questo modulo. Il
 //   merge lo fa il SERVER (SPEC-RIDISEGNO-MAX.md §10): verdetti registrati,
@@ -89,10 +104,13 @@ import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { pinnedRepoRoot } from './lib/tools-pin.mjs';
 import { isProtectedBranch, headSha } from './lib/branch-integrity.mjs';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { leggiTestoLivello } from './lib/livelli.mjs';
+import { haFormaDiBigliettoVero, leggiBigliettoAMano } from './lib/routine-ticket.mjs';
+import { scriviImmagine } from './lib/consegna-file.mjs';
 
 // La radice del checkout, con lo stesso ripiego di dispatch: i marcatori del
 // giro (biglietto, battito) stanno lì dentro, e chi lavora in una cartella di
@@ -234,6 +252,37 @@ export async function work(t, opts) {
   return { ok: false, reason: String((body && body.reason) || (status === 200 ? 'busta_incompleta' : `http_${status}`)) };
 }
 
+// Gli id delle immagini del contratto #900: `sN` della segnalazione, `rK.j` della risposta K.
+export const ID_IMMAGINE_RE = /^(s\d{1,4}|r\d{1,4}\.\d{1,4})$/;
+
+/**
+ * Chi chiede un'immagine: l'id, e il biglietto se passato (davanti all'id o con `--ticket`, uguali se
+ * tutti e due). Senza biglietto lo ritrova chi chiama, come heartbeat. PURA.
+ * @returns {{ id: string, ticket: string } | { errore: string }}
+ */
+export function argomentiImmagine(args, aMano = '') {
+  const lista = Array.isArray(args) ? args.map(String) : [];
+  const mano = String(aMano || '').trim();
+  let davanti = '';
+  if (lista.length === 2 && haFormaDiBigliettoVero(lista[0])) davanti = lista.shift();
+  if (lista.length !== 1) return { errore: 'Uso: immagine <id> [--ticket <codice>], un id solo (s2, r1.3).' };
+  const id = lista[0].trim();
+  if (!ID_IMMAGINE_RE.test(id)) return { errore: `Id d'immagine non valido: «${id.slice(0, 20)}». La forma è sN (segnalazione) o rK.j (risposta K), come in «immagini».` };
+  if (davanti && mano && davanti !== mano) return { errore: 'Due biglietti diversi: passane uno solo.' };
+  return { id, ticket: davanti || mano };
+}
+
+/** Un'immagine rinviata, chiesta da sola allo stesso endpoint del lavoro (contratto #900 §3). */
+export async function immagine(t, id, opts) {
+  const { status, body } = await call('routineWork', { ticket: t, immagine: id }, opts);
+  if (status === 200 && body && body.ok && body.immagine && typeof body.immagine === 'object') {
+    return { outcome: 'ok', voce: body.immagine };
+  }
+  // Un 200 senza voce è un server che non conosce la domanda (prima del deploy): non è un no.
+  const outcome = classifyReply(status, body);
+  return { outcome: outcome === 'ok' ? 'fault' : outcome, reason: String((body && body.reason) || (outcome === 'ok' ? 'risposta_senza_immagine' : `http_${status}`)) };
+}
+
 // I motivi per cui il battito NON va ritentato: il server ha guardato il
 // biglietto e ha detto che non vale più. Qualunque altro motivo (rete giù, 5xx,
 // risposta illeggibile) è un intoppo che può passare da solo, e mollare lì
@@ -342,6 +391,13 @@ export function statoContenitore({ osImpl = os, proc = process, leggi = leggiFil
   };
 }
 
+/** Quanto aspettare il battito dopo: ogni dieci minuti, ma sempre ben dentro la scadenza che il server ha detto. PURA. */
+export function attesaBattito(expiresAt, now = Date.now()) {
+  const resta = Date.parse(String(expiresAt || '')) - now;
+  if (!Number.isFinite(resta) || resta <= 0) return BEAT_EVERY_MS;
+  return Math.min(BEAT_EVERY_MS, Math.max(1000, Math.floor(resta / 3)));
+}
+
 export async function heartbeat(t, opts = {}) {
   const { status, body } = await call('routineHeartbeat', { ticket: t, ...statoContenitore(opts) }, opts);
   if (status === 200 && body && body.ok) return { ok: true, expiresAt: body.expiresAt };
@@ -402,6 +458,96 @@ export async function releaseConRapporto(t, fault, report, opts) {
     return { ...r, rapporto: 'scartato', avviso: `il server non ha capito il rapporto (report_malformed${dettaglio}): rilasciato SENZA rapporto.` };
   }
   return { ...r, rapporto: 'allegato' };
+}
+
+// ─── Domanda di fine sessione (endpoint routineClosing) ─────────────────────
+
+/** Il corpo della richiesta: una credenziale sola, il server ne rifiuta due o nessuna. PURA. */
+export function corpoChiusura(op, { passphrase = '', ticket = '', id = '', answer, requestId = '' } = {}) {
+  if (!passphrase === !ticket) throw new Error('serve esattamente una fra parola d\'ordine e biglietto');
+  const corpo = passphrase ? { passphrase: String(passphrase), op } : { ticket: String(ticket), op };
+  if (op === 'question' && passphrase && requestId) corpo.requestId = String(requestId);
+  if (op === 'answer') {
+    if (passphrase) corpo.id = String(id || '');
+    corpo.answer = String(answer ?? '');
+  }
+  return corpo;
+}
+
+/**
+ * Traduce la risposta di `routineClosing`. PURA.
+ * 'assente' = nessuna domanda da avere (endpoint che non c'è, rete, 5xx): si
+ * chiude comunque. 'rifiutato' = il server ha guardato e ha detto no.
+ */
+export function leggiRispostaChiusura(status, body) {
+  const b = body || {};
+  if (status === 200 && b.ok) {
+    return { esito: 'ok', question: typeof b.question === 'string' ? b.question : '', id: b.id ? String(b.id) : '' };
+  }
+  const reason = String(b.reason || `http_${status}`);
+  // Un 404 senza motivo del server è la funzione che non esiste (pagina HTML);
+  // `bad_closing` è un 404 vero del server, e resta un rifiuto.
+  const senzaServer = status === 0 || status >= 500 || b.reason === 'malformed_response' || (status === 404 && !b.reason);
+  if (senzaServer) return { esito: 'assente', reason: status === 404 ? 'endpoint_assente' : reason };
+  const out = { esito: 'rifiutato', reason };
+  if (b.detail) out.detail = String(b.detail);
+  if (b.bytes !== undefined) out.bytes = b.bytes;
+  if (b.max !== undefined) out.max = b.max;
+  return out;
+}
+
+export const EXIT_CHIUSURA = { ok: 0, assente: 2, rifiutato: 4 };
+
+/** La riga da stampare su un rifiuto: su `answer_too_big` coi numeri, perché chi scrive accorci lui. PURA. */
+export function testoRifiutoChiusura(r) {
+  if (r.reason === 'answer_too_big') {
+    return `RIFIUTATO dal server: answer_too_big — la risposta è di ${r.bytes ?? '?'} byte, il massimo è ${r.max ?? '?'}. `
+      + 'Non è stato salvato niente: accorciala tu e rilancia.';
+  }
+  return `RIFIUTATO dal server: ${r.reason}${r.detail ? `: ${r.detail}` : ''}`;
+}
+
+export async function domandaChiusura(cred, opts) {
+  // Un id per invocazione, uguale in tutti i ritentativi di call(): il server ritrova lo
+  // stesso documento invece di crearne uno orfano per ogni 5xx arrivato dopo la scrittura.
+  const requestId = cred.passphrase ? randomUUID() : '';
+  const { status, body } = await call('routineClosing', corpoChiusura('question', { ...cred, requestId }), opts);
+  const r = leggiRispostaChiusura(status, body);
+  // Senza testo, o senza l'id con cui rispondere, non c'è una domanda a cui rispondere.
+  if (r.esito === 'ok' && (!r.question.trim() || (cred.passphrase && !r.id))) return { esito: 'assente', reason: 'busta_incompleta' };
+  return r;
+}
+
+export async function rispostaChiusura(cred, answer, opts) {
+  const { status, body } = await call('routineClosing', corpoChiusura('answer', { ...cred, answer }), opts);
+  return leggiRispostaChiusura(status, body);
+}
+
+/**
+ * Le parole di `domanda` e `risposta`: la parola d'ordine (orchestratore) o
+ * `--biglietto` (worker), mai tutte e due. PURA.
+ * @returns {{ cred: object } | { errore: string }}
+ */
+export function argomentiChiusura(cmd, args, data = {}) {
+  const uso = cmd === 'risposta'
+    ? 'risposta "<parola-d-ordine>" <id>  oppure  risposta --biglietto <biglietto>, col testo da stdin'
+    : 'domanda "<parola-d-ordine>"  oppure  domanda --biglietto <biglietto>';
+  const estranei = Object.keys(data).filter((k) => k !== 'biglietto');
+  if (estranei.length) return { errore: `--${estranei[0]} non vale qui. Uso: ${uso}` };
+  const biglietto = typeof data.biglietto === 'string' ? data.biglietto.trim() : '';
+  if (biglietto) {
+    if (args.length) return { errore: `Argomento non capito: "${String(args[0]).slice(0, 40)}": col biglietto non serve altro. Uso: ${uso}` };
+    return { cred: { ticket: biglietto } };
+  }
+  const attesi = cmd === 'risposta' ? 2 : 1;
+  if (args.length !== attesi || args.some((a) => !String(a).trim())) return { errore: `Uso: ${uso}` };
+  return { cred: cmd === 'risposta' ? { passphrase: args[0], id: args[1] } : { passphrase: args[0] } };
+}
+
+/** Il comando esatto per rispondere, stampato insieme alla domanda. La parola d'ordine resta segnaposto. PURA. */
+export function comandoRisposta(io, cred, id) {
+  const chi = cred.ticket ? `--biglietto ${cred.ticket}` : `"<parola-d-ordine>" ${id}`;
+  return `node "${io}" risposta ${chi} <<'FINE'\n<la tua risposta>\nFINE`;
 }
 
 /**
@@ -609,13 +755,17 @@ export async function compare(t, mine, opts) {
  * se la chiede comunque. Questo è il controllo in più, e il posto dove
  * l'informazione arriva.
  *
- * @returns {{ ok:true, result:'merged'|'blocked'|'conflict', reason?, sha?, approval? }
+ * `opts.provaUnit` è l'esito degli unit sul risultato della fusione (#929, scripts/lib/unit-sulla-fusione.mjs):
+ * il server fonde solo se main è ancora lo sha provato, e altrimenti risponde `main_moved`.
+ *
+ * @returns {{ ok:true, result:'merged'|'blocked'|'conflict'|'main_moved'|'unit_rossi', reason?, sha?, approval?, mainSha? }
  *           | { ok:false, reason }}
  */
 export async function merge(t, branch, opts) {
-  const { sha = '', ...rest } = opts && typeof opts === 'object' ? opts : {};
+  const { sha = '', provaUnit = null, ...rest } = opts && typeof opts === 'object' ? opts : {};
   const payload = { ticket: t, branch: String(branch || '') };
   if (String(sha || '')) payload.sha = String(sha);
+  if (provaUnit && typeof provaUnit === 'object') payload.provaUnit = provaUnit;
   const { status, body } = await call('routineMerge', payload, rest);
   if (status === 200 && body && body.ok && body.result) {
     return {
@@ -624,6 +774,7 @@ export async function merge(t, branch, opts) {
       reason: String(body.reason || ''),
       sha: String(body.sha || ''),
       approval: String(body.approval || ''),
+      ...(body.mainSha ? { mainSha: String(body.mainSha) } : {}),
     };
   }
   return { ok: false, reason: String((body && body.reason) || `http_${status}`) };
@@ -688,11 +839,62 @@ export function testoImprontaDiversa(quale, dichiarato, punta, motivo = 'altro_c
     + 'Niente è stato consegnato: un esito vale per il contenuto che hai davvero davanti, e l\'impronta la timbra lo strumento. Togli --sha e rilancia, oppure posizionati sul commit che hai esaminato.';
 }
 
+/** Gli intenti che una consegna conosce: decidono se la prima parola di `deliver` è un intento o un biglietto. */
+export const INTENTI_CONSEGNA = ['verdict', 'fixed', 'secaudit', 'status', 'note', 'feedback'];
+
+// Quante parole vogliono questi comandi DOPO il biglietto (che sta sempre davanti).
+const POSIZIONALI_DOPO_BIGLIETTO = { work: 0, heartbeat: 0, release: 0, compare: 2, deliver: 1 };
+
+/** «Manca l'intento, o è scritto storto»: il testo è uno, per chi passa il biglietto a mano e per chi no. PURA. */
+export function testoIntentoNonCapito(parola) {
+  const p = String(parola || '');
+  return `${p ? `Intento non capito: «${p.slice(0, 40)}».` : 'Manca l\'intento della consegna.'} Gli intenti sono: ${INTENTI_CONSEGNA.join(', ')}. Non ho consegnato niente.`;
+}
+
+/**
+ * Il biglietto passato a mano (`--ticket` o `--biglietto`) vale allo stesso modo in ogni comando che ne
+ * usa uno, con una regola sola sulla parola davanti: lo stesso biglietto (spazi intorno compresi) lo
+ * conferma, una parola con la forma lunga di un biglietto vero è un secondo biglietto e si rifiuta, ogni
+ * altra parola resta dopo il biglietto e la nominano i controlli del comando. Probe e ticket lo rifiutano
+ * col motivo; `domanda` e `risposta` lo leggono da sé. PURA.
+ * @returns {{ args: string[] } | { errore: string }}
+ */
+export function bigliettoAMano(cmd, args, dato) {
+  const b = String(dato || '').trim();
+  const lista = Array.isArray(args) ? [...args] : [];
+  if (!b) return { args: lista };
+  if (cmd === 'probe' || cmd === 'ticket') {
+    return { errore: `--ticket non vale con «${cmd}»: lì serve la parola d'ordine. Non ho fatto niente.` };
+  }
+  if (POSIZIONALI_DOPO_BIGLIETTO[cmd] === undefined) return { args: lista };
+  const davanti = String(lista[0] ?? '').trim();
+  if (davanti === b) return { args: [b, ...lista.slice(1)] };
+  // Un intento, un ruolo o un valore senza il suo campo chiamati «secondo biglietto» facevano togliere il
+  // biglietto giusto, e senza promemoria la risposta dopo era «aggiungi il biglietto»: un giro a vuoto.
+  if (!haFormaDiBigliettoVero(davanti)) return { args: [b, ...lista] };
+  const senzaIntento = cmd === 'deliver' && lista.length < 2;
+  return {
+    errore: `Due biglietti diversi (${davanti.slice(0, 12)}… e --ticket ${b.slice(0, 12)}…)${senzaIntento ? ', e manca l\'intento' : ''}: non ho fatto niente. `
+      + (senzaIntento ? `Passa un biglietto solo, e dopo l'intento (${INTENTI_CONSEGNA.join(', ')}).` : 'Passane uno solo.'),
+  };
+}
+
+/** La parola in più dopo quelle che il comando vuole, se c'è: rilascio e consegna hanno i loro testi. PURA. */
+export function parolaInPiu(cmd, args) {
+  const dopo = POSIZIONALI_DOPO_BIGLIETTO[cmd];
+  if (!['work', 'heartbeat', 'compare'].includes(cmd) || !Array.isArray(args) || args.length <= dopo + 1) return '';
+  return String(args[dopo + 1]);
+}
+
 // ─── CLI ─────────────────────────────────────────────────────────────────────
 
 const isMain = resolve(process.argv[1] || '') === resolve(fileURLToPath(import.meta.url));
 if (isMain) {
-  const [cmd, ...rest] = process.argv.slice(2);
+  const [cmd, ...tutti] = process.argv.slice(2);
+  // Il biglietto a mano si toglie per primo, con la stessa regola delle registrazioni (#587).
+  const mano = leggiBigliettoAMano(tutti);
+  if (mano.errore) { console.error(`${mano.errore} Non ho fatto niente.`); process.exit(1); }
+  const rest = mano.args;
   // Un passaggio solo: i `--campo valore` diventano dati dell'intento, il resto
   // sono posizionali. Così l'ordine fra flag e posizionali non conta, e un
   // valore che assomiglia a un comando non viene scambiato per tale.
@@ -701,7 +903,7 @@ if (isMain) {
     'notes', 'frase', 'text', 'title', 'status', 'reason', 'resolvedInVersion',
     'branch', 'sha', 'verdict', 'critique', 'summary', 'findings', 'report',
     'userNote', 'priority', 'guasto', 'loop', 'name', 'json',
-    'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop',
+    'segnala', 'senza-push', 'senza-rapporto', 'role', 'stop', 'biglietto', 'ticket',
   ]);
   // «Sembra un'opzione ma scritta storta?»: un trattino solo, un trattino
   // lungo da copia-incolla, o la forma di Windows con la barra — e il nome che
@@ -739,6 +941,8 @@ if (isMain) {
   const data = {};
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
+    // Un biglietto vero davanti è un posizionale anche col trattino (o due): nessuna opzione ha la sua forma.
+    if (haFormaDiBigliettoVero(a)) { args.push(a); continue; }
     // Un'opzione scritta storta non è un posizionale: presa per tale, il
     // biglietto veniva rilasciato e il guasto NON dichiarato, con la risposta
     // che diceva «OK» (feedback #565).
@@ -797,6 +1001,22 @@ if (isMain) {
   // la stessa cosa: due (uno qui e uno lì) è come si perde un testo per strada.
   if (typeof data.frase === 'string') { data.userNote = data.frase; }
   delete data.frase;
+  // Il biglietto a mano vale in OGNI comando con la stessa regola (#587): accettarlo per poi ignorarlo
+  // faceva rilasciare in silenzio un biglietto diverso da quello passato.
+  if (cmd === 'domanda' || cmd === 'risposta') {
+    if (mano.ticket) data.biglietto = mano.ticket;
+  } else {
+    const conMano = bigliettoAMano(cmd, args, mano.ticket);
+    if (conMano.errore) { console.error(conMano.errore); process.exit(1); }
+    args.splice(0, args.length, ...conMano.args);
+    // Ignorata, `loop` senza trattini dava un battito solo e un «OK».
+    const inPiu = parolaInPiu(cmd, args);
+    if (inPiu) {
+      const cosa = { compare: 'Dopo il biglietto vanno solo il ruolo e il numero.', heartbeat: 'Dopo il biglietto qui non va altro: il battito continuo si chiede con --loop.' }[cmd] || 'Dopo il biglietto qui non va altro.';
+      console.error(`Argomento non capito: "${inPiu.slice(0, 40)}": non ho fatto niente. ${cosa}`);
+      process.exit(1);
+    }
+  }
 
   // `--segnala <file.md>`: la segnalazione per l'owner (L3), letta INTERA dal
   // file con gli stessi controlli di dispatch --record-* (assente, vuoto,
@@ -815,12 +1035,13 @@ if (isMain) {
   }
   delete data.segnala;
 
-  // `--stop` ferma il lavoro e chiama l'owner: senza segnalazione non saprebbe
-  // cosa decidere. Stessa regola di dispatch --record-fixed --ferma.
+  // `--stop` resta accettato per chi lo scrive ancora, ma non serve: è la
+  // segnalazione che ferma il lavoro, e senza l'owner non saprebbe cosa
+  // decidere. Stessa regola di dispatch --record-fixed --ferma.
   if (data.stop !== undefined) {
     const suFixed = cmd === 'deliver' && [args[0], args[1]].includes('fixed');
     if (data.stop !== true || !suFixed || !data.segnalazione) {
-      console.error('--stop vale solo su deliver fixed, senza valore, e insieme a --segnala <file.md>: non ho consegnato niente.');
+      console.error('--stop vale solo su deliver fixed, senza valore, e insieme a --segnala <file.md> (che da sola ferma già il lavoro): non ho consegnato niente.');
       process.exit(1);
     }
   }
@@ -830,15 +1051,43 @@ if (isMain) {
     // la copia fissata, `scripts/…` porterebbe a quello del ramo di lavoro —
     // cioè proprio la cosa che il contratto dei worker vieta di scrivere a mano.
     const io = resolve(fileURLToPath(import.meta.url)).split('\\').join('/');
-    console.error(`Uso: node "${io}" <probe|ticket|work|heartbeat|release|deliver|compare> <segreto> [...]`);
+    console.error(`Uso: node "${io}" <probe|ticket|work|immagine|heartbeat|release|deliver|compare|domanda|risposta> <segreto> [...]`);
     process.exit(1);
   };
 
-  // `heartbeat` è l'unico comando che può girare senza posizionali: il ciclo lo
-  // avvia dispatch e il biglietto viaggia nell'ambiente, mai fra gli argomenti.
-  if (!cmd || (!args[0] && cmd !== 'heartbeat')) usage();
+  // `heartbeat` può girare senza posizionali (il biglietto viaggia nell'ambiente);
+  // `domanda` e `risposta` del worker hanno il biglietto in `--biglietto`.
+  if (!cmd || (!args[0] && !['heartbeat', 'domanda', 'risposta'].includes(cmd))) usage();
 
-  if (cmd === 'probe') {
+  if (cmd === 'domanda' || cmd === 'risposta') {
+    const a = argomentiChiusura(cmd, args, data);
+    if (a.errore) { console.error(`${a.errore} — non ho mandato niente.`); process.exit(1); }
+    if (cmd === 'domanda') {
+      const r = await domandaChiusura(a.cred);
+      if (r.esito === 'assente') { console.error(`nessuna domanda (${r.reason}): niente da rispondere, chiudi o rilascia come sempre.`); process.exit(EXIT_CHIUSURA.assente); }
+      if (r.esito === 'rifiutato') { console.error(testoRifiutoChiusura(r)); process.exit(EXIT_CHIUSURA.rifiutato); }
+      const io = resolve(fileURLToPath(import.meta.url)).split('\\').join('/');
+      console.log(`${r.question.trim()}\n\nPer rispondere:\n${comandoRisposta(io, a.cred, r.id)}`);
+      process.exit(0);
+    }
+    // Il testo arriva da stdin (heredoc): sulla riga di comando gli apostrofi
+    // italiani romperebbero la shell. Da un terminale senza tubo si aspetterebbe per sempre.
+    let testo = '';
+    if (!process.stdin.isTTY) {
+      const pezzi = [];
+      for await (const p of process.stdin) pezzi.push(p);
+      testo = Buffer.concat(pezzi).toString('utf8').trim();
+    }
+    if (!testo) {
+      console.error('Nessuna risposta su stdin — non ho mandato niente. Il testo va fra due righe FINE:');
+      console.error(`  … risposta ${a.cred.ticket ? '--biglietto <biglietto>' : '"<parola-d-ordine>" <id>'} <<'FINE'\n  niente\n  FINE`);
+      process.exit(1);
+    }
+    const r = await rispostaChiusura(a.cred, testo);
+    if (r.esito === 'ok') { console.log('OK: risposta registrata.'); process.exit(0); }
+    if (r.esito === 'assente') { console.error(`risposta non arrivata (${r.reason}): chiudi comunque, senza insistere.`); process.exit(EXIT_CHIUSURA.assente); }
+    console.error(testoRifiutoChiusura(r)); process.exit(EXIT_CHIUSURA.rifiutato);
+  } else if (cmd === 'probe') {
     const r = await probe(args[0]);
     if (r.outcome === 'work') { console.log('c’è lavoro'); process.exit(0); }
     if (r.outcome === 'nothing') { console.error(`niente da fare (${r.reason})`); process.exit(2); }
@@ -854,6 +1103,32 @@ if (isMain) {
     const r = await work(args[0]);
     if (!r.ok) { console.error(`guasto ${r.reason}`); process.exit(3); }
     console.log(JSON.stringify(r.payload, null, 2));
+  } else if (cmd === 'immagine') {
+    const a = argomentiImmagine(args, mano.ticket);
+    if (a.errore) { console.error(`${a.errore} Il server non è stato chiamato.`); process.exit(1); }
+    let biglietto = a.ticket;
+    if (!biglietto) {
+      const { readTicket } = await import('./lib/routine-ticket.mjs');
+      biglietto = readTicket(ROOT);
+    }
+    if (!biglietto) {
+      console.error('NESSUN BIGLIETTO: il server non è stato chiamato. Passalo con --ticket <codice>.');
+      process.exit(1);
+    }
+    const r = await immagine(biglietto, a.id);
+    if (r.outcome === 'refused') {
+      console.error(r.reason === 'no_image'
+        ? `Nessuna immagine «${a.id}» per il tuo lavoro: usa un id che c'è in «immagini».`
+        : `RIFIUTATO dal server (${r.reason}).`);
+      process.exit(4);
+    }
+    if (r.outcome !== 'ok') { console.error(`guasto ${r.reason}`); process.exit(3); }
+    let voce;
+    try { voce = scriviImmagine(r.voce, { root: ROOT }); } catch (e) {
+      console.error(`immagine ricevuta ma non scritta su disco (${e.message})`); process.exit(3);
+    }
+    console.log(JSON.stringify(voce, null, 2));
+    if (voce && voce.errore) console.error(`immagine ${a.id} non aperta: ${voce.errore}`);
   } else if (cmd === 'heartbeat') {
     // Il ciclo lo avvia dispatch, che passa il biglietto nell'ambiente: la riga
     // di comando di un processo la legge chiunque sulla macchina.
@@ -863,8 +1138,9 @@ if (isMain) {
       biglietto = readTicket(ROOT);
     }
     if (!biglietto) {
-      console.error('Nessun biglietto: non c’è nessun semaforo da tenere vivo.');
-      process.exit(3);
+      // Uscita 1, non 3: per il contratto 3 è «canale giù», e qui il server non è stato chiamato.
+      console.error('NESSUN BIGLIETTO: non c’è nessun semaforo da tenere vivo, e il server non è stato chiamato. Passalo con --ticket <codice>.');
+      process.exit(1);
     }
     if (!flags.includes('--loop')) {
       const r = await heartbeat(biglietto);
@@ -883,7 +1159,7 @@ if (isMain) {
       let primoGuastoMs = 0;
       for (;;) {
         const r = await heartbeat(biglietto);
-        if (r.ok) { primoGuastoMs = 0; await defaultSleep(BEAT_EVERY_MS); continue; }
+        if (r.ok) { primoGuastoMs = 0; await defaultSleep(attesaBattito(r.expiresAt)); continue; }
         if (r.final) { console.error(`battito finito: ${r.reason}`); process.exit(0); }
         const ora = Date.now();
         if (!primoGuastoMs) primoGuastoMs = ora;
@@ -945,7 +1221,7 @@ if (isMain) {
         const { readTicketSince } = await import('./lib/routine-ticket.mjs');
         rapporto = await generaRapporto({ role: ruolo, ticket: args[0], cwd: ROOT, since: readTicketSince(ROOT) });
       } catch (e) {
-        rapporto = { v: 1, role: ruolo, ticket: args[0], notes: [`rapporto non generato: ${String((e && e.message) || e)}`] };
+        rapporto = { v: 2, role: ruolo, ticket: args[0], notes: [`rapporto non generato: ${String((e && e.message) || e)}`] };
       }
     }
     const r = await releaseConRapporto(args[0], guasto, rapporto);
@@ -966,7 +1242,10 @@ if (isMain) {
       // clone verrebbero scartati come moncone di un'istanza morta.
       try {
         const { sealCurrentWork } = await import('./lib/branch-integrity.mjs');
-        sealCurrentWork(ROOT, { by: 'release' });
+        const { readRole } = await import('./lib/routine-role.mjs');
+        // Il ruolo nel sigillo: dopo un «pass» vale come pulizia solo quello del verificatore (#880).
+        const chi = readRole(ROOT);
+        sealCurrentWork(ROOT, { by: chi ? `release:${chi}` : 'release' });
       } catch (_) { /* best-effort: il rilascio è già andato */ }
     }
     if (r.ok) console.log(guasto ? 'OK: biglietto rilasciato, guasto dichiarato.' : 'OK: biglietto rilasciato.');
@@ -978,7 +1257,8 @@ if (isMain) {
     // dispatcher dove chi consegna lo trova). Chiedere a chi lavora di
     // ricopiarlo a ogni consegna è la scommessa già persa sulla provenienza dei
     // feedback — su decine di ritrovamenti, uno solo risultava firmato giusto.
-    const INTENTI = ['verdict', 'fixed', 'secaudit', 'status', 'note', 'feedback'];
+    // `--ticket` a mano è già davanti, al posto del biglietto (bigliettoAMano, più su).
+    const INTENTI = INTENTI_CONSEGNA;
     let biglietto = args[0];
     let intento = args[1] || '';
     if (INTENTI.includes(args[0])) {
@@ -986,8 +1266,10 @@ if (isMain) {
       const { readTicket } = await import('./lib/routine-ticket.mjs');
       biglietto = readTicket(ROOT);
       if (!biglietto) {
-        console.error('Nessun biglietto: questa consegna non ha un lavoro a cui riferirsi.');
-        process.exit(3);
+        // Uscita 1, non 3: per il contratto 3 è «canale giù, fermati», e qui il
+        // server non è stato nemmeno chiamato.
+        console.error('NESSUN BIGLIETTO: questa consegna non ha un lavoro a cui riferirsi, e il server non è stato chiamato. Ripeti lo stesso comando aggiungendo --ticket <codice> (il codice è nelle istruzioni con cui sei partito).');
+        process.exit(1);
       }
     }
     // Un posizionale avanzato NON viene ignorato in silenzio. È la trappola in
@@ -998,6 +1280,16 @@ if (isMain) {
     if (avanzati.length) {
       console.error(`Argomento non capito: "${avanzati[0].slice(0, 40)}". I dati si passano come --campo valore.`);
       console.error('Il report va in --notes "…", la frase per chi ha mandato il feedback in --frase "…", il testo di un feedback nuovo in --text "…".');
+      process.exit(1);
+    }
+    // Senza intento una parola storta partiva verso il server COME biglietto, e dopo un biglietto COME
+    // intento: la regola è una, l'intento storto si ferma qui con l'elenco.
+    if (!intento) {
+      console.error(testoIntentoNonCapito(haFormaDiBigliettoVero(biglietto) ? '' : biglietto));
+      process.exit(1);
+    }
+    if (!INTENTI.includes(intento)) {
+      console.error(testoIntentoNonCapito(intento));
       process.exit(1);
     }
     // La versione in cui il fix confluisce la sa solo questa macchina (è quella
@@ -1105,7 +1397,16 @@ if (isMain) {
         sealCurrentWork(ROOT, { by: `deliver:${intento}` });
       } catch (_) { /* best-effort: la consegna è già registrata */ }
     }
-    if (r.outcome === 'ok') { console.log(r.num ? `OK: ${r.num}` : 'OK: consegnato.'); process.exit(0); }
+    if (r.outcome === 'ok') {
+      // Una consegna con segnalazione ferma il lavoro: chi consegna deve saperlo
+      // adesso, o crede di averlo mandato in verifica.
+      const fermo = r.reply && r.reply.outcome === 'stop';
+      const conSegnalazione = typeof data.segnalazione === 'string' && data.segnalazione.trim();
+      if (fermo) console.log(`${r.num ? `OK: ${r.num}` : 'OK'}: il lavoro è FERMO e aspetta l'owner (la segnalazione è consegnata). Rilascia il biglietto.`);
+      else if (conSegnalazione) console.log(`${r.num ? `OK: ${r.num}` : 'OK: consegnato'}. ATTENZIONE: la consegna portava una segnalazione ma il server non ha fermato il lavoro (server vecchio?).`);
+      else console.log(r.num ? `OK: ${r.num}` : 'OK: consegnato.');
+      process.exit(0);
+    }
     if (r.outcome === 'refused') { console.error(`RIFIUTATO dal server: ${r.reason}${r.detail ? `: ${r.detail}` : ''}`); process.exit(4); }
     console.error(`guasto ${r.reason}`); process.exit(3);
   } else if (cmd === 'compare') {

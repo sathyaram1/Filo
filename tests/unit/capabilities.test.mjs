@@ -1,7 +1,7 @@
 // Unit test per src/shared/capabilities.js — il manifesto delle capacità di
 // Filo (F1). Verifica due cose:
 //   1. integrità strutturale del manifesto e della sua API;
-//   2. anti-stale: incrocia alcune voci col CODICE REALE (shortcut globali,
+//   2. anti-stale: incrocia alcune voci col CODICE REALE (scorciatoie,
 //      icone del menu, pagine filo://) così che, se una capacità sparisce o
 //      cambia invocazione senza aggiornare il manifesto, il test diventi rosso.
 // Pura logica → niente Electron, gira in millisecondi.
@@ -49,26 +49,49 @@ test('gli id sono unici e stabili (kebab-case)', () => {
 });
 
 test('index() è compatto, get()/byCategory()/all() coerenti', () => {
-  const idx = CAP.index();
+  const tutti = { redteam: true };
+  const idx = CAP.index(tutti);
   assert.equal(idx.length, CAP.CAPABILITIES.length);
   for (const e of idx) {
     assert.deepEqual(Object.keys(e).sort(), ['category', 'id', 'title']);
-    assert.ok(CAP.get(e.id), `get(${e.id}) deve risolvere`);
+    assert.ok(CAP.get(e.id, tutti), `get(${e.id}) deve risolvere`);
   }
-  assert.equal(CAP.get('id-inesistente'), undefined);
-  assert.equal(CAP.all().length, CAP.CAPABILITIES.length);
+  assert.equal(CAP.get('id-inesistente', tutti), undefined);
+  assert.equal(CAP.all(tutti).length, CAP.CAPABILITIES.length);
   // all() torna una copia: mutarla non tocca l'originale.
-  CAP.all().pop();
-  assert.equal(CAP.all().length, CAP.CAPABILITIES.length);
+  CAP.all(tutti).pop();
+  assert.equal(CAP.all(tutti).length, CAP.CAPABILITIES.length);
+});
+
+test('#896 — il Red Team in pausa non esiste per l’agente: né voce, né accenno nelle altre', () => {
+  const chiuso = { redteam: false };
+  for (const aperti of [undefined, chiuso]) {
+    assert.equal(CAP.get('red-team', aperti), undefined);
+    assert.ok(!CAP.index(aperti).some((c) => c.id === 'red-team'));
+    assert.ok(!CAP.all(aperti).some((c) => c.id === 'red-team'));
+    assert.ok(!CAP.byCategory('pages', aperti).some((c) => c.id === 'red-team'));
+    const idx = CAP.renderIndexForPrompt(aperti);
+    assert.doesNotMatch(idx, /red.?team/i, 'l’indice per il prompt parla ancora del Red Team');
+    assert.match(CAP.renderDetailForPrompt(['red-team'], aperti), /nessuna capacità con questo id/i);
+    // Le voci che restano non lo nominano: l'agente lo racconterebbe lo stesso.
+    for (const c of CAP.all(aperti)) {
+      assert.doesNotMatch(`${c.title} ${c.desc} ${c.invoke} ${c.doesNot || ''}`, /red.?team|filo:\/\/redteam/i,
+        `la voce "${c.id}" nomina il Red Team anche a chi non lo vede`);
+    }
+  }
+  const aperto = { redteam: true };
+  assert.ok(CAP.get('red-team', aperto));
+  assert.match(CAP.renderIndexForPrompt(aperto), /Red Team \[red-team\]/);
+  assert.match(CAP.renderDetailForPrompt(['red-team'], aperto), /filo:\/\/redteam\/redteam\.html/);
 });
 
 // ── Anti-stale: incrocio col codice reale ────────────────────────────────────
 
-test('ogni comando degli shortcut globali è coperto dal manifesto', () => {
-  // shortcuts.js definisce i 4 comandi OS; ognuno deve esistere come capacità.
+test('ogni comando delle scorciatoie di Filo è coperto dal manifesto', () => {
+  // shortcuts.js definisce i 4 comandi; ognuno deve esistere come capacità.
   const src = readFileSync(join(ROOT, 'src', 'main', 'shortcuts.js'), 'utf8');
   const commands = [...src.matchAll(/'(Alt\+[A-Z])':\s*'([a-z-]+)'/g)].map((m) => ({ accel: m[1], cmd: m[2] }));
-  assert.ok(commands.length >= 4, 'mi aspetto almeno 4 shortcut globali');
+  assert.ok(commands.length >= 4, 'mi aspetto almeno 4 scorciatoie');
   // Mappa comando-shortcut → id capacità che lo descrive.
   const cmdToCap = {
     'explain-selection': 'explain-selection',
@@ -111,10 +134,16 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
   // della stessa feature (es. add/get/delete) puntano alla stessa voce.
   const FILO_MSG_TO_CAP = {
     FILO_CHAT: 'filo-assistant',
+    FILO_CHAT_STOP: 'filo-assistant',
     FILO_GENERATE_DASHBOARD: 'generate-dashboard',
     FILO_RUN_ACTION: 'agent-actions',
     FILO_CONFIRM_ACTION: 'agent-actions',
+    // #810 — un indirizzo proposto da un modello si apre col clic solo dopo la porta delle uscite.
+    FILO_APRI_PROPOSTA: 'agent-actions',
     FILO_GET_MEMORY: 'filo-memory',
+    // #592 — la memoria riga per riga nelle Preferenze: rileggerla e toglierne una.
+    FILO_MEMORY_VIEW: 'filo-memory',
+    FILO_MEMORY_FORGET: 'filo-memory',
     // #525 — l'archivio delle chat: lo consulta la pagina Cronologia
     // (capacità "chat-archive"). La ricerca che fa FILO stesso passa dalle
     // azioni (FILO_RUN_ACTION → CERCA_CHAT) ed è la capacità gemella
@@ -130,6 +159,9 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     FILO_CHAT_NOTE: 'chat-archive',
     FILO_CHAT_UPDATE: 'chat-archive',
     FILO_CHAT_FOCUS: 'chat-archive',
+    // #866 — le pagine visitate che il filo ricorda: contarle e cancellarle dalla pagina Sicurezza.
+    FILO_PAGINE_CONTA: 'visited-pages',
+    FILO_PAGINE_CANCELLA: 'visited-pages',
     // Gli appunti non hanno handler propri: la capacità "filo-notes" è servita
     // dall'azione SALVA_APPUNTO (FILO_RUN_ACTION), che scrive nei file dell'editor.
     FILO_GET_TIMERS: 'filo-timers',
@@ -140,6 +172,7 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     FILO_STOP_TIMER_ALARM: 'filo-timers',
     FILO_GET_NOTIFICATIONS: 'filo-notifications',
     FILO_DISMISS_NOTIFICATION: 'filo-notifications',
+    FILO_INSTALLA_AGGIORNAMENTO: 'auto-update',
     FILO_GET_ONBOARDING: 'onboarding',
     FILO_RESTART_ONBOARDING: 'onboarding',
     FILO_CLOSE_ONBOARDING: 'onboarding',
@@ -225,9 +258,14 @@ test('ogni icona fissa della home che apre una pagina filo:// è coperta dal man
   // segnalazioni lui non la può aprire (#583). Dalla home ci si arriva solo da
   // admin, per questo l'indirizzo compare ancora nel file.
   const SOLO_OWNER = new Set(['filo://feedback/feedback.html', 'filo://manage/manage.html']);
-  const urls = [...dash.matchAll(/url:\s*'(filo:\/\/[a-z-]+\/[a-z-]+\.html)'/g)]
-    .map((m) => m[1])
-    .filter((u) => !SOLO_OWNER.has(u));
+  // Le icone che stavano in alto a destra nella home sono nella barra laterale (#871): stessa regola.
+  const barra = readFileSync(join(ROOT, 'src', 'main', 'barraLaterale.js'), 'utf8');
+  const pagineBarra = barra.match(/const PAGINE_FISSE = \{([\s\S]*?)\};/)?.[1] || '';
+  assert.ok(pagineBarra, 'non trovo le pagine fisse della barra laterale');
+  const urls = [
+    ...[...dash.matchAll(/url:\s*'(filo:\/\/[a-z-]+\/[a-z-]+\.html)'/g)].map((m) => m[1]),
+    ...[...pagineBarra.matchAll(/'(filo:\/\/[a-z-]+\/[a-z-]+\.html)'/g)].map((m) => m[1]),
+  ].filter((u) => !SOLO_OWNER.has(u));
   assert.ok(urls.length >= 2, `mi aspetto ≥2 icone della home con url filo://, trovate ${urls.length}`);
   const manifestText = CAP.CAPABILITIES.map((c) => `${c.invoke} ${c.desc}`).join('\n');
   for (const url of urls) {
@@ -254,18 +292,16 @@ function menuIconLabels() {
     const text = label(m[2]);
     if (text) byId.set(m[1], text);
   }
-  const retired = new Set(
-    [...(src.match(/RETIRED_ICONS\s*=\s*new Set\(\[([^\]]*)\]/)?.[1] || '').matchAll(/'(\w+)'/g)].map((m) => m[1]),
+  // Dove sta ogni icona lo dice src/shared/disposizioneIcone.js (#871): dal tasto destro si
+  // raggiungono la riga e «Altro…», più le icone nate dopo che la migrazione mette in «Altro…».
+  // Le globali (indietro, avanti, ricarica…) stanno nella barra laterale, non nel menu.
+  require(join(ROOT, 'src', 'shared', 'disposizioneIcone.js'));
+  const D = globalThis.SN_DISPOSIZIONE_ICONE;
+  const retired = new Set(D.RITIRATE);
+  const reachable = new Set(
+    [...D.DEFAULT.primary, ...D.DEFAULT.secondary, ...D.AGGIUNTE.filter((id) => !D.GLOBALI.includes(id))]
+      .filter((id) => !retired.has(id)),
   );
-  // Icone raggiungibili: quelle del layout di default più quelle che la
-  // migrazione aggiunge ai layout già salvati. Un'icona fuori da qui non
-  // compare nel menu di NESSUNO, anche se resta nel registro.
-  const reachable = new Set();
-  const layout = src.match(/DEFAULT_ICON_LAYOUT\s*=\s*\{([\s\S]*?)\n  \};/)?.[1] || '';
-  const additions = src.match(/const additions\s*=\s*\[([^\]]*)\]/)?.[1] || '';
-  for (const m of `${layout}${additions}`.matchAll(/'(\w+)'/g)) {
-    if (!retired.has(m[1])) reachable.add(m[1]);
-  }
   return { byId, retired, reachable };
 }
 
@@ -333,8 +369,8 @@ test('nessuna capacità cita la barra in alto / degli indirizzi, rimossa dalla s
   // Drift #399 (stessa famiglia di #387/#252): la shell tiene la barra indirizzi
   // (<nav class="addr">) SEMPRE nascosta — applyChrome() forza compact=true e
   // boot.spec.mjs asserisce #addr assente. Sopra le schede ci sono solo le
-  // linguette e i pulsanti finestra: indietro/avanti/ricarica vivono nel menu
-  // del tasto destro, l'icona Home in alto a destra DENTRO la home. Il manifesto
+  // linguette e i pulsanti finestra: indietro/avanti/ricarica e Home vivono
+  // nella barra laterale che si apre dal bordo sinistro (#871). Il manifesto
   // aveva continuato a mandare l'utente a "frecce/pulsante nella barra in alto" e
   // a "digitare nella barra degli indirizzi", strade che non esistono più.
   //
@@ -354,15 +390,131 @@ test('nessuna capacità cita la barra in alto / degli indirizzi, rimossa dalla s
     // "nella barra" generico, TRANNE la barra delle schede (le linguette, che
     // esiste) o la barra in basso (chat del deck builder): intercetta formule
     // come "Pulsante Home nella barra" che rimandano alla barra sparita.
-    { re: /nella barra(?!\s+(delle schede|in basso))/i, why: 'l\'unica barra sopra le schede è quella delle linguette' },
+    { re: /nella barra(?!\s+(delle schede|in basso|laterale))/i, why: 'l\'unica barra sopra le schede è quella delle linguette (a sinistra c\'è la barra laterale)' },
   ];
   for (const c of CAP.CAPABILITIES) {
     const text = `${c.invoke} ${c.desc}${c.doesNot ? ' ' + c.doesNot : ''}`;
     for (const { re, why } of FORBIDDEN) {
       assert.ok(!re.test(text),
         `la capacità "${c.id}" cita "${(text.match(re) || [''])[0]}", ma ${why}: `
-        + 'aggiorna il manifesto (indietro/avanti/ricarica sono nel menu del tasto destro, '
-        + 'l\'indirizzo si scrive con "/" nella nuova scheda, Home è in alto a destra nella home)');
+        + 'aggiorna il manifesto (indietro/avanti/ricarica e Home sono nella barra laterale, '
+        + 'l\'indirizzo si scrive con "/" nella nuova scheda)');
     }
+  }
+});
+
+// Etichette che il menu del tasto destro MOSTRA davvero: i valori italiani
+// delle chiavi `menu_*` nominate dai content script (anche dentro un ternario,
+// perché cerchiamo la chiave come stringa) più le etichette scritte a mano lì.
+// Una chiave rimasta in i18n ma che nessuno nomina NON è una voce: è il residuo
+// di una voce tolta, ed è esattamente da lì che il manifesto ha copiato.
+function menuVoiceLabels() {
+  const i18n = readFileSync(join(ROOT, 'src', 'shared', 'i18n.js'), 'utf8');
+  const dir = join(ROOT, 'src', 'content');
+  const content = readdirSync(dir).filter((f) => f.endsWith('.js'))
+    .map((f) => readFileSync(join(dir, f), 'utf8')).join('\n');
+  // Anche le pagine filo:// hanno il loro menu del tasto destro, e il manifesto
+  // ne promette le voci: cercarle solo fra i content script le dava per assenti.
+  const pagesDir = join(ROOT, 'src', 'pages');
+  let pages = '';
+  for (const sub of readdirSync(pagesDir, { withFileTypes: true })) {
+    if (!sub.isDirectory()) continue;
+    const d = join(pagesDir, sub.name);
+    for (const f of readdirSync(d)) {
+      if (f.endsWith('.js')) pages += '\n' + readFileSync(join(d, f), 'utf8');
+    }
+  }
+  // E il menu del tasto destro sulle schede, che sta nella cornice.
+  pages += '\n' + readFileSync(join(ROOT, 'src', 'renderer', 'shell.js'), 'utf8');
+  // E la voce «Dai un nome sensato», che più pagine prendono dallo stesso modulo condiviso.
+  pages += '\n' + readFileSync(join(ROOT, 'src', 'shared', 'rinominaUi.js'), 'utf8');
+  const labels = new Set();
+  for (const m of i18n.matchAll(/^ {4}(menu_[a-z0-9_]+):\s*'([^']+)'/gm)) {
+    if (new RegExp(`'${m[1]}'`).test(content)) labels.add(m[2]);
+  }
+  // Una riga `label:` può scegliere fra due etichette con un ternario: le
+  // prendiamo tutte, sono tutte voci che l'utente può vedersi davanti.
+  for (const riga of (content + pages).split('\n')) {
+    if (!/\blabel:/.test(riga)) continue;
+    for (const m of riga.slice(riga.indexOf('label:')).matchAll(/'([^']+)'/g)) labels.add(m[1]);
+  }
+  return labels;
+}
+
+test('ogni voce promessa per il tasto destro esiste davvero nel menu', () => {
+  // Drift #725, fratello maggiore di #252: il manifesto prometteva «clic destro
+  // su un link → "Spiega link"», ma quella voce non è mai stata nel menu — la
+  // spiegazione compare da sola, senza niente da cliccare. Il controllo sulle
+  // icone RITIRATE non se ne accorgeva, perché "Spiega link" non era un'icona:
+  // era solo una stringa in i18n che nessun codice nominava più.
+  //
+  // Qui la promessa è quella esplicita: il testo dopo la freccia in un'invocazione
+  // che parla di tasto/clic destro. Se una voce non si può più cliccare, il
+  // manifesto deve dire come si ottiene DAVVERO quella cosa, non citarla lo stesso.
+  const labels = menuVoiceLabels();
+  assert.ok(labels.size >= 30, `mi aspetto ≥30 etichette vere nel menu, trovate ${labels.size}`);
+
+  // Le tre forme con cui il manifesto nomina una voce del tasto destro: la
+  // freccia, "scegli" e l'elenco dopo "menu" / "menu:". La catena si ferma al
+  // primo pezzo che non è un separatore fra voci, altrimenti si porta dentro le
+  // frasi da dire all'assistente, che voci di menu non sono.
+  const VOCE = '["\u201c\u00ab][^"\u201d\u00bb]+["\u201d\u00bb]';
+  const SEPARATORE = '\\s*(?:\\/|,|\\se\\s|\\sed\\s|\\so\\s|\\sod\\s|\\soppure\\s)\\s*';
+  const PROMESSE = new RegExp(
+    `(?:tasto destro|clic destro)[^"\u201c\u00ab]{0,80}?(?:\u2192|scegli|menu:?)\\s*((?:${VOCE})(?:${SEPARATORE}${VOCE})*)`, 'gi');
+  let promesse = 0;
+  for (const c of CAP.CAPABILITIES) {
+    for (const m of String(c.invoke || '').matchAll(PROMESSE)) {
+      for (const q of m[1].matchAll(/["\u201c\u00ab]([^"\u201d\u00bb]+)["\u201d\u00bb]/g)) {
+        promesse++;
+        assert.ok(labels.has(q[1].trim()),
+          `la capacità "${c.id}" promette la voce «${q[1].trim()}» nel menu del tasto destro, ma quella voce non esiste: `
+          + 'correggi il manifesto (se la cosa succede da sola, scrivilo) o rimetti la voce');
+      }
+    }
+  }
+  assert.ok(promesse >= 12, `mi aspetto ≥12 voci promesse dal manifesto, trovate ${promesse}`);
+});
+
+test('nessuna capacità descrive come voce da cliccare una spiegazione che arriva da sola', () => {
+  // #725 — la causa dietro al drift: le tre spiegazioni inline (testo, immagine,
+  // link) sono sezioni che si riempiono da sole all'apertura del menu. Nessuna
+  // di loro ha, o deve avere, una voce: buildInlineExplain* le costruisce come
+  // `type: 'inline'`, che il menu monta senza onClick.
+  const actions = readFileSync(join(ROOT, 'src', 'content', 'actions.js'), 'utf8');
+  for (const fn of ['buildInlineExplain', 'buildInlineExplainImage', 'buildInlineExplainLink']) {
+    assert.match(actions, new RegExp(`function ${fn}\\([^)]*\\)\\s*\\{[\\s\\S]{0,400}?type: 'inline'`),
+      `${fn} non costruisce più una sezione inline: se è tornata una voce cliccabile, aggiorna manifesto e test`);
+  }
+  for (const id of ['explain-selection', 'explain-image', 'explain-link']) {
+    const cap = CAP.get(id);
+    assert.ok(cap, `manca la capacità "${id}"`);
+    assert.ok(!/(?:tasto destro|clic destro)[^"“«]*?(?:→|scegli)\s*["“«]/i.test(cap.invoke),
+      `la capacità "${id}" promette una voce del tasto destro, ma la spiegazione compare da sola`);
+    assert.match(cap.invoke, /da sola|automaticamente/i,
+      `la capacità "${id}" deve dire che la spiegazione arriva da sola, senza niente da cliccare`);
+  }
+});
+
+// #545: la chat deve sapere quali moduli dell'Editor prendono una scorciatoia;
+// l'elenco vero è la tabella delle azioni dell'Editor, il manifesto la segue.
+test('il manifesto nomina ogni modulo dell\'Editor che prende una scorciatoia, e solo quelli', () => {
+  const src = readFileSync(join(ROOT, 'src', 'pages', 'editor', 'editor.js'), 'utf8');
+  const blocco = /const AZIONE_SCORCIATOIA = \{([\s\S]*?)\n  \};/.exec(src);
+  assert.ok(blocco, 'tabella delle azioni delle scorciatoie non trovata nell\'Editor');
+  const tipi = [...blocco[1].matchAll(/^\s+'?([a-z-]+)'?:/gm)].map((m) => m[1]);
+  const etichetta = (tipo) => {
+    const m = new RegExp(`^\\s+'?${tipo}'?:\\s*\\{\\s*label: '([^']+)'`, 'm').exec(src);
+    assert.ok(m, `etichetta del modulo ${tipo} non trovata`);
+    return m[1];
+  };
+  const frase = /[^.]*prendono una scorciatoia[^.]*\./.exec(CAP.get('editor').desc);
+  assert.ok(frase, 'la voce «editor» non dice quali moduli prendono una scorciatoia');
+  for (const tipo of tipi) {
+    assert.ok(frase[0].includes(etichetta(tipo)), `il manifesto non dice che «${etichetta(tipo)}» prende una scorciatoia`);
+  }
+  const tutti = [...src.matchAll(/^\s+'?([a-z-]+)'?:\s*\{\s*label: '([^']+)'/gm)].map((m) => m[2]);
+  for (const altro of tutti.filter((l) => !tipi.map(etichetta).includes(l))) {
+    assert.ok(!frase[0].includes(altro), `il manifesto promette una scorciatoia a «${altro}», che non la prende`);
   }
 });

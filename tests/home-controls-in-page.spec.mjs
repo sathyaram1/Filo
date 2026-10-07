@@ -1,27 +1,24 @@
-// Feedback 1tsAuna: "leva questa barra, metti le icone nel contenuto della
-// pagina home". La barra in alto di Filo (indietro/avanti/ricarica +
-// home/impostazioni/app/profilo) è stata rimossa: indietro/avanti/ricarica
-// vivono nel menu tasto destro, mentre red-team/home/cronologia/impostazioni/
-// app/profilo sono ora icone DENTRO la home, in alto a destra. Cliccarle apre
-// i menu reali della shell (nessuna logica duplicata). Il controllo Red-team
-// (più a sinistra, in rosso) apre direttamente filo://redteam/ — vedi
-// renderControls() in dashboard.js, "Spec §2".
-//
-// Gli assert verificano il SUCCESSO: le icone esistono nella home, la barra in
-// alto non c'è più (chrome compatto), e il click apre davvero il menu nativo.
+// #871 porta le icone che stavano in alto a destra nella home nella barra laterale; in alto a destra
+// restano Impostazioni e Profilo, dove ogni app li mette. Gli assert verificano il SUCCESSO: le voci
+// stanno nella barra, il profilo mostra l'avatar e App apre davvero il menu nativo accanto alla barra.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { barraPage, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
 
-test('La home mostra le icone di controllo (red-team/home/cronologia/impostazioni/app/profilo)', async ({ openTab }) => {
+test('In alto a destra nella home restano Impostazioni e Profilo; le altre voci stanno nella barra laterale', async ({ app, openTab }) => {
   const page = await openTab('filo://newtab/');
   await page.waitForSelector('#dashControls .dash-ctrl', { timeout: 8_000 });
   const commands = await page.$$eval('#dashControls .dash-ctrl', (els) => els.map((e) => e.dataset.command));
-  // Red-team è il primo (più a sinistra, in rosso); cronologia e gli altri
-  // controlli seguono in alto a destra (vedi renderControls() in dashboard.js).
-  expect(commands).toEqual(['redteam', 'home', 'history', 'settings', 'apps', 'account']);
-  // Ogni icona ha un'immagine SVG (non un fallback testuale).
-  const svgs = await page.$$eval('#dashControls .dash-ctrl svg', (els) => els.length);
-  expect(svgs).toBe(6);
+  expect(commands).toEqual(['settings', 'account']);
+  expect(await page.$$eval('#dashControls .dash-ctrl svg', (els) => els.length)).toBe(2);
+  const barra = await barraPage(app);
+  const nav = await barra.$$eval('#nav .ico', (els) => els.map((e) => e.dataset.id));
+  expect(nav).toContain('home');
+  // Il Red Team in pausa (#896) non c'è per chi non è owner (lo prova redteam-pausa.spec.mjs).
+  const fisse = await barra.$$eval('#fisse .ico:not([hidden])', (els) => els.map((e) => e.dataset.comando));
+  expect(fisse).toEqual(['history', 'apps', 'account', 'settings']);
+  // Ogni voce ha il suo disegno, non una lettera di ripiego.
+  expect(await barra.$$eval('#nav .ico svg, #fisse .ico:not([hidden]) svg', (els) => els.length)).toBe(nav.length + fisse.length);
 });
 
 test('La barra in alto di Filo è sparita (chrome compatto, barra indirizzi nascosta)', async ({ shell, openTab }) => {
@@ -44,58 +41,38 @@ test('La barra in alto di Filo è sparita (chrome compatto, barra indirizzi nasc
   expect(shellH).toBe(40);
 });
 
-test("L'icona profilo mostra l'avatar quando loggato (parità con la vecchia barra)", async ({ app, openTab }) => {
-  const page = await openTab('filo://newtab/');
-  const account = page.locator('#dashControls .dash-ctrl[data-command="account"]');
-  await account.waitFor({ timeout: 8_000 });
+test("L'icona profilo della barra mostra l'avatar quando loggato", async ({ app }) => {
+  const barra = await barraPage(app);
+  const account = barra.locator('#fisse [data-comando="account"]');
+  await expect(account.locator('img.avatar')).toHaveCount(0);
+  await expect(account).toHaveAttribute('aria-label', 'Accedi');
 
-  // Sloggato (stato dei test): icona utente generica, nessun avatar.
-  await expect(account.locator('img.account-avatar')).toHaveCount(0);
-
-  // Simula un login: broadcast `auth_changed` alla view della dashboard, come
-  // fa il main dopo il sign-in (broadcastToTabs). Avatar = data URL che carica
-  // davvero (così l'onerror di fallback non scatta).
-  const picture =
-    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22'%3E%3Crect width='22' height='22' fill='%23c0552b'/%3E%3C/svg%3E";
+  // Il login arriva alla shell come dopo il sign-in; la shell lo passa alla barra. Una foto vera
+  // (https) non si carica nei test: l'errore riporta l'icona, quindi si guarda l'etichetta e la src.
+  const picture = 'https://lh3.googleusercontent.com/a/foto-di-prova';
   await app.evaluate(({ BrowserWindow }, pic) => {
-    for (const w of BrowserWindow.getAllWindows()) {
-      if (!w._filoTabs) continue;
-      for (const t of w._filoTabs.tabs) {
-        try {
-          t.view.webContents.send('filo:broadcast', {
-            type: 'auth_changed', signedIn: true,
-            profile: { name: 'Mario Rossi', email: 'mario@example.it', picture: pic },
-          });
-        } catch (_) {}
-      }
-    }
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    w.webContents.send('filo:broadcast', {
+      type: 'auth_changed', signedIn: true,
+      profile: { name: 'Mario Rossi', email: 'mario@example.it', picture: pic },
+    });
   }, picture);
+  await expect(account).toHaveAttribute('aria-label', 'Profilo: Mario Rossi');
 
-  // L'avatar compare al posto dell'icona generica.
-  await expect(account.locator('img.account-avatar')).toHaveCount(1, { timeout: 5_000 });
-  await expect(account).toHaveClass(/signed-in/);
-
-  // E un logout riporta l'icona generica (niente avatar).
   await app.evaluate(({ BrowserWindow }) => {
-    for (const w of BrowserWindow.getAllWindows()) {
-      if (!w._filoTabs) continue;
-      for (const t of w._filoTabs.tabs) {
-        try { t.view.webContents.send('filo:broadcast', { type: 'auth_changed', signedIn: false, profile: null }); } catch (_) {}
-      }
-    }
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    w.webContents.send('filo:broadcast', { type: 'auth_changed', signedIn: false, profile: null });
   });
-  await expect(account.locator('img.account-avatar')).toHaveCount(0, { timeout: 5_000 });
+  await expect(account).toHaveAttribute('aria-label', 'Accedi');
+  await expect(account.locator('img.avatar')).toHaveCount(0);
 });
 
-test("Cliccare l'icona App nella home apre il menu nativo della shell", async ({ app, openTab }) => {
-  const page = await openTab('filo://newtab/');
-  await page.waitForSelector('#dashControls .dash-ctrl[data-command="apps"]', { timeout: 8_000 });
-
+test("Cliccare App nella barra apre il menu nativo della shell", async ({ app }) => {
+  const barra = await barraPage(app);
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
   const popupBefore = app.windows().filter((w) => (w.url() || '').startsWith('data:text/html')).length;
-  await page.click('#dashControls .dash-ctrl[data-command="apps"]');
-
-  // Il bridge page → main → shell → click bottone reale apre un popup-menu
-  // (BrowserWindow su data:text/html). Comparsa = bridge funzionante.
+  await barra.click('#fisse [data-comando="apps"]');
   await expect
     .poll(() => app.windows().filter((w) => (w.url() || '').startsWith('data:text/html')).length, { timeout: 6_000 })
     .toBeGreaterThan(popupBefore);

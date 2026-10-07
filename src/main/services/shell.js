@@ -10,28 +10,108 @@
 //     pulita (comportamento atteso da chi usa un terminale; persistere sarebbe
 //     complessità inutile e un rischio di sicurezza in più).
 //
-// PROTOCOLLO marcatori (validato empiricamente su powershell/cmd/sh):
-//   - FILO_RDY_<sid>            riga di "pronto" + prompt da rimuovere (cmd);
+// PROTOCOLLO marcatori (powershell/cmd/sh):
+//   - FILO_RDY_<sid>            riga di "pronto" (e prompt da rimuovere, con cmd);
 //   - FILO_META_<sid>:<code>:<cwd>  fine comando, con exit code e directory.
 // I comandi vengono serializzati in coda: ne parte uno alla volta e l'output
 // in arrivo è instradato alle callback del comando corrente fino al suo META.
 //
-// SICUREZZA: esegue comandi arbitrari sulla macchina. È raggiungibile SOLO
-// dalle pagine interne filo:// (vedi ipc.js, che rifiuta i sender esterni),
-// SOLO con la modalità terminale attiva e SOLO con comandi digitati a mano
-// dall'utente — mai output dell'LLM, mai contenuto di pagine web.
+// SICUREZZA: esegue comandi arbitrari sulla macchina. Via ipc.js è raggiungibile
+// SOLO dalle pagine interne filo://, con la modalità terminale attiva e con
+// comandi digitati a mano dall'utente. L'altro chiamante è il comando one-shot
+// dell'assistente con cmd (terminal.js), che arriva già passato dal gate dei livelli.
 
 const { spawn } = require('node:child_process');
 const os = require('node:os');
 const fs = require('node:fs');
+const path = require('node:path');
 // Quale shell gira davvero, dato quella chiesta e il sistema: la regola è una
 // sola e sta in terminal.js. Erano due: i comandi dell'assistente onoravano
 // "bash" fuori da Windows, questa sessione ricadeva sempre su /bin/sh — cioè
 // su Linux e Mac la voce "Bash" delle Preferenze non faceva niente.
-const { resolveShell } = require('./terminal');
+// I preludi che mettono la shell di Windows in UTF-8 (#551) stanno in un posto
+// solo, accanto ai comandi one-shot dell'assistente: due copie divergono.
+const { resolveShell, PRELUDI_CODIFICA, righePowerShell, invocaCodificato, PREPARA_STDIN_POWERSHELL } = require('./terminal');
 
 function defaultCwd() {
   return os.homedir();
+}
+
+// ── Il comando dell'UTENTE viaggia verso PowerShell per lo stdin ─────────────
+//
+// #551, l'altro verso. Il preludio mette la shell in UTF-8 quando SCRIVE, e i
+// nomi che escono tornano interi. Quando LEGGE, no: Windows PowerShell
+// decodifica lo stdin con la tabella di codici della console (quella OEM),
+// mentre Node gli scrive UTF-8. Un comando che contiene «attività» arriva alla
+// shell con un nome diverso da quello digitato, e lei risponde che il file non
+// esiste. È il guasto della segnalazione, dalla parte opposta. Con cmd succede
+// lo stesso, per un'altra via: vedi comandoPerCmd.
+//
+// Toccare `[Console]::InputEncoding` sarebbe peggio del male. Il setter di .NET
+// butta via il lettore dello stdin, e con lui tutto quello che aveva già letto
+// in avanti: la riga di «pronto» parte nello stesso pezzo del preludio, quindi
+// andrebbe persa e la sessione resterebbe muta per sempre.
+//
+// La cura è non far viaggiare caratteri non ASCII sul filo. Il comando parte con
+// i caratteri speciali scritti come numeri e lo rimette insieme PowerShell, che
+// ricostruisce il testo da sé senza passare da nessuna tabella. Si fa SOLO quando serve: un comando di soli
+// caratteri ASCII parte identico a prima, e `exit`, `cd`, le variabili e tutto
+// quello che un utente digita di solito si comportano come si sono sempre
+// comportati. Il testo ricomposto gira nello scope di chi chiama, quindi anche
+// per un comando accentato le variabili e la cartella restano quelle della
+// sessione: continua a essere un terminale vero.
+const SOLO_ASCII = /^[\x00-\x7F]*$/;
+
+function comandoPerPowerShell(command, coda = '') {
+  const cmd = String(command == null ? '' : command);
+  if (!SOLO_ASCII.test(cmd)) return invocaCodificato(cmd, coda);
+  return coda ? `${cmd}\n${coda}` : cmd;
+}
+
+// cmd legge lo stdin di una pipe un byte per volta e decodifica ogni byte da solo con la tabella attiva: con 65001
+// i byte di «à» o «—» diventano rombi, con una tabella a un byte passa solo ciò che quella tabella contiene (#1044).
+// Sul filo vanno quindi solo caratteri ASCII: i tratti con caratteri non ASCII stanno in file UTF-8 che `set /p`
+// legge a righe intere, e il comando li richiama come %variabili%, espanse prima che cmd guardi virgolette e
+// redirezioni. Un tratto non contiene `%`, così le variabili e i `%f` del `for` scritti dall'utente restano suoi.
+// Tetti: `set /p` legge 1023 byte per riga (200 caratteri da 4 byte ci stanno) e una riga di cmd ne tiene 8191
+// (100 letture per riga e per file).
+const PEZZO_CMD = 200;
+const LETTURE_PER_FILE = 100;
+const VALORI_CMD = 'FILO_VALORI_CMD';
+
+function comandoPerCmd(command) {
+  const cmd = String(command == null ? '' : command);
+  if (SOLO_ASCII.test(cmd)) return { testo: cmd, file: [] };
+  const valori = [];
+  const nomi = new Map();
+  const richiama = (pezzo) => {
+    if (!nomi.has(pezzo)) { valori.push(pezzo); nomi.set(pezzo, `FILO_U${valori.length}`); }
+    return `%${nomi.get(pezzo)}%`;
+  };
+  const testo = cmd.replace(/[^\x00-\x7F](?:[^%\r\n]*[^\x00-\x7F])?/g, (tratto) => {
+    const caratteri = Array.from(tratto);
+    let s = '';
+    for (let i = 0; i < caratteri.length; i += PEZZO_CMD) s += richiama(caratteri.slice(i, i + PEZZO_CMD).join(''));
+    return s;
+  });
+  const file = [];
+  const letture = [];
+  for (let i = 0; i < valori.length; i += LETTURE_PER_FILE) {
+    const gruppo = valori.slice(i, i + LETTURE_PER_FILE);
+    file.push(`${gruppo.join('\r\n')}\r\n`);
+    const set = gruppo.map((_, j) => `set /p "FILO_U${i + j + 1}="`).join(' & ');
+    letture.push(`(${set})<"%${VALORI_CMD}%-${file.length}.txt"`);
+  }
+  return { testo: `${letture.join('\r\n')}\r\n${testo}`, file };
+}
+
+// Quella cartella c'è ancora, ed è una cartella? La domanda si fa qui per
+// tutti, perché la risposta sia la stessa nei tre punti che la fanno: la shell
+// persistente quando nasce, il comando one-shot dell'assistente quando parte, e
+// il popup che dice all'utente in quale cartella quel comando scriverà.
+function cartellaViva(p) {
+  if (!p) return false;
+  try { return fs.statSync(p).isDirectory(); } catch (_) { return false; }
 }
 
 // La cartella iniziale può arrivare da uno stato persistito (#259: "riparti da
@@ -42,10 +122,32 @@ function defaultCwd() {
 function usableCwd(cwd) {
   if (!cwd) return defaultCwd();
   if (process.platform === 'win32' && /^\//.test(cwd)) return cwd;
-  try {
-    if (fs.statSync(cwd).isDirectory()) return cwd;
-  } catch (_) {}
-  return defaultCwd();
+  return cartellaViva(cwd) ? cwd : defaultCwd();
+}
+
+// La cartella in cui far girare DAVVERO un comando, più la notizia che quella
+// chiesta non c'è più.
+//
+// #551, quarto giro di verifica. La cartella in cui Filo sta guardando può
+// sparire sotto i piedi: l'utente la rinomina mentre riordina, stacca la
+// chiavetta, o la cancella Filo stesso perché gliel'ha chiesto. Avviare una
+// shell lì dentro non fa fallire il COMANDO: fa fallire la shell prima ancora
+// di leggerlo, con un motivo che parla del programma («spawn … ENOENT») e non
+// della cartella. E siccome la cartella resta appuntata, da quello stato non si
+// esce più nemmeno chiedendo di andare altrove: in quella scheda il terminale
+// dell'assistente è finito finché l'utente non la chiude. Il terminale che
+// l'utente digita a mano questo controllo ce l'ha da sempre (qui sopra), e
+// infatti riparte dalla home e continua a funzionare: erano due strade
+// equivalenti con esiti diversi.
+//
+// Il ripiego è la home, la stessa da cui il terminale parte. Se non esiste
+// nemmeno quella (profilo su un disco di rete staccato) si lascia decidere al
+// sistema invece di insistere su un percorso che non c'è.
+function cartellaPerComando(cwd) {
+  const chiesta = String(cwd || '');
+  if (chiesta && cartellaViva(chiesta)) return { cwd: chiesta, persa: false };
+  const casa = defaultCwd();
+  return { cwd: cartellaViva(casa) ? casa : undefined, persa: !!chiesta };
 }
 
 // Identificativo di sessione, improbabile in output reale. Entra nei marcatori.
@@ -56,7 +158,8 @@ function randSid() {
 // Config per shell: come avviare il processo persistente, la riga di "pronto"
 // da inviare all'avvio, e come "incartare" un comando utente perché stampi il
 // marcatore di fine (exit code + cwd) su una riga propria.
-function shellConfig(shell, sid, startCwd) {
+function shellConfig(shell, sid, startCwd, { env, autoRun = true } = {}) {
+  const ambiente = env ? { env } : {};
   // Fuori da Windows (Linux, macOS): shell POSIX persistente, letta da pipe →
   // non-interattiva, nessun prompt da ripulire. `bash` se l'utente l'ha scelto
   // nelle Preferenze, altrimenti la shell di sistema. I marcatori sono gli
@@ -65,7 +168,7 @@ function shellConfig(shell, sid, startCwd) {
     return {
       file: shell === 'bash' ? 'bash' : '/bin/sh',
       args: [],
-      options: { cwd: startCwd || undefined, windowsHide: true },
+      options: { cwd: startCwd || undefined, windowsHide: true, ...ambiente },
       ready: `printf 'FILO_RDY_${sid}\\n'\n`,
       wrap: (command) =>
         `${command}\nprintf 'FILO_META_${sid}:%s:%s\\n' "$?" "$PWD"\n`,
@@ -73,15 +176,32 @@ function shellConfig(shell, sid, startCwd) {
   }
   if (shell === 'cmd') {
     // /q = niente echo dei comandi; /k = resta aperto leggendo da stdin.
-    // Cambiamo il prompt nel marcatore RDY ($_ = CRLF): così ogni prompt
-    // diventa una riga FILO_RDY_<sid> che rimuoviamo dall'output.
+    // Con l'eco spento cmd non mostra nemmeno il prompt: la riga di pronto la stampa un `echo`, se no non
+    // arriva mai e la sessione resta muta (#719). Il prompt diventa comunque RDY, per chi riaccende l'eco.
+    // Davanti a tutto il preludio che porta la tabella codici a UTF-8 (#551,
+    // gemello di quello in terminal.js): senza, i nomi con accenti e trattini
+    // lunghi arrivano storpiati anche qui, nel terminale che l'utente guarda.
+    // Il percorso del file dei pezzi non ASCII arriva per variabile d'ambiente: la cartella temporanea può avere
+    // accenti nel nome utente, e scritta sullo stdin si storpierebbe come il resto (comandoPerCmd).
+    const fileValori = path.join(os.tmpdir(), `filo-cmd-${sid}`);
+    let scritti = 0;
     return {
       file: process.env.ComSpec || 'cmd.exe',
-      args: ['/q', '/k'],
-      options: { cwd: startCwd || undefined, windowsHide: true },
-      ready: `prompt FILO_RDY_${sid}$_\r\n`,
-      wrap: (command) =>
-        `${command}\r\necho FILO_META_${sid}:%errorlevel%:%cd%\r\n`,
+      // /d salta l'AutoRun del registro: un suo `cd` porterebbe il comando dell'assistente fuori dalla sua cartella.
+      args: autoRun ? ['/q', '/k'] : ['/d', '/q', '/k'],
+      options: { cwd: startCwd || undefined, windowsHide: true, env: { ...(env || process.env), [VALORI_CMD]: fileValori } },
+      ready: `${PRELUDI_CODIFICA.cmd}prompt FILO_RDY_${sid}$_\r\necho FILO_RDY_${sid}\r\n`,
+      wrap: (command) => {
+        let { testo, file } = comandoPerCmd(command);
+        try {
+          file.forEach((contenuto, i) => fs.writeFileSync(`${fileValori}-${i + 1}.txt`, contenuto, 'utf8'));
+          scritti = Math.max(scritti, file.length);
+        } catch (_) { testo = String(command); }
+        return `${testo}\r\necho FILO_META_${sid}:%errorlevel%:%cd%\r\n`;
+      },
+      pulisci: () => {
+        for (let i = 1; i <= scritti; i++) { try { fs.rmSync(`${fileValori}-${i}.txt`, { force: true }); } catch (_) {} }
+      },
     };
   }
   if (shell === 'bash') {
@@ -91,40 +211,43 @@ function shellConfig(shell, sid, startCwd) {
     return {
       file: 'wsl.exe',
       args,
-      options: { windowsHide: true },
+      options: { windowsHide: true, ...ambiente },
       ready: `printf 'FILO_RDY_${sid}\\n'\n`,
       wrap: (command) =>
         `${command}\nprintf 'FILO_META_${sid}:%s:%s\\n' "$?" "$PWD"\n`,
     };
   }
   // PowerShell (default). `-Command -` legge ed esegue da stdin in modo
-  // incrementale, senza prompt. Azzeriamo $LASTEXITCODE prima di ogni comando
-  // così i cmdlet (che non lo toccano) riportano 0 invece dell'ultimo codice
-  // nativo rimasto appeso.
+  // incrementale, senza prompt. Le righe attorno al comando sono le stesse dei
+  // comandi dell'assistente (righePowerShell), che leggono da stdin anche loro.
+  // La prima cosa che scriviamo è il preludio UTF-8 (#551): la console di
+  // Windows scrive di suo nella tabella OEM, dove il trattino lungo diventa
+  // «-» e la «à» un byte che qui arriva come «<27>». Gemello del preludio in
+  // terminal.js, che fa lo stesso per i comandi one-shot dell'assistente.
   return {
     file: 'powershell.exe',
     args: ['-NoLogo', '-NoProfile', '-Command', '-'],
-    options: { cwd: startCwd || undefined, windowsHide: true },
-    ready: `"FILO_RDY_${sid}"\n`,
-    wrap: (command) =>
-      `$global:LASTEXITCODE=0\n${command}\n` +
-      `"FILO_META_${sid}:$($LASTEXITCODE):$((Get-Location).Path)"\n`,
+    options: { cwd: startCwd || undefined, windowsHide: true, ...ambiente },
+    ready: `${PREPARA_STDIN_POWERSHELL}${PRELUDI_CODIFICA.powershell}"FILO_RDY_${sid}"\n`,
+    wrap: (command) => righePowerShell(command, `FILO_META_${sid}`, comandoPerPowerShell),
   };
 }
 
 // Crea una sessione persistente. Ritorna un oggetto con:
 //   exec(command, { onData, onExit, onError })  accoda ed esegue un comando
 //   write(text)                                 invia testo grezzo allo stdin
+//   chiudi()                                    chiude lo stdin: la shell esce da sola, i programmi avviati restano
 //   kill()                                      termina l'albero di processi
 //   shell, cwd, dead                            stato osservabile
 //
 // Le callback sono PER COMANDO: onData({chunk, stream}), onExit({code, cwd}),
-// onError({message}).
-function createSession({ shell, cwd } = {}) {
+// onError({message}). Se la shell si chiude prima del marcatore (un `exit 3`),
+// onExit porta anche { chiusa: true, uscita: <codice del processo> }.
+function createSession({ shell, cwd, env, autoRun } = {}) {
   const sid = randSid();
   const wantShell = resolveShell(shell);
   const startCwd = usableCwd(cwd);
-  const cfg = shellConfig(wantShell, sid, startCwd);
+  const cfg = shellConfig(wantShell, sid, startCwd, { env, autoRun });
 
   const session = {
     // La shell VERA, non quella chiesta: chi confronta per decidere se
@@ -140,7 +263,7 @@ function createSession({ shell, cwd } = {}) {
     current: null,    // comando in esecuzione: { cb }
     _buf: '',         // buffer di linea per stdout
     _pendingBlank: 0, // righe vuote in attesa (separatori prompt/marcatore)
-    exec, write, kill,
+    exec, write, chiudi, kill,
   };
 
   const META_PREFIX = `FILO_META_${sid}:`;
@@ -167,11 +290,12 @@ function createSession({ shell, cwd } = {}) {
     }
   });
   proc.on('error', (err) => fatal(err.message || String(err)));
-  proc.on('close', () => {
+  proc.on('close', (uscita) => {
     session.dead = true;
+    if (cfg.pulisci) cfg.pulisci();
     const cur = session.current;
     session.current = null;
-    if (cur && cur.cb.onExit) cur.cb.onExit({ code: 0, cwd: session.cwd });
+    if (cur && cur.cb.onExit) cur.cb.onExit({ code: 0, cwd: session.cwd, chiusa: true, uscita });
     drainQueueErr('shell terminata');
   });
 
@@ -269,6 +393,10 @@ function createSession({ shell, cwd } = {}) {
 
   function write(text) {
     try { proc.stdin && proc.stdin.write(String(text == null ? '' : text)); } catch (_) {}
+  }
+
+  function chiudi() {
+    try { proc.stdin && proc.stdin.end(); } catch (_) {}
   }
 
   function kill() {
@@ -403,4 +531,14 @@ async function commandExists({ shell, cwd, command } = {}) {
 // ("firebase rosso"): l'ordine dei probe — `where.exe` prima di Get-Command —
 // è ciò che tiene veloci gli shim npm, e un assert sul cronometro era rumore
 // su una macchina carica.
-module.exports = { createSession, defaultCwd, commandExists, existenceProbes };
+module.exports = {
+  createSession, defaultCwd, commandExists, existenceProbes,
+  // La cartella di lavoro, controllata in un posto solo (#551, quarto giro):
+  // la usano il comando one-shot dell'assistente e il popup di conferma.
+  cartellaViva, cartellaPerComando, usableCwd,
+  // esportata per la guardia di regressione di #551: il comando che l'utente
+  // digita non deve mai arrivare a PowerShell con byte fuori dall'ASCII.
+  comandoPerPowerShell,
+  // e a cmd non arrivano byte fuori dall'ASCII nemmeno lui (#1044).
+  comandoPerCmd,
+};

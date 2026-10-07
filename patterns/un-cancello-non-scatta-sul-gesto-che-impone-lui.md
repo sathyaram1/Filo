@@ -3,62 +3,58 @@
 [← Tutti i pattern](../PATTERNS.md)
 
 **Regola.** Certi controlli obbligano a un gesto prima di lasciar passare:
-segnare un rosso atteso, aggiornare un file di stato, rigenerare un elenco.
-Quel gesto non deve farli scattare. Il controllo si lega a **quello che gira**,
-non alla punta del ramo. Si confronta il contenuto ridotto a ciò che decide, e
-se lì non è cambiato niente il verdetto regge.
+togliere le prove dei rilievi usciti in un feedback loro, aggiornare un file di
+stato, rigenerare un elenco. Quel gesto non deve farli scattare. Il controllo si
+lega a **quello che gira**, non alla punta del ramo, e perdona solo il gesto
+che impone — con la stessa regola in ogni cancello che lo guarda.
 
 ## Il caso
 
-Il giro di verifica locale, quando un rilievo resta aperto perché il bilancio è
-esaurito, dice «si può pubblicare» e lascia rosse le prove del giro che quel
-rilievo lo riproducono. La chiusura del ramo quelle prove le rilancia, e si
-ferma. La mossa giusta è segnarle come rosso atteso (`test.fail`) e
-committarle — ma quel commit spostava la punta del ramo dopo il verdetto, e il
-verdetto era legato allo sha: la chiusura rispondeva «il codice è cambiato dopo
-la verifica» e ci voleva un giro intero, di un'altra istanza, per riverificare
-un ramo in cui era cambiata una riga di test.
+Il giro di verifica, quando un rilievo resta fuori dal giro, dice «si può
+pubblicare» e manda a togliere dal ramo la prova del giro che lo riproduce (il
+rilievo vive nel feedback appena nato). Quel commit sposta la punta del ramo
+dopo il verdetto, e il verdetto era legato allo sha: la chiusura rispondeva «il
+codice è cambiato dopo la verifica» e ci voleva un giro intero, di un'altra
+istanza, per riverificare un ramo in cui non era cambiata una riga di prodotto.
 
 Il cancello chiedeva un gesto e poi puniva chi lo faceva. È costato due giri,
-mezz'ora e un'istanza l'uno, prima che diventasse un feedback (#661).
+mezz'ora e un'istanza l'uno, prima che diventasse un feedback (#661). Allora il
+gesto era segnare la prova come rosso atteso; dal 23/09/2026 è toglierla.
 
 ## Cosa non ha funzionato
 
-**Scrivere i marcatori prima del verdetto** sposta il problema: chi verifica
-sa quali rilievi restano fuori solo *dopo* che lo strumento ha fatto i conti coi
+**Scrivere il gesto prima del verdetto** sposta il problema: chi verifica sa
+quali rilievi restano fuori solo *dopo* che lo strumento ha fatto i conti coi
 bilanci. Il gesto viene dopo per costruzione.
 
-**Leggere le righe del diff una per una** («è una riga che comincia per
-`test.fail`?») si rompe sulle forme legittime: il marcatore sulla
-dichiarazione, il motivo che va a capo, il commento scritto accanto. E si rompe
-anche dall'altra parte, quella pericolosa: un marcatore con una virgoletta
-dimenticata lascia le tonde aperte e si mangia il corpo della prova, che a quel
-punto può cambiare senza che nessuno se ne accorga.
+**Due cancelli con due regole.** Il cancello locale riduceva i due contenuti a
+«ciò che gira» (via commenti, righe vuote e marcatori di rosso atteso) e li
+confrontava; quello di fusione del server ammetteva solo righe tolte. Il primo
+lasciava passare un marcatore che il secondo rifiutava, e rifiutava un caso
+tolto da una prova che il secondo accettava — proprio la mossa che il testo del
+pass chiedeva (verifica del giro 2 sul lavoro «seguito del giro»).
 
 ## Come si fa
 
-Dai due contenuti si tolgono righe vuote, commenti e marcatori. Quello che
-resta è **ciò che fa girare la prova**, e si confronta. Se è uguale il verdetto
-regge, e chi pubblica legge quali file sono passati. Se è diverso, o se anche un
-solo file sta fuori dalla cartella delle prove del giro, decade come prima.
+Dopo il verdetto, dentro `tests/verifica/`, si può solo **togliere**: un file
+intero, o delle righe (un caso) da un file. Il contenuto nuovo di ogni file
+toccato dev'essere il vecchio con qualche riga in meno, nello stesso ordine;
+qualunque riga aggiunta o cambiata — anche un commento o un marcatore — fa
+decadere il verdetto, e il marcatore va nel commit di una correzione, prima del
+verdetto. Un file fuori dalla cartella lo fa decadere sempre.
 
 Tre paletti, e nessuno è di gusto:
 
-- si perdona solo ciò che **non cambia cosa succede**, cioè un commento, una
-  riga vuota, un marcatore. Una riga commentata via non è perdonata. Quello che
-  c'era prima sparisce dal confronto, ed è il modo più facile di spegnere una
-  prova;
-- ciò che non si riconosce come marcatore intero **resta una riga come le
-  altre**. Meglio un verdetto che decade di uno che tollera una riga di codice
-  inghiottita da un marcatore scritto male;
+- **la stessa regola in ogni cancello**: la chiusura locale e il cancello di
+  fusione del server devono dire sì e no alle stesse cose, o il gesto giusto su
+  una strada è una trappola sull'altra;
+- **fail-closed**: un diff illeggibile, un file svuotato o uno che git dice
+  modificato ma non si legge non sono una cancellazione;
 - quando il cancello si apre più largo del solito, **lo dice**: un cancello che
   si apre in silenzio è indistinguibile da un cancello che non c'è.
 
-E la parte che non si muove: una prova del giro rossa **senza** marcatore ferma
-la chiusura esattamente come prima. Il verdetto tollera il gesto, non il rosso.
-
-Il codice sta in `scripts/verify-local.mjs` (`corpoSenzaMarcatori`,
-`soloMarcatori`, `checkVerdict`), i casi in
+Il codice locale sta in `scripts/verify-local.mjs` (`soloRigheTolte`,
+`soloProveTolte`, `checkVerdict`), i casi in
 `tests/unit/verifyLocalMarcatori.test.mjs`.
 
 Vicino: [Un controllo che RIFIUTA non rifiuta mai in silenzio (e si può scavalcare)](un-controllo-che-rifiuta-non-rifiuta-mai-in-silenzio.md).

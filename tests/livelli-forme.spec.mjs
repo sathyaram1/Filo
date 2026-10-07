@@ -300,8 +300,163 @@ test('domande nelle sole note: rombo verde, e dentro ci sono le domande', async 
   const rombo = page.locator('#mgLivelliRow .mg-forma[data-livello="l3"]');
   await expect(rombo).toHaveClass(/mg-forma--design/);
   await expect(rombo).not.toHaveClass(/mg-forma--vuota/);
+  // Nessuna segnalazione registrata: il verde qui vuol dire solo «domande per te».
+  expect(await rombo.getAttribute('title')).toBe('Domande di Claude');
+  expect(await rombo.getAttribute('aria-label')).toBe('Domande di Claude');
   await rombo.click();
+  await expect(page.locator('#mgSideTitle')).toHaveText('Domande di Claude');
   await expect(page.locator('#mgSideBody')).toContainText('decisi voce per voce');
+});
+
+test('domande nelle sole note: «Quando» è il giorno dell’ultimo turno di Filo, anche dopo il 12 e prima del 13', async ({ openTab }) => {
+  const conv = (marcatore) => ['Quale immagine intendi?', '--- La tua risposta del 01/09/26, 09:00 ---', 'Quelle dentro.',
+    `--- Filo ha risposto il ${marcatore} ---`, 'Anche quelle di sfondo?'].join('\n');
+  const base = { text: 'Salva immagine.', name: 'Salva immagine', subSeq: 0, status: 'design', statusReason: 'clarify',
+    clientId: 'local:claude', createdAt: '2026-09-01T08:00:00Z', images: [] };
+  const fbs = [
+    { ...base, _id: 'fb-quando-27', seq: 764, notes: conv('27/09/26, 11:00') },
+    { ...base, _id: 'fb-quando-05', seq: 765, notes: conv('05/09/26, 11:00') },
+  ];
+  const page = await openTab(MANAGE);
+  await apri(page, fbs);
+  for (const [id, atteso] of [['fb-quando-27', '27/09/2026 11:00'], ['fb-quando-05', '05/09/2026 11:00']]) {
+    await page.evaluate((i) => window.__mgTest.openDetail(i), id);
+    await page.locator('#mgLivelliRow .mg-forma[data-livello="l3"]').click();
+    await expect(page.locator('#mgSideTitle')).toHaveText('Domande di Claude');
+    await expect(page.locator('#mgSideBody .mg-liv-riga', { hasText: 'Quando' })).toHaveText(`Quando:${atteso}`);
+  }
+});
+
+test('domande in attesa e segnalazione che qui non si decifra: il titolo copre le due parti, e niente blob', async ({ openTab }) => {
+  const BLOB = 'FENCv1:8f3a2b91c7d4e6a0b5f2';
+  const fb = {
+    _id: 'fb-livelli-cifrata', text: 'Fiducia nei mittenti.', name: 'Fiducia nei mittenti',
+    seq: 703, subSeq: 0, status: 'design', statusReason: 'clarify',
+    clientId: 'local:claude', createdAt: '2026-09-08T10:00:00Z', images: [],
+    notes: 'Prima di procedere: i prefissi riservati vanno decisi voce per voce?',
+    livelli: { l3: { esito: 'segnalato', ruolo: 'resolver', at: '2026-09-08T11:00:00Z', testo: BLOB } },
+  };
+  const page = await openTab(MANAGE);
+  await apri(page, [fb]);
+  await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
+
+  const rombo = page.locator('#mgLivelliRow .mg-forma[data-livello="l3"]');
+  await expect(rombo).toHaveClass(/mg-forma--design/);
+  expect(await rombo.getAttribute('title')).toBe('Domande e segnalazione di Claude');
+  await rombo.click();
+  await expect(page.locator('#mgSideTitle')).toHaveText('Domande e segnalazione di Claude');
+  const corpo = page.locator('#mgSideBody');
+  await expect(corpo).toContainText('decisi voce per voce');
+  await expect(corpo).toContainText('non ha la chiave privata per leggerlo');
+  await expect(corpo).not.toContainText('FENC');
+});
+
+test('fermo su una scelta dell’owner: sta fra i Ricevuti con la casella di risposta, e il rombo apre la segnalazione', async ({ openTab }) => {
+  // Una consegna con segnalazione ferma il lavoro (design/decisione): l'owner
+  // deve trovarlo dove guarda i feedback nuovi, con la scelta da fare e il
+  // posto dove scriverla.
+  const fb = {
+    _id: 'fb-livelli-fermo', text: 'Il tasto salva anche col titolo vuoto.', name: 'Salva senza titolo',
+    seq: 702, subSeq: 0, status: 'design', statusReason: 'decisione', branch: 'worker/fb-livelli-fermo',
+    clientId: 'user:abc', createdAt: '2026-09-22T10:00:00Z', images: [],
+    notes: 'Corretto per la strada A.\n\nSegnalazione per l\'owner (chi verifica):\n## Problema\nDue strade con costi diversi.\n## Scelte\n- A: rifiutare\n- B: titolo automatico',
+    livelli: { l3: { esito: 'segnalato', ruolo: 'verifier', at: '2026-09-22T10:05:00Z', testo: '## Problema\nDue strade con costi diversi.\n## Scelte\n- A: rifiutare\n- B: titolo automatico' } },
+  };
+  const page = await openTab(MANAGE);
+  await apri(page, [fb]);
+  // È fra i Ricevuti, la scheda che si apre per prima, e la scheda dice perché.
+  const card = page.locator(`.mg-item[data-id="${fb._id}"]`).first();
+  await expect(card).toBeVisible();
+  expect(await card.getAttribute('title')).toMatch(/aspetta una tua scelta/);
+  await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
+
+  await expect(page.locator('#mgClarify')).toBeVisible();
+  const rombo = page.locator('#mgLivelliRow .mg-forma[data-livello="l3"]');
+  await expect(rombo).not.toHaveClass(/mg-forma--vuota/);
+  expect(await rombo.getAttribute('title')).toBe('Domande e segnalazione di Claude');
+  await rombo.click();
+  await expect(page.locator('#mgSideBody')).toContainText('Due strade con costi diversi');
+});
+
+test('nel rombo, nel pentagono e nella conversazione il markdown della segnalazione si legge formattato, non come simboli; l’HTML resta testo', async ({ openTab }) => {
+  // «**A.**» è la forma che il modello della segnalazione prescrive per le scelte (#703).
+  const SEGNALAZIONE = '## Problema\nIl nome del file salvato: dal sito o chiesto ogni volta?\n\n## Scelte\n- **A.** Dal sito: zero attrito.\n- **B.** Chiesto: un passaggio in più.\n\n## Cosa ho fatto nel frattempo\nHo preso la **A.**, la *meno* invasiva. <b>finto</b> <img src=x onerror="window.__xss=1">\n1. Primo passo.\n2. Secondo passo.';
+  const fb = {
+    _id: 'fb-livelli-grassetto', text: 'Il download non tiene il nome del file.', name: 'Nome del file',
+    seq: 704, subSeq: 0, status: 'design', statusReason: 'decisione', branch: 'worker/fb-livelli-grassetto',
+    clientId: 'user:abc', createdAt: '2026-09-22T10:00:00Z', images: [],
+    notes: `Ho fatto A.\n\nSegnalazione per l'owner (chi verifica):\n${SEGNALAZIONE}`,
+    livelli: {
+      l3: { esito: 'segnalato', ruolo: 'verifier', at: '2026-09-22T10:05:00Z', testo: SEGNALAZIONE },
+      l4: { esito: 'pass', at: '2026-09-22T11:00:00Z', testo: '## Problema\nNessuno: il controllo `salvaDownload` resta **dentro** la pagina.' },
+    },
+  };
+  const page = await openTab(MANAGE);
+  await apri(page, [fb]);
+  await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
+
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l3"]').click();
+  const corpo = page.locator('#mgSideBody');
+  await expect(corpo.locator('.mg-liv-testo ul li')).toHaveText(['A. Dal sito: zero attrito.', 'B. Chiesto: un passaggio in più.']);
+  await expect(corpo.locator('.mg-liv-testo ul li strong')).toHaveText(['A.', 'B.']);
+  expect(await corpo.locator('.mg-liv-testo ul li strong').first().evaluate((e) => Number(getComputedStyle(e).fontWeight))).toBeGreaterThanOrEqual(600);
+  await expect(corpo).not.toContainText('**');
+  await expect(corpo.locator('.mg-liv-testo p strong')).toHaveText('A.');
+  await expect(corpo.locator('.mg-liv-testo em')).toHaveText('meno');
+  await expect(corpo).not.toContainText('*meno*');
+  // Un elenco numerato tiene i numeri: una scelta citata per numero si ritrova.
+  await expect(corpo.locator('.mg-liv-testo ol li')).toHaveText(['Primo passo.', 'Secondo passo.']);
+  await expect(corpo).toContainText('<b>finto</b> <img src=x');
+  expect(await corpo.locator('b, img').count()).toBe(0);
+  expect(await page.evaluate(() => window.__xss)).toBeUndefined();
+  for (const tema of ['dark', 'light']) {
+    await page.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), tema);
+    await page.locator('#mgSide').screenshot({ path: `tests/.shots/livelli-rombo-grassetto-${tema}.png` });
+  }
+
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l4"]').click();
+  await expect(corpo.locator('.mg-liv-testo code')).toHaveText('salvaDownload');
+  await expect(corpo.locator('.mg-liv-testo strong')).toHaveText('dentro');
+  await expect(corpo).not.toContainText('`');
+  await page.locator('#mgSide').screenshot({ path: 'tests/.shots/livelli-pentagono-codice-light.png' });
+
+  // La stessa segnalazione nella conversazione della pratica, il primo testo che l'owner legge.
+  const turno = page.locator('#mgThread .mg-bubble--model', { hasText: 'Segnalazione per l' });
+  await expect(turno.locator('ul li strong')).toHaveText(['A.', 'B.']);
+  await expect(turno.locator('h4')).toHaveText(['Problema', 'Scelte', 'Cosa ho fatto nel frattempo']);
+  await expect(turno).not.toContainText('**A.**');
+  await expect(turno).not.toContainText('## ');
+  await expect(turno).toContainText('<b>finto</b>');
+  expect(await page.locator('#mgThread').locator('b, img:not(.mg-img-loading)').count()).toBe(0);
+  expect(await page.evaluate(() => window.__xss)).toBeUndefined();
+});
+
+test('le scelte numerate staccate da righe vuote tengono 1, 2, 3 nel rombo e nella pratica; un blocco di codice non fa scorrere di lato la conversazione', async ({ openTab }) => {
+  const SCELTE = '## Scelte\n1. **Dal sito**: zero attrito.\n\n2. **Chiesto**: un passaggio in più.\n\n3. **Misto**: chiesto solo la prima volta.';
+  const fb = {
+    _id: 'fb-livelli-numeri', text: 'Il download non tiene il nome del file.', name: 'Nome del file',
+    seq: 705, subSeq: 0, status: 'design', statusReason: 'decisione', branch: 'worker/fb-livelli-numeri',
+    clientId: 'user:abc', createdAt: '2026-09-22T10:00:00Z', images: [],
+    notes: `Ho fatto A.\n\nSegnalazione per l'owner (chi verifica):\n${SCELTE}\n\n\`\`\`\nconst nome = "${'x'.repeat(200)}";\n\`\`\``,
+    livelli: { l3: { esito: 'segnalato', ruolo: 'verifier', at: '2026-09-22T10:05:00Z', testo: SCELTE } },
+  };
+  // Il numero che il lettore vede davanti a ogni voce.
+  const numeri = (loc) => loc.evaluateAll((els) => els.map((li) => (li.parentElement.start || 1) + [...li.parentElement.children].indexOf(li)));
+  const page = await openTab(MANAGE);
+  await apri(page, [fb]);
+  await page.evaluate((id) => window.__mgTest.openDetail(id), fb._id);
+
+  const turno = page.locator('#mgThread .mg-bubble--model', { hasText: 'Segnalazione per l' });
+  await expect(turno.locator('ol li')).toHaveCount(3);
+  expect(await numeri(turno.locator('ol li'))).toEqual([1, 2, 3]);
+  await expect(turno.locator('pre')).toHaveCount(1);
+  const [largo, visibile] = await page.locator('#mgThread').evaluate((t) => [t.scrollWidth, t.clientWidth]);
+  expect(largo).toBeLessThanOrEqual(visibile);
+
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l3"]').click();
+  const voci = page.locator('#mgSideBody .mg-liv-testo ol li');
+  await expect(voci).toHaveCount(3);
+  expect(await numeri(voci)).toEqual([1, 2, 3]);
 });
 
 test('il pentagono verde dice cosa ha controllato l’audit, e non offre di saltarlo', async ({ openTab }) => {
@@ -356,6 +511,61 @@ test('quadrato rosso: dentro ci sono i blocchi, chi ha chiesto, ramo e commit, e
   const chiamata = await page.evaluate(() => window.__chiamate[0]);
   expect(chiamata.type).toBe('merge_approval_approve');
   expect(chiamata.id).toBe('ab12cd34ef56ab12cd34ef56');
+});
+
+// Il secondo clic cade dove è caduto il primo: «Confermi?» è più corto di
+// «Approva e fondi», e in una fila allineata a destra Scarta gli scivolava
+// sotto. Una fusione voluta finiva scartata (#550).
+test('confermare la fusione: il secondo clic nello stesso punto approva, e Scarta non ci arriva sotto', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page, [FB_COMPLETO], { pending: [richiesta()] });
+  await page.evaluate((id) => window.__mgTest.openDetail(id), FB_COMPLETO._id);
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l5"]').click();
+
+  const corpo = page.locator('#mgSideBody');
+  const go = corpo.locator('.sn-mac-btn-go');
+  const scarta = corpo.locator('.sn-mac-btn-quiet');
+  await expect(go).toBeVisible();
+  const prima = await go.boundingBox();
+  // Il bordo sinistro del tasto, il lato verso Scarta.
+  const punto = { x: prima.x + 3, y: prima.y + prima.height / 2 };
+
+  await page.mouse.click(punto.x, punto.y);
+  await expect(go).toHaveText('Confermi?');
+  expect(await page.evaluate(() => window.__chiamate)).toEqual([]);
+  const armato = await go.boundingBox();
+  for (const k of ['x', 'y', 'width', 'height']) expect(Math.abs(armato[k] - prima[k]), `Approva si è mosso (${k})`).toBeLessThan(0.5);
+  const s = await scarta.boundingBox();
+  const sotto = punto.x >= s.x && punto.x <= s.x + s.width && punto.y >= s.y && punto.y <= s.y + s.height;
+  expect(sotto, 'Scarta sotto il punto del primo clic').toBe(false);
+
+  await page.mouse.click(punto.x, punto.y);
+  await expect.poll(() => page.evaluate(() => window.__chiamate.map((c) => c.type))).toEqual(['merge_approval_approve']);
+  // L'esito compare sotto i tasti: non li spinge giù.
+  await expect(corpo.locator('.sn-mac-status')).toContainText(/su main/i);
+  expect(Math.abs((await go.boundingBox()).y - prima.y)).toBeLessThan(0.5);
+});
+
+// Le riletture automatiche (un cambio di stato, una richiesta nuova) ridisegnavano il
+// pannello sotto il cursore e la conferma armata si perdeva: il secondo clic riarmava (#550).
+test('quadrato: una rilettura fra il primo clic e la conferma non si mangia la conferma', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page, [FB_COMPLETO], { pending: [richiesta()] });
+  await page.evaluate((id) => window.__mgTest.openDetail(id), FB_COMPLETO._id);
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l5"]').click();
+
+  const go = page.locator('#mgSideBody .sn-mac-btn-go');
+  await expect(go).toBeVisible();
+  const b = await go.boundingBox();
+  const punto = { x: b.x + 4, y: b.y + b.height / 2 };
+  await page.mouse.click(punto.x, punto.y);
+  await expect(go).toHaveText('Confermi?');
+  await page.evaluate(() => window.__mgTest.loadMergeApprovals());
+  await page.waitForTimeout(300);
+  await expect(go).toHaveText('Confermi?');
+
+  await page.mouse.click(punto.x, punto.y);
+  await expect.poll(() => page.evaluate(() => window.__chiamate.map((c) => c.type))).toEqual(['merge_approval_approve']);
 });
 
 test('quadrato verde quando il lavoro è uscito, con la versione', async ({ openTab }) => {

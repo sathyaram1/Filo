@@ -39,7 +39,9 @@ test('mostra il documento con le fonti numerate in fondo', async ({ openTab }) =
   }
 });
 
-test('il documento sta nell\'indirizzo, e un\'ancora porta al punto giusto', async ({ openTab }) => {
+test('il documento sta nell\'indirizzo, e un\'ancora porta al punto giusto', async ({ app, openTab }) => {
+  const nonScritte = await app.evaluate(() => globalThis.SN_TRANSPARENCY.NAV
+    .filter((n) => !globalThis.SN_TRANSPARENCY.ids().includes(n.id)).length);
   const page = await openTab(URL + '?doc=models#i-punti-deboli');
 
   await expect(page.locator('h1')).toHaveText('Politica sui modelli');
@@ -51,8 +53,59 @@ test('il documento sta nell\'indirizzo, e un\'ancora porta al punto giusto', asy
   // La voce attiva della navigazione è quella del documento aperto, e le aree
   // non ancora scritte restano visibili e spente.
   await expect(page.locator('.sn-nav-item.is-active')).toHaveText('Modelli');
-  expect(await page.locator('.sn-nav-item.is-soon').count()).toBe(3);
+  expect(await page.locator('.sn-nav-item.is-soon').count()).toBe(nonScritte);
 });
+
+// #951 — Privacy e Sicurezza erano «non ancora scritte»: dalla barra si arriva al documento vero, con le sue sezioni.
+for (const { id, voce, sezione, frase } of [
+  { id: 'privacy', voce: 'Privacy', sezione: 'Cosa resta sul tuo computer', frase: 'Safe Browsing' },
+  { id: 'security', voce: 'Sicurezza', sezione: 'Da dove viene il file che hai scaricato', frase: 'SHA-256' },
+]) {
+  test(`la voce ${voce} della barra apre il suo documento, non il segnaposto`, async ({ openTab }) => {
+    const page = await openTab(URL);
+    await expect(page.locator('#title')).toHaveText('Politica sui modelli');
+    const link = page.locator(`#nav a[href*="doc=${id}"]`);
+    await expect(link).not.toHaveClass(/is-soon/);
+    await link.click();
+
+    await expect(page.locator('#title')).toHaveText(voce);
+    await expect(page.locator('#subtitle')).not.toContainText('non è ancora scritta');
+    await expect(page.locator('.sn-nav-item.is-active')).toHaveText(voce);
+    await expect(page.locator('#doc-body h2', { hasText: sezione })).toHaveCount(1);
+    await expect(page.locator('#doc-body h2', { hasText: 'I punti deboli' })).toHaveCount(1);
+    await expect(page.locator('#doc-body')).toContainText(frase);
+    expect(await page.locator('#doc-body li').count()).toBeGreaterThan(5);
+    await page.screenshot({ path: `tests/.shots/trasparenza-${id}.png`, fullPage: false });
+  });
+}
+
+for (const tema of ['light', 'dark']) {
+  test(`i comandi per controllare il file scaricato si leggono come codice sul tema ${tema}`, async ({ openTab }) => {
+    const page = await openTab(`${URL}?doc=security#da-dove-viene-il-file-che-hai-scaricato`);
+    await page.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), tema);
+    const codici = page.locator('#doc-body code');
+    await expect(codici).toHaveCount(3);
+    await expect(codici.first()).toHaveText('certutil -hashfile Filo-Setup.exe SHA256');
+    expect(await page.locator('#doc-body code .sn-gloss').count()).toBe(0);
+    const contrasto = await codici.first().evaluate((el) => {
+      const rgb = (s) => (String(s).match(/rgba?\(([^)]+)\)/) || [0, '0,0,0'])[1].split(',').slice(0, 3).map(parseFloat);
+      const lum = (c) => {
+        const l = c.map((v) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; });
+        return 0.2126 * l[0] + 0.7152 * l[1] + 0.0722 * l[2];
+      };
+      let sfondo = null;
+      for (let n = el; n && !sfondo; n = n.parentElement) {
+        const b = getComputedStyle(n).backgroundColor;
+        if (b && !/rgba\([^)]*,\s*0\)|transparent/.test(b)) sfondo = rgb(b);
+      }
+      sfondo = sfondo || rgb(getComputedStyle(document.documentElement).backgroundColor);
+      const [x, y] = [lum(rgb(getComputedStyle(el).color)), lum(sfondo)];
+      return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+    });
+    expect(contrasto, `contrasto ${contrasto.toFixed(2)}:1 sul tema ${tema}`).toBeGreaterThanOrEqual(4.5);
+    await page.screenshot({ path: `tests/.shots/trasparenza-security-comandi-${tema}.png`, fullPage: false });
+  });
+}
 
 test('le glosse sono in corsivo e si aprono al clic (non solo al passaggio del mouse)', async ({ openTab }) => {
   const page = await openTab(URL);
@@ -102,3 +155,94 @@ test('un link a una fonte apre una scheda e non porta via la pagina interna', as
   // non ha navigato via la pagina interna.
   expect(page.url()).toBe(before);
 });
+
+// 5. una sezione chiesta nell'indirizzo ma non ancora scritta: la pagina lo
+//    dice. Prima mostrava il documento sui modelli lasciando nell'indirizzo il
+//    nome di quella chiesta, e chi arrivava da un link che prometteva la
+//    privacy leggeva la politica sui modelli credendo fosse quella (#515).
+test('una sezione non ancora scritta lo dice, invece di mostrarne un\'altra al suo posto', async ({ app, openTab }) => {
+  const esistenti = await app.evaluate(() => globalThis.SN_TRANSPARENCY.ids());
+  const previsti = await app.evaluate(() => globalThis.SN_TRANSPARENCY.NAV.map((n) => n.id));
+  const mancante = previsti.find((i) => !esistenti.includes(i));
+  test.skip(!mancante, 'tutte le sezioni hanno il loro documento');
+
+  const page = await openTab(`${URL}?doc=${mancante}`);
+  await expect(page.locator('#title')).not.toHaveText('Politica sui modelli');
+  await expect(page.locator('#subtitle')).toContainText('non è ancora scritta');
+  // E la via d'uscita: da qui si arriva a quello che invece c'è scritto.
+  await expect(page.locator('#doc-body a[href*="doc=models"]')).toHaveCount(1);
+  await expect(page.locator('.sn-nav-item.is-active')).toHaveCount(1);
+});
+
+// Le due strade per la stessa sezione devono rispondere allo stesso modo:
+// prima, dall'indirizzo si otteneva la spiegazione e dalla barra niente.
+test('una sezione non ancora scritta si spiega anche cliccandola nella barra', async ({ app, openTab }) => {
+  const esistenti = await app.evaluate(() => globalThis.SN_TRANSPARENCY.ids());
+  const previsti = await app.evaluate(() => globalThis.SN_TRANSPARENCY.NAV.map((n) => n.id));
+  const mancante = previsti.find((i) => !esistenti.includes(i));
+  test.skip(!mancante, 'tutte le sezioni hanno il loro documento');
+
+  const page = await openTab(URL);
+  await expect(page.locator('#title')).toHaveText('Politica sui modelli');
+  await page.locator(`#nav a[href*="doc=${mancante}"]`).click();
+
+  await expect(page.locator('#subtitle')).toContainText('non è ancora scritta');
+  await expect(page.locator('#doc-body a[href*="doc=models"]')).toHaveCount(1);
+
+  // Senza mouse quelle voci erano irraggiungibili, e "in arrivo" lo diceva solo
+  // il suggerimento che compare fermandocisi sopra.
+  const tab = await page.locator('#nav .is-soon').first().evaluate((el) => ({
+    tab: el.tabIndex,
+    nome: el.getAttribute('aria-label') || '',
+  }));
+  expect(tab.tab, 'la voce non si raggiunge con il tabulatore').toBeGreaterThanOrEqual(0);
+  expect(tab.nome).toMatch(/non ancora scritta/);
+});
+
+test('lo stesso documento chiesto con le maiuscole resta lo stesso documento', async ({ openTab }) => {
+  // In chat «MODELS» e «models» sono la stessa cosa. Un indirizzo lo si scrive
+  // a mano o lo si ricopia da un messaggio: negare lì un documento che esiste
+  // sarebbe la bugia opposta a quella che questa pagina esiste per evitare.
+  const page = await openTab(`${URL}?doc=MODELS`);
+  await expect(page.locator('h1')).toHaveText('Politica sui modelli');
+  await expect(page.locator('#subtitle')).not.toContainText('non esiste');
+});
+
+test('un documento che non esiste per niente non diventa un altro documento', async ({ openTab }) => {
+  const page = await openTab(`${URL}?doc=pippo`);
+  await expect(page.locator('#title')).not.toHaveText('Politica sui modelli');
+  await expect(page.locator('#subtitle')).toContainText('non esiste');
+  await expect(page.locator('#doc-body a[href*="doc=models"]')).toHaveCount(1);
+});
+
+// #515 — Le sezioni non scritte si cliccano e sono l'unica strada per sapere
+// che arriveranno: sbiadite a 1,8:1 non le vedeva nessuno. 3:1 è il minimo
+// per un elemento d'interfaccia.
+for (const tema of ['light', 'dark']) {
+  test(`le sezioni non ancora scritte nella barra si leggono sul tema ${tema}`, async ({ app, openTab }) => {
+    const mancanti = await app.evaluate(() => {
+      const T = globalThis.SN_TRANSPARENCY;
+      return T.NAV.filter((n) => !T.ids().includes(n.id)).length;
+    });
+    test.skip(!mancanti, 'tutte le sezioni sono scritte');
+    const page = await openTab(URL);
+    await expect(page.locator('#title')).toBeVisible({ timeout: 10_000 });
+    await page.evaluate((t) => document.documentElement.setAttribute('data-sn-theme', t), tema);
+    const contrasto = await page.evaluate(() => {
+      const lum = (c) => {
+        const l = c.map((v) => { const s = v / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; });
+        return 0.2126 * l[0] + 0.7152 * l[1] + 0.0722 * l[2];
+      };
+      const rgb = (str) => (String(str).match(/rgba?\(([^)]+)\)/) || [0, '0,0,0'])[1].split(',').slice(0, 3).map(parseFloat);
+      const voce = document.querySelector('#nav .is-soon');
+      const st = getComputedStyle(voce);
+      const corpo = rgb(getComputedStyle(document.body).backgroundColor);
+      const sfondo = corpo.some((v) => v > 0) ? corpo : rgb(getComputedStyle(document.documentElement).backgroundColor);
+      const a = parseFloat(st.opacity);
+      const visto = rgb(st.color).map((v, i) => sfondo[i] + a * (v - sfondo[i]));
+      const [x, y] = [lum(visto), lum(sfondo)];
+      return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+    });
+    expect(contrasto, `contrasto ${contrasto.toFixed(2)}:1 sul tema ${tema}`).toBeGreaterThanOrEqual(3);
+  });
+}

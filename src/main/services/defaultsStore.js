@@ -49,6 +49,8 @@ const ROUTINES_DOC = 'config/routines';
 // Le manopole dei crediti (#652). Il documento lo legge il server dei crediti a
 // ogni riscatto, quota e premio; da qui lo scrive l'owner dalla sua pagina.
 const CREDITS_DOC = 'config/credits';
+// L'interruttore del Red Team (#896): lettura pubblica, scrittura dell'owner.
+const REDTEAM_DOC = 'config/redteam';
 
 // Cache degli override remoti dall'ultimo refresh.
 let remoteModels = null;  // { provider?, models?, modelRegistry? }
@@ -56,6 +58,7 @@ let remoteModels = null;  // { provider?, models?, modelRegistry? }
 // null e le chiavi effettive sono quelle del build.
 let remoteSecrets = null; // { apiKeys?: { openrouter?, tavily? }, safeBrowsingKey? }
 let lastFetchTs = 0;
+let adesso = () => Date.now();
 
 // ── Firestore Value <-> JS ───────────────────────────────────────────────────
 function toFsValue(v) {
@@ -96,9 +99,14 @@ function fsDocToObject(doc) {
   return out;
 }
 
-// Legge un documento Firestore. Ritorna l'oggetto, {} se 404 (non esiste
-// ancora), oppure null se la lettura non è consentita/è fallita (403/altro).
-async function fetchDoc(docPath, idToken) {
+// Legge un documento DICENDO com'è andata, non solo cosa ha portato (#679).
+// «Non esiste» e «non ti riguarda» sono risposte definitive del server; «non
+// ho potuto chiedere» no, e chi tiene una copia in memoria deve distinguerle:
+// contare un tentativo fallito come una lettura fatta lascia Filo con la
+// configurazione che non ha fino alla scadenza lunga.
+// `tokenMancato`: chi usa Filo è dentro ma la sessione non ha dato il token, e
+// il «non ti riguarda» detto a un anonimo non parla di lui (#679.2).
+async function leggiDoc(docPath, idToken, { tokenMancato = false } = {}) {
   const url = `${FIRESTORE_BASE}/${docPath}?key=${API_KEY}`;
   const headers = {};
   if (idToken) headers.Authorization = `Bearer ${idToken}`;
@@ -106,16 +114,21 @@ async function fetchDoc(docPath, idToken) {
   try {
     res = await fetch(url, { headers });
   } catch (_) {
-    return null; // offline o rete giù → usa i fallback
+    return { risposto: false, doc: null }; // offline o rete giù → usa i fallback
   }
-  if (res.status === 404) return {};
-  if (!res.ok) return null;
+  if (res.status === 404) return { risposto: true, doc: {} };
+  if (res.status === 401 || res.status === 403) return { risposto: !tokenMancato, doc: null };
+  if (!res.ok) return { risposto: false, doc: null };
   try {
     const json = await res.json();
-    return fsDocToObject(json);
+    return { risposto: true, doc: fsDocToObject(json) };
   } catch (_) {
-    return null;
+    return { risposto: false, doc: null };
   }
+}
+
+async function fetchDoc(docPath, idToken) {
+  return (await leggiDoc(docPath, idToken)).doc;
 }
 
 // ── API ──────────────────────────────────────────────────────────────────────
@@ -132,29 +145,55 @@ function isAdminUser() {
 // `config/secrets` si legge SOLO da admin (#581): per tutti gli altri le chiavi
 // sono quelle incastonate dal build, e questo documento non si tocca affatto.
 async function refresh() {
+  // Letto PRIMA del token: un rinnovo che fallisce chiude la sessione, e dopo
+  // l'owner sembrerebbe uno qualunque.
+  const admin = isAdminUser();
+  let dentro = false;
+  try { dentro = Boolean(auth.isSignedIn()); } catch (_) {}
   let idToken = null;
   try { idToken = await auth.getIdToken(); } catch (_) {}
+  const tokenMancato = (admin || dentro) && !idToken;
 
-  const models = await fetchDoc(MODELS_DOC, idToken);
-  if (models) remoteModels = models;
+  const models = await leggiDoc(MODELS_DOC, idToken, { tokenMancato });
+  if (models.doc) remoteModels = models.doc;
+  let risposto = models.risposto;
 
-  if (idToken && isAdminUser()) {
-    const secrets = await fetchDoc(SECRETS_DOC, idToken);
-    if (secrets) remoteSecrets = secrets;
+  if (admin && !idToken) {
+    // Owner senza token: le sue chiavi non si sono potute chiedere. Si tiene
+    // l'ultima copia (la serve `get()` solo se admin c'è) e si riprova presto:
+    // spegnerla faceva pagare la chiave del build per mezz'ora (#679.2).
+    risposto = false;
+  } else if (admin) {
+    const secrets = await leggiDoc(SECRETS_DOC, idToken);
+    // Il «non ti riguarda» detto a un token vero è definitivo, e spegne la copia.
+    if (secrets.risposto) remoteSecrets = secrets.doc;
+    risposto = risposto && secrets.risposto;
   } else {
-    // Chi non è admin non ha override: azzerare invece di lasciare la cache
-    // com'era tiene onesta la precedenza anche dopo un logout dell'owner sulla
-    // stessa installazione (altrimenti le chiavi lette da admin resterebbero in
-    // uso per un account che non può più leggerle).
+    // Chi non è admin non ha override; il cancello che conta sta in `get()`,
+    // qui si libera solo la copia in memoria.
     remoteSecrets = null;
   }
-  lastFetchTs = Date.now();
+  // Solo una lettura a cui il server HA risposto rimanda la prossima (#679).
+  // Se Filo si apre mentre la rete non c'è ancora, la configurazione non
+  // arriva e nessuna funzione ha un modello da usare: segnare quel tentativo
+  // come fatto teneva l'app senza modelli fino alla scadenza lunga, anche se
+  // la rete tornava un istante dopo. Riprovare subito non è un ciclo: qui ci
+  // si passa solo all'avvio, all'accesso e quando una pagina chiede la config.
+  if (risposto) lastFetchTs = adesso();
   return get();
 }
 
+// Ogni quanto la config remota si rilegge da sola. Cinque minuti erano
+// trecento letture di Firestore al giorno PER UTENTE, per un documento che
+// cambia quando l'owner lo tocca (#679). Mezz'ora perché la rilettura
+// periodica serve solo alle installazioni ALTRUI: su quella di chi salva il
+// documento la config torna aggiornata subito, perché `update()` chiude
+// chiamando `refresh()`.
+const DEFAULT_MAX_AGE_MS = 30 * 60 * 1000;
+
 // Refresh "pigro": rinfresca al massimo una volta ogni `maxAgeMs`.
-async function refreshIfStale(maxAgeMs = 5 * 60 * 1000) {
-  if (Date.now() - lastFetchTs < maxAgeMs) return get();
+async function refreshIfStale(maxAgeMs = DEFAULT_MAX_AGE_MS) {
+  if (adesso() - lastFetchTs < maxAgeMs) return get();
   return refresh();
 }
 
@@ -166,6 +205,16 @@ function buildModels() {
   const C = globalThis.SN_CONST || {};
   const T = globalThis.SN_TEST_MODELS; // presente solo nei test (loader.js)
   return T ? { registry: T.registry, models: T.models } : { registry: C.DEFAULT_MODEL_REGISTRY || {}, models: C.DEFAULT_MODELS || {} };
+}
+
+// Il fornitore del documento remoto vale solo se Filo lo sa chiamare e la politica lo ammette: il
+// documento è rimasto su 'gemini' dopo l'uscita di Google, e nessuna chiave lo trovava più.
+function fornitoreUsabile(nome, C = globalThis.SN_CONST || {}) {
+  if (typeof nome !== 'string' || !nome) return false;
+  if ((C.PRODUCER_DIRECT_PROVIDERS || []).includes(nome)) return false;
+  if (nome === (C.DEFAULT_PROVIDER || 'openrouter')) return true;
+  const Gate = globalThis.SN_MODEL_GATE;
+  return Boolean(Gate && Gate.hasProvider(nome));
 }
 
 function get() {
@@ -190,8 +239,9 @@ function get() {
     safeBrowsingKey: getBuildSafeBrowsingKey(),
   };
 
+  let remoteReasons = [];
   if (remoteModels) {
-    if (typeof remoteModels.provider === 'string' && remoteModels.provider) out.provider = remoteModels.provider;
+    if (fornitoreUsabile(remoteModels.provider, C)) out.provider = remoteModels.provider;
     if (remoteModels.models && typeof remoteModels.models === 'object') {
       out.models = { ...out.models, ...remoteModels.models };
     }
@@ -221,8 +271,15 @@ function get() {
         .filter((x) => typeof x === 'string' && x.trim())
         .map((x) => x.trim());
     }
+    if (Array.isArray(remoteModels.excludedProviderReasons)) {
+      remoteReasons = remoteModels.excludedProviderReasons;
+    }
     if (typeof remoteModels.providerSort === 'string') {
       out.providerSort = remoteModels.providerSort.trim();
+    }
+    // #1004 — gli elenchi delle pagine delicate (posta, banche, sanità): ogni categoria remota sostituisce la sua.
+    if (remoteModels.sitiDelicati && typeof remoteModels.sitiDelicati === 'object') {
+      out.sitiDelicati = remoteModels.sitiDelicati;
     }
     if (Array.isArray(remoteModels.modelRegistryDeleted)) {
       for (const nick of remoteModels.modelRegistryDeleted) {
@@ -233,7 +290,16 @@ function get() {
     }
   }
 
-  if (remoteSecrets) {
+  // Il perché di ogni esclusione: sta in un campo a parte, così i client che
+  // leggono solo `excludedProviders` (array di nomi) restano compatibili.
+  out.excludedProviderReasons = typeof C.excludedProviderReasons === 'function'
+    ? C.excludedProviderReasons(out.excludedProviders, remoteReasons, C.DEFAULT_EXCLUDED_PROVIDER_REASONS)
+    : [];
+
+  // Le chiavi lette da admin valgono solo finché admin c'è ADESSO, non fino alla
+  // prossima rilettura: un logout non rilegge niente, e la copia restava in uso
+  // a chi usava il computer dopo, fino a mezz'ora (#679.1).
+  if (remoteSecrets && isAdminUser()) {
     if (remoteSecrets.apiKeys && typeof remoteSecrets.apiKeys === 'object') {
       // Solo i valori non vuoti sovrascrivono le chiavi di build.
       for (const k of ['openrouter', 'tavily']) {
@@ -258,14 +324,20 @@ function getPublicForAdmin() {
     models: eff.models,
     modelRegistry: eff.modelRegistry,
     excludedProviders: eff.excludedProviders,
+    excludedProviderReasons: eff.excludedProviderReasons,
     providerSort: eff.providerSort,
     apiKeysPresent: {
       openrouter: Boolean(eff.apiKeys.openrouter),
       tavily: Boolean(eff.apiKeys.tavily),
     },
     safeBrowsingKeyPresent: Boolean(eff.safeBrowsingKey),
+    // #1004 — gli elenchi delle pagine delicate in vigore, e quelli del codice: l'editor salva solo le categorie che
+    // se ne discostano, così una banca aggiunta con un rilascio arriva anche dove l'owner non ha toccato niente.
+    sitiDelicati: PD() ? PD().elenco(eff.sitiDelicati) : (eff.sitiDelicati || {}),
+    sitiDelicatiDiSerie: PD() ? PD().elenco(null) : {},
   };
 }
+const PD = () => globalThis.SN_PAGINE_DELICATE || null;
 
 async function patchDoc(docPath, fields, mask, idToken) {
   const qs = mask.map((m) => `updateMask.fieldPaths=${encodeURIComponent(m)}`).join('&');
@@ -322,11 +394,40 @@ async function update(partial, idToken) {
     modelFields.excludedProviders = toFsValue(clean);
     modelMask.push('excludedProviders');
   }
+  if (Array.isArray(partial.excludedProviderReasons)) {
+    const C = globalThis.SN_CONST || {};
+    const kinds = C.EXCLUDED_PROVIDER_KINDS || [];
+    const clean = partial.excludedProviderReasons
+      .filter((r) => r && typeof r.name === 'string' && r.name.trim())
+      .map((r) => ({
+        name: r.name.trim(),
+        kind: kinds.includes(r.kind) ? r.kind : '',
+        note: typeof r.note === 'string' ? r.note.trim() : '',
+      }));
+    modelFields.excludedProviderReasons = toFsValue(clean);
+    modelMask.push('excludedProviderReasons');
+  }
   if (typeof partial.providerSort === 'string') {
     modelFields.providerSort = toFsValue(partial.providerSort.trim());
     modelMask.push('providerSort');
   }
-  if (modelMask.length) await patchDoc(MODELS_DOC, modelFields, modelMask, idToken);
+  // #1004 — le categorie delle pagine delicate: l'oggetto inviato sostituisce quello remoto per intero.
+  if (partial.sitiDelicati && typeof partial.sitiDelicati === 'object' && !Array.isArray(partial.sitiDelicati)) {
+    const clean = {};
+    for (const [k, v] of Object.entries(partial.sitiDelicati)) {
+      if (!/^[a-z0-9_-]{1,40}$/i.test(k) || !Array.isArray(v)) continue;
+      clean[k] = [...new Set(v.filter((x) => typeof x === 'string').map((x) => x.trim().toLowerCase()).filter(Boolean))];
+    }
+    modelFields.sitiDelicati = toFsValue(clean);
+    modelMask.push('sitiDelicati');
+  }
+  if (modelMask.length) {
+    await patchDoc(MODELS_DOC, modelFields, modelMask, idToken);
+    // Il salvato entra subito nella copia: se la rilettura qui sotto non arriva,
+    // la schermata non deve tornare ai valori di prima (#679.2).
+    remoteModels = { ...(remoteModels || {}) };
+    for (const k of modelMask) remoteModels[k] = fromFsValue(modelFields[k]);
+  }
 
   // Doc segreti (chiavi). Scriviamo solo i campi presenti come stringa.
   //
@@ -356,8 +457,17 @@ async function update(partial, idToken) {
     secretFields.safeBrowsingKey = toFsValue(partial.safeBrowsingKey.trim());
     secretMask.push('safeBrowsingKey');
   }
-  if (secretMask.length) await patchDoc(SECRETS_DOC, secretFields, secretMask, idToken);
+  if (secretMask.length) {
+    await patchDoc(SECRETS_DOC, secretFields, secretMask, idToken);
+    const prima = remoteSecrets || {};
+    remoteSecrets = { ...prima, apiKeys: { ...(prima.apiKeys || {}), ...fromFsValue(secretFields.apiKeys || { mapValue: {} }) } };
+    if ('safeBrowsingKey' in secretFields) remoteSecrets.safeBrowsingKey = fromFsValue(secretFields.safeBrowsingKey);
+  }
 
+  // La rilettura qui NON è un lusso: è ciò che rende immediata la modifica
+  // sulla macchina di chi salva. La rilettura periodica è lenta apposta
+  // (DEFAULT_MAX_AGE_MS), e senza questa riga l'owner cambierebbe un modello e
+  // continuerebbe a usare il vecchio per mezz'ora.
   await refresh();
   return getPublicForAdmin();
 }
@@ -483,16 +593,22 @@ async function setAutomationProberIdle(on, idToken) {
   return Boolean(on);
 }
 
-// I tre bilanci dei giri di correzione (config/routines, campi `cap2`,
-// `cap1`, `cap0` — feedback #561) e il testo della fase 2 (`fixInstructions`).
+// I bilanci dei giri di correzione, uno per livello (config/routines, campi in
+// VERIFIER_CAP_KEYS — feedback #561) e il testo della fase 2 (`fixInstructions`).
 // Li applica il SERVER quando registra la critica; qui la dashboard li legge e
 // li scrive. Non c'è un default: i numeri stanno SOLO nel documento (decisione
 // dell'owner del 2026-09-16 — un default nel codice faceva ragionare la
 // verifica locale con 5/2/0 mentre la dashboard diceva 10/1/0). Un campo che
 // nel documento non c'è torna `null`, e la dashboard lo mostra vuoto. Il range
 // da SN_CONST.AUTOMATION; clamp prudente sia in lettura sia in scrittura. Lo 0
-// è un valore valido per tutti e tre.
-const CAP_KEYS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAP_KEYS) || ['cap2', 'cap1', 'cap0'];
+// è un valore valido per tutti.
+const CAP_KEYS = (globalThis.SN_FB_TRANSITIONS && globalThis.SN_FB_TRANSITIONS.VERIFIER_CAP_KEYS) || ['cap3', 'cap2', 'cap1', 'cap0'];
+/** La forma di risposta coi bilanci tutti a `null`: un campo che nel documento non c'è resta vuoto. */
+function capsVuoti() {
+  const out = { fixInstructions: '', giroStretto: false };
+  for (const k of CAP_KEYS) out[k] = null;
+  return out;
+}
 const FIX_INSTRUCTIONS_MAX = Number(globalThis.SN_CONST && globalThis.SN_CONST.AUTOMATION && globalThis.SN_CONST.AUTOMATION.FIX_INSTRUCTIONS_MAX) || 8000;
 
 function automationRange() {
@@ -518,7 +634,7 @@ async function getRoutineCaps(idToken) {
   const doc = await fetchDoc(ROUTINES_DOC, idToken);
   // `null` = non ho potuto leggere: dirlo, o «spento» e «non impostato» sembrano parole del server.
   if (doc === null) throw new Error('Impostazioni del giro di verifica non raggiungibili.');
-  const out = { cap2: null, cap1: null, cap0: null, fixInstructions: '', giroStretto: false };
+  const out = capsVuoti();
   for (const k of CAP_KEYS) {
     if (doc && doc[k] != null) out[k] = clampCap(doc[k]);
   }
@@ -556,7 +672,7 @@ async function setRoutineCaps(patch, idToken) {
   } catch (e) {
     // Scritto ma non riletto: un salvataggio riuscito non deve sembrare fallito. Tornano i soli campi scritti.
     if (!mask.length) throw e;
-    const scritto = { cap2: null, cap1: null, cap0: null, fixInstructions: '', giroStretto: false };
+    const scritto = capsVuoti();
     for (const k of mask) scritto[k] = k === 'fixInstructions' ? p[k].slice(0, FIX_INSTRUCTIONS_MAX) : (k === 'giroStretto' ? p[k] : clampCap(p[k]));
     return scritto;
   }
@@ -600,6 +716,24 @@ async function setRoutineSessions(patch, idToken) {
   }
 }
 
+
+// ── Red Team aperto a tutti (#896) ───────────────────────────────────────────
+// `aperto` è vero solo per un `openToAll: true` scritto: documento assente o
+// illeggibile vale «in pausa», come sul server. `risposto` distingue la rete giù
+// dal no del server, perché chi tiene una copia in memoria possa riprovare.
+async function getRedteamOpen() {
+  const r = await leggiDoc(REDTEAM_DOC, null);
+  return { risposto: r.risposto, aperto: !!(r.doc && r.doc.openToAll === true) };
+}
+
+async function setRedteamOpen(on, idToken) {
+  if (!idToken) throw new Error('Serve un ID token admin per aprire o mettere in pausa il Red Team.');
+  await patchDoc(REDTEAM_DOC, {
+    openToAll: toFsValue(Boolean(on)),
+    updatedAt: { timestampValue: new Date(adesso()).toISOString() },
+  }, ['openToAll', 'updatedAt'], idToken);
+  return Boolean(on);
+}
 
 // ── Manopole dei crediti (#652) ──────────────────────────────────────────────
 // Le sette impostazioni di `config/credits` che l'owner cambia dalla sua
@@ -656,8 +790,12 @@ async function setCreditsKnobs(patch, idToken) {
 // (owner-gated) per la tab "Log" della dashboard. Ritorna le voci più recenti
 // PRIMA (ordine decrescente per istante d'avvio), già normalizzate. Documento o
 // campo assente / lettura fallita ⇒ lista vuota (mai un errore per un log).
-async function getWorkerLog(idToken) {
-  const doc = await fetchDoc(AUTOMATION_DOC, idToken);
+// `severo`: una lettura fallita lancia invece di valere «registro vuoto» (il giro
+// della Gestione deve distinguere «non lo so» da «niente di nuovo», #676.1).
+async function getWorkerLog(idToken, { severo = false } = {}) {
+  const letto = await leggiDoc(AUTOMATION_DOC, idToken);
+  if (severo && (!letto.risposto || !letto.doc)) throw new Error('registro dei worker non letto');
+  const doc = letto.doc;
   const raw = doc && Array.isArray(doc.workerLog) ? doc.workerLog : [];
   const entries = raw
     .filter((e) => e && typeof e === 'object')
@@ -673,9 +811,14 @@ async function getWorkerLog(idToken) {
 
 module.exports = {
   get,
+  fornitoreUsabile,
   getPublicForAdmin,
   refresh,
   refreshIfStale,
+  DEFAULT_MAX_AGE_MS,
+  // L'orologio si sostituisce solo nei test: far scadere una mezz'ora
+  // aspettandola davvero non è una prova che si possa correre.
+  _setAdesso: (fn) => { adesso = typeof fn === 'function' ? fn : Date.now; },
   update,
   getAutomationGate,
   setAutomationGate,
@@ -691,5 +834,7 @@ module.exports = {
   setRoutineSessions,
   getCreditsKnobs,
   setCreditsKnobs,
+  getRedteamOpen,
+  setRedteamOpen,
   getWorkerLog,
 };

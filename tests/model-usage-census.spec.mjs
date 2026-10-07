@@ -22,6 +22,10 @@ async function revealAdvanced(page) {
   await page.waitForSelector('#useDefaultModels', { timeout: 8_000 });
   await page.uncheck('#useDefaultModels');
   await page.waitForSelector('#modelsGrid .sn-chain', { timeout: 4_000 });
+  // Spegnere l'interruttore salva tutta la pagina (catene e registro compresi): una scrittura della prova fatta
+  // prima che quel salvataggio arrivi viene ricoperta (#687). Si aspetta il valore salvato, non un tempo.
+  await expect.poll(() => page.evaluate(async () => (await window.SN_STORAGE.getSettings()).useDefaultModels),
+    { timeout: 5_000 }).toBe(false);
 }
 
 test('ogni punto censito come impostabile ha davvero un campo nelle Opzioni', async ({ openTab }) => {
@@ -40,9 +44,13 @@ test('ogni punto censito come impostabile ha davvero un campo nelle Opzioni', as
   // dell'editor (prendevano in prestito il modello di «Spiega»).
   const A = await page.evaluate(() => window.SN_CONST.ACTIONS);
   for (const action of [A.ARCHIVE_EMBED, A.EDITOR_TITLE, A.EDITOR_SUMMARY, A.EDITOR_CHAT,
-    A.MANAGE_SEARCH, A.PROVIDER_TEST]) {
+    A.PROVIDER_TEST]) {
     expect(expected).toContain(action);
   }
+  // La ricerca fra i feedback la usa solo chi gestisce Filo: si imposta in
+  // Gestione → Modelli di supporto, non qui (#465).
+  expect(expected).not.toContain(A.MANAGE_SEARCH);
+  await expect(page.locator('#modelsGrid')).not.toContainText('ricerca fra i feedback');
 });
 
 test('impostare il modello dell\'indicizzazione lo salva e lo ripropone', async ({ openTab }) => {
@@ -92,6 +100,9 @@ test('gli altri punti (giudici, sanificatore, punti senza modello) sono elencati
   expect(joined).toContain('Giudice della priorità dei feedback');
   const sanitizerRow = list.locator('.sn-usage-row', { hasText: 'Sanificatore dei feedback' });
   await expect(sanitizerRow.locator('.sn-usage-where')).toHaveText('Lo imposta chi gestisce Filo');
+  // La ricerca fra i feedback non gira mai sul computer di chi usa Filo: qui
+  // sarebbe rumore (#465).
+  expect(joined).not.toContain('Ricerca fra i feedback');
 
   // I punti che un modello NON lo usano sono elencati apposta, così non si
   // continua a cercare dove impostarlo.
@@ -104,7 +115,7 @@ test('gli altri punti (giudici, sanificatore, punti senza modello) sono elencati
 
   // Numero di righe = i punti non-utente del censimento (nessuno perso).
   const expectedRows = await page.evaluate(() =>
-    window.SN_MODEL_USAGE.list().filter((e) => e.from !== 'user').length);
+    window.SN_MODEL_USAGE.list().filter((e) => e.from !== 'user' && !e.action).length);
   await expect(list.locator('.sn-usage-row')).toHaveCount(expectedRows);
 });
 

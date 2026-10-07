@@ -4,9 +4,10 @@
 // funzioni di modello e manda qui il mazzo intero da persistere (DECKS_UPDATE).
 
 module.exports = function register(on, ctx) {
-  const { MSG, handleAIRequest } = ctx;
+  const { MSG, handleAIRequest, broadcastToFiloPages } = ctx;
   const Store = globalThis.SN_DECK_STORE;
   const Opinions = globalThis.SN_DECK_OPINIONS_SVC;
+  const Chats = globalThis.SN_DECK_CHATS_SVC;
   const Scry = globalThis.SN_SCRYFALL;
 
   on(MSG.DECKS_LIST, async () => {
@@ -32,10 +33,46 @@ module.exports = function register(on, ctx) {
   on(MSG.DECKS_DELETE, async (msg) => {
     const id = String(msg?.id || '');
     const removed = await Store.remove(id);
-    // Mazzo eliminato → via anche i suoi pareri cacheati (la cache tag resta:
+    // Mazzo eliminato → via anche i suoi pareri cacheati e la sua chat (la cache tag resta:
     // è per carta, cross-mazzo). Best-effort: il delete non deve fallire per questo.
-    if (removed) await Opinions.dropDeck(id).catch(() => {});
+    if (removed) {
+      await Opinions.dropDeck(id).catch(() => {});
+      await Chats.dropDeck(id).catch(() => {});
+    }
     return { ok: removed, ...(removed ? {} : { error: 'not_found' }) };
+  });
+
+  // ── Chat per mazzo (§3.2) ─────────────────────────────────────────────────
+  // Solo le pagine filo:// (la chat la scrive la pagina dei mazzi); un sito non ha niente da leggere né da scrivere qui.
+  const isFilo = (origin) => String(origin || '').startsWith('filo://');
+  const changed = (deckId, clientId) => broadcastToFiloPages({
+    type: MSG.DECKS_CHAT_CHANGED, deckId, clientId: String(clientId || ''),
+  });
+
+  on(MSG.DECKS_CHAT_GET, async (msg, _sender, origin) => {
+    if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
+    return { ok: true, messages: await Chats.get(String(msg?.deckId || '')) };
+  });
+
+  on(MSG.DECKS_CHAT_EDIT, async (msg, sender, origin) => {
+    if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
+    const deckId = String(msg?.deckId || '');
+    const change = {
+      op: String(msg?.op || ''), messages: msg?.messages, turn: msg?.turn, message: msg?.message,
+      userText: msg?.userText, nameIds: msg?.nameIds, sort: msg?.sort,
+    };
+    // Pagina ricaricata o chiusa col turno ancora atteso: le altre schede rileggono e lo trovano interrotto.
+    const r = await Chats.edit(deckId, change, { wc: sender && sender.wc, onAbandon: () => changed(deckId, '') });
+    if (r.ok) changed(deckId, msg?.clientId);
+    return r;
+  });
+
+  on(MSG.DECKS_CHAT_CLEAR, async (msg, _sender, origin) => {
+    if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
+    const deckId = String(msg?.deckId || '');
+    await Chats.dropDeck(deckId);
+    changed(deckId, msg?.clientId);
+    return { ok: true };
   });
 
   on(MSG.DECKS_DUPLICATE, async (msg) => {

@@ -10,7 +10,12 @@
 //   - un server che non risponde non ferma niente;
 //   - `filo://invito/<codice>` riscatta e porta davanti la pagina Crediti,
 //     mentre ogni ALTRO `filo://…` (che il sistema consegna comunque, una
-//     volta che Filo è il gestore del protocollo) non fa niente.
+//     volta che Filo è il gestore del protocollo) non fa niente;
+//   - dentro Filo (#664) il pulsante della pagina dell'invito e il tasto
+//     destro sul link fanno lo stesso; il benvenuto lo racconta una scheda
+//     sola; un saluto davanti al codice non lo nasconde; anche le altre porte
+//     (tasto destro «Apri in nuova tab», un pulsante che naviga da script, la
+//     barra degli indirizzi) riscattano invece di tacere.
 //
 // Server e identità Firebase sono simulati da un HTTP locale, come in
 // tests/wallet-credits.spec.mjs: gli endpoint si spostano con
@@ -29,6 +34,12 @@ const T_CAMPO = 'nel campo va bene il link intero, e gli inviti si danno come li
 const T_PRIMO_AVVIO = 'al primo avvio l\'invito che aspettava si riscatta da solo, e lo dicono home e Crediti';
 const T_MUTO = 'se il server non risponde l\'avvio non si ferma, e nessun invito viene dato per riscattato';
 const T_DEEP_LINK = 'filo://invito riscatta e porta davanti Crediti; ogni altro filo:// non fa niente';
+const T_CLIC_DENTRO = 'dentro Filo il pulsante della pagina dell’invito riscatta, e la pagina resta; una pagina che lo spinge da sola no';
+const T_TASTO_DESTRO = 'tasto destro su un link d’invito: «Riscatta l’invito» lo porta dentro Filo';
+const T_BENVENUTO_UNA_VOLTA = 'con più schede nuove aperte il benvenuto compare in una sola, quella che guardi';
+const T_SALUTO = 'un saluto che sembra un codice non si mangia il codice, nei Crediti e con /invito';
+const T_RIMBALZO = 'un collegamento cliccato che rimbalza su filo://invito riscatta, anche in una scheda nuova che poi non resta bianca';
+const T_ALTRE_PORTE = 'filo://invito fuori dal clic sul link non cade in silenzio: «Apri in nuova tab», pulsante da script, barra';
 
 let server;
 const seen = { redeems: [], pendings: 0 };
@@ -74,6 +85,8 @@ test.beforeAll(async () => {
       if (url === '/token') {
         return json(res, 200, { id_token: 'anon-id-token', refresh_token: 'anon-refresh', expires_in: '3600', user_id: 'anon-uid-1' });
       }
+      // Un collegamento tracciato o una pagina che passa dal server prima di rimandare all'invito.
+      if (url === '/redir') { res.writeHead(302, { Location: 'filo://invito/ABCD-EFGH' }); return res.end(); }
       if ((req.headers.authorization || '') !== 'Bearer anon-id-token') return json(res, 401, { error: { message: 'no auth' } });
 
       if (url === '/walletState') {
@@ -277,4 +290,268 @@ test(T_DEEP_LINK, async ({ app }) => {
   // E su Mac lo stesso indirizzo arriva con open-url: stessa strada, stesso esito.
   const macOk = await app.evaluate(({ app: a }) => a.emit('open-url', { preventDefault() {} }, 'filo://invito/ABCDEFGH'));
   expect(macOk, 'open-url ha un ascoltatore: su Mac il link arriva solo da lì').toBe(true);
+});
+
+// La pagina dell'invito com'è fatta: il codice a schermo e il pulsante che lo
+// porta dentro Filo. Chi Filo ce l'ha già la apre anche DENTRO Filo, che è un
+// browser (#664): lì il pulsante deve fare quello che fa da fuori.
+const PAGINA_INVITO = `<!doctype html><html><head><meta charset="utf-8"><title>Il tuo invito a Filo</title></head>
+<body style="font-family:sans-serif;padding:40px"><h1>Hai un invito</h1><p>Codice: ABCD-EFGH</p>
+<p><a id="apri" href="filo://invito/ABCD-EFGH" style="display:inline-block;padding:16px 28px;background:#c66;color:#fff">Apri in Filo</a></p>
+</body></html>`;
+
+// Una pagina che spinge l'invito da sé, senza che nessuno clicchi: un clic
+// finto, un rinvio, una finestra nuova.
+const PAGINA_SPINGE = `<!doctype html><html><head><meta charset="utf-8"><title>spinge</title></head>
+<body><h1>Una pagina qualsiasi</h1><a id="a" href="filo://invito/ABCD-EFGH">invito</a>
+<script>setTimeout(function () {
+  try { document.getElementById('a').click(); } catch (e) {}
+  try { window.open('filo://invito/ABCD-EFGH', '_blank'); } catch (e) {}
+  try { location.href = 'filo://invito/ABCD-EFGH'; } catch (e) {}
+}, 300);</script></body></html>`;
+
+test(T_CLIC_DENTRO, async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  // Su un altro host: openTab sceglie la scheda per host, e le due pagine non si devono confondere.
+  const spinge = await testServer.openReady(openTab, PAGINA_SPINGE, { pubblico: true });
+  await new Promise((r) => setTimeout(r, 3000));
+  expect(seen.redeems, 'una pagina da sola non riscatta niente').toEqual([]);
+  // Il contenuto si legge con evaluate: dopo una navigazione fermata i locator
+  // di Playwright aspettano un caricamento che non arriva (succede anche col mailto:).
+  expect(spinge.url()).toMatch(/^http:\/\/sito-pubblico\.test:/);
+  expect(await spinge.evaluate(() => document.querySelector('h1').textContent), 'la scheda non finisce su un indirizzo che non esiste')
+    .toBe('Una pagina qualsiasi');
+  expect(await attendiPagina(app, 'invito', 0), 'nessuna scheda su filo://invito').toBeNull();
+
+  const pagina = await testServer.openReady(openTab, PAGINA_INVITO);
+  const indirizzo = pagina.url();
+  // Due clic attaccati, come chi non è sicuro che il primo sia andato: un
+  // riscatto solo, e il benvenuto non diventa «hai già i crediti».
+  await pagina.locator('#apri').dblclick();
+  await expect.poll(() => seen.redeems, { timeout: 20000 }).toEqual(['ABCDEFGH']);
+  const credits = await attendiPagina(app, 'credits');
+  expect(credits, 'il clic apre la pagina Crediti').toBeTruthy();
+  await expect(credits.locator('#walletNote')).toContainText('Sei entrato con un invito', { timeout: 15000 });
+  // La pagina dell'invito resta dov'era, col suo codice.
+  expect(pagina.url()).toBe(indirizzo);
+  await expect(pagina.locator('h1')).toHaveText('Hai un invito');
+});
+
+const CHAT = `<!doctype html><html><head><meta charset="utf-8"><title>chat</title></head>
+<body style="font-family:sans-serif;padding:40px"><p>Anna: ecco il mio invito a Filo</p>
+<p><a id="invito" href="https://filo.red/i/ABCD-EFGH">https://filo.red/i/ABCD-EFGH</a></p>
+<p><a id="altro" href="https://filo.red/">il sito di Filo</a></p></body></html>`;
+
+async function vociDelMenu(pagina, sel) {
+  await pagina.locator(sel).click({ button: 'right' });
+  const menu = pagina.locator('.sn-menu');
+  await expect(menu).toBeVisible({ timeout: 20000 });
+  const voci = (await menu.locator('.sn-menu-item').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
+  return { menu, voci };
+}
+
+test(T_TASTO_DESTRO, async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  const pagina = await testServer.openReady(openTab, CHAT);
+
+  // Un link di filo.red che non è un invito non ha la voce.
+  const altro = await vociDelMenu(pagina, '#altro');
+  expect(altro.voci.some((v) => /Riscatta/.test(v)), altro.voci.join(' · ')).toBe(false);
+  await pagina.keyboard.press('Escape');
+  await expect(altro.menu).toBeHidden({ timeout: 10000 });
+
+  const { menu, voci } = await vociDelMenu(pagina, '#invito');
+  expect(voci.findIndex((v) => /Riscatta l’invito/.test(v)), `prima voce del collegamento: ${voci.join(' · ')}`).toBeGreaterThanOrEqual(0);
+  await pagina.screenshot({ path: 'tests/.shots/664-tasto-destro-invito.png' });
+  await menu.locator('.sn-menu-item', { hasText: 'Riscatta l’invito' }).click();
+  await expect.poll(() => seen.redeems, { timeout: 20000 }).toEqual(['ABCDEFGH']);
+  const credits = await attendiPagina(app, 'credits');
+  expect(credits, 'la voce apre la pagina Crediti').toBeTruthy();
+  await expect(credits.locator('#walletNote')).toContainText('Sei entrato con un invito', { timeout: 15000 });
+});
+
+function schedeNuove(app) {
+  return app.windows().filter((w) => { try { return new URL(w.url()).hostname === 'newtab'; } catch (_) { return false; } });
+}
+
+test(T_BENVENUTO_UNA_VOLTA, async ({ app, shell }) => {
+  test.setTimeout(180000);
+  await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/'));
+  await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab/'));
+  await expect.poll(() => schedeNuove(app).length, { timeout: 20000 }).toBe(3);
+  for (const h of schedeNuove(app)) await h.waitForFunction(() => !!window.SN_CONFIRM_UI, null, { timeout: 20000 });
+
+  // Il collegamento arriva da fuori mentre Filo è acceso: riscatta e porta
+  // davanti la pagina Crediti, che lo racconta a modo suo.
+  await app.evaluate(({ app: a }) => { a.emit('second-instance', {}, ['filo.exe', 'filo://invito/ABCD-EFGH'], process.cwd()); });
+  await expect.poll(() => seen.redeems, { timeout: 20000 }).toEqual(['ABCDEFGH']);
+  const credits = await attendiPagina(app, 'credits');
+  await expect(credits.locator('#walletNote')).toContainText('Sei entrato con un invito', { timeout: 15000 });
+
+  // L'utente torna alle schede nuove, una per una: il benvenuto lo trova
+  // nella prima che guarda, e lì soltanto.
+  const ids = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs
+    .filter((t) => String(t.url || '').startsWith('filo://newtab')).map((t) => t.id));
+  expect(ids.length).toBe(3);
+  const visti = [];
+  for (const id of ids) {
+    await shell.evaluate((x) => window.filoShell.tabs.activate(x), id);
+    await new Promise((r) => setTimeout(r, 2500));
+    const testi = await Promise.all(schedeNuove(app).map((h) => confirmText(h).catch(() => '')));
+    visti.push(testi.filter((t) => t.includes('Sei entrato con un invito')).length);
+  }
+  expect(visti, 'schede col benvenuto dopo ogni passaggio').toEqual([1, 1, 1]);
+});
+
+test(T_SALUTO, async ({ openTab }) => {
+  test.setTimeout(120000);
+  // A pari segni («CARA SARA» è otto lettere buone, in maiuscolo come il
+  // codice), il server dice che il primo non esiste e Filo prova il secondo.
+  const page = await openTab('filo://credits/credits.html');
+  await expect(page.locator('#redeemForm')).toBeVisible({ timeout: 15000 });
+  await page.fill('#inviteCode', 'CARA SARA, ecco il codice: ABCDEFGH');
+  await page.click('#redeemBtn');
+  await expect(page.locator('#walletNote')).toContainText('riscattato', { timeout: 15000 });
+  expect(seen.redeems).toEqual(['CARASARA', 'ABCDEFGH']);
+
+  // Dalla chat della home, col messaggio com'è arrivato: il codice scritto
+  // come si mostra passa davanti al saluto, e non si spreca un giro.
+  seen.redeems.length = 0;
+  const home = await openTab('filo://newtab/');
+  await home.waitForSelector('#input');
+  await home.fill('#input', '/invito Cara Sara, ecco il codice: ABCD-EFGH');
+  await home.press('#input', 'Enter');
+  await expect(home.locator('#bubbles .dash-bubble-filo').last()).toContainText('Invito riscattato', { timeout: 15000 });
+  expect(seen.redeems).toEqual(['ABCDEFGH']);
+});
+
+// Le altre porte dello stesso invito (#664, giro 1 di verifica): prima il
+// collegamento veniva fermato in silenzio. Il pulsante da script si preme con
+// un clic che passa dal renderer della scheda, come quello di una persona: il
+// main conta solo quei gesti, e una pagina che naviga da sola resta ferma
+// (T_CLIC_DENTRO).
+const PAGINA_INVITO_SCRIPT = `<!doctype html><html><head><meta charset="utf-8"><title>Il tuo invito</title></head>
+<body style="font-family:sans-serif;padding:40px"><h1>Hai un invito</h1>
+<p><a id="apri" href="filo://invito/ABCD-EFGH">Apri in Filo</a></p>
+<p><button id="js" onclick="location.href='filo://invito/ABCD-EFGH'">Apri in Filo</button></p>
+</body></html>`;
+
+async function riscattaEApreCrediti(app) {
+  await expect.poll(() => seen.redeems, { timeout: 15000, message: 'il codice arriva al server' }).toEqual(['ABCDEFGH']);
+  const credits = await attendiPagina(app, 'credits');
+  expect(credits, 'si apre la pagina Crediti').toBeTruthy();
+  await expect(credits.locator('#walletNote')).toContainText('Sei entrato con un invito', { timeout: 15000 });
+}
+
+test(T_ALTRE_PORTE, async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(150000);
+  const pagina = await testServer.openReady(openTab, PAGINA_INVITO_SCRIPT);
+  const indirizzo = pagina.url();
+
+  await pagina.locator('#apri').click({ button: 'right' });
+  const menu = pagina.locator('.sn-menu');
+  await expect(menu).toBeVisible({ timeout: 20000 });
+  await menu.locator('.sn-menu-item', { hasText: 'nuova tab' }).first().click({ noWaitAfter: true });
+  await riscattaEApreCrediti(app);
+
+  // Il secondo e il terzo arrivano a un portafoglio già fatto: conta che il codice arrivi a Filo.
+  const p = await pagina.evaluate(() => { const b = document.querySelector('#js').getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) }; });
+  const idPagina = await shell.evaluate(async (u) => (await window.filoShell.tabs.snapshot()).tabs.find((t) => t.url === u).id, indirizzo);
+  await shell.evaluate((x) => window.filoShell.tabs.activate(x), idPagina);
+  await new Promise((r) => setTimeout(r, 500));
+  const crediti = await attendiPagina(app, 'credits');
+  const avviso = () => crediti.evaluate(() => (document.getElementById('walletNote') || {}).textContent || '');
+  await app.evaluate(({ BrowserWindow }, q) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    const wc = tm.tabs.find((t) => t.id === tm.activeId).view.webContents;
+    wc.sendInputEvent({ type: 'mouseDown', x: q.x, y: q.y, button: 'left', clickCount: 1 });
+    wc.sendInputEvent({ type: 'mouseUp', x: q.x, y: q.y, button: 'left', clickCount: 1 });
+  }, p);
+  await expect.poll(avviso, { timeout: 15000, message: 'il pulsante da script porta l’invito dentro' }).toContain('Hai già i crediti');
+  expect(pagina.url(), 'la pagina dell’invito resta').toBe(indirizzo);
+
+  await crediti.evaluate(() => { document.getElementById('walletNote').textContent = ''; });
+  const id = await shell.evaluate(async () => (await window.filoShell.tabs.open('filo://newtab/')).id);
+  await shell.evaluate(async (x) => { await window.filoShell.tabs.navigate(x, 'filo://invito/ABCD-EFGH'); }, id);
+  await expect.poll(avviso, { timeout: 15000, message: 'la barra degli indirizzi porta l’invito dentro' }).toContain('Hai già i crediti');
+});
+
+// #664 giro 2: il clic vale per i rinvii della navigazione che ha fatto partire, anche in una scheda nuova.
+test(T_RIMBALZO, async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120000);
+  const rimbalzo = `${process.env.FILO_FUNCTIONS_BASE}/redir`;
+  const pagina = await testServer.openReady(openTab, `<!doctype html><meta charset="utf-8"><body style="padding:40px">
+    <p><a id="qui" href="${rimbalzo}">Apri in Filo</a></p>
+    <p><a id="nuova" href="${rimbalzo}" target="_blank" rel="noopener">Apri in Filo (scheda nuova)</a></p></body>`);
+  const indirizzo = pagina.url();
+  await pagina.locator('#qui').click();
+  await riscattaEApreCrediti(app);
+  expect(pagina.url(), 'la pagina resta').toBe(indirizzo);
+
+  const crediti = await attendiPagina(app, 'credits');
+  const avviso = () => crediti.evaluate(() => (document.getElementById('walletNote') || {}).textContent || '');
+  await crediti.evaluate(() => { document.getElementById('walletNote').textContent = ''; });
+  const idPagina = await shell.evaluate(async (u) => (await window.filoShell.tabs.snapshot()).tabs.find((t) => t.url === u).id, indirizzo);
+  await shell.evaluate((x) => window.filoShell.tabs.activate(x), idPagina);
+  await new Promise((r) => setTimeout(r, 500));
+  await pagina.locator('#nuova').click();
+  await expect.poll(avviso, { timeout: 15000, message: 'il collegamento in una scheda nuova porta l’invito dentro' }).toContain('Hai già i crediti');
+  await new Promise((r) => setTimeout(r, 1000));
+  const urls = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs.map((t) => t.url));
+  expect(urls, 'la scheda nata per il collegamento non resta bianca').not.toContain('');
+});
+
+// Il clic che porta a una pagina non vale per lei: quella che all'arrivo rimanda da sola all'invito resta ferma.
+test('la pagina d’arrivo di un clic non eredita il gesto per spingere l’invito', async ({ openTab, testServer }) => {
+  test.setTimeout(90000);
+  const arrivo = testServer.html(`<!doctype html><meta charset="utf-8"><body><h1>arrivata</h1>
+    <script>setTimeout(function () { location.href = 'filo://invito/ABCD-EFGH'; }, 300);</script></body>`);
+  const pagina = await testServer.openReady(openTab, `<!doctype html><meta charset="utf-8"><body><a id="vai" href="${arrivo}">vai</a></body>`);
+  await pagina.locator('#vai').click();
+  await expect.poll(() => pagina.evaluate(() => (document.querySelector('h1') || {}).textContent || '').catch(() => ''), { timeout: 15000 }).toBe('arrivata');
+  await new Promise((r) => setTimeout(r, 3000));
+  expect(seen.redeems, 'nessun riscatto senza un clic sulla pagina').toEqual([]);
+});
+
+// #664 giro 3: chi non ha crediti scrive l'invito alla chat della home, col messaggio com'è arrivato o col link.
+async function scriviAllaHome(home, testo) {
+  const prima = await home.locator('#bubbles .dash-bubble-filo').count();
+  await home.fill('#input', testo);
+  await home.press('#input', 'Enter');
+  await expect.poll(() => home.locator('#bubbles .dash-bubble-filo').count(), { timeout: 15000 }).toBeGreaterThan(prima);
+  return home.locator('#bubbles .dash-bubble-filo').last().innerText();
+}
+
+test('senza crediti, il messaggio dell’invito scritto nella chat della home lo riscatta; una frase qualsiasi no', async ({ openTab }) => {
+  test.setTimeout(120000);
+  const home = await openTab('filo://newtab/');
+  await home.waitForSelector('#input');
+  expect(await scriviAllaHome(home, 'Cara Sara, come va?')).toContain('serve un codice d\'invito');
+  expect(await scriviAllaHome(home, 'Cara Sara, ecco il codice: ABCD-EFGH')).toContain('Invito riscattato');
+  expect(seen.redeems).toContain('ABCDEFGH');
+});
+
+test('senza crediti, il link d’invito incollato nella chat della home lo riscatta', async ({ openTab }) => {
+  test.setTimeout(120000);
+  const home = await openTab('filo://newtab/');
+  await home.waitForSelector('#input');
+  expect(await scriviAllaHome(home, 'https://filo.red/i/ABCD-EFGH')).toContain('Invito riscattato');
+  expect(seen.redeems).toEqual(['ABCDEFGH']);
+});
+
+// Il modo classico delle pagine per aprire un'app: al clic un riquadro nascosto puntato sull'indirizzo dell'app.
+test('un pulsante che chiede l’invito con un riquadro nascosto riscatta; un riquadro messo dalla pagina da sola no', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  const daSola = await testServer.openReady(openTab, `<!doctype html><meta charset="utf-8"><body><h1>da sola</h1>
+    <script>setTimeout(function () { var f = document.createElement('iframe'); f.style.display = 'none'; f.src = 'filo://invito/ABCD-EFGH'; document.body.appendChild(f); }, 300);</script></body>`, { pubblico: true });
+  await new Promise((r) => setTimeout(r, 3000));
+  expect(seen.redeems, 'un riquadro senza clic non riscatta').toEqual([]);
+  expect(await daSola.evaluate(() => document.querySelector('h1').textContent)).toBe('da sola');
+
+  const pagina = await testServer.openReady(openTab, `<!doctype html><meta charset="utf-8"><body style="padding:40px"><h1>Hai un invito</h1>
+    <button id="b" style="padding:20px" onclick="var f=document.createElement('iframe');f.style.display='none';f.src='filo://invito/ABCD-EFGH';document.body.appendChild(f);">Apri in Filo</button></body>`);
+  const indirizzo = pagina.url();
+  await pagina.locator('#b').click();
+  await riscattaEApreCrediti(app);
+  expect(pagina.url(), 'la pagina dell’invito resta').toBe(indirizzo);
 });

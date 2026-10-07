@@ -68,6 +68,27 @@ CURRENT=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 [ -n "$CURRENT" ] || exit 0
 [ "$CURRENT" = "$EXPECTED" ] && exit 0
 
+# Un rebase del ramo assegnato stacca la cartella per forza, e il ruolo di chi riallinea lo chiede: non è
+# una deriva. Registrare durante il rebase resta rifiutato da dispatch (checkDelivery).
+rebase_dir() {
+  for d in rebase-merge rebase-apply; do
+    p=$(git rev-parse --git-path "$d" 2>/dev/null)
+    [ -n "$p" ] && [ -d "$p" ] || continue
+    [ "$d" = rebase-apply ] && [ ! -f "$p/rebasing" ] && continue
+    printf '%s' "$p"
+    return 0
+  done
+  return 1
+}
+if [ "$CURRENT" = "HEAD" ] && RB=$(rebase_dir); then
+  RB_BRANCH=$(sed 's|^refs/heads/||' "$RB/head-name" 2>/dev/null | head -1)
+  if [ "$RB_BRANCH" = "$EXPECTED" ]; then
+    MSG="[branch-guard] Rebase del ramo '$EXPECTED' in corso: finché non finisce la cartella resta staccata, ed è normale. Portalo a termine (risolvi i conflitti, poi git rebase --continue; per rinunciare git rebase --abort) PRIMA di registrare qualunque esito: durante il rebase la registrazione viene rifiutata."
+    printf '{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"%s"}}\n' "$MSG"
+    exit 0
+  fi
+fi
+
 if [ "$CURRENT" = "HEAD" ]; then
   WHERE="in uno stato staccato (nessun ramo)"
 else

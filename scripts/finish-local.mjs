@@ -51,34 +51,28 @@
 //   obbligatori: sono quelli che dicono se il lavoro è finito. Il server non
 //   li rifà e non ci crede — controlla altro.
 //
-// SE IL SERVER BLOCCA, NON È UN VICOLO CIECO (SPEC-RIDISEGNO-MAX.md §10)
-//   I controlli deterministici del server fermano chi tocca le aree protette
-//   (guardie, automatismi, regole del database, chiavi, dipendenze nuove) — e
-//   il lavoro locale ci cade dentro quasi sempre, perché in locale si lavora
-//   proprio su quelle cose. Da qui non si aggirano, e su main da questa
-//   macchina non scrive nessuno: senza una via d'uscita quel lavoro non
-//   arriverebbe mai agli utenti.
-//
-//   La via d'uscita non è un permesso in più per questo script: il server APRE
-//   UNA RICHIESTA IN ATTESA, e l'owner la approva DENTRO FILO (l'avviso in
-//   cima ai Ricevuti della dashboard di gestione). Serve una persona davanti
-//   allo schermo, su una superficie diversa da questo terminale: è l'unica
-//   cosa che una sessione catturata non può procurarsi da sola.
-//
-//   Qui i compiti sono due. DIRLO bene (messageForOwnerMerge in
-//   scripts/lib/owner-merge.mjs): l'esito porta il nome della richiesta aperta,
-//   e il messaggio nomina dove approvarla invece di fermarsi al blocco. E
-//   SUONARE IL CAMPANELLO: se quella pagina è già aperta non si accorgerebbe
-//   di niente, perché l'elenco lo legge solo quando la si apre. Una riga qui e
-//   l'avviso compare sotto gli occhi di chi lo sta aspettando
-//   (src/main/services/mergeApprovalSignal.js).
+// SE IL SERVER BLOCCA (SPEC-RIDISEGNO-MAX.md §10, #908)
+//   I controlli deterministici del server fermano chi tocca le aree protette, e
+//   il lavoro locale ci cade quasi sempre. Con la pratica (`--feedback`, o il
+//   feedbackId che `verify-local.mjs start --feedback` scrive nel ramo) il server
+//   rilegge il feedback: un lavoro locale col mittente provato si fonde senza
+//   chiedere, i blocchi restano registrati e la pratica si chiude. Senza pratica
+//   qui non si parte (senzaPraticaStop); con una non ammessa il server apre una
+//   richiesta che aspetta il sì dell'owner in Gestione. Qui si dice bene (messageForOwnerMerge) e si suona il
+//   campanello per la pagina già aperta (src/main/services/mergeApprovalSignal.js).
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { verdictForCurrentBranch } from './verify-local.mjs';
-import { askServerMerge, messageForOwnerMerge, exitCodeForOwnerMerge } from './lib/owner-merge.mjs';
+import { verdictForCurrentBranch, readState } from './verify-local.mjs';
+import { askServerMerge, messageForOwnerMerge, exitCodeForOwnerMerge, richiestaForseInAttesa } from './lib/owner-merge.mjs';
+import { preparaLancioElectron } from './lib/schermo-virtuale.mjs';
+import { lottiPerRigaDiComando } from './lib/riga-di-comando.mjs';
+import { readMarker } from './lib/routine-role.mjs';
+import { partiServerInSospeso } from './lib/parti-lavoro.mjs';
+import { chiediConProva, pulisciResti, gitIn } from './lib/unit-sulla-fusione.mjs';
+import { cartellaDelServer } from './server-fondi-pratica.mjs';
 import mergeApprovalSignal from '../src/main/services/mergeApprovalSignal.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -157,10 +151,42 @@ function defaultBranch() {
   return r.ok ? r.out : '';
 }
 
-function run(cmd, args, label) {
+function run(cmd, args, label, env = undefined) {
   process.stdout.write(`\n▸ ${label}\n`);
-  const r = spawnSync(cmd, args, { cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32' });
+  const r = spawnSync(cmd, args, { cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32', ...(env ? { env } : {}) });
   return r.status === 0;
+}
+
+/**
+ * Il commit da cui prendere ANCHE i file cambiati, in un giro di riallineamento: quello che
+ * aveva passato la verifica, scritto da dispatch nel marcatore del ruolo. '' altrimenti. PURA.
+ * Il ramo contro main non vede il lato arrivato da main né il file in conflitto.
+ */
+export function shaDelRiallineamento(marker) {
+  const m = marker && typeof marker === 'object' ? marker : {};
+  const sha = String(m.dal || '').trim();
+  return m.role === 'verifier' && /^[0-9a-f]{7,40}$/i.test(sha) ? sha : '';
+}
+
+/**
+ * I file da cui scegliere gli spec: il ramo contro `base` e, in un giro di riallineamento, anche
+ * quelli cambiati dal commit verificato alla punta. `{ changed, nota }`; la nota va stampata.
+ */
+export function cambiatiPerLaScelta({ base, marker, root = ROOT }) {
+  const g = (args) => git(args, { cwd: root });
+  const changed = g(['diff', '--name-only', `${base}...HEAD`]).out.split('\n').filter(Boolean);
+  const dal = shaDelRiallineamento(marker);
+  if (!dal) return { changed, nota: '' };
+  const c = g(['cat-file', '-e', `${dal}^{commit}`]).ok || g(['fetch', 'origin', dal]).ok;
+  const r = c ? g(['diff', '--name-only', dal, 'HEAD']) : { ok: false };
+  if (!r.ok) {
+    return { changed, nota: `Giro di riallineamento, ma il commit verificato ${dal.slice(0, 8)} qui non c'è: scelgo gli spec solo dal ramo contro main, e il lato arrivato da main resta scoperto.` };
+  }
+  const lato = r.out.split('\n').filter(Boolean);
+  return {
+    changed: [...new Set([...changed, ...lato])],
+    nota: `Giro di riallineamento: scelgo gli spec anche dai ${lato.length} file cambiati da ${dal.slice(0, 8)} (il commit verificato) alla punta, cioè il lato arrivato da main e i file in conflitto.`,
+  };
 }
 
 /**
@@ -190,43 +216,80 @@ export function resolveDiffBase({ fetchOk, remoteRefOk }) {
 }
 
 /**
- * Il messaggio che ferma la chiusura quando il ramo è rimasto indietro
- * rispetto alla linea principale. '' = via libera. PURA.
+ * Il messaggio che ferma la chiusura quando il ramo è indietro rispetto alla
+ * linea principale E la fusione andrebbe in conflitto. '' = via libera. PURA.
  *
- * Fermarsi QUI, prima dei controlli, è il punto (caso #500): un conflitto di
- * fusione scoperto dopo 15 minuti di spec, o dopo l'approvazione dell'owner,
- * costa un giro intero; scoperto adesso costa cinque secondi. Un conteggio
- * illeggibile non blocca: la guardia non inventa conflitti.
- *
- * Con `--check` non si ferma: nessuna fusione segue, quindi non c'è un
- * conflitto da scoprire in anticipo — e chi verifica in locale ha proprio
- * quel comando al posto della suite intera; fermarlo mentre la linea
- * principale si muove (succede ogni giorno, con le fusioni del server) lo
- * mandava a far ripartire la verifica che era già in corso (giro 3 di
- * suite-locale). Il ramo indietro si dice comunque, come nota:
- * `behindMainNota`.
+ * Un conflitto scoperto dopo 15 minuti di spec o dopo l'approvazione costa un
+ * giro (caso #500); ma fermarsi per un ramo solo indietro non chiudeva mai: con
+ * le routine accese main riceve decine di commit l'ora, e il server fonde lo
+ * stesso se non c'è conflitto. `prova` è l'esito di provaFusione: senza (git
+ * vecchio, prova fallita) ci si ferma come prima, e lo si dice. Un conteggio
+ * illeggibile non blocca: la guardia non inventa conflitti. Con `--check` non
+ * segue nessuna fusione, quindi non si ferma mai (nota: `behindMainNota`).
  */
-export function behindMainStop(behind, { checkOnly = false } = {}) {
+export function behindMainStop(behind, { checkOnly = false, prova = null } = {}) {
   const n = Number(behind);
   if (!Number.isFinite(n) || n <= 0) return '';
   if (checkOnly) return '';
+  const conflitti = prova && Array.isArray(prova.conflitti) ? prova.conflitti : null;
+  if (conflitti && !conflitti.length) return '';
   return [
-    `Il ramo è indietro di ${n} commit rispetto alla linea principale: chiedere la fusione così`,
-    'finisce in conflitto alla fine, a controlli già pagati.',
+    conflitti
+      ? `Il ramo è indietro di ${n} commit rispetto alla linea principale, e la fusione andrebbe in conflitto su:`
+      : `Il ramo è indietro di ${n} commit rispetto alla linea principale: chiedere la fusione così`,
+    ...(conflitti ? conflitti.map((f) => `  · ${f}`) : ['può finire in conflitto alla fine, a controlli già pagati.']),
+    ...(!conflitti && prova && prova.motivo ? [`(Non ho potuto provare la fusione senza toccare l'albero: ${prova.motivo}. Mi fermo come se ci fosse un conflitto.)`] : []),
     'Riallinealo rifacendo la verifica, che se ne occupa da sola in partenza:',
     '  node scripts/verify-local.mjs start "<cosa aveva chiesto l\'owner>"',
   ].join('\n');
 }
 
-/** La stessa informazione, quando non ferma (`--check`). '' = ramo pari. PURA. */
-export function behindMainNota(behind) {
+/** Il ramo indietro quando non ferma: coi soli controlli, o senza conflitti. '' = ramo pari. PURA. */
+export function behindMainNota(behind, { checkOnly = true } = {}) {
   const n = Number(behind);
   if (!Number.isFinite(n) || n <= 0) return '';
+  if (!checkOnly) {
+    return `▸ Il ramo è indietro di ${n} commit rispetto alla linea principale, ma la fusione non va in conflitto: proseguo.`;
+  }
   return [
     `▸ Il ramo è indietro di ${n} commit rispetto alla linea principale. Coi soli controlli non importa`,
-    '  (nessuna fusione segue); `npm run finish` invece si fermerebbe qui. Lo riallinea la prossima',
-    '  verifica in partenza (node scripts/verify-local.mjs start).',
+    '  (nessuna fusione segue); `npm run finish` si fermerebbe qui solo se la fusione andasse in conflitto.',
   ].join('\n');
+}
+
+/** Da `git version` a sì/no su `merge-tree --write-tree` (git 2.38). PURA. */
+export function gitSaProvareFusione(versione) {
+  const m = /(\d+)\.(\d+)/.exec(String(versione || ''));
+  if (!m) return false;
+  const [maj, min] = [Number(m[1]), Number(m[2])];
+  return maj > 2 || (maj === 2 && min >= 38);
+}
+
+/**
+ * L'uscita di `git merge-tree --write-tree --name-only --no-messages`: exit 0 = pulita, 1 = conflitti,
+ * elencati dopo la riga dell'albero. Altro = la prova non è riuscita. PURA.
+ */
+export function leggiMergeTree(status, stdout) {
+  if (status === 0) return { conflitti: [] };
+  if (status !== 1) return { motivo: `git merge-tree è uscito con ${status}` };
+  const righe = String(stdout || '').split(/\r?\n/);
+  const file = [];
+  for (const r of righe.slice(1)) {
+    if (!r.trim()) break;
+    if (!file.includes(r.trim())) file.push(r.trim());
+  }
+  return file.length ? { conflitti: file } : { motivo: 'git merge-tree segnala un conflitto ma non dice su quali file' };
+}
+
+/** Prova la fusione di HEAD con `base` senza toccare albero né indice. */
+export function provaFusione(base, root = ROOT) {
+  const v = spawnSync('git', ['version'], { cwd: root, encoding: 'utf8' });
+  if (!gitSaProvareFusione(v.stdout)) {
+    return { motivo: `${String(v.stdout || 'git').trim() || 'git'} non sa provarla (serve git 2.38 o più)` };
+  }
+  const r = spawnSync('git', ['merge-tree', '--write-tree', '--name-only', '--no-messages', base, 'HEAD'], { cwd: root, encoding: 'utf8' });
+  if (r.error) return { motivo: r.error.message };
+  return leggiMergeTree(r.status, r.stdout);
 }
 
 /**
@@ -287,7 +350,11 @@ export function specsForChangedFiles(changed, tracked) {
     // (giro 4 di suite-locale). Il nome di un file è l'area che prova.
     const n = f.match(/^src\/(?:[^/]+\/)*([^/.]+)\.[^/]+$/);
     if (n) aggiungi(n[1]);
-    if (f.startsWith('tests/') && f.endsWith('.spec.mjs')) specs.add(f.replace(/\.spec\.mjs$/, ''));
+    // Uno spec toccato si lancia; una prova di un giro no, si lancia per numero
+    // (un ramo che ne sposta o ne ritocca qualcuna ne trascinerebbe centinaia).
+    if (f.startsWith('tests/') && !f.startsWith('tests/verifica/') && f.endsWith('.spec.mjs')) {
+      specs.add(f.replace(/\.spec\.mjs$/, ''));
+    }
   }
   const elenco = Array.isArray(tracked) ? tracked : [];
   const tracciati = new Set(elenco.map((t) => String(t).replace(/\\/g, '/').replace(/\.spec\.mjs$/, '')));
@@ -351,22 +418,40 @@ export function esitoVerificaPerCheck({ checkOnly, ok, reason }) {
 }
 
 /**
- * Spezza l'elenco degli spec in lotti che stanno in UNA riga di comando. PURA.
- * Su Windows la riga ha un tetto di ~8.000 caratteri: con tutto `src` toccato
- * gli spec mirati sono stati 245 e il lancio moriva con «riga troppo lunga»
- * prima ancora di partire. Ogni lotto è un `npx playwright test …` a sé.
+ * Unit rossi: con `--check` gli spec delle aree girano lo stesso e l'esito resta rosso alla fine. PURA.
+ * Fermarsi lì lasciava chi verifica senza gli spec, anche per un rosso che c'è uguale su main (#874.1).
  */
-export function lottiPerRigaDiComando(specs, maxChars = 6000) {
-  const lotti = [];
-  let corrente = [], lunghezza = 0;
-  for (const s of specs) {
-    const pezzo = s.length + 1;
-    if (corrente.length && lunghezza + pezzo > maxChars) { lotti.push(corrente); corrente = []; lunghezza = 0; }
-    corrente.push(s); lunghezza += pezzo;
-  }
-  if (corrente.length) lotti.push(corrente);
-  return lotti;
+export function esitoUnitPerCheck({ checkOnly }) {
+  if (!checkOnly) return { ferma: true, messaggio: 'Controlli di logica rossi: non pubblico. Sistema e rilancia.' };
+  return { ferma: false, messaggio: 'Controlli di logica rossi: corro lo stesso gli spec delle aree toccate, l\'esito finale resta rosso.' };
 }
+
+/**
+ * Gli spec delle aree toccate si rilanciano, o li ha già corsi chi ha
+ * verificato sullo stesso contenuto? PURA.
+ *
+ * Sono la parte lunga della chiusura (da quindici a quarantacinque minuti), e
+ * chi verifica li lancia in partenza per obbligo del suo ruolo: rifarli qui,
+ * sullo stesso commit, è la stessa ora pagata due volte. Si saltano solo con un
+ * verdetto valido in mano, che è già legato a quel contenuto — senza verifica
+ * superata non cambia niente. `--check` non salta mai: promette «i controlli e
+ * basta», e chi lo lancia è spesso proprio chi sta verificando.
+ *
+ * La logica pura NON si salta: le prove del giro che chi verifica committa
+ * dopo aver lanciato i controlli passano solo di qui (le sentinelle su quella
+ * cartella stanno negli unit test), e costa millisecondi.
+ */
+export function specDaRilanciare({ checkOnly, ok, sha, tollerato }) {
+  if (checkOnly || !ok) return { rilancia: true, nota: '' };
+  const dove = String(sha || '').slice(0, 8) || '—';
+  return {
+    rilancia: false,
+    nota: `▸ Spec delle aree toccate: li ha già corsi la verifica indipendente su ${dove}${tollerato ? ' (da lì il ramo si è mosso solo dentro le prove del giro)' : ''}, non li rifaccio.\n  La logica pura gira lo stesso: le prove del giro committate dopo quel controllo passano solo di qui.`,
+  };
+}
+
+// Con tutto `src` toccato gli spec mirati sono stati 245: in una riga sola `npx` (cmd.exe) moriva prima di partire.
+export { lottiPerRigaDiComando };
 
 /** Lancia gli spec a lotti (vedi lottiPerRigaDiComando); tutti i lotti girano, l'esito è l'AND. */
 function runSpecsALotti(specs, label) {
@@ -374,7 +459,8 @@ function runSpecsALotti(specs, label) {
   let ok = true;
   lotti.forEach((lotto, i) => {
     const suffisso = lotti.length > 1 ? ` — lotto ${i + 1}/${lotti.length}, ${lotto.length} spec` : '';
-    if (!run('npx', ['playwright', 'test', ...lotto], label + suffisso)) ok = false;
+    const l = preparaLancioElectron('npx', ['playwright', 'test', ...lotto]);
+    if (!l.ok || !run(l.cmd, l.args, label + suffisso, l.env)) ok = false;
   });
   return ok;
 }
@@ -386,17 +472,87 @@ function readKnownRed(root) {
   } catch (_) { return []; }
 }
 
+/**
+ * La pratica del lavoro: dall'opzione, o dal ramo in .claude/verify-local.json.
+ * Un riferimento che non si risolve ferma tutto: fondere legati alla pratica sbagliata è peggio.
+ */
+/**
+ * Ogni lavoro locale arriva su main con la sua pratica (#908): è il registro dell'owner di cosa fa ogni sessione.
+ * Tutte le strade verso main passano di qui, quindi la regola sta qui. PURA. '' = si prosegue.
+ */
+export function senzaPraticaStop({ checkOnly, pratica }) {
+  if (checkOnly || (pratica && pratica.id)) return '';
+  return [
+    'Questo lavoro non ha la sua pratica, e ogni lavoro locale ne ha una: in Gestione è il registro di cosa fa ogni sessione.',
+    'Aprila e legala, poi rilancia:',
+    '  npm run feedback:apri -- "<titolo>" "<cosa fa il lavoro>" --locale',
+    '  npm run finish -- --feedback <N>',
+    'Non ho toccato niente.',
+  ].join('\n');
+}
+
+/** Perché il finish si ferma dopo la prova degli unit sulla fusione (#929). PURA. */
+export function fermoDopoLaProva(prova) {
+  const p = prova || {};
+  if (p.errore) {
+    return `✗ Non ho potuto provare gli unit sul risultato della fusione con main: ${p.errore}.\n`
+      + '  Non ho chiesto la fusione. Il ramo è spedito e intatto: rilancia npm run finish.';
+  }
+  return '✗ Gli unit sono rossi sul risultato della fusione con main, e su main da solo no: non ho chiesto la fusione.\n'
+    + '  Riallinea il ramo (git merge origin/main, o rebase), fai tornare verdi i test elencati sopra e rilancia npm run finish.';
+}
+
+async function praticaDelLavoro(valore) {
+  const branchCorrente = git(['rev-parse', '--abbrev-ref', 'HEAD']).out;
+  const scritta = (readState()[branchCorrente] || {});
+  if (valore === null || valore === undefined) {
+    return scritta.feedbackId ? { id: String(scritta.feedbackId), seq: scritta.feedbackNum || null } : null;
+  }
+  const { risolviFeedback } = await import('./lib/pratica-locale.mjs');
+  const { acquireBearer, FIRESTORE_BASE } = await import('./lib/firestore-auth.mjs');
+  let r;
+  let lavorabile = { ok: true };
+  try {
+    const bearer = await acquireBearer();
+    r = await risolviFeedback(valore, { bearer, base: FIRESTORE_BASE });
+    if (r.ok) {
+      const { praticaPerLaSessione } = await import('./owner-feedback.mjs');
+      lavorabile = await praticaPerLaSessione(r.id, { bearer, allaChiusura: true });
+    }
+  } catch (e) {
+    r = { ok: false, motivo: String((e && e.message) || e).slice(0, 200) };
+  }
+  if (!r.ok) {
+    console.error(`Pratica non trovata: ${r.motivo} — non ho toccato niente.`);
+    process.exit(1);
+  }
+  if (!lavorabile.ok) {
+    const { rifiutoPratica } = await import('./owner-feedback.mjs');
+    console.error(`${rifiutoPratica(r.id, lavorabile)}\nNon ho legato il lavoro a questa pratica e non ho toccato niente.`);
+    process.exit(1);
+  }
+  if (scritta.feedbackId && scritta.feedbackId !== r.id) {
+    console.error(`  (il ramo era legato a un'altra pratica, ${scritta.feedbackNum ? '#' + scritta.feedbackNum : scritta.feedbackId}: vale quella indicata adesso)`);
+  }
+  return r;
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   // Un aiuto vero: senza, QUALUNQUE argomento (`--help` compreso) faceva
   // partire l'intera chiusura, e chi voleva solo sapere cosa fa lo strumento
   // si ritrovava dentro la procedura (feedback #565).
   const AIUTO = [
-    'Uso: npm run finish [-- --check]',
+    'Uso: npm run finish [-- --check] [-- --feedback <N>]',
     '',
     '  (nessun argomento)   chiude il lavoro: controlli, verifica, richiesta di fusione',
     '  --check              esegue i controlli e si ferma prima di chiedere la fusione',
     '                       (con npm: `npm run finish -- --check`, oppure `npm run finish:check`)',
+    '  --feedback <N>       la pratica di questo lavoro (numero o id): senza, quella scritta da',
+    '                       verify-local start --feedback. Senza nessuna delle due non si chiude.',
+    '                       Un lavoro locale provato, o approvato da te, non aspetta il sì.',
+    '                       Su un feedback di un utente la frase per lui la scrive la sessione:',
+    '                       npm run feedback -- <N> --frase "…" (vale anche a pratica chiusa)',
     '  --help               questa schermata',
   ].join('\n');
   if (argv.includes('--help') || argv.includes('-h')) { console.log(AIUTO); return; }
@@ -409,14 +565,15 @@ async function main() {
   // a chi voleva solo i controlli. L'opzione resta scritta nell'ambiente: da
   // lì ce ne accorgiamo e ci fermiamo (feedback #565).
   const { argomentiDaNpm, opzioneStorpiata } = await import('./lib/argomenti.mjs');
-  const storpiata = opzioneStorpiata(process.env, ['--check']);
+  const storpiata = opzioneStorpiata(process.env, ['--check', '--feedback']);
   if (storpiata) {
     console.error(`${storpiata}
 `);
     console.error(AIUTO);
     process.exit(1);
   }
-  const daNpm = argomentiDaNpm(process.env, { opzioni: ['--check'] });
+  const daNpm = argomentiDaNpm(process.env, { opzioni: ['--check', '--feedback'], conValore: ['--feedback'] });
+  if (daNpm.errore) { console.error(daNpm.errore); process.exit(1); }
   if (daNpm.nota) { console.error(daNpm.nota); argv.push(...daNpm.args); }
   // Prima dell'elenco degli sconosciuti: a chi prova la vecchia scorciatoia
   // serve il PERCHÉ, non «argomento sconosciuto» (feedback #565).
@@ -425,13 +582,24 @@ async function main() {
     console.error('indipendente girano sempre (SPEC-RIDISEGNO-MAX.md §8).');
     process.exit(1);
   }
-  const ignoti = argv.filter((a) => !['--check', '--help', '-h'].includes(a));
+  const { estraiOpzioneFeedback, parseRiferimento } = await import('./lib/pratica-locale.mjs');
+  const opzFeedback = estraiOpzioneFeedback(argv);
+  if (opzFeedback.errore) { console.error(`${opzFeedback.errore} — non ho toccato niente.`); process.exit(1); }
+  if (opzFeedback.valore !== null) {
+    const rif = parseRiferimento(opzFeedback.valore);
+    if (!rif.ok) { console.error(`${rif.motivo} — non ho toccato niente.`); process.exit(1); }
+  }
+  const ignoti = opzFeedback.resto.filter((a) => !['--check', '--help', '-h'].includes(a));
   if (ignoti.length) {
     console.error(`Argomento sconosciuto: ${ignoti.join(' ')} — non ho toccato niente.\n`);
     console.error(AIUTO);
     process.exit(1);
   }
   const checkOnly = argv.includes('--check');
+  // Un numero sbagliato si scopre adesso, non dopo i controlli.
+  const pratica = checkOnly ? null : await praticaDelLavoro(opzFeedback.valore);
+  const senza = senzaPraticaStop({ checkOnly, pratica });
+  if (senza) { console.error(senza); process.exit(1); }
 
   const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']).out;
   if (!branch || branch === 'HEAD') { console.error('Stato del repo non chiaro: nessun ramo corrente.'); process.exit(1); }
@@ -451,6 +619,8 @@ async function main() {
     console.error('Ci sono modifiche non salvate: falle salvare (un Edit qualsiasi) prima di chiudere.');
     process.exit(1);
   }
+  // Anche con --check, che la prova sulla fusione non la fa: i resti di una prova interrotta non aspettano la prossima.
+  pulisciResti({ git: gitIn(ROOT) });
 
   // La linea principale VERA è su origin: il ref locale può essere indietro di
   // centinaia di commit (vedi resolveDiffBase). Un fetch qui serve a due cose:
@@ -462,32 +632,51 @@ async function main() {
 
   {
     const behind = Number(git(['rev-list', '--count', `HEAD..${base}`]).out);
-    const stop = behindMainStop(behind, { checkOnly });
+    const prova = !checkOnly && behind > 0 ? provaFusione(base) : null;
+    const stop = behindMainStop(behind, { checkOnly, prova });
     if (stop) { console.error(`\n${stop}`); process.exit(1); }
-    const nota = checkOnly ? behindMainNota(behind) : '';
+    const nota = behindMainNota(behind, { checkOnly });
     if (nota) console.log(`\n${nota}`);
   }
 
+  // L'esito della verifica si legge PRIMA dei controlli: è lui a dire se gli
+  // spec delle aree sono già stati corsi su questo contenuto (il cancello vero
+  // resta più sotto, dopo i controlli, dov'è sempre stato).
+  const v = verdictForCurrentBranch(ROOT);
+  const spec = specDaRilanciare({ checkOnly, ok: v.ok, sha: v.entry && v.entry.sha, tollerato: v.tollerato });
+  let unitRossi = false;
+
   {
-    // 1. Logica pura — veloce, nessuna finestra che si apre.
-    if (!run('npm', ['run', 'test:unit'], 'Controlli di logica')) {
-      console.error('\n✗ Controlli di logica rossi: non pubblico. Sistema e rilancia.');
-      process.exit(1);
-    }
-    // 2. Spec mirati alle aree toccate. La suite completa gira SOLO in GitHub
-    //    Actions, nel lavoro di release, ogni sei ore prima di pubblicare
-    //    (dal 2026-09-15: nessun ruolo e nessuna sessione la lancia): qui
-    //    serve il segnale rapido.
-    const changed = git(['diff', '--name-only', `${base}...HEAD`]).out.split('\n').filter(Boolean);
+    // Gli spec si scelgono PRIMA dei controlli di logica: se non potranno partire, ci si ferma
+    // adesso e non dopo gli unit test.
+    if (!spec.rilancia) console.log(`\n${spec.nota}`);
+    const scelta = spec.rilancia ? cambiatiPerLaScelta({ base, marker: readMarker(ROOT) }) : { changed: [], nota: '' };
+    if (scelta.nota) console.log(`\n${scelta.nota}`);
+    const changed = scelta.changed;
     // `--error-unmatch` stampa un errore su stderr per ogni spec inesistente:
     // il filtro funzionava, ma a schermo sembrava un guasto. Chiediamo invece
     // l'elenco degli spec tracciati e filtriamo in memoria.
     const tracked = new Set(git(['ls-files', 'tests/*.spec.mjs']).out.split('\n').filter(Boolean));
     const specs = specsForChangedFiles(changed, [...tracked]).filter((s) => tracked.has(`${s}.spec.mjs`));
     const { blocking, informative } = splitKnownRed(specs, readKnownRed(ROOT));
+    if (specs.length) {
+      const schermo = preparaLancioElectron('npx', []);
+      if (!schermo.ok) { console.error(`\n✗ ${schermo.motivo}`); process.exit(1); }
+      if (schermo.nota) console.log(`\n${schermo.nota}`);
+    }
+    // 1. Logica pura — veloce, nessuna finestra che si apre.
+    if (!run('npm', ['run', 'test:unit'], 'Controlli di logica')) {
+      const esito = esitoUnitPerCheck({ checkOnly });
+      console.error(`\n✗ ${esito.messaggio}`);
+      if (esito.ferma) process.exit(1);
+      unitRossi = true;
+    }
+    // 2. Spec mirati alle aree toccate. La suite completa gira SOLO in GitHub
+    //    Actions, a ogni fusione su main: qui serve il segnale rapido.
     if (blocking.length) {
       if (!runSpecsALotti(blocking, `Spec delle aree toccate (${blocking.length})`)) {
         console.error('\n✗ Spec rossi: non pubblico. Sistema e rilancia.');
+        if (unitRossi) console.error('  Rossi anche i controlli di logica, più sopra.');
         process.exit(1);
       }
     }
@@ -499,7 +688,7 @@ async function main() {
         ? '\n(i rossi noti toccati sono verdi qui: valuta se toglierli da tests/rossi-noti.json)'
         : '\n(rossi noti anche su main su questa macchina: non fermano la pubblicazione)');
     }
-    if (!specs.length) {
+    if (spec.rilancia && !specs.length) {
       console.log('\n(nessuno spec mirato per le aree toccate: il lavoro verrà comunque ricontrollato prima della pubblicazione agli utenti)');
     }
   }
@@ -510,7 +699,6 @@ async function main() {
   //    ha fatto il lavoro, quindi hanno i suoi stessi punti ciechi. In cloud
   //    questo passaggio c'è da sempre; qui mancava, e si pubblicava senza.
   {
-    const v = verdictForCurrentBranch(ROOT);
     const esito = esitoVerificaPerCheck({ checkOnly, ok: v.ok, reason: v.reason });
     if (esito.nota) console.log(`\n${esito.nota}`);
     if (esito.ferma) {
@@ -526,17 +714,21 @@ async function main() {
     }
     if (v.ok) {
       console.log(`\n▸ Verifica indipendente: superata su ${v.entry?.sha?.slice(0, 8) || '—'}`);
-      // Il verdetto vale per un commit. Se la punta si è mossa solo per i
-      // marcatori di rosso atteso nelle prove del giro, regge lo stesso
-      // (#661): quando succede si DICE quali file sono passati, perché un
-      // cancello che si apre in silenzio è indistinguibile da uno che non c'è.
+      // Il verdetto vale per un commit. Se dopo di lui dalle prove del giro si
+      // è solo tolto, regge lo stesso (#661): quando succede si DICE quali file
+      // sono passati, perché un cancello che si apre in silenzio è
+      // indistinguibile da uno che non c'è.
       if (v.tollerato) {
-        console.log(`  Il ramo si è mosso dopo la verifica, ma solo per i marcatori di rosso atteso: ${(v.files || []).join(', ')}`);
-        console.log('  Quello che gira è lo stesso contenuto verificato, quindi il verdetto regge.');
+        console.log(`  Il ramo si è mosso dopo la verifica, ma solo togliendo prove o casi dalle prove del giro: ${(v.files || []).join(', ')}`);
+        console.log('  Quello che gira non è cresciuto rispetto al contenuto verificato, quindi il verdetto regge.');
       }
     }
   }
 
+  if (unitRossi) {
+    console.error('\n✗ Controlli di logica rossi, più sopra: sistema e rilancia.');
+    process.exit(1);
+  }
   if (checkOnly) { console.log('\n✓ Controlli passati (--check: non chiedo la fusione).'); return; }
 
   // 4. Il ramo dev'essere SU ORIGIN: il server fonde ciò che vede lui, non ciò
@@ -581,19 +773,43 @@ async function main() {
 
   // 5. La fusione la CHIEDE, non la fa: su main scrive solo il server, con
   //    un'identità che qui non esiste. Lo sha lega la richiesta esattamente al
-  //    codice appena controllato.
-  process.stdout.write('\n▸ Chiedo al server di fondere\n');
-  const reply = await askServerMerge({ branch, sha: cur });
-  // Il server ha aperto una richiesta: suona il campanello, così una finestra
+  //    codice appena controllato; la prova degli unit sulla fusione (#929) la
+  //    lega al main su cui sono girati.
+  // La parte del server dello stesso lavoro (ramo con lo stesso nome) non ancora su main tiene aperta la pratica (#915).
+  const pendingParts = pratica && pratica.id ? partiServerInSospeso(branch, { cartellaServer: cartellaDelServer(ROOT) }) : [];
+  const giro = await chiediConProva({
+    root: ROOT, punta: cur,
+    fermaSe: (p) => !!(p.errore || p.esito === 'rosso_sulla_fusione'),
+    chiedi: (provaUnit) => {
+      process.stdout.write('\n▸ Chiedo al server di fondere\n');
+      if (pratica && pratica.id) console.log(`  pratica ${pratica.seq ? `#${pratica.seq}` : pratica.id}`);
+      else console.log('  nessuna pratica collegata: se i controlli fermano, la fusione aspetta il tuo sì');
+      for (const p of pendingParts) console.log(`  parte del server non ancora su main: ${p.branch} (la pratica resta aperta per lei)`);
+      return askServerMerge({ branch, sha: cur, feedbackId: pratica ? pratica.id : '', pendingParts, provaUnit });
+    },
+    mainMosso: (r) => !!(r && r.outcome === 'main_moved'),
+    scrivi: (s) => console.log(`\n${s}`),
+  });
+  if (giro.fermo) {
+    console.error(`\n${fermoDopoLaProva(giro.prova)}`);
+    process.exit(1);
+  }
+  const reply = giro.reply;
+  // C'è (o può esserci) una richiesta in attesa: suona il campanello, così una finestra
   // di Filo GIÀ APERTA se ne accorge da sola. Non è un permesso in più — non
   // crea niente e non approva niente, fa solo rileggere l'elenco vero — ed è
   // l'unica cosa che impedisce all'avviso di cui parla il messaggio qui sotto
   // di comparire soltanto a chi apre una scheda nuova.
-  if (reply?.outcome === 'blocked' && reply.requestId) mergeApprovalSignal.note(reply.requestId);
+  if (richiestaForseInAttesa(reply)) mergeApprovalSignal.note(reply.requestId);
   const code = exitCodeForOwnerMerge(reply);
-  const message = messageForOwnerMerge(reply, branch);
+  const message = messageForOwnerMerge(reply, branch, { feedbackId: pratica ? pratica.id : '', feedbackNum: pratica ? pratica.seq : '' });
   if (code === 0) console.log(`\n${message}`);
   else console.error(`\n${message}`);
+  if (pratica && pratica.id) {
+    const { fraseDaScrivere } = await import('./owner-feedback.mjs');
+    const frase = await fraseDaScrivere(pratica.id, pratica.seq ? `#${pratica.seq}` : pratica.id);
+    if (frase) console.log(`\n${frase}`);
+  }
   process.exit(code);
 }
 

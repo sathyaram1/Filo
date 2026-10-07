@@ -87,6 +87,14 @@ il livello non viene eseguito.
   il comando), e va abbreviato per la lettura (`~/.ssh`, non
   `/home/mario/.ssh`), che tiene anche il nome utente fuori da un popup disegnato
   dentro una pagina web qualsiasi.
+- **Un comando si presenta a parole, scritte dal modello, sopra il comando vero
+  (#892).** Chi non sa cos'è un terminale legge `spiegazione` per prima, su
+  bottone e popup. È l'unico testo del modello che apre un popup, quindi: si
+  ripulisce in un posto solo (`spiegazioneComando`, chiamata dal main prima del
+  gate e idempotente, così la firma RUN/CONFIRM regge), si mostra come testo e
+  non entra MAI nel livello. Quello che il sistema sa da sé (cartella, «perché
+  te lo chiedo», «non è reversibile») resta sotto e non lo scrive il modello.
+  Sentinella: `tests/unit/terminaleAccesoDiSerie.test.mjs`.
 - **UI:** le conferme usano i componenti riusabili `SN_CONFIRM_UI.confirm`
   (livello 2) e `SN_CONFIRM_UI.confirmTyped` (livello 3) in
   `src/shared/confirmUi.js` — mai `window.confirm` nativo.
@@ -126,5 +134,9 @@ un'azione, Filo la compie — non lascia un bottone "da cliccare per davvero":
   mai un `…` a metà frase: un consenso su un testo che l'utente non ha potuto
   leggere per intero non è un consenso. Vale in particolare per il feedback, che
   parte a nome suo.
+- **Il popup di livello 2 non ha un bottone già scelto (#592).** Si apre da solo
+  anche mentre l'utente scrive la domanda dopo: col fuoco su OK il primo spazio o
+  invio battuto per la chat lo confermava senza che nessuno l'avesse letto. Il
+  fuoco va al riquadro; da tastiera si arriva a OK col tabulatore.
 - **Test:** `tests/filo-open-link-direct.spec.mjs`, `tests/filo-action-levels.spec.mjs`
   (più popup di livello 2 → si aprono in sequenza, nessun chip resta da cliccare).

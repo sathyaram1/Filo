@@ -58,5 +58,5 @@ cosa per volta, applica subito, poi vai avanti"; l'utente vede una chat normale
   reale, compresa la home finale), `tests/onboarding-uscita.spec.mjs` (le vie
   d'uscita e le strade che si rompono: provider giù, "Riprova", due schede),
   `tests/onboarding-ripresa.spec.mjs` (la riga sulla home dopo una chiusura a
-  metà), `tests/verify-524-g2.spec.mjs` (rifiutare una proposta, rilanci a
+  metà), `tests/verifica/524/verify-524-g2.spec.mjs` (rifiutare una proposta, rilanci a
   vuoto, testo ostile, tre schede).

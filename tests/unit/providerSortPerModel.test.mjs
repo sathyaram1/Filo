@@ -169,3 +169,40 @@ test('la scelta generale regge maiuscole e spazi, e un valore ignoto vale «ness
   const r = C.providerRoutingFor({ excludedProviders: [], providerSort: 'Price' }, 'throughput');
   assert.equal(r.sort, 'throughput');
 });
+
+// La politica sui modelli resta intera con un ordinamento: `ignore`, `only` per i modelli da comprare dal
+// produttore (#904) e `require_parameters` con gli strumenti (#700) convivono con `sort`.
+test('sort convive con ignore, only e require_parameters', () => {
+  const routing = C.providerRoutingFor({ excludedProviders: ['Google'] }, 'throughput');
+  const claude = OpenRouter.providerBlock(routing, 'anthropic/claude-sonnet-4.5', { tools: true });
+  assert.equal(claude.sort, 'throughput');
+  assert.deepEqual(claude.ignore, ['Google']);
+  assert.deepEqual(claude.only, C.producerOnlyRule('anthropic/claude-sonnet-4.5').only);
+  assert.equal(claude.require_parameters, true);
+  const aperto = OpenRouter.providerBlock(routing, 'x/aperto');
+  assert.equal(aperto.sort, 'throughput');
+  assert.equal(aperto.only, undefined);
+});
+
+// La scelta personale di chi usa Filo (Opzioni o chat) sta sopra a quella dell'owner, anche per modello.
+test('scelta personale: vince sui modelli predefiniti, non sulle voci dell\'utente', () => {
+  assert.equal(C.ordinamentoPerUtente('price', 'throughput', 'latency'), 'price');
+  assert.equal(C.ordinamentoPerUtente('', 'throughput', 'latency'), 'throughput');
+  assert.equal(C.ordinamentoPerUtente('boh', '', 'latency'), 'latency');
+  const reg = { a: { provider: 'openrouter', model: 'x/a', sort: 'price', reasoning: 'low' }, b: { model: 'x/b' } };
+  const senza = C.registroSenzaOrdinamento(reg);
+  assert.deepEqual(senza.a, { provider: 'openrouter', model: 'x/a', reasoning: 'low' });
+  assert.deepEqual(senza.b, { model: 'x/b' });
+  assert.equal(reg.a.sort, 'price');
+  assert.equal(C.DEFAULT_SETTINGS.ordineHost, '');
+});
+
+test('la chat sa cambiare la scelta personale degli host', () => {
+  require(join(__dirname, '..', '..', 'src', 'shared', 'cambi.js'));
+  require(join(__dirname, '..', '..', 'src', 'shared', 'preferences.js'));
+  const P = globalThis.SN_PREF;
+  assert.deepEqual(P.buildPreferencePartial('ordine_host', 'velocità').partial, { ordineHost: 'throughput' });
+  assert.deepEqual(P.buildPreferencePartial('ordine_host', 'prezzo').partial, { ordineHost: 'price' });
+  assert.deepEqual(P.buildPreferencePartial('ordine_host', 'latenza').partial, { ordineHost: 'latency' });
+  assert.deepEqual(P.buildPreferencePartial('ordine_host', 'filo').partial, { ordineHost: '' });
+});

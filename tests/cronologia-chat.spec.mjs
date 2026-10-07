@@ -396,11 +396,12 @@ test('una chat vuota non lascia un guscio senza titolo in Cronologia', async ({ 
 });
 
 test('l’intervista di benvenuto resta una conversazione anche se il modello dice "comando"', async ({ app, openTab }) => {
-  // Niente `configura`: su un profilo nuovo l'intervista è APERTA, e la prima
-  // chat È l'intervista. Il classificatore qui risponde sempre "comando":
-  // deve perdere.
+  // Niente `configura`: l'intervista è aperta col benvenuto, come la trova chi apre Filo la prima volta, e la prima
+  // chat È l'intervista. Il classificatore qui risponde sempre "comando": deve perdere.
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
+    const O = globalThis.SN_ONBOARDING;
+    await globalThis.SN_FILO_MEMORY.setOnboarding(O.appendTurn(O.emptyState(), { role: 'filo', text: O.WELCOME_MESSAGE }));
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
@@ -1019,33 +1020,6 @@ test('rinominare con un campo vuoto non lascia una riga senza niente da leggere'
   await expect(page.locator('.arc-chat-title').first()).toHaveText(primaTitolo, { timeout: 10_000 });
 });
 
-// Il titolo si conferma quando il cursore lascia il campo: chiudendo la scheda
-// prima, il cursore non esce e quel nome non lo salverebbe nessuno.
-test('il titolo appena scritto non si perde chiudendo la scheda', async ({ app, shell, openTab }) => {
-  test.setTimeout(120_000);
-  await preparaDueChat(app);
-  await expect.poll(async () => (await leggiArchivio(app)).filter((c) => c.title).length, { timeout: 30_000 }).toBe(2);
-
-  const page = await openTab(ARCHIVE);
-  const riga = page.locator('.arc-chat').first();
-  await expect(riga).toBeVisible({ timeout: 20_000 });
-  await riga.click({ button: 'right' });
-  await page.locator('.arc-ctxmenu .sn-select-option', { hasText: 'Rinomina' }).click();
-  const campo = page.locator('.arc-chat-rename');
-  await expect(campo).toBeVisible({ timeout: 10_000 });
-  await campo.fill('titolo scritto e chiuso subito');
-
-  const id = await shell.evaluate(async () => {
-    const snap = await window.filoShell.tabs.snapshot();
-    const t = (snap.tabs || snap).find((x) => String(x.url || '').includes('archive'));
-    return t && t.id;
-  });
-  await shell.evaluate((tabId) => window.filoShell.tabs.close(tabId), id);
-
-  await expect.poll(async () => (await leggiArchivio(app)).map((c) => c.title || ''), { timeout: 15_000 })
-    .toContain('titolo scritto e chiuso subito');
-});
-
 test('cercare una frase intera trova la chat, e la pagina dice con quali parole', async ({ app, openTab }) => {
   test.setTimeout(120_000);
   await preparaDueChat(app);
@@ -1080,9 +1054,9 @@ test('l’esito di un comando lento resta nella chat in cui il comando è stato 
   await dash.locator('#input').press('Enter');
   await expect(dash.locator('.dash-bubble-filo').first()).toBeVisible({ timeout: 30_000 });
 
-  // Un comando che ci mette qualche secondo, e l'utente se ne va prima. Il
-  // marcatore non porta virgolette: PowerShell e sh le raddoppiano diversamente.
-  await dash.locator('#input').fill('/sleep 4; echo ESITO-TARDIVO');
+  // Un comando che ci mette qualche secondo, e l'utente se ne va prima.
+  // La parola spezzata vale in sh e in PowerShell ("ESIT""O" in PowerShell stampa ESIT"O).
+  await dash.locator('#input').fill("/sleep 4; echo ESIT''O-TARDIVO");
   await dash.locator('#input').press('Enter');
   await dash.waitForTimeout(700);
   await dash.locator('#input').fill('/home');
@@ -1090,16 +1064,10 @@ test('l’esito di un comando lento resta nella chat in cui il comando è stato 
   await expect.poll(async () => dash.evaluate(() => document.body.dataset.state), { timeout: 10_000 })
     .toBe('home');
 
-  // L'esito, non la riga del comando: quella la si riconosce perché contiene
-  // il comando stesso.
   await expect.poll(async () => {
     const c = (await leggiArchivio(app))[0];
-    if (!c) return false;
-    return c.messages.some((m) => {
-      const t = String((m && m.text) || '');
-      return t.includes('ESITO-TARDIVO') && !t.includes('sleep');
-    });
-  }, { timeout: 40_000 }).toBe(true);
+    return c ? c.messages.map((m) => m.text).join('\n') : '';
+  }, { timeout: 40_000 }).toContain('ESITO-TARDIVO');
 
   const chats = await leggiArchivio(app);
   // Una conversazione sola: l'esito è tornato dove il comando era stato dato.

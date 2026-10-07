@@ -25,6 +25,12 @@ REGISTRATO con gli script, mentre lavori:
   `--segnala` e `--nota` si scrivono FUORI dal repo, nella cartella temporanea
   del sistema (per esempio `../segnala-<numero>.md`): la consegna rifiuta una
   directory con file non committati;
+- la domanda di fine sessione dell'owner → subito prima del rilascio, anche di
+  uno con `--guasto`: `node scripts/routine-channel.mjs domanda --biglietto <biglietto>`
+  la stampa insieme al comando per rispondere, col testo da stdin fra due
+  righe `FINE` (`risposta --biglietto <biglietto> <<'FINE'`). Rispondi su ciò
+  che hai visto tu in questa sessione; «niente» va benissimo ed è la risposta
+  più frequente. Se la domanda non arriva (exit diverso da 0), rilascia e basta;
 - il claim → il rilascio, quando hai finito (`node scripts/routine-channel.mjs
   release <biglietto> --role <il tuo ruolo>`: il rilascio allega da solo il
   rapporto di fine sessione, e il ruolo è la firma di quel rapporto. Senza,
@@ -36,6 +42,13 @@ REGISTRATO con gli script, mentre lavori:
 
 Se hai registrato tutto, la tua ultima frase può essere qualsiasi cosa e non
 conta niente. Se non l'hai registrato, non esiste.
+
+## I pezzi lunghi del payload stanno in un file
+
+Un campo del payload troppo lungo per la stampa arriva in un file fuori dal
+progetto, intero: al suo posto c'è `[nel file <percorso>, N caratteri: …]`, e
+`fileEsterni` elenca quali campi sono usciti e dove. Leggi quel file per intero
+come leggeresti il campo: non è un riassunto, è il contenuto.
 
 ## Gli strumenti che ti vengono nominati
 

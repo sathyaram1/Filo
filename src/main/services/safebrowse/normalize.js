@@ -41,8 +41,8 @@ function parseHost(input) {
 
 // Normalizza un URL/host in forma canonica per tutti i confronti a valle.
 // Ritorna null se l'input non contiene un hostname analizzabile (es. about:,
-// data:, javascript:, file senza host).
-function normalize(input) {
+// data:, javascript:, file senza host). `soloPsl`: solo le piattaforme che il web separa (per i cookie).
+function normalize(input, { soloPsl = false } = {}) {
   const parsed = parseHost(input);
   if (!parsed) return null;
   const { host, protocol, port } = parsed;
@@ -74,7 +74,7 @@ function normalize(input) {
   let unicode = domainToUnicode(ascii) || host;
   unicode = unicode.normalize('NFC').toLowerCase();
 
-  const info = getDomainInfo(ascii);
+  const info = getDomainInfo(ascii, { soloPsl });
   if (!info) return null;
 
   const registrable = info.registrable;
@@ -90,6 +90,7 @@ function normalize(input) {
     isIp: false,
     single: !!info.single,
     suffixOnly: !!info.suffixOnly,
+    ospitato: !!info.ospitato,
     host: ascii,
     hostUnicode: unicode,
     registrable,

@@ -24,6 +24,8 @@ require(path.join(SHARED, 'i18n.js'));
 // Come si CHIAMA una scorciatoia sulla macchina di chi legge (Ctrl o Cmd):
 // serve a chiunque disegni un'etichetta, quindi sta in alto.
 require(path.join(SHARED, 'tasti.js'));
+// Dove sta ogni icona globale (riga, «Altro…», barra laterale): la legge la barra, la scrive il main.
+require(path.join(SHARED, 'disposizioneIcone.js'));
 // "Il cursore è in un campo di testo?": la regola che decide se Ctrl/Cmd+Z
 // annulla o torna indietro. La barra dei menu la manda a valutare nelle pagine
 // (src/main/menu.js), i content script la chiamano direttamente.
@@ -40,11 +42,14 @@ require(path.join(SHARED, 'modelUsage.js'));
 // solo dentro le funzioni di rendering, mai al caricamento.
 require(path.join(SHARED, 'modelChainEditor.js'));
 require(path.join(SHARED, 'storage.js'));
-require(path.join(SHARED, 'salvaRimandato.js'));
 require(path.join(SHARED, 'themeTokens.js'));
 require(path.join(SHARED, 'tabColor.js'));
 require(path.join(SHARED, 'tabTriage.js')); // §2.1 — candidati/dedup riordino schede (logica pura)
 require(path.join(SHARED, 'downloadTabs.js')); // #412/#441 — schede usa e getta dei download (logica pura)
+require(path.join(SHARED, 'nomiSito.js')); // #590 — quando un dominio scritto a mano è valido, e come si legge (prima di eseguibili)
+require(path.join(SHARED, 'pagineDelicate.js')); // #1004 — quali pagine non mandano testo ai modelli nei lavori automatici
+require(path.join(SHARED, 'eseguibili.js')); // #588 — quali file il sistema ESEGUE (logica pura)
+require(path.join(SHARED, 'nomiFile.js')); // #950 — nome sensato ai file dell'utente (logica pura)
 // #585 — pulizia e incapsulamento dei percorsi condivisi. Va PRIMA di paths.js
 // (che la usa in scrittura) e di handlers.js (che la usa in lettura).
 require(path.join(SHARED, 'pathsSafety.js'));
@@ -53,12 +58,17 @@ require(path.join(SHARED, 'paths.js'));
 // PRIMA di filoMemory (che ci passa lo stato letto dallo storage).
 require(path.join(SHARED, 'onboarding.js'));
 require(path.join(SHARED, 'filoMemory.js'));
+// Ora, batteria, rete e Bluetooth a parole: lo legge filoState per lo STATO, e la home per le sue voci.
+require(path.join(SHARED, 'sistema.js'));
 require(path.join(SHARED, 'filoState.js'));
+require(path.join(SHARED, 'carteHome.js')); // #870 — carte della home: catalogo e mosse (logica pura)
 // #525 — archivio delle chat con Filo: titoli, tipi, ricerca (logica pura).
 // Va PRIMA di services/filoChats.js, che ci si appoggia per scrivere.
 require(path.join(SHARED, 'chatArchive.js'));
+require(path.join(SHARED, 'filoEventi.js'));  // #866 — forma degli eventi del filo: prima di services/ilFilo.js
 require(path.join(SHARED, 'dashboardRefresh.js'));
 require(path.join(SHARED, 'feedback.js'));
+require(path.join(SHARED, 'feedbackMine.js')); // #678 — il registro dei feedback mandati da questa installazione
 require(path.join(SHARED, 'feedbackLive.js')); // confronto versioni + fusione per l'aggiornamento continuo della dashboard
 require(path.join(SHARED, 'feedbackTransitions.js')); // DATI della macchina a stati (fonte unica, SPEC-RIDISEGNO-MAX.md §7)
 require(path.join(SHARED, 'verifierRound.js')); // regole del giro di verifica (fonte unica, feedback #561)
@@ -69,6 +79,7 @@ require(path.join(SHARED, 'feedbackPublicView.js')); // #583 — quali feedback 
 require(path.join(SHARED, 'preferences.js'));
 require(path.join(SHARED, 'cmdClassify.js'));
 require(path.join(SHARED, 'urlNav.js'));  // #398 — testo→indirizzo (normalizeUrl/looksLikeAddress), condiviso main+dashboard
+require(path.join(SHARED, 'guardianoStatico.js')); // #810 — forme dei segreti: prima della porta delle uscite
 require(path.join(SHARED, 'urlExfil.js'));
 require(path.join(SHARED, 'netError.js'));  // #327 — pagina d'errore di rete (tabs.js + filo://error)
 require(path.join(SHARED, 'chatErrors.js'));  // #360 — errore tecnico → frase per l'utente in chat
@@ -78,10 +89,17 @@ require(path.join(SHARED, 'wallet.js'));      // #598 — crediti sul server: ri
 require(path.join(SHARED, 'campoNumero.js'));
 // Come partono le sessioni delle routine: stesse regole in pagina e nel main.
 require(path.join(SHARED, 'routineSessioni.js'));
+require(path.join(SHARED, 'calcMarkers.js'));  // #724.1 — calcolatrice dei marker [[calc:]]: la chat li risolve nel main
+// #711 — cosa dichiara un'immagine sulla propria origine, letto dai suoi byte.
+// Usa node:crypto per verificare le firme: vive solo dove Node c'è (main).
+require(path.join(SHARED, 'provenienzaImmagine.js'));
 require(path.join(SHARED, 'streamingJson.js'));  // #420 — estrae il campo "text" mentre il JSON di risposta arriva in streaming
 require(path.join(SHARED, 'actionLevels.js'));
 require(path.join(SHARED, 'actionTools.js'));  // le azioni come strumenti del modello (tool calling nativo)
 require(path.join(SHARED, 'pageRestyle.js'));
+require(path.join(SHARED, 'zoomPagina.js'));  // zoom della pagina: passo, limiti, livello↔percentuale (una regola sola per tasti e chat)
+require(path.join(SHARED, 'cambi.js'));  // #867 — i cambi di stato come eventi del filo: frasi, confronto, annullo (logica pura)
+require(path.join(SHARED, 'vociImpostazioni.js'));  // #949 — le voci delle pagine delle impostazioni: cosa legge e cambia la chat
 require(path.join(SHARED, 'ttsChunk.js'));
 require(path.join(SHARED, 'ttsCache.js'));
 require(path.join(SHARED, 'ttsVoices.js'));          // voci del modello di lettura (Kokoro)
@@ -108,29 +126,37 @@ require(path.join(SHARED, 'deckStats.js'));    // dipende da SN_DECKS (tipoOf)
 require(path.join(SHARED, 'scryfallQuery.js'));
 require(path.join(SHARED, 'deckOpinions.js')); // pareri/auto-tag §6-§7 (logica pura)
 require(path.join(SHARED, 'deckImportExport.js')); // parser rigido testo↔carte §11 (logica pura)
+require(path.join(SHARED, 'deckChat.js'));     // chat per mazzo §3.2: cosa si conserva (logica pura)
 require(path.join(SHARED, 'editorStore.js'));   // collezione file editor (logica pura)
 require(path.join(SHARED, 'editorVersions.js')); // storico/punti di ripristino (logica pura)
 require(path.join(SHARED, 'editorNotes.js'));   // appunti di Filo dentro i file editor (dipende dai due sopra)
 require(path.join(SHARED, 'editorSummary.js')); // riassunto per file + estrazione testo (logica pura, #379.5)
 require(path.join(SVC, 'providers', 'openrouter.js'));
 require(path.join(SVC, 'providers', 'index.js'));
+require(path.join(SVC, 'modelGate.js')); // l'unica strada verso i fornitori: limite, costo, chi ha servito (#591)
 require(path.join(SVC, 'feedbackOutbox.js')); // #341 — coda invio feedback offline (dipende da SN_FEEDBACK + SN_STORAGE)
 require(path.join(SVC, 'creditStore.js'));
 require(path.join(SVC, 'costTracker.js'));
 require(path.join(SVC, 'savedPages.js'));
 require(path.join(SVC, 'historyStore.js'));
 require(path.join(SVC, 'archivedTabs.js'));
-require(path.join(SVC, 'filoChats.js'));  // #525 — dipende da SN_CHAT_ARCHIVE
+require(path.join(SVC, 'segnalazioniMie.js')); // #986 — la copia locale delle segnalazioni mandate da qui
+require(path.join(SVC, 'ilFilo.js'));     // #866 — la linea del tempo: l'unico che legge e scrive il suo file
+require(path.join(SVC, 'filoChats.js'));  // #525 — dipende da SN_CHAT_ARCHIVE e SN_IL_FILO
 require(path.join(SVC, 'deckStore.js'));   // dipende da SN_DECKS (shared/decks.js)
 require(path.join(SVC, 'scryfall.js'));    // dipende da SN_SCRYFALL_Q (shared/scryfallQuery.js)
 require(path.join(SVC, 'deckOpinions.js')); // dipende da SN_DECK_OPINIONS + SN_SCRYFALL_Q
+require(path.join(SVC, 'deckChats.js'));   // dipende da SN_DECK_CHAT + SN_DECK_STORE
 require(path.join(SVC, 'aiCache.js'));
 require(path.join(SVC, 'categorizer.js'));
 require(path.join(SVC, 'pathsCollector.js'));
 require(path.join(SVC, 'llmsTxt.js'));
 require(path.join(SVC, 'webSearch.js'));
 require(path.join(SVC, 'fxRates.js'));
+require(path.join(SVC, 'statoSistema.js')); // batteria, rete, Bluetooth del computer: SN_SISTEMA_MAIN per lo STATO
+require(path.join(SVC, 'comandiSistema.js')); // #874 volume, Bluetooth e Wi-Fi a comando: SN_COMANDI_SISTEMA
 require(path.join(SVC, 'safebrowse', 'index.js'));
+require(path.join(SVC, 'pagineDelicate.js')); // #1004 — i siti che hanno mostrato un campo password o carta, per la sessione
 require(path.join(SVC, 'geoBlock.js'));
 require(path.join(SVC, 'geoBlockClassifier.js'));
 require(path.join(SVC, 'geoBlockRules.js'));
@@ -141,7 +167,6 @@ module.exports = {
   get SN_CONST() { return globalThis.SN_CONST; },
   get SN_MSG() { return globalThis.SN_MSG; },
   get SN_STORAGE() { return globalThis.SN_STORAGE; },
-  get SN_PROVIDERS() { return globalThis.SN_PROVIDERS; },
   get SN_COSTS() { return globalThis.SN_COSTS; },
   get SN_CREDITS() { return globalThis.SN_CREDITS; },
   get SN_SAVED_PAGES() { return globalThis.SN_SAVED_PAGES; },

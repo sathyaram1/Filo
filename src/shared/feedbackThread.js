@@ -97,20 +97,33 @@
   //            in chat con lui. È la provenienza di chi apre un feedback da lì.
   const MODEL_PREFIXES = ['agent:', 'routine:', 'local:'];
 
+  // Un nome riservato vale solo con la prova che scrivono l'admin o il server (#595, #912): senza, è un utente nello
+  // spazio `non-provato:`. Gemelli: effectiveClientId in manageReview.js e in filo-security (data/identities.js);
+  // la sentinella tests/unit/mittentiProvati.test.mjs li tiene uguali.
+  const RESERVED_SENDER_RE = /^(owner|routine|agent|local):/i;
+  const SENDER_PROOFS = ['admin', 'server'];
+  // Le funzioni di classificazione qui sotto prendono il FEEDBACK (si legge la prova) o una stringa che è già un
+  // mittente efficace o una firma scritta dall'admin; il `clientId` grezzo di un feedback non va passato.
+  function senderOf(x) {
+    if (!x || typeof x !== 'object') return String(x || '');
+    const c = String(x.clientId || '');
+    return RESERVED_SENDER_RE.test(c) && SENDER_PROOFS.indexOf(x.senderProof) === -1 ? 'non-provato:' + c : c;
+  }
+
   // true se il feedback è stato inviato da un modello (issue d'agente,
   // sub-feedback creato da una routine, ritrovamento di una sessione locale):
   // in quel caso anche la segnalazione originale è "lato Filo", non
   // "lato utente".
-  function isFromModel(clientId) {
-    const c = String(clientId || '');
+  function isFromModel(fb) {
+    const c = senderOf(fb);
     return MODEL_PREFIXES.some(function (p) { return c.indexOf(p) === 0; });
   }
 
   // true se il feedback è un invio MANUALE dell'owner (admin loggato). L'identità
   // owner viene applicata nel main process al momento dell'invio (vedi
   // ownerize): il content script non sa di esserlo.
-  function isFromOwner(clientId) {
-    return String(clientId || '').startsWith('owner:');
+  function isFromOwner(fb) {
+    return senderOf(fb).startsWith('owner:');
   }
 
   // Classifica l'ORIGINE di un feedback dal prefisso del clientId. Serve alla
@@ -120,8 +133,8 @@
   //   routine:<slug> → 'routine'  audit automatico delle routine cloud (blu)
   //   local:<slug>   → 'local'    sessione locale di Claude (viola)
   //   <altro>        → 'user'     alpha tester esterno (arancione)
-  function originOf(clientId) {
-    const c = String(clientId || '');
+  function originOf(fb) {
+    const c = senderOf(fb);
     if (c.startsWith('owner:')) return 'owner';
     if (c.startsWith('agent:')) return 'agent';
     if (c.startsWith('routine:')) return 'routine';
@@ -155,12 +168,12 @@
   //                                      saprebbe più da dove viene un
   //                                      ritrovamento — ed è l'unica cosa che il
   //                                      mittente serve a dire
-  //   routine:residuo       → 'residuo'  i rilievi RESIDUI di una verifica: quelli
-  //                                      quelli rimasti fuori dal giro di
-  //                                      correzione (feedback #561: livello 0,
-  //                                      bilancio esaurito, o da decidere), raccolti
-  //                                      dal SERVER in un feedback derivato figlio
-  //                                      del lavoro (#N.k). Categoria propria, NON
+  //   routine:residuo       → 'residuo'  i rilievi DERIVATI da una verifica: quelli
+  //                                      che quel lavoro non corregge (esterni, o
+  //                                      interni messi da parte dal bilancio),
+  //                                      aperti dal SERVER uno per rilievo come
+  //                                      feedback figli del lavoro (#N.k), con la
+  //                                      priorità del livello. Categoria propria, NON
   //                                      prober e NON verifier: spacciarlo per uno
   //                                      dei due falserebbe la lettura di dove
   //                                      nascono i ritrovamenti
@@ -183,8 +196,8 @@
     secaudit: 'verifier',
     residuo: 'residuo',
   };
-  function authorKind(clientId) {
-    var c = String(clientId || '');
+  function authorKind(fb) {
+    var c = senderOf(fb);
     if (c.indexOf('auto:') === 0 || c.indexOf('filo:') === 0) return 'filo';
     if (c.indexOf('owner:') === 0) return 'owner';
     // La sessione locale prima del ramo agent/routine: non ha ruoli dopo i due
@@ -281,11 +294,18 @@
     return ('owner:' + c).slice(0, 100);
   }
 
+  // Una riga finisce a OGNI a capo, di qualunque tipo: chi ripulisce e chi legge spezzano solo così, o un «\r» in
+  // mezzo a un marcatore sfugge a chi ripulisce e apre un turno per chi legge. Copia sul server: routine/notes.js.
+  const A_CAPO_RE = /\r\n|[\n\r\u2028\u2029]/;
+  function righe(s) {
+    return String(s == null ? '' : s).split(A_CAPO_RE);
+  }
+
   // Spezza il blob `notes` nei suoi turni. Ritorna una lista di
   // { role: 'model'|'user', ts: string|null, body: string } senza i segmenti
   // vuoti (es. note che iniziano direttamente con un marcatore di riapertura).
   function splitNotes(notes) {
-    const lines = String(notes || '').split('\n');
+    const lines = righe(notes || '');
     const segments = [];
     // Il testo prima di qualsiasi marcatore è il turno di Filo (il report/le
     // domande scritte dalla routine).
@@ -328,7 +348,7 @@
     const text = String(f.text || '').trim();
     if (text) {
       turns.push({
-        role: isFromModel(f.clientId) ? 'model' : 'user',
+        role: isFromModel(f) ? 'model' : 'user',
         kind: 'report',
         body: text,
         ts: f.createdAt || f._createTime || null,
@@ -379,6 +399,27 @@
   function modelTurnMarker(ts, label) {
     const when = ts || new Date().toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
     return `--- ${label || "Aggiornamento dell'agente del"} ${when} ---`;
+  }
+
+  // L'istante scritto in un marcatore, in ISO, o null. I marcatori sono scritti in italiano (giorno/mese, anno a due
+  // o quattro cifre, ora locale di chi scrive): `new Date()` li legge mese/giorno e sbaglia o li scarta (#764).
+  const DATA_MARCATORE_RE = /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})(?:,?\s+(\d{1,2})[:.](\d{2})(?:[:.](\d{2}))?)?$/;
+  function istanteDelMarcatore(ts) {
+    const s = String(ts == null ? '' : ts).trim();
+    if (!s) return null;
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+      const t = Date.parse(s);
+      return Number.isNaN(t) ? null : new Date(t).toISOString();
+    }
+    const m = DATA_MARCATORE_RE.exec(s);
+    if (!m) return null;
+    const [g, me, a, h, mi, se] = [m[1], m[2], m[3], m[4] || 0, m[5] || 0, m[6] || 0].map(Number);
+    const anno = m[3].length === 2 ? 2000 + a : a;
+    const d = new Date(anno, me - 1, g, h, mi, se);
+    // Un 31/02 o un 25:00 non è una data: Date li farebbe scivolare in avanti in silenzio.
+    if (d.getFullYear() !== anno || d.getMonth() !== me - 1 || d.getDate() !== g
+      || d.getHours() !== h || d.getMinutes() !== mi) return null;
+    return d.toISOString();
   }
 
   // Appende un turno dell'agente al blob note esistente, conservando lo storico.
@@ -433,8 +474,23 @@
   //     duplicati;
   //   - altrimenti → APPENDI il report come nuovo turno dell'agente, conservando
   //     report precedente + annotazione di riapertura dell'utente.
+  // Un report di un agente non può aprire un turno: una riga che imita un
+  // confine («--- La tua risposta del … ---») diventerebbe una decisione
+  // dell'owner. Resta leggibile, citata con «> » davanti (come fa il server).
+  // Lo stesso per l'intestazione di un blocco di domande: le scrive solo il server.
+  const CONFINE_GENERICO_RE = /^---\s.*\sdel\s.*---\s*$/;
+  const CONFINE_PROPRIETARIO_RE = /^---\s*(?:Risposta|Aggiornamento) (?:dell'utente|dell’utente|del proprietario) del .*---\s*$/;
+  const DOMANDA_SERVER_RE = /^(?:Segnalazione|Domande) per l'owner \(chi [^)\n]+\):/;
+  function neutralizzaConfini(report) {
+    return righe(report || '').map((l) => {
+      const confine = USER_TURN_RE.test(l) || MODEL_TURN_RE.test(l) || CONFINE_GENERICO_RE.test(l)
+        || CONFINE_PROPRIETARIO_RE.test(l) || DOMANDA_SERVER_RE.test(l.trim());
+      return confine ? `> ${l}` : l;
+    }).join('\n');
+  }
+
   function mergeModelReport(existingNotes, incomingReport, opts) {
-    const incoming = String(incomingReport || '').trim();
+    const incoming = neutralizzaConfini(String(incomingReport || '').trim());
     const existing = String(existingNotes || '');
     if (!incoming) return existing;
     if (!existing.trim()) return incoming;
@@ -478,7 +534,7 @@
   // Diverso da splitNotes(): qui NON si perde nulla (marcatori, righe vuote,
   // allegati restano dove sono) perché il risultato torna su Firestore.
   function rawBlocks(notes) {
-    const lines = String(notes || '').split('\n');
+    const lines = righe(notes || '');
     const blocks = [];
     let current = [];
     for (const line of lines) {
@@ -590,6 +646,7 @@
     isFromOwner,
     originOf,
     authorKind,
+    senderOf,
     // Il clientId con cui si firma una sessione locale. Sta qui perché chi lo
     // SCRIVE (scripts/claude-feedback.mjs) e chi lo LEGGE (authorKind) non
     // possano divergere su una stringa copiata a mano.
@@ -605,6 +662,7 @@
     CLAUDE_GROUPS,
     ownerize,
     userTurnMarker,
+    istanteDelMarcatore,
     appendUserTurn,
     modelTurnMarker,
     appendModelTurn,
@@ -622,5 +680,7 @@
     ATTACH_PREFIX,
     USER_TURN_RE,
     MODEL_TURN_RE,
+    A_CAPO_RE,
+    righe,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

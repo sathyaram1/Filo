@@ -56,18 +56,20 @@
   border-bottom-color: var(--sn-accent, #c45a3b);
 }
 
-/* Le sezioni non ancora scritte restano visibili ma spente: dire "in arrivo" è
- * più onesto che far sparire la voce. */
-.sn-nav-item.is-soon {
-  opacity: 0.4;
-  cursor: default;
-}
+/* Le sezioni non ancora scritte: grigie invece del colore dei link, ma leggibili, perché si cliccano.
+ * Farle sparire direbbe che Filo non ha niente da dire su privacy o sicurezza. */
+.sn-nav-item.is-soon:not(.is-active) { color: var(--sn-muted, #6e6b63); }
 
+.sn-nav-item.is-soon:not(.is-active):hover { color: var(--sn-fg, #1a1918); }
+
+/* Il titolo può arrivare dall'indirizzo: una parola senza spazi lunga quanto
+ * vuole non deve allargare la pagina. */
 .sn-doc h1 {
   font-size: 1.9rem;
   line-height: 1.2;
   margin: 0 0 0.5rem;
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .sn-doc-sub {
@@ -100,6 +102,17 @@
 .sn-doc li { margin-bottom: 0.55rem; }
 
 .sn-doc strong { font-weight: 600; }
+
+/* I comandi da copiare: si devono distinguere dalla prosa e andare a capo senza allargare la pagina. */
+.sn-doc code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 0.86em;
+  padding: 0.05em 0.35em;
+  background: var(--sn-hover, #ffffff);
+  border: 1px solid var(--sn-border, #e0dcd4);
+  border-radius: var(--sn-radius, 6px);
+  overflow-wrap: anywhere;
+}
 
 .sn-doc hr {
   border: 0;
