@@ -1190,7 +1190,7 @@
       aiuto: 'giorni 0,5-365, o "predefinito" (quanti giorni di conversazioni, da tutte le schede, la chat ha davanti a ogni messaggio)',
       keys: ['giorni_ricordati', 'giorni ricordati', 'giorni di memoria della chat', 'giorni di conversazione', 'giorni del contesto',
         'memoria della chat in giorni', 'contestofilo.giorni'],
-      level: 2,
+      costo: 2,
       risk: 'Più giorni: Filo ricorda più conversazioni senza cercarle, ma ogni messaggio costa di più e la risposta può arrivare più tardi. Meno giorni: costa meno, e il resto lo ritrova cercando.',
       build(v) {
         if (predefinito(v)) return { partial: { contestoFilo: { giorni: null } }, label: 'Giorni di conversazioni che la chat ricorda → come i predefiniti' };
@@ -1208,7 +1208,7 @@
       scrive: ['contestoFilo.token'],
       aiuto: 'token 2.000-2.000.000, o "predefinito" (il tetto in token di quello che la chat ha davanti; vince il minore fra questo e i giorni)',
       keys: ['token_ricordati', 'token ricordati', 'tetto del contesto', 'tetto di token', 'token del contesto', 'contestofilo.token'],
-      level: 2,
+      costo: 2,
       risk: 'Un tetto più alto fa ricordare più conversazioni a ogni messaggio, e ogni messaggio costa di più; uno più basso costa meno e ricorda meno senza cercare.',
       build(v) {
         if (predefinito(v)) return { partial: { contestoFilo: { token: null } }, label: 'Tetto in token della chat → come i predefiniti' };
