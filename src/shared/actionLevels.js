@@ -417,6 +417,9 @@
     EVENTO_CALENDARIO: {
       level: 1,
       describe: (a) => `Creare l'evento "${a.title || a.titolo || ''}"`,
+      // La finisce l'UTENTE con un click in chat: senza questa riga, al turno
+      // dopo il modello non sa che è successo e tira a indovinare.
+      describeDone: (a) => `Evento aggiunto al calendario: "${a.title || a.titolo || ''}"`,
     },
     // La prima riga di describe è quella che il diario mostra mentre si aspetta il clic.
     PULISCI_TAB: {

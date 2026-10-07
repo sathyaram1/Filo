@@ -887,6 +887,15 @@
     CAMBI_ANNULLA: 'cambi_annulla',
     CAMBI_AGGIORNATI: 'cambi_aggiornati',           // main → pagine di Filo { ids }: un cambio è nato o è stato annullato
 
+    // L'utente aggiunge al calendario del suo computer l'evento che Filo gli
+    // ha proposto in chat: il main scrive un .ics e lo apre col programma di
+    // calendario. → { ok, file, aperto, error }  { evento: { data, ora, titolo, dettagli } }
+    //
+    // ORIGINE: solo filo:// (scrive un file e chiede al sistema di aprirlo, e
+    // la risposta contiene un percorso assoluto). Una pagina web che potesse
+    // chiamarlo farebbe aprire un file al sistema operativo.
+    CALENDAR_ADD: 'calendar_add',
+
     // Primo dispatch (non ancora confermato) di UNA singola azione di Filo,
     // usato dall'agente "Aiuto" (sidebar) per attivare le azioni tipizzate di
     // Filo — es. inviare un feedback — passando dallo stesso registro dei

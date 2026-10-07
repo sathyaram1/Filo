@@ -66,8 +66,10 @@
     let turnStartedAt = 0;
     let lastTurn = { text: '', ms: 0 };
     let sawReasoning = false;
-    // Tipi delle azioni compiute, nell'ordine: da qui nasce il riassunto.
+    // Le azioni del lavoro col loro esito, nell'ordine: da qui nasce il riassunto. La stessa azione che torna
+    // (confermata dopo, o finita col bottone) aggiorna la sua voce invece di contarsi due volte.
     const doneTypes = [];
+    let fallito = false;
     // Le sezioni: un pensiero e le azioni che ne sono nate. `viva` è quella che riceve adesso.
     const segs = [];
     let viva = null;
@@ -180,8 +182,28 @@
     function riassunto() {
       const ms = (fineLavoro || Date.now()) - startedAt;
       const fatto = summarizeActivity(doneTypes, sawReasoning);
-      if (fermato) return `Fermato · ${doneTypes.length ? `${fatto.charAt(0).toLowerCase()}${fatto.slice(1)} · ` : ''}${fmtActivityDuration(ms)}`;
+      const qualcosa = doneTypes.some((v) => global.SN_ESITO.conta(v.esito));
+      if (fermato) return `Fermato · ${qualcosa ? `${fatto.charAt(0).toLowerCase()}${fatto.slice(1)} · ` : ''}${fmtActivityDuration(ms)}`;
       return `${fatto} · ${fmtActivityDuration(ms)}`;
+    }
+    // Una riga arrivata a lavoro finito (l'impostazione confermata dopo la risposta) rifà il riassunto, non il cronometro.
+    function rifaiTesta() {
+      label.textContent = fallito && !fermato ? `Tentativo non riuscito · ${riassunto()}` : riassunto();
+    }
+    // Ritorna la voce di prima con il suo esito quando l'azione era già contata, altrimenti null.
+    function contaAzione(type, a, failed) {
+      const E = global.SN_ESITO;
+      const tipo = String(type || '').toUpperCase();
+      let esito = E.FATTO;
+      if (failed) esito = E.FALLITO;
+      else if (a && tipo !== 'FERMATA') esito = E.esitoAzione(a);
+      const gia = a ? doneTypes.find((v) => v.a === a || (a._callId && v.a && v.a._callId === a._callId)) : null;
+      if (!gia) { doneTypes.push({ type: tipo, esito, a }); return null; }
+      const prima = gia.esito;
+      gia.type = tipo;
+      gia.esito = esito;
+      gia.a = a;
+      return { prima, voce: gia };
     }
     const haCose = () => sawReasoning || segs.some((s) => s.testo || s.corpo.querySelector('.dash-activity-note, .dash-activity-row, .dash-activity-cmd'));
     let tendina = 0;
@@ -356,18 +378,24 @@
       // `failed`: la riga resta (è successo qualcosa) ma il riassunto non la conta.
       addRow(type, rowIcon, text, failed = false, cambi = null, a = null) {
         closeTurnReasoning();
-        if (!failed) doneTypes.push(String(type || '').toUpperCase());
+        const gia = contaAzione(type, a, failed);
         const seg = registra({ tipo: type, testo: text, esito: esitoDi(a, failed, type) }, a);
-        aggiungiEsito(seg, makeActivityRow(rowIcon, text, cambi));
+        const riga = makeActivityRow(rowIcon, text, cambi);
+        // La proposta finita col bottone diventa il suo esito nella stessa riga: due frasi che si contraddicono no.
+        if (gia && gia.prima === global.SN_ESITO.PROPOSTO && gia.voce.riga && gia.voce.riga.isConnected) gia.voce.riga.replaceWith(riga);
+        else aggiungiEsito(seg, riga);
+        if (a) (gia ? gia.voce : doneTypes[doneTypes.length - 1]).riga = riga;
+        if (phase === 'done') rifaiTesta();
       },
       // Esito di un comando eseguito subito (livello 1): riga di comando e output, nel suo nodo.
       addCommand(out, spiegazione = '', a = null) {
         closeTurnReasoning();
-        doneTypes.push('ESEGUI_COMANDO');
+        contaAzione('ESEGUI_COMANDO', a, false);
         const seg = registra({ tipo: 'ESEGUI_COMANDO', testo: `Eseguito · ${spiegazione || (out && out.command) || 'comando'}`, esito: 'ok' }, a);
         const el = renderCommandResult(out, spiegazione);
         el.classList.add('dash-activity-cmd');
         aggiungiEsito(seg, el);
+        if (phase === 'done') rifaiTesta();
       },
       // Un'azione che in chat è un bottone (un link aperto) o che il registro ha scartato: il nodo la conta e la
       // nomina, la riga non c'è.
@@ -440,6 +468,7 @@
       finish({ failed = false } = {}) {
         closeTurnReasoning();
         inDiretta = false;
+        fallito = !!failed;
         for (const s of segs) {
           if (s.stato !== 'agisce') continue;
           if (s.voci.length) { chiudiNodo(s); continue; }
@@ -493,7 +522,7 @@
     SVEGLIA: (n) => (n > 1 ? `impostato ${n} sveglie` : 'impostato una sveglia'),
     CANCELLA_SVEGLIA: () => 'cancellato una sveglia',
     MODIFICA_SVEGLIA: () => 'spostato una sveglia',
-    EVENTO_CALENDARIO: (n) => (n > 1 ? `creato ${n} eventi` : 'creato un evento'),
+    EVENTO_CALENDARIO: (n) => (n > 1 ? `aggiunto ${n} eventi al calendario` : 'aggiunto un evento al calendario'),
     ESEGUI_COMANDO: (n) => (n > 1 ? `eseguito ${n} comandi` : 'eseguito un comando'),
     IMPOSTA_PREFERENZA: (n) => (n > 1 ? `cambiato ${n} impostazioni` : 'cambiato un\'impostazione'),
     IMPOSTA_ESTETICA: (n) => (n > 1 ? `cambiato ${n} dettagli dell'aspetto` : 'cambiato l\'aspetto'),
@@ -501,6 +530,7 @@
     SALVA_APPUNTO: (n) => (n > 1 ? `salvato ${n} appunti` : 'salvato un appunto'),
     SALVA_LEZIONE: (n) => (n > 1 ? `memorizzato ${n} cose` : 'memorizzato una cosa'),
     DIMENTICA: (n) => (n > 1 ? `dimenticato ${n} cose` : 'dimenticato una cosa'),
+    CANCELLA_MEMORIA: () => 'cancellato la memoria',
     NAVIGA: (n) => (n > 1 ? `aperto ${n} pagine` : 'aperto una pagina'),
     ONBOARDING: () => 'proseguito con l\'accoglienza',
     PROXY_TAB: () => 'aperto la scheda da un altro paese',
@@ -514,6 +544,8 @@
     SPOSTA_ICONA: () => 'spostato un\'icona',
     INSTALLA_AGGIORNAMENTO: () => 'chiesto la versione nuova di Filo',
     CARTA_HOME: (n) => (n > 1 ? `sistemato ${n} carte della home` : 'sistemato una carta della home'),
+    CANCELLA_PAGINE: () => 'cancellato pagine visitate',
+    ZOOM_PAGINA: () => 'cambiato lo zoom',
     VOLUME: () => 'cambiato il volume',
     BLUETOOTH: () => 'comandato il Bluetooth',
     WIFI: () => 'comandato il Wi-Fi',
@@ -521,15 +553,30 @@
     PULISCI_TAB: () => 'riordinato le schede',
     CANCELLA_ARCHIVIO: () => 'eliminato schede dall\'archivio',
   };
+  // Le azioni che Filo propone e l'utente finisce col bottone: finché il click non arriva il riassunto dice la
+  // proposta; dopo (e nell'archivio, che le tiene solo fatte) vale il verbo di sempre.
+  const ACTIVITY_VERBS_PROPOSTI = {
+    EVENTO_CALENDARIO: (n) => (n > 1 ? `proposto ${n} eventi` : 'proposto un evento'),
+  };
+  // `voci`: le azioni del turno col loro esito, o i soli nomi di una chat
+  // archiviata (che tiene solo ciò che è successo). Un esito che non si può
+  // vantare — conferma mai data, tentativo fallito — non entra nel riassunto.
   // `hasReasoning`: il modello ha davvero ragionato. Senza, un blocco che
   // contiene solo una frase intermedia non può intitolarsi «Ragionamento».
-  function summarizeActivity(types, hasReasoning = true) {
+  function summarizeActivity(voci, hasReasoning = true) {
+    const E = global.SN_ESITO;
     const counts = new Map();
-    for (const t of types) counts.set(t, (counts.get(t) || 0) + 1);
+    for (const v of E.voci(voci)) {
+      if (!E.conta(v.esito)) continue;
+      const c = counts.get(v.type) || { proposte: 0, altre: 0 };
+      if (v.esito === E.PROPOSTO && ACTIVITY_VERBS_PROPOSTI[v.type]) c.proposte += 1;
+      else c.altre += 1;
+      counts.set(v.type, c);
+    }
     const parts = [];
-    for (const [t, n] of counts) {
-      const fn = ACTIVITY_VERBS[t];
-      if (fn) parts.push(fn(n));
+    for (const [t, c] of counts) {
+      if (c.proposte) parts.push(ACTIVITY_VERBS_PROPOSTI[t](c.proposte));
+      if (c.altre && ACTIVITY_VERBS[t]) parts.push(ACTIVITY_VERBS[t](c.altre));
     }
     if (!parts.length) return hasReasoning ? 'Ragionamento' : 'Come ha lavorato';
     const ultima = parts[parts.length - 1];
@@ -604,7 +651,15 @@
       const list = (a._output && Array.isArray(a._output.updated)) ? a._output.updated : [];
       return { icon: '⏰', text: `Spostata · ${list.join(', ') || (a.etichetta || a.label || '')}` };
     },
-    EVENTO_CALENDARIO: (a) => ({ icon: '📅', text: `Evento creato · ${a.title || a.titolo || ''}` }),
+    // Nel calendario l'evento ci entra col bottone: qui si racconta la
+    // proposta, e chiamarla «creata» era una promessa che nessuno manteneva.
+    EVENTO_CALENDARIO: (a) => {
+      const ev = (a._output && a._output.evento) || null;
+      const quando = ev && ev.quando ? ` · ${ev.quando}` : '';
+      const nome = `${(ev && ev.titolo) || a.titolo || a.title || ''}${quando}`;
+      const fatto = a._output && a._output.fatto;
+      return { icon: '📅', text: `${fatto ? 'Evento aggiunto al calendario' : 'Evento proposto'} · ${nome}` };
+    },
     // Impostazione applicata subito (livello 1, es. il tema): prima non
     // lasciava traccia in chat, come se non fosse successo niente.
     // La frase è quella dell'evento del filo, col nome della pagina Preferenze (#557, #867); senza
@@ -661,6 +716,13 @@
       const t = tolte.join(', ') || String(a.testo || '').trim();
       return { icon: '🧠', text: `Dimenticato · ${t.length > 80 ? `${t.slice(0, 77)}…` : t}` };
     },
+    // Le due azioni che l'utente conferma nel popup e poi non ritrova da
+    // nessuna parte: proprio quelle che non si disfano più.
+    CANCELLA_MEMORIA: () => ({ icon: '🧠', text: 'Memoria cancellata' }),
+    INVIA_FEEDBACK: (a) => {
+      const t = pulito(a.titolo || a.title);
+      return { icon: '📨', text: `Segnalazione inviata${t ? ` · ${t}` : ''}` };
+    },
     ONBOARDING: (a) => {
       if (a && (a.fine ?? a.chiudi ?? a.done)) return { icon: '👋', text: 'Accoglienza conclusa' };
       const ids = Array.isArray(a && a.spunta) ? a.spunta : [];
@@ -711,6 +773,14 @@
       if (op === 'ripristina') return { icon: '🏠', text: 'Carte della home rimesse com\'erano' };
       return { icon: '🏠', text: `${cosa || 'Carta della home'}${nome ? ` · ${nome}` : ''}` };
     },
+    CANCELLA_PAGINE: (a) => {
+      const n = Number(a._output && a._output.cancellate) || 0;
+      return { icon: '🗑', text: n ? `Cancellate ${n === 1 ? '1 pagina visitata' : `${n} pagine visitate`}` : 'Nessuna pagina visitata da cancellare' };
+    },
+    ZOOM_PAGINA: (a) => {
+      const p = Number(a._output && a._output.percentuale);
+      return { icon: '🔍', text: Number.isFinite(p) && p > 0 ? `Zoom al ${p}%` : 'Zoom cambiato' };
+    },
     // #874 — il numero e i nomi veri, quelli che il sistema ha confermato.
     VOLUME: (a) => {
       const o = a._output || {};
@@ -732,6 +802,9 @@
         sidebar: 'Barra laterale aperta',
       };
       const cmd = String(a.comando || a.command || a.cmd || '').toLowerCase();
+      // La home chiesta dalla home non ricarica niente (butterebbe via lavoro e
+      // risposta), e `failed` tiene fuori dal riassunto un comando che non ha agito.
+      if (cmd === 'home' && a._output && a._output.already) return { icon: '🏠', text: 'Sei già nella home', failed: true };
       return { icon: '🪟', text: labels[cmd] || 'Comando della finestra' };
     },
     SPOSTA_ICONA: (a) => {
@@ -763,8 +836,12 @@
     RIMUOVI_REGOLA_PROXY: 'Regola non tolta', COMANDO_FINESTRA: 'Comando non eseguito',
     INSTALLA_AGGIORNAMENTO: 'Aggiornamento non partito',
     CARTA_HOME: 'Carta della home non cambiata',
-    EVENTO_CALENDARIO: 'Evento non creato', ONBOARDING: 'Accoglienza non aggiornata',
+    CANCELLA_PAGINE: 'Pagine non cancellate', ZOOM_PAGINA: 'Zoom non cambiato',
+    EVENTO_CALENDARIO: 'Evento non proposto', ONBOARDING: 'Accoglienza non aggiornata',
     VOLUME: 'Volume non cambiato', BLUETOOTH: 'Bluetooth non cambiato', WIFI: 'Wi-Fi non cambiato',
+    ESEGUI_COMANDO: 'Comando non eseguito', CANCELLA_MEMORIA: 'Memoria non cancellata',
+    INVIA_FEEDBACK: 'Segnalazione non inviata',
+    PULISCI_TAB: 'Riordino non riuscito', CANCELLA_ARCHIVIO: 'Archivio non svuotato',
   };
   function rigaRadio(a, radio) {
     const o = a._output || {};
@@ -778,6 +855,9 @@
     if (o.collegato === null) return { icon, text: `Collegamento chiesto · ${nome}` };
     return { icon, text: `${o.collegato === false ? 'Scollegato' : 'Collegato'} · ${nome}` };
   }
+  // Si raccontano SOLO col bottone: la riga ripeterebbe ciò che l'utente ha già
+  // davanti. Ogni azione sta qui o in ACTIVITY_ROWS: lo pretende una sentinella.
+  const SOLO_BOTTONE = ['APRI_FILE', 'NAVIGA', 'ESEGUI_COMANDO'];
   function activityRowFor(a) {
     const row = rigaAttivita(a);
     if (!row || row.failed) return row;
@@ -801,6 +881,12 @@
     // Un segreto che sarebbe uscito (#810): cosa è stato fermato e da dove veniva, frase del main.
     const fermata = a._output && a._output.blocked === 'segreto' ? String(a._output.frase || '').trim() : '';
     if (fermata) return { icon: '🔒', text: fermata.charAt(0).toUpperCase() + fermata.slice(1), tipo: 'FERMATA' };
+    // Proposta (l'evento di calendario): il main non l'ha eseguita perché tocca
+    // al bottone qui sotto, e raccontarla come fallita sarebbe falso.
+    if (a._output && a._output.proposta) {
+      const fn = ACTIVITY_ROWS[type];
+      return fn ? fn(a) : { icon: '•', text: `Proposto · ${type.toLowerCase().replace(/_/g, ' ')}` };
+    }
     // Non riuscita: la riga lo DICE, invece di raccontare un successo che non
     // c'è stato (un documento inesistente diceva «Leggo il documento…»).
     if (a._executed === false) {
@@ -809,15 +895,19 @@
     }
     const fn = ACTIVITY_ROWS[type];
     if (fn) return fn(a);
-    // Azione eseguita di cui la tabella non sa niente: meglio una riga generica
-    // che il silenzio — il diario deve dire tutto quello che Filo ha fatto.
-    if (a._traccia) return { icon: '•', text: type.toLowerCase().replace(/_/g, ' ') };
+    if (SOLO_BOTTONE.includes(type)) return null;
+    // Rete di sicurezza per un'azione che la tabella non copre: una riga
+    // generica invece del silenzio, e mai il nome interno dell'azione.
+    if (a._traccia || a._executed) return { icon: '•', text: 'Azione eseguita' };
     return null;
   }
   // La ragione del fallimento, quando il main la conosce.
   function motivoFallimento(a) {
     const o = a && a._output;
     if (!o) return '';
+    if (o.blocked === 'disabled') return 'la modalità terminale è spenta';
+    if (o.blocked === 'empty') return 'comando vuoto';
+    if (o.event === 'invalid') return 'data o ora non valide';
     if (o.blocked === 'scheme') return 'indirizzo non ammesso';
     if (o.blocked === 'site') {
       const quali = o.reason === 'lists' ? 'di pubblicità e tracciamento' : 'bloccati';
@@ -977,6 +1067,19 @@
     return true;
   }
 
+  // Riga e bottone insieme anche quando lo decide l'ESITO: il comando non
+  // partito (il riquadro dice perché), l'evento da aggiungere, la home già qui.
+  function rigaEBottone(a) {
+    const type = String(a.type || '').toUpperCase();
+    if (ROW_AND_BUTTON.includes(type) && a._executed !== false) return true;
+    if (type === 'ESEGUI_COMANDO' && a._output && a._output.blocked) return true;
+    if (type === 'COMANDO_FINESTRA' && a._output && a._output.already) return true;
+    // Ciò che Filo lascia finire all'UTENTE (l'evento): la riga dice che l'ha
+    // proposto, il bottone è come si accetta. Senza il bottone non si raggiunge.
+    if (a._output && a._output.proposta) return true;
+    return false;
+  }
+
   // `shown`: gli id delle chiamate già raccontate in diretta nel blocco di
   // attività (evento 'done'): a fine turno non si ripetono.
   function renderActions(container, actions, { onAck, autoConfirm = false, activity = null, shown = null } = {}) {
@@ -995,8 +1098,7 @@
       // (riga che racconta, bottone che porta all'editor) vale per tutto ciò
       // che aspetta una conferma: la riga dice che Filo l'ha chiesta, il
       // bottone è come si risponde.
-      const anche = a._confirm
-        || (ROW_AND_BUTTON.includes(String(a.type || '').toUpperCase()) && a._executed !== false)
+      const anche = a._confirm || rigaEBottone(a)
         || apribileComunque(a) || permessoDaConcedere(a) || stileAccoglienza(a);
       if (activity) {
         if (told) {
@@ -1017,7 +1119,8 @@
       // cieco (era il caso di un link con un indirizzo non ammesso). La sua
       // riga sta già nel diario. Un'azione IN ATTESA DI CONFERMA non è
       // «fallita»: non è ancora partita, e il suo bottone è tutto il punto.
-      if (!a._confirm && !apribileComunque(a) && !permessoDaConcedere(a) && ((a._traccia && !anche) || a._executed === false)) continue;
+      if (!a._confirm && !apribileComunque(a) && !permessoDaConcedere(a) && !rigaEBottone(a)
+        && ((a._traccia && !anche) || a._executed === false)) continue;
       const btn = renderActionButton(a, { onAck, activity });
       if (btn) wrap.appendChild(btn);
       if (String(a.type || '').toUpperCase() === 'SALVA_APPUNTO') hasAck = true;
@@ -1123,8 +1226,20 @@
     wrap.className = 'dash-cmd-result';
     if (!out) return wrap;
     if (out.blocked === 'disabled') {
+      // Chi non sa che quell'interruttore esiste non ha modo di capire perché
+      // il comando non è partito: il riquadro lo dice e porta dov'è.
       wrap.classList.add('dash-cmd-blocked');
-      wrap.textContent = 'Modalità terminale disattivata: attivala nelle impostazioni perché Filo possa eseguire comandi.';
+      const testo = document.createElement('div');
+      testo.textContent = out.command
+        ? `«${out.command}» non è partito: la modalità terminale è spenta, e finché lo è Filo non esegue comandi sul tuo computer.`
+        : 'Il comando non è partito: la modalità terminale è spenta, e finché lo è Filo non esegue comandi sul tuo computer.';
+      const apri = document.createElement('button');
+      apri.type = 'button';
+      apri.className = 'dash-action-btn dash-cmd-blocked-btn';
+      apri.textContent = 'Apri Preferenze';
+      apri.title = 'Preferenze → Modalità terminale';
+      apri.addEventListener('click', () => send({ type: MSG.OPEN_URL, url: 'filo://preferences/preferences.html#terminalEnabled' }));
+      wrap.append(testo, apri);
       return wrap;
     }
     if (out.blocked === 'empty') {
@@ -1269,6 +1384,13 @@
     return btn;
   }
 
+  // Quel che l'utente finisce col bottone (l'evento aggiunto al calendario) vale come una conferma data nel
+  // popup: lo sanno il diario, l'archivio e il modello al turno dopo. Un secondo click non lo conta due volte.
+  function segnaCompiuta(a, activity, esito = {}) {
+    if (!a || (a._output && a._output.fatto)) return;
+    segnaConfermata(a, { ...(a._output || {}), ...esito, proposta: false, fatto: true }, activity);
+  }
+
   function renderActionButton(a, { onAck, activity = null } = {}) {
     const type = String(a.type || '').toUpperCase();
     // In attesa di conferma come le altre, ma la si dà dalla loro UI: il
@@ -1357,16 +1479,24 @@
         // storico della conversazione, quindi basta segnarlo qui. Senza,
         // a «l'hai attivato?» il modello poteva solo tirare a indovinare.
         if (r && r.executed) segnaConfermata(a, r.output, activity, r.cambi);
+        else nonRiuscita(a, r, activity);
+        const row = activityRowFor(a);
         // #146.6 — comando confermato (livello 2/3): mostra l'output in chat.
         if (isCmd) {
           segnaComando((r && r.executed) ? '✓' : '✗');
-          if (r && r.output) btn.after(renderCommandResult(r.output));
-          if (r && r.output) applyCommandCwd([{ _output: r.output }]);
+          const out = r && r.output;
+          // L'esito di un comando confermato è un passo del lavoro: nel diario, come quello di sola lettura.
+          if (out && !out.blocked && activity && r.executed) activity.addCommand(out, spiegazioneDi(a), a);
+          else if (out) btn.after(renderCommandResult(out, spiegazioneDi(a)));
+          if (out) applyCommandCwd([{ _output: out }]);
           return;
         }
         const fatto = r && typeof r.fatto === 'string' ? r.fatto.trim() : '';
-        btn.textContent = (r && r.executed) ? `✓ ${fatto ? (fatto.length > 140 ? `${fatto.slice(0, 139)}…` : fatto) : shortLabel}` : '✗ Non eseguita';
+        // Quando non è riuscita il bottone dice PERCHÉ: «Non eseguita» non si può leggere.
+        const guasto = row && row.failed ? row.text : 'Non eseguita';
+        btn.textContent = (r && r.executed) ? `✓ ${fatto ? (fatto.length > 140 ? `${fatto.slice(0, 139)}…` : fatto) : shortLabel}` : `✗ ${guasto.length > 70 ? `${guasto.slice(0, 67)}…` : guasto}`;
         if (fatto.length > 140) btn.title = fatto;
+        else if (!(r && r.executed)) btn.title = guasto;
         // #874 — il sistema ha detto no dopo l'OK (un permesso, una rete fuori portata): la frase e, se serve, il tasto.
         if ((type === 'BLUETOOTH' || type === 'WIFI') && r && !r.executed && r.output && r.output.frase) {
           btn.textContent = `✗ ${r.output.frase}`;
@@ -1530,14 +1660,96 @@
       return stepTrace('📄 Rileggo la pagina di trasparenza');
     }
     if (type === 'EVENTO_CALENDARIO') {
+      // Filo propone, l'utente aggiunge: il main scrive l'evento in un file e
+      // lo apre col calendario del computer.
+      const ev = (a._output && a._output.evento) || {
+        data: a.data || a.date, ora: a.ora || a.orario || a.time,
+        titolo: a.titolo || a.title, dettagli: a.dettagli || a.details,
+      };
+      const btn = document.createElement('button');
+      btn.className = 'dash-action-btn dash-action-btn-primary';
+      btn.type = 'button';
+      btn.textContent = '📅 Aggiungi al calendario';
+      btn.title = `${ev.titolo || 'Evento'}${ev.quando ? ` · ${ev.quando}` : ''}`;
+      btn.addEventListener('click', async () => {
+        if (btn.disabled) return;
+        btn.disabled = true;
+        btn.textContent = '📅 Aggiungo…';
+        const r = await send({ type: MSG.CALENDAR_ADD, evento: ev });
+        if (r && r.ok) segnaCompiuta(a, activity, { evento: ev });
+        if (r && r.ok && r.aperto) {
+          btn.textContent = '✓ Aperto nel calendario';
+          // Riapribile: chi chiude per sbaglio la finestra del calendario deve
+          // poterlo rimandare, non ritrovarsi un bottone spento.
+          btn.disabled = false;
+          btn.title = 'Il calendario ha l’evento davanti: salvalo lì. Un altro click lo riapre.';
+          return;
+        }
+        if (r && r.ok) {
+          // Nessun programma di calendario ha risposto: il file c'è comunque, e
+          // dove sta finito va detto — un bottone che non porta a niente è il
+          // difetto che stavamo togliendo.
+          btn.textContent = '✓ Evento salvato';
+          const nota = document.createElement('div');
+          nota.className = 'dash-bubble-note';
+          nota.textContent = `Il computer non ha aperto nessun calendario. L’evento è nel file ${r.file}: aprilo col tuo calendario.`;
+          btn.after(nota);
+          return;
+        }
+        btn.disabled = false;
+        btn.textContent = '📅 Aggiungi al calendario';
+        btn.title = `Non è riuscito${r && r.error ? ` (${r.error})` : ''}. Riprova.`;
+      });
+      return btn;
+    }
+    if (type === 'COMANDO_FINESTRA' && a._output && a._output.already && onAck) {
+      // La home era già questa pagina: ricaricarla porterebbe via lavoro e
+      // risposta, quindi quando tornarci lo decide l'utente, dopo aver letto.
       const btn = document.createElement('button');
       btn.className = 'dash-action-btn';
       btn.type = 'button';
-      btn.disabled = true;
-      btn.textContent = `📅 ${a.title || a.titolo || ''}`;
+      btn.textContent = '🏠 Torna alla home';
+      btn.title = 'Chiude questa conversazione';
+      btn.addEventListener('click', onAck);
       return btn;
     }
     return null;
+  }
+
+  // Perché il riordino non è potuto partire, o '' se è andato. Un riordino che
+  // ha comunque archiviato qualcosa è riuscito, anche se il giudizio è mancato:
+  // i doppioni li decide Filo da sé.
+  function motivoRiordinoMancato(r, archiviate) {
+    if (!r || r.ok === false) return 'Filo non è riuscito a valutare le schede.';
+    if (archiviate > 0) return '';
+    if (r.giaInCorso) return 'Un riordino è già in corso.';
+    if (r.giudizioMancato) return 'Filo non è riuscito a valutare le schede.';
+    return '';
+  }
+
+  // L'esito del riordino come lo legge l'utente. Una frase sola per le tre
+  // strade che lo chiedono (bottone in chat, suggerimento della home,
+  // «/pulisci»): tre copie divergono, e il caso mai partito torna a somigliare
+  // a quello riuscito su due strade su tre.
+  function esitoRiordino(r) {
+    const n = (r && r.archived) || 0;
+    const motivo = motivoRiordinoMancato(r, n);
+    if (motivo) return { ok: false, testo: 'Riordino non riuscito', motivo };
+    return {
+      ok: true,
+      motivo: '',
+      testo: n > 0 ? `Archiviate ${n} ${n === 1 ? 'scheda' : 'schede'}` : 'Nessuna scheda da archiviare',
+    };
+  }
+
+  // L'OK è arrivato ma non è successo niente: la riga «Conferma chiesta» diventa il perché, e il riassunto non la
+  // conta.
+  function nonRiuscita(a, r, activity) {
+    delete a._confirm;
+    a._executed = false;
+    if (r && r.output) a._output = r.output;
+    const row = activityRowFor(a);
+    if (activity && row) activity.addRow(row.tipo || a.type, row.icon, row.text, true, row.cambi, a);
   }
 
   // Confermata e fatta: lo sanno il diario e, al turno dopo, il modello (è lo
@@ -1577,16 +1789,15 @@
       btn.disabled = true;
       btn.textContent = '🧹 Riordino in corso…';
       const r = await send({ type: MSG.RUN_TAB_TRIAGE });
-      if (!r || !r.ok) {
+      const e = esitoRiordino(r);
+      if (!e.ok) {
         btn.disabled = false;
         btn.textContent = '🧹 Riordino non riuscito · riprova';
+        btn.title = e.motivo;
         return;
       }
-      const n = r.archived || 0;
-      btn.textContent = n > 0
-        ? `✓ Archiviate ${n} ${n === 1 ? 'scheda' : 'schede'}`
-        : '✓ Nessuna scheda da archiviare';
-      segnaConfermata(a, { archived: n }, activity);
+      btn.textContent = `✓ ${e.testo}`;
+      segnaConfermata(a, { archived: r.archived || 0 }, activity);
     });
     return btn;
   }
@@ -1731,6 +1942,7 @@
     tellActionInActivity,
     stepTrace,
     isType,
+    esitoRiordino,
     // #525 — «Ha aperto una pagina e avviato un timer»: la stessa frase del
     // diario del turno, per chi RIAPRE una chat archiviata. Lì i bottoni non
     // si rimettono (un'azione da confermare non si può ri-offrire giorni

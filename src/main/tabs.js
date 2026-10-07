@@ -1411,7 +1411,11 @@ class TabManager {
   // (feed consumati, dead-end, impostazioni ormai chiuse) e applica le decisioni.
   // Se l'LLM manca o fallisce, i duplicati vengono comunque collassati.
   async runAutoTriage({ trigger = 'idle' } = {}) {
-    if (this.incognito || this._triageRunning) return { archived: 0 };
+    if (this.incognito) return { archived: 0 };
+    // Chi chiede il riordino mentre ne gira già uno non ha ottenuto niente:
+    // rispondergli «nessuna scheda da archiviare» è la frase di un riordino
+    // riuscito, e i due casi si confondono.
+    if (this._triageRunning) return { archived: 0, giaInCorso: true };
     const cands = this._triageCandidates();
     if (!cands.length) return { archived: 0 };
     this._triageRunning = true;
@@ -1432,13 +1436,18 @@ class TabManager {
       }
 
       // 2) LLM per il resto (giudizio). No-op sui duplicati (già decisi sopra).
+      // Il giudizio può non arrivare (crediti finiti, chiave sbagliata, rete
+      // giù): chi ha chiesto il riordino deve saperlo, o legge lo stesso esito
+      // di un riordino riuscito in cui non c'era niente da chiudere.
       const decide = globalThis.SN_TAB_TRIAGE_DECIDE;
       let decisions = [];
+      let giudizioMancato = true;
       if (typeof decide === 'function') {
         try {
           const input = await this._gatherTriageInput(cands);
           const r = await decide({ tabs: input, trigger });
           decisions = Array.isArray(r && r.decisions) ? r.decisions : [];
+          giudizioMancato = false;
         } catch (_) { decisions = []; }
       }
 
@@ -1450,7 +1459,8 @@ class TabManager {
       for (const i of dupIdx) {
         byIndex.set(i, { i, action: 'archive', reason: 'duplicato' });
       }
-      return this.applyTriageDecisions(cands, [...byIndex.values()]);
+      const esito = this.applyTriageDecisions(cands, [...byIndex.values()]);
+      return giudizioMancato ? { ...esito, giudizioMancato: true } : esito;
     } finally {
       this._triageRunning = false;
     }

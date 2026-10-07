@@ -12,8 +12,15 @@
       version: '0.2.237', date: '2026-10-07',
       features: [
         'Su ogni pagina, spingendo il mouse contro il bordo sinistro, si apre una barra con indietro, avanti, ricarica, home, incognito, schermo intero e chiudi scheda, e in fondo l\'ora, la cronologia, le app, il profilo e le impostazioni. La apri anche dalla linguetta a sinistra delle schede o con Ctrl+Shift+B (Cmd+Shift+B su Mac). Le icone del tasto destro si trascinano nella barra e ritorno, o lo chiedi a Filo a parole, e restano dove le metti. Col tasto destro su Indietro e Avanti vedi le pagine della scheda e ci torni con un clic, anche dopo essere passato dalla home. In Preferenze → Impostazioni avanzate, col tasto destro sulla striscia o chiedendolo a Filo nascondi la striscia, spegni l\'apertura dal bordo o cambi quanto aspetta e quanto resta aperta.',
+        'Quando chiedi a Filo di segnarti un appuntamento, il bottone «Aggiungi al calendario» ora funziona davvero: apre l’evento nel calendario del tuo computer, con giorno, ora, durata e note già scritti. Un compleanno o una scadenza, che un’ora non ce l’hanno, entrano come evento di tutto il giorno, e le ferie occupano tutti i loro giorni. Prima il bottone era spento e la proposta non portava da nessuna parte.',
       ],
-      fixes: [],
+      fixes: [
+        'Se chiedi un comando mentre la modalità terminale è spenta, Filo torna a spiegarti perché non è partito, e il riquadro ti porta dove si accende. Prima restava un «Azione non riuscita» che non diceva niente a chi non sapeva dell’esistenza di quell’interruttore.',
+        'Quando confermi un’impostazione dopo che Filo ha già risposto, la riga in cima al blocco del lavoro la conta, invece di restare su «Come ha lavorato».',
+        'Se dici a Filo di dimenticare tutto quello che sa di te e confermi, nel diario del lavoro adesso c’è scritto che l’ha fatto. E se una cosa che hai confermato non riesce, il bottone ti dice perché invece di un semplice «Non eseguita».',
+        'Il riordino delle schede che non riesce a partire te lo dice, invece di rispondere «nessuna scheda da archiviare» come quando è andato tutto bene e non c\'era niente da chiudere. Vale dalla chat, dal suggerimento della home e da «/pulisci».',
+        'Se chiedi «portami alla home» mentre sei già nella home, Filo non ricarica più la pagina: prima si portava via quello che aveva appena fatto e la risposta, prima che tu potessi leggerle. Ora te lo dice, e sotto la risposta hai un bottone per svuotare la conversazione quando hai finito.',
+      ],
     },
     {
       version: '0.2.235', date: '2026-10-06',

@@ -1025,6 +1025,7 @@ html, body {
   border-radius: 8px;
 }
 /* Riga intera delle azioni e mai oltre: i titoli lunghi si accorciano coi puntini invece di allargare la bolla. */
+.dash-cmd-blocked-btn { margin-top: 8px; }
 .dash-delete-panel {
   flex: 1 1 100%;
   min-width: 0;

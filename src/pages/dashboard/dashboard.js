@@ -592,7 +592,16 @@
         ? await window.SN_CONFIRM_UI.confirm({ title: 'Riordino delle schede', text, okLabel: 'Procedi' })
         : window.confirm(`${text} Procedo?`);
       if (!ok) return;
-      send({ type: MSG.RUN_TAB_TRIAGE });
+      // L'esito si legge sul suggerimento stesso, come sul bottone in chat: un
+      // riordino che non risponde non si distingue da uno mai partito, e quando
+      // non c'è niente da archiviare non succede proprio nulla a schermo.
+      const testo = vicino && vicino.querySelector('.dash-carta-voce-testo');
+      if (vicino) vicino.disabled = true;
+      if (testo) testo.textContent = 'Riordino in corso…';
+      const r = await send({ type: MSG.RUN_TAB_TRIAGE });
+      const e = Att.esitoRiordino(r);
+      if (testo) testo.textContent = `${e.ok ? '✓' : '✗'} ${e.testo}`;
+      if (!e.ok && vicino) { vicino.disabled = false; vicino.title = `${e.motivo} Puoi riprovare.`; }
       return;
     }
     // Il suggerimento l'ha scritto un modello (#810): un indirizzo passa dalla porta delle uscite, e il suo testo va
