@@ -827,10 +827,10 @@
     // Costo 1: è la stessa cosa che fanno Ctrl +/- e Ctrl 0, visibile e
     // reversibile in un tasto.
     // #786 — installare la versione nuova è quello che Filo fa di serie: chiederlo a parole non chiede conferma.
-    // #1039 — con una versione già pronta «aggiornati» riavvia Filo (2: chiude tutto per qualche secondo, e «aggiorna»
-    // vuol dire anche «ricarica»). `_riavvio` lo scrive il main, mai il modello.
+    // #1039 — con una versione già pronta «aggiornati» riavvia Filo, e chiede prima (3: le finestre in incognito si
+    // chiudono e non tornano, e «aggiorna» vuol dire anche «ricarica»). `_riavvio` lo scrive il main, mai il modello.
     INSTALLA_AGGIORNAMENTO: {
-      costo: (a) => (a && a._riavvio === true ? 2 : 1),
+      costo: (a) => (a && a._riavvio === true ? 3 : 1),
       campo: null,
       describe: (a) => (a && a._riavvio === true
         ? `Riavviare Filo per installare la versione ${a._versione || 'nuova'}.\n\n`
