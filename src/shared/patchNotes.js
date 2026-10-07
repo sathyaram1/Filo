@@ -9,9 +9,15 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
-      version: '0.2.237', date: '2026-10-07',
+      version: '0.2.238', date: '2026-10-07',
       features: [
         'Su Windows e Linux, quando una versione nuova di Filo è pronta te lo dice un avviso in basso a destra, e nella home resta una carta con «Riavvia e aggiorna» finché non la installi. Puoi anche scrivere a Filo «aggiornati». Su Windows, se non lo premi, la versione nuova si installa la prossima volta che apri Filo: vedi la barra di avanzamento per una decina di secondi e poi Filo si riapre da solo. Prima si installava di nascosto quando lo chiudevi, e se lo riaprivi in quel momento Windows diceva che il collegamento non funzionava. Chi preferisce il modo di prima lo rimette in Preferenze, Impostazioni avanzate.',
+      ],
+      fixes: [],
+    },
+    {
+      version: '0.2.237', date: '2026-10-07',
+      features: [
         'Su ogni pagina, spingendo il mouse contro il bordo sinistro, si apre una barra con indietro, avanti, ricarica, home, incognito, schermo intero e chiudi scheda, e in fondo l\'ora, la cronologia, le app, il profilo e le impostazioni. La apri anche dalla linguetta a sinistra delle schede o con Ctrl+Shift+B (Cmd+Shift+B su Mac). Le icone del tasto destro si trascinano nella barra e ritorno, o lo chiedi a Filo a parole, e restano dove le metti. Col tasto destro su Indietro e Avanti vedi le pagine della scheda e ci torni con un clic, anche dopo essere passato dalla home. In Preferenze → Impostazioni avanzate, col tasto destro sulla striscia o chiedendolo a Filo nascondi la striscia, spegni l\'apertura dal bordo o cambi quanto aspetta e quanto resta aperta.',
         'Adesso scegli tu quanto Filo fa da solo. In Preferenze, sotto «Autonomia di Filo», ci sono Conservativo, Normale e Automatico, e il livello scelto si vede sempre nella nuova scheda, accanto a dove scrivi. A Normale Filo fa da solo le cose che si rimediano, come ricordarsi una regola o mandare la segnalazione che gli hai chiesto. Quando ha appena letto cose scritte da altri, come una pagina web, una ricerca o un documento, ti chiede di più, e il riquadro dice cosa ha letto.',
       ],
