@@ -270,8 +270,8 @@
 
   // L'altra metà della convenzione del Mac: Cmd+freccia. Dentro un campo di
   // testo quel tasto porta il cursore a inizio o fine riga, quindi naviga solo
-  // quando non si scrive, e la domanda va fatta alla pagina (src/shared/campoTesto.js)
-  // prima di muoversi. Per questo è una funzione a parte e l'etichetta resta Cmd+[.
+  // se la pagina non l'ha usata e non ci si scrive: lo dice la pagina stessa
+  // (src/preload/cmd-freccia.js). Per questo è una funzione a parte e l'etichetta resta Cmd+[.
   function comandoNavigazioneFuoriDalCampo(ev, esplicita) {
     if (!ev || !suMac(esplicita)) return null;
     if (modificatore(ev, 'shift')) return null;

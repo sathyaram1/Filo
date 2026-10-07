@@ -208,3 +208,72 @@ test('su Mac Cmd+[ naviga anche mentre si scrive, e su Windows Ctrl+← resta al
   await premiNellaPagina(app, '[', ['meta']);
   await page.waitForURL(urlA, { timeout: 8_000 });
 });
+
+// ── Cmd+freccia è prima della pagina (#685.1 giro 1) ────────────────────────
+// Come in Safari e Chrome: si naviga solo se la pagina non l'ha usata e non ci si
+// scrive. Le tre strade per cui prima Filo indovinava male e portava via la pagina.
+
+async function schedaSu(app, { openTab, testServer }, html) {
+  const urlA = testServer.html(PAGE_A);
+  const url = testServer.html(html);
+  const page = await testServer.openReady(openTab, PAGE_A);
+  await navigateAndReady(page, urlA);
+  await navigateAndReady(page, url);
+  await diventaMac(app);
+  return { page, url, urlA };
+}
+
+// Come gli editor di documenti online: il testo si disegna nella pagina, i tasti
+// li riceve un campo in un riquadro, e un clic sul foglio non toglie il fuoco al campo.
+const PAGE_DOC = '<!doctype html><title>Doc</title>'
+  + '<div id="foglio" style="height:200px;background:#eee">foglio</div>'
+  + '<iframe id="fr" srcdoc="<div id=ed contenteditable=true style=min-height:40px></div>"></iframe>'
+  + '<script>document.getElementById("foglio").addEventListener("mousedown", e => e.preventDefault());</script>';
+
+test('su Mac Cmd+← in un editor dentro un riquadro, dopo un clic sul foglio, non porta via la pagina', async ({ app, openTab, testServer }) => {
+  const { page, url } = await schedaSu(app, { openTab, testServer }, PAGE_DOC);
+  const ed = page.frameLocator('#fr').locator('#ed');
+  await ed.click();
+  await page.keyboard.type('una riga scritta');
+  await page.waitForTimeout(700);
+  await page.locator('#foglio').click();
+  expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('fr');
+  await premiNellaPagina(app, 'Left', ['meta']);
+  await page.waitForTimeout(1_200);
+  expect(page.url()).toBe(url);
+  await expect(ed).toHaveText('una riga scritta');
+});
+
+test('su Mac Cmd+← in un campo «solo testo» non porta via la pagina', async ({ app, openTab, testServer }) => {
+  const { page, url } = await schedaSu(app, { openTab, testServer },
+    '<!doctype html><title>T</title><div id="ed" contenteditable="plaintext-only" style="min-height:40px"></div>');
+  await page.locator('#ed').click();
+  await page.keyboard.type('testo');
+  await premiNellaPagina(app, 'Left', ['meta']);
+  await page.waitForTimeout(1_200);
+  expect(page.url()).toBe(url);
+});
+
+test('su Mac una pagina che usa Cmd+← per sé la tiene, e la scheda resta lì', async ({ app, openTab, testServer }) => {
+  const { page, url } = await schedaSu(app, { openTab, testServer },
+    '<!doctype html><title>P</title><h1 id="p">griglia</h1><div id="n">0</div>'
+    + '<script>addEventListener("keydown", e => { if (e.metaKey && e.key === "ArrowLeft") { e.preventDefault(); n.textContent = +n.textContent + 1; } });</script>');
+  await page.locator('#p').click();
+  await premiNellaPagina(app, 'Left', ['meta']);
+  await expect(page.locator('#n')).toHaveText('1');
+  await page.waitForTimeout(1_200);
+  expect(page.url()).toBe(url);
+});
+
+test('su Mac Cmd+← vale anche sulle pagine di Filo', async ({ app, openTab }) => {
+  const page = await openTab('filo://history/history.html');
+  await page.waitForLoadState('domcontentloaded');
+  const partenza = page.url();
+  await page.evaluate(() => { window.location.href = 'filo://options/options.html'; });
+  await page.waitForURL(/filo:\/\/options\//, { timeout: 10_000 });
+  await page.waitForLoadState('domcontentloaded');
+  await diventaMac(app);
+  await page.evaluate(() => { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); });
+  await premiNellaPagina(app, 'Left', ['meta']);
+  await page.waitForURL(partenza, { timeout: 8_000 });
+});

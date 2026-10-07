@@ -157,6 +157,17 @@ function registerIpcHandlers() {
     try { event.sender._filoActiveFrame = event.senderFrame || null; } catch (_) {}
   });
 
+  // #685.1 — Cmd+freccia che la pagina non ha usato: decide la scheda (tabs.cmdFrecciaNonUsata).
+  ipcMain.on('filo:cmd-freccia', (event, verso) => {
+    if (verso !== 'indietro' && verso !== 'avanti') return;
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (w._filoTabs?.tabs?.some((t) => t.view.webContents === event.sender)) {
+        try { w._filoTabs.cmdFrecciaNonUsata(event.sender, verso); } catch (_) {}
+        return;
+      }
+    }
+  });
+
   ipcMain.handle('filo:message', async (event, msg) => {
     const info = senderInfo(event);
     // In incognito avvolgiamo l'handler in runIncognito(): ogni lettura/scrittura

@@ -140,6 +140,39 @@ test('i tasti arrivano sia dalla pagina sia dalla barra di Filo', () => {
   assert.match(tabs, /staScrivendo\(wc\)\) return;\s*\} catch \(_\) \{ return; \}\s*this\.navigaCronologia/);
 });
 
+// #685.1 — sulla pagina Cmd+freccia è prima della pagina, come in Safari e Chrome:
+// il main la lascia passare, e naviga solo se il preload la rimanda perché nessuno l'ha usata.
+test('Cmd+freccia: la pagina la usa per prima, e solo un tasto vero torna al main', () => {
+  const tabs = sorgente('src', 'main', 'tabs.js');
+  assert.match(tabs, /if \(fuoriDalCampo\) wc\._filoCmdFreccia = \{ verso: fuoriDalCampo, t: Date\.now\(\) \}/,
+    'dalla pagina il main naviga da sé invece di lasciare il tasto alla pagina');
+  assert.match(tabs, /cmdFrecciaNonUsata\(wc, verso\) \{\s*const visto = wc && wc\._filoCmdFreccia;\s*if \(!visto \|\| visto\.verso !== verso/,
+    'il main accetta il rimando anche senza aver visto il tasto');
+  assert.match(sorgente('src', 'main', 'ipc.js'), /'filo:cmd-freccia'[\s\S]{0,400}cmdFrecciaNonUsata/);
+  const aiuto = sorgente('src', 'preload', 'cmd-freccia.js');
+  assert.match(aiuto, /!e\.isTrusted/, 'un tasto finto della pagina farebbe navigare');
+  assert.match(aiuto, /setTimeout\([\s\S]*e\.defaultPrevented[\s\S]*scriveQui\(win\.document\) !== false/);
+  for (const p of ['page-preload.js', 'internal-preload.js']) {
+    assert.match(sorgente('src', 'preload', p), /require\('\.\/cmd-freccia\.js'\)\(window, ipcRenderer\)/, `${p} non ascolta Cmd+freccia`);
+  }
+  assert.doesNotMatch(sorgente('src', 'preload', 'page-preload.js'), /if \(!IS_SUBFRAME\) \{[^}]*cmd-freccia/,
+    'nei riquadri non ascolta nessuno: un campo lì dentro non si vede');
+});
+
+test('si scrive anche in un campo "solo testo" e in un campo dentro un riquadro', () => {
+  require(join(ROOT, 'src', 'shared', 'campoTesto.js'));
+  const C = globalThis.SN_CAMPO_TESTO;
+  const editabile = { tagName: 'DIV', isContentEditable: true, matches: () => false };
+  const fermo = { tagName: 'DIV', isContentEditable: false, matches: () => false, closest: () => null };
+  assert.equal(C.campoDiTesto(editabile), true);
+  const riquadro = (dentro) => ({ tagName: 'IFRAME', matches: () => false, get contentDocument() { return dentro; } });
+  assert.equal(C.scriveQui({ activeElement: riquadro({ activeElement: editabile }) }), true);
+  assert.equal(C.scriveQui({ activeElement: riquadro({ activeElement: fermo }) }), false);
+  // D'altra origine il riquadro non si apre: «non so», e chi chiede lo interroga a parte.
+  assert.equal(C.scriveQui({ activeElement: riquadro(null) }), null);
+  assert.equal(C.scriveQui({ activeElement: fermo }), false);
+});
+
 test('i tasti laterali del mouse e lo scorrimento a due dita sono attaccati', () => {
   const win = sorgente('src', 'main', 'window.js');
   assert.match(win, /'app-command'/, 'nessuno ascolta i tasti laterali del mouse (Windows e Linux)');
