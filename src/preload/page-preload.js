@@ -402,10 +402,6 @@ try {
       ? { key: e.key, code: e.code, ctrlKey: e.ctrlKey, metaKey: e.metaKey, altKey: e.altKey, shiftKey: e.shiftKey } : null;
     try { ipcRenderer.sendSync('filo:gesto-pagina', tasto); } catch (_) {}
   };
-  // Solo l'inizio di un gesto, come nella pagina: il rilascio dello stesso clic non è un gesto nuovo (il tocco finisce).
-  for (const ev of ['pointerdown', 'mousedown', 'keydown', 'touchend']) {
-    window.addEventListener(ev, gesto, { capture: true, passive: true });
-  }
   const SCHEMI_APRIBILI = /^(https?|mailto|tel|sms):/i;
   // Il pulsante d'invio cliccato porta dove lo manda il suo modulo: con GET i campi diventano la domanda dell'indirizzo.
   const indirizzoDelModulo = (percorso) => {
