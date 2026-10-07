@@ -325,3 +325,27 @@ test('riquadri vuoti creati o scritti dalla pagina leggono GPC come la pagina', 
     nellHtml: 'true', altroSitoRaggiungibile: 'function',
   });
 });
+
+// Per indice o per nome della finestra nessun getter vede il riquadro: il segnale deve esserci già
+// quando lo script successivo lo raggiunge, anche se è stato scritto nell'HTML o da un altro script.
+test('riquadri vuoti raggiunti per indice o per nome leggono GPC come la pagina', async ({ openTab, testServer }) => {
+  const url = testServer.html(`<!doctype html><html><head><script>
+    window.__r = { pagina: String(navigator.globalPrivacyControl) };
+  </script></head><body>
+  <iframe name="vuoto"></iframe>
+  <div id="contenitore"></div>
+  <script>
+    __r.perIndice = String(frames[0].navigator.globalPrivacyControl);
+    __r.perNome = String(window.vuoto.navigator.globalPrivacyControl);
+    document.getElementById('contenitore').innerHTML = '<p><iframe name="annidato"></iframe></p>';
+  </script>
+  <script>
+    __r.inseritoDaScript = String(window.annidato.navigator.globalPrivacyControl);
+    __r.fatto = true;
+  </script></body></html>`);
+  const page = await openTab(url);
+  await page.waitForFunction(() => window.__r && window.__r.fatto, null, { timeout: 10_000 });
+  expect(await page.evaluate(() => window.__r)).toEqual({
+    pagina: 'true', perIndice: 'true', perNome: 'true', inseritoDaScript: 'true', fatto: true,
+  });
+});
