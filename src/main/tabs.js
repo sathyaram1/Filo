@@ -2948,8 +2948,12 @@ class TabManager {
   // Posta, telefono e SMS chiesti da una pagina: col blocco dei popup acceso partono solo da un gesto, come le finestre.
   // `navigazione`: la navigazione è già partita, e il gesto che la porta Permessi l'ha messo da parte.
   _esternoDallaPagina(wc, tabId, url, referrer, { navigazione = false } = {}) {
-    if (invitoFermato(url, { win: this.win, wc }) || !isOsDelegatedScheme(url)) return;
-    const gesto = Permessi.perUnaFinestra(wc, url, referrer) || (navigazione && Permessi.gestoPerLaNavigazione(wc));
+    const invito = Boolean(globalThis.SN_WALLET?.isInviteDeepLink?.(url));
+    if (!invito && !isOsDelegatedScheme(url)) return;
+    // Per l'invito il clic che ha fatto partire la navigazione lo conta `invitoFermato`, che lo spegne all'arrivo (#664).
+    const gesto = Permessi.perUnaFinestra(wc, url, referrer) || (!invito && navigazione && Permessi.gestoPerLaNavigazione(wc));
+    // L'invito scelto dall'utente (anche dal menu di Filo, che alla pagina non dà il gesto) lo porta dentro Filo.
+    if (invito) { invitoFermato(url, { win: this.win, wc: gesto ? null : wc }); return; }
     if (this.security.blockPopups && !gesto) {
       this._notifyPopupBlocked(tabId, url, wc);
       return;
