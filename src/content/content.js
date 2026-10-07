@@ -2136,7 +2136,28 @@
   // ------------------------------------------------------------
   // Messaggi runtime: shortcut, settings update
   // ------------------------------------------------------------
+  function rispondiEtichetteBarra(ids) {
+    if (IS_SUBFRAME) return;
+    try {
+      const voci = MenuIcons.statoPerBarra?.(ids) || [];
+      if (voci.length) chrome.runtime.sendMessage({ type: MSG.BARRA_ETICHETTE, voci }).catch?.(() => {});
+    } catch (_) {}
+  }
+
   function onRuntimeMessage(msg, sender, sendResponse) {
+    // #871 — la disposizione delle icone è cambiata altrove, o un'icona arriva dalla barra laterale.
+    if (msg?.type === MSG.ICON_LAYOUT_CHANGED) {
+      try { MenuIcons.layoutCambiato?.(msg.layout); } catch (_) {}
+      return;
+    }
+    if (msg?.type === MSG.BARRA_FUORI) {
+      try { MenuIcons.dallaBarra?.(msg); } catch (_) {}
+      return;
+    }
+    if (msg?.type === MSG.BARRA_ETICHETTE_CHIEDI) {
+      rispondiEtichetteBarra(msg.ids);
+      return;
+    }
     if (msg?.type === MSG.FULLSCREEN_CHANGED) {
       fullscreenAnnunciato = true;
       contentFullscreen = !!msg.fullscreen;
@@ -2179,6 +2200,8 @@
         else if (msg.surface === 'help') openHelpSidebar();
         else MenuIcons.runIconAction(msg.iconId);
       } catch (e) { console.error('[SN] azione di pagina dal riquadro', e); }
+      // Premuta dalla barra laterale: la barra rilegge come si chiama adesso (Traduci → Mostra originale).
+      if (msg.daBarra) setTimeout(() => rispondiEtichetteBarra([msg.iconId]), 60);
       return;
     }
     if (msg?.type === MSG.SHOW_TOAST) {

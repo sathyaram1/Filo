@@ -53,13 +53,13 @@
     {
       id: 'close-tab', title: 'Chiudi la scheda', category: 'navigation',
       desc: 'Chiude la scheda corrente; la pagina chiusa finisce nell’archivio, da cui puoi riaprirla.',
-      invoke: 'Pulsante di chiusura sulla scheda, il menu del tasto destro → "Chiudi pagina", oppure la scorciatoia Ctrl+W (Cmd+W su Mac) — che funziona anche mentre stai guardando un sito.',
+      invoke: 'Pulsante di chiusura sulla scheda, la barra laterale → "Chiudi pagina", oppure la scorciatoia Ctrl+W (Cmd+W su Mac) — che funziona anche mentre stai guardando un sito.',
       doesNot: 'Le finestre in incognito e le pagine interne di Filo non vengono archiviate.',
     },
     {
       id: 'navigate-back-forward', title: 'Indietro / Avanti', category: 'navigation',
-      desc: 'Torna alla pagina precedente o va a quella successiva nella cronologia della scheda.',
-      invoke: 'Alt+\u2190 e Alt+\u2192 (su Mac Cmd+[ e Cmd+], perch\u00e9 l\u00ec Alt+freccia sposta il cursore), i due tasti laterali del mouse, oppure su Mac lo scorrimento orizzontale a due dita. Funziona su qualsiasi pagina, anche mentre scrivi in un campo di testo. In pi\u00f9: menu del tasto destro \u2192 "Indietro" / "Avanti" (dentro "Altro\u2026"), e Ctrl+Z (Cmd+Z su Mac) torna alla pagina precedente quando non stai scrivendo in un campo di testo.',
+      desc: 'Torna alla pagina precedente o va a quella successiva nella cronologia della scheda. Sui pulsanti della barra laterale il tasto destro elenca le pagine della scheda, dalla più vicina, e ci salta con un clic.',
+      invoke: 'Alt+\u2190 e Alt+\u2192 (su Mac Cmd+[ e Cmd+], perch\u00e9 l\u00ec Alt+freccia sposta il cursore), i due tasti laterali del mouse, oppure su Mac lo scorrimento orizzontale a due dita. Funziona su qualsiasi pagina, anche mentre scrivi in un campo di testo. In pi\u00f9: i pulsanti "Indietro" e "Avanti" in cima alla barra laterale, spenti quando non c\u2019\u00e8 dove andare, e Ctrl+Z (Cmd+Z su Mac) torna alla pagina precedente quando non stai scrivendo in un campo di testo.',
       doesNot: 'Se non c\u2019\u00e8 nessuna pagina dove andare non succede niente. Lo scorrimento a due dita funziona solo se \u00e8 acceso nelle impostazioni del Mac.',
     },
     {
@@ -71,12 +71,12 @@
     {
       id: 'reload', title: 'Ricarica la pagina', category: 'navigation',
       desc: 'Ricarica la pagina corrente.',
-      invoke: 'Menu del tasto destro → "Ricarica", oppure la scorciatoia Ctrl+R (Cmd+R su Mac) — che funziona anche mentre stai guardando un sito.',
+      invoke: 'Pulsante "Ricarica" della barra laterale, oppure la scorciatoia Ctrl+R (Cmd+R su Mac) — che funziona anche mentre stai guardando un sito.',
     },
     {
       id: 'home', title: 'Vai alla home', category: 'navigation',
       desc: 'Apre la home di Filo nella scheda corrente, con suggerimenti e aggiornamenti.',
-      invoke: 'Icona Home in alto a destra nella home (la nuova scheda), oppure menu del tasto destro → "Home".',
+      invoke: 'Icona Home della barra laterale, da qualunque pagina.',
     },
     {
       id: 'address-bar', title: 'Apri un indirizzo', category: 'navigation',
@@ -86,14 +86,20 @@
     {
       id: 'incognito', title: 'Finestra in incognito', category: 'navigation',
       desc: 'Apre una nuova finestra privata e isolata: la sessione è effimera e non viene archiviata.',
-      invoke: 'Menu del tasto destro → "Nuova finestra incognito".',
+      invoke: 'Barra laterale → "Nuova finestra incognito", oppure dal menu del profilo in fondo alla barra.',
       doesNot: 'Non sospende il limite di spesa del mese: quello che si spende lì conta come fuori e resta nel conto. Il testo delle pagine non va al modello per riconoscere i blocchi geografici.',
     },
     {
       id: 'fullscreen', title: 'Schermo intero', category: 'navigation',
       desc: 'Nasconde la barra delle schede così la pagina occupa tutta la finestra.',
-      invoke: 'Menu del tasto destro → "Schermo intero" / "Esci da schermo intero", oppure chiedilo all’assistente ("metti a schermo intero", "togli lo schermo intero"). Esci in ogni momento con Esc.',
+      invoke: 'Barra laterale → "Schermo intero" / "Esci da schermo intero", oppure chiedilo all’assistente ("metti a schermo intero", "togli lo schermo intero"). Esci in ogni momento con Esc; a schermo intero la barra laterale si apre come sempre dal bordo sinistro.',
       doesNot: 'Non preme il pulsante di schermo intero del lettore video dentro un sito (es. quello di YouTube): agisce sulla finestra di Filo, non sui comandi della pagina.',
+    },
+    {
+      id: 'sidebar', title: 'Barra laterale', category: 'navigation',
+      desc: 'Una barra che si apre dal bordo sinistro su ogni pagina, siti e pagine di Filo, con quello che riguarda la finestra e non l\'elemento sotto il mouse: in cima Indietro, Avanti, Ricarica, Home, Nuova finestra incognito, Schermo intero e Chiudi pagina (Indietro e Avanti spenti quando non c\'è dove andare); in fondo l\'ora, Cronologia, App, il profilo e le Impostazioni. Le icone del menu del tasto destro si trascinano nella barra laterale e da lì nel menu aperto, e restano dove le metti anche dopo un riavvio; lo stesso lo chiedi a Filo a parole («metti Screenshot nella barra laterale», «togli Chiudi scheda dalla barra»). Col tasto destro su un\'icona della barra la rimetti nel menu; su Indietro e Avanti vedi le pagine della scheda a cui tornare e ci vai con un clic; il tasto destro sulle voci in fondo, sull\'ora e sulla striscia apre le loro scelte (la data, la Cronologia AI, le Preferenze).',
+      invoke: 'Spingi il mouse contro il bordo sinistro della finestra per un attimo, oppure clicca la striscia sottile sul bordo sinistro (a finestra non massimizzata i primi pixel del bordo servono al sistema per ridimensionarla: la striscia si clicca appena più in dentro) o la linguetta a sinistra delle schede, oppure Ctrl+Shift+B (Cmd+Shift+B su Mac), che la apre e la chiude, oppure chiedilo all’assistente («apri la barra laterale»). Si chiude uscendo col mouse, con Esc o cliccando sulla pagina. In Preferenze → Impostazioni avanzate → «Barra laterale» (o chiedendolo a Filo, o col tasto destro sulla striscia) spegni l\'apertura dal bordo, cambi l\'attesa sul bordo e quanto resta aperta dopo che il mouse esce, e nascondi la striscia.',
+      doesNot: 'Passarci sopra di corsa o trascinare una scheda non la apre. Un sito non può aprirla né premerne i pulsanti.',
     },
     {
       id: 'page-zoom', title: 'Ingrandisci o rimpicciolisci la pagina', category: 'navigation',
@@ -104,7 +110,7 @@
     {
       id: 'network-error-page', title: 'Pagina d’errore quando un sito non si carica', category: 'navigation',
       desc: 'Se un sito non è raggiungibile (indirizzo sbagliato, server spento, sei offline) o una scheda si blocca, compare una pagina che spiega il problema in italiano con un tasto "Riprova". Se eri offline, riprova da sola appena torni in rete.',
-      invoke: 'Automatico quando un caricamento fallisce; "Riprova" sulla pagina o "Ricarica" dal menu ritentano il sito.',
+      invoke: 'Automatico quando un caricamento fallisce; "Riprova" sulla pagina, "Ricarica" della barra laterale o Ctrl+R (Cmd+R su Mac) ritentano il sito.',
       doesNot: 'Non aggira i blocchi di sicurezza: i siti segnalati come pericolosi restano gestiti dagli avvisi dedicati.',
     },
     {
@@ -307,12 +313,12 @@
       id: 'open-for-later', title: 'Aperti per dopo', category: 'save',
       desc: 'La lista delle pagine e dei link che hai messo da parte, pronti da riaprire.',
       invoke: 'Menu «App» → «Aperti per dopo», oppure Impostazioni → «Altro» → «Aperti per dopo»; indirizzo filo://home/home.html. Anche cliccando la conferma che appare dopo «Salva per dopo». Clicca una scheda per riaprirla.',
-      doesNot: 'Non è la home: l’icona Home (in alto a destra e nel menu del tasto destro) porta alla nuova scheda, non a questa lista.',
+      doesNot: 'Non è la home: l’icona Home della barra laterale porta alla nuova scheda, non a questa lista.',
     },
     {
       id: 'archive', title: 'Cronologia delle schede', category: 'save',
       desc: 'La cronologia principale: le schede chiuse raggruppate per giorno, una riga per giorno, colorate come le tab in alto; puoi cercarle anche per contenuto e riaprirle. Restano tutte finché non le cancelli tu. Una scheda cancellata esce dall\'archivio sul disco; la copia della pagina nella cache di navigazione resta finché il motore non la scarta.',
-      invoke: 'Icona «Cronologia» in alto a destra nella home (o dalla home → "Cronologia"), pagina filo://archive/archive.html. Clicca una scheda per riaprirla; tasto destro per il menu: «Riapri» o «Elimina». La ricerca per contenuto nasce da un riassunto che un modello scrive quando chiudi la scheda: lo spegni in Preferenze → «Riassumi le schede chiuse» o chiedendolo a Filo («spegni il riassunto delle schede chiuse»), e da spento le schede si ritrovano per parole.',
+      invoke: 'Icona «Cronologia» in fondo alla barra laterale (bordo sinistro, su ogni pagina), pagina filo://archive/archive.html. Clicca una scheda per riaprirla; tasto destro per il menu: «Riapri» o «Elimina». La ricerca per contenuto nasce da un riassunto che un modello scrive quando chiudi la scheda: lo spegni in Preferenze → «Riassumi le schede chiuse» o chiedendolo a Filo («spegni il riassunto delle schede chiuse»), e da spento le schede si ritrovano per parole.',
       doesNot: 'Delle pagine delicate (posta, banca, sanità, quelle con un campo password o carta, i siti delicati aggiunti da te) non fa il riassunto e non tiene il testo: restano titolo e indirizzo, e la ricerca le trova per parole. Le finestre in incognito e le pagine interne di Filo non entrano.',
     },
     {
@@ -462,8 +468,8 @@
     // ─────────────────────────── Pagine interne ──────────────────────────────
     {
       id: 'home-page', title: 'Home di Filo', category: 'pages',
-      desc: 'La pagina della nuova scheda: al centro l’assistente a cui chiedere qualsiasi cosa, con un messaggio in evidenza e gli aggiornamenti recenti; ai lati le carte. A sinistra quello che sta accadendo (timer, sveglie, scaricamenti, avvisi), a destra quello che tieni tu (Editor, Mazzi, «Filo ti suggerisce», Impostazioni rapide) e sotto «altro», con le app che una carta non ce l’hanno. In alto a destra ci sono le icone per Cronologia, Impostazioni, App e Profilo.',
-      invoke: 'Apri una nuova scheda, l\'icona Home in alto a destra nella home, oppure indirizzo filo://newtab/.',
+      desc: 'La pagina della nuova scheda: al centro l’assistente a cui chiedere qualsiasi cosa, con un messaggio in evidenza e gli aggiornamenti recenti; ai lati le carte. A sinistra quello che sta accadendo (timer, sveglie, scaricamenti, avvisi), a destra quello che tieni tu (Editor, Mazzi, «Filo ti suggerisce», Impostazioni rapide) e sotto «altro», con le app che una carta non ce l’hanno. In alto a destra ci sono Impostazioni e Profilo; Cronologia, App, Impostazioni e Profilo stanno anche in fondo alla barra laterale, su ogni pagina.',
+      invoke: 'Apri una nuova scheda, l\'icona Home della barra laterale, oppure indirizzo filo://newtab/.',
     },
     {
       id: 'home-cards', title: 'Le carte della home', category: 'pages',
@@ -474,7 +480,7 @@
     {
       id: 'red-team', title: 'Red Team', category: 'pages', cancello: 'redteam',
       desc: 'Il programma per mettere alla prova la sicurezza di Filo: provi a farne aggirare le difese e, per i tentativi riconosciuti come attacchi reali, guadagni crediti e sali in classifica. La pagina raccoglie le tue statistiche e i tuoi record, la classifica dei partecipanti e le regole del gioco. Per partecipare davvero serve un codice di invito, che leghi al tuo account e sblocca le statistiche personali.',
-      invoke: 'Icona a scudo rosso in alto a destra nella home (nuova scheda), oppure indirizzo filo://redteam/redteam.html.',
+      invoke: 'Icona a scudo rosso in fondo alla barra laterale, oppure indirizzo filo://redteam/redteam.html.',
       doesNot: 'Senza un codice di invito puoi leggere regole e classifica ma non accumulare punteggi. La creazione dei codici di invito è riservata a chi gestisce Filo.',
     },
     {

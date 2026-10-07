@@ -265,6 +265,20 @@
   // subito, 2 chiede conferma con popup. `risk` (obbligatorio quando level=2,
   // #183) è la spiegazione in chiaro mostrata nel popup: cosa controlla
   // l'impostazione e quali rischi comporta toccarla.
+  // Un tempo della barra laterale in millisecondi ("300", "300 ms", "0,5 secondi"); fuori dai limiti è un
+  // rifiuto col numero, mai un taglio. Un numero sotto 10 senza unità sono secondi: nessuno chiede 1 ms.
+  function msBarra(v, campo, etichetta) {
+    const s = String(v == null ? '' : v).trim().toLowerCase();
+    let n = parseItalianNumber(s.replace(/[^0-9.,-]/g, ''));
+    if (!Number.isFinite(n)) return null;
+    const ms = /\bms\b|millisecond/.test(s);
+    if ((/\bs(ec|econd[oi])?\b/.test(s) && !ms) || (!ms && !/[a-z]/.test(s) && n > 0 && n < 10)) n *= 1000;
+    n = Math.round(n);
+    const [min, max] = global.SN_CONST.BARRA_LATERALE_LIMITI[campo];
+    if (n < min || n > max) return { rifiuto: `${n} ms è fuori dai limiti: da ${min} a ${max} ms` };
+    return { partial: { barraLaterale: { [campo]: n } }, label: etichetta(n) };
+  }
+
   const PREF_SETTERS = [
     {
       scrive: ['theme'],
@@ -388,6 +402,38 @@
         if (n <= 0) return { rifiuto: `le ore di inattività vanno da 1 a 168, e ${String(v).trim()} è fuori` };
         n = Math.min(168, Math.max(1, Math.round(n)));
         return { partial: { autoArchive: { idleHours: n } }, label: `Archivia dopo ${n} ${n === 1 ? 'ora' : 'ore'} di inattività` };
+      },
+    },
+    {
+      scrive: ['barraLaterale.spinta'],
+      aiuto: 'true | false (la barra laterale si apre spingendo il mouse sul bordo sinistro)',
+      keys: ['barra_spinta', 'barra spinta', 'apertura dal bordo', 'apri la barra dal bordo', 'spinta sul bordo', 'bordo sinistro'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { barraLaterale: { spinta: b } }, label: `Barra laterale spingendo sul bordo → ${b ? 'si apre' : 'non si apre'}` };
+      },
+    },
+    {
+      scrive: ['barraLaterale.attesaMs'],
+      aiuto: 'millisecondi 100-3000 (attesa sul bordo prima che la barra laterale si apra)',
+      keys: ['barra_attesa', 'barra attesa', 'attesa sul bordo', 'attesa della spinta', 'ritardo apertura barra'],
+      build(v) { return msBarra(v, 'attesaMs', (n) => `Attesa sul bordo prima che la barra si apra → ${n} ms`); },
+    },
+    {
+      scrive: ['barraLaterale.uscitaMs'],
+      aiuto: 'millisecondi 100-5000 (dopo quanto la barra laterale si chiude quando il mouse esce)',
+      keys: ['barra_uscita', 'barra uscita', 'chiusura della barra', 'ritardo chiusura barra', 'barra resta aperta'],
+      build(v) { return msBarra(v, 'uscitaMs', (n) => `La barra si chiude ${n} ms dopo che il mouse esce`); },
+    },
+    {
+      scrive: ['barraLaterale.striscia'],
+      aiuto: 'true | false (la striscia sottile sul bordo sinistro che indica la barra laterale)',
+      keys: ['barra_striscia', 'barra striscia', 'striscia sul bordo', 'striscia', 'indizio della barra'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { barraLaterale: { striscia: b } }, label: `Striscia della barra laterale → ${b ? 'visibile' : 'nascosta'}` };
       },
     },
     {

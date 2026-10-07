@@ -4,17 +4,14 @@
 
 const path = require('node:path');
 const { collegaScorciatoie } = require('./shortcuts');
+const { VuotoDellaVista } = require('./vuotoDellaVista');
 
 const NOME_VAR = /^--[a-z][a-z0-9-]*$/;
 const AZIONE = /^(chiudi|\d{1,2})$/;
-const GESTI = new Set(['mouseDown', 'mouseUp', 'mouseMove', 'mouseLeave', 'mouseWheel']);
-const TASTI = new Set(['left', 'middle', 'right']);
-const MODIFICATORI = new Set(['shift', 'control', 'alt', 'meta', 'leftButtonDown', 'middleButtonDown', 'rightButtonDown']);
 
 const testo = (v) => (typeof v === 'string' ? v : String(v == null ? '' : v));
 const lato = (v) => Math.max(0, Math.min(10000, Math.round(Number(v) || 0)));
 const coord = (v) => Math.max(-10000, Math.min(10000, Math.round(Number(v) || 0)));
-const passo = (v) => Math.max(-5000, Math.min(5000, Number(v) || 0));
 
 // Lo stato arriva dalla shell: se ne tengono solo le forme attese, senza tagliare i testi.
 function pulisci(stato) {
@@ -37,9 +34,11 @@ function pulisci(stato) {
 }
 
 class AvvisiSopraPagina {
-  // schedaAttiva: la WebContentsView della scheda in primo piano (o null).
-  constructor(win, { alto = () => 0, restituisciTastiera = () => {}, schedaAttiva = () => null } = {}) {
+  // schedaAttiva: la WebContentsView della scheda in primo piano (o null). sottoIlVuoto: quello che l'utente vede
+  // sotto (l'avviso del sito quando la copre), dove vanno i gesti del vuoto.
+  constructor(win, { alto = () => 0, restituisciTastiera = () => {}, schedaAttiva = () => null, sottoIlVuoto = null } = {}) {
     this.win = win;
+    this.sottoIlVuoto = sottoIlVuoto;
     this.alto = alto;
     this.restituisciTastiera = restituisciTastiera;
     this.schedaAttiva = schedaAttiva;
@@ -50,9 +49,12 @@ class AvvisiSopraPagina {
     this.altezza = 0;
     this.riserve = new WeakMap();
     this.suggerimento = false;
-    this.inoltroSu = null;
-    this.cursori = new WeakSet();
-    this.forme = new WeakMap();
+    this.vuoto = new VuotoDellaVista({
+      vista: () => this.vista,
+      scheda: () => this._sottoIlVuoto(),
+      canale: 'avvisi:cursore',
+      primaDelClic: () => this.restituisciTastiera(),
+    });
     if (win && typeof win.once === 'function') win.once('closed', () => this._butta());
   }
 
@@ -86,8 +88,8 @@ class AvvisiSopraPagina {
     vista.setVisible(true);
     this.altezza = h;
     this._riserva(h);
-    const wc = this._wcAttiva();
-    if (wc) this._seguiPuntatore(wc);
+    const sotto = this._sottoIlVuoto();
+    if (sotto) this.vuoto.segui(sotto.webContents);
   }
 
   // L'angolo in basso a destra è uno: gli avvisi di Filo dentro la scheda attiva salgono sopra la
@@ -134,51 +136,16 @@ class AvvisiSopraPagina {
     return v && v.webContents && !v.webContents.isDestroyed() ? v : null;
   }
 
+  _sottoIlVuoto() {
+    if (typeof this.sottoIlVuoto !== 'function') return this._schedaViva();
+    let v = null;
+    try { v = this.sottoIlVuoto(); } catch (_) { v = null; }
+    return v && v.webContents && !v.webContents.isDestroyed() ? v : null;
+  }
+
   _wcAttiva() {
     const v = this._schedaViva();
     return v ? v.webContents : null;
-  }
-
-  // Dove la vista è vuota (margine, accanto a una carta più stretta) il gesto è della pagina sotto:
-  // la vista lo rigira alla scheda, come le pile della pagina che dove sono vuote lasciano passare il clic.
-  _inoltra(d) {
-    const tipo = testo(d && d.tipo);
-    const v = this._schedaViva();
-    if (!GESTI.has(tipo) || !this.vista || !v) return;
-    const wc = v.webContents;
-    const b = this.vista.getBounds();
-    const s = v.getBounds();
-    const ev = { type: tipo, x: coord(b.x + coord(d.x) - s.x), y: coord(b.y + coord(d.y) - s.y) };
-    ev.modifiers = (Array.isArray(d.mod) ? d.mod : []).map(testo).filter((m) => MODIFICATORI.has(m));
-    if (tipo === 'mouseDown' || tipo === 'mouseUp') {
-      ev.button = TASTI.has(d.tasto) ? d.tasto : 'left';
-      ev.clickCount = Math.max(1, Math.min(3, Math.round(Number(d.clic) || 1)));
-    } else if (tipo === 'mouseWheel') {
-      Object.assign(ev, { deltaX: passo(d.dx), deltaY: passo(d.dy), canScroll: true, hasPreciseScrollingDeltas: true });
-    }
-    const prima = this.inoltroSu;
-    this.inoltroSu = tipo === 'mouseLeave' ? null : wc;
-    this._seguiPuntatore(wc);
-    // Rientrando nel vuoto la pagina non ridice un puntatore che per lei non è cambiato: lo si ridà da qui.
-    if (this.inoltroSu && prima !== wc) this._puntatore(this.forme.get(wc) || '');
-    if (tipo === 'mouseDown') this.restituisciTastiera();
-    try { wc.sendInputEvent(ev); } catch (_) {}
-  }
-
-  // Sopra il vuoto della vista il puntatore è quello che mostrerebbe la pagina (mano su un link, barra sul testo).
-  // Si ascolta da quando la vista copre la scheda, così si sa anche quello che la pagina ha detto prima.
-  _seguiPuntatore(wc) {
-    if (this.cursori.has(wc)) return;
-    this.cursori.add(wc);
-    wc.on('cursor-changed', (_e, forma) => {
-      this.forme.set(wc, testo(forma));
-      if (this.inoltroSu === wc) this._puntatore(forma);
-    });
-  }
-
-  _puntatore(forma) {
-    if (!this.vista || this.vista.webContents.isDestroyed()) return;
-    try { this.vista.webContents.send('avvisi:cursore', testo(forma)); } catch (_) {}
   }
 
   // Tasto destro su una carta: le sue azioni e la chiusura, nel menu di Filo; la scelta fa quello che fa il pulsante.
@@ -274,7 +241,7 @@ class AvvisiSopraPagina {
       } else if (canale === 'avvisi:suggerimento') {
         this._mostraSuggerimento(dati);
       } else if (canale === 'avvisi:inoltra') {
-        this._inoltra(dati);
+        this.vuoto.inoltra(dati);
       } else if (canale === 'avvisi:menu') {
         this._menu(dati);
       } else if (canale === 'avvisi:sopra') {

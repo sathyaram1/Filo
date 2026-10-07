@@ -369,6 +369,15 @@
     NAV_FORWARD: 'nav_forward',
     NAV_RELOAD: 'nav_reload',
     NAV_STATE: 'nav_state',                         // → { ok, canBack, canFwd }
+    // Barra laterale (#871): aperti anche ai content script dei siti, perché dicono e
+    // spostano solo dove stanno le icone di Filo. La disposizione la scrive il main, uno solo.
+    ICON_LAYOUT_GET: 'icon_layout_get',             // → { ok, layout }
+    ICON_LAYOUT_DROP: 'icon_layout_drop',           // { id, target, beforeId } → { ok, layout }
+    ICON_LAYOUT_CHANGED: 'icon_layout_changed',     // spinta → { layout }
+    BARRA_TRASCINA: 'barra_trascina',               // { fase: inizio|sopra|posa|fine, id, x, y } → { ok, larghezza }
+    BARRA_FUORI: 'barra_fuori',                     // spinta alla scheda davanti → { fase: muovi|rilascia|annulla, id, x, y }
+    BARRA_ETICHETTE_CHIEDI: 'barra_etichette_chiedi', // spinta alla scheda davanti → { ids }: come si chiamano adesso le sue azioni nella barra
+    BARRA_ETICHETTE: 'barra_etichette',             // dalla scheda davanti { voci: [{ id, etichetta, icona }] } → { ok }
     TOGGLE_FULLSCREEN: 'toggle_fullscreen',
     EXIT_FULLSCREEN: 'exit_fullscreen',             // idempotente (Esc)
     FULLSCREEN_CHANGED: 'fullscreen_changed',       // broadcast → { fullscreen: bool }

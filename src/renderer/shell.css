@@ -67,6 +67,27 @@ html[data-chrome-compact="1"] .addr {
   -webkit-app-region: drag;
   app-region: drag;
 }
+/* La maniglia della barra laterale (#871): la stessa barra della striscia sul bordo, per chi il
+   bordo non lo raggiunge o non sa che c'è. */
+.barra-maniglia {
+  flex: 0 0 auto;
+  align-self: center;
+  width: 8px;
+  height: 24px;
+  margin: -8px 8px 0 -4px;
+  padding: 0;
+  border: none;
+  border-radius: 0 6px 6px 0;
+  background: var(--accent);
+  opacity: 0.5;
+  cursor: pointer;
+  transition: opacity 0.15s ease, width 0.15s ease;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+.barra-maniglia:hover, .barra-maniglia:focus-visible { opacity: 1; width: 11px; }
+.barra-maniglia:active { opacity: 0.8; }
+.barra-maniglia:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .tabs {
   display: flex;
   align-items: flex-end;

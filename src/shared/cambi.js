@@ -13,6 +13,7 @@
   const ATTIVA = sino('attiva', 'spenta');
   const numero = (v) => String(Number(v)).replace('.', ',');
   const percento = (v) => `${Math.round(Number(v) * 100)}%`;
+  const millisecondi = (v) => `${Math.round(Number(v))} ms`;
 
   function etichettaColoreTab(k) {
     const meta = global.SN_TAB_COLOR && Array.isArray(global.SN_TAB_COLOR.IDENTITY_PARAM_META)
@@ -56,6 +57,10 @@
     'autoArchive.onIdle': { nome: 'archiviazione quando Filo è inattivo', valore: ATTIVA, livello: 1 },
     'autoArchive.idleHours': { nome: 'ore di inattività prima di archiviare', valore: numero, livello: 1 },
     'autoArchive.onClose': { nome: 'riordino alla riapertura', valore: ATTIVO, livello: 1 },
+    'barraLaterale.spinta': { nome: 'apertura della barra laterale dal bordo', valore: ATTIVA, livello: 1 },
+    'barraLaterale.striscia': { nome: 'striscia della barra laterale', valore: sino('visibile', 'nascosta'), livello: 1 },
+    'barraLaterale.attesaMs': { nome: 'attesa sul bordo prima che la barra laterale si apra', valore: millisecondi, livello: 1 },
+    'barraLaterale.uscitaMs': { nome: 'tempo prima che la barra laterale si chiuda', valore: millisecondi, livello: 1 },
     'riassuntoSchede.enabled': { nome: 'riassunto delle schede chiuse', valore: ATTIVO, livello: 1 },
     'notifications.durationSec': { nome: 'durata delle notifiche', valore: (v) => (Number(v) ? `${numero(v)} s` : 'finché non la chiudi'), livello: 1 },
     'notifications.soundEnabled': { nome: 'suono delle notifiche', valore: ATTIVO, livello: 1 },

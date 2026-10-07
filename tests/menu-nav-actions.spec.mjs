@@ -4,6 +4,11 @@
 // agisce sulla BrowserWindow (non sulla view).
 
 import { test, expect } from './fixtures/electron.mjs';
+import { mettiNelMenu } from './helpers/barra.mjs';
+
+// Da #871 queste icone stanno nella barra laterale: qui si prova la strada del tasto destro,
+// quella di chi le ha rimesse nel menu.
+test.beforeEach(async ({ app }) => { await mettiNelMenu(app, ['back', 'forward', 'reload', 'closeTab']); });
 
 const HTML_A = `<!doctype html><html><body><h1 id="t">pagina A</h1></body></html>`;
 const HTML_B = `<!doctype html><html><body><h1 id="t">pagina B</h1></body></html>`;

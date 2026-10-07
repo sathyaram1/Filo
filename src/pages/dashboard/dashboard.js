@@ -1557,13 +1557,9 @@
       if (msg.settings && msg.settings.timerRingtone && RINGTONES[msg.settings.timerRingtone]) {
         _timerRingTone = msg.settings.timerRingtone;
       }
-    } else if (msg?.type === MSG.REDTEAM_VISIBILITY_CHANGED) {
-      setRedteamVisibile(msg.visible);
     } else if (msg?.type === MSG.AUTH_CHANGED) {
       // Login/logout fatto altrove (es. dal menu profilo): aggiorna l'avatar.
       Comandi.setOwner(msg.signedIn && msg.isAdmin);
-      // Entrare o uscire come owner apre o chiude il Red Team in pausa (#896).
-      refreshRedteamVisibile();
       applyAccountProfile(msg.signedIn ? msg.profile : null);
       // #524 — l'accoglienza aspettava un modello: appena l'accesso lo rende
       // disponibile, Filo si presenta subito invece di rimandare alla prossima
@@ -1582,50 +1578,17 @@
 
 
   // ===== Bootstrap =====
-  // ===== Controlli del browser dentro la home (in alto a destra) =====
-  // Le icone home/impostazioni/app/profilo (un tempo nella barra in alto, ora
-  // rimossa) vivono qui. Ogni click aziona il comando REALE della shell via
-  // MSG.SHELL_ACTION: il main lo inoltra alla shell, che clicca il bottone
-  // corrispondente e apre il suo menu nativo (Impostazioni, App, Account) in
-  // alto a destra, oppure naviga (Home). Nessuna logica di menu duplicata qui.
+  // ===== Profilo e impostazioni in alto a destra =====
+  // Dove ogni app li mette (SPEC home). Red-team, Home, Cronologia e App stanno solo nella barra laterale (#871).
+  // Ogni click aziona il comando REALE della shell via MSG.SHELL_ACTION, che apre il suo menu nativo.
   let accountCtrlBtn = null; // riferimento all'icona profilo (mostra l'avatar)
-
-  // Il Red Team in pausa (#896) si mostra solo a chi lo vede: lo decide il main. Parte nascosto.
-  let redteamVisibile = false;
-  function setRedteamVisibile(v) {
-    const nuovo = !!v;
-    if (nuovo === redteamVisibile) return;
-    redteamVisibile = nuovo;
-    renderControls();
-  }
-  async function refreshRedteamVisibile() {
-    try {
-      const r = await send({ type: MSG.REDTEAM_VISIBILITY, attendi: true });
-      setRedteamVisibile(r && r.ok && r.visible);
-    } catch (_) { /* resta com'era */ }
-  }
 
   function renderControls() {
     const host = $('dashControls');
     if (!host) return;
     const ICONS = self.SN_ICONS || {};
     const items = [
-      // Red-team: apre direttamente la pagina interna (è solo una navigazione,
-      // non un menu nativo). Tenuto per primo (più a sinistra) e in rosso (vedi
-      // dashboard.css) perché è il canale sicurezza, distinto dai controlli del
-      // browser. Spec §2: punto d'accesso in alto a destra nella home.
-      redteamVisibile && { command: 'redteam', icon: 'redteam', label: 'Red-team', url: 'filo://redteam/redteam.html' },
-      { command: 'home', icon: 'home', label: 'Home' },
-      // Cronologia: la pagina principale è quella delle schede visitate/chiuse
-      // (raggruppate per giorno), non il log delle azioni AI (raggiungibile da lì
-      // come "Cronologia AI"). Apre direttamente la pagina interna (non passa
-      // dalla shell come gli altri, che ancorano un menu nativo) — è solo una
-      // navigazione. Risponde al feedback "metti la cronologia in alto a destra".
-      { command: 'history', icon: 'history', label: 'Cronologia', url: 'filo://archive/archive.html' },
-      // Gli appunti non hanno più un pannello separato: Filo li scrive nei file
-      // dell'editor (icona Editor, che ora usa proprio l'SVG degli appunti).
       { command: 'settings', icon: 'options', label: 'Impostazioni' },
-      { command: 'apps', icon: 'apps', label: 'App' },
       { command: 'account', icon: 'user', label: 'Profilo' },
     ];
     host.replaceChildren();
@@ -1683,10 +1646,8 @@
     try {
       const r = await send({ type: MSG.AUTH_STATUS });
       Comandi.setOwner(r && r.signedIn && r.isAdmin);
-      applyAccountProfile(r && r.signedIn ? r.profile : null);
     } catch (_) {
       Comandi.setOwner(false);
-      applyAccountProfile(null);
     }
   }
 
@@ -1938,9 +1899,7 @@
   }
 
   // Anima alcune "monete credito" dorate dal centro dello schermo verso l'icona
-  // profilo (accountCtrlBtn). Riusa lo spirito di C3 ma vive nella home, dove
-  // l'icona account è un elemento DOM reale: puntiamo al suo centro. Decorativa,
-  // best-effort, rispetta prefers-reduced-motion.
+  // profilo in alto a destra. Decorativa, best-effort, rispetta prefers-reduced-motion.
   function flyCreditsToAccount(amount) {
     try {
       const reduce = !!(window.matchMedia &&
@@ -2135,7 +2094,6 @@
 
   (async function init() {
     renderControls();
-    refreshRedteamVisibile();
     await applySavedTheme();
     try {
       const settings = await self.SN_STORAGE?.getSettings?.();

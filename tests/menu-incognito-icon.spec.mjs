@@ -13,6 +13,11 @@
 // expect fallirebbe.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { mettiNelMenu } from './helpers/barra.mjs';
+
+// Da #871 queste icone stanno nella barra laterale: qui si prova la strada del tasto destro,
+// quella di chi le ha rimesse nel menu.
+test.beforeEach(async ({ app }) => { await mettiNelMenu(app, ['incognito']); });
 
 const HTML = `<!doctype html><html><body style="padding:40px;font:16px sans-serif">
   <h1>Filo test page</h1>

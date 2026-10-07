@@ -315,9 +315,7 @@ const safebrowseMethods = {
     const tab = this.tabs.find((t) => t.id === tabId);
     if (!tab) return { ok: false };
     const wc = tab.view.webContents;
-    let puo = false;
-    try { puo = wc.navigationHistory ? wc.navigationHistory.canGoBack() : wc.canGoBack(); } catch (_) {}
-    if (puo) this.goBack(tabId);
+    if (this.puoTornare(tab, 'indietro')) this.goBack(tabId);
     else { try { wc.loadURL('about:blank'); } catch (_) {} }
     return { ok: true };
   },
