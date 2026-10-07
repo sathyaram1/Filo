@@ -352,6 +352,21 @@ test('Google Sites: un modulo d\'accesso nel riquadro incorporato fa comparire l
   expect(await livelloScheda(app, 'sites.google.com')).toBe('sospetto');
 });
 
+// #730 — nessuna password: decide il nome del sito, che sta nel sottodominio di una piattaforma mai elencata a mano.
+test('un sosia sul sottodominio di una piattaforma di hosting qualunque fa comparire l\'avviso col marchio', async ({ app, openTab }) => {
+  const SOSIA = '<h1>PayPal</h1><p>Il tuo conto è sospeso: accedi per riattivarlo.</p>';
+  const host = ['paypal-login.weebly.com', 'paypal-login.us-east-1.elasticbeanstalk.com', 'paypal-com.translate.goog'];
+  await servi(app, Object.fromEntries(host.map((h) => [h, SOSIA])));
+  for (const h of host) {
+    await openTab('https://' + h + '/');
+    expect(await livelloScheda(app, h), h).toBe('sospetto');
+  }
+  const avviso = await vistaAvviso(app);
+  await expect(avviso.getByRole('heading', { name: 'PayPal? Controlla l\'indirizzo' })).toBeVisible({ timeout: 8_000 });
+  await expect(avviso.getByText('paypal-com.translate.goog usa il nome "PayPal"')).toBeVisible();
+  await expect(avviso.getByRole('button', { name: 'Continua' })).toBeVisible();
+});
+
 test('Apps Script: la pagina dell\'utente in un riquadro dentro un riquadro fa comparire l\'avviso', async ({ app, openTab }) => {
   await servi(app, {
     'script.google.com/macros/s/AKfy123/exec': '<iframe src="https://n-abc-0lu-script.googleusercontent.com/panel" width="600" height="400"></iframe>',

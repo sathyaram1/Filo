@@ -1,9 +1,6 @@
-// Public Suffix List: la sezione ICANN intera (pslIcann.js, con jolly ed eccezioni) + le piattaforme qui sotto, ed
-// estrazione del dominio registrabile (eTLD+1). Della sezione privata ci sono solo le piattaforme scelte qui.
-//
-// L'algoritmo segue publicsuffix.org: cerca la regola che combacia con il
-// maggior numero di etichette (con gestione di wildcard `*` ed eccezioni `!`),
-// poi il dominio registrabile è "suffisso + 1 etichetta".
+// Dominio registrabile (eTLD+1) di un host, secondo l'algoritmo di publicsuffix.org (regola più lunga, `*`, `!`).
+// La Public Suffix List c'è intera: la sezione ICANN in pslIcann.js, la privata (le piattaforme che ospitano gli
+// utenti) in src/vendor/public-suffix-list (`node scripts/aggiorna-psl.mjs`).
 
 'use strict';
 
@@ -25,22 +22,32 @@ for (const riga of require('./pslIcann').trim().split('\n')) {
 // Piattaforme dove ogni sottodominio è di un utente diverso: senza, `utente.github.io` diventa `github.io` («GitHub
 // su .io») e un dominio in whitelist copre ogni pagina ospitata. L'host uguale alla piattaforma resta suo.
 // Queste le separa già il web (sezione privata della PSL): valgono anche per i cookie della modalità privacy.
-const PRIVATE_PSL = new Set([
-  'github.io', 'githubusercontent.com', 'gitlab.io', 'pages.dev', 'workers.dev',
-  'vercel.app', 'netlify.app', 'web.app', 'firebaseapp.com', 'herokuapp.com',
-  'appspot.com', 'blogspot.com', 'azurewebsites.net', 'onrender.com', 'fly.dev',
-  'surge.sh', 'glitch.me', 'neocities.org', 'blob.core.windows.net', 'web.core.windows.net',
-  's3.amazonaws.com', 'googleapis.com', 'myshopify.com', 'hf.space', 'static.hf.space',
-]);
+const PRIVATE_PSL = new Set();
+const PRIVATE_WILDCARD = new Set();
+const PRIVATE_EXCEPTION = new Set();
+for (const r of require('../../../vendor/public-suffix-list/privata.json').rules) {
+  if (r.startsWith('*.')) PRIVATE_WILDCARD.add(r.slice(2));
+  else if (r.startsWith('!')) PRIVATE_EXCEPTION.add(r.slice(1));
+  else PRIVATE_PSL.add(r);
+}
+// Nella PSL perché ogni sito tenga i suoi cookie, ma i siti sono tutti del marchio: per il giudizio restano il suo dominio.
+const DEL_MARCHIO = new Set(['withgoogle.com', 'withyoutube.com']);
 // Gli indirizzi di S3 per regione e da sito statico, uno per regione nella PSL: il secchio è il sito, non la regione.
 const S3 = /^s3(?:[.-][a-z0-9-]+){0,3}\.amazonaws\.com$/;
 // Così le pagine d'accesso di Cognito, <prefisso>.auth.<regione>.amazoncognito.com: il prefisso lo sceglie l'utente.
 const COGNITO = /^auth(?:-fips)?\.[a-z0-9-]+\.amazoncognito\.com$/;
 // Queste il web NON le separa (un login su wordpress.com vale sui blog): solo per il giudizio, mai per i cookie.
+// Ci sta solo ciò che la PSL non ha (tests/unit/safebrowsePiattaforme.test.mjs).
 const PRIVATE_AVVISO = new Set([
-  'notion.site', 'amazonaws.com', 'amazoncognito.com', 'googleusercontent.com', 'app.github.dev',
-  'sharepoint.com', 'wordpress.com', 'medium.com', 'dropboxusercontent.com',
+  'amazonaws.com', 'amazoncognito.com', 'googleusercontent.com', 'app.github.dev', 'sharepoint.com', 'wordpress.com',
+  'medium.com', 'dropboxusercontent.com', 'glitch.me', 'neocities.org', 'weebly.com', 'weeblysite.com',
+  'godaddysites.com', 'mystrikingly.com', 'jimdosite.com', 'jimdofree.com', 'mybluehost.me', 'zohosites.com',
+  'odoo.com', 'webnode.page', 'webnode.com', 'webnode.it', 'mailchimpsites.com',
 ]);
+// Azure mette una zona fra il cliente e il suffisso (<account>.z13.web.core.windows.net, <nome>.z01.azurefd.net,
+// <vm>.<regione>.cloudapp.azure.com), che la PSL non descrive: per il giudizio la zona è della piattaforma. Senza, una
+// macchina virtuale di chiunque passa per azure.com, che è in whitelist.
+const AZURE_ZONA = /^(?:z\d+\.web\.core\.windows\.net|[a-z]\d+\.azurefd\.net|[a-z0-9-]+\.cloudapp\.azure\.com)$/;
 
 // Estrae l'eTLD+1 (dominio registrabile) e il public suffix da un hostname.
 // `host` deve già essere in forma ascii/punycode minuscola e senza porta.
@@ -65,17 +72,19 @@ function getDomainInfo(host, { soloPsl = false } = {}) {
   let ospitato = false;
   for (let i = 0; i < labels.length; i++) {
     const candidate = labels.slice(i).join('.');
-    if (EXCEPTION.has(candidate)) {
+    if (EXCEPTION.has(candidate) || PRIVATE_EXCEPTION.has(candidate)) {
       // Eccezione: il public suffix è candidate MENO la prima etichetta.
       suffixLabels = labels.length - i - 1;
+      ospitato = PRIVATE_EXCEPTION.has(candidate);
       break;
     }
     if (NORMAL.has(candidate)) {
       suffixLabels = labels.length - i;
       break;
     }
-    const soloAvviso = !soloPsl && (PRIVATE_AVVISO.has(candidate) || COGNITO.test(candidate));
-    if (i > 0 && (PRIVATE_PSL.has(candidate) || S3.test(candidate) || soloAvviso)) {
+    const soloAvviso = !soloPsl && (PRIVATE_AVVISO.has(candidate) || COGNITO.test(candidate) || AZURE_ZONA.test(candidate));
+    const psl = PRIVATE_PSL.has(candidate) && (soloPsl || !DEL_MARCHIO.has(candidate));
+    if (i > 0 && (psl || S3.test(candidate) || soloAvviso)) {
       suffixLabels = labels.length - i;
       ospitato = true;
       break;
@@ -83,6 +92,12 @@ function getDomainInfo(host, { soloPsl = false } = {}) {
     // Wildcard: se la parte DOPO la prima etichetta del candidato è una
     // wildcard, allora candidate è un public suffix.
     const parent = labels.slice(i + 1).join('.');
+    // In `*.piattaforma` l'asterisco è il cliente: un host che è lui stesso quel suffisso resta suo.
+    if (parent && PRIVATE_WILDCARD.has(parent)) {
+      suffixLabels = labels.length - Math.max(i, 1);
+      ospitato = true;
+      break;
+    }
     if (parent && WILDCARD.has(parent)) {
       suffixLabels = labels.length - i;
       break;
@@ -117,4 +132,4 @@ function isIpAddress(host) {
   return false;
 }
 
-module.exports = { getDomainInfo, isIpAddress, S3 };
+module.exports = { getDomainInfo, isIpAddress, S3, PRIVATE_AVVISO, DEL_MARCHIO };

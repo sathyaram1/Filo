@@ -14,7 +14,7 @@
 
 'use strict';
 
-const { BRANDS } = require('./brands');
+const { BRANDS, nominaMarchio } = require('./brands');
 const { skeleton } = require('./confusables');
 
 // Distanza di Damerau-Levenshtein (OSA): conta sostituzione/inserzione/
@@ -102,8 +102,8 @@ function matchBrands(norm) {
 
     // ── BROAD: nome esatto su suffisso non ufficiale ────────────────────
     if (!broad && sld === token) { broad = { brand, reason: 'exact_other_tld', sld }; continue; }
-    // ── BROAD: combosquat (token come sottostringa insieme ad altro) ────
-    if (!broad && sld.length > token.length && (sld.includes(token) || sldSkel.includes(tokenSkel))) {
+    // ── BROAD: combosquat (il marchio insieme ad altro; regola in brands.js) ────
+    if (!broad && sld.length > token.length && nominaMarchio(sld, token, skeleton)) {
       broad = { brand, reason: 'combosquat', sld }; continue;
     }
     // ── BROAD: brand come sottodominio mentre l'eTLD+1 è altro ───────────
