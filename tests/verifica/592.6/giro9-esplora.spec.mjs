@@ -20,7 +20,7 @@ const PAGINA = `<!doctype html><html><body style="padding:40px;font:16px sans-se
   v.srcObject = c.captureStream(20);
   v.play().catch((e) => __log.push('play ' + e.message));
   document.getElementById('b').addEventListener('click', async () => {
-    if (window.__haDoc) {
+    if (window.__haDoc && location.hash === '#doc') {
       try {
         const w = await documentPictureInPicture.requestWindow({ width: 900, height: 700 });
         w.document.body.innerHTML = '<p style="font:20px sans-serif">Filo chiede conferma. Filo vuole impostare: Tema → Scuro.</p>';
@@ -33,6 +33,7 @@ const PAGINA = `<!doctype html><html><body style="padding:40px;font:16px sans-se
 
 test('picture in picture: esiste una finestra del sito sopra la domanda?', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, PAGINA);
+  if (process.env.DOC) await page.evaluate(() => { location.hash = '#doc'; });
   const host = new URL(page.url()).hostname;
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
   const box = await page.locator('#b').boundingBox();
@@ -45,8 +46,13 @@ test('picture in picture: esiste una finestra del sito sopra la domanda?', async
   }));
   console.log('PRIMA', JSON.stringify(await finestre()));
   await nelMondoDiFilo(app, host, `(() => { SN_CONFIRM_UI.confirm({ title: 'Filo chiede conferma', text: 'Invio agli sviluppatori: testo vero' }); return 1; })()`);
-  await confermaSopraPagina(app);
   await new Promise((r) => setTimeout(r, 1500));
+  console.log('DIAG', JSON.stringify(await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    const tm = w._filoTabs; const c = tm.conferme;
+    let s = null; try { s = c.sotto(); } catch (_) {}
+    return { coda: c.coda.length, codaUrl: c.coda.map((v) => v.wc.getURL()), sotto: s && s.getURL(), area: c.area(), vista: !!c.vista, pronta: c.pronta, mostrata: c.mostrata, active: tm.activeId, tabs: tm.tabs.map((t) => t.view.webContents.getURL()) };
+  })));
   console.log('DURANTE', JSON.stringify(await finestre()));
   try { execFileSync('import', ['-window', 'root', 'tests/.shots/giro9-pip.png']); } catch (e) { console.log('import', e.message); }
 });
@@ -56,7 +62,7 @@ test('aspetto vero, chiaro e scuro', async ({ app, openTab, testServer }) => {
   const host = new URL(page.url()).hostname;
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
   for (const tema of ['light', 'dark']) {
-    await app.evaluate(async (_e, tema) => { const s = await globalThis.SN_STORAGE.getSettings(); await globalThis.SN_STORAGE.setSettings?.({ ...s, theme: tema }); }, tema).catch((e) => console.log('tema', e.message));
+    await app.evaluate(async (_e, tema) => { await globalThis.SN_STORAGE.updateSettings({ theme: tema }); }, tema).catch((e) => console.log('tema', e.message));
     await nelMondoDiFilo(app, host, `(() => { globalThis.__e = 'attesa'; SN_CONFIRM_UI.confirm({ title: 'Filo chiede conferma', text: 'Filo vuole impostare: Tema → ${tema}. Questo cambia i colori di tutte le pagine.' }).then((ok) => { globalThis.__e = ok; }); return 1; })()`);
     const sopra = await confermaSopraPagina(app);
     await new Promise((r) => setTimeout(r, 800));
