@@ -12,6 +12,7 @@
 // per tutti e non per un elenco (giro 4).
 
 import { test, expect } from './fixtures/electron.mjs';
+import { mettiNelMenu } from './helpers/barra.mjs';
 
 const PAGINA = '<html><body style="margin:0;height:1200px"><p id="t">parola dentro una frase</p></body></html>';
 
@@ -140,6 +141,8 @@ test('nessun riquadro aperto: l\'Esc esce dallo schermo intero al primo colpo', 
 });
 
 test('il menu aperto mentre lo schermo intero si spegne da un\'altra strada cambia nome', async ({ app, openTab, testServer }) => {
+  // Da #871 lo schermo intero sta nella barra laterale: qui la voce è di chi l'ha rimessa nel menu.
+  await mettiNelMenu(app, ['fullscreen']);
   const page = await testServer.openReady(openTab, PAGINA);
   await entra(app);
   await page.locator('#t').click({ button: 'right' });

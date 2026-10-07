@@ -16,6 +16,7 @@
 // compare, il picker scrive il nuovo valore), non l'assenza di un errore.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { livelloAutonomia } from './helpers/autonomia.mjs';
 
 const NEWTAB = 'filo://newtab/';
 
@@ -60,8 +61,10 @@ test('un valore di token non valido non scrive nulla', async ({ app }) => {
   expect(settings.themeTokens && settings.themeTokens.accent).toBeUndefined();
 });
 
-test('testo ≈ sfondo → livello 2: conferma prima di applicare, poi applica', async ({ app }) => {
+test('testo ≈ sfondo → costo 2: a Conservativo conferma prima di applicare, poi applica', async ({ app }) => {
   await waitForBoot(app);
+  // A Normale un compito pulito lo applicherebbe da solo: l'ha chiesto l'utente (#530).
+  await livelloAutonomia(app, 'conservativo');
   // Sfondo personalizzato indipendente dal tema, così l'illeggibilità non
   // dipende dal tema risolto in headless.
   await app.evaluate(async () => {

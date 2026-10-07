@@ -68,6 +68,7 @@ if (process.env.NODE_ENV === 'test') {
     globalThis.__filoAdblock = require('./services/adblock');
     globalThis.__filoCookieBanners = require('./services/cookieBanners');
     globalThis.__filoCookieIncorporati = require('./services/cookieIncorporati');
+    globalThis.__filoRiquadriRotti = require('./services/riquadriRotti');
     globalThis.__filoFirmatariC2pa = require('./services/firmatariC2pa');
     globalThis.__filoFingerprint = require('./services/fingerprint');
     globalThis.__filoProxyTab = require('./services/proxyTab');
@@ -85,7 +86,7 @@ const { createMainWindow, revealWindow } = require('./window');
 const { registerFiloProtocol } = require('./protocol');
 const { registerIpcHandlers } = require('./ipc');
 const { installaMenuApplicazione } = require('./menu');
-const { initAutoUpdater } = require('./updater');
+const { initAutoUpdater, installaAllAvvioSeServe } = require('./updater');
 
 // Permette al protocollo filo:// di caricarsi con privilegi standard (CORS
 // libero, fetch, ecc.) — deve essere chiamato PRIMA di app.whenReady.
@@ -187,6 +188,10 @@ function configureSpellchecker() {
 }
 
 app.whenReady().then(async () => {
+  // #1039 — un aggiornamento scaricato si installa qui, con la barra visibile, prima che si apra qualsiasi finestra.
+  let impostazioniAvvio = {};
+  try { impostazioniAvvio = await globalThis.SN_STORAGE.getSettings(); } catch (_) {}
+  try { if (await installaAllAvvioSeServe(impostazioniAvvio)) return; } catch (_) {}
   await registerFiloProtocol();
   registerIpcHandlers();
   configureSpellchecker();
@@ -206,6 +211,7 @@ app.whenReady().then(async () => {
     // Cookie dei contenuti incorporati di terzi (#758): va agganciato prima della prima scheda, è lui che vede
     // nascere i cookie dei riquadri.
     try { require('./services/cookieIncorporati').init(s); } catch (_) {}
+    try { require('./services/riquadriRotti').init(s); } catch (_) {}
     // Anti-fingerprinting: carica/genera il master secret persistente e fissa
     // la modalità corrente (off/default/privacy) prima di aprire qualsiasi tab.
     try { await require('./services/fingerprint').init(s); } catch (_) {}
@@ -285,9 +291,8 @@ app.whenReady().then(async () => {
   // suoneria). Senza questo, una sveglia scatta solo se la newtab è aperta.
   try { require('./services/alarmWatcher').start(); } catch (_) {}
 
-  // Auto-update: controlla le GitHub Releases e applica la nuova versione
-  // al riavvio (no-op in dev/test — vedi updater.js).
-  initAutoUpdater();
+  // Controlla le GitHub Releases e scarica in sottofondo; quando installare lo dice updater.js (no-op in dev/test).
+  initAutoUpdater(impostazioniAvvio);
 
   // Smoke sentinel: in test mode apre la newtab E una pagina di test esterna,
   // verifica che i content script si caricano in quest'ultima, cattura

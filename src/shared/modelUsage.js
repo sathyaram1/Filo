@@ -114,6 +114,8 @@
     // Sicurezza e navigazione
     user('safebrowse-judge', 'Giudizio sui siti pericolosi', 'Sicurezza', A.SAFEBROWSE_JUDGE),
     user('geoblock-classify', 'Riconoscimento dei blocchi geografici', 'Sicurezza', A.GEOBLOCK_CLASSIFY),
+    user('embed-cookie-check', 'Contenuti incorporati rotti dai cookie', 'Sicurezza', A.EMBED_COOKIE_CHECK,
+      'Guarda l\'immagine di un riquadro di un altro sito che resta vuoto o chiede di entrare, solo quando le regole non lo riconoscono, e dice se è rotto per i cookie. Serve un modello che veda le immagini.'),
 
     // Feedback
     user('feedback-title', 'Titolo automatico di un feedback', 'Feedback', A.FEEDBACK_TITLE),

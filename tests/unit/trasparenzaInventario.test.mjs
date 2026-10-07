@@ -157,6 +157,7 @@ const INDIRIZZI = {
   'raw.githubusercontent.com': { frase: 'GitHub, EasyList e Fanboy' },
   'easylist.to': { frase: 'GitHub, EasyList e Fanboy' },
   'secure.fanboy.co.nz': { frase: 'GitHub, EasyList e Fanboy' },
+  'easylist-downloads.adblockplus.org': { frase: 'EasyList la pubblica su adblockplus.org' },
   'api.frankfurter.dev': { frase: 'Cambi valuta e carte Magic' },
   'api.scryfall.com': { frase: 'Cambi valuta e carte Magic' },
   'cards.scryfall.io': { frase: 'Cambi valuta e carte Magic' },

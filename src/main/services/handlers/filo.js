@@ -5,7 +5,7 @@ module.exports = function register(on, ctx) {
   const {
     MSG, winOf, broadcastLiveUpdate, handleFiloChat, fermaFiloChat, handleFiloGenerateDashboard,
     executeFiloAction, controllaUscita, apriDaFilo, SCHEMI_USCITA, ricordaLettoInChat, maybeRunCompactor, closeAndTriageChat,
-    archiviaCongedoAccoglienza,
+    archiviaCongedoAccoglienza, decisioneAzionePagina, segnaLetturaAiuto, nuovaConversazioneAiuto,
     saveOnboarding, finishOnboarding, claimOnboardingResume,
   } = ctx;
   const FiloMem = globalThis.SN_FILO_MEMORY;
@@ -40,7 +40,7 @@ module.exports = function register(on, ctx) {
       // scrive dentro il messaggio dell'utente e la risposta, turno per turno.
       const chatId = msg.chatId || null;
       fineLavoro = require('../lavoriInCorso').inizia({ tipo: 'risposta', chat: chatId, testo: msg.userMessage, wc: sender && sender.wc, ambito: ctx.ambitoDellaFinestra(sender && sender.win) });
-      const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images, reasoningReqId: msg.reasoningReqId, internal: !!msg.internal, daModello: !!msg.daModello, chatId, sender });
+      const r = await handleFiloChat({ userMessage: msg.userMessage, threadHistory: msg.threadHistory, image: msg.image, images: msg.images, reasoningReqId: msg.reasoningReqId, internal: !!msg.internal, daModello: !!msg.daModello, daFuori: msg.daFuori === true, chatId, sender });
       return { ok: true, ...r };
     } catch (e) {
       // #360 — la chat non è un log: se il turno fallisce (rete assente, provider
@@ -75,6 +75,7 @@ module.exports = function register(on, ctx) {
   // un'azione fuori registro.
   on(MSG.FILO_CONFIRM_ACTION, async (msg, sender) => {
     const r = await executeFiloAction(msg.action, { confirmed: true, sender, assistente: msg.assistente === true, parole: paroleDa(msg) });
+    if (r && r.output && msg.assistente === true) segnaLetturaAiuto(sender, { ...msg.action, _output: r.output });
     // Dopo l'OK il pulsante dice la cosa fatta, non quella proposta («Filo vuole…»): il testo lo dà il registro,
     // col risultato vero davanti (quante pagine cancellate, quante schede archiviate), come la riga del diario.
     const Levels = globalThis.SN_ACTION_LEVELS;
@@ -106,6 +107,7 @@ module.exports = function register(on, ctx) {
   // per la chat: la sidebar non è un canale privilegiato.
   on(MSG.FILO_RUN_ACTION, async (msg, sender) => {
     const r = await executeFiloAction(msg.action, { sender, assistente: true, parole: paroleDa(msg) });
+    if (r && r.output) segnaLetturaAiuto(sender, { ...msg.action, _output: r.output });
     return { ok: true, ...r };
   });
 
@@ -146,6 +148,19 @@ module.exports = function register(on, ctx) {
     if (!testo.trim()) return { ok: true, blocca: false };
     const u = await controllaUscita({ type: 'CAMPO_PAGINA', testo }, { sender, parole: paroleDa(msg) });
     return { ok: true, blocca: !!u.blocca, frase: u.blocca ? u.frase : '' };
+  });
+
+  // Anche da una pagina web, di proposito: la sidebar vive lì. Risponde solo cosa farebbe Filo; l'azione la
+  // esegue comunque il codice di Filo nel content script, quindi chi lo chiama non ottiene niente di più.
+  on(MSG.FILO_DECIDI_PAGINA, async (msg, sender) => {
+    const r = await decisioneAzionePagina({ costo: msg && msg.costo, campo: msg && msg.campo, sender });
+    return { ok: true, ...r };
+  });
+
+  // Anche da una pagina web: toglie solo ciò che ha letto l'Aiuto di quella scheda, e lì la pagina sporca comunque.
+  on(MSG.FILO_AIUTO_NUOVO, async (msg, sender) => {
+    nuovaConversazioneAiuto(sender);
+    return { ok: true };
   });
 
   // Lo stato porta schede aperte, notifiche e il messaggio della home con le pagine salvate: a un sito non si dà (#589.12).

@@ -139,6 +139,25 @@ function registerIpcHandlers() {
     event.returnValue = out;
   });
 
+  // #576 — i riquadri pubblicitari da nascondere nella pagina che sta per caricarsi: SINCRONO, o compaiono prima.
+  ipcMain.on('filo:adblock-css', (event, href, gate) => {
+    try {
+      event.returnValue = require('./services/adblock').cosmeticForPage(String(href || ''), gate);
+    } catch (_) {
+      event.returnValue = { css: '', tokens: false };
+    }
+  });
+
+  // Il sito vale quello del frame che chiede, non quello che il messaggio dichiara.
+  ipcMain.handle('filo:adblock-tokens', (event, msg) => {
+    try {
+      const href = (event.senderFrame && event.senderFrame.url) || '';
+      return require('./services/adblock').cosmeticForTokens(href, msg && msg.ids, msg && msg.classes, msg && msg.gate);
+    } catch (_) {
+      return '';
+    }
+  });
+
   // Cosa la pagina che sta per caricarsi legge delle notifiche (#591): SINCRONO per lo stesso motivo di filo:fp-config.
   ipcMain.on('filo:permessi-stato', (event, href) => {
     try {
@@ -522,6 +541,18 @@ function registerIpcHandlers() {
     const win = finestraDellaBarra(event.sender);
     if (win && win._filoTabs.avvisi) win._filoTabs.avvisi.aggiorna(stato);
   });
+
+  // ─── barra laterale (#871) ────────────────────────────────────────────────
+  // Solo la shell della propria finestra: tema e profilo che mostra, e la maniglia.
+  const barraDellaShell = (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win || win.isDestroyed() || win.webContents !== event.sender) return null;
+    return win._filoTabs?.barra || null;
+  };
+  ipcMain.on('barra:dalla-shell', (event, dati) => { barraDellaShell(event)?.dallaShell(dati); });
+  ipcMain.on('barra:commuta', (event) => { barraDellaShell(event)?.commuta('clic'); });
+  ipcMain.on('barra:chiudi', (event) => { barraDellaShell(event)?.chiudi(); });
+  ipcMain.on('barra:menu-maniglia', (event, dati) => { barraDellaShell(event)?.menuDellaManiglia(dati); });
 
   // ─── tooltip custom (sopra le WebContentsView) ───────────────────────────
   ipcMain.on('shell:tooltip-show', (event, { text, x, y }) => {
