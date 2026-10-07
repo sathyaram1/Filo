@@ -19,6 +19,7 @@
         'Dopo «Traduci la pagina» l\'avviso non dice più che un riquadro è rimasto in lingua originale quando quel riquadro sullo schermo non c\'è, come gli spazi pubblicitari e i banner nascosti. I riquadri nascosti non si traducono e non si pagano. Se ne apri uno, il tasto destro offre di tradurlo.',
         'Su un sito il popup con cui Filo ti chiede conferma adesso compare sopra la pagina, dove il codice del sito non arriva. Una pagina scritta apposta non può più renderlo invisibile e mostrarti al suo posto un popup finto con un altro testo. Quello che leggi è quello che confermi.',
         'Anche la proposta di aprire una pagina da un altro paese compare sopra la pagina: il sito non può nasconderla né rispondere al posto tuo.',
+        'Quando Filo propone di attivare i cookie di un contenuto incorporato, il «Sì» si conferma in un popup sopra la pagina. Un sito non può farti attivare i cookie mentre credi di rispondere a un\'altra domanda.',
       ],
     },
     {
