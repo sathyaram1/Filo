@@ -326,26 +326,33 @@ test('un documento letto in una conversazione ferma non resta davanti a Filo nel
   }
 });
 
-test('un messaggio lunghissimo incollato e tagliato nel contesto si rilegge davvero, anche nel mezzo', async ({ app }) => {
-  test.setTimeout(90_000);
+test('un messaggio lunghissimo incollato e tagliato nel contesto si rilegge intero; oltre il tetto, a pezzi', async ({ app }) => {
+  test.setTimeout(120_000);
   await primaScheda(app);
   const lungo = 'a'.repeat(100_000) + ' SEGNO-DEL-MEZZO-77 ' + 'b'.repeat(100_000);
   await preparaModello(app, [
     { text: 'Letto.' },
     { text: '', tools: [{ name: 'CERCA_CHAT', args: { id: 'scheda-lunga' } }] },
+    { text: 'Fatto.' },
+    { text: '', tools: [{ name: 'CERCA_CHAT', args: { id: 'scheda-lunga' } }] },
     { text: '', tools: [{ name: 'CERCA_CHAT', args: { id: 'scheda-lunga', da: 90_000 } }] },
     { text: 'Fatto.' },
   ]);
   await app.evaluate((_e, lungo) => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: lungo, threadHistory: [], chatId: 'scheda-lunga' }), lungo);
-  await app.evaluate(() => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'cosa c\'era in mezzo al testo che ti ho incollato?', threadHistory: [], chatId: 'scheda-lunga' }));
-  const tutte = await chiamate(app);
+  await app.evaluate(() => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'cosa c\'era in mezzo al testo che ti ho incollato?', threadHistory: [], chatId: 'scheda-altra' }));
+  let tutte = await chiamate(app);
   const secondo = tutte[1];
   const tratto = secondo.slice(0, posContesto(secondo)).map(testo).join('\n');
-  // Il tratto lo taglia e dice con quale id e come rileggerlo...
+  // Il tratto lo taglia e dice con quale id rileggerlo; la rilettura, col tetto di serie, lo dà intero.
   expect(tratto).toContain('CERCA_CHAT con id "scheda-lunga"');
   expect(tratto).not.toContain('SEGNO-DEL-MEZZO-77');
-  // ...la rilettura dice da dove continuare, e il pezzo chiesto ha il mezzo.
-  const esiti = tutte[3].filter((m) => m.role === 'tool').map(testo);
+  expect(testo(tutte[2].find((m) => m.role === 'tool'))).toContain('SEGNO-DEL-MEZZO-77');
+  // Con un tetto basso la rilettura dà testa e coda col numero da cui ripartire, e il pezzo chiesto ha il mezzo.
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ contestoFilo: { token: 20000 } }));
+  await app.evaluate(() => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'e adesso?', threadHistory: [], chatId: 'scheda-terza' }));
+  tutte = await chiamate(app);
+  const esiti = tutte[tutte.length - 1].filter((m) => m.role === 'tool').map(testo);
+  expect(esiti[0]).not.toContain('SEGNO-DEL-MEZZO-77');
   expect(esiti[0]).toMatch(/da = \d+/);
   expect(esiti[1]).toContain('SEGNO-DEL-MEZZO-77');
 });

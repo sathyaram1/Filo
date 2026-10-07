@@ -277,7 +277,7 @@
   }
 
   global.SN_FILO_CONTESTO = {
-    TETTI_DI_SERIE, LIMITI, MESSAGGI_CON_ESITI, MESSAGGI_DELLA_CHAT, QUOTA_RIPRESI, SOGLIA_RICORDO, MAX_RICORDI,
+    TETTI_DI_SERIE, LIMITI, CARATTERI_PER_TOKEN, MESSAGGI_CON_ESITI, MESSAGGI_DELLA_CHAT, QUOTA_RIPRESI, SOGLIA_RICORDO, MAX_RICORDI,
     tetti, numeroIn, stimaToken, taglio, passoTaglio, etichettaChat, quando, intestazione, chiave,
     finestra, tratti, testoPerIndice, scegliRicordi, rendiRicordi, coda, assembla,
   };
