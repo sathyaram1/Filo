@@ -858,6 +858,39 @@
     return withinPage(box, pos === 'fixed');
   }
 
+  // La finestra più grande da cui `el` si può vedere: la sua misura, stretta da ogni antenato che ritaglia e lo contiene.
+  // Chi ritaglia lascia passare al massimo la propria misura, comunque il sito sposti quel che c'è dentro (#503).
+  function clippedExtent(el) {
+    let w = 0;
+    let h = 0;
+    try {
+      const r = el.getBoundingClientRect();
+      w = r.width;
+      h = r.height;
+      const doc = el.ownerDocument;
+      const stop = new Set([doc && doc.body, doc && doc.documentElement]);
+      const vista = viewOf(el);
+      let pos = (vista.getComputedStyle(el) || {}).position || 'static';
+      let cur = parentOrHost(el);
+      for (let hops = 0; cur && cur.nodeType === 1 && hops < REACH_MAX_HOPS; hops++, cur = parentOrHost(cur)) {
+        // <body> e <html> passano il loro overflow alla finestra, che si scorre: la pagina non è una finestrella.
+        if (stop.has(cur)) continue;
+        const cs = vista.getComputedStyle(cur);
+        if (!cs) break;
+        const escapes = (pos === 'absolute' && cs.position === 'static' && !makesFixedContainingBlock(cs))
+                     || (pos === 'fixed' && !makesFixedContainingBlock(cs));
+        if (escapes) continue;
+        pos = cs.position || 'static';
+        const disp = cs.display || '';
+        if (disp === 'inline' || disp === 'contents' || disp === 'none') continue;
+        const paint = !!(cs.contain && /paint|strict|content/.test(cs.contain));
+        if (paint || (cs.overflowX && cs.overflowX !== 'visible')) w = Math.min(w, cur.clientWidth || 0);
+        if (paint || (cs.overflowY && cs.overflowY !== 'visible')) h = Math.min(h, cur.clientHeight || 0);
+      }
+    } catch (_) {}
+    return { w, h };
+  }
+
   // Un riquadro incorporato che l'utente non vede (#503): il metro delle sezioni ripiegate, su di lui e su ogni
   // antenato fino alla pagina, più il punto dove sta dipinto: fuori dall'area a cui si arriva scorrendo è nascosto
   // comunque ce l'abbia spinto il sito. Più in basso della prima schermata no: ci si arriva scorrendo.
