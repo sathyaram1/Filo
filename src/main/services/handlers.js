@@ -1651,7 +1651,9 @@ async function fontiDellaChat(chatId) {
   return fontiPerChat.get(chatId);
 }
 async function segnaFonteLetta(chatId, fontiLette, action) {
-  const f = globalThis.SN_ACTION_LEVELS && globalThis.SN_ACTION_LEVELS.fonteDi(action);
+  await segnaFonte(chatId, fontiLette, globalThis.SN_ACTION_LEVELS && globalThis.SN_ACTION_LEVELS.fonteDi(action));
+}
+async function segnaFonte(chatId, fontiLette, f) {
   if (!f || !Array.isArray(fontiLette)) return;
   const voce = { classe: f.classe, campo: f.campo || null, chiave: String(f.chiave || ''), motivo: String(f.motivo || '') };
   if (fontiLette.some((x) => x && x.chiave === voce.chiave && x.classe === voce.classe)) return;
@@ -3876,6 +3878,10 @@ async function handleFiloChat({ userMessage, threadHistory, image, images, reaso
   ricordaLettoInChat(azioniViste, cleanHistory);
   const fontiLette = chatId ? await fontiDellaChat(chatId) : [];
   for (const a of azioniViste) await segnaFonteLetta(chatId, fontiLette, a);
+  // Nel benvenuto il testo di altri (incollato, trascinato, da un sito) sporca il compito: lo stile torna al riquadro (#592.2).
+  if (onbActive && !accoglienza) {
+    await segnaFonte(chatId, fontiLette, { classe: 5, campo: null, chiave: 'benvenuto:testo-di-altri', motivo: 'è entrato un testo che non hai scritto tu' });
+  }
   // Cosa ha scritto l'utente nel compito: le coordinate bancarie che ci stanno dentro le ha chieste lui (#530).
   const richiesta = [...cleanHistory.filter((m) => m && m.role !== 'filo').map((m) => String(m.text || '')), String(userMessage || '')].join('\n');
   for (const m of cleanHistory) {
