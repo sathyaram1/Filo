@@ -167,21 +167,32 @@
     try { if (v) el.style.setProperty(p, v, pr); else el.style.removeProperty(p); } catch (_) {}
   }
 
-  // Un riquadro incorporato: gli effetti della pagina che lo contiene (una scheda semitrasparente, un'ombra fatta
-  // con un filtro, la pagina in grigio) accecano le sonde come quelli del suo documento, e da qui non si toccano.
-  // Il riquadro chiede alla pagina sopra di sospenderli finché il menu è aperto; ripete la richiesta mentre resta
-  // aperto, e senza richieste la pagina li rimette da sé. Una richiesta finta toglie solo effetti, mai un velo.
+  // In un riquadro gli effetti della pagina sopra accecano le sonde e da qui non si toccano: li sospende lei, a
+  // richiesta. Le sonde si guardano dopo la sua risposta, o la prima voce aspetterebbe come dopo un velo.
   const CHIAVE_RIQUADRO = '__snVistoSospendi';
+  const CHIAVE_PRONTO = '__snVistoSospesi';
   const RINNOVO_MS = 1000;
   const SCADENZA_MS = 2500;
+  const ATTESA_GENITORE_MS = 250;
   const IN_RIQUADRO = (() => { try { return global.top !== global; } catch (_) { return true; } })();
   let chiestoAl = -Infinity;
+  let rinvio = 0;
+  let inCoda = [];
   function chiediAlGenitore(si) {
     if (!IN_RIQUADRO) return;
     const ora = global.performance.now();
     if (si && ora - chiestoAl < RINNOVO_MS) return;
+    if (si && chiestoAl === -Infinity && !rinvio) rinvio = setTimeout(guardaLeSonde, ATTESA_GENITORE_MS);
     chiestoAl = si ? ora : -Infinity;
     try { global.parent.postMessage({ [CHIAVE_RIQUADRO]: si ? 1 : 0 }, '*'); } catch (_) {}
+  }
+  // Una conferma finta fa solo guardare prima, come senza riquadro.
+  function guardaLeSonde() {
+    clearTimeout(rinvio);
+    rinvio = 0;
+    const coda = inCoda;
+    inCoda = [];
+    for (const rec of coda) if (voci.get(rec.voce) === rec) osservatore().observe(rec.sonda);
   }
   const perRiquadro = new Map();
   function sospendiPerRiquadro(fr) {
@@ -213,11 +224,20 @@
   if (DOC) {
     global.addEventListener('message', (e) => {
       const d = e.data;
-      if (!d || typeof d !== 'object' || !(CHIAVE_RIQUADRO in d) || !e.source) return;
+      if (!d || typeof d !== 'object' || !e.source) return;
+      if (CHIAVE_PRONTO in d) { if (e.source === global.parent && rinvio) guardaLeSonde(); return; }
+      if (!(CHIAVE_RIQUADRO in d)) return;
       let fr = null;
       try { for (const f of DOC.querySelectorAll('iframe, frame')) if (f.contentWindow === e.source) { fr = f; break; } } catch (_) {}
       if (!fr) return;
-      if (d[CHIAVE_RIQUADRO]) sospendiPerRiquadro(fr); else rimettiPerRiquadro(fr);
+      if (d[CHIAVE_RIQUADRO]) {
+        sospendiPerRiquadro(fr);
+        // Dopo il prossimo disegno, quando il riquadro sa già di essere scoperto.
+        const fonte = e.source;
+        global.requestAnimationFrame(() => global.requestAnimationFrame(() => {
+          try { fonte.postMessage({ [CHIAVE_PRONTO]: 1 }, '*'); } catch (_) {}
+        }));
+      } else rimettiPerRiquadro(fr);
       // Un riquadro dentro un riquadro: anche la pagina sopra di questo ha i suoi effetti.
       if (IN_RIQUADRO) { try { global.parent.postMessage({ [CHIAVE_RIQUADRO]: d[CHIAVE_RIQUADRO] ? 1 : 0 }, '*'); } catch (_) {} }
     });
@@ -281,6 +301,7 @@
     const reg = { bloccato: opts.bloccato, premuta: null, detto: false, mo: null, moPiano: null };
     pannelli.set(pannello, reg);
     if (genitore) sospendiEffetti(genitore);
+    chiediAlGenitore(true);
     for (const tipo of ['pointerdown', 'mousedown', 'click', 'auxclick']) {
       pannello.addEventListener(tipo, (e) => filtra(e, pannello, reg), true);
     }
@@ -315,7 +336,7 @@
       try { io?.unobserve(rec.sonda); } catch (_) {}
       rec.sonda.remove();
     }
-    for (const rec of nuove) { posa(rec); osservatore().observe(rec.sonda); }
+    for (const rec of nuove) { posa(rec); if (rinvio) inCoda.push(rec); else osservatore().observe(rec.sonda); }
   }
 
   // Le sonde si sovrappongono dove i pannelli si toccano, e una sonda sopra l'altra la farebbe sembrare coperta.
@@ -401,6 +422,7 @@
     }
     battito ^= 1;
     metronomo.style.width = battito + 'px';
+    chiediAlGenitore(true);
     raf = global.requestAnimationFrame(giro);
   }
 
@@ -422,6 +444,10 @@
     moGenitore = null;
     genitore = null;
     rimettiEffetti();
+    clearTimeout(rinvio);
+    rinvio = 0;
+    inCoda = [];
+    chiediAlGenitore(false);
     try { ospite?.remove(); } catch (_) {}
   }
 

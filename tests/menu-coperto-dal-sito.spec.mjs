@@ -332,3 +332,67 @@ test('una pagina scura per inversione dei colori resta scura col menu aperto, e 
   await expect(avvisoCoperto(page)).toBeVisible();
   expect(await page.locator('#campo').inputValue()).not.toContain(SEGRETO);
 });
+
+// Ciò che il sito tiene al piano più alto (la bolla di una chat) sta sopra anche al fondo che rifà l'inversione.
+test('su una pagina scura per inversione la bolla della chat al piano più alto resta scura col menu aperto', async ({ app, openTab, testServer }) => {
+  const page = await apri(openTab, testServer, `<!doctype html><html style="filter:invert(1) hue-rotate(180deg)">
+    <body style="padding:40px;background:#fff;color:#000"><h1>Pagina in tema scuro</h1>
+    <div id="bolla" style="position:fixed;right:20px;bottom:20px;width:120px;height:60px;background:#fd4;z-index:2147483647"></div>
+    <input id="campo" style="width:320px;font-size:16px"></body></html>`);
+  const b = await page.locator('#bolla').boundingBox();
+  const x = Math.round(b.x + b.width / 2), y = Math.round(b.y + b.height / 2);
+  await expect.poll(() => luce(app, page, x, y)).toBeLessThan(110);
+  const chiusa = await luce(app, page, x, y);
+
+  await page.locator('#campo').click({ button: 'right' });
+  await expect(page.locator('.sn-menu-paste-main')).toBeVisible();
+  await page.waitForTimeout(400);
+  const aperta = await luce(app, page, x, y);
+  expect(Math.abs(aperta - chiusa), `la bolla cambia colore col menu aperto (${chiusa} → ${aperta})`).toBeLessThan(25);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.sn-menu')).toHaveCount(0);
+  await expect.poll(() => page.locator('#bolla').evaluate((el) => el.style.filter)).toBe('');
+});
+
+// Gli effetti della pagina sopra un riquadro incorporato accecano le sonde del menu aperto lì dentro come quelli
+// del suo documento: la pagina li sospende finché quel menu è aperto, e un velo resta un velo.
+const SCHEDE = {
+  'una scheda semitrasparente': ['', 'opacity:.98'],
+  'una scheda con l\'ombra fatta da un filtro': ['', 'filter:drop-shadow(0 4px 12px #0006)'],
+  'una pagina tutta in scala di grigi': ['filter:grayscale(1)', ''],
+};
+for (const [nome, [stileHtml, stileScheda]] of Object.entries(SCHEDE)) {
+  test(`il menu di un riquadro incorporato in ${nome} risponde al primo clic, e l'effetto torna alla chiusura`, async ({ openTab, testServer }) => {
+    const riquadro = testServer.html(`<!doctype html><html><body style="margin:10px">
+      <input id="campo" style="width:240px;font-size:16px"></body></html>`, { pubblico: true });
+    const page = await apri(openTab, testServer, `<!doctype html><html style="${stileHtml}"><body style="padding:20px">
+      <div id="scheda" style="${stileScheda}"><iframe src="${riquadro}" style="width:600px;height:420px;border:0"></iframe></div>
+      <script>${SITO}</script></body></html>`);
+    const effetti = () => page.evaluate(() => [document.documentElement, document.getElementById('scheda')]
+      .map((el) => getComputedStyle(el).filter + ' ' + getComputedStyle(el).opacity).join(' | '));
+    const prima = await effetti();
+    const delRiquadro = () => page.frames().find((f) => f.url().includes('sito-pubblico.test'));
+    await expect.poll(() => !!delRiquadro()).toBe(true);
+    const frame = delRiquadro();
+    await frame.waitForSelector('#campo');
+    const coperto = frame.locator('.sn-toast', { hasText: 'Il menu era coperto' });
+
+    await frame.locator('#campo').click({ button: 'right' });
+    const incolla = frame.locator('.sn-menu-paste-main');
+    await expect(incolla).toBeVisible();
+    await page.waitForTimeout(150);
+    await incolla.click();
+    await expect(frame.locator('.sn-menu'), 'il clic è passato e il menu si è chiuso').toHaveCount(0);
+    await page.waitForTimeout(300);
+    expect(await coperto.count(), 'il clic dell\'utente non viene rifiutato').toBe(0);
+    await expect.poll(effetti, { timeout: 5000 }).toBe(prima);
+
+    // Un velo della pagina sopra il riquadro resta fermato anche con gli effetti sospesi.
+    await page.evaluate(() => window.stendi());
+    await frame.locator('#campo').click({ button: 'right' });
+    await expect(incolla).toBeVisible();
+    await page.waitForTimeout(700);
+    await incolla.click();
+    await expect(coperto).toBeVisible();
+  });
+}

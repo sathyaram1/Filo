@@ -150,5 +150,20 @@ nascondono il menu più del sito: la guardia li sospende finché il menu è aper
 e li rimette alla chiusura. Se il sito li rimette lui, i clic si fermano: è il
 lato sicuro. Il filtro sospeso torna sulla pagina da un nostro fondo sotto il
 menu (`backdrop-filter` con lo stesso valore): senza, una pagina scura per
-inversione diventava bianca a ogni tasto destro (#589.11, giro 2). Opacità e
+inversione diventava bianca a ogni tasto destro (#589.11, giro 2). Ciò che il
+sito tiene al piano del menu o più su (la bolla di una chat) sta sopra anche al
+fondo: riceve il filtro sul suo, finché il menu è aperto (giro 3). Opacità e
 trasformazione restano solo sospese: non hanno un equivalente sul fondo.
+
+Un menu aperto in un **riquadro incorporato** ha sopra anche gli effetti della
+pagina che lo contiene (una scheda semitrasparente, un'ombra fatta con
+`filter`, la pagina in grigio), e da dentro il riquadro non si toccano: ogni
+clic si fermava (#589.11, giro 3). Il riquadro chiede alla pagina sopra, con un
+messaggio, di sospenderli sugli antenati del suo `iframe` finché il menu resta
+aperto (la richiesta si rinnova ogni secondo, e senza la pagina li rimette da
+sé); le sonde si guardano quando la pagina risponde che li ha tolti, o dopo un
+quarto di secondo, così la prima voce non aspetta il mezzo secondo di una
+scoperta. Una richiesta o una risposta finte del sito tolgono solo effetti o
+fanno guardare prima: un velo resta un velo. Lì il filtro della pagina non
+torna su un fondo, che coprirebbe il riquadro: finché il menu è aperto la pagina
+sopra lo perde.
