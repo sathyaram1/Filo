@@ -454,12 +454,11 @@
         // Riquadro riempito dalla pagina stessa: lì dentro non c'è nessun Filo
         // che possa rispondere, ma il testo lo prende l'estrazione da qui.
         if (Extract && typeof Extract.inlineFrameBody === 'function' && Extract.inlineFrameBody(f)) continue;
-        const r = f.getBoundingClientRect();
-        const nascosto = Extract && typeof Extract.isHiddenFromUser === 'function' && Extract.isHiddenFromUser(f);
+        const nascosto = frameHidden(f);
         if (isInsideFiloUi(f)) { skipped.push(f); continue; }
         // Una scheda spenta del tutto toglie al riquadro anche la misura: per la riapertura conta che sia nascosto,
         // non quanto è grande adesso (la misura la riguarda chi si chiede se si è scoperto).
-        if (r.width < FRAME_MIN_W || r.height < FRAME_MIN_H) { skipped.push(f); if (nascosto) folded.push(f); continue; }
+        if (frameTooSmall(f)) { skipped.push(f); if (nascosto) folded.push(f); continue; }
         if (nascosto) {
           skipped.push(f);
           folded.push(f);
@@ -471,7 +470,8 @@
     return { shown, skipped, folded };
   }
 
-  // Anche i riquadri dentro i componenti aperti del sito: un incorporato avvolto in un componente è la norma.
+  // Anche i riquadri dentro i componenti aperti del sito: un incorporato avvolto in un componente è la norma. E quelli
+  // dentro un riquadro riempito dalla pagina (gli spazi pubblicitari): lì non c'è un Filo che li giudichi al posto nostro.
   function framesOf(root) {
     const out = [];
     const roots = [root];
@@ -481,11 +481,41 @@
       try { all = r.querySelectorAll('*'); } catch (_) { continue; }
       for (const el of all) {
         const t = el.tagName;
-        if (t === 'IFRAME' || t === 'FRAME') out.push(el);
+        if (t === 'IFRAME' || t === 'FRAME') {
+          out.push(el);
+          const body = Extract && typeof Extract.inlineFrameBody === 'function' && Extract.inlineFrameBody(el);
+          if (body && body.ownerDocument) roots.push(body.ownerDocument);
+        }
         if (el.shadowRoot) roots.push(el.shadowRoot);
       }
     }
     return out;
+  }
+
+  // Il riquadro della pagina che ospita `el`, quando `el` sta dentro uno riempito dalla pagina; null al primo livello.
+  function hostFrameOf(el) {
+    try {
+      const w = el.ownerDocument && el.ownerDocument.defaultView;
+      return w && w !== window ? w.frameElement : null;
+    } catch (_) { return null; }
+  }
+
+  // Un riquadro è nascosto se lo è lui o uno dei riquadri della pagina che lo contengono.
+  function frameHidden(f) {
+    if (!(Extract && typeof Extract.isHiddenFromUser === 'function')) return false;
+    for (let el = f, hops = 0; el && hops < 16; el = hostFrameOf(el), hops++) {
+      if (Extract.isHiddenFromUser(el)) return true;
+    }
+    return false;
+  }
+
+  // Sotto le misure minime, lui o chi lo contiene: dentro un francobollo non c'è niente da leggere.
+  function frameTooSmall(f) {
+    for (let el = f, hops = 0; el && hops < 16; el = hostFrameOf(el), hops++) {
+      const r = el.getBoundingClientRect();
+      if (r.width < FRAME_MIN_W || r.height < FRAME_MIN_H) return true;
+    }
+    return false;
   }
 
   // Il giudizio arriva al riquadro prima della parola di tradurre: lo legge il suo preload, che senza un sì non lo
@@ -504,9 +534,8 @@
     for (const f of hiddenFrames) {
       try {
         if (!f.isConnected) continue;
-        const r = f.getBoundingClientRect();
-        if (r.width < FRAME_MIN_W || r.height < FRAME_MIN_H) continue;
-        if (!Extract.isHiddenFromUser(f)) return true;
+        if (frameTooSmall(f)) continue;
+        if (!frameHidden(f)) return true;
       } catch (_) {}
     }
     return false;

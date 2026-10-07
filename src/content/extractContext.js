@@ -748,7 +748,7 @@
   //   - ritaglia e basta (hidden/clip) → il limite è la finestrella e quel che
   //     sborda è perduto.
   // Ritorna null quando non resta niente: irraggiungibile.
-  function narrowByClipper(box, anc, cs) {
+  function narrowByClipper(box, anc, cs, soloScorrevoli) {
     const ox = cs.overflowX || 'visible';
     const oy = cs.overflowY || 'visible';
     if (ox === 'visible' && oy === 'visible') return box;
@@ -775,7 +775,7 @@
         const hi = padL + ((rtl ? 0 : range) - sL) + cw;
         if (out.r <= lo || out.l >= hi) return null;
         out.l = padL; out.r = padL + cw;
-      } else {
+      } else if (!soloScorrevoli) {
         out.l = Math.max(out.l, padL);
         out.r = Math.min(out.r, padL + cw);
         if (out.r <= out.l) return null;
@@ -789,7 +789,7 @@
         const hi = padT + range - sT + ch;
         if (out.b <= lo || out.t >= hi) return null;
         out.t = padT; out.b = padT + ch;
-      } else {
+      } else if (!soloScorrevoli) {
         out.t = Math.max(out.t, padT);
         out.b = Math.min(out.b, padT + ch);
         if (out.b <= out.t) return null;
@@ -833,7 +833,8 @@
   }
 
   // "L'utente ci arriva?" — con lo stesso metro usato per il resto della pagina.
-  function isReachableByUser(el, rect) {
+  // Con `soloScorrevoli` un antenato che ritaglia senza barra non conta: è la giostra, a cui si torna strisciando.
+  function isReachableByUser(el, rect, soloScorrevoli) {
     let box = { l: rect.left, t: rect.top, r: rect.right, b: rect.bottom };
     const own = styleOf(el);
     let pos = (own && own.position) || 'static';
@@ -850,7 +851,7 @@
       const escapes = (pos === 'absolute' && cs.position === 'static' && !makesFixedContainingBlock(cs))
                    || (pos === 'fixed' && !makesFixedContainingBlock(cs));
       if (escapes) continue;
-      box = narrowByClipper(box, cur, cs);
+      box = narrowByClipper(box, cur, cs, soloScorrevoli);
       if (!box) return false;
       pos = cs.position || 'static';
     }
@@ -858,10 +859,15 @@
   }
 
   // Un riquadro incorporato che l'utente non vede (#503): il metro delle sezioni ripiegate, su di lui e su ogni
-  // antenato fino alla pagina. Più in basso della prima schermata non è nascosto: ci si arriva scorrendo.
+  // antenato fino alla pagina, più il punto dove sta dipinto: fuori dall'area a cui si arriva scorrendo è nascosto
+  // comunque ce l'abbia spinto il sito. Più in basso della prima schermata no: ci si arriva scorrendo.
   function isHiddenFromUser(el) {
     try {
       if (isVisibilityHidden(el)) return true;
+      if (el.ownerDocument === document) {
+        const r = el.getBoundingClientRect();
+        if ((r.width > 0 || r.height > 0) && !isReachableByUser(el, r, true)) return true;
+      }
       const doc = el.ownerDocument;
       const stop = doc && (doc.body || doc.documentElement);
       let cur = parentOrHost(el);

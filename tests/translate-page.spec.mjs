@@ -1983,3 +1983,73 @@ test('un riquadro che non si conta non risponde al posto di uno chiuso a chiave 
   await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 60000 }).toContain('riquadro incorporato');
   expect(await toasts(page)).not.toContain('Pagina tradotta');
 });
+
+test('riquadri chiusi a chiave nascosti nei modi meno comuni: «Pagina tradotta», senza mandare a cercare niente', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  const lock = testServer.html(frameInner('ZZLOCK'));
+  const box = 'width:300px;height:200px;border:0';
+  const page = await testServer.openReady(openTab, framePage(`
+    <iframe sandbox src="${lock}" style="transform:translateX(-9999px);${box}"></iframe>
+    <iframe sandbox src="${lock}" style="position:absolute;clip:rect(0 0 0 0);${box}"></iframe>
+    <iframe sandbox src="${lock}" style="clip-path:circle(0);${box}"></iframe>
+    <iframe sandbox src="${lock}" style="clip-path:polygon(0 0, 0 0, 0 0);${box}"></iframe>
+    <iframe sandbox src="${lock}" style="position:absolute;left:100%;top:0;${box}"></iframe>`).replace('<body style="', '<body style="overflow-x:hidden;'));
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#p1');
+  await expect(page.locator('#p1')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 30000 }).toContain('Pagina tradotta');
+  await page.waitForTimeout(2500);
+  expect((await toasts(page)).join(' | ')).not.toContain('riquadro incorporato');
+});
+
+test('riquadro con script nella diapositiva nascosta di una giostra: si traduce, ci si arriva strisciando', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  const src = testServer.html(frameInner('ZZSLIDE')).replace('127.0.0.1', 'blocked.test');
+  const page = await testServer.openReady(openTab, framePage(`
+    <div style="width:520px;overflow:hidden"><div style="display:flex;width:1040px;transform:translateX(0)">
+      <div style="width:520px;flex:none;height:220px">First slide</div>
+      <iframe id="emb" src="${src}" style="width:520px;height:220px;flex:none;border:0"></iframe>
+    </div></div>`));
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#p1');
+  await expect(page.frameLocator('#emb').locator('#fbody')).toHaveText(/^IT /, { timeout: 60000 });
+});
+
+// Gli spazi pubblicitari sono spesso riquadri riempiti dalla pagina, con dentro un riquadro vero: lì in mezzo non c'è
+// un Filo che giudichi, e il giudizio lo dà la pagina.
+const filledWith = (src) => `<!doctype html><html><body style="margin:0"><iframe id="in" src="${src}" style="width:300px;height:200px;border:0"></iframe></body></html>`
+  .replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+
+test('riquadro con script dentro uno spazio della pagina nascosto: non si paga e non copre quello chiuso a chiave', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  const cross = (token) => testServer.html(frameInner(token)).replace('127.0.0.1', 'blocked.test');
+  const page = await testServer.openReady(openTab, framePage(`
+    <iframe src="${cross('ZZSEEN')}" style="width:520px;height:120px"></iframe>
+    <iframe sandbox src="${testServer.html(frameInner('ZZLOCK'))}" style="width:520px;height:120px"></iframe>
+    <iframe srcdoc="${filledWith(cross('ZZNEST'))}" style="opacity:0;width:320px;height:220px"></iframe>`));
+  await page.waitForTimeout(1500);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#p1');
+  await expect(page.locator('#p1')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 60000 }).toContain('riquadro incorporato');
+  await page.waitForTimeout(2000);
+  expect(await sentText(app)).not.toContain('ZZNEST');
+});
+
+test('riquadro con script dentro uno spazio della pagina visibile: si traduce anche da solo', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  const src = testServer.html(frameInner('ZZVIS')).replace('127.0.0.1', 'blocked.test');
+  const page = await testServer.openReady(openTab, framePage(`<iframe id="emb" srcdoc="${filledWith(src)}" style="width:320px;height:220px"></iframe>`));
+  await page.waitForTimeout(1500);
+  await watchToasts(page);
+  await clickTranslateIcon(page, '#p1');
+  await expect(page.frameLocator('#emb').frameLocator('#in').locator('#fbody')).toHaveText(/^IT /, { timeout: 60000 });
+  await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 30000 }).toMatch(/Pagina tradotta/);
+  const t = (await toasts(page)).join(' | ');
+  expect(t).not.toContain('riquadro incorporato');
+  expect(t).not.toContain('aggiunta');
+});

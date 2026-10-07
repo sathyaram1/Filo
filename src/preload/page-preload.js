@@ -253,13 +253,36 @@ const WAKE_BROADCASTS = new Set(['frame_translate']);
 const VERDETTO_ATTESA_MS = 1500;
 const verdettiRiquadro = new Map();
 const inAttesaDiVerdetto = new Set();
+// Anche quelli dentro un riquadro riempito dalla pagina (about:, srcdoc): lì non c'è un Filo che passi parola.
 function riquadriFigli() {
-  try { return Array.from(document.querySelectorAll('iframe, frame')); } catch (_) { return []; }
+  const out = [];
+  const docs = [document];
+  while (docs.length && out.length < 500) {
+    let lista = [];
+    try { lista = Array.from(docs.pop().querySelectorAll('iframe, frame')); } catch (_) {}
+    for (const f of lista) {
+      out.push(f);
+      try { if (f.contentWindow.location.protocol === 'about:' && f.contentDocument) docs.push(f.contentDocument); } catch (_) {}
+    }
+  }
+  return out;
+}
+// Il giudizio arriva da chi ha un Filo e mi vede: la madre, o un antenato quando fra noi c'è solo un riquadro riempito
+// dalla pagina, che un Filo non ce l'ha.
+function daUnAntenato(src) {
+  try {
+    for (let w = window.parent, hops = 0; w && hops < 16; hops++) {
+      if (src === w) return true;
+      if (w === w.parent) break;
+      w = w.parent;
+    }
+  } catch (_) {}
+  return false;
 }
 if (IS_SUBFRAME) try {
   window.addEventListener('message', (e) => {
     const d = e && e.data;
-    if (!d || typeof d !== 'object' || d.filoFrameVerdict !== 1 || e.source !== window.parent) return;
+    if (!d || typeof d !== 'object' || d.filoFrameVerdict !== 1 || !daUnAntenato(e.source)) return;
     const runId = typeof d.runId === 'string' ? d.runId.slice(0, 64) : '';
     if (!runId) return;
     const visto = d.visible === true;
