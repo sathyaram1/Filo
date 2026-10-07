@@ -85,11 +85,15 @@ test('Novita è escluso: host che ha restituito la risposta di un\'altra richies
 test("Alibaba è escluso col nome che OpenRouter dà all'host, non solo col prefisso qwen/", () => {
   const list = C.DEFAULT_EXCLUDED_PROVIDERS;
   // È il nome che OpenRouter riporta nel campo `provider` della risposta (slug `alibaba`).
-  for (const served of ['Alibaba', 'alibaba', 'Alibaba Cloud']) {
+  for (const served of ['Alibaba', 'alibaba', 'Alibaba Cloud', 'Alibaba Cloud Int.', 'alibaba/qwen']) {
     assert.equal(C.isProviderExcluded(served, list), true, served);
+    assert.equal(C.servedPolicyViolation(served, 'qwen/qwen3-coder', list), 'excluded', served);
   }
+  assert.equal(C.hostPolicyViolation({ name: 'Alibaba Cloud Int.', tag: 'alibaba' }, 'qwen/qwen3-coder', list), 'excluded');
   assert.ok(C.providerIgnoreList(list).includes('Alibaba'));
   assert.ok(C.providerIgnoreList(list).includes('Qwen'));
+  const reason = C.DEFAULT_EXCLUDED_PROVIDER_REASONS.find((r) => r.name === 'Alibaba');
+  assert.equal(reason && reason.kind, 'producer');
 });
 
 // ── Deriva fra la lista del codice e quella scritta a mano ───────────────────
