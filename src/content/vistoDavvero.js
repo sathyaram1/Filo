@@ -98,7 +98,8 @@
   }
 
   // Un filtro sul contenitore del menu (la pagina in scala di grigi) per il browser nasconde anche le sonde: vale per
-  // menu e velo insieme, quindi non nasconde il menu più del sito, e si sospende finché il menu è aperto.
+  // menu e velo insieme, quindi non nasconde il menu più del sito, e si sospende finché il menu è aperto. Il filtro
+  // torna sulla pagina da un nostro fondo sotto il menu (backdrop-filter): la pagina non cambia aspetto.
   const EFFETTI = [['filter', 'none'], ['opacity', '1'], ['transform', 'none'], ['mix-blend-mode', 'normal']];
   let sospesi = null;
   function sospendiEffetti(el) {
@@ -107,18 +108,33 @@
     let cs;
     try { cs = global.getComputedStyle(el); } catch (_) { return; }
     const vecchi = [];
+    let filtro = '';
     for (const [p, neutro] of EFFETTI) {
       const v = cs.getPropertyValue(p);
       if (!v || v === neutro || (p === 'transform' && /^matrix\(1, 0, 0, 1, [^,]+, [^,]+\)$/.test(v))) continue;
+      if (p === 'filter') filtro = v;
       vecchi.push([p, el.style.getPropertyValue(p), el.style.getPropertyPriority(p)]);
       el.style.setProperty(p, neutro, 'important');
     }
-    sospesi = { el, vecchi };
+    sospesi = { el, vecchi, fondo: null };
+    if (filtro && el === genitore) sospesi.fondo = fondoFiltrato(filtro);
+  }
+  function fondoFiltrato(filtro) {
+    const f = DOC.createElement('div');
+    f.setAttribute('aria-hidden', 'true');
+    f.style.cssText = 'all:initial!important;display:block!important;position:fixed!important;inset:0!important;'
+      + 'z-index:' + Z + '!important;pointer-events:none!important;backdrop-filter:' + filtro + '!important;';
+    let primo = null;
+    for (const n of genitore.children) if (sotto.has(n)) { primo = n; break; }
+    sotto.add(f);
+    genitore.insertBefore(f, primo || ospite);
+    return f;
   }
   function rimettiEffetti() {
     if (!sospesi) return;
-    const { el, vecchi } = sospesi;
+    const { el, vecchi, fondo } = sospesi;
     sospesi = null;
+    try { fondo?.remove(); } catch (_) {}
     for (const [p, v, pr] of vecchi) {
       try { if (v) el.style.setProperty(p, v, pr); else el.style.removeProperty(p); } catch (_) {}
     }
@@ -370,6 +386,8 @@
     _test: {
       stato: (el) => voci.get(el)?.stato ?? null,
       pronta: (el) => !ATTIVO || giudica(voci.get(el), global.performance.now()) === 'ok',
+      // A schermo per la guardia: la sonda ha un'area. Una riga tagliata dal bordo della lista sotto il pixel no.
+      aSchermo: (el) => !!voci.get(el)?.r,
       // Scoperta senza attesa: comparsa così, o liberata da un pezzo nostro.
       libera: (el) => { const r = voci.get(el); return !!r && r.stato === 'visibile' && r.da === -Infinity; },
     },

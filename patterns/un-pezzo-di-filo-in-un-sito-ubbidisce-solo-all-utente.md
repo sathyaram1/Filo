@@ -148,4 +148,7 @@ filter: grayscale(1) }`, una pagina in lutto) per il browser nasconde anche le
 sonde, e ogni clic si fermava. Valgono per menu e velo insieme, quindi non
 nascondono il menu più del sito: la guardia li sospende finché il menu è aperto
 e li rimette alla chiusura. Se il sito li rimette lui, i clic si fermano: è il
-lato sicuro.
+lato sicuro. Il filtro sospeso torna sulla pagina da un nostro fondo sotto il
+menu (`backdrop-filter` con lo stesso valore): senza, una pagina scura per
+inversione diventava bianca a ogni tasto destro (#589.11, giro 2). Opacità e
+trasformazione restano solo sospese: non hanno un equivalente sul fondo.

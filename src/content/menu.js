@@ -1373,8 +1373,10 @@
     const cerca = sub.querySelector('.sn-menu-history-search-input');
     // Un clic conta solo su una voce che il browser ha già visto scoperta (#589.11): gli spec aspettano questo.
     const pronta = (el) => !el || !global.SN_VISTO || global.SN_VISTO._test.pronta(el);
-    // Una voce scorsa fuori dalla lista non ha niente da dire: null.
+    // Una voce scorsa fuori dalla lista non ha niente da dire: null. Con la guardia accesa decide lei cosa è a
+    // schermo, così una riga tagliata dal bordo sotto il pixel non resta «da aspettare» per sempre.
     const nellaLista = (el) => {
+      if (global.SN_VISTO?.ATTIVO) return global.SN_VISTO._test.aSchermo(el);
       if (!lista) return true;
       const a = el.getBoundingClientRect(), b = lista.getBoundingClientRect();
       return a.bottom > b.top && a.top < b.bottom;
@@ -1385,8 +1387,9 @@
         testo: riga.querySelector('.sn-menu-history-paste')?.getAttribute('aria-label') || '',
         incolla: centro(riga.querySelector('.sn-menu-history-paste')),
         rimuovi: centro(riga.querySelector('.sn-menu-history-remove')),
-        pronta: !nellaLista(riga) ? null
-          : pronta(riga.querySelector('.sn-menu-history-paste')) && pronta(riga.querySelector('.sn-menu-history-remove')),
+        pronta: ((bottoni) => (bottoni.length ? bottoni.every(pronta) : null))(
+          [riga.querySelector('.sn-menu-history-paste'), riga.querySelector('.sn-menu-history-remove')]
+            .filter((b) => b && nellaLista(b))),
         libera: !global.SN_VISTO || !!global.SN_VISTO._test.libera(riga.querySelector('.sn-menu-history-paste')),
       })),
       svuotaPronta: pronta(svuota),

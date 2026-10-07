@@ -293,3 +293,42 @@ test('su una pagina tutta in scala di grigi il menu risponde, il velo resta ferm
   expect(await page.locator('#campo').inputValue()).not.toContain(SEGRETO);
   await expect.poll(filtro).toBe('grayscale(1)');
 });
+
+// Colore medio di un punto della scheda, letto da ciò che Electron disegna davvero.
+function luce(app, page, x, y) {
+  return app.evaluate(async ({ BrowserWindow }, { u, x, y }) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      const tab = (win._filoTabs?.tabs || []).find((t) => { try { return t.view?.webContents?.getURL() === u; } catch (_) { return false; } });
+      if (!tab) continue;
+      const b = (await tab.view.webContents.capturePage({ x, y, width: 1, height: 1 })).toBitmap();
+      return (b[0] + b[1] + b[2]) / 3;
+    }
+    return null;
+  }, { u: page.url(), x, y });
+}
+
+test('una pagina scura per inversione dei colori resta scura col menu aperto, e il velo resta fermato', async ({ app, openTab, testServer }) => {
+  await app.evaluate(({ clipboard }, s) => clipboard.writeText(s), SEGRETO);
+  const page = await apri(openTab, testServer, `<!doctype html><html style="filter:invert(1) hue-rotate(180deg)">
+    <body style="padding:40px;background:#fff;color:#000"><h1>Pagina in tema scuro</h1>
+    <input id="campo" style="width:320px;font-size:16px"><script>${SITO}</script></body></html>`);
+  await expect.poll(() => luce(app, page, 900, 600)).toBeLessThan(60);
+
+  await page.locator('#campo').click({ button: 'right' });
+  await expect(page.locator('.sn-menu-paste-main')).toBeVisible();
+  await page.waitForTimeout(400);
+  expect(await luce(app, page, 900, 600), 'lontano dal menu la pagina resta scura').toBeLessThan(60);
+  await page.screenshot({ path: 'tests/.shots/589-11-pagina-invertita-menu.png' });
+  await page.locator('.sn-menu-paste-main').click();
+  await expect(page.locator('#campo')).toHaveValue(SEGRETO);
+  expect(await luce(app, page, 900, 600)).toBeLessThan(60);
+
+  await page.locator('#campo').fill('');
+  await page.evaluate(() => window.alMenu(() => window.stendi()));
+  await page.locator('#campo').click({ button: 'right' });
+  await expect(page.locator('#velo')).toBeVisible();
+  await page.waitForTimeout(700);
+  await page.locator('.sn-menu-paste-main').click();
+  await expect(avvisoCoperto(page)).toBeVisible();
+  expect(await page.locator('#campo').inputValue()).not.toContain(SEGRETO);
+});
