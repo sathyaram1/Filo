@@ -33,6 +33,16 @@ for (const [nome, sfondo, livello] of [
       return { font: getComputedStyle(el).fontSize, w: r.width, h: r.height, dpr: devicePixelRatio };
     });
     console.log(nome, JSON.stringify(fs));
-    await page.screenshot({ path: `tests/.shots/686-giro10-${nome}.png` });
+    const url = await page.evaluate(() => location.href);
+    const b64 = await app.evaluate(async ({ webContents }, u) => {
+      for (const wc of webContents.getAllWebContents()) {
+        let here = '';
+        try { here = wc.getURL(); } catch (_) {}
+        if (here === u) return (await wc.capturePage()).toPNG().toString('base64');
+      }
+      return null;
+    }, url);
+    const fs2 = await import('node:fs');
+    fs2.writeFileSync(`tests/.shots/686-giro10-${nome}.png`, Buffer.from(b64, 'base64'));
   });
 }
