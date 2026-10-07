@@ -24,12 +24,12 @@ test('r2 una richiesta fallita dopo la fine del worker non accorcia l\'attesa mi
     turno(1, { tools: [{ type: 'tool_use', id: 'tu1', name: 'Agent', input: { prompt: 'x', run_in_background: true } }] }),
     risultato(1.1, 'tu1', 'Async agent launched successfully. (agentId: w1)'),
     turno(2),
-    notifica(80, 'w1', 'tu1'),
+    notifica(60, 'w1', 'tu1'),
     // La richiesta dopo la notifica fallisce (rete giù): Claude Code scrive un
     // messaggio «<synthetic>» con usage a zero, che non tocca la cache.
-    turno(81, { model: '<synthetic>', cw: 0, cr: 0 }),
-    // Il primo turno vero arriva dopo 68 minuti dall'ultimo che ha usato la cache.
-    turno(70 - 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0, { cw: 200000, cr: 0 }),
+    turno(61, { model: '<synthetic>', cw: 0, cr: 0 }),
+    // Il primo turno vero arriva 68 minuti dopo l'ultimo che ha usato la cache: è scaduta.
+    turno(70, { cw: 200000, cr: 0 }),
   ];
   const { attesaPrimaS } = finestraOrchestratore(linee);
   expect(attesaPrimaS).toBe(68 * 60);
