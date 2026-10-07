@@ -71,6 +71,7 @@
   let ombra = null;
   let metronomo = null;
   let stileOspite = '';
+  let zoomOspite = 1;
   let genitore = null;
   let moGenitore = null;
   let io = null;
