@@ -172,10 +172,20 @@ test('si scrive anche in un campo "solo testo" e in un campo dentro un riquadro'
   assert.equal(C.scriveQui({ activeElement: riquadro(null) }), null);
   assert.equal(C.scriveQui({ activeElement: fermo }), false);
   // Componente a shadow DOM chiuso: decide il documento, che vede dove sta il cursore.
-  const chiuso = (scrivibile) => ({ tagName: 'X-CAMPO', localName: 'x-campo', shadowRoot: null, isContentEditable: false,
-    matches: () => false, closest: () => null, ownerDocument: { queryCommandEnabled: (c) => c === 'insertText' && scrivibile } });
+  // Fuori dall'ombra la selezione punta all'ospite: (genitore, suo indice).
+  const chiuso = (scrivibile, cursoreQui = true) => {
+    const genitore = { childNodes: [] };
+    const el = { tagName: 'X-CAMPO', localName: 'x-campo', shadowRoot: null, isContentEditable: false, parentNode: genitore,
+      matches: () => false, closest: () => null, contains: () => false,
+      ownerDocument: { queryCommandEnabled: (c) => c === 'insertText' && scrivibile,
+        getSelection: () => ({ anchorNode: genitore, anchorOffset: cursoreQui ? 1 : 0 }) } };
+    genitore.childNodes.push({}, el);
+    return el;
+  };
   assert.equal(C.scriveQui({ activeElement: chiuso(true) }), true);
   assert.equal(C.scriveQui({ activeElement: chiuso(false) }), false);
+  assert.equal(C.scriveQui({ activeElement: chiuso(true, false) }), false,
+    'il cursore scrivibile sta in un altro componente: qui non si scrive');
   assert.equal(C.scriveQui({ activeElement: { ...fermo, localName: 'div', ownerDocument: { queryCommandEnabled: () => true } } }), false,
     'un elemento qualunque non è un componente chiuso: lì la regola resta quella del campo');
 });

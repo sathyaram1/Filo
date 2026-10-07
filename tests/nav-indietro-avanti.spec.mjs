@@ -261,7 +261,7 @@ const COMPONENTE_CHIUSO = '<!doctype html><title>C</title><x-campo id="c"></x-ca
   + 'customElements.define("x-tasto", class extends HTMLElement { constructor() { super();'
   + ' this.attachShadow({ mode: "closed" }).innerHTML = "<button>ok</button>"; } });</script>';
 
-test('su Mac Cmd+← in un campo dentro un componente chiuso non porta via la pagina; sul suo pulsante sì', async ({ app, openTab, testServer }) => {
+test('su Mac Cmd+← in un campo dentro un componente chiuso non porta via la pagina; sul pulsante di un altro componente sì', async ({ app, openTab, testServer }) => {
   const { page, url } = await schedaSu(app, { openTab, testServer }, COMPONENTE_CHIUSO);
   await page.locator('#c').click();
   await page.keyboard.type('scrivo qui');
