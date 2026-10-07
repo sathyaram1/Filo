@@ -739,8 +739,10 @@
     INSTALLA_AGGIORNAMENTO: (a) => {
       const o = a._output || {};
       if (o.aggiornamento === 'aggiornato') return { icon: '⬇', text: 'Filo è già aggiornato' };
-      if (o.aggiornamento === 'pronta') return { icon: '⬇', text: `Versione ${o.versione} pronta · si installa alla chiusura` };
+      if (o.aggiornamento === 'pronta') return { icon: '⬇', text: `Versione ${o.versione} pronta` };
       if (o.aggiornamento === 'scarica') return { icon: '⬇', text: `Scarico la versione ${o.versione}` };
+      if (o.aggiornamento === 'riavvio') return { icon: '⬇', text: `Riavvio per installare la versione ${o.versione}` };
+      if (o.aggiornamento === 'a-mano' && o.versione) return { icon: '⬇', text: `Versione ${o.versione} da scaricare a mano` };
       return { icon: '⬇', text: 'Aggiornamento' };
     },
     COMANDO_FINESTRA: (a) => {
@@ -1370,7 +1372,7 @@
       // partirebbe a nome dell'utente. Il popup non invia nulla: mostra il testo
       // e aspetta l'OK, esattamente come nella sidebar (che già fa così).
       // Le azioni distruttive (livello 3) e i comandi restano a click esplicito.
-      const AUTO_CONFIRM_TYPES = ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'INVIA_FEEDBACK', 'SALVA_LEZIONE', 'DIMENTICA', 'RINOMINA_FILE', 'BLUETOOTH', 'WIFI'];
+      const AUTO_CONFIRM_TYPES = ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'INVIA_FEEDBACK', 'SALVA_LEZIONE', 'DIMENTICA', 'RINOMINA_FILE', 'BLUETOOTH', 'WIFI', 'INSTALLA_AGGIORNAMENTO'];
       // Una difesa abbassata (#530) vuole la parola, ma non è distruttiva: il box si apre da solo come il popup.
       if (AUTO_CONFIRM_TYPES.includes(type) && (a._confirm.level === 2 || a._confirm.avviso)) {
         btn.dataset.autoConfirm = '1';

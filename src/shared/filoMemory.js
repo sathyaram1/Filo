@@ -805,6 +805,16 @@
     return entry;
   }
 
+  // Un avviso che descrive uno stato si riscrive quando lo stato cambia, invece di restare con una frase non più vera.
+  async function setNotificationText(id, text) {
+    const list = await getRaw(KEYS.FILO_NOTIFICATIONS, []);
+    const n = list.find((x) => x.id === id);
+    if (!n || n.dismissed || n.text === String(text || '')) return false;
+    n.text = String(text || '');
+    await setRaw(KEYS.FILO_NOTIFICATIONS, list);
+    return true;
+  }
+
   async function dismissNotification(id, { acted = false } = {}) {
     const list = await getRaw(KEYS.FILO_NOTIFICATIONS, []);
     const idx = list.findIndex((n) => n.id === id);
@@ -924,7 +934,7 @@
     normalizeRepeat, parseClock, nextRecurrence, nextAlarmOccurrence, formatRepeat, isRecurring,
     resolveTimerRefs, removeTimersByRef, updateTimersByRef,
     // notifications
-    listNotifications, addNotification, dismissNotification,
+    listNotifications, addNotification, dismissNotification, setNotificationText,
     // dashboard cache
     getDashboardCache, setDashboardCache,
     // proxy: regole persistenti per dominio (#152)

@@ -491,6 +491,33 @@
       },
     },
     {
+      scrive: ['aggiornamenti.installa'],
+      aiuto: '"apertura" | "chiusura", o true per "in silenzio" (solo su Windows: una versione nuova di Filo già scaricata si installa la prossima volta che lo apri, con la barra di avanzamento, oppure in silenzio quando lo chiudi)',
+      keys: ['installazione_aggiornamenti', 'installazione aggiornamenti', 'installazione degli aggiornamenti',
+        'quando installare gli aggiornamenti', 'aggiornamenti silenziosi', 'aggiornamento silenzioso', 'aggiornamenti in silenzio',
+        'installa aggiornamenti'],
+      costo: 1,
+      build(v) {
+        const s = String(v == null ? '' : v).trim().toLowerCase().replace(/\s+/g, ' ');
+        const map = {
+          avvio: 'avvio', apertura: 'avvio', 'all\'apertura': 'avvio', 'all\'avvio': 'avvio', 'con la barra': 'avvio',
+          visibile: 'avvio', predefinito: 'avvio', predefinita: 'avvio', 'di serie': 'avvio',
+          chiusura: 'chiusura', 'alla chiusura': 'chiusura', 'quando chiudo': 'chiusura', 'in silenzio': 'chiusura',
+          silenzioso: 'chiusura', silenziosa: 'chiusura', silenzio: 'chiusura',
+        };
+        const silenzio = parsePrefBool(v);
+        const modo = map[s] || (silenzio === null ? null : (silenzio ? 'chiusura' : 'avvio'));
+        if (!modo) return null;
+        const A = global.SN_AGGIORNAMENTI;
+        const altrove = A && A.sceltaNonVale ? A.sceltaNonVale() : null;
+        if (altrove) return { rifiuto: altrove };
+        return {
+          partial: { aggiornamenti: { installa: modo } },
+          label: `Installazione degli aggiornamenti → ${modo === 'avvio' ? 'all\'apertura, con la barra' : 'in silenzio alla chiusura'}`,
+        };
+      },
+    },
+    {
       scrive: ['terminal.shell'],
       aiuto: (ctx) => ctx.shellPref,
       keys: ['shell_terminale', 'shell terminale', 'shell'],

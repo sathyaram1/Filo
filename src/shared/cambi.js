@@ -45,6 +45,9 @@
     'terminal.enabled': { nome: 'modalità terminale', valore: ATTIVA, livello: 2 },
     'nomiSensati.scaricamenti': { nome: 'nome sensato ai file scaricati', valore: ATTIVO, livello: 2 },
     'aggiornamenti.automatici': { nome: 'installazione automatica degli aggiornamenti', valore: ATTIVA, livello: 2 },
+    'aggiornamenti.installa': {
+      nome: 'installazione degli aggiornamenti', valori: { avvio: 'all\'apertura, con la barra', chiusura: 'in silenzio alla chiusura' }, livello: 1,
+    },
     'terminal.shell': { nome: 'shell del terminale', valori: { powershell: 'PowerShell', cmd: 'Prompt dei comandi', bash: 'Bash' }, livello: 2 },
     'tts.voice': { nome: 'voce di riserva della lettura', valore: (v) => v || 'automatica', livello: 1 },
     'tts.rate': { nome: 'velocità di lettura', valore: (v) => `${numero(v)}×`, livello: 1 },

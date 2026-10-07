@@ -836,6 +836,7 @@
       case 'nomiSensati.scaricamenti': return $('nomiSensatiScaricamenti').checked;
       case 'aggiornamenti.automatici': return $('aggiornamentiAutomatici').checked;
       case 'terminal.shell': return $('terminalShell').value;
+      case 'aggiornamenti.installa': return $('aggiornamentiInstalla').value === 'chiusura' ? 'chiusura' : 'avvio';
       case 'tts.voice': return $('ttsVoice').value || '';
       case 'tts.rate': return parseFloat($('ttsRate').value) || 1;
       case 'tts.pitch': return parseFloat($('ttsPitch').value) || 1;
@@ -880,6 +881,7 @@
       case 'terminal.enabled': return !!(s.terminal && s.terminal.enabled === true);
       case 'nomiSensati.scaricamenti': return !!(s.nomiSensati && s.nomiSensati.scaricamenti === true);
       case 'aggiornamenti.automatici': return !(s.aggiornamenti && s.aggiornamenti.automatici === false);
+      case 'aggiornamenti.installa': return s.aggiornamenti && s.aggiornamenti.installa === 'chiusura' ? 'chiusura' : 'avvio';
       case 'terminal.shell': return (s.terminal && s.terminal.shell) || '';
       case 'tts.voice': return tts.voice || '';
       case 'tts.rate': return Number(tts.rate) || 1;
@@ -996,6 +998,9 @@
     if (vuole('terminal.enabled')) $('terminalEnabled').checked = terminal.enabled === true;
     if (vuole('nomiSensati.scaricamenti')) $('nomiSensatiScaricamenti').checked = !!(settings.nomiSensati && settings.nomiSensati.scaricamenti === true);
     if (vuole('aggiornamenti.automatici')) $('aggiornamentiAutomatici').checked = !(settings.aggiornamenti && settings.aggiornamenti.automatici === false);
+    if (vuole('aggiornamenti.installa')) {
+      $('aggiornamentiInstalla').value = settings.aggiornamenti && settings.aggiornamenti.installa === 'chiusura' ? 'chiusura' : 'avvio';
+    }
     if (vuole('terminal.shell')) {
       const sel = $('terminalShell');
       const suWindows = shellDiWindows();
@@ -1216,6 +1221,7 @@
     mostraAutonomia(settings.autonomia && settings.autonomia.livello);
     buildPresetOptions();
     preparaShell();
+    $('aggiornamentiQuando').hidden = !shellDiWindows();
     populateNotifSounds();
     if (!ttsSupported()) {
       const u = $('ttsUnsupported');
@@ -1316,6 +1322,7 @@
       // Al blur il campo mostra il valore davvero in uso: uno fuori dai limiti torna dentro, a vista.
       $(id).addEventListener('blur', () => { $(id).value = String(opzioniBarraLaterale({ [campo]: $(id).value })[campo]); });
     }
+    $('aggiornamentiInstalla').addEventListener('change', persist);
 
     // Lettura ad alta voce: la lista voci può popolarsi in ritardo.
     if (ttsSupported() && typeof window.speechSynthesis.addEventListener === 'function') {
