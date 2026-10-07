@@ -104,7 +104,8 @@ for (const tema of ['light', 'dark']) {
     await banca.locator('#c').click({ button: 'right' });
     await banca.locator('.sn-menu .sn-menu-paste-main').first().click();
     await app.evaluate(({ clipboard }) => clipboard.writeText('testo-due'));
-    const page = await testServer.openReady(openTab, `<!doctype html><title>Sito</title><body style="font:16px Georgia;line-height:2"><input id="fuori" style="margin:40px;width:300px"></body>`);
+    const page = await openTab(testServer.html(`<!doctype html><title>Sito</title><body style="font:16px Georgia;line-height:2"><input id="fuori" style="margin:40px;width:300px"></body>`).replace('127.0.0.1', 'localhost'));
+    await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
     await page.locator('#fuori').click({ button: 'right' });
     await expect(page.locator('.sn-menu .sn-menu-paste-main').first()).toBeVisible({ timeout: 5000 });
     await sleep(400);
