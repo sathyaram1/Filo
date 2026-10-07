@@ -1,5 +1,23 @@
 /* Menu contestuale custom. Tutti gli stili sono prefissati .sn- per non collidere col sito. */
 
+@keyframes sn-fade-in {
+  from { opacity: 0; transform: translateY(-2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes sn-scivola-in {
+  from { transform: translateY(-2px); }
+  to   { transform: translateY(0); }
+}
+
+/* Sulle pagine web il menu non prende niente dalle regole del sito, ovunque nasca (dentro un dialogo modale o
+   l'elemento a schermo intero valgono anche le regole scritte per il loro contenuto, #586): ogni suo elemento torna
+   ai valori di serie, con una forza che le regole di un sito non raggiungono (due id). Le icone no: i loro attributi
+   di disegno contano come regole della pagina e sparirebbero. */
+:is(:root, #sn-scudo#sn-scudo) :is(.sn-menu[data-sn-sul-web], .sn-menu[data-sn-sul-web] :not(svg, svg *)) { all: revert; }
+
+/* Le regole di Filo invece passano sopra il ritorno ai valori di serie: tre id che nessun elemento ha, davanti a tutte. */
+:is(:root, #sn-scudo#sn-scudo#sn-scudo) {
+
 .sn-menu {
   position: fixed;
   z-index: 2147483646;
@@ -31,18 +49,9 @@
   cursor: default;
 }
 
-@keyframes sn-fade-in {
-  from { opacity: 0; transform: translateY(-2px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
 /* Sulle pagine web il menu entra senza dissolvenza né sfocatura (è opaco al 98%): i suoi bottoni rispondono solo se
    il browser lo vede intero (#586). Lo strato alto (popover) porta inset e margini di serie: qui si rimettono. */
 .sn-menu[data-sn-sul-web] { animation-name: sn-scivola-in; backdrop-filter: none; inset: auto; margin: 0; overflow: visible; }
-@keyframes sn-scivola-in {
-  from { transform: translateY(-2px); }
-  to   { transform: translateY(0); }
-}
 
 .sn-menu-item {
   all: unset;
@@ -743,4 +752,58 @@
   display: none;
   width: 0;
   height: 0;
+}
+
+/* Dal tema, per i contenitori del menu: il ritorno ai valori di serie le toglierebbe. */
+.sn-menu,
+.sn-tooltip {
+  accent-color: var(--sn-accent);
+  scrollbar-width: thin;
+  scrollbar-color: var(--sn-border) transparent;
+}
+
+/* Il testo formattato della spiegazione dentro il menu (gemello di .sn-msg-text in popup.css). */
+.sn-menu-inline p { margin: 0 0 8px 0; }
+.sn-menu-inline p:last-child { margin-bottom: 0; }
+.sn-menu-inline h3, .sn-menu-inline h4, .sn-menu-inline h5, .sn-menu-inline h6 {
+  margin: 10px 0 4px 0;
+  font-weight: 600;
+  font-size: 1em;
+}
+.sn-menu-inline strong { font-weight: 600; }
+.sn-menu-inline em { font-style: italic; }
+.sn-menu-inline ul, .sn-menu-inline ol {
+  margin: 4px 0 8px 0;
+  padding-left: 22px;
+}
+.sn-menu-inline li { margin: 2px 0; }
+.sn-menu-inline code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+  background: var(--sn-hover);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.sn-menu-inline pre {
+  background: var(--sn-hover);
+  border-radius: 4px;
+  padding: 8px;
+  overflow-x: auto;
+  margin: 6px 0;
+}
+.sn-menu-inline pre code {
+  background: transparent;
+  padding: 0;
+}
+.sn-menu-inline a.filo-md-link {
+  color: var(--sn-link, var(--sn-accent, #3b82f6));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  word-break: break-word;
+}
+.sn-menu-inline a.filo-md-link:hover {
+  text-decoration: none;
+}
+
 }

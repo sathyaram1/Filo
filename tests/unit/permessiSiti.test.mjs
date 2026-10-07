@@ -640,6 +640,29 @@ test('sulle pagine web solo il menu va nello strato alto: sotto-menu, etichette 
   assert.equal((menu.match(/showPopover\(\)/g) || []).length, 1, 'uno strato alto solo, quello del menu');
 });
 
+test('sulle pagine web il menu non prende le regole del sito: ogni regola del menu sta nel blocco che passa sopra al ritorno ai valori di serie', () => {
+  const css = readFileSync(join(ROOT, 'src', 'styles', 'menu.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  // Blocchi al primo livello: una regola fuori dal blocco forte, sulle pagine web, la cancella il ritorno ai valori di serie.
+  const blocchi = [];
+  let prof = 0; let inizio = 0;
+  for (let i = 0; i < css.length; i++) {
+    if (css[i] === '{') { if (prof === 0) blocchi.push(css.slice(inizio, i).trim()); prof++; }
+    else if (css[i] === '}') { prof--; if (prof === 0) inizio = i + 1; }
+  }
+  assert.equal(prof, 0, 'graffe di menu.css sbilanciate');
+  const altri = blocchi.filter((s) => !s.startsWith('@keyframes '));
+  assert.deepEqual(altri, [
+    ':is(:root, #sn-scudo#sn-scudo) :is(.sn-menu[data-sn-sul-web], .sn-menu[data-sn-sul-web] :not(svg, svg *))',
+    ':is(:root, #sn-scudo#sn-scudo#sn-scudo)',
+  ], 'in menu.css, fuori dal blocco forte, c’è solo il ritorno ai valori di serie');
+  assert.match(css, /\(svg, svg \*\)\) \{ all: revert; \}/);
+  // Le regole per quello che sta dentro il menu vivono lì: altrove perderebbero contro il ritorno ai valori di serie.
+  for (const f of ['popup.css', 'sidebar.css', 'highlight.css', 'spellcheck.css', 'feedback.css']) {
+    const altro = readFileSync(join(ROOT, 'src', 'styles', f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    assert.doesNotMatch(altro, /\.sn-menu[\w-]*[^{]*\{/, `${f} scrive regole per il menu`);
+  }
+});
+
 test('il sorgente per il mondo della pagina: «da chiedere» dove nessuno ha negato, e niente strada vecchia per lo schermo', () => {
   const { buildPermessiPaginaSource } = require(join(ROOT, 'src', 'preload', 'permessi-pagina.js'));
   const src = buildPermessiPaginaSource(['camera']);
