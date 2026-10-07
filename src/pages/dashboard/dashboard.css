@@ -950,6 +950,19 @@ html, body {
   line-height: 1.4;
   color: var(--dash-ink-soft);
 }
+/* Lo stile scelto nel benvenuto: una nota come quella della prima volta, col suo Annulla accanto. */
+.dash-stile-accoglienza {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--dash-ink-soft);
+}
+.dash-stile-accoglienza-testo { min-width: 0; overflow-wrap: anywhere; }
+.dash-stile-accoglienza .dash-action-btn { padding: 3px 10px; font-size: 12.5px; transition: background 0.15s ease, color 0.15s ease; }
 /* La frase della prima volta: una riga a sé sopra i bottoni, discreta come una nota. */
 .dash-cmd-primavolta {
   flex-basis: 100%;

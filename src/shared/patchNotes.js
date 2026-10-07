@@ -9,9 +9,17 @@
     // In cima il blocco della prossima versione (package.json + 1 patch). Se il suo numero è già
     // uscito, sopra se ne apre uno nuovo: { version, date, features: [], fixes: [] }.
     {
-      version: '0.2.235', date: '2026-10-06',
+      version: '0.2.237', date: '2026-10-07',
       features: [
         'Su ogni pagina, spingendo il mouse contro il bordo sinistro, si apre una barra con indietro, avanti, ricarica, home, incognito, schermo intero e chiudi scheda, e in fondo l\'ora, la cronologia, le app, il profilo e le impostazioni. La apri anche dalla linguetta a sinistra delle schede o con Ctrl+Shift+B (Cmd+Shift+B su Mac). Le icone del tasto destro si trascinano nella barra e ritorno, o lo chiedi a Filo a parole, e restano dove le metti. Col tasto destro su Indietro e Avanti vedi le pagine della scheda e ci torni con un clic, anche dopo essere passato dalla home. In Preferenze → Impostazioni avanzate, col tasto destro sulla striscia o chiedendolo a Filo nascondi la striscia, spegni l\'apertura dal bordo o cambi quanto aspetta e quanto resta aperta.',
+      ],
+      fixes: [],
+    },
+    {
+      version: '0.2.235', date: '2026-10-06',
+      features: [
+        'Se un post, un video o una mappa dentro la pagina di un altro sito non si vede perché Filo ne ha bloccato i cookie, sopra compare la domanda «Attivo i cookie di Instagram per questo contenuto?». Con «Sì» il contenuto si ricarica e funziona. Li togli col tasto destro sul contenuto o in Impostazioni, Sicurezza.',
+        'Nell\'intervista di benvenuto, quando dici a Filo come vuoi che ti scriva, lo stile si imposta subito senza riquadri da confermare. In chat leggi «Userò questo stile» con il testo esatto, e «Annulla» lo toglie.',
       ],
       fixes: [
         'Un sito dal nome comune non passa pi\u00f9 per l\'imitazione di un marchio. team.com, email.com, apply.com, telegraph.co.uk e le altre parole vicine a Steam, Gmail, Apple o Telegram aprivano il blocco a tutta pagina, quello che si toglie solo scrivendo \u00abconfermo\u00bb. Adesso trovi un avviso che chiudi con un clic. Il blocco resta sui sosia scritti con lettere che si somigliano, come paypa1 o g00gle, e su ogni sito che oltre al nome somigliante \u00e8 stato registrato da poco, ha il certificato rotto o ti chiede la password, anche se il modulo compare dopo.',

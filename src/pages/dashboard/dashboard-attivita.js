@@ -863,6 +863,46 @@
   // si mangia il bottone e la funzione sparisce dalla chat.
   const ROW_AND_BUTTON = ['SALVA_APPUNTO', 'IMPOSTA_ESTETICA', 'RINOMINA_FILE'];
 
+  // Lo stile proposto nell'intervista di benvenuto si imposta senza riquadro (#592.2): la chat lo dice in una riga
+  // col suo Annulla, fuori dal blocco di attività.
+  function stileAccoglienza(a) {
+    const o = a && a._output;
+    return isType(a, 'IMPOSTA_PREFERENZA') && a._executed !== false && !!o && typeof o.stile === 'string' && !!o.stile.trim();
+  }
+
+  function rigaStileAccoglienza(a) {
+    const o = a._output;
+    const cambio = (Array.isArray(a._cambi) ? a._cambi : []).find((c) => c && c.id);
+    const riga = document.createElement('div');
+    riga.className = 'dash-stile-accoglienza';
+    const testo = document.createElement('span');
+    testo.className = 'dash-stile-accoglienza-testo';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'dash-action-btn';
+    btn.textContent = 'Annulla';
+    btn.title = 'Torna a come scrivevo prima';
+    const mostra = () => {
+      testo.textContent = o.annullato ? 'Stile annullato: scrivo come prima.' : `Userò questo stile: «${o.stile.trim()}»`;
+      // Senza un cambio (lo stile era già quello) non c'è niente da rimettere.
+      btn.hidden = !!o.annullato || !cambio;
+    };
+    btn.addEventListener('click', async () => {
+      if (btn.disabled || !cambio) return;
+      btn.disabled = true;
+      let r = null;
+      try { r = await send({ type: MSG.CAMBI_ANNULLA, id: cambio.id }); } catch (_) { r = null; }
+      btn.disabled = false;
+      // Già annullato dal segno sul messaggio: il risultato è quello voluto.
+      if (r && (r.ok || r.error === 'già annullato')) { o.annullato = true; mostra(); return; }
+      btn.textContent = 'Annulla non riuscito: riprova';
+      btn.title = (r && r.error) || '';
+    });
+    mostra();
+    riga.append(testo, btn);
+    return riga;
+  }
+
   // Una pagina che il modello voleva aprire e che la lista dei siti bloccati ha fermato: la
   // notifica se ne va in pochi secondi, e la chat le tiene il suo «Apri comunque» (#590).
   function apribileComunque(a) {
@@ -957,7 +997,7 @@
       // bottone è come si risponde.
       const anche = a._confirm
         || (ROW_AND_BUTTON.includes(String(a.type || '').toUpperCase()) && a._executed !== false)
-        || apribileComunque(a) || permessoDaConcedere(a);
+        || apribileComunque(a) || permessoDaConcedere(a) || stileAccoglienza(a);
       if (activity) {
         if (told) {
           // Già in cronologia; resta solo l'eventuale bottone (link, conferma).
@@ -1405,6 +1445,7 @@
       return btn;
     }
     if (type === 'RINOMINA_FILE') return bottoneRimettiNomi(a);
+    if (stileAccoglienza(a)) return rigaStileAccoglienza(a);
     if (type === 'APRI_FILE') {
       const btn = document.createElement('a');
       btn.className = 'dash-action-btn';

@@ -692,6 +692,16 @@
     // suo figlio da nascondere: fra frame si passa dal main, una postMessage la saprebbe scrivere anche il sito.
     COOKIES_FRAME_BANNER: 'cookies_frame_banner',   // (riquadro) {} → { ok }
     COOKIES_HIDE_FRAME: 'cookies_hide_frame',       // main → pagina { url, origin }
+    // #760 — riquadro di terzi rotto dai cookie che Filo rifiuta. Il riquadro dice cosa mostra; il servizio e la
+    // pagina li ricava il main dal mittente, mai dal messaggio. La proposta la disegna la pagina, la risposta la
+    // valida il main sul gettone che ha dato lui.
+    RIQUADRO_COOKIE_SEGNALA: 'riquadro_cookie_segnala', // (riquadro) { testo, parole, media, password, larghezza, altezza } → { ok }
+    RIQUADRO_COOKIE_STATO: 'riquadro_cookie_stato',     // (riquadro) {} → { ok, nome, consentito, proponibile }
+    RIQUADRO_COOKIE_CAMBIA: 'riquadro_cookie_cambia',   // (riquadro, tasto destro) { attiva } → { ok }
+    RIQUADRO_COOKIE_PROPONI: 'riquadro_cookie_proponi', // main → pagina { token, nome, url, origin }
+    RIQUADRO_COOKIE_RITIRA: 'riquadro_cookie_ritira',   // main → pagina { token }
+    RIQUADRO_COOKIE_AGGIORNA: 'riquadro_cookie_aggiorna', // main → riquadri: l'elenco o la modalità sono cambiati
+    RIQUADRO_COOKIE_RISPOSTA: 'riquadro_cookie_risposta', // (pagina) { token, si } → { ok }
     // Solo pagine filo:// (Sicurezza): cosa Filo ha fatto coi banner, sito per sito, nel profilo della finestra.
     COOKIES_SITES: 'cookies_sites',                 // {} → { ok, sites: [{ site, rejected, hidden, at }] }
     // Solo pagine filo:// (Sicurezza): «Apri da un altro paese» ha un fornitore? E con quale host.
