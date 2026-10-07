@@ -17,6 +17,7 @@
   <script src="filo://shared/storage.js"></script>
   <script src="filo://shared/sounds.js"></script>
   <script src="filo://shared/confirmUi.js"></script>
+  <script src="filo://shared/autonomia.js"></script>
   <script src="filo://shared/onboarding.js"></script>
   <script src="filo://shared/caselleAlSicuro.js"></script>
   <script src="filo://shared/vociImpostazioni.js"></script>
@@ -178,6 +179,13 @@
       <select id="agentStylePreset"></select>
       <textarea id="agentStyleText" rows="4" placeholder="Es. Rispondi sempre in italiano, con un tono pacato e qualche esempio pratico." style="width:100%;margin-top:10px;"></textarea>
       <p id="agentStyleNote" class="agent-style-note" aria-live="polite" hidden></p>
+    </section>
+
+    <section id="autonomia">
+      <h2 id="autonomiaTitolo">Autonomia di Filo</h2>
+      <p class="sn-muted">Filo fa da solo quello che può disfare. Quando legge cose scritte da altri, fa meno. Tu scegli con un livello quanto si fida.</p>
+      <div class="sn-cookie-modes" id="autonomiaLivelli" role="radiogroup" aria-labelledby="autonomiaTitolo"></div>
+      <span id="autonomiaHint" class="sn-saved-indicator" aria-live="polite">Salvato</span>
     </section>
 
     <section>
@@ -347,12 +355,21 @@
 
       <section id="sec-aggiornamenti">
         <h2>Aggiornamenti</h2>
-        <p class="sn-muted">A ogni avvio Filo controlla se c'è una versione nuova, la scarica e la installa quando lo chiudi. Se togli la spunta ti avvisa nella home e aspetta che premi «Installa». Fino ad allora restano aperti anche i problemi di sicurezza già corretti nella versione nuova.</p>
+        <p class="sn-muted">A ogni avvio Filo controlla se c'è una versione nuova, la scarica e la installa. Se togli la spunta ti avvisa nella home e aspetta che premi «Installa». Fino ad allora restano aperti anche i problemi di sicurezza già corretti nella versione nuova.</p>
         <div class="sn-toggle-row">
           <label>
             <input type="checkbox" id="aggiornamentiAutomatici" />
             <span>Installa gli aggiornamenti da solo</span>
           </label>
+        </div>
+        <!-- Solo su Windows: su Mac e Linux all'apertura non si installa niente (src/main/aggiornamentoRegole.js). -->
+        <div id="aggiornamentiQuando" hidden>
+          <p class="sn-muted" style="margin-top:12px;">Installata alla chiusura non si vede: se riapri Filo in quei dieci secondi, Windows dice che il collegamento non funziona.</p>
+          <label for="aggiornamentiInstalla" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Quando installarla</label>
+          <select id="aggiornamentiInstalla">
+            <option value="avvio">La prossima volta che apro Filo, con la barra di avanzamento</option>
+            <option value="chiusura">In silenzio, quando chiudo Filo</option>
+          </select>
         </div>
       </section>
 

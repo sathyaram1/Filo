@@ -840,6 +840,7 @@
       case 'nomiSensati.scaricamenti': return $('nomiSensatiScaricamenti').checked;
       case 'aggiornamenti.automatici': return $('aggiornamentiAutomatici').checked;
       case 'terminal.shell': return $('terminalShell').value;
+      case 'aggiornamenti.installa': return $('aggiornamentiInstalla').value === 'chiusura' ? 'chiusura' : 'avvio';
       case 'tts.voice': return $('ttsVoice').value || '';
       case 'tts.rate': return parseFloat($('ttsRate').value) || 1;
       case 'tts.pitch': return parseFloat($('ttsPitch').value) || 1;
@@ -884,6 +885,7 @@
       case 'terminal.enabled': return !!(s.terminal && s.terminal.enabled === true);
       case 'nomiSensati.scaricamenti': return !!(s.nomiSensati && s.nomiSensati.scaricamenti === true);
       case 'aggiornamenti.automatici': return !(s.aggiornamenti && s.aggiornamenti.automatici === false);
+      case 'aggiornamenti.installa': return s.aggiornamenti && s.aggiornamenti.installa === 'chiusura' ? 'chiusura' : 'avvio';
       case 'terminal.shell': return (s.terminal && s.terminal.shell) || '';
       case 'tts.voice': return tts.voice || '';
       case 'tts.rate': return Number(tts.rate) || 1;
@@ -1001,6 +1003,9 @@
     if (vuole('terminal.enabled')) $('terminalEnabled').checked = terminal.enabled === true;
     if (vuole('nomiSensati.scaricamenti')) $('nomiSensatiScaricamenti').checked = !!(settings.nomiSensati && settings.nomiSensati.scaricamenti === true);
     if (vuole('aggiornamenti.automatici')) $('aggiornamentiAutomatici').checked = !(settings.aggiornamenti && settings.aggiornamenti.automatici === false);
+    if (vuole('aggiornamenti.installa')) {
+      $('aggiornamentiInstalla').value = settings.aggiornamenti && settings.aggiornamenti.installa === 'chiusura' ? 'chiusura' : 'avvio';
+    }
     if (vuole('terminal.shell')) {
       const sel = $('terminalShell');
       const suWindows = shellDiWindows();
@@ -1151,10 +1156,77 @@
 
   let caricato = false;
 
+  // ── Autonomia di Filo (#530) ─────────────────────────────────────────────
+  // Alzare il livello vuole «conferma», abbassarlo no: lo dice SN_AUTONOMIA, non questa pagina.
+  // La scelta parte subito e da sola, fuori dai campi in sospeso: un livello mezzo confermato non esiste.
+  const Autonomia = window.SN_AUTONOMIA;
+  let livelloSalvato = Autonomia ? Autonomia.LIVELLO_PREDEFINITO : 'default';
+  let sceltaInCorso = false;
+
+  function disegnaAutonomia() {
+    const box = $('autonomiaLivelli');
+    if (!box || !Autonomia) return;
+    box.textContent = '';
+    for (const l of Autonomia.livelliSelezionabili()) {
+      const label = document.createElement('label');
+      label.className = 'sn-cookie-mode';
+      const input = document.createElement('input');
+      input.type = 'radio';
+      input.name = 'autonomia';
+      input.value = l.id;
+      input.id = `autonomia-${l.id}`;
+      input.addEventListener('change', () => { if (input.checked) scegliAutonomia(l.id); });
+      const testo = document.createElement('span');
+      const nome = document.createElement('span');
+      nome.className = 'sn-cookie-mode-label';
+      nome.textContent = l.nome;
+      const frase = document.createElement('span');
+      frase.className = 'sn-muted sn-cookie-mode-desc';
+      frase.textContent = l.frase;
+      testo.append(nome, frase);
+      label.append(input, testo);
+      box.appendChild(label);
+    }
+  }
+
+  function mostraAutonomia(livello) {
+    if (!Autonomia) return;
+    livelloSalvato = Autonomia.livelloAttivo(livello);
+    const r = $(`autonomia-${livelloSalvato}`);
+    if (r) r.checked = true;
+  }
+
+  async function scegliAutonomia(nuovo) {
+    if (sceltaInCorso || nuovo === livelloSalvato) return;
+    const serve = Autonomia.richiestaCambioLivello(livelloSalvato, nuovo);
+    if (serve === 'no') { mostraAutonomia(livelloSalvato); return; }
+    if (serve === 'conferma') {
+      sceltaInCorso = true;
+      const info = Autonomia.infoLivello(nuovo);
+      const Ui = window.SN_CONFIRM_UI;
+      let ok = false;
+      try {
+        ok = Ui ? await Ui.confirmTyped({
+          title: `Autonomia: ${info.nome}`,
+          text: `Filo farà da solo più cose di adesso.\n\n${info.frase}`,
+          avviso: 'Così Filo si fida di più.',
+          okLabel: 'Cambia',
+        }) : false;
+      } finally { sceltaInCorso = false; }
+      if (!ok) { mostraAutonomia(livelloSalvato); return; }
+    }
+    mostraAutonomia(nuovo);
+    await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { autonomia: { livello: nuovo } } });
+    flashSaved('autonomiaHint');
+  }
+
   async function load() {
     const settings = await Storage.getSettings();
+    disegnaAutonomia();
+    mostraAutonomia(settings.autonomia && settings.autonomia.livello);
     buildPresetOptions();
     preparaShell();
+    $('aggiornamentiQuando').hidden = !shellDiWindows();
     populateNotifSounds();
     if (!ttsSupported()) {
       const u = $('ttsUnsupported');
@@ -1193,6 +1265,7 @@
   // cambiato e che l'utente non sta toccando qui, così il cursore non salta.
   function riallinea(settings) {
     if (!caricato || !settings) return;
+    if (!sceltaInCorso) mostraAutonomia(settings.autonomia && settings.autonomia.livello);
     riempi(settings, (k) => !toccati.has(k) && valoreDelCampo(k) !== valoreSalvato(settings, k));
     riallineaToken(settings.themeTokens);
     riallineaTabColor(settings.tabColor);
@@ -1254,6 +1327,7 @@
       // Al blur il campo mostra il valore davvero in uso: uno fuori dai limiti torna dentro, a vista.
       $(id).addEventListener('blur', () => { $(id).value = String(opzioniBarraLaterale({ [campo]: $(id).value })[campo]); });
     }
+    $('aggiornamentiInstalla').addEventListener('change', persist);
 
     // Lettura ad alta voce: la lista voci può popolarsi in ritardo.
     if (ttsSupported() && typeof window.speechSynthesis.addEventListener === 'function') {

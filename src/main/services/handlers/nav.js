@@ -3,6 +3,7 @@
 // handlers.js e riceve (msg, sender, origin), ritornando l'oggetto risposta.
 
 const { app } = require('electron');
+const { soloFilo } = require('./origine');
 
 module.exports = function register(on, ctx) {
   const { MSG, winOf, apriDaFilo, SCHEMI_USCITA } = ctx;
@@ -108,6 +109,11 @@ module.exports = function register(on, ctx) {
     app.quit();
     return { ok: true };
   });
+
+  on(MSG.AGGIORNAMENTO_INSTALLA, soloFilo(async (msg) => {
+    const U = require('../../updater');
+    return msg && msg.avvisa === true ? U.riavviaDallaHome() : U.riavviaEAggiorna();
+  }));
 
   on(MSG.NAV_BACK, async (msg, sender) => {
     if (sender?.tab?.id) {

@@ -5,6 +5,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { home, modelloFinto, ripristina, chiedi, chiamateAlModello } from './helpers/chatFinta.mjs';
 import { clickConfirm, confirmText } from './helpers/confirm.mjs';
+import { livelloAutonomia } from './helpers/autonomia.mjs';
 
 const PARTENZA = {
   batteria: { livello: 70, inCarica: false, collegata: false },
@@ -92,6 +93,7 @@ test('«alza il volume al 40%» in chat: il volume del computer è al 40% e la v
 });
 
 test('«spegni il Bluetooth» in chat e il tasto nel riquadro della home fanno la stessa cosa allo stesso computer', async ({ app }) => {
+  await livelloAutonomia(app, 'conservativo'); // il popup di un costo 2 si prova a Conservativo (#530)
   await computerFinto(app);
   const page = await home(app);
   await expect(voce(page, 'bluetooth')).toHaveAttribute('title', 'Bluetooth acceso', { timeout: 8_000 });
@@ -209,6 +211,7 @@ test('le cuffie abbinate si collegano dal riquadro del Bluetooth, e una rete con
 });
 
 test('in chat: una rete detta a metà si trova, e cambiare rete chiede conferma col nome vero prima di partire', async ({ app }) => {
+  await livelloAutonomia(app, 'conservativo'); // il popup di un costo 2 si prova a Conservativo (#530)
   await computerFinto(app, { reti: ['Casa', 'Ufficio 5G'] });
   const page = await home(app);
   await modelloFinto(app, [
@@ -224,6 +227,7 @@ test('in chat: una rete detta a metà si trova, e cambiare rete chiede conferma 
 });
 
 test('in chat: la conferma nomina la rete che partirà anche trovata per somiglianza; un nome che non ne trova una sola non chiede conferma', async ({ app }) => {
+  await livelloAutonomia(app, 'conservativo'); // il popup di un costo 2 si prova a Conservativo (#530)
   await computerFinto(app, { reti: ['Cava', 'Ufficio 5G', 'Ufficio Ospiti'] });
   const page = await home(app);
   await modelloFinto(app, [
@@ -249,6 +253,7 @@ test('in chat: la conferma nomina la rete che partirà anche trovata per somigli
 });
 
 test('in chat, le parole dell\'utente bastano: «le cuffie Sony» collega le Cuffie Sony e «la rete di casa» chiede conferma per Casa', async ({ app }) => {
+  await livelloAutonomia(app, 'conservativo'); // il popup di un costo 2 si prova a Conservativo (#530)
   await computerFinto(app, {
     dispositivi: [{ indirizzo: '00:11:22:33:44:55', nome: 'Cuffie Sony', collegato: false }, { indirizzo: '00:11:22:33:44:66', nome: 'Casse JBL', collegato: false }],
     reti: ['Casa', 'Ufficio 5G'],
@@ -377,6 +382,7 @@ test('aperto il riquadro del Bluetooth, il tasto spegne subito: non aspetta l\'e
 });
 
 test('un sito non comanda il computer: le due porte rispondono «rifiutato» fuori da Filo', async ({ app, shell }) => {
+  await livelloAutonomia(app, 'conservativo'); // il popup di un costo 2 si prova a Conservativo (#530)
   void shell;
   await computerFinto(app);
   const out = await app.evaluate(async ({ BrowserWindow }) => {

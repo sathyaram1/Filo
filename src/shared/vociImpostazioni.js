@@ -50,6 +50,7 @@
         barraAttesa: 'barraLaterale.attesaMs',
         barraUscita: 'barraLaterale.uscitaMs',
         aggiornamentiAutomatici: 'aggiornamenti.automatici',
+        aggiornamentiInstalla: 'aggiornamenti.installa',
       },
       gruppi: { tokenCode: 'themeTokens.*', tabColorCode: 'tabColor.*' },
       fuori: {},
@@ -195,7 +196,7 @@
     if (percorso.startsWith('themeTokens.')) return { come: `IMPOSTA_ESTETICA token ${percorso.slice(12)}`, chiave: '', conferma: false };
     const P = global.SN_PREF;
     const s = P && P.setterDi ? P.setterDi(percorso) : null;
-    return s ? { come: `chiave ${s.keys[0]}`, chiave: s.keys[0], conferma: s.level === 2 } : { come: '', chiave: '', conferma: false };
+    return s ? { come: `chiave ${s.keys[0]}`, chiave: s.keys[0], conferma: s.costo >= 2 } : { come: '', chiave: '', conferma: false };
   }
   function minuscola(s) {
     return s.charAt(0).toLowerCase() + s.slice(1);
@@ -322,6 +323,11 @@
     }
     if (voce && voce.testo) return String(v || '').trim() ? `«${String(v).trim()}»` : 'nessuno';
     if (percorso === 'terminal.shell' && sistema && sistema !== 'win32' && !['bash', 'sh'].includes(v)) return 'shell di sistema (sh)';
+    if (percorso === 'aggiornamenti.installa') {
+      const A = global.SN_AGGIORNAMENTI;
+      const altrove = A && A.sceltaNonVale ? A.sceltaNonVale() : null;
+      if (altrove) return `non vale qui (${altrove})`;
+    }
     if (K && K.valore) return K.valore(percorso, v);
     return typeof v === 'boolean' ? (v ? 'sì' : 'no') : String(v == null ? 'nessuno' : v);
   }

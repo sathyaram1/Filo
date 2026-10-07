@@ -1494,6 +1494,34 @@ html, body {
 .dash-lightbox.open { display: flex; }
 .dash-lightbox img { max-width: 95vw; max-height: 95vh; border-radius: 8px; }
 
+/* Il livello di autonomia (#530): tacche come una carica, piene fino al livello scelto. */
+.dash-autonomia {
+  /* In basso come l'invio: quando il testo va a capo resta sulla riga dei bottoni. */
+  align-self: flex-end;
+  margin-bottom: 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 10px 0 12px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dash-ink-mute);
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.dash-autonomia:hover, .dash-autonomia:focus-visible { background: var(--dash-line); color: var(--dash-ink); outline: none; }
+.dash-autonomia-tacche { display: inline-flex; align-items: flex-end; gap: 2px; height: 11px; }
+.dash-autonomia-tacca { width: 3px; border-radius: 1px; background: var(--dash-line-strong); }
+.dash-autonomia-tacca:nth-child(1) { height: 5px; }
+.dash-autonomia-tacca:nth-child(2) { height: 8px; }
+.dash-autonomia-tacca:nth-child(3) { height: 11px; }
+.dash-autonomia-tacca.piena { background: var(--dash-accent); }
+
 .dash-dir {
   flex-basis: 100%;
   padding: 2px 14px 0;

@@ -1424,6 +1424,15 @@
               onClick: () => api.message({ type: 'cancel_auto_feedback', id: fbId }).catch(() => {}),
             };
           }
+          // #1039 — «Riavvia e aggiorna»: se l'installatore non parte Filo resta aperto, e lo dice.
+          if (a && a.aggiornaFilo && !a.onClick) {
+            return {
+              label: a.label,
+              onClick: () => api.message({ type: 'aggiornamento_installa' }).then((res) => {
+                if (res && res.ok === false) NOTIFS.show(res.frase || 'Non sono riuscito ad avviare l’aggiornamento');
+              }).catch(() => {}),
+            };
+          }
           // #410.1 — toast di fine scaricamento: apri il file / mostra in cartella.
           if (a && a.openDownloadId && !a.onClick && api.downloads) {
             const id = a.openDownloadId;
@@ -1888,12 +1897,12 @@
     });
 
     function provenienza(r) {
-      try { return window.SN_ESEGUIBILI.provenienza(r.site, r.siteUncertain); } catch (_) {}
+      try { return window.SN_ESEGUIBILI.provenienza(r.site, r.siteUncertain, r.servedBy, r.filename); } catch (_) {}
       return r.site ? `da ${r.site}` : '';
     }
 
     function testoScarica(r) {
-      try { return window.SN_ESEGUIBILI.testoScarica(r.filename, r.site, r.siteUncertain); } catch (_) {}
+      try { return window.SN_ESEGUIBILI.testoScarica(r.filename, r.site, r.siteUncertain, r.servedBy); } catch (_) {}
       return `«${r.filename}» è un programma. Scaricarlo?`;
     }
 

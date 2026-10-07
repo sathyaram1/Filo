@@ -365,6 +365,8 @@
     APRI_COMUNQUE: 'apri_comunque',                 // { url } — sito della lista dei siti bloccati: pagine filo://, o l'assistente per una sua apertura fermata (#590)
     APERTURA_FERMATA: 'apertura_fermata',           // main → assistente sulla pagina: { callId, host, reason, url } (#590)
     QUIT_APP: 'quit_app',
+    // #1039 — «Riavvia e aggiorna»: chiude Filo e lancia l'installatore, quindi solo dalle superfici di Filo (soloFilo).
+    AGGIORNAMENTO_INSTALLA: 'aggiornamento_installa', // → { ok } | { ok:false, frase }
     NAV_BACK: 'nav_back',
     NAV_FORWARD: 'nav_forward',
     NAV_RELOAD: 'nav_reload',
@@ -894,6 +896,11 @@
     // needsConfirm, describe }: se needsConfirm il client mostra il popup di
     // conferma e poi rimanda l'azione via FILO_CONFIRM_ACTION. { action }
     FILO_RUN_ACTION: 'filo_run_action',
+    // #530 — l'agente "Aiuto" chiede se una sua azione sulla pagina (copia, cerca,
+    // condividi) parte, chiede o no. { costo, campo } → { risposta, digita, perche, no? }.
+    FILO_DECIDI_PAGINA: 'filo_decidi_pagina',
+    // #530 — l'Aiuto si è aperto: comincia una conversazione nuova, che non ha ancora letto niente. {}
+    FILO_AIUTO_NUOVO: 'filo_aiuto_nuovo',
 
     // #810 — un indirizzo web proposto da un modello in una pagina di Filo si apre solo dopo la porta delle
     // uscite. { url, parole } → { aperto, frase }
