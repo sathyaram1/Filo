@@ -1402,6 +1402,7 @@
     hasRevealedText,
     inlineFrameBody,
     isHiddenFromUser,
+    clippedExtent,
     isFiloOwnUi,
     pageMeta,
     pageExcerpt,
