@@ -1,4 +1,4 @@
-// #589.11 giro 2, rilievo 1: su una pagina che si fa scura invertendo i colori (o in scala di grigi), aprire il menu
+// #589.11 giro 2, rilievo 2: su una pagina che si fa scura invertendo i colori (o in scala di grigi), aprire il menu
 // toglie l'effetto a tutta la pagina finché il menu resta aperto: la pagina lampeggia chiara a ogni tasto destro.
 import { test, expect } from '../../fixtures/electron.mjs';
 
@@ -18,7 +18,7 @@ function pixel(app, page, x, y) {
   }, { u: page.url(), x, y });
 }
 
-test('r1 la pagina scura per inversione resta scura col menu aperto, e il menu incolla', async ({ app, openTab, testServer }) => {
+test('r2 la pagina scura per inversione resta scura col menu aperto, e il menu incolla', async ({ app, openTab, testServer }) => {
   await app.evaluate(({ clipboard }, s) => clipboard.writeText(s), SEGRETO);
   const page = await testServer.openReady(openTab, `<!doctype html><html style="filter:invert(1) hue-rotate(180deg)">
     <body style="padding:40px;background:#fff;color:#000"><h1>Pagina in tema scuro</h1>
