@@ -411,6 +411,8 @@
       // activeElement nel caso il keydown arrivi sul body con un campo a fuoco.
       const target = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target;
       if (isEditable(target) || isEditable(document.activeElement)) return;
+      // Il campo dentro un componente chiuso lo vede solo la regola intera (src/shared/campoTesto.js).
+      if (self.SN_CAMPO_TESTO && self.SN_CAMPO_TESTO.scriveQui(document) === true) return;
       // Una pagina di Filo in cui l'utente ha dato Ctrl+Z a un suo comando (un
       // modulo dell'Editor) se lo tiene: vince la scelta esplicita (#545).
       if (PAGINA_DI_FILO && document.documentElement.dataset.filoCtrlZ === 'pagina') return;
