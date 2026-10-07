@@ -473,7 +473,7 @@
       required: ['icona', 'dove'],
     },
     INSTALLA_AGGIORNAMENTO: {
-      description: 'Installa la versione nuova di Filo quando l\'utente lo chiede ("aggiornati", "installa la versione nuova", "installa l\'aggiornamento"): la scarica e si installa quando l\'utente chiude Filo. Serve soprattutto a chi ha spento «Installa gli aggiornamenti da solo». L\'esito dice se c\'è una versione nuova, quale, e se sta scaricando o è già pronta: riporta quello, senza promettere di più. Per accendere o spegnere l\'installazione automatica si usa IMPOSTA_PREFERENZA.',
+      description: 'Aggiorna FILO STESSO all\'ultima versione quando l\'utente lo chiede ("aggiornati", "aggiorna Filo", "installa la versione nuova", "installa l\'aggiornamento", "c\'è una versione nuova di Filo?"). Se una versione nuova è già scaricata riavvia Filo per installarla: la conferma la chiede il sistema all\'utente, e le schede si riaprono da sole. Altrimenti controlla se ce n\'è una e la scarica, anche per chi ha spento «Installa gli aggiornamenti da solo». L\'esito dice com\'è: riporta quello, senza promettere di più e senza inventare numeri di versione. NON ricarica la pagina ("aggiorna la pagina" è un\'altra cosa) e non aggiorna siti o altri programmi. Per accendere o spegnere l\'installazione automatica si usa IMPOSTA_PREFERENZA.',
       properties: {},
       required: [],
       risultato: true,

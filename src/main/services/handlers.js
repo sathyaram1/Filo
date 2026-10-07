@@ -1970,6 +1970,15 @@ async function eseguiAzioneFilo(action, {
     else delete action._nomeSistema;
   }
 
+  // #1039 — «aggiornati» riavvia Filo solo se una versione è già pronta: lo dice l'updater, mai il modello.
+  if (type === 'INSTALLA_AGGIORNAMENTO') {
+    let st = null;
+    try { st = await require('../updater').statoAggiornamento(); } catch (_) {}
+    action._riavvio = !!(st && st.riavvio);
+    action._versione = action._riavvio ? st.versione : null;
+    action._conBarra = action._riavvio && st.piattaforma === 'win32';
+  }
+
   // ── chi decide se parte (#530) ─────────────────────────────────────────────
   // Il registro dà costo, campo, elenco fisso e difesa (src/shared/actionLevels.js), mai l'LLM; la risposta
   // la dà SN_AUTONOMIA col livello scelto dall'utente e lo stato del compito. Fuori registro o senza costo:
@@ -2719,10 +2728,14 @@ async function eseguiAzioneFilo(action, {
         return { executed: true, kept: false, output: { annullato: r.id, frase: r.frase, saltati: r.saltati || [] } };
       }
       case 'INSTALLA_AGGIORNAMENTO': {
-        // #786 — la stessa porta di «Installa» sulla carta della home.
-        const r = await require('../updater').installaAggiornamento();
-        if (!r.ok) return { executed: false, kept: false, output: { error: r.error } };
-        return { executed: true, kept: false, output: { aggiornamento: r.stato, versione: r.versione, ...(r.errore ? { error: r.errore } : {}) } };
+        // #786 — da spento è la stessa porta di «Installa» sulla carta; con una versione pronta riavvia (#1039).
+        const r = await require('../updater').aggiornaDaChat({ riavvio: action._riavvio === true });
+        const aggiornamento = r.aggiornamento || { pronto: 'pronta' }[r.esito] || r.esito;
+        return {
+          executed: r.eseguito === true,
+          kept: false,
+          output: { aggiornamento, versione: r.versione || null, frase: r.frase, ...(r.eseguito === true ? {} : { error: r.frase }) },
+        };
       }
       case 'VOLUME':
       case 'BLUETOOTH':
@@ -3539,6 +3552,9 @@ function toolResultText({ action, res, rendered }) {
     return res.output.updated.length ? `Spostate:\n${nomiSalvati(res.output.updated)}` : 'Nessuna sveglia o timer corrispondeva: niente da spostare. Non ripetere uguale: chiedi all\'utente quale intende.';
   }
   if ((type === 'VOLUME' || type === 'BLUETOOTH' || type === 'WIFI') && res.output) return esitoSistemaPerModello(res.output);
+  if (type === 'INSTALLA_AGGIORNAMENTO' && res.output && res.output.frase) {
+    return `${res.output.frase}\nDillo all'utente in una riga, con parole tue; non ripetere l'azione.`;
+  }
   // #686 — lo zoom lo riferisce il numero VERO, non quello chiesto: un «al
   // 900%» finisce al massimo, e l'utente deve sentirselo dire.
   if (type === 'ZOOM_PAGINA' && res.executed && res.output) {

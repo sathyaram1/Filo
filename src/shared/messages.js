@@ -365,6 +365,8 @@
     APRI_COMUNQUE: 'apri_comunque',                 // { url } — sito della lista dei siti bloccati: pagine filo://, o l'assistente per una sua apertura fermata (#590)
     APERTURA_FERMATA: 'apertura_fermata',           // main → assistente sulla pagina: { callId, host, reason, url } (#590)
     QUIT_APP: 'quit_app',
+    // #1039 — «Riavvia e aggiorna»: chiude Filo e lancia l'installatore, quindi solo dalle superfici di Filo (soloFilo).
+    AGGIORNAMENTO_INSTALLA: 'aggiornamento_installa', // → { ok } | { ok:false, frase }
     NAV_BACK: 'nav_back',
     NAV_FORWARD: 'nav_forward',
     NAV_RELOAD: 'nav_reload',
