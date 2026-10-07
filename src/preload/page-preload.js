@@ -516,6 +516,19 @@ try {
   globalThis.SN_APERTURA_SCELTA = (url) => { try { ipcRenderer.sendSync('filo:apertura-scelta', String(url || '')); } catch (_) {} };
 } catch (_) {}
 
+// Electron fa di window.close() la chiusura dell'intera finestra di Filo, da ogni pagina e riquadro: qui la pagina chiede
+// e il main chiude solo la sua scheda, quando un browser lo permetterebbe (#737.1 giro 11, ipc.js `filo:chiudi-pagina`).
+try {
+  const CHIUDI = 'filo:chiudi-pagina';
+  const chiudi = () => { try { ipcRenderer.send(CHIUDI); } catch (_) {} };
+  const ascolta = () => window.addEventListener(CHIUDI, chiudi, true);
+  ascolta();
+  // La riscrittura da capo (document.open, la ricevuta scritta dalla pagina che l'ha aperta) toglie gli ascolti.
+  new MutationObserver(ascolta).observe(document, { childList: true });
+  webFrame.executeJavaScript(`(()=>{const w=window,d=EventTarget.prototype.dispatchEvent,E=Event;
+    Object.defineProperty(w,'close',{value:function close(){d.call(w,new E(${JSON.stringify(CHIUDI)}))},writable:true,configurable:true,enumerable:true})})()`, false).catch(() => {});
+} catch (_) {}
+
 // ─── shortcut hook ─────────────────────────────────────────────────────────
 // La scorciatoia (shortcuts.js) fa un webContents.send('shortcut:triggered'); il content
 // script registra un listener via chrome.runtime.onMessage su MSG.SHORTCUT_TRIGGERED.

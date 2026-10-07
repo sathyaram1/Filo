@@ -41,11 +41,10 @@ test('la pagina chiude la finestra che ha aperto, e la sua scheda se ne va', asy
   const prima = (await schede(app)).length;
   await page.click('#a');
   await expect.poll(async () => (await schede(app)).some((s) => s.titolo === 'APERTA'), { timeout: 8000 }).toBe(true);
-  await app.evaluate(({ BrowserWindow }) => {
+  await app.evaluate(({ BrowserWindow }, u) => {
     const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
-    const t = tm.tabs.find((x) => x.view.webContents.getURL().endsWith('/1') === false && x.view.webContents.getTitle() !== 'APERTA' && /^http/.test(x.view.webContents.getURL()));
-    tm.activate(t.id);
-  });
+    tm.activate(tm.tabs.find((x) => x.view.webContents.getURL() === u).id);
+  }, page.url());
   await page.click('#c');
   await expect.poll(async () => (await schede(app)).some((s) => s.titolo === 'APERTA'), { timeout: 8000 }).toBe(false);
   expect((await schede(app)).length).toBe(prima);
@@ -75,4 +74,44 @@ test('nella finestra tenuta dalla pagina Filo c\'è: da sola non apre schede, co
   const figlia = app.windows().find((w) => { try { return w.url() === aperta; } catch (_) { return false; } });
   await figlia.click('#x');
   await expect.poll(async () => (await schede(app)).some((s) => s.url === dalClic), { timeout: 8000 }).toBe(true);
+});
+
+test('la pagina chiude la ricevuta che ha scritto, e Filo resta aperto', async ({ app, openTab, testServer }) => {
+  const page = await openTab(testServer.html(`${pulsante('b', 'Stampa', "window.__w=window.open('');window.__w.document.write('<title>RICEVUTA</title>');window.__w.document.close();")}${pulsante('c', 'Chiudi', 'window.__w.close()')}`));
+  const prima = (await schede(app)).length;
+  await page.click('#b');
+  await expect.poll(async () => (await schede(app)).some((s) => s.titolo === 'RICEVUTA'), { timeout: 8000 }).toBe(true);
+  await app.evaluate(({ BrowserWindow }, u) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    tm.activate(tm.tabs.find((x) => x.view.webContents.getURL() === u).id);
+  }, page.url());
+  await page.click('#c');
+  await expect.poll(async () => (await schede(app)).length, { timeout: 8000 }).toBe(prima);
+  expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some((w) => w._filoTabs && !w.isDestroyed()))).toBe(true);
+});
+
+// Electron farebbe di window.close() la chiusura della finestra di Filo, da qualunque pagina o riquadro.
+test('window.close() di una pagina chiude al più la sua scheda, mai Filo', async ({ app, openTab, testServer }) => {
+  const viva = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some((w) => w._filoTabs && !w.isDestroyed()));
+  const riquadro = testServer.html(pulsante('r', 'chiudi dal riquadro', 'window.close()'), { pubblico: true });
+  const seconda = testServer.html(`<title>SECONDA</title>${pulsante('c', 'chiudi', 'window.close()')}`);
+  const page = await openTab(testServer.html(`<title>PRIMA</title>${pulsante('c', 'chiudi', 'window.close()')}
+    <a id="l" href="${seconda}">avanti</a><iframe src="${riquadro}" width="300" height="100"></iframe>`));
+  await expect.poll(() => page.frames().some((f) => f.url() === riquadro), { timeout: 8000 }).toBe(true);
+  await page.frames().find((f) => f.url() === riquadro).click('#r');
+  await page.waitForTimeout(800);
+  expect(await viva(), 'un riquadro non chiude Filo').toBe(true);
+  expect((await schede(app)).some((s) => s.titolo === 'PRIMA'), 'né la scheda').toBe(true);
+
+  await page.click('#l');
+  await expect.poll(async () => (await schede(app)).some((s) => s.titolo === 'SECONDA'), { timeout: 8000 }).toBe(true);
+  await page.click('#c');
+  await page.waitForTimeout(800);
+  expect(await viva()).toBe(true);
+  expect((await schede(app)).some((s) => s.titolo === 'SECONDA'), 'con una storia la pagina non si chiude, come in un browser').toBe(true);
+
+  const sola = await openTab(testServer.html(`<title>SOLA</title>${pulsante('c', 'chiudi', 'window.close()')}`));
+  await sola.click('#c');
+  await expect.poll(async () => (await schede(app)).some((s) => s.titolo === 'SOLA'), { timeout: 8000 }).toBe(false);
+  expect(await viva(), 'alla prima pagina si chiude la scheda, non Filo').toBe(true);
 });

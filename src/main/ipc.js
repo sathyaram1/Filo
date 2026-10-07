@@ -161,6 +161,19 @@ function registerIpcHandlers() {
     event.returnValue = true;
   });
 
+  // window.close() di una pagina web (page-preload.js): chiude la sua scheda, mai la finestra di Filo; una finestrella
+  // di accesso, che è una finestra sua, si chiude come prima.
+  ipcMain.on('filo:chiudi-pagina', (event) => {
+    try {
+      if (!event.senderFrame || event.senderFrame.parent) return;
+      const wc = event.sender;
+      const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs?.tabs?.some((t) => t.view.webContents === wc));
+      if (win) { win._filoTabs.chiusaDallaPagina(wc); return; }
+      const propria = BrowserWindow.fromWebContents(wc);
+      if (propria && !propria._filoTabs && propria.webContents === wc) propria.close();
+    } catch (_) {}
+  });
+
   ipcMain.handle('filo:message', async (event, msg) => {
     const info = senderInfo(event);
     // In incognito avvolgiamo l'handler in runIncognito(): ogni lettura/scrittura

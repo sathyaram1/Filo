@@ -26,6 +26,7 @@
       ],
       fixes: [
         'Col blocco dei popup acceso, una pagina non ti apre più schede nuove da sola, né il programma di posta. Ne apre una per ogni tuo clic, anche le finestrelle di condivisione, e quelle fermate le apri dall\'avviso con «Apri». Il collegamento che scegli si apre sempre, anche sui siti che a ogni clic provano ad aprire una pubblicità. Anche lo schermo intero lo prende solo dopo un tuo clic.',
+        'I pulsanti che aprono una ricevuta, un report o un pagamento in una finestra nuova funzionano: la scheda mostra quello che il sito ci scrive, e il sito la può richiudere. Una pagina che chiede di chiudersi chiude solo la sua scheda, non più tutto Filo.',
         'Le schede chiuse restano in Cronologia finché non le cancelli tu. Prima, passate le 5000, le più vecchie sparivano da sole, e dopo le 2000 la ricerca per contenuto non le trovava più. Adesso le trova tutte, anche le più vecchie, già alla prima ricerca.',
         '«Copia immagine» funziona anche sulle foto che i siti tengono su un altro dominio. Se la incolli in chat e chiedi se è fatta con l\'AI, Filo risponde come col tasto destro.',
         'Lettura ad alta voce e dettatura non partono più verso un fornitore che Filo esclude. Se il modello che hai scelto lo serve solo lui, Filo te lo dice e non manda niente.',

@@ -753,7 +753,8 @@ class TabManager {
   _makeView(url, partition, opts = {}) {
     const webPreferences = this._preferenzeWeb(url, partition, opts);
     // `opts.webContents`: la finestra che una pagina ha aperto col clic, tenuta da lei (setWindowOpenHandler).
-    const view = new WebContentsView(opts.webContents ? { webContents: opts.webContents } : { webPreferences });
+    // Con una finestra già nata le preferenze vanno ridate, o il preload non parte nei suoi documenti.
+    const view = new WebContentsView(opts.webContents ? { webContents: opts.webContents, webPreferences } : { webPreferences });
     // #410.1 — segui gli scaricamenti anche sulle sessioni NON predefinite
     // (privacy, proxy, incognito): una sessione non agganciata scarica col
     // dialogo nativo, senza barra e senza il controllo sui programmi (#588.2).
@@ -2606,6 +2607,8 @@ class TabManager {
           outlivesOpener: true,
           overrideBrowserWindowOptions: { webPreferences: this._preferenzeWeb('about:blank', partition) },
           createWindow: (options) => {
+            // Un collegamento (Maiuscolo+clic, target=_blank) non dà una finestra da tenere: la scheda carica da sé.
+            if (!options.webContents) { daLei(this.openTab(url, opzioni)); return undefined; }
             daLei(this.openTab(url || 'about:blank', { ...opzioni, adotta: { webContents: options.webContents, partition, sito: tab.partitionSite } }));
             return options.webContents;
           },
@@ -2622,6 +2625,15 @@ class TabManager {
     wc.on('did-create-window', (child) => {
       this._hardenAuthPopup(child, tab);
     });
+  }
+
+  // Come in un browser una pagina chiude la sua scheda se l'ha aperta una pagina, o se è ancora alla prima pagina.
+  chiusaDallaPagina(wc) {
+    const tab = this.tabs.find((t) => t.view.webContents === wc);
+    if (!tab || tab.isInternal !== false) return;
+    let storia = 1;
+    try { storia = wc.navigationHistory.length(); } catch (_) {}
+    if (tab._openedByLink || storia <= 1) this.closeTab(tab.id);
   }
 
   // Una scheda proxata ha la partizione sua, e in privacy ogni sito la sua: lì la finestra non può restare alla pagina.

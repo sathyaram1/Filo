@@ -292,6 +292,20 @@ for (const [indirizzo, testo] of [
 // Giro 6: su una pagina che spende ogni clic per una sua pubblicità, ciò che l'utente ha scelto si apre lo stesso, e il
 // menu di Filo (disegnato sulla pagina) non è un clic dato a lei.
 const PUBBLICITA = "document.addEventListener('mousedown',function(){window.open(AD)})";
+// Il clic come arriva dal mouse: quello di Playwright si perde dopo la pressione se la pagina apre lì una finestra
+// collegata a sé (la pubblicità qui sopra), perché Playwright si aggancia alla finestra nuova.
+const clicVero = async (app, page, sel, { button = 'left', modifiers = [] } = {}) => {
+  const b = await page.locator(sel).boundingBox();
+  await app.evaluate(async ({ BrowserWindow }, [b, button, mod]) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    const wc = tm.tabs.find((t) => t.id === tm.activeId).view.webContents;
+    const p = { x: Math.round(b.x + b.width / 2), y: Math.round(b.y + b.height / 2), modifiers: mod };
+    wc.sendInputEvent({ type: 'mouseMove', ...p });
+    wc.sendInputEvent({ type: 'mouseDown', ...p, button, clickCount: 1 });
+    await new Promise((r) => setTimeout(r, 80));
+    wc.sendInputEvent({ type: 'mouseUp', ...p, button, clickCount: 1 });
+  }, [b, button, modifiers.map((m) => m.toLowerCase())]);
+};
 for (const [nome, opz] of Object.entries({ 'il clic centrale': { button: 'middle' }, 'Ctrl+clic': { modifiers: ['Control'] }, 'il clic su un link che apre una scheda': {} })) {
   test(`${nome} apre il collegamento anche se la pagina apre una pubblicità a ogni clic`, async ({ app, openTab, testServer }) => {
     const ad = testServer.html('<title>AD</title>');
@@ -300,7 +314,7 @@ for (const [nome, opz] of Object.entries({ 'il clic centrale': { button: 'middle
     const page = await testServer.openReady(openTab, `<!doctype html><body style="padding:24px"><a id="l" href="${dest}" ${blank}>collegamento</a>
       <script>var AD=${JSON.stringify(ad)};${PUBBLICITA}</script></body>`);
     await page.waitForTimeout(5600);
-    await page.locator('#l').click(opz);
+    await clicVero(app, page, '#l', opz);
     await expect.poll(() => aperteSu(app, dest), { timeout: 6000 }).toBe(1);
   });
 }
@@ -337,7 +351,7 @@ test('un collegamento di posta cliccato apre il programma di posta anche se la p
   const page = await testServer.openReady(openTab, `<!doctype html><body style="padding:24px"><a id="l" href="mailto:x@y.it">scrivici</a>
     <script>var AD=${JSON.stringify(ad)};${PUBBLICITA}</script></body>`);
   await page.waitForTimeout(5600);
-  await page.locator('#l').click({ noWaitAfter: true });
+  await clicVero(app, page, '#l');
   await expect.poll(() => app.evaluate(() => globalThis.__esterni), { timeout: 6000 }).toEqual(['mailto:x@y.it']);
 });
 
@@ -348,7 +362,7 @@ test('il pulsante di un modulo che apre una scheda la apre anche se la pagina ap
     <form action="${dest}" method="get" target="_blank"><input name="q" value="ciao mondo"><button id="b">Cerca</button></form>
     <script>var AD=${JSON.stringify(ad)};${PUBBLICITA}</script></body>`);
   await page.waitForTimeout(5600);
-  await page.locator('#b').click();
+  await clicVero(app, page, '#b');
   await expect.poll(async () => (await schede(app)).filter((x) => x.startsWith(`${dest}?q=ciao`)).length, { timeout: 6000 }).toBe(1);
 });
 
