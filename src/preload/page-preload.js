@@ -409,7 +409,7 @@ try {
       const b = percorso.find((n) => n && n.form && /^(submit|image)$/i.test(n.type || ''));
       if (!b) return '';
       const f = b.form;
-      const u = new URL(b.hasAttribute('formaction') ? b.formAction : f.action, document.baseURI);
+      const u = new URL(b.hasAttribute('formaction') ? b.formAction : f.action, (b.ownerDocument || document).baseURI);
       if (String(b.formMethod || f.method || 'get').toLowerCase() === 'get') u.search = new URLSearchParams(new FormData(f, b)).toString();
       return u.href;
     } catch (_) { return ''; }
