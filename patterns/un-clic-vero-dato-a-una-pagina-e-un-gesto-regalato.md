@@ -86,6 +86,11 @@ voleva.
   mondo isolato, e non si ascolta due volte. Il riquadro cambia documento tenendo la finestra (il vuoto iniziale, la
   riscrittura), e gli osservatori del documento vecchio tacciono: si riaggancia a ogni `load`. Un riquadro che sta per
   caricare un indirizzo non si tocca prima del `load`: toccato prima, il suo preload non parte e Filo sparisce da lì.
+  Un riquadro dentro una radice ombra non lo vedono gli osservatori né `window.frames` (#737.1 giro 10): si cerca al
+  passaggio del puntatore, prima della pressione. Radice aperta: l'evento porta il riquadro, o si visitano le radici.
+  Radice chiusa: il preload conta i figli nell'albero dei frame, e a quelli in più fa presentare il riquadro nel suo
+  mondo isolato; alla cieca solo quando nessun riquadro visto è ancora in arrivo. Resta fuori un riquadro di una
+  radice chiusa dentro un documento che la pagina si è scritta da sé.
 
 Prove: `tests/unit/gestoNonRegalato.test.mjs` (nessuno script di Filo nelle pagine porta il gesto),
 `tests/popup-senza-gesto.spec.mjs`, `tests/unit/adSkip.test.mjs`, `tests/ad-skip.spec.mjs` (il «Salta» finto
