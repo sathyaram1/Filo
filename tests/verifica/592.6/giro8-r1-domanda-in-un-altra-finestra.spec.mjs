@@ -15,13 +15,13 @@ test('r1 una domanda aperta in un’altra finestra non nasconde il popup di acce
     const w = BrowserWindow.getAllWindows().find((x) => x._filoIncognito);
     return !!(w && w._filoTabs && w._filoTabs.tabs.length);
   }), { timeout: 15_000 }).toBe(true);
-  const altrove = testServer.html('<h1>Altra pagina</h1>').replace('localhost', '127.0.0.1');
+  const altrove = testServer.html('<h1>Altra pagina</h1>', { pubblico: true });
   await app.evaluate(({ BrowserWindow }, u) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoIncognito);
     w._filoTabs.openTab(u);
   }, altrove);
-  await expect.poll(() => nelMondoDiFilo(app, '127.0.0.1', 'typeof SN_CONFIRM_UI').catch(() => ''), { timeout: 15_000 }).toBe('object');
-  await nelMondoDiFilo(app, '127.0.0.1', `(() => { SN_CONFIRM_UI.confirm({ title: 'Filo chiede conferma', text: 'Svuoto la cronologia degli appunti?' }); return 1; })()`);
+  await expect.poll(() => nelMondoDiFilo(app, 'sito-pubblico.test', 'typeof SN_CONFIRM_UI').catch(() => ''), { timeout: 15_000 }).toBe('object');
+  await nelMondoDiFilo(app, 'sito-pubblico.test', `(() => { SN_CONFIRM_UI.confirm({ title: 'Filo chiede conferma', text: 'Svuoto la cronologia degli appunti?' }); return 1; })()`);
   await confermaSopraPagina(app);
   // L'utente torna alla finestra di prima e preme «Accedi con Google».
   await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito).focus(); });
