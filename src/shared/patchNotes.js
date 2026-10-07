@@ -16,6 +16,7 @@
       fixes: [
         'Con la protezione fingerprinting accesa, Filo dà un\'impronta diversa a ogni sito anche quando due siti stanno sulla stessa piattaforma, come due pagine su github.io o vercel.app, due negozi sotto .com.tw, .co.id o .com.co, o due indirizzi IP. Prima ricevevano la stessa, e uno script di tracciamento presente su entrambi li collegava. Le pagine di uno stesso sito restano con la stessa impronta.',
         'Con i cookie su Privacy massima, un sito fidato scritto col suo indirizzo completo, come webmail.libero.it o mail.google.com, ti tiene connesso. Prima l\'elenco lo mostrava ma il sito ti faceva uscire a ogni visita.',
+        'Dopo «Traduci la pagina» l\'avviso non dice più che un riquadro è rimasto in lingua originale quando quel riquadro sullo schermo non c\'è, come gli spazi pubblicitari e i banner nascosti. I riquadri nascosti non si traducono e non si pagano. Se ne apri uno, il tasto destro offre di tradurlo.',
       ],
     },
     {

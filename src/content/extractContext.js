@@ -441,22 +441,59 @@
     return (w > 0 && r.left >= w) || (h > 0 && r.top >= h);
   }
 
-  // Ritagliato via del tutto da una maschera: è il modo in cui certi siti chiudono un pannello. Sotto i quattro
-  // pixel no: lì è la ricetta del testo per i lettori di schermo, che nessuno apre e che va tradotto col resto.
+  // Ritagliato via del tutto: una maschera (di qualunque forma) o il vecchio ritaglio rettangolare lasciano zero area.
+  // È il modo in cui certi siti chiudono un pannello o uno spazio pubblicitario. Sotto i quattro pixel no: lì è la
+  // ricetta del testo per i lettori di schermo, che nessuno apre e che va tradotto col resto.
   function isClippedAwayByPath(el, cs) {
-    const cp = cs.clipPath;
-    if (!cp || cp.indexOf('inset(') !== 0) return false;
+    const cp = cs.clipPath && cs.clipPath !== 'none' ? cs.clipPath : '';
+    const vecchio = cs.clip && cs.clip !== 'auto' && (cs.position === 'absolute' || cs.position === 'fixed') ? cs.clip : '';
+    if (!cp && !vecchio) return false;
     let r;
     try { r = el.getBoundingClientRect(); } catch (_) { return false; }
     if (r.width < 4 || r.height < 4) return false;
-    const parti = cp.slice(6, cp.indexOf(')')).trim().split(/\s+/);
-    if (!parti.length || parti.length > 4) return false;
-    const [alto, destra = alto, basso = alto, sinistra = destra] = parti;
-    const misura = (v, base) => (v.endsWith('%') ? (parseFloat(v) / 100) * base : parseFloat(v));
-    const y = misura(alto, r.height) + misura(basso, r.height);
-    const x = misura(sinistra, r.width) + misura(destra, r.width);
-    if (!Number.isFinite(y) || !Number.isFinite(x)) return false;
-    return y >= r.height - 0.5 || x >= r.width - 0.5;
+    const misura = (v, base) => (String(v).endsWith('%') ? (parseFloat(v) / 100) * base : parseFloat(v));
+    const dentro = (txt) => txt.slice(txt.indexOf('(') + 1, txt.lastIndexOf(')')).trim();
+    if (vecchio && vecchio.indexOf('rect(') === 0) {
+      // rect(alto, destra, basso, sinistra) misurati dal bordo in alto a sinistra; `auto` è il bordo stesso.
+      const v = dentro(vecchio).split(/[\s,]+/);
+      if (v.length === 4) {
+        const lato = (x, auto) => (x === 'auto' ? auto : parseFloat(x));
+        const h = lato(v[2], r.height) - lato(v[0], 0);
+        const w = lato(v[1], r.width) - lato(v[3], 0);
+        if (Number.isFinite(h) && Number.isFinite(w) && (h <= 0.5 || w <= 0.5)) return true;
+      }
+    }
+    if (!cp) return false;
+    const forma = cp.slice(0, cp.indexOf('('));
+    const corpo = dentro(cp).split(/\s+at\s+/)[0].trim();
+    if (forma === 'inset') {
+      const parti = corpo.split(/\s+round\s+/)[0].trim().split(/\s+/);
+      if (!parti.length || parti.length > 4) return false;
+      const [alto, destra = alto, basso = alto, sinistra = destra] = parti;
+      const y = misura(alto, r.height) + misura(basso, r.height);
+      const x = misura(sinistra, r.width) + misura(destra, r.width);
+      if (!Number.isFinite(y) || !Number.isFinite(x)) return false;
+      return y >= r.height - 0.5 || x >= r.width - 0.5;
+    }
+    if (forma === 'circle' || forma === 'ellipse') {
+      const raggi = corpo.split(/\s+/).filter(Boolean);
+      if (!raggi.length) return false;
+      const base = forma === 'circle' ? [Math.hypot(r.width, r.height) / Math.SQRT2] : [r.width, r.height];
+      return raggi.some((x, i) => { const n = misura(x, base[i] || base[0]); return Number.isFinite(n) && n <= 0.25; });
+    }
+    if (forma === 'polygon') {
+      const punti = corpo.replace(/^(nonzero|evenodd)\s*,\s*/, '').split(',').map((c) => c.trim().split(/\s+/))
+        .map(([x, y]) => [misura(x, r.width), misura(y, r.height)]);
+      if (punti.length < 3 || punti.some(([x, y]) => !Number.isFinite(x) || !Number.isFinite(y))) return false;
+      let area = 0;
+      for (let i = 0; i < punti.length; i++) {
+        const [x1, y1] = punti[i];
+        const [x2, y2] = punti[(i + 1) % punti.length];
+        area += x1 * y2 - x2 * y1;
+      }
+      return Math.abs(area) / 2 <= 0.5;
+    }
+    return false;
   }
 
   // Schiacciato a zero e ritagliato (`max-height:0` più `overflow:hidden`). Il RITAGLIO è la condizione che conta:
@@ -616,6 +653,266 @@
     } catch (_) { return 'unknown'; }
   }
 
+  // #503 — il rettangolo da solo non basta: dice quanto è grande il componente,
+  // mai se l'utente ci può arrivare. Un componente chiuso che l'utente non
+  // raggiunge non va contato, perché il conto serve a una cosa sola — scrivere
+  // l'avviso finale — e "tradotta solo in parte" ha senso solo se nella pagina
+  // è rimasto davvero un riquadro in lingua originale da andare a leggere.
+  // Spazi pubblicitari, banner dei cookie già chiusi e riquadri di statistica
+  // sono esattamente questo: componenti chiusi che il sito tiene fuori dalla
+  // vista, e su un sito di giornale ce n'è sempre almeno uno. Senza il filtro
+  // l'avviso esce quasi sempre, e quasi sempre a vuoto: è la bugia di #439
+  // girata al contrario — lì dichiarava finito un lavoro monco, qui
+  // dichiarerebbe monco un lavoro finito — e un avviso che sbaglia spesso
+  // brucia anche le volte in cui dice il vero, che sono le uniche che servono.
+  //
+  // Prima della prova del punto restano fuori i componenti che nessuno
+  // scorrimento porta sotto gli occhi:
+  //   - nascosti dal CSS (display:none, visibility:hidden, opacità zero, anche
+  //     ereditate da un antenato): l'opacità la prova del punto non la vede,
+  //     un componente trasparente si lascia colpire come uno visibile;
+  //   - portati oltre i bordi dell'area scorribile (left:-9999px, transform),
+  //     o fuori dalla finestra se sono agganciati a lei (position:fixed);
+  //   - RITAGLIATI da un antenato che non scorre: la fisarmonica ripiegata e il
+  //     banner dei cookie chiuso sono un contenitore schiacciato a zero con
+  //     overflow:hidden, e quel che sborda non lo vedrà mai nessuno.
+
+  const REACH_MAX_HOPS = 128;
+
+  function styleOf(el) {
+    try { return window.getComputedStyle(el); } catch (_) { return null; }
+  }
+
+  // Sale di un livello restando dentro i componenti aperti: al confine di uno
+  // shadow tree `parentElement` è null, e fermarsi lì vorrebbe dire perdere di
+  // vista chi sta ritagliando dall'alto.
+  function parentOrHost(el) {
+    if (el.parentElement) return el.parentElement;
+    const p = el.parentNode;
+    if (p && p.nodeType === 11 && p.host && p.host.nodeType === 1) return p.host;
+    return null;
+  }
+
+  // Trasparente per l'utente. checkVisibility (Chromium) guarda display,
+  // visibility e opacità lungo tutta la catena degli antenati in un colpo solo;
+  // il ripiego rifà lo stesso giro a mano con lo stesso metro già usato dal
+  // resto della pagina (isHiddenByCss).
+  function isInvisibleToUser(el) {
+    try {
+      if (typeof el.checkVisibility === 'function') {
+        return !el.checkVisibility({
+          // I nomi nuovi e quelli vecchi della stessa opzione: passarli
+          // entrambi evita che su una versione di Chromium l'opacità venga
+          // semplicemente ignorata (il default è "non guardarla").
+          opacityProperty: true, checkOpacity: true,
+          visibilityProperty: true, checkVisibilityCSS: true,
+        });
+      }
+    } catch (_) {}
+    let cur = el;
+    for (let hops = 0; cur && cur.nodeType === 1 && hops < REACH_MAX_HOPS; hops++) {
+      if (isHiddenByCss(cur)) return true;
+      cur = parentOrHost(cur);
+    }
+    return false;
+  }
+
+  // Un antenato crea un blocco contenitore anche per chi è posizionato in
+  // assoluto (transform, filter, contain…). Serve a sapere CHI ritaglia chi:
+  // un elemento in posizione assoluta non viene ritagliato dagli antenati che
+  // non lo contengono, e scambiarli per ritagliatori dichiarerebbe
+  // irraggiungibile un riquadro che invece si vede benissimo — l'errore
+  // opposto, che costa uguale.
+  function makesFixedContainingBlock(cs) {
+    if (cs.transform && cs.transform !== 'none') return true;
+    if (cs.perspective && cs.perspective !== 'none') return true;
+    if (cs.filter && cs.filter !== 'none') return true;
+    if (cs.backdropFilter && cs.backdropFilter !== 'none') return true;
+    if (cs.contain && /paint|layout|strict|content/.test(cs.contain)) return true;
+    if (cs.containerType && cs.containerType !== 'normal') return true;
+    if (cs.willChange && /transform|perspective|filter|contain/.test(cs.willChange)) return true;
+    return false;
+  }
+
+  const SCROLLS = (o) => o === 'auto' || o === 'scroll' || o === 'overlay';
+
+  // Restringe il rettangolo raggiungibile passando per un antenato che ritaglia.
+  // Su ciascun asse:
+  //   - overflow:visible → l'antenato non c'entra;
+  //   - barra di scorrimento (auto/scroll) → prima o poi TUTTO il contenuto
+  //     passa dentro la finestrella: il limite è l'estensione scorribile, e una
+  //     volta scorso il riquadro si trova NELLA finestrella (ecco perché il
+  //     rettangolo che prosegue verso l'alto diventa quello della finestrella:
+  //     altrimenti un pannello che scorre dentro una pagina corta risulterebbe
+  //     fuori pagina);
+  //   - ritaglia e basta (hidden/clip) → il limite è la finestrella e quel che
+  //     sborda è perduto.
+  // Ritorna null quando non resta niente: irraggiungibile.
+  function narrowByClipper(box, anc, cs, soloScorrevoli) {
+    const ox = cs.overflowX || 'visible';
+    const oy = cs.overflowY || 'visible';
+    if (ox === 'visible' && oy === 'visible') return box;
+    // Su una scatola in linea (o senza scatola) l'overflow non ha effetto, e
+    // clientWidth/clientHeight varrebbero zero: sarebbe un ritaglio inventato.
+    const disp = cs.display || '';
+    if (disp === 'inline' || disp === 'contents' || disp === 'none') return box;
+    let rect;
+    try { rect = anc.getBoundingClientRect(); } catch (_) { return box; }
+    const padL = rect.left + (parseFloat(cs.borderLeftWidth) || 0);
+    const padT = rect.top + (parseFloat(cs.borderTopWidth) || 0);
+    const cw = anc.clientWidth || 0;
+    const ch = anc.clientHeight || 0;
+    const out = { l: box.l, t: box.t, r: box.r, b: box.b };
+
+    if (ox !== 'visible') {
+      if (SCROLLS(ox)) {
+        const range = Math.max(0, (anc.scrollWidth || 0) - cw);
+        // Da destra a sinistra la corsa della barra va in negativo: lì lo zero
+        // non è il bordo di partenza.
+        const rtl = cs.direction === 'rtl';
+        const sL = anc.scrollLeft || 0;
+        const lo = padL + ((rtl ? -range : 0) - sL);
+        const hi = padL + ((rtl ? 0 : range) - sL) + cw;
+        if (out.r <= lo || out.l >= hi) return null;
+        out.l = padL; out.r = padL + cw;
+      } else if (!soloScorrevoli) {
+        out.l = Math.max(out.l, padL);
+        out.r = Math.min(out.r, padL + cw);
+        if (out.r <= out.l) return null;
+      }
+    }
+    if (oy !== 'visible') {
+      if (SCROLLS(oy)) {
+        const range = Math.max(0, (anc.scrollHeight || 0) - ch);
+        const sT = anc.scrollTop || 0;
+        const lo = padT - sT;
+        const hi = padT + range - sT + ch;
+        if (out.b <= lo || out.t >= hi) return null;
+        out.t = padT; out.b = padT + ch;
+      } else if (!soloScorrevoli) {
+        out.t = Math.max(out.t, padT);
+        out.b = Math.min(out.b, padT + ch);
+        if (out.b <= out.t) return null;
+      }
+    }
+    return out;
+  }
+
+  // Ultimo passo: la pagina stessa. Se il riquadro è agganciato alla finestra
+  // (position:fixed) non scorre con la pagina, quindi "raggiungibile" vuol dire
+  // "dentro la finestra adesso" — è la forma delle strisce e dei banner
+  // appiccicati, che una volta chiusi restano nella pagina spinti fuori.
+  // Altrimenti il confronto è con l'AREA SCORRIBILE del documento: quel che sta
+  // sotto la prima schermata è dentro, quel che sta a -9999px è fuori.
+  function withinPage(box, anchored) {
+    const de = document.documentElement;
+    const vw = (de && de.clientWidth) || window.innerWidth || 0;
+    const vh = (de && de.clientHeight) || window.innerHeight || 0;
+    if (anchored) {
+      return box.r > 0 && box.b > 0 && box.l < vw && box.t < vh;
+    }
+    const sX = window.scrollX || 0;
+    const sY = window.scrollY || 0;
+    // Una pagina che non scorre di lato non porta da nessuna parte chi sta oltre il bordo. In verticale no: lo
+    // stesso stile lo mette il sito mentre un suo banner tiene ferma la pagina, e sotto c'è contenuto vero.
+    const rangeX = viewportClipsX() ? 0 : Math.max(0, ((de && de.scrollWidth) || 0) - vw);
+    const rangeY = Math.max(0, ((de && de.scrollHeight) || 0) - vh);
+    const dirEl = styleOf(de) || (document.body && styleOf(document.body));
+    const rtl = !!(dirEl && dirEl.direction === 'rtl');
+    const loX = (rtl ? -rangeX : 0) - sX;
+    const hiX = (rtl ? 0 : rangeX) - sX + vw;
+    return box.r > loX && box.l < hiX && box.b > -sY && box.t < rangeY - sY + vh;
+  }
+
+  // L'overflow della finestra è quello di <html>, o quello di <body> che sale quando <html> lo lascia visibile.
+  function viewportClipsX() {
+    const de = styleOf(document.documentElement);
+    let o = de && de.overflowX;
+    if ((!o || o === 'visible') && document.body) { const b = styleOf(document.body); o = b && b.overflowX; }
+    return o === 'hidden' || o === 'clip';
+  }
+
+  // "L'utente ci arriva?" — con lo stesso metro usato per il resto della pagina.
+  // Con `soloScorrevoli` un antenato che ritaglia senza barra non conta: è la giostra, a cui si torna strisciando.
+  function isReachableByUser(el, rect, soloScorrevoli) {
+    let box = { l: rect.left, t: rect.top, r: rect.right, b: rect.bottom };
+    const own = styleOf(el);
+    let pos = (own && own.position) || 'static';
+    const de = document.documentElement;
+    const body = document.body;
+    let cur = parentOrHost(el);
+    for (let hops = 0; cur && cur.nodeType === 1 && hops < REACH_MAX_HOPS; hops++, cur = parentOrHost(cur)) {
+      // <body> e <html> non si giudicano qui: il loro overflow "sale" al
+      // viewport (un `body { overflow-x: hidden }`, che è ovunque, non ritaglia
+      // un bel niente), e la pagina la giudica withinPage.
+      if (cur === body || cur === de) continue;
+      const cs = styleOf(cur);
+      if (!cs) break;
+      const escapes = (pos === 'absolute' && cs.position === 'static' && !makesFixedContainingBlock(cs))
+                   || (pos === 'fixed' && !makesFixedContainingBlock(cs));
+      if (escapes) continue;
+      box = narrowByClipper(box, cur, cs, soloScorrevoli);
+      if (!box) return false;
+      pos = cs.position || 'static';
+    }
+    return withinPage(box, pos === 'fixed');
+  }
+
+  // La finestra più grande da cui `el` si può vedere: la sua misura, stretta da ogni antenato che ritaglia e lo contiene.
+  // Chi ritaglia lascia passare al massimo la propria misura, comunque il sito sposti quel che c'è dentro (#503).
+  function clippedExtent(el) {
+    let w = 0;
+    let h = 0;
+    try {
+      const r = el.getBoundingClientRect();
+      w = r.width;
+      h = r.height;
+      const doc = el.ownerDocument;
+      const stop = new Set([doc && doc.body, doc && doc.documentElement]);
+      const vista = viewOf(el);
+      let pos = (vista.getComputedStyle(el) || {}).position || 'static';
+      let cur = parentOrHost(el);
+      for (let hops = 0; cur && cur.nodeType === 1 && hops < REACH_MAX_HOPS; hops++, cur = parentOrHost(cur)) {
+        // <body> e <html> passano il loro overflow alla finestra, che si scorre: la pagina non è una finestrella.
+        if (stop.has(cur)) continue;
+        const cs = vista.getComputedStyle(cur);
+        if (!cs) break;
+        const escapes = (pos === 'absolute' && cs.position === 'static' && !makesFixedContainingBlock(cs))
+                     || (pos === 'fixed' && !makesFixedContainingBlock(cs));
+        if (escapes) continue;
+        pos = cs.position || 'static';
+        const disp = cs.display || '';
+        if (disp === 'inline' || disp === 'contents' || disp === 'none') continue;
+        const paint = !!(cs.contain && /paint|strict|content/.test(cs.contain));
+        if (paint || (cs.overflowX && cs.overflowX !== 'visible')) w = Math.min(w, cur.clientWidth || 0);
+        if (paint || (cs.overflowY && cs.overflowY !== 'visible')) h = Math.min(h, cur.clientHeight || 0);
+      }
+    } catch (_) {}
+    return { w, h };
+  }
+
+  // Un riquadro incorporato che l'utente non vede (#503): il metro delle sezioni ripiegate, su di lui e su ogni
+  // antenato fino alla pagina, più il punto dove sta dipinto: fuori dall'area a cui si arriva scorrendo è nascosto
+  // comunque ce l'abbia spinto il sito. Più in basso della prima schermata no: ci si arriva scorrendo.
+  function isHiddenFromUser(el) {
+    try {
+      if (isVisibilityHidden(el)) return true;
+      if (el.ownerDocument === document) {
+        const r = el.getBoundingClientRect();
+        if ((r.width > 0 || r.height > 0) && !isReachableByUser(el, r, true)) return true;
+      }
+      const doc = el.ownerDocument;
+      const stop = doc && (doc.body || doc.documentElement);
+      let cur = parentOrHost(el);
+      for (let hops = 0; cur && cur.nodeType === 1 && cur !== stop && hops < REACH_MAX_HOPS; hops++) {
+        // `visibility` l'ha già detta il riquadro, che la eredita: un antenato invisibile così non decide per lui.
+        if (isVisibilityHidden(cur) === true) return true;
+        cur = parentOrHost(cur);
+      }
+      return false;
+    } catch (_) { return false; }
+  }
+
   function isClosedComponent(el) {
     const tag = (el.tagName || '').toLowerCase();
     if (tag.indexOf('-') < 0) return false;
@@ -631,6 +928,8 @@
       if (el.matches && !el.matches(':defined')) return false;
       const r = el.getBoundingClientRect();
       if (r.width < CLOSED_MIN_W || r.height < CLOSED_MIN_H) return false;
+      if (isInvisibleToUser(el)) return false;
+      if (!isReachableByUser(el, r)) return false;
       // Serve la PROVA che lì dentro ci sia qualcosa: 'unknown' vale quanto un
       // no. Il prezzo è un componente chiuso che resta fuori dal conto quando
       // sta sotto il bordo dello schermo — l'avviso dirà "Pagina tradotta"
@@ -1102,6 +1401,8 @@
     findTranslatedElements,
     hasRevealedText,
     inlineFrameBody,
+    isHiddenFromUser,
+    clippedExtent,
     isFiloOwnUi,
     pageMeta,
     pageExcerpt,
