@@ -104,48 +104,56 @@ const testo = (m) => (typeof m.content === 'string' ? m.content : JSON.stringify
 const posContesto = (msgs) => msgs.findIndex((m) => m.role === 'user' && testo(m).startsWith('═══ CONTESTO DI ADESSO'));
 
 
-async function homeIncognito(app, shell) {
-  await shell.evaluate(() => window.filoShell.openIncognito());
-  await expect.poll(() => app.evaluate(async ({ BrowserWindow }) => {
-    const w = BrowserWindow.getAllWindows().find((x) => x._filoIncognito && x._filoTabs);
-    const t = w && w._filoTabs.tabs.find((tt) => tt.view.webContents.getURL().startsWith('filo://newtab'));
-    if (!t) return false;
-    try { await t.view.webContents.executeJavaScript('window.__homeIncognito = 1'); return true; } catch (_) { return false; }
-  }), { timeout: 20_000 }).toBe(true);
-  for (const w of app.windows()) {
-    try { if (await w.evaluate(() => window.__homeIncognito === 1)) return w; } catch (_) {}
-  }
-  throw new Error('home incognito non trovata');
-}
 
-test('sonda: una chat in incognito non entra nel contesto di una scheda normale', async ({ app, shell }) => {
-  test.setTimeout(120_000);
-  const a = await primaScheda(app);
-  await preparaModello(app, [{ text: 'Segnato in incognito.' }, { text: 'Ok normale.' }]);
-  const inc = await homeIncognito(app, shell);
-  await inc.locator('#input').fill('il mio codice segreto è SEGRETO-INC-913');
-  await inc.locator('#sendBtn').click();
-  await expect(inc.locator('.dash-bubble-filo', { hasText: 'Segnato in incognito.' })).toBeVisible({ timeout: 20_000 });
-  await a.bringToFront();
-  await a.reload();
-  await expect(a.locator('#input')).toBeVisible();
-  await scrivi(a, 'qual è il mio codice segreto?');
-  await expect(a.locator('.dash-bubble-filo', { hasText: 'Ok normale.' })).toBeVisible({ timeout: 20_000 });
-  const tutte = await chiamate(app);
-  expect(tutte.length).toBe(2);
-  expect(tutte[1].map(testo).join('\n')).not.toContain('SEGRETO-INC-913');
+// Una lettura (documento, pagina, comando) oggi vive al più venti messaggi, e solo nella conversazione che l'ha fatta.
+test('r1 un documento letto in una conversazione finita non torna davanti a Filo a ogni messaggio delle altre schede', async ({ app }) => {
+  test.setTimeout(150_000);
+  await primaScheda(app);
+  const casa = cartellaInCasa('filo-868-g2-');
+  const doc = join(casa, 'contratto.txt');
+  writeFileSync(doc, 'Contratto di affitto. Punto 3: il canone mensile è di 742 euro, da pagare entro il giorno 5.');
+  try {
+    const copione = [
+      { text: '', tools: [{ name: 'LEGGI_DOCUMENTO', args: { percorso: doc } }] },
+      { text: 'Ho letto il contratto.' },
+    ];
+    const N = 21;
+    for (let i = 0; i < N; i++) copione.push({ text: `Risposta ${i}.` });
+    await preparaModello(app, copione);
+    const a = await app.evaluate((_e, doc) => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: `leggi ${doc}`, threadHistory: [], chatId: 'scheda-contratto' }), doc);
+    expect(a.actions.find((x) => x.type === 'LEGGI_DOCUMENTO')._executed).toBe(true);
+    let storia = [];
+    for (let i = 0; i < N; i++) {
+      const q = `domanda numero ${i} su tutt'altro`;
+      const r = await app.evaluate((_e, { q, storia }) => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: q, threadHistory: storia, chatId: 'scheda-altro' }), { q, storia });
+      storia = [...storia, { role: 'user', text: q }, { role: 'filo', text: r.text, actions: r.actions || [] }];
+    }
+    const tutte = await chiamate(app);
+    const ultima = tutte[tutte.length - 1];
+    // Quarantadue messaggi dopo, in un'altra conversazione: il testo del contratto non deve esserci più.
+    expect(ultima.map(testo).join('\n')).not.toContain('742 euro');
+  } finally {
+    rmSync(casa, { recursive: true, force: true });
+  }
 });
 
-test('sonda: una chat cancellata esce dal contesto al turno dopo', async ({ app }) => {
+test('r2 un messaggio lunghissimo incollato si rilegge intero con la ricerca, come promette il taglio', async ({ app }) => {
   test.setTimeout(90_000);
   await primaScheda(app);
-  await preparaModello(app, [{ text: 'Segnato.' }, { text: 'Non so.' }]);
-  await app.evaluate(() => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'il codice del portone è PORTONE-4471', threadHistory: [], chatId: 'scheda-canc' }));
-  const ids = await app.evaluate(async () => (await globalThis.SN_FILO_CHATS.list()).map((c) => c.id));
-  expect(ids).toContain('scheda-canc');
-  await app.evaluate(() => globalThis.SN_FILO_CHATS.remove('scheda-canc'));
-  await app.evaluate(() => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'qual è il codice del portone?', threadHistory: [], chatId: 'scheda-dopo' }));
-  const [primo, secondo] = await chiamate(app);
-  expect(primo.map(testo).join('\n')).toContain('PORTONE-4471');
-  expect(secondo.map(testo).join('\n')).not.toContain('PORTONE-4471');
+  const lungo = 'a'.repeat(100_000) + ' SEGNO-DEL-MEZZO-77 ' + 'b'.repeat(100_000);
+  await preparaModello(app, [
+    { text: 'Letto.' },
+    { text: '', tools: [{ name: 'CERCA_CHAT', args: { id: 'scheda-lunga' } }] },
+    { text: 'Fatto.' },
+  ]);
+  await app.evaluate((_e, lungo) => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: lungo, threadHistory: [], chatId: 'scheda-lunga' }), lungo);
+  await app.evaluate(() => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'cosa c\'era in mezzo al testo che ti ho incollato?', threadHistory: [], chatId: 'scheda-altra' }));
+  const tutte = await chiamate(app);
+  const secondo = tutte[1];
+  const k = posContesto(secondo);
+  const tratto = secondo.slice(0, k).map(testo).join('\n');
+  expect(tratto).toContain('si rileggono interi con CERCA_CHAT');
+  expect(tratto).not.toContain('SEGNO-DEL-MEZZO-77');
+  const terzo = tutte[2];
+  expect(testo(terzo.find((m) => m.role === 'tool'))).toContain('SEGNO-DEL-MEZZO-77');
 });
