@@ -30,10 +30,12 @@ function stessoFrame(frame, pid, rid) {
 
 class ConfermeSopraPagina {
   // sotto(): il webContents che si vede adesso nell'area da coprire; area(): quell'area, nella finestra.
-  constructor(win, { sotto = () => null, area = () => null } = {}) {
+  // dopoInCima: la barra laterale le torna sopra, se no la domanda ne coprirebbe la striscia.
+  constructor(win, { sotto = () => null, area = () => null, dopoInCima = () => {} } = {}) {
     this.win = win;
     this.sotto = sotto;
     this.area = area;
+    this.dopoInCima = dopoInCima;
     this.vista = null;
     this.pronta = false;
     this.coda = [];
@@ -87,6 +89,7 @@ class ConfermeSopraPagina {
     const cv = this.win.contentView;
     const figli = cv.children || [];
     if (figli[figli.length - 1] !== this.vista) cv.addChildView(this.vista);
+    try { this.dopoInCima(); } catch (_) {}
   }
 
   _daMostrare() {

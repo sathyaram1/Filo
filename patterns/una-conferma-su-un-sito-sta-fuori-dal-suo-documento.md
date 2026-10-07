@@ -32,7 +32,8 @@ nella pagina, in uno Shadow DOM chiuso.
   quando è pronta, come in `patterns/la-shell-non-disegna-sopra-la-pagina.md`). Copre **tutta la
   scheda**, non solo il riquadro: è una domanda modale, il velo scuro è suo e la pagina sotto non si
   tocca finché non si risponde. Sta in cima a tutto, anche agli avvisi della barra
-  (`dopoInCima`). Dentro gira lo stesso `confirmUi.js` di sempre (stile, testo che si scorre fino in
+  (`dopoInCima`), tranne la barra laterale: la sua striscia sul bordo sinistro e il pannello
+  restano raggiungibili, e il clic nell'ombra del pannello cade sul velo, non sulla pagina. Dentro gira lo stesso `confirmUi.js` di sempre (stile, testo che si scorre fino in
   fondo, mezzo secondo prima che un clic vero valga), col tema e i token dell'utente mandati dal main.
 - **Segue la sua scheda.** Una domanda si vede solo sopra la scheda che l'ha fatta, quando è davanti;
   le altre aspettano. Tornando davanti si ridisegna da capo, e il mezzo secondo riparte. Scheda chiusa,

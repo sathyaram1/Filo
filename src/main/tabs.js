@@ -345,6 +345,7 @@ class TabManager {
     this.conferme = new ConfermeSopraPagina(window, {
       sotto: () => { const t = schedaDavanti(); return (t && t.view && t.view.webContents) || null; },
       area: () => { const t = schedaDavanti(); return t && t.view ? t.view.getBounds() : null; },
+      dopoInCima: () => { if (this.barra) this.barra._inCima(); },
     });
     this.visite = new VisiteSchede({ incognito: this.incognito });
     this.anteprime = new AnteprimeSchede(this, {
@@ -1662,8 +1663,9 @@ class TabManager {
   vistaSottoIlVuoto() {
     const tab = this.tabs.find((t) => t.id === this.activeId);
     if (!tab) return null;
+    const domanda = this.conferme && this.conferme.mostrata ? this.conferme.vista : null;
     const avviso = this.avvisoSito && this.avvisoSito.coperta() === tab && this.avvisoSito.webContents() ? this.avvisoSito.vista : null;
-    return avviso || tab.view || null;
+    return domanda || avviso || tab.view || null;
   }
 
   _tastieraAllaSchedaAttiva() {

@@ -4,6 +4,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { confermaSopraPagina, nelMondoDiFilo, confirmState, clickConfirm, pointWhenConfirmAppears, mouseClickConfirm, CONFIRM_HOST } from './helpers/confirm.mjs';
+import { barraPage, statoBarra, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
 
 test.setTimeout(60_000);
 
@@ -56,11 +57,11 @@ function geometria(app) {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
     const tm = w._filoTabs;
     const figli = w.contentView.children;
-    const ultima = figli[figli.length - 1];
     const scheda = tm.tabs.find((t) => t.id === tm.activeId);
     const vista = tm.conferme.vista;
     return {
-      inCima: !!vista && ultima === vista,
+      // Sopra di lei solo la barra laterale, che resta raggiungibile dal bordo sinistro.
+      inCima: !!vista && figli.indexOf(vista) >= 0 && figli.slice(figli.indexOf(vista) + 1).every((v) => v === tm.barra.vista),
       // Nascosta, la vista ha anche misure zero: Electron non dice se una vista è visibile.
       visibile: !!vista && vista.getBounds().width > 0,
       vista: vista ? vista.getBounds() : null,
@@ -88,7 +89,7 @@ test('sito ostile: il popup vero sta sopra la scheda, il sito non lo vede, e OK 
   expect(await page.evaluate(() => ({ visto: window.__visto, finto: !!document.getElementById('finto') }))).toEqual({ visto: false, finto: false });
   const g = await geometria(app);
   expect(g.url).toBe('filo://shell/conferma.html');
-  expect(g.inCima, 'la vista del popup sta sopra tutte le altre').toBe(true);
+  expect(g.inCima, 'la vista del popup sta sopra tutte le altre, barra laterale a parte').toBe(true);
   expect(g.visibile).toBe(true);
   expect(g.vista).toEqual(g.scheda);
   await sopra.screenshot({ path: 'tests/.shots/conferme-sopra-pagina.png' });
@@ -338,4 +339,45 @@ test('la casella e le scelte dell’Aiuto: il codice della pagina non manda nien
   await page.keyboard.type('ancora');
   await page.click('.sn-sidebar-input button[type="submit"]');
   await expect.poll(() => chiamate(app, host)).toBe(3);
+});
+
+// Quale vista riceve il puntatore in un punto della finestra: la più in alto, visibile, che lo contiene.
+const chiPrende = (app, x, y) => app.evaluate(({ BrowserWindow }, { x, y }) => {
+  const w = BrowserWindow.getAllWindows().find((v) => v._filoTabs && !v._filoIncognito);
+  const tm = w._filoTabs;
+  const f = w.contentView.children;
+  for (let i = f.length - 1; i >= 0; i--) {
+    const v = f[i];
+    if (v.getVisible && !v.getVisible()) continue;
+    const b = v.getBounds();
+    if (x >= b.x && x < b.x + b.width && y >= b.y && y < b.y + b.height) {
+      if (v === tm.barra.vista) return 'barra';
+      if (v === tm.conferme.vista) return 'conferma';
+      return 'altro';
+    }
+  }
+  return 'nessuna';
+}, { x, y });
+
+test('con la domanda a schermo la barra laterale resta raggiungibile, e aprirla non risponde alla domanda', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, '<h1>pagina</h1>');
+  const host = new URL(page.url()).hostname;
+  const barra = await barraPage(app);
+  const y = (await statoBarra(app)).alto + 200;
+  await nelMondoDiFilo(app, host, `(() => { globalThis.__e = 'attesa'; SN_CONFIRM_UI.confirm({ title: 'Filo chiede conferma', text: 'Prova' }).then((ok) => { globalThis.__e = ok; }); return 1; })()`);
+  const vista = await confermaSopraPagina(app);
+  await expect.poll(async () => (await geometria(app)).visibile).toBe(true);
+  expect(await chiPrende(app, 1, y), 'la striscia sul bordo sinistro').toBe('barra');
+  expect(await chiPrende(app, 640, y), 'il resto della scheda').toBe('conferma');
+  await barra.mouse.move(0, 300);
+  await expect.poll(async () => (await statoBarra(app)).aperta).toBe(true);
+  await pannelloFermo(barra);
+  const indietro = await barra.locator('#nav .ico[data-id="back"]').boundingBox();
+  expect(await chiPrende(app, Math.round(indietro.x + indietro.width / 2), Math.round((await statoBarra(app)).alto + indietro.y + indietro.height / 2))).toBe('barra');
+  expect(await nelMondoDiFilo(app, host, 'globalThis.__e')).toBe('attesa');
+  await comandaBarra(app, 'chiudi');
+  await expect.poll(async () => (await statoBarra(app)).aperta).toBe(false);
+  // Chiusa la barra, la domanda ha ancora la tastiera: Esc la annulla.
+  await vista.keyboard.press('Escape');
+  await expect.poll(() => nelMondoDiFilo(app, host, 'globalThis.__e')).toBe(false);
 });

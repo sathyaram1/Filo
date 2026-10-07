@@ -374,8 +374,8 @@ class BarraLaterale {
   }
 
   // Ogni scheda nuova entra in cima alle viste della finestra: la barra deve tornarle sopra, e sopra
-  // l'avviso del sito pericoloso che copre la scheda (Indietro serve proprio lì), ma sotto gli avvisi,
-  // che restano l'ultima vista (tests/avvisi-sopra-pagina.spec.mjs).
+  // l'avviso del sito pericoloso che copre la scheda (Indietro serve proprio lì) e la conferma a schermo sopra
+  // la scheda (#592.6), che sta sopra gli avvisi; senza conferma gli avvisi restano l'ultima vista.
   _inCima() {
     if (!this.vista || !this.win || this.win.isDestroyed()) return;
     const cv = this.win.contentView;
@@ -383,6 +383,8 @@ class BarraLaterale {
     const daCoprire = new Set(this.tabs.tabs.map((t) => t.view));
     const sito = this.tabs.avvisoSito && this.tabs.avvisoSito.vista;
     if (sito) daCoprire.add(sito);
+    const conferme = this.tabs.conferme;
+    try { if (conferme && conferme.vista && conferme.vista.getBounds().width > 0) daCoprire.add(conferme.vista); } catch (_) {}
     const mia = figli().indexOf(this.vista);
     if (mia >= 0 && !figli().slice(mia + 1).some((v) => daCoprire.has(v))) return;
     if (mia >= 0) cv.removeChildView(this.vista);
