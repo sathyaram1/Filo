@@ -59,10 +59,19 @@
       break;
     }
     if (campoDiTesto(el)) return true;
-    // Un componente a shadow DOM chiuso nasconde il suo campo (#685.1): lì si chiede al
-    // documento se il cursore sta in un punto scrivibile, che vale in ogni mondo e oltre ogni ombra.
+    // Un componente a shadow DOM chiuso nasconde il suo campo (#685.1): lì si chiede al documento
+    // se il cursore è scrivibile e se sta in QUEL componente (fuori dall'ombra la selezione punta all'ospite).
     if (el && !el.shadowRoot && String(el.localName || '').indexOf('-') !== -1) {
-      try { return !!(el.ownerDocument || doc).queryCommandEnabled('insertText'); } catch (_) { return false; }
+      try {
+        const d = el.ownerDocument || doc;
+        if (!d.queryCommandEnabled('insertText')) return false;
+        const s = d.getSelection && d.getSelection();
+        const nodo = s && s.anchorNode;
+        if (!nodo) return false;
+        if (el.contains && el.contains(nodo)) return true;
+        const i = el.parentNode ? Array.prototype.indexOf.call(el.parentNode.childNodes, el) : -1;
+        return nodo === el.parentNode && (s.anchorOffset === i || s.anchorOffset === i + 1);
+      } catch (_) { return false; }
     }
     return false;
   }
