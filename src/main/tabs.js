@@ -751,6 +751,23 @@ class TabManager {
   }
 
   _makeView(url, partition, opts = {}) {
+    const webPreferences = this._preferenzeWeb(url, partition, opts);
+    // `opts.webContents`: la finestra che una pagina ha aperto col clic, tenuta da lei (setWindowOpenHandler).
+    const view = new WebContentsView(opts.webContents ? { webContents: opts.webContents } : { webPreferences });
+    // #410.1 — segui gli scaricamenti anche sulle sessioni NON predefinite
+    // (privacy, proxy, incognito): una sessione non agganciata scarica col
+    // dialogo nativo, senza barra e senza il controllo sui programmi (#588.2).
+    // L'incognito ha il suo ambito: le sue voci non vanno su disco.
+    try {
+      require('./services/downloads').attachSession(view.webContents.session, { scope: this.incognito ? (this.partition || 'incognito') : '' });
+    } catch (_) {}
+    installaPermessi(view.webContents.session);
+    Permessi.seguiGesti(view.webContents);
+    require('./services/homeNetwork').attach(view.webContents.session);
+    return view;
+  }
+
+  _preferenzeWeb(url, partition, opts = {}) {
     const isInternal = url.startsWith('filo://');
     const webPreferences = {
       preload: isInternal ? INTERNAL_PRELOAD : PAGE_PRELOAD,
@@ -789,24 +806,14 @@ class TabManager {
         '--filo-suppress-autoplay',
       ];
     }
-    const view = new WebContentsView({ webPreferences });
-    // #410.1 — segui gli scaricamenti anche sulle sessioni NON predefinite
-    // (privacy, proxy, incognito): una sessione non agganciata scarica col
-    // dialogo nativo, senza barra e senza il controllo sui programmi (#588.2).
-    // L'incognito ha il suo ambito: le sue voci non vanno su disco.
-    try {
-      require('./services/downloads').attachSession(view.webContents.session, { scope: this.incognito ? (this.partition || 'incognito') : '' });
-    } catch (_) {}
-    installaPermessi(view.webContents.session);
-    Permessi.seguiGesti(view.webContents);
-    require('./services/homeNetwork').attach(view.webContents.session);
-    return view;
+    return webPreferences;
   }
 
   // `apriComunque`: la scheda non passa dalla lista dei siti bloccati per quel sito.
   // `permessoRichieste`: è un «Apri comunque» vero, e passa anche il blocco delle richieste.
   // `bloccoInPagina`: se la lista la ferma, la scheda nasce sulla pagina «Sito bloccato» invece di non nascere.
-  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false, allowDuplicate = false, openedByLink = false, apriComunque = false, permessoRichieste = false, bloccoInPagina = false } = {}) {
+  // `adotta`: { webContents, partition, sito } della finestra che una pagina ha aperto e tiene; si carica da sé.
+  openTab(url = 'filo://newtab/', { activate = true, restoreScrollPct = null, restoreZoomLevel = null, suppressAutoplay = false, allowDuplicate = false, openedByLink = false, apriComunque = false, permessoRichieste = false, bloccoInPagina = false, adotta = null } = {}) {
     // #252 — INDIRIZZO UNICO per le pagine interne: riporta l'eventuale forma
     // legacy `filo://src/pages/<page>/<file>` (dallo shim getURL) alla forma
     // canonica `filo://<page>/<file>` che usa il menu. Così tutti i punti di
@@ -859,8 +866,8 @@ class TabManager {
     }
     const id = randomUUID();
     const isInternal = url.startsWith('filo://');
-    const partition = this._partitionFor(url);
-    const view = this._makeView(url, partition, { suppressAutoplay });
+    const partition = adotta ? adotta.partition : this._partitionFor(url);
+    const view = this._makeView(url, partition, { suppressAutoplay, webContents: adotta && adotta.webContents });
 
     const tab = {
       id,
@@ -888,7 +895,7 @@ class TabManager {
       // (Electron zoom "level", 0 = 100%). Applicato una volta a fine caricamento.
       restoreZoomLevel: typeof restoreZoomLevel === 'number' ? restoreZoomLevel : null,
       partition,
-      partitionSite: isInternal ? null : Cookies.registrableOf(url),
+      partitionSite: isInternal ? null : (adotta && adotta.sito) || Cookies.registrableOf(url),
       // Proxy per-tab ("Apri da un altro paese"): { country, tier } finché la
       // tab è instradata da un altro paese, null altrimenti. Vedi setTabProxy.
       proxy: null,
@@ -937,7 +944,12 @@ class TabManager {
       this.layout();
     }
     if (bloccata) this._mostraPaginaBloccata(tab, url, bloccata);
-    else view.webContents.loadURL(url);
+    else if (!adotta) view.webContents.loadURL(url);
+    // La pagina che l'ha aperta può chiuderla (window.close): la scheda se ne va con lei.
+    if (adotta) {
+      const wc = view.webContents;
+      wc.once('destroyed', () => setImmediate(() => { if (this.tabs.includes(tab) && tab.view.webContents === wc) this.closeTab(tab.id); }));
+    }
     if (activate) {
       // Riaffermo la visibilità su tutti i tab dopo loadURL.
       for (const t of this.tabs) t.view.setVisible?.(this._visibile(t));
@@ -2574,15 +2586,32 @@ class TabManager {
       // ogni apertura veniva attivata, quindi l'utente veniva strappato dalla
       // pagina che stava leggendo — lo stesso attrito della musica che passava
       // davanti da sola.
-      const aperta = this.openTab(url, {
+      const opzioni = {
         activate: disposition !== 'background-tab',
         openedByLink: true,
         apriComunque: this._siteAllowedIn(tab, url),
         permessoRichieste: this._siteAllowedIn(tab, url) && !!tab._permessoRichieste,
-      });
+      };
       // Un blob: aperto dalla pagina si giudica come lei (src/main/tabs/tabSafebrowse.js).
-      const nuova = this.tabs.find((t) => t.id === aperta);
-      if (nuova) nuova._sbApertaDa = tab._urlNavigato;
+      const daLei = (aperta) => {
+        const nuova = this.tabs.find((t) => t.id === aperta);
+        if (nuova) nuova._sbApertaDa = tab._urlNavigato;
+      };
+      // La finestra resta in mano alla pagina che l'ha chiesta (la riempie, la porta altrove, la chiude), come in un
+      // browser; si può solo se la scheda nuova starebbe nella sua stessa partizione, altrove nasce staccata.
+      if (this._finestraDellaPagina(tab, url, opzioni.apriComunque)) {
+        const partition = tab.partition || null;
+        return {
+          action: 'allow',
+          outlivesOpener: true,
+          overrideBrowserWindowOptions: { webPreferences: this._preferenzeWeb('about:blank', partition) },
+          createWindow: (options) => {
+            daLei(this.openTab(url || 'about:blank', { ...opzioni, adotta: { webContents: options.webContents, partition, sito: tab.partitionSite } }));
+            return options.webContents;
+          },
+        };
+      }
+      daLei(this.openTab(url, opzioni));
       return { action: 'deny' };
     });
 
@@ -2593,6 +2622,17 @@ class TabManager {
     wc.on('did-create-window', (child) => {
       this._hardenAuthPopup(child, tab);
     });
+  }
+
+  // Una scheda proxata ha la partizione sua, e in privacy ogni sito la sua: lì la finestra non può restare alla pagina.
+  _finestraDellaPagina(tab, url, apriComunque) {
+    if (!tab || tab.isInternal !== false || tab.proxy) return false;
+    const u = String(url || '');
+    if (u && u !== 'about:blank') {
+      if (!/^https?:/i.test(u)) return false;
+      if ((this._partitionFor(u) || null) !== (tab.partition || null)) return false;
+    }
+    return Boolean(apriComunque || !this._decisioneBlocco(null, u || 'about:blank'));
   }
 
   // #209 — risposta 'allow' per un popup di login, con le webPreferences
