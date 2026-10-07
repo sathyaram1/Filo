@@ -639,6 +639,67 @@ export function sommaSottoAgente(rep, sub) {
 }
 
 /**
+ * Le righe del thread principale che toccano al biglietto in corso: i turni
+ * dell'orchestratore dopo la fine del worker di prima (o dopo un suo rilascio
+ * di un biglietto morto, già contato lì) fino alla chiamata Agent ancora aperta,
+ * quella del worker che sta rilasciando. Ogni turno finisce in un rapporto solo;
+ * restano fuori quelli dopo l'ultimo rilascio della sessione. PURA.
+ */
+export function finestraOrchestratore(linee) {
+  const voci = [];
+  for (const l of linee) {
+    let e;
+    try { e = JSON.parse(l); } catch (_) { continue; }
+    const ms = e && e.timestamp ? Date.parse(e.timestamp) : NaN;
+    voci.push({ l, e: e || {}, ms });
+  }
+  const chiamate = new Map();
+  const rilasci = [];
+  const turni = [];
+  for (const { e, ms } of voci) {
+    const msg = e.message && typeof e.message === 'object' ? e.message : null;
+    if (!msg || !Number.isFinite(ms)) continue;
+    const blocchi = Array.isArray(msg.content) ? msg.content : [];
+    if (e.type === 'assistant') {
+      if (msg.usage) turni.push(ms);
+      for (const b of blocchi) {
+        if (!b || b.type !== 'tool_use') continue;
+        if (b.name === 'Agent' || b.name === 'Task') chiamate.set(b.id, { inizio: ms, fine: NaN });
+        const cmd = b.input && typeof b.input.command === 'string' ? b.input.command : '';
+        if (/routine-channel\.mjs\s+release\b/.test(cmd)) rilasci.push(ms);
+      }
+    } else if (e.type === 'user') {
+      for (const b of blocchi) if (b && b.type === 'tool_result' && chiamate.has(b.tool_use_id)) chiamate.get(b.tool_use_id).fine = ms;
+    }
+  }
+  const aperte = [...chiamate.values()].filter((c) => !Number.isFinite(c.fine));
+  const fine = aperte.length ? Math.max(...aperte.map((c) => c.inizio)) : Infinity;
+  const confini = [...[...chiamate.values()].map((c) => c.fine), ...rilasci].filter((t) => Number.isFinite(t) && t < fine);
+  const inizio = confini.length ? Math.max(...confini) : -Infinity;
+  const prima = turni.filter((t) => t <= inizio);
+  const dentro = turni.filter((t) => t > inizio && t <= fine);
+  return {
+    righe: voci.filter((v) => Number.isFinite(v.ms) && v.ms > inizio && v.ms <= fine).map((v) => v.l),
+    // Quanto è rimasto fermo il thread principale prima del primo turno: oltre
+    // un'ora la sua cache (a un'ora) è scaduta e il turno riscrive tutto.
+    attesaPrimaS: prima.length && dentro.length ? Math.round((Math.min(...dentro) - Math.max(...prima)) / 1000) : 0,
+  };
+}
+
+async function rapportoOrchestratore(fileSottoAgente) {
+  const principale = `${dirname(dirname(fileSottoAgente))}.jsonl`;
+  if (!existsSync(principale)) return null;
+  const linee = [];
+  for await (const l of righeDelFile(principale)) if (String(l).trim()) linee.push(l);
+  const { righe, attesaPrimaS } = finestraOrchestratore(linee);
+  const r = await analizzaRighe(righe, { role: 'orchestrator' });
+  return {
+    costUsd: r.costUsd, turns: r.turns, coldTurns: r.coldTurns, rewarmTurns: r.rewarmTurns, rewarmTokens: r.rewarmTokens,
+    maxContextTokens: r.maxContextTokens, attesaPrimaS, tokens: r.tokens, startedAt: r.startedAt, endedAt: r.endedAt,
+  };
+}
+
+/**
  * Il rapporto di questa sessione, sotto-agenti compresi. Non lancia mai per
  * un transcript assente o illeggibile: torna il rapporto minimo con la nota.
  * (Un errore di programmazione qui dentro sì: lo prende chi chiama.)
