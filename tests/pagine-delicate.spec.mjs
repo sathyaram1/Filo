@@ -3,6 +3,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { clickConfirm, confirmText, CONFIRM_HOST } from './helpers/confirm.mjs';
+import { livelloAutonomia } from './helpers/autonomia.mjs';
 
 const SEGRETO = 'Saldo disponibile 12.345,67 euro bonifico a Mario Rossi';
 
@@ -217,6 +218,7 @@ test('il titolo di una pagina delicata non resta sulla scheda quando la pagina d
 });
 
 test('dalla chat della home una scheda aperta diventa delicata col suo titolo, senza scriverne l\'indirizzo', async ({ app, openTab, testServer }) => {
+  await livelloAutonomia(app, 'conservativo'); // il popup di un costo 2 si prova a Conservativo (#530)
   await testServer.openReady(openTab,
     '<!doctype html><html><head><title>Studio Rossi - Area clienti</title></head><body><p>Dichiarazione dei redditi</p></body></html>',
     { pubblico: true });

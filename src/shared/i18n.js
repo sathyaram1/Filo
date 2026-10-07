@@ -378,6 +378,7 @@
     options_action_archive_embed: 'Indicizzazione delle schede archiviate',
     options_action_provider_test: 'Prova di un fornitore (pulsante «Prova»)',
     options_action_file_name: 'Nome sensato ai file (legge l\'inizio del file o una miniatura)',
+    options_action_embed_cookie_check: 'Contenuti incorporati rotti dai cookie (guarda il riquadro)',
     // Elenco (di sola lettura) degli altri punti in cui Filo usa un modello:
     // quelli che girano sui server di Filo e quelli che un modello non lo usano.
     options_h_model_usage: 'Dove altro Filo usa un modello',
@@ -468,8 +469,9 @@
       'in alto ti permette di aprirlo comunque se era legittimo.',
     options_security_adblock: 'Blocca pubblicità e tracker',
     options_security_adblock_desc:
-      'Usa liste di blocco pubbliche e gratuite (StevenBlack, EasyList) per impedire ' +
-      'il caricamento di pubblicità e tracker. Le liste si scaricano dalla rete, restano ' +
+      'Usa liste di blocco pubbliche e gratuite (StevenBlack, EasyList e le sue liste per i siti ' +
+      'italiani e francesi): pubblicità e tracker non si caricano, e i riquadri della pubblicità ' +
+      'che restano nella pagina spariscono. Le liste si scaricano dalla rete, restano ' +
       'in cache sul tuo computer e si aggiornano da sole una volta a settimana. I siti ' +
       'che usi davvero (Google, YouTube, banche…) non vengono mai bloccati.',
     options_security_adskip: 'Salta le pubblicità dei video',
@@ -606,6 +608,15 @@
       + 'cookie restano, così non esci dai siti dove hai fatto l\'accesso. Degli altri siti, i cookie messi da un '
       + 'contenuto incorporato durano solo la visita.',
     options_cookies_accessi_remove: 'Togli',
+    options_cookies_riquadri_title: 'Contenuti incorporati con i cookie riattivati',
+    options_cookies_riquadri_desc: 'Post, video e mappe di questi servizi, dentro le pagine di altri siti, tengono i loro cookie.',
+    options_cookies_riquadri_remove: 'Togli',
+    riquadro_cookie_domanda: 'Attivo i cookie di %s per questo contenuto?',
+    riquadro_cookie_si: 'Sì',
+    riquadro_cookie_no: 'No',
+    riquadro_cookie_fatto: 'Cookie di %s attivi: ricarico il contenuto',
+    riquadro_cookie_menu_attiva: 'Attiva i cookie di %s qui',
+    riquadro_cookie_menu_togli: 'Togli i cookie riattivati di %s',
     options_cookies_banners_title: 'Qui i banner dei cookie li vedi',
     options_cookies_banners_remove: 'Rifiuta in automatico',
     options_cookies_done_title: 'Qui Filo li ha rifiutati o nascosti',

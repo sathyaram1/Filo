@@ -9,6 +9,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { CONFIRM_HOST, confirmState } from './helpers/confirm.mjs';
+import { home } from './helpers/chatFinta.mjs';
 
 const NEWTAB = 'filo://newtab/';
 
@@ -21,7 +22,8 @@ async function submit(page, command) {
   }, command);
 }
 
-test('"/pulisci" è un comando Filo e apre la conferma di riordino delle schede', async ({ openTab }) => {
+test('"/pulisci" è un comando Filo e, a livello Conservativo, apre la conferma di riordino delle schede', async ({ app, openTab }) => {
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'conservativo' } }));
   const page = await openTab(NEWTAB);
   const input = page.locator('#input');
   await expect(input).toBeVisible({ timeout: 8_000 });
@@ -37,7 +39,8 @@ test('"/pulisci" è un comando Filo e apre la conferma di riordino delle schede'
   await expect.poll(async () => (await confirmState(page)).title).toBe('Riordino delle schede');
 });
 
-test('"/pulizia" è un alias dello stesso comando', async ({ openTab }) => {
+test('"/pulizia" è un alias dello stesso comando', async ({ app, openTab }) => {
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'conservativo' } }));
   const page = await openTab(NEWTAB);
   const input = page.locator('#input');
   await expect(input).toBeVisible({ timeout: 8_000 });
@@ -45,4 +48,13 @@ test('"/pulizia" è un alias dello stesso comando', async ({ openTab }) => {
   await expect(input).toHaveClass(/is-cmd-filo/);
   await submit(page, '/pulizia');
   await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 8_000 });
+});
+
+// #530: a Normale, in una conversazione pulita, il riordino costa 2 e parte da solo, come chiesto in chat.
+// Nella home che c'è già: una seconda home aperta apposta sarebbe un doppione, e il riordino la archivierebbe.
+test('"/pulisci" a livello Normale riordina subito, senza popup, e dice com\'è andata', async ({ app }) => {
+  const page = await home(app);
+  await submit(page, '/pulisci');
+  await expect(page.locator('body')).toContainText(/✓ (Archiviate \d+|Nessuna scheda da archiviare)/, { timeout: 15_000 });
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
 });

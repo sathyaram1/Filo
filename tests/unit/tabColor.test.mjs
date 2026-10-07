@@ -149,3 +149,111 @@ test('centralità: logo centrale vince su rumore saturo ai bordi', () => {
   const h = hueDeg(out);
   assert.ok(h > 90 && h < 160, `atteso verde (centrale), ottenuto hue ${h}° (${out})`);
 });
+
+// ------------------------------------------------------------
+// Fondo di una scheda non attiva (#821): Pipeline 3-4 della spec, senza
+// attenuazioni in più. Le due barre sono il neutro delle schede di shell.css.
+// ------------------------------------------------------------
+
+const BARRE = { chiaro: [239, 227, 203], scuro: [42, 36, 29] };
+const vicino = (got, want, msg) => {
+  for (let i = 0; i < 3; i++) assert.ok(Math.abs(got[i] - want[i]) <= 1, `${msg}: ${got} invece di ${want}`);
+};
+
+test('fondo della scheda non attiva = adattato × opacità + barra × (1 − opacità), nei due temi', () => {
+  const adattato = [255, 0, 0];
+  for (const [tema, barra] of Object.entries(BARRE)) {
+    for (const op of [0, 0.25, 0.6, 0.9, 1]) {
+      const got = TC.inactiveTabBackground('rgb(255, 0, 0)', barra, { opacita_tab: op });
+      const want = [0, 1, 2].map((i) => adattato[i] * op + barra[i] * (1 - op));
+      vicino(got, want, `${tema}, opacità ${op}`);
+    }
+  }
+});
+
+test('saturazione e opacità a 1: la scheda di YouTube è rosso YouTube; a 0 è la barra', () => {
+  for (const barra of Object.values(BARRE)) {
+    assert.deepEqual(TC.inactiveTabBackground('rgb(255, 0, 0)', barra, { saturazione_tab: 1, opacita_tab: 1 }), [255, 0, 0]);
+    assert.deepEqual(TC.inactiveTabBackground('rgb(255, 0, 0)', barra, { opacita_tab: 0 }), barra);
+  }
+});
+
+test('coi valori predefiniti il rosso resta rosso vivo, non il grigiastro della vecchia regola', () => {
+  const got = TC.inactiveTabBackground('rgb(255, 0, 0)', BARRE.chiaro, TC.defaultParams());
+  vicino(got, [249, 91, 81], 'predefiniti, tema chiaro');
+  const [h, s] = TC.rgbToHsl(...got);
+  assert.ok(h < 0.02 || h > 0.98, `tinta rossa, ottenuto ${h * 360}°`);
+  assert.ok(s > 0.9, `saturazione viva (la vecchia regola dava ~0.18), ottenuto ${s}`);
+});
+
+test('saturazione_tab pesa per intero: 0 spegne la tinta, 1 la accende', () => {
+  const grigia = TC.inactiveTabBackground('rgb(255, 0, 0)', BARRE.chiaro, { saturazione_tab: 0, opacita_tab: 1 });
+  assert.equal(TC.chroma(`rgb(${grigia.join(',')})`), 0);
+  const piena = TC.inactiveTabBackground('rgb(255, 0, 0)', BARRE.chiaro, { saturazione_tab: 1, opacita_tab: 1 });
+  assert.equal(TC.chroma(`rgb(${piena.join(',')})`), 255);
+});
+
+test('«colori più vivaci» dai predefiniti dà una differenza che si vede', () => {
+  const prima = TC.inactiveTabBackground('rgb(255, 0, 0)', BARRE.chiaro, TC.defaultParams());
+  const preset = { ...TC.defaultParams(), saturazione_tab: 1, opacita_tab: 0.9 };
+  const dopo = TC.inactiveTabBackground('rgb(255, 0, 0)', BARRE.chiaro, preset);
+  const dist = Math.hypot(...[0, 1, 2].map((i) => dopo[i] - prima[i]));
+  assert.ok(dist > 60, `differenza troppo piccola: ${prima} → ${dopo}`);
+});
+
+test('adattamento: tinta del sito coi parametri, acromatico inalterato, riapplicarlo non cambia niente', () => {
+  const ripiego = TC.adaptIdentity('rgb(220, 30, 90)', { saturazione_tab: 1, luminosita_tab: 0.5 });
+  const [h, s, l] = TC.rgbToHsl(...ripiego);
+  assert.ok(Math.abs(h - TC.rgbToHsl(220, 30, 90)[0]) < 0.01, 'stessa tinta');
+  assert.ok(s > 0.98 && Math.abs(l - 0.5) < 0.01, `saturazione e luminosità dai parametri: ${ripiego}`);
+  assert.deepEqual(TC.adaptIdentity('rgb(250, 250, 250)', TC.defaultParams()), [250, 250, 250]);
+  assert.deepEqual(TC.adaptIdentity('rgb(24, 23, 23)', TC.defaultParams()), [24, 23, 23]);
+  const gia = TC.adaptIdentity([255, 0, 0], TC.defaultParams());
+  assert.deepEqual(TC.adaptIdentity(gia, TC.defaultParams()), gia);
+  assert.equal(TC.inactiveTabBackground(null, BARRE.chiaro, TC.defaultParams()), null);
+  assert.equal(TC.inactiveTabBackground('non-un-colore', BARRE.chiaro, TC.defaultParams()), null);
+});
+
+test('il titolo regge 4,5:1 su ogni colore, a riposo e in hover, nei due temi', () => {
+  const temi = {
+    chiaro: { barra: BARRE.chiaro, pagina: [253, 246, 236], fg: [42, 34, 26] },
+    scuro: { barra: BARRE.scuro, pagina: [29, 26, 22], fg: [241, 231, 214] },
+    incognito: { barra: [52, 44, 71], pagina: [42, 36, 56], fg: [236, 231, 245] },
+  };
+  const identita = ['rgb(250, 250, 250)', 'rgb(30, 30, 30)', 'rgb(128, 128, 128)'];
+  for (let h = 0; h < 360; h += 10) identita.push(TC.hslToRgb(h / 360, 1, 0.5));
+  const peggiore = { r: Infinity };
+  for (const [tema, t] of Object.entries(temi)) {
+    for (const op of [0.05, 0.35, 0.6, 0.9, 1]) {
+      for (const lum of [0.2, 0.5, 0.8]) {
+        for (const id of identita) {
+          const params = { opacita_tab: op, luminosita_tab: lum };
+          const bg = TC.inactiveTabBackground(id, t.barra, params);
+          const { ink, hover } = TC.inkAndHover(bg, t.fg, t.pagina);
+          const r = Math.min(TC.contrastRatio(ink, bg), TC.contrastRatio(ink, hover));
+          if (r < peggiore.r) Object.assign(peggiore, { r, tema, op, lum, id, bg, ink });
+        }
+      }
+    }
+  }
+  assert.ok(peggiore.r >= 4.5, `contrasto ${peggiore.r.toFixed(2)} in ${JSON.stringify(peggiore)}`);
+});
+
+test('hover di una scheda colorata: va verso il polo lontano dall\'inchiostro', () => {
+  const scuro = [42, 34, 26], chiaro = [253, 246, 236];
+  const giallo = TC.inkAndHover([249, 219, 81], scuro, chiaro);
+  assert.deepEqual(giallo.ink, scuro);
+  assert.ok(TC.relativeLuminance(giallo.hover) > TC.relativeLuminance([249, 219, 81]));
+  const blu = TC.inkAndHover([96, 91, 234], scuro, chiaro);
+  assert.deepEqual(blu.ink, chiaro);
+  assert.ok(TC.relativeLuminance(blu.hover) < TC.relativeLuminance([96, 91, 234]));
+});
+
+test('inchiostro: col fondo chiaro vince quello scuro del tema, col fondo scuro quello chiaro', () => {
+  const scuro = [42, 34, 26], chiaro = [253, 246, 236];
+  assert.deepEqual(TC.readableInk([[249, 219, 81]], [scuro, chiaro]), scuro);
+  assert.deepEqual(TC.readableInk([[170, 14, 12]], [scuro, chiaro]), chiaro);
+  // Inchiostri del tema che non reggono (token dell'utente): si ripiega su nero o bianco.
+  assert.deepEqual(TC.readableInk([[128, 128, 128]], [[120, 120, 120], [140, 140, 140]]), [0, 0, 0]);
+  assert.ok(Math.abs(TC.contrastRatio([0, 0, 0], [255, 255, 255]) - 21) < 1e-9);
+});

@@ -222,7 +222,7 @@ test('le voci si tolgono e si rimettono a parole, una alla volta', () => {
   for (const [chiave, voce] of [['ora_home', 'ora'], ['batteria_home', 'batteria'], ['rete_home', 'rete'], ['bluetooth_home', 'bluetooth'], ['orologio_home', 'ora'], ['wifi_home', 'rete'], ['volume_home', 'volume'], ['audio_home', 'volume']]) {
     const via = P.buildPreferencePartial(chiave, false);
     assert.deepEqual(via.partial, { homeSistema: { [voce]: false } }, chiave);
-    assert.equal(via.level, 1);
+    assert.equal(via.costo, 1);
     assert.deepEqual(P.buildPreferencePartial(chiave, 'mostra').partial, { homeSistema: { [voce]: true } }, chiave);
   }
   assert.equal(P.buildPreferencePartial('batteria_home', 'boh'), null);

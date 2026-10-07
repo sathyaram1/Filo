@@ -137,6 +137,9 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     FILO_CHAT_STOP: 'filo-assistant',
     FILO_GENERATE_DASHBOARD: 'generate-dashboard',
     FILO_RUN_ACTION: 'agent-actions',
+    // #530 — l'agente sulla pagina chiede se una sua azione parte, chiede o no.
+    FILO_DECIDI_PAGINA: 'autonomy-levels',
+    FILO_AIUTO_NUOVO: 'autonomy-levels',
     FILO_CONFIRM_ACTION: 'agent-actions',
     // #810 — un indirizzo proposto da un modello si apre col clic solo dopo la porta delle uscite.
     FILO_APRI_PROPOSTA: 'agent-actions',
@@ -258,9 +261,14 @@ test('ogni icona fissa della home che apre una pagina filo:// è coperta dal man
   // segnalazioni lui non la può aprire (#583). Dalla home ci si arriva solo da
   // admin, per questo l'indirizzo compare ancora nel file.
   const SOLO_OWNER = new Set(['filo://feedback/feedback.html', 'filo://manage/manage.html']);
-  const urls = [...dash.matchAll(/url:\s*'(filo:\/\/[a-z-]+\/[a-z-]+\.html)'/g)]
-    .map((m) => m[1])
-    .filter((u) => !SOLO_OWNER.has(u));
+  // Le icone che stavano in alto a destra nella home sono nella barra laterale (#871): stessa regola.
+  const barra = readFileSync(join(ROOT, 'src', 'main', 'barraLaterale.js'), 'utf8');
+  const pagineBarra = barra.match(/const PAGINE_FISSE = \{([\s\S]*?)\};/)?.[1] || '';
+  assert.ok(pagineBarra, 'non trovo le pagine fisse della barra laterale');
+  const urls = [
+    ...[...dash.matchAll(/url:\s*'(filo:\/\/[a-z-]+\/[a-z-]+\.html)'/g)].map((m) => m[1]),
+    ...[...pagineBarra.matchAll(/'(filo:\/\/[a-z-]+\/[a-z-]+\.html)'/g)].map((m) => m[1]),
+  ].filter((u) => !SOLO_OWNER.has(u));
   assert.ok(urls.length >= 2, `mi aspetto ≥2 icone della home con url filo://, trovate ${urls.length}`);
   const manifestText = CAP.CAPABILITIES.map((c) => `${c.invoke} ${c.desc}`).join('\n');
   for (const url of urls) {
@@ -287,18 +295,16 @@ function menuIconLabels() {
     const text = label(m[2]);
     if (text) byId.set(m[1], text);
   }
-  const retired = new Set(
-    [...(src.match(/RETIRED_ICONS\s*=\s*new Set\(\[([^\]]*)\]/)?.[1] || '').matchAll(/'(\w+)'/g)].map((m) => m[1]),
+  // Dove sta ogni icona lo dice src/shared/disposizioneIcone.js (#871): dal tasto destro si
+  // raggiungono la riga e «Altro…», più le icone nate dopo che la migrazione mette in «Altro…».
+  // Le globali (indietro, avanti, ricarica…) stanno nella barra laterale, non nel menu.
+  require(join(ROOT, 'src', 'shared', 'disposizioneIcone.js'));
+  const D = globalThis.SN_DISPOSIZIONE_ICONE;
+  const retired = new Set(D.RITIRATE);
+  const reachable = new Set(
+    [...D.DEFAULT.primary, ...D.DEFAULT.secondary, ...D.AGGIUNTE.filter((id) => !D.GLOBALI.includes(id))]
+      .filter((id) => !retired.has(id)),
   );
-  // Icone raggiungibili: quelle del layout di default più quelle che la
-  // migrazione aggiunge ai layout già salvati. Un'icona fuori da qui non
-  // compare nel menu di NESSUNO, anche se resta nel registro.
-  const reachable = new Set();
-  const layout = src.match(/DEFAULT_ICON_LAYOUT\s*=\s*\{([\s\S]*?)\n  \};/)?.[1] || '';
-  const additions = src.match(/const additions\s*=\s*\[([^\]]*)\]/)?.[1] || '';
-  for (const m of `${layout}${additions}`.matchAll(/'(\w+)'/g)) {
-    if (!retired.has(m[1])) reachable.add(m[1]);
-  }
   return { byId, retired, reachable };
 }
 
@@ -366,8 +372,8 @@ test('nessuna capacità cita la barra in alto / degli indirizzi, rimossa dalla s
   // Drift #399 (stessa famiglia di #387/#252): la shell tiene la barra indirizzi
   // (<nav class="addr">) SEMPRE nascosta — applyChrome() forza compact=true e
   // boot.spec.mjs asserisce #addr assente. Sopra le schede ci sono solo le
-  // linguette e i pulsanti finestra: indietro/avanti/ricarica vivono nel menu
-  // del tasto destro, l'icona Home in alto a destra DENTRO la home. Il manifesto
+  // linguette e i pulsanti finestra: indietro/avanti/ricarica e Home vivono
+  // nella barra laterale che si apre dal bordo sinistro (#871). Il manifesto
   // aveva continuato a mandare l'utente a "frecce/pulsante nella barra in alto" e
   // a "digitare nella barra degli indirizzi", strade che non esistono più.
   //
@@ -387,15 +393,15 @@ test('nessuna capacità cita la barra in alto / degli indirizzi, rimossa dalla s
     // "nella barra" generico, TRANNE la barra delle schede (le linguette, che
     // esiste) o la barra in basso (chat del deck builder): intercetta formule
     // come "Pulsante Home nella barra" che rimandano alla barra sparita.
-    { re: /nella barra(?!\s+(delle schede|in basso))/i, why: 'l\'unica barra sopra le schede è quella delle linguette' },
+    { re: /nella barra(?!\s+(delle schede|in basso|laterale))/i, why: 'l\'unica barra sopra le schede è quella delle linguette (a sinistra c\'è la barra laterale)' },
   ];
   for (const c of CAP.CAPABILITIES) {
     const text = `${c.invoke} ${c.desc}${c.doesNot ? ' ' + c.doesNot : ''}`;
     for (const { re, why } of FORBIDDEN) {
       assert.ok(!re.test(text),
         `la capacità "${c.id}" cita "${(text.match(re) || [''])[0]}", ma ${why}: `
-        + 'aggiorna il manifesto (indietro/avanti/ricarica sono nel menu del tasto destro, '
-        + 'l\'indirizzo si scrive con "/" nella nuova scheda, Home è in alto a destra nella home)');
+        + 'aggiorna il manifesto (indietro/avanti/ricarica e Home sono nella barra laterale, '
+        + 'l\'indirizzo si scrive con "/" nella nuova scheda)');
     }
   }
 });

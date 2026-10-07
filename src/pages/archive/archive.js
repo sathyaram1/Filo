@@ -24,6 +24,7 @@
     const settings = await Storage.getSettings();
     window.SN_PAGE_THEME = settings.theme;
     window.SN_PAGE_BOOTSTRAP.applyTheme(settings.theme);
+    if (TabColor && settings.tabColor) tabColorParams = TabColor.clampParams(settings.tabColor);
 
     const [r, rc] = await Promise.all([
       chrome.runtime.sendMessage({ type: MSG.GET_ARCHIVED_TABS }),
@@ -54,49 +55,48 @@
     return (h / 6) * 360;
   }
 
-  // Tinta identità ATTENUATA per lo sfondo della chip: stessa logica delle tab
-  // in alto (§1.2, shell.js) — riduciamo la saturazione al ~18% dell'originale
-  // e lasciamo che il CSS (color-mix col neutro di superficie) sposti la
-  // luminosità verso il tema. Così una scheda molto satura (es. YouTube rosso)
-  // non diventa un blocco acceso ma una tinta sobria e riconoscibile. Ritorna
-  // null per grigi/valori non parsabili → la chip usa il neutro.
-  function tintOf(rgbStr) {
-    const m = /rgba?\(([^)]+)\)/.exec(rgbStr || '');
-    if (!m) return null;
-    const p = m[1].split(',').map((s) => parseFloat(s.trim()));
-    if (p.length < 3 || p.some((n) => Number.isNaN(n))) return null;
-    const r = p[0] / 255, g = p[1] / 255, b = p[2] / 255;
-    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
-    const l = (mx + mn) / 2;
-    let h = 0, s = 0;
-    if (mx !== mn) {
-      const d = mx - mn;
-      s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
-      if (mx === r) h = (g - b) / d + (g < b ? 6 : 0);
-      else if (mx === g) h = (b - r) / d + 2;
-      else h = (r - g) / d + 4;
-      h /= 6;
+  // Chip colorata con la stessa regola delle schede in alto (tabColor.js): tinta
+  // del sito sul neutro della chip quanto dice opacita_tab, titolo per contrasto.
+  const TabColor = window.SN_TAB_COLOR;
+  let tabColorParams = TabColor ? TabColor.defaultParams() : null;
+
+  function chipSurfaces() {
+    if (!TabColor || !tabColorParams || !(tabColorParams.opacita_tab > 0)) return null;
+    const rest = TabColor.resolveCssColor(document, 'var(--sn-hover)');
+    const page = TabColor.resolveCssColor(document, 'var(--sn-bg)');
+    const fg = TabColor.resolveCssColor(document, 'var(--sn-fg)');
+    return rest && page && fg ? { rest, page, fg } : null;
+  }
+
+  // Un giro di render dipinge centinaia di chip: le superfici si leggono una volta.
+  let surfacesThisTurn = null;
+  function chipSurfacesOnce() {
+    if (!surfacesThisTurn) {
+      surfacesThisTurn = { v: chipSurfaces() };
+      queueMicrotask(() => { surfacesThisTurn = null; });
     }
-    s *= 0.18; // saturazione ridotta al ~18% dell'originale (come §1.2)
-    const hue2rgb = (pp, qq, t) => {
-      if (t < 0) t += 1;
-      if (t > 1) t -= 1;
-      if (t < 1 / 6) return pp + (qq - pp) * 6 * t;
-      if (t < 1 / 2) return qq;
-      if (t < 2 / 3) return pp + (qq - pp) * (2 / 3 - t) * 6;
-      return pp;
-    };
-    let nr, ng, nb;
-    if (s === 0) {
-      nr = ng = nb = l;
-    } else {
-      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-      const pq = 2 * l - q;
-      nr = hue2rgb(pq, q, h + 1 / 3);
-      ng = hue2rgb(pq, q, h);
-      nb = hue2rgb(pq, q, h - 1 / 3);
+    return surfacesThisTurn.v;
+  }
+
+  function paintChip(row, surf) {
+    const identity = row.dataset.identity;
+    const bg = identity && surf && TabColor.inactiveTabBackground(identity, surf.rest, tabColorParams);
+    if (!bg) {
+      row.classList.remove('tinted');
+      for (const v of ['--arc-bg', '--arc-bg-hover', '--arc-ink']) row.style.removeProperty(v);
+      return;
     }
-    return `rgb(${Math.round(nr * 255)}, ${Math.round(ng * 255)}, ${Math.round(nb * 255)})`;
+    const { ink, hover } = TabColor.inkAndHover(bg, surf.fg, surf.page);
+    row.classList.add('tinted');
+    row.style.setProperty('--arc-bg', TabColor.rgbCss(bg));
+    row.style.setProperty('--arc-bg-hover', TabColor.rgbCss(hover));
+    row.style.setProperty('--arc-ink', TabColor.rgbCss(ink));
+  }
+
+  // Tema, token o parametri cambiati: si ridipingono le chip già a schermo.
+  function repaintChips() {
+    const surf = chipSurfaces();
+    for (const row of document.querySelectorAll('.arc-tab[data-identity]')) paintChip(row, surf);
   }
 
   function dayKey(iso) {
@@ -631,9 +631,8 @@
     row.setAttribute('role', 'button');
     if (t.identityColor) {
       row.style.setProperty('--arc-color', t.identityColor);
-      // Sfondo della chip = tinta identità attenuata, come le tab in alto.
-      const tint = tintOf(t.identityColor);
-      if (tint) row.style.setProperty('--arc-tint', tint);
+      row.dataset.identity = t.identityColor;
+      paintChip(row, chipSurfacesOnce());
     }
 
     const titleText = t.title || t.url || '';
@@ -711,12 +710,21 @@
     if (!chrome.runtime || !chrome.runtime.onMessage) return;
     chrome.runtime.onMessage.addListener((msg) => {
       if (msg && msg.type === MSG.FILO_CHATS_UPDATED) refreshChats();
+      // Dopo pageBootstrap, che su questo stesso messaggio riapplica tema e token.
+      if (msg && msg.type === 'settings_updated') {
+        if (TabColor && msg.settings && msg.settings.tabColor) tabColorParams = TabColor.clampParams(msg.settings.tabColor);
+        requestAnimationFrame(repaintChips);
+      }
     });
   }
 
   document.addEventListener('DOMContentLoaded', () => {
     load();
     ascoltaCambiDelleChat();
+    try {
+      window.matchMedia('(prefers-color-scheme: dark)')
+        .addEventListener('change', () => requestAnimationFrame(repaintChips));
+    } catch (_) {}
     $('list').addEventListener('wheel', onListWheel, { passive: false });
     // Digitare = filtro testuale immediato (e si esce dalla modalità semantica).
     // Le schede si filtrano qui, in pagina; le chat le cerca il main, che ha i

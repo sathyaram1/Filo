@@ -572,6 +572,7 @@ const TASTI_DI_FILO = {
   'CommandOrControl+=': 'ingrandisci la PAGINA, col tasto con cui il "+" si preme davvero',
   'CommandOrControl+-': 'rimpicciolisci la PAGINA',
   'CommandOrControl+0': 'riporta la PAGINA al 100%',
+  'CommandOrControl+Shift+B': 'apre e chiude la barra laterale',
 };
 
 // I `role` che, su Mac, farebbero la cosa sbagliata al posto di Filo.

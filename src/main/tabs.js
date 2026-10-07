@@ -7,6 +7,7 @@ const { WebContentsView, Menu, MenuItem, session, shell, BrowserWindow, ipcMain 
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const Cookies = require('./services/cookies');
+const Sito = require('./services/stessoSito');
 const { spingiAllaScheda } = require('./services/impostazioniPerOrigine');
 const ProxyTab = require('./services/proxyTab');
 const { registerFiloProtocolForSession } = require('./protocol');
@@ -28,10 +29,12 @@ require('../shared/tasti'); // nome E comportamento delle scorciatoie, per il si
 const { indiceSaltoScheda, comandoNavigazione } = globalThis.SN_TASTI;
 const { collegaScorciatoie } = require('./shortcuts');
 const { AvvisiSopraPagina } = require('./avvisiSopraPagina');
+const { BarraLaterale } = require('./barraLaterale');
 const { AnteprimeSchede } = require('./tabs/anteprime');
 const { VisiteSchede } = require('./tabs/visite');
 const CartaAnteprima = require('./popup-anteprima');
 const { AvvisoSito } = require('./avvisoSito');
+const Storia = require('./tabs/storia');
 
 // #441 — eventi di solo PUNTAMENTO: il cursore che attraversa la pagina non è
 // un'interazione dell'utente con quella scheda (tutto il resto — click, tasti,
@@ -350,12 +353,17 @@ class TabManager {
         const t = this.tabs.find((x) => x.id === this.activeId);
         return (t && t.view) || null;
       },
+      sottoIlVuoto: () => this.vistaSottoIlVuoto(),
     });
+    this.barra = new BarraLaterale(window, this, { alto: () => this._altezzaCornice() });
     this.avvisoSito = new AvvisoSito(window, {
       schedaAttiva: () => this.tabs.find((x) => x.id === this.activeId) || null,
       scegli: (tab, scelta, dati) => this._sbScelta(tab, scelta, dati),
       menu: (tab) => this._sbVociMenu(tab),
       restituisciTastiera: () => this._tastieraAllaSchedaAttiva(),
+      inCima: () => { if (this.barra) this.barra._inCima(); },
+      cambiata: () => { if (this.barra) this.barra.aggiornaNav(); },
+      input: (wc, input) => { if (this.barra) this.barra.inputDa(wc, input); },
     });
     // §1.2 — cache del colore identità per dominio (host → 'rgb(r,g,b)'). Così
     // una nuova tab su un dominio già visto mostra subito la sua tinta, senza
@@ -1208,6 +1216,7 @@ class TabManager {
     const ses = session.fromPartition(partition);
     // Senza filo:// qui la pagina d'errore non si carica e un proxy muto lascia la scheda vuota.
     if (!ses.protocol.isProtocolHandled('filo')) registerFiloProtocolForSession(ses);
+    try { Cookies.coverAdblock(ses); } catch (_) {}
     try {
       await ses.setProxy({
         proxyRules: resolved.proxyRules,
@@ -1269,8 +1278,8 @@ class TabManager {
   // Sincrono: usato in will-navigate dove non si può attendere lo storage.
   _ruleForUrl(url) {
     if (!url || url.startsWith('filo://') || !/^https?:\/\//i.test(url)) return null;
-    const dom = Cookies.registrableOf(url);
-    return (dom && this._proxyRules && this._proxyRules[dom]) || null;
+    const dom = Sito.voceSalvata(url, Object.keys(this._proxyRules || {}));
+    return (dom && this._proxyRules[dom]) || null;
   }
 
   // Se `url` ha una regola persistente e la tab non è già instradata su quel
@@ -1309,7 +1318,7 @@ class TabManager {
     // Applica subito alle tab già aperte su quel dominio (born proxied immediato).
     for (const t of this.tabs) {
       if (t.isInternal || !/^https?:\/\//i.test(t.url || '')) continue;
-      if (Cookies.registrableOf(t.url) !== dom) continue;
+      if (Sito.voceSalvata(t.url, [dom]) !== dom) continue;
       if (t.proxy && t.proxy.country === code) continue;
       try { await this.setTabProxy(t.id, code); } catch (_) {}
     }
@@ -1321,7 +1330,8 @@ class TabManager {
   // futuro alla navigazione.
   async removeDomainProxyRule({ domain } = {}) {
     const src = String(domain || '');
-    const dom = src ? Cookies.registrableOf(/:\/\//.test(src) ? src : `https://${src}`) : null;
+    const url = /:\/\//.test(src) ? src : `https://${src}`;
+    const dom = src ? (Sito.voceSalvata(url, Object.keys(this._proxyRules || {})) || Cookies.registrableOf(url)) : null;
     if (!dom) return { ok: false, error: 'no_domain' };
     const FM = globalThis.SN_FILO_MEMORY;
     if (FM) await FM.removeProxyRule(dom);
@@ -1640,6 +1650,15 @@ class TabManager {
   // Ctrl+W, Alt+cifra o Alt+S i tasti non arrivano a nessuno finché non si
   // clicca (#838). La barra che ha la tastiera la tiene; Filo dietro non la ruba.
   // Una scheda coperta dall'avviso del sito pericoloso dà la tastiera all'avviso, mai alla pagina (#813.5).
+  // Quello che l'utente vede sotto le viste posate sulla pagina (barra, avvisi): l'avviso del sito quando copre la
+  // scheda, sennò la scheda. I gesti del loro vuoto vanno qui, mai alla pagina che l'avviso nasconde.
+  vistaSottoIlVuoto() {
+    const tab = this.tabs.find((t) => t.id === this.activeId);
+    if (!tab) return null;
+    const avviso = this.avvisoSito && this.avvisoSito.coperta() === tab && this.avvisoSito.webContents() ? this.avvisoSito.vista : null;
+    return avviso || tab.view || null;
+  }
+
   _tastieraAllaSchedaAttiva() {
     const tab = this.tabs.find((t) => t.id === this.activeId);
     if (!tab || this.win.isDestroyed() || !this.win.isFocused()) return;
@@ -1696,7 +1715,7 @@ class TabManager {
     // fissati alla creazione della view e un loadURL non li rivaluta, quindi
     // riusare la view caricherebbe il contenuto col preload sbagliato.
     if (this._needsRecreate(tab, target)) {
-      this._recreateView(tab, target);
+      this._recreateView(tab, target, { nuova: true });
     } else {
       tab.view.webContents.loadURL(target);
     }
@@ -1736,9 +1755,8 @@ class TabManager {
   // Ricrea la WebContentsView di `tab` nella partizione corretta per `url`,
   // preservando id/posizione/stato attivo. Necessario in privacy ai cambi di
   // sito: la partizione non è modificabile dopo la creazione della view.
-  // NOTA: la cronologia avanti/indietro è per-WebContents, quindi attraversare
-  // un confine di sito in privacy riparte con cronologia pulita (è il prezzo
-  // dell'isolamento per-sito; resta intatta entro lo stesso sito).
+  // La cronologia è per-WebContents: le voci della vista vecchia restano nella
+  // scheda (tab.storia, src/main/tabs/storia.js), e Indietro e Avanti ci arrivano.
   // `opts.loadUrl` (#327): URL da caricare al posto di `url` — la view resta
   // configurata (preload/partition/isInternal) per `url`. Usato dal recupero
   // crash per mostrare la pagina d'errore in una view pronta a ritentare il sito.
@@ -1747,12 +1765,16 @@ class TabManager {
     const partition = this._partitionForTab(tab, url);
     // La pagina che la vista vecchia mostrava: se il primo salto della nuova si ferma sulla lista, si torna lì.
     let prima = '';
-    try { prima = opts.ritorno ? '' : (tab.view.webContents.getURL() || ''); } catch (_) {}
+    try { prima = opts.ritorno ? '' : (tab.view.webContents.getURL() || this._inArrivo(tab).url || ''); } catch (_) {}
+    if (!opts.storia) {
+      const modo = opts.ritorno ? 'ritorno' : opts.nuova ? 'nuova' : 'stessa';
+      tab.storia = Storia.conserva(tab.storia, this._vociDellaVista(tab), modo, url);
+    }
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
     try { tab.view.webContents.close(); } catch (_) {}
     const view = this._makeView(url, partition, { suppressAutoplay: tab.suppressAutoplay });
     tab.view = view;
-    tab._vistaNuova = { wc: view.webContents, prima: /^(https?|filo):/i.test(prima) ? prima : '' };
+    tab._vistaNuova = { wc: view.webContents, prima: /^(https?|filo):/i.test(prima) ? prima : '', meta: { url, titolo: opts.titolo || '' } };
     tab.partition = partition;
     tab.isInternal = url.startsWith('filo://');
     tab.partitionSite = tab.isInternal ? null : Cookies.registrableOf(url);
@@ -1792,8 +1814,10 @@ class TabManager {
   goBack(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
+    if (!canGoBack(tab.view.webContents)) { this._vaiFuori(tab, 'indietro', 0); return; }
     const meta = this._vocePassoStoria(tab, -1);
     if (meta && this._maybeBlockNavigation(tab, meta)) return;
+    tab._passoStoria = true;
     if (tab.view.webContents.navigationHistory?.canGoBack()) {
       tab.view.webContents.navigationHistory.goBack();
     } else if (tab.view.webContents.canGoBack?.()) {
@@ -1812,11 +1836,148 @@ class TabManager {
     else this.goBack(target);
   }
 
+  // I tasti del browser (#404, #685) da qualunque vista della finestra abbia il fuoco: la scheda, e la barra
+  // laterale aperta da tastiera (#871 giro 9). `tab` è la scheda su cui agire. true = preso.
+  tastoDelBrowser(input, tab) {
+    if (!input || !tab) return false;
+    // Salto alla N-esima scheda: Alt+cifra su Windows/Linux, Cmd+cifra su
+    // Mac (lì Opzione+cifra scrive un simbolo, e prendercela impediva di
+    // digitarlo). Quale combinazione sia, e come si chiama nell'elenco delle
+    // scorciatoie, lo decide un posto solo: src/shared/tasti.js.
+    // Intercettiamo qui (per-webContents) invece che con un globalShortcut
+    // OS-wide, così la combinazione resta disponibile alle altre app.
+    if (input.type === 'keyDown') {
+      // Il numero di schede serve alla regola: su Mac la cifra 9 è "l'ultima
+      // scheda", perché lo 0 lì è lo zoom e non può essere anche la decima.
+      const idx = indiceSaltoScheda(input, undefined, this.tabs.length);
+      if (idx != null) {
+        const target = this.tabs[idx];
+        if (target) {
+          this.activate(target.id);
+          return true;
+        }
+      }
+    }
+    // Indietro e avanti (#685). Qui, nel main, e non nel content script:
+    // `before-input-event` arriva PRIMA che il documento veda il tasto, così
+    // la combinazione vale anche con un campo di testo a fuoco e anche sulle
+    // pagine dove i content script non girano (le filo:// e quelle bloccate).
+    // Quale combinazione sia lo decide src/shared/tasti.js: su Mac è Cmd+[ e
+    // Cmd+], perché lì Opzione+freccia muove il cursore.
+    if (input.type === 'keyDown') {
+      const verso = comandoNavigazione(input);
+      if (verso) {
+        this.navigaCronologia(verso, tab.id);
+        return true;
+      }
+    }
+    // #404 — Ctrl/Cmd+T/W/L/R "da browser". La shell (src/renderer/shell.js)
+    // le gestisce nel keydown della barra, ma quel keydown NON riceve eventi
+    // quando il focus è dentro una pagina (WebContentsView): risultato, le
+    // scorciatoie erano morte proprio mentre si naviga un sito — il caso più
+    // comune. Come per il salto di scheda qui sopra, le intercettiamo per-webContents
+    // così valgono anche dalle pagine. In un browser questi tasti sono
+    // riservati alla shell e vincono SEMPRE sulla pagina: preventDefault li
+    // toglie al contenuto (niente doppio reload su Ctrl+R, ecc.). Escludiamo
+    // Alt per non catturare AltGr (Ctrl+Alt su Windows), che sui layout
+    // europei serve a digitare caratteri mentre si scrive nella pagina.
+    // `tab` è la scheda che ha il focus (quella che riceve l'input) = quella
+    // che l'utente sta guardando, quindi è la "scheda corrente" su cui agire.
+    if (input.type === 'keyDown' && (input.control || input.meta) && !input.alt) {
+      const k = String(input.key || '').toLowerCase();
+      if (k === 't') { this.openTab('filo://newtab/'); return true; }
+      if (k === 'w') { this.closeTab(tab.id); return true; }
+      // L'indirizzo si digita dalla home (la barra indirizzi è stata tolta):
+      // Ctrl+L apre la home di Filo, esattamente come nella shell.
+      if (k === 'l') { this.navigate(tab.id, 'filo://newtab/'); return true; }
+      if (k === 'r') { this.reload(tab.id); return true; }
+    }
+    return false;
+  }
+  // Le pagine dietro (o davanti) nella cronologia della scheda, dalla più vicina: il tasto destro su
+  // Indietro e Avanti della barra laterale le elenca, e sceglierne una ci torna con vaiAllaVoce.
+  vociCronologia(verso, id) {
+    const tab = this.tabs.find((t) => t.id === (id || this.activeId));
+    const h = tab && tab.view.webContents.navigationHistory;
+    if (!h || typeof h.getEntryAtIndex !== 'function') return [];
+    const attiva = h.getActiveIndex();
+    const passo = verso === 'avanti' ? 1 : -1;
+    const out = [];
+    for (let i = attiva + passo; i >= 0 && i < h.length(); i += passo) {
+      const e = h.getEntryAtIndex(i);
+      if (e) out.push({ indice: i, titolo: String(e.title || ''), url: String(e.url || '') });
+    }
+    return [...out, ...Storia.elenco(tab.storia, verso, h.length())];
+  }
+
+  vaiAllaVoce(id, indice) {
+    const tab = this.tabs.find((t) => t.id === id);
+    const h = tab && tab.view.webContents.navigationHistory;
+    const i = Math.round(Number(indice));
+    if (!h || !Number.isFinite(i) || i === h.getActiveIndex()) return;
+    const f = Storia.fuori(i, h.length());
+    if (f) { this._vaiFuori(tab, f.verso, f.k); return; }
+    tab._passoStoria = true;
+    h.goToIndex(i);
+  }
+
+  // ── la cronologia oltre la vista (src/main/tabs/storia.js) ──
+  _urlUtente(raw) {
+    const NE = globalThis.SN_NET_ERROR;
+    return (NE && NE.targetOf(raw)) || raw;
+  }
+
+  // La pagina che la vista appena nata sta ancora caricando: fino al primo commit la sua cronologia è vuota.
+  _inArrivo(tab) {
+    const n = tab && tab._vistaNuova;
+    return (n && tab.view && n.wc === tab.view.webContents && n.meta) || { url: '' };
+  }
+
+  _vociDellaVista(tab) {
+    const inArrivo = this._inArrivo(tab);
+    try {
+      const h = tab.view.webContents.navigationHistory;
+      const entries = [];
+      for (let i = 0; i < h.length(); i++) entries.push(h.getEntryAtIndex(i) || {});
+      return Storia.vociDellaVista(entries, h.getActiveIndex(), (u) => this._urlUtente(u), inArrivo);
+    } catch (_) { return Storia.vociDellaVista([], 0, (u) => u, inArrivo); }
+  }
+
+  // Indietro e Avanti hanno dove andare: nella vista, o nella cronologia che la scheda ha tenuto da quelle di prima.
+  puoTornare(tab, verso, wc = tab && tab.view && tab.view.webContents) {
+    if (!tab || !wc) return false;
+    let inVista = false;
+    try { inVista = verso === 'avanti' ? canGoFwd(wc) : canGoBack(wc); } catch (_) {}
+    const s = tab.storia;
+    return inVista || !!(s && (verso === 'avanti' ? s.dopo : s.prima).length);
+  }
+
+  _vaiFuori(tab, verso, k) {
+    const salto = Storia.salta(tab.storia, this._vociDellaVista(tab).voci, verso, k);
+    if (!salto) return false;
+    if (this._maybeBlockNavigation(tab, salto.meta.url)) return true;
+    tab.storia = salto.storia;
+    this._recreateView(tab, salto.meta.url, { storia: true, titolo: salto.meta.titolo });
+    return true;
+  }
+
+  // Una pagina nuova nella stessa vista toglie il davanti che la scheda teneva fuori dalla vista.
+  _misuraStoria(tab, wc) {
+    let ora = null;
+    try { ora = { wc, n: wc.navigationHistory.length(), a: wc.navigationHistory.getActiveIndex() }; } catch (_) { return; }
+    const prima = tab._misuraStoria && tab._misuraStoria.wc === wc ? tab._misuraStoria : null;
+    if (tab.storia && tab.storia.dopo.length && Storia.paginaNuova(prima, ora, tab._passoStoria)) tab.storia = { prima: tab.storia.prima, dopo: [] };
+    tab._misuraStoria = ora;
+    tab._passoStoria = false;
+  }
+
   goForward(id) {
     const tab = this.tabs.find((t) => t.id === id);
     if (!tab) return;
+    if (!canGoFwd(tab.view.webContents)) { this._vaiFuori(tab, 'avanti', 0); return; }
     const meta = this._vocePassoStoria(tab, 1);
     if (meta && this._maybeBlockNavigation(tab, meta)) return;
+    tab._passoStoria = true;
     if (tab.view.webContents.navigationHistory?.canGoForward()) {
       tab.view.webContents.navigationHistory.goForward();
     } else if (tab.view.webContents.canGoForward?.()) {
@@ -1895,6 +2056,7 @@ class TabManager {
     // L'ordine conta: l'avviso del sito sta sopra la scheda, gli avvisi della barra sopra di lui.
     this.avvisoSito.posa();
     this.avvisi.posa();
+    this.barra.posa();
   }
 
   // ─── zoom da tastiera quando il focus è sulla barra di Filo ────────────
@@ -2061,6 +2223,11 @@ class TabManager {
       // perché questo evento arriva PRIMA che il documento veda il tasto, ed è
       // dentro quel giro che la pagina chiede.
       tab._ultimoInputEsc = String(input.key || '') === 'Escape' || String(input.code || '') === 'Escape';
+      // La barra laterale prima di tutto: il suo tasto, e l'Esc che la chiude prima della modalità.
+      if (this.barra.tasto(input)) {
+        event.preventDefault();
+        return;
+      }
       if (input.type === 'keyDown' && input.key === 'Escape') {
         // Regola unica in tabs.js: handleFullscreenEscape decide (e sa quando
         // l'Esc va invece lasciato alla pagina che ha chiesto il fullscreen).
@@ -2069,59 +2236,7 @@ class TabManager {
           return;
         }
       }
-      // Salto alla N-esima scheda: Alt+cifra su Windows/Linux, Cmd+cifra su
-      // Mac (lì Opzione+cifra scrive un simbolo, e prendercela impediva di
-      // digitarlo). Quale combinazione sia, e come si chiama nell'elenco delle
-      // scorciatoie, lo decide un posto solo: src/shared/tasti.js.
-      // Intercettiamo qui (per-webContents) invece che con un globalShortcut
-      // OS-wide, così la combinazione resta disponibile alle altre app.
-      if (input.type === 'keyDown') {
-        // Il numero di schede serve alla regola: su Mac la cifra 9 è "l'ultima
-        // scheda", perché lo 0 lì è lo zoom e non può essere anche la decima.
-        const idx = indiceSaltoScheda(input, undefined, this.tabs.length);
-        if (idx != null) {
-          const target = this.tabs[idx];
-          if (target) {
-            event.preventDefault();
-            this.activate(target.id);
-          }
-        }
-      }
-      // Indietro e avanti (#685). Qui, nel main, e non nel content script:
-      // `before-input-event` arriva PRIMA che il documento veda il tasto, così
-      // la combinazione vale anche con un campo di testo a fuoco e anche sulle
-      // pagine dove i content script non girano (le filo:// e quelle bloccate).
-      // Quale combinazione sia lo decide src/shared/tasti.js: su Mac è Cmd+[ e
-      // Cmd+], perché lì Opzione+freccia muove il cursore.
-      if (input.type === 'keyDown') {
-        const verso = comandoNavigazione(input);
-        if (verso) {
-          event.preventDefault();
-          this.navigaCronologia(verso, tab.id);
-          return;
-        }
-      }
-      // #404 — Ctrl/Cmd+T/W/L/R "da browser". La shell (src/renderer/shell.js)
-      // le gestisce nel keydown della barra, ma quel keydown NON riceve eventi
-      // quando il focus è dentro una pagina (WebContentsView): risultato, le
-      // scorciatoie erano morte proprio mentre si naviga un sito — il caso più
-      // comune. Come per il salto di scheda qui sopra, le intercettiamo per-webContents
-      // così valgono anche dalle pagine. In un browser questi tasti sono
-      // riservati alla shell e vincono SEMPRE sulla pagina: preventDefault li
-      // toglie al contenuto (niente doppio reload su Ctrl+R, ecc.). Escludiamo
-      // Alt per non catturare AltGr (Ctrl+Alt su Windows), che sui layout
-      // europei serve a digitare caratteri mentre si scrive nella pagina.
-      // `tab` è la scheda che ha il focus (quella che riceve l'input) = quella
-      // che l'utente sta guardando, quindi è la "scheda corrente" su cui agire.
-      if (input.type === 'keyDown' && (input.control || input.meta) && !input.alt) {
-        const k = String(input.key || '').toLowerCase();
-        if (k === 't') { event.preventDefault(); this.openTab('filo://newtab/'); return; }
-        if (k === 'w') { event.preventDefault(); this.closeTab(tab.id); return; }
-        // L'indirizzo si digita dalla home (la barra indirizzi è stata tolta):
-        // Ctrl+L apre la home di Filo, esattamente come nella shell.
-        if (k === 'l') { event.preventDefault(); this.navigate(tab.id, 'filo://newtab/'); return; }
-        if (k === 'r') { event.preventDefault(); this.reload(tab.id); return; }
-      }
+      if (this.tastoDelBrowser(input, tab)) event.preventDefault();
     });
     // Navigazione main-frame iniziata dalla pagina (click su link,
     // window.location). Due casi richiedono di RICREARE la view invece di
@@ -2156,7 +2271,7 @@ class TabManager {
       }
       if (this._needsRecreate(tab, url)) {
         event.preventDefault();
-        this._recreateView(tab, url);
+        this._recreateView(tab, url, { nuova: true });
       }
       // #152 — born proxied su click-link/redirect verso un dominio con regola
       // persistente: NON preventDefault (la navigazione in-place prosegue), poi
@@ -2344,8 +2459,8 @@ class TabManager {
       update({
         loading: false,
         url: userUrl(wc.getURL()),
-        canBack: canGoBack(wc),
-        canFwd: canGoFwd(wc),
+        canBack: this.puoTornare(tab, 'indietro', wc),
+        canFwd: this.puoTornare(tab, 'avanti', wc),
       });
       if (tab.view && tab.view.webContents === wc) this.anteprime.caricata(tab);
       this.visite.caricata(wc);
@@ -2383,9 +2498,10 @@ class TabManager {
         try { nuovo = wc.getTitle() || ''; } catch (_) {}
         tab.title = nuovo || userUrl(url);
       }
-      if (tab.view && tab.view.webContents === wc) this.anteprime.navigata(tab);
+      // Prima della misura: la storia che conta è quella senza la voce gemella.
+      this._sostituisciVoceGemella(wc, url);
+      if (tab.view && tab.view.webContents === wc) { this.anteprime.navigata(tab); this._misuraStoria(tab, wc); }
       if (tab._vistaNuova && tab._vistaNuova.wc === wc) tab._vistaNuova = null;
-      this._sostituisciVoceBloccata(wc, url);
       // #590 — una navigazione già partita quando il suo sito è entrato in lista arriva lo stesso: si ferma qui.
       const bloccata = /^https?:\/\//i.test(url) && this._decisioneBlocco(tab, url);
       if (bloccata) {
@@ -2423,8 +2539,8 @@ class TabManager {
         url: userUrl(url),
         color: null,
         identityColor: cachedIdentity,
-        canBack: canGoBack(wc),
-        canFwd: canGoFwd(wc),
+        canBack: this.puoTornare(tab, 'indietro', wc),
+        canFwd: this.puoTornare(tab, 'avanti', wc),
       });
       // Rilevamento siti pericolosi: ricontrolla l'URL FINALE (dopo i redirect)
       // appena il main-frame si è committato, prima che la pagina sia
@@ -2449,7 +2565,8 @@ class TabManager {
       }
     });
     wc.on('did-navigate-in-page', (_e, url, isMainFrame) => {
-      update({ url: userUrl(url), canBack: canGoBack(wc), canFwd: canGoFwd(wc) });
+      if (isMainFrame === true && tab.view && tab.view.webContents === wc) this._misuraStoria(tab, wc);
+      update({ url: userUrl(url), canBack: this.puoTornare(tab, 'indietro', wc), canFwd: this.puoTornare(tab, 'avanti', wc) });
       if (isMainFrame === true && tab.view && tab.view.webContents === wc) this.anteprime.navigata(tab, { inPagina: true });
       if (isMainFrame === true) this.visite.navigata(wc, tab.id, url, { inPagina: true });
     });
@@ -2460,6 +2577,7 @@ class TabManager {
     // NON conta: muovere il cursore sopra una scheda non è usarla.
     wc.on('input-event', (_e, input) => {
       const type = (input && input.type) || '';
+      this.barra.inputDa(wc, input);
       if (!type || HOVER_INPUT_TYPES.has(type)) return;
       tab._userInputAt = Date.now();
       // #514 — qui passa l'input VERO, quello che la pagina non può fabbricare:
@@ -3032,19 +3150,19 @@ class TabManager {
     if (nuovo) wc.once('destroyed', () => permessiApriComunque.delete(wcId));
   }
 
-  // La pagina «Sito bloccato» prende nella storia il posto del suo sito, e viceversa:
-  // senza, indietro da lì riporta sul sito e si ferma di nuovo.
-  _sostituisciVoceBloccata(wc, url) {
+  // Una pagina che sta per un indirizzo (errore di rete, «Sito bloccato») ne prende il posto nella storia, e
+  // viceversa: senza, Indietro da lì riapre l'indirizzo, che fallisce o si ferma di nuovo (#871 giro 9).
+  _sostituisciVoceGemella(wc, url) {
     const NE = globalThis.SN_NET_ERROR;
     if (!NE) return;
     try {
       const h = wc.navigationHistory;
-      const i = h.getActiveIndex();
-      if (i < 1) return;
-      const prima = (h.getEntryAtIndex(i - 1) || {}).url || '';
-      const gemelle = (NE.isBlockedPageUrl(url) && NE.targetOf(url) === prima)
-        || (NE.isBlockedPageUrl(prima) && NE.targetOf(prima) === url);
-      if (gemelle) h.removeEntryAtIndex(i - 1);
+      for (let i = h.getActiveIndex(); i >= 1; i--) {
+        const prima = (h.getEntryAtIndex(i - 1) || {}).url || '';
+        const gemelle = (NE.isErrorPageUrl(url) || NE.isErrorPageUrl(prima)) && this._urlUtente(prima) === this._urlUtente(url);
+        if (!gemelle) return;
+        h.removeEntryAtIndex(i - 1);
+      }
     } catch (_) {}
   }
 
@@ -3160,6 +3278,7 @@ class TabManager {
     try {
       this.win.webContents.send('tabs:updated', this.snapshot());
     } catch (_) { /* shell non ancora caricata */ }
+    this.barra.aggiornaNav();
     this._annunciaVista();
     this._persistSession();
   }

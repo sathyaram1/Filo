@@ -65,8 +65,8 @@
 //     parsing di getopt e del quoting: fuori dal principio del file. Toglierla
 //     costa una conferma in più su un comando raro (per la sola verifica di un
 //     indirizzo c'è `curl -I`, che stampa a schermo e resta 2) e chiude la porta.
-//     curl invece, SENZA flag che scrivono, stampa a schermo e non fa atterrare
-//     niente: resta 2. Due programmi che si comportano diversamente prendono
+//     curl invece, SENZA flag che scrivono o mandano dati, stampa a schermo e non
+//     fa atterrare niente: resta 2. Due programmi che si comportano diversamente prendono
 //     regole diverse — è l'effetto a decidere. Salgono a 3 i flag curl che fanno
 //     atterrare qualcosa: output-su-file (-o/-O/--output/--remote-name…), i DATI
 //     ACCESSORI il cui contenuto è influenzato dal server (-D/--dump-header,
@@ -351,9 +351,8 @@
   // che pilota l'assistente da una pagina ostile), rendendolo un altro primitivo
   // di scrittura-su-file arbitraria → 3. Meno potente di `-o`/`-O` (byte header,
   // non corpo scelto liberamente) ma stessa classe: over-cautela = solo attrito.
-  // Check curl-specifico e case-SENSITIVE sulla `D`: `-d`/`--data` (corpo POST)
-  // è innocuo e NON deve salire; solo la `D` maiuscola (in curl = solo
-  // `--dump-header`) alza, anche in bundle (`-sD file`).
+  // Check curl-specifico e case-SENSITIVE sulla `D`: la `D` maiuscola in curl è
+  // solo `--dump-header`, anche in bundle (`-sD file`); `-d` è CURL_SEND_SHORT_RE.
   const CURL_DUMP_RE = /(^|\s)(--dump-header|-[a-zA-Z]*D)/;
 
   // curl con flag che SALVANO DATI ACCESSORI in un percorso scelto da chi lancia
@@ -401,6 +400,24 @@
   // maiuscola è solo `--config`, quindi anche in un bundle (`-sK cfg`) l'unica
   // lettura possibile è quella.
   const CURL_CONFIG_RE = /(^|\s)(--config(=|\s|$)|-[a-zA-Z]*K)/;
+
+  // curl che MANDA qualcosa al server (dati, un file, una mail, comandi FTP) o gli chiede di cambiare (un metodo
+  // diverso da GET/HEAD) non si disfa: un file uscito dal computer non torna indietro → 3 (#530). Case-sensitive:
+  // -d/-F/-T/-Q/-X in curl sono solo quelli, anche in un bundle; -x minuscolo è il proxy. Un'opzione lunga vale
+  // anche accorciata (`--uplo`): curl accetta un prefisso che non è ambiguo.
+  const CURL_SEND_SHORT_RE = /(^|\s)-[a-zA-Z]*[dFTQ]/;
+  const CURL_SEND_LONG = ['data', 'form', 'form-string', 'upload-file', 'json', 'mail-rcpt', 'mail-from', 'quote'];
+  const CURL_METHOD_RE = /(?:^|\s)(?:--request(?:=|\s+)|-[a-zA-Z]*X\s*)["']?([A-Za-z]*)/g;
+  function curlCambiaIlServer(cmd) {
+    if (CURL_SEND_SHORT_RE.test(cmd)) return true;
+    for (const m of cmd.matchAll(/(?:^|\s)--([a-z][a-z-]*)/g)) {
+      const w = m[1];
+      if (w.startsWith('data') || CURL_SEND_LONG.some((n) => n.startsWith(w))) return true;
+      if (w !== 'request' && 'request'.startsWith(w) && w.length >= 3) return true;
+    }
+    for (const m of cmd.matchAll(CURL_METHOD_RE)) if (!/^(GET|HEAD)$/i.test(m[1])) return true;
+    return false;
+  }
 
   // git: il livello dipende dal sotto-comando. I sotto-comandi "duali"
   // (tag, branch, config, remote) NON stanno qui: leggono da soli ma scrivono
@@ -612,8 +629,11 @@
       const args = gitArgsAfterSub(cmd);
       const low = args.map((a) => a.toLowerCase());
       if (low.some((a) => a === '--unset' || a === '--unset-all' || a === '--remove-section')) return 3;
-      if (low.some((a) => a === '--add' || a === '--replace-all' || a === '--rename-section' || a === '-e' || a === '--edit')) return 2;
       const ops = args.filter((a) => !a.startsWith('-'));
+      // Riscrivere l'indirizzo di un remoto è `git remote set-url` per un'altra strada (#530).
+      const scrive = ops.length >= 2 || low.some((a) => a === '--add' || a === '--replace-all');
+      if (scrive && /^remote\..+\.(push)?url$|^url\..+\.(push)?insteadof$/.test((ops[0] || '').toLowerCase())) return 3;
+      if (low.some((a) => a === '--add' || a === '--replace-all' || a === '--rename-section' || a === '-e' || a === '--edit')) return 2;
       if (ops.length >= 2) return 2; // `chiave valore` imposta
       // Lettura: un dump completo, o una chiave che porta credenziali (URL di un
       // remoto con token, `credential.helper`), stampa un segreto in chiaro nella
@@ -628,7 +648,9 @@
       const action = ops[0].toLowerCase();
       if (action === 'show' || action === 'get-url') return 2; // stampano l'URL col token
       if (action === 'remove' || action === 'rm' || action === 'prune') return 3; // cancellazioni
-      return 2; // add, rename, set-url, set-head, set-branches, update…
+      // Un indirizzo nuovo decide dove andrà il codice al prossimo push: un server qualsiasi (#530).
+      if (action === 'add' || action === 'set-url') return 3;
+      return 2; // rename, set-head, set-branches, update…
     },
   };
 
@@ -640,6 +662,9 @@
     const dual = GIT_DUAL[sub];
     if (dual) return dual(cmd); // tag/branch/config/remote: dipende dagli argomenti
     if (GIT_READ.has(sub)) return 1;
+    // Il push verso il remoto già configurato si rimedia; verso un indirizzo scritto nel comando manda il codice
+    // a un server qualsiasi, e non torna indietro (#530).
+    if (sub === 'push' && gitArgsAfterSub(cmd).some((a) => /:\/\//.test(a) || /^(--repo=)?[^\s/:=-][^\s/:=]*@[^\s:]+:/.test(a))) return 3;
     if (GIT_WRITE.has(sub)) return 2;
     return 3; // sotto-comando git sconosciuto → cautela
   }
@@ -747,6 +772,7 @@
       // curl -K/--config: le opzioni (output compreso) arrivano da un file, quindi
       // l'effetto non si legge nel comando → 3.
       if (prog === 'curl' && CURL_CONFIG_RE.test(trimmed)) return 3;
+      if (prog === 'curl' && curlCambiaIlServer(trimmed)) return 3;
       // robocopy /MIR /PURGE (cancellano la destinazione) / /MOVE /MOV
       // (cancellano la sorgente): distruzione permanente → 3.
       if (prog === 'robocopy' && ROBOCOPY_DESTRUCTIVE_RE.test(trimmed)) return 3;
