@@ -279,7 +279,9 @@
     const tutte = normalizeForSearch(query).split(/\s+/).filter(Boolean);
     if (!tutte.length) return { results: taglia(candidate), termini: [], allargata: false };
 
-    const hays = new Map(candidate.map((c) => [c.id, haystackOf(c)]));
+    // `o.testo(c)`: dove cercare quando i candidati non sono chat (le pagine del filo), con gli stessi tre passi.
+    const pagliaio = typeof o.testo === 'function' ? (c) => normalizeForSearch(o.testo(c)) : haystackOf;
+    const hays = new Map(candidate.map((c) => [c.id, pagliaio(c)]));
     const conTutte = candidate.filter((c) => tutte.every((t) => hays.get(c.id).includes(t)));
     if (conTutte.length) return { results: taglia(conTutte), termini: tutte, allargata: false };
 

@@ -213,6 +213,26 @@ test('«quella pagina sulle orche che ho chiuso ieri»: la ricerca la trova nel 
   await expect.poll(() => app.windows().some((w) => { try { return w.url() === url; } catch (_) { return false; } }), { timeout: 10_000 }).toBe(true);
 });
 
+test('una parola in più nella ricerca non fa sparire la pagina, anche quando una conversazione combacia', async ({ app, testServer }) => {
+  test.setTimeout(90_000);
+  await primaScheda(app);
+  const url = testServer.html('<!doctype html><title>Orche - Wikipedia</title><h1>Orche</h1>');
+  await semina(app, {
+    chat: [{ id: 'orche-chat', oreFa: 30, scambi: [['le orche cacciano in gruppo?', 'Sì, in branchi familiari.']] }],
+    pagine: [{ url, titolo: 'Orche - Wikipedia', oreFa: 20 }, { url: testServer.html('<title>Meteo</title>'), titolo: 'Meteo', oreFa: 19 }],
+  });
+  await preparaModello(app, [
+    { text: '', tools: [{ name: 'CERCA_CHAT', args: { query: 'pagina sulle orche chiusa ieri' } }] },
+    { text: 'Eccola.' },
+  ]);
+  await app.evaluate(() => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'riapri quella pagina sulle orche che ho chiuso ieri', threadHistory: [], chatId: 'scheda-orche' }));
+  const [, secondo] = await chiamate(app);
+  const esito = testo(secondo.find((m) => m.role === 'tool'));
+  expect(esito).toContain('orche-chat');
+  expect(esito).toContain(url);
+  expect(esito).not.toContain('Meteo');
+});
+
 test('col tetto a un giorno in Preferenze avanzate il contesto si accorcia al turno dopo', async ({ app, openTab }) => {
   test.setTimeout(90_000);
   const page = await primaScheda(app);

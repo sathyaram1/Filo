@@ -155,3 +155,43 @@ test('l\'ora è assoluta e la chat ha un nome fisso: niente «2 ore fa» che cam
   assert.match(h, /^\[\w{3} \d+ \w{3} 2026, \d\d:\d\d · chat ab12\]$/);
   assert.equal(FC.etichettaChat('Ab-12cd'), 'ab12');
 });
+
+test('una lettura vive venti messaggi della SUA conversazione: dieci scambi in un\'altra scheda non la tolgono', () => {
+  const filo = [...scambio('a', 10, 'leggi il contratto', 'Letto.')];
+  for (let i = 0; i < 11; i++) filo.push(...scambio('b', 9 - i * 0.5, `altro ${i}`, `ok ${i}`));
+  const conLettura = (m) => (m.chat === 'a' && m.role === 'filo' ? { azioni: [{ type: 'LEGGI_DOCUMENTO', _output: { text: 'canone 742 euro' } }] } : null);
+  const osserva = (azioni) => azioni.map((a) => `[letto] ${a._output.text}`).join('\n');
+  const f = FC.finestra(filo, { ora: ORA, ...TETTI, chatCorrente: 'a', esiti: conLettura, osserva });
+  assert.match(f.messaggi.map((m) => m.content).join('\n'), /canone 742 euro/);
+  assert.deepEqual(f.azioni.map((a) => a._output.text), ['canone 742 euro']);
+});
+
+test('la conversazione della scheda ripresa oltre il tetto in token resta dentro il tetto', () => {
+  const filo = [];
+  for (let i = 0; i < 15; i++) filo.push(...scambio('lunga', 2 - i * 0.1, `incollato ${i}: ${'parola '.repeat(300)}`, `letto ${i}: ${'parola '.repeat(300)}`));
+  for (const token of [2000, 10000]) {
+    const f = FC.finestra(filo, { ora: ORA, giorni: 3, token, chatCorrente: 'lunga' });
+    const peso = f.messaggi.reduce((n, m) => n + FC.stimaToken(m.content), 0);
+    assert.ok(peso <= token, `col tetto a ${token} token ne vanno ${peso}`);
+    assert.match(f.messaggi[f.messaggi.length - 1].content, /letto 14/);
+    // Il turno dopo, con uno scambio breve in più, ripete lo stesso inizio: la cache lo riusa.
+    const dopo = [...filo, ...scambio('lunga', 0.2, 'grazie', 'Prego.')];
+    const g = FC.finestra(dopo, { ora: ORA, giorni: 3, token, ancora: f.ancora, chatCorrente: 'lunga' });
+    assert.equal(prefissoComune(f.messaggi, g.messaggi), f.messaggi.length, `col tetto a ${token} il turno dopo riscrive l'inizio`);
+  }
+  // Ripresa da giorni fa, coi messaggi brevi: gli ultimi venti tornano tutti, come prima.
+  const vecchia = [];
+  for (let i = 0; i < 15; i++) vecchia.push(...scambio('vecchia', 24 * 10 - i, `domanda ${i}`, `risposta ${i}`));
+  const g = FC.finestra(vecchia, { ora: ORA, ...TETTI, chatCorrente: 'vecchia' });
+  assert.equal(g.ripresi, 20);
+});
+
+test('col ragionamento allegato alle risposte, due turni di fila hanno lo stesso prefisso fino in fondo', () => {
+  const filo = [...scambio('c', 3, 'quando è la riunione?', 'Giovedì.'), ...scambio('c', 2, 'a che ora?', 'Alle 15.')];
+  const rd = (m) => (m.role === 'filo' ? { azioni: [], reasoningDetails: [{ type: 'reasoning.text', text: `penso: ${m.text}` }] } : null);
+  const t1 = FC.finestra(filo, { ora: ORA, ...TETTI, chatCorrente: 'c', esiti: rd });
+  const dopo = [...filo, ...scambio('c', 1, 'dove?', 'In sala blu.')];
+  const t2 = FC.finestra(dopo, { ora: ORA, ...TETTI, ancora: t1.ancora, chatCorrente: 'c', esiti: rd });
+  assert.equal(prefissoComune(t1.messaggi, t2.messaggi), t1.messaggi.length);
+  assert.deepEqual(t2.messaggi[t2.messaggi.length - 1].reasoning_details, [{ type: 'reasoning.text', text: 'penso: In sala blu.' }]);
+});
