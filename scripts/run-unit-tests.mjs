@@ -317,6 +317,19 @@ export function fileInCorso(righe) {
   return righe.filter((r) => r.via && !finiti.has(r.via)).map((r) => r.via);
 }
 
+/**
+ * Dice, a ogni sguardo sul file dell'avanzamento, se la corsa è ferma da oltre il tetto. Il tempo parte dal primo
+ * evento: prima node sta ancora partendo, e su una macchina carica partire è lento ma non è un file appeso. PURA.
+ */
+export function guardiaFermo(tetto = TETTO_FERMO_MS) {
+  let visto = 0;
+  let dal = null;
+  return (dimensione, ora) => {
+    if (dimensione !== visto) { visto = dimensione; dal = ora; return false; }
+    return dal !== null && ora - dal >= tetto;
+  };
+}
+
 /** PURA. */
 export function testoFermo(inCorso, fermoMs, root = REPO_ROOT) {
   const minuti = Math.round(fermoMs / 60000);
@@ -347,13 +360,11 @@ const lancia = (args, temp, avanzamento = null) => new Promise((ok) => {
   if (temp) Object.assign(env, { TMPDIR: temp, TEMP: temp, TMP: temp });
   const c = spawn(process.execPath, args, { stdio: 'inherit', cwd: REPO_ROOT, env });
   let fermo = null;
-  let visto = -1;
-  let dal = Date.now();
+  const eFermo = guardiaFermo();
   const guardia = avanzamento && setInterval(() => {
     let n = 0;
     try { n = statSync(avanzamento).size; } catch (_) { /* il reporter non ha ancora scritto niente */ }
-    if (n !== visto) { visto = n; dal = Date.now(); return; }
-    if (Date.now() - dal < TETTO_FERMO_MS) return;
+    if (!eFermo(n, Date.now())) return;
     clearInterval(guardia);
     fermo = fileInCorso(leggiRighe(avanzamento));
     chiudiAlbero(c);
@@ -409,8 +420,9 @@ async function main() {
   const extra = posizionali.filter((p) => !trovati.has(resolve(REPO_ROOT, p)));
   const utente = (i) => rapportiDaRiunire(date, copia(i));
   const flagsGruppo = (i) => flagsConRiepilogo(utente(i).flags, destinazione(i), { tty });
-  // Con --watch la corsa sta ferma apposta; coi reporter che non si sanno appaiare resta il tetto di node.
-  const guarda = !chiedeWatch(flags);
+  // Con --watch la corsa sta ferma apposta; coi reporter che non si sanno appaiare, o in una copia del lanciatore senza
+  // il suo reporter, resta il tetto di node.
+  const guarda = !chiedeWatch(flags) && existsSync(join(REPO_ROOT, REPORTER_AVANZAMENTO));
   const lancioDi = (i, base) => {
     const conGuardia = guarda && flagsConAvanzamento(base, avanzamento(i), { tty });
     return conGuardia ? { flags: conGuardia, avanzamento: avanzamento(i) } : { flags: conTettoDiTempo(base), avanzamento: null };

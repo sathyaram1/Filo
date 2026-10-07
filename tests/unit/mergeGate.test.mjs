@@ -212,7 +212,7 @@ test('una prova degli unit più lunga della finestra di silenzio non fa arrivare
     const altro = join(casa, 'altro');
     g(casa, 'init', '-q', '--bare', '--initial-branch=main', origin);
     g(casa, 'clone', '-q', origin, lavoro);
-    for (const f of ['scripts/run-unit-tests.mjs', 'scripts/lib/riga-di-comando.mjs']) {
+    for (const f of ['scripts/run-unit-tests.mjs', 'scripts/lib/riga-di-comando.mjs', 'scripts/lib/avanzamento-unit.mjs']) {
       mkdirSync(dirname(join(lavoro, f)), { recursive: true });
       copyFileSync(resolve(__dirname, '..', '..', f), join(lavoro, f));
     }

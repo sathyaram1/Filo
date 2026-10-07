@@ -27,7 +27,7 @@ import {
   collectTestFiles, fileArgs, isTestFile, UNIT_DIR, REPO_ROOT, TETTO_WINDOWS, TETTO_RIGA,
   gruppiDiLancio, perLaRiga, flagsConRiepilogo, sommaRiepiloghi, testoRiepilogo,
   allaLettera, nomeNonLanciabile, NODE_LEGGE_MODELLI, rapportiDaRiunire, separaArgomenti, unisciRapporti, chiedeWatch, chiedeCopertura,
-  conTettoDiTempo, TETTO_FERMO_MS, fileInCorso, testoFermo, flagsConAvanzamento,
+  conTettoDiTempo, TETTO_FERMO_MS, fileInCorso, testoFermo, flagsConAvanzamento, guardiaFermo,
 } from '../../scripts/run-unit-tests.mjs';
 import { costoArgomentoWindows, lottiPerRigaDiComando } from '../../scripts/lib/riga-di-comando.mjs';
 import { lottiPerRigaDiComando as lottiDiFinish } from '../../scripts/finish-local.mjs';
@@ -489,17 +489,50 @@ test('fermo è il primo file partito e non finito: gli altri aspettano lui', () 
   assert.match(testoFermo([], 3000, ROOT), /ROSSO: per 3 secondi non è andato avanti niente/);
 });
 
+test('una copia del lanciatore senza il suo reporter gira lo stesso, col tetto di node', () => {
+  const casa = cartellaTemporanea('filo-copia-lanciatore-');
+  try {
+    for (const f of ['scripts/run-unit-tests.mjs', 'scripts/lib/riga-di-comando.mjs']) {
+      mkdirSync(dirname(join(casa, f)), { recursive: true });
+      writeFileSync(join(casa, f), readFileSync(join(ROOT, f)));
+    }
+    mkdirSync(join(casa, 'tests', 'unit'), { recursive: true });
+    writeFileSync(join(casa, 'package.json'), '{"type":"module"}\n');
+    writeFileSync(join(casa, 'tests', 'unit', 'base.test.mjs'), "import { test } from 'node:test';\ntest('base', () => {});\n");
+    const env = { ...process.env };
+    delete env.NODE_TEST_CONTEXT;
+    delete env.FILO_UNIT_DIR;
+    const r = spawnSync(process.execPath, [join(casa, 'scripts', 'run-unit-tests.mjs')], { env, cwd: casa, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.match(r.stdout, /^ok 1 - base$/m);
+  } finally {
+    togliCartella(casa);
+  }
+});
+
+test('la guardia conta il tempo fermo dal primo evento: un file lento che avanza non arriva mai al tetto', () => {
+  const lento = guardiaFermo(1000);
+  assert.equal(lento(0, 0), false);
+  assert.equal(lento(0, 50_000), false, 'prima del primo evento node sta ancora partendo');
+  for (let t = 1; t <= 30; t++) assert.equal(lento(t * 10, 50_000 + t * 900), false, 'un evento ogni 900 ms su un tetto di 1000');
+  const appeso = guardiaFermo(1000);
+  assert.equal(appeso(10, 0), false);
+  assert.equal(appeso(10, 999), false);
+  assert.equal(appeso(10, 1000), true);
+});
+
 test('un file lento che va avanti finisce verde, uno appeso diventa un rosso col suo nome', () => {
   const dir = cartellaTemporanea('filo-fermo-');
   try {
     // Ogni prova dura meno del tetto, il file intero ben di più: sotto carico i file sani sono così.
-    writeFileSync(join(dir, 'a-lento.test.mjs'), "import { test } from 'node:test';\nfor (let i = 0; i < 6; i++) test('lento ' + i, () => new Promise((r) => setTimeout(r, 1000)));\n");
+    writeFileSync(join(dir, 'a-lento.test.mjs'), "import { test } from 'node:test';\nfor (let i = 0; i < 15; i++) test('lento ' + i, () => new Promise((r) => setTimeout(r, 1000)));\n");
     writeFileSync(join(dir, 'b-appeso.test.mjs'), "import { test } from 'node:test';\ntest('prima di appendersi', () => {});\nsetInterval(() => {}, 1000);\n");
-    const env = { ...process.env, FILO_UNIT_DIR: dir, FILO_UNIT_TETTO_FERMO_MS: '3000' };
+    // Il tetto è dieci volte il passo del file lento: il margine regge una macchina carica.
+    const env = { ...process.env, FILO_UNIT_DIR: dir, FILO_UNIT_TETTO_FERMO_MS: '10000' };
     delete env.NODE_TEST_CONTEXT;
     const r = spawnSync(process.execPath, [LANCIATORE], { env, cwd: REPO_ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
     assert.notEqual(r.error?.code, 'ETIMEDOUT', 'la corsa è rimasta appesa');
-    for (let i = 0; i < 6; i++) assert.match(r.stdout, new RegExp(`^ok \\d+ - lento ${i}$`, 'm'), `il file lento è stato tagliato:\n${r.stdout}`);
+    for (let i = 0; i < 15; i++) assert.match(r.stdout, new RegExp(`^ok \\d+ - lento ${i}$`, 'm'), `il file lento è stato tagliato:\n${r.stdout}`);
     assert.match(r.stdout, /ROSSO: .*b-appeso\.test\.mjs non è andato avanti/);
     assert.doesNotMatch(r.stdout, /a-lento\.test\.mjs non è andato avanti/);
     assert.equal(r.status, 1);

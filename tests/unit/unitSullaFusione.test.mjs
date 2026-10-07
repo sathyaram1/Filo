@@ -128,7 +128,7 @@ function repoFinto() {
   execFileSync('git', ['init', '-q', '--bare', '--initial-branch=main', origin]);
   mkdirSync(join(lavoro, 'scripts', 'lib'), { recursive: true });
   mkdirSync(join(lavoro, 'tests', 'unit'), { recursive: true });
-  for (const f of ['scripts/run-unit-tests.mjs', 'scripts/lib/riga-di-comando.mjs', 'scripts/lib/riepilogo-unit.mjs']) {
+  for (const f of ['scripts/run-unit-tests.mjs', 'scripts/lib/riga-di-comando.mjs', 'scripts/lib/riepilogo-unit.mjs', 'scripts/lib/avanzamento-unit.mjs']) {
     copyFileSync(join(ROOT, f), join(lavoro, f));
   }
   writeFileSync(join(lavoro, '.gitignore'), 'node_modules\n', 'utf8');
