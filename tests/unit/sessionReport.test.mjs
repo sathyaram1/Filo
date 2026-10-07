@@ -603,7 +603,8 @@ test('worker in sottofondo: la finestra va dalla notifica del worker di prima a 
   const secondo = finestraOrchestratore(SOTTOFONDO);
   assert.deepEqual(ids(secondo), ['s4', 's5', 's6', 's7']);
   assert.equal(secondo.attesaPrimaS, 5410, 'da s3 a s4: un\'ora e mezza ferma, la cache a un\'ora è scaduta');
-  const r = await analizzaRighe(secondo.righe, { role: 'orchestrator' });
+  assert.equal(secondo.continua, true);
+  const r = await analizzaRighe(secondo.righe, { role: 'orchestrator', continua: secondo.continua });
   assert.equal(r.rewarmTurns, 1, 's4 riscrive la cache');
   // Il lancio in primo piano, a parità di passi, dà la stessa finestra.
   const primoPiano = SOTTOFONDO.filter((l) => !l.includes('Async agent') && !l.includes('task-notification'));

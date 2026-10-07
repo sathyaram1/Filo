@@ -672,8 +672,10 @@ export function finestraOrchestratore(linee) {
     } else if (e.type === 'user') {
       for (const b of blocchi) {
         if (!b || b.type !== 'tool_result' || !chiamate.has(b.tool_use_id)) continue;
-        if (/^\s*Async agent launched/i.test(testoDi(b.content))) continue;
-        chiamate.get(b.tool_use_id).fine = ms;
+        const testo = testoDi(b.content);
+        const c = chiamate.get(b.tool_use_id);
+        if (/^\s*Async agent launched/i.test(testo)) { c.sottofondo = true; c.agentId = (testo.match(/agentId:\s*([\w-]+)/) || [])[1] || ''; continue; }
+        c.fine = ms;
       }
     }
   }
