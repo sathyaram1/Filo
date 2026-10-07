@@ -283,6 +283,19 @@
     return null;
   }
 
+  // ── La barra laterale ─────────────────────────────────────────────────────
+  // Ctrl+Shift+B (Cmd+Shift+B su Mac), non Ctrl+B: quello è il grassetto di ogni
+  // editor, Filo compreso. Tasto fisico prima del carattere, come sopra.
+  const ACCEL_BARRA = 'Ctrl+Shift+B';
+  function comandoBarra(ev) {
+    if (!ev || modificatore(ev, 'alt') || !modificatore(ev, 'shift')) return false;
+    if (!(modificatore(ev, 'ctrl') || modificatore(ev, 'meta'))) return false;
+    const code = String(ev.code || '');
+    if (code) return code === 'KeyB';
+    return String(ev.key || '').toLowerCase() === 'b';
+  }
+  function etichettaBarra(esplicita) { return etichetta(ACCEL_BARRA, esplicita); }
+
   function etichettaIndietro(esplicita) { return etichetta('Alt+\u2190', esplicita); }
   function etichettaAvanti(esplicita) { return etichetta('Alt+\u2192', esplicita); }
 
@@ -362,6 +375,8 @@
     // la fa `etichetta`, e con lei il fatto che su Mac Alt+freccia resti libera
     // per il movimento del cursore).
     'Alt+\u2190', 'Alt+\u2192',
+    // La barra laterale (src/main/barraLaterale.js), da qualunque vista abbia il fuoco.
+    ACCEL_BARRA,
   ];
   const PRESI_SU_MAC = [
     // Le voci della barra dei menu (src/main/menu.js), anche col tasto che un role di Electron
@@ -515,6 +530,7 @@
     piattaforma, suMac, etichetta, etichettaScritta, frase, acceleratoreElectron,
     indiceSaltoScheda, etichettaSaltoScheda, descrizioneSaltoScheda,
     comandoNavigazione, comandoNavigazioneFuoriDalCampo, etichettaIndietro, etichettaAvanti,
+    comandoBarra, etichettaBarra, ACCEL_BARRA,
     tastiRiservati, riservato,
     tastoRiconosciuto, tipoModificatore, pezzoSconosciuto, soloModificatori, combacia, pressioneScritta, delSistema,
     modificatoreCheCambiaSimbolo,

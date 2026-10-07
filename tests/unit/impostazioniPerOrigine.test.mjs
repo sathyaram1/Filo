@@ -134,7 +134,7 @@ test('sentinella: ogni azione di Filo che la barra d\'aiuto chiede è fra quelle
   const mandate = [...siti.matchAll(/runFiloAction\(\s*\{\s*type:\s*['"]([A-Za-z_]+)['"]/g)].map((m) => m[1].toUpperCase());
   assert.ok(mandate.includes('NAVIGA'), 'la sentinella non vede più le azioni che la barra manda da sé');
   assert.deepEqual([...descritte, ...mandate].filter((t) => !W.AZIONI_WEB.has(t)), [], 'azioni della barra d\'aiuto non ammesse dai siti');
-  for (const t of W.AZIONI_WEB) assert.ok(globalThis.SN_ACTION_LEVELS.levelFor({ type: t }), `azione ammessa inesistente: ${t}`);
+  for (const t of W.AZIONI_WEB) assert.ok(globalThis.SN_ACTION_LEVELS.costoFor({ type: t }), `azione ammessa inesistente: ${t}`);
 });
 
 test('un campo nuovo non elencato non raggiunge i siti (lista di ammessi, non di esclusi)', () => {

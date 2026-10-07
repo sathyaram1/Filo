@@ -31,6 +31,7 @@
   // Il messaggio con cui riparte un turno fermato: non è voce dell'utente, e il main lo sa (`internal`).
   const RIPRENDI = '[L\'utente ti ha chiesto di riprendere il lavoro da dove ti eri fermato.]';
   const dashDir = $('dashDir');
+  const autonomiaEl = $('dashAutonomia');
 
   // ===== Stato locale =====
   let suggestions = [];
@@ -58,6 +59,8 @@
   // #950 — file trascinati dal disco: { percorso, nome }. Il percorso parte col messaggio, come se l'utente
   // l'avesse incollato; le immagini arrivate dal disco ricordano il loro.
   let pendingFiles = [];
+  // Nel campo è entrato testo incollato o trascinato: il main lo tratta come testo di altri (#592.2).
+  let testoDaFuori = false;
   const percorsiImmagini = new Map();
 
   // ===== Le parti della home =====
@@ -195,7 +198,11 @@
       const riga = (m) => `${m.role === 'filo' ? 'filo' : 'user'}\n${String(m.text || '').trim()}`;
       const loro = (Array.isArray(state && state.thread) ? state.thread : []).map(riga);
       const nostri = threadHistory.filter((m) => !m.interno && (m.role !== 'filo' || String(m.text || '').trim())).map(riga);
-      return loro.length === nostri.length && loro.every((x, i) => x === nostri[i]);
+      // Un annuncio più vecchio di quello che è a schermo (l'intervista salvata a metà turno, consegnato dopo la
+      // risposta) è già superato: ridisegnare butterebbe via le righe e i bottoni delle azioni (#592.2).
+      // Un'intervista rifatta da capo ha un'altra targa: quella si ridisegna anche se comincia uguale.
+      if (loro.length < nostri.length && chatIdOnboarding(state) !== chatId) return false;
+      return loro.length <= nostri.length && loro.every((x, i) => x === nostri[i]);
     },
     beginSending: () => { sending = true; aggiornaTasto(); },
     runTurnAndContinue: (args) => runTurnAndContinue(args),
@@ -576,17 +583,8 @@
     if (!a) return;
     const type = String(a.type || '').toUpperCase();
     if (type === 'PULISCI_TAB') {
-      // §6 — suggerimento di pulizia dalla home: STESSA conferma del bottone chat.
-      // Popup Filo (SN_CONFIRM_UI), non il window.confirm nativo del browser
-      // (PATTERNS.md: niente default del browser). Fallback al nativo solo se il
-      // modulo non è caricato.
-      const text = 'Filo valuterà tutte le schede aperte e archivierà quelle non più utili. '
-        + 'Le schede archiviate restano riapribili da “Tab archiviate”.';
-      const ok = window.SN_CONFIRM_UI
-        ? await window.SN_CONFIRM_UI.confirm({ title: 'Riordino delle schede', text, okLabel: 'Procedi' })
-        : window.confirm(`${text} Procedo?`);
-      if (!ok) return;
-      send({ type: MSG.RUN_TAB_TRIAGE });
+      // §6 — suggerimento di pulizia dalla home: stessa regola e stesso popup della chat (#530).
+      Att.riordinaSchede();
       return;
     }
     // Il suggerimento l'ha scritto un modello (#810): un indirizzo passa dalla porta delle uscite, e il suo testo va
@@ -761,7 +759,7 @@
     return h;
   }
 
-  async function runFiloTurn({ userMessage, images = [], internal = false, daModello = false, activity = null }) {
+  async function runFiloTurn({ userMessage, images = [], internal = false, daModello = false, daFuori = false, activity = null }) {
     // Blocco di attività della domanda (#521): lo crea e lo chiude chi guida
     // la sequenza dei turni (runTurnAndContinue); qui ci si scrive dentro.
     const pending = activity || Att.create(bubblesEl);
@@ -867,6 +865,7 @@
       reasoningReqId,
       internal,
       ...(daModello ? { daModello: true } : {}),
+      ...(daFuori ? { daFuori: true } : {}),
       // #525 — la chat si archivia nel main, mentre la si fa.
       chatId: ensureChatId(),
     };
@@ -1041,6 +1040,8 @@
     ripresa = null;
     aggiornaTasto();
     const imagesToSend = pendingImages.slice();
+    const daFuori = testoDaFuori || imagesToSend.length > 0 || pendingFiles.length > 0;
+    testoDaFuori = false;
     const righeFile = [...pendingFiles.map((f) => f.percorso), ...imagesToSend.map((d) => percorsiImmagini.get(d))]
       .filter(Boolean).map((p) => `File: ${p}`);
     clearImagePreviews();
@@ -1052,7 +1053,7 @@
     if (body.dataset.state !== 'thread') goThread();
 
     // Bolla utente
-    threadHistory.push({ role: 'user', text: text || '(immagine)', ...(daModello ? { daModello: true } : {}) });
+    threadHistory.push({ role: 'user', text: text || '(immagine)', ...(daModello ? { daModello: true } : {}), ...(daFuori ? { daFuori: true } : {}) });
     const userBubble = makeBubble({ role: 'user', text: text || '' });
     // Mostra TUTTE le immagini inviate nella bolla, ognuna ingrandibile al click.
     imagesToSend.forEach((src, i) => {
@@ -1064,7 +1065,7 @@
     });
     bubblesEl.appendChild(userBubble);
 
-    await runTurnAndContinue({ userMessage: text || 'Descrivi questa immagine.', images: imagesToSend, daModello });
+    await runTurnAndContinue({ userMessage: text || 'Descrivi questa immagine.', images: imagesToSend, daModello, daFuori });
   }
 
   // Un turno + la sua eventuale prosecuzione autonoma, e il rilascio della barra
@@ -1382,6 +1383,7 @@
     }
     const testo = e.dataTransfer?.getData('text/plain') || '';
     if (!testo) return;
+    testoDaFuori = true;
     const prima = inputEl.value.slice(0, inputEl.selectionStart);
     const dopo = inputEl.value.slice(inputEl.selectionEnd);
     const pezzo = `${prima && !/\s$/.test(prima) ? ' ' : ''}${testo}${dopo && !/^\s/.test(dopo) ? ' ' : ''}`;
@@ -1472,7 +1474,11 @@
 
   // Evidenziazione live mentre si scrive: arancione = comando Filo (o sito),
   // azzurro = comando shell (solo in modalità terminale).
-  inputEl.addEventListener('input', () => { Comandi.updateInputClass(); autoGrowInput(); Sistema.scrive(); aggiornaTasto(); });
+  inputEl.addEventListener('input', (e) => {
+    if (!inputEl.value) testoDaFuori = false;
+    else if (e.inputType === 'insertFromPaste' || e.inputType === 'insertFromDrop') testoDaFuori = true;
+    Comandi.updateInputClass(); autoGrowInput(); Sistema.scrive(); aggiornaTasto();
+  });
 
   // Il tasto microfono: si parla, e la richiesta parte come col tasto d'invio (o resta da correggere).
   // La scorciatoia vale in tutta la home, che è la sua chat.
@@ -1539,17 +1545,14 @@
         applyHomeMessageVisibility();
       }
       if (msg.settings && msg.settings.terminal) Term.applySettings(msg.settings.terminal);
+      if (msg.settings && msg.settings.autonomia) mostraAutonomia(msg.settings.autonomia);
       // Aggiorna suoneria in live se l'utente la cambia dalle opzioni.
       if (msg.settings && msg.settings.timerRingtone && RINGTONES[msg.settings.timerRingtone]) {
         _timerRingTone = msg.settings.timerRingtone;
       }
-    } else if (msg?.type === MSG.REDTEAM_VISIBILITY_CHANGED) {
-      setRedteamVisibile(msg.visible);
     } else if (msg?.type === MSG.AUTH_CHANGED) {
       // Login/logout fatto altrove (es. dal menu profilo): aggiorna l'avatar.
       Comandi.setOwner(msg.signedIn && msg.isAdmin);
-      // Entrare o uscire come owner apre o chiude il Red Team in pausa (#896).
-      refreshRedteamVisibile();
       applyAccountProfile(msg.signedIn ? msg.profile : null);
       // #524 — l'accoglienza aspettava un modello: appena l'accesso lo rende
       // disponibile, Filo si presenta subito invece di rimandare alla prossima
@@ -1568,50 +1571,17 @@
 
 
   // ===== Bootstrap =====
-  // ===== Controlli del browser dentro la home (in alto a destra) =====
-  // Le icone home/impostazioni/app/profilo (un tempo nella barra in alto, ora
-  // rimossa) vivono qui. Ogni click aziona il comando REALE della shell via
-  // MSG.SHELL_ACTION: il main lo inoltra alla shell, che clicca il bottone
-  // corrispondente e apre il suo menu nativo (Impostazioni, App, Account) in
-  // alto a destra, oppure naviga (Home). Nessuna logica di menu duplicata qui.
+  // ===== Profilo e impostazioni in alto a destra =====
+  // Dove ogni app li mette (SPEC home). Red-team, Home, Cronologia e App stanno solo nella barra laterale (#871).
+  // Ogni click aziona il comando REALE della shell via MSG.SHELL_ACTION, che apre il suo menu nativo.
   let accountCtrlBtn = null; // riferimento all'icona profilo (mostra l'avatar)
-
-  // Il Red Team in pausa (#896) si mostra solo a chi lo vede: lo decide il main. Parte nascosto.
-  let redteamVisibile = false;
-  function setRedteamVisibile(v) {
-    const nuovo = !!v;
-    if (nuovo === redteamVisibile) return;
-    redteamVisibile = nuovo;
-    renderControls();
-  }
-  async function refreshRedteamVisibile() {
-    try {
-      const r = await send({ type: MSG.REDTEAM_VISIBILITY, attendi: true });
-      setRedteamVisibile(r && r.ok && r.visible);
-    } catch (_) { /* resta com'era */ }
-  }
 
   function renderControls() {
     const host = $('dashControls');
     if (!host) return;
     const ICONS = self.SN_ICONS || {};
     const items = [
-      // Red-team: apre direttamente la pagina interna (è solo una navigazione,
-      // non un menu nativo). Tenuto per primo (più a sinistra) e in rosso (vedi
-      // dashboard.css) perché è il canale sicurezza, distinto dai controlli del
-      // browser. Spec §2: punto d'accesso in alto a destra nella home.
-      redteamVisibile && { command: 'redteam', icon: 'redteam', label: 'Red-team', url: 'filo://redteam/redteam.html' },
-      { command: 'home', icon: 'home', label: 'Home' },
-      // Cronologia: la pagina principale è quella delle schede visitate/chiuse
-      // (raggruppate per giorno), non il log delle azioni AI (raggiungibile da lì
-      // come "Cronologia AI"). Apre direttamente la pagina interna (non passa
-      // dalla shell come gli altri, che ancorano un menu nativo) — è solo una
-      // navigazione. Risponde al feedback "metti la cronologia in alto a destra".
-      { command: 'history', icon: 'history', label: 'Cronologia', url: 'filo://archive/archive.html' },
-      // Gli appunti non hanno più un pannello separato: Filo li scrive nei file
-      // dell'editor (icona Editor, che ora usa proprio l'SVG degli appunti).
       { command: 'settings', icon: 'options', label: 'Impostazioni' },
-      { command: 'apps', icon: 'apps', label: 'App' },
       { command: 'account', icon: 'user', label: 'Profilo' },
     ];
     host.replaceChildren();
@@ -1669,10 +1639,8 @@
     try {
       const r = await send({ type: MSG.AUTH_STATUS });
       Comandi.setOwner(r && r.signedIn && r.isAdmin);
-      applyAccountProfile(r && r.signedIn ? r.profile : null);
     } catch (_) {
       Comandi.setOwner(false);
-      applyAccountProfile(null);
     }
   }
 
@@ -1924,9 +1892,7 @@
   }
 
   // Anima alcune "monete credito" dorate dal centro dello schermo verso l'icona
-  // profilo (accountCtrlBtn). Riusa lo spirito di C3 ma vive nella home, dove
-  // l'icona account è un elemento DOM reale: puntiamo al suo centro. Decorativa,
-  // best-effort, rispetta prefers-reduced-motion.
+  // profilo in alto a destra. Decorativa, best-effort, rispetta prefers-reduced-motion.
   function flyCreditsToAccount(amount) {
     try {
       const reduce = !!(window.matchMedia &&
@@ -2113,19 +2079,49 @@
     } else if (q.tipo === 'chiedi') {
       if (!inAccoglienza) { submitMessage(q.testo); return; }
       inputEl.value = q.testo;
+      testoDaFuori = true;
       autoGrowInput();
       inputEl.focus();
     }
   }
 
+  // #530 — il livello di autonomia attivo, sempre in vista accanto a dove si scrive.
+  function mostraAutonomia(aut) {
+    const A = self.SN_AUTONOMIA;
+    if (!autonomiaEl || !A) return;
+    const info = A.infoLivello(A.livelloAttivo(aut && aut.livello));
+    const livelli = A.livelliSelezionabili();
+    const n = livelli.findIndex((l) => l.id === info.id) + 1;
+    const tacche = document.createElement('span');
+    tacche.className = 'dash-autonomia-tacche';
+    tacche.setAttribute('aria-hidden', 'true');
+    for (let i = 1; i <= livelli.length; i++) {
+      const t = document.createElement('span');
+      t.className = `dash-autonomia-tacca${i <= n ? ' piena' : ''}`;
+      tacche.appendChild(t);
+    }
+    const nome = document.createElement('span');
+    nome.textContent = info.nome;
+    autonomiaEl.replaceChildren(tacche, nome);
+    autonomiaEl.dataset.livello = info.id;
+    autonomiaEl.title = 'Quanto Filo fa da solo · clic per cambiarlo';
+    autonomiaEl.setAttribute('aria-label', `Autonomia di Filo: ${info.nome}. Clic per cambiarla.`);
+    autonomiaEl.hidden = false;
+  }
+  if (autonomiaEl) {
+    autonomiaEl.addEventListener('click', () => {
+      send({ type: MSG.OPEN_URL, url: 'filo://preferences/preferences.html#autonomia' });
+    });
+  }
+
   (async function init() {
     renderControls();
-    refreshRedteamVisibile();
     await applySavedTheme();
     try {
       const settings = await self.SN_STORAGE?.getSettings?.();
       showHomeMessage = settings?.showHomeMessage !== false;
       Sistema.applicaImpostazioni(settings);
+      mostraAutonomia(settings?.autonomia);
       Term.setEnabled(!!settings?.terminal?.enabled);
       Term.setShell(settings?.terminal?.shell || 'powershell');
       // Suoneria timer: legge la preferenza; se non impostata o non valida usa 'default'.

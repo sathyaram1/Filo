@@ -157,6 +157,11 @@ function schermoIntero() {
   try { win && win._filoTabs.toggleContentFullscreen(); } catch (_) {}
 }
 
+function barraLaterale() {
+  const win = finestra();
+  try { win && win._filoTabs.barra.commuta('tasto'); } catch (_) {}
+}
+
 function apriPagina(url) {
   const win = finestra();
   try { win && win._filoTabs.openTab(url); } catch (_) {}
@@ -274,6 +279,7 @@ function template(piattaforma) {
       // SOLO i tasti che Filo fa già ovunque. Un tasto che qui funziona e su
       // Windows no sarebbe la stessa asimmetria da cui nasce tutto #527.
       { label: 'Schermo intero', click: schermoIntero },
+      { label: 'Barra laterale', accelerator: 'CommandOrControl+Shift+B', click: barraLaterale, ...SOLO_SCRITTA },
     ],
   };
 

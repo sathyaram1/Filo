@@ -4,7 +4,7 @@
 // gira solo nelle build installate: qui ce n'è uno finto nel main, guidato dalla prova. Foto in tests/.shots/.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { clickConfirm, confirmState } from './helpers/confirm.mjs';
+import { clickConfirm, confirmState, fillConfirmInput, scrollConfirmToEnd } from './helpers/confirm.mjs';
 import { mkdirSync } from 'node:fs';
 
 const SHOTS = 'tests/.shots';
@@ -207,7 +207,10 @@ test('«non aggiornarti da solo» in chat: la conferma spiega il rischio, e solo
   mkdirSync(SHOTS, { recursive: true });
   await chat.screenshot({ path: `${SHOTS}/aggiornamenti-chat-conferma.png` });
 
-  await clickConfirm(chat, 'ok');
+  // Spegnerli abbassa una difesa (#530): vuole la parola «conferma» a ogni livello.
+  await fillConfirmInput(chat, 'conferma');
+  await scrollConfirmToEnd(chat);
+  await clickConfirm(chat, 'danger');
   await expect.poll(async () => (await impostazioni(app)).aggiornamenti.automatici, { timeout: 5_000 }).toBe(false);
   expect((await finto(app)).autoInstallOnAppQuit).toBe(false);
   // La versione trovata all'avvio, che non si installerà più da sola, diventa la carta con «Installa».

@@ -90,7 +90,8 @@ test('l\'interruttore cambiato si dice alle schede, una volta', () => {
 test('dalla chat si accende e si spegne subito, senza conferma', () => {
   const off = globalThis.SN_PREF.buildPreferencePartial('salta_pubblicita', 'off');
   assert.deepEqual(off.partial, { security: { adSkip: { enabled: false } } });
-  assert.equal(off.level, 1);
+  assert.equal(off.costo, 1);
+  assert.equal(off.allenta, false);
   assert.deepEqual(globalThis.SN_PREF.buildPreferencePartial('salta pubblicità', 'sì').partial, { security: { adSkip: { enabled: true } } });
   assert.equal(globalThis.SN_PREF.buildPreferencePartial('salta_pubblicita', 'boh'), null);
 });

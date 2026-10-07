@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { cartellaTemporanea, cartellaInCasa } from './helpers/percorsi.mjs';
 import { home, modelloFinto, chiedi, ripristina } from './helpers/chatFinta.mjs';
 import { confirmText, clickConfirm } from './helpers/confirm.mjs';
+import { livelloAutonomia } from './helpers/autonomia.mjs';
 
 const SHOTS = join(process.cwd(), 'tests', '.shots');
 
@@ -243,6 +244,7 @@ test('negli Scaricamenti: «Dai un nome sensato», la voce segue il file, e «Ri
 });
 
 test('in chat: «rinomina i file in Download» mostra vecchio → nuovo, rinomina solo dopo l\'OK, «Annulla» rimette tutto', async ({ app }) => {
+  await livelloAutonomia(app, 'conservativo'); // il popup di un costo 2 si prova a Conservativo (#530)
   test.setTimeout(120_000);
   const dir = cartellaInCasa('filo-nomi-chat-');
   writeFileSync(join(dir, 'scan_00231.pdf'), BOLLETTA);
@@ -280,6 +282,7 @@ test('in chat: «rinomina i file in Download» mostra vecchio → nuovo, rinomin
 });
 
 test('in chat, l\'utente che dice no: niente cambia sul disco', async ({ app }) => {
+  await livelloAutonomia(app, 'conservativo'); // il popup di un costo 2 si prova a Conservativo (#530)
   test.setTimeout(90_000);
   const dir = cartellaInCasa('filo-nomi-no-');
   writeFileSync(join(dir, 'scan_00231.pdf'), BOLLETTA);
@@ -515,6 +518,7 @@ test('pannello degli scaricamenti in alto: tasto destro → «Dai un nome sensat
 });
 
 test('in chat, mentre Filo legge un lotto di file: la riga d\'attesa dice che legge i file e quanti ne ha letti', async ({ app }) => {
+  await livelloAutonomia(app, 'conservativo'); // il popup di un costo 2 si prova a Conservativo (#530)
   test.setTimeout(90_000);
   const dir = cartellaInCasa('filo-nomi-attesa-');
   for (let i = 1; i <= 3; i++) writeFileSync(join(dir, `scan_0023${i}.pdf`), pdfConTesto([`Documento numero ${i}`, 'Prova attesa']));
@@ -563,6 +567,7 @@ test('col nome automatico acceso, il nome dato a mano mentre Filo legge ancora i
 });
 
 test('una scansione in bianco e nero e un PDF da 30 MB prendono un nome: dal tasto destro e dall\'elenco in chat', async ({ app }) => {
+  await livelloAutonomia(app, 'conservativo'); // il popup di un costo 2 si prova a Conservativo (#530)
   test.setTimeout(120_000);
   const dir = cartellaInCasa('filo-nomi-scansioni-');
   writeFileSync(join(dir, 'scan_00900.pdf'), pdfGrande(['Manuale lavatrice Bosch', 'Serie 6']));

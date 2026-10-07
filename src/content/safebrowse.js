@@ -30,22 +30,22 @@
   }
 
   let level = 'safe';
-  let sentHints = { hasPassword: false, hasPayment: false };
+  let sentHints = { shownPassword: false, shownPayment: false };
   function requestVerdict() {
     const hints = pageHints();
     sentHints = hints;
     campiMostrati(hints);
-    send({ type: T_GET, url: location.href, hasPassword: hints.hasPassword, hasPayment: hints.hasPayment }, (r) => {
+    send({ type: T_GET, url: location.href, hasPassword: hints.shownPassword, hasPayment: hints.shownPayment }, (r) => {
       if (r && r.ok) level = r.level || 'safe';
     });
   }
 
   // Un campo password o di carta alza la gravità: va chiesto appena compare, non quando la pagina dice di aver finito.
   function hintsGrew() {
-    if (sentHints.hasPassword && sentHints.hasPayment && campiDetti) return;
+    if (sentHints.shownPassword && sentHints.shownPayment && campiDetti) return;
     const h = pageHints();
     campiMostrati(h);
-    if ((h.hasPassword && !sentHints.hasPassword) || (h.hasPayment && !sentHints.hasPayment)) requestVerdict();
+    if ((h.shownPassword && !sentHints.shownPassword) || (h.shownPayment && !sentHints.shownPayment)) requestVerdict();
   }
 
   // Finché il parser lavora i campi sensibili si guardano a ogni pezzo di pagina (al più ogni 200 ms).

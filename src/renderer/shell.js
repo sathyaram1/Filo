@@ -17,6 +17,22 @@
   const tabsEl = document.getElementById('tabs');
   const newBtn = document.getElementById('tab-new');
   if (newBtn) newBtn.dataset.tip = `Nuova scheda (${tasto('Ctrl+T')})`;
+  // #871 — la maniglia apre e chiude la barra laterale; un clic altrove nella fila la chiude.
+  const manigliaBarra = document.getElementById('barra-maniglia');
+  if (manigliaBarra) {
+    manigliaBarra.dataset.tip = `Barra laterale (${TASTI && TASTI.etichettaBarra ? TASTI.etichettaBarra() : tasto('Ctrl+Shift+B')})`;
+    manigliaBarra.addEventListener('click', (e) => { if (e.isTrusted) api.barra?.commuta(); });
+    // Tasto destro: le scelte della striscia (aprirla, nasconderla, spegnere l'apertura dal bordo, regolarla).
+    manigliaBarra.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.isTrusted) api.barra?.menu?.(Math.round(e.clientX), Math.round(e.clientY));
+    });
+  }
+  document.addEventListener('pointerdown', (e) => {
+    if (!e.isTrusted || (manigliaBarra && manigliaBarra.contains(e.target))) return;
+    try { api.barra?.chiudi(); } catch (_) {}
+  }, true);
   const backBtn = document.getElementById('nav-back');
   const fwdBtn = document.getElementById('nav-forward');
   const reloadBtn = document.getElementById('nav-reload');
@@ -52,15 +68,17 @@
   function applyShellTokens(tokens) {
     if (ThemeTokens) ThemeTokens.applyToDocument(document, tokens || {}, { shell: true });
   }
-  // Opacità del colore identità sulle tab inattive (param `opacita_tab` della
-  // spec "Colore identità delle tab"): governa quanto la tinta del sito copre lo
-  // sfondo del tab bar nel color-mix più sotto. 0 = nessun colore, 1 = tinta
-  // piena. Letta dalle impostazioni e aggiornata live al cambio prefs.
-  let tabOpacity = 0.6;
+  // Parametri "Colore identità delle tab" per il fondo delle schede non attive.
+  const TabColor = window.SN_TAB_COLOR;
+  let tabColorParams = TabColor ? TabColor.defaultParams() : null;
   function applyTabColorParams(tabColor) {
-    const v = tabColor && Number(tabColor.opacita_tab);
-    if (Number.isFinite(v)) tabOpacity = Math.max(0, Math.min(1, v));
+    if (TabColor && tabColor && typeof tabColor === 'object') tabColorParams = TabColor.clampParams(tabColor);
   }
+  // Fondo e inchiostri si calcolano sui colori veri del tema: al cambio di tema si ridipinge.
+  try {
+    window.matchMedia('(prefers-color-scheme: dark)')
+      .addEventListener('change', () => { try { render(); } catch (_) {} });
+  } catch (_) {}
   // Config notifiche (spec #170.1): durata, suono on/off, suono scelto. Letta
   // dalle impostazioni al boot e aggiornata live a ogni cambio prefs, così le
   // notifiche successive rispettano i nuovi valori senza riavviare.
@@ -87,6 +105,7 @@
   api.message({ type: 'get_settings' })
     .then((r) => {
       applyShellTokens(r?.settings?.themeTokens);
+      rispecchiaBarra();
       applyTabColorParams(r?.settings?.tabColor);
       applyNotifConfig(r?.settings?.notifications);
       applyTabPreview(r?.settings?.tabPreview);
@@ -98,6 +117,7 @@
     api.onBroadcast((m) => {
       if (m?.type === 'settings_updated') {
         applyShellTokens(m.settings?.themeTokens);
+        rispecchiaBarra();
         applyTabColorParams(m.settings?.tabColor);
         applyNotifConfig(m.settings?.notifications);
         applyTabPreview(m.settings?.tabPreview);
@@ -177,16 +197,20 @@
 
   // Popup menu custom: BrowserWindow frameless che appare sopra le
   // WebContentsView native, stilizzato come il menu tasto destro.
+  // Dove aprire il prossimo menu quando lo chiede la barra laterale: accanto alla sua icona.
+  let ancoraMenu = null;
   function showNativeMenu(btn, entries) {
     const r = btn.getBoundingClientRect();
     let x = Math.round(r.left);
     let y = Math.round(r.bottom + 4);
-    // La barra in alto è nascosta e le icone reali hanno rect nullo: i menu
-    // (Impostazioni, App, Account) si aprono sotto le icone, che ora vivono in
-    // alto a destra DENTRO la home. La home parte sotto la fila di tab (~40px) e
-    // le icone sono alte ~34px: ancoriamo appena sotto. Coordinate relative alla
-    // finestra shell. popup-menu.js riallinea/clampa per restare nello schermo.
-    if (r.width === 0 && r.height === 0) {
+    // La barra in alto è nascosta e le icone reali hanno rect nullo. Dalla barra
+    // laterale arriva l'ancora; dall'assistente no, e il menu si apre in alto a
+    // destra. Coordinate relative alla finestra shell: popup-menu.js clampa.
+    if (ancoraMenu) {
+      x = ancoraMenu.x;
+      y = ancoraMenu.y;
+      ancoraMenu = null;
+    } else if (r.width === 0 && r.height === 0) {
       x = Math.max(8, window.innerWidth - 250);
       y = 86;
     }
@@ -225,6 +249,7 @@
   }
 
   function renderAccount() {
+    rispecchiaBarra();
     if (!accountBtn) return;
     if (authBusy) {
       accountBtn.dataset.tip = 'Accesso in corso…';
@@ -333,6 +358,21 @@
     }
     refreshAuth();
   }
+  // La barra laterale si disegna in una vista sua: le arrivano da qui i colori già calcolati
+  // (tema, token dell'utente, incognito) e il profilo da mostrare.
+  const VAR_BARRA = ['--bg', '--fg', '--fg-soft', '--border', '--tab-active', '--tab-bg', '--accent', '--accent-rgb', '--font', '--radius'];
+  function rispecchiaBarra() {
+    if (!api.barra) return;
+    const cs = getComputedStyle(document.documentElement);
+    const tema = {};
+    for (const k of VAR_BARRA) { const v = cs.getPropertyValue(k).trim(); if (v) tema[k] = v; }
+    const account = authProfile
+      ? { dentro: true, foto: authProfile.picture || '', etichetta: shortName(authProfile) }
+      : { dentro: false, foto: '', etichetta: '' };
+    try { api.barra.stato({ tema, account }); } catch (_) {}
+  }
+  try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rispecchiaBarra); } catch (_) {}
+
   setIcon(winMinBtn, 'minimize', 16);
   setIcon(winMaxBtn, 'maximize', 14);
   setIcon(winCloseBtn, 'close', 16);
@@ -350,9 +390,13 @@
       minimize: winMinBtn,
       fullscreen: winMaxBtn,
     };
-    api.onTriggerButton((command) => {
+    api.onTriggerButton((command, anchor) => {
       const btn = triggerMap[command];
-      if (btn) btn.click();
+      if (!btn) return;
+      const ok = anchor && Number.isFinite(anchor.x) && Number.isFinite(anchor.y);
+      ancoraMenu = ok ? { x: Math.round(anchor.x), y: Math.round(anchor.y) } : null;
+      btn.click();
+      ancoraMenu = null;
     });
   }
 
@@ -725,71 +769,14 @@
     '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/>' +
     '<path d="M12 3a13.5 13.5 0 0 1 0 18"/><path d="M12 3a13.5 13.5 0 0 0 0 18"/></svg>';
 
-  // "Vetro smerigliato" della tab attiva (§1.1): dato il colore campionato dal
-  // sito, scegli un testo leggibile per contrasto (luminanza relativa).
-  function readableOn(rgbStr) {
-    const m = /rgba?\(([^)]+)\)/.exec(rgbStr || '');
-    if (!m) return null;
-    const p = m[1].split(',').map((s) => parseFloat(s.trim()));
-    if (p.length < 3 || p.some((n) => Number.isNaN(n))) return null;
-    const lin = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
-    const L = 0.2126 * lin(p[0]) + 0.7152 * lin(p[1]) + 0.0722 * lin(p[2]);
-    return L > 0.45 ? '#1a1918' : '#f8f6f0';
-  }
-
-  // Un colore "ha identità" solo se ha croma sufficiente: bianco/nero/grigio
-  // (es. l'header bianco di YouTube campionato per il vetro smerigliato §1.1)
-  // non rappresentano il sito. Soglia allineata a SN_TAB_COLOR
-  // (src/shared/tabColor.js) e al campionatore favicon in pageColor.js.
+  // Per il bagliore audio una cima bianca/nera/grigia non è il sito e si ripiega sul suo colore
+  // (la scheda attiva invece resta della cima, D63). Soglia allineata a SN_TAB_COLOR.hasIdentity.
   function hasColorIdentity(rgbStr) {
     const m = /rgba?\(([^)]+)\)/.exec(rgbStr || '');
     if (!m) return false;
     const p = m[1].split(',').map((s) => parseFloat(s.trim()));
     if (p.length < 3 || p.some((n) => Number.isNaN(n))) return false;
     return Math.max(p[0], p[1], p[2]) - Math.min(p[0], p[1], p[2]) >= 24;
-  }
-
-  // Colore identità attenuato (§1.2): smorza la saturazione del colore del sito
-  // a una frazione dell'originale (tinta "subliminale"). La luminosità non la
-  // tocchiamo qui: la spostiamo verso il neutro del tab bar mescolandola con
-  // --tab-bg via CSS color-mix (così resta giusta sia in tema chiaro che scuro).
-  function attenuateIdentity(rgbStr) {
-    const m = /rgba?\(([^)]+)\)/.exec(rgbStr || '');
-    if (!m) return null;
-    const p = m[1].split(',').map((s) => parseFloat(s.trim()));
-    if (p.length < 3 || p.some((n) => Number.isNaN(n))) return null;
-    const r = p[0] / 255, g = p[1] / 255, b = p[2] / 255;
-    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
-    const l = (mx + mn) / 2;
-    let h = 0, s = 0;
-    if (mx !== mn) {
-      const d = mx - mn;
-      s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
-      if (mx === r) h = (g - b) / d + (g < b ? 6 : 0);
-      else if (mx === g) h = (b - r) / d + 2;
-      else h = (r - g) / d + 4;
-      h /= 6;
-    }
-    s *= 0.18; // saturazione ridotta al ~18% dell'originale (spec: 15-20%)
-    const hue2rgb = (pp, qq, t) => {
-      if (t < 0) t += 1;
-      if (t > 1) t -= 1;
-      if (t < 1 / 6) return pp + (qq - pp) * 6 * t;
-      if (t < 1 / 2) return qq;
-      if (t < 2 / 3) return pp + (qq - pp) * (2 / 3 - t) * 6;
-      return pp;
-    };
-    let nr, ng, nb;
-    if (s === 0) {
-      nr = ng = nb = l;
-    } else {
-      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-      const pq = 2 * l - q;
-      nr = hue2rgb(pq, q, h + 1 / 3);
-      ng = hue2rgb(pq, q, h);
-      nb = hue2rgb(pq, q, h - 1 / 3);
-    }
-    return `rgb(${Math.round(nr * 255)}, ${Math.round(ng * 255)}, ${Math.round(nb * 255)})`;
   }
 
   let ctxTabId = null;
@@ -940,6 +927,28 @@
     ridisegnoRimandato = false;
     // tabs
     tabsEl.innerHTML = '';
+    // Colori veri del tema, letti una volta per render e solo se servono.
+    let theme;
+    const themeColors = () => {
+      if (theme === undefined) {
+        const bar = TabColor.resolveCssColor(document, 'var(--tab-bg)');
+        const page = TabColor.resolveCssColor(document, 'var(--bg)');
+        const fg = TabColor.resolveCssColor(document, 'var(--fg)');
+        theme = bar && page && fg ? { bar, page, fg } : null;
+      }
+      return theme;
+    };
+    // Il colore salvato del sito ha la tinta piena: saturazione e luminosità dell'utente si applicano qui.
+    const siteColor = (t) => {
+      const c = TabColor && t.identityColor ? TabColor.adaptIdentity(t.identityColor, tabColorParams) : null;
+      return c ? TabColor.rgbCss(c) : null;
+    };
+    // opacita_tab 0 = nessun colore: la scheda resta identica a una senza favicon.
+    let tabPaint = null;
+    if (TabColor && tabColorParams && tabColorParams.opacita_tab > 0
+      && state.tabs.some((t) => t.id !== state.activeId && t.identityColor)) {
+      tabPaint = themeColors();
+    }
     for (const t of state.tabs) {
       const el = document.createElement('div');
       el.className = 'tab' + (t.id === state.activeId ? ' active' : '');
@@ -954,50 +963,44 @@
         el.style.maxWidth = `${ferma}px`;
       }
 
-      // Tab attiva: tingila col colore live del sito (§1.1). Sovrascriviamo la
-      // variabile --tab-active così anche i "piedini" a goccia (::before/::after)
-      // assumono lo stesso colore. Il testo passa a chiaro/scuro per contrasto.
-      // Se il colore campionato dalla cima pagina è neutro (header bianco/grigio:
-      // es. YouTube) non porta identità → ripieghiamo sul colore identità del
-      // sito (theme-color/favicon), così la tab attiva mostra il brand e non il
-      // bianco. Se manca anche quello, si resta sul colore campionato.
+      // Tab attiva: sempre il colore della cima della pagina, anche bianca, mai il
+      // marchio del sito (decisione D63). Inchiostro con la regola delle inattive.
       if (t.id === state.activeId) {
-        const activeColor = hasColorIdentity(t.color) ? t.color : (t.identityColor || t.color);
+        const activeColor = t.color;
         if (activeColor) {
-          const fg = readableOn(activeColor);
           el.style.setProperty('--tab-active', activeColor);
-          if (fg) el.style.color = fg;
+          const c = TabColor ? themeColors() : null;
+          const ink = c && TabColor.readableInk([activeColor], [c.fg, c.page]);
+          if (ink) {
+            el.classList.add('inked');
+            el.style.setProperty('--tab-ink', TabColor.rgbCss(ink));
+          }
         }
       }
 
-      // Tab INATTIVE: tinta identità attenuata del sito (§1.2). Smorziamo la
-      // saturazione e poi mescoliamo col neutro del tab bar via CSS, così la
-      // tinta è appena percepibile ma riconoscibile a livello subliminale.
-      // Usiamo la variabile --tab-bg-eff (non `background` diretto) per non
-      // rompere il feedback di hover, che è definito in CSS sulla stessa var.
-      if (t.id !== state.activeId && t.identityColor && tabOpacity > 0) {
-        const tint = attenuateIdentity(t.identityColor);
-        if (tint) {
-          // `opacita_tab` controlla la frazione di tinta nel mix col fondo del
-          // tab bar: 0.6 (default) ≈ tinta percepibile ma sobria, 1 = piena.
-          const pct = Math.round(tabOpacity * 100);
-          el.style.setProperty(
-            '--tab-bg-eff',
-            `color-mix(in srgb, ${tint} ${pct}%, var(--tab-bg))`,
-          );
+      // Tab INATTIVE: la tinta del sito mescolata col neutro della barra quanto
+      // dice opacita_tab (tabColor.js). Passa da --tab-bg-eff, non da
+      // `background`, perché l'hover del CSS si calcola sulla stessa variabile.
+      if (t.id !== state.activeId && t.identityColor && tabPaint) {
+        const bg = TabColor.inactiveTabBackground(t.identityColor, tabPaint.bar, tabColorParams);
+        if (bg) {
+          const { ink, hover } = TabColor.inkAndHover(bg, tabPaint.fg, tabPaint.page);
+          el.classList.add('tinted', 'inked');
+          el.style.setProperty('--tab-bg-eff', TabColor.rgbCss(bg));
+          el.style.setProperty('--tab-bg-hover', TabColor.rgbCss(hover));
+          el.style.setProperty('--tab-ink', TabColor.rgbCss(ink));
         }
       }
 
       // Audio in riproduzione: aggiunge classe per il bagliore animato.
       // Il colore del bagliore viene calcolato dal colore identità della tab
-      // (desaturato, come la tinta §1.2) e impostato come variabile CSS inline.
+      // e impostato come variabile CSS inline.
       const isAudible = t.audible && !t.muted;
       if (isAudible) {
         el.classList.add('audible');
         // Calcola il colore del bagliore: usa il colore identità se disponibile,
         // altrimenti l'accento Filo come fallback. Desaturiamo già via CSS.
-        const glowBase = hasColorIdentity(t.color) ? t.color
-          : (t.identityColor || null);
+        const glowBase = hasColorIdentity(t.color) ? t.color : siteColor(t);
         if (glowBase) {
           el.style.setProperty('--tab-glow-color', glowBase);
         }
@@ -1152,11 +1155,9 @@
     return !url || url.startsWith('filo://newtab/');
   }
 
-  // La barra indirizzi è sempre nascosta: le icone di navigazione (indietro,
-  // avanti, ricarica) vivono nel menu tasto destro, mentre home/impostazioni/
-  // app/profilo sono state spostate DENTRO la pagina home (in alto a destra).
-  // Resta solo la fila di tab, e la WebContentsView risale a coprire lo spazio
-  // liberato. Manteniamo applyChrome (chiamata dal render) per idempotenza.
+  // La barra indirizzi è sempre nascosta: navigazione, home, impostazioni, app e
+  // profilo vivono nella barra laterale (#871). Resta solo la fila di tab, e la
+  // WebContentsView risale a coprire lo spazio liberato.
   let chromeCompact = null;
   function applyChrome(_isHome) {
     const compact = true;
@@ -1887,12 +1888,12 @@
     });
 
     function provenienza(r) {
-      try { return window.SN_ESEGUIBILI.provenienza(r.site, r.siteUncertain); } catch (_) {}
+      try { return window.SN_ESEGUIBILI.provenienza(r.site, r.siteUncertain, r.servedBy, r.filename); } catch (_) {}
       return r.site ? `da ${r.site}` : '';
     }
 
     function testoScarica(r) {
-      try { return window.SN_ESEGUIBILI.testoScarica(r.filename, r.site, r.siteUncertain); } catch (_) {}
+      try { return window.SN_ESEGUIBILI.testoScarica(r.filename, r.site, r.siteUncertain, r.servedBy); } catch (_) {}
       return `«${r.filename}» è un programma. Scaricarlo?`;
     }
 

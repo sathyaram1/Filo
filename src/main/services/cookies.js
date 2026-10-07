@@ -26,6 +26,7 @@
 'use strict';
 
 const { session } = require('electron');
+const Sito = require('./stessoSito');
 
 const MODES = { MANUAL: 'manual', DEFAULT: 'default', PRIVACY: 'privacy' };
 
@@ -117,6 +118,13 @@ function getTrustedSites(settings) {
   return Array.isArray(list) ? list : [];
 }
 
+// Servizi (eTLD+1) dei contenuti incorporati a cui l'utente ha riattivato i cookie (#760).
+function getEmbedSites(settings) {
+  const c = settings && settings.security && settings.security.cookies;
+  const list = (c && c.embedSites) || [];
+  return Array.isArray(list) ? list.map((d) => String(d || '').toLowerCase()).filter(Boolean) : [];
+}
+
 // Siti (eTLD+1) dove l'utente ha chiesto di rivedere i banner dei cookie: lì Filo non rifiuta e non nasconde.
 function getBannerSites(settings) {
   const c = settings && settings.security && settings.security.cookies;
@@ -126,25 +134,16 @@ function getBannerSites(settings) {
 
 function isBannerSiteIn(sites, url) {
   if (!/^https?:/i.test(String(url || ''))) return false;
-  const reg = registrableOf(url);
-  return !!reg && sites.includes(reg);
+  return !!Sito.voceSalvata(url, sites);
 }
 
 function trustedSetOf(settings) {
   return new Set(getTrustedSites(settings).map((d) => String(d || '').toLowerCase()).filter(Boolean));
 }
 
-// eTLD+1 per i cookie: solo le piattaforme che il web già separa (un blog su wordpress.com resta con wordpress.com).
-// Ripiego sull'hostname grezzo se il normalizzatore manca o l'URL non ha dominio (IP, localhost).
+// Il sito dei cookie è quello di services/stessoSito.js: un blog su wordpress.com resta con wordpress.com.
 function registrableOf(url) {
-  try {
-    const SB = globalThis.SN_SAFEBROWSE;
-    if (SB && typeof SB.normalize === 'function') {
-      const norm = SB.normalize(url, { soloPsl: true });
-      if (norm && norm.registrable) return norm.registrable;
-    }
-  } catch (_) {}
-  try { return new URL(url).hostname.toLowerCase() || null; } catch (_) { return null; }
+  return Sito.sitoDi(url);
 }
 
 // Chiave di partizione per-sito in modalità privacy. Slug sicuro per il nome di
@@ -158,11 +157,11 @@ function baseDelSito(reg) {
 function partitionForUrl(url, trusted) {
   const reg = registrableOf(url);
   if (!reg) return null;
-  const base = baseDelSito(reg);
-  const isTrusted = trusted instanceof Set && trusted.has(reg);
-  // 'persist:' → jar isolato per-sito ma persistente (resta connesso).
+  // 'persist:' → jar isolato per-sito ma persistente (resta connesso). È del sito anche quando la voce fidata è un
+  // suffisso (co.uk, gov.it): un jar per voce metterebbe tutti i siti sotto di lei insieme (#796).
   // Senza prefisso → jar isolato ed effimero, buttato all'uscita dal sito (vedi «uscita dal sito»).
-  if (isTrusted) return 'persist:' + base;
+  const base = baseDelSito(reg);
+  if (Sito.voceSalvata(url, trusted instanceof Set ? trusted : null)) return 'persist:' + base;
   sitoDelJar.set(base, reg);
   const g = jarGen.get(base);
   return g && g.n ? `${base}~${g.n}` : base;
@@ -241,16 +240,16 @@ function ensureRequestHook(ses) {
       callback({ cancel: false });
       return;
     }
-    if (s.enabled && isTrackerUrl(details.url)) {
-      callback({ cancel: true });
-      return;
-    }
     let ad = null;
     try { ad = require('./adblock'); } catch (_) {}
-    if (ad && ad.shouldBlock && ad.shouldBlock(details.url)) {
+    // La pagina che l'utente apre non si ferma qui in silenzio: la decide il blocco dei siti, che avvisa con «Apri comunque» (#576).
+    const pagina = details.resourceType === 'mainFrame';
+    if ((s.enabled && isTrackerUrl(details.url)) || (!pagina && ad && ad.shouldBlock && ad.shouldBlock(details.url))) {
       callback({ cancel: true });
+      if (ad) ad.chiudiInPagina(details);
       return;
     }
+    if (ad && ad.ricordaRichiesta) ad.ricordaRichiesta(details);
     callback({ cancel: false });
   });
   return state;
@@ -261,6 +260,13 @@ function applyTrackerBlocking(ses, enabled) {
   if (!state) return;
   state.filtri = true;
   state.enabled = !!enabled;
+}
+
+// Finestra incognito e scheda col proxy hanno una sessione loro: senza, lì la pubblicità passava intera (#576).
+// Accende solo le liste della pubblicità; il blocco tracker resta com'era.
+function coverAdblock(ses) {
+  const state = ensureRequestHook(ses);
+  if (state) state.filtri = true;
 }
 
 // ─── sessioni per-sito (modalità privacy) ─────────────────────────────────
@@ -362,8 +368,7 @@ function controllaUscita(partition) {
 
 // Il sito non è più un'eccezione: quello che aveva salvato se ne va come per gli altri siti, ma mai mentre
 // è aperto in una scheda (lo butterebbe fuori a metà sessione): lì aspetta che la chiuda, come un jar normale.
-function dimenticaFidato(site) {
-  const partition = 'persist:' + baseDelSito(site);
+function dimenticaFidato(site, partition = 'persist:' + baseDelSito(site)) {
   let ses = siteSessions.get(partition);
   try { if (!ses) ses = session.fromPartition(partition); } catch (_) { return; }
   siteSessions.set(partition, ses);
@@ -392,26 +397,28 @@ function spazzaFidatiOrfani(trusted) {
       .filter((v) => v.isDirectory() && v.name.startsWith('filo-priv-'))
       .map((v) => v.name);
   } catch (_) { return; }
-  const vivi = new Set([...trusted].map((s) => baseDelSito(s)));
   for (const nome of nomi) {
-    if (vivi.has(nome)) continue;
+    if (jarFidato(nome, trusted)) continue;
     const partition = 'persist:' + nome;
-    try {
-      const ses = siteSessions.get(partition) || session.fromPartition(partition);
-      if (inUso(partition, ses)) continue;   // la scheda è ancora aperta: aspetta che la chiuda
-      siteSessions.set(partition, ses);
-      fidatiDaButtare.add(partition);
-      buttaJar(partition, ses);
-    } catch (_) {}
+    if (fidatiDaButtare.has(partition)) continue;
+    dimenticaFidato(nome.slice('filo-priv-'.length), partition);
   }
 }
 
+// Il jar persistente di un sito resta finché una voce fidata copre il sito (la sua, o un suffisso salvato prima).
+function jarFidato(nome, trusted) {
+  const sito = String(nome).replace(/^filo-priv-/, '');
+  return Boolean(Sito.voceSalvata(sito, trusted)) || [...trusted].some((d) => baseDelSito(d) === nome);
+}
+
 // Rimesso fra i fidati prima che il suo jar se ne andasse: resta dov'è, l'utente ha disdetto.
-function tieniFidato(site) {
-  const partition = 'persist:' + baseDelSito(site);
-  if (!fidatiDaButtare.delete(partition)) return;
-  clearTimeout(uscite.get(partition));
-  uscite.delete(partition);
+function tieniFidati(trusted) {
+  for (const partition of [...fidatiDaButtare]) {
+    if (!jarFidato(partition.replace(/^persist:/, ''), trusted)) continue;
+    fidatiDaButtare.delete(partition);
+    clearTimeout(uscite.get(partition));
+    uscite.delete(partition);
+  }
 }
 
 // Il sito riparte subito in un'altra generazione: chi lo riapre mentre il vecchio jar si svuota non perde i cookie a metà.
@@ -430,13 +437,43 @@ function buttaJar(partition, ses) {
   fidatiDaButtare.delete(partition);
   try { require('./permessiPagine').dimenticaSessione(ses); } catch (_) {}
   const pulisci = (fn) => Promise.resolve().then(fn).catch(() => {});
-  Promise.all([
+  const nuova = g.n ? `${base}~${g.n}` : base;
+  passaRiquadri(ses, nuova).then(() => Promise.all([
     pulisci(() => (typeof ses.clearData === 'function' ? ses.clearData() : Promise.all([ses.clearStorageData(), ses.clearCache()]))),
     pulisci(() => ses.clearAuthCache()),
     pulisci(() => typeof ses.closeAllConnections === 'function' && ses.closeAllConnections()),
-  ]).then(() => g.svuota.delete(idx));
+  ])).then(() => g.svuota.delete(idx));
   const site = sitoDelJar.get(base);
   try { if (site && jarWipe) jarWipe(site); } catch (_) {}
+}
+
+// I cookie dei servizi incorporati riattivati dall'utente (#760) passano dallo spazio del sito che se ne va a quello
+// che lo sostituirà: sopravvivono all'uscita dal sito, ma restano suoi (mai quelli dello spazio del servizio stesso).
+function cookieUrl(c) {
+  return (c.secure ? 'https://' : 'http://') + String(c.domain || '').replace(/^\./, '') + (c.path || '/');
+}
+function delServizio(c, servizi) {
+  const d = String(c.domain || '').replace(/^\./, '').toLowerCase();
+  return servizi.some((s) => d === s || d.endsWith('.' + s));
+}
+async function passaRiquadri(ses, nuova) {
+  const servizi = _cached.embedSites || [];
+  if (!servizi.length) return;
+  let lista = [];
+  try { lista = (await ses.cookies.get({})).filter((c) => delServizio(c, servizi)); } catch (_) { return; }
+  if (!lista.length) return;
+  const dest = ensureSiteSession(nuova, { gpc: _cached.mode !== MODES.MANUAL });
+  const ora = Date.now() / 1000;
+  for (const c of lista) {
+    if (c.expirationDate && c.expirationDate < ora) continue;
+    try {
+      await dest.cookies.set({
+        url: cookieUrl(c), name: c.name, value: c.value, path: c.path || '/', secure: !!c.secure, httpOnly: !!c.httpOnly,
+        sameSite: c.sameSite, ...(c.expirationDate ? { expirationDate: c.expirationDate } : {}),
+        ...(c.hostOnly ? {} : { domain: String(c.domain || '').replace(/^\./, '') }),
+      });
+    } catch (_) {}
+  }
 }
 
 let jarWipe = null;
@@ -480,7 +517,7 @@ function configureForMode(mode) {
 
 // Ultima modalità/siti fidati visti, così before-quit (sincrono) può lanciare il
 // wipe senza dover rileggere lo storage in modo asincrono.
-let _cached = { mode: MODES.DEFAULT, trustedSites: [], bannerSites: [] };
+let _cached = { mode: MODES.DEFAULT, trustedSites: [], bannerSites: [], embedSites: [] };
 let _configured = false;
 // Impostazioni cambiate da una finestra incognito: valgono solo lì, il profilo normale non le vede (#754).
 // null = l'incognito non ha cambiato niente e vede quelle del profilo normale.
@@ -521,8 +558,7 @@ function setConfigChangeHandler(fn) { configChange = typeof fn === 'function' ? 
 // In Privacy un sito non fidato non tiene niente oltre la sessione, nemmeno quello che Filo sa di lui.
 function keepsSiteData(site) {
   if (_cached.mode !== MODES.PRIVACY) return true;
-  const s = String(site || '').toLowerCase();
-  return _cached.trustedSites.some((d) => String(d || '').toLowerCase() === s);
+  return !!Sito.voceSalvata(String(site || '').toLowerCase(), _cached.trustedSites);
 }
 
 // I nomi che il sito ha dato alla sua risposta, visti dopo il clic sul banner: li tiene tabs/tabCookies.js.
@@ -544,7 +580,7 @@ function configureFromSettings(settings) {
   const prev = _cached.bannerSites;
   const prevMode = _cached.mode;
   const prevTrusted = _cached.trustedSites.join('\n');
-  _cached = { mode: getMode(settings), trustedSites: getTrustedSites(settings), bannerSites: getBannerSites(settings) };
+  _cached = { mode: getMode(settings), trustedSites: getTrustedSites(settings), bannerSites: getBannerSites(settings), embedSites: getEmbedSites(settings) };
   configureForMode(_cached.mode);
   const changed = prevMode !== _cached.mode || prev.join('\n') !== _cached.bannerSites.join('\n');
   if (_configured) {
@@ -556,8 +592,8 @@ function configureFromSettings(settings) {
     const prima = new Set(prevTrusted.split('\n').map((d) => d.toLowerCase()).filter(Boolean));
     const adesso = trustedSetOf(settings);
     if (_configured) {
-      for (const site of prima) if (!adesso.has(site)) dimenticaFidato(site);
-      for (const site of adesso) if (!prima.has(site)) tieniFidato(site);
+      for (const site of prima) if (!adesso.has(site) && !jarFidato(baseDelSito(site), adesso)) dimenticaFidato(site);
+      tieniFidati(adesso);
     }
     spazzaFidatiOrfani(adesso);
   }
@@ -639,6 +675,7 @@ module.exports = {
   getMode,
   getTrustedSites,
   getBannerSites,
+  getEmbedSites,
   isBannerSiteIn,
   isBannerSite,
   currentMode,
@@ -659,6 +696,7 @@ module.exports = {
   ensureHeaderHook,
   applyGpc,
   applyTrackerBlocking,
+  coverAdblock,
   ensureRequestHook,
   chiudiHost,
   permettiRichieste,

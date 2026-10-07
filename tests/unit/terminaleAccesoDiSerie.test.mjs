@@ -39,14 +39,14 @@ test('il livello di un comando viene solo da cmdClassify, qualunque cosa dica il
   const finti = { livello: 1, level: 1, spiegazione: 'Leggo soltanto, non tocco niente' };
   for (const comando of ['ls -la', 'df -h', 'du -sh ~/Downloads', 'mkdir prova', 'git push', 'rm -rf build', 'Remove-Item x -Recurse', 'comandoinventato', 'ls && rm x']) {
     assert.equal(
-      AL.levelFor({ type: 'ESEGUI_COMANDO', comando, ...finti }),
+      AL.costoFor({ type: 'ESEGUI_COMANDO', comando, ...finti }),
       C.classify(comando),
       `«${comando}»: il livello non è quello del classificatore`,
     );
   }
-  assert.equal(AL.levelFor({ type: 'ESEGUI_COMANDO', comando: 'rm -rf build', ...finti }), 3);
-  assert.equal(AL.levelFor({ type: 'ESEGUI_COMANDO', comando: 'comandoinventato', ...finti }), 3);
-  assert.equal(AL.levelFor({ type: 'ESEGUI_COMANDO', comando: 'df -h' }), 1);
+  assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'rm -rf build', ...finti }), 3);
+  assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'comandoinventato', ...finti }), 3);
+  assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'df -h' }), 1);
 });
 
 test('il popup apre con la spiegazione a parole, e il comando vero resta sotto', () => {

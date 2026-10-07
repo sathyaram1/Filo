@@ -45,6 +45,10 @@
         terminalEnabled: 'terminal.enabled',
         terminalShell: 'terminal.shell',
         nomiSensatiScaricamenti: 'nomiSensati.scaricamenti',
+        barraSpinta: 'barraLaterale.spinta',
+        barraStriscia: 'barraLaterale.striscia',
+        barraAttesa: 'barraLaterale.attesaMs',
+        barraUscita: 'barraLaterale.uscitaMs',
         aggiornamentiAutomatici: 'aggiornamenti.automatici',
       },
       gruppi: { tokenCode: 'themeTokens.*', tabColorCode: 'tabColor.*' },
@@ -87,7 +91,7 @@
         'fp-mode-default': 'security.fingerprint.mode',
         'fp-mode-privacy': 'security.fingerprint.mode',
       },
-      gruppi: { 'sec-cookies-banners': 'security.cookies.bannerSites', 'sec-delicate-campi': 'security.pagineDelicate.nonDelicati', 'sec-cookies-accessi': 'security.cookies.loggedSites' },
+      gruppi: { 'sec-cookies-banners': 'security.cookies.bannerSites', 'sec-delicate-campi': 'security.pagineDelicate.nonDelicati', 'sec-cookies-accessi': 'security.cookies.loggedSites', 'sec-cookies-riquadri': 'security.cookies.embedSites' },
       altrove: { 'sec-perm-list': 'permessiSiti' },
       fuori: {},
       messaggi: {
@@ -190,7 +194,7 @@
     if (percorso.startsWith('themeTokens.')) return { come: `IMPOSTA_ESTETICA token ${percorso.slice(12)}`, chiave: '', conferma: false };
     const P = global.SN_PREF;
     const s = P && P.setterDi ? P.setterDi(percorso) : null;
-    return s ? { come: `chiave ${s.keys[0]}`, chiave: s.keys[0], conferma: s.level === 2 } : { come: '', chiave: '', conferma: false };
+    return s ? { come: `chiave ${s.keys[0]}`, chiave: s.keys[0], conferma: s.costo >= 2 } : { come: '', chiave: '', conferma: false };
   }
   function minuscola(s) {
     return s.charAt(0).toLowerCase() + s.slice(1);
