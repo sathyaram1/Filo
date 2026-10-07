@@ -27,7 +27,7 @@ import {
   collectTestFiles, fileArgs, isTestFile, UNIT_DIR, REPO_ROOT, TETTO_WINDOWS, TETTO_RIGA,
   gruppiDiLancio, perLaRiga, flagsConRiepilogo, sommaRiepiloghi, testoRiepilogo,
   allaLettera, nomeNonLanciabile, NODE_LEGGE_MODELLI, rapportiDaRiunire, separaArgomenti, unisciRapporti, chiedeWatch, chiedeCopertura,
-  conTettoDiTempo, TETTO_FILE_MS,
+  conTettoDiTempo, TETTO_FERMO_MS, fileInCorso, testoFermo, flagsConAvanzamento,
 } from '../../scripts/run-unit-tests.mjs';
 import { costoArgomentoWindows, lottiPerRigaDiComando } from '../../scripts/lib/riga-di-comando.mjs';
 import { lottiPerRigaDiComando as lottiDiFinish } from '../../scripts/finish-local.mjs';
@@ -466,13 +466,46 @@ describe('un file trovato è un file che gira', () => {
   });
 });
 
-// Un file appeso (col disco pieno, #717) teneva ferma la corsa per sempre, senza dire quale fosse.
-test('ogni corsa ha un tetto di tempo per file, largo, a meno che chi lancia non ne dia uno suo', () => {
-  assert.ok(TETTO_FILE_MS >= 10 * 60 * 1000, 'un tetto stretto fa rossi sui Windows lenti');
-  assert.deepEqual(conTettoDiTempo(['--test-only']), [`--test-timeout=${TETTO_FILE_MS}`, '--test-only']);
-  assert.deepEqual(conTettoDiTempo([]), [`--test-timeout=${TETTO_FILE_MS}`]);
+// Un file appeso (col disco pieno, #717) teneva ferma la corsa per sempre, senza dire quale fosse. Il tetto conta il tempo
+// senza avanzamenti: uno sulla durata del file tagliava i file sani della macchina carica (#1063).
+test('il tetto conta il tempo fermo, è largo, e quello di node resta solo dove l\'avanzamento non si vede', () => {
+  assert.ok(TETTO_FERMO_MS >= 10 * 60 * 1000, 'un tetto stretto fa rossi sui Windows lenti');
+  const conGuardia = flagsConAvanzamento([], 'A');
+  assert.ok(!conGuardia.some((a) => a.startsWith('--test-timeout')), 'con la guardia node non deve contare la durata del file');
+  assert.deepEqual(conGuardia.slice(-2), ['--test-reporter=./scripts/lib/avanzamento-unit.mjs', '--test-reporter-destination=A']);
+  assert.equal(flagsConAvanzamento(['--test-reporter=dot', '--test-reporter=tap', '--test-reporter-destination=x'], 'A'), null);
+  assert.deepEqual(conTettoDiTempo(['--test-only']), [`--test-timeout=${TETTO_FERMO_MS}`, '--test-only']);
   assert.deepEqual(conTettoDiTempo(['--test-timeout', '5000']), ['--test-timeout', '5000']);
   assert.deepEqual(conTettoDiTempo(['--test-timeout=5000']), ['--test-timeout=5000']);
+});
+
+test('fermo è il primo file partito e non finito: gli altri aspettano lui', () => {
+  const r = [{ via: 'a' }, {}, { via: 'b' }, { via: 'c' }, { fine: 'a' }, {}, { via: 'd' }, { fine: 'c' }];
+  assert.deepEqual(fileInCorso(r), ['b', 'd']);
+  assert.deepEqual(fileInCorso([{}, {}]), []);
+  const t = testoFermo([join(ROOT, 'tests', 'unit', 'b.test.mjs'), join(ROOT, 'tests', 'unit', 'd.test.mjs')], 20 * 60 * 1000, ROOT);
+  assert.match(t, /ROSSO: tests\/unit\/b\.test\.mjs non è andato avanti per 20 minuti/);
+  assert.match(t, /senza esito: tests\/unit\/d\.test\.mjs/);
+  assert.match(testoFermo([], 3000, ROOT), /ROSSO: per 3 secondi non è andato avanti niente/);
+});
+
+test('un file lento che va avanti finisce verde, uno appeso diventa un rosso col suo nome', () => {
+  const dir = cartellaTemporanea('filo-fermo-');
+  try {
+    // Ogni prova dura meno del tetto, il file intero ben di più: sotto carico i file sani sono così.
+    writeFileSync(join(dir, 'a-lento.test.mjs'), "import { test } from 'node:test';\nfor (let i = 0; i < 6; i++) test('lento ' + i, () => new Promise((r) => setTimeout(r, 1000)));\n");
+    writeFileSync(join(dir, 'b-appeso.test.mjs'), "import { test } from 'node:test';\ntest('prima di appendersi', () => {});\nsetInterval(() => {}, 1000);\n");
+    const env = { ...process.env, FILO_UNIT_DIR: dir, FILO_UNIT_TETTO_FERMO_MS: '3000' };
+    delete env.NODE_TEST_CONTEXT;
+    const r = spawnSync(process.execPath, [LANCIATORE], { env, cwd: REPO_ROOT, encoding: 'utf8', timeout: TETTO_ATTESA_MS });
+    assert.notEqual(r.error?.code, 'ETIMEDOUT', 'la corsa è rimasta appesa');
+    for (let i = 0; i < 6; i++) assert.match(r.stdout, new RegExp(`^ok \\d+ - lento ${i}$`, 'm'), `il file lento è stato tagliato:\n${r.stdout}`);
+    assert.match(r.stdout, /ROSSO: .*b-appeso\.test\.mjs non è andato avanti/);
+    assert.doesNotMatch(r.stdout, /a-lento\.test\.mjs non è andato avanti/);
+    assert.equal(r.status, 1);
+  } finally {
+    togliCartella(dir);
+  }
 });
 
 test('un file appeso diventa un rosso col suo nome, e la corsa finisce', () => {

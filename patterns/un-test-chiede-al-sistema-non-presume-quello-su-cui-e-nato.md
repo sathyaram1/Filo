@@ -178,8 +178,9 @@ Le forme che cadevano, e cosa le ha sostituite:
   test quando Windows la tiene ancora; `rmSync` ricorsivo nudo nei test lo ferma una
   sentinella (`tests/unit/cartelleTemporanee.test.mjs`). Gli script che i test lanciano
   ritentano anche loro (`maxRetries`).
-- **Un file vicino al tetto per file** (20 minuti in `node --test`): si divide, e una scena
-  che si ricostruisce identica a ogni prova si costruisce una volta e si copia
+- **Il tetto del lanciatore** (20 minuti in cui niente va avanti, non la durata del file: un
+  file sano sotto carico è lento ma avanza): una prova sola che ci si avvicina si divide, e una
+  scena che si ricostruisce identica a ogni prova si costruisce una volta e si copia
   (`tests/helpers/scenaHook.mjs`).
 
 ## Il verso opposto (#937)
