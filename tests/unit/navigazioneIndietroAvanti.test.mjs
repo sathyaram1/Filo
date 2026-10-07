@@ -171,6 +171,13 @@ test('si scrive anche in un campo "solo testo" e in un campo dentro un riquadro'
   // D'altra origine il riquadro non si apre: «non so», e chi chiede lo interroga a parte.
   assert.equal(C.scriveQui({ activeElement: riquadro(null) }), null);
   assert.equal(C.scriveQui({ activeElement: fermo }), false);
+  // Componente a shadow DOM chiuso: decide il documento, che vede dove sta il cursore.
+  const chiuso = (scrivibile) => ({ tagName: 'X-CAMPO', localName: 'x-campo', shadowRoot: null, isContentEditable: false,
+    matches: () => false, closest: () => null, ownerDocument: { queryCommandEnabled: (c) => c === 'insertText' && scrivibile } });
+  assert.equal(C.scriveQui({ activeElement: chiuso(true) }), true);
+  assert.equal(C.scriveQui({ activeElement: chiuso(false) }), false);
+  assert.equal(C.scriveQui({ activeElement: { ...fermo, localName: 'div', ownerDocument: { queryCommandEnabled: () => true } } }), false,
+    'un elemento qualunque non è un componente chiuso: lì la regola resta quella del campo');
 });
 
 test('i tasti laterali del mouse e lo scorrimento a due dita sono attaccati', () => {

@@ -254,6 +254,26 @@ test('su Mac Cmd+← in un campo «solo testo» non porta via la pagina', async 
   expect(page.url()).toBe(url);
 });
 
+// Un componente web a shadow DOM chiuso (widget di chat, di pagamento) nasconde il suo campo alla pagina.
+const COMPONENTE_CHIUSO = '<!doctype html><title>C</title><x-campo id="c"></x-campo><x-tasto id="t"></x-tasto><script>'
+  + 'customElements.define("x-campo", class extends HTMLElement { constructor() { super();'
+  + ' this.attachShadow({ mode: "closed" }).innerHTML = "<input style=width:300px>"; } });'
+  + 'customElements.define("x-tasto", class extends HTMLElement { constructor() { super();'
+  + ' this.attachShadow({ mode: "closed" }).innerHTML = "<button>ok</button>"; } });</script>';
+
+test('su Mac Cmd+← in un campo dentro un componente chiuso non porta via la pagina; sul suo pulsante sì', async ({ app, openTab, testServer }) => {
+  const { page, url } = await schedaSu(app, { openTab, testServer }, COMPONENTE_CHIUSO);
+  await page.locator('#c').click();
+  await page.keyboard.type('scrivo qui');
+  await premiNellaPagina(app, 'Left', ['meta']);
+  await page.waitForTimeout(1_200);
+  expect(page.url()).toBe(url);
+
+  await page.locator('#t').click();
+  await premiNellaPagina(app, 'Left', ['meta']);
+  await expect.poll(() => page.url(), { timeout: 8_000 }).not.toBe(url);
+});
+
 test('su Mac una pagina che usa Cmd+← per sé la tiene, e la scheda resta lì', async ({ app, openTab, testServer }) => {
   const { page, url } = await schedaSu(app, { openTab, testServer },
     '<!doctype html><title>P</title><h1 id="p">griglia</h1><div id="n">0</div>'

@@ -76,3 +76,22 @@ test('Ctrl+Z resta "annulla" mentre si scrive in un campo di testo', async ({ op
   await expect(page.locator('#mark-b')).toBeVisible();
   await expect(page.locator('#mark-a')).toHaveCount(0);
 });
+
+// #685.1 — un componente web a shadow DOM chiuso nasconde il suo campo: si scrive lo stesso.
+test('Ctrl+Z resta "annulla" in un campo dentro un componente chiuso', async ({ openTab, testServer }) => {
+  const urlA = testServer.html(PAGE_A);
+  const urlC = testServer.html('<!doctype html><title>C</title><x-campo id="c"></x-campo><script>'
+    + 'customElements.define("x-campo", class extends HTMLElement { constructor() { super();'
+    + ' window.__campo = this.attachShadow({ mode: "closed" }); window.__campo.innerHTML = "<input style=width:300px>"; } });</script>');
+  const page = await testServer.openReady(openTab, PAGE_A);
+  await navigateAndReady(page, urlA);
+  await navigateAndReady(page, urlC);
+
+  await page.locator('#c').click();
+  await page.keyboard.type('scrivo');
+  await page.waitForTimeout(600);
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(1_000);
+  expect(page.url()).toBe(urlC);
+  expect(await page.evaluate(() => window.__campo.querySelector('input').value)).toBe('');
+});
